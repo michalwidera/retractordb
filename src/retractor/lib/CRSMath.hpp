@@ -34,6 +34,8 @@ class TimeLine : private boost::noncopyable {
    */
   rational<int> ctSlot_;
 
+  void rebuild(const set<rational<int>> &inSet);
+
  public:
   /** This constructor fills inherited set of values filtered
    * During call of constructor list with minimal times is created
@@ -42,6 +44,12 @@ class TimeLine : private boost::noncopyable {
    */
   explicit TimeLine(set<boost::rational<int>> const &inSet);
   TimeLine() = delete;
+
+  /** Replace the set of stream intervals without rewinding the timeline.
+   * Newly introduced rates start at their first occurrence after the current
+   * time slot. This is required when an ad-hoc query introduces a new rate.
+   */
+  void updateTimeIntervals(const set<boost::rational<int>> &inSet);
 
   /** Function return true if given delta is in current time slot
    * Note: This is not trivial

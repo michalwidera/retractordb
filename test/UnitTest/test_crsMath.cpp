@@ -87,6 +87,23 @@ TEST(TimeLineUnitTest, AwaitCheckMatchesCurrentTimeSlotAndRejectsZeroDelta) {
   EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 1)));
 }
 
+TEST(TimeLineUnitTest, UpdatingIntervalsPreservesPositionAndSchedulesNewFasterRate) {
+  TimeLine tl({boost::rational<int>(1, 10), boost::rational<int>(1, 5)});
+
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 10));
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 5));
+
+  tl.updateTimeIntervals({boost::rational<int>(1, 20), boost::rational<int>(1, 10), boost::rational<int>(1, 5)});
+
+  // The timeline must neither restart at 1/20 nor skip to the old next slot 3/10.
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 4));
+  EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 20)));
+  EXPECT_FALSE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 10)));
+  EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(3, 10));
+  EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 20)));
+  EXPECT_TRUE(tl.isThisDeltaAwaitCurrentTimeSlot(boost::rational<int>(1, 10)));
+}
+
 const int TEST_COUNT = 15;
 
 // std::unique_ptr<dataModel> dataArea;

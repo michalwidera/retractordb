@@ -3,6 +3,7 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <cstdint>
 #include <ctime>  // kotwica osi czasu pętli: clock_gettime, timespec
 #include <iostream>
 #include <memory>
@@ -92,6 +93,7 @@ std::vector<std::pair<std::string, std::string>> processedLines;
 
 dataModel *pProc = nullptr;
 std::atomic<bool> dataModelExpected{false};
+std::atomic<std::uint64_t> adHocPlanRevision{0};
 
 // variable connected with llimitqry (-m) parameter
 // counts remaining loop iterations; 0 = stop, inifitie_loop = run forever
@@ -208,7 +210,8 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   // to the execution loop.
   {
     std::scoped_lock scoped_lock(core_mutex);
-    mergedIds          = cmPtr->importFrom(coreInstanceCopy);
+    mergedIds = cmPtr->importFrom(coreInstanceCopy);
+    if (!mergedIds.empty()) adHocPlanRevision.fetch_add(1, std::memory_order_release);
     compileChainResult = cmPtr->compile();
     if (compileChainResult == "OK") {
       for (const auto &id : mergedIds)
@@ -639,7 +642,14 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 
       if (vm.contains("verbose")) coreInstancePtr->dumpCore();
 
-      TimeLine tl(coreInstancePtr->getAvailableTimeIntervals());
+      std::set<boost::rational<int>> timeIntervals;
+      std::uint64_t observedAdHocPlanRevision;
+      {
+        std::scoped_lock lock(core_mutex);
+        timeIntervals             = coreInstancePtr->getAvailableTimeIntervals();
+        observedAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_relaxed);
+      }
+      TimeLine tl(timeIntervals);
       //
       // Main loop of data processing
       //
@@ -695,6 +705,21 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
         if (!guard.isLockActive()) {
           SPDLOG_ERROR("CRITICAL ERROR: Lost service lock!");
           break;
+        }
+
+        // Szybka ścieżka wykonuje tylko odczyt atomowy. Pełny skan planu i
+        // przebudowa osi następują wyłącznie po opublikowaniu importu ad hoc.
+        const auto currentAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_acquire);
+        if (currentAdHocPlanRevision != observedAdHocPlanRevision) {
+          std::scoped_lock lock(core_mutex);
+          auto availableTimeIntervals = coreInstancePtr->getAvailableTimeIntervals();
+          if (availableTimeIntervals != timeIntervals) {
+            tl.updateTimeIntervals(availableTimeIntervals);
+            timeIntervals = std::move(availableTimeIntervals);
+          }
+          // Import również publikuje rewizję pod core_mutex. Ponowny odczyt
+          // pod blokadą obejmuje wszystkie importy zakończone przed tym skanem.
+          observedAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_relaxed);
         }
 
         //

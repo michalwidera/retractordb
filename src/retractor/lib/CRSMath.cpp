@@ -4,8 +4,14 @@
 
 using namespace CRationalStreamMath;
 
-TimeLine::TimeLine(set<boost::rational<int>> const &inSet) : ctSlot_(0) {
+TimeLine::TimeLine(set<boost::rational<int>> const &inSet) : ctSlot_(0) { rebuild(inSet); }
+
+void TimeLine::updateTimeIntervals(const set<boost::rational<int>> &inSet) { rebuild(inSet); }
+
+void TimeLine::rebuild(const set<boost::rational<int>> &inSet) {
   if (inSet.empty()) FatalError("TimeLine: input interval set must not be empty");
+  set<rational<int>> newRates;
+  map<rational<int>, long> newCounters;
   for (auto val : inSet) {
     // Latch - catch true if val is divided
     // bu any number from the set
@@ -23,14 +29,15 @@ TimeLine::TimeLine(set<boost::rational<int>> const &inSet) : ctSlot_(0) {
       }
     }
     if (!isDivided) {
-      // If number is not divided we add sr set
-      // ONLY HERE IS SR.INSERT
-      // Here we insert only theses deltas to se set which are not delta = delta
-      // * n
-      sr_.insert(val);
-      counter_[val] = 1;
+      // Start each rate at its first occurrence strictly after the current
+      // slot. For construction ctSlot_ is zero, so every counter starts at 1.
+      const auto elapsed = ctSlot_ / val;
+      newRates.insert(val);
+      newCounters[val] = static_cast<long>(elapsed.numerator() / elapsed.denominator()) + 1;
     }
   }
+  sr_      = std::move(newRates);
+  counter_ = std::move(newCounters);
 }
 
 bool TimeLine::isThisDeltaAwaitCurrentTimeSlot(const boost::rational<int> &inDelta) {
