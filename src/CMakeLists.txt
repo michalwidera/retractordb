@@ -70,7 +70,7 @@ add_custom_target(
 # wykresie swojego zespolu QRS i wyglada jak odpowiedz przed danymi. Jedna
 # sekunda (360 probek) daje temu spory zapas.
 add_custom_target(
-  ecg-qrs
+  ecg-qrs-warmup
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh qrs_out rec205-qrs.rql
           1440,-50,350 "--gnuplot-rtl --warmup 360"
   DEPENDS ecg-clean
@@ -78,9 +78,23 @@ add_custom_target(
 
 # Ten sam powod co przy ecg-qrs — detect_out jest wynikiem tego samego potoku.
 add_custom_target(
-  ecg-detect-qrs
+  ecg-detect-qrs-warmup
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh detect_out rec205-detect.rql
           720,-400,400 "--gnuplot-rtl --warmup 360"
+  DEPENDS ecg-clean
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
+
+add_custom_target(
+  ecg-qrs
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh qrs_out rec205-qrs.rql
+          1440,-50,350 "--gnuplot-rtl"
+  DEPENDS ecg-clean
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
+
+add_custom_target(
+  ecg-detect-qrs
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh detect_out rec205-detect.rql
+          720,-400,400 "--gnuplot-rtl"
   DEPENDS ecg-clean
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 
