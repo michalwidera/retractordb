@@ -1093,14 +1093,17 @@ std::string compiler::computeLogicalOrigin() {
       if (q.lProgram.size() == 1) {
         // Czysty PUSH_STREAM czyta bieżący payload producenta — ten sam rekord, ten sam origin.
       } else if (op == STREAM_TIMEMOVE) {
-        // Operator przesunięcia czyta OFFSETEM WZGLĘDNYM (fetchBack), nie indeksem logicznym:
-        // jego rekord n niesie rekord n producenta, przesunięty jest moment emisji, a nie adres
-        // w czasie. Origin zatem tylko propaguje.
+        // tau_N jest OPÓŹNIENIEM: rekord n ma treść rekordu n-N producenta. Rekordy o indeksie
+        // mniejszym od N nie mają definicji — sięgałyby przed początek producenta — więc
+        // niedefiniowalność jest tu origin, a nie ogon.
         //
-        // Ta sama precesja co w oknie dotyczy więc również `>N` — jego opóźnienie nie jest
-        // widoczne w złączeniu. Jest to jednak osobna konwencja operatora (patrz komentarz przy
-        // dataModel::fetchBack) z własną tożsamością R1 i własną bramką K24/H10a dla klasy SHIFT,
-        // więc pozostaje nietknięta; przestemplowanie dotyczy wyłącznie okna.
+        // Dotąd `N` siedziało w ogonie, przez co przesunięcie było w złączeniach NIEWIDOCZNE:
+        // rekord n brał rekord n i operator zmieniał tylko liczbę rekordów na starcie. To ta sama
+        // precesja co w oknie stemplowanym początkiem przedziału.
+        //
+        // Suma slotów milczenia (origin + ogon) zostaje bez zmian, więc ciąg wydanych rekordów
+        // jest identyczny — przesuwa się wyłącznie ich adres w czasie.
+        result = o1 + std::get<int>(q.lProgram.back().getVT());
       } else if (op == STREAM_AVG || op == STREAM_MIN || op == STREAM_MAX || op == STREAM_SUM) {
         // Redukcje działają na bieżącej krotce producenta.
       } else if (op == STREAM_AGSE) {
@@ -1203,9 +1206,14 @@ std::string compiler::computeStartupLatency() {
       if (q.lProgram.size() == 1) {
         result = w1;  // czysty PUSH_STREAM — ten sam interwał, ten sam ogon
       } else if (op == STREAM_TIMEMOVE) {
-        // Konwencja opóźnienia (>N odsuwa wynik o N slotów) — zgodna z runtime i testami.
-        // Formalna definicja tau w dokumentacji używa tej samej realizacji przyczynowej i ogona W.
-        result = w1 + std::get<int>(q.lProgram.back().getVT());
+        // Ogon samego przesunięcia jest ZEROWY: rekord n czyta rekord n-N producenta, czyli
+        // rekord STARSZY od bieżącego, dostępny tym bardziej. Przesunięcie o N slotów siedzi
+        // w origin (patrz computeLogicalOrigin), bo to niedefiniowalność, nie oczekiwanie.
+        //
+        // Ogon musi natomiast wynosić dokładnie tyle, co ogon producenta — ani mniej, ani
+        // więcej. dataModel::fetchBack czyta OFFSETEM WZGLĘDNYM, więc w slocie n+W dostaje
+        // rekord (n + W - W_src) - N; równość z żądanym n-N wymaga W = W_src.
+        result = w1;
       } else if (op == STREAM_HASH) {
         auto second = std::next(q.lProgram.begin());
         int w2      = 0;

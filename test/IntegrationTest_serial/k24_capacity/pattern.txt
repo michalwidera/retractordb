@@ -24,10 +24,10 @@
 { source_0:80 source_1:90 source_2:100 }
 { source_0:110 source_1:120 source_2:130 }
  SHIFT_UNDER_HASH
-10 Record(s)
+11 Record(s)
 12 Byte(s) per record.
 { INTEGER source_0 INTEGER source_1 INTEGER source_2 }
+{ source_0:230 source_1:240 source_2:250 }
 { source_0:20 source_1:30 source_2:40 }
-{ source_0:20 source_1:30 source_2:40 }
-{ source_0:50 source_1:60 source_2:70 }
+{ source_0:260 source_1:270 source_2:280 }
 { source_0:50 source_1:60 source_2:70 }

@@ -1,7 +1,8 @@
-// Bramka H10a dla klasy `@` — przeniesiona do ctest z kampanii K24
-// (rdb-experiment/results_20260804_K24r). Werdykt z 2026-08-04 mówił dla klasy AGSE
-// „dokładna, 4309 z 4309 węzłów"; ta liczba dotyczyła semantyki okna stemplowanego
-// POCZĄTKIEM przedziału, więc po przestemplowaniu nie da się jej zachować dosłownie.
+// Bramka H10a dla klas `@` (AGSE) i `>` (SHIFT) — przeniesiona do ctest z kampanii K24
+// (rdb-experiment/results_20260804_K24r). Werdykt z 2026-08-04 mówił „dokładna" dla obu klas
+// (AGSE 4309/4309, SHIFT 5484/5484); obie liczby dotyczyły semantyki sprzed przestemplowania
+// (okno stemplowane POCZĄTKIEM przedziału, `>N` z opóźnieniem ukrytym w ogonie), więc nie da
+// się ich zachować dosłownie.
 // Zachowane jest to, co ma znaczenie: REŻIM (postać zamknięta równa granicy zdarzeniowej,
 // nigdy zaniżona) oraz METODA (porównanie silnika z niezależnym modelem zdarzeniowym).
 // Różnica wobec kampanii: bramka chodzi teraz przy każdym commicie, na mniejszym korpusie.
@@ -19,7 +20,7 @@
 // dostępny w chwili swojej emisji, bo dataModel::processRows publikuje producentów
 // przed konsumentami w takcie.
 //
-// ctest -R '^ut_agseOracle' -V
+// ctest -R '^ut_h10aGate' -V
 
 #include <numeric>
 #include <string>
@@ -120,6 +121,27 @@ agseOracle evaluate(const streamModel &source, int step, int length, int probeMu
   return result;
 }
 
+// Przesunięcie tau_N: rekord n niesie rekord n-N producenta, na tym samym interwale.
+//
+// Origin: rekord n wymaga rekordu n-N, więc pierwszy definiowalny to O_src + N.
+// Ogon: rekord n-N jest STARSZY od bieżącego, więc dostępność go nie ogranicza — ale
+// dataModel::fetchBack czyta offsetem WZGLĘDNYM, przez co w slocie n+W dostaje rekord
+// (n + W - W_src) - N. Równość z żądanym n-N wymusza W = W_src; ogon nie ma tu swobody
+// w żadną stronę i to jest treść bramki dla tej klasy.
+//
+// Model kampanii K24 opisywał `>N` inaczej — jako odwzorowanie tożsamościowe z opóźnieniem
+// N*Delta doklejonym do dostępności — bo taką semantykę miał wtedy silnik. Wynikało z niej
+// W = W_src + N i opóźnienie NIEWIDOCZNE w złączeniu (rekord n brał rekord n).
+struct shiftOracle {
+  int origin;
+  int tail;
+  int sourceCapacity;
+};
+
+shiftOracle evaluateShift(const streamModel &source, int offset) {
+  return {.origin = source.origin + offset, .tail = source.tail, .sourceCapacity = offset + 1};
+}
+
 // --- korpus -------------------------------------------------------------------------
 
 std::string declareSource(const std::string &id, int width, const ratio &delta) {
@@ -135,6 +157,12 @@ std::string windowOf(const std::string &id, const std::string &src, int step, in
   return "SELECT * STREAM " + id + " FROM " + src + "@(" + std::to_string(step) + "," + std::to_string(length) + ")\n";
 }
 
+std::string shiftOf(const std::string &id, const std::string &src, int offset) {
+  return "SELECT * STREAM " + id + " FROM " + src + ">" + std::to_string(offset) + "\n";
+}
+
+const std::vector<int> kOffsets{1, 2, 3, 5, 8};
+
 const std::vector<ratio> kDeltas{ratio(1, 1), ratio(1, 2), ratio(1, 3), ratio(2, 5), ratio(3, 10), ratio(1, 100)};
 const std::vector<int> kWidths{1, 2, 3, 4};
 const std::vector<int> kSteps{1, 2, 3, 4};
@@ -146,7 +174,7 @@ constexpr int kDeclarationPrefetch = 2;
 
 // Korpus jednowęzłowy: okno nad deklaracją, pełna siatka (F, step, len, Delta).
 // Deklaracja ma ogon 0 i origin 0, więc każdy przypadek testuje wyłącznie regułę węzła `@`.
-TEST(agseOracle, closed_form_matches_event_model_over_single_window_corpus) {
+TEST(h10aGate, closed_form_matches_event_model_over_single_window_corpus) {
   int checked = 0;
   for (const auto &delta : kDeltas)
     for (int width : kWidths)
@@ -182,7 +210,7 @@ TEST(agseOracle, closed_form_matches_event_model_over_single_window_corpus) {
 // Korpus dwuwęzłowy: okno nad oknem. Dopiero tu producent ma NIEZEROWY ogon i NIEZEROWY
 // origin, więc sprawdzana jest propagacja obu wielkości — a nie tylko przypadek brzegowy
 // nad deklaracją.
-TEST(agseOracle, closed_form_matches_event_model_over_stacked_windows) {
+TEST(h10aGate, closed_form_matches_event_model_over_stacked_windows) {
   const std::vector<ratio> deltas{ratio(1, 1), ratio(1, 2), ratio(3, 10)};
   const std::vector<std::pair<int, int>> inner{{1, 3}, {2, 3}, {3, 2}};
   const std::vector<std::pair<int, int>> outer{{1, 2}, {2, 3}, {1, 4}};
@@ -224,7 +252,7 @@ TEST(agseOracle, closed_form_matches_event_model_over_stacked_windows) {
 // Kontrola aparatury: okno sondowania musi być dobrane tak, żeby wynik już się nie zmieniał.
 // Bez tej kontroli zbyt wąskie okno dawałoby zaniżony ogon i bramka przepuszczałaby błąd.
 // (Odpowiednik testu stabilności z model.py kampanii.)
-TEST(agseOracle, probe_window_is_wide_enough) {
+TEST(h10aGate, probe_window_is_wide_enough) {
   for (const auto &delta : kDeltas)
     for (int width : kWidths)
       for (int step : kSteps)
@@ -241,7 +269,7 @@ TEST(agseOracle, probe_window_is_wide_enough) {
 // bramka przechodziłaby również dla postaci zamkniętej, która systematycznie zaniża —
 // a to jest dokładnie ta klasa defektu (rekord wydany, zanim jego zależności są określone),
 // którą kampania K24 nazwała reżimem zaniżającym.
-TEST(agseOracle, event_model_rejects_a_tail_one_slot_too_small) {
+TEST(h10aGate, event_model_rejects_a_tail_one_slot_too_small) {
   int witnesses = 0;
   for (const auto &delta : kDeltas)
     for (int width : kWidths)
@@ -263,4 +291,99 @@ TEST(agseOracle, event_model_rejects_a_tail_one_slot_too_small) {
         ++witnesses;
       }
   EXPECT_GT(witnesses, 0);
+}
+
+// Klasa SHIFT nad deklaracją: pełna siatka (F, N, Delta). Ogon musi być ZEROWY, a całe
+// opóźnienie ma siedzieć w origin — dotąd było odwrotnie i dlatego `>N` nie było widoczne
+// w złączeniu.
+TEST(h10aGate, closed_form_matches_event_model_over_shift_corpus) {
+  int checked = 0;
+  for (const auto &delta : kDeltas)
+    for (int width : kWidths)
+      for (int offset : kOffsets) {
+        qTree instance;
+        const std::string rql             = declareSource("src", width, delta) + shiftOf("sh", "src", offset);
+        auto [parseResult, keyword, name] = parserRQLString(instance, rql);
+        ASSERT_EQ(parseResult, "OK") << rql;
+
+        compiler compilerInstance(instance);
+        ASSERT_EQ(compilerInstance.compile(), "OK") << rql;
+
+        const streamModel source{.delta = delta, .width = width, .tail = 0, .origin = 0};
+        const shiftOracle expected = evaluateShift(source, offset);
+
+        const auto &sh = instance.getQuery("sh");
+        EXPECT_EQ(sh.rInterval, delta) << rql;  // przesunięcie nie zmienia interwału
+        EXPECT_EQ(sh.logicalOrigin, expected.origin) << rql;
+        EXPECT_EQ(sh.startupLatency, expected.tail) << rql;
+        EXPECT_EQ(instance.maxCapacity.at("src"), expected.sourceCapacity) << rql;
+        ++checked;
+      }
+  EXPECT_EQ(checked, static_cast<int>(kDeltas.size() * kWidths.size() * kOffsets.size()));
+}
+
+// Przesunięcie NAD oknem: jedyne miejsce, w którym sprawdzane jest, że origin okna przechodzi
+// przez `>N` i sumuje się z jego własnym przesunięciem, a ogon okna przechodzi nietknięty.
+TEST(h10aGate, shift_over_window_composes_both_quantities) {
+  int checked = 0;
+  for (const auto &delta : {ratio(1, 1), ratio(1, 2), ratio(3, 10)})
+    for (int width : {1, 2, 3})
+      for (int step : kSteps)
+        for (int length : {2, 3, -4})
+          for (int offset : {1, 3, 8}) {
+            qTree instance;
+            const std::string rql = declareSource("src", width, delta) +    //
+                                    windowOf("win", "src", step, length) +  //
+                                    shiftOf("sh", "win", offset);
+            auto [parseResult, keyword, name] = parserRQLString(instance, rql);
+            ASSERT_EQ(parseResult, "OK") << rql;
+
+            compiler compilerInstance(instance);
+            ASSERT_EQ(compilerInstance.compile(), "OK") << rql;
+
+            const streamModel source{.delta = delta, .width = width, .tail = 0, .origin = 0};
+            const agseOracle window = evaluate(source, step, length);
+            const streamModel middle{
+                .delta = window.delta, .width = length < 0 ? -length : length, .tail = window.tail, .origin = window.origin};
+            const shiftOracle expected = evaluateShift(middle, offset);
+
+            EXPECT_EQ(instance.getQuery("sh").logicalOrigin, expected.origin) << rql;
+            EXPECT_EQ(instance.getQuery("sh").startupLatency, expected.tail) << rql;
+            EXPECT_EQ(instance.maxCapacity.at("win"), expected.sourceCapacity) << rql;
+            ++checked;
+          }
+  EXPECT_EQ(checked, 3 * 3 * static_cast<int>(kSteps.size()) * 3 * 3);
+}
+
+// Okno NAD przesunięciem: producent o ogonie ZEROWYM i origin NIEZEROWYM. Korpus okien
+// piętrowych tego nie obejmuje — tam origin i ogon producenta rosną razem — więc dopiero
+// ten przypadek rozdziela wpływ obu wielkości na regułę węzła `@`.
+TEST(h10aGate, window_over_shift_separates_origin_from_tail) {
+  int checked = 0;
+  for (const auto &delta : {ratio(1, 1), ratio(1, 2), ratio(3, 10)})
+    for (int width : {1, 2, 3})
+      for (int offset : {1, 3, 8})
+        for (int step : kSteps)
+          for (int length : {2, 3, -4}) {
+            qTree instance;
+            const std::string rql = declareSource("src", width, delta) +  //
+                                    shiftOf("sh", "src", offset) +        //
+                                    windowOf("win", "sh", step, length);
+            auto [parseResult, keyword, name] = parserRQLString(instance, rql);
+            ASSERT_EQ(parseResult, "OK") << rql;
+
+            compiler compilerInstance(instance);
+            ASSERT_EQ(compilerInstance.compile(), "OK") << rql;
+
+            const streamModel source{.delta = delta, .width = width, .tail = 0, .origin = 0};
+            const shiftOracle shifted = evaluateShift(source, offset);
+            const streamModel middle{.delta = delta, .width = width, .tail = shifted.tail, .origin = shifted.origin};
+            const agseOracle expected = evaluate(middle, step, length);
+
+            EXPECT_EQ(instance.getQuery("win").logicalOrigin, expected.origin) << rql;
+            EXPECT_EQ(instance.getQuery("win").startupLatency, expected.tail) << rql;
+            EXPECT_EQ(instance.maxCapacity.at("sh"), expected.sourceCapacity) << rql;
+            ++checked;
+          }
+  EXPECT_EQ(checked, 3 * 3 * 3 * static_cast<int>(kSteps.size()) * 3);
 }

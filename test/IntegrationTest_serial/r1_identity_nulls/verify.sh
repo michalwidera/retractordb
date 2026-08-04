@@ -8,14 +8,18 @@ mkdir -p temp
 
 xretractor query.rql -c > out_compile.txt
 
-# Obie strony deklaruja ten sam ogon (2 sloty przeplotu + 3 przesuniecia).
-# Rowny payload przy roznym ogonie to nadal rozny wynik.
-grep -F 'lhs(1/15)	tail=5' out_compile.txt
-grep -F 'rhs(1/15)	tail=5' out_compile.txt
-# Dla delta_C/delta_D=3/2 wlasny ogon # wynosi 2 (maksimum fazowe),
-# wiec obie strony maja 2+5=7 slotow. Poprzedni wzor wyliczal 6 dla LHS.
-grep -F 'phase_lhs(3/25)	tail=7' out_compile.txt
-grep -F 'phase_rhs(3/25)	tail=7' out_compile.txt
+# Obie strony deklaruja to samo opoznienie: 2 sloty przeplotu (ogon) + 3 sloty
+# przesuniecia (origin). Rowny payload przy roznej deklaracji to nadal rozny wynik.
+#
+# Suma 2+3 jest ta sama co dawne tail=5 — przestemplowanie tau_N rozdzielilo ja na
+# czlon "jeszcze nie teraz" (ogon) i "tego rekordu nie ma" (origin). Sprawdzamy OBA
+# czlony, bo tozsamosc R1 ma zachowywac deklaracje, a nie tylko jej sume.
+grep -F 'lhs(1/15)	tail=2	origin=3' out_compile.txt
+grep -F 'rhs(1/15)	tail=2	origin=3' out_compile.txt
+# Dla delta_C/delta_D=3/2 wlasny ogon # wynosi 2 (maksimum fazowe), a przesuniecia
+# skladaja sie na origin 5 — razem 7 slotow, jak poprzednio.
+grep -F 'phase_lhs(3/25)	tail=2	origin=5' out_compile.txt
+grep -F 'phase_rhs(3/25)	tail=2	origin=5' out_compile.txt
 
 xretractor query.rql -r -k -m 48
 

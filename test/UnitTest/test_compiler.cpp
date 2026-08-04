@@ -339,9 +339,13 @@ TEST(xcompiler, computes_startup_latency) {
   EXPECT_EQ(instance.getQuery("a").startupLatency, 0);
   // Przepisanie bez operatora nie wnosi opoznienia.
   EXPECT_EQ(instance.getQuery("mid").startupLatency, 0);
-  // tau_N to N slotow opoznienia, kumulowanych wzdluz lancucha.
-  EXPECT_EQ(instance.getQuery("shifted").startupLatency, 3);
-  EXPECT_EQ(instance.getQuery("shifted_twice").startupLatency, 5);
+  // tau_N to N slotow opoznienia, kumulowanych wzdluz lancucha — ale po przestemplowaniu
+  // to opoznienie jest ORIGIN, nie ogonem: rekord n ma tresc rekordu n-N, wiec rekordy ponizej
+  // N nie maja definicji. Ogon zostaje ogonem producenta, bo fetchBack czyta offsetem wzglednym.
+  EXPECT_EQ(instance.getQuery("shifted").startupLatency, 0);
+  EXPECT_EQ(instance.getQuery("shifted").logicalOrigin, 3);
+  EXPECT_EQ(instance.getQuery("shifted_twice").startupLatency, 0);
+  EXPECT_EQ(instance.getQuery("shifted_twice").logicalOrigin, 5);
   // phi: ogon obejmuje najgorsza faze odczytu drugiego argumentu w jednym okresie.
   // Dla zredukowanego delta1/delta2=p/q wynosi ceil((p+q-1)/p).
   EXPECT_EQ(instance.getQuery("hash_slow_snd").startupLatency, 2);
@@ -372,17 +376,16 @@ TEST(xcompiler, computes_startup_latency) {
   // Redukcja działa na bieżącej pełnej krotce i tylko propaguje ogon ORAZ origin.
   EXPECT_EQ(instance.getQuery("reduced").startupLatency, 0);
   EXPECT_EQ(instance.getQuery("reduced").logicalOrigin, 3);
-  // Operator przesunięcia czyta offsetem względnym, więc przestemplowanie okna go nie dotyka:
-  // ogon jak dotąd (w1 + N), origin zerowy.
-  EXPECT_EQ(instance.getQuery("wide_shifted").startupLatency, 1);
-  EXPECT_EQ(instance.getQuery("wide_shifted").logicalOrigin, 0);
-  // Okno 2-polowe nad producentem o szerokosci 3 i ogonie 1: najnowsze pole rekordu n
+  // Przesuniecie nad deklaracja: ogon producenta (0) i wlasne opoznienie w origin.
+  EXPECT_EQ(instance.getQuery("wide_shifted").startupLatency, 0);
+  EXPECT_EQ(instance.getQuery("wide_shifted").logicalOrigin, 1);
+  // Okno 2-polowe nad producentem o szerokosci 3 i ogonie 0: najnowsze pole rekordu n
   // to pozycja n, czyli rekord producenta floor(n/3), okreslony w chwili
-  // (floor(n/3)+1+1)*D_src; stad ogon ceil(2*3/1)-1 = 5.
-  EXPECT_EQ(instance.getQuery("wide_nested").startupLatency, 5);
-  // Origin: producent ma origin 0, wiec okno musi tylko zmiescic wlasna rozpietosc:
-  // O = ceil((0*3 + 2 - 1)/1) = 1.
-  EXPECT_EQ(instance.getQuery("wide_nested").logicalOrigin, 1);
+  // (floor(n/3)+1+0)*D_src; stad ogon ceil(1*3/1)-1 = 2.
+  EXPECT_EQ(instance.getQuery("wide_nested").startupLatency, 2);
+  // Origin: producent ma origin 1, wiec okno musi zmiescic i jego, i wlasna rozpietosc:
+  // O = ceil((1*3 + 2 - 1)/1) = 4.
+  EXPECT_EQ(instance.getQuery("wide_nested").logicalOrigin, 4);
   EXPECT_EQ(instance.maxCapacity.at("wide_shifted"), 2);
   EXPECT_EQ(instance.getQuery("sub_same").startupLatency, 1);
   // K24/P1: pojemnosc zrodla roznicy wzrosla z 3 na 4. Wartosc 3 pokrywala
@@ -445,8 +448,12 @@ TEST(xcompiler, startup_latency_is_preserved_by_shift_matching_identity) {
   compiler compilerInstance(instance);
   ASSERT_EQ(compilerInstance.compile(), "OK");
 
+  // Tozsamosc ma zachowywac CALA deklaracje opoznienia, a nie tylko jej sume — po
+  // przestemplowaniu tau_N sklada sie ona z ogona (przeplot) i origin (przesuniecie).
   EXPECT_EQ(instance.getQuery("lhs").startupLatency, instance.getQuery("rhs").startupLatency);
-  EXPECT_EQ(instance.getQuery("rhs").startupLatency, 5);  // ogon przeplotu 2 + przesuniecie 3
+  EXPECT_EQ(instance.getQuery("lhs").logicalOrigin, instance.getQuery("rhs").logicalOrigin);
+  EXPECT_EQ(instance.getQuery("rhs").startupLatency, 2);  // ogon przeplotu
+  EXPECT_EQ(instance.getQuery("rhs").logicalOrigin, 3);   // przesuniecie 2+1 slotow wyjscia
 }
 
 // Niezmiennik D3: przepisania planu nie zmieniaja nazw pol nazwanych strumieni uzytkownika.
