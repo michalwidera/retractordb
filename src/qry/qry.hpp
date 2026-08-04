@@ -39,6 +39,8 @@ class qry {
  public:
   formatMode outputFormatMode{formatMode::RAW};
   bool gnuplotRightToLeft{false};
+  /// Liczba poczatkowych rekordow pomijanych w trybie wykresu — patrz Formatter::gnuplot_warmup_.
+  int gnuplotWarmup{0};
 
   explicit qry(int serverNoDataTimeoutMs     = kDefaultServerNoDataTimeoutMs,
                int clientResponseMaxFails    = kDefaultClientResponseMaxFails,

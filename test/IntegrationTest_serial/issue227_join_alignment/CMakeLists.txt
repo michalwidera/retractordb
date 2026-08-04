@@ -18,7 +18,7 @@ add_test(
 
 # Test uruchamia silnik, wiec nie moze biec rownolegle z innymi takimi testami:
 # dziela /tmp/xretractor_service.lock i pamiec wspoldzielona boost. Automatyczne
-# wykrywanie w IntegrationTest_serial/CMakeLists.txt patrzy na argumenty add_test
-# i przy `bash verify.sh` nie widzi ani `-m N`, ani `xqry` — trzeba oznaczyc recznie
-# (tak samo robi r1_identity_nulls).
+# wykrywanie w IntegrationTest_serial/CMakeLists.txt patrzy na argumenty
+# add_test i przy `bash verify.sh` nie widzi ani `-m N`, ani `xqry` — trzeba
+# oznaczyc recznie (tak samo robi r1_identity_nulls).
 set_tests_properties(${TestID}-run PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)

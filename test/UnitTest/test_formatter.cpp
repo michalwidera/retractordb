@@ -83,36 +83,32 @@ TEST(Formatter, renderRaw_skipNull_false_outputs_all_null_row) {
 
 // ---- renderGnuplot ----
 
-TEST(Formatter, renderGnuplot_accumulates_state) {
+// Podaje kolejne wartosci do formattera i zwraca to, co poszlo do gnuplota.
+namespace {
+std::string feedGnuplot(Formatter &fmt, int firstValue, int howMany, int window) {
   ptree schema;
   schema.put("db.field.x", "x");
-  ptree row1;
-  ptree row2;
-  row1.put("0", "10");
-  row2.put("0", "20");
-
-  Formatter fmt;
   testing::internal::CaptureStdout();
-  fmt.renderGnuplot(row1, 1, "0", "s", schema, {5, 0, 100});
-  fmt.renderGnuplot(row2, 1, "0", "s", schema, {5, 0, 100});
-  auto out = testing::internal::GetCapturedStdout();
+  for (int i = 0; i < howMany; ++i) {
+    ptree row;
+    row.put("0", std::to_string(firstValue + i));
+    fmt.renderGnuplot(row, 1, "0", "s", schema, {window, 0, 100});
+  }
+  return testing::internal::GetCapturedStdout();
+}
+}  // namespace
+
+TEST(Formatter, renderGnuplot_accumulates_state) {
+  Formatter fmt;
+  auto out = feedGnuplot(fmt, 10, 2, 5);
 
   EXPECT_NE(out.find("10"), std::string::npos);
-  EXPECT_NE(out.find("20"), std::string::npos);
+  EXPECT_NE(out.find("11"), std::string::npos);
 }
 
 TEST(Formatter, renderGnuplot_respects_window_size) {
-  ptree schema;
-  schema.put("db.field.x", "x");
   Formatter fmt;
-
-  testing::internal::CaptureStdout();
-  for (int i = 0; i < 5; ++i) {
-    ptree row;
-    row.put("0", std::to_string(i));
-    fmt.renderGnuplot(row, 1, "0", "s", schema, {3, 0, 100});  // window = 3
-  }
-  auto out = testing::internal::GetCapturedStdout();
+  auto out = feedGnuplot(fmt, 0, 5, 3);  // window = 3
 
   // Only last 3 values should appear (0 and 1 evicted)
   EXPECT_EQ(out.find(" 0 \n"), std::string::npos);
@@ -130,6 +126,60 @@ TEST(Formatter, renderGnuplot_null_value_becomes_NaN) {
   auto out = testing::internal::GetCapturedStdout();
 
   EXPECT_NE(out.find("NaN"), std::string::npos);
+}
+
+// ---- rozbieg wykresu (issue #227) ----
+//
+// Poczatkowe rekordy strumienia wyliczanego odpowiadaja na probki sprzed jego poczatku:
+// okna i przesuniecia siegaja w historie zrodla, ktora do strumienia juz nie trafia.
+// Na wykresie widac wtedy odpowiedz bez widocznej przyczyny — w potoku QRS (examples/ecg)
+// pierwszy impuls detekcji nalezy do zespolu, ktorego szczyt wypada przed poczatkiem
+// strumienia. Przyczynowosc nie jest naruszona, ale rysunek zadaje falszywe pytanie.
+
+TEST(Formatter, renderGnuplot_without_warmup_draws_from_first_record) {
+  Formatter fmt;  // rozbieg wylaczony — zachowanie domyslne
+  // Czekanie na pelny kadr kosztuje `window` rekordow. Dla wolnych strumieni to dziesiatki
+  // sekund bez zadnej klatki, a gnuplot nie tworzy okna, dopoki nie dostanie `plot` — wyglada
+  // to na martwy proces. Domyslnie wiec rysujemy od razu, choc kadr jest jeszcze niepelny.
+  EXPECT_NE(feedGnuplot(fmt, 0, 1, 4).find("plot"), std::string::npos);
+}
+
+TEST(Formatter, renderGnuplot_with_warmup_draws_nothing_until_window_is_full) {
+  Formatter fmt;
+  fmt.setGnuplotWarmup(1);
+  // Slad zaczynajacy sie w srodku kadru mialby lewa krawedz bedaca POCZATKIEM danych,
+  // a nie zwyklym obcieciem przesuwajacego sie okna — wiec przy wlaczonym rozbiegu czekamy.
+  EXPECT_EQ(feedGnuplot(fmt, 0, 4, 4), "");  // 1 odrzucony + 3 w buforze
+  EXPECT_NE(feedGnuplot(fmt, 4, 1, 4).find("plot"), std::string::npos);
+}
+
+TEST(Formatter, renderGnuplot_drops_warmup_records_entirely) {
+  Formatter fmt;
+  fmt.setGnuplotWarmup(3);
+  // Trzy rekordy rozbiegowe + dwa na wypelnienie kadru: pierwsza klatka dopiero na piatym.
+  EXPECT_EQ(feedGnuplot(fmt, 100, 4, 2), "");
+
+  auto out = feedGnuplot(fmt, 104, 1, 2);
+  ASSERT_NE(out.find("plot"), std::string::npos);
+  // Rekordy rozbiegowe nie moga trafic nawet do bufora — inaczej odciecie byloby pozorne
+  // i wrocilyby na wykres przy pierwszej klatce.
+  EXPECT_EQ(out.find("100"), std::string::npos);
+  EXPECT_EQ(out.find("101"), std::string::npos);
+  EXPECT_EQ(out.find("102"), std::string::npos);
+  EXPECT_NE(out.find("103"), std::string::npos);
+  EXPECT_NE(out.find("104"), std::string::npos);
+}
+
+TEST(Formatter, renderGnuplot_warmup_zero_keeps_first_record) {
+  Formatter fmt;
+  fmt.setGnuplotWarmup(0);
+  EXPECT_NE(feedGnuplot(fmt, 7, 1, 5).find("7"), std::string::npos);
+}
+
+TEST(Formatter, renderGnuplot_negative_warmup_is_treated_as_none) {
+  Formatter fmt;
+  fmt.setGnuplotWarmup(-5);
+  EXPECT_NE(feedGnuplot(fmt, 7, 1, 5).find("7"), std::string::npos);
 }
 
 // ---- renderGraphite ----

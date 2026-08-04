@@ -87,7 +87,10 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
 
   std::jthread producer_thread([this] { transport_->producer(); });
 
-  if (outputFormatMode == formatMode::GNUPLOT) Formatter::initGnuplot(gnuplotDim, gnuplotRightToLeft);
+  if (outputFormatMode == formatMode::GNUPLOT) {
+    Formatter::initGnuplot(gnuplotDim, gnuplotRightToLeft);
+    formatter_->setGnuplotWarmup(gnuplotWarmup);
+  }
 
   ptree schema;
   if (outputFormatMode != formatMode::RAW) schema = netClient("detail", input);

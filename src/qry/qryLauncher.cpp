@@ -62,6 +62,7 @@ int main(int argc, char *argv[]) {
     std::string sGnuplotDim;
     std::string sConfig;
     std::tuple<int, int, int> gnuplotDim{0, 0, 0};
+    int gnuplotWarmup{0};
     desc.add_options()                                                                                    //
         ("select,s", po::value<std::string>(&sInputStream), "show this stream")                           //
         ("detail,t", po::value<std::string>(&sDetailStream), "show details of this stream")               //
@@ -77,6 +78,8 @@ int main(int argc, char *argv[]) {
         ("influxdb,f", "influxDB output mode")                                                            //
         ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                  //
         ("gnuplot-rtl,z", "gnuplot output: newest samples on the right (right-to-left scroll)")           //
+        ("warmup", po::value<int>(&gnuplotWarmup),                                                        //
+         "gnuplot: records to drop before plotting (default: one window; 0 disables)")                    //
         ("config,e", po::value<std::string>(&sConfig), "config file (TOML); overrides search")            //
         ("help,h", "produce help message")                                                                //
         ("needctrlc,c", "force ctl+c for stop this tool")                                                 //
@@ -133,6 +136,14 @@ int main(int argc, char *argv[]) {
         return system::errc::invalid_argument;
       }
       gnuplotDim = std::make_tuple(x, ymin, ymax);
+
+      // Rozbieg jest WYLACZONY domyslnie. Odrzucanie rekordow ma sens tylko dla potoku,
+      // ktorego poczatkowe wyniki odpowiadaja na probki sprzed poczatku strumienia — a wlacza
+      // sie razem z czekaniem na pelny kadr (patrz Formatter::renderGnuplot), co dla wolnych
+      // strumieni oznacza dziesiatki sekund bez zadnej klatki. Domyslne wlaczenie tego zabralo
+      // okno gnuplota celom `simple` i `ecg-qrs`. Wartosc podaje wywolujacy, bo tylko on zna
+      // opoznienie grupowe swojego potoku.
+      obj.gnuplotWarmup = gnuplotWarmup;
     }
     if (vm.contains("gnuplot-rtl") && !vm.contains("gnuplot")) {
       std::print(std::cerr, "--gnuplot-rtl requires --gnuplot/-p mode.");
