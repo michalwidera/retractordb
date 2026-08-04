@@ -2,7 +2,10 @@
 
 #include <map>
 #include <memory>  // unique_ptr
+#include <set>
 #include <vector>
+
+#include <boost/rational.hpp>
 
 #include "streamInstance.hpp"  // streamInstance (transitively includes qTree.hpp, rdb/payload.hpp)
 class dataModel {
@@ -39,7 +42,7 @@ class dataModel {
    */
   void constructInputPayload(const std::string &instance);
 
-  void processRows(const std::set<std::string> &inSet);
+  void processRows(const std::set<std::string> &inSet, const boost::rational<int> &currentTimeSlot = boost::rational<int>(0));
   void processZeroStep();
 
   std::vector<rdb::descFldVT> getRow(const std::string &instance, int timeOffset);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>  // unique_ptr
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -33,6 +34,13 @@ struct streamInstance {
   /// te dwie wielkości — outputPayload->getRecordsCount() pozostaje indeksem elementu, ten licznik jest
   /// pozycją na siatce slotów.
   size_t elapsedSlots = 0;
+
+  /// @brief Indeks logiczny fizycznego rekordu 0 tej instancji.
+  ///
+  /// Plan uruchamiany od początku używa query::logicalOrigin. Instancja dodana ad hoc
+  /// dostaje bazę dopiero w pierwszym należnym jej slocie bieżącej osi czasu; do tego
+  /// momentu std::nullopt odróżnia ją od strumienia startowego oczekującego na origin/ogon.
+  std::optional<int> logicalIndexBase;
 
   // This constructor will create data based on query
   explicit streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam = "");

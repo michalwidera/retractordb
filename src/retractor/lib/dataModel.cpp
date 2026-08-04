@@ -37,8 +37,11 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
                                         [](const query &qry) { return qry.isCompilerDirective(); });
   coreInstance_.erase(removed.begin(), removed.end());
 
-  for (auto &qry : coreInstance_)
-    qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]));
+  for (auto &qry : coreInstance_) {
+    auto runtime              = std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]);
+    runtime->logicalIndexBase = qry.logicalOrigin;
+    qSet.emplace(qry.id, std::move(runtime));
+  }
   for (auto const &[key, val] : qSet)
     val->outputPayload->setDisposable(coreInstance_[key].isDisposable);
 }
@@ -59,6 +62,9 @@ bool dataModel::addQueryToModel(const std::string &id) {
 
   qSet.emplace(id, std::make_unique<streamInstance>(coreInstance_, *it, directive_[":STORAGE"]));
   qSet[id]->outputPayload->setDisposable(coreInstance_[id].isDisposable);
+  // SELECT dodany do działającego planu nie zaczyna w historycznym origin całego systemu.
+  // Jego bazę wyznaczy dokładny pierwszy slot, w którym runtime zobaczy tę instancję.
+  if (!it->isDeclaration()) qSet[id]->logicalIndexBase.reset();
 
   return true;
 }
@@ -120,13 +126,16 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
   // źródeł deklarowanych i od siatki slotów.
   //
   // forwardIndex jest indeksem LOGICZNYM (walutą wszystkich odwzorowań z SOperations.hpp).
-  // Strumień o niezerowym query::logicalOrigin nie ma rekordów o indeksach mniejszych od
-  // origin, więc jego rekord logiczny origin jest fizycznie rekordem 0 w buforze. To jedyne
-  // miejsce, w którym ta różnica jest przeliczana — dzięki temu ADD, SUBTRACT, HASH i rozplot
-  // dostają poprawkę raz, a nie każdy z osobna.
-  const auto count   = static_cast<int>(out.getRecordsCount());
-  const int origin   = coreInstance_.getQuery(instance).logicalOrigin;
-  const int physical = forwardIndex - origin;
+  // Strumień nie ma rekordów o indeksach mniejszych od swojej runtime'owej bazy logicznej,
+  // więc rekord o indeksie równym bazie jest fizycznie rekordem 0 w buforze. To jedyne miejsce,
+  // w którym ta różnica jest przeliczana — dzięki temu ADD, SUBTRACT, HASH i rozplot dostają
+  // poprawkę raz, a nie każdy z osobna.
+  const auto count        = static_cast<int>(out.getRecordsCount());
+  const auto &logicalBase = qSet[instance]->logicalIndexBase;
+  if (!logicalBase.has_value()) {
+    FatalError("dataModel::fetchForward: logical index base not initialized for '{}'", instance);
+  }
+  const int physical = forwardIndex - *logicalBase;
   const int rev      = count - 1 - physical;
 
   const bool outOfRange = physical < 0 || rev < 0 ||  //
@@ -135,7 +144,7 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
     // Rekord niedostępny (przyszłość na osi czasu źródła, przed początkiem logicznym
     // albo poza historią bufora) — rekord all-null; o jego losie decyduje ścieżka zapisu.
     // Poziom ERROR z tego samego powodu co w fetchBack powyżej.
-    SPDLOG_ERROR("fetchForward {}: record {} not available (count={}, origin={})", instance, forwardIndex, count, origin);
+    SPDLOG_ERROR("fetchForward {}: record {} not available (count={}, base={})", instance, forwardIndex, count, *logicalBase);
     rdb::payload nullRecord(out.descriptor);
     nullRecord.setNullBitset(std::vector<bool>(out.descriptor.size(), true));
     return nullRecord;
@@ -164,7 +173,7 @@ void dataModel::processZeroStep() {
   }
 }
 
-void dataModel::processRows(const std::set<std::string> &inSet) {
+void dataModel::processRows(const std::set<std::string> &inSet, const boost::rational<int> &currentTimeSlot) {
   std::scoped_lock scoped_lock(core_mutex);
 
   // first - process all non-declaration queries
@@ -181,7 +190,29 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     // gotowy", origin mówi „tego rekordu nie ma". Pierwszy wyemitowany rekord nosi indeks logiczny
     // równy origin, więc slotów milczenia jest origin + ogon.
     const auto silentSlots = static_cast<size_t>(std::max(q.startupLatency, 0) + std::max(q.logicalOrigin, 0));
-    if (qSet[q.id]->elapsedSlots++ < silentSlots) continue;
+
+    auto &runtime = *qSet[q.id];
+    if (!runtime.logicalIndexBase.has_value()) {
+      // Instancja ad hoc dołącza do już biegnącej osi. W jej pierwszym należnym slocie T
+      // indeks rekordu wynika z definicji chwili emisji:
+      //   T = (n + 1 + W) * Delta  =>  n = T/Delta - 1 - W.
+      // Nie wolno zaczynać ponownie od query::logicalOrigin, bo fizyczny rekord 0 niósłby
+      // wtedy bieżącą wartość oznaczoną historycznym indeksem.
+      const auto slotNumber = currentTimeSlot / q.rInterval;
+      if (slotNumber.denominator() != 1) {
+        FatalError("dataModel::processRows: current slot {}/{} is not aligned with interval {}/{} for '{}'",
+                   currentTimeSlot.numerator(), currentTimeSlot.denominator(), q.rInterval.numerator(),
+                   q.rInterval.denominator(), q.id);
+      }
+      const int firstLogicalIndex = slotNumber.numerator() - 1 - q.startupLatency;
+      if (firstLogicalIndex < q.logicalOrigin) continue;
+
+      runtime.logicalIndexBase = firstLogicalIndex;
+      // Bieżąca oś przeszła już origin i ogon. Ustawienie licznika na granicy
+      // pozwala temu samemu wywołaniu wyemitować pierwszy rekord ad hoc.
+      runtime.elapsedSlots = silentSlots;
+    }
+    if (runtime.elapsedSlots++ < silentSlots) continue;
 
     constructInputPayload(q.id);                    // That will create 'from' clause data set
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
@@ -221,7 +252,11 @@ void dataModel::constructInputPayload(const std::string &instance) {
   // fizyczny 0 nosi indeks logiczny origin. Wszystkie odwzorowania z SOperations.hpp są
   // zdefiniowane na indeksach logicznych, więc karmimy je tą wartością.
   const auto logicalIndex = [&](const std::string &id) {
-    return static_cast<int>(qSet[id]->outputPayload->getRecordsCount()) + coreInstance_.getQuery(id).logicalOrigin;
+    const auto &logicalBase = qSet[id]->logicalIndexBase;
+    if (!logicalBase.has_value()) {
+      FatalError("dataModel::constructInputPayload: logical index base not initialized for '{}'", id);
+    }
+    return static_cast<int>(qSet[id]->outputPayload->getRecordsCount()) + *logicalBase;
   };
 
   auto operation = qry.lProgram.back();  // Operation is always last element on stack
