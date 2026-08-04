@@ -283,6 +283,47 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
       " 333 |    4,5,6|        1|      9,8|      1,9|      1,9|    1,9,8|    8,9,1|    9,8,7|  9,8,7,6|\n"
       " 333 |         |        2|         |      2,1|         |         |         |         |         |\n"
       " 333 |         |        3|      2,1|      3,2|         |         |         |    2,1,9|  2,1,9,8|\n";
+
+  // Q: W wyniku zmian w bieżącym branch zmieniona została wartość expectdResults. 
+  // Nie rozumiem dlaczego w linii 275 kolumnie 2/3 nie może wystąpić wiersz 1,2. Wyjaśnij mi to.
+
+  // A: Która to kolumna Delta 2/3 w trzeciej kolumnie to s2x = cx@(2,2) → step=2, length=2.
+  // Źródło cx: F=3 pola, Delta=1 s, pozycja spłaszczona p niesie wartość (p mod 9)+1.
+
+  // Dlaczego „1,2" tam nie może wystąpić — dwie niezależne przyczyny
+  //
+  // 1. Treść: okno o takiej zawartości nie jest rekordem s2x.
+  // Po przestemplowaniu (ta gałąź) rekord n obejmuje pozycje n*step-(len-1) … n*step, 
+  // czyli jego koniec leży na siatce kroku — streamInstance.cpp:118.
+  // Dla step=2 legalne okna kończą się wyłącznie na pozycjach parzystych:
+  // n	pozycje	wartości	wydruk
+  // 1	1–2	2,3	3,2
+  // 2	3–4	4,5	5,4
+  // 3	5–6	6,7	7,6
+  // 4	7–8	8,9	9,8
+  // 5	9–10	1,2	2,1
+  // Okno z wartościami 1 i 2 to pozycje 0–1, koniec na pozycji 1 — nieparzystej.
+  // Takiego rekordu w s2x po prostu nie ma.
+  // Na masterze był (windowStart = n*step → n=0 → pozycje 0,1 → 2,1 dokładnie w linii 275)
+  // i to jest ta usunięta precesja: okno stemplowane początkiem przedziału wyprzedzało własny indeks logiczny.
+  // 
+  // 2. Czas: w tym slocie s2x jeszcze niczego nie wydaje.
+  // origin = ceil((0*3+2-1)/2) = 1 (SOperations.hpp:123), ogon W = ceil(3/2)-1 = 1 (SOperations.hpp:114).
+  // Slot k wydaje rekord k-W; linia 275 to t=4/3, czyli slot 1 → rekord 0 → poniżej origin, więc nie ma definicji. 
+  // Zasada brzegu: brakujący rekord jest nieobecny, nie NULL-owany. 
+  // Pierwsza emisja wypada w slocie 2 (t=2, linia 277) rekordem 1 = 3,2. 
+  // Suma milczenia origin+ogon = 2 jest ta sama co ogon przed zmianą — przesunął się tylko adres w czasie.
+  //
+  // Kontrast w tym samym wierszu
+  // s3x = cx@(1,2) ma step=1, więc każda pozycja leży na siatce — 
+  // jego okno kończące się na pozycji 1 istnieje i to jest właśnie 2,1 w linii 275.
+  // Różnica między kolumnami to wyłącznie krok, nie długość okna.
+  // Uzupełniająco: wartości 1 i 2 wracają w s2x w ostatnim wierszu (linia 285, 2,1), ale jako pozycje 9–10 następnego cyklu,
+  // a w kolumnie 2/3 obok — s7x (len=3) ma pozycje 0–2 jako 3,2,1 w linii 277. 
+  // Wartość z pozycji 0 nie trafia natomiast do żadnego okna s2x 
+  // — to bezpośrednia konsekwencja przypięcia końca okna do parzystej siatki
+  // i nieparzystego początku okna (step=2, len=2) w tym samym cyklu.
+  
   std::stringstream strstream;
 
   dataModel proc(coreInstance);
