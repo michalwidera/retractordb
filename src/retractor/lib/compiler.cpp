@@ -824,34 +824,31 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         }
         auto &source          = coreInstance[nameSrc];
         const int sourceWidth = source.descriptorStorage().flatElementCount();
-        const int phaseUnit   = std::gcd(sourceWidth, step);
-        const auto ratio      = q.rInterval / source.rInterval;
-        // Odległość (w rekordach źródła) od rekordu najnowszego do najstarszego pola okna:
-        // Wout*ratio-Wsrc + max frac(n*step/sourceWidth).
-        // Osiągalne reszty są wielokrotnościami gcd(step, sourceWidth),
-        // więc największa faza to (sourceWidth-gcd)/sourceWidth.
-        const auto phase    = boost::rational<int>(sourceWidth - phaseUnit, sourceWidth);
-        const auto retained = boost::rational<int>(q.startupLatency) * ratio - source.startupLatency + phase;
+        const int length      = get<std::pair<int, int>>(cmd.getVT()).second;
+        // Okno stemplowane końcem przedziału (rekord n obejmuje pozycje n*step-(|L|-1) ... n*step)
+        // czyta wstecz o całą rozpiętość okna, więc pojemność źródła musi ją pomieścić.
+        //
+        // Odległość wsteczna w chwili emisji rekordu n:
+        //   j_max(n) = floor((n+1+Wout)*step/F) - Wsrc - 1   — najnowszy rekord źródła,
+        //   r_old(n) = floor((n*step-|L|+1)/F)               — najstarsze pole okna,
+        //   dystans  = j_max(n) - r_old(n).
+        // Obie części zmieniają się o step/gcd(step,F) przy wzroście n o F/gcd(step,F), więc
+        // dystans jest okresowy i maksimum liczymy DOKŁADNIE, przeglądając jeden pełny okres
+        // od origin. Postać zamknięta byłaby tu domysłem — a to jest wzór, którego zaniżenie
+        // oznacza odczyt poza historią (defekt D1 z K24), nie tylko slot opóźnienia.
+        const int period     = sourceWidth / std::gcd(sourceWidth, step);
+        int maxDistance      = 0;
+        const int firstIndex = q.logicalOrigin;
+        for (int n = firstIndex; n < firstIndex + period; ++n) {
+          const int newest = floorDiv((n + 1 + q.startupLatency) * step, sourceWidth) - source.startupLatency - 1;
+          const int oldest = floorDiv(n * step - std::abs(length) + 1, sourceWidth);
+          maxDistance      = std::max(maxDistance, newest - oldest);
+        }
         // Bufor musi pomieścić oba końce zakresu, więc pojemność to odległość + 1.
-        // ceilR() dawało o jeden za mało zawsze, gdy odległość wypada całkowita
-        // (m.in. dla każdego źródła o szerokości 1) — kołowy bufor MEMORY nadpisywał
-        // wtedy najstarsze pole okna i AGSE czytało zamiast niego rekord najnowszy.
         // Deklaracja ma dodatkowo dwa rekordy przed pierwszym wykonaniem konsumenta:
         // rekord uzbrojony przy otwarciu storage oraz zerowy prefetch.
-        int required = floorR(retained) + (source.isDeclaration() ? 2 : 1);
-        // K24/P1: powyższa formuła zaniżała pojemność dla 10,4% par (konsument,
-        // deklaracja) w korpusie 10 010 planów — odczyt poza historią kończył się
-        // przerwaniem procesu w storage::revRead. Odległość wsteczna wyprowadzona
-        // z modelu zdarzeniowego wynosi dla deklaracji (Wsrc=0)
-        //   max_n [ floor((n+1+Wout)*step/F) - floor(n*step/F) ] = ceil((1+Wout)*step/F),
-        // co potwierdzono wyczerpująco na 1152 kombinacjach (step, F, Wout).
-        // Bierzemy maksimum obu wartości: naprawa nie ma prawa zmniejszyć
-        // pojemności żadnemu strumieniowi, który działa dziś poprawnie.
-        if (source.isDeclaration()) {
-          const auto perSlot = boost::rational<int>(1 + q.startupLatency) * boost::rational<int>(step, sourceWidth);
-          required           = std::max(required, ceilR(perSlot) + kDeclarationPrefetch);
-        }
-        capMap[nameSrc] = std::max(capMap[nameSrc], std::max(required, 1));
+        const int required = maxDistance + (source.isDeclaration() ? kDeclarationPrefetch : 1);
+        capMap[nameSrc]    = std::max(capMap[nameSrc], std::max(required, 1));
       } break;
       case STREAM_HASH:
         // Przeplot/rozplot czytają elementy składowych po indeksie
@@ -1020,6 +1017,143 @@ std::string compiler::verifyUserFieldNamesPreserved(const std::map<std::string, 
   return {"OK"};
 }
 
+namespace {
+
+// Origin jest ograniczony rozpiętością okien w planie, więc realnie jest małą liczbą.
+// Limit chroni wyłącznie przed odwzorowaniem, które wbrew założeniu nie rośnie —
+// bez niego pętla podwajania byłaby nieskończona.
+constexpr int kOriginSearchLimit = 1 << 24;
+
+// Najmniejsze n >= 0, dla którego niemalejące odwzorowanie indeksu osiąga próg.
+// Wszystkie odwzorowania rekord->rekord w SOperations.hpp są niemalejące, więc
+// zbiór n spełniających warunek jest półprostą i wystarczy znaleźć jej początek.
+template <typename Mapping>
+int firstIndexReaching(const Mapping &mapping, const int threshold, const std::string &nodeId) {
+  if (threshold <= 0) return 0;
+  // Podwajanie w poszukiwaniu górnego ograniczenia, potem połowienie. Odwzorowania
+  // rozplotu rosną szybciej niż liniowo, więc podwajanie kończy się po kilku krokach.
+  int hi = 1;
+  while (mapping(hi) < threshold) {
+    if (hi > kOriginSearchLimit) {
+      FatalError("compiler::computeLogicalOrigin: origin search diverged for '{}' (threshold {})", nodeId, threshold);
+    }
+    hi *= 2;
+  }
+  int lo = 0;
+  while (lo < hi) {
+    const int mid = lo + (hi - lo) / 2;
+    if (mapping(mid) < threshold)
+      lo = mid + 1;
+    else
+      hi = mid;
+  }
+  return lo;
+}
+
+}  // namespace
+
+std::string compiler::computeLogicalOrigin() {
+  // Początek logiczny (query::logicalOrigin) — indeks pierwszego rekordu, który W OGÓLE istnieje.
+  // Różnica wobec ogona: ogon mówi „jeszcze nie teraz", origin mówi „ten rekord nie ma definicji".
+  // Źródłem origin jest wyłącznie okno `@` stemplowane końcem przedziału: jego wczesne rekordy
+  // sięgałyby przed początek strumienia źródłowego. Reszta planu origin tylko przenosi, przez
+  // to samo odwzorowanie indeksu, którym czyta dane w dataModel::constructInputPayload().
+  //
+  // Wszystkie te odwzorowania są niemalejące, więc „brakujące" rekordy tworzą prefiks, a nie dziury.
+
+  std::map<std::string, int> origin;
+  for (const auto &q : coreInstance)
+    if (q.isDeclaration() || q.isCompilerDirective()) origin[q.id] = 0;  // źródło istnieje od rekordu 0
+
+  auto deltaOf  = [this](const std::string &id) { return coreInstance.getQuery(id).rInterval; };
+  auto originOf = [&origin](const std::string &id, int &out) {
+    auto it = origin.find(id);
+    if (it == origin.end()) return false;
+    out = it->second;
+    return true;
+  };
+
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    for (const auto &q : coreInstance) {
+      if (origin.contains(q.id)) continue;
+      if (q.lProgram.empty()) continue;
+
+      auto it = q.lProgram.begin();
+      if (it->getCommandID() != PUSH_STREAM) continue;
+      const std::string src1 = it->getStr_();
+      int o1                 = 0;
+      if (!originOf(src1, o1)) continue;  // producent jeszcze nierozwiązany
+
+      const auto op     = q.lProgram.back().getCommandID();
+      const auto delta1 = deltaOf(src1);
+      int result        = o1;
+
+      if (q.lProgram.size() == 1) {
+        // Czysty PUSH_STREAM czyta bieżący payload producenta — ten sam rekord, ten sam origin.
+      } else if (op == STREAM_TIMEMOVE) {
+        // Operator przesunięcia czyta OFFSETEM WZGLĘDNYM (fetchBack), nie indeksem logicznym:
+        // jego rekord n niesie rekord n producenta, przesunięty jest moment emisji, a nie adres
+        // w czasie. Origin zatem tylko propaguje.
+        //
+        // Ta sama precesja co w oknie dotyczy więc również `>N` — jego opóźnienie nie jest
+        // widoczne w złączeniu. Jest to jednak osobna konwencja operatora (patrz komentarz przy
+        // dataModel::fetchBack) z własną tożsamością R1 i własną bramką K24/H10a dla klasy SHIFT,
+        // więc pozostaje nietknięta; przestemplowanie dotyczy wyłącznie okna.
+      } else if (op == STREAM_AVG || op == STREAM_MIN || op == STREAM_MAX || op == STREAM_SUM) {
+        // Redukcje działają na bieżącej krotce producenta.
+      } else if (op == STREAM_AGSE) {
+        const auto [step, length] = std::get<std::pair<int, int>>(q.lProgram.back().getVT());
+        const int sourceWidth     = coreInstance[src1].descriptorStorage().flatElementCount();
+        result                    = AgseLogicalOrigin(sourceWidth, step, length, o1);
+      } else if (op == STREAM_SUBTRACT) {
+        const auto delta = q.rInterval;
+        result           = firstIndexReaching([&](int n) { return Subtract(delta1, delta, n); }, o1, q.id);
+      } else if (op == STREAM_DEHASH_DIV) {
+        const auto delta = q.rInterval;
+        const auto param = std::next(q.lProgram.begin())->getRI();
+        result           = firstIndexReaching([&](int n) { return Div(delta, param, n); }, o1, q.id);
+      } else if (op == STREAM_DEHASH_MOD) {
+        const auto delta = q.rInterval;
+        const auto param = std::next(q.lProgram.begin())->getRI();
+        result           = firstIndexReaching([&](int n) { return Mod(param, delta, n); }, o1, q.id);
+      } else if (op == STREAM_ADD || op == STREAM_HASH) {
+        auto second = std::next(q.lProgram.begin());
+        int o2      = 0;
+        if (second->getCommandID() != PUSH_STREAM || !originOf(second->getStr_(), o2)) continue;
+        const auto delta2 = deltaOf(second->getStr_());
+
+        if (op == STREAM_ADD) {
+          const auto delta = q.rInterval;
+          result           = std::max(firstIndexReaching([&](int n) { return Add(delta, delta1, n); }, o1, q.id),
+                                      firstIndexReaching([&](int n) { return Add(delta, delta2, n); }, o2, q.id));
+        } else {
+          // Przeplot czyta w slocie n tylko JEDNĄ składową, ale obie pozycje — floor(z*n) dla
+          // pierwszej i n-floor(z*n) dla drugiej — są niemalejące. Najmniejsze n, od którego
+          // KAŻDY dalszy slot trafia w istniejący rekord swojej składowej, to maksimum progów.
+          const auto zet = delta2 / (delta1 + delta2);
+          result         = std::max(firstIndexReaching([&](int n) { return floorR(zet * n); }, o1, q.id),
+                                    firstIndexReaching([&](int n) { return n - floorR(zet * n); }, o2, q.id));
+        }
+      }
+
+      origin[q.id] = result;
+      changed      = true;
+    }
+  }
+
+  for (auto &q : coreInstance) {
+    auto it = origin.find(q.id);
+    if (it == origin.end()) {
+      SPDLOG_WARN("compiler::computeLogicalOrigin: unresolved logical origin for '{}'", q.id);
+      continue;
+    }
+    q.logicalOrigin = it->second;
+  }
+  return {"OK"};
+}
+
 std::string compiler::computeStartupLatency() {
   // Ogon strumienia (query::startupLatency) — liczba początkowych slotów własnego interwału, w których
   // wynik nie jest jeszcze zdefiniowany. Zasada brzegu: te sloty nie są rekordami. NULL zostaje wyłącznie
@@ -1108,9 +1242,9 @@ std::string compiler::computeStartupLatency() {
       } else if (op == STREAM_SUBTRACT) {
         result = SubtractStartupLatency(delta1, q.rInterval, w1, coreInstance[src1].isDeclaration());
       } else if (op == STREAM_AGSE) {
-        const auto [step, length] = std::get<std::pair<int, int>>(q.lProgram.back().getVT());
-        const int sourceWidth     = coreInstance[src1].descriptorStorage().flatElementCount();
-        result                    = AgseStartupLatency(sourceWidth, step, length, w1);
+        const auto step       = std::get<std::pair<int, int>>(q.lProgram.back().getVT()).first;
+        const int sourceWidth = coreInstance[src1].descriptorStorage().flatElementCount();
+        result                = AgseStartupLatency(sourceWidth, step, w1);
       } else if (op == STREAM_AVG || op == STREAM_MIN || op == STREAM_MAX || op == STREAM_SUM) {
         // Redukcje działają wyłącznie na bieżącej krotce producenta.
       }
@@ -1569,6 +1703,13 @@ std::string compiler::compile() {
   // Po wszystkich przepisaniach planu — ogon liczymy dla planu, który faktycznie pójdzie do wykonania.
   // Pojemność historii zależy od tej wartości: opóźniony konsument może nadal
   // potrzebować wczesnych rekordów szybszego producenta.
+  //
+  // Origin przed ogonem: ogon węzła `@` origin nie potrzebuje (minimum reszty n*step mod F
+  // jest osiągane niezależnie od tego, od którego n zaczyna się strumień), ale model pojemności
+  // potrzebuje obu, a przebiegi mają być czytelnie uporządkowane od definicji do konsekwencji.
+  result = computeLogicalOrigin();
+  if (result != "OK") return result;
+
   result = computeStartupLatency();
   if (result != "OK") return result;
 

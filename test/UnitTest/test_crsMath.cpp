@@ -233,12 +233,19 @@ std::string print(const std::string &query_name, dataModel &proc) {
 }
 
 // K24/H10a: wzorzec przesunięty razem z postacią zamkniętą ogona `@`. Wszystkie
-// strumienie planu są oknami nad deklaracją cx (F=3, Delta=1), więc nowy ogon to
-// ceil((P+3)/step)-1: s1x (step 1, len 1) rusza o slot później (1 -> 2, bo pole 0
-// to rekord cx 0, określony dopiero w chwili 1*Delta), s3x tak samo (2 -> 3),
-// a s4x, s5x i s6x (step 3) o slot wcześniej (1 -> 0, okno pokrywa dokładnie
-// jeden rekord cx). s2x, s7x i s8x bez zmian. Wartości w komórkach są te same —
-// zmieniła się chwila pierwszej emisji, nie treść.
+// Strumienie planu są oknami nad deklaracją cx (F=3, Delta=1, wartości 1..9 cyklicznie),
+// stemplowanymi KOŃCEM przedziału: rekord n obejmuje pozycje spłaszczone
+// n*step-(|len|-1) ... n*step, a pozycja p niesie wartość (p mod 9)+1.
+//
+// Stąd każda komórka tabeli daje się sprawdzić rachunkiem, np.:
+//   s2x = cx@(2,2), origin ceil(1/2)=1 -> rekord 1 to pozycje 1..2 = (3,2) [najnowsze pierwsze],
+//   s8x = cx@(2,4), origin ceil(3/2)=2 -> rekord 2 to pozycje 1..4 = (5,4,3,2),
+//   s6x = cx@(3,-3), origin 1        -> rekord 1 to pozycje 1..3 w kolejności napływu = (2,3,4).
+//
+// Wobec stemplowania początkiem przedziału zmieniają się DWIE rzeczy: dla step=1 (s1x, s3x)
+// treść zostaje ta sama, a okno przesuwa się o slot później — to właśnie usunięta precesja;
+// dla step>1 (s2x, s4x..s8x) zmienia się także zbiór próbek, bo na siatce kroku leży teraz
+// koniec okna, a nie jego początek.
 TEST_F(crsMathTest, check_if_streams_values_are_correct) {
   const auto colSize = 9;
   const auto *const expectedResult =
@@ -247,18 +254,18 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
       " 000 |    1,2,3|         |         |         |         |         |         |         |         |\n"
       " 333 |         |         |         |         |         |         |         |         |         |\n"
       " 333 |         |         |         |         |         |         |         |         |         |\n"
-      " 333 |    4,5,6|        1|         |         |      2,1|    3,2,1|    1,2,3|         |         |\n"
-      " 333 |         |        2|      2,1|      2,1|         |         |         |         |         |\n"
-      " 333 |         |        3|         |      3,2|         |         |         |         |         |\n"
-      " 333 |    7,8,9|        4|      4,3|      4,3|      5,4|    6,5,4|    4,5,6|    3,2,1|  4,3,2,1|\n"
-      " 333 |         |        5|         |      5,4|         |         |         |         |         |\n"
-      " 333 |         |        6|      6,5|      6,5|         |         |         |    5,4,3|  6,5,4,3|\n"
-      " 333 |    1,2,3|        7|         |      7,6|      8,7|    9,8,7|    7,8,9|         |         |\n"
-      " 333 |         |        8|      8,7|      8,7|         |         |         |    7,6,5|  8,7,6,5|\n"
-      " 333 |         |        9|         |      9,8|         |         |         |         |         |\n"
-      " 333 |    4,5,6|        1|      1,9|      1,9|      2,1|    3,2,1|    1,2,3|    9,8,7|  1,9,8,7|\n"
+      " 333 |    4,5,6|        1|         |         |         |         |         |         |         |\n"
       " 333 |         |        2|         |      2,1|         |         |         |         |         |\n"
-      " 333 |         |        3|      3,2|      3,2|         |         |         |    2,1,9|  3,2,1,9|\n";
+      " 333 |         |        3|         |      3,2|         |         |         |         |         |\n"
+      " 333 |    7,8,9|        4|      3,2|      4,3|      4,3|    4,3,2|    2,3,4|    3,2,1|         |\n"
+      " 333 |         |        5|         |      5,4|         |         |         |         |         |\n"
+      " 333 |         |        6|      5,4|      6,5|         |         |         |    5,4,3|  5,4,3,2|\n"
+      " 333 |    1,2,3|        7|         |      7,6|      7,6|    7,6,5|    5,6,7|         |         |\n"
+      " 333 |         |        8|      7,6|      8,7|         |         |         |    7,6,5|  7,6,5,4|\n"
+      " 333 |         |        9|         |      9,8|         |         |         |         |         |\n"
+      " 333 |    4,5,6|        1|      9,8|      1,9|      1,9|    1,9,8|    8,9,1|    9,8,7|  9,8,7,6|\n"
+      " 333 |         |        2|         |      2,1|         |         |         |         |         |\n"
+      " 333 |         |        3|      2,1|      3,2|         |         |         |    2,1,9|  2,1,9,8|\n";
   std::stringstream strstream;
 
   dataModel proc(coreInstance);

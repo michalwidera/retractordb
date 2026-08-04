@@ -353,23 +353,36 @@ TEST(xcompiler, computes_startup_latency) {
   EXPECT_EQ(instance.getQuery("hash_160_147").startupLatency, 2);
   // Suma o zgodnych interwalach i zerowych ogonach zrodel nie wnosi opoznienia.
   EXPECT_EQ(instance.getQuery("added").startupLatency, 0);
-  // AGSE nie emituje niepelnych okien: pelne okno 4-polowe nad deklaracja
-  // o szerokosci 1 potrzebuje rekordow 0..3, czyli chwili 4*D, a slot n konczy
-  // sie w (n+1+W)*D — stad ogon 3. K24/H10a: bylo 4, bo poprzednia postac
-  // dodawala slot na publikacje deklaracji, ktory jest juz w czlonie (1+W_src).
-  EXPECT_EQ(instance.getQuery("agse4").startupLatency, 3);
-  EXPECT_EQ(instance.getQuery("agse4_mirror").startupLatency, 3);
+  // AGSE po przestemplowaniu na koniec przedzialu: rekord n obejmuje pozycje
+  // n-3 ... n, wiec czeka wylacznie na pole najnowsze (pozycja n), dostepne w
+  // jego wlasnym slocie — ogon 0. Czekanie na komplet okna przeszlo do origin:
+  // pierwsze pelne okno konczy sie na pozycji 3, czyli O = ceil(3/1) = 3.
+  // Liczba i tresc emitowanych rekordow sie nie zmienia, zmienia sie ich indeks
+  // logiczny — i to on naprawia zlaczenie okna z wlasnym zrodlem.
+  EXPECT_EQ(instance.getQuery("agse4").startupLatency, 0);
+  EXPECT_EQ(instance.getQuery("agse4").logicalOrigin, 3);
+  // Znak dlugosci jest wylacznie konwencja kolejnosci pol — ogon i origin te same.
+  EXPECT_EQ(instance.getQuery("agse4_mirror").startupLatency, 0);
+  EXPECT_EQ(instance.getQuery("agse4_mirror").logicalOrigin, 3);
   // Różnica ma jeden slot dla deklaracji; całkowita faza producenta
   // obliczanego jest dostępna topologicznie, a faza 3/2 wymaga slotu.
   EXPECT_EQ(instance.getQuery("sub_declared").startupLatency, 1);
   EXPECT_EQ(instance.getQuery("sub_computed").startupLatency, 0);
   EXPECT_EQ(instance.getQuery("sub_fractional").startupLatency, 1);
-  // Redukcja działa na bieżącej pełnej krotce i tylko propaguje ogon.
-  EXPECT_EQ(instance.getQuery("reduced").startupLatency, 3);
-  // Regresja K19: dla F=3, step=1 i ogona producenta 1 najgorsza faza wypada
-  // dla n=2 (okno wchodzi w kolejny rekord producenta) i daje 6, nie 5.
-  // K24/H10a: poprzednia postać zaniżała tu ogon o jeden slot.
-  EXPECT_EQ(instance.getQuery("wide_nested").startupLatency, 6);
+  // Redukcja działa na bieżącej pełnej krotce i tylko propaguje ogon ORAZ origin.
+  EXPECT_EQ(instance.getQuery("reduced").startupLatency, 0);
+  EXPECT_EQ(instance.getQuery("reduced").logicalOrigin, 3);
+  // Operator przesunięcia czyta offsetem względnym, więc przestemplowanie okna go nie dotyka:
+  // ogon jak dotąd (w1 + N), origin zerowy.
+  EXPECT_EQ(instance.getQuery("wide_shifted").startupLatency, 1);
+  EXPECT_EQ(instance.getQuery("wide_shifted").logicalOrigin, 0);
+  // Okno 2-polowe nad producentem o szerokosci 3 i ogonie 1: najnowsze pole rekordu n
+  // to pozycja n, czyli rekord producenta floor(n/3), okreslony w chwili
+  // (floor(n/3)+1+1)*D_src; stad ogon ceil(2*3/1)-1 = 5.
+  EXPECT_EQ(instance.getQuery("wide_nested").startupLatency, 5);
+  // Origin: producent ma origin 0, wiec okno musi tylko zmiescic wlasna rozpietosc:
+  // O = ceil((0*3 + 2 - 1)/1) = 1.
+  EXPECT_EQ(instance.getQuery("wide_nested").logicalOrigin, 1);
   EXPECT_EQ(instance.maxCapacity.at("wide_shifted"), 2);
   EXPECT_EQ(instance.getQuery("sub_same").startupLatency, 1);
   // K24/P1: pojemnosc zrodla roznicy wzrosla z 3 na 4. Wartosc 3 pokrywala
@@ -398,15 +411,20 @@ TEST(xcompiler, agse_capacity_covers_whole_window_over_computed_source) {
   compiler compilerInstance(instance);
   ASSERT_EQ(compilerInstance.compile(), "OK");
 
-  // Okno 3-polowe nad deklaracja o szerokosci 1 potrzebuje rekordow 0..2,
-  // czyli chwili 3*D; slot n konczy sie w (n+1+W)*D, stad ogon 2.
-  // Przepisanie go nie zmienia. K24/H10a: bylo 3.
-  EXPECT_EQ(instance.getQuery("win1").startupLatency, 2);
-  EXPECT_EQ(instance.getQuery("mid").startupLatency, 2);
-  // Okno nad producentem z ogonem 2: rekord n czyta mid n..n+2, a mid n+2
-  // jest okreslone w chwili (n+2+1+2)*D — stad ogon 4.
-  EXPECT_EQ(instance.getQuery("win2").startupLatency, 4);
-  // win2 czyta rekordy mid o indeksach n..n+2, gdy mid ma juz wydany rekord n+2.
+  // Okno 3-polowe nad deklaracja o szerokosci 1: rekord n czyta pozycje n-2..n,
+  // wiec czeka tylko na pozycje n — ogon 0, a niedefiniowalny poczatek to origin
+  // ceil(2/1) = 2. Przepisanie (mid) propaguje jedno i drugie.
+  EXPECT_EQ(instance.getQuery("win1").startupLatency, 0);
+  EXPECT_EQ(instance.getQuery("win1").logicalOrigin, 2);
+  EXPECT_EQ(instance.getQuery("mid").startupLatency, 0);
+  EXPECT_EQ(instance.getQuery("mid").logicalOrigin, 2);
+  // Okno nad producentem o szerokosci 1 i ogonie 0 rowniez nie czeka; origin sklada
+  // sie z origin producenta i rozpietosci wlasnego okna: ceil((2*1 + 2)/1) = 4.
+  EXPECT_EQ(instance.getQuery("win2").startupLatency, 0);
+  EXPECT_EQ(instance.getQuery("win2").logicalOrigin, 4);
+  // win2 czyta rekordy mid o indeksach n-2..n. W chwili emisji rekordu n=4 mid ma
+  // wydane rekordy do indeksu 4, a najstarszy potrzebny to 2 — dystans 2, plus jeden
+  // rekord na drugi koniec zakresu.
   EXPECT_EQ(instance.maxCapacity.at("mid"), 3);
 }
 

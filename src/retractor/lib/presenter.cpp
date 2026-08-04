@@ -343,6 +343,9 @@ void presenter::onlyCompileShowProgram() {
     // Ogon zapytania: ile początkowych slotów nie ma jeszcze zdefiniowanego wyniku. Raportowany
     // tylko gdy niezerowy, żeby listing planów bez opóźnienia pozostał niezmieniony.
     if (q.startupLatency > 0) std::cout << "\ttail=" << q.startupLatency;
+    // Origin: indeks pierwszego istniejącego rekordu. Ta sama zasada raportowania co dla ogona —
+    // tylko gdy niezerowy, żeby plany bez okien wyglądały jak dotąd.
+    if (q.logicalOrigin > 0) std::cout << "\torigin=" << q.logicalOrigin;
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
     std::cout << '\n';
     for (auto t : q.lProgram)

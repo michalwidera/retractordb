@@ -9,7 +9,7 @@ echo serial2
 open serial2
 size
 descc
-list 6
+list 5
 
 echo serial3
 open serial3

@@ -194,26 +194,39 @@ TEST(xSOperations, add_pairs_slower_component_by_floor_index) {
     EXPECT_EQ(ratioThreeQuarters[n], Add(fast, boost::rational<int>{3, 4}, n));
 }
 
-// K24/H10a: wartości oczekiwane zmienione razem z postacią zamkniętą ogona `@`.
-// Każda jest tu wyprowadzona wprost z warunku dostępności: okno rekordu n sięga
-// pola n*step+|len|-1, czyli rekordu źródła floor((n*step+|len|-1)/F), a ten
-// jest określony dopiero w chwili (floor(...)+1+W_src)*Delta_src.
-TEST(xSOperations, agse_startup_latency_covers_every_phase) {
-  // F=1, step=1, len=4: rekord 0 potrzebuje źródła 0..3, czyli chwili 4*D.
-  // Slot n kończy się w (n+1+W)*D, więc W = 3. Poprzednia postać dawała 4 —
-  // o slot za dużo, ogon tłumił rekord już określony.
-  EXPECT_EQ(3, AgseStartupLatency(1, 1, 4, 0));
-  // F=5, step=1, len=5: maksimum wypada dla n=1 (okno wchodzi w rekord 1
-  // źródła, a slot przesuwa się tylko o 1/5 rekordu) i wynosi 8. Poprzednia
-  // postać dawała 5 — trzy sloty za mało, więc strumień emitował okna
-  // z polami jeszcze nieokreślonymi.
-  EXPECT_EQ(8, AgseStartupLatency(5, 1, 5, 0));
+// Okno stemplowane KOŃCEM przedziału: rekord n obejmuje pozycje n*step-(|len|-1) ... n*step.
+// Ogon zabezpiecza wyłącznie NAJNOWSZE pole (n*step), bo dolny koniec zakresu jest domeną
+// origin — stąd brak zależności od długości okna i brak członu fazowego. Wartości poniżej
+// wyprowadzone z warunku dostępności: rekord floor(n*step/F) jest określony w chwili
+// (floor(n*step/F)+1+W_src)*Delta_src, a slot n kończy się w (n+1+W)*Delta_out.
+TEST(xSOperations, agse_startup_latency_covers_newest_field) {
+  // F=1, step=1: rekord n potrzebuje wyłącznie źródła n, dostępnego w jego własnym slocie.
+  // Czekanie na komplet okna przeszło do origin, więc ogon jest zerowy niezależnie od długości.
+  EXPECT_EQ(0, AgseStartupLatency(1, 1, 0));
+  // F=5, step=1: slot wyjścia to 1/5 rekordu źródła, więc na rekord 0 źródła czeka się
+  // 5 slotów; W = ceil(5/1)-1 = 4.
+  EXPECT_EQ(4, AgseStartupLatency(5, 1, 0));
+  // Producent obliczany o własnym ogonie 2: pierwszy rekord źródła dopiero w chwili 3*D_src.
+  EXPECT_EQ(1, AgseStartupLatency(2, 3, 2));
+  // Krok większy od szerokości źródła — slot wyjścia dłuższy niż rekord źródła, ogon zerowy.
+  EXPECT_EQ(0, AgseStartupLatency(2, 3, 0));
+  EXPECT_EQ(1, AgseStartupLatency(6, 4, 0));
+}
 
-  // Dla producenta obliczanego obowiązuje ta sama granica; fazę wszystkich
-  // kolejnych okien wyznacza gcd(F, step).
-  EXPECT_EQ(1, AgseStartupLatency(2, 3, 5, 0));
-  EXPECT_EQ(1, AgseStartupLatency(6, 4, 4, 0));
-  EXPECT_EQ(3, AgseStartupLatency(2, 3, 5, 2));
+// Origin jest jedynym miejscem, w którym rozpiętość okna wpływa na start strumienia.
+// O = ceil((O_src*F + |len| - 1) / step).
+TEST(xSOperations, agse_logical_origin_skips_incomplete_windows) {
+  // F=1, step=1, len=4: pierwsze pełne okno kończy się na pozycji 3.
+  EXPECT_EQ(3, AgseLogicalOrigin(1, 1, 4, 0));
+  // Znak długości jest wyłącznie konwencją kolejności pól — origin jest ten sam.
+  EXPECT_EQ(3, AgseLogicalOrigin(1, 1, -4, 0));
+  // Krok 2: okno kończące się na pozycji 2*n musi sięgnąć 2*n-1 >= 0, czyli n >= 1.
+  EXPECT_EQ(1, AgseLogicalOrigin(1, 2, 2, 0));
+  // Okno o długości 1 nigdy nie sięga wstecz — strumień zaczyna się od rekordu 0.
+  EXPECT_EQ(0, AgseLogicalOrigin(1, 1, 1, 0));
+  // Origin źródła przesuwa jego pozycje spłaszczone o O_src*F i propaguje się w górę:
+  // ceil((2*3 + 4 - 1) / 2) = ceil(9/2) = 5.
+  EXPECT_EQ(5, AgseLogicalOrigin(3, 2, 4, 2));
 }
 
 // Ogon sumy strumieni musi objąć dostępność rekordu KAŻDEJ składowej pod

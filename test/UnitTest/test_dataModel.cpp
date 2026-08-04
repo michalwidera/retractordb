@@ -116,10 +116,12 @@ TEST_F(xschema, check_construct_payload) {
   //  13, 14
   //  15, 16
 
-  // Trzeci logiczny slot @(1,4): pola 13..16.
+  // Okno @(1,4) stemplowane koncem przedzialu: rekord o indeksie logicznym 5 obejmuje
+  // pozycje splaszczone 2..5, czyli pola 13..16. Indeks nazywa teraz KONIEC okna, wiec
+  // ta sama zawartosc siedzi pod indeksem 5, nie 2.
   // Dodatnia szerokosc uklada najnowsze pole jako pierwsze.
   {
-    std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(4, 1, "str1", 2));
+    std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(4, 1, "str1", 5));
     std::stringstream coutstring1;
     coutstring1 << rdb::singleLineFormat << payload->descriptor;
     std::stringstream coutstring2;
@@ -141,9 +143,9 @@ TEST_F(xschema, check_construct_payload_mirror) {
   //  13, 14
   //  15, 16
 
-  // Ujemna szerokosc jest odbiciem lustrzanym tego samego pelnego okna.
+  // Ujemna szerokosc jest odbiciem lustrzanym tego samego pelnego okna (pozycje 2..5).
   {
-    std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(-4, 1, "str1", 2));
+    std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(-4, 1, "str1", 5));
     std::stringstream coutstring1;
     coutstring1 << rdb::singleLineFormat << payload->descriptor;
 
@@ -161,8 +163,10 @@ TEST_F(xschema, check_construct_payload_mirror) {
 // okna, nie z pomiaru.
 //
 // str1: 11,12 / 13,14 / 15,16   -> recordsCount=3, descriptorSrcSize=2
-// Okno (length=4, step=1, storedRecordCountDst=2): windowStart = 2*1 = 2,
-// pozycje płaskie 2,3,4,5 -> recordIndex = 2/2, 3/2, 4/2, 5/2 = 1,1,2,2.
+// Okno (length=4, step=1, windowIndex=5) jest stemplowane koncem przedzialu:
+// windowStart = 5*1 - (4-1) = 2, pozycje płaskie 2,3,4,5 -> recordIndex = 2/2, 3/2, 4/2, 5/2 = 1,1,2,2.
+// Geometria (a wiec i praca) jest ta sama co przed przestemplowaniem — zmienil sie
+// wylacznie indeks, pod ktorym to okno wystepuje.
 //
 // Stąd dokładnie:
 //   agseWindows  = 1  (jedna konstrukcja okna)
@@ -181,7 +185,7 @@ TEST_F(xschema, probe_e4_agse_window_work_counts) {
   data.outputPayload->setDisposable(false);
 
   rdb::probe::workReset();
-  { auto payload = data.constructAgsePayload(4, 1, "str1", 2); }
+  { auto payload = data.constructAgsePayload(4, 1, "str1", 5); }
   const auto after = rdb::probe::workReport();
 
   EXPECT_EQ(after.agseWindows, 1 * on);
@@ -192,7 +196,7 @@ TEST_F(xschema, probe_e4_agse_window_work_counts) {
   // a analiza dzieli je przez liczbę slotów. Gdyby akumulacja gubiła wywołania, model
   // kosztu dostałby zaniżoną pracę i to jest dokładnie ta klasa błędu, przez którą
   // upadł model K20 etap 1.
-  { auto payload = data.constructAgsePayload(4, 1, "str1", 2); }
+  { auto payload = data.constructAgsePayload(4, 1, "str1", 5); }
   const auto twice = rdb::probe::workReport();
 
   EXPECT_EQ(twice.agseWindows, 2 * on);
@@ -202,7 +206,7 @@ TEST_F(xschema, probe_e4_agse_window_work_counts) {
   // Okno lustrzane ma tę samą geometrię, więc tę samą pracę — znak steruje kolejnością
   // pól w wyniku, nie liczbą odwiedzin.
   rdb::probe::workReset();
-  { auto payload = data.constructAgsePayload(-4, 1, "str1", 2); }
+  { auto payload = data.constructAgsePayload(-4, 1, "str1", 5); }
   const auto mirrored = rdb::probe::workReport();
 
   EXPECT_EQ(mirrored.agseElements, 4 * on);

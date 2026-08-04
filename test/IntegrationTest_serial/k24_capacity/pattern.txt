@@ -16,18 +16,18 @@
 { value:90 }
 { value:130 }
  AGSE_WINDOW
-14 Record(s)
+13 Record(s)
 12 Byte(s) per record.
 { INTEGER source_0 INTEGER source_1 INTEGER source_2 }
-{ source_0:10 source_1:20 source_2:30 }
-{ source_0:40 source_1:50 source_2:60 }
-{ source_0:70 source_1:80 source_2:90 }
-{ source_0:100 source_1:110 source_2:120 }
+{ source_0:20 source_1:30 source_2:40 }
+{ source_0:50 source_1:60 source_2:70 }
+{ source_0:80 source_1:90 source_2:100 }
+{ source_0:110 source_1:120 source_2:130 }
  SHIFT_UNDER_HASH
-12 Record(s)
+10 Record(s)
 12 Byte(s) per record.
 { INTEGER source_0 INTEGER source_1 INTEGER source_2 }
-{ source_0:10 source_1:20 source_2:30 }
-{ source_0:10 source_1:20 source_2:30 }
-{ source_0:40 source_1:50 source_2:60 }
-{ source_0:40 source_1:50 source_2:60 }
+{ source_0:20 source_1:30 source_2:40 }
+{ source_0:20 source_1:30 source_2:40 }
+{ source_0:50 source_1:60 source_2:70 }
+{ source_0:50 source_1:60 source_2:70 }

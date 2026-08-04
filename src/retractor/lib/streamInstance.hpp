@@ -40,7 +40,8 @@ struct streamInstance {
   [[nodiscard]] rdb::payload constructAgsePayload(int length,                   //  _@(_,length)
                                                   int step,                     //  _@(step,_)
                                                   const std::string &instance,  //  instance@(_,_)
-                                                  int storedRecordCountDst) const;
+                                                  int windowIndex,              //  indeks LOGICZNY okna
+                                                  int sourceOrigin = 0) const;
   /*
    * This function will create aggregate payload based on the command and instance
    */
