@@ -49,7 +49,7 @@ struct streamInstance {
                                                   int step,                     //  _@(step,_)
                                                   const std::string &instance,  //  instance@(_,_)
                                                   int windowIndex,              //  indeks LOGICZNY okna
-                                                  int sourceOrigin = 0) const;
+                                                  int sourceIndexBase = 0) const;
   /*
    * This function will create aggregate payload based on the command and instance
    */

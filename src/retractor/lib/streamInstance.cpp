@@ -67,7 +67,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
                                                   const int step,               //
                                                   const std::string &instance,  //
                                                   const int windowIndex,        //
-                                                  const int sourceOrigin) const {
+                                                  const int sourceIndexBase) const {
   if (step <= 0) {
     FatalError("streamInstance::constructAgsePayload: step must be > 0, got {}", step);
   }
@@ -130,10 +130,10 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
       --fp.quot;
       fp.rem += descriptorSrcSize;
     }
-    // Rekord logiczny fp.quot leży w buforze na pozycji fp.quot - sourceOrigin: strumień
-    // o niezerowym origin nie ma rekordów wcześniejszych, więc jego rekord fizyczny 0 nosi
-    // indeks logiczny sourceOrigin.
-    const auto recordIndex = fp.quot - sourceOrigin;
+    // Rekord logiczny fp.quot leży w buforze na pozycji fp.quot - sourceIndexBase:
+    // strumień uruchomiony z niezerową bazą nie ma rekordów wcześniejszych, więc jego
+    // rekord fizyczny 0 nosi właśnie ten indeks logiczny.
+    const auto recordIndex = fp.quot - sourceIndexBase;
     if (recordIndex >= 0 && std::cmp_less(recordIndex, recordsCountSrc)) {
       const auto reversePosition = recordsCountSrc - static_cast<size_t>(recordIndex) - 1;
       if (lastReadPosition != reversePosition) {

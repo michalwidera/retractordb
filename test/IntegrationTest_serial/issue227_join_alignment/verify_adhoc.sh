@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Regresja epoki logicznej zapytań ad hoc. Późny pass-through musi zachować
-# bieżący indeks źródła, żeby następny operator indeksowany nie zestawił go
-# z historycznym rekordem istniejącego strumienia.
+# bieżący indeks źródła zarówno w złączeniu, jak i w oknie AGSE.
 set -eu
 
 rm -rf temp
@@ -17,7 +16,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-xretractor query.rql -m 35 > adhoc-server.out 2> adhoc-server.err &
+xretractor query.rql -m 45 > adhoc-server.out 2> adhoc-server.err &
 server_pid=$!
 
 lock_file="${TMPDIR:-/tmp}/xretractor_service.lock"
@@ -35,6 +34,8 @@ sleep 0.6
 xqry -a 'SELECT * STREAM late FROM win'
 sleep 0.4
 xqry -a 'SELECT * STREAM late_pair FROM late+win'
+sleep 0.4
+xqry -a 'SELECT * STREAM late_window FROM late@(3,3)'
 
 wait "$server_pid"
 server_pid=""
@@ -52,6 +53,24 @@ od -An -v -w24 -td4 temp/late_pair | awk '
 ' || {
   echo "ad hoc: polaczono rekordy z roznych indeksow logicznych"
   od -An -v -w24 -td4 temp/late_pair
+  exit 1
+}
+
+[ -s temp/late_window ] || {
+  echo "ad hoc: late_window nie zawiera rekordow"
+  exit 1
+}
+
+# late jest 3-polowym oknem. Kolejne polecenie bierze trzy spłaszczone pola
+# kończące się na pierwszym polu bieżącego rekordu: [curr[0], prev[2], prev[1]].
+# Wynik musi pozostać pełny zamiast all-NULL powstałego przez odjęcie statycznego
+# origin zamiast runtime'owej bazy.
+od -An -v -w12 -td4 temp/late_window | awk '
+  NF != 3 || $1 == 0 || $2 == 0 || $3 == 0 || $1 != $2 + 3 || $1 != $3 + 2 { exit 1 }
+  END { if (NR == 0) exit 1 }
+' || {
+  echo "ad hoc: AGSE uzyl niewlasciwej bazy indeksu logicznego"
+  od -An -v -w12 -td4 temp/late_window
   exit 1
 }
 

@@ -251,12 +251,15 @@ void dataModel::constructInputPayload(const std::string &instance) {
   // fizycznym; strumień o niezerowym origin nie ma rekordów przed origin, więc jego rekord
   // fizyczny 0 nosi indeks logiczny origin. Wszystkie odwzorowania z SOperations.hpp są
   // zdefiniowane na indeksach logicznych, więc karmimy je tą wartością.
-  const auto logicalIndex = [&](const std::string &id) {
+  const auto logicalIndexBase = [&](const std::string &id) {
     const auto &logicalBase = qSet[id]->logicalIndexBase;
     if (!logicalBase.has_value()) {
       FatalError("dataModel::constructInputPayload: logical index base not initialized for '{}'", id);
     }
-    return static_cast<int>(qSet[id]->outputPayload->getRecordsCount()) + *logicalBase;
+    return *logicalBase;
+  };
+  const auto logicalIndex = [&](const std::string &id) {
+    return static_cast<int>(qSet[id]->outputPayload->getRecordsCount()) + logicalIndexBase(id);
   };
 
   auto operation = qry.lProgram.back();  // Operation is always last element on stack
@@ -376,10 +379,12 @@ void dataModel::constructInputPayload(const std::string &instance) {
         FatalError("dataModel::constructInputPayload: AGSE step must be > 0, got {} for '{}'", step, instance);
       }
       // Okno jest stemplowane końcem przedziału, więc rekord o indeksie logicznym n sięga
-      // wstecz od pozycji n*step. Origin źródła przesuwa jego pozycje spłaszczone o origin*F.
+      // wstecz od pozycji n*step. Runtime'owa baza źródła przesuwa jego pozycje
+      // spłaszczone o base*F. Dla planu startowego jest równa origin kompilatora,
+      // ale zapytanie dodane ad hoc dostaje ją z bieżącej osi logicznej.
       const int windowIndex           = logicalIndex(instance);
-      const int sourceOrigin          = coreInstance_.getQuery(nameSrc).logicalOrigin;
-      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, nameSrc, windowIndex, sourceOrigin);
+      const int sourceIndexBase       = logicalIndexBase(nameSrc);
+      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, nameSrc, windowIndex, sourceIndexBase);
     } break;
     case STREAM_HASH: {
       // 	:- PUSH_STREAM(core0)

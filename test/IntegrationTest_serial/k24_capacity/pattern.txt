@@ -15,6 +15,14 @@
 { value:50 }
 { value:90 }
 { value:130 }
+ SUB_RATIO5
+7 Record(s)
+4 Byte(s) per record.
+{ INTEGER value }
+{ value:10 }
+{ value:60 }
+{ value:110 }
+{ value:160 }
  AGSE_WINDOW
 13 Record(s)
 12 Byte(s) per record.
