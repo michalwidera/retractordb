@@ -47,7 +47,7 @@ Multi-operator expressions remain postfix token programs immediately after parsi
 
 ## Compiler pipeline
 
-`compiler::compile()` runs this exact order:
+`compiler::compile()` runs this exact order (passes 4, 5, and 8 are `#if RDB_OPT_*` build-switch guarded):
 
 1. `extractIntermediateStreams()` — reduce complex stream expressions into generated `STREAM_*` substrate queries with a maximum of one operator and one/two sources.
 2. `expandSchemaWildcards()` — replace `*` with concrete fields and construct schemas for generated operations.
@@ -60,13 +60,17 @@ Multi-operator expressions remain postfix token programs immediately after parsi
    only the two children of each individual `STREAM_ADD`, and move equivalent computation into one generated
    `STREAM_SELECT_*` substrate while retaining each public SELECT as a pass-through stream.
 9. `localizeFieldOffsets()` — translate direct and transitive source offsets into the consumer's local input payload layout.
-10. `computeRequiredCapacities()` — calculate source history for shifts, AGSE, junctions, and negative DUMP ranges; a shift
-   by `N` addresses history slot `N` and therefore requires capacity `N+1`.
-11. `validateConstraints()` — enforce canonical-plan and operator constraints, especially equal flat schema size for `#`.
-12. `applyCapacitiesToStreams()` — write computed memory capacities into query storage policies.
-13. `computeStartupLatency()` — calculate causal startup tails for the final plan. Tail slots are not records; `>N` adds
-   `N`, `#` combines converted input tails with its own look-ahead on the second argument, `+` takes the maximum,
-   and left de-interleave adds one slot.
+10. `computeStartupLatency()` — calculate causal startup tails for the final plan. Tail slots are not records; `>N` adds
+    `N`, `#` combines converted input tails with the phase maximum `ceil((p+q-1)/p)` on the second argument, `+` takes
+    the per-component `AddStartupLatency` maximum, `SUBTRACT` uses `SubtractStartupLatency`, AGSE uses
+    `AgseStartupLatency`, reductions add no own tail, and left de-interleave adds one slot. Runs before capacities
+    because the required history depends on the consumer's first emission slot.
+11. `computeRequiredCapacities()` — calculate source history for shifts, AGSE, junctions, stream sums, and negative DUMP
+    ranges from the event distance between producer availability and consumer reads. A shift by `N` addresses history
+    slot `N` and therefore requires capacity `N+1`. Declared sources get a fixed two-record front allowance
+    (`kDeclarationPrefetch`: the armed record plus the zero prefetch).
+12. `validateConstraints()` — enforce canonical-plan and operator constraints, especially equal flat schema size for `#`.
+13. `applyCapacitiesToStreams()` — write computed memory capacities into query storage policies.
 14. `topologicalSort()` — unconditionally restore producer-before-consumer execution order after interval sorting and
    all rewrites.
 
@@ -93,9 +97,13 @@ sources share the same `fetchBack()` path. Runtime emits no zero or all-null pla
 Every rewriting pass snapshots field names of user-named outputs and calls `verifyUserFieldNamesPreserved()` afterward.
 Internal substrate names may change, but a rewrite that changes a public `.desc` field name fails compilation.
 
-Current audit boundary: `STREAM_DEHASH_MOD`, `STREAM_SUBTRACT`, `STREAM_AGSE`, and reductions propagate producer tails
-but have no separately derived own-tail term. Do not generalize the proven R1 boundary semantics to those operators
-without completing the index/look-ahead audit and adding regressions.
+The K19/K24 event-model audit covers every canonical operator's own tail: `MOD` has own tail 0, `SUBTRACT` uses
+`SubtractStartupLatency()` (phase bound, declaration-aware), AGSE uses the closed form
+`ceil((P+(1+W_src)*F)/k)-1` with phase bound `P=floor((|L|-1)/g)*g`, `g=gcd(F,k)`, and reductions operate on the
+current producer tuple only. A read beyond available history yields an internal all-null failsafe record, but a
+correctly compiled plan never materializes it; `it_k19_boundaries` and `it_k24_capacity` guard these boundaries.
+The earlier tick-conversion tail/capacity approximations under- or over-sized a large share of corpus plans — do not
+reintroduce them.
 
 SELECT computation sharing runs after symbolic references and `[_]` have been expanded, but before field offsets are
 localized to a query's input payload. This lets `FROM a+b` and `FROM b+a` compare the source identities rather than
@@ -108,9 +116,15 @@ new IDs so an already instantiated live query cannot be rewritten underneath its
 
 - `#`, `&`, `%`, shift, and subtraction largely preserve the relevant source schema.
 - Stream `+` concatenates schemas and generates distinct positional names.
-- `.avg/.min/.max/.sumc` yield one `RATIONAL` field.
-- AGSE yields `abs(width)` fields with the widest source field type/size.
+- `.avg/.min/.max/.sumc` yield one `RATIONAL` field. `reductionResultField()` (`query.hpp`) is the single rule shared
+  by `query::descriptorFrom` and `streamInstance::reduceFieldsToPayload`: arithmetic sources (`BYTE`/`INTEGER`/`UINT`/
+  `RATIONAL`) reduce to a full `RATIONAL` field, so an odd sum no longer truncates through `rational_cast<int>`.
+- AGSE yields `abs(width)` fields with the widest source field type/size. Positive width keeps the historical
+  newest-field-first convention; negative width mirrors into arrival order.
 - Pass-through SELECT copies/expands the source schema, but SELECT expressions can construct a different descriptor.
+- Interval formulas (`(Da*Db)/(Da+Db)`, div/mod variants, AGSE `(Ds*k)/F`) are computed in 64-bit `wideRational` and
+  range-checked by `narrowInterval()`; an unrepresentable interval throws `std::out_of_range` instead of silently
+  overflowing `boost::rational<int>` and surfacing later as an unrelated plan-validation error.
 
 Use `query::descriptorStorage()` for output schema and `query::descriptorFrom(qTree&)` for the concatenated input payload expected by field programs.
 
@@ -125,6 +139,10 @@ Use `query::descriptorStorage()` for output schema and `query::descriptorFrom(qT
 
 ## Plan inspection
 
-`xretractor -c` parses and compiles without executing. Presenter modes expose query sets, fields, programs, rules, CSV, sequence diagrams, or Graphviz DOT. The most useful dependency view is produced with `-c -d` plus `-f`, `-s`, and optionally `-u`.
+`xretractor -c` parses and compiles without executing. Presenter modes expose query sets, fields, programs, rules, CSV, sequence diagrams, or Graphviz DOT. The most useful dependency view is produced with `-c -d` plus `-f`, `-s`, and optionally `-u`. Plan listings report each query's causal tail as `tail=`.
+
+With `RDB_BENCH_PROBE=ON` and `RDB_BENCH_PLAN` set, the compiler additionally prints a stable stderr line
+`REWRITE_APPLIED r1=<n> r2=<n>`: `r1` counts applied `(A > i) # (B > k) -> (A # B) > (i + k)` factorizations and `r2`
+counts `STREAM_ADD` nodes whose canonical fingerprint actually swapped child order (not a speedup measure).
 
 Compilation is allowed while another execution instance owns the service lock. Execution remains singleton.

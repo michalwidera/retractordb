@@ -98,7 +98,7 @@ Build option `RDB_BENCH_PROBE` enables opt-in runtime probes:
 - `RDB_BENCH_CSV` records `compute_ns`, wake lag, and end-to-end emission latency.
 - `RDB_BENCH_PLAN` records plan stream/token sizes around substrate deduplication.
 
-Recent repository experiments investigate throughput ceilings and the previously observed roughly 40 ms startup/client-attach latency; do not generalize experiment results without reading `examples/experiment` and current branch artifacts.
+Recent experiments investigate throughput ceilings and the previously observed roughly 40 ms startup/client-attach latency; do not generalize experiment results without reading the sibling `rdb-experiment` repository (campaign journals and `results_*` directories) and current branch artifacts.
 
 ## IPC protocol
 
