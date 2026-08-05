@@ -89,7 +89,6 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
 
   if (outputFormatMode == formatMode::GNUPLOT) {
     Formatter::initGnuplot(gnuplotDim, gnuplotRightToLeft);
-    formatter_->setGnuplotWarmup(gnuplotWarmup);
   }
 
   ptree schema;

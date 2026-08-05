@@ -64,26 +64,6 @@ add_custom_target(
   DEPENDS ecg-clean
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 
-# --warmup 360: pierwsze rekordy qrs_out odpowiadaja na probki sprzed poczatku
-# strumienia (potok Pan-Tompkinsa ma opoznienie grupowe ~29 probek: BPF 12 +
-# rozniczka 2 + MWI 14,5), wiec bez odciecia pierwszy impuls detekcji nie ma na
-# wykresie swojego zespolu QRS i wyglada jak odpowiedz przed danymi. Jedna
-# sekunda (360 probek) daje temu spory zapas.
-add_custom_target(
-  ecg-qrs-warmup
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh qrs_out rec205-qrs.rql
-          1440,-50,350 "--gnuplot-rtl --warmup 360"
-  DEPENDS ecg-clean
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
-
-# Ten sam powod co przy ecg-qrs — detect_out jest wynikiem tego samego potoku.
-add_custom_target(
-  ecg-detect-qrs-warmup
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh detect_out rec205-detect.rql
-          720,-50,400 "--gnuplot-rtl --warmup 360"
-  DEPENDS ecg-clean
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
-
 add_custom_target(
   ecg-qrs
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh qrs_out rec205-qrs.rql

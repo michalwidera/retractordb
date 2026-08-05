@@ -55,30 +55,11 @@ void Formatter::renderGnuplot(const ptree &row, int count, const std::string &nu
 
   const auto window = static_cast<size_t>(std::get<0>(dim));
 
-  // 1. Okres rozbiegowy strumienia — rekord odrzucany, nie trafia nawet do bufora.
-  //    Patrz Formatter::gnuplot_warmup_: te rekordy odpowiadaja na probki sprzed poczatku
-  //    strumienia, wiec ich przyczyny nie da sie narysowac.
-  if (gnuplot_skipped_ < gnuplot_warmup_) {
-    ++gnuplot_skipped_;
-    return;
-  }
-
   for (int i = 0; i < count; i++) {
     gnuplot_lines_[i].push_front(displayedValue(row, i, nullmap, formatMode::GNUPLOT));
     if (gnuplot_lines_[i].size() > window) gnuplot_lines_[i].pop_back();
   }
 
-  // 2. Przy wlaczonym rozbiegu czekamy dodatkowo na PELNY kadr: slad zaczynajacy sie w srodku
-  //    wykresu ma lewa krawedz bedaca POCZATKIEM danych, a nie zwyklym obcieciem przesuwajacego
-  //    sie okna, wiec zdarzenie tuz przy niej wyglada na pozbawione przyczyny. W pelnym kadrze
-  //    lewa krawedz jest takim samym cieciem jak w kazdej nastepnej klatce.
-  //
-  //    Warunek jest zwiazany z rozbiegiem, a nie bezwarunkowy: samo czekanie na pelny kadr
-  //    kosztuje `window` rekordow, co dla wolnych strumieni to dziesiatki sekund ciszy przed
-  //    pierwsza klatka (gnuplot nie tworzy okna, dopoki nie dostanie `plot`, wiec wyglada to na
-  //    martwy proces). Domyslnie xqry rysuje wiec od pierwszego rekordu, jak dotad.
-  //    Warunek dotyczy pierwszej serii — wszystkie rosna razem.
-  if (gnuplot_warmup_ > 0 && !gnuplot_lines_.empty() && gnuplot_lines_[0].size() < window) return;
 
   std::print("plot");
   int colIdx{0};
