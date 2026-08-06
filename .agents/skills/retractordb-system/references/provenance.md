@@ -63,7 +63,9 @@ embedded key. Exact revision checks remain only for the two external documentati
 - Issue 225 (merged as `c4b63a7`) installs the K24 event-model capacity and tail formulas. `computeStartupLatency()`
   now runs before `computeRequiredCapacities()`, and capacities are derived from the event distance between producer
   availability and consumer reads: `AddStartupLatency` (`ceil((1+W_src)*Ds/Dout)-1` per `STREAM_ADD` component),
-  `AgseStartupLatency` (`ceil((P+(1+W_src)*F)/k)-1` with phase bound `P=floor((|L|-1)/g)*g`, `g=gcd(F,k)`), and
+  `AgseStartupLatency` (`ceil((P+(1+W_src)*F)/k)-1` with phase bound `P=floor((|L|-1)/g)*g`, `g=gcd(F,k)` — the
+  phase bound was later moved out of the tail into the logical origin by the H10a re-timestamping; see the Issue 227
+  entry below), and
   `SubtractStartupLatency` replace the earlier tick-conversion approximations that under- or over-sized tails for a
   large share of corpus plans. `STREAM_ADD` entered the capacity model; declared sources get a fixed
   `kDeclarationPrefetch = 2` front allowance (armed record plus zero prefetch); wrong capacities previously produced
@@ -74,6 +76,21 @@ embedded key. Exact revision checks remain only for the two external documentati
   silently overflowing `boost::rational<int>`. New regressions: `it_k19_boundaries` (operator tail/observability
   boundaries, real NULL inside a full AGSE window versus the all-null failsafe) and `it_k24_capacity` (declaration
   history depths). The Debug inventory is now 181 tests: `pt_*` 1-41, `it_*` 42-98, unit-related 99-181.
+- Issue 227 (branch `issue_227-precesja`, H10a re-timestamping) moves the join-alignment delay out of startup tails
+  into a new logical origin. The `@` window is now stamped by the interval END; its early records would reach before
+  the source start, so the window span generates `query::logicalOrigin` through `AgseLogicalOrigin()`
+  (`ceil((sourceOrigin*F + |L| - 1)/step)`) instead of inflating the tail, and `AgseStartupLatency` loses its phase
+  bound, becoming `ceil((1+W_src)*F/step)-1`. `STREAM_TIMEMOVE(N)` adds `N` to the origin and keeps the tail exactly
+  equal to the producer tail; the emitted record sequence is unchanged, only its time address shifts, and
+  origin+tail silence equals the former tail length. A new compiler pass `computeLogicalOrigin()` runs between
+  `localizeFieldOffsets()` and `computeStartupLatency()`; every other operator propagates origin through the same
+  non-decreasing index mapping it reads with. The presenter reports `origin=` alongside `tail=`. Ad-hoc import now
+  publishes the compiled tree and its stream instances atomically under `core_mutex`, bumps `adHocPlanRevision`, and
+  the execution loop rebuilds the `TimeLine` via `updateTimeIntervals()` without rewinding when an ad-hoc query
+  introduces a new rate; an ad-hoc SELECT starts at the first slot the runtime sees it, not at the system origin.
+  New regressions: `it_issue227_join_alignment-run`/`-adhoc-origin` (join-content expectations derived from operator
+  definitions, not engine output) and `ut_h10aGate` (the `results_20260804_K24r` campaign gate moved into per-commit
+  ctest for the `@` and `>` classes).
 
 ## Source hierarchy and scope
 
@@ -88,6 +105,14 @@ The English repository is treated as derived content. Consult it only for Englis
 ## Known documentation-to-code drift at this revision
 
 These are navigation warnings, not necessarily product defects:
+
+- Reopened by the H10a re-timestamping (branch `issue_227-precesja`): the documentation realization defines
+  `\tau_m` as increasing the tail `W` by `m`, and
+  `podstawy-matematyczne/ogony-i-obserwowalnosc-operatorow.md` still gives the AGSE tail with the phase bound
+  `g=gcd(F,k)` and has no logical-origin concept. Current code puts the `>N` delay and the AGSE window span into
+  `query::logicalOrigin` instead of the tail (`computeLogicalOrigin()`, `AgseLogicalOrigin()`); the tail formulas
+  are the phase-free ones from the Issue 227 entry above. The Polish tail/observability page and the formal-proof
+  `\tau_m` definition need updating, then the English derivative.
 
 - Resolved at the current basis: the former `tau_m(S)=s_(n+m)` drift. Both documentation repositories now define a
   causal realization `((s_n,Delta),W)` with `tau_m` increasing `W` by `m` without prefix records, matching

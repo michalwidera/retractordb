@@ -132,7 +132,7 @@ On shutdown, `xretractor` sends reserved stream id `OUT_OF_BUSSINESS` to subscri
 
 ## Ad-hoc behavior
 
-An ad-hoc RQL statement is parsed into a temporary `qTree`, compiled, and imported into the live plan if ids do not already exist. New runtime instances are added for imported queries. Treat changes here carefully: live import must preserve existing query objects, capacities, subscriptions, and source state.
+An ad-hoc RQL statement is parsed into a temporary `qTree`, compiled, and imported into the live plan if ids do not already exist. The compiled tree and its new runtime stream instances are published atomically under `core_mutex`, and a non-empty import bumps `adHocPlanRevision`. The execution loop watches that revision with a single atomic read per tick and rebuilds its `TimeLine` through `updateTimeIntervals()` only when the available interval set actually changed; the rebuild does not rewind the timeline — a rate introduced by an ad-hoc query starts at its first occurrence strictly after the current slot. An ad-hoc SELECT does not start at the system's historical logical origin: `dataModel::addQueryToModel` resets its `logicalIndexBase`, so its base is the first slot in which the runtime sees the instance. Treat changes here carefully: live import must preserve existing query objects, capacities, subscriptions, and source state.
 
 ## Configuration and service mode
 

@@ -60,18 +60,24 @@ Multi-operator expressions remain postfix token programs immediately after parsi
    only the two children of each individual `STREAM_ADD`, and move equivalent computation into one generated
    `STREAM_SELECT_*` substrate while retaining each public SELECT as a pass-through stream.
 9. `localizeFieldOffsets()` — translate direct and transitive source offsets into the consumer's local input payload layout.
-10. `computeStartupLatency()` — calculate causal startup tails for the final plan. Tail slots are not records; `>N` adds
-    `N`, `#` combines converted input tails with the phase maximum `ceil((p+q-1)/p)` on the second argument, `+` takes
-    the per-component `AddStartupLatency` maximum, `SUBTRACT` uses `SubtractStartupLatency`, AGSE uses
-    `AgseStartupLatency`, reductions add no own tail, and left de-interleave adds one slot. Runs before capacities
-    because the required history depends on the consumer's first emission slot.
-11. `computeRequiredCapacities()` — calculate source history for shifts, AGSE, junctions, stream sums, and negative DUMP
+10. `computeLogicalOrigin()` — calculate `query::logicalOrigin`: the index of the first record that exists at all.
+    The tail says "not yet"; the origin says "this record has no definition". Only the `@` window stamped by the
+    interval end generates origin (`AgseLogicalOrigin()`, because its early records would reach before the source
+    start) and `>N` adds `N`; every other operator propagates origin through the same non-decreasing index mapping
+    it reads with in `dataModel::constructInputPayload()`, so missing records form a prefix, never holes.
+11. `computeStartupLatency()` — calculate causal startup tails for the final plan. Tail slots are not records; `>N`
+    adds nothing of its own (the tail equals exactly the producer tail; the `N` delay lives in the origin), `#`
+    combines converted input tails with the phase maximum `ceil((p+q-1)/p)` on the second argument, `+` takes the
+    per-component `AddStartupLatency` maximum, `SUBTRACT` uses `SubtractStartupLatency`, AGSE uses
+    `AgseStartupLatency`, reductions add no own tail, and left de-interleave adds one slot. Runs after origin and
+    before capacities because the required history depends on the consumer's first emission slot.
+12. `computeRequiredCapacities()` — calculate source history for shifts, AGSE, junctions, stream sums, and negative DUMP
     ranges from the event distance between producer availability and consumer reads. A shift by `N` addresses history
     slot `N` and therefore requires capacity `N+1`. Declared sources get a fixed two-record front allowance
     (`kDeclarationPrefetch`: the armed record plus the zero prefetch).
-12. `validateConstraints()` — enforce canonical-plan and operator constraints, especially equal flat schema size for `#`.
-13. `applyCapacitiesToStreams()` — write computed memory capacities into query storage policies.
-14. `topologicalSort()` — unconditionally restore producer-before-consumer execution order after interval sorting and
+13. `validateConstraints()` — enforce canonical-plan and operator constraints, especially equal flat schema size for `#`.
+14. `applyCapacitiesToStreams()` — write computed memory capacities into query storage policies.
+15. `topologicalSort()` — unconditionally restore producer-before-consumer execution order after interval sorting and
    all rewrites.
 
 The pipeline invariant after reduction is fewer than four stream-program tokens per query. `dataModel` treats any larger program as a fatal compiler invariant violation.
@@ -90,18 +96,23 @@ only `B[0]`. The phase definition is
 `ceil((p+q-1)/p)` with a 64-bit intermediate. This boundary is required for non-rewritten R1 plans at ratios such as
 `3/5`, `3/2`, `7/11`, and `160/147`.
 
-`STREAM_TIMEMOVE(N)` is a causal delay, not an advance to `s_(n+N)`. It leaves the emitted record sequence intact,
-increases the startup tail by `N`, and reads history slot `N` only after that tail has elapsed. Declared and computed
-sources share the same `fetchBack()` path. Runtime emits no zero or all-null placeholder for a tail slot.
+`STREAM_TIMEMOVE(N)` is a causal delay, not an advance to `s_(n+N)`. Since the H10a re-timestamping the delay lives
+in the logical origin (`origin + N`), while the startup tail equals exactly the producer tail — `fetchBack()` reads a
+relative offset, so `W = W_src` is required, neither less nor more. The emitted record sequence is unchanged; only its
+time address shifts, and origin+tail silence slots sum to the former tail length. Records below the origin never
+arise; runtime emits no zero or all-null placeholder for tail or origin slots. Declared and computed sources share
+the same `fetchBack()` path.
 
 Every rewriting pass snapshots field names of user-named outputs and calls `verifyUserFieldNamesPreserved()` afterward.
 Internal substrate names may change, but a rewrite that changes a public `.desc` field name fails compilation.
 
-The K19/K24 event-model audit covers every canonical operator's own tail: `MOD` has own tail 0, `SUBTRACT` uses
-`SubtractStartupLatency()` (phase bound, declaration-aware), AGSE uses the closed form
-`ceil((P+(1+W_src)*F)/k)-1` with phase bound `P=floor((|L|-1)/g)*g`, `g=gcd(F,k)`, and reductions operate on the
-current producer tuple only. A read beyond available history yields an internal all-null failsafe record, but a
-correctly compiled plan never materializes it; `it_k19_boundaries` and `it_k24_capacity` guard these boundaries.
+The K19/K24/H10a event-model audit covers every canonical operator's own tail: `MOD` has own tail 0, `SUBTRACT` uses
+`SubtractStartupLatency()` (phase bound, declaration-aware), AGSE uses the closed form `ceil((1+W_src)*F/step)-1` —
+the former phase bound `P=floor((|L|-1)/g)*g`, `g=gcd(F,k)`, moved out of the tail into `logicalOrigin` with the
+H10a re-timestamping — and reductions operate on the current producer tuple only. `ut_h10aGate` replays the campaign
+gate per commit, comparing the compiler against an independent event model for the `@` and `>` classes. A read
+beyond available history yields an internal all-null failsafe record, but a correctly compiled plan never
+materializes it; `it_k19_boundaries` and `it_k24_capacity` guard these boundaries.
 The earlier tick-conversion tail/capacity approximations under- or over-sized a large share of corpus plans — do not
 reintroduce them.
 
@@ -139,7 +150,7 @@ Use `query::descriptorStorage()` for output schema and `query::descriptorFrom(qT
 
 ## Plan inspection
 
-`xretractor -c` parses and compiles without executing. Presenter modes expose query sets, fields, programs, rules, CSV, sequence diagrams, or Graphviz DOT. The most useful dependency view is produced with `-c -d` plus `-f`, `-s`, and optionally `-u`. Plan listings report each query's causal tail as `tail=`.
+`xretractor -c` parses and compiles without executing. Presenter modes expose query sets, fields, programs, rules, CSV, sequence diagrams, or Graphviz DOT. The most useful dependency view is produced with `-c -d` plus `-f`, `-s`, and optionally `-u`. Plan listings report each query's causal tail as `tail=` and its logical origin as `origin=`.
 
 With `RDB_BENCH_PROBE=ON` and `RDB_BENCH_PLAN` set, the compiler additionally prints a stable stderr line
 `REWRITE_APPLIED r1=<n> r2=<n>`: `r1` counts applied `(A > i) # (B > k) -> (A # B) > (i + k)` factorizations and `r2`

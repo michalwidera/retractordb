@@ -55,6 +55,13 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
 - Operator tail/observability phase boundaries (difference, AGSE, reductions, real NULL inside a full window versus
   the all-null out-of-history failsafe): `it_k19_boundaries`.
 - Event-model history capacities for declared sources feeding AGSE/SUBTRACT/ADD consumers: `it_k24_capacity`.
+- Join alignment (precession, issue 227): a derived stream must join the source at the moment that source
+  corresponds to. Expectations in `verify.sh` are derived from operator definitions, not copied from engine output,
+  closing the gap left by the listing-only `dsp` and `issue96_substrat_reference` comparisons:
+  `it_issue227_join_alignment-run` and `it_issue227_join_alignment-adhoc-origin`.
+- H10a event-model gate for the `@` (AGSE) and `>` (SHIFT) classes, moved from the K24 campaign
+  (`rdb-experiment/results_20260804_K24r`) into per-commit ctest; the gate compares the compiler against an
+  independent event model that shares no code with `SOperations.hpp`: `ut_h10aGate`.
 - Compiler/presenter documentation graphs: four `pt_issue31_doc-*`.
 - Wildcards/unfold/retention: `pt_Pattern3`.
 - Identical field names in multiple streams: `pt_Pattern7`.
