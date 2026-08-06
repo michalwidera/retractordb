@@ -29,6 +29,15 @@ if [ -z "$DISPLAY" ]
 then
 export DISPLAY=:0
 fi
+
+# Bez --warmup xqry rysuje od pierwszego rekordu i okno pojawia sie od razu — tak dziala
+# wiekszosc celow, bo ich strumienie nie maja czego odcinac. Z --warmup xqry odrzuca podana
+# liczbe rekordow i czeka na pelny kadr (patrz Formatter::gnuplot_warmup_), wiec przez ten
+# czas gnuplot nie dostaje zadnego `plot` i nie tworzy okna. Bez ostrzezenia wyglada to na
+# zawieszenie, dlatego mowimy o tym tylko wtedy, gdy rozbieg jest faktycznie wlaczony.
+case "$XQRY_EXTRA_FLAGS" in
+  *--warmup*) echo "xplot: pomijam okres rozbiegowy strumienia, okno pojawi sie za chwile..." >&2 ;;
+esac
 { printf 'bind "Close" "exit gnuplot"\n'; xqry -s "$STREAM" -p "$SIZE" $XQRY_EXTRA_FLAGS; } | gnuplot || true
 # gnuplot closed (window X or Ctrl+C) — cleanup
 xqry -k || true

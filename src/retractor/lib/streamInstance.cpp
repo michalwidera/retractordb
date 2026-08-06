@@ -66,7 +66,8 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::strin
 rdb::payload streamInstance::constructAgsePayload(const int length,             //
                                                   const int step,               //
                                                   const std::string &instance,  //
-                                                  const int storedRecordCountDst) const {
+                                                  const int windowIndex,        //
+                                                  const int sourceIndexBase) const {
   if (step <= 0) {
     FatalError("streamInstance::constructAgsePayload: step must be > 0, got {}", step);
   }
@@ -104,19 +105,35 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   //    on return).
   rdb::payload result(descriptor);
 
-  const auto windowStart = storedRecordCountDst * step;
+  // Okno jest stemplowane KOŃCEM przedziału: rekord o indeksie logicznym n obejmuje
+  // spłaszczone pozycje n*step-(lengthAbs-1) ... n*step, więc jego najnowsze pole leży
+  // dokładnie w pozycji n*step. Dzięki temu indeks logiczny okna oznacza tę samą chwilę
+  // co indeks logiczny źródła i złączenie okna z jego źródłem nie wyprzedza sygnału.
+  //
+  // Origin (compiler::computeLogicalOrigin) gwarantuje, że dolny koniec zakresu nie sięga
+  // przed początek źródła, a ogon (compiler::computeStartupLatency) — że górny koniec już
+  // istnieje. Kontrola zakresu poniżej pozostaje ochroną przed uszkodzonym planem albo
+  // bezpośrednim wywołaniem jednostkowym.
+  const auto windowStart = windowIndex * step - (lengthAbs - 1);
 
-  // Okno n obejmuje spłaszczone pozycje n*step ... n*step+length-1.
-  // Ogon wyliczony przez compiler::computeStartupLatency() gwarantuje,
-  // że cały ten zakres jest dostępny; kontrola poniżej pozostaje ochroną
-  // przed uszkodzonym planem albo bezpośrednim wywołaniem jednostkowym.
   rdb::probe::onAgseWindow(lengthAbs);
 
   std::optional<size_t> lastReadPosition;
   for (auto i = 0; i < lengthAbs; ++i) {
     const auto flatPosition = windowStart + i;
-    auto fp                 = std::div(flatPosition, descriptorSrcSize);
-    const auto recordIndex  = fp.quot;
+    // Dzielenie z zaokrągleniem W DÓŁ, nie w stronę zera: pozycja ujemna (okno sięgające
+    // przed początek strumienia) ma trafiać do rekordu -1, a nie do rekordu 0. W silniku
+    // ten przypadek nie występuje — origin go wyklucza — ale wywołanie jednostkowe może
+    // podać dowolny indeks i cicha pomyłka o jeden rekord byłaby tu trudna do zauważenia.
+    auto fp = std::div(flatPosition, descriptorSrcSize);
+    if (fp.rem < 0) {
+      --fp.quot;
+      fp.rem += descriptorSrcSize;
+    }
+    // Rekord logiczny fp.quot leży w buforze na pozycji fp.quot - sourceIndexBase:
+    // strumień uruchomiony z niezerową bazą nie ma rekordów wcześniejszych, więc jego
+    // rekord fizyczny 0 nosi właśnie ten indeks logiczny.
+    const auto recordIndex = fp.quot - sourceIndexBase;
     if (recordIndex >= 0 && std::cmp_less(recordIndex, recordsCountSrc)) {
       const auto reversePosition = recordsCountSrc - static_cast<size_t>(recordIndex) - 1;
       if (lastReadPosition != reversePosition) {

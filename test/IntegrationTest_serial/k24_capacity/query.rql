@@ -1,6 +1,6 @@
 # K24/P1: pojemnosc historii dla operatorow czytajacych w przod.
 #
-# sub3/sub4 — roznica o calkowitym ilorazie >= 3. Przed poprawka caly strumien
+# sub3/sub4/sub5 — roznica o calkowitym ilorazie >= 3. Przed poprawka caly strumien
 # skladal sie z rekordow all-NULL przy poprawnej ich liczbie (cichy defekt).
 #
 # win/lag/mix — AGSE nad deklaracja o ilorazie 3 oraz `>N` pod `#`. Przed
@@ -10,6 +10,7 @@ DECLARE value INTEGER STREAM source, 1/100 FILE 'data.txt'
 
 SELECT * STREAM sub3 FROM source-3/100
 SELECT * STREAM sub4 FROM source-4/100
+SELECT * STREAM sub5 FROM source-5/100
 SELECT * STREAM win  FROM source@(3,-3)
 SELECT * STREAM lag  FROM win>8
 SELECT * STREAM mix  FROM win#lag

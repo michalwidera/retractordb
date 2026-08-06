@@ -10,6 +10,12 @@ size
 descc
 list 4
 
+echo SUB_RATIO5
+open sub5
+size
+descc
+list 4
+
 echo AGSE_WINDOW
 open win
 size

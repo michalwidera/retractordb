@@ -3,6 +3,7 @@
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <cstdint>
 #include <ctime>  // kotwica osi czasu pętli: clock_gettime, timespec
 #include <iostream>
 #include <memory>
@@ -92,6 +93,7 @@ std::vector<std::pair<std::string, std::string>> processedLines;
 
 dataModel *pProc = nullptr;
 std::atomic<bool> dataModelExpected{false};
+std::atomic<std::uint64_t> adHocPlanRevision{0};
 
 // variable connected with llimitqry (-m) parameter
 // counts remaining loop iterations; 0 = stop, inifitie_loop = run forever
@@ -201,13 +203,23 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
 
   std::vector<std::string> mergedIds;
   std::string compileChainResult;
+  std::string addFailedId;
   if (cmPtr == nullptr) FatalError("executorsm::getAdHoc: cmPtr is null");
 
-  // These brackets are important - we need to lock coreInstancePtr as less as possible
+  // Publish the compiled tree and its runtime stream instances atomically with respect
+  // to the execution loop.
   {
     std::scoped_lock scoped_lock(core_mutex);
-    mergedIds          = cmPtr->importFrom(coreInstanceCopy);
+    mergedIds = cmPtr->importFrom(coreInstanceCopy);
+    if (!mergedIds.empty()) adHocPlanRevision.fetch_add(1, std::memory_order_release);
     compileChainResult = cmPtr->compile();
+    if (compileChainResult == "OK") {
+      for (const auto &id : mergedIds)
+        if (!pProc->addQueryToModel(id)) {
+          addFailedId = id;
+          break;
+        }
+    }
   }
 
   if (compileChainResult != "OK") {
@@ -216,15 +228,14 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     return ptRetval;
   }
 
-  for (const auto &id : mergedIds) {
-    auto result = pProc->addQueryToModel(id);
-    if (!result) {
-      ptRetval.put(std::string("db"), "dataModel::addQueryToModel FAILED:" + id);
-      SPDLOG_ERROR("dataModel::addQueryToModel FAILED, stream {}", id);
-      return ptRetval;
-    }
-    processedLines.emplace_back(id, adHocQuery);
+  if (!addFailedId.empty()) {
+    ptRetval.put(std::string("db"), "dataModel::addQueryToModel FAILED:" + addFailedId);
+    SPDLOG_ERROR("dataModel::addQueryToModel FAILED, stream {}", addFailedId);
+    return ptRetval;
   }
+
+  for (const auto &id : mergedIds)
+    processedLines.emplace_back(id, adHocQuery);
 
   ptRetval.put(std::string("db"), "OK");
   return ptRetval;
@@ -631,7 +642,14 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 
       if (vm.contains("verbose")) coreInstancePtr->dumpCore();
 
-      TimeLine tl(coreInstancePtr->getAvailableTimeIntervals());
+      std::set<boost::rational<int>> timeIntervals;
+      std::uint64_t observedAdHocPlanRevision;
+      {
+        std::scoped_lock lock(core_mutex);
+        timeIntervals             = coreInstancePtr->getAvailableTimeIntervals();
+        observedAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_relaxed);
+      }
+      TimeLine tl(timeIntervals);
       //
       // Main loop of data processing
       //
@@ -689,12 +707,28 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
           break;
         }
 
+        // Szybka ścieżka wykonuje tylko odczyt atomowy. Pełny skan planu i
+        // przebudowa osi następują wyłącznie po opublikowaniu importu ad hoc.
+        const auto currentAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_acquire);
+        if (currentAdHocPlanRevision != observedAdHocPlanRevision) {
+          std::scoped_lock lock(core_mutex);
+          auto availableTimeIntervals = coreInstancePtr->getAvailableTimeIntervals();
+          if (availableTimeIntervals != timeIntervals) {
+            tl.updateTimeIntervals(availableTimeIntervals);
+            timeIntervals = std::move(availableTimeIntervals);
+          }
+          // Import również publikuje rewizję pod core_mutex. Ponowny odczyt
+          // pod blokadą obejmuje wszystkie importy zakończone przed tym skanem.
+          observedAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_relaxed);
+        }
+
         //
         // Inner time is counted in miliseconds
         // probably can be increased in faster machines
         //
-        const int msInSec = 1000;
-        boost::rational<int> interval(tl.getNextTimeSlot() * msInSec /* sec->ms */);
+        const int msInSec                          = 1000;
+        const boost::rational<int> currentTimeSlot = tl.getNextTimeSlot();
+        boost::rational<int> interval(currentTimeSlot * msInSec /* sec->ms */);
         int period(rational_cast<int>(interval - prev_interval));  // miliseconds
         prev_interval = interval;
 
@@ -707,9 +741,14 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
           std::this_thread::sleep_for(std::chrono::milliseconds(period));
 
         slotBench.beginSlot(rational_cast<long>(interval));
-        inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
+        {
+          // Kompilator ad hoc modyfikuje qTree pod tym samym muteksem. Bez blokady
+          // iteracja getAwaitedStreamsSet mogłaby ścigać się z importem nowych węzłów.
+          std::scoped_lock lock(core_mutex);
+          inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
+        }
         slotBench.beginCompute();
-        proc.processRows(inSet);  // mierzony rdzeń obliczeń jednego interwału (E1)
+        proc.processRows(inSet, currentTimeSlot);  // mierzony rdzeń obliczeń jednego interwału (E1)
         slotBench.endCompute();
         boradcast(inSet);
         slotBench.endSlot();

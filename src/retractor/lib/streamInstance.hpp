@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>  // unique_ptr
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -34,13 +35,21 @@ struct streamInstance {
   /// pozycją na siatce slotów.
   size_t elapsedSlots = 0;
 
+  /// @brief Indeks logiczny fizycznego rekordu 0 tej instancji.
+  ///
+  /// Plan uruchamiany od początku używa query::logicalOrigin. Instancja dodana ad hoc
+  /// dostaje bazę dopiero w pierwszym należnym jej slocie bieżącej osi czasu; do tego
+  /// momentu std::nullopt odróżnia ją od strumienia startowego oczekującego na origin/ogon.
+  std::optional<int> logicalIndexBase;
+
   // This constructor will create data based on query
   explicit streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam = "");
 
   [[nodiscard]] rdb::payload constructAgsePayload(int length,                   //  _@(_,length)
                                                   int step,                     //  _@(step,_)
                                                   const std::string &instance,  //  instance@(_,_)
-                                                  int storedRecordCountDst) const;
+                                                  int windowIndex,              //  indeks LOGICZNY okna
+                                                  int sourceIndexBase = 0) const;
   /*
    * This function will create aggregate payload based on the command and instance
    */

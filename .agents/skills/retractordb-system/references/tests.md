@@ -10,11 +10,11 @@
 
 ## Test architecture
 
-At the current G1 revision, CTest exposes 166 tests:
+At the current Issue 225 (capacity model) revision, CTest exposes 181 tests:
 
 - `pt_*` (1-41): parallel-safe compile-only, presenter, Valgrind, or offline `xtrdb` scenarios;
-- `it_*` (42-89): serial/end-to-end scenarios, especially those using singleton lock or shared IPC;
-- unit-related (90-166): GTest binaries, setup fixtures, and data-model comparison.
+- `it_*` (42-98): serial/end-to-end scenarios, especially those using singleton lock or shared IPC;
+- unit-related (99-181): GTest binaries, setup fixtures, and data-model comparison.
 
 The serial CMake wrapper detects commands that start the server (`-m`, `-k`, `xqry`, workflow scripts, lock access) and assigns `RUN_SERIAL TRUE`. Some shell-wrapped server tests set it explicitly because CMake cannot see flags inside the script.
 
@@ -52,6 +52,16 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
   `it_r1_identity_nulls-run`. Its blocked `3/2` case pins the phase-maximum `STREAM_HASH` tail and compares payload plus
   metadata against the explicit RHS; `ut_compiler` additionally covers `3/5`, `3/2`, `7/11`, and `160/147`.
 - Scalar divide-by-zero produces NULL without suppressing later records: `it_null_divide_by_zero-run`.
+- Operator tail/observability phase boundaries (difference, AGSE, reductions, real NULL inside a full window versus
+  the all-null out-of-history failsafe): `it_k19_boundaries`.
+- Event-model history capacities for declared sources feeding AGSE/SUBTRACT/ADD consumers: `it_k24_capacity`.
+- Join alignment (precession, issue 227): a derived stream must join the source at the moment that source
+  corresponds to. Expectations in `verify.sh` are derived from operator definitions, not copied from engine output,
+  closing the gap left by the listing-only `dsp` and `issue96_substrat_reference` comparisons:
+  `it_issue227_join_alignment-run` and `it_issue227_join_alignment-adhoc-origin`.
+- H10a event-model gate for the `@` (AGSE) and `>` (SHIFT) classes, moved from the K24 campaign
+  (`rdb-experiment/results_20260804_K24r`) into per-commit ctest; the gate compares the compiler against an
+  independent event model that shares no code with `SOperations.hpp`: `ut_h10aGate`.
 - Compiler/presenter documentation graphs: four `pt_issue31_doc-*`.
 - Wildcards/unfold/retention: `pt_Pattern3`.
 - Identical field names in multiple streams: `pt_Pattern7`.

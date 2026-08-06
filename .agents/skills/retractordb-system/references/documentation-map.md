@@ -67,6 +67,7 @@ Directory: `podstawy-matematyczne/`
 - `README.md` — scope and motivation of the mathematical model.
 - `algebra-regularnych-serii-czasowych.md` — regular time-series object, intervals, and the main stream-algebra operators.
 - `formalne-podstawy-i-dowody.md` — Beatty/Fraenkel foundations, formal definitions, identities, and proofs.
+- `ogony-i-obserwowalnosc-operatorow.md` — causal startup tails, per-operator tail audit, AGSE full-window bound, and the observability tuple (interval, tail, descriptor, records with NULL maps, gaps, materialization policy).
 - `wyrazenia-algebraiczne.md` — construction and interpretation of algebraic stream expressions.
 - `implementacja-programowa.md` — translation of the formal model into program algorithms and index calculations.
 - `zaleznosci-pomiedzy-operatorami-algebry.md` — graphical relationships and composition of algebra operators.

@@ -33,10 +33,10 @@ Core stream operators:
 | `A + B` | synchronized sum/join `Sigma` | concatenates schemas, repeats the slower side as needed; `Delta=min(Da,Db)` |
 | `C - D` | inverse/difference `delta` | selects a component according to rational interval argument; output interval remains source interval |
 | `S > n` | sample/time shift `tau` | reads a reverse offset while preserving interval |
-| `S@(step,width)` | AGSE `Psi` | outputs `abs(width)` flattened elements; `Delta_out=Delta_source*step/source_flat_width`; negative width mirrors order |
+| `S@(step,width)` | AGSE `Psi` | outputs `abs(width)` flattened elements; `Delta_out=Delta_source*step/source_flat_width`; positive width keeps the newest field first, negative width mirrors into arrival order |
 | `S.min/.max/.avg/.sumc` | field reduction | one rational output field; interval unchanged |
 
-The `Hash`, `Div`, `Mod`, `Subtract`, and `agse` index equations live in `src/include/SOperations.hpp`. They use `boost::rational<int>` and integer floor/ceiling functions to avoid floating-point timing drift. `deinterleave_roundtrip` asserts bit-exact reconstruction, including the causal one-slot delay of left deinterleave.
+The `Hash`, `Div`, `Mod`, `Add`, `Subtract`, and `agse` index equations live in `src/include/SOperations.hpp`, together with the event-model startup-latency closed forms (`AddStartupLatency`, `AgseStartupLatency`, `SubtractStartupLatency`) and the logical-origin form (`AgseLogicalOrigin`). They use `boost::rational<int>` and integer floor/ceiling functions to avoid floating-point timing drift. `deinterleave_roundtrip` asserts bit-exact reconstruction, including the causal one-slot delay of left deinterleave.
 
 ## Executables
 

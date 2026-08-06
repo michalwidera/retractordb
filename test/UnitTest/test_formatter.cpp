@@ -83,36 +83,32 @@ TEST(Formatter, renderRaw_skipNull_false_outputs_all_null_row) {
 
 // ---- renderGnuplot ----
 
-TEST(Formatter, renderGnuplot_accumulates_state) {
+// Podaje kolejne wartosci do formattera i zwraca to, co poszlo do gnuplota.
+namespace {
+std::string feedGnuplot(Formatter &fmt, int firstValue, int howMany, int window) {
   ptree schema;
   schema.put("db.field.x", "x");
-  ptree row1;
-  ptree row2;
-  row1.put("0", "10");
-  row2.put("0", "20");
-
-  Formatter fmt;
   testing::internal::CaptureStdout();
-  fmt.renderGnuplot(row1, 1, "0", "s", schema, {5, 0, 100});
-  fmt.renderGnuplot(row2, 1, "0", "s", schema, {5, 0, 100});
-  auto out = testing::internal::GetCapturedStdout();
+  for (int i = 0; i < howMany; ++i) {
+    ptree row;
+    row.put("0", std::to_string(firstValue + i));
+    fmt.renderGnuplot(row, 1, "0", "s", schema, {window, 0, 100});
+  }
+  return testing::internal::GetCapturedStdout();
+}
+}  // namespace
+
+TEST(Formatter, renderGnuplot_accumulates_state) {
+  Formatter fmt;
+  auto out = feedGnuplot(fmt, 10, 2, 5);
 
   EXPECT_NE(out.find("10"), std::string::npos);
-  EXPECT_NE(out.find("20"), std::string::npos);
+  EXPECT_NE(out.find("11"), std::string::npos);
 }
 
 TEST(Formatter, renderGnuplot_respects_window_size) {
-  ptree schema;
-  schema.put("db.field.x", "x");
   Formatter fmt;
-
-  testing::internal::CaptureStdout();
-  for (int i = 0; i < 5; ++i) {
-    ptree row;
-    row.put("0", std::to_string(i));
-    fmt.renderGnuplot(row, 1, "0", "s", schema, {3, 0, 100});  // window = 3
-  }
-  auto out = testing::internal::GetCapturedStdout();
+  auto out = feedGnuplot(fmt, 0, 5, 3);  // window = 3
 
   // Only last 3 values should appear (0 and 1 evicted)
   EXPECT_EQ(out.find(" 0 \n"), std::string::npos);

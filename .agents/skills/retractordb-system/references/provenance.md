@@ -5,10 +5,10 @@
 | Repository | Role | Branch | Version basis |
 |---|---|---|---|
 | `retractordb` | implementation, tests, examples, packaging | `master` | versioned in the same Git tree as this file |
-| `dokumentacja-rdb` | canonical Polish documentation | `main` | `2723e03cabac72fed29eb5e2d82f7275fefd38d6` |
-| `documentation-rdb` | derived English translation | `main` | `93f372882ec5c5b5022e72834a5562b743ba441f` |
+| `dokumentacja-rdb` | canonical Polish documentation | `main` | `58e5c704ecb3c8765fae0da62b2e24fb26c3ea66` |
+| `documentation-rdb` | derived English translation | `main` | `417266451f0a3068c10f3f9fbee19bb91d3607ab` |
 
-Index prepared on 2026-07-23 and its external documentation basis refreshed on 2026-07-25 in timezone Europe/Warsaw.
+Index prepared on 2026-07-23 and its external documentation basis refreshed on 2026-08-05 in timezone Europe/Warsaw.
 The initial code basis was commit `48f9b50`. Code and the index now live in the same repository and are selected by the
 same checkout, so provenance does not embed a mutable current-code commit hash. This avoids a self-referential update in
 which committing a new hash immediately makes that hash historical. The initial verified product baseline remains
@@ -60,10 +60,41 @@ embedded key. Exact revision checks remain only for the two external documentati
   Compiler rewrites preserve public field names through `verifyUserFieldNamesPreserved()`, and compilation ends with an
   unconditional topological sort. The current Debug inventory is 166/166 passing; the G1 realization record also
   captured 165/165 Debug and Release before the final additional regression.
+- Issue 225 (merged as `c4b63a7`) installs the K24 event-model capacity and tail formulas. `computeStartupLatency()`
+  now runs before `computeRequiredCapacities()`, and capacities are derived from the event distance between producer
+  availability and consumer reads: `AddStartupLatency` (`ceil((1+W_src)*Ds/Dout)-1` per `STREAM_ADD` component),
+  `AgseStartupLatency` (`ceil((P+(1+W_src)*F)/k)-1` with phase bound `P=floor((|L|-1)/g)*g`, `g=gcd(F,k)` — the
+  phase bound was later moved out of the tail into the logical origin by the H10a re-timestamping; see the Issue 227
+  entry below), and
+  `SubtractStartupLatency` replace the earlier tick-conversion approximations that under- or over-sized tails for a
+  large share of corpus plans. `STREAM_ADD` entered the capacity model; declared sources get a fixed
+  `kDeclarationPrefetch = 2` front allowance (armed record plus zero prefetch); wrong capacities previously produced
+  silent all-NULL reads or `storage::revRead` aborts. Reduction output for arithmetic sources is now always `RATIONAL`
+  through `reductionResultField()` shared by `query::descriptorFrom` and `streamInstance::reduceFieldsToPayload`,
+  fixing rational truncation such as `2000003/2` becoming `1000001/1`. Interval arithmetic in
+  `resolveStreamIntervals()` is computed in 64-bit `wideRational` and range-checked by `narrowInterval()` instead of
+  silently overflowing `boost::rational<int>`. New regressions: `it_k19_boundaries` (operator tail/observability
+  boundaries, real NULL inside a full AGSE window versus the all-null failsafe) and `it_k24_capacity` (declaration
+  history depths). The Debug inventory is now 181 tests: `pt_*` 1-41, `it_*` 42-98, unit-related 99-181.
+- Issue 227 (branch `issue_227-precesja`, H10a re-timestamping) moves the join-alignment delay out of startup tails
+  into a new logical origin. The `@` window is now stamped by the interval END; its early records would reach before
+  the source start, so the window span generates `query::logicalOrigin` through `AgseLogicalOrigin()`
+  (`ceil((sourceOrigin*F + |L| - 1)/step)`) instead of inflating the tail, and `AgseStartupLatency` loses its phase
+  bound, becoming `ceil((1+W_src)*F/step)-1`. `STREAM_TIMEMOVE(N)` adds `N` to the origin and keeps the tail exactly
+  equal to the producer tail; the emitted record sequence is unchanged, only its time address shifts, and
+  origin+tail silence equals the former tail length. A new compiler pass `computeLogicalOrigin()` runs between
+  `localizeFieldOffsets()` and `computeStartupLatency()`; every other operator propagates origin through the same
+  non-decreasing index mapping it reads with. The presenter reports `origin=` alongside `tail=`. Ad-hoc import now
+  publishes the compiled tree and its stream instances atomically under `core_mutex`, bumps `adHocPlanRevision`, and
+  the execution loop rebuilds the `TimeLine` via `updateTimeIntervals()` without rewinding when an ad-hoc query
+  introduces a new rate; an ad-hoc SELECT starts at the first slot the runtime sees it, not at the system origin.
+  New regressions: `it_issue227_join_alignment-run`/`-adhoc-origin` (join-content expectations derived from operator
+  definitions, not engine output) and `ut_h10aGate` (the `results_20260804_K24r` campaign gate moved into per-commit
+  ctest for the `@` and `>` classes).
 
 ## Source hierarchy and scope
 
-At the indexed Polish documentation commit, the repository contains 74 Markdown files and 7,851 Markdown lines; 71
+At the indexed Polish documentation commit, the repository contains 75 Markdown files and 8,178 Markdown lines; 72
 content files are linked from `SUMMARY.md`. The index covers all major domains: mathematical foundations, RQL
 construction, architecture, compiler, execution, examples, CLI appendices, and the integration-test catalog.
 
@@ -75,30 +106,23 @@ The English repository is treated as derived content. Consult it only for Englis
 
 These are navigation warnings, not necessarily product defects:
 
-- The former `tau_m(S)=s_(n+m)` documentation drift has been corrected in the
-  current Polish and English documentation working trees. Both now define a
-  causal realization `((s_n,Delta),W)` and `tau_m` as increasing `W` by `m`
-  without prefix records. The matched-shift proof uses exact tail conversion
-  and matches `computeStartupLatency()`. Until the human commits the external
-  documentation changes and this table's version basis is advanced, freshness
-  correctly remains stale and the working-tree diff is part of the evidence.
-- The K2/G3 independent oracle campaign in
-  `examples/experiment/results_20260726_G3` first found that the former
-  `ceil(deltaB/deltaA)` own-tail term was insufficient for some interleave
-  phases. The K2 implementation, merged into `master` as `4f026f9`, uses the
-  phase maximum `ceil((p+q-1)/p)` for reduced `deltaA/deltaB=p/q`. Unit
-  regressions cover
-  `3/5`, `3/2`, `7/11`, and `160/147`; the blocked `3/2` integration case
-  compares payload and NULL metadata against explicit R1 RHS. Debug CTest
-  passes 166/166, and the repeated full campaign passes 13/13 engine cases
-  plus 75,548 model cases / 143,065,922 positions with zero mismatch. The
-  report records the base commits and SHA-256 hashes of the uncommitted
-  worktree diffs. K2/G3 meets its experimental criterion. The canonical
-  Polish and derived English documentation working trees now define the
-  phase-tail formula in the formal proof, compiler-pass, and substrate pages
-  and list the integration regression. Until the human commits those external
-  documentation changes and this table's version basis is advanced, freshness
-  correctly remains stale and the working-tree diffs are part of the evidence.
+- Reopened by the H10a re-timestamping (branch `issue_227-precesja`): the documentation realization defines
+  `\tau_m` as increasing the tail `W` by `m`, and
+  `podstawy-matematyczne/ogony-i-obserwowalnosc-operatorow.md` still gives the AGSE tail with the phase bound
+  `g=gcd(F,k)` and has no logical-origin concept. Current code puts the `>N` delay and the AGSE window span into
+  `query::logicalOrigin` instead of the tail (`computeLogicalOrigin()`, `AgseLogicalOrigin()`); the tail formulas
+  are the phase-free ones from the Issue 227 entry above. The Polish tail/observability page and the formal-proof
+  `\tau_m` definition need updating, then the English derivative.
+
+- Resolved at the current basis: the former `tau_m(S)=s_(n+m)` drift. Both documentation repositories now define a
+  causal realization `((s_n,Delta),W)` with `tau_m` increasing `W` by `m` without prefix records, matching
+  `computeStartupLatency()`.
+- Resolved at the current basis: the K2/G3 phase-maximum interleave tail `ceil((p+q-1)/p)` for reduced
+  `deltaA/deltaB=p/q` (merged as `4f026f9`) is now documented in the committed formal proof, compiler-pass, and
+  substrate pages, together with the `r1_identity_nulls` regression. The campaign evidence lives in the sibling
+  `rdb-experiment` repository (`results_20260726_G3`). The newer K19/K24 campaigns (`results_20260728_K19`,
+  `results_20260728_K4` in the same repository) extend the same event-model reasoning to all operators; see the
+  Issue 225 entry above.
 - Several storage chapters still call the metadata class `metaDataStream`; current code uses `rdb::metaData`, with `MetaIndexStore`, `GapDetector`, `IndexRecord`, `metaShadow`, and `storageShadow` extracted into separate units.
 - The Polish integration-test appendix omits newer scenarios including `config_storage_validation`, `deinterleave_roundtrip`, `packaging`, and `service_idle`. The live CTest inventory is authoritative.
 - Some prose says `xretractor` requires a query file. Current service mode supports no query file / an empty startup file and stays alive in idle mode.

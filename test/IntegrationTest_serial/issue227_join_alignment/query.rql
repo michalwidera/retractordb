@@ -1,0 +1,23 @@
+# Regresja precesji (issue #227): okno i przesuniecie MUSZA byc widoczne w zlaczeniu.
+#
+# Dotad `@(k,len)` bylo stemplowane POCZATKIEM przedzialu, a `>N` mialo opoznienie
+# ukryte w ogonie. W obu przypadkach zlaczenie po indeksie rekordu zestawialo strumien
+# pochodny z niewlasciwa chwila zrodla: okno WYPRZEDZALO sygnal (plaski wykres detekcji
+# QRS w examples/ecg — odpowiedz przed danymi), a przesuniecie bylo w parze niewidoczne.
+#
+# Zaden test danych tego nie pokrywal: dsp i issue96_substrat_reference sprawdzaly
+# wylacznie listing kompilacji, a ecg nie ma testu w ogole.
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM fast, 0.1 FILE 'datafile1.txt'
+DECLARE a INTEGER STREAM slow, 0.2 FILE 'datafile2.txt'
+
+SELECT * STREAM win     FROM fast@(1,3)
+SELECT * STREAM shifted FROM fast>2
+
+# Okno zlaczone z WLASNYM zrodlem — jadro potoku FIR (mlii+mwi w examples/ecg).
+SELECT * STREAM win_join   FROM fast+win
+
+# Przesuniecie zlaczone ze strumieniem o innym takcie.
+SELECT * STREAM shift_join FROM shifted+slow

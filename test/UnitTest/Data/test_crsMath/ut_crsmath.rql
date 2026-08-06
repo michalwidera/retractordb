@@ -1,6 +1,9 @@
 DECLARE a INTEGER, b INTEGER, c INTEGER STREAM cx, 1 FILE 'datafile4.txt'
+DECLARE a INTEGER STREAM cy, 1/3 FILE 'datafile3.txt'
 
 # streams presented in agse2/agse-decomposition.drawio 
+
+# cx@(1,1) != cx, bo |cx_schemat| == 3
 
 SELECT * STREAM s1x FROM cx@(1,1)
 SELECT * STREAM s2x FROM cx@(2,2)
@@ -10,6 +13,14 @@ SELECT * STREAM s5x FROM cx@(3,3)
 SELECT * STREAM s6x FROM cx@(3,-3)
 SELECT * STREAM s7x FROM cx@(2,3)
 SELECT * STREAM s8x FROM cx@(2,4)
+
+# interesting streams for testing the decomposition of the query
+
+# cy@(1,1) == cy, bo |cy_schemat| == 1
+
+SELECT * STREAM s1y FROM cy@(1,1)
+SELECT * STREAM s2y FROM (cy>1)@(2,2)
+SELECT * STREAM s9x FROM (s1x>1)@(2,2)
 
 # DECLARE a INTEGER STREAM cy, 1 FILE 'datafile3.txt'
 # SELECT * STREAM s11x FROM cy@(3,3)

@@ -53,6 +53,14 @@ void Formatter::renderGnuplot(const ptree &row, int count, const std::string &nu
                               const ptree &schema, std::tuple<int, int, int> dim) {
   if (std::cmp_less(gnuplot_lines_.size(), count)) gnuplot_lines_.resize(static_cast<std::size_t>(count));
 
+  const auto window = static_cast<size_t>(std::get<0>(dim));
+
+  for (int i = 0; i < count; i++) {
+    gnuplot_lines_[i].push_front(displayedValue(row, i, nullmap, formatMode::GNUPLOT));
+    if (gnuplot_lines_[i].size() > window) gnuplot_lines_[i].pop_back();
+  }
+
+
   std::print("plot");
   int colIdx{0};
   for (const auto &v : schema.get_child("db.field")) {
@@ -64,10 +72,6 @@ void Formatter::renderGnuplot(const ptree &row, int count, const std::string &nu
   }
   std::print("\r\n");
 
-  for (int i = 0; i < count; i++) {
-    gnuplot_lines_[i].push_front(displayedValue(row, i, nullmap, formatMode::GNUPLOT));
-    if (gnuplot_lines_[i].size() > static_cast<size_t>(std::get<0>(dim))) gnuplot_lines_[i].pop_back();
-  }
   for (int i = 0; i < count; i++) {
     for (size_t j = 0; j < gnuplot_lines_[i].size(); j++)
       std::print("{} {}\r\n", j, gnuplot_lines_[i][j]);

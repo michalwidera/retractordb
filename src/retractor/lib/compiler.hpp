@@ -33,6 +33,7 @@ struct compiler {
   std::string applyCapacitiesToStreams(const std::map<std::string, int> &capMap);
   std::map<std::string, std::vector<std::string>> snapshotUserFieldNames() const;
   std::string verifyUserFieldNamesPreserved(const std::map<std::string, std::vector<std::string>> &before) const;
+  std::string computeLogicalOrigin();
   std::string computeStartupLatency();
   std::string factorMatchedHashTimeMoves();
   void retargetSchemaReferences(query &q, const std::string &oldName, const std::string &newName);

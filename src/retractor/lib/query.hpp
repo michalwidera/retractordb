@@ -56,10 +56,24 @@ class query {
   ///
   /// Wyliczane dokładną arytmetyką wymierną przez compiler::computeStartupLatency().
   int startupLatency = 0;
-  bool isDisposable  = false;
-  bool isOneShot     = false;
-  bool isHold        = false;
-  bool isSubstrat    = false;
+
+  /// @brief Początek logiczny strumienia: indeks PIERWSZEGO rekordu, który w ogóle istnieje.
+  ///
+  /// Rekordy o indeksie mniejszym od origin nie powstają — nie dlatego, że jeszcze ich nie ma (od tego jest ogon),
+  /// tylko dlatego, że ich definicja sięga przed początek strumienia źródłowego. Okno `@(k,L)` stemplowane końcem
+  /// przedziału obejmuje pozycje n*k-(|L|-1) ... n*k, więc dla małych n sięga w nieistniejącą przeszłość; te sloty
+  /// są niedefiniowalne, a nie „puste”. Zasada brzegu z komentarza przy startupLatency zabrania wypełniać je NULL-em.
+  ///
+  /// Indeks logiczny jest walutą wszystkich odwzorowań między strumieniami (Add, Hash, Subtract, Theta, AGSE).
+  /// Przeliczenie na fizyczny offset w buforze robi wyłącznie dataModel::fetchForward().
+  ///
+  /// Wyliczane przez compiler::computeLogicalOrigin().
+  int logicalOrigin = 0;
+
+  bool isDisposable = false;
+  bool isOneShot    = false;
+  bool isHold       = false;
+  bool isSubstrat   = false;
 
   std::list<field> lSchema;
   std::list<token> lProgram;

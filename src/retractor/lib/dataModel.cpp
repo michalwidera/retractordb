@@ -37,8 +37,11 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
                                         [](const query &qry) { return qry.isCompilerDirective(); });
   coreInstance_.erase(removed.begin(), removed.end());
 
-  for (auto &qry : coreInstance_)
-    qSet.emplace(qry.id, std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]));
+  for (auto &qry : coreInstance_) {
+    auto runtime              = std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]);
+    runtime->logicalIndexBase = qry.logicalOrigin;
+    qSet.emplace(qry.id, std::move(runtime));
+  }
   for (auto const &[key, val] : qSet)
     val->outputPayload->setDisposable(coreInstance_[key].isDisposable);
 }
@@ -59,6 +62,9 @@ bool dataModel::addQueryToModel(const std::string &id) {
 
   qSet.emplace(id, std::make_unique<streamInstance>(coreInstance_, *it, directive_[":STORAGE"]));
   qSet[id]->outputPayload->setDisposable(coreInstance_[id].isDisposable);
+  // SELECT dodany do działającego planu nie zaczyna w historycznym origin całego systemu.
+  // Jego bazę wyznaczy dokładny pierwszy slot, w którym runtime zobaczy tę instancję.
+  if (!it->isDeclaration()) qSet[id]->logicalIndexBase.reset();
 
   return true;
 }
@@ -118,16 +124,27 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
   // Konwersja indeksu postępującego na offset wsteczny względem bieżącej
   // liczby rekordów źródła — uniezależnia odczyt od kadencji prefetch
   // źródeł deklarowanych i od siatki slotów.
-  const auto count = static_cast<int>(out.getRecordsCount());
-  const int rev    = count - 1 - forwardIndex;
+  //
+  // forwardIndex jest indeksem LOGICZNYM (walutą wszystkich odwzorowań z SOperations.hpp).
+  // Strumień nie ma rekordów o indeksach mniejszych od swojej runtime'owej bazy logicznej,
+  // więc rekord o indeksie równym bazie jest fizycznie rekordem 0 w buforze. To jedyne miejsce,
+  // w którym ta różnica jest przeliczana — dzięki temu ADD, SUBTRACT, HASH i rozplot dostają
+  // poprawkę raz, a nie każdy z osobna.
+  const auto count        = static_cast<int>(out.getRecordsCount());
+  const auto &logicalBase = qSet[instance]->logicalIndexBase;
+  if (!logicalBase.has_value()) {
+    FatalError("dataModel::fetchForward: logical index base not initialized for '{}'", instance);
+  }
+  const int physical = forwardIndex - *logicalBase;
+  const int rev      = count - 1 - physical;
 
-  const bool outOfRange = forwardIndex < 0 || rev < 0 ||  //
+  const bool outOfRange = physical < 0 || rev < 0 ||  //
                           (out.isDeclared() && rev >= static_cast<int>(out.historySize()));
   if (outOfRange) {
-    // Rekord niedostępny (przyszłość na osi czasu źródła albo poza historią
-    // bufora) — rekord all-null; o jego losie decyduje ścieżka zapisu.
+    // Rekord niedostępny (przyszłość na osi czasu źródła, przed początkiem logicznym
+    // albo poza historią bufora) — rekord all-null; o jego losie decyduje ścieżka zapisu.
     // Poziom ERROR z tego samego powodu co w fetchBack powyżej.
-    SPDLOG_ERROR("fetchForward {}: record {} not available (count={})", instance, forwardIndex, count);
+    SPDLOG_ERROR("fetchForward {}: record {} not available (count={}, base={})", instance, forwardIndex, count, *logicalBase);
     rdb::payload nullRecord(out.descriptor);
     nullRecord.setNullBitset(std::vector<bool>(out.descriptor.size(), true));
     return nullRecord;
@@ -156,7 +173,7 @@ void dataModel::processZeroStep() {
   }
 }
 
-void dataModel::processRows(const std::set<std::string> &inSet) {
+void dataModel::processRows(const std::set<std::string> &inSet, const boost::rational<int> &currentTimeSlot) {
   std::scoped_lock scoped_lock(core_mutex);
 
   // first - process all non-declaration queries
@@ -168,7 +185,34 @@ void dataModel::processRows(const std::set<std::string> &inSet) {
     // rekordu — ani zerowego, ani all-null. NULL jest wartością pochłaniającą (dane oczekiwane a
     // nieobecne, wynik nieistniejący w zbiorze wartości), nigdy rezerwacją miejsca na dane. Długość
     // ogona jest zadeklarowana w planie (query::startupLatency) i raportowana jako 'tail'.
-    if (qSet[q.id]->elapsedSlots++ < static_cast<size_t>(std::max(q.startupLatency, 0))) continue;
+    //
+    // Origin dokłada do bramki własny człon o innej naturze: ogon mówi „ten rekord jeszcze nie jest
+    // gotowy", origin mówi „tego rekordu nie ma". Pierwszy wyemitowany rekord nosi indeks logiczny
+    // równy origin, więc slotów milczenia jest origin + ogon.
+    const auto silentSlots = static_cast<size_t>(std::max(q.startupLatency, 0) + std::max(q.logicalOrigin, 0));
+
+    auto &runtime = *qSet[q.id];
+    if (!runtime.logicalIndexBase.has_value()) {
+      // Instancja ad hoc dołącza do już biegnącej osi. W jej pierwszym należnym slocie T
+      // indeks rekordu wynika z definicji chwili emisji:
+      //   T = (n + 1 + W) * Delta  =>  n = T/Delta - 1 - W.
+      // Nie wolno zaczynać ponownie od query::logicalOrigin, bo fizyczny rekord 0 niósłby
+      // wtedy bieżącą wartość oznaczoną historycznym indeksem.
+      const auto slotNumber = currentTimeSlot / q.rInterval;
+      if (slotNumber.denominator() != 1) {
+        FatalError("dataModel::processRows: current slot {}/{} is not aligned with interval {}/{} for '{}'",
+                   currentTimeSlot.numerator(), currentTimeSlot.denominator(), q.rInterval.numerator(),
+                   q.rInterval.denominator(), q.id);
+      }
+      const int firstLogicalIndex = slotNumber.numerator() - 1 - q.startupLatency;
+      if (firstLogicalIndex < q.logicalOrigin) continue;
+
+      runtime.logicalIndexBase = firstLogicalIndex;
+      // Bieżąca oś przeszła już origin i ogon. Ustawienie licznika na granicy
+      // pozwala temu samemu wywołaniu wyemitować pierwszy rekord ad hoc.
+      runtime.elapsedSlots = silentSlots;
+    }
+    if (runtime.elapsedSlots++ < silentSlots) continue;
 
     constructInputPayload(q.id);                    // That will create 'from' clause data set
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
@@ -202,6 +246,21 @@ void dataModel::constructInputPayload(const std::string &instance) {
   std::vector<token> arg;
   std::ranges::copy(qry.lProgram, std::back_inserter(arg));
   // same: for (auto tk : qry.lProgram) arg.push_back(tk);
+
+  // Indeks LOGICZNY rekordu, który właśnie powstaje. Liczba rekordów w buforze jest indeksem
+  // fizycznym; strumień o niezerowym origin nie ma rekordów przed origin, więc jego rekord
+  // fizyczny 0 nosi indeks logiczny origin. Wszystkie odwzorowania z SOperations.hpp są
+  // zdefiniowane na indeksach logicznych, więc karmimy je tą wartością.
+  const auto logicalIndexBase = [&](const std::string &id) {
+    const auto &logicalBase = qSet[id]->logicalIndexBase;
+    if (!logicalBase.has_value()) {
+      FatalError("dataModel::constructInputPayload: logical index base not initialized for '{}'", id);
+    }
+    return *logicalBase;
+  };
+  const auto logicalIndex = [&](const std::string &id) {
+    return static_cast<int>(qSet[id]->outputPayload->getRecordsCount()) + logicalIndexBase(id);
+  };
 
   auto operation = qry.lProgram.back();  // Operation is always last element on stack
 
@@ -244,7 +303,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       // n — 0-bazowy indeks rekordu wyjściowego; Div/Mod (SOperations.hpp)
       // zwracają indeks POSTĘPUJĄCY elementu w strumieniu przeplecionym.
-      const auto n = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount());
+      const auto n = logicalIndex(instance);
 
       int fwdPos = -1;
       if (cmd == STREAM_DEHASH_DIV) {
@@ -276,7 +335,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
-      const auto n                = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount());
+      const auto n                = logicalIndex(instance);
       const auto forwardIndex     = Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, n);
 
       *(qSet[instance]->inputPayload) = fetchForward(nameSrc, forwardIndex);
@@ -297,7 +356,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       // dopiero na koniec slotu, czyli w slocie n jeszcze nieokreślony.
       //
       // n — 0-bazowy indeks rekordu wyjściowego (indeks c_n z definicji).
-      const auto n = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount());
+      const auto n = logicalIndex(instance);
 
       const auto fwdPos1 = Add(qry.rInterval, coreInstance_.getQuery(nameSrc1).rInterval, n);
       const auto fwdPos2 = Add(qry.rInterval, coreInstance_.getQuery(nameSrc2).rInterval, n);
@@ -319,8 +378,13 @@ void dataModel::constructInputPayload(const std::string &instance) {
       if (step <= 0) {
         FatalError("dataModel::constructInputPayload: AGSE step must be > 0, got {} for '{}'", step, instance);
       }
-      const int storedRecordsInOutput = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount());
-      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, nameSrc, storedRecordsInOutput);
+      // Okno jest stemplowane końcem przedziału, więc rekord o indeksie logicznym n sięga
+      // wstecz od pozycji n*step. Runtime'owa baza źródła przesuwa jego pozycje
+      // spłaszczone o base*F. Dla planu startowego jest równa origin kompilatora,
+      // ale zapytanie dodane ad hoc dostaje ją z bieżącej osi logicznej.
+      const int windowIndex           = logicalIndex(instance);
+      const int sourceIndexBase       = logicalIndexBase(nameSrc);
+      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, nameSrc, windowIndex, sourceIndexBase);
     } break;
     case STREAM_HASH: {
       // 	:- PUSH_STREAM(core0)
@@ -336,7 +400,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       // n — 0-bazowy indeks rekordu wyjściowego (indeks c_n z definicji
       // przeplotu); Hash zwraca indeks POSTĘPUJĄCY elementu składowej.
-      const auto n = static_cast<int>(qSet[instance]->outputPayload->getRecordsCount());
+      const auto n = logicalIndex(instance);
 
       rdb::probe::onHashPick();
       int fwdPos                      = 0;
