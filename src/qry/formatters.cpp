@@ -60,7 +60,6 @@ void Formatter::renderGnuplot(const ptree &row, int count, const std::string &nu
     if (gnuplot_lines_[i].size() > window) gnuplot_lines_[i].pop_back();
   }
 
-
   std::print("plot");
   int colIdx{0};
   for (const auto &v : schema.get_child("db.field")) {

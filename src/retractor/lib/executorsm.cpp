@@ -163,7 +163,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   auto [parseOut, first_keyword, stream_name] = parserRQLString(coreInstanceCopy, adHocQuery);
 
   if (first_keyword == "UNRECOGNIZED") {
-    ptRetval.put(std::string("db"), "Unrecognized command. AdHoc query must start with DECLARE or SELECT");
+    ptRetval.put(std::string("db"), "Unrecognized command. AdHoc query must start with SELECT");
     SPDLOG_ERROR("Unrecognized command in AdHoc query");
     return ptRetval;
   }
@@ -182,7 +182,17 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     return ptRetval;
   }
 
-  if (first_keyword != "SELECT" && first_keyword != "DECLARE") {
+  // Deklaracja dodana w locie nie dostaje runtime'owej bazy indeksu logicznego
+  // (processRows pomija deklaracje), więc pierwszy odczyt przez operator kończył
+  // się FatalError i śmiercią całego serwera (issue #227, śledztwo po 5f31051).
+  // Odrzucamy, dopóki ad-hoc DECLARE nie dostanie własnej ścieżki wyznaczania bazy.
+  if (first_keyword == "DECLARE") {
+    ptRetval.put(std::string("db"), "Fail parse: AdHoc DECLARE not supported");
+    SPDLOG_ERROR("Parse adhoc query failed: AdHoc DECLARE not supported");
+    return ptRetval;
+  }
+
+  if (first_keyword != "SELECT") {
     FatalError("executorsm::getAdHoc: unexpected first_keyword '{}' after filtering — parser logic error", first_keyword);
   }
 

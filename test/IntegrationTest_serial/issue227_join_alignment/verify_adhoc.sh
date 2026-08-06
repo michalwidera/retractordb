@@ -32,6 +32,21 @@ done
 # Plan ma już rekordy o indeksach większych niż origin=2.
 sleep 0.6
 xqry -a 'SELECT * STREAM late FROM win'
+
+# Ad-hoc DECLARE jest odrzucane — serwer musi odpowiedzieć błędem i przetrwać.
+# Dołączona w locie deklaracja nie miałaby bazy indeksu logicznego; wcześniej
+# zapytanie z operatorem na takim źródle zabijało cały proces (issue #227).
+declare_out=$(xqry -a "DECLARE a INTEGER STREAM adhoc_src, 0.1 FILE 'datafile1.txt'" 2>&1) && {
+  echo "ad hoc: DECLARE nie zostalo odrzucone"
+  exit 1
+}
+case "$declare_out" in
+  *"DECLARE not supported"*) ;;
+  *)
+    echo "ad hoc: nieoczekiwana odpowiedz na DECLARE: $declare_out"
+    exit 1
+    ;;
+esac
 sleep 0.4
 xqry -a 'SELECT * STREAM late_pair FROM late+win'
 sleep 0.4
