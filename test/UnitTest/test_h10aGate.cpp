@@ -192,6 +192,134 @@ hashOracle evaluateHash(const streamModel &left, const streamModel &right, int p
   return result;
 }
 
+// Początek logiczny przeplotu. Obie pozycje — floor(z*n) dla pierwszej składowej
+// i n-floor(z*n) dla drugiej — są niemalejące, więc rekordy bez definicji tworzą
+// prefiks. Szukamy go przeglądem, a nie maksimum dwóch progów, żeby model nie
+// powtarzał rachunku silnika.
+int evaluateHashOrigin(const streamModel &left, const streamModel &right, int probeMultiplier = 1) {
+  // Origin to slot za OSTATNIM, w którym czytana składowa nie ma jeszcze rekordu.
+  // Szukamy go przeglądem, a nie maksimum dwóch progów, żeby model nie powtarzał
+  // rachunku silnika. Pozycja składowej o ilorazie p/q rośnie w tempie q/(p+q)
+  // albo p/(p+q), więc próg origin wypada najpóźniej po (O_A+O_B)*(p+q) slotach;
+  // zapas 64 slotów pokrywa fazę początkową.
+  const auto ratioAB = left.delta / right.delta;
+  const int span     = ((ratioAB.numerator() + ratioAB.denominator()) * (left.origin + right.origin + 2) + 64) * probeMultiplier;
+  int origin         = 0;
+  for (int n = 0; n < span; ++n) {
+    const auto pick        = pickConstituent(left.delta, right.delta, n);
+    const streamModel &src = pick.fromB ? right : left;
+    if (pick.position < src.origin) origin = n + 1;
+  }
+  return origin;
+}
+
+// --- suma strumieni `+` -------------------------------------------------------------
+//
+// Rekord n sumy o interwale Delta_c = min(Delta_1, Delta_2) niesie krotkę złożoną
+// z rekordów obu składowych: składowa o interwale Delta_src wnosi rekord
+// floor(n*Delta_c/Delta_src) — szybsza dostaje n, wolniejsza swój bieżący.
+// Odwzorowanie wyprowadzone z DEFINICJI sumy, celowo bez wołania Add()
+// ani AddStartupLatency() z SOperations.hpp.
+struct sumOracle {
+  int origin;
+  int tail;
+  ratio delta;
+};
+
+// Reszta n*Delta_c/Delta_src wraca po mianowniku zredukowanego ilorazu, więc
+// wielokrotność wspólnej wielokrotności obu mianowników pokazuje każdą fazę.
+int sumProbeWindow(const ratio &deltaOut, const streamModel &left, const streamModel &right) {
+  return std::max(64, 4 * std::lcm((deltaOut / left.delta).denominator(), (deltaOut / right.delta).denominator()));
+}
+
+sumOracle evaluateSum(const streamModel &left, const streamModel &right, int probeMultiplier = 1) {
+  sumOracle result{};
+  result.delta = std::min(left.delta, right.delta);
+
+  auto indexIn = [&result](const streamModel &src, int n) { return floorOf(ratio(n) * result.delta / src.delta); };
+
+  // Origin: najmniejsze n, w którym OBIE składowe trafiają w istniejący rekord.
+  result.origin = 0;
+  while (indexIn(left, result.origin) < left.origin || indexIn(right, result.origin) < right.origin)
+    ++result.origin;
+
+  const int window = sumProbeWindow(result.delta, left, right) * probeMultiplier;
+  for (int n = result.origin; n < result.origin + window; ++n)
+    for (const streamModel *src : {&left, &right}) {
+      const ratio available = ratio(indexIn(*src, n) + 1 + src->tail) * src->delta;
+      result.tail           = std::max(result.tail, ceilOf(available / result.delta - ratio(n + 1)));
+    }
+  return result;
+}
+
+// --- różnica `-` --------------------------------------------------------------------
+//
+// C-Delta wybiera z producenta rekord ceil(n*Delta/Delta_src); dla równych interwałów
+// wybór jest tożsamością. Model daje ogon w konwencji C1, czyli DOLNE ograniczenie:
+// silnik dokłada deklaracji własny slot (źródło jest publikowane po konsumentach
+// w takcie), więc bramka wymaga tu bezpieczeństwa, a nie równości. Klasa `-` jest
+// w tab:tail-exactness zawyżająca — treścią regresji jest brak zaniżeń.
+struct subtractOracle {
+  int origin;
+  int tail;
+};
+
+subtractOracle evaluateSubtract(const streamModel &source, const ratio &target, int probeMultiplier = 1) {
+  auto indexIn = [&](int n) { return source.delta == target ? n : ceilOf(ratio(n) * target / source.delta); };
+
+  subtractOracle result{};
+  result.origin = 0;
+  while (indexIn(result.origin) < source.origin)
+    ++result.origin;
+
+  const int window = std::max(64, 4 * (target / source.delta).denominator()) * probeMultiplier;
+  for (int n = result.origin; n < result.origin + window; ++n) {
+    const ratio available = ratio(indexIn(n) + 1 + source.tail) * source.delta;
+    result.tail           = std::max(result.tail, ceilOf(available / target - ratio(n + 1)));
+  }
+  return result;
+}
+
+// --- rozplot `&` (Theta) i `%` (~Theta) ---------------------------------------------
+//
+// Rekord i lewej składowej leży w przeplocie na pozycji i + ceil((i+1)*Da/Db), prawej
+// — na pozycji i + floor(i*Db/Da). Oba odwzorowania wyprowadzone z DEFINICJI rozplotu,
+// celowo bez wołania Div()/Mod() z SOperations.hpp: wspólny błąd odwzorowania
+// przeszedłby przez bramkę niezauważony.
+//
+// Theta jest o slot NIEPRZYCZYNOWA — jej pozycja w przeplocie wypada po własnym slocie
+// — i to jest cały powód, dla którego silnik dokłada jej jeden slot ogona. Bramka ma
+// wykazać, że tego slotu nie da się usunąć.
+struct dehashOracle {
+  int origin;
+  int tail;
+};
+
+int thetaPosition(const ratio &deltaA, const ratio &deltaB, int i) { return i + ceilOf(ratio(i + 1) * deltaA / deltaB); }
+
+int notThetaPosition(const ratio &deltaA, const ratio &deltaB, int i) { return i + floorOf(ratio(i) * deltaB / deltaA); }
+
+dehashOracle evaluateDehash(const streamModel &source, const ratio &deltaA, const ratio &deltaB, bool leftConstituent,
+                            int probeMultiplier = 1) {
+  const ratio target = leftConstituent ? deltaA : deltaB;
+  auto position      = [&](int i) {
+    return leftConstituent ? thetaPosition(deltaA, deltaB, i) : notThetaPosition(deltaA, deltaB, i);
+  };
+
+  dehashOracle result{};
+  result.origin = 0;
+  while (position(result.origin) < source.origin)
+    ++result.origin;
+
+  const auto ratioAB = deltaA / deltaB;
+  const int window   = std::max(64, 4 * (ratioAB.numerator() + ratioAB.denominator())) * probeMultiplier;
+  for (int i = result.origin; i < result.origin + window; ++i) {
+    const ratio available = ratio(position(i) + 1 + source.tail) * source.delta;
+    result.tail           = std::max(result.tail, ceilOf(available / target - ratio(i + 1)));
+  }
+  return result;
+}
+
 // --- korpus -------------------------------------------------------------------------
 
 std::string declareSource(const std::string &id, int width, const ratio &delta) {
@@ -213,6 +341,35 @@ std::string shiftOf(const std::string &id, const std::string &src, int offset) {
 
 std::string hashOf(const std::string &id, const std::string &left, const std::string &right) {
   return "SELECT * STREAM " + id + " FROM " + left + "#" + right + "\n";
+}
+
+std::string ratioText(const ratio &value) {
+  return std::to_string(value.numerator()) + "/" + std::to_string(value.denominator());
+}
+
+std::string sumOf(const std::string &id, const std::string &left, const std::string &right) {
+  return "SELECT * STREAM " + id + " FROM " + left + "+" + right + "\n";
+}
+
+std::string subtractOf(const std::string &id, const std::string &src, const ratio &target) {
+  return "SELECT * STREAM " + id + " FROM " + src + "-" + ratioText(target) + "\n";
+}
+
+// Argumentem rozplotu jest interwał składowej USUWANEJ, nie odzyskiwanej.
+std::string thetaOf(const std::string &id, const std::string &src, const ratio &removed) {
+  return "SELECT * STREAM " + id + " FROM " + src + "&" + ratioText(removed) + "\n";
+}
+
+std::string notThetaOf(const std::string &id, const std::string &src, const ratio &removed) {
+  return "SELECT * STREAM " + id + " FROM " + src + "%" + ratioText(removed) + "\n";
+}
+
+std::string projectionOf(const std::string &id, const std::string &src) {
+  return "SELECT " + src + "[0] STREAM " + id + " FROM " + src + "\n";
+}
+
+std::string reductionOf(const std::string &id, const std::string &src) {
+  return "SELECT * STREAM " + id + " FROM " + src + ".sumc\n";
 }
 
 const std::vector<int> kOffsets{1, 2, 3, 5, 8};
@@ -466,6 +623,7 @@ TEST(h10aGate, closed_form_matches_event_model_over_hash_corpus) {
       const auto &node = instance.getQuery("c");
       EXPECT_EQ(node.rInterval, expected.delta) << rql;
       EXPECT_EQ(node.startupLatency, expected.tail) << rql;
+      EXPECT_EQ(node.logicalOrigin, evaluateHashOrigin(left, right)) << rql;
       ++checked;
     }
   EXPECT_EQ(checked, static_cast<int>(deltas.size() * deltas.size()));
@@ -510,6 +668,10 @@ TEST(h10aGate, hash_over_two_windows_uses_the_constituent_selected_per_record) {
 
               EXPECT_EQ(instance.getQuery("c").rInterval, expected.delta) << rql;
               EXPECT_EQ(instance.getQuery("c").startupLatency, expected.tail) << rql;
+              // Origin przeplotu nad składowymi o NIEZEROWYM origin — korpus nad deklaracjami
+              // sprawdza tylko przypadek zerowy, więc dopiero tu widać, że obie pozycje
+              // przeplotu przenoszą niedefiniowalność.
+              EXPECT_EQ(instance.getQuery("c").logicalOrigin, evaluateHashOrigin(left, right)) << rql;
               ++checked;
             }
   EXPECT_EQ(checked, 2 * 2 * 2 * 3 * 3 * 3);
@@ -528,4 +690,399 @@ TEST(h10aGate, one_phase_period_is_enough_for_the_hash_tail) {
         EXPECT_EQ(evaluateHash(left, right, 1).tail, evaluateHash(left, right, 8).tail)
             << "dA=" << deltaA << " dB=" << deltaB << " W_A=" << tailA;
       }
+}
+
+// =====================================================================================
+// Klasy dopisane 2026-08-07 (luka L1): `+`, `-`, `&`, `%`, projekcja i redukcje.
+//
+// Powód: tab:tail-exactness w artykule podaje reżim dla DZIEWIĘCIU klas, a bramka
+// pilnowała trzech. Klasy `Θ` i `~Θ` nie miały żadnej kontroli, mimo że ich własny ogon
+// jest w compiler::computeStartupLatency() pojedynczą instrukcją (`++result` i jej brak).
+// Usunięcie tej instrukcji dawało reżim ZANIŻAJĄCY — rekord wydany przed określeniem
+// zależności — i nie zapalało w ctest ani jednej lampki.
+//
+// Asercje są ASYMETRYCZNE, zgodnie z twierdzeniem: równość dla klas dokładnych,
+// nierówność `silnik >= model` dla klas zawyżających. Origin jest wymagany dokładnie
+// we wszystkich klasach — artykuł podaje dla niego 100% w dziewięciu na dziewięć.
+// =====================================================================================
+
+namespace {
+
+const std::vector<ratio> kPairDeltas{ratio(1, 1), ratio(1, 2), ratio(3, 10)};
+const std::vector<int> kPairWidths{2, 3};
+const std::vector<int> kPairSteps{1, 2};
+
+}  // namespace
+
+// Klasa `+` nad DWOMA OKNAMI. Korpus nad deklaracjami byłby bezwartościowy: przy zerowych
+// ogonach składowych AddStartupLatency() degeneruje się do ceil(Delta_src/Delta_out)-1
+// i nie sprawdza członu (1+W_src). Dopiero producent o niezerowym ogonie odróżnia postać
+// obowiązującą od postaci sprzed K24 (ceil(W_src*Delta_src/Delta_out)), która dla zerowego
+// ogona składowej dawała zero niezależnie od tego, jak wolna jest ta składowa.
+TEST(h10aGate, closed_form_matches_event_model_over_sum_corpus) {
+  int checked        = 0;
+  int distinguishing = 0;
+  for (const auto &deltaA : kPairDeltas)
+    for (int widthA : kPairWidths)
+      for (int stepA : kPairSteps)
+        for (const auto &deltaB : kPairDeltas)
+          for (int widthB : kPairWidths)
+            for (int stepB : kPairSteps) {
+              qTree instance;
+              const std::string rql = declareSource("a", widthA, deltaA) +  //
+                                      declareSource("b", widthB, deltaB) +  //
+                                      windowOf("wa", "a", stepA, 2) +       //
+                                      windowOf("wb", "b", stepB, 3) +       //
+                                      sumOf("s", "wa", "wb");
+              auto [parseResult, keyword, name] = parserRQLString(instance, rql);
+              ASSERT_EQ(parseResult, "OK") << rql;
+
+              compiler compilerInstance(instance);
+              ASSERT_EQ(compilerInstance.compile(), "OK") << rql;
+
+              const streamModel sourceA{.delta = deltaA, .width = widthA, .tail = 0, .origin = 0};
+              const streamModel sourceB{.delta = deltaB, .width = widthB, .tail = 0, .origin = 0};
+              const agseOracle windowA = evaluate(sourceA, stepA, 2);
+              const agseOracle windowB = evaluate(sourceB, stepB, 3);
+              const streamModel left{.delta = windowA.delta, .width = 2, .tail = windowA.tail, .origin = windowA.origin};
+              const streamModel right{.delta = windowB.delta, .width = 3, .tail = windowB.tail, .origin = windowB.origin};
+              const sumOracle expected = evaluateSum(left, right);
+
+              const auto &node = instance.getQuery("s");
+              EXPECT_EQ(node.rInterval, expected.delta) << rql;
+              EXPECT_EQ(node.startupLatency, expected.tail) << rql;
+              EXPECT_EQ(node.logicalOrigin, expected.origin) << rql;
+              if (left.tail > 0 || right.tail > 0) ++distinguishing;
+              ++checked;
+            }
+  EXPECT_EQ(checked, 3 * 2 * 2 * 3 * 2 * 2);
+  // Moc detekcyjna: korpus musi zawierać przypadki z niezerowym ogonem składowej,
+  // bo tylko one odróżniają postać obowiązującą od zastąpionej.
+  EXPECT_GT(distinguishing, 0);
+}
+
+// Kontrola aparatury sumy: okno sondowania szerokie na tyle, że wynik już nie rośnie.
+TEST(h10aGate, sum_probe_window_is_wide_enough) {
+  for (const auto &deltaA : kPairDeltas)
+    for (const auto &deltaB : kPairDeltas)
+      for (int tailA : {0, 1, 3})
+        for (int tailB : {0, 2}) {
+          const streamModel left{.delta = deltaA, .width = 1, .tail = tailA, .origin = 1};
+          const streamModel right{.delta = deltaB, .width = 1, .tail = tailB, .origin = 2};
+          EXPECT_EQ(evaluateSum(left, right, 1).tail, evaluateSum(left, right, 3).tail)
+              << "dA=" << deltaA << " dB=" << deltaB << " W_A=" << tailA << " W_B=" << tailB;
+        }
+}
+
+// Klasa `-` nad oknem: producent ma niezerowy ogon i niezerowy origin, więc sprawdzana
+// jest propagacja obu wielkości, a nie tylko przypadek brzegowy nad deklaracją (ten
+// pokrywa ut_capacities). Reżim klasy jest ZAWYŻAJĄCY — w kampanii K24d 19,1% zgodności
+// — więc asercją ogona jest nierówność. Origin musi być dokładny.
+TEST(h10aGate, subtract_never_falls_below_the_event_model) {
+  int checked     = 0;
+  int tight       = 0;
+  int originMoved = 0;
+  // Okno pięciopolowe, a nie dwupolowe: przy origin producenta równym 1 odwzorowanie
+  // ceil(n*Delta/Delta_src) zwraca dokładnie ten sam próg, więc korpus przechodziłby
+  // także dla silnika PRZEPISUJĄCEGO origin producenta bez odwzorowania — sprawdzone
+  // mutacyjnie 2026-08-07. Origin 4 (krok 1) i 2 (krok 2) rozdziela te dwie reguły.
+  for (const auto &delta : kPairDeltas)
+    for (int width : kPairWidths)
+      for (int step : kPairSteps)
+        for (const auto &factor : {ratio(1, 1), ratio(2, 1), ratio(3, 1), ratio(5, 2)}) {
+          const ratio windowDelta = delta * ratio(step, width);
+          const ratio target      = windowDelta * factor;
+
+          qTree instance;
+          const std::string rql = declareSource("src", width, delta) +  //
+                                  windowOf("win", "src", step, 5) +     //
+                                  subtractOf("res", "win", target);
+          auto [parseResult, keyword, name] = parserRQLString(instance, rql);
+          ASSERT_EQ(parseResult, "OK") << rql;
+
+          compiler compilerInstance(instance);
+          ASSERT_EQ(compilerInstance.compile(), "OK") << rql;
+
+          const streamModel source{.delta = delta, .width = width, .tail = 0, .origin = 0};
+          const agseOracle window = evaluate(source, step, 5);
+          const streamModel producer{.delta = window.delta, .width = 5, .tail = window.tail, .origin = window.origin};
+          const subtractOracle expected = evaluateSubtract(producer, target);
+
+          const auto &node = instance.getQuery("res");
+          EXPECT_EQ(node.rInterval, target) << rql;
+          EXPECT_GE(node.startupLatency, expected.tail) << rql;
+          EXPECT_EQ(node.logicalOrigin, expected.origin) << rql;
+          if (node.startupLatency == expected.tail) ++tight;
+          if (expected.origin != producer.origin) ++originMoved;
+          ++checked;
+        }
+  EXPECT_EQ(checked, 3 * 2 * 2 * 4);
+  // Moc detekcyjna, dwa świadki. Ogon: gdyby nierówność nigdzie nie była ciasna,
+  // przechodziłaby też dla reguły zawyżającej dowolnie mocno, czyli nie strzegłaby
+  // niczego poza znakiem. Origin: musi być w korpusie przypadek, w którym odwzorowanie
+  // różnicy PRZESUWA origin producenta — inaczej sprawdzana jest tożsamość, nie reguła.
+  EXPECT_GT(tight, 0);
+  EXPECT_GT(originMoved, 0);
+}
+
+// Kontrola aparatury różnicy.
+TEST(h10aGate, subtract_probe_window_is_wide_enough) {
+  for (const auto &delta : kPairDeltas)
+    for (const auto &factor : {ratio(1, 1), ratio(2, 1), ratio(5, 2), ratio(7, 3)})
+      for (int tail : {0, 1, 4}) {
+        const streamModel source{.delta = delta, .width = 1, .tail = tail, .origin = 2};
+        const ratio target = delta * factor;
+        EXPECT_EQ(evaluateSubtract(source, target, 1).tail, evaluateSubtract(source, target, 3).tail)
+            << "d=" << delta << " target=" << target << " W=" << tail;
+      }
+}
+
+// Klasy `&` i `%` nad przeplotem DWÓCH DEKLARACJI. Producent ma zerowy origin, więc każdy
+// przypadek testuje wyłącznie własny wkład operatora rozplotu — a ten jest w silniku
+// stałą: jeden slot dla Theta, zero dla ~Theta.
+TEST(h10aGate, dehash_never_falls_below_the_event_model) {
+  const std::vector<ratio> deltas{ratio(1, 1), ratio(1, 2), ratio(2, 5), ratio(5, 7)};
+  int checked    = 0;
+  int thetaTight = 0;
+  for (const auto &deltaA : deltas)
+    for (const auto &deltaB : deltas) {
+      qTree instance;
+      const std::string rql = declareSource("a", 1, deltaA) +  //
+                              declareSource("b", 1, deltaB) +  //
+                              hashOf("c", "a", "b") +          //
+                              thetaOf("left", "c", deltaB) +   //
+                              notThetaOf("right", "c", deltaA);
+      auto [parseResult, keyword, name] = parserRQLString(instance, rql);
+      ASSERT_EQ(parseResult, "OK") << rql;
+
+      compiler compilerInstance(instance);
+      ASSERT_EQ(compilerInstance.compile(), "OK") << rql;
+
+      const streamModel left{.delta = deltaA, .width = 1, .tail = 0, .origin = 0};
+      const streamModel right{.delta = deltaB, .width = 1, .tail = 0, .origin = 0};
+      const hashOracle interleaved = evaluateHash(left, right);
+      const streamModel producer{
+          .delta = interleaved.delta, .width = 1, .tail = interleaved.tail, .origin = evaluateHashOrigin(left, right)};
+
+      const dehashOracle theta    = evaluateDehash(producer, deltaA, deltaB, true);
+      const dehashOracle notTheta = evaluateDehash(producer, deltaA, deltaB, false);
+
+      const auto &leftNode  = instance.getQuery("left");
+      const auto &rightNode = instance.getQuery("right");
+      EXPECT_EQ(leftNode.rInterval, deltaA) << rql;
+      EXPECT_EQ(rightNode.rInterval, deltaB) << rql;
+      EXPECT_GE(leftNode.startupLatency, theta.tail) << rql;
+      EXPECT_GE(rightNode.startupLatency, notTheta.tail) << rql;
+      EXPECT_EQ(leftNode.logicalOrigin, theta.origin) << rql;
+      EXPECT_EQ(rightNode.logicalOrigin, notTheta.origin) << rql;
+      if (leftNode.startupLatency == theta.tail) ++thetaTight;
+      ++checked;
+    }
+  EXPECT_EQ(checked, static_cast<int>(deltas.size() * deltas.size()));
+  // Moc detekcyjna nie jest tu założeniem: własny slot Theta musi być w korpusie
+  // WYMUSZONY przez model, inaczej bramka przeszłaby także po usunięciu `++result`
+  // z compiler::computeStartupLatency(). Osobny test niżej mówi to wprost.
+  EXPECT_GT(thetaTight, 0);
+}
+
+// Klasy `&` i `%` nad przeplotem DWÓCH OKIEN: producent ma niezerowy ogon ORAZ niezerowy
+// origin. To jedyne miejsce, w którym sprawdzana jest propagacja niedefiniowalności przez
+// odwzorowania rozplotu — a te rosną szybciej niż liniowo, więc origin nie przenosi się
+// tu przez proste dodanie.
+TEST(h10aGate, dehash_over_two_windows_propagates_origin_and_tail) {
+  int checked = 0;
+  for (const auto &deltaA : kPairDeltas)
+    for (int widthA : kPairWidths)
+      for (const auto &deltaB : kPairDeltas)
+        for (int widthB : kPairWidths) {
+          const ratio deltaWa = deltaA / widthA;  // okno @(1,2) nad szerokoscia F ma interwal D*1/F
+          const ratio deltaWb = deltaB / widthB;
+
+          qTree instance;
+          const std::string rql = declareSource("a", widthA, deltaA) +  //
+                                  declareSource("b", widthB, deltaB) +  //
+                                  windowOf("wa", "a", 1, 2) +           //
+                                  windowOf("wb", "b", 1, 2) +           //
+                                  hashOf("c", "wa", "wb") +             //
+                                  thetaOf("left", "c", deltaWb) +       //
+                                  notThetaOf("right", "c", deltaWa);
+          auto [parseResult, keyword, name] = parserRQLString(instance, rql);
+          ASSERT_EQ(parseResult, "OK") << rql;
+
+          compiler compilerInstance(instance);
+          ASSERT_EQ(compilerInstance.compile(), "OK") << rql;
+
+          const streamModel sourceA{.delta = deltaA, .width = widthA, .tail = 0, .origin = 0};
+          const streamModel sourceB{.delta = deltaB, .width = widthB, .tail = 0, .origin = 0};
+          const agseOracle windowA = evaluate(sourceA, 1, 2);
+          const agseOracle windowB = evaluate(sourceB, 1, 2);
+          const streamModel left{.delta = windowA.delta, .width = 2, .tail = windowA.tail, .origin = windowA.origin};
+          const streamModel right{.delta = windowB.delta, .width = 2, .tail = windowB.tail, .origin = windowB.origin};
+          const hashOracle interleaved = evaluateHash(left, right);
+          const streamModel producer{
+              .delta = interleaved.delta, .width = 2, .tail = interleaved.tail, .origin = evaluateHashOrigin(left, right)};
+
+          const dehashOracle theta    = evaluateDehash(producer, left.delta, right.delta, true);
+          const dehashOracle notTheta = evaluateDehash(producer, left.delta, right.delta, false);
+
+          EXPECT_GE(instance.getQuery("left").startupLatency, theta.tail) << rql;
+          EXPECT_GE(instance.getQuery("right").startupLatency, notTheta.tail) << rql;
+          EXPECT_EQ(instance.getQuery("left").logicalOrigin, theta.origin) << rql;
+          EXPECT_EQ(instance.getQuery("right").logicalOrigin, notTheta.origin) << rql;
+          ++checked;
+        }
+  EXPECT_EQ(checked, 3 * 2 * 3 * 2);
+}
+
+// Kontrola negatywna klasy Theta — dowód mocy detekcyjnej bramki, a nie jej założenie.
+// Lekcja z §14.14/§14.15 planu badawczego: korpus, który przechodzi także dla reguły
+// obalonej, niczego nie strzeże. Sprawdzamy WPROST, że wartość o slot mniejsza od
+// deklarowanej przez silnik — czyli dokładnie wynik usunięcia `++result` — wypada PONIŻEJ
+// granicy zdarzeniowej, więc dopuszczałaby emisję rekordu przed określeniem zależności.
+TEST(h10aGate, event_model_rejects_theta_without_its_own_slot) {
+  const std::vector<ratio> deltas{ratio(1, 1), ratio(1, 2), ratio(2, 5), ratio(5, 7)};
+  int witnesses = 0;
+  for (const auto &deltaA : deltas)
+    for (const auto &deltaB : deltas) {
+      const streamModel left{.delta = deltaA, .width = 1, .tail = 0, .origin = 0};
+      const streamModel right{.delta = deltaB, .width = 1, .tail = 0, .origin = 0};
+      const hashOracle interleaved = evaluateHash(left, right);
+      const streamModel producer{
+          .delta = interleaved.delta, .width = 1, .tail = interleaved.tail, .origin = evaluateHashOrigin(left, right)};
+
+      const dehashOracle theta = evaluateDehash(producer, deltaA, deltaB, true);
+      if (theta.tail > 0) ++witnesses;
+    }
+  // Bez tej liczby test klasy Theta byłby spełniony przez ogon zerowy.
+  EXPECT_EQ(witnesses, static_cast<int>(deltas.size() * deltas.size()));
+}
+
+// Kontrola aparatury rozplotu.
+TEST(h10aGate, dehash_probe_window_is_wide_enough) {
+  const std::vector<ratio> deltas{ratio(1, 1), ratio(1, 2), ratio(2, 5), ratio(5, 7)};
+  for (const auto &deltaA : deltas)
+    for (const auto &deltaB : deltas)
+      for (int tail : {0, 1, 3}) {
+        const ratio deltaC = deltaA * deltaB / (deltaA + deltaB);
+        const streamModel producer{.delta = deltaC, .width = 1, .tail = tail, .origin = 1};
+        EXPECT_EQ(evaluateDehash(producer, deltaA, deltaB, true, 1).tail, evaluateDehash(producer, deltaA, deltaB, true, 3).tail)
+            << "dA=" << deltaA << " dB=" << deltaB << " W=" << tail;
+        EXPECT_EQ(evaluateDehash(producer, deltaA, deltaB, false, 1).tail,
+                  evaluateDehash(producer, deltaA, deltaB, false, 3).tail)
+            << "dA=" << deltaA << " dB=" << deltaB << " W=" << tail;
+      }
+}
+
+// Projekcja i redukcje: klasy dokładne, bo NIE mają własnego wkładu — działają na bieżącej
+// krotce producenta i przenoszą obie wielkości bez zmiany. Korpus ma producenta
+// o niezerowym ogonie ORAZ niezerowym origin, żeby przenoszenie każdej z nich osobno było
+// widoczne; dotąd sprawdzały to pojedyncze wartości wpisane wprost w ut_compiler.
+TEST(h10aGate, projection_and_reduction_carry_both_quantities_unchanged) {
+  int checked = 0;
+  for (const auto &delta : kPairDeltas)
+    for (int width : {2, 3, 4})
+      for (int step : kPairSteps)
+        for (int length : {2, 3}) {
+          qTree instance;
+          const std::string rql = declareSource("src", width, delta) +    //
+                                  windowOf("win", "src", step, length) +  //
+                                  projectionOf("proj", "win") +           //
+                                  reductionOf("red", "win");
+          auto [parseResult, keyword, name] = parserRQLString(instance, rql);
+          ASSERT_EQ(parseResult, "OK") << rql;
+
+          compiler compilerInstance(instance);
+          ASSERT_EQ(compilerInstance.compile(), "OK") << rql;
+
+          const streamModel source{.delta = delta, .width = width, .tail = 0, .origin = 0};
+          const agseOracle window = evaluate(source, step, length);
+
+          const auto &win  = instance.getQuery("win");
+          const auto &proj = instance.getQuery("proj");
+          const auto &red  = instance.getQuery("red");
+          ASSERT_EQ(win.startupLatency, window.tail) << rql;
+          ASSERT_EQ(win.logicalOrigin, window.origin) << rql;
+          EXPECT_EQ(proj.rInterval, window.delta) << rql;
+          EXPECT_EQ(proj.startupLatency, window.tail) << rql;
+          EXPECT_EQ(proj.logicalOrigin, window.origin) << rql;
+          EXPECT_EQ(red.rInterval, window.delta) << rql;
+          EXPECT_EQ(red.startupLatency, window.tail) << rql;
+          EXPECT_EQ(red.logicalOrigin, window.origin) << rql;
+          if (window.origin > 0) ++checked;
+        }
+  // Moc detekcyjna: korpus musi zawierać przypadki o niezerowym origin, inaczej
+  // przenoszenie origin byłoby sprawdzane wyłącznie na wartości zerowej.
+  EXPECT_GT(checked, 0);
+}
+
+// Origin przeplotu — korpus DEDYKOWANY, wymuszony przez kontrolę mutacyjną. Korpusy
+// ogona (`closed_form_matches_event_model_over_hash_corpus` i `hash_over_two_windows_...`)
+// mają origin składowych zawsze zdominowany przez pierwszą z nich, więc przechodzą także
+// wtedy, gdy silnik liczy origin przeplotu WYŁĄCZNIE z pierwszej składowej — sprawdzone
+// mutacyjnie 2026-08-07. Bramka, która przechodzi dla reguły obalonej, niczego nie strzeże.
+//
+// Tu obie składowe są oknami o RÓŻNYCH origin (krok okna rozstrzyga: ceil((L-1)/step)),
+// a stosunek interwałów przesuwa dominację raz na jedną, raz na drugą stronę. Test wymaga
+// obu rodzajów świadków wprost.
+TEST(h10aGate, hash_origin_takes_the_later_of_both_constituents) {
+  const std::vector<ratio> deltas{ratio(1, 1), ratio(1, 5), ratio(3, 10)};
+  const std::vector<int> steps{1, 2, 3};
+  int leftDominates  = 0;
+  int rightDominates = 0;
+  int checked        = 0;
+
+  for (const auto &deltaA : deltas)
+    for (int stepA : steps)
+      for (const auto &deltaB : deltas)
+        for (int stepB : steps) {
+          qTree instance;
+          const std::string rql = declareSource("a", 1, deltaA) +  //
+                                  declareSource("b", 1, deltaB) +  //
+                                  windowOf("wa", "a", stepA, 5) +  //
+                                  windowOf("wb", "b", stepB, 5) +  //
+                                  hashOf("c", "wa", "wb");
+          auto [parseResult, keyword, name] = parserRQLString(instance, rql);
+          ASSERT_EQ(parseResult, "OK") << rql;
+
+          compiler compilerInstance(instance);
+          ASSERT_EQ(compilerInstance.compile(), "OK") << rql;
+
+          const streamModel sourceA{.delta = deltaA, .width = 1, .tail = 0, .origin = 0};
+          const streamModel sourceB{.delta = deltaB, .width = 1, .tail = 0, .origin = 0};
+          const agseOracle windowA = evaluate(sourceA, stepA, 5);
+          const agseOracle windowB = evaluate(sourceB, stepB, 5);
+          const streamModel left{.delta = windowA.delta, .width = 5, .tail = windowA.tail, .origin = windowA.origin};
+          const streamModel right{.delta = windowB.delta, .width = 5, .tail = windowB.tail, .origin = windowB.origin};
+
+          const int expected = evaluateHashOrigin(left, right);
+          EXPECT_EQ(instance.getQuery("c").logicalOrigin, expected) << rql;
+
+          // Świadek dominacji: origin liczony z JEDNEJ składowej jest ściśle mniejszy
+          // od prawdziwego, czyli druga składowa naprawdę rozstrzyga.
+          const streamModel leftOnly{.delta = left.delta, .width = 5, .tail = left.tail, .origin = 0};
+          const streamModel rightOnly{.delta = right.delta, .width = 5, .tail = right.tail, .origin = 0};
+          if (evaluateHashOrigin(left, rightOnly) < expected) ++rightDominates;
+          if (evaluateHashOrigin(leftOnly, right) < expected) ++leftDominates;
+          ++checked;
+        }
+
+  EXPECT_EQ(checked, 3 * 3 * 3 * 3);
+  EXPECT_GT(leftDominates, 0);
+  EXPECT_GT(rightDominates, 0);
+}
+
+// Kontrola aparatury origin przeplotu: zapas przeglądu musi być tak dobrany, żeby ostatni
+// brak rekordu na pewno się w nim mieścił. Za wąskie okno dawałoby origin ZANIŻONY, czyli
+// rekord bez definicji uznany za istniejący.
+TEST(h10aGate, hash_origin_probe_span_is_wide_enough) {
+  const std::vector<ratio> deltas{ratio(1, 1), ratio(1, 5), ratio(3, 10)};
+  for (const auto &deltaA : deltas)
+    for (const auto &deltaB : deltas)
+      for (int originA : {0, 2, 4})
+        for (int originB : {0, 2, 4}) {
+          const streamModel left{.delta = deltaA, .width = 1, .tail = 0, .origin = originA};
+          const streamModel right{.delta = deltaB, .width = 1, .tail = 0, .origin = originB};
+          EXPECT_EQ(evaluateHashOrigin(left, right, 1), evaluateHashOrigin(left, right, 4))
+              << "dA=" << deltaA << " dB=" << deltaB << " O_A=" << originA << " O_B=" << originB;
+        }
 }

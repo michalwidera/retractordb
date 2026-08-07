@@ -1,0 +1,4 @@
+temp/
+run1/
+*.out
+*.err

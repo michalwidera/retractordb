@@ -1,0 +1,40 @@
+# Stabilnosc odtworzenia (replay stability).
+#
+# Twierdzenie artykulu (sekcja Exactness and Replay Stability): ta sama rewizja
+# silnika, te same wejscia, dwa przebiegi — wszystkie artefakty identyczne co do
+# bajtu, z wyjatkiem 8-bajtowego znacznika utworzenia w naglowku .meta.
+#
+# Dotad sprawdzala to wylacznie reczna kampania K18 w rdb-experiment (67 plikow,
+# 17 strumieni potoku Pan-Tompkins). W ctest nie bylo ANI JEDNEGO testu
+# porownujacego dwa przebiegi tej samej binarki — istniejace porownania bajtowe
+# (optimizer_ablation, select_cse_commutative_add, issue202_hash_shift_e2e)
+# zestawiaja WARIANTY planu albo profile optymalizatora, a nie powtorzenie.
+#
+# Plan obejmuje wszystkie dziewiec klas operatorow z tabeli dokladnosci ogona,
+# zeby powtorzenie dotyczylo calego rachunku indeksu logicznego, a nie jego
+# wycinka: projekcja, okno, redukcja, przesuniecie, suma, przeplot, oba rozploty
+# i roznica. Dane wejsciowe zawieraja NULL-e, wiec porownanie obejmuje takze
+# mape null w .meta — rekord all-null i rekord o wartosci zero maja te sama
+# zawartosc binarna, a rozna denotacje.
+
+STORAGE 'temp'
+
+DECLARE ax INTEGER, ay INTEGER STREAM a, 1/10 FILE 'datafile1.txt'
+DECLARE bx INTEGER, by INTEGER STREAM b, 1/5  FILE 'datafile2.txt'
+
+# projekcja i redukcja — klasy przenoszace obie wielkosci bez zmiany
+SELECT a[0] STREAM proj FROM a
+SELECT * STREAM win FROM a@(1,3)
+SELECT * STREAM red FROM win.sumc
+
+# przesuniecie i suma
+SELECT * STREAM shifted FROM proj>2
+SELECT * STREAM merged FROM shifted+b
+
+# przeplot i oba rozploty — tozsamosc okrezna w tym samym planie
+SELECT * STREAM inter FROM a#b
+SELECT * STREAM recovered_a FROM inter&1/5
+SELECT * STREAM recovered_b FROM inter%1/10
+
+# roznica
+SELECT * STREAM slower FROM a-1/5
