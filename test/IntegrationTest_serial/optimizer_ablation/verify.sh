@@ -185,8 +185,28 @@ elif [ "$mode" = "factor-shared-substrate-semantic" ]; then
 elif [ "$mode" = "factor-name-collision-semantic" ]; then
   # Gdyby reguła użyła ponownie cudzej projekcji, collide_user dostałby pola
   # w odwrotnej kolejności — różnica jest widoczna bajtowo.
-  cmp temp/collide_user temp/collide_reference
-  cmp <(tail -c +9 temp/collide_user.meta) <(tail -c +9 temp/collide_reference.meta)
+  #
+  # ZAKRES ROWNOSCI — decyzja A z 2026-08-07. collide_user ma faktoryzacje R1
+  # ZABLOKOWANA przez kolizje nazw, wiec wykonuje sie jako (CA>2)#(CB>1), a jego ogon jest
+  # SCISLE WIEKSZY od ogona collide_reference zapisanego wprost jako (CA2#CB2)>3: strona
+  # niefaktoryzowana czyta skladowe PO ich wlasnym przesunieciu, wiec na te sama tresc
+  # czeka dluzej. Rownosc jest wiec tozsamoscia ciagu rekordow (tresc + indeks logiczny
+  # + origin), nie opoznienia — porownujemy wspolny prefiks.
+  #
+  # Do 2026-08-07 obie strony mialy ten sam ogon wylacznie dlatego, ze tau_N zawyzalo swoj
+  # o min(W_src, N). Zawyzenie zmierzono w kampanii K24p (§2.2) i zdjeto adresowaniem
+  # indeksem logicznym w dataModel::fetchForward.
+  size_user=$(stat -c %s temp/collide_user)
+  size_reference=$(stat -c %s temp/collide_reference)
+  common=$(( size_user < size_reference ? size_user : size_reference ))
+  [ "$common" -gt 0 ]
+  cmp -n "$common" temp/collide_user temp/collide_reference
+  # Origin jest ten sam po obu stronach — to on niesie tozsamosc; rozni sie ogon.
+  grep -F 'collide_user(1/15)	tail=2	origin=3' out_compile.txt
+  grep -F 'collide_reference(1/15)	origin=3' out_compile.txt
+  # Strona sfaktoryzowana ma byc SCISLE DLUZSZA. Rownosc albo odwrotna nierownosc
+  # oznaczalaby, ze optymalizacja opoznienia zniknela.
+  [ "$size_reference" -gt "$size_user" ]
 elif [ "$mode" = "factor-multiquery-semantic" ]; then
   cmp temp/multi1 temp/multi2
   cmp temp/multi1 temp/multi_reference

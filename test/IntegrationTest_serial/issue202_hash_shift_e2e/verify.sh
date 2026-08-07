@@ -30,15 +30,17 @@ xretractor query.rql -r -k -m 48
 cmp matched CC
 cmp <(tail -c +9 matched.meta) <(tail -c +9 CC.meta)
 
-# Both sides must declare the same delay, in both of its components: interleave
-# latency 2 (tail) plus shift 3 (origin). An equal payload with an unequal
-# declaration would still be an unequal result.
+# Both sides must declare the same delay, in both of its components. An equal
+# payload with an unequal declaration would still be an unequal result.
 #
-# The split replaced a single tail=5. Since tau_N was restamped, the shift is no
-# longer "not ready yet" (tail) but "this record has no definition" (origin);
-# the sum, and therefore the emitted record sequence, is unchanged.
-grep -F 'matched(1/15)	tail=2	origin=3' out_compile.txt
-grep -F 'CC(1/15)	tail=2	origin=3' out_compile.txt
+# Both sides are factored to the same shape here, so both declare tail 0 and
+# origin 3. Two restampings led to this: tau_N stopped being "not ready yet"
+# (tail) and became "this record has no definition" (origin), and then tau_N
+# stopped inflating its own tail — tau_3 over an interleave of tail 2 absorbs it
+# entirely, max(0, 2 - 3) = 0, because record n reads the OLDER record n-3.
+# The emitted record sequence is unchanged; only its time address moved.
+grep -F 'matched(1/15)	origin=3' out_compile.txt
+grep -F 'CC(1/15)	origin=3' out_compile.txt
 
 # Formula-derived payload for delta(A)=1/10 and delta(B)=1/5:
 # A#B has the repeating order B,A,A. The equivalent shift of 2+1=3 output slots

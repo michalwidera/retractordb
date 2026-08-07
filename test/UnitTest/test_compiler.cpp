@@ -458,7 +458,7 @@ TEST(xcompiler, startup_latency_is_preserved_by_shift_matching_identity) {
   // a slot 3 konczy sie w 4*Delta — czekac nie ma na co. Do 2026-08-07 stalo tu 2, bo
   // adresowanie wzgledne w fetchBack wymuszalo W = W_src (K24p §2.2).
   EXPECT_EQ(instance.getQuery("rhs").startupLatency, 0);
-  EXPECT_EQ(instance.getQuery("rhs").logicalOrigin, 3);   // przesuniecie 2+1 slotow wyjscia
+  EXPECT_EQ(instance.getQuery("rhs").logicalOrigin, 3);  // przesuniecie 2+1 slotow wyjscia
 }
 
 // Niezmiennik D3: przepisania planu nie zmieniaja nazw pol nazwanych strumieni uzytkownika.

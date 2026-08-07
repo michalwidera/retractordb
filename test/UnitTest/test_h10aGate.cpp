@@ -151,9 +151,8 @@ struct shiftOracle {
 shiftOracle evaluateShift(const streamModel &source, int offset, bool sourceDeclared) {
   const int tail = std::max(0, source.tail - offset);
   const int rev  = tail - source.tail + offset;
-  return {.origin = source.origin + offset,
-          .tail   = tail,
-          .sourceCapacity = rev + 1 + (sourceDeclared ? kDeclarationPrefetch : 0)};
+  return {
+      .origin = source.origin + offset, .tail = tail, .sourceCapacity = rev + 1 + (sourceDeclared ? kDeclarationPrefetch : 0)};
 }
 
 // --- korpus -------------------------------------------------------------------------
