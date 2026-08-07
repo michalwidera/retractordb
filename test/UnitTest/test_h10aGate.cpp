@@ -22,7 +22,11 @@
 //
 // ctest -R '^ut_h10aGate' -V
 
+#include <array>
+#include <cstdint>
+#include <cstdlib>
 #include <numeric>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -1085,4 +1089,470 @@ TEST(h10aGate, hash_origin_probe_span_is_wide_enough) {
           EXPECT_EQ(evaluateHashOrigin(left, right, 1), evaluateHashOrigin(left, right, 4))
               << "dA=" << deltaA << " dB=" << deltaB << " O_A=" << originA << " O_B=" << originB;
         }
+}
+
+// =====================================================================================
+// L6 — miniatura kampanii K24 na KOMPOZYCJACH (2026-08-07).
+//
+// Bramki wyzej sprawdzaja dziewiec klas operatorow, ale KAZDA OSOBNO, na korpusach
+// dobranych pod te jedna klase. Regresja w PROPAGACJI miedzy klasami — na przyklad
+// origin przechodzacy przez roznice do okna — przejdzie przez wszystkie z nich, bo zaden
+// nie sklada tych dwoch operatorow. Kampania K24d (rdb-experiment/results_20260807_K24d)
+// robi to na 10 010 planach glebokosci 1-6, ale chodzi recznie i tylko przy przypinaniu SHA.
+//
+// Ta miniatura generuje plany MIESZANE o glebokosci 2-4 i sprawdza KAZDY wezel osobno.
+// Trzy rzeczy sa tu istotne:
+//
+//  1. Generator jest DETERMINISTYCZNY, z ziarnem wpisanym w test — nie losowanym z zegara.
+//     Korpus, ktory zmienia sie miedzy przebiegami, nie jest bramka, tylko loteria.
+//  2. Oracle jest REKURENCYJNY nad drzewem planu i sklada sie wylacznie z modeli
+//     zdarzeniowych zdefiniowanych wyzej w tym pliku. Zaden z nich nie wola funkcji
+//     silnika (ani AgseStartupLatency, ani HashStartupLatency, ani Hash/Div/Mod/Add/
+//     Subtract z SOperations.hpp). Ta niezaleznosc jest jedynym powodem, dla ktorego
+//     test cokolwiek znaczy.
+//  3. Plan odrzucony przez kompilator jest AWARIA APARATURY i zatrzymuje test — nie jest
+//     cicho pomijany. Ta sama zasada co w kampanii K24. Generator dobiera wiec parametry
+//     tak, zeby produkowac wylacznie plany poprawne (kontrola reprezentowalnosci
+//     interwalu i szerokosci okna sondowania PRZED emisja wezla).
+//
+// Miniatura mieszka w tym pliku, a nie w osobnym, bo caly model zdarzeniowy dziewieciu
+// klas jest tutaj i przeniesienie go do naglowka wspoldzielonego byloby przebudowa
+// bramki L1, a nie dopisaniem bramki L6.
+//
+// KONTROLA MUTACYJNA (2026-08-07). Czternascie mutantow silnika, nanoszonych pojedynczo
+// i cofanych; wszystkie WYKRYTE przez sama miniature (bez pozostalych bramek w pliku):
+//   M1  ++result usuniete z galezi STREAM_DEHASH_DIV (wlasny slot Theta)
+//   M2  AddStartupLatency w postaci sprzed K24: ceil(W_src*D_src/D_out)
+//   M3  origin sumy liczony tylko z pierwszej skladowej
+//   M4  origin przeplotu liczony tylko z pierwszej skladowej
+//   M5  origin Theta bez odwzorowania Div
+//   M6  origin ~Theta bez odwzorowania Mod
+//   M7  SubtractStartupLatency zastapione zerem
+//   M8  origin roznicy bez odwzorowania Subtract
+//   M9  redukcja gubiaca origin producenta
+//   M10 AgseStartupLatency: ceil -> floor
+//   M11 AgseLogicalOrigin bez czlonu (lengthAbs - 1)
+//   M12 origin przesuniecia bez czlonu N
+//   M13 ogon przesuniecia bez odjecia N
+//   M14 projekcja gubiaca ogon producenta
+// M1-M9 to lista z planu L6; M10-M14 dopisane, zeby kazda z dziewieciu klas miala
+// wlasnego mutanta zarowno dla ogona, jak i dla origin. M4 i M8 — te, ktore przeszly
+// przez pierwsza wersje korpusow L1 — sa tu wykrywane od razu, bo korpus WYMAGA
+// swiadkow rozrozniajacych obie sytuacje (asercje na koncu testu).
+// =====================================================================================
+
+namespace {
+
+enum class opClass { window, shift, projection, reduction, subtract, sum, hash, theta, notTheta };
+constexpr int kOpClassCount = 9;
+
+int indexOf(opClass kind) { return static_cast<int>(kind); }
+
+const char *nameOf(opClass kind) {
+  switch (kind) {
+    case opClass::window:
+      return "@";
+    case opClass::shift:
+      return ">N";
+    case opClass::projection:
+      return "projekcja";
+    case opClass::reduction:
+      return "redukcja";
+    case opClass::subtract:
+      return "-";
+    case opClass::sum:
+      return "+";
+    case opClass::hash:
+      return "#";
+    case opClass::theta:
+      return "&";
+    case opClass::notTheta:
+      return "%";
+  }
+  return "?";
+}
+
+// Rezim klasy wg tab:tail-exactness: rownosc dla klas dokladnych, `silnik >= model`
+// dla zawyzajacych. W ZADNEJ klasie nie wolno dopuscic zanizenia.
+bool tailIsExact(opClass kind) { return kind != opClass::subtract && kind != opClass::theta && kind != opClass::notTheta; }
+
+struct planNode {
+  std::string id;
+  opClass kind  = opClass::projection;
+  bool declared = false;
+  streamModel model{};
+
+  // Czy ogon MODELU jest dla tego wezla granica dokladna, czy tylko dolna.
+  //
+  // Dokladnosc jest wlasnoscia wezla PRZY DOKLADNYCH WEJSCIACH. Klasa dokladna nad
+  // producentem zawyzajacym dziedziczy jego luz: model liczy ogon z modelowego (nizszego)
+  // ogona producenta, a silnik ze swojego (wyzszego), wiec rownosc nie obowiazuje.
+  // Przyklad z korpusu: `(a#b)&D` ma ogon silnika 2 przy modelu 1 (Theta jest zawyzajaca),
+  // a stojace nad nim `>1` dziedziczy te roznice. Skazenie idzie wiec w gore drzewa.
+  bool tailExact = true;
+
+  // Skladowe przeplotu — potrzebne do zbudowania nad nim rozplotu ORAZ do swiadkow
+  // dominacji origin (mutant M4: origin przeplotu liczony z jednej skladowej).
+  bool isHash = false;
+  streamModel left{};
+  streamModel right{};
+
+  // Producent wezla jednoargumentowego — potrzebny do swiadka M8 (origin roznicy
+  // bez odwzorowania Subtract jest tozsamoscia na origin producenta).
+  int producerOrigin = 0;
+};
+
+// Interwal, ktorego licznik albo mianownik wychodzi poza ten prog, prowadzi w kompilatorze
+// do bledu zakresu — plan bylby odrzucony, a odrzucony plan jest awaria aparatury.
+constexpr int kMaxIntervalTerm = 20000;
+// Gorne ograniczenia okien sondowania oracle'a: bez nich glebokie kompozycje przeplotow
+// daja okresy fazowe rzedu 10^4 slotow i test przestaje miescic sie w budzecie.
+constexpr int kMaxPhasePeriod         = 120;
+constexpr int kMaxSubtractDenominator = 20;
+
+bool representable(const ratio &value) {
+  return std::abs(value.numerator()) <= kMaxIntervalTerm && value.denominator() <= kMaxIntervalTerm;
+}
+
+const std::vector<ratio> kMixDeltas{ratio(1, 1), ratio(1, 2), ratio(1, 3), ratio(1, 5), ratio(2, 5), ratio(3, 10)};
+const std::vector<int> kMixWidths{1, 2, 3};
+const std::vector<int> kMixSteps{1, 2, 3};
+const std::vector<int> kMixLengths{2, 3, 4, 5, -2, -3};
+const std::vector<int> kMixOffsets{1, 2, 3, 5};
+const std::vector<ratio> kMixFactors{ratio(2, 1), ratio(3, 1), ratio(5, 2), ratio(4, 3)};
+
+// Generator planow mieszanych. Ziarno jest argumentem konstruktora i w tescie jest STALA.
+struct mixedPlanBuilder {
+  explicit mixedPlanBuilder(std::uint32_t seed) : state_(seed) {}
+
+  std::string rql;
+  std::vector<planNode> derived;
+
+  void reset() {
+    rql.clear();
+    derived.clear();
+    counter_ = 0;
+  }
+
+  // Buduje poddrzewo o zadanej glebokosci i zwraca jego korzen.
+  planNode build(int depth) {
+    if (depth <= 0) return declaration();
+
+    // Klasy probowane w losowej kolejnosci; pierwsza, ktora da sie zbudowac legalnie,
+    // wygrywa. Projekcja jest zawsze legalna, wiec petla zawsze sie konczy.
+    for (int attempt = 0; attempt < 24; ++attempt) {
+      const auto kind = static_cast<opClass>(nextInt(kOpClassCount));
+      if (auto node = tryBuild(kind, depth); node) return *node;
+    }
+    return unaryCarrier(opClass::projection, build(depth - 1));
+  }
+
+ private:
+  std::uint32_t state_;
+  int counter_ = 0;
+
+  int nextInt(int bound) {
+    state_ = state_ * 1103515245u + 12345u;
+    return static_cast<int>((state_ >> 16) % static_cast<std::uint32_t>(bound));
+  }
+
+  template <typename T>
+  const T &pick(const std::vector<T> &values) {
+    return values[static_cast<size_t>(nextInt(static_cast<int>(values.size())))];
+  }
+
+  std::string freshId(const char *prefix) { return prefix + std::to_string(counter_++); }
+
+  planNode declaration() {
+    const ratio delta = pick(kMixDeltas);
+    const int width   = pick(kMixWidths);
+    planNode node{.id = freshId("d"), .kind = opClass::projection, .declared = true};
+    node.model = streamModel{.delta = delta, .width = width, .tail = 0, .origin = 0};
+    rql += declareSource(node.id, width, delta);
+    return node;
+  }
+
+  planNode record(planNode node) {
+    derived.push_back(node);
+    return node;
+  }
+
+  // Projekcja i redukcja: klasy przenoszace obie wielkosci bez zmiany, szerokosc wyniku 1.
+  planNode unaryCarrier(opClass kind, const planNode &src) {
+    planNode node{.id = freshId(kind == opClass::projection ? "p" : "r"), .kind = kind};
+    node.model          = streamModel{.delta = src.model.delta, .width = 1, .tail = src.model.tail, .origin = src.model.origin};
+    node.tailExact      = src.tailExact && tailIsExact(kind);
+    node.producerOrigin = src.model.origin;
+    rql += (kind == opClass::projection) ? projectionOf(node.id, src.id) : reductionOf(node.id, src.id);
+    return record(node);
+  }
+
+  // Przeplot wymaga zgodnych schematow, wiec obie skladowe sprowadzamy projekcja
+  // do jednego pola. Projekcja jest klasa dokladna i sama tez jest sprawdzana.
+  planNode narrowToOneField(const planNode &node) {
+    if (node.model.width == 1) return node;
+    return unaryCarrier(opClass::projection, node);
+  }
+
+  std::optional<planNode> makeHash(int depth) {
+    const planNode rawLeft  = build(depth - 1);
+    const planNode rawRight = build(nextInt(depth));
+    const planNode left     = narrowToOneField(rawLeft);
+    const planNode right    = narrowToOneField(rawRight);
+
+    const ratio ratioAB = left.model.delta / right.model.delta;
+    if (ratioAB.numerator() + ratioAB.denominator() > kMaxPhasePeriod) return std::nullopt;
+    const ratio deltaC = left.model.delta * right.model.delta / (left.model.delta + right.model.delta);
+    if (!representable(deltaC)) return std::nullopt;
+
+    const hashOracle expected = evaluateHash(left.model, right.model);
+    planNode node{.id = freshId("h"), .kind = opClass::hash};
+    node.model = streamModel{
+        .delta = expected.delta, .width = 1, .tail = expected.tail, .origin = evaluateHashOrigin(left.model, right.model)};
+    node.isHash    = true;
+    node.tailExact = left.tailExact && right.tailExact && tailIsExact(opClass::hash);
+    node.left      = left.model;
+    node.right     = right.model;
+    rql += hashOf(node.id, left.id, right.id);
+    return record(node);
+  }
+
+  std::optional<planNode> tryBuild(opClass kind, int depth) {
+    switch (kind) {
+      case opClass::projection:
+      case opClass::reduction:
+        return unaryCarrier(kind, build(depth - 1));
+
+      case opClass::window: {
+        const planNode src = build(depth - 1);
+        const int step     = pick(kMixSteps);
+        const int length   = pick(kMixLengths);
+        const ratio delta  = src.model.delta * ratio(step, src.model.width);
+        if (!representable(delta)) return std::nullopt;
+
+        const agseOracle expected = evaluate(src.model, step, length);
+        planNode node{.id = freshId("w"), .kind = kind};
+        node.model = streamModel{
+            .delta = expected.delta, .width = length < 0 ? -length : length, .tail = expected.tail, .origin = expected.origin};
+        node.tailExact      = src.tailExact && tailIsExact(kind);
+        node.producerOrigin = src.model.origin;
+        rql += windowOf(node.id, src.id, step, length);
+        return record(node);
+      }
+
+      case opClass::shift: {
+        const planNode src         = build(depth - 1);
+        const int offset           = pick(kMixOffsets);
+        const shiftOracle expected = evaluateShift(src.model, offset, src.declared);
+        planNode node{.id = freshId("s"), .kind = kind};
+        node.model =
+            streamModel{.delta = src.model.delta, .width = src.model.width, .tail = expected.tail, .origin = expected.origin};
+        node.tailExact      = src.tailExact && tailIsExact(kind);
+        node.producerOrigin = src.model.origin;
+        rql += shiftOf(node.id, src.id, offset);
+        return record(node);
+      }
+
+      case opClass::subtract: {
+        const planNode src = build(depth - 1);
+        const ratio target = src.model.delta * pick(kMixFactors);
+        if (!representable(target)) return std::nullopt;
+        if ((target / src.model.delta).denominator() > kMaxSubtractDenominator) return std::nullopt;
+
+        const subtractOracle expected = evaluateSubtract(src.model, target);
+        planNode node{.id = freshId("m"), .kind = kind};
+        node.model = streamModel{.delta = target, .width = src.model.width, .tail = expected.tail, .origin = expected.origin};
+        node.tailExact      = false;  // klasa zawyzajaca
+        node.producerOrigin = src.model.origin;
+        rql += subtractOf(node.id, src.id, target);
+        return record(node);
+      }
+
+      case opClass::sum: {
+        const planNode left  = build(depth - 1);
+        const planNode right = build(nextInt(depth));
+        const ratio deltaOut = std::min(left.model.delta, right.model.delta);
+        if (!representable(deltaOut)) return std::nullopt;
+        const int span = std::lcm((deltaOut / left.model.delta).denominator(), (deltaOut / right.model.delta).denominator());
+        if (span > kMaxPhasePeriod) return std::nullopt;
+
+        const sumOracle expected = evaluateSum(left.model, right.model);
+        planNode node{.id = freshId("a"), .kind = kind};
+        node.model     = streamModel{.delta  = expected.delta,
+                                     .width  = left.model.width + right.model.width,
+                                     .tail   = expected.tail,
+                                     .origin = expected.origin};
+        node.tailExact = left.tailExact && right.tailExact && tailIsExact(kind);
+        node.left      = left.model;
+        node.right     = right.model;
+        rql += sumOf(node.id, left.id, right.id);
+        return record(node);
+      }
+
+      case opClass::hash:
+        return makeHash(depth);
+
+      case opClass::theta:
+      case opClass::notTheta: {
+        const auto source = makeHash(depth);
+        if (!source) return std::nullopt;
+        const bool leftConstituent = (kind == opClass::theta);
+        // Argumentem rozplotu jest interwal skladowej USUWANEJ.
+        const ratio removed   = leftConstituent ? source->right.delta : source->left.delta;
+        const ratio recovered = leftConstituent ? source->left.delta : source->right.delta;
+
+        const dehashOracle expected = evaluateDehash(source->model, source->left.delta, source->right.delta, leftConstituent);
+        planNode node{.id = freshId(leftConstituent ? "t" : "n"), .kind = kind};
+        node.model =
+            streamModel{.delta = recovered, .width = source->model.width, .tail = expected.tail, .origin = expected.origin};
+        node.tailExact      = false;  // klasa zawyzajaca
+        node.producerOrigin = source->model.origin;
+        rql += leftConstituent ? thetaOf(node.id, source->id, removed) : notThetaOf(node.id, source->id, removed);
+        return record(node);
+      }
+    }
+    return std::nullopt;
+  }
+};
+
+}  // namespace
+
+// Miniatura K24: 240 planow mieszanych o glebokosci 2-4, asercje PER WEZEL.
+TEST(h10aGate, mixed_plan_corpus_matches_the_recursive_event_model) {
+  constexpr std::uint32_t kSeed = 20260807u;  // ziarno WPISANE W TEST
+  constexpr int kPlans          = 400;
+  constexpr int kMinPerClass    = 60;
+
+  mixedPlanBuilder builder(kSeed);
+  std::array<int, kOpClassCount> classCount{};
+  // Osobno liczone asercje ROWNOSCI ogona. Asercja `>=` jest istotnie slabsza, wiec
+  // stratyfikacja po samej liczbie wystapien klasy nie wystarcza: klasa dokladna, ktora
+  // w calym korpusie stoi wylacznie nad producentem zawyzajacym, bylaby sprawdzana
+  // wylacznie nierownoscia.
+  std::array<int, kOpClassCount> exactTailChecks{};
+  int nodesChecked = 0;
+
+  // Swiadkowie mocy detekcyjnej — patrz komentarz przy asercjach na koncu testu.
+  int hashLeftDominates = 0, hashRightDominates = 0;
+  int subtractOriginMoved = 0, subtractTight = 0, thetaTight = 0;
+
+  for (int planIndex = 0; planIndex < kPlans; ++planIndex) {
+    builder.reset();
+    builder.build(2 + planIndex % 3);
+
+    qTree instance;
+    auto [parseResult, keyword, name] = parserRQLString(instance, builder.rql);
+    ASSERT_EQ(parseResult, "OK") << builder.rql;
+
+    compiler compilerInstance(instance);
+    ASSERT_EQ(compilerInstance.compile(), "OK") << builder.rql;
+
+    for (const auto &node : builder.derived) {
+      // Wezel, ktory znika z planu, jest awaria aparatury tak samo jak plan odrzucony:
+      // bez niego nie wiadomo, czy regula byla sprawdzona.
+      ASSERT_TRUE(instance.exists(node.id)) << builder.rql;
+      const auto &q = instance.getQuery(node.id);
+
+      EXPECT_EQ(q.rInterval, node.model.delta) << nameOf(node.kind) << " " << node.id << "\n" << builder.rql;
+      // Origin: rownosc we WSZYSTKICH dziewieciu klasach.
+      EXPECT_EQ(q.logicalOrigin, node.model.origin) << nameOf(node.kind) << " " << node.id << "\n" << builder.rql;
+      // Ogon: rownosc dla klas dokladnych NAD DOKLADNYMI PRODUCENTAMI, `silnik >= model`
+      // gdziekolwiek w poddrzewie stoi klasa zawyzajaca. Zanizenie jest niedopuszczalne
+      // w kazdej klasie i w kazdym polozeniu.
+      if (node.tailExact) {
+        EXPECT_EQ(q.startupLatency, node.model.tail) << nameOf(node.kind) << " " << node.id << "\n" << builder.rql;
+        ++exactTailChecks[indexOf(node.kind)];
+      } else
+        EXPECT_GE(q.startupLatency, node.model.tail) << nameOf(node.kind) << " " << node.id << "\n" << builder.rql;
+
+      ++classCount[indexOf(node.kind)];
+      ++nodesChecked;
+
+      if (node.kind == opClass::hash) {
+        // Swiadek mutanta M4 (origin przeplotu liczony tylko z pierwszej skladowej):
+        // korpus musi zawierac przypadki, w ktorych rozstrzyga raz jedna, raz druga.
+        const streamModel leftOnly{.delta = node.left.delta, .width = node.left.width, .tail = node.left.tail, .origin = 0};
+        const streamModel rightOnly{.delta = node.right.delta, .width = node.right.width, .tail = node.right.tail, .origin = 0};
+        if (evaluateHashOrigin(node.left, rightOnly) < node.model.origin) ++hashRightDominates;
+        if (evaluateHashOrigin(leftOnly, node.right) < node.model.origin) ++hashLeftDominates;
+      }
+      if (node.kind == opClass::subtract) {
+        // Swiadek mutanta M8 (origin roznicy bez odwzorowania Subtract): odwzorowanie
+        // musi w korpusie NAPRAWDE przesuwac origin producenta, inaczej sprawdzana
+        // jest tozsamosc, a nie regula.
+        if (node.model.origin != node.producerOrigin) ++subtractOriginMoved;
+        if (q.startupLatency == node.model.tail) ++subtractTight;
+      }
+      if (node.kind == opClass::theta && q.startupLatency == node.model.tail) ++thetaTight;
+    }
+  }
+
+  // --- stratyfikacja ---------------------------------------------------------------
+  // Bez tej asercji generator moglby wylosowac korpus, w ktorym trzech klas nie ma wcale,
+  // a test i tak by przeszedl.
+  for (int i = 0; i < kOpClassCount; ++i)
+    EXPECT_GE(classCount[i], kMinPerClass) << "klasa " << nameOf(static_cast<opClass>(i)) << " wystapila " << classCount[i]
+                                           << " razy";
+  // Szesc klas dokladnych musi byc sprawdzone ROWNOSCIA, a nie tylko nierownoscia.
+  for (int i = 0; i < kOpClassCount; ++i) {
+    const auto kind = static_cast<opClass>(i);
+    if (!tailIsExact(kind)) continue;
+    EXPECT_GE(exactTailChecks[i], kMinPerClass)
+        << "klasa " << nameOf(kind) << " sprawdzona rownoscia ogona " << exactTailChecks[i] << " razy";
+  }
+  EXPECT_GT(nodesChecked, 0);
+
+  // --- moc detekcyjna --------------------------------------------------------------
+  // Lekcja z §14.14/§14.15 planu badawczego, potwierdzona przy L1: mutanty M4 i M8
+  // przeszly przez pierwsza wersje korpusow, bo korpus przypadkiem nie zawieral
+  // przypadku rozrozniajacego. Tu obie sytuacje sa wymagane WPROST.
+  EXPECT_GT(hashLeftDominates, 0);
+  EXPECT_GT(hashRightDominates, 0);
+  EXPECT_GT(subtractOriginMoved, 0);
+  // Nierownosci musza byc gdzies CIASNE — inaczej przechodzilyby takze dla reguly
+  // zawyzajacej dowolnie mocno, czyli nie strzeglyby niczego poza znakiem.
+  EXPECT_GT(subtractTight, 0);
+  EXPECT_GT(thetaTight, 0);
+}
+
+// Kontrola aparatury miniatury: oracle rekurencyjny na planach JEDNOWEZLOWYCH musi dawac
+// to samo co bramki jednoklasowe wyzej. Plan glebokosci 1 to dokladnie ich ksztalt —
+// jeden operator nad deklaracjami — wiec ten test sprawdza maszynerie skladania, a nie
+// same reguly. Bez niej blad w rekurencji (na przyklad zla szerokosc przekazana w gore)
+// mogby udawac blad silnika albo, gorzej, kompensowac sie z nim.
+TEST(h10aGate, recursive_oracle_reduces_to_the_single_node_gates) {
+  constexpr std::uint32_t kSeed = 20260808u;
+  constexpr int kPlans          = 120;
+
+  mixedPlanBuilder builder(kSeed);
+  std::array<int, kOpClassCount> classCount{};
+
+  for (int planIndex = 0; planIndex < kPlans; ++planIndex) {
+    builder.reset();
+    builder.build(1);
+
+    qTree instance;
+    auto [parseResult, keyword, name] = parserRQLString(instance, builder.rql);
+    ASSERT_EQ(parseResult, "OK") << builder.rql;
+
+    compiler compilerInstance(instance);
+    ASSERT_EQ(compilerInstance.compile(), "OK") << builder.rql;
+
+    for (const auto &node : builder.derived) {
+      ASSERT_TRUE(instance.exists(node.id)) << builder.rql;
+      const auto &q = instance.getQuery(node.id);
+      EXPECT_EQ(q.rInterval, node.model.delta) << nameOf(node.kind) << "\n" << builder.rql;
+      EXPECT_EQ(q.logicalOrigin, node.model.origin) << nameOf(node.kind) << "\n" << builder.rql;
+      if (node.tailExact)
+        EXPECT_EQ(q.startupLatency, node.model.tail) << nameOf(node.kind) << "\n" << builder.rql;
+      else
+        EXPECT_GE(q.startupLatency, node.model.tail) << nameOf(node.kind) << "\n" << builder.rql;
+      ++classCount[indexOf(node.kind)];
+    }
+  }
+
+  // Kontrola aparatury tez musi byc stratyfikowana — inaczej moglaby nie dotknac
+  // polowy klas i milczaco potwierdzac maszynerie, ktorej nie uruchomila.
+  for (int i = 0; i < kOpClassCount; ++i)
+    EXPECT_GT(classCount[i], 0) << "klasa " << nameOf(static_cast<opClass>(i)) << " nieobecna w kontroli aparatury";
 }

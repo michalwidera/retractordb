@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <fstream>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -600,4 +601,84 @@ TEST(xcompiler, unrepresentable_interval_reports_range_error) {
         }
       },
       std::out_of_range);
+}
+
+// --- L5: nierozwiazany wezel planu nie moze degradowac po cichu ---------------------
+//
+// compiler::computeLogicalOrigin() i compiler::computeStartupLatency() konczyly sie
+// petla, ktora dla wezla nieobecnego w mapie wynikow robila SPDLOG_WARN i przechodzila
+// dalej. query::logicalOrigin i query::startupLatency maja wartosc domyslna 0, wiec taki
+// wezel dostawal ZERO — rezim ZANIZAJACY, ten sam, ktory tabela dokladnosci ogona
+// wyklucza dla wszystkich dziewieciu klas. Ostrzezenie szlo do logu, ktorego ctest nie
+// czyta.
+//
+// Reguly „plan nie zostawia wezla nierozwiazanego" NIE DA SIE zlamac zapytaniem RQL:
+// program klauzuli FROM ma 1, 2 albo 3 tokeny i zawsze zaczyna sie od PUSH_STREAM
+// (kazdy inny ksztalt zatrzymuje wczesniej resolveStreamIntervals), a deklaracje
+// i dyrektywy sa zaszczepiane zerem przed petla. Przeglad 233 ksztaltow planu nad
+// wszystkimi dziewiecioma klasami nie znalazl ani jednego przypadku nierozwiazanego.
+// Dlatego bramka wola requireResolvedForEveryNode() wprost, z mapa podana recznie —
+// inaczej test broniacy tej reguly nie mialby jak jej naruszyc.
+
+TEST(xcompiler, unresolved_node_is_a_compilation_error) {
+  qTree plan;
+  plan.push_back(query(boost::rational<int>(1), "src"));
+  plan.push_back(query(boost::rational<int>(1), "consumer"));
+
+  // Mapa pokrywa producenta, ale nie konsumenta — dokladnie stan, w ktorym stara
+  // wersja przepisywala konsumentowi ciche zero.
+  const std::map<std::string, int> partial{{"src", 0}};
+
+  EXPECT_DEATH(
+      { requireResolvedForEveryNode(plan, partial, "test", "startup latency"); }, "unresolved startup latency for 'consumer'");
+}
+
+// Kontrola aparatury do testu wyzej: przy komplecie wynikow bramka musi milczec.
+// Bez niej test smierci przechodzilby takze dla bramki, ktora zabija zawsze.
+TEST(xcompiler, complete_resolution_passes_the_gate) {
+  qTree plan;
+  plan.push_back(query(boost::rational<int>(1), "src"));
+  plan.push_back(query(boost::rational<int>(1), "consumer"));
+
+  const std::map<std::string, int> complete{{"src", 0}, {"consumer", 3}};
+
+  requireResolvedForEveryNode(plan, complete, "test", "startup latency");
+  SUCCEED();
+}
+
+// Kontrola pozytywna na korpusie planow poprawnych: plan obejmujacy wszystkie dziewiec
+// klas operatorow musi wyjsc z kompilatora bez ani jednego wezla nierozwiazanego.
+//
+// Trybem porazki tego testu jest SMIERC PROCESU: requireResolvedForEveryNode() konczy
+// kompilacje przez FatalError, wiec nierozwiazany wezel przerywa binarke testu, zamiast
+// zapisac ostrzezenie w logu. Kontrola mutacyjna (zaszczepienie deklaracji usuniete
+// z computeStartupLatency) pokazuje, ze ten tryb porazki dziala.
+TEST(xcompiler, every_node_of_a_nine_class_plan_is_resolved) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE ax INTEGER, ay INTEGER STREAM a, 1/10 FILE 'a.txt'
+        DECLARE bx INTEGER, by INTEGER STREAM b, 1/5  FILE 'b.txt'
+        SELECT a[0] STREAM proj        FROM a
+        SELECT * STREAM win            FROM a@(1,3)
+        SELECT * STREAM red            FROM win.sumc
+        SELECT * STREAM shifted        FROM proj>2
+        SELECT * STREAM merged         FROM shifted+b
+        SELECT * STREAM inter          FROM a#b
+        SELECT * STREAM recovered_a    FROM inter&1/5
+        SELECT * STREAM recovered_b    FROM inter%1/10
+        SELECT * STREAM slower         FROM a-1/5
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  // Plan po kompilacji zawiera takze wezly wygenerowane (STREAM_*) — one rowniez
+  // przechodza przez ta sama bramke, wiec korpus jest szerszy niz lista SELECT-ow.
+  ASSERT_GE(instance.size(), 11u);
+  for (const auto &q : instance) {
+    EXPECT_GE(q.logicalOrigin, 0) << "origin ujemny dla " << q.id;
+    EXPECT_GE(q.startupLatency, 0) << "ogon ujemny dla " << q.id;
+  }
 }

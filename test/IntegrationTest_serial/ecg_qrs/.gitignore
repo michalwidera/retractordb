@@ -1,0 +1,5 @@
+temp/
+*.out
+*.err
+shape.txt
+out.txt

@@ -1,0 +1,25 @@
+echo BP_OUT
+open bp_out
+size
+descc
+list 1616
+
+echo BP_DEC
+open bp_dec
+size
+descc
+list 227
+
+echo MWI
+open mwi
+size
+descc
+list 1583
+
+echo QRS_OUT
+open qrs_out
+size
+descc
+list 1404
+
+quit

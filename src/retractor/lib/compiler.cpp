@@ -23,6 +23,26 @@
 
 using boost::lexical_cast;
 
+void requireResolvedForEveryNode(const qTree &plan, const std::map<std::string, int> &resolved, std::string_view pass,
+                                 std::string_view quantity) {
+  // Reguła: kompilator nie wypuszcza planu z węzłem, dla którego nie policzył origin albo ogona.
+  //
+  // Do 2026-08-07 stało tu SPDLOG_WARN i `continue`. Ponieważ query::logicalOrigin
+  // i query::startupLatency mają wartość domyślną 0, węzeł pominięty dostawał ZERO — czyli
+  // najgroźniejszą z możliwych wartości: nie ma w niej ani niedefiniowalności, ani oczekiwania.
+  // To jest dokładnie reżim ZANIŻAJĄCY, który tabela dokładności ogona wyklucza dla wszystkich
+  // dziewięciu klas operatorów. Ostrzeżenie szło przy tym do logu, którego ctest nie czyta,
+  // więc plan degradował po cichu.
+  //
+  // Że to błąd, a nie stan dopuszczalny, wynika z kształtu programu klauzuli FROM: ma on 1, 2
+  // albo 3 tokeny i ZAWSZE zaczyna się od PUSH_STREAM — każdy inny kształt zatrzymuje wcześniej
+  // compiler::resolveStreamIntervals(). Deklaracje i dyrektywy kompilatora są zaszczepiane
+  // zerem przed pętlą. Nie ma więc legalnego planu, który zostawia węzeł nierozwiązany;
+  // jeżeli tak się stanie, jest to defekt kompilatora — awaria aparatury, nie wynik.
+  for (const auto &q : plan)
+    if (!resolved.contains(q.id)) FatalError("{}: unresolved {} for '{}'", pass, quantity, q.id);
+}
+
 namespace {
 /// Wyliczanie interwałów w szerszym typie, z kontrolą zakresu.
 ///
@@ -1160,14 +1180,9 @@ std::string compiler::computeLogicalOrigin() {
     }
   }
 
-  for (auto &q : coreInstance) {
-    auto it = origin.find(q.id);
-    if (it == origin.end()) {
-      SPDLOG_WARN("compiler::computeLogicalOrigin: unresolved logical origin for '{}'", q.id);
-      continue;
-    }
-    q.logicalOrigin = it->second;
-  }
+  requireResolvedForEveryNode(coreInstance, origin, "compiler::computeLogicalOrigin", "logical origin");
+  for (auto &q : coreInstance)
+    q.logicalOrigin = origin.at(q.id);
   return {"OK"};
 }
 
@@ -1272,14 +1287,9 @@ std::string compiler::computeStartupLatency() {
     }
   }
 
-  for (auto &q : coreInstance) {
-    auto it = latency.find(q.id);
-    if (it == latency.end()) {
-      SPDLOG_WARN("compiler::computeStartupLatency: unresolved startup latency for '{}'", q.id);
-      continue;
-    }
-    q.startupLatency = it->second;
-  }
+  requireResolvedForEveryNode(coreInstance, latency, "compiler::computeStartupLatency", "startup latency");
+  for (auto &q : coreInstance)
+    q.startupLatency = latency.at(q.id);
   return {"OK"};
 }
 

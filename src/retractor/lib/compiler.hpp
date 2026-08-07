@@ -1,9 +1,25 @@
 #pragma once
 
+#include <map>
 #include <set>
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include "qTree.hpp"  // for qTree, query, token
+
+/// Zatrzymuje kompilację, jeżeli którykolwiek węzeł planu nie ma wyliczonej wielkości.
+///
+/// Wspólna bramka obu przebiegów rachunku indeksu logicznego
+/// (compiler::computeLogicalOrigin i compiler::computeStartupLatency). Uzasadnienie —
+/// dlaczego nierozwiązany węzeł jest błędem, a nie stanem dopuszczalnym — jest przy
+/// definicji w compiler.cpp.
+///
+/// Zadeklarowana w nagłówku, bo poza dwoma miejscami użycia w kompilatorze woła ją
+/// bramka jednostkowa: reguły „plan bez nierozwiązanych węzłów" nie da się złamać
+/// zapytaniem RQL (gramatyka na to nie pozwala), więc test musi podać mapę wprost.
+void requireResolvedForEveryNode(const qTree &plan, const std::map<std::string, int> &resolved, std::string_view pass,
+                                 std::string_view quantity);
 
 struct compiler {
   explicit compiler(qTree &coreInstance) : coreInstance(coreInstance) {};

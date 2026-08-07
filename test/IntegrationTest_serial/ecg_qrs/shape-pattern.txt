@@ -1,0 +1,18 @@
+ecg(1/360)	ecgdata
+mlii(1/360)
+mlii_win(1/360)	origin=24
+bpf(1/1)	bp_coef.txt
+bp_acc(1/360)	tail=359	origin=24
+bp_out(1/360)	tail=359	origin=24
+bp_win(1/360)	tail=359	origin=28
+df(1/1)	d_coef.txt
+d_acc(1/360)	tail=359	origin=28
+d_out(1/360)	tail=359	origin=28
+sq_out(1/360)	tail=359	origin=28
+mwi_win(1/360)	tail=359	origin=57
+mwi(1/360)	tail=359	origin=57
+mwi_long(1/360)	tail=359	origin=236
+mwi_thr(1/360)	tail=359	origin=236
+qrs_out(1/360)	tail=359	origin=236
+bp_dec_win(7/360)	tail=51	origin=7
+bp_dec(7/360)	tail=51	origin=7
