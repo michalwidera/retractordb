@@ -155,6 +155,43 @@ shiftOracle evaluateShift(const streamModel &source, int offset, bool sourceDecl
       .origin = source.origin + offset, .tail = tail, .sourceCapacity = rev + 1 + (sourceDeclared ? kDeclarationPrefetch : 0)};
 }
 
+// Przeplot `#`: rekord n niesie rekord jednej ze składowych, wybranej regułą Beatty'ego.
+// Mapowanie wyprowadzone tu z DEFINICJI przeplotu, celowo bez wołania Hash() z SOperations.hpp
+// — wspólny błąd w regule wyboru przeszedłby przez bramkę niezauważony.
+struct hashPick {
+  bool fromB;
+  int position;
+};
+
+hashPick pickConstituent(const ratio &deltaA, const ratio &deltaB, int n) {
+  const ratio zet = deltaB / (deltaA + deltaB);
+  if (floorOf(zet * n) == floorOf(zet * (n + 1))) return {.fromB = true, .position = n - floorOf(zet * n)};
+  return {.fromB = false, .position = floorOf(zet * n)};
+}
+
+struct hashOracle {
+  int tail;
+  ratio delta;
+};
+
+// Ogon przeglądem slotów: deficyt slotu n to (chwila dostępności wybranej składowej)/Delta_c
+// minus (n+1). Okno sondowania jest WIELOKROTNOŚCIĄ okresu fazowego p+q, żeby test mówił
+// również o tym, że jeden okres wystarcza — na tym stoi rachunek w HashStartupLatency().
+hashOracle evaluateHash(const streamModel &left, const streamModel &right, int periodMultiplier = 4) {
+  hashOracle result{};
+  result.delta       = left.delta * right.delta / (left.delta + right.delta);
+  const auto ratioAB = left.delta / right.delta;
+  const int period   = ratioAB.numerator() + ratioAB.denominator();
+
+  for (int n = 0; n < period * periodMultiplier; ++n) {
+    const auto pick        = pickConstituent(left.delta, right.delta, n);
+    const streamModel &src = pick.fromB ? right : left;
+    const ratio available  = ratio(pick.position + 1 + src.tail) * src.delta;
+    result.tail            = std::max(result.tail, ceilOf(available / result.delta - ratio(n + 1)));
+  }
+  return result;
+}
+
 // --- korpus -------------------------------------------------------------------------
 
 std::string declareSource(const std::string &id, int width, const ratio &delta) {
@@ -172,6 +209,10 @@ std::string windowOf(const std::string &id, const std::string &src, int step, in
 
 std::string shiftOf(const std::string &id, const std::string &src, int offset) {
   return "SELECT * STREAM " + id + " FROM " + src + ">" + std::to_string(offset) + "\n";
+}
+
+std::string hashOf(const std::string &id, const std::string &left, const std::string &right) {
+  return "SELECT * STREAM " + id + " FROM " + left + "#" + right + "\n";
 }
 
 const std::vector<int> kOffsets{1, 2, 3, 5, 8};
@@ -398,4 +439,93 @@ TEST(h10aGate, window_over_shift_separates_origin_from_tail) {
             ++checked;
           }
   EXPECT_EQ(checked, 3 * 3 * 3 * static_cast<int>(kSteps.size()) * 3);
+}
+
+// Klasa HASH nad dwiema deklaracjami: siatka par delt. Obie składowe mają ogon zerowy,
+// więc każdy przypadek testuje wyłącznie regułę węzła `#` — a ta od 2026-08-07 jest
+// przeglądem okresu fazowego, nie postacią O(1) z członem ceil((p+q-1)/p).
+TEST(h10aGate, closed_form_matches_event_model_over_hash_corpus) {
+  const std::vector<ratio> deltas{ratio(1, 1), ratio(1, 2), ratio(1, 3), ratio(2, 5), ratio(3, 10), ratio(5, 7)};
+  int checked = 0;
+  for (const auto &deltaA : deltas)
+    for (const auto &deltaB : deltas) {
+      qTree instance;
+      const std::string rql = declareSource("a", 1, deltaA) +  //
+                              declareSource("b", 1, deltaB) +  //
+                              hashOf("c", "a", "b");
+      auto [parseResult, keyword, name] = parserRQLString(instance, rql);
+      ASSERT_EQ(parseResult, "OK") << rql;
+
+      compiler compilerInstance(instance);
+      ASSERT_EQ(compilerInstance.compile(), "OK") << rql;
+
+      const streamModel left{.delta = deltaA, .width = 1, .tail = 0, .origin = 0};
+      const streamModel right{.delta = deltaB, .width = 1, .tail = 0, .origin = 0};
+      const hashOracle expected = evaluateHash(left, right);
+
+      const auto &node = instance.getQuery("c");
+      EXPECT_EQ(node.rInterval, expected.delta) << rql;
+      EXPECT_EQ(node.startupLatency, expected.tail) << rql;
+      ++checked;
+    }
+  EXPECT_EQ(checked, static_cast<int>(deltas.size() * deltas.size()));
+}
+
+// Przeplot nad DWOMA oknami: obie składowe mają niezerowy ogon i niezerowy origin.
+// To jest korpus, który faktycznie strzeże reguły. Siatka z ogonami zerowymi tego nie
+// robi: dla zerowych ogonów składowych zastąpiona postać O(1) i przegląd okresu dają
+// tę samą liczbę, więc bramka na deklaracjach przeszłaby również przed naprawą.
+// Sprawdzone offline na tej siatce: 27 z 216 przypadków rozróżnia obie postacie,
+// zawsze o slot w górę po stronie postaci O(1).
+TEST(h10aGate, hash_over_two_windows_uses_the_constituent_selected_per_record) {
+  const std::vector<ratio> leftDeltas{ratio(1, 1), ratio(1, 2)};
+  const std::vector<ratio> rightDeltas{ratio(1, 1), ratio(1, 2), ratio(3, 10)};
+  int checked = 0;
+  for (const auto &deltaA : leftDeltas)
+    for (int widthA : {2, 3})
+      for (int stepA : {1, 2})
+        for (const auto &deltaB : rightDeltas)
+          for (int widthB : {2, 3, 4})
+            for (int stepB : {1, 2, 3}) {
+              qTree instance;
+              // Przeplot wymaga zgodnych schematów, więc oba okna mają długość 2.
+              const std::string rql = declareSource("a", widthA, deltaA) +  //
+                                      declareSource("b", widthB, deltaB) +  //
+                                      windowOf("wa", "a", stepA, 2) +       //
+                                      windowOf("wb", "b", stepB, 2) +       //
+                                      hashOf("c", "wa", "wb");
+              auto [parseResult, keyword, name] = parserRQLString(instance, rql);
+              ASSERT_EQ(parseResult, "OK") << rql;
+
+              compiler compilerInstance(instance);
+              ASSERT_EQ(compilerInstance.compile(), "OK") << rql;
+
+              const streamModel sourceA{.delta = deltaA, .width = widthA, .tail = 0, .origin = 0};
+              const streamModel sourceB{.delta = deltaB, .width = widthB, .tail = 0, .origin = 0};
+              const agseOracle windowA = evaluate(sourceA, stepA, 2);
+              const agseOracle windowB = evaluate(sourceB, stepB, 2);
+              const streamModel left{.delta = windowA.delta, .width = 2, .tail = windowA.tail, .origin = windowA.origin};
+              const streamModel right{.delta = windowB.delta, .width = 2, .tail = windowB.tail, .origin = windowB.origin};
+              const hashOracle expected = evaluateHash(left, right);
+
+              EXPECT_EQ(instance.getQuery("c").rInterval, expected.delta) << rql;
+              EXPECT_EQ(instance.getQuery("c").startupLatency, expected.tail) << rql;
+              ++checked;
+            }
+  EXPECT_EQ(checked, 2 * 2 * 2 * 3 * 3 * 3);
+}
+
+// Kontrola aparatury: jeden okres fazowy musi wystarczyć. Gdyby maksimum deficytu wypadało
+// dalej niż p+q, rachunek w HashStartupLatency() zaniżałby ogon — a zaniżenie jest tą klasą
+// defektu, której reżim bezpieczny miał nie dopuszczać.
+TEST(h10aGate, one_phase_period_is_enough_for_the_hash_tail) {
+  const std::vector<ratio> deltas{ratio(1, 1), ratio(1, 2), ratio(1, 3), ratio(2, 5), ratio(3, 10), ratio(5, 7)};
+  for (const auto &deltaA : deltas)
+    for (const auto &deltaB : deltas)
+      for (int tailA : {0, 1, 4}) {
+        const streamModel left{.delta = deltaA, .width = 1, .tail = tailA, .origin = 0};
+        const streamModel right{.delta = deltaB, .width = 1, .tail = 0, .origin = 0};
+        EXPECT_EQ(evaluateHash(left, right, 1).tail, evaluateHash(left, right, 8).tail)
+            << "dA=" << deltaA << " dB=" << deltaB << " W_A=" << tailA;
+      }
 }
