@@ -804,9 +804,23 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
 
         const auto nameSrc    = arg1;
         const auto timeOffset = std::get<int>(cmd.getVT());
-        // Offset N addresses history slot N (0 is the current record), so the
-        // source buffer must contain N+1 records.
-        capMap[nameSrc] = std::max(capMap[nameSrc], timeOffset + 1);
+        // Rekord n czyta INDEKS LOGICZNY n-N. W chwili odczytu źródło ma wyemitowanych
+        //   count = (n + W_out - W_src) - O_src + 1   rekordów fizycznych,
+        // a żądany rekord leży na pozycji (n - N) - O_src, więc
+        //   rev = count - 1 - pozycja = W_out - W_src + N = N - min(N, W_src)  <=  N.
+        // Origin skraca się: przesuwa i czoło, i żądaną pozycję o tyle samo. Pojemność musi
+        // pomieścić oba końce zakresu, stąd +1. Ogon producenta ODEJMUJE się od żądania:
+        // im dłużej producent każe czekać, tym bliżej czoła leży rekord sprzed N slotów.
+        //
+        // Człon prefetchu jest tu NOWY i konieczny dla deklaracji. Dopóki przesunięcie szło
+        // przez fetchBack z offsetem WZGLĘDNYM, wyprzedzenie czoła deklaracji skracało się samo
+        // i N+1 wystarczało. Adresowanie bezwzględne tej własności nie ma: czoło deklaracji
+        // biegnie o dwa rekordy przed rachunkiem czasowym (rekord uzbrojony przy otwarciu
+        // storage oraz zerowy prefetch), więc bez tego członu odczyt wypadałby poza historię.
+        const auto &source = coreInstance[nameSrc];
+        const int rev      = q.startupLatency - source.startupLatency + timeOffset;
+        const int required = rev + 1 + (source.isDeclaration() ? kDeclarationPrefetch : 0);
+        capMap[nameSrc]    = std::max(capMap[nameSrc], std::max(required, 1));
       } break;
       case STREAM_AGSE: {
         // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
@@ -1206,14 +1220,17 @@ std::string compiler::computeStartupLatency() {
       if (q.lProgram.size() == 1) {
         result = w1;  // czysty PUSH_STREAM — ten sam interwał, ten sam ogon
       } else if (op == STREAM_TIMEMOVE) {
-        // Ogon samego przesunięcia jest ZEROWY: rekord n czyta rekord n-N producenta, czyli
-        // rekord STARSZY od bieżącego, dostępny tym bardziej. Przesunięcie o N slotów siedzi
-        // w origin (patrz computeLogicalOrigin), bo to niedefiniowalność, nie oczekiwanie.
+        // Rekord n czyta rekord n-N producenta, czyli STARSZY od bieżącego. Przesunięcie o N
+        // slotów siedzi w origin (patrz computeLogicalOrigin), bo to niedefiniowalność, nie
+        // oczekiwanie. Sam ogon wynika z warunku dostępności: rekord n-N jest określony
+        // w chwili (n-N+1+W_src)*Delta, a slot n kończy się w (n+1+W)*Delta, więc
+        //   W >= W_src - N,  deficyt jest STAŁY,  stąd  W = max(0, W_src - N).
         //
-        // Ogon musi natomiast wynosić dokładnie tyle, co ogon producenta — ani mniej, ani
-        // więcej. dataModel::fetchBack czyta OFFSETEM WZGLĘDNYM, więc w slocie n+W dostaje
-        // rekord (n + W - W_src) - N; równość z żądanym n-N wymaga W = W_src.
-        result = w1;
+        // Do 2026-08-07 stało tu W = W_src, wymuszone adresowaniem WZGLĘDNYM w fetchBack:
+        // w slocie n+W dostawał rekord (n + W - W_src) - N i tylko przy W = W_src trafiał
+        // w żądany. Kampania K24p zmierzyła tamto zawyżenie na 6,6% węzłów `>N` o dokładnie
+        // min(W_src, N) slotów; dataModel adresuje teraz indeksem logicznym, więc związek zniknął.
+        result = std::max(0, w1 - std::get<int>(q.lProgram.back().getVT()));
       } else if (op == STREAM_HASH) {
         auto second = std::next(q.lProgram.begin());
         int w2      = 0;

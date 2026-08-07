@@ -341,7 +341,8 @@ TEST(xcompiler, computes_startup_latency) {
   EXPECT_EQ(instance.getQuery("mid").startupLatency, 0);
   // tau_N to N slotow opoznienia, kumulowanych wzdluz lancucha — ale po przestemplowaniu
   // to opoznienie jest ORIGIN, nie ogonem: rekord n ma tresc rekordu n-N, wiec rekordy ponizej
-  // N nie maja definicji. Ogon zostaje ogonem producenta, bo fetchBack czyta offsetem wzglednym.
+  // N nie maja definicji. Ogon wynosi max(0, W_src - N): rekord n-N jest STARSZY od biezacego,
+  // wiec producent o ogonie nie wiekszym od N nie kaze na niego czekac ani slotu.
   EXPECT_EQ(instance.getQuery("shifted").startupLatency, 0);
   EXPECT_EQ(instance.getQuery("shifted").logicalOrigin, 3);
   EXPECT_EQ(instance.getQuery("shifted_twice").startupLatency, 0);
@@ -452,7 +453,11 @@ TEST(xcompiler, startup_latency_is_preserved_by_shift_matching_identity) {
   // przestemplowaniu tau_N sklada sie ona z ogona (przeplot) i origin (przesuniecie).
   EXPECT_EQ(instance.getQuery("lhs").startupLatency, instance.getQuery("rhs").startupLatency);
   EXPECT_EQ(instance.getQuery("lhs").logicalOrigin, instance.getQuery("rhs").logicalOrigin);
-  EXPECT_EQ(instance.getQuery("rhs").startupLatency, 2);  // ogon przeplotu
+  // Ogon przeplotu to 2, ale tau_3 nad nim NIE dokłada nic i wręcz go pochłania:
+  // W = max(0, 2 - 3) = 0. Rekord 3 niesie rekord 0 przeplotu, dostepny w chwili 3*Delta,
+  // a slot 3 konczy sie w 4*Delta — czekac nie ma na co. Do 2026-08-07 stalo tu 2, bo
+  // adresowanie wzgledne w fetchBack wymuszalo W = W_src (K24p §2.2).
+  EXPECT_EQ(instance.getQuery("rhs").startupLatency, 0);
   EXPECT_EQ(instance.getQuery("rhs").logicalOrigin, 3);   // przesuniecie 2+1 slotow wyjscia
 }
 

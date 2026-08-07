@@ -53,6 +53,10 @@ int floorOf(const ratio &value) { return floorOf(value.numerator(), value.denomi
 
 int ceilOf(const ratio &value) { return -floorOf(-value.numerator(), value.denominator()); }
 
+// Deklaracja wyprzedza konsumenta o rekord uzbrojony przy otwarciu storage i o zerowy
+// prefetch, więc jej czoło jest dalej, niż wynika z samego rachunku czasowego.
+constexpr int kDeclarationPrefetch = 2;
+
 struct streamModel {
   ratio delta;
   int width;
@@ -123,23 +127,33 @@ agseOracle evaluate(const streamModel &source, int step, int length, int probeMu
 
 // Przesunięcie tau_N: rekord n niesie rekord n-N producenta, na tym samym interwale.
 //
-// Origin: rekord n wymaga rekordu n-N, więc pierwszy definiowalny to O_src + N.
-// Ogon: rekord n-N jest STARSZY od bieżącego, więc dostępność go nie ogranicza — ale
-// dataModel::fetchBack czyta offsetem WZGLĘDNYM, przez co w slocie n+W dostaje rekord
-// (n + W - W_src) - N. Równość z żądanym n-N wymusza W = W_src; ogon nie ma tu swobody
-// w żadną stronę i to jest treść bramki dla tej klasy.
-//
-// Model kampanii K24 opisywał `>N` inaczej — jako odwzorowanie tożsamościowe z opóźnieniem
-// N*Delta doklejonym do dostępności — bo taką semantykę miał wtedy silnik. Wynikało z niej
-// W = W_src + N i opóźnienie NIEWIDOCZNE w złączeniu (rekord n brał rekord n).
+// Historia konwencji tej klasy jest trzystopniowa i warto ją tu mieć, bo dwa razy zmieniła
+// się liczba, którą bramka sprawdza:
+//   K24 (do 2026-08-06) — odwzorowanie tożsamościowe z opóźnieniem N*Delta doklejonym do
+//     dostępności: W = W_src + N, opóźnienie NIEWIDOCZNE w złączeniu (rekord n brał rekord n);
+//   K24p (2026-08-07)  — rekord n bierze rekord n-N, ale fetchBack adresował offsetem
+//     WZGLĘDNYM, co wymuszało W = W_src; kampania zmierzyła to jako zawyżenie o min(W_src, N)
+//     na 6,6% węzłów klasy;
+//   dziś              — fetchForward adresuje indeksem LOGICZNYM, więc ogon jest wolny
+//     i równy granicy zdarzeniowej.
 struct shiftOracle {
   int origin;
   int tail;
   int sourceCapacity;
 };
 
-shiftOracle evaluateShift(const streamModel &source, int offset) {
-  return {.origin = source.origin + offset, .tail = source.tail, .sourceCapacity = offset + 1};
+// Rekord n przesunięcia niesie treść rekordu n-N producenta, więc:
+//   origin — rekordy poniżej O_src+N nie mają definicji;
+//   ogon   — deficyt slotu n wynosi (n-N+1+W_src) - (n+1) = W_src - N i jest STAŁY,
+//            stąd W = max(0, W_src - N);
+//   pojemność — odległość wsteczna rev = W - W_src + N = N - min(N, W_src), plus jeden
+//            na oba końce zakresu, plus wyprzedzenie czoła, jeżeli producent jest deklaracją.
+shiftOracle evaluateShift(const streamModel &source, int offset, bool sourceDeclared) {
+  const int tail = std::max(0, source.tail - offset);
+  const int rev  = tail - source.tail + offset;
+  return {.origin = source.origin + offset,
+          .tail   = tail,
+          .sourceCapacity = rev + 1 + (sourceDeclared ? kDeclarationPrefetch : 0)};
 }
 
 // --- korpus -------------------------------------------------------------------------
@@ -167,8 +181,6 @@ const std::vector<ratio> kDeltas{ratio(1, 1), ratio(1, 2), ratio(1, 3), ratio(2,
 const std::vector<int> kWidths{1, 2, 3, 4};
 const std::vector<int> kSteps{1, 2, 3, 4};
 const std::vector<int> kLengths{1, 2, 3, 4, -2, -3, -4};
-
-constexpr int kDeclarationPrefetch = 2;
 
 }  // namespace
 
@@ -293,9 +305,10 @@ TEST(h10aGate, event_model_rejects_a_tail_one_slot_too_small) {
   EXPECT_GT(witnesses, 0);
 }
 
-// Klasa SHIFT nad deklaracją: pełna siatka (F, N, Delta). Ogon musi być ZEROWY, a całe
-// opóźnienie ma siedzieć w origin — dotąd było odwrotnie i dlatego `>N` nie było widoczne
-// w złączeniu.
+// Klasa SHIFT nad deklaracją: pełna siatka (F, N, Delta). Ogon musi być ZEROWY (producent
+// o ogonie zerowym nie każe czekać na rekord STARSZY od bieżącego), a całe opóźnienie ma
+// siedzieć w origin — przed przestemplowaniem było odwrotnie i dlatego `>N` nie było
+// widoczne w złączeniu.
 TEST(h10aGate, closed_form_matches_event_model_over_shift_corpus) {
   int checked = 0;
   for (const auto &delta : kDeltas)
@@ -310,7 +323,7 @@ TEST(h10aGate, closed_form_matches_event_model_over_shift_corpus) {
         ASSERT_EQ(compilerInstance.compile(), "OK") << rql;
 
         const streamModel source{.delta = delta, .width = width, .tail = 0, .origin = 0};
-        const shiftOracle expected = evaluateShift(source, offset);
+        const shiftOracle expected = evaluateShift(source, offset, true);
 
         const auto &sh = instance.getQuery("sh");
         EXPECT_EQ(sh.rInterval, delta) << rql;  // przesunięcie nie zmienia interwału
@@ -345,7 +358,7 @@ TEST(h10aGate, shift_over_window_composes_both_quantities) {
             const agseOracle window = evaluate(source, step, length);
             const streamModel middle{
                 .delta = window.delta, .width = length < 0 ? -length : length, .tail = window.tail, .origin = window.origin};
-            const shiftOracle expected = evaluateShift(middle, offset);
+            const shiftOracle expected = evaluateShift(middle, offset, false);
 
             EXPECT_EQ(instance.getQuery("sh").logicalOrigin, expected.origin) << rql;
             EXPECT_EQ(instance.getQuery("sh").startupLatency, expected.tail) << rql;
@@ -376,7 +389,7 @@ TEST(h10aGate, window_over_shift_separates_origin_from_tail) {
             ASSERT_EQ(compilerInstance.compile(), "OK") << rql;
 
             const streamModel source{.delta = delta, .width = width, .tail = 0, .origin = 0};
-            const shiftOracle shifted = evaluateShift(source, offset);
+            const shiftOracle shifted = evaluateShift(source, offset, true);
             const streamModel middle{.delta = delta, .width = width, .tail = shifted.tail, .origin = shifted.origin};
             const agseOracle expected = evaluate(middle, step, length);
 

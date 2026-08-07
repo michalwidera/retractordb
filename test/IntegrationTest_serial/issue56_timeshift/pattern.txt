@@ -11,7 +11,7 @@ STREAM_ADD_core0_core1(1/10)	tail=1
 		PUSH_ID(STREAM_ADD_core0_core1[0])
 	core1_1: INTEGER
 		PUSH_ID(STREAM_ADD_core0_core1[1])
-str1(1/10)	tail=1	origin=5
+str1(1/10)	origin=5
 	:- PUSH_STREAM(STREAM_ADD_core0_core1)
 	:- STREAM_TIMEMOVE(5)
 	str1_0: INTEGER

@@ -284,7 +284,16 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto nameSrc    = arg[0].getStr_();
       const auto timeOffset = std::get<int>(operation.getVT());
 
-      *(qSet[instance]->inputPayload) = fetchBack(nameSrc, timeOffset);
+      // tau_N adresowane INDEKSEM LOGICZNYM: rekord n niesie treść rekordu n-N producenta.
+      // Poprzednio szło to przez fetchBack z offsetem WZGLĘDNYM wobec czoła źródła, co wiązało
+      // ogon przesunięcia z ogonem producenta (W = W_src) — bo tylko przy tej równości offset
+      // względny trafiał w żądany rekord. Model zdarzeniowy wymaga mniej: deficyt przesunięcia
+      // jest stały i równy W_src - N, więc dokładnym ogonem jest max(0, W_src - N) (K24p §2.2).
+      // Adresowanie bezwzględne uwalnia ogon od tego związku; origin nadal gwarantuje, że
+      // indeks n-N nie schodzi poniżej początku logicznego producenta.
+      const auto n = logicalIndex(instance);
+
+      *(qSet[instance]->inputPayload) = fetchForward(nameSrc, n - timeOffset);
     } break;
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV: {

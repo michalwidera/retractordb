@@ -272,6 +272,13 @@ std::string print(const std::string &query_name, dataModel &proc) {
 // koniec okna, a nie jego początek.
 TEST_F(crsMathTest, check_if_streams_values_are_correct) {
   const auto colSize = 9;
+  // Kolumna s9x = (s1x>1)@(2,2) przesunieta o jeden wlasny slot (dwa wiersze siatki 1/3)
+  // w gore wobec stanu sprzed 2026-08-07. Wyprowadzenie, nie przepisanie z wyjscia silnika:
+  // s1x = cx@(1,1) ma ogon 2 i origin 0; (s1x>1) ma origin 1 i ogon max(0, 2-1) = 1;
+  // s9x ma origin ceil((1*1+1)/2) = 1 i ogon ceil((1+1)*1/2)-1 = 0. Rekord 1 obejmuje
+  // pozycje 1..2, czyli s1x[0] i s1x[1]; s1x[1] jest dostepny w chwili (1+1+2)/3 = 4/3,
+  // a slot 1 konczy sie w (1+1+0)*2/3 = 4/3 — dokladnie na czas, bez slotu zapasu.
+  // Poprzednio (s1x>1) mialo ogon 2, wymuszony adresowaniem wzglednym w fetchBack.
   const auto *const expectedResult =
       // clang-format off
       " Dlt:|      1/1|      1/3|      2/3|      1/3|      1/1|      1/1|      1/1|      2/3|      2/3|      1/3|      1/3|      2/3|      2/3|\n"
@@ -280,17 +287,17 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
       " 333 |         |         |         |         |         |         |         |         |         |        2|        1|         |         |\n"
       " 333 |         |         |         |         |         |         |         |         |         |        3|        2|         |         |\n"
       " 333 |    4,5,6|        1|         |         |         |         |         |         |         |        4|        3|         |         |\n"
-      " 333 |         |        2|         |      2,1|         |         |         |         |         |        5|        4|      2,1|         |\n"
+      " 333 |         |        2|         |      2,1|         |         |         |         |         |        5|        4|      2,1|      2,1|\n"
       " 333 |         |        3|         |      3,2|         |         |         |         |         |        6|        5|         |         |\n"
-      " 333 |    7,8,9|        4|      3,2|      4,3|      4,3|    4,3,2|    2,3,4|    3,2,1|         |        7|        6|      4,3|      2,1|\n"
+      " 333 |    7,8,9|        4|      3,2|      4,3|      4,3|    4,3,2|    2,3,4|    3,2,1|         |        7|        6|      4,3|      4,3|\n"
       " 333 |         |        5|         |      5,4|         |         |         |         |         |        8|        7|         |         |\n"
-      " 333 |         |        6|      5,4|      6,5|         |         |         |    5,4,3|  5,4,3,2|        9|        8|      6,5|      4,3|\n"
+      " 333 |         |        6|      5,4|      6,5|         |         |         |    5,4,3|  5,4,3,2|        9|        8|      6,5|      6,5|\n"
       " 333 |    1,2,3|        7|         |      7,6|      7,6|    7,6,5|    5,6,7|         |         |        1|        9|         |         |\n"
-      " 333 |         |        8|      7,6|      8,7|         |         |         |    7,6,5|  7,6,5,4|        2|        1|      8,7|      6,5|\n"
+      " 333 |         |        8|      7,6|      8,7|         |         |         |    7,6,5|  7,6,5,4|        2|        1|      8,7|      8,7|\n"
       " 333 |         |        9|         |      9,8|         |         |         |         |         |        3|        2|         |         |\n"
-      " 333 |    4,5,6|        1|      9,8|      1,9|      1,9|    1,9,8|    8,9,1|    9,8,7|  9,8,7,6|        4|        3|      1,9|      8,7|\n"
+      " 333 |    4,5,6|        1|      9,8|      1,9|      1,9|    1,9,8|    8,9,1|    9,8,7|  9,8,7,6|        4|        3|      1,9|      1,9|\n"
       " 333 |         |        2|         |      2,1|         |         |         |         |         |        5|        4|         |         |\n"
-      " 333 |         |        3|      2,1|      3,2|         |         |         |    2,1,9|  2,1,9,8|        6|        5|      3,2|      1,9|\n";
+      " 333 |         |        3|      2,1|      3,2|         |         |         |    2,1,9|  2,1,9,8|        6|        5|      3,2|      3,2|\n";
   // clang-format on
 
   // Q: W wyniku zmian w bieżącym branch zmieniona została wartość expectdResults.
