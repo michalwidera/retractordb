@@ -1,0 +1,8 @@
+# Funkcje z gramatyki mają w RQL wyłącznie postać z wielkiej litery ('Sqrt', 'Ceil', 'Floor').
+# Ten plan MUSI się policzyć, nie tylko skompilować.
+
+STORAGE 'temp'
+
+DECLARE a INTEGER, b DOUBLE STREAM src, 1/8 FILE 'data.txt' ONESHOT
+
+SELECT Sqrt(src[0]), Ceil(src[1]), Floor(src[1]) STREAM dst FROM src

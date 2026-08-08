@@ -3,6 +3,9 @@
 #include <spdlog/spdlog.h>
 
 #include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "rdb/payload.hpp"
 #include "retractor/lib/expressionEvaluator.hpp"
@@ -839,6 +842,46 @@ TEST(xExpressionEval, too_many_values_on_stack_throws) {
 }
 
 // --- CALL functions ---
+
+// Nazwy pisane wielką literą to POSTAĆ, KTÓRĄ NAPRAWDĘ PRODUKUJE PARSER: gramatyka zna wyłącznie
+// 'Sqrt', 'Ceil' i 'Floor', a `exitFunction_call` wkłada do tokena tekst dosłowny. Pozostałe testy
+// w tym pliku fabrykują nazwy małymi literami, czyli sprawdzają dopasowanie, którego z RQL nie da
+// się osiągnąć — i dlatego przechodziły, gdy `Sqrt(x)` wywracał się w wykonaniu.
+TEST(xExpressionEval, call_function_name_as_grammar_writes_it) {
+  const std::vector<std::pair<std::string, double>> cases{{"Sqrt", 2.0}, {"Ceil", 4.0}, {"Floor", 4.0}};
+
+  for (const auto &[name, expected] : cases) {
+    std::list<token> program;
+    program.emplace_back(PUSH_VAL, 4.0);
+    program.emplace_back(CALL, name);
+
+    expressionEvaluator test;
+    rdb::descFldVT result = test.eval(program);
+
+    ASSERT_TRUE(std::holds_alternative<double>(result)) << name;
+    EXPECT_EQ(std::get<double>(result), expected) << name;
+  }
+}
+
+// Złożenie wielkości liter nie może zamienić nieznanej funkcji w znaną ani zamazać nazwy
+// w komunikacie — `Abs` jest w gramatyce, ale ewaluator go nie ma.
+TEST(xExpressionEval, call_unknown_function_keeps_author_spelling) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, 4.0);
+  program.emplace_back(CALL, std::string("Abs"));
+
+  expressionEvaluator test;
+  EXPECT_THROW(
+      {
+        try {
+          test.eval(program);
+        } catch (const std::runtime_error &error) {
+          EXPECT_STREQ(error.what(), "Unsupported function call: Abs");
+          throw;
+        }
+      },
+      std::runtime_error);
+}
 
 TEST(xExpressionEval, call_sqrt_function_double) {
   std::list<token> program;

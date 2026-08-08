@@ -3,6 +3,8 @@
 #include <spdlog/spdlog.h>
 #include <boost/container/small_vector.hpp>
 
+#include <algorithm>   // std::ranges::transform
+#include <cctype>      // std::tolower
 #include <cmath>       // sqrt
 #include <functional>  // std::function
 #include <optional>
@@ -22,6 +24,13 @@ static cast<rdb::descFldVT> castFldVT;
 expressionEvaluator::expressionEvaluator(/* args */) = default;
 
 using pairVar = std::pair<rdb::descFldVT, rdb::descFldVT>;
+
+/// Nazwa funkcji złożona do małych liter. Nazwy pochodzą z gramatyki, więc ASCII wystarcza,
+/// a wynik mieści się w SSO — dopasowanie nazwy nie alokuje.
+static std::string lowercased(std::string text) {
+  std::ranges::transform(text, text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  return text;
+}
 
 bool isNullValue(const rdb::descFldVT &value) { return std::holds_alternative<std::monostate>(value); }
 
@@ -570,7 +579,12 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         rStack.push(is_logic_and(b, a));
         break;
       case CALL: {
-        const auto tkStr = tk.getStr_();
+        // Gramatyka zapisuje nazwy funkcji wielką literą ('Sqrt', 'Ceil', 'Floor'), a parser
+        // wkłada do tokena tekst dosłowny (RQLParser::exitFunction_call), więc dopasowanie musi
+        // złożyć wielkość liter. Bez tego `Sqrt(x)` kompiluje się i wywraca dopiero w wykonaniu.
+        // Do komunikatu idzie nazwa tak, jak ją napisał autor zapytania.
+        const auto original = tk.getStr_();
+        const auto tkStr    = lowercased(original);
         // https://learnmoderncpp.com/2020/06/01/strings-as-switch-case-labels/ (?)
         if (tkStr == "floor")
           rStack.push(callFun(b, floor));
@@ -603,7 +617,7 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         else if (tkStr == "to_string")
           rStack.push(isNullValue(b) ? rdb::descFldVT{std::monostate{}} : castFldVT(b, rdb::STRING));
         else
-          throw std::runtime_error(std::string("Unsupported function call: ") + tkStr);
+          throw std::runtime_error(std::string("Unsupported function call: ") + original);
       } break;
       case CALL2: {
         const auto tkStr = tk.getStr_();
