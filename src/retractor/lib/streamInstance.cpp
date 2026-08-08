@@ -35,6 +35,12 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::strin
   auto desc = qry.descriptorStorage();
   outputPayload->attachDescriptor(&desc);
 
+  // Jedyne miejsce, w którym rola z planu (`isSubstrat`) spotyka się z magazynem — sonda
+  // logicznych zapisów (K23) rozdziela materializowany podplan od publicznego wyniku.
+  // `if constexpr` obejmuje wywołanie, żeby build produkcyjny nie różnił się od wersji
+  // bez sondy nawet o zapis tego jednego pola.
+  if constexpr (rdb_probe_materialize) outputPayload->markAsSubstrate(qry.isSubstrat);
+
   if (qry.rInterval > 0 && qry.isDeclaration()) {
     outputPayload->configureGapDetection(qry.rInterval);
   }

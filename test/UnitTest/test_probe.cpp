@@ -219,6 +219,166 @@ TEST(probeMaterialization, reset_zeroes_every_counter) {
 }
 
 //
+// ─── K23: kanoniczne zapisy logiczne ────────────────────────────────────────────
+//
+// Przypadki o ZNANEJ odpowiedzi — bramka §10 planu K23. Serializer jest czystą funkcją
+// deskryptora, więc działa identycznie w obu wariantach kompilacji (bez mnożnika);
+// mnożnik dotyczy tylko liczników zdarzeń.
+//
+
+TEST(probeCanonicalRecord, empty_descriptor_has_only_an_empty_null_map) {
+  const rdb::Descriptor descriptor;
+
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(descriptor), 0u);
+}
+
+TEST(probeCanonicalRecord, integer_field_is_eight_bytes_plus_one_map_byte) {
+  // Kanoniczna szerokość NIE jest natywnym rlen: pole zadeklarowane jako 4-bajtowe
+  // liczy się jako 8 B, bo metryka ma być neutralna wobec obu porównywanych systemów.
+  const rdb::Descriptor descriptor{{"a", sizeof(int), 1, rdb::INTEGER}};
+
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(descriptor), 8u + 1u);
+}
+
+TEST(probeCanonicalRecord, width_per_type_follows_the_frozen_mapping) {
+  const rdb::Descriptor byteField{{"a", 1, 1, rdb::BYTE}};
+  const rdb::Descriptor floatField{{"a", 4, 1, rdb::FLOAT}};
+  const rdb::Descriptor doubleField{{"a", 8, 1, rdb::DOUBLE}};
+  const rdb::Descriptor rationalField{{"a", 8, 1, rdb::RATIONAL}};
+
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(byteField), 1u + 1u);
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(floatField), 4u + 1u);
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(doubleField), 8u + 1u);
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(rationalField), 16u + 1u);
+}
+
+TEST(probeCanonicalRecord, string_keeps_its_declared_width) {
+  // Napis jest jedynym typem, dla którego szerokość zadeklarowana JEST szerokością
+  // kanoniczną — nie ma neutralnego rozmiaru napisu do podstawienia.
+  const rdb::Descriptor descriptor{{"s", 16, 1, rdb::STRING}};
+
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(descriptor), 16u + 1u);
+}
+
+TEST(probeCanonicalRecord, array_multiplies_the_canonical_width) {
+  const rdb::Descriptor descriptor{{"a", sizeof(int), 3, rdb::INTEGER}};
+
+  // 3 wartości × 8 B + mapa NULL na 3 bity = 1 bajt
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(descriptor), 24u + 1u);
+}
+
+TEST(probeCanonicalRecord, null_map_rounds_up_to_whole_bytes) {
+  // Mapa ma jeden bit na wartość, zaokrąglony w górę: 8 wartości = 1 bajt, 9 = 2 bajty.
+  const rdb::Descriptor eightValues{{"a", sizeof(int), 8, rdb::INTEGER}};
+  const rdb::Descriptor nineValues{{"a", sizeof(int), 9, rdb::INTEGER}};
+
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(eightValues), 64u + 1u);
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(nineValues), 72u + 2u);
+}
+
+TEST(probeCanonicalRecord, configuration_fields_and_nulltype_carry_no_width) {
+  // Pola konfiguracyjne nie są danymi rekordu; ta sama reguła co w Descriptor::fieldSize().
+  const rdb::Descriptor descriptor{{"a", sizeof(int), 1, rdb::INTEGER},  //
+                                   {"TYPE", 0, 1, rdb::TYPE},
+                                   {"REF", 0, 1, rdb::REF},
+                                   {"n", 0, 1, rdb::NULLTYPE}};
+
+  // Tylko pole `a` wnosi szerokość; mapa liczy wartości spłaszczonego widoku pól danych.
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(descriptor), 8u + 1u);
+}
+
+TEST(probeCanonicalRecord, result_is_independent_of_record_contents) {
+  // Metryka bajtowa jest deterministycznym wynikiem mechanizmu — dwa odczyty tego samego
+  // deskryptora muszą dać tę samą liczbę, niezależnie od tego, co stoi w rekordzie.
+  const rdb::Descriptor descriptor{{"a", sizeof(int), 2, rdb::INTEGER}, {"s", 8, 1, rdb::STRING}};
+
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(descriptor), rdb::probe::canonicalRecordBytes(descriptor));
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(descriptor), 16u + 8u + 1u);
+}
+
+TEST(probeLogicalWrite, zero_writes_report_zero) {
+  rdb::probe::logicalWriteReset();
+
+  const auto l = rdb::probe::logicalWriteReport();
+  EXPECT_EQ(l.substrateAppends, 0u);
+  EXPECT_EQ(l.substrateBytes, 0u);
+  EXPECT_EQ(l.publicAppends, 0u);
+  EXPECT_EQ(l.publicBytes, 0u);
+}
+
+TEST(probeLogicalWrite, substrate_and_public_roles_counted_apart) {
+  // Metryka pierwotna to bajty substratu, a mianownikiem jest liczba rekordów publicznych.
+  // Licznik globalny nie dawał ani jednej, ani drugiej wielkości.
+  rdb::probe::logicalWriteReset();
+  rdb::probe::onLogicalWrite(true, true, 24);
+  rdb::probe::onLogicalWrite(true, true, 24);
+  rdb::probe::onLogicalWrite(false, true, 9);
+
+  const auto l = rdb::probe::logicalWriteReport();
+  EXPECT_EQ(l.substrateAppends, 2 * materializeOn);
+  EXPECT_EQ(l.substrateBytes, 48 * materializeOn);
+  EXPECT_EQ(l.publicAppends, 1 * materializeOn);
+  EXPECT_EQ(l.publicBytes, 9 * materializeOn);
+}
+
+TEST(probeLogicalWrite, overwrite_carries_bytes_unlike_the_native_counter) {
+  // To jest ta różnica, która ratuje pomiar substratu na buforze kołowym: po zawinięciu
+  // zapisy idą ścieżką nadpisania i licznik natywny pokazałby tam zero bajtów.
+  rdb::probe::logicalWriteReset();
+  rdb::probe::onLogicalWrite(true, false, 24);
+  rdb::probe::onLogicalWrite(true, false, 24);
+
+  const auto l = rdb::probe::logicalWriteReport();
+  EXPECT_EQ(l.substrateAppends, 0u);
+  EXPECT_EQ(l.substrateOverwrites, 2 * materializeOn);
+  EXPECT_EQ(l.substrateBytes, 48 * materializeOn);
+}
+
+TEST(probeLogicalWrite, q_copies_of_the_same_subplan_scale_linearly) {
+  // Geometria progu H9: bez współdzielenia Q instancji zapisuje Q×b, po współdzieleniu b.
+  // Ten test pilnuje samego licznika, nie mechanizmu — ale bez niego liczba 1−1/Q nie ma
+  // podstawy pomiarowej.
+  constexpr unsigned long long recordBytes = 17;
+  constexpr int q                          = 8;
+
+  rdb::probe::logicalWriteReset();
+  for (int instance = 0; instance < q; ++instance)
+    rdb::probe::onLogicalWrite(true, true, recordBytes);
+  const auto without = rdb::probe::logicalWriteReport();
+
+  rdb::probe::logicalWriteReset();
+  rdb::probe::onLogicalWrite(true, true, recordBytes);
+  const auto with = rdb::probe::logicalWriteReport();
+
+  EXPECT_EQ(without.substrateBytes, q * recordBytes * materializeOn);
+  EXPECT_EQ(with.substrateBytes, recordBytes * materializeOn);
+}
+
+TEST(probeLogicalWrite, records_of_different_width_sum_exactly) {
+  rdb::probe::logicalWriteReset();
+  rdb::probe::onLogicalWrite(true, true, 9);
+  rdb::probe::onLogicalWrite(true, true, 17);
+  rdb::probe::onLogicalWrite(true, true, 25);
+
+  EXPECT_EQ(rdb::probe::logicalWriteReport().substrateBytes, 51 * materializeOn);
+}
+
+TEST(probeLogicalWrite, reset_zeroes_every_counter) {
+  rdb::probe::onLogicalWrite(true, true, 10);
+  rdb::probe::onLogicalWrite(false, false, 10);
+
+  rdb::probe::logicalWriteReset();
+
+  const auto l = rdb::probe::logicalWriteReport();
+  EXPECT_EQ(l.substrateAppends, 0u);
+  EXPECT_EQ(l.substrateOverwrites, 0u);
+  EXPECT_EQ(l.substrateBytes, 0u);
+  EXPECT_EQ(l.publicAppends, 0u);
+  EXPECT_EQ(l.publicOverwrites, 0u);
+  EXPECT_EQ(l.publicBytes, 0u);
+}
+
+//
 // ─── E3: kształt planu ──────────────────────────────────────────────────────────
 //
 // Te funkcje są czystymi przekształceniami danych, więc działają identycznie w obu
@@ -304,6 +464,7 @@ TEST(probePlanShape, empty_capacity_map_has_zero_shape) {
 
 TEST(probeReport, runtime_counters_are_silent_without_environment) {
   const envGuard noMaterialize("RDB_BENCH_MATERIALIZE", nullptr);
+  const envGuard noLogical("RDB_BENCH_LOGICAL", nullptr);
   const envGuard noWork("RDB_BENCH_WORK", nullptr);
 
   testing::internal::CaptureStderr();
@@ -313,6 +474,7 @@ TEST(probeReport, runtime_counters_are_silent_without_environment) {
 
 TEST(probeReport, work_line_printed_when_armed) {
   const envGuard noMaterialize("RDB_BENCH_MATERIALIZE", nullptr);
+  const envGuard noLogical("RDB_BENCH_LOGICAL", nullptr);
   const envGuard work("RDB_BENCH_WORK", "1");
 
   rdb::probe::workReset();
@@ -336,6 +498,7 @@ TEST(probeReport, work_line_printed_when_armed) {
 
 TEST(probeReport, materialization_line_printed_when_armed) {
   const envGuard materialize("RDB_BENCH_MATERIALIZE", "1");
+  const envGuard noLogical("RDB_BENCH_LOGICAL", nullptr);
   const envGuard noWork("RDB_BENCH_WORK", nullptr);
 
   rdb::probe::materializationReset();
@@ -351,6 +514,30 @@ TEST(probeReport, materialization_line_printed_when_armed) {
     EXPECT_EQ(output,
               "MATERIALIZED trwale: dopisania=1 nadpisania=1 bajty=64  "
               "pamieciowe: dopisania=1 nadpisania=0 bajty=8\n");
+  else
+    EXPECT_EQ(output, "");
+}
+
+TEST(probeReport, logical_line_is_armed_by_its_own_variable) {
+  // Dwie osobne zmienne, bo to dwie różne wielkości: MATERIALIZED opisuje objętość
+  // magazynu w reprezentacji natywnej, LOGICAL — kanoniczne bajty zapisów wg roli.
+  const envGuard noMaterialize("RDB_BENCH_MATERIALIZE", nullptr);
+  const envGuard logical("RDB_BENCH_LOGICAL", "1");
+  const envGuard noWork("RDB_BENCH_WORK", nullptr);
+
+  rdb::probe::logicalWriteReset();
+  rdb::probe::onLogicalWrite(true, true, 24);
+  rdb::probe::onLogicalWrite(true, false, 24);
+  rdb::probe::onLogicalWrite(false, true, 9);
+
+  testing::internal::CaptureStderr();
+  rdb::probe::reportRuntimeCounters();
+  const std::string output = testing::internal::GetCapturedStderr();
+
+  if constexpr (rdb_probe_materialize)
+    EXPECT_EQ(output,
+              "LOGICAL substrat: dopisania=1 nadpisania=1 bajty=48  "
+              "publiczne: dopisania=1 nadpisania=0 bajty=9\n");
   else
     EXPECT_EQ(output, "");
 }

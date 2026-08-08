@@ -37,6 +37,13 @@
 
 #include "probeConfig.h"
 
+namespace rdb {
+// Deklaracja wyprzedzająca, nie include: canonicalRecordBytes() potrzebuje deskryptora, ale
+// probe.hpp dołączany jest w gorących jednostkach kompilacji, a descriptor.hpp ciągnie za sobą
+// magic_enum i boost::rational. Definicja siedzi w probe.cc, które include ma.
+class Descriptor;
+}  // namespace rdb
+
 namespace rdb::probe {
 
 /// Czy jakakolwiek sonda jest wkompilowana — do banerów ostrzegawczych.
@@ -80,6 +87,35 @@ struct materializationCounters {
   unsigned long long memoryBytes      = 0;
 };
 
+/// Kanoniczne zapisy logiczne (K23/H9) — metryka PIERWOTNA kampanii K23, obok
+/// `materializationCounters`, nie zamiast nich.
+///
+/// Trzy różnice wobec licznika natywnego wynikają wprost ze specyfikacji metryki:
+///
+/// 1. **bajty są kanoniczne, nie natywne** — liczone przez canonicalRecordBytes() wg
+///    odwzorowania niezależnego od reprezentacji obu porównywanych systemów, wraz
+///    z kanoniczną mapą NULL/luk. Natywne `mat_bytes` są nieporównywalne między
+///    RetractorDB a Flinkiem, bo opisują dwa różne formaty rekordu.
+/// 2. **rola strumienia jest rozdzielona** — metryka pyta o zapisy do materializowanego
+///    podplanu (substraty), a mianownikiem jest liczba publicznych rekordów wyjściowych.
+///    Licznik natywny jest globalny, więc jednej ani drugiej wielkości nie daje.
+/// 3. **nadpisanie wnosi bajty** — jednostką jest RZECZYWISTY ZAPIS rekordu pośredniego,
+///    nie przyrost objętości magazynu. Substrat na buforze kołowym (`SUBSTRAT 'memory'`)
+///    po zawinięciu idzie ścieżką nadpisania; licznik natywny pokazałby tam zero bajtów,
+///    czyli bramka mechanizmu przeszłaby, a metryka pierwotna skłamała. Dopisania
+///    i nadpisania zostają rozdzielne, żeby ten reżim był widoczny w raporcie.
+///
+/// Zapis pochłonięty przez detekcję gap nie jest liczony — wynika to z położenia sondy
+/// za `metaData_->absorbAppend()`, nie z osobnej reguły tutaj.
+struct logicalWriteCounters {
+  unsigned long long substrateAppends    = 0;
+  unsigned long long substrateOverwrites = 0;
+  unsigned long long substrateBytes      = 0;
+  unsigned long long publicAppends       = 0;
+  unsigned long long publicOverwrites    = 0;
+  unsigned long long publicBytes         = 0;
+};
+
 namespace detail {
 // Stan sond ścieżki gorącej (okno agregatu, ewaluator, zapis rekordu) leży w nagłówku, bo
 // inkrementacja musi się inline'ować — skok do innej jednostki kompilacji byłby w pomiarze
@@ -89,6 +125,7 @@ namespace detail {
 // jednostce kompilacji dołączającej ten plik — także tam, gdzie sond nie ma.
 inline workCounters work{};
 inline materializationCounters materialization{};
+inline logicalWriteCounters logicalWrite{};
 
 void printRuntimeCounters();
 void countRewriteR1();
@@ -161,10 +198,43 @@ void workReset();
 materializationCounters materializationReport();
 void materializationReset();
 
-/// Raport liczników runtime (K6 + E4) na stderr, po zakończeniu mierzonej pętli — żeby
+/// Kanoniczna szerokość rekordu opisanego deskryptorem, wraz z kanoniczną mapą NULL/luk.
+///
+/// **To jest serializer metryki pierwotnej K23 i jedyne miejsce, w którym wolno go zmienić.**
+/// Ta sama definicja obowiązuje job Flinka; predeklaracja kampanii ją zamraża. Wynik zależy
+/// wyłącznie od deskryptora, nie od zawartości rekordu — metryka bajtowa jest
+/// deterministycznym wynikiem mechanizmu, więc nie może się zmieniać z danymi.
+std::size_t canonicalRecordBytes(const Descriptor &descriptor);
+
+/// Zapis rekordu do magazynu strumienia: `substrate` rozdziela materializowany podplan od
+/// wyniku publicznego, `append` — dopisanie od nadpisania.
+[[gnu::always_inline]] inline void onLogicalWrite(bool substrate, bool append, std::size_t canonicalBytes) noexcept {
+  if constexpr (rdb_probe_materialize) {
+    auto &counters = detail::logicalWrite;
+    if (substrate) {
+      if (append)
+        ++counters.substrateAppends;
+      else
+        ++counters.substrateOverwrites;
+      counters.substrateBytes += canonicalBytes;
+    } else {
+      if (append)
+        ++counters.publicAppends;
+      else
+        ++counters.publicOverwrites;
+      counters.publicBytes += canonicalBytes;
+    }
+  }
+}
+
+logicalWriteCounters logicalWriteReport();
+void logicalWriteReset();
+
+/// Raport liczników runtime (K6 + K23 + E4) na stderr, po zakończeniu mierzonej pętli — żeby
 /// zliczanie nie obciążało budżetu slotu. Każdy wiersz sterowany osobną zmienną
-/// środowiskową (`RDB_BENCH_MATERIALIZE`, `RDB_BENCH_WORK`), bo to różne wielkości:
-/// tam objętość zapisów, tu liczba odwiedzin elementów.
+/// środowiskową (`RDB_BENCH_MATERIALIZE`, `RDB_BENCH_LOGICAL`, `RDB_BENCH_WORK`), bo to różne
+/// wielkości: tam objętość zapisów w reprezentacji natywnej, obok kanoniczne bajty zapisów
+/// z rozdziałem na role, tu liczba odwiedzin elementów.
 [[gnu::always_inline]] inline void reportRuntimeCounters() {
   if constexpr (rdb_probe_materialize || rdb_probe_work) detail::printRuntimeCounters();
 }

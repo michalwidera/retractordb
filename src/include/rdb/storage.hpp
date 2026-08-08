@@ -73,6 +73,19 @@ class storage {
   /// nie może raportować objętości, której nigdy nie zapisał na dysk.
   [[nodiscard]] bool isMemoryBackedStorage() const;
 
+  /// Rola strumienia dla sondy logicznych zapisów (K23): substrat to materializowany
+  /// podplan, strumień publiczny wchodzi do mianownika metryki. `storage` sam tego nie
+  /// wie — `isSubstrat` należy do planu, więc rolę ustawia właściciel przy konstrukcji.
+  bool isSubstrate_ = false;
+
+  /// Kanoniczna szerokość rekordu, liczona raz i pamiętana: iteracja po polach przy każdym
+  /// zapisie obciążałaby budżet slotu, który mierzy sonda E1. Zero = jeszcze nie liczona.
+  ///
+  /// Pamiętana tu, a nie w funkcji pomocniczej: metoda poza `if constexpr` miałaby ciało
+  /// kompilowane w KAŻDYM buildzie i zostawiała w `storage.cc.o` odwołanie do
+  /// `probe::canonicalRecordBytes` także przy wyłączonej sondzie. Sprawdzone `nm`.
+  std::size_t canonicalRecordBytes_ = 0;
+
   std::unique_ptr<rdb::metaData> metaData_;
 
  public:
@@ -92,6 +105,13 @@ class storage {
   sourceState bufferState{sourceState::empty};  // ? test lock
 
   void attachDescriptor(const Descriptor *descriptor = nullptr);
+
+  /// @brief Oznacz magazyn jako materializowany podplan (substrat) dla sondy K23.
+  ///
+  /// Bez tego sonda logicznych zapisów nie odróżni zapisu pośredniego od publicznego
+  /// wyniku, a metryka pierwotna H9 wymaga obu wielkości rozdzielnie. Setter jest
+  /// w nagłówku, żeby w buildzie bez sondy nie powstał osobny symbol w bibliotece.
+  void markAsSubstrate(const bool value) { isSubstrate_ = value; }
 
   bool write(size_t recordIndex = std::numeric_limits<size_t>::max());
 

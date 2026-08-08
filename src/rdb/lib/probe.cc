@@ -7,6 +7,8 @@
 #include <set>
 #include <string>
 
+#include "rdb/descriptor.hpp"
+
 namespace rdb::probe {
 
 namespace {
@@ -27,6 +29,42 @@ long nowNs() {
 }
 
 long toNs(const std::timespec &ts) { return ts.tv_sec * 1'000'000'000L + ts.tv_nsec; }
+
+/// Kanoniczna szerokość jednego pola — odwzorowanie NIEZALEŻNE od reprezentacji
+/// RetractorDB i Flinka, bo metryka pierwotna K23 porównuje oba systemy.
+///
+/// Odwzorowanie: liczby całkowite i podwójnej precyzji = 8 B, pojedyncza precyzja = 4 B
+/// (IEEE-754 binary32/binary64), bajt = 1 B, para liczb (RATIONAL, INTPAIR) = 16 B, napis =
+/// szerokość zadeklarowana w deskryptorze. Pola konfiguracyjne (TYPE, REF, RETENTION,
+/// RETMEMORY) i NULLTYPE nie są danymi, więc mają szerokość zero — tak samo jak
+/// w Descriptor::fieldSize().
+///
+/// Świadomie NIE jest to `rlen * rarray`: natywne `rlen` opisuje format RetractorDB, a §10
+/// degraduje takie liczby do metryk drugorzędnych właśnie dlatego, że „ich reprezentacje nie
+/// są bezpośrednio porównywalne". Baseline dopasowany do naszego formatu byłby pierwszą
+/// rzeczą, którą zakwestionuje recenzent.
+std::size_t canonicalFieldWidth(const rdb::rField &field) {
+  const auto count = static_cast<std::size_t>(field.rarray);
+  switch (field.rtype) {
+    case rdb::BYTE:
+      return count;
+    case rdb::INTEGER:
+    case rdb::UINT:
+    case rdb::DOUBLE:
+      return 8u * count;
+    case rdb::FLOAT:
+      return 4u * count;
+    case rdb::RATIONAL:
+    case rdb::INTPAIR:
+      return 16u * count;
+    case rdb::IDXPAIR:
+      return static_cast<std::size_t>(field.rlen) * count + 8u;
+    case rdb::STRING:
+      return static_cast<std::size_t>(field.rlen) * count;
+    default:
+      return 0u;  // NULLTYPE oraz pola konfiguracyjne
+  }
+}
 }  // namespace
 
 //
@@ -41,6 +79,22 @@ materializationCounters materializationReport() { return detail::materialization
 
 void materializationReset() { detail::materialization = materializationCounters{}; }
 
+logicalWriteCounters logicalWriteReport() { return detail::logicalWrite; }
+
+void logicalWriteReset() { detail::logicalWrite = logicalWriteCounters{}; }
+
+std::size_t canonicalRecordBytes(const Descriptor &descriptor) {
+  std::size_t bytes = 0;
+  for (const auto &field : descriptor)
+    bytes += canonicalFieldWidth(field);
+
+  // Kanoniczna mapa NULL/luk: jeden bit na wartość spłaszczonego widoku pól, zaokrąglony
+  // w górę do bajtu. Szerokość mapy jest stała dla deskryptora — nie zależy od tego, ile
+  // wartości jest w danym rekordzie puste, bo metryka ma być deterministyczna.
+  const auto values = static_cast<std::size_t>(descriptor.flatElementCount());
+  return bytes + (values + 7u) / 8u;
+}
+
 void detail::countRewriteR1() { ++rewriteR1; }
 
 void detail::countRewriteR2(const std::string &node) { rewriteR2Nodes.insert(node); }
@@ -53,6 +107,17 @@ void detail::printRuntimeCounters() {
                    "MATERIALIZED trwale: dopisania=%llu nadpisania=%llu bajty=%llu  "
                    "pamieciowe: dopisania=%llu nadpisania=%llu bajty=%llu\n",
                    m.appends, m.overwrites, m.bytes, m.memoryAppends, m.memoryOverwrites, m.memoryBytes);
+    }
+
+    // Osobna zmienna, bo to inna wielkość niż wiersz powyżej: tam objętość magazynu
+    // w reprezentacji natywnej, tu kanoniczne bajty zapisów z rozdziałem na role.
+    if (std::getenv("RDB_BENCH_LOGICAL")) {
+      const auto l = logicalWriteReport();
+      std::fprintf(stderr,
+                   "LOGICAL substrat: dopisania=%llu nadpisania=%llu bajty=%llu  "
+                   "publiczne: dopisania=%llu nadpisania=%llu bajty=%llu\n",
+                   l.substrateAppends, l.substrateOverwrites, l.substrateBytes, l.publicAppends, l.publicOverwrites,
+                   l.publicBytes);
     }
   }
 

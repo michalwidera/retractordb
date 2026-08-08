@@ -311,7 +311,13 @@ bool storage::write(const size_t recordIndex) {
     // `if constexpr` obejmuje całe wywołanie, nie tylko treść sondy: przy wyłączonej
     // sondzie z gorącej ścieżki zapisu musi zniknąć także wyliczenie argumentów
     // (isMemoryBackedStorage() porównuje napisy).
-    if constexpr (rdb_probe_materialize) probe::onMaterializedAppend(isMemoryBackedStorage(), descriptor.getSizeInBytes());
+    if constexpr (rdb_probe_materialize) {
+      probe::onMaterializedAppend(isMemoryBackedStorage(), descriptor.getSizeInBytes());
+      // Kanoniczna szerokość liczona raz na magazyn: iteracja po polach w każdym zapisie
+      // obciążałaby budżet slotu mierzony sondą E1.
+      if (canonicalRecordBytes_ == 0) canonicalRecordBytes_ = probe::canonicalRecordBytes(descriptor);
+      probe::onLogicalWrite(isSubstrate_, true, canonicalRecordBytes_);
+    }
 
     metaData_->onRecordAppended(nullInfo);
     metaData_->flushCurrentEntry();
@@ -320,8 +326,14 @@ bool storage::write(const size_t recordIndex) {
     if (result != 0) {
       FatalError("storage::write: overwrite to '{}' at index {} failed (result={})", paths_.storageFile(), recordIndex, result);
     }
-    // Nadpisanie nie zwiększa objętości magazynu, więc nie wchodzi do `bytes`.
-    if constexpr (rdb_probe_materialize) probe::onMaterializedOverwrite(isMemoryBackedStorage());
+    // Nadpisanie nie zwiększa objętości magazynu, więc nie wchodzi do `bytes`. Do metryki
+    // K23 wchodzi, bo tam jednostką jest zapis rekordu, nie przyrost objętości — inaczej
+    // substrat na buforze kołowym raportowałby zero.
+    if constexpr (rdb_probe_materialize) {
+      probe::onMaterializedOverwrite(isMemoryBackedStorage());
+      if (canonicalRecordBytes_ == 0) canonicalRecordBytes_ = probe::canonicalRecordBytes(descriptor);
+      probe::onLogicalWrite(isSubstrate_, false, canonicalRecordBytes_);
+    }
 
     metaData_->onRecordModified(recordIndex, nullInfo);  // polimorficznie: cień indeksu albo główny indeks
   }
