@@ -1,0 +1,28 @@
+{
+  "folders": [
+    {
+      "path": "."
+    },
+    {
+      "path": "../paper-arXiv"
+    },
+    {
+      "path": "../dokumentacja-rdb"
+    },
+    {
+      "path": "../documentation-rdb"
+    },
+    {
+      "path": "../rdb-experiment"
+    }
+  ],
+  "settings": {
+    "git.repositoryScanIgnoredFolders": [
+      "node_modules",
+      "book"
+    ],
+    "git.ignoredRepositories": [
+      "book"
+    ]
+  }
+}
