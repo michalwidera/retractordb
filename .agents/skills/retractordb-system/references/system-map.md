@@ -32,11 +32,24 @@ Core stream operators:
 | `C % Da` | right deinterleave `~Theta` | reconstructs the complementary component; `Db=(Dc*Da)/abs(Dc-Da)` |
 | `A + B` | synchronized sum/join `Sigma` | concatenates schemas, repeats the slower side as needed; `Delta=min(Da,Db)` |
 | `C - D` | inverse/difference `delta` | selects a component according to rational interval argument; output interval remains source interval |
-| `S > n` | sample/time shift `tau` | reads a reverse offset while preserving interval |
+| `S > n` | sample/time shift `tau` | output index `i` reads source logical index `i-n`; interval is preserved, origin grows by `n`, and tail becomes `max(0,Wsrc-n)` |
 | `S@(step,width)` | AGSE `Psi` | outputs `abs(width)` flattened elements; `Delta_out=Delta_source*step/source_flat_width`; positive width keeps the newest field first, negative width mirrors into arrival order |
 | `S.min/.max/.avg/.sumc` | field reduction | one rational output field; interval unchanged |
 
-The `Hash`, `Div`, `Mod`, `Add`, `Subtract`, and `agse` index equations live in `src/include/SOperations.hpp`, together with the event-model startup-latency closed forms (`AddStartupLatency`, `AgseStartupLatency`, `SubtractStartupLatency`) and the logical-origin form (`AgseLogicalOrigin`). They use `boost::rational<int>` and integer floor/ceiling functions to avoid floating-point timing drift. `deinterleave_roundtrip` asserts bit-exact reconstruction, including the causal one-slot delay of left deinterleave.
+The `Hash`, `Div`, `Mod`, `Add`, `Subtract`, and `agse` index equations live in `src/include/SOperations.hpp`, together
+with `AddStartupLatency`, `AgseStartupLatency`, `SubtractStartupLatency`, `AgseLogicalOrigin`, and
+`HashStartupLatency`. Interleave tail is exact by scanning one reduced phase period `p+q` up to
+`kHashPhaseScanLimit=100000`; above the limit the implementation uses the earlier safe, possibly one-slot-high `O(1)`
+bound. The routines use rational/integer floor and ceiling arithmetic with explicit 64-bit intermediates where products
+would overflow `rational<int>`. `deinterleave_roundtrip` asserts bit-exact reconstruction, including the causal one-slot
+delay of left deinterleave.
+
+## Coordinated workspace repositories
+
+`retractordb.code-workspace` opens the code repository together with sibling `paper-arXiv`, `dokumentacja-rdb`,
+`documentation-rdb`, and `rdb-experiment`. This is navigation only: every sibling is an independent Git repository and
+must be pinned by its own full SHA for documentation, experiments, or an artifact package. See `paper-debs.md` for the
+manuscript boundary and `provenance.md` for indexed external revisions.
 
 ## Executables
 

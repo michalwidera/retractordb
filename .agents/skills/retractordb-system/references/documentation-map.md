@@ -22,7 +22,12 @@ Default repository layout:
   retractordb/
   dokumentacja-rdb/
   documentation-rdb/
+  paper-arXiv/
+  rdb-experiment/
 ```
+
+The last two repositories are derived research artifacts, not documentation authority. Use `paper-debs.md` for the
+manuscript and pin experiment evidence by its own SHA and campaign manifest.
 
 Paths below are relative to the corresponding repository root.
 
@@ -31,7 +36,7 @@ Paths below are relative to the corresponding repository root.
 | Subject | Polish documentation | Verify primarily in |
 |---|---|---|
 | Product identity, ESPE positioning | `README.md`, `przeglad-rozwiazan.md` | `README.md`, binaries, current examples |
-| Mathematical model and proofs | `podstawy-matematyczne/` | `src/include/SOperations.hpp`, `CRSMath.*`, `ut_soperations`, `ut_crsMath` |
+| Mathematical model, origins, tails, and proofs | `podstawy-matematyczne/` | `src/include/SOperations.hpp`, `compiler.cpp`, `dataModel.cpp`, `ut_soperations`, `ut_h10aGate`, `ut_crsMath` |
 | RQL commands and user syntax | `konstrukcja-jezyka-zapytan/` | `RQL.g4`, `RQLParser.cpp`, compiler and integration fixtures |
 | Overall architecture and data flow | `architektura-systemu-przetwarzania-danych/` | launchers, `executorsm`, `dataModel`, `streamInstance`, IPC tests |
 | Artifacts, substrates, ephemerides | architecture chapter plus `kompilacja-zapytan/substraty.md` | `query.*`, `compiler.cpp`, storage factory, substrate tests |
@@ -44,7 +49,8 @@ Paths below are relative to the corresponding repository root.
 | Artifact inspection and mutation | architecture analysis/storage chapters | `src/rdb/`, `xtrdbLauncher.*`, storage-map and Pattern5 tests |
 | CLI options | `zalaczniki/opcje-wywolania/` | current launcher option construction and CLI tests |
 | Production, probe, and optimizer-ablation builds | `zalaczniki/budowanie-produkcyjne-i-warianty-badawcze.md` | `scripts/buildrdb.sh`, root `CMakeLists.txt`, `--build-info`, `it_optimizer_ablation-*` |
-| Integration test catalogue | `zalaczniki/testy-integracyjne.md` | current `test/CMakeLists.txt` and `test/IntegrationTest_*` |
+| Integration test catalogue | `zalaczniki/testy-integracyjne.md` | current `test/CMakeLists.txt`, `test/IntegrationTest_*`, and live `ctest -N` |
+| Documentation toolchain and local build | `CLAUDE.md`, `scripts/build-book.sh`, `scripts/install-local-tools.sh`, `scripts/generate-railroad.*` | current scripts and `.github/workflows/deploy.yml` |
 | Signal-processing examples | `przyklady-zastosowan/` | example RQL, DSP integration tests, current generated plans |
 | History, naming, future directions | `zalaczniki/geneza-systemu/`, `zalaczniki/dalsze-kierunki-rozwoju/` | historical/design context only |
 
@@ -67,7 +73,9 @@ Directory: `podstawy-matematyczne/`
 - `README.md` — scope and motivation of the mathematical model.
 - `algebra-regularnych-serii-czasowych.md` — regular time-series object, intervals, and the main stream-algebra operators.
 - `formalne-podstawy-i-dowody.md` — Beatty/Fraenkel foundations, formal definitions, identities, and proofs.
-- `ogony-i-obserwowalnosc-operatorow.md` — causal startup tails, per-operator tail audit, AGSE full-window bound, and the observability tuple (interval, tail, descriptor, records with NULL maps, gaps, materialization policy).
+- `ogony-i-obserwowalnosc-operatorow.md` — logical origins versus startup tails, exact shift and AGSE rules, exact
+  interleave period scan with safe fallback, per-operator audit, capacity discussion, and the split value/latency
+  observability contract.
 - `wyrazenia-algebraiczne.md` — construction and interpretation of algebraic stream expressions.
 - `implementacja-programowa.md` — translation of the formal model into program algorithms and index calculations.
 - `zaleznosci-pomiedzy-operatorami-algebry.md` — graphical relationships and composition of algebra operators.
@@ -164,7 +172,8 @@ The storage documentation is especially likely to preserve historical class name
 Directory: `kompilacja-zapytan/`
 
 - `README.md` — compiler goals and internal representations.
-- `przebiegi-kompilacji.md` — ordered `compiler::compile()` passes and a plan traced through the pipeline.
+- `przebiegi-kompilacji.md` — ordered `compiler::compile()` passes and a plan traced through the pipeline. Its current
+  shift-capacity sentence is stale; consult `provenance.md` before repeating `N+1`.
 - `budowa-drzewa-zaleznosci.md` — dependency extraction and plan ordering.
 - `substraty.md` — intermediate stream creation, sharing, and deduplication.
 - `rozwijanie-symbolu.md` — `SELECT *` schema expansion.
@@ -239,6 +248,9 @@ Directory: `zalaczniki/`
 - `dalsze-kierunki-rozwoju/jeszcze-inna-matematyka.md` — exploratory mathematical direction.
 - `kolorowanie-skladni/README.md` — RQL syntax-highlighting integrations.
 - `testy-integracyjne.md` — narrative catalogue of integration scenarios and their intended guarantees.
+
+The catalogue is intentionally not exhaustive. At the indexed code revision it still omits the newer `ecg_qrs` and
+`replay_stability` scenarios; use `references/tests.md` and `ctest -N` for the executable inventory.
 
 CLI documentation must be verified against current option construction in the three launchers. The integration-test
 appendix is not a complete inventory; use `test/CMakeLists.txt`, live `ctest -N`, and `references/tests.md`.

@@ -66,15 +66,16 @@ Multi-operator expressions remain postfix token programs immediately after parsi
     start) and `>N` adds `N`; every other operator propagates origin through the same non-decreasing index mapping
     it reads with in `dataModel::constructInputPayload()`, so missing records form a prefix, never holes.
 11. `computeStartupLatency()` — calculate causal startup tails for the final plan. Tail slots are not records; `>N`
-    adds nothing of its own (the tail equals exactly the producer tail; the `N` delay lives in the origin), `#`
-    combines converted input tails with the phase maximum `ceil((p+q-1)/p)` on the second argument, `+` takes the
-    per-component `AddStartupLatency` maximum, `SUBTRACT` uses `SubtractStartupLatency`, AGSE uses
-    `AgseStartupLatency`, reductions add no own tail, and left de-interleave adds one slot. Runs after origin and
-    before capacities because the required history depends on the consumer's first emission slot.
+    produces `max(0,Wsrc-N)` because it reads an older logical index, `#` calls `HashStartupLatency()` to scan one
+    reduced phase period exactly (with a safe `O(1)` fallback above the scan limit), `+` takes the per-component
+    `AddStartupLatency` maximum, `SUBTRACT` uses `SubtractStartupLatency`, AGSE uses `AgseStartupLatency`, reductions
+    add no own tail, and left de-interleave adds one slot. Runs after origin and before capacities because the required
+    history depends on the consumer's first emission slot.
 12. `computeRequiredCapacities()` — calculate source history for shifts, AGSE, junctions, stream sums, and negative DUMP
-    ranges from the event distance between producer availability and consumer reads. A shift by `N` addresses history
-    slot `N` and therefore requires capacity `N+1`. Declared sources get a fixed two-record front allowance
-    (`kDeclarationPrefetch`: the armed record plus the zero prefetch).
+    ranges from the event distance between producer availability and consumer reads. A shift by `N` uses
+    `rev = Wout-Wsrc+N` and retains `max(rev+1+prefetch,1)` records; the declaration-only `prefetch` is
+    `kDeclarationPrefetch=2` (the armed record plus zero prefetch). Do not reduce this rule to `N+1`: logical-index
+    addressing removed the old relative-offset cancellation for declarations.
 13. `validateConstraints()` — enforce canonical-plan and operator constraints, especially equal flat schema size for `#`.
 14. `applyCapacitiesToStreams()` — write computed memory capacities into query storage policies.
 15. `topologicalSort()` — unconditionally restore producer-before-consumer execution order after interval sorting and
@@ -88,33 +89,39 @@ The matched-shift rewrite runs after interval resolution because equality of phy
 source intervals. It runs before structural deduplication so the exposed `A # B` substrate can be shared normally.
 `it_issue202_hash_shift_e2e-run` executes the optimized left-hand side and an explicit right-hand side over independent
 TEXTSOURCE instances, compares the stored payload/metadata bodies, verifies the complete formula-derived sequence, and
-checks equal startup tails.
+checks the current origin/tail contract. The value sequence and logical origin are equal; after logical-index shift
+addressing the factored side may have a strictly shorter tail, so tail equality is not an R1 invariant.
 
-For `STREAM_HASH` with reduced `deltaA/deltaB = p/q`, the own startup tail protects the worst second-input phase, not
-only `B[0]`. The phase definition is
-`max_{0 <= j < p}(ceil((j+1)q/p) - floor(jq/p))`; `computeStartupLatency()` uses its equivalent closed form
-`ceil((p+q-1)/p)` with a 64-bit intermediate. This boundary is required for non-rewritten R1 plans at ratios such as
-`3/5`, `3/2`, `7/11`, and `160/147`.
+For `STREAM_HASH` with reduced `deltaA/deltaB = p/q`, exact availability depends on which constituent and constituent
+position `Hash()` selects in each output slot. `HashStartupLatency()` evaluates the event-distance bound over one
+period `0 <= i < p+q`; selection and residue repeat after that period. The scan uses 64-bit products. If the period
+exceeds `kHashPhaseScanLimit`, the code falls back to the older phase-safe closed form; it can delay by one slot but
+cannot release a record early. `ut_soperations` separately guards exact-branch use, 64-bit arithmetic, and fallback
+safety.
 
 `STREAM_TIMEMOVE(N)` is a causal delay, not an advance to `s_(n+N)`. Since the H10a re-timestamping the delay lives
-in the logical origin (`origin + N`), while the startup tail equals exactly the producer tail — `fetchBack()` reads a
-relative offset, so `W = W_src` is required, neither less nor more. The emitted record sequence is unchanged; only its
-time address shifts, and origin+tail silence slots sum to the former tail length. Records below the origin never
-arise; runtime emits no zero or all-null placeholder for tail or origin slots. Declared and computed sources share
-the same `fetchBack()` path.
+in the logical origin (`origin + N`), while the startup tail is `max(0,Wsrc-N)`. Runtime obtains output logical index
+`n` and calls `fetchForward(source,n-N)`; it no longer reads a relative reverse offset. The emitted record sequence is
+unchanged and no prefix record is manufactured. Records below the origin never arise; runtime emits no zero or all-null
+placeholder for tail or origin slots.
 
 Every rewriting pass snapshots field names of user-named outputs and calls `verifyUserFieldNamesPreserved()` afterward.
 Internal substrate names may change, but a rewrite that changes a public `.desc` field name fails compilation.
 
-The K19/K24/H10a event-model audit covers every canonical operator's own tail: `MOD` has own tail 0, `SUBTRACT` uses
+The K19/K24 event-model audit covers every canonical operator's own tail: `MOD` has own tail 0, `SUBTRACT` uses
 `SubtractStartupLatency()` (phase bound, declaration-aware), AGSE uses the closed form `ceil((1+W_src)*F/step)-1` —
 the former phase bound `P=floor((|L|-1)/g)*g`, `g=gcd(F,k)`, moved out of the tail into `logicalOrigin` with the
-H10a re-timestamping — and reductions operate on the current producer tuple only. `ut_h10aGate` replays the campaign
-gate per commit, comparing the compiler against an independent event model for the `@` and `>` classes. A read
+H10a re-timestamping — and reductions operate on the current producer tuple only. `ut_h10aGate` now replays the
+independent event model for all nine canonical classes, checks compositions through a recursive oracle, and requires
+per-class mutant discrimination and coverage. A read
 beyond available history yields an internal all-null failsafe record, but a correctly compiled plan never
 materializes it; `it_k19_boundaries` and `it_k24_capacity` guard these boundaries.
 The earlier tick-conversion tail/capacity approximations under- or over-sized a large share of corpus plans — do not
 reintroduce them.
+
+Both origin and tail passes call `requireResolvedForEveryNode()` before assigning results. An unresolved node is a hard
+compiler error rather than a warning followed by the dangerous default value zero. `ut_compiler` covers the direct
+gate and a plan spanning all nine operator classes.
 
 SELECT computation sharing runs after symbolic references and `[_]` have been expanded, but before field offsets are
 localized to a query's input payload. This lets `FROM a+b` and `FROM b+a` compare the source identities rather than

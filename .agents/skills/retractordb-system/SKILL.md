@@ -10,13 +10,15 @@ Use this skill as the navigation layer for RetractorDB work. Treat the repositor
 ## Start every RetractorDB task
 
 1. Run `scripts/check_freshness.sh`. The script discovers repositories cloned as siblings of the code repository.
-   For a different layout, pass the three repository paths as arguments or set `RETRACTORDB_CODE_REPO`,
-   `RETRACTORDB_DOCS_PL_REPO`, and `RETRACTORDB_DOCS_EN_REPO`. Code and its index are versioned together, so the script
-   reports the current code revision without comparing it to a hash embedded in the index.
-2. If both documentation repositories are `FRESH`, load only the references relevant to the request.
-3. If a documentation repository is `STALE`, inspect `git diff <indexed-commit>..HEAD` for the affected areas before
-   relying on the notes. For code, inspect current changes directly with `git status`, `git log`, and `git diff`.
-   Update the notes only when a change materially alters system behavior.
+   For a different layout, pass the four repository paths as arguments or set `RETRACTORDB_CODE_REPO`,
+   `RETRACTORDB_DOCS_PL_REPO`, `RETRACTORDB_DOCS_EN_REPO`, and `RETRACTORDB_PAPER_REPO`. Code and its index are
+   versioned together, so the script reports the current code revision without comparing it to a hash embedded in the
+   index.
+2. If both documentation repositories are `FRESH`, load only the references relevant to the request. For article work,
+   also require the `paper` repository to be `FRESH` before relying on `references/paper-debs.md`.
+3. If a documentation or paper repository is `STALE`, inspect `git diff <indexed-commit>..HEAD` for the affected areas
+   before relying on the notes. For code, inspect current changes directly with `git status`, `git log`, and `git diff`.
+   Update the notes only when a change materially alters system behavior, documentation ownership, or a paper claim.
 4. Read the applicable repository's `AGENTS.md` and `CLAUDE.md` for build, editing, and documentation rules. Apply its repository rules; treat Claude-product-specific model-switch instructions as non-applicable to Codex.
 5. Check `git status` before edits. Preserve user changes.
 
@@ -30,7 +32,9 @@ Resolve conflicts in this order:
    `dokumentacja-rdb` sibling of the code repository).
 4. English documentation from the `documentation-rdb` repository selected by the same script; it is a synchronized
    derivative of Polish documentation.
-5. These indexed notes.
+5. The DEBS manuscript and planning files from `paper-arXiv` are authoritative only for the paper's current wording,
+   research status, and submission plan; they are never evidence of engine behavior.
+6. These indexed notes.
 
 Documentation is explanatory context, not evidence that current code behaves as described. A `FRESH` documentation
 revision only means that the navigation index points at that revision; it does not certify correctness or completeness.
@@ -69,7 +73,9 @@ Never edit generated ANTLR files manually. Edit `RQL.g4` or `DESC.g4` and regene
 
 ## Load references by task
 
-- For a general explanation, architecture decision, article, or system positioning, read `references/system-map.md`.
+- For a general explanation, architecture decision, or system positioning, read `references/system-map.md`.
+- For the DEBS manuscript, research plan, schedule, page budget, contribution framing, or cross-repository paper work,
+  read `references/paper-debs.md` and then the relevant system references.
 - For RQL syntax, algebraic operators, parser behavior, compiler passes, field references, or plan optimization, read `references/rql-compiler.md`.
 - For scheduling, stream evaluation, AGSE, rules, IPC, ad-hoc queries, service mode, or configuration, read `references/runtime-ipc.md`.
 - For descriptors, payloads, accessors, retention, files, null/gap metadata, shadows, rotation, or `xtrdb`, read `references/storage.md`.

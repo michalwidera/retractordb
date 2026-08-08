@@ -14,6 +14,7 @@ fi
 workspace_dir="$(dirname "$code_repo")"
 polish_docs_repo="${2:-${RETRACTORDB_DOCS_PL_REPO:-$workspace_dir/dokumentacja-rdb}}"
 english_docs_repo="${3:-${RETRACTORDB_DOCS_EN_REPO:-$workspace_dir/documentation-rdb}}"
+paper_repo="${4:-${RETRACTORDB_PAPER_REPO:-$workspace_dir/paper-arXiv}}"
 
 report_versioned_repo() {
   local label="$1"
@@ -52,6 +53,7 @@ check_external_repo() {
 
 status=0
 report_versioned_repo "code" "$code_repo" || status=1
-check_external_repo "docs-pl" "$polish_docs_repo" "58e5c704ecb3c8765fae0da62b2e24fb26c3ea66" || status=1
-check_external_repo "docs-en" "$english_docs_repo" "417266451f0a3068c10f3f9fbee19bb91d3607ab" || status=1
+check_external_repo "docs-pl" "$polish_docs_repo" "9d1321889a0d5a5f7616b435ca4921e4f0623308" || status=1
+check_external_repo "docs-en" "$english_docs_repo" "38f8056bcd5fa450a9cc5cd7966ed7c5453a4b97" || status=1
+check_external_repo "paper" "$paper_repo" "5f8f28dec026ac2e64dc9a4ef6f662578a210803" || status=1
 exit "$status"

@@ -10,11 +10,11 @@
 
 ## Test architecture
 
-At the current Issue 225 (capacity model) revision, CTest exposes 181 tests:
+At the current indexed checkout, CTest exposes 183 tests:
 
 - `pt_*` (1-41): parallel-safe compile-only, presenter, Valgrind, or offline `xtrdb` scenarios;
-- `it_*` (42-98): serial/end-to-end scenarios, especially those using singleton lock or shared IPC;
-- unit-related (99-181): GTest binaries, setup fixtures, and data-model comparison.
+- `it_*` (42-100): serial/end-to-end scenarios, especially those using singleton lock or shared IPC;
+- unit-related (101-183): GTest binaries, setup fixtures, and data-model comparison.
 
 The serial CMake wrapper detects commands that start the server (`-m`, `-k`, `xqry`, workflow scripts, lock access) and assigns `RUN_SERIAL TRUE`. Some shell-wrapped server tests set it explicitly because CMake cannot see flags inside the script.
 
@@ -36,7 +36,8 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
 - Matched hash shifts and the unmatched guard: `pt_issue202_hash_shift_factorization-matched`,
   `pt_issue202_hash_shift_factorization-unmatched`; the underlying index identity is also checked by
   `ut_soperations`, while physical execution of both sides and the formula-derived payload are checked by
-  `it_issue202_hash_shift_e2e-run`, including equal `tail=`.
+  `it_issue202_hash_shift_e2e-run`. R1 preserves value sequence and logical origin; the factored tail is allowed to be
+  strictly shorter and is tested as such.
 - Three/four-argument decomposition: `it_issue167_triarg`.
 - Circular dependency rejection: `pt_issue95_loopInCompile-compile`.
 - Generated substrate sharing: `pt_issue96_substrat_reference-*`; its exact plan-pattern case is disabled and labeled
@@ -49,8 +50,8 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
   semantic equivalence with optimizations enabled or disabled: six `it_optimizer_ablation-*` tests. The former
   expected runtime divergences were removed after causal tails and final topological ordering made them invalid.
 - R1 over explicit NULL values and metadata in rewritten, blocked, and explicit-right-hand-side plans:
-  `it_r1_identity_nulls-run`. Its blocked `3/2` case pins the phase-maximum `STREAM_HASH` tail and compares payload plus
-  metadata against the explicit RHS; `ut_compiler` additionally covers `3/5`, `3/2`, `7/11`, and `160/147`.
+  `it_r1_identity_nulls-run`. It compares the common value prefix and origin while requiring the current tail ordering;
+  `ut_compiler` covers additional ratios and rewrite guards.
 - Scalar divide-by-zero produces NULL without suppressing later records: `it_null_divide_by_zero-run`.
 - Operator tail/observability phase boundaries (difference, AGSE, reductions, real NULL inside a full window versus
   the all-null out-of-history failsafe): `it_k19_boundaries`.
@@ -59,9 +60,17 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
   corresponds to. Expectations in `verify.sh` are derived from operator definitions, not copied from engine output,
   closing the gap left by the listing-only `dsp` and `issue96_substrat_reference` comparisons:
   `it_issue227_join_alignment-run` and `it_issue227_join_alignment-adhoc-origin`.
-- H10a event-model gate for the `@` (AGSE) and `>` (SHIFT) classes, moved from the K24 campaign
-  (`rdb-experiment/results_20260804_K24r`) into per-commit ctest; the gate compares the compiler against an
-  independent event model that shares no code with `SOperations.hpp`: `ut_h10aGate`.
+- Per-commit event-model gate for all nine canonical classes, including mixed plans, per-class coverage minima,
+  probe-span checks, and mutants that must distinguish the implemented rule from known-bad alternatives:
+  `ut_h10aGate`. It shares no formula code with `SOperations.hpp`.
+- Exact interleave-tail scan, 64-bit intermediate arithmetic, scan-limit fallback safety, and proof that the exact
+  branch is actually exercised: `ut_soperations`.
+- The article's Pan--Tompkins-inspired pipeline is executable regression `it_ecg_qrs-run`: it pins plan
+  `origin=`/`tail=` shape, requires non-empty streams, and compares 4,830 persisted records across four stages.
+- Deterministic replay is executable regression `it_replay_stability-run`: two runs must produce the same set of at
+  least 36 non-empty artifact files and identical bytes, excluding only the 8-byte `.meta` creation timestamp.
+- Origin/tail passes fail closed if any plan node remains unresolved; direct and nine-class coverage lives in
+  `ut_compiler`.
 - Compiler/presenter documentation graphs: four `pt_issue31_doc-*`.
 - Wildcards/unfold/retention: `pt_Pattern3`.
 - Identical field names in multiple streams: `pt_Pattern7`.
@@ -105,6 +114,7 @@ Use these GTest binaries for focused changes:
 |---|---|
 | exact rational timeline/algebra | `ut_crsMath`, `ut_soperations` |
 | parser/compiler/plan | `ut_compiler`, `ut_qTree`, `ut_field`, `ut_presenter` |
+| capacity formulas and limits | `ut_capacities` |
 | execution/AGSE/rules | `ut_dataModel`, `ut_dumpManager`, `ut_expeval` |
 | type system and record layout | `ut_convertTypes`, `ut_descriptor`, `ut_descriptorIO`, `ut_payload` |
 | accessor selection | `ut_accessorFactory` |
@@ -115,6 +125,7 @@ Use these GTest binaries for focused changes:
 | storage integration/paths/rotation | `ut_rdb`, `ut_storagePaths`, `ut_persistentCounter` |
 | IPC/client/rendering | `ut_ipc_transport`, `ut_xqry`, `ut_formatter` |
 | config/service/RT | `ut_appConfig`, `ut_lockManager`, `ut_executor_rt` |
+| benchmark probe accounting | `ut_probe` |
 | CLI utilities | `ut_uxSysTermTools` |
 
 `ut_expeval` is especially dense and is the primary executable specification for scalar types, conversions, function calls, string behavior, errors, NULL propagation, and three-valued logic.

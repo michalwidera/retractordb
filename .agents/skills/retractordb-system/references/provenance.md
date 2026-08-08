@@ -5,10 +5,12 @@
 | Repository | Role | Branch | Version basis |
 |---|---|---|---|
 | `retractordb` | implementation, tests, examples, packaging | `master` | versioned in the same Git tree as this file |
-| `dokumentacja-rdb` | canonical Polish documentation | `main` | `58e5c704ecb3c8765fae0da62b2e24fb26c3ea66` |
-| `documentation-rdb` | derived English translation | `main` | `417266451f0a3068c10f3f9fbee19bb91d3607ab` |
+| `dokumentacja-rdb` | canonical Polish documentation | `main` | `9d1321889a0d5a5f7616b435ca4921e4f0623308` |
+| `documentation-rdb` | derived English translation | `main` | `38f8056bcd5fa450a9cc5cd7966ed7c5453a4b97` |
+| `paper-arXiv` | DEBS manuscript, research plan, and schedule | `main` | `5f8f28dec026ac2e64dc9a4ef6f662578a210803` |
 
-Index prepared on 2026-07-23 and its external documentation basis refreshed on 2026-08-05 in timezone Europe/Warsaw.
+Index prepared on 2026-07-23 and its external documentation and paper basis refreshed on 2026-08-08 in timezone
+Europe/Warsaw.
 The initial code basis was commit `48f9b50`. Code and the index now live in the same repository and are selected by the
 same checkout, so provenance does not embed a mutable current-code commit hash. This avoids a self-referential update in
 which committing a new hash immediately makes that hash historical. The initial verified product baseline remains
@@ -16,7 +18,7 @@ which committing a new hash immediately makes that hash historical. The initial 
 
 Run `../scripts/check_freshness.sh` from this directory, or the same script through the installed skill link, before
 using the index. For the code repository it reports the checked-out revision as `VERSIONED` without comparing it to an
-embedded key. Exact revision checks remain only for the two external documentation repositories.
+embedded key. Exact revision checks cover the two external documentation repositories and the paper repository.
 
 ## Verification baseline for the indexed code revision
 
@@ -24,6 +26,10 @@ embedded key. Exact revision checks remain only for the two external documentati
 - At commit `48f9b50`, full `ctest --output-on-failure -j 4` result: **153/153 passed**, 0 failed, 65.54 seconds.
 - The first test attempt correctly exposed the documented CMake trap: 38 GTest executables were absent after a prior reconfiguration. This was a build-state issue, not a logic failure; `ninja` recreated 88 targets and the repeated suite passed.
 - Test inventory at this revision: 38 `pt_*` compile/file scenarios, 38 `it_*` serial/end-to-end scenarios, and 77 unit-related CTest entries.
+- On 2026-08-08 at checkout `e434f28`, the current Debug tree exposed 183 CTest entries. A missing-unit-binary state was
+  repaired with `ninja`; targeted verification then passed for `ut_compiler`, `ut_h10aGate`, `ut_soperations`,
+  `it_ecg_qrs-run`, and `it_replay_stability-run` (including their registered setup fixtures). This is a focused
+  freshness check, not a claim that the full 183-test suite was rerun for the index-only change.
 
 ## Behavioral changes after the initial baseline
 
@@ -31,7 +37,8 @@ embedded key. Exact revision checks remain only for the two external documentati
   `(A > i) # (B > k) -> (A # B) > (i + k)` only when `i*deltaA == k*deltaB`. The extraction pass now reduces
   each postfix program to a fixed point, including the unmatched sibling-shift case. Coverage:
   `pt_issue202_hash_shift_factorization-*`, `ut_soperations`, and the physical/formula E2E comparison
-  `it_issue202_hash_shift_e2e-run`. The E2E case also fixes shift-history sizing to `N+1` records for offset `N`.
+  `it_issue202_hash_shift_e2e-run`. The later logical-index shift implementation supersedes the original `N+1`
+  capacity shortcut; see the current shift entry below.
 - Equivalent public SELECTs over commutative `STREAM_ADD` nodes can share one generated `STREAM_SELECT_*` computation
   while retaining their separate public names, descriptors, storage, rules, and artifacts. Fingerprints preserve tree
   grouping and output-field order; they canonicalize only sibling order at each individual `STREAM_ADD`. Full scans and
@@ -76,25 +83,38 @@ embedded key. Exact revision checks remain only for the two external documentati
   silently overflowing `boost::rational<int>`. New regressions: `it_k19_boundaries` (operator tail/observability
   boundaries, real NULL inside a full AGSE window versus the all-null failsafe) and `it_k24_capacity` (declaration
   history depths). The Debug inventory is now 181 tests: `pt_*` 1-41, `it_*` 42-98, unit-related 99-181.
-- Issue 227 (branch `issue_227-precesja`, H10a re-timestamping) moves the join-alignment delay out of startup tails
+- Issue 227 (merged as `5f31051`, H10a re-timestamping) moves the join-alignment delay out of startup tails
   into a new logical origin. The `@` window is now stamped by the interval END; its early records would reach before
   the source start, so the window span generates `query::logicalOrigin` through `AgseLogicalOrigin()`
   (`ceil((sourceOrigin*F + |L| - 1)/step)`) instead of inflating the tail, and `AgseStartupLatency` loses its phase
-  bound, becoming `ceil((1+W_src)*F/step)-1`. `STREAM_TIMEMOVE(N)` adds `N` to the origin and keeps the tail exactly
-  equal to the producer tail; the emitted record sequence is unchanged, only its time address shifts, and
-  origin+tail silence equals the former tail length. A new compiler pass `computeLogicalOrigin()` runs between
+  bound, becoming `ceil((1+W_src)*F/step)-1`. A new compiler pass `computeLogicalOrigin()` runs between
   `localizeFieldOffsets()` and `computeStartupLatency()`; every other operator propagates origin through the same
   non-decreasing index mapping it reads with. The presenter reports `origin=` alongside `tail=`. Ad-hoc import now
   publishes the compiled tree and its stream instances atomically under `core_mutex`, bumps `adHocPlanRevision`, and
   the execution loop rebuilds the `TimeLine` via `updateTimeIntervals()` without rewinding when an ad-hoc query
   introduces a new rate; an ad-hoc SELECT starts at the first slot the runtime sees it, not at the system origin.
   New regressions: `it_issue227_join_alignment-run`/`-adhoc-origin` (join-content expectations derived from operator
-  definitions, not engine output) and `ut_h10aGate` (the `results_20260804_K24r` campaign gate moved into per-commit
-  ctest for the `@` and `>` classes).
+  definitions, not engine output). The first realization kept `STREAM_TIMEMOVE(N)` tail equal to the producer tail;
+  commits after `db4a360` replaced that conservative result with the exact rule below.
+- Logical-index shift addressing (`fcc5a44`) makes `STREAM_TIMEMOVE(N)` read `fetchForward(source,n-N)`. Its origin is
+  `Osrc+N`, its exact tail is `max(0,Wsrc-N)`, and shift capacity is derived from
+  `Wout-Wsrc+N+1` plus the declaration-only two-record prefetch allowance. R1 preserves value sequence and origin but
+  may strictly shorten the factored tail; current regressions compare the common value prefix rather than demanding
+  tail equality.
+- Exact interleave tail (`34db1a2`) scans one reduced phase period through `HashStartupLatency()`. The scan is exact up
+  to `kHashPhaseScanLimit=100000`; above that limit the old closed form is retained as a safe over-approximation.
+  `ut_soperations` guards exact-branch use, 64-bit arithmetic, and fallback safety.
+- System-test armour (`7dcf6d9`, `5446bd9`) extends `ut_h10aGate` from the `@`/`>` gate to all nine canonical operator
+  classes and mixed compositions, adds mutants and per-class coverage floors, makes unresolved origin/tail nodes a hard
+  compiler error through `requireResolvedForEveryNode()`, and adds `it_ecg_qrs-run` plus
+  `it_replay_stability-run`. The live Debug inventory is 183 tests: `pt_*` 1-41, `it_*` 42-100, and unit-related
+  101-183.
+- `retractordb.code-workspace` (`e434f28`) opens code, both documentation repositories, the paper, and experiments as
+  independent sibling repositories. It is not a version manifest.
 
 ## Source hierarchy and scope
 
-At the indexed Polish documentation commit, the repository contains 75 Markdown files and 8,178 Markdown lines; 72
+At the indexed Polish documentation commit, the repository contains 75 Markdown files and 8,548 Markdown lines; 72
 content files are linked from `SUMMARY.md`. The index covers all major domains: mathematical foundations, RQL
 construction, architecture, compiler, execution, examples, CLI appendices, and the integration-test catalog.
 
@@ -106,29 +126,28 @@ The English repository is treated as derived content. Consult it only for Englis
 
 These are navigation warnings, not necessarily product defects:
 
-- Reopened by the H10a re-timestamping (branch `issue_227-precesja`): the documentation realization defines
-  `\tau_m` as increasing the tail `W` by `m`, and
-  `podstawy-matematyczne/ogony-i-obserwowalnosc-operatorow.md` still gives the AGSE tail with the phase bound
-  `g=gcd(F,k)` and has no logical-origin concept. Current code puts the `>N` delay and the AGSE window span into
-  `query::logicalOrigin` instead of the tail (`computeLogicalOrigin()`, `AgseLogicalOrigin()`); the tail formulas
-  are the phase-free ones from the Issue 227 entry above. The Polish tail/observability page and the formal-proof
-  `\tau_m` definition need updating, then the English derivative.
+- `kompilacja-zapytan/przebiegi-kompilacji.md` still reduces shift history to `N+1`. Current code uses
+  `Wout-Wsrc+N+1` plus `kDeclarationPrefetch=2` for declarations after the move to logical-index `fetchForward()`.
+  The Polish compiler-pass chapter should be corrected and then synchronized to
+  `query-compilation/compilation-passes.md` in English.
+- `podstawy-matematyczne/ogony-i-obserwowalnosc-operatorow.md` still says the per-commit `ut_h10aGate` covers only
+  `@` and `>`.
+  Current `test_h10aGate.cpp` covers all nine canonical classes, mixed compositions, probe spans, coverage floors, and
+  mutant discrimination. Update the Polish page, then its English counterpart
+  `mathematical-foundations/operator-tails-and-observability.md`. Both integration-test appendices also omit the newer
+  `ecg_qrs` and `replay_stability` scenarios.
+- The root code `CLAUDE.md` summarizes only `[storage] dir`, while current `AppConfig` and both CLI documentation sets
+  also expose IPC sizing, client retry count, startup/no-data timing, real-time priority, lock directory, and service
+  query-file fallback.
+- CLI short options are mode-dependent: for `xretractor`, `-m` is CSV in compile-only option construction and loop limit
+  in execution mode. Verify against `launcher.cpp`, not a single summary table.
 
-- Resolved at the current basis: the former `tau_m(S)=s_(n+m)` drift. Both documentation repositories now define a
-  causal realization `((s_n,Delta),W)` with `tau_m` increasing `W` by `m` without prefix records, matching
-  `computeStartupLatency()`.
-- Resolved at the current basis: the K2/G3 phase-maximum interleave tail `ceil((p+q-1)/p)` for reduced
-  `deltaA/deltaB=p/q` (merged as `4f026f9`) is now documented in the committed formal proof, compiler-pass, and
-  substrate pages, together with the `r1_identity_nulls` regression. The campaign evidence lives in the sibling
-  `rdb-experiment` repository (`results_20260726_G3`). The newer K19/K24 campaigns (`results_20260728_K19`,
-  `results_20260728_K4` in the same repository) extend the same event-model reasoning to all operators; see the
-  Issue 225 entry above.
-- Several storage chapters still call the metadata class `metaDataStream`; current code uses `rdb::metaData`, with `MetaIndexStore`, `GapDetector`, `IndexRecord`, `metaShadow`, and `storageShadow` extracted into separate units.
-- The Polish integration-test appendix omits newer scenarios including `config_storage_validation`, `deinterleave_roundtrip`, `packaging`, and `service_idle`. The live CTest inventory is authoritative.
-- Some prose says `xretractor` requires a query file. Current service mode supports no query file / an empty startup file and stays alive in idle mode.
-- The root code `CLAUDE.md` summarizes `[storage] dir`, but current `AppConfig` also exposes IPC sizing, client retry count, startup/no-data timing, real-time priority, lock directory, and service query-file fallback.
-- Documentation sometimes describes ephemerides as having no files. Conceptually they are not materialized results, but declared external sources can still have/generated `.desc` descriptors; `DEVICE` and `TEXTSOURCE` have inert `.meta` persistence.
-- Storage documentation may describe up to four primary files while current shadow-aware metadata also uses `.meta.shadow` to keep null overrides consistent with `.shadow`.
-- CLI short options are mode-dependent: for `xretractor`, `-m` is CSV in compile-only option construction and loop limit in execution mode. Verify against `launcher.cpp`, not a single summary table.
+Resolved at the current documentation basis: logical origin and exact shift/AGSE semantics; exact interleave phase scan
+with the safe fallback; the `metaData`/`MetaIndexStore`/`GapDetector`/shadow decomposition; five-file artifact families;
+declared-source descriptors and inert metadata; idle service startup; full TOML option documentation; and the previously
+missing `config_storage_validation`, `deinterleave_roundtrip`, `packaging`, and `service_idle` appendix entries.
+
+Paper-specific inconsistencies and stale planning metadata are listed in `paper-debs.md`; they are not documentation
+authority and must not be silently promoted into system behavior.
 
 When changing documentation, fix only drift relevant to the task unless the user asks for a broader synchronization pass.

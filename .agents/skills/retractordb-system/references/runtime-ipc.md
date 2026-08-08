@@ -57,7 +57,7 @@ Each later slot:
 `dataModel::constructInputPayload` dispatches on the final canonical token:
 
 - pass-through reads the current source payload;
-- shift uses reverse history offset;
+- shift computes the consumer logical index `n` and reads source logical index `n-N` through `fetchForward()`;
 - `#` calls exact `Hash` to select a source and forward index;
 - `&`/`%` call `Div`/`Mod`, then convert a forward index to reverse storage history;
 - stream `+` concatenates two payloads;
