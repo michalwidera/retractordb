@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <optional>
@@ -327,32 +328,35 @@ std::string compiler::extractIntermediateStreams() {
           std::string arg1;
           std::string arg2;
 
-          token newVal(*it2);
-          newQuery.lProgram.push_front(newVal);
-          command_id cmd = (*it2).getCommandID();
+          const command_id cmd = (*it2).getCommandID();
+          const int argCount   = consumesTwoPrecedingTokens(cmd) ? 2 : 1;
 
-          it2 = currentQuery.lProgram.erase(it2);
-          --it2;
+          // Operator poprzedza w programie DOKŁADNIE argCount tokenów; cofamy się na pierwszy
+          // z nich i wycinamy cały podciąg [argumenty..., operator] jednym erase().
+          //
+          // Dawniej robiło to erase() przeplatane z `--it2`. Gdy kasowany token stał na początku
+          // listy, dekrementacja schodziła PRZED begin() — formalnie zachowanie niezdefiniowane,
+          // działające wyłącznie dlatego, że std::list w libstdc++ jest cyklem z wartownikiem
+          // i `++` wracało na begin(). Ta sama konstrukcja o jeden krok dalej (sięgnięcie po
+          // nieistniejący drugi argument `@`) kasowała wartownika i psuła stertę.
+          if (std::distance(currentQuery.lProgram.begin(), it2) < argCount) {
+            FatalError("compiler::extractIntermediateStreams: operator '{}' in query '{}' has {} preceding tokens, needs {}",
+                       GetStringcommand_id(cmd), currentQuery.id, std::distance(currentQuery.lProgram.begin(), it2), argCount);
+          }
+          auto firstArg = it2;
+          std::advance(firstArg, -argCount);
+          const auto afterOperator = std::next(it2);
 
-          {
-            token newValSh1(*it2);
-            newQuery.lProgram.push_front(newValSh1);
-            std::stringstream s;
-            s << (*it2).getStr_();
-            arg1 = std::string(s.str());
-            it2  = currentQuery.lProgram.erase(it2);
-            --it2;
+          // Kolejność w substracie zostaje taka jak w programie źródłowym.
+          newQuery.lProgram.assign(firstArg, afterOperator);
+
+          // arg1 to token STOJĄCY BEZPOŚREDNIO PRZED operatorem, arg2 — ten przed nim.
+          auto argIt = firstArg;
+          if (argCount == 2) {
+            arg2 = (*argIt).getStr_();
+            ++argIt;
           }
-          if (consumesTwoPrecedingTokens(cmd)) {
-            token newValSh2(*it2);
-            newQuery.lProgram.push_front(newValSh2);
-            std::stringstream s;
-            s << (*it2).getStr_();
-            arg2 = std::string(s.str());
-            it2  = currentQuery.lProgram.erase(it2);
-            --it2;
-          }
-          ++it2;
+          arg1 = (*argIt).getStr_();
 
           std::list<token> lTempProgram;
           lTempProgram.emplace_back(PUSH_TSCAN);
@@ -360,6 +364,7 @@ std::string compiler::extractIntermediateStreams() {
           newQuery.policy     = std::make_pair(substratType_C, 1);
           newQuery.id         = composeStreamName(arg1, arg2, cmd);
           newQuery.isSubstrat = true;
+          it2                 = currentQuery.lProgram.erase(firstArg, afterOperator);
           currentQuery.lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
           coreInstance.push_back(newQuery);
           extracted = true;

@@ -891,3 +891,20 @@ TEST(xcompiler, shift_over_agse_matches_the_two_step_form) {
   EXPECT_EQ(oneClause.first, twoStep.first) << "origin rozny miedzy postacia jedno- i dwuetapowa";
   EXPECT_EQ(oneClause.second, twoStep.second) << "ogon rozny miedzy postacia jedno- i dwuetapowa";
 }
+
+// Uszkodzony program pośredni nie może cofnąć iteratora przed begin(). Operator binarny
+// bez operandów ma zostać odrzucony przed próbą wycięcia zakresu z listy tokenów.
+TEST(xcompiler, malformed_intermediate_operator_is_rejected_before_iterator_underflow) {
+  qTree instance;
+  query malformed(boost::rational<int>(1), "malformed");
+  malformed.lProgram.emplace_back(STREAM_HASH);
+  malformed.lProgram.emplace_back(STREAM_TIMEMOVE);
+  instance.push_back(malformed);
+
+  EXPECT_DEATH(
+      {
+        compiler compilerInstance(instance);
+        (void)compilerInstance.compile();
+      },
+      "operator 'STREAM_HASH' in query 'malformed' has 0 preceding tokens, needs 2");
+}
