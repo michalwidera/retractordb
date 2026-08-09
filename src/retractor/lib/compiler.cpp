@@ -269,6 +269,37 @@ std::string compiler::composeStreamName(const std::string &sName1, const std::st
   return std::string(GetStringcommand_id(cmd)) + std::string("_") + sName2 + std::string("_") + sName1;
 }
 
+namespace {
+/// Czy operator klauzuli FROM zjada DWA poprzedzające tokeny, czy jeden.
+///
+/// Rozstrzyga o tym miejsce parametru, nie „dwuargumentowość" w potocznym sensie:
+///   * `#`, `+` — dwa strumienie, więc dwa tokeny PUSH_STREAM;
+///   * `&`, `%` — strumień i liczba wymierna, więc PUSH_STREAM + PUSH_VAL;
+///   * `>N`, `-r`, `@(k,L)` — parametr siedzi W SAMYM TOKENIE operatora
+///     (patrz RQLParser: `recpToken(STREAM_TIMEMOVE, int)`, `recpToken(STREAM_SUBTRACT, rational)`,
+///     `program.emplace_back(STREAM_AGSE, pair)`), więc poprzedza je JEDEN token.
+///
+/// Lista jest POZYTYWNA celowo. Do 2026-08-09 stała tu czarna lista
+/// (`cmd != STREAM_TIMEMOVE && cmd != STREAM_SUBTRACT`), przez którą `@` uchodziło za
+/// dwutokenowe. Dla `(A@(1,4))>1` po zdjęciu jedynego argumentu `@` lista programu miała
+/// już tylko `[STREAM_TIMEMOVE]`, a kod sięgał po drugi argument: dereferencjonował
+/// WARTOWNIKA listy i go kasował. Skutkiem było uszkodzenie sterty ujawniane dopiero
+/// w qTree::topologicalSort() jako odczyt zwolnionej pamięci. Czarna lista milczy przy
+/// każdym nowym operatorze; pozytywna zawodzi w stronę bezpieczną — nowy operator jest
+/// domyślnie jednotokenowy i nie sięga poza początek listy.
+bool consumesTwoPrecedingTokens(command_id cmd) {
+  switch (cmd) {
+    case STREAM_HASH:
+    case STREAM_ADD:
+    case STREAM_DEHASH_DIV:
+    case STREAM_DEHASH_MOD:
+      return true;
+    default:
+      return false;
+  }
+}
+}  // namespace
+
 /* Goal of this procedure is to provide stream to canonical form
 TODO: Stream_MAX,MIN,AVG...
 */
@@ -312,7 +343,7 @@ std::string compiler::extractIntermediateStreams() {
             it2  = currentQuery.lProgram.erase(it2);
             --it2;
           }
-          if (cmd != STREAM_TIMEMOVE && cmd != STREAM_SUBTRACT) {
+          if (consumesTwoPrecedingTokens(cmd)) {
             token newValSh2(*it2);
             newQuery.lProgram.push_front(newValSh2);
             std::stringstream s;

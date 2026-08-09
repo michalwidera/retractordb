@@ -824,3 +824,70 @@ TEST(xcompiler, sum_allows_bare_field_names) {
   ASSERT_EQ(offsets.size(), 2u);
   EXPECT_NE(offsets[0], offsets[1]) << "suma zgubila tozsamosc przy golych nazwach pol";
 }
+
+// --- ZnA/uboczne: `>N` nalozone wprost na `@` psulo sterte -------------------------
+//
+// extractIntermediateStreams() wydziela operatory z klauzuli FROM do substratow. Liczbe
+// poprzedzajacych tokenow, ktore operator konsumuje, ustalala CZARNA LISTA: wszystko poza
+// `>N` i `-` uznawano za dwuargumentowe. `@` niesie jednak swoje parametry (krok, szerokosc)
+// W SAMYM TOKENIE, wiec konsumuje JEDEN token — tak samo jak `>N`.
+//
+// Dla `(A@(1,4))>1` program ma trzy tokeny [PUSH_STREAM, STREAM_AGSE, STREAM_TIMEMOVE].
+// Po wydzieleniu `@` i zdjeciu jego jedynego argumentu lista ma juz tylko [STREAM_TIMEMOVE],
+// a kod siegal po drugi argument: dereferencjonowal WARTOWNIKA listy i go kasowal. Skutkiem
+// bylo uszkodzenie sterty — `SIGSEGV` albo `free(): invalid size`, zaleznie od parametrow —
+// ujawniane dopiero w qTree::topologicalSort() jako odczyt zwolnionej pamieci.
+//
+// Defekt jest WCZESNIEJSZY niz naprawa F9: odtworzony na `ebd8aab` (abort) i `530c80e`
+// (SIGSEGV). Zaden test ani plan integracyjny nie zestawial `@` z `>N` w jednej klauzuli
+// FROM, wiec `ctest` 186/186 tego nie lapal — to byla luka pokrycia, nie tylko defekt.
+//
+// TRYBEM PORAZKI TEGO TESTU JEST SMIERC PROCESU, nie asercja: przed naprawa binarka testu
+// przerywa sie w tym miejscu.
+
+TEST(xcompiler, shift_over_agse_in_one_from_clause_does_not_corrupt_heap) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        SELECT * STREAM m FROM (a@(1,4))>2
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+  EXPECT_TRUE(instance.exists("m"));
+}
+
+// KONTROLA POZYTYWNA — sam brak wywrotki nie wystarczy. Postac jednoklauzulowa musi dac
+// DOKLADNIE ten sam brzeg co rownowazna postac dwuetapowa, ktora dzialala takze przed
+// naprawa. Bez tej kontroli przechodzilaby rowniez „naprawa”, ktora tylko przestaje
+// kasowac wartownika, ale gubi argument albo przesuwa origin.
+TEST(xcompiler, shift_over_agse_matches_the_two_step_form) {
+  auto boundaryOf = [](const char *rql, const char *name) {
+    qTree instance;
+    auto [parseResult, kw, sn] = parserRQLString(instance, rql);
+    EXPECT_EQ(parseResult, "OK");
+    compiler compilerInstance(instance);
+    EXPECT_EQ(compilerInstance.compile(), "OK");
+    const auto &q = instance.getQuery(name);
+    return std::make_pair(q.logicalOrigin, q.startupLatency);
+  };
+
+  const auto oneClause = boundaryOf(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        SELECT * STREAM m FROM (a@(1,4))>2
+      )",
+                                    "m");
+  const auto twoStep   = boundaryOf(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        SELECT * STREAM w FROM a@(1,4)
+        SELECT * STREAM m FROM w>2
+      )",
+                                    "m");
+
+  EXPECT_EQ(oneClause.first, twoStep.first) << "origin rozny miedzy postacia jedno- i dwuetapowa";
+  EXPECT_EQ(oneClause.second, twoStep.second) << "ogon rozny miedzy postacia jedno- i dwuetapowa";
+}
