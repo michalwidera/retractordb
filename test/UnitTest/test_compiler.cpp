@@ -825,6 +825,100 @@ TEST(xcompiler, sum_allows_bare_field_names) {
   EXPECT_NE(offsets[0], offsets[1]) << "suma zgubila tozsamosc przy golych nazwach pol";
 }
 
+TEST(xcompiler, interleave_constituent_named_field_is_rejected) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        DECLARE v INTEGER STREAM b, 1/50  FILE 'b.txt'
+        SELECT a.v-b.v STREAM roznica FROM a#b
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  EXPECT_NE(compilerInstance.compile(), "OK") << "odwolanie A.pole do skladnika przeplotu przeszlo kompilacje";
+}
+
+TEST(xcompiler, interleave_constituent_index_wildcard_is_rejected) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        DECLARE v INTEGER STREAM b, 1/50  FILE 'b.txt'
+        SELECT a[_]-b[_] STREAM roznica FROM a#b
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  EXPECT_NE(compilerInstance.compile(), "OK") << "odwolanie A[_] do skladnika przeplotu przeszlo kompilacje";
+}
+
+TEST(xcompiler, sum_allows_constituent_index_wildcards) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        DECLARE v INTEGER STREAM b, 1/50  FILE 'b.txt'
+        SELECT a[_]-b[_] STREAM roznica FROM a+b
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  const auto &result = instance.getQuery("roznica");
+  ASSERT_EQ(result.lSchema.size(), 1u);
+  std::vector<int> offsets;
+  for (const auto &t : result.lSchema.front().lProgram)
+    if (t.getCommandID() == PUSH_ID) offsets.push_back(std::get<std::pair<std::string, int>>(t.getVT()).second);
+
+  ASSERT_EQ(offsets.size(), 2u);
+  EXPECT_NE(offsets[0], offsets[1]) << "suma zgubila tozsamosc przy A[_]";
+}
+
+TEST(xcompiler, interleave_constituent_qualified_wildcard_is_rejected) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        DECLARE v INTEGER STREAM b, 1/50  FILE 'b.txt'
+        SELECT a.* STREAM wynik FROM a#b
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  EXPECT_NE(compilerInstance.compile(), "OK") << "odwolanie A.* do skladnika przeplotu przeszlo kompilacje";
+}
+
+TEST(xcompiler, interleave_allows_qualified_wildcard_by_output_stream_name) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        DECLARE v INTEGER STREAM b, 1/50  FILE 'b.txt'
+        SELECT wynik.* STREAM wynik FROM a#b
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  EXPECT_EQ(compilerInstance.compile(), "OK");
+}
+
+TEST(xcompiler, rule_rejects_interleave_constituent_reference) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        DECLARE v INTEGER STREAM b, 1/50  FILE 'b.txt'
+        SELECT * STREAM wynik FROM a#b
+        RULE niejednoznaczna ON wynik WHEN a[0] > 0 DO DUMP -1 TO 0
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  EXPECT_NE(compilerInstance.compile(), "OK") << "RULE odwolujaca sie do skladnika przeplotu przeszla kompilacje";
+}
+
 // --- ZnA/uboczne: `>N` nalozone wprost na `@` psulo sterte -------------------------
 //
 // extractIntermediateStreams() wydziela operatory z klauzuli FROM do substratow. Liczbe

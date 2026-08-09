@@ -710,7 +710,7 @@ std::string compiler::resolveFieldReferences() {
   return {"OK"};
 }
 
-/// Migawka odwołań, które NAPISAŁ użytkownik — `A[0]` (PUSH_ID2) i `A.pole` (PUSH_ID1).
+/// Migawka odwołań, które NAPISAŁ użytkownik — `A[0]`, `A.pole`, `A[_]` i `A.*`.
 ///
 /// Zdejmowana z planu prosto po parsowaniu, przed jakimkolwiek przebiegiem, bo później takiej
 /// informacji już nie ma: buildOutputSchema() sam syntetyzuje PUSH_ID2 o tekście `lewy[offset]`
@@ -723,9 +723,24 @@ void compiler::snapshotNamedSourceRefs() {
     for (const auto &t : program) {
       const std::string text(t.getStr_());
       boost::cmatch what;
-      const auto &pattern = (t.getCommandID() == PUSH_ID2) ? xprFieldId2 : xprFieldId1;
-      if (t.getCommandID() != PUSH_ID2 && t.getCommandID() != PUSH_ID1) continue;
-      if (regex_search(text.c_str(), what, pattern)) namedSourceRefs_[id].insert(std::string(what[1]));
+      const boost::regex *pattern = nullptr;
+      switch (t.getCommandID()) {
+        case PUSH_ID1:
+          pattern = &xprFieldId1;
+          break;
+        case PUSH_ID2:
+          pattern = &xprFieldId2;
+          break;
+        case PUSH_IDX:
+          pattern = &xprFieldIdX;
+          break;
+        case PUSH_TSCAN:
+          if (text.size() > 2 && text.ends_with(".*")) namedSourceRefs_[id].insert(text.substr(0, text.size() - 2));
+          continue;
+        default:
+          continue;
+      }
+      if (regex_search(text.c_str(), what, *pattern)) namedSourceRefs_[id].insert(std::string(what[1]));
     }
   };
   for (const auto &q : coreInstance) {
