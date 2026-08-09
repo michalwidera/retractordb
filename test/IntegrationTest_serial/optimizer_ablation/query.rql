@@ -54,7 +54,11 @@ DECLARE cbx INTEGER, cby INTEGER STREAM CB, 0.2 FILE 'q.txt'
 DECLARE cax INTEGER, cay INTEGER STREAM CA2, 0.1 FILE 'p.txt'
 DECLARE cbx INTEGER, cby INTEGER STREAM CB2, 0.2 FILE 'q.txt'
 
-SELECT CA[1],CA[0] STREAM STREAM_HASH_CA_CB FROM CA#CB
+# Zamiana pol zapisana przez nazwe strumienia wynikowego: odwolanie `CA[1]` siegaloby
+# skladnika przeplotu, co od bramki F9 (D-F1 = S3) jest bledem kompilacji. Projekcja
+# pozostaje ta sama, wiec zapytanie nadal NIE jest surowym przeplotem i regula R1 nie
+# ma prawa go uzyc ponownie — o to w tym przypadku chodzi.
+SELECT STREAM_HASH_CA_CB[1],STREAM_HASH_CA_CB[0] STREAM STREAM_HASH_CA_CB FROM CA#CB
 SELECT * STREAM collide_user FROM (CA>2)#(CB>1)
 SELECT * STREAM collide_reference FROM (CA2#CB2)>3
 

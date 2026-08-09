@@ -682,3 +682,145 @@ TEST(xcompiler, every_node_of_a_nine_class_plan_is_resolved) {
     EXPECT_GE(q.startupLatency, 0) << "ogon ujemny dla " << q.id;
   }
 }
+
+// --- F9/S3: odwolanie do skladnika przeplotu jest bledem kompilacji ------------------
+//
+// `A[0]` na liscie pol NIE znaczy „biezaca wartosc strumienia A" — znaczy pozycje
+// w schemacie strumienia z FROM, liczona od miejsca wejscia A do zlaczenia (aliasowanie).
+// Przeplot wymaga IDENTYCZNYCH schematow obu argumentow i wydaje jeden strumien o tym
+// samym schemacie, wiec pozycja k skladnika lewego i pozycja k skladnika prawego to
+// TA SAMA pozycja: compiler::localizeFieldOffsets() zeruje offsety obu skladnikow.
+//
+// Skutkiem bylo, ze `A[0]-B[0]` nad `A#B` kompilowalo sie po cichu do `roznica[0]-roznica[0]`,
+// czyli tozsamosciowego zera, mimo ze A i B to rozne strumienie. Dwa syntaktycznie rozne
+// odwolania dawaly tozsamy wynik i kompilator nie mowil o tym ani slowa. Odzyskanie
+// skladnika ma w algebrze wlasny operator — rozplot & / % — a siegania po skladnik nazwa
+// przez wezel # algebra nie przewiduje wcale.
+//
+// Rozstrzygniecie F9 (D-F1 = S3, 2026-08-09): takie odwolanie jest bledem kompilacji,
+// nie wynikiem. Nie zmienia sie wartosc — odmawia sie planu.
+
+TEST(xcompiler, interleave_constituent_reference_is_a_compilation_error) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        DECLARE v INTEGER STREAM b, 1/50  FILE 'b.txt'
+        SELECT a[0]-b[0] STREAM roznica FROM a#b
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  const auto result = compilerInstance.compile();
+  EXPECT_NE(result, "OK") << "odwolanie do skladnika przeplotu skompilowalo sie po cichu";
+  EXPECT_NE(result.find("roznica"), std::string::npos) << "komunikat nie wskazuje strumienia: " << result;
+}
+
+// Ten sam defekt w ksztalcie z kampanii K23 (rodzina F9-X): odwolania siegaja skladnikow
+// przez DWA wezly przeplotu ukryte w substratach generowanych przez kompilator, a klauzula
+// FROM na wierzchu jest suma. Sciezka przechodzi przez collectTransitiveOffsets(), wiec
+// bramka pilnujaca wylacznie bezposrednich argumentow by tego nie zlapala.
+TEST(xcompiler, interleave_constituent_reference_is_rejected_through_substrates) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        DECLARE v INTEGER STREAM b, 1/50  FILE 'b.txt'
+        DECLARE v INTEGER STREAM c, 1/100 FILE 'c.txt'
+        DECLARE v INTEGER STREAM d, 1/50  FILE 'd.txt'
+        SELECT a[0]*c[0]+b[0]*d[0] STREAM m1 FROM ((a>2)#(b>1)) + ((c>2)#(d>1))
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  EXPECT_NE(compilerInstance.compile(), "OK") << "ksztalt F9-X skompilowal sie po cichu";
+}
+
+// KONTROLA NEGATYWNA — bramka, ktora odrzuca takze plany poprawne, jest bezwartosciowa.
+// Suma sklada schematy przez konkatenacje, wiec `a[0]` i `b[0]` maja ROZNE offsety
+// i pozostaja rozroznialne. To jest udokumentowane aliasowanie (Pattern7) i musi dzialac.
+TEST(xcompiler, sum_keeps_constituent_identity) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        DECLARE v INTEGER STREAM b, 1/50  FILE 'b.txt'
+        SELECT a[0]-b[0] STREAM roznica FROM a+b
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  std::vector<int> offsets;
+  for (const auto &q : instance)
+    if (q.id == "roznica")
+      for (const auto &f : q.lSchema)
+        for (const auto &t : f.lProgram)
+          if (t.getCommandID() == PUSH_ID) offsets.push_back(std::get<std::pair<std::string, int>>(t.getVT()).second);
+
+  ASSERT_EQ(offsets.size(), 2u);
+  EXPECT_NE(offsets[0], offsets[1]) << "suma zgubila tozsamosc skladnikow";
+}
+
+// KONTROLA NEGATYWNA — nad przeplotem legalne pozostaje odwolanie nazwa strumienia
+// WYNIKOWEGO. Ono nie jest dwuznaczne: wskazuje pozycje w jedynym schemacie, jaki po #
+// istnieje. Gdyby bramka odrzucala i to, odcielaby przeplot od listy pol w ogole.
+TEST(xcompiler, interleave_allows_reference_by_output_stream_name) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        DECLARE v INTEGER STREAM b, 1/50  FILE 'b.txt'
+        SELECT h[0]+1 STREAM h FROM a#b
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  EXPECT_EQ(compilerInstance.compile(), "OK");
+}
+
+// Ta sama utrata tozsamosci zapisana gola nazwa pola. `v` jest polem A, `w` polem B,
+// wiec autor jawnie wskazal DWA rozne strumienie — a nad `A#B` oba odwolania trafialy
+// na pozycje 0 tego samego schematu i roznica byla tozsamosciowym zerem. Bramka, ktora
+// lapie `A[0]-B[0]`, ale przepuszcza `v-w`, nie zamyka defektu.
+TEST(xcompiler, interleave_constituent_reference_is_rejected_for_bare_field_names) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        DECLARE w INTEGER STREAM b, 1/50  FILE 'b.txt'
+        SELECT v-w STREAM roznica FROM a#b
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  EXPECT_NE(compilerInstance.compile(), "OK") << "gola nazwa pola skompilowala sie po cichu";
+}
+
+// KONTROLA NEGATYWNA do testu wyzej: nad suma gole nazwy pol pozostaja legalne i musza
+// wskazywac ROZNE pozycje. Bez tej kontroli bramka odcinajaca gole nazwy w ogole
+// przechodzilaby test wyzej, nic nie naprawiajac.
+TEST(xcompiler, sum_allows_bare_field_names) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/100 FILE 'a.txt'
+        DECLARE w INTEGER STREAM b, 1/50  FILE 'b.txt'
+        SELECT v-w STREAM roznica FROM a+b
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  std::vector<int> offsets;
+  for (const auto &q : instance)
+    if (q.id == "roznica")
+      for (const auto &f : q.lSchema)
+        for (const auto &t : f.lProgram)
+          if (t.getCommandID() == PUSH_ID) offsets.push_back(std::get<std::pair<std::string, int>>(t.getVT()).second);
+
+  ASSERT_EQ(offsets.size(), 2u);
+  EXPECT_NE(offsets[0], offsets[1]) << "suma zgubila tozsamosc przy golych nazwach pol";
+}

@@ -5,8 +5,14 @@ DECLARE val INTEGER STREAM s2, 1 FILE 'data2.dat'
 DECLARE val INTEGER STREAM s3, 1 FILE 'data3.dat'
 DECLARE val INTEGER STREAM s4, 1 FILE 'data4.dat'
 
+# Przeplot znosi tozsamosc skladnikow — w out2/out3/out5 wszystkie odwolania siegajace
+# przez `#` trafialy na te sama pozycje, wiec `s1[0]+s2[0]+s3[0]` liczylo POTROJONA
+# wartosc przeplotu, a nie sume trzech strumieni. Od bramki F9 (D-F1 = S3) taki zapis
+# jest bledem kompilacji; ponizej ta sama wartosc zapisana jawnie. Przedmiotem tych
+# przypadkow jest ksztalt klauzuli FROM, nie lista pol, wiec kolejnosc zapytan zostaje.
+# W out3 `s1[0]` jest legalne: s1 wchodzi do sumy wprost, nie przez przeplot.
 SELECT s1[0]+s2[0]+s3[0] STREAM out1 FROM s1+s2+s3
-SELECT s1[0]+s2[0]+s3[0] STREAM out2 FROM (s1#s2)#s3
-SELECT s1[0]+s2[0]+s3[0] STREAM out3 FROM s1+(s2#s3)
+SELECT out2[0]+out2[0]+out2[0] STREAM out2 FROM (s1#s2)#s3
+SELECT s1[0]+out3[1]+out3[1] STREAM out3 FROM s1+(s2#s3)
 SELECT s1[0]+s2[0]+s3[0]+s4[0] STREAM out4 FROM s1+s2+s3+s4
-SELECT s1[0]+s2[0]+s3[0] STREAM out5 FROM s1#s2#s3
+SELECT out5[0]+out5[0]+out5[0] STREAM out5 FROM s1#s2#s3

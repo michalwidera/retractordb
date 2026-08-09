@@ -32,9 +32,19 @@ struct compiler {
   qTree &coreInstance;
   bool restrictSelectSharing_ = false;
   std::set<std::string> selectSharingScope_;
+  /// Nazwy strumieni, po których sięgnął UŻYTKOWNIK, per zapytanie — sprawdzane przez bramkę
+  /// przeplotu w localizeFieldOffsets(). Zbierane z dwóch miejsc, bo formy zapisu różnią się
+  /// momentem, w którym znana jest nazwa strumienia:
+  ///  * `A[0]` i `A.pole` — snapshotNamedSourceRefs(), przed pierwszym przebiegiem, bo później
+  ///    buildOutputSchema() syntetyzuje własne PUSH_ID2 i typ tokenu przestaje odróżniać
+  ///    użytkownika od kompilatora (te syntetyczne dwuznaczne nie są);
+  ///  * goła nazwa pola — resolveTokenReferences(), bo nazwa strumienia powstaje dopiero
+  ///    z wyszukania pola w schematach argumentów. PUSH_ID3 wystawia wyłącznie parser.
+  std::map<std::string, std::set<std::string>> namedSourceRefs_;
   std::list<field> buildOutputSchema(const std::string &sName1, const std::string &sName2, token &cmd_token);
   std::string composeStreamName(const std::string &sName1, const std::string &sName2, command_id cmd);
   void resolveTokenReferences(std::list<token> &lProgram, query &q);
+  void snapshotNamedSourceRefs();
 
   // compile chain steps
   std::string resolveStreamIntervals();
@@ -43,7 +53,8 @@ struct compiler {
   std::string expandIndexWildcards();
   std::string resolveFieldReferences();
   std::string localizeFieldOffsets();
-  void collectTransitiveOffsets(const std::string &srcId, int baseOffset, std::map<std::string, int> &result);
+  void collectTransitiveOffsets(const std::string &srcId, int baseOffset, bool viaHash, std::map<std::string, int> &result,
+                                std::set<std::string> &viaInterleave);
   std::string validateConstraints();
   std::map<std::string, int> computeRequiredCapacities();
   std::string applyCapacitiesToStreams(const std::map<std::string, int> &capMap);

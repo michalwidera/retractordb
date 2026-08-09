@@ -602,7 +602,12 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
             offset1 = 0;
             for (auto &f1 : (*pQ1).lSchema) {
               if ((f1.field_).rname == field) {
-                t           = token(PUSH_ID, std::make_pair(schema1, offset1));
+                t = token(PUSH_ID, std::make_pair(schema1, offset1));
+                // Goła nazwa pola też wskazuje składową — `v-w` nad `A#B` znosi tożsamość
+                // dokładnie tak jak `A[0]-B[0]`. PUSH_ID3 wystawia wyłącznie parser, więc
+                // zapis tutaj nie łapie tokenów kompilatora; migawka wejściowa nie da rady,
+                // bo nazwa strumienia powstaje dopiero z tego wyszukiwania.
+                namedSourceRefs_[q.id].insert(schema1);
                 bFieldFound = true;
               }
               ++offset1;
@@ -612,7 +617,8 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
             offset1 = 0;
             for (auto &f2 : (*pQ2).lSchema) {
               if (f2.field_.rname == field) {
-                t           = token(PUSH_ID, std::make_pair(schema2, offset1));
+                t = token(PUSH_ID, std::make_pair(schema2, offset1));
+                namedSourceRefs_[q.id].insert(schema2);
                 bFieldFound = true;
               }
               ++offset1;
@@ -668,9 +674,36 @@ std::string compiler::resolveFieldReferences() {
   return {"OK"};
 }
 
+/// Migawka odwołań, które NAPISAŁ użytkownik — `A[0]` (PUSH_ID2) i `A.pole` (PUSH_ID1).
+///
+/// Zdejmowana z planu prosto po parsowaniu, przed jakimkolwiek przebiegiem, bo później takiej
+/// informacji już nie ma: buildOutputSchema() sam syntetyzuje PUSH_ID2 o tekście `lewy[offset]`
+/// (rozwinięcie `SELECT *` i schematy substratów), więc typ tokenu przestaje odróżniać
+/// użytkownika od kompilatora. Nazwy w migawce są stabilne: przemianowania planu
+/// (retargetSchemaReferences) dotykają wyłącznie nazw substratów, nigdy strumieni z DECLARE.
+void compiler::snapshotNamedSourceRefs() {
+  namedSourceRefs_.clear();
+  auto record = [this](const std::list<token> &program, const std::string &id) {
+    for (const auto &t : program) {
+      const std::string text(t.getStr_());
+      boost::cmatch what;
+      const auto &pattern = (t.getCommandID() == PUSH_ID2) ? xprFieldId2 : xprFieldId1;
+      if (t.getCommandID() != PUSH_ID2 && t.getCommandID() != PUSH_ID1) continue;
+      if (regex_search(text.c_str(), what, pattern)) namedSourceRefs_[id].insert(std::string(what[1]));
+    }
+  };
+  for (const auto &q : coreInstance) {
+    for (const auto &f : q.lSchema)
+      record(f.lProgram, q.id);
+    for (const auto &r : q.lRules)
+      record(r.condition, q.id);
+  }
+}
+
 /* This function will convert fields list where stream a from b#c
 clause from b[x1],c[x2] int a[y1],a[y2] according to offset of from operation */
-void compiler::collectTransitiveOffsets(const std::string &srcId, int baseOffset, std::map<std::string, int> &result) {
+void compiler::collectTransitiveOffsets(const std::string &srcId, int baseOffset, bool viaHash,
+                                        std::map<std::string, int> &result, std::set<std::string> &viaInterleave) {
   auto &srcQuery = coreInstance.getQuery(srcId);
   if (!srcQuery.isSubstrat) return;
   bool isHash = std::ranges::any_of(srcQuery.lProgram, [](token &t) { return t.getCommandID() == STREAM_HASH; });
@@ -679,8 +712,11 @@ void compiler::collectTransitiveOffsets(const std::string &srcId, int baseOffset
     if (t.getCommandID() == PUSH_STREAM) {
       const std::string &sub = t.getStr_();
       const int globalOffset = isHash ? baseOffset : (baseOffset + offset);
-      result[sub]            = globalOffset;
-      collectTransitiveOffsets(sub, globalOffset, result);
+      // Raz wejdziemy pod przeplot i tożsamość nie wraca: niżej wszystko dzieli tę samą pozycję.
+      const bool subViaHash = viaHash || isHash;
+      result[sub]           = globalOffset;
+      if (subViaHash) viaInterleave.insert(sub);
+      collectTransitiveOffsets(sub, globalOffset, subViaHash, result, viaInterleave);
       if (!isHash) offset += coreInstance[sub].descriptorStorage().flatElementCount();
     }
   }
@@ -688,6 +724,7 @@ void compiler::collectTransitiveOffsets(const std::string &srcId, int baseOffset
 
 std::string compiler::localizeFieldOffsets() {
   std::map<std::string, std::map<std::string, int>> offsetMap;
+  std::map<std::string, std::set<std::string>> interleavedSources;
 
   // This loop fill&create OffsetMap structure.
   for (auto &q : coreInstance) {  // for each query
@@ -696,21 +733,54 @@ std::string compiler::localizeFieldOffsets() {
     }  // that has at least two arguments
     auto offset{0};                         //
     std::map<std::string, int> offsetItem;  //
+    std::set<std::string> viaInterleave;    // składowe, których tożsamość zniosło `#`
     for (auto &f : q.lProgram) {            // for each token in stream program
       if (f.getCommandID() == PUSH_STREAM) {
         offsetItem[f.getStr_()] = offset;
         offset += coreInstance[f.getStr_()].descriptorStorage().flatElementCount();
       }
       if (f.getCommandID() == STREAM_HASH) {
-        for (auto &i : offsetItem)
+        for (auto &i : offsetItem) {
           i.second = 0;
+          viaInterleave.insert(i.first);
+        }
       }
     }
     // Extend with transitive sources from system-generated substrats.
     std::vector<std::pair<std::string, int>> directSources(offsetItem.begin(), offsetItem.end());
     for (const auto &[srcName, srcBase] : directSources)
-      collectTransitiveOffsets(srcName, srcBase, offsetItem);
-    offsetMap[q.id] = offsetItem;
+      collectTransitiveOffsets(srcName, srcBase, viaInterleave.contains(srcName), offsetItem, viaInterleave);
+    offsetMap[q.id]          = offsetItem;
+    interleavedSources[q.id] = viaInterleave;
+  }
+
+  // Bramka F9 (D-F1 = S3, 2026-08-09). `A[0]` na liście pól nie znaczy „bieżąca wartość
+  // strumienia A" — znaczy pozycję w schemacie strumienia z FROM, liczoną od miejsca wejścia
+  // A do złączenia. Przeplot wymaga IDENTYCZNYCH schematów obu argumentów i wydaje jeden
+  // strumień o tym samym schemacie, więc pozycja k lewej składowej i pozycja k prawej to TA
+  // SAMA pozycja — pętla wyżej zeruje offsety obu. Skutkiem było, że `A[0]-B[0]` nad `A#B`
+  // kompilowało się po cichu do `roznica[0]-roznica[0]`, czyli tożsamościowego zera: dwa
+  // syntaktycznie różne odwołania dawały tożsamy wynik, a kompilator o tym nie mówił.
+  //
+  // Odzyskanie składowej ma w algebrze własny operator — rozplot Theta / ~Theta (`&`, `%`).
+  // Sięgania po składową nazwą PRZEZ węzeł `#` algebra nie przewiduje wcale, więc nie ma tu
+  // poprawnej wartości do wyliczenia i jedynym uczciwym wyjściem jest odmowa planu.
+  //
+  // Sprawdzamy WYŁĄCZNIE odwołania napisane przez użytkownika (namedSourceRefs_). PUSH_ID
+  // wygenerowane przez buildOutputSchema() dla `SELECT *` i dla substratów wskazują ten jedyny
+  // schemat, jaki po `#` istnieje, i dwuznaczne nie są.
+  for (const auto &q : coreInstance) {
+    const auto refs = namedSourceRefs_.find(q.id);
+    if (refs == namedSourceRefs_.end()) continue;
+    for (const auto &name : refs->second) {
+      if (name == q.id) continue;
+      if (!interleavedSources[q.id].contains(name)) continue;
+      SPDLOG_ERROR("Reference to '{}' in stream '{}' reaches a constituent of an interleave (#). q.id={}", name, q.id, q.id);
+      return std::string("Stream '" + q.id + "' refers to '" + name +
+                         "', which is a constituent of an interleave (#). After # the constituents share one schema, so "
+                         "this reference cannot be told apart from the other constituent's. Refer to '" +
+                         q.id + "' by its own name, or recover the constituent with de-interleave (& / %).");
+    }
   }
 
   // This loop converts with help of offsetMap
@@ -1675,6 +1745,9 @@ std::string compiler::compile() {
   // a właściwą redukcję strukturalną widać dopiero w parze przed/po deduplikacji.
   rdb::probe::planProbe planBench;
   planBench.capture(rdb::probe::planStage::entry, coreInstance);
+
+  // Musi być PRZED pierwszym przebiegiem — patrz uzasadnienie przy definicji.
+  snapshotNamedSourceRefs();
 
   result = extractIntermediateStreams();
   if (result != "OK") return result;
