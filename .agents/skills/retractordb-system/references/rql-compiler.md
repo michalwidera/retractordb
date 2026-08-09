@@ -23,6 +23,14 @@ Field-reference parse forms:
 | `stream[_]` | `PUSH_IDX` | replicate expression for every compatible flat element |
 | `*` or `stream.*` | `PUSH_TSCAN` | expand an entire schema |
 
+Source aliases preserve component identity only across `STREAM_ADD`, whose output schema concatenates its inputs. After
+`STREAM_HASH` the two inputs share one output schema and position `k` of either component is the same position `k` of
+the result. The compiler therefore rejects user-written `A[n]`, `A.field`, `A[_]`, `A.*`, and bare field names resolved
+to `A` when `A` is reached through an interleave. The guard also covers `RULE` conditions and transitive sources hidden
+behind generated substrates. References through the output stream's own name, an unqualified `*`, and explicit
+de-interleave through `&` or `%` remain legal. `ut_compiler` covers every named syntax form plus positive sum/output
+controls.
+
 The listener builds postfix token lists for scalar expressions and stream expressions. `command_id` separates scalar operations (`ADD`, comparisons, `CALL`) from stream operations (`STREAM_HASH`, `STREAM_AGSE`, and others).
 
 ## Scalar expressions
@@ -60,6 +68,8 @@ Multi-operator expressions remain postfix token programs immediately after parsi
    only the two children of each individual `STREAM_ADD`, and move equivalent computation into one generated
    `STREAM_SELECT_*` substrate while retaining each public SELECT as a pass-through stream.
 9. `localizeFieldOffsets()` — translate direct and transitive source offsets into the consumer's local input payload layout.
+   It also rejects user-named references to constituents reached through `#`, because interleave erases constituent
+   identity at a shared schema position.
 10. `computeLogicalOrigin()` — calculate `query::logicalOrigin`: the index of the first record that exists at all.
     The tail says "not yet"; the origin says "this record has no definition". Only the `@` window stamped by the
     interval end generates origin (`AgseLogicalOrigin()`, because its early records would reach before the source

@@ -109,6 +109,13 @@ embedded key. Exact revision checks cover the two external documentation reposit
   compiler error through `requireResolvedForEveryNode()`, and adds `it_ecg_qrs-run` plus
   `it_replay_stability-run`. The live Debug inventory is 183 tests: `pt_*` 1-41, `it_*` 42-100, and unit-related
   101-183.
+- The F9/K23 compiler guard (`530c80e`, completed for every grammar-visible named form by `ae530d6`) rejects source
+  aliases that reach a constituent through interleave `#`. Interleave has one shared schema, so `A[k]` and `B[k]`
+  cannot identify different current values after `A#B`; previously expressions such as `A[0]-B[0]` and
+  `A[_]-B[_]` silently collapsed to `result[k]-result[k]`. The guard covers numeric indices, named and bare fields,
+  `[_]`, qualified `A.*`, `RULE` conditions, and transitive generated substrates. Positive controls retain aliases
+  across `+` and references through the interleave result's own name. Coverage lives in `ut_compiler`; Debug passed
+  186/186 tests after the completed guard.
 - `retractordb.code-workspace` (`e434f28`) opens code, both documentation repositories, the paper, and experiments as
   independent sibling repositories. It is not a version manifest.
 

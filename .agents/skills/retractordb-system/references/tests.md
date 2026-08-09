@@ -71,6 +71,9 @@ Integration fixtures are copied from source `test/` to `build/Debug/test/` at co
   least 36 non-empty artifact files and identical bytes, excluding only the 8-byte `.meta` creation timestamp.
 - Origin/tail passes fail closed if any plan node remains unresolved; direct and nine-class coverage lives in
   `ut_compiler`.
+- Named references to interleave constituents fail closed for numeric indices, named and bare fields, `[_]`, qualified
+  `A.*`, `RULE` conditions, and transitive generated substrates. `ut_compiler` also guards the legal controls: source
+  aliases and distinct offsets across `+`, plus references through the interleave output stream's own name.
 - Compiler/presenter documentation graphs: four `pt_issue31_doc-*`.
 - Wildcards/unfold/retention: `pt_Pattern3`.
 - Identical field names in multiple streams: `pt_Pattern7`.

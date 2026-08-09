@@ -179,8 +179,10 @@ Directory: `kompilacja-zapytan/`
 - `rozwijanie-symbolu.md` — `SELECT *` schema expansion.
 - `rozwiazywanie-interwalow.md` — interval inference across stream expressions.
 - `wykrywanie-petli.md` — unresolved/circular dependency detection.
-- `aliasowanie.md` — source/result field reference rewriting.
-- `przetwarzanie-symbolu-_.md` — indexed wildcard replication.
+- `aliasowanie.md` — source/result field reference rewriting, including the distinction between identity-preserving
+  aliases across `+` and rejected constituent aliases through `#`.
+- `przetwarzanie-symbolu-_.md` — indexed wildcard replication and the requirement to address an interleave through its
+  result rather than `A[_]`/`B[_]` component names.
 - `rownanie-typow-w-gore.md` — type propagation/promotion through expressions.
 - `debugowanie-kompilacji.md` — textual, CSV, and graph plan diagnostics.
 
