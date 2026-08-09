@@ -8,6 +8,7 @@ share=$4
 commutative=$5
 factor=$6
 probe=$7
+simplify=$8
 
 build_info=$("$xretractor_bin" --build-info)
 expected_info=$(printf '%s\n' \
@@ -15,7 +16,8 @@ expected_info=$(printf '%s\n' \
   "RDB_OPT_SHARE_EQUIVALENT_SELECTS=$share" \
   "RDB_OPT_COMMUTATIVE_ADD=$commutative" \
   "RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=$factor" \
-  "RDB_BENCH_PROBE=$probe")
+  "RDB_BENCH_PROBE=$probe" \
+  "RDB_OPT_SIMPLIFY_EXPRESSIONS=$simplify")
 
 if [ "$build_info" != "$expected_info" ]; then
   echo "optimizer build info mismatch"
@@ -43,9 +45,13 @@ expected_r2=0
 # Dwa ostatnie są możliwe dopiero od zniesienia warunku jednego konsumenta.
 [ "$factor" = "ON" ] && expected_r1=4
 [ "$commutative" = "ON" ] && expected_r2=1
+# query.rql nie ma w polach ani jednej stałej do zwinięcia — R3 nie ma tu czego przepisać
+# niezależnie od przełącznika, i to jest treść oczekiwania: reguła nie rusza wyrażeń,
+# w których nie ma stałych.
+expected_r3=0
 
 if [ "$probe" = "ON" ]; then
-  grep -Fx "REWRITE_APPLIED r1=$expected_r1 r2=$expected_r2" out_probe.txt
+  grep -Fx "REWRITE_APPLIED r1=$expected_r1 r2=$expected_r2 r3=$expected_r3" out_probe.txt
 
   # Czas kompilacji (K6). Wartość musi być dodatnia, a narzut sondy odjęty —
   # mutacja usuwająca odjęcie zostawia sonda=0 i wtedy ten test nie zabija,

@@ -170,7 +170,9 @@ Use `query::descriptorStorage()` for output schema and `query::descriptorFrom(qT
 `xretractor -c` parses and compiles without executing. Presenter modes expose query sets, fields, programs, rules, CSV, sequence diagrams, or Graphviz DOT. The most useful dependency view is produced with `-c -d` plus `-f`, `-s`, and optionally `-u`. Plan listings report each query's causal tail as `tail=` and its logical origin as `origin=`.
 
 With `RDB_BENCH_PROBE=ON` and `RDB_BENCH_PLAN` set, the compiler additionally prints a stable stderr line
-`REWRITE_APPLIED r1=<n> r2=<n>`: `r1` counts applied `(A > i) # (B > k) -> (A # B) > (i + k)` factorizations and `r2`
-counts `STREAM_ADD` nodes whose canonical fingerprint actually swapped child order (not a speedup measure).
+`REWRITE_APPLIED r1=<n> r2=<n> r3=<n>`: `r1` counts applied `(A > i) # (B > k) -> (A # B) > (i + k)` factorizations, `r2`
+counts `STREAM_ADD` nodes whose canonical fingerprint actually swapped child order (not a speedup measure), and `r3`
+counts algebraic simplifications applied to field expressions and rule conditions (constant folding, constant-tail
+reassociation, neutral-operand removal).
 
 Compilation is allowed while another execution instance owns the service lock. Execution remains singleton.

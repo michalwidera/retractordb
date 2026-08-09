@@ -25,6 +25,7 @@ production_cmake_args=(
     -DRDB_OPT_SHARE_EQUIVALENT_SELECTS=ON
     -DRDB_OPT_COMMUTATIVE_ADD=ON
     -DRDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=ON
+    -DRDB_OPT_SIMPLIFY_EXPRESSIONS=ON
     -DRDB_BENCH_PROBE=OFF
 )
 
@@ -33,6 +34,7 @@ probe_cmake_args=(
     -DRDB_OPT_SHARE_EQUIVALENT_SELECTS=ON
     -DRDB_OPT_COMMUTATIVE_ADD=ON
     -DRDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=ON
+    -DRDB_OPT_SIMPLIFY_EXPRESSIONS=ON
     -DRDB_BENCH_PROBE=ON
 )
 
@@ -866,6 +868,7 @@ verify_optimizer_build_info() {
     local commutative="$4"
     local factor="$5"
     local probe="$6"
+    local simplify="$7"
     local actual
     local expected
 
@@ -880,7 +883,8 @@ verify_optimizer_build_info() {
         "RDB_OPT_SHARE_EQUIVALENT_SELECTS=$share" \
         "RDB_OPT_COMMUTATIVE_ADD=$commutative" \
         "RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=$factor" \
-        "RDB_BENCH_PROBE=$probe")
+        "RDB_BENCH_PROBE=$probe" \
+        "RDB_OPT_SIMPLIFY_EXPRESSIONS=$simplify")
 
     if [ "$actual" != "$expected" ]; then
         echo "Error: built xretractor configuration does not match the selected build mode."
@@ -894,7 +898,7 @@ verify_optimizer_build_info() {
     # Konfiguracja domyślna (wszystkie optymalizacje ON, sonda OFF) jest cicha —
     # raportujemy tylko odchylenia: wyłączoną optymalizację albo włączoną sondę.
     if [ "$dedup" != "ON" ] || [ "$share" != "ON" ] || [ "$commutative" != "ON" ] || [ "$factor" != "ON" ] ||
-        [ "$probe" != "OFF" ]; then
+        [ "$simplify" != "ON" ] || [ "$probe" != "OFF" ]; then
         echo "-- Verified xretractor build configuration (non-default):"
         printf '%s\n' "$actual"
     fi
@@ -906,6 +910,7 @@ choose_ablation_options() {
     local commutative="ON"
     local factor="ON"
     local probe="OFF"
+    local simplify="ON"
     local choice
 
     while true; do
@@ -916,10 +921,11 @@ choose_ablation_options() {
         echo "  3) RDB_OPT_COMMUTATIVE_ADD=$commutative"
         echo "  4) RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=$factor"
         echo "  5) RDB_BENCH_PROBE=$probe"
+        echo "  6) RDB_OPT_SIMPLIFY_EXPRESSIONS=$simplify"
         echo "  b) Build selected configuration"
         echo "  q) Cancel"
 
-        if ! read -r -p "-- Toggle option or build [1-5/b/q]: " choice; then
+        if ! read -r -p "-- Toggle option or build [1-6/b/q]: " choice; then
             choice="q"
         fi
 
@@ -929,6 +935,7 @@ choose_ablation_options() {
             3) commutative=$(toggle_on_off "$commutative") ;;
             4) factor=$(toggle_on_off "$factor") ;;
             5) probe=$(toggle_on_off "$probe") ;;
+            6) simplify=$(toggle_on_off "$simplify") ;;
             b|B)
                 if [ "$share" = "OFF" ] && [ "$commutative" = "ON" ]; then
                     echo "Error: RDB_OPT_COMMUTATIVE_ADD=ON requires RDB_OPT_SHARE_EQUIVALENT_SELECTS=ON."
@@ -941,6 +948,7 @@ choose_ablation_options() {
                     "-DRDB_OPT_SHARE_EQUIVALENT_SELECTS=$share"
                     "-DRDB_OPT_COMMUTATIVE_ADD=$commutative"
                     "-DRDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=$factor"
+                    "-DRDB_OPT_SIMPLIFY_EXPRESSIONS=$simplify"
                     "-DRDB_BENCH_PROBE=$probe"
                 )
                 ablation_dedup="$dedup"
@@ -948,8 +956,9 @@ choose_ablation_options() {
                 ablation_commutative="$commutative"
                 ablation_factor="$factor"
                 ablation_probe="$probe"
-                ablation_build_dir="$rdb_source_dir/build/Release-Ablation/dedup-${dedup}_share-${share}_comm-${commutative}_factor-${factor}_probe-${probe}"
-                ablation_conan_dir="$rdb_source_dir/build/Conan-Release-Ablation/dedup-${dedup}_share-${share}_comm-${commutative}_factor-${factor}_probe-${probe}"
+                ablation_simplify="$simplify"
+                ablation_build_dir="$rdb_source_dir/build/Release-Ablation/dedup-${dedup}_share-${share}_comm-${commutative}_factor-${factor}_probe-${probe}_simplify-${simplify}"
+                ablation_conan_dir="$rdb_source_dir/build/Conan-Release-Ablation/dedup-${dedup}_share-${share}_comm-${commutative}_factor-${factor}_probe-${probe}_simplify-${simplify}"
                 return 0
                 ;;
             q|Q)
@@ -1001,7 +1010,7 @@ run_option() {
             run_with_sanitized_build_environment cmake --build "$rdb_source_dir/build/Release" --parallel "$build_jobs"
             verify_optimizer_build_info \
                 "$rdb_source_dir/build/Release/src/retractor/xretractor" \
-                ON ON ON ON OFF
+                ON ON ON ON OFF ON
             release_source_tree_guard
             ;;
         "release-ablation")
@@ -1034,7 +1043,8 @@ run_option() {
                 "$ablation_share" \
                 "$ablation_commutative" \
                 "$ablation_factor" \
-                "$ablation_probe"
+                "$ablation_probe" \
+                "$ablation_simplify"
             ;;
         "debug")
             sed 's/Release/Debug/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
@@ -1066,7 +1076,7 @@ run_option() {
             cmake --build "$probe_build_dir" --parallel "$build_jobs"
             verify_optimizer_build_info \
                 "$probe_build_dir/src/retractor/xretractor" \
-                ON ON ON ON ON
+                ON ON ON ON ON ON
             echo "-- [warning: probe benchmark build] sonda pomiarowa WŁĄCZONA w tej kompilacji (RDB_BENCH_PROBE=ON)."
             ;;
         "package")

@@ -197,6 +197,11 @@ static void printOptimizerBuildInfo() {
   std::println("RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=OFF");
 #endif
   std::println("RDB_BENCH_PROBE={}", rdb::probe::enabled ? "ON" : "OFF");
+#if RDB_OPT_SIMPLIFY_EXPRESSIONS
+  std::println("RDB_OPT_SIMPLIFY_EXPRESSIONS=ON");
+#else
+  std::println("RDB_OPT_SIMPLIFY_EXPRESSIONS=OFF");
+#endif
 }
 
 int main(int argc, char *argv[]) {

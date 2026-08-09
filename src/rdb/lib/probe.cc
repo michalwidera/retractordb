@@ -18,6 +18,7 @@ namespace {
 // w jednym węźle wielokrotnie, a metryka pyta o liczbę przepisanych węzłów.
 std::size_t rewriteR1{};
 std::set<std::string> rewriteR2Nodes{};
+std::size_t rewriteR3{};
 
 /// Jedno źródło czasu dla wszystkich sond: zegar monotoniczny, ten sam, którym posługuje
 /// się planowanie snu slotu (executor_rt). Mieszanie zegarów dawałoby w wake_lag stałe
@@ -98,6 +99,8 @@ std::size_t canonicalRecordBytes(const Descriptor &descriptor) {
 void detail::countRewriteR1() { ++rewriteR1; }
 
 void detail::countRewriteR2(const std::string &node) { rewriteR2Nodes.insert(node); }
+
+void detail::countRewriteR3(std::size_t applied) { rewriteR3 += applied; }
 
 void detail::printRuntimeCounters() {
   if constexpr (rdb_probe_materialize) {
@@ -183,7 +186,8 @@ void planProbe::begin() {
   active_   = std::getenv("RDB_BENCH_PLAN") != nullptr;
   rewriteR1 = 0;
   rewriteR2Nodes.clear();
-  startNs_ = nowNs();
+  rewriteR3 = 0;
+  startNs_  = nowNs();
 }
 
 planShape &planProbe::stage(planStage which) { return stages_[static_cast<std::size_t>(which)]; }
@@ -204,7 +208,7 @@ void planProbe::print(const capacityShape &capacities, bool dedupEnabled) const 
                preDedup.publicStreams, preDedup.substrates, preDedup.fromTokens, preDedup.fieldTokens, postDedup.publicStreams,
                postDedup.substrates, postDedup.fromTokens, postDedup.fieldTokens, atExit.publicStreams, atExit.substrates,
                atExit.fromTokens, atExit.fieldTokens);
-  std::fprintf(stderr, "REWRITE_APPLIED r1=%zu r2=%zu\n", rewriteR1, rewriteR2Nodes.size());
+  std::fprintf(stderr, "REWRITE_APPLIED r1=%zu r2=%zu r3=%zu\n", rewriteR1, rewriteR2Nodes.size(), rewriteR3);
 
   // Czas kompilacji (K6, §9.2). Mierzone jest WYŁĄCZNIE compile(), bez parsowania RQL
   // i bez startu procesu — te są niezależne od profilu ablacyjnego i dla planów rzędu

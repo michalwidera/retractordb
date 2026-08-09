@@ -18,6 +18,7 @@
 #include <boost/rational.hpp>
 #include <boost/regex.hpp>
 
+#include "exprSimplify.hpp"  // simplifyExpression
 #include "fatalError.hpp"
 #include "rdb/probe.hpp"    // sonda E3: rozmiar planu, czas kompilacji
 #include "SOperations.hpp"  // ceilR
@@ -1786,6 +1787,42 @@ std::string compiler::shareEquivalentSelectComputations() {
   return {"OK"};
 }
 
+/// R3 — uproszczenia algebraiczne w programach pól i w warunkach reguł.
+///
+/// Reguły i ich uzasadnienie są przy simplifyExpression() (exprSimplify.hpp); tutaj jest
+/// tylko dostarczenie typów pól i obejście planu.
+///
+/// Miejsce w łańcuchu nie jest dowolne — przebieg musi stać MIĘDZY resolveFieldReferences()
+/// a localizeFieldOffsets(). Wcześniej odwołania do pól są jeszcze nierozwiązane
+/// (PUSH_ID1/PUSH_ID2/PUSH_ID3) i typu nie ma z czego odczytać; później PUSH_ID wskazuje
+/// offset w LOKALNYM buforze wejściowym zapytania, więc nazwa strumienia źródłowego
+/// przestaje prowadzić do schematu. Typ jest tu konieczny: reasocjacja stałych jest
+/// niepoprawna dla FLOAT/DOUBLE i dla podwyrażeń o nieznanym typie.
+///
+/// Przed shareEquivalentSelectComputations(), bo odciski liczą się z tokenów — kanoniczna
+/// postać wyrażenia zwiększa liczbę wykrytych równoważności.
+std::string compiler::simplifyFieldExpressions() {
+  auto typeOfField = [this](const std::string &streamId, int fieldIndex) -> std::optional<rdb::descFld> {
+    auto source = std::ranges::find_if(coreInstance, [&streamId](const query &q) { return q.id == streamId; });
+    if (source == coreInstance.end()) return std::nullopt;
+    if (fieldIndex < 0 || fieldIndex >= static_cast<int>(source->lSchema.size())) return std::nullopt;
+    const auto type = std::next(source->lSchema.begin(), fieldIndex)->field_.rtype;
+    // Pola konfiguracyjne deskryptora (TYPE, REF, RETENTION, RETMEMORY) nie są wartościami
+    // wyrażeń — ich „typ" nie mówi nic o arytmetyce, więc zgłaszamy je jako nieznane.
+    if (type > rdb::STRING) return std::nullopt;
+    return type;
+  };
+
+  for (auto &q : coreInstance) {
+    if (q.isCompilerDirective()) continue;
+    for (auto &f : q.lSchema)
+      rdb::probe::onRewriteR3(simplifyExpression(f.lProgram, typeOfField));
+    for (auto &r : q.lRules)
+      rdb::probe::onRewriteR3(simplifyExpression(r.condition, typeOfField));
+  }
+  return {"OK"};
+}
+
 std::string compiler::compile() {
   std::string result;
 
@@ -1838,6 +1875,14 @@ std::string compiler::compile() {
 
   result = expandIndexWildcards();
   if (result != "OK") return result;
+
+#if RDB_OPT_SIMPLIFY_EXPRESSIONS
+  namesBeforeRewrite = snapshotUserFieldNames();
+  result             = simplifyFieldExpressions();
+  if (result != "OK") return result;
+  result = verifyUserFieldNamesPreserved(namesBeforeRewrite);
+  if (result != "OK") return result;
+#endif
 
   // Podpis pól musi używać źródłowych PUSH_ID, zanim ich offsety zostaną
   // przepisane na lokalny bufor wejściowy publicznego zapytania.

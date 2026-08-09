@@ -130,6 +130,7 @@ inline logicalWriteCounters logicalWrite{};
 void printRuntimeCounters();
 void countRewriteR1();
 void countRewriteR2(const std::string &node);
+void countRewriteR3(std::size_t applied);
 }  // namespace detail
 
 /// Konstrukcja okna agregatu: okno odwiedza `elements` elementów w KAŻDYM slocie,
@@ -380,6 +381,12 @@ capacityShape shapeOfCapacities(const CapacityMap &capacities) {
 /// po węzłach, bo ta sama reguła może odpalić w jednym węźle wielokrotnie.
 [[gnu::always_inline]] inline void onRewriteR2(const std::string &node) {
   if constexpr (rdb_probe_plan) detail::countRewriteR2(node);
+}
+
+/// Zastosowania reguły R3 (uproszczenia algebraiczne wyrażeń) — liczone sumą przepisań,
+/// bo jedno wyrażenie może zwinąć wiele stałych naraz, a metryka pyta o rozmiar planu.
+[[gnu::always_inline]] inline void onRewriteR3(std::size_t applied) {
+  if constexpr (rdb_probe_plan) detail::countRewriteR3(applied);
 }
 
 /// Sonda planu, obiekt o czasie życia jednej kompilacji. Aktywna dopiero, gdy ustawiona

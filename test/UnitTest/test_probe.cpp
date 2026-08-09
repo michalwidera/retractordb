@@ -576,6 +576,8 @@ TEST(probePlanReport, stages_and_rewrites_reported_when_armed) {
   rdb::probe::onRewriteR2("nodeA");
   rdb::probe::onRewriteR2("nodeA");  // ten sam węzeł — metryka liczy WĘZŁY, nie zastosowania
   rdb::probe::onRewriteR2("nodeB");
+  rdb::probe::onRewriteR3(3);  // R3 liczy SUMĘ przepisań — jedno wyrażenie może zwinąć kilka stałych
+  rdb::probe::onRewriteR3(2);
 
   testing::internal::CaptureStderr();
   bench.report(plan, plan.maxCapacity, true);
@@ -586,7 +588,7 @@ TEST(probePlanReport, stages_and_rewrites_reported_when_armed) {
                           "wejscie=1/0/2/3  przed-dedup=1/1/3/3  po-dedup=1/0/2/3  wyjscie=1/0/2/3\n"),
               std::string::npos)
         << output;
-    EXPECT_NE(output.find("REWRITE_APPLIED r1=2 r2=2\n"), std::string::npos) << output;
+    EXPECT_NE(output.find("REWRITE_APPLIED r1=2 r2=2 r3=5\n"), std::string::npos) << output;
     EXPECT_NE(output.find("COMPILE_NS "), std::string::npos) << output;
     EXPECT_NE(output.find("PLAN capacity: strumieni=2 suma=10 maks=6\n"), std::string::npos) << output;
   } else {
@@ -617,6 +619,7 @@ TEST(probePlanReport, construction_resets_rewrite_counters) {
 
   rdb::probe::onRewriteR1();
   rdb::probe::onRewriteR2("stale");
+  rdb::probe::onRewriteR3(7);
 
   qTree plan;
   rdb::probe::planProbe bench;  // nowa kompilacja zaczyna liczenie od zera
@@ -626,7 +629,7 @@ TEST(probePlanReport, construction_resets_rewrite_counters) {
   const std::string output = testing::internal::GetCapturedStderr();
 
   if constexpr (rdb_probe_plan)
-    EXPECT_NE(output.find("REWRITE_APPLIED r1=0 r2=0\n"), std::string::npos) << output;
+    EXPECT_NE(output.find("REWRITE_APPLIED r1=0 r2=0 r3=0\n"), std::string::npos) << output;
   else
     EXPECT_EQ(output, "");
 }

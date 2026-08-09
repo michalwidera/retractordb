@@ -63,6 +63,7 @@ struct compiler {
   std::string computeLogicalOrigin();
   std::string computeStartupLatency();
   std::string factorMatchedHashTimeMoves();
+  std::string simplifyFieldExpressions();
   void retargetSchemaReferences(query &q, const std::string &oldName, const std::string &newName);
   void replaceStreamReferences(const std::string &oldName, const std::string &newName);
   std::string deduplicateSubstrats();

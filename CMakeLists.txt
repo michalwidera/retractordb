@@ -59,6 +59,8 @@ option(RDB_OPT_COMMUTATIVE_ADD
        "Use A+B == B+A when fingerprinting equivalent SELECT plans" ON)
 option(RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES
        "Factor matched time moves across the stream hash operator" ON)
+option(RDB_OPT_SIMPLIFY_EXPRESSIONS
+       "Fold constants and simplify algebraic field expressions" ON)
 
 if(NOT RDB_OPT_SHARE_EQUIVALENT_SELECTS AND RDB_OPT_COMMUTATIVE_ADD)
   message(
@@ -104,6 +106,7 @@ message(
   STATUS
     "RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=${RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES}"
 )
+message(STATUS "RDB_OPT_SIMPLIFY_EXPRESSIONS=${RDB_OPT_SIMPLIFY_EXPRESSIONS}")
 message(STATUS "RDB_BENCH_PROBE=${RDB_BENCH_PROBE}")
 
 # mold jest domyślnym linkerem (szybszy niż ld/lld), ale na platformach z
