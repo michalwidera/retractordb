@@ -14,7 +14,7 @@ the manuscript and planning files are not implementation evidence.
 | `debs/harmonogram.md` | operational deadlines, gates, and abandonment rules |
 | `debs/related_work_k8.md` | recorded novelty/related-work gate |
 | `debs/references.bib` | bibliography and remaining metadata checks |
-| `debs/done/` | completed protocols and repair records; historical, not the active task list |
+| `debs/done/` | completed protocols and repair records; includes `plan-znalezisko-A.md`; historical, not the active task list |
 
 Repository policy requires substantive edits in English first and synchronization of the Polish version in the same
 session. ACM generative-AI disclosure belongs in the venue-designated statement; the current anonymous source keeps the
@@ -79,8 +79,29 @@ The critical remaining path in `research_plan.md`/`harmonogram.md` is:
    reproducibility instructions, and a citable release/DOI.
 2. **K17**: page reduction, anonymous-repository audit, final reference metadata, figure regeneration, official DEBS
    2027 CFP check, and final submission build.
-3. **K23/H9** is optional. If its compile-only pilot has not started by 2026-11-15, or has no verdict by 2027-01-10,
-   the submission proceeds without H9.
+3. **K23/H9** is closed without a verdict. Both non-clean families were
+   ultimately classified as `apparatus`: F9-X was a port over an invalid RQL
+   program, while F9-R1 was rejected by a `public_identity` harness stricter
+   than the declared `Obs` relation. H9 remains untested, not refuted.
+4. **K26/H9** is the required clean iteration after those apparatus failures.
+   It uses a legal F9-X, an `Obs`-compatible identity gate, a separate `corpus`
+   classification and a complete corpus-validity check. The explicit
+   `corpus_validity` gate is required per family before runtime gates and
+   revalidates the exact 21-plan inventory, pinned build evidence, 84/84 valid
+   compilations and 4/4 rejected historical mutants. No K23 data may enter K26.
+
+K26 review commits are not themselves the freeze point. Because no P6 run or
+cost measurement had started, the apparatus could still be corrected. The
+freeze becomes binding when the experiment starts, operationally defined as
+the first P6 run on main data. The final reviewed commit and push and a passing
+`freeze_check.sh predeklaracja` are required immediately beforehand; changes
+after the P6 start require a new iteration.
+
+The completed ZnA protocol is
+`debs/done/plan-znalezisko-A.md`. Its decision D1 found no engine defect:
+matched-shift factorization may shorten latency while preserving values and
+origin. The current F9-R1 classification is therefore `apparatus` (harness),
+even though frozen K23 artifacts retain the original historical label.
 
 The schedule assumes readiness by 2027-02-20 and an unconfirmed research-paper deadline near 2027-03-10. Replace these
 dates when the official 2027 CFP appears. The conference dates recorded in the schedule are 2027-06-29 through
