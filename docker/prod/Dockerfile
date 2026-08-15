@@ -54,7 +54,7 @@ RUN mkdir -p /home/retractor/temp && chown retractor:retractor /home/retractor/t
 
 # Plik zapytań usługi: ExecStart czyta /etc/retractor/startup.rql (postinst tworzy go
 # pustym = tryb idle). Podmieniamy na przykładowy workload kontenera.
-COPY --chown=retractor:retractor docker/supervisor/startup.rql /etc/retractor/startup.rql
+COPY --chown=retractor:retractor docker/prod/startup.rql /etc/retractor/startup.rql
 
 # Konfiguracja usługi (czytana automatycznie z /etc/retractor/retractor.toml).
 # lock_dir: serwis liczy ścieżkę lock-a z argv[0] → '/usr/bin/xretractor_service.lock',

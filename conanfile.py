@@ -57,6 +57,10 @@ class Retractor(ConanFile):
         "magic_enum/0.9.8",
         "tomlplusplus/3.4.0"
     )
+    additional_docker_requires = (
+        "gtest/1.17.0",
+        "magic_enum/0.9.7"
+    )
     testing = []
     package_type = "application"
 

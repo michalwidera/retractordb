@@ -32,6 +32,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     valgrind \
     cppcheck \
     mold \
+    ccache \
     # Additional development tools
     git \
     wget \
@@ -93,14 +94,21 @@ RUN chown -R developer:developer /home/developer/workspace
 USER developer
 
 # Generuj DockerConan.txt wewnątrz kontenera na podstawie conanfile.py.
+# Gdy conanfile.py ma additional_docker_requires, powstaje też DockerConanExtra.txt
+# ze starszymi wersjami: conan nie przyjmuje dwóch wersji pakietu w jednym [requires],
+# więc grzeją cache osobnym przebiegiem instalacji poniżej.
 # docker build wywołuj z katalogu głównego repo: docker build -f docker/ci/Dockerfile .
 COPY --chown=developer:developer conanfile.py /tmp/conanfile.py
 COPY --chown=developer:developer docker/ci/gen_dockerconan.sh /tmp/gen_dockerconan.sh
 RUN bash /tmp/gen_dockerconan.sh /tmp/conanfile.py /home/developer/workspace/DockerConan.txt \
     && rm /tmp/conanfile.py /tmp/gen_dockerconan.sh
 
-RUN python3 -m venv .venv \
-    && . .venv/bin/activate \
+# Venv w $HOME, nie w WORKDIR: scripts/buildrdb.sh wykrywa conana wyłącznie po
+# ~/.venv/bin/conan (tool_installed). Przy venv w katalogu roboczym CI go nie
+# widzi i przy każdym jobie stawia drugi venv z pip install conan od zera —
+# CircleCI i tak pracuje w ~/retractordb, nie w WORKDIR obrazu.
+RUN python3 -m venv ~/.venv \
+    && . ~/.venv/bin/activate \
     && pip install --upgrade pip \
     && pip install cmakelang conan \
     && conan profile detect \
@@ -109,10 +117,14 @@ RUN python3 -m venv .venv \
     && echo 'tools.cmake.cmaketoolchain:generator=Ninja' >> ~/.conan2/profiles/default \
     && conan install DockerConan.txt -s build_type=Release --build missing \
     && conan install DockerConan.txt -s build_type=Debug --build missing \
+    && if [ -f DockerConanExtra.txt ]; then \
+         conan install DockerConanExtra.txt -s build_type=Release --build missing \
+         && conan install DockerConanExtra.txt -s build_type=Debug --build missing; \
+       fi \
     && conan cache clean "*" \
     && pip cache purge
 
-RUN echo "source .venv/bin/activate" >> ~/.bashrc
+RUN echo "source ~/.venv/bin/activate" >> ~/.bashrc
 # RUN echo "cat /etc/lsb-release" >> ~/.bashrc
 
 # Set default command
@@ -121,17 +133,47 @@ CMD ["/bin/bash"]
 # Optional: Expose ports if your application needs them
 # EXPOSE 8080
 
-# How to check docker layers size - install https://github.com/wagoodman/dive
-# First: start docker desktop app on windows
-# docker image ls
-# dive <IMAGE ID>
+# Podgląd rozmiaru warstw — dive: https://github.com/wagoodman/dive
+# (na Windows najpierw uruchom Docker Desktop)
+#   docker image ls
+#   dive <IMAGE ID>
 
-# How to build and push (run from repo root):
-#   docker build --build-arg RDB_VERSION="$(cat VERSION)" -f docker/ci/Dockerfile -t buildenv-retractordb .
-#   docker run -it buildenv-retractordb
-#   docker login
-#   docker tag buildenv-retractordb micwide/buildenv-retractordb:latest
-#   docker push micwide/buildenv-retractordb:latest
+# ── Budowa i publikacja obrazu ───────────────────────────────────────────────
+#
+# 1. Budowa. Wywoływać z KORZENIA repo: kontekst musi objąć conanfile.py oraz
+#    docker/ci/gen_dockerconan.sh, oba kopiowane niżej. Buduj po każdej zmianie
+#    zależności w conanfile.py — inaczej joby -mydocker dobudowują je w locie.
+#
+#      docker build --build-arg RDB_VERSION="$(cat VERSION)" -f docker/ci/Dockerfile -t buildenv-retractordb .
+#
+#    Uwaga: docker/ci/DockerConan.txt z repo NIE trafia do obrazu — jest tylko
+#    lokalnym podglądem (i jest w .gitignore). Listę zależności generuje
+#    gen_dockerconan.sh wewnątrz kontenera z conanfile.py, więc ręczne zmiany
+#    w tym pliku nie mają na obraz żadnego wpływu.
+#
+# 2. Weryfikacja przed pushem — czy cache ma wersje z conanfile.py (i te
+#    z additional_docker_requires, jeśli krotka istnieje):
+#
+#      docker run --rm buildenv-retractordb bash -c 'PATH=~/.venv/bin:$PATH conan list "*"'
+#
+#    Kontrola venv — musi być w $HOME, bo tam i tylko tam szuka conana
+#    scripts/buildrdb.sh; przy złej ścieżce CI stawia drugi venv przy każdym jobie:
+#
+#      docker run --rm buildenv-retractordb ls -d /home/developer/.venv
+#
+#    Shell w obrazie, gdy trzeba pogrzebać ręcznie:
+#
+#      docker run -it buildenv-retractordb
+#
+# 3. Publikacja. Po pushu joby -mydocker biorą nowy :latest przy następnym
+#    uruchomieniu pipeline'u — CircleCI nie buduje tego obrazu samo.
+#
+#      docker login
+#      docker tag buildenv-retractordb micwide/buildenv-retractordb:latest
+#      docker push micwide/buildenv-retractordb:latest
 
-# clean up all dangling images
+# Sprzątanie po budowach (przebudowa tego obrazu zostawia sporo śmieci):
+#   docker system df               # co ile zajmuje
+#   docker image prune -f          # obrazy osierocone (dangling)
+#   docker builder prune -f        # cache BuildKita — rośnie do dziesiątek GB
 # https://stackoverflow.com/questions/44785585/how-can-i-delete-all-local-docker-images
