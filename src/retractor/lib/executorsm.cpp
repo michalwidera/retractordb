@@ -109,10 +109,13 @@ int executorsm::cfgRtPriority         = appcfg::kDefaultSchedulingRtPriority;
 static std::thread bt;
 
 void cleanup() {
-  if (iLoopLimitCnt != executorsm::stop_now) {
-    SPDLOG_WARN("Cleanup: Setting iLoopLimitCnt to stop_now.");
-    iLoopLimitCnt = executorsm::stop_now;
-    std::cout << "Cleanup!" << '\n';
+  {
+    std::scoped_lock lock(core_mutex);
+    if (iLoopLimitCnt != executorsm::stop_now) {
+      SPDLOG_WARN("Cleanup: Setting iLoopLimitCnt to stop_now.");
+      iLoopLimitCnt = executorsm::stop_now;
+      std::cout << "Cleanup!" << '\n';
+    }
   }
   cv.notify_all();
   if (bt.joinable()) bt.join();
@@ -358,7 +361,10 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
     // This command stop (kills) server process
     //
     if (command == "kill") {
-      iLoopLimitCnt = executorsm::stop_now;
+      {
+        std::scoped_lock lock(core_mutex);
+        iLoopLimitCnt = executorsm::stop_now;
+      }
       cv.notify_all();
     }
     //
@@ -394,7 +400,15 @@ void executorsm::commandProcessorLoop() {
     );
     IPCMap *mymap = mapSegment.construct<IPCMap>(std::string(ipc::kMapObject).c_str())  // object name
                     (std::less<>(), allocatorShmemMapInstance);
-    ipcReady = true;
+    // Stan predykatu musi zmienic sie POD core_mutex. Watek glowny czeka na ipcReady
+    // pod tym samym muteksem (executorsm::run), a cv.wait zwalnia go dopiero w chwili
+    // zablokowania. Ustawienie flagi bez muteksu pozwalalo trafic w okno miedzy
+    // sprawdzeniem predykatu a zasnieciem watku glownego — powiadomienie przepadalo
+    // i start wisial na zawsze, nie reagujac nawet na SIGTERM.
+    {
+      std::scoped_lock lock(core_mutex);
+      ipcReady = true;
+    }
     cv.notify_all();
     //
     // This need to be clean up - There are some mess.
@@ -408,7 +422,10 @@ void executorsm::commandProcessorLoop() {
       while (mq.try_receive(message.data(), ipc::kQueryQueueMaxMessageSize, recvd_size, priority)) {
         if (iLoopLimitCnt == executorsm::waitForXqry) {
           // Notify main thread that first query is received
-          iLoopLimitCnt = executorsm::inifitie_loop;
+          {
+            std::scoped_lock lock(core_mutex);
+            iLoopLimitCnt = executorsm::inifitie_loop;
+          }
           cv.notify_all();
         }
 
@@ -604,7 +621,10 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 
   if (!guard.acquireLock()) {
     SPDLOG_ERROR("Cannot acquire service lock, another instance might be running.");
-    iLoopLimitCnt = executorsm::stop_now;
+    {
+      std::scoped_lock lock(core_mutex);
+      iLoopLimitCnt = executorsm::stop_now;
+    }
     cv.notify_all();
     bt.join();
     return system::errc::no_lock_available;
@@ -782,7 +802,10 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     SPDLOG_ERROR("catch exception: {}", e.what());
     retVal = system::errc::interrupted;
   }
-  iLoopLimitCnt = executorsm::stop_now;
+  {
+    std::scoped_lock lock(core_mutex);
+    iLoopLimitCnt = executorsm::stop_now;
+  }
   cv.notify_all();
   boradcastOutOfBussiness();
   bt.join();
