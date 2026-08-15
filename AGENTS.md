@@ -1,16 +1,14 @@
 # Repository instructions for coding agents
 
-These instructions apply to the whole RetractorDB repository.
+These instructions apply to the whole RetractorDB repository. They assume the reader knows nothing about the project and contain only what `CLAUDE.md` does not cover.
 
 ## Required context
 
-1. Read `CLAUDE.md` in full before working with code, tests, build files, or documentation. Follow its repository rules,
-   except for instructions that are specific to Claude model selection.
+1. Read `CLAUDE.md` in full before working with code, tests, build files, or documentation. It is the single source for build commands, testing, code style, integration-test sync traps, ANTLR4 grammar pitfalls, collaboration rules, commit/push/CI policy, and the AI-watermark hygiene procedure — all mandatory.
+
 2. Use the `retractordb-system` skill from `.agents/skills/retractordb-system` for every RetractorDB task.
 3. Run the skill's `scripts/check_freshness.sh` before relying on its indexed notes.
-4. Treat the current implementation and generated build configuration as the primary source of truth, followed by
-   integration and unit tests, canonical Polish documentation, derived English documentation, and finally the indexed
-   notes.
+4. Treat the current implementation and generated build configuration as the primary source of truth, followed by integration and unit tests, canonical Polish documentation, derived English documentation, and finally the indexed notes.
 
 ## Sharing the RetractorDB skill
 
