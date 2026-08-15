@@ -96,6 +96,63 @@ Use `rg` in the live repositories to verify identifiers and line locations. The 
 6. Update the relevant reference and `references/provenance.md` when system behavior or the external documentation
    basis changes materially. Do not update provenance solely because the code repository received a new commit.
 
+## Text watermark hygiene before anything enters a repository
+
+Text delivered to `retractordb` or `paper-arXiv` must carry no AI provenance marks: invisible Unicode
+(zero-width, bidi, tag characters, variation selectors, private use) and space homoglyphs. Marks inside images
+(`.png`, `.jpg`, `.pdf`, figures) are explicitly out of scope and may stay. The rule covers sources, scripts,
+Markdown, LaTeX, RQL, grammars, build files and commit messages.
+
+Use the local `watermarks-remover` scripts (default `~/github/watermarks-remover/service/scripts`). Do not
+start its Docker or HTTP service for this check — the CLI path is the required one. Layer A only.
+
+```bash
+WM="${WATERMARKS_REMOVER:-$HOME/github/watermarks-remover}/service/scripts"
+TEXT='\.(md|txt|tex|bib|rql|desc|cpp|hpp|h|c|g4|sh|py|ya?ml|toml|json|cmake|in)$|CMakeLists\.txt$'
+
+git diff --cached --name-only --diff-filter=ACM | grep -E "$TEXT" \
+  | while read -r f; do python3 "$WM/inspect_text.py" --json "$f" >/dev/null 2>&1 || echo "WATERMARK: $f"; done
+
+python3 "$WM/inspect_text.py" <file>                                     # report
+python3 "$WM/clean_text.py" <file> --in-place --stats && rm -f <file>.bak # clean, drop backup
+python3 "$WM/inspect_text.py" --json <file> >/dev/null && git add <file>  # verify, re-stage
+```
+
+Swap `git ls-files` for the staged-file listing to audit the whole tracked tree before a push.
+
+Source code is zero tolerance and uses strict mode. A zero-width character or a Cyrillic lookalike inside an
+identifier, string literal, RQL query or grammar rule compiles and reviews as ordinary text, and the failure
+it causes cannot realistically be found by hand. Never paste model, browser or chat output straight into
+`.cpp`, `.hpp`, `.h`, `.c`, `.g4`, `.rql`, `.desc`, `.sh`, `.py`, `.cmake`, `CMakeLists.txt`, `.toml`, `.yml`
+or `.json`; retype it as ASCII. Check a source file immediately after editing it — before `ninja cformat` and
+before the build, not at commit time:
+
+```bash
+python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
+```
+
+The default check misses Latin/Cyrillic confusables — `int value = 1;` whose `a` is a Cyrillic `U+0430`
+instead of ASCII `a` passes it — so code needs `--aggressive`; name such a codepoint in prose, never paste the
+character itself into a rule file, comment or test. `--strip-emoji-glue` rejects the invisibles that are legitimate in prose but never in code.
+Strict mode reports zero hits across the current `src/` and `scripts/` tree and leaves Polish diacritics in
+comments alone. On a hit, stop and report file, line and codepoint to the human rather than sweeping the file
+with `--in-place`; any `U+00A0` or invisible codepoint in code is a defect, not an informational finding.
+
+Never point `clean_text.py` at binary fixtures (`test/**/*.dat`, `.meta`, `.shadow`, ECG records, `examples/**`
+data): it rewrites bytes and integration tests compare output byte-exactly. Keep the extension filter; never
+use `--force-text`. Report a hit instead of editing generated ANTLR files or test fixtures.
+
+The same rule governs `dokumentacja-rdb` and `documentation-rdb`; each states it in its own `CLAUDE.md`. One
+baseline exception there: the documented callout convention writes `U+2139` / `U+26A0` followed by
+`U+FE0F VARIATION SELECTOR-16`, which the scanner reports because those symbols are text-default. That pair is
+the convention, not a watermark — leave it in the roughly one dozen affected `.md` files and in
+`migrate_to_mdbook.py`. Every other reported codepoint there is a real finding.
+
+For `paper-arXiv`, this hygiene rule operates on codepoints only. It never overrides that repository's ACM
+generative-AI disclosure requirement: the disclosure of AI use stays in the document, in its designated
+location and wording, and stripping marks is not a substitute for it. After cleaning, `git diff` must show no
+visible prose change — otherwise revert and clean again.
+
 ## Important test trap
 
 `cmake .` recopies `test/` and removes built unit-test executables. After reconfiguration, run `ninja` before `ctest`. Integration tests use installed binaries plus build-copied scripts, so changes spanning C++ and integration fixtures usually require:

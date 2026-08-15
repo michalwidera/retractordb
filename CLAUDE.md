@@ -132,8 +132,88 @@ Never start a new topic on a dirty working tree.
 - **No scope creep** — do not improve adjacent code even if it looks wrong.
 - **Run ctest before reporting done** — never claim success without executing the relevant tests.
 
+### AI watermark hygiene (text)
+
+Every text artifact that enters the repository must be free of AI provenance marks — invisible Unicode
+(zero-width, bidi, tag chars, variation selectors, private use) and space homoglyphs. **Images are out of
+scope: marks in `.png` / `.jpg` / `.pdf` / figures may stay.** The requirement covers only text: sources,
+scripts, `.md`, `.rql`, `.g4`, CMake, TOML/YAML and commit messages.
+
+Tool: `watermarks-remover` (default `~/github/watermarks-remover`), used through its local scripts — **do not
+start the Docker/HTTP service for this check**. Layer A only (deterministic Unicode scrub); statistical
+Layer B rewriting is not part of this rule.
+
+**Mandatory sequence before every commit and before every push:**
+
+```bash
+WM="${WATERMARKS_REMOVER:-$HOME/github/watermarks-remover}/service/scripts"
+TEXT='\.(md|txt|tex|bib|rql|desc|cpp|hpp|h|c|g4|sh|py|ya?ml|toml|json|cmake|in)$|CMakeLists\.txt$'
+
+# 1. Check the staged text files (empty output = clean)
+git diff --cached --name-only --diff-filter=ACM | grep -E "$TEXT" \
+  | while read -r f; do python3 "$WM/inspect_text.py" --json "$f" >/dev/null 2>&1 || echo "WATERMARK: $f"; done
+
+# 2. Report for a flagged file (which codepoints, where)
+python3 "$WM/inspect_text.py" <file>
+
+# 3. Clean it, then drop the backup the tool leaves behind
+python3 "$WM/clean_text.py" <file> --in-place --stats && rm -f <file>.bak
+
+# 4. Re-check, then re-stage
+python3 "$WM/inspect_text.py" --json <file> >/dev/null && git add <file>
+```
+
+Before a push, run the same check over the whole tracked tree — substitute `git ls-files` for
+`git diff --cached --name-only --diff-filter=ACM` in step 1. Optionally check the commit message too:
+`git log -1 --pretty=%B | python3 "$WM/inspect_text.py" -`.
+
+#### Source code — zero tolerance, strict mode
+
+Documentation can be fixed later; **source code cannot**. A zero-width character or a Cyrillic lookalike
+inside an identifier, string literal, RQL query or grammar rule compiles, diffs and reviews as normal text,
+and the resulting failure is practically undebuggable by hand. Nothing may ever introduce such a character
+into `.cpp` / `.hpp` / `.h` / `.c` / `.g4` / `.rql` / `.desc` / `.sh` / `.py` / `.cmake` / `CMakeLists.txt` /
+`.toml` / `.yml` / `.json`.
+
+Consequences for the assistant:
+
+- **Never paste model, browser or chat output straight into a source file.** Retype it as ASCII, or clean it
+  before it lands on disk.
+- **Check code immediately after editing it** — right after the edit, before `ninja cformat` and before the
+  build, not at commit time. A defect found at push has already been built and tested against.
+- Code uses **strict mode**, which the default check does not cover:
+
+```bash
+python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
+```
+
+  Default mode misses Latin/Cyrillic confusables: `int value = 1;` whose `a` is a Cyrillic `U+0430` instead of
+  ASCII `a` passes it and is caught only by `--aggressive`. (Write such an example by naming the codepoint —
+  never paste the actual character into a rule file, a comment or a test.) `--strip-emoji-glue` additionally rejects the load-bearing invisibles that
+  are legitimate in prose but never in code. Verified against the whole `src/` and `scripts/` tree: strict
+  mode yields zero hits, and Polish diacritics in comments are not affected.
+
+- On a hit in a source file: **stop and report it to the human** with file, line and codepoint. Do not sweep
+  the file with `--in-place`. The targeted repair is
+  `python3 "$WM/clean_text.py" <file> --aggressive-homoglyphs --strip-emoji-glue -o <file>.fixed`, followed by
+  a `git diff` confirming that only the offending codepoint changed.
+- Any `U+00A0` or invisible codepoint in code is a defect, never "informational".
+
+Rules:
+
+- **Never run `clean_text.py` on binary fixtures** (`test/**/*.dat`, `.meta`, `.shadow`, ECG records,
+  `examples/**` data files). It rewrites bytes and corrupts them, and integration tests compare output
+  byte-exactly. The extension filter above exists for that reason — do not widen it with `--force-text`.
+- `--in-place` writes a `.bak` next to the file. Delete it; never commit it.
+- `U+00A0` (no-break space) is reported as *informational*. In `.rql`, `.g4` and C++ sources it is always a
+  defect — normalize it. Elsewhere confirm it is not a deliberate typographic space before replacing.
+- A commit or push must not go out while the check reports a hit. If cleaning would change test fixtures or
+  generated ANTLR files, stop and hand the case to the human instead of editing them.
+
 ### Commits, push and CI
 
+- **Watermark check first** — run the sequence from *AI watermark hygiene (text)* before every commit and
+  before handing a diff over for push. No commit leaves with a reported hit.
 - **`master` in the code repository** — commits and pushes are performed by the human only, after reviewing the diff. The
   assistant must leave changes uncommitted, show the diff, and wait for the human to commit and push.
 - **Side branches** — the assistant may create local commits autonomously after verification, provided no CI process is
