@@ -31,12 +31,12 @@ class Retractor(ConanFile):
     # | Komponent                  | Licencja                              | Zgodna z MIT | Uwagi                                |
     # |----------------------------|---------------------------------------|--------------|--------------------------------------|
     # | boost/1.91.0               | BSL-1.0                               | Tak          | permisywna                           |
-    # | gtest/1.17.0               | BSD-3-Clause                          | Tak          | tylko testy                          |
+    # | gtest/1.18.0               | BSD-3-Clause                          | Tak          | tylko testy                          |
     # | antlr4-cppruntime/4.13.2   | BSD-3-Clause                          | Tak          | runtime parsera                      |
     # | antlr4/4.13.1              | BSD-3-Clause                          | Tak          | generator (build-time)               |
     # | spdlog/1.17.0              | MIT                                   | Tak          | header-only                          |
     # | openjdk/21.0.1             | GPL-2.0 WITH Classpath-exception-2.0  | Tak (*)      | build-time, nielinkowany do binariów |
-    # | magic_enum/0.9.7           | MIT                                   | Tak          | header-only                          |
+    # | magic_enum/0.9.8           | MIT                                   | Tak          | header-only                          |
     # | tomlplusplus/3.4.0         | MIT                                   | Tak          | header-only                          |
     # | fmt/12.1.0                 | MIT                                   | Tak          | tranzytywna (z spdlog)               |
     # | libbacktrace/cci.20210118  | BSD-3-Clause                          | Tak          | tranzytywna (z boost)                |
@@ -49,12 +49,12 @@ class Retractor(ConanFile):
     #     not o prawach autorskich w dystrybucji.
     requires = (
         "boost/1.91.0",
-        "gtest/1.17.0",
+        "gtest/1.18.0",
         "antlr4-cppruntime/4.13.2",
         "antlr4/4.13.1",
         "spdlog/1.17.0",
         "openjdk/21.0.1",
-        "magic_enum/0.9.7",
+        "magic_enum/0.9.8",
         "tomlplusplus/3.4.0"
     )
     testing = []

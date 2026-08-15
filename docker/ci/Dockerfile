@@ -7,7 +7,7 @@ ARG RDB_VERSION
 
 LABEL com.retractordb.version="${RDB_VERSION}"
 LABEL vendor1="Michal Widera"
-LABEL com.retractordb.release-date="2026-06-20"
+LABEL com.retractordb.release-date="2026-08-15"
 LABEL com.retractordb.description="Development environment for RetractorDB project"
 LABEL com.retractordb.url="https://retractordb.com"
 
