@@ -1,16 +1,15 @@
 # Repository instructions for coding agents
 
-These instructions apply to the whole RetractorDB repository.
+These instructions apply to the whole RetractorDB repository. They assume the reader knows nothing about the project and contain only what `CLAUDE.md` does not cover.
 
 ## Required context
 
-1. Read `CLAUDE.md` in full before working with code, tests, build files, or documentation. Follow its repository rules,
-   except for instructions that are specific to Claude model selection.
+1. Read `CLAUDE.md` in full before working with code, tests, build files, or documentation. It is the single source for build commands, testing, code style, integration-test sync traps, ANTLR4 grammar pitfalls, collaboration rules, commit/push/CI policy, and the AI-watermark hygiene procedure — all mandatory.
+
 2. Use the `retractordb-system` skill from `.agents/skills/retractordb-system` for every RetractorDB task.
 3. Run the skill's `scripts/check_freshness.sh` before relying on its indexed notes.
-4. Treat the current implementation and generated build configuration as the primary source of truth, followed by
-   integration and unit tests, canonical Polish documentation, derived English documentation, and finally the indexed
-   notes.
+4. Resolve conflicts between sources using the skill's *Source precedence* section, which is the only copy of that
+   ordering.
 
 ## Sharing the RetractorDB skill
 
@@ -24,10 +23,10 @@ scripts/install-codex-skill.sh
 The installer creates `~/.agents/skills/retractordb-system` as a symbolic link to the repository copy. It is idempotent
 and refuses to replace an existing file, directory, or link to a different target.
 
-## Commits, push, and CI
+## Commits, push and CI
 
-- On `master` in this code repository, commits and pushes are performed by the human only after reviewing the diff.
-  Agents leave changes uncommitted and hand them over for review.
-- On side branches, agents may create local commits after verification, provided that doing so does not start CI.
-- Agents do not push, open pull requests, or invoke CI without an explicit human request.
-- If an action would trigger CI, stop and hand it over to the human.
+Follow *Commits, push and CI* and *AI watermark hygiene (text)* in `CLAUDE.md`. Both are binding here and hold
+the full text: the mandatory watermark check before every commit, the human-only rule for `master`, the limits
+on side-branch commits, the prohibition on pushing, opening pull requests, or invoking CI without an explicit
+human request, and the session-end handoff requirement. The `retractordb-system` skill restates none of it — it
+only adds the deltas that apply to the documentation and paper repositories.

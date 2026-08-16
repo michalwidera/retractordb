@@ -9,6 +9,9 @@ parameters:
   run_manual_nightly_full:
     type: boolean
     default: false
+  run_manual_ablation:
+    type: boolean
+    default: false
 
 workflows:
   commit:
@@ -44,9 +47,6 @@ workflows:
       - build-debug:
           requires:
             - build-release
-      - build-debug-ninja:
-          requires:
-            - build-release
       - build-ARM:
           requires:
             - build-release
@@ -69,12 +69,59 @@ workflows:
       - build-debug:
           requires:
             - build-release
-      - build-debug-ninja:
-          requires:
-            - build-release
       - build-ARM:
           requires:
             - build-release
+
+  # Optimizer ablation matrix — manual only, never scheduled and never
+  # commit-triggered. One-factor-at-a-time over the RDB_OPT_* switches plus the
+  # all-off floor and a probe-instrumented build. The all-off configuration runs
+  # first: it is the one most likely to fail, so the remaining variants are not
+  # started when the floor is already broken.
+  manual-ablation:
+    when: << pipeline.parameters.run_manual_ablation >>
+    jobs:
+      - build-release-ablation:
+          name: ablation-all-off
+          dedup: "OFF"
+          share: "OFF"
+          commutative: "OFF"
+          factor: "OFF"
+          simplify: "OFF"
+      - build-release-ablation:
+          name: ablation-no-dedup
+          dedup: "OFF"
+          requires:
+            - ablation-all-off
+      - build-release-ablation:
+          name: ablation-no-share
+          # RDB_OPT_COMMUTATIVE_ADD=ON with share OFF is rejected by CMake.
+          share: "OFF"
+          commutative: "OFF"
+          requires:
+            - ablation-all-off
+      - build-release-ablation:
+          name: ablation-no-commutative
+          commutative: "OFF"
+          requires:
+            - ablation-all-off
+      - build-release-ablation:
+          name: ablation-no-factor
+          factor: "OFF"
+          requires:
+            - ablation-all-off
+      - build-release-ablation:
+          name: ablation-no-simplify
+          simplify: "OFF"
+          requires:
+            - ablation-all-off
+      - build-release-ablation:
+          # Measurement instrumentation, not an optimizer switch — kept in the
+          # matrix so the probe code cannot rot unnoticed.
+          name: ablation-probe-on
+          probe: "ON"
+          requires:
+            - ablation-all-off
 
   nightly-partial:
     triggers:
@@ -103,25 +150,15 @@ executors:
       - image: micwide/buildenv-retractordb:latest
     resource_class: large
 
-  ubuntu-docker-2204:
-    docker:
-      - image: cimg/base:current-22.04
-    resource_class: large
-
   ubuntu-docker:
     docker:
       # Use 'current' to always receive the latest security patches.
       - image: cimg/base:current
     resource_class: large
 
-  ubuntu-machine:
-    machine:
-      image: ubuntu-2404:2025.09.1
-    resource_class: large
-
   ubuntu-machine-arm:
     machine:
-      image: ubuntu-2404:2025.09.1
+      image: ubuntu-2404:2026.05.1
     resource_class: arm.large
 
 commands:
@@ -197,6 +234,49 @@ commands:
             - run:
                 name: Configure Ninja generator
                 command: scripts/buildrdb.sh ninja
+
+  # ccache przeżywa job tylko dzięki cache'owi CircleCI — kontener startuje pusty.
+  # Podpięcie ccache jako CMAKE_CXX_COMPILER_LAUNCHER robi CMakeLists.txt samo,
+  # gdy znajdzie binarkę (RDB_USE_CCACHE, domyślnie ON).
+  # Używane wyłącznie w jobach na executorze debian-mydocker: tylko tam ccache jest
+  # pewny (wbudowany w obraz). prep-env-ci wywołuje toolchain_required, gdzie ccache
+  # jest 'optional' i nie instaluje się automatycznie.
+  ccache-restore:
+    parameters:
+      cache_id:
+        type: string
+    steps:
+      - run:
+          name: Configure ccache
+          command: |
+            # ccache 4.x domyślnie trzyma cache w ~/.cache/ccache (XDG). Bez jawnego
+            # CCACHE_DIR save_cache zapisywałby pusty ~/.ccache i nic by nie działało.
+            echo 'export CCACHE_DIR="$HOME/.ccache"' >> "$BASH_ENV"
+            # Domyślne 5 GiB to o rząd wielkości za dużo jak na cache CircleCI.
+            echo 'export CCACHE_MAXSIZE=500M' >> "$BASH_ENV"
+      - restore_cache:
+          keys:
+            - ccache-v1-<< parameters.cache_id >>-{{ arch }}-{{ .Branch }}-{{ .Revision }}
+            - ccache-v1-<< parameters.cache_id >>-{{ arch }}-{{ .Branch }}-
+            - ccache-v1-<< parameters.cache_id >>-{{ arch }}-master-
+      - run:
+          name: Reset ccache statistics
+          command: ccache -z
+
+  ccache-save:
+    parameters:
+      cache_id:
+        type: string
+    steps:
+      - run:
+          name: ccache statistics
+          command: ccache -s
+      - save_cache:
+          # Klucze CircleCI są niezmienne — {{ .Revision }} daje nowy wpis na commit,
+          # a prefiksy w restore_cache pozwalają odziedziczyć cache poprzedniego.
+          key: ccache-v1-<< parameters.cache_id >>-{{ arch }}-{{ .Branch }}-{{ .Revision }}
+          paths:
+            - ~/.ccache
 
   conan-install:
     parameters:
@@ -297,12 +377,16 @@ jobs:
           enabled: false
       - prep-env:
           use_ninja: true
+      - ccache-restore:
+          cache_id: mydocker-release
       - conan-install:
           build_param: --build missing
           build_tool: ninja
       - conan-build:
           build_param: --build missing
           build_tool: ninja
+      - ccache-save:
+          cache_id: mydocker-release
       - run-test:
           build_tool: ninja
 
@@ -320,6 +404,8 @@ jobs:
           enabled: << parameters.check_skipci >>
       - prep-env:
           use_ninja: true
+      - ccache-restore:
+          cache_id: mydocker-debug
       - conan-install:
           build_type: Debug
           build_param: --build missing
@@ -328,6 +414,8 @@ jobs:
           build_type: Debug
           build_param: --build missing
           build_tool: ninja
+      - ccache-save:
+          cache_id: mydocker-debug
       - run-test:
           build_type: Debug
           build_tool: ninja
@@ -366,26 +454,80 @@ jobs:
       - run-test:
           build_type: Debug
 
-  build-debug-ninja:
+  # Release build with an explicit optimizer switch combination.
+  # scripts/buildrdb.sh release-ablation is interactive, so the CMake
+  # configuration is spelled out here instead of reusing that option.
+  build-release-ablation:
+    parameters:
+      dedup:
+        type: string
+        default: "ON"
+      share:
+        type: string
+        default: "ON"
+      commutative:
+        type: string
+        default: "ON"
+      factor:
+        type: string
+        default: "ON"
+      simplify:
+        type: string
+        default: "ON"
+      probe:
+        type: string
+        default: "OFF"
     working_directory: ~/retractordb
-    executor: ubuntu-docker
+    executor: debian-mydocker
     steps:
       - checkout:
           method: blobless
       - check-skipci:
           enabled: false
-      - prep-env-ci:
+      - prep-env:
           use_ninja: true
       - conan-install:
-          build_type: Debug
           build_param: --build missing
           build_tool: ninja
-      - conan-build:
-          build_type: Debug
-          build_param: --build missing
-          build_tool: ninja
+      - run:
+          name: Configure ablation variant
+          command: |
+            cmake \
+              -S . \
+              -B build/Release \
+              -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_TOOLCHAIN_FILE="$PWD/build/Release/generators/conan_toolchain.cmake" \
+              -DRDB_OPT_DEDUP_SUBSTRATES=<< parameters.dedup >> \
+              -DRDB_OPT_SHARE_EQUIVALENT_SELECTS=<< parameters.share >> \
+              -DRDB_OPT_COMMUTATIVE_ADD=<< parameters.commutative >> \
+              -DRDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=<< parameters.factor >> \
+              -DRDB_OPT_SIMPLIFY_EXPRESSIONS=<< parameters.simplify >> \
+              -DRDB_BENCH_PROBE=<< parameters.probe >>
+      - run:
+          name: Build and install ablation variant
+          command: |
+            cmake --build build/Release --parallel "$(nproc)"
+            cd build/Release && ninja install
+      - run:
+          name: Verify compiled switches match the requested profile
+          command: |
+            export PATH="$HOME/.local/bin:$PATH"
+            actual="$(xretractor --build-info)"
+            expected="$(printf '%s\n' \
+              "RDB_OPT_DEDUP_SUBSTRATES=<< parameters.dedup >>" \
+              "RDB_OPT_SHARE_EQUIVALENT_SELECTS=<< parameters.share >>" \
+              "RDB_OPT_COMMUTATIVE_ADD=<< parameters.commutative >>" \
+              "RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=<< parameters.factor >>" \
+              "RDB_BENCH_PROBE=<< parameters.probe >>" \
+              "RDB_OPT_SIMPLIFY_EXPRESSIONS=<< parameters.simplify >>")"
+            printf '%s\n' "$actual"
+            if [ "$actual" != "$expected" ]; then
+              echo "Error: built binary does not report the requested optimizer configuration."
+              printf 'expected:\n%s\n' "$expected"
+              exit 1
+            fi
       - run-test:
-          build_type: Debug
           build_tool: ninja
 
   build-ARM:

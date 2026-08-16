@@ -1,5 +1,11 @@
 # CLAUDE.md
 
+This file is the binding source for build, testing, style, collaboration, and commit/push/CI rules. `AGENTS.md`
+adds the agent-facing entry points it does not duplicate: the indexed system knowledge in
+`.agents/skills/retractordb-system/` (architecture, RQL/compiler, storage, tests, documentation map, plus
+`scripts/check_freshness.sh`), and `scripts/install-codex-skill.sh`, which links that skill into other
+workspaces.
+
 ## Build
 
 Conan 2 + CMake + Ninja. Setup via `scripts/buildrdb.sh` (run from repo root, `scripts/`, or `build/Debug/`):
@@ -103,9 +109,11 @@ Sorted case-insensitively within each block. `IncludeBlocks: Preserve` — blank
 
 1. **Ask before implementing** — state assumptions, surface ambiguities, push back on overcomplicated requests.
 2. **Minimum code** — no speculative features, no single-use abstractions, no impossible-scenario error handling.
-3. **Surgical edits** — touch only what the task requires; don't improve adjacent code; match existing style.
+3. **Surgical edits** — touch only what the task requires; don't improve adjacent code even if it looks wrong; match
+   existing style. Report what looks wrong at the end of the task, with file and line and one sentence on why.
+   Whether it gets fixed is the human's decision; fixing it is a separate task and needs a separate go-ahead.
 4. **Clean your orphans** — remove imports/vars/functions YOUR changes made unused; leave pre-existing dead code alone.
-5. **Verify** — for multi-step tasks state a brief plan with success criteria per step; loop until verified.
+5. **Verify before reporting done** — never claim success without running the relevant `ctest`.
 
 ## Collaboration Rules
 
@@ -114,23 +122,98 @@ Sorted case-insensitively within each block. `IncludeBlocks: Preserve` — blank
 Every session has a single declared goal in the form:
 > "Cel: X. Gotowe gdy: Y. Pliki dotknięte: Z."
 
-For tasks spanning >2 files: show a plan and wait for approval before writing any code.
-
-### Before coding
+Then, before touching code:
 
 ```bash
-git status        # must be clean
-ninja cformat     # format first, not after
+git status        # clean, or holding only the diff handed over at the end of the previous session
+ninja cformat     # format the tree as found, so later reformatting does not pollute the diff
 ctest -R ...      # relevant tests must pass
 ```
 
-Never start a new topic on a dirty working tree.
+Never start a new topic on top of unrelated uncommitted work.
 
-### During the session
+**Planning threshold** — one rule for the whole session:
+- **3 or more files** — present a plan with success criteria and wait for approval before writing any code.
+- **1-2 files** — state the steps and success criteria, then proceed without waiting.
 
-- **Plan before implement** — for multi-file tasks, list the steps and success criteria first.
-- **No scope creep** — do not improve adjacent code even if it looks wrong.
-- **Run ctest before reporting done** — never claim success without executing the relevant tests.
+### AI watermark hygiene (text)
+
+Every text artifact that enters the repository must be free of AI provenance marks — invisible Unicode
+(zero-width, bidi, tag chars, variation selectors, private use) and space homoglyphs. **Images are out of
+scope: marks in `.png` / `.jpg` / `.pdf` / figures may stay.** The requirement covers only text: sources,
+scripts, `.md`, `.rql`, `.g4`, CMake, TOML/YAML and commit messages.
+
+Tool: `watermarks-remover` (default `~/github/watermarks-remover`), used through its local scripts — **do not
+start the Docker/HTTP service for this check**. Layer A only (deterministic Unicode scrub); statistical
+Layer B rewriting is not part of this rule.
+
+**Mandatory sequence before every commit and before every push.** No commit or push goes out — and no diff is
+handed over for human review — while the check reports a hit.
+
+```bash
+WM="${WATERMARKS_REMOVER:-$HOME/github/watermarks-remover}/service/scripts"
+TEXT='\.(md|txt|tex|bib|rql|desc|cpp|hpp|h|c|g4|sh|py|ya?ml|toml|json|cmake|in)$|CMakeLists\.txt$'
+
+# 1. Check the staged text files (empty output = clean)
+git diff --cached --name-only --diff-filter=ACM | grep -E "$TEXT" \
+  | while read -r f; do python3 "$WM/inspect_text.py" --json "$f" >/dev/null 2>&1 || echo "WATERMARK: $f"; done
+
+# 2. Report for a flagged file (which codepoints, where)
+python3 "$WM/inspect_text.py" <file>
+
+# 3. Clean it, then drop the backup the tool leaves behind
+python3 "$WM/clean_text.py" <file> --in-place --stats && rm -f <file>.bak
+
+# 4. Re-check, then re-stage
+python3 "$WM/inspect_text.py" --json <file> >/dev/null && git add <file>
+```
+
+Before a push, run the same check over the whole tracked tree — substitute `git ls-files` for
+`git diff --cached --name-only --diff-filter=ACM` in step 1. Optionally check the commit message too:
+`git log -1 --pretty=%B | python3 "$WM/inspect_text.py" -`.
+
+#### Source code — zero tolerance, strict mode
+
+Documentation can be fixed later; **source code cannot**. A zero-width character or a Cyrillic lookalike
+inside an identifier, string literal, RQL query or grammar rule compiles, diffs and reviews as normal text,
+and the resulting failure is practically undebuggable by hand. Nothing may ever introduce such a character
+into `.cpp` / `.hpp` / `.h` / `.c` / `.g4` / `.rql` / `.desc` / `.sh` / `.py` / `.cmake` / `CMakeLists.txt` /
+`.toml` / `.yml` / `.json`.
+
+Consequences for the assistant:
+
+- **Never paste model, browser or chat output straight into a source file.** Retype it as ASCII, or clean it
+  before it lands on disk.
+- **Check code immediately after editing it** — right after the edit, before `ninja cformat` and before the
+  build, not at commit time. A defect found at push has already been built and tested against.
+- Code uses **strict mode**, which the default check does not cover:
+
+```bash
+python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
+```
+
+  Default mode misses Latin/Cyrillic confusables: `int value = 1;` whose `a` is a Cyrillic `U+0430` instead of
+  ASCII `a` passes it and is caught only by `--aggressive`. (Write such an example by naming the codepoint —
+  never paste the actual character into a rule file, a comment or a test.) `--strip-emoji-glue` additionally rejects the load-bearing invisibles that
+  are legitimate in prose but never in code. Verified against the whole `src/` and `scripts/` tree: strict
+  mode yields zero hits, and Polish diacritics in comments are not affected.
+
+- On a hit in a source file: **stop and report it to the human** with file, line and codepoint. Do not sweep
+  the file with `--in-place`. The targeted repair is
+  `python3 "$WM/clean_text.py" <file> --aggressive-homoglyphs --strip-emoji-glue -o <file>.fixed`, followed by
+  a `git diff` confirming that only the offending codepoint changed.
+- Any `U+00A0` or invisible codepoint in code is a defect, never "informational".
+
+Rules:
+
+- **Never run `clean_text.py` on binary fixtures** (`test/**/*.dat`, `.meta`, `.shadow`, ECG records,
+  `examples/**` data files). It rewrites bytes and corrupts them, and integration tests compare output
+  byte-exactly. The extension filter above exists for that reason — do not widen it with `--force-text`.
+- `--in-place` writes a `.bak` next to the file. Delete it; never commit it.
+- `U+00A0` (no-break space) is reported as *informational*. In `.rql`, `.g4` and C++ sources it is always a
+  defect — normalize it. Elsewhere confirm it is not a deliberate typographic space before replacing.
+- If cleaning would change test fixtures or generated ANTLR files, stop and hand the case to the human instead
+  of editing them.
 
 ### Commits, push and CI
 
@@ -147,28 +230,6 @@ Never start a new topic on a dirty working tree.
 Every session ends with either a permitted local commit on a side branch, an explicit handoff of the uncommitted diff on
 `master` for human review/commit/push, or an explicit note why no commit was created. No unexplained uncommitted progress
 is left behind.
-
-### Model selection
-
-During a session, if the task shows signs of needing deeper reasoning, say so explicitly:
-> "To zadanie może wymagać silniejszego modelu — rozważ przełączenie na Opus 4.8 (`/model`)."
-
-Signals that warrant suggesting Opus 4.8:
-- Multi-file refactor with subtle cross-file interactions
-- Concurrency bugs, race conditions, or undefined behavior in C++
-- Architectural decision with long-range consequences
-- Security or adversarial analysis
-- Repeated self-corrections on the same issue within one session
-
-Sonnet 5 is sufficient for: single-file edits, bugfixes, formatting, test additions, grammar changes with clear spec.
-
-When suggesting a model switch, use this exact phrasing:
-
-> **Sugestia modelu:** To zadanie wymaga głębszego rozumowania (podaj krótki powód).
->
-> **Opcja A — przełącz na Opus 4.8:** wpisz `/model`, wybierz `claude-opus-4-8`, następnie powtórz ostatnie polecenie.
->
-> **Opcja B — kontynuuj na Sonnet 5:** mogę podjąć próbę, ale jakość wyniku może być niższa. Wpisz „kontynuuj" aby kontynuować.
 
 ### Context hygiene
 

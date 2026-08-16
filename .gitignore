@@ -50,6 +50,7 @@ bin/*
 !.codex/config.toml
 dokumentacja-rdb/
 docker/ci/DockerConan.txt
+docker/ci/DockerConanExtra.txt
 205.bin
 205.bin.meta
 

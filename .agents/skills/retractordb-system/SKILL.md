@@ -69,8 +69,6 @@ Also emit a documentation-update reminder when a code change alters behavior des
 that chapter was correct before the change. A warning or reminder does not authorize edits in a documentation
 repository unless the user requested those edits; report the required follow-up instead.
 
-Never edit generated ANTLR files manually. Edit `RQL.g4` or `DESC.g4` and regenerate.
-
 ## Load references by task
 
 - For a general explanation, architecture decision, or system positioning, read `references/system-map.md`.
@@ -92,14 +90,25 @@ Use `rg` in the live repositories to verify identifiers and line locations. The 
 2. Trace it through `RQL/parser -> compiler -> qTree/query -> dataModel/streamInstance -> storage or IPC`.
 3. Identify existing unit and integration coverage before changing code.
 4. Make the smallest change consistent with the repository policy.
-5. Rebuild after any CMake reconfiguration, then run focused tests and the appropriate regression set.
+5. Rebuild after any CMake reconfiguration, then run focused tests and the appropriate regression set. The
+   reconfiguration trap and the build/install/recopy sequence it forces are documented in *Integration test
+   file sync* in the code repository's `CLAUDE.md`.
 6. Update the relevant reference and `references/provenance.md` when system behavior or the external documentation
    basis changes materially. Do not update provenance solely because the code repository received a new commit.
 
-## Important test trap
+## Text watermark hygiene before anything enters a repository
 
-`cmake .` recopies `test/` and removes built unit-test executables. After reconfiguration, run `ninja` before `ctest`. Integration tests use installed binaries plus build-copied scripts, so changes spanning C++ and integration fixtures usually require:
+The procedure itself — scope, the `watermarks-remover` CLI sequence, strict mode for source files, and the
+binary-fixture prohibition — lives in each repository's own top-level agent instructions: `CLAUDE.md` in
+`retractordb`, `dokumentacja-rdb` and `documentation-rdb`, `AGENTS.md` in `paper-arXiv`. It is mandatory and
+not restated here. What follows are the two cross-repository exceptions those files do not carry.
 
-```bash
-ninja && ninja install && cmake . && ninja && ctest
-```
+**`dokumentacja-rdb` and `documentation-rdb`** — the documented callout convention writes `U+2139` / `U+26A0`
+followed by `U+FE0F VARIATION SELECTOR-16`, which the scanner reports because those symbols are text-default.
+That pair is the convention, not a watermark: leave it in the roughly one dozen affected `.md` files and in
+`migrate_to_mdbook.py`. Every other reported codepoint in those repositories is a real finding.
+
+**`paper-arXiv`** — the hygiene rule operates on codepoints only and never overrides that repository's ACM
+generative-AI disclosure requirement: the disclosure of AI use stays in the document, in its designated
+location and wording, and stripping marks is not a substitute for it. After cleaning, `git diff` must show no
+visible prose change — otherwise revert and clean again.
