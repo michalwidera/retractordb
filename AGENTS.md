@@ -8,7 +8,8 @@ These instructions apply to the whole RetractorDB repository. They assume the re
 
 2. Use the `retractordb-system` skill from `.agents/skills/retractordb-system` for every RetractorDB task.
 3. Run the skill's `scripts/check_freshness.sh` before relying on its indexed notes.
-4. Treat the current implementation and generated build configuration as the primary source of truth, followed by integration and unit tests, canonical Polish documentation, derived English documentation, and finally the indexed notes.
+4. Resolve conflicts between sources using the skill's *Source precedence* section, which is the only copy of that
+   ordering.
 
 ## Sharing the RetractorDB skill
 
@@ -24,7 +25,8 @@ and refuses to replace an existing file, directory, or link to a different targe
 
 ## Commits, push and CI
 
-Follow *Commits, push and CI* in `CLAUDE.md`. That section is binding here and is the only copy of the policy:
-the mandatory AI-watermark check before every commit, the human-only rule for `master`, the limits on
-side-branch commits, the prohibition on pushing, opening pull requests, or invoking CI without an explicit
-human request, and the session-end handoff requirement all live there.
+Follow *Commits, push and CI* and *AI watermark hygiene (text)* in `CLAUDE.md`. Both are binding here and hold
+the full text: the mandatory watermark check before every commit, the human-only rule for `master`, the limits
+on side-branch commits, the prohibition on pushing, opening pull requests, or invoking CI without an explicit
+human request, and the session-end handoff requirement. The `retractordb-system` skill restates none of it — it
+only adds the deltas that apply to the documentation and paper repositories.

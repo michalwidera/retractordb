@@ -109,9 +109,11 @@ Sorted case-insensitively within each block. `IncludeBlocks: Preserve` — blank
 
 1. **Ask before implementing** — state assumptions, surface ambiguities, push back on overcomplicated requests.
 2. **Minimum code** — no speculative features, no single-use abstractions, no impossible-scenario error handling.
-3. **Surgical edits** — touch only what the task requires; don't improve adjacent code; match existing style.
+3. **Surgical edits** — touch only what the task requires; don't improve adjacent code even if it looks wrong; match
+   existing style. Report what looks wrong at the end of the task, with file and line and one sentence on why.
+   Whether it gets fixed is the human's decision; fixing it is a separate task and needs a separate go-ahead.
 4. **Clean your orphans** — remove imports/vars/functions YOUR changes made unused; leave pre-existing dead code alone.
-5. **Verify** — for multi-step tasks state a brief plan with success criteria per step; loop until verified.
+5. **Verify before reporting done** — never claim success without running the relevant `ctest`.
 
 ## Collaboration Rules
 
@@ -120,23 +122,19 @@ Sorted case-insensitively within each block. `IncludeBlocks: Preserve` — blank
 Every session has a single declared goal in the form:
 > "Cel: X. Gotowe gdy: Y. Pliki dotknięte: Z."
 
-For tasks spanning >2 files: show a plan and wait for approval before writing any code.
-
-### Before coding
+Then, before touching code:
 
 ```bash
-git status        # must be clean
-ninja cformat     # format first, not after
+git status        # clean, or holding only the diff handed over at the end of the previous session
+ninja cformat     # format the tree as found, so later reformatting does not pollute the diff
 ctest -R ...      # relevant tests must pass
 ```
 
-Never start a new topic on a dirty working tree.
+Never start a new topic on top of unrelated uncommitted work.
 
-### During the session
-
-- **Plan before implement** — for multi-file tasks, list the steps and success criteria first.
-- **No scope creep** — do not improve adjacent code even if it looks wrong.
-- **Run ctest before reporting done** — never claim success without executing the relevant tests.
+**Planning threshold** — one rule for the whole session:
+- **3 or more files** — present a plan with success criteria and wait for approval before writing any code.
+- **1-2 files** — state the steps and success criteria, then proceed without waiting.
 
 ### AI watermark hygiene (text)
 
@@ -149,7 +147,8 @@ Tool: `watermarks-remover` (default `~/github/watermarks-remover`), used through
 start the Docker/HTTP service for this check**. Layer A only (deterministic Unicode scrub); statistical
 Layer B rewriting is not part of this rule.
 
-**Mandatory sequence before every commit and before every push:**
+**Mandatory sequence before every commit and before every push.** No commit or push goes out — and no diff is
+handed over for human review — while the check reports a hit.
 
 ```bash
 WM="${WATERMARKS_REMOVER:-$HOME/github/watermarks-remover}/service/scripts"
@@ -213,13 +212,11 @@ Rules:
 - `--in-place` writes a `.bak` next to the file. Delete it; never commit it.
 - `U+00A0` (no-break space) is reported as *informational*. In `.rql`, `.g4` and C++ sources it is always a
   defect — normalize it. Elsewhere confirm it is not a deliberate typographic space before replacing.
-- A commit or push must not go out while the check reports a hit. If cleaning would change test fixtures or
-  generated ANTLR files, stop and hand the case to the human instead of editing them.
+- If cleaning would change test fixtures or generated ANTLR files, stop and hand the case to the human instead
+  of editing them.
 
 ### Commits, push and CI
 
-- **Watermark check first** — run the sequence from *AI watermark hygiene (text)* before every commit and
-  before handing a diff over for push. No commit leaves with a reported hit.
 - **`master` in the code repository** — commits and pushes are performed by the human only, after reviewing the diff. The
   assistant must leave changes uncommitted, show the diff, and wait for the human to commit and push.
 - **Side branches** — the assistant may create local commits autonomously after verification, provided no CI process is
@@ -233,28 +230,6 @@ Rules:
 Every session ends with either a permitted local commit on a side branch, an explicit handoff of the uncommitted diff on
 `master` for human review/commit/push, or an explicit note why no commit was created. No unexplained uncommitted progress
 is left behind.
-
-### Model selection
-
-During a session, if the task shows signs of needing deeper reasoning, say so explicitly:
-> "To zadanie może wymagać silniejszego modelu — rozważ przełączenie na Opus 4.8 (`/model`)."
-
-Signals that warrant suggesting Opus 4.8:
-- Multi-file refactor with subtle cross-file interactions
-- Concurrency bugs, race conditions, or undefined behavior in C++
-- Architectural decision with long-range consequences
-- Security or adversarial analysis
-- Repeated self-corrections on the same issue within one session
-
-Sonnet 5 is sufficient for: single-file edits, bugfixes, formatting, test additions, grammar changes with clear spec.
-
-When suggesting a model switch, use this exact phrasing:
-
-> **Sugestia modelu:** To zadanie wymaga głębszego rozumowania (podaj krótki powód).
->
-> **Opcja A — przełącz na Opus 4.8:** wpisz `/model`, wybierz `claude-opus-4-8`, następnie powtórz ostatnie polecenie.
->
-> **Opcja B — kontynuuj na Sonnet 5:** mogę podjąć próbę, ale jakość wyniku może być niższa. Wpisz „kontynuuj" aby kontynuować.
 
 ### Context hygiene
 
