@@ -1,0 +1,33 @@
+# F9-R1 — kontrole near-miss na danych głównych. Wygenerowane przez
+# gen_corpus.py; nie edytować ręcznie (bramka: `gen_corpus.py --check`).
+#
+# Kryterium wspólne: nad źródłami kontrolnymi NIE MOŻE powstać wspólny
+# substrat. Kontrola Q=1 jest osobną komórką siatki, nie tym plikiem.
+
+STORAGE 'temp'
+SUBSTRAT 'memory'
+
+# near-miss 1: niedopasowane przesunięcie, 2*(1/100) != 2*(1/50)
+DECLARE v INTEGER STREAM MA, 1/100 FILE 'vib.txt'
+DECLARE v INTEGER STREAM MB, 1/50  FILE 'cur.txt'
+SELECT mm[0]*mm[0] STREAM mm FROM (MA>2)#(MB>2)
+
+# near-miss 2: równoważne postacie nad RÓŻNYMI instancjami źródeł
+DECLARE v INTEGER STREAM IA, 1/100 FILE 'vib.txt'
+DECLARE v INTEGER STREAM IB, 1/50  FILE 'cur.txt'
+DECLARE v INTEGER STREAM IA2, 1/100 FILE 'vib.txt'
+DECLARE v INTEGER STREAM IB2, 1/50  FILE 'cur.txt'
+SELECT i1[0]*i1[0] STREAM i1 FROM (IA>2)#(IB>1)
+SELECT i2[0]*i2[0] STREAM i2 FROM (IA2#IB2)>3
+
+# near-miss 3: granica obserwowalności — publiczny strumień nazwany
+# konwencją kompilatora, o przestawionym schemacie
+DECLARE cx INTEGER, cy INTEGER STREAM CA, 1/100 FILE 'vib.txt'
+DECLARE cx INTEGER, cy INTEGER STREAM CB, 1/50  FILE 'cur.txt'
+SELECT STREAM_HASH_CA_CB[1],STREAM_HASH_CA_CB[0] STREAM STREAM_HASH_CA_CB FROM CA#CB
+SELECT * STREAM collide_user FROM (CA>2)#(CB>1)
+
+# kontrola bez etapu materializowanego: oczekiwane ZERO bajtów substratów
+DECLARE v INTEGER STREAM ZA, 1/100 FILE 'vib.txt'
+SELECT ZA[0]*ZA[0] STREAM z1 FROM ZA
+SELECT ZA[0]*ZA[0] STREAM z2 FROM ZA

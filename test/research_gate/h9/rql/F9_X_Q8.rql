@@ -1,0 +1,24 @@
+# F9-X, Q=8 — plan kampanii K26. Wygenerowany przez gen_corpus.py;
+# nie edytować ręcznie (bramka: `gen_corpus.py --check`).
+# Postacie czynne przy tym Q: 4 z 4 (W1, W4, W2, W3).
+
+STORAGE 'temp'
+SUBSTRAT 'memory'
+
+DECLARE front INTEGER STREAM A, 1/100  FILE 'front_vib.txt'
+DECLARE front INTEGER STREAM B, 1/50   FILE 'front_cur.txt'
+DECLARE rear INTEGER STREAM C, 1/100  FILE 'rear_vib.txt'
+DECLARE rear INTEGER STREAM D, 1/50   FILE 'rear_cur.txt'
+
+# postać W1
+SELECT Sqrt(front*front+rear*rear) STREAM m1 FROM ((A>2)#(B>1)) + ((C>2)#(D>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m2 FROM ((A>2)#(B>1)) + ((C>2)#(D>1))
+# postać W4
+SELECT Sqrt(front*front+rear*rear) STREAM m3 FROM ((C#D)>3) + ((A#B)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m4 FROM ((C#D)>3) + ((A#B)>3)
+# postać W2
+SELECT Sqrt(front*front+rear*rear) STREAM m5 FROM ((C>2)#(D>1)) + ((A>2)#(B>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m6 FROM ((C>2)#(D>1)) + ((A>2)#(B>1))
+# postać W3
+SELECT Sqrt(front*front+rear*rear) STREAM m7 FROM ((A#B)>3) + ((C#D)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m8 FROM ((A#B)>3) + ((C#D)>3)

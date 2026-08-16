@@ -52,3 +52,18 @@ dokumentacja-rdb/
 docker/ci/DockerConan.txt
 205.bin
 205.bin.meta
+
+# Bramka badawcza test/research_gate: cache bajtkodu Pythona i artefakty
+# przebiegow. Aparatura kampanii importuje sie modulami wewnatrz swojego
+# katalogu, wiec kazdy przebieg zostawia __pycache__ obok zrodel; katalogi
+# work/ i .gate-work/ to wyjscia przebiegu, odtwarzalne z ziarna.
+__pycache__/
+*.pyc
+test/research_gate/**/work/
+test/research_gate/.gate-work/
+
+# Wyjscia uruchomienia bramki badawczej pisane obok aparatury: `validate_corpus.py`
+# bez --out zapisuje corpus_validation/, `run_campaign.py` bez --out zapisuje raw/.
+# To dowody kompilacji konkretnej rewizji, nie zrodla — do repozytorium nie wchodza.
+test/research_gate/**/corpus_validation/
+test/research_gate/**/raw/

@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+flink/build/
+flink/oracle/canonical_oracle
+calib/slot_grid
+/results/

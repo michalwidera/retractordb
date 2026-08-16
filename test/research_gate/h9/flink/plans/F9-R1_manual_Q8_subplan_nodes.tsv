@@ -1,0 +1,10 @@
+family	variant	q	node	role	unit_weight	program_tokens	kind
+F9-R1	manual	8	PUB:m1	publiczny_monitor	1.0000	3	MAP
+F9-R1	manual	8	PUB:m2	publiczny_monitor	1.0000	3	MAP
+F9-R1	manual	8	PUB:m3	publiczny_monitor	1.0000	3	MAP
+F9-R1	manual	8	PUB:m4	publiczny_monitor	1.0000	3	MAP
+F9-R1	manual	8	PUB:m5	publiczny_monitor	1.0000	3	MAP
+F9-R1	manual	8	PUB:m6	publiczny_monitor	1.0000	3	MAP
+F9-R1	manual	8	PUB:m7	publiczny_monitor	1.0000	3	MAP
+F9-R1	manual	8	PUB:m8	publiczny_monitor	1.0000	3	MAP
+F9-R1	manual	8	SUB:shared:hash	badany_podplan	1.0000	1	INTERLEAVE

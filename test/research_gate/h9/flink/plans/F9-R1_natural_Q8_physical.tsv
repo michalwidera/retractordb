@@ -1,0 +1,11 @@
+vertex_id	vertex_name	parallelism	chained_operators
+b9a442dc1e6de56c211a9cd149ddc3c9	Source: SRC:A -> (SUB:m1:shift_A, SUB:m2:shift_A, SUB:m3:shift_A, SUB:m4:shift_A)	1	5
+48c7001096bed2ba231050436efc585c	Source: SRC:B -> (SUB:m1:shift_B, SUB:m2:shift_B, SUB:m3:shift_B, SUB:m4:shift_B)	1	5
+77782dc58b73e117a12a902c82c93bd7	PUB:m1 -> Sink: SINK:m1	1	2
+de0cfe57882aab293e700fa860bffe5f	PUB:m2 -> Sink: SINK:m2	1	2
+bb4ebb94cbea6fbd74f1a252cc714be0	PUB:m3 -> Sink: SINK:m3	1	2
+8e5069e5f1af800ffe78f6afae05972a	PUB:m4 -> Sink: SINK:m4	1	2
+b7192ade0157a4bc8bf94e1d00b33308	SUB:m5:hash -> PUB:m5 -> Sink: SINK:m5	1	3
+90bc2374e6398450d6c77dc893f54c12	SUB:m6:hash -> PUB:m6 -> Sink: SINK:m6	1	3
+2ef178057f75888fad1e7e4ceabd68c5	SUB:m7:hash -> PUB:m7 -> Sink: SINK:m7	1	3
+9dcc16ffcd2cdf82d6da6ead71a5c93d	SUB:m8:hash -> PUB:m8 -> Sink: SINK:m8	1	3

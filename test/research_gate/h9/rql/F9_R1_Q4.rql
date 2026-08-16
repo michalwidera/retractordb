@@ -1,0 +1,16 @@
+# F9-R1, Q=4 — plan kampanii K26. Wygenerowany przez gen_corpus.py;
+# nie edytować ręcznie (bramka: `gen_corpus.py --check`).
+# Postacie czynne przy tym Q: 2 z 2 (P1, P2).
+
+STORAGE 'temp'
+SUBSTRAT 'memory'
+
+DECLARE v INTEGER STREAM A, 1/100  FILE 'vib.txt'
+DECLARE v INTEGER STREAM B, 1/50   FILE 'cur.txt'
+
+# postać P1
+SELECT m1[0]*m1[0] STREAM m1 FROM (A>2)#(B>1)
+SELECT m2[0]*m2[0] STREAM m2 FROM (A>2)#(B>1)
+# postać P2
+SELECT m3[0]*m3[0] STREAM m3 FROM (A#B)>3
+SELECT m4[0]*m4[0] STREAM m4 FROM (A#B)>3

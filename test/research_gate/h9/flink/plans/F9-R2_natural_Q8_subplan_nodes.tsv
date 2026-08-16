@@ -1,0 +1,17 @@
+family	variant	q	node	role	unit_weight	program_tokens	kind
+F9-R2	natural	8	PUB:m1	publiczny_monitor	0.6667	1	MAP
+F9-R2	natural	8	PUB:m2	publiczny_monitor	0.6667	1	MAP
+F9-R2	natural	8	PUB:m3	publiczny_monitor	0.6667	1	MAP
+F9-R2	natural	8	PUB:m4	publiczny_monitor	0.6667	1	MAP
+F9-R2	natural	8	PUB:m5	publiczny_monitor	0.6667	1	MAP
+F9-R2	natural	8	PUB:m6	publiczny_monitor	0.6667	1	MAP
+F9-R2	natural	8	PUB:m7	publiczny_monitor	0.6667	1	MAP
+F9-R2	natural	8	PUB:m8	publiczny_monitor	0.6667	1	MAP
+F9-R2	natural	8	SUB:m1:select_P1	badany_podplan	0.6667	8	ADD
+F9-R2	natural	8	SUB:m2:select_P1	badany_podplan	0.6667	8	ADD
+F9-R2	natural	8	SUB:m3:select_P1	badany_podplan	0.6667	8	ADD
+F9-R2	natural	8	SUB:m4:select_P1	badany_podplan	0.6667	8	ADD
+F9-R2	natural	8	SUB:m5:select_P2	badany_podplan	0.6667	8	ADD
+F9-R2	natural	8	SUB:m6:select_P2	badany_podplan	0.6667	8	ADD
+F9-R2	natural	8	SUB:m7:select_P2	badany_podplan	0.6667	8	ADD
+F9-R2	natural	8	SUB:m8:select_P2	badany_podplan	0.6667	8	ADD

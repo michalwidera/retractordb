@@ -1,0 +1,44 @@
+# F9-R2, Q=32 — plan kampanii K26. Wygenerowany przez gen_corpus.py;
+# nie edytować ręcznie (bramka: `gen_corpus.py --check`).
+# Postacie czynne przy tym Q: 2 z 2 (P1, P2).
+
+STORAGE 'temp'
+SUBSTRAT 'memory'
+
+DECLARE v INTEGER STREAM A, 1/100  FILE 'axis_x.txt'
+DECLARE v INTEGER STREAM B, 1/100  FILE 'axis_y.txt'
+
+# postać P1
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m1 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m2 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m3 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m4 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m5 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m6 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m7 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m8 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m9 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m10 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m11 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m12 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m13 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m14 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m15 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m16 FROM A+B
+# postać P2
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m17 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m18 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m19 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m20 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m21 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m22 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m23 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m24 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m25 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m26 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m27 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m28 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m29 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m30 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m31 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m32 FROM B+A

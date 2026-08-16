@@ -1,0 +1,311 @@
+{
+  "nodes" : [ {
+    "id" : 1,
+    "type" : "Source: SRC:A",
+    "pact" : "Data Source",
+    "contents" : "Source: SRC:A",
+    "parallelism" : 1
+  }, {
+    "id" : 2,
+    "type" : "Source: SRC:B",
+    "pact" : "Data Source",
+    "contents" : "Source: SRC:B",
+    "parallelism" : 1
+  }, {
+    "id" : 3,
+    "type" : "SUB:m1:select_P1",
+    "pact" : "Operator",
+    "contents" : "SUB:m1:select_P1",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 4,
+    "type" : "PUB:m1",
+    "pact" : "Operator",
+    "contents" : "PUB:m1",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 3,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 6,
+    "type" : "SUB:m2:select_P1",
+    "pact" : "Operator",
+    "contents" : "SUB:m2:select_P1",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 7,
+    "type" : "PUB:m2",
+    "pact" : "Operator",
+    "contents" : "PUB:m2",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 6,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 9,
+    "type" : "SUB:m3:select_P1",
+    "pact" : "Operator",
+    "contents" : "SUB:m3:select_P1",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 10,
+    "type" : "PUB:m3",
+    "pact" : "Operator",
+    "contents" : "PUB:m3",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 9,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 12,
+    "type" : "SUB:m4:select_P1",
+    "pact" : "Operator",
+    "contents" : "SUB:m4:select_P1",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 13,
+    "type" : "PUB:m4",
+    "pact" : "Operator",
+    "contents" : "PUB:m4",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 12,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 15,
+    "type" : "SUB:m5:select_P2",
+    "pact" : "Operator",
+    "contents" : "SUB:m5:select_P2",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 16,
+    "type" : "PUB:m5",
+    "pact" : "Operator",
+    "contents" : "PUB:m5",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 15,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 18,
+    "type" : "SUB:m6:select_P2",
+    "pact" : "Operator",
+    "contents" : "SUB:m6:select_P2",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 19,
+    "type" : "PUB:m6",
+    "pact" : "Operator",
+    "contents" : "PUB:m6",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 18,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 21,
+    "type" : "SUB:m7:select_P2",
+    "pact" : "Operator",
+    "contents" : "SUB:m7:select_P2",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 22,
+    "type" : "PUB:m7",
+    "pact" : "Operator",
+    "contents" : "PUB:m7",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 21,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 24,
+    "type" : "SUB:m8:select_P2",
+    "pact" : "Operator",
+    "contents" : "SUB:m8:select_P2",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 25,
+    "type" : "PUB:m8",
+    "pact" : "Operator",
+    "contents" : "PUB:m8",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 24,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 5,
+    "type" : "Sink: SINK:m1",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m1",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 4,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 8,
+    "type" : "Sink: SINK:m2",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m2",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 7,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 11,
+    "type" : "Sink: SINK:m3",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m3",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 10,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 14,
+    "type" : "Sink: SINK:m4",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m4",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 13,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 17,
+    "type" : "Sink: SINK:m5",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m5",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 16,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 20,
+    "type" : "Sink: SINK:m6",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m6",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 19,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 23,
+    "type" : "Sink: SINK:m7",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m7",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 22,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 26,
+    "type" : "Sink: SINK:m8",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m8",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 25,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  } ]
+}

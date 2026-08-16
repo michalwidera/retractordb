@@ -1,0 +1,37 @@
+# Wektory o ZNANEJ odpowiedzi dla kanonicznego serializera metryki pierwotnej K26.
+#
+# Ten plik jest WSPOLNYM wejsciem dla obu stron:
+#   * C++  — oracle/canonical_oracle (linkuje rdb::probe::canonicalRecordBytes z librdb.a),
+#   * Java — java/CanonTest (wywoluje Canon.recordBytes).
+# Zgodnosc obu wyjsc jest bramka kroku B: rozbieznosc uniewaznia metryke miedzysystemowa.
+#
+# Format:  label <TAB> pola <TAB> oczekiwane_bajty
+# pola  :  name:rlen:rarray:TYPE  rozdzielone ';'   ("-" = deskryptor pusty)
+# TYPE  :  nazwa z rdb::descFld (src/include/fldType.hpp)
+#
+# Kolumna oczekiwana jest odczytem z test/UnitTest/test_probe.cpp (bramka C++ tej metryki);
+# wiersze bez odpowiednika w tescie oznaczono w komentarzu przy grupie.
+
+# --- przypadki 1:1 z test_probe.cpp (TEST(probeCanonicalRecord, ...))
+empty	-	0
+integer_declared_as_4B	a:4:1:INTEGER	9
+byte	a:1:1:BYTE	2
+float	a:4:1:FLOAT	5
+double	a:8:1:DOUBLE	9
+rational	a:8:1:RATIONAL	17
+string_keeps_declared_width	s:16:1:STRING	17
+integer_array_3	a:4:3:INTEGER	25
+null_map_8_values	a:4:8:INTEGER	65
+null_map_9_values	a:4:9:INTEGER	74
+configuration_fields_and_nulltype	a:4:1:INTEGER;TYPE:0:1:TYPE;REF:0:1:REF;n:0:1:NULLTYPE	9
+mixed_array_and_string	a:4:2:INTEGER;s:8:1:STRING	25
+
+# --- typy nieobjete testem C++ wprost, ale wystepujace w odwzorowaniu canonicalFieldWidth
+uint	a:4:1:UINT	9
+intpair	a:8:1:INTPAIR	17
+idxpair	a:8:1:IDXPAIR	17
+
+# --- deskryptory RZECZYWISCIE uzywane przez rodziny K26
+k26_stream_record	v:4:1:INTEGER	9
+k26_add_pair	x:4:1:INTEGER;y:4:1:INTEGER	17
+k26_string_map_boundary	s:4:1:STRING;a:4:8:INTEGER	70

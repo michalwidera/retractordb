@@ -1,0 +1,61 @@
+node_id	operator	parallelism	role	inputs
+1	Source: SRC:A	1	ingress_poza_metryka	-
+2	Source: SRC:B	1	ingress_poza_metryka	-
+3	Source: SRC:C	1	ingress_poza_metryka	-
+4	Source: SRC:D	1	ingress_poza_metryka	-
+5	SUB:m1:shift_A	1	badany_podplan	1
+6	SUB:m1:shift_B	1	badany_podplan	2
+7	SUB:m1:hash_AB	1	badany_podplan	5,6
+8	SUB:m1:shift_C	1	badany_podplan	3
+9	SUB:m1:shift_D	1	badany_podplan	4
+10	SUB:m1:hash_CD	1	badany_podplan	8,9
+11	PUB:m1_W1	1	publiczny_monitor	7,10
+12	Sink: SINK:m1	1	sink_poza_metryka	11
+13	SUB:m2:shift_A	1	badany_podplan	1
+14	SUB:m2:shift_B	1	badany_podplan	2
+15	SUB:m2:hash_AB	1	badany_podplan	13,14
+16	SUB:m2:shift_C	1	badany_podplan	3
+17	SUB:m2:shift_D	1	badany_podplan	4
+18	SUB:m2:hash_CD	1	badany_podplan	16,17
+19	PUB:m2_W1	1	publiczny_monitor	15,18
+20	Sink: SINK:m2	1	sink_poza_metryka	19
+21	SUB:m3:hash_AB	1	badany_podplan	1,2
+22	SUB:m3:shift_AB	1	badany_podplan	21
+23	SUB:m3:hash_CD	1	badany_podplan	3,4
+24	SUB:m3:shift_CD	1	badany_podplan	23
+25	PUB:m3_W4	1	publiczny_monitor	24,22
+26	Sink: SINK:m3	1	sink_poza_metryka	25
+27	SUB:m4:hash_AB	1	badany_podplan	1,2
+28	SUB:m4:shift_AB	1	badany_podplan	27
+29	SUB:m4:hash_CD	1	badany_podplan	3,4
+30	SUB:m4:shift_CD	1	badany_podplan	29
+31	PUB:m4_W4	1	publiczny_monitor	30,28
+32	Sink: SINK:m4	1	sink_poza_metryka	31
+33	SUB:m5:shift_A	1	badany_podplan	1
+34	SUB:m5:shift_B	1	badany_podplan	2
+35	SUB:m5:hash_AB	1	badany_podplan	33,34
+36	SUB:m5:shift_C	1	badany_podplan	3
+37	SUB:m5:shift_D	1	badany_podplan	4
+38	SUB:m5:hash_CD	1	badany_podplan	36,37
+39	PUB:m5_W2	1	publiczny_monitor	38,35
+40	Sink: SINK:m5	1	sink_poza_metryka	39
+41	SUB:m6:shift_A	1	badany_podplan	1
+42	SUB:m6:shift_B	1	badany_podplan	2
+43	SUB:m6:hash_AB	1	badany_podplan	41,42
+44	SUB:m6:shift_C	1	badany_podplan	3
+45	SUB:m6:shift_D	1	badany_podplan	4
+46	SUB:m6:hash_CD	1	badany_podplan	44,45
+47	PUB:m6_W2	1	publiczny_monitor	46,43
+48	Sink: SINK:m6	1	sink_poza_metryka	47
+49	SUB:m7:hash_AB	1	badany_podplan	1,2
+50	SUB:m7:shift_AB	1	badany_podplan	49
+51	SUB:m7:hash_CD	1	badany_podplan	3,4
+52	SUB:m7:shift_CD	1	badany_podplan	51
+53	PUB:m7_W3	1	publiczny_monitor	50,52
+54	Sink: SINK:m7	1	sink_poza_metryka	53
+55	SUB:m8:hash_AB	1	badany_podplan	1,2
+56	SUB:m8:shift_AB	1	badany_podplan	55
+57	SUB:m8:hash_CD	1	badany_podplan	3,4
+58	SUB:m8:shift_CD	1	badany_podplan	57
+59	PUB:m8_W3	1	publiczny_monitor	56,58
+60	Sink: SINK:m8	1	sink_poza_metryka	59

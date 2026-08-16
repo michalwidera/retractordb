@@ -1,0 +1,739 @@
+{
+  "nodes" : [ {
+    "id" : 1,
+    "type" : "Source: SRC:A",
+    "pact" : "Data Source",
+    "contents" : "Source: SRC:A",
+    "parallelism" : 1
+  }, {
+    "id" : 2,
+    "type" : "Source: SRC:B",
+    "pact" : "Data Source",
+    "contents" : "Source: SRC:B",
+    "parallelism" : 1
+  }, {
+    "id" : 3,
+    "type" : "Source: SRC:C",
+    "pact" : "Data Source",
+    "contents" : "Source: SRC:C",
+    "parallelism" : 1
+  }, {
+    "id" : 4,
+    "type" : "Source: SRC:D",
+    "pact" : "Data Source",
+    "contents" : "Source: SRC:D",
+    "parallelism" : 1
+  }, {
+    "id" : 5,
+    "type" : "SUB:m1:shift_A",
+    "pact" : "Operator",
+    "contents" : "SUB:m1:shift_A",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 6,
+    "type" : "SUB:m1:shift_B",
+    "pact" : "Operator",
+    "contents" : "SUB:m1:shift_B",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 7,
+    "type" : "SUB:m1:hash_AB",
+    "pact" : "Operator",
+    "contents" : "SUB:m1:hash_AB",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 5,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 6,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 8,
+    "type" : "SUB:m1:shift_C",
+    "pact" : "Operator",
+    "contents" : "SUB:m1:shift_C",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 3,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 9,
+    "type" : "SUB:m1:shift_D",
+    "pact" : "Operator",
+    "contents" : "SUB:m1:shift_D",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 4,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 10,
+    "type" : "SUB:m1:hash_CD",
+    "pact" : "Operator",
+    "contents" : "SUB:m1:hash_CD",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 8,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 9,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 11,
+    "type" : "PUB:m1_W1",
+    "pact" : "Operator",
+    "contents" : "PUB:m1_W1",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 7,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 10,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 13,
+    "type" : "SUB:m2:shift_A",
+    "pact" : "Operator",
+    "contents" : "SUB:m2:shift_A",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 14,
+    "type" : "SUB:m2:shift_B",
+    "pact" : "Operator",
+    "contents" : "SUB:m2:shift_B",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 15,
+    "type" : "SUB:m2:hash_AB",
+    "pact" : "Operator",
+    "contents" : "SUB:m2:hash_AB",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 13,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 14,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 16,
+    "type" : "SUB:m2:shift_C",
+    "pact" : "Operator",
+    "contents" : "SUB:m2:shift_C",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 3,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 17,
+    "type" : "SUB:m2:shift_D",
+    "pact" : "Operator",
+    "contents" : "SUB:m2:shift_D",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 4,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 18,
+    "type" : "SUB:m2:hash_CD",
+    "pact" : "Operator",
+    "contents" : "SUB:m2:hash_CD",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 16,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 17,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 19,
+    "type" : "PUB:m2_W1",
+    "pact" : "Operator",
+    "contents" : "PUB:m2_W1",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 15,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 18,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 21,
+    "type" : "SUB:m3:hash_AB",
+    "pact" : "Operator",
+    "contents" : "SUB:m3:hash_AB",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 22,
+    "type" : "SUB:m3:shift_AB",
+    "pact" : "Operator",
+    "contents" : "SUB:m3:shift_AB",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 21,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 23,
+    "type" : "SUB:m3:hash_CD",
+    "pact" : "Operator",
+    "contents" : "SUB:m3:hash_CD",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 3,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 4,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 24,
+    "type" : "SUB:m3:shift_CD",
+    "pact" : "Operator",
+    "contents" : "SUB:m3:shift_CD",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 23,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 25,
+    "type" : "PUB:m3_W4",
+    "pact" : "Operator",
+    "contents" : "PUB:m3_W4",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 24,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 22,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 27,
+    "type" : "SUB:m4:hash_AB",
+    "pact" : "Operator",
+    "contents" : "SUB:m4:hash_AB",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 28,
+    "type" : "SUB:m4:shift_AB",
+    "pact" : "Operator",
+    "contents" : "SUB:m4:shift_AB",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 27,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 29,
+    "type" : "SUB:m4:hash_CD",
+    "pact" : "Operator",
+    "contents" : "SUB:m4:hash_CD",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 3,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 4,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 30,
+    "type" : "SUB:m4:shift_CD",
+    "pact" : "Operator",
+    "contents" : "SUB:m4:shift_CD",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 29,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 31,
+    "type" : "PUB:m4_W4",
+    "pact" : "Operator",
+    "contents" : "PUB:m4_W4",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 30,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 28,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 33,
+    "type" : "SUB:m5:shift_A",
+    "pact" : "Operator",
+    "contents" : "SUB:m5:shift_A",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 34,
+    "type" : "SUB:m5:shift_B",
+    "pact" : "Operator",
+    "contents" : "SUB:m5:shift_B",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 35,
+    "type" : "SUB:m5:hash_AB",
+    "pact" : "Operator",
+    "contents" : "SUB:m5:hash_AB",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 33,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 34,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 36,
+    "type" : "SUB:m5:shift_C",
+    "pact" : "Operator",
+    "contents" : "SUB:m5:shift_C",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 3,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 37,
+    "type" : "SUB:m5:shift_D",
+    "pact" : "Operator",
+    "contents" : "SUB:m5:shift_D",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 4,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 38,
+    "type" : "SUB:m5:hash_CD",
+    "pact" : "Operator",
+    "contents" : "SUB:m5:hash_CD",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 36,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 37,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 39,
+    "type" : "PUB:m5_W2",
+    "pact" : "Operator",
+    "contents" : "PUB:m5_W2",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 38,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 35,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 41,
+    "type" : "SUB:m6:shift_A",
+    "pact" : "Operator",
+    "contents" : "SUB:m6:shift_A",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 42,
+    "type" : "SUB:m6:shift_B",
+    "pact" : "Operator",
+    "contents" : "SUB:m6:shift_B",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 43,
+    "type" : "SUB:m6:hash_AB",
+    "pact" : "Operator",
+    "contents" : "SUB:m6:hash_AB",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 41,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 42,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 44,
+    "type" : "SUB:m6:shift_C",
+    "pact" : "Operator",
+    "contents" : "SUB:m6:shift_C",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 3,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 45,
+    "type" : "SUB:m6:shift_D",
+    "pact" : "Operator",
+    "contents" : "SUB:m6:shift_D",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 4,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 46,
+    "type" : "SUB:m6:hash_CD",
+    "pact" : "Operator",
+    "contents" : "SUB:m6:hash_CD",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 44,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 45,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 47,
+    "type" : "PUB:m6_W2",
+    "pact" : "Operator",
+    "contents" : "PUB:m6_W2",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 46,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 43,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 49,
+    "type" : "SUB:m7:hash_AB",
+    "pact" : "Operator",
+    "contents" : "SUB:m7:hash_AB",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 50,
+    "type" : "SUB:m7:shift_AB",
+    "pact" : "Operator",
+    "contents" : "SUB:m7:shift_AB",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 49,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 51,
+    "type" : "SUB:m7:hash_CD",
+    "pact" : "Operator",
+    "contents" : "SUB:m7:hash_CD",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 3,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 4,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 52,
+    "type" : "SUB:m7:shift_CD",
+    "pact" : "Operator",
+    "contents" : "SUB:m7:shift_CD",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 51,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 53,
+    "type" : "PUB:m7_W3",
+    "pact" : "Operator",
+    "contents" : "PUB:m7_W3",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 50,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 52,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 55,
+    "type" : "SUB:m8:hash_AB",
+    "pact" : "Operator",
+    "contents" : "SUB:m8:hash_AB",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 1,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 2,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 56,
+    "type" : "SUB:m8:shift_AB",
+    "pact" : "Operator",
+    "contents" : "SUB:m8:shift_AB",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 55,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 57,
+    "type" : "SUB:m8:hash_CD",
+    "pact" : "Operator",
+    "contents" : "SUB:m8:hash_CD",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 3,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 4,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 58,
+    "type" : "SUB:m8:shift_CD",
+    "pact" : "Operator",
+    "contents" : "SUB:m8:shift_CD",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 57,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 59,
+    "type" : "PUB:m8_W3",
+    "pact" : "Operator",
+    "contents" : "PUB:m8_W3",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 56,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    }, {
+      "id" : 58,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 12,
+    "type" : "Sink: SINK:m1",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m1",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 11,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 20,
+    "type" : "Sink: SINK:m2",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m2",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 19,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 26,
+    "type" : "Sink: SINK:m3",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m3",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 25,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 32,
+    "type" : "Sink: SINK:m4",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m4",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 31,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 40,
+    "type" : "Sink: SINK:m5",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m5",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 39,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 48,
+    "type" : "Sink: SINK:m6",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m6",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 47,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 54,
+    "type" : "Sink: SINK:m7",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m7",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 53,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  }, {
+    "id" : 60,
+    "type" : "Sink: SINK:m8",
+    "pact" : "Data Sink",
+    "contents" : "Sink: SINK:m8",
+    "parallelism" : 1,
+    "predecessors" : [ {
+      "id" : 59,
+      "ship_strategy" : "FORWARD",
+      "side" : "second"
+    } ]
+  } ]
+}

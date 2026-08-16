@@ -1,0 +1,48 @@
+# F9-X, Q=32 — plan kampanii K26. Wygenerowany przez gen_corpus.py;
+# nie edytować ręcznie (bramka: `gen_corpus.py --check`).
+# Postacie czynne przy tym Q: 4 z 4 (W1, W4, W2, W3).
+
+STORAGE 'temp'
+SUBSTRAT 'memory'
+
+DECLARE front INTEGER STREAM A, 1/100  FILE 'front_vib.txt'
+DECLARE front INTEGER STREAM B, 1/50   FILE 'front_cur.txt'
+DECLARE rear INTEGER STREAM C, 1/100  FILE 'rear_vib.txt'
+DECLARE rear INTEGER STREAM D, 1/50   FILE 'rear_cur.txt'
+
+# postać W1
+SELECT Sqrt(front*front+rear*rear) STREAM m1 FROM ((A>2)#(B>1)) + ((C>2)#(D>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m2 FROM ((A>2)#(B>1)) + ((C>2)#(D>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m3 FROM ((A>2)#(B>1)) + ((C>2)#(D>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m4 FROM ((A>2)#(B>1)) + ((C>2)#(D>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m5 FROM ((A>2)#(B>1)) + ((C>2)#(D>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m6 FROM ((A>2)#(B>1)) + ((C>2)#(D>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m7 FROM ((A>2)#(B>1)) + ((C>2)#(D>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m8 FROM ((A>2)#(B>1)) + ((C>2)#(D>1))
+# postać W4
+SELECT Sqrt(front*front+rear*rear) STREAM m9 FROM ((C#D)>3) + ((A#B)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m10 FROM ((C#D)>3) + ((A#B)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m11 FROM ((C#D)>3) + ((A#B)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m12 FROM ((C#D)>3) + ((A#B)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m13 FROM ((C#D)>3) + ((A#B)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m14 FROM ((C#D)>3) + ((A#B)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m15 FROM ((C#D)>3) + ((A#B)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m16 FROM ((C#D)>3) + ((A#B)>3)
+# postać W2
+SELECT Sqrt(front*front+rear*rear) STREAM m17 FROM ((C>2)#(D>1)) + ((A>2)#(B>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m18 FROM ((C>2)#(D>1)) + ((A>2)#(B>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m19 FROM ((C>2)#(D>1)) + ((A>2)#(B>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m20 FROM ((C>2)#(D>1)) + ((A>2)#(B>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m21 FROM ((C>2)#(D>1)) + ((A>2)#(B>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m22 FROM ((C>2)#(D>1)) + ((A>2)#(B>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m23 FROM ((C>2)#(D>1)) + ((A>2)#(B>1))
+SELECT Sqrt(front*front+rear*rear) STREAM m24 FROM ((C>2)#(D>1)) + ((A>2)#(B>1))
+# postać W3
+SELECT Sqrt(front*front+rear*rear) STREAM m25 FROM ((A#B)>3) + ((C#D)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m26 FROM ((A#B)>3) + ((C#D)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m27 FROM ((A#B)>3) + ((C#D)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m28 FROM ((A#B)>3) + ((C#D)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m29 FROM ((A#B)>3) + ((C#D)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m30 FROM ((A#B)>3) + ((C#D)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m31 FROM ((A#B)>3) + ((C#D)>3)
+SELECT Sqrt(front*front+rear*rear) STREAM m32 FROM ((A#B)>3) + ((C#D)>3)

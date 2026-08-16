@@ -1,0 +1,20 @@
+node_id	operator	parallelism	role	inputs
+1	Source: SRC:A	1	ingress_poza_metryka	-
+2	Source: SRC:B	1	ingress_poza_metryka	-
+3	SUB:shared:select	1	badany_podplan	1,2
+4	PUB:m1	1	publiczny_monitor	3
+5	Sink: SINK:m1	1	sink_poza_metryka	4
+6	PUB:m2	1	publiczny_monitor	3
+7	Sink: SINK:m2	1	sink_poza_metryka	6
+8	PUB:m3	1	publiczny_monitor	3
+9	Sink: SINK:m3	1	sink_poza_metryka	8
+10	PUB:m4	1	publiczny_monitor	3
+11	Sink: SINK:m4	1	sink_poza_metryka	10
+12	PUB:m5	1	publiczny_monitor	3
+13	Sink: SINK:m5	1	sink_poza_metryka	12
+14	PUB:m6	1	publiczny_monitor	3
+15	Sink: SINK:m6	1	sink_poza_metryka	14
+16	PUB:m7	1	publiczny_monitor	3
+17	Sink: SINK:m7	1	sink_poza_metryka	16
+18	PUB:m8	1	publiczny_monitor	3
+19	Sink: SINK:m8	1	sink_poza_metryka	18

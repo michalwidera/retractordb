@@ -1,0 +1,32 @@
+# F9-R2 — kontrole near-miss na danych głównych. Wygenerowane przez
+# gen_corpus.py; nie edytować ręcznie (bramka: `gen_corpus.py --check`).
+#
+# Kryterium wspólne: nad źródłami kontrolnymi NIE MOŻE powstać wspólny
+# substrat. Kontrola Q=1 jest osobną komórką siatki, nie tym plikiem.
+
+STORAGE 'temp'
+SUBSTRAT 'memory'
+
+# near-miss 1: zmieniona kolejność pól wyniku
+DECLARE v INTEGER STREAM NA, 1/100 FILE 'axis_x.txt'
+DECLARE v INTEGER STREAM NB, 1/100 FILE 'axis_y.txt'
+SELECT NA[0],NB[0] STREAM n1 FROM NA+NB
+SELECT NB[0],NA[0] STREAM n2 FROM NB+NA
+
+# near-miss 2: SELECT * ujawnia kolejność wejścia
+DECLARE v INTEGER STREAM SA, 1/100 FILE 'axis_x.txt'
+DECLARE v INTEGER STREAM SB, 1/100 FILE 'axis_y.txt'
+SELECT * STREAM d1 FROM SA+SB
+SELECT * STREAM d2 FROM SB+SA
+
+# near-miss 3: inne grupowanie trzech źródeł (brak reasocjacji)
+DECLARE v INTEGER STREAM GA, 1/100 FILE 'axis_x.txt'
+DECLARE v INTEGER STREAM GB, 1/100 FILE 'axis_y.txt'
+DECLARE v INTEGER STREAM GC, 1/100 FILE 'axis_y.txt'
+SELECT GA[0]*GB[0]+GC[0] STREAM x1 FROM (GA+GB)+GC
+SELECT GA[0]*GB[0]+GC[0] STREAM x3 FROM (GC+GB)+GA
+
+# kontrola bez etapu materializowanego: oczekiwane ZERO bajtów substratów
+DECLARE v INTEGER STREAM ZA, 1/100 FILE 'axis_x.txt'
+SELECT Sqrt(ZA[0]*ZA[0]) STREAM z1 FROM ZA
+SELECT Sqrt(ZA[0]*ZA[0]) STREAM z2 FROM ZA

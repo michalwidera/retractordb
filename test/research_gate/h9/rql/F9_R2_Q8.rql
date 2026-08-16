@@ -1,0 +1,20 @@
+# F9-R2, Q=8 — plan kampanii K26. Wygenerowany przez gen_corpus.py;
+# nie edytować ręcznie (bramka: `gen_corpus.py --check`).
+# Postacie czynne przy tym Q: 2 z 2 (P1, P2).
+
+STORAGE 'temp'
+SUBSTRAT 'memory'
+
+DECLARE v INTEGER STREAM A, 1/100  FILE 'axis_x.txt'
+DECLARE v INTEGER STREAM B, 1/100  FILE 'axis_y.txt'
+
+# postać P1
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m1 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m2 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m3 FROM A+B
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m4 FROM A+B
+# postać P2
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m5 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m6 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m7 FROM B+A
+SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m8 FROM B+A

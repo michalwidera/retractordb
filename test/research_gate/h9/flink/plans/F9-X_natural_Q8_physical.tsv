@@ -1,0 +1,29 @@
+vertex_id	vertex_name	parallelism	chained_operators
+b9a442dc1e6de56c211a9cd149ddc3c9	Source: SRC:A -> (SUB:m1:shift_A, SUB:m2:shift_A, SUB:m5:shift_A, SUB:m6:shift_A)	1	5
+48c7001096bed2ba231050436efc585c	Source: SRC:B -> (SUB:m1:shift_B, SUB:m2:shift_B, SUB:m5:shift_B, SUB:m6:shift_B)	1	5
+32a60ffd52717686c808992fae6c968f	Source: SRC:C -> (SUB:m1:shift_C, SUB:m2:shift_C, SUB:m5:shift_C, SUB:m6:shift_C)	1	5
+793eb347dce327553813b0534ad18184	Source: SRC:D -> (SUB:m1:shift_D, SUB:m2:shift_D, SUB:m5:shift_D, SUB:m6:shift_D)	1	5
+440b678800b745b22a9b2d3c430e6335	SUB:m1:hash_AB	1	1
+60dd575dbc3c296e3fdcdc2f36cbf9ee	SUB:m2:hash_AB	1	1
+ad862523f6de8b585defa5de603e7b76	SUB:m5:hash_AB	1	1
+d25e9ccdbe199437be363d1d2aaab546	SUB:m6:hash_AB	1	1
+100d63d6a04d7f63c28a12b1cf119645	SUB:m3:hash_AB -> SUB:m3:shift_AB	1	2
+6b715e7abd50a9c1f27cddd781d1ec46	SUB:m4:hash_AB -> SUB:m4:shift_AB	1	2
+d6f03bb0ae1ff4239488541d75f8a937	SUB:m7:hash_AB -> SUB:m7:shift_AB	1	2
+ae044dd142f852c81dbed3541e09305d	SUB:m8:hash_AB -> SUB:m8:shift_AB	1	2
+2bf9b79ae88819ce27a0486073fa83a8	SUB:m1:hash_CD	1	1
+674204ead052c3d08098a66b8719b9c0	PUB:m1_W1 -> Sink: SINK:m1	1	2
+fbd90630c6a95cfc61d6e0b0c49799ed	SUB:m2:hash_CD	1	1
+0618812922534c2bfac751325b32aefd	PUB:m2_W1 -> Sink: SINK:m2	1	2
+30a8bd9a11426737d1d94dd45b6911ab	SUB:m5:hash_CD	1	1
+ed64451f77c12b05885ad9f37cc64b0b	PUB:m5_W2 -> Sink: SINK:m5	1	2
+ba9277d1966d41ae690240cec2e87516	SUB:m6:hash_CD	1	1
+7a4fa255e41fe6e8db5c4fa9cbcacc87	PUB:m6_W2 -> Sink: SINK:m6	1	2
+61a36bd822fa78c7eeb1aa2f4008fe35	SUB:m3:hash_CD -> SUB:m3:shift_CD	1	2
+58e93a5f0a20596cbb241add9981208e	PUB:m3_W4 -> Sink: SINK:m3	1	2
+63935fae5b1a3dc8bbcb61ac8b3364dd	SUB:m4:hash_CD -> SUB:m4:shift_CD	1	2
+984eb23b900b37fb970bc1dd73b4b70b	PUB:m4_W4 -> Sink: SINK:m4	1	2
+b3f769acc4434b4272e022b89ddc4eb5	SUB:m7:hash_CD -> SUB:m7:shift_CD	1	2
+7e1d5066e474f54195f42ffdf75a1405	PUB:m7_W3 -> Sink: SINK:m7	1	2
+971883682b93067280f33fd9c0ca7abc	SUB:m8:hash_CD -> SUB:m8:shift_CD	1	2
+f7090657784bde95cdebf095fe049a73	PUB:m8_W3 -> Sink: SINK:m8	1	2

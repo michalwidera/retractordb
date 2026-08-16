@@ -1,0 +1,4 @@
+vertex_id	vertex_name	parallelism	chained_operators
+b9a442dc1e6de56c211a9cd149ddc3c9	Source: SRC:A	1	1
+48c7001096bed2ba231050436efc585c	Source: SRC:B	1	1
+98b3d6c5cbf6ec986f36c89ab9be8113	SUB:shared:select -> (PUB:m1 -> Sink: SINK:m1, PUB:m2 -> Sink: SINK:m2, PUB:m3 -> Sink: SINK:m3, PUB:m4 -> Sink: SINK:m4, PUB:m5 -> Sink: SINK:m5, PUB:m6 -> Sink: SINK:m6, PUB:m7 -> Sink: SINK:m7, PUB:m8 -> Sink: SINK:m8)	1	17
