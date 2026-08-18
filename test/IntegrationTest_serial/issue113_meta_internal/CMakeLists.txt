@@ -15,6 +15,6 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash run.sh)
 
-# Startuje serwer (blokada uslugi) -> RUN_SERIAL jawnie: flagi -k/-x sa w run.sh,
-# wiec makro add_test ich nie widzi.
+# Startuje serwer (blokada uslugi) -> RUN_SERIAL jawnie: flagi -k/-x sa w
+# run.sh, wiec makro add_test ich nie widzi.
 set_tests_properties(${TestID} PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)

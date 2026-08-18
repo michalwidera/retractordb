@@ -14,8 +14,9 @@ set(RESEARCH_GATE_COUNT
     10010
     CACHE STRING "Liczba planow w kampanii H10 (10010 = pelna kampania K24d)")
 
-# Profile ablacji H9 mieszkaja w build/K26v3-*. Bramka sama sprawdza, czy nie sa
-# starsze od src/ — jesli sa albo ich nie ma, poziom 84/84 jest POMINIETY, nigdy
+# Profile ablacji H9 mieszkaja w build/K26v3-*. Bramka sama sprawdza, czy odcisk
+# tresci src/ zapisany przy ich budowie zgadza sie z biezacym — jesli nie zgadza
+# sie, profili nie ma albo odcisku brak, poziom 84/84 jest POMINIETY, nigdy
 # zaliczony po cichu. Zbudowac: test/research_gate/h9/build_profiles.sh
 add_custom_target(
   test_gate

@@ -8,16 +8,45 @@
 # Uzycie:
 #   ./run_gate.sh --xretractor <sciezka> [--work <katalog>] [--count N]
 #                 [--only h9|h10] [--profiles <katalog buildow ablacji>]
+#
+# Pomocniczo, dla h9/build_profiles.sh:
+#   ./run_gate.sh --print-src-fingerprint [--code-repo <sciezka>]
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CODE_REPO="$(cd "$HERE/../.." && pwd)"
+
+# Nazwa pliku odcisku skladanego przez h9/build_profiles.sh w katalogu builda
+# profilu. Uzgodniona miedzy tymi dwoma skryptami i nigdzie indziej.
+STAMP=".gate-src-fingerprint"
+
+# Odcisk TRESCI src/, a nie czasu modyfikacji. Git przepisuje mtime przy kazdym
+# `checkout` i `pull --rebase`, wiec profil zbudowany z dokladnie tej samej
+# tresci wygladal na nieswiezy i poziom 84/84 byl pomijany bez powodu
+# (2026-08-18: profile z 17:00 uznane za nieswieze po rebase o 18:37, przy
+# pustym `git diff -- src/`).
+#
+# Odcisk liczy sie z DRZEWA ROBOCZEGO (`ls-files -c -o` + `hash-object` po
+# tresci plikow), nie z `HEAD:src`: niezacommitowana zmiana w src/ zmienia go
+# tak samo jak commit, wiec profil zbudowany przed nia jest nieswiezy. Lista
+# sciezek wchodzi do sumy razem z hashami, wiec dodanie i usuniecie pliku tez
+# zmienia odcisk.
+src_fingerprint() { # src_fingerprint <repozytorium> -> odcisk na stdout
+  local repo="$1" list hashes
+  list="$(git -C "$repo" ls-files -c -o --exclude-standard -- src 2>/dev/null | LC_ALL=C sort -u)" || return 1
+  [[ -n "$list" ]] || return 1
+  # Plik sledzony, ale usuniety z dysku, przewraca `hash-object` — i slusznie:
+  # nieobliczalny odcisk ma znaczyc "nieswiezy", nigdy "swiezy".
+  hashes="$(printf '%s\n' "$list" | git -C "$repo" hash-object --stdin-paths 2>/dev/null)" || return 1
+  printf '%s\n%s\n' "$list" "$hashes" | sha256sum | awk '{print $1}'
+}
 
 XRETRACTOR=""
 WORK="$HERE/.gate-work"
 COUNT=10010
 ONLY="both"
 PROFILES=""
+PRINT_FP=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -26,9 +55,22 @@ while [[ $# -gt 0 ]]; do
     --count)      COUNT="$2"; shift 2 ;;
     --only)       ONLY="$2"; shift 2 ;;
     --profiles)   PROFILES="$2"; shift 2 ;;
+    --code-repo)  CODE_REPO="$(cd "$2" && pwd)" || exit 2; shift 2 ;;
+    --print-src-fingerprint) PRINT_FP=1; shift ;;
     *) echo "nieznany argument: $1" >&2; exit 2 ;;
   esac
 done
+
+# Tryb pomocniczy: sam odcisk, bez binarki i bez bramki. Wychodzi przed
+# szukaniem xretractora, bo build_profiles.sh wola go ZANIM cokolwiek zbuduje.
+if [[ "$PRINT_FP" -eq 1 ]]; then
+  fp="$(src_fingerprint "$CODE_REPO")" || {
+    echo "BLAD: nie udalo sie policzyc odcisku tresci src/ w $CODE_REPO" >&2
+    exit 2
+  }
+  printf '%s\n' "$fp"
+  exit 0
+fi
 
 if [[ -z "$XRETRACTOR" ]]; then
   for c in "$CODE_REPO/build/Debug/src/retractor/xretractor" \
@@ -130,16 +172,29 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
   # profili, bo bez nich nie da sie odroznic R1 od R2.
   if [[ -n "$PROFILES" ]]; then
     # Binarka nie niesie SHA zrodla (`--build-info` podaje tylko flagi), wiec
-    # jedyny dostepny test swiezosci to czas modyfikacji. Profil starszy od
-    # zrodel orzekalby o innej rewizji niz badana — to falszywa zielen.
+    # swiezosc rozstrzyga odcisk tresci src/ zapisany przy budowie profilu
+    # (build_profiles.sh -> $STAMP). Profil zbudowany z innej tresci orzekalby
+    # o innej rewizji niz badana — to falszywa zielen. Kierunek bledu jest
+    # jednostronny: cokolwiek nie da sie potwierdzic, jest NIESWIEZE.
     stale=""
-    for p in DEFAULT NO_R2_CANON NO_R1_FACTOR NO_R1_NO_R2; do
-      bin="$PROFILES/K26v3-$p/src/retractor/xretractor"
-      if [[ ! -x "$bin" ]]; then stale="brak profilu $p"; break; fi
-      if [[ -n "$(find "$CODE_REPO/src" -type f -newer "$bin" -print -quit 2>/dev/null)" ]]; then
-        stale="profil $p starszy od zrodel w src/"; break
-      fi
-    done
+    cur_fp="$(src_fingerprint "$CODE_REPO")" || cur_fp=""
+    if [[ -z "$cur_fp" ]]; then
+      stale="nie udalo sie policzyc odcisku tresci src/"
+    else
+      for p in DEFAULT NO_R2_CANON NO_R1_FACTOR NO_R1_NO_R2; do
+        bin="$PROFILES/K26v3-$p/src/retractor/xretractor"
+        stamp="$PROFILES/K26v3-$p/$STAMP"
+        if [[ ! -x "$bin" ]]; then stale="brak profilu $p"; break; fi
+        # Brak odcisku = profil zbudowany aparatura sprzed tej zmiany. Nie ma
+        # czym potwierdzic tresci, wiec nie zalicza sie po cichu — przebudowa.
+        if [[ ! -f "$stamp" ]]; then
+          stale="profil $p bez odcisku zrodel (zbudowany starsza aparatura)"; break
+        fi
+        if [[ "$(cat "$stamp" 2>/dev/null)" != "$cur_fp" ]]; then
+          stale="profil $p zbudowany z innej tresci src/"; break
+        fi
+      done
+    fi
 
     if [[ -n "$stale" ]]; then
       skip "H9 84/84 kompilacji — $stale" "h9-profile-stale"
