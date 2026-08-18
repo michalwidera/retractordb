@@ -7,7 +7,12 @@
 #
 # Uzycie:
 #   ./run_gate.sh --xretractor <sciezka> [--work <katalog>] [--count N]
-#                 [--only h9|h10] [--profiles <katalog buildow ablacji>]
+#                 [--only h9|h10] [--profiles <katalog buildow ablacji>] [--strict]
+#
+# --strict: poziom POMINIETY konczy przebieg bledem. Pominiecie znaczy "nie
+# uruchomiono", nigdy "zaliczono" — bez tej opcji przebieg bez profili ablacji
+# konczy sie kodem 0 i w CI wygladalby na zaliczona bramke. Praca lokalna
+# domyslnie pominiecie dopuszcza, CI nigdy.
 #
 # Pomocniczo, dla h9/build_profiles.sh:
 #   ./run_gate.sh --print-src-fingerprint [--code-repo <sciezka>]
@@ -47,6 +52,7 @@ COUNT=10010
 ONLY="both"
 PROFILES=""
 PRINT_FP=0
+STRICT=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -57,6 +63,7 @@ while [[ $# -gt 0 ]]; do
     --profiles)   PROFILES="$2"; shift 2 ;;
     --code-repo)  CODE_REPO="$(cd "$2" && pwd)" || exit 2; shift 2 ;;
     --print-src-fingerprint) PRINT_FP=1; shift ;;
+    --strict)     STRICT=1; shift ;;
     *) echo "nieznany argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -218,6 +225,12 @@ fi
 # -------------------------------------------------------------- podsumowanie
 echo
 echo "=============================================================="
+# Pominiety poziom nie jest zaliczony. Bez --strict przebieg tylko go odnotowuje;
+# z --strict oblewa, bo zielona bramka o niepelnym zakresie jest gorsza od jej braku.
+if [[ "$STRICT" -eq 1 && "${#SKIP[@]}" -gt 0 ]]; then
+  FAIL=1
+  echo " STRICT: poziom pominiety liczy sie jako OBLANY (${#SKIP[@]}: ${SKIP[*]})"
+fi
 if [[ "$FAIL" -eq 0 ]]; then
   echo " WYNIK: bramki mechanizmowe PRZESZLY na silniku $ENGINE_SHA"
 else
