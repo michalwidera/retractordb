@@ -142,17 +142,57 @@ constexpr int AddStartupLatency(const rational<int> &deltaSource, const rational
   return ceilR(rational<int>(1 + sourceLatency) * deltaSource / deltaTarget) - 1;
 }
 
-// C-Delta wybiera c_{ceil(n*Delta/Dc)}. Ułamkowa faza może wyprzedzać
-// fizyczny slot najwyżej o (q-1)/q rekordu źródła, gdzie q jest mianownikiem
-// Delta/Dc. Dla deklaracji również faza całkowita wymaga jednego slotu,
-// ponieważ źródło jest publikowane po konsumentach w tym samym takcie.
-constexpr int SubtractStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget, const int sourceLatency,
-                                     const bool sourceDeclared) {
+// Ogon operatorów jednoargumentowych o afinicznym odwzorowaniu indeksu: `-`, `Θ` i `~Θ`.
+// Jedna postać, trzy stałe fazowe.
+//
+// Rekord n czyta rekord idx(n) składowej, a odwzorowanie rozkłada się na część liniową
+// i fazową: idx(n) = n*r + e(n), gdzie r = Delta_out/Delta_src. Warunek dostępności
+//   W >= ceil( (idx(n) + 1 + W_src) / r ) - 1 - n
+// po podstawieniu rozkładu upraszcza się, bo n*r/r = n jest całkowite i wychodzi przed
+// sufit, kasując -n:
+//   W >= ceil( (e(n) + 1 + W_src) / r ) - 1.
+// Prawa strona zależy od n wyłącznie przez e(n), więc maksimum wypada tam, gdzie e(n)
+// osiąga kres. Kres jest OSIĄGANY — reszty przebiegają wszystkie klasy modulo mianownik,
+// bo po skróceniu gcd = 1 — i dlatego postać jest DOKŁADNA, a nie oszacowaniem z góry.
+//
+// Do 2026-08-18 każdy z trzech operatorów miał tu własną regułę zawyżającą o slot
+// (`-` 19,1% zgodności z modelem zdarzeniowym, `Θ` 59,7%, `~Θ` 99,2%). Wspólną
+// przyczyną było rozbicie rachunku na "przeliczenie ogona składowej przez takt plus
+// stały człon własny": przeliczenie zakłada najgorsze wyrównanie fazowe niezależnie od
+// tego, który rekord konsument naprawdę czyta. Wyprowadzenie, dowód osiągalności kresu
+// i weryfikacja: rdb-experiment/investigation_K24H10/DERIVATION.md §5. Zgodność
+// z modelem zdarzeniowym na korpusie K24: 4329/4329, 2578/2578 i 2503/2503 węzłów
+// (ziarno 20260804), tyleż na 20260807, zero zaniżeń w żadnej z klas.
+constexpr int PhaseStartupLatency(const rational<int> &phaseBound, const rational<int> &ratio, const int sourceLatency) {
+  return std::max(0, ceilR((phaseBound + sourceLatency + 1) / ratio) - 1);
+}
+
+// C-Delta wybiera c_{ceil(n*Delta/Dc)}, czyli e(n) = (q - n*p mod q)/q przy p/q = Delta/Dc
+// po skróceniu. Kres (q-1)/q jest osiągany dla n spełniającego n*p = 1 (mod q).
+constexpr int SubtractStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget,
+                                     const int sourceLatency) {
   const auto ratio = deltaTarget / deltaSource;
   const int q      = ratio.denominator();
-  const rational<int> phase(q - 1, q);
-  if (sourceDeclared) return floorR(phase / ratio) + 1;
-  return ceilR((rational<int>(sourceLatency) + phase) / ratio);
+  return PhaseStartupLatency(rational<int>(q - 1, q), ratio, sourceLatency);
+}
+
+// Θ czyta pozycję i + ceil((i+1)*Da/Db) przeplotu (patrz Div()). Przy a/b = Delta_out/param
+// po skróceniu faza wynosi (a-t)/b dla t = 0 i (a+b-t)/b dla t > 0, gdzie t = (n+1)*a mod b,
+// więc kres to (a+b-1)/b — osiągany, bo gcd(a,b) = 1. Dla ilorazu całkowitego (b = 1) kres
+// wynosi a i po podzieleniu przez r daje ogon własny ZERO, nie jeden.
+constexpr int ThetaStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget, const rational<int> &other,
+                                  const int sourceLatency) {
+  const auto span = deltaTarget / other;
+  return PhaseStartupLatency(rational<int>(span.numerator() + span.denominator() - 1, span.denominator()),
+                             deltaTarget / deltaSource, sourceLatency);
+}
+
+// ~Θ czyta pozycję i + floor(i*Db/Da) (patrz Mod()), więc e(n) = -(n*a mod b)/b <= 0
+// i kres wynosi 0, osiągany dla n = 0. Ogon jest zatem samym przeliczeniem dostępności
+// pierwszego rekordu — bez zaokrąglenia ogona składowej w górę, które zawyżało wynik przy
+// niezerowym W_src.
+constexpr int NThetaStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget, const int sourceLatency) {
+  return PhaseStartupLatency(rational<int>(0), deltaTarget / deltaSource, sourceLatency);
 }
 
 // Najdłuższy okres fazowy przeplotu, dla którego ogon liczy się DOKŁADNIE.

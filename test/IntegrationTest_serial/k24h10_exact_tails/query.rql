@@ -1,0 +1,25 @@
+# K24/H10: ogon `-`, `Theta` i `~Theta` po wyprowadzeniu postaci dokladnych
+# (2026-08-18, silnik e2a61ff). Kampania K24e mierzy zgodnosc rachunku z modelem
+# zdarzeniowym na 10 010 planach; ten test pilnuje tego samego OD STRONY WYJSCIA,
+# na piesciu przypadkach o recznie sprawdzonych wartosciach.
+#
+# Ogon jest obserwowalny jako liczba rekordow: strumien milczy przez pierwsze
+# `tail` slotow, wiec ogon dluzszy o jeden daje o jeden rekord MNIEJ przy tej
+# samej dlugosci przebiegu. Powrot dawnej reguly zmieni wiec `size` w tym wzorcu.
+#
+#   th_int    Theta o ilorazie CALKOWITYM  -> ogon 0 (dawna regula: 1)
+#   th_fr     Theta o ilorazie ulamkowym   -> ogon 1 (bez zmian, bramka regresyjna)
+#   sub_over  roznica nad skladowa z ogonem -> ogon 0 (dawna regula: 1)
+#   th_deep   Theta nad zrodlem 1/160      -> ogon 1 (bez zmian)
+#   nth_deep  ~Theta nad skladowa z ogonem -> ogon 0 (dawna regula: 1)
+
+STORAGE 'temp'
+
+DECLARE value INTEGER STREAM src,  1/100 FILE 'data.txt'
+DECLARE value INTEGER STREAM src2, 1/160 FILE 'data.txt'
+
+SELECT * STREAM th_int   FROM src&1/50
+SELECT * STREAM th_fr    FROM src&3/100
+SELECT * STREAM sub_over FROM th_fr-1/25
+SELECT * STREAM th_deep  FROM src2&1/60
+SELECT * STREAM nth_deep FROM th_deep%1/50

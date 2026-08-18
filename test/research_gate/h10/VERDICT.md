@@ -1,6 +1,20 @@
 # K24d / H10 — werdykt
 
-Korpus: **10010 planów**, **35544 obserwacji węzłowych**, zero błędów aparatury. Ziarno 20260804, silnik `34db1a2`.
+> **Odniesienie bramki zaktualizowane 2026-08-18 (K24/H10, faza 3).** Trzy klasy
+> przeszły z reżimu zawyżającego do dokładnego: `SUB`, `THETA`, `NTHETA`. Bramka
+> zgłosiła POPRAWĘ na obu ziarnach, a plik odniesienia jest aktualizowany w tym
+> samym commicie co zmiana silnika — inaczej regresja z powrotem do zawyżania
+> nie byłaby wykrywana (README.md, „Gdy bramka oblewa”).
+>
+> Ten plik jest **odniesieniem regresyjnym**, nie werdyktem kampanii. Werdyktem
+> obowiązującym dla artykułu pozostaje K24d (`rdb-experiment/results_20260807_K24d/`,
+> silnik `34db1a2`) do czasu kampanii K24e z własną predeklaracją i własnym
+> ziarnem. Liczby poniżej pochodzą z przebiegu bramki na drzewie roboczym
+> `0f273d5` + zmiana fazy 3; po commicie SHA w nagłówku będzie inny, co bramki
+> nie dotyczy — porównuje ona reżimy, nie rewizje.
+
+
+Korpus: **10010 planów**, **35544 obserwacji węzłowych**, zero błędów aparatury. Ziarno 20260804, silnik `0f273d5`.
 
 Werdykt jest raportowany per klasa operatora. Zgodność 100% jest jedynym
 wsparciem H10a w klasie; jedna niezgodność falsyfikuje H10a w tej klasie.
@@ -14,20 +28,20 @@ na całym planie — zawiera skutki niezgodności odziedziczonych po dzieciach.
 
 | Klasa | Węzłów | Izolowana C1 | Izolowana C2 | Propagowana C1 | Reżim | Werdykt H10a |
 |---|---:|---:|---:|---:|---|---|
-| `HASH` | 5960 | 100.0% | 50.0% | 92.7% | dokładna | **wsparta** |
-| `SHIFT` | 5314 | 100.0% | 95.6% | 99.5% | dokładna | **wsparta** |
-| `PASS` | 4825 | 100.0% | 0.0% | 97.1% | dokładna | **wsparta** |
-| `SUB` | 4329 | 19.1% | 37.6% | 6.6% | zawyżająca | **FALSYFIKACJA** |
-| `AGSE` | 4256 | 100.0% | 43.7% | 97.6% | dokładna | **wsparta** |
-| `REDUCE` | 3292 | 100.0% | 0.0% | 98.7% | dokładna | **wsparta** |
-| `THETA` | 2578 | 59.7% | 87.9% | 52.9% | zawyżająca | **FALSYFIKACJA** |
-| `NTHETA` | 2503 | 99.2% | 99.4% | 98.1% | zawyżająca | **FALSYFIKACJA** |
-| `ADD` | 2487 | 100.0% | 42.9% | 97.6% | dokładna | **wsparta** |
+| `HASH` | 5960 | 100.0% | 50.0% | 100.0% | dokładna | **wsparta** |
+| `SHIFT` | 5314 | 100.0% | 95.6% | 100.0% | dokładna | **wsparta** |
+| `PASS` | 4825 | 100.0% | 0.0% | 100.0% | dokładna | **wsparta** |
+| `SUB` | 4329 | 100.0% | 69.7% | 100.0% | dokładna | **wsparta** |
+| `AGSE` | 4256 | 100.0% | 43.7% | 100.0% | dokładna | **wsparta** |
+| `REDUCE` | 3292 | 100.0% | 0.0% | 100.0% | dokładna | **wsparta** |
+| `THETA` | 2578 | 100.0% | 67.8% | 100.0% | dokładna | **wsparta** |
+| `NTHETA` | 2503 | 100.0% | 99.2% | 100.0% | dokładna | **wsparta** |
+| `ADD` | 2487 | 100.0% | 42.9% | 100.0% | dokładna | **wsparta** |
 
 ### Trzy reżimy
 
-* **dokładna** (postać zamknięta == oracle wszędzie): `HASH`, `SHIFT`, `PASS`, `AGSE`, `REDUCE`, `ADD`;
-* **zawyżająca** (nigdy nie zaniża, bezpieczna, ale nie równa): `SUB`, `THETA`, `NTHETA`;
+* **dokładna** (postać zamknięta == oracle wszędzie): `HASH`, `SHIFT`, `PASS`, `SUB`, `AGSE`, `REDUCE`, `THETA`, `NTHETA`, `ADD`;
+* **zawyżająca** (nigdy nie zaniża, bezpieczna, ale nie równa): brak;
 * **zaniżająca** (ogon mniejszy od wymaganego przez model zdarzeniowy): brak.
 
 Reżim zaniżający jest jakościowo inny od zawyżającego: zawyżenie
@@ -41,23 +55,17 @@ wszystkie jego zależności są określone.
 | `HASH` | `+0`: 5960 (100.0%) |
 | `SHIFT` | `+0`: 5314 (100.0%) |
 | `PASS` | `+0`: 4825 (100.0%) |
-| `SUB` | `+0`: 828 (19.1%), `+1`: 3501 (80.9%) |
+| `SUB` | `+0`: 4329 (100.0%) |
 | `AGSE` | `+0`: 4256 (100.0%) |
 | `REDUCE` | `+0`: 3292 (100.0%) |
-| `THETA` | `+0`: 1540 (59.7%), `+1`: 1038 (40.3%) |
-| `NTHETA` | `+0`: 2483 (99.2%), `+1`: 20 (0.8%) |
+| `THETA` | `+0`: 2578 (100.0%) |
+| `NTHETA` | `+0`: 2503 (100.0%) |
 | `ADD` | `+0`: 2487 (100.0%) |
 
 ### Świadkowie
 
 | Klasa | Kierunek | Plan | Węzeł | Interwał | Silnik | Postać zamknięta (izol.) | Oracle C1 |
 |---|---|---:|---|---|---:|---:|---:|
-| `SUB` | zawyżenie | 4 | n0 | `5/2` | 1 | 1 | 0 |
-| `SUB` | zawyżenie | 4 | n1 | `5/4` | 1 | 1 | 0 |
-| `THETA` | zawyżenie | 5 | n0 | `1` | 1 | 1 | 0 |
-| `THETA` | zawyżenie | 5 | n1 | `3/4` | 1 | 1 | 0 |
-| `NTHETA` | zawyżenie | 167 | n2 | `1/5` | 1 | 1 | 0 |
-| `NTHETA` | zawyżenie | 209 | n4 | `3/32` | 1 | 1 | 0 |
 
 ## 1b. H10a — początek logiczny, per klasa operatora
 
@@ -67,15 +75,15 @@ to jedyna wielkość wspólna z kampaniami sprzed zmiany.
 
 | Klasa | Węzłów | Izolowana | Propagowana | Suma (origin+ogon) | Reżim | Werdykt |
 |---|---:|---:|---:|---:|---|---|
-| `HASH` | 5960 | 100.0% | 100.0% | 92.7% | dokładna | **wsparta** |
-| `SHIFT` | 5314 | 100.0% | 100.0% | 99.5% | dokładna | **wsparta** |
-| `PASS` | 4825 | 100.0% | 100.0% | 97.1% | dokładna | **wsparta** |
-| `SUB` | 4329 | 100.0% | 100.0% | 6.6% | dokładna | **wsparta** |
-| `AGSE` | 4256 | 100.0% | 100.0% | 97.6% | dokładna | **wsparta** |
-| `REDUCE` | 3292 | 100.0% | 100.0% | 98.7% | dokładna | **wsparta** |
-| `THETA` | 2578 | 100.0% | 100.0% | 52.9% | dokładna | **wsparta** |
-| `NTHETA` | 2503 | 100.0% | 100.0% | 98.1% | dokładna | **wsparta** |
-| `ADD` | 2487 | 100.0% | 100.0% | 97.6% | dokładna | **wsparta** |
+| `HASH` | 5960 | 100.0% | 100.0% | 100.0% | dokładna | **wsparta** |
+| `SHIFT` | 5314 | 100.0% | 100.0% | 100.0% | dokładna | **wsparta** |
+| `PASS` | 4825 | 100.0% | 100.0% | 100.0% | dokładna | **wsparta** |
+| `SUB` | 4329 | 100.0% | 100.0% | 100.0% | dokładna | **wsparta** |
+| `AGSE` | 4256 | 100.0% | 100.0% | 100.0% | dokładna | **wsparta** |
+| `REDUCE` | 3292 | 100.0% | 100.0% | 100.0% | dokładna | **wsparta** |
+| `THETA` | 2578 | 100.0% | 100.0% | 100.0% | dokładna | **wsparta** |
+| `NTHETA` | 2503 | 100.0% | 100.0% | 100.0% | dokładna | **wsparta** |
+| `ADD` | 2487 | 100.0% | 100.0% | 100.0% | dokładna | **wsparta** |
 
 ### Rozkład różnicy origin (rachunek silnika − oracle)
 

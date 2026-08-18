@@ -169,13 +169,51 @@ def hash_own(delta1, delta2, phase_delta=0, swap=False, drop_own=False, first_ph
     return (period + advance - 2) // period + 1 + phase_delta
 
 
-def subtract_tail(delta_source, delta_target, source_tail, source_declared):
+def phase_tail(phase_bound, ratio, source_tail):
+    """Wspólna postać ogona `-`, `Θ` i `~Θ` (silnik: PhaseStartupLatency).
+
+    Odwzorowanie indeksu rozkłada się na idx(n) = n*r + e(n), więc warunek
+    dostępności redukuje się do ceil((e(n)+1+W_src)/r) - 1, a maksimum wypada
+    tam, gdzie e(n) osiąga kres. Kres jest osiągany (gcd = 1 po skróceniu),
+    stąd postać jest dokładna, nie oszacowana.
+    """
+    return max(0, _ceil((Fraction(phase_bound) + source_tail + 1) / ratio) - 1)
+
+
+def subtract_tail(delta_source, delta_target, source_tail, source_declared=False,
+                  declaration_slot=False):
+    """`-`: e(n) = (q - n*p mod q)/q, kres (q-1)/q.
+
+    ``declaration_slot`` odtwarza postać sprzed 2026-08-18 (mutant
+    ``subtract_declaration_slot``): człon fazowy doklejany do ogona składowej
+    zamiast do indeksu, plus osobna gałąź dla deklaracji. Zawyżała o slot
+    w 80,9% węzłów `-` korpusu.
+    """
     ratio = delta_target / delta_source
     q = ratio.denominator
     phase = Fraction(q - 1, q)
-    if source_declared:
-        return _floor(phase / ratio) + 1
-    return _ceil((Fraction(source_tail) + phase) / ratio)
+    if declaration_slot:
+        if source_declared:
+            return _floor(phase / ratio) + 1
+        return _ceil((Fraction(source_tail) + phase) / ratio)
+    return phase_tail(phase, ratio, source_tail)
+
+
+def theta_tail(delta_source, delta_target, other, source_tail):
+    """`Θ`: e(n) = (a-t)/b dla t = 0, inaczej (a+b-t)/b; kres (a+b-1)/b.
+
+    Przy ilorazie całkowitym (b = 1) kres wynosi a, co po podzieleniu przez r
+    daje ogon własny ZERO — dlatego stała jedynka sprzed 2026-08-18 zawyżała
+    w 40,3% węzłów `Θ`.
+    """
+    span = delta_target / other
+    bound = Fraction(span.numerator + span.denominator - 1, span.denominator)
+    return phase_tail(bound, delta_target / delta_source, source_tail)
+
+
+def ntheta_tail(delta_source, delta_target, source_tail):
+    """`~Θ`: e(n) = -(n*a mod b)/b <= 0, kres 0 przy n = 0."""
+    return phase_tail(0, delta_target / delta_source, source_tail)
 
 
 def agse_tail(source_width, step, source_tail):
@@ -333,11 +371,24 @@ def evaluate(plan, mutation=None, given_tails=None):
             result = max(add_tail(first.delta, node.delta, w1),
                          add_tail(second.delta, node.delta, source_tails[second.name]))
         elif node.kind == THETA:
-            result += 0 if mutation.get("theta_zero_own", False) else 1
+            # Postać sprzed 2026-08-18 — stały człon własny doklejany do
+            # przeliczonego ogona składowej — jest teraz mutantem
+            # (`theta_constant_own`), tak jak `hash_closed_form_o1` w K24d.
+            if mutation.get("theta_constant_own", False):
+                result += 0 if mutation.get("theta_zero_own", False) else 1
+            elif mutation.get("theta_zero_own", False):
+                result = phase_tail(0, node.delta / first.delta, w1)
+            else:
+                result = theta_tail(first.delta, node.delta, node.param, w1)
         elif node.kind == NTHETA:
-            pass
+            # Sprzed 2026-08-18: samo przeliczenie ogona składowej przez takt,
+            # z zaokrągleniem w górę liczonym OSOBNO — mutant
+            # `ntheta_rounds_source_tail`.
+            if not mutation.get("ntheta_rounds_source_tail", False):
+                result = ntheta_tail(first.delta, node.delta, w1)
         elif node.kind == SUB:
-            result = subtract_tail(first.delta, node.delta, w1, first.kind == SOURCE)
+            result = subtract_tail(first.delta, node.delta, w1, first.kind == SOURCE,
+                                   declaration_slot=mutation.get("subtract_declaration_slot", False))
         elif node.kind == AGSE:
             step, length = node.param
             if mutation.get("agse_tail_keeps_phase", False):

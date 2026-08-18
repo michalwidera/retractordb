@@ -370,11 +370,13 @@ TEST(xcompiler, computes_startup_latency) {
   // Znak dlugosci jest wylacznie konwencja kolejnosci pol — ogon i origin te same.
   EXPECT_EQ(instance.getQuery("agse4_mirror").startupLatency, 0);
   EXPECT_EQ(instance.getQuery("agse4_mirror").logicalOrigin, 3);
-  // Różnica ma jeden slot dla deklaracji; całkowita faza producenta
-  // obliczanego jest dostępna topologicznie, a faza 3/2 wymaga slotu.
-  EXPECT_EQ(instance.getQuery("sub_declared").startupLatency, 1);
+  // Różnica nie ma własnego członu: ogon wynika z kresu fazy odczytu, a ten po podzieleniu
+  // przez iloraz taktów daje zero zarówno dla producenta deklarowanego, jak i obliczanego.
+  // Do 2026-08-18 stały tu jedynki — dawna reguła dokładała slot deklaracji zawsze,
+  // a fazę 3/2 traktowała jako pełne oczekiwanie (K24: zgodność 19,1%).
+  EXPECT_EQ(instance.getQuery("sub_declared").startupLatency, 0);
   EXPECT_EQ(instance.getQuery("sub_computed").startupLatency, 0);
-  EXPECT_EQ(instance.getQuery("sub_fractional").startupLatency, 1);
+  EXPECT_EQ(instance.getQuery("sub_fractional").startupLatency, 0);
   // Redukcja działa na bieżącej pełnej krotce i tylko propaguje ogon ORAZ origin.
   EXPECT_EQ(instance.getQuery("reduced").startupLatency, 0);
   EXPECT_EQ(instance.getQuery("reduced").logicalOrigin, 3);
@@ -389,13 +391,56 @@ TEST(xcompiler, computes_startup_latency) {
   // O = ceil((1*3 + 2 - 1)/1) = 4.
   EXPECT_EQ(instance.getQuery("wide_nested").logicalOrigin, 4);
   EXPECT_EQ(instance.maxCapacity.at("wide_shifted"), 2);
-  EXPECT_EQ(instance.getQuery("sub_same").startupLatency, 1);
-  // K24/P1: pojemnosc zrodla roznicy wzrosla z 3 na 4. Wartosc 3 pokrywala
-  // odleglosc wsteczna tylko dla ilorazu 1 i 2; od ilorazu 3 odczyt wypadal
-  // poza historia i dawal cichy rekord all-NULL. Nowy czlon to
-  // floor((1+Wout)*ratio) + prefetch deklaracji, brany jako maksimum ze stara
-  // formula — pojemnosc nigdy nie maleje.
-  EXPECT_EQ(instance.maxCapacity.at("subsrc"), 4);
+  EXPECT_EQ(instance.getQuery("sub_same").startupLatency, 0);
+  // K24/P1: czlon pojemnosci zrodla roznicy to floor((1+Wout)*ratio) + prefetch
+  // deklaracji, brany jako maksimum ze stara formula. Wartosc 3 pokrywala odleglosc
+  // wsteczna tylko dla ilorazu 1 i 2; od ilorazu 3 odczyt wypadal poza historia
+  // i dawal cichy rekord all-NULL.
+  //
+  // K24/H10 (2026-08-18): wynik spadl z 4 na 3, bo Wout tego wezla spadl z 1 na 0 wraz
+  // z naprawa ogona `-`. Pojemnosc jest FUNKCJA ogona, wiec zawyzony ogon zawyzal tez
+  // wymagana historie; formula sie nie zmienila. Kierunek jest bezpieczny, bo konsument
+  // czyta te same rekordy, tylko zaczyna o slot wczesniej — potwierdza to model
+  // pojemnosci kampanii (bramka badawcza, `ninja test_gate`).
+  EXPECT_EQ(instance.maxCapacity.at("subsrc"), 3);
+}
+
+// Ogon `-`, `Θ` i `~Θ` po wyprowadzeniu postaci dokładnych (K24/H10, faza 3).
+//
+// Wartości oczekiwane pochodzą z NIEZALEŻNEGO modelu zdarzeniowego kampanii K24
+// (rdb-experiment/investigation_K24H10/PHASE2.md §4), nie z postaci zamkniętej silnika.
+// Cztery pierwsze przypadki zmieniają wynik wobec reguł sprzed 2026-08-18, piąty jest
+// bramką regresyjną: tam slot jest prawdziwy i ma zostać. Trybem porażki tego testu jest
+// powrót zawyżenia — zaniżenie łapie osobna bramka `EXPECT_GE` w ut_h10aGate.
+TEST(xcompiler, exact_tail_for_subtract_and_dehash) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        DECLARE value INTEGER STREAM s58,  5/8  FILE 'a.txt'
+        DECLARE value INTEGER STREAM s12,  1/2  FILE 'a.txt'
+        DECLARE value INTEGER STREAM s116, 1/16 FILE 'a.txt'
+        SELECT * STREAM sub_decl    FROM s58-5/2
+        SELECT * STREAM theta_int   FROM s12&1
+        SELECT * STREAM theta_frac  FROM s12&3/2
+        SELECT * STREAM sub_over    FROM theta_frac-2
+        SELECT * STREAM theta_deep  FROM s116&1/6
+        SELECT * STREAM ntheta_deep FROM theta_deep%1/5
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  // `-` nad deklaracją, iloraz 4: kres fazy zerowy, ogon zerowy (dawniej 1).
+  EXPECT_EQ(instance.getQuery("sub_decl").startupLatency, 0);
+  // `Θ` przy ilorazie całkowitym: własny ogon zerowy (dawniej 1).
+  EXPECT_EQ(instance.getQuery("theta_int").startupLatency, 0);
+  // `Θ` przy ilorazie ułamkowym: slot jest prawdziwy — bramka regresyjna.
+  EXPECT_EQ(instance.getQuery("theta_frac").startupLatency, 1);
+  // `-` nad składową obliczaną o ogonie 1: ogon nie dziedziczy się w skali 1:1 (dawniej 1).
+  EXPECT_EQ(instance.getQuery("sub_over").startupLatency, 0);
+  // `~Θ` nad składową o ogonie 1: dawna reguła zaokrąglała ogon składowej osobno i dawała 1.
+  EXPECT_EQ(instance.getQuery("theta_deep").startupLatency, 1);
+  EXPECT_EQ(instance.getQuery("ntheta_deep").startupLatency, 0);
 }
 
 // Pojemnosc bufora zrodla okna to odleglosc do najstarszego pola okna PLUS jeden:

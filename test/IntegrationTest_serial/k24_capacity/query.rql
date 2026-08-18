@@ -5,6 +5,10 @@
 #
 # win/lag/mix — AGSE nad deklaracja o ilorazie 3 oraz `>N` pod `#`. Przed
 # poprawka lancuch konczyl sie przerwaniem procesu w storage::revRead.
+#
+# K24/H10 (2026-08-18): liczby rekordow sub3/sub4/sub5 wzrosly o jeden (13/10/7 ->
+# 14/11/8). Ogon `-` spadl z 1 na 0, wiec strumien milczy o slot krocej przy tej samej
+# dlugosci przebiegu. Tresc rekordow bez zmian — ciag pozostaje arytmetyczny.
 
 DECLARE value INTEGER STREAM source, 1/100 FILE 'data.txt'
 

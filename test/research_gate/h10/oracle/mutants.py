@@ -25,6 +25,21 @@ TAIL_MUTANTS = {
     "hash_swap_pq": {"hash_swap": True},
     "hash_drop_own": {"hash_drop_own": True},
     "theta_zero_own": {"theta_zero_own": True},
+    # --- dolozone w K24/H10 faza 3 (2026-08-18): postacie zastapione naprawa
+    # ogona `-`, `Theta` i `~Theta`. Kazda z nich byla do tego dnia rachunkiem
+    # SILNIKA, wiec — tak jak `shift_tail_keeps_source` i `hash_closed_form_o1`
+    # — jest najwazniejszym rodzajem mutanta: powrot do niej musi byc widoczny.
+    #
+    # `-` na silniku `0f273d5`: czlon fazowy doklejony do ogona skladowej
+    # zamiast do indeksu, plus osobna galaz dla deklaracji (zawyzala o slot
+    # w 80,9% wezlow `-` korpusu).
+    "subtract_declaration_slot": {"subtract_declaration_slot": True},
+    # `Theta` na silniku `0f273d5`: staly czlon wlasny rowny jeden, doklejany do
+    # przeliczonego ogona skladowej (zawyzal o slot w 40,3% wezlow `Theta`).
+    "theta_constant_own": {"theta_constant_own": True},
+    # `~Theta` na silniku `0f273d5`: samo przeliczenie ogona skladowej przez
+    # takt, z zaokragleniem w gore liczonym OSOBNO (zawyzalo w 0,8% wezlow).
+    "ntheta_rounds_source_tail": {"ntheta_rounds_source_tail": True},
     # Stan sprzed przestemplowania: `N` z powrotem w ogonie przesunięcia.
     "shift_tail_keeps_n": {"shift_tail_keeps_n": True},
     # Stan sprzed przestemplowania: człon fazowy z powrotem w ogonie okna.
