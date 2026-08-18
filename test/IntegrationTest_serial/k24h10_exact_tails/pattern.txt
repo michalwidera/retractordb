@@ -1,0 +1,32 @@
+ THETA_INTEGER_RATIO
+11 Record(s)
+4 Byte(s) per record.
+{ INTEGER value }
+{ value:20 }
+{ value:40 }
+{ value:60 }
+{ value:80 }
+ THETA_FRACTIONAL_RATIO
+13 Record(s)
+4 Byte(s) per record.
+{ INTEGER value }
+{ value:20 }
+{ value:30 }
+{ value:50 }
+{ value:60 }
+ SUBTRACT_OVER_TAILED_SOURCE
+5 Record(s)
+4 Byte(s) per record.
+{ INTEGER value }
+{ value:20 }
+{ value:60 }
+{ value:110 }
+{ value:140 }
+ NTHETA_OVER_TAILED_SOURCE
+11 Record(s)
+4 Byte(s) per record.
+{ INTEGER value }
+{ value:20 }
+{ value:50 }
+{ value:80 }
+{ value:120 }

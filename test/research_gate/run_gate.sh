@@ -76,6 +76,12 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
     step "H10 $t" python3 "tests/$t.py"
   done
 
+  # Postacie fazowe `-`, `Theta` i `~Theta` (K24/H10, 2026-08-18). Osobny poziom,
+  # bo korpus losowy siega q <= 5, a twierdzenie dotyczy kazdego q — przemiatanie
+  # pyta silnik wprost dla q do 12. Poziom niesie wlasna kontrole mocy: jesli dawna
+  # regula nie roznilaby sie od modelu w zadnym przypadku, konczy sie kodem 2.
+  step "H10 test_phase_forms" python3 tests/test_phase_forms.py "$XRETRACTOR"
+
   # Dwa ziarna: w probie i poza proba. Kazde ma wlasny zamrozony werdykt
   # odniesienia, wiec kazde jest osobnym porownaniem.
   for pair in "20260804:VERDICT.md:w probie" "20260807:VERDICT_oos.md:poza proba"; do

@@ -1,0 +1,25 @@
+echo THETA_INTEGER_RATIO
+open th_int
+size
+descc
+list 4
+
+echo THETA_FRACTIONAL_RATIO
+open th_fr
+size
+descc
+list 4
+
+echo SUBTRACT_OVER_TAILED_SOURCE
+open sub_over
+size
+descc
+list 4
+
+echo NTHETA_OVER_TAILED_SOURCE
+open nth_deep
+size
+descc
+list 4
+
+quit

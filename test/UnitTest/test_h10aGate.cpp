@@ -820,7 +820,12 @@ TEST(h10aGate, subtract_never_falls_below_the_event_model) {
 
           const auto &node = instance.getQuery("res");
           EXPECT_EQ(node.rInterval, target) << rql;
-          EXPECT_GE(node.startupLatency, expected.tail) << rql;
+          // Od K24/H10 (2026-08-18) klasa `-` jest DOKŁADNA, więc bramka żąda równości,
+          // nie samego bezpieczeństwa. Nierówność zostaje obok jako osobny komunikat:
+          // zaniżenie i zawyżenie są jakościowo różne, a przy równości oba są błędem,
+          // tyle że o innym koszcie.
+          EXPECT_GE(node.startupLatency, expected.tail) << "ZANIŻENIE\n" << rql;
+          EXPECT_EQ(node.startupLatency, expected.tail) << rql;
           EXPECT_EQ(node.logicalOrigin, expected.origin) << rql;
           if (node.startupLatency == expected.tail) ++tight;
           if (expected.origin != producer.origin) ++originMoved;
@@ -881,8 +886,11 @@ TEST(h10aGate, dehash_never_falls_below_the_event_model) {
       const auto &rightNode = instance.getQuery("right");
       EXPECT_EQ(leftNode.rInterval, deltaA) << rql;
       EXPECT_EQ(rightNode.rInterval, deltaB) << rql;
-      EXPECT_GE(leftNode.startupLatency, theta.tail) << rql;
-      EXPECT_GE(rightNode.startupLatency, notTheta.tail) << rql;
+      // Θ i ~Θ są od K24/H10 klasami DOKŁADNYMI — patrz komentarz przy różnicy.
+      EXPECT_GE(leftNode.startupLatency, theta.tail) << "ZANIŻENIE Θ\n" << rql;
+      EXPECT_GE(rightNode.startupLatency, notTheta.tail) << "ZANIŻENIE ~Θ\n" << rql;
+      EXPECT_EQ(leftNode.startupLatency, theta.tail) << rql;
+      EXPECT_EQ(rightNode.startupLatency, notTheta.tail) << rql;
       EXPECT_EQ(leftNode.logicalOrigin, theta.origin) << rql;
       EXPECT_EQ(rightNode.logicalOrigin, notTheta.origin) << rql;
       if (leftNode.startupLatency == theta.tail) ++thetaTight;
@@ -935,8 +943,10 @@ TEST(h10aGate, dehash_over_two_windows_propagates_origin_and_tail) {
           const dehashOracle theta    = evaluateDehash(producer, left.delta, right.delta, true);
           const dehashOracle notTheta = evaluateDehash(producer, left.delta, right.delta, false);
 
-          EXPECT_GE(instance.getQuery("left").startupLatency, theta.tail) << rql;
-          EXPECT_GE(instance.getQuery("right").startupLatency, notTheta.tail) << rql;
+          EXPECT_GE(instance.getQuery("left").startupLatency, theta.tail) << "ZANIŻENIE Θ\n" << rql;
+          EXPECT_GE(instance.getQuery("right").startupLatency, notTheta.tail) << "ZANIŻENIE ~Θ\n" << rql;
+          EXPECT_EQ(instance.getQuery("left").startupLatency, theta.tail) << rql;
+          EXPECT_EQ(instance.getQuery("right").startupLatency, notTheta.tail) << rql;
           EXPECT_EQ(instance.getQuery("left").logicalOrigin, theta.origin) << rql;
           EXPECT_EQ(instance.getQuery("right").logicalOrigin, notTheta.origin) << rql;
           ++checked;

@@ -42,6 +42,7 @@ osiągniętej dokładności.
 | `tests/test_oracle.py` | 44 przypadki ręczne, 220 porównań — model zdarzeniowy zgadza się z policzonym ręcznie |
 | `tests/test_mutants.py` | wstrzykuje błędy do modelu; wykrycie 100% jest warunkiem, żeby model cokolwiek orzekał |
 | `tests/test_closedform.py` | replika postaci zamkniętej wierna wobec silnika |
+| `tests/test_phase_forms.py` | ogon `-`, `Θ` i `~Θ` wobec modelu zdarzeniowego dla `q` do 12 — poza zakresem korpusu losowego (`q <= 5`); ma własną kontrolę mocy detekcyjnej |
 | `run_campaign.py` | generuje 10 010 losowych planów, dla każdego czyta ogon i origin ze zrzutu `xretractor -c` i zestawia z modelem zdarzeniowym |
 | `verdict.py` | klasyfikuje każdą klasę operatora do jednego z trzech reżimów |
 | `../compare_regimes.py` | **jądro bramki** — porównuje reżimy z odniesieniem, kierunkowo |
