@@ -47,7 +47,19 @@ ninja test_gate                                    # calosc
 ./run_gate.sh --only h10                           # sam H10
 ./run_gate.sh --only h9 --profiles <katalog>       # H9 z profilami ablacji
 ./run_gate.sh --count 1000                         # skrocona kampania H10
+./run_gate.sh --strict ...                         # poziom pominiety = oblany
 ```
+
+`--profiles` przyjmuje sciezke uzywana po `cd` do katalogu poziomu, wiec podaje
+sie ja bezwzglednie; sciezka wzgledna cicho pomija poziom 84/84.
+
+**W CI** bramka ma wlasny job `research-gate` (warstwa 3 workflow
+`manual-nightly-full`, trzy razy w miesiacu, Release). Job buduje najpierw
+cztery profile ablacji, bo bez nich poziom 84/84 jest pomijany, i konfiguruje
+drzewo z `-DRESEARCH_GATE_STRICT=ON`. W tym trybie **pominiety poziom oblewa
+przebieg**: pominiecie znaczy "nie uruchomiono", a zielona bramka o niepelnym
+zakresie jest gorsza niz jej brak. Praca lokalna zostaje przy domyslnym OFF,
+gdzie pominiecie jest tylko odnotowane.
 
 Poziomy mają różne wymagania i `gate_requirements` instaluje te najwyższego:
 

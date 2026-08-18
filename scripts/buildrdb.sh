@@ -20,6 +20,20 @@ fi
 
 echo "-- Note: Current folder is [ ${PWD##*/} ] and will start build in [ $rdb_source_dir ]"
 
+# PODLOGA wersji CMake, nie zamrozenie. Dryft narzedzia w gore jest normalny
+# i ma przechodzic bez bledu i bez ostrzezenia — nowszy cmake spelnia ten prog.
+# Chodzi wylacznie o to, zeby nie zejsc PONIZEJ wersji, dla ktorej zachowania
+# polityk sa ustalone: zakres cmake_minimum_required(VERSION 3.20...4.4) w
+# CMakeLists i dolna granica tool_requires w conanfile.py mowia to samo.
+#
+# Po co: dopoki conanfile mowil [>=3.25], `conan build` bral dowolna nowsza
+# wersje, a `cmake` wolane wprost z PATH bylo tym z apt albo z venv — dwie rozne
+# wersje generowaly to samo drzewo. 2026-08-18 wyszlo to jako ostrzezenie CMP0219
+# (polityka od 4.4) widoczne wylacznie w CI i niereprodukowalne lokalnie (4.2.3).
+# Gdy nowszy cmake zacznie ostrzegac o kolejnej polityce, podnosi sie gorna
+# granice zakresu w CMakeLists — swiadomie, w commicie.
+RDB_CMAKE_MIN_VERSION="4.4.2"
+
 production_cmake_args=(
     -DRDB_OPT_DEDUP_SUBSTRATES=ON
     -DRDB_OPT_SHARE_EQUIVALENT_SELECTS=ON
@@ -103,6 +117,15 @@ install_python_venv_support() {
 tool_installed() {
     local tool="$1"
     case "$tool" in
+        cmake-pinned)
+            # Sama obecnosc `cmake` nie wystarcza — liczy sie, czy w PATH stoi
+            # wersja nie starsza niz podloga. Nowsza spelnia warunek i NIE jest
+            # cofana do podlogi: dryft w gore jest oczekiwany.
+            local ver
+            command_exists cmake || return 1
+            ver=$(extract_first_version "$(cmake --version 2>/dev/null | head -n1)")
+            [ -n "$ver" ] && version_ge "$ver" "$RDB_CMAKE_MIN_VERSION"
+            ;;
         graphviz)
             command_exists dot
             ;;
@@ -177,6 +200,29 @@ install_gcovr_if_missing() {
 
     pip3 install gcovr
     command_exists gcovr
+}
+
+# CMake z apt jest tak stary (albo tak nowy), jak akurat wypadlo dystrybucji.
+# Przypieta wersja ladowana jest do ~/.venv, ktore i tak jest aktywowane przez
+# ~/.bashrc i przez CI, wiec `cmake` z PATH staje sie ta sama wersja, ktorej uzywa
+# conan. Systemowego cmake to nie rusza.
+install_pinned_cmake_if_needed() {
+    ensure_venv
+    # --only-binary: PyPI ma dla cmake takze sdist, a jego budowa to kompilacja
+    # calego CMake ze zrodel. Na platformie bez kola ma sie nie udac od razu,
+    # zamiast zajmowac CI na godziny. Kola sa dla x86_64 i aarch64, wiec job ARM
+    # jest pokryty.
+    if ! pip install --only-binary=:all: "cmake>=$RDB_CMAKE_MIN_VERSION"; then
+        echo "-- WARNING: brak koła cmake>=$RDB_CMAKE_MIN_VERSION dla tej platformy."
+        echo "-- WARNING: build nadal zadziala — conan wciaga wlasnego cmake — ale"
+        echo "--          'cmake' wolane wprost z PATH bedzie starsza wersja."
+        return 0
+    fi
+    if ! tool_installed cmake-pinned; then
+        echo "-- WARNING: 'cmake' z PATH jest nadal starszy niz $RDB_CMAKE_MIN_VERSION."
+        echo "--          Sprawdz, czy ~/.venv jest aktywowane przed systemowym cmake."
+    fi
+    return 0
 }
 
 install_cmake_format_if_missing() {
@@ -317,7 +363,7 @@ cmd_to_apt_package() {
         apt-get) echo "apt" ;;
         sudo) echo "sudo" ;;
         batcat) echo "bat" ;;
-        conan|gcovr|cmake-format) echo "" ;;
+        conan|gcovr|cmake-format|cmake-pinned) echo "" ;;
         *) echo "$cmd" ;;
     esac
 }
@@ -389,6 +435,9 @@ install_missing_special_tool() {
         cmake-format)
             install_cmake_format_if_missing
             ;;
+        cmake-pinned)
+            install_pinned_cmake_if_needed
+            ;;
         *)
             command_exists "$cmd"
             ;;
@@ -435,7 +484,7 @@ ensure_tools_for_option() {
             tool_specs=(
                 "sudo:required" "apt-get:required"
                 "git:required" "gcc:required" "g++:required"
-                "cmake:required" "make:required" "ninja:required"
+                "cmake:required" "cmake-pinned:required" "make:required" "ninja:required"
                 "python3:required" "python3-venv:required" "pip3:required" "conan:required"
                 "valgrind:required" "hexdump:required" "graphviz:required"
                 "cppcheck:recommended" "mold:recommended" "ccache:recommended" "rg:recommended"
@@ -445,8 +494,8 @@ ensure_tools_for_option() {
         "toolchain_required")
             tool_specs=(
                 "sudo:required" "apt-get:required"
-                "gcc:required" "g++:required" "cmake:required" "make:required"
-                "ninja:required" "build-essential:required"
+                "gcc:required" "g++:required" "cmake:required" "cmake-pinned:required"
+                "make:required" "ninja:required" "build-essential:required"
                 "python3:required" "python3-venv:required" "pip3:required"
                 "mold:required" "valgrind:required"
                 "graphviz:required" "hexdump:required" "conan:required"
@@ -457,7 +506,7 @@ ensure_tools_for_option() {
             tool_specs=(
                 "sudo:required" "apt-get:required"
                 "git:required" "gcc:required" "g++:required"
-                "cmake:required" "make:required" "ninja:required"
+                "cmake:required" "cmake-pinned:required" "make:required" "ninja:required"
                 "python3:required" "python3-venv:required" "pip3:required" "conan:required"
                 "valgrind:required" "hexdump:required" "graphviz:required"
                 "cppcheck:required" "gdb:required" "mold:required" "ccache:required" "cmake-format:required" "clang-format:required" "clang-tidy:required" "rg:required"
@@ -590,6 +639,20 @@ ensure_tools_for_option() {
             compat_failures=$((compat_failures + 1))
             printf "%-28s | %-14s | %-8s | %-18s\n" "cmake version" "missing" "$compat_status" ">= 3.20"
         fi
+
+        # Osobny wiersz, bo to inne pytanie niz "czy w ogole da sie zbudowac".
+        # Tutaj chodzi o to, czy `cmake` z PATH nie jest STARSZY niz wersja, dla
+        # ktorej zachowania polityk sa ustalone. Nowszy jest w porzadku — dryft
+        # narzedzia w gore jest oczekiwany i nie jest ani bledem, ani ostrzezeniem.
+        # Starszy jest tylko ostrzezeniem: build i tak przejdzie, bo conan wciaga
+        # wlasnego cmake, ale drzewo generuja wtedy dwie rozne wersje — a wlasnie
+        # tak powstalo ostrzezenie CMP0219 widoczne wylacznie w CI (2026-08-18).
+        if [ -n "$cmake_ver" ] && version_ge "$cmake_ver" "$RDB_CMAKE_MIN_VERSION"; then
+            compat_status="ok"
+        else
+            compat_status="warn"
+        fi
+        printf "%-28s | %-14s | %-8s | %-18s\n" "cmake policy floor" "${cmake_ver:-unknown}" "$compat_status" ">= $RDB_CMAKE_MIN_VERSION"
 
         conan_ver=""
         conan_bin=$(command -v conan 2>/dev/null || echo "$HOME/.venv/bin/conan")

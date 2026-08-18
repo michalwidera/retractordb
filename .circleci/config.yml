@@ -6,6 +6,10 @@ parameters:
   run_manual_arm:
     type: boolean
     default: false
+  # Mimo nazwy nie jest to wylacznie uruchomienie reczne: ten sam parametr ustawia
+  # trigger `cron-shedule` skonfigurowany w UI CircleCI (0 4 5,15,25 * *, galaz
+  # master). Nazwa zostaje, bo trigger przekazuje ja doslownie — zmiana wymagalaby
+  # rownoczesnej edycji triggera po stronie UI.
   run_manual_nightly_full:
     type: boolean
     default: false
@@ -14,7 +18,16 @@ parameters:
     default: false
 
 workflows:
+  # Warstwa commitowa. Jeden job: kompilacja Debug i pelny zestaw testow.
   commit:
+    # Pipeline uruchomiony przez trigger cronowy albo recznie z parametrem ma
+    # galaz master, wiec bez tego warunku `commit` dokladalby drugi, zbedny
+    # build-debug-ninja-mydocker obok workflow parametrowego.
+    when:
+      and:
+        - not: << pipeline.parameters.run_manual_nightly_full >>
+        - not: << pipeline.parameters.run_manual_arm >>
+        - not: << pipeline.parameters.run_manual_ablation >>
     jobs:
       - build-debug-ninja-mydocker:
           filters:
@@ -24,54 +37,46 @@ workflows:
                 - /[Ii]ssue_.*/
                 - /[0-9]+[-].*/
 
-  nightly-full:
-    triggers:
-      - schedule:
-          # https://crontab.guru/#0_4_5,15,25_*_*
-          # At 04:00 on day-of-month 5, 15, and 25.
-          cron: "0 4 5,15,25 * *"
-          filters:
-            branches:
-              only:
-                - master
-                - /[Ii]ssue_.*/
-    jobs:
-      - build-release-ninja-mydocker
-      - build-release:
-          requires:
-            - build-release-ninja-mydocker
-      - build-debug-ninja-mydocker:
-          check_skipci: false
-          requires:
-            - build-release-ninja-mydocker
-      - build-debug:
-          requires:
-            - build-release
-      - build-ARM:
-          requires:
-            - build-release
   manual-arm:
     when: << pipeline.parameters.run_manual_arm >>
     jobs:
       - build-ARM
 
+  # Pelny przebieg: trzy razy w miesiacu z triggera `cron-shedule` albo recznie.
+  # Do 2026-08-18 istnial obok blizniaczy workflow `nightly-full` z wlasnym
+  # `triggers.schedule` o tym samym cronie — scalony tutaj, zeby jeden harmonogram
+  # nie byl zapisany w dwoch miejscach.
+  #
+  # Trzy warstwy, kazda odcina nastepna:
+  #   L1  smoke  — kompilacja Debug + same unity; zatrzymuje reszte w kilka minut;
+  #   L2  pelny zestaw testow (189) w Debug i Release na obrazie projektu;
+  #   L3  rzeczy kosztowne: bramka badawcza, budy na czystej Ubuntu, pakiet, ARM.
   manual-nightly-full:
     when: << pipeline.parameters.run_manual_nightly_full >>
     jobs:
-      - build-release-ninja-mydocker
-      - build-release:
+      # -- L1 ---------------------------------------------------------------
+      - smoke-debug-ninja-mydocker
+      # -- L2 ---------------------------------------------------------------
+      - build-release-ninja-mydocker:
           requires:
-            - build-release-ninja-mydocker
+            - smoke-debug-ninja-mydocker
       - build-debug-ninja-mydocker:
           check_skipci: false
+          requires:
+            - smoke-debug-ninja-mydocker
+      # -- L3 ---------------------------------------------------------------
+      - research-gate:
+          requires:
+            - build-release-ninja-mydocker
+      - build-release:
           requires:
             - build-release-ninja-mydocker
       - build-debug:
           requires:
-            - build-release
+            - build-debug-ninja-mydocker
       - build-ARM:
           requires:
-            - build-release
+            - build-debug-ninja-mydocker
 
   # Optimizer ablation matrix — manual only, never scheduled and never
   # commit-triggered. One-factor-at-a-time over the RDB_OPT_* switches plus the
@@ -367,6 +372,39 @@ commands:
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> packages
 
 jobs:
+  # L1 pelnego przebiegu: kompilacja Debug i SAME testy jednostkowe (`ut_`), bez
+  # `it_` i `pt_`. Jedyne zadanie tego jobu to odciac warstwy 2 i 3, kiedy drzewo
+  # sie nie kompiluje albo unity padaja — zamiast dowiadywac sie o tym po pelnym
+  # zestawie 189 testow. Zapisuje cache ccache dla `mydocker-debug`, wiec
+  # build-debug-ninja-mydocker w warstwie 2 startuje z goracego cache.
+  smoke-debug-ninja-mydocker:
+    working_directory: ~/retractordb
+    executor: debian-mydocker
+    steps:
+      - checkout:
+          method: blobless
+      - check-skipci:
+          enabled: false
+      - prep-env:
+          use_ninja: true
+      - ccache-restore:
+          cache_id: mydocker-debug
+      - conan-install:
+          build_type: Debug
+          build_param: --build missing
+          build_tool: ninja
+      - conan-build:
+          build_type: Debug
+          build_param: --build missing
+          build_tool: ninja
+      - ccache-save:
+          cache_id: mydocker-debug
+      - run:
+          name: Unit tests only (no integration)
+          command: |
+            export PATH="$HOME/.local/bin:$PATH"
+            cd build/Debug/test && ctest -j "$(nproc)" -R '^ut_' --output-on-failure
+
   build-release-ninja-mydocker:
     working_directory: ~/retractordb
     executor: debian-mydocker
@@ -419,6 +457,59 @@ jobs:
       - run-test:
           build_type: Debug
           build_tool: ninja
+
+  # Bramka badawcza H9/H10 — ochrona osiagnietych wynikow przed regresja silnika
+  # (test/research_gate/README.md). Celowo poza `ninja` i poza `ninja test`, wiec
+  # musi byc wywolana jawnie; L3, bo to najdrozszy job w przebiegu.
+  #
+  # Release, nie Debug: bramka wykonuje ok. 20 000 kompilacji planow przez
+  # xretractor. Sprawdzane zachowanie jest w obu konfiguracjach identyczne, czas
+  # przebiegu nie jest.
+  research-gate:
+    working_directory: ~/retractordb
+    executor: debian-mydocker
+    steps:
+      - checkout:
+          method: blobless
+      - check-skipci:
+          enabled: false
+      - prep-env:
+          use_ninja: true
+      # Sam odczyt. Klucz `mydocker-release` zapisuje build-release-ninja-mydocker,
+      # ktory w tym workflow konczy sie przed tym jobem.
+      - ccache-restore:
+          cache_id: mydocker-release
+      - conan-install:
+          build_param: --build missing
+          build_tool: ninja
+      - run:
+          name: Configure Release tree (gate in strict mode)
+          command: |
+            cmake \
+              -S . \
+              -B build/Release \
+              -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_TOOLCHAIN_FILE="$PWD/build/Release/generators/conan_toolchain.cmake" \
+              -DRESEARCH_GATE_STRICT=ON
+      # Poziom 84/84 hipotezy H9 odroznia R1 od R2 wylacznie na czterech profilach
+      # ablacji. Bez nich bramka ten poziom POMIJA, a w trybie strict pominiecie
+      # jest bledem — wiec profile musza powstac tutaj, w tym samym jobie i z tej
+      # samej tresci src/ (bramka sprawdza odcisk).
+      - run:
+          name: Build H9 ablation profiles
+          command: |
+            K6_CCACHE=1 K6_BUILD_JOBS="$(nproc)" test/research_gate/h9/build_profiles.sh
+      - run:
+          name: Research gate H9/H10
+          command: |
+            cmake --build build/Release --target test_gate
+      - store_artifacts:
+          path: build/Release/test/research_gate/gate-work
+          destination: research-gate
+      - store_artifacts:
+          path: build/gate-profiles-logs
+          destination: research-gate-profiles
 
   build-release:
     working_directory: ~/retractordb

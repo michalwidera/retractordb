@@ -2,32 +2,15 @@
 # Regresja epoki logicznej zapytań ad hoc. Późny pass-through musi zachować
 # bieżący indeks źródła zarówno w złączeniu, jak i w oknie AGSE.
 set -eu
+. "$(dirname "$0")/../serverlib.sh"
 
 rm -rf temp
 mkdir -p temp
 
-server_pid=""
-cleanup() {
-  xqry -k >/dev/null 2>&1 || true
-  if [ -n "$server_pid" ] && kill -0 "$server_pid" 2>/dev/null; then
-    kill "$server_pid" 2>/dev/null || true
-    wait "$server_pid" 2>/dev/null || true
-  fi
-}
-trap cleanup EXIT INT TERM
-
-xretractor query.rql -m 45 > adhoc-server.out 2> adhoc-server.err &
-server_pid=$!
-
-lock_file="${TMPDIR:-/tmp}/xretractor_service.lock"
-for _ in $(seq 1 100); do
-  [ -f "$lock_file" ] && break
-  sleep 0.02
-done
-[ -f "$lock_file" ] || {
-  echo "ad hoc: serwer nie utworzyl blokady"
-  exit 1
-}
+# server_start czeka na blokade NALEZACA do tego procesu. Samo istnienie pliku
+# blokady spelnialaby rowniez instancja zostawiona przez wczesniejszy test,
+# a zapytania ad hoc trafialyby wtedy do cudzego planu.
+server_start query.rql -m 45
 
 # Plan ma już rekordy o indeksach większych niż origin=2.
 sleep 0.6
@@ -60,8 +43,7 @@ xqry -a 'SELECT * STREAM late_left FROM late_hash&0.1'
 sleep 0.2
 xqry -a 'SELECT * STREAM late_right FROM late_hash%0.1'
 
-wait "$server_pid"
-server_pid=""
+server_wait_exit
 
 [ -s temp/late_pair ] || {
   echo "ad hoc: late_pair nie zawiera rekordow"

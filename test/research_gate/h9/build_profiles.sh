@@ -96,6 +96,16 @@ verify_probe_binary_profile() {
   }
 }
 
+# Odcisk tresci src/ dla testu swiezosci profili w run_gate.sh. Liczy go BRAMKA,
+# a nie ten skrypt: jedna definicja odcisku po obu stronach porownania. Odcisk
+# powstaje PRZED buildem, wiec opisuje zrodla, z ktorych profile sa budowane.
+gate_sh="$here/../run_gate.sh"
+stamp_name=".gate-src-fingerprint"   # nazwa uzgodniona z run_gate.sh ($STAMP)
+[ -x "$gate_sh" ] || die "brak wykonywalnego $gate_sh — nie ma czym policzyc odcisku zrodel"
+src_fp=$("$gate_sh" --print-src-fingerprint --code-repo "$code_repo") \
+  || die "nie udalo sie policzyc odcisku tresci src/ w $code_repo"
+log "odcisk tresci src/: $src_fp"
+
 conan_dir="$code_repo/build/Conan-K6-Profiles"
 toolchain="$conan_dir/build/Release/generators/conan_toolchain.cmake"
 mkdir -p "$raw_dir"
@@ -134,6 +144,11 @@ while IFS=$'\t' read -r profile slug dedup share commutative factor; do
     die "profil $profile nie potwierdza się w --build-info"
   "$binary" --build-info >"$raw_dir/build-info-$slug.txt"
 
+  # Odcisk zapisany PO weryfikacji, wiec istnieje wylacznie dla profilu, ktory
+  # potwierdzil sie bajtowo w `--build-info`. run_gate.sh porownuje go z
+  # odciskiem biezacego src/; brak pliku znaczy dla bramki "nieswiezy".
+  printf '%s\n' "$src_fp" >"$build_dir/$stamp_name"
+
   if [ "${K6_SETCAP:-0}" = "1" ]; then
     # R7: sonda mierzy pod SCHED_FIFO i mlockall, więc capabilities muszą być
     # na KAŻDEJ z czterech binarek, nie tylko na zainstalowanej.
@@ -160,4 +175,13 @@ done < profiles.tsv
 expected=$(awk 'NR > 1 && NF { n++ } END { print n + 0 }' profiles.tsv)
 [ "$expected" -ge 1 ] || die "profiles.tsv nie zawiera żadnego profilu"
 [ "$built" -eq "$expected" ] || die "zbudowano $built profili, oczekiwano $expected"
-log "profile zbudowane i zweryfikowane: $built"
+
+# Zrodla nie moga sie zmienic W TRAKCIE budowania, bo zapisane odciski mowilyby
+# wtedy o czyms innym niz zawartosc binarek. Sprawdzenie jest tanie, a bez niego
+# edycja src/ w trakcie builda daje profil z odciskiem sprzed edycji.
+src_fp_after=$("$gate_sh" --print-src-fingerprint --code-repo "$code_repo") \
+  || die "nie udalo sie przeliczyc odcisku tresci src/ po budowie"
+[ "$src_fp_after" = "$src_fp" ] \
+  || die "src/ zmienilo sie w trakcie budowania profili ($src_fp -> $src_fp_after); zbudowac ponownie"
+
+log "profile zbudowane i zweryfikowane: $built (odcisk src/: $src_fp)"

@@ -33,9 +33,9 @@ else()
   set(_rdbInfoActive 1)
 endif()
 
-# Testy startują serwer (blokada /tmp/xretractor_service.lock), więc muszą biec
-# szeregowo. Makro add_test wykrywa to po -m/-k w argv, ale tu flagi są w
-# skrypcie, dlatego ustawiamy RUN_SERIAL jawnie.
+# Testy startują serwer (blokada ${TMPDIR:-/tmp}/xretractor_service.lock), więc
+# muszą biec szeregowo. Makro add_test wykrywa to po -m/-k w argv, ale tu flagi
+# są w skrypcie, dlatego ustawiamy RUN_SERIAL jawnie.
 set_tests_properties(
   ${TestID}-run ${TestID}-env PROPERTIES RUN_SERIAL TRUE TIMEOUT 60 ENVIRONMENT
                                          "RDB_INFO_ACTIVE=${_rdbInfoActive}")

@@ -48,10 +48,21 @@ skutku R1 od skutku R2, więc bez `--profiles` bramka raportuje ten poziom jako
 ```
 
 **Profile muszą być świeże.** `xretractor --build-info` podaje wyłącznie flagi
-optymalizatora, nie rewizję źródła, więc jedyną dostępną miarą jest czas
-modyfikacji. Bramka porównuje go z `src/` i gdy którykolwiek profil jest
-starszy, **pomija poziom 84/84** zamiast orzekać. Profil zbudowany z innej
-rewizji dałby zieleń, która nie mówi nic o rewizji badanej.
+optymalizatora, nie rewizję źródła, więc świeżość rozstrzyga **odcisk treści
+`src/`**. `build_profiles.sh` zapisuje go przy budowie profilu w
+`build/K26v3-<slug>/.gate-src-fingerprint`, a bramka porównuje z odciskiem
+bieżącego drzewa. Obie strony liczą go tym samym kodem — `run_gate.sh
+--print-src-fingerprint` — więc definicja odcisku jest jedna. Gdy odciski się
+różnią, profilu brak, brak przy nim odcisku albo odcisku nie da się policzyć,
+bramka **pomija poziom 84/84** zamiast orzekać. Profil zbudowany z innej treści
+dałby zieleń, która nie mówi nic o badanej rewizji.
+
+Odcisk liczy się z **drzewa roboczego**, nie z `HEAD`, więc niezacommitowana
+zmiana w `src/` unieważnia profile dokładnie tak samo jak commit. Miarą **nie
+jest** czas modyfikacji: `git checkout` i `pull --rebase` przepisują mtime także
+tym plikom, których treść się nie zmieniła, i dawna reguła mtime pomijała wtedy
+poziom 84/84 bez powodu (2026-08-18 — profile zbudowane o 17:00 uznane za
+nieświeże po rebase o 18:37, przy pustym `git diff -- src/`).
 
 Zależności najwyższego poziomu instaluje `scripts/buildrdb.sh
 gate_requirements` — przypięty JDK 17 i Flink 2.3.0, z weryfikacją sumy

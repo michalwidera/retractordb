@@ -4,15 +4,12 @@
 #
 # Rekord PO dzieleniu przez zero jest tu istota testu: gdyby brak wyniku byl
 # obslugiwany wyjatkiem, trzeci rekord nigdy by nie powstal.
-#
-# ${TMPDIR:-/tmp} dla sciezki blokady serwera — zob. komentarz w issue121_isnull.
 set -e
-LOCK="${TMPDIR:-/tmp}/xretractor_service.lock"
+. "$(dirname "$0")/../serverlib.sh"
 mkdir -p temp
-xretractor query.rql -k -x &
-while [ ! -f "$LOCK" ]; do sleep 0.1; done
+server_start query.rql -k -x
 xqry -s dst -k -m 3 > out.txt
-while [ -f "$LOCK" ]; do sleep 0.1; done
+server_wait_exit
 grep -F '25' out.txt
 grep -F 'null' out.txt
 grep -F '20' out.txt
