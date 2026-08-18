@@ -41,7 +41,7 @@ class Retractor(ConanFile):
     # | fmt/12.1.0                 | MIT                                   | Tak          | tranzytywna (z spdlog)               |
     # | libbacktrace/cci.20210118  | BSD-3-Clause                          | Tak          | tranzytywna (z boost)                |
     # | b2/5.4.2                   | BSL-1.0                               | Tak          | narzędzie build-only                 |
-    # | cmake/4.3.2                | BSD-3-Clause                          | Tak          | narzędzie build-only                 |
+    # | cmake/4.4.2                | BSD-3-Clause                          | Tak          | narzędzie build-only                 |
     #
     # (*) GPL-2.0 nie infekuje produktu: openjdk uruchamia jedynie ANTLR przy buildzie,
     #     nie jest linkowany do binariów, a Classpath-exception i tak na to zezwala.
@@ -112,7 +112,13 @@ class Retractor(ConanFile):
         cmake_layout(self, src_folder=".")
 
     def build_requirements(self):
-        self.tool_requires("cmake/[>=3.25]")
+        # PODLOGA, nie zamrozenie: dryft w gore jest dozwolony, zejscie ponizej
+        # nie. Dawne [>=3.25] pozwalalo swiezemu kontenerowi CI wziac wersje, dla
+        # ktorej zachowania polityk nie byly w tym drzewie ustalone — 2026-08-18
+        # wyszlo to jako CMP0219 (polityka od 4.4), widoczne wylacznie w CI.
+        # Prog trzyma sie razem z RDB_CMAKE_MIN_VERSION w scripts/buildrdb.sh
+        # i z zakresem cmake_minimum_required(VERSION 3.20...4.4) w CMakeLists.
+        self.tool_requires("cmake/[>=4.4.2]")
 
     def package(self):
         cmake = self._configure_cmake()

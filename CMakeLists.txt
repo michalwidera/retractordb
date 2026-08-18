@@ -1,4 +1,16 @@
-cmake_minimum_required(VERSION 3.20 FATAL_ERROR)
+# Zakres `<min>...<max>`, nie jedna liczba: dolna granica mowi, czym da sie ten
+# projekt skonfigurowac (3.20), gorna — z ktorej wersji brane sa DOMYSLNE
+# ZACHOWANIA polityk (4.4). Nowszy cmake dostaje wiec zachowanie NEW zamiast
+# ostrzegac, a starszy nadal konfiguruje projekt.
+#
+# Powod historyczny: `tool_requires("cmake/[>=3.25]")` nie byl przypiety, wiec
+# CI w swiezym kontenerze pobieral nowsza wersje niz deweloper. 2026-08-18
+# rozjazd ujawnil sie jako CMP0219 (od 4.4) w testach integracyjnych, gdzie
+# `add_test` jest przeslonione makrem: przy zachowaniu OLD ginal backslash i
+# `grep '\.shadow$'` stawal sie `grep '.shadow$'`. Podloga wersji stoi teraz w
+# conanfile.py i w RDB_CMAKE_MIN_VERSION w scripts/buildrdb.sh — dryft w gore
+# jest dozwolony, a te trzy miejsca podnosi sie razem i swiadomie.
+cmake_minimum_required(VERSION 3.20...4.4 FATAL_ERROR)
 
 # Jedyne źródło prawdy o wersji: plik VERSION w korzeniu repo. Czytany też przez
 # conanfile.py (set_version) i Dockerfile (--build-arg). NIE wpisywać wersji
