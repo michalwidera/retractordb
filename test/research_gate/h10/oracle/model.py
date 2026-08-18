@@ -54,6 +54,18 @@ PROBE_FACTOR = 4
 # jest małą liczbą (generator: |L| <= 4, N <= 8, głębokość <= 6). Limit chroni
 # wyłącznie przed odwzorowaniem, które wbrew założeniu nie rośnie — wtedy
 # poszukiwanie nie ma prawa zakończyć się cicho.
+#
+# K24e (2026-08-18): stała była WARTOŚCIĄ BEZWZGLĘDNĄ, nie powiązaną z oknem
+# sondowania, przez co strzelała w planach o dużym okresie fazowym — czyli
+# w przebiegu całkowicie legalnym. Skan potrzebuje `last_missing + window`
+# kroków, a window = 4*(p+q); korpusy bramki mają maksymalne okno 98 228 przy
+# limicie 100 000, czyli zapas 1,8%, o którym nikt nie wiedział. Ziarno spoza
+# bramki (`20260819`) wygenerowało `#` o ilorazie 2000/29841 (okno 127 364)
+# i kampania zatrzymała się na błędzie aparatury.
+#
+# Limit jest teraz marginesem NAD oknem, nie zamiast niego: strażnik zachowuje
+# swoją rolę (odwzorowanie, które nie rośnie, wciąż zatrzymuje przebieg), ale
+# nie może już strzelić w planie, którego okno jest po prostu szerokie.
 ORIGIN_LIMIT = 100_000
 
 
@@ -197,10 +209,11 @@ def _origin_over_scan(node, children, origins, window):
     """
     last_missing = -1
     n = 0
+    limit = ORIGIN_LIMIT + window
     while n <= last_missing + window:
-        if n > ORIGIN_LIMIT:
+        if n > limit:
             raise OracleError(f"oracle: nie znaleziono początku logicznego dla {node.name} "
-                              f"poniżej {ORIGIN_LIMIT}")
+                              f"poniżej {limit} (okno {window})")
         if not _record_exists(node, children, origins, n):
             last_missing = n
         n += 1
