@@ -32,7 +32,8 @@ std::vector<std::string> split(const std::string &text, char separator) {
   std::vector<std::string> parts;
   std::istringstream stream(text);
   std::string item;
-  while (std::getline(stream, item, separator)) parts.push_back(item);
+  while (std::getline(stream, item, separator))
+    parts.push_back(item);
   return parts;
 }
 

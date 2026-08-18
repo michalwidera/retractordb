@@ -124,6 +124,22 @@ def hand_cases():
         add(f"ntheta {delta}%{other}", [a, P.make_ntheta("n0", a, other)],
             {"n0": ntheta1}, {"n0": ntheta2}, {"n0": 0})
 
+    # ~Theta nad skladowa o NIEZEROWYM ogonie. Bez tego przypadku korpus nie
+    # rozroznia reguly dokladnej od samego przeliczenia ogona skladowej przez
+    # takt: rozjazd wymaga W_src > 0 (w kampanii K24 tylko 0,8% wezlow `~Theta`).
+    #
+    # s0 = 1/16; n0 = s0&1/6 ma Delta = (1/16*1/6)/(1/6-1/16) = 1/10.
+    #   idx(n) = n + ceil((n+1)*(1/10)/(1/6)) = n + ceil(3(n+1)/5),
+    #   deficyt ceil((idx(n)+1)*5/8) - 1 - n wynosi 1 dla n = 0..3 i 0 od n = 4,
+    #   wiec W(n0) = 1, O(n0) = 0 (odwzorowanie nieujemne od zera).
+    # n1 = n0%1/5 ma Delta = (1/10*1/5)/(1/5-1/10) = 1/5, a idx(n) = n + floor(n) = 2n:
+    #   deficyt = ceil((2n+1+W_src)*(1/10)/(1/5)) - 1 - n = ceil((2n+2)/2) - 1 - n = 0,
+    #   wiec W(n1) = 0 mimo ogona skladowej 1. Przy C2 deficyt podnosi sie do 1.
+    a = _src("s0", Fraction(1, 16))
+    th = P.make_theta("n0", a, Fraction(1, 6))
+    add("ntheta over theta (skladowa z ogonem)", [a, th, P.make_ntheta("n1", th, Fraction(1, 5))],
+        {"n0": 1, "n1": 0}, {"n0": 1, "n1": 1}, {"n0": 0, "n1": 0})
+
     # --- suma ---
     a, b = _src("s0", 1), _src("s1", 1)
     add("add 1+1", [a, b, P.make_add("n0", a, b)], {"n0": 0}, {"n0": 1}, {"n0": 0})

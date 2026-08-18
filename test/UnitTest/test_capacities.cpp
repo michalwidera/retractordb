@@ -63,14 +63,21 @@ struct subtractCapacityCase {
   int expectedCapacity;
 };
 
+// K24/H10 (2026-08-18): ogon spadl z 1 na 0 we wszystkich siedmiu przypadkach, bo
+// znikla galaz deklaracyjna w SubtractStartupLatency() — dokladala slot ZAWSZE, choc
+// deklaracja ma ogon zerowy. Wartosci ogona pochodza z modelu zdarzeniowego kampanii
+// K24 (2669/2669 i 2670/2670 wezlow `-` o skladowej deklarowanej na obu ziarnach),
+// pojemnosci z eventCapacity() ponizej — czyli z niezaleznego przegladu okresu, ktory
+// test i tak sprawdza osobnym EXPECT_EQ. Pojemnosc jest funkcja ogona, wiec zawyzony
+// ogon zawyzal tez wymagana historie.
 const std::vector<subtractCapacityCase> subtractCases{
-    {.intervalRatio = ratio(1), .sourceWidth = 1, .expectedTail = 1, .expectedCapacity = 4},
-    {.intervalRatio = ratio(3, 2), .sourceWidth = 2, .expectedTail = 1, .expectedCapacity = 5},
-    {.intervalRatio = ratio(2), .sourceWidth = 3, .expectedTail = 1, .expectedCapacity = 6},
-    {.intervalRatio = ratio(7, 3), .sourceWidth = 4, .expectedTail = 1, .expectedCapacity = 6},
-    {.intervalRatio = ratio(3), .sourceWidth = 1, .expectedTail = 1, .expectedCapacity = 8},
-    {.intervalRatio = ratio(4), .sourceWidth = 2, .expectedTail = 1, .expectedCapacity = 10},
-    {.intervalRatio = ratio(5), .sourceWidth = 4, .expectedTail = 1, .expectedCapacity = 12},
+    {.intervalRatio = ratio(1), .sourceWidth = 1, .expectedTail = 0, .expectedCapacity = 3},
+    {.intervalRatio = ratio(3, 2), .sourceWidth = 2, .expectedTail = 0, .expectedCapacity = 3},
+    {.intervalRatio = ratio(2), .sourceWidth = 3, .expectedTail = 0, .expectedCapacity = 4},
+    {.intervalRatio = ratio(7, 3), .sourceWidth = 4, .expectedTail = 0, .expectedCapacity = 4},
+    {.intervalRatio = ratio(3), .sourceWidth = 1, .expectedTail = 0, .expectedCapacity = 5},
+    {.intervalRatio = ratio(4), .sourceWidth = 2, .expectedTail = 0, .expectedCapacity = 6},
+    {.intervalRatio = ratio(5), .sourceWidth = 4, .expectedTail = 0, .expectedCapacity = 7},
 };
 
 // ADD wybiera rekord floor(n*Dout/Dsrc) każdej składowej. Ogon jest najmniejszą

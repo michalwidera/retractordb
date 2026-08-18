@@ -259,10 +259,15 @@ sumOracle evaluateSum(const streamModel &left, const streamModel &right, int pro
 // --- różnica `-` --------------------------------------------------------------------
 //
 // C-Delta wybiera z producenta rekord ceil(n*Delta/Delta_src); dla równych interwałów
-// wybór jest tożsamością. Model daje ogon w konwencji C1, czyli DOLNE ograniczenie:
-// silnik dokłada deklaracji własny slot (źródło jest publikowane po konsumentach
-// w takcie), więc bramka wymaga tu bezpieczeństwa, a nie równości. Klasa `-` jest
-// w tab:tail-exactness zawyżająca — treścią regresji jest brak zaniżeń.
+// wybór jest tożsamością. Model daje ogon w konwencji C1, czyli DOLNE ograniczenie,
+// i bramka wymaga tu bezpieczeństwa (EXPECT_GE), a nie równości — trybem porażki jest
+// zaniżenie, bo ono oznacza rekord wyemitowany przed określeniem zależności.
+//
+// Do 2026-08-18 klasa `-` była w tab:tail-exactness zawyżająca: silnik dokładał
+// deklaracji własny slot, uzasadniając to publikacją źródła po konsumentach w takcie.
+// Ta gałąź zniknęła (K24/H10 faza 3) — dokładała slot ZAWSZE, stawiając `-` w konwencji
+// dostępności innej niż siedem pozostałych klas silnika. Bramka zostaje kierunkowa:
+// dokładność jest dziś osiągana, ale chronione jest to, żeby nigdy nie spaść poniżej.
 struct subtractOracle {
   int origin;
   int tail;
@@ -291,9 +296,10 @@ subtractOracle evaluateSubtract(const streamModel &source, const ratio &target, 
 // celowo bez wołania Div()/Mod() z SOperations.hpp: wspólny błąd odwzorowania
 // przeszedłby przez bramkę niezauważony.
 //
-// Theta jest o slot NIEPRZYCZYNOWA — jej pozycja w przeplocie wypada po własnym slocie
-// — i to jest cały powód, dla którego silnik dokłada jej jeden slot ogona. Bramka ma
-// wykazać, że tego slotu nie da się usunąć.
+// Theta bywa o slot NIEPRZYCZYNOWA — jej pozycja w przeplocie potrafi wypaść po własnym
+// slocie — i stąd bierze się jej ogon. Slot ten NIE jest jednak stały: przy ilorazie
+// całkowitym kres fazy odczytu daje ogon zerowy, co silnik od 2026-08-18 liczy dokładnie
+// (K24/H10). Bramka wykazuje, że tam, gdzie slot jest prawdziwy, nie da się go usunąć.
 struct dehashOracle {
   int origin;
   int tail;

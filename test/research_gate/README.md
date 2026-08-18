@@ -29,7 +29,7 @@ Bramka jest **kierunkowa**:
 
 | Katalog | Hipoteza | Co chroni |
 |---|---|---|
-| [`h10/`](h10/README.md) | **H10** — początek logiczny i ogon startowy dają się policzyć statycznie z planu i zgadzają się z modelem zdarzeniowym | podział dziewięciu klas operatorów na reżimy: **6 dokładnych, 3 zawyżające, 0 zaniżających**; początek logiczny dokładny w 9/9 |
+| [`h10/`](h10/README.md) | **H10** — początek logiczny i ogon startowy dają się policzyć statycznie z planu i zgadzają się z modelem zdarzeniowym | podział dziewięciu klas operatorów na reżimy: **9 dokładnych, 0 zawyżających, 0 zaniżających** (do 2026-08-18: 6/3/0); początek logiczny dokładny w 9/9 |
 | [`h9/`](h9/README.md) | **H9** — kompilator rozpoznaje automatycznie wspólny materializowany podplan i liczy go raz zamiast wielokrotnie | mechanizm rozpoznawania równoważnych obliczeń: korpus, tablica mechanizmu, 84 kompilacje na czterech profilach ablacji |
 
 Szczegóły — pełne brzmienie hipotez, przebieg i reguły oblania — w README

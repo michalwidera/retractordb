@@ -1388,14 +1388,22 @@ std::string compiler::computeStartupLatency() {
         result =
             std::max(AddStartupLatency(delta1, q.rInterval, w1), AddStartupLatency(deltaOf(second->getStr_()), q.rInterval, w2));
       } else if (op == STREAM_DEHASH_DIV) {
-        // Θ zawsze wyprzedza swój slot o mniej niż jeden okres wyjścia.
-        // Jeden slot jest dokładnym własnym ogonem operatora.
-        ++result;
+        // Ogon Θ liczy się DOKŁADNIE z kresu fazy odczytu — patrz ThetaStartupLatency()
+        // w SOperations.hpp. Do 2026-08-18 stało tu bezwarunkowe ++result z uzasadnieniem
+        // "jeden slot jest dokładnym własnym ogonem operatora"; kampania K24 zmierzyła
+        // zgodność tej reguły z granicą zdarzeniową na 59,7% węzłów `Θ`, a przy ilorazie
+        // całkowitym własny ogon wynosi zero w 100% węzłów korpusu.
+        result = ThetaStartupLatency(delta1, q.rInterval, std::next(q.lProgram.begin())->getRI(), w1);
       } else if (op == STREAM_DEHASH_MOD) {
-        // ~Theta wybiera pozycję floor(n*DeltaOut/DeltaSource), dostępną
-        // najpóźniej w bieżącym slocie — własny ogon wynosi zero.
+        // ~Θ wybiera pozycję floor(n*DeltaOut/DeltaSource), dostępną najpóźniej w bieżącym
+        // slocie, więc kres fazy wynosi zero — ale ogon składowej wchodzi do rachunku bez
+        // zaokrąglania w górę, które zawyżało wynik w 0,8% węzłów korpusu (K24d).
+        result = NThetaStartupLatency(delta1, q.rInterval, w1);
       } else if (op == STREAM_SUBTRACT) {
-        result = SubtractStartupLatency(delta1, q.rInterval, w1, coreInstance[src1].isDeclaration());
+        // Rachunek nie zależy już od isDeclaration(): dawna gałąź deklaracyjna dokładała
+        // slot ZAWSZE (2669/2669 i 2670/2670 węzłów obu ziaren), stawiając `-` w konwencji
+        // dostępności innej niż siedem pozostałych klas silnika.
+        result = SubtractStartupLatency(delta1, q.rInterval, w1);
       } else if (op == STREAM_AGSE) {
         const auto step       = std::get<std::pair<int, int>>(q.lProgram.back().getVT()).first;
         const int sourceWidth = coreInstance[src1].descriptorStorage().flatElementCount();

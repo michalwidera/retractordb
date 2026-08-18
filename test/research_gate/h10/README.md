@@ -14,15 +14,21 @@ Wynik jest **mieszany i taki pozostaje**. Na silniku, który te liczby wytworzy�
 
 | Reżim | Klasy | Znaczenie |
 |---|---|---|
-| **dokładna** | `HASH`, `SHIFT`, `PASS`, `AGSE`, `REDUCE`, `ADD` | postać zamknięta równa modelowi zdarzeniowemu wszędzie |
-| **zawyżająca** | `SUB`, `THETA`, `NTHETA` | nigdy nie zaniża; kosztuje slot opóźnienia |
+| **dokładna** | wszystkie dziewięć | postać zamknięta równa modelowi zdarzeniowemu wszędzie |
+| **zawyżająca** | brak | nigdy nie zaniża; kosztuje slot opóźnienia |
 | **zaniżająca** | brak | — |
 
 Początek logiczny jest dokładny we **wszystkich dziewięciu** klasach.
 H10b pozostaje wsparta w swojej zawężonej populacji.
 
-Trzy klasy zawyżające to **zapisana falsyfikacja H10a w mocnej postaci**, nie
-usterka. Bramka ma tę falsyfikację utrwalić, a nie ukryć.
+**Zmiana z 2026-08-18 (K24/H10, faza 3).** Do tego dnia trzy klasy — `SUB`,
+`THETA`, `NTHETA` — były zawyżające, i była to zapisana falsyfikacja H10a
+w mocnej postaci. Wyprowadzenie postaci dokładnych
+(`rdb-experiment/investigation_K24H10/DERIVATION.md`) domknęło je: wszystkie
+trzy przeszły do reżimu dokładnego, bramka zgłosiła POPRAWĘ na obu ziarnach.
+Dokumentem obowiązującym dla artykułu pozostaje jednak kampania K24d do czasu
+przebiegu K24e z własną predeklaracją — bramka jest zabezpieczeniem rozwoju,
+nie dowodem.
 
 ## Na czym polega bramka
 

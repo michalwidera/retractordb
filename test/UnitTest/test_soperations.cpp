@@ -248,13 +248,41 @@ TEST(xSOperations, add_startup_latency_covers_slower_component) {
   EXPECT_EQ(0, AddStartupLatency(boost::rational<int>{1, 4}, fast, 0));
 }
 
+// Ogon `-`, `Θ` i `~Θ` liczony z kresu fazy odczytu. Wartości oczekiwane pochodzą
+// z modelu zdarzeniowego (investigation_K24H10, weryfikacja per węzeł), nie z tej samej
+// postaci zamkniętej — inaczej test potwierdzałby wyłącznie sam siebie.
 TEST(xSOperations, subtract_startup_latency_covers_fractional_phase) {
   const boost::rational<int> source{1, 2};
 
-  EXPECT_EQ(1, SubtractStartupLatency(source, boost::rational<int>{1}, 0, true));
-  EXPECT_EQ(0, SubtractStartupLatency(source, boost::rational<int>{1}, 0, false));
-  EXPECT_EQ(1, SubtractStartupLatency(source, boost::rational<int>{3, 4}, 0, false));
-  EXPECT_EQ(1, SubtractStartupLatency(source, boost::rational<int>{3, 4}, 1, false));
+  // Składowa dwa razy szybsza od wyniku: pierwszy potrzebny rekord istnieje w slocie 0.
+  // Do 2026-08-18 gałąź deklaracyjna dokładała tu slot, choć deklaracja ma ogon zerowy.
+  EXPECT_EQ(0, SubtractStartupLatency(source, boost::rational<int>{1}, 0));
+  // Faza ułamkowa: r = 3/2, kres fazy 1/2, więc ceil((1/2+1)/(3/2))-1 = 0.
+  // Dawna postać dawała 1 — to jest ten slot zawyżenia, który mierzyła kampania K24.
+  EXPECT_EQ(0, SubtractStartupLatency(source, boost::rational<int>{3, 4}, 0));
+  // Ogon składowej wchodzi liniowo: ceil((1/2+2)/(3/2))-1 = 1.
+  EXPECT_EQ(1, SubtractStartupLatency(source, boost::rational<int>{3, 4}, 1));
+  // Ten sam takt na wejściu i wyjściu przenosi ogon składowej bez zmiany.
+  EXPECT_EQ(3, SubtractStartupLatency(source, source, 3));
+}
+
+TEST(xSOperations, dehash_startup_latency_follows_the_phase_bound) {
+  const boost::rational<int> source{1, 2};
+
+  // Iloraz całkowity: kres fazy Θ wynosi a, po podzieleniu przez r daje ogon ZERO.
+  // Dawne bezwarunkowe ++result dawało tu 1 — 40,3% węzłów `Θ` korpusu K24.
+  EXPECT_EQ(0, ThetaStartupLatency(source, boost::rational<int>{1}, boost::rational<int>{1}, 0));
+  // Iloraz ułamkowy: a/b = (3/4)/(3/2) = 1/2, kres (1+2-1)/2 = 1, r = 3/2,
+  // więc ceil((1+1)/(3/2))-1 = 1. Tu slot jest prawdziwy i zostaje.
+  EXPECT_EQ(1, ThetaStartupLatency(source, boost::rational<int>{3, 4}, boost::rational<int>{3, 2}, 0));
+
+  // ~Θ nie ma własnego członu: kres fazy jest zerowy, bo pozycja wypada najpóźniej
+  // w bieżącym slocie.
+  EXPECT_EQ(0, NThetaStartupLatency(source, boost::rational<int>{1}, 0));
+  EXPECT_EQ(0, NThetaStartupLatency(source, boost::rational<int>{3, 4}, 0));
+  // Ogon składowej 1 przy takcie wyjścia dwa razy wolniejszym: ceil(2/2)-1 = 0.
+  // Dawna reguła zaokrąglała ogon składowej w górę OSOBNO i dawała 1.
+  EXPECT_EQ(0, NThetaStartupLatency(boost::rational<int>{1, 10}, boost::rational<int>{1, 5}, 1));
 }
 
 // =====================================================================================
