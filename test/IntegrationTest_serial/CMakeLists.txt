@@ -8,7 +8,7 @@ macro(add_test)
   endif()
   set(_it_argv_str "${ARGV}")
   # Tests that start the xretractor server must not run in parallel with each
-  # other: they share /tmp/xretractor_service.lock and boost shared memory.
+  # other: they share ${TMPDIR:-/tmp}/xretractor_service.lock and boost shared memory.
   # Detection: -m N (run mode), -k (background daemon), xqry (IPC client),
   # workflow.sh (integration workflow), xretractor_service (lock file access).
   if(_it_argv_str MATCHES

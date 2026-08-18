@@ -21,6 +21,10 @@ add_test(
     --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xretractor
     query.rql -m 5)
 
+# Bez czekania na plik blokady: serwer biegnie pierwszoplanowo (-m N), wiec po
+# jego powrocie proces juz nie istnieje. Usunieta petla odpytywala twardy /tmp
+# i tak czy tak nie dowodzila konca procesu — blokade kasuje destruktor przed
+# wyjsciem z main (zob. ../serverlib.sh).
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -28,9 +32,6 @@ add_test(
     bash -c "
 set -e
 xretractor query.rql -m 11
-while [ -f /tmp/xretractor_service.lock ]
-do sleep 0.1
-done
 ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt
 ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern-run.txt out.txt
 ")

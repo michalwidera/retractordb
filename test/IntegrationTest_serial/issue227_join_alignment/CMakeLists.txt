@@ -22,7 +22,7 @@ add_test(
   COMMAND bash verify_adhoc.sh)
 
 # Test uruchamia silnik, wiec nie moze biec rownolegle z innymi takimi testami:
-# dziela /tmp/xretractor_service.lock i pamiec wspoldzielona boost. Automatyczne
+# dziela ${TMPDIR:-/tmp}/xretractor_service.lock i pamiec wspoldzielona boost. Automatyczne
 # wykrywanie w IntegrationTest_serial/CMakeLists.txt patrzy na argumenty
 # add_test i przy `bash verify.sh` nie widzi ani `-m N`, ani `xqry` — trzeba
 # oznaczyc recznie (tak samo robi r1_identity_nulls).

@@ -6,8 +6,9 @@
 # są separatorem listy i rozbiłyby polecenie na osobne argumenty.
 set -e
 
-# Poczekaj aż ewentualna poprzednia instancja zwolni blokadę usługi.
-while [ -f /tmp/xretractor_service.lock ]; do sleep 0.1; done
+# Nie czekamy tu na cudzą blokadę: xretractor biegnie poniżej pierwszoplanowo
+# (-m 5), a za to, żeby poprzedni test nie zostawił po sobie instancji, odpowiada
+# bramka higieny w ../serverlib.sh — obarcza winowajcę, nie następną ofiarę.
 
 # Ciche raportowanie w Release (SPDLOG_ACTIVE_LEVEL=ERROR — zwiazane z
 # efektywnoscia, patrz glowny CMakeLists.txt) wycina komunikaty INFO. Marker

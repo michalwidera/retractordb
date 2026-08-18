@@ -231,6 +231,22 @@ Every session ends with either a permitted local commit on a side branch, an exp
 `master` for human review/commit/push, or an explicit note why no commit was created. No unexplained uncommitted progress
 is left behind.
 
+**Research gate — mandatory before closing.** Whenever the session touched engine sources (`src/`), run the gate and
+report its verdict before the commit or the handoff:
+
+```bash
+ninja test_gate          # from build/Debug or build/Release
+```
+
+It is deliberately outside `ninja` and `ninja test` (see `test/research_gate/README.md`), so nothing runs it
+implicitly. It is directional: a result worse than the reference is an **error** and stops the work; equal passes;
+better passes and is recorded. A skipped level (missing or stale H9 ablation profiles) counts as *not run*, never as
+passed — report it as such. No commit and no handoff goes out with an unreported or failing gate; a red gate is
+handed to the human, not worked around.
+
+Sessions that touched only tests, scripts or documentation do not need the gate — say explicitly that it was skipped
+and why.
+
 ### Context hygiene
 
 Warn the user when the session shows signs of context degradation:

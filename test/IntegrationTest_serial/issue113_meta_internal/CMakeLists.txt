@@ -13,23 +13,8 @@ set(TestID "it_${TestID}")
 add_test(
   NAME ${TestID}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND
-    bash -c
-    "set -e ; \
-    mkdir -p temp ; \
-    rm -f temp/str_null temp/str_null.* temp/core0 temp/core0.* ; \
-    for i in $(seq 1 30); do [ ! -f /tmp/xretractor_service.lock ] && break; sleep 0.1; done ; \
-    [ ! -f /tmp/xretractor_service.lock ] ; \
-    xretractor query.rql -k -x & \
-    while [ ! -f /tmp/xretractor_service.lock ]; do sleep 0.1; done ; \
-    xqry -s str_null -k -m 5 > /dev/null ; \
-    for i in $(seq 1 30); do [ ! -f /tmp/xretractor_service.lock ] && break; sleep 0.1; done ; \
-    [ ! -f /tmp/xretractor_service.lock ] ; \
-    ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt ; \
-    grep -Fq 'header size: 8' out.txt ; \
-    grep -Fq 'entry size: 18' out.txt ; \
-    grep -Fq 'sampling interval: 1/1' out.txt ; \
-    grep -Fq 'entry[0] count:1 gap:0 bitsetSize:2 bitsetHex:03' out.txt ; \
-    grep -Fq 'entry[1] count:2 gap:0 bitsetSize:2 bitsetHex:02' out.txt ; \
-    grep -Fq 'entry[2] count:1 gap:0 bitsetSize:2 bitsetHex:00' out.txt ; \
-    grep -Fq 'entries: 3' out.txt")
+  COMMAND bash run.sh)
+
+# Startuje serwer (blokada uslugi) -> RUN_SERIAL jawnie: flagi -k/-x sa w run.sh,
+# wiec makro add_test ich nie widzi.
+set_tests_properties(${TestID} PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)

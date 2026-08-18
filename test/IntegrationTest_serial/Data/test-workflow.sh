@@ -1,60 +1,50 @@
-#!/bin/sh
+#!/bin/bash
+# Przebieg uzytkowy: kompilacja, start serwera, trzy zapytania przez IPC,
+# zatrzymanie i kontrola, ze kolejki w /dev/shm nie zostaly po nas.
+#
+# Poprzednia wersja zaczynala od `pkill xretractor`, czyli ubijala KAZDA
+# instancje w systemie — takze cudza, nie swoja. Za to, zeby poprzedni test nie
+# zostawil po sobie serwera, odpowiada teraz bramka higieny w ../serverlib.sh:
+# obarcza winowajce zamiast pozwalac mu sprzatac po sobie cudzymi rekami.
+set -e
 
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
   echo "Usage: $0 <query.rql> <stream1> <stream2>"
   exit 1
 fi
 
-pkill xretractor 2>/dev/null
-sleep 0.5
+. "$(dirname "$0")/../serverlib.sh"
+
 rm -f core*
 rm -f str*
 
 QUEUES_BEFORE=$(ls /dev/shm/brcdbr* 2>/dev/null | wc -l)
 
-if ! xretractor "$1" -c; then exit 1; fi
+xretractor "$1" -c
 
-xretractor "$1" -m 100 -k -x &
-XRETRACTOR_PID=$!
+server_start "$1" -m 100 -k -x
 
-# Poll until xretractor accepts IPC queries (up to 5 seconds)
+# Blokada dowodzi, ze serwer wstal; gotowosc kanalu IPC sprawdzamy osobno.
 READY=0
-for i in $(seq 1 10); do
-  sleep 0.5
-  if ! kill -0 $XRETRACTOR_PID 2>/dev/null; then
-    echo "xretractor exited unexpectedly"
-    exit 1
-  fi
+for _ in $(seq 1 10); do
   if xqry -d > /dev/null 2>&1; then
     READY=1
     break
   fi
+  sleep 0.5
 done
-
-if [ $READY -ne 1 ]; then
-  echo "xretractor not ready after 5 seconds"
-  kill $XRETRACTOR_PID 2>/dev/null
+if [ "$READY" -ne 1 ]; then
+  echo "xretractor nie przyjmuje zapytan IPC po 5 s"
   exit 1
 fi
 
 xqry -d
-
-if ! xqry -s "$2" -m 3; then
-  kill $XRETRACTOR_PID 2>/dev/null
-  exit 1
-fi
-
-if ! xqry -s "$3" -m 3; then
-  kill $XRETRACTOR_PID 2>/dev/null
-  exit 1
-fi
-
+xqry -s "$2" -m 3
+xqry -s "$3" -m 3
 xqry -l
-xqry -k || true
 
-kill $XRETRACTOR_PID 2>/dev/null
-wait $XRETRACTOR_PID 2>/dev/null
-pkill xretractor 2>/dev/null; true
+xqry -k || true
+server_wait_exit
 
 QUEUES_AFTER=$(ls /dev/shm/brcdbr* 2>/dev/null | wc -l)
 if [ "$QUEUES_AFTER" -gt "$QUEUES_BEFORE" ]; then
