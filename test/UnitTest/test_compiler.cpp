@@ -478,9 +478,20 @@ TEST(xcompiler, agse_capacity_covers_whole_window_over_computed_source) {
   EXPECT_EQ(instance.maxCapacity.at("mid"), 3);
 }
 
-// Tozsamosc R1 musi zachowywac ogon — inaczej przepisanie zmienialoby obserwowalna
-// deklaracje opoznienia, nawet gdyby sekwencja rekordow byla identyczna.
-TEST(xcompiler, startup_latency_is_preserved_by_shift_matching_identity) {
+// Tozsamosc R1 jest ROWNOSCIA WYNIKOW i NIEROWNOSCIA OPOZNIEN (`thm:shift-match`).
+// Obie postaci zgadzaja sie co do interwalu, poczatku logicznego i ciagu rekordow,
+// a strona prawa ma ogon NIE WIEKSZY od lewej — dla niektorych taktow scisle
+// mniejszy. `def:observable` zada `Val(P) = Val(Q)` dokladnie, ale tylko
+// `Lat(Q) <= Lat(P)`: przepisaniu wolno skrocic oczekiwanie, nigdy wydluzyc.
+//
+// Zadanie ROWNOSCI ogonow byloby wiec ostrzejsze niz relacja obserwowalnosci i
+// odrzucaloby przepisanie, ktore teoria dopuszcza. Dokladnie tak oblala bramka
+// `public_identity` kampanii K23 (znalezisko A, decyzja D1 z 2026-08-09,
+// `research_plan.md` §14.20) — i dlatego test sprawdza nierownosc, nie rownosc.
+//
+// Przy R1 ON obie strony i tak schodza sie do jednego ksztaltu; niezmiennik jest
+// nietrywialny dopiero przy R1 OFF, gdzie lewa ma ogon 2, a prawa 0.
+TEST(xcompiler, shift_matching_identity_does_not_lengthen_startup_latency) {
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
         DECLARE value INTEGER STREAM fa,  1/10 FILE 'a.txt'
@@ -495,10 +506,13 @@ TEST(xcompiler, startup_latency_is_preserved_by_shift_matching_identity) {
   compiler compilerInstance(instance);
   ASSERT_EQ(compilerInstance.compile(), "OK");
 
-  // Tozsamosc ma zachowywac CALA deklaracje opoznienia, a nie tylko jej sume — po
-  // przestemplowaniu tau_N sklada sie ona z ogona (przeplot) i origin (przesuniecie).
-  EXPECT_EQ(instance.getQuery("lhs").startupLatency, instance.getQuery("rhs").startupLatency);
+  // Czesc wartosciowa: poczatek logiczny musi byc IDENTYCZNY po obu stronach — to on
+  // niesie tozsamosc, w kazdej konfiguracji przelacznikow.
   EXPECT_EQ(instance.getQuery("lhs").logicalOrigin, instance.getQuery("rhs").logicalOrigin);
+  // Czesc opoznieniowa: strona prawa (sfaktoryzowana) nie moze czekac DLUZEJ niz lewa.
+  // Rownosc jest dozwolona i zachodzi przy R1 ON; przy R1 OFF nierownosc jest ostra
+  // (2 wobec 0) i to jest przypadek przewidziany przez `thm:shift-match`, nie defekt.
+  EXPECT_LE(instance.getQuery("rhs").startupLatency, instance.getQuery("lhs").startupLatency);
   // Ogon przeplotu to 2, ale tau_3 nad nim NIE dokłada nic i wręcz go pochłania:
   // W = max(0, 2 - 3) = 0. Rekord 3 niesie rekord 0 przeplotu, dostepny w chwili 3*Delta,
   // a slot 3 konczy sie w 4*Delta — czekac nie ma na co. Do 2026-08-07 stalo tu 2, bo

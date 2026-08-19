@@ -180,9 +180,46 @@ else
   ! grep -F "MATERIALIZED" out_run.txt
 fi
 
+# Tozsamosc R1 jest ROWNOSCIA WYNIKOW i NIEROWNOSCIA OPOZNIEN (`thm:shift-match`):
+# obie postaci daja ten sam ciag rekordow, a strona sfaktoryzowana ma ogon NIE WIEKSZY.
+# Przy factor=ON obie strony schodza sie do jednego ksztaltu i rownosc jest PELNA,
+# lacznie z dlugoscia. Przy factor=OFF strona niefaktoryzowana naprawde czeka dluzej
+# (czyta skladowe PO ich wlasnym przesunieciu), wiec wydaje mniej rekordow — i to jest
+# zachowanie DOZWOLONE przez `def:observable`, ktore zada rownosci `Val`, ale tylko
+# `Lat(prawa) <= Lat(lewa)`. Zadanie rownosci dlugosci byloby ostrzejsze niz relacja
+# obserwowalnosci; dokladnie tak oblala bramka `public_identity` kampanii K23
+# (znalezisko A, decyzja D1 z 2026-08-09, `research_plan.md` §14.20).
+#
+# Wzorzec przeniesiony z trybu factor-name-collision-semantic nizej, ktory stosuje go
+# od 2026-08-07 dla faktoryzacji zablokowanej kolizja nazw.
+compare_identity() { # compare_identity <niefaktoryzowana> <sfaktoryzowana> <etykieta>
+  left="$1"
+  right="$2"
+  label="$3"
+  if [ "$factor" = "ON" ]; then
+    cmp "$left" "$right"
+    cmp <(tail -c +9 "$left.meta") <(tail -c +9 "$right.meta")
+    return 0
+  fi
+  size_left=$(stat -c %s "$left")
+  size_right=$(stat -c %s "$right")
+  common=$(( size_left < size_right ? size_left : size_right ))
+  [ "$common" -gt 0 ] || { echo "$label: pusty wspolny prefiks"; exit 1; }
+  # Tresc na wspolnym prefiksie musi byc identyczna — to jest rownosc `Val`.
+  cmp -n "$common" "$left" "$right"
+  # Kierunek nierownosci: strona sfaktoryzowana wyprzedza. Rownosc albo odwrotna
+  # nierownosc znaczylaby, ze optymalizacja opoznienia zniknela.
+  [ "$size_right" -gt "$size_left" ] || {
+    echo "$label: strona sfaktoryzowana nie wyprzedza niefaktoryzowanej"
+    exit 1
+  }
+  # .meta nie porownujemy bajtowo: strumienie roznej dlugosci maja rozna krotnosc
+  # ostatniego przebiegu, wiec prefiks bajtow rozjezdza sie mimo zgodnej denotacji.
+  # Mape null na wspolnym prefiksie sprawdza it_r1_identity_nulls.
+}
+
 if [ "$mode" = "factor-semantic" ]; then
-  cmp temp/factored temp/factor_reference
-  cmp <(tail -c +9 temp/factored.meta) <(tail -c +9 temp/factor_reference.meta)
+  compare_identity temp/factored temp/factor_reference "factor R1"
 elif [ "$mode" = "factor-shared-substrate-semantic" ]; then
   # Konsument niepasujący do wzorca musi dawać ten sam wynik co plan, w którym
   # substrat przesunięcia nie jest z nikim dzielony.
@@ -214,10 +251,12 @@ elif [ "$mode" = "factor-name-collision-semantic" ]; then
   # oznaczalaby, ze optymalizacja opoznienia zniknela.
   [ "$size_reference" -gt "$size_user" ]
 elif [ "$mode" = "factor-multiquery-semantic" ]; then
+  # multi1 i multi2 to ten SAM ksztalt zapytania, wiec ich rownosc jest pelna
+  # niezaleznie od przelacznikow — tu porownanie dlugosci nadal obowiazuje.
   cmp temp/multi1 temp/multi2
-  cmp temp/multi1 temp/multi_reference
   cmp <(tail -c +9 temp/multi1.meta) <(tail -c +9 temp/multi2.meta)
-  cmp <(tail -c +9 temp/multi1.meta) <(tail -c +9 temp/multi_reference.meta)
+  # Wobec postaci jawnie sfaktoryzowanej obowiazuje juz nierownosc opoznien.
+  compare_identity temp/multi1 temp/multi_reference "factor R1 (multi)"
 elif [ "$mode" = "dedup-exact-semantic" ]; then
   cmp temp/dedup_shifted temp/dedup_reference
   cmp <(tail -c +9 temp/dedup_shifted.meta) <(tail -c +9 temp/dedup_reference.meta)

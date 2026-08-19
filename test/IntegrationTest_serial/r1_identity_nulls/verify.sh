@@ -25,12 +25,27 @@ mkdir -p temp
 
 xretractor query.rql -c > out_compile.txt
 
+# Konfiguracja optymalizatora decyduje o KSZTALCIE lewej strony, nie o jej wyniku.
+# Test biegnie w obu (macierz it_optimizer_ablation, workflow manual-ablation).
+factor=$(xretractor --build-info | sed -n 's/^RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=//p')
+[ -n "$factor" ] || { echo "nie udalo sie odczytac konfiguracji R1 z --build-info"; exit 1; }
+
 # --- deklaracja opoznienia ----------------------------------------------------------
 #
-# lhs zostaje sfaktoryzowane do postaci prawej, wiec obie strony deklaruja to samo:
-# ogon 0 (tau_3 nad przeplotem o ogonie 2 pochlania go w calosci: max(0, 2-3) = 0)
-# i origin 3 (przesuniecia skladaja sie na niedefiniowalnosc).
-grep -F 'lhs(1/15)	origin=3' out_compile.txt
+# Przy R1 ON lhs zostaje sfaktoryzowane do postaci prawej, wiec obie strony deklaruja
+# to samo: ogon 0 (tau_3 nad przeplotem o ogonie 2 pochlania go w calosci:
+# max(0, 2-3) = 0) i origin 3 (przesuniecia skladaja sie na niedefiniowalnosc).
+#
+# Przy R1 OFF lhs zostaje niefaktoryzowane i ma ogon DODATNI — czeka na skladowe po ich
+# wlasnym przesunieciu. Sprawdzamy wtedy sam KIERUNEK (ogon jest, origin ten sam), a nie
+# jego wartosc: `def:observable` zada rownosci `Val`, ale tylko `Lat(prawa) <= Lat(lewa)`,
+# wiec dluzsze oczekiwanie strony niefaktoryzowanej jest dozwolone (znalezisko A,
+# decyzja D1 z 2026-08-09, `research_plan.md` §14.20).
+if [ "$factor" = "ON" ]; then
+  grep -F 'lhs(1/15)	origin=3' out_compile.txt
+else
+  grep -E '^lhs\(1/15\)	tail=[1-9][0-9]*	origin=3$' out_compile.txt
+fi
 grep -F 'rhs(1/15)	origin=3' out_compile.txt
 
 # phase_lhs ma faktoryzacje ZABLOKOWANA przez publiczne przesuniecia posrednie, wiec
@@ -91,11 +106,21 @@ phase_nulls=$(xtrdb -n -s temp/phase_lhs | grep -c 'all nulls')
   exit 1
 }
 
-# Faktoryzacja zastosowana po obu stronach: rownosc jest PELNA, lacznie z dlugoscia.
-cmp temp/lhs temp/rhs
-# Naglowek .meta zawiera znacznik czasu utworzenia (jedyne bajty niedeterministyczne),
-# wiec porownujemy tresc za nim.
-cmp <(tail -c +9 temp/lhs.meta) <(tail -c +9 temp/rhs.meta)
+if [ "$factor" = "ON" ]; then
+  # Faktoryzacja zastosowana po obu stronach: rownosc jest PELNA, lacznie z dlugoscia.
+  cmp temp/lhs temp/rhs
+  # Naglowek .meta zawiera znacznik czasu utworzenia (jedyne bajty niedeterministyczne),
+  # wiec porownujemy tresc za nim.
+  cmp <(tail -c +9 temp/lhs.meta) <(tail -c +9 temp/rhs.meta)
+else
+  # Bez R1 para lhs/rhs zachowuje sie dokladnie tak jak para fazowa nizej: ten sam ciag
+  # rekordow, krotsze oczekiwanie po stronie sfaktoryzowanej. Ten sam wzorzec porownania.
+  compare_common_prefix temp/lhs temp/rhs "R1 bez faktoryzacji"
+  [ "$(stat -c %s temp/rhs)" -gt "$(stat -c %s temp/lhs)" ] || {
+    echo "R1 bez faktoryzacji: strona sfaktoryzowana nie wyprzedza niefaktoryzowanej"
+    exit 1
+  }
+fi
 
 # Faktoryzacja zablokowana: rownosc jest tozsamoscia ciagu rekordow, wiec porownujemy
 # wspolny prefiks. Strona sfaktoryzowana (phase_rhs) ma byc SCISLE DLUZSZA — gdyby byla
