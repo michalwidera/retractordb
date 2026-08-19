@@ -486,7 +486,8 @@ ensure_tools_for_option() {
                 "git:required" "gcc:required" "g++:required"
                 "cmake:required" "cmake-pinned:required" "make:required" "ninja:required"
                 "python3:required" "python3-venv:required" "pip3:required" "conan:required"
-                "valgrind:required" "hexdump:required" "graphviz:required"
+                "valgrind:required" "hexdump:required"
+                "graphviz:recommended"
                 "cppcheck:recommended" "mold:recommended" "ccache:recommended" "rg:recommended"
                 "cmake-format:optional" "clang-format:optional" "clang-tidy:optional" "gdb:optional" "tmux:optional" "feh:optional" "gnuplot:optional"
             )
@@ -506,6 +507,12 @@ ensure_tools_for_option() {
                 # listy (ARM, czysta Ubuntu) przestaja przez to ciagnac zaleznosci
                 # graphviza z apt — a to wlasnie na nich lustro ports.ubuntu.com
                 # oddawalo okresowo 503 na fonts-liberation.
+                #
+                # POZIOM TRZYMAC SPOJNIE Z LISTA `validate`: ona ma wlasny zestaw
+                # i sprawdza go NIEZALEZNIE od tego, co ktorykolwiek `toolchain`
+                # zainstalowal. 2026-08-19 obnizenie poziomu tylko tutaj wywrocilo
+                # `manual-arm` na kroku "Validate installed toolchain": pakiet nie
+                # byl juz instalowany, a validate nadal go wymagal.
                 "graphviz:optional"
                 "ccache:optional" "clang-format:optional"
             )
@@ -526,7 +533,8 @@ ensure_tools_for_option() {
                 "git:required" "gcc:required" "g++:required"
                 "cmake:required" "make:required" "conan:required" "ninja:required"
                 "python3:required" "pip3:required" "valgrind:required"
-                "hexdump:required" "graphviz:required"
+                "hexdump:required"
+                "graphviz:recommended"
                 "cppcheck:recommended" "mold:recommended" "ccache:recommended" "rg:recommended"
                 "cmake-format:optional" "clang-format:optional" "clang-tidy:optional" "gdb:optional" "tmux:optional" "feh:optional" "gnuplot:optional"
             )
