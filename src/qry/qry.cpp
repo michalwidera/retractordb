@@ -152,6 +152,16 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
 
   transport_->done = true;
 
+  // Werdykt producenta trzeba ODEBRAĆ, a nie podejrzeć w locie. `responseQueueMissing`
+  // ustawia wątek producenta dopiero wtedy, gdy wyczerpie próby otwarcia własnej kolejki
+  // odpowiedzi. Pętla powyżej wychodzi zwykle na `done` OD producenta — ale nie zawsze:
+  // `_kbhit()` (klawisz operatora, a na CI terminal z bajtem w buforze), limit elementów
+  // albo wyjątek kończą ją WCZEŚNIEJ. Bez `join()` flaga była wtedy jeszcze fałszem
+  // i klient melduje „brak danych" zamiast „serwer nie utworzył kolejki" — czyli mylną
+  // diagnozę tej samej awarii. `done` jest już ustawione, a każda pętla producenta
+  // sprawdza tę flagę, więc oczekiwanie jest krótkie.
+  producer_thread.join();
+
   // Reguła: klient, który nie przeczytał ani jednego elementu, nie kończy się
   // sukcesem. Rozróżniamy przy tym DLACZEGO nic nie przyszło, bo „serwer nie
   // utworzył mojej kolejki" i „kolejka była, ale pusta" to dwie różne awarie.
