@@ -247,6 +247,25 @@ handed to the human, not worked around.
 Sessions that touched only tests, scripts or documentation do not need the gate — say explicitly that it was skipped
 and why.
 
+**Ablation floor — mandatory when the session touched an optimizer pass.** The `RDB_OPT_*` switches must not change
+what the engine computes, only how fast it gets there. That invariant rots silently: the matrix broke with the `>N`
+tail rule change of 2026-08-07 and nobody noticed for twelve days, because `manual-ablation` runs only by hand. Whenever
+the session touched `src/retractor/lib/compiler.cpp`, the startup-latency or tail rules (`SOperations.hpp`,
+`computeStartupLatency`), or any code behind an `RDB_OPT_*` switch, build the all-off configuration and run the full
+suite before the commit or the handoff:
+
+```bash
+scripts/buildrdb.sh release-ablation     # interactive: set all five switches OFF, probe OFF
+ctest --test-dir <katalog wypisany przez skrypt>/test -j 4
+```
+
+Success is **the whole suite green**, exactly as in the default configuration — the switches are an efficiency knob,
+not a semantics knob. A test that holds only with a switch ON is either wrong or documents a real difference, and that
+difference belongs in `def:observable`: `Val` must be equal, `Lat` only non-increasing (see `research_plan.md` §14.20).
+Never paper over a red ablation run with `WILL_FAIL` or `DISABLED` — the matrix already carries a note from 2026-07-26
+explaining why those annotations were removed. CI runs this same floor as `ablation-all-off` in layer L3 of
+`manual-nightly-full`, so a skipped local run gets caught within days, not weeks.
+
 ### Context hygiene
 
 Warn the user when the session shows signs of context degradation:

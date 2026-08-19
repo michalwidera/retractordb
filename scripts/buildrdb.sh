@@ -386,6 +386,16 @@ version_ge() {
 # z dużą ilością RAM nie ogranicza niczego (wynik i tak ograniczony do liczby
 # rdzeni). Nadpisanie ręczne: RDB_BUILD_JOBS=N w env, lub opcje
 # 'lowmem'/'nolowmem' (patrz niżej, analogicznie do 'mold'/'nomold').
+#
+# TA SAMA REGUŁA ISTNIEJE DRUGI RAZ, NA SZTYWNO, W `.circleci/config.yml`.
+# Kroki CI nie mogą wywołać funkcji z tego skryptu (każdy `run:` to osobna
+# powłoka na czystym drzewie), a `$(nproc)` w kontenerze podaje rdzenie HOSTA,
+# nie przydział kontenera -- 2026-08-19 job `research-gate` dostał 36 zadań przy
+# 8 GiB executora `large` i został ubity przez OOM po 45 s, bez komunikatu.
+# Joby `research-gate` i `build-release-ablation` mają więc wpisane `--parallel 4`,
+# co odpowiada tej formule dla `resource_class: large` (4 vCPU / 8 GiB).
+# Przy zmianie klasy executora albo przy zmianie założenia ~850MB/zadanie
+# poprawić OBA miejsca -- tutaj i w `config.yml`.
 compute_build_jobs() {
     if [ -n "${RDB_BUILD_JOBS:-}" ]; then
         echo "$RDB_BUILD_JOBS"

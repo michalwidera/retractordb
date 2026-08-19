@@ -95,6 +95,23 @@ workflows:
       - research-gate:
           requires:
             - build-release-ninja-mydocker
+      # PODLOGA matrycy ablacyjnej, jeden job zamiast siedmiu. Pelna matryca
+      # `manual-ablation` odpowiada na pytanie "ktory przelacznik", a ta konfiguracja
+      # na pytanie "czy w ogole" — i to ona wychwytuje regresje. Dowod z 2026-08-19:
+      # matryca byla zepsuta od zmiany reguly `>N` z 2026-08-07, dwanascie dni bez
+      # wykrycia, bo `manual-ablation` jest wylacznie reczna; wszystkie cztery awarie
+      # zlapal wlasnie wariant all-off, warianty jednoczynnikowe nie dolozyly zadnej.
+      # Trzy przebiegi w miesiacu skracaja okno wykrycia z tygodni do dni za koszt
+      # jednego jobu dockerowego.
+      - build-release-ablation:
+          name: ablation-all-off
+          dedup: "OFF"
+          share: "OFF"
+          commutative: "OFF"
+          factor: "OFF"
+          simplify: "OFF"
+          requires:
+            - build-release-ninja-mydocker
 
   # Sama bramka badawcza H9/H10, bez L1 i L2. Uruchamiana z reki, gdy trzeba
   # potwierdzic, ze wyniki sie nie cofnely — np. przed zgloszeniem artykulu —
@@ -554,6 +571,13 @@ jobs:
       # z `nproc`. Liczba 4 idzie za `resource_class: large` (4 vCPU / 8 GiB) —
       # przy zmianie klasy executora zmienic tutaj.
       #
+      # DRUGIE ZRODLO TEJ SAMEJ REGULY: `compute_build_jobs()` w
+      # scripts/buildrdb.sh (~850 MB na zadanie, ~500 MB marginesu, wynik
+      # ograniczony liczba rdzeni) — to jest ta sama arytmetyka, policzona dla
+      # maszyny lokalnej. Kroku CI nie da sie do niej podpiac: kazdy `run:` to
+      # osobna powloka, a funkcja siedzi w srodku 1500-liniowego skryptu. Stad
+      # duplikat; przy zmianie zalozen poprawic OBA miejsca.
+      #
       # `no_output_timeout`: CircleCI zabija krok, ktory przez 10 minut (domyslna
       # wartosc) nie napisal ani znaku. Oba te kroki sa z zalozenia MILCZACE:
       # wyjscie kompilatora idzie do plikow w build/gate-profiles-logs, a bramka
@@ -655,8 +679,12 @@ jobs:
       # Rownoleglosc 4, nie `$(nproc)` i nie domyslna ninja (`nproc`+2): powod
       # jak w jobie research-gate wyzej — w kontenerze `nproc` podaje rdzenie
       # HOSTA, a jedna jednostka kompilacji tego drzewa siega ~1 GiB RSS przy
-      # 8 GiB executora `large`. Job jest wylacznie reczny, wiec pulapka nigdy
-      # nie wystrzelila, ale jest ta sama.
+      # 8 GiB executora `large`. Odpowiednik `compute_build_jobs()` z
+      # scripts/buildrdb.sh, policzony recznie dla tego executora.
+      #
+      # Od 2026-08-19 ten job jest tez podloga ablacyjna warstwy L3 przebiegu
+      # nocnego (`ablation-all-off`), a nie tylko czescia recznej matrycy —
+      # `--parallel 4` przestalo byc zabezpieczeniem teoretycznym.
       - run:
           name: Build and install ablation variant
           command: |
