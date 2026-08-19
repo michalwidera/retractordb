@@ -16,6 +16,24 @@ parameters:
   run_manual_ablation:
     type: boolean
     default: false
+  # Sama bramka badawcza, bez reszty przebiegu nocnego. Wylacznie z reki: README
+  # bramki przewiduje uruchomienie "recznie przed wysłaniem artykułu do
+  # recenzji", a dotad jedynym wejsciem byl trigger `cron-shedule` razem z
+  # calym `manual-nightly-full`. Harmonogramu ten parametr nie ma i miec nie
+  # musi — bramka biegnie dalej 3 razy w miesiacu w warstwie L3 tamtego
+  # workflow, z cieplym ccache po build-release-ninja-mydocker.
+  run_manual_research_gate:
+    type: boolean
+    default: false
+  # Budy na generatorze Makefile: czysta Ubuntu (z pakietowaniem) i ARM. Wyjete
+  # 2026-08-19 z `manual-nightly-full`, ktory zostal przy samym ninja na obrazie
+  # projektu. Powod: te dwa joby nie maja ani ccache, ani prebuiltow conana z
+  # docker/ci/Dockerfile, wiec kosztuja wielokrotnie wiecej niz ich odpowiedniki
+  # ninja, a sprawdzaja co innego (przenosnosc na stockowym toolchainie, nie
+  # zachowanie silnika). Uruchamiane z reki, gdy pyta sie wlasnie o przenosnosc.
+  run_manual_make_build:
+    type: boolean
+    default: false
 
 workflows:
   # Warstwa commitowa. Jeden job: kompilacja Debug i pelny zestaw testow.
@@ -28,6 +46,8 @@ workflows:
         - not: << pipeline.parameters.run_manual_nightly_full >>
         - not: << pipeline.parameters.run_manual_arm >>
         - not: << pipeline.parameters.run_manual_ablation >>
+        - not: << pipeline.parameters.run_manual_research_gate >>
+        - not: << pipeline.parameters.run_manual_make_build >>
     jobs:
       - build-debug-ninja-mydocker:
           filters:
@@ -48,9 +68,16 @@ workflows:
   # nie byl zapisany w dwoch miejscach.
   #
   # Trzy warstwy, kazda odcina nastepna:
-  #   L1  smoke  — kompilacja Debug + same unity; zatrzymuje reszte w kilka minut;
+  #   L1  smoke  — sama kompilacja Debug; zatrzymuje reszte w kilka minut;
   #   L2  pelny zestaw testow (189) w Debug i Release na obrazie projektu;
-  #   L3  rzeczy kosztowne: bramka badawcza, budy na czystej Ubuntu, pakiet, ARM.
+  #   L3  bramka badawcza H9/H10 — najdrozszy job przebiegu.
+  #
+  # Od 2026-08-19 wylacznie budy na ninja i na obrazie projektu. Budy makefile
+  # (czysta Ubuntu, ARM) wyjechaly do `manual-make-build`, a `build-debug` na
+  # czystej Ubuntu zniknal calkiem: jego pokrycie bylo przecieciem dwoch innych
+  # jobow — przenosnosc na stockowym toolchainie sprawdza `build-release` (ktory
+  # jako jedyny robi tez `run-package`), a pelny zestaw Debug `build-debug-
+  # ninja-mydocker`.
   manual-nightly-full:
     when: << pipeline.parameters.run_manual_nightly_full >>
     jobs:
@@ -68,15 +95,33 @@ workflows:
       - research-gate:
           requires:
             - build-release-ninja-mydocker
-      - build-release:
-          requires:
-            - build-release-ninja-mydocker
-      - build-debug:
-          requires:
-            - build-debug-ninja-mydocker
-      - build-ARM:
-          requires:
-            - build-debug-ninja-mydocker
+
+  # Sama bramka badawcza H9/H10, bez L1 i L2. Uruchamiana z reki, gdy trzeba
+  # potwierdzic, ze wyniki sie nie cofnely — np. przed zgloszeniem artykulu —
+  # zamiast czekac na najblizszy przebieg `manual-nightly-full`.
+  #
+  # Bez `requires`, wiec job idzie od razu. Cena: ccache zapisywany przez
+  # build-release-ninja-mydocker jest tu tylko ODCZYTYWANY, a poza przebiegiem
+  # nocnym nie ma wpisu dla tego samego commita — zaladuje sie klucz prefiksowy
+  # ze starszej rewizji i pierwszy profil ablacji zbuduje sie dluzej. Dlatego
+  # ten workflow jest dodatkiem, a nie zamiennikiem warstwy L3.
+  research-gate-only:
+    when: << pipeline.parameters.run_manual_research_gate >>
+    jobs:
+      - research-gate
+
+  # Budy na generatorze Makefile, poza przebiegiem nocnym. Odpowiadaja na jedno
+  # pytanie: czy projekt stawia sie na stockowym toolchainie, poza obrazem
+  # projektu — na czystej Ubuntu (`build-release`, wraz z pakietem CPack) i na
+  # ARM. Bez `requires`: oba joby sa niezalezne i maja lecac rownolegle.
+  #
+  # `build-ARM` jest osiagalny takze przez `manual-arm` — to jest celowe: tamten
+  # workflow uruchamia sam ARM, ten caly zestaw makefile.
+  manual-make-build:
+    when: << pipeline.parameters.run_manual_make_build >>
+    jobs:
+      - build-release
+      - build-ARM
 
   # Optimizer ablation matrix — manual only, never scheduled and never
   # commit-triggered. One-factor-at-a-time over the RDB_OPT_* switches plus the
@@ -372,11 +417,17 @@ commands:
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> packages
 
 jobs:
-  # L1 pelnego przebiegu: kompilacja Debug i SAME testy jednostkowe (`ut_`), bez
-  # `it_` i `pt_`. Jedyne zadanie tego jobu to odciac warstwy 2 i 3, kiedy drzewo
-  # sie nie kompiluje albo unity padaja — zamiast dowiadywac sie o tym po pelnym
-  # zestawie 189 testow. Zapisuje cache ccache dla `mydocker-debug`, wiec
+  # L1 pelnego przebiegu: SAMA kompilacja Debug. Zadanie tego jobu to odciac
+  # warstwe 2, kiedy drzewo sie nie kompiluje — zamiast dowiadywac sie o tym po
+  # pelnym zestawie 189 testow. Zapisuje cache ccache dla `mydocker-debug`, wiec
   # build-debug-ninja-mydocker w warstwie 2 startuje z goracego cache.
+  #
+  # Do 2026-08-19 byl tu jeszcze krok `ctest -R '^ut_'` — zdjety, bo byla to
+  # JEDYNA czesc tego jobu nieznajdujaca sie juz w `build-debug-ninja-mydocker`
+  # (ten sam obraz, te same kroki, ten sam klucz ccache — tylko pelne `run-test`
+  # zamiast samych `ut_`), a zarazem najdrozsza: 45 binarek jednostkowych pod
+  # valgrindem, liczonych dwa razy w jednym przebiegu. Pokrycie nie ginie — te
+  # same testy wykonuje warstwa L2 kilkanascie minut pozniej.
   smoke-debug-ninja-mydocker:
     working_directory: ~/retractordb
     executor: debian-mydocker
@@ -399,11 +450,6 @@ jobs:
           build_tool: ninja
       - ccache-save:
           cache_id: mydocker-debug
-      - run:
-          name: Unit tests only (no integration)
-          command: |
-            export PATH="$HOME/.local/bin:$PATH"
-            cd build/Debug/test && ctest -j "$(nproc)" -R '^ut_' --output-on-failure
 
   build-release-ninja-mydocker:
     working_directory: ~/retractordb
@@ -555,24 +601,6 @@ jobs:
           build_param: --build missing
       - run-test
       - run-package
-
-  build-debug:
-    working_directory: ~/retractordb
-    executor: ubuntu-docker
-    steps:
-      - checkout:
-          method: blobless
-      - check-skipci:
-          enabled: false
-      - prep-env-ci
-      - conan-install:
-          build_type: Debug
-          build_param: --build missing
-      - conan-build:
-          build_type: Debug
-          build_param: --build missing
-      - run-test:
-          build_type: Debug
 
   # Release build with an explicit optimizer switch combination.
   # scripts/buildrdb.sh release-ablation is interactive, so the CMake

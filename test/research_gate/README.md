@@ -61,6 +61,12 @@ przebieg**: pominiecie znaczy "nie uruchomiono", a zielona bramka o niepelnym
 zakresie jest gorsza niz jej brak. Praca lokalna zostaje przy domyslnym OFF,
 gdzie pominiecie jest tylko odnotowane.
 
+Ten sam job wchodzi takze do workflow `research-gate-only`, uruchamianego z reki
+przez parametr pipeline'u `run_manual_research_gate` — sama bramka, bez warstw L1
+i L2, na potrzeby sprawdzenia przed zgloszeniem artykulu. Jest to dodatek, nie
+zamiennik: przebieg nocny daje bramce ccache zapisany dla tej samej rewizji,
+uruchomienie samodzielne startuje z cache'a starszego.
+
 Poziomy mają różne wymagania i `gate_requirements` instaluje te najwyższego:
 
 | Poziom | Wymaga |

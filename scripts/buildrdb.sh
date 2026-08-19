@@ -498,7 +498,15 @@ ensure_tools_for_option() {
                 "make:required" "ninja:required" "build-essential:required"
                 "python3:required" "python3-venv:required" "pip3:required"
                 "mold:required" "valgrind:required"
-                "graphviz:required" "hexdump:required" "conan:required"
+                "hexdump:required" "conan:required"
+                # graphviz OPCJONALNY na tej liscie (minimalny toolchain CI), a nie
+                # wymagany: jedynym jego konsumentem jest render SVG w tescie
+                # pt_issue31_doc, ktory bez `dot` sam sie nie rejestruje. Na obrazie
+                # projektu graphviz jest, wiec x86 nie traci nic. Joby uzywajace tej
+                # listy (ARM, czysta Ubuntu) przestaja przez to ciagnac zaleznosci
+                # graphviza z apt — a to wlasnie na nich lustro ports.ubuntu.com
+                # oddawalo okresowo 503 na fonts-liberation.
+                "graphviz:optional"
                 "ccache:optional" "clang-format:optional"
             )
             ;;
@@ -787,8 +795,13 @@ ensure_tools_for_option() {
             echo "Error: cannot auto-install apt packages without sudo and apt-get. Missing packages: ${apt_to_install[*]}"
             exit 1
         fi
-        sudo apt-get update
-        sudo apt-get -y install "${apt_to_install[@]}"
+        # Acquire::Retries: lustra potrafia oddac 503 na POJEDYNCZYM pliku, a bez
+        # ponowien wywraca to caly job. Na CI ARM (us-east-1.ec2.ports.ubuntu.com)
+        # zdarza sie to okresowo na fonts-liberation, ciagnietym jako zaleznosc
+        # graphviza z listy `toolchain_required`. apt ponawia samo POBRANIE pozycji,
+        # wiec to jest ta warstwa, na ktorej awaria lustra ma byc obsluzona.
+        sudo apt-get -o Acquire::Retries=5 update
+        sudo apt-get -o Acquire::Retries=5 -y install "${apt_to_install[@]}"
     fi
 
     for cmd in "${special_to_install[@]}"; do

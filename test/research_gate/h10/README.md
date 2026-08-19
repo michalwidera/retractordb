@@ -88,3 +88,29 @@ Precedens jest realny i świeży: zmiana silnika przestemplowująca okno `@`
 i przenosząca `>N` do origin wypchnęła `HASH` i `SHIFT` z reżimu dokładnego do
 zawyżającego. Wyszło to dopiero w osobnym przebiegu badawczym tydzień później.
 Ta bramka istnieje po to, żeby wyszło przy commicie.
+
+## Defekt aparatury z 2026-08-19 — binarka nie może być zgadywana
+
+Poziom `test_closedform` oblał na CI z powodu, który **nie miał nic wspólnego
+z silnikiem**: `run_gate.sh` jako jedynemu testowi rozmawiającemu z silnikiem
+nie podawał ścieżki do binarki. `oracle/engine.py` miał wtedy dwa domyślne
+zachowania i oba były pułapkami:
+
+1. `DEFAULT_BINARY` wskazywała `parents[3]/retractordb/build/Debug/...`, czyli
+   układ katalogów **repozytorium eksperymentu**. Po przeniesieniu aparatury do
+   drzewa silnika ta ścieżka nie istnieje i nigdy nie zadziałała.
+2. Po niej wchodził fallback na `xretractor` z `PATH`. Na CI nie ma tam nic
+   (job bramki nie robi `ninja install`), więc poziom oblewał. Lokalnie stoi tam
+   binarka **zainstalowana**, więc poziom przechodził — sprawdzając inną binarkę
+   niż cała reszta bramki.
+
+Drugi przypadek jest groźniejszy od pierwszego: czerwone światło widać, a ciche
+podstawienie binarki wygląda jak dowód. Poprawka jest w dwóch miejscach:
+`run_gate.sh` podaje `$XRETRACTOR` jawnie każdemu wywołaniu, a
+`engine.resolve_binary` nie ma już ani ścieżki domyślnej, ani fallbacku na
+`PATH` — bez jawnego wskazania podnosi `EngineError`. Wołający zawsze wie, którą
+binarkę bada.
+
+Zanim to naprawiono, test uruchomiono ręcznie na binarce z `build/Release`:
+57 porównanych węzłów, wierność repliki potwierdzona. Mechanizm był nietknięty,
+czerwone światło pochodziło wyłącznie z aparatury.

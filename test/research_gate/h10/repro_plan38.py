@@ -10,7 +10,7 @@ zbyt krótkiego przebiegu. Budżet bramki (`loops`) jest liczony z rozpiętości
 interwałów i **nie uwzględnia origin**, który po przestemplowaniu potrafi być
 duży (tu 43 sloty dla `n2`).
 
-    python3 repro_plan38.py
+    python3 repro_plan38.py <sciezka/do/xretractor>
 """
 
 import sys
@@ -31,8 +31,10 @@ INDEX = 38
 SCALE = Fraction(1, 200)
 
 
-def main():
-    binary = E.resolve_binary(None)
+def main(argv):
+    # Binarka z argumentu, bo engine.resolve_binary jej nie zgaduje — patrz
+    # komentarz przy tej funkcji w oracle/engine.py.
+    binary = E.resolve_binary(argv[1] if len(argv) > 1 else None)
     target = None
     for index, (stratum, item) in enumerate(generate(SEED, 10_010)):
         if index == INDEX:
@@ -67,4 +69,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)

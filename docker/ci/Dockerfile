@@ -7,7 +7,7 @@ ARG RDB_VERSION
 
 LABEL com.retractordb.version="${RDB_VERSION}"
 LABEL vendor1="Michal Widera"
-LABEL com.retractordb.release-date="2026-08-15"
+LABEL com.retractordb.release-date="2026-08-19"
 LABEL com.retractordb.description="Development environment for RetractorDB project"
 LABEL com.retractordb.url="https://retractordb.com"
 
@@ -107,10 +107,21 @@ RUN bash /tmp/gen_dockerconan.sh /tmp/conanfile.py /home/developer/workspace/Doc
 # ~/.venv/bin/conan (tool_installed). Przy venv w katalogu roboczym CI go nie
 # widzi i przy każdym jobie stawia drugi venv z pip install conan od zera —
 # CircleCI i tak pracuje w ~/retractordb, nie w WORKDIR obrazu.
+#
+# CMake przypięty w tym samym venv, bo apt-owy z trixie (3.31) jest poniżej
+# podłogi projektu. Bez tego `scripts/buildrdb.sh toolchain` dociąga koło cmake
+# w KAŻDYM jobie CI — siedem razy na przebieg nocny; instalacja tutaj kasuje ten
+# koszt raz na obraz. `--only-binary`: PyPI ma dla cmake także sdist, a jego
+# budowa to kompilacja całego CMake ze źródeł.
+#
+# To CZWARTE miejsce z tą samą podłogą wersji. Pozostałe trzy: RDB_CMAKE_MIN_VERSION
+# w scripts/buildrdb.sh, tool_requires w conanfile.py i górna granica zakresu
+# cmake_minimum_required w CMakeLists.txt. Podnosi się je razem, w jednym commicie.
 RUN python3 -m venv ~/.venv \
     && . ~/.venv/bin/activate \
     && pip install --upgrade pip \
     && pip install cmakelang conan \
+    && pip install --only-binary=:all: "cmake>=4.4.2" \
     && conan profile detect \
     && sed -i -e "s/gnu17/gnu23/g" ~/.conan2/profiles/default \
     && echo '[conf]' >> ~/.conan2/profiles/default \

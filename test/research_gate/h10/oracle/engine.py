@@ -9,7 +9,6 @@ jako 0.
 
 import os
 import re
-import shutil
 import subprocess
 from fractions import Fraction
 from pathlib import Path
@@ -18,22 +17,35 @@ HEADER = re.compile(r"^(?P<name>[A-Za-z_][A-Za-z_0-9]*)\((?P<interval>\d+/\d+)\)
 TAIL = re.compile(r"tail=(\d+)")
 ORIGIN = re.compile(r"origin=(\d+)")
 
-DEFAULT_BINARY = Path(__file__).resolve().parents[3] / "retractordb/build/Debug/src/retractor/xretractor"
-
-
 class EngineError(RuntimeError):
     """Awaria aparatury silnika — zatrzymuje iterację."""
 
 
 def resolve_binary(explicit=None):
-    if explicit:
-        return Path(explicit).resolve()
-    if DEFAULT_BINARY.exists():
-        return DEFAULT_BINARY
-    found = shutil.which("xretractor")
-    if not found:
-        raise EngineError("nie znaleziono xretractor — podaj --xretractor")
-    return Path(found).resolve()
+    """Binarka silnika WYŁĄCZNIE ze wskazania wołającego.
+
+    Nie ma tu ani ścieżki domyślnej, ani szukania `xretractor` w PATH — i to
+    jest cała treść tej funkcji.
+
+    2026-08-19 poziom `H10 test_closedform` oblał na CI, bo `run_gate.sh` jako
+    jedynemu testowi z silnikiem nie podawał binarki. Dawna `DEFAULT_BINARY`
+    wskazywała `parents[3]/retractordb/build/Debug/...`, czyli układ katalogów
+    repozytorium eksperymentu, nieistniejący po przeniesieniu aparatury do
+    drzewa silnika. Zostawał więc fallback na PATH: na CI nie ma tam nic i
+    poziom oblewał, a lokalnie stała tam binarka ZAINSTALOWANA — poziom
+    przechodził, mierząc co innego niż reszta bramki. Zielone światło z cicho
+    podstawionej binarki jest gorsze od czerwonego, bo nie widać, że kłamie.
+
+    Wołający zawsze wie, którą binarkę bada; aparatura nie ma prawa zgadywać.
+    """
+    if not explicit:
+        raise EngineError(
+            "brak binarki xretractor — podaj ją jawnie (--xretractor albo argv[1]); "
+            "aparatura celowo nie zgaduje, którą binarkę mierzy")
+    binary = Path(explicit).resolve()
+    if not binary.is_file() or not os.access(binary, os.X_OK):
+        raise EngineError(f"wskazana ścieżka nie jest wykonywalną binarką: {binary}")
+    return binary
 
 
 def build_info(binary):

@@ -121,9 +121,18 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
   echo
   echo "-- H10: rachunek poczatku logicznego i ogona startowego --"
   cd "$HERE/h10"
-  for t in test_independence test_oracle test_mutants test_closedform; do
+  for t in test_independence test_oracle test_mutants; do
     step "H10 $t" python3 "tests/$t.py"
   done
+
+  # test_closedform jako jedyny z tej czworki rozmawia z SILNIKIEM, wiec dostaje
+  # binarke jawnie, jak test_phase_forms i kampanie nizej. Bez tego wpada w
+  # resolve_binary(None) z oracle/engine.py: DEFAULT_BINARY wskazuje tam sciezke
+  # z repozytorium eksperymentu, nieistniejaca w tym drzewie, wiec zostaje
+  # fallback na `xretractor` z PATH. Na CI nie ma go wcale (job bramki nie robi
+  # `ninja install`) i poziom oblewa; lokalnie jest, wiec poziom przechodzi —
+  # tyle ze sprawdzajac ZAINSTALOWANA binarke, a nie te, ktora bada reszta bramki.
+  step "H10 test_closedform" python3 tests/test_closedform.py "$XRETRACTOR"
 
   # Postacie fazowe `-`, `Theta` i `~Theta` (K24/H10, 2026-08-18). Osobny poziom,
   # bo korpus losowy siega q <= 5, a twierdzenie dotyczy kazdego q — przemiatanie
