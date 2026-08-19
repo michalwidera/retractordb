@@ -69,6 +69,22 @@ fi
 log()  { printf '[%(%Y-%m-%d %H:%M:%S)T] %s\n' -1 "$*" >&2; }
 die()  { log "BLAD: $*"; exit 1; }
 
+# Kazde wywolanie narzedzia idzie do pliku, zeby log kroku nie tonal w wyjsciu
+# kompilatora. Cena jest taka, ze porazka bywa NIEMA: 2026-08-19 job CI
+# zatrzymal sie na linii "profil DEFAULT ->" i nie powiedzial nic wiecej, a
+# store_artifacts z logami nie wykonal sie, bo krok juz nie zyl. Plik zostaje
+# plikiem, ale ogon nieudanego przebiegu idzie na stderr, czyli do logu kroku.
+run_logged() { # run_logged <plik logu> <opis> <komenda...>
+  local logfile="$1" what="$2" rc=0
+  shift 2
+  "$@" >"$logfile" 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log "$what — kod wyjscia $rc; ostatnie 40 linii $logfile:"
+    tail -n 40 "$logfile" >&2 || true
+  fi
+  return "$rc"
+}
+
 verify_probe_binary_profile() {
   local binary="$1" dedup="$2" share="$3" commutative="$4" factor="$5" simplify="${6:-}"
   local actual expected
@@ -112,11 +128,14 @@ mkdir -p "$raw_dir"
 
 if [ ! -f "$toolchain" ]; then
   log "conan install (jednorazowo dla wszystkich profili)"
-  conan install "$code_repo" \
+  run_logged "$raw_dir/conan-install.log" "conan install" \
+    conan install "$code_repo" \
     -s build_type=Release \
     --build missing \
-    -of "$conan_dir" >"$raw_dir/conan-install.log" 2>&1
+    -of "$conan_dir" \
+    || die "conan install nie powiodl sie"
 fi
+[ -f "$toolchain" ] || die "conan install nie zostawil $toolchain"
 
 built=0
 while IFS=$'\t' read -r profile slug dedup share commutative factor; do
@@ -125,7 +144,8 @@ while IFS=$'\t' read -r profile slug dedup share commutative factor; do
 
   build_dir="$code_repo/build/K26v3-$slug"
   log "profil $profile -> $build_dir"
-  cmake -S "$code_repo" -B "$build_dir" -G Ninja \
+  run_logged "$raw_dir/cmake-$slug.log" "cmake configure profilu $profile" \
+    cmake -S "$code_repo" -B "$build_dir" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE="$toolchain" \
     "${ccache_args[@]}" \
@@ -134,10 +154,13 @@ while IFS=$'\t' read -r profile slug dedup share commutative factor; do
     -DRDB_OPT_COMMUTATIVE_ADD="$commutative" \
     -DRDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES="$factor" \
     -DRDB_OPT_SIMPLIFY_EXPRESSIONS=ON \
-    -DRDB_BENCH_PROBE=ON >"$raw_dir/cmake-$slug.log" 2>&1
+    -DRDB_BENCH_PROBE=ON \
+    || die "cmake configure profilu $profile nie powiodl sie"
 
-  "${build_wrapper[@]}" cmake --build "$build_dir" --target xretractor \
-    --parallel "$jobs" >"$raw_dir/build-$slug.log" 2>&1
+  run_logged "$raw_dir/build-$slug.log" "build profilu $profile" \
+    "${build_wrapper[@]}" cmake --build "$build_dir" --target xretractor \
+    --parallel "$jobs" \
+    || die "build profilu $profile nie powiodl sie"
 
   binary="$build_dir/src/retractor/xretractor"
   verify_probe_binary_profile "$binary" "$dedup" "$share" "$commutative" "$factor" ON ||

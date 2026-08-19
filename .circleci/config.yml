@@ -496,20 +496,49 @@ jobs:
       # ablacji. Bez nich bramka ten poziom POMIJA, a w trybie strict pominiecie
       # jest bledem — wiec profile musza powstac tutaj, w tym samym jobie i z tej
       # samej tresci src/ (bramka sprawdza odcisk).
+      #
+      # Rownoleglosc: 4, nie `$(nproc)`. W kontenerze `nproc` podaje rdzenie
+      # HOSTA (36), nie przydzial kontenera — a wiazacym limitem i tak jest
+      # pamiec: jedna jednostka kompilacji tego drzewa siega ~1 GiB RSS
+      # (zmierzone: executorsm.cpp 0,93 GiB, launcher.cpp 0,86 GiB), executor
+      # `large` ma 8 GiB. 36 rownoleglych g++ to ~30 GiB, czyli OOM: 2026-08-19
+      # krok padl po 45 s bez jednej linii bledu i bez artefaktow, bo zabity
+      # krok nie dochodzi do store_artifacts. Inne joby przechodza dlatego, ze
+      # buduje je `conan build`, a conan liczy rownoleglosc z limitu cgroup, nie
+      # z `nproc`. Liczba 4 idzie za `resource_class: large` (4 vCPU / 8 GiB) —
+      # przy zmianie klasy executora zmienic tutaj.
+      #
+      # `no_output_timeout`: CircleCI zabija krok, ktory przez 10 minut (domyslna
+      # wartosc) nie napisal ani znaku. Oba te kroki sa z zalozenia MILCZACE:
+      # wyjscie kompilatora idzie do plikow w build/gate-profiles-logs, a bramka
+      # drukuje dopiero werdykt poziomu. Miedzy dwiema liniami "profil X ->"
+      # mieszcza sie minuty pierwszego, zimnego profilu (lokalnie 4 min 20 s przy
+      # -j4; na 4 vCPU kontenera odpowiednio dluzej), a w kroku bramki cala
+      # kampania 2 x 10010 planow. Dzielenie tego na osobne kroki NIE pomaga —
+      # limit liczy sie per krok, nie per job. Kolejne profile sa tansze: rozne
+      # miedzy nimi sa tylko 19 ze 112 jednostek kompilacji (cel `retractor`),
+      # reszta trafia w ccache.
       - run:
           name: Build H9 ablation profiles
+          no_output_timeout: 30m
           command: |
-            K6_CCACHE=1 K6_BUILD_JOBS="$(nproc)" test/research_gate/h9/build_profiles.sh
+            K6_CCACHE=1 K6_BUILD_JOBS=4 test/research_gate/h9/build_profiles.sh
       - run:
           name: Research gate H9/H10
+          no_output_timeout: 30m
           command: |
-            cmake --build build/Release --target test_gate
+            cmake --build build/Release --target test_gate --parallel 4
+      # `when: always`: artefakty sa potrzebne WLASNIE wtedy, gdy bramka padla —
+      # bez tego nieudany przebieg nie zostawia ani logow builda profili, ani
+      # katalogu roboczego bramki.
       - store_artifacts:
           path: build/Release/test/research_gate/gate-work
           destination: research-gate
+          when: always
       - store_artifacts:
           path: build/gate-profiles-logs
           destination: research-gate-profiles
+          when: always
 
   build-release:
     working_directory: ~/retractordb
@@ -595,11 +624,16 @@ jobs:
               -DRDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=<< parameters.factor >> \
               -DRDB_OPT_SIMPLIFY_EXPRESSIONS=<< parameters.simplify >> \
               -DRDB_BENCH_PROBE=<< parameters.probe >>
+      # Rownoleglosc 4, nie `$(nproc)` i nie domyslna ninja (`nproc`+2): powod
+      # jak w jobie research-gate wyzej — w kontenerze `nproc` podaje rdzenie
+      # HOSTA, a jedna jednostka kompilacji tego drzewa siega ~1 GiB RSS przy
+      # 8 GiB executora `large`. Job jest wylacznie reczny, wiec pulapka nigdy
+      # nie wystrzelila, ale jest ta sama.
       - run:
           name: Build and install ablation variant
           command: |
-            cmake --build build/Release --parallel "$(nproc)"
-            cd build/Release && ninja install
+            cmake --build build/Release --parallel 4
+            cd build/Release && ninja -j 4 install
       - run:
           name: Verify compiled switches match the requested profile
           command: |
