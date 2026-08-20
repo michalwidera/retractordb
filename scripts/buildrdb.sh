@@ -553,6 +553,9 @@ ensure_tools_for_option() {
         "batsyntax")
             tool_specs=("batcat:required")
             ;;
+        "attach_knowledge")
+            tool_specs=("git:required")
+            ;;
         "bashrc"|"vimsyntax"|"quit"|"help"|"--help"|"-h")
             tool_specs=()
             ;;
@@ -1064,12 +1067,52 @@ choose_ablation_options() {
     done
 }
 
+attach_knowledge_index() {
+    local repository_url="git@github.com:michalwidera/knowledge-index.git"
+    local knowledge_index_dir
+    local skill_link="$rdb_source_dir/.agents/skills/retractordb-system"
+    local resolved_skill_dir
+
+    knowledge_index_dir="$(dirname "$rdb_source_dir")/knowledge-index"
+
+    if [ -e "$knowledge_index_dir" ]; then
+        if [ ! -d "$knowledge_index_dir" ] || ! git -C "$knowledge_index_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            echo "Error: $knowledge_index_dir exists but is not a Git repository."
+            return 1
+        fi
+        echo "-- Knowledge index already exists: $knowledge_index_dir"
+    else
+        echo "-- Cloning knowledge index into $knowledge_index_dir"
+        git clone "$repository_url" "$knowledge_index_dir"
+    fi
+
+    if [ ! -L "$skill_link" ]; then
+        echo "Error: expected tracked symbolic link is missing: $skill_link"
+        return 1
+    fi
+
+    if ! resolved_skill_dir=$(cd "$skill_link" 2>/dev/null && pwd -P); then
+        echo "Error: symbolic link does not resolve: $skill_link"
+        return 1
+    fi
+
+    if [ "$resolved_skill_dir" != "$knowledge_index_dir" ] || [ ! -f "$resolved_skill_dir/SKILL.md" ]; then
+        echo "Error: $skill_link does not point to a valid knowledge index at $knowledge_index_dir"
+        return 1
+    fi
+
+    echo "-- RetractorDB knowledge index attached: $resolved_skill_dir"
+}
+
 run_option() {
     local opt="$1"
     if [ "$opt" != "help" ] && [ "$opt" != "--help" ] && [ "$opt" != "-h" ]; then
         ensure_tools_for_option "$opt"
     fi
     case "$opt" in
+        "attach_knowledge")
+            attach_knowledge_index
+            ;;
         "release"|"release-dirty")
             # Produkcyjny Release powstaje wyłącznie z czystego drzewa źródeł,
             # świeżego katalogu i jawnej konfiguracji. Typowe zmienne wstrzykujące
@@ -1443,6 +1486,7 @@ run_option() {
             echo "  bashrc     - Add ~/.local/bin to PATH in ~/.bashrc (and create it)"
             echo "  coverage   - Build tests with code coverage enabled"
             echo "  gate_requirements - Install deps of the research gate (JDK 17 + Flink 2.3.0) and verify them"
+            echo "  attach_knowledge - Clone and attach the sibling RetractorDB knowledge index"
             echo "  mold       - Enable mold linker for subsequent options (default; e.g. buildrdb.sh mold debug)"
             echo "  nomold     - Disable mold linker for subsequent options (e.g. RPi: buildrdb.sh nomold debug)"
             echo "  lowmem     - Force build parallelism to a fixed 2 jobs, overriding the automatic RAM-aware default (e.g. RPi: buildrdb.sh lowmem release)"
@@ -1456,7 +1500,7 @@ run_option() {
             echo "Multiple options can be passed: $0 conan ninja debug"
             ;;
         *) echo "invalid option: $opt"
-              echo "Valid options: release release-dirty release-ablation debug probe package conan ninja toolchain toolchain_required toolchain_all validate bashrc coverage gate_requirements mold nomold lowmem nolowmem vimsyntax batsyntax help quit"
+              echo "Valid options: release release-dirty release-ablation debug probe package conan ninja toolchain toolchain_required toolchain_all validate bashrc coverage gate_requirements attach_knowledge mold nomold lowmem nolowmem vimsyntax batsyntax help quit"
            exit 1
            ;;
     esac
@@ -1468,7 +1512,7 @@ if [ $# -gt 0 ]; then
     done
 else
     PS3='-- Pick option, please enter your setup choice: '
-    options=("release" "release-dirty" "release-ablation" "debug" "probe" "package" "conan" "ninja" "toolchain" "toolchain_required" "toolchain_all" "validate" "bashrc" "coverage" "gate_requirements" "mold" "nomold" "lowmem" "nolowmem" "vimsyntax" "batsyntax" "help" "quit")
+    options=("release" "release-dirty" "release-ablation" "debug" "probe" "package" "conan" "ninja" "toolchain" "toolchain_required" "toolchain_all" "validate" "bashrc" "coverage" "gate_requirements" "attach_knowledge" "mold" "nomold" "lowmem" "nolowmem" "vimsyntax" "batsyntax" "help" "quit")
     select opt in "${options[@]}"
     do
         run_option "$opt"
