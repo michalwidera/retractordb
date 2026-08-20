@@ -6,22 +6,24 @@ These instructions apply to the whole RetractorDB repository. They assume the re
 
 1. Read `CLAUDE.md` in full before working with code, tests, build files, or documentation. It is the single source for build commands, testing, code style, integration-test sync traps, ANTLR4 grammar pitfalls, collaboration rules, commit/push/CI policy, and the AI-watermark hygiene procedure — all mandatory.
 
-2. Use the `retractordb-system` skill from `.agents/skills/retractordb-system` for every RetractorDB task.
+2. Use the `retractordb-system` skill from the sibling `knowledge-index` repository for every RetractorDB task. The
+   `.agents/skills/retractordb-system` path in this repository is only a relative symbolic link to that checkout.
 3. Run the skill's `scripts/check_freshness.sh` before relying on its indexed notes.
 4. Resolve conflicts between sources using the skill's *Source precedence* section, which is the only copy of that
    ordering.
 
-## Sharing the RetractorDB skill
+## Installing the RetractorDB skill
 
-The repository copy is discovered automatically while working inside this repository. To make the same version
-available from the documentation repositories and derived-artifact workspaces, run:
+The sibling `knowledge-index` checkout is discovered through the repository symlink. To make the same skill available
+from the documentation repositories and derived-artifact workspaces, run:
 
 ```bash
 scripts/install-codex-skill.sh
 ```
 
-The installer creates `~/.agents/skills/retractordb-system` as a symbolic link to the repository copy. It is idempotent
-and refuses to replace an existing file, directory, or link to a different target.
+The installer delegates to `../knowledge-index/scripts/install-skill.sh` and creates
+`~/.agents/skills/retractordb-system` as a symbolic link to the knowledge-index checkout. It is idempotent and refuses
+to replace an existing file, directory, or link to a different target.
 
 ## Commits, push and CI
 

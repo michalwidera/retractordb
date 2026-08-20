@@ -1,10 +1,9 @@
 # CLAUDE.md
 
 This file is the binding source for build, testing, style, collaboration, and commit/push/CI rules. `AGENTS.md`
-adds the agent-facing entry points it does not duplicate: the indexed system knowledge in
-`.agents/skills/retractordb-system/` (architecture, RQL/compiler, storage, tests, documentation map, plus
-`scripts/check_freshness.sh`), and `scripts/install-codex-skill.sh`, which links that skill into other
-workspaces.
+adds the agent-facing entry points it does not duplicate: the indexed system knowledge in the sibling
+`knowledge-index` repository (referenced here through `.agents/skills/retractordb-system`), and
+`scripts/install-codex-skill.sh`, which installs that external skill for other workspaces.
 
 ## Build
 
