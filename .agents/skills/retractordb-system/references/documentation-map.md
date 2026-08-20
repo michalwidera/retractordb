@@ -35,7 +35,7 @@ Paths below are relative to the corresponding repository root.
 
 | Subject | Polish documentation | Verify primarily in |
 |---|---|---|
-| Product identity, ESPE positioning | `README.md`, `przeglad-rozwiazan.md` | `README.md`, binaries, current examples |
+| Product identity, name, ESPE positioning, and reading paths | `README.md`, `zalaczniki/geneza-systemu/dlaczego-wybrano-taka-nazwe-dla-systemu.md`, `przeglad-rozwiazan.md` | `README.md`, binaries, current examples |
 | Mathematical model, origins, tails, and proofs | `podstawy-matematyczne/` | `src/include/SOperations.hpp`, `compiler.cpp`, `dataModel.cpp`, `ut_soperations`, `ut_h10aGate`, `ut_crsMath` |
 | RQL commands and user syntax | `konstrukcja-jezyka-zapytan/` | `RQL.g4`, `RQLParser.cpp`, compiler and integration fixtures |
 | Overall architecture and data flow | `architektura-systemu-przetwarzania-danych/` | launchers, `executorsm`, `dataModel`, `streamInstance`, IPC tests |
@@ -58,7 +58,7 @@ Paths below are relative to the corresponding repository root.
 
 ### Entry points and positioning
 
-- `README.md` — introduction to RetractorDB, intended problem domain, high-level capabilities, and reading entry point.
+- `README.md` — concise ESPE definition, the `Retractor`/`DB` name split, high-level capabilities, sequential and topic-oriented reading paths, and positioning among neighboring research fields.
 - `przeglad-rozwiazan.md` — comparison and positioning against other data-processing approaches.
 - `SUMMARY.md` — authoritative mdBook navigation order.
 - `literatura.md` — bibliography and theoretical/technical references.

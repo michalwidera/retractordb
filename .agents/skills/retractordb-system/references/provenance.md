@@ -5,12 +5,14 @@
 | Repository | Role | Branch | Version basis |
 |---|---|---|---|
 | `retractordb` | implementation, tests, examples, packaging | `master` | versioned in the same Git tree as this file |
-| `dokumentacja-rdb` | canonical Polish documentation | `main` | `9d1321889a0d5a5f7616b435ca4921e4f0623308` |
-| `documentation-rdb` | derived English translation | `main` | `38f8056bcd5fa450a9cc5cd7966ed7c5453a4b97` |
+| `dokumentacja-rdb` | canonical Polish documentation | `main` | `c154f5cb803b0dd15152ad747c9c1315f271a5b6` |
+| `documentation-rdb` | derived English translation | `main` | `8d543c8cbf95ab7cdb41049be3b30163e225bf5b` |
 | `paper-arXiv` | DEBS manuscript, research plan, and schedule | `main` | `5f8f28dec026ac2e64dc9a4ef6f662578a210803` |
 
-Index prepared on 2026-07-23 and its external documentation and paper basis refreshed on 2026-08-08 in timezone
-Europe/Warsaw.
+Index prepared on 2026-07-23; its Polish and English documentation basis was refreshed on 2026-08-20 in timezone
+Europe/Warsaw. The synchronized root `README.md` introductions are included in the recorded documentation commits. The
+paper basis remains the separately recorded 2026-08-08 revision and is intentionally still reported as stale against
+the current paper checkout.
 The initial code basis was commit `48f9b50`. Code and the index now live in the same repository and are selected by the
 same checkout, so provenance does not embed a mutable current-code commit hash. This avoids a self-referential update in
 which committing a new hash immediately makes that hash historical. The initial verified product baseline remains
@@ -133,16 +135,6 @@ The English repository is treated as derived content. Consult it only for Englis
 
 These are navigation warnings, not necessarily product defects:
 
-- `kompilacja-zapytan/przebiegi-kompilacji.md` still reduces shift history to `N+1`. Current code uses
-  `Wout-Wsrc+N+1` plus `kDeclarationPrefetch=2` for declarations after the move to logical-index `fetchForward()`.
-  The Polish compiler-pass chapter should be corrected and then synchronized to
-  `query-compilation/compilation-passes.md` in English.
-- `podstawy-matematyczne/ogony-i-obserwowalnosc-operatorow.md` still says the per-commit `ut_h10aGate` covers only
-  `@` and `>`.
-  Current `test_h10aGate.cpp` covers all nine canonical classes, mixed compositions, probe spans, coverage floors, and
-  mutant discrimination. Update the Polish page, then its English counterpart
-  `mathematical-foundations/operator-tails-and-observability.md`. Both integration-test appendices also omit the newer
-  `ecg_qrs` and `replay_stability` scenarios.
 - The root code `CLAUDE.md` summarizes only `[storage] dir`, while current `AppConfig` and both CLI documentation sets
   also expose IPC sizing, client retry count, startup/no-data timing, real-time priority, lock directory, and service
   query-file fallback.
@@ -152,7 +144,10 @@ These are navigation warnings, not necessarily product defects:
 Resolved at the current documentation basis: logical origin and exact shift/AGSE semantics; exact interleave phase scan
 with the safe fallback; the `metaData`/`MetaIndexStore`/`GapDetector`/shadow decomposition; five-file artifact families;
 declared-source descriptors and inert metadata; idle service startup; full TOML option documentation; and the previously
-missing `config_storage_validation`, `deinterleave_roundtrip`, `packaging`, and `service_idle` appendix entries.
+missing `config_storage_validation`, `deinterleave_roundtrip`, `packaging`, and `service_idle` appendix entries. The
+compiler-pass chapters now give the logical-index shift capacity as `Wout-Wsrc+N+1` plus declaration prefetch. The
+operator-observability chapters and both integration-test catalogues now cover the full nine-class `ut_h10aGate` scope
+and the `ecg_qrs` and `replay_stability` scenarios.
 
 Paper-specific inconsistencies and stale planning metadata are listed in `paper-debs.md`; they are not documentation
 authority and must not be silently promoted into system behavior.

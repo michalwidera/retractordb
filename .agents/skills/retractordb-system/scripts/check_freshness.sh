@@ -53,7 +53,7 @@ check_external_repo() {
 
 status=0
 report_versioned_repo "code" "$code_repo" || status=1
-check_external_repo "docs-pl" "$polish_docs_repo" "9d1321889a0d5a5f7616b435ca4921e4f0623308" || status=1
-check_external_repo "docs-en" "$english_docs_repo" "38f8056bcd5fa450a9cc5cd7966ed7c5453a4b97" || status=1
+check_external_repo "docs-pl" "$polish_docs_repo" "c154f5cb803b0dd15152ad747c9c1315f271a5b6" || status=1
+check_external_repo "docs-en" "$english_docs_repo" "8d543c8cbf95ab7cdb41049be3b30163e225bf5b" || status=1
 check_external_repo "paper" "$paper_repo" "5f8f28dec026ac2e64dc9a4ef6f662578a210803" || status=1
 exit "$status"

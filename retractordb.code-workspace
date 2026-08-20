@@ -17,6 +17,7 @@
     }
   ],
   "settings": {
+    "git.autoRepositoryDetection": false,
     "git.repositoryScanIgnoredFolders": [
       "node_modules",
       "book"
