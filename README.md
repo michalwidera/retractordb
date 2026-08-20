@@ -97,8 +97,8 @@ toolchain and drives the build. Run it from the repo root, `scripts/`, or
 ```bash
 git clone https://github.com/michalwidera/retractordb.git
 cd retractordb
-# Note: this does NOT fetch the research data under examples/experiment.
-# That is deliberate — see "Experiments" below if you need it.
+# Note: research data lives in the independent rdb-experiment repository.
+# See "Experiments" below if you need it.
 
 # 1. Install build dependencies (apt packages + Python venv + Conan)
 scripts/buildrdb.sh toolchain
@@ -167,11 +167,10 @@ switch. Any valid optimizer combination can be configured with the probe either
 
 ## Experiments
 
-`examples/experiment` is a **git submodule** pointing at
-[rdb-experiment](https://github.com/michalwidera/rdb-experiment). It is not
-part of the engine and nothing in the build, the test suite, or CI depends on
-it. A normal clone leaves the directory empty, and that is the intended
-default.
+[rdb-experiment](https://github.com/michalwidera/rdb-experiment) is an
+independent repository containing the scripts, journal, and results of
+RetractorDB research. It is not part of this repository, and the build, test
+suite, packaging, and CI do not require it.
 
 ### What the experiments are
 
@@ -197,79 +196,48 @@ turned out wrong — they are part of the path, not something to be edited out.
 `REQUIREMENTS.md` defines how a campaign must be conducted to stay
 reproducible.
 
-### Why a submodule
+### Why a separate repository
 
 Experimental data grows far faster than source code, and it grows
 monotonically: every campaign adds raw samples that must never be rewritten,
-because reproducibility is the point. The current state is roughly **57 MB of
-results across eight campaigns**, the largest single one 23 MB — against about
-12 MB of tracked engine content, of which source and tests are 4 MB. One
-campaign can therefore outweigh the entire engine. Keeping that history in the
-main repository would mean every `git clone`, every CI job, and every packaging
-build pays for measurement data it will never read.
+because reproducibility is the point. Keeping that growing history in the main
+repository would make every `git clone`, CI job, and packaging build fetch
+measurement data it will never read.
 
-Splitting it out keeps the engine repository small and makes the boundary
-explicit: the engine is the product, the experiments are evidence about it.
-They evolve on different schedules and are versioned independently — the
-engine repository records only *which* commit of the experiment repository a
-given engine state was measured against.
+Keeping it separate leaves the engine repository small and makes the boundary
+explicit: the engine is the product, while experiments are evidence about it.
+The two repositories have separate histories and evolve on different
+schedules. Each experiment manifest records the full engine commit and the
+base commit of the experiment repository used for that campaign.
 
 ### When you need it
 
-You need the submodule if you want to reproduce a published measurement, audit
-the raw data behind a table in the paper, or run a new campaign. You do not
-need it to build, install, test, or use RetractorDB.
-
-Fetch it into an existing clone:
+Clone it separately when you need to reproduce a published measurement, audit
+raw data, or run a campaign. The standard supervisor layout keeps both
+repositories as siblings:
 
 ```bash
-git submodule update --init examples/experiment
+cd /path/to/parent
+git clone https://github.com/michalwidera/retractordb.git
+git clone https://github.com/michalwidera/rdb-experiment.git
 ```
 
-Or clone the engine together with it from the start:
-
-```bash
-git clone --recurse-submodules https://github.com/michalwidera/retractordb.git
-```
-
-After a `git pull` that moves the recorded pointer, check the submodule out at
-that revision — this is the state the engine commit was measured against:
-
-```bash
-git submodule update examples/experiment
-```
-
-Deliberately advancing to the newest experiment revision is a separate action,
-and it changes what the engine repository records:
-
-```bash
-git submodule update --remote examples/experiment
-git add examples/experiment && git commit -m "bump experiment pointer"
-```
-
-Working inside the submodule means committing and pushing in `rdb-experiment`
-first, then committing the moved pointer here. The experiment scripts resolve
-paths relative to the engine repository root, so they expect to run from this
-checkout, at this path — not from a standalone clone of `rdb-experiment`.
+Run experiment commands from the `rdb-experiment` checkout. Its `README.md`
+describes the supervisor and worker layout, while `REQUIREMENTS.md` defines the
+reproducibility, clean-tree, build, and artifact rules. The supervisor accepts
+`--code-repo` and related path options when the checkouts do not use its
+documented default locations.
 
 ### What this does to CI
 
 | Action | Pipeline |
 |---|---|
-| Commit and push inside `examples/experiment` (i.e. to `rdb-experiment`) | **does not run** — that repository has no CI configuration, and the CircleCI project watches this repository only |
-| Commit here that moves the submodule pointer | **runs**, on `master`, `issue_*`, and `<number>-*` branches — it is an ordinary commit to the engine repository |
+| Commit and push in `rdb-experiment` | Does not trigger this repository's CircleCI pipeline |
+| Commit in this repository | Runs according to this repository's branch and workflow filters |
 
-A pointer bump would otherwise repeat a full build while changing nothing the
-pipeline can see: CircleCI's `checkout` does not initialize submodules, so the
-build and the test suite would be byte-for-byte the same work as on the
-preceding commit. The commit-triggered workflow therefore halts automatically
-when the commit changes only the `examples/experiment` pointer. The `[skipci]`
-commit message marker remains available for other explicit skips. Scheduled
-and manual workflows ignore both conditions and run regardless.
-
-This is also why measurement data can grow without bounds in the other
-repository: no amount of experimental output can slow the engine's pipeline
-down, because the pipeline never fetches it.
+CircleCI does not fetch the experiment repository. The `[skipci]` commit
+message marker remains available for explicit commit-triggered skips;
+scheduled and manual workflows ignore it and run regardless.
 
 ## Initial configuration
 
