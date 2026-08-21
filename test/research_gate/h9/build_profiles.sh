@@ -132,6 +132,7 @@ if [ ! -f "$toolchain" ]; then
     conan install "$code_repo" \
     -s build_type=Release \
     --build missing \
+    -c "tools.cmake.cmaketoolchain:user_presets=" \
     -of "$conan_dir" \
     || die "conan install nie powiodl sie"
 fi
