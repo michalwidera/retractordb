@@ -211,7 +211,14 @@ run_build_option() {
             fi
 
             cd "$rdb_source_dir"
-            cmake --preset conan-debug -DENABLE_COVERAGE=ON
+            conan install "$rdb_source_dir" -s build_type=Debug --build missing
+            cmake \
+                -S "$rdb_source_dir" \
+                -B "$rdb_source_dir/build/Debug" \
+                -G Ninja \
+                -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_TOOLCHAIN_FILE="$rdb_source_dir/build/Debug/generators/conan_toolchain.cmake" \
+                -DENABLE_COVERAGE=ON
             cd build/Debug
             find . -name '*.gcda' -delete -o -name '*.gcno' -delete
             build_jobs=$(compute_build_jobs)

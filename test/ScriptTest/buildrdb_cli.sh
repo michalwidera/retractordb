@@ -128,4 +128,47 @@ while IFS= read -r line; do
 done < "$state_log"
 [[ $(wc -l < "$state_log") -eq 3 ]] || fail "expected three conan calls"
 
+coverage_parent="$test_root/coverage"
+coverage_source="$coverage_parent/retractordb"
+copy_launcher "$coverage_source"
+mkdir -p "$coverage_source/build/Debug"
+coverage_home="$test_root/coverage-home"
+make_home "$coverage_home"
+coverage_stubs="$test_root/coverage-stubs"
+mkdir -p "$coverage_stubs"
+for command_name in g++ cmake ninja conan ctest gcovr valgrind pip3; do
+  cat > "$coverage_stubs/$command_name" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s %s\n' "${0##*/}" "$*" >> "$RDB_TEST_COVERAGE_LOG"
+EOF
+  chmod +x "$coverage_stubs/$command_name"
+done
+cat > "$coverage_stubs/gcc" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "-dumpversion" ]]; then
+  echo 15
+fi
+EOF
+chmod +x "$coverage_stubs/gcc"
+cat > "$coverage_stubs/gcov-15" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == "--version" ]]; then
+  echo "gcov 15"
+fi
+EOF
+chmod +x "$coverage_stubs/gcov-15"
+coverage_log="$test_root/coverage.log"
+HOME="$coverage_home" PATH="$coverage_stubs:$PATH" RDB_TEST_COVERAGE_LOG="$coverage_log" \
+  "$coverage_source/scripts/buildrdb.sh" coverage >"$test_root/coverage-output.log" 2>&1
+coverage_calls=$(<"$coverage_log")
+assert_contains "$coverage_calls" "conan install $coverage_source -s build_type=Debug --build missing"
+assert_contains "$coverage_calls" "cmake -S $coverage_source -B $coverage_source/build/Debug -G Ninja"
+assert_contains "$coverage_calls" "-DCMAKE_BUILD_TYPE=Debug"
+assert_contains "$coverage_calls" "-DCMAKE_TOOLCHAIN_FILE=$coverage_source/build/Debug/generators/conan_toolchain.cmake"
+assert_contains "$coverage_calls" "-DENABLE_COVERAGE=ON"
+[[ "$coverage_calls" != *"--preset"* ]] || fail "coverage still depends on a CMake preset"
+
 echo "buildrdb CLI tests passed"
