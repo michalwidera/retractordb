@@ -1,0 +1,26 @@
+# Artefakty generowane przez przebieg — wynik pomiaru, nie zrodlo.
+temp/
+*.shadow
+*.meta
+*.desc
+ecg_raw
+qrs_ship
+mlii
+mlii_win
+bp_acc
+bp_out
+bp_win
+d_acc
+d_out
+sq_out
+mwi_win
+mwi
+mwi_long
+mwi_thr
+qrs_feat
+STREAM_ADD*
+
+# Wyniki eksperymentu: zapisywane przez experiment.sh, odtwarzalne z niego.
+results.tsv
+run-*.log
+experiment.out

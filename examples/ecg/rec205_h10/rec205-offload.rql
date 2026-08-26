@@ -1,0 +1,69 @@
+# Odciazenie lacza — rekord 205 MIT-BIH, 360 Hz
+#
+# Ten sam potok Pan-Tompkinsa co rec205-qrs.rql, ale zakonczony REDUKCJA TEMPA.
+# rec205-qrs.rql tempa nie redukuje: wejscie to 2 wartosci na probke przy
+# 360 Hz, wyjscie qrs_out to 3 wartosci na probke przy tym samym 360 Hz, czyli
+# potok ZWIEKSZA ruch wychodzacy. Ten wariant pokazuje odciazenie lacza.
+#
+# Rozplot `&` jest doborem podciagu krotek (bez interpolacji i bez filtracji),
+# wiec decymacja jest dopuszczalna dopiero PO scaleniu w oknie ruchomym
+# (krok 4), ktore ogranicza pasmo obwiedni do ok. 12 Hz. Nyquist strumienia
+# wysylanego wynosi 18 Hz, wiec dobor co 10. krotki nie aliasuje obwiedni.
+#
+# Argument rozplotu = delta strumienia USUWANEGO. Dla decymacji 10x z 1/360
+# jest to 1/324, bo (1/36 * 1/324) / (1/36 + 1/324) = 1/360.
+#
+#   ecg_raw   2 x INTEGER @ 1/360  — to, co lacze musialoby przeniesc surowo
+#   qrs_ship  2 x INTEGER @ 1/36   — to, co idzie w lacze po potoku
+#
+# Zmierzone (master:6dec187, Release, -m 180000, czyli 500 s sygnalu):
+#   ecg_raw  179999 rek. x 8 B = 1 439 992 B = 2880,0 B/s
+#   qrs_ship  17940 rek. x 8 B =   143 520 B =  287,0 B/s
+#   iloraz 10,03 ; w stanie ustalonym dokladnie 10x, czyli 90,0% redukcji.
+# Roznica miedzy 10,03 a 10,00 to ogon startowy qrs_ship: staly ubytek
+# 59 rekordow, identyczny przy -m 36000 i przy -m 180000.
+#
+# Dane wejsciowe sa wspoldzielone z examples/ecg/rec205 przez sciezki wzgledne,
+# zeby nie duplikowac 5,2 MB rekordu. Ten katalog istnieje osobno, bo przebieg
+# nadpisuje artefakty strumieni o nazwach wspolnych z rec205-qrs.rql.
+#
+# Uruchamiac stad:
+#   cd examples/ecg/rec205_h10
+#   ./measure.sh            # pomiar odtwarzalny, 500 s sygnalu
+#   ./measure.sh 36000      # krotszy przebieg
+
+DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 FILE '../rec205/rec205'
+DECLARE bp_coef INTEGER[25] STREAM bpf, 1 FILE '../rec205/bp_coef.txt'
+DECLARE d_coef INTEGER[5] STREAM df, 1 FILE '../rec205/d_coef.txt'
+
+# Odniesienie: to, co lacze musialoby przeniesc surowo (oba kanaly, pelne tempo)
+SELECT ecg.MLII, ecg.V1 STREAM ecg_raw FROM ecg
+
+SELECT ecg.MLII STREAM mlii FROM ecg VOLATILE
+
+# 1. Filtr pasmowoprzepustowy (5-15 Hz) — splot FIR 25-tap
+SELECT * STREAM mlii_win FROM mlii@(1,25) VOLATILE
+SELECT mlii_win[_]*bpf[_] STREAM bp_acc FROM mlii_win+bpf VOLATILE
+SELECT bp_acc[0]/1000 STREAM bp_out FROM bp_acc.sumc VOLATILE
+
+# 2. Rozniczkowanie — splot FIR 5-tap
+SELECT * STREAM bp_win FROM bp_out@(1,5) VOLATILE
+SELECT bp_win[_]*df[_] STREAM d_acc FROM bp_win+df VOLATILE
+SELECT d_acc[0] STREAM d_out FROM d_acc.sumc VOLATILE
+
+# 3. Kwadrat (dzielenie /1000 zapobiega przepelnieniu int32)
+SELECT d_out[0]*d_out[0]/1000 STREAM sq_out FROM d_out VOLATILE
+
+# 4. Calkowanie w oknie ruchomym 30 probek (~83 ms) — ogranicza pasmo
+SELECT * STREAM mwi_win FROM sq_out@(1,30) VOLATILE
+SELECT mwi_win[0] STREAM mwi FROM mwi_win.avg VOLATILE
+
+# 5. Prog adaptacyjny — srednia ruchoma 180 probek (0.5 s)
+SELECT * STREAM mwi_long FROM mwi@(1,180) VOLATILE
+SELECT mwi_long[0] STREAM mwi_thr FROM mwi_long.avg VOLATILE
+
+# Cecha przesylana dalej: obwiednia i sygnal detekcji, pelne tempo
+SELECT mwi[0]*5, (mwi[0]-mwi_thr[0]*2)*5 STREAM qrs_feat FROM mwi+mwi_thr VOLATILE
+
+# Strumien wysylany w gore: decymacja 10x
+SELECT * STREAM qrs_ship FROM qrs_feat&1/324
