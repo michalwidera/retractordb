@@ -188,6 +188,9 @@ public:
   virtual void enterSExpFactor(RQLParser::SExpFactorContext *ctx) = 0;
   virtual void exitSExpFactor(RQLParser::SExpFactorContext *ctx) = 0;
 
+  virtual void enterSExpFnCall(RQLParser::SExpFnCallContext *ctx) = 0;
+  virtual void exitSExpFnCall(RQLParser::SExpFnCallContext *ctx) = 0;
+
   virtual void enterSExpHash(RQLParser::SExpHashContext *ctx) = 0;
   virtual void exitSExpHash(RQLParser::SExpHashContext *ctx) = 0;
 
@@ -217,6 +220,9 @@ public:
 
   virtual void enterStreamSum(RQLParser::StreamSumContext *ctx) = 0;
   virtual void exitStreamSum(RQLParser::StreamSumContext *ctx) = 0;
+
+  virtual void enterStream_fn_call(RQLParser::Stream_fn_callContext *ctx) = 0;
+  virtual void exitStream_fn_call(RQLParser::Stream_fn_callContext *ctx) = 0;
 
   virtual void enterFunction_call(RQLParser::Function_callContext *ctx) = 0;
   virtual void exitFunction_call(RQLParser::Function_callContext *ctx) = 0;

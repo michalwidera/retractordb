@@ -38,7 +38,8 @@ public:
     RuleField_type = 11, RuleSelect_list = 12, RuleField_id = 13, RuleUnary_op_expression = 14, 
     RuleAsterisk = 15, RuleExpression = 16, RuleLogic = 17, RuleExpression_logic = 18, 
     RuleTerm_logic = 19, RuleExpression_factor = 20, RuleTerm = 21, RuleStream_expression = 22, 
-    RuleStream_term = 23, RuleStream_factor = 24, RuleAgregator = 25, RuleFunction_call = 26
+    RuleStream_term = 23, RuleStream_factor = 24, RuleAgregator = 25, RuleStream_fn_call = 26, 
+    RuleFunction_call = 27
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -84,6 +85,7 @@ public:
   class Stream_termContext;
   class Stream_factorContext;
   class AgregatorContext;
+  class Stream_fn_callContext;
   class Function_callContext; 
 
   class  ProgContext : public antlr4::ParserRuleContext {
@@ -1024,6 +1026,15 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
+  class  SExpFnCallContext : public Stream_termContext {
+  public:
+    SExpFnCallContext(Stream_termContext *ctx);
+
+    Stream_fn_callContext *stream_fn_call();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
   class  SExpHashContext : public Stream_termContext {
   public:
     SExpHashContext(Stream_termContext *ctx);
@@ -1150,6 +1161,23 @@ public:
   };
 
   AgregatorContext* agregator();
+
+  class  Stream_fn_callContext : public antlr4::ParserRuleContext {
+  public:
+    Stream_fn_callContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    Stream_expressionContext *stream_expression();
+    antlr4::tree::TerminalNode *MIN();
+    antlr4::tree::TerminalNode *MAX();
+    antlr4::tree::TerminalNode *AVG();
+    antlr4::tree::TerminalNode *SUMC();
+
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
+  };
+
+  Stream_fn_callContext* stream_fn_call();
 
   class  Function_callContext : public antlr4::ParserRuleContext {
   public:

@@ -147,6 +147,46 @@ class ParserListener : public RQLBaseListener {
   void exitStreamMax(RQLParser::StreamMaxContext *ctx) override { recpToken(STREAM_MAX); }
   void exitStreamAvg(RQLParser::StreamAvgContext *ctx) override { recpToken(STREAM_AVG); }
   void exitStreamSum(RQLParser::StreamSumContext *ctx) override { recpToken(STREAM_SUM); }
+
+  // Notacja przyrostkowa `strumien.avg` jest wygaszana na rzecz AVG(strumien) — patrz
+  // exitStream_fn_call(). Ostrzezenie stoi TUTAJ, a nie w exitStreamMin/Max/Avg/Sum,
+  // bo reguly `agregator` uzywa takze `term : agregator # ExpAgg`, gdzie `avg` jest
+  // odwolaniem do POLA wyniku reduktora, a nie operatorem strumieniowym. Ostrzezenie
+  // w tamtym miejscu krzyczaloby na poprawny zapis SELECT-a.
+  void exitSExpAgregate_proforma(RQLParser::SExpAgregate_proformaContext *ctx) override {
+    auto functionName = ctx->agregator()->getText();
+    std::ranges::transform(functionName, functionName.begin(), ::toupper);
+    SPDLOG_WARN("RQL: notacja '{}' jest wygaszana; uzyj postaci funkcyjnej {}({})", ctx->getText(), functionName,
+                ctx->stream_factor()->getText());
+  }
+
+  /// AVG/MIN/MAX/SUMC w postaci funkcyjnej nad WYRAZENIEM strumieniowym.
+  ///
+  /// Nie wnosi nic do wykonania: dokleja ten sam token reduktora, ktory dokladalaby notacja
+  /// przyrostkowa. Cala roznica jest w tym, CO stoi przed reduktorem — postac przyrostkowa
+  /// przyjmuje wylacznie stream_factor, wiec okno trzeba bylo zmaterializowac osobnym
+  /// zapytaniem:
+  ///
+  ///     SELECT * STREAM w FROM sq@(125,1000)
+  ///     SELECT * STREAM s FROM w.sumc
+  ///
+  /// Postac funkcyjna bierze cale stream_expression, wiec ta sama para to jedno zapytanie
+  /// `FROM SUMC(sq@(125,1000))`. Program klauzuli FROM wychodzi identyczny po sklejeniu
+  /// — [PUSH_STREAM sq, STREAM_AGSE(125,1000), STREAM_SUM] — a rozbija go z powrotem na dwa
+  /// wezly compiler::extractIntermediateStreams(). DAG jest ten sam; znika tylko koniecznosc
+  /// nazwania okna w RQL.
+  void exitStream_fn_call(RQLParser::Stream_fn_callContext *ctx) override {
+    if (ctx->MIN() != nullptr)
+      recpToken(STREAM_MIN);
+    else if (ctx->MAX() != nullptr)
+      recpToken(STREAM_MAX);
+    else if (ctx->AVG() != nullptr)
+      recpToken(STREAM_AVG);
+    else if (ctx->SUMC() != nullptr)
+      recpToken(STREAM_SUM);
+    else
+      FatalError("RQLParser::exitStream_fn_call: unknown stream function '{}'", ctx->getText());
+  }
   void exitSExpPlus(RQLParser::SExpPlusContext *ctx) override { recpToken(STREAM_ADD); }
   void exitSExpMinus(RQLParser::SExpMinusContext *ctx) override { recpToken(STREAM_SUBTRACT, rationalResult); }
 

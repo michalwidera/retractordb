@@ -1,6 +1,9 @@
 #include <algorithm>
+#include <cctype>
+#include <cerrno>
 #include <fstream>
 #include <map>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -252,14 +255,16 @@ TEST(xcompiler, toggles_matched_hash_time_move_factorization) {
   compiler compilerInstance(instance);
   ASSERT_EQ(compilerInstance.compile(), "OK");
 
+  // Nazwa substratu przesuniecia niesie wielkosc przesuniecia — `A>2` daje
+  // STREAM_TIMEMOVE_2_A. Patrz compiler::composeStreamName().
 #if RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES
   EXPECT_TRUE(instance.exists("STREAM_HASH_A_B"));
-  EXPECT_FALSE(instance.exists("STREAM_TIMEMOVE_A"));
-  EXPECT_FALSE(instance.exists("STREAM_TIMEMOVE_B"));
+  EXPECT_FALSE(instance.exists("STREAM_TIMEMOVE_2_A"));
+  EXPECT_FALSE(instance.exists("STREAM_TIMEMOVE_1_B"));
 #else
   EXPECT_FALSE(instance.exists("STREAM_HASH_A_B"));
-  EXPECT_TRUE(instance.exists("STREAM_TIMEMOVE_A"));
-  EXPECT_TRUE(instance.exists("STREAM_TIMEMOVE_B"));
+  EXPECT_TRUE(instance.exists("STREAM_TIMEMOVE_2_A"));
+  EXPECT_TRUE(instance.exists("STREAM_TIMEMOVE_1_B"));
 #endif
 }
 
@@ -1060,4 +1065,220 @@ TEST(xcompiler, malformed_intermediate_operator_is_rejected_before_iterator_unde
         (void)compilerInstance.compile();
       },
       "operator 'STREAM_HASH' in query 'malformed' has 0 preceding tokens, needs 2");
+}
+
+// --- Issue 236: reduktor w postaci funkcyjnej SUMC()/MIN()/MAX()/AVG() ------------
+//
+// Postac przyrostkowa `.sumc` przyjmuje wylacznie stream_factor, wiec okno trzeba bylo
+// zmaterializowac osobnym, nazwanym zapytaniem. Postac funkcyjna bierze cale
+// stream_expression, wiec ta sama para miesci sie w jednym zapytaniu. To zmiana
+// WYLACZNIE w kompilacji: extractIntermediateStreams() rozbija program z powrotem
+// na dwa wezly, wiec DAG ma byc identyczny.
+
+namespace {
+
+/// Program klauzuli FROM jako tekst — do porownan ksztaltu planu.
+std::string fromProgram(query &q) {
+  std::ostringstream out;
+  for (auto &t : q.lProgram)
+    out << t << ";";
+  return out.str();
+}
+
+/// Kompiluje RQL i zwraca plan. Blad kompilacji jest bledem testu.
+qTree compilePlan(const char *rql) {
+  qTree instance;
+  auto [parseResult, keyword, streamName] = parserRQLString(instance, rql);
+  EXPECT_EQ(parseResult, "OK");
+  compiler compilerInstance(instance);
+  EXPECT_EQ(compilerInstance.compile(), "OK");
+  return instance;
+}
+
+}  // namespace
+
+// Rdzen zgloszenia. Jedno zapytanie `FROM SUMC(sq@(125,1000))` ma dac DOKLADNIE ten plan,
+// co para zapytan z nazwanym oknem — az do brzegu (origin, ogon) i deskryptora wyjscia.
+// Rozna jest tylko nazwa wezla okna: uzytkownik nadal moze ja nadac sam, ale nie musi.
+TEST(xcompiler, stream_function_matches_the_two_step_form) {
+  auto oneClause = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
+        SELECT v*v STREAM sq FROM a
+        SELECT * STREAM s FROM SUMC(sq@(125,1000))
+      )");
+  auto twoStep   = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
+        SELECT v*v STREAM sq FROM a
+        SELECT * STREAM w FROM sq@(125,1000)
+        SELECT * STREAM s FROM w.sumc
+      )");
+
+  auto &oneResult = oneClause.getQuery("s");
+  auto &twoResult = twoStep.getQuery("s");
+
+  EXPECT_EQ(oneResult.rInterval, twoResult.rInterval);
+  EXPECT_EQ(oneResult.logicalOrigin, twoResult.logicalOrigin);
+  EXPECT_EQ(oneResult.startupLatency, twoResult.startupLatency);
+  EXPECT_EQ(oneResult.descriptorFrom(oneClause), twoResult.descriptorFrom(twoStep));
+
+  // Wezel okna powstaje jako substrat kompilatora, a nie znika: rachunek brzegu
+  // ma na czym stanac. Nazwa niesie parametry okna — patrz composeStreamName().
+  ASSERT_TRUE(oneClause.exists("STREAM_AGSE_125_1000_sq"));
+  auto &window = oneClause.getQuery("STREAM_AGSE_125_1000_sq");
+  EXPECT_TRUE(window.isSubstrat);
+  EXPECT_EQ(fromProgram(window), "PUSH_STREAM(sq);STREAM_AGSE(125,1000);");
+  EXPECT_EQ(fromProgram(oneResult), "PUSH_STREAM(STREAM_AGSE_125_1000_sq);STREAM_SUM(0);");
+
+  // Brzeg wezla okna tez musi sie zgadzac, nie tylko brzeg wyniku — inaczej rownosc
+  // na `s` mogla by wyjsc z dwoch bledow znoszacych sie nawzajem.
+  auto &namedWindow = twoStep.getQuery("w");
+  EXPECT_EQ(window.rInterval, namedWindow.rInterval);
+  EXPECT_EQ(window.logicalOrigin, namedWindow.logicalOrigin);
+  EXPECT_EQ(window.startupLatency, namedWindow.startupLatency);
+}
+
+// Reduktor jest zwyklym operatorem klauzuli FROM, wiec sklada sie z pozostalymi.
+// SUMC(x)+SUMC(y) jest tu przypadkiem wprost zamowionym: `+` laczy dwa WYNIKI
+// reduktorow, wiec kazdy z nich musi wczesniej trafic do wlasnego substratu.
+TEST(xcompiler, stream_functions_compose_with_other_from_operators) {
+  auto plan = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
+        DECLARE w INTEGER STREAM b, 1/500 FILE 'b.txt'
+        SELECT * STREAM p FROM SUMC(a@(125,1000))+SUMC(b@(125,1000))
+        SELECT * STREAM q FROM MIN(a)>2
+        SELECT * STREAM r FROM AVG(SUMC(a))
+        SELECT * STREAM t FROM MIN(a)#(MAX(b))
+        SELECT * STREAM u FROM SUMC(a+b)
+      )");
+
+  // Kazdy wezel planu ma po wydzieleniu DOKLADNIE jeden operator — tego wymaga
+  // wykonanie (GetArgs odrzuca program dluzszy niz trzy tokeny).
+  for (auto &q : plan)
+    if (!q.isDeclaration() && !q.isCompilerDirective()) EXPECT_LE(q.lProgram.size(), 3u) << "wezel " << q.id;
+
+  EXPECT_EQ(fromProgram(plan.getQuery("p")),
+            "PUSH_STREAM(STREAM_SUM_STREAM_AGSE_125_1000_a);PUSH_STREAM(STREAM_SUM_STREAM_AGSE_125_1000_b);STREAM_ADD(0);");
+  EXPECT_EQ(fromProgram(plan.getQuery("q")), "PUSH_STREAM(STREAM_MIN_a);STREAM_TIMEMOVE(2);");
+  EXPECT_EQ(fromProgram(plan.getQuery("r")), "PUSH_STREAM(STREAM_SUM_a);STREAM_AVG(0);");
+  EXPECT_EQ(fromProgram(plan.getQuery("t")), "PUSH_STREAM(STREAM_MIN_a);PUSH_STREAM(STREAM_MAX_b);STREAM_HASH(0);");
+  EXPECT_EQ(fromProgram(plan.getQuery("u")), "PUSH_STREAM(STREAM_ADD_a_b);STREAM_SUM(0);");
+}
+
+// Postac przyrostkowa jest wygaszana, ale dopoki dziala, ma dawac TEN SAM plan.
+TEST(xcompiler, deprecated_dot_notation_matches_the_function_form) {
+  auto dotted = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
+        SELECT * STREAM s FROM a.sumc
+      )");
+  auto called = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
+        SELECT * STREAM s FROM SUMC(a)
+      )");
+
+  EXPECT_EQ(fromProgram(dotted.getQuery("s")), fromProgram(called.getQuery("s")));
+  EXPECT_EQ(dotted.getQuery("s").descriptorFrom(dotted), called.getQuery("s").descriptorFrom(called));
+}
+
+// `(a.sumc)>2` konczylo sie zabiciem procesu w computeRequiredCapacities: program
+// [PUSH_STREAM, STREAM_SUM, STREAM_TIMEMOVE] nie byl uznawany za wymagajacy redukcji,
+// bo isReductionRequired() nie liczyl reduktorow. Ten sam brak przewracal forme funkcyjna
+// nad oknem, czyli caly sens zgloszenia. TRYBEM PORAZKI JEST SMIERC PROCESU.
+TEST(xcompiler, reducer_over_another_from_operator_is_extracted_not_fatal) {
+  auto plan = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
+        SELECT * STREAM m FROM (a.sumc)>2
+      )");
+  ASSERT_TRUE(plan.exists("STREAM_SUM_a"));
+  EXPECT_EQ(fromProgram(plan.getQuery("m")), "PUSH_STREAM(STREAM_SUM_a);STREAM_TIMEMOVE(2);");
+}
+
+// --- Nazwa substratu musi identyfikowac wezel ------------------------------------
+//
+// Do 2026-08-29 nazwa skladala sie z operatora i operandow, BEZ parametru operatora.
+// Dwa rozne okna nad tym samym zrodlem dawaly wiec jeden substrat STREAM_AGSE_a,
+// a drugie zapytanie po cichu liczylo okno pierwszego. Defekt byl osiagalny juz przez
+// `(a@(k,L))>N`, ale forma funkcyjna czyni go typowym, bo SUMC(x@(...)) obok AVG(x@(...))
+// to zwykly zapis. TESTEM JEST ROZNICA WYNIKU, nie sama liczba wezlow: interwaly
+// i brzegi obu galezi musza zostac rozne.
+TEST(xcompiler, distinct_windows_over_one_source_get_distinct_substrates) {
+  auto plan = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
+        SELECT * STREAM m1 FROM SUMC(a@(1,4))
+        SELECT * STREAM m2 FROM SUMC(a@(2,8))
+      )");
+
+  ASSERT_TRUE(plan.exists("STREAM_AGSE_1_4_a"));
+  ASSERT_TRUE(plan.exists("STREAM_AGSE_2_8_a"));
+  EXPECT_EQ(fromProgram(plan.getQuery("STREAM_AGSE_1_4_a")), "PUSH_STREAM(a);STREAM_AGSE(1,4);");
+  EXPECT_EQ(fromProgram(plan.getQuery("STREAM_AGSE_2_8_a")), "PUSH_STREAM(a);STREAM_AGSE(2,8);");
+  EXPECT_NE(plan.getQuery("m1").rInterval, plan.getQuery("m2").rInterval);
+}
+
+// Identyczne wezly nadal maja sie scalac — parametr w nazwie nie moze wylaczyc
+// deduplikacji, bo wtedy naprawa kolizji kosztowalaby powielenie planu.
+TEST(xcompiler, identical_windows_over_one_source_still_share_one_substrate) {
+  auto plan = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
+        SELECT * STREAM m1 FROM SUMC(a@(1,4))
+        SELECT * STREAM m2 FROM AVG(a@(1,4))
+      )");
+
+  EXPECT_EQ(std::ranges::count_if(plan, [](const query &q) { return q.id.starts_with("STREAM_AGSE_"); }), 1);
+  EXPECT_TRUE(plan.exists("STREAM_AGSE_1_4_a"));
+}
+
+// Nazwa substratu jest zarazem nazwa artefaktu na dysku, wiec musi byc identyfikatorem.
+// `-` liczby ujemnej idzie na "N", a `/` liczby wymiernej na "_" — do 2026-08-29 nazwa
+// substratu `&` niosla kreske ulamkowa, czyli separator sciezki, wprost z token::getStr_().
+TEST(xcompiler, substrate_names_stay_identifiers) {
+  auto plan = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
+        DECLARE w INTEGER STREAM b, 1/500 FILE 'b.txt'
+        SELECT * STREAM g FROM (a-1/4)>1
+        SELECT * STREAM h FROM ((a#b)&2)>1
+        SELECT * STREAM i FROM SUMC(a@(1,-10))
+      )");
+
+  for (auto &q : plan) {
+    if (!q.isSubstrat) continue;
+    EXPECT_TRUE(std::ranges::all_of(q.id, [](unsigned char c) { return std::isalnum(c) != 0 || c == '_'; }))
+        << "nazwa substratu nie jest identyfikatorem: " << q.id;
+  }
+  EXPECT_TRUE(plan.exists("STREAM_SUBTRACT_1_4_a"));
+  EXPECT_TRUE(plan.exists("STREAM_AGSE_1_N10_a"));
+  // `&` niesie swoj parametr jako OPERAND, nie w tokenie operatora, wiec liczba wymierna
+  // stoi na koncu nazwy — po nazwie strumienia, a nie po nazwie operatora.
+  EXPECT_TRUE(plan.exists("STREAM_DEHASH_DIV_STREAM_HASH_a_b_2_1"));
+}
+
+// MIN/MAX/AVG/SUMC sa tokenami leksera stojacymi PRZED ID, wiec zaden strumien nie moze
+// sie tak nazywac — reguly stream_factor przyjmuja wylacznie ID. Zastrzezenie jest
+// dzialaniem gramatyki, nie osobna kontrola w kompilatorze, i ten test je przypina:
+// gdyby ktos zdjal MIN z leksera albo dodal go do ID, `SUMC(x)` przestaloby byc
+// jednoznaczne. parserRQLString konczy proces przy bledzie skladni, stad EXPECT_EXIT.
+TEST(xparser, aggregate_keywords_are_reserved_stream_names) {
+  for (const char *rql : {
+           "DECLARE v INTEGER STREAM min, 1/500 FILE 'a.txt'",
+           "DECLARE v INTEGER STREAM MAX, 1/500 FILE 'a.txt'",
+           "DECLARE v INTEGER STREAM avg, 1/500 FILE 'a.txt'",
+           "DECLARE v INTEGER STREAM SUMC, 1/500 FILE 'a.txt'",
+       }) {
+    EXPECT_EXIT(
+        {
+          qTree instance;
+          (void)parserRQLString(instance, rql);
+          exit(0);
+        },
+        ::testing::ExitedWithCode(EPERM), "expecting ID")
+        << rql;
+  }
 }

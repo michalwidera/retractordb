@@ -15,8 +15,8 @@ add_test(
     grep -F ':- PUSH_STREAM(STREAM_HASH_A_B)' matched.out ; \
     grep -F ':- STREAM_TIMEMOVE(3)' matched.out ; \
     grep -F 'STREAM_HASH_A_B(1/15)' matched.out ; \
-    if grep -F 'STREAM_TIMEMOVE_A(' matched.out ; then exit 1 ; fi ; \
-    if grep -F 'STREAM_TIMEMOVE_B(' matched.out ; then exit 1 ; fi")
+    if grep -F 'STREAM_TIMEMOVE_2_A(' matched.out ; then exit 1 ; fi ; \
+    if grep -F 'STREAM_TIMEMOVE_1_B(' matched.out ; then exit 1 ; fi")
 
 add_test(
   NAME ${TestID}-unmatched
@@ -25,10 +25,10 @@ add_test(
     bash -c "set -e ; \
     xretractor unmatched.rql -c > unmatched.out ; \
     grep -F 'unmatched(1/15)' unmatched.out ; \
-    grep -F ':- PUSH_STREAM(STREAM_TIMEMOVE_A)' unmatched.out ; \
-    grep -F ':- PUSH_STREAM(STREAM_TIMEMOVE_B)' unmatched.out ; \
-    grep -F 'STREAM_TIMEMOVE_A(1/10)' unmatched.out ; \
-    grep -F 'STREAM_TIMEMOVE_B(1/5)' unmatched.out ; \
+    grep -F ':- PUSH_STREAM(STREAM_TIMEMOVE_1_A)' unmatched.out ; \
+    grep -F ':- PUSH_STREAM(STREAM_TIMEMOVE_1_B)' unmatched.out ; \
+    grep -F 'STREAM_TIMEMOVE_1_A(1/10)' unmatched.out ; \
+    grep -F 'STREAM_TIMEMOVE_1_B(1/5)' unmatched.out ; \
     if grep -F 'STREAM_HASH_A_B(' unmatched.out ; then exit 1 ; fi")
 
 add_test(

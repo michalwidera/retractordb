@@ -48,6 +48,19 @@ int query::getFieldIndex(const field &f_arg) {
   return -1;  // not found
 }
 
+/// Czy klauzula FROM ma wiecej niz jeden operator, czyli wymaga wydzielenia substratow.
+///
+/// Wykonanie przyjmuje program klauzuli FROM o DOKLADNIE jednym operatorze — patrz GetArgs(),
+/// ktore odrzuca program dluzszy niz trzy tokeny, i dataModel::constructInputPayload().
+/// Kompilator sprowadza do tej postaci extractIntermediateStreams(), a ta funkcja decyduje,
+/// kiedy go uruchomic.
+///
+/// Reduktory (`.avg`/`.min`/`.max`/`.sumc` oraz rownowazne AVG()/MIN()/MAX()/SUMC()) sa na
+/// tej liscie od 2026-08-29. Bez nich program `[PUSH_STREAM, STREAM_AGSE, STREAM_SUM]` mial
+/// licznik 1 i nie trafial do wydzielenia, a GetArgs() czytal go jako dwa argumenty
+/// i operator — bral STREAM_AGSE za nazwe strumienia. Postac dwuoperatorowa byla wczesniej
+/// nieosiagalna sposobem innym niz `(a.sumc)>2`, ktore konczylo sie
+/// `FATAL: unexpected program size in computeRequiredCapacities`.
 bool query::isReductionRequired() {
   int streamOperatorCount(0);
   for (auto &t : lProgram) {
@@ -59,6 +72,10 @@ bool query::isReductionRequired() {
       case STREAM_SUBTRACT:
       case STREAM_TIMEMOVE:
       case STREAM_AGSE:
+      case STREAM_AVG:
+      case STREAM_MIN:
+      case STREAM_MAX:
+      case STREAM_SUM:
         ++streamOperatorCount;
       default:;
     }

@@ -137,16 +137,35 @@ stream_term         : stream_term SHARP stream_factor   # SExpHash
                     | stream_factor AT '(' step=DECIMAL COMMA '-'? window=DECIMAL ')' # SExpAgse
                     | stream_factor DOT agregator       # SExpAgregate_proforma
                     | stream_factor                     # SExpFactor
+                    | stream_fn_call                    # SExpFnCall
                     ;
 
 stream_factor       : ID
                     | '(' stream_expression ')'
                     ;
 
+// Notacja przyrostkowa `strumien.avg`. WYGASZANA na rzecz stream_fn_call —
+// przyjmuje wylacznie stream_factor, wiec okno trzeba zmaterializowac osobnym
+// zapytaniem. RQLParser::exitSExpAgregate_proforma ostrzega o kazdym uzyciu.
 agregator           : MIN   # StreamMin
                     | MAX   # StreamMax
                     | AVG   # StreamAvg
                     | SUMC  # StreamSum
+                    ;
+
+// Postac funkcyjna reduktora nad CALYM wyrazeniem strumieniowym: SUMC(sq@(125,1000)).
+//
+// MIN, MAX, AVG i SUMC sa tokenami leksera zdefiniowanymi PRZED ID, wiec te nazwy sa
+// zastrzezone: zaden strumien nie moze sie tak nazywac. `DECLARE ... STREAM min` konczy
+// sie bledem skladni "mismatched input 'min' expecting ID" — reguly stream_factor i tak
+// przyjmuja tylko ID. Zastrzezenie obejmuje pisownie wymienione przy tokenach, czyli
+// 'MIN'|'min'; `Min` pozostaje zwykla nazwa, tak samo jak `Select` nie jest slowem
+// kluczowym. Pilnuje tego test xparser.aggregate_keywords_are_reserved_stream_names.
+stream_fn_call      : ( MIN
+                    | MAX
+                    | AVG
+                    | SUMC
+                    ) '(' stream_expression ')'
                     ;
 
 function_call       : ( 'Sqrt'

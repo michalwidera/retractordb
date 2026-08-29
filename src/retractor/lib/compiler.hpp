@@ -42,7 +42,7 @@ struct compiler {
   ///    z wyszukania pola w schematach argumentów. PUSH_ID3 wystawia wyłącznie parser.
   std::map<std::string, std::set<std::string>> namedSourceRefs_;
   std::list<field> buildOutputSchema(const std::string &sName1, const std::string &sName2, token &cmd_token);
-  std::string composeStreamName(const std::string &sName1, const std::string &sName2, command_id cmd);
+  std::string composeStreamName(const std::string &sName1, const std::string &sName2, const token &cmd);
   void resolveTokenReferences(std::list<token> &lProgram, query &q);
   void snapshotNamedSourceRefs();
 

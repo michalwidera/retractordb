@@ -266,9 +266,94 @@ std::string compiler::resolveStreamIntervals() {
   return {"OK"};
 }
 
-std::string compiler::composeStreamName(const std::string &sName1, const std::string &sName2, command_id cmd) {
-  if (sName2.empty()) return std::string(GetStringcommand_id(cmd)) + std::string("_") + sName1;
-  return std::string(GetStringcommand_id(cmd)) + std::string("_") + sName2 + std::string("_") + sName1;
+namespace {
+/// Czy parametr operatora siedzi W TOKENIE operatora.
+///
+/// Rozstrzyga o tym to samo co w consumesTwoPrecedingTokens(): miejsce parametru.
+/// `&`, `%` niosa swoj parametr jako OPERAND (PUSH_VAL), wiec trafia on do nazwy przez
+/// argumenty; `#`, `+` i reduktory parametru nie maja w ogole. Pozostale — `@(k,L)`, `>N`,
+/// `-r` — trzymaja go w tokenie i tylko one potrzebuja osobnego fragmentu nazwy.
+///
+/// Lista jest NEGATYWNA celowo, odwrotnie niz w consumesTwoPrecedingTokens(). Tam pomylka
+/// w strone "dwuargumentowy" siegala poza poczatek listy tokenow, wiec bezpieczny domysl
+/// brzmial "jednoargumentowy". Tutaj pomylka w strone "bez parametru" daje DWA ROZNE wezly
+/// o tej samej nazwie, czyli cicha zla odpowiedz; pomylka w druga strone daje tylko brzydsza
+/// nazwe z nadmiarowym "_0". Nowy operator jest wiec domyslnie parametryczny.
+bool carriesParameterInToken(command_id cmd) {
+  switch (cmd) {
+    case STREAM_HASH:
+    case STREAM_ADD:
+    case STREAM_DEHASH_DIV:
+    case STREAM_DEHASH_MOD:
+    case STREAM_AVG:
+    case STREAM_MIN:
+    case STREAM_MAX:
+    case STREAM_SUM:
+      return false;
+    default:
+      return true;
+  }
+}
+
+/// Fragment nazwy substratu odpowiadajacy JEDNEJ wartosci tokenu.
+///
+/// Nazwa substratu jest zarazem nazwa artefaktu na dysku, wiec fragment musi byc
+/// identyfikatorem: cyfry, litery i podkreslenie. Stad dwa zabiegi:
+///   * kreska ulamkowa liczby wymiernej idzie na podkreslenie (1/4 -> "1_4") — do 2026-08-29
+///     nazwa substratu `&`/`%` niosla `/` wprost z token::getStr_(), czyli separator sciezki
+///     w nazwie pliku;
+///   * minus liczby ujemnej idzie na "N" (-10 -> "N10") — okno `@(1,-10)` jest legalne,
+///     a `-` w nazwie strumienia nie jest.
+std::string streamNameFragment(const rdb::descFldVT &value) {
+  auto number = [](long long v) { return v < 0 ? "N" + std::to_string(-v) : std::to_string(v); };
+  return std::visit(
+      [&number](const auto &v) -> std::string {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, std::monostate>)
+          return {};
+        else if constexpr (std::is_same_v<T, std::string>)
+          return v;
+        else if constexpr (std::is_same_v<T, boost::rational<int>>)
+          return number(v.numerator()) + "_" + number(v.denominator());
+        else if constexpr (std::is_same_v<T, std::pair<int, int>>)
+          return number(v.first) + "_" + number(v.second);
+        else if constexpr (std::is_same_v<T, std::pair<std::string, int>>)
+          return v.first + "_" + number(v.second);
+        else if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>)
+          // Zadna klauzula FROM nie niesie zmiennoprzecinkowego parametru — wariant istnieje,
+          // bo descFldVT sluzy takze wyrazeniom pol. Rationalize() w parserze zamienia ulamek
+          // dziesietny na wymierny, zanim token trafi do programu strumienia.
+          return number(static_cast<long long>(v));
+        else
+          return number(static_cast<long long>(v));
+      },
+      value);
+}
+}  // namespace
+
+/// Nazwa substratu wydzielonego dla jednego operatora klauzuli FROM.
+///
+/// Ksztalt: OPERATOR [_parametr] [_arg2] _arg1. Parametr wchodzi do nazwy, bo INACZEJ
+/// nazwa nie identyfikuje wezla. Do 2026-08-29 skladala sie wylacznie z operatora
+/// i operandow, wiec dwa rozne okna nad tym samym zrodlem
+///
+///     SELECT * STREAM m1 FROM (a@(1,4))>2
+///     SELECT * STREAM m2 FROM (a@(2,8))>2
+///
+/// dawaly JEDEN substrat STREAM_AGSE_a, a m2 po cichu liczylo okno z m1. To samo dotyczylo
+/// `>N` i `-r`. Defekt byl osiagalny juz wczesniej, ale forma funkcyjna SUMC(x@(k,L)) czyni
+/// go typowym: dwa rozne okna nad jednym zrodlem to zwykly zapis, nie przypadek brzegowy.
+///
+/// Po tej zmianie nazwa niesie CALA trojke (operator, parametr, operandy), wiec rowna nazwa
+/// oznacza rowny program: deduplicateSubstrats() scala duplikaty, a rozne wezly sie nie zderza.
+std::string compiler::composeStreamName(const std::string &sName1, const std::string &sName2, const token &cmd) {
+  std::string retVal(GetStringcommand_id(cmd.getCommandID()));
+  if (carriesParameterInToken(cmd.getCommandID())) {
+    const auto parameter = streamNameFragment(cmd.getVT());
+    if (!parameter.empty()) retVal += "_" + parameter;
+  }
+  if (!sName2.empty()) retVal += "_" + sName2;
+  return retVal + "_" + sName1;
 }
 
 namespace {
@@ -352,18 +437,22 @@ std::string compiler::extractIntermediateStreams() {
           newQuery.lProgram.assign(firstArg, afterOperator);
 
           // arg1 to token STOJĄCY BEZPOŚREDNIO PRZED operatorem, arg2 — ten przed nim.
+          //
+          // Fragment nazwy, nie token::getStr_(): dla PUSH_STREAM oba dają tę samą nazwę
+          // strumienia, ale dla PUSH_VAL `&`/`%` getStr_() renderuje liczbę wymierną z kreską
+          // ułamkową, czyli wstawia separator ścieżki w nazwę artefaktu na dysku.
           auto argIt = firstArg;
           if (argCount == 2) {
-            arg2 = (*argIt).getStr_();
+            arg2 = streamNameFragment((*argIt).getVT());
             ++argIt;
           }
-          arg1 = (*argIt).getStr_();
+          arg1 = streamNameFragment((*argIt).getVT());
 
           std::list<token> lTempProgram;
           lTempProgram.emplace_back(PUSH_TSCAN);
           newQuery.lSchema.emplace_back(rdb::rField("*", 1, 1, rdb::BYTE), lTempProgram);
           newQuery.policy     = std::make_pair(substratType_C, 1);
-          newQuery.id         = composeStreamName(arg1, arg2, cmd);
+          newQuery.id         = composeStreamName(arg1, arg2, *it2);
           newQuery.isSubstrat = true;
           it2                 = currentQuery.lProgram.erase(firstArg, afterOperator);
           currentQuery.lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
@@ -1526,7 +1615,7 @@ std::string compiler::factorMatchedHashTimeMoves() {
       // Kopia przed ewentualnym push_back: dopisanie węzła unieważnia referencję q.
       const auto queryInterval = q.rInterval;
 
-      const std::string hashName = composeStreamName(rightSource, leftSource, STREAM_HASH);
+      const std::string hashName = composeStreamName(rightSource, leftSource, token(STREAM_HASH));
       const bool hashNameExists =
           std::ranges::any_of(coreInstance, [&hashName](const query &candidate) { return candidate.id == hashName; });
       const size_t hashIndex = findUniqueQueryIndex(hashName);

@@ -17,10 +17,10 @@ grep -F ':- PUSH_STREAM(STREAM_HASH_A2_B2)' out_compile.txt
 grep -F 'STREAM_HASH_A2_B2(1/15)' out_compile.txt
 
 # Neither side may retain per-input shift substrates.
-if grep -F 'STREAM_TIMEMOVE_A(' out_compile.txt; then exit 1; fi
-if grep -F 'STREAM_TIMEMOVE_B(' out_compile.txt; then exit 1; fi
-if grep -F 'STREAM_TIMEMOVE_A2(' out_compile.txt; then exit 1; fi
-if grep -F 'STREAM_TIMEMOVE_B2(' out_compile.txt; then exit 1; fi
+if grep -F 'STREAM_TIMEMOVE_2_A(' out_compile.txt; then exit 1; fi
+if grep -F 'STREAM_TIMEMOVE_1_B(' out_compile.txt; then exit 1; fi
+if grep -F 'STREAM_TIMEMOVE_2_A2(' out_compile.txt; then exit 1; fi
+if grep -F 'STREAM_TIMEMOVE_1_B2(' out_compile.txt; then exit 1; fi
 
 xretractor query.rql -r -k -m 48
 
