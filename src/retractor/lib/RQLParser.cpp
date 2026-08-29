@@ -157,15 +157,16 @@ class ParserListener : public RQLBaseListener {
     auto functionName = ctx->agregator()->getText();
     std::ranges::transform(functionName, functionName.begin(), ::toupper);
     SPDLOG_WARN("RQL: notacja '{}' jest wygaszana; uzyj postaci funkcyjnej {}({})", ctx->getText(), functionName,
-                ctx->stream_factor()->getText());
+                ctx->stream_expression()->getText());
   }
 
   /// AVG/MIN/MAX/SUMC w postaci funkcyjnej nad WYRAZENIEM strumieniowym.
   ///
   /// Nie wnosi nic do wykonania: dokleja ten sam token reduktora, ktory dokladalaby notacja
-  /// przyrostkowa. Cala roznica jest w tym, CO stoi przed reduktorem — postac przyrostkowa
-  /// przyjmuje wylacznie stream_factor, wiec okno trzeba bylo zmaterializowac osobnym
-  /// zapytaniem:
+  /// przyrostkowa. Roznica jest w zasiegu — postac funkcyjna domyka argument wlasnymi
+  /// nawiasami, wiec bierze cale wyrazenie niezaleznie od drabiny priorytetow, podczas gdy
+  /// `.agg` siega tylko po operand poziomu postfiksowego. Do 2026-08-29 `.agg` przyjmowalo
+  /// wylacznie stream_factor i okno trzeba bylo materializowac osobnym zapytaniem:
   ///
   ///     SELECT * STREAM w FROM sq@(125,1000)
   ///     SELECT * STREAM s FROM w.sumc
@@ -387,8 +388,14 @@ class ParserListener : public RQLBaseListener {
     recpToken(STREAM_TIMEMOVE, std::stoi(ctx->DECIMAL()->getText()));
   }
 
+  /// Nazwa strumienia. Pozostale alternatywy `stream_factor` — `( e )` i wywolanie
+  /// reduktora — nie wnosza wlasnego tokenu: ich tresc dolozyly juz wezly nizej.
+  ///
+  /// Rozroznienie idzie po ctx->ID(), a nie po liczbie dzieci: od chwili, gdy prymitywem
+  /// stalo sie takze `stream_fn_call`, JEDNO dziecko maja dwie alternatywy, a `MIN(a)`
+  /// wchodzilo tedy z ctx->ID() rownym nullptr.
   void exitStream_factor(RQLParser::Stream_factorContext *ctx) override {
-    if (ctx->children.size() == 1) program.emplace_back(PUSH_STREAM, ctx->ID()->getText());
+    if (ctx->ID() != nullptr) program.emplace_back(PUSH_STREAM, ctx->ID()->getText());
   }
 
   void exitSelectListFullscan(RQLParser::SelectListFullscanContext *ctx) override {
@@ -520,12 +527,22 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   return {status, firsttoken, streamName};
 }
 
+/// Wiersze logiczne pliku RQL: komentarze usuniete, kontynuacje `\\` sklejone.
+///
+/// Komentarz `#` jest obslugiwany TUTAJ, a nie w lekserze, i zajmuje CALY wiersz. Lekser
+/// zna `#` wylacznie jako operator przeplotu, wiec `FROM a # b` jest przeplotem niezaleznie
+/// od spacji — do 2026-08-29 regula leksera `'# '` zjadala taki zapis do `FROM a` i plan
+/// kompilowal sie po cichu bez `b`. Komentarz konczacy wiersz zapisuje sie `//`.
+///
+/// Warunek patrzy na pierwszy NIEBIALY znak, bo wcieta linia komentarza szla dotad do
+/// leksera i lapala ja wlasnie usunieta regula.
 std::vector<std::string> readLogicalLines(std::ifstream &file) {
   std::vector<std::string> result;
   std::string line;
   std::string accumulated;
   while (std::getline(file, line)) {
-    if (line.empty() || line[0] == '#') continue;
+    const auto firstVisible = line.find_first_not_of(" \t\r");
+    if (firstVisible == std::string::npos || line[firstVisible] == '#') continue;
     if (line.back() == '\\') {
       accumulated += line.substr(0, line.size() - 1) + ' ';
       continue;

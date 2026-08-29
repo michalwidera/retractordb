@@ -1070,9 +1070,9 @@ TEST(xcompiler, malformed_intermediate_operator_is_rejected_before_iterator_unde
 
 // --- Issue 236: reduktor w postaci funkcyjnej SUMC()/MIN()/MAX()/AVG() ------------
 //
-// Postac przyrostkowa `.sumc` przyjmuje wylacznie stream_factor, wiec okno trzeba bylo
-// zmaterializowac osobnym, nazwanym zapytaniem. Postac funkcyjna bierze cale
-// stream_expression, wiec ta sama para miesci sie w jednym zapytaniu. To zmiana
+// Postac przyrostkowa `.sumc` siega tylko po operand poziomu postfiksowego, wiec okno
+// trzeba bylo zmaterializowac osobnym, nazwanym zapytaniem. Postac funkcyjna domyka
+// argument wlasnymi nawiasami, wiec ta sama para miesci sie w jednym zapytaniu. To zmiana
 // WYLACZNIE w kompilacji: extractIntermediateStreams() rozbija program z powrotem
 // na dwa wezly, wiec DAG ma byc identyczny.
 
@@ -1400,4 +1400,165 @@ TEST(xcompiler, reducer_over_a_digest_named_substrate_keeps_its_shape) {
   EXPECT_TRUE(plan.exists(windowName)) << windowName;
   EXPECT_LE(windowName.size(), 200u);
   EXPECT_TRUE(plan.getQuery(windowName).isSubstrat);
+}
+
+// --- Issue 236: drabina priorytetow operatorow strumieniowych ---------------------
+//
+// Do 2026-08-29 szesc operatorow o jednej postaci — operator plus literal nad jednym
+// strumieniem — bylo rozrzuconych na dwa pietra gramatyki: `@`, `&`, `%` i `.agg` wiazaly
+// mocniej niz `#`, a `>` i `-` slabiej. Zaden z nich nie dawal sie lancuchowac, bo wszystkie
+// zadaly `stream_factor`, a wywolanie reduktora stalo o pietro za wysoko, wiec `a#MAX(b)`
+// bylo bledem skladni. RQL.g4 opisuje docelowa drabine; ponizsze testy przypinaja KAZDA
+// jej granice od strony planu.
+//
+// Metoda jest wszedzie ta sama: zapis bez nawiasow ma dac DOKLADNIE ten plan, co zapis
+// z nawiasami stawiajacymi grupowanie wprost. Nazwy substratow sa pochodna struktury
+// wyrazenia, wiec rownosc ksztaltow planu jest rownowaznoscia grupowania.
+
+namespace {
+
+/// Plan jednego wyrazenia strumieniowego nad trzema zrodlami o rownym takcie.
+qTree streamExpressionPlan(const std::string &fromClause) {
+  return compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'\n"
+      "DECLARE w INTEGER STREAM b, 1/500 FILE 'b.txt'\n"
+      "DECLARE x INTEGER STREAM c, 1/500 FILE 'c.txt'\n"
+      "SELECT * STREAM t FROM " +
+      fromClause + "\n");
+}
+
+/// Ksztalt planu: kazdy wezel niebedacy deklaracja jako "id=program", posortowany.
+std::string planShape(qTree &plan) {
+  std::vector<std::string> nodes;
+  for (auto &q : plan)
+    if (!q.isDeclaration() && !q.isCompilerDirective()) nodes.push_back(q.id + "=" + fromProgram(q));
+  std::ranges::sort(nodes);
+  std::string out;
+  for (const auto &node : nodes)
+    out += node + "\n";
+  return out;
+}
+
+/// Zapis bez nawiasow grupuje tak samo, jak zapis z nawiasami.
+void expectSameGrouping(const std::string &bare, const std::string &parenthesized) {
+  auto lhs = streamExpressionPlan(bare);
+  auto rhs = streamExpressionPlan(parenthesized);
+  EXPECT_EQ(planShape(lhs), planShape(rhs)) << bare << "   vs   " << parenthesized;
+}
+
+}  // namespace
+
+// Poziom 1. Wywolanie reduktora domykaja wlasne nawiasy, wiec jest PRYMITYWEM i stoi tam,
+// gdzie nazwa strumienia — po obu stronach `#` i pod kazdym postfiksem. Nawias w
+// `MIN(a)#(MAX(b))` byl dokladany wylacznie po to, zeby zejsc na poziom stream_factor.
+TEST(xparser, function_call_is_a_primary) {
+  expectSameGrouping("MIN(a)#MAX(b)", "(MIN(a))#(MAX(b))");
+  expectSameGrouping("a#MAX(b)", "a#(MAX(b))");
+  expectSameGrouping("SUMC(a)#SUMC(b)", "(SUMC(a))#(SUMC(b))");
+  expectSameGrouping("MIN(a)@(1,4)", "(MIN(a))@(1,4)");
+  expectSameGrouping("MIN(a)&2", "(MIN(a))&2");
+}
+
+// Granica 2|3 — JEDYNA zmiana znaczenia wzgledem stanu sprzed 2026-08-29. `>` i `-` sa
+// postfiksami unarnymi tak samo jak `&` i `%`, wiec wiaza mocniej niz przeplot.
+//
+// Test musi pokazac ROZNICE, a nie tylko rownowaznosc: oba grupowania sa poprawne i daja
+// rozne plany (rozny ogon), wiec sama zgodnosc z nawiasami niczego by nie rozstrzygnela.
+TEST(xparser, shift_binds_tighter_than_hash) {
+  expectSameGrouping("a#b>1", "a#(b>1)");
+  expectSameGrouping("a#b-1/4", "a#(b-1/4)");
+
+  auto tight = streamExpressionPlan("a#b>1");
+  auto loose = streamExpressionPlan("(a#b)>1");
+  EXPECT_NE(planShape(tight), planShape(loose));
+  EXPECT_TRUE(tight.exists("STREAM_TIMEMOVE_1_b"));
+  EXPECT_TRUE(loose.exists("STREAM_HASH_a_b"));
+
+  // Dominujacy zapis korpusu traci nawiasy i ma znaczyc dokladnie to samo.
+  expectSameGrouping("a>1#b>2", "(a>1)#(b>2)");
+}
+
+// Granica 3|4 wynika z typowania, nie z konwencji: `#` zada zgodnych schematow, `+` schemat
+// poszerza, wiec `a#b+c` ma tylko jeden dobrze otypowany odczyt.
+TEST(xparser, hash_binds_tighter_than_concatenation) {
+  expectSameGrouping("a#b+c", "(a#b)+c");
+  expectSameGrouping("a+b#c", "a+(b#c)");
+}
+
+// Lacznosc operatorow binarnych MUSI zostac lewostronna: compiler sklada nazwe substratu
+// lewostronnie, a ta nazwa jest nazwa pliku na dysku. Zmiana lacznosci przemianowalaby
+// kazdy istniejacy artefakt, wiec ten test broni zgodnosci wstecz, a nie samej skladni.
+TEST(xparser, binary_stream_operators_are_left_associative) {
+  expectSameGrouping("a#b#c", "(a#b)#c");
+  expectSameGrouping("a+b+c", "(a+b)+c");
+
+  auto plan = streamExpressionPlan("a#b#c");
+  EXPECT_TRUE(plan.exists("STREAM_HASH_a_b")) << "przeplot nie jest lewostronny";
+}
+
+// Poziom 2 jest lancuchowalny. Do 2026-08-29 kazdy z tych zapisow byl bledem skladni,
+// bo postfiksy zadaly `stream_factor`, czyli nazwy albo nawiasu.
+TEST(xparser, postfix_stream_operators_chain) {
+  expectSameGrouping("a>1>2", "(a>1)>2");
+  expectSameGrouping("a&2&2", "(a&2)&2");
+  expectSameGrouping("a@(1,4)&2", "(a@(1,4))&2");
+  // `-` przetaktowuje do ZADANEGO interwalu, wiec ogniwa lancucha musza isc od szybszego
+  // do wolniejszego — inaczej plan pada na wiezie SUBTRACT, a nie na skladni.
+  expectSameGrouping("a-1/4-1/2", "(a-1/4)-1/2");
+  expectSameGrouping("a@(1,4).sumc", "(a@(1,4)).sumc");
+}
+
+// --- Issue 236: `#` przestaje kolidowac z komentarzem ----------------------------
+//
+// Lekser mial regule `'# ' ~[\r\n]*`, wiec o znaczeniu `#` decydowala SPACJA po nim.
+// Skutek nie byl bledem, tylko cisza: `FROM a # b` kompilowalo sie jako `FROM a`, gubiac
+// drugi operand bez zadnego komunikatu. Komentarz `#` obsluguje dzis wylacznie
+// readLogicalLines() i zajmuje caly wiersz; w lekserze `#` znaczy zawsze przeplot.
+
+// Odstep wokol `#` nie moze zmieniac planu. TRYBEM PORAZKI JEST CICHA ZLA ODPOWIEDZ:
+// przed naprawa lewa strona dawala plan jednooperandowy i przechodzila kompilacje.
+TEST(xparser, hash_operator_is_not_whitespace_sensitive) {
+  expectSameGrouping("a # b", "a#b");
+  expectSameGrouping("a # b > 1", "a#(b>1)");
+
+  auto plan = streamExpressionPlan("a # b");
+  EXPECT_EQ(fromProgram(plan.getQuery("t")), "PUSH_STREAM(a);PUSH_STREAM(b);STREAM_HASH(0);");
+}
+
+// Komentarz na koncu wiersza po `#` ma byc odrzucony GLOSNO. Tresc komentarza jest tu
+// wielowyrazowa, wiec konczy sie bledem skladni; komentarz jednowyrazowy trafia dalej jako
+// nazwa strumienia i ginie na nierozwiazanym odwolaniu — takze glosno. Komentarz konczacy
+// wiersz zapisuje sie `//`.
+TEST(xparser, trailing_hash_comment_is_rejected) {
+  EXPECT_EXIT(
+      {
+        qTree instance;
+        (void)parserRQLString(instance, "SELECT * STREAM t FROM a # komentarz na koncu wiersza");
+        exit(0);
+      },
+      ::testing::ExitedWithCode(EPERM), "extraneous input");
+}
+
+// Komentarz zajmujacy caly wiersz — takze wciety — nadal jest komentarzem. Przechodzi
+// przez readLogicalLines(), a nie przez lekser, wiec wymaga sciezki plikowej.
+TEST(xparser, whole_line_hash_comment_survives) {
+  const std::string fileName("ut_hash_comment.rql");
+  {
+    std::ofstream out(fileName);
+    out << "# komentarz pelnowierszowy\n"
+        << "   # komentarz wciety\n"
+        << "SUBSTRAT 'memory'\n"
+        << "DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'\n"
+        << "DECLARE w INTEGER STREAM b, 1/500 FILE 'b.txt'\n"
+        << "SELECT * STREAM t FROM a # b\n";
+  }
+
+  qTree instance;
+  ASSERT_EQ(parserRQLFile_4Test(instance, fileName), "OK");
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  // Komentarze zniknely, a `#` w klauzuli FROM zostal przeplotem.
+  EXPECT_EQ(fromProgram(instance.getQuery("t")), "PUSH_STREAM(a);PUSH_STREAM(b);STREAM_HASH(0);");
 }

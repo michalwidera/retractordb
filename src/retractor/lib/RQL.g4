@@ -125,28 +125,55 @@ term                : term STAR term               # ExpMult
                     | NOT_C term                   # ExpNot
                     ;
 
-stream_expression   : stream_expression PLUS stream_term # SExpPlus
-                    | stream_term '>' DECIMAL             # SExpTimeMove
-                    | stream_term MINUS rational_se       # SExpMinus
-                    | stream_term                         # SExpTerm
+// Drabina priorytetow wyrazenia strumieniowego, od NAJMOCNIEJ wiazacego:
+//
+//   1. prymityw          ID | '(' e ')' | MIN/MAX/AVG/SUMC '(' e ')'
+//   2. postfiks unarny   e@(k,L)  e&r  e%r  e>N  e-r  e.agg     lewostronny, lancuchowalny
+//   3. przeplot          a#b                                    lewostronny
+//   4. konkatenacja      a+b                                    lewostronny
+//
+// ANTLR4 nadaje WYZSZY priorytet alternatywom stojacym WCZESNIEJ w regule lewostronnie
+// rekurencyjnej, wiec kolejnosc alternatyw ponizej JEST ta drabina. Przestawienie ich
+// zmienia znaczenie jezyka, nie tylko zapis.
+//
+// Poziom 2 skupia SZESC operatorow o jednej postaci — operator plus literal, jeden strumien
+// na wejsciu. Do 2026-08-29 byly rozrzucone na dwa pietra: `@`, `&`, `%` i `.agg` wiazaly
+// mocniej niz `#`, a `>` i `-` slabiej. Bylo to niespojne szczegolnie dla `&` i `%`, ktore sa
+// ODWROTNOSCIAMI `#` — staly pod operatorem, ktory odwracaja, podczas gdy `>` stal nad nim.
+// Zadny z nich nie dawal sie tez lancuchowac, bo wszystkie zadaly `stream_factor`.
+//
+// Jedyna zmiana ZNACZENIA wzgledem tamtego stanu dotyczy `X#Y>N` i `X#Y-r`: znaczyly
+// `(X#Y)>N`, znacza `X#(Y>N)`. Oba plany sa rozne (rozny ogon), dawne grupowanie zapisuje
+// sie nawiasem, a roznice pilnuje test xparser.shift_binds_tighter_than_hash.
+//
+// Granica 3|4 wynika z typowania: `#` zada zgodnych schematow, `+` schemat poszerza, wiec
+// `a#b+c` ma tylko jeden dobrze otypowany odczyt — `(a#b)+c`.
+//
+// Lacznosc operatorow binarnych musi zostac LEWOSTRONNA: compiler sklada nazwe substratu
+// lewostronnie (`OP _arg2 _arg1`), a ta nazwa jest nazwa pliku na dysku.
+stream_expression   : stream_expression AT '(' step=DECIMAL COMMA '-'? window=DECIMAL ')' # SExpAgse
+                    | stream_expression AND rational_se         # SExpAnd
+                    | stream_expression MOD rational_se         # SExpMod
+                    | stream_expression '>' DECIMAL             # SExpTimeMove
+                    | stream_expression MINUS rational_se       # SExpMinus
+                    | stream_expression DOT agregator           # SExpAgregate_proforma
+                    | stream_expression SHARP stream_expression # SExpHash
+                    | stream_expression PLUS stream_expression  # SExpPlus
+                    | stream_factor                             # SExpFactor
                     ;
 
-stream_term         : stream_term SHARP stream_factor   # SExpHash
-                    | stream_factor AND rational_se     # SExpAnd
-                    | stream_factor MOD rational_se     # SExpMod
-                    | stream_factor AT '(' step=DECIMAL COMMA '-'? window=DECIMAL ')' # SExpAgse
-                    | stream_factor DOT agregator       # SExpAgregate_proforma
-                    | stream_factor                     # SExpFactor
-                    | stream_fn_call                    # SExpFnCall
-                    ;
-
+// Wywolanie reduktora jest PRYMITYWEM, a nie pietrem operatorowym: jego argument domykaja
+// wlasne nawiasy, tak samo jak `( e )`. Do 2026-08-29 stalo alternatywa `stream_term`, czyli
+// o pietro za wysoko, wiec przechodzilo wylacznie na szczycie termu — `a#MAX(b)`,
+// `MIN(a)@(1,4)` i `MIN(a)&2` byly bledami skladni, a `MIN(a)#(MAX(b))` wymagalo nawiasu
+// dokladanego wylacznie po to, zeby zejsc na poziom `stream_factor`.
 stream_factor       : ID
                     | '(' stream_expression ')'
+                    | stream_fn_call
                     ;
 
-// Notacja przyrostkowa `strumien.avg`. WYGASZANA na rzecz stream_fn_call —
-// przyjmuje wylacznie stream_factor, wiec okno trzeba zmaterializowac osobnym
-// zapytaniem. RQLParser::exitSExpAgregate_proforma ostrzega o kazdym uzyciu.
+// Notacja przyrostkowa `strumien.avg`. WYGASZANA na rzecz stream_fn_call.
+// RQLParser::exitSExpAgregate_proforma ostrzega o kazdym uzyciu.
 agregator           : MIN   # StreamMin
                     | MAX   # StreamMax
                     | AVG   # StreamAvg
@@ -157,8 +184,9 @@ agregator           : MIN   # StreamMin
 //
 // MIN, MAX, AVG i SUMC sa tokenami leksera zdefiniowanymi PRZED ID, wiec te nazwy sa
 // zastrzezone: zaden strumien nie moze sie tak nazywac. `DECLARE ... STREAM min` konczy
-// sie bledem skladni "mismatched input 'min' expecting ID" — reguly stream_factor i tak
-// przyjmuja tylko ID. Zastrzezenie obejmuje pisownie wymienione przy tokenach, czyli
+// sie bledem skladni "mismatched input 'min' expecting ID", bo nazwa deklarowanego
+// strumienia jest w regule declare_statement zwyklym ID. Zastrzezenie obejmuje pisownie
+// wymienione przy tokenach, czyli
 // 'MIN'|'min'; `Min` pozostaje zwykla nazwa, tak samo jak `Select` nie jest slowem
 // kluczowym. Pilnuje tego test xparser.aggregate_keywords_are_reserved_stream_names.
 stream_fn_call      : ( MIN
@@ -274,8 +302,17 @@ BIT_XOR:            '^';
 
 SPACE:              [ \t\r\n]+    -> skip;
 COMMENT:            '/*' (COMMENT | .)*? '*/' -> channel(HIDDEN);
-// note: there must be space after the hash - otherwise a#b is recognized as a #comment.
-LINE_COMMENT1:      '# ' ~[\r\n]* -> channel(HIDDEN);
+// Komentarz `#` NIE jest tokenem leksera: wiersz, ktorego pierwszym niebialym znakiem jest
+// `#`, odrzuca readLogicalLines() jeszcze przed parserem — tak samo w produkcji
+// (launcher.cpp) jak i w testach (parserRQLFile_4Test). Dzieki temu `#` W LEKSERZE znaczy
+// zawsze przeplot, niezaleznie od otaczajacych spacji.
+//
+// Do 2026-08-29 stala tu regula `'# ' ~[\r\n]*`, ktorej autor byl swiadom kolizji
+// ("there must be space after the hash - otherwise a#b is recognized as a #comment").
+// Odstep po `#` nie rozwiazywal jej jednak, tylko przenosil skutek w cisza: `FROM a # b`
+// przechodzilo kompilacje jako `FROM a`, gubiac `b` BEZ zadnego komunikatu. Po usunieciu
+// reguly ten sam zapis jest przeplotem, a `SELECT ... # komentarz na koncu wiersza` jest
+// bledem skladni — glosnym, a nie cichym. Komentarz konczacy wiersz zapisuje sie `//`.
 LINE_COMMENT2:      '//' ~[\r\n]* -> channel(HIDDEN);
 
 fragment LETTER:    [A-Z_];

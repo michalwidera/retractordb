@@ -173,23 +173,14 @@ public:
   virtual void enterExpMult(RQLParser::ExpMultContext *ctx) = 0;
   virtual void exitExpMult(RQLParser::ExpMultContext *ctx) = 0;
 
-  virtual void enterSExpTerm(RQLParser::SExpTermContext *ctx) = 0;
-  virtual void exitSExpTerm(RQLParser::SExpTermContext *ctx) = 0;
-
   virtual void enterSExpPlus(RQLParser::SExpPlusContext *ctx) = 0;
   virtual void exitSExpPlus(RQLParser::SExpPlusContext *ctx) = 0;
 
   virtual void enterSExpTimeMove(RQLParser::SExpTimeMoveContext *ctx) = 0;
   virtual void exitSExpTimeMove(RQLParser::SExpTimeMoveContext *ctx) = 0;
 
-  virtual void enterSExpMinus(RQLParser::SExpMinusContext *ctx) = 0;
-  virtual void exitSExpMinus(RQLParser::SExpMinusContext *ctx) = 0;
-
   virtual void enterSExpFactor(RQLParser::SExpFactorContext *ctx) = 0;
   virtual void exitSExpFactor(RQLParser::SExpFactorContext *ctx) = 0;
-
-  virtual void enterSExpFnCall(RQLParser::SExpFnCallContext *ctx) = 0;
-  virtual void exitSExpFnCall(RQLParser::SExpFnCallContext *ctx) = 0;
 
   virtual void enterSExpHash(RQLParser::SExpHashContext *ctx) = 0;
   virtual void exitSExpHash(RQLParser::SExpHashContext *ctx) = 0;
@@ -202,6 +193,9 @@ public:
 
   virtual void enterSExpAgse(RQLParser::SExpAgseContext *ctx) = 0;
   virtual void exitSExpAgse(RQLParser::SExpAgseContext *ctx) = 0;
+
+  virtual void enterSExpMinus(RQLParser::SExpMinusContext *ctx) = 0;
+  virtual void exitSExpMinus(RQLParser::SExpMinusContext *ctx) = 0;
 
   virtual void enterSExpAnd(RQLParser::SExpAndContext *ctx) = 0;
   virtual void exitSExpAnd(RQLParser::SExpAndContext *ctx) = 0;
