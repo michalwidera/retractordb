@@ -1562,3 +1562,208 @@ TEST(xparser, whole_line_hash_comment_survives) {
   // Komentarze zniknely, a `#` w klauzuli FROM zostal przeplotem.
   EXPECT_EQ(fromProgram(instance.getQuery("t")), "PUSH_STREAM(a);PUSH_STREAM(b);STREAM_HASH(0);");
 }
+
+// ---------------------------------------------------------------------------------------
+// Generator strumieni: `SELECT cells[$] STREAM cell[24] FROM cells`
+// ---------------------------------------------------------------------------------------
+
+namespace {
+
+/// Plan w postaci porownywalnej: strumienie posortowane po nazwie, kazdy z pelna trescia.
+///
+/// Poza operatorem query::operator<< (id, plik, interwal, schemat, program) doklada ogon
+/// i poczatek logiczny, bo to one niosa skutki czasowe planu — a wlasnie o brak roznicy
+/// w skutkach chodzi w tescie rownowaznosci.
+std::string renderPlan(qTree &plan) {
+  std::vector<std::string> rendered;
+  rendered.reserve(plan.size());
+  for (auto &q : plan) {
+    std::ostringstream os;
+    os << q << ",tail:" << q.startupLatency << ",origin:" << q.logicalOrigin;
+    rendered.push_back(os.str());
+  }
+  std::ranges::sort(rendered);
+  std::string out;
+  for (const auto &entry : rendered)
+    out += entry + "\n";
+  return out;
+}
+
+/// Kompiluje pojedynczy tekst RQL i zwraca werdykt kompilatora.
+std::string compileRql(const std::string &rql) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, rql);
+  if (parseResult != "OK") return parseResult;
+  compiler compilerInstance(instance);
+  return compilerInstance.compile();
+}
+
+}  // namespace
+
+/// Wlasciwosc, dla ktorej generator zostal zrobiony tak, a nie inaczej: po ekspansji plan
+/// jest NIE DO ODROZNIENIA od recznie rozpisanych SELECT-ow. Gdyby ten test zaczal padac,
+/// generator przestalby byc skrotem zapisu, a stalby sie osobnym bytem w silniku.
+TEST(xcompiler, generator_plan_is_identical_to_hand_written_plan) {
+  qTree generated;
+  auto [genParse, genKeyword, genName] = parserRQLString(generated, R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[$] STREAM cell[4] FROM cells
+        SELECT * STREAM grp FROM cell[0]#cell[1]#cell[2]#cell[3]
+      )");
+  ASSERT_EQ(genParse, "OK");
+  compiler generatedCompiler(generated);
+  ASSERT_EQ(generatedCompiler.compile(), "OK");
+
+  qTree handWritten;
+  auto [manParse, manKeyword, manName] = parserRQLString(handWritten, R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[0] STREAM cell$0 FROM cells
+        SELECT cells[1] STREAM cell$1 FROM cells
+        SELECT cells[2] STREAM cell$2 FROM cells
+        SELECT cells[3] STREAM cell$3 FROM cells
+        SELECT * STREAM grp FROM cell$0#cell$1#cell$2#cell$3
+      )");
+  ASSERT_EQ(manParse, "OK");
+  compiler handWrittenCompiler(handWritten);
+  ASSERT_EQ(handWrittenCompiler.compile(), "OK");
+
+  EXPECT_EQ(renderPlan(generated), renderPlan(handWritten));
+}
+
+/// `$` poza nawiasami kwadratowymi jest WARTOSCIA, wiec kazda instancja liczy co innego.
+TEST(xcompiler, generator_substitutes_ordinal_as_a_value) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[0]+$ STREAM cell[3] FROM cells
+      )");
+  ASSERT_EQ(parseResult, "OK");
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  // Po ekspansji nie ma juz sladu po PUSH_GENIDX w calym planie.
+  for (const auto &qry : instance)
+    for (const auto &f : qry.lSchema)
+      EXPECT_EQ(std::ranges::count_if(f.lProgram, [](const token &t) { return t.getCommandID() == PUSH_GENIDX; }), 0) << qry.id;
+
+  // Wartosci nie sprawdzamy tokenem, tylko rownowaznoscia planow: dla instancji zerowej
+  // `cells[0]+0` zwija simplifyFieldExpressions() i PUSH_VAL(0) prawidlowo znika. Porownanie
+  // z recznym zapisem jest odporne na przebiegi upraszczajace, bo dotykaja obu planow tak samo.
+  qTree handWritten;
+  auto [manParse, manKeyword, manName] = parserRQLString(handWritten, R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[0]+0 STREAM cell$0 FROM cells
+        SELECT cells[0]+1 STREAM cell$1 FROM cells
+        SELECT cells[0]+2 STREAM cell$2 FROM cells
+      )");
+  ASSERT_EQ(manParse, "OK");
+  compiler handWrittenCompiler(handWritten);
+  ASSERT_EQ(handWrittenCompiler.compile(), "OK");
+
+  EXPECT_EQ(renderPlan(instance), renderPlan(handWritten));
+}
+
+/// `$` w klauzuli FROM buduje kaskade rodzin: okno per instancja poprzedniej rodziny.
+TEST(xcompiler, generator_expands_ordinal_in_from_clause) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[$] STREAM cell[4] FROM cells
+        SELECT * STREAM w[4] FROM cell[$]@(2,4)
+      )");
+  ASSERT_EQ(parseResult, "OK");
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  for (int ordinal = 0; ordinal < 4; ++ordinal) {
+    EXPECT_TRUE(instance.exists("cell$" + std::to_string(ordinal)));
+    EXPECT_TRUE(instance.exists("w$" + std::to_string(ordinal)));
+  }
+  // Odwolanie `cell[3]` zostalo nazwa fizyczna, a nie zapisem z nawiasem.
+  EXPECT_EQ(std::ranges::count_if(instance, [](const query &qry) { return qry.id.find('[') != std::string::npos; }), 0);
+}
+
+/// Generator bez `$` wyprodukowalby N identycznych strumieni pod roznymi nazwami — to zawsze
+/// pomylka zapisu, nigdy zamiar, wiec kompilator ma ja zatrzymac.
+TEST(xcompiler, rejects_generator_without_ordinal) {
+  const std::string verdict = compileRql(R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[0] STREAM cell[4] FROM cells
+      )");
+  EXPECT_NE(verdict, "OK");
+  EXPECT_NE(verdict.find("uses no '$'"), std::string::npos) << verdict;
+}
+
+/// `[0]` musi byc odrozniane od braku generatora — inaczej stalby sie po cichu strumieniem `cell`.
+TEST(xcompiler, rejects_zero_sized_generator) {
+  const std::string verdict = compileRql(R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[$] STREAM cell[0] FROM cells
+      )");
+  EXPECT_NE(verdict, "OK");
+  EXPECT_NE(verdict.find("positive size"), std::string::npos) << verdict;
+}
+
+/// Zwiniety indeks musi miescic sie w zrodle. Kontrola dziala, bo szerokosc DECLARE jest
+/// znana juz po parsowaniu.
+TEST(xcompiler, rejects_generated_field_index_beyond_source) {
+  const std::string verdict = compileRql(R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[$] STREAM cell[9] FROM cells
+      )");
+  EXPECT_NE(verdict, "OK");
+  EXPECT_NE(verdict.find("has only 4 element"), std::string::npos) << verdict;
+}
+
+/// Wyrazenie moze zejsc ponizej zera, zanim wyjdzie poza zrodlo — osobny komunikat.
+TEST(xcompiler, rejects_negative_generated_field_index) {
+  const std::string verdict = compileRql(R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[1-$] STREAM cell[4] FROM cells
+      )");
+  EXPECT_NE(verdict, "OK");
+  EXPECT_NE(verdict.find("must not be negative"), std::string::npos) << verdict;
+}
+
+/// Poza szablonem `$` nie ma czego oznaczac.
+TEST(xcompiler, rejects_ordinal_outside_generator) {
+  const std::string verdict = compileRql(R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[$] STREAM plain FROM cells
+      )");
+  EXPECT_NE(verdict, "OK");
+  EXPECT_NE(verdict.find("outside a stream generator"), std::string::npos) << verdict;
+}
+
+/// Odwolanie do nieistniejacej instancji rodziny.
+TEST(xcompiler, rejects_reference_beyond_family_range) {
+  const std::string verdict = compileRql(R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[$] STREAM cell[4] FROM cells
+        SELECT * STREAM w FROM cell[9]
+      )");
+  EXPECT_NE(verdict, "OK");
+  EXPECT_NE(verdict.find("outside the range 0..3"), std::string::npos) << verdict;
+}
+
+/// Jedna nazwa pliku nie obsluzy N strumieni.
+TEST(xcompiler, rejects_file_directive_on_generator) {
+  const std::string verdict = compileRql(R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[$] STREAM cell[4] FROM cells FILE 'one.dat'
+      )");
+  EXPECT_NE(verdict, "OK");
+  EXPECT_NE(verdict.find("FILE directive"), std::string::npos) << verdict;
+}
+
+/// Nazwa fizyczna instancji jest zwyklym identyfikatorem, wiec moze zderzyc sie z recznie
+/// zadeklarowanym strumieniem. Ciche nadpisanie byloby tu najgorszym z wyjsc.
+TEST(xcompiler, rejects_collision_with_existing_stream) {
+  const std::string verdict = compileRql(R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[$] STREAM cell[4] FROM cells
+        SELECT cells[0] STREAM cell$2 FROM cells
+      )");
+  EXPECT_NE(verdict, "OK");
+  EXPECT_NE(verdict.find("collides"), std::string::npos) << verdict;
+}

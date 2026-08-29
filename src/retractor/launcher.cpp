@@ -465,13 +465,25 @@ int main(int argc, char *argv[]) {
         storage_location = it.filename;
       }
 
+    // Nazwa zwracana przez parser jest nazwa Z ZAPISU, a ta nie musi byc nazwa zapytania
+    // w planie: generator `STREAM cell[24]` daje jedna linie RQL i 24 strumienie `cell$0`..
+    // `cell$23`, a samego `cell` w planie nie ma. Rodziny bierzemy z kompilatora, bo to
+    // jedyne pewne zrodlo — patrz compiler::generatedStreams().
+    const auto &generatedStreams = cm.generatedStreams();
     for (const auto &[stream_id, query_text] : processedLines) {
       if (stream_id.empty()) continue;
-      if (coreInstance[stream_id].isDeclaration()) continue;
-      if (coreInstance[stream_id].isCompilerDirective()) continue;
-      dropArtifactFile(std::filesystem::path(storage_location) / stream_id);
-      dropArtifactFile(std::filesystem::path(storage_location) / (stream_id + ".desc"));
-      dropArtifactFile(std::filesystem::path(storage_location) / (stream_id + ".meta"));
+
+      const auto family = generatedStreams.find(stream_id);
+      const std::vector<std::string> definedStreams =
+          (family != generatedStreams.end()) ? family->second : std::vector<std::string>{stream_id};
+
+      for (const auto &defined_id : definedStreams) {
+        if (coreInstance[defined_id].isDeclaration()) continue;
+        if (coreInstance[defined_id].isCompilerDirective()) continue;
+        dropArtifactFile(std::filesystem::path(storage_location) / defined_id);
+        dropArtifactFile(std::filesystem::path(storage_location) / (defined_id + ".desc"));
+        dropArtifactFile(std::filesystem::path(storage_location) / (defined_id + ".meta"));
+      }
     }
   }
 

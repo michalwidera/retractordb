@@ -12,7 +12,7 @@ compiler_option     : directive=( ROTATION | STORAGE | SUBSTRAT ) value=( STRING
                     ;
 
 select_statement    : SELECT select_list
-                      STREAM stream_name=ID
+                      STREAM stream_name=ID ('[' gen_size=DECIMAL ']')?
                       FROM stream_expression
                       (FILE file_name=STRING)?
                       (retention_from)?
@@ -77,6 +77,7 @@ field_id            : column_name=ID                             # FieldID      
                     | tablename=ID '[' UNDERLINE ']'             # FieldIDUnderline   // id[_] - IDX
                     | tablename=ID DOT column_name=ID            # FieldIDColumnName  // id.id - ID1
                     | tablename=ID '[' column_index=DECIMAL ']'  # FieldIDTable       // id[x] - ID2
+                    | tablename=ID '[' gen_index ']'             # FieldIDGenerated   // id[$] - ID2
                     ;
 
 unary_op_expression : BIT_NOT expression
@@ -121,6 +122,7 @@ term                : term STAR term               # ExpMult
                     | unary_op_expression          # ExpUnary
                     | field_id                     # ExpField
                     | agregator                    # ExpAgg
+                    | DOLLAR                       # ExpGenIndex
                     | function_call                # ExpFnCall
                     | NOT_C term                   # ExpNot
                     ;
@@ -168,8 +170,29 @@ stream_expression   : stream_expression AT '(' step=DECIMAL COMMA '-'? window=DE
 // `MIN(a)@(1,4)` i `MIN(a)&2` byly bledami skladni, a `MIN(a)#(MAX(b))` wymagalo nawiasu
 // dokladanego wylacznie po to, zeby zejsc na poziom `stream_factor`.
 stream_factor       : ID
+                    | ID '[' gen_index ']'
                     | '(' stream_expression ')'
                     | stream_fn_call
+                    ;
+
+// Indeks generatora strumieni: wyrazenie CALKOWITE nad `$` i literalami, zwijane do liczby
+// przez compiler::expandStreamGenerators() ZANIM ruszy jakikolwiek inny przebieg. `$` znaczy
+// numer porzadkowy instancji, wiec `cells[23-$]` w rodzinie `cell[24]` daje kolejno
+// cells[23], cells[22], ... — a po zwinieciu token jest nie do odroznienia od recznie
+// napisanego `cells[22]`. Dzieki temu generator nie dotyka ani DAG, ani silnika.
+//
+// Regula jest CELOWO zamknieta: ewaluator w kompilatorze obsluguje dokladnie te produkcje
+// i nic wiecej. Poszerzenie jej tutaj bez poszerzenia ewaluatora konczy sie FatalError.
+//
+// `$` jest tokenem DOLLAR, nieuzywanym dotad w zadnej regule parsera. Wybrany, bo pozostale
+// znaki interpunkcyjne sa zajete przez operatory (`&` rozplot, `%` rozplot modulo, `#` przeplot,
+// `@` okno, `_` gwiazdka indeksowa, `:` szerokosc to_string), a `\` sklaja wiersze logiczne
+// w readLogicalLines(). Leksuje sie jednoznacznie po `[`, bo ID musi zaczynac sie litera.
+gen_index           : gen_index STAR gen_index
+                    | gen_index (PLUS | MINUS) gen_index
+                    | '(' gen_index ')'
+                    | DOLLAR
+                    | DECIMAL
                     ;
 
 // Notacja przyrostkowa `strumien.avg`. WYGASZANA na rzecz stream_fn_call.

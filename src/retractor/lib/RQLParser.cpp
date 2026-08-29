@@ -104,6 +104,13 @@ class ParserListener : public RQLBaseListener {
   void exitFieldIDColumnName(RQLParser::FieldIDColumnNameContext *ctx) override { recpToken(PUSH_ID1, ctx->getText()); }
   void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) override { recpToken(PUSH_ID2, ctx->getText()); }
 
+  /// `cells[$]`, `cells[23-$]` — indeks z numerem instancji generatora.
+  ///
+  /// Wystawia DOKLADNIE ten sam token co `cells[3]`: rozny jest wylacznie tekst, ktory
+  /// compiler::expandStreamGenerators() zwija do postaci literalowej zanim zobaczy go
+  /// ktorykolwiek dalszy przebieg. Osobny opcode byl tu zbedny.
+  void exitFieldIDGenerated(RQLParser::FieldIDGeneratedContext *ctx) override { recpToken(PUSH_ID2, ctx->getText()); }
+
   void exitExpPlus(RQLParser::ExpPlusContext *ctx) override { recpToken(ADD); }
   void exitExpMinus(RQLParser::ExpMinusContext *ctx) override { recpToken(SUBTRACT); }
   void exitExpMult(RQLParser::ExpMultContext *ctx) override { recpToken(MULTIPLY); }
@@ -117,6 +124,14 @@ class ParserListener : public RQLBaseListener {
   void exitExpGe(RQLParser::ExpGeContext *ctx) override { recpToken(CMP_GE); }
   void exitExpLe(RQLParser::ExpLeContext *ctx) override { recpToken(CMP_LE); }
   void exitExpNot(RQLParser::ExpNotContext *ctx) override { recpToken(NOT); }
+
+  /// `$` poza nawiasami kwadratowymi — numer instancji jako wartosc.
+  ///
+  /// Wartosci jeszcze nie znamy (jest nia numer instancji, ktory powstanie dopiero przy
+  /// ekspansji), wiec token jest tymczasowy: expandStreamGenerators() zamienia go na
+  /// PUSH_VAL. PUSH_GENIDX, ktory przezyl ten przebieg, jest bledem kompilacji — znaczy
+  /// `$` uzyte poza generatorem.
+  void exitExpGenIndex(RQLParser::ExpGenIndexContext *ctx) override { recpToken(PUSH_GENIDX); }
 
   void exitExpFloat(RQLParser::ExpFloatContext *ctx) override { recpToken(PUSH_VAL, std::stof(ctx->getText())); }
   void exitExpDec(RQLParser::ExpDecContext *ctx) override { recpToken(PUSH_VAL, std::stoi(ctx->getText())); }
@@ -245,9 +260,17 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitSelect(RQLParser::SelectContext *ctx) override {
+    qry.generatorSize = (ctx->gen_size != nullptr) ? std::stoi(ctx->gen_size->getText()) : query::notAGenerator;
+
     // this loop creates field names in streamName + "_" + counter++
-    for (auto &i : qry.lSchema) {
-      if ((i.field_.rname).starts_with("_")) (i.field_.rname) = ctx->ID()->getText() + i.field_.rname;
+    //
+    // Dla generatora prefiks doklada compiler::expandStreamGenerators(), bo nazwa pola ma
+    // pochodzic od nazwy INSTANCJI (`cell$0_0`), a nie od nazwy szablonu (`cell_0`). Tylko
+    // wtedy plan z generatora jest nie do odroznienia od recznie rozpisanych SELECT-ow.
+    if (qry.generatorSize == query::notAGenerator) {
+      for (auto &i : qry.lSchema) {
+        if ((i.field_.rname).starts_with("_")) (i.field_.rname) = ctx->ID()->getText() + i.field_.rname;
+      }
     }
 
     qry.id = ctx->ID()->getText();
@@ -395,7 +418,13 @@ class ParserListener : public RQLBaseListener {
   /// stalo sie takze `stream_fn_call`, JEDNO dziecko maja dwie alternatywy, a `MIN(a)`
   /// wchodzilo tedy z ctx->ID() rownym nullptr.
   void exitStream_factor(RQLParser::Stream_factorContext *ctx) override {
-    if (ctx->ID() != nullptr) program.emplace_back(PUSH_STREAM, ctx->ID()->getText());
+    if (ctx->ID() == nullptr) return;
+    // `cell[3]` i `cell[$]` musza wejsc z nawiasem: samo ctx->ID() zgubiloby indeks, a to on
+    // wskazuje instancje rodziny. Nazwe fizyczna (`cell$3`) podstawia expandStreamGenerators().
+    if (ctx->gen_index() != nullptr)
+      program.emplace_back(PUSH_STREAM, ctx->getText());
+    else
+      program.emplace_back(PUSH_STREAM, ctx->ID()->getText());
   }
 
   void exitSelectListFullscan(RQLParser::SelectListFullscanContext *ctx) override {

@@ -18,12 +18,13 @@ void query::reset() {
   rInterval = 0;
   lSchema.clear();
   lProgram.clear();
-  isDisposable = false;
-  isOneShot    = false;
-  isHold       = false;
-  isSubstrat   = false;
-  policy       = std::make_pair("DEFAULT", 0);
-  retention    = rdb::retention_t{.segments = 0, .capacity = 0};
+  isDisposable  = false;
+  isOneShot     = false;
+  isHold        = false;
+  isSubstrat    = false;
+  generatorSize = notAGenerator;
+  policy        = std::make_pair("DEFAULT", 0);
+  retention     = rdb::retention_t{.segments = 0, .capacity = 0};
 }
 
 bool isThere(const std::vector<query> &v, const std::string &query_name) {

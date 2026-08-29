@@ -2012,6 +2012,257 @@ std::string compiler::simplifyFieldExpressions() {
   return {"OK"};
 }
 
+namespace {
+
+/// Zwija wyrazenie indeksu generatora — regule `gen_index` z RQL.g4 — do liczby calkowitej.
+///
+/// `$` ma wartosc numeru instancji. Tekst pochodzi z ANTLR-owego getText(), wiec nie zawiera
+/// bialych znakow, a jego ksztalt gwarantuje gramatyka. Kazde odstepstwo od niej jest wiec
+/// bledem WEWNETRZNYM — rozjechala sie gramatyka z ewaluatorem — a nie bledem uzytkownika,
+/// i stad FatalError zamiast komunikatu zwracanego do wolajacego.
+class genIndexFolder {
+ public:
+  genIndexFolder(const std::string &text, int ordinal) : text_(text), ordinal_(ordinal) {}
+
+  int fold() {
+    const int value = sum();
+    if (pos_ != text_.size())
+      FatalError("compiler::expandStreamGenerators: trailing '{}' in generator index '{}'", text_.substr(pos_), text_);
+    return value;
+  }
+
+ private:
+  int sum() {
+    int value = product();
+    while (pos_ < text_.size() && (text_[pos_] == '+' || text_[pos_] == '-')) {
+      const char op = text_[pos_++];
+      const int rhs = product();
+      value         = (op == '+') ? value + rhs : value - rhs;
+    }
+    return value;
+  }
+
+  int product() {
+    int value = atom();
+    while (pos_ < text_.size() && text_[pos_] == '*') {
+      ++pos_;
+      value *= atom();
+    }
+    return value;
+  }
+
+  int atom() {
+    if (pos_ >= text_.size()) FatalError("compiler::expandStreamGenerators: truncated generator index '{}'", text_);
+    if (text_[pos_] == '(') {
+      ++pos_;
+      const int value = sum();
+      if (pos_ >= text_.size() || text_[pos_] != ')')
+        FatalError("compiler::expandStreamGenerators: unbalanced '(' in generator index '{}'", text_);
+      ++pos_;
+      return value;
+    }
+    if (text_[pos_] == '$') {
+      ++pos_;
+      return ordinal_;
+    }
+    if (text_[pos_] < '0' || text_[pos_] > '9')
+      FatalError("compiler::expandStreamGenerators: unexpected '{}' in generator index '{}'", text_[pos_], text_);
+    int value = 0;
+    while (pos_ < text_.size() && text_[pos_] >= '0' && text_[pos_] <= '9')
+      value = value * 10 + (text_[pos_++] - '0');
+    return value;
+  }
+
+  const std::string &text_;
+  int ordinal_;
+  std::size_t pos_ = 0;
+};
+
+/// Rozbija `cells[23-$]` na nazwe `cells` i tresc nawiasu `23-$`.
+std::optional<std::pair<std::string, std::string>> splitIndexedRef(const std::string &text) {
+  const auto open = text.find('[');
+  if (open == std::string::npos || text.empty() || text.back() != ']') return std::nullopt;
+  return std::make_pair(text.substr(0, open), text.substr(open + 1, text.size() - open - 2));
+}
+
+/// Czy odwolanie zalezy od numeru instancji.
+///
+/// Pytanie dotyczy WYLACZNIE tresci nawiasu. Nazwa fizyczna wygenerowanego strumienia tez
+/// zawiera `$` (`cell$3`), wiec szukanie znaku w calym tekscie mylilo by gotowa instancje
+/// z nierozwinietym wyrazeniem generatora.
+bool dependsOnOrdinal(const std::string &text) {
+  const auto parts = splitIndexedRef(text);
+  return parts.has_value() && parts->second.find('$') != std::string::npos;
+}
+
+/// Nazwa fizyczna instancji rodziny — ta sama, ktora trafia na dysk i do `xqry`.
+std::string instanceName(const std::string &family, int ordinal) { return family + "$" + std::to_string(ordinal); }
+
+/// Czy szablon generatora w ogole uzywa numeru instancji.
+bool mentionsOrdinal(const query &q) {
+  for (const auto &t : q.lProgram)
+    if (t.getCommandID() == PUSH_STREAM && dependsOnOrdinal(t.getStr_())) return true;
+  for (const auto &f : q.lSchema)
+    for (const auto &t : f.lProgram) {
+      if (t.getCommandID() == PUSH_GENIDX) return true;
+      if (t.getCommandID() == PUSH_ID2 && dependsOnOrdinal(t.getStr_())) return true;
+    }
+  return false;
+}
+}  // namespace
+
+/// Kontrola zakresu indeksu pola dla odwolan pochodzacych z generatora.
+///
+/// Dziala tylko tam, gdzie szerokosc zrodla jest znana ZARAZ po parsowaniu: dla DECLARE
+/// i dla SELECT-ow z jawna lista pol. Zrodlo zapisane jako `SELECT *` ma pusty schemat az do
+/// expandSchemaWildcards(), wiec tam kontrola jest pomijana — swiadomie, bo przeniesienie
+/// calego przebiegu za rozwijanie gwiazdki zabiloby jego glowna wlasnosc: po ekspansji plan
+/// ma byc nie do odroznienia od recznie rozpisanego, a wiec zadne pozniejsze przebiegi
+/// nie moga o generatorach wiedziec.
+///
+/// Kontrola obejmuje WYLACZNIE indeksy zwiniete z `$`. Literal `a[99]` na czteroelementowym
+/// polu przechodzi tedy tak samo jak dotad — w kompilatorze nie ma dzis zadnej kontroli
+/// zakresu indeksu pola i jej dolozenie jest osobnym zadaniem, nie skutkiem ubocznym tego.
+std::string compiler::validateGeneratedFieldIndex(const std::string &owner, const std::string &source, int index) {
+  if (!coreInstance.exists(source)) return {"OK"};
+  query &src = coreInstance.getQuery(source);
+  if (src.lSchema.empty()) return {"OK"};
+  const int width = src.descriptorStorage().flatElementCount();
+  if (index >= width)
+    return "Stream '" + owner + "' references '" + source + "[" + std::to_string(index) + "]' but '" + source + "' has only " +
+           std::to_string(width) + " element(s)";
+  return {"OK"};
+}
+
+/// Podstawia numer instancji w jednej kopii szablonu generatora.
+///
+/// Po tym kroku po `$` nie ma w kopii sladu: PUSH_GENIDX staje sie zwyklym PUSH_VAL,
+/// a `cells[23-$]` zwyklym `cells[22]` — tokenem nie do odroznienia od recznie napisanego.
+std::string compiler::substituteOrdinal(query &instance, int ordinal) {
+  for (auto &t : instance.lProgram) {
+    if (t.getCommandID() != PUSH_STREAM || !dependsOnOrdinal(t.getStr_())) continue;
+    const auto parts = splitIndexedRef(t.getStr_());
+    const int index  = genIndexFolder(parts->second, ordinal).fold();
+    t                = token(PUSH_STREAM, parts->first + "[" + std::to_string(index) + "]");
+  }
+
+  for (auto &f : instance.lSchema)
+    for (auto &t : f.lProgram) {
+      if (t.getCommandID() == PUSH_GENIDX) {
+        t = token(PUSH_VAL, ordinal);
+        continue;
+      }
+      if (t.getCommandID() != PUSH_ID2 || !dependsOnOrdinal(t.getStr_())) continue;
+      const auto parts = splitIndexedRef(t.getStr_());
+      const int index  = genIndexFolder(parts->second, ordinal).fold();
+      if (index < 0)
+        return "Stream '" + instance.id + "' references '" + parts->first + "[" + std::to_string(index) +
+               "]' — field index must not be negative";
+      if (const std::string status = validateGeneratedFieldIndex(instance.id, parts->first, index); status != "OK")
+        return status;
+      t = token(PUSH_ID2, parts->first + "[" + std::to_string(index) + "]");
+    }
+  return {"OK"};
+}
+
+/// Rozwija generatory strumieni: jedno `SELECT cells[$] STREAM cell[24] FROM cells`
+/// w 24 zapytania `cell$0`..`cell$23`.
+///
+/// Stoi jako PIERWSZY przebieg kompilacji i to jest jego cala istota. Po nim qTree jest nie do
+/// odroznienia od planu z recznie rozpisanych SELECT-ow, wiec zaden dalszy przebieg, zaden
+/// ksztalt DAG i zaden fragment silnika nie musi o generatorach wiedziec. Cena za to jest
+/// jedna: wszystko, co przebieg chce sprawdzic, musi dac sie sprawdzic PRZED rozwiazaniem
+/// schematow — stad ograniczenie kontroli zakresu opisane przy validateGeneratedFieldIndex().
+///
+/// Numer instancji wchodzi w trzy miejsca, wszystkie zapisywane tym samym `$`:
+///   * indeks pola     `cells[$]`, `cells[23-$]`  — zwijany do literalu,
+///   * wartosc         `cells[0]+$`               — PUSH_GENIDX staje sie PUSH_VAL,
+///   * nazwa strumienia w klauzuli FROM `cell[$]` — staje sie nazwa fizyczna `cell$3`.
+std::string compiler::expandStreamGenerators() {
+  std::map<std::string, int> families;
+  std::set<std::string> plainNames;
+  for (const auto &q : coreInstance) {
+    if (q.generatorSize == query::notAGenerator) {
+      plainNames.insert(q.id);
+      continue;
+    }
+    if (q.generatorSize <= 0)
+      return "Stream generator '" + q.id + "' must declare a positive size, got " + std::to_string(q.generatorSize);
+    if (!families.emplace(q.id, q.generatorSize).second) return "Stream generator '" + q.id + "' is declared more than once";
+  }
+
+  std::vector<query> plan;
+  plan.reserve(coreInstance.size());
+  std::set<std::string> generatedNames;
+
+  for (auto &q : coreInstance) {
+    if (q.generatorSize == query::notAGenerator) {
+      plan.push_back(q);
+      continue;
+    }
+
+    if (!q.filename.empty())
+      return "Stream generator '" + q.id + "' must not carry a FILE directive — one file name cannot serve " +
+             std::to_string(q.generatorSize) + " streams";
+
+    // Bez `$` kazda z N instancji liczylaby to samo z tego samego zrodla. Rozniloby je
+    // wylacznie imie, wiec generator jest wtedy pomylka zapisu, a nie skrotem.
+    if (!mentionsOrdinal(q))
+      return "Stream generator '" + q.id + "' uses no '$' — it would produce " + std::to_string(q.generatorSize) +
+             " identical streams under different names";
+
+    for (int ordinal = 0; ordinal < q.generatorSize; ++ordinal) {
+      query instance         = q;
+      instance.generatorSize = query::notAGenerator;
+      instance.id            = instanceName(q.id, ordinal);
+
+      if (plainNames.contains(instance.id) || !generatedNames.insert(instance.id).second)
+        return "Generated stream '" + instance.id + "' collides with a stream that already exists";
+
+      // Prefiks nazwy pola bierze sie z nazwy INSTANCJI, nie szablonu — dlatego parser go
+      // dla generatora nie doklada. Inaczej pole nazywaloby sie `cell_0` zamiast `cell$0_0`
+      // i plan przestalby byc rownowazny recznemu zapisowi.
+      for (auto &f : instance.lSchema)
+        if (f.field_.rname.starts_with("_")) f.field_.rname = instance.id + f.field_.rname;
+
+      if (const std::string status = substituteOrdinal(instance, ordinal); status != "OK") return status;
+      generatedStreams_[q.id].push_back(instance.id);
+      plan.push_back(std::move(instance));
+    }
+  }
+
+  // Odwolania do instancji rodziny: `cell[3]` w klauzuli FROM staje sie nazwa fizyczna.
+  for (auto &q : plan)
+    for (auto &t : q.lProgram) {
+      if (t.getCommandID() != PUSH_STREAM) continue;
+      const auto parts = splitIndexedRef(t.getStr_());
+      if (!parts) continue;
+      if (parts->second.find('$') != std::string::npos)
+        return "Stream '" + q.id + "' uses '$' in '" + t.getStr_() + "' outside a stream generator";
+      const auto family = families.find(parts->first);
+      if (family == families.end())
+        return "Stream '" + q.id + "' references '" + t.getStr_() + "' but '" + parts->first + "' is not a stream generator";
+      const int index = genIndexFolder(parts->second, 0).fold();
+      if (index < 0 || index >= family->second)
+        return "Stream '" + q.id + "' references '" + t.getStr_() + "' outside the range 0.." +
+               std::to_string(family->second - 1);
+      t = token(PUSH_STREAM, instanceName(parts->first, index));
+    }
+
+  // Slad po `$` poza generatorem. Gramatyka na taki zapis pozwala, bo `$` jest zwyklym
+  // skladnikiem wyrazenia; sensu nabiera dopiero w szablonie i tylko tam jest dozwolony.
+  for (const auto &q : plan)
+    for (const auto &f : q.lSchema)
+      for (const auto &t : f.lProgram) {
+        if (t.getCommandID() == PUSH_GENIDX) return "Stream '" + q.id + "' uses '$' outside a stream generator";
+        if (t.getCommandID() == PUSH_ID2 && dependsOnOrdinal(t.getStr_()))
+          return "Stream '" + q.id + "' uses '$' in '" + t.getStr_() + "' outside a stream generator";
+      }
+
+  static_cast<std::vector<query> &>(coreInstance) = std::move(plan);
+  return {"OK"};
+}
+
 std::string compiler::compile() {
   std::string result;
 
@@ -2022,6 +2273,12 @@ std::string compiler::compile() {
   // a właściwą redukcję strukturalną widać dopiero w parze przed/po deduplikacji.
   rdb::probe::planProbe planBench;
   planBench.capture(rdb::probe::planStage::entry, coreInstance);
+
+  // PIERWSZY przebieg, przed wszystkim innym łącznie z migawką odwołań: po nim plan jest
+  // nie do odróżnienia od ręcznie rozpisanego, więc dalsza część kompilatora o generatorach
+  // nie wie i wiedzieć nie musi.
+  result = expandStreamGenerators();
+  if (result != "OK") return result;
 
   // Musi być PRZED pierwszym przebiegiem — patrz uzasadnienie przy definicji.
   snapshotNamedSourceRefs();

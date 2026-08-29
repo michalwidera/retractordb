@@ -89,6 +89,9 @@ public:
   virtual void enterFieldIDTable(RQLParser::FieldIDTableContext *ctx) = 0;
   virtual void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) = 0;
 
+  virtual void enterFieldIDGenerated(RQLParser::FieldIDGeneratedContext *ctx) = 0;
+  virtual void exitFieldIDGenerated(RQLParser::FieldIDGeneratedContext *ctx) = 0;
+
   virtual void enterUnary_op_expression(RQLParser::Unary_op_expressionContext *ctx) = 0;
   virtual void exitUnary_op_expression(RQLParser::Unary_op_expressionContext *ctx) = 0;
 
@@ -149,6 +152,9 @@ public:
   virtual void enterExpDec(RQLParser::ExpDecContext *ctx) = 0;
   virtual void exitExpDec(RQLParser::ExpDecContext *ctx) = 0;
 
+  virtual void enterExpGenIndex(RQLParser::ExpGenIndexContext *ctx) = 0;
+  virtual void exitExpGenIndex(RQLParser::ExpGenIndexContext *ctx) = 0;
+
   virtual void enterExpAgg(RQLParser::ExpAggContext *ctx) = 0;
   virtual void exitExpAgg(RQLParser::ExpAggContext *ctx) = 0;
 
@@ -202,6 +208,9 @@ public:
 
   virtual void enterStream_factor(RQLParser::Stream_factorContext *ctx) = 0;
   virtual void exitStream_factor(RQLParser::Stream_factorContext *ctx) = 0;
+
+  virtual void enterGen_index(RQLParser::Gen_indexContext *ctx) = 0;
+  virtual void exitGen_index(RQLParser::Gen_indexContext *ctx) = 0;
 
   virtual void enterStreamMin(RQLParser::StreamMinContext *ctx) = 0;
   virtual void exitStreamMin(RQLParser::StreamMinContext *ctx) = 0;

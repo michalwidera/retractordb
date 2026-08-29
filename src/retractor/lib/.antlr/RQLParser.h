@@ -37,8 +37,8 @@ public:
     RuleField_type = 11, RuleSelect_list = 12, RuleField_id = 13, RuleUnary_op_expression = 14, 
     RuleAsterisk = 15, RuleExpression = 16, RuleLogic = 17, RuleExpression_logic = 18, 
     RuleTerm_logic = 19, RuleExpression_factor = 20, RuleTerm = 21, RuleStream_expression = 22, 
-    RuleStream_factor = 23, RuleAgregator = 24, RuleStream_fn_call = 25, 
-    RuleFunction_call = 26
+    RuleStream_factor = 23, RuleGen_index = 24, RuleAgregator = 25, RuleStream_fn_call = 26, 
+    RuleFunction_call = 27
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -82,6 +82,7 @@ public:
   class TermContext;
   class Stream_expressionContext;
   class Stream_factorContext;
+  class Gen_indexContext;
   class AgregatorContext;
   class Stream_fn_callContext;
   class Function_callContext; 
@@ -155,6 +156,7 @@ public:
     SelectContext(Select_statementContext *ctx);
 
     antlr4::Token *stream_name = nullptr;
+    antlr4::Token *gen_size = nullptr;
     antlr4::Token *file_name = nullptr;
     antlr4::Token *type_name = nullptr;
     antlr4::tree::TerminalNode *SELECT();
@@ -167,6 +169,7 @@ public:
     Retention_fromContext *retention_from();
     antlr4::tree::TerminalNode *VOLATILE();
     antlr4::tree::TerminalNode *STORAGE();
+    antlr4::tree::TerminalNode *DECIMAL();
     antlr4::tree::TerminalNode *STRING();
     antlr4::tree::TerminalNode *TYPE_PROFILE();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
@@ -571,6 +574,17 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
+  class  FieldIDGeneratedContext : public Field_idContext {
+  public:
+    FieldIDGeneratedContext(Field_idContext *ctx);
+
+    antlr4::Token *tablename = nullptr;
+    Gen_indexContext *gen_index();
+    antlr4::tree::TerminalNode *ID();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
   Field_idContext* field_id();
 
   class  Unary_op_expressionContext : public antlr4::ParserRuleContext {
@@ -866,6 +880,15 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
+  class  ExpGenIndexContext : public TermContext {
+  public:
+    ExpGenIndexContext(TermContext *ctx);
+
+    antlr4::tree::TerminalNode *DOLLAR();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
   class  ExpAggContext : public TermContext {
   public:
     ExpAggContext(TermContext *ctx);
@@ -1067,6 +1090,7 @@ public:
     Stream_factorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *ID();
+    Gen_indexContext *gen_index();
     Stream_expressionContext *stream_expression();
     Stream_fn_callContext *stream_fn_call();
 
@@ -1077,6 +1101,25 @@ public:
 
   Stream_factorContext* stream_factor();
 
+  class  Gen_indexContext : public antlr4::ParserRuleContext {
+  public:
+    Gen_indexContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    std::vector<Gen_indexContext *> gen_index();
+    Gen_indexContext* gen_index(size_t i);
+    antlr4::tree::TerminalNode *DOLLAR();
+    antlr4::tree::TerminalNode *DECIMAL();
+    antlr4::tree::TerminalNode *STAR();
+    antlr4::tree::TerminalNode *PLUS();
+    antlr4::tree::TerminalNode *MINUS();
+
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
+  };
+
+  Gen_indexContext* gen_index();
+  Gen_indexContext* gen_index(int precedence);
   class  AgregatorContext : public antlr4::ParserRuleContext {
   public:
     AgregatorContext(antlr4::ParserRuleContext *parent, size_t invokingState);
@@ -1175,6 +1218,7 @@ public:
   bool expression_factorSempred(Expression_factorContext *_localctx, size_t predicateIndex);
   bool termSempred(TermContext *_localctx, size_t predicateIndex);
   bool stream_expressionSempred(Stream_expressionContext *_localctx, size_t predicateIndex);
+  bool gen_indexSempred(Gen_indexContext *_localctx, size_t predicateIndex);
 
   // By default the static state used to implement the parser is lazily initialized during the first
   // call to the constructor. You can call this function if you wish to initialize the static state

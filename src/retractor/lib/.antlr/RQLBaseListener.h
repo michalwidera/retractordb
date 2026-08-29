@@ -91,6 +91,9 @@ public:
   virtual void enterFieldIDTable(RQLParser::FieldIDTableContext * /*ctx*/) override { }
   virtual void exitFieldIDTable(RQLParser::FieldIDTableContext * /*ctx*/) override { }
 
+  virtual void enterFieldIDGenerated(RQLParser::FieldIDGeneratedContext * /*ctx*/) override { }
+  virtual void exitFieldIDGenerated(RQLParser::FieldIDGeneratedContext * /*ctx*/) override { }
+
   virtual void enterUnary_op_expression(RQLParser::Unary_op_expressionContext * /*ctx*/) override { }
   virtual void exitUnary_op_expression(RQLParser::Unary_op_expressionContext * /*ctx*/) override { }
 
@@ -151,6 +154,9 @@ public:
   virtual void enterExpDec(RQLParser::ExpDecContext * /*ctx*/) override { }
   virtual void exitExpDec(RQLParser::ExpDecContext * /*ctx*/) override { }
 
+  virtual void enterExpGenIndex(RQLParser::ExpGenIndexContext * /*ctx*/) override { }
+  virtual void exitExpGenIndex(RQLParser::ExpGenIndexContext * /*ctx*/) override { }
+
   virtual void enterExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
   virtual void exitExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
 
@@ -204,6 +210,9 @@ public:
 
   virtual void enterStream_factor(RQLParser::Stream_factorContext * /*ctx*/) override { }
   virtual void exitStream_factor(RQLParser::Stream_factorContext * /*ctx*/) override { }
+
+  virtual void enterGen_index(RQLParser::Gen_indexContext * /*ctx*/) override { }
+  virtual void exitGen_index(RQLParser::Gen_indexContext * /*ctx*/) override { }
 
   virtual void enterStreamMin(RQLParser::StreamMinContext * /*ctx*/) override { }
   virtual void exitStreamMin(RQLParser::StreamMinContext * /*ctx*/) override { }
