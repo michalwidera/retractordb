@@ -63,7 +63,7 @@ struct compiler {
   std::string resolveStreamIntervals();
   std::string extractIntermediateStreams();
   std::string expandSchemaWildcards();
-  std::string expandIndexWildcards();
+  std::string expandIndexWildcards(query &q);
   std::string resolveFieldReferences();
   std::string localizeFieldOffsets();
   void collectTransitiveOffsets(const std::string &srcId, int baseOffset, bool viaHash, std::map<std::string, int> &result,

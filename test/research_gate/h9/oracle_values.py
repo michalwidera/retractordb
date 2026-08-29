@@ -318,7 +318,7 @@ def compare_rdb_vs_flink(rdb, flink_rows, tag, tail_allowance):
 # §7.1: "Dla kazdego mechanizmu co najmniej trzy mutanty: zmieniona faza/shift,
 # kolejnosc pola, mapa NULL/luka — oracle ma wykryc wszystkie."
 #
-# Regula tego luku dokłada do tego drugi warunek, tward­szy: NAJPIERW pokaz, ze
+# Regula tego luku dokłada do tego drugi warunek, twardszy: NAJPIERW pokaz, ze
 # oracle ODRZUCA mutanty, dopiero potem, ze akceptuje wariant poprawny; i pokaz,
 # ze przypadek odrzucany DOCHODZI do warunku, ktory ma go zlapac. Mutant zlapany
 # przez warunek wczesniejszy niz zamierzony NIE JEST dowodem, ze zamierzony

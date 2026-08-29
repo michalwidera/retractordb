@@ -1767,3 +1767,44 @@ TEST(xcompiler, rejects_collision_with_existing_stream) {
   EXPECT_NE(verdict, "OK");
   EXPECT_NE(verdict.find("collides"), std::string::npos) << verdict;
 }
+
+/// Strumien o schemacie z dzikiego indeksu `[_]` skonsumowany przez zlaczenie. Rozwiniecie `[_]`
+/// bylo kiedys osobnym przebiegiem piec krokow po materializacji schematow, wiec buildOutputSchema()
+/// kopiowal liste pol zrodla, gdy ta miala jeszcze jedno pole zastepcze: zlaczenie dostawalo dwa
+/// pola zamiast trzech, a przesuniecie drugiego argumentu bylo juz liczone z prawidlowej szerokosci.
+/// Schemat rozjezdzal sie z ukladem rekordu i wykonanie zamieralo bez bledu.
+TEST(xcompiler, index_wildcard_schema_survives_being_joined) {
+  qTree wildcard;
+  auto [wildParse, wildKeyword, wildName] = parserRQLString(wildcard, R"(
+        DECLARE c INTEGER[4] STREAM src, 1 FILE 'src.txt'
+        SELECT src[0] STREAM x FROM src
+        SELECT src[1] STREAM y FROM src
+        SELECT * STREAM j FROM x+y
+        SELECT to_integer(j[_]) STREAM w FROM j
+        SELECT * STREAM out FROM w+x
+      )");
+  ASSERT_EQ(wildParse, "OK");
+  compiler wildcardCompiler(wildcard);
+  ASSERT_EQ(wildcardCompiler.compile(), "OK");
+
+  // Zlaczenie ma trzy pola, a nie dwa, i offsety sa ciagle: w_0,w_1 z lewej, x_2 z prawej.
+  auto &joined = wildcard.getQuery("out");
+  ASSERT_EQ(joined.lSchema.size(), 3u);
+  EXPECT_EQ(joined.descriptorStorage().flatElementCount(), 3);
+
+  // Rownowaznosc z recznym zapisem: `[_]` ma byc czystym skrotem, nie osobna sciezka kompilacji.
+  qTree handWritten;
+  auto [manParse, manKeyword, manName] = parserRQLString(handWritten, R"(
+        DECLARE c INTEGER[4] STREAM src, 1 FILE 'src.txt'
+        SELECT src[0] STREAM x FROM src
+        SELECT src[1] STREAM y FROM src
+        SELECT * STREAM j FROM x+y
+        SELECT to_integer(j[0]), to_integer(j[1]) STREAM w FROM j
+        SELECT * STREAM out FROM w+x
+      )");
+  ASSERT_EQ(manParse, "OK");
+  compiler handWrittenCompiler(handWritten);
+  ASSERT_EQ(handWrittenCompiler.compile(), "OK");
+
+  EXPECT_EQ(renderPlan(wildcard), renderPlan(handWritten));
+}

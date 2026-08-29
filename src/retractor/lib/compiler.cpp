@@ -657,57 +657,74 @@ std::string compiler::expandSchemaWildcards() {
       for (auto eraseIt : eraseList)
         q.lSchema.erase(eraseIt);
     }
+    // Rozwinięcie [_] musi się dziać TUTAJ, w tej samej pętli topologicznej, zaraz po
+    // rozwinięciu `*` dla tego zapytania — nie w osobnym, późniejszym przebiegu.
+    // buildOutputSchema() materializuje schemat węzła pochodnego kopiując listy pól
+    // operandów, więc konsument złączenia zobaczyłby strumień z nierozwiniętym [_]
+    // jako jednopolowy i schemat rozjechałby się z układem rekordu.
+    const std::string resultIdx{expandIndexWildcards(q)};
+    if (resultIdx != "OK") return resultIdx;
   }
   coreInstance.sort();
   return {"OK"};
 }
 
 /* If in query plan is PUSH_IDX it means that we need to duplicate [_] */
-std::string compiler::expandIndexWildcards() {
-  for (auto &q : coreInstance) {             // for each query
-    for (auto &f : q.lSchema) {              // for each field in query
-      std::vector<std::string> usedSchemaX;  //
-      for (auto &t : f.lProgram)             // for each token in query field
-        if (t.getCommandID() == PUSH_IDX)
-          usedSchemaX.push_back(get<std::pair<std::string, int>>(t.getVT()).first);  // .second arg is always 0
-      if (!usedSchemaX.empty()) {
-        int minSizeFlat{std::numeric_limits<int>::max()};
-        for (const auto &schema : usedSchemaX) {
-          auto size   = coreInstance.getQuery(schema).descriptorStorage().flatElementCount();
-          minSizeFlat = std::min(minSizeFlat, size);
-        }
-
-        if (minSizeFlat == std::numeric_limits<int>::max()) {
-          FatalError("compiler::expandIndexWildcards: flat size not resolved for query '{}'", q.id);
-        }
-        if (minSizeFlat <= 0) {
-          FatalError("compiler::expandIndexWildcards: flat size must be positive, got {} for query '{}'", minSizeFlat, q.id);
-        }
-        if (q.lSchema.size() != 1) {
-          FatalError(
-              "compiler::expandIndexWildcards: PUSH_IDX expansion requires exactly one schema field, got {} for query '{}'",
-              q.lSchema.size(), q.id);
-        }
-
-        field oldField = *q.lSchema.begin();
-        q.lSchema.clear();
-        for (int i = 0; i < minSizeFlat; i++) {
-          std::list<token> lTempProgram;
-          for (auto &t : oldField.lProgram) {
-            if (t.getCommandID() == PUSH_IDX)
-              lTempProgram.emplace_back(PUSH_ID, std::make_pair(t.getStr_(), i));
-            else
-              lTempProgram.emplace_back(t.getCommandID(), t.getVT());
-          }
-          field newField(rdb::rField(q.id + "_" + lexical_cast<std::string>(i),  //
-                                     oldField.field_.rlen,                       //
-                                     1,                                          // (expanded)
-                                     oldField.field_.rtype),
-                         lTempProgram);
-          q.lSchema.push_back(newField);
-        }
-        break;
+/// Wywoływane per zapytanie z pętli topologicznej expandSchemaWildcards(). Samo przestawienie
+/// kolejności przebiegów by nie wystarczyło: źródłem [_] bywa `SELECT *`, a źródłem `*` bywa
+/// strumień z [_], więc zależność idzie w obie strony i rozstrzyga ją dopiero porządek
+/// topologiczny. Na tym etapie PUSH_IDX niesie jeszcze tekst `strumien[_]` prosto z parsera,
+/// nie parę — stąd regex i normalizacja tokenu na miejscu. descriptorStorage() liczy się
+/// wyłącznie z lSchema, więc szerokość źródła jest tu już dostępna.
+std::string compiler::expandIndexWildcards(query &q) {
+  for (auto &f : q.lSchema) {              // for each field in query
+    std::vector<std::string> usedSchemaX;  //
+    for (auto &t : f.lProgram) {           // for each token in query field
+      if (t.getCommandID() != PUSH_IDX) continue;
+      boost::cmatch what;
+      const std::string text(t.getStr_());
+      if (!regex_search(text.c_str(), what, xprFieldIdX)) throw std::out_of_range("No mach on type conversion IDX");
+      if (what.size() != 2) FatalError("compiler: PUSH_IDX regex match has unexpected capture count");
+      const std::string schema(what[1]);
+      t = token(PUSH_IDX, std::make_pair(schema, 0));  // .second arg is always 0
+      usedSchemaX.push_back(schema);
+    }
+    if (!usedSchemaX.empty()) {
+      int minSizeFlat{std::numeric_limits<int>::max()};
+      for (const auto &schema : usedSchemaX) {
+        auto size   = coreInstance.getQuery(schema).descriptorStorage().flatElementCount();
+        minSizeFlat = std::min(minSizeFlat, size);
       }
+
+      if (minSizeFlat == std::numeric_limits<int>::max()) {
+        FatalError("compiler::expandIndexWildcards: flat size not resolved for query '{}'", q.id);
+      }
+      if (minSizeFlat <= 0) {
+        FatalError("compiler::expandIndexWildcards: flat size must be positive, got {} for query '{}'", minSizeFlat, q.id);
+      }
+      if (q.lSchema.size() != 1) {
+        FatalError("compiler::expandIndexWildcards: PUSH_IDX expansion requires exactly one schema field, got {} for query '{}'",
+                   q.lSchema.size(), q.id);
+      }
+
+      field oldField = *q.lSchema.begin();
+      q.lSchema.clear();
+      for (int i = 0; i < minSizeFlat; i++) {
+        std::list<token> lTempProgram;
+        for (auto &t : oldField.lProgram) {
+          if (t.getCommandID() == PUSH_IDX)
+            lTempProgram.emplace_back(PUSH_ID, std::make_pair(t.getStr_(), i));
+          else
+            lTempProgram.emplace_back(t.getCommandID(), t.getVT());
+        }
+        field newField(rdb::rField(q.id + "_" + lexical_cast<std::string>(i),  //
+                                   oldField.field_.rlen,                       //
+                                   1,                                          // (expanded)
+                                   oldField.field_.rtype),
+                       lTempProgram);
+        q.lSchema.push_back(newField);
+      }
+      break;
     }
   }
   return {"OK"};
@@ -746,14 +763,6 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
           }
         } else
           throw std::out_of_range("No mach on type conversion ID1");
-        break;
-      case PUSH_IDX:
-        if (regex_search(text.c_str(), what, xprFieldIdX)) {
-          if (what.size() != 2) FatalError("compiler: PUSH_IDX regex match has unexpected capture count");
-          const std::string schema(what[1]);
-          t = token(PUSH_IDX, std::make_pair(schema, 0));
-        } else
-          throw std::out_of_range("No mach on type conversion IDX");
         break;
       case PUSH_ID2:
         if (regex_search(text.c_str(), what, xprFieldId2)) {
@@ -2294,8 +2303,8 @@ std::string compiler::compile() {
 
   // Niezmiennik D3 sprawdzany wokół KAŻDEGO przebiegu przepisującego z osobna. Jednego snapshotu
   // "przed optymalizacjami" zrobić się nie da, bo przebiegi przepisujące są przeplecione
-  // z przebiegami dopełniającymi schemat (resolveFieldReferences, expandIndexWildcards) — te
-  // legalnie zmieniają listę pól, np. rozwijając [_].
+  // z przebiegami dopełniającymi schemat (resolveFieldReferences) — te legalnie zmieniają
+  // listę pól. Rozwinięcie [_] jest już za nami: dzieje się w expandSchemaWildcards().
   std::map<std::string, std::vector<std::string>> namesBeforeRewrite;
 
 #if RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES
@@ -2322,9 +2331,6 @@ std::string compiler::compile() {
   if (result != "OK") return result;
 
   result = resolveFieldReferences();
-  if (result != "OK") return result;
-
-  result = expandIndexWildcards();
   if (result != "OK") return result;
 
 #if RDB_OPT_SIMPLIFY_EXPRESSIONS
