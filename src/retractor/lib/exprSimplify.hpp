@@ -26,7 +26,7 @@ using fieldTypeLookup = std::function<std::optional<rdb::descFld>(const std::str
 ///  * C — elementy neutralne: `E+0`, `E-0`, `E*1`, `E/1` → `E`;
 ///  * D — powtórzony czynnik jako potęga: `a*a` → `a^2`, `a*a*a` → `a^3`, i tak dalej dla
 ///        dowolnie długiego łańcucha oraz dla dowolnego powtórzonego podwyrażenia
-///        (`(x+1)*(x+1)` → `(x+1)^2`).
+///        (`(x+1)*(x+1)` → `(x+1)^2`). WYŁĄCZNIE przy `aggressive_expr_optimization=ON`.
 ///
 /// Świadomie NIE ma tu `E*0` → `0`: `NULL*0` daje NULL, więc pochłanianie złamałoby 3VL.
 ///
@@ -40,6 +40,16 @@ using fieldTypeLookup = std::function<std::optional<rdb::descFld>(const std::str
 ///
 /// Na tej równości stoi też niezmiennik ablacyjny: przy RDB_OPT_SIMPLIFY_EXPRESSIONS=OFF
 /// w planie zostaje `a*a` i musi policzyć dokładnie to samo, co `a^2`.
+///
+/// Reguła D stoi za osobnym przełącznikiem `aggressive_expr_optimization`, DOMYŚLNIE
+/// WYŁĄCZONYM, i nie dlatego, że budzi wątpliwość co do wyniku. Powodem jest aparatura
+/// badawcza: mierzone plany H9 stoją na normie `Sqrt(A[0]*A[0]+B[0]*B[0])` (15 z 21 plików
+/// `test/research_gate/h9/rql/`), a `validate_corpus.py::require_main_r3_zero` wymaga, żeby
+/// R3 nie przepisała ich ani razu — inaczej pomiar współdzielenia podplanu przestaje być
+/// odizolowany od upraszczania wyrażeń. Włączenie reguły zapala `ninja test_gate`.
+///
+/// Przełącznik jest CELOWO poza rodziną `RDB_OPT_*`: tamte pięć tworzy macierz ablacyjną i
+/// trafia do `xretractor --build-info`, którego ZBIÓR kluczy korpus H9 sprawdza dokładnie.
 ///
 /// Zwijanie liczy PRODUKCYJNY ewaluator (expressionEvaluator::eval bez payloadu), więc nie
 /// może się rozjechać z wykonaniem — promocje typów, 3VL i dzielenie przez zero są z definicji

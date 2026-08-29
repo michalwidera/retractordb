@@ -1874,13 +1874,13 @@ TEST(xcompiler, field_type_lookup_uses_flat_element_index) {
       << "mnozenie FLOAT nie moze zostac przepisane na potege";
 
   // Kontrola dodatnia na tym samym ksztalcie schematu: dla tablicy INTEGER przepisanie
-  // ma zadzialac na KAZDYM elemencie, nie tylko na zerowym. Przy wylaczonym przelaczniku
-  // zostaje mnozenie — przelacznik zmienia POSTAC programu, nigdy jego wynik.
+  // ma zadzialac na KAZDYM elemencie, nie tylko na zerowym. Bez agresywnych przepisan
+  // zostaje mnozenie — przelaczniki zmieniaja POSTAC programu, nigdy jego wynik.
   auto intArray = compilePlan(
       "SUBSTRAT 'memory'\n"
       "DECLARE v INTEGER[4], n INTEGER STREAM src, 1 FILE 'a.txt'\n"
       "SELECT src[0]*src[0], src[3]*src[3] STREAM t FROM src\n");
-#if RDB_OPT_SIMPLIFY_EXPRESSIONS
+#if RDB_OPT_SIMPLIFY_EXPRESSIONS && aggressive_expr_optimization
   const command_id expected = POWER;
 #else
   const command_id expected = MULTIPLY;

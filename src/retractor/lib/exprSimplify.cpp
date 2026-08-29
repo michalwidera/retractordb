@@ -97,11 +97,13 @@ struct constantTail {
   std::optional<rdb::descFld> baseType;  ///< typ statyczny E, o ile znany
 };
 
+#if aggressive_expr_optimization
 /// Podwyrażenie zwinięte już do postaci `E ^ k` — materiał dla reguły D.
 struct powerForm {
   std::list<token> base;  ///< program podwyrażenia E
   int exponent;           ///< wykładnik, zawsze >= 2
 };
+#endif
 
 /// Węzeł drzewa wyrażenia odtworzonego ze strumienia ONP.
 struct node {
@@ -109,7 +111,9 @@ struct node {
   std::optional<rdb::descFldVT> constant;  ///< wartość, gdy CAŁE podwyrażenie jest stałe
   std::optional<rdb::descFld> type;
   std::optional<constantTail> tail;
+#if aggressive_expr_optimization
   std::optional<powerForm> asPower;  ///< ustawione tylko dla węzłów zbudowanych regułą D
+#endif
 };
 
 node constantNode(rdb::descFldVT value) {
@@ -184,6 +188,7 @@ std::optional<node> dropNeutralOperand(const node &left, const rdb::descFldVT &c
   return left;
 }
 
+#if aggressive_expr_optimization
 /// Równość SKŁADNIOWA dwóch programów ONP. `token` nie ma operator==, a dokładanie go do
 /// jego publicznego API tylko dla tego porównania byłoby zmianą szerszą niż potrzeba.
 bool sameProgram(const std::list<token> &left, const std::list<token> &right) {
@@ -232,6 +237,7 @@ std::optional<node> foldRepeatedFactor(const node &left, const node &right) {
 
   return std::nullopt;
 }
+#endif
 
 std::optional<node> rewriteWithConstantOnRight(const node &left, const rdb::descFldVT &constant, command_id op) {
   if (auto rewritten = reassociate(left, constant, op)) return rewritten;
@@ -334,6 +340,7 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
           }
         }
 
+#if aggressive_expr_optimization
         // D — powtórzony czynnik jako potęga.
         if (cmd == MULTIPLY) {
           if (auto rewritten = foldRepeatedFactor(*left, *right)) {
@@ -342,6 +349,7 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
             break;
           }
         }
+#endif
 
         // B i C — stała po prawej.
         if (right->constant.has_value() && !left->constant.has_value()) {

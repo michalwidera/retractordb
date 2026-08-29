@@ -287,9 +287,25 @@ TEST(exprSimplify, keeps_expression_without_constants_untouched) {
   EXPECT_EQ(dump(program), dump(original));
 }
 
+// Stałe należą do reguły A niezależnie od `aggressive_expr_optimization`: `2*2` ma się
+// zwinąć do 4, a nie do `2^2`.
+TEST(exprSimplify, constant_square_folds_to_value_not_to_power) {
+  std::list<token> program{token(PUSH_VAL, 2), token(PUSH_VAL, 2), token(MULTIPLY)};
+
+  EXPECT_EQ(simplifyExpression(program, testFieldType), 1u);
+  ASSERT_EQ(program.size(), 1u);
+  EXPECT_EQ(std::get<int>(program.front().getVT()), 4);
+}
+
 //
 // ─── D: powtórzony czynnik jako potęga ──────────────────────────────────────────
 //
+// Cała reguła stoi za `aggressive_expr_optimization`, domyślnie wyłączonym — powód jest
+// w exprSimplify.hpp (korpus H9). Przy wyłączonym przełączniku sprawdzamy to, co ma być
+// wtedy prawdą: program zostaje nietknięty.
+//
+
+#if aggressive_expr_optimization
 
 TEST(exprSimplify, folds_squared_factor_into_power) {
   // x * x == x ^ 2
@@ -352,11 +368,14 @@ TEST(exprSimplify, does_not_fold_distinct_factors) {
   EXPECT_EQ(simplifyExpression(program, testFieldType), 0u);
 }
 
-// Stałe należą do reguły A: `2*2` ma się zwinąć do 4, a nie do `2^2`.
-TEST(exprSimplify, constant_square_folds_to_value_not_to_power) {
-  std::list<token> program{token(PUSH_VAL, 2), token(PUSH_VAL, 2), token(MULTIPLY)};
+#else
 
-  EXPECT_EQ(simplifyExpression(program, testFieldType), 1u);
-  ASSERT_EQ(program.size(), 1u);
-  EXPECT_EQ(std::get<int>(program.front().getVT()), 4);
+TEST(exprSimplify, keeps_repeated_factor_when_aggressive_rewrites_are_off) {
+  const std::list<token> original{pushId(0), pushId(0), token(MULTIPLY)};
+  std::list<token> program = original;
+
+  EXPECT_EQ(simplifyExpression(program, testFieldType), 0u);
+  EXPECT_EQ(dump(program), dump(original));
 }
+
+#endif
