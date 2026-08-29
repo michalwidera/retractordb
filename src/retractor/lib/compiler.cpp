@@ -2000,15 +2000,34 @@ std::string compiler::shareEquivalentSelectComputations() {
 /// Przed shareEquivalentSelectComputations(), bo odciski liczą się z tokenów — kanoniczna
 /// postać wyrażenia zwiększa liczbę wykrytych równoważności.
 std::string compiler::simplifyFieldExpressions() {
+  // Indeks w PUSH_ID jest PŁASKI — liczy elementy, nie pozycje w schemacie. Pole zadeklarowane
+  // jako `a INTEGER[4]` zajmuje cztery kolejne indeksy pod JEDNĄ pozycją lSchema, a pola
+  // konfiguracyjne deskryptora nie zajmują żadnego. Odwzorowanie wprost po pozycji w liście
+  // zgadza się więc tylko dla schematów złożonych wyłącznie ze skalarów; dla
+  // `DECLARE f FLOAT[4], n INTEGER` indeks 1 to `f[1]` (FLOAT), a nie `n` (INTEGER) — czyli typ
+  // wychodził NIE TEN, a nie tylko „nieznany".
+  //
+  // Reguła płaskiego indeksu musi być TA SAMA, co w Descriptor::rebuildFieldMappings(), bo to
+  // ona rządzi odczytem w payload::getItemVT: STRING zajmuje jeden indeks, pozostałe rarray.
   auto typeOfField = [this](const std::string &streamId, int fieldIndex) -> std::optional<rdb::descFld> {
     auto source = std::ranges::find_if(coreInstance, [&streamId](const query &q) { return q.id == streamId; });
-    if (source == coreInstance.end()) return std::nullopt;
-    if (fieldIndex < 0 || fieldIndex >= static_cast<int>(source->lSchema.size())) return std::nullopt;
-    const auto type = std::next(source->lSchema.begin(), fieldIndex)->field_.rtype;
-    // Pola konfiguracyjne deskryptora (TYPE, REF, RETENTION, RETMEMORY) nie są wartościami
-    // wyrażeń — ich „typ" nie mówi nic o arytmetyce, więc zgłaszamy je jako nieznane.
-    if (type > rdb::STRING) return std::nullopt;
-    return type;
+    if (source == coreInstance.end() || fieldIndex < 0) return std::nullopt;
+
+    int remaining = fieldIndex;
+    for (const auto &item : source->lSchema) {
+      const auto type = item.field_.rtype;
+      // Pola konfiguracyjne deskryptora (TYPE, REF, RETENTION, RETMEMORY) nie są wartościami
+      // wyrażeń i nie zajmują indeksów płaskich — Descriptor pomija je tak samo.
+      if (type == rdb::TYPE || type == rdb::REF || type == rdb::RETENTION || type == rdb::RETMEMORY) continue;
+      const int flatCount = (type == rdb::STRING) ? 1 : item.field_.rarray;
+      if (remaining < flatCount) {
+        // NULLTYPE zajmuje indeks, ale jego „typ" nie mówi nic o arytmetyce.
+        if (type > rdb::STRING) return std::nullopt;
+        return type;
+      }
+      remaining -= flatCount;
+    }
+    return std::nullopt;
   };
 
   for (auto &q : coreInstance) {

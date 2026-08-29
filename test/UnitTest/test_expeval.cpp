@@ -1535,3 +1535,136 @@ TEST(xExpressionEval, call_to_string_null_propagates_null) {
   expressionEvaluator test;
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
 }
+
+// --- POWER: operator `^` z RQL.g4 (ExpPow) ------------------------------------------------
+
+// Kolejnosc operandow. ONP `PUSH 2; PUSH 3; POWER` ma znaczyc 2^3 = 8, a nie 3^2 = 9.
+// Potegowanie jest pierwszym NIEPRZEMIENNYM operatorem w tym pliku, ktory nie ma
+// osobnego znaku po obu stronach, wiec pomylka stron przeszlaby przez kazdy inny test.
+TEST(xExpressionEval, pow_operand_order) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(PUSH_VAL, 3);
+  program.emplace_back(POWER);
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 8);
+}
+
+// Typ wyniku ustala normalize(), tak samo jak dla `*`. Kwadrat pola INTEGER zostaje
+// INTEGER-em — inaczej `pole ^ 2` nie bylby zamiennikiem dla `pole * pole`.
+TEST(xExpressionEval, pow_int_int_stays_integer) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, 7);
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(POWER);
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  EXPECT_EQ(result.index(), rdb::INTEGER);
+  EXPECT_EQ(std::get<int>(result), 49);
+}
+
+// Wykladnik ulamkowy promuje wynik do DOUBLE — normalize() bierze wyzszy indeks wariantu.
+TEST(xExpressionEval, pow_int_double_promotes_to_double) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(PUSH_VAL, 0.5);
+  program.emplace_back(POWER);
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_EQ(result.index(), rdb::DOUBLE);
+  EXPECT_NEAR(std::get<double>(result), 1.4142135623730951, 1E-12);
+}
+
+// Podstawa calkowita obcina wynik, dokladnie jak dzielenie calkowite: 2^-1 = 0.5 -> 0.
+TEST(xExpressionEval, pow_negative_exponent_truncates_on_integer_base) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(PUSH_VAL, -1);
+  program.emplace_back(POWER);
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 0);
+}
+
+// Wynik poza zbiorem wartosci jest wartoscia POCHLANIAJACA, jak dzielenie przez zero.
+// Rzut nieskonczonosci na int bylby zreszta zachowaniem niezdefiniowanym.
+TEST(xExpressionEval, pow_non_finite_result_gives_null) {
+  for (const auto &operands : {std::pair<rdb::descFldVT, rdb::descFldVT>{0, -1},         // 0^-1 = inf
+                               std::pair<rdb::descFldVT, rdb::descFldVT>{-8.0, 0.5}}) {  // (-8)^0.5 = NaN
+    std::list<token> program;
+    program.emplace_back(PUSH_VAL, operands.first);
+    program.emplace_back(PUSH_VAL, operands.second);
+    program.emplace_back(POWER);
+
+    expressionEvaluator test;
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  }
+}
+
+TEST(xExpressionEval, pow_null_operand_propagates_null) {
+  for (bool nullOnLeft : {true, false}) {
+    std::list<token> program;
+    program.emplace_back(PUSH_VAL, nullOnLeft ? rdb::descFldVT(std::monostate{}) : rdb::descFldVT(2));
+    program.emplace_back(PUSH_VAL, nullOnLeft ? rdb::descFldVT(2) : rdb::descFldVT(std::monostate{}));
+    program.emplace_back(POWER);
+
+    expressionEvaluator test;
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  }
+}
+
+// Operand tekstowy jest bledem, tak samo jak dla `*`, `-` i `/`. normalize() promuje
+// druga strone do STRING, wiec lapane sa oba ustawienia operandow.
+TEST(xExpressionEval, pow_string_operand_throws) {
+  for (bool stringOnLeft : {true, false}) {
+    std::list<token> program;
+    program.emplace_back(PUSH_VAL, stringOnLeft ? rdb::descFldVT(std::string("abc")) : rdb::descFldVT(2));
+    program.emplace_back(PUSH_VAL, stringOnLeft ? rdb::descFldVT(2) : rdb::descFldVT(std::string("abc")));
+    program.emplace_back(POWER);
+
+    expressionEvaluator test;
+    EXPECT_THROW(test.eval(program), std::runtime_error);
+  }
+}
+
+// Sciezka dokladna: dla typow calkowitych i wymiernych `a^k` MA BYC iloczynem `a*a*...*a`,
+// razem z przekreceniem i promocja typu. Na tej rownosci stoi regula D w exprSimplify,
+// ktora przepisuje `a*a` na `a^2`.
+TEST(xExpressionEval, pow_on_exact_types_matches_multiplication) {
+  struct testCase {
+    rdb::descFldVT value;
+    int exponent;
+  };
+
+  for (const auto &item : {testCase{100000, 2},                         // przekrecenie int
+                           testCase{-3, 3},                             // ujemna podstawa
+                           testCase{rdb::descFldVT{uint8_t(200)}, 2},   // promocja BYTE do int
+                           testCase{7U, 3},                             // unsigned
+                           testCase{boost::rational<int>(2, 3), 3}}) {  // arytmetyka wymierna
+    std::list<token> asPower;
+    asPower.emplace_back(PUSH_VAL, item.value);
+    asPower.emplace_back(PUSH_VAL, item.exponent);
+    asPower.emplace_back(POWER);
+
+    std::list<token> asProduct;
+    asProduct.emplace_back(PUSH_VAL, item.value);
+    for (int step = 1; step < item.exponent; ++step) {
+      asProduct.emplace_back(PUSH_VAL, item.value);
+      asProduct.emplace_back(MULTIPLY);
+    }
+
+    expressionEvaluator test;
+    EXPECT_TRUE(test.eval(asPower) == test.eval(asProduct)) << "wykladnik " << item.exponent;
+  }
+}

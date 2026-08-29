@@ -113,6 +113,7 @@ class ParserListener : public RQLBaseListener {
 
   void exitExpPlus(RQLParser::ExpPlusContext *ctx) override { recpToken(ADD); }
   void exitExpMinus(RQLParser::ExpMinusContext *ctx) override { recpToken(SUBTRACT); }
+  void exitExpPow(RQLParser::ExpPowContext *ctx) override { recpToken(POWER); }
   void exitExpMult(RQLParser::ExpMultContext *ctx) override { recpToken(MULTIPLY); }
   void exitExpDiv(RQLParser::ExpDivContext *ctx) override { recpToken(DIVIDE); }
   void exitExpAnd(RQLParser::ExpAndContext *ctx) override { recpToken(AND); }

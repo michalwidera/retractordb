@@ -51,7 +51,8 @@ enum command_id : std::uint8_t {
   STREAM_AGSE,        // 39
   COUNT,              // 40
   COUNT_RANGE,        // 41
-  PUSH_GENIDX         // 42 - numer instancji generatora; zyje tylko do expandStreamGenerators()
+  PUSH_GENIDX,        // 42 - numer instancji generatora; zyje tylko do expandStreamGenerators()
+  POWER               // 43 - potegowanie `a^b`; dopisane NA KONCU, zeby nie przenumerowac reszty
 };
 
 constexpr auto GetStringcommand_id(enum command_id index) -> std::string_view { return magic_enum::enum_name(index); }

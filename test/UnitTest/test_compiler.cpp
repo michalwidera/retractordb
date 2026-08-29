@@ -1497,6 +1497,57 @@ TEST(xparser, binary_stream_operators_are_left_associative) {
   EXPECT_TRUE(plan.exists("STREAM_HASH_a_b")) << "przeplot nie jest lewostronny";
 }
 
+namespace {
+
+/// Program pola SELECT-a w postaci ONP — do porownan grupowania w wyrazeniu skalarnym.
+///
+/// Sam PARSER, bez kompilacji: uproszczenia algebraiczne (R3) zwinelyby stale i zatarly
+/// roznice, o ktore chodzi. Zrodlem jest jeden strumien o dwoch polach, wiec `v` i `w` sa
+/// zwyklymi odwolaniami FieldID.
+std::string selectFieldProgram(const std::string &expression) {
+  qTree instance;
+  auto [parseResult, keyword, streamName] = parserRQLString(instance,
+                                                            "DECLARE v INTEGER, w INTEGER STREAM a, 1/500 FILE 'a.txt'\n"
+                                                            "SELECT " +
+                                                                expression + " STREAM t FROM a\n");
+  EXPECT_EQ(parseResult, "OK") << expression;
+
+  std::ostringstream out;
+  for (auto &f : instance.getQuery("t").lSchema)
+    for (auto &tk : f.lProgram)
+      out << tk << ";";
+  return out.str();
+}
+
+}  // namespace
+
+// `^` stoi PIERWSZE w regule `term`, wiec wiaze mocniej niz `*` i `/` — a te z kolei
+// mocniej niz `+`. Test pokazuje ROZNICE, nie tylko rownowaznosc: `v*w^2` i `(v*w)^2` to
+// dwa rozne wyrazenia i tylko pierwsze ma znaczyc to, co zapis bez nawiasow.
+TEST(xparser, power_binds_tighter_than_multiplication) {
+  EXPECT_EQ(selectFieldProgram("v*w^2"), selectFieldProgram("v*(w^2)"));
+  EXPECT_NE(selectFieldProgram("v*w^2"), selectFieldProgram("(v*w)^2"));
+
+  EXPECT_EQ(selectFieldProgram("v/w^2"), selectFieldProgram("v/(w^2)"));
+  EXPECT_EQ(selectFieldProgram("v+w^2"), selectFieldProgram("v+(w^2)"));
+}
+
+// Jedyny prawostronnie laczny operator tej gramatyki. Wolno tak, bo drabina `term` buduje
+// program ONP dla expressionEvaluator, a nie nazwe substratu — lewostronnosc jest wymogiem
+// tylko po stronie stream_expression, gdzie nazwa wezla jest nazwa pliku na dysku.
+TEST(xparser, power_is_right_associative) {
+  EXPECT_EQ(selectFieldProgram("v^w^2"), selectFieldProgram("v^(w^2)"));
+  EXPECT_NE(selectFieldProgram("v^w^2"), selectFieldProgram("(v^w)^2"));
+}
+
+// Literal ujemny jest PRYMITYWEM tego samego pietra, a `unary_op_expression` siega po cale
+// `expression` — stad asymetria, ktorej dla `*` nie bylo widac, bo tam nie zmieniala wyniku.
+// Test utrwala stan faktyczny: dla `^` zamiar zapisuje sie nawiasem.
+TEST(xparser, power_and_unary_minus_group_differently_for_literals_and_fields) {
+  EXPECT_EQ(selectFieldProgram("-2^2"), selectFieldProgram("(-2)^2"));
+  EXPECT_EQ(selectFieldProgram("-v^2"), selectFieldProgram("-(v^2)"));
+}
+
 // Poziom 2 jest lancuchowalny. Do 2026-08-29 kazdy z tych zapisow byl bledem skladni,
 // bo postfiksy zadaly `stream_factor`, czyli nazwy albo nawiasu.
 TEST(xparser, postfix_stream_operators_chain) {
@@ -1807,4 +1858,34 @@ TEST(xcompiler, index_wildcard_schema_survives_being_joined) {
   ASSERT_EQ(handWrittenCompiler.compile(), "OK");
 
   EXPECT_EQ(renderPlan(wildcard), renderPlan(handWritten));
+}
+
+// Indeks pola w PUSH_ID jest PLASKI: `f FLOAT[4]` zajmuje cztery indeksy, wiec `src[1]` to
+// `f[1]`, a nie kolejne pole schematu. Odwzorowanie liczone wprost po pozycji w lSchema
+// dawalo tu FLOAT-owi typ nastepnego pola — a to nie jest „typ nieznany", tylko typ ZLY:
+// regula D przepisywalaby na `^` mnozenie zmiennoprzecinkowe, ktorego przepisac nie wolno.
+TEST(xcompiler, field_type_lookup_uses_flat_element_index) {
+  auto floatArray = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE f FLOAT[4], n INTEGER STREAM src, 1 FILE 'a.txt'\n"
+      "SELECT src[1]*src[1] STREAM t FROM src\n");
+  const auto &floatField = floatArray.getQuery("t").lSchema.front();
+  EXPECT_EQ(std::ranges::count_if(floatField.lProgram, [](const token &tk) { return tk.getCommandID() == POWER; }), 0)
+      << "mnozenie FLOAT nie moze zostac przepisane na potege";
+
+  // Kontrola dodatnia na tym samym ksztalcie schematu: dla tablicy INTEGER przepisanie
+  // ma zadzialac na KAZDYM elemencie, nie tylko na zerowym. Przy wylaczonym przelaczniku
+  // zostaje mnozenie — przelacznik zmienia POSTAC programu, nigdy jego wynik.
+  auto intArray = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE v INTEGER[4], n INTEGER STREAM src, 1 FILE 'a.txt'\n"
+      "SELECT src[0]*src[0], src[3]*src[3] STREAM t FROM src\n");
+#if RDB_OPT_SIMPLIFY_EXPRESSIONS
+  const command_id expected = POWER;
+#else
+  const command_id expected = MULTIPLY;
+#endif
+  for (const auto &item : intArray.getQuery("t").lSchema)
+    EXPECT_EQ(std::ranges::count_if(item.lProgram, [expected](const token &tk) { return tk.getCommandID() == expected; }), 1)
+        << "pole " << item.field_.rname;
 }

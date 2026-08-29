@@ -146,9 +146,6 @@ public:
   virtual void enterExpIn(RQLParser::ExpInContext *ctx) = 0;
   virtual void exitExpIn(RQLParser::ExpInContext *ctx) = 0;
 
-  virtual void enterExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
-  virtual void exitExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
-
   virtual void enterExpDec(RQLParser::ExpDecContext *ctx) = 0;
   virtual void exitExpDec(RQLParser::ExpDecContext *ctx) = 0;
 
@@ -157,6 +154,18 @@ public:
 
   virtual void enterExpAgg(RQLParser::ExpAggContext *ctx) = 0;
   virtual void exitExpAgg(RQLParser::ExpAggContext *ctx) = 0;
+
+  virtual void enterExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
+  virtual void exitExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
+
+  virtual void enterExpMult(RQLParser::ExpMultContext *ctx) = 0;
+  virtual void exitExpMult(RQLParser::ExpMultContext *ctx) = 0;
+
+  virtual void enterExpPow(RQLParser::ExpPowContext *ctx) = 0;
+  virtual void exitExpPow(RQLParser::ExpPowContext *ctx) = 0;
+
+  virtual void enterExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
+  virtual void exitExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
 
   virtual void enterExpFnCall(RQLParser::ExpFnCallContext *ctx) = 0;
   virtual void exitExpFnCall(RQLParser::ExpFnCallContext *ctx) = 0;
@@ -172,12 +181,6 @@ public:
 
   virtual void enterExpString(RQLParser::ExpStringContext *ctx) = 0;
   virtual void exitExpString(RQLParser::ExpStringContext *ctx) = 0;
-
-  virtual void enterExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
-  virtual void exitExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
-
-  virtual void enterExpMult(RQLParser::ExpMultContext *ctx) = 0;
-  virtual void exitExpMult(RQLParser::ExpMultContext *ctx) = 0;
 
   virtual void enterSExpPlus(RQLParser::SExpPlusContext *ctx) = 0;
   virtual void exitSExpPlus(RQLParser::SExpPlusContext *ctx) = 0;

@@ -97,12 +97,19 @@ struct constantTail {
   std::optional<rdb::descFld> baseType;  ///< typ statyczny E, o ile znany
 };
 
+/// Podwyrażenie zwinięte już do postaci `E ^ k` — materiał dla reguły D.
+struct powerForm {
+  std::list<token> base;  ///< program podwyrażenia E
+  int exponent;           ///< wykładnik, zawsze >= 2
+};
+
 /// Węzeł drzewa wyrażenia odtworzonego ze strumienia ONP.
 struct node {
   std::list<token> program;
   std::optional<rdb::descFldVT> constant;  ///< wartość, gdy CAŁE podwyrażenie jest stałe
   std::optional<rdb::descFld> type;
   std::optional<constantTail> tail;
+  std::optional<powerForm> asPower;  ///< ustawione tylko dla węzłów zbudowanych regułą D
 };
 
 node constantNode(rdb::descFldVT value) {
@@ -177,6 +184,55 @@ std::optional<node> dropNeutralOperand(const node &left, const rdb::descFldVT &c
   return left;
 }
 
+/// Równość SKŁADNIOWA dwóch programów ONP. `token` nie ma operator==, a dokładanie go do
+/// jego publicznego API tylko dla tego porównania byłoby zmianą szerszą niż potrzeba.
+bool sameProgram(const std::list<token> &left, const std::list<token> &right) {
+  return std::ranges::equal(left, right, [](const token &a, const token &b) {
+    return a.getCommandID() == b.getCommandID() && a.getVT() == b.getVT();
+  });
+}
+
+/// Węzeł `E ^ exponent` o znanej postaci potęgowej, gotowy na kolejny krok łańcucha.
+node powerNode(std::list<token> base, int exponent, rdb::descFld baseType) {
+  node result;
+  result.program = base;
+  result.program.emplace_back(PUSH_VAL, exponent);
+  result.program.emplace_back(POWER);
+  // Wykładnik jest literałem INTEGER, więc normalize() podniesie do niego podstawę —
+  // stąd typ wyniku jest maksimum z obu, a nie samym typem podstawy. Dla BYTE daje to
+  // INTEGER, czyli dokładnie to, co daje `bajt * bajt` (promocja do int w operator*).
+  result.type    = std::max(baseType, rdb::INTEGER);
+  result.asPower = powerForm{std::move(base), exponent};
+  return result;
+}
+
+/// Reguła D — powtórzony czynnik zwija się do potęgi: `a*a` to `a^2`, `a*a*a` to `a^3`.
+///
+/// Wygrana jest w liczbie ODCZYTÓW pola, nie w liczbie mnożeń: `a*a` czyta payload dwa
+/// razy, `a^2` raz. Mnożeń jest tyle samo.
+///
+/// Warunkiem jest DOKŁADNA arytmetyka czynnika. Dla FLOAT i DOUBLE przepisanie byłoby
+/// niepoprawne — `x*x` to jedno mnożenie IEEE, a `x^2` liczy się przez std::pow, który nie
+/// ma gwarancji poprawnego zaokrąglenia. Dla typów dokładnych różnicy nie ma z definicji:
+/// exactPower() w expressionEvaluator liczy je tym samym operator*, którego użyłby MULTIPLY,
+/// więc zawinięcie modulo 2^n i promocja BYTE do int zostają zachowane. Na tej równości
+/// stoi też niezmiennik ablacyjny — przy RDB_OPT_SIMPLIFY_EXPRESSIONS=OFF zostaje `a*a`
+/// i musi policzyć dokładnie to samo.
+std::optional<node> foldRepeatedFactor(const node &left, const node &right) {
+  // Stałe należą do reguły A; `2*2` ma się zwinąć do 4, a nie do `2^2`.
+  if (left.constant.has_value() || right.constant.has_value()) return std::nullopt;
+  if (!right.type.has_value() || !isExact(*right.type)) return std::nullopt;
+
+  // `a * a` — pierwszy krok łańcucha.
+  if (sameProgram(left.program, right.program)) return powerNode(right.program, 2, *right.type);
+
+  // `a^k * a` — kolejny krok. Lewostronna łączność `*` daje wyłącznie to ustawienie stron.
+  if (left.asPower.has_value() && sameProgram(left.asPower->base, right.program))
+    return powerNode(right.program, left.asPower->exponent + 1, *right.type);
+
+  return std::nullopt;
+}
+
 std::optional<node> rewriteWithConstantOnRight(const node &left, const rdb::descFldVT &constant, command_id op) {
   if (auto rewritten = reassociate(left, constant, op)) return rewritten;
   return dropNeutralOperand(left, constant, op);
@@ -246,6 +302,13 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
       case SUBTRACT:
       case MULTIPLY:
       case DIVIDE:
+      // POWER wchodzi tu WYLACZNIE po regule A (zwijanie stalych) i po to, zeby wyrazenie
+      // z `^` nie wypadalo na `default: return 0`, blokujac uproszczenia w calym polu.
+      // Regul B i C nie dotyka: potegowanie nie jest ani laczne, ani przemienne, wiec
+      // `E^c1^c2` nie zwija sie do `E^(c1?c2)`. Trzy warunki nizej pilnuja tego same z
+      // siebie — foldOperator() nie zna POWER, dropNeutralOperand() nie zna POWER, a
+      // galaz „stala po lewej" wpuszcza tylko ADD i MULTIPLY.
+      case POWER:
       case CMP_EQUAL:
       case CMP_NOT_EQUAL:
       case CMP_LT:
@@ -266,6 +329,15 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
         if (left->constant.has_value() && right->constant.has_value()) {
           if (auto value = foldConstants(combined)) {
             stack.push_back(constantNode(std::move(*value)));
+            ++rewrites;
+            break;
+          }
+        }
+
+        // D — powtórzony czynnik jako potęga.
+        if (cmd == MULTIPLY) {
+          if (auto rewritten = foldRepeatedFactor(*left, *right)) {
+            stack.push_back(std::move(*rewritten));
             ++rewrites;
             break;
           }
@@ -294,11 +366,11 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
 
         node result;
         result.program = std::move(combined);
-        if (cmd == ADD || cmd == SUBTRACT || cmd == MULTIPLY || cmd == DIVIDE) {
+        if (cmd == ADD || cmd == SUBTRACT || cmd == MULTIPLY || cmd == DIVIDE || cmd == POWER) {
           result.type = arithmeticResultType(left->type, right->type);
-          if (cmd != DIVIDE && right->constant.has_value() && !left->constant.has_value())
+          if (cmd != DIVIDE && cmd != POWER && right->constant.has_value() && !left->constant.has_value())
             result.tail = constantTail{cmd, *right->constant, false, std::move(left->program), left->type};
-          else if (cmd != DIVIDE && left->constant.has_value() && !right->constant.has_value())
+          else if (cmd != DIVIDE && cmd != POWER && left->constant.has_value() && !right->constant.has_value())
             result.tail = constantTail{cmd, *left->constant, true, std::move(right->program), right->type};
         }
         stack.push_back(std::move(result));

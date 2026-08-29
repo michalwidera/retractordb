@@ -113,7 +113,23 @@ expression_factor   : expression_factor PLUS expression_factor   # ExpPlus
                     | term                                       # ExpTerm
                     ;
 
-term                : term STAR term               # ExpMult
+// Potegowanie `a^b`. Stoi PIERWSZE, wiec wiaze mocniej niz `*` i `/`: `a*b^2` to `a*(b^2)`.
+// Laczne PRAWOSTRONNIE, jak w matematyce — `2^3^2` to `2^(3^2)` = 512, a nie 64. Jest to
+// jedyny operator w tej gramatyce, ktory nie jest lewostronny; wolno tak, bo ta drabina
+// buduje program ONP dla expressionEvaluator, a nie nazwe substratu (tam lewostronnosc
+// jest wymogiem — patrz komentarz przy stream_expression).
+//
+// UWAGA na jednoargumentowy minus: `-2^2` daje 4, a `-x^2` daje -(x^2). Nie jest to
+// niedopatrzenie tylko skutek tego, ze literal ujemny (`'-'? DECIMAL`) jest PRYMITYWEM
+// tego samego pietra, a `unary_op_expression` siega po cale `expression`. Dla `*` ta sama
+// asymetria nie zmieniala wyniku, dla `^` zmienia — zamiar zapisuje sie nawiasem.
+//
+// Token to BIT_XOR, zdefiniowany w lekserze od poczatku i do 2026-08-29 nieuzywany w
+// zadnej regule parsera. `^` nie koliduje z pozostalymi znakami interpunkcyjnymi RQL
+// (`#` przeplot, `&` i `%` rozplot, `@` okno, `$` indeks generatora, `:` szerokosc
+// to_string), wiec wybor nie zabiera niczego innego.
+term                : <assoc=right> term BIT_XOR term  # ExpPow
+                    | term STAR term               # ExpMult
                     | term DIVIDE term             # ExpDiv
                     | '(' expression_factor ')'    # ExpIn
                     | '-'? FLOAT                   # ExpFloat

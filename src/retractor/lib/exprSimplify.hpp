@@ -23,17 +23,33 @@ using fieldTypeLookup = std::function<std::optional<rdb::descFld>(const std::str
 ///  * A — zwijanie stałych: `1+1` → `2`, `'a'+'b'` → `'ab'`, `Sqrt(4)` → `2`;
 ///  * B — reasocjacja ogona stałych: `E+c1+c2` → `E+(c1+c2)` (także `-`, `*` oraz stała
 ///        po lewej: `c1-E-c2` → `(c1-c2)-E`);
-///  * C — elementy neutralne: `E+0`, `E-0`, `E*1`, `E/1` → `E`.
+///  * C — elementy neutralne: `E+0`, `E-0`, `E*1`, `E/1` → `E`;
+///  * D — powtórzony czynnik jako potęga: `a*a` → `a^2`, `a*a*a` → `a^3`, i tak dalej dla
+///        dowolnie długiego łańcucha oraz dla dowolnego powtórzonego podwyrażenia
+///        (`(x+1)*(x+1)` → `(x+1)^2`).
 ///
 /// Świadomie NIE ma tu `E*0` → `0`: `NULL*0` daje NULL, więc pochłanianie złamałoby 3VL.
+///
+/// Regułę D warto czytać jako oszczędność ODCZYTÓW, nie mnożeń: `a*a` czyta payload dwa razy,
+/// `a^2` raz, a mnożeń jest tyle samo. Wolno ją zastosować wyłącznie dla typów o arytmetyce
+/// DOKŁADNEJ (BYTE, INTEGER, UINT, RATIONAL), bo tylko tam `^` jest z definicji tym samym, co
+/// zapisany wprost iloczyn — expressionEvaluator liczy taką potęgę tym samym operator*, którego
+/// użyłby MULTIPLY (patrz exactPower), więc zawinięcie modulo 2^n i promocja BYTE do int
+/// zostają zachowane. Dla FLOAT i DOUBLE przepisania NIE MA: `x*x` to jedno mnożenie IEEE,
+/// a `x^2` idzie przez std::pow, który nie ma gwarancji poprawnego zaokrąglenia.
+///
+/// Na tej równości stoi też niezmiennik ablacyjny: przy RDB_OPT_SIMPLIFY_EXPRESSIONS=OFF
+/// w planie zostaje `a*a` i musi policzyć dokładnie to samo, co `a^2`.
 ///
 /// Zwijanie liczy PRODUKCYJNY ewaluator (expressionEvaluator::eval bez payloadu), więc nie
 /// może się rozjechać z wykonaniem — promocje typów, 3VL i dzielenie przez zero są z definicji
 /// te same. Wyrażenie, którego ewaluator nie umie policzyć (np. `'a'-'b'`), zostaje nietknięte
 /// i błąd leci w wykonaniu tak jak dotąd.
 ///
-/// Reguły B i C wymagają znajomości typu podwyrażenia i odmawiają przepisania dla FLOAT/DOUBLE
-/// — reasocjacja zmienia tam zaokrąglenie. Program z tokenem spoza zestawu ewaluatora
+/// Reguły B, C i D wymagają znajomości typu podwyrażenia i odmawiają przepisania dla
+/// FLOAT/DOUBLE — reasocjacja zmienia tam zaokrąglenie. Typ podaje `typeOfField`, a jego
+/// indeks jest PŁASKI (`a INTEGER[4]` zajmuje cztery indeksy) — patrz
+/// compiler::simplifyFieldExpressions(). Program z tokenem spoza zestawu ewaluatora
 /// (PUSH_STREAM, COUNT, PUSH_IDX...) nie jest ruszany w ogóle.
 ///
 /// @param program wyrażenie w ONP; podmieniane tylko wtedy, gdy jakaś reguła zadziałała

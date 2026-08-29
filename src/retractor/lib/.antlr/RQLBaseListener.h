@@ -148,9 +148,6 @@ public:
   virtual void enterExpIn(RQLParser::ExpInContext * /*ctx*/) override { }
   virtual void exitExpIn(RQLParser::ExpInContext * /*ctx*/) override { }
 
-  virtual void enterExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
-  virtual void exitExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
-
   virtual void enterExpDec(RQLParser::ExpDecContext * /*ctx*/) override { }
   virtual void exitExpDec(RQLParser::ExpDecContext * /*ctx*/) override { }
 
@@ -159,6 +156,18 @@ public:
 
   virtual void enterExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
   virtual void exitExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
+
+  virtual void enterExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
+  virtual void exitExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
+
+  virtual void enterExpMult(RQLParser::ExpMultContext * /*ctx*/) override { }
+  virtual void exitExpMult(RQLParser::ExpMultContext * /*ctx*/) override { }
+
+  virtual void enterExpPow(RQLParser::ExpPowContext * /*ctx*/) override { }
+  virtual void exitExpPow(RQLParser::ExpPowContext * /*ctx*/) override { }
+
+  virtual void enterExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
+  virtual void exitExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
 
   virtual void enterExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
   virtual void exitExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
@@ -174,12 +183,6 @@ public:
 
   virtual void enterExpString(RQLParser::ExpStringContext * /*ctx*/) override { }
   virtual void exitExpString(RQLParser::ExpStringContext * /*ctx*/) override { }
-
-  virtual void enterExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
-  virtual void exitExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
-
-  virtual void enterExpMult(RQLParser::ExpMultContext * /*ctx*/) override { }
-  virtual void exitExpMult(RQLParser::ExpMultContext * /*ctx*/) override { }
 
   virtual void enterSExpPlus(RQLParser::SExpPlusContext * /*ctx*/) override { }
   virtual void exitSExpPlus(RQLParser::SExpPlusContext * /*ctx*/) override { }
