@@ -55,6 +55,7 @@ struct compiler {
   std::string localizeFieldOffsets();
   void collectTransitiveOffsets(const std::string &srcId, int baseOffset, bool viaHash, std::map<std::string, int> &result,
                                 std::set<std::string> &viaInterleave);
+  std::string validateSubstratNameUniqueness();
   std::string validateConstraints();
   std::map<std::string, int> computeRequiredCapacities();
   std::string applyCapacitiesToStreams(const std::map<std::string, int> &capMap);

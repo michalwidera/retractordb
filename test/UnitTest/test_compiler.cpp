@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cerrno>
+#include <format>
 #include <fstream>
 #include <map>
 #include <sstream>
@@ -1086,7 +1087,7 @@ std::string fromProgram(query &q) {
 }
 
 /// Kompiluje RQL i zwraca plan. Blad kompilacji jest bledem testu.
-qTree compilePlan(const char *rql) {
+qTree compilePlan(const std::string &rql) {
   qTree instance;
   auto [parseResult, keyword, streamName] = parserRQLString(instance, rql);
   EXPECT_EQ(parseResult, "OK");
@@ -1281,4 +1282,122 @@ TEST(xparser, aggregate_keywords_are_reserved_stream_names) {
         ::testing::ExitedWithCode(EPERM), "expecting ID")
         << rql;
   }
+}
+
+namespace {
+
+/// Plan z jedna szeroka klauzula FROM: `str01 + str02 + ... + strNN`.
+///
+/// Nazwa substratu rosnie LINIOWO z liczba skladnikow — kazdy poziom doklada
+/// "STREAM_ADD_" (11), podkreslenie i piecioznakowa nazwe operandu, czyli 17 bajtow.
+/// Dwa skladniki daja 22 bajty, wiec prog 200 wypada miedzy 12. a 13. skladnikiem.
+std::string wideFromClause(int operandCount) {
+  std::string clause("str01");
+  for (int index = 2; index <= operandCount; ++index)
+    clause += std::format("+str{:02}", index);
+  return clause;
+}
+
+std::string wideAdditionPlan(int operandCount) {
+  std::string rql("SUBSTRAT 'memory'\n");
+  for (int index = 1; index <= operandCount; ++index)
+    rql += std::format("DECLARE v INTEGER STREAM str{:02}, 1 FILE 'd{:02}.txt'\n", index, index);
+  return rql + "SELECT * STREAM wide FROM " + wideFromClause(operandCount) + "\n";
+}
+
+/// Nazwa szczytowego substratu planu — pierwszego operandu programu zapytania `wide`.
+///
+/// To ten wezel niesie CALY lancuch skladnikow, wiec to on jako pierwszy uderza w NAME_MAX.
+/// Ostatni STREAM_ADD zostaje w samym zapytaniu publicznym i substratu nie dostaje, wiec
+/// szczyt lancucha ma o jeden skladnik mniej niz klauzula FROM.
+std::string topSubstratName(qTree &plan) { return plan.getQuery("wide").lProgram.front().getStr_(); }
+
+}  // namespace
+
+// Ponizej progu nazwa ma zostac DOKLADNIE taka jak dotad. To przypina brak przemianowania:
+// gałąź skrótu wolno wprowadzić tylko tam, gdzie nazwa czytelna i tak jest nie do zapisania,
+// bo kazde przemianowanie unieważnia wzorce testow integracyjnych i artefakty na dysku.
+TEST(xcompiler, substrate_name_stays_readable_below_threshold) {
+  auto plan = compilePlan(wideAdditionPlan(12));
+
+  const auto longest = topSubstratName(plan);
+  EXPECT_EQ(longest,
+            "STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_"
+            "str01_str02_str03_str04_str05_str06_str07_str08_str09_str10_str11");
+  // Blisko progu, ale ponizej — inaczej test przestaje pilnowac granicy.
+  EXPECT_GT(longest.size(), 150u);
+  EXPECT_LE(longest.size(), 200u);
+}
+
+// Powyzej progu nazwa czytelna ustepuje skrotowi. Bez tego plan jest NIEZAPISYWALNY:
+// nazwa substratu jest nazwa pliku, a NAME_MAX to 255 bajtow.
+TEST(xcompiler, wide_from_clause_falls_back_to_digest) {
+  auto plan = compilePlan(wideAdditionPlan(14));
+
+  bool sawDigest = false;
+  for (auto &q : plan) {
+    if (!q.isSubstrat) continue;
+    EXPECT_LE(q.id.size(), 200u) << "nazwa substratu ponad progiem: " << q.id;
+    EXPECT_TRUE(std::ranges::all_of(q.id, [](unsigned char c) { return std::isalnum(c) != 0 || c == '_'; }))
+        << "nazwa substratu nie jest identyfikatorem: " << q.id;
+    if (q.id.starts_with("STREAM_ADD_x")) {
+      sawDigest = true;
+      // Prefiks operatora zostaje czytelny; skrot to 16 znakow szesnastkowych.
+      EXPECT_EQ(q.id.size(), std::string("STREAM_ADD_x").size() + 16);
+      EXPECT_TRUE(std::ranges::all_of(q.id.substr(std::string("STREAM_ADD_x").size()), [](unsigned char c) {
+        return std::isxdigit(c) != 0;
+      })) << q.id;
+    }
+  }
+  EXPECT_TRUE(sawDigest) << "prog nie zadzialal — zaden wezel nie dostal skrotu";
+}
+
+// Skrot liczy sie z CALEJ nazwy czytelnej, wiec pozostaje CZYSTA FUNKCJA trojki
+// (operator, parametr, operandy). Na tym stoja dwa niezmienniki: deduplikacja substratow
+// oraz odtwarzanie nazwy wezla przeplotu w factorMatchedHashTimeMoves(), ktore sklada ja
+// od nowa z nazw zrodel i wyszukuje po niej istniejacy wezel.
+TEST(xcompiler, digest_name_is_a_pure_function_of_the_readable_name) {
+  auto digestNames = [](qTree &plan) {
+    std::vector<std::string> names;
+    for (auto &q : plan)
+      if (q.isSubstrat && q.id.starts_with("STREAM_ADD_x")) names.push_back(q.id);
+    std::ranges::sort(names);
+    return names;
+  };
+
+  // Ta sama szeroka klauzula w dwoch zapytaniach — jeden wspolny wezel, nie dwa.
+  auto shared            = compilePlan(wideAdditionPlan(14) + "SELECT * STREAM twin FROM " + wideFromClause(14) + "\n");
+  const auto sharedNames = digestNames(shared);
+  ASSERT_EQ(sharedNames.size(), 1u);
+
+  // Powtorna kompilacja daje ten sam skrot — nie zalezy on od kolejnosci w planie,
+  // od adresow ani od liczby konsumentow.
+  auto again = compilePlan(wideAdditionPlan(14));
+  EXPECT_EQ(digestNames(again), sharedNames);
+
+  // Inna kolejnosc skladnikow to INNY program, wiec musi dac inna nazwe. Gdyby skrot
+  // nie zalezal od operandow, oba plany uzylyby jednej nazwy dla dwoch roznych wezlow —
+  // dokladnie ta cicha zla odpowiedz, ktorej pilnuje validateSubstratNameUniqueness().
+  std::string reversedClause("str14");
+  for (int index = 13; index >= 1; --index)
+    reversedClause += std::format("+str{:02}", index);
+  auto reversed = compilePlan(wideAdditionPlan(14) + "SELECT * STREAM mirror FROM " + reversedClause + "\n");
+  for (const auto &name : digestNames(reversed))
+    if (name != sharedNames.front()) return;
+  FAIL() << "odwrocona klauzula nie dostala wlasnego skrotu";
+}
+
+// Reduktor nad wezlem o skroconej nazwie. Sam substrat okna dziedziczy dluga nazwe zrodla,
+// wiec rowniez przechodzi w galaz skrotu — a plan ma nadal miec ksztalt "okno, potem suma".
+TEST(xcompiler, reducer_over_a_digest_named_substrate_keeps_its_shape) {
+  auto plan = compilePlan(wideAdditionPlan(14) + "SELECT * STREAM reduced FROM SUMC(wide@(1,3))\n");
+
+  auto &reduced = plan.getQuery("reduced");
+  ASSERT_EQ(reduced.lProgram.size(), 2u);
+  EXPECT_EQ(reduced.lProgram.back().getCommandID(), STREAM_SUM);
+
+  const auto windowName = reduced.lProgram.front().getStr_();
+  EXPECT_TRUE(plan.exists(windowName)) << windowName;
+  EXPECT_LE(windowName.size(), 200u);
+  EXPECT_TRUE(plan.getQuery(windowName).isSubstrat);
 }

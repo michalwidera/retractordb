@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <format>
 #include <functional>
 #include <iterator>
 #include <limits>
@@ -329,6 +330,32 @@ std::string streamNameFragment(const rdb::descFldVT &value) {
       },
       value);
 }
+
+/// Prog, powyzej ktorego nazwa czytelna ustepuje skrotowi — patrz compiler::composeStreamName().
+///
+/// Sufit twardy to NAME_MAX (255) MINUS najdluzszy sufiks artefaktu. Sufiksy w drzewie:
+/// `.desc`, `.meta`, `.shadow`, `.duration`, `.tmp`, przy czym `.tmp` NAKLADA sie na `.meta`
+/// (metaIndexStore.cc: `{}.tmp` na sciezce pliku meta, razem 9 B), a dumpManager dokleja
+/// `_dump_NNN.tmp` (13 B). 200 zostawia ponad 40 B zapasu pod kazdy z nich.
+///
+/// Od gory prog lezy POWYZEJ wszystkiego, co dzis istnieje: najdluzsza nazwa substratu
+/// w drzewie testow ma 49 B, a w przypadkach uzycia z paper-arXiv 142 B. Galaz skrotu nie
+/// odpala sie wiec w zadnym istniejacym planie — zdejmuje sufit, nie przemianowuje dorobku.
+constexpr std::size_t substratNameBudget_C = 200;
+
+/// Skrot FNV-1a 64-bit, 16 znakow szesnastkowych.
+///
+/// Wlasna implementacja, a nie std::hash: nazwa substratu trafia na dysk jako nazwa pliku
+/// i do wzorcow testow integracyjnych, wiec musi byc identyczna miedzy wersjami biblioteki
+/// standardowej i miedzy platformami. std::hash<std::string> tego nie gwarantuje.
+std::string nameDigest(const std::string &text) {
+  std::uint64_t hash = 14695981039346656037ULL;
+  for (const unsigned char character : text) {
+    hash ^= character;
+    hash *= 1099511628211ULL;
+  }
+  return std::format("{:016x}", hash);
+}
 }  // namespace
 
 /// Nazwa substratu wydzielonego dla jednego operatora klauzuli FROM.
@@ -346,14 +373,41 @@ std::string streamNameFragment(const rdb::descFldVT &value) {
 ///
 /// Po tej zmianie nazwa niesie CALA trojke (operator, parametr, operandy), wiec rowna nazwa
 /// oznacza rowny program: deduplicateSubstrats() scala duplikaty, a rozne wezly sie nie zderza.
+///
+/// POSTAC HYBRYDOWA (2026-08-29). Nazwa rosnie LINIOWO z arnoscia klauzuli FROM: kazdy poziom
+/// zagniezdzenia dokleja operator, podkreslenie i nazwe operandu. Przy nazwach 7-znakowych
+/// `STREAM_HASH` konczy sie okolo 13. operandu, bo nazwa substratu jest zarazem nazwa pliku,
+/// a ta ma sufit NAME_MAX. Plaski przeplot kilkunastu strumieni jest wiec dzis niezapisywalny
+/// i wymaga recznego rozbicia na pomocnicze zapytania — obejscie widoczne w RQL i psujace
+/// teze, ze program odzwierciedla strukture zadania.
+///
+/// Skracanie prefiksow (`H_` zamiast `STREAM_HASH_`) przesuwa ten prog, ale go nie usuwa:
+/// wzrost pozostaje liniowy, a krotszy prefiks czesciej zderza sie z przestrzenia nazw
+/// uzytkownika. Dlatego po przekroczeniu progu nazwa czytelna ustepuje skrotowi:
+///
+///     STREAM_HASH_a_b_c            (ponizej progu — jak dotad)
+///     STREAM_HASH_x7f3a91c48d20e6b5 (powyzej progu — sufit staly)
+///
+/// Skrot liczy sie z CALEJ nazwy czytelnej, wiec nazwa pozostaje czysta funkcja tej samej
+/// trojki co dotad. To utrzymuje oba niezmienniki: „rowna nazwa oznacza rowny program" oraz
+/// odtwarzanie nazwy wezla przeplotu w factorMatchedHashTimeMoves(), ktore sklada ja od nowa
+/// z nazw zrodel i szuka po niej istniejacego wezla. Prefiks operatora zostaje czytelny, bo
+/// `xretractor -c` ma nadal pokazywac RODZAJ wezla; ginie wylacznie lista operandow, ktora
+/// przy kilkunastu ogniwach i tak jest nieczytelna.
+///
+/// Jednoznacznosci pilnuje validateSubstratNameUniqueness().
 std::string compiler::composeStreamName(const std::string &sName1, const std::string &sName2, const token &cmd) {
-  std::string retVal(GetStringcommand_id(cmd.getCommandID()));
+  const std::string operatorName(GetStringcommand_id(cmd.getCommandID()));
+  std::string retVal(operatorName);
   if (carriesParameterInToken(cmd.getCommandID())) {
     const auto parameter = streamNameFragment(cmd.getVT());
     if (!parameter.empty()) retVal += "_" + parameter;
   }
   if (!sName2.empty()) retVal += "_" + sName2;
-  return retVal + "_" + sName1;
+  retVal += "_" + sName1;
+
+  if (retVal.size() <= substratNameBudget_C) return retVal;
+  return operatorName + "_x" + nameDigest(retVal);
 }
 
 namespace {
@@ -1726,6 +1780,44 @@ std::string compiler::deduplicateSubstrats() {
   return {"OK"};
 }
 
+/// Dwa substraty o rownej nazwie musza miec rowny program — inaczej plan ma niejednoznaczne
+/// odwolanie.
+///
+/// Duplikat nazwy jest tu stanem NORMALNYM i przejsciowym: extractIntermediateStreams()
+/// wydziela wezel osobno dla kazdego zapytania, wiec dwa identyczne okna nad tym samym
+/// zrodlem daja dwa wezly o tej samej nazwie, a scala je dopiero deduplicateSubstrats().
+/// Przy RDB_OPT_DEDUP_SUBSTRATES=OFF zostaja rozdzielone do konca kompilacji. Dlatego
+/// sprawdzenie pyta o ROWNOSC PROGRAMU, nie o unikalnosc nazwy, i stoi POZA `#if` — jest
+/// kontrola poprawnosci, a nie optymalizacja.
+///
+/// Zakres to wylacznie substraty. Konwencja nazewnicza kompilatora nie jest zarezerwowana
+/// dla nazw uzytkownika, wiec zapytanie publiczne WOLNO nazwac `STREAM_HASH_CA_CB`; takim
+/// zderzeniem zajmuje sie factorMatchedHashTimeMoves(), ktora wtedy po prostu nie sklada
+/// faktoryzacji (przypadek `collide_user` w macierzy ablacyjnej).
+///
+/// Praktycznie jedyna droga do naruszenia jest kolizja skrotu z composeStreamName(). Przy
+/// 64 bitach jest ona rzadsza od bledu sprzetu, ale poprawnosc nie ma sie opierac na
+/// prawdopodobienstwie: bez tej kontroli kolizja daje cicha zla odpowiedz, z nia — glosna
+/// awarie. Stad FatalError, tak samo jak w requireResolvedForEveryNode().
+std::string compiler::validateSubstratNameUniqueness() {
+  std::map<std::string, const query *> seen;
+  for (const auto &candidate : coreInstance) {
+    if (!candidate.isSubstrat) continue;
+    const auto [it, inserted] = seen.emplace(candidate.id, &candidate);
+    if (inserted) continue;
+
+    const query &first = *it->second;
+    const bool progMatch =
+        first.lProgram.size() == candidate.lProgram.size() &&
+        std::equal(first.lProgram.begin(), first.lProgram.end(), candidate.lProgram.begin(), [](const token &a, const token &b) {
+          return a.getCommandID() == b.getCommandID() && a.getVT() == b.getVT();
+        });
+    if (!progMatch)
+      FatalError("compiler::validateSubstratNameUniqueness: substrate name '{}' denotes two different programs", candidate.id);
+  }
+  return {"OK"};
+}
+
 std::string compiler::shareEquivalentSelectComputations() {
   // Współdziel tylko kosztowne programy pól. Publiczne SELECT-y pozostają
   // osobnymi strumieniami, dzięki czemu zachowują storage, reguły i deskryptory.
@@ -1966,6 +2058,11 @@ std::string compiler::compile() {
   if (result != "OK") return result;
 #endif
   planBench.capture(rdb::probe::planStage::postDedup, coreInstance);
+
+  // POZA `#if` — kontrola poprawnosci, nie optymalizacja. Musi widziec plan po deduplikacji,
+  // bo przed nia duplikaty nazw sa stanem normalnym.
+  result = validateSubstratNameUniqueness();
+  if (result != "OK") return result;
 
   result = resolveFieldReferences();
   if (result != "OK") return result;
