@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -64,6 +65,9 @@ struct compiler {
   std::string extractIntermediateStreams();
   std::string expandSchemaWildcards();
   std::string expandIndexWildcards(query &q);
+  std::optional<int> sourceSpanInFrom(query &q, const std::string &name);
+  std::optional<int> sourceSpanIn(query &node, int nodeWidth, const std::string &name);
+  std::optional<int> descendSpan(const std::string &nodeId, int width, const std::string &name);
   std::string resolveFieldReferences();
   std::string localizeFieldOffsets();
   void collectTransitiveOffsets(const std::string &srcId, int baseOffset, bool viaHash, std::map<std::string, int> &result,

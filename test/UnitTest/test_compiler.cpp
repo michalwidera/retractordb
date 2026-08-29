@@ -1860,6 +1860,114 @@ TEST(xcompiler, index_wildcard_schema_survives_being_joined) {
   EXPECT_EQ(renderPlan(wildcard), renderPlan(handWritten));
 }
 
+// --- Szerokosc `[_]` liczona ze schematu klauzuli FROM ---------------------------
+//
+// `x[_]` znaczy „wszystkie sloty, ktore x wnosi do rekordu czytanego przez to zapytanie",
+// a nie „wlasna szerokosc strumienia x". Do 2026-08-29 expandIndexWildcards() bralo te druga,
+// wiec `x[_]` przy `FROM x@(1,5)+y` rozwijalo sie do JEDNEGO skladnika zamiast pieciu.
+// Trybem porazki byl CICHY ZLY WYNIK: plan sie kompilowal, offsety liczone pozniej przez
+// collectTransitiveOffsets() byly poprawne, tylko splot miec mial piec tapow, a mial jeden.
+
+namespace {
+
+/// Programy pol zapytania jako tekst — do porownan schematu miedzy dwoma zapisami planu.
+/// Sam program klauzuli FROM sie rozni (raz nazwane okno, raz substrat kompilatora), wiec
+/// porownanie idzie po tym, co zapytanie LICZY, a nie po nazwie wezla, z ktorego czyta.
+std::string fieldPrograms(query &q) {
+  std::ostringstream out;
+  for (auto &f : q.lSchema) {
+    out << f.field_.rname << ":";
+    for (auto &t : f.lProgram)
+      out << t << ";";
+    out << "\n";
+  }
+  return out.str();
+}
+
+}  // namespace
+
+TEST(xcompiler, index_wildcard_width_comes_from_the_from_clause) {
+  auto namedWindow  = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
+        DECLARE c INTEGER[5] STREAM coef, 1 FILE 'c.txt'
+        SELECT * STREAM w FROM a@(1,5)
+        SELECT w[_]*coef[_] STREAM prod FROM w+coef
+        SELECT prod[0] STREAM out FROM SUMC(prod)
+      )");
+  auto inlineWindow = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
+        DECLARE c INTEGER[5] STREAM coef, 1 FILE 'c.txt'
+        SELECT a[_]*coef[_] STREAM prod FROM a@(1,5)+coef
+        SELECT prod[0] STREAM out FROM SUMC(prod)
+      )");
+
+  auto &namedProduct  = namedWindow.getQuery("prod");
+  auto &inlineProduct = inlineWindow.getQuery("prod");
+
+  // Piec tapow, nie jeden — i te same offsety, bo `[_]` ma byc czystym skrotem.
+  EXPECT_EQ(inlineProduct.lSchema.size(), 5u);
+  EXPECT_EQ(fieldPrograms(inlineProduct), fieldPrograms(namedProduct));
+  EXPECT_EQ(inlineProduct.descriptorFrom(inlineWindow), namedProduct.descriptorFrom(namedWindow));
+  EXPECT_EQ(inlineProduct.rInterval, namedProduct.rInterval);
+  EXPECT_EQ(inlineProduct.logicalOrigin, namedProduct.logicalOrigin);
+  EXPECT_EQ(inlineProduct.startupLatency, namedProduct.startupLatency);
+
+  // Rownosc musi siegac wyniku, nie tylko wezla posredniego.
+  EXPECT_EQ(fieldPrograms(inlineWindow.getQuery("out")), fieldPrograms(namedWindow.getQuery("out")));
+  EXPECT_EQ(inlineWindow.getQuery("out").startupLatency, namedWindow.getQuery("out").startupLatency);
+}
+
+// Bezposredni operand zachowuje sie jak dotad — to jest zapis uzywany w calym korpusie
+// (`examples/ecg/*`, `select_cse_commutative_add`), wiec poprawka nie moze go ruszyc.
+TEST(xcompiler, index_wildcard_over_direct_operands_is_unchanged) {
+  auto plan = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE c INTEGER[4] STREAM src, 1 FILE 'src.txt'
+        DECLARE d INTEGER[4] STREAM other, 1 FILE 'other.txt'
+        SELECT src[_]*other[_] STREAM p FROM src+other
+      )");
+  EXPECT_EQ(plan.getQuery("p").lSchema.size(), 4u);
+}
+
+// Reduktor zwija krotnosc do jednego slotu, wiec `a[_]` pod nim znaczy JEDEN skladnik.
+// Szerokosc bierze sie z wezla stojacego w FROM, a nie z dna lancucha.
+TEST(xcompiler, index_wildcard_under_a_reducer_is_one_slot) {
+  auto plan = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
+        SELECT a[_] STREAM s FROM SUMC(a@(1,5))
+      )");
+  EXPECT_EQ(plan.getQuery("s").lSchema.size(), 1u);
+}
+
+// Nazwa nieobecna w klauzuli FROM nie ma w tym schemacie zadnej szerokosci. Do 2026-08-29
+// dostawala wlasna szerokosc strumienia o tej nazwie, czyli liczbe wzieta z innego schematu.
+TEST(xcompiler, index_wildcard_over_a_stream_outside_from_is_refused) {
+  const auto verdict = compileRql(R"(
+        SUBSTRAT 'memory'
+        DECLARE c INTEGER[4] STREAM src, 1 FILE 'src.txt'
+        DECLARE d INTEGER[4] STREAM other, 1 FILE 'other.txt'
+        SELECT other[_] STREAM p FROM src
+      )");
+  EXPECT_NE(verdict, "OK");
+  EXPECT_NE(verdict.find("contiguous"), std::string::npos) << verdict;
+}
+
+// Okno nad konkatenacja przeplata sloty skladowych (a,b,a,b,...), wiec wklad `a` nie jest
+// spojnym blokiem i nie opisuje go zadna pojedyncza szerokosc. Odmowa zamiast zgadywania.
+TEST(xcompiler, index_wildcard_through_a_width_changing_join_is_refused) {
+  const auto verdict = compileRql(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
+        DECLARE w INTEGER STREAM b, 1/500 FILE 'b.txt'
+        SELECT a[_] STREAM p FROM (a+b)@(1,5)
+      )");
+  EXPECT_NE(verdict, "OK");
+  EXPECT_NE(verdict.find("contiguous"), std::string::npos) << verdict;
+}
+
 // Indeks pola w PUSH_ID jest PLASKI: `f FLOAT[4]` zajmuje cztery indeksy, wiec `src[1]` to
 // `f[1]`, a nie kolejne pole schematu. Odwzorowanie liczone wprost po pozycji w lSchema
 // dawalo tu FLOAT-owi typ nastepnego pola — a to nie jest „typ nieznany", tylko typ ZLY:

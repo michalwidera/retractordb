@@ -669,6 +669,78 @@ std::string compiler::expandSchemaWildcards() {
   return {"OK"};
 }
 
+namespace {
+/// Nazwy strumieni, po ktore siega program klauzuli FROM danego wezla.
+std::vector<std::string> streamOperandsOf(const query &node) {
+  std::vector<std::string> result;
+  for (const auto &t : node.lProgram)
+    if (t.getCommandID() == PUSH_STREAM) result.emplace_back(t.getStr_());
+  return result;
+}
+}  // namespace
+
+/// Rozpietosc nazwy `name` w schemacie, ktory wydaje wezel `node` o szerokosci `nodeWidth`.
+///
+/// Wolane z descendSpan() i wzajemnie z nim rekurencyjne. Rozdzial szerokosci idzie po
+/// ksztalcie klauzuli FROM: operator JEDNOARGUMENTOWY (`@`, reduktor, `>`, `-`, `&`, `%`)
+/// zastepuje schemat swojego jedynego zrodla wlasnym, wiec cala szerokosc wezla nalezy do
+/// tego zrodla; konkatenacja daje kazdemu zrodlu jego wlasna szerokosc, a przeplot — cala,
+/// bo po `#` oba argumenty dziela jeden schemat.
+std::optional<int> compiler::sourceSpanIn(query &node, int nodeWidth, const std::string &name) {
+  const auto sources = streamOperandsOf(node);
+  if (sources.empty()) return std::nullopt;
+  if (sources.size() == 1) return descendSpan(sources.front(), nodeWidth, name);
+
+  const bool isHash = std::ranges::any_of(node.lProgram, [](const token &t) { return t.getCommandID() == STREAM_HASH; });
+  auto flatOf       = [this](const std::string &id) { return coreInstance.getQuery(id).descriptorStorage().flatElementCount(); };
+
+  // Wezel wieloargumentowy dzieli swoja szerokosc miedzy zrodla tylko wtedy, gdy jest to
+  // nadal ta szerokosc, ktora sam wydal. Jezeli operator stojacy WYZEJ ja zmienil — okno
+  // albo reduktor nad konkatenacja — sloty zrodel sa przemieszane albo zwiniete i wkladu
+  // pojedynczego zrodla nie opisuje zadna liczba. Zgadywanie dawaloby cichy zly wynik,
+  // wiec sciezka konczy sie odmowa.
+  if (isHash) {
+    if (std::ranges::any_of(sources, [&](const std::string &s) { return flatOf(s) != nodeWidth; })) return std::nullopt;
+  } else {
+    int total = 0;
+    for (const auto &s : sources)
+      total += flatOf(s);
+    if (total != nodeWidth) return std::nullopt;
+  }
+
+  for (const auto &s : sources)
+    if (const auto span = descendSpan(s, isHash ? nodeWidth : flatOf(s), name)) return span;
+  return std::nullopt;
+}
+
+/// Zejscie o jeden wezel w dol klauzuli FROM. Przezroczyste sa WYLACZNIE substraty
+/// kompilatora — tak samo jak w collectTransitiveOffsets(), ktore liczy dla tych samych
+/// nazw offsety. Strumien nazwany przez uzytkownika jest lisciem: jego wlasne zrodla nie
+/// sa widoczne w rekordzie czytanym przez zapytanie.
+std::optional<int> compiler::descendSpan(const std::string &nodeId, int width, const std::string &name) {
+  if (nodeId == name) return width;
+  auto &node = coreInstance.getQuery(nodeId);
+  if (!node.isSubstrat) return std::nullopt;
+  return sourceSpanIn(node, width, name);
+}
+
+/// Ile slotow schematu klauzuli FROM zapytania `q` zajmuje wklad strumienia `name`.
+///
+/// To jest szerokosc, ktorej potrzebuje `[_]`, i NIE jest nia wlasna szerokosc strumienia
+/// `name`. Do 2026-08-29 expandIndexWildcards() bralo te druga, wiec `x[_]` przy
+/// `FROM x@(1,5)+y` rozwijalo sie do JEDNEGO skladnika zamiast pieciu — po cichu i z blednym
+/// wynikiem, bo offsety liczone pozniej przez collectTransitiveOffsets() byly juz poprawne.
+///
+/// Szerokosc wyjsciowa bierze sie z descriptorFrom(), bo wlasny operator zapytania nie ma
+/// substratu, w ktorym moglaby byc juz policzona: `FROM SUMC(a@(1,5))` czyta JEDEN slot,
+/// mimo ze stojacy w FROM substrat okna ma ich piec.
+///
+/// `nullopt` znaczy „nazwa nie wnosi do tego schematu spojnego bloku pol" — jest spoza FROM
+/// albo osiagalna wylacznie przez wezel, ktory jej sloty przemieszal z cudzymi.
+std::optional<int> compiler::sourceSpanInFrom(query &q, const std::string &name) {
+  return sourceSpanIn(q, q.descriptorFrom(coreInstance).flatElementCount(), name);
+}
+
 /* If in query plan is PUSH_IDX it means that we need to duplicate [_] */
 /// Wywoływane per zapytanie z pętli topologicznej expandSchemaWildcards(). Samo przestawienie
 /// kolejności przebiegów by nie wystarczyło: źródłem [_] bywa `SELECT *`, a źródłem `*` bywa
@@ -692,8 +764,14 @@ std::string compiler::expandIndexWildcards(query &q) {
     if (!usedSchemaX.empty()) {
       int minSizeFlat{std::numeric_limits<int>::max()};
       for (const auto &schema : usedSchemaX) {
-        auto size   = coreInstance.getQuery(schema).descriptorStorage().flatElementCount();
-        minSizeFlat = std::min(minSizeFlat, size);
+        const auto span = sourceSpanInFrom(q, schema);
+        if (!span) {
+          SPDLOG_ERROR("Wildcard index '{}[_]' in stream '{}' does not resolve against its FROM clause", schema, q.id);
+          return std::string("Stream '" + q.id + "' uses '" + schema + "[_]', but '" + schema +
+                             "' contributes no contiguous block of fields to its FROM clause. Refer to a stream that "
+                             "stands in FROM, or give the sub-expression a query of its own.");
+        }
+        minSizeFlat = std::min(minSizeFlat, *span);
       }
 
       if (minSizeFlat == std::numeric_limits<int>::max()) {

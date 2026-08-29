@@ -32,6 +32,13 @@
 #   ./measure.sh            # pomiar odtwarzalny, 500 s sygnalu
 #   ./measure.sh 36000      # krotszy przebieg
 
+# Wezly posrednie, ktore kompilator wydziela sam z klauzuli FROM (okna pod AVG i pod
+# iloczynem skalarnym), sa SUBSTRATAMI, a nie zapytaniami uzytkownika, wiec nie obejmuje
+# ich VOLATILE z zapytania nadrzednego. Bez tej dyrektywy ida na dysk substratem DEFAULT:
+# samo okno 180-probkowe zapisuje 4,7 MB przy 20 s sygnalu, czyli 80x wiecej niz strumien
+# odniesienia. Pomiar dotyczy objetosci przesylanej, wiec te zapisy musza zostac w pamieci.
+SUBSTRAT 'memory'
+
 DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 FILE '../rec205/rec205'
 DECLARE bp_coef INTEGER[25] STREAM bpf, 1 FILE '../rec205/bp_coef.txt'
 DECLARE d_coef INTEGER[5] STREAM df, 1 FILE '../rec205/d_coef.txt'
@@ -42,25 +49,25 @@ SELECT ecg.MLII, ecg.V1 STREAM ecg_raw FROM ecg
 SELECT ecg.MLII STREAM mlii FROM ecg VOLATILE
 
 # 1. Filtr pasmowoprzepustowy (5-15 Hz) — splot FIR 25-tap
-SELECT * STREAM mlii_win FROM mlii@(1,25) VOLATILE
-SELECT mlii_win[_]*bpf[_] STREAM bp_acc FROM mlii_win+bpf VOLATILE
-SELECT bp_acc[0]/1000 STREAM bp_out FROM bp_acc.sumc VOLATILE
+#
+# Okno stoi w klauzuli FROM, wiec nie potrzebuje wlasnego zapytania. Gwiazdka indeksowa
+# `[_]` bierze szerokosc ze schematu tej klauzuli, czyli 25 slotow, ktore wnosi tam okno
+# nad `mlii` — a nie z wlasnej szerokosci strumienia `mlii`.
+SELECT mlii[_]*bpf[_] STREAM bp_acc FROM mlii@(1,25)+bpf VOLATILE
+SELECT bp_acc[0]/1000 STREAM bp_out FROM SUMC(bp_acc) VOLATILE
 
-# 2. Rozniczkowanie — splot FIR 5-tap
-SELECT * STREAM bp_win FROM bp_out@(1,5) VOLATILE
-SELECT bp_win[_]*df[_] STREAM d_acc FROM bp_win+df VOLATILE
-SELECT d_acc[0] STREAM d_out FROM d_acc.sumc VOLATILE
+# 2. Rozniczkowanie — splot FIR 5-tap, ten sam zapis co krok 1
+SELECT bp_out[_]*df[_] STREAM d_acc FROM bp_out@(1,5)+df VOLATILE
+SELECT d_acc[0] STREAM d_out FROM SUMC(d_acc) VOLATILE
 
 # 3. Kwadrat (dzielenie /1000 zapobiega przepelnieniu int32)
-SELECT d_out[0]*d_out[0]/1000 STREAM sq_out FROM d_out VOLATILE
+SELECT d_out[0]^2/1000 STREAM sq_out FROM d_out VOLATILE
 
 # 4. Calkowanie w oknie ruchomym 30 probek (~83 ms) — ogranicza pasmo
-SELECT * STREAM mwi_win FROM sq_out@(1,30) VOLATILE
-SELECT mwi_win[0] STREAM mwi FROM mwi_win.avg VOLATILE
+SELECT sq_out[0] STREAM mwi FROM AVG(sq_out@(1,30)) VOLATILE
 
 # 5. Prog adaptacyjny — srednia ruchoma 180 probek (0.5 s)
-SELECT * STREAM mwi_long FROM mwi@(1,180) VOLATILE
-SELECT mwi_long[0] STREAM mwi_thr FROM mwi_long.avg VOLATILE
+SELECT mwi[0] STREAM mwi_thr FROM AVG(mwi@(1,180)) VOLATILE
 
 # Cecha przesylana dalej: obwiednia i sygnal detekcji, pelne tempo
 SELECT mwi[0]*5, (mwi[0]-mwi_thr[0]*2)*5 STREAM qrs_feat FROM mwi+mwi_thr VOLATILE
