@@ -91,6 +91,9 @@ public:
   virtual void enterFieldIDTable(RQLParser::FieldIDTableContext * /*ctx*/) override { }
   virtual void exitFieldIDTable(RQLParser::FieldIDTableContext * /*ctx*/) override { }
 
+  virtual void enterFieldIDGenerated(RQLParser::FieldIDGeneratedContext * /*ctx*/) override { }
+  virtual void exitFieldIDGenerated(RQLParser::FieldIDGeneratedContext * /*ctx*/) override { }
+
   virtual void enterUnary_op_expression(RQLParser::Unary_op_expressionContext * /*ctx*/) override { }
   virtual void exitUnary_op_expression(RQLParser::Unary_op_expressionContext * /*ctx*/) override { }
 
@@ -145,14 +148,26 @@ public:
   virtual void enterExpIn(RQLParser::ExpInContext * /*ctx*/) override { }
   virtual void exitExpIn(RQLParser::ExpInContext * /*ctx*/) override { }
 
-  virtual void enterExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
-  virtual void exitExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
-
   virtual void enterExpDec(RQLParser::ExpDecContext * /*ctx*/) override { }
   virtual void exitExpDec(RQLParser::ExpDecContext * /*ctx*/) override { }
 
+  virtual void enterExpGenIndex(RQLParser::ExpGenIndexContext * /*ctx*/) override { }
+  virtual void exitExpGenIndex(RQLParser::ExpGenIndexContext * /*ctx*/) override { }
+
   virtual void enterExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
   virtual void exitExpAgg(RQLParser::ExpAggContext * /*ctx*/) override { }
+
+  virtual void enterExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
+  virtual void exitExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
+
+  virtual void enterExpMult(RQLParser::ExpMultContext * /*ctx*/) override { }
+  virtual void exitExpMult(RQLParser::ExpMultContext * /*ctx*/) override { }
+
+  virtual void enterExpPow(RQLParser::ExpPowContext * /*ctx*/) override { }
+  virtual void exitExpPow(RQLParser::ExpPowContext * /*ctx*/) override { }
+
+  virtual void enterExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
+  virtual void exitExpFloat(RQLParser::ExpFloatContext * /*ctx*/) override { }
 
   virtual void enterExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
   virtual void exitExpFnCall(RQLParser::ExpFnCallContext * /*ctx*/) override { }
@@ -169,23 +184,11 @@ public:
   virtual void enterExpString(RQLParser::ExpStringContext * /*ctx*/) override { }
   virtual void exitExpString(RQLParser::ExpStringContext * /*ctx*/) override { }
 
-  virtual void enterExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
-  virtual void exitExpUnary(RQLParser::ExpUnaryContext * /*ctx*/) override { }
-
-  virtual void enterExpMult(RQLParser::ExpMultContext * /*ctx*/) override { }
-  virtual void exitExpMult(RQLParser::ExpMultContext * /*ctx*/) override { }
-
-  virtual void enterSExpTerm(RQLParser::SExpTermContext * /*ctx*/) override { }
-  virtual void exitSExpTerm(RQLParser::SExpTermContext * /*ctx*/) override { }
-
   virtual void enterSExpPlus(RQLParser::SExpPlusContext * /*ctx*/) override { }
   virtual void exitSExpPlus(RQLParser::SExpPlusContext * /*ctx*/) override { }
 
   virtual void enterSExpTimeMove(RQLParser::SExpTimeMoveContext * /*ctx*/) override { }
   virtual void exitSExpTimeMove(RQLParser::SExpTimeMoveContext * /*ctx*/) override { }
-
-  virtual void enterSExpMinus(RQLParser::SExpMinusContext * /*ctx*/) override { }
-  virtual void exitSExpMinus(RQLParser::SExpMinusContext * /*ctx*/) override { }
 
   virtual void enterSExpFactor(RQLParser::SExpFactorContext * /*ctx*/) override { }
   virtual void exitSExpFactor(RQLParser::SExpFactorContext * /*ctx*/) override { }
@@ -202,11 +205,17 @@ public:
   virtual void enterSExpAgse(RQLParser::SExpAgseContext * /*ctx*/) override { }
   virtual void exitSExpAgse(RQLParser::SExpAgseContext * /*ctx*/) override { }
 
+  virtual void enterSExpMinus(RQLParser::SExpMinusContext * /*ctx*/) override { }
+  virtual void exitSExpMinus(RQLParser::SExpMinusContext * /*ctx*/) override { }
+
   virtual void enterSExpAnd(RQLParser::SExpAndContext * /*ctx*/) override { }
   virtual void exitSExpAnd(RQLParser::SExpAndContext * /*ctx*/) override { }
 
   virtual void enterStream_factor(RQLParser::Stream_factorContext * /*ctx*/) override { }
   virtual void exitStream_factor(RQLParser::Stream_factorContext * /*ctx*/) override { }
+
+  virtual void enterGen_index(RQLParser::Gen_indexContext * /*ctx*/) override { }
+  virtual void exitGen_index(RQLParser::Gen_indexContext * /*ctx*/) override { }
 
   virtual void enterStreamMin(RQLParser::StreamMinContext * /*ctx*/) override { }
   virtual void exitStreamMin(RQLParser::StreamMinContext * /*ctx*/) override { }
@@ -219,6 +228,9 @@ public:
 
   virtual void enterStreamSum(RQLParser::StreamSumContext * /*ctx*/) override { }
   virtual void exitStreamSum(RQLParser::StreamSumContext * /*ctx*/) override { }
+
+  virtual void enterStream_fn_call(RQLParser::Stream_fn_callContext * /*ctx*/) override { }
+  virtual void exitStream_fn_call(RQLParser::Stream_fn_callContext * /*ctx*/) override { }
 
   virtual void enterFunction_call(RQLParser::Function_callContext * /*ctx*/) override { }
   virtual void exitFunction_call(RQLParser::Function_callContext * /*ctx*/) override { }

@@ -286,3 +286,96 @@ TEST(exprSimplify, keeps_expression_without_constants_untouched) {
   EXPECT_EQ(simplifyExpression(program, testFieldType), 0u);
   EXPECT_EQ(dump(program), dump(original));
 }
+
+// Stałe należą do reguły A niezależnie od `aggressive_expr_optimization`: `2*2` ma się
+// zwinąć do 4, a nie do `2^2`.
+TEST(exprSimplify, constant_square_folds_to_value_not_to_power) {
+  std::list<token> program{token(PUSH_VAL, 2), token(PUSH_VAL, 2), token(MULTIPLY)};
+
+  EXPECT_EQ(simplifyExpression(program, testFieldType), 1u);
+  ASSERT_EQ(program.size(), 1u);
+  EXPECT_EQ(std::get<int>(program.front().getVT()), 4);
+}
+
+//
+// ─── D: powtórzony czynnik jako potęga ──────────────────────────────────────────
+//
+// Cała reguła stoi za `aggressive_expr_optimization`, domyślnie wyłączonym — powód jest
+// w exprSimplify.hpp (korpus H9). Przy wyłączonym przełączniku sprawdzamy to, co ma być
+// wtedy prawdą: program zostaje nietknięty.
+//
+
+#if aggressive_expr_optimization
+
+TEST(exprSimplify, folds_squared_factor_into_power) {
+  // x * x == x ^ 2
+  const std::list<token> original{pushId(0), pushId(0), token(MULTIPLY)};
+  std::list<token> program = original;
+
+  EXPECT_EQ(simplifyExpression(program, testFieldType), 1u);
+  ASSERT_EQ(program.size(), 3u);
+  EXPECT_EQ(program.front().getCommandID(), PUSH_ID);
+  EXPECT_EQ(std::get<int>(std::next(program.begin())->getVT()), 2);
+  EXPECT_EQ(program.back().getCommandID(), POWER);
+  expectSameResult(original, program, 7);
+  expectSameResult(original, program, -3);
+  // Przekręcenie int też ma wyjść tak samo — na tym stoi ścieżka dokładna w power().
+  expectSameResult(original, program, 100000);
+}
+
+TEST(exprSimplify, folds_multiplication_chain_into_power) {
+  // x * x * x * x == x ^ 4, w jednym przebiegu
+  const std::list<token> original{pushId(0), pushId(0), token(MULTIPLY), pushId(0), token(MULTIPLY), pushId(0), token(MULTIPLY)};
+  std::list<token> program = original;
+
+  EXPECT_EQ(simplifyExpression(program, testFieldType), 3u);
+  ASSERT_EQ(program.size(), 3u);
+  EXPECT_EQ(std::get<int>(std::next(program.begin())->getVT()), 4);
+  EXPECT_EQ(program.back().getCommandID(), POWER);
+  expectSameResult(original, program, 3);
+  expectSameResult(original, program, -2);
+}
+
+// Powtórzonym czynnikiem może być całe podwyrażenie, nie tylko pole.
+TEST(exprSimplify, folds_repeated_subexpression) {
+  // (x+1) * (x+1) == (x+1) ^ 2
+  const std::list<token> original{pushId(0),          token(PUSH_VAL, 1), token(ADD),     pushId(0),
+                                  token(PUSH_VAL, 1), token(ADD),         token(MULTIPLY)};
+  std::list<token> program = original;
+
+  EXPECT_GE(simplifyExpression(program, testFieldType), 1u);
+  EXPECT_EQ(program.back().getCommandID(), POWER);
+  expectSameResult(original, program, 7);
+}
+
+// FLOAT i DOUBLE zostają nietknięte: `x*x` to jedno mnożenie IEEE, a `x^2` idzie przez
+// std::pow, który nie ma gwarancji poprawnego zaokrąglenia.
+TEST(exprSimplify, does_not_fold_repeated_factor_for_inexact_types) {
+  std::list<token> program{pushId(1), pushId(1), token(MULTIPLY)};
+  EXPECT_EQ(simplifyExpression(program, testFieldType), 0u);
+  EXPECT_EQ(dump(program), dump(std::list<token>{pushId(1), pushId(1), token(MULTIPLY)}));
+}
+
+// Nieznany typ podwyrażenia — odmowa uproszczenia jest zawsze bezpieczna.
+TEST(exprSimplify, does_not_fold_repeated_factor_of_unknown_type) {
+  std::list<token> program{pushId(9), pushId(9), token(MULTIPLY)};
+  EXPECT_EQ(simplifyExpression(program, testFieldType), 0u);
+}
+
+// Różne pola nie są powtórzonym czynnikiem.
+TEST(exprSimplify, does_not_fold_distinct_factors) {
+  std::list<token> program{pushId(0), pushId(3), token(MULTIPLY)};
+  EXPECT_EQ(simplifyExpression(program, testFieldType), 0u);
+}
+
+#else
+
+TEST(exprSimplify, keeps_repeated_factor_when_aggressive_rewrites_are_off) {
+  const std::list<token> original{pushId(0), pushId(0), token(MULTIPLY)};
+  std::list<token> program = original;
+
+  EXPECT_EQ(simplifyExpression(program, testFieldType), 0u);
+  EXPECT_EQ(dump(program), dump(original));
+}
+
+#endif

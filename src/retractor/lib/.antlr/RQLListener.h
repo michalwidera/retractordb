@@ -89,6 +89,9 @@ public:
   virtual void enterFieldIDTable(RQLParser::FieldIDTableContext *ctx) = 0;
   virtual void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) = 0;
 
+  virtual void enterFieldIDGenerated(RQLParser::FieldIDGeneratedContext *ctx) = 0;
+  virtual void exitFieldIDGenerated(RQLParser::FieldIDGeneratedContext *ctx) = 0;
+
   virtual void enterUnary_op_expression(RQLParser::Unary_op_expressionContext *ctx) = 0;
   virtual void exitUnary_op_expression(RQLParser::Unary_op_expressionContext *ctx) = 0;
 
@@ -143,14 +146,26 @@ public:
   virtual void enterExpIn(RQLParser::ExpInContext *ctx) = 0;
   virtual void exitExpIn(RQLParser::ExpInContext *ctx) = 0;
 
-  virtual void enterExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
-  virtual void exitExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
-
   virtual void enterExpDec(RQLParser::ExpDecContext *ctx) = 0;
   virtual void exitExpDec(RQLParser::ExpDecContext *ctx) = 0;
 
+  virtual void enterExpGenIndex(RQLParser::ExpGenIndexContext *ctx) = 0;
+  virtual void exitExpGenIndex(RQLParser::ExpGenIndexContext *ctx) = 0;
+
   virtual void enterExpAgg(RQLParser::ExpAggContext *ctx) = 0;
   virtual void exitExpAgg(RQLParser::ExpAggContext *ctx) = 0;
+
+  virtual void enterExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
+  virtual void exitExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
+
+  virtual void enterExpMult(RQLParser::ExpMultContext *ctx) = 0;
+  virtual void exitExpMult(RQLParser::ExpMultContext *ctx) = 0;
+
+  virtual void enterExpPow(RQLParser::ExpPowContext *ctx) = 0;
+  virtual void exitExpPow(RQLParser::ExpPowContext *ctx) = 0;
+
+  virtual void enterExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
+  virtual void exitExpFloat(RQLParser::ExpFloatContext *ctx) = 0;
 
   virtual void enterExpFnCall(RQLParser::ExpFnCallContext *ctx) = 0;
   virtual void exitExpFnCall(RQLParser::ExpFnCallContext *ctx) = 0;
@@ -167,23 +182,11 @@ public:
   virtual void enterExpString(RQLParser::ExpStringContext *ctx) = 0;
   virtual void exitExpString(RQLParser::ExpStringContext *ctx) = 0;
 
-  virtual void enterExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
-  virtual void exitExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
-
-  virtual void enterExpMult(RQLParser::ExpMultContext *ctx) = 0;
-  virtual void exitExpMult(RQLParser::ExpMultContext *ctx) = 0;
-
-  virtual void enterSExpTerm(RQLParser::SExpTermContext *ctx) = 0;
-  virtual void exitSExpTerm(RQLParser::SExpTermContext *ctx) = 0;
-
   virtual void enterSExpPlus(RQLParser::SExpPlusContext *ctx) = 0;
   virtual void exitSExpPlus(RQLParser::SExpPlusContext *ctx) = 0;
 
   virtual void enterSExpTimeMove(RQLParser::SExpTimeMoveContext *ctx) = 0;
   virtual void exitSExpTimeMove(RQLParser::SExpTimeMoveContext *ctx) = 0;
-
-  virtual void enterSExpMinus(RQLParser::SExpMinusContext *ctx) = 0;
-  virtual void exitSExpMinus(RQLParser::SExpMinusContext *ctx) = 0;
 
   virtual void enterSExpFactor(RQLParser::SExpFactorContext *ctx) = 0;
   virtual void exitSExpFactor(RQLParser::SExpFactorContext *ctx) = 0;
@@ -200,11 +203,17 @@ public:
   virtual void enterSExpAgse(RQLParser::SExpAgseContext *ctx) = 0;
   virtual void exitSExpAgse(RQLParser::SExpAgseContext *ctx) = 0;
 
+  virtual void enterSExpMinus(RQLParser::SExpMinusContext *ctx) = 0;
+  virtual void exitSExpMinus(RQLParser::SExpMinusContext *ctx) = 0;
+
   virtual void enterSExpAnd(RQLParser::SExpAndContext *ctx) = 0;
   virtual void exitSExpAnd(RQLParser::SExpAndContext *ctx) = 0;
 
   virtual void enterStream_factor(RQLParser::Stream_factorContext *ctx) = 0;
   virtual void exitStream_factor(RQLParser::Stream_factorContext *ctx) = 0;
+
+  virtual void enterGen_index(RQLParser::Gen_indexContext *ctx) = 0;
+  virtual void exitGen_index(RQLParser::Gen_indexContext *ctx) = 0;
 
   virtual void enterStreamMin(RQLParser::StreamMinContext *ctx) = 0;
   virtual void exitStreamMin(RQLParser::StreamMinContext *ctx) = 0;
@@ -217,6 +226,9 @@ public:
 
   virtual void enterStreamSum(RQLParser::StreamSumContext *ctx) = 0;
   virtual void exitStreamSum(RQLParser::StreamSumContext *ctx) = 0;
+
+  virtual void enterStream_fn_call(RQLParser::Stream_fn_callContext *ctx) = 0;
+  virtual void exitStream_fn_call(RQLParser::Stream_fn_callContext *ctx) = 0;
 
   virtual void enterFunction_call(RQLParser::Function_callContext *ctx) = 0;
   virtual void exitFunction_call(RQLParser::Function_callContext *ctx) = 0;

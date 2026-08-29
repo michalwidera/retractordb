@@ -47,6 +47,18 @@ class query {
   std::string filename;
   boost::rational<int> rInterval = 0;
 
+  /// @brief Licznosc rodziny generatora strumieni; 0 = zwyczajny strumien, nie generator.
+  ///
+  /// Ustawia parser z zapisu `STREAM cell[24]`, kasuje compiler::expandStreamGenerators()
+  /// przy tworzeniu kazdej z N instancji. Zadne zapytanie z nieujemna wartoscia tego pola nie
+  /// moze przezyc pierwszego przebiegu kompilacji — dalsze przebiegi go nie znaja.
+  ///
+  /// UJEMNA wartosc znaczy „to nie jest generator", a nie „generator o zerowej licznosci".
+  /// Rozroznienie jest konieczne, bo `STREAM cell[0]` jest bledem, ktory trzeba zglosic —
+  /// przy wartowniku 0 zapis ten stalby sie po cichu zwyklym strumieniem `cell`.
+  static constexpr int notAGenerator = -1;
+  int generatorSize                  = notAGenerator;
+
   /// @brief Ogon strumienia: liczba początkowych slotów WŁASNEGO interwału, w których wynik nie jest jeszcze zdefiniowany.
   ///
   /// Zasada brzegu strumienia: te sloty NIE są rekordami — ani zerami, ani NULL-ami. Strumień po prostu jeszcze nie

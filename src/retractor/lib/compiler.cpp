@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <format>
 #include <functional>
 #include <iterator>
 #include <limits>
@@ -266,9 +267,147 @@ std::string compiler::resolveStreamIntervals() {
   return {"OK"};
 }
 
-std::string compiler::composeStreamName(const std::string &sName1, const std::string &sName2, command_id cmd) {
-  if (sName2.empty()) return std::string(GetStringcommand_id(cmd)) + std::string("_") + sName1;
-  return std::string(GetStringcommand_id(cmd)) + std::string("_") + sName2 + std::string("_") + sName1;
+namespace {
+/// Czy parametr operatora siedzi W TOKENIE operatora.
+///
+/// Rozstrzyga o tym to samo co w consumesTwoPrecedingTokens(): miejsce parametru.
+/// `&`, `%` niosa swoj parametr jako OPERAND (PUSH_VAL), wiec trafia on do nazwy przez
+/// argumenty; `#`, `+` i reduktory parametru nie maja w ogole. Pozostale — `@(k,L)`, `>N`,
+/// `-r` — trzymaja go w tokenie i tylko one potrzebuja osobnego fragmentu nazwy.
+///
+/// Lista jest NEGATYWNA celowo, odwrotnie niz w consumesTwoPrecedingTokens(). Tam pomylka
+/// w strone "dwuargumentowy" siegala poza poczatek listy tokenow, wiec bezpieczny domysl
+/// brzmial "jednoargumentowy". Tutaj pomylka w strone "bez parametru" daje DWA ROZNE wezly
+/// o tej samej nazwie, czyli cicha zla odpowiedz; pomylka w druga strone daje tylko brzydsza
+/// nazwe z nadmiarowym "_0". Nowy operator jest wiec domyslnie parametryczny.
+bool carriesParameterInToken(command_id cmd) {
+  switch (cmd) {
+    case STREAM_HASH:
+    case STREAM_ADD:
+    case STREAM_DEHASH_DIV:
+    case STREAM_DEHASH_MOD:
+    case STREAM_AVG:
+    case STREAM_MIN:
+    case STREAM_MAX:
+    case STREAM_SUM:
+      return false;
+    default:
+      return true;
+  }
+}
+
+/// Fragment nazwy substratu odpowiadajacy JEDNEJ wartosci tokenu.
+///
+/// Nazwa substratu jest zarazem nazwa artefaktu na dysku, wiec fragment musi byc
+/// identyfikatorem: cyfry, litery i podkreslenie. Stad dwa zabiegi:
+///   * kreska ulamkowa liczby wymiernej idzie na podkreslenie (1/4 -> "1_4") — do 2026-08-29
+///     nazwa substratu `&`/`%` niosla `/` wprost z token::getStr_(), czyli separator sciezki
+///     w nazwie pliku;
+///   * minus liczby ujemnej idzie na "N" (-10 -> "N10") — okno `@(1,-10)` jest legalne,
+///     a `-` w nazwie strumienia nie jest.
+std::string streamNameFragment(const rdb::descFldVT &value) {
+  auto number = [](long long v) { return v < 0 ? "N" + std::to_string(-v) : std::to_string(v); };
+  return std::visit(
+      [&number](const auto &v) -> std::string {
+        using T = std::decay_t<decltype(v)>;
+        if constexpr (std::is_same_v<T, std::monostate>)
+          return {};
+        else if constexpr (std::is_same_v<T, std::string>)
+          return v;
+        else if constexpr (std::is_same_v<T, boost::rational<int>>)
+          return number(v.numerator()) + "_" + number(v.denominator());
+        else if constexpr (std::is_same_v<T, std::pair<int, int>>)
+          return number(v.first) + "_" + number(v.second);
+        else if constexpr (std::is_same_v<T, std::pair<std::string, int>>)
+          return v.first + "_" + number(v.second);
+        else if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>)
+          // Zadna klauzula FROM nie niesie zmiennoprzecinkowego parametru — wariant istnieje,
+          // bo descFldVT sluzy takze wyrazeniom pol. Rationalize() w parserze zamienia ulamek
+          // dziesietny na wymierny, zanim token trafi do programu strumienia.
+          return number(static_cast<long long>(v));
+        else
+          return number(static_cast<long long>(v));
+      },
+      value);
+}
+
+/// Prog, powyzej ktorego nazwa czytelna ustepuje skrotowi — patrz compiler::composeStreamName().
+///
+/// Sufit twardy to NAME_MAX (255) MINUS najdluzszy sufiks artefaktu. Sufiksy w drzewie:
+/// `.desc`, `.meta`, `.shadow`, `.duration`, `.tmp`, przy czym `.tmp` NAKLADA sie na `.meta`
+/// (metaIndexStore.cc: `{}.tmp` na sciezce pliku meta, razem 9 B), a dumpManager dokleja
+/// `_dump_NNN.tmp` (13 B). 200 zostawia ponad 40 B zapasu pod kazdy z nich.
+///
+/// Od gory prog lezy POWYZEJ wszystkiego, co dzis istnieje: najdluzsza nazwa substratu
+/// w drzewie testow ma 49 B, a w przypadkach uzycia z paper-arXiv 142 B. Galaz skrotu nie
+/// odpala sie wiec w zadnym istniejacym planie — zdejmuje sufit, nie przemianowuje dorobku.
+constexpr std::size_t substratNameBudget_C = 200;
+
+/// Skrot FNV-1a 64-bit, 16 znakow szesnastkowych.
+///
+/// Wlasna implementacja, a nie std::hash: nazwa substratu trafia na dysk jako nazwa pliku
+/// i do wzorcow testow integracyjnych, wiec musi byc identyczna miedzy wersjami biblioteki
+/// standardowej i miedzy platformami. std::hash<std::string> tego nie gwarantuje.
+std::string nameDigest(const std::string &text) {
+  std::uint64_t hash = 14695981039346656037ULL;
+  for (const unsigned char character : text) {
+    hash ^= character;
+    hash *= 1099511628211ULL;
+  }
+  return std::format("{:016x}", hash);
+}
+}  // namespace
+
+/// Nazwa substratu wydzielonego dla jednego operatora klauzuli FROM.
+///
+/// Ksztalt: OPERATOR [_parametr] [_arg2] _arg1. Parametr wchodzi do nazwy, bo INACZEJ
+/// nazwa nie identyfikuje wezla. Do 2026-08-29 skladala sie wylacznie z operatora
+/// i operandow, wiec dwa rozne okna nad tym samym zrodlem
+///
+///     SELECT * STREAM m1 FROM (a@(1,4))>2
+///     SELECT * STREAM m2 FROM (a@(2,8))>2
+///
+/// dawaly JEDEN substrat STREAM_AGSE_a, a m2 po cichu liczylo okno z m1. To samo dotyczylo
+/// `>N` i `-r`. Defekt byl osiagalny juz wczesniej, ale forma funkcyjna SUMC(x@(k,L)) czyni
+/// go typowym: dwa rozne okna nad jednym zrodlem to zwykly zapis, nie przypadek brzegowy.
+///
+/// Po tej zmianie nazwa niesie CALA trojke (operator, parametr, operandy), wiec rowna nazwa
+/// oznacza rowny program: deduplicateSubstrats() scala duplikaty, a rozne wezly sie nie zderza.
+///
+/// POSTAC HYBRYDOWA (2026-08-29). Nazwa rosnie LINIOWO z arnoscia klauzuli FROM: kazdy poziom
+/// zagniezdzenia dokleja operator, podkreslenie i nazwe operandu. Przy nazwach 7-znakowych
+/// `STREAM_HASH` konczy sie okolo 13. operandu, bo nazwa substratu jest zarazem nazwa pliku,
+/// a ta ma sufit NAME_MAX. Plaski przeplot kilkunastu strumieni jest wiec dzis niezapisywalny
+/// i wymaga recznego rozbicia na pomocnicze zapytania — obejscie widoczne w RQL i psujace
+/// teze, ze program odzwierciedla strukture zadania.
+///
+/// Skracanie prefiksow (`H_` zamiast `STREAM_HASH_`) przesuwa ten prog, ale go nie usuwa:
+/// wzrost pozostaje liniowy, a krotszy prefiks czesciej zderza sie z przestrzenia nazw
+/// uzytkownika. Dlatego po przekroczeniu progu nazwa czytelna ustepuje skrotowi:
+///
+///     STREAM_HASH_a_b_c            (ponizej progu — jak dotad)
+///     STREAM_HASH_x7f3a91c48d20e6b5 (powyzej progu — sufit staly)
+///
+/// Skrot liczy sie z CALEJ nazwy czytelnej, wiec nazwa pozostaje czysta funkcja tej samej
+/// trojki co dotad. To utrzymuje oba niezmienniki: „rowna nazwa oznacza rowny program" oraz
+/// odtwarzanie nazwy wezla przeplotu w factorMatchedHashTimeMoves(), ktore sklada ja od nowa
+/// z nazw zrodel i szuka po niej istniejacego wezla. Prefiks operatora zostaje czytelny, bo
+/// `xretractor -c` ma nadal pokazywac RODZAJ wezla; ginie wylacznie lista operandow, ktora
+/// przy kilkunastu ogniwach i tak jest nieczytelna.
+///
+/// Jednoznacznosci pilnuje validateSubstratNameUniqueness().
+std::string compiler::composeStreamName(const std::string &sName1, const std::string &sName2, const token &cmd) {
+  const std::string operatorName(GetStringcommand_id(cmd.getCommandID()));
+  std::string retVal(operatorName);
+  if (carriesParameterInToken(cmd.getCommandID())) {
+    const auto parameter = streamNameFragment(cmd.getVT());
+    if (!parameter.empty()) retVal += "_" + parameter;
+  }
+  if (!sName2.empty()) retVal += "_" + sName2;
+  retVal += "_" + sName1;
+
+  if (retVal.size() <= substratNameBudget_C) return retVal;
+  return operatorName + "_x" + nameDigest(retVal);
 }
 
 namespace {
@@ -352,18 +491,22 @@ std::string compiler::extractIntermediateStreams() {
           newQuery.lProgram.assign(firstArg, afterOperator);
 
           // arg1 to token STOJĄCY BEZPOŚREDNIO PRZED operatorem, arg2 — ten przed nim.
+          //
+          // Fragment nazwy, nie token::getStr_(): dla PUSH_STREAM oba dają tę samą nazwę
+          // strumienia, ale dla PUSH_VAL `&`/`%` getStr_() renderuje liczbę wymierną z kreską
+          // ułamkową, czyli wstawia separator ścieżki w nazwę artefaktu na dysku.
           auto argIt = firstArg;
           if (argCount == 2) {
-            arg2 = (*argIt).getStr_();
+            arg2 = streamNameFragment((*argIt).getVT());
             ++argIt;
           }
-          arg1 = (*argIt).getStr_();
+          arg1 = streamNameFragment((*argIt).getVT());
 
           std::list<token> lTempProgram;
           lTempProgram.emplace_back(PUSH_TSCAN);
           newQuery.lSchema.emplace_back(rdb::rField("*", 1, 1, rdb::BYTE), lTempProgram);
           newQuery.policy     = std::make_pair(substratType_C, 1);
-          newQuery.id         = composeStreamName(arg1, arg2, cmd);
+          newQuery.id         = composeStreamName(arg1, arg2, *it2);
           newQuery.isSubstrat = true;
           it2                 = currentQuery.lProgram.erase(firstArg, afterOperator);
           currentQuery.lProgram.insert(it2, token(PUSH_STREAM, newQuery.id));
@@ -514,57 +657,74 @@ std::string compiler::expandSchemaWildcards() {
       for (auto eraseIt : eraseList)
         q.lSchema.erase(eraseIt);
     }
+    // Rozwinięcie [_] musi się dziać TUTAJ, w tej samej pętli topologicznej, zaraz po
+    // rozwinięciu `*` dla tego zapytania — nie w osobnym, późniejszym przebiegu.
+    // buildOutputSchema() materializuje schemat węzła pochodnego kopiując listy pól
+    // operandów, więc konsument złączenia zobaczyłby strumień z nierozwiniętym [_]
+    // jako jednopolowy i schemat rozjechałby się z układem rekordu.
+    const std::string resultIdx{expandIndexWildcards(q)};
+    if (resultIdx != "OK") return resultIdx;
   }
   coreInstance.sort();
   return {"OK"};
 }
 
 /* If in query plan is PUSH_IDX it means that we need to duplicate [_] */
-std::string compiler::expandIndexWildcards() {
-  for (auto &q : coreInstance) {             // for each query
-    for (auto &f : q.lSchema) {              // for each field in query
-      std::vector<std::string> usedSchemaX;  //
-      for (auto &t : f.lProgram)             // for each token in query field
-        if (t.getCommandID() == PUSH_IDX)
-          usedSchemaX.push_back(get<std::pair<std::string, int>>(t.getVT()).first);  // .second arg is always 0
-      if (!usedSchemaX.empty()) {
-        int minSizeFlat{std::numeric_limits<int>::max()};
-        for (const auto &schema : usedSchemaX) {
-          auto size   = coreInstance.getQuery(schema).descriptorStorage().flatElementCount();
-          minSizeFlat = std::min(minSizeFlat, size);
-        }
-
-        if (minSizeFlat == std::numeric_limits<int>::max()) {
-          FatalError("compiler::expandIndexWildcards: flat size not resolved for query '{}'", q.id);
-        }
-        if (minSizeFlat <= 0) {
-          FatalError("compiler::expandIndexWildcards: flat size must be positive, got {} for query '{}'", minSizeFlat, q.id);
-        }
-        if (q.lSchema.size() != 1) {
-          FatalError(
-              "compiler::expandIndexWildcards: PUSH_IDX expansion requires exactly one schema field, got {} for query '{}'",
-              q.lSchema.size(), q.id);
-        }
-
-        field oldField = *q.lSchema.begin();
-        q.lSchema.clear();
-        for (int i = 0; i < minSizeFlat; i++) {
-          std::list<token> lTempProgram;
-          for (auto &t : oldField.lProgram) {
-            if (t.getCommandID() == PUSH_IDX)
-              lTempProgram.emplace_back(PUSH_ID, std::make_pair(t.getStr_(), i));
-            else
-              lTempProgram.emplace_back(t.getCommandID(), t.getVT());
-          }
-          field newField(rdb::rField(q.id + "_" + lexical_cast<std::string>(i),  //
-                                     oldField.field_.rlen,                       //
-                                     1,                                          // (expanded)
-                                     oldField.field_.rtype),
-                         lTempProgram);
-          q.lSchema.push_back(newField);
-        }
-        break;
+/// Wywoływane per zapytanie z pętli topologicznej expandSchemaWildcards(). Samo przestawienie
+/// kolejności przebiegów by nie wystarczyło: źródłem [_] bywa `SELECT *`, a źródłem `*` bywa
+/// strumień z [_], więc zależność idzie w obie strony i rozstrzyga ją dopiero porządek
+/// topologiczny. Na tym etapie PUSH_IDX niesie jeszcze tekst `strumien[_]` prosto z parsera,
+/// nie parę — stąd regex i normalizacja tokenu na miejscu. descriptorStorage() liczy się
+/// wyłącznie z lSchema, więc szerokość źródła jest tu już dostępna.
+std::string compiler::expandIndexWildcards(query &q) {
+  for (auto &f : q.lSchema) {              // for each field in query
+    std::vector<std::string> usedSchemaX;  //
+    for (auto &t : f.lProgram) {           // for each token in query field
+      if (t.getCommandID() != PUSH_IDX) continue;
+      boost::cmatch what;
+      const std::string text(t.getStr_());
+      if (!regex_search(text.c_str(), what, xprFieldIdX)) throw std::out_of_range("No mach on type conversion IDX");
+      if (what.size() != 2) FatalError("compiler: PUSH_IDX regex match has unexpected capture count");
+      const std::string schema(what[1]);
+      t = token(PUSH_IDX, std::make_pair(schema, 0));  // .second arg is always 0
+      usedSchemaX.push_back(schema);
+    }
+    if (!usedSchemaX.empty()) {
+      int minSizeFlat{std::numeric_limits<int>::max()};
+      for (const auto &schema : usedSchemaX) {
+        auto size   = coreInstance.getQuery(schema).descriptorStorage().flatElementCount();
+        minSizeFlat = std::min(minSizeFlat, size);
       }
+
+      if (minSizeFlat == std::numeric_limits<int>::max()) {
+        FatalError("compiler::expandIndexWildcards: flat size not resolved for query '{}'", q.id);
+      }
+      if (minSizeFlat <= 0) {
+        FatalError("compiler::expandIndexWildcards: flat size must be positive, got {} for query '{}'", minSizeFlat, q.id);
+      }
+      if (q.lSchema.size() != 1) {
+        FatalError("compiler::expandIndexWildcards: PUSH_IDX expansion requires exactly one schema field, got {} for query '{}'",
+                   q.lSchema.size(), q.id);
+      }
+
+      field oldField = *q.lSchema.begin();
+      q.lSchema.clear();
+      for (int i = 0; i < minSizeFlat; i++) {
+        std::list<token> lTempProgram;
+        for (auto &t : oldField.lProgram) {
+          if (t.getCommandID() == PUSH_IDX)
+            lTempProgram.emplace_back(PUSH_ID, std::make_pair(t.getStr_(), i));
+          else
+            lTempProgram.emplace_back(t.getCommandID(), t.getVT());
+        }
+        field newField(rdb::rField(q.id + "_" + lexical_cast<std::string>(i),  //
+                                   oldField.field_.rlen,                       //
+                                   1,                                          // (expanded)
+                                   oldField.field_.rtype),
+                       lTempProgram);
+        q.lSchema.push_back(newField);
+      }
+      break;
     }
   }
   return {"OK"};
@@ -603,14 +763,6 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
           }
         } else
           throw std::out_of_range("No mach on type conversion ID1");
-        break;
-      case PUSH_IDX:
-        if (regex_search(text.c_str(), what, xprFieldIdX)) {
-          if (what.size() != 2) FatalError("compiler: PUSH_IDX regex match has unexpected capture count");
-          const std::string schema(what[1]);
-          t = token(PUSH_IDX, std::make_pair(schema, 0));
-        } else
-          throw std::out_of_range("No mach on type conversion IDX");
         break;
       case PUSH_ID2:
         if (regex_search(text.c_str(), what, xprFieldId2)) {
@@ -1526,7 +1678,7 @@ std::string compiler::factorMatchedHashTimeMoves() {
       // Kopia przed ewentualnym push_back: dopisanie węzła unieważnia referencję q.
       const auto queryInterval = q.rInterval;
 
-      const std::string hashName = composeStreamName(rightSource, leftSource, STREAM_HASH);
+      const std::string hashName = composeStreamName(rightSource, leftSource, token(STREAM_HASH));
       const bool hashNameExists =
           std::ranges::any_of(coreInstance, [&hashName](const query &candidate) { return candidate.id == hashName; });
       const size_t hashIndex = findUniqueQueryIndex(hashName);
@@ -1633,6 +1785,44 @@ std::string compiler::deduplicateSubstrats() {
       }
       if (changed) break;
     }
+  }
+  return {"OK"};
+}
+
+/// Dwa substraty o rownej nazwie musza miec rowny program — inaczej plan ma niejednoznaczne
+/// odwolanie.
+///
+/// Duplikat nazwy jest tu stanem NORMALNYM i przejsciowym: extractIntermediateStreams()
+/// wydziela wezel osobno dla kazdego zapytania, wiec dwa identyczne okna nad tym samym
+/// zrodlem daja dwa wezly o tej samej nazwie, a scala je dopiero deduplicateSubstrats().
+/// Przy RDB_OPT_DEDUP_SUBSTRATES=OFF zostaja rozdzielone do konca kompilacji. Dlatego
+/// sprawdzenie pyta o ROWNOSC PROGRAMU, nie o unikalnosc nazwy, i stoi POZA `#if` — jest
+/// kontrola poprawnosci, a nie optymalizacja.
+///
+/// Zakres to wylacznie substraty. Konwencja nazewnicza kompilatora nie jest zarezerwowana
+/// dla nazw uzytkownika, wiec zapytanie publiczne WOLNO nazwac `STREAM_HASH_CA_CB`; takim
+/// zderzeniem zajmuje sie factorMatchedHashTimeMoves(), ktora wtedy po prostu nie sklada
+/// faktoryzacji (przypadek `collide_user` w macierzy ablacyjnej).
+///
+/// Praktycznie jedyna droga do naruszenia jest kolizja skrotu z composeStreamName(). Przy
+/// 64 bitach jest ona rzadsza od bledu sprzetu, ale poprawnosc nie ma sie opierac na
+/// prawdopodobienstwie: bez tej kontroli kolizja daje cicha zla odpowiedz, z nia — glosna
+/// awarie. Stad FatalError, tak samo jak w requireResolvedForEveryNode().
+std::string compiler::validateSubstratNameUniqueness() {
+  std::map<std::string, const query *> seen;
+  for (const auto &candidate : coreInstance) {
+    if (!candidate.isSubstrat) continue;
+    const auto [it, inserted] = seen.emplace(candidate.id, &candidate);
+    if (inserted) continue;
+
+    const query &first = *it->second;
+    const bool progMatch =
+        first.lProgram.size() == candidate.lProgram.size() &&
+        std::equal(first.lProgram.begin(), first.lProgram.end(), candidate.lProgram.begin(), [](const token &a, const token &b) {
+          return a.getCommandID() == b.getCommandID() && a.getVT() == b.getVT();
+        });
+    if (!progMatch)
+      FatalError("compiler::validateSubstratNameUniqueness: substrate name '{}' denotes two different programs", candidate.id);
   }
   return {"OK"};
 }
@@ -1810,15 +2000,34 @@ std::string compiler::shareEquivalentSelectComputations() {
 /// Przed shareEquivalentSelectComputations(), bo odciski liczą się z tokenów — kanoniczna
 /// postać wyrażenia zwiększa liczbę wykrytych równoważności.
 std::string compiler::simplifyFieldExpressions() {
+  // Indeks w PUSH_ID jest PŁASKI — liczy elementy, nie pozycje w schemacie. Pole zadeklarowane
+  // jako `a INTEGER[4]` zajmuje cztery kolejne indeksy pod JEDNĄ pozycją lSchema, a pola
+  // konfiguracyjne deskryptora nie zajmują żadnego. Odwzorowanie wprost po pozycji w liście
+  // zgadza się więc tylko dla schematów złożonych wyłącznie ze skalarów; dla
+  // `DECLARE f FLOAT[4], n INTEGER` indeks 1 to `f[1]` (FLOAT), a nie `n` (INTEGER) — czyli typ
+  // wychodził NIE TEN, a nie tylko „nieznany".
+  //
+  // Reguła płaskiego indeksu musi być TA SAMA, co w Descriptor::rebuildFieldMappings(), bo to
+  // ona rządzi odczytem w payload::getItemVT: STRING zajmuje jeden indeks, pozostałe rarray.
   auto typeOfField = [this](const std::string &streamId, int fieldIndex) -> std::optional<rdb::descFld> {
     auto source = std::ranges::find_if(coreInstance, [&streamId](const query &q) { return q.id == streamId; });
-    if (source == coreInstance.end()) return std::nullopt;
-    if (fieldIndex < 0 || fieldIndex >= static_cast<int>(source->lSchema.size())) return std::nullopt;
-    const auto type = std::next(source->lSchema.begin(), fieldIndex)->field_.rtype;
-    // Pola konfiguracyjne deskryptora (TYPE, REF, RETENTION, RETMEMORY) nie są wartościami
-    // wyrażeń — ich „typ" nie mówi nic o arytmetyce, więc zgłaszamy je jako nieznane.
-    if (type > rdb::STRING) return std::nullopt;
-    return type;
+    if (source == coreInstance.end() || fieldIndex < 0) return std::nullopt;
+
+    int remaining = fieldIndex;
+    for (const auto &item : source->lSchema) {
+      const auto type = item.field_.rtype;
+      // Pola konfiguracyjne deskryptora (TYPE, REF, RETENTION, RETMEMORY) nie są wartościami
+      // wyrażeń i nie zajmują indeksów płaskich — Descriptor pomija je tak samo.
+      if (type == rdb::TYPE || type == rdb::REF || type == rdb::RETENTION || type == rdb::RETMEMORY) continue;
+      const int flatCount = (type == rdb::STRING) ? 1 : item.field_.rarray;
+      if (remaining < flatCount) {
+        // NULLTYPE zajmuje indeks, ale jego „typ" nie mówi nic o arytmetyce.
+        if (type > rdb::STRING) return std::nullopt;
+        return type;
+      }
+      remaining -= flatCount;
+    }
+    return std::nullopt;
   };
 
   for (auto &q : coreInstance) {
@@ -1828,6 +2037,257 @@ std::string compiler::simplifyFieldExpressions() {
     for (auto &r : q.lRules)
       rdb::probe::onRewriteR3(simplifyExpression(r.condition, typeOfField));
   }
+  return {"OK"};
+}
+
+namespace {
+
+/// Zwija wyrazenie indeksu generatora — regule `gen_index` z RQL.g4 — do liczby calkowitej.
+///
+/// `$` ma wartosc numeru instancji. Tekst pochodzi z ANTLR-owego getText(), wiec nie zawiera
+/// bialych znakow, a jego ksztalt gwarantuje gramatyka. Kazde odstepstwo od niej jest wiec
+/// bledem WEWNETRZNYM — rozjechala sie gramatyka z ewaluatorem — a nie bledem uzytkownika,
+/// i stad FatalError zamiast komunikatu zwracanego do wolajacego.
+class genIndexFolder {
+ public:
+  genIndexFolder(const std::string &text, int ordinal) : text_(text), ordinal_(ordinal) {}
+
+  int fold() {
+    const int value = sum();
+    if (pos_ != text_.size())
+      FatalError("compiler::expandStreamGenerators: trailing '{}' in generator index '{}'", text_.substr(pos_), text_);
+    return value;
+  }
+
+ private:
+  int sum() {
+    int value = product();
+    while (pos_ < text_.size() && (text_[pos_] == '+' || text_[pos_] == '-')) {
+      const char op = text_[pos_++];
+      const int rhs = product();
+      value         = (op == '+') ? value + rhs : value - rhs;
+    }
+    return value;
+  }
+
+  int product() {
+    int value = atom();
+    while (pos_ < text_.size() && text_[pos_] == '*') {
+      ++pos_;
+      value *= atom();
+    }
+    return value;
+  }
+
+  int atom() {
+    if (pos_ >= text_.size()) FatalError("compiler::expandStreamGenerators: truncated generator index '{}'", text_);
+    if (text_[pos_] == '(') {
+      ++pos_;
+      const int value = sum();
+      if (pos_ >= text_.size() || text_[pos_] != ')')
+        FatalError("compiler::expandStreamGenerators: unbalanced '(' in generator index '{}'", text_);
+      ++pos_;
+      return value;
+    }
+    if (text_[pos_] == '$') {
+      ++pos_;
+      return ordinal_;
+    }
+    if (text_[pos_] < '0' || text_[pos_] > '9')
+      FatalError("compiler::expandStreamGenerators: unexpected '{}' in generator index '{}'", text_[pos_], text_);
+    int value = 0;
+    while (pos_ < text_.size() && text_[pos_] >= '0' && text_[pos_] <= '9')
+      value = value * 10 + (text_[pos_++] - '0');
+    return value;
+  }
+
+  const std::string &text_;
+  int ordinal_;
+  std::size_t pos_ = 0;
+};
+
+/// Rozbija `cells[23-$]` na nazwe `cells` i tresc nawiasu `23-$`.
+std::optional<std::pair<std::string, std::string>> splitIndexedRef(const std::string &text) {
+  const auto open = text.find('[');
+  if (open == std::string::npos || text.empty() || text.back() != ']') return std::nullopt;
+  return std::make_pair(text.substr(0, open), text.substr(open + 1, text.size() - open - 2));
+}
+
+/// Czy odwolanie zalezy od numeru instancji.
+///
+/// Pytanie dotyczy WYLACZNIE tresci nawiasu. Nazwa fizyczna wygenerowanego strumienia tez
+/// zawiera `$` (`cell$3`), wiec szukanie znaku w calym tekscie mylilo by gotowa instancje
+/// z nierozwinietym wyrazeniem generatora.
+bool dependsOnOrdinal(const std::string &text) {
+  const auto parts = splitIndexedRef(text);
+  return parts.has_value() && parts->second.find('$') != std::string::npos;
+}
+
+/// Nazwa fizyczna instancji rodziny — ta sama, ktora trafia na dysk i do `xqry`.
+std::string instanceName(const std::string &family, int ordinal) { return family + "$" + std::to_string(ordinal); }
+
+/// Czy szablon generatora w ogole uzywa numeru instancji.
+bool mentionsOrdinal(const query &q) {
+  for (const auto &t : q.lProgram)
+    if (t.getCommandID() == PUSH_STREAM && dependsOnOrdinal(t.getStr_())) return true;
+  for (const auto &f : q.lSchema)
+    for (const auto &t : f.lProgram) {
+      if (t.getCommandID() == PUSH_GENIDX) return true;
+      if (t.getCommandID() == PUSH_ID2 && dependsOnOrdinal(t.getStr_())) return true;
+    }
+  return false;
+}
+}  // namespace
+
+/// Kontrola zakresu indeksu pola dla odwolan pochodzacych z generatora.
+///
+/// Dziala tylko tam, gdzie szerokosc zrodla jest znana ZARAZ po parsowaniu: dla DECLARE
+/// i dla SELECT-ow z jawna lista pol. Zrodlo zapisane jako `SELECT *` ma pusty schemat az do
+/// expandSchemaWildcards(), wiec tam kontrola jest pomijana — swiadomie, bo przeniesienie
+/// calego przebiegu za rozwijanie gwiazdki zabiloby jego glowna wlasnosc: po ekspansji plan
+/// ma byc nie do odroznienia od recznie rozpisanego, a wiec zadne pozniejsze przebiegi
+/// nie moga o generatorach wiedziec.
+///
+/// Kontrola obejmuje WYLACZNIE indeksy zwiniete z `$`. Literal `a[99]` na czteroelementowym
+/// polu przechodzi tedy tak samo jak dotad — w kompilatorze nie ma dzis zadnej kontroli
+/// zakresu indeksu pola i jej dolozenie jest osobnym zadaniem, nie skutkiem ubocznym tego.
+std::string compiler::validateGeneratedFieldIndex(const std::string &owner, const std::string &source, int index) {
+  if (!coreInstance.exists(source)) return {"OK"};
+  query &src = coreInstance.getQuery(source);
+  if (src.lSchema.empty()) return {"OK"};
+  const int width = src.descriptorStorage().flatElementCount();
+  if (index >= width)
+    return "Stream '" + owner + "' references '" + source + "[" + std::to_string(index) + "]' but '" + source + "' has only " +
+           std::to_string(width) + " element(s)";
+  return {"OK"};
+}
+
+/// Podstawia numer instancji w jednej kopii szablonu generatora.
+///
+/// Po tym kroku po `$` nie ma w kopii sladu: PUSH_GENIDX staje sie zwyklym PUSH_VAL,
+/// a `cells[23-$]` zwyklym `cells[22]` — tokenem nie do odroznienia od recznie napisanego.
+std::string compiler::substituteOrdinal(query &instance, int ordinal) {
+  for (auto &t : instance.lProgram) {
+    if (t.getCommandID() != PUSH_STREAM || !dependsOnOrdinal(t.getStr_())) continue;
+    const auto parts = splitIndexedRef(t.getStr_());
+    const int index  = genIndexFolder(parts->second, ordinal).fold();
+    t                = token(PUSH_STREAM, parts->first + "[" + std::to_string(index) + "]");
+  }
+
+  for (auto &f : instance.lSchema)
+    for (auto &t : f.lProgram) {
+      if (t.getCommandID() == PUSH_GENIDX) {
+        t = token(PUSH_VAL, ordinal);
+        continue;
+      }
+      if (t.getCommandID() != PUSH_ID2 || !dependsOnOrdinal(t.getStr_())) continue;
+      const auto parts = splitIndexedRef(t.getStr_());
+      const int index  = genIndexFolder(parts->second, ordinal).fold();
+      if (index < 0)
+        return "Stream '" + instance.id + "' references '" + parts->first + "[" + std::to_string(index) +
+               "]' — field index must not be negative";
+      if (const std::string status = validateGeneratedFieldIndex(instance.id, parts->first, index); status != "OK")
+        return status;
+      t = token(PUSH_ID2, parts->first + "[" + std::to_string(index) + "]");
+    }
+  return {"OK"};
+}
+
+/// Rozwija generatory strumieni: jedno `SELECT cells[$] STREAM cell[24] FROM cells`
+/// w 24 zapytania `cell$0`..`cell$23`.
+///
+/// Stoi jako PIERWSZY przebieg kompilacji i to jest jego cala istota. Po nim qTree jest nie do
+/// odroznienia od planu z recznie rozpisanych SELECT-ow, wiec zaden dalszy przebieg, zaden
+/// ksztalt DAG i zaden fragment silnika nie musi o generatorach wiedziec. Cena za to jest
+/// jedna: wszystko, co przebieg chce sprawdzic, musi dac sie sprawdzic PRZED rozwiazaniem
+/// schematow — stad ograniczenie kontroli zakresu opisane przy validateGeneratedFieldIndex().
+///
+/// Numer instancji wchodzi w trzy miejsca, wszystkie zapisywane tym samym `$`:
+///   * indeks pola     `cells[$]`, `cells[23-$]`  — zwijany do literalu,
+///   * wartosc         `cells[0]+$`               — PUSH_GENIDX staje sie PUSH_VAL,
+///   * nazwa strumienia w klauzuli FROM `cell[$]` — staje sie nazwa fizyczna `cell$3`.
+std::string compiler::expandStreamGenerators() {
+  std::map<std::string, int> families;
+  std::set<std::string> plainNames;
+  for (const auto &q : coreInstance) {
+    if (q.generatorSize == query::notAGenerator) {
+      plainNames.insert(q.id);
+      continue;
+    }
+    if (q.generatorSize <= 0)
+      return "Stream generator '" + q.id + "' must declare a positive size, got " + std::to_string(q.generatorSize);
+    if (!families.emplace(q.id, q.generatorSize).second) return "Stream generator '" + q.id + "' is declared more than once";
+  }
+
+  std::vector<query> plan;
+  plan.reserve(coreInstance.size());
+  std::set<std::string> generatedNames;
+
+  for (auto &q : coreInstance) {
+    if (q.generatorSize == query::notAGenerator) {
+      plan.push_back(q);
+      continue;
+    }
+
+    if (!q.filename.empty())
+      return "Stream generator '" + q.id + "' must not carry a FILE directive — one file name cannot serve " +
+             std::to_string(q.generatorSize) + " streams";
+
+    // Bez `$` kazda z N instancji liczylaby to samo z tego samego zrodla. Rozniloby je
+    // wylacznie imie, wiec generator jest wtedy pomylka zapisu, a nie skrotem.
+    if (!mentionsOrdinal(q))
+      return "Stream generator '" + q.id + "' uses no '$' — it would produce " + std::to_string(q.generatorSize) +
+             " identical streams under different names";
+
+    for (int ordinal = 0; ordinal < q.generatorSize; ++ordinal) {
+      query instance         = q;
+      instance.generatorSize = query::notAGenerator;
+      instance.id            = instanceName(q.id, ordinal);
+
+      if (plainNames.contains(instance.id) || !generatedNames.insert(instance.id).second)
+        return "Generated stream '" + instance.id + "' collides with a stream that already exists";
+
+      // Prefiks nazwy pola bierze sie z nazwy INSTANCJI, nie szablonu — dlatego parser go
+      // dla generatora nie doklada. Inaczej pole nazywaloby sie `cell_0` zamiast `cell$0_0`
+      // i plan przestalby byc rownowazny recznemu zapisowi.
+      for (auto &f : instance.lSchema)
+        if (f.field_.rname.starts_with("_")) f.field_.rname = instance.id + f.field_.rname;
+
+      if (const std::string status = substituteOrdinal(instance, ordinal); status != "OK") return status;
+      generatedStreams_[q.id].push_back(instance.id);
+      plan.push_back(std::move(instance));
+    }
+  }
+
+  // Odwolania do instancji rodziny: `cell[3]` w klauzuli FROM staje sie nazwa fizyczna.
+  for (auto &q : plan)
+    for (auto &t : q.lProgram) {
+      if (t.getCommandID() != PUSH_STREAM) continue;
+      const auto parts = splitIndexedRef(t.getStr_());
+      if (!parts) continue;
+      if (parts->second.find('$') != std::string::npos)
+        return "Stream '" + q.id + "' uses '$' in '" + t.getStr_() + "' outside a stream generator";
+      const auto family = families.find(parts->first);
+      if (family == families.end())
+        return "Stream '" + q.id + "' references '" + t.getStr_() + "' but '" + parts->first + "' is not a stream generator";
+      const int index = genIndexFolder(parts->second, 0).fold();
+      if (index < 0 || index >= family->second)
+        return "Stream '" + q.id + "' references '" + t.getStr_() + "' outside the range 0.." +
+               std::to_string(family->second - 1);
+      t = token(PUSH_STREAM, instanceName(parts->first, index));
+    }
+
+  // Slad po `$` poza generatorem. Gramatyka na taki zapis pozwala, bo `$` jest zwyklym
+  // skladnikiem wyrazenia; sensu nabiera dopiero w szablonie i tylko tam jest dozwolony.
+  for (const auto &q : plan)
+    for (const auto &f : q.lSchema)
+      for (const auto &t : f.lProgram) {
+        if (t.getCommandID() == PUSH_GENIDX) return "Stream '" + q.id + "' uses '$' outside a stream generator";
+        if (t.getCommandID() == PUSH_ID2 && dependsOnOrdinal(t.getStr_()))
+          return "Stream '" + q.id + "' uses '$' in '" + t.getStr_() + "' outside a stream generator";
+      }
+
+  static_cast<std::vector<query> &>(coreInstance) = std::move(plan);
   return {"OK"};
 }
 
@@ -1841,6 +2301,12 @@ std::string compiler::compile() {
   // a właściwą redukcję strukturalną widać dopiero w parze przed/po deduplikacji.
   rdb::probe::planProbe planBench;
   planBench.capture(rdb::probe::planStage::entry, coreInstance);
+
+  // PIERWSZY przebieg, przed wszystkim innym łącznie z migawką odwołań: po nim plan jest
+  // nie do odróżnienia od ręcznie rozpisanego, więc dalsza część kompilatora o generatorach
+  // nie wie i wiedzieć nie musi.
+  result = expandStreamGenerators();
+  if (result != "OK") return result;
 
   // Musi być PRZED pierwszym przebiegiem — patrz uzasadnienie przy definicji.
   snapshotNamedSourceRefs();
@@ -1856,8 +2322,8 @@ std::string compiler::compile() {
 
   // Niezmiennik D3 sprawdzany wokół KAŻDEGO przebiegu przepisującego z osobna. Jednego snapshotu
   // "przed optymalizacjami" zrobić się nie da, bo przebiegi przepisujące są przeplecione
-  // z przebiegami dopełniającymi schemat (resolveFieldReferences, expandIndexWildcards) — te
-  // legalnie zmieniają listę pól, np. rozwijając [_].
+  // z przebiegami dopełniającymi schemat (resolveFieldReferences) — te legalnie zmieniają
+  // listę pól. Rozwinięcie [_] jest już za nami: dzieje się w expandSchemaWildcards().
   std::map<std::string, std::vector<std::string>> namesBeforeRewrite;
 
 #if RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES
@@ -1878,10 +2344,12 @@ std::string compiler::compile() {
 #endif
   planBench.capture(rdb::probe::planStage::postDedup, coreInstance);
 
-  result = resolveFieldReferences();
+  // POZA `#if` — kontrola poprawnosci, nie optymalizacja. Musi widziec plan po deduplikacji,
+  // bo przed nia duplikaty nazw sa stanem normalnym.
+  result = validateSubstratNameUniqueness();
   if (result != "OK") return result;
 
-  result = expandIndexWildcards();
+  result = resolveFieldReferences();
   if (result != "OK") return result;
 
 #if RDB_OPT_SIMPLIFY_EXPRESSIONS

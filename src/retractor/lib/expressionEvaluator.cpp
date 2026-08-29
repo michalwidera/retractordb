@@ -7,6 +7,7 @@
 #include <cctype>      // std::tolower
 #include <cmath>       // sqrt
 #include <functional>  // std::function
+#include <limits>      // std::numeric_limits
 #include <optional>
 #include <regex>
 #include <stack>
@@ -231,6 +232,95 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
              a, b);
 
   return retVal;
+}
+
+/// Potegowanie `b ^ a` — operator ExpPow z RQL.g4.
+///
+/// Typ wyniku ustala normalize(), tak samo jak dla `+`, `-`, `*` i `/`: wygrywa wyzszy
+/// indeks wariantu. Dzieki temu `pole ^ 2` na polu INTEGER zostaje INTEGER-em (dokladny
+/// odpowiednik dotychczasowego `pole * pole`), a `pole ^ 0.5` promuje sie do FLOAT.
+///
+/// Rachunek idzie przez double — tak samo jak callFun() dla Sqrt/Log/Sin — bo std::pow nie
+/// ma przeciazenia dla boost::rational, a wykladnik ulamkowy i tak wyprowadza poza ciala
+/// calkowite. Rzut z powrotem na typ znormalizowany robi ten sam castFldVT, ktorego uzywa
+/// reszta pliku.
+///
+/// Wynik nieskonczony albo NaN (`0 ^ -1`, `(-8) ^ 0.5`) daje NULL. Jest to ta sama decyzja,
+/// co przy dzieleniu przez zero kilkadziesiat linii wyzej: brak wyniku w zbiorze wartosci
+/// jest wartoscia POCHLANIAJACA, a nie bledem zatrzymujacym strumien. Rzutowanie takiego
+/// double na int byloby zreszta zachowaniem niezdefiniowanym.
+///
+/// Operand tekstowy jest bledem, jak dla `*`, `-` i `/`. normalize() promuje wtedy druga
+namespace {
+
+/// Typy o arytmetyce DOKLADNEJ — te same, ktore isExact() wyroznia w exprSimplify.
+bool hasExactArithmetic(rdb::descFld type) {
+  return type == rdb::BYTE || type == rdb::INTEGER || type == rdb::UINT || type == rdb::RATIONAL;
+}
+
+/// Wykladnik jako nieujemna liczba calkowita — o ile nia jest.
+std::optional<int> integralExponent(const rdb::descFldVT &value) {
+  return std::visit(
+      Overload{[](uint8_t v) -> std::optional<int> { return v; },
+               [](int v) -> std::optional<int> { return v >= 0 ? std::optional<int>{v} : std::nullopt; },
+               [](unsigned v) -> std::optional<int> {
+                 return v <= static_cast<unsigned>(std::numeric_limits<int>::max()) ? std::optional<int>{static_cast<int>(v)}
+                                                                                    : std::nullopt;
+               },
+               [](boost::rational<int> v) -> std::optional<int> {
+                 return (v.denominator() == 1 && v.numerator() >= 0) ? std::optional<int>{v.numerator()} : std::nullopt;
+               },
+               [](const auto &) -> std::optional<int> { return std::nullopt; }},
+      value);
+}
+
+/// Potega typu dokladnego, liczona TYM SAMYM operator*, ktorego uzywa MULTIPLY.
+///
+/// To nie jest optymalizacja, tylko warunek poprawnosci przepisania `a*a` -> `a^2`
+/// (regula D w exprSimplify): gdyby `^` szlo tu przez std::pow, przepisanie zmienialoby
+/// wynik wszedzie tam, gdzie mnozenie sie przekreca albo promuje typ. Przy tej definicji
+/// `a^k` JEST iloczynem `a*a*...*a` — z zawinieciem, promocja BYTE do int i dokladna
+/// arytmetyka wymierna wlacznie.
+///
+/// Potegowanie przez kwadraty wolno tu zastosowac, bo mnozenie w tych typach jest laczne
+/// (takze modulo 2^n), wiec grupowanie nie zmienia wyniku. Chroni to przed `a^1000000000`
+/// w petli na kazdym interwale.
+///
+/// Wynik NIE jest rzutowany z powrotem na typ podstawy — typ ma byc dokladnie ten, ktory
+/// dalby zapisany wprost iloczyn (dla BYTE jest to INTEGER, bo `uint8_t * uint8_t`
+/// promuje sie do int).
+rdb::descFldVT exactPower(const rdb::descFldVT &base, int exponent) {
+  rdb::descFldVT result = castFldVT(rdb::descFldVT{1}, static_cast<rdb::descFld>(base.index()));
+  rdb::descFldVT factor = base;
+  for (int rest = exponent; rest > 0; rest >>= 1) {
+    if ((rest & 1) != 0) result = result * factor;
+    if (rest > 1) factor = factor * factor;
+  }
+  return result;
+}
+
+}  // namespace
+
+/// strone do STRING, wiec wystarczy sprawdzic typ znormalizowany. To samo zdanie zalatwia
+/// INTPAIR i IDXPAIR, ktore nie sa wartosciami wyrazen.
+rdb::descFldVT power(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+  if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
+
+  auto [base, exponent] = normalize(aParam, bParam);
+
+  const auto resultType = static_cast<rdb::descFld>(base.index());
+  if (resultType > rdb::DOUBLE) throw std::runtime_error("Operator '^' not defined for non-numeric operands");
+
+  // Typ dokladny + calkowity nieujemny wykladnik: liczymy iloczynem, nie std::pow. Patrz
+  // exactPower() — od tego zalezy, czy `a*a` wolno przepisac na `a^2`.
+  if (hasExactArithmetic(resultType))
+    if (const auto steps = integralExponent(exponent)) return exactPower(base, *steps);
+
+  const double result =
+      std::pow(std::get<double>(castFldVT(base, rdb::DOUBLE)), std::get<double>(castFldVT(exponent, rdb::DOUBLE)));
+  if (!std::isfinite(result)) return std::monostate{};
+
+  return castFldVT(rdb::descFldVT{result}, resultType);
 }
 
 rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
@@ -514,6 +604,7 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
       case SUBTRACT:
       case MULTIPLY:
       case DIVIDE:
+      case POWER:
       case CMP_EQUAL:
       case CMP_NOT_EQUAL:
       case CMP_LT:
@@ -547,6 +638,9 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         break;
       case DIVIDE:
         rStack.push(b / a);
+        break;
+      case POWER:
+        rStack.push(power(b, a));
         break;
       case NEGATE:
         rStack.push(neg(b));

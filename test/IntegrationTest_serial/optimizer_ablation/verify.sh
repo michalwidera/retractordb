@@ -117,12 +117,12 @@ fi
 if [ "$factor" = "ON" ]; then
   grep -F 'STREAM_HASH_FA_FB(' out_compile.txt
   grep -F ':- STREAM_TIMEMOVE(3)' out_compile.txt
-  ! grep -F 'STREAM_TIMEMOVE_FA(' out_compile.txt
-  ! grep -F 'STREAM_TIMEMOVE_FB(' out_compile.txt
+  ! grep -F 'STREAM_TIMEMOVE_2_FA(' out_compile.txt
+  ! grep -F 'STREAM_TIMEMOVE_1_FB(' out_compile.txt
 else
   ! grep -F 'STREAM_HASH_FA_FB(' out_compile.txt
-  grep -F 'STREAM_TIMEMOVE_FA(' out_compile.txt
-  grep -F 'STREAM_TIMEMOVE_FB(' out_compile.txt
+  grep -F 'STREAM_TIMEMOVE_2_FA(' out_compile.txt
+  grep -F 'STREAM_TIMEMOVE_1_FB(' out_compile.txt
 fi
 
 if [ "$factor" = "ON" ]; then
@@ -130,31 +130,31 @@ if [ "$factor" = "ON" ]; then
   # i niepasującego. Przepisany zostaje wyłącznie pierwszy; drugi musi nadal
   # czytać przesunięcie, a nie przeplot.
   grep -F 'STREAM_HASH_MA_MB(' out_compile.txt
-  grep -F 'STREAM_TIMEMOVE_MA(' out_compile.txt
-  ! grep -F 'STREAM_TIMEMOVE_MB(' out_compile.txt
+  grep -F 'STREAM_TIMEMOVE_2_MA(' out_compile.txt
+  ! grep -F 'STREAM_TIMEMOVE_1_MB(' out_compile.txt
   [ "$(stream_source mixed_hash)" = "STREAM_HASH_MA_MB" ]
-  [ "$(stream_source mixed_shift)" = "STREAM_TIMEMOVE_MA" ]
+  [ "$(stream_source mixed_shift)" = "STREAM_TIMEMOVE_2_MA" ]
 
   # Wiele zapytań nad tym samym przesuniętym przeplotem: jeden wspólny węzeł
   # przeplotu, oba substraty przesunięć osierocone i usunięte.
   grep -F 'STREAM_HASH_QA_QB(' out_compile.txt
-  ! grep -F 'STREAM_TIMEMOVE_QA(' out_compile.txt
-  ! grep -F 'STREAM_TIMEMOVE_QB(' out_compile.txt
+  ! grep -F 'STREAM_TIMEMOVE_2_QA(' out_compile.txt
+  ! grep -F 'STREAM_TIMEMOVE_1_QB(' out_compile.txt
   [ "$(grep -c '^STREAM_HASH_QA_QB(' out_compile.txt)" = "1" ]
 
   # Kolizja nazw: węzeł o nazwie przeplotu jest zapytaniem publicznym, więc
   # reguła musi go pominąć i zostawić collide_user na własnych przesunięciach.
-  [ "$(stream_source collide_user)" = "STREAM_TIMEMOVE_CA" ]
-  grep -F 'STREAM_TIMEMOVE_CA(' out_compile.txt
-  grep -F 'STREAM_TIMEMOVE_CB(' out_compile.txt
+  [ "$(stream_source collide_user)" = "STREAM_TIMEMOVE_2_CA" ]
+  grep -F 'STREAM_TIMEMOVE_2_CA(' out_compile.txt
+  grep -F 'STREAM_TIMEMOVE_1_CB(' out_compile.txt
 else
   ! grep -F 'STREAM_HASH_MA_MB(' out_compile.txt
-  grep -F 'STREAM_TIMEMOVE_MA(' out_compile.txt
-  grep -F 'STREAM_TIMEMOVE_MB(' out_compile.txt
+  grep -F 'STREAM_TIMEMOVE_2_MA(' out_compile.txt
+  grep -F 'STREAM_TIMEMOVE_1_MB(' out_compile.txt
   ! grep -F 'STREAM_HASH_QA_QB(' out_compile.txt
-  grep -F 'STREAM_TIMEMOVE_QA(' out_compile.txt
-  grep -F 'STREAM_TIMEMOVE_QB(' out_compile.txt
-  [ "$(stream_source collide_user)" = "STREAM_TIMEMOVE_CA" ]
+  grep -F 'STREAM_TIMEMOVE_2_QA(' out_compile.txt
+  grep -F 'STREAM_TIMEMOVE_1_QB(' out_compile.txt
+  [ "$(stream_source collide_user)" = "STREAM_TIMEMOVE_2_CA" ]
 fi
 
 if [ "$mode" = "plan" ]; then

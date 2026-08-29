@@ -27,8 +27,7 @@ public:
     EXCLAMATION = 72, DOUBLE_BAR = 73, DOT = 74, UNDERLINE = 75, AT = 76, 
     SHARP = 77, AND = 78, MOD = 79, DOLLAR = 80, COMMA = 81, SEMI = 82, 
     COLON = 83, DOUBLE_COLON = 84, STAR = 85, DIVIDE = 86, PLUS = 87, MINUS = 88, 
-    BIT_NOT = 89, BIT_OR = 90, BIT_XOR = 91, SPACE = 92, COMMENT = 93, LINE_COMMENT1 = 94, 
-    LINE_COMMENT2 = 95
+    BIT_NOT = 89, BIT_OR = 90, BIT_XOR = 91, SPACE = 92, COMMENT = 93, LINE_COMMENT2 = 94
   };
 
   explicit RQLLexer(antlr4::CharStream *input);

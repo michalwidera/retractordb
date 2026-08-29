@@ -2,8 +2,8 @@
 
 # Kontrola: kaskadowe wchłonięcia substratów. Runda 1: mysum wchłania
 # STREAM_ADD_s1_s2 — aktualizuje PUSH_ID2(pair) w schemacie
-# STREAM_TIMEMOVE_STREAM_ADD_s1_s2 i shifted. Runda 2: shifted wchłania
-# STREAM_TIMEMOVE_STREAM_ADD_s1_s2 — aktualizuje PUSH_ID w schemacie merged.
+# STREAM_TIMEMOVE_1_STREAM_ADD_s1_s2 i shifted. Runda 2: shifted wchłania
+# STREAM_TIMEMOVE_1_STREAM_ADD_s1_s2 — aktualizuje PUSH_ID w schemacie merged.
 # Wynik: merged ma pola shifted na offsecie 1, więc musi pojawić się
 # PUSH_ID(merged[2]). Bez poprawki PUSH_ID w lSchema pola z shifted mapowałyby
 # się na merged[0] i merged[1].
@@ -25,7 +25,7 @@ add_test(
 \; grep -F 'PUSH_ID(merged[1])' out_compile.txt \
 \; grep -F 'PUSH_ID(merged[2])' out_compile.txt \
 \; if grep -F 'STREAM_ADD_s1_s2(1/1)' out_compile.txt \; then exit 1 \; fi \
-\; if grep -F 'STREAM_TIMEMOVE_STREAM_ADD_s1_s2(1/1)' out_compile.txt \; then exit 1 \; fi"
+\; if grep -F 'STREAM_TIMEMOVE_1_STREAM_ADD_s1_s2(1/1)' out_compile.txt \; then exit 1 \; fi"
 )
 
 if(NOT RDB_OPT_DEDUP_SUBSTRATES)

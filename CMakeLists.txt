@@ -74,6 +74,20 @@ option(RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES
 option(RDB_OPT_SIMPLIFY_EXPRESSIONS
        "Fold constants and simplify algebraic field expressions" ON)
 
+# Agresywne przepisania wyrazenia — regula D w R3 (`a*a` -> `a^2`). CELOWO poza
+# rodzina RDB_OPT_*: tamte piec przelacznikow tworzy macierz ablacyjna i sa
+# wypisywane przez `xretractor --build-info`, a korpus H9 weryfikuje ZBIOR
+# kluczy tego wypisu dokladnie (test/research_gate/h9/validate_corpus.py). Nowy
+# klucz zapalilby bramke badawcza.
+#
+# Domyslnie OFF, i nie z powodu poprawnosci: regula D nie zmienia wyniku (patrz
+# exactPower w expressionEvaluator). Powodem jest APARATURA — mierzone plany H9
+# stoja na normie `Sqrt(A[0]*A[0]+B[0]*B[0])`, a bramka wymaga, zeby R3 nie
+# ruszyla ich ani razu. Wlaczenie: scripts/buildrdb.sh release
+# -Daggressive_expr_optimization=ON
+option(aggressive_expr_optimization
+       "Aggressive field-expression rewrites (rule D: a*a -> a^2)" OFF)
+
 if(NOT RDB_OPT_SHARE_EQUIVALENT_SELECTS AND RDB_OPT_COMMUTATIVE_ADD)
   message(
     FATAL_ERROR

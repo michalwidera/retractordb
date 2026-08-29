@@ -1,0 +1,7 @@
+# Recznie rozpisany odpowiednik query.rql. Rozni sie WYLACZNIE zapisem.
+STORAGE '.'
+DECLARE cell INTEGER[4] STREAM cells, 1 FILE 'cells.txt'
+SELECT cells[0] STREAM cell$0 FROM cells
+SELECT cells[1] STREAM cell$1 FROM cells
+SELECT cells[2] STREAM cell$2 FROM cells
+SELECT cells[3] STREAM cell$3 FROM cells
