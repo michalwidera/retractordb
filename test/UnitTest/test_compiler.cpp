@@ -1350,7 +1350,8 @@ TEST(xparser, implemented_functions_are_reachable_from_rql) {
 // dokladnosci wartosci wymiernej; `IsZero`/`IsNonZero` wnosza predykat do wyrazenia
 // w SELECT, gdzie porownania z `term_logic` nie sa dostepne.
 TEST(xparser, newly_implemented_functions_compile) {
-  for (const char *call : {"Abs(a)", "abs(a)", "IsZero(a)", "isnonzero(a)"}) {
+  // `Length` doszedl 30.08.2026, po doprowadzeniu pola STRING do wyrazenia (pozycja 12).
+  for (const char *call : {"Abs(a)", "abs(a)", "IsZero(a)", "isnonzero(a)", "Length(a)", "LENGTH(a)"}) {
     EXPECT_EQ(compileRql(selectRql(call)), "OK") << call;
   }
 }
@@ -1360,7 +1361,7 @@ TEST(xparser, newly_implemented_functions_compile) {
 // `Unsupported function call`. Teraz odpadaja na kompilacji, kanalem `Check result:`.
 TEST(xparser, unknown_function_is_rejected_at_compile_time) {
   for (const char *call : {"Crc(a)", "Sum(a)", "Sign(a)", "Chr(a)", "Count(a)", "IntCast(a)", "FloatCast(a)", "ToNumber(a)",
-                           "ToTimeStamp(a)", "Length(a)", "Sqrtt(a)"}) {
+                           "ToTimeStamp(a)", "Sqrtt(a)"}) {
     const std::string result = compileRql(selectRql(call));
     EXPECT_NE(result, "OK") << call;
     EXPECT_NE(result.find("not a known RQL function"), std::string::npos) << call << " -> " << result;
@@ -2176,6 +2177,23 @@ TEST(xparser, to_string_width_survives_concatenation) {
   const auto &fallback = outputField(plan, "dst", 2);
   EXPECT_EQ(fallback.rtype, rdb::STRING);
   EXPECT_EQ(fallback.rlen * fallback.rarray, kToStringDefaultWidth);
+}
+
+// Funkcja o argumencie tekstowym i wyniku liczbowym. Zaden inny test nie pokrywa tego
+// kierunku, a jest on wrazliwy: inferStringWidth widzi na stosie napis (PUSH_ID nad polem
+// STRING) i musi go ZDJAC przy CALL, zamiast przepuscic do pola wyjsciowego.
+TEST(xcompiler, length_over_string_field_yields_integer_field) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE txt STRING[8], k INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT Length(txt), txt STREAM dst FROM src\n");
+
+  EXPECT_EQ(outputField(plan, "dst", 0).rtype, rdb::INTEGER);
+
+  // Kontrola, ze zdjecie napisu przy CALL nie psuje sasiedniego pola tekstowego.
+  const auto &text = outputField(plan, "dst", 1);
+  EXPECT_EQ(text.rtype, rdb::STRING);
+  EXPECT_EQ(text.rlen * text.rarray, 8);
 }
 
 // Wnioskowany jest WYLACZNIE napis. Typy liczbowe zostaja przy dotychczasowej regule

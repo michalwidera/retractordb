@@ -610,6 +610,25 @@ rdb::descFldVT isZeroValue(const rdb::descFldVT &inVar, bool wantZero) {
   return (isZero == wantZero) ? 1 : 0;
 }
 
+/// Length — liczba bajtow wartosci tekstowej, jako INTEGER.
+///
+/// Liczona jest WARTOSC, nie zadeklarowana szerokosc pola: payload::getItemVT przycina pole
+/// STRING na pierwszym bajcie zerowym, wiec `STRING[8]` z wartoscia `42` dochodzi tu jako
+/// dwuznakowy napis. Zadeklarowanej szerokosci ewaluator nie widzi i widziec nie moze.
+///
+/// Argument nietekstowy jest bledem, a nie cicha konwersja przez to_string — symetrycznie do
+/// Abs i IsZero, ktore odrzucaja napis. `Length(k)` nad polem INTEGER jest niemal na pewno
+/// literowka, a nie prosba o dlugosc zapisu dziesietnego; kto chce tej drugiej rzeczy, pisze
+/// `Length(to_string(k))` i mowi to wprost.
+rdb::descFldVT stringLength(const rdb::descFldVT &inVar) {
+  if (isNullValue(inVar)) return std::monostate{};
+
+  const auto *text = std::get_if<std::string>(&inVar);
+  if (text == nullptr) throw std::runtime_error("Function 'Length' is defined for string operands only");
+
+  return static_cast<int>(text->length());
+}
+
 rdb::descFldVT callFun(rdb::descFldVT &inVar, const std::function<double(double)> &fnName) {
   if (isNullValue(inVar)) return std::monostate{};
   auto backResultType = inVar.index();
@@ -756,6 +775,8 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
           rStack.push(isZeroValue(b, true));
         else if (tkStr == "isnonzero")
           rStack.push(isZeroValue(b, false));
+        else if (tkStr == "length")
+          rStack.push(stringLength(b));
         else if (tkStr == "to_integer")
           rStack.push(isNullValue(b) ? rdb::descFldVT{std::monostate{}} : castFldVT(b, rdb::INTEGER));
         else if (tkStr == "to_float")

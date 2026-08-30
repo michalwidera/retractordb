@@ -13,7 +13,8 @@
 /// - `RQL.g4` wymienial `Abs`, `Sign`, `Chr`, `Length`, `ToNumber`, `ToTimeStamp`,
 ///   `FloatCast`, `IntCast`, `Count`, `Crc`, `Sum`, `IsZero`, `IsNonZero`, ktorych
 ///   ewaluator nie znal. Program kompilowal sie czysto, a `-c` przechodzilo — proces
-///   ginal dopiero w wykonaniu na `Unsupported function call`;
+///   ginal dopiero w wykonaniu na `Unsupported function call`. `Abs`, `IsZero` i `IsNonZero`
+///   zostaly wtedy zaimplementowane, `Length` doszedl 30.08.2026, reszta znikla;
 /// - `round`, `trunc`, `sin`, `cos`, `tan`, `log` i `log2` byly zaimplementowane
 ///   w ewaluatorze, ale nie stalo ich w gramatyce, wiec byly nieosiagalne z RQL.
 ///
@@ -47,7 +48,7 @@ struct RqlFunction {
 /// UWAGA na przyszly `min(a, b)`: `MIN`, `MAX`, `AVG` i `SUMC` sa tokenami leksera
 /// stojacymi PRZED `ID` (reduktory strumieniowe), wiec `min` nigdy nie zaleksuje sie
 /// jako nazwa funkcji skalarnej. Skalarne minimum bedzie musialo nazywac sie inaczej.
-inline constexpr std::array<RqlFunction, 18> kRqlFunctions{{
+inline constexpr std::array<RqlFunction, 19> kRqlFunctions{{
     {"Sqrt", 1, 1},        //
     {"Ceil", 1, 1},        //
     {"Floor", 1, 1},       //
@@ -62,6 +63,7 @@ inline constexpr std::array<RqlFunction, 18> kRqlFunctions{{
     {"isnull", 1, 1},      //
     {"IsZero", 1, 1},      //
     {"IsNonZero", 1, 1},   //
+    {"Length", 1, 1},      // WYLACZNIE nad napisem — argument liczbowy jest bledem wykonania
     {"to_integer", 1, 1},  //
     {"to_float", 1, 1},    //
     {"to_double", 1, 1},   //

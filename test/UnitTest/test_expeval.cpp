@@ -937,9 +937,41 @@ TEST(xExpressionEval, call_iszero_and_isnonzero_return_integer) {
   }
 }
 
+// Length liczy WARTOŚĆ, nie zadeklarowaną szerokość pola: payload::getItemVT przycina pole
+// STRING na pierwszym bajcie zerowym, więc `STRING[8]` z wartością `42` dochodzi do ewaluatora
+// jako napis dwuznakowy. Wynik jest INTEGER niezależnie od szerokości pola źródłowego.
+TEST(xExpressionEval, call_length_counts_value_not_field_width) {
+  const std::vector<std::pair<std::string, int>> cases{{"", 0}, {"42", 2}, {"hello", 5}};
+
+  for (const auto &[input, expected] : cases) {
+    std::list<token> program;
+    program.emplace_back(PUSH_VAL, input);
+    program.emplace_back(CALL, std::string("Length"));
+
+    expressionEvaluator test;
+    rdb::descFldVT result = test.eval(program);
+    ASSERT_TRUE(std::holds_alternative<int>(result)) << "Length('" << input << "')";
+    EXPECT_EQ(std::get<int>(result), expected) << "Length('" << input << "')";
+  }
+}
+
+// Argument nietekstowy jest błędem, a nie cichą konwersją przez to_string — symetrycznie do
+// `Abs` i `IsZero`, które odrzucają napis. `Length(k)` nad polem INTEGER jest niemal na pewno
+// literówką; kto chce długości zapisu dziesiętnego, pisze `Length(to_string(k))`.
+TEST(xExpressionEval, call_length_rejects_numeric_operand) {
+  for (const auto &value : std::vector<rdb::descFldVT>{7, 2.5, boost::rational<int>(22, 7)}) {
+    std::list<token> program;
+    program.emplace_back(PUSH_VAL, value);
+    program.emplace_back(CALL, std::string("Length"));
+
+    expressionEvaluator test;
+    EXPECT_THROW({ auto discarded = test.eval(program); }, std::runtime_error) << "indeks " << value.index();
+  }
+}
+
 // NULL pochłania: predykat na braku danych jest brakiem danych, a nie fałszem.
 TEST(xExpressionEval, new_functions_propagate_null) {
-  for (const char *name : {"Abs", "IsZero", "IsNonZero"}) {
+  for (const char *name : {"Abs", "IsZero", "IsNonZero", "Length"}) {
     std::list<token> program;
     program.emplace_back(PUSH_VAL, rdb::descFldVT{std::monostate{}});
     program.emplace_back(CALL, std::string(name));

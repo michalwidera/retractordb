@@ -4,4 +4,4 @@ STORAGE 'temp'
 
 DECLARE txt STRING[8], k INTEGER STREAM src, 1/8 FILE 'data.txt' ONESHOT
 
-SELECT txt, k STREAM dst FROM src
+SELECT txt, k, Length(txt) STREAM dst FROM src

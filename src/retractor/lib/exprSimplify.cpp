@@ -59,6 +59,14 @@ std::optional<rdb::descFld> typeOfCall(const token &call, std::optional<rdb::des
   if (name == "to_double") return rdb::DOUBLE;
   if (name == "to_string") return rdb::STRING;
   if (name == "isnull") return rdb::INTEGER;
+  // Funkcje dopisane 2026-08-30. Bez tych czterech wierszy typ wychodzil nullopt, czyli
+  // „nie wiadomo" — odpowiedz bezpieczna, ale blokujaca reguly B i C w kazdym wyrazeniu,
+  // ktore ich uzywa. Zadna z nich nie liczy w double przez callFun, wiec nie naleza do
+  // typePreserving mimo ze `Abs` zachowuje typ argumentu.
+  if (name == "abs") return argumentType;
+  // IsZero/IsNonZero/Length zwracaja INTEGER NIEZALEZNIE od typu argumentu — predykat 0/1
+  // i dlugosc napisu sa liczbami calkowitymi, a nie wartoscia w typie wejscia.
+  if (name == "iszero" || name == "isnonzero" || name == "length") return rdb::INTEGER;
   if (typePreserving.contains(name)) return argumentType;
   return std::nullopt;
 }
