@@ -250,6 +250,57 @@ TEST_F(TextSourceROTest, test_read_string_null_token) {
     EXPECT_EQ(buffer[i], 0);
 }
 
+// Napis BEZ cudzyslowu jest zwyklym tokenem i jego wartosc ma trafic do pola. Do 2026-08-30
+// przeczytany token byl wyrzucany, a skan cudzyslowu ponizej konsumowal reszte pliku
+// (pozycja 12 w usecases/requested.md).
+TEST_F(TextSourceROTest, test_read_string_unquoted) {
+  auto filename = createTestFile("test_str_plain.txt", "hello\n");
+
+  rdb::Descriptor desc{{"s", 5, 1, rdb::STRING}};
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
+
+  auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
+
+  EXPECT_EQ(std::string(reinterpret_cast<char *>(buffer.get()), 5), "hello");
+}
+
+// Sedno objawu z pozycji 12: dla `DECLARE txt STRING[8], k INTEGER` nad wierszem `42 7`
+// pole txt wychodzilo puste, a k dostawalo 42 — czyli PIERWSZY token wiersza.
+TEST_F(TextSourceROTest, test_read_unquoted_string_and_int_stay_aligned) {
+  auto filename = createTestFile("test_str_plain_int.txt", "42 7\n43 8\n");
+
+  rdb::Descriptor desc{{"s", 1, 8, rdb::STRING}, {"k", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, true);
+
+  auto buffer                                             = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  const std::vector<std::pair<std::string, int>> expected = {{"42", 7}, {"43", 8}, {"42", 7}};
+
+  for (size_t i = 0; i < expected.size(); ++i) {
+    GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS) << "read #" << i;
+    EXPECT_EQ(std::string(reinterpret_cast<char *>(buffer.get())), expected[i].first) << "read #" << i;
+    int value = 0;
+    std::memcpy(&value, buffer.get() + 8, sizeof(int));
+    EXPECT_EQ(value, expected[i].second) << "read #" << i;
+  }
+}
+
+// Token dluzszy od pola jest przycinany dokladnie tak, jak napis w cudzyslowie.
+TEST_F(TextSourceROTest, test_read_string_unquoted_truncated_to_field) {
+  auto filename = createTestFile("test_str_plain_long.txt", "abcdefgh\n");
+
+  rdb::Descriptor desc{{"s", 3, 1, rdb::STRING}};
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
+
+  auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
+
+  EXPECT_EQ(std::string(reinterpret_cast<char *>(buffer.get()), 3), "abc");
+}
+
 // ============================================================
 // textSourceRO - multi-field descriptor tests
 // ============================================================

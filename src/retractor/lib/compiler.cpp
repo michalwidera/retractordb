@@ -19,7 +19,7 @@
 #include <boost/rational.hpp>
 #include <boost/regex.hpp>
 
-#include "exprSimplify.hpp"  // simplifyExpression
+#include "exprSimplify.hpp"  // simplifyExpression, inferStringWidth
 #include "fatalError.hpp"
 #include "rdb/probe.hpp"     // sonda E3: rozmiar planu, czas kompilacji
 #include "rqlFunctions.hpp"  // jedyna lista funkcji skalarnych
@@ -2064,6 +2064,79 @@ std::string compiler::shareEquivalentSelectComputations() {
   return {"OK"};
 }
 
+/// Pole schematu, po które sięga PUSH_ID — nazwa strumienia i PŁASKI indeks.
+///
+/// Indeks w PUSH_ID liczy ELEMENTY, nie pozycje w schemacie. Pole zadeklarowane jako
+/// `a INTEGER[4]` zajmuje cztery kolejne indeksy pod JEDNĄ pozycją lSchema, a pola
+/// konfiguracyjne deskryptora nie zajmują żadnego. Odwzorowanie wprost po pozycji w liście
+/// zgadza się więc tylko dla schematów złożonych wyłącznie ze skalarów; dla
+/// `DECLARE f FLOAT[4], n INTEGER` indeks 1 to `f[1]` (FLOAT), a nie `n` (INTEGER) — czyli typ
+/// wychodził NIE TEN, a nie tylko „nieznany".
+///
+/// Reguła płaskiego indeksu musi być TA SAMA, co w Descriptor::rebuildFieldMappings(), bo to
+/// ona rządzi odczytem w payload::getItemVT: STRING zajmuje jeden indeks, pozostałe rarray.
+std::optional<rdb::rField> compiler::sourceFieldAt(const std::string &streamId, const int flatIndex) const {
+  auto source = std::ranges::find_if(coreInstance, [&streamId](const query &q) { return q.id == streamId; });
+  if (source == coreInstance.end() || flatIndex < 0) return std::nullopt;
+
+  int remaining = flatIndex;
+  for (const auto &item : source->lSchema) {
+    const auto type = item.field_.rtype;
+    // Pola konfiguracyjne deskryptora (TYPE, REF, RETENTION, RETMEMORY) nie są wartościami
+    // wyrażeń i nie zajmują indeksów płaskich — Descriptor pomija je tak samo.
+    if (type == rdb::TYPE || type == rdb::REF || type == rdb::RETENTION || type == rdb::RETMEMORY) continue;
+    const int flatCount = (type == rdb::STRING) ? 1 : item.field_.rarray;
+    if (remaining < flatCount) return item.field_;
+    remaining -= flatCount;
+  }
+  return std::nullopt;
+}
+
+/// Typ pola wyjściowego, którego nie da się poznać przy parsowaniu — wynik jest napisem,
+/// bo napisem jest pole źródłowe.
+///
+/// `RQLParser::exitExpression` rozstrzyga to samo pytanie tą samą funkcją (inferStringWidth),
+/// ale bez znajomości schematów: w chwili parsowania odwołanie do pola jest jeszcze
+/// PUSH_ID1/2/3, a schematu strumienia, do którego sięga, może w ogóle nie być. Dlatego
+/// `SELECT txt` nad polem `STRING[8]` dawało pole `INTEGER` wypełnione zerami — pozycja 12
+/// w usecases/requested.md. Tutaj PUSH_ID niesie już parę (strumień, indeks płaski), więc
+/// kształt pola źródłowego jest dostępny.
+///
+/// Przebieg wyłącznie PODNOSI pole do `STRING`. Degradacja — wyrażenie liczbowe z literałem
+/// tekstowym w środku — jest w całości załatwiona regułą wyniku w parserze, a wnioskowania
+/// typów liczbowych tu NIE MA: `Ceil(x)` nad `DOUBLE` daje pole `INTEGER` i tego wymaga test
+/// integracyjny `fncall_runtime_case`.
+///
+/// Punkt stały zamiast jednego przebiegu, bo na tym etapie qTree jest posortowane po
+/// interwale (resolveStreamIntervals), a nie topologicznie: konsument potrafi stać przed
+/// swoim producentem, a typ musi się przez plan przenieść.
+std::string compiler::inferStringFieldTypes() {
+  auto shapeOfField = [this](const std::string &streamId, int fieldIndex) -> std::optional<fieldShape> {
+    const auto sourceField = sourceFieldAt(streamId, fieldIndex);
+    if (!sourceField.has_value()) return std::nullopt;
+    return fieldShape{sourceField->rtype, sourceField->rlen * sourceField->rarray};
+  };
+
+  for (std::size_t round = 0; round <= coreInstance.size(); ++round) {
+    bool changed = false;
+    for (auto &q : coreInstance) {
+      if (q.isCompilerDirective() || q.isDeclaration()) continue;
+      for (auto &f : q.lSchema) {
+        if (f.lProgram.empty()) continue;
+        const auto width = inferStringWidth(f.lProgram, shapeOfField);
+        if (!width.has_value()) continue;
+        if (f.field_.rtype == rdb::STRING && f.field_.rlen * f.field_.rarray == *width) continue;
+        f.field_.rtype  = rdb::STRING;
+        f.field_.rlen   = static_cast<int>(sizeof(uint8_t));
+        f.field_.rarray = *width;
+        changed         = true;
+      }
+    }
+    if (!changed) break;
+  }
+  return {"OK"};
+}
+
 /// R3 — uproszczenia algebraiczne w programach pól i w warunkach reguł.
 ///
 /// Reguły i ich uzasadnienie są przy simplifyExpression() (exprSimplify.hpp); tutaj jest
@@ -2079,34 +2152,12 @@ std::string compiler::shareEquivalentSelectComputations() {
 /// Przed shareEquivalentSelectComputations(), bo odciski liczą się z tokenów — kanoniczna
 /// postać wyrażenia zwiększa liczbę wykrytych równoważności.
 std::string compiler::simplifyFieldExpressions() {
-  // Indeks w PUSH_ID jest PŁASKI — liczy elementy, nie pozycje w schemacie. Pole zadeklarowane
-  // jako `a INTEGER[4]` zajmuje cztery kolejne indeksy pod JEDNĄ pozycją lSchema, a pola
-  // konfiguracyjne deskryptora nie zajmują żadnego. Odwzorowanie wprost po pozycji w liście
-  // zgadza się więc tylko dla schematów złożonych wyłącznie ze skalarów; dla
-  // `DECLARE f FLOAT[4], n INTEGER` indeks 1 to `f[1]` (FLOAT), a nie `n` (INTEGER) — czyli typ
-  // wychodził NIE TEN, a nie tylko „nieznany".
-  //
-  // Reguła płaskiego indeksu musi być TA SAMA, co w Descriptor::rebuildFieldMappings(), bo to
-  // ona rządzi odczytem w payload::getItemVT: STRING zajmuje jeden indeks, pozostałe rarray.
   auto typeOfField = [this](const std::string &streamId, int fieldIndex) -> std::optional<rdb::descFld> {
-    auto source = std::ranges::find_if(coreInstance, [&streamId](const query &q) { return q.id == streamId; });
-    if (source == coreInstance.end() || fieldIndex < 0) return std::nullopt;
-
-    int remaining = fieldIndex;
-    for (const auto &item : source->lSchema) {
-      const auto type = item.field_.rtype;
-      // Pola konfiguracyjne deskryptora (TYPE, REF, RETENTION, RETMEMORY) nie są wartościami
-      // wyrażeń i nie zajmują indeksów płaskich — Descriptor pomija je tak samo.
-      if (type == rdb::TYPE || type == rdb::REF || type == rdb::RETENTION || type == rdb::RETMEMORY) continue;
-      const int flatCount = (type == rdb::STRING) ? 1 : item.field_.rarray;
-      if (remaining < flatCount) {
-        // NULLTYPE zajmuje indeks, ale jego „typ" nie mówi nic o arytmetyce.
-        if (type > rdb::STRING) return std::nullopt;
-        return type;
-      }
-      remaining -= flatCount;
-    }
-    return std::nullopt;
+    const auto sourceField = sourceFieldAt(streamId, fieldIndex);
+    if (!sourceField.has_value()) return std::nullopt;
+    // NULLTYPE zajmuje indeks, ale jego „typ" nie mówi nic o arytmetyce.
+    if (sourceField->rtype > rdb::STRING) return std::nullopt;
+    return sourceField->rtype;
   };
 
   for (auto &q : coreInstance) {
@@ -2494,6 +2545,12 @@ std::string compiler::compile() {
   if (result != "OK") return result;
 
   result = resolveFieldReferences();
+  if (result != "OK") return result;
+
+  // MUSI stac PRZED upraszczaniem wyrazen, i nie jest to kwestia porzadku. Po zwinieciu stalych
+  // `to_string(42:16)` jest literalem "42", wiec szerokosc pola wyszlaby 2 zamiast 16 — deskryptor
+  // zaczalby zalezec od RDB_OPT_SIMPLIFY_EXPRESSIONS, czyli od przelacznika wydajnosciowego.
+  result = inferStringFieldTypes();
   if (result != "OK") return result;
 
 #if RDB_OPT_SIMPLIFY_EXPRESSIONS

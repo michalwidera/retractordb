@@ -154,6 +154,14 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
           myFile_.seekg(0, std::ios::beg);
           myFile_ >> std::ws;
         }
+        auto strLen = item.rlen * item.rarray;
+
+        // Napis BEZ cudzyslowu jest zwyklym tokenem rozdzielanym bialym znakiem — jego wartosc
+        // idzie do pola tak samo, jak wartosc pola liczbowego. Do 2026-08-30 przeczytany token
+        // byl tu wyrzucany, a sterowanie schodzilo do skanu cudzyslowu ponizej: ten konsumowal
+        // reszte pliku, zawijal go i rozjezdzal caly rekord. Dla `DECLARE txt STRING[8], k INTEGER`
+        // nad wierszem `42 7` pole txt wychodzilo puste, a k dostawalo 42 — czyli pierwszy token
+        // wiersza (pozycja 12 w usecases/requested.md).
         if (myFile_.peek() != '"') {
           auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
           if (!token.has_value() || isNullToken(*token)) {
@@ -161,10 +169,14 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
             i++;
             continue;
           }
+          auto plain = *token;
+          plain.resize(strLen);
+          payload_->setItem(i, plain);
+          i++;
+          continue;
         }
 
         std::string var;
-        auto strLen = item.rlen * item.rarray;
         char c;
         bool found = false;
         while (myFile_.get(c) && c != '"')

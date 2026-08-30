@@ -53,6 +53,7 @@ struct compiler {
   std::map<std::string, std::set<std::string>> namedSourceRefs_;
   std::map<std::string, std::vector<std::string>> generatedStreams_;
   std::list<field> buildOutputSchema(const std::string &sName1, const std::string &sName2, token &cmd_token);
+  [[nodiscard]] std::optional<rdb::rField> sourceFieldAt(const std::string &streamId, int flatIndex) const;
   std::string composeStreamName(const std::string &sName1, const std::string &sName2, const token &cmd);
   void resolveTokenReferences(std::list<token> &lProgram, query &q);
   void snapshotNamedSourceRefs();
@@ -70,6 +71,7 @@ struct compiler {
   std::optional<int> sourceSpanIn(query &node, int nodeWidth, const std::string &name);
   std::optional<int> descendSpan(const std::string &nodeId, int width, const std::string &name);
   std::string resolveFieldReferences();
+  std::string inferStringFieldTypes();
   std::string localizeFieldOffsets();
   void collectTransitiveOffsets(const std::string &srcId, int baseOffset, bool viaHash, std::map<std::string, int> &result,
                                 std::set<std::string> &viaInterleave);

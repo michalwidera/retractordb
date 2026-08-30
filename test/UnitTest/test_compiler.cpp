@@ -14,6 +14,7 @@
 #include <boost/system/error_code.hpp>
 
 #include "retractor/lib/compiler.hpp"
+#include "retractor/lib/exprSimplify.hpp"
 #include "retractor/lib/qTree.hpp"
 
 // ctest -R '^ut-test_compiler' -V
@@ -2093,4 +2094,101 @@ TEST(xcompiler, field_type_lookup_uses_flat_element_index) {
   for (const auto &item : intArray.getQuery("t").lSchema)
     EXPECT_EQ(std::ranges::count_if(item.lProgram, [expected](const token &tk) { return tk.getCommandID() == expected; }), 1)
         << "pole " << item.field_.rname;
+}
+
+// ---------------------------------------------------------------------------
+// Typ pola wyjsciowego (pozycja 12 w usecases/requested.md)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Pole schematu strumienia po numerze pozycji — typ i szerokosc, czyli to, co trafia
+/// do deskryptora artefaktu.
+const rdb::rField &outputField(qTree &plan, const std::string &streamId, const int position) {
+  const auto &schema = plan.getQuery(streamId).lSchema;
+  auto it            = schema.begin();
+  std::advance(it, position);
+  return it->field_;
+}
+
+}  // namespace
+
+// Pole zadeklarowane jako STRING ma dotrzec do deskryptora wyjscia. Do 2026-08-30 `SELECT txt`
+// dawalo pole INTEGER wypelnione zerami: parser nie zna typow pol obcych strumieni, a innego
+// wnioskowania nie bylo.
+TEST(xcompiler, string_field_reaches_output_descriptor) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE txt STRING[8], k INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT txt, k STREAM dst FROM src\n");
+
+  const auto &text = outputField(plan, "dst", 0);
+  EXPECT_EQ(text.rtype, rdb::STRING);
+  EXPECT_EQ(text.rlen * text.rarray, 8);
+
+  // Kontrola, ze przebieg podnosi WYLACZNIE napisy — sasiednie pole liczbowe zostaje.
+  EXPECT_EQ(outputField(plan, "dst", 1).rtype, rdb::INTEGER);
+}
+
+// Ten sam typ musi przejsc przez strumien posredni: przebieg liczy punkt staly, bo na tym
+// etapie qTree jest posortowane po interwale, a nie topologicznie.
+TEST(xcompiler, string_type_propagates_through_intermediate_stream) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE txt STRING[8], k INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT txt STREAM mid FROM src\n"
+      "SELECT mid[0] STREAM dst FROM mid\n");
+
+  const auto &text = outputField(plan, "dst", 0);
+  EXPECT_EQ(text.rtype, rdb::STRING);
+  EXPECT_EQ(text.rlen * text.rarray, 8);
+}
+
+// Typ wyniku, nie pierwszy napotkany literal. `to_integer('42')+k` jest liczba, mimo ze
+// literal tekstowy stoi w programie przed dodawaniem.
+TEST(xparser, string_literal_inside_numeric_expression_does_not_make_string_field) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT to_integer('42')+a STREAM dst FROM src\n");
+
+  EXPECT_EQ(outputField(plan, "dst", 0).rtype, rdb::INTEGER);
+}
+
+// Odwrotny kierunek dziala jak dotad i ma pilnowana szerokosc: `to_string(expr : N)` daje
+// pole N-bajtowe, a konkatenacja sumuje szerokosci skladnikow (16 + 5 = 21). Ta sama liczba
+// stoi we wzorcu testu integracyjnego issue128_numeric_to_string.
+TEST(xparser, to_string_width_survives_concatenation) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT to_string(src[0]:16)+'_test', to_string(src[1]:16), to_string(src[0]) STREAM dst FROM src\n");
+
+  const auto &concatenated = outputField(plan, "dst", 0);
+  EXPECT_EQ(concatenated.rtype, rdb::STRING);
+  EXPECT_EQ(concatenated.rlen * concatenated.rarray, 21);
+
+  const auto &declared = outputField(plan, "dst", 1);
+  EXPECT_EQ(declared.rtype, rdb::STRING);
+  EXPECT_EQ(declared.rlen * declared.rarray, 16);
+
+  // Bez zadeklarowanej szerokosci zostaje domyslna kToStringDefaultWidth.
+  const auto &fallback = outputField(plan, "dst", 2);
+  EXPECT_EQ(fallback.rtype, rdb::STRING);
+  EXPECT_EQ(fallback.rlen * fallback.rarray, kToStringDefaultWidth);
+}
+
+// Wnioskowany jest WYLACZNIE napis. Typy liczbowe zostaja przy dotychczasowej regule
+// (INTEGER, chyba ze ostatnim tokenem jest to_float albo to_double) — `Ceil(x)` nad DOUBLE
+// ma dac pole INTEGER, bo tego wymaga test integracyjny fncall_runtime_case.
+TEST(xparser, numeric_result_types_are_unchanged) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER, b DOUBLE STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT Ceil(src[1]), src[1], to_float(src[0]), to_double(src[0]) STREAM dst FROM src\n");
+
+  EXPECT_EQ(outputField(plan, "dst", 0).rtype, rdb::INTEGER);
+  EXPECT_EQ(outputField(plan, "dst", 1).rtype, rdb::INTEGER);
+  EXPECT_EQ(outputField(plan, "dst", 2).rtype, rdb::FLOAT);
+  EXPECT_EQ(outputField(plan, "dst", 3).rtype, rdb::DOUBLE);
 }

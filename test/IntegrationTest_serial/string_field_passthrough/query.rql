@@ -1,0 +1,7 @@
+# make install && ctest -R string_field_passthrough -V
+
+STORAGE 'temp'
+
+DECLARE txt STRING[8], k INTEGER STREAM src, 1/8 FILE 'data.txt' ONESHOT
+
+SELECT txt, k STREAM dst FROM src

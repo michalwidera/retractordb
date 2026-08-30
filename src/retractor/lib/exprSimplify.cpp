@@ -395,3 +395,121 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
   program = std::move(stack.front().program);
   return rewrites;
 }
+
+namespace {
+
+/// Wartość na stosie wnioskowania typu wyniku: napis o znanej szerokości albo liczba.
+/// Liczba wchodząca w konkatenację ma szerokość 0 — tak samo, jak liczyła ją reguła
+/// sprzed 2026-08-30, więc szerokości pól w istniejących planach się nie zmieniają.
+struct inferredValue {
+  bool isString;
+  int width;
+};
+
+}  // namespace
+
+std::optional<int> inferStringWidth(const std::list<token> &program, const fieldShapeLookup &shapeOfField) {
+  if (program.empty()) return std::nullopt;
+
+  std::vector<inferredValue> stack;
+
+  auto pop = [&stack]() -> std::optional<inferredValue> {
+    if (stack.empty()) return std::nullopt;
+    const inferredValue result = stack.back();
+    stack.pop_back();
+    return result;
+  };
+
+  for (const auto &tk : program) {
+    const command_id cmd = tk.getCommandID();
+    switch (cmd) {
+      case PUSH_VAL:
+        if (const auto *text = std::get_if<std::string>(&tk.getVT()))
+          stack.push_back({true, static_cast<int>(text->length())});
+        else
+          stack.push_back({false, 0});
+        break;
+
+      // Odwołanie do pola. Kształt zna wyłącznie PUSH_ID, bo tylko on niesie parę
+      // (nazwa strumienia, indeks płaski). Pozostałe postaci są przedrozwiązaniowe:
+      // PUSH_ID1/PUSH_ID3 trzymają sam tekst, a PUSH_ID2 wprawdzie parę, ale jej pierwszy
+      // element to odwołanie `strumień[offset]`, a nie nazwa. Wchodzą więc jako liczba —
+      // i jest to dokładnie stan wiedzy parsera, którego domyślnym typem pola jest INTEGER.
+      case PUSH_ID:
+      case PUSH_ID1:
+      case PUSH_ID2:
+      case PUSH_ID3:
+      case PUSH_ID4:
+      case PUSH_ID5:
+      case PUSH_IDX: {
+        std::optional<fieldShape> shape;
+        if (cmd == PUSH_ID)
+          if (const auto *reference = std::get_if<std::pair<std::string, int>>(&tk.getVT()))
+            shape = shapeOfField(reference->first, reference->second);
+        if (shape.has_value() && shape->type == rdb::STRING)
+          stack.push_back({true, shape->width});
+        else
+          stack.push_back({false, 0});
+      } break;
+
+      case CALL:
+      case CALL2: {
+        if (!pop().has_value()) return std::nullopt;
+        if (lowercased(tk.getStr_()) != "to_string") {
+          stack.push_back({false, 0});
+          break;
+        }
+        // Szerokość zadeklarowana `to_string(expr : N)` siedzi w tokenie jako IDXPAIR —
+        // jest deklaracją pola, a nie wartością na stosie (patrz rqlFunctions.hpp).
+        int width = kToStringDefaultWidth;
+        if (cmd == CALL2)
+          if (const auto *declared = std::get_if<std::pair<std::string, int>>(&tk.getVT())) width = declared->second;
+        stack.push_back({true, width});
+      } break;
+
+      case NEGATE:
+      case NOT:
+        if (!pop().has_value()) return std::nullopt;
+        stack.push_back({false, 0});
+        break;
+
+      // Konkatenacja: `operator+` ewaluatora normalizuje operandy do wyższego indeksu
+      // wariantu, a STRING stoi wyżej niż każdy typ liczbowy — więc `'a'+1` daje napis.
+      case ADD: {
+        auto right = pop();
+        auto left  = pop();
+        if (!right.has_value() || !left.has_value()) return std::nullopt;
+        if (left->isString || right->isString)
+          stack.push_back({true, left->width + right->width});
+        else
+          stack.push_back({false, 0});
+      } break;
+
+      case SUBTRACT:
+      case MULTIPLY:
+      case DIVIDE:
+      case POWER:
+      case CMP_EQUAL:
+      case CMP_NOT_EQUAL:
+      case CMP_LT:
+      case CMP_GT:
+      case CMP_LE:
+      case CMP_GE:
+      case AND:
+      case OR: {
+        auto right = pop();
+        auto left  = pop();
+        if (!right.has_value() || !left.has_value()) return std::nullopt;
+        stack.push_back({false, 0});
+      } break;
+
+      default:
+        // Token spoza zestawu ewaluatora (PUSH_STREAM, COUNT, PUSH_TSCAN...) — nie znamy
+        // jego arytmetyki stosu, więc odmawiamy odpowiedzi zamiast zgadywać.
+        return std::nullopt;
+    }
+  }
+
+  if (stack.size() != 1 || !stack.front().isString) return std::nullopt;
+  return stack.front().width > 0 ? stack.front().width : kToStringDefaultWidth;
+}

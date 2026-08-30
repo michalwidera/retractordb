@@ -66,3 +66,42 @@ using fieldTypeLookup = std::function<std::optional<rdb::descFld>(const std::str
 /// @param typeOfField odwzorowanie PUSH_ID → typ pola źródłowego
 /// @return liczba zastosowanych przepisań (0 = program nietknięty)
 std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup &typeOfField);
+
+/// Szerokość pola `STRING` bez zadeklarowanego `N` — `to_string(expr)` bez dwukropka.
+constexpr int kToStringDefaultWidth = 32;
+
+/// Kształt pola źródłowego: typ i szerokość napisu w bajtach (`rlen * rarray`).
+/// Dla pól nietekstowych szerokość jest bez znaczenia i nie jest czytana.
+struct fieldShape {
+  rdb::descFld type;
+  int width;
+};
+
+/// Kształt pola źródłowego, po nazwie strumienia i PŁASKIM indeksie pola — jak
+/// `fieldTypeLookup`, tylko z szerokością. std::nullopt oznacza „nie wiadomo".
+using fieldShapeLookup = std::function<std::optional<fieldShape>(const std::string &, int)>;
+
+/// @brief Szerokość pola wyjściowego, gdy wynikiem wyrażenia jest napis.
+///
+/// Odpowiada na jedno pytanie: czy wartość, która ZOSTAJE NA STOSIE po wykonaniu programu,
+/// jest napisem, i jak szeroka. Do 2026-08-30 pytanie to było zadawane inaczej — przez skan
+/// programu do PIERWSZEGO literału tekstowego — więc wyrażenie liczbowe z literałem gdziekolwiek
+/// w środku lądowało w polu `STRING` (`to_integer('42')+k`, pozycja 12 w usecases/requested.md).
+///
+/// Wnioskowany jest WYŁĄCZNIE napis. Typy liczbowe zostają przy regule, którą stosuje
+/// `RQLParser::exitExpression`: `INTEGER`, chyba że ostatnim tokenem jest `to_float`
+/// albo `to_double`. Rozszerzenie na propagację `FLOAT`/`DOUBLE` byłoby zmianą znaczenia
+/// istniejących planów — `Ceil(x)` nad `DOUBLE` daje dziś pole `INTEGER` i tego wymaga
+/// test integracyjny `fncall_runtime_case`.
+///
+/// Reguły stosu: `to_string` → napis zadeklarowanej szerokości (albo kToStringDefaultWidth),
+/// literał tekstowy → napis swojej długości, `PUSH_ID` → napis, gdy pole źródłowe jest
+/// `STRING`, `ADD` dwóch napisów → konkatenacja (suma szerokości). Wszystko pozostałe jest
+/// liczbą. Token spoza zestawu ewaluatora (PUSH_STREAM, COUNT, PUSH_TSCAN...) przerywa
+/// wnioskowanie — tak samo jak w simplifyExpression().
+///
+/// @param program wyrażenie w ONP
+/// @param shapeOfField odwzorowanie PUSH_ID → kształt pola źródłowego; przy parsowaniu,
+///        gdzie schematów obcych strumieni jeszcze nie ma, wolno zwracać zawsze nullopt
+/// @return szerokość pola `STRING`, albo nullopt gdy wynik nie jest napisem lub nie wiadomo
+std::optional<int> inferStringWidth(const std::list<token> &program, const fieldShapeLookup &shapeOfField);

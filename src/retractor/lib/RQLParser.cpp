@@ -15,6 +15,7 @@
 #include ".antlr/RQLParser.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 #include "constants.hpp"
+#include "exprSimplify.hpp"
 #include "fatalError.hpp"
 #include "qTree.hpp"
 #include "rdb/convertTypes.hpp"
@@ -26,8 +27,7 @@ using namespace antlr4;
 std::string status = "OK";
 
 namespace {
-constexpr size_t kAgseWindowSignChildIndex  = 5;
-constexpr int kFallbackToStringOutputLength = 32;
+constexpr size_t kAgseWindowSignChildIndex = 5;
 }  // namespace
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
@@ -457,31 +457,20 @@ class ParserListener : public RQLBaseListener {
     auto outType = rdb::INTEGER;
     int outLen   = 4;
     int outArr   = 1;
-    for (auto &it : program) {
-      if ((it.getCommandID() == CALL || it.getCommandID() == CALL2) && it.getStr_() == "to_string") {
-        outType = rdb::STRING;
-        outLen  = 1;
-        break;
-      }
-      if (it.getCommandID() == PUSH_VAL && it.getVT().index() == rdb::STRING) {
-        outType = rdb::STRING;
-        outLen  = 1;
-        break;
-      }
-    }
-    if (outType == rdb::STRING) {
-      outArr = 0;
-      for (auto &tk : program) {
-        if (tk.getCommandID() == CALL2 && tk.getStr_() == "to_string")
-          outArr += std::get<std::pair<std::string, int>>(tk.getVT()).second;
-        else if (tk.getCommandID() == CALL && tk.getStr_() == "to_string")
-          outArr += kFallbackToStringOutputLength;
-        else if (tk.getCommandID() == PUSH_VAL && tk.getVT().index() == rdb::STRING)
-          outArr += static_cast<int>(std::get<std::string>(tk.getVT()).length());
-      }
-      if (outArr == 0) outArr = kFallbackToStringOutputLength;
-    }
-    if (outType == rdb::INTEGER && !program.empty()) {
+
+    // Napis rozstrzyga wynik CALEGO wyrazenia, a nie pierwszy napotkany literal — inaczej
+    // `to_integer('42')+k` ladowalo w polu STRING (pozycja 12 w usecases/requested.md).
+    // Ksztaltow pol obcych strumieni na etapie parsowania nie ma i miec nie moze, wiec
+    // odwolanie do pola wchodzi tu jako liczba; przypadek `SELECT txt` nad polem STRING
+    // domyka compiler::inferStringFieldTypes(), gdy schematy sa juz rozwiazane.
+    const auto stringWidth =
+        inferStringWidth(program, [](const std::string &, int) -> std::optional<fieldShape> { return std::nullopt; });
+
+    if (stringWidth.has_value()) {
+      outType = rdb::STRING;
+      outLen  = 1;
+      outArr  = *stringWidth;
+    } else if (!program.empty()) {
       auto &last = program.back();
       if (last.getCommandID() == CALL) {
         auto fn = last.getStr_();
