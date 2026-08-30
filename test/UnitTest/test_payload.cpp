@@ -2,6 +2,9 @@
 
 #include <algorithm>
 #include <any>
+#include <array>
+#include <bit>
+#include <cstdint>
 #include <cstring>
 #include <sstream>
 #include <string>
@@ -356,6 +359,54 @@ TEST(payload, vt_interface_null_matches_any_interface) {
   EXPECT_EQ(v.getNullBitset(), a.getNullBitset());
   ASSERT_EQ(v.span().size(), a.span().size());
   EXPECT_TRUE(std::equal(a.span().begin(), a.span().end(), v.span().begin()));
+}
+
+// Uklad pola RATIONAL w rekordzie — para int32 (licznik, mianownik), licznik pierwszy,
+// 8 bajtow na wartosc. Jest to format ZEWNETRZNY: czytelnik artefaktu spoza silnika rozbiera
+// te bajty wprost, a opis w dokumentacji (format-zapisu-danych/pliki.md, "Uklad pola RATIONAL")
+// twierdzi dokladnie to. Do 2026-08-30 dokumentacja podawala 16 B i pare int64 — bledny opis
+// przeszedl niezauwazony, bo nic go nie sprawdzalo. Ten test jest ta kontrola.
+TEST(payload, rational_field_layout_is_two_int32_numerator_first) {
+  static_assert(sizeof(boost::rational<int>) == 2 * sizeof(int32_t));
+
+  auto desc = rdb::Descriptor("ratio", static_cast<int>(sizeof(boost::rational<int>)), 1, rdb::RATIONAL);
+  rdb::payload p(desc);
+  p.setItem(0, boost::rational<int>(-8, 3));
+
+  ASSERT_EQ(p.span().size(), 8U);
+
+  int32_t numerator{}, denominator{};
+  std::memcpy(&numerator, p.span().data(), sizeof(numerator));
+  std::memcpy(&denominator, p.span().data() + sizeof(numerator), sizeof(denominator));
+  EXPECT_EQ(numerator, -8);
+  EXPECT_EQ(denominator, 3);
+
+  // Bajty wprost — tak, jak widzi je hexdump artefaktu na maszynie little-endian.
+  if constexpr (std::endian::native == std::endian::little) {
+    const std::array<uint8_t, 8> expected{0xf8, 0xff, 0xff, 0xff, 0x03, 0x00, 0x00, 0x00};
+    EXPECT_TRUE(std::equal(expected.begin(), expected.end(), p.span().begin()));
+  }
+}
+
+// Niezmienniki postaci zapisanej: ulamek nieskracalny, mianownik dodatni, zero jako 0/1.
+// Czytelnik artefaktu ma prawo na nich polegac i dokumentacja mu to obiecuje, wiec nie moga
+// zaleze wylacznie od tego, ze boost normalizuje przy przypisaniu.
+TEST(payload, rational_field_is_stored_in_normalized_form) {
+  auto desc = rdb::Descriptor("ratio", static_cast<int>(sizeof(boost::rational<int>)), 1, rdb::RATIONAL);
+  rdb::payload p(desc);
+
+  const auto stored = [&p](boost::rational<int> value) {
+    p.setItem(0, value);
+    int32_t numerator{}, denominator{};
+    std::memcpy(&numerator, p.span().data(), sizeof(numerator));
+    std::memcpy(&denominator, p.span().data() + sizeof(numerator), sizeof(denominator));
+    return std::make_pair(numerator, denominator);
+  };
+
+  EXPECT_EQ(stored(boost::rational<int>(6, 3)), std::make_pair(2, 1));    // skrocone
+  EXPECT_EQ(stored(boost::rational<int>(0, 5)), std::make_pair(0, 1));    // zero jako 0/1
+  EXPECT_EQ(stored(boost::rational<int>(1, -3)), std::make_pair(-1, 3));  // znak w liczniku
+  EXPECT_EQ(stored(boost::rational<int>(7)), std::make_pair(7, 1));       // calkowita jako n/1
 }
 
 // NOLINTEND(bugprone-unchecked-optional-access,modernize-avoid-c-arrays)

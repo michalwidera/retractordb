@@ -137,6 +137,29 @@ TEST(cast_variant, rational_to_float) {
   EXPECT_FLOAT_EQ(std::get<float>(c(in, rdb::FLOAT)), 0.5F);
 }
 
+// Zaokraglenie przy rzutowaniu na INTEGER — OBCIECIE W STRONE ZERA, nie podloga.
+// Regula jest udokumentowana (operatory-agregujace.md, sekcja "Zaokraglenie") i korpus
+// UC04/UC06/UC08 opiera na niej swoje modele w Pythonie, gdzie `//` PODLOGUJE. Roznica
+// widac tylko na wartosciach ujemnych, wiec bez tych przypadkow zmiana rational_cast na
+// floor przeszlaby przez cala baterie niezauwazona.
+TEST(cast_variant, rational_to_integer_truncates_toward_zero) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT positive      = boost::rational<int>(8, 3);
+  rdb::descFldVT negative      = boost::rational<int>(-8, 3);
+  rdb::descFldVT negativeSmall = boost::rational<int>(-4, 3);
+
+  EXPECT_EQ(std::get<int>(c(positive, rdb::INTEGER)), 2);
+  EXPECT_EQ(std::get<int>(c(negative, rdb::INTEGER)), -2);       // podloga dalaby -3
+  EXPECT_EQ(std::get<int>(c(negativeSmall, rdb::INTEGER)), -1);  // podloga dalaby -2
+}
+
+// Ta sama regula dla argumentu zmiennoprzecinkowego — to_integer nie rozroznia zrodla.
+TEST(cast_variant, double_to_integer_truncates_toward_zero) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = -2.6666666666666665;
+  EXPECT_EQ(std::get<int>(c(in, rdb::INTEGER)), -2);  // podloga dalaby -3
+}
+
 // ── cast<descFldVT> — STRING ──────────────────────────────────────────────────
 
 TEST(cast_variant, int_to_string) {
