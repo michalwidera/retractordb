@@ -19,8 +19,12 @@ done
 cp query.rql gen/
 cp manual.rql man/
 
-(cd gen && xretractor query.rql -r -k -m 4 >/dev/null)
-(cd man && xretractor manual.rql -r -k -m 4 >/dev/null)
+# Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
+# wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
+# Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
+# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+(cd gen && xretractor query.rql -r -k -m 4 -f >/dev/null)
+(cd man && xretractor manual.rql -r -k -m 4 -f >/dev/null)
 
 dump() { od -An -v -tu4 "$1" | xargs; }
 

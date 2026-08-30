@@ -22,7 +22,11 @@ if grep -F 'STREAM_TIMEMOVE_1_B(' out_compile.txt; then exit 1; fi
 if grep -F 'STREAM_TIMEMOVE_2_A2(' out_compile.txt; then exit 1; fi
 if grep -F 'STREAM_TIMEMOVE_1_B2(' out_compile.txt; then exit 1; fi
 
-xretractor query.rql -r -k -m 48
+# Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
+# wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
+# Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
+# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+xretractor query.rql -r -k -m 48 -f
 
 # Physical equality covers the complete stored INTEGER payload. Metadata headers
 # contain per-stream creation timestamps, so compare the format-dependent body

@@ -1,3 +1,5 @@
+core0(1/10)	datafile1.txt
+	a: INTEGER
 str1(1/10)
 	:- PUSH_STREAM(core0)
 	str1_0: INTEGER
@@ -18,5 +20,3 @@ str3(1/10)
 		PUSH_ID(str3[1])
 		PUSH_ID(str3[0])
 		SUBTRACT
-core0(1/10)	datafile1.txt
-	a: INTEGER

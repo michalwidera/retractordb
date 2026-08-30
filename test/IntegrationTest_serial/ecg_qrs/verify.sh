@@ -53,7 +53,11 @@ diff shape-pattern.txt shape.txt || {
 }
 
 # --- 2. tresc strumieni --------------------------------------------------------------
-xretractor query.rql -r -k -m "$kBudget" > run.out 2> run.err
+# Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
+# wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
+# Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
+# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+xretractor query.rql -r -k -m "$kBudget" -f > run.out 2> run.err
 
 for pair in $kExpected; do
   stream=${pair%%:*}

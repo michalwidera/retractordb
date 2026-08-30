@@ -41,7 +41,11 @@ grep -F 'STREAM_AGSE_1_3_wide(1/14)' out_compile.txt
 grep -F ':- PUSH_STREAM(STREAM_AGSE_1_3_wide)' out_compile.txt
 grep -F ':- STREAM_SUM' out_compile.txt
 
-xretractor query.rql -r -k -m 60
+# Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
+# wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
+# Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
+# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+xretractor query.rql -r -k -m 60 -f
 
 # Wytworzenie artefaktu. SUBSTRAT 'default', wiec wezel skrotu ma na dysku komplet:
 # dane, deskryptor, metadane i cien. Cien bywa pusty (brak luk do odnotowania), wiec

@@ -162,7 +162,11 @@ if [ "$mode" = "plan" ]; then
   exit 0
 fi
 
-RDB_BENCH_MATERIALIZE=1 "$xretractor_bin" query.rql -r -k -m 48 2> out_run.txt
+# Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
+# wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
+# Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
+# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+RDB_BENCH_MATERIALIZE=1 "$xretractor_bin" query.rql -r -k -m 48 -f 2> out_run.txt
 
 if [ "$probe" = "ON" ]; then
   # Licznik materializacji (K6) ma wyrocznię: zadeklarowana objętość trwała musi

@@ -1,0 +1,3 @@
+add_test([=[it_zdrowy]=] "bash" "run.sh" "/build")
+add_test([=[it_rozbity]=] "sh" "-c" "set -e " "   rm -f *.meta " "   xretractor q.rql -m 5 ")
+add_test([=[it_jednoargumentowy]=] "bash" "-c" "set -e ; a ; b")

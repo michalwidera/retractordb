@@ -54,7 +54,11 @@ grep -F 'rhs(1/15)	origin=3' out_compile.txt
 grep -F 'phase_lhs(3/25)	tail=2	origin=5' out_compile.txt
 grep -F 'phase_rhs(3/25)	origin=5' out_compile.txt
 
-xretractor query.rql -r -k -m 48
+# Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
+# wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
+# Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
+# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+xretractor query.rql -r -k -m 48 -f
 
 # --- narzedzia porownania -----------------------------------------------------------
 #

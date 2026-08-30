@@ -14,13 +14,8 @@ set(TestID "it_${TestID}")
 add_test(
   NAME ${TestID}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND
-    sh -c
-    "set -e ; \
-  rm -f *.meta ; \
-  xretractor -c query-consitency.rql > out_compile.txt ; \
-  xretractor query-consitency.rql -m 5 -v > verbose.txt ; \
-  ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out_xtrdb.txt ; \
-  ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern_compile.txt out_compile.txt ; \
-  ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern_xtrdb.txt out_xtrdb.txt"
-)
+  COMMAND bash run.sh ${CMAKE_BINARY_DIR})
+
+# Uruchamia silnik (blokada uslugi) -> RUN_SERIAL jawnie: flagi -m/-k siedza
+# teraz w run.sh, wiec regex w makrze add_test ich nie widzi.
+set_tests_properties(${TestID} PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)

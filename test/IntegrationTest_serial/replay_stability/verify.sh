@@ -20,11 +20,15 @@ readonly kMinimumFiles=36
 rm -rf temp run1
 mkdir -p temp
 
-xretractor query.rql -r -k -m "$kBudget" > run1.out 2> run1.err
+# Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
+# wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
+# Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
+# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+xretractor query.rql -r -k -m "$kBudget" -f > run1.out 2> run1.err
 mv temp run1
 
 mkdir -p temp
-xretractor query.rql -r -k -m "$kBudget" > run2.out 2> run2.err
+xretractor query.rql -r -k -m "$kBudget" -f > run2.out 2> run2.err
 
 # --- kontrole niepustosci -----------------------------------------------------------
 #

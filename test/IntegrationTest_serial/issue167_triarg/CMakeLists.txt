@@ -20,15 +20,8 @@ set(TestID "it_${TestID}")
 add_test(
   NAME ${TestID}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND
-    sh -c
-    "set -e ; \
-  rm -f out1 out1.desc out2 out2.desc out3 out3.desc out4 out4.desc out5 out5.desc \
-        STREAM_ADD_s1_s2.desc STREAM_ADD_STREAM_ADD_s1_s2_s3.desc \
-        STREAM_HASH_s1_s2.desc STREAM_HASH_s2_s3.desc \
-        s1.desc s2.desc s3.desc s4.desc *.meta *.shadow ; \
-  xretractor -c query.rql > out_compile.txt ; \
-  xretractor query.rql -m 30 ; \
-  ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out_run.txt ; \
-  ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern_compile.txt out_compile.txt ; \
-  ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern_run.txt out_run.txt")
+  COMMAND bash run.sh ${CMAKE_BINARY_DIR})
+
+# Uruchamia silnik (blokada uslugi) -> RUN_SERIAL jawnie: flaga -m siedzi teraz
+# w run.sh, wiec regex w makrze add_test jej nie widzi.
+set_tests_properties(${TestID} PROPERTIES RUN_SERIAL TRUE TIMEOUT 90)

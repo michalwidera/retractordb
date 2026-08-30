@@ -13,13 +13,17 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
+# Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
+# wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten
+# sam. Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera
+# -f znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
 add_test(
   NAME ${TestID}-vg-2
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND
     valgrind --vgdb=no --error-exitcode=1 --leak-check=full
     --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xretractor
-    query.rql -m 5)
+    query.rql -m 5 -f)
 
 # Bez czekania na plik blokady: serwer biegnie pierwszoplanowo (-m N), wiec po
 # jego powrocie proces juz nie istnieje. Usunieta petla odpytywala twardy /tmp i
@@ -31,7 +35,7 @@ add_test(
   COMMAND
     bash -c "
 set -e
-xretractor query.rql -m 11
+xretractor query.rql -m 11 -f
 ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt
 ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern-run.txt out.txt
 ")

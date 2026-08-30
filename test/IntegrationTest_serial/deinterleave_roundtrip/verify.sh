@@ -14,7 +14,11 @@
 # -m, wiec kazdy strumien porownujemy z prefiksem jego wzorca o dlugosci faktycznej.
 set -e
 rm -f ./*.meta ./*.desc ./*.shadow c a2 b2
-xretractor query.rql -r -k -m 48
+# Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
+# wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
+# Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
+# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+xretractor query.rql -r -k -m 48 -f
 
 dump() { od -An -v -tu4 "$1" | xargs; }
 records() { echo $(($(stat -c %s "$1") / 4)); }

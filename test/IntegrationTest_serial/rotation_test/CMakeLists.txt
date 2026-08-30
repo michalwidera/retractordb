@@ -10,7 +10,11 @@ set(TestID "it_${TestID}")
 # Bez czekania na plik blokady: serwer biegnie pierwszoplanowo (-m N), wiec po
 # jego powrocie proces juz nie istnieje. Usunieta petla odpytywala twardy /tmp i
 # tak czy tak nie dowodzila konca procesu — blokade kasuje destruktor przed
-# wyjsciem z main (zob. ../serverlib.sh).
+# wyjsciem z main (zob. ../serverlib.sh). Flaga -f (--no-clock) zdejmuje
+# czekanie na zegar scienny; os czasu planu, wyrownanie slotow i ogon zostaja
+# bez zmian, wiec artefakt jest bajtowo ten sam. Rownosc obu sciezek pilnuje
+# it_noclock_offline. UWAGA: w trybie -c litera -f znaczy 'fields' w wyjsciu DOT
+# — do wywolan kompilacyjnych jej NIE dodawac.
 add_test(
   NAME ${TestID}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -18,8 +22,8 @@ add_test(
     bash -c "
 set -e
 rm -f str*
-xretractor query.rql -m 2
-xretractor query.rql -m 2
+xretractor query.rql -m 2 -f
+xretractor query.rql -m 2 -f
 ls str* | grep --invert-match '\\.shadow$' | wc -l > count.txt
 ${CMAKE_COMMAND} -E compare_files --ignore-eol count.pattern count.txt
 ")
