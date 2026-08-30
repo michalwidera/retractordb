@@ -1,0 +1,36 @@
+echo TUMBLING
+open tumbling
+descc
+list 3
+
+echo SLIDING
+open sliding
+descc
+list 6
+
+echo SINGLE
+open single
+descc
+list 7
+
+echo REF_SINGLE
+open ref_single
+descc
+list 7
+
+echo REF_SUM
+open ref_sum
+descc
+list 7
+
+echo SCALAR3
+open scalar3
+descc
+list 5
+
+echo DERIVED3
+open derived3
+descc
+list 5
+
+quit

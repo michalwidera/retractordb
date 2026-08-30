@@ -35,7 +35,7 @@ public:
     RuleAsterisk = 15, RuleExpression = 16, RuleLogic = 17, RuleExpression_logic = 18, 
     RuleTerm_logic = 19, RuleExpression_factor = 20, RuleTerm = 21, RuleStream_expression = 22, 
     RuleStream_factor = 23, RuleGen_index = 24, RuleAgregator = 25, RuleStream_fn_call = 26, 
-    RuleFunction_call = 27
+    RuleWindow_agg = 27, RuleFunction_call = 28
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -82,6 +82,7 @@ public:
   class Gen_indexContext;
   class AgregatorContext;
   class Stream_fn_callContext;
+  class Window_aggContext;
   class Function_callContext; 
 
   class  ProgContext : public antlr4::ParserRuleContext {
@@ -885,6 +886,15 @@ public:
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
 
+  class  ExpWindowAggContext : public TermContext {
+  public:
+    ExpWindowAggContext(TermContext *ctx);
+
+    Window_aggContext *window_agg();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
   class  ExpUnaryContext : public TermContext {
   public:
     ExpUnaryContext(TermContext *ctx);
@@ -1195,6 +1205,29 @@ public:
   };
 
   Stream_fn_callContext* stream_fn_call();
+
+  class  Window_aggContext : public antlr4::ParserRuleContext {
+  public:
+    antlr4::Token *width = nullptr;
+    antlr4::Token *step = nullptr;
+    Window_aggContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+    virtual size_t getRuleIndex() const override;
+    Field_idContext *field_id();
+    std::vector<antlr4::tree::TerminalNode *> COLON();
+    antlr4::tree::TerminalNode* COLON(size_t i);
+    antlr4::tree::TerminalNode *MIN();
+    antlr4::tree::TerminalNode *MAX();
+    antlr4::tree::TerminalNode *AVG();
+    antlr4::tree::TerminalNode *SUMC();
+    std::vector<antlr4::tree::TerminalNode *> DECIMAL();
+    antlr4::tree::TerminalNode* DECIMAL(size_t i);
+
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+   
+  };
+
+  Window_aggContext* window_agg();
 
   class  Function_callContext : public antlr4::ParserRuleContext {
   public:

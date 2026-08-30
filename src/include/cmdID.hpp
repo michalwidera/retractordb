@@ -52,7 +52,18 @@ enum command_id : std::uint8_t {
   COUNT,              // 40
   COUNT_RANGE,        // 41
   PUSH_GENIDX,        // 42 - numer instancji generatora; zyje tylko do expandStreamGenerators()
-  POWER               // 43 - potegowanie `a^b`; dopisane NA KONCU, zeby nie przenumerowac reszty
+  POWER,              // 43 - potegowanie `a^b`; dopisane NA KONCU, zeby nie przenumerowac reszty
+  // Agregaty okna REKORDOWEGO w liscie SELECT: `MIN(cells : 10 : 10)`. Odrebne od
+  // STREAM_MIN/MAX/AVG/SUM, ktore redukuja pola JEDNEGO rekordu w klauzuli FROM.
+  //
+  // Zycie tokena jest dwuetapowe. Parser wystawia go z para (szerokosc, krok) i poprzedza
+  // odwolaniem do pola (PUSH_ID3/PUSH_ID1/PUSH_ID2). compiler::resolveWindowAggregates()
+  // zamienia te pare na indeks grupy w qTree::windowGroups i USUWA poprzedzajacy PUSH_ID,
+  // wiec od tego przebiegu token jest bezargumentowym lisciem programu.
+  WINDOW_MIN,  // 44
+  WINDOW_MAX,  // 45
+  WINDOW_AVG,  // 46
+  WINDOW_SUM   // 47
 };
 
 constexpr auto GetStringcommand_id(enum command_id index) -> std::string_view { return magic_enum::enum_name(index); }

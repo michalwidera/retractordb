@@ -42,6 +42,13 @@ class dataModel {
    */
   void constructInputPayload(const std::string &instance);
 
+  /*
+   * Wylicza okna rekordowe (MIN(pole:W:H) i rodzeństwo) dla jednego taktu strumienia.
+   * Musi stać TU, a nie w streamInstance ani w ewaluatorze: okno czyta historię ŹRÓDŁA,
+   * a dostęp do innych strumieni ma wyłącznie dataModel (qSet).
+   */
+  void computeWindowAggregates(const query &qry);
+
   void processRows(const std::set<std::string> &inSet, const boost::rational<int> &currentTimeSlot = boost::rational<int>(0));
   void processZeroStep();
 

@@ -155,6 +155,9 @@ public:
   virtual void enterExpAgg(RQLParser::ExpAggContext *ctx) = 0;
   virtual void exitExpAgg(RQLParser::ExpAggContext *ctx) = 0;
 
+  virtual void enterExpWindowAgg(RQLParser::ExpWindowAggContext *ctx) = 0;
+  virtual void exitExpWindowAgg(RQLParser::ExpWindowAggContext *ctx) = 0;
+
   virtual void enterExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
   virtual void exitExpUnary(RQLParser::ExpUnaryContext *ctx) = 0;
 
@@ -229,6 +232,9 @@ public:
 
   virtual void enterStream_fn_call(RQLParser::Stream_fn_callContext *ctx) = 0;
   virtual void exitStream_fn_call(RQLParser::Stream_fn_callContext *ctx) = 0;
+
+  virtual void enterWindow_agg(RQLParser::Window_aggContext *ctx) = 0;
+  virtual void exitWindow_agg(RQLParser::Window_aggContext *ctx) = 0;
 
   virtual void enterFunction_call(RQLParser::Function_callContext *ctx) = 0;
   virtual void exitFunction_call(RQLParser::Function_callContext *ctx) = 0;

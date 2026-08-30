@@ -34,6 +34,57 @@ inline std::pair<rdb::descFld, int> reductionResultField(rdb::descFld sourceType
   return {rdb::RATIONAL, static_cast<int>(sizeof(boost::rational<int>))};
 }
 
+/// Grupa okna rekordowego — cel jednego przejscia po historii zrodla.
+///
+/// Okno rekordu wyjsciowego n obejmuje rekordy zrodla `(n+1)*step-width ... (n+1)*step-1`,
+/// czyli konczy sie na OSTATNIM rekordzie zrodla nalezacym do slotu n. Stad interwal wyjscia
+/// `step * interwal zrodla`, a brzeg:
+///   origin = ceil((origin zrodla + width) / step) - 1
+///   ogon   = ceil(ogon zrodla / step)
+///
+/// Konwencja jest wymuszona, nie wybrana. Stemplowanie koncem na `n*step` — czyli wprost
+/// przeniesione z AGSE — daje przy width=step=10 okna [1..10], [11..20], ...: rekord 0 nie
+/// trafia do ZADNEGO okna. Kafelkowanie ma zaczynac sie od rekordu 0, bo strumien zaczyna
+/// sie od rekordu 0. Konwencja powyzej daje [0..9], [10..19], ... i zachowuje przy okazji
+/// dwie wlasnosci: `AGG(pole:1)` jest tozsame z reduktorem `FROM AGG(strumien)` (okno n to
+/// rekord n), a okno siega po NAJSWIEZSZY rekord dostepny w slocie n.
+///
+/// Wzgledem bazowego UC07 znika przy tym kompensacja `>1`: tam agregat wydany pod indeksem
+/// n opisuje sekunde n-1 (patrz uc07/README.md), tutaj opisuje sekunde n.
+///
+/// `firstSlot` i `slotCount` opisuja pole w PLASKIM ukladzie rekordu zrodla: `INTEGER[24]`
+/// to jeden wpis deskryptora, ale 24 sloty, i wszystkie 24 wchodza do okna. Redukcja obejmuje
+/// wiec `width * slotCount` wartosci.
+struct windowGroup {
+  std::string source;  ///< strumien zrodlowy (nazwa fizyczna po ekspansji generatorow)
+  int firstSlot = 0;   ///< pierwszy slot plaski pola w rekordzie zrodla
+  int slotCount = 1;   ///< liczba slotow plaskich pola (1 dla skalara, N dla `T[N]`)
+  int width     = 0;   ///< szerokosc okna w REKORDACH
+  int step      = 1;   ///< krok w REKORDACH
+
+  bool sameAs(const windowGroup &other) const {
+    return source == other.source && firstSlot == other.firstSlot && slotCount == other.slotCount && width == other.width &&
+           step == other.step;
+  }
+};
+
+/// Wynik JEDNEGO przejścia po oknie grupy — wszystkie cztery agregaty naraz.
+///
+/// Liczymy komplet, a nie tylko żądany agregat, bo przejście po oknie jest kosztem
+/// dominującym, a same porównania są darmowe. Dzięki temu `MIN(cells:10:10)` i
+/// `MAX(cells:10:10)` w jednej liście SELECT czytają historię źródła raz.
+///
+/// `count` liczy wartości NIE-NULL. NULL-e są pomijane (nie zerowane), a okno bez ani
+/// jednej wartości daje NULL we wszystkich czterech polach — zasada brzegu: brak wyniku
+/// nie jest zerem.
+struct windowStats {
+  rdb::descFldVT minValue{std::monostate{}};
+  rdb::descFldVT maxValue{std::monostate{}};
+  rdb::descFldVT sumValue{std::monostate{}};
+  rdb::descFldVT avgValue{std::monostate{}};
+  int count = 0;
+};
+
 class query {
   void fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &val, const std::string &id);
 
@@ -89,6 +140,22 @@ class query {
 
   std::list<field> lSchema;
   std::list<token> lProgram;
+
+  /// Grupy okien rekordowych tego zapytania — jedna pozycja na czworke
+  /// (zrodlo, pole, szerokosc, krok). Token WINDOW_* niesie indeks do tej tabeli.
+  ///
+  /// Tabela jest skladowa ZAPYTANIA, nie planu, i to jest wymog poprawnosci. Zapytania
+  /// wedruja miedzy drzewami: compiler::importFrom() przenosi zapytanie ad hoc do zywego
+  /// planu, a expandStreamGenerators() kopiuje szablon na N instancji. Indeks globalny
+  /// przezylby te wedrowke tylko przy przenumerowaniu tabeli w kazdym z tych miejsc;
+  /// tabela lokalna jedzie razem z zapytaniem i pozostaje spojna sama z siebie.
+  ///
+  /// Grupa niesie WSZYSTKIE cztery wartosci (min, max, sum, count) z jednego przejscia po
+  /// oknie, wiec `MIN(cells:10:10)` i `MAX(cells:10:10)` w tej samej liscie SELECT czytaja
+  /// okno raz — o to chodzi we wspolnym stanie dla agregatow o identycznym ksztalcie.
+  std::vector<windowGroup> windowGroups;
+
+  [[nodiscard]] bool hasWindowAggregates() const { return !windowGroups.empty(); }
 
   std::list<rule> lRules;
 

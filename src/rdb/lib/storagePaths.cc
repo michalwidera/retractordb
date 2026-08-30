@@ -3,6 +3,8 @@
 #include <cstdio>  // ::remove
 #include <filesystem>
 #include <ranges>
+#include <string>
+#include <system_error>  // std::error_code
 
 #include "fatalError.hpp"
 #include "rdb/storageShadow.hpp"
@@ -20,8 +22,29 @@ StoragePaths::StoragePaths(const std::string_view qryID, const std::string_view 
     return;  // no change
   }
 
-  if (!std::filesystem::is_directory(storageParam)) {
-    FatalError("storage: path '{}' is not a directory", storageParam);
+  // Katalog wskazany przez :STORAGE musi ISTNIEC — dyrektywa go nie tworzy. Rozroznienie
+  // "nie ma" od "jest, ale nie katalogiem" jest tu istotne: pierwszy przypadek to zwykle
+  // zapomniane `mkdir`, drugi to kolizja nazw. Komunikat podaje sciezke BEZWZGLEDNA, bo
+  // sciezka wzgledna rozwiazuje sie wzgledem katalogu roboczego procesu, a ten przy
+  // uruchomieniu z ctest albo z serwisu nie jest tym, o ktorym mysli autor zapytania.
+  // Koncowy ukosnik trzeba sciac PRZED sprawdzeniem istnienia: `exists("temp/")` dla
+  // zwyklego pliku `temp` daje falsz, bo ukosnik zada katalogu — bez tego galaz o kolizji
+  // nazw bylaby nieosiagalna i kazdy przypadek raportowalby "nie istnieje".
+  std::string dirName(storageParam);
+  while (dirName.size() > 1 && dirName.back() == std::filesystem::path::preferred_separator)
+    dirName.pop_back();
+
+  if (!std::filesystem::exists(dirName)) {
+    std::error_code absError;
+    const auto full = std::filesystem::absolute(dirName, absError);
+    FatalError(
+        "storage: directory '{}' from the STORAGE directive does not exist ({}); "
+        "RetractorDB does not create it — run 'mkdir -p {}' first",
+        dirName, absError ? std::string("path could not be resolved") : full.string(), dirName);
+  }
+
+  if (!std::filesystem::is_directory(dirName)) {
+    FatalError("storage: path '{}' from the STORAGE directive exists but is not a directory", dirName);
   }
 
   descriptorFile_ = std::filesystem::path(storageParam) / std::filesystem::path(descriptorFile_);

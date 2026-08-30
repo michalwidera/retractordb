@@ -11,7 +11,8 @@
 #include <optional>
 #include <set>
 #include <sstream>
-#include <utility>  // std::pair
+#include <utility>  // std::pair, std::cmp_greater_equal
+#include <variant>  // std::holds_alternative, std::get_if
 #include <vector>
 
 #include <spdlog/spdlog.h>
@@ -72,6 +73,69 @@ boost::rational<int> narrowInterval(const wideRational &value, const std::string
   }
   return boost::rational<int>{static_cast<int>(value.numerator()), static_cast<int>(value.denominator())};
 }
+
+/// Czy token jest agregatem okna rekordowego (`MIN(cells:10:10)` i rodzeństwo).
+bool isWindowAggregate(command_id cmd) {
+  return cmd == WINDOW_MIN || cmd == WINDOW_MAX || cmd == WINDOW_AVG || cmd == WINDOW_SUM;
+}
+
+/// Kształt okien zapytania — para (największa szerokość, wspólny krok).
+///
+/// Czyta token WINDOW_* w OBU jego postaciach, bo przebiegi kompilatora widzą obie: parę
+/// (szerokość, krok) przed compiler::resolveWindowAggregates(), indeks grupy po nim. Interwał
+/// trzeba policzyć w pierwszej postaci, bo resolveStreamIntervals() stoi przed rozwiązaniem
+/// odwołań do pól; origin, ogon i pojemność liczą się w drugiej.
+///
+/// Obsługa OBU postaci jest wymogiem poprawności, nie wygodą: ścieżka zapytań ad hoc
+/// (executorsm::getAdHoc) kompiluje ŻYWY plan po raz drugi, więc przebiegi widzą wtedy
+/// zapytania już rozwiązane. Bez tego std::get rzucałby bad_variant_access i zabijał serwer
+/// przy pierwszym zapytaniu ad hoc do planu z oknem.
+///
+/// Krok MUSI być jeden dla całej listy SELECT: wyznacza interwał strumienia wyjściowego, więc
+/// dwa kroki znaczyłyby dwa takty jednego rekordu. Różne szerokości przy jednym kroku są
+/// w porządku — to ten sam takt, inne okna. Największa szerokość rozstrzyga origin, bo rekord
+/// powstaje dopiero wtedy, gdy definiują się wszystkie jego pola.
+std::optional<std::pair<int, int>> windowShapeOf(const query &q, std::string &error) {
+  std::optional<std::pair<int, int>> shape;
+  for (const auto &f : q.lSchema)
+    for (const auto &t : f.lProgram) {
+      if (!isWindowAggregate(t.getCommandID())) continue;
+
+      int width(0);
+      int step(0);
+      if (const auto *raw = std::get_if<std::pair<int, int>>(&t.getVT())) {
+        width = raw->first;
+        step  = raw->second;
+      } else if (const auto *groupIndex = std::get_if<int>(&t.getVT())) {
+        if (*groupIndex < 0 || std::cmp_greater_equal(*groupIndex, q.windowGroups.size())) {
+          error = "Stream '" + q.id + "' has a window aggregate pointing outside its own window group table";
+          return std::nullopt;
+        }
+        const auto &group = q.windowGroups[static_cast<size_t>(*groupIndex)];
+        width             = group.width;
+        step              = group.step;
+      } else {
+        error = "Stream '" + q.id + "' has a malformed window aggregate token";
+        return std::nullopt;
+      }
+
+      if (width <= 0) {
+        error = "Stream '" + q.id + "' has a window aggregate of width " + std::to_string(width) + "; width must be > 0";
+        return std::nullopt;
+      }
+      if (step <= 0) {
+        error = "Stream '" + q.id + "' has a window aggregate of step " + std::to_string(step) + "; step must be > 0";
+        return std::nullopt;
+      }
+      if (shape.has_value() && shape->second != step) {
+        error = "Stream '" + q.id + "' mixes window aggregate steps " + std::to_string(shape->second) + " and " +
+                std::to_string(step) + "; one SELECT list has one output interval, so it takes one step";
+        return std::nullopt;
+      }
+      shape = std::make_pair(shape.has_value() ? std::max(shape->first, width) : width, step);
+    }
+  return shape;
+}
 }  // namespace
 
 namespace localContext {
@@ -96,6 +160,20 @@ std::string compiler::resolveStreamIntervals() {
       if (q.lProgram.empty()) {
         continue; /* Declaration */
       }
+      // Okno rekordowe w liście SELECT zmienia takt strumienia — jako jedyna konstrukcja
+      // w tym języku, bo we wszystkich pozostałych interwał wynika wyłącznie z klauzuli FROM.
+      // Stąd wymóg, żeby FROM było POJEDYNCZYM odwołaniem do strumienia: okno czyta historię
+      // konkretnego strumienia po indeksie logicznym, a złączenie takiej historii nie ma
+      // (payload wejściowy złączenia powstaje dopiero w takcie konsumenta i nigdzie nie leży).
+      std::string windowError;
+      const auto windowShape = windowShapeOf(q, windowError);
+      if (!windowError.empty()) return windowError;
+      if (windowShape.has_value() && q.lProgram.size() != 1) {
+        return "Stream '" + q.id +
+               "' uses a window aggregate, so its FROM clause must be a single stream reference "
+               "(a window reads the stored history of one stream)";
+      }
+
       if (q.lProgram.size() == 1) {
         token tInstance(*(q.lProgram.begin()));
         // Źródło nierozwiązane w tym przebiegu daje deltę 0. Bez tej kontroli
@@ -108,7 +186,11 @@ std::string compiler::resolveStreamIntervals() {
           continue;
         }
         if (q.rInterval == 0) resolvedThisPass++;
-        q.rInterval = sourceDelta;
+        // Krok liczy REKORDY źródła, więc rekord wyjściowy przypada co `step` rekordów
+        // źródła — to jest AGSE z szerokością źródła 1, przeniesione na oś rekordów.
+        q.rInterval = windowShape.has_value()
+                          ? narrowInterval(widen(sourceDelta) * widen(windowShape->second), q.id, "D_src*step (window)")
+                          : sourceDelta;
         continue;  // Just one stream
       }
       if (q.lProgram.size() != 3 && q.lProgram.size() != 2) {
@@ -1209,7 +1291,22 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         }
 
         if (cmd.getCommandID() == PUSH_STREAM) {
-          // Pass-through stream does not increase source history requirement.
+          // Okno rekordowe sięga wstecz o całą swoją szerokość, więc historia źródła musi ją
+          // pomieścić. W chwili emisji rekordu n dostępny jest najnowszy rekord źródła
+          //   j_max = (n+1+W_out)*step - 1 - W_src,
+          // a najstarszy potrzebny to (n+1)*step - width. Różnica NIE zależy od n:
+          //   dystans = W_out*step - W_src + width - 1,
+          // więc — inaczej niż w AGSE, gdzie fazy elementów płaskich wymuszają przegląd okresu —
+          // postać zamknięta jest tu dokładna, a nie oszacowaniem.
+          std::string windowError;
+          if (const auto shape = windowShapeOf(q, windowError); shape.has_value()) {
+            const auto &source   = coreInstance[arg1];
+            const auto [w, step] = *shape;
+            const int distance   = step * q.startupLatency - source.startupLatency + w - 1;
+            const int required   = distance + (source.isDeclaration() ? kDeclarationPrefetch : 1);
+            capMap[arg1]         = std::max(capMap[arg1], std::max(required, 1));
+          }
+          // Poza oknem strumień przepisujący nie zwiększa wymagań wobec historii źródła.
           break;
         }
 
@@ -1517,6 +1614,16 @@ std::string compiler::computeLogicalOrigin() {
 
       if (q.lProgram.size() == 1) {
         // Czysty PUSH_STREAM czyta bieżący payload producenta — ten sam rekord, ten sam origin.
+        //
+        // Okno rekordowe w liście SELECT to wyjątek: rekord n obejmuje rekordy źródła
+        // (n+1)*step-width ... (n+1)*step-1, więc pierwszy definiowalny rekord wypada tam, gdzie
+        // całe okno mieści się w istniejącej części źródła:
+        //   (n+1)*step - width >= O_src  =>  O = ceil((O_src + width)/step) - 1.
+        std::string windowError;
+        if (const auto shape = windowShapeOf(q, windowError); shape.has_value()) {
+          const auto [windowWidth, windowStep] = *shape;
+          result                               = ceilR(boost::rational<int>(o1 + windowWidth, windowStep)) - 1;
+        }
       } else if (op == STREAM_TIMEMOVE) {
         // tau_N jest OPÓŹNIENIEM: rekord n ma treść rekordu n-N producenta. Rekordy o indeksie
         // mniejszym od N nie mają definicji — sięgałyby przed początek producenta — więc
@@ -1625,6 +1732,14 @@ std::string compiler::computeStartupLatency() {
 
       if (q.lProgram.size() == 1) {
         result = w1;  // czysty PUSH_STREAM — ten sam interwał, ten sam ogon
+        // Okno rekordowe: rekord n czyta najnowszy rekord źródła (n+1)*step-1, określony
+        // w chwili ((n+1)*step + W_src)*D_src, a slot n konsumenta kończy się w
+        // (n+1+W)*step*D_src. Warunek (n+1)*step + W_src <= (n+1+W)*step upraszcza się do
+        //   W >= W_src/step,  czyli  W = ceil(W_src/step),
+        // bez członu fazowego i bez zależności od szerokości okna — tę niesie origin.
+        std::string windowError;
+        if (const auto shape = windowShapeOf(q, windowError); shape.has_value())
+          result = ceilR(boost::rational<int>(w1, shape->second));
       } else if (op == STREAM_TIMEMOVE) {
         // Rekord n czyta rekord n-N producenta, czyli STARSZY od bieżącego. Przesunięcie o N
         // slotów siedzi w origin (patrz computeLogicalOrigin), bo to niedefiniowalność, nie
@@ -2148,6 +2263,135 @@ std::optional<rdb::rField> compiler::sourceFieldAt(const std::string &streamId, 
 /// Punkt stały zamiast jednego przebiegu, bo na tym etapie qTree jest posortowane po
 /// interwale (resolveStreamIntervals), a nie topologicznie: konsument potrafi stać przed
 /// swoim producentem, a typ musi się przez plan przenieść.
+/// Scala parę [PUSH_ID pola, WINDOW_*] w jeden token z indeksem grupy okna.
+///
+/// Po tym przebiegu WINDOW_* jest bezargumentowym LIŚCIEM programu: nie zdejmuje niczego ze
+/// stosu i kładzie gotową wartość okna. Dzięki temu późniejsze przebiegi — upraszczanie
+/// wyrażeń, współdzielenie obliczeń, lokalizacja offsetów — widzą go jako zwykły operand
+/// i nie muszą o oknach wiedzieć. W szczególności PUSH_ID okna MUSI zniknąć przed
+/// localizeFieldOffsets(), bo tamten przebieg przepisuje offsety na bufor wejściowy
+/// konsumenta, a okno adresuje sloty ŹRÓDŁA.
+///
+/// Grupy są tabelą ZAPYTANIA (query::windowGroups), więc `MIN(cells:10:10)`
+/// i `MAX(cells:10:10)` w jednej liście SELECT dzielą jedno przejście po oknie.
+///
+/// Przebieg jest IDEMPOTENTNY: token już rozwiązany (niosący indeks grupy zamiast pary)
+/// zostaje nietknięty. Jest to wymóg, nie ozdoba — executorsm::getAdHoc() kompiluje żywy
+/// plan po raz drugi, żeby dołączyć do niego zapytanie ad hoc, więc ten przebieg z całą
+/// pewnością zobaczy zapytania rozwiązane w poprzednim przebiegu. Zapytanie rozwiązane ma
+/// już własną, spójną tabelę grup i nic w nim nie wymaga poprawki.
+std::string compiler::resolveWindowAggregates() {
+  for (auto &q : coreInstance) {
+    // Indeks grupy o zadanym kształcie W TYM zapytaniu; zakłada nową, gdy jeszcze nie było.
+    auto groupIndexFor = [&q](const windowGroup &shape) {
+      for (size_t i = 0; i < q.windowGroups.size(); ++i)
+        if (q.windowGroups[i].sameAs(shape)) return static_cast<int>(i);
+      q.windowGroups.push_back(shape);
+      return static_cast<int>(q.windowGroups.size() - 1);
+    };
+
+    // Warunek reguły jest wyliczany osobnym wywołaniem ewaluatora, poza ścieżką pól, więc
+    // okna tam nie sięgają. Gramatyka na taki zapis pozwala (`logic` schodzi do `term`),
+    // dlatego odrzucamy go tutaj, a nie milczeniem.
+    for (const auto &r : q.lRules)
+      for (const auto &t : r.condition)
+        if (isWindowAggregate(t.getCommandID()))
+          return "Stream '" + q.id + "' uses a window aggregate in a RULE condition, which is not supported";
+
+    for (auto &f : q.lSchema) {
+      // Typ startowy jest NAJWĘŻSZY z arytmetycznych, a nie NULLTYPE: porządek enum descFld
+      // stawia NULLTYPE ZA typami liczbowymi, więc sentinel z NULLTYPE nigdy nie przegrałby
+      // porównania i pole zostawałoby bez typu.
+      bool fieldHasWindow = false;
+      rdb::descFld windowType(rdb::BYTE);
+      int windowLen(static_cast<int>(sizeof(uint8_t)));
+
+      for (auto it = f.lProgram.begin(); it != f.lProgram.end();) {
+        if (!isWindowAggregate(it->getCommandID())) {
+          ++it;
+          continue;
+        }
+        // Token rozwiązany w poprzedniej kompilacji tego samego planu — patrz komentarz
+        // o idempotentności przy definicji przebiegu.
+        if (std::holds_alternative<int>(it->getVT())) {
+          ++it;
+          continue;
+        }
+        if (it == f.lProgram.begin()) {
+          return "Stream '" + q.id + "' has a window aggregate without a field reference";
+        }
+        auto refIt = std::prev(it);
+        if (refIt->getCommandID() != PUSH_ID) {
+          return "Stream '" + q.id + "' has a window aggregate whose argument is not a field of its source";
+        }
+
+        const auto [sourceName, entryIndex] = std::get<std::pair<std::string, int>>(refIt->getVT());
+        const auto [width, step]            = std::get<std::pair<int, int>>(it->getVT());
+
+        if (!coreInstance.exists(sourceName)) {
+          return "Stream '" + q.id + "' aggregates a window over unknown stream '" + sourceName + "'";
+        }
+        const auto &source = coreInstance.getQuery(sourceName);
+
+        // Wpis schematu -> pierwszy slot PŁASKI i liczba slotów. `INTEGER[24]` to jeden wpis
+        // i 24 sloty — wszystkie wchodzą do okna, stąd `width * slotCount` redukowanych
+        // wartości. Reguła slotów jest ta sama co w Descriptor::rebuildFieldMappings().
+        windowGroup shape;
+        shape.source = sourceName;
+        shape.width  = width;
+        shape.step   = step;
+
+        int entry(0);
+        int firstSlot(0);
+        const rdb::rField *found(nullptr);
+        for (const auto &sf : source.lSchema) {
+          if (entry == entryIndex) {
+            found = &sf.field_;
+            break;
+          }
+          firstSlot += flatSlotCount(sf.field_);
+          ++entry;
+        }
+        if (found == nullptr) {
+          return "Stream '" + q.id + "' aggregates a window over field " + std::to_string(entryIndex) + " of '" + sourceName +
+                 "', which has only " + std::to_string(entry) + " fields";
+        }
+        if (found->rtype == rdb::STRING) {
+          return "Stream '" + q.id + "' aggregates a window over STRING field '" + found->rname + "' of '" + sourceName +
+                 "'; window aggregates are arithmetic";
+        }
+        shape.firstSlot = firstSlot;
+        shape.slotCount = flatSlotCount(*found);
+
+        const int groupIndex = groupIndexFor(shape);
+
+        // Typ wyniku tą samą regułą co reduktory strumieniowe — patrz reductionResultField().
+        const auto [resultType, resultLen] = reductionResultField(found->rtype, found->rlen);
+        if (!fieldHasWindow || resultType > windowType) {
+          windowType = resultType;
+          windowLen  = resultLen;
+        }
+        fieldHasWindow = true;
+
+        *it = token(it->getCommandID(), groupIndex);
+        f.lProgram.erase(refIt);
+        ++it;
+      }
+
+      // Typ pola ustawiamy TYLKO wtedy, gdy parser zostawił swój domyślny INTEGER. Zapis
+      // `to_double(MIN(x:10))` albo `to_string(MIN(x:10):8)` ma typ ustalony przez funkcję
+      // zewnętrzną i nadpisanie go tutaj byłoby zgubieniem intencji autora; zapis
+      // `MIN(x:10)` i `MIN(x:10)+1` domyślnego typu nie mają skąd wziąć i biorą go stąd.
+      if (fieldHasWindow && f.field_.rtype == rdb::INTEGER) {
+        f.field_.rtype  = windowType;
+        f.field_.rlen   = windowLen;
+        f.field_.rarray = 1;
+      }
+    }
+  }
+  return {"OK"};
+}
+
 std::string compiler::inferStringFieldTypes() {
   auto shapeOfField = [this](const std::string &streamId, int fieldIndex) -> std::optional<fieldShape> {
     const auto sourceField = sourceFieldAt(streamId, fieldIndex);
@@ -2583,6 +2827,12 @@ std::string compiler::compile() {
   if (result != "OK") return result;
 
   result = resolveFieldReferences();
+  if (result != "OK") return result;
+
+  // MUSI stac po rozwiazaniu odwolan do pol (potrzebuje pary strumien+pole) i PRZED
+  // localizeFieldOffsets(), ktore przepisuje offsety PUSH_ID na bufor wejsciowy konsumenta —
+  // okno adresuje sloty ZRODLA, wiec jego PUSH_ID musi wczesniej zniknac z programu.
+  result = resolveWindowAggregates();
   if (result != "OK") return result;
 
   // MUSI stac PRZED upraszczaniem wyrazen, i nie jest to kwestia porzadku. Po zwinieciu stalych

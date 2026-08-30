@@ -108,6 +108,18 @@ int executorsm::cfgRtPriority         = appcfg::kDefaultSchedulingRtPriority;
 
 static std::thread bt;
 
+/// Straznik blokady uslugi — wskaznik wazny WYLACZNIE na czas trwania executorsm::run().
+///
+/// Plik blokady kasuje destruktor FlockServiceGuard, a std::exit — przez ktory konczy
+/// FatalError — nie uruchamia destruktorow obiektow AUTOMATYCZNYCH. Przy bledzie
+/// krytycznym cleanup() jest jedynym miejscem, ktore jeszcze dziala, wiec to on musi
+/// blokade zwolnic.
+///
+/// Zerowany przed powrotem z run() (patrz lockGuardScope), i to jest wymog poprawnosci:
+/// handlery atexit wykonuja sie PO zakonczeniu main, a straznik jest tam obiektem
+/// automatycznym — po normalnym wyjsciu wskaznik wskazywalby na obiekt juz zniszczony.
+static FlockServiceGuard *serviceGuardPtr = nullptr;
+
 void cleanup() {
   {
     std::scoped_lock lock(core_mutex);
@@ -118,9 +130,27 @@ void cleanup() {
     }
   }
   cv.notify_all();
-  if (bt.joinable()) bt.join();
+  // Nie dolaczamy watku, ktory WLASNIE wykonuje to sprzatanie. FatalError konczy proces
+  // przez std::exit, a ten uruchamia funkcje atexit W WATKU, ktory go wywolal — takze
+  // w watku komunikacyjnym: commandProcessorLoop -> commandProcessor -> getAdHoc ->
+  // compile(), a kompilator ma wiele wywolan FatalError. join() na watku biezacym rzuca
+  // std::system_error("Resource deadlock avoided"), a wyjatek z handlera atexit to
+  // std::terminate: JEDNO wadliwe zapytanie ad hoc (np. `src@(0,4)`) zabijalo serwer
+  // SIGABRT-em zamiast zakonczyc go z EXIT_FAILURE, i to juz po wypisaniu wlasciwej
+  // diagnostyki. Watek i tak konczy sie razem z procesem, wiec pominiecie join() niczego
+  // nie zostawia w locie; sprzatanie IPC ponizej wykonuje sie wtedy normalnie.
+  if (bt.joinable()) {
+    if (bt.get_id() == std::this_thread::get_id()) bt.detach();  // samego siebie nie da sie dolaczyc; ODPINAMY, bo destruktor
+                                                                 // std::thread nad watkiem dolaczalnym wola std::terminate
+    else
+      bt.join();
+  }
   IPC::shared_memory_object::remove("RetractorShmemMap");
   IPC::message_queue::remove("RetractorQueryQueue");
+  // Blokada uslugi na koncu: po niej moze juz wystartowac kolejna instancja, wiec
+  // zwalniamy ja dopiero, gdy IPC jest posprzatane. releaseLock() jest idempotentny,
+  // wiec pozniejszy destruktor straznika na sciezce normalnej nie zrobi nic drugi raz.
+  if (serviceGuardPtr != nullptr) serviceGuardPtr->releaseLock();
 }
 
 std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl, qTree *coreInstancePtr) {
@@ -602,6 +632,13 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
   dataModelExpected                 = !coreInstance.empty();
 
   std::atexit(cleanup);
+
+  // Zakres waznosci wskaznika na straznika — patrz komentarz przy serviceGuardPtr.
+  // RAII, a nie zerowanie przy kazdym `return`, bo run() ma ich kilka.
+  struct LockGuardScope {
+    explicit LockGuardScope(FlockServiceGuard &g) { serviceGuardPtr = &g; }
+    ~LockGuardScope() { serviceGuardPtr = nullptr; }
+  } lockGuardScope(guard);
 
   std::string percounterFilename{"{notinitialized}"};
   for (const auto &it : coreInstance)

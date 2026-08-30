@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "dumpManager.hpp"
 #include "qTree.hpp"        // qTree
@@ -54,6 +55,25 @@ struct streamInstance {
    * This function will create aggregate payload based on the command and instance
    */
   [[nodiscard]] rdb::payload reduceFieldsToPayload(command_id cmd, const std::string &instance) const;
+
+  /// Redukcja okna REKORDOWEGO nad polem TEGO strumienia — jedno przejście, cztery agregaty.
+  ///
+  /// Okno obejmuje rekordy logiczne `lastLogicalIndex-(group.width-1) ... lastLogicalIndex`.
+  /// Który rekord jest ostatni, rozstrzyga wołający (dataModel::computeWindowAggregates);
+  /// dla slotu n konsumenta jest to `(n+1)*krok-1` — patrz windowGroup. Z każdego
+  /// rekordu wchodzą do redukcji wszystkie sloty płaskie pola, więc `INTEGER[24]` przy
+  /// szerokości 10 daje 240 wartości.
+  ///
+  /// Rekordy spoza historii są pomijane (nie zerowane). Przy poprawnym planie ten przypadek
+  /// nie występuje — origin gwarantuje, że całe okno leży w istniejącej części strumienia,
+  /// a compiler::computeRequiredCapacities() zamawia dla niego pojemność.
+  [[nodiscard]] windowStats reduceRecordWindow(const windowGroup &group, int lastLogicalIndex, int sourceIndexBase) const;
+
+  /// Wyniki okien tego taktu, indeksowane numerem grupy (query::windowGroups).
+  ///
+  /// Wypełnia dataModel::computeWindowAggregates() tuż przed constructOutputPayload(),
+  /// czyta expressionEvaluator.
+  std::vector<windowStats> windowValues;
 
   /*
    * This function will create OutputPayload based on all field from query

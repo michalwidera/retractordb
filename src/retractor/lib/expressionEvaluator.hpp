@@ -1,6 +1,9 @@
 #pragma once
 
+#include <vector>
+
 #include "fldType.hpp"
+#include "query.hpp"  // windowStats
 #include "rdb/payload.hpp"
 #include "token.hpp"  // token, std::list
 
@@ -27,5 +30,10 @@ class expressionEvaluator {
   expressionEvaluator(/* args */);
   ~expressionEvaluator() = default;
 
-  rdb::descFldVT eval(const std::list<token> &program, rdb::payload *payload = nullptr);
+  /// @param windowValues wyniki okien rekordowych tego taktu, indeksowane numerem grupy
+  ///        (qTree::windowGroups). Wypełnia je dataModel::computeWindowAggregates() PRZED
+  ///        wyliczeniem pól, bo okno czyta historię ŹRÓDŁA, a payload wejściowy niesie tylko
+  ///        rekord bieżący. nullptr znaczy: plan bez okien.
+  rdb::descFldVT eval(const std::list<token> &program, rdb::payload *payload = nullptr,
+                      const std::vector<windowStats> *windowValues = nullptr);
 };

@@ -215,6 +215,7 @@ void dataModel::processRows(const std::set<std::string> &inSet, const boost::rat
     if (runtime.elapsedSlots++ < silentSlots) continue;
 
     constructInputPayload(q.id);                    // That will create 'from' clause data set
+    computeWindowAggregates(q);                     // That will reduce record windows read from the source history
     qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
     qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
     qSet[q.id]->constructRulesAndUpdate(q);         // That will process all rules for this query
@@ -240,6 +241,38 @@ std::string dataModel::exhaustedInputStream() const {
     if (runtime->outputPayload->isDeclared() && runtime->outputPayload->sourceExhausted()) return id;
 
   return {};
+}
+
+void dataModel::computeWindowAggregates(const query &qry) {
+  if (!qry.hasWindowAggregates()) return;
+
+  auto &runtime = *qSet[qry.id];
+  // Wektor odwzorowuje tabele grup TEGO zapytania jeden do jednego. Czyszczony w kazdym
+  // takcie, zeby zadna pozycja nie niosla wyniku sprzed taktu.
+  runtime.windowValues.assign(qry.windowGroups.size(), windowStats{});
+
+  const auto baseOf = [&](const std::string &id) {
+    const auto &logicalBase = qSet[id]->logicalIndexBase;
+    if (!logicalBase.has_value()) {
+      FatalError("dataModel::computeWindowAggregates: logical index base not initialized for '{}'", id);
+    }
+    return *logicalBase;
+  };
+
+  // Indeks logiczny rekordu, ktory wlasnie powstaje — ta sama definicja co w
+  // constructInputPayload(). Rekord n obejmuje rekordy zrodla (n+1)*step-width ... (n+1)*step-1,
+  // czyli konczy sie na ostatnim rekordzie zrodla nalezacym do slotu n.
+  const int n = static_cast<int>(runtime.outputPayload->getRecordsCount()) + baseOf(qry.id);
+
+  for (size_t groupIndex = 0; groupIndex < qry.windowGroups.size(); ++groupIndex) {
+    const auto &group = qry.windowGroups[groupIndex];
+    auto sourceIt     = qSet.find(group.source);
+    if (sourceIt == qSet.end()) {
+      FatalError("dataModel::computeWindowAggregates: source '{}' of window group not in model", group.source);
+    }
+    runtime.windowValues[groupIndex] =
+        sourceIt->second->reduceRecordWindow(group, (n + 1) * group.step - 1, baseOf(group.source));
+  }
 }
 
 void dataModel::constructInputPayload(const std::string &instance) {

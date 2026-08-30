@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <string>
 #include <typeinfo>  // operator typeid
+#include <utility>   // std::cmp_greater_equal
 #include <variant>
 #include "fatalError.hpp"
 
@@ -639,7 +640,8 @@ rdb::descFldVT callFun(rdb::descFldVT &inVar, const std::function<double(double)
   throw std::runtime_error("callFun: unsupported type - math functions require numeric operand");
 }
 
-rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::payload *payload) {
+rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::payload *payload,
+                                         const std::vector<windowStats> *windowValues) {
   // Kontener stosu: small_vector z inline-storage zamiast domyślnej std::deque.
   // std::deque alokuje mapę + blok już przy konstrukcji pustego stosu (~2 alok.),
   // a eval() jest wołane raz na pole/regułę co interwał (gorąca ścieżka K1 —
@@ -811,6 +813,34 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
           break;
         }
         rStack.push(std::move(*valueOpt));
+      } break;
+      case WINDOW_MIN:
+      case WINDOW_MAX:
+      case WINDOW_AVG:
+      case WINDOW_SUM: {
+        // Po compiler::resolveWindowAggregates() token jest LIŚCIEM: nie zdejmuje operandu,
+        // tylko kładzie gotowy wynik okna. Samo okno policzył wcześniej
+        // dataModel::computeWindowAggregates(), bo sięga po historię źródła, której payload
+        // wejściowy nie zawiera.
+        if (windowValues == nullptr) throw std::runtime_error("WINDOW aggregate: window values not supplied");
+        const auto groupIndex = std::get<int>(tk.getVT());
+        if (groupIndex < 0 || std::cmp_greater_equal(groupIndex, windowValues->size()))
+          throw std::runtime_error("WINDOW aggregate: group index out of range");
+        const auto &stats = (*windowValues)[static_cast<size_t>(groupIndex)];
+        switch (tk.getCommandID()) {
+          case WINDOW_MIN:
+            rStack.push(stats.minValue);
+            break;
+          case WINDOW_MAX:
+            rStack.push(stats.maxValue);
+            break;
+          case WINDOW_AVG:
+            rStack.push(stats.avgValue);
+            break;
+          default:
+            rStack.push(stats.sumValue);
+            break;
+        }
       } break;
       case PUSH_IDX:
         SPDLOG_ERROR("There should not appear PUSH_IDX here.");

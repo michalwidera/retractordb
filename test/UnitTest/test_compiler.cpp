@@ -2261,3 +2261,162 @@ TEST(xcompiler, derived_schema_width_is_flat_for_array_fields) {
     }
   }
 }
+
+// Agregat okna REKORDOWEGO w liscie SELECT: `AGG(pole : szerokosc : krok)`.
+//
+// Rodzina ORTOGONALNA wobec `FROM MIN(strumien)`: tamten redukuje pola JEDNEGO rekordu,
+// ten redukuje `szerokosc` kolejnych rekordow, a przy polu tablicowym `szerokosc*N` wartosci.
+//
+// Brzeg liczy sie wzorami AGSE z szerokoscia zrodla rowna 1 — okno rekordowe to to samo
+// okno stemplowane koncem, tyle ze na osi REKORDOW, a nie elementow plaskich:
+//   interwal = krok * interwal zrodla
+//   origin   = ceil((origin zrodla + szerokosc - 1) / krok)
+//   ogon     = ceil((1 + ogon zrodla) / krok) - 1
+namespace {
+std::string compileStatus(const std::string &rql) {
+  qTree instance;
+  auto [parseResult, keyword, streamName] = parserRQLString(instance, rql);
+  if (parseResult != "OK") return parseResult;
+  compiler compilerInstance(instance);
+  return compilerInstance.compile();
+}
+}  // namespace
+
+TEST(xcompiler, window_aggregate_step_scales_the_output_interval) {
+  for (const int step : {1, 2, 5}) {
+    auto plan = compilePlan(
+        "SUBSTRAT 'memory'\n"
+        "DECLARE a INTEGER[3] STREAM src, 1/10 FILE 'src.txt'\n"
+        "SELECT MIN(a : 2 : " +
+        std::to_string(step) + ") STREAM dst FROM src\n");
+
+    auto &dst = plan.getQuery("dst");
+    EXPECT_EQ(dst.rInterval, boost::rational<int>(step, 10)) << "step=" << step;
+    // origin = ceil((0 + 2)/step) - 1
+    EXPECT_EQ(dst.logicalOrigin, (2 + step - 1) / step - 1) << "step=" << step;
+    EXPECT_EQ(dst.startupLatency, 0) << "step=" << step;
+  }
+}
+
+TEST(xcompiler, window_aggregate_origin_covers_the_whole_window) {
+  for (const int width : {1, 2, 7}) {
+    auto plan = compilePlan(
+        "SUBSTRAT 'memory'\n"
+        "DECLARE a INTEGER STREAM src, 1 FILE 'src.txt'\n"
+        "SELECT SUMC(a : " +
+        std::to_string(width) + ") STREAM dst FROM src\n");
+    // Krok domyslny to 1, wiec origin = ceil(szerokosc/1) - 1 = szerokosc - 1: dopiero wtedy
+    // caly zakres okna, ktore konczy sie na rekordzie n, miesci sie w istniejacym strumieniu.
+    EXPECT_EQ(plan.getQuery("dst").logicalOrigin, width - 1) << "width=" << width;
+  }
+}
+
+// Wynik idzie ta sama regula promocji co reduktory strumieniowe (reductionResultField):
+// zrodlo arytmetyczne daje RATIONAL, zeby srednia nie tracila dokladnosci na rzutowaniu.
+TEST(xcompiler, window_aggregate_result_type_follows_the_reduction_rule) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER, d DOUBLE STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT AVG(a : 4), AVG(d : 4), to_double(MIN(a : 4)) STREAM dst FROM src\n");
+
+  EXPECT_EQ(outputField(plan, "dst", 0).rtype, rdb::RATIONAL);
+  EXPECT_EQ(outputField(plan, "dst", 1).rtype, rdb::DOUBLE);
+  // Typ narzucony funkcja zewnetrzna zostaje nietkniety.
+  EXPECT_EQ(outputField(plan, "dst", 2).rtype, rdb::DOUBLE);
+}
+
+// Agregaty o tym samym zrodle, polu, szerokosci i kroku dziela JEDNO przejscie po oknie.
+// Rozny ksztalt to rozna grupa — inaczej `MAX(a:2)` czytalby okno `MAX(a:3)`.
+TEST(xcompiler, window_aggregates_of_one_shape_share_a_group) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT MIN(a : 2), MAX(a : 2), SUMC(a : 2), AVG(a : 2) STREAM same FROM src\n"
+      "SELECT MIN(a : 3), MIN(b : 2) STREAM other FROM src\n");
+
+  // Cztery agregaty o jednym ksztalcie to JEDNO przejscie po oknie.
+  EXPECT_EQ(plan.getQuery("same").windowGroups.size(), 1u);
+  // Rozny ksztalt to rozna grupa, inaczej MAX(a:2) czytalby okno MAX(a:3).
+  EXPECT_EQ(plan.getQuery("other").windowGroups.size(), 2u);
+}
+
+// Pole tablicowe wchodzi do okna WSZYSTKIMI slotami plaskimi, a pole skalarne jednym.
+TEST(xcompiler, window_group_spans_every_flat_slot_of_an_array_field) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER[3], c INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT MIN(a : 2), MIN(c : 2) STREAM dst FROM src\n");
+
+  const auto &groups = plan.getQuery("dst").windowGroups;
+  ASSERT_EQ(groups.size(), 2u);
+  EXPECT_EQ(groups[0].firstSlot, 0);
+  EXPECT_EQ(groups[0].slotCount, 3);
+  // Pole skalarne stoi ZA tablica, wiec jego pierwszy slot to 3, nie 1: numeracja idzie
+  // po slotach plaskich rekordu, nie po wpisach schematu.
+  EXPECT_EQ(groups[1].firstSlot, 3);
+  EXPECT_EQ(groups[1].slotCount, 1);
+}
+
+// Plan skompilowany jest kompilowany PONOWNIE za kazdym zapytaniem ad hoc: executorsm
+// kopiuje zywe drzewo, doklada do niego zapytanie klienta i przepuszcza calosc przez
+// caly lancuch (executorsm.cpp, getAdHoc). Przebiegi okna musza wiec byc idempotentne.
+//
+// Bez tego pierwsze zapytanie ad hoc do planu z oknem zabijalo serwer: token WINDOW_*
+// niesie po rozwiazaniu indeks grupy zamiast pary (szerokosc, krok), wiec std::get
+// na parze rzucalby bad_variant_access juz przy wyznaczaniu interwalow.
+TEST(xcompiler, window_aggregate_survives_recompilation_of_a_live_plan) {
+  const std::string rql =
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER[3] STREAM src, 1/10 FILE 'src.txt'\n"
+      "SELECT MIN(a : 4 : 2), MAX(a : 4 : 2), AVG(a : 6 : 2) STREAM dst FROM src\n";
+
+  qTree instance;
+  auto [parseResult, keyword, streamName] = parserRQLString(instance, rql);
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler firstPass(instance);
+  ASSERT_EQ(firstPass.compile(), "OK");
+
+  const auto interval = instance.getQuery("dst").rInterval;
+  const auto origin   = instance.getQuery("dst").logicalOrigin;
+  const auto latency  = instance.getQuery("dst").startupLatency;
+  const auto groups   = instance.getQuery("dst").windowGroups.size();
+  ASSERT_EQ(groups, 2u);
+
+  compiler secondPass(instance);
+  EXPECT_EQ(secondPass.compile(), "OK");
+
+  // Powtorna kompilacja nie moze ani przeliczyc brzegu od nowa, ani rozmnozyc grup.
+  EXPECT_EQ(instance.getQuery("dst").rInterval, interval);
+  EXPECT_EQ(instance.getQuery("dst").logicalOrigin, origin);
+  EXPECT_EQ(instance.getQuery("dst").startupLatency, latency);
+  EXPECT_EQ(instance.getQuery("dst").windowGroups.size(), groups);
+}
+
+TEST(xcompiler, window_aggregate_rejects_plans_it_cannot_execute) {
+  const std::string declare =
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER, t STRING[8] STREAM src, 1 FILE 'src.txt'\n"
+      "DECLARE b INTEGER STREAM other, 1 FILE 'other.txt'\n";
+
+  // Krok wyznacza interwal wyjscia, wiec jedna lista SELECT ma jeden krok.
+  EXPECT_NE(compileStatus(declare + "SELECT MIN(a : 2 : 2), MAX(a : 2 : 3) STREAM dst FROM src\n"), "OK");
+
+  // Okno czyta historie JEDNEGO strumienia; zlaczenie zadnej historii nie ma.
+  EXPECT_NE(compileStatus(declare + "SELECT MIN(a : 2) STREAM dst FROM src+other\n"), "OK");
+
+  // Szerokosc i krok musza byc dodatnie.
+  EXPECT_NE(compileStatus(declare + "SELECT MIN(a : 0) STREAM dst FROM src\n"), "OK");
+  EXPECT_NE(compileStatus(declare + "SELECT MIN(a : 2 : 0) STREAM dst FROM src\n"), "OK");
+
+  // Agregaty sa arytmetyczne.
+  EXPECT_NE(compileStatus(declare + "SELECT MIN(t : 2) STREAM dst FROM src\n"), "OK");
+
+  // Warunek reguly jest wyliczany poza sciezka pol, wiec okno tam nie siega.
+  EXPECT_NE(compileStatus(declare + "SELECT a STREAM dst FROM src\n"
+                                    "RULE r ON dst WHEN MIN(a : 2) > 1 DO DUMP -1 TO 1\n"),
+            "OK");
+
+  // Postac poprawna — zeby powyzsze EXPECT_NE nie przechodzily z powodu literowki w RQL.
+  EXPECT_EQ(compileStatus(declare + "SELECT MIN(a : 2 : 2), MAX(a : 3 : 2) STREAM dst FROM src\n"), "OK");
+}

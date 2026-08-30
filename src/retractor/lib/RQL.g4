@@ -137,6 +137,7 @@ term                : <assoc=right> term BIT_XOR term  # ExpPow
                     | STRING                       # ExpString
                     | unary_op_expression          # ExpUnary
                     | field_id                     # ExpField
+                    | window_agg                   # ExpWindowAgg
                     | agregator                    # ExpAgg
                     | DOLLAR                       # ExpGenIndex
                     | function_call                # ExpFnCall
@@ -233,6 +234,33 @@ stream_fn_call      : ( MIN
                     | AVG
                     | SUMC
                     ) '(' stream_expression ')'
+                    ;
+
+// Agregat okna REKORDOWEGO w liscie SELECT: `MIN(cells : 10 : 10)`.
+//
+// Redukuje pole `cells` po 10 kolejnych REKORDACH zrodla, wydajac wynik co 10 rekordow.
+// Krok jest opcjonalny i domyslnie wynosi 1 (okno przesuwne). Pole tablicowe `INTEGER[24]`
+// przy szerokosci 10 redukuje 240 wartosci: szerokosc liczy REKORDY, nie elementy plaskie.
+//
+// Jest to rodzina ORTOGONALNA wobec `FROM MIN(strumien)`, ktory redukuje pola JEDNEGO
+// rekordu i zostaje bez zmian. Roznica jest widoczna w gramatyce: tamten stoi w
+// stream_expression i bierze strumien, ten stoi w `term` i bierze POLE.
+//
+// Separatorem jest COLON, nie COMMA — przecinek rozdziela pozycje `select_list`, a pulapka
+// SLL opisana przy tej regule zamienilaby `MIN(a, 10)` w `MIN(a)` plus smiec `10`. Ten sam
+// powod i ten sam znak co w `to_string(expr : N)`.
+//
+// Argumentem jest `field_id`, a NIE wyrazenie. Okno czyta wartosci zapamietane w historii
+// zrodla; przeliczanie wyrazenia nad rekordami historycznymi wymagaloby ewaluatora o innym
+// cyklu zycia niz obecny (tworzony od nowa dla kazdego pola, widzi tylko biezacy payload).
+//
+// Alternatywa stoi w `term` PRZED `agregator`, bo `agregator` to sam token MIN i pasuje do
+// prefiksu. ANTLR poradzilby sobie predykcja adaptacyjna, ale kolejnosc jest darmowa.
+window_agg          : ( MIN
+                    | MAX
+                    | AVG
+                    | SUMC
+                    ) '(' field_id COLON width=DECIMAL ( COLON step=DECIMAL )? ')'
                     ;
 
 // Wywolanie funkcji skalarnej. Nazwa jest zwyklym ID, a NIE lista literalow: lista

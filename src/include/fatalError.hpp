@@ -18,8 +18,23 @@ struct FatalError {
     if (auto logger = spdlog::default_logger(); logger) {
       logger->log(spdlog::source_loc{loc.file_name(), static_cast<int>(loc.line()), loc.function_name()},
                   spdlog::level::critical, msg);
+      // FLUSH, nie shutdown. std::exit ponizej uruchamia funkcje zarejestrowane przez
+      // std::atexit, a te loguja — executorsm::cleanup() zaczyna od SPDLOG_WARN. Po
+      // spdlog::shutdown() rejestr jest pusty i default_logger_raw() zwraca nullptr, wiec
+      // makro SPDLOG_* wolalo should_log() na wskazniku zerowym: KAZDY blad krytyczny
+      // konczyl sie SIGSEGV w atexit, tuz po wypisaniu wlasciwego komunikatu. Proces
+      // zwracal 139 zamiast EXIT_FAILURE, komunikat ginal za sladem crashu, a IPC
+      // (RetractorShmemMap, RetractorQueryQueue) zostawal nieposprzatany, bo cleanup()
+      // ginal przed swoimi wywolaniami remove().
+      //
+      // Flush wystarcza do trwalosci: wszystkie sinki tego projektu sa SYNCHRONICZNE
+      // (basic_file_sink_mt, stderr_sink_mt — patrz uxSysTermTools.cpp::logger), nie ma
+      // ani jednego loggera asynchronicznego, ktory wymagalby drenowania kolejki.
+      // Rejestr zamyka sie sam przy destrukcji statykow, juz PO handlerach atexit:
+      // spdlog::registry::instance() powstaje przy konfiguracji logowania, czyli wczesniej
+      // niz std::atexit(cleanup), a kolejnosc sprzatania jest odwrotna do rejestracji.
+      logger->flush();
     }
-    spdlog::shutdown();
     std::cerr << "\nFATAL: " << msg << "\n";
     std::exit(EXIT_FAILURE);
   }

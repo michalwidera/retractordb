@@ -1,0 +1,54 @@
+ TUMBLING
+{ RATIONAL tumbling_0 RATIONAL tumbling_1 RATIONAL tumbling_2 RATIONAL tumbling_3 }
+{ tumbling_0:1/1 tumbling_1:9/1 tumbling_2:29/1 tumbling_3:29/6 }
+{ tumbling_0:1/1 tumbling_1:7/1 tumbling_2:24/1 tumbling_3:4/1 }
+{ tumbling_0:1/1 tumbling_1:9/1 tumbling_2:32/1 tumbling_3:16/3 }
+ SLIDING
+{ RATIONAL sliding_0 RATIONAL sliding_1 }
+{ sliding_0:1/1 sliding_1:9/1 }
+{ sliding_0:2/1 sliding_1:8/1 }
+{ sliding_0:1/1 sliding_1:7/1 }
+{ sliding_0:1/1 sliding_1:9/1 }
+{ sliding_0:1/1 sliding_1:9/1 }
+{ sliding_0:1/1 sliding_1:7/1 }
+ SINGLE
+{ RATIONAL single_0 RATIONAL single_1 }
+{ single_0:1/1 single_1:15/1 }
+{ single_0:2/1 single_1:14/1 }
+{ single_0:3/1 single_1:16/1 }
+{ single_0:1/1 single_1:8/1 }
+{ single_0:4/1 single_1:21/1 }
+{ single_0:1/1 single_1:11/1 }
+{ single_0:2/1 single_1:13/1 }
+ REF_SINGLE
+{ RATIONAL min }
+{ min:1/1 }
+{ min:2/1 }
+{ min:3/1 }
+{ min:1/1 }
+{ min:4/1 }
+{ min:1/1 }
+{ min:2/1 }
+ REF_SUM
+{ RATIONAL sum }
+{ sum:15/1 }
+{ sum:14/1 }
+{ sum:16/1 }
+{ sum:8/1 }
+{ sum:21/1 }
+{ sum:11/1 }
+{ sum:13/1 }
+ SCALAR3
+{ RATIONAL scalar3_0 RATIONAL scalar3_1 }
+{ scalar3_0:100/1 scalar3_1:600/1 }
+{ scalar3_0:200/1 scalar3_1:900/1 }
+{ scalar3_0:300/1 scalar3_1:1200/1 }
+{ scalar3_0:400/1 scalar3_1:1500/1 }
+{ scalar3_0:500/1 scalar3_1:1800/1 }
+ DERIVED3
+{ RATIONAL derived3_0 RATIONAL derived3_1 }
+{ derived3_0:1000/1 derived3_1:6000/1 }
+{ derived3_0:2000/1 derived3_1:9000/1 }
+{ derived3_0:3000/1 derived3_1:12000/1 }
+{ derived3_0:4000/1 derived3_1:15000/1 }
+{ derived3_0:5000/1 derived3_1:18000/1 }

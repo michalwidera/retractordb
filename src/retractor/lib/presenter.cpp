@@ -363,8 +363,12 @@ void presenter::onlyCompileShowProgram() {
       std::cout << "\t";
       std::cout << f.field_.rname << ": " << GetStringdescFld(f.field_.rtype);
       std::cout << '\n';
+      // Agregat okna rekordowego niesie numer swojej grupy (query::windowGroups), a kilka
+      // agregatow o jednym ksztalcie dzieli jedna grupe — bez tej liczby nie widac w planie,
+      // ktore pola czytaja to samo okno.
       for (auto tf : f.lProgram)
-        if ((tf.getStrCommandID() == "PUSH_ID") || (tf.getStrCommandID() == "CALL") || (tf.getStrCommandID() == "PUSH_VAL"))
+        if ((tf.getStrCommandID() == "PUSH_ID") || (tf.getStrCommandID() == "CALL") || (tf.getStrCommandID() == "PUSH_VAL") ||
+            tf.getStrCommandID().starts_with("WINDOW_"))
           std::cout << "\t\t" << tf << '\n';
         else
           std::cout << "\t\t" << tf.getStrCommandID() << '\n';
