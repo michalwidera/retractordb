@@ -74,7 +74,11 @@ ssize_t binaryDeviceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, co
   auto outcome = readExact(ptrData);  // /dev/random no seek supported
   if (outcome == readOutcome::error) return markAllNullAndZero(EXIT_FAILURE);
   if (outcome == readOutcome::endOfFile) {  // dev/random has no seek - but binary files should loop?
-    if (!loopToBeginningIfEOF_) return markAllNullAndZero(EXIT_SUCCESS);
+    if (!loopToBeginningIfEOF_) {
+      // Koniec strumienia bez zawijania to koniec danych — przebieg z --until-eof ma sie tu zatrzymac.
+      exhausted_ = true;
+      return markAllNullAndZero(EXIT_SUCCESS);
+    }
     if (::lseek(fd_, 0, SEEK_SET) < 0) return markAllNullAndZero(EXIT_FAILURE);
     if (readExact(ptrData) != readOutcome::complete) return markAllNullAndZero(EXIT_FAILURE);
   }

@@ -1,0 +1,8 @@
+# Tryb --until-eof ma liczyc do konca wejscia i tam sie zatrzymac. Deklaracja NIE niesie
+# ONESHOT: brak zawijania jest w tym trybie wymuszany z linii polecen, bo to zawijanie
+# jest zrodlem rekordow zmyslonych z danych, ktore juz raz przeszly.
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM src, 1/2 FILE 'data.txt'
+SELECT a*2 STREAM dst FROM src

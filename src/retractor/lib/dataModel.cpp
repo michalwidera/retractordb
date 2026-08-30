@@ -235,6 +235,13 @@ void dataModel::processRows(const std::set<std::string> &inSet, const boost::rat
   }
 }
 
+std::string dataModel::exhaustedInputStream() const {
+  for (const auto &[id, runtime] : qSet)
+    if (runtime->outputPayload->isDeclared() && runtime->outputPayload->sourceExhausted()) return id;
+
+  return {};
+}
+
 void dataModel::constructInputPayload(const std::string &instance) {
   const query &qry = coreInstance_[instance];
 

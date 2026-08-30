@@ -1,0 +1,10 @@
+# Dwa zrodla o roznej dlugosci: 8 i 3 rekordy, ten sam takt. Warunek stopu to PIERWSZE
+# wyczerpane wejscie, wiec oba strumienie wyjsciowe maja po 3 rekordy i zaden z nich nie
+# jest policzony z all-null wstawionego za koniec krotszego pliku.
+
+STORAGE 'two'
+
+DECLARE a INTEGER STREAM s1, 1/2 FILE 'data.txt'
+DECLARE b INTEGER STREAM s2, 1/2 FILE 'short.txt'
+SELECT a*2 STREAM d1 FROM s1
+SELECT b*3 STREAM d2 FROM s2

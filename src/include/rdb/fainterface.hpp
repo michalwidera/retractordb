@@ -73,6 +73,13 @@ struct FileInterface {
   /// @return true when updates go to a shadow file (see posixBinaryFileWithShadow)
   [[nodiscard]] virtual bool hasShadow() const { return false; }
 
+  /// @brief Czy sekwencyjne źródło wyczerpało wejście i nie ma już czego czytać.
+  ///
+  /// Dotyczy wyłącznie źródeł deklarowanych czytanych bez zawijania (ONESHOT): po końcu wejścia
+  /// zwracają one rekordy all-null, a bez tego pytania nie da się ich odróżnić od danych. Magazyny
+  /// zapisywalne nigdy się nie wyczerpują, stąd domyślne false.
+  [[nodiscard]] virtual bool exhausted() const { return false; }
+
   virtual ~FileInterface() = default;
 };
 }  // namespace rdb

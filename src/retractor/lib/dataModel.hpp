@@ -51,4 +51,11 @@ class dataModel {
 
   /** This function return length of data stream */
   size_t getStreamCount(const std::string &instance);
+
+  /// @brief Nazwa pierwszego strumienia deklarowanego, którego źródło wyczerpało wejście.
+  ///
+  /// Pusty napis, gdy każde źródło ma jeszcze dane. Warunek stopu trybu --until-eof: przebieg
+  /// trwa dopóty, dopóki KAŻDE wejście ma dane, bo od pierwszego wyczerpania rekordy liczyłyby
+  /// się z all-null wstawionego za koniec pliku, a nie z danych.
+  [[nodiscard]] std::string exhaustedInputStream() const;
 };

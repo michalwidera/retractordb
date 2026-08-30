@@ -19,6 +19,7 @@ namespace rdb {
 /// - działać sekwencyjnie; jedyną poprawną pozycją odczytu jest 0, a inna pozycja skutkuje zwróceniem danych wyzerowanych i nullBitset ustawionego na same wartości true,
 /// - po osiągnięciu końca pliku wracać do początku, jeśli włączono loopToBeginningIfEOF,
 /// - po osiągnięciu końca pliku przy wyłączonym loopToBeginningIfEOF zwracać kolejne rekordy jako wyzerowane dane z nullBitset ustawionym na same wartości true,
+/// - w tym samym przypadku zgłaszać wyczerpanie wejścia przez exhausted(), bo rekord all-null jest nieodróżnialny od danych,
 /// - w przypadku błędu otwarcia pliku lub błędu odczytu zwracać dane wyzerowane z nullBitset ustawionym na same wartości true,
 /// - zliczać wykonane odczyty i zwracać ich liczbę przez count().
 ///
@@ -38,6 +39,10 @@ class textSourceRO : public FileInterface {
 
   bool loopToBeginningIfEOF_ = true;
 
+  /// Wejście wyczerpane: ustawiane wyłącznie przy wyłączonym zawijaniu, bo przy włączonym
+  /// koniec pliku jest tylko powrotem na jego początek, a nie końcem danych.
+  bool exhausted_ = false;
+
  public:
   textSourceRO(std::string_view fileName,          //
                const rdb::Descriptor &descriptor,  //
@@ -54,6 +59,7 @@ class textSourceRO : public FileInterface {
 
   auto name() -> std::string & override;
   size_t count() override;
+  [[nodiscard]] bool exhausted() const override { return exhausted_; }
 
   const std::vector<bool> &lastNullBitset() const;
 };

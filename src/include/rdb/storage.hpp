@@ -151,6 +151,12 @@ class storage {
 
   [[nodiscard]] bool isDeclared() const;
 
+  /// @brief Czy źródło deklarowane wyczerpało wejście (patrz FileInterface::exhausted()).
+  ///
+  /// Pytanie ma sens wyłącznie dla źródeł czytanych bez zawijania; magazyny zapisywalne
+  /// i źródła zawijane zawsze odpowiadają false.
+  [[nodiscard]] bool sourceExhausted() const { return accessor_ != nullptr && accessor_->exhausted(); }
+
   void setCapacity(int capacity);
   void cleanPayload(uint8_t *destination = nullptr);
 

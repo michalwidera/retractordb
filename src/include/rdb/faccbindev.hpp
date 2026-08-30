@@ -20,6 +20,7 @@ namespace rdb {
 /// - w przypadku błędu, niepoprawnej pozycji lub braku danych zwracać dane wyzerowane i nullBitset ustawiony na same wartości true,
 /// - po osiągnięciu końca strumienia próbować wrócić do początku, jeśli włączono loopToBeginningIfEOF,
 /// - po osiągnięciu końca strumienia przy wyłączonym loopToBeginningIfEOF zwracać rekord oznaczony jako null,
+/// - w tym samym przypadku zgłaszać wyczerpanie wejścia przez exhausted(), bo rekord all-null jest nieodróżnialny od danych,
 /// - zliczać wykonane odczyty i zwracać ich liczbę przez count().
 ///
 /// @note Klasa nie interpretuje semantyki pól opisanych w Descriptor; przekazuje jedynie surowe bajty do bufora wyjściowego.
@@ -40,6 +41,10 @@ class binaryDeviceRO : public FileInterface {
   bool loopToBeginningIfEOF_ = true;
   std::vector<bool> lastNullBitset_;
 
+  /// Wejście wyczerpane: ustawiane wyłącznie przy wyłączonym zawijaniu, bo przy włączonym
+  /// koniec strumienia jest tylko powrotem na jego początek, a nie końcem danych.
+  bool exhausted_ = false;
+
   /// @brief Wypełnia cały rekord, sklejając krótkie odczyty i ponawiając wywołanie przerwane przez EINTR.
   readOutcome readExact(uint8_t *ptrData);
 
@@ -58,6 +63,7 @@ class binaryDeviceRO : public FileInterface {
 
   auto name() -> std::string & override;
   size_t count() override;
+  [[nodiscard]] bool exhausted() const override { return exhausted_; }
 
   [[nodiscard]] const std::vector<bool> &lastNullBitset() const;
 };

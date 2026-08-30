@@ -655,6 +655,16 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       }
       if (iLoopLimitCnt != executorsm::stop_now) _getch();
     } else {
+      // Tryb liczenia do konca wejscia: zrodla deklarowane czytamy bez zawijania, tak jakby kazda
+      // deklaracja niosla ONESHOT. Bez tego pytanie "czy wejscie sie skonczylo" nie ma odpowiedzi —
+      // zrodlo zawijane po koncu pliku wraca na jego poczatek i produkuje rekordy z danych, ktore
+      // juz raz przeszly. Ustawienie musi nastapic PRZED konstrukcja dataModel, bo to ona tworzy
+      // magazyny i przekazuje isOneShot do fabryki akcesorow.
+      const bool until_eof_mode = vm.contains("until-eof");
+      if (until_eof_mode)
+        for (auto &q : *coreInstancePtr)
+          if (q.isDeclaration()) q.isOneShot = true;
+
       dataModel proc(*coreInstancePtr);
       {
         std::scoped_lock lock(core_mutex);
@@ -786,6 +796,24 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
         slotBench.endCompute();
         boradcast(inSet);
         slotBench.endSlot();
+
+        // Deklaracje sa czytane na koncu slotu, a ich rekord konsumuje dopiero slot nastepny.
+        // Wyjscie z petli w tym miejscu wypada wiec dokladnie przed pierwszym rekordem, ktory
+        // powstalby z all-null wstawionego za koniec wejscia.
+        if (until_eof_mode) {
+          const auto exhausted = proc.exhaustedInputStream();
+          if (!exhausted.empty()) {
+            SPDLOG_INFO("End of input on declared stream '{}' — stopping (--until-eof).", exhausted);
+            if (vm.contains("verbose")) std::cout << "End of input on stream '" << exhausted << "'. Stopping.\n";
+            // Ta sama droga wyjscia co przy wyczerpaniu --llimitqry: stop_now zdejmuje czekanie
+            // na klawisz ponizej petli, wiec przebieg wsadowy konczy sie sam.
+            {
+              std::scoped_lock lock(core_mutex);
+              iLoopLimitCnt = executorsm::stop_now;
+            }
+            break;
+          }
+        }
         // End of loop while( ! _kbhit(ignoreanykey) )
       }
 

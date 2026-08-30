@@ -124,6 +124,9 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
 
   if (!loopToBeginningIfEOF_) {
     if (myFile_.eof()) {
+      // Ostatni rekord skonczyl sie dokladnie na koncu pliku: eofbit stoi juz przy wejsciu
+      // do kolejnego odczytu, a wiec danych nie ma i przebieg z --until-eof ma sie zatrzymac.
+      exhausted_ = true;
       return markAllNullAndZero(EXIT_SUCCESS);
     }
   }
@@ -221,6 +224,12 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
       i += (item.rtype == rdb::STRING) ? 1 : item.rarray;
     }
   }
+
+  // Plik zakonczony znakiem nowej linii nie ustawia eofbit na ostatnim tokenie, wiec bramka
+  // na wejsciu do read() go nie zlapie — konczy sie dopiero ekstrakcja tokenu w TYM rekordzie.
+  // failbit po petli oznacza rekord skladany z brakujacych tokenow, czyli pierwszy rekord za
+  // koncem wejscia. Rekord kompletny zostawia czysty failbit, nawet jesli eofbit juz stoi.
+  if (!loopToBeginningIfEOF_ && myFile_.fail()) exhausted_ = true;
 
   std::memcpy(ptrData, payload_->span().data(), descriptor_.getSizeInBytes());
 

@@ -95,6 +95,9 @@
 ///   punktu czasu) dla deterministycznych interwałów przetwarzania.
 /// - Oferować tryb bez taktowania zegarem ściennym (--no-clock) dla przebiegów offline: pełna semantyka
 ///   interwałów planu, ale bez czekania na zegar. Wyklucza się z --realtime.
+/// - Oferować tryb liczenia do końca wejścia (--until-eof): źródła deklarowane czytane bez zawijania,
+///   a przebieg kończony w slocie, w którym pierwsze z nich wyczerpie dane. Zdejmuje dobieranie --llimitqry
+///   do długości serii danych.
 ///
 /// Konfiguracja:
 /// - System w trybie usługowym wspiera pliki konfiguracjne podobnie jak inne usługi systemu linux (np. sshd).
@@ -294,11 +297,12 @@ int main(int argc, char *argv[]) {
           ("xqrywait,x", "wait with processing for first query")                  //
           ("noanykey,k", "do not wait for any key to terminate")                  //
           ("service,j", "service mode: log to stderr (journald), no log file")    //
-          ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")     //
-          ("no-clock,f", "offline mode: compute slots without waiting for the wall clock")          //
-          ("config,g", po::value<std::string>(&sConfig), "config file (TOML); overrides search")    //
-          ("llimitqry,m", po::value<int>(&loopLimitVar)->default_value(executorsm::inifitie_loop),  //
-           "loop iteration limit, 0 - no limit")                                                    //
+          ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")       //
+          ("no-clock,f", "offline mode: compute slots without waiting for the wall clock")            //
+          ("until-eof,u", "stop when a declared source runs out of input (forces one-shot sources)")  //
+          ("config,g", po::value<std::string>(&sConfig), "config file (TOML); overrides search")      //
+          ("llimitqry,m", po::value<int>(&loopLimitVar)->default_value(executorsm::inifitie_loop),    //
+           "loop iteration limit, 0 - no limit")                                                      //
           ;
     }
     po::positional_options_description p;  // Assume that infile is the first option

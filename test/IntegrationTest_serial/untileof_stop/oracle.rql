@@ -1,0 +1,8 @@
+# Przebieg wzorcowy: to samo wejscie, ale z ONESHOT i z RECZNIE dobranym -m. Wartosc 9
+# zostala znaleziona tak, jak opisuje pozycja 6 z usecases/requested.md — probowaniem:
+# -m 8 daje 7 rekordow, -m 10 doklada rekord all-null za koncem wejscia.
+
+STORAGE 'oracle'
+
+DECLARE a INTEGER STREAM src, 1/2 FILE 'data.txt' ONESHOT
+SELECT a*2 STREAM dst FROM src
