@@ -235,27 +235,28 @@ stream_fn_call      : ( MIN
                     ) '(' stream_expression ')'
                     ;
 
-function_call       : ( 'Sqrt'
-                    | 'Ceil'
-                    | 'Abs'
-                    | 'Floor'
-                    | 'Sign'
-                    | 'Chr'
-                    | 'Length'
-                    | 'ToNumber'
-                    | 'ToTimeStamp'
-                    | 'FloatCast'
-                    | 'IntCast'
-                    | 'Count'
-                    | 'Crc'
-                    | 'Sum'
-                    | 'IsZero'
-                    | 'IsNonZero'
-                    | 'isnull'
-                    | TO_INTEGER_FN
-                    | TO_FLOAT_FN
-                    | TO_DOUBLE_FN ) '(' expression_factor ( COMMA expression_factor )* ')'
-                    | TO_STRING_FN '(' expression_factor ( COLON DECIMAL )? ')'
+// Wywolanie funkcji skalarnej. Nazwa jest zwyklym ID, a NIE lista literalow: lista
+// dozwolonych nazw stoi w `src/include/rqlFunctions.hpp` i sprawdza ja
+// compiler::checkFunctionCalls(), wiec `-c` jest bramka.
+//
+// Do 2026-08-30 nazwy byly literalami tej reguly. Mialo to dwa skutki naraz. Wielkosc
+// liter byla czescia SKLADNI — `Sqrt(x)` przechodzilo, `sqrt(x)` bylo bledem, a dla
+// `to_integer` i `isnull` odwrotnie — bo ewaluator sklada wielkosc liter przed
+// dopasowaniem, a gramatyka nie. I trzynascie nazw bez implementacji kompilowalo sie
+// czysto, zeby wywrocic proces dopiero w wykonaniu. Oba znika, gdy nazwa jest ID.
+//
+// `ID` nie koliduje tu z `field_id : column_name=ID`, bo rozroznia je JEDEN token
+// wyprzedzenia (`(` po nazwie); zadna alternatywa `field_id` nie zaczyna sie `ID '('`.
+// Pulapka SLL opisana przy `select_list` tego nie dotyczy — tam obie sciezki byly
+// poprawne, tu tylko jedna.
+//
+// Dwa ksztalty wywolania, bo drugi argument `to_string` NIE jest wartoscia na stosie,
+// tylko zadeklarowana szerokoscia pola wyjsciowego, i jedzie w tokenie jako IDXPAIR.
+// Gdyby stal tu `expression_factor`, jego wlasny token PUSH_VAL zostalby na stosie
+// jako smiec, bo CALL2 zdejmuje jeden argument. Separatorem jest COLON, nie COMMA —
+// patrz regula przy `select_list`. Liczbe argumentow sprawdza tabela arnosci.
+function_call       : fn=ID '(' expression_factor ')'
+                    | fn=ID '(' expression_factor COLON DECIMAL ')'
                     ;
 
 // sync types with: src/include/rdb/fldType.hpp
@@ -299,11 +300,9 @@ SUMC:               'SUMC'|'sumc';
 TYPE_PROFILE:       'MEMORY'|'memory'|'DEFAULT'|'default'|'DIRECT'|'direct'|'POSIX'|'posix'|'POSIXSHD'|'posixshd'|'GENERIC'|'generic'|'DEVICE'|'device'|'TEXTSOURCE'|'textsource';
 STRING_PROFILE:    '\'' TYPE_PROFILE '\'';
 
-TO_INTEGER_FN:      'to_integer';
-TO_FLOAT_FN:        'to_float';
-TO_DOUBLE_FN:       'to_double';
-TO_STRING_FN:       'to_string';
-
+// UWAGA: `to_integer`, `to_float`, `to_double` i `to_string` mialy tu do 2026-08-30 wlasne
+// tokeny leksera, wiec byly slowami ZASTRZEZONYMI. Teraz leksuja sie jako ID, tak samo jak
+// pozostale nazwy funkcji — inaczej nie przeszlyby przez `function_call : fn=ID ...`.
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
 STRING:             '\'' (~'\'' | '\'\'')* '\'';
 FLOAT:              DEC_DOT_DEC;

@@ -18,6 +18,7 @@
 #include "fatalError.hpp"
 #include "qTree.hpp"
 #include "rdb/convertTypes.hpp"
+#include "rqlFunctions.hpp"
 
 using namespace antlrcpp;
 using namespace antlr4;
@@ -219,11 +220,23 @@ class ParserListener : public RQLBaseListener {
     program.emplace_back(STREAM_AGSE, std::make_pair(step, window));
   }
 
+  /// Nazwa funkcji jest w gramatyce zwyklym ID, wiec autor moze ja napisac dowolna
+  /// wielkoscia liter. Do tokena idzie postac KANONICZNA z rqlFunctions.hpp, a nie ta
+  /// napisana w zapytaniu — uzasadnienie przy definicji tabeli.
+  ///
+  /// Nazwy NIEZNANEJ nie odrzucamy tutaj. Listener parsera nie ma kanalu na lagodny
+  /// blad (zostaje FatalError), a `compiler::checkFunctionCalls()` raportuje ja przez
+  /// `Check result:` razem z pozostalymi kontrolami planu. Nieznana nazwa jedzie wiec
+  /// dalej w postaci doslownej, zeby komunikat pokazal to, co napisal autor.
   void exitFunction_call(RQLParser::Function_callContext *ctx) override {
-    if (ctx->TO_STRING_FN() != nullptr && ctx->DECIMAL() != nullptr)
-      recpToken(CALL2, std::make_pair(std::string("to_string"), std::stoi(ctx->DECIMAL()->getText())));
+    const std::string written = ctx->fn->getText();
+    const auto known          = rdb::findRqlFunction(written);
+    const std::string name    = known ? std::string(known->canonical) : written;
+
+    if (ctx->DECIMAL() != nullptr)
+      recpToken(CALL2, std::make_pair(name, std::stoi(ctx->DECIMAL()->getText())));
     else
-      recpToken(CALL, ctx->children[0]->getText());
+      recpToken(CALL, name);
   }
 
   // page 119 - The Definitive ANTL4 Reference Guide

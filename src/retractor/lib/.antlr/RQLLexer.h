@@ -12,22 +12,19 @@
 class  RQLLexer : public antlr4::Lexer {
 public:
   enum {
-    T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, T__4 = 5, T__5 = 6, T__6 = 7, 
-    T__7 = 8, T__8 = 9, T__9 = 10, T__10 = 11, T__11 = 12, T__12 = 13, T__13 = 14, 
-    T__14 = 15, T__15 = 16, T__16 = 17, T__17 = 18, T__18 = 19, T__19 = 20, 
-    T__20 = 21, BYTE_T = 22, STRING_T = 23, UNSIGNED_T = 24, INTEGER_T = 25, 
-    FLOAT_T = 26, DOUBLE_T = 27, SELECT = 28, STREAM = 29, FROM = 30, DECLARE = 31, 
-    RETENTION = 32, FILE = 33, STORAGE = 34, ROTATION = 35, SUBSTRAT = 36, 
-    RULE = 37, DISPOSABLE = 38, ONESHOT = 39, HOLD = 40, VOLATILE = 41, 
-    ON = 42, WHEN = 43, DUMP = 44, SYSTEM = 45, DO = 46, TO = 47, AND_C = 48, 
-    OR_C = 49, NOT_C = 50, MIN = 51, MAX = 52, AVG = 53, SUMC = 54, TYPE_PROFILE = 55, 
-    STRING_PROFILE = 56, TO_INTEGER_FN = 57, TO_FLOAT_FN = 58, TO_DOUBLE_FN = 59, 
-    TO_STRING_FN = 60, ID = 61, STRING = 62, FLOAT = 63, DECIMAL = 64, REAL = 65, 
-    IS_EQ = 66, IS_NQ = 67, IS_GR = 68, IS_LS = 69, IS_GE = 70, IS_LE = 71, 
-    EXCLAMATION = 72, DOUBLE_BAR = 73, DOT = 74, UNDERLINE = 75, AT = 76, 
-    SHARP = 77, AND = 78, MOD = 79, DOLLAR = 80, COMMA = 81, SEMI = 82, 
-    COLON = 83, DOUBLE_COLON = 84, STAR = 85, DIVIDE = 86, PLUS = 87, MINUS = 88, 
-    BIT_NOT = 89, BIT_OR = 90, BIT_XOR = 91, SPACE = 92, COMMENT = 93, LINE_COMMENT2 = 94
+    T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, BYTE_T = 5, STRING_T = 6, UNSIGNED_T = 7, 
+    INTEGER_T = 8, FLOAT_T = 9, DOUBLE_T = 10, SELECT = 11, STREAM = 12, 
+    FROM = 13, DECLARE = 14, RETENTION = 15, FILE = 16, STORAGE = 17, ROTATION = 18, 
+    SUBSTRAT = 19, RULE = 20, DISPOSABLE = 21, ONESHOT = 22, HOLD = 23, 
+    VOLATILE = 24, ON = 25, WHEN = 26, DUMP = 27, SYSTEM = 28, DO = 29, 
+    TO = 30, AND_C = 31, OR_C = 32, NOT_C = 33, MIN = 34, MAX = 35, AVG = 36, 
+    SUMC = 37, TYPE_PROFILE = 38, STRING_PROFILE = 39, ID = 40, STRING = 41, 
+    FLOAT = 42, DECIMAL = 43, REAL = 44, IS_EQ = 45, IS_NQ = 46, IS_GR = 47, 
+    IS_LS = 48, IS_GE = 49, IS_LE = 50, EXCLAMATION = 51, DOUBLE_BAR = 52, 
+    DOT = 53, UNDERLINE = 54, AT = 55, SHARP = 56, AND = 57, MOD = 58, DOLLAR = 59, 
+    COMMA = 60, SEMI = 61, COLON = 62, DOUBLE_COLON = 63, STAR = 64, DIVIDE = 65, 
+    PLUS = 66, MINUS = 67, BIT_NOT = 68, BIT_OR = 69, BIT_XOR = 70, SPACE = 71, 
+    COMMENT = 72, LINE_COMMENT2 = 73
   };
 
   explicit RQLLexer(antlr4::CharStream *input);

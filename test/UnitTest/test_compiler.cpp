@@ -1286,6 +1286,112 @@ TEST(xparser, aggregate_keywords_are_reserved_stream_names) {
 
 namespace {
 
+/// Sparsuj i skompiluj `rql`, zwracajac wynik compiler::compile().
+///
+/// Nazwa funkcji jest w gramatyce zwyklym ID, wiec bledna nazwa NIE jest bledem skladni
+/// i nie konczy procesu — wychodzi lagodnie przez wartosc zwracana z compile(), tym samym
+/// kanalem co pozostale kontrole planu. Dlatego te testy nie potrzebuja EXPECT_EXIT.
+std::string compileRql(const std::string &rql) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, rql);
+  if (parseResult != "OK") return parseResult;
+  compiler compilerInstance(instance);
+  return compilerInstance.compile();
+}
+
+std::string selectRql(const std::string &selectList) {
+  return "SUBSTRAT 'memory'\n"
+         "DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'\n"
+         "SELECT " +
+         selectList + " STREAM out FROM src\n";
+}
+
+}  // namespace
+
+// Wielkosc liter w nazwie funkcji przestala byc czescia skladni. Do 2026-08-29 gramatyka
+// miala literaly 'Sqrt', 'Ceil', 'Floor', a ewaluator skladal nazwe do malych liter przed
+// dopasowaniem — `Sqrt(x)` przechodzilo, `sqrt(x)` bylo bledem skladni, a dla `to_integer`
+// i `isnull` bylo odwrotnie.
+TEST(xparser, function_name_is_case_insensitive) {
+  for (const char *call : {"Sqrt(a)", "sqrt(a)", "SQRT(a)", "SqRt(a)"}) {
+    EXPECT_EQ(compileRql(selectRql(call)), "OK") << call;
+  }
+}
+
+// Do tokena idzie postac KANONICZNA z rqlFunctions.hpp, a nie ta napisana przez autora.
+// Trzyma to zrzuty planu stabilne — wzorce testow integracyjnych i zapisy planow pilota H9
+// pokazuja `CALL(Sqrt)` niezaleznie od pisowni w zrodle. Bez kanonizacji porownania
+// `getStr_() == "to_string"` w exitExpression i exprSimplify przestalyby dzialac.
+TEST(xparser, function_name_is_canonicalized_in_token) {
+  for (const char *call : {"sqrt(a)", "SQRT(a)"}) {
+    qTree instance;
+    auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, selectRql(call));
+    ASSERT_EQ(parseResult, "OK") << call;
+
+    bool found = false;
+    for (const auto &q : instance)
+      for (const auto &f : q.lSchema)
+        for (const auto &tk : f.lProgram)
+          if (tk.getCommandID() == CALL && tk.getStr_() == "Sqrt") found = true;
+    EXPECT_TRUE(found) << call;
+  }
+}
+
+// Siedem funkcji bylo zaimplementowanych w ewaluatorze, ale nie stalo ich w gramatyce,
+// wiec byly z RQL nieosiagalne. To odwrotna polowa tej samej rozbieznosci list.
+TEST(xparser, implemented_functions_are_reachable_from_rql) {
+  for (const char *call : {"round(a)", "trunc(a)", "sin(a)", "cos(a)", "tan(a)", "log(a)", "log2(a)"}) {
+    EXPECT_EQ(compileRql(selectRql(call)), "OK") << call;
+  }
+}
+
+// Funkcje dopisane 2026-08-30. `Abs` liczy sie wprost na wariancie, zeby nie tracic
+// dokladnosci wartosci wymiernej; `IsZero`/`IsNonZero` wnosza predykat do wyrazenia
+// w SELECT, gdzie porownania z `term_logic` nie sa dostepne.
+TEST(xparser, newly_implemented_functions_compile) {
+  for (const char *call : {"Abs(a)", "abs(a)", "IsZero(a)", "isnonzero(a)"}) {
+    EXPECT_EQ(compileRql(selectRql(call)), "OK") << call;
+  }
+}
+
+// Sedno pozycji 1 z usecases/requested.md: `-c` jest bramka. Te nazwy stały w gramatyce
+// bez implementacji, wiec plan kompilowal sie czysto i ginal dopiero w wykonaniu na
+// `Unsupported function call`. Teraz odpadaja na kompilacji, kanalem `Check result:`.
+TEST(xparser, unknown_function_is_rejected_at_compile_time) {
+  for (const char *call : {"Crc(a)", "Sum(a)", "Sign(a)", "Chr(a)", "Count(a)", "IntCast(a)", "FloatCast(a)", "ToNumber(a)",
+                           "ToTimeStamp(a)", "Length(a)", "Sqrtt(a)"}) {
+    const std::string result = compileRql(selectRql(call));
+    EXPECT_NE(result, "OK") << call;
+    EXPECT_NE(result.find("not a known RQL function"), std::string::npos) << call << " -> " << result;
+  }
+}
+
+// Nieznana nazwa w warunku reguly musi odpasc tak samo jak w liscie SELECT: warunek jest
+// osobnym programem tokenow i przebieg kontrolny musi go obejsc.
+TEST(xparser, unknown_function_in_rule_condition_is_rejected) {
+  const std::string result = compileRql(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT a, b STREAM out FROM src\n"
+      "RULE alarm ON out WHEN Crc(out[0]) >= 1 DO DUMP -1 TO 1 RETENTION 8\n");
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("not a known RQL function"), std::string::npos) << result;
+}
+
+// Zadeklarowana szerokosc `f(expr : N)` nalezy wylacznie do `to_string` — N jest szerokoscia
+// pola wyjsciowego, a nie wartoscia na stosie. Arnosc sprawdza tabela w rqlFunctions.hpp,
+// a nie ksztalt gramatyki, wiec dodanie funkcji o innej arnosci nie wymaga regeneracji ANTLR.
+TEST(xparser, declared_width_is_rejected_for_functions_without_width) {
+  const std::string result = compileRql(selectRql("Sqrt(a:8)"));
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("takes no width argument"), std::string::npos) << result;
+
+  EXPECT_EQ(compileRql(selectRql("to_string(a:8)")), "OK");
+  EXPECT_EQ(compileRql(selectRql("TO_STRING(a:8)")), "OK");
+}
+
+namespace {
+
 /// Plan z jedna szeroka klauzula FROM: `str01 + str02 + ... + strNN`.
 ///
 /// Nazwa substratu rosnie LINIOWO z liczba skladnikow — kazdy poziom doklada
@@ -1638,15 +1744,6 @@ std::string renderPlan(qTree &plan) {
   for (const auto &entry : rendered)
     out += entry + "\n";
   return out;
-}
-
-/// Kompiluje pojedynczy tekst RQL i zwraca werdykt kompilatora.
-std::string compileRql(const std::string &rql) {
-  qTree instance;
-  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, rql);
-  if (parseResult != "OK") return parseResult;
-  compiler compilerInstance(instance);
-  return compilerInstance.compile();
 }
 
 }  // namespace

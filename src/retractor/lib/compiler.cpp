@@ -21,8 +21,9 @@
 
 #include "exprSimplify.hpp"  // simplifyExpression
 #include "fatalError.hpp"
-#include "rdb/probe.hpp"    // sonda E3: rozmiar planu, czas kompilacji
-#include "SOperations.hpp"  // ceilR
+#include "rdb/probe.hpp"     // sonda E3: rozmiar planu, czas kompilacji
+#include "rqlFunctions.hpp"  // jedyna lista funkcji skalarnych
+#include "SOperations.hpp"   // ceilR
 
 using boost::lexical_cast;
 
@@ -2271,6 +2272,65 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
   return {"OK"};
 }
 
+/// Kontrola nazw i arnosci funkcji skalarnych — jedyne miejsce, w ktorym plan moze odpasc
+/// z powodu wywolania funkcji.
+///
+/// Do 2026-08-30 takiego miejsca nie bylo: lista dozwolonych nazw stala w gramatyce, a lista
+/// zaimplementowanych w ewaluatorze, i nie byly ze soba zwiazane. Trzynascie nazw z gramatyki
+/// przechodzilo `-c` czysto, zeby wywrocic proces dopiero w wykonaniu na `Unsupported function
+/// call`. Odwrotnie, siedem funkcji zaimplementowanych (`round`, `trunc`, `sin`, `cos`, `tan`,
+/// `log`, `log2`) bylo z RQL nieosiagalnych, bo nie stalo ich w gramatyce.
+///
+/// Teraz gramatyka przyjmuje dowolne `ID`, a jedyna lista stoi w rqlFunctions.hpp i czyta ja
+/// ten przebieg. Dzieki temu `-c` JEST bramka: program, ktory nie ma prawa sie wykonac, nie
+/// przechodzi kompilacji.
+///
+/// Przebieg jest czysto kontrolny — niczego nie przepisuje — wiec moze stac przed rozwinieciem
+/// generatorow. Rodziny powielaja gotowe programy pol, a wywolanie funkcji nie zmienia sie przy
+/// podstawianiu numeru instancji: nazwa zla w szablonie jest zla w kazdej instancji, a nazwa
+/// dobra pozostaje dobra. Sprawdzanie 24 kopii tego samego bledu tylko powielaloby komunikat.
+std::string compiler::checkFunctionCalls() {
+  // CALL2 niesie pare <nazwa, zadeklarowana szerokosc>, CALL samo nazwe. Obie postaci maja te
+  // sama nazwe funkcji, wiec rozstrzyga o niej getStr_(), a o arnosci — command_id.
+  const auto checkProgram = [](const std::list<token> &program, const std::string &owner) -> std::string {
+    for (const auto &t : program) {
+      const auto cmd = t.getCommandID();
+      if (cmd != CALL && cmd != CALL2) continue;
+
+      const std::string name = t.getStr_();
+      const auto known       = rdb::findRqlFunction(name);
+      if (!known) {
+        SPDLOG_ERROR("Unknown scalar function '{}' in stream '{}'", name, owner);
+        return "Stream '" + owner + "' calls '" + name + "', which is not a known RQL function.";
+      }
+
+      // Jedyna funkcja o arnosci 2 to `to_string(expr : N)`, gdzie N jest zadeklarowana
+      // szerokoscia pola wyjsciowego, a nie wartoscia na stosie. Postac CALL2 dla funkcji,
+      // ktora tej szerokosci nie przyjmuje, jest bledem uzycia, nie bledem skladni.
+      const int usedArgs = (cmd == CALL2) ? 2 : 1;
+      if (usedArgs > known->maxArgs) {
+        SPDLOG_ERROR("Function '{}' in stream '{}' takes {} argument(s), {} given", name, owner, known->maxArgs, usedArgs);
+        return "Stream '" + owner + "' calls '" + name + "' with a declared width, but '" + name + "' takes no width argument.";
+      }
+    }
+    return "OK";
+  };
+
+  for (const auto &q : coreInstance) {
+    for (const auto &f : q.lSchema) {
+      const auto result = checkProgram(f.lProgram, q.id);
+      if (result != "OK") return result;
+    }
+    // Warunek reguly jest osobnym programem i tak samo moze wolac funkcje.
+    for (const auto &r : q.lRules) {
+      const auto result = checkProgram(r.condition, q.id);
+      if (result != "OK") return result;
+    }
+  }
+
+  return "OK";
+}
+
 /// Rozwija generatory strumieni: jedno `SELECT cells[$] STREAM cell[24] FROM cells`
 /// w 24 zapytania `cell$0`..`cell$23`.
 ///
@@ -2380,9 +2440,15 @@ std::string compiler::compile() {
   rdb::probe::planProbe planBench;
   planBench.capture(rdb::probe::planStage::entry, coreInstance);
 
-  // PIERWSZY przebieg, przed wszystkim innym łącznie z migawką odwołań: po nim plan jest
-  // nie do odróżnienia od ręcznie rozpisanego, więc dalsza część kompilatora o generatorach
-  // nie wie i wiedzieć nie musi.
+  // Kontrola czysto nazewnicza, więc stoi przed rozwinięciem rodzin: zła nazwa funkcji
+  // w szablonie generatora jest zła w każdej z 24 instancji, a sprawdzanie kopii tylko
+  // powielałoby komunikat. Uzasadnienie w komentarzu przy definicji przebiegu.
+  result = checkFunctionCalls();
+  if (result != "OK") return result;
+
+  // PIERWSZY przebieg PRZEPISUJĄCY, przed wszystkim innym łącznie z migawką odwołań: po nim
+  // plan jest nie do odróżnienia od ręcznie rozpisanego, więc dalsza część kompilatora
+  // o generatorach nie wie i wiedzieć nie musi.
   result = expandStreamGenerators();
   if (result != "OK") return result;
 

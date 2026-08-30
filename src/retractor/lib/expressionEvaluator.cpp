@@ -5,7 +5,8 @@
 
 #include <algorithm>   // std::ranges::transform
 #include <cctype>      // std::tolower
-#include <cmath>       // sqrt
+#include <cmath>       // sqrt, std::fabs
+#include <cstdlib>     // std::abs
 #include <functional>  // std::function
 #include <limits>      // std::numeric_limits
 #include <optional>
@@ -562,6 +563,53 @@ rdb::descFldVT logic_not(const rdb::descFldVT &inVar) {
 
 rdb::descFldVT isnull(const rdb::descFldVT &inVar) { return isNullValue(inVar) ? 1 : 0; }
 
+/// Wartosc bezwzgledna, napisana wprost na wariancie, a NIE przez callFun.
+///
+/// callFun przepuszcza argument przez double i z powrotem (castFldVT), a droga powrotna dla
+/// RATIONAL idzie przez Rationalize z tolerancja 1e-6 — czyli gubi dokladna wartosc wymierna.
+/// Dla `Abs` ta strata bylaby czysto zbedna: wartosc bezwzgledna nie zmienia ani typu, ani
+/// mianownika. Wzorzec wziety z neg() powyzej, ktore jest tym samym rodzajem operacji.
+rdb::descFldVT absolute(const rdb::descFldVT &inVar) {
+  if (isNullValue(inVar)) return std::monostate{};
+
+  rdb::descFldVT retVal;
+  std::visit(Overload{[&retVal](std::monostate) { retVal = std::monostate{}; },  //
+                      [&retVal](uint8_t a) { retVal = a; },                      // bez znaku — tozsamosc
+                      [&retVal](int a) { retVal = std::abs(a); },                //
+                      [&retVal](unsigned a) { retVal = a; },                     // bez znaku — tozsamosc
+                      [&retVal](boost::rational<int> a) { retVal = (a < boost::rational<int>(0)) ? -a : a; },  //
+                      [&retVal](float a) { retVal = std::fabs(a); },                                           //
+                      [&retVal](double a) { retVal = std::fabs(a); },                                          //
+                      [](std::pair<int, int>) { throw std::runtime_error("Function 'Abs' not defined for INTPAIR operands"); },
+                      [](const std::pair<std::string, int> &) {
+                        throw std::runtime_error("Function 'Abs' not defined for IDXPAIR operands");
+                      },
+                      [](const std::string &) { throw std::runtime_error("Function 'Abs' not defined for string operands"); }},
+             inVar);
+
+  return retVal;
+}
+
+/// IsZero / IsNonZero — predykat liczbowy zwracajacy 0 albo 1 jako INTEGER.
+///
+/// Wynik jest INTEGER, a nie typem argumentu (inaczej niz w logic_not), bo na tym polega cala
+/// ich wartosc uzytkowa: porownania (`>=`, `<`, ...) zyja w regule `term_logic` i nie sa dostepne
+/// wewnatrz wyrazenia w SELECT. Te dwie funkcje sa jedynym sposobem wniesienia predykatu do
+/// wyrazenia jako wartosci 0/1 — stad ich przydatnosc obok RULE.
+///
+/// Dla stringa predykat nie ma sensu i jest bledem, a nie cicha konwersja: toLogicValue()
+/// uznaje kazdy niepusty napis za prawde, co dla nazwy `IsZero` byloby mylace.
+rdb::descFldVT isZeroValue(const rdb::descFldVT &inVar, bool wantZero) {
+  if (isNullValue(inVar)) return std::monostate{};
+  if (std::holds_alternative<std::string>(inVar))
+    throw std::runtime_error("Functions 'IsZero'/'IsNonZero' are not defined for string operands");
+
+  const auto value = toLogicValue(inVar);
+  if (!value.has_value()) return std::monostate{};
+  const bool isZero = !(*value);
+  return (isZero == wantZero) ? 1 : 0;
+}
+
 rdb::descFldVT callFun(rdb::descFldVT &inVar, const std::function<double(double)> &fnName) {
   if (isNullValue(inVar)) return std::monostate{};
   auto backResultType = inVar.index();
@@ -673,10 +721,10 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         rStack.push(is_logic_and(b, a));
         break;
       case CALL: {
-        // Gramatyka zapisuje nazwy funkcji wielką literą ('Sqrt', 'Ceil', 'Floor'), a parser
-        // wkłada do tokena tekst dosłowny (RQLParser::exitFunction_call), więc dopasowanie musi
-        // złożyć wielkość liter. Bez tego `Sqrt(x)` kompiluje się i wywraca dopiero w wykonaniu.
-        // Do komunikatu idzie nazwa tak, jak ją napisał autor zapytania.
+        // Parser zapisuje do tokena postać KANONICZNĄ z rqlFunctions.hpp ('Sqrt', 'to_integer'),
+        // więc dopasowanie po złożeniu wielkości liter jest tu nadmiarowe — i zostaje właśnie
+        // dlatego, że jest tanie, a chroni przed rozjazdem, gdyby ktoś dopisał do tabeli nazwę
+        // o innej pisowni niż gałąź poniżej.
         const auto original = tk.getStr_();
         const auto tkStr    = lowercased(original);
         // https://learnmoderncpp.com/2020/06/01/strings-as-switch-case-labels/ (?)
@@ -702,6 +750,12 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
           rStack.push(callFun(b, trunc));
         else if (tkStr == "isnull")
           rStack.push(isnull(b));
+        else if (tkStr == "abs")
+          rStack.push(absolute(b));
+        else if (tkStr == "iszero")
+          rStack.push(isZeroValue(b, true));
+        else if (tkStr == "isnonzero")
+          rStack.push(isZeroValue(b, false));
         else if (tkStr == "to_integer")
           rStack.push(isNullValue(b) ? rdb::descFldVT{std::monostate{}} : castFldVT(b, rdb::INTEGER));
         else if (tkStr == "to_float")
@@ -711,6 +765,11 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         else if (tkStr == "to_string")
           rStack.push(isNullValue(b) ? rdb::descFldVT{std::monostate{}} : castFldVT(b, rdb::STRING));
         else
+          // Nieosiągalne z RQL od 2026-08-30: compiler::checkFunctionCalls() odrzuca nieznaną
+          // nazwę przez `Check result:`, więc plan z taką nazwą nie dochodzi do wykonania.
+          // Rzut zostaje jako kontrola dla ścieżek omijających kompilator (testy jednostkowe
+          // budujące program tokenów wprost) — tak samo jak FatalError przy nierozwiązanym
+          // węźle planu.
           throw std::runtime_error(std::string("Unsupported function call: ") + original);
       } break;
       case CALL2: {

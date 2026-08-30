@@ -58,6 +58,7 @@ struct compiler {
   void snapshotNamedSourceRefs();
 
   // compile chain steps
+  std::string checkFunctionCalls();
   std::string expandStreamGenerators();
   std::string substituteOrdinal(query &instance, int ordinal);
   std::string validateGeneratedFieldIndex(const std::string &owner, const std::string &source, int index);

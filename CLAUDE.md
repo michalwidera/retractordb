@@ -287,14 +287,34 @@ Then suggest either: (a) commit current state and end the session, or (b) defer 
 
 Current pattern: `to_string(expr : N)` — `:` (COLON) = output field width.
 
-### Adding new function call tokens
+### Adding a scalar function
 
-1. Add grammar alternative with non-COMMA separator — do NOT extend `( COMMA expression_factor )*`
-2. `ninja rqlgrammar` to regenerate `.antlr/`
-3. Add `CALL2` (or new `command_id`) to `src/include/cmdID.hpp`
-4. Handle in `exitFunction_call` in `src/retractor/lib/RQLParser.cpp` — store extra param as `std::pair<std::string, int>` (IDXPAIR variant)
-5. In `exitExpression`: accumulate output field size from token value
-6. In `expressionEvaluator.cpp`: pop 1 arg (size is in token, not stack)
+Function names are **not** grammar literals. `function_call` takes a plain `ID`, and the single
+list of legal names lives in `src/include/rqlFunctions.hpp`. Adding a one-argument function:
+
+1. Add a row to `kRqlFunctions` in `src/include/rqlFunctions.hpp` — canonical name plus arity
+2. Add a branch in the `CALL` chain in `src/retractor/lib/expressionEvaluator.cpp` — match the
+   **lowercased** name; the parser stores the canonical spelling, the evaluator folds case
+3. No grammar edit, no `ninja rqlgrammar`, no new `command_id`
+
+`canonical` is what the parser writes into the token, regardless of how the author spelled it.
+Keep it stable: plan dumps print it (`CALL(Sqrt)`), integration `pattern.txt` files and the H9
+pilot plans under `test/research_gate/h9/pilot/out/` match on it, and `exitExpression` /
+`exprSimplify` compare `getStr_() == "to_string"` literally.
+
+`compiler::checkFunctionCalls()` rejects an unknown name or a bad arity through the
+`Check result:` channel, so `-c` is a gate: a program that cannot run does not compile.
+
+**Two-argument functions.** The grammar has exactly two shapes — `f(expr)` and
+`f(expr : DECIMAL)`. The second belongs to `to_string` alone: `N` is the declared output field
+width carried in the token as `IDXPAIR`, not a value on the stack. A future function taking two
+**evaluated** arguments needs one more grammar alternative
+(`fn=ID '(' expression_factor ( COLON expression_factor )* ')'` is verified to parse) plus the
+arity row — never a `COMMA` separator, see the rule above.
+
+**`min` is unavailable as a scalar function name.** `MIN`, `MAX`, `AVG` and `SUMC` are lexer
+tokens ahead of `ID` (stream reducers), so they never lex as a function name. A scalar minimum
+must be called something else.
 
 ### Integration test file sync
 

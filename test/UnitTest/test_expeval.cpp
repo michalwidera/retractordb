@@ -1,10 +1,13 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <spdlog/spdlog.h>
+#include <boost/rational.hpp>
 
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "rdb/payload.hpp"
@@ -843,10 +846,10 @@ TEST(xExpressionEval, too_many_values_on_stack_throws) {
 
 // --- CALL functions ---
 
-// Nazwy pisane wielką literą to POSTAĆ, KTÓRĄ NAPRAWDĘ PRODUKUJE PARSER: gramatyka zna wyłącznie
-// 'Sqrt', 'Ceil' i 'Floor', a `exitFunction_call` wkłada do tokena tekst dosłowny. Pozostałe testy
-// w tym pliku fabrykują nazwy małymi literami, czyli sprawdzają dopasowanie, którego z RQL nie da
-// się osiągnąć — i dlatego przechodziły, gdy `Sqrt(x)` wywracał się w wykonaniu.
+// Nazwy pisane wielką literą to POSTAĆ, KTÓRĄ NAPRAWDĘ PRODUKUJE PARSER: `exitFunction_call`
+// wkłada do tokena postać kanoniczną z `rqlFunctions.hpp`, a tam `Sqrt`, `Ceil` i `Floor` stoją
+// właśnie tak. Pozostałe testy w tym pliku fabrykują nazwy małymi literami, czyli sprawdzają
+// samo złożenie wielkości liter w ewaluatorze, a nie postać, którą dostaje z parsera.
 TEST(xExpressionEval, call_function_name_as_grammar_writes_it) {
   const std::vector<std::pair<std::string, double>> cases{{"Sqrt", 2.0}, {"Ceil", 4.0}, {"Floor", 4.0}};
 
@@ -864,11 +867,16 @@ TEST(xExpressionEval, call_function_name_as_grammar_writes_it) {
 }
 
 // Złożenie wielkości liter nie może zamienić nieznanej funkcji w znaną ani zamazać nazwy
-// w komunikacie — `Abs` jest w gramatyce, ale ewaluator go nie ma.
+// w komunikacie.
+//
+// Od 2026-08-30 ta ścieżka jest z RQL NIEOSIĄGALNA: `compiler::checkFunctionCalls()` odrzuca
+// nieznaną nazwę na kompilacji, więc plan z nią nie dochodzi do wykonania. Rzut zostaje jako
+// kontrola dla programów tokenów budowanych wprost, tak jak tutaj. `Crc` był w gramatyce do
+// tej daty i został usunięty razem z ośmioma innymi nazwami bez implementacji.
 TEST(xExpressionEval, call_unknown_function_keeps_author_spelling) {
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 4.0);
-  program.emplace_back(CALL, std::string("Abs"));
+  program.emplace_back(CALL, std::string("Crc"));
 
   expressionEvaluator test;
   EXPECT_THROW(
@@ -876,11 +884,70 @@ TEST(xExpressionEval, call_unknown_function_keeps_author_spelling) {
         try {
           test.eval(program);
         } catch (const std::runtime_error &error) {
-          EXPECT_STREQ(error.what(), "Unsupported function call: Abs");
+          EXPECT_STREQ(error.what(), "Unsupported function call: Crc");
           throw;
         }
       },
       std::runtime_error);
+}
+
+// Funkcje dopisane 2026-08-30. `Abs` liczy się wprost na wariancie, żeby nie tracić dokładności
+// wartości wymiernej na okrążeniu przez double, które robi callFun. `IsZero` i `IsNonZero`
+// zwracają INTEGER 0/1 niezależnie od typu argumentu — to jest ich cała wartość użytkowa, bo
+// porównania żyją w regule `term_logic` i nie są dostępne wewnątrz wyrażenia w SELECT.
+TEST(xExpressionEval, call_abs_preserves_type) {
+  const std::vector<std::pair<int, int>> intCases{{-9, 9}, {9, 9}, {0, 0}};
+  for (const auto &[input, expected] : intCases) {
+    std::list<token> program;
+    program.emplace_back(PUSH_VAL, input);
+    program.emplace_back(CALL, std::string("Abs"));
+
+    expressionEvaluator test;
+    rdb::descFldVT result = test.eval(program);
+    ASSERT_TRUE(std::holds_alternative<int>(result)) << input;
+    EXPECT_EQ(std::get<int>(result), expected) << input;
+  }
+
+  // Wartość wymierna ma wyjść dokładnie ta sama, bez przybliżenia przez Rationalize.
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, boost::rational<int>(-22, 7));
+  program.emplace_back(CALL, std::string("Abs"));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+  ASSERT_TRUE(std::holds_alternative<boost::rational<int>>(result));
+  EXPECT_EQ(std::get<boost::rational<int>>(result), boost::rational<int>(22, 7));
+}
+
+TEST(xExpressionEval, call_iszero_and_isnonzero_return_integer) {
+  const std::vector<std::tuple<int, int, int>> cases{{0, 1, 0}, {5, 0, 1}, {-5, 0, 1}};
+
+  for (const auto &[input, zeroExpected, nonZeroExpected] : cases) {
+    for (const auto &[name, expected] :
+         std::vector<std::pair<std::string, int>>{{"IsZero", zeroExpected}, {"IsNonZero", nonZeroExpected}}) {
+      std::list<token> program;
+      program.emplace_back(PUSH_VAL, input);
+      program.emplace_back(CALL, name);
+
+      expressionEvaluator test;
+      rdb::descFldVT result = test.eval(program);
+      ASSERT_TRUE(std::holds_alternative<int>(result)) << name << "(" << input << ")";
+      EXPECT_EQ(std::get<int>(result), expected) << name << "(" << input << ")";
+    }
+  }
+}
+
+// NULL pochłania: predykat na braku danych jest brakiem danych, a nie fałszem.
+TEST(xExpressionEval, new_functions_propagate_null) {
+  for (const char *name : {"Abs", "IsZero", "IsNonZero"}) {
+    std::list<token> program;
+    program.emplace_back(PUSH_VAL, rdb::descFldVT{std::monostate{}});
+    program.emplace_back(CALL, std::string(name));
+
+    expressionEvaluator test;
+    rdb::descFldVT result = test.eval(program);
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(result)) << name;
+  }
 }
 
 TEST(xExpressionEval, call_sqrt_function_double) {

@@ -277,11 +277,6 @@ add_subdirectory(src)
 add_subdirectory(scripts)
 add_subdirectory(test)
 
-option(BUILD_EXAMPLES "Build example programs" OFF)
-if(BUILD_EXAMPLES)
-  add_subdirectory(examples/generator)
-endif()
-
 include(InstallRequiredSystemLibraries)
 
 set(CPACK_GENERATOR "DEB;TGZ")
