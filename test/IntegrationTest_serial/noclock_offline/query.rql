@@ -1,0 +1,8 @@
+# Tryb offline (--no-clock) ma zdejmowac wylacznie czekanie na zegar scienny.
+# Os czasu planu, wyrownanie slotow i ogon musza dac ten sam ciag rekordow,
+# co przebieg taktowany — dlatego test porownuje artefakty bajtowo.
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM src, 1/2 FILE 'data.txt' ONESHOT
+SELECT a*2 STREAM dst FROM src

@@ -93,6 +93,8 @@
 /// - Oferować ograniczenie liczby iteracji pętli (--llimitqry) na potrzeby testów i pracy deterministycznej.
 /// - Opcjonalnie wspierać szeregowanie czasu rzeczywistego (--realtime: SCHED_FIFO, mlockall, sen do bezwzględnego
 ///   punktu czasu) dla deterministycznych interwałów przetwarzania.
+/// - Oferować tryb bez taktowania zegarem ściennym (--no-clock) dla przebiegów offline: pełna semantyka
+///   interwałów planu, ale bez czekania na zegar. Wyklucza się z --realtime.
 ///
 /// Konfiguracja:
 /// - System w trybie usługowym wspiera pliki konfiguracjne podobnie jak inne usługi systemu linux (np. sshd).
@@ -293,6 +295,7 @@ int main(int argc, char *argv[]) {
           ("noanykey,k", "do not wait for any key to terminate")                  //
           ("service,j", "service mode: log to stderr (journald), no log file")    //
           ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")     //
+          ("no-clock,f", "offline mode: compute slots without waiting for the wall clock")          //
           ("config,g", po::value<std::string>(&sConfig), "config file (TOML); overrides search")    //
           ("llimitqry,m", po::value<int>(&loopLimitVar)->default_value(executorsm::inifitie_loop),  //
            "loop iteration limit, 0 - no limit")                                                    //
@@ -340,6 +343,14 @@ int main(int argc, char *argv[]) {
       if (vm.contains("realtime")) rtCheckAndPrint();
       std::println("{}", warranty);
       return system::errc::success;
+    }
+
+    // --realtime zaostrza szeregowanie do bezwzględnych pobudek, --no-clock je usuwa. Żądania są
+    // sprzeczne i nie ma sensownego rozstrzygnięcia w żadną stronę, więc zamiast cichego pierwszeństwa
+    // jednej z opcji zgłaszamy błąd argumentów.
+    if (vm.contains("realtime") && vm.contains("no-clock")) {
+      std::println("{}: fatal error: --realtime and --no-clock are mutually exclusive", argv[0]);
+      return EPERM;
     }
 
     // Brak pliku z zapytaniami: w trybie --onlycompile to błąd (nie ma czego kompilować),

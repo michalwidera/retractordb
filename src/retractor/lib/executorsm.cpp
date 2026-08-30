@@ -704,6 +704,10 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
 
       struct timespec loop_anchor{};
       const bool rt_mode = vm.contains("realtime");
+      // Tryb offline: oś czasu planu (interwały, wyrównanie slotów, ogon) pozostaje nietknięta —
+      // znika wyłącznie czekanie na zegar ścienny, więc ciąg wyliczonych rekordów jest ten sam
+      // co w przebiegu taktowanym. Wyklucza się z rt_mode; sprzeczność odrzuca launcher.
+      const bool no_clock_mode = vm.contains("no-clock");
       if (rt_mode) {
         if (rtCheckAndPrint()) {
           rtActivate(cfgRtPriority);
@@ -767,7 +771,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
         //
         if (rt_mode)
           rtAbsoluteSleep(loop_anchor, rational_cast<long>(interval));
-        else
+        else if (!no_clock_mode)
           std::this_thread::sleep_for(std::chrono::milliseconds(period));
 
         slotBench.beginSlot(rational_cast<long>(interval));
