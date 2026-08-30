@@ -341,6 +341,11 @@ std::string declareSource(const std::string &id, int width, const ratio &delta) 
   return text;
 }
 
+std::string declareArraySource(const std::string &id, int width, const ratio &delta) {
+  return "DECLARE f INTEGER[" + std::to_string(width) + "] STREAM " + id + ", " + std::to_string(delta.numerator()) + "/" +
+         std::to_string(delta.denominator()) + " FILE 'a.txt'\n";
+}
+
 std::string windowOf(const std::string &id, const std::string &src, int step, int length) {
   return "SELECT * STREAM " + id + " FROM " + src + "@(" + std::to_string(step) + "," + std::to_string(length) + ")\n";
 }
@@ -424,6 +429,47 @@ TEST(h10aGate, closed_form_matches_event_model_over_single_window_corpus) {
           ++checked;
         }
   EXPECT_EQ(checked, static_cast<int>(kDeltas.size() * kWidths.size() * kSteps.size() * kLengths.size()));
+}
+
+// Szerokosc strumienia jest liczba splaszczonych elementow, niezaleznie od tego,
+// czy deskryptor zapisuje je jako osobne pola, czy jako jedno pole tablicowe.
+// Pozostale przebiegi AGSE uzywaja flatElementCount(); ta bramka pilnuje, ze
+// resolveStreamIntervals() stosuje te sama reprezentacje F.
+TEST(h10aGate, array_field_and_scalar_fields_have_the_same_window_model) {
+  for (const auto &delta : {ratio(1, 10), ratio(3, 10)})
+    for (int width : {2, 3, 4})
+      for (int step : {1, 2, 4})
+        for (int length : {2, 5, -3}) {
+          qTree scalarPlan;
+          const std::string scalarRql = declareSource("src", width, delta) + windowOf("win", "src", step, length);
+          auto [scalarParse, scalarKeyword, scalarName] = parserRQLString(scalarPlan, scalarRql);
+          ASSERT_EQ(scalarParse, "OK") << scalarRql;
+          compiler scalarCompiler(scalarPlan);
+          ASSERT_EQ(scalarCompiler.compile(), "OK") << scalarRql;
+
+          qTree arrayPlan;
+          const std::string arrayRql = declareArraySource("src", width, delta) + windowOf("win", "src", step, length);
+          auto [arrayParse, arrayKeyword, arrayName] = parserRQLString(arrayPlan, arrayRql);
+          ASSERT_EQ(arrayParse, "OK") << arrayRql;
+          compiler arrayCompiler(arrayPlan);
+          ASSERT_EQ(arrayCompiler.compile(), "OK") << arrayRql;
+
+          ASSERT_EQ(scalarPlan.getQuery("src").lSchema.size(), static_cast<size_t>(width));
+          ASSERT_EQ(arrayPlan.getQuery("src").lSchema.size(), 1u);
+          ASSERT_EQ(scalarPlan.getQuery("src").descriptorStorage().flatElementCount(), width);
+          ASSERT_EQ(arrayPlan.getQuery("src").descriptorStorage().flatElementCount(), width);
+
+          auto &scalarWindow = scalarPlan.getQuery("win");
+          auto &arrayWindow  = arrayPlan.getQuery("win");
+          EXPECT_EQ(arrayWindow.rInterval, scalarWindow.rInterval) << arrayRql;
+          EXPECT_EQ(arrayWindow.logicalOrigin, scalarWindow.logicalOrigin) << arrayRql;
+          EXPECT_EQ(arrayWindow.startupLatency, scalarWindow.startupLatency) << arrayRql;
+          EXPECT_EQ(arrayPlan.maxCapacity.at("src"), scalarPlan.maxCapacity.at("src")) << arrayRql;
+          EXPECT_EQ(arrayWindow.descriptorStorage().flatElementCount(), scalarWindow.descriptorStorage().flatElementCount())
+              << arrayRql;
+          EXPECT_EQ(arrayWindow.descriptorStorage().getSizeInBytes(), scalarWindow.descriptorStorage().getSizeInBytes())
+              << arrayRql;
+        }
 }
 
 // Korpus dwuwęzłowy: okno nad oknem. Dopiero tu producent ma NIEZEROWY ogon i NIEZEROWY

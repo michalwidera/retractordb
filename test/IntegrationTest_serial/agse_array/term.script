@@ -1,0 +1,13 @@
+echo SCALAR_FIELDS
+open fields_window
+size
+descc
+list 6
+
+echo ARRAY_FIELD
+open array_window
+size
+descc
+list 6
+
+quit

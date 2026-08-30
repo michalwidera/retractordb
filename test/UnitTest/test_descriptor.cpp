@@ -89,6 +89,18 @@ TEST(descriptor, read_from_stream) { EXPECT_TRUE(test_descriptor_read()); }
 
 TEST(descriptor, print_and_basic_accessors) { EXPECT_TRUE(test_descriptor()); }
 
+TEST(descriptor, widest_field_type_reports_flat_element_width) {
+  rdb::Descriptor numericArray{{"samples", static_cast<int>(sizeof(int)), 3, rdb::INTEGER}};
+  EXPECT_EQ(numericArray.widestFieldType(), std::make_pair(rdb::INTEGER, static_cast<int>(sizeof(int))));
+
+  rdb::Descriptor mixed{{"samples", static_cast<int>(sizeof(int)), 8, rdb::INTEGER},
+                        {"value", static_cast<int>(sizeof(double)), 1, rdb::DOUBLE}};
+  EXPECT_EQ(mixed.widestFieldType(), std::make_pair(rdb::DOUBLE, static_cast<int>(sizeof(double))));
+
+  rdb::Descriptor text{{"label", 1, 12, rdb::STRING}};
+  EXPECT_EQ(text.widestFieldType(), std::make_pair(rdb::STRING, 12));
+}
+
 TEST(descriptor, compare) {
   rdb::Descriptor dataDescriptor1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
                                   rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //

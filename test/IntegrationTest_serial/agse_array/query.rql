@@ -1,0 +1,5 @@
+DECLARE f0 INTEGER, f1 INTEGER, f2 INTEGER STREAM fields, 3/10 FILE 'data.txt'
+DECLARE f INTEGER[3] STREAM array, 3/10 FILE 'data.txt'
+
+SELECT * STREAM fields_window FROM fields@(2,4)
+SELECT * STREAM array_window FROM array@(2,4)

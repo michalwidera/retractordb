@@ -242,9 +242,15 @@ std::pair<rdb::descFld, int> Descriptor::widestFieldType() {
   auto size{1};
   for (auto const &field : *this) {
     if (isConfigurationField(field.rtype)) continue;
-    if (retVal <= field.rtype) {
+    // Liczby tablicowe sa splaszczane do osobnych elementow, wiec szerokoscia
+    // pojedynczej wartosci jest rlen, a nie rozmiar calego pola rlen*rarray.
+    // STRING pozostaje jednym elementem plaskim i zachowuje pelna szerokosc pola.
+    const int elementSize = (field.rtype == rdb::STRING) ? fieldSize(field) : field.rlen;
+    if (retVal < field.rtype) {
       retVal = field.rtype;
-      size   = std::max(size, fieldSize(field));
+      size   = elementSize;
+    } else if (retVal == field.rtype) {
+      size = std::max(size, elementSize);
     }
   }
   return std::make_pair(retVal, size);

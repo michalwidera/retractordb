@@ -227,7 +227,7 @@ std::string compiler::resolveStreamIntervals() {
             unresolvedCount++;
             continue;
           }
-          int coreWindow          = static_cast<int>(coreInstance.getQuery(t1.getStr_()).lSchema.size());
+          const int coreWindow    = coreInstance.getQuery(t1.getStr_()).descriptorStorage().flatElementCount();
           auto [step, windowSize] = std::get<std::pair<int, int>>(op.getVT());
           if (step <= 0) {
             FatalError("compiler::prepareFields: AGSE step must be > 0, got {} for query '{}'", step, q.id);

@@ -1,0 +1,20 @@
+ SCALAR_FIELDS
+7 Record(s)
+16 Byte(s) per record.
+{ INTEGER fields_0 INTEGER fields_1 INTEGER fields_2 INTEGER fields_3 }
+{ fields_0:21 fields_1:20 fields_2:12 fields_3:11 }
+{ fields_0:30 fields_1:22 fields_2:21 fields_3:20 }
+{ fields_0:32 fields_1:31 fields_2:30 fields_3:22 }
+{ fields_0:41 fields_1:40 fields_2:32 fields_3:31 }
+{ fields_0:50 fields_1:42 fields_2:41 fields_3:40 }
+{ fields_0:52 fields_1:51 fields_2:50 fields_3:42 }
+ ARRAY_FIELD
+7 Record(s)
+16 Byte(s) per record.
+{ INTEGER array_0 INTEGER array_1 INTEGER array_2 INTEGER array_3 }
+{ array_0:21 array_1:20 array_2:12 array_3:11 }
+{ array_0:30 array_1:22 array_2:21 array_3:20 }
+{ array_0:32 array_1:31 array_2:30 array_3:22 }
+{ array_0:41 array_1:40 array_2:32 array_3:31 }
+{ array_0:50 array_1:42 array_2:41 array_3:40 }
+{ array_0:52 array_1:51 array_2:50 array_3:42 }
