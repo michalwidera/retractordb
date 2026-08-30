@@ -1,0 +1,17 @@
+SUBSTRAT 'memory'
+
+DECLARE f0 INTEGER, f1 INTEGER, f2 INTEGER STREAM fields, 3/10 FILE 'data.txt'
+DECLARE f INTEGER[3] STREAM array, 3/10 FILE 'data.txt'
+
+SELECT * STREAM fields_pass FROM fields
+SELECT * STREAM array_pass FROM array
+
+SELECT * STREAM fields_shift FROM (fields>1)@(3,3)
+SELECT * STREAM array_shift FROM (array>1)@(3,3)
+
+SELECT * STREAM fields_sum FROM SUMC(fields)
+SELECT * STREAM array_sum FROM SUMC(array)
+
+SELECT * STREAM fields_woven FROM fields#fields
+SELECT * STREAM array_woven FROM array#array
+SELECT * STREAM mixed_woven FROM array#fields

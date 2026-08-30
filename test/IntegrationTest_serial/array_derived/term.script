@@ -1,0 +1,46 @@
+echo PASS_FIELDS
+open fields_pass
+descc
+list 4
+
+echo PASS_ARRAY
+open array_pass
+descc
+list 4
+
+echo SHIFT_FIELDS
+open fields_shift
+descc
+list 4
+
+echo SHIFT_ARRAY
+open array_shift
+descc
+list 4
+
+echo SUM_FIELDS
+open fields_sum
+descc
+list 4
+
+echo SUM_ARRAY
+open array_sum
+descc
+list 4
+
+echo WOVEN_FIELDS
+open fields_woven
+descc
+list 4
+
+echo WOVEN_ARRAY
+open array_woven
+descc
+list 4
+
+echo WOVEN_MIXED
+open mixed_woven
+descc
+list 4
+
+quit

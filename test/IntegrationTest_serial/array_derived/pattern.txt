@@ -1,0 +1,54 @@
+ PASS_FIELDS
+{ INTEGER fields_0 INTEGER fields_1 INTEGER fields_2 }
+{ fields_0:10 fields_1:11 fields_2:12 }
+{ fields_0:20 fields_1:21 fields_2:22 }
+{ fields_0:30 fields_1:31 fields_2:32 }
+{ fields_0:40 fields_1:41 fields_2:42 }
+ PASS_ARRAY
+{ INTEGER array_3 INTEGER array_4 INTEGER array_5 }
+{ array_3:10 array_4:11 array_5:12 }
+{ array_3:20 array_4:21 array_5:22 }
+{ array_3:30 array_4:31 array_5:32 }
+{ array_3:40 array_4:41 array_5:42 }
+ SHIFT_FIELDS
+{ INTEGER STREAM_TIMEMOVE_1_fields_0 INTEGER STREAM_TIMEMOVE_1_fields_1 INTEGER STREAM_TIMEMOVE_1_fields_2 }
+{ STREAM_TIMEMOVE_1_fields_0:20 STREAM_TIMEMOVE_1_fields_1:12 STREAM_TIMEMOVE_1_fields_2:11 }
+{ STREAM_TIMEMOVE_1_fields_0:30 STREAM_TIMEMOVE_1_fields_1:22 STREAM_TIMEMOVE_1_fields_2:21 }
+{ STREAM_TIMEMOVE_1_fields_0:40 STREAM_TIMEMOVE_1_fields_1:32 STREAM_TIMEMOVE_1_fields_2:31 }
+{ STREAM_TIMEMOVE_1_fields_0:50 STREAM_TIMEMOVE_1_fields_1:42 STREAM_TIMEMOVE_1_fields_2:41 }
+ SHIFT_ARRAY
+{ INTEGER STREAM_TIMEMOVE_1_array_0 INTEGER STREAM_TIMEMOVE_1_array_1 INTEGER STREAM_TIMEMOVE_1_array_2 }
+{ STREAM_TIMEMOVE_1_array_0:20 STREAM_TIMEMOVE_1_array_1:12 STREAM_TIMEMOVE_1_array_2:11 }
+{ STREAM_TIMEMOVE_1_array_0:30 STREAM_TIMEMOVE_1_array_1:22 STREAM_TIMEMOVE_1_array_2:21 }
+{ STREAM_TIMEMOVE_1_array_0:40 STREAM_TIMEMOVE_1_array_1:32 STREAM_TIMEMOVE_1_array_2:31 }
+{ STREAM_TIMEMOVE_1_array_0:50 STREAM_TIMEMOVE_1_array_1:42 STREAM_TIMEMOVE_1_array_2:41 }
+ SUM_FIELDS
+{ RATIONAL sum }
+{ sum:33/1 }
+{ sum:63/1 }
+{ sum:93/1 }
+{ sum:123/1 }
+ SUM_ARRAY
+{ RATIONAL sum }
+{ sum:33/1 }
+{ sum:63/1 }
+{ sum:93/1 }
+{ sum:123/1 }
+ WOVEN_FIELDS
+{ INTEGER f0 INTEGER f1 INTEGER f2 }
+{ f0:10 f1:11 f2:12 }
+{ f0:10 f1:11 f2:12 }
+{ f0:20 f1:21 f2:22 }
+{ f0:20 f1:21 f2:22 }
+ WOVEN_ARRAY
+{ INTEGER f_0 INTEGER f_1 INTEGER f_2 }
+{ f_0:10 f_1:11 f_2:12 }
+{ f_0:10 f_1:11 f_2:12 }
+{ f_0:20 f_1:21 f_2:22 }
+{ f_0:20 f_1:21 f_2:22 }
+ WOVEN_MIXED
+{ INTEGER f_0 INTEGER f_1 INTEGER f_2 }
+{ f_0:10 f_1:11 f_2:12 }
+{ f_0:10 f_1:11 f_2:12 }
+{ f_0:20 f_1:21 f_2:22 }
+{ f_0:20 f_1:21 f_2:22 }

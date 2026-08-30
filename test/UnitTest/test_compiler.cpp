@@ -2210,3 +2210,54 @@ TEST(xparser, numeric_result_types_are_unchanged) {
   EXPECT_EQ(outputField(plan, "dst", 2).rtype, rdb::FLOAT);
   EXPECT_EQ(outputField(plan, "dst", 3).rtype, rdb::DOUBLE);
 }
+
+// Pole tablicowe `T[N]` opisuje ten sam rekord co N pol skalarnych `T`, wiec kazdy
+// strumien POCHODNY musi wydac z obu zapisow schemat tej samej szerokosci.
+//
+// Do 2026-08-30 nie wydawal: rozwiniecie `*` i buildOutputSchema() liczyly WPISY schematu
+// zrodla, a nie sloty plaskie rekordu. `SELECT * FROM x` nad `INTEGER[24]` dawalo jedno
+// pole zamiast dwudziestu czterech, a numeracja `zrodlo[offset]` rozjezdzala sie z ukladem
+// rekordu — po cichu, bo plan kompilowal sie bez bledu. Sama deklaracja zachowuje `T[N]`:
+// splaszczenie dotyczy wylacznie schematow pochodnych.
+TEST(xcompiler, derived_schema_width_is_flat_for_array_fields) {
+  const std::vector<std::pair<std::string, std::string>> forms{
+      {"passthrough", "src"},        //
+      {"shift", "src>1"},            //
+      {"window", "src@(3,3)"},       //
+      {"concatenation", "src+src"},  //
+      {"interleave", "src#src"},     //
+      {"reduction", "SUMC(src)"}     //
+  };
+
+  for (int width : {2, 3, 5}) {
+    std::string fields;
+    for (int i = 0; i < width; ++i)
+      fields += (i ? ", f" : "f") + std::to_string(i) + " INTEGER";
+
+    for (const auto &[label, from] : forms) {
+      const std::string header = "SUBSTRAT 'memory'\nDECLARE ";
+      const std::string tail   = " STREAM src, 1/10 FILE 'src.txt'\nSELECT * STREAM dst FROM " + from + "\n";
+
+      auto scalarPlan = compilePlan(header + fields + tail);
+      auto arrayPlan  = compilePlan(header + "f INTEGER[" + std::to_string(width) + "]" + tail);
+
+      const std::string trace = label + ", width=" + std::to_string(width);
+
+      // Zalozenie testu: rozne zapisy TEGO SAMEGO rekordu zrodlowego.
+      ASSERT_EQ(scalarPlan.getQuery("src").lSchema.size(), static_cast<size_t>(width)) << trace;
+      ASSERT_EQ(arrayPlan.getQuery("src").lSchema.size(), 1u) << trace;
+      ASSERT_EQ(arrayPlan.getQuery("src").descriptorStorage().flatElementCount(),
+                scalarPlan.getQuery("src").descriptorStorage().flatElementCount())
+          << trace;
+
+      auto &scalarDst = scalarPlan.getQuery("dst");
+      auto &arrayDst  = arrayPlan.getQuery("dst");
+      EXPECT_EQ(arrayDst.lSchema.size(), scalarDst.lSchema.size()) << trace;
+      EXPECT_EQ(arrayDst.descriptorStorage().flatElementCount(), scalarDst.descriptorStorage().flatElementCount()) << trace;
+      EXPECT_EQ(arrayDst.descriptorStorage().getSizeInBytes(), scalarDst.descriptorStorage().getSizeInBytes()) << trace;
+      EXPECT_EQ(arrayDst.rInterval, scalarDst.rInterval) << trace;
+      EXPECT_EQ(arrayDst.logicalOrigin, scalarDst.logicalOrigin) << trace;
+      EXPECT_EQ(arrayDst.startupLatency, scalarDst.startupLatency) << trace;
+    }
+  }
+}

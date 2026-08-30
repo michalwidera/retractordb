@@ -440,6 +440,42 @@ bool consumesTwoPrecedingTokens(command_id cmd) {
       return false;
   }
 }
+
+/// Ile slotów PŁASKICH zajmuje pole w rekordzie.
+///
+/// Reguła jest jedna dla całego systemu i pochodzi z Descriptor::rebuildFieldMappings():
+/// pole liczbowe `T[N]` to N slotów, `STRING[N]` to JEDEN slot o długości N bajtów.
+/// compiler::sourceFieldAt() chodzi po schemacie źródła dokładnie tak samo.
+int flatSlotCount(const rdb::rField &f) { return (f.rtype == rdb::STRING) ? 1 : f.rarray; }
+
+/// Schemat strumienia POCHODNEGO rozwinięty na sloty płaskie.
+///
+/// Schemat węzła pochodnego jest indeksowany POZYCJĄ PŁASKĄ: buildOutputSchema() numeruje
+/// `źródło[offset]` po jednym slocie na wpis, PUSH_ID niesie indeks płaski (patrz
+/// sourceFieldAt()), payload::setItemVT() przyjmuje indeks płaski, a
+/// streamInstance::constructOutputPayload() zapisuje jedną wartość na wpis schematu.
+/// Wpis z `rarray > 1` łamie tę zgodność: zajmuje N slotów rekordu, ale przesuwa licznik
+/// o jeden. Elementy 1..N-1 nie zostają wtedy nigdy zapisane, a dalsza numeracja rozjeżdża
+/// się z układem rekordu — stąd zera w oknie nad `(cells>1)` i jednopolowy wynik `SELECT *`
+/// nad `INTEGER[24]`.
+///
+/// Rozwinięcie dotyczy WYŁĄCZNIE schematów pochodnych. Deklaracja zachowuje `T[N]`: to jest
+/// jej zapis w `.desc` i umowa polecenia DECLARE. Układ bajtów się nie zmienia — N pól
+/// skalarnych `T` zajmuje tyle samo miejsca co `T[N]`.
+std::list<field> flattenArrayFields(const std::list<field> &schema) {
+  std::list<field> result;
+  for (const auto &f : schema) {
+    const int slots = flatSlotCount(f.field_);
+    if (slots == 1) {
+      result.push_back(f);
+      continue;
+    }
+    for (int slot = 0; slot < slots; ++slot)
+      result.emplace_back(rdb::rField(f.field_.rname + "_" + std::to_string(slot), f.field_.rlen, 1, f.field_.rtype),
+                          f.lProgram);
+  }
+  return result;
+}
 }  // namespace
 
 /* Goal of this procedure is to provide stream to canonical form
@@ -534,30 +570,25 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
     if (coreInstance.getQuery(sName1).descriptorStorage().flatElementCount() !=
         coreInstance.getQuery(sName2).descriptorStorage().flatElementCount())
       throw std::invalid_argument("Hash operation needs same schemas on arguments stream");
-    lRetVal = coreInstance.getQuery(sName1).lSchema;
+    lRetVal = flattenArrayFields(coreInstance.getQuery(sName1).lSchema);
   } else if (cmd == STREAM_DEHASH_DIV || cmd == STREAM_DEHASH_MOD)
-    lRetVal = coreInstance.getQuery(sName1).lSchema;  // NOLINT(bugprone-branch-clone)
+    lRetVal = flattenArrayFields(coreInstance.getQuery(sName1).lSchema);  // NOLINT(bugprone-branch-clone)
   else if (cmd == STREAM_ADD) {
     int fieldCountSh = 0;
-    int i            = 0;
-    for (const auto &f : coreInstance.getQuery(sName1).lSchema) {
-      field intf(rdb::rField(sName1 + "_" + boost::lexical_cast<std::string>(fieldCountSh++), f.field_.rlen, f.field_.rarray,
-                             f.field_.rtype),
-                 token(PUSH_ID, std::make_pair(sName1, i++)));
-      lRetVal.push_back(intf);
-    }
-    i = 0;
-    for (const auto &f : coreInstance.getQuery(sName2).lSchema) {
-      field intf(rdb::rField(sName2 + "_" + boost::lexical_cast<std::string>(fieldCountSh++), f.field_.rlen, f.field_.rarray,
-                             f.field_.rtype),
-                 token(PUSH_ID, std::make_pair(sName2, i++)));
-      lRetVal.push_back(intf);
+    for (const auto &side : {sName1, sName2}) {
+      int i = 0;
+      for (const auto &f : flattenArrayFields(coreInstance.getQuery(side).lSchema)) {
+        field intf(rdb::rField(side + "_" + boost::lexical_cast<std::string>(fieldCountSh++), f.field_.rlen, f.field_.rarray,
+                               f.field_.rtype),
+                   token(PUSH_ID, std::make_pair(side, i++)));
+        lRetVal.push_back(intf);
+      }
     }
     return lRetVal;
   } else if (cmd == STREAM_SUBTRACT)
-    lRetVal = coreInstance.getQuery(sName1).lSchema;
+    lRetVal = flattenArrayFields(coreInstance.getQuery(sName1).lSchema);
   else if (cmd == STREAM_TIMEMOVE)
-    lRetVal = coreInstance.getQuery(sName1).lSchema;
+    lRetVal = flattenArrayFields(coreInstance.getQuery(sName1).lSchema);
   else if (cmd == STREAM_AVG) {
     field intf(rdb::rField("avg", sizeof(boost::rational<int>), 1, rdb::RATIONAL), token(PUSH_ID, std::make_pair(sName1, 0)));
     lRetVal.push_back(intf);
@@ -638,12 +669,19 @@ std::string compiler::expandSchemaWildcards() {
             eraseList.push_back(it);
             // q.lSchema =  getQuery(t.getStr()).lSchema;
             // copy list of fields from one to another
+            //
+            // Pętla idzie po SLOTACH PŁASKICH źródła, nie po jego wpisach schematu — indeks
+            // w PUSH_ID jest indeksem płaskim (patrz flattenArrayFields() i sourceFieldAt()).
+            // Licząc wpisy, `SELECT * FROM x` nad `INTEGER[24]` dawało JEDNO pole zamiast
+            // dwudziestu czterech i po cichu gubiło 23 wartości z rekordu.
             int filedPosition = 0;
-            for (auto s : coreInstance.getQuery(t.getStr_()).lSchema) {
-              std::list<token> lTempProgram;
-              lTempProgram.emplace_back(PUSH_ID, std::make_pair(nameOfscanningTable, filedPosition++));
-              std::string name = /*"Field_"*/ t.getStr_() + "_" + boost::lexical_cast<std::string>(fieldCountSh++);
-              q.lSchema.emplace_back(rdb::rField(name, 4, 1, rdb::INTEGER), lTempProgram);
+            for (const auto &s : coreInstance.getQuery(t.getStr_()).lSchema) {
+              for (int slot = 0; slot < flatSlotCount(s.field_); ++slot) {
+                std::list<token> lTempProgram;
+                lTempProgram.emplace_back(PUSH_ID, std::make_pair(nameOfscanningTable, filedPosition++));
+                std::string name = /*"Field_"*/ t.getStr_() + "_" + boost::lexical_cast<std::string>(fieldCountSh++);
+                q.lSchema.emplace_back(rdb::rField(name, 4, 1, rdb::INTEGER), lTempProgram);
+              }
             }
             break;
           }

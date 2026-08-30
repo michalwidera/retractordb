@@ -33,6 +33,19 @@ constexpr auto isConfigurationField(const rdb::descFld index) {
          index == rdb::RETMEMORY;
 }
 
+/// Szerokosc POJEDYNCZEGO slotu plaskiego rekordu.
+///
+/// Dla pola nietablicowego jest to rozmiar calego pola, czyli dokladnie to, co liczy
+/// fieldSize(). Numeryczne `T[N]` zajmuje N slotow po `rlen` bajtow; `STRING[N]` pozostaje
+/// JEDNYM slotem o dlugosci N — ten sam podzial, ktorego uzywa rebuildFieldMappings()
+/// przy wyznaczaniu offsetow.
+constexpr int flatSlotSize(const rField &field) {
+  if (isConfigurationField(field.rtype)) return 0;
+  if (field.rtype == rdb::NULLTYPE) return 0;
+  if (field.rtype != rdb::STRING && field.rarray > 1) return field.rlen;
+  return field.rlen * field.rarray;
+}
+
 Descriptor::Descriptor(std::initializer_list<rField> fields) : std::vector<rField>(fields) {}
 
 Descriptor::Descriptor(const std::string &fieldName, int length, int elementCount, rdb::descFld type) {  //
@@ -111,29 +124,26 @@ Descriptor &Descriptor::operator+=(const Descriptor &rhs) {
 // 4,INT  == 1,BYTE   1
 // 1,BYTE == 4,INT    0
 // 4,INT  == 4,INT    1
+//
+// Zgodnosc idzie po SLOTACH PLASKICH, nie po wpisach deskryptora. `INTEGER[3]` i trzy pola
+// `INTEGER` opisuja ten sam rekord — te same bajty pod tymi samymi offsetami — ale maja
+// odpowiednio jeden i trzy wpisy. Liczac wpisy, para taka wychodzila NIEZGODNA i
+// payload::operator= konczylo sie bledem krytycznym; dotykalo to kazdego przypisania miedzy
+// tymi dwoma zapisami rekordu, w tym przeplotu `#` nad polem tablicowym.
+//
+// Dla deskryptora BEZ numerycznego pola tablicowego wynik jest identyczny jak poprzednio:
+// pole nietablicowe zajmuje dokladnie jeden slot o szerokosci fieldSize().
 bool Descriptor::operator==(const Descriptor &rhs) const {
-  auto lhsIt = begin();
-  auto rhsIt = rhs.begin();
+  if (flatElementCount() != rhs.flatElementCount()) return false;
 
-  auto skipConfigurationFields = [](auto &it, const auto &container) {
-    while (it != container.end() && isConfigurationField(it->rtype)) {
-      ++it;
-    }
-  };
+  const int slots = flatElementCount();
+  for (int slot = 0; slot < slots; ++slot) {
+    const auto &lhsField = (*this)[flatIndexToDescriptorPosition(slot)->first];
+    const auto &rhsField = rhs[rhs.flatIndexToDescriptorPosition(slot)->first];
 
-  while (true) {
-    skipConfigurationFields(lhsIt, *this);
-    skipConfigurationFields(rhsIt, rhs);
-
-    if (lhsIt == end() || rhsIt == rhs.end()) {
-      return lhsIt == end() && rhsIt == rhs.end();
-    }
-
-    if (fieldSize(*lhsIt) < fieldSize(*rhsIt) || lhsIt->rtype < rhsIt->rtype) return false;
-
-    ++lhsIt;
-    ++rhsIt;
+    if (flatSlotSize(lhsField) < flatSlotSize(rhsField) || lhsField.rtype < rhsField.rtype) return false;
   }
+  return true;
 }
 
 void Descriptor::removeConfigurationFields() {
@@ -151,17 +161,24 @@ void Descriptor::removeConfigurationFields() {
 void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, Descriptor lhs, Descriptor rhs) {
   lhs.removeConfigurationFields();
   rhs.removeConfigurationFields();
-  if (lhs.size() != rhs.size()) {
-    FatalError("descriptor: hash composition requires equal-size descriptors: lhs={} rhs={}", lhs.size(), rhs.size());
+  // Zgodnosc idzie po slotach PLASKICH, nie po liczbie wpisow: `INTEGER[3]` i trzy pola
+  // `INTEGER` opisuja ten sam rekord, a `#` laczy rekordy, nie deklaracje pol. Liczac wpisy,
+  // strona tablicowa dawala deskryptor o szerokosci 1 zamiast 3 i przeplot zawieszal sie na
+  // rekordzie wezszym niz plaski uklad zrodla. Ten sam warunek ta sama miara sprawdza
+  // compiler::buildOutputSchema().
+  if (lhs.flatElementCount() != rhs.flatElementCount()) {
+    FatalError("descriptor: hash composition requires equal-width descriptors: lhs={} rhs={}", lhs.flatElementCount(),
+               rhs.flatElementCount());
   }
 
   clear();
-  auto i{0};
-  for (auto const &looper : lhs) {
-    auto maxRtype = std::max(lhs[i].rtype, rhs[i].rtype);
-    auto maxRlen  = std::max(lhs[i].rlen, rhs[i].rlen);
+  const int width = lhs.flatElementCount();
+  for (int i = 0; i < width; ++i) {
+    const auto &lhsField = lhs[lhs.flatIndexToDescriptorPosition(i)->first];
+    const auto &rhsField = rhs[rhs.flatIndexToDescriptorPosition(i)->first];
+    auto maxRtype        = std::max(lhsField.rtype, rhsField.rtype);
+    auto maxRlen         = std::max(lhsField.rlen, rhsField.rlen);
     push_back(rField(fieldNamePrefix + "_" + std::to_string(i), maxRlen, 1, maxRtype));
-    ++i;
   }
 
   fieldMappingsDirty_ = true;

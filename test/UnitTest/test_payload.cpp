@@ -410,3 +410,58 @@ TEST(payload, rational_field_is_stored_in_normalized_form) {
 }
 
 // NOLINTEND(bugprone-unchecked-optional-access,modernize-avoid-c-arrays)
+
+// Przypisanie miedzy dwoma ZGODNYMI zapisami tego samego rekordu: `INTEGER[3]` i trzy pola
+// `INTEGER`. Bajty ida wprost, bo uklad jest ten sam; znaczniki NULL wymagaja odwzorowania,
+// bo sa per WPIS deskryptora — jeden bit po stronie tablicy, trzy po stronie skalarow.
+TEST(payload, assign_between_array_and_scalar_record_forms) {
+  const rdb::Descriptor arrayForm("cells", 4, 3, rdb::INTEGER);
+  const auto scalarForm{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
+                        rdb::Descriptor("c1", 4, 1, rdb::INTEGER) +  //
+                        rdb::Descriptor("c2", 4, 1, rdb::INTEGER)};
+
+  rdb::payload source(arrayForm);
+  source.setItemVT(0, rdb::descFldVT{11});
+  source.setItemVT(1, rdb::descFldVT{12});
+  source.setItemVT(2, rdb::descFldVT{13});
+
+  rdb::payload target(scalarForm);
+  target = source;
+
+  EXPECT_EQ(std::get<int>(target.getItemVT(0).value()), 11);
+  EXPECT_EQ(std::get<int>(target.getItemVT(1).value()), 12);
+  EXPECT_EQ(std::get<int>(target.getItemVT(2).value()), 13);
+
+  // Droga powrotna: trzy pola skalarne wracaja do jednego pola tablicowego.
+  rdb::payload back(arrayForm);
+  back = target;
+  EXPECT_EQ(std::get<int>(back.getItemVT(0).value()), 11);
+  EXPECT_EQ(std::get<int>(back.getItemVT(2).value()), 13);
+}
+
+// Pole tablicowe niesie JEDEN bit NULL na wszystkie elementy, wiec zwiniecie trzech pol
+// skalarnych musi je scalic: NULL na dowolnym elemencie oznacza NULL calego pola. Rozwiniecie
+// idzie w druga strone — jeden bit rozklada sie na wszystkie sloty.
+TEST(payload, null_flags_survive_the_change_of_record_form) {
+  const rdb::Descriptor arrayForm("cells", 4, 3, rdb::INTEGER);
+  const auto scalarForm{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
+                        rdb::Descriptor("c1", 4, 1, rdb::INTEGER) +  //
+                        rdb::Descriptor("c2", 4, 1, rdb::INTEGER)};
+
+  rdb::payload partiallyNull(scalarForm);
+  partiallyNull.setItemVT(0, rdb::descFldVT{11});
+  partiallyNull.setItemVT(1, std::nullopt);
+  partiallyNull.setItemVT(2, rdb::descFldVT{13});
+
+  rdb::payload collapsed(arrayForm);
+  collapsed = partiallyNull;
+  EXPECT_FALSE(collapsed.getItemVT(0).has_value());
+  EXPECT_FALSE(collapsed.getItemVT(2).has_value());
+
+  rdb::payload allSet(arrayForm);
+  allSet.setItemVT(0, rdb::descFldVT{7});
+  rdb::payload expanded(scalarForm);
+  expanded = allSet;
+  EXPECT_TRUE(expanded.getItemVT(0).has_value());
+  EXPECT_TRUE(expanded.getItemVT(2).has_value());
+}

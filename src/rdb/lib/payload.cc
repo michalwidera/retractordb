@@ -131,8 +131,40 @@ payload &payload::operator=(const payload &other) {
 
   *this = other.descriptor;  // call operator=(const Descriptor
   std::copy(other.span().begin(), other.span().end(), span().begin());
-  nullBitset_ = other.nullBitset_;
+
+  // Bit NULL jest per WPIS deskryptora, a zgodnosc ukladow — per SLOT PLASKI (patrz
+  // Descriptor::operator==). Dwa zgodne zapisy tego samego rekordu moga miec rozna liczbe
+  // wpisow: `INTEGER[3]` niesie JEDEN bit na trzy sloty, trzy pola `INTEGER` — trzy bity.
+  // Kopia wprost dalaby wtedy bitset innej dlugosci niz deskryptor tego payloadu, czyli
+  // odczyt poza zakresem przy pierwszym getItemVT/setItemVT.
+  //
+  // Rowna liczba wpisow to przypadek zwykly i idzie ta sama sciezka co dotad.
+  if (nullBitset_.size() == other.nullBitset_.size()) {
+    nullBitset_ = other.nullBitset_;
+  } else {
+    retargetNullBitsetFrom(other);
+  }
   return *this;
+}
+
+/// Przeniesienie znacznikow NULL miedzy zgodnymi zapisami rekordu o roznej liczbie wpisow.
+///
+/// Slot plaski jest jedyna wspolna miara obu zapisow, wiec przez niego idzie odwzorowanie.
+/// Zwijanie N pol skalarnych do jednego `T[N]` musi scalic N bitow w jeden: pole tablicowe
+/// nie ma miejsca na wiecej, wiec NULL na dowolnym elemencie oznacza NULL calego pola.
+/// W druga strone jeden bit rozklada sie na wszystkie N slotow.
+void payload::retargetNullBitsetFrom(const payload &other) {
+  nullBitset_.assign(descriptor.size(), false);
+
+  const int slots = descriptor.flatElementCount();
+  for (int slot = 0; slot < slots; ++slot) {
+    const auto targetPosition = descriptor.flatIndexToDescriptorPosition(slot);
+    const auto sourcePosition = other.descriptor.flatIndexToDescriptorPosition(slot);
+    if (!targetPosition.has_value() || !sourcePosition.has_value()) {
+      FatalError("payload: flat slot {} missing while retargeting NULL flags", slot);
+    }
+    if (other.nullBitset_[sourcePosition->first]) nullBitset_[targetPosition->first] = true;
+  }
 }
 
 // Special init operator

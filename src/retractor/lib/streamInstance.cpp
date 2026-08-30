@@ -302,15 +302,16 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   if (std::holds_alternative<std::monostate>(valueRet))
     FatalError("streamInstance::reduceFieldsToPayload: valueRet not initialized after switch");
 
-  auto item{0};
   auto validItemCount{0};
-  for (auto const &it : outputPayload->descriptor) {
-    if (it.rtype == rdb::REF) continue;
-    if (it.rtype == rdb::TYPE) continue;
-    if (it.rtype == rdb::RETENTION) continue;
-    if (it.rtype == rdb::RETMEMORY) continue;
-
-    auto valueOpt = outputPayload->getPayload()->getItemVT(item++);
+  // Petla idzie po SLOTACH PLASKICH, nie po wpisach deskryptora: getItemVT() przyjmuje
+  // indeks plaski, a pole `T[N]` zajmuje N slotow przy JEDNYM wpisie. Liczac wpisy,
+  // reduktor nad `INTEGER[3]` czytal wylacznie element 0. MIN i MAX to maskowaly, bo
+  // ekstremum zbioru jednoelementowego bywa poprawne przez przypadek; SUMC nie.
+  // Pola konfiguracyjne (REF, TYPE, RETENTION, RETMEMORY) nie maja slotow plaskich,
+  // wiec ich pominiecie zapewnia sam Descriptor::rebuildFieldMappings().
+  const int flatCount = outputPayload->descriptor.flatElementCount();
+  for (int item = 0; item < flatCount; ++item) {
+    auto valueOpt = outputPayload->getPayload()->getItemVT(item);
     if (!valueOpt.has_value()) continue;
     validItemCount++;
 

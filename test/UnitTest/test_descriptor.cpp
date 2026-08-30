@@ -293,3 +293,42 @@ TEST(descriptor, copy_constructor) {
   EXPECT_TRUE(data2.fieldSize("Control") == data1.fieldSize("Control"));
   EXPECT_TRUE(data2.fieldIndex("TLen") == data1.fieldIndex("TLen"));
 }
+
+// Zgodnosc deskryptorow idzie po SLOTACH PLASKICH rekordu, nie po wpisach: numeryczne
+// `T[N]` i N pol `T` opisuja te same bajty pod tymi samymi offsetami. Do 2026-08-30
+// porownanie szlo po wpisach, wiec ta para wychodzila NIEZGODNA i payload::operator=
+// konczylo sie bledem krytycznym — tak wywracal sie przeplot `#` nad polem tablicowym.
+TEST(descriptor, array_field_is_compatible_with_the_same_flat_scalar_fields) {
+  const rdb::Descriptor arrayForm("cells", 4, 3, rdb::INTEGER);
+  const auto scalarForm{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
+                        rdb::Descriptor("c1", 4, 1, rdb::INTEGER) +  //
+                        rdb::Descriptor("c2", 4, 1, rdb::INTEGER)};
+
+  ASSERT_EQ(arrayForm.flatElementCount(), scalarForm.flatElementCount());
+  ASSERT_EQ(arrayForm.getSizeInBytes(), scalarForm.getSizeInBytes());
+  EXPECT_TRUE(arrayForm == scalarForm);
+  EXPECT_TRUE(scalarForm == arrayForm);
+}
+
+// Zluzowanie porownania nie moze uczynic go slepym: rozna szerokosc plaska to nadal
+// niezgodnosc, niezaleznie od tego, ze liczba wpisow moglaby sie zgadzac.
+TEST(descriptor, different_flat_width_stays_incompatible) {
+  const rdb::Descriptor threeElements("cells", 4, 3, rdb::INTEGER);
+  const rdb::Descriptor fourElements("cells", 4, 4, rdb::INTEGER);
+  const rdb::Descriptor oneScalar("cells", 4, 1, rdb::INTEGER);
+
+  EXPECT_FALSE(threeElements == fourElements);
+  EXPECT_FALSE(fourElements == threeElements);
+  EXPECT_FALSE(threeElements == oneScalar);
+}
+
+// STRING[N] jest JEDNYM slotem o dlugosci N bajtow, a nie N slotami — inaczej niz typy
+// liczbowe. Ta sama regula co w Descriptor::rebuildFieldMappings().
+TEST(descriptor, string_array_stays_one_flat_slot) {
+  const rdb::Descriptor text("name", 1, 8, rdb::STRING);
+  const auto eightBytes{rdb::Descriptor("b0", 1, 1, rdb::BYTE) +  //
+                        rdb::Descriptor("b1", 1, 1, rdb::BYTE)};
+
+  EXPECT_EQ(text.flatElementCount(), 1);
+  EXPECT_FALSE(text == eightBytes);
+}

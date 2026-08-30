@@ -35,6 +35,9 @@ class payload {
 
   payload &operator=(const Descriptor &other);
 
+  /// @brief Przenosi znaczniki NULL ze zgodnego payloadu o innej liczbie wpisow deskryptora
+  void retargetNullBitsetFrom(const payload &other);
+
   std::vector<bool> nullBitset_;  // true if field at position i is null, false otherwise
  public:
   /// @brief Descriptor of managed payload area
