@@ -100,19 +100,27 @@ std::optional<int> windowWidthOf(const query &q, std::string &error) {
     for (const auto &t : f.lProgram) {
       if (!isWindowAggregate(t.getCommandID())) continue;
 
-      const auto *raw = std::get_if<int>(&t.getVT());
-      if (raw == nullptr) {
-        error = "Stream '" + q.id + "' has a malformed window aggregate token";
-        return std::nullopt;
-      }
-
-      int width = *raw;
+      int width(0);
       if (resolved) {
-        if (*raw < 0 || std::cmp_greater_equal(*raw, q.windowGroups.size())) {
+        // Rozwiazany token niesie INDEKS GRUPY, a szerokosc stoi w tabeli grup zapytania.
+        const auto *groupIndex = std::get_if<int>(&t.getVT());
+        if (groupIndex == nullptr) {
+          error = "Stream '" + q.id + "' has a malformed window aggregate token";
+          return std::nullopt;
+        }
+        if (*groupIndex < 0 || std::cmp_greater_equal(*groupIndex, q.windowGroups.size())) {
           error = "Stream '" + q.id + "' has a window aggregate pointing outside its own window group table";
           return std::nullopt;
         }
-        width = q.windowGroups[static_cast<size_t>(*raw)].width;
+        width = q.windowGroups[static_cast<size_t>(*groupIndex)].width;
+      } else {
+        // Token prosto z parsera niesie pare (szerokosc, poczatek podprogramu argumentu).
+        const auto *shape = std::get_if<std::pair<int, int>>(&t.getVT());
+        if (shape == nullptr) {
+          error = "Stream '" + q.id + "' has a malformed window aggregate token";
+          return std::nullopt;
+        }
+        width = shape->first;
       }
 
       if (width <= 0) {
@@ -126,12 +134,17 @@ std::optional<int> windowWidthOf(const query &q, std::string &error) {
 }  // namespace
 
 namespace localContext {
-boost::regex xprFieldId5(R"((\w*)\[(\d*)\]\[(\d*)\])");  // something[1][1]
-boost::regex xprFieldId4(R"((\w*)\[(\d*)\,(\d*)\])");    // something[1,1]
-boost::regex xprFieldId2(R"((\w*)\[(\d*)\])");           // something[1]
-boost::regex xprFieldIdX("(\\w*)\\[_]");                 // something[_]
-boost::regex xprFieldId1("(\\w*).(\\w*)");               // something.in_schema
-boost::regex xprFieldId3("(\\w*)");                      // field_of_corn
+// Klasa `[\w$]` zamiast `\w`: nazwa fizyczna instancji generatora zawiera `$` (`cell$0`),
+// a `\w` sie na nim urywa. regex_search bral wtedy dopasowanie ZA `$` i z `cell$0[0]`
+// wyciagal nazwe strumienia "0". Do 2026-08-31 nie bylo tego widac, bo nieznana nazwa
+// degradowala sie po cichu do offsetu 0 bufora wejsciowego — czyli akurat do wartosci
+// poprawnej dla jednozrodlowego konsumenta.
+boost::regex xprFieldId5(R"(([\w$]*)\[(\d*)\]\[(\d*)\])");  // something[1][1]
+boost::regex xprFieldId4(R"(([\w$]*)\[(\d*)\,(\d*)\])");    // something[1,1]
+boost::regex xprFieldId2(R"(([\w$]*)\[(\d*)\])");           // something[1]
+boost::regex xprFieldIdX("([\\w$]*)\\[_]");                 // something[_]
+boost::regex xprFieldId1("(\\w*).(\\w*)");                  // something.in_schema
+boost::regex xprFieldId3("(\\w*)");                         // field_of_corn
 }  // namespace localContext
 
 using namespace localContext;
@@ -513,6 +526,48 @@ bool consumesTwoPrecedingTokens(command_id cmd) {
 /// pole liczbowe `T[N]` to N slotów, `STRING[N]` to JEDEN slot o długości N bajtów.
 /// compiler::sourceFieldAt() chodzi po schemacie źródła dokładnie tak samo.
 int flatSlotCount(const rdb::rField &f) { return (f.rtype == rdb::STRING) ? 1 : f.rarray; }
+
+/// Wpis schematu o zadanej nazwie: (indeks PLASKI pierwszego slotu, liczba slotow).
+/// nullopt = w tym schemacie nie ma wpisu o tej nazwie.
+///
+/// Numeracja jest ta sama, ktora widzi WYKONANIE: payload::getItemVT() adresuje sloty plaskie,
+/// wiec `T[N]` zajmuje N pozycji, a pole konfiguracyjne deskryptora (TYPE, REF, RETENTION,
+/// RETMEMORY) nie zajmuje zadnej. compiler::sourceFieldAt() chodzi po tej samej numeracji
+/// w druga strone.
+///
+/// Do 2026-08-31 nazwa rozwiazywala sie na NUMER WPISU schematu, a `strumien[k]` na indeks
+/// plaski. Dopoki zaden wpis nie byl tablica, obie liczby byly rowne i roznicy nie bylo widac;
+/// przy `DECLARE a INTEGER[3], b INTEGER` zapis `SELECT b` czytal `a[1]`.
+std::optional<std::pair<int, int>> namedEntrySlots(const query &q, const std::string &name) {
+  int flatIndex(0);
+  for (const auto &f : q.lSchema) {
+    const auto type = f.field_.rtype;
+    if (type == rdb::TYPE || type == rdb::REF || type == rdb::RETENTION || type == rdb::RETMEMORY) continue;
+    const int slots = flatSlotCount(f.field_);
+    if (f.field_.rname == name) return std::make_pair(flatIndex, slots);
+    flatIndex += slots;
+  }
+  return std::nullopt;
+}
+
+/// Slot pola wskazanego GOLA NAZWA — czyli wpisu, ktory MUSI byc pojedynczy.
+///
+/// Nazwa tablicy nie jest nazwa pola: `DECLARE a INTEGER[3]` deklaruje trzy pola `a[0]`,
+/// `a[1]`, `a[2]`, a `a` jest nazwa calego wpisu. Do 2026-08-31 goła nazwa tablicy czytala
+/// po cichu element zerowy, a w oknie znaczyla jeszcze co innego — redukcje po WSZYSTKICH
+/// elementach rekordu naraz, czyli po rownoleglych kanalach zamiast po czasie.
+/// @param error wypelniany, gdy nazwa wskazuje wpis TABLICOWY; pusty, gdy wpisu po prostu nie ma
+std::optional<int> singleFieldSlot(const query &q, const std::string &name, const std::string &streamId, std::string &error) {
+  const auto entry = namedEntrySlots(q, name);
+  if (!entry.has_value()) return std::nullopt;
+  const auto [firstSlot, slots] = *entry;
+  if (slots > 1) {
+    error = "'" + name + "' names an array of " + std::to_string(slots) + " fields in stream '" + streamId +
+            "', not a single field — index one element: " + name + "[0] .. " + name + "[" + std::to_string(slots - 1) + "]";
+    return std::nullopt;
+  }
+  return firstSlot;
+}
 
 /// Schemat strumienia POCHODNEGO rozwinięty na sloty płaskie.
 ///
@@ -925,11 +980,19 @@ std::string compiler::expandIndexWildcards(query &q) {
   return {"OK"};
 }
 
-void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
+/// Błędy odwołań idą kanałem `Check result:`, a nie wyjątkiem.
+///
+/// Do 2026-08-31 ta funkcja rzucała `std::logic_error` / `std::out_of_range` na każdą nieznaną
+/// nazwę pola. Kanał był przez to niespójny: `-c` raportowało jedne błędy planu komunikatem
+/// kompilatora, a inne wywróceniem procesu z tekstem wyjątku — mimo że jedne i drugie są
+/// zwyczajną pomyłką w zapisie zapytania, a nie awarią silnika. FatalError zostaje tam, gdzie
+/// był: sygnalizuje niezgodność gramatyki z kompilatorem, czyli błąd WEWNĘTRZNY.
+std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
   for (auto &t : lProgram) {  // for each token in query field
     const command_id cmd(t.getCommandID());
     const std::string text(t.getStr_());
     boost::cmatch what;
+    std::string arrayError;
     switch (cmd) {
       case PUSH_ID1:
         if (regex_search(text.c_str(), what, xprFieldId1)) {
@@ -940,35 +1003,58 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
           // and then insert
           for (auto &q1 : coreInstance) {
             if (q1.id == schema) {
-              int offset1(0);
-              for (auto &f1 : q1.lSchema) {
-                if (f1.field_.rname == field) {
-                  t = token(PUSH_ID, std::make_pair(schema, offset1));
-                  break;
-                }
-                ++offset1;
-              }
-              if (offset1 == q1.lSchema.size())
-                throw std::out_of_range(
-                    "Failure during reference conversation - schema exist, "
-                    "no "
-                    "fields");
+              const auto flatIndex = singleFieldSlot(q1, field, schema, arrayError);
+              if (!arrayError.empty()) return "Stream '" + q.id + "': " + arrayError;
+              if (!flatIndex.has_value())
+                return "Stream '" + q.id + "' refers to '" + text + "', but stream '" + schema + "' has no field '" + field +
+                       "'";
+              t = token(PUSH_ID, std::make_pair(schema, *flatIndex));
               break;
             }
           }
         } else
-          throw std::out_of_range("No mach on type conversion ID1");
+          return "Stream '" + q.id + "' has a malformed field reference '" + text + "'";
         break;
       case PUSH_ID2:
         if (regex_search(text.c_str(), what, xprFieldId2)) {
           if (what.size() != 3) FatalError("compiler: PUSH_ID2 regex match has unexpected capture count");
-          const std::string schema(what[1]);
+          const std::string name(what[1]);
           const std::string sOffset1(what[2]);
           const int offset1(atoi(sOffset1.c_str()));
-          t = token(PUSH_ID, std::make_pair(schema, offset1));
+
+          // `strumien[k]` — pozycja PŁASKA w rekordzie źródła. W tej postaci buildOutputSchema()
+          // wystawia też schematy substratów i rozwinięcie `SELECT *`.
+          if (coreInstance.exists(name)) {
+            t = token(PUSH_ID, std::make_pair(name, offset1));
+            break;
+          }
+
+          // `pole[k]` — ELEMENT pola tablicowego ze schematu z FROM. Nazwa tablicy nie jest
+          // nazwą pola, więc dopiero ten zapis wskazuje wartość.
+          //
+          // Do 2026-08-31 tej gałęzi nie było: nieznana nazwa szła dalej jako nazwa strumienia,
+          // a localizeFieldOffsets() zamieniało ją po cichu na offset 0 bufora wejściowego.
+          // `a[1]` trafiało wtedy we właściwy element wyłącznie wtedy, gdy `a` było pierwszym
+          // polem jedynego strumienia z FROM; przy dwóch źródłach czytało cudzą wartość, a przy
+          // indeksie spoza tablicy — sąsiednie pole. Nikt tego nie zgłaszał.
+          auto [schema1, schema2, cmdFrom]{GetArgs(q.lProgram)};
+          bool bFieldFound(false);
+          for (const auto &schema : {schema1, schema2}) {
+            if (bFieldFound || schema.empty() || !coreInstance.exists(schema)) continue;
+            const auto entry = namedEntrySlots(coreInstance.getQuery(schema), name);
+            if (!entry.has_value()) continue;
+            const auto [firstSlot, slots] = *entry;
+            if (offset1 < 0 || offset1 >= slots)
+              return "Stream '" + q.id + "': field '" + name + "' of stream '" + schema + "' has " + std::to_string(slots) +
+                     " element(s), so '" + text + "' is out of range";
+            t = token(PUSH_ID, std::make_pair(schema, firstSlot + offset1));
+            namedSourceRefs_[q.id].insert(schema);
+            bFieldFound = true;
+          }
+          if (!bFieldFound)
+            return "Stream '" + q.id + "' refers to '" + text + "', but there is no stream or field '" + name + "'";
         } else {
-          SPDLOG_ERROR("No mach on type conversion ID2 text:{}", text.c_str());
-          throw std::out_of_range("No mach on type conversion");
+          return "Stream '" + q.id + "' has a malformed field reference '" + text + "'";
         }
         break;
       case PUSH_ID3:
@@ -977,40 +1063,35 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
           const std::string field(what[1]);
           query *pQ1(nullptr);
           query *pQ2(nullptr);
-          auto [schema1, schema2, cmd]{GetArgs(q.lProgram)};
+          auto [schema1, schema2, cmdFrom]{GetArgs(q.lProgram)};
           pQ1 = &coreInstance.getQuery(schema1);
           if (q.lProgram.size() == 3) pQ2 = &coreInstance.getQuery(schema2);
           bool bFieldFound(false);
-          int offset1(0);
           if (pQ1 != nullptr) {
-            offset1 = 0;
-            for (auto &f1 : (*pQ1).lSchema) {
-              if ((f1.field_).rname == field) {
-                t = token(PUSH_ID, std::make_pair(schema1, offset1));
-                // Goła nazwa pola też wskazuje składową — `v-w` nad `A#B` znosi tożsamość
-                // dokładnie tak jak `A[0]-B[0]`. PUSH_ID3 wystawia wyłącznie parser, więc
-                // zapis tutaj nie łapie tokenów kompilatora; migawka wejściowa nie da rady,
-                // bo nazwa strumienia powstaje dopiero z tego wyszukiwania.
-                namedSourceRefs_[q.id].insert(schema1);
-                bFieldFound = true;
-              }
-              ++offset1;
+            const auto flatIndex = singleFieldSlot(*pQ1, field, schema1, arrayError);
+            if (!arrayError.empty()) return "Stream '" + q.id + "': " + arrayError;
+            if (flatIndex.has_value()) {
+              t = token(PUSH_ID, std::make_pair(schema1, *flatIndex));
+              // Goła nazwa pola też wskazuje składową — `v-w` nad `A#B` znosi tożsamość
+              // dokładnie tak jak `A[0]-B[0]`. PUSH_ID3 wystawia wyłącznie parser, więc
+              // zapis tutaj nie łapie tokenów kompilatora; migawka wejściowa nie da rady,
+              // bo nazwa strumienia powstaje dopiero z tego wyszukiwania.
+              namedSourceRefs_[q.id].insert(schema1);
+              bFieldFound = true;
             }
           }
           if (pQ2 != nullptr && !bFieldFound) {
-            offset1 = 0;
-            for (auto &f2 : (*pQ2).lSchema) {
-              if (f2.field_.rname == field) {
-                t = token(PUSH_ID, std::make_pair(schema2, offset1));
-                namedSourceRefs_[q.id].insert(schema2);
-                bFieldFound = true;
-              }
-              ++offset1;
+            const auto flatIndex = singleFieldSlot(*pQ2, field, schema2, arrayError);
+            if (!arrayError.empty()) return "Stream '" + q.id + "': " + arrayError;
+            if (flatIndex.has_value()) {
+              t = token(PUSH_ID, std::make_pair(schema2, *flatIndex));
+              namedSourceRefs_[q.id].insert(schema2);
+              bFieldFound = true;
             }
           }
-          if (!bFieldFound) throw std::logic_error("No field of given name in stream schema ID3");
+          if (!bFieldFound) return "Stream '" + q.id + "' has no field '" + field + "' in the schema of its FROM clause";
         } else
-          throw std::out_of_range("No mach on type conversion ID3");
+          return "Stream '" + q.id + "' has a malformed field reference '" + text + "'";
         break;
       case PUSH_ID4:
       case PUSH_ID5: {
@@ -1026,16 +1107,17 @@ void compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
           const bool foundSchema =
               ranges::find_if(coreInstance, [schema](const auto &qry) { return qry.id == schema; }) != coreInstance.end();
 
-          if (!foundSchema) throw std::logic_error("Field calls non-exist schema - config.log (-g)");
+          if (!foundSchema) return "Stream '" + q.id + "' refers to '" + text + "', but there is no stream '" + schema + "'";
           t = token(PUSH_ID, std::make_pair(schema, offset1 + (offset2 * static_cast<int>(q.lSchema.size()))));
         } else
-          throw std::out_of_range("No mach on type conversion ID4");
+          return "Stream '" + q.id + "' has a malformed field reference '" + text + "'";
         break;
       }
       default:
         break;
     }
   }
+  return {"OK"};
 }
 /* Purpose of this function is to translate all references to fields
 to form schema_name[postion, time_offset]
@@ -1048,11 +1130,13 @@ std::string compiler::resolveFieldReferences() {
     if (q.isReductionRequired()) {
       FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
     }
-    for (auto &f : q.lSchema) {               // for each field in query
-      resolveTokenReferences(f.lProgram, q);  // for each token in query field
+    for (auto &f : q.lSchema) {  // for each field in query
+      const std::string result{resolveTokenReferences(f.lProgram, q)};
+      if (result != "OK") return result;
     }  // end for each field in query
-    for (auto &r : q.lRules) {                 // for each rule in query
-      resolveTokenReferences(r.condition, q);  // for each token in rule
+    for (auto &r : q.lRules) {  // for each rule in query
+      const std::string result{resolveTokenReferences(r.condition, q)};
+      if (result != "OK") return result;
     }  // end for each rule in query
   }
   return {"OK"};
@@ -2274,6 +2358,19 @@ std::optional<rdb::rField> compiler::sourceFieldAt(const std::string &streamId, 
 std::string compiler::resolveWindowAggregates() {
   for (auto &q : coreInstance) {
     if (!q.windowGroups.empty()) continue;
+
+    // `q.id[k]` na liście pól znaczy „slot k MOJEGO payloadu wejściowego" — tak samo, jak po
+    // localizeFieldOffsets() znaczy je każde odwołanie do pola. Dla okna to jednak za mało:
+    // okno musi wskazać strumień, którego HISTORIĘ czyta, a własnej historii konsument w tym
+    // miejscu nie ma — jego rekord dopiero powstaje. Bez tej podmiany `MIN(w[0] : 2)` zakładało
+    // grupę nad strumieniem `w`, czyli czytało wyjście, które właśnie liczy, zamiast wejścia.
+    //
+    // FROM jest tu POJEDYNCZYM odwołaniem do strumienia — pilnuje tego resolveStreamIntervals(),
+    // zanim ten przebieg ruszy — więc podmiana jest jednoznaczna i `MIN(a[0]:2)`, `MIN(src[0]:2)`
+    // oraz `MIN(w[0]:2)` opisują jedno i to samo okno.
+    const std::string fromStream =
+        (q.lProgram.size() == 1 && q.lProgram.front().getCommandID() == PUSH_STREAM) ? q.lProgram.front().getStr_() : "";
+
     // Indeks grupy o zadanym kształcie W TYM zapytaniu; zakłada nową, gdy jeszcze nie było.
     auto groupIndexFor = [&q](const windowGroup &shape) {
       for (size_t i = 0; i < q.windowGroups.size(); ++i)
@@ -2298,70 +2395,118 @@ std::string compiler::resolveWindowAggregates() {
       rdb::descFld windowType(rdb::BYTE);
       int windowLen(static_cast<int>(sizeof(uint8_t)));
 
-      for (auto it = f.lProgram.begin(); it != f.lProgram.end();) {
-        if (!isWindowAggregate(it->getCommandID())) {
-          ++it;
-          continue;
-        }
-        if (it == f.lProgram.begin()) {
-          return "Stream '" + q.id + "' has a window aggregate without a field reference";
-        }
-        auto refIt = std::prev(it);
-        if (refIt->getCommandID() != PUSH_ID) {
-          return "Stream '" + q.id + "' has a window aggregate whose argument is not a field of its source";
-        }
+      // Praca na wektorze, bo argument okna jest ZAKRESEM pozycji, a nie jednym tokenem:
+      // parser zapisal w tokenie poczatek podprogramu argumentu, koncem jest sam token okna.
+      std::vector<token> prog(f.lProgram.begin(), f.lProgram.end());
 
-        const auto [sourceName, entryIndex] = std::get<std::pair<std::string, int>>(refIt->getVT());
-        const int width                     = std::get<int>(it->getVT());
+      std::vector<std::pair<size_t, std::pair<int, int>>> windows;
+      for (size_t i = 0; i < prog.size(); ++i) {
+        if (!isWindowAggregate(prog[i].getCommandID())) continue;
+        const auto *shape = std::get_if<std::pair<int, int>>(&prog[i].getVT());
+        if (shape == nullptr) return "Stream '" + q.id + "' has a malformed window aggregate token";
+        windows.emplace_back(i, *shape);
+      }
 
-        if (!coreInstance.exists(sourceName)) {
-          return "Stream '" + q.id + "' aggregates a window over unknown stream '" + sourceName + "'";
+      // Zagniezdzenie odrzucamy PRZED jakakolwiek zmiana programu: znaczniki argumentow sa
+      // pozycjami w TYM programie, a po pierwszym wycieciu wewnetrzne przestaja cokolwiek
+      // znaczyc. Okno w oknie i tak jest nie do policzenia — historia zrodla trzyma jego
+      // rekordy, a nie wyniki innego okna nad nimi.
+      for (const auto &[pos, shape] : windows) {
+        if (shape.second < 0 || std::cmp_greater_equal(shape.second, pos)) {
+          return "Stream '" + q.id + "' has a window aggregate without an argument";
         }
-        const auto &source = coreInstance.getQuery(sourceName);
+        for (size_t i = static_cast<size_t>(shape.second); i < pos; ++i)
+          if (isWindowAggregate(prog[i].getCommandID()))
+            return "Stream '" + q.id + "' nests one window aggregate inside another, which is not supported";
+      }
 
-        // Wpis schematu -> pierwszy slot PŁASKI i liczba slotów. `INTEGER[24]` to jeden wpis
-        // i 24 sloty — wszystkie wchodzą do okna, stąd `width * slotCount` redukowanych
-        // wartości. Reguła slotów jest ta sama co w Descriptor::rebuildFieldMappings().
+      // Od KONCA: wyciecie argumentu przesuwa wylacznie pozycje za nim, wiec znaczniki okien
+      // stojacych wczesniej pozostaja wazne.
+      for (auto w = windows.rbegin(); w != windows.rend(); ++w) {
+        const size_t pos      = w->first;
+        const int width       = w->second.first;
+        const size_t argStart = static_cast<size_t>(w->second.second);
+
+        std::list<token> argument(prog.begin() + static_cast<std::ptrdiff_t>(argStart),
+                                  prog.begin() + static_cast<std::ptrdiff_t>(pos));
+
         windowGroup shape;
-        shape.source = sourceName;
-        shape.width  = width;
+        shape.width = width;
 
-        int entry(0);
-        int firstSlot(0);
-        const rdb::rField *found(nullptr);
-        for (const auto &sf : source.lSchema) {
-          if (entry == entryIndex) {
-            found = &sf.field_;
-            break;
+        // Zrodlo okna wyznaczaja odwolania argumentu i musi byc JEDNO: okno siega po historie
+        // strumienia, a historii zlaczenia nikt nie przechowuje. Typ wartosci bierzemy
+        // z NAJSZERSZEGO pola, po ktore argument siega — dla golego pola to po prostu jego typ.
+        rdb::descFld valueType(rdb::BYTE);
+        int valueLen(static_cast<int>(sizeof(uint8_t)));
+        bool anyReference(false);
+        for (auto &t : argument) {
+          if (t.getCommandID() == PUSH_VAL && std::holds_alternative<std::string>(t.getVT())) {
+            return "Stream '" + q.id + "' aggregates a window over a text expression; window aggregates are arithmetic";
           }
-          firstSlot += flatSlotCount(sf.field_);
-          ++entry;
-        }
-        if (found == nullptr) {
-          return "Stream '" + q.id + "' aggregates a window over field " + std::to_string(entryIndex) + " of '" + sourceName +
-                 "', which has only " + std::to_string(entry) + " fields";
-        }
-        if (found->rtype == rdb::STRING) {
-          return "Stream '" + q.id + "' aggregates a window over STRING field '" + found->rname + "' of '" + sourceName +
-                 "'; window aggregates are arithmetic";
-        }
-        shape.firstSlot = firstSlot;
-        shape.slotCount = flatSlotCount(*found);
+          if (t.getCommandID() != PUSH_ID) continue;
+          const auto *ref = std::get_if<std::pair<std::string, int>>(&t.getVT());
+          if (ref == nullptr) return "Stream '" + q.id + "' has a malformed field reference in a window aggregate";
 
-        const int groupIndex = groupIndexFor(shape);
+          const int slot = ref->second;
+          // Odwolanie wlasna nazwa wskazuje payload WEJSCIOWY — normalizujemy je do strumienia
+          // z FROM, zeby wszystkie trzy zapisy tego samego okna trafily w jedna grupe.
+          std::string refSource = (ref->first == q.id) ? fromStream : ref->first;
+          if (refSource.empty()) {
+            return "Stream '" + q.id + "' aggregates a window over its own name, but its FROM clause is not a single stream";
+          }
+          if (refSource != ref->first) t = token(t.getCommandID(), std::make_pair(refSource, slot));
+
+          if (anyReference && shape.source != refSource) {
+            return "Stream '" + q.id + "' aggregates a window over an expression mixing streams '" + shape.source + "' and '" +
+                   refSource + "'; a window reads the history of ONE stream";
+          }
+          if (!coreInstance.exists(refSource)) {
+            return "Stream '" + q.id + "' aggregates a window over unknown stream '" + refSource + "'";
+          }
+          const auto field = sourceFieldAt(refSource, slot);
+          if (!field.has_value()) {
+            return "Stream '" + q.id + "' aggregates a window over slot " + std::to_string(slot) + " of '" + refSource +
+                   "', which has no such slot";
+          }
+          if (field->rtype == rdb::STRING) {
+            return "Stream '" + q.id + "' aggregates a window over STRING field '" + field->rname + "' of '" + refSource +
+                   "'; window aggregates are arithmetic";
+          }
+          if (!anyReference || field->rtype > valueType) {
+            valueType = field->rtype;
+            valueLen  = field->rlen;
+          }
+          shape.source = refSource;
+          shape.slot   = slot;
+          anyReference = true;
+        }
+        if (!anyReference) {
+          return "Stream '" + q.id +
+                 "' aggregates a window over an expression that reads no field; a window needs a stream to look back on";
+        }
+
+        // Gole pole idzie szybka sciezka: bez programu, bez ewaluatora, odczyt slotu wprost.
+        if (argument.size() > 1) {
+          shape.slot    = 0;
+          shape.program = std::move(argument);
+        }
 
         // Typ wyniku tą samą regułą co reduktory strumieniowe — patrz reductionResultField().
-        const auto [resultType, resultLen] = reductionResultField(found->rtype, found->rlen);
+        const auto [resultType, resultLen] = reductionResultField(valueType, valueLen);
+        shape.valueType                    = resultType;
+
+        const int groupIndex = groupIndexFor(shape);
         if (!fieldHasWindow || resultType > windowType) {
           windowType = resultType;
           windowLen  = resultLen;
         }
         fieldHasWindow = true;
 
-        *it = token(it->getCommandID(), groupIndex);
-        f.lProgram.erase(refIt);
-        ++it;
+        prog[pos] = token(prog[pos].getCommandID(), groupIndex);
+        prog.erase(prog.begin() + static_cast<std::ptrdiff_t>(argStart), prog.begin() + static_cast<std::ptrdiff_t>(pos));
       }
+
+      if (fieldHasWindow) f.lProgram.assign(prog.begin(), prog.end());
 
       // Typ pola ustawiamy TYLKO wtedy, gdy parser zostawił swój domyślny INTEGER. Zapis
       // `to_double(MIN(x:10))` albo `to_string(MIN(x:10):8)` ma typ ustalony przez funkcję
@@ -2528,6 +2673,24 @@ std::string compiler::simplifyFieldExpressions() {
       rdb::probe::onRewriteR3(simplifyExpression(f.lProgram, typeOfField));
     for (auto &r : q.lRules)
       rdb::probe::onRewriteR3(simplifyExpression(r.condition, typeOfField));
+
+    // Podwyrazenia okien stoja w tabeli grup, a nie w programie pola — resolveWindowAggregates()
+    // wyjmuje je stamtad wczesniej, bo okno adresuje sloty ZRODLA. Bez tej petli `MIN(x*1 : 3)`
+    // zostawaloby nieuproszczone tylko z powodu kolejnosci przebiegow, a nie z powodu reguly.
+    // Odwolania w programie grupy niosa numeracje zrodla, czyli dokladnie te, ktorej oczekuje
+    // typeOfField() — tak samo jak programy pol przed localizeFieldOffsets().
+    for (auto &g : q.windowGroups) {
+      if (g.program.empty()) continue;
+      rdb::probe::onRewriteR3(simplifyExpression(g.program, typeOfField));
+      // Rachunek zwiniety do samego odczytu pola wraca na szybka sciezke — bez ewaluatora
+      // w petli po rekordach okna. Grup zwinietych do tego samego ksztaltu ten przebieg nie
+      // scala: wymagaloby to przenumerowania indeksow w programach pol, a kosztem duplikatu
+      // jest jedno dodatkowe przejscie po oknie, nie roznica w wyniku.
+      if (g.program.size() == 1 && g.program.front().getCommandID() == PUSH_ID) {
+        g.slot = std::get<std::pair<std::string, int>>(g.program.front().getVT()).second;
+        g.program.clear();
+      }
+    }
   }
   return {"OK"};
 }

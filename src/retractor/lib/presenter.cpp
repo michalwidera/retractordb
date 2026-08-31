@@ -374,6 +374,23 @@ void presenter::onlyCompileShowProgram() {
           std::cout << "\t\t" << tf.getStrCommandID() << '\n';
     }
 
+    // Tabela grup okna. Bez niej `WINDOW_MIN(0)` nie mowi, PO CZYM idzie okno — a od
+    // 2026-08-31 argumentem moze byc cale wyrazenie, ktore w programie pola juz nie stoi:
+    // resolveWindowAggregates() przenosi je tutaj. Wypisujemy wylacznie zapytania, ktore okna
+    // maja, wiec zrzut planu bez okien jest bajtowo taki sam jak przedtem.
+    for (size_t windowIndex = 0; windowIndex < q.windowGroups.size(); ++windowIndex) {
+      const auto &group = q.windowGroups[windowIndex];
+      std::cout << "\tWINDOW " << windowIndex << ": " << group.source;
+      if (group.program.empty()) std::cout << '[' << group.slot << ']';
+      std::cout << " rows=" << group.width << '\n';
+      for (auto tw : group.program) {
+        if ((tw.getStrCommandID() == "PUSH_ID") || (tw.getStrCommandID() == "CALL") || (tw.getStrCommandID() == "PUSH_VAL"))
+          std::cout << "\t\t" << tw << '\n';
+        else
+          std::cout << "\t\t" << tw.getStrCommandID() << '\n';
+      }
+    }
+
     for (const auto &r : q.lRules) {
       std::cout << "\tRULE " << r.name << '\n';
 

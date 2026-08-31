@@ -771,6 +771,11 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
           rStack.push(callFun(b, trunc));
         else if (tkStr == "isnull")
           rStack.push(isnull(b));
+        // NULL -> 0, reszta bez zmian. Zeruje wartosc POCHLANIAJACA (dziura w danych, dzielenie
+        // przez zero, okno bez ani jednej wartosci), a NIE ogon strumienia: sloty ogona nie sa
+        // rekordami, wiec nie ma w nich czego zamienic — patrz query::startupLatency.
+        else if (tkStr == "null2zero")
+          rStack.push(isNullValue(b) ? rdb::descFldVT{0} : b);
         else if (tkStr == "abs")
           rStack.push(absolute(b));
         else if (tkStr == "iszero")

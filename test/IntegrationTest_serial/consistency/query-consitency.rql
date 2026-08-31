@@ -5,8 +5,8 @@
 
 DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile1.txt'
 
-SELECT core[0]+100 STREAM str1 FROM core0
-SELECT core[0]+200 STREAM str2 FROM core0
+SELECT core0[0]+100 STREAM str1 FROM core0
+SELECT core0[0]+200 STREAM str2 FROM core0
 
 # str3 should be all equal 100 - otherwise read from core0 is not consistent
 

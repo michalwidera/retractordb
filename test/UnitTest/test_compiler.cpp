@@ -2291,7 +2291,7 @@ TEST(xcompiler, window_aggregate_never_changes_the_output_interval) {
     auto plan = compilePlan(
         "SUBSTRAT 'memory'\n"
         "DECLARE a INTEGER[3] STREAM src, 1/10 FILE 'src.txt'\n"
-        "SELECT MIN(a : " +
+        "SELECT MIN(a[0] : " +
         std::to_string(width) + ") STREAM dst FROM src\n");
 
     auto &dst = plan.getQuery("dst");
@@ -2308,7 +2308,7 @@ TEST(xcompiler, window_aggregate_never_changes_the_output_interval) {
         (void)parserRQLString(instance,
                               "SUBSTRAT 'memory'\n"
                               "DECLARE a INTEGER[3] STREAM src, 1/10 FILE 'src.txt'\n"
-                              "SELECT MIN(a : 2 : 2) STREAM dst FROM src\n");
+                              "SELECT MIN(a[0] : 2 : 2) STREAM dst FROM src\n");
         exit(0);
       },
       ::testing::ExitedWithCode(EPERM), "expecting ')'");
@@ -2327,6 +2327,26 @@ TEST(xcompiler, window_aggregate_origin_covers_the_whole_window) {
     // Ogon zostaje ogonem zrodla — okno czeka dokladnie tyle co czysty przepis.
     EXPECT_EQ(plan.getQuery("dst").startupLatency, 0) << "width=" << width;
   }
+
+  // Sciezka wyrazeniowa czeka tak samo: wartosc powstaje dopiero z PELNEGO okna, a wczesniejsze
+  // sloty nie sa rekordami (ani zerami, ani NULL-ami — zasada brzegu strumienia z query.hpp).
+  for (const int width : {1, 2, 7}) {
+    auto plan = compilePlan(
+        "SUBSTRAT 'memory'\n"
+        "DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'\n"
+        "SELECT SUMC(a * 2 + b : " +
+        std::to_string(width) + ") STREAM dst FROM src\n");
+    EXPECT_EQ(plan.getQuery("dst").logicalOrigin, width - 1) << "width=" << width;
+    EXPECT_EQ(plan.getQuery("dst").startupLatency, 0) << "width=" << width;
+  }
+
+  // Kilka okien w jednej liscie SELECT: rekord powstaje dopiero, gdy definiuja sie WSZYSTKIE
+  // jego pola, wiec origin bierze NAJSZERSZE okno.
+  auto mixed = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT MIN(a : 2), MAX(a + b : 5), AVG(b : 3) STREAM dst FROM src\n");
+  EXPECT_EQ(mixed.getQuery("dst").logicalOrigin, 4);
 }
 
 // Wynik idzie ta sama regula promocji co reduktory strumieniowe (reductionResultField):
@@ -2358,21 +2378,162 @@ TEST(xcompiler, window_aggregates_of_one_shape_share_a_group) {
   EXPECT_EQ(plan.getQuery("other").windowGroups.size(), 2u);
 }
 
-// Pole tablicowe wchodzi do okna WSZYSTKIMI slotami plaskimi, a pole skalarne jednym.
-TEST(xcompiler, window_group_spans_every_flat_slot_of_an_array_field) {
+// Okno adresuje JEDEN slot plaski rekordu zrodla — redukuje po czasie, nie po elementach
+// jednego rekordu. Nazwa tablicy nie jest nazwa pola, wiec argumentem jest element `a[k]`.
+TEST(xcompiler, window_group_addresses_a_single_flat_slot) {
   auto plan = compilePlan(
       "SUBSTRAT 'memory'\n"
       "DECLARE a INTEGER[3], c INTEGER STREAM src, 1 FILE 'src.txt'\n"
-      "SELECT MIN(a : 2), MIN(c : 2) STREAM dst FROM src\n");
+      "SELECT MIN(a[0] : 2), MIN(a[2] : 2), MIN(c : 2) STREAM dst FROM src\n");
+
+  const auto &groups = plan.getQuery("dst").windowGroups;
+  ASSERT_EQ(groups.size(), 3u);
+  EXPECT_EQ(groups[0].slot, 0);
+  EXPECT_EQ(groups[1].slot, 2);
+  // Pole skalarne stoi ZA tablica, wiec jego slot to 3, nie 1: numeracja idzie po slotach
+  // plaskich rekordu, nie po wpisach schematu.
+  EXPECT_EQ(groups[2].slot, 3);
+}
+
+// Gola nazwa tablicy nie jest odwolaniem do pola i nie moze przejsc — ani w oknie, ani
+// w zwyklym wyrazeniu. Do 2026-08-31 pierwsze czytalo wszystkie elementy naraz (redukcja
+// po kanalach zamiast po czasie), drugie po cichu element zerowy.
+TEST(xcompiler, bare_array_name_is_not_a_field_reference) {
+  const std::string declare =
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER[3] STREAM src, 1 FILE 'src.txt'\n";
+
+  EXPECT_NE(compileStatus(declare + "SELECT MIN(a : 2) STREAM dst FROM src\n"), "OK");
+  EXPECT_NE(compileStatus(declare + "SELECT a STREAM dst FROM src\n"), "OK");
+  // Indeks poza tablica tez jest bledem, a nie odczytem sasiedniego pola.
+  EXPECT_NE(compileStatus(declare + "SELECT a[3] STREAM dst FROM src\n"), "OK");
+  // Nieznana nazwa idzie tym samym kanalem, a nie wyjatkiem przerywajacym proces.
+  EXPECT_NE(compileStatus(declare + "SELECT nosuch STREAM dst FROM src\n"), "OK");
+  EXPECT_NE(compileStatus(declare + "SELECT nosuch[0] STREAM dst FROM src\n"), "OK");
+  // Postac poprawna.
+  EXPECT_EQ(compileStatus(declare + "SELECT MIN(a[0] : 2), a[2] STREAM dst FROM src\n"), "OK");
+}
+
+// Trzy zapisy TEGO SAMEGO okna: nazwa pola, slot rekordu zrodla i slot payloadu WEJSCIOWEGO
+// (czyli wlasna nazwa zapytania). Wszystkie znacza to samo, wiec dziela jedna grupe.
+//
+// Trzeci zapis do 2026-08-31 zakladal grupe nad strumieniem, KTORY WLASNIE POWSTAWAL: okno
+// czytalo wyjscie konsumenta zamiast historii jego zrodla.
+TEST(xcompiler, window_argument_spellings_describe_one_window) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER[3], c INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT MIN(a[0] : 2), MIN(src[0] : 2), MIN(dst[0] : 2) STREAM dst FROM src\n"
+      "SELECT MIN(c : 2), MIN(src[3] : 2), MIN(scal[3] : 2) STREAM scal FROM src\n"
+      "SELECT MIN(a[0]*2 : 2), MIN(mix[0]*2 : 2) STREAM mix FROM src\n");
+
+  ASSERT_EQ(plan.getQuery("dst").windowGroups.size(), 1u);
+  EXPECT_EQ(plan.getQuery("dst").windowGroups[0].source, "src");
+  EXPECT_EQ(plan.getQuery("dst").windowGroups[0].slot, 0);
+
+  // Pole skalarne stoi za tablica, wiec jego slot plaski to 3 — i wszystkie trzy zapisy
+  // musza tam trafic tak samo.
+  ASSERT_EQ(plan.getQuery("scal").windowGroups.size(), 1u);
+  EXPECT_EQ(plan.getQuery("scal").windowGroups[0].slot, 3);
+
+  // To samo dotyczy sciezki wyrazeniowej: odwolanie wlasna nazwa jest normalizowane w tokenie,
+  // wiec rachunki sa identyczne i grupa jest jedna.
+  ASSERT_EQ(plan.getQuery("mix").windowGroups.size(), 1u);
+  EXPECT_EQ(plan.getQuery("mix").windowGroups[0].source, "src");
+}
+
+// Argumentem okna jest wyrazenie, liczone osobno na kazdym rekordzie okna. Podwyrazenie
+// WYCHODZI z programu pola do tabeli grup, wiec w polu zostaje sam bezargumentowy lisc.
+TEST(xcompiler, window_aggregate_accepts_an_expression_argument) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER[3] STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT MIN(a[0]*10 - a[1] : 2), MAX(a[0]*10 - a[1] : 2), SUMC(a[0] : 2) STREAM dst FROM src\n");
+
+  const auto &groups = plan.getQuery("dst").windowGroups;
+  // Ten sam rachunek i ta sama szerokosc to JEDNA grupa, tak samo jak dla golego pola.
+  ASSERT_EQ(groups.size(), 2u);
+  EXPECT_EQ(groups[0].source, "src");
+  EXPECT_EQ(groups[0].width, 2);
+  EXPECT_FALSE(groups[0].program.empty());
+  // Gole pole idzie szybka sciezka: bez programu, z samym numerem slotu.
+  EXPECT_TRUE(groups[1].program.empty());
+  EXPECT_EQ(groups[1].slot, 0);
+
+  for (const auto &f : plan.getQuery("dst").lSchema) {
+    ASSERT_EQ(f.lProgram.size(), 1u) << f.field_.rname;
+    const auto cmd = f.lProgram.front().getCommandID();
+    EXPECT_TRUE(cmd == WINDOW_MIN || cmd == WINDOW_MAX || cmd == WINDOW_SUM) << f.field_.rname;
+  }
+}
+
+// Straz przelacznika, bo ten test opisuje KSZTALT planu, a nie wynik: przy
+// RDB_OPT_SIMPLIFY_EXPRESSIONS=OFF w grupie zostaje `a*1` i policzy dokladnie to samo.
+// Rownosc wartosci w obu konfiguracjach pilnuje it_window_aggregate (strumien `expr1`).
+#if RDB_OPT_SIMPLIFY_EXPRESSIONS
+// Podwyrazenie okna przechodzi przez upraszczanie wyrazen tak samo jak program pola — mimo ze
+// stoi w tabeli grup, a nie w programie. Rachunek zwiniety do samego odczytu pola wraca przy
+// okazji na szybka sciezke, wiec `MIN(x*1 : W)` daje DOKLADNIE ten sam plan co `MIN(x : W)`.
+TEST(xcompiler, window_subexpression_goes_through_expression_simplification) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT MIN(a*1 : 2), MAX(a + b + 0 : 2) STREAM dst FROM src\n");
 
   const auto &groups = plan.getQuery("dst").windowGroups;
   ASSERT_EQ(groups.size(), 2u);
-  EXPECT_EQ(groups[0].firstSlot, 0);
-  EXPECT_EQ(groups[0].slotCount, 3);
-  // Pole skalarne stoi ZA tablica, wiec jego pierwszy slot to 3, nie 1: numeracja idzie
-  // po slotach plaskich rekordu, nie po wpisach schematu.
-  EXPECT_EQ(groups[1].firstSlot, 3);
-  EXPECT_EQ(groups[1].slotCount, 1);
+
+  // `a*1` -> `a`, czyli goly odczyt slotu: program znika, zostaje numer slotu.
+  EXPECT_TRUE(groups[0].program.empty());
+  EXPECT_EQ(groups[0].slot, 0);
+
+  // `a + b + 0` -> `a + b`: stala neutralna zdjeta, rachunek zostaje rachunkiem.
+  ASSERT_EQ(groups[1].program.size(), 3u);
+}
+#endif
+
+// Rozny rachunek to rozna grupa — inaczej `MIN(a[0]*11:2)` czytalby okno `MIN(a[0]*10:2)`.
+TEST(xcompiler, window_aggregates_over_different_expressions_get_different_groups) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER[3] STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT MIN(a[0]*10 : 2), MIN(a[0]*11 : 2), MIN(a[0]*10 : 3) STREAM dst FROM src\n");
+
+  EXPECT_EQ(plan.getQuery("dst").windowGroups.size(), 3u);
+}
+
+// Typ wartosci wchodzacych do redukcji bierze sie z NAJSZERSZEGO pola, po ktore siega
+// wyrazenie — deskryptor zrodla na to pytanie nie odpowie, bo wyrazenie nie jest polem.
+TEST(xcompiler, window_over_an_expression_takes_the_widest_field_type) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER, d DOUBLE STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT AVG(a + d : 4), AVG(a * 2 : 4) STREAM dst FROM src\n");
+
+  EXPECT_EQ(outputField(plan, "dst", 0).rtype, rdb::DOUBLE);
+  EXPECT_EQ(outputField(plan, "dst", 1).rtype, rdb::RATIONAL);
+}
+
+// Cztery ksztalty, ktorych ta konstrukcja policzyc nie moze. Kazdy wychodzi kanalem
+// `Check result:`, a nie wywroceniem procesu w wykonaniu.
+TEST(xcompiler, window_over_an_expression_rejects_what_it_cannot_execute) {
+  const std::string declare =
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER, t STRING[8] STREAM src, 1 FILE 'src.txt'\n"
+      "DECLARE b INTEGER STREAM other, 1 FILE 'other.txt'\n";
+
+  // Historia zrodla trzyma rekordy, a nie wyniki innego okna nad nimi.
+  EXPECT_NE(compileStatus(declare + "SELECT MIN(MAX(a : 2) + 1 : 3) STREAM dst FROM src\n"), "OK");
+  // Bez odwolania do pola okno nie ma po czym isc wstecz.
+  EXPECT_NE(compileStatus(declare + "SELECT MIN(1 + 2 : 3) STREAM dst FROM src\n"), "OK");
+  // Agregaty sa arytmetyczne — takze wtedy, gdy napis wchodzi literalem.
+  EXPECT_NE(compileStatus(declare + "SELECT MIN(a + 'x' : 2) STREAM dst FROM src\n"), "OK");
+  EXPECT_NE(compileStatus(declare + "SELECT MIN(t + 'x' : 2) STREAM dst FROM src\n"), "OK");
+  // Okno czyta historie JEDNEGO strumienia.
+  EXPECT_NE(compileStatus(declare + "SELECT MIN(a + b : 2) STREAM dst FROM src+other\n"), "OK");
+
+  // Postac poprawna — zeby powyzsze EXPECT_NE nie przechodzily z powodu literowki w RQL.
+  EXPECT_EQ(compileStatus(declare + "SELECT MIN(a * 2 + 1 : 2) STREAM dst FROM src\n"), "OK");
 }
 
 // Plan skompilowany jest kompilowany PONOWNIE za kazdym zapytaniem ad hoc: executorsm
@@ -2387,7 +2548,7 @@ TEST(xcompiler, window_aggregate_survives_recompilation_of_a_live_plan) {
   const std::string rql =
       "SUBSTRAT 'memory'\n"
       "DECLARE a INTEGER[3] STREAM src, 1/10 FILE 'src.txt'\n"
-      "SELECT MIN(a : 4), MAX(a : 4), AVG(a : 6) STREAM dst FROM src\n";
+      "SELECT MIN(a[0] : 4), MAX(a[0] : 4), AVG(a[0] : 6) STREAM dst FROM src\n";
 
   qTree instance;
   auto [parseResult, keyword, streamName] = parserRQLString(instance, rql);

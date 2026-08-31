@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <iostream>
 #include <list>
 #include <string>
@@ -51,17 +52,36 @@ inline std::pair<rdb::descFld, int> reductionResultField(rdb::descFld sourceType
 /// Wzgledem bazowego UC07 znika przy tym kompensacja `>1`: tam agregat wydany pod indeksem
 /// n opisuje sekunde n-1 (patrz uc07/README.md), tutaj opisuje sekunde n.
 ///
-/// `firstSlot` i `slotCount` opisuja pole w PLASKIM ukladzie rekordu zrodla: `INTEGER[24]`
-/// to jeden wpis deskryptora, ale 24 sloty, i wszystkie 24 wchodza do okna. Redukcja obejmuje
-/// wiec `width * slotCount` wartosci.
+/// Okno redukuje DOKLADNIE `width` wartosci: po jednej z kazdego z `width` kolejnych rekordow.
+/// Redukcja idzie wiec wylacznie po CZASIE.
+///
+/// Do 2026-08-31 argumentem mogla byc cala tablica i wtedy okno redukowalo `width * N` wartosci
+/// (`MIN(a : 2)` nad `INTEGER[3]` mieszalo 6 liczb). Mieszalo to dwie rozne redukcje: po czasie
+/// i po ROWNOLEGLYCH kanalach jednego rekordu. Nazwa tablicy nie jest nazwa pola — polami sa jej
+/// elementy `a[0]`, `a[1]`, ... — wiec argumentem okna jest element, a `slot` wskazuje jeden
+/// slot PLASKI rekordu zrodla.
+/// Wartoscia rekordu moze byc takze WYRAZENIE (`MIN(a[0]*10 - a[1] : 3)`). Wtedy `program`
+/// niesie jego tokeny, a `slot` nie znaczy nic: wartosc powstaje z przeliczenia programu na
+/// payloadzie kazdego rekordu okna z osobna. Pusty `program` to argument bedacy golym polem —
+/// szybka sciezka, ktora czyta slot wprost, bez ewaluatora.
+///
+/// `valueType` ustala KOMPILACJA (typ pola albo najszerszy typ pol wyrazenia, przepuszczony
+/// przez reductionResultField), bo dla wyrazenia nie ma jednego wpisu deskryptora, z ktorego
+/// mozna go odczytac w wykonaniu.
 struct windowGroup {
-  std::string source;  ///< strumien zrodlowy (nazwa fizyczna po ekspansji generatorow)
-  int firstSlot = 0;   ///< pierwszy slot plaski pola w rekordzie zrodla
-  int slotCount = 1;   ///< liczba slotow plaskich pola (1 dla skalara, N dla `T[N]`)
-  int width     = 0;   ///< szerokosc okna w REKORDACH
+  std::string source;                      ///< strumien zrodlowy (nazwa fizyczna po ekspansji generatorow)
+  int slot  = 0;                           ///< slot plaski pola w rekordzie zrodla; nieuzywany, gdy `program` niepusty
+  int width = 0;                           ///< szerokosc okna w REKORDACH
+  std::list<token> program;                ///< rachunek wartosci rekordu; pusty = goly odczyt slotu
+  rdb::descFld valueType = rdb::RATIONAL;  ///< typ wartosci wchodzacych do redukcji
 
   bool sameAs(const windowGroup &other) const {
-    return source == other.source && firstSlot == other.firstSlot && slotCount == other.slotCount && width == other.width;
+    if (source != other.source || width != other.width || valueType != other.valueType) return false;
+    if (program.empty() != other.program.empty()) return false;
+    if (program.empty()) return slot == other.slot;
+    return std::ranges::equal(program, other.program, [](const token &a, const token &b) {
+      return a.getCommandID() == b.getCommandID() && a.getVT() == b.getVT();
+    });
   }
 };
 

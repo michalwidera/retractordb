@@ -3,6 +3,11 @@ open sliding
 descc
 list 6
 
+echo SPELLING
+open spelling
+descc
+list 6
+
 echo SHIFTED
 open shifted
 descc
@@ -12,6 +17,41 @@ echo SINGLE
 open single
 descc
 list 7
+
+echo REF_ELEM
+open ref_elem
+descc
+list 7
+
+echo ELEM2
+open elem2
+descc
+list 5
+
+echo EXPR
+open expr
+descc
+list 5
+
+echo EXPR1
+open expr1
+descc
+list 6
+
+echo COMPOSED
+open composed
+descc
+list 6
+
+echo NULLFIX
+open nullfix
+descc
+list 5
+
+echo NULLWIN
+open nullwin
+descc
+list 5
 
 echo REF_SINGLE
 open ref_single

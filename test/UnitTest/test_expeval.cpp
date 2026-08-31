@@ -369,6 +369,24 @@ TEST(xExpressionEval, zero_divided_by_value_stays_a_value) {
   EXPECT_EQ(std::get<int>(result), 0);
 }
 
+// Regula jest GLOBALNA, nie calkowitoliczbowa: `operator/` rozstrzyga zerowy dzielnik PRZED
+// rozgalezieniem po typach, wiec float i double nie daja inf, a rational nie rzuca wyjatkiem.
+// To jest ten przypadek, ktory bez testu cicho wrocilby do semantyki IEEE.
+TEST(xExpressionEval, divide_by_zero_yields_null_for_every_numeric_type) {
+  const std::vector<rdb::descFldVT> zeros{
+      rdb::descFldVT{static_cast<uint8_t>(0)}, rdb::descFldVT{0}, rdb::descFldVT{0U}, rdb::descFldVT{0.0F}, rdb::descFldVT{0.0},
+      rdb::descFldVT{boost::rational<int>(0)}};
+  for (const auto &zero : zeros) {
+    std::list<token> program;
+    program.emplace_back(PUSH_VAL, 7);
+    program.emplace_back(PUSH_VAL, zero);
+    program.emplace_back(DIVIDE);
+
+    expressionEvaluator test;
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program))) << "divisor variant index " << zero.index();
+  }
+}
+
 TEST(xExpressionEval, malformed_stack_throws) {
   std::list<token> program;
   program.emplace_back(ADD);
@@ -1261,6 +1279,35 @@ TEST(xExpressionEval, isnull_returns_0_for_non_null) {
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
+}
+
+// null2zero zamienia wartosc POCHLANIAJACA na zero: dziure w danych, dzielenie przez zero
+// albo okno bez ani jednej wartosci. Ogona strumienia nie dotyczy — tam nie ma rekordu,
+// wiec nie ma czego zamieniac (patrz query::startupLatency).
+TEST(xExpressionEval, null2zero_replaces_null_with_zero) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
+  program.emplace_back(CALL, std::string("null2zero"));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 0);
+}
+
+// Wartosc nie-NULL przechodzi BEZ ZMIANY — takze co do typu, zeby zawiniecie pola nie
+// przycinalo wyniku okna z RATIONAL do liczby calkowitej.
+TEST(xExpressionEval, null2zero_passes_a_value_through_unchanged) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, boost::rational<int>(7, 2));
+  program.emplace_back(CALL, std::string("null2zero"));
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<boost::rational<int>>(result));
+  EXPECT_EQ(std::get<boost::rational<int>>(result), boost::rational<int>(7, 2));
 }
 
 // --- string comparison operators (CMP_NOT_EQUAL, CMP_LT, CMP_GT, CMP_LE, CMP_GE) ---

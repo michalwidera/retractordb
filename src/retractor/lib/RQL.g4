@@ -236,11 +236,17 @@ stream_fn_call      : ( MIN
                     ) '(' stream_expression ')'
                     ;
 
-// Agregat okna REKORDOWEGO w liscie SELECT: `MIN(cells : 10)`.
+// Agregat okna REKORDOWEGO w liscie SELECT: `MIN(cells[0] : 10)`.
 //
-// Redukuje pole `cells` po 10 kolejnych REKORDACH zrodla, wydajac wynik co rekord — okno
-// jest PRZESUWNE i innym byc nie moze. Pole tablicowe `INTEGER[24]` przy szerokosci 10
-// redukuje 240 wartosci: szerokosc liczy REKORDY, nie elementy plaskie.
+// Drugi argument liczy HISTORYCZNE WIERSZE: okno redukuje DOKLADNIE tyle wartosci, po jednej
+// z kazdego z 10 kolejnych rekordow zrodla, i wydaje wynik co rekord — jest PRZESUWNE i innym
+// byc nie moze. Redukcja idzie wiec wylacznie po CZASIE.
+//
+// Do 2026-08-31 argumentem mogla byc cala tablica i wtedy `MIN(cells : 10)` nad `INTEGER[24]`
+// redukowalo 240 wartosci, mieszajac czas z 24 ROWNOLEGLYMI kanalami jednego rekordu. Nazwa
+// tablicy nie jest nazwa pola — polami sa jej elementy `cells[0]`, `cells[1]`, ... — wiec
+// argumentem jest element. Redukcja po kanalach jednego rekordu ma wlasny zapis po stronie
+// FROM (`FROM MIN(strumien)`) i pozostaje bez zmian.
 //
 // KROKU TU NIE MA i miec nie moze. Do 2026-08-31 regula przyjmowala trzeci czlon
 // `MIN(cells : 10 : 10)`, ktory wydawal wynik co 10 rekordow, mnozac przez 10 interwal
@@ -259,9 +265,15 @@ stream_fn_call      : ( MIN
 // SLL opisana przy tej regule zamienilaby `MIN(a, 10)` w `MIN(a)` plus smiec `10`. Ten sam
 // powod i ten sam znak co w `to_string(expr : N)`.
 //
-// Argumentem jest `field_id`, a NIE wyrazenie. Okno czyta wartosci zapamietane w historii
-// zrodla; przeliczanie wyrazenia nad rekordami historycznymi wymagaloby ewaluatora o innym
-// cyklu zycia niz obecny (tworzony od nowa dla kazdego pola, widzi tylko biezacy payload).
+// Argumentem jest WYRAZENIE, nie samo odwolanie do pola: `MIN(a[0]*10 - a[1] : 3)` jest
+// legalne. Wyrazenie liczy sie osobno dla KAZDEGO rekordu okna, na jego wlasnym payloadzie,
+// wiec do redukcji wchodzi po jednej wartosci na rekord — tak samo jak przy golym polu.
+// Wszystkie odwolania w wyrazeniu musza siegac po JEDEN strumien: okno czyta historie
+// jednego zrodla i innej nie ma skad wziac. Kompilator odrzuca tez okno w oknie oraz
+// wyrazenie, ktore nie czyta zadnego pola albo daje napis.
+//
+// Podwyrazenie WYCHODZI z programu pola w compiler::resolveWindowAggregates() i laduje
+// w tabeli grup okna, czyli PRZED przebiegami upraszczajacymi — stale w nim nie sa zwijane.
 //
 // Alternatywa stoi w `term` PRZED `agregator`, bo `agregator` to sam token MIN i pasuje do
 // prefiksu. ANTLR poradzilby sobie predykcja adaptacyjna, ale kolejnosc jest darmowa.
@@ -269,7 +281,7 @@ window_agg          : ( MIN
                     | MAX
                     | AVG
                     | SUMC
-                    ) '(' field_id COLON width=DECIMAL ')'
+                    ) '(' expression_factor COLON width=DECIMAL ')'
                     ;
 
 // Wywolanie funkcji skalarnej. Nazwa jest zwyklym ID, a NIE lista literalow: lista

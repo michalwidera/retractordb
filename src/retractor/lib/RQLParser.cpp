@@ -143,12 +143,25 @@ class ParserListener : public RQLBaseListener {
   /// `$` uzyte poza generatorem.
   void exitExpGenIndex(RQLParser::ExpGenIndexContext *ctx) override { recpToken(PUSH_GENIDX); }
 
-  /// `MIN(cells : 10)` — agregat okna REKORDOWEGO w liscie SELECT.
+  /// Poczatki podprogramow argumentow okna — pozycja w `program` w chwili wejscia w regule.
   ///
-  /// Wystawia DWA tokeny: odwolanie do pola doklada juz podregula `field_id` (PUSH_ID3 /
-  /// PUSH_ID1 / PUSH_ID2 — ten sam token co przy zwyklym odczycie pola), a ten listener
-  /// dopisuje operator z szerokoscia okna. compiler::resolveWindowAggregates() scala oba
-  /// w jeden bezargumentowy token, w ktorym szerokosc ustepuje indeksowi grupy okna.
+  /// Stos, a nie pojedyncza zmienna, bo gramatyka dopuszcza `MIN(MAX(a[0]:2):3)`: znacznik
+  /// wewnetrznego okna musi zdjac sie przed zewnetrznym. Samo zagniezdzenie odrzuca dopiero
+  /// kompilator, ktory jako jedyny widzi, ze historia zrodla nie zawiera wynikow okna.
+  ///
+  /// Znaczniki sa wazne w obrebie JEDNEGO wyrazenia — `program` czysci exitExpression().
+  std::vector<size_t> windowArgMarks;
+
+  void enterWindow_agg(RQLParser::Window_aggContext *ctx) override { windowArgMarks.push_back(program.size()); }
+
+  /// `MIN(cells[0] : 10)` — agregat okna REKORDOWEGO w liscie SELECT.
+  ///
+  /// Argument jest WYRAZENIEM, wiec jego tokeny doklada juz podregula `expression_factor`;
+  /// ten listener dopisuje operator, ktory niesie DWIE liczby: szerokosc okna i pozycje
+  /// pierwszego tokenu argumentu. Bez tej drugiej nie da sie odroznic argumentu od tego, co
+  /// stalo w programie wczesniej — `x + MIN(y[0]:2)` i `MIN(x+y[0]:2)` roznia sie wylacznie
+  /// nia. compiler::resolveWindowAggregates() zabiera oba i zostawia jeden bezargumentowy
+  /// token z indeksem grupy okna.
   ///
   /// Okno jest zawsze PRZESUWNE co rekord — powod przy regule `window_agg` w RQL.g4.
   /// Szerokosc NIE jest tu sprawdzana: listener parsera nie ma lagodnego kanalu bledu
@@ -156,16 +169,20 @@ class ParserListener : public RQLBaseListener {
   /// raportuje przez `Check result:` razem z pozostalymi kontrolami.
   void exitWindow_agg(RQLParser::Window_aggContext *ctx) override {
     const int width = std::stoi(ctx->width->getText());
+    if (windowArgMarks.empty()) FatalError("RQLParser::exitWindow_agg: no argument mark for '{}'", ctx->getText());
+    const auto argStart = static_cast<int>(windowArgMarks.back());
+    windowArgMarks.pop_back();
+    const auto shape = std::make_pair(width, argStart);
 
     const auto name = lowercased(ctx->children[0]->getText());
     if (name == "min")
-      recpToken(WINDOW_MIN, width);
+      recpToken(WINDOW_MIN, shape);
     else if (name == "max")
-      recpToken(WINDOW_MAX, width);
+      recpToken(WINDOW_MAX, shape);
     else if (name == "avg")
-      recpToken(WINDOW_AVG, width);
+      recpToken(WINDOW_AVG, shape);
     else if (name == "sumc")
-      recpToken(WINDOW_SUM, width);
+      recpToken(WINDOW_SUM, shape);
     else
       FatalError("RQLParser::exitWindow_agg: unknown aggregate '{}'", ctx->children[0]->getText());
   }

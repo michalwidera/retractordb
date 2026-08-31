@@ -1,27 +1,88 @@
  SLIDING
 { RATIONAL sliding_0 RATIONAL sliding_1 RATIONAL sliding_2 RATIONAL sliding_3 }
-{ sliding_0:1/1 sliding_1:9/1 sliding_2:29/1 sliding_3:29/6 }
-{ sliding_0:2/1 sliding_1:8/1 sliding_2:30/1 sliding_3:5/1 }
-{ sliding_0:1/1 sliding_1:7/1 sliding_2:24/1 sliding_3:4/1 }
-{ sliding_0:1/1 sliding_1:9/1 sliding_2:29/1 sliding_3:29/6 }
-{ sliding_0:1/1 sliding_1:9/1 sliding_2:32/1 sliding_3:16/3 }
-{ sliding_0:1/1 sliding_1:7/1 sliding_2:24/1 sliding_3:4/1 }
+{ sliding_0:2/1 sliding_1:5/1 sliding_2:7/1 sliding_3:7/2 }
+{ sliding_0:2/1 sliding_1:7/1 sliding_2:9/1 sliding_3:9/2 }
+{ sliding_0:1/1 sliding_1:7/1 sliding_2:8/1 sliding_3:4/1 }
+{ sliding_0:1/1 sliding_1:9/1 sliding_2:10/1 sliding_3:5/1 }
+{ sliding_0:3/1 sliding_1:9/1 sliding_2:12/1 sliding_3:6/1 }
+{ sliding_0:3/1 sliding_1:6/1 sliding_2:9/1 sliding_3:9/2 }
+ SPELLING
+{ RATIONAL spelling_0 RATIONAL spelling_1 RATIONAL spelling_2 }
+{ spelling_0:2/1 spelling_1:2/1 spelling_2:2/1 }
+{ spelling_0:2/1 spelling_1:2/1 spelling_2:2/1 }
+{ spelling_0:1/1 spelling_1:1/1 spelling_2:1/1 }
+{ spelling_0:1/1 spelling_1:1/1 spelling_2:1/1 }
+{ spelling_0:3/1 spelling_1:3/1 spelling_2:3/1 }
+{ spelling_0:3/1 spelling_1:3/1 spelling_2:3/1 }
  SHIFTED
 { RATIONAL sliding_0 RATIONAL sliding_1 RATIONAL sliding_2 RATIONAL sliding_3 }
-{ sliding_0:1/1 sliding_1:9/1 sliding_2:29/1 sliding_3:29/6 }
-{ sliding_0:2/1 sliding_1:8/1 sliding_2:30/1 sliding_3:5/1 }
-{ sliding_0:1/1 sliding_1:7/1 sliding_2:24/1 sliding_3:4/1 }
-{ sliding_0:1/1 sliding_1:9/1 sliding_2:29/1 sliding_3:29/6 }
-{ sliding_0:1/1 sliding_1:9/1 sliding_2:32/1 sliding_3:16/3 }
+{ sliding_0:2/1 sliding_1:5/1 sliding_2:7/1 sliding_3:7/2 }
+{ sliding_0:2/1 sliding_1:7/1 sliding_2:9/1 sliding_3:9/2 }
+{ sliding_0:1/1 sliding_1:7/1 sliding_2:8/1 sliding_3:4/1 }
+{ sliding_0:1/1 sliding_1:9/1 sliding_2:10/1 sliding_3:5/1 }
+{ sliding_0:3/1 sliding_1:9/1 sliding_2:12/1 sliding_3:6/1 }
  SINGLE
 { RATIONAL single_0 RATIONAL single_1 }
-{ single_0:1/1 single_1:15/1 }
-{ single_0:2/1 single_1:14/1 }
-{ single_0:3/1 single_1:16/1 }
-{ single_0:1/1 single_1:8/1 }
-{ single_0:4/1 single_1:21/1 }
-{ single_0:1/1 single_1:11/1 }
-{ single_0:2/1 single_1:13/1 }
+{ single_0:1/1 single_1:1/1 }
+{ single_0:8/1 single_1:8/1 }
+{ single_0:3/1 single_1:3/1 }
+{ single_0:5/1 single_1:5/1 }
+{ single_0:4/1 single_1:4/1 }
+{ single_0:7/1 single_1:7/1 }
+{ single_0:2/1 single_1:2/1 }
+ REF_ELEM
+{ INTEGER ref_elem_0 }
+{ ref_elem_0:1 }
+{ ref_elem_0:8 }
+{ ref_elem_0:3 }
+{ ref_elem_0:5 }
+{ ref_elem_0:4 }
+{ ref_elem_0:7 }
+{ ref_elem_0:2 }
+ ELEM2
+{ RATIONAL elem2_0 }
+{ elem2_0:9/1 }
+{ elem2_0:6/1 }
+{ elem2_0:8/1 }
+{ elem2_0:8/1 }
+{ elem2_0:8/1 }
+ EXPR
+{ RATIONAL expr_0 RATIONAL expr_1 }
+{ expr_0:12/1 expr_1:11/1 }
+{ expr_0:5/1 expr_1:22/3 }
+{ expr_0:5/1 expr_1:11/1 }
+{ expr_0:23/1 expr_1:8/1 }
+{ expr_0:23/1 expr_1:32/3 }
+ EXPR1
+{ RATIONAL expr1_0 }
+{ expr1_0:2/1 }
+{ expr1_0:2/1 }
+{ expr1_0:1/1 }
+{ expr1_0:1/1 }
+{ expr1_0:3/1 }
+{ expr1_0:3/1 }
+ COMPOSED
+{ RATIONAL composed_0 RATIONAL composed_1 RATIONAL composed_2 }
+{ composed_0:4/1 composed_1:10/1 composed_2:7/1 }
+{ composed_0:4/1 composed_1:10/1 composed_2:7/1 }
+{ composed_0:2/1 composed_1:6/1 composed_2:4/1 }
+{ composed_0:2/1 composed_1:6/1 composed_2:4/1 }
+{ composed_0:6/1 composed_1:10/1 composed_2:10/1 }
+{ composed_0:6/1 composed_1:10/1 composed_2:10/1 }
+ NULLFIX
+{ INTEGER nullfix_0 INTEGER nullfix_1 }
+{ nullfix_0:null nullfix_1:0 }
+{ nullfix_0:null nullfix_1:0 }
+{ nullfix_0:null nullfix_1:0 }
+{ nullfix_0:null nullfix_1:0 }
+{ nullfix_0:null nullfix_1:0 }
+ NULLWIN
+{ RATIONAL nullwin_0 RATIONAL nullwin_1 }
+{ nullwin_0:null nullwin_1:0/1 }
+{ nullwin_0:null nullwin_1:0/1 }
+{ nullwin_0:null nullwin_1:0/1 }
+{ nullwin_0:null nullwin_1:0/1 }
+{ nullwin_0:null nullwin_1:0/1 }
  REF_SINGLE
 { RATIONAL min }
 { min:1/1 }
@@ -41,12 +102,12 @@
 { sum:11/1 }
 { sum:13/1 }
  SCALAR3
-{ RATIONAL scalar3_0 RATIONAL scalar3_1 }
-{ scalar3_0:100/1 scalar3_1:600/1 }
-{ scalar3_0:200/1 scalar3_1:900/1 }
-{ scalar3_0:300/1 scalar3_1:1200/1 }
-{ scalar3_0:400/1 scalar3_1:1500/1 }
-{ scalar3_0:500/1 scalar3_1:1800/1 }
+{ RATIONAL scalar3_0 RATIONAL scalar3_1 RATIONAL scalar3_2 }
+{ scalar3_0:100/1 scalar3_1:600/1 scalar3_2:100/1 }
+{ scalar3_0:200/1 scalar3_1:900/1 scalar3_2:200/1 }
+{ scalar3_0:300/1 scalar3_1:1200/1 scalar3_2:300/1 }
+{ scalar3_0:400/1 scalar3_1:1500/1 scalar3_2:400/1 }
+{ scalar3_0:500/1 scalar3_1:1800/1 scalar3_2:500/1 }
  DERIVED3
 { RATIONAL derived3_0 RATIONAL derived3_1 }
 { derived3_0:1000/1 derived3_1:6000/1 }

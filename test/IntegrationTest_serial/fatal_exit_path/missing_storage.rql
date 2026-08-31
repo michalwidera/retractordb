@@ -2,4 +2,4 @@
 STORAGE 'nosuchdir'
 SUBSTRAT 'memory'
 DECLARE a INTEGER[3] STREAM src, 1 FILE 'data.txt'
-SELECT MIN(a : 2) STREAM w FROM src
+SELECT MIN(a[0] : 2) STREAM w FROM src

@@ -48,7 +48,7 @@ struct RqlFunction {
 /// UWAGA na przyszly `min(a, b)`: `MIN`, `MAX`, `AVG` i `SUMC` sa tokenami leksera
 /// stojacymi PRZED `ID` (reduktory strumieniowe), wiec `min` nigdy nie zaleksuje sie
 /// jako nazwa funkcji skalarnej. Skalarne minimum bedzie musialo nazywac sie inaczej.
-inline constexpr std::array<RqlFunction, 19> kRqlFunctions{{
+inline constexpr std::array<RqlFunction, 20> kRqlFunctions{{
     {"Sqrt", 1, 1},        //
     {"Ceil", 1, 1},        //
     {"Floor", 1, 1},       //
@@ -61,6 +61,7 @@ inline constexpr std::array<RqlFunction, 19> kRqlFunctions{{
     {"log", 1, 1},         //
     {"log2", 1, 1},        //
     {"isnull", 1, 1},      //
+    {"null2zero", 1, 1},   // NULL -> 0; wartosc nie-NULL przechodzi bez zmian
     {"IsZero", 1, 1},      //
     {"IsNonZero", 1, 1},   //
     {"Length", 1, 1},      // WYLACZNIE nad napisem — argument liczbowy jest bledem wykonania

@@ -1,10 +1,11 @@
-# Agregat okna rekordowego w liscie SELECT: AGG(pole : szerokosc).
+# Agregat okna rekordowego w liscie SELECT: AGG(pole : liczba_wierszy).
 #
-# Szerokosc liczy REKORDY, wiec pole tablicowe redukuje szerokosc*N wartosci.
+# Drugi argument liczy HISTORYCZNE WIERSZE, a okno bierze jedno pole, wiec
+# redukuje dokladnie tyle wartosci: po jednej z rekordu, wstecz w czasie.
 # Wzorzec jest policzony recznie: porownanie z inna konstrukcja silnika
 # sprawdzaloby zgodnosc dwoch implementacji, a nie zgodnosc z definicja. Jedyny
-# wyjatek jest tozsamoscia — MIN(a:1) kontra FROM MIN(src) — i wlasnie dlatego
-# nadaje sie na kotwice.
+# wyjatek jest tozsamoscia — MIN(a[1]:1) kontra odczyt a[1] wprost — i wlasnie
+# dlatego nadaje sie na kotwice.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")

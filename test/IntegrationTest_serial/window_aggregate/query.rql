@@ -1,14 +1,18 @@
-# Agregat okna REKORDOWEGO w liscie SELECT: AGG(pole : szerokosc).
+# Agregat okna REKORDOWEGO w liscie SELECT: AGG(pole : liczba_wierszy).
 #
-# Szerokosc liczy REKORDY, nie elementy plaskie, wiec pole `INTEGER[3]` przy szerokosci 2
-# redukuje 6 wartosci. Okno jest PRZESUWNE i stemplowane koncem: rekord wyjsciowy n obejmuje
-# rekordy zrodla n-(szerokosc-1) ... n, a interwal wyjscia jest ROWNY interwalowi zrodla —
-# lista SELECT nie rusza osi czasu, kazda zmiana taktu nalezy do klauzuli FROM.
+# Okno redukuje DOKLADNIE tyle wartosci, ile wynosi drugi argument — po jednej z kazdego
+# kolejnego rekordu. Idzie wiec wylacznie po CZASIE. Okno jest PRZESUWNE i stemplowane
+# koncem: rekord wyjsciowy n obejmuje rekordy zrodla n-(W-1) ... n, a interwal wyjscia jest
+# ROWNY interwalowi zrodla — lista SELECT nie rusza osi czasu, kazda zmiana taktu nalezy do
+# klauzuli FROM.
+#
+# Argumentem jest POLE. Nazwa tablicy nim nie jest: `DECLARE a INTEGER[3]` deklaruje trzy
+# pola `a[0]`, `a[1]`, `a[2]`, a `a` nazywa caly wpis, wiec `MIN(a : 2)` jest bledem.
+# Redukcja po elementach JEDNEGO rekordu jest osobna konstrukcja i mieszka po stronie FROM
+# (`FROM MIN(src)`) — obie stoja nizej obok siebie wlasnie po to, zeby bylo widac roznice.
 #
 # Wartosci oczekiwane sa policzone RECZNIE w pattern.txt, a nie porownane z inna
-# konstrukcja silnika — poza jednym przypadkiem, ktory jest tozsamoscia i dlatego
-# nadaje sie na kotwice: MIN(a:1) redukuje pola biezacego rekordu, czyli dokladnie
-# to samo co reduktor strumieniowy FROM MIN(src).
+# konstrukcja silnika.
 STORAGE 'temp'
 SUBSTRAT 'memory'
 
@@ -17,23 +21,64 @@ DECLARE c INTEGER STREAM sc, 1 FILE 'scalar.txt'
 
 # Cztery agregaty jednego ksztaltu: jedna grupa, jedno przejscie po oknie. Liczba rekordow
 # pilnuje przy okazji interwalu — okno o szerokosci 2 wydaje wynik co rekord zrodla, wiec
-# przy `-m 8` powstaje ich szesc, a nie trzy.
-SELECT MIN(a : 2), MAX(a : 2), SUMC(a : 2), AVG(a : 2) STREAM sliding FROM src
+# przy `-m 8` powstaje ich siedem, a nie cztery.
+SELECT MIN(a[0] : 2), MAX(a[0] : 2), SUMC(a[0] : 2), AVG(a[0] : 2) STREAM sliding FROM src
+
+# Trzy zapisy TEGO SAMEGO okna. `a[0]` nazywa pole, `src[0]` slot rekordu zrodla, a
+# `spelling[0]` slot payloadu WEJSCIOWEGO tego zapytania — po stronie okna wszystkie trzy
+# musza znaczyc jedno i to samo, wiec kolumny sa rowne wiersz w wiersz i rowne SLIDING_0.
+# Do 2026-08-31 trzecia z nich zakladala osobna grupe nad strumieniem `spelling`, czyli
+# czytala wyjscie, ktore wlasnie liczy.
+SELECT MIN(a[0] : 2), MIN(src[0] : 2), MIN(spelling[0] : 2) STREAM spelling FROM src
 
 # Kopia strumienia z oknem. Schemat wezla pochodnego materializuje sie ZANIM ustali sie typ
 # wyniku okna, wiec bez przebiegu propagateCopiedFieldShapes() to pole nosiloby domyslny
-# INTEGER parsera i przycinaloby RATIONAL po cichu: 29/6 wychodzilo jako 4.
+# INTEGER parsera i przycinaloby RATIONAL po cichu: 7/2 wychodzilo jako 3.
 SELECT * STREAM shifted FROM sliding>1
 
-# Szerokosc 1: redukcja pol JEDNEGO rekordu.
-SELECT MIN(a : 1), SUMC(a : 1) STREAM single FROM src
+# Szerokosc 1: okno obejmuje sam rekord biezacy, wiec MIN i SUMC musza dac wartosc pola.
+SELECT MIN(a[1] : 1), SUMC(a[1] : 1) STREAM single FROM src
 
-# Kotwica metamorficzna dla powyzszego.
+# Kotwica metamorficzna dla powyzszego: to samo pole czytane wprost.
+SELECT a[1] STREAM ref_elem FROM src
+
+# Ostatni element tablicy — okno adresuje slot, wiec musi trafic w a[2], a nie w a[0].
+SELECT MAX(a[2] : 3) STREAM elem2 FROM src
+
+# Argumentem okna jest WYRAZENIE, liczone osobno dla kazdego rekordu okna. Do redukcji
+# wchodzi z rekordu jedna wartosc — tak samo jak przy golym polu.
+SELECT MIN(a[0]*10 - a[1] : 2), AVG(a[0] + a[2] : 3) STREAM expr FROM src
+
+# Kotwica metamorficzna sciezki wyrazeniowej: `a[0] + a[1] - a[1]` to wciaz `a[0]`, wiec ten
+# strumien musi byc co do wartosci rowny pierwszej kolumnie SLIDING.
+#
+# Rachunek jest celowo taki, ktorego NIE zwija exprSimplify: reguly zdejmuja stale neutralne
+# (`x*1`, `x+0`), a nie powtorzone podwyrazenia. Dzieki temu kotwica sprawdza ewaluator w petli
+# po rekordach okna, a nie sciezke golego pola, na ktora `MIN(a[0]*1 : 2)` zostaje zwiniete.
+SELECT MIN(a[0] + a[1] - a[1] : 2) STREAM expr1 FROM src
+
+# Wynik okna jest zwyklym OPERANDEM: wchodzi w dalszy rachunek i pod funkcje skalarne.
+# Po przebiegu resolveWindowAggregates() token okna jest bezargumentowym lisciem programu,
+# wiec dla reszty ewaluatora nie rozni sie od odczytu pola.
+SELECT 2 * MIN(a[0]*1 : 2), MIN(a[0] : 2) + MAX(a[1] : 2), null2zero(MIN(a[0] : 2)) * 3 + 1 STREAM composed FROM src
+
+# NULL POCHLANIAJACY: dzielenie przez zero. null2zero zamienia go na 0. Ogona strumienia
+# ta funkcja nie rusza i ruszyc nie moze — sloty ogona nie sa rekordami.
+SELECT c/(c-c), null2zero(c/(c-c)) STREAM nullfix FROM sc
+
+# Okno, do ktorego nie weszla ANI JEDNA wartosc, daje NULL — a nie zero. Brak wyniku nie jest
+# zerem, tak samo jak ogon nie jest zerem. Dopiero null2zero zamienia go na 0 na zyczenie.
+SELECT MIN(c/(c-c) : 3), null2zero(MIN(c/(c-c) : 3)) STREAM nullwin FROM sc
+
+# Redukcja po ELEMENTACH jednego rekordu — konstrukcja ORTOGONALNA wobec okna. Stoi po
+# stronie FROM i bierze caly strumien, nie pole.
 SELECT * STREAM ref_single FROM MIN(src)
 SELECT * STREAM ref_sum FROM SUMC(src)
 
-# Zrodlo skalarne: slotCount = 1, inna sciezka niz tablica.
-SELECT MIN(c : 3), SUMC(c : 3) STREAM scalar3 FROM sc
+# Zrodlo skalarne: pole nietablicowe, wiec sama nazwa jest jednoznaczna. Zapis przez slot
+# payloadu wejsciowego (`scalar3[0]`) opisuje to samo okno — trzecia kolumna musi byc rowna
+# pierwszej.
+SELECT MIN(c : 3), SUMC(c : 3), MIN(scalar3[0] : 3) STREAM scalar3 FROM sc
 
 # Zrodlo POCHODNE, nie deklarowane: inna galaz rachunku pojemnosci historii
 # (deklaracja wyprzedza konsumenta o rekord uzbrojony i zerowy prefetch, pochodna nie).

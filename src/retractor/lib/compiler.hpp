@@ -55,7 +55,7 @@ struct compiler {
   std::list<field> buildOutputSchema(const std::string &sName1, const std::string &sName2, token &cmd_token);
   [[nodiscard]] std::optional<rdb::rField> sourceFieldAt(const std::string &streamId, int flatIndex) const;
   std::string composeStreamName(const std::string &sName1, const std::string &sName2, const token &cmd);
-  void resolveTokenReferences(std::list<token> &lProgram, query &q);
+  std::string resolveTokenReferences(std::list<token> &lProgram, query &q);
   void snapshotNamedSourceRefs();
 
   // compile chain steps

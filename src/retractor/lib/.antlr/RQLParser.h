@@ -1211,7 +1211,7 @@ public:
     antlr4::Token *width = nullptr;
     Window_aggContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
-    Field_idContext *field_id();
+    Expression_factorContext *expression_factor();
     antlr4::tree::TerminalNode *COLON();
     antlr4::tree::TerminalNode *MIN();
     antlr4::tree::TerminalNode *MAX();

@@ -207,26 +207,20 @@ void fnOp(opType op, const rdb::descFldVT &value, rdb::descFldVT &valueRet) {
 windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const int lastLogicalIndex,
                                                const int sourceIndexBase) const {
   if (group.width <= 0) FatalError("streamInstance::reduceRecordWindow: window width must be > 0, got {}", group.width);
-  if (group.slotCount <= 0)
-    FatalError("streamInstance::reduceRecordWindow: window slot count must be > 0, got {}", group.slotCount);
 
   const auto &source = outputPayload;
 
-  // Typ wyniku bierzemy z POLA okna, nie z najszerszego pola rekordu: okno redukuje jedno
-  // pole, a rekord może mieszać typy. Reguła promocji jest ta sama co dla reduktorów
-  // strumieniowych — patrz reductionResultField() w query.hpp.
-  const auto entryPosition = source->descriptor.flatIndexToDescriptorPosition(group.firstSlot);
-  if (!entryPosition.has_value())
-    FatalError("streamInstance::reduceRecordWindow: flat slot {} outside descriptor of '{}'", group.firstSlot, group.source);
-  const auto &sourceField            = source->descriptor[entryPosition->first];
-  const auto [resultType, resultLen] = reductionResultField(sourceField.rtype, sourceField.rlen);
-
+  // Typ wyniku ustalila KOMPILACJA (windowGroup::valueType): dla golego pola jest to jego typ
+  // przepuszczony przez reductionResultField(), dla wyrazenia — najszerszy typ pol, po ktore
+  // siega. Deskryptor zrodla nie odpowie na to drugie pytanie, bo wyrazenie nie jest polem.
+  const auto resultType = group.valueType;
   if (resultType != rdb::RATIONAL && resultType != rdb::FLOAT && resultType != rdb::DOUBLE) {
     FatalError("streamInstance::reduceRecordWindow: unsupported field type for window aggregation on '{}'", group.source);
   }
 
   cast<rdb::descFldVT> castVT;
   windowStats stats;
+  expressionEvaluator windowEvaluator;
 
   const auto recordsCountSrc = source->getRecordsCount();
 
@@ -239,36 +233,43 @@ windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const i
     const auto reversePosition = recordsCountSrc - static_cast<size_t>(recordIndex) - 1;
     if (!source->revRead(reversePosition)) continue;
 
-    for (int slot = 0; slot < group.slotCount; ++slot) {
-      auto valueOpt = source->getPayload()->getItemVT(group.firstSlot + slot);
-      if (!valueOpt.has_value()) continue;  // NULL jest pomijany, nie zerowany
-
-      rdb::descFldVT value = castVT(valueOpt.value(), resultType);
-      if (stats.count == 0) {
-        stats.minValue = value;
-        stats.maxValue = value;
-        stats.sumValue = value;
-      } else {
-        switch (resultType) {
-          case rdb::RATIONAL:
-            fnOp<boost::rational<int>>(minop, value, stats.minValue);
-            fnOp<boost::rational<int>>(maxop, value, stats.maxValue);
-            fnOp<boost::rational<int>>(sumop, value, stats.sumValue);
-            break;
-          case rdb::FLOAT:
-            fnOp<float>(minop, value, stats.minValue);
-            fnOp<float>(maxop, value, stats.maxValue);
-            fnOp<float>(sumop, value, stats.sumValue);
-            break;
-          default:
-            fnOp<double>(minop, value, stats.minValue);
-            fnOp<double>(maxop, value, stats.maxValue);
-            fnOp<double>(sumop, value, stats.sumValue);
-            break;
-        }
-      }
-      ++stats.count;
+    // JEDNA wartosc z rekordu: okno idzie po czasie, nie po slotach rekordu (patrz windowGroup).
+    // Wyrazenie liczy sie na payloadzie TEGO rekordu — ewaluator dostaje program grupy
+    // i historyczny rekord zrodla, a nie biezacy payload wejsciowy konsumenta.
+    std::optional<rdb::descFldVT> valueOpt;
+    if (group.program.empty()) {
+      valueOpt = source->getPayload()->getItemVT(group.slot);
+    } else {
+      auto computed = windowEvaluator.eval(group.program, source->getPayload());
+      if (!std::holds_alternative<std::monostate>(computed)) valueOpt = std::move(computed);
     }
+    if (!valueOpt.has_value()) continue;  // NULL jest pomijany, nie zerowany
+
+    rdb::descFldVT value = castVT(valueOpt.value(), resultType);
+    if (stats.count == 0) {
+      stats.minValue = value;
+      stats.maxValue = value;
+      stats.sumValue = value;
+    } else {
+      switch (resultType) {
+        case rdb::RATIONAL:
+          fnOp<boost::rational<int>>(minop, value, stats.minValue);
+          fnOp<boost::rational<int>>(maxop, value, stats.maxValue);
+          fnOp<boost::rational<int>>(sumop, value, stats.sumValue);
+          break;
+        case rdb::FLOAT:
+          fnOp<float>(minop, value, stats.minValue);
+          fnOp<float>(maxop, value, stats.maxValue);
+          fnOp<float>(sumop, value, stats.sumValue);
+          break;
+        default:
+          fnOp<double>(minop, value, stats.minValue);
+          fnOp<double>(maxop, value, stats.maxValue);
+          fnOp<double>(sumop, value, stats.sumValue);
+          break;
+      }
+    }
+    ++stats.count;
   }
 
   source->revRead(0);  // Reset source — ten sam porzadek co w constructAgsePayload

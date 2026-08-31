@@ -219,7 +219,7 @@ void rqlParserInitialize() {
   	5,36,0,0,390,392,5,37,0,0,391,387,1,0,0,0,391,388,1,0,0,0,391,389,1,0,
   	0,0,391,390,1,0,0,0,392,51,1,0,0,0,393,394,7,3,0,0,394,395,5,3,0,0,395,
   	396,3,44,22,0,396,397,5,4,0,0,397,53,1,0,0,0,398,399,7,3,0,0,399,400,
-  	5,3,0,0,400,401,3,26,13,0,401,402,5,62,0,0,402,403,5,43,0,0,403,404,5,
+  	5,3,0,0,400,401,3,40,20,0,401,402,5,62,0,0,402,403,5,43,0,0,403,404,5,
   	4,0,0,404,55,1,0,0,0,405,406,5,40,0,0,406,407,5,3,0,0,407,408,3,40,20,
   	0,408,409,5,4,0,0,409,418,1,0,0,0,410,411,5,40,0,0,411,412,5,3,0,0,412,
   	413,3,40,20,0,413,414,5,62,0,0,414,415,5,43,0,0,415,416,5,4,0,0,416,418,
@@ -4463,8 +4463,8 @@ RQLParser::Window_aggContext::Window_aggContext(ParserRuleContext *parent, size_
   : ParserRuleContext(parent, invokingState) {
 }
 
-RQLParser::Field_idContext* RQLParser::Window_aggContext::field_id() {
-  return getRuleContext<RQLParser::Field_idContext>(0);
+RQLParser::Expression_factorContext* RQLParser::Window_aggContext::expression_factor() {
+  return getRuleContext<RQLParser::Expression_factorContext>(0);
 }
 
 tree::TerminalNode* RQLParser::Window_aggContext::COLON() {
@@ -4535,7 +4535,7 @@ RQLParser::Window_aggContext* RQLParser::window_agg() {
     setState(399);
     match(RQLParser::T__2);
     setState(400);
-    field_id();
+    expression_factor(0);
     setState(401);
     match(RQLParser::COLON);
     setState(402);
