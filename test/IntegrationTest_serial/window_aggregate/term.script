@@ -73,4 +73,9 @@ open derived3
 descc
 list 5
 
+echo CASTED
+open casted
+descc
+list 6
+
 quit

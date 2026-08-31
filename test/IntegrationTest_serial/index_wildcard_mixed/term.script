@@ -1,0 +1,21 @@
+echo PRZED
+open przed
+descc
+list 5
+
+echo PO
+open po
+descc
+list 5
+
+echo DWA
+open dwa
+descc
+list 5
+
+echo SAMO
+open samo
+descc
+list 5
+
+quit

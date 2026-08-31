@@ -115,3 +115,11 @@
 { derived3_0:3000/1 derived3_1:12000/1 }
 { derived3_0:4000/1 derived3_1:15000/1 }
 { derived3_0:5000/1 derived3_1:18000/1 }
+ CASTED
+{ INTEGER casted_0 RATIONAL casted_1 }
+{ casted_0:3 casted_1:7/2 }
+{ casted_0:4 casted_1:9/2 }
+{ casted_0:4 casted_1:4/1 }
+{ casted_0:5 casted_1:5/1 }
+{ casted_0:6 casted_1:6/1 }
+{ casted_0:4 casted_1:9/2 }

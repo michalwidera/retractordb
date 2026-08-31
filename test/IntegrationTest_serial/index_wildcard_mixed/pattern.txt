@@ -1,0 +1,28 @@
+ PRZED
+{ INTEGER przed_0 INTEGER przed_1 INTEGER przed_2 }
+{ przed_0:5 przed_1:1 przed_2:10 }
+{ przed_0:2 przed_1:8 przed_2:20 }
+{ przed_0:7 przed_1:3 przed_2:30 }
+{ przed_0:1 przed_1:5 przed_2:40 }
+{ przed_0:9 przed_1:4 przed_2:50 }
+ PO
+{ INTEGER po_0 INTEGER po_1 INTEGER po_2 }
+{ po_0:10 po_1:5 po_2:1 }
+{ po_0:20 po_1:2 po_2:8 }
+{ po_0:30 po_1:7 po_2:3 }
+{ po_0:40 po_1:1 po_2:5 }
+{ po_0:50 po_1:9 po_2:4 }
+ DWA
+{ INTEGER dwa_0 INTEGER dwa_1 INTEGER dwa_2 INTEGER dwa_3 INTEGER dwa_4 }
+{ dwa_0:10 dwa_1:2 dwa_2:10 dwa_3:5 dwa_4:1 }
+{ dwa_0:4 dwa_1:16 dwa_2:20 dwa_3:2 dwa_4:8 }
+{ dwa_0:14 dwa_1:6 dwa_2:30 dwa_3:7 dwa_4:3 }
+{ dwa_0:2 dwa_1:10 dwa_2:40 dwa_3:1 dwa_4:5 }
+{ dwa_0:18 dwa_1:8 dwa_2:50 dwa_3:9 dwa_4:4 }
+ SAMO
+{ INTEGER samo_0 INTEGER samo_1 }
+{ samo_0:5 samo_1:1 }
+{ samo_0:2 samo_1:8 }
+{ samo_0:7 samo_1:3 }
+{ samo_0:1 samo_1:5 }
+{ samo_0:9 samo_1:4 }

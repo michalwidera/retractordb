@@ -1,0 +1,29 @@
+# Dziki indeks `[_]` jako POZYCJA listy SELECT, a nie caly jej ksztalt.
+#
+# `x[_]` rozwija sie w tyle pol, ile slotow wnosi `x` do schematu klauzuli FROM. Pozycje
+# stojace za nim zjezdzaja o tyle, ile ich przybylo — i to jest tresc tego testu, bo
+# rozwiniecie zmienia UKLAD PAYLOADU, a nie tylko liczbe pol w deskryptorze. Sama
+# kompilacja tego nie pokaze.
+#
+# Do 2026-08-31 expandIndexWildcards() zastepowalo dzikim indeksem CALA liste pol i
+# pilnowalo tego zalozenia asercja `lSchema.size() != 1`, wiec kazdy z ponizszych zapisow
+# poza `samo` przerywal proces komunikatem `FATAL: ... requires exactly one schema field`.
+STORAGE 'temp'
+SUBSTRAT 'memory'
+
+DECLARE v INTEGER, w INTEGER STREAM a, 1 FILE 'a.txt'
+DECLARE k INTEGER STREAM b, 1 FILE 'b.txt'
+
+# Rozwiniecie PRZED pozycja zwykla: pole `b.k` ladzuje na slocie 2, a nie 1.
+SELECT a[_], b.k STREAM przed FROM a+b
+
+# Rozwiniecie ZA pozycja zwykla: kolejnosc listy SELECT jest kolejnoscia pol wyjscia.
+SELECT b.k, a[_] STREAM po FROM a+b
+
+# Dwa niezalezne rozwiniecia w jednej liscie, jedno pod rachunkiem. Kazda pozycja liczy
+# swoja szerokosc osobno, wiec wyjscie ma 2 + 1 + 2 = piec pol.
+SELECT a[_] * 2, b.k, a[_] STREAM dwa FROM a+b
+
+# Kotwica: ksztalt JEDNOPOZYCYJNY, jedyny obslugiwany do 2026-08-31. Nazwy pol musza wyjsc
+# takie same jak dawniej, inaczej przenumerowanie zmienialoby `.desc` istniejacych planow.
+SELECT a[_] STREAM samo FROM a

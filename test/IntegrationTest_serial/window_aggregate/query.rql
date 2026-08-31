@@ -84,3 +84,10 @@ SELECT MIN(c : 3), SUMC(c : 3), MIN(scalar3[0] : 3) STREAM scalar3 FROM sc
 # (deklaracja wyprzedza konsumenta o rekord uzbrojony i zerowy prefetch, pochodna nie).
 SELECT c * 10 STREAM scaled FROM sc
 SELECT MIN(scaled_0 : 3), SUMC(scaled_0 : 3) STREAM derived3 FROM scaled
+
+# `to_integer` nad oknem jest tak samo jawnym wyborem typu jak `to_double`, ale parser go
+# w typie pola NIE zapisuje: `to_integer` zostawia domyslny INTEGER, czyli ten sam sentinel,
+# ktory znaczy „autor nic nie powiedzial". Do 2026-08-31 resolveWindowAggregates() nadpisywalo
+# go typem redukcji, wiec pole szlo do artefaktu jako RATIONAL wbrew wywolaniu stojacemu w
+# jego wlasnym programie. Druga kolumna jest kotwica: bez rzutowania typ nadal ma byc RATIONAL.
+SELECT to_integer(AVG(a[0] : 2)), AVG(a[0] : 2) STREAM casted FROM src

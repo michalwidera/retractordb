@@ -942,6 +942,70 @@ TEST(xcompiler, sum_allows_constituent_index_wildcards) {
   EXPECT_NE(offsets[0], offsets[1]) << "suma zgubila tozsamosc przy A[_]";
 }
 
+// Dziki indeks jest POZYCJA listy SELECT, a nie calym jej ksztaltem: rozwija sie w miejscu,
+// a pozycje stojace za nim zjezdzaja o tyle slotow, ile ich przybylo.
+//
+// Do 2026-08-31 expandIndexWildcards() zastepowalo `[_]`-em CALA liste pol i pilnowalo tego
+// zalozenia asercja `lSchema.size() != 1`, wiec `SELECT x[_], y.k` przerywalo proces
+// (`FATAL: ... requires exactly one schema field, got 2`) zamiast sie skompilowac.
+TEST(xcompiler, index_wildcard_expands_in_place_beside_other_select_items) {
+  auto slotsOf = [](const query &q) {
+    std::vector<int> slots;
+    for (const auto &f : q.lSchema)
+      for (const auto &t : f.lProgram)
+        if (t.getCommandID() == PUSH_ID) slots.push_back(std::get<std::pair<std::string, int>>(t.getVT()).second);
+    return slots;
+  };
+  auto namesOf = [](const query &q) {
+    std::vector<std::string> names;
+    for (const auto &f : q.lSchema)
+      names.push_back(f.field_.rname);
+    return names;
+  };
+
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER, w INTEGER STREAM a, 1/100 FILE 'a.txt'
+        DECLARE k INTEGER STREAM b, 1/100 FILE 'b.txt'
+        SELECT a[_], b.k STREAM przed FROM a+b
+        SELECT b.k, a[_] STREAM po FROM a+b
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  // Rozwiniecie dwoch pol `a` plus jedno pole `b` — i w tej kolejnosci, w jakiej stoja w SELECT.
+  EXPECT_EQ(slotsOf(instance.getQuery("przed")), (std::vector<int>{0, 1, 2}));
+  EXPECT_EQ(slotsOf(instance.getQuery("po")), (std::vector<int>{2, 0, 1}));
+
+  // Nazwy sa przenumerowane po POZYCJI w rozwinietej liscie, bo rozwiniecie przesuwa reszte.
+  EXPECT_EQ(namesOf(instance.getQuery("przed")), (std::vector<std::string>{"przed_0", "przed_1", "przed_2"}));
+  EXPECT_EQ(namesOf(instance.getQuery("po")), (std::vector<std::string>{"po_0", "po_1", "po_2"}));
+}
+
+// Straz przy deskryptorze: dla listy JEDNOPOZYCYJNEJ — jedynego ksztaltu, ktory ten przebieg
+// obslugiwal do 2026-08-31 — nazwy pol musza wyjsc dokladnie takie jak dawniej, inaczej
+// przenumerowanie zmienialoby `.desc` istniejacych planow.
+TEST(xcompiler, sole_index_wildcard_keeps_its_historical_field_names) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER, w INTEGER STREAM a, 1/100 FILE 'a.txt'
+        SELECT a[_] STREAM samo FROM a
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  const auto &schema = instance.getQuery("samo").lSchema;
+  ASSERT_EQ(schema.size(), 2u);
+  EXPECT_EQ(schema.front().field_.rname, "samo_0");
+  EXPECT_EQ(schema.back().field_.rname, "samo_1");
+}
+
 TEST(xcompiler, interleave_constituent_qualified_wildcard_is_rejected) {
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
@@ -1875,6 +1939,34 @@ TEST(xcompiler, rejects_negative_generated_field_index) {
   EXPECT_NE(verdict.find("must not be negative"), std::string::npos) << verdict;
 }
 
+/// Rodzina nie przezywa ekspansji: po expandStreamGenerators() istnieja tylko instancje
+/// `cell$0`, `cell$1`, ... `cell[k]` na LISCIE POL znaczy wiec „slot k strumienia cell", tak
+/// samo jak wszedzie indziej, i zadnej instancji nie wskazuje — indeksem rodziny `[]` jest
+/// wylacznie w klauzuli FROM. Instancja jest osiagalna wlasna nazwa (`$` jest zwyklym znakiem
+/// ID), wiec komunikat ma ja podac; do 2026-08-31 mowil tylko „there is no stream or field",
+/// o strumieniu, ktory autor przed chwila zadeklarowal.
+TEST(xcompiler, family_reference_in_select_list_points_at_the_instance_name) {
+  const std::string verdict = compileRql(R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[$] STREAM cell[4] FROM cells
+        SELECT cell[0] STREAM wynik FROM cell[0]+cell[1]
+      )");
+  EXPECT_NE(verdict, "OK");
+  EXPECT_NE(verdict.find("stream generator family"), std::string::npos) << verdict;
+  EXPECT_NE(verdict.find("cell$0[0]"), std::string::npos) << verdict;
+}
+
+/// Druga polowa tej samej reguly: droga wskazana w komunikacie musi dzialac.
+TEST(xcompiler, family_instance_is_addressable_by_its_physical_name) {
+  auto plan = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[$] STREAM cell[4] FROM cells
+        SELECT cell$0[0] + cell$1[0] STREAM wynik FROM cell[0]+cell[1]
+      )");
+  EXPECT_EQ(plan.getQuery("wynik").lSchema.size(), 1u);
+}
+
 /// Poza szablonem `$` nie ma czego oznaczac.
 TEST(xcompiler, rejects_ordinal_outside_generator) {
   const std::string verdict = compileRql(R"(
@@ -2361,6 +2453,26 @@ TEST(xcompiler, window_aggregate_result_type_follows_the_reduction_rule) {
   EXPECT_EQ(outputField(plan, "dst", 1).rtype, rdb::DOUBLE);
   // Typ narzucony funkcja zewnetrzna zostaje nietkniety.
   EXPECT_EQ(outputField(plan, "dst", 2).rtype, rdb::DOUBLE);
+}
+
+// `to_integer` nad oknem jest tak samo jawnym wyborem typu jak `to_double`, ale parser nie
+// zapisuje go w typie pola: `to_integer` zostawia domyslny INTEGER, czyli ten sam sentinel,
+// ktory znaczy „autor nic nie powiedzial". Do 2026-08-31 resolveWindowAggregates() nadpisywalo
+// go wiec typem redukcji i `to_integer(AVG(a:4))` szlo do artefaktu jako RATIONAL, wbrew
+// wywolaniu stojacemu w programie pola.
+TEST(xcompiler, explicit_to_integer_outranks_the_window_reduction_type) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT to_integer(AVG(a : 4)), AVG(a : 4), to_integer(AVG(a : 4)) + 1 STREAM dst FROM src\n");
+
+  EXPECT_EQ(outputField(plan, "dst", 0).rtype, rdb::INTEGER);
+  // Bez rzutowania typ nadal bierze sie z reguly redukcji.
+  EXPECT_EQ(outputField(plan, "dst", 1).rtype, rdb::RATIONAL);
+  // Granica naprawy: rozstrzyga OSTATNI token programu, wiec rzutowanie schowane pod
+  // arytmetyka nadal przegrywa. To jest reszta pozycji 12 z usecases/requested.md, czyli
+  // ogolne wnioskowanie typow liczbowych, a nie ta zmiana.
+  EXPECT_EQ(outputField(plan, "dst", 2).rtype, rdb::RATIONAL);
 }
 
 // Agregaty o tym samym zrodle, polu i szerokosci dziela JEDNO przejscie po oknie.

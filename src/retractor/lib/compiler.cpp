@@ -842,6 +842,12 @@ std::string compiler::expandSchemaWildcards() {
 }
 
 namespace {
+/// Nazwa fizyczna instancji rodziny — ta sama, ktora trafia na dysk i do `xqry`.
+///
+/// Stoi TUTAJ, a nie przy pozostalych pomocnikach generatora, bo siega po nia takze
+/// resolveFieldReferences(), zeby rozpoznac odwolanie do rodziny po jej wlasnej nazwie.
+std::string instanceName(const std::string &family, int ordinal) { return family + "$" + std::to_string(ordinal); }
+
 /// Nazwy strumieni, po ktore siega program klauzuli FROM danego wezla.
 std::vector<std::string> streamOperandsOf(const query &node) {
   std::vector<std::string> result;
@@ -921,6 +927,9 @@ std::optional<int> compiler::sourceSpanInFrom(query &q, const std::string &name)
 /// nie parę — stąd regex i normalizacja tokenu na miejscu. descriptorStorage() liczy się
 /// wyłącznie z lSchema, więc szerokość źródła jest tu już dostępna.
 std::string compiler::expandIndexWildcards(query &q) {
+  std::list<field> expanded;
+  bool anyWildcard(false);
+
   for (auto &f : q.lSchema) {              // for each field in query
     std::vector<std::string> usedSchemaX;  //
     for (auto &t : f.lProgram) {           // for each token in query field
@@ -933,50 +942,65 @@ std::string compiler::expandIndexWildcards(query &q) {
       t = token(PUSH_IDX, std::make_pair(schema, 0));  // .second arg is always 0
       usedSchemaX.push_back(schema);
     }
-    if (!usedSchemaX.empty()) {
-      int minSizeFlat{std::numeric_limits<int>::max()};
-      for (const auto &schema : usedSchemaX) {
-        const auto span = sourceSpanInFrom(q, schema);
-        if (!span) {
-          SPDLOG_ERROR("Wildcard index '{}[_]' in stream '{}' does not resolve against its FROM clause", schema, q.id);
-          return std::string("Stream '" + q.id + "' uses '" + schema + "[_]', but '" + schema +
-                             "' contributes no contiguous block of fields to its FROM clause. Refer to a stream that "
-                             "stands in FROM, or give the sub-expression a query of its own.");
-        }
-        minSizeFlat = std::min(minSizeFlat, *span);
-      }
 
-      if (minSizeFlat == std::numeric_limits<int>::max()) {
-        FatalError("compiler::expandIndexWildcards: flat size not resolved for query '{}'", q.id);
-      }
-      if (minSizeFlat <= 0) {
-        FatalError("compiler::expandIndexWildcards: flat size must be positive, got {} for query '{}'", minSizeFlat, q.id);
-      }
-      if (q.lSchema.size() != 1) {
-        FatalError("compiler::expandIndexWildcards: PUSH_IDX expansion requires exactly one schema field, got {} for query '{}'",
-                   q.lSchema.size(), q.id);
-      }
+    // Pozycja bez dzikiego indeksu przechodzi nietknieta i NA SWOJE MIEJSCE. Do 2026-08-31
+    // ta petla po napotkaniu `[_]` zastepowala CALA liste pol rozwinieciem pierwszego z nich
+    // i konczyla sie `break`, wiec `x[_]` obok czegokolwiek innego bylo obslugiwane przez
+    // asercje `lSchema.size() != 1`, czyli przerwaniem procesu. Wyrazenie takie jest zwyklym
+    // RQL-em (`SELECT to_integer(sredniej[_]), zrodlo.h1 ...`), a nie stanem nieosiagalnym.
+    if (usedSchemaX.empty()) {
+      expanded.push_back(f);
+      continue;
+    }
+    anyWildcard = true;
 
-      field oldField = *q.lSchema.begin();
-      q.lSchema.clear();
-      for (int i = 0; i < minSizeFlat; i++) {
-        std::list<token> lTempProgram;
-        for (auto &t : oldField.lProgram) {
-          if (t.getCommandID() == PUSH_IDX)
-            lTempProgram.emplace_back(PUSH_ID, std::make_pair(t.getStr_(), i));
-          else
-            lTempProgram.emplace_back(t.getCommandID(), t.getVT());
-        }
-        field newField(rdb::rField(q.id + "_" + lexical_cast<std::string>(i),  //
-                                   oldField.field_.rlen,                       //
-                                   1,                                          // (expanded)
-                                   oldField.field_.rtype),
-                       lTempProgram);
-        q.lSchema.push_back(newField);
+    int minSizeFlat{std::numeric_limits<int>::max()};
+    for (const auto &schema : usedSchemaX) {
+      const auto span = sourceSpanInFrom(q, schema);
+      if (!span) {
+        SPDLOG_ERROR("Wildcard index '{}[_]' in stream '{}' does not resolve against its FROM clause", schema, q.id);
+        return std::string("Stream '" + q.id + "' uses '" + schema + "[_]', but '" + schema +
+                           "' contributes no contiguous block of fields to its FROM clause. Refer to a stream that "
+                           "stands in FROM, or give the sub-expression a query of its own.");
       }
-      break;
+      minSizeFlat = std::min(minSizeFlat, *span);
+    }
+
+    if (minSizeFlat == std::numeric_limits<int>::max()) {
+      FatalError("compiler::expandIndexWildcards: flat size not resolved for query '{}'", q.id);
+    }
+    if (minSizeFlat <= 0) {
+      FatalError("compiler::expandIndexWildcards: flat size must be positive, got {} for query '{}'", minSizeFlat, q.id);
+    }
+
+    for (int i = 0; i < minSizeFlat; i++) {
+      std::list<token> lTempProgram;
+      for (auto &t : f.lProgram) {
+        if (t.getCommandID() == PUSH_IDX)
+          lTempProgram.emplace_back(PUSH_ID, std::make_pair(t.getStr_(), i));
+        else
+          lTempProgram.emplace_back(t.getCommandID(), t.getVT());
+      }
+      expanded.emplace_back(rdb::rField("",               // nazwa po przenumerowaniu, nizej
+                                        f.field_.rlen,    //
+                                        1,                // (expanded)
+                                        f.field_.rtype),  //
+                            lTempProgram);
     }
   }
+
+  if (!anyWildcard) return {"OK"};
+
+  // Przenumerowanie CALEJ listy, bo rozwiniecie przesuwa pozycje pol stojacych za nim.
+  // Konwencja jest ta sama, ktora nadaje nazwy parser (RQLParser::exitSelect: `_N` z
+  // przedrostkiem nazwy strumienia), wiec dla listy jednopozycyjnej — jedynej, ktora ten
+  // przebieg obslugiwal do 2026-08-31 — nazwy wychodza identyczne jak dawniej i zaden
+  // istniejacy `.desc` sie nie zmienia.
+  int position(0);
+  for (auto &f : expanded)
+    f.field_.rname = q.id + "_" + lexical_cast<std::string>(position++);
+  q.lSchema = std::move(expanded);
+
   return {"OK"};
 }
 
@@ -1051,6 +1075,21 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
             namedSourceRefs_[q.id].insert(schema);
             bFieldFound = true;
           }
+          // Rodzina generatora po expandStreamGenerators() nie istnieje juz pod wlasna nazwa —
+          // sa tylko jej instancje `nazwa$0`, `nazwa$1`, ... Zapis `nazwa[k]` na LISCIE POL
+          // znaczy „slot k strumienia nazwa", tak samo jak wszedzie indziej w tym jezyku, wiec
+          // instancji nie wskazuje i wskazywac nie moze; instancje wskazuje `nazwa[k]` wylacznie
+          // w klauzuli FROM, gdzie `[]` jest indeksem rodziny, a nie pola. Rozne znaczenie tego
+          // samego nawiasu w dwoch miejscach jest wlasnoscia jezyka, ale komunikat „nie ma
+          // takiego strumienia" o strumieniu, ktory autor przed chwila zadeklarowal, nie mowil
+          // o tym nic. Nazwa fizyczna jest zwyklym ID (lekser dopuszcza `$`), wiec droga do pola
+          // instancji istnieje i wystarczy ja podac.
+          if (!bFieldFound && coreInstance.exists(instanceName(name, 0)))
+            return "Stream '" + q.id + "' refers to '" + text + "', but '" + name +
+                   "' is a stream generator family, not a stream. '" + name +
+                   "[i]' names an instance only in a FROM clause. In a SELECT list use the instance's own name, for "
+                   "example '" +
+                   instanceName(name, 0) + "[0]'.";
           if (!bFieldFound)
             return "Stream '" + q.id + "' refers to '" + text + "', but there is no stream or field '" + name + "'";
         } else {
@@ -2508,11 +2547,23 @@ std::string compiler::resolveWindowAggregates() {
 
       if (fieldHasWindow) f.lProgram.assign(prog.begin(), prog.end());
 
+      // `to_integer(MIN(x:10))` jest tak samo jawnym wyborem typu jak `to_double(...)`, ale
+      // rozpoznac go po SAMYM typie pola nie sposob: RQLParser::exitExpression zapisuje typ
+      // wprost wylacznie dla `to_float`, `to_double` i `to_string`, a `to_integer` zostawia
+      // domyslny INTEGER, czyli dokladnie ten sentinel, ktory znaczy „autor nic nie powiedzial".
+      // Do 2026-08-31 pole wychodzilo stad jako RATIONAL wbrew wywolaniu stojacemu w programie
+      // i `to_integer(AVG(t:12))` trafialo do artefaktu jako RATIONAL. Rozstrzyga wiec ostatni
+      // token programu, a nie typ. Ogolnego wnioskowania typow liczbowych to nie zastepuje —
+      // `to_integer(MIN(x:10))+1` nadal wraca do reguly ponizej (pozycja 12 w requested.md).
+      const bool explicitIntegerCast(!f.lProgram.empty() &&                       //
+                                     f.lProgram.back().getCommandID() == CALL &&  //
+                                     f.lProgram.back().getStr_() == "to_integer");
+
       // Typ pola ustawiamy TYLKO wtedy, gdy parser zostawił swój domyślny INTEGER. Zapis
       // `to_double(MIN(x:10))` albo `to_string(MIN(x:10):8)` ma typ ustalony przez funkcję
       // zewnętrzną i nadpisanie go tutaj byłoby zgubieniem intencji autora; zapis
       // `MIN(x:10)` i `MIN(x:10)+1` domyślnego typu nie mają skąd wziąć i biorą go stąd.
-      if (fieldHasWindow && f.field_.rtype == rdb::INTEGER) {
+      if (fieldHasWindow && f.field_.rtype == rdb::INTEGER && !explicitIntegerCast) {
         f.field_.rtype  = windowType;
         f.field_.rlen   = windowLen;
         f.field_.rarray = 1;
@@ -2777,9 +2828,6 @@ bool dependsOnOrdinal(const std::string &text) {
   const auto parts = splitIndexedRef(text);
   return parts.has_value() && parts->second.find('$') != std::string::npos;
 }
-
-/// Nazwa fizyczna instancji rodziny — ta sama, ktora trafia na dysk i do `xqry`.
-std::string instanceName(const std::string &family, int ordinal) { return family + "$" + std::to_string(ordinal); }
 
 /// Czy szablon generatora w ogole uzywa numeru instancji.
 bool mentionsOrdinal(const query &q) {
