@@ -143,30 +143,29 @@ class ParserListener : public RQLBaseListener {
   /// `$` uzyte poza generatorem.
   void exitExpGenIndex(RQLParser::ExpGenIndexContext *ctx) override { recpToken(PUSH_GENIDX); }
 
-  /// `MIN(cells : 10 : 10)` — agregat okna REKORDOWEGO w liscie SELECT.
+  /// `MIN(cells : 10)` — agregat okna REKORDOWEGO w liscie SELECT.
   ///
   /// Wystawia DWA tokeny: odwolanie do pola doklada juz podregula `field_id` (PUSH_ID3 /
   /// PUSH_ID1 / PUSH_ID2 — ten sam token co przy zwyklym odczycie pola), a ten listener
-  /// dopisuje operator z para (szerokosc, krok). compiler::resolveWindowAggregates() scala
-  /// oba w jeden bezargumentowy token z indeksem grupy okna.
+  /// dopisuje operator z szerokoscia okna. compiler::resolveWindowAggregates() scala oba
+  /// w jeden bezargumentowy token, w ktorym szerokosc ustepuje indeksowi grupy okna.
   ///
-  /// Krok domyslny to 1, czyli okno przesuwne co rekord. Wartosci NIE sa tu sprawdzane:
-  /// listener parsera nie ma lagodnego kanalu bledu (zostaje FatalError), a szerokosc
-  /// niedodatnia jest bledem PLANU, ktory kompilator raportuje przez `Check result:`
-  /// razem z pozostalymi kontrolami.
+  /// Okno jest zawsze PRZESUWNE co rekord — powod przy regule `window_agg` w RQL.g4.
+  /// Szerokosc NIE jest tu sprawdzana: listener parsera nie ma lagodnego kanalu bledu
+  /// (zostaje FatalError), a szerokosc niedodatnia jest bledem PLANU, ktory kompilator
+  /// raportuje przez `Check result:` razem z pozostalymi kontrolami.
   void exitWindow_agg(RQLParser::Window_aggContext *ctx) override {
     const int width = std::stoi(ctx->width->getText());
-    const int step  = (ctx->step != nullptr) ? std::stoi(ctx->step->getText()) : 1;
 
     const auto name = lowercased(ctx->children[0]->getText());
     if (name == "min")
-      recpToken(WINDOW_MIN, std::make_pair(width, step));
+      recpToken(WINDOW_MIN, width);
     else if (name == "max")
-      recpToken(WINDOW_MAX, std::make_pair(width, step));
+      recpToken(WINDOW_MAX, width);
     else if (name == "avg")
-      recpToken(WINDOW_AVG, std::make_pair(width, step));
+      recpToken(WINDOW_AVG, width);
     else if (name == "sumc")
-      recpToken(WINDOW_SUM, std::make_pair(width, step));
+      recpToken(WINDOW_SUM, width);
     else
       FatalError("RQLParser::exitWindow_agg: unknown aggregate '{}'", ctx->children[0]->getText());
   }

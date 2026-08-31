@@ -1209,18 +1209,15 @@ public:
   class  Window_aggContext : public antlr4::ParserRuleContext {
   public:
     antlr4::Token *width = nullptr;
-    antlr4::Token *step = nullptr;
     Window_aggContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     Field_idContext *field_id();
-    std::vector<antlr4::tree::TerminalNode *> COLON();
-    antlr4::tree::TerminalNode* COLON(size_t i);
+    antlr4::tree::TerminalNode *COLON();
     antlr4::tree::TerminalNode *MIN();
     antlr4::tree::TerminalNode *MAX();
     antlr4::tree::TerminalNode *AVG();
     antlr4::tree::TerminalNode *SUMC();
-    std::vector<antlr4::tree::TerminalNode *> DECIMAL();
-    antlr4::tree::TerminalNode* DECIMAL(size_t i);
+    antlr4::tree::TerminalNode *DECIMAL();
 
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;

@@ -1,8 +1,9 @@
-# Agregat okna REKORDOWEGO w liscie SELECT: AGG(pole : szerokosc [: krok]).
+# Agregat okna REKORDOWEGO w liscie SELECT: AGG(pole : szerokosc).
 #
-# Szerokosc i krok licza REKORDY, nie elementy plaskie, wiec pole `INTEGER[3]` przy
-# szerokosci 2 redukuje 6 wartosci. Okno jest stemplowane koncem: rekord wyjsciowy n
-# obejmuje rekordy zrodla n*krok-(szerokosc-1) ... n*krok.
+# Szerokosc liczy REKORDY, nie elementy plaskie, wiec pole `INTEGER[3]` przy szerokosci 2
+# redukuje 6 wartosci. Okno jest PRZESUWNE i stemplowane koncem: rekord wyjsciowy n obejmuje
+# rekordy zrodla n-(szerokosc-1) ... n, a interwal wyjscia jest ROWNY interwalowi zrodla —
+# lista SELECT nie rusza osi czasu, kazda zmiana taktu nalezy do klauzuli FROM.
 #
 # Wartosci oczekiwane sa policzone RECZNIE w pattern.txt, a nie porownane z inna
 # konstrukcja silnika — poza jednym przypadkiem, ktory jest tozsamoscia i dlatego
@@ -14,11 +15,15 @@ SUBSTRAT 'memory'
 DECLARE a INTEGER[3] STREAM src, 1 FILE 'data.txt'
 DECLARE c INTEGER STREAM sc, 1 FILE 'scalar.txt'
 
-# Okno tumblingowe: szerokosc 2, krok 2. Interwal wyjscia = 2 * interwal zrodla.
-SELECT MIN(a : 2 : 2), MAX(a : 2 : 2), SUMC(a : 2 : 2), AVG(a : 2 : 2) STREAM tumbling FROM src
+# Cztery agregaty jednego ksztaltu: jedna grupa, jedno przejscie po oknie. Liczba rekordow
+# pilnuje przy okazji interwalu — okno o szerokosci 2 wydaje wynik co rekord zrodla, wiec
+# przy `-m 8` powstaje ich szesc, a nie trzy.
+SELECT MIN(a : 2), MAX(a : 2), SUMC(a : 2), AVG(a : 2) STREAM sliding FROM src
 
-# Okno przesuwne: krok domyslny 1, wiec interwal wyjscia rowny interwalowi zrodla.
-SELECT MIN(a : 2), MAX(a : 2) STREAM sliding FROM src
+# Kopia strumienia z oknem. Schemat wezla pochodnego materializuje sie ZANIM ustali sie typ
+# wyniku okna, wiec bez przebiegu propagateCopiedFieldShapes() to pole nosiloby domyslny
+# INTEGER parsera i przycinaloby RATIONAL po cichu: 29/6 wychodzilo jako 4.
+SELECT * STREAM shifted FROM sliding>1
 
 # Szerokosc 1: redukcja pol JEDNEGO rekordu.
 SELECT MIN(a : 1), SUMC(a : 1) STREAM single FROM src

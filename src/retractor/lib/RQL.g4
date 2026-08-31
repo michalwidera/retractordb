@@ -236,11 +236,20 @@ stream_fn_call      : ( MIN
                     ) '(' stream_expression ')'
                     ;
 
-// Agregat okna REKORDOWEGO w liscie SELECT: `MIN(cells : 10 : 10)`.
+// Agregat okna REKORDOWEGO w liscie SELECT: `MIN(cells : 10)`.
 //
-// Redukuje pole `cells` po 10 kolejnych REKORDACH zrodla, wydajac wynik co 10 rekordow.
-// Krok jest opcjonalny i domyslnie wynosi 1 (okno przesuwne). Pole tablicowe `INTEGER[24]`
-// przy szerokosci 10 redukuje 240 wartosci: szerokosc liczy REKORDY, nie elementy plaskie.
+// Redukuje pole `cells` po 10 kolejnych REKORDACH zrodla, wydajac wynik co rekord — okno
+// jest PRZESUWNE i innym byc nie moze. Pole tablicowe `INTEGER[24]` przy szerokosci 10
+// redukuje 240 wartosci: szerokosc liczy REKORDY, nie elementy plaskie.
+//
+// KROKU TU NIE MA i miec nie moze. Do 2026-08-31 regula przyjmowala trzeci czlon
+// `MIN(cells : 10 : 10)`, ktory wydawal wynik co 10 rekordow, mnozac przez 10 interwal
+// strumienia wyjsciowego. Byla to JEDYNA konstrukcja w tym jezyku, w ktorej lista SELECT
+// zmieniala takt strumienia; wszedzie indziej interwal wynika wylacznie z klauzuli FROM.
+// Kazde okno z krokiem zapisuje sie po stronie FROM — albo przez AGSE `@(krok, szerokosc)`,
+// albo przez rozrzedzenie wyniku operatorem `-`. Rozrzedzenie wyniku zachowuje przy tym
+// tresc okna (te same W kolejnych rekordow), a rozni sie od dawnego kroku wylacznie faza,
+// czyli tym, ktore okno okresu zostaje wydane.
 //
 // Jest to rodzina ORTOGONALNA wobec `FROM MIN(strumien)`, ktory redukuje pola JEDNEGO
 // rekordu i zostaje bez zmian. Roznica jest widoczna w gramatyce: tamten stoi w
@@ -260,7 +269,7 @@ window_agg          : ( MIN
                     | MAX
                     | AVG
                     | SUMC
-                    ) '(' field_id COLON width=DECIMAL ( COLON step=DECIMAL )? ')'
+                    ) '(' field_id COLON width=DECIMAL ')'
                     ;
 
 // Wywolanie funkcji skalarnej. Nazwa jest zwyklym ID, a NIE lista literalow: lista

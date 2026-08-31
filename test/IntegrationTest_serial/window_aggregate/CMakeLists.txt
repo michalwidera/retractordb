@@ -1,4 +1,4 @@
-# Agregat okna rekordowego w liscie SELECT: AGG(pole : szerokosc [: krok]).
+# Agregat okna rekordowego w liscie SELECT: AGG(pole : szerokosc).
 #
 # Szerokosc liczy REKORDY, wiec pole tablicowe redukuje szerokosc*N wartosci.
 # Wzorzec jest policzony recznie: porownanie z inna konstrukcja silnika

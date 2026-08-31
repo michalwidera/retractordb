@@ -53,13 +53,14 @@ enum command_id : std::uint8_t {
   COUNT_RANGE,        // 41
   PUSH_GENIDX,        // 42 - numer instancji generatora; zyje tylko do expandStreamGenerators()
   POWER,              // 43 - potegowanie `a^b`; dopisane NA KONCU, zeby nie przenumerowac reszty
-  // Agregaty okna REKORDOWEGO w liscie SELECT: `MIN(cells : 10 : 10)`. Odrebne od
+  // Agregaty okna REKORDOWEGO w liscie SELECT: `MIN(cells : 10)`. Odrebne od
   // STREAM_MIN/MAX/AVG/SUM, ktore redukuja pola JEDNEGO rekordu w klauzuli FROM.
   //
-  // Zycie tokena jest dwuetapowe. Parser wystawia go z para (szerokosc, krok) i poprzedza
+  // Zycie tokena jest dwuetapowe. Parser wystawia go z szerokoscia okna i poprzedza
   // odwolaniem do pola (PUSH_ID3/PUSH_ID1/PUSH_ID2). compiler::resolveWindowAggregates()
-  // zamienia te pare na indeks grupy w qTree::windowGroups i USUWA poprzedzajacy PUSH_ID,
-  // wiec od tego przebiegu token jest bezargumentowym lisciem programu.
+  // zamienia szerokosc na indeks grupy w query::windowGroups i USUWA poprzedzajacy PUSH_ID,
+  // wiec od tego przebiegu token jest bezargumentowym lisciem programu. Etap rozpoznaje sie
+  // po tabeli grup zapytania, nie po tokenie: obie postaci niosa zwykly `int`.
   WINDOW_MIN,  // 44
   WINDOW_MAX,  // 45
   WINDOW_AVG,  // 46

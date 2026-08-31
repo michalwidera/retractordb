@@ -2262,16 +2262,16 @@ TEST(xcompiler, derived_schema_width_is_flat_for_array_fields) {
   }
 }
 
-// Agregat okna REKORDOWEGO w liscie SELECT: `AGG(pole : szerokosc : krok)`.
+// Agregat okna REKORDOWEGO w liscie SELECT: `AGG(pole : szerokosc)`.
 //
 // Rodzina ORTOGONALNA wobec `FROM MIN(strumien)`: tamten redukuje pola JEDNEGO rekordu,
 // ten redukuje `szerokosc` kolejnych rekordow, a przy polu tablicowym `szerokosc*N` wartosci.
 //
-// Brzeg liczy sie wzorami AGSE z szerokoscia zrodla rowna 1 — okno rekordowe to to samo
-// okno stemplowane koncem, tyle ze na osi REKORDOW, a nie elementow plaskich:
-//   interwal = krok * interwal zrodla
-//   origin   = ceil((origin zrodla + szerokosc - 1) / krok)
-//   ogon     = ceil((1 + ogon zrodla) / krok) - 1
+// Okno jest PRZESUWNE co rekord i innego kroku miec nie moze — kazda zmiana taktu nalezy do
+// klauzuli FROM. Stad brzeg:
+//   interwal = interwal zrodla
+//   origin   = origin zrodla + szerokosc - 1
+//   ogon     = ogon zrodla
 namespace {
 std::string compileStatus(const std::string &rql) {
   qTree instance;
@@ -2282,20 +2282,36 @@ std::string compileStatus(const std::string &rql) {
 }
 }  // namespace
 
-TEST(xcompiler, window_aggregate_step_scales_the_output_interval) {
-  for (const int step : {1, 2, 5}) {
+// Lista SELECT NIE rusza osi czasu — to jest wlasnie powod, dla ktorego trzeci czlon
+// `AGG(pole : szerokosc : krok)` zostal usuniety 31.08.2026. Mnozyl interwal wyjscia przez
+// krok, czyli byl jedyna konstrukcja tego jezyka, w ktorej takt strumienia wynikal z listy
+// SELECT, a nie z klauzuli FROM. Okno co k rekordow zapisuje sie dzis po stronie FROM.
+TEST(xcompiler, window_aggregate_never_changes_the_output_interval) {
+  for (const int width : {1, 2, 5}) {
     auto plan = compilePlan(
         "SUBSTRAT 'memory'\n"
         "DECLARE a INTEGER[3] STREAM src, 1/10 FILE 'src.txt'\n"
-        "SELECT MIN(a : 2 : " +
-        std::to_string(step) + ") STREAM dst FROM src\n");
+        "SELECT MIN(a : " +
+        std::to_string(width) + ") STREAM dst FROM src\n");
 
     auto &dst = plan.getQuery("dst");
-    EXPECT_EQ(dst.rInterval, boost::rational<int>(step, 10)) << "step=" << step;
-    // origin = ceil((0 + 2)/step) - 1
-    EXPECT_EQ(dst.logicalOrigin, (2 + step - 1) / step - 1) << "step=" << step;
-    EXPECT_EQ(dst.startupLatency, 0) << "step=" << step;
+    EXPECT_EQ(dst.rInterval, boost::rational<int>(1, 10)) << "width=" << width;
+    EXPECT_EQ(dst.startupLatency, 0) << "width=" << width;
   }
+
+  // Trzeci czlon nie jest juz skladnia. Bez tej kontroli test wyzej przechodzilby takze
+  // wtedy, gdyby krok wrocil do gramatyki i tylko przestal byc uzywany.
+  // parserRQLString konczy proces przy bledzie skladni, stad EXPECT_EXIT.
+  EXPECT_EXIT(
+      {
+        qTree instance;
+        (void)parserRQLString(instance,
+                              "SUBSTRAT 'memory'\n"
+                              "DECLARE a INTEGER[3] STREAM src, 1/10 FILE 'src.txt'\n"
+                              "SELECT MIN(a : 2 : 2) STREAM dst FROM src\n");
+        exit(0);
+      },
+      ::testing::ExitedWithCode(EPERM), "expecting ')'");
 }
 
 TEST(xcompiler, window_aggregate_origin_covers_the_whole_window) {
@@ -2305,9 +2321,11 @@ TEST(xcompiler, window_aggregate_origin_covers_the_whole_window) {
         "DECLARE a INTEGER STREAM src, 1 FILE 'src.txt'\n"
         "SELECT SUMC(a : " +
         std::to_string(width) + ") STREAM dst FROM src\n");
-    // Krok domyslny to 1, wiec origin = ceil(szerokosc/1) - 1 = szerokosc - 1: dopiero wtedy
-    // caly zakres okna, ktore konczy sie na rekordzie n, miesci sie w istniejacym strumieniu.
+    // origin = origin zrodla + szerokosc - 1: dopiero wtedy caly zakres okna, ktore konczy
+    // sie na rekordzie n, miesci sie w istniejacym strumieniu.
     EXPECT_EQ(plan.getQuery("dst").logicalOrigin, width - 1) << "width=" << width;
+    // Ogon zostaje ogonem zrodla — okno czeka dokladnie tyle co czysty przepis.
+    EXPECT_EQ(plan.getQuery("dst").startupLatency, 0) << "width=" << width;
   }
 }
 
@@ -2325,7 +2343,7 @@ TEST(xcompiler, window_aggregate_result_type_follows_the_reduction_rule) {
   EXPECT_EQ(outputField(plan, "dst", 2).rtype, rdb::DOUBLE);
 }
 
-// Agregaty o tym samym zrodle, polu, szerokosci i kroku dziela JEDNO przejscie po oknie.
+// Agregaty o tym samym zrodle, polu i szerokosci dziela JEDNO przejscie po oknie.
 // Rozny ksztalt to rozna grupa — inaczej `MAX(a:2)` czytalby okno `MAX(a:3)`.
 TEST(xcompiler, window_aggregates_of_one_shape_share_a_group) {
   auto plan = compilePlan(
@@ -2361,14 +2379,15 @@ TEST(xcompiler, window_group_spans_every_flat_slot_of_an_array_field) {
 // kopiuje zywe drzewo, doklada do niego zapytanie klienta i przepuszcza calosc przez
 // caly lancuch (executorsm.cpp, getAdHoc). Przebiegi okna musza wiec byc idempotentne.
 //
-// Bez tego pierwsze zapytanie ad hoc do planu z oknem zabijalo serwer: token WINDOW_*
-// niesie po rozwiazaniu indeks grupy zamiast pary (szerokosc, krok), wiec std::get
-// na parze rzucalby bad_variant_access juz przy wyznaczaniu interwalow.
+// Bez tego pierwsze zapytanie ad hoc do planu z oknem zabijalo serwer. Token WINDOW_* niesie
+// przed rozwiazaniem szerokosc okna, a po nim indeks grupy — obie postaci to zwykly `int`,
+// wiec o etapie rozstrzyga tabela grup zapytania, a nie sam token. Powtorna kompilacja, ktora
+// wzielaby indeks za szerokosc, przeliczylaby brzeg od nowa i to wlasnie tu ma sie wywalic.
 TEST(xcompiler, window_aggregate_survives_recompilation_of_a_live_plan) {
   const std::string rql =
       "SUBSTRAT 'memory'\n"
       "DECLARE a INTEGER[3] STREAM src, 1/10 FILE 'src.txt'\n"
-      "SELECT MIN(a : 4 : 2), MAX(a : 4 : 2), AVG(a : 6 : 2) STREAM dst FROM src\n";
+      "SELECT MIN(a : 4), MAX(a : 4), AVG(a : 6) STREAM dst FROM src\n";
 
   qTree instance;
   auto [parseResult, keyword, streamName] = parserRQLString(instance, rql);
@@ -2399,15 +2418,11 @@ TEST(xcompiler, window_aggregate_rejects_plans_it_cannot_execute) {
       "DECLARE a INTEGER, t STRING[8] STREAM src, 1 FILE 'src.txt'\n"
       "DECLARE b INTEGER STREAM other, 1 FILE 'other.txt'\n";
 
-  // Krok wyznacza interwal wyjscia, wiec jedna lista SELECT ma jeden krok.
-  EXPECT_NE(compileStatus(declare + "SELECT MIN(a : 2 : 2), MAX(a : 2 : 3) STREAM dst FROM src\n"), "OK");
-
   // Okno czyta historie JEDNEGO strumienia; zlaczenie zadnej historii nie ma.
   EXPECT_NE(compileStatus(declare + "SELECT MIN(a : 2) STREAM dst FROM src+other\n"), "OK");
 
-  // Szerokosc i krok musza byc dodatnie.
+  // Szerokosc musi byc dodatnia.
   EXPECT_NE(compileStatus(declare + "SELECT MIN(a : 0) STREAM dst FROM src\n"), "OK");
-  EXPECT_NE(compileStatus(declare + "SELECT MIN(a : 2 : 0) STREAM dst FROM src\n"), "OK");
 
   // Agregaty sa arytmetyczne.
   EXPECT_NE(compileStatus(declare + "SELECT MIN(t : 2) STREAM dst FROM src\n"), "OK");
@@ -2418,5 +2433,50 @@ TEST(xcompiler, window_aggregate_rejects_plans_it_cannot_execute) {
             "OK");
 
   // Postac poprawna — zeby powyzsze EXPECT_NE nie przechodzily z powodu literowki w RQL.
-  EXPECT_EQ(compileStatus(declare + "SELECT MIN(a : 2 : 2), MAX(a : 3 : 2) STREAM dst FROM src\n"), "OK");
+  EXPECT_EQ(compileStatus(declare + "SELECT MIN(a : 2), MAX(a : 3) STREAM dst FROM src\n"), "OK");
+}
+
+// Pole wezla pochodnego jest ODWOLANIEM do slotu operandu, a NIE kopia jego rachunku:
+// operand jest zmaterializowany, wiec wartosc juz policzyl.
+//
+// buildOutputSchema() podmieniala tylko PIERWSZY token skopiowanego programu, co jest
+// poprawne wylacznie dla programow jednotokenowych. Producent o polu `a+b` przenosil wiec
+// do konsumenta ogon swojego rachunku i `SELECT * FROM s>1` konczylo sie komunikatem
+// `No field of given name in stream schema ID3`; pole `MIN(a:2)` przenosilo tam token
+// WINDOW_*, przez ktory straznik okna odrzucal KAZDY wezel fullscan nad strumieniem
+// z oknem — lacznie z substratami, ktore kompilator wystawia sam.
+TEST(xcompiler, derived_field_is_a_reference_not_a_copy_of_the_producer_program) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT a+b STREAM s FROM src\n"
+      "SELECT * STREAM shifted FROM s>1\n"
+      "SELECT MIN(a : 2) STREAM w FROM src\n"
+      "SELECT * STREAM wshifted FROM w>1\n");
+
+  for (const char *id : {"shifted", "wshifted"}) {
+    const auto &schema = plan.getQuery(id).lSchema;
+    ASSERT_EQ(schema.size(), 1u) << id;
+    ASSERT_EQ(schema.front().lProgram.size(), 1u) << id;
+    EXPECT_EQ(schema.front().lProgram.front().getCommandID(), PUSH_ID) << id;
+  }
+}
+
+// Typ wyniku okna ustala sie w resolveWindowAggregates(), czyli DUZO pozniej niz schematy
+// wezlow pochodnych (expandSchemaWildcards). Kopia zabierala wiec domyslny INTEGER parsera
+// i przycinala RATIONAL po cichu: `SELECT * FROM okno>1` dawalo z 17/4 wartosc 4.
+//
+// `twice` przypina punkt staly: lancuch kopii jest dluzszy niz jeden, a qTree nie jest na tym
+// etapie posortowane topologicznie, wiec jeden przebieg by nie wystarczyl.
+TEST(xcompiler, window_result_type_reaches_copies_of_the_window_stream) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT AVG(a : 4) STREAM w FROM src\n"
+      "SELECT * STREAM plain FROM w\n"
+      "SELECT * STREAM shifted FROM w>1\n"
+      "SELECT * STREAM twice FROM shifted>1\n");
+
+  for (const char *id : {"w", "plain", "shifted", "twice"})
+    EXPECT_EQ(outputField(plan, id, 0).rtype, rdb::RATIONAL) << id;
 }

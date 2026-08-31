@@ -1,16 +1,18 @@
- TUMBLING
-{ RATIONAL tumbling_0 RATIONAL tumbling_1 RATIONAL tumbling_2 RATIONAL tumbling_3 }
-{ tumbling_0:1/1 tumbling_1:9/1 tumbling_2:29/1 tumbling_3:29/6 }
-{ tumbling_0:1/1 tumbling_1:7/1 tumbling_2:24/1 tumbling_3:4/1 }
-{ tumbling_0:1/1 tumbling_1:9/1 tumbling_2:32/1 tumbling_3:16/3 }
  SLIDING
-{ RATIONAL sliding_0 RATIONAL sliding_1 }
-{ sliding_0:1/1 sliding_1:9/1 }
-{ sliding_0:2/1 sliding_1:8/1 }
-{ sliding_0:1/1 sliding_1:7/1 }
-{ sliding_0:1/1 sliding_1:9/1 }
-{ sliding_0:1/1 sliding_1:9/1 }
-{ sliding_0:1/1 sliding_1:7/1 }
+{ RATIONAL sliding_0 RATIONAL sliding_1 RATIONAL sliding_2 RATIONAL sliding_3 }
+{ sliding_0:1/1 sliding_1:9/1 sliding_2:29/1 sliding_3:29/6 }
+{ sliding_0:2/1 sliding_1:8/1 sliding_2:30/1 sliding_3:5/1 }
+{ sliding_0:1/1 sliding_1:7/1 sliding_2:24/1 sliding_3:4/1 }
+{ sliding_0:1/1 sliding_1:9/1 sliding_2:29/1 sliding_3:29/6 }
+{ sliding_0:1/1 sliding_1:9/1 sliding_2:32/1 sliding_3:16/3 }
+{ sliding_0:1/1 sliding_1:7/1 sliding_2:24/1 sliding_3:4/1 }
+ SHIFTED
+{ RATIONAL sliding_0 RATIONAL sliding_1 RATIONAL sliding_2 RATIONAL sliding_3 }
+{ sliding_0:1/1 sliding_1:9/1 sliding_2:29/1 sliding_3:29/6 }
+{ sliding_0:2/1 sliding_1:8/1 sliding_2:30/1 sliding_3:5/1 }
+{ sliding_0:1/1 sliding_1:7/1 sliding_2:24/1 sliding_3:4/1 }
+{ sliding_0:1/1 sliding_1:9/1 sliding_2:29/1 sliding_3:29/6 }
+{ sliding_0:1/1 sliding_1:9/1 sliding_2:32/1 sliding_3:16/3 }
  SINGLE
 { RATIONAL single_0 RATIONAL single_1 }
 { single_0:1/1 single_1:15/1 }

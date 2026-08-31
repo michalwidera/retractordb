@@ -60,9 +60,9 @@ struct streamInstance {
   ///
   /// Okno obejmuje rekordy logiczne `lastLogicalIndex-(group.width-1) ... lastLogicalIndex`.
   /// Który rekord jest ostatni, rozstrzyga wołający (dataModel::computeWindowAggregates);
-  /// dla slotu n konsumenta jest to `(n+1)*krok-1` — patrz windowGroup. Z każdego
-  /// rekordu wchodzą do redukcji wszystkie sloty płaskie pola, więc `INTEGER[24]` przy
-  /// szerokości 10 daje 240 wartości.
+  /// dla slotu n konsumenta jest to rekord n — patrz windowGroup. Z każdego rekordu wchodzą
+  /// do redukcji wszystkie sloty płaskie pola, więc `INTEGER[24]` przy szerokości 10 daje
+  /// 240 wartości.
   ///
   /// Rekordy spoza historii są pomijane (nie zerowane). Przy poprawnym planie ten przypadek
   /// nie występuje — origin gwarantuje, że całe okno leży w istniejącej części strumienia,

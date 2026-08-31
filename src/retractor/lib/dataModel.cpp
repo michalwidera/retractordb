@@ -260,8 +260,8 @@ void dataModel::computeWindowAggregates(const query &qry) {
   };
 
   // Indeks logiczny rekordu, ktory wlasnie powstaje — ta sama definicja co w
-  // constructInputPayload(). Rekord n obejmuje rekordy zrodla (n+1)*step-width ... (n+1)*step-1,
-  // czyli konczy sie na ostatnim rekordzie zrodla nalezacym do slotu n.
+  // constructInputPayload(). Rekord n obejmuje rekordy zrodla n-(width-1) ... n, czyli konczy
+  // sie na rekordzie zrodla o TYM SAMYM indeksie logicznym.
   const int n = static_cast<int>(runtime.outputPayload->getRecordsCount()) + baseOf(qry.id);
 
   for (size_t groupIndex = 0; groupIndex < qry.windowGroups.size(); ++groupIndex) {
@@ -270,8 +270,7 @@ void dataModel::computeWindowAggregates(const query &qry) {
     if (sourceIt == qSet.end()) {
       FatalError("dataModel::computeWindowAggregates: source '{}' of window group not in model", group.source);
     }
-    runtime.windowValues[groupIndex] =
-        sourceIt->second->reduceRecordWindow(group, (n + 1) * group.step - 1, baseOf(group.source));
+    runtime.windowValues[groupIndex] = sourceIt->second->reduceRecordWindow(group, n, baseOf(group.source));
   }
 }
 

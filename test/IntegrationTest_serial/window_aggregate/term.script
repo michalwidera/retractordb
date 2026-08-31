@@ -1,12 +1,12 @@
-echo TUMBLING
-open tumbling
-descc
-list 3
-
 echo SLIDING
 open sliding
 descc
 list 6
+
+echo SHIFTED
+open shifted
+descc
+list 5
 
 echo SINGLE
 open single
