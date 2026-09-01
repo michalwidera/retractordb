@@ -19,19 +19,19 @@ constexpr int kSpscQueueCapacity = 1024;
 // rzędu sekundy. Klient poddawał się, zanim serwer w ogóle został zaszeregowany
 // — i kończył się kodem `timed_out`, co harness pomiarowy odczytywał jako
 // zniknięcie klienta (issue_217).
-constexpr int kIpcTransportDefaultClientResponseMaxFails = 300;
+constexpr int kIpcClientDefaultResponseMaxFails = 300;
 
 // Ile razy producent ponawia otwarcie własnej kolejki odpowiedzi, zanim uzna, że
 // serwer jej nie utworzy. Kolejka powstaje po stronie serwera w reakcji na
 // rejestrację klienta, więc przy starcie istnieje WYŚCIG: `open_only` wołane
 // natychmiast potrafi trafić w moment przed jej utworzeniem. Odstęp między
 // próbami to ipc::kClientResponsePollInterval.
-constexpr int kIpcTransportDefaultResponseQueueOpenMaxFails = 100;
+constexpr int kIpcClientDefaultResponseQueueOpenMaxFails = 100;
 
-class IpcTransport {
+class IpcClient {
   boost::lockfree::spsc_queue<boost::property_tree::ptree, boost::lockfree::capacity<kSpscQueueCapacity>> spsc_queue_;
-  int clientResponseMaxFails_{kIpcTransportDefaultClientResponseMaxFails};
-  int responseQueueOpenMaxFails_{kIpcTransportDefaultResponseQueueOpenMaxFails};
+  int clientResponseMaxFails_{kIpcClientDefaultResponseMaxFails};
+  int responseQueueOpenMaxFails_{kIpcClientDefaultResponseQueueOpenMaxFails};
 
  public:
   std::atomic<bool> done{false};
@@ -42,8 +42,8 @@ class IpcTransport {
   // przeczytawszy nic (issue_215).
   std::atomic<bool> responseQueueMissing{false};
 
-  explicit IpcTransport(int clientResponseMaxFails    = kIpcTransportDefaultClientResponseMaxFails,
-                        int responseQueueOpenMaxFails = kIpcTransportDefaultResponseQueueOpenMaxFails);
+  explicit IpcClient(int clientResponseMaxFails    = kIpcClientDefaultResponseMaxFails,
+                     int responseQueueOpenMaxFails = kIpcClientDefaultResponseQueueOpenMaxFails);
 
   boost::property_tree::ptree netClient(const std::string &netCommand, const std::string &netArgument);
   void producer();

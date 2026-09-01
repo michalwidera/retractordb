@@ -17,24 +17,24 @@
 #include <boost/property_tree/ptree.hpp>
 
 #include "constants.hpp"
-#include "qry/ipc_transport.hpp"
+#include "qry/ipcClient.hpp"
 
 // ---- Lifecycle ----
 
-TEST(IpcTransport, done_starts_false) {
-  IpcTransport t;
+TEST(IpcClient, done_starts_false) {
+  IpcClient t;
   EXPECT_FALSE(t.done);
 }
 
-TEST(IpcTransport, done_can_be_set_and_read) {
-  IpcTransport t;
+TEST(IpcClient, done_can_be_set_and_read) {
+  IpcClient t;
   t.done = true;
   EXPECT_TRUE(t.done);
 }
 
-TEST(IpcTransport, done_is_independently_per_instance) {
-  IpcTransport a;
-  IpcTransport b;
+TEST(IpcClient, done_is_independently_per_instance) {
+  IpcClient a;
+  IpcClient b;
   a.done = true;
   EXPECT_TRUE(a.done);
   EXPECT_FALSE(b.done);
@@ -42,23 +42,23 @@ TEST(IpcTransport, done_is_independently_per_instance) {
 
 // ---- popQueue ----
 
-TEST(IpcTransport, popQueue_returns_false_on_empty) {
-  IpcTransport t;
+TEST(IpcClient, popQueue_returns_false_on_empty) {
+  IpcClient t;
   boost::property_tree::ptree pt;
   EXPECT_FALSE(t.popQueue(pt));
 }
 
-TEST(IpcTransport, popQueue_does_not_modify_pt_on_empty) {
-  IpcTransport t;
+TEST(IpcClient, popQueue_does_not_modify_pt_on_empty) {
+  IpcClient t;
   boost::property_tree::ptree pt;
   pt.put("key", "original");
   t.popQueue(pt);
   EXPECT_EQ(pt.get<std::string>("key"), "original");
 }
 
-TEST(IpcTransport, multiple_instances_have_independent_queues) {
-  IpcTransport a;
-  IpcTransport b;
+TEST(IpcClient, multiple_instances_have_independent_queues) {
+  IpcClient a;
+  IpcClient b;
   boost::property_tree::ptree pt;
   EXPECT_FALSE(a.popQueue(pt));
   EXPECT_FALSE(b.popQueue(pt));
@@ -81,11 +81,11 @@ struct QueueEraser {
 }  // namespace
 
 // Producent musi PRZECZEKAĆ opóźnione utworzenie kolejki, a nie poddać się od razu.
-TEST(IpcTransport, producer_waits_for_late_response_queue) {
+TEST(IpcClient, producer_waits_for_late_response_queue) {
   QueueEraser eraser;
   boost::interprocess::message_queue::remove(responseQueueName().c_str());
 
-  IpcTransport transport(kIpcTransportDefaultClientResponseMaxFails, 200);
+  IpcClient transport(kIpcClientDefaultResponseMaxFails, 200);
 
   std::thread creator([] {
     // Kolejka pojawia się dopiero po chwili — dokładnie ten wyścig, który
@@ -109,11 +109,11 @@ TEST(IpcTransport, producer_waits_for_late_response_queue) {
 // Gdy kolejka nie powstanie nigdy, producent musi to ZAMELDOWAĆ osobną flagą.
 // Samo `done` jest nieodróżnialne od normalnego końca strumienia — i to była
 // przyczyna, dla której klient kończył się zerem bez danych.
-TEST(IpcTransport, producer_reports_missing_queue_distinctly_from_normal_end) {
+TEST(IpcClient, producer_reports_missing_queue_distinctly_from_normal_end) {
   QueueEraser eraser;
   boost::interprocess::message_queue::remove(responseQueueName().c_str());
 
-  IpcTransport transport(kIpcTransportDefaultClientResponseMaxFails, 3);
+  IpcClient transport(kIpcClientDefaultResponseMaxFails, 3);
   transport.producer();
 
   EXPECT_TRUE(transport.responseQueueMissing) << "brak kolejki musi byc odrozniony od normalnego konca";
@@ -175,10 +175,10 @@ class SilentServer {
 // Domyślny budżet klienta musi przetrwać serwer, który przez chwilę nie dostaje
 // CPU. 100 ms nie wystarczało: okno throttlingu RT ma okres rzędu sekundy, więc
 // klient poddawał się, zanim wątek komunikacyjny w ogóle został zaszeregowany.
-TEST(IpcTransport, netClient_default_budget_survives_briefly_starved_server) {
+TEST(IpcClient, netClient_default_budget_survives_briefly_starved_server) {
   const SilentServer server;
 
-  IpcTransport transport;  // domyślny budżet — to on był defektem
+  IpcClient transport;  // domyślny budżet — to on był defektem
   const auto start = std::chrono::steady_clock::now();
   const auto pt    = transport.netClient("get", "");
   const auto spent = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
@@ -190,10 +190,10 @@ TEST(IpcTransport, netClient_default_budget_survives_briefly_starved_server) {
 // Budżet ma być liczony ZEGAREM, a nie liczbą obrotów pętli. Przy liczeniu
 // obrotów przeciążony klient (albo dłuższy `lock`) skracał faktyczne czekanie
 // poniżej zadeklarowanego, czyli dokładnie wtedy, gdy potrzebne było najdłuższe.
-TEST(IpcTransport, netClient_honours_configured_budget_by_wall_clock) {
+TEST(IpcClient, netClient_honours_configured_budget_by_wall_clock) {
   const SilentServer server;
 
-  IpcTransport transport(120, kIpcTransportDefaultResponseQueueOpenMaxFails);  // 120 × 10 ms = 1200 ms
+  IpcClient transport(120, kIpcClientDefaultResponseQueueOpenMaxFails);  // 120 × 10 ms = 1200 ms
   const auto start = std::chrono::steady_clock::now();
   transport.netClient("get", "");
   const auto spent = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);

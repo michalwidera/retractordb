@@ -11,7 +11,7 @@ constexpr std::string_view Reserved_id_oob = "OUT_OF_BUSSINESS";
 namespace ipc {
 
 // === Shared memory / mutex / queue names ===
-// Muszą być spójne między serwerem (executorsm) a klientem (ipc_transport, qryLauncher).
+// Muszą być spójne między serwerem (executorsm) a klientem (ipcClient, qryLauncher).
 
 // Segment shared memory przechowujący mapę odpowiedzi per-PID.
 constexpr std::string_view kShmemSegment = "RetractorShmemMap";
@@ -47,7 +47,7 @@ constexpr std::size_t kShmemSegmentSize = 65536;
 // === Interwały czasowe ===
 
 // Interwał odpytywania kolejek IPC/SPSC — kompromis między latencją a obciążeniem CPU.
-// Używany przez: producenta w ipc_transport, pętlę komend w executorsm, pętlę select w qry.
+// Używany przez: producenta w ipcClient, pętlę komend w executorsm, pętlę select w qry.
 constexpr std::chrono::milliseconds kQueuePollInterval{1};
 
 // Czas oczekiwania klienta na odpowiedź serwera w shared memory między próbami.

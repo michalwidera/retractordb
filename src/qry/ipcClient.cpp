@@ -1,4 +1,4 @@
-#include "ipc_transport.hpp"
+#include "ipcClient.hpp"
 
 #include <unistd.h>
 
@@ -12,9 +12,6 @@
 #include <thread>
 
 #include <spdlog/spdlog.h>
-#include <boost/container/map.hpp>
-#include <boost/container/string.hpp>
-#include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/sync/named_mutex.hpp>
@@ -23,17 +20,18 @@
 #include <boost/system/system_error.hpp>
 
 #include "constants.hpp"
+#include "ipcTypes.hpp"
 
 using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
 
-IpcTransport::IpcTransport(int clientResponseMaxFails, int responseQueueOpenMaxFails)
+IpcClient::IpcClient(int clientResponseMaxFails, int responseQueueOpenMaxFails)
     : clientResponseMaxFails_(std::max(1, clientResponseMaxFails)),
       responseQueueOpenMaxFails_(std::max(1, responseQueueOpenMaxFails)) {}
 
-bool IpcTransport::popQueue(ptree &pt) { return spsc_queue_.pop(pt); }
+bool IpcClient::popQueue(ptree &pt) { return spsc_queue_.pop(pt); }
 
-void IpcTransport::producer() {
+void IpcClient::producer() {
   const std::string queueName = std::string(ipc::kResponseQueuePrefix) + std::to_string(getpid());
 
   // Kolejkę odpowiedzi tworzy SERWER w reakcji na rejestrację klienta, więc
@@ -51,7 +49,7 @@ void IpcTransport::producer() {
     }
   }
   if (!mq) {
-    SPDLOG_ERROR("ipc_transport: kolejka odpowiedzi '{}' nie powstala po {} probach", queueName, responseQueueOpenMaxFails_);
+    SPDLOG_ERROR("ipcClient: kolejka odpowiedzi '{}' nie powstala po {} probach", queueName, responseQueueOpenMaxFails_);
     responseQueueMissing = true;
     done                 = true;
     return;
@@ -83,20 +81,11 @@ void IpcTransport::producer() {
   }
 }
 
-ptree IpcTransport::netClient(const std::string &netCommand, const std::string &netArgument) {
+ptree IpcClient::netClient(const std::string &netCommand, const std::string &netArgument) {
   ptree pt_response;
   ptree pt_request;
   try {
-    using segment_manager_t = IPC::managed_shared_memory::segment_manager;
-    using CharAllocator     = IPC::allocator<char, segment_manager_t>;
-    using IPCString         = boost::container::basic_string<char, std::char_traits<char>, CharAllocator>;
-    using KeyType           = int;
-    using ValueType         = std::pair<const int, IPCString>;
-    using ShmemAllocator    = IPC::allocator<ValueType, segment_manager_t>;
-    using IPCMap            = boost::container::map<KeyType, IPCString, std::less<>, ShmemAllocator>;
-
     IPC::managed_shared_memory mapSegment(IPC::open_only, std::string(ipc::kShmemSegment).c_str());
-    const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
     IPC::named_mutex mapMutex(IPC::open_only, std::string(ipc::kMapMutex).c_str());
     pt_request.put("db.message", netCommand);
     pt_request.put("db.id", getpid());
@@ -107,10 +96,10 @@ ptree IpcTransport::netClient(const std::string &netCommand, const std::string &
     write_info(request_stream, pt_request);
     mq.send(request_stream.str().c_str(), request_stream.str().length(), 0);
 
-    std::pair<IPCMap *, std::size_t> ret = mapSegment.find<IPCMap>(std::string(ipc::kMapObject).c_str());
-    IPCMap *mymap                        = ret.first;
+    std::pair<ipc::IPCMap *, std::size_t> ret = mapSegment.find<ipc::IPCMap>(std::string(ipc::kMapObject).c_str());
+    ipc::IPCMap *mymap                        = ret.first;
     if (mymap == nullptr) {
-      SPDLOG_ERROR("ipc_transport: shared memory map '{}' not found", ipc::kMapObject);
+      SPDLOG_ERROR("ipcClient: shared memory map '{}' not found", ipc::kMapObject);
       done = true;
       pt_response.put("error.response", "server not found");
       return pt_response;

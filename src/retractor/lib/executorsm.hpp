@@ -27,18 +27,15 @@ struct executorsm {
   static int cfgQueueBufferSeconds;
   static int cfgMinQueueElements;
   static int cfgRtPriority;
-  // Set by commandProcessorLoop once all IPC resources are ready.
+  // Set from IpcServer's onReady callback once all IPC resources are ready.
   // run() waits on this before acquireLock(), so the lock file appears
   // only after IPC is fully initialized and xqry can connect safely.
   static std::atomic<bool> ipcReady;
 
-  static void commandProcessorLoop();
   static ptree commandProcessor(const ptree &ptInval);
   static ptree collectStreamsParameters();
   static ptree getAdHoc(const std::string &adHocQuery);
-  static void boradcastOutOfBussiness();
 
-  void boradcast(const std::set<std::string> &inSet);
   std::set<std::string> getAwaitedStreamsSet(CRationalStreamMath::TimeLine &tl, qTree *coreInstancePtr);
   std::string printRowValue(const std::string &query_name);
 };

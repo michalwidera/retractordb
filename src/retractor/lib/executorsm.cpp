@@ -1,6 +1,5 @@
 #include "executorsm.hpp"
 
-#include <array>
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
@@ -13,13 +12,7 @@
 
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
-#include <boost/container/map.hpp>
-#include <boost/container/string.hpp>
-#include <boost/interprocess/allocators/allocator.hpp>
-#include <boost/interprocess/ipc/message_queue.hpp>
-#include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/interprocess/sync/named_mutex.hpp>
-#include <boost/interprocess/sync/scoped_lock.hpp>
+#include <boost/interprocess/exceptions.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/system/error_code.hpp>
@@ -28,6 +21,7 @@
 #include "dataModel.hpp"
 #include "executor_rt.hpp"
 #include "fatalError.hpp"
+#include "ipcServer.hpp"
 #include "persistentCounter.hpp"
 #include "rdb/convertTypes.hpp"
 #include "rdb/probe.hpp"  // sondy E1/E2E, K6, E4
@@ -39,18 +33,6 @@
 
 namespace IPC = boost::interprocess;
 
-// Define for IPC purposes - maps & strings (most important IPCString i IPCMap)
-using segment_manager_t = IPC::managed_shared_memory::segment_manager;
-
-using CharAllocator   = IPC::allocator<char, segment_manager_t>;
-using IPCString       = boost::container::basic_string<char, std::char_traits<char>, CharAllocator>;
-using StringAllocator = IPC::allocator<IPCString, segment_manager_t>;
-
-using ValueType = std::pair<const int, IPCString>;
-
-using ShmemAllocator = IPC::allocator<ValueType, segment_manager_t>;
-using IPCMap         = boost::container::map<int, IPCString, std::less<>, ShmemAllocator>;
-
 using namespace CRationalStreamMath;
 
 namespace {
@@ -60,30 +42,6 @@ constexpr std::chrono::milliseconds kIdleLoopSleep{100};
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
 
 std::unique_ptr<PersistentCounter> pCounterPtr;
-
-// Segment and allocator for string exchange
-// IPC::managed_shared_memory strSegment(IPC::open_or_create,
-// "RetractorShmemStr", 65536); const StringAllocator allocatorShmemStrInstance
-// (strSegment.get_segment_manager());
-
-// Map stores relations processId -> sended stream
-static std::map<const int, std::string> id2StreamName_Relation;
-
-// Cache otwartych kolejek IPC per klient. Konstrukcja message_queue(open_only)
-// to shm_open+mmap -- wykonywana w kazdym slocie kosztowala ~3,2 ms/slot na
-// Pi 400 (zmierzone, JOURNAL.md kampania 7bis) i lamala os czasu 360 Hz.
-// Uchwyt jest wazny dopoki kolejka istnieje: otwieramy przy pierwszej emisji,
-// usuwamy z cache przy usunieciu kolejki (przepelnienie) i re-rejestracji
-// klienta. Wzorzec wspoldzielenia miedzy watkami identyczny jak
-// id2StreamName_Relation powyzej.
-static std::map<const int, std::unique_ptr<IPC::message_queue>> id2Queue_Cache;
-
-// Muteks obu map klienckich (sledztwo ~40 ms, JOURNAL.md 2026-07-18, Faza 3):
-// mapy sa modyfikowane przez watek komunikacyjny (rejestracja show) i czytane/
-// czyszczone przez watek przetwarzajacy (boradcast). Muteks trzymany wylacznie
-// na operacjach na mapach -- NIGDY podczas konstrukcji kolejki (mmap ~MB), aby
-// nie wnosic inwersji priorytetow do watku RT.
-static std::mutex clientMapsMutex;
 
 extern std::mutex core_mutex;
 
@@ -106,7 +64,11 @@ int executorsm::cfgQueueBufferSeconds = appcfg::kDefaultIpcQueueBufferSeconds;
 int executorsm::cfgMinQueueElements   = appcfg::kDefaultIpcMinQueueElements;
 int executorsm::cfgRtPriority         = appcfg::kDefaultSchedulingRtPriority;
 
-static std::thread bt;
+// Transport IPC serwera. Obiekt o statycznym czasie zycia, bo sprzatanie musi byc
+// osiagalne z handlera atexit (cleanup ponizej): std::exit nie uruchamia destruktorow
+// obiektow automatycznych, a destruktory obiektow statycznych wykonuja sie PO
+// handlerach zarejestrowanych pozniej niz ich konstrukcja.
+static IpcServer ipcServer;
 
 /// Straznik blokady uslugi — wskaznik wazny WYLACZNIE na czas trwania executorsm::run().
 ///
@@ -130,23 +92,7 @@ void cleanup() {
     }
   }
   cv.notify_all();
-  // Nie dolaczamy watku, ktory WLASNIE wykonuje to sprzatanie. FatalError konczy proces
-  // przez std::exit, a ten uruchamia funkcje atexit W WATKU, ktory go wywolal — takze
-  // w watku komunikacyjnym: commandProcessorLoop -> commandProcessor -> getAdHoc ->
-  // compile(), a kompilator ma wiele wywolan FatalError. join() na watku biezacym rzuca
-  // std::system_error("Resource deadlock avoided"), a wyjatek z handlera atexit to
-  // std::terminate: JEDNO wadliwe zapytanie ad hoc (np. `src@(0,4)`) zabijalo serwer
-  // SIGABRT-em zamiast zakonczyc go z EXIT_FAILURE, i to juz po wypisaniu wlasciwej
-  // diagnostyki. Watek i tak konczy sie razem z procesem, wiec pominiecie join() niczego
-  // nie zostawia w locie; sprzatanie IPC ponizej wykonuje sie wtedy normalnie.
-  if (bt.joinable()) {
-    if (bt.get_id() == std::this_thread::get_id()) bt.detach();  // samego siebie nie da sie dolaczyc; ODPINAMY, bo destruktor
-                                                                 // std::thread nad watkiem dolaczalnym wola std::terminate
-    else
-      bt.join();
-  }
-  IPC::shared_memory_object::remove("RetractorShmemMap");
-  IPC::message_queue::remove("RetractorQueryQueue");
+  ipcServer.shutdownFromExitHandler();
   // Blokada uslugi na koncu: po niej moze juz wystartowac kolejna instancja, wiec
   // zwalniamy ja dopiero, gdy IPC jest posprzatane. releaseLock() jest idempotentny,
   // wiec pozniejszy destruktor straznika na sciezce normalnej nie zrobi nic drugi raz.
@@ -188,7 +134,6 @@ ptree executorsm::collectStreamsParameters() {
 }
 
 ptree executorsm::getAdHoc(const std::string &adHocQuery) {
-  qTree coreCopy;
   ptree ptRetval;
 
   qTree coreInstanceCopy = *coreInstancePtr;
@@ -360,31 +305,12 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
         return ptRetval;
       }
       // Here we set that for process of given id we send appropriate data stream
-      int streamId          = boost::lexical_cast<int>(ptInval.get("db.id", ""));
-      std::string queueName = std::string(ipc::kResponseQueuePrefix) + ptInval.get("db.id", "");
+      int streamId = boost::lexical_cast<int>(ptInval.get("db.id", ""));
       // 10-second buffer to prevent overflow on loaded systems
       // (1/delta gives elements/sec; multiply by 10 for 10s headroom)
       int maxElements = boost::rational_cast<int>(1 / (*coreInstancePtr)[streamName].rInterval) * cfgQueueBufferSeconds;
       maxElements     = std::max(maxElements, cfgMinQueueElements);
-      // Pre-otwarcie kolejki TUTAJ, w watku komunikacyjnym (sledztwo ~40 ms,
-      // JOURNAL.md 2026-07-18, Faza 3): tworzenie + mmap segmentu (~MB) nie moze
-      // zostac w torze emisji watku RT -- lazy open_only w boradcast() kosztowal
-      // 42 ms przy pierwszej emisji do nowego klienta (populacja stron mapowania
-      // pod mlockall). Rejestracja w id2StreamName_Relation dopiero PO zbudowaniu
-      // kolejki i razem z uchwytem pod muteksem, wiec watek RT nigdy nie widzi
-      // klienta bez gotowego uchwytu (przy okazji znika dotychczasowy wyscig
-      // rejestracja-przed-utworzeniem-kolejki). Nadpisanie uchwytu przy
-      // re-rejestracji zamyka stare mapowanie w tym watku.
-      auto queueHandle = std::make_unique<IPC::message_queue>(IPC::open_or_create,               // open or create
-                                                              queueName.c_str(),                 // name
-                                                              maxElements,                       // max message number
-                                                              ipc::kResponseQueueMaxMessageSize  // max message size
-      );
-      {
-        std::scoped_lock lock(clientMapsMutex);
-        id2StreamName_Relation[streamId] = streamName;
-        id2Queue_Cache[streamId]         = std::move(queueHandle);
-      }
+      ipcServer.subscribe(streamId, streamName, maxElements);
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
     }
     //
@@ -409,82 +335,6 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
     SPDLOG_ERROR("Command processor failure: {}", e.what());
   }
   return ptRetval;  // sub for a while
-}
-
-// Thread procedure
-void executorsm::commandProcessorLoop() {
-  if (coreInstancePtr == nullptr) FatalError("executorsm::commandProcessorLoop: coreInstancePtr is null");
-  try {
-    IPC::message_queue::remove(std::string(ipc::kQueryQueue).c_str());
-    IPC::shared_memory_object::remove(std::string(ipc::kShmemSegment).c_str());
-    IPC::named_mutex::remove(std::string(ipc::kMapMutex).c_str());
-    // Segment and allocator for map purposes
-    IPC::managed_shared_memory mapSegment(IPC::open_or_create, std::string(ipc::kShmemSegment).c_str(), ipc::kShmemSegmentSize);
-    const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
-    IPC::named_mutex mapMutex(IPC::open_or_create, std::string(ipc::kMapMutex).c_str());
-    // Create a message_queue.
-    IPC::message_queue mq(IPC::open_or_create,                    // open or crate
-                          std::string(ipc::kQueryQueue).c_str(),  // name
-                          ipc::kQueryQueueMaxMessages,            // max message number
-                          ipc::kQueryQueueMaxMessageSize          // max message size
-    );
-    IPCMap *mymap = mapSegment.construct<IPCMap>(std::string(ipc::kMapObject).c_str())  // object name
-                    (std::less<>(), allocatorShmemMapInstance);
-    // Stan predykatu musi zmienic sie POD core_mutex. Watek glowny czeka na ipcReady
-    // pod tym samym muteksem (executorsm::run), a cv.wait zwalnia go dopiero w chwili
-    // zablokowania. Ustawienie flagi bez muteksu pozwalalo trafic w okno miedzy
-    // sprawdzeniem predykatu a zasnieciem watku glownego — powiadomienie przepadalo
-    // i start wisial na zawsze, nie reagujac nawet na SIGTERM.
-    {
-      std::scoped_lock lock(core_mutex);
-      ipcReady = true;
-    }
-    cv.notify_all();
-    //
-    // This need to be clean up - There are some mess.
-    //
-    std::array<char, ipc::kQueryQueueMaxMessageSize> message;
-    unsigned int priority;
-    IPC::message_queue::size_type recvd_size;
-
-    bool loopRunning = true;
-    while (loopRunning) {
-      while (mq.try_receive(message.data(), ipc::kQueryQueueMaxMessageSize, recvd_size, priority)) {
-        if (iLoopLimitCnt == executorsm::waitForXqry) {
-          // Notify main thread that first query is received
-          {
-            std::scoped_lock lock(core_mutex);
-            iLoopLimitCnt = executorsm::inifitie_loop;
-          }
-          cv.notify_all();
-        }
-
-        message[recvd_size] = 0;
-        std::stringstream strstream;
-        strstream << message.data();
-        memset(message.data(), 0, ipc::kQueryQueueMaxMessageSize);
-        ptree pt;
-        read_info(strstream, pt);
-        ptree pt_retval     = commandProcessor(pt);
-        int clientProcessId = boost::lexical_cast<int>(pt.get("db.id", ""));
-        // Sending answer
-        std::stringstream response_stream;
-        write_info(response_stream, pt_retval);
-        IPCString ipcResponse(allocatorShmemMapInstance);
-        ipcResponse = response_stream.str().c_str();
-        // cppcheck-suppress danglingTemporaryLifetime
-        {
-          IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
-          mymap->insert(std::pair<int, IPCString>(clientProcessId, ipcResponse));
-        }
-      }
-      std::this_thread::sleep_for(ipc::kQueuePollInterval);
-
-      if (iLoopLimitCnt == executorsm::stop_now) loopRunning = false;
-    }
-  } catch (IPC::interprocess_exception &ex) {
-    std::cout << "Exception on server." << '\n' << ex.what() << '\n';
-  }
 }
 
 std::string executorsm::printRowValue(const std::string &query_name) {
@@ -539,90 +389,6 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
-void executorsm::boradcastOutOfBussiness() {
-  if (executorsm::coreInstancePtr == nullptr) FatalError("executorsm::boradcastOutOfBussiness: coreInstancePtr is null");
-  std::scoped_lock lock(clientMapsMutex);
-  for (const auto &element : id2StreamName_Relation) {
-    using namespace boost::interprocess;
-    //
-    // Queue may have been removed earlier (try_send overflow in boradcast).
-    // Wrap in try-catch to avoid crash on open_only failure.
-    //
-    std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
-    try {
-      IPC::message_queue mq(IPC::open_only, queueName.c_str());
-      //
-      // Sending out-of-bussiness message
-      //
-      ptree pt;
-      pt.put("stream", constants::Reserved_id_oob);
-      std::stringstream strstream;
-      write_info(strstream, pt);
-      std::string row = strstream.str();
-
-      mq.try_send(row.c_str(), row.length(), 0);
-      message_queue::remove(queueName.c_str());
-      SPDLOG_WARN("queue erased on out-of-business, procId={}", element.first);
-    } catch (IPC::interprocess_exception &e) {
-      SPDLOG_WARN("boradcastOutOfBussiness: queue {} already removed, procId={}: {}", queueName, element.first, e.what());
-    }
-  }
-  id2StreamName_Relation.clear();
-  id2Queue_Cache.clear();
-}
-
-void executorsm::boradcast(const std::set<std::string> &inSet) {
-  if (executorsm::coreInstancePtr == nullptr) FatalError("executorsm::boradcast: coreInstancePtr is null");
-  // Muteks na caly przebieg emisji: kontencja tylko z krotkim wstawieniem do map
-  // przy rejestracji klienta (watek komunikacyjny trzyma go nanosekundy), a koszt
-  // niekontendowanego lock/unlock raz na slot jest pomijalny wobec ~ms compute.
-  std::scoped_lock lock(clientMapsMutex);
-  for (const auto &queryName : inSet) {
-    // Formatowanie wiersza (printRowValue: ptree + serializacja wszystkich pol)
-    // jest kosztowne i potrzebne wylacznie subskrybentom -- wykonuj leniwie,
-    // dopiero przy pierwszym kliencie danego strumienia. Bez subskrybentow
-    // wiersz i tak byl wyrzucany (petla ponizej nie robila nic).
-    std::string row;
-    bool rowFormatted = false;
-    std::list<int> eraseList;
-    for (const auto &element : id2StreamName_Relation) {
-      if (element.second == queryName) {
-        using namespace boost::interprocess;
-        if (!rowFormatted) {
-          row          = printRowValue(queryName);
-          rowFormatted = true;
-        }
-        //
-        // Query discovery. queues are created by show command
-        //
-        std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
-        // Uchwyt kolejki z cache -- otwarcie (shm_open+mmap) tylko przy pierwszej
-        // emisji do danego klienta, nie w kazdym slocie (patrz komentarz przy
-        // id2Queue_Cache).
-        auto &mqPtr = id2Queue_Cache[element.first];
-        if (!mqPtr) mqPtr = std::make_unique<IPC::message_queue>(IPC::open_only, queueName.c_str());
-        //
-        // If send queue is full - means no one is listening and queue is
-        // going to remove
-        //
-        if (!mqPtr->try_send(row.c_str(), row.length(), 0)) {
-          mqPtr.reset();  // zamknij mapowanie przed unlink
-          message_queue::remove(queueName.c_str());
-          eraseList.push_back(element.first);
-        }
-      }
-    }
-    //
-    // cleaning form clients map that are not receiving data from queue
-    //
-    for (const auto &element : eraseList) {
-      id2StreamName_Relation.erase(element);
-      id2Queue_Cache.erase(element);
-      SPDLOG_WARN("queue erased on timeout, procId={}", element);
-    }
-  }
-}
-
 int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm, const AppConfig &cfg) {
   executorsm::coreInstancePtr       = &coreInstance;
   executorsm::cmPtr                 = &cm;
@@ -649,7 +415,36 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
   if (percounterFilename != "{notinitialized}") pCounterPtr = std::make_unique<PersistentCounter>(percounterFilename);
 
   auto retVal = system::errc::success;
-  bt          = std::thread(executorsm::commandProcessorLoop);  // Sending service in thread
+  // Sending service in thread. Warstwa protokolu wchodzi do transportu przez te
+  // cztery wywolania zwrotne -- IpcServer nie zna qTree, dataModel ani compilera.
+  ipcServer.start({
+      .onCommand = [](const ptree &pt) { return executorsm::commandProcessor(pt); },
+      // Stan predykatu musi zmienic sie POD core_mutex. Watek glowny czeka na ipcReady
+      // pod tym samym muteksem (ponizej), a cv.wait zwalnia go dopiero w chwili
+      // zablokowania. Ustawienie flagi bez muteksu pozwalalo trafic w okno miedzy
+      // sprawdzeniem predykatu a zasnieciem watku glownego -- powiadomienie przepadalo
+      // i start wisial na zawsze, nie reagujac nawet na SIGTERM.
+      .onReady =
+          [] {
+            {
+              std::scoped_lock lock(core_mutex);
+              executorsm::ipcReady = true;
+            }
+            cv.notify_all();
+          },
+      .onMessageReceived =
+          [] {
+            if (iLoopLimitCnt == executorsm::waitForXqry) {
+              // Notify main thread that first query is received
+              {
+                std::scoped_lock lock(core_mutex);
+                iLoopLimitCnt = executorsm::inifitie_loop;
+              }
+              cv.notify_all();
+            }
+          },
+      .shouldStop = [] { return iLoopLimitCnt == executorsm::stop_now; },
+  });
 
   {
     std::unique_lock<std::mutex> lock(core_mutex);
@@ -663,7 +458,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       iLoopLimitCnt = executorsm::stop_now;
     }
     cv.notify_all();
-    bt.join();
+    ipcServer.stop();
     return system::errc::no_lock_available;
   }
   try {
@@ -734,12 +529,15 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
       //
       if (iLoopLimitCnt == executorsm::inifitie_loop && vm.contains("verbose")) std::cout << "Press any key to stop.\n";
 
+      // Formatowanie wiersza jest warstwa protokolu, transport dostaje je jako callback.
+      const IpcServer::RowFormatter formatRow = [this](const std::string &name) { return printRowValue(name); };
+
       // ZERO-step
       std::set<std::string> inSet;
       for (const auto &it : *coreInstancePtr)
         if (it.isDeclaration()) inSet.insert(it.id);
       proc.processZeroStep();
-      boradcast(inSet);
+      ipcServer.broadcast(inSet, formatRow);
       // End of ZERO-step
 
       // Loop of data processing
@@ -762,7 +560,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
           // niej wyliczyć rdzenie dla wątku komunikacyjnego. Bez tego przy
           // obciążeniu powyżej 100 % slotu wątek komunikacyjny nie dostaje CPU
           // i żaden klient nie zdąży się zarejestrować (issue_217, badanie W8).
-          rtKeepThreadOffRtCpus(bt.native_handle());
+          rtKeepThreadOffRtCpus(ipcServer.threadHandle());
         }
       }
 
@@ -831,7 +629,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
         slotBench.beginCompute();
         proc.processRows(inSet, currentTimeSlot);  // mierzony rdzeń obliczeń jednego interwału (E1)
         slotBench.endCompute();
-        boradcast(inSet);
+        ipcServer.broadcast(inSet, formatRow);
         slotBench.endSlot();
 
         // Deklaracje sa czytane na koncu slotu, a ich rekord konsumuje dopiero slot nastepny.
@@ -876,14 +674,8 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     iLoopLimitCnt = executorsm::stop_now;
   }
   cv.notify_all();
-  boradcastOutOfBussiness();
-  bt.join();
-  IPC::shared_memory_object::remove("RetractorShmemMap");
-  IPC::message_queue::remove("RetractorQueryQueue");
-  IPC::named_mutex::remove("RetractorMapMutex");
-  for (const auto &element : id2StreamName_Relation) {
-    std::string queueName = "brcdbr" + boost::lexical_cast<std::string>(element.first);
-    IPC::message_queue::remove(queueName.c_str());
-  }
+  ipcServer.broadcastOutOfBusiness();
+  ipcServer.stop();
+  ipcServer.removeAllObjects();
   return retVal;
 }

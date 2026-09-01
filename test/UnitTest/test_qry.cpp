@@ -369,7 +369,7 @@ TEST(xqry, test_format_mode_set) {
 // obciążonym rodziną W8 (Q=32) ginął po ~3 s przy serwerze pracującym 12 s.
 
 // Serwer nie zdążył odpowiedzieć: `netClient` po wyczerpaniu prób zwraca ptree
-// z samym `error.response` (ipc_transport.cpp, gałąź "server not found").
+// z samym `error.response` (ipcClient.cpp, gałąź "server not found").
 class qry_fake_no_response : public qry {
  public:
   boost::property_tree::ptree netClient(const std::string & /*cmd*/, const std::string & /*arg*/) override {

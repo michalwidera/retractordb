@@ -15,7 +15,7 @@
 #include "constants.hpp"
 #include "fatalError.hpp"
 #include "formatters.hpp"
-#include "ipc_transport.hpp"
+#include "ipcClient.hpp"
 #include "uxSysTermTools.hpp"
 
 using namespace boost;
@@ -27,7 +27,7 @@ constexpr int kDirLineBufferSize = 1024;
 
 qry::qry(int serverNoDataTimeoutMs, int clientResponseMaxFails, int responseQueueOpenMaxFails)
     : serverNoDataTimeoutMs_(std::max(1, serverNoDataTimeoutMs)),
-      transport_(std::make_unique<IpcTransport>(clientResponseMaxFails, responseQueueOpenMaxFails)),
+      transport_(std::make_unique<IpcClient>(clientResponseMaxFails, responseQueueOpenMaxFails)),
       formatter_(std::make_unique<Formatter>()) {}
 qry::~qry() = default;
 

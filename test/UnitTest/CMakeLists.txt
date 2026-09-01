@@ -49,7 +49,7 @@ foreach(item ${V_GLOB})
                         -Wl,--wrap=write)
   endif()
   # test_uxSysTermTools: symbole uxSysTermTools dostępne przez retractor →
-  # common (PUBLIC) test_formatter i test_ipc_transport: symbole dostępne przez
+  # common (PUBLIC) test_formatter i test_ipcClient: symbole dostępne przez
   # bibliotekę qry (w LIBRARY_TEST_SET)
   add_test(
     NAME ut_${TEST_SHORT}-setup
@@ -92,6 +92,14 @@ add_test(
 set_tests_properties(ut_dataModel-compare
                      PROPERTIES DEPENDS "ut_dataModel-compile;ut_dataModel")
 
+# ut_ipcServer kasuje globalne nazwy IPC (segment, kolejka komend, muteks mapy),
+# wiec nie moze biec obok testu, ktory ich uzywa.
 set_tests_properties(
-  ut_rdb ut_xqry ut_dataModel ut_dataModel-compile ut_dataModel-compare
-  ut_soperations PROPERTIES RUN_SERIAL TRUE)
+  ut_rdb
+  ut_xqry
+  ut_dataModel
+  ut_dataModel-compile
+  ut_dataModel-compare
+  ut_soperations
+  ut_ipcServer
+  PROPERTIES RUN_SERIAL TRUE)
