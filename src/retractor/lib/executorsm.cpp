@@ -9,6 +9,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
@@ -17,6 +18,7 @@
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/system/error_code.hpp>
 
+#include "bus.hpp"
 #include "constants.hpp"
 #include "dataModel.hpp"
 #include "executor_rt.hpp"
@@ -82,6 +84,11 @@ static IpcServer ipcServer;
 /// automatycznym — po normalnym wyjsciu wskaznik wskazywalby na obiekt juz zniszczony.
 static FlockServiceGuard *serviceGuardPtr = nullptr;
 
+/// Magistrala xrdbbus — wskaznik wazny na tych samych zasadach co serviceGuardPtr powyzej.
+/// Slot instancji musi zniknac takze na sciezce FatalError, inaczej martwy wpis blokowalby
+/// nazwy strumieni az do chwili, gdy ktos go zauwazy i sprzatnie.
+static bus::Bus *busPtr = nullptr;
+
 void cleanup() {
   {
     std::scoped_lock lock(core_mutex);
@@ -93,6 +100,9 @@ void cleanup() {
   }
   cv.notify_all();
   ipcServer.shutdownFromExitHandler();
+  // Slot magistrali przed blokada, w tej samej kolejnosci co reszta sprzatania: dopiero
+  // zwolniona blokada wpuszcza kolejna instancje, a ta czyta magistrale.
+  if (busPtr != nullptr) busPtr->release();
   // Blokada uslugi na koncu: po niej moze juz wystartowac kolejna instancja, wiec
   // zwalniamy ja dopiero, gdy IPC jest posprzatane. releaseLock() jest idempotentny,
   // wiec pozniejszy destruktor straznika na sciezce normalnej nie zrobi nic drugi raz.
@@ -423,6 +433,60 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
   // wyjsciu sprzatalaby zasoby cudzego, dzialajacego serwera.
   std::atexit(cleanup);
 
+  // Nazwa instancji musi trafic do transportu PRZED start(): to ona wyznacza komplet nazw
+  // obiektow IPC, ktore watek komunikacyjny tworzy zaraz po uruchomieniu. Ustawiamy ja juz
+  // TUTAJ, przed roszczeniem w magistrali, bo atexit jest juz zarejestrowany: instancja,
+  // ktora odmowi startu na kolizji nazw, przejdzie przez cleanup() i skasuje obiekty IPC
+  // WEDLUG TEJ NAZWY. Z nazwa domyslna (historyczna) skasowalaby segment, kolejke komend
+  // i muteks dzialajacego serwera bezimiennego.
+  ipcServer.setServerName(serverName);
+  if (!serverName.empty()) SPDLOG_INFO("Instance name: {}", serverName);
+
+  // Roszczenie nazw strumieni w magistrali: PO kompilacji (dopiero wtedy znany jest zbior
+  // q.id) i PRZED startem transportu. Kolizja nazw miedzy serwerami nie jest sama w sobie
+  // bledem logicznym -- jest bledem FIZYCZNYM: rdb::StoragePaths tworzy <qryID>.desc dla
+  // KAZDEGO wpisu planu, deklaracje wlacznie, wiec dwie instancje o tej samej nazwie
+  // strumienia w tym samym katalogu magazynu nadpisalyby sobie deskryptory.
+  bus::Bus xrdbbus;
+  struct BusScope {
+    explicit BusScope(bus::Bus &b) { busPtr = &b; }
+    ~BusScope() { busPtr = nullptr; }
+  } busScope(xrdbbus);
+
+  {
+    std::vector<std::string> claimedStreams;
+    for (const auto &q : coreInstance)
+      if (!q.isCompilerDirective()) claimedStreams.push_back(q.id);
+
+    const std::string queryFile    = vm.contains("queryfile") ? vm["queryfile"].as<std::string>() : std::string{};
+    const bus::ClaimResult claimed = xrdbbus.claim(serverName, queryFile, claimedStreams);
+
+    switch (claimed.status) {
+      case bus::ClaimStatus::Claimed:
+        break;
+      case bus::ClaimStatus::Conflict: {
+        // Komunikat wskazuje wlasciciela, bo to jedyna informacja, ktora pozwala operatorowi
+        // dzialac: albo zatrzymac tamta instancje, albo zmienic nazwe strumienia u siebie.
+        const std::string owner = claimed.ownerName.empty() ? "the unnamed instance" : "instance '" + claimed.ownerName + "'";
+        std::cerr << "xretractor: stream '" << claimed.stream << "' is already served by " << owner << " (pid "
+                  << claimed.ownerPid << ")\n";
+        SPDLOG_ERROR("Stream '{}' is already served by {} (pid {}).", claimed.stream, owner, claimed.ownerPid);
+        return system::errc::device_or_resource_busy;
+      }
+      case bus::ClaimStatus::TooLarge:
+      case bus::ClaimStatus::NoFreeSlot:
+        std::cerr << "xretractor: cannot register on the xrdbbus bus: " << claimed.detail << '\n';
+        SPDLOG_ERROR("Cannot register on the xrdbbus bus: {}", claimed.detail);
+        return system::errc::device_or_resource_busy;
+      case bus::ClaimStatus::Unavailable:
+        // Niedostepna magistrala nie zatrzymuje serwera: jeden uszkodzony segment nie moze
+        // unieruchomic maszyny. Cena jest wypisana wprost -- rozlacznosc nazw nie jest
+        // wtedy egzekwowana.
+        SPDLOG_WARN("xrdbbus unavailable ({}); stream name uniqueness is NOT enforced.", claimed.detail);
+        break;
+    }
+  }
+
   std::string percounterFilename{"{notinitialized}"};
   for (const auto &it : coreInstance)
     if (it.id == ":ROTATION") {
@@ -432,11 +496,6 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
   if (percounterFilename != "{notinitialized}") pCounterPtr = std::make_unique<PersistentCounter>(percounterFilename);
 
   auto retVal = system::errc::success;
-
-  // Nazwa instancji musi trafic do transportu PRZED start(): to ona wyznacza komplet nazw
-  // obiektow IPC, ktore watek komunikacyjny tworzy zaraz po uruchomieniu.
-  ipcServer.setServerName(serverName);
-  if (!serverName.empty()) SPDLOG_INFO("Instance name: {}", serverName);
 
   // Sending service in thread. Warstwa protokolu wchodzi do transportu przez te
   // cztery wywolania zwrotne -- IpcServer nie zna qTree, dataModel ani compilera.

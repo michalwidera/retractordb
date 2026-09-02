@@ -1,0 +1,2 @@
+DECLARE ve INTEGER STREAM srce, 1 FILE 'data.txt'
+SELECT srce[0]+5 STREAM dst FROM srce
