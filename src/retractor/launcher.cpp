@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -28,6 +29,7 @@
 #include "lib/persistentCounter.hpp"
 #include "lib/presenter.hpp"
 #include "lib/qTree.hpp"
+#include "lib/serverName.hpp"
 #include "lib/serviceControl.hpp"
 #include "rdb/probe.hpp"  // baner buildu z sondami pomiarowymi
 #include "uxSysTermTools.hpp"
@@ -241,6 +243,38 @@ int main(int argc, char *argv[]) {
       break;
     }
   }
+  // Nazwa instancji musi byc znana rownie wczesnie: wchodzi do nazwy pliku blokady, a straznik
+  // powstaje ponizej. Walidacje robimy tutaj, bo bledna nazwa nie moze dojsc do nazw obiektow IPC.
+  std::string earlyServerName;
+  for (int i = 1; i < argc - 1; ++i) {
+    if (strcmp(argv[i], "-n") == 0 || strcmp(argv[i], "--name") == 0) {
+      earlyServerName = argv[i + 1];
+      break;
+    }
+  }
+  // --autoname to osobna flaga, a nie --name o opcjonalnej wartosci: przy opcjonalnej wartosci
+  // `xretractor --name plik.rql` bylo nierozroznialne od nazwy instancji podanej wprost, bo
+  // plik zapytan jest argumentem pozycyjnym. Osobna flaga nie ma tej dwuznacznosci.
+  const bool wantsAutoName = std::any_of(argv + 1, argv + argc, [](const char *arg) { return strcmp(arg, "--autoname") == 0; });
+  if (wantsAutoName && !earlyServerName.empty()) {
+    std::println(std::cerr, "{}: --autoname and --name are mutually exclusive", argv[0]);
+    return system::errc::invalid_argument;
+  }
+  if (wantsAutoName) {
+    earlyServerName = servername::generate();
+    // Nazwa musi trafic na standardowe wyjscie, nie tylko do logu: bez niej operator nie ma
+    // jak wskazac tej instancji w `xqry --server`. Opróznienie bufora jest tu konieczne, a nie
+    // ostrozne: stdout przekierowany do pliku jest buforowany blokowo, wiec bez flush nazwa
+    // pojawia sie dopiero przy koncu procesu — czyli wtedy, gdy nie jest juz do niczego potrzebna.
+    std::println("Instance name: {}", earlyServerName);
+    std::fflush(stdout);
+  }
+  if (!earlyServerName.empty() && !servername::isValid(earlyServerName)) {
+    std::println(std::cerr, "{}: invalid instance name '{}': expected [a-z][a-z0-9_-]{{0,{}}}", argv[0], earlyServerName,
+                 servername::kMaxLength - 1);
+    return system::errc::invalid_argument;
+  }
+
   const AppConfig earlyAppCfg = [&]() -> AppConfig {
     try {
       return loadAppConfig(earlyConfigPath);
@@ -258,7 +292,10 @@ int main(int argc, char *argv[]) {
     if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--onlycompile") == 0) onlyCompile = true;
   }
 
-  const std::string serviceName = std::string(argv[0]) + "_service";
+  // Bez --name zostaje tozsamosc historyczna (jeden serwer na maszyne, ta sama nazwa blokady
+  // i te same obiekty IPC co dotad). Nazwa wlacza rezim wieloserwerowy i jest opcjonalna
+  // wlasnie po to, zeby dotychczasowe uzycie nie zmienilo sie ani o jeden plik.
+  const std::string serviceName = std::string(argv[0]) + "_service" + (earlyServerName.empty() ? "" : "." + earlyServerName);
   FlockServiceGuard guard(serviceName);
   guard.setLockDir(earlyAppCfg.lockDir);
 
@@ -268,6 +305,7 @@ int main(int argc, char *argv[]) {
     std::string sInputFile;
     std::string sDiagram;
     std::string sConfig;
+    std::string sServerName;
     if (onlyCompile) {
       desc.add_options()                                                             //
           ("help,h", "show help options")                                            //
@@ -295,8 +333,11 @@ int main(int argc, char *argv[]) {
           ("status,s", "check service status")                                    //
           ("verbose,v", "verbose mode (show stream params)")                      //
           ("xqrywait,x", "wait with processing for first query")                  //
-          ("noanykey,k", "do not wait for any key to terminate")                  //
-          ("service,j", "service mode: log to stderr (journald), no log file")    //
+          ("name,n", po::value<std::string>(&sServerName),
+           "instance name; own IPC area and lock (default: single-instance mode)")                    //
+          ("autoname", "generate a docker-style instance name and print it")                          //
+          ("noanykey,k", "do not wait for any key to terminate")                                      //
+          ("service,j", "service mode: log to stderr (journald), no log file")                        //
           ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")       //
           ("no-clock,f", "offline mode: compute slots without waiting for the wall clock")            //
           ("until-eof,u", "stop when a declared source runs out of input (forces one-shot sources)")  //
@@ -503,5 +544,5 @@ int main(int argc, char *argv[]) {
   }
 
   executorsm exec;
-  return exec.run(coreInstance, guard, cm, vm, appCfg);
+  return exec.run(coreInstance, guard, cm, vm, appCfg, earlyServerName);
 }

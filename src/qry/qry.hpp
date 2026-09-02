@@ -2,6 +2,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -40,9 +41,11 @@ class qry {
   formatMode outputFormatMode{formatMode::RAW};
   bool gnuplotRightToLeft{false};
 
+  /// serverName pusta => serwer jednoinstancyjny (nazwy historyczne); niepusta => instancja
+  /// o tej nazwie, czyli jej wlasny obszar IPC.
   explicit qry(int serverNoDataTimeoutMs     = kDefaultServerNoDataTimeoutMs,
                int clientResponseMaxFails    = kDefaultClientResponseMaxFails,
-               int responseQueueOpenMaxFails = kIpcClientDefaultResponseQueueOpenMaxFails);
+               int responseQueueOpenMaxFails = kIpcClientDefaultResponseQueueOpenMaxFails, std::string_view serverName = {});
   selectResult select(boost::program_options::variables_map &vm, int /*iElemLimit*/, const std::string & /*input*/,
                       std::tuple<int, int, int> /*gnuplotDim*/, bool /*gnuplotRightToLeft*/ = false);
   bool adhoc(const std::string & /*sAdhoc*/);

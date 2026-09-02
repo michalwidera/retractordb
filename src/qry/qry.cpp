@@ -25,9 +25,9 @@ using boost::property_tree::ptree;
 // Musi pomieścić jedną sformatowaną linię z nazwami wszystkich kolumn strumienia.
 constexpr int kDirLineBufferSize = 1024;
 
-qry::qry(int serverNoDataTimeoutMs, int clientResponseMaxFails, int responseQueueOpenMaxFails)
+qry::qry(int serverNoDataTimeoutMs, int clientResponseMaxFails, int responseQueueOpenMaxFails, std::string_view serverName)
     : serverNoDataTimeoutMs_(std::max(1, serverNoDataTimeoutMs)),
-      transport_(std::make_unique<IpcClient>(clientResponseMaxFails, responseQueueOpenMaxFails)),
+      transport_(std::make_unique<IpcClient>(clientResponseMaxFails, responseQueueOpenMaxFails, serverName)),
       formatter_(std::make_unique<Formatter>()) {}
 qry::~qry() = default;
 

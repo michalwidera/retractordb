@@ -389,7 +389,8 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
-int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm, const AppConfig &cfg) {
+int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm, const AppConfig &cfg,
+                    std::string_view serverName) {
   executorsm::coreInstancePtr       = &coreInstance;
   executorsm::cmPtr                 = &cm;
   executorsm::cfgQueueBufferSeconds = cfg.ipcQueueBufferSeconds;
@@ -431,6 +432,12 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
   if (percounterFilename != "{notinitialized}") pCounterPtr = std::make_unique<PersistentCounter>(percounterFilename);
 
   auto retVal = system::errc::success;
+
+  // Nazwa instancji musi trafic do transportu PRZED start(): to ona wyznacza komplet nazw
+  // obiektow IPC, ktore watek komunikacyjny tworzy zaraz po uruchomieniu.
+  ipcServer.setServerName(serverName);
+  if (!serverName.empty()) SPDLOG_INFO("Instance name: {}", serverName);
+
   // Sending service in thread. Warstwa protokolu wchodzi do transportu przez te
   // cztery wywolania zwrotne -- IpcServer nie zna qTree, dataModel ani compilera.
   ipcServer.start({

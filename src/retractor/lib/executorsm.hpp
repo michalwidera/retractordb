@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -17,7 +18,10 @@
 using ptree  = boost::property_tree::ptree;
 using vm_map = boost::program_options::variables_map;
 struct executorsm {
-  int run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm, const AppConfig &cfg);
+  /// serverName pusta => tozsamosc historyczna (jeden serwer na maszyne, dotychczasowe nazwy
+  /// obiektow IPC). Niepusta => wlasny, rozlaczny obszar IPC tej instancji.
+  int run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm, const AppConfig &cfg,
+          std::string_view serverName = {});
 
   enum : std::int8_t { inifitie_loop = 0, stop_now = 1, waitForXqry = -1 };
 

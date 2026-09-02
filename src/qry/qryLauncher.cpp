@@ -5,6 +5,7 @@
 #include <print>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
 
@@ -26,13 +27,13 @@ using boost::property_tree::ptree;
 
 namespace IPC = boost::interprocess;
 
-static bool waitForServer(int maxSeconds, int pollIntervalMs) {
+static bool waitForServer(int maxSeconds, int pollIntervalMs, std::string_view serverName) {
   const int safeSeconds      = std::max(1, maxSeconds);
   const int safePollInterval = std::max(1, pollIntervalMs);
   const int maxAttempts      = std::max(1, safeSeconds * 1000 / safePollInterval);
   for (int i = 0; i < maxAttempts; ++i) {
     try {
-      const ipc::ServerNames names = ipc::names();
+      const ipc::ServerNames names = ipc::names(serverName);
       IPC::managed_shared_memory seg(IPC::open_only, names.shmemSegment.c_str());
       IPC::message_queue mq(IPC::open_only, names.queryQueue.c_str());
       return true;
@@ -62,6 +63,7 @@ int main(int argc, char *argv[]) {
     std::string sAdHoc;
     std::string sGnuplotDim;
     std::string sConfig;
+    std::string sServerName;
     std::tuple<int, int, int> gnuplotDim{0, 0, 0};
     desc.add_options()                                                                                    //
         ("select,s", po::value<std::string>(&sInputStream), "show this stream")                           //
@@ -81,7 +83,8 @@ int main(int argc, char *argv[]) {
         ("config,e", po::value<std::string>(&sConfig), "config file (TOML); overrides search")            //
         ("help,h", "produce help message")                                                                //
         ("needctrlc,c", "force ctl+c for stop this tool")                                                 //
-        ("wait-server,w", "poll until xretractor server is available before executing command");
+        ("wait-server,w", "poll until xretractor server is available before executing command")           //
+        ("server", po::value<std::string>(&sServerName), "target xretractor instance name (default: single-instance server)");
     po::positional_options_description p;  // Assume that select is the first option
     p.add("select", -1);
     po::variables_map vm;
@@ -91,7 +94,8 @@ int main(int argc, char *argv[]) {
 
     const AppConfig appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
 
-    qry obj(appCfg.timingQueryNoDataTimeoutMs, appCfg.ipcClientResponseMaxFails);
+    qry obj(appCfg.timingQueryNoDataTimeoutMs, appCfg.ipcClientResponseMaxFails, kIpcClientDefaultResponseQueueOpenMaxFails,
+            sServerName);
 
     if (vm.count("graphite") + vm.count("raw") + vm.count("influxdb") + vm.count("gnuplot") > 1) {
       std::println("Only one output format could be selected.");
@@ -140,7 +144,7 @@ int main(int argc, char *argv[]) {
       return system::errc::invalid_argument;
     }
     if (vm.contains("wait-server") && !vm.contains("help")) {
-      if (!waitForServer(appCfg.timingServerStartupWaitSeconds, appCfg.timingServerStartupPollIntervalMs)) {
+      if (!waitForServer(appCfg.timingServerStartupWaitSeconds, appCfg.timingServerStartupPollIntervalMs, sServerName)) {
         SPDLOG_ERROR("server not available after {} seconds", appCfg.timingServerStartupWaitSeconds);
         return system::errc::no_child_process;
       }
