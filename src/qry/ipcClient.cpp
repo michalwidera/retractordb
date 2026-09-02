@@ -25,14 +25,15 @@
 using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
 
-IpcClient::IpcClient(int clientResponseMaxFails, int responseQueueOpenMaxFails)
+IpcClient::IpcClient(int clientResponseMaxFails, int responseQueueOpenMaxFails, std::string_view serverName)
     : clientResponseMaxFails_(std::max(1, clientResponseMaxFails)),
-      responseQueueOpenMaxFails_(std::max(1, responseQueueOpenMaxFails)) {}
+      responseQueueOpenMaxFails_(std::max(1, responseQueueOpenMaxFails)),
+      names_(ipc::names(serverName)) {}
 
 bool IpcClient::popQueue(ptree &pt) { return spsc_queue_.pop(pt); }
 
 void IpcClient::producer() {
-  const std::string queueName = std::string(ipc::kResponseQueuePrefix) + std::to_string(getpid());
+  const std::string queueName = names_.responseQueue(getpid());
 
   // Kolejkę odpowiedzi tworzy SERWER w reakcji na rejestrację klienta, więc
   // `open_only` wołane natychmiast po starcie wątku bywa o krok za wcześnie.
@@ -76,7 +77,7 @@ void IpcClient::producer() {
         std::this_thread::sleep_for(ipc::kQueuePollInterval);
     }
   } catch (IPC::interprocess_exception &e) {
-    SPDLOG_ERROR("IPC: {} (producer queue:{})", e.what(), std::string(ipc::kResponseQueuePrefix) + std::to_string(getpid()));
+    SPDLOG_ERROR("IPC: {} (producer queue:{})", e.what(), names_.responseQueue(getpid()));
     done = true;
   }
 }
@@ -85,13 +86,13 @@ ptree IpcClient::netClient(const std::string &netCommand, const std::string &net
   ptree pt_response;
   ptree pt_request;
   try {
-    IPC::managed_shared_memory mapSegment(IPC::open_only, std::string(ipc::kShmemSegment).c_str());
-    IPC::named_mutex mapMutex(IPC::open_only, std::string(ipc::kMapMutex).c_str());
+    IPC::managed_shared_memory mapSegment(IPC::open_only, names_.shmemSegment.c_str());
+    IPC::named_mutex mapMutex(IPC::open_only, names_.mapMutex.c_str());
     pt_request.put("db.message", netCommand);
     pt_request.put("db.id", getpid());
     if (!netArgument.empty()) pt_request.put("db.argument", netArgument);
 
-    IPC::message_queue mq(IPC::open_only, std::string(ipc::kQueryQueue).c_str());
+    IPC::message_queue mq(IPC::open_only, names_.queryQueue.c_str());
     std::stringstream request_stream;
     write_info(request_stream, pt_request);
     mq.send(request_stream.str().c_str(), request_stream.str().length(), 0);

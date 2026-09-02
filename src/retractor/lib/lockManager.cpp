@@ -107,10 +107,23 @@ bool FlockServiceGuard::acquireLock() {
 
   isLocked = true;
 
-  if (!writeLockInfo()) {
-    SPDLOG_WARN("Cannot write process info to lock file: {}, bypass.", lockFilePath);
+  // Plik zerujemy natychmiast, ale opisu procesu jeszcze nie piszemy (patrz publishLockInfo).
+  // Po padzie poprzednika zostaje w pliku JEGO opis, a nikt go nie prostuje az do publikacji --
+  // pusty plik czyta sie jako "instancja wstaje", nie jako cudzy, nieaktualny serwer.
+  if (ftruncate(lockFileDescriptor, 0) == -1) {
+    SPDLOG_WARN("Cannot truncate lock file: {}, errno: {}", lockFilePath, strerror(errno));
   }
 
+  return true;
+}
+
+bool FlockServiceGuard::publishLockInfo() {
+  if (!isLockActive()) return false;
+
+  if (!writeLockInfo()) {
+    SPDLOG_WARN("Cannot write process info to lock file: {}, bypass.", lockFilePath);
+    return false;
+  }
   return true;
 }
 

@@ -32,8 +32,9 @@ static bool waitForServer(int maxSeconds, int pollIntervalMs) {
   const int maxAttempts      = std::max(1, safeSeconds * 1000 / safePollInterval);
   for (int i = 0; i < maxAttempts; ++i) {
     try {
-      IPC::managed_shared_memory seg(IPC::open_only, std::string(ipc::kShmemSegment).c_str());
-      IPC::message_queue mq(IPC::open_only, std::string(ipc::kQueryQueue).c_str());
+      const ipc::ServerNames names = ipc::names();
+      IPC::managed_shared_memory seg(IPC::open_only, names.shmemSegment.c_str());
+      IPC::message_queue mq(IPC::open_only, names.queryQueue.c_str());
       return true;
     } catch (...) {
       std::this_thread::sleep_for(std::chrono::milliseconds(safePollInterval));

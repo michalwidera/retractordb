@@ -73,7 +73,7 @@ TEST(IpcClient, multiple_instances_have_independent_queues) {
 // kończył się kodem 0, nie przeczytawszy nic. Cichy sukces bez danych.
 
 namespace {
-std::string responseQueueName() { return std::string(ipc::kResponseQueuePrefix) + std::to_string(::getpid()); }
+std::string responseQueueName() { return ipc::names().responseQueue(::getpid()); }
 
 struct QueueEraser {
   ~QueueEraser() { boost::interprocess::message_queue::remove(responseQueueName().c_str()); }
@@ -155,18 +155,18 @@ class SilentServer {
 
  public:
   SilentServer()
-      : segment_(boost::interprocess::open_or_create, std::string(ipc::kShmemSegment).c_str(), ipc::kShmemSegmentSize),
-        mutex_(boost::interprocess::open_or_create, std::string(ipc::kMapMutex).c_str()),
-        queue_(boost::interprocess::open_or_create, std::string(ipc::kQueryQueue).c_str(), ipc::kQueryQueueMaxMessages,
+      : segment_(boost::interprocess::open_or_create, ipc::names().shmemSegment.c_str(), ipc::kShmemSegmentSize),
+        mutex_(boost::interprocess::open_or_create, ipc::names().mapMutex.c_str()),
+        queue_(boost::interprocess::open_or_create, ipc::names().queryQueue.c_str(), ipc::kQueryQueueMaxMessages,
                ipc::kQueryQueueMaxMessageSize) {
     segment_.construct<IPCMap>(std::string(ipc::kMapObject).c_str())(std::less<>(),
                                                                      ShmemAllocator(segment_.get_segment_manager()));
   }
 
   ~SilentServer() {
-    boost::interprocess::shared_memory_object::remove(std::string(ipc::kShmemSegment).c_str());
-    boost::interprocess::named_mutex::remove(std::string(ipc::kMapMutex).c_str());
-    boost::interprocess::message_queue::remove(std::string(ipc::kQueryQueue).c_str());
+    boost::interprocess::shared_memory_object::remove(ipc::names().shmemSegment.c_str());
+    boost::interprocess::named_mutex::remove(ipc::names().mapMutex.c_str());
+    boost::interprocess::message_queue::remove(ipc::names().queryQueue.c_str());
   }
 };
 

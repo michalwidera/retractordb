@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <string>
 #include <string_view>
 
 namespace constants {
@@ -27,6 +28,47 @@ constexpr std::string_view kMapObject = "MyMap";
 
 // Prefiks nazwy kolejki odpowiedzi per-proces; pełna nazwa = prefiks + PID.
 constexpr std::string_view kResponseQueuePrefix = "brcdbr";
+
+// === Nazwy obiektów IPC jednego serwera ===
+//
+// Powyższe stałe są nazwami BAZOWYMI. Komplet obiektów jednego serwera wyróżnia nazwa
+// serwera doklejana jako sufiks, dzięki czemu obszary IPC kolejnych serwerów są rozłączne
+// i żaden z nich nie może skasować cudzych obiektów.
+//
+// Pusta nazwa serwera daje dokładnie nazwy historyczne (jednoserwerowe). To jest celowe:
+// sama parametryzacja niczego nie zmienia w zachowaniu, a rozdział obszarów włącza się
+// dopiero wtedy, gdy ktoś poda nazwę niepustą.
+struct ServerNames {
+  std::string shmemSegment;
+  std::string mapMutex;
+  std::string queryQueue;
+  std::string responseQueuePrefix;
+
+  /// Nazwa kolejki odpowiedzi konkretnego klienta.
+  [[nodiscard]] std::string responseQueue(int clientId) const { return responseQueuePrefix + std::to_string(clientId); }
+};
+
+/// Nazwa bazowa z sufiksem serwera; bez sufiksu, gdy nazwa serwera pusta.
+inline std::string withServerSuffix(std::string_view base, std::string_view serverName) {
+  std::string retVal(base);
+  if (!serverName.empty()) {
+    retVal += '.';
+    retVal += serverName;
+  }
+  return retVal;
+}
+
+inline ServerNames names(std::string_view serverName = {}) {
+  ServerNames retVal;
+  retVal.shmemSegment = withServerSuffix(kShmemSegment, serverName);
+  retVal.mapMutex     = withServerSuffix(kMapMutex, serverName);
+  retVal.queryQueue   = withServerSuffix(kQueryQueue, serverName);
+  // Prefiks kolejki odpowiedzi domyka się kropką, bo doklejany jest do niego identyfikator
+  // klienta: bez separatora "brcdbr.srv" + "12" i "brcdbr.srv1" + "2" dałyby tę samą nazwę.
+  retVal.responseQueuePrefix =
+      serverName.empty() ? std::string(kResponseQueuePrefix) : withServerSuffix(kResponseQueuePrefix, serverName) + ".";
+  return retVal;
+}
 
 // === Rozmiary buforów i kolejek ===
 

@@ -397,14 +397,30 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
   executorsm::cfgRtPriority         = cfg.schedulingRtPriority;
   dataModelExpected                 = !coreInstance.empty();
 
-  std::atexit(cleanup);
-
   // Zakres waznosci wskaznika na straznika — patrz komentarz przy serviceGuardPtr.
   // RAII, a nie zerowanie przy kazdym `return`, bo run() ma ich kilka.
   struct LockGuardScope {
     explicit LockGuardScope(FlockServiceGuard &g) { serviceGuardPtr = &g; }
     ~LockGuardScope() { serviceGuardPtr = nullptr; }
   } lockGuardScope(guard);
+
+  // Kolejnosc ponizej jest wymogiem poprawnosci, nie stylem. Wylacznosc instancji musi byc
+  // ustalona ZANIM proces dotknie obiektow IPC: commandLoop() na wejsciu kasuje segment,
+  // kolejke komend i muteks nazwany. Gdy blokada byla brana dopiero PO starcie transportu,
+  // druga instancja wycinala te obiekty zywemu serwerowi spod nog — jego klienci dostawali
+  // "server not found", a handler atexit instancji-intruza kasowal je po raz drugi.
+  // Po przejeciu blokady te same remove() sa juz bezpieczne i nadal potrzebne: flock dowodzi,
+  // ze zaden inny ZYWY serwer nie istnieje, wiec kasowane sa wylacznie smieci po poprzedniku,
+  // ktory padl (po SIGKILL segmenty zostaja w /dev/shm i open_or_create trafilby na nie).
+  if (!guard.acquireLock()) {
+    SPDLOG_ERROR("Cannot acquire service lock, another instance might be running.");
+    return system::errc::no_lock_available;
+  }
+
+  // atexit dopiero po przejeciu blokady. Handler kasuje obiekty IPC i zwalnia blokade, wiec
+  // instancja, ktora blokady NIE dostala, nie moze go miec zarejestrowanego — inaczej przy
+  // wyjsciu sprzatalaby zasoby cudzego, dzialajacego serwera.
+  std::atexit(cleanup);
 
   std::string percounterFilename{"{notinitialized}"};
   for (const auto &it : coreInstance)
@@ -451,16 +467,12 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     cv.wait(lock, [] { return executorsm::ipcReady.load(); });
   }
 
-  if (!guard.acquireLock()) {
-    SPDLOG_ERROR("Cannot acquire service lock, another instance might be running.");
-    {
-      std::scoped_lock lock(core_mutex);
-      iLoopLimitCnt = executorsm::stop_now;
-    }
-    cv.notify_all();
-    ipcServer.stop();
-    return system::errc::no_lock_available;
-  }
+  // Blokade mamy od poczatku run(), ale jej TRESC publikujemy dopiero teraz. Linia
+  // "PID: <pid>" w pliku blokady jest dla klientow i dla testow sygnalem "serwer gotowy"
+  // (kontrakt server_start w test/IntegrationTest_serial/serverlib.sh), wiec nie moze
+  // pojawic sie, zanim segment i kolejka komend beda istniec.
+  guard.publishLockInfo();
+
   try {
     bool ignoreanykey = vm.contains("noanykey");
 

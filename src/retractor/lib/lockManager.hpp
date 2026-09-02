@@ -28,7 +28,16 @@ class FlockServiceGuard {
   explicit FlockServiceGuard(const std::string &serviceName);
   ~FlockServiceGuard();
 
+  // Przejmuje wylaczna blokade i ZERUJE plik. Tresci (PID/MODE/UNIT/...) jeszcze nie zapisuje --
+  // robi to publishLockInfo(). Rozdzielenie jest wymogiem poprawnosci startu: wylacznosc musi byc
+  // ustalona ZANIM instancja dotknie obiektow IPC, ale pusty plik nie moze udawac gotowego serwera
+  // przed klientami, ktorzy czekaja na linie "PID: <pid>".
   bool acquireLock();
+
+  // Zapisuje do trzymanej blokady informacje o procesie. Wolac dopiero gdy instancja jest
+  // gotowa obsluzyc klientow -- pojawienie sie linii "PID: <pid>" jest dla nich sygnalem startu.
+  bool publishLockInfo();
+
   void setLockDir(const std::string &dir);
   // Ścieżka pliku zapytań tej instancji — zapisywana do locka jako QUERYFILE, by inna instancja
   // wiedziała, który plik nadpisać przed restartem serwisu. Ustawić przed acquireLock().

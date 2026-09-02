@@ -1,9 +1,12 @@
 #pragma once
 #include <atomic>
 #include <string>
+#include <string_view>
 
 #include <boost/lockfree/spsc_queue.hpp>
 #include <boost/property_tree/ptree.hpp>
+
+#include "constants.hpp"
 
 // Pojemność wewnętrznej kolejki SPSC między wątkiem producenta (IPC) a wątkiem select().
 // Wartość musi być potęgą 2 i wystarczająco duża by zaabsorbować burstowe dane strumieniowe.
@@ -33,6 +36,10 @@ class IpcClient {
   int clientResponseMaxFails_{kIpcClientDefaultResponseMaxFails};
   int responseQueueOpenMaxFails_{kIpcClientDefaultResponseQueueOpenMaxFails};
 
+  // Komplet nazw obiektow IPC serwera, z ktorym rozmawia ten klient. Nazwa pusta =
+  // nazwy historyczne, jednoserwerowe.
+  ipc::ServerNames names_{ipc::names()};
+
  public:
   std::atomic<bool> done{false};
 
@@ -43,7 +50,8 @@ class IpcClient {
   std::atomic<bool> responseQueueMissing{false};
 
   explicit IpcClient(int clientResponseMaxFails    = kIpcClientDefaultResponseMaxFails,
-                     int responseQueueOpenMaxFails = kIpcClientDefaultResponseQueueOpenMaxFails);
+                     int responseQueueOpenMaxFails = kIpcClientDefaultResponseQueueOpenMaxFails,
+                     std::string_view serverName   = {});
 
   boost::property_tree::ptree netClient(const std::string &netCommand, const std::string &netArgument);
   void producer();
