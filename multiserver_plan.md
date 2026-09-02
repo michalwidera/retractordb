@@ -7,24 +7,23 @@ kolejny etap dało się zacząć od czystego kontekstu bez powtarzania rozpoznan
 
 ## Zadanie do wykonania w nowej sesji
 
-> **Cel:** routing automatyczny w `xqry` — klient sam znajduje właściciela strumienia,
-> zamiast wymagać `--server`.
-> **Gotowe gdy:** `xqry --servers` listuje instancje bez kontaktu z serwerami, `xqry -s
-> <strumień>` trafia do właściciela bez podania `--server`, zapytanie ad-hoc przekraczające
-> granicę serwera jest odrzucane, `ctest` zielony w Debug i Release, `ninja test_gate`
-> przechodzi bez pominiętych poziomów.
-> **Pliki dotknięte:** `src/qry/qryLauncher.cpp`, `src/qry/ipcClient.{hpp,cpp}`, ewentualnie
-> `src/retractor/lib/bus.{hpp,cpp}` (odczyt magistrali jest już gotowy — `Bus::instances()`),
-> nowy katalog `test/IntegrationTest_serial/multiserver_routing/`.
+> **Cel:** E3 — dostarczenie zestawu zapytan dzialajacemu serwisowi bez recznego restartu.
+> **Gotowe gdy:** ustalone z czlowiekiem; zakres nizej jest przeslanka, nie planem.
+> **Pliki dotkniete:** do ustalenia.
 
-Próg planowania z `CLAUDE.md` jest przekroczony (≥3 pliki) — przed pisaniem kodu przedstawić plan
-z kryteriami sukcesu i poczekać na akceptację.
+Routing 2c jest zamkniety, wiec sciezka E3 ma juz komplet przeslanek: skompiluj plik, sprawdz
+magistrale, przy kolizji nazw strumieni to jest wlasciciel tego DAG-u — dostarcz plik i
+zrestartuj **jego** unit; przy rozlacznosci wystartuj nowa instancje. Restart, a nie IPC
+ad-hoc: `getAdHoc` nie umie `RULE`, `STORAGE`, `SUBSTRAT` ani `PERCOUNTER`, a jego skutek jest
+ulotny.
 
-Magistrala jest gotowa i przetestowana; 2c **nie wymaga zmian w segmencie ani w układzie slotu**.
-Czytelnik potrzebuje wyłącznie `bus::Bus::instances()`, które zwraca nazwę instancji, PID, plik
-zapytań i listę strumieni każdej żywej instancji, bez muteksu i bez kontaktu z serwerami.
+Otwarte, swiadomie nieobjete dotad:
 
----
+- Kolizja sciezki licznika `:ROTATION` i katalogu `:STORAGE` nadal nie jest wykrywana.
+- Strumien powolany zapytaniem ad-hoc **nie jest roszczony w magistrali**. Plan serwera rosnie
+  o nazwe, ktorej rozlacznosc nie jest egzekwowana wobec pozostalych instancji.
+- Pole `unit` (nazwa jednostki systemd) w slocie: wymaga wyniesienia `detectSystemdIdentity()`
+  z `lockManager.cpp` i bumpu `layoutVersion`.
 
 ## Stan na dziś
 
@@ -33,12 +32,13 @@ zapytań i listę strumieni każdej żywej instancji, bez muteksu i bez kontaktu
 | 0 | Kolejność: blokada instancji przed obiektami IPC | **zrobione**, commit `acd07dc` |
 | 1 | Nazwy obiektów IPC sparametryzowane nazwą serwera | **zrobione**, commit `acd07dc` |
 | 2a | Tożsamość serwera: `--name`, `--autoname`, `xqry --server` | **zrobione**, commit `0533a11` |
-| 2b | Magistrala `xrdbbus`: wykrywanie + unikalność strumieni | **zrobione**, niezacommitowane |
-| 2c | Routing automatyczny w `xqry` | do zrobienia |
+| 2b | Magistrala `xrdbbus`: wykrywanie + unikalność strumieni | **zrobione**, commit `0cb845d` |
+| 2c | Routing automatyczny w `xqry` | **zrobione**, niezacommitowane |
 
 Po etapie 2b dwa serwery pracują równocześnie, a kolizja nazw strumieni jest wykrywana przy
-starcie i kończy się odmową wskazującą właściciela. Klient nadal musi wskazać serwer jawnie
-(`xqry --server alfa`) — to jest zakres 2c.
+starcie i kończy się odmową wskazującą właściciela. Po 2c klient nie musi już wskazywać serwera:
+`xqry -s dstb` sam trafia do właściciela, a komenda, której nie da się przypisać do jednej
+instancji, kończy się odmową z listą kandydatów.
 
 ---
 
@@ -246,24 +246,75 @@ kończy się nieudany `flock`, żeby dwie różne diagnozy nie skleiły się w j
 
 ---
 
-## Etap 2c — routing w xqry
+## Etap 2c — routing w xqry (stan zrealizowany)
 
-- `xqry --servers` — lista instancji i ich strumieni, czysty odczyt magistrali, bez kontaktu
-  z serwerami.
-- `xqry -s <strumień>` — rozwiązanie nazwy przez magistralę, potem rozmowa z właścicielem.
-- `xqry -k` — przy dokładnie jednej żywej instancji zachowuje się jak dotąd (to trzyma istniejące
-  testy przy życiu), przy wielu wymaga `-k <nazwa>` albo `--server <nazwa>`.
-- **ad-hoc**: klient wyciąga tokeny `[A-Za-z_]\w*`, przecina ze zbiorem znanych nazw strumieni
-  z magistrali, wszystkie muszą należeć do jednej instancji; inaczej błąd „zapytanie przekracza
-  granicę serwera". **Rozgłaszanie ad-hoc jest wykluczone** — `getAdHoc` modyfikuje plan serwera
-  (`src/retractor/lib/executorsm.cpp:252`), więc trafienie w niewłaściwą instancję to nie pomyłka,
-  tylko trwały skutek uboczny.
+### Zasada nadrzędna
 
-Ścieżka E3 (dostarczenie zestawu zapytań działającemu serwisowi) uogólnia się wtedy naturalnie:
-skompiluj, sprawdź magistralę, przy kolizji nazw strumieni to jest właściciel tego DAG-u —
-dostarcz plik i zrestartuj **jego** unit; przy rozłączności wystartuj nową instancję.
+> Rozstrzygnięcie właściciela **nigdy nie odpytuje serwerów.** Żywotność instancji rozstrzyga
+> `/proc`, nie timeout.
 
----
+Powód jest wprost przeniesiony z pomiaru z 2 września: osierocony segment jest nieodróżnialny
+od żywego aż do wyczerpania budżetu klienta (3,008 s), więc szukanie strumienia przez
+odpytywanie kosztowałoby N × 3 s dokładnie w najczęstszym przypadku — literówce. Punkt (6)
+w `multiserver_routing/routing.sh` jest na to regresją: mierzy czas `--servers` nad segmentem
+z samymi martwymi slotami i wymaga poniżej 1 s.
+
+### Reguły rozstrzygania
+
+| sytuacja | zachowanie |
+|---|---|
+| podano `--server X` | wygrywa zawsze, magistrala **nieczytana** |
+| magistrala niedostępna albo 0 instancji | nazwa pusta = tryb historyczny |
+| dokładnie 1 instancja | jej nazwa, **bez sprawdzania strumienia** |
+| ≥2, `-s`/`-t <strumień>` | właściciel z magistrali; brak → kod `2` (`no_such_file_or_directory`) |
+| ≥2, `-a` | wszystkie rozpoznane nazwy w jednej instancji → tam; inaczej kod `22` |
+| ≥2, `-k`/`-d`/`-y`/`-l` | odmowa z listą kandydatów, kod `22` |
+
+**Przy jednej instancji nie sprawdzamy strumienia celowo.** Diagnostyka „nie ma takiego
+strumienia" należy wtedy do serwera, dokładnie jak przed 2c — i to jest powód, dla którego
+żaden istniejący test integracyjny ani `serverlib.sh` nie wymagał poprawki.
+
+### Decyzje przyjęte w 2c
+
+- **Klient nie zakłada magistrali.** `Bus` dostał `createIfMissing`; `xqry` woła z `false`.
+  Pusty segment 862 kB założony przez proces jednorazowy nie niesie żadnej informacji, a jego
+  brak znaczy dokładnie tyle, że żaden serwer nie wystartował — stan normalny, nie awaria.
+- **Kolejność warunków w `resolveTarget` odpowiada kolejności wysyłki w `main()`.** Gdyby się
+  rozjechały, routing rozstrzygałby według innej komendy niż ta, która faktycznie poleci do
+  serwera: `xqry -k -a "..."` zabija serwer, więc musi być rozstrzygany jak `-k`.
+- **Tokenizacja ad-hoc pomija literały w apostrofach.** Bez tego napis `'dstb'` w wyrażeniu
+  przekierowałby zapytanie do obcej instancji — a `getAdHoc` modyfikuje **plan** serwera
+  (`executorsm.cpp:252`), więc trafienie w niewłaściwą instancję to trwały skutek uboczny,
+  nie pomyłka do powtórzenia. Punkt (5) testu sprawdza planami przed i po, że odrzucony
+  ad-hoc nie zostawił śladu.
+- **`-k` rozróżnia się wyłącznie przez `--server`.** Forma pozycyjna `xqry -k <nazwa>` odpadła:
+  `-k` nie przyjmuje wartości, a argument pozycyjny jest już zajęty przez `select`, więc
+  `xqry -k str1` czytałoby się jak „zabij strumień str1".
+- **Logika rozstrzygania jest czysta i wydzielona** (`src/qry/serverRouting.{hpp,cpp}`): pracuje
+  na gotowej migawce, nie dotyka IPC. Dzięki temu 15 przypadków w `test_serverRouting` biegnie
+  pod valgrindem bez pamięci dzielonej i bez startowania serwerów.
+- **`bus.cpp` dokładana źródłowo do binarki `xqry`**, tak jak `appConfig.cpp` — zależy tylko od
+  pthread/boost.interprocess/spdlog. Do biblioteki `qry` jej **nie** ma: testy jednostkowe
+  linkują jednocześnie `qry` i `retractor`, a dwie kopie `bus.o` dałyby duplikaty symboli.
+
+### Format `xqry --servers`
+
+Jedna linia na instancję, pola oddzielone spacją, sortowane; instancja bezimienna jako
+`(unnamed)`, brak pliku zapytań jako `-`:
+
+```
+alfa 249247 alfa.rql srca dsta
+beta 249248 beta.rql srcb dstb
+```
+
+Brak żywych instancji: pusty stdout, jedna linia na stderr, kod `0`.
+
+### Czego 2c nie objęło
+
+- **Strumień powołany zapytaniem ad-hoc nie jest roszczony w magistrali.** Plan serwera rośnie
+  o nazwę, której rozłączność nie jest egzekwowana wobec pozostałych instancji.
+- `-w/--wait-server` nadal czeka na nazwy podane jawnie (albo historyczne), bo routing wymaga
+  żywej instancji, a `-w` służy dokładnie sytuacji, w której jej jeszcze nie ma.
 
 ## Protokół weryfikacji
 
@@ -291,7 +342,9 @@ python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <plik>
 ```
 
 Bramka ablacyjna **nie jest wymagana**, dopóki etap nie dotyka `compiler.cpp`, `SOperations.hpp`,
-`computeStartupLatency` ani kodu za przełącznikami `RDB_OPT_*`. Etapy 0–2a jej nie dotykały.
+`computeStartupLatency` ani kodu za przełącznikami `RDB_OPT_*`. Etapy 0–2c jej nie dotykały.
+Bramka badawcza jest wymagana od 2b wzwyż — te etapy zmieniają `src/`, więc profile H9 trzeba
+przebudować, inaczej poziom 84/84 zostaje pominięty (pułapka 1).
 
 ---
 
@@ -352,11 +405,14 @@ Każda z nich kosztowała czas w sesji z 2 września 2026.
 | `src/retractor/lib/executorsm.cpp` | `run()` — kolejność startu i rejestracja w magistrali; `cleanup()` zwalnia slot |
 | `src/retractor/launcher.cpp` | wczesny skan `--name` / `--autoname`, walidacja, nazwa pliku blokady |
 | `src/qry/ipcClient.{hpp,cpp}` | klient zna nazwę instancji, z którą rozmawia |
-| `src/qry/qryLauncher.cpp` | opcja `--server`, `waitForServer` |
+| `src/qry/serverRouting.{hpp,cpp}` | czyste reguły routingu nad migawką magistrali; bez IPC |
+| `src/qry/qryLauncher.cpp` | opcje `--server` / `--servers`, `resolveTarget`, `waitForServer` |
 | `test/IntegrationTest_serial/serverlib.sh` | oprawa **jednoinstancyjna** — nie używać w testach wieloserwerowych |
 | `test/IntegrationTest_serial/multiserver_named/` | wzorzec testu dwuserwerowego z własną bramką higieny |
 | `test/IntegrationTest_serial/multiserver_uniqueness/` | 5 punktów kontrolnych unikalności; zabija serwer przez SIGKILL i sam sprząta po sobie |
+| `test/IntegrationTest_serial/multiserver_routing/` | 6 punktów routingu; mierzy też czas `--servers` nad osieroconym segmentem |
 | `test/UnitTest/test_bus.cpp` | 9 przypadków magistrali pod valgrindem; pracuje na segmencie `xrdbbus_ut`, nie na produkcyjnym |
+| `test/UnitTest/test_serverRouting.cpp` | 15 przypadków reguł routingu; bez pamięci dzielonej i bez serwerów |
 
 ## Zgodność wsteczna — reguła obowiązująca do końca prac
 

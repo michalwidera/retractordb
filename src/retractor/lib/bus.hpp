@@ -85,7 +85,11 @@ class Bus {
   /// bledem startu serwera -- obiekt przechodzi wtedy w stan niepodlaczony, a claim() zwraca
   /// Unavailable. Nazwa segmentu jest parametrem wylacznie po to, by test jednostkowy nie
   /// dotykal magistrali dzialajacych serwerow.
-  explicit Bus(std::string_view segmentName = kSegmentName);
+  ///
+  /// createIfMissing = false to tryb CZYTELNIKA (xqry). Klient nie ma prawa zakladac
+  /// magistrali: pusty segment nie niesie zadnej informacji, a jego brak znaczy dokladnie
+  /// tyle, ze zaden serwer jeszcze nie wystartowal -- czyli stan normalny, nie awaria.
+  explicit Bus(std::string_view segmentName = kSegmentName, bool createIfMissing = true);
   ~Bus();
 
   Bus(const Bus &)            = delete;

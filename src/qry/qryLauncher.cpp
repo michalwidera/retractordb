@@ -20,6 +20,8 @@
 #include "config.h"  // Add an automatically generated configuration file
 #include "constants.hpp"
 #include "qry.hpp"
+#include "retractor/lib/bus.hpp"
+#include "serverRouting.hpp"
 #include "uxSysTermTools.hpp"
 
 using namespace boost;
@@ -48,6 +50,28 @@ void cleanup() {
   spdlog::shutdown();  // flush logs on disk
 }
 
+/// Rozstrzyga instancję docelową dla komendy, która nie dostała jawnego `--server`.
+///
+/// Kolejność warunków odpowiada kolejności wysyłki w `main()`. To nie jest kosmetyka: gdyby
+/// się rozjechały, routing rozstrzygałby według innej komendy niż ta, która faktycznie
+/// poleci do serwera — np. `xqry -k -a "..."` zabija serwer, więc musi być rozstrzygany
+/// jak `-k`, a nie jak zapytanie ad-hoc.
+///
+/// Przy dokładnie jednej żywej instancji zwracamy jej nazwę BEZ sprawdzania strumienia.
+/// Diagnostyka "nie ma takiego strumienia" należy wtedy do serwera, dokładnie tak jak przed
+/// etapem 2c — dzięki temu żaden istniejący test integracyjny nie wymaga poprawki.
+static routing::Resolution resolveTarget(const boost::program_options::variables_map &vm,
+                                         const std::vector<bus::InstanceInfo> &instances, int elemLimit,
+                                         const std::string &stream, const std::string &detail, const std::string &adHoc) {
+  if (instances.size() <= 1) return routing::forSingleTarget(instances);
+  if (vm.contains("hello") || (vm.contains("kill") && elemLimit == 0) || vm.contains("dir") || vm.contains("diryaml"))
+    return routing::forSingleTarget(instances);
+  if (vm.contains("adhoc") && !adHoc.empty()) return routing::forAdHoc(instances, adHoc);
+  if (vm.contains("detail")) return routing::forStream(instances, detail);
+  if (vm.contains("select") && stream != "none") return routing::forStream(instances, stream);
+  return routing::forSingleTarget(instances);
+}
+
 int main(int argc, char *argv[]) {
   fixArgcv(argc, argv);
   const auto tempLocation = setupLoggerMain(std::string(argv[0]), true);
@@ -65,26 +89,27 @@ int main(int argc, char *argv[]) {
     std::string sConfig;
     std::string sServerName;
     std::tuple<int, int, int> gnuplotDim{0, 0, 0};
-    desc.add_options()                                                                                    //
-        ("select,s", po::value<std::string>(&sInputStream), "show this stream")                           //
-        ("detail,t", po::value<std::string>(&sDetailStream), "show details of this stream")               //
-        ("adhoc,a", po::value<std::string>(&sAdHoc), "adhoc query mode")                                  //
-        ("elimitqry,m", po::value<int>(&elemLimit)->default_value(0), "limit of elements, 0 - no limit")  //
-        ("null,n", "if null row appear - skip it in output")                                              //
-        ("hello,l", "diagnostic - hello db world")                                                        //
-        ("kill,k", "kill xretractor server")                                                              //
-        ("dir,d", "list of queries")                                                                      //
-        ("diryaml,y", "list of queries in yaml format")                                                   //
-        ("raw,r", "raw output mode (default)")                                                            //
-        ("graphite,g", "graphite output mode")                                                            //
-        ("influxdb,f", "influxDB output mode")                                                            //
-        ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                  //
-        ("gnuplot-rtl,z", "gnuplot output: newest samples on the right (right-to-left scroll)")           //
-        ("config,e", po::value<std::string>(&sConfig), "config file (TOML); overrides search")            //
-        ("help,h", "produce help message")                                                                //
-        ("needctrlc,c", "force ctl+c for stop this tool")                                                 //
-        ("wait-server,w", "poll until xretractor server is available before executing command")           //
-        ("server", po::value<std::string>(&sServerName), "target xretractor instance name (default: single-instance server)");
+    desc.add_options()                                                                                                        //
+        ("select,s", po::value<std::string>(&sInputStream), "show this stream")                                               //
+        ("detail,t", po::value<std::string>(&sDetailStream), "show details of this stream")                                   //
+        ("adhoc,a", po::value<std::string>(&sAdHoc), "adhoc query mode")                                                      //
+        ("elimitqry,m", po::value<int>(&elemLimit)->default_value(0), "limit of elements, 0 - no limit")                      //
+        ("null,n", "if null row appear - skip it in output")                                                                  //
+        ("hello,l", "diagnostic - hello db world")                                                                            //
+        ("kill,k", "kill xretractor server")                                                                                  //
+        ("dir,d", "list of queries")                                                                                          //
+        ("diryaml,y", "list of queries in yaml format")                                                                       //
+        ("raw,r", "raw output mode (default)")                                                                                //
+        ("graphite,g", "graphite output mode")                                                                                //
+        ("influxdb,f", "influxDB output mode")                                                                                //
+        ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                                      //
+        ("gnuplot-rtl,z", "gnuplot output: newest samples on the right (right-to-left scroll)")                               //
+        ("config,e", po::value<std::string>(&sConfig), "config file (TOML); overrides search")                                //
+        ("help,h", "produce help message")                                                                                    //
+        ("needctrlc,c", "force ctl+c for stop this tool")                                                                     //
+        ("wait-server,w", "poll until xretractor server is available before executing command")                               //
+        ("server", po::value<std::string>(&sServerName), "target xretractor instance name (default: resolved from the bus)")  //
+        ("servers", "list live xretractor instances and their streams");
     po::positional_options_description p;  // Assume that select is the first option
     p.add("select", -1);
     po::variables_map vm;
@@ -94,19 +119,22 @@ int main(int argc, char *argv[]) {
 
     const AppConfig appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
 
-    qry obj(appCfg.timingQueryNoDataTimeoutMs, appCfg.ipcClientResponseMaxFails, kIpcClientDefaultResponseQueueOpenMaxFails,
-            sServerName);
+    // Format wyjścia rozbierany do zmiennych lokalnych, a nie wprost do obiektu `qry`:
+    // instancja docelowa jest znana dopiero po odczycie magistrali, więc `qry` powstaje
+    // niżej. Walidacja argumentów zostaje tam, gdzie była — przed jakimkolwiek IPC.
+    formatMode outputFormatMode{formatMode::RAW};
+    bool gnuplotRightToLeft{false};
 
     if (vm.count("graphite") + vm.count("raw") + vm.count("influxdb") + vm.count("gnuplot") > 1) {
       std::println("Only one output format could be selected.");
       return system::errc::invalid_argument;
     }
-    if (vm.contains("graphite")) obj.outputFormatMode = formatMode::GRAPHITE;
-    if (vm.contains("raw")) obj.outputFormatMode = formatMode::RAW;
-    if (vm.contains("influxdb")) obj.outputFormatMode = formatMode::INFLUXDB;
+    if (vm.contains("graphite")) outputFormatMode = formatMode::GRAPHITE;
+    if (vm.contains("raw")) outputFormatMode = formatMode::RAW;
+    if (vm.contains("influxdb")) outputFormatMode = formatMode::INFLUXDB;
     if (vm.contains("gnuplot")) {
-      obj.outputFormatMode   = formatMode::GNUPLOT;
-      obj.gnuplotRightToLeft = vm.contains("gnuplot-rtl");
+      outputFormatMode   = formatMode::GNUPLOT;
+      gnuplotRightToLeft = vm.contains("gnuplot-rtl");
       std::stringstream ss(sGnuplotDim);
 
       auto delimetersCnt = std::count_if(sGnuplotDim.begin(), sGnuplotDim.end(), [](char c) { return c == ',' || c == ':'; });
@@ -158,6 +186,46 @@ int main(int argc, char *argv[]) {
       std::println("{}", warranty);
       return system::errc::success;
     }
+
+    // Migawka magistrali: czysty odczyt seqlockiem, bez muteksu i BEZ kontaktu z serwerami.
+    // Klient nie zakłada segmentu (`createIfMissing = false`) — jego brak znaczy dokładnie
+    // tyle, że żaden serwer nie wystartował.
+    const std::vector<bus::InstanceInfo> liveInstances = [] {
+      const bus::Bus xrdbbus(bus::kSegmentName, /*createIfMissing=*/false);
+      return xrdbbus.instances();
+    }();
+
+    if (vm.contains("servers")) {
+      const std::vector<std::string> lines = routing::describe(liveInstances);
+      for (const auto &line : lines)
+        std::println("{}", line);
+      if (lines.empty()) std::println(std::cerr, "xqry: no live xretractor instance");
+      return system::errc::success;
+    }
+
+    // Jawny `--server` wygrywa zawsze i pomija magistralę: operator, który wskazał instancję
+    // palcem, ma dostać dokładnie ją, także wtedy gdy magistrala jest niedostępna.
+    if (!vm.contains("server")) {
+      const routing::Resolution resolved = resolveTarget(vm, liveInstances, elemLimit, sInputStream, sDetailStream, sAdHoc);
+      switch (resolved.status) {
+        case routing::Status::Resolved:
+          sServerName = resolved.serverName;
+          break;
+        case routing::Status::StreamNotFound:
+          std::println(std::cerr, "xqry: {}", resolved.detail);
+          return system::errc::no_such_file_or_directory;
+        case routing::Status::Ambiguous:
+        case routing::Status::CrossServer:
+          std::println(std::cerr, "xqry: {}", resolved.detail);
+          return system::errc::invalid_argument;
+      }
+    }
+
+    qry obj(appCfg.timingQueryNoDataTimeoutMs, appCfg.ipcClientResponseMaxFails, kIpcClientDefaultResponseQueueOpenMaxFails,
+            sServerName);
+    obj.outputFormatMode   = outputFormatMode;
+    obj.gnuplotRightToLeft = gnuplotRightToLeft;
+
     if (vm.contains("hello")) return obj.hello();
     if (vm.contains("kill") && elemLimit == 0) {
       obj.netClient("kill", "");

@@ -181,18 +181,29 @@ struct Bus::Impl {
   void unlock() { pthread_mutex_unlock(&segment->mutex); }
 };
 
-Bus::Bus(std::string_view segmentName) : impl(std::make_unique<Impl>()) {
+Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_unique<Impl>()) {
   const std::string name(segmentName);
 
   bool creator = false;
-  try {
-    impl->shm = std::make_unique<IPC::shared_memory_object>(IPC::create_only, name.c_str(), IPC::read_write);
-    creator   = true;
-  } catch (const IPC::interprocess_exception &) {
+  if (createIfMissing) {
+    try {
+      impl->shm = std::make_unique<IPC::shared_memory_object>(IPC::create_only, name.c_str(), IPC::read_write);
+      creator   = true;
+    } catch (const IPC::interprocess_exception &) {
+      impl->shm.reset();
+    }
+  }
+
+  if (!impl->shm) {
     try {
       impl->shm = std::make_unique<IPC::shared_memory_object>(IPC::open_only, name.c_str(), IPC::read_write);
     } catch (const IPC::interprocess_exception &e) {
-      SPDLOG_WARN("xrdbbus: cannot attach to bus segment '{}': {}", name, e.what());
+      // W trybie czytelnika brak segmentu jest odpowiedzia "nie ma zadnej instancji", a nie
+      // usterka; ostrzezenie nalezy sie wylacznie temu, kto segment tworzyc UMIAL i nie zdolal.
+      if (createIfMissing)
+        SPDLOG_WARN("xrdbbus: cannot attach to bus segment '{}': {}", name, e.what());
+      else
+        SPDLOG_DEBUG("xrdbbus: bus segment '{}' is absent: {}", name, e.what());
       impl->shm.reset();
       return;
     }

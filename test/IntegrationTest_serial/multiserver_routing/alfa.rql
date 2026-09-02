@@ -1,0 +1,2 @@
+DECLARE va INTEGER STREAM srca, 1 FILE 'data_alfa.txt'
+SELECT srca[0]+1 STREAM dsta FROM srca
