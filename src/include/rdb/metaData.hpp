@@ -39,14 +39,15 @@ namespace rdb {
 ///   pozostawiając sobie zapis wpisu gap do indeksu,
 /// - udostępniać flushPendingGap() zapisujące zaakumulowaną przerwę jako wpis gap (wywoływane przez storage także przy
 ///   zamykaniu magazynu),
-/// - nie przechowywać znacznika czasu dla każdego rekordu; czas utworzenia indeksu jest zapisywany w nagłówku pliku,
+/// - nie przechowywać znacznika czasu dla każdego rekordu ani żadnego innego; nagłówek pliku jest 8-bajtowym polem
+///   zarezerwowanym, zapisywanym jako zero (do 2026-09-02 niósł czas utworzenia indeksu — pole wycofane),
 /// - zarządzać własnymi zasobami w sposób bezpieczny i bez wycieków pamięci.
 /// - przyjąć od obiektu storage informację o przerwie w transmisji danych (wraz z jej długością w jednostkach próbkowania) i zapisać ją jako wpis gap w indeksie,
 /// - przyjąć od obiektu storage informację o rotacji pliku danych i wykonać rotację indeksu: skopiować obecny plik indeksu z rozszerzeniem .old/percounter, następnie stworzyć nowy, czysty plik indeksu (bez wpisu gap),
 /// - jeśli plik danych nie zrotował, przyjąć od obiektu storage informację o brakujących danych i dopisać odpowiedni wpis gap przed pierwszym nowym rekordem.
 /// - gwarantować, że plik indeksu nigdy nie zawiera przestarzałych (nadpisanych logicznie) wpisów: jeśli bieżący segment RLE został wciągnięty do pamięci w celu rozszerzenia (mechanizm lazy overwrite), każda operacja dopisująca nowe wpisy do pliku musi najpierw zastąpić ten przestarzały wpis zamiast dopisywać za nim.
 /// - udostępniać metodę wymuszającą natychmiastowy zapis pending entry na dysk (flushCurrentEntry()), aby null metadata przeżyła awarię lub otwarcie pliku przez drugi obiekt storage.
-/// - umożliwiać wyczyszczenie całej zawartości indeksu (reset()) odpowiadające wywołaniu purge() w storage — usunięcie wszystkich wpisów (wraz z licznikami maszyny gap, lecz bez wyłączania skonfigurowanej detekcji) przy zachowaniu czasu utworzenia zapisanego w nagłówku pliku.
+/// - umożliwiać wyczyszczenie całej zawartości indeksu (reset()) odpowiadające wywołaniu purge() w storage — usunięcie wszystkich wpisów (wraz z licznikami maszyny gap, lecz bez wyłączania skonfigurowanej detekcji) przy zachowaniu 8-bajtowego zarezerwowanego nagłówka pliku.
 /// - udostępniać abandonFile() odłączające indeks od pliku (dalsze operacje I/O stają się no-opem) — wywoływane
 ///   przez storage dla magazynów dysponowalnych PRZED skasowaniem pliku .meta, aby destruktor (niejawny
 ///   flushCurrentEntry()) nie odtworzył właśnie usuniętego pliku.
@@ -189,8 +190,8 @@ class metaData {
   /// @brief Clear all index data and reset to initial state.
   ///
   /// Removes all committed entries, resets the pending entry and the
-  /// gap-detection counters. Does not modify the creation time.
-  /// The meta file is rewritten with only the header.
+  /// gap-detection counters.
+  /// The meta file is rewritten with only the reserved header.
   /// @note Virtual: the shadow-aware variant (storageShadow) also discards the shadow index.
   virtual void reset();
 

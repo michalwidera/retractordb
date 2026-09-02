@@ -43,7 +43,7 @@ def write_meta(path: Path, field_count: int) -> None:
         pack_entry(True, 1, [True] * field_count, SIZE_T_FMT),
     ]
 
-    # Header: int64 creation timestamp placeholder
+    # Header: int64 reserved field, always zero (was a creation timestamp until 2026-09-02)
     payload = struct.pack("<q", 0) + b"".join(entries)
     path.write_bytes(payload)
 

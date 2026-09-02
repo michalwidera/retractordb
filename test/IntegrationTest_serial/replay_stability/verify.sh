@@ -3,9 +3,10 @@
 # musza dac identyczne artefakty. Porownanie obejmuje dane, deskryptory (.desc),
 # metadane (.meta) i cienie (.shadow).
 #
-# Z porownania .meta wylaczony jest WYLACZNIE 8-bajtowy naglowek ze znacznikiem
-# utworzenia — ta sama granica, ktora stosuje kampania K18 i pozostale testy
-# bajtowe w tym katalogu (tail -c +9).
+# Z porownania .meta wylaczony jest WYLACZNIE 8-bajtowy naglowek — ta sama granica,
+# ktora stosuje kampania K18 i pozostale testy bajtowe w tym katalogu (tail -c +9).
+# Do 2026-09-02 naglowek niosl znacznik utworzenia i bylo to konieczne; dzis jest
+# zarezerwowany (zera), wiec pominiecie jest juz tylko zaszloscia.
 #
 # Test jest napisany tak, zeby NIE MOGL przejsc pusty: sprawdza liczbe
 # porownanych plikow, identycznosc zbioru nazw i niezerowa dlugosc kazdego
@@ -58,8 +59,8 @@ for path in run1/*; do
   name=$(basename "$path")
   case "$name" in
     *.meta)
-      # Naglowek .meta niesie 8-bajtowy znacznik utworzenia — jedyna wielkosc,
-      # ktorej rownosci nie wymagamy.
+      # Naglowek .meta to 8 bajtow zarezerwowanych — jedyna wielkosc, ktorej
+      # rownosci nie wymagamy (patrz nota na poczatku pliku).
       cmp <(tail -c +9 "run1/$name") <(tail -c +9 "temp/$name") || {
         echo "replay: rozna mapa null w $name"
         exit 1

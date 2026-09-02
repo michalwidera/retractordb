@@ -113,8 +113,8 @@ phase_nulls=$(xtrdb -n -s temp/phase_lhs | grep -c 'all nulls')
 if [ "$factor" = "ON" ]; then
   # Faktoryzacja zastosowana po obu stronach: rownosc jest PELNA, lacznie z dlugoscia.
   cmp temp/lhs temp/rhs
-  # Naglowek .meta zawiera znacznik czasu utworzenia (jedyne bajty niedeterministyczne),
-  # wiec porownujemy tresc za nim.
+  # Naglowek .meta to 8 bajtow zarezerwowanych (zera). Do 2026-09-02 niosl znacznik
+  # czasu utworzenia i porownanie musialo go omijac; pominiecie zostaje jako zaszlosc.
   cmp <(tail -c +9 temp/lhs.meta) <(tail -c +9 temp/rhs.meta)
 else
   # Bez R1 para lhs/rhs zachowuje sie dokladnie tak jak para fazowa nizej: ten sam ciag

@@ -2,9 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
-#include <array>
 #include <cstdint>
-#include <cstring>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -15,11 +13,16 @@ namespace rdb {
 
 namespace {
 
-constexpr size_t kHeaderSize = sizeof(int64_t);
+// Naglowek pliku `.meta`: 8 bajtow ZAREZERWOWANYCH, zapisywanych jako zero.
+// Do 2026-09-02 nioslo to czas utworzenia; pole wycofane, bo nikt go nie odczytywal.
+// Bajty zostaja: kHeaderSize wchodzi we wszystkie offsety wpisow, stare pliki maja
+// pozostac czytelne, a oracle bramek badawczych adresuja wpisy od stalego offsetu 8.
+constexpr size_t kHeaderSize      = sizeof(int64_t);
+constexpr int64_t kReservedHeader = 0;
 
-void writeHeader(std::ostream &out, std::chrono::system_clock::time_point t) {
-  int64_t ns       = std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
-  const auto bytes = std::as_bytes(std::span{&ns, 1});
+void writeHeader(std::ostream &out) {
+  int64_t reserved = kReservedHeader;
+  const auto bytes = std::as_bytes(std::span{&reserved, 1});
   out.write(reinterpret_cast<const char *>(bytes.data()), static_cast<std::streamsize>(bytes.size_bytes()));
 }
 
@@ -32,37 +35,15 @@ void writeEntry(std::ostream &out, const IndexRecord &entry) {
 
 MetaIndexStore::MetaIndexStore(std::string metaFilePath, size_t entrySize)
     : metaFilePath_(std::move(metaFilePath)),
-      entrySize_(entrySize),
-      creationTime_(std::chrono::system_clock::now()) {
-  loadHeaderTimestamp();
-}
+      entrySize_(entrySize) {}
 
 bool MetaIndexStore::fileExists() const { return !metaFilePath_.empty() && std::filesystem::exists(metaFilePath_); }
-
-void MetaIndexStore::loadHeaderTimestamp() {
-  std::ifstream in(metaFilePath_, std::ios::binary);
-  if (!in.is_open()) return;
-
-  in.seekg(0, std::ios::end);
-  // Compare stream positions as streamoff; cmp_less with streampos is ill-formed.
-  const auto fileSize = static_cast<std::streamoff>(in.tellg());
-  if (fileSize <= 0 || std::cmp_less(fileSize, kHeaderSize)) return;
-  in.seekg(0, std::ios::beg);
-
-  std::array<std::byte, sizeof(int64_t)> nsBuf{};
-  in.read(reinterpret_cast<char *>(nsBuf.data()), static_cast<std::streamsize>(nsBuf.size()));
-  in.close();
-  int64_t creationTimeNs{};
-  std::memcpy(&creationTimeNs, nsBuf.data(), sizeof(creationTimeNs));
-
-  creationTime_ = std::chrono::system_clock::time_point(std::chrono::nanoseconds(creationTimeNs));
-}
 
 void MetaIndexStore::saveHeader() {
   if (metaFilePath_.empty()) return;
   std::ofstream out(metaFilePath_, std::ios::binary | std::ios::trunc);
   if (!out.is_open()) return;  // plik nietkniety -- cache pozostaje aktualny
-  writeHeader(out, creationTime_);
+  writeHeader(out);
   // write-through: po truncate plik zawiera tylko naglowek -> zero wpisow
   entriesCache_.clear();
   cacheValid_ = true;
@@ -139,7 +120,7 @@ void MetaIndexStore::rewrite(const std::vector<IndexRecord> &entries) {
   const std::string tmpPath = std::format("{}.tmp", metaFilePath_);
   std::ofstream out(tmpPath, std::ios::binary | std::ios::trunc);
   if (!out.is_open()) return;  // plik nietkniety -- cache pozostaje aktualny
-  writeHeader(out, creationTime_);
+  writeHeader(out);
   for (const auto &rec : entries)
     writeEntry(out, rec);
   out.close();

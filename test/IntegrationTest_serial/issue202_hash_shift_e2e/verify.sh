@@ -28,9 +28,9 @@ if grep -F 'STREAM_TIMEMOVE_1_B2(' out_compile.txt; then exit 1; fi
 # znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
 xretractor query.rql -r -k -m 48 -f
 
-# Physical equality covers the complete stored INTEGER payload. Metadata headers
-# contain per-stream creation timestamps, so compare the format-dependent body
-# after that eight-byte field.
+# Physical equality covers the complete stored INTEGER payload. The .meta header is
+# an eight-byte reserved field (zeros); it carried a per-stream creation timestamp
+# until 2026-09-02, so the comparison still skips it.
 cmp matched CC
 cmp <(tail -c +9 matched.meta) <(tail -c +9 CC.meta)
 

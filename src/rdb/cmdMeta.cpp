@@ -81,20 +81,17 @@ bool MetaRawCmd::execute(CommandContext &ctx) {
 
   in.seekg(0, std::ios::end);
   const auto fileSize = in.tellg();
-  in.seekg(0, std::ios::beg);
-
-  size_t effectiveHeaderSize = headerSize;
   if (fileSize >= 0) {
     const auto fs = static_cast<size_t>(fileSize);
     if (fs < headerSize || (fs - headerSize) % entrySize != 0)
       std::print("{}warning: unexpected meta payload alignment\n{}", ctx.colors.YELLOW, ctx.colors.RESET);
   }
 
-  int64_t creationTimeNs = 0;
-  in.read(reinterpret_cast<char *>(&creationTimeNs), sizeof(creationTimeNs));
+  // Naglowek jest zarezerwowany (8 bajtow zer) -- pomijamy go, nie ma czego interpretowac.
+  in.seekg(static_cast<std::streamoff>(headerSize), std::ios::beg);
 
   std::print("{}meta raw: {}\n{}", ctx.colors.BLUE, path, ctx.colors.RESET);
-  std::print("header size: {}\n", effectiveHeaderSize);
+  std::print("header size: {}\n", headerSize);
   std::print("entry size: {}\n", entrySize);
   std::cout << "sampling interval: " << ctx.dacc->getSamplingInterval() << "\n";  // boost::rational — brak std::formatter
 

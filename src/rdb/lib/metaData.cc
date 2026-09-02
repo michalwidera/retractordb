@@ -3,7 +3,6 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <chrono>
 #include <filesystem>
 #include <format>
 #include <memory>
@@ -205,7 +204,6 @@ void metaData::rotate(int percounter) {
     std::filesystem::rename(store_.path(), rotatedPath, ec);
     if (ec) SPDLOG_WARN("metaData::rotate: failed to rename '{}' to '{}': {}", store_.path(), rotatedPath, ec.message());
   }
-  store_.setCreationTime(std::chrono::system_clock::now());
   reset();
 }
 

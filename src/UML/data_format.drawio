@@ -148,7 +148,7 @@
         <mxCell id="dbMJjGrBMlG3Bmrodw8c-20" parent="1" style="rounded=0;whiteSpace=wrap;html=1;align=left;" value="Null&lt;div&gt;Bitset&lt;/div&gt;" vertex="1">
           <mxGeometry height="40" width="210" x="560" y="160" as="geometry" />
         </mxCell>
-        <mxCell id="dbMJjGrBMlG3Bmrodw8c-25" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Creation Time" vertex="1">
+        <mxCell id="dbMJjGrBMlG3Bmrodw8c-25" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Reserved (8 B)" vertex="1">
           <mxGeometry height="40" width="80" x="440" y="120" as="geometry" />
         </mxCell>
         <mxCell id="dbMJjGrBMlG3Bmrodw8c-31" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Interval" vertex="1">
