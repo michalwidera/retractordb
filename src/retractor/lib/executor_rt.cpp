@@ -129,7 +129,7 @@ bool rtActivate(int priority) {
     SPDLOG_WARN("mlockall failed: {}", strerror(errno));
     ok = false;
   }
-  if (mlockMode != "onfault") SPDLOG_WARN("RDB_MLOCKALL={} (tryb diagnostyczny)", mlockMode);
+  if (mlockMode != "onfault") SPDLOG_WARN("RDB_MLOCKALL={} (diagnostic mode)", mlockMode);
   struct sched_param sp{};
   sp.sched_priority = priority;
   if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0) {
@@ -161,13 +161,13 @@ bool rtKeepThreadOffRtCpus(pthread_t handle) {
   cpu_set_t rtCpus;
   CPU_ZERO(&rtCpus);
   if (sched_getaffinity(0, sizeof(rtCpus), &rtCpus) != 0) {
-    std::cout << "[WARN] RT: nie odczytano powinowactwa watku RT: " << strerror(errno) << "\n";
+    std::cout << "[WARN] RT: could not read RT thread affinity: " << strerror(errno) << "\n";
     return false;
   }
 
   const long online = sysconf(_SC_NPROCESSORS_ONLN);
   if (online <= 0) {
-    std::cout << "[WARN] RT: nie ustalono liczby rdzeni online\n";
+    std::cout << "[WARN] RT: could not determine the number of online cores\n";
     return false;
   }
 
@@ -182,15 +182,14 @@ bool rtKeepThreadOffRtCpus(pthread_t handle) {
   }
 
   if (const int rc = pthread_setaffinity_np(handle, sizeof(auxCpus), &auxCpus); rc != 0) {
-    std::cout << "[WARN] RT: nie przeniesiono watku komunikacyjnego poza rdzenie RT: " << strerror(rc) << "\n";
+    std::cout << "[WARN] RT: could not move the comms thread off the RT cores: " << strerror(rc) << "\n";
     return false;
   }
 
   // Komunikat na stdout, nie przez spdlog: w Release SPDLOG_ACTIVE_LEVEL to
   // SPDLOG_LEVEL_ERROR, więc SPDLOG_WARN/INFO znikają na etapie kompilacji, a
   // zmiana powinowactwa musi być widoczna w logu przebiegu pomiarowego.
-  std::cout << "[INFO] RT: watek komunikacyjny przeniesiony poza rdzenie RT (rdzeni pomocniczych: " << CPU_COUNT(&auxCpus)
-            << ")\n";
+  std::cout << "[INFO] RT: comms thread moved off the RT cores (auxiliary cores: " << CPU_COUNT(&auxCpus) << ")\n";
   return true;
 }
 

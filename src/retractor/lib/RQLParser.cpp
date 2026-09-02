@@ -225,7 +225,7 @@ class ParserListener : public RQLBaseListener {
   void exitSExpAgregate_proforma(RQLParser::SExpAgregate_proformaContext *ctx) override {
     auto functionName = ctx->agregator()->getText();
     std::ranges::transform(functionName, functionName.begin(), ::toupper);
-    SPDLOG_WARN("RQL: notacja '{}' jest wygaszana; uzyj postaci funkcyjnej {}({})", ctx->getText(), functionName,
+    SPDLOG_WARN("RQL: notation '{}' is deprecated; use the functional form {}({})", ctx->getText(), functionName,
                 ctx->stream_expression()->getText());
   }
 

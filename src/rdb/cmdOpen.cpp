@@ -8,7 +8,7 @@
 
 std::pair<std::string, std::vector<std::string>> OpenCmd::usage() const {
   return {"open file [schema]",
-          {"open or create database with schema", "example: open test_db { INTEGER dane STRING name[3] }"}};
+          {"open or create database with schema", "example: open test_db { INTEGER value STRING name[3] }"}};
 }
 
 bool OpenCmd::execute(CommandContext &ctx) {

@@ -49,7 +49,7 @@ void IpcClient::producer() {
     }
   }
   if (!mq) {
-    SPDLOG_ERROR("ipcClient: kolejka odpowiedzi '{}' nie powstala po {} probach", queueName, responseQueueOpenMaxFails_);
+    SPDLOG_ERROR("ipcClient: response queue '{}' did not appear after {} attempts", queueName, responseQueueOpenMaxFails_);
     responseQueueMissing = true;
     done                 = true;
     return;

@@ -64,12 +64,12 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
   // komunikat o brakującym węźle zamiast informacji, że serwer nie zdążył
   // odpowiedzieć — a to dwie różne awarie i dwie różne naprawy (issue_215).
   if (pt.get_optional<std::string>("error.response")) {
-    SPDLOG_ERROR("serwer nie odpowiedzial na komende 'get' w wyznaczonym czasie (strumien: {})", input);
+    SPDLOG_ERROR("server did not answer the 'get' command within the timeout (stream: {})", input);
     return selectResult::serverNoResponse;
   }
   const auto streamNode = pt.get_child_optional("db.stream");
   if (!streamNode) {
-    SPDLOG_ERROR("odpowiedz serwera nie zawiera listy strumieni (strumien: {})", input);
+    SPDLOG_ERROR("server response carries no stream list (stream: {})", input);
     return selectResult::serverNoResponse;
   }
 
@@ -167,10 +167,10 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
   // utworzył mojej kolejki" i „kolejka była, ale pusta" to dwie różne awarie.
   if (rendered == 0) {
     if (transport_->responseQueueMissing) {
-      SPDLOG_ERROR("serwer nie utworzyl kolejki odpowiedzi tego klienta (strumien: {})", input);
+      SPDLOG_ERROR("server did not create this client's response queue (stream: {})", input);
       return selectResult::clientQueueMissing;
     }
-    SPDLOG_ERROR("strumien '{}' nie dostarczyl ani jednego elementu", input);
+    SPDLOG_ERROR("stream '{}' delivered no elements", input);
     return selectResult::noData;
   }
   return selectResult::ok;
@@ -181,15 +181,15 @@ const char *toString(selectResult result) {
     case selectResult::ok:
       return "ok";
     case selectResult::streamNotFound:
-      return "strumien nieznany serwerowi";
+      return "stream unknown to the server";
     case selectResult::serverNoResponse:
-      return "serwer nie odpowiedzial w wyznaczonym czasie";
+      return "server did not answer within the timeout";
     case selectResult::clientQueueMissing:
-      return "serwer nie utworzyl kolejki odpowiedzi klienta";
+      return "server did not create the client response queue";
     case selectResult::noData:
-      return "brak danych w strumieniu";
+      return "no data in stream";
   }
-  return "nieznany";
+  return "unknown";
 }
 
 int qry::hello() {
