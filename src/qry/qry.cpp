@@ -233,13 +233,16 @@ std::string qry::dir() {
   const std::vector<std::pair<std::string, std::string>> vcols = {{"", "name"},       {"duration", "duration"}, {"size", "size"},
                                                                   {"count", "count"}, {"location", "location"}, {"cap", "cap"}};
   std::stringstream ss;
+  std::stringstream separator;
   for (const auto &[key, title] : vcols) {
     std::size_t width = title.length();
     for (const auto &v : pt.get_child("db.stream"))
       width = std::max(width, v.second.get<std::string>(key).length());
     ss << "|%" << width << "s";
+    separator << "+" << std::string(width, '-');
   }
   ss << "|\n";
+  separator << "+\n";
 
   auto emitRow = [&](const std::string &name, const std::string &duration, const std::string &size, const std::string &count,
                      const std::string &location, const std::string &cap) {
@@ -263,6 +266,7 @@ std::string qry::dir() {
   };
 
   emitRow(vcols[0].second, vcols[1].second, vcols[2].second, vcols[3].second, vcols[4].second, vcols[5].second);
+  retval << separator.str();
   for (const auto &v : pt.get_child("db.stream"))
     emitRow(v.second.get<std::string>(""),          //
             v.second.get<std::string>("duration"),  //

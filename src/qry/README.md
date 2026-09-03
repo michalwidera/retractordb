@@ -58,13 +58,14 @@ without warranty of any kind. For more information, see the LICENSE file.
 
 ## Listing streams - `xqry -d`
 
-`-d` prints one row per stream. The first row is a header naming the columns;
-column widths adapt to the widest value (header included), so the table stays
-aligned.
+`-d` prints one row per stream, under a header naming the columns and a
+separator line. Column widths adapt to the widest value (header included), so
+the table stays aligned.
 
 ```
 $ xqry -d
 | name|duration|size|count|     location|cap|
++-----+--------+----+-----+-------------+---+
 |core0|    1/10|  -1|    0|datafile2.dat|  4|
 |core1|    1/20|  -1|    0|datafile3.dat| 12|
 | str1|    1/30|   0|    0|             |  0|
