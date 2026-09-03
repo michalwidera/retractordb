@@ -6,7 +6,6 @@
 
 This tool allows you to view and download current data from the retractorDB system
 
-> :warning: **This is work in progress**: This readme can be outdated.
 
 ```
 $ xqry -h
@@ -35,8 +34,11 @@ Allowed options:
   -c [ --needctrlc ]          force ctl+c for stop this tool
   -w [ --wait-server ]        poll until xretractor server is available before
                               executing command
-Branch: issue_31-doc:eb1aba1, Code compiler: GNU Ver. 13.3.0, Build time: 2512170028, Type: Debug
-Log: /tmp/xqry.log
+  --server arg                target xretractor instance name (default:
+                              resolved from the bus)
+  --servers                   list live xretractor instances and their streams
+Branch: issue_238-multiserver:XXXXXXXX, Code compiler: GNU Ver. 15.2.0, Build time: YYMMDDHHmm, Type: Release
+Log: /home/michal/.tmp/xqry.log
 This software is licensed under the MIT License and is provided ‘as is’,
 without warranty of any kind. For more information, see the LICENSE file.
 ```
@@ -49,8 +51,34 @@ without warranty of any kind. For more information, see the LICENSE file.
 > output: 
 >```
 >$ xqry -d
->No such file or directory
->catch IPC server
+>IPC: No such file or directory
 >```
 >as result of listing active queries request.
 
+
+## Listing streams - `xqry -d`
+
+`-d` prints one row per stream. The first row is a header naming the columns;
+column widths adapt to the widest value (header included), so the table stays
+aligned.
+
+```
+$ xqry -d
+| name|duration|size|count|     location|cap|
+|core0|    1/10|  -1|    0|datafile2.dat|  4|
+|core1|    1/20|  -1|    0|datafile3.dat| 12|
+| str1|    1/30|   0|    0|             |  0|
+| str2|     1/2|   0|    0|             |  0|
+```
+
+| column | meaning |
+|---|---|
+| `name` | stream name |
+| `duration` | stream interval (delta) in seconds, printed as a fraction |
+| `size` | stored size in bytes; `-1` for a declared source stream, which the server does not store |
+| `count` | number of records currently held in the output buffer |
+| `location` | source file of a declared stream (`FILE '...'`); empty for computed streams |
+| `cap` | buffer capacity in records, as computed by the compiler |
+
+`-y` reports the same listing in YAML (`apiVersion: xqry/v1`), without the
+`cap` column and with `size` omitted for declared streams.

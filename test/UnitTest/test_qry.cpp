@@ -42,8 +42,12 @@ boost::property_tree::ptree qry_fake::netClient(const std::string &cmd, const st
 // Verify hello handshake succeeds when server responds with "world"
 TEST(xqry, test_hello) { EXPECT_TRUE(obj.hello() == boost::system::errc::success); }
 
-// Verify dir() formats single-stream table with pipe-delimited columns
-TEST(xqry, test_dir) { EXPECT_TRUE(obj.dir() == "|core0|1|123|345|/dev/location|789|\n"); }
+// Verify dir() formats single-stream table with a header row and pipe-delimited columns
+TEST(xqry, test_dir) {
+  EXPECT_EQ(obj.dir(),
+            "| name|duration|size|count|     location|cap|\n"
+            "|core0|       1| 123|  345|/dev/location|789|\n");
+}
 
 // Command-aware fake - dispatches different responses based on netClient command.
 // Supports: hello, get, detail, adhoc, show. Used for detailShow, adhoc, and dirYaml tests.
@@ -251,8 +255,9 @@ TEST(xqry, test_dir_multi_stream) {
 TEST(xqry, test_dir_multi_stream_exact_output) {
   qry_fake_multi obj_multi;
   EXPECT_EQ(obj_multi.dir(),
-            "|core0|  1|100|200|/dev/loc0|300|\n"
-            "|core1|0.5|400|500|/dev/loc1|600|\n");
+            "| name|duration|size|count| location|cap|\n"
+            "|core0|       1| 100|  200|/dev/loc0|300|\n"
+            "|core1|     0.5| 400|  500|/dev/loc1|600|\n");
 }
 
 // Verify dirYaml() lists both streams with correct names and deltas

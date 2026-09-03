@@ -228,40 +228,48 @@ std::string qry::dirYaml() {
 
 std::string qry::dir() {
   std::stringstream retval;
-  ptree pt                       = netClient("get", "");
-  std::vector<std::string> vcols = {"", "duration", "size", "count", "location", "cap"};
+  ptree pt = netClient("get", "");
+  // Klucz w ptree ("" to nazwa strumienia) i naglowek kolumny w wydruku.
+  const std::vector<std::pair<std::string, std::string>> vcols = {{"", "name"},       {"duration", "duration"}, {"size", "size"},
+                                                                  {"count", "count"}, {"location", "location"}, {"cap", "cap"}};
   std::stringstream ss;
-  for (auto nName : vcols) {
-    auto stream    = pt.get_child("db.stream");
-    auto maxSizeIt = std::ranges::max_element(stream, [&nName](const auto &node1, const auto &node2) {
-      const ptree &v1 = node1.second;
-      const ptree &v2 = node2.second;
-      return v1.get<std::string>(nName).length() < v2.get<std::string>(nName).length();
-    });
-    ss << "|%" << maxSizeIt->second.get<std::string>(nName).length() << "s";
+  for (const auto &[key, title] : vcols) {
+    std::size_t width = title.length();
+    for (const auto &v : pt.get_child("db.stream"))
+      width = std::max(width, v.second.get<std::string>(key).length());
+    ss << "|%" << width << "s";
   }
   ss << "|\n";
 
-  std::array<char, static_cast<std::size_t>(kDirLineBufferSize)> buffer{};
-  for (const auto &v : pt.get_child("db.stream")) {
+  auto emitRow = [&](const std::string &name, const std::string &duration, const std::string &size, const std::string &count,
+                     const std::string &location, const std::string &cap) {
+    std::array<char, static_cast<std::size_t>(kDirLineBufferSize)> buffer{};
     int n = snprintf(buffer.data(), buffer.size(), ss.str().c_str(),  //
-                     v.second.get<std::string>("").c_str(),           //
-                     v.second.get<std::string>("duration").c_str(),   //
-                     v.second.get<std::string>("size").c_str(),       //
-                     v.second.get<std::string>("count").c_str(),      //
-                     v.second.get<std::string>("location").c_str(),   //
-                     v.second.get<std::string>("cap").c_str());
+                     name.c_str(),                                    //
+                     duration.c_str(),                                //
+                     size.c_str(),                                    //
+                     count.c_str(),                                   //
+                     location.c_str(),                                //
+                     cap.c_str());
     if (n < 0) {
-      SPDLOG_ERROR("qry::dir: snprintf failed while formatting stream '{}'", v.second.get<std::string>(""));
-      continue;
+      SPDLOG_ERROR("qry::dir: snprintf failed while formatting stream '{}'", name);
+      return;
     }
     if (static_cast<std::size_t>(n) >= buffer.size()) {
-      SPDLOG_ERROR("qry::dir: formatted output truncated for stream '{}' (required {}, buffer {})",
-                   v.second.get<std::string>(""), n, buffer.size());
+      SPDLOG_ERROR("qry::dir: formatted output truncated for stream '{}' (required {}, buffer {})", name, n, buffer.size());
       buffer[buffer.size() - 1] = '\0';
     }
     retval << buffer.data();
-  }
+  };
+
+  emitRow(vcols[0].second, vcols[1].second, vcols[2].second, vcols[3].second, vcols[4].second, vcols[5].second);
+  for (const auto &v : pt.get_child("db.stream"))
+    emitRow(v.second.get<std::string>(""),          //
+            v.second.get<std::string>("duration"),  //
+            v.second.get<std::string>("size"),      //
+            v.second.get<std::string>("count"),     //
+            v.second.get<std::string>("location"),  //
+            v.second.get<std::string>("cap"));
 
   return retval.str();
 }
