@@ -28,9 +28,11 @@ może wybierać właściciela DAG-u z magistrali zamiast z pojedynczego pliku bl
 | 2a | Tożsamość serwera: `--name`, `--autoname`, `xqry --server` | **zrobione**, commit `0533a11` |
 | 2b | Magistrala `xrdbbus`: wykrywanie + unikalność strumieni | **zrobione**, commit `0cb845d` |
 | 2c | Routing automatyczny w `xqry` | **zrobione**, commit `006c990` |
-| 2d | Roszczenie nazw ad-hoc + zombie jako martwy slot | **zrobione**, niezacommitowane |
-| 2e | Odsiew przed czynnościami nieodwracalnymi; licznik `:ROTATION` i `unit` w slocie (`layoutVersion` 2, segment `xrdbbus_v2`) | **zrobione**, niezacommitowane |
-| 2f | Naprawy usterek 1–6 z przeglądu wieloserwerowości plus 8 znalezisk z przeglądu diffu | **zrobione**, niezacommitowane; Debug/Release 213/213, `test_gate` **zielona** |
+| 2d | Roszczenie nazw ad-hoc + zombie jako martwy slot | **zrobione**, commit `52a7d76` |
+| 2e | Odsiew przed czynnościami nieodwracalnymi; licznik `:ROTATION` i `unit` w slocie (`layoutVersion` 2, segment `xrdbbus_v2`) | **zrobione**, commit `52a7d76` |
+| 2f | Naprawy usterek 1–6 z przeglądu wieloserwerowości plus 8 znalezisk z przeglądu diffu | **zrobione**, commit `52a7d76`; Debug/Release 213/213, `test_gate` **zielona** |
+| 2g | Usterka: cele wykresowe (`ninja dsp`, `ninja simple`) walczące o jedną tożsamość — `xplot.sh` na nazwanych instancjach | **zrobione**, commit `fbc51c8`; Debug/Release 213/213, `test_gate` **zielona** |
+| 2h | Tryb pracy instancji w slocie i kolumna `MODE` w `xqry --servers` (`layoutVersion` 3, segment `xrdbbus_v3`) | **zrobione**, niezacommitowane; Debug/Release 213/213, `test_gate` **zielona** |
 
 Po etapie 2b dwa serwery pracują równocześnie, a kolizja nazw strumieni jest wykrywana przy
 starcie i kończy się odmową wskazującą właściciela. Po 2c klient nie musi już wskazywać serwera:
@@ -40,7 +42,8 @@ powoływane w locie: ad-hoc z cudzą nazwą jest odrzucany, zanim ruszy plan ser
 
 ### Plan etapu 2f i dziennik postępu
 
-Stan startowy: `issue_238-multiserver` na `006c990` plus niezacommitowane etapy 2d/2e.
+Stan startowy: `issue_238-multiserver` na `006c990` plus etapy 2d/2e, wówczas jeszcze
+niezacommitowane (weszły razem z 2f w `52a7d76`).
 `git diff --check` oraz 16 skupionych testów multiserver/bus/IPC/lock/routing przechodzą przed
 rozpoczęciem zmian.
 
@@ -197,6 +200,38 @@ z odniesieniem, H9 korpus, samotesty i 84/84 kompilacji + 4/4 odrzucone mutanty.
 ablacyjna nie dotyczy tej zmiany: żaden przełącznik `RDB_OPT_*`, `compiler.cpp` ani reguły
 ogona nie były ruszane.
 
+#### Etap 2h — tryb pracy instancji w tabeli `--servers` (3 września 2026)
+
+Tabela odpowiadała dotąd na „kto serwuje ten strumień", ale nie na „w jakim trybie to liczy".
+Dwa serwery z tego samego `.rql` mogą pracować zupełnie inaczej — jeden z zegarem ściennym,
+drugi offline — a operator nie miał tego skąd zobaczyć bez zaglądania do `ps`.
+
+Tryb jest własnością URUCHOMIENIA, nie planu, więc jego źródłem jest linia poleceń, a nośnikiem
+slot magistrali: nowe pole `modes` (maska bitowa) obok `queryFile` i `unit`. Pole jest czysto
+informacyjne — magistrala nie podejmuje na jego podstawie żadnej decyzji, więc slot zapisany
+zerem (instancja starszej binarki) opisuje się jako zwykły, a nie jako błąd.
+
+Litery w kolumnie `MODE`, wypisywane w stałej kolejności i łączone, bo tryby nie są rozłączne:
+
+| Litera | Opcja | Znaczenie |
+|---|---|---|
+| `N` | — | żaden z poniższych: zwykły przebieg taktowany zegarem |
+| `R` | `--realtime` | SCHED_FIFO, `mlockall`, bezwzględne pobudki |
+| `F` | `--no-clock` | pełna semantyka interwałów, bez czekania na zegar |
+| `U` | `--until-eof` | stop w slocie, w którym pierwsze źródło wyczerpie dane |
+| `M` | `--llimitqry` | limit iteracji pętli inny niż „bez limitu" |
+| `X` | `--xqrywait` | przetwarzanie wstrzymane do pierwszego zapytania |
+| `S` | `--service` lub jednostka systemd | proces, którego nie zatrzymuje się ręcznie |
+
+Legenda jest ostatnim wierszem tabeli — litery nie są odgadywalne, a wiersz zaczyna się od
+`MODE:`, więc nie pasuje do wzorców kolumnowych, którymi skrypty łapią wiersze instancji.
+Szerokość każdej kolumny nadal wynika z najszerszej wartości, więc nazwa z `--autoname`
+(`objective_galileo`) rozsuwa kolumnę `SERVER` zamiast rozjechać wiersz.
+
+Zmiana układu slotu podnosi `layoutVersion` do 3 i — zgodnie z regułą niżej — nazwę segmentu do
+`xrdbbus_v3`. Rozmiar slotu się nie zmienił (27 328 B): `modes` wszedł w wyrównanie, które slot
+i tak niósł, więc segment ma nadal 874 560 B.
+
 ---
 
 ## Ustalenia, których nie trzeba powtarzać
@@ -281,16 +316,18 @@ slot, którego dotyczył przerwany zapis.
 
 ### Układ segmentu (stan bieżący)
 
-Segment nazywa się `xrdbbus_v2`, **874 560 B** (nagłówek 64 B + 32 sloty × 27 328 B) — zmierzone
-`ls -l /dev/shm/xrdbbus_v2`. Kod w `src/retractor/lib/bus.{hpp,cpp}`.
+Segment nazywa się `xrdbbus_v3`, **874 560 B** (nagłówek 64 B + 32 sloty × 27 328 B) — zmierzone
+`ls -l /dev/shm/xrdbbus_v3`. Kod w `src/retractor/lib/bus.{hpp,cpp}`.
 
 W etapie 2b segment nazywał się `xrdbbus` i miał 862 272 B przy `layoutVersion` 1; etap 2e dołożył
 do slotu `unit` i `counterPath`, co podniosło wersję układu do 2 i — zgodnie z regułą opisaną niżej
-— przeniosło ją do nazwy segmentu. Poniższa tabela opisuje układ **aktualny**, nie historyczny.
+— przeniosło ją do nazwy segmentu. Etap 2h dołożył `modes`, czyli wersję 3; rozmiar slotu się nie
+zmienił, bo nowe pole weszło w wyrównanie, które slot i tak niósł. Poniższa tabela opisuje układ
+**aktualny**, nie historyczny.
 
 ```
 [ magic "XRDBBUS" (u64) ]               wpisywane JAKO OSTATNIE przy tworzeniu segmentu
-[ layoutVersion (u32) = 2 ]             niezgodność => praca bez magistrali
+[ layoutVersion (u32) = 3 ]             niezgodność => praca bez magistrali
 [ slotCount (u32) = 32 ]
 [ slotSize (u32) + reserved (u32) ]     zmiana POJEMNOŚCI bez bumpu wersji => odmowa
 [ pthread_mutex_t (robust, pshared) ]   używany przy roszczeniu i przy zwalnianiu slotu
@@ -299,6 +336,7 @@ do slotu `unit` i `counterPath`, co podniosło wersję układu do 2 i — zgodni
     pid          (i32)
     startTime    (u64)          pole 22 z /proc/<pid>/stat
     streamCount  (u32)
+    modes        (u32)          maska trybów pracy (R/F/U/M/X/S); pole informacyjne
     name         [40]
     queryFile    [256]          ścieżka bezwzględna; pole informacyjne, obcinane z ostrzeżeniem
     unit         [128]          jednostka systemd; pole informacyjne, obcinane z ostrzeżeniem
@@ -616,7 +654,7 @@ niżej.
   syntetyczny proces trzyma prawdziwy `flock`, a `systemctl` jest kontrolowaną atrapą.
 - `--autoname` nadal losuje raz, bez ponowienia przy trafieniu w nazwę żywej instancji.
 
-### Wersja w nazwie segmentu: `xrdbbus_v2`
+### Wersja w nazwie segmentu: `xrdbbus_v3`
 
 Segment o starym układzie zostaje w `/dev/shm` po podmianie binarki, a instancja, która odmówi się
 do niego podłączyć, **startuje bez egzekwowania rozłączności** — awaria jest cicha aż do pierwszej

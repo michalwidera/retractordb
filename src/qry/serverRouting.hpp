@@ -59,6 +59,9 @@ struct Resolution {
 
 /// Tabela wypisywana przez `xqry --servers`, posortowana po nazwie instancji. Bezwzgledna
 /// sciezka zapytania jest prezentowana jako `.../<katalog>/<plik>`, a strumienie po przecinku.
+/// Szerokosc kazdej kolumny wynika z najszerszej wartosci, wiec nazwy z `--autoname` nie
+/// rozjezdzaja wiersza. Kolumna MODE niesie litery trybow pracy instancji (R/F/U/M/X/S,
+/// N = zwykly), a ostatni wiersz tabeli to ich legenda.
 [[nodiscard]] std::vector<std::string> describe(const std::vector<bus::InstanceInfo> &instances);
 
 }  // namespace routing

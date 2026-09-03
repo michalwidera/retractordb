@@ -433,6 +433,31 @@ TEST_F(BusFixture, SlotCarriesUnitAndCounterPath) {
   EXPECT_TRUE(plain[0].counterPath.empty());
 }
 
+// Maska trybow pracy jest wlasnoscia uruchomienia, nie planu, wiec slot musi ja niesc obok
+// pliku zapytan -- i czyscic przy przejeciu slotu, zeby po instancji realtime nie zostal
+// bit realtime u jej nastepcy.
+TEST_F(BusFixture, SlotCarriesRunModes) {
+  bus::Bus instance(kTestSegment);
+
+  ASSERT_EQ(instance
+                .claim({.name      = "alfa",
+                        .queryFile = "alfa.rql",
+                        .modes     = bus::mode::kRealTime | bus::mode::kService,
+                        .streams   = {"dsta"}})
+                .status,
+            bus::ClaimStatus::Claimed);
+
+  const auto instances = instance.instances();
+  ASSERT_EQ(instances.size(), 1U);
+  EXPECT_EQ(instances[0].modes, bus::mode::kRealTime | bus::mode::kService);
+
+  instance.release();
+  ASSERT_EQ(instance.claim({.name = "beta", .queryFile = "beta.rql", .streams = {"dstb"}}).status, bus::ClaimStatus::Claimed);
+  const auto plain = instance.instances();
+  ASSERT_EQ(plain.size(), 1U);
+  EXPECT_EQ(plain[0].modes, 0U);
+}
+
 // Sciezka dluzsza niz pole slotu jest odmowa, nie cichym obcieciem: obciety napis zrownalby
 // dwa rozne pliki licznika albo rozdzielil jeden.
 TEST_F(BusFixture, OversizedCounterPathIsRefused) {
@@ -451,6 +476,6 @@ TEST_F(BusFixture, OversizedCounterPathIsRefused) {
 // Podkreslenie zamiast kropki jest czescia kontraktu: obiekty IPC instancji nazywaja sie
 // "<obiekt>.<nazwa instancji>", wiec segment z kropka wpadlby pod wzorce sprzatajace /dev/shm/*.<nazwa>.
 TEST(BusSegmentName, CarriesLayoutVersionAndAvoidsInstanceNamespace) {
-  EXPECT_EQ(bus::kSegmentName, "xrdbbus_v2");
+  EXPECT_EQ(bus::kSegmentName, "xrdbbus_v3");
   EXPECT_EQ(bus::kSegmentName.find('.'), std::string_view::npos);
 }

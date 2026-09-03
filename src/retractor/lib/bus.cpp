@@ -36,7 +36,7 @@ constexpr std::uint64_t kMagic = 0x5852'4442'4255'5300ULL;
 // ukladach nie spotykaja sie na jednym segmencie, wiec do tego sprawdzenia w ogole nie dochodzi.
 // Ten numer razem ze slotSize chroni przypadek, ktorego nazwa nie zlapie: zmiane znaczenia pol
 // przy zapomnianym bumpie nazwy oraz obcy obiekt o tej samej nazwie.
-constexpr std::uint32_t kLayoutVersion = 2;  // 2: slot niesie takze unit i sciezke licznika
+constexpr std::uint32_t kLayoutVersion = 3;  // 3: slot niesie takze mask trybow pracy
 
 // Ile czasu instancja podlaczajaca sie czeka na dokonczenie inicjalizacji przez tworce.
 // Inicjalizacja to truncate + memset + pthread_mutex_init, czyli mikrosekundy; dwie sekundy
@@ -55,6 +55,7 @@ struct Slot {
   std::int32_t pid;
   std::uint64_t startTime;
   std::uint32_t streamCount;
+  std::uint32_t modes;  ///< maska bus::mode::*; 0 => tryb zwykly
   char name[kInstanceNameSize];
   char queryFile[kQueryFileSize];
   char unit[kUnitNameSize];
@@ -147,6 +148,7 @@ void clearSlot(Slot &slot) {
   slot.pid            = 0;
   slot.startTime      = 0;
   slot.streamCount    = 0;
+  slot.modes          = 0;
   slot.name[0]        = '\0';
   slot.queryFile[0]   = '\0';
   slot.unit[0]        = '\0';
@@ -447,6 +449,7 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
   mine.pid         = static_cast<std::int32_t>(getpid());
   mine.startTime   = processStartTime(mine.pid);
   mine.streamCount = static_cast<std::uint32_t>(streams.size());
+  mine.modes       = request.modes;
   storeString(mine.name, kInstanceNameSize, request.name);
   storeString(mine.queryFile, kQueryFileSize, request.queryFile);
   storeString(mine.unit, kUnitNameSize, request.unit);
@@ -582,6 +585,7 @@ std::vector<InstanceInfo> Bus::instances() const {
     info.queryFile   = loadString(scratch->queryFile, kQueryFileSize);
     info.unit        = loadString(scratch->unit, kUnitNameSize);
     info.counterPath = loadString(scratch->counterPath, kCounterPathSize);
+    info.modes       = scratch->modes;
     for (std::uint32_t s = 0; s < std::min(scratch->streamCount, static_cast<std::uint32_t>(kMaxStreams)); ++s)
       info.streams.push_back(loadString(scratch->streams[s], kStreamNameSize));
     retVal.push_back(std::move(info));

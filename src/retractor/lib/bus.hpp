@@ -42,7 +42,7 @@ namespace bus {
 /// Podkreslenie, nie kropka: obiekty IPC instancji nazywaja sie "<obiekt>.<nazwa instancji>", wiec
 /// "xrdbbus.v2" wygladalby jak obiekt instancji o nazwie "v2" i wpadl pod wzorce sprzatajace
 /// postaci /dev/shm/*.<nazwa>.
-inline constexpr std::string_view kSegmentName = "xrdbbus_v2";
+inline constexpr std::string_view kSegmentName = "xrdbbus_v3";
 
 /// Pojemnosci ukladu. Przekroczenie ktoregokolwiek limitu jest bledem startu, a nie cichym
 /// zawieszeniem gwarancji rozlacznosci -- slot z obcieta lista strumieni nie moglby juz
@@ -72,6 +72,21 @@ inline constexpr std::size_t kCounterPathSize  = 256;  ///< znormalizowana sciez
 /// jest wtedy zapisywane ostrzezeniem, zeby przyciety identyfikator w `xqry --servers` nie
 /// wygladal na prawdziwy.
 
+/// Tryby pracy instancji, publikowane w slocie jako maska bitowa. Sluza WYLACZNIE prezentacji
+/// (`xqry --servers`): magistrala nie podejmuje na ich podstawie zadnej decyzji, wiec instancja
+/// starszej binarki, ktora zglosi zero bitow, jest opisana jako zwykla -- a nie odrzucona.
+///
+/// Tryby nie sa rozlaczne: --realtime idzie w parze z --service, a --no-clock z --until-eof.
+/// Wyklucza sie tylko para --realtime / --no-clock, i to juz na poziomie argumentow.
+namespace mode {
+inline constexpr std::uint32_t kRealTime  = 1U << 0;  ///< --realtime  (R)
+inline constexpr std::uint32_t kNoClock   = 1U << 1;  ///< --no-clock  (F)
+inline constexpr std::uint32_t kUntilEof  = 1U << 2;  ///< --until-eof (U)
+inline constexpr std::uint32_t kLoopLimit = 1U << 3;  ///< --llimitqry z limitem innym niz "bez limitu" (M)
+inline constexpr std::uint32_t kXqryWait  = 1U << 4;  ///< --xqrywait  (X)
+inline constexpr std::uint32_t kService   = 1U << 5;  ///< --service albo praca jako jednostka systemd (S)
+}  // namespace mode
+
 /// Opis jednej zywej instancji odczytany z magistrali.
 struct InstanceInfo {
   std::string name;  ///< pusta => instancja historyczna (bez --name)
@@ -79,6 +94,7 @@ struct InstanceInfo {
   std::string queryFile;
   std::string unit;         ///< nazwa jednostki systemd; pusta => zwykly proces
   std::string counterPath;  ///< sciezka licznika :ROTATION; pusta => plan bez rotacji
+  std::uint32_t modes{0};   ///< maska bus::mode::*; 0 => tryb zwykly
   std::vector<std::string> streams;
 };
 
@@ -133,6 +149,7 @@ struct ClaimRequest {
   std::string_view queryFile;    ///< plik zapytan, z ktorego instancja wystartowala
   std::string_view unit;         ///< nazwa jednostki systemd; pusta => zwykly proces
   std::string_view counterPath;  ///< znormalizowana sciezka licznika :ROTATION; pusta => brak rotacji
+  std::uint32_t modes{0};        ///< maska bus::mode::*; 0 => tryb zwykly
   std::vector<std::string> streams;
 };
 

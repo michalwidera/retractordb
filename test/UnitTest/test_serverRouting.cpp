@@ -14,11 +14,12 @@ namespace {
 // Scenariusz wieloserwerowy w /dev/shm pokrywa it_multiserver_routing.
 
 bus::InstanceInfo makeInstance(const std::string &name, std::int32_t pid, const std::string &queryFile,
-                               const std::vector<std::string> &streams) {
+                               const std::vector<std::string> &streams, std::uint32_t modes = 0) {
   bus::InstanceInfo retVal;
   retVal.name      = name;
   retVal.pid       = pid;
   retVal.queryFile = queryFile;
+  retVal.modes     = modes;
   retVal.streams   = streams;
   return retVal;
 }
@@ -147,20 +148,44 @@ TEST(serverRouting, describeIsSortedAndCarriesStreams) {
   const std::vector<bus::InstanceInfo> instances{makeInstance("beta", 202, "beta.rql", {"srcb", "dstb"}),
                                                  makeInstance("alfa", 101, "/home/rdb/plans/alfa.rql", {"srca", "dsta"})};
   const std::vector<std::string> lines = routing::describe(instances);
-  ASSERT_EQ(lines.size(), 4U);
-  EXPECT_EQ(lines[0], "SERVER | PID | QUERY              | STREAMS");
-  EXPECT_EQ(lines[1], "-------+-----+--------------------+-----------");
-  EXPECT_EQ(lines[2], "alfa   | 101 | .../plans/alfa.rql | srca, dsta");
-  EXPECT_EQ(lines[3], "beta   | 202 | beta.rql           | srcb, dstb");
+  ASSERT_EQ(lines.size(), 5U);
+  EXPECT_EQ(lines[0], "SERVER | PID | MODE | QUERY              | STREAMS");
+  EXPECT_EQ(lines[1], "-------+-----+------+--------------------+-----------");
+  EXPECT_EQ(lines[2], "alfa   | 101 | N    | .../plans/alfa.rql | srca, dsta");
+  EXPECT_EQ(lines[3], "beta   | 202 | N    | beta.rql           | srcb, dstb");
+  EXPECT_EQ(lines[4], "MODE: N=normal, R=realtime, F=no-clock, U=until-eof, M=llimitqry, X=xqrywait, S=service");
 }
 
 TEST(serverRouting, describeMarksMissingQueryFile) {
   const std::vector<bus::InstanceInfo> instances{makeInstance("", 101, "", {"dst1"})};
   const std::vector<std::string> lines = routing::describe(instances);
-  ASSERT_EQ(lines.size(), 3U);
-  EXPECT_EQ(lines[0], "SERVER    | PID | QUERY | STREAMS");
-  EXPECT_EQ(lines[1], "----------+-----+-------+--------");
-  EXPECT_EQ(lines[2], "(unnamed) | 101 | -     | dst1");
+  ASSERT_EQ(lines.size(), 4U);
+  EXPECT_EQ(lines[0], "SERVER    | PID | MODE | QUERY | STREAMS");
+  EXPECT_EQ(lines[1], "----------+-----+------+-------+--------");
+  EXPECT_EQ(lines[2], "(unnamed) | 101 | N    | -     | dst1");
+}
+
+TEST(serverRouting, describeWidensColumnsForGeneratedNames) {
+  // Nazwa z --autoname jest dluzsza od naglowka SERVER, a tryby moga wystapic razem: obie
+  // kolumny musza sie rozsunac, a nie rozjechac wiersz.
+  const std::vector<bus::InstanceInfo> instances{
+      makeInstance("nostalgic-ptolemy", 7, "plan.rql", {"dst1"}, bus::mode::kRealTime | bus::mode::kService),
+      makeInstance("alfa", 101, "plan.rql", {"dst2"}, bus::mode::kNoClock)};
+  const std::vector<std::string> lines = routing::describe(instances);
+  ASSERT_EQ(lines.size(), 5U);
+  EXPECT_EQ(lines[0], "SERVER            | PID | MODE | QUERY    | STREAMS");
+  EXPECT_EQ(lines[2], "alfa              | 101 | F    | plan.rql | dst2");
+  EXPECT_EQ(lines[3], "nostalgic-ptolemy | 7   | RS   | plan.rql | dst1");
+}
+
+TEST(serverRouting, describeSpellsOutEveryRunMode) {
+  const std::vector<bus::InstanceInfo> instances{makeInstance("alfa", 1, "plan.rql", {"dst1"},
+                                                              bus::mode::kRealTime | bus::mode::kNoClock | bus::mode::kUntilEof |
+                                                                  bus::mode::kLoopLimit | bus::mode::kXqryWait |
+                                                                  bus::mode::kService)};
+  const std::vector<std::string> lines = routing::describe(instances);
+  ASSERT_EQ(lines.size(), 4U);
+  EXPECT_EQ(lines[2], "alfa   | 1   | RFUMXS | plan.rql | dst1");
 }
 
 }  // namespace

@@ -48,16 +48,52 @@ std::string streamList(const std::vector<std::string> &streams) {
   return retVal.empty() ? std::string{"-"} : retVal;
 }
 
+/// Litery trybow pracy w kolejnosci od najbardziej zmieniajacego przebieg do najmniej.
+/// Wybor liter: R jak realtime, F jak flag `-f` (--no-clock), U jak until-eof, M jak `-m`
+/// (--llimitqry), X jak `-x` (--xqrywait), S jak service. Tryby sie nie wykluczaja, wiec
+/// pole jest napisem, nie jedna litera; brak ktoregokolwiek bitu to "N" -- zwykly przebieg.
+constexpr struct {
+  std::uint32_t bit;
+  char letter;
+  std::string_view option;
+} kModeLetters[] = {
+    {bus::mode::kRealTime, 'R', "realtime"},   {bus::mode::kNoClock, 'F', "no-clock"},  {bus::mode::kUntilEof, 'U', "until-eof"},
+    {bus::mode::kLoopLimit, 'M', "llimitqry"}, {bus::mode::kXqryWait, 'X', "xqrywait"}, {bus::mode::kService, 'S', "service"},
+};
+
+std::string modeLabel(std::uint32_t modes) {
+  std::string retVal;
+  for (const auto &entry : kModeLetters)
+    if ((modes & entry.bit) != 0U) retVal += entry.letter;
+  return retVal.empty() ? std::string{"N"} : retVal;
+}
+
+std::string modeLegend() {
+  std::string retVal{"MODE: N=normal"};
+  for (const auto &entry : kModeLetters) {
+    retVal += ", ";
+    retVal += entry.letter;
+    retVal += '=';
+    retVal += entry.option;
+  }
+  return retVal;
+}
+
 struct ServerRow {
   std::string server;
   std::string pid;
+  std::string mode;
   std::string query;
   std::string streams;
 };
 
+/// Kazda kolumna jest dopelniana do szerokosci NAJSZERSZEJ wartosci w tabeli, wiec nazwa
+/// instancji wygenerowana przez --autoname (dluzsza od naglowka SERVER) rozsuwa kolumne
+/// zamiast rozjechac wiersz.
 std::string tableLine(const ServerRow &row, const ServerRow &widths) {
   return row.server + std::string(widths.server.size() - row.server.size(), ' ') + " | " + row.pid +
-         std::string(widths.pid.size() - row.pid.size(), ' ') + " | " + row.query +
+         std::string(widths.pid.size() - row.pid.size(), ' ') + " | " + row.mode +
+         std::string(widths.mode.size() - row.mode.size(), ' ') + " | " + row.query +
          std::string(widths.query.size() - row.query.size(), ' ') + " | " + row.streams;
 }
 
@@ -238,27 +274,35 @@ std::vector<std::string> describe(const std::vector<bus::InstanceInfo> &instance
   for (const auto &instance : instances)
     rows.push_back({.server  = instanceLabel(instance.name),
                     .pid     = std::to_string(instance.pid),
+                    .mode    = modeLabel(instance.modes),
                     .query   = queryPathLabel(instance.queryFile),
                     .streams = streamList(instance.streams)});
 
   // Kolejnosc slotow w segmencie zalezy od kolejnosci startow, a wyjscie ma byc powtarzalne.
   std::ranges::sort(rows, {}, &ServerRow::server);
 
-  ServerRow widths{.server = "SERVER", .pid = "PID", .query = "QUERY", .streams = "STREAMS"};
+  const ServerRow header{.server = "SERVER", .pid = "PID", .mode = "MODE", .query = "QUERY", .streams = "STREAMS"};
+  ServerRow widths = header;
   for (const auto &row : rows) {
     widths.server.resize(std::max(widths.server.size(), row.server.size()), ' ');
     widths.pid.resize(std::max(widths.pid.size(), row.pid.size()), ' ');
+    widths.mode.resize(std::max(widths.mode.size(), row.mode.size()), ' ');
     widths.query.resize(std::max(widths.query.size(), row.query.size()), ' ');
     widths.streams.resize(std::max(widths.streams.size(), row.streams.size()), ' ');
   }
 
   std::vector<std::string> retVal;
-  retVal.reserve(rows.size() + 2);
-  retVal.push_back(tableLine({.server = "SERVER", .pid = "PID", .query = "QUERY", .streams = "STREAMS"}, widths));
+  retVal.reserve(rows.size() + 3);
+  retVal.push_back(tableLine(header, widths));
   retVal.push_back(std::string(widths.server.size() + 1, '-') + "+" + std::string(widths.pid.size() + 2, '-') + "+" +
-                   std::string(widths.query.size() + 2, '-') + "+" + std::string(widths.streams.size() + 1, '-'));
+                   std::string(widths.mode.size() + 2, '-') + "+" + std::string(widths.query.size() + 2, '-') + "+" +
+                   std::string(widths.streams.size() + 1, '-'));
   for (const auto &row : rows)
     retVal.push_back(tableLine(row, widths));
+  // Legenda pod tabela, bo litery trybow nie sa odgadywalne. Wiersz zaczyna sie od "MODE:",
+  // czyli nie pasuje do zadnego wzorca kolumnowego -- skrypty dopasowujace wiersze instancji
+  // po "^<nazwa> |" jej nie widza.
+  retVal.push_back(modeLegend());
   return retVal;
 }
 

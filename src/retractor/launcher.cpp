@@ -607,11 +607,24 @@ int main(int argc, char *argv[]) {
   // Sciezka BEZWZGLEDNA, tak samo jak w pliku blokady (setServiceQueryFile wyzej). Slot czyta
   // operator z innego katalogu roboczego niz serwer, wiec `xqry --servers` z pozycja wzgledna
   // wskazywalby plik, ktorego pod ta nazwa u niego nie ma.
-  const std::string queryFile    = vm.contains("queryfile") ? absolutePathOf(vm["queryfile"].as<std::string>()) : std::string{};
+  const std::string queryFile = vm.contains("queryfile") ? absolutePathOf(vm["queryfile"].as<std::string>()) : std::string{};
+  // Tryb pracy jest wlasnoscia URUCHOMIENIA, nie planu: dwa serwery na tym samym pliku zapytan
+  // moga liczyc raz z zegarem, raz offline. Operator widzi wiec w `xqry --servers` to, co
+  // wybrala linia polecen, a nie to, co da sie odczytac z .rql.
+  //
+  // Serwisem jest zarowno instancja z --service (log do journald), jak i ta wykryta jako
+  // jednostka systemd: dla patrzacego na tabele to jeden fakt -- "tego nie zabijaj recznie".
+  const std::uint32_t runModes = (vm.contains("realtime") ? bus::mode::kRealTime : 0U) |
+                                 (vm.contains("no-clock") ? bus::mode::kNoClock : 0U) |
+                                 (vm.contains("until-eof") ? bus::mode::kUntilEof : 0U) |
+                                 (loopLimitVar != executorsm::inifitie_loop ? bus::mode::kLoopLimit : 0U) |
+                                 (vm.contains("xqrywait") ? bus::mode::kXqryWait : 0U) |
+                                 (vm.contains("service") || systemd.unit.has_value() ? bus::mode::kService : 0U);
   const bus::ClaimResult claimed = xrdbbus.claim({.name        = earlyServerName,
                                                   .queryFile   = queryFile,
                                                   .unit        = systemd.unit.value_or(std::string{}),
                                                   .counterPath = counterPath,
+                                                  .modes       = runModes,
                                                   .streams     = claimedStreams});
 
   switch (claimed.status) {
