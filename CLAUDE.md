@@ -72,19 +72,9 @@ CI: CircleCI, branches `master` or `issue_*`.
 - `src/retractor/lib/RQL.g4` → `.antlr/` (regenerate: `ninja rqlgrammar`)
 - Never edit generated files by hand.
 
-**Tests layout:**
-```
-test/
-  UnitTest/                   # GTest + valgrind; one binary per source file
-  IntegrationTest_serial/     # serial shell tests; subdirs = scenarios
-  IntegrationTest_parallel/   # parallel shell tests
-```
-
 ## Code Style
 
 - **C++23**, clang-format Google style, 129-col limit, 2-space indent. Run `ninja cformat` before commit.
-- **Linker**: `mold` (via CMakeLists `-fuse-ld=mold`)
-- **Deps**: Boost, spdlog (header-only), fmt (header-only), ANTLR4 runtime, GTest, magic_enum — Conan.
 - Source comments in Polish — intentional.
 
 **Include order (5 blocks, blank-line separated):**
@@ -149,27 +139,9 @@ Layer B rewriting is not part of this rule.
 **Mandatory sequence before every commit and before every push.** No commit or push goes out — and no diff is
 handed over for human review — while the check reports a hit.
 
-```bash
-WM="${WATERMARKS_REMOVER:-$HOME/github/watermarks-remover}/service/scripts"
-TEXT='\.(md|txt|tex|bib|rql|desc|cpp|hpp|h|c|g4|sh|py|ya?ml|toml|json|cmake|in)$|CMakeLists\.txt$'
-
-# 1. Check the staged text files (empty output = clean)
-git diff --cached --name-only --diff-filter=ACM | grep -E "$TEXT" \
-  | while read -r f; do python3 "$WM/inspect_text.py" --json "$f" >/dev/null 2>&1 || echo "WATERMARK: $f"; done
-
-# 2. Report for a flagged file (which codepoints, where)
-python3 "$WM/inspect_text.py" <file>
-
-# 3. Clean it, then drop the backup the tool leaves behind
-python3 "$WM/clean_text.py" <file> --in-place --stats && rm -f <file>.bak
-
-# 4. Re-check, then re-stage
-python3 "$WM/inspect_text.py" --json <file> >/dev/null && git add <file>
-```
-
-Before a push, run the same check over the whole tracked tree — substitute `git ls-files` for
-`git diff --cached --name-only --diff-filter=ACM` in step 1. Optionally check the commit message too:
-`git log -1 --pretty=%B | python3 "$WM/inspect_text.py" -`.
+The command sequence — staged-file scan, per-file report, cleaning, re-check and re-stage, plus the
+whole-tree variant for a push and the commit-message check — is in the `watermark-check` skill.
+Invoke it before committing and before pushing.
 
 #### Source code — zero tolerance, strict mode
 
@@ -188,31 +160,15 @@ Consequences for the assistant:
 - Code uses **strict mode**, which the default check does not cover:
 
 ```bash
+WM="${WATERMARKS_REMOVER:-$HOME/github/watermarks-remover}/service/scripts"
 python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
 ```
-
-  Default mode misses Latin/Cyrillic confusables: `int value = 1;` whose `a` is a Cyrillic `U+0430` instead of
-  ASCII `a` passes it and is caught only by `--aggressive`. (Write such an example by naming the codepoint —
-  never paste the actual character into a rule file, a comment or a test.) `--strip-emoji-glue` additionally rejects the load-bearing invisibles that
-  are legitimate in prose but never in code. Verified against the whole `src/` and `scripts/` tree: strict
-  mode yields zero hits, and Polish diacritics in comments are not affected.
 
 - On a hit in a source file: **stop and report it to the human** with file, line and codepoint. Do not sweep
   the file with `--in-place`. The targeted repair is
   `python3 "$WM/clean_text.py" <file> --aggressive-homoglyphs --strip-emoji-glue -o <file>.fixed`, followed by
   a `git diff` confirming that only the offending codepoint changed.
 - Any `U+00A0` or invisible codepoint in code is a defect, never "informational".
-
-Rules:
-
-- **Never run `clean_text.py` on binary fixtures** (`test/**/*.dat`, `.meta`, `.shadow`, ECG records,
-  `examples/**` data files). It rewrites bytes and corrupts them, and integration tests compare output
-  byte-exactly. The extension filter above exists for that reason — do not widen it with `--force-text`.
-- `--in-place` writes a `.bak` next to the file. Delete it; never commit it.
-- `U+00A0` (no-break space) is reported as *informational*. In `.rql`, `.g4` and C++ sources it is always a
-  defect — normalize it. Elsewhere confirm it is not a deliberate typographic space before replacing.
-- If cleaning would change test fixtures or generated ANTLR files, stop and hand the case to the human instead
-  of editing them.
 
 ### Commits, push and CI
 
@@ -279,60 +235,7 @@ Then suggest either: (a) commit current state and end the session, or (b) defer 
 
 ## ANTLR4 Grammar — Known Pitfalls
 
-### COMMA ambiguity in `select_list` vs `function_call`
+Moved next to the code they govern, so they load when those files are in play:
 
-`select_list` uses `COMMA` to separate expressions. ANTLR4 SLL mode ignores call-stack context → `f(a, b)` inside multi-item SELECT parses as `f(a)`, `, b` treated as list separator.
-
-**Rule:** Never use `COMMA` in function arguments in `RQL.g4`. Use `COLON` or another token absent from `select_list`.
-
-Current pattern: `to_string(expr : N)` — `:` (COLON) = output field width.
-
-### Adding a scalar function
-
-Function names are **not** grammar literals. `function_call` takes a plain `ID`, and the single
-list of legal names lives in `src/include/rqlFunctions.hpp`. Adding a one-argument function:
-
-1. Add a row to `kRqlFunctions` in `src/include/rqlFunctions.hpp` — canonical name plus arity
-2. Add a branch in the `CALL` chain in `src/retractor/lib/expressionEvaluator.cpp` — match the
-   **lowercased** name; the parser stores the canonical spelling, the evaluator folds case
-3. No grammar edit, no `ninja rqlgrammar`, no new `command_id`
-
-`canonical` is what the parser writes into the token, regardless of how the author spelled it.
-Keep it stable: plan dumps print it (`CALL(Sqrt)`), integration `pattern.txt` files and the H9
-pilot plans under `test/research_gate/h9/pilot/out/` match on it, and `exitExpression` /
-`exprSimplify` compare `getStr_() == "to_string"` literally.
-
-`compiler::checkFunctionCalls()` rejects an unknown name or a bad arity through the
-`Check result:` channel, so `-c` is a gate: a program that cannot run does not compile.
-
-**Two-argument functions.** The grammar has exactly two shapes — `f(expr)` and
-`f(expr : DECIMAL)`. The second belongs to `to_string` alone: `N` is the declared output field
-width carried in the token as `IDXPAIR`, not a value on the stack. A future function taking two
-**evaluated** arguments needs one more grammar alternative
-(`fn=ID '(' expression_factor ( COLON expression_factor )* ')'` is verified to parse) plus the
-arity row — never a `COMMA` separator, see the rule above.
-
-**`min` is unavailable as a scalar function name.** `MIN`, `MAX`, `AVG` and `SUMC` are lexer
-tokens ahead of `ID` (stream reducers), so they never lex as a function name. A scalar minimum
-must be called something else.
-
-### Integration test file sync
-
-`test/CMakeLists.txt` copies `test/` → build dir at **cmake configure time**. After editing `.rql`, `data.txt`, or a test `.sh`:
-- Re-run cmake, **or** manually copy to `build/Debug/test/...`
-- `CTestTestfile.cmake` is CMake-generated — do NOT overwrite with `CMakeLists.txt`; different formats.
-
-**Reconfigure (`cmake .`) wipes built unit-test binaries.** The `test/` copy step regenerates the `build/Debug/test/` subtree, deleting `test_*` binaries → ctest fails with `No such file or directory` for ~all unit tests. After any `cmake .`, rebuild with `ninja` before `ctest`.
-
-**Integration tests run the *installed* binary + the *build-copied* script, not source.** Editing a `.sh` and the C++ it exercises requires syncing both: build, install, recopy script, rebuild test binaries. Full sequence after touching integration `.sh` + source:
-```bash
-ninja && ninja install && cmake . && ninja && ctest
-```
-
-### Descriptor field sizes for STRING expressions in SELECT
-
-`exitExpression` in `RQLParser.cpp` sums output field size from `program` tokens:
-- `CALL2` + `to_string` → `pair.second` (declared width)
-- `CALL` + `to_string` (no width) → 32 (default)
-- `PUSH_VAL` string literal → `string.length()`
-- Summed: `to_string(x:16)+'_test'` → 16+5=21
+- `src/retractor/lib/CLAUDE.md` — COMMA ambiguity in `select_list`, adding a scalar function, Descriptor field sizes for STRING expressions in SELECT.
+- `test/CLAUDE.md` — integration test file sync: cmake copy timing, reconfigure wiping unit-test binaries, installed-binary vs build-copied script.
