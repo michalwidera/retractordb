@@ -32,7 +32,10 @@ cleanup() {
     kill -KILL "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
   done
-  # Bramka higieny: zaden obiekt IPC ani plik blokady tych instancji nie ma prawa zostac.
+  # Stabilne pliki flock pozostaja po procesie celowo; test usuwa je dopiero po zebraniu obu
+  # procesow, gdy nikt nie moze miec otwartego starego inode.
+  rm -f "$LOCK_A" "$LOCK_B"
+  # Bramka higieny: zaden obiekt IPC ani testowy plik blokady tych instancji nie ma prawa zostac.
   if ls /dev/shm/*alfa* /dev/shm/*beta* >/dev/null 2>&1; then
     echo "higiena: zostaly obiekty IPC w /dev/shm:"
     ls /dev/shm/ | grep -E 'alfa|beta' || true
@@ -45,6 +48,22 @@ cleanup() {
   exit "$status"
 }
 trap cleanup EXIT INT TERM
+
+# Wszystkie formy wartosci opcji rozpoznawane przez Boost musza dawac ta sama tozsamosc.
+xretractor --name=alfa --status >status_equals.txt
+grep -q '^xretractor_service\.alfa: Stopped$' status_equals.txt
+xretractor -nalfa --status >status_sticky.txt
+grep -q '^xretractor_service\.alfa: Stopped$' status_sticky.txt
+
+set +e
+xretractor --autoname --name=alfa --status >autoname_conflict.txt 2>&1
+autoname_conflict_rc=$?
+set -e
+if [ "$autoname_conflict_rc" -eq 0 ] || ! grep -q 'mutually exclusive' autoname_conflict.txt; then
+  echo "--autoname z --name=alfa nie zostal odrzucony"
+  cat autoname_conflict.txt
+  exit 1
+fi
 
 wait_for_lock() {
   local lock="$1" pid="$2" i=0
@@ -65,6 +84,22 @@ pid_b=$!
 
 wait_for_lock "$LOCK_A" "$pid_a"
 wait_for_lock "$LOCK_B" "$pid_b"
+
+# argv[0] nie jest czescia klucza blokady: pelna i wzgledna sciezka widza proces
+# uruchomiony przez PATH jako te sama instancje alfa.
+XRETRACTOR_BIN=$(command -v xretractor)
+set +e
+"$XRETRACTOR_BIN" --name alfa --status >status_absolute.txt
+status_absolute_rc=$?
+"$(dirname "$XRETRACTOR_BIN")/./xretractor" --name alfa --status >status_relative.txt
+status_relative_rc=$?
+set -e
+if [ "$status_absolute_rc" -eq 0 ] || [ "$status_relative_rc" -eq 0 ]; then
+  echo "status przez inna postac argv[0] nie zobaczyl blokady alfa"
+  exit 1
+fi
+grep -q '^xretractor_service\.alfa: Running$' status_absolute.txt
+grep -q '^xretractor_service\.alfa: Running$' status_relative.txt
 
 # (1) oba zyja rownoczesnie
 kill -0 "$pid_a" 2>/dev/null || { echo "serwer alfa nie zyje"; cat alfa.log; exit 1; }

@@ -24,14 +24,14 @@ constexpr std::array<std::string_view, 64> kAdjectives{
     "pedantic", "pensive",    "practical", "quirky",   "quizzical", "relaxed",    "serene",     "vibrant"};
 
 constexpr std::array<std::string_view, 64> kSurnames{
-    "agnesi", "almeida", "banach",   "bardeen",     "bassi",      "bell",     "blackwell",  "bohr",
-    "booth",  "borg",    "bose",     "brahmagupta", "brown",      "carson",   "cartwright", "chandrasekhar",
-    "clarke", "codd",    "colden",   "cori",        "curie",      "darwin",   "dijkstra",   "dirac",
-    "easley", "edison",  "einstein", "elion",       "euclid",     "euler",    "faraday",    "fermat",
-    "fermi",  "feynman", "franklin", "galileo",     "gauss",      "germain",  "goldberg",   "goldwasser",
-    "golick", "goodall", "hamilton", "hawking",     "heisenberg", "hermann",  "hodgkin",    "hoover",
-    "hopper", "hugle",   "hypatia",  "jackson",     "jang",       "jennings", "jepsen",     "johnson",
-    "joliot", "kalam",   "kapitsa",  "kare",        "keldysh",    "keller",   "kepler",     "khorana"};
+    "fraenkel", "banach",     "bardeen",      "bassi",      "bell",       "blackwell",   "bohr",       "booth",
+    "bose",     "indyk",      "carson",       "cartwright", "kaku",       "clarke",      "codd",       "cori",
+    "curie",    "darwin",     "dijkstra",     "dirac",      "edison",     "einstein",    "adler",      "euclid",
+    "euler",    "faraday",    "fermat",       "fermi",      "feynman",    "franklin",    "galileo",    "gauss",
+    "germain",  "goldberg",   "stern",        "szuwar",     "hamilton",   "hawking",     "heisenberg", "hodgkin",
+    "hopper",   "karpinski",  "infeld",       "jackson",    "mayer",      "kaiser",      "kalam",      "kapitsa",
+    "knuth",    "kepler",     "apt",          "kopernik",   "kuratowski", "lukasiewicz", "pachocki",   "rejewski",
+    "sidor",    "sierpinski", "smoluchowski", "steinhaus",  "tarski",     "tworek",      "ulam",       "zaremba"};
 
 }  // namespace
 

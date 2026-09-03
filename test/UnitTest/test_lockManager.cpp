@@ -1,9 +1,14 @@
-#include <gtest/gtest.h>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
+
+#include <gtest/gtest.h>
 
 #include "retractor/lib/lockManager.hpp"
 #include "retractor/lib/serviceControl.hpp"
@@ -83,6 +88,42 @@ TEST(LockManagerPeerInfo, missing_lock_file_yields_unknown) {
   const FlockServiceGuard::PeerInfo info = guard.readPeerInfo();
 
   EXPECT_EQ(info.kind, FlockServiceGuard::PeerInfo::Kind::Unknown);
+}
+
+TEST(LockManagerFlock, releaseKeepsStableInode) {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / ("ut_lockmgr_inode_" + std::to_string(getpid()));
+  const std::string serviceName   = "xretractor_service.alfa";
+  const std::filesystem::path lockPath = dir / (serviceName + ".lock");
+  std::filesystem::create_directories(dir);
+  std::filesystem::remove(lockPath);
+
+  FlockServiceGuard first(serviceName);
+  first.setLockDir(dir.string());
+  ASSERT_TRUE(first.acquireLock());
+
+  // Drugi uczestnik otwiera TEN SAM inode jeszcze przed zwolnieniem pierwszej blokady.
+  // Stary kod wykonywal potem unlink: drugi blokowal osierocony inode, a trzeci tworzyl
+  // pod ta sama sciezka nowy plik i rowniez zdobywal flock.
+  const int secondFd = open(lockPath.c_str(), O_RDWR | O_CLOEXEC);
+  ASSERT_NE(secondFd, -1);
+  struct stat original{};
+  ASSERT_EQ(fstat(secondFd, &original), 0);
+
+  first.releaseLock();
+  ASSERT_EQ(flock(secondFd, LOCK_EX | LOCK_NB), 0);
+
+  struct stat current{};
+  ASSERT_EQ(stat(lockPath.c_str(), &current), 0);
+  EXPECT_EQ(current.st_dev, original.st_dev);
+  EXPECT_EQ(current.st_ino, original.st_ino);
+
+  FlockServiceGuard third(serviceName);
+  third.setLockDir(dir.string());
+  EXPECT_FALSE(third.acquireLock());
+
+  EXPECT_EQ(flock(secondFd, LOCK_UN), 0);
+  EXPECT_EQ(close(secondFd), 0);
+  std::filesystem::remove_all(dir);
 }
 
 // --- restartService: składanie argv przez wstrzykiwalny runner ---

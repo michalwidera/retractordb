@@ -5,25 +5,19 @@ kolejny etap dało się zacząć od czystego kontekstu bez powtarzania rozpoznan
 
 ---
 
-## Zadanie do wykonania w nowej sesji
+## Zadanie bieżącej sesji
 
-> **Cel:** E3 — dostarczenie zestawu zapytan dzialajacemu serwisowi bez recznego restartu.
-> **Gotowe gdy:** ustalone z czlowiekiem; zakres nizej jest przeslanka, nie planem.
-> **Pliki dotkniete:** do ustalenia.
+> **Cel:** etap 2f — usunąć sześć usterek wykrytych w przeglądzie etapów 0–2e: parsowanie nazwy,
+> stabilność blokad, kolejność rezerwacji przed szkodą, licznik rotacji przy dostarczaniu oraz
+> poprawność routingu ad-hoc.
+> **Gotowe gdy:** każdy punkt ma test regresyjny, skupiony zestaw multiserver przechodzi, pełne
+> CTest Debug i Release przechodzą, a wynik `test_gate` jest zapisany niżej.
+> **Pliki dotknięte:** `multiserver_plan.md`, launcher i executor, magistrala i manager blokad,
+> routing `xqry` oraz odpowiadające im testy jednostkowe/integracyjne.
 
-Routing 2c jest zamkniety, wiec sciezka E3 ma juz komplet przeslanek: skompiluj plik, sprawdz
-magistrale, przy kolizji nazw strumieni to jest wlasciciel tego DAG-u — dostarcz plik i
-zrestartuj **jego** unit; przy rozlacznosci wystartuj nowa instancje. Restart, a nie IPC
-ad-hoc: `getAdHoc` nie umie `RULE`, `STORAGE`, `SUBSTRAT` ani `PERCOUNTER`, a jego skutek jest
-ulotny.
-
-Otwarte, swiadomie nieobjete dotad:
-
-- Kolizja sciezki licznika `:ROTATION` i katalogu `:STORAGE` nadal nie jest wykrywana.
-- Strumien powolany zapytaniem ad-hoc **nie jest roszczony w magistrali**. Plan serwera rosnie
-  o nazwe, ktorej rozlacznosc nie jest egzekwowana wobec pozostalych instancji.
-- Pole `unit` (nazwa jednostki systemd) w slocie: wymaga wyniesienia `detectSystemdIdentity()`
-  z `lockManager.cpp` i bumpu `layoutVersion`.
+E3 pozostaje następnym etapem funkcjonalnym. Naprawy 2f mają najpierw zapewnić, że zwykły start
+i istniejąca ścieżka dostarczania nie niszczą stanu innej instancji. Dopiero na tej podstawie E3
+może wybierać właściciela DAG-u z magistrali zamiast z pojedynczego pliku blokady.
 
 ## Stan na dziś
 
@@ -33,12 +27,126 @@ Otwarte, swiadomie nieobjete dotad:
 | 1 | Nazwy obiektów IPC sparametryzowane nazwą serwera | **zrobione**, commit `acd07dc` |
 | 2a | Tożsamość serwera: `--name`, `--autoname`, `xqry --server` | **zrobione**, commit `0533a11` |
 | 2b | Magistrala `xrdbbus`: wykrywanie + unikalność strumieni | **zrobione**, commit `0cb845d` |
-| 2c | Routing automatyczny w `xqry` | **zrobione**, niezacommitowane |
+| 2c | Routing automatyczny w `xqry` | **zrobione**, commit `006c990` |
+| 2d | Roszczenie nazw ad-hoc + zombie jako martwy slot | **zrobione**, niezacommitowane |
+| 2e | Odsiew przed czynnościami nieodwracalnymi; licznik `:ROTATION` i `unit` w slocie (`layoutVersion` 2, segment `xrdbbus_v2`) | **zrobione**, niezacommitowane |
+| 2f | Naprawy usterek 1–6 z przeglądu wieloserwerowości plus 8 znalezisk z przeglądu diffu | **zrobione**, niezacommitowane; Debug/Release 213/213, `test_gate` **zielona** |
 
 Po etapie 2b dwa serwery pracują równocześnie, a kolizja nazw strumieni jest wykrywana przy
 starcie i kończy się odmową wskazującą właściciela. Po 2c klient nie musi już wskazywać serwera:
 `xqry -s dstb` sam trafia do właściciela, a komenda, której nie da się przypisać do jednej
-instancji, kończy się odmową z listą kandydatów.
+instancji, kończy się odmową z listą kandydatów. Po 2d rozłączność obejmuje także nazwy
+powoływane w locie: ad-hoc z cudzą nazwą jest odrzucany, zanim ruszy plan serwera.
+
+### Plan etapu 2f i dziennik postępu
+
+Stan startowy: `issue_238-multiserver` na `006c990` plus niezacommitowane etapy 2d/2e.
+`git diff --check` oraz 16 skupionych testów multiserver/bus/IPC/lock/routing przechodzą przed
+rozpoczęciem zmian.
+
+| Punkt | Naprawa | Kryterium sukcesu | Stan |
+|---|---|---|---|
+| 1 | Zastąpić ręczny skan nazwy wczesnym parsowaniem zgodnym z Boost.Program_options; jedna wartość ma zasilać walidację, blokadę, magistralę i IPC. | `--name alfa`, `--name=alfa` i `-nalfa` wybierają tę samą instancję; `--autoname` z każdą formą `--name` jest odrzucane. | **zrobione**, test `it_multiserver_named` |
+| 2 | Budować nazwę blokady z kanonicznej nazwy programu (`filename(argv[0])`), nigdy z pełnej ścieżki. | Wywołanie przez `PATH`, ścieżkę względną i bezwzględną wskazuje ten sam plik blokady i daje ten sam wynik `--status`. | **zrobione**, test `it_multiserver_named` |
+| 6 | Nie usuwać stabilnego pliku blokady po `flock`; czyścić wyłącznie jego treść pod posiadaną blokadą, jeżeli jest to potrzebne diagnostycznie. | Test z trzema uczestnikami nie pozwala utworzyć dwóch niezależnie zablokowanych inode dla jednej nazwy. | **zrobione**, test `LockManagerFlock.releaseKeepsStableInode` |
+| 3 | Przenieść przejęcie blokady instancji i atomowe roszczenie magistrali przed kasowanie artefaktów; utrzymać oba zasoby do końca pracy executora. | Dwa równoległe starty z kolidującym planem: dokładnie jeden startuje, przegrany nie zmienia artefaktów; drugi start z tą samą nazwą również niczego nie kasuje. | **zrobione**, punkty 9–10 `it_multiserver_uniqueness` |
+| 4 | Włączyć znormalizowaną ścieżkę licznika do odsiewu wykonywanego przed `deliverQueryFile`; odmowa ma wskazywać właściciela tak samo jak końcowe `claim`. | Kolizja `:ROTATION` nie nadpisuje pliku zapytań i nie restartuje działającego serwisu. | **zrobione**, punkt 11 `it_multiserver_uniqueness` |
+| 5 | Zastąpić ogólny tokenizer rozpoznawaniem rzeczywistych odwołań do strumieni w RQL; zachować pełną składnię `ID`, w tym `$`, i ignorować nazwy pól/funkcji/strumienia wynikowego. | `cell$0` routuje się poprawnie; kolizja nazwy funkcji lub pola ze strumieniem innego serwera nie daje fałszywego `CrossServer`; rzeczywiste dwa źródła nadal są odrzucane. | **zrobione**, test `ut_serverRouting` + `it_multiserver_routing` |
+
+Kolejność realizacji: 1 → 2 → 6 → 3 → 4 → 5. Po każdym punkcie najpierw test najniższej
+warstwy, następnie odpowiedni scenariusz integracyjny. Punkt 3 nie zostanie oznaczony jako gotowy
+na podstawie samego odsiewu migawki: kryterium wymaga rezerwacji utrzymywanej przed pierwszą
+czynnością destrukcyjną. Punkt 4 obejmuje istniejące dostarczanie do serwisu; pełny wybór serwisu
+docelowego z magistrali nadal należy do E3.
+
+#### Dziennik 2f — punkty 1, 2 i 6
+
+- Wczesny parser używa teraz Boost.Program_options z `allow_unregistered`, więc nie utrzymuje
+  drugiej, uboższej składni opcji. Pełny parser sprawdza dodatkowo, że otrzymał tę samą nazwę.
+- Klucz blokady zaczyna się od `filename(argv[0])`; katalog uruchomienia i sposób znalezienia
+  programu nie wchodzą już do tożsamości instancji.
+- `FlockServiceGuard::releaseLock()` zwalnia blokadę i deskryptor, ale nie usuwa ścieżki. Test
+  otwiera inode przed zwolnieniem pierwszego właściciela, blokuje go drugim deskryptorem i
+  potwierdza, że trzeci guard nie dostaje nowego inode pod tą samą nazwą.
+- Oprawy integracyjne usuwają własne stabilne pliki dopiero po zebraniu procesów. Skupiony zestaw
+  16 testów multiserver/bus/IPC/lock/routing przechodzi po zmianie.
+
+#### Dziennik 2f — punkty 3 i 4
+
+- Launcher po kompilacji najpierw przejmuje blokadę instancji, następnie wykonuje atomowe
+  `Bus::claim`, a dopiero po obu sukcesach kasuje artefakty. Obiekt magistrali z zajętym slotem
+  jest przekazywany przez referencję do `executorsm::run` i żyje do końca serwera.
+- Executor nie przejmuje już blokady ani nie tworzy drugiego roszczenia. Sprawdza niezmiennik
+  wejściowy, rejestruje oba zasoby dla `cleanup()` i dopiero wtedy uruchamia IPC.
+- Punkt 9 testu unikalności uruchamia drugi proces z tą samą nazwą i sprawdza, że artefakty
+  pierwszego nadal istnieją. Punkt 10 uruchamia równolegle dwie różnie nazwane instancje z jednym
+  strumieniem: zostaje dokładnie jeden właściciel, a jego artefakt pozostaje dostępny.
+- Odsiew przed dostarczaniem do serwisu sprawdza teraz także znormalizowaną ścieżkę licznika.
+  Punkt 11 trzyma syntetyczny lock `MODE: service`, podstawia atrapę `systemctl` i dowodzi, że
+  konflikt nie zmienia pliku zapytań ani nie wywołuje restartu.
+
+#### Dziennik 2f — punkt 5
+
+- Routing ad-hoc nie zbiera już wszystkich identyfikatorów. Lekser pomocniczy czyta tylko
+  wyrażenie `FROM`, zgodnie z alfabetem `ID` z `RQL.g4`, łącznie ze znakiem `$`.
+- Literały, komentarze zagnieżdżone, reduktory strumieniowe i agregatory po kropce są pomijane;
+  nazwa funkcji, pola i strumienia wynikowego nie może już stworzyć fałszywego `CrossServer`.
+- Jednostkowo pokryte są `cell$0`, kolizje nazwy pola/funkcji/wyniku/agregatora, komentarze oraz
+  rzeczywiste źródła z dwóch instancji. Istniejący test integracyjny routingu nadal przechodzi.
+
+#### Dziennik 2f — przegląd przed commitem (3 września 2026)
+
+Osiem znalezisk z przeglądu diffu, wszystkie naprawione w tej samej sesji:
+
+- Sekcja „Układ segmentu" opisywała stan sprzed 2e (`xrdbbus`, `layoutVersion` 1, 862 272 B).
+  Opisuje teraz stan bieżący, z historią w jednym akapicie zamiast w milczącej rozbieżności.
+- `launcher.cpp`: komentarz przy ścieżce E3 wskazywał `exec.run` jako miejsce zgłoszenia braku
+  blokady — blokada jest brana w `main()` od etapu 2f.
+- `launcher.cpp`: komentarz przy kontroli zgodności parserów twierdził, że pełny parser nie ma
+  opcji `name`; ma ją, tylko `vm` jej nie zawiera przy `--autoname`.
+- `launcher.cpp`: plik zapytań publikowany w slocie był ścieżką jak wpisaną. Jest bezwzględny,
+  tak samo jak w pliku blokady — slot czyta operator z innego katalogu roboczego niż serwer.
+  Normalizację obu ścieżek robi teraz jeden `absolutePathOf`.
+- `bus.cpp`: `unit` i `queryFile` były jedynymi polami obcinanymi bez śladu. Zostają obcinane
+  (odmowa startu z powodu długiej nazwy unitu byłaby lekarstwem gorszym od choroby), ale
+  z ostrzeżeniem w logu; podział na pola rozstrzygające i informacyjne jest opisany w `bus.hpp`.
+- `serverRouting.cpp`: lekser składał tokeny do lowercase, a `RQL.g4` leksuje słowa kluczowe
+  wielkościowo (`'FROM'|'from'`). Strumień nazwany `Min` albo `From` byłby pominięty w klauzuli
+  FROM. Regresja: `serverRouting.sourceStreamsTreatMixedCaseKeywordsAsStreamNames`.
+- `uniqueness.sh` punkt (10): sam brak procesu przegranego nie dowodził, że odpadł **na
+  roszczeniu** — odpadłby tak samo po skasowaniu artefaktów. Test wymaga teraz komunikatu
+  magistrali w logu przegranego i kompletu artefaktów zwycięzcy.
+- `serverName.cpp`: wymiana całej listy `kSurnames` **nie należy do zakresu 2f**. Zmiana jest
+  nieszkodliwa (64 pozycje, bez duplikatów, nic się do starych nazw nie odwołuje), ale idzie
+  osobnym commitem — inaczej opis 2f nie opisuje własnego diffu.
+
+#### Dziennik 2f — weryfikacja końcowa (3 września 2026)
+
+- Skupiony zestaw 16 testów multiserver/bus/IPC/lock/routing: **16/16 przeszło**.
+- Pełny CTest Debug: **213/213 przeszło** w 144,29 s.
+- Pełny CTest Release, po instalacji bieżących binariów: **213/213 przeszło** w 72,81 s.
+- `git diff --check` oraz kontrole watermarków zmienionych plików źródłowych i testowych
+  w trybie ścisłym: **bez uwag**.
+
+Przebieg po naprawach z przeglądu (ta sama sesja, drzewo z poprawkami):
+
+- Pełny CTest Debug: **213/213 przeszło** w 141,18 s.
+- Pełny CTest Release: **213/213 przeszło** w 70,10 s.
+- `ninja -C build/Release test_gate`: **bramka zielona**, odcisk `src/`
+  `7e97e566…6179b0e`. Testy mechanizmu H10 (5/5), obie kampanie po 10 010 planów, oba werdykty
+  dokładne 9/9, **reżimy H10a zgodne z odniesieniem w próbie i poza próbą**, H9 korpus,
+  samotesty i **84/84 kompilacji + 4/4 odrzucone mutanty**.
+
+Wcześniejszy czerwony wynik bramki — brak wierszy z reżimem w `H10a` i pominięty poziom
+H9 84/84 — pochodził **w całości z nieświeżych artefaktów bramki**, nie ze zmian 2f: profile
+`build/K26v3-*` niosły odcisk starszej treści `src/`, a katalog `gate-work` został po
+poprzednim przebiegu. Naprawa jest ta z pułapki nr 1 w `CLAUDE.md`: `rm -rf build/K26v3-*`,
+`test/research_gate/h9/build_profiles.sh` (4 profile, ok. 7 min), `rm -rf` katalogu `gate-work`,
+ponowna bramka. Warto to zapamiętać: przy brudnym drzewie **oba** poziomy potrafią zgasnąć
+naraz i wyglądać jak dwie osobne awarie badawcze.
+
+Kolejność ma znaczenie: profile buduje się **po** ostatniej zmianie w `src/`, bo ich odcisk
+liczy się z treści drzewa. Przebudowa przed poprawkami byłaby pracą do wyrzucenia.
 
 ---
 
@@ -122,25 +230,31 @@ niespójną stertę w pamięci dzielonej, a `EOWNERDEAD` wtedy nie pomaga — ni
 półrozpiętego drzewa. Przy stałych slotach naprawa niezmiennika to jedna operacja: unieważnić
 slot, którego dotyczył przerwany zapis.
 
-### Układ segmentu (zbudowany)
+### Układ segmentu (stan bieżący)
 
-Segment nazywa się `xrdbbus`, **862 272 B** (32 sloty × 26 928 B + nagłówek) — zmierzone
-`ls -l /dev/shm/xrdbbus`. Kod w `src/retractor/lib/bus.{hpp,cpp}`.
+Segment nazywa się `xrdbbus_v2`, **874 560 B** (nagłówek 64 B + 32 sloty × 27 328 B) — zmierzone
+`ls -l /dev/shm/xrdbbus_v2`. Kod w `src/retractor/lib/bus.{hpp,cpp}`.
+
+W etapie 2b segment nazywał się `xrdbbus` i miał 862 272 B przy `layoutVersion` 1; etap 2e dołożył
+do slotu `unit` i `counterPath`, co podniosło wersję układu do 2 i — zgodnie z regułą opisaną niżej
+— przeniosło ją do nazwy segmentu. Poniższa tabela opisuje układ **aktualny**, nie historyczny.
 
 ```
 [ magic "XRDBBUS" (u64) ]               wpisywane JAKO OSTATNIE przy tworzeniu segmentu
-[ layoutVersion (u32) = 1 ]             niezgodność => praca bez magistrali
+[ layoutVersion (u32) = 2 ]             niezgodność => praca bez magistrali
 [ slotCount (u32) = 32 ]
 [ slotSize (u32) + reserved (u32) ]     zmiana POJEMNOŚCI bez bumpu wersji => odmowa
 [ pthread_mutex_t (robust, pshared) ]   używany przy roszczeniu i przy zwalnianiu slotu
-[ slot[0..31] ]
+[ slot[0..31] ]                         27 328 B (27 324 B pól + wyrównanie do 8)
     seq          (u32)          seqlock: nieparzysty = zapis w toku
     pid          (i32)
     startTime    (u64)          pole 22 z /proc/<pid>/stat
     streamCount  (u32)
     name         [40]
-    queryFile    [256]
-    streams      [128][208]
+    queryFile    [256]          ścieżka bezwzględna; pole informacyjne, obcinane z ostrzeżeniem
+    unit         [128]          jednostka systemd; pole informacyjne, obcinane z ostrzeżeniem
+    counterPath  [256]          znormalizowana ścieżka licznika :ROTATION; za długa => odmowa
+    streams      [128][208]     za długa nazwa => odmowa
 ```
 
 Trzy odstępstwa od projektu wstępnego, każde z powodu:
@@ -153,9 +267,10 @@ Trzy odstępstwa od projektu wstępnego, każde z powodu:
   skrótem — więc 208 B pokrywa wszystko, co silnik potrafi wygenerować. Liczba strumieni ma
   zapas 2,5× wobec największego skompilowanego planu w repozytorium (53 węzły,
   `optimizer_ablation`).
-- **Pole `unit` (nazwa jednostki systemd) pominięte.** Nie jest potrzebne w 2b, a jego
-  wypełnienie wymaga wyniesienia `detectSystemdIdentity()` z `lockManager.cpp` — to praca 2c
-  albo E3, nie rezerwacja miejsca na zapas. Dodanie go później wymaga bumpu `layoutVersion`.
+- **Pole `unit` (nazwa jednostki systemd) pominięte w 2b, dołożone w 2e.** W 2b nie było
+  potrzebne, a jego wypełnienie wymagało wyniesienia `detectSystemdIdentity()` z
+  `lockManager.cpp` — więc zostało odłożone zamiast zarezerwowane na zapas. Etap 2e je dołożył
+  razem z `counterPath` i zapłacił za to zapowiedzianym bumpem `layoutVersion` z 1 na 2.
 - **Pole `slotSize` dodane.** Numer wersji chroni przed zmianą znaczenia pól, a nie przed
   zmianą pojemności; pomyłka w tym miejscu kosztowała jeden przebieg testów podczas 2b.
 
@@ -189,24 +304,20 @@ całą podstawą powyższej naprawy.
 ### Kolejność startu serwera (zrealizowana)
 
 ```
-acquireLock()                              (etap 0)
 kompilacja planu                           (launcher)
+acquireLock()                              <— przed artefaktami i IPC
+xrdbbus: attach + claim zasobów            <— atomowa odmowa przed artefaktami
+kasowanie własnych artefaktów              (tylko po obu sukcesach)
+ipcServer.setServerName                    (executor)
 std::atexit(cleanup)
-ipcServer.setServerName                    <— MUSI być tutaj, patrz niżej
-xrdbbus: attach + claim nazw strumieni     <— tu odmowa przy kolizji
 ipcServer.start()
 publishLockInfo()
 przetwarzanie
 ```
 
-Roszczenie **po** kompilacji (znamy dopiero wtedy zbiór `q.id`) i **przed** startem transportu.
-
-**`setServerName` musi stać przed roszczeniem, nie po nim.** To nie jest kosmetyka: odmowa
-następuje już po `std::atexit(cleanup)`, a `cleanup()` kasuje obiekty IPC **według nazwy
-instancji**. Z nazwą jeszcze nieustawioną instancja odprawiona z kwitkiem kasowała nazwy
-historyczne — czyli segment, kolejkę komend i muteks *działającego* serwera bezimiennego.
-Defekt powstał i został naprawiony w 2b; punkt (5) w `multiserver_uniqueness/uniqueness.sh`
-jest na niego regresją i został zweryfikowany przez tymczasowe cofnięcie poprawki.
+Roszczenie następuje **po** kompilacji (dopiero wtedy znamy zbiór `q.id`) i **przed** pierwszą
+czynnością destrukcyjną. Launcher przekazuje aktywną blokadę i zajęty slot do executora; odmowa
+nie rejestruje `atexit` i nie dotyka IPC.
 
 ### Komunikat odmowy
 
@@ -300,21 +411,184 @@ strumienia" należy wtedy do serwera, dokładnie jak przed 2c — i to jest pow�
 ### Format `xqry --servers`
 
 Jedna linia na instancję, pola oddzielone spacją, sortowane; instancja bezimienna jako
-`(unnamed)`, brak pliku zapytań jako `-`:
+`(unnamed)`, brak pliku zapytań jako `-`. Plik zapytań jest ścieżką **bezwzględną**, tak samo
+jak w pliku blokady: slot czyta operator z innego katalogu roboczego niż serwer, a wybór celu
+dostarczania z magistrali (E3) potrzebuje ścieżki, którą da się otworzyć bez zgadywania `cwd`.
 
 ```
-alfa 249247 alfa.rql srca dsta
-beta 249248 beta.rql srcb dstb
+alfa 249247 /home/rdb/plans/alfa.rql srca dsta
+beta 249248 /home/rdb/plans/beta.rql srcb dstb
 ```
 
 Brak żywych instancji: pusty stdout, jedna linia na stderr, kod `0`.
 
 ### Czego 2c nie objęło
 
-- **Strumień powołany zapytaniem ad-hoc nie jest roszczony w magistrali.** Plan serwera rośnie
-  o nazwę, której rozłączność nie jest egzekwowana wobec pozostałych instancji.
 - `-w/--wait-server` nadal czeka na nazwy podane jawnie (albo historyczne), bo routing wymaga
   żywej instancji, a `-w` służy dokładnie sytuacji, w której jej jeszcze nie ma.
+
+---
+
+## Etap 2d — roszczenie nazw powołanych ad-hoc (stan zrealizowany)
+
+### Dlaczego to nie jest kosmetyka
+
+`getAdHoc` modyfikuje **plan działającego serwera** (`executorsm.cpp`, `importFrom` +
+`addQueryToModel`), a `rdb::StoragePaths` zakłada `<qryID>.desc` dla każdego wpisu planu.
+Nazwa dołożona w locie w drugiej instancji nadpisywała więc deskryptor cudzego strumienia
+we wspólnym katalogu magazynu — dokładnie ta sama **fizyczna** kolizja, przed którą broni
+etap 2b, tyle że wpuszczana tylnymi drzwiami. Skutek jest trwały, bo plan zostaje zmieniony.
+
+### `Bus::claimAdditional` zamiast powtórnego `claim`
+
+`claim()` zaczyna od `release()` (`bus.cpp`), bo powtórne roszczenie tej samej instancji ma
+zastąpić jej slot, a nie kolidować sam ze sobą. W locie to jest niedopuszczalne: odmowa
+zostawiłaby **działający** serwer bez slotu, czyli bez roszczenia także tych nazw, które już
+obsługuje. Stąd osobna operacja:
+
+- wymaga posiadanego slotu (bez niego `Unavailable`),
+- pod muteksem sprawdza rozłączność wobec **cudzych** żywych slotów, własny pomijając,
+- nazwy już obecne w slocie odfiltrowuje, więc powtórzone zapytanie przechodzi i slot nie
+  rośnie o duplikaty,
+- pojemność slotu sprawdza po odfiltrowaniu, przed jakimkolwiek zapisem,
+- **odmowa nie ma żadnego skutku ubocznego** — slot zostaje bit w bit taki, jaki był.
+
+### Miejsce sprawdzenia w `getAdHoc`
+
+Po lokalnej kompilacji (dopiero wtedy znane są także węzły pośrednie, które kompilator dołożył
+do planu) i **przed** `importFrom`, czyli przed jakąkolwiek zmianą planu serwera. Zbiór nowych
+nazw wyznaczany jest dokładnie tą samą regułą co `compiler::importFrom`: węzły nie będące
+dyrektywą, których plan serwera jeszcze nie zna.
+
+Odmowa wraca do klienta kanałem `db`, więc `xqry -a` kończy się kodem `2` i komunikatem:
+
+```
+Rejected: stream 'dst' is already served by instance 'alfa' (pid 178735)
+```
+
+### Decyzje przyjęte w 2d
+
+- **`Unavailable` przepuszcza zapytanie i loguje ostrzeżenie**, spójnie ze ścieżką startową:
+  jeden uszkodzony segment nie może unieruchomić maszyny, a cena jest wypisana wprost.
+- **Roszczenia nie cofamy, gdy dalszy `compile()` łańcucha albo `addQueryToModel` zawiedzie.**
+  `importFrom` wstawił już te węzły do planu i istniejący kod ich stamtąd nie usuwa, więc
+  roszczenie odpowiada rzeczywistej zawartości planu.
+- **Sprawdzenie jest poza `core_mutex`.** Ad-hoc jest serializowany wątkiem komunikacyjnym,
+  a jedynym innym pisarzem do planu jest znowu ad-hoc; branie muteksu magistrali pod
+  `core_mutex` zatrzymywałoby pętlę przetwarzania bez potrzeby.
+
+### Zombie liczy się jako martwy (kryterium żywotności, ta sama sesja)
+
+Slot serwera zabitego, ale niezebranego przez rodzica, blokował swoje nazwy strumieni **dowolnie
+długo**: zombie zachowuje `/proc/<pid>/stat` razem z niezmienionym `starttime`, więc oba warunki
+żywotności były spełnione (sprawdzone eksperymentem). Kolejna instancja dostawała odmowę
+wskazującą proces, który już nie przetwarza.
+
+Odpytywanie serwerów przez `hello` odpadło z tego samego powodu co w 2b i 2c — 3,008 s budżetu
+klienta na każdy martwy slot, i to na ścieżce startu. Rozwiązanie kosztuje zero: `processStartTime`
+i tak czytał `/proc/<pid>/stat` i i tak przeskakiwał nad polem 3 w drodze do pola 22. `readProcStat`
+zwraca teraz oba pola z tej samej linii, a `isProcessAlive` odrzuca stan `'Z'`.
+
+Sprzątania nie trzeba było dopisywać: gdy `isProcessAlive` mówi „martwy", istniejąca ścieżka
+w `claim()` i `claimAdditional()` sama woła `clearSlot` i uznaje slot za wolny.
+
+Odrzucany jest **wyłącznie** `'Z'`. `'T'` (zatrzymany SIGSTOP-em) i `'D'` (nieprzerywalny sen) to
+procesy żywe, które wznawiają pracę — uznanie ich za martwe wpuściłoby drugą instancję na ten sam
+`<qryID>.desc`. Regresja: `test_bus` · `ZombieSlotIsFreeAgain` (fork, SIGKILL bez `waitpid`,
+przejęcie nazwy przez rodzica, `waitpid` na końcu).
+
+### Czego 2d nie objęło
+
+- `xqry -a` bez `--server` przy ≥2 instancjach nadal rozstrzyga się regułami 2c (wszystkie
+  rozpoznane nazwy w jednej instancji), a nazwa **nowa** z definicji nie należy do nikogo —
+  routing wybiera więc instancję po nazwach źródeł, nie po nazwie tworzonego strumienia.
+- Ścieżka dostarczania E3 w `launcher.cpp` wybiera cel z pliku blokady (`readPeerInfo`),
+  a nie z magistrali: przy wielu instancjach trafia w tę spod blokady, nie we właściciela
+  kolidujących nazw. To zadanie E3, nie 2d.
+
+---
+
+## Etap 2e — odsiew przed szkodą, licznik rotacji, `unit` w slocie
+
+### Odsiew rozłączności w `launcher.cpp`
+
+Roszczenie w `executorsm::run` przychodziło **za późno wobec dwóch czynności nieodwracalnych**,
+które launcher wykonuje wcześniej:
+
+1. dostarczenie zestawu do działającego serwisu — nadpisanie jego pliku zapytań i restart
+   (`deliverQueryFile` + `restartService`),
+2. skasowanie artefaktów strumieni planu (`dropArtifactFile`, gdy plan nie ma `:ROTATION`).
+
+Instancja kolidująca i tak kończyła się odmową, więc **jedynym jej skutkiem była szkoda**: przy (1)
+serwis zostawał w stanie failed z nadpisanym zestawem, przy (2) tracił dane działający serwer.
+Punkt (2) nie jest teorią — ujawnił go nowy punkt (7) testu unikalności: `epsilon` kasowała
+artefakty strumienia `adh`, powołanego ad-hoc w `gamma`, a `gamma` padała z
+`FATAL: storage: internal record count mismatch ... in adh` i wieszała test na `wait`.
+
+Etap 2f rozdzielił te ścieżki. Zwykły start używa atomowego `Bus::claim` przed kasowaniem
+artefaktów. Migawka `findForeignOwner` pozostaje wyłącznie na ścieżce dostarczania do istniejącego
+serwisu, gdzie pomija instancję docelową; obejmuje teraz także licznik przez
+`findForeignCounterOwner`.
+
+### Licznik `:ROTATION` w slocie
+
+`PersistentCounter` wczytuje wartość przy starcie, a zapisuje dopiero w destruktorze, więc dwie
+instancje na jednym pliku zapisują tę samą wartość i **gubią rotacje**, nadpisując sobie archiwa.
+Licznik nie jest nazwą strumienia, więc rozłączność nazw go nie chroniła. Slot niesie teraz ścieżkę
+licznika, a kolizja kończy się `ClaimStatus::CounterConflict` ze wskazaniem właściciela.
+
+Ścieżkę normalizuje **wołający**, i to `absolute()` **przed** `weakly_canonical()`: plik licznika
+przy pierwszym starcie jeszcze nie istnieje, a `weakly_canonical` nad nieistniejącą ścieżką
+względną zwraca ją bez zmiany — czyli bez katalogu roboczego, o który w tej normalizacji chodzi.
+
+Sam `:STORAGE` **nie** jest osobno chroniony i nie musi być: pliki są per nazwa strumienia, a te są
+rozłączne.
+
+### `unit` w slocie i `layoutVersion` 2
+
+`detectSystemdIdentity()` wyniesiony z anonimowej przestrzeni `lockManager.cpp` do
+`lockManager.hpp`. Slot niesie nazwę jednostki systemd, więc magistrala umie wskazać, którą
+jednostkę zatrzymać, żeby zwolnić kolidującą nazwę.
+
+Slot urósł o `unit[128]` i `counterPath[256]`, więc `layoutVersion` idzie z 1 na 2, a `slotSize`
+w nagłówku i tak wyłapałby samą zmianę pojemności.
+
+Pułapkę wdrożeniową, którą to za sobą ciągnie, rozwiązuje **wersja w nazwie segmentu** — patrz
+niżej.
+
+### Czego 2e nie objęło, a 2f domknęło
+
+- Druga instancja o **tej samej** nazwie odpada teraz na blokadzie przed kasowaniem artefaktów.
+- Dostarczanie planu z kolidującym licznikiem ma test integracyjny bez zależności od systemd:
+  syntetyczny proces trzyma prawdziwy `flock`, a `systemctl` jest kontrolowaną atrapą.
+- `--autoname` nadal losuje raz, bez ponowienia przy trafieniu w nazwę żywej instancji.
+
+### Wersja w nazwie segmentu: `xrdbbus_v2`
+
+Segment o starym układzie zostaje w `/dev/shm` po podmianie binarki, a instancja, która odmówi się
+do niego podłączyć, **startuje bez egzekwowania rozłączności** — awaria jest cicha aż do pierwszej
+kolizji. Nazwa niesie więc wersję układu i idzie w górę razem z `layoutVersion` przy każdej zmianie
+układu slotu. Nowa binarka po prostu zakłada własny segment, stary zostaje nieużywanym śmieciem do
+restartu maszyny. Zweryfikowane: pełny `it_multiserver` przechodzi przy obecnym w `/dev/shm`
+segmencie o poprzedniej nazwie, bez żadnego ręcznego `rm`.
+
+**Automatycznego kasowania świadomie nie ma.** Rozważony wariant „sprawdź, czy żyją inne instancje,
+i jeśli nie — skasuj segment" ma dwie wady, obie w miejscu, w którym miałby pomóc:
+
+1. **Nieczytelnego segmentu nie da się zapytać o żywotność.** Przy obcym układzie `pid` i
+   `startTime` czyta się jako śmieć, więc źródłem prawdy musiałby być skan `/proc` — czyli coś
+   spoza magistrali.
+2. **Kasowanie jest wyścigiem, i to psującym cicho.** `shm_unlink` usuwa nazwę, ale istniejące
+   odwzorowania żyją dalej: instancja, która skasuje segment tuż po tym, jak inna go założyła,
+   doprowadza do stanu **dwóch segmentów**, w którym każda instancja widzi tylko siebie i
+   rozłączność nazw przestaje obowiązywać — bez jednego komunikatu. Dzisiejsza odmowa podłączenia
+   jest zła, ale **głośna**. Zamknięcie tego wyścigu wymagałoby `flock` obejmującego całe
+   podłączenie, czyli drugiego protokołu wzajemnego wykluczania nad tym samym segmentem.
+
+Podkreślenie zamiast kropki jest częścią kontraktu: obiekty IPC instancji nazywają się
+`<obiekt>.<nazwa instancji>`, więc `xrdbbus.v2` wyglądałby jak obiekt instancji o nazwie `v2`
+i wpadłby pod wzorce sprzątające postaci `/dev/shm/*.<nazwa>`. Regresja:
+`test_bus` · `BusSegmentName.CarriesLayoutVersionAndAvoidsInstanceNamespace`.
 
 ## Protokół weryfikacji
 
@@ -401,18 +675,18 @@ Każda z nich kosztowała czas w sesji z 2 września 2026.
 | `src/include/constants.hpp` | `ipc::names(serverName)` — nazwy obiektów IPC instancji |
 | `src/retractor/lib/serverName.{hpp,cpp}` | generator nazw w stylu dockera + walidacja |
 | `src/retractor/lib/lockManager.{hpp,cpp}` | `acquireLock()` (wyłączność) i `publishLockInfo()` (treść) — rozdzielone celowo |
-| `src/retractor/lib/bus.{hpp,cpp}` | magistrala `xrdbbus`: `claim()`, `release()`, `instances()`, `isProcessAlive()` |
-| `src/retractor/lib/executorsm.cpp` | `run()` — kolejność startu i rejestracja w magistrali; `cleanup()` zwalnia slot |
-| `src/retractor/launcher.cpp` | wczesny skan `--name` / `--autoname`, walidacja, nazwa pliku blokady |
+| `src/retractor/lib/bus.{hpp,cpp}` | magistrala `xrdbbus`: `claim()`, `claimAdditional()`, `release()`, `instances()`, odsiew właścicieli i `isProcessAlive()` |
+| `src/retractor/lib/executorsm.cpp` | `run()` przyjmuje aktywną blokadę i slot; `cleanup()` zwalnia oba po IPC |
+| `src/retractor/launcher.cpp` | wczesny parser tożsamości, blokada i roszczenie przed artefaktami, nazwa IPC |
 | `src/qry/ipcClient.{hpp,cpp}` | klient zna nazwę instancji, z którą rozmawia |
 | `src/qry/serverRouting.{hpp,cpp}` | czyste reguły routingu nad migawką magistrali; bez IPC |
 | `src/qry/qryLauncher.cpp` | opcje `--server` / `--servers`, `resolveTarget`, `waitForServer` |
 | `test/IntegrationTest_serial/serverlib.sh` | oprawa **jednoinstancyjna** — nie używać w testach wieloserwerowych |
 | `test/IntegrationTest_serial/multiserver_named/` | wzorzec testu dwuserwerowego z własną bramką higieny |
-| `test/IntegrationTest_serial/multiserver_uniqueness/` | 5 punktów kontrolnych unikalności; zabija serwer przez SIGKILL i sam sprząta po sobie |
+| `test/IntegrationTest_serial/multiserver_uniqueness/` | 11 punktów kontrolnych unikalności, kolejności startu i dostarczania; sam sprząta procesy i pliki |
 | `test/IntegrationTest_serial/multiserver_routing/` | 6 punktów routingu; mierzy też czas `--servers` nad osieroconym segmentem |
-| `test/UnitTest/test_bus.cpp` | 9 przypadków magistrali pod valgrindem; pracuje na segmencie `xrdbbus_ut`, nie na produkcyjnym |
-| `test/UnitTest/test_serverRouting.cpp` | 15 przypadków reguł routingu; bez pamięci dzielonej i bez serwerów |
+| `test/UnitTest/test_bus.cpp` | 26 przypadków magistrali pod valgrindem; pracuje na segmencie `xrdbbus_ut`, nie na produkcyjnym |
+| `test/UnitTest/test_serverRouting.cpp` | 17 przypadków reguł routingu; bez pamięci dzielonej i bez serwerów |
 
 ## Zgodność wsteczna — reguła obowiązująca do końca prac
 

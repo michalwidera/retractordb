@@ -78,23 +78,53 @@ TEST(serverRouting, unnamedInstanceIsRoutableTarget) {
   EXPECT_TRUE(resolved.serverName.empty());
 }
 
-TEST(serverRouting, identifiersSkipQuotedLiterals) {
-  // Napis o tresci cudzej nazwy strumienia nie moze przekierowac zapytania: 'dstb' jest
-  // tu literalem, a nie odwolaniem.
-  const std::vector<std::string> found = routing::extractIdentifiers("SELECT to_string(dsta[0]:8)+'dstb' STREAM x FROM dsta");
-  EXPECT_NE(std::ranges::find(found, "dsta"), found.end());
-  EXPECT_EQ(std::ranges::find(found, "dstb"), found.end());
+TEST(serverRouting, sourceStreamsIgnoreSelectIdentifiersAndQuotedLiterals) {
+  const std::vector<std::string> found =
+      routing::extractSourceStreams("SELECT to_string(dsta[0]:8)+'dstb' STREAM x FROM dsta FILE 'dstb'");
+  EXPECT_EQ(found, (std::vector<std::string>{"dsta"}));
 }
 
-TEST(serverRouting, identifiersKeepTrailingDigits) {
-  // Nazwy w rodzaju str12 sa w testach integracyjnych regula, nie wyjatkiem.
-  const std::vector<std::string> found = routing::extractIdentifiers("SELECT str12[0] STREAM y FROM str12");
-  EXPECT_NE(std::ranges::find(found, "str12"), found.end());
-  EXPECT_EQ(std::ranges::find(found, "str"), found.end());
+TEST(serverRouting, sourceStreamsFollowRqlIdGrammar) {
+  const std::vector<std::string> found = routing::extractSourceStreams("SELECT cell$0[0] STREAM y FROM cell$0#str12");
+  EXPECT_EQ(found, (std::vector<std::string>{"cell$0", "str12"}));
+}
+
+TEST(serverRouting, sourceStreamsIgnoreReducersAggregatorsAndComments) {
+  const std::vector<std::string> found = routing::extractSourceStreams(
+      "SELECT 1 STREAM y FROM MIN(dsta).avg/* dstb /* nested */ dstb */+srca // dstb\n RETENTION 4");
+  EXPECT_EQ(found, (std::vector<std::string>{"dsta", "srca"}));
+}
+
+// RQL.g4 leksuje slowa kluczowe wielkosciowo (`MIN: 'MIN'|'min'`), wiec pisownia mieszana jest
+// zwykla nazwa strumienia -- grammar mowi to wprost przy stream_fn_call. Lekser routingu ma sie
+// trzymac tej samej reguly: `Min` i `From` to zrodla, `min` i `from` to skladnia.
+TEST(serverRouting, sourceStreamsTreatMixedCaseKeywordsAsStreamNames) {
+  EXPECT_EQ(routing::extractSourceStreams("SELECT Min[0] STREAM y FROM Min"), (std::vector<std::string>{"Min"}));
+  EXPECT_EQ(routing::extractSourceStreams("SELECT 1 STREAM y from Storage+MIN(a)"), (std::vector<std::string>{"Storage", "a"}));
+  // Pisownie z grammar nadal sa skladnia: `min` to reduktor, `storage` konczy wyrazenie FROM.
+  EXPECT_EQ(routing::extractSourceStreams("SELECT 1 STREAM y FROM min(a) STORAGE 'memory'"), (std::vector<std::string>{"a"}));
 }
 
 TEST(serverRouting, adHocResolvesToTheOnlyOwner) {
   const routing::Resolution resolved = routing::forAdHoc(twoInstances(), "SELECT dsta[0]+1 STREAM tmp FROM dsta");
+  EXPECT_EQ(resolved.status, routing::Status::Resolved);
+  EXPECT_EQ(resolved.serverName, "alfa");
+}
+
+TEST(serverRouting, adHocIgnoresFieldFunctionAndOutputNameCollisions) {
+  const std::vector<bus::InstanceInfo> instances{
+      makeInstance("alfa", 101, "alfa.rql", {"dsta"}),
+      makeInstance("beta", 202, "beta.rql", {"to_string", "temperature", "tmp", "avg"})};
+  const routing::Resolution resolved =
+      routing::forAdHoc(instances, "SELECT to_string(dsta.temperature:8) STREAM tmp FROM dsta.avg");
+  EXPECT_EQ(resolved.status, routing::Status::Resolved);
+  EXPECT_EQ(resolved.serverName, "alfa");
+}
+
+TEST(serverRouting, adHocRoutesGeneratedDollarStream) {
+  const std::vector<bus::InstanceInfo> instances{makeInstance("alfa", 101, "alfa.rql", {"cell$0"}),
+                                                 makeInstance("beta", 202, "beta.rql", {"cell"})};
+  const routing::Resolution resolved = routing::forAdHoc(instances, "SELECT cell$0[0] STREAM tmp FROM cell$0");
   EXPECT_EQ(resolved.status, routing::Status::Resolved);
   EXPECT_EQ(resolved.serverName, "alfa");
 }

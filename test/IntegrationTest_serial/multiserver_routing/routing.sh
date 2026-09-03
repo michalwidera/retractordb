@@ -40,7 +40,9 @@ cleanup() {
     kill -KILL "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
   done
-  # Bramka higieny: zaden obiekt IPC ani plik blokady tych instancji nie ma prawa zostac.
+  # Stabilne pliki flock sa czescia protokolu; usuwamy pliki testowe dopiero po procesach.
+  rm -f "$LOCK_A" "$LOCK_B"
+  # Bramka higieny: zaden obiekt IPC ani testowy plik blokady tych instancji nie ma prawa zostac.
   if ls /dev/shm/*alfa* /dev/shm/*beta* >/dev/null 2>&1; then
     echo "higiena: zostaly obiekty IPC w /dev/shm:"
     ls /dev/shm/ | grep -E 'alfa|beta' || true
@@ -88,10 +90,15 @@ wait_for_lock "$LOCK_A" "$pid_a"
 wait_for_lock "$LOCK_B" "$pid_b"
 
 # (1) --servers: obie instancje ze swoimi strumieniami, jedna linia na instancje.
+#
+# Plik zapytan jest w slocie sciezka BEZWZGLEDNA, tak samo jak w pliku blokady: slot czyta
+# operator (i przyszly wybor celu dostarczania w E3) z innego katalogu roboczego niz serwer,
+# wiec pozycja wzgledna wskazywalaby u niego nieistniejacy plik. Wzorzec dopuszcza dowolny
+# przedrostek katalogu, zeby test nie zalezal od miejsca zbudowania drzewa.
 xqry --servers > servers.txt
-grep -qE "^alfa $pid_a alfa\.rql .*\bdsta\b" servers.txt || {
+grep -qE "^alfa $pid_a /.*/alfa\.rql .*\bdsta\b" servers.txt || {
   echo "--servers nie opisal instancji alfa:"; cat servers.txt; exit 1; }
-grep -qE "^beta $pid_b beta\.rql .*\bdstb\b" servers.txt || {
+grep -qE "^beta $pid_b /.*/beta\.rql .*\bdstb\b" servers.txt || {
   echo "--servers nie opisal instancji beta:"; cat servers.txt; exit 1; }
 [ "$(wc -l < servers.txt)" -eq 2 ] || {
   echo "--servers wypisal inna liczbe instancji niz dwie:"; cat servers.txt; exit 1; }

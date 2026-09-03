@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -23,12 +24,25 @@
 ///
 /// Zywotnosc slotu: /proc/<pid> istnieje ORAZ startTime sie zgadza. Sam kill(pid, 0) nie
 /// wystarcza, bo PID-y sa reuzywane. Slot martwy jest wolny; kasuje go ten, kto to
-/// zauwazy -- bez demona i bez heartbeatow.
+/// zauwazy -- bez demona i bez heartbeatow. Proces zombie liczy sie jako martwy, patrz
+/// isProcessAlive ponizej.
 namespace bus {
 
 /// Nazwa segmentu w /dev/shm. Segment nie jest przez nikogo kasowany: usuniecie go w chwili,
 /// gdy inna instancja trzyma odwzorowanie, zerwaloby jej magistrale.
-inline constexpr std::string_view kSegmentName = "xrdbbus";
+///
+/// NAZWA NIESIE WERSJE UKLADU i przy KAZDEJ zmianie ukladu slotu musi isc w gore razem
+/// z kLayoutVersion. Powod jest wdrozeniowy: segment o starym ukladzie zostaje w /dev/shm po
+/// podmianie binarki, a instancja, ktora odmowi sie do niego podlaczyc, startuje BEZ egzekwowania
+/// rozlacznosci nazw -- czyli awaria jest cicha az do pierwszej kolizji. Z wersja w nazwie nowa
+/// binarka po prostu zaklada wlasny segment, a stary zostaje nieuzywanym smieciem do restartu
+/// maszyny. Automatycznego kasowania swiadomie nie ma: "sprawdz, czy nikt nie zyje, i skasuj" jest
+/// wyscigiem, w ktorym dwie instancje moga skonczyc na DWOCH segmentach, kazda widzac tylko siebie.
+///
+/// Podkreslenie, nie kropka: obiekty IPC instancji nazywaja sie "<obiekt>.<nazwa instancji>", wiec
+/// "xrdbbus.v2" wygladalby jak obiekt instancji o nazwie "v2" i wpadl pod wzorce sprzatajace
+/// postaci /dev/shm/*.<nazwa>.
+inline constexpr std::string_view kSegmentName = "xrdbbus_v2";
 
 /// Pojemnosci ukladu. Przekroczenie ktoregokolwiek limitu jest bledem startu, a nie cichym
 /// zawieszeniem gwarancji rozlacznosci -- slot z obcieta lista strumieni nie moglby juz
@@ -46,29 +60,80 @@ inline constexpr std::size_t kMaxStreams       = 128;
 inline constexpr std::size_t kStreamNameSize   = 208;  ///< z terminatorem => nazwa do 207 znakow
 inline constexpr std::size_t kInstanceNameSize = 40;   ///< servername::kMaxLength (32) + zapas
 inline constexpr std::size_t kQueryFileSize    = 256;  ///< z terminatorem => sciezka do 255 znakow
+inline constexpr std::size_t kUnitNameSize     = 128;  ///< nazwa jednostki systemd; limit systemd to 256, tu z zapasem
+inline constexpr std::size_t kCounterPathSize  = 256;  ///< znormalizowana sciezka licznika :ROTATION
+
+/// Przekroczenie limitu ma DWA rozne skutki, i podzial nie jest dowolny.
+///
+/// Pola ROZSTRZYGAJACE rozlacznosc -- nazwa strumienia i sciezka licznika -- to odmowa startu:
+/// obciety napis zrownalby dwa rozne zasoby albo rozdzielil jeden, czyli zawiesilby gwarancje
+/// po cichu. Pola INFORMACYJNE -- nazwa jednostki systemd i plik zapytan -- sa obcinane, bo
+/// odmowa startu z powodu dlugiej nazwy unitu byloby lekarstwem gorszym od choroby; obciecie
+/// jest wtedy zapisywane ostrzezeniem, zeby przyciety identyfikator w `xqry --servers` nie
+/// wygladal na prawdziwy.
 
 /// Opis jednej zywej instancji odczytany z magistrali.
 struct InstanceInfo {
   std::string name;  ///< pusta => instancja historyczna (bez --name)
   std::int32_t pid{0};
   std::string queryFile;
+  std::string unit;         ///< nazwa jednostki systemd; pusta => zwykly proces
+  std::string counterPath;  ///< sciezka licznika :ROTATION; pusta => plan bez rotacji
   std::vector<std::string> streams;
 };
 
+/// Wlasciciel nazwy strumienia znaleziony w migawce magistrali.
+struct StreamOwner {
+  std::string stream;    ///< kolidujaca nazwa
+  std::string instance;  ///< wlasciciel; pusta => instancja bezimienna
+  std::int32_t pid{0};
+};
+
+/// Wlasciciel pliku licznika rotacji znaleziony w migawce magistrali.
+struct CounterOwner {
+  std::string path;
+  std::string instance;
+  std::int32_t pid{0};
+};
+
+/// Szuka w migawce nazwy z `streams`, ktora nalezy do instancji INNEJ niz `selfName`.
+///
+/// Sluzy sprawdzeniu zestawu zapytan PRZED dostarczeniem go dzialajacemu serwisowi: instancje
+/// docelowa trzeba pominac, bo restart i tak zwalnia jej slot, a kolizja z nia sama nie jest
+/// kolizja. Czysta funkcja nad gotowa migawka -- bez IPC i bez kontaktu z serwerami.
+[[nodiscard]] std::optional<StreamOwner> findForeignOwner(const std::vector<InstanceInfo> &instances, std::string_view selfName,
+                                                          const std::vector<std::string> &streams);
+
+/// Odpowiednik findForeignOwner dla znormalizowanej sciezki licznika :ROTATION. Pusta
+/// sciezka nie rości zasobu. Instancja docelowa jest pomijana, bo dostarczenie planu
+/// zastępuje jej dotychczasowy slot po restarcie.
+[[nodiscard]] std::optional<CounterOwner> findForeignCounterOwner(const std::vector<InstanceInfo> &instances,
+                                                                  std::string_view selfName, std::string_view counterPath);
+
 enum class ClaimStatus : std::uint8_t {
-  Claimed,      ///< slot zajety, nazwy strumieni rozlaczne ze wszystkimi zywymi instancjami
-  Conflict,     ///< nazwa strumienia nalezy juz do zywej instancji
-  TooLarge,     ///< plan przekracza pojemnosc slotu
-  NoFreeSlot,   ///< wszystkie sloty zajete przez zywe instancje
-  Unavailable,  ///< magistrali nie da sie uzyc; start bez egzekwowania rozlacznosci
+  Claimed,          ///< slot zajety, nazwy strumieni rozlaczne ze wszystkimi zywymi instancjami
+  Conflict,         ///< nazwa strumienia nalezy juz do zywej instancji
+  CounterConflict,  ///< plik licznika :ROTATION jest juz uzywany przez zywa instancje
+  TooLarge,         ///< plan przekracza pojemnosc slotu
+  NoFreeSlot,       ///< wszystkie sloty zajete przez zywe instancje
+  Unavailable,      ///< magistrali nie da sie uzyc; start bez egzekwowania rozlacznosci
 };
 
 struct ClaimResult {
   ClaimStatus status{ClaimStatus::Unavailable};
   std::string stream;     ///< kolidujaca nazwa strumienia (Conflict)
-  std::string ownerName;  ///< wlasciciel kolidujacej nazwy (Conflict); pusty => bezimienny
+  std::string ownerName;  ///< wlasciciel kolidujacego zasobu; pusty => bezimienny
   std::int32_t ownerPid{0};
-  std::string detail;  ///< powod niedostepnosci albo przekroczony limit -- do logu
+  std::string detail;  ///< sciezka licznika (CounterConflict), powod niedostepnosci albo limit
+};
+
+/// Komplet danych, ktore instancja publikuje w swoim slocie.
+struct ClaimRequest {
+  std::string_view name;         ///< pusta => instancja historyczna (bez --name)
+  std::string_view queryFile;    ///< plik zapytan, z ktorego instancja wystartowala
+  std::string_view unit;         ///< nazwa jednostki systemd; pusta => zwykly proces
+  std::string_view counterPath;  ///< znormalizowana sciezka licznika :ROTATION; pusta => brak rotacji
+  std::vector<std::string> streams;
 };
 
 /// Czas startu procesu: pole 22 z /proc/<pid>/stat. Zwraca 0, gdy procesu nie ma
@@ -77,6 +142,11 @@ struct ClaimResult {
 
 /// Czy proces o podanym PID nadal zyje. Zgodnosc startTime odrozania ten sam proces
 /// od innego procesu, ktoremu jadro nadalo ten sam, zwolniony wczesniej PID.
+///
+/// Proces ZOMBIE (stan 'Z') jest martwy: niezebrany potomek zachowuje /proc/<pid>/stat
+/// razem ze starttime, wiec bez sprawdzenia stanu trzymalby swoje nazwy strumieni az do
+/// wait() rodzica. Stan czytany jest z tej samej linii co starttime, czyli za darmo.
+/// Odrzucany jest wylacznie 'Z' -- uzasadnienie w bus.cpp przy definicji.
 [[nodiscard]] bool isProcessAlive(std::int32_t pid, std::uint64_t startTime);
 
 class Bus {
@@ -97,9 +167,27 @@ class Bus {
 
   [[nodiscard]] bool attached() const;
 
-  /// Sprawdza rozlacznosc nazw strumieni ze wszystkimi zywymi instancjami i -- gdy sa
-  /// rozlaczne -- zatwierdza wlasny slot. Jedyna operacja wymagajaca serializacji.
-  ClaimResult claim(std::string_view serverName, std::string_view queryFile, const std::vector<std::string> &streams);
+  /// Sprawdza rozlacznosc nazw strumieni ORAZ sciezki licznika :ROTATION ze wszystkimi zywymi
+  /// instancjami i -- gdy sa rozlaczne -- zatwierdza wlasny slot. Jedyna operacja wymagajaca
+  /// serializacji.
+  ///
+  /// Licznik jest chroniony osobno, bo nie jest nazwa strumienia: PersistentCounter wczytuje
+  /// wartosc przy starcie, a zapisuje ja dopiero w destruktorze, wiec dwie instancje na jednym
+  /// pliku zapisuja te sama wartosc i gubia rotacje. Sciezke normalizuje WOLAJACY -- magistrala
+  /// porownuje napisy, a nie pliki.
+  ClaimResult claim(const ClaimRequest &request);
+
+  /// Dopisuje nazwy strumieni do JUZ posiadanego slotu, sprawdziwszy ich rozlacznosc
+  /// z pozostalymi zywymi instancjami. Sluzy zapytaniom ad-hoc, ktore powiekszaja plan
+  /// dzialajacego serwera o nowe nazwy.
+  ///
+  /// To NIE jest claim() wolane powtornie: claim() zaczyna od release(), wiec odmowa
+  /// zostawialaby dzialajacy serwer bez slotu, czyli takze bez roszczenia nazw, ktore
+  /// juz obsluguje. Tutaj odmowa nie ma zadnego skutku ubocznego -- slot zostaje
+  /// nietkniety. Nazwy juz obecne w slocie sa pomijane, wiec operacja jest idempotentna.
+  ///
+  /// Wymaga posiadanego slotu (po udanym claim()); bez niego zwraca Unavailable.
+  ClaimResult claimAdditional(const std::vector<std::string> &streams);
 
   /// Zwalnia slot tej instancji. Idempotentne; wolane takze z handlera atexit.
   void release();

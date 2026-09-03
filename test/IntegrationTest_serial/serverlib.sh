@@ -12,12 +12,9 @@
 #  1. Istnienie pliku blokady NIE dowodzi, ze wstal NASZ serwer. Instancja
 #     zostawiona przez wczesniejszy test daje ten sam sygnal, a klient trafia
 #     wtedy do cudzego planu. Sprawdzamy PID zapisany w blokadzie.
-#  2. Znikniecie pliku blokady NIE dowodzi, ze proces sie zakonczyl.
-#     FlockServiceGuard kasuje plik w destruktorze (lockManager.cpp,
-#     cleanupLockFile), a handler zarejestrowany przez std::atexit
-#     (executorsm.cpp, cleanup) dolacza watek komunikacyjny i sprzata IPC
-#     dopiero PO wyjsciu z main. Miedzy tymi zdarzeniami proces zyje bez
-#     blokady. Czekamy wiec na zakonczenie procesu przez `wait`.
+#  2. Stan pliku blokady NIE dowodzi, ze proces sie zakonczyl. Plik ma stabilny inode i
+#     pozostaje po zwolnieniu flock, a handler zarejestrowany przez std::atexit dolacza
+#     watek komunikacyjny i sprzata IPC przed wyjsciem. Czekamy na proces przez `wait`.
 #
 # Uzycie:
 #   . "$(dirname "$0")/../serverlib.sh"
@@ -53,9 +50,15 @@ server_cleanup() {
     echo "higiena: test zostawil zywy proces xretractor $_server_started"
     status=1
   fi
-  if [ -n "$_server_started" ] && grep -qx "PID: $_server_started" "$SERVER_LOCK" 2>/dev/null; then
-    echo "higiena: test zostawil blokade $SERVER_LOCK nalezaca do $_server_started"
-    status=1
+  if [ -n "$_server_started" ] && [ -e "$SERVER_LOCK" ]; then
+    # Tresc pozostaje diagnostyczna po zwolnieniu flock. Oprawa usuwa plik tylko wtedy,
+    # gdy potrafi sama przejac blokade; aktywnego inode nie wolno odlaczyc od sciezki.
+    if flock -n "$SERVER_LOCK" true; then
+      rm -f "$SERVER_LOCK"
+    else
+      echo "higiena: test zostawil aktywna blokade $SERVER_LOCK"
+      status=1
+    fi
   fi
 
   exit "$status"

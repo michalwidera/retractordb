@@ -1,0 +1,2 @@
+DECLARE vp INTEGER STREAM srcp, 1 FILE 'data.txt'
+SELECT srcp[0]+6 STREAM adh FROM srcp

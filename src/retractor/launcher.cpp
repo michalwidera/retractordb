@@ -22,6 +22,7 @@
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "lib/appConfig.hpp"
+#include "lib/bus.hpp"
 #include "lib/compiler.hpp"
 #include "lib/executor_rt.hpp"
 #include "lib/executorsm.hpp"
@@ -151,6 +152,36 @@ void dropArtifactFile(const std::filesystem::path &artifact_filename) {
   }
 }
 
+static std::vector<std::string> claimedStreamNames(const qTree &plan) {
+  std::vector<std::string> retVal;
+  for (const auto &q : plan)
+    if (!q.isCompilerDirective()) retVal.push_back(q.id);
+  return retVal;
+}
+
+// Normalizacja sciezki publikowanej w slocie magistrali. absolute() PRZED weakly_canonical():
+// plik licznika przy pierwszym starcie jeszcze nie istnieje, a weakly_canonical nad
+// nieistniejaca sciezka wzgledna zwraca ja bez zmiany — czyli bez katalogu roboczego,
+// o ktory w tej normalizacji chodzi.
+static std::string absolutePathOf(const std::string &path) {
+  if (path.empty()) return {};
+  std::error_code ec;
+  const auto absolute = std::filesystem::absolute(std::filesystem::path(path), ec);
+  if (ec) return path;
+  const auto canonical = std::filesystem::weakly_canonical(absolute, ec);
+  return ec ? absolute.string() : canonical.string();
+}
+
+static std::string normalizedRotationCounterPath(const qTree &plan) {
+  for (const auto &q : plan)
+    if (q.id == ":ROTATION" && !q.filename.empty()) return absolutePathOf(q.filename);
+  return {};
+}
+
+static std::string ownerLabel(std::string_view instance) {
+  return instance.empty() ? "the unnamed instance" : "instance '" + std::string(instance) + "'";
+}
+
 static void validateConfiguredStorageDir(const AppConfig &cfg) {
   if (cfg.storageDir.empty()) return;
 
@@ -217,6 +248,8 @@ int main(int argc, char *argv[]) {
 
   fixArgcv(argc, argv);
 
+  namespace po = boost::program_options;
+
   // Wczesny skan argumentów: tryb logowania usługowego musi być znany przed konfiguracją logera.
   // Tryb usługi można włączyć flagą (-j/--service) albo zmienną środowiskową XRETRACTOR_SERVICE
   // (dowolna wartość poza pustą i "0") — wygodne dla jednostki systemd przez Environment=.
@@ -234,33 +267,49 @@ int main(int argc, char *argv[]) {
   if constexpr (rdb::probe::enabled)
     SPDLOG_WARN("[warning: probe benchmark build] measurement probe compiled in (RDB_BENCH_PROBE) — NOT for production.");
 
-  // Wczesny skan argumentów: ścieżka --config musi być znana przed konstruowaniem FlockServiceGuard,
-  // aby lock dir z config trafił do guard przed acquireLock().
-  std::optional<std::string> earlyConfigPath;
-  for (int i = 0; i < argc - 1; ++i) {
-    if (strcmp(argv[i], "-g") == 0 || strcmp(argv[i], "--config") == 0) {
-      earlyConfigPath = argv[i + 1];
-      break;
-    }
+  // Nazwa instancji i sciezka konfiguracji musza byc znane przed zbudowaniem straznika blokady.
+  // Ten sam parser Boosta obsluguje wszystkie formy, ktore zaakceptuje pozniejsze parsowanie
+  // pelnego CLI: `--name alfa`, `--name=alfa` i sklejone `-nalfa`. allow_unregistered zostawia
+  // pozostale opcje i argument pozycyjny dla pelnego parsera nizej.
+  po::options_description earlyDesc;
+  earlyDesc.add_options()("name,n", po::value<std::string>())("autoname", "")("config,g", po::value<std::string>());
+  po::variables_map earlyVm;
+  try {
+    po::store(po::command_line_parser(argc, argv).options(earlyDesc).allow_unregistered().run(), earlyVm);
+    po::notify(earlyVm);
+  } catch (const po::error &e) {
+    std::println(std::cerr, "{}: {}", argv[0], e.what());
+    return system::errc::invalid_argument;
   }
-  // Nazwa instancji musi byc znana rownie wczesnie: wchodzi do nazwy pliku blokady, a straznik
-  // powstaje ponizej. Walidacje robimy tutaj, bo bledna nazwa nie moze dojsc do nazw obiektow IPC.
-  std::string earlyServerName;
-  for (int i = 1; i < argc - 1; ++i) {
-    if (strcmp(argv[i], "-n") == 0 || strcmp(argv[i], "--name") == 0) {
-      earlyServerName = argv[i + 1];
-      break;
-    }
-  }
+
+  const std::optional<std::string> earlyConfigPath =
+      earlyVm.contains("config") ? std::optional<std::string>(earlyVm["config"].as<std::string>()) : std::nullopt;
+  std::string earlyServerName = earlyVm.contains("name") ? earlyVm["name"].as<std::string>() : std::string{};
   // --autoname to osobna flaga, a nie --name o opcjonalnej wartosci: przy opcjonalnej wartosci
   // `xretractor --name plik.rql` bylo nierozroznialne od nazwy instancji podanej wprost, bo
   // plik zapytan jest argumentem pozycyjnym. Osobna flaga nie ma tej dwuznacznosci.
-  const bool wantsAutoName = std::any_of(argv + 1, argv + argc, [](const char *arg) { return strcmp(arg, "--autoname") == 0; });
+  const bool wantsAutoName = earlyVm.contains("autoname");
   if (wantsAutoName && !earlyServerName.empty()) {
     std::println(std::cerr, "{}: --autoname and --name are mutually exclusive", argv[0]);
     return system::errc::invalid_argument;
   }
-  if (wantsAutoName) {
+
+  // Konfiguracja musi byc znana przed rozstrzygnieciem nazwy, bo klucz [server] autoname
+  // wspoldecyduje o losowaniu. Sama sciezka konfiguracji zalezy tylko od --config, wiec
+  // przesuniecie tego ladowania przed blok nazwy nie tworzy cyklu.
+  const AppConfig earlyAppCfg = [&]() -> AppConfig {
+    try {
+      return loadAppConfig(earlyConfigPath);
+    } catch (...) {
+      return {};  // błąd zostanie powtórzony i zgłoszony niżej z właściwym komunikatem
+    }
+  }();
+
+  // Klucz konfiguracyjny dziala tylko wtedy, gdy operator nie rozstrzygnal nazwy sam:
+  // jawne --name wygrywa po cichu, tak samo jak dyrektywa :STORAGE z RQL wygrywa nad
+  // storage.dir. --autoname i autoname=true nie sa konfliktem, tylko dwiema drogami do
+  // tego samego skutku.
+  if (wantsAutoName || (earlyServerName.empty() && earlyAppCfg.serverAutoName)) {
     earlyServerName = servername::generate();
     // Nazwa musi trafic na standardowe wyjscie, nie tylko do logu: bez niej operator nie ma
     // jak wskazac tej instancji w `xqry --server`. Opróznienie bufora jest tu konieczne, a nie
@@ -275,15 +324,6 @@ int main(int argc, char *argv[]) {
     return system::errc::invalid_argument;
   }
 
-  const AppConfig earlyAppCfg = [&]() -> AppConfig {
-    try {
-      return loadAppConfig(earlyConfigPath);
-    } catch (...) {
-      return {};  // błąd zostanie powtórzony i zgłoszony niżej z właściwym komunikatem
-    }
-  }();
-
-  namespace po = boost::program_options;
   po::variables_map vm;
   po::options_description desc("Available options");
 
@@ -295,7 +335,8 @@ int main(int argc, char *argv[]) {
   // Bez --name zostaje tozsamosc historyczna (jeden serwer na maszyne, ta sama nazwa blokady
   // i te same obiekty IPC co dotad). Nazwa wlacza rezim wieloserwerowy i jest opcjonalna
   // wlasnie po to, zeby dotychczasowe uzycie nie zmienilo sie ani o jeden plik.
-  const std::string serviceName = std::string(argv[0]) + "_service" + (earlyServerName.empty() ? "" : "." + earlyServerName);
+  const std::string executableName = std::filesystem::path(argv[0]).filename().string();
+  const std::string serviceName    = executableName + "_service" + (earlyServerName.empty() ? "" : "." + earlyServerName);
   FlockServiceGuard guard(serviceName);
   guard.setLockDir(earlyAppCfg.lockDir);
 
@@ -351,6 +392,14 @@ int main(int argc, char *argv[]) {
     po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
 
     po::notify(vm);
+
+    // Wczesny i pelny parser maja dawac jedna tozsamosc. Niezgodnosc oznaczalaby, ze blokada
+    // i IPC dostaly inna nazwe niz pozostala czesc programu. Przy --autoname nikt nie podal
+    // --name, wiec vm nie ma tego klucza i porownanie sie nie wykonuje: nazwa zostala
+    // wygenerowana wyzej i zadne pozniejsze parsowanie jej nie zna.
+    if (vm.contains("name") && vm["name"].as<std::string>() != earlyServerName) {
+      throw std::logic_error("early and full --name parsing produced different instance names");
+    }
 
     // Introspekcja binarki (jak --version): tylko odczyt flag kompilacji, obsługiwana przed
     // wczytaniem i walidacją konfiguracji — na hoście z niepoprawnym storage.dir zapytanie
@@ -461,6 +510,33 @@ int main(int argc, char *argv[]) {
         return system::errc::success;
       }
 
+      // Odsiew przed dostarczeniem planu do dzialajacego serwisu obejmuje wszystkie fizyczne
+      // zasoby publikowane w slocie: nazwy strumieni i licznik rotacji. Instancje docelowa
+      // pomijamy, bo restart zastapi jej dotychczasowy plan. Zwykly start nie polega juz na tej
+      // migawce: ponizej atomowo rości slot PRZED skasowaniem pierwszego artefaktu.
+      {
+        const std::vector<std::string> plannedStreams = claimedStreamNames(coreInstance);
+        const std::string counterPath                 = normalizedRotationCounterPath(coreInstance);
+        const bus::Bus xrdbbus(bus::kSegmentName, false);
+        const std::vector<bus::InstanceInfo> instances = xrdbbus.instances();
+        if (const auto owner = bus::findForeignOwner(instances, earlyServerName, plannedStreams)) {
+          const std::string ownerName = ownerLabel(owner->instance);
+          std::cerr << "xretractor: stream '" << owner->stream << "' is already served by " << ownerName << " (pid "
+                    << owner->pid << "); nothing was changed\n";
+          SPDLOG_ERROR("Refused before any change: stream '{}' is already served by {} (pid {}).", owner->stream, ownerName,
+                       owner->pid);
+          return system::errc::device_or_resource_busy;
+        }
+        if (const auto owner = bus::findForeignCounterOwner(instances, earlyServerName, counterPath)) {
+          const std::string ownerName = ownerLabel(owner->instance);
+          std::cerr << "xretractor: rotation counter file '" << owner->path << "' is already used by " << ownerName << " (pid "
+                    << owner->pid << "); nothing was changed\n";
+          SPDLOG_ERROR("Refused before any change: rotation counter file '{}' is already used by {} (pid {}).", owner->path,
+                       ownerName, owner->pid);
+          return system::errc::device_or_resource_busy;
+        }
+      }
+
       // E3: jeśli działa już inna instancja będąca serwisem systemd, nie startujemy drugiej —
       // dostarczamy zwalidowany (skompilowany powyżej) zestaw zapytań, nadpisując plik zapytań
       // serwisu i zlecając restart. Serwis załaduje nowy zestaw, zachowując konfigurację jednostki.
@@ -485,8 +561,8 @@ int main(int argc, char *argv[]) {
           std::println("Query compiled OK and sent to running service '{}' (restart requested).", peer.unit);
           return system::errc::success;
         }
-        // Inna instancja to zwykły proces (lub nierozpoznana) — dalsza ścieżka (exec.run) zgłosi
-        // brak dostępnej blokady (no_lock_available); nie próbujemy restartu.
+        // Inna instancja to zwykły proces (lub nierozpoznana) — transakcja startowa poniżej
+        // zgłosi brak dostępnej blokady (no_lock_available); nie próbujemy restartu.
       }
     }
 
@@ -505,6 +581,57 @@ int main(int argc, char *argv[]) {
   } catch (std::exception &e) {
     std::cerr << e.what() << "\n";
     return system::errc::interrupted;
+  }
+
+  // Od tego miejsca zaczyna sie transakcja startowa zwyklej instancji. Najpierw blokada
+  // tozsamosci, potem atomowe roszczenie magistrali, dopiero potem kasowanie artefaktow.
+  // Przegrany rownolegly start nie dochodzi dzieki temu do zadnej czynnosci destrukcyjnej.
+  if (!guard.acquireLock()) {
+    SPDLOG_ERROR("Cannot acquire service lock, another instance might be running.");
+    return system::errc::no_lock_available;
+  }
+
+  bus::Bus xrdbbus;
+  const std::vector<std::string> claimedStreams = claimedStreamNames(coreInstance);
+  const std::string counterPath                 = normalizedRotationCounterPath(coreInstance);
+  const SystemdIdentity systemd                 = detectSystemdIdentity();
+  // Sciezka BEZWZGLEDNA, tak samo jak w pliku blokady (setServiceQueryFile wyzej). Slot czyta
+  // operator z innego katalogu roboczego niz serwer, wiec `xqry --servers` z pozycja wzgledna
+  // wskazywalby plik, ktorego pod ta nazwa u niego nie ma.
+  const std::string queryFile    = vm.contains("queryfile") ? absolutePathOf(vm["queryfile"].as<std::string>()) : std::string{};
+  const bus::ClaimResult claimed = xrdbbus.claim({.name        = earlyServerName,
+                                                  .queryFile   = queryFile,
+                                                  .unit        = systemd.unit.value_or(std::string{}),
+                                                  .counterPath = counterPath,
+                                                  .streams     = claimedStreams});
+
+  switch (claimed.status) {
+    case bus::ClaimStatus::Claimed:
+      break;
+    case bus::ClaimStatus::Conflict: {
+      const std::string owner = ownerLabel(claimed.ownerName);
+      std::cerr << "xretractor: stream '" << claimed.stream << "' is already served by " << owner << " (pid " << claimed.ownerPid
+                << ")\n";
+      SPDLOG_ERROR("Stream '{}' is already served by {} (pid {}).", claimed.stream, owner, claimed.ownerPid);
+      return system::errc::device_or_resource_busy;
+    }
+    case bus::ClaimStatus::CounterConflict: {
+      const std::string owner = ownerLabel(claimed.ownerName);
+      std::cerr << "xretractor: rotation counter file '" << claimed.detail << "' is already used by " << owner << " (pid "
+                << claimed.ownerPid << ")\n";
+      SPDLOG_ERROR("Rotation counter file '{}' is already used by {} (pid {}).", claimed.detail, owner, claimed.ownerPid);
+      return system::errc::device_or_resource_busy;
+    }
+    case bus::ClaimStatus::TooLarge:
+    case bus::ClaimStatus::NoFreeSlot:
+      std::cerr << "xretractor: cannot register on the xrdbbus bus: " << claimed.detail << '\n';
+      SPDLOG_ERROR("Cannot register on the xrdbbus bus: {}", claimed.detail);
+      return system::errc::device_or_resource_busy;
+    case bus::ClaimStatus::Unavailable:
+      // Utrzymujemy dotychczasowa decyzje fail-open. Blokada instancji nadal chroni jej IPC,
+      // ale przy niedostepnej magistrali rozlacznosc zasobow miedzy nazwami nie jest wymuszana.
+      SPDLOG_WARN("xrdbbus unavailable ({}); stream name uniqueness is NOT enforced.", claimed.detail);
+      break;
   }
 
   signal(SIGINT, handleSignal);   // Ctrl+C
@@ -544,5 +671,5 @@ int main(int argc, char *argv[]) {
   }
 
   executorsm exec;
-  return exec.run(coreInstance, guard, cm, vm, appCfg, earlyServerName);
+  return exec.run(coreInstance, guard, xrdbbus, cm, vm, appCfg, earlyServerName);
 }

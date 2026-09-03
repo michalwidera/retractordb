@@ -77,6 +77,13 @@ struct AppConfig {
   /// Dla usług systemd zalecane /var/run/retractor lub $XDG_RUNTIME_DIR.
   std::string lockDir;
 
+  // === [server] ===
+
+  /// Losowanie nazwy instancji, gdy nie podano ani `--name`, ani `--autoname`. Wartosc `false`
+  /// (domyslna) zostawia tryb historyczny: pusta nazwa, blokada i obiekty IPC bez sufiksu.
+  /// Jawne `--name` wygrywa nad tym kluczem — wskazanie operatora jest nadrzedne wobec configu.
+  bool serverAutoName{false};
+
   // === [service] ===
 
   /// Plik zapytań nadpisywany przy przekazaniu zestawu działającemu serwisowi (restart).

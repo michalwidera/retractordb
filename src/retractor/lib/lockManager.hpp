@@ -1,7 +1,20 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
+
+/// Tozsamosc systemd biezacego procesu, ustalona z /proc/self/cgroup.
+struct SystemdIdentity {
+  std::optional<std::string> unit;  // nazwa jednostki, gdy proces jest jednostka systemd
+  bool userScope{false};            // true => user.slice (systemctl --user), false => system
+};
+
+/// Ustala wlasna tozsamosc systemd. unit == nullopt => zwykly proces.
+///
+/// Wyniesione z lockManager.cpp, bo tozsamosci jednostki potrzebuje takze magistrala: bez niej
+/// slot nie umie odpowiedziec, ktora jednostke trzeba zatrzymac, zeby zwolnic kolidujaca nazwe.
+[[nodiscard]] SystemdIdentity detectSystemdIdentity();
 
 class FlockServiceGuard {
  public:
@@ -52,5 +65,4 @@ class FlockServiceGuard {
 
  private:
   [[nodiscard]] bool writeLockInfo() const;
-  void cleanupLockFile();
 };

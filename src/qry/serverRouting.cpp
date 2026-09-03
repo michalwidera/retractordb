@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -29,33 +30,97 @@ std::string labelList(const std::vector<bus::InstanceInfo> &instances) {
 
 std::string instanceLabel(std::string_view name) { return name.empty() ? std::string{"(unnamed)"} : std::string{name}; }
 
-std::vector<std::string> extractIdentifiers(std::string_view query) {
-  std::vector<std::string> retVal;
-  std::string token;
-  bool inLiteral{false};
-
-  auto flush = [&retVal, &token]() {
-    if (!token.empty()) retVal.push_back(token);
-    token.clear();
+std::vector<std::string> extractSourceStreams(std::string_view query) {
+  // RQL.g4 leksuje slowa kluczowe WIELKOSCIOWO: `FROM: 'FROM'|'from'`, i tak samo MIN, MAX, AVG,
+  // SUMC, FILE, RETENTION, VOLATILE i STORAGE. Pisownia mieszana NIE jest slowem kluczowym, tylko
+  // zwykla nazwa -- grammar mowi to wprost przy regule stream_fn_call ("`Min` pozostaje zwykla
+  // nazwa"). Skladanie tokenu do lowercase odbieraloby wiec strumieniowi nazwanemu `Min` albo
+  // `From` szanse na rozpoznanie, a routing gubilby jego wlasciciela.
+  const auto isKeyword = [](std::string_view token, std::string_view upper, std::string_view lower) {
+    return token == upper || token == lower;
   };
 
-  for (const char c : query) {
-    if (c == '\'') {
-      flush();
-      inLiteral = !inLiteral;
+  std::vector<std::string> retVal;
+  bool inLiteral{false};
+  bool inLineComment{false};
+  std::size_t blockCommentDepth{0};
+  bool inFrom{false};
+  char previousSignificant{'\0'};
+
+  for (std::size_t i = 0; i < query.size();) {
+    const char c    = query[i];
+    const char next = i + 1 < query.size() ? query[i + 1] : '\0';
+
+    if (inLineComment) {
+      if (c == '\n') inLineComment = false;
+      ++i;
       continue;
     }
-    if (inLiteral) continue;
+    if (blockCommentDepth != 0) {
+      if (c == '/' && next == '*') {
+        ++blockCommentDepth;
+        i += 2;
+      } else if (c == '*' && next == '/') {
+        --blockCommentDepth;
+        i += 2;
+      } else {
+        ++i;
+      }
+      continue;
+    }
+    if (inLiteral) {
+      if (c == '\\' && next != '\0') {
+        i += 2;
+      } else {
+        if (c == '\'') inLiteral = false;
+        ++i;
+      }
+      continue;
+    }
+    if (c == '/' && next == '/') {
+      inLineComment = true;
+      i += 2;
+      continue;
+    }
+    if (c == '/' && next == '*') {
+      blockCommentDepth = 1;
+      i += 2;
+      continue;
+    }
+    if (c == '\'') {
+      inLiteral = true;
+      ++i;
+      continue;
+    }
 
-    const auto uc    = static_cast<unsigned char>(c);
-    const bool head  = std::isalpha(uc) != 0 || c == '_';
-    const bool inner = head || std::isdigit(uc) != 0;
-    if (token.empty() ? head : inner)
-      token.push_back(c);
-    else
-      flush();
+    const auto uc = static_cast<unsigned char>(c);
+    if (std::isalpha(uc) != 0) {
+      const std::size_t begin = i++;
+      while (i < query.size()) {
+        const char inner = query[i];
+        const auto uci   = static_cast<unsigned char>(inner);
+        if (std::isalnum(uci) == 0 && inner != '_' && inner != '$') break;
+        ++i;
+      }
+
+      const std::string token(query.substr(begin, i - begin));
+
+      if (isKeyword(token, "FROM", "from")) {
+        inFrom = true;
+      } else if (inFrom && (isKeyword(token, "FILE", "file") || isKeyword(token, "RETENTION", "retention") ||
+                            isKeyword(token, "VOLATILE", "volatile") || isKeyword(token, "STORAGE", "storage"))) {
+        break;
+      } else if (inFrom && previousSignificant != '.' && !isKeyword(token, "MIN", "min") && !isKeyword(token, "MAX", "max") &&
+                 !isKeyword(token, "AVG", "avg") && !isKeyword(token, "SUMC", "sumc")) {
+        retVal.push_back(token);
+      }
+      previousSignificant = 'I';
+      continue;
+    }
+
+    if (std::isspace(uc) == 0) previousSignificant = c;
+    ++i;
   }
-  flush();
   return retVal;
 }
 
@@ -80,7 +145,7 @@ Resolution forAdHoc(const std::vector<bus::InstanceInfo> &instances, std::string
   bool crossed{false};
   std::vector<std::string> reached;
 
-  for (const auto &token : extractIdentifiers(query))
+  for (const auto &token : extractSourceStreams(query))
     for (const auto &instance : instances) {
       if (!serves(instance, token)) continue;
       // Ta sama nazwa pada w zapytaniu wielokrotnie (`dsta[0]` i `FROM dsta`), a komunikat

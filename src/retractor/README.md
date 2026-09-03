@@ -184,6 +184,18 @@ If any of those checks fail, xretractor reports a configuration error and stops.
   - Empty means system temp directory.
   - Recommended for service deployments: `/var/run/retractor` or `$XDG_RUNTIME_DIR`.
 
+#### [server]
+
+- `server.autoname` (bool, default: `false`)
+  - When `true`, an instance started without `--name` and without `--autoname` gets a
+    generated docker-style name (same generator as `--autoname`), printed on stdout as
+    `Instance name: <name>`.
+  - Explicit `--name` wins over this key, silently.
+  - Default `false` keeps the historical single-instance identity: empty name, lock file and
+    IPC objects without a suffix, reported by `xqry --servers` as `(unnamed)`.
+  - The generated name is random, so it differs after every restart — it identifies a running
+    instance, not a durable service.
+
 #### [service]
 
 - `service.query_file` (string, default: `/etc/retractor/startup.rql`)
@@ -213,6 +225,9 @@ rt_priority = 50
 
 [paths]
 lock_dir = "/var/run/retractor"
+
+[server]
+autoname = false
 
 [service]
 query_file = "/etc/retractor/startup.rql"

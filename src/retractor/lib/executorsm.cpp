@@ -4,6 +4,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <ctime>  // kotwica osi czasu pętli: clock_gettime, timespec
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -74,10 +75,9 @@ static IpcServer ipcServer;
 
 /// Straznik blokady uslugi — wskaznik wazny WYLACZNIE na czas trwania executorsm::run().
 ///
-/// Plik blokady kasuje destruktor FlockServiceGuard, a std::exit — przez ktory konczy
-/// FatalError — nie uruchamia destruktorow obiektow AUTOMATYCZNYCH. Przy bledzie
-/// krytycznym cleanup() jest jedynym miejscem, ktore jeszcze dziala, wiec to on musi
-/// blokade zwolnic.
+/// std::exit — przez ktory konczy sie FatalError — nie uruchamia destruktorow obiektow
+/// AUTOMATYCZNYCH. Przy bledzie krytycznym cleanup() jest jedynym miejscem, ktore jeszcze
+/// dziala, wiec to on musi zwolnic flock. Stabilny plik blokady pozostaje na dysku celowo.
 ///
 /// Zerowany przed powrotem z run() (patrz lockGuardScope), i to jest wymog poprawnosci:
 /// handlery atexit wykonuja sie PO zakonczeniu main, a straznik jest tam obiektem
@@ -197,6 +197,54 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     ptRetval.put(std::string("db"), "Fail local chain compiler:" + response);
     SPDLOG_ERROR("Compile chain of adhoc failed: {}", response);
     return ptRetval;
+  }
+
+  // Roszczenie nazw powolanych ad-hoc: PO lokalnej kompilacji (dopiero wtedy znane sa takze
+  // wezly posrednie, ktore kompilator dolozyl do planu) i PRZED importFrom, czyli przed
+  // jakakolwiek zmiana planu dzialajacego serwera. Bez tego nazwa dodana w locie zylaby
+  // w drugiej instancji bez roszczenia, a rdb::StoragePaths nadpisalby jej <qryID>.desc
+  // we wspolnym katalogu magazynu — ta sama fizyczna kolizja, przed ktora broni start.
+  //
+  // Zbior nowych nazw wyznaczamy dokladnie ta sama regula co compiler::importFrom:
+  // wezly nie bedace dyrektywa, ktorych plan serwera jeszcze nie zna.
+  std::vector<std::string> adHocStreams;
+  for (const auto &q : coreInstanceCopy) {
+    if (q.isCompilerDirective()) continue;
+    if (coreInstancePtr->exists(q.id)) continue;
+    adHocStreams.push_back(q.id);
+  }
+
+  if (busPtr != nullptr && !adHocStreams.empty()) {
+    const bus::ClaimResult claimed = busPtr->claimAdditional(adHocStreams);
+    switch (claimed.status) {
+      case bus::ClaimStatus::Claimed:
+        break;
+      case bus::ClaimStatus::Conflict: {
+        const std::string owner   = claimed.ownerName.empty() ? "the unnamed instance" : "instance '" + claimed.ownerName + "'";
+        const std::string message = "Rejected: stream '" + claimed.stream + "' is already served by " + owner + " (pid " +
+                                    std::to_string(claimed.ownerPid) + ")";
+        ptRetval.put(std::string("db"), message);
+        SPDLOG_ERROR("AdHoc rejected: {}", message);
+        return ptRetval;
+      }
+      case bus::ClaimStatus::CounterConflict:
+        // Nieosiagalne: ad-hoc nie przyjmuje :ROTATION (getAdHoc odrzuca dyrektywy wyzej),
+        // wiec claimAdditional nigdy nie porownuje sciezki licznika.
+        FatalError("executorsm::getAdHoc: bus reported a rotation counter conflict for an adhoc query");
+        break;
+      case bus::ClaimStatus::TooLarge:
+      case bus::ClaimStatus::NoFreeSlot: {
+        const std::string message = "Rejected: cannot register adhoc streams on the xrdbbus bus: " + claimed.detail;
+        ptRetval.put(std::string("db"), message);
+        SPDLOG_ERROR("AdHoc rejected: {}", message);
+        return ptRetval;
+      }
+      case bus::ClaimStatus::Unavailable:
+        // Spojnie ze sciezka startowa: niedostepna magistrala nie zatrzymuje pracy, cena jest
+        // wypisana wprost — rozlacznosc nazw nie jest wtedy egzekwowana.
+        SPDLOG_WARN("xrdbbus unavailable ({}); adhoc stream name uniqueness is NOT enforced.", claimed.detail);
+        break;
+    }
   }
 
   std::vector<std::string> mergedIds;
@@ -399,8 +447,8 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
-int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm, vm_map &vm, const AppConfig &cfg,
-                    std::string_view serverName) {
+int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrdbbus, compiler &cm, vm_map &vm,
+                    const AppConfig &cfg, std::string_view serverName) {
   executorsm::coreInstancePtr       = &coreInstance;
   executorsm::cmPtr                 = &cm;
   executorsm::cfgQueueBufferSeconds = cfg.ipcQueueBufferSeconds;
@@ -415,77 +463,25 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, compiler &cm,
     ~LockGuardScope() { serviceGuardPtr = nullptr; }
   } lockGuardScope(guard);
 
-  // Kolejnosc ponizej jest wymogiem poprawnosci, nie stylem. Wylacznosc instancji musi byc
-  // ustalona ZANIM proces dotknie obiektow IPC: commandLoop() na wejsciu kasuje segment,
-  // kolejke komend i muteks nazwany. Gdy blokada byla brana dopiero PO starcie transportu,
-  // druga instancja wycinala te obiekty zywemu serwerowi spod nog — jego klienci dostawali
-  // "server not found", a handler atexit instancji-intruza kasowal je po raz drugi.
-  // Po przejeciu blokady te same remove() sa juz bezpieczne i nadal potrzebne: flock dowodzi,
-  // ze zaden inny ZYWY serwer nie istnieje, wiec kasowane sa wylacznie smieci po poprzedniku,
-  // ktory padl (po SIGKILL segmenty zostaja w /dev/shm i open_or_create trafilby na nie).
-  if (!guard.acquireLock()) {
-    SPDLOG_ERROR("Cannot acquire service lock, another instance might be running.");
-    return system::errc::no_lock_available;
-  }
-
-  // atexit dopiero po przejeciu blokady. Handler kasuje obiekty IPC i zwalnia blokade, wiec
-  // instancja, ktora blokady NIE dostala, nie moze go miec zarejestrowanego — inaczej przy
-  // wyjsciu sprzatalaby zasoby cudzego, dzialajacego serwera.
-  std::atexit(cleanup);
-
-  // Nazwa instancji musi trafic do transportu PRZED start(): to ona wyznacza komplet nazw
-  // obiektow IPC, ktore watek komunikacyjny tworzy zaraz po uruchomieniu. Ustawiamy ja juz
-  // TUTAJ, przed roszczeniem w magistrali, bo atexit jest juz zarejestrowany: instancja,
-  // ktora odmowi startu na kolizji nazw, przejdzie przez cleanup() i skasuje obiekty IPC
-  // WEDLUG TEJ NAZWY. Z nazwa domyslna (historyczna) skasowalaby segment, kolejke komend
-  // i muteks dzialajacego serwera bezimiennego.
-  ipcServer.setServerName(serverName);
-  if (!serverName.empty()) SPDLOG_INFO("Instance name: {}", serverName);
-
-  // Roszczenie nazw strumieni w magistrali: PO kompilacji (dopiero wtedy znany jest zbior
-  // q.id) i PRZED startem transportu. Kolizja nazw miedzy serwerami nie jest sama w sobie
-  // bledem logicznym -- jest bledem FIZYCZNYM: rdb::StoragePaths tworzy <qryID>.desc dla
-  // KAZDEGO wpisu planu, deklaracje wlacznie, wiec dwie instancje o tej samej nazwie
-  // strumienia w tym samym katalogu magazynu nadpisalyby sobie deskryptory.
-  bus::Bus xrdbbus;
   struct BusScope {
     explicit BusScope(bus::Bus &b) { busPtr = &b; }
     ~BusScope() { busPtr = nullptr; }
   } busScope(xrdbbus);
 
-  {
-    std::vector<std::string> claimedStreams;
-    for (const auto &q : coreInstance)
-      if (!q.isCompilerDirective()) claimedStreams.push_back(q.id);
-
-    const std::string queryFile    = vm.contains("queryfile") ? vm["queryfile"].as<std::string>() : std::string{};
-    const bus::ClaimResult claimed = xrdbbus.claim(serverName, queryFile, claimedStreams);
-
-    switch (claimed.status) {
-      case bus::ClaimStatus::Claimed:
-        break;
-      case bus::ClaimStatus::Conflict: {
-        // Komunikat wskazuje wlasciciela, bo to jedyna informacja, ktora pozwala operatorowi
-        // dzialac: albo zatrzymac tamta instancje, albo zmienic nazwe strumienia u siebie.
-        const std::string owner = claimed.ownerName.empty() ? "the unnamed instance" : "instance '" + claimed.ownerName + "'";
-        std::cerr << "xretractor: stream '" << claimed.stream << "' is already served by " << owner << " (pid "
-                  << claimed.ownerPid << ")\n";
-        SPDLOG_ERROR("Stream '{}' is already served by {} (pid {}).", claimed.stream, owner, claimed.ownerPid);
-        return system::errc::device_or_resource_busy;
-      }
-      case bus::ClaimStatus::TooLarge:
-      case bus::ClaimStatus::NoFreeSlot:
-        std::cerr << "xretractor: cannot register on the xrdbbus bus: " << claimed.detail << '\n';
-        SPDLOG_ERROR("Cannot register on the xrdbbus bus: {}", claimed.detail);
-        return system::errc::device_or_resource_busy;
-      case bus::ClaimStatus::Unavailable:
-        // Niedostepna magistrala nie zatrzymuje serwera: jeden uszkodzony segment nie moze
-        // unieruchomic maszyny. Cena jest wypisana wprost -- rozlacznosc nazw nie jest
-        // wtedy egzekwowana.
-        SPDLOG_WARN("xrdbbus unavailable ({}); stream name uniqueness is NOT enforced.", claimed.detail);
-        break;
-    }
+  // Launcher musi wejsc tutaj z przejeta blokada i roszczeniem magistrali. To jest granica
+  // transakcji startowej: oba zasoby zostaly zdobyte przed kasowaniem artefaktow i pozostaja
+  // wazne do konca executora. Brak blokady oznacza blad kolejnosci wywolan, nie zwykla kolizje.
+  if (!guard.isLockActive()) {
+    SPDLOG_ERROR("Executor started without an active instance lock.");
+    return system::errc::state_not_recoverable;
   }
+
+  ipcServer.setServerName(serverName);
+  if (!serverName.empty()) SPDLOG_INFO("Instance name: {}", serverName);
+
+  // atexit dopiero po przejeciu blokady i slotu. Proces, ktory odpadl w launcherze, nie moze
+  // miec handlera kasujacego IPC lub zwalniajacego cudze zasoby.
+  std::atexit(cleanup);
 
   std::string percounterFilename{"{notinitialized}"};
   for (const auto &it : coreInstance)

@@ -16,17 +16,12 @@
 
 #include <spdlog/spdlog.h>
 
-namespace {
-
-struct SystemdIdentity {
-  std::optional<std::string> unit;  // nazwa jednostki, gdy proces jest jednostką systemd
-  bool userScope{false};            // true => user.slice (systemctl --user), false => system
-};
-
 // Ustala własną tożsamość systemd na podstawie /proc/self/cgroup. systemd umieszcza jednostkę
 // w ścieżce cgroup typu ".../system.slice/xretractor.service" lub (dla --user)
 // ".../user.slice/user@1000.service/.../xretractor.service". Zwraca nazwę unitu, gdy proces jest
 // jednostką systemd; unit == nullopt gdy to zwykły proces.
+//
+// Deklaracja stoi w lockManager.hpp: tozsamosci jednostki potrzebuje takze magistrala xrdbbus.
 SystemdIdentity detectSystemdIdentity() {
   SystemdIdentity id;
 
@@ -61,8 +56,6 @@ SystemdIdentity detectSystemdIdentity() {
   }
   return id;
 }
-
-}  // namespace
 
 FlockServiceGuard::FlockServiceGuard(const std::string &serviceName)
 
@@ -141,8 +134,6 @@ void FlockServiceGuard::releaseLock() {
 
     lockFileDescriptor = -1;
     isLocked           = false;
-
-    cleanupLockFile();
   }
 }
 
@@ -237,5 +228,3 @@ bool FlockServiceGuard::writeLockInfo() const {
 
   return true;
 }
-
-void FlockServiceGuard::cleanupLockFile() { unlink(lockFilePath.c_str()); }

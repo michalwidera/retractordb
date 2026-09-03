@@ -36,10 +36,13 @@ struct Resolution {
 /// bez spacji, więc wyjście `--servers` zostaje kolumnowo rozbieralne.
 [[nodiscard]] std::string instanceLabel(std::string_view name);
 
-/// Identyfikatory `[A-Za-z_]\w*` z tekstu zapytania, z pominięciem literałów w apostrofach.
-/// Literały są pomijane, bo `'dsta'` w wyrażeniu jest napisem, a nie odwołaniem do strumienia
-/// — bez tego napis o treści cudzej nazwy przekierowałby zapytanie do obcej instancji.
-[[nodiscard]] std::vector<std::string> extractIdentifiers(std::string_view query);
+/// Nazwy strumieni występujące w wyrażeniu FROM zapytania SELECT. Lekser zachowuje składnię
+/// RQL ID (`[A-Za-z][A-Za-z_$0-9]*`), pomija napisy i komentarze oraz odróżnia reduktory
+/// MIN/MAX/AVG/SUMC i agregator po kropce od nazw źródeł.
+///
+/// Słowa kluczowe rozpoznaje dokładnie w dwóch pisowniach z `RQL.g4` (`'FROM'|'from'`), bo
+/// tylko te dwie są tam słowami kluczowymi — `Min` czy `From` to zwykłe nazwy strumieni.
+[[nodiscard]] std::vector<std::string> extractSourceStreams(std::string_view query);
 
 /// Właściciel strumienia. Magistrala pilnuje rozłączności nazw, więc właściciel jest co
 /// najwyżej jeden i pierwsze trafienie jest jedynym.
