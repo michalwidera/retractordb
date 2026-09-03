@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -24,6 +25,40 @@ std::string labelList(const std::vector<bus::InstanceInfo> &instances) {
     retVal += instanceLabel(instance.name);
   }
   return retVal;
+}
+
+/// Sciezka w magistrali pozostaje bezwzgledna, ale operatorowi wystarcza jej rozpoznawalny
+/// ogon: katalog planu i nazwa pliku. Krotszych sciezek nie wydluzamy prefiksem `.../`.
+std::string queryPathLabel(std::string_view queryFile) {
+  if (queryFile.empty()) return "-";
+
+  const std::filesystem::path path{queryFile};
+  if (!path.is_absolute() || path.parent_path().filename().empty()) return std::string{queryFile};
+
+  const std::string shortened = ".../" + (path.parent_path().filename() / path.filename()).string();
+  return shortened.size() < queryFile.size() ? shortened : std::string{queryFile};
+}
+
+std::string streamList(const std::vector<std::string> &streams) {
+  std::string retVal;
+  for (const auto &stream : streams) {
+    if (!retVal.empty()) retVal += ", ";
+    retVal += stream;
+  }
+  return retVal.empty() ? std::string{"-"} : retVal;
+}
+
+struct ServerRow {
+  std::string server;
+  std::string pid;
+  std::string query;
+  std::string streams;
+};
+
+std::string tableLine(const ServerRow &row, const ServerRow &widths) {
+  return row.server + std::string(widths.server.size() - row.server.size(), ' ') + " | " + row.pid +
+         std::string(widths.pid.size() - row.pid.size(), ' ') + " | " + row.query +
+         std::string(widths.query.size() - row.query.size(), ' ') + " | " + row.streams;
 }
 
 }  // namespace
@@ -196,18 +231,34 @@ Resolution forSingleTarget(const std::vector<bus::InstanceInfo> &instances) {
 }
 
 std::vector<std::string> describe(const std::vector<bus::InstanceInfo> &instances) {
-  std::vector<std::string> retVal;
-  retVal.reserve(instances.size());
-  for (const auto &instance : instances) {
-    std::string line = instanceLabel(instance.name) + " " + std::to_string(instance.pid) + " " +
-                       (instance.queryFile.empty() ? std::string{"-"} : instance.queryFile);
-    for (const auto &stream : instance.streams)
-      line += " " + stream;
-    retVal.push_back(std::move(line));
+  if (instances.empty()) return {};
+
+  std::vector<ServerRow> rows;
+  rows.reserve(instances.size());
+  for (const auto &instance : instances)
+    rows.push_back({.server  = instanceLabel(instance.name),
+                    .pid     = std::to_string(instance.pid),
+                    .query   = queryPathLabel(instance.queryFile),
+                    .streams = streamList(instance.streams)});
+
+  // Kolejnosc slotow w segmencie zalezy od kolejnosci startow, a wyjscie ma byc powtarzalne.
+  std::ranges::sort(rows, {}, &ServerRow::server);
+
+  ServerRow widths{.server = "SERVER", .pid = "PID", .query = "QUERY", .streams = "STREAMS"};
+  for (const auto &row : rows) {
+    widths.server.resize(std::max(widths.server.size(), row.server.size()), ' ');
+    widths.pid.resize(std::max(widths.pid.size(), row.pid.size()), ' ');
+    widths.query.resize(std::max(widths.query.size(), row.query.size()), ' ');
+    widths.streams.resize(std::max(widths.streams.size(), row.streams.size()), ' ');
   }
-  // Sortowanie po całej linii, czyli w pierwszej kolejności po nazwie instancji: kolejność
-  // slotów w segmencie zależy od kolejności startów, a wyjście ma być powtarzalne.
-  std::ranges::sort(retVal);
+
+  std::vector<std::string> retVal;
+  retVal.reserve(rows.size() + 2);
+  retVal.push_back(tableLine({.server = "SERVER", .pid = "PID", .query = "QUERY", .streams = "STREAMS"}, widths));
+  retVal.push_back(std::string(widths.server.size() + 1, '-') + "+" + std::string(widths.pid.size() + 2, '-') + "+" +
+                   std::string(widths.query.size() + 2, '-') + "+" + std::string(widths.streams.size() + 1, '-'));
+  for (const auto &row : rows)
+    retVal.push_back(tableLine(row, widths));
   return retVal;
 }
 

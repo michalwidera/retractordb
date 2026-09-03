@@ -145,18 +145,22 @@ TEST(serverRouting, adHocWithoutKnownStreamIsUndecidable) {
 
 TEST(serverRouting, describeIsSortedAndCarriesStreams) {
   const std::vector<bus::InstanceInfo> instances{makeInstance("beta", 202, "beta.rql", {"srcb", "dstb"}),
-                                                 makeInstance("alfa", 101, "alfa.rql", {"srca", "dsta"})};
+                                                 makeInstance("alfa", 101, "/home/rdb/plans/alfa.rql", {"srca", "dsta"})};
   const std::vector<std::string> lines = routing::describe(instances);
-  ASSERT_EQ(lines.size(), 2U);
-  EXPECT_EQ(lines[0], "alfa 101 alfa.rql srca dsta");
-  EXPECT_EQ(lines[1], "beta 202 beta.rql srcb dstb");
+  ASSERT_EQ(lines.size(), 4U);
+  EXPECT_EQ(lines[0], "SERVER | PID | QUERY              | STREAMS");
+  EXPECT_EQ(lines[1], "-------+-----+--------------------+-----------");
+  EXPECT_EQ(lines[2], "alfa   | 101 | .../plans/alfa.rql | srca, dsta");
+  EXPECT_EQ(lines[3], "beta   | 202 | beta.rql           | srcb, dstb");
 }
 
 TEST(serverRouting, describeMarksMissingQueryFile) {
   const std::vector<bus::InstanceInfo> instances{makeInstance("", 101, "", {"dst1"})};
   const std::vector<std::string> lines = routing::describe(instances);
-  ASSERT_EQ(lines.size(), 1U);
-  EXPECT_EQ(lines[0], "(unnamed) 101 - dst1");
+  ASSERT_EQ(lines.size(), 3U);
+  EXPECT_EQ(lines[0], "SERVER    | PID | QUERY | STREAMS");
+  EXPECT_EQ(lines[1], "----------+-----+-------+--------");
+  EXPECT_EQ(lines[2], "(unnamed) | 101 | -     | dst1");
 }
 
 }  // namespace

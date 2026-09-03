@@ -148,6 +148,55 @@ naraz i wyglądać jak dwie osobne awarie badawcze.
 Kolejność ma znaczenie: profile buduje się **po** ostatniej zmianie w `src/`, bo ich odcisk
 liczy się z treści drzewa. Przebudowa przed poprawkami byłaby pracą do wyrzucenia.
 
+#### Usterka 2g — cele wykresowe walczą o jedną tożsamość (3 września 2026)
+
+Objaw zgłoszony przez operatora: `ninja dsp` w jednym terminalu i `ninja simple` w drugim —
+oba procesy giną. Odtworzone z logów, przyczyna jest jedna i leży **poza silnikiem**.
+
+`scripts/xplot.sh` był napisany dla jednego serwera na maszynę: startował `xretractor` bez
+`--name` (czyli w tożsamości historycznej), po `sleep 1` odpytywał go klientem i sprzątał
+globalnym `xqry -k`. Przy dwóch celach naraz przebieg wyglądał tak:
+
+1. `dsp` przejmuje blokadę `xretractor_service`; `simple` odpada na `acquireLock`
+   (`launcher.cpp:589`) i nie startuje wcale;
+2. `xplot.sh` celu `simple` nie sprawdza, czy jego serwer żyje — po `sleep 1` pyta o `str1`
+   i trafia do **jedynej** żywej instancji, czyli do `dsp` (`routing::forSingleTarget`);
+3. `not found: str1` kończy klienta, gnuplot się zamyka, a sprzątanie `xqry -k` — znów jedyna
+   instancja — **zabija serwer celu `dsp`**;
+4. w pierwszym terminalu klient traci serwer i jego skrypt też woła `xqry -k`, tym razem
+   w pustkę (`IPC: No such file or directory`).
+
+Zginął więc jeden serwer, nie dwa: drugi nigdy nie wstał, a jego skrypt posprzątał po cudzym.
+
+Naprawa, w trzech miejscach:
+
+- `scripts/xplot.sh` nadaje instancji nazwę wyprowadzoną z katalogu roboczego celu
+  (`dsp`, `simple`, `rec205`, …; piąty argument nadpisuje), czeka na gotowość **własnej**
+  instancji zamiast `sleep 1` i pilnuje przy tym, czy proces serwera jeszcze żyje, a każde
+  `xqry` — z zapytaniem o strumień i z zabiciem — dostaje `--server "$NAME"`. Odsiew
+  „ta nazwa już działa" stoi **przed** `rm -rf temp`, bo drugie uruchomienie tego samego celu
+  kasowało magazyn działającej instancji, zanim silnik zdążył odmówić startu.
+- `launcher.cpp` przy nieudanym `acquireLock` wypisuje na stderr, kto trzyma tożsamość
+  (nazwa instancji, PID i plik zapytań właściciela z pliku blokady) oraz jak uruchomić drugą
+  instancję. Dotychczasowe `Another instance is running, errno: …` z `lockManager.cpp` nie
+  mówiło ani która to instancja, ani czyja; zostało usunięte, żeby ta sama odmowa nie
+  pojawiała się na konsoli dwa razy. Diagnostyka niskiego poziomu zostaje w logu.
+- `FlockServiceGuard::PeerInfo` czyta z pliku blokady także `PID:` — bez tego komunikat
+  odmowy nie miał czym wskazać właściciela.
+
+Regresja: `it_multiserver_no_clobber` wymaga teraz, żeby odmowa startu wskazywała PID
+właściciela odczytany z pliku blokady (test oblewa po podmianie oczekiwanego napisu).
+Sprawdzone także ręcznie, atrapą `gnuplot`: `dsp` i `simple` uruchomione równolegle rysują
+jednocześnie i każdy zabija wyłącznie własny serwer, a drugie uruchomienie tego samego celu
+odpada przed skasowaniem czegokolwiek.
+
+Weryfikacja: CTest Debug **213/213** (230,40 s), CTest Release **213/213** (104,91 s),
+`ninja -C build/Release test_gate` **zielona** po przebudowie profili (odcisk `src/`
+`5d502ea3…0a767fa`) — H10 5/5, obie kampanie 10 010 planów, oba werdykty 9/9, reżimy zgodne
+z odniesieniem, H9 korpus, samotesty i 84/84 kompilacji + 4/4 odrzucone mutanty. Podłoga
+ablacyjna nie dotyczy tej zmiany: żaden przełącznik `RDB_OPT_*`, `compiler.cpp` ani reguły
+ogona nie były ruszane.
+
 ---
 
 ## Ustalenia, których nie trzeba powtarzać
@@ -410,14 +459,18 @@ strumienia" należy wtedy do serwera, dokładnie jak przed 2c — i to jest pow�
 
 ### Format `xqry --servers`
 
-Jedna linia na instancję, pola oddzielone spacją, sortowane; instancja bezimienna jako
-`(unnamed)`, brak pliku zapytań jako `-`. Plik zapytań jest ścieżką **bezwzględną**, tak samo
-jak w pliku blokady: slot czyta operator z innego katalogu roboczego niż serwer, a wybór celu
-dostarczania z magistrali (E3) potrzebuje ścieżki, którą da się otworzyć bez zgadywania `cwd`.
+Tabela z nagłówkiem, wyrównanymi kolumnami i instancjami sortowanymi po nazwie; instancja
+bezimienna jest pokazana jako `(unnamed)`, a brak pliku zapytań lub strumieni jako `-`.
+Strumienie są rozdzielone przecinkami. Magistrala nadal przechowuje **bezwzględną** ścieżkę
+pliku, tak samo jak plik blokady: wybór celu dostarczania z magistrali (E3) potrzebuje ścieżki,
+którą da się otworzyć bez zgadywania `cwd`. Tylko widok operatorski skraca ją do rozpoznawalnego
+ogona `.../<katalog>/<plik>`.
 
 ```
-alfa 249247 /home/rdb/plans/alfa.rql srca dsta
-beta 249248 /home/rdb/plans/beta.rql srcb dstb
+SERVER | PID    | QUERY              | STREAMS
+-------+--------+--------------------+-----------
+alfa   | 249247 | .../plans/alfa.rql | srca, dsta
+beta   | 249248 | .../plans/beta.rql | srcb, dstb
 ```
 
 Brak żywych instancji: pusty stdout, jedna linia na stderr, kod `0`.

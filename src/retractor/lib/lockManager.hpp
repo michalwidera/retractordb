@@ -27,6 +27,7 @@ class FlockServiceGuard {
     enum class Scope : std::uint8_t { Unknown, System, User };  // systemctl restart vs systemctl --user restart
     Kind kind{Kind::Unknown};
     Scope scope{Scope::Unknown};
+    int pid{0};             // PID właściciela blokady; 0 => nieznany. Do diagnostyki odmowy startu.
     std::string unit;       // nazwa jednostki systemd, gdy kind == Service
     std::string queryFile;  // plik zapytań, z którego serwis wystartował (do nadpisania przy restarcie)
   };

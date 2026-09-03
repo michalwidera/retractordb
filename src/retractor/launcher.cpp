@@ -587,7 +587,16 @@ int main(int argc, char *argv[]) {
   // tozsamosci, potem atomowe roszczenie magistrali, dopiero potem kasowanie artefaktow.
   // Przegrany rownolegly start nie dochodzi dzieki temu do zadnej czynnosci destrukcyjnej.
   if (!guard.acquireLock()) {
-    SPDLOG_ERROR("Cannot acquire service lock, another instance might be running.");
+    // Odmowa startu musi byc widoczna tam, gdzie widac pozostale odmowy z tej transakcji
+    // (konflikt strumienia, licznika, magistrali) — czyli na stderr, nie tylko w logu. Skrypt,
+    // ktory startuje serwer w tle i po chwili odpytuje go klientem, nie ma innego sposobu, zeby
+    // zauwazyc, ze jego serwer nie wstal: bez komunikatu pracuje dalej na cudzej instancji.
+    const FlockServiceGuard::PeerInfo peer = guard.readPeerInfo();
+    std::cerr << "xretractor: " << ownerLabel(earlyServerName) << " is already running";
+    if (peer.pid != 0) std::cerr << " (pid " << peer.pid << ")";
+    if (!peer.queryFile.empty()) std::cerr << ", queries: " << peer.queryFile;
+    std::cerr << "\nxretractor: use --name <name> to run a second, independent instance\n";
+    SPDLOG_ERROR("Cannot acquire service lock, {} is already running (pid {}).", ownerLabel(earlyServerName), peer.pid);
     return system::errc::no_lock_available;
   }
 

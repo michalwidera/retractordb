@@ -9,7 +9,6 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <optional>
 #include <sstream>
 #include <string_view>
@@ -86,7 +85,9 @@ bool FlockServiceGuard::acquireLock() {
   int flockResult = flock(lockFileDescriptor, LOCK_EX | LOCK_NB);
 
   if (flockResult == -1) {
-    std::cerr << "Another instance is running, errno: " << strerror(errno) << '\n';
+    // Komunikat dla operatora nalezy do wolajacego: tylko on wie, ktora tozsamosc probowal
+    // przejac i co odczytal z pliku blokady (patrz launcher.cpp). Tutaj zostaje sam log,
+    // zeby ta sama odmowa nie pojawiala sie na konsoli dwa razy.
     if (errno == EWOULDBLOCK || errno == EAGAIN) {
       SPDLOG_WARN("Other instance is already running, cannot acquire lock on: {}", lockFilePath);
     } else {
@@ -161,7 +162,10 @@ FlockServiceGuard::PeerInfo FlockServiceGuard::readPeerInfo() const {
     std::istringstream ls(line);
     std::string key;
     ls >> key;
-    if (key == "MODE:") {
+    if (key == "PID:") {
+      ls >> info.pid;
+      if (ls.fail()) info.pid = 0;
+    } else if (key == "MODE:") {
       std::string value;
       ls >> value;
       if (value == "service")

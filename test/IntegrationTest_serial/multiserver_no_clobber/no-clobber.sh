@@ -31,6 +31,16 @@ if [ "$intruder_rc" -eq 0 ]; then
   exit 1
 fi
 
+# Odmowa startu musi byc czytelna na stderr, nie tylko w logu, i musi wskazywac wlasciciela
+# tozsamosci. Skrypt startujacy serwer w tle (scripts/xplot.sh) rozpoznaje po tym komunikacie,
+# ze jego serwer nie wstal; bez tego szedl dalej i sprzatajac zabijal cudza instancje.
+owner_pid=$(awk '/^PID: /{print $2}' "$SERVER_LOCK")
+if ! grep -q "is already running (pid $owner_pid)" intruder.txt; then
+  echo "odmowa startu nie wskazuje wlasciciela blokady (pid $owner_pid):"
+  cat intruder.txt
+  exit 1
+fi
+
 # ISTOTA TESTU: serwer A nadal odpowiada. Przed naprawa konczylo sie to tutaj bledem
 # "server not found" po pelnym budzecie oczekiwania na odpowiedz.
 set +e

@@ -89,19 +89,19 @@ pid_b=$!
 wait_for_lock "$LOCK_A" "$pid_a"
 wait_for_lock "$LOCK_B" "$pid_b"
 
-# (1) --servers: obie instancje ze swoimi strumieniami, jedna linia na instancje.
+# (1) --servers: obie instancje ze swoimi strumieniami w czytelnej tabeli.
 #
 # Plik zapytan jest w slocie sciezka BEZWZGLEDNA, tak samo jak w pliku blokady: slot czyta
 # operator (i przyszly wybor celu dostarczania w E3) z innego katalogu roboczego niz serwer,
-# wiec pozycja wzgledna wskazywalaby u niego nieistniejacy plik. Wzorzec dopuszcza dowolny
-# przedrostek katalogu, zeby test nie zalezal od miejsca zbudowania drzewa.
+# wiec pozycja wzgledna wskazywalaby u niego nieistniejacy plik. Prezentacja skraca ja do
+# ostatniego katalogu i nazwy pliku; pelna wartosc pozostaje w magistrali.
 xqry --servers > servers.txt
-grep -qE "^alfa $pid_a /.*/alfa\.rql .*\bdsta\b" servers.txt || {
+grep -qE "^alfa[[:space:]]+\|[[:space:]]+$pid_a[[:space:]]+\|[[:space:]]+\.\.\./multiserver_routing/alfa\.rql[[:space:]]+\|.*\bdsta\b" servers.txt || {
   echo "--servers nie opisal instancji alfa:"; cat servers.txt; exit 1; }
-grep -qE "^beta $pid_b /.*/beta\.rql .*\bdstb\b" servers.txt || {
+grep -qE "^beta[[:space:]]+\|[[:space:]]+$pid_b[[:space:]]+\|[[:space:]]+\.\.\./multiserver_routing/beta\.rql[[:space:]]+\|.*\bdstb\b" servers.txt || {
   echo "--servers nie opisal instancji beta:"; cat servers.txt; exit 1; }
-[ "$(wc -l < servers.txt)" -eq 2 ] || {
-  echo "--servers wypisal inna liczbe instancji niz dwie:"; cat servers.txt; exit 1; }
+[ "$(wc -l < servers.txt)" -eq 4 ] || {
+  echo "--servers wypisal tabele o nieoczekiwanej liczbie wierszy:"; cat servers.txt; exit 1; }
 
 # (2) -s bez --server trafia do wlasciciela.
 #
@@ -190,7 +190,7 @@ if [ "$elapsed_ms" -ge 1000 ]; then
   echo "--servers nad osieroconym segmentem trwalo ${elapsed_ms} ms -- wykrywanie przez timeout?"
   exit 1
 fi
-if grep -qE '^(alfa|beta) ' orphan.txt; then
+if grep -qE '^(alfa|beta)[[:space:]]+\|' orphan.txt; then
   echo "--servers wypisal martwa instancje:"
   cat orphan.txt
   exit 1

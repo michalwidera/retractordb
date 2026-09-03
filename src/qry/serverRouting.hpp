@@ -57,8 +57,8 @@ struct Resolution {
 /// instancja jest dokładnie jedna albo nie ma żadnej (wtedy nazwa pusta = tryb historyczny).
 [[nodiscard]] Resolution forSingleTarget(const std::vector<bus::InstanceInfo> &instances);
 
-/// Linie wypisywane przez `xqry --servers`, posortowane — jedna instancja na linię:
-/// `<nazwa> <pid> <plik zapytań> <strumień>...`
+/// Tabela wypisywana przez `xqry --servers`, posortowana po nazwie instancji. Bezwzgledna
+/// sciezka zapytania jest prezentowana jako `.../<katalog>/<plik>`, a strumienie po przecinku.
 [[nodiscard]] std::vector<std::string> describe(const std::vector<bus::InstanceInfo> &instances);
 
 }  // namespace routing
