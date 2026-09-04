@@ -407,16 +407,38 @@ commands:
             xretractor -h
             xqry -h
             xtrdb -h
+      # Diagnostyka porazki jest w TYM SAMYM kroku co ctest, zeby kolektor dostal jego
+      # prawdziwy kod wyjscia. Powod: 2026-09-04 `it_agse_array` oblal tutaj, a jedynym
+      # sladem byl wpis w test_results.xml z pustym <system-out/> — czyli wiadomo bylo,
+      # ZE oblal, i nic ponadto. Awaria nie powtorzyla sie lokalnie w 31 pelnych
+      # przebiegach, wiec bez zebranych dowodow kolejne takie zdarzenie tez byloby
+      # nie do zbadania.
+      #
+      # Kod wyjscia jest przekazywany jawnie, bo CTest NIE kasuje LastTestsFailed.log po
+      # udanym przebiegu: plik z wczesniejszego, czerwonego biegu zostaje i sam z siebie
+      # kazalby zebrac raport dla testu, ktory wlasnie przeszedl. Na koncu krok zwraca
+      # kod ctest, wiec job pada dokladnie tak jak dotad.
       - run:
           name: Integration & Unit test
           command: |
             export PATH="$HOME/.local/bin:$PATH"
-            cd build/<< parameters.build_type >>/test && ctest -j "$(nproc)" -V --output-junit test_results.xml
+            ( cd build/<< parameters.build_type >>/test \
+              && ctest -j "$(nproc)" -V --output-junit test_results.xml ) && rc=0 || rc=$?
+            python3 scripts/collect-test-failures.py build/<< parameters.build_type >> --ctest-status "$rc"
+            exit "$rc"
       - store_test_results:
           path: build/<< parameters.build_type >>/test
       - store_artifacts:
           path: build/<< parameters.build_type >>/test/test_results.xml
           destination: test_results.xml
+      # Raport niesie takze kopie calego LastTest.log (pelne wyjscie kazdego testu, bo CI
+      # biegnie z -V). Osobnego artefaktu z oryginalu NIE ma celowo: kolektor buduje liste
+      # testow przez `ctest --show-only`, a to nadpisuje LastTest.log pustym naglowkiem —
+      # zapisany bylby wiec pusty plik. Kopia powstaje przed tym wolaniem.
+      - store_artifacts:
+          when: always
+          path: build/<< parameters.build_type >>/test-failure-report
+          destination: test-failure-report
   run-cppcheck:
     parameters:
       build_type:

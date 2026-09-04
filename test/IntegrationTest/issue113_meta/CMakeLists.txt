@@ -14,4 +14,4 @@ add_test(
     bash -c "set -e && \
   rm -f test_db.meta test_db.meta.shadow && \
   ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt &&  \
-  ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern.txt out.txt")
+  bash ../compare.sh --ignore-eol pattern.txt out.txt")

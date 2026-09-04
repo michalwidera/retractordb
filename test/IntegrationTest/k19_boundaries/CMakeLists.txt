@@ -17,4 +17,4 @@ add_test(
     rm -f *.meta source agse agse_mirror sub_same sub2 sum3 && \
     ${CMAKE_BINARY_DIR}/src/retractor/xretractor query.rql -m 12 -f > verbose.txt && \
     ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt && \
-    ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern.txt out.txt")
+    bash ../compare.sh --ignore-eol pattern.txt out.txt")

@@ -25,7 +25,7 @@ rm -f str*
 xretractor query.rql -m 2 -f
 xretractor query.rql -m 2 -f
 ls str* | grep --invert-match '\\.shadow$' | wc -l > count.txt
-${CMAKE_COMMAND} -E compare_files --ignore-eol count.pattern count.txt
+bash ../compare.sh --ignore-eol count.pattern count.txt
 ")
 
 # note : the while loop is to wait for the service to release the lock file one

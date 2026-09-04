@@ -25,5 +25,5 @@ xretractor -c query-consitency.rql > out_compile.txt
 xretractor query-consitency.rql -m 5 -f -v > verbose.txt
 "$XTRDB" noprompt < term.script > out_xtrdb.txt
 
-cmake -E compare_files --ignore-eol pattern_compile.txt out_compile.txt
-cmake -E compare_files --ignore-eol pattern_xtrdb.txt out_xtrdb.txt
+bash ../compare.sh --ignore-eol pattern_compile.txt out_compile.txt
+bash ../compare.sh --ignore-eol pattern_xtrdb.txt out_xtrdb.txt

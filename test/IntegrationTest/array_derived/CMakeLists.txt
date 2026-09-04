@@ -14,4 +14,4 @@ add_test(
     rm -f ./*.desc ./*.meta ./*.shadow fields_pass array_pass fields_shift array_shift fields_sum array_sum fields_woven array_woven mixed_woven out.txt && \
     ${CMAKE_BINARY_DIR}/src/retractor/xretractor query.rql -m 15 -f > verbose.txt && \
     ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt && \
-    ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern.txt out.txt")
+    bash ../compare.sh --ignore-eol pattern.txt out.txt")

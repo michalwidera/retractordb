@@ -10,7 +10,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash -c "set -e && \
     xretractor queryWithSubstrats.rql -c > out-compile.txt && \
-    ${CMAKE_COMMAND} -E compare_files pattern.txt out-compile.txt")
+    bash ../compare.sh pattern.txt out-compile.txt")
 
 add_test(
   NAME ${TestID}-vg-compile

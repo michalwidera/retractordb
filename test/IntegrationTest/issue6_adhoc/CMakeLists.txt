@@ -22,7 +22,7 @@ add_test(
   chmod +x ./xlaunch.sh && \
   ./xlaunch.sh && \
   ls temp | grep --invert-match '\\.shadow$' > out-ls.txt && \
-  ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern-ls.txt out-ls.txt")
+  bash ../compare.sh --ignore-eol pattern-ls.txt out-ls.txt")
 
 # Startuje serwer przez xlaunch.sh (blokada usługi) -> RUN_SERIAL.
 set_tests_properties(${TestID}-run PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)

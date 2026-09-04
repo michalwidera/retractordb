@@ -24,7 +24,7 @@ add_test(
 set -e
 xretractor query-42.rql -m 10 -f
 ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out-run.txt
-${CMAKE_COMMAND} -E compare_files --ignore-eol pattern-run.txt out-run.txt
+bash ../compare.sh --ignore-eol pattern-run.txt out-run.txt
 ")
 
 # Testy kompilacyjne tego katalogu, do 2026-09-04 osobny katalog
@@ -38,4 +38,4 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash -c "set -e && \
     xretractor query-42.rql -c > out.txt && \
-    ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern.txt out.txt")
+    bash ../compare.sh --ignore-eol pattern.txt out.txt")

@@ -26,5 +26,5 @@ xretractor -c query.rql > out_compile.txt
 xretractor query.rql -m 30 -f
 "$XTRDB" noprompt < term.script > out_run.txt
 
-cmake -E compare_files --ignore-eol pattern_compile.txt out_compile.txt
-cmake -E compare_files --ignore-eol pattern_run.txt out_run.txt
+bash ../compare.sh --ignore-eol pattern_compile.txt out_compile.txt
+bash ../compare.sh --ignore-eol pattern_run.txt out_run.txt
