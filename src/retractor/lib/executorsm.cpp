@@ -536,7 +536,20 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   guard.publishLockInfo();
 
   try {
-    bool ignoreanykey = vm.contains("noanykey");
+    // Zatrzymanie klawiszem nalezy wylacznie do przebiegu nieograniczonego -- tylko dla niego
+    // drukowany jest ponizej komunikat "Press any key to stop". Przebieg z zadeklarowanym
+    // budzetem slotow konczy sie po tym budzecie i po niczym innym, bo jego wynik ma byc
+    // powtarzalny. Bez tego warunku bajt czekajacy na terminalu konczyl petle PRZED pierwszym
+    // slotem: proces wychodzil kodem 0, deskryptor juz istnial (powstaje przed petla), a plik
+    // danych zostawal pusty -- tak padl it_agse_array na CI (2026-09-04). Ta sama pulapka, co
+    // opisana w qry.cpp dla xqry (issue_215): na CI stdin bywa terminalem z bajtem w buforze.
+    // Ctrl+C (SIGINT) zatrzymuje przebieg bez zmian, obiema drogami.
+    //
+    // O ograniczeniu przebiegu decyduje WARTOSC licznika, nie obecnosc opcji: --llimitqry ma
+    // default_value, wiec vm.contains("llimitqry") jest zawsze prawda. Licznik ograniczony
+    // liczy w dol do stop_now i nigdy nie przyjmuje wartosci inifitie_loop.
+    const bool boundedRun   = iLoopLimitCnt != executorsm::inifitie_loop;
+    const bool ignoreanykey = vm.contains("noanykey") || boundedRun;
 
     if (coreInstancePtr->empty()) {
       //

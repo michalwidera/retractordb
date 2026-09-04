@@ -1,0 +1,3 @@
+DECLARE a INTEGER STREAM src, 1/10 FILE 'data.txt'
+
+SELECT a STREAM keyproof FROM src

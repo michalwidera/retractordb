@@ -38,6 +38,12 @@ alone is enough to diagnose. `--ignore-eol` mirrors the cmake flag exactly: it i
 **and** a missing final newline (`it_rotation_test`'s `count.pattern` has no trailing newline).
 Without the flag the comparison is byte-exact.
 
+That paid off on the next occurrence: the diff showed `0 Record(s)` against a valid descriptor,
+which pinned the cause to `_kbhit()` reading a byte pending on the CI terminal and ending the
+processing loop before its first slot. Fixed in the engine (a run with a declared slot budget
+ignores the keyboard) and guarded by `it_tty_keystroke_immunity`, which runs the engine under a
+pseudo-terminal with a byte in the buffer.
+
 ### Failure reports from CI
 
 `scripts/collect-test-failures.py <build-dir> [--ctest-status N]` collects, for every test that
