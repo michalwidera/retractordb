@@ -83,10 +83,10 @@ class IpcServer {
   void removeAllObjects();
 
  private:
-  void commandLoop();
+  void commandLoop() const;
 
   /// Segment, kolejka komend, muteks nazwany. Nie dotyka stanu klientow.
-  void removeGlobalObjects();
+  void removeGlobalObjects() const;
 
   /// Kolejki odpowiedzi klientow plus wyczyszczenie rejestru subskrypcji.
   /// Wolajacy MUSI trzymac clientMapsMutex_.

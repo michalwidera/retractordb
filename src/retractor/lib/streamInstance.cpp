@@ -120,7 +120,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   // przed początek źródła, a ogon (compiler::computeStartupLatency) — że górny koniec już
   // istnieje. Kontrola zakresu poniżej pozostaje ochroną przed uszkodzonym planem albo
   // bezpośrednim wywołaniem jednostkowym.
-  const auto windowStart = windowIndex * step - (lengthAbs - 1);
+  const auto windowStart = (windowIndex * step) - (lengthAbs - 1);
 
   rdb::probe::onAgseWindow(lengthAbs);
 

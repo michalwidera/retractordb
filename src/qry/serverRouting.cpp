@@ -1,6 +1,7 @@
 #include "serverRouting.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstddef>
 #include <filesystem>
@@ -52,13 +53,19 @@ std::string streamList(const std::vector<std::string> &streams) {
 /// Wybor liter: R jak realtime, F jak flag `-f` (--no-clock), U jak until-eof, M jak `-m`
 /// (--llimitqry), X jak `-x` (--xqrywait), S jak service. Tryby sie nie wykluczaja, wiec
 /// pole jest napisem, nie jedna litera; brak ktoregokolwiek bitu to "N" -- zwykly przebieg.
-constexpr struct {
+struct ModeLetter {
   std::uint32_t bit;
   char letter;
   std::string_view option;
-} kModeLetters[] = {
-    {bus::mode::kRealTime, 'R', "realtime"},   {bus::mode::kNoClock, 'F', "no-clock"},  {bus::mode::kUntilEof, 'U', "until-eof"},
-    {bus::mode::kLoopLimit, 'M', "llimitqry"}, {bus::mode::kXqryWait, 'X', "xqrywait"}, {bus::mode::kService, 'S', "service"},
+};
+
+constexpr std::array kModeLetters{
+    ModeLetter{.bit = bus::mode::kRealTime, .letter = 'R', .option = "realtime"},
+    ModeLetter{.bit = bus::mode::kNoClock, .letter = 'F', .option = "no-clock"},
+    ModeLetter{.bit = bus::mode::kUntilEof, .letter = 'U', .option = "until-eof"},
+    ModeLetter{.bit = bus::mode::kLoopLimit, .letter = 'M', .option = "llimitqry"},
+    ModeLetter{.bit = bus::mode::kXqryWait, .letter = 'X', .option = "xqrywait"},
+    ModeLetter{.bit = bus::mode::kService, .letter = 'S', .option = "service"},
 };
 
 std::string modeLabel(std::uint32_t modes) {

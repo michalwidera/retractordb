@@ -124,12 +124,18 @@ find_program(PROG_CLANG_TIDY NAMES clang-tidy clang-tidy-19 clang-tidy-18
                                    clang-tidy-17 clang-tidy-16 clang-tidy-15)
 
 if(PROG_CLANG_TIDY)
+  set(CTIDY_COMPILATION_DATABASE
+      ${CMAKE_BINARY_DIR}/ctidy/compile_commands.json)
   add_custom_target(
     ctidy
     COMMAND
-      find ${CMAKE_SOURCE_DIR}/src -iname "*.cpp" -o -iname "*.cc" | grep
-      --invert-match '.antlr/' | xargs -r ${PROG_CLANG_TIDY}
-      -p=${CMAKE_BINARY_DIR}
+      ${CMAKE_COMMAND} -DINPUT=${CMAKE_BINARY_DIR}/compile_commands.json
+      -DOUTPUT=${CTIDY_COMPILATION_DATABASE} -P
+      ${CMAKE_SOURCE_DIR}/cmake/prepare_ctidy_compdb.cmake
+    COMMAND
+      ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+      -DCLANG_TIDY=${PROG_CLANG_TIDY} -DCOMPDB_DIR=${CMAKE_BINARY_DIR}/ctidy -P
+      ${CMAKE_SOURCE_DIR}/cmake/run_ctidy.cmake
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 else()
   message(STATUS "Optional tool not found: clang-tidy (ctidy target disabled)")

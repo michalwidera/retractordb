@@ -74,7 +74,7 @@ void IpcServer::removeAllObjects() {
   removeClientQueues();
 }
 
-void IpcServer::removeGlobalObjects() {
+void IpcServer::removeGlobalObjects() const {
   IPC::shared_memory_object::remove(names_.shmemSegment.c_str());
   IPC::message_queue::remove(names_.queryQueue.c_str());
   IPC::named_mutex::remove(names_.mapMutex.c_str());
@@ -199,7 +199,7 @@ void IpcServer::broadcastOutOfBusiness() {
 }
 
 // Procedura watku komunikacyjnego.
-void IpcServer::commandLoop() {
+void IpcServer::commandLoop() const {
   try {
     // Kasowanie na wejsciu sprzata po poprzedniku, ktory PADL: po SIGKILL segment, kolejka
     // i muteks zostaja w /dev/shm, a open_or_create trafiloby na nie i probowalo skonstruowac

@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <string>
@@ -19,7 +20,7 @@ inline constexpr int kDefaultClientResponseMaxFails{kIpcClientDefaultResponseMax
 /// Zasada: klient, który nie przeczytał ani jednego elementu, NIGDY nie kończy
 /// się sukcesem. Cichy sukces bez danych wygląda w harnessie i w CI dokładnie
 /// tak samo jak poprawny przebieg.
-enum class selectResult {
+enum class selectResult : std::uint8_t {
   ok,                  ///< strumień czytany; przeczytano co najmniej jeden element
   streamNotFound,      ///< serwer odpowiedział, ale nie zna tego strumienia
   serverNoResponse,    ///< serwer nie odpowiedział na komendę w wyznaczonym czasie

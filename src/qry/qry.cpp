@@ -230,8 +230,12 @@ std::string qry::dir() {
   std::stringstream retval;
   ptree pt = netClient("get", "");
   // Klucz w ptree ("" to nazwa strumienia) i naglowek kolumny w wydruku.
-  const std::vector<std::pair<std::string, std::string>> vcols = {{"", "name"},       {"duration", "duration"}, {"size", "size"},
-                                                                  {"count", "count"}, {"location", "location"}, {"cap", "cap"}};
+  const std::array vcols{std::pair{std::string{""}, std::string{"name"}},
+                         std::pair{std::string{"duration"}, std::string{"duration"}},
+                         std::pair{std::string{"size"}, std::string{"size"}},
+                         std::pair{std::string{"count"}, std::string{"count"}},
+                         std::pair{std::string{"location"}, std::string{"location"}},
+                         std::pair{std::string{"cap"}, std::string{"cap"}}};
   std::stringstream ss;
   std::stringstream separator;
   for (const auto &[key, title] : vcols) {
@@ -265,7 +269,7 @@ std::string qry::dir() {
     retval << buffer.data();
   };
 
-  emitRow(vcols[0].second, vcols[1].second, vcols[2].second, vcols[3].second, vcols[4].second, vcols[5].second);
+  std::apply([&](const auto &...column) { emitRow(column.second...); }, vcols);
   retval << separator.str();
   for (const auto &v : pt.get_child("db.stream"))
     emitRow(v.second.get<std::string>(""),          //

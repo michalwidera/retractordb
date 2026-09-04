@@ -23,10 +23,10 @@ if(RESEARCH_GATE_STRICT)
   set(RESEARCH_GATE_STRICT_ARG "--strict")
 endif()
 
-# Profile ablacji H9 mieszkaja w build/K26v3-*. Bramka sama sprawdza, czy odcisk
-# tresci src/ zapisany przy ich budowie zgadza sie z biezacym — jesli nie zgadza
-# sie, profili nie ma albo odcisku brak, poziom 84/84 jest POMINIETY, nigdy
-# zaliczony po cichu. Zbudowac: test/research_gate/h9/build_profiles.sh
+# Profile ablacji H9 mieszkaja w build/K26v3-*. Bramka sprawdza, czy odcisk
+# tresci src/ zapisany przy ich budowie zgadza sie z biezacym. Rozjazd odcisku
+# automatycznie przebudowuje profile przed poziomem 84/84; brak profilu albo
+# odcisku nadal jest POMINIETY, nigdy zaliczony po cichu.
 add_custom_target(
   test_gate
   COMMAND

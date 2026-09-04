@@ -66,7 +66,7 @@ std::string metaShadow::shadowFilePathFor(std::string_view metaFilePath) {
   return metaFilePath.empty() ? std::string{} : std::string(metaFilePath) + ".shadow";
 }
 
-metaShadow::metaShadow(const Descriptor &descriptor, std::string metaFilePath)
+metaShadow::metaShadow(const Descriptor &descriptor, const std::string &metaFilePath)
     : shadowFilePath_(shadowFilePathFor(metaFilePath)),
       entrySize_(sizeof(uint8_t) + (2 * sizeof(size_t)) + packedByteCount(descriptor.size())) {}
 

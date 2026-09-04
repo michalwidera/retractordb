@@ -49,26 +49,28 @@ struct RqlFunction {
 /// stojacymi PRZED `ID` (reduktory strumieniowe), wiec `min` nigdy nie zaleksuje sie
 /// jako nazwa funkcji skalarnej. Skalarne minimum bedzie musialo nazywac sie inaczej.
 inline constexpr std::array<RqlFunction, 20> kRqlFunctions{{
-    {"Sqrt", 1, 1},        //
-    {"Ceil", 1, 1},        //
-    {"Floor", 1, 1},       //
-    {"Abs", 1, 1},         //
-    {"round", 1, 1},       //
-    {"trunc", 1, 1},       //
-    {"sin", 1, 1},         //
-    {"cos", 1, 1},         //
-    {"tan", 1, 1},         //
-    {"log", 1, 1},         //
-    {"log2", 1, 1},        //
-    {"isnull", 1, 1},      //
-    {"null2zero", 1, 1},   // NULL -> 0; wartosc nie-NULL przechodzi bez zmian
-    {"IsZero", 1, 1},      //
-    {"IsNonZero", 1, 1},   //
-    {"Length", 1, 1},      // WYLACZNIE nad napisem — argument liczbowy jest bledem wykonania
-    {"to_integer", 1, 1},  //
-    {"to_float", 1, 1},    //
-    {"to_double", 1, 1},   //
-    {"to_string", 1, 2},   // drugi argument to ZADEKLAROWANA SZEROKOSC pola, nie wartosc na stosie
+    {.canonical = "Sqrt", .minArgs = 1, .maxArgs = 1},        //
+    {.canonical = "Ceil", .minArgs = 1, .maxArgs = 1},        //
+    {.canonical = "Floor", .minArgs = 1, .maxArgs = 1},       //
+    {.canonical = "Abs", .minArgs = 1, .maxArgs = 1},         //
+    {.canonical = "round", .minArgs = 1, .maxArgs = 1},       //
+    {.canonical = "trunc", .minArgs = 1, .maxArgs = 1},       //
+    {.canonical = "sin", .minArgs = 1, .maxArgs = 1},         //
+    {.canonical = "cos", .minArgs = 1, .maxArgs = 1},         //
+    {.canonical = "tan", .minArgs = 1, .maxArgs = 1},         //
+    {.canonical = "log", .minArgs = 1, .maxArgs = 1},         //
+    {.canonical = "log2", .minArgs = 1, .maxArgs = 1},        //
+    {.canonical = "isnull", .minArgs = 1, .maxArgs = 1},      //
+    {.canonical = "null2zero", .minArgs = 1, .maxArgs = 1},   // NULL -> 0; wartosc nie-NULL przechodzi bez zmian
+    {.canonical = "IsZero", .minArgs = 1, .maxArgs = 1},      //
+    {.canonical = "IsNonZero", .minArgs = 1, .maxArgs = 1},   //
+    {.canonical = "Length", .minArgs = 1, .maxArgs = 1},      // WYLACZNIE nad napisem — argument liczbowy jest bledem wykonania
+    {.canonical = "to_integer", .minArgs = 1, .maxArgs = 1},  //
+    {.canonical = "to_float", .minArgs = 1, .maxArgs = 1},    //
+    {.canonical = "to_double", .minArgs = 1, .maxArgs = 1},   //
+    {.canonical = "to_string",
+     .minArgs   = 1,
+     .maxArgs   = 2},  // drugi argument to ZADEKLAROWANA SZEROKOSC pola, nie wartosc na stosie
 }};
 
 /// @brief Znajdz funkcje po nazwie, ignorujac wielkosc liter.
@@ -81,7 +83,7 @@ inline std::optional<RqlFunction> findRqlFunction(std::string_view name) {
            });
   };
 
-  const auto it =
+  const auto *const it =
       std::ranges::find_if(kRqlFunctions, [&](const RqlFunction &fn) { return sameIgnoringCase(fn.canonical, name); });
   if (it == kRqlFunctions.end()) return std::nullopt;
   return *it;

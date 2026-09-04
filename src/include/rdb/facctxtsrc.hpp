@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fstream>
+#include <memory>
 
 #include "descriptor.hpp"
 #include "fainterface.hpp"

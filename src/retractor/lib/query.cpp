@@ -63,8 +63,7 @@ int query::getFieldIndex(const field &f_arg) {
 /// nieosiagalna sposobem innym niz `(a.sumc)>2`, ktore konczylo sie
 /// `FATAL: unexpected program size in computeRequiredCapacities`.
 bool query::isReductionRequired() {
-  int streamOperatorCount(0);
-  for (auto &t : lProgram) {
+  const auto isStreamOperator = [](const token &t) {
     switch (t.getCommandID()) {
       case STREAM_HASH:
       case STREAM_DEHASH_DIV:
@@ -77,18 +76,16 @@ bool query::isReductionRequired() {
       case STREAM_MIN:
       case STREAM_MAX:
       case STREAM_SUM:
-        ++streamOperatorCount;
-      default:;
+        return true;
+      default:
+        return false;
     }
-  }
-  return streamOperatorCount > 1;
+  };
+  return std::ranges::count_if(lProgram, isStreamOperator) > 1;
 }
 
 bool query::is(command_id command) {
-  for (auto &t : lProgram) {
-    if (t.getCommandID() == command) return true;
-  }
-  return false;
+  return std::ranges::any_of(lProgram, [command](const auto &t) { return t.getCommandID() == command; });
 }
 
 std::vector<std::string> query::getDepStream() {

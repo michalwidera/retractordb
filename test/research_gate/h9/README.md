@@ -53,9 +53,11 @@ optymalizatora, nie rewizję źródła, więc świeżość rozstrzyga **odcisk t
 `build/K26v3-<slug>/.gate-src-fingerprint`, a bramka porównuje z odciskiem
 bieżącego drzewa. Obie strony liczą go tym samym kodem — `run_gate.sh
 --print-src-fingerprint` — więc definicja odcisku jest jedna. Gdy odciski się
-różnią, profilu brak, brak przy nim odcisku albo odcisku nie da się policzyć,
-bramka **pomija poziom 84/84** zamiast orzekać. Profil zbudowany z innej treści
-dałby zieleń, która nie mówi nic o badanej rewizji.
+różnią, bramka automatycznie uruchamia `build_profiles.sh`, ponownie weryfikuje
+odciski i wykonuje poziom 84/84. Gdy profilu brak, brak przy nim odcisku albo
+odcisku nie da się policzyć, bramka **pomija poziom 84/84** zamiast orzekać.
+Profil zbudowany z innej treści dałby zieleń, która nie mówi nic o badanej
+rewizji.
 
 Odcisk liczy się z **drzewa roboczego**, nie z `HEAD`, więc niezacommitowana
 zmiana w `src/` unieważnia profile dokładnie tak samo jak commit. Miarą **nie

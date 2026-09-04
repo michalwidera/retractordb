@@ -75,7 +75,7 @@ struct windowGroup {
   std::list<token> program;                ///< rachunek wartosci rekordu; pusty = goly odczyt slotu
   rdb::descFld valueType = rdb::RATIONAL;  ///< typ wartosci wchodzacych do redukcji
 
-  bool sameAs(const windowGroup &other) const {
+  [[nodiscard]] bool sameAs(const windowGroup &other) const {
     if (source != other.source || width != other.width || valueType != other.valueType) return false;
     if (program.empty() != other.program.empty()) return false;
     if (program.empty()) return slot == other.slot;

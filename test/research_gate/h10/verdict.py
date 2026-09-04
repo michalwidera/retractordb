@@ -252,6 +252,13 @@ def main():
     parser.add_argument("--engine", default="db4a360")
     args = parser.parse_args()
     summary = render(load(args.raw), args.out, args.seed, args.engine)
+    # Puste listy `zawyżające` i `zaniżające` są stanem NAJLEPSZYM, nie awarią.
+    # Trzy reżimy są rozłączne i sumują się do wszystkich klas, więc komplet
+    # klas w `dokładne` z konieczności zostawia dwie pozostałe listy puste.
+    # Zapis `[]` bywa czytany jako brak danych — stąd ta uwaga przy samym druku:
+    # niepusta lista `zaniżające` oznacza defekt poprawności (rekord wyemitowany,
+    # zanim jego zależności są określone), a niepusta `zawyżające` utratę
+    # dokładności wobec zamrożonego odniesienia — dopiero to oblewa bramkę.
     print(f"dokładne: {summary['exact']}")
     print(f"zawyżające: {summary['over']}")
     print(f"zaniżające: {summary['under']}")

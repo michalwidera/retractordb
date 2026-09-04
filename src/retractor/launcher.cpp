@@ -242,7 +242,7 @@ static void printOptimizerBuildInfo() {
 #endif
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) try {
   qTree coreInstance;
   compiler cm(coreInstance);
 
@@ -694,4 +694,16 @@ int main(int argc, char *argv[]) {
 
   executorsm exec;
   return exec.run(coreInstance, guard, xrdbbus, cm, vm, appCfg, earlyServerName);
+} catch (const std::exception &error) {
+  const char *const executable = argc > 0 && argv[0] != nullptr ? argv[0] : "xretractor";
+  std::fputs(executable, stderr);
+  std::fputs(": unexpected error: ", stderr);
+  std::fputs(error.what(), stderr);
+  std::fputc('\n', stderr);
+  return EXIT_FAILURE;
+} catch (...) {
+  const char *const executable = argc > 0 && argv[0] != nullptr ? argv[0] : "xretractor";
+  std::fputs(executable, stderr);
+  std::fputs(": unexpected non-standard error\n", stderr);
+  return EXIT_FAILURE;
 }

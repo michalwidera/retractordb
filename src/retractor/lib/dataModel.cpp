@@ -4,6 +4,7 @@
 #include <iostream>
 #include <memory>  // unique_ptr
 #include <mutex>
+#include <utility>
 
 #include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
@@ -97,7 +98,7 @@ rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffs
   out.releaseOnHold();
 
   const auto available              = static_cast<int>(out.getRecordsCount());
-  const bool outsideRetainedHistory = out.isDeclared() && revOffset >= static_cast<int>(out.historySize());
+  const bool outsideRetainedHistory = out.isDeclared() && std::cmp_greater_equal(revOffset, out.historySize());
   if (revOffset < 0 || revOffset >= available || outsideRetainedHistory) {
     // Rekord poza zgromadzoną historią — wartość nieokreślona, czyli all-null (pochłaniająca).
     // Ogon strumienia (query::startupLatency) jest tak dobrany, żeby ta ścieżka nie była
@@ -139,7 +140,7 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
   const int rev      = count - 1 - physical;
 
   const bool outOfRange = physical < 0 || rev < 0 ||  //
-                          (out.isDeclared() && rev >= static_cast<int>(out.historySize()));
+                          (out.isDeclared() && std::cmp_greater_equal(rev, out.historySize()));
   if (outOfRange) {
     // Rekord niedostępny (przyszłość na osi czasu źródła, przed początkiem logicznym
     // albo poza historią bufora) — rekord all-null; o jego losie decyduje ścieżka zapisu.

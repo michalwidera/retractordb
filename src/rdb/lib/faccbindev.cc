@@ -38,7 +38,7 @@ auto binaryDeviceRO::name() -> std::string & { return filename_; }
 // Krótki odczyt NIE oznacza końca danych: ::read na FIFO, potoku czy urządzeniu wolno zwrócić mniej
 // bajtów, niż zażądano, a EINTR przerywa wywołanie bez utraty czegokolwiek. Rekord składamy więc
 // z kolejnych porcji i ponawiamy przerwane wywołanie.
-binaryDeviceRO::readOutcome binaryDeviceRO::readExact(uint8_t *ptrData) {
+binaryDeviceRO::readOutcome binaryDeviceRO::readExact(uint8_t *ptrData) const {
   ssize_t done = 0;
   while (done < recordSize_) {
     const ssize_t readSize = ::read(fd_, ptrData + done, static_cast<size_t>(recordSize_ - done));

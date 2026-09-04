@@ -9,6 +9,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <ranges>
 #include <set>
 #include <sstream>
 #include <utility>  // std::pair, std::cmp_greater_equal
@@ -400,12 +401,10 @@ std::string streamNameFragment(const rdb::descFldVT &value) {
           return number(v.first) + "_" + number(v.second);
         else if constexpr (std::is_same_v<T, std::pair<std::string, int>>)
           return v.first + "_" + number(v.second);
-        else if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>)
+        else
           // Zadna klauzula FROM nie niesie zmiennoprzecinkowego parametru — wariant istnieje,
           // bo descFldVT sluzy takze wyrazeniom pol. Rationalize() w parserze zamienia ulamek
           // dziesietny na wymierny, zanim token trafi do programu strumienia.
-          return number(static_cast<long long>(v));
-        else
           return number(static_cast<long long>(v));
       },
       value);
@@ -422,6 +421,8 @@ std::string streamNameFragment(const rdb::descFldVT &value) {
 /// w drzewie testow ma 49 B, a w przypadkach uzycia z paper-arXiv 142 B. Galaz skrotu nie
 /// odpala sie wiec w zadnym istniejacym planie — zdejmuje sufit, nie przemianowuje dorobku.
 constexpr std::size_t substratNameBudget_C = 200;
+constexpr std::uint64_t kFnv1aOffsetBasis  = 14'695'981'039'346'656'037ULL;
+constexpr std::uint64_t kFnv1aPrime        = 1'099'511'628'211ULL;
 
 /// Skrot FNV-1a 64-bit, 16 znakow szesnastkowych.
 ///
@@ -429,10 +430,10 @@ constexpr std::size_t substratNameBudget_C = 200;
 /// i do wzorcow testow integracyjnych, wiec musi byc identyczna miedzy wersjami biblioteki
 /// standardowej i miedzy platformami. std::hash<std::string> tego nie gwarantuje.
 std::string nameDigest(const std::string &text) {
-  std::uint64_t hash = 14695981039346656037ULL;
+  std::uint64_t hash = kFnv1aOffsetBasis;
   for (const unsigned char character : text) {
     hash ^= character;
-    hash *= 1099511628211ULL;
+    hash *= kFnv1aPrime;
   }
   return std::format("{:016x}", hash);
 }
@@ -611,6 +612,7 @@ std::string compiler::extractIntermediateStreams() {
   if (substratTypeIt != std::end(coreInstance)) substratType_C = substratTypeIt->filename;
   std::ranges::transform(substratType_C, substratType_C.begin(), ::toupper);
 
+  // NOLINTNEXTLINE(modernize-loop-convert): extractIntermediateStreams() może powiększyć qTree i unieważnić iteratory.
   for (size_t queryIndex = 0; queryIndex < coreInstance.size(); ++queryIndex) {
     // Optimization phase 2. Redukuj jedno zapytanie do punktu stałego;
     // push_back() może unieważnić iteratory qTree, dlatego zapytanie jest
@@ -959,9 +961,10 @@ std::string compiler::expandIndexWildcards(query &q) {
       const auto span = sourceSpanInFrom(q, schema);
       if (!span) {
         SPDLOG_ERROR("Wildcard index '{}[_]' in stream '{}' does not resolve against its FROM clause", schema, q.id);
-        return std::string("Stream '" + q.id + "' uses '" + schema + "[_]', but '" + schema +
-                           "' contributes no contiguous block of fields to its FROM clause. Refer to a stream that "
-                           "stands in FROM, or give the sub-expression a query of its own.");
+        return std::format(
+            "Stream '{}' uses '{}[_]', but '{}' contributes no contiguous block of fields to its FROM "
+            "clause. Refer to a stream that stands in FROM, or give the sub-expression a query of its own.",
+            q.id, schema, schema);
       }
       minSizeFlat = std::min(minSizeFlat, *span);
     }
@@ -1030,8 +1033,7 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
               const auto flatIndex = singleFieldSlot(q1, field, schema, arrayError);
               if (!arrayError.empty()) return "Stream '" + q.id + "': " + arrayError;
               if (!flatIndex.has_value())
-                return "Stream '" + q.id + "' refers to '" + text + "', but stream '" + schema + "' has no field '" + field +
-                       "'";
+                return std::format("Stream '{}' refers to '{}', but stream '{}' has no field '{}'", q.id, text, schema, field);
               t = token(PUSH_ID, std::make_pair(schema, *flatIndex));
               break;
             }
@@ -1069,8 +1071,8 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
             if (!entry.has_value()) continue;
             const auto [firstSlot, slots] = *entry;
             if (offset1 < 0 || offset1 >= slots)
-              return "Stream '" + q.id + "': field '" + name + "' of stream '" + schema + "' has " + std::to_string(slots) +
-                     " element(s), so '" + text + "' is out of range";
+              return std::format("Stream '{}': field '{}' of stream '{}' has {} element(s), so '{}' is out of range", q.id, name,
+                                 schema, slots, text);
             t = token(PUSH_ID, std::make_pair(schema, firstSlot + offset1));
             namedSourceRefs_[q.id].insert(schema);
             bFieldFound = true;
@@ -1085,13 +1087,13 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
           // o tym nic. Nazwa fizyczna jest zwyklym ID (lekser dopuszcza `$`), wiec droga do pola
           // instancji istnieje i wystarczy ja podac.
           if (!bFieldFound && coreInstance.exists(instanceName(name, 0)))
-            return "Stream '" + q.id + "' refers to '" + text + "', but '" + name +
-                   "' is a stream generator family, not a stream. '" + name +
-                   "[i]' names an instance only in a FROM clause. In a SELECT list use the instance's own name, for "
-                   "example '" +
-                   instanceName(name, 0) + "[0]'.";
+            return std::format(
+                "Stream '{}' refers to '{}', but '{}' is a stream generator family, not a stream. "
+                "'{}[i]' names an instance only in a FROM clause. In a SELECT list use the instance's own "
+                "name, for example '{}[0]'.",
+                q.id, text, name, name, instanceName(name, 0));
           if (!bFieldFound)
-            return "Stream '" + q.id + "' refers to '" + text + "', but there is no stream or field '" + name + "'";
+            return std::format("Stream '{}' refers to '{}', but there is no stream or field '{}'", q.id, text, name);
         } else {
           return "Stream '" + q.id + "' has a malformed field reference '" + text + "'";
         }
@@ -1146,7 +1148,7 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
           const bool foundSchema =
               ranges::find_if(coreInstance, [schema](const auto &qry) { return qry.id == schema; }) != coreInstance.end();
 
-          if (!foundSchema) return "Stream '" + q.id + "' refers to '" + text + "', but there is no stream '" + schema + "'";
+          if (!foundSchema) return std::format("Stream '{}' refers to '{}', but there is no stream '{}'", q.id, text, schema);
           t = token(PUSH_ID, std::make_pair(schema, offset1 + (offset2 * static_cast<int>(q.lSchema.size()))));
         } else
           return "Stream '" + q.id + "' has a malformed field reference '" + text + "'";
@@ -1422,7 +1424,7 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
             const auto &source = coreInstance[arg1];
             const int distance = q.startupLatency - source.startupLatency + *width - 1;
             const int required = distance + (source.isDeclaration() ? kDeclarationPrefetch : 1);
-            capMap[arg1]       = std::max(capMap[arg1], std::max(required, 1));
+            capMap[arg1]       = std::max({capMap[arg1], required, 1});
           }
           // Poza oknem strumień przepisujący nie zwiększa wymagań wobec historii źródła.
           break;
@@ -1446,7 +1448,7 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         const auto &source = coreInstance[nameSrc];
         const int rev      = q.startupLatency - source.startupLatency + timeOffset;
         const int required = rev + 1 + (source.isDeclaration() ? kDeclarationPrefetch : 0);
-        capMap[nameSrc]    = std::max(capMap[nameSrc], std::max(required, 1));
+        capMap[nameSrc]    = std::max({capMap[nameSrc], required, 1});
       } break;
       case STREAM_AGSE: {
         // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
@@ -1481,14 +1483,14 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         const int firstIndex = q.logicalOrigin;
         for (int n = firstIndex; n < firstIndex + period; ++n) {
           const int newest = floorDiv((n + 1 + q.startupLatency) * step, sourceWidth) - source.startupLatency - 1;
-          const int oldest = floorDiv(n * step - std::abs(length) + 1, sourceWidth);
+          const int oldest = floorDiv((n * step) - std::abs(length) + 1, sourceWidth);
           maxDistance      = std::max(maxDistance, newest - oldest);
         }
         // Bufor musi pomieścić oba końce zakresu, więc pojemność to odległość + 1.
         // Deklaracja ma dodatkowo dwa rekordy przed pierwszym wykonaniem konsumenta:
         // rekord uzbrojony przy otwarciu storage oraz zerowy prefetch.
         const int required = maxDistance + (source.isDeclaration() ? kDeclarationPrefetch : 1);
-        capMap[nameSrc]    = std::max(capMap[nameSrc], std::max(required, 1));
+        capMap[nameSrc]    = std::max({capMap[nameSrc], required, 1});
       } break;
       case STREAM_HASH:
         // Przeplot/rozplot czytają elementy składowych po indeksie
@@ -1502,7 +1504,7 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
           const auto &source = coreInstance[nameSrc];
           const int delayed =
               ceilR(boost::rational<int>(q.startupLatency) * q.rInterval / source.rInterval) - source.startupLatency + 2;
-          capMap[nameSrc] = std::max(capMap[nameSrc], std::max(kJunctionHistory, delayed));
+          capMap[nameSrc] = std::max({capMap[nameSrc], kJunctionHistory, delayed});
         }
         break;
       case STREAM_DEHASH_DIV:
@@ -1513,7 +1515,7 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
           const auto &source = coreInstance[arg1];
           const int delayed =
               ceilR(boost::rational<int>(q.startupLatency) * q.rInterval / source.rInterval) - source.startupLatency + 2;
-          capMap[arg1] = std::max(capMap[arg1], std::max(kJunctionHistory, delayed));
+          capMap[arg1] = std::max({capMap[arg1], kJunctionHistory, delayed});
         }
         break;
       case STREAM_ADD: {
@@ -1531,7 +1533,7 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
           const auto ratio   = q.rInterval / source.rInterval;
           int required       = ceilR(boost::rational<int>(1 + q.startupLatency) * ratio) - source.startupLatency;
           if (source.isDeclaration()) required += kDeclarationPrefetch;
-          capMap[nameSrc] = std::max(capMap[nameSrc], std::max(required, 1));
+          capMap[nameSrc] = std::max({capMap[nameSrc], required, 1});
         }
       } break;
       case STREAM_AVG:
@@ -1560,7 +1562,7 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         if (source.isDeclaration()) {
           required = std::max(required, floorR(boost::rational<int>(1 + q.startupLatency) * ratio) + kDeclarationPrefetch);
         }
-        capMap[arg1] = std::max(capMap[arg1], std::max(required, 1));
+        capMap[arg1] = std::max({capMap[arg1], required, 1});
       } break;
       default:
         FatalError("compiler::computeRequiredCapacities: unsupported command '{}' for query '{}'",
@@ -1681,7 +1683,7 @@ int firstIndexReaching(const Mapping &mapping, const int threshold, const std::s
   }
   int lo = 0;
   while (lo < hi) {
-    const int mid = lo + (hi - lo) / 2;
+    const int mid = lo + ((hi - lo) / 2);
     if (mapping(mid) < threshold)
       lo = mid + 1;
     else
@@ -2454,17 +2456,17 @@ std::string compiler::resolveWindowAggregates() {
         if (shape.second < 0 || std::cmp_greater_equal(shape.second, pos)) {
           return "Stream '" + q.id + "' has a window aggregate without an argument";
         }
-        for (size_t i = static_cast<size_t>(shape.second); i < pos; ++i)
+        for (auto i = static_cast<size_t>(shape.second); i < pos; ++i)
           if (isWindowAggregate(prog[i].getCommandID()))
             return "Stream '" + q.id + "' nests one window aggregate inside another, which is not supported";
       }
 
       // Od KONCA: wyciecie argumentu przesuwa wylacznie pozycje za nim, wiec znaczniki okien
       // stojacych wczesniej pozostaja wazne.
-      for (auto w = windows.rbegin(); w != windows.rend(); ++w) {
-        const size_t pos      = w->first;
-        const int width       = w->second.first;
-        const size_t argStart = static_cast<size_t>(w->second.second);
+      for (auto &window : windows | std::views::reverse) {
+        const size_t pos    = window.first;
+        const int width     = window.second.first;
+        const auto argStart = static_cast<size_t>(window.second.second);
 
         std::list<token> argument(prog.begin() + static_cast<std::ptrdiff_t>(argStart),
                                   prog.begin() + static_cast<std::ptrdiff_t>(pos));
@@ -2672,7 +2674,7 @@ std::string compiler::inferStringFieldTypes() {
   auto shapeOfField = [this](const std::string &streamId, int fieldIndex) -> std::optional<fieldShape> {
     const auto sourceField = sourceFieldAt(streamId, fieldIndex);
     if (!sourceField.has_value()) return std::nullopt;
-    return fieldShape{sourceField->rtype, sourceField->rlen * sourceField->rarray};
+    return fieldShape{.type = sourceField->rtype, .width = sourceField->rlen * sourceField->rarray};
   };
 
   for (std::size_t round = 0; round <= coreInstance.size(); ++round) {
@@ -2803,11 +2805,12 @@ class genIndexFolder {
       FatalError("compiler::expandStreamGenerators: unexpected '{}' in generator index '{}'", text_[pos_], text_);
     int value = 0;
     while (pos_ < text_.size() && text_[pos_] >= '0' && text_[pos_] <= '9')
-      value = value * 10 + (text_[pos_++] - '0');
+      value = (value * kDecimalBase) + (text_[pos_++] - '0');
     return value;
   }
 
   const std::string &text_;
+  static constexpr int kDecimalBase{10};
   int ordinal_;
   std::size_t pos_ = 0;
 };
@@ -2873,8 +2876,9 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
   for (auto &t : instance.lProgram) {
     if (t.getCommandID() != PUSH_STREAM || !dependsOnOrdinal(t.getStr_())) continue;
     const auto parts = splitIndexedRef(t.getStr_());
-    const int index  = genIndexFolder(parts->second, ordinal).fold();
-    t                = token(PUSH_STREAM, parts->first + "[" + std::to_string(index) + "]");
+    if (!parts.has_value()) FatalError("compiler::substituteOrdinal: malformed indexed stream reference '{}'", t.getStr_());
+    const int index = genIndexFolder(parts->second, ordinal).fold();
+    t               = token(PUSH_STREAM, parts->first + "[" + std::to_string(index) + "]");
   }
 
   for (auto &f : instance.lSchema)
@@ -2885,7 +2889,8 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
       }
       if (t.getCommandID() != PUSH_ID2 || !dependsOnOrdinal(t.getStr_())) continue;
       const auto parts = splitIndexedRef(t.getStr_());
-      const int index  = genIndexFolder(parts->second, ordinal).fold();
+      if (!parts.has_value()) FatalError("compiler::substituteOrdinal: malformed indexed field reference '{}'", t.getStr_());
+      const int index = genIndexFolder(parts->second, ordinal).fold();
       if (index < 0)
         return "Stream '" + instance.id + "' references '" + parts->first + "[" + std::to_string(index) +
                "]' — field index must not be negative";
@@ -2925,7 +2930,7 @@ std::string compiler::checkFunctionCalls() {
       const auto known       = rdb::findRqlFunction(name);
       if (!known) {
         SPDLOG_ERROR("Unknown scalar function '{}' in stream '{}'", name, owner);
-        return "Stream '" + owner + "' calls '" + name + "', which is not a known RQL function.";
+        return std::format("Stream '{}' calls '{}', which is not a known RQL function.", owner, name);
       }
 
       // Jedyna funkcja o arnosci 2 to `to_string(expr : N)`, gdzie N jest zadeklarowana
@@ -2934,7 +2939,7 @@ std::string compiler::checkFunctionCalls() {
       const int usedArgs = (cmd == CALL2) ? 2 : 1;
       if (usedArgs > known->maxArgs) {
         SPDLOG_ERROR("Function '{}' in stream '{}' takes {} argument(s), {} given", name, owner, known->maxArgs, usedArgs);
-        return "Stream '" + owner + "' calls '" + name + "' with a declared width, but '" + name + "' takes no width argument.";
+        return std::format("Stream '{}' calls '{}' with a declared width, but '{}' takes no width argument.", owner, name, name);
       }
     }
     return "OK";

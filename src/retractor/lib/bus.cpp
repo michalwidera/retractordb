@@ -10,8 +10,10 @@
 #include <cstring>
 #include <fstream>
 #include <optional>
+#include <span>
 #include <sstream>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <spdlog/spdlog.h>
@@ -47,7 +49,8 @@ constexpr std::chrono::milliseconds kInitPollInterval{1};
 // Ile razy czytelnik ponawia migawke slotu, zanim uzna go za nieczytelny. Zapis slotu trwa
 // jeden memcpy, wiec kilka prob wystarcza; limit istnieje po to, by odczyt nie mogl zawisnac
 // nad slotem instancji, ktora zginela w polowie zapisu.
-constexpr int kSnapshotRetries = 8;
+constexpr int kSnapshotRetries        = 8;
+constexpr int kProcStatStartTimeField = 22;
 
 /// Slot jednej instancji. Wylacznie POD -- patrz komentarz naglowka.
 struct Slot {
@@ -56,11 +59,13 @@ struct Slot {
   std::uint64_t startTime;
   std::uint32_t streamCount;
   std::uint32_t modes;  ///< maska bus::mode::*; 0 => tryb zwykly
+  // NOLINTBEGIN(modernize-avoid-c-arrays): ustalony binarny format pamięci współdzielonej
   char name[kInstanceNameSize];
   char queryFile[kQueryFileSize];
   char unit[kUnitNameSize];
   char counterPath[kCounterPathSize];
   char streams[kMaxStreams][kStreamNameSize];
+  // NOLINTEND(modernize-avoid-c-arrays)
 };
 
 struct Segment {
@@ -73,6 +78,7 @@ struct Segment {
   std::uint32_t slotSize;
   std::uint32_t reserved;  // wyrownanie muteksu do 8 bajtow
   pthread_mutex_t mutex;   ///< robust + pshared; NIE boost::named_mutex -- patrz nizej
+  // NOLINTNEXTLINE(modernize-avoid-c-arrays): ustalony binarny format pamięci współdzielonej
   Slot slots[kMaxSlots];
 };
 
@@ -135,7 +141,7 @@ bool readProcStat(std::int32_t pid, std::uint64_t &startTime, char &state) {
   std::istringstream fields(line.substr(lastParen + 1));
   std::string token;
   state = '\0';
-  for (int index = 3; index < 22; ++index) {
+  for (int index = 3; index < kProcStatStartTimeField; ++index) {
     if (!(fields >> token)) return false;
     if (index == 3 && !token.empty()) state = token.front();
   }
@@ -220,7 +226,7 @@ struct Bus::Impl {
   /// Boost NIE udostepnia atrybutu robust (named_mutex nie jest robust, wiec proces
   /// zabity z muteksem w reku zawiesilby wszystkie pozostale). Stad surowy pthread_mutex_t
   /// w segmencie: przy EOWNERDEAD stan da sie naprawic.
-  bool lock() {
+  [[nodiscard]] bool lock() const {
     int rc = pthread_mutex_lock(&segment->mutex);
     if (rc == EOWNERDEAD) {
       // Poprzedni wlasciciel zginal trzymajac muteks. Trzymanie muteksu jest tu dowodem,
@@ -240,7 +246,7 @@ struct Bus::Impl {
     return rc == 0;
   }
 
-  void unlock() { pthread_mutex_unlock(&segment->mutex); }
+  void unlock() const { pthread_mutex_unlock(&segment->mutex); }
 };
 
 Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_unique<Impl>()) {
@@ -279,7 +285,7 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
     // czekamy na pelny rozmiar.
     const auto deadline = std::chrono::steady_clock::now() + kInitWaitLimit;
     IPC::offset_t size{0};
-    while (impl->shm->get_size(size) && size < static_cast<IPC::offset_t>(sizeof(Segment))) {
+    while (impl->shm->get_size(size) && std::cmp_less(size, sizeof(Segment))) {
       if (std::chrono::steady_clock::now() > deadline) {
         SPDLOG_WARN("xrdbbus: segment '{}' stayed undersized ({} B, expected {} B); remove /dev/shm/{} to repair.", name, size,
                     sizeof(Segment), name);
@@ -512,7 +518,7 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams) {
     return retVal;
   }
 
-  if (owned + toAdd.size() > kMaxStreams) {
+  if (owned > kMaxStreams || toAdd.size() > kMaxStreams - owned) {
     retVal.status = ClaimStatus::TooLarge;
     retVal.detail = "plan would grow to " + std::to_string(owned + toAdd.size()) + " streams, the bus slot holds " +
                     std::to_string(kMaxStreams);
@@ -523,7 +529,7 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams) {
   auto scratch = std::make_unique<Slot>();  // ~16 KiB -- na stercie, nie na stosie
 
   for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
-    if (static_cast<int>(i) == impl->slotIndex) continue;  // wlasnych nazw nie sprawdzamy przeciw sobie
+    if (std::cmp_equal(i, impl->slotIndex)) continue;  // wlasnych nazw nie sprawdzamy przeciw sobie
     Slot &slot = segment.slots[i];
     if (!snapshot(slot, *scratch)) continue;
 
@@ -545,8 +551,9 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams) {
   }
 
   beginWrite(mine);
+  const auto availableStreams = std::span{mine.streams}.subspan(owned);
   for (std::size_t s = 0; s < toAdd.size(); ++s)
-    storeString(mine.streams[owned + s], kStreamNameSize, toAdd[s]);
+    storeString(availableStreams[s], kStreamNameSize, toAdd[s]);
   mine.streamCount = owned + static_cast<std::uint32_t>(toAdd.size());
   endWrite(mine);
 

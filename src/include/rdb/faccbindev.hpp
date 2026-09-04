@@ -46,7 +46,7 @@ class binaryDeviceRO : public FileInterface {
   bool exhausted_ = false;
 
   /// @brief Wypełnia cały rekord, sklejając krótkie odczyty i ponawiając wywołanie przerwane przez EINTR.
-  readOutcome readExact(uint8_t *ptrData);
+  readOutcome readExact(uint8_t *ptrData) const;
 
  public:
   explicit binaryDeviceRO(std::string_view fileName,          //
