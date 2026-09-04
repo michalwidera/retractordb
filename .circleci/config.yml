@@ -112,6 +112,22 @@ workflows:
           simplify: "OFF"
           requires:
             - build-release-ninja-mydocker
+      # Kontrakt tekstowy sondy. Wiersze WORK/MATERIALIZED/LOGICAL/PLAN bench sa
+      # porownywane co do znaku przez `ut_probe`, ale tylko w buildzie z
+      # RDB_BENCH_PROBE=ON — poza ta konfiguracja galezie `if constexpr` oczekuja
+      # pustego stderr i format nie jest sprawdzany przez nic. Dowod z 2026-09-04:
+      # konwersja fprintf -> println scalila sklejane literaly i zgubila podwojne
+      # spacje rozdzielajace grupy; caly przebieg commitowy byl zielony, awarie
+      # zlapal dopiero reczny job `ablation-probe-on`.
+      #
+      # Rownolegle do podlogi, a nie za nia jak w `manual-ablation`: tam
+      # serializacja oszczedza szesc jobow jednoczynnikowych, tutaj chodzi o dwa
+      # niezalezne rodzaje regresji i czerwona podloga nie moze zaslonic sondy.
+      - build-release-ablation:
+          name: ablation-probe-on
+          probe: "ON"
+          requires:
+            - build-release-ninja-mydocker
 
   # Sama bramka badawcza H9/H10, bez L1 i L2. Uruchamiana z reki, gdy trzeba
   # potwierdzic, ze wyniki sie nie cofnely — np. przed zgloszeniem artykulu —
