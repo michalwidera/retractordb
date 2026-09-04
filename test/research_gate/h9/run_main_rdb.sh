@@ -59,9 +59,14 @@ controls=(F9_R2_controls F9_R1_controls F9_X_controls)
 
 # Wyciekly `xretractor -x` wywrocil kiedys 22 kolejne testy, a kazdy przechodzil
 # w izolacji. Sprawdzamy raz, na wejsciu.
-if pgrep -af '[x]retractor' >/dev/null; then
+#
+# Dopasowanie po NAZWIE procesu (`-x`), nie po wierszu polecen: `pgrep -af` lapal
+# takze wolajacego, ktory ma slowo `xretractor` we wlasnym argv — na przyklad
+# `run_prove.sh --xretractor <sciezka>`. Straznik odmawial wtedy pracy z powodu
+# procesu, ktory sam go uruchomil.
+if pgrep -x xretractor >/dev/null; then
   echo "BLAD: w systemie biegnie xretractor — najpierw sprzatnij" >&2
-  pgrep -af '[x]retractor' >&2
+  pgrep -ax xretractor >&2
   exit 2
 fi
 

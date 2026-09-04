@@ -62,6 +62,8 @@ __pycache__/
 *.pyc
 test/research_gate/**/work/
 test/research_gate/.gate-work/
+test/research_gate/.drift-work/
+test/research_gate/.drift.lock
 
 # Wyjscia uruchomienia bramki badawczej pisane obok aparatury: `validate_corpus.py`
 # bez --out zapisuje corpus_validation/, `run_campaign.py` bez --out zapisuje raw/.

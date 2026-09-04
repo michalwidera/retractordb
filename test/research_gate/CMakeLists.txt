@@ -38,3 +38,23 @@ add_custom_target(
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMENT "Bramka badawcza H9/H10 (mechanizm, nie potwierdzenie hipotez)"
   USES_TERMINAL VERBATIM)
+
+# Fizyczna weryfikacja braku dryftu — inne pytanie niz `test_gate`. Bramka
+# porownuje ETYKIETY rezimow z zamrozona tablica odniesienia na dwoch
+# zamrozonych ziarnach. Ten cel WYKONUJE silnik: na swiezo wylosowanej probie
+# planow i wobec niezaleznej implementacji (Apache Flink), czyli lapie dryft
+# wartosci i dryft poza korpusem tych dwoch ziaren — jedno i drugie jest dla
+# bramki niewidoczne z konstrukcji.
+#
+# Tak samo poza `all` i poza `ninja test`, i z tego samego powodu co bramka —
+# tyle ze mocniejszego: przebieg z poziomem wartosci trwa kilkadziesiat minut.
+add_custom_target(
+  test_drift
+  COMMAND
+    ${CMAKE_CURRENT_SOURCE_DIR}/run_drift.sh --xretractor
+    $<TARGET_FILE:xretractor> --work ${CMAKE_CURRENT_BINARY_DIR}/drift-work
+    --count ${RESEARCH_GATE_COUNT} --profiles ${CMAKE_SOURCE_DIR}/build
+  DEPENDS xretractor
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMENT "Fizyczna weryfikacja braku dryftu silnika wzgledem wynikow H9/H10"
+  USES_TERMINAL VERBATIM)
