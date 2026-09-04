@@ -80,6 +80,27 @@ A CI race cannot be ordered on demand, so the test forces the failure through th
 hook read by the handler. Without the fix the test goes red on both counts: the client's log lacks
 the server's reason and still carries `did not appear after`.
 
+### The `--xqrywait` gate
+
+`it_xqrywait_gate` guards two properties of the `-x` gate, both broken until 2026-09-04 and both
+fixed by the same change (the gate now waits on its own latch instead of borrowing `iLoopLimitCnt`).
+
+- **A command from the startup window must lift the gate.** The lock file's `PID:` line — the
+  `server_start` contract — is published well before `dataModel` is built, and the gate flag was
+  set only after. The window measured ~90 ms for a 120-stream plan, and a command landing in it was
+  lost: the server waited for the *next* one. Reproduced 5/5.
+- **`--llimitqry` must survive the gate.** The gate flag lived in the slot-budget counter, so
+  lifting it wrote back "unbounded": `xretractor -m 5` exited on its own, `xretractor -x -m 5` ran
+  forever. Deterministic, no race involved.
+
+The observable for both is the same and unambiguous: with `-m 5` a server whose gate was lifted
+exits by itself. Do **not** assert on the server's stdout instead — redirected to a file it is
+block-buffered, and a grep will report a gate that is merely unflushed as a gate that is stuck.
+That mistake produced a false 5/5 during this investigation before it was caught.
+
+Part A is timing-assisted: it can pass falsely if the window closes before `xqry` starts, but it
+cannot fail falsely, so it is repeated three times.
+
 ### Namespaces
 
 Each test directory gets `RDB_NAMESPACE`, its own `TMPDIR` and a `RESOURCE_LOCK`, assigned from a

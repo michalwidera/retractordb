@@ -56,6 +56,9 @@ std::vector<std::pair<std::string, std::string>> processedLines;
 
 dataModel *pProc = nullptr;
 std::atomic<bool> dataModelExpected{false};
+/// Zatrzask bramki --xqrywait: czy watek komunikacyjny odebral juz JAKAKOLWIEK komende.
+/// Osobny od iLoopLimitCnt swiadomie -- patrz komentarz przy bramce w run().
+std::atomic<bool> firstQueryReceived{false};
 std::atomic<std::uint64_t> adHocPlanRevision{0};
 
 // variable connected with llimitqry (-m) parameter
@@ -527,14 +530,17 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
           },
       .onMessageReceived =
           [] {
-            if (iLoopLimitCnt == executorsm::waitForXqry) {
-              // Notify main thread that first query is received
-              {
-                std::scoped_lock lock(core_mutex);
-                iLoopLimitCnt = executorsm::inifitie_loop;
-              }
-              cv.notify_all();
+            // Fakt "przyszla pierwsza komenda" zapisujemy BEZWARUNKOWO i w osobnym
+            // zatrzasku. Poprzednia wersja podnosila bramke tylko wtedy, gdy widziala juz
+            // iLoopLimitCnt == waitForXqry, a te flage watek glowny ustawia dopiero PO
+            // zbudowaniu dataModel -- czyli dlugo po opublikowaniu blokady, na ktora czeka
+            // klient. Komenda z tego okna gubila pobudke i serwer stal na bramce az do
+            // nastepnej komendy (odtworzone 5/5 planem o 120 strumieniach).
+            {
+              std::scoped_lock lock(core_mutex);
+              firstQueryReceived = true;
             }
+            cv.notify_all();
           },
       .shouldStop = [] { return iLoopLimitCnt == executorsm::stop_now; },
   });
@@ -608,9 +614,14 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
 
       if (vm.contains("xqrywait")) {
         if (vm.contains("verbose")) std::cout << "Waiting for first query to start process.\n";
+        // Warunek na zatrzasku, a nie na liczniku petli. Licznik niesie budzet slotow
+        // z --llimitqry, wiec uzycie go jako flagi bramki kasowalo ten budzet: po
+        // podniesieniu bramki wracala wartosc inifitie_loop, a nie zadane N. Skutek byl
+        // wprost mierzalny -- `xretractor -m 5` konczyl sie sam, `xretractor -x -m 5`
+        // chodzil bez konca. Zatrzask ustawiony PRZED wejsciem tutaj przepuszcza od razu,
+        // wiec komenda z okna startowego nie ginie.
         std::unique_lock<std::mutex> scoped_lock(core_mutex);
-        iLoopLimitCnt = executorsm::waitForXqry;
-        cv.wait(scoped_lock, [this] { return iLoopLimitCnt != executorsm::waitForXqry; });
+        cv.wait(scoped_lock, [] { return firstQueryReceived.load(); });
         if (vm.contains("verbose")) std::cout << "First query received, starting processing loop.\n";
       }
 

@@ -24,7 +24,7 @@ struct executorsm {
   int run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrdbbus, compiler &cm, vm_map &vm, const AppConfig &cfg,
           std::string_view serverName = {});
 
-  enum : std::int8_t { inifitie_loop = 0, stop_now = 1, waitForXqry = -1 };
+  enum : std::int8_t { inifitie_loop = 0, stop_now = 1 };
 
  private:
   static qTree *coreInstancePtr;
