@@ -70,7 +70,7 @@ set_tests_properties(
   ${TestID}-factor-multiquery-semantic
   ${TestID}-dedup-steady-semantic
   ${TestID}-dedup-exact-semantic
-  PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
+  PROPERTIES TIMEOUT 60)
 
 # Do 2026-07-26 dwa testy tej macierzy były oznaczone WILL_FAIL jako jawnie
 # oczekiwane porażki ablacyjne:

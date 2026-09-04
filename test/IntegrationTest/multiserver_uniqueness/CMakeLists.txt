@@ -9,6 +9,12 @@
 # srednik w add_test() jest separatorem listy CMake i rozbilby skrypt na osobne
 # argumenty.
 
+# Katalog poza pula przestrzeni nazw: scenariusz bada takze instancje BEZIMIENNA
+# i rozlacznosc nazw strumieni na wspolnej magistrali. RDB_NAMESPACE zmienilaby
+# tu przedmiot badania, wiec makro add_test w katalogu nadrzednym daje temu
+# testowi wylacznosc (RUN_SERIAL) zamiast wlasnej przestrzeni.
+set(IT_NO_NAMESPACE TRUE)
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 

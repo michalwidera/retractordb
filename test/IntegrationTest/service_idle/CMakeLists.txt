@@ -33,9 +33,13 @@ else()
   set(_rdbInfoActive 1)
 endif()
 
-# Testy startują serwer (blokada ${TMPDIR:-/tmp}/xretractor_service.lock), więc
-# muszą biec szeregowo. Makro add_test wykrywa to po -m/-k w argv, ale tu flagi
-# są w skrypcie, dlatego ustawiamy RUN_SERIAL jawnie.
-set_tests_properties(
-  ${TestID}-run ${TestID}-env PROPERTIES RUN_SERIAL TRUE TIMEOUT 60 ENVIRONMENT
-                                         "RDB_INFO_ACTIVE=${_rdbInfoActive}")
+set_tests_properties(${TestID}-run ${TestID}-env PROPERTIES TIMEOUT 60)
+
+# DOPISANIE, nie ustawienie: ENVIRONMENT niesie juz przestrzen nazw uruchomienia
+# (RDB_NAMESPACE, TMPDIR) nadana przez makro add_test w katalogu nadrzednym, a
+# set_tests_properties zastapiloby ja w calosci — test startowalby wtedy na
+# zasobach wspolnych i kolidowal z sasiadem biegnacym rownoczesnie.
+set_property(
+  TEST ${TestID}-run ${TestID}-env
+  APPEND
+  PROPERTY ENVIRONMENT "RDB_INFO_ACTIVE=${_rdbInfoActive}")

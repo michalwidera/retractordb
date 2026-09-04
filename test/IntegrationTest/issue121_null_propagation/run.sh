@@ -5,7 +5,9 @@
 # temp_directory_path(), zob. lockManager.cpp). Bez tego pętle synchronizacji
 # wieszają się gdy TMPDIR != /tmp.
 set -e
-LOCK="${TMPDIR:-/tmp}/xretractor_service.lock"
+# Nazwa pliku blokady niesie nazwe instancji, a ta przy uruchomieniu w przestrzeni nazw
+# pochodzi z RDB_NAMESPACE (servername::environmentNamespace) - tak samo jak w ../serverlib.sh.
+LOCK="${TMPDIR:-/tmp}/xretractor_service${RDB_NAMESPACE:+.$RDB_NAMESPACE}.lock"
 # xretractor/xqry logują domyślnie do temp_directory_path()/<bin>.log (zob.
 # uxSysTermTools.cpp) - ten sam katalog co LOCK, więc respektuje TMPDIR.
 XRETRACTOR_LOG="${TMPDIR:-/tmp}/xretractor.log"

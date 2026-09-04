@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Straznik oprawy: kazdy zarejestrowany test ma wykonywac CALY swoj skrypt.
 
-Powod istnienia. Makro `add_test` z IntegrationTest_serial/CMakeLists.txt
+Powod istnienia. Makro `add_test` z IntegrationTest/CMakeLists.txt
 przekazuje argumenty przez `_add_test(${ARGV})`. W makrze `${ARGV}` jest lista
 sklejona srednikami, wiec ponowne rozwiniecie tnie kazdy argument po jego
 WEWNETRZNYCH srednikach. Zapis

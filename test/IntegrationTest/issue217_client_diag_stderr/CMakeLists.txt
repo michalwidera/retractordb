@@ -13,6 +13,4 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash run.sh)
 
-# Dotyka obiektów IPC serwera -> nie może biec równolegle z testami startującymi
-# xretractor (flagi -k/-m są w run.sh, więc makro add_test ich nie widzi).
-set_tests_properties(${TestID}-run PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
+set_tests_properties(${TestID}-run PROPERTIES TIMEOUT 60)

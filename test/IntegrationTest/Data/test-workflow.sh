@@ -18,7 +18,12 @@ fi
 rm -f core*
 rm -f str*
 
-QUEUES_BEFORE=$(ls /dev/shm/brcdbr* 2>/dev/null | wc -l)
+# Kolejki odpowiedzi TEJ przestrzeni nazw, a nie wszystkie w systemie. Nazwa kolejki to
+# "brcdbr.<instancja>.<klient>" (ipc::names w constants.hpp), wiec globalne brcdbr* liczy
+# takze klientow testu biegnacego rownoczesnie w innej przestrzeni — i pokazuje ich jako
+# WLASNY wyciek. Pod `ctest -j 24` wywracalo to test na cudzych kolejkach.
+QUEUE_GLOB="/dev/shm/brcdbr${RDB_NAMESPACE:+.$RDB_NAMESPACE}"*
+QUEUES_BEFORE=$(ls $QUEUE_GLOB 2>/dev/null | wc -l)
 
 xretractor "$1" -c
 
@@ -46,9 +51,9 @@ xqry -l
 xqry -k || true
 server_wait_exit
 
-QUEUES_AFTER=$(ls /dev/shm/brcdbr* 2>/dev/null | wc -l)
+QUEUES_AFTER=$(ls $QUEUE_GLOB 2>/dev/null | wc -l)
 if [ "$QUEUES_AFTER" -gt "$QUEUES_BEFORE" ]; then
   echo "LEAK: brcdbr queue count increased from $QUEUES_BEFORE to $QUEUES_AFTER"
-  ls /dev/shm/brcdbr* 2>/dev/null
+  ls $QUEUE_GLOB 2>/dev/null
   exit 1
 fi

@@ -24,4 +24,22 @@ std::string generate();
 /// pierwszy znak mala litera, dalej male litery, cyfry, '_' lub '-', dlugosc 1..kMaxLength.
 bool isValid(std::string_view name);
 
+/// Nazwa zmiennej srodowiskowej niosacej przestrzen nazw calego uruchomienia.
+inline constexpr const char *kNamespaceEnv = "RDB_NAMESPACE";
+
+/// Przestrzen nazw uruchomienia odczytana z kNamespaceEnv; pusta, gdy zmienna nie jest
+/// ustawiona albo ma wartosc pusta.
+///
+/// Jedno pokretlo rozdziela KOMPLET zasobow globalnych dla maszyny: nazwe segmentu magistrali
+/// (bus::segmentName), domyslna nazwe instancji xretractora i domyslny cel xqry. Powstalo dla
+/// rownoczesnych testow integracyjnych, ktore dziela nazwy strumieni: bez wlasnej magistrali
+/// druga taka instancja odpada na ClaimStatus::Conflict, bo rozlacznosc nazw jest wlasnoscia
+/// maszyny, a nie katalogu roboczego.
+///
+/// Wartosc jest zwracana SUROWA, bez sprawdzania. Ocenia ja wolajacy przez isValid i ma
+/// zatrzymac program z komunikatem: po cichu zignorowana przestrzen nazw cofnelaby rownolegle
+/// uruchomienia na wspolne zasoby, czyli awaria bylaby widoczna dopiero jako kolizja gdzie
+/// indziej.
+std::string environmentNamespace();
+
 }  // namespace servername

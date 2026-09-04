@@ -5,6 +5,12 @@
 # startuje xretractor, wysyła zapytanie ad-hoc przez xqry, następnie zatrzymuje
 # serwer. Asercja: pliki strumieni w temp/ zgodne z pattern-ls.txt.
 
+# Katalog poza pula przestrzeni nazw: jedyny straznik sciezki historycznej:
+# instancja bezimienna, jej blokada i jej obiekty IPC. RDB_NAMESPACE zmienilaby
+# tu przedmiot badania, wiec makro add_test w katalogu nadrzednym daje temu
+# testowi wylacznosc (RUN_SERIAL) zamiast wlasnej przestrzeni.
+set(IT_NO_NAMESPACE TRUE)
+
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 

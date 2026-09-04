@@ -16,6 +16,4 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash run.sh ${CMAKE_BINARY_DIR})
 
-# Uruchamia silnik (blokada uslugi) -> RUN_SERIAL jawnie: flagi -m/-k siedza
-# teraz w run.sh, wiec regex w makrze add_test ich nie widzi.
-set_tests_properties(${TestID} PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
+set_tests_properties(${TestID} PROPERTIES TIMEOUT 60)

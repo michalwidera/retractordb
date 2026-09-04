@@ -6,7 +6,7 @@
 # -d -f -t -s -p, -d -f -t -s -u -p. Generuje pliki SVG przez graphviz.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
-set(TestID "pt_${TestID}")
+set(TestID "it_${TestID}")
 
 # Graph parameters
 set(XRETRACTOR_GRAPH_PARAM_0 "-d -p")
@@ -37,12 +37,12 @@ foreach(item ${V_GLOB_RQL})
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMAND
       bash -c
-      "set -e ; \
-      xretractor ${item} -c > ${item}.out.txt ; \
-      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_0} > ${item}.out.0.dot && dot -Tsvg ${item}.out.0.dot -o ${item}.out.0.svg ; \
-      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_1} > ${item}.out.1.dot && dot -Tsvg ${item}.out.1.dot -o ${item}.out.1.svg ; \
-      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_2} > ${item}.out.2.dot && dot -Tsvg ${item}.out.2.dot -o ${item}.out.2.svg ; \
-      ")
+      "set -e && \
+      xretractor ${item} -c > ${item}.out.txt && \
+      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_0} > ${item}.out.0.dot && dot -Tsvg ${item}.out.0.dot -o ${item}.out.0.svg && \
+      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_1} > ${item}.out.1.dot && dot -Tsvg ${item}.out.1.dot -o ${item}.out.1.svg && \
+      xretractor ${item} -c ${XRETRACTOR_GRAPH_PARAM_2} > ${item}.out.2.dot && dot -Tsvg ${item}.out.2.dot -o ${item}.out.2.svg"
+  )
 endforeach()
 
 # set_tests_properties(${TestID}-graph1 PROPERTIES DEPENDS ${TestID}-graph2) feh

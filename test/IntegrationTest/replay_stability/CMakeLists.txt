@@ -14,4 +14,4 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash verify.sh)
 
-set_tests_properties(${TestID}-run PROPERTIES RUN_SERIAL TRUE TIMEOUT 120)
+set_tests_properties(${TestID}-run PROPERTIES TIMEOUT 120)

@@ -170,7 +170,7 @@ tool_specs_for_option() {
                 "hexdump:required" "conan:required"
                 # graphviz OPCJONALNY na tej liscie (minimalny toolchain CI), a nie
                 # wymagany: jedynym jego konsumentem jest render SVG w tescie
-                # pt_issue31_doc, ktory bez `dot` sam sie nie rejestruje. Na obrazie
+                # it_issue31_doc, ktory bez `dot` sam sie nie rejestruje. Na obrazie
                 # projektu graphviz jest, wiec x86 nie traci nic. Joby uzywajace tej
                 # listy (ARM, czysta Ubuntu) przestaja przez to ciagnac zaleznosci
                 # graphviza z apt — a to wlasnie na nich lustro ports.ubuntu.com

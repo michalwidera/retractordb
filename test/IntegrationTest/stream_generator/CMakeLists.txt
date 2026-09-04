@@ -11,4 +11,3 @@ add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash verify.sh)
-set_tests_properties(${TestID}-run PROPERTIES RUN_SERIAL TRUE)

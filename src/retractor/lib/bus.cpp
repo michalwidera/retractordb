@@ -20,6 +20,8 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
 
+#include "serverName.hpp"
+
 namespace IPC = boost::interprocess;
 
 namespace bus {
@@ -169,6 +171,16 @@ std::uint64_t processStartTime(std::int32_t pid) {
   char state{'\0'};
   if (!readProcStat(pid, startTime, state)) return 0;
   return startTime;
+}
+
+std::string segmentName() {
+  const std::string runNamespace = servername::environmentNamespace();
+  // Wartosc niepoprawna odrzucaja launchery xretractora i xqry, zanim dojda tutaj. To
+  // sprawdzenie jest zabezpieczeniem dla pozostalych wolajacych: zly znak w nazwie obiektu
+  // /dev/shm nie ma szansy zamienic braku izolacji na blad otwarcia segmentu, ktory
+  // przeszedlby jako zwykle "magistrala niedostepna".
+  if (runNamespace.empty() || !servername::isValid(runNamespace)) return std::string(kSegmentName);
+  return std::string(kSegmentName) + '_' + runNamespace;
 }
 
 bool isProcessAlive(std::int32_t pid, std::uint64_t startTime) {

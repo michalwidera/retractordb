@@ -44,6 +44,19 @@ namespace bus {
 /// postaci /dev/shm/*.<nazwa>.
 inline constexpr std::string_view kSegmentName = "xrdbbus_v3";
 
+/// Nazwa segmentu dla BIEZACEGO uruchomienia: kSegmentName, a przy ustawionej przestrzeni
+/// nazw (servername::environmentNamespace) kSegmentName + "_" + przestrzen.
+///
+/// Rozlacznosc nazw strumieni jest wlasnoscia CALEJ maszyny, wiec dwa niezalezne zestawy
+/// testow integracyjnych uzywajace tych samych nazw (`core0`, `dst`, `str1` powtarzaja sie
+/// w kilkunastu katalogach) nie moga biec obok siebie na jednym segmencie -- drugi start
+/// odpada na ClaimStatus::Conflict. Wlasny segment daje kazdemu z nich wlasna przestrzen
+/// nazw strumieni, bez ruszania samych zapytan i plikow wzorcowych.
+///
+/// Podkreslenie, tak samo jak przy czlonie wersji: kropka jest zarezerwowana dla obiektow
+/// instancji ("<obiekt>.<nazwa instancji>") i wpadalaby pod wzorce sprzatajace.
+[[nodiscard]] std::string segmentName();
+
 /// Pojemnosci ukladu. Przekroczenie ktoregokolwiek limitu jest bledem startu, a nie cichym
 /// zawieszeniem gwarancji rozlacznosci -- slot z obcieta lista strumieni nie moglby juz
 /// odpowiadac na pytanie "czyja jest ta nazwa".
@@ -54,7 +67,7 @@ inline constexpr std::string_view kSegmentName = "xrdbbus_v3";
 /// STREAM_ADD_STREAM_ADD_..._str01_..._str12 z it_wide_from_names ma ponad 130 znakow.
 ///
 /// Liczba strumieni ma zapas rzedu 2,5x: najwiekszy skompilowany plan w repozytorium
-/// (test/IntegrationTest_serial/optimizer_ablation) ma 53 wezly.
+/// (test/IntegrationTest/optimizer_ablation) ma 53 wezly.
 inline constexpr std::size_t kMaxSlots         = 32;
 inline constexpr std::size_t kMaxStreams       = 128;
 inline constexpr std::size_t kStreamNameSize   = 208;  ///< z terminatorem => nazwa do 207 znakow
@@ -170,13 +183,17 @@ class Bus {
  public:
   /// Podlacza sie do segmentu, tworzac go, gdy jeszcze nie istnieje. Niepowodzenie nie jest
   /// bledem startu serwera -- obiekt przechodzi wtedy w stan niepodlaczony, a claim() zwraca
-  /// Unavailable. Nazwa segmentu jest parametrem wylacznie po to, by test jednostkowy nie
-  /// dotykal magistrali dzialajacych serwerow.
+  /// Unavailable.
+  ///
+  /// Nazwa segmentu jest parametrem OBOWIAZKOWYM. Wartosc domyslna kSegmentName byla tu
+  /// pulapka od chwili wprowadzenia przestrzeni nazw uruchomienia: wolanie bez argumentu
+  /// omijalo ja po cichu i sadzalo instancje na segmencie produkcyjnym. Program uzywa
+  /// segmentName(), test jednostkowy swojego wlasnego segmentu.
   ///
   /// createIfMissing = false to tryb CZYTELNIKA (xqry). Klient nie ma prawa zakladac
   /// magistrali: pusty segment nie niesie zadnej informacji, a jego brak znaczy dokladnie
   /// tyle, ze zaden serwer jeszcze nie wystartowal -- czyli stan normalny, nie awaria.
-  explicit Bus(std::string_view segmentName = kSegmentName, bool createIfMissing = true);
+  explicit Bus(std::string_view segmentName, bool createIfMissing = true);
   ~Bus();
 
   Bus(const Bus &)            = delete;

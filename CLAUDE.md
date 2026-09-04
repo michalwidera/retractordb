@@ -38,7 +38,7 @@ ctest -R ut_payload     # by name
 ctest -R ut_payload -V  # verbose
 ```
 
-Unit tests: valgrind + leak check. Integration tests: output matched against `test/IntegrationTest_serial/*/Pattern*/` and `test/IntegrationTest_parallel/*/Pattern*/`.
+Unit tests: valgrind + leak check. Integration tests: output matched against `test/IntegrationTest/*/Pattern*/`.
 
 CI: CircleCI, branches `master` or `issue_*`.
 

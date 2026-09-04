@@ -25,11 +25,15 @@ target_link_libraries(
 # Cienka binarka: tylko launcher + biblioteka qry. bus.cpp dokladana zrodlowo,
 # tak samo jak appConfig.cpp: zalezy wylacznie od
 # pthread/boost.interprocess/spdlog, wiec nie ciagnie ANTLR-a ani rdb, a
-# linkowanie calej biblioteki `retractor` do klienta byloby za drogie. W
-# bibliotece `qry` jej NIE ma celowo - testy jednostkowe linkuja jednoczesnie
-# `qry` i `retractor`, a dwie kopie bus.o daloby duplikaty symboli.
-add_executable(${PROJECT_NAME} qryLauncher.cpp ../retractor/lib/appConfig.cpp
-                               ../retractor/lib/bus.cpp)
+# linkowanie calej biblioteki `retractor` do klienta byloby za drogie.
+# serverName.cpp dochodzi z tego samego powodu - bus.cpp czyta przez nia
+# przestrzen nazw uruchomienia, a sama zalezy wylacznie od biblioteki
+# standardowej. W bibliotece `qry` zadnej z nich NIE ma celowo - testy
+# jednostkowe linkuja jednoczesnie `qry` i `retractor`, a dwie kopie bus.o
+# daloby duplikaty symboli.
+add_executable(
+  ${PROJECT_NAME} qryLauncher.cpp ../retractor/lib/appConfig.cpp
+                  ../retractor/lib/bus.cpp ../retractor/lib/serverName.cpp)
 
 target_include_directories(${PROJECT_NAME}
                            PRIVATE ${CMAKE_SOURCE_DIR}/src/retractor/lib)

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <stdlib.h>
+
 #include <set>
 #include <string>
 
@@ -43,6 +45,21 @@ TEST(ServerName, generated_names_vary) {
   for (int i = 0; i < 50; ++i)
     seen.insert(servername::generate());
   EXPECT_GT(seen.size(), 1U);
+}
+
+// Przestrzen nazw uruchomienia jest czytana SUROWO. Ocena nalezy do wolajacego wlasnie po to,
+// zeby zla wartosc zatrzymala program z komunikatem zamiast zostac po cichu zignorowana —
+// zignorowana cofnelaby rownolegle uruchomienie na zasoby wspolne.
+TEST(ServerName, environment_namespace_is_returned_verbatim) {
+  ASSERT_EQ(setenv(servername::kNamespaceEnv, "it03", 1), 0);
+  EXPECT_EQ(servername::environmentNamespace(), "it03");
+
+  ASSERT_EQ(setenv(servername::kNamespaceEnv, "Zla Wartosc", 1), 0);
+  EXPECT_EQ(servername::environmentNamespace(), "Zla Wartosc");
+  EXPECT_FALSE(servername::isValid(servername::environmentNamespace()));
+
+  ASSERT_EQ(unsetenv(servername::kNamespaceEnv), 0);
+  EXPECT_TRUE(servername::environmentNamespace().empty());
 }
 
 }  // namespace

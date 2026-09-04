@@ -5,7 +5,7 @@
 # binarnego porównywane z oczekiwanym wzorcem pattern.txt.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
-set(TestID "pt_${TestID}")
+set(TestID "it_${TestID}")
 
 add_test(
   NAME ${TestID}

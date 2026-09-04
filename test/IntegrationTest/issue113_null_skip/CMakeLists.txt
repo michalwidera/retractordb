@@ -20,7 +20,5 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash run.sh noskip)
 
-# Startują serwer (blokada usługi) -> RUN_SERIAL jawnie (flagi -k/-m są w
-# run.sh, więc makro add_test ich nie widzi).
 set_tests_properties(${TestID}-skip-enabled ${TestID}-skip-disabled
-                     PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
+                     PROPERTIES TIMEOUT 60)

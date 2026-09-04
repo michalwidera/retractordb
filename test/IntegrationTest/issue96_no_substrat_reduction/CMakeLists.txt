@@ -4,7 +4,7 @@
 # pozostać oddzielne. Uruchamia też valgrind z wykrywaniem wycieków pamięci.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
-set(TestID "pt_${TestID}")
+set(TestID "it_${TestID}")
 add_test(
   NAME ${TestID}-compile
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

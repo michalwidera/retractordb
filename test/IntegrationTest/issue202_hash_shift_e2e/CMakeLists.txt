@@ -14,7 +14,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash verify.sh)
 
-set_tests_properties(${TestID}-run PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
+set_tests_properties(${TestID}-run PROPERTIES TIMEOUT 60)
 
 if(NOT RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES)
   set_tests_properties(

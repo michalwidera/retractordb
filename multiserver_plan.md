@@ -33,6 +33,8 @@ może wybierać właściciela DAG-u z magistrali zamiast z pojedynczego pliku bl
 | 2f | Naprawy usterek 1–6 z przeglądu wieloserwerowości plus 8 znalezisk z przeglądu diffu | **zrobione**, commit `52a7d76`; Debug/Release 213/213, `test_gate` **zielona** |
 | 2g | Usterka: cele wykresowe (`ninja dsp`, `ninja simple`) walczące o jedną tożsamość — `xplot.sh` na nazwanych instancjach | **zrobione**, commit `fbc51c8`; Debug/Release 213/213, `test_gate` **zielona** |
 | 2h | Tryb pracy instancji w slocie i kolumna `MODE` w `xqry --servers` (`layoutVersion` 3, segment `xrdbbus_v3`) | **zrobione**, niezacommitowane; Debug/Release 213/213, `test_gate` **zielona** |
+| 2i | Przestrzenie nazw dla równoczesnych testów integracyjnych: `RDB_NAMESPACE` + `bus::segmentName()` | **zrobione**, niezacommitowane; Debug/Release 213/213 przy `-j 4` i `-j 24`, `test_gate` **zielona** |
+| 2j | Scalenie `IntegrationTest_serial` i `IntegrationTest_parallel` w jedno drzewo `test/IntegrationTest`, prefiks `it_` dla całości | **zrobione**, niezacommitowane; Debug/Release 213/213 przy `-j 4` i `-j 24` |
 
 Po etapie 2b dwa serwery pracują równocześnie, a kolizja nazw strumieni jest wykrywana przy
 starcie i kończy się odmową wskazującą właściciela. Po 2c klient nie musi już wskazywać serwera:
@@ -681,6 +683,152 @@ Podkreślenie zamiast kropki jest częścią kontraktu: obiekty IPC instancji na
 i wpadłby pod wzorce sprzątające postaci `/dev/shm/*.<nazwa>`. Regresja:
 `test_bus` · `BusSegmentName.CarriesLayoutVersionAndAvoidsInstanceNamespace`.
 
+## Etap 2i — przestrzenie nazw równoczesnych testów integracyjnych
+
+### Skąd wziął się problem
+
+Gwarancja z etapu 2b ma skutek uboczny w zestawie testów. Rozłączność nazw strumieni jest
+własnością **maszyny**, a nie katalogu roboczego, więc dwa testy integracyjne uruchomione
+równocześnie nie mogą użyć tej samej nazwy strumienia — drugi start kończy się
+`ClaimStatus::Conflict`. Nazwy powtarzają się w testach masowo: `core0` w czternastu
+katalogach, `src` w trzynastu, `dst` w jedenastu, `str1` w dziewięciu. Dlatego 67 testów
+integracyjnych stało pod `RUN_SERIAL` i dawało ~67 s ściśle sekwencyjnego ogona.
+
+Zmiana nazw strumieni w 72 plikach `.rql` była rozważona i **odrzucona**: nazwa strumienia
+przenika oracle testów — `term.script` (`open str1`), nazwy pól we wzorcach (`INTEGER str1_0`),
+listing `temp/` w `pattern-ls.txt`, wyjścia DOT — więc trzeba by regenerować wzorce, czyli
+oddać ich wartość regresyjną za jeden przebieg. Do tego `it_wide_from_names` ma nazwy złożone
+powyżej 130 znaków przy budżecie `substratNameBudget_C` = 200; prefiks mógłby przełączyć
+kompilator na skracanie nazw i zmienić wynik.
+
+### Mechanizm
+
+Jedna zmienna środowiskowa `RDB_NAMESPACE` (`servername::environmentNamespace`) rozdziela
+**wszystkie cztery** zasoby globalne dla maszyny naraz:
+
+| Zasób | Jak przestrzeń nazw go rozdziela |
+|---|---|
+| plik blokady instancji | wartość staje się nazwą instancji → `xretractor_service.<ns>.lock` |
+| obiekty IPC w `/dev/shm` | ta sama nazwa instancji → sufiks przez `ipc::names()` |
+| segment magistrali | `bus::segmentName()` → `xrdbbus_v3_<ns>` |
+| plik logu | osobny `TMPDIR` ustawiany razem z `RDB_NAMESPACE` |
+
+`xqry` bez `--server` celuje w instancję przestrzeni nazw; jawny `--server` pozostaje nadrzędny.
+Wartość niepoprawna **zatrzymuje** oba programy z komunikatem — zignorowanie jej po cichu
+cofnęłoby równoległe uruchomienie na zasoby wspólne, a awaria ujawniłaby się jako kolizja
+u niewinnego sąsiada.
+
+### Pula szesnastu, a nie jedna przestrzeń na katalog
+
+Segment magistrali ma 874 KB i z założenia nikt go nie kasuje, a `/dev/shm` w kontenerze CI ma
+domyślnie 64 MB. Pięćdziesiąt kilka segmentów (po jednym na katalog) zmieściłoby się na styk,
+a przepełnienie `/dev/shm` **nie wywraca testu**: daje `ClaimStatus::Unavailable`, który jest
+fail-open, czyli po cichu zdejmuje izolację. Szesnaście przestrzeni to najwyżej 14 MB
+niezależnie od liczby katalogów — zmierzone po przebiegu dokładnie tyle.
+
+Przydział jest per katalog i niesie `RESOURCE_LOCK` na nazwie przestrzeni. Załatwia to dwa
+wykluczenia naraz: testy jednego katalogu dzielą katalog roboczy i `temp/`, więc i tak nie mogą
+biec obok siebie, a katalogi, które trafiły na ten sam slot puli, dzielą tożsamość instancji.
+
+### Katalogi poza pulą
+
+Pięć katalogów zostaje przy `RUN_SERIAL`, bo badają tożsamość globalną maszyny, a przestrzeń
+nazw zmieniłaby tam przedmiot badania: cztery `multiserver_*` (własne nazwy `alfa`/`beta`,
+instancja bezimienna, produkcyjny segment magistrali) oraz `issue6_adhoc`, zostawiony jako
+**jedyny strażnik ścieżki historycznej** — bez niego instancja bezimienna, jej blokada i jej
+obiekty IPC straciłyby pokrycie end-to-end.
+
+Próbowany był środek słabszy — wspólny `RESOURCE_LOCK` zamiast `RUN_SERIAL`, bo z testem
+w przestrzeni nazw taki test nie dzieli żadnego zasobu. Nie dał nic mierzalnego (94,65 s wobec
+94,34 s), a `multiserver_routing` mierzy czas `--servers` z progiem 1 s, więc obciążenie
+sąsiadów mogło mu tylko zaszkodzić. Została mocniejsza gwarancja.
+
+### Usterka wykryta przy okazji
+
+`Data/test-workflow.sh` liczył kolejki odpowiedzi wzorcem globalnym `/dev/shm/brcdbr*` przed
+przebiegiem i po nim. Nazwa kolejki to `brcdbr.<instancja>.<klient>`, więc pod `ctest -j 24`
+test widział klientów **innej** przestrzeni nazw i zgłaszał ich jako własny wyciek
+(`LEAK: brcdbr queue count increased from 0 to 3`). Wzorzec jest teraz zawężony do własnej
+przestrzeni. Bramka higieny w `serverlib.sh` sprawdza z tego samego powodu człon przestrzeni
+zarówno na końcu nazwy (obiekty serwera), jak i w środku (kolejki klientów).
+
+### Wynik pomiaru
+
+| Konfiguracja | Przed | Po |
+|---|---|---|
+| Debug, `ctest -j 4` | 141,13 s | 94,4 / 95,9 / 94,3 s |
+| Debug, `ctest -j 24` | — | 93,4 / 93,5 s |
+| Release, `ctest -j 4` | ~70 s (zapis z 2g) | 44,9 / 42,9 s |
+| Release, `ctest -j 24` | — | 32,1 / 31,7 / 31,7 s |
+
+Wszystkie przebiegi 213/213. Sufit Debug to teraz **nie** testy integracyjne, tylko
+`ut_h10aGate` (~61 s w jednym procesie) plus ~33 s ogona `RUN_SERIAL`, w tym siedem testów
+jednostkowych operujących na bezimiennych obiektach IPC. Dalsze skracanie wymagałoby ruszenia
+tamtych, a nie testów integracyjnych.
+
+### Czego 2i nie objęło
+
+- Testy jednostkowe (`ut_dataModel`, `ut_ipcServer`, `ut_rdb`, `ut_soperations`, `ut_xqry`)
+  nadal używają bezimiennych obiektów IPC i zostają `RUN_SERIAL`. Nazwa instancji jest w nich
+  wpisana w kodzie C++, więc zmienna środowiskowa do nich nie sięga.
+- `IntegrationTest_parallel` zostało wtedy bez zmian: te testy pracują w trybie `-c`, nie biorą
+  blokady i nie dotykają magazynu, więc równoległość miały już wcześniej. Etap 2j scalił je
+  z drzewem głównym.
+- Plik logu ścieżki bezimiennej nadal rośnie w `TMPDIR` bez rotacji (`xretractor.log` na tej
+  maszynie ma 94 MB). Poza zakresem.
+
+## Etap 2j — scalenie drzewa testów integracyjnych
+
+Po 2i podział na `IntegrationTest_serial` i `IntegrationTest_parallel` przestał cokolwiek znaczyć:
+oba drzewa biegną równolegle, a drzewo „parallel" i tak w sześciu przypadkach pracowało na danych
+z drzewa „serial", tylko z drugiego `CMakeLists.txt`. Scalone w `test/IntegrationTest`, prefiks
+`it_` dla całości (`pt_` znaczyło „parallel test" i po scaleniu nie miało desygnatu).
+
+Przeprowadzka rozpadła się na trzy grupy:
+
+- **6 katalogów bez własnych plików** (`Data`, `issue42_rule`, `issue56_timeshift`,
+  `issue61_tmpmem`, `simple`, `simple_max`) — miały tylko `DATA_DIR` wskazujący na bliźniaka.
+  Ich `add_test` przeszły do tamtego `CMakeLists.txt`, `DATA_DIR` zastąpił `CMAKE_CURRENT_BINARY_DIR`.
+- **19 katalogów z własnymi danymi** — `git mv` w całości, zero kolizji nazw.
+- **7 katalogów z pułapką średnika** — patrz niżej.
+
+### Pułapka średnika była tu prawdziwą robotą
+
+`Pattern1`, `Pattern2`, `Pattern3`, `Pattern5`, `issue113_meta_autocreate`,
+`issue202_hash_shift_factorization` i `issue31_doc` miały `bash -c "set -e ; a ; b"`. Działało to
+**wyłącznie dlatego**, że drzewo równoległe nie miało makra `add_test`: jest dodawane alfabetycznie
+przed `IntegrationTest_serial`, więc makro jeszcze nie istniało. W jednym drzewie każdy z nich
+przechodzi przez `_add_test(${ARGV})`, które tnie argument po wewnętrznych średnikach — powłoka
+wykonałaby samo `set -e` i test byłby zawsze zielony, nic nie sprawdzając. To ta sama awaria, po
+której powstał `harness_command_integrity`.
+
+Pięć przypadków to proste łańcuchy — `;` zamienione na `&&`. Dwa wymagały czegoś więcej:
+`issue202_hash_shift_factorization` ma asercje postaci `if grep ... ; then exit 1 ; fi`, których
+nie da się zapisać bez średnika, więc logika trafiła do `verify.sh` z parą `must` / `must_not` —
+zgodnie z regułą domową ze strażnika. `issue31_doc` dał się przerobić na `&&` po usunięciu
+zawieszonego separatora na końcu łańcucha.
+
+### Czym to sprawdzone
+
+Sam zielony przebieg **nie jest** tu dowodem — awaria średnika objawia się właśnie zielenią.
+Dlatego:
+
+1. Zbiór nazw z `ctest -N` przed i po scaleniu **identyczny** (213, modulo `pt_` → `it_`) —
+   żaden test nie zginął w przeprowadzce ani się nie zdublował.
+2. `harness_command_integrity` zielony — po `-c` stoi dokładnie jeden argument.
+3. Testy przerobione oblewają, gdy mają oblewać: zepsute `pattern.txt` wywraca `it_Pattern1`,
+   zepsute oczekiwanie w `verify.sh` wywraca `it_issue202_hash_shift_factorization-matched`,
+   i to **obiema** gałęziami — `must` i `must_not`.
+4. Łańcuchy dochodzą do ostatniego kroku: `issue113_meta_autocreate` zostawia `out_meta.txt`
+   (krok piąty z siedmiu), `issue31_doc` cztery pliki `*.out.2.svg` (krok ostatni).
+
+### Skutek uboczny, korzystny
+
+40 testów kompilacyjnych weszło pod `RESOURCE_LOCK` swojego katalogu. To **ostrzejsze** niż przed
+scaleniem: `pt_simple-compile` pisał `out-compile.txt` do tego samego katalogu roboczego, w którym
+`it_simple-run` prowadził swój przebieg. Czas nie ucierpiał — 110 testów w 16 przestrzeniach,
+Debug `-j 4` nadal 94,4 s, Release `-j 24` 32,2 s.
+
 ## Protokół weryfikacji
 
 Rytuał startu sesji z `CLAUDE.md`, w tej kolejności:
@@ -772,16 +920,20 @@ Każda z nich kosztowała czas w sesji z 2 września 2026.
 | `src/qry/ipcClient.{hpp,cpp}` | klient zna nazwę instancji, z którą rozmawia |
 | `src/qry/serverRouting.{hpp,cpp}` | czyste reguły routingu nad migawką magistrali; bez IPC |
 | `src/qry/qryLauncher.cpp` | opcje `--server` / `--servers`, `resolveTarget`, `waitForServer` |
-| `test/IntegrationTest_serial/serverlib.sh` | oprawa **jednoinstancyjna** — nie używać w testach wieloserwerowych |
-| `test/IntegrationTest_serial/multiserver_named/` | wzorzec testu dwuserwerowego z własną bramką higieny |
-| `test/IntegrationTest_serial/multiserver_uniqueness/` | 11 punktów kontrolnych unikalności, kolejności startu i dostarczania; sam sprząta procesy i pliki |
-| `test/IntegrationTest_serial/multiserver_routing/` | 6 punktów routingu; mierzy też czas `--servers` nad osieroconym segmentem |
+| `test/IntegrationTest/CMakeLists.txt` | pula szesnastu przestrzeni nazw: `RDB_NAMESPACE` + `TMPDIR` + `RESOURCE_LOCK` per katalog; `IT_NO_NAMESPACE` wypisuje katalog z puli |
+| `test/IntegrationTest/serverlib.sh` | oprawa **jednoinstancyjna** (jedna instancja na przestrzeń nazw) — nie używać w testach wieloserwerowych; ścieżka blokady i bramka higieny podążają za `RDB_NAMESPACE` |
+| `test/IntegrationTest/multiserver_named/` | wzorzec testu dwuserwerowego z własną bramką higieny |
+| `test/IntegrationTest/multiserver_uniqueness/` | 11 punktów kontrolnych unikalności, kolejności startu i dostarczania; sam sprząta procesy i pliki |
+| `test/IntegrationTest/multiserver_routing/` | 6 punktów routingu; mierzy też czas `--servers` nad osieroconym segmentem |
 | `test/UnitTest/test_bus.cpp` | 26 przypadków magistrali pod valgrindem; pracuje na segmencie `xrdbbus_ut`, nie na produkcyjnym |
 | `test/UnitTest/test_serverRouting.cpp` | 17 przypadków reguł routingu; bez pamięci dzielonej i bez serwerów |
 
 ## Zgodność wsteczna — reguła obowiązująca do końca prac
 
-Brak `--name` oznacza tryb historyczny: te same nazwy obiektów IPC, ten sam plik blokady, to samo
-zachowanie. Kryterium przyjęte w etapie 1 i utrzymane w 2a brzmiało: **pełny `ctest` przechodzi bez
-jednej zmiany w testach integracyjnych ani w `serverlib.sh`**. Utrzymać je w 2b i 2c — jeśli któryś
+Brak `--name` **i** brak `RDB_NAMESPACE` oznacza tryb historyczny: te same nazwy obiektów IPC, ten
+sam plik blokady, to samo zachowanie. Kryterium przyjęte w etapie 1 i utrzymane w 2a brzmiało:
+**pełny `ctest` przechodzi bez jednej zmiany w testach integracyjnych ani w `serverlib.sh`**.
+Obowiązywało do 2h włącznie. Etap 2i znosi je świadomie i tylko w jedną stronę: testy dostają
+przestrzeń nazw, żeby mogły biec równocześnie, ale **żaden plik wzorcowy ani `.rql` się nie zmienił**
+— gdyby zmiana sięgnęła wzorców, znaczyłoby to, że coś przeciekło poza warstwę nazw. Utrzymać je w 2b i 2c — jeśli któryś
 istniejący test wymaga poprawki, to sygnał, że coś przeciekło poza warstwę nazw.

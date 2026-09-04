@@ -531,7 +531,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
 
   // Blokade mamy od poczatku run(), ale jej TRESC publikujemy dopiero teraz. Linia
   // "PID: <pid>" w pliku blokady jest dla klientow i dla testow sygnalem "serwer gotowy"
-  // (kontrakt server_start w test/IntegrationTest_serial/serverlib.sh), wiec nie moze
+  // (kontrakt server_start w test/IntegrationTest/serverlib.sh), wiec nie moze
   // pojawic sie, zanim segment i kolejka komend beda istniec.
   guard.publishLockInfo();
 

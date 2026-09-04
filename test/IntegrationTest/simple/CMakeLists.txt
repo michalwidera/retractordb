@@ -33,3 +33,31 @@ add_test(
   xretractor query.rql -m 11 -f && \
   ${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt &&  \
   ${CMAKE_COMMAND} -E compare_files --ignore-eol pattern-run.txt out.txt")
+
+# Testy kompilacyjne tego katalogu, do 2026-09-04 osobny katalog
+# IntegrationTest_parallel/simple. Podzial na drzewo "serial" i "parallel"
+# stracil sens, gdy testy serii dostaly przestrzenie nazw i zaczely biec
+# rownoczesnie; te testy i tak pracowaly na danych stad, tylko z drugiego
+# CMakeLists.
+
+add_test(
+  NAME ${TestID}-compile
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash -c "set -e && \
+    xretractor query.rql -c > out-compile.txt && \
+    ${CMAKE_COMMAND} -E compare_files pattern.txt out-compile.txt")
+
+add_test(
+  NAME ${TestID}-dot
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash -c "set -e && \
+    xretractor query.rql -c -d -f -t -s > out.dot && \
+    ${CMAKE_COMMAND} -E compare_files pattern-dot.txt out.dot")
+
+add_test(
+  NAME ${TestID}-vg-compile
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+    valgrind --vgdb=no --error-exitcode=1 --leak-check=full
+    --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xretractor
+    query.rql -c)

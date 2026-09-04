@@ -14,4 +14,4 @@ add_test(
 
 # Buduje pakiety (cpack stage'uje instalację) -> serial, by nie kolidować z
 # innymi.
-set_tests_properties(${TestID} PROPERTIES RUN_SERIAL TRUE TIMEOUT 60)
+set_tests_properties(${TestID} PROPERTIES TIMEOUT 60)

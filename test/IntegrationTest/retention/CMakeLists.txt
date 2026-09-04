@@ -3,7 +3,7 @@
 # konkretny rekord bez zmiany pozostałych. Wynik porównywany z pattern-run.txt.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
-set(TestID "pt_${TestID}")
+set(TestID "it_${TestID}")
 
 add_test(
   NAME ${TestID}-run

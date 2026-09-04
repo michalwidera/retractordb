@@ -11,27 +11,24 @@ add_subdirectory(retractor)
 add_custom_target(
   simple
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh
-  WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_serial/simple)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple)
 
 add_custom_target(
   simple-max
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh str2
   WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_serial/simple_max)
+    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple_max)
 
 add_custom_target(
   simple-timeshift
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh str1 query-51.rql
   WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_serial/issue56_timeshift
-)
+    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/issue56_timeshift)
 
 add_custom_target(
   dsp
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh outputAll query.rql 50:256
-  WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_parallel/dsp)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/dsp)
 
 add_custom_target(
   ecg-clean
@@ -82,8 +79,7 @@ add_custom_target(
   simple-view
   COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
           out.png && feh out.png
-  WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_serial/simple)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple)
 
 add_custom_target(
   show-ninja-build
@@ -95,14 +91,13 @@ add_custom_target(
   COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
           out.png && feh out.png
   WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_serial/simple_max)
+    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple_max)
 
 add_custom_target(
   dsp-view
   COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
           out.png && feh out.png
-  WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_parallel/dsp)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/dsp)
 
 # python -m pip install clang-format cmakelang
 # https://zed0.co.uk/clang-format-configurator/ | $clang-format --version

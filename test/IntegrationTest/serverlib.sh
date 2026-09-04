@@ -22,7 +22,11 @@
 #   xqry -s dst -k -m 3 > out.txt
 #   server_wait_exit
 
-SERVER_LOCK="${TMPDIR:-/tmp}/xretractor_service.lock"
+# Sciezka blokady podaza za przestrzenia nazw uruchomienia: przy ustawionej RDB_NAMESPACE
+# xretractor bierze ja za nazwe instancji, wiec plik nazywa sie
+# xretractor_service.<przestrzen>.lock, a nie xretractor_service.lock. Oprawa, ktora
+# czekalaby na te druga, nie doczekalaby sie nigdy.
+SERVER_LOCK="${TMPDIR:-/tmp}/xretractor_service${RDB_NAMESPACE:+.$RDB_NAMESPACE}.lock"
 _server_pid=""     # zywy serwer tego testu ("" gdy juz zakonczony)
 _server_started="" # PID startowany przez ten test, do kontroli higieny
 
@@ -50,6 +54,23 @@ server_cleanup() {
     echo "higiena: test zostawil zywy proces xretractor $_server_started"
     status=1
   fi
+  # Obiekty IPC tej przestrzeni nazw. Serwer sprzata je sam przy wyjsciu, wiec pozostalosc
+  # jest usterka, a nie smieciem do cichego skasowania — i usterka WLASNIE tego testu,
+  # bo czlon nazwy nalezy do jego przestrzeni. Segmentu magistrali celowo nie ruszamy:
+  # nikt go nie kasuje z zalozenia (bus.hpp), a pula jest skonczona, wiec bywa reuzywany.
+  #
+  # Wzorzec dopuszcza czlon przestrzeni na koncu nazwy (obiekty serwera: segment, muteks,
+  # kolejka komend) oraz w srodku (kolejki odpowiedzi klientow, "brcdbr.<instancja>.<klient>").
+  if [ -n "$RDB_NAMESPACE" ]; then
+    local leftovers
+    leftovers=$(ls /dev/shm/ 2>/dev/null | grep -E "\.${RDB_NAMESPACE}(\.|\$)" || true)
+    if [ -n "$leftovers" ]; then
+      echo "higiena: zostaly obiekty IPC przestrzeni $RDB_NAMESPACE:"
+      echo "$leftovers"
+      status=1
+    fi
+  fi
+
   if [ -n "$_server_started" ] && [ -e "$SERVER_LOCK" ]; then
     # Tresc pozostaje diagnostyczna po zwolnieniu flock. Oprawa usuwa plik tylko wtedy,
     # gdy potrafi sama przejac blokade; aktywnego inode nie wolno odlaczyc od sciezki.

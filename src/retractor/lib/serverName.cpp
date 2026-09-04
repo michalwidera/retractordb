@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <random>
 #include <string>
 #include <string_view>
@@ -48,6 +49,12 @@ std::string generate() {
   retVal += '_';
   retVal += kSurnames[surname(gen)];
   return retVal;
+}
+
+std::string environmentNamespace() {
+  const char *env = std::getenv(kNamespaceEnv);
+  if (env == nullptr) return {};
+  return std::string(env);
 }
 
 bool isValid(std::string_view name) {

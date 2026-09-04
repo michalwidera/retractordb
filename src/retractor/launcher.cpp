@@ -305,6 +305,24 @@ int main(int argc, char *argv[]) try {
     }
   }();
 
+  // Przestrzen nazw uruchomienia (RDB_NAMESPACE) rozstrzyga tozsamosc wtedy, gdy nie zrobil
+  // tego operator: jawne --name i --autoname sa wskazaniem palcem i wygrywaja. Razem
+  // z bus::segmentName daje to komplet rozlacznych zasobow -- plik blokady, obiekty IPC
+  // i magistrala -- czyli wszystko, co dwa rownolegle uruchomienia dzielilyby na maszynie.
+  if (!wantsAutoName && earlyServerName.empty()) {
+    if (const std::string runNamespace = servername::environmentNamespace(); !runNamespace.empty()) {
+      // Niepoprawna wartosc zatrzymuje program. Zignorowanie jej byloby najgorszym z wyjsc:
+      // proces wstalby na zasobach WSPOLNYCH, czyli dokladnie tam, przed czym przestrzen nazw
+      // mial go uchronic, a objawiloby sie to kolizja w innym, niewinnym uruchomieniu.
+      if (!servername::isValid(runNamespace)) {
+        std::println(std::cerr, "{}: invalid {} value '{}': expected [a-z][a-z0-9_-]{{0,{}}}", argv[0],
+                     servername::kNamespaceEnv, runNamespace, servername::kMaxLength - 1);
+        return system::errc::invalid_argument;
+      }
+      earlyServerName = runNamespace;
+    }
+  }
+
   // Klucz konfiguracyjny dziala tylko wtedy, gdy operator nie rozstrzygnal nazwy sam:
   // jawne --name wygrywa po cichu, tak samo jak dyrektywa :STORAGE z RQL wygrywa nad
   // storage.dir. --autoname i autoname=true nie sa konfliktem, tylko dwiema drogami do
@@ -517,7 +535,7 @@ int main(int argc, char *argv[]) try {
       {
         const std::vector<std::string> plannedStreams = claimedStreamNames(coreInstance);
         const std::string counterPath                 = normalizedRotationCounterPath(coreInstance);
-        const bus::Bus xrdbbus(bus::kSegmentName, false);
+        const bus::Bus xrdbbus(bus::segmentName(), false);
         const std::vector<bus::InstanceInfo> instances = xrdbbus.instances();
         if (const auto owner = bus::findForeignOwner(instances, earlyServerName, plannedStreams)) {
           const std::string ownerName = ownerLabel(owner->instance);
@@ -600,7 +618,7 @@ int main(int argc, char *argv[]) try {
     return system::errc::no_lock_available;
   }
 
-  bus::Bus xrdbbus;
+  bus::Bus xrdbbus(bus::segmentName());
   const std::vector<std::string> claimedStreams = claimedStreamNames(coreInstance);
   const std::string counterPath                 = normalizedRotationCounterPath(coreInstance);
   const SystemdIdentity systemd                 = detectSystemdIdentity();

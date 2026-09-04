@@ -28,11 +28,10 @@ endforeach()
 
 # Straznik oprawy. Pilnuje, ze kazdy zarejestrowany test wykonuje CALY swoj
 # skrypt: po `-c` ma stac dokladnie jeden argument. Makro add_test z
-# IntegrationTest_serial przekazuje argumenty przez `_add_test(${ARGV})`, co
-# tnie je po wewnetrznych srednikach — tak cztery testy naraz stalo sie
-# zawsze-zielonymi no-opami. Objaw jest odwrotny do awarii, wiec potrzebna jest
-# osobna bramka. Samotest idzie pierwszy: straznik, ktory nie umie oblac,
-# niczego nie pilnuje.
+# IntegrationTest przekazuje argumenty przez `_add_test(${ARGV})`, co tnie je po
+# wewnetrznych srednikach — tak cztery testy naraz stalo sie zawsze-zielonymi
+# no-opami. Objaw jest odwrotny do awarii, wiec potrzebna jest osobna bramka.
+# Samotest idzie pierwszy: straznik, ktory nie umie oblac, niczego nie pilnuje.
 add_test(
   NAME harness_guard-selftest
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

@@ -21,6 +21,7 @@
 #include "constants.hpp"
 #include "qry.hpp"
 #include "retractor/lib/bus.hpp"
+#include "retractor/lib/serverName.hpp"
 #include "serverRouting.hpp"
 #include "uxSysTermTools.hpp"
 
@@ -119,6 +120,18 @@ int main(int argc, char *argv[]) {
 
     const AppConfig appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
 
+    // Przestrzen nazw uruchomienia (RDB_NAMESPACE) wskazuje instancje docelowa wprost, wiec
+    // musi byc znana PRZED --wait-server: czekanie odpytuje obiekty IPC konkretnej instancji,
+    // a bez nazwy czekaloby na obiekty instancji bezimiennej -- czyli w nieskonczonosc.
+    // Jawny --server pozostaje nadrzedny.
+    const std::string runNamespace = servername::environmentNamespace();
+    if (!runNamespace.empty() && !servername::isValid(runNamespace)) {
+      std::println(std::cerr, "xqry: invalid {} value '{}': expected [a-z][a-z0-9_-]{{0,{}}}", servername::kNamespaceEnv,
+                   runNamespace, servername::kMaxLength - 1);
+      return system::errc::invalid_argument;
+    }
+    if (!vm.contains("server") && !runNamespace.empty()) sServerName = runNamespace;
+
     // Format wyjścia rozbierany do zmiennych lokalnych, a nie wprost do obiektu `qry`:
     // instancja docelowa jest znana dopiero po odczycie magistrali, więc `qry` powstaje
     // niżej. Walidacja argumentów zostaje tam, gdzie była — przed jakimkolwiek IPC.
@@ -191,7 +204,7 @@ int main(int argc, char *argv[]) {
     // Klient nie zakłada segmentu (`createIfMissing = false`) — jego brak znaczy dokładnie
     // tyle, że żaden serwer nie wystartował.
     const std::vector<bus::InstanceInfo> liveInstances = [] {
-      const bus::Bus xrdbbus(bus::kSegmentName, /*createIfMissing=*/false);
+      const bus::Bus xrdbbus(bus::segmentName(), /*createIfMissing=*/false);
       return xrdbbus.instances();
     }();
 
@@ -204,8 +217,9 @@ int main(int argc, char *argv[]) {
     }
 
     // Jawny `--server` wygrywa zawsze i pomija magistralę: operator, który wskazał instancję
-    // palcem, ma dostać dokładnie ją, także wtedy gdy magistrala jest niedostępna.
-    if (!vm.contains("server")) {
+    // palcem, ma dostać dokładnie ją, także wtedy gdy magistrala jest niedostępna. Tak samo
+    // ustawiona przestrzeń nazw — jej instancja jest wskazana równie jednoznacznie.
+    if (!vm.contains("server") && runNamespace.empty()) {
       const routing::Resolution resolved = resolveTarget(vm, liveInstances, elemLimit, sInputStream, sDetailStream, sAdHoc);
       switch (resolved.status) {
         case routing::Status::Resolved:

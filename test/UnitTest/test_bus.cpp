@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -14,6 +15,7 @@
 #include <boost/interprocess/shared_memory_object.hpp>
 
 #include "retractor/lib/bus.hpp"
+#include "retractor/lib/serverName.hpp"
 
 namespace {
 
@@ -478,4 +480,36 @@ TEST_F(BusFixture, OversizedCounterPathIsRefused) {
 TEST(BusSegmentName, CarriesLayoutVersionAndAvoidsInstanceNamespace) {
   EXPECT_EQ(bus::kSegmentName, "xrdbbus_v3");
   EXPECT_EQ(bus::kSegmentName.find('.'), std::string_view::npos);
+}
+
+// Przestrzen nazw uruchomienia rozdziela magistrale. To jest mechanizm, dzieki ktoremu
+// dwa zestawy testow uzywajace tych samych nazw strumieni moga biec obok siebie: bez
+// wlasnego segmentu drugi start odpadlby z ClaimStatus::Conflict.
+//
+// Wartosc niepoprawna NIE MOZE trafic do nazwy obiektu /dev/shm. Launchery odrzucaja ja
+// wczesniej z komunikatem, a tutaj obowiazuje zasada odwrotna do cichej zguby izolacji:
+// zly znak dalby blad otwarcia segmentu, ktory przeszedlby jako zwykle "magistrala
+// niedostepna" — czyli fail-open bez sladu w logu testu.
+class BusSegmentNamespace : public ::testing::Test {
+ protected:
+  void TearDown() override { unsetenv(servername::kNamespaceEnv); }
+};
+
+TEST_F(BusSegmentNamespace, AppendsNamespaceToSegmentName) {
+  ASSERT_EQ(setenv(servername::kNamespaceEnv, "it07", 1), 0);
+  EXPECT_EQ(bus::segmentName(), std::string(bus::kSegmentName) + "_it07");
+}
+
+TEST_F(BusSegmentNamespace, UnsetOrEmptyKeepsProductionSegment) {
+  ASSERT_EQ(unsetenv(servername::kNamespaceEnv), 0);
+  EXPECT_EQ(bus::segmentName(), bus::kSegmentName);
+  ASSERT_EQ(setenv(servername::kNamespaceEnv, "", 1), 0);
+  EXPECT_EQ(bus::segmentName(), bus::kSegmentName);
+}
+
+TEST_F(BusSegmentNamespace, InvalidValueNeverReachesTheObjectName) {
+  for (const char *bad : {"z/skosem", "z.kropka", "Wielka", "9cyfra", "z spacja"}) {
+    ASSERT_EQ(setenv(servername::kNamespaceEnv, bad, 1), 0);
+    EXPECT_EQ(bus::segmentName(), bus::kSegmentName) << "niepoprawna wartosc trafila do nazwy segmentu: " << bad;
+  }
 }
