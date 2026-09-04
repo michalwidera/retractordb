@@ -3,11 +3,13 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
+#include <cstdlib>
 #include <ctime>  // kotwica osi czasu pętli: clock_gettime, timespec
 #include <filesystem>
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -368,6 +370,13 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
       // (1/delta gives elements/sec; multiply by 10 for 10s headroom)
       int maxElements = boost::rational_cast<int>(1 / (*coreInstancePtr)[streamName].rInterval) * cfgQueueBufferSeconds;
       maxElements     = std::max(maxElements, cfgMinQueueElements);
+      // Hak diagnostyczny testu regresyjnego it_show_handler_failure. Awaria handlera
+      // 'show' na CI (2026-09-04) byla nieodtwarzalna lokalnie, a jej jedynym skutkiem
+      // widocznym dla klienta byla ODPOWIEDZ WYGLADAJACA NA POPRAWNA — bo blok ponizej
+      // nie wpisuje do ptRetval niczego takze wtedy, gdy sie powiedzie. Test musi wiec
+      // umiec wymusic wyjatek, zamiast czekac na warunki wyscigu.
+      if (std::getenv("RDB_FAULT_SHOW") != nullptr)
+        throw std::runtime_error("RDB_FAULT_SHOW: wstrzyknieta awaria handlera 'show'");
       ipcServer.subscribe(streamId, streamName, maxElements);
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
     }
@@ -389,8 +398,14 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
     }
   } catch (const boost::property_tree::ptree_error &e) {
     SPDLOG_ERROR("ptree fail: {}", e.what());
+    ptRetval.put("error.response", std::string("ptree fail: ") + e.what());
   } catch (std::exception &e) {
+    // Bez tego wpisu awaria handlera jest dla klienta NIEODROZNIALNA od powodzenia:
+    // 'show' nie wypelnia ptRetval nawet po udanej subskrypcji, wiec pusta odpowiedz
+    // znaczyla naraz "zrobione" i "wywrocilo sie". Klient dostawal komunikat o braku
+    // kolejki odpowiedzi, a zdanie nazywajace przyczyne zostawalo w logu serwera.
     SPDLOG_ERROR("Command processor failure: {}", e.what());
+    ptRetval.put("error.response", std::string("command processor failure: ") + e.what());
   }
   return ptRetval;  // sub for a while
 }

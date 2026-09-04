@@ -85,6 +85,18 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
     return selectResult::streamNotFound;
   }
 
+  // Odpowiedź na 'show' sprawdzana tak samo jak odpowiedź na 'get' powyżej. Do
+  // 2026-09-04 nie była sprawdzana wcale, a handler 'show' nie wpisuje niczego do
+  // odpowiedzi TAKŻE po udanej subskrypcji — połknięty po stronie serwera wyjątek dawał
+  // więc odpowiedź nie do odróżnienia od powodzenia. Klient ruszał z wątkiem producenta
+  // i meldował dopiero brak kolejki, sekundę później i bez nazwania przyczyny; zdanie
+  // nazywające wyjątek zostawało w logu serwera. Werdykt jest ten sam
+  // (clientQueueMissing: kolejki faktycznie nie ma), ale pada od razu i z powodem.
+  if (const auto reason = streamTable[input].get_optional<std::string>("error.response")) {
+    SPDLOG_ERROR("server rejected the 'show' command (stream: {}): {}", input, *reason);
+    return selectResult::clientQueueMissing;
+  }
+
   std::jthread producer_thread([this] { transport_->producer(); });
 
   if (outputFormatMode == formatMode::GNUPLOT) {

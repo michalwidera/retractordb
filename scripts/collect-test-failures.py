@@ -11,6 +11,8 @@ Dla kazdego testu z LastTestsFailed.log zbierane sa:
   * zarejestrowane polecenie i katalog roboczy,
   * fragment LastTest.log dotyczacy tego testu (pelne wyjscie, bo CI biegnie z -V),
   * male pliki tekstowe z katalogu roboczego (wyniki, logi, wyjscia posrednie),
+  * logi silnika i klienta z katalogu przestrzeni nazw (TMPDIR), ktore NIE leza
+    w katalogu roboczym testu,
   * gotowa roznica kazdej pary wzorzec/wynik, ktora da sie sparowac.
 
 Mapowanie nazwy testu na katalog roboczy pochodzi z `ctest --show-only=json-v1`
@@ -66,6 +68,21 @@ def failedTests(testDir: Path) -> list[str]:
     return names
 
 
+def namespaceTmpDir(props: dict) -> str | None:
+    """Katalog tymczasowy przestrzeni nazw testu, z wlasnosci ENVIRONMENT.
+
+    Logi silnika i klienta NIE leza w katalogu roboczym testu, tylko w TMPDIR nadanym
+    przez makro add_test (test/IntegrationTest/CMakeLists.txt). Bez nich porazka
+    it_fncall_runtime_case z 2026-09-04 byla nie do rozstrzygniecia: klient meldowal
+    brak kolejki odpowiedzi, a zdanie nazywajace wyjatek ("Command processor failure")
+    szlo do xretractor.log w TMPDIR i przepadalo razem z kontenerem.
+    """
+    for entry in props.get("ENVIRONMENT") or []:
+        if entry.startswith("TMPDIR="):
+            return entry[len("TMPDIR="):]
+    return None
+
+
 def testCatalogue(testDir: Path) -> dict[str, dict]:
     try:
         raw = subprocess.run(
@@ -80,6 +97,7 @@ def testCatalogue(testDir: Path) -> dict[str, dict]:
         catalogue[test["name"]] = {
             "workingDirectory": props.get("WORKING_DIRECTORY"),
             "command": test.get("command", []),
+            "tmpDir": namespaceTmpDir(props),
         }
     return catalogue
 
@@ -190,6 +208,27 @@ def collectOne(name: str, info: dict, lastTestLog: str, reportDir: Path) -> list
         copyCapped(item, target / item.name)
         collected += 1
     lines.append(f"  plikow z katalogu roboczego: {collected}")
+
+    # Logi silnika i klienta z katalogu przestrzeni nazw. Ida do wlasnego podkatalogu,
+    # bo przestrzen jest WSPOLNA dla kilku katalogow testowych (pula ma 16 slotow, a
+    # testow jest wiecej) — plik moze wiec zawierac takze przebieg sasiada z tego samego
+    # slotu. RESOURCE_LOCK gwarantuje rozlacznosc w czasie, nie rozlacznosc tresci.
+    tmpRaw = info.get("tmpDir")
+    if tmpRaw and Path(tmpRaw).is_dir():
+        tmpDir = Path(tmpRaw)
+        logTarget = target / "namespace-logs"
+        logTarget.mkdir(parents=True, exist_ok=True)
+        gathered = 0
+        for item in sorted(tmpDir.iterdir()):
+            if gathered >= kMaxFilesPerTest:
+                break
+            if not item.is_file() or item.suffix not in kCollectSuffixes:
+                continue
+            copyCapped(item, logTarget / item.name)
+            gathered += 1
+        lines.append(f"  plikow z katalogu przestrzeni nazw ({tmpDir.name}): {gathered}")
+    elif tmpRaw:
+        lines.append(f"  katalog przestrzeni nazw {tmpRaw} nie istnieje")
 
     for pattern, actual in patternPairs(workDir):
         diff = subprocess.run(

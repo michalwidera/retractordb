@@ -48,8 +48,17 @@ pseudo-terminal with a byte in the buffer.
 
 `scripts/collect-test-failures.py <build-dir> [--ctest-status N]` collects, for every test that
 failed in *this* run: the registered command, its slice of `LastTest.log`, the small text files
-from its working directory, and a ready diff of each pattern/output pair. CI runs it in the same
+from its working directory, the engine and client logs from the namespace `TMPDIR`
+(`namespace-logs/`), and a ready diff of each pattern/output pair. CI runs it in the same
 step as `ctest` and publishes `test-failure-report` as an artifact.
+
+The `TMPDIR` logs are collected because `xretractor.log` does **not** live in the test's working
+directory, and it is the only place that names a swallowed server-side exception. When
+`it_fncall_runtime_case` failed on CI on 2026-09-04 the client reported nothing but a missing
+response queue; the sentence naming the cause (`Command processor failure: …`) was written to
+`xretractor.log` in `TMPDIR` and thrown away with the container. Note that a namespace slot is
+shared by several directories, so such a log may also contain a neighbour's run — `RESOURCE_LOCK`
+separates them in time, not in file content.
 
 Two traps it works around, both found the hard way:
 - `ctest --show-only` (used to map test names to working directories) **overwrites `LastTest.log`**,
@@ -57,6 +66,19 @@ Two traps it works around, both found the hard way:
 - CTest does **not** clear `LastTestsFailed.log` after a green run, so a stale entry would produce a
   report for a test that just passed. The CI status is passed in explicitly, and entries are
   cross-checked against `LastTest.log`.
+
+### A handler that fails silently
+
+`it_show_handler_failure` guards the other half of that same 2026-09-04 investigation. The `show`
+command writes nothing into its reply even when the subscription **succeeds**, so a swallowed
+exception produced a reply indistinguishable from success: the client started its producer thread
+and reported a missing response queue a second later, one step away from the cause. The reply now
+carries `error.response`, and the client checks it exactly as it already checked the reply to
+`get`.
+
+A CI race cannot be ordered on demand, so the test forces the failure through the `RDB_FAULT_SHOW`
+hook read by the handler. Without the fix the test goes red on both counts: the client's log lacks
+the server's reason and still carries `did not appear after`.
 
 ### Namespaces
 

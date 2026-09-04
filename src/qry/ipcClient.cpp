@@ -41,7 +41,8 @@ void IpcClient::producer() {
   // `done`, przez co pętla `select()` nie wykonywała ani jednego obrotu,
   // a klient kończył się kodem 0 bez jednego przeczytanego elementu (issue_215).
   std::unique_ptr<IPC::message_queue> mq;
-  for (int attempt = 0; attempt < responseQueueOpenMaxFails_ && !done; ++attempt) {
+  int attempts = 0;
+  for (; attempts < responseQueueOpenMaxFails_ && !done; ++attempts) {
     try {
       mq = std::make_unique<IPC::message_queue>(IPC::open_only, queueName.c_str());
       break;
@@ -50,7 +51,12 @@ void IpcClient::producer() {
     }
   }
   if (!mq) {
-    SPDLOG_ERROR("ipcClient: response queue '{}' did not appear after {} attempts", queueName, responseQueueOpenMaxFails_);
+    // Liczba FAKTYCZNYCH prob i powod wyjscia, a nie sam limit. Petla konczy sie takze
+    // na `done` ustawionym przez watek glowny, wiec zdanie "po 100 probach" opisywalo
+    // wtedy czekanie, ktorego nie bylo, i kierowalo diagnoze na wyscig z serwerem
+    // zamiast na przerwanie od strony klienta.
+    SPDLOG_ERROR("ipcClient: response queue '{}' did not appear after {} of {} attempts ({})", queueName, attempts,
+                 responseQueueOpenMaxFails_, done ? "aborted by client" : "budget exhausted");
     responseQueueMissing = true;
     done                 = true;
     return;
