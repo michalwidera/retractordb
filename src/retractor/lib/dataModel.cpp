@@ -12,6 +12,7 @@
 #include "fatalError.hpp"
 #include "rdb/convertTypes.hpp"
 #include "rdb/probe.hpp"
+#include "rdb/rationalFormat.hpp"
 #include "SOperations.hpp"
 
 // ctest -R '^ut-dataModel' -V
@@ -201,9 +202,8 @@ void dataModel::processRows(const std::set<std::string> &inSet, const boost::rat
       // wtedy bieżącą wartość oznaczoną historycznym indeksem.
       const auto slotNumber = currentTimeSlot / q.rInterval;
       if (slotNumber.denominator() != 1) {
-        FatalError("dataModel::processRows: current slot {}/{} is not aligned with interval {}/{} for '{}'",
-                   currentTimeSlot.numerator(), currentTimeSlot.denominator(), q.rInterval.numerator(),
-                   q.rInterval.denominator(), q.id);
+        FatalError("dataModel::processRows: current slot {} is not aligned with interval {} for '{}'", currentTimeSlot,
+                   q.rInterval, q.id);
       }
       const int firstLogicalIndex = slotNumber.numerator() - 1 - q.startupLatency;
       if (firstLogicalIndex < q.logicalOrigin) continue;

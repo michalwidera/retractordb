@@ -23,7 +23,8 @@
 
 #include "exprSimplify.hpp"  // simplifyExpression, inferStringWidth
 #include "fatalError.hpp"
-#include "rdb/probe.hpp"     // sonda E3: rozmiar planu, czas kompilacji
+#include "rdb/probe.hpp"  // sonda E3: rozmiar planu, czas kompilacji
+#include "rdb/rationalFormat.hpp"
 #include "rqlFunctions.hpp"  // jedyna lista funkcji skalarnych
 #include "SOperations.hpp"   // ceilR
 
@@ -68,8 +69,7 @@ wideRational widen(int value) { return wideRational{value, 1}; }
 boost::rational<int> narrowInterval(const wideRational &value, const std::string &id, const char *formula) {
   constexpr std::int64_t limit = std::numeric_limits<int>::max();
   if (value.numerator() > limit || value.numerator() < std::numeric_limits<int>::min() || value.denominator() > limit) {
-    SPDLOG_ERROR("compiler: interval {}/{} of stream '{}' ({}) is out of representable range", value.numerator(),
-                 value.denominator(), id, formula);
+    SPDLOG_ERROR("compiler: interval {} of stream '{}' ({}) is out of representable range", value, id, formula);
     throw std::out_of_range("Stream interval out of representable range — simplify the plan or use coarser intervals");
   }
   return boost::rational<int>{static_cast<int>(value.numerator()), static_cast<int>(value.denominator())};
@@ -2238,7 +2238,7 @@ std::string compiler::shareEquivalentSelectComputations() {
     if (fromFingerprint.find("ADD{") == std::string::npos) return std::nullopt;
 
     std::ostringstream out;
-    out << "INTERVAL{" << qry.rInterval.numerator() << "/" << qry.rInterval.denominator() << "}";
+    out << "INTERVAL{" << qry.rInterval << "}";
     out << "FROM{" << fromFingerprint << "}";
     out << "FIELDS{";
     for (const auto &item : qry.lSchema) {

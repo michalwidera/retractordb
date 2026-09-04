@@ -8,6 +8,7 @@
 #include <stdexcept>
 
 #include "fatalError.hpp"
+#include "rdb/rationalFormat.hpp"
 
 using namespace boost;
 
@@ -65,8 +66,7 @@ void qTree::dumpCore() {
       if (nName == vcols[0])
         size = static_cast<int>(std::to_string(getSeqNr(it.id)).length());
       else if (nName == vcols[1])
-        size = static_cast<int>(
-            (std::to_string(it.rInterval.numerator()) + "/" + std::to_string(it.rInterval.denominator())).length());
+        size = static_cast<int>(fmt::format("{}", it.rInterval).length());
       else if (nName == vcols[2])
         size = static_cast<int>(std::to_string(maxCapacity[it.id]).length());
       else if (nName == vcols[3])
@@ -92,7 +92,7 @@ void qTree::dumpCore() {
 
   for (const auto &it : *this) {
     std::string col0        = std::to_string(getSeqNr(it.id));
-    std::string col1        = std::to_string(it.rInterval.numerator()) + "/" + std::to_string(it.rInterval.denominator());
+    std::string col1        = fmt::format("{}", it.rInterval);
     std::string col2        = std::to_string(maxCapacity[it.id]);
     const std::string &col3 = it.id;
     fmt::vprint(ss.str(), fmt::make_format_args(col0, col1, col2, col3));

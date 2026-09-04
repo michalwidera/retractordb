@@ -3,9 +3,11 @@
 #include <spdlog/spdlog.h>
 
 #include <cassert>
+#include <format>
 #include <type_traits>
 
 #include "rdb/convertTypes.hpp"
+#include "rdb/rationalFormat.hpp"
 
 static_assert(std::is_copy_constructible_v<rdb::descFldVT>);
 
@@ -30,7 +32,7 @@ std::string token::getStr_() const {
         else if constexpr (std::is_same_v<T, uint8_t>)
           return std::to_string(unsigned(v));
         else if constexpr (std::is_same_v<T, boost::rational<int>>)
-          return std::to_string(v.numerator()) + "/" + std::to_string(v.denominator());
+          return std::format("{}", v);
         else if constexpr (std::is_same_v<T, std::pair<int, int>>)
           return std::to_string(v.first) + "," + std::to_string(v.second);
         else if constexpr (std::is_same_v<T, std::pair<std::string, int>>)
