@@ -115,7 +115,7 @@ void detail::printRuntimeCounters() {
     if (std::getenv("RDB_BENCH_MATERIALIZE") != nullptr) {
       const auto m = materializationReport();
       std::println(stderr,
-                   "MATERIALIZED trwale: dopisania={} nadpisania={} bajty={} pamieciowe: dopisania={} nadpisania={} bajty={}",
+                   "MATERIALIZED trwale: dopisania={} nadpisania={} bajty={}  pamieciowe: dopisania={} nadpisania={} bajty={}",
                    m.appends, m.overwrites, m.bytes, m.memoryAppends, m.memoryOverwrites, m.memoryBytes);
     }
 
@@ -124,7 +124,7 @@ void detail::printRuntimeCounters() {
     if (std::getenv("RDB_BENCH_LOGICAL") != nullptr) {
       const auto l = logicalWriteReport();
       std::println(
-          stderr, "LOGICAL substrat: dopisania={} nadpisania={} bajty={} publiczne: dopisania={} nadpisania={} bajty={}",
+          stderr, "LOGICAL substrat: dopisania={} nadpisania={} bajty={}  publiczne: dopisania={} nadpisania={} bajty={}",
           l.substrateAppends, l.substrateOverwrites, l.substrateBytes, l.publicAppends, l.publicOverwrites, l.publicBytes);
     }
   }
@@ -133,7 +133,7 @@ void detail::printRuntimeCounters() {
     if (std::getenv("RDB_BENCH_WORK") != nullptr) {
       const auto w = workReport();
       std::println(stderr,
-                   "WORK agse: okna={} elementy={} odczyty={} eval: wywolania={} tokeny={} hash: wybory={} add: scalenia={}",
+                   "WORK agse: okna={} elementy={} odczyty={}  eval: wywolania={} tokeny={}  hash: wybory={}  add: scalenia={}",
                    w.agseWindows, w.agseElements, w.agseReads, w.evalCalls, w.evalTokens, w.hashPicks, w.addMerges);
     }
   }
@@ -205,8 +205,8 @@ void planProbe::print(const capacityShape &capacities, bool dedupEnabled) const 
   const auto &atExit    = stages_[static_cast<std::size_t>(planStage::exit)];
 
   std::println(stderr,
-               "PLAN bench (publiczne/substraty/tokeny-from/tokeny-pol, dedup={}): wejscie={}/{}/{}/{} przed-dedup={}/{}/{}/{} "
-               "po-dedup={}/{}/{}/{} wyjscie={}/{}/{}/{}",
+               "PLAN bench (publiczne/substraty/tokeny-from/tokeny-pol, dedup={}): wejscie={}/{}/{}/{}"
+               "  przed-dedup={}/{}/{}/{}  po-dedup={}/{}/{}/{}  wyjscie={}/{}/{}/{}",
                dedupEnabled ? "ON" : "OFF", atEntry.publicStreams, atEntry.substrates, atEntry.fromTokens, atEntry.fieldTokens,
                preDedup.publicStreams, preDedup.substrates, preDedup.fromTokens, preDedup.fieldTokens, postDedup.publicStreams,
                postDedup.substrates, postDedup.fromTokens, postDedup.fieldTokens, atExit.publicStreams, atExit.substrates,
