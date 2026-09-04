@@ -172,19 +172,22 @@ python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
 
 ### Commits, push and CI
 
-- **`master` in the code repository** — commits and pushes are performed by the human only, after reviewing the diff. The
-  assistant must leave changes uncommitted, show the diff, and wait for the human to commit and push.
-- **Side branches** — the assistant may create local commits autonomously after verification, provided no CI process is
-  triggered.
+- **No commit is created without human review — on any branch, `master` and side branches alike.** After verification
+  the assistant shows the diff and stops. The human reads it and gives the go-ahead; only then does `git commit` run.
+  Verification passing is not the go-ahead: green tests say the change works, not that it is the change the human wants
+  in the history.
+- **`master` in the code repository** — commits and pushes are performed by the human only.
+- **Side branches** — the assistant may run `git commit` locally, but only on an explicit go-ahead for that specific
+  diff, and provided no CI process is triggered. Approval is per diff and does not carry over to the next change.
 - Permission to commit on a side branch does not include permission to push, open a pull request, or invoke CI manually.
   Those actions require an explicit human request.
 - If an action would trigger CI, stop and hand it over to the human.
 
 ### Session end
 
-Every session ends with either a permitted local commit on a side branch, an explicit handoff of the uncommitted diff on
-`master` for human review/commit/push, or an explicit note why no commit was created. No unexplained uncommitted progress
-is left behind.
+Every session ends with either a local commit on a side branch made on an explicit go-ahead, a handoff of the
+uncommitted diff for human review/commit/push, or an explicit note why no commit was created. No unexplained
+uncommitted progress is left behind.
 
 **Research gate — mandatory before closing.** Whenever the session touched engine sources (`src/`), run the gate and
 report its verdict before the commit or the handoff:
