@@ -1,0 +1,8 @@
+# Plan bez znaczenia dla samej regresji: liczy sie tylko to, ze wyprodukuje dwa rekordy,
+# ktore klient ma zdazyc odebrac mimo bajtu czekajacego na terminalu.
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM src, 1/8 FILE 'data.txt' ONESHOT
+
+SELECT a STREAM dst FROM src

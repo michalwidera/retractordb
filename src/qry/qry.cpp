@@ -55,7 +55,18 @@ bool qry::adhoc(const std::string &sAdhoc) {
 selectResult qry::select(boost::program_options::variables_map &vm, const int iElemLimit, const std::string &input,
                          std::tuple<int, int, int> gnuplotDim, bool gnuplotRightToLeft) {
   elemLimitCnt = (iElemLimit > 0) ? iElemLimit + 1 : iElemLimit;
-  ptree pt     = netClient("get", "");
+
+  // Zatrzymanie klawiszem nalezy wylacznie do przebiegu NIEOGRANICZONEGO. Przebieg
+  // z zadeklarowanym budzetem elementow (-m N) konczy sie po tym budzecie i po niczym innym,
+  // bo jego wynik ma byc powtarzalny. Bez tego warunku bajt czekajacy na terminalu konczyl
+  // petle przed odczytaniem czegokolwiek: klient wychodzil z zerem elementow i -- co gorsza --
+  // z werdyktem obciazajacym serwer, bo watek producenta byl wtedy zrywany, zanim raz sprobowal
+  // otworzyc swoja kolejke. Tak padl it_fncall_runtime_case na CI (2026-09-04): stdin kroku jest
+  // tam terminalem, a CTest przekazuje go testom. Ta sama regula i to samo uzasadnienie co dla
+  // silnika w executorsm.cpp (`ignoreanykey`), gdzie ta pulapka wywrocila it_agse_array.
+  // Ctrl+C (SIGINT) zatrzymuje klienta bez zmian, obiema drogami.
+  const bool ignoreAnyKey = vm.contains("needctrlc") || iElemLimit > 0;
+  ptree pt                = netClient("get", "");
 
   // Brak odpowiedzi serwera jest ODPOWIEDZIĄ, a nie niespodzianką w strukturze
   // danych. `netClient` po wyczerpaniu prób zwraca ptree z samym
@@ -114,7 +125,7 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
   ptree e_value;
   try {
     while (!transport_->done) {
-      if (_kbhit(vm.contains("needctrlc"))) break;
+      if (_kbhit(ignoreAnyKey)) break;
       if (elemLimitCnt == 1) {
         if (vm.contains("kill")) {
           netClient("kill", "");

@@ -55,10 +55,16 @@ void IpcClient::producer() {
     // na `done` ustawionym przez watek glowny, wiec zdanie "po 100 probach" opisywalo
     // wtedy czekanie, ktorego nie bylo, i kierowalo diagnoze na wyscig z serwerem
     // zamiast na przerwanie od strony klienta.
+    const bool abortedByClient = done;
     SPDLOG_ERROR("ipcClient: response queue '{}' did not appear after {} of {} attempts ({})", queueName, attempts,
-                 responseQueueOpenMaxFails_, done ? "aborted by client" : "budget exhausted");
-    responseQueueMissing = true;
-    done                 = true;
+                 responseQueueOpenMaxFails_, abortedByClient ? "aborted by client" : "budget exhausted");
+    // Werdykt "serwer nie utworzyl kolejki" ma prawo padac WYLACZNIE po wyczerpaniu budzetu.
+    // Producent zerwany przez watek glowny nie czekal, wiec o serwerze nie wie nic -- a mimo to
+    // obciazal go na rowni z producentem, ktory przeczekal cale 100 prob. Tak wygladala awaria
+    // it_fncall_runtime_case na CI (2026-09-04): klient konczyl petle na bajcie z terminala,
+    // a meldowal brak kolejki odpowiedzi i wskazywal winnego po drugiej stronie IPC.
+    if (!abortedByClient) responseQueueMissing = true;
+    done = true;
     return;
   }
 
