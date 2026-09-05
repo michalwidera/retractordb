@@ -3073,6 +3073,13 @@ std::string compiler::expandStreamGenerators() {
   return {"OK"};
 }
 
+void compiler::reset() {
+  restrictSelectSharing_ = false;
+  selectSharingScope_.clear();
+  namedSourceRefs_.clear();
+  generatedStreams_.clear();
+}
+
 std::string compiler::compile() {
   std::string result;
 

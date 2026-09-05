@@ -182,6 +182,53 @@ TEST(ServiceControlDeliver, overwrites_target_atomically) {
   std::filesystem::remove_all(dir);
 }
 
+// --- writeQueryFile: ta sama atomowa droga, ale dla TRESCI, nie pliku zrodlowego ---
+//
+// Uzywa jej przeladowanie planu w locie (`xqry --reset`): plan przychodzi kanalem IPC, wiec
+// pliku zrodlowego po stronie serwera nie ma. Tresc pusta jest zadaniem poprawnym — tak
+// sprowadza sie plik zapytan uslugi do stanu zerowego po bledzie krytycznym.
+
+TEST(ServiceControlWrite, writes_content_over_existing_target) {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_writequery";
+  std::filesystem::create_directories(dir);
+  const std::filesystem::path dst = dir / "startup.rql";
+  {
+    std::ofstream d(dst);
+    d << "OLD CONTENT\n";
+  }
+
+  EXPECT_TRUE(servicecontrol::writeQueryFile("SELECT a STREAM d FROM b\n", dst.string()));
+
+  std::ifstream check(dst);
+  const std::string content((std::istreambuf_iterator<char>(check)), std::istreambuf_iterator<char>());
+  EXPECT_EQ(content, "SELECT a STREAM d FROM b\n");
+
+  std::filesystem::remove_all(dir);
+}
+
+TEST(ServiceControlWrite, empty_content_truncates_the_target) {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_writequery_empty";
+  std::filesystem::create_directories(dir);
+  const std::filesystem::path dst = dir / "startup.rql";
+  {
+    std::ofstream d(dst);
+    d << "SELECT a STREAM d FROM b\n";
+  }
+
+  EXPECT_TRUE(servicecontrol::writeQueryFile("", dst.string()));
+
+  EXPECT_TRUE(std::filesystem::exists(dst));
+  EXPECT_EQ(std::filesystem::file_size(dst), 0U);
+
+  std::filesystem::remove_all(dir);
+}
+
+TEST(ServiceControlWrite, fails_when_the_target_directory_does_not_exist) {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_writequery_nodir";
+  std::filesystem::remove_all(dir);
+  EXPECT_FALSE(servicecontrol::writeQueryFile("x\n", (dir / "startup.rql").string()));
+}
+
 TEST(ServiceControlDeliver, fails_on_missing_source) {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_deliver_missing";
   std::filesystem::create_directories(dir);

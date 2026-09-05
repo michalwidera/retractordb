@@ -23,6 +23,11 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash service-idle.sh env)
 
+add_test(
+  NAME ${TestID}-empty
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash service-idle.sh empty)
+
 # Logi INFO sa wkompilowane tylko poza Release (SPDLOG_ACTIVE_LEVEL, glowny
 # CMakeLists.txt). W Release tryb uslugowy nie emituje markerow INFO — skrypt
 # pomija wtedy asercje INFO (podaza za cichym, efektywnym Release). Przekazujemy
@@ -33,13 +38,14 @@ else()
   set(_rdbInfoActive 1)
 endif()
 
-set_tests_properties(${TestID}-run ${TestID}-env PROPERTIES TIMEOUT 60)
+set_tests_properties(${TestID}-run ${TestID}-env ${TestID}-empty
+                     PROPERTIES TIMEOUT 60)
 
 # DOPISANIE, nie ustawienie: ENVIRONMENT niesie juz przestrzen nazw uruchomienia
 # (RDB_NAMESPACE, TMPDIR) nadana przez makro add_test w katalogu nadrzednym, a
 # set_tests_properties zastapiloby ja w calosci — test startowalby wtedy na
 # zasobach wspolnych i kolidowal z sasiadem biegnacym rownoczesnie.
 set_property(
-  TEST ${TestID}-run ${TestID}-env
+  TEST ${TestID}-run ${TestID}-env ${TestID}-empty
   APPEND
   PROPERTY ENVIRONMENT "RDB_INFO_ACTIVE=${_rdbInfoActive}")

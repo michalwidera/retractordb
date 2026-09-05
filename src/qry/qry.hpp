@@ -13,6 +13,14 @@
 #include "ipcClient.hpp"
 
 inline constexpr int kDefaultServerNoDataTimeoutMs{10'000};
+
+/// Rozmiar porcji, na ktore dzielony jest plan wysylany komenda `--reset`.
+///
+/// Kolejka komend przyjmuje komunikat do ipc::kQueryQueueMaxMessageSize (1000 B), a wysylany
+/// jest nie sam tekst, tylko dokument `info` z nim w srodku: kazdy znak nowej linii, cudzyslow
+/// i backslash zajmuja tam po dwa bajty. 400 bajtow surowego tekstu miesci sie w limicie
+/// nawet przy najgorszym mozliwym rozstrzeleniu, z zapasem na klucze dokumentu.
+inline constexpr std::size_t kResetChunkBytes{400};
 inline constexpr int kDefaultClientResponseMaxFails{kIpcClientDefaultResponseMaxFails};
 
 /// Wynik `qry::select`. Rozróżnia tryby porażki, bo wszystkie trzy dawały
@@ -26,7 +34,8 @@ enum class selectResult : std::uint8_t {
   streamNotFound,      ///< serwer odpowiedział, ale nie zna tego strumienia
   serverNoResponse,    ///< serwer nie odpowiedział na komendę w wyznaczonym czasie
   clientQueueMissing,  ///< serwer nie utworzył kolejki odpowiedzi tego klienta
-  noData               ///< dołączono do strumienia, ale nie przyszedł ani jeden element
+  noData,              ///< dołączono do strumienia, ale nie przyszedł ani jeden element
+  noActivePlan         ///< serwer odpowiedział, ale nie ma wczytanego planu (tryb bezczynny)
 };
 
 /// Nazwa trybu do komunikatu dla operatora.
@@ -56,6 +65,12 @@ class qry {
   selectResult select(boost::program_options::variables_map &vm, int /*iElemLimit*/, const std::string & /*input*/,
                       std::tuple<int, int, int> /*gnuplotDim*/, bool /*gnuplotRightToLeft*/ = false);
   bool adhoc(const std::string & /*sAdhoc*/);
+
+  /// Przeladowanie CALEGO planu instancji trescia @p planText. Zwraca true przy odmowie
+  /// (spojnie z adhoc()). Tekst pusty jest zadaniem poprawnym: sprowadza instancje do stanu
+  /// bezczynnego. Powod odmowy — komunikat serwera — trafia na stderr, bo jest to jedyna
+  /// rzecz, ktora operator moze z ta odmowa zrobic.
+  bool reset(const std::string & /*planText*/);
   std::string dir();
   std::string dirYaml();
   int hello();

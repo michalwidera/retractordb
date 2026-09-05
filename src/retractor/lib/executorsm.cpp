@@ -28,8 +28,10 @@
 #include "fatalError.hpp"
 #include "ipcServer.hpp"
 #include "persistentCounter.hpp"
+#include "planSource.hpp"
 #include "rdb/convertTypes.hpp"
 #include "rdb/probe.hpp"  // sondy E1/E2E, K6, E4
+#include "serviceControl.hpp"
 #include "uxSysTermTools.hpp"
 
 // #include "antlr4-runtime/tree/ParseTree.h"
@@ -42,6 +44,20 @@ using namespace CRationalStreamMath;
 
 namespace {
 constexpr std::chrono::milliseconds kIdleLoopSleep{100};
+
+/// Gorna granica transferu planu kanalem `reset`. Nie jest to limit rozmiaru planu jako
+/// takiego, tylko zabezpieczenie przed niedomknietym transferem: zle zachowany klient nie
+/// moze rosnac serwerowi w pamieci bez konca. 512 porcji to okolo 200 kB tekstu RQL.
+constexpr int kResetMaxChunks{512};
+
+/// Transfer planu w toku, per klient (db.id). Trzymany BEZ muteksu, bo dotyka go wylacznie
+/// watek komunikacyjny — IpcServer prowadzi dokladnie jedna petle odbioru komend.
+struct ResetTransfer {
+  int expectedChunks{0};
+  int receivedChunks{0};
+  std::string text;
+};
+std::map<int, ResetTransfer> resetTransfers;
 }  // namespace
 
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
@@ -63,6 +79,26 @@ std::atomic<bool> dataModelExpected{false};
 std::atomic<bool> firstQueryReceived{false};
 std::atomic<std::uint64_t> adHocPlanRevision{0};
 bool untilEofMode{false};
+
+/// Zadanie przeladowania planu przyjete przez kanal IPC. Podnosi je resetCommit() po pelnej
+/// walidacji, zdejmuje applyPendingPlan(). Petla epok traktuje je jak warunek konca epoki —
+/// dokladnie tak samo jak `stop_now`, tyle ze po niej zaczyna sie epoka nastepna, nie koniec
+/// procesu.
+std::atomic<bool> planResetRequested{false};
+/// Tresc przyjetego zestawu RQL. Chroniona przez core_mutex.
+std::string pendingPlanText;
+
+/// Tozsamosc uruchomienia potrzebna przy KAZDYM roszczeniu magistrali, nie tylko pierwszym.
+/// Wlasne kopie (nie string_view z ClaimRequest launchera), bo slot rosci sie ponownie przy
+/// kazdej wymianie planu, dlugo po tym, jak ramka launchera przestala istniec.
+std::string busInstanceName;
+std::string busUnitName;
+std::uint32_t busRunModes{0};
+
+/// Plik zapytan uslugi, do ktorego trafia przyjety plan i ktory jest oprozniany po bledzie
+/// krytycznym. PUSTY dla instancji, ktora usluga nie jest — plik operatora uruchamiajacego
+/// xretractor z terminala nie jest stanem uslugi i nie wolno go nadpisywac.
+std::string serviceQueryFilePath;
 
 // variable connected with llimitqry (-m) parameter
 // counts remaining loop iterations; 0 = stop, inifitie_loop = run forever
@@ -98,6 +134,19 @@ static FlockServiceGuard *serviceGuardPtr = nullptr;
 static bus::Bus *busPtr = nullptr;
 
 void cleanup() {
+  // Blad krytyczny w usludze systemd: plan, ktory zabil proces, nie moze wrocic przy
+  // restarcie. Plik zapytan zostaje oprozniony, wiec jednostka wstaje w trybie bezczynnym
+  // i czeka na kolejne `xqry --reset`. Bez tego Restart=on-failure zapetla start na tym
+  // samym planie — a stan zerowy jest jedynym stanem, o ktorym wiadomo, ze wstanie.
+  // Pierwsza czynnosc sprzatania: dalej zwalniamy blokade, po ktorej moze juz wystartowac
+  // nastepna instancja i przeczytac ten plik.
+  if (fatalErrorRaised.load(std::memory_order_acquire) && !serviceQueryFilePath.empty()) {
+    if (servicecontrol::writeQueryFile("", serviceQueryFilePath))
+      SPDLOG_CRITICAL("Fatal error: query file '{}' cleared; the service unit will restart with no plan.", serviceQueryFilePath);
+    else
+      SPDLOG_CRITICAL("Fatal error: could NOT clear query file '{}'; the service unit may restart into the same plan.",
+                      serviceQueryFilePath);
+  }
   {
     std::scoped_lock lock(core_mutex);
     if (iLoopLimitCnt != executorsm::stop_now) {
@@ -377,17 +426,138 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   return ptRetval;
 }
 
+std::string executorsm::validatePlanText(const std::string &planText) {
+  qTree candidate;
+  const PlanSource loaded = parsePlanText(candidate, planText);
+  if (loaded.status != "OK") return "Fail parse:" + loaded.status;
+
+  // Zestaw bez ani jednej instrukcji jest LEGALNY: tak sprowadza sie usluge do stanu
+  // zerowego, w ktorym czeka na nastepny plan. To ta sama droga, ktora idzie start
+  // z pustym plikiem zapytan.
+  if (candidate.empty()) return {};
+
+  compiler localCompiler(candidate);
+  if (const std::string response = localCompiler.compile(); response != "OK") return "Fail compile:" + response;
+
+  // Rozlacznosc nazw wzgledem POZOSTALYCH zywych instancji. Wlasna pomijamy: przeladowanie
+  // zwalnia jej dotychczasowe nazwy, wiec kolizja z samym soba kolizja nie jest. Sprawdzenie
+  // jest tutaj, a nie dopiero przy roszczeniu slotu, bo odmowa ma dojsc do klienta ZANIM
+  // dzialajacy plan zostanie rozebrany.
+  if (busPtr != nullptr) {
+    const std::vector<bus::InstanceInfo> instances = busPtr->instances();
+    if (const auto owner = bus::findForeignOwner(instances, busInstanceName, planStreamNames(candidate))) {
+      const std::string ownerName = owner->instance.empty() ? "the unnamed instance" : "instance '" + owner->instance + "'";
+      return "Rejected: stream '" + owner->stream + "' is already served by " + ownerName + " (pid " +
+             std::to_string(owner->pid) + ")";
+    }
+    if (const auto owner = bus::findForeignCounterOwner(instances, busInstanceName, planCounterPath(candidate))) {
+      const std::string ownerName = owner->instance.empty() ? "the unnamed instance" : "instance '" + owner->instance + "'";
+      return "Rejected: rotation counter file '" + owner->path + "' is already used by " + ownerName + " (pid " +
+             std::to_string(owner->pid) + ")";
+    }
+  }
+  return {};
+}
+
+ptree executorsm::resetBegin(const ptree &ptInval) {
+  ptree ptRetval;
+  const int clientId = ptInval.get("db.id", 0);
+  const int chunks   = ptInval.get("db.argument", -1);
+  if (chunks < 0 || chunks > kResetMaxChunks) {
+    ptRetval.put("db", "Rejected: chunk count out of range (0.." + std::to_string(kResetMaxChunks) + ")");
+    SPDLOG_ERROR("reset-begin rejected: chunk count {} out of range", chunks);
+    return ptRetval;
+  }
+  // Nadpisanie transferu w toku jest zamierzone: klient, ktory zaczyna od nowa, przerwal
+  // poprzedni. Bez tego porzucony transfer blokowalby nastepny az do konca procesu.
+  resetTransfers[clientId] = ResetTransfer{.expectedChunks = chunks, .receivedChunks = 0, .text = {}};
+  ptRetval.put("db", "OK");
+  return ptRetval;
+}
+
+ptree executorsm::resetChunk(const ptree &ptInval) {
+  ptree ptRetval;
+  const int clientId = ptInval.get("db.id", 0);
+  const auto it      = resetTransfers.find(clientId);
+  if (it == resetTransfers.end()) {
+    ptRetval.put("db", "Rejected: no plan transfer in progress");
+    SPDLOG_ERROR("reset-chunk rejected: no transfer in progress for client {}", clientId);
+    return ptRetval;
+  }
+  // Kolejnosc porcji gwarantuje sam protokol: klient wysyla nastepna dopiero po odpowiedzi
+  // na poprzednia, a kolejka komend zachowuje kolejnosc. Sprawdzana jest za to LICZBA —
+  // nadmiarowa porcja znaczy, ze po drugiej stronie dzieje sie cos innego niz zapowiedziany
+  // transfer, a wtedy plan nie moze zostac sklejony "prawie dobrze".
+  if (it->second.receivedChunks >= it->second.expectedChunks) {
+    const int expected = it->second.expectedChunks;
+    resetTransfers.erase(it);
+    ptRetval.put("db", "Rejected: more chunks than the announced " + std::to_string(expected));
+    SPDLOG_ERROR("reset-chunk rejected: more chunks than the announced {} for client {}", expected, clientId);
+    return ptRetval;
+  }
+  it->second.text += ptInval.get("db.argument", "");
+  ++it->second.receivedChunks;
+  ptRetval.put("db", "OK");
+  return ptRetval;
+}
+
+ptree executorsm::resetCommit(const ptree &ptInval) {
+  ptree ptRetval;
+  const int clientId = ptInval.get("db.id", 0);
+  const auto it      = resetTransfers.find(clientId);
+  if (it == resetTransfers.end()) {
+    ptRetval.put("db", "Rejected: no plan transfer in progress");
+    SPDLOG_ERROR("reset-commit rejected: no transfer in progress for client {}", clientId);
+    return ptRetval;
+  }
+  if (it->second.receivedChunks != it->second.expectedChunks) {
+    const int got      = it->second.receivedChunks;
+    const int expected = it->second.expectedChunks;
+    resetTransfers.erase(it);
+    ptRetval.put("db", "Rejected: incomplete transfer (" + std::to_string(got) + " of " + std::to_string(expected) + ")");
+    SPDLOG_ERROR("reset-commit rejected: incomplete transfer, {} of {} chunks", got, expected);
+    return ptRetval;
+  }
+  std::string planText = std::move(it->second.text);
+  resetTransfers.erase(it);
+
+  if (const std::string refusal = validatePlanText(planText); !refusal.empty()) {
+    ptRetval.put("db", refusal);
+    SPDLOG_ERROR("reset-commit rejected: {}", refusal);
+    return ptRetval;
+  }
+
+  {
+    std::scoped_lock lock(core_mutex);
+    pendingPlanText = std::move(planText);
+  }
+  planResetRequested.store(true, std::memory_order_release);
+  cv.notify_all();
+  SPDLOG_INFO("Plan reload accepted; the running plan will be replaced.");
+  ptRetval.put("db", "OK");
+  return ptRetval;
+}
+
 ptree executorsm::commandProcessor(const ptree &ptInval) {
   if (coreInstancePtr == nullptr) FatalError("executorsm::commandProcessor: coreInstancePtr is null");
   ptree ptRetval;
   std::string command = ptInval.get("db.message", "");
   try {
     const bool requiresDataModel = command == "get" || command == "adhoc" || command == "detail" || command == "show";
-    if (requiresDataModel && dataModelExpected.load()) {
-      std::unique_lock<std::mutex> lock(core_mutex);
-      cv.wait(lock, [] { return pProc != nullptr || iLoopLimitCnt == executorsm::stop_now; });
+    if (requiresDataModel) {
+      if (dataModelExpected.load()) {
+        // Predykat obejmuje takze ZNIKNIECIE modelu: przeladowanie planu zdejmuje
+        // dataModelExpected pod tym samym muteksem, wiec komenda, ktora trafila w rozbiorke
+        // epoki, budzi sie zamiast czekac na model, ktory juz nie powstanie.
+        std::unique_lock<std::mutex> lock(core_mutex);
+        cv.wait(lock, [] { return pProc != nullptr || iLoopLimitCnt == executorsm::stop_now || !dataModelExpected.load(); });
+      }
+      // Brak modelu jest ODPOWIEDZIA, nie cisza. Do 2026-09-05 instancja bez planu
+      // przepuszczala komendy przez wszystkie `if`-y i odsylala PUSTE ptree, a klient
+      // meldowal brak kolejki odpowiedzi i wskazywal winnego po drugiej stronie IPC.
       if (pProc == nullptr) {
-        ptRetval.put("db", "server stopping");
+        ptRetval.put("db", iLoopLimitCnt == executorsm::stop_now ? std::string("server stopping")
+                                                                 : std::string(constants::kNoActivePlanReply));
         return ptRetval;
       }
     }
@@ -468,6 +638,14 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
       ipcServer.subscribe(streamId, streamName, maxElements);
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
     }
+    //
+    // Przeladowanie calego planu: transfer porcjami, potem walidacja i publikacja zadania.
+    // Dziala takze przy pProc == nullptr — to jest cala rzecz, po ktora ten kanal istnieje:
+    // instancja bezczynna musi umiec przyjac pierwszy plan.
+    //
+    if (command == "reset-begin") ptRetval = resetBegin(ptInval);
+    if (command == "reset-chunk") ptRetval = resetChunk(ptInval);
+    if (command == "reset-commit") ptRetval = resetCommit(ptInval);
     //
     // This command stop (kills) server process
     //
@@ -550,8 +728,114 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   return strstream.str();
 }
 
+void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, const AppConfig &cfg) {
+  std::string planText;
+  {
+    std::scoped_lock lock(core_mutex);
+    planText = std::move(pendingPlanText);
+    pendingPlanText.clear();
+  }
+  planResetRequested.store(false, std::memory_order_release);
+
+  // Licznik rotacji nalezy do planu, ktory wlasnie odszedl. Nowy powstanie nizej, o ile
+  // nowy plan w ogole niesie :ROTATION.
+  pCounterPtr.reset();
+
+  {
+    std::scoped_lock lock(core_mutex);
+    // Plan wymienia sie PRZEZ ZAWARTOSC tego samego obiektu: `cm` i wszystkie wskazniki na
+    // qTree sa zwiazane z nim na stale. Przypisanie pustego drzewa czysci takze maxCapacity
+    // i stan sortowania topologicznego — czego samo clear() na wektorze bazowym nie robi.
+    *coreInstancePtr = qTree{};
+    cmPtr->reset();
+    processedLines.clear();
+    adHocPlanRevision.store(0, std::memory_order_release);
+
+    const PlanSource loaded = parsePlanText(*coreInstancePtr, planText);
+    if (loaded.status != "OK") {
+      // Nieosiagalne przez kanal `reset`: resetCommit() przepuszcza wylacznie zestaw, ktory
+      // przeszedl te sama droge na kopii. Gdyby jednak tu wyladowalo, epoka ma byc PUSTA,
+      // a nie polowiczna — instancja z na wpol wczytanym planem liczylaby cos, czego nikt
+      // nie zamowil.
+      SPDLOG_ERROR("Plan reload failed at parse stage: {}; falling back to idle mode.", loaded.status);
+      *coreInstancePtr = qTree{};
+      cmPtr->reset();
+    } else {
+      processedLines = loaded.lines;
+      if (!coreInstancePtr->empty()) {
+        if (const std::string response = cmPtr->compile(); response != "OK") {
+          SPDLOG_ERROR("Plan reload failed at compile stage: {}; falling back to idle mode.", response);
+          *coreInstancePtr = qTree{};
+          cmPtr->reset();
+          processedLines.clear();
+        }
+      }
+    }
+
+    // Domyslny katalog storage z konfiguracji — ta sama regula co przy starcie: dyrektywa
+    // :STORAGE z RQL ma pierwszenstwo, a w planie pustym nie ma czego kierowac.
+    if (!cfg.storageDir.empty() && !coreInstancePtr->empty() &&
+        std::ranges::none_of(*coreInstancePtr, [](const auto &it) { return it.id == ":STORAGE"; })) {
+      query storageDirective;
+      storageDirective.id       = ":STORAGE";
+      storageDirective.filename = cfg.storageDir;
+      coreInstancePtr->push_back(storageDirective);
+    }
+  }
+
+  // Roszczenie slotu od nowa. Bus::claim() zaczyna od release(), wiec nazwy poprzedniego
+  // planu zwalniaja sie dokladnie w tej samej operacji, w ktorej rosci sie nowe.
+  const std::string queryFile                   = serviceQueryFilePath.empty() ? guard.getServiceQueryFile()  //
+                                                                               : serviceQueryFilePath;
+  const std::vector<std::string> claimedStreams = planStreamNames(*coreInstancePtr);
+  const std::string counterPath                 = planCounterPath(*coreInstancePtr);
+  const bus::ClaimResult claimed                = xrdbbus.claim({.name        = busInstanceName,
+                                                                 .queryFile   = queryFile,
+                                                                 .unit        = busUnitName,
+                                                                 .counterPath = counterPath,
+                                                                 .modes       = busRunModes,
+                                                                 .streams     = claimedStreams});
+  if (claimed.status != bus::ClaimStatus::Claimed && claimed.status != bus::ClaimStatus::Unavailable) {
+    // Wyscig z inna instancja, ktora zajela nazwe miedzy walidacja a ta chwila. Plan
+    // odpada w calosci, instancja wraca do stanu bezczynnego i zostaje na magistrali
+    // widoczna — slot bez strumieni jest nadal slotem tej instancji.
+    SPDLOG_ERROR("Plan reload refused by the bus ({}); falling back to idle mode.",
+                 claimed.stream.empty() ? claimed.detail : claimed.stream);
+    {
+      std::scoped_lock lock(core_mutex);
+      *coreInstancePtr = qTree{};
+      cmPtr->reset();
+      processedLines.clear();
+    }
+    xrdbbus.claim({.name        = busInstanceName,
+                   .queryFile   = queryFile,
+                   .unit        = busUnitName,
+                   .counterPath = {},
+                   .modes       = busRunModes,
+                   .streams     = {}});
+  }
+
+  dropStalePlanArtifacts(*coreInstancePtr, *cmPtr, processedLines);
+
+  for (const auto &it : *coreInstancePtr)
+    if (it.id == ":ROTATION") pCounterPtr = std::make_unique<PersistentCounter>(it.filename);
+
+  // Trwalosc planu: usluga, ktora zostanie zrestartowana, ma wstac z tym, co faktycznie
+  // liczy, a nie z zestawem sprzed przeladowania. Niepowodzenie zapisu nie zatrzymuje
+  // pracy — plan juz dziala, traci sie wylacznie jego przetrwanie restartu.
+  if (!serviceQueryFilePath.empty()) {
+    if (servicecontrol::writeQueryFile(planText, serviceQueryFilePath))
+      SPDLOG_INFO("Plan persisted to '{}'.", serviceQueryFilePath);
+    else
+      SPDLOG_WARN("Plan is running but could NOT be persisted to '{}'; a restart would lose it.", serviceQueryFilePath);
+  }
+
+  guard.publishLockInfo();
+  SPDLOG_INFO("Plan reloaded: {} node(s) in the new plan.", coreInstancePtr->size());
+}
+
 int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrdbbus, compiler &cm, vm_map &vm,
-                    const AppConfig &cfg, std::string_view serverName) {
+                    const AppConfig &cfg, std::string_view serverName, std::string_view systemdUnit, std::uint32_t runModes) {
   executorsm::coreInstancePtr       = &coreInstance;
   executorsm::cmPtr                 = &cm;
   executorsm::cfgQueueBufferSeconds = cfg.ipcQueueBufferSeconds;
@@ -559,6 +843,17 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   executorsm::cfgRtPriority         = cfg.schedulingRtPriority;
   dataModelExpected                 = !coreInstance.empty();
   untilEofMode                      = vm.contains("until-eof");
+  busInstanceName                   = std::string(serverName);
+  busUnitName                       = std::string(systemdUnit);
+  busRunModes                       = runModes;
+
+  // Plik zapytan uslugi. Nadpisuje go przyjety plan i oprozniaja skutki bledu krytycznego,
+  // wiec wskazuje go WYLACZNIE instancja bedaca jednostka systemd: plik `.rql` operatora,
+  // ktory uruchomil xretractor z terminala, jest jego wlasnoscia, a nie stanem uslugi.
+  if (!busUnitName.empty()) {
+    serviceQueryFilePath = guard.getServiceQueryFile().empty() ? cfg.serviceQueryFile : guard.getServiceQueryFile();
+    SPDLOG_INFO("Service unit '{}': plan reloads are persisted to '{}'.", busUnitName, serviceQueryFilePath);
+  }
 
   // Zakres waznosci wskaznika na straznika — patrz komentarz przy serviceGuardPtr.
   // RAII, a nie zerowanie przy kazdym `return`, bo run() ma ich kilka.
@@ -658,207 +953,234 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
     const bool boundedRun   = iLoopLimitCnt != executorsm::inifitie_loop;
     const bool ignoreanykey = vm.contains("noanykey") || boundedRun;
 
-    if (coreInstancePtr->empty()) {
-      //
-      // Tryb bezczynny (idle): brak zapytań — nie budujemy dataModel ani TimeLine
-      // (uniknięcie FatalError). Czekamy na zatrzymanie (SIGTERM / klawisz / limit iteracji),
-      // utrzymując wątek komunikacyjny i blokadę usługi. pProc pozostaje null —
-      // wątek komunikacyjny obsługuje to (komendy działają tylko gdy pProc != nullptr).
-      //
-      SPDLOG_INFO("Idle mode: no queries to process, waiting for shutdown signal.");
-      while (!_kbhit(ignoreanykey) && iLoopLimitCnt != executorsm::stop_now) {
-        if (iLoopLimitCnt != executorsm::inifitie_loop) {
-          if (iLoopLimitCnt != executorsm::stop_now)
-            iLoopLimitCnt--;
-          else
-            break;
-        }
-        if (!guard.isLockActive()) {
-          SPDLOG_ERROR("CRITICAL ERROR: Lost service lock!");
-          break;
-        }
-        std::this_thread::sleep_for(kIdleLoopSleep);
-      }
-      if (iLoopLimitCnt != executorsm::stop_now) _getch();
-    } else {
-      // Tryb liczenia do konca wejscia: zrodla deklarowane czytamy bez zawijania, tak jakby kazda
-      // deklaracja niosla ONESHOT. Bez tego pytanie "czy wejscie sie skonczylo" nie ma odpowiedzi —
-      // zrodlo zawijane po koncu pliku wraca na jego poczatek i produkuje rekordy z danych, ktore
-      // juz raz przeszly. Ustawienie musi nastapic PRZED konstrukcja dataModel, bo to ona tworzy
-      // magazyny i przekazuje isOneShot do fabryki akcesorow.
-      const bool until_eof_mode = untilEofMode;
-      if (until_eof_mode)
-        for (auto &q : *coreInstancePtr)
-          if (q.isDeclaration()) q.isOneShot = true;
+    // Petla EPOK planu. Jedna epoka to jeden plan: pusty (tryb bezczynny) albo policzalny
+    // (dataModel + os czasu + petla slotow). Epoka konczy sie zatrzymaniem procesu, klawiszem,
+    // wyczerpaniem budzetu — albo przyjeta komenda `reset`, i tylko wtedy zaczyna sie nastepna.
+    // Bez tej petli tryb bezczynny byl slepym zaulkiem: instancja bez planu nie miala jak go
+    // przyjac inaczej niz przez restart procesu.
+    while (iLoopLimitCnt != executorsm::stop_now) {
+      dataModelExpected = !coreInstancePtr->empty();
 
-      dataModel proc(*coreInstancePtr);
-      {
-        std::scoped_lock lock(core_mutex);
-        pProc = &proc;
-      }
-      cv.notify_all();
-
-      if (vm.contains("xqrywait")) {
-        if (vm.contains("verbose")) std::cout << "Waiting for first query to start process.\n";
-        // Warunek na zatrzasku, a nie na liczniku petli. Licznik niesie budzet slotow
-        // z --llimitqry, wiec uzycie go jako flagi bramki kasowalo ten budzet: po
-        // podniesieniu bramki wracala wartosc inifitie_loop, a nie zadane N. Skutek byl
-        // wprost mierzalny -- `xretractor -m 5` konczyl sie sam, `xretractor -x -m 5`
-        // chodzil bez konca. Zatrzask ustawiony PRZED wejsciem tutaj przepuszcza od razu,
-        // wiec komenda z okna startowego nie ginie.
-        std::unique_lock<std::mutex> scoped_lock(core_mutex);
-        cv.wait(scoped_lock, [] { return firstQueryReceived.load(); });
-        if (vm.contains("verbose")) std::cout << "First query received, starting processing loop.\n";
-      }
-
-      if (vm.contains("verbose")) coreInstancePtr->dumpCore();
-
-      std::set<boost::rational<int>> timeIntervals;
-      std::uint64_t observedAdHocPlanRevision;
-      {
-        std::scoped_lock lock(core_mutex);
-        timeIntervals             = coreInstancePtr->getAvailableTimeIntervals();
-        observedAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_relaxed);
-      }
-      TimeLine tl(timeIntervals);
-      //
-      // Main loop of data processing
-      //
-      // When this value is 0 - means we are waiting for key - other way watchdog
-      //
-      if (iLoopLimitCnt == executorsm::inifitie_loop && vm.contains("verbose")) std::cout << "Press any key to stop.\n";
-
-      // Formatowanie wiersza jest warstwa protokolu, transport dostaje je jako callback.
-      const IpcServer::RowFormatter formatRow = [this](const std::string &name) { return printRowValue(name); };
-
-      // ZERO-step
-      std::set<std::string> inSet;
-      for (const auto &it : *coreInstancePtr)
-        if (it.isDeclaration()) inSet.insert(it.id);
-      proc.processZeroStep();
-      ipcServer.broadcast(inSet, formatRow);
-      // End of ZERO-step
-
-      // Loop of data processing
-      boost::rational<int> prev_interval(0);
-
-      // Sonda E1/E2E: czas obliczeń slotu i latencja end-to-end (rdb/probe.hpp).
-      // Uzbrajana dopiero zmienną RDB_BENCH_CSV; bez wkompilowanej sondy znika w całości.
-      rdb::probe::slotProbe slotBench;
-
-      struct timespec loop_anchor{};
-      const bool rt_mode = vm.contains("realtime");
-      // Tryb offline: oś czasu planu (interwały, wyrównanie slotów, ogon) pozostaje nietknięta —
-      // znika wyłącznie czekanie na zegar ścienny, więc ciąg wyliczonych rekordów jest ten sam
-      // co w przebiegu taktowanym. Wyklucza się z rt_mode; sprzeczność odrzuca launcher.
-      const bool no_clock_mode = vm.contains("no-clock");
-      if (rt_mode) {
-        if (rtCheckAndPrint()) {
-          rtActivate(cfgRtPriority);
-          // Dopiero TERAZ znana jest maska wątku RT, więc dopiero teraz można z
-          // niej wyliczyć rdzenie dla wątku komunikacyjnego. Bez tego przy
-          // obciążeniu powyżej 100 % slotu wątek komunikacyjny nie dostaje CPU
-          // i żaden klient nie zdąży się zarejestrować (issue_217, badanie W8).
-          rtKeepThreadOffRtCpus(ipcServer.threadHandle());
-        }
-      }
-
-      // Sonda E1/E2E otwierana PRZED kotwicą osi czasu: koszt otwarcia pliku nie może
-      // obciążyć budżetu pierwszych slotów (transjent startowy ~20-47 ms w wake_lag --
-      // sledztwo ~40 ms, JOURNAL.md 2026-07-18, Faza 3). Tak samo rtActivate
-      // (mlockall/SCHED_FIFO) musi wykonać się przed kotwicą.
-      slotBench.open();
-      clock_gettime(CLOCK_MONOTONIC, &loop_anchor);
-      slotBench.anchor(loop_anchor);
-
-      while (!_kbhit(ignoreanykey) && iLoopLimitCnt != executorsm::stop_now) {
-        if (iLoopLimitCnt != executorsm::inifitie_loop) {
-          if (iLoopLimitCnt != executorsm::stop_now)
-            iLoopLimitCnt--;
-          else
-            break;
-        }
-
-        // Check if system service lock is still active
-        if (!guard.isLockActive()) {
-          SPDLOG_ERROR("CRITICAL ERROR: Lost service lock!");
-          break;
-        }
-
-        // Szybka ścieżka wykonuje tylko odczyt atomowy. Pełny skan planu i
-        // przebudowa osi następują wyłącznie po opublikowaniu importu ad hoc.
-        const auto currentAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_acquire);
-        if (currentAdHocPlanRevision != observedAdHocPlanRevision) {
-          std::scoped_lock lock(core_mutex);
-          auto availableTimeIntervals = coreInstancePtr->getAvailableTimeIntervals();
-          if (availableTimeIntervals != timeIntervals) {
-            tl.updateTimeIntervals(availableTimeIntervals);
-            timeIntervals = std::move(availableTimeIntervals);
+      if (coreInstancePtr->empty()) {
+        //
+        // Tryb bezczynny (idle): brak zapytań — nie budujemy dataModel ani TimeLine
+        // (uniknięcie FatalError). Czekamy na zatrzymanie (SIGTERM / klawisz / limit iteracji),
+        // utrzymując wątek komunikacyjny i blokadę usługi. pProc pozostaje null —
+        // wątek komunikacyjny obsługuje to (komendy działają tylko gdy pProc != nullptr).
+        //
+        SPDLOG_INFO("Idle mode: no queries to process, waiting for a plan or a shutdown signal.");
+        while (!_kbhit(ignoreanykey) && iLoopLimitCnt != executorsm::stop_now &&
+               !planResetRequested.load(std::memory_order_acquire)) {
+          if (iLoopLimitCnt != executorsm::inifitie_loop) {
+            if (iLoopLimitCnt != executorsm::stop_now)
+              iLoopLimitCnt--;
+            else
+              break;
           }
-          // Import również publikuje rewizję pod core_mutex. Ponowny odczyt
-          // pod blokadą obejmuje wszystkie importy zakończone przed tym skanem.
+          if (!guard.isLockActive()) {
+            SPDLOG_ERROR("CRITICAL ERROR: Lost service lock!");
+            break;
+          }
+          std::this_thread::sleep_for(kIdleLoopSleep);
+        }
+      } else {
+        // Tryb liczenia do konca wejscia: zrodla deklarowane czytamy bez zawijania, tak jakby kazda
+        // deklaracja niosla ONESHOT. Bez tego pytanie "czy wejscie sie skonczylo" nie ma odpowiedzi —
+        // zrodlo zawijane po koncu pliku wraca na jego poczatek i produkuje rekordy z danych, ktore
+        // juz raz przeszly. Ustawienie musi nastapic PRZED konstrukcja dataModel, bo to ona tworzy
+        // magazyny i przekazuje isOneShot do fabryki akcesorow.
+        const bool until_eof_mode = untilEofMode;
+        if (until_eof_mode)
+          for (auto &q : *coreInstancePtr)
+            if (q.isDeclaration()) q.isOneShot = true;
+
+        dataModel proc(*coreInstancePtr);
+        {
+          std::scoped_lock lock(core_mutex);
+          pProc = &proc;
+        }
+        cv.notify_all();
+
+        if (vm.contains("xqrywait")) {
+          if (vm.contains("verbose")) std::cout << "Waiting for first query to start process.\n";
+          // Warunek na zatrzasku, a nie na liczniku petli. Licznik niesie budzet slotow
+          // z --llimitqry, wiec uzycie go jako flagi bramki kasowalo ten budzet: po
+          // podniesieniu bramki wracala wartosc inifitie_loop, a nie zadane N. Skutek byl
+          // wprost mierzalny -- `xretractor -m 5` konczyl sie sam, `xretractor -x -m 5`
+          // chodzil bez konca. Zatrzask ustawiony PRZED wejsciem tutaj przepuszcza od razu,
+          // wiec komenda z okna startowego nie ginie.
+          std::unique_lock<std::mutex> scoped_lock(core_mutex);
+          cv.wait(scoped_lock, [] { return firstQueryReceived.load(); });
+          if (vm.contains("verbose")) std::cout << "First query received, starting processing loop.\n";
+        }
+
+        if (vm.contains("verbose")) coreInstancePtr->dumpCore();
+
+        std::set<boost::rational<int>> timeIntervals;
+        std::uint64_t observedAdHocPlanRevision;
+        {
+          std::scoped_lock lock(core_mutex);
+          timeIntervals             = coreInstancePtr->getAvailableTimeIntervals();
           observedAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_relaxed);
         }
+        TimeLine tl(timeIntervals);
+        //
+        // Main loop of data processing
+        //
+        // When this value is 0 - means we are waiting for key - other way watchdog
+        //
+        if (iLoopLimitCnt == executorsm::inifitie_loop && vm.contains("verbose")) std::cout << "Press any key to stop.\n";
 
-        //
-        // Inner time is counted in miliseconds
-        // probably can be increased in faster machines
-        //
-        const int msInSec                          = 1000;
-        const boost::rational<int> currentTimeSlot = tl.getNextTimeSlot();
-        boost::rational<int> interval(currentTimeSlot * msInSec /* sec->ms */);
-        int period(rational_cast<int>(interval - prev_interval));  // miliseconds
-        prev_interval = interval;
+        // Formatowanie wiersza jest warstwa protokolu, transport dostaje je jako callback.
+        const IpcServer::RowFormatter formatRow = [this](const std::string &name) { return printRowValue(name); };
 
-        //
-        // Waiting given miliseconds time that is computed
-        //
-        if (rt_mode)
-          rtAbsoluteSleep(loop_anchor, rational_cast<long>(interval));
-        else if (!no_clock_mode)
-          std::this_thread::sleep_for(std::chrono::milliseconds(period));
-
-        slotBench.beginSlot(rational_cast<long>(interval));
-        {
-          // Kompilator ad hoc modyfikuje qTree pod tym samym muteksem. Bez blokady
-          // iteracja getAwaitedStreamsSet mogłaby ścigać się z importem nowych węzłów.
-          std::scoped_lock lock(core_mutex);
-          inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
-        }
-        slotBench.beginCompute();
-        proc.processRows(inSet, currentTimeSlot);  // mierzony rdzeń obliczeń jednego interwału (E1)
-        slotBench.endCompute();
+        // ZERO-step
+        std::set<std::string> inSet;
+        for (const auto &it : *coreInstancePtr)
+          if (it.isDeclaration()) inSet.insert(it.id);
+        proc.processZeroStep();
         ipcServer.broadcast(inSet, formatRow);
-        slotBench.endSlot();
+        // End of ZERO-step
 
-        // Deklaracje sa czytane na koncu slotu, a ich rekord konsumuje dopiero slot nastepny.
-        // Wyjscie z petli w tym miejscu wypada wiec dokladnie przed pierwszym rekordem, ktory
-        // powstalby z all-null wstawionego za koniec wejscia.
-        if (until_eof_mode) {
-          const auto exhausted = proc.exhaustedInputStream();
-          if (!exhausted.empty()) {
-            SPDLOG_INFO("End of input on declared stream '{}' — stopping (--until-eof).", exhausted);
-            if (vm.contains("verbose")) std::cout << "End of input on stream '" << exhausted << "'. Stopping.\n";
-            // Ta sama droga wyjscia co przy wyczerpaniu --llimitqry: stop_now zdejmuje czekanie
-            // na klawisz ponizej petli, wiec przebieg wsadowy konczy sie sam.
-            {
-              std::scoped_lock lock(core_mutex);
-              iLoopLimitCnt = executorsm::stop_now;
-            }
-            break;
+        // Loop of data processing
+        boost::rational<int> prev_interval(0);
+
+        // Sonda E1/E2E: czas obliczeń slotu i latencja end-to-end (rdb/probe.hpp).
+        // Uzbrajana dopiero zmienną RDB_BENCH_CSV; bez wkompilowanej sondy znika w całości.
+        rdb::probe::slotProbe slotBench;
+
+        struct timespec loop_anchor{};
+        const bool rt_mode = vm.contains("realtime");
+        // Tryb offline: oś czasu planu (interwały, wyrównanie slotów, ogon) pozostaje nietknięta —
+        // znika wyłącznie czekanie na zegar ścienny, więc ciąg wyliczonych rekordów jest ten sam
+        // co w przebiegu taktowanym. Wyklucza się z rt_mode; sprzeczność odrzuca launcher.
+        const bool no_clock_mode = vm.contains("no-clock");
+        if (rt_mode) {
+          if (rtCheckAndPrint()) {
+            rtActivate(cfgRtPriority);
+            // Dopiero TERAZ znana jest maska wątku RT, więc dopiero teraz można z
+            // niej wyliczyć rdzenie dla wątku komunikacyjnego. Bez tego przy
+            // obciążeniu powyżej 100 % slotu wątek komunikacyjny nie dostaje CPU
+            // i żaden klient nie zdąży się zarejestrować (issue_217, badanie W8).
+            rtKeepThreadOffRtCpus(ipcServer.threadHandle());
           }
         }
-        // End of loop while( ! _kbhit(ignoreanykey) )
+
+        // Sonda E1/E2E otwierana PRZED kotwicą osi czasu: koszt otwarcia pliku nie może
+        // obciążyć budżetu pierwszych slotów (transjent startowy ~20-47 ms w wake_lag --
+        // sledztwo ~40 ms, JOURNAL.md 2026-07-18, Faza 3). Tak samo rtActivate
+        // (mlockall/SCHED_FIFO) musi wykonać się przed kotwicą.
+        slotBench.open();
+        clock_gettime(CLOCK_MONOTONIC, &loop_anchor);
+        slotBench.anchor(loop_anchor);
+
+        while (!_kbhit(ignoreanykey) && iLoopLimitCnt != executorsm::stop_now &&
+               !planResetRequested.load(std::memory_order_acquire)) {
+          if (iLoopLimitCnt != executorsm::inifitie_loop) {
+            if (iLoopLimitCnt != executorsm::stop_now)
+              iLoopLimitCnt--;
+            else
+              break;
+          }
+
+          // Check if system service lock is still active
+          if (!guard.isLockActive()) {
+            SPDLOG_ERROR("CRITICAL ERROR: Lost service lock!");
+            break;
+          }
+
+          // Szybka ścieżka wykonuje tylko odczyt atomowy. Pełny skan planu i
+          // przebudowa osi następują wyłącznie po opublikowaniu importu ad hoc.
+          const auto currentAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_acquire);
+          if (currentAdHocPlanRevision != observedAdHocPlanRevision) {
+            std::scoped_lock lock(core_mutex);
+            auto availableTimeIntervals = coreInstancePtr->getAvailableTimeIntervals();
+            if (availableTimeIntervals != timeIntervals) {
+              tl.updateTimeIntervals(availableTimeIntervals);
+              timeIntervals = std::move(availableTimeIntervals);
+            }
+            // Import również publikuje rewizję pod core_mutex. Ponowny odczyt
+            // pod blokadą obejmuje wszystkie importy zakończone przed tym skanem.
+            observedAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_relaxed);
+          }
+
+          //
+          // Inner time is counted in miliseconds
+          // probably can be increased in faster machines
+          //
+          const int msInSec                          = 1000;
+          const boost::rational<int> currentTimeSlot = tl.getNextTimeSlot();
+          boost::rational<int> interval(currentTimeSlot * msInSec /* sec->ms */);
+          int period(rational_cast<int>(interval - prev_interval));  // miliseconds
+          prev_interval = interval;
+
+          //
+          // Waiting given miliseconds time that is computed
+          //
+          if (rt_mode)
+            rtAbsoluteSleep(loop_anchor, rational_cast<long>(interval));
+          else if (!no_clock_mode)
+            std::this_thread::sleep_for(std::chrono::milliseconds(period));
+
+          slotBench.beginSlot(rational_cast<long>(interval));
+          {
+            // Kompilator ad hoc modyfikuje qTree pod tym samym muteksem. Bez blokady
+            // iteracja getAwaitedStreamsSet mogłaby ścigać się z importem nowych węzłów.
+            std::scoped_lock lock(core_mutex);
+            inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
+          }
+          slotBench.beginCompute();
+          proc.processRows(inSet, currentTimeSlot);  // mierzony rdzeń obliczeń jednego interwału (E1)
+          slotBench.endCompute();
+          ipcServer.broadcast(inSet, formatRow);
+          slotBench.endSlot();
+
+          // Deklaracje sa czytane na koncu slotu, a ich rekord konsumuje dopiero slot nastepny.
+          // Wyjscie z petli w tym miejscu wypada wiec dokladnie przed pierwszym rekordem, ktory
+          // powstalby z all-null wstawionego za koniec wejscia.
+          if (until_eof_mode) {
+            const auto exhausted = proc.exhaustedInputStream();
+            if (!exhausted.empty()) {
+              SPDLOG_INFO("End of input on declared stream '{}' — stopping (--until-eof).", exhausted);
+              if (vm.contains("verbose")) std::cout << "End of input on stream '" << exhausted << "'. Stopping.\n";
+              // Ta sama droga wyjscia co przy wyczerpaniu --llimitqry: stop_now zdejmuje czekanie
+              // na klawisz ponizej petli, wiec przebieg wsadowy konczy sie sam.
+              {
+                std::scoped_lock lock(core_mutex);
+                iLoopLimitCnt = executorsm::stop_now;
+              }
+              break;
+            }
+          }
+          // End of loop while( ! _kbhit(ignoreanykey) )
+        }
+
+        // Raport liczników runtime (K6 materializacja, E4 praca na slot) po zakończeniu
+        // mierzonej pętli, żeby zliczanie nie obciążało budżetu slotu.
+        rdb::probe::reportRuntimeCounters();
+        //
+        // End of data processing loop
+        //
+
+        // Koniec epoki: model znika, zanim `proc` wyjdzie z zakresu. Kolejnosc jest wymogiem
+        // poprawnosci — watek komunikacyjny siega po pProc bez wlasnej wiedzy o epokach, wiec
+        // wskaznik musi zgasnac POD muteksem i z powiadomieniem, inaczej komenda obudzona
+        // w trakcie rozbiorki czytalaby zniszczony dataModel.
+        {
+          std::scoped_lock lock(core_mutex);
+          pProc             = nullptr;
+          dataModelExpected = false;
+        }
+        cv.notify_all();
+        ipcServer.broadcastOutOfBusiness();
       }
 
-      // Raport liczników runtime (K6 materializacja, E4 praca na slot) po zakończeniu
-      // mierzonej pętli, żeby zliczanie nie obciążało budżetu slotu.
-      rdb::probe::reportRuntimeCounters();
-      //
-      // End of data processing loop
-      //
-      if (iLoopLimitCnt != executorsm::stop_now) _getch();  // no wait ... feed key from kbhit
+      if (!planResetRequested.load(std::memory_order_acquire)) break;
+      applyPendingPlan(guard, xrdbbus, cfg);
     }
+    // Klawisz, ktory zakonczyl OSTATNIA epoke, zdejmujemy raz — epoka przerwana
+    // przeladowaniem planu nie konczy sie klawiszem, wiec nie ma tam czego pobierac.
+    if (iLoopLimitCnt != executorsm::stop_now) _getch();  // no wait ... feed key from kbhit
   } catch (IPC::interprocess_exception &ex) {
     std::cerr << ex.what() << '\n' << "IPC::interprocess exception" << '\n';
     retVal = system::errc::no_child_process;

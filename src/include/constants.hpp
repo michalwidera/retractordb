@@ -7,6 +7,12 @@
 
 namespace constants {
 constexpr std::string_view Reserved_id_oob = "OUT_OF_BUSSINESS";
+
+/// Odpowiedz serwera na komende wymagajaca modelu danych, gdy instancja nie ma wczytanego
+/// planu (tryb bezczynny). Wspolna dla obu stron IPC: serwer ja wpisuje, klient rozpoznaje.
+/// Bez wspolnej stalej klient nie odroznial instancji bezczynnej od serwera, ktory nie
+/// odpowiedzial — i meldowal timeout tam, gdzie odpowiedz przyszla od razu.
+constexpr std::string_view kNoActivePlanReply = "no active plan";
 }  // namespace constants
 
 namespace ipc {

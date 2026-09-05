@@ -16,6 +16,13 @@ namespace servername {
 /// klienta.
 inline constexpr std::size_t kMaxLength = 32;
 
+/// Nazwa instancji dzialajacej jako USLUGA. Jedna, stala i znana z gory, bo usluga jest
+/// adresatem polecen operatora (`xqry --server service --reset plan.rql`), a adresat, ktorego
+/// nazwy trzeba najpierw poszukac na magistrali, nie nadaje sie do wpisania w skrypt. Serwerow
+/// zwyklych moze dzialac wiele; usluga jest dokladnie jedna i pilnuje tego blokada tej nazwy
+/// oraz kontrola trybu kService przy roszczeniu slotu.
+inline constexpr const char *kServiceInstanceName = "service";
+
 /// Losuje nazwe w stylu "przymiotnik_nazwisko" (jeden token, bez spacji), np. "nervous_hopper".
 /// Kolejne wywolania moga dac te sama nazwe -- o rozstrzyganiu kolizji decyduje wolajacy.
 std::string generate();

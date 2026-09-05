@@ -2,6 +2,7 @@
 # Scenariusz trybu usługowego/idle xretractor. Argument $1:
 #   (brak) -> tryb flagi --service
 #   env    -> tryb zmiennej środowiskowej XRETRACTOR_SERVICE=1
+#   empty  -> plik zapytań istnieje, ale nie niesie ani jednej instrukcji
 # Logikę trzymamy w skrypcie (nie w 'bash -c' w add_test), bo średniki w CMake
 # są separatorem listy i rozbiłyby polecenie na osobne argumenty.
 set -e
@@ -18,7 +19,19 @@ set -e
 # (build z INFO), gdy uruchamiany bez zmiennej.
 info_active="${RDB_INFO_ACTIVE:-1}"
 
-if [ "$1" = "env" ]; then
+if [ "$1" = "empty" ]; then
+  # Plik zapytań bez ani jednej instrukcji = tryb bezczynny, a nie błąd. Jednostka systemd
+  # wskazuje ExecStart-em stały plik (RETRACTOR_QUERY_FILE), a ten przy pierwszym starcie
+  # systemu jest pusty — i tak jest udokumentowana w samej jednostce. Do 2026-09-05 taki
+  # start kończył się kodem błędu ("Parse result:Empty file."), więc Restart=on-failure
+  # zapętlał usługę zamiast pozostawić ją czekającą na plan.
+  printf '# zestaw bez instrukcji\n\n' > empty-plan.rql
+  xretractor --service --noanykey -m 5 empty-plan.rql 2>stderr.txt
+  if [ "$info_active" = "1" ]; then
+    grep -q 'holds no statements' stderr.txt
+    grep -q 'Idle mode: no queries to process' stderr.txt
+  fi
+elif [ "$1" = "env" ]; then
   # Logowanie usługowe włączone zmienną środowiskową, bez flagi --service.
   XRETRACTOR_SERVICE=1 xretractor --noanykey -m 5 2>stderr.txt
 else

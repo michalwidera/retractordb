@@ -721,7 +721,7 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
 ///
 /// Warunek patrzy na pierwszy NIEBIALY znak, bo wcieta linia komentarza szla dotad do
 /// leksera i lapala ja wlasnie usunieta regula.
-std::vector<std::string> readLogicalLines(std::ifstream &file) {
+std::vector<std::string> readLogicalLines(std::istream &file) {
   std::vector<std::string> result;
   std::string line;
   std::string accumulated;

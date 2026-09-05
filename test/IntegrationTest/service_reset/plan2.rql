@@ -1,0 +1,4 @@
+STORAGE 'temp'
+SUBSTRAT 'memory'
+DECLARE a INTEGER STREAM src, 0.2 FILE 'data.txt'
+SELECT a*10 STREAM beta FROM src

@@ -17,6 +17,8 @@ Allowed options:
   -s [ --select ] arg         show this stream
   -t [ --detail ] arg         show details of this stream
   -a [ --adhoc ] arg          adhoc query mode
+  -q [ --reset ] arg          replace the whole plan of the target instance
+                              with this RQL file
   -m [ --elimitqry ] arg (=0) limit of elements, 0 - no limit
   -n [ --null ]               if null row appear - skip it in output
   -l [ --hello ]              diagnostic - hello db world
@@ -84,7 +86,7 @@ str2  | 1/2      | 0    | 0     |               | 0
 
 ## One command at a time
 
-`-s`, `-t`, `-a`, `-d`, `-b` and `-l` each print something different, so giving
+`-s`, `-t`, `-a`, `-q`, `-d`, `-b` and `-l` each do something different, so giving
 two of them at once is refused with exit code `22` instead of silently running
 the first one. This also stops a whole class of typos: boost glues a value onto
 a short option, so `xqry -t str1 -yaml` parses as `-y -a ml`, i.e. an ad-hoc
@@ -92,6 +94,41 @@ query `ml` sent to the server instead of the requested detail.
 
 `-k` is not part of the set - `xqry -s <stream> -m N -k` (kill after the element
 budget) and `xqry -k -a "..."` are deliberate combinations.
+
+## Reloading the plan - `xqry --reset <file.rql>`
+
+`--reset` (short `-q`) replaces the **whole** query plan of the target instance with the
+contents of an RQL file. It is not `--adhoc`: ad-hoc adds a single statement to a running
+plan, `--reset` swaps the plan itself, including directives (`STORAGE`, `SUBSTRAT`,
+`:ROTATION`) that ad-hoc refuses.
+
+```
+$ xqry --reset plan.rql --server service
+Plan accepted by the server and scheduled for loading: plan.rql
+```
+
+The client reads the file and sends its **contents**, not the path: the service usually runs
+under its own account (`User=retractor` in the systemd unit) and could not open the
+operator's file.
+
+The server validates the whole set - parse, compile, and stream-name disjointness against the
+other live instances - **before** it touches the running plan. A refusal therefore costs
+nothing; the previous plan keeps computing and the exit code is non-zero:
+
+```
+$ xqry --reset broken.rql --server service
+xqry: plan reload refused at reset-commit: Fail compile:...
+```
+
+An accepted plan replaces the running one at the end of the current slot: stream artifacts of
+the old plan are dropped exactly as at start-up (unless the plan carries `:ROTATION`),
+subscribed clients are told the show is over, and the new names are claimed on the bus. A file
+with no statements at all is a legal request - it returns the instance to the **idle** state,
+serving nothing and waiting for the next plan.
+
+An instance started as a service (`--service`, `XRETRACTOR_SERVICE=1`, or a systemd unit) is
+named `service` on the bus unless `--name` says otherwise, so the target is the same on every
+machine: `--server service`. With exactly one live instance `--server` may be omitted.
 
 ## Output format - `-y`
 

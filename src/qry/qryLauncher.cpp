@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <chrono>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <print>
@@ -67,6 +68,10 @@ static routing::Resolution resolveTarget(const boost::program_options::variables
   if (instances.size() <= 1) return routing::forSingleTarget(instances);
   if (vm.contains("hello") || (vm.contains("kill") && elemLimit == 0) || vm.contains("dir"))
     return routing::forSingleTarget(instances);
+  // Przeladowanie planu dotyczy CALEJ instancji, a nie strumienia — a instancja bezczynna
+  // nie serwuje zadnego strumienia, wiec po strumieniu nie da sie jej wskazac. Przy wiecej
+  // niz jednej zywej instancji `--reset` wymaga wiec jawnego `--server`.
+  if (vm.contains("reset")) return routing::forSingleTarget(instances);
   if (vm.contains("adhoc") && !adHoc.empty()) return routing::forAdHoc(instances, adHoc);
   if (vm.contains("detail")) return routing::forStream(instances, detail);
   if (vm.contains("select") && stream != "none") return routing::forStream(instances, stream);
@@ -89,11 +94,14 @@ int main(int argc, char *argv[]) {
     std::string sGnuplotDim;
     std::string sConfig;
     std::string sServerName;
+    std::string sResetFile;
     std::tuple<int, int, int> gnuplotDim{0, 0, 0};
-    desc.add_options()                                                                                    //
-        ("select,s", po::value<std::string>(&sInputStream), "show this stream")                           //
-        ("detail,t", po::value<std::string>(&sDetailStream), "show details of this stream")               //
-        ("adhoc,a", po::value<std::string>(&sAdHoc), "adhoc query mode")                                  //
+    desc.add_options()                                                                       //
+        ("select,s", po::value<std::string>(&sInputStream), "show this stream")              //
+        ("detail,t", po::value<std::string>(&sDetailStream), "show details of this stream")  //
+        ("adhoc,a", po::value<std::string>(&sAdHoc), "adhoc query mode")                     //
+        ("reset,q", po::value<std::string>(&sResetFile),
+         "replace the whole plan of the target instance with this RQL file")                              //
         ("elimitqry,m", po::value<int>(&elemLimit)->default_value(0), "limit of elements, 0 - no limit")  //
         ("null,n", "if null row appear - skip it in output")                                              //
         ("hello,l", "diagnostic - hello db world")                                                        //
@@ -193,10 +201,10 @@ int main(int argc, char *argv[]) {
     //
     // `-k` do zbioru NIE nalezy: `-s <strumien> -k -m N` (ubij po budzecie elementow) i
     // `-k -a "..."` to celowe kombinacje, uzywane w testach integracyjnych.
-    const auto commandCount =
-        vm.count("select") + vm.count("detail") + vm.count("adhoc") + vm.count("dir") + vm.count("bus") + vm.count("hello");
+    const auto commandCount = vm.count("select") + vm.count("detail") + vm.count("adhoc") + vm.count("dir") + vm.count("bus") +
+                              vm.count("hello") + vm.count("reset");
     if (commandCount > 1) {
-      std::println(std::cerr, "xqry: only one command at a time (--select, --detail, --adhoc, --dir, --bus, --hello)");
+      std::println(std::cerr, "xqry: only one command at a time (--select, --detail, --adhoc, --reset, --dir, --bus, --hello)");
       return system::errc::invalid_argument;
     }
     // `-y` jest modyfikatorem formatu, nie komenda: sam z siebie nie wybiera niczego do
@@ -270,6 +278,20 @@ int main(int argc, char *argv[]) {
       obj.netClient("kill", "");
     } else if (vm.contains("dir")) {
       std::print("{}", vm.contains("yaml") ? obj.dirYaml() : obj.dir());
+    } else if (vm.contains("reset")) {
+      // Plik czyta KLIENT, nie serwer: usluga chodzi zwykle na innym koncie (User=retractor
+      // w jednostce systemd) i pliku operatora zwyczajnie nie otworzy. Kanalem IPC idzie
+      // wiec tresc, a nie sciezka.
+      std::ifstream planFile(sResetFile, std::ios::binary);
+      if (!planFile.is_open()) {
+        std::println(std::cerr, "xqry: cannot open plan file: {}", sResetFile);
+        return system::errc::no_such_file_or_directory;
+      }
+      std::ostringstream planText;
+      planText << planFile.rdbuf();
+      planFile.close();
+      if (obj.reset(planText.str())) return system::errc::protocol_error;
+      std::println("Plan accepted by the server and scheduled for loading: {}", sResetFile);
     } else if (vm.contains("adhoc") && !sAdHoc.empty()) {
       if (obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
     } else if (vm.contains("detail")) {
@@ -299,6 +321,9 @@ int main(int argc, char *argv[]) {
         case selectResult::noData:
           std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
           return system::errc::no_message_available;
+        case selectResult::noActivePlan:
+          std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
+          return system::errc::no_such_file_or_directory;
       }
     } else {
       SPDLOG_ERROR("no argument.");

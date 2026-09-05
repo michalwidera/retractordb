@@ -7,6 +7,7 @@
 #include <chrono>
 #include <iostream>
 #include <optional>
+#include <print>
 #include <sstream>
 #include <thread>
 #include <vector>
@@ -54,6 +55,47 @@ bool qry::adhoc(const std::string &sAdhoc) {
   return false;
 }
 
+namespace {
+
+/// Werdykt serwera wyjety z odpowiedzi. Ten sam ksztalt co w qry::adhoc: serwer wpisuje
+/// jedna wartosc pod kluczem `db` albo `error.response`.
+std::string serverVerdict(const boost::property_tree::ptree &pt) {
+  std::string rcv("fail.");
+  for (const auto &[first, second] : pt) {
+    rcv = second.get<std::string>("");
+  }
+  return rcv;
+}
+
+}  // namespace
+
+bool qry::reset(const std::string &planText) {
+  const std::size_t chunkCount = (planText.size() + kResetChunkBytes - 1) / kResetChunkBytes;
+
+  const auto refuse = [](const std::string &stage, const std::string &verdict) {
+    // Werdykt idzie na stderr raz. SPDLOG w xqry pisze wlasnie na stderr (i do pliku logu),
+    // wiec dolozenie tam drugiej kopii dawalo operatorowi ten sam komunikat dwa razy.
+    std::println(std::cerr, "xqry: plan reload refused at {}: {}", stage, verdict);
+    return true;
+  };
+
+  if (const std::string verdict = serverVerdict(netClient("reset-begin", std::to_string(chunkCount))); verdict != "OK")
+    return refuse("reset-begin", verdict);
+
+  for (std::size_t offset = 0; offset < planText.size(); offset += kResetChunkBytes) {
+    const std::string chunk = planText.substr(offset, kResetChunkBytes);
+    if (const std::string verdict = serverVerdict(netClient("reset-chunk", chunk)); verdict != "OK")
+      return refuse("reset-chunk", verdict);
+  }
+
+  // Dopiero commit uruchamia walidacje po stronie serwera: parsowanie, kompilacje i
+  // rozlacznosc nazw. Do tej chwili dzialajacy plan nie jest niczym dotkniety.
+  if (const std::string verdict = serverVerdict(netClient("reset-commit", "")); verdict != "OK")
+    return refuse("reset-commit", verdict);
+
+  return false;
+}
+
 selectResult qry::select(boost::program_options::variables_map &vm, const int iElemLimit, const std::string &input,
                          std::tuple<int, int, int> gnuplotDim, bool gnuplotRightToLeft) {
   elemLimitCnt = (iElemLimit > 0) ? iElemLimit + 1 : iElemLimit;
@@ -82,6 +124,13 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
   }
   const auto streamNode = pt.get_child_optional("db.stream");
   if (!streamNode) {
+    // Instancja bezczynna ODPOWIADA — po prostu nie ma czego wyliczyc. Bez tego rozroznienia
+    // klient meldowal "server did not answer within the timeout", czyli obciazal serwer awaria,
+    // ktorej nie bylo, i kierowal diagnoze na IPC zamiast na brak planu.
+    if (const auto reason = pt.get_optional<std::string>("db"); reason && *reason == constants::kNoActivePlanReply) {
+      SPDLOG_ERROR("server has no plan loaded (stream: {})", input);
+      return selectResult::noActivePlan;
+    }
     SPDLOG_ERROR("server response carries no stream list (stream: {})", input);
     return selectResult::serverNoResponse;
   }
@@ -213,6 +262,8 @@ const char *toString(selectResult result) {
       return "server did not create the client response queue";
     case selectResult::noData:
       return "no data in stream";
+    case selectResult::noActivePlan:
+      return "server has no plan loaded (idle); load one with --reset";
   }
   return "unknown";
 }
@@ -236,6 +287,12 @@ std::string qry::dirYaml() {
   ptree pt = netClient("get", "");
 
   retval << "---\napiVersion: xqry/v1\n";
+  // Instancja bez planu daje dokument z pusta lista, tak samo jak `--bus -y` przy pustej
+  // magistrali. Konsument YAML-a ma dostac dokument, a nie wyjatek o brakujacym wezle.
+  if (!pt.get_child_optional("db.stream")) {
+    retval << "streams: []\n";
+    return retval.str();
+  }
   retval << "streams:\n";
   for (const auto &v : pt.get_child("db.stream")) {
     auto location = v.second.get<std::string>("location");
@@ -254,6 +311,10 @@ std::string qry::dirYaml() {
 std::string qry::dir() {
   std::stringstream retval;
   ptree pt = netClient("get", "");
+  // Instancja bez planu nie odsyla listy strumieni. Do 2026-09-05 get_child ponizej rzucalo
+  // wtedy "No such node (db.stream)", a wyjatek wychodzil do operatora jako "Std: ..." —
+  // komunikat o strukturze ptree zamiast o stanie serwera.
+  if (!pt.get_child_optional("db.stream")) return std::string(constants::kNoActivePlanReply) + "\n";
   // Klucz w ptree ("" to nazwa strumienia) i naglowek kolumny w wydruku.
   const std::array vcols{std::pair{std::string{""}, std::string{"name"}},
                          std::pair{std::string{"duration"}, std::string{"duration"}},

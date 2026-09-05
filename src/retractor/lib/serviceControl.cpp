@@ -60,7 +60,10 @@ bool deliverQueryFile(const std::string &source, const std::string &target) {
   }
   std::ostringstream buf;
   buf << src.rdbuf();
+  return writeQueryFile(buf.str(), target);
+}
 
+bool writeQueryFile(const std::string &content, const std::string &target) {
   const std::filesystem::path targetPath(target);
   const std::filesystem::path tmpPath =
       targetPath.parent_path() / (targetPath.filename().string() + ".tmp." + std::to_string(::getpid()));
@@ -68,13 +71,13 @@ bool deliverQueryFile(const std::string &source, const std::string &target) {
   {
     std::ofstream out(tmpPath, std::ios::binary | std::ios::trunc);
     if (!out.is_open()) {
-      SPDLOG_ERROR("deliverQueryFile: cannot open temp {}", tmpPath.string());
+      SPDLOG_ERROR("writeQueryFile: cannot open temp {}", tmpPath.string());
       return false;
     }
-    out << buf.str();
+    out << content;
     out.flush();
     if (!out) {
-      SPDLOG_ERROR("deliverQueryFile: write failed to temp {}", tmpPath.string());
+      SPDLOG_ERROR("writeQueryFile: write failed to temp {}", tmpPath.string());
       return false;
     }
   }
@@ -82,7 +85,7 @@ bool deliverQueryFile(const std::string &source, const std::string &target) {
   std::error_code ec;
   std::filesystem::rename(tmpPath, targetPath, ec);
   if (ec) {
-    SPDLOG_ERROR("deliverQueryFile: rename {} -> {} failed: {}", tmpPath.string(), targetPath.string(), ec.message());
+    SPDLOG_ERROR("writeQueryFile: rename {} -> {} failed: {}", tmpPath.string(), targetPath.string(), ec.message());
     std::filesystem::remove(tmpPath, ec);
     return false;
   }
