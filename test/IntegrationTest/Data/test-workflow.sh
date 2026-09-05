@@ -27,7 +27,15 @@ QUEUES_BEFORE=$(ls $QUEUE_GLOB 2>/dev/null | wc -l)
 
 xretractor "$1" -c
 
-server_start "$1" -m 100 -k -x
+# Bez budzetu slotow (--llimitqry): dlugosc zycia serwera wyznacza `xqry -k` na koncu,
+# a nie zgadniety limit iteracji. Poprzednie `-m 100` liczylo SLOTY, czyli czas scienny
+# planu (~1,7 s dla query-lnx.rql), podczas gdy sam `xqry -s str2 -m 3` potrzebuje 1,5 s,
+# bo str2 ma takt 1/2 s. Margines wynosil kilkadziesiat milisekund: kazde opoznienie na
+# obciazonym CI wyczerpywalo budzet, serwer konczyl sie sam i kolejne polecenie klienta
+# meldowalo "IPC: No such file or directory" albo "server not found". Odtworzone lokalnie
+# jednym `sleep 0.5` wstawionym przed zapytania. Pozostale dziewiec testow serwerowych
+# startuje wlasnie bez -m; higiena po nieudanym przebiegu nalezy do trap-u w serverlib.sh.
+server_start "$1" -k -x
 
 # Blokada dowodzi, ze serwer wstal; gotowosc kanalu IPC sprawdzamy osobno.
 READY=0
