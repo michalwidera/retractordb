@@ -40,7 +40,7 @@ constexpr std::uint64_t kMagic = 0x5852'4442'4255'5300ULL;
 // ukladach nie spotykaja sie na jednym segmencie, wiec do tego sprawdzenia w ogole nie dochodzi.
 // Ten numer razem ze slotSize chroni przypadek, ktorego nazwa nie zlapie: zmiane znaczenia pol
 // przy zapomnianym bumpie nazwy oraz obcy obiekt o tej samej nazwie.
-constexpr std::uint32_t kLayoutVersion = 3;  // 3: slot niesie takze mask trybow pracy
+constexpr std::uint32_t kLayoutVersion = 4;  // 4: osobna rezerwacja zasobow nastepnego planu
 
 // Ile czasu instancja podlaczajaca sie czeka na dokonczenie inicjalizacji przez tworce.
 // Inicjalizacja to truncate + memset + pthread_mutex_init, czyli mikrosekundy; dwie sekundy
@@ -61,12 +61,16 @@ struct Slot {
   std::uint64_t startTime;
   std::uint32_t streamCount;
   std::uint32_t modes;  ///< maska bus::mode::*; 0 => tryb zwykly
+  std::uint32_t reservationActive;
+  std::uint32_t reservedStreamCount;
   // NOLINTBEGIN(modernize-avoid-c-arrays): ustalony binarny format pamięci współdzielonej
   char name[kInstanceNameSize];
   char queryFile[kQueryFileSize];
   char unit[kUnitNameSize];
   char counterPath[kCounterPathSize];
   char streams[kMaxStreams][kStreamNameSize];
+  char reservedCounterPath[kCounterPathSize];
+  char reservedStreams[kMaxStreams][kStreamNameSize];
   // NOLINTEND(modernize-avoid-c-arrays)
 };
 
@@ -104,7 +108,7 @@ std::string loadString(const char *src, std::size_t capacity) {
 /// juz przy wolnej pamieci, nie jest wtedy tworca -- `create_only` odpada na istniejacej nazwie,
 /// `open_only` przechodzi, a segment nigdy nie dorosnie do sizeof(Segment). Instancja odczekuje
 /// kInitWaitLimit i startuje BEZ magistrali; stan jest trwaly az do recznego skasowania pliku.
-/// Sprawdzone eksperymentem: tmpfs 512 KiB zostawia `xrdbbus_v3` o rozmiarze 0 B.
+/// Sprawdzone eksperymentem: tmpfs 512 KiB zostawia `xrdbbus_v4` o rozmiarze 0 B.
 ///
 /// Kasuje wylacznie tworca i wylacznie przed publikacja `magic`, czyli obiekt, ktorego zaden
 /// inny proces nie mogl jeszcze uznac za zdatny do uzytku. Po publikacji obowiazuje regula
@@ -140,6 +144,26 @@ bool snapshot(Slot &slot, Slot &out) {
   return false;
 }
 
+std::optional<std::string> collidingStream(const Slot &slot, const std::vector<std::string> &streams) {
+  const auto findCollision = [&](const auto &ownedStreams, std::uint32_t count) -> std::optional<std::string> {
+    for (std::uint32_t s = 0; s < std::min(count, static_cast<std::uint32_t>(kMaxStreams)); ++s) {
+      const std::string owned = loadString(ownedStreams[s], kStreamNameSize);
+      if (std::ranges::find(streams, owned) != streams.end()) return owned;
+    }
+    return std::nullopt;
+  };
+
+  if (const auto active = findCollision(slot.streams, slot.streamCount)) return active;
+  if (slot.reservationActive != 0) return findCollision(slot.reservedStreams, slot.reservedStreamCount);
+  return std::nullopt;
+}
+
+bool collidesWithCounter(const Slot &slot, std::string_view counterPath) {
+  if (counterPath.empty()) return false;
+  if (loadString(slot.counterPath, kCounterPathSize) == counterPath) return true;
+  return slot.reservationActive != 0 && loadString(slot.reservedCounterPath, kCounterPathSize) == counterPath;
+}
+
 /// Jeden odczyt /proc/<pid>/stat: stan procesu (pole 3) i czas startu (pole 22). Oba pola
 /// pochodza z tej samej linii, wiec sprawdzenie stanu nie kosztuje ani jednego dodatkowego
 /// wywolania systemowego -- token pola 3 i tak przechodzil przez petle szukajaca pola 22.
@@ -170,14 +194,17 @@ bool readProcStat(std::int32_t pid, std::uint64_t &startTime, char &state) {
 
 void clearSlot(Slot &slot) {
   beginWrite(slot);
-  slot.pid            = 0;
-  slot.startTime      = 0;
-  slot.streamCount    = 0;
-  slot.modes          = 0;
-  slot.name[0]        = '\0';
-  slot.queryFile[0]   = '\0';
-  slot.unit[0]        = '\0';
-  slot.counterPath[0] = '\0';
+  slot.pid                    = 0;
+  slot.startTime              = 0;
+  slot.streamCount            = 0;
+  slot.modes                  = 0;
+  slot.reservationActive      = 0;
+  slot.reservedStreamCount    = 0;
+  slot.name[0]                = '\0';
+  slot.queryFile[0]           = '\0';
+  slot.unit[0]                = '\0';
+  slot.counterPath[0]         = '\0';
+  slot.reservedCounterPath[0] = '\0';
   endWrite(slot);
 }
 
@@ -442,7 +469,7 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
   }
 
   Segment &segment = *impl->segment;
-  auto scratch     = std::make_unique<Slot>();  // ~16 KiB -- na stercie, nie na stosie
+  auto scratch     = std::make_unique<Slot>();  // ~53 KiB -- na stercie, nie na stosie
   int freeSlot     = -1;
 
   for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
@@ -456,11 +483,9 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
       continue;
     }
 
-    for (std::uint32_t s = 0; s < std::min(scratch->streamCount, static_cast<std::uint32_t>(kMaxStreams)); ++s) {
-      const std::string owned = loadString(scratch->streams[s], kStreamNameSize);
-      if (std::ranges::find(streams, owned) == streams.end()) continue;
+    if (const auto owned = collidingStream(*scratch, streams)) {
       retVal.status    = ClaimStatus::Conflict;
-      retVal.stream    = owned;
+      retVal.stream    = *owned;
       retVal.ownerName = loadString(scratch->name, kInstanceNameSize);
       retVal.ownerPid  = scratch->pid;
       impl->unlock();
@@ -469,7 +494,7 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
 
     // Licznik rotacji: dwie instancje na jednym pliku zapisuja te sama wartosc i gubia rotacje,
     // a archiwa nadpisuja sie nawzajem. Plan bez :ROTATION ma sciezke pusta i nie koliduje z niczym.
-    if (!request.counterPath.empty() && loadString(scratch->counterPath, kCounterPathSize) == request.counterPath) {
+    if (collidesWithCounter(*scratch, request.counterPath)) {
       retVal.status    = ClaimStatus::CounterConflict;
       retVal.detail    = std::string(request.counterPath);
       retVal.ownerName = loadString(scratch->name, kInstanceNameSize);
@@ -488,19 +513,132 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
 
   Slot &mine = segment.slots[freeSlot];
   beginWrite(mine);
-  mine.pid         = static_cast<std::int32_t>(getpid());
-  mine.startTime   = processStartTime(mine.pid);
-  mine.streamCount = static_cast<std::uint32_t>(streams.size());
-  mine.modes       = request.modes;
+  mine.pid                 = static_cast<std::int32_t>(getpid());
+  mine.startTime           = processStartTime(mine.pid);
+  mine.streamCount         = static_cast<std::uint32_t>(streams.size());
+  mine.modes               = request.modes;
+  mine.reservationActive   = 0;
+  mine.reservedStreamCount = 0;
   storeString(mine.name, kInstanceNameSize, request.name);
   storeString(mine.queryFile, kQueryFileSize, request.queryFile);
   storeString(mine.unit, kUnitNameSize, request.unit);
   storeString(mine.counterPath, kCounterPathSize, request.counterPath);
+  mine.reservedCounterPath[0] = '\0';
   for (std::size_t s = 0; s < streams.size(); ++s)
     storeString(mine.streams[s], kStreamNameSize, streams[s]);
   endWrite(mine);
 
   impl->slotIndex = freeSlot;
+  impl->unlock();
+
+  retVal.status = ClaimStatus::Claimed;
+  return retVal;
+}
+
+ClaimResult Bus::reservePlan(const std::vector<std::string> &streams, std::string_view counterPath) {
+  ClaimResult retVal;
+
+  if (!attached() || impl->slotIndex < 0) {
+    retVal.detail = "instance holds no bus slot";
+    return retVal;
+  }
+
+  if (streams.size() > kMaxStreams) {
+    retVal.status = ClaimStatus::TooLarge;
+    retVal.detail = "plan has " + std::to_string(streams.size()) + " streams, the bus slot holds " + std::to_string(kMaxStreams);
+    return retVal;
+  }
+  for (const auto &stream : streams)
+    if (stream.size() >= kStreamNameSize) {
+      retVal.status = ClaimStatus::TooLarge;
+      retVal.stream = stream;
+      retVal.detail = "stream name is longer than " + std::to_string(kStreamNameSize - 1) + " characters";
+      return retVal;
+    }
+  if (counterPath.size() >= kCounterPathSize) {
+    retVal.status = ClaimStatus::TooLarge;
+    retVal.detail = "counter file path is longer than " + std::to_string(kCounterPathSize - 1) + " characters";
+    return retVal;
+  }
+
+  if (!impl->lock()) {
+    retVal.detail = "bus mutex unusable";
+    return retVal;
+  }
+
+  Segment &segment = *impl->segment;
+  auto scratch     = std::make_unique<Slot>();  // ~53 KiB -- na stercie, nie na stosie
+
+  for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
+    if (std::cmp_equal(i, impl->slotIndex)) continue;
+    Slot &slot = segment.slots[i];
+    if (!snapshot(slot, *scratch)) continue;
+
+    if (!isProcessAlive(scratch->pid, scratch->startTime)) {
+      if (scratch->pid != 0) clearSlot(slot);
+      continue;
+    }
+
+    if (const auto owned = collidingStream(*scratch, streams)) {
+      retVal.status    = ClaimStatus::Conflict;
+      retVal.stream    = *owned;
+      retVal.ownerName = loadString(scratch->name, kInstanceNameSize);
+      retVal.ownerPid  = scratch->pid;
+      impl->unlock();
+      return retVal;
+    }
+
+    if (collidesWithCounter(*scratch, counterPath)) {
+      retVal.status    = ClaimStatus::CounterConflict;
+      retVal.detail    = std::string(counterPath);
+      retVal.ownerName = loadString(scratch->name, kInstanceNameSize);
+      retVal.ownerPid  = scratch->pid;
+      impl->unlock();
+      return retVal;
+    }
+  }
+
+  Slot &mine = segment.slots[impl->slotIndex];
+  beginWrite(mine);
+  mine.reservationActive   = 1;
+  mine.reservedStreamCount = static_cast<std::uint32_t>(streams.size());
+  storeString(mine.reservedCounterPath, kCounterPathSize, counterPath);
+  for (std::size_t s = 0; s < streams.size(); ++s)
+    storeString(mine.reservedStreams[s], kStreamNameSize, streams[s]);
+  endWrite(mine);
+  impl->unlock();
+
+  retVal.status = ClaimStatus::Claimed;
+  return retVal;
+}
+
+ClaimResult Bus::activateReservedPlan() {
+  ClaimResult retVal;
+
+  if (!attached() || impl->slotIndex < 0) {
+    retVal.detail = "instance holds no bus slot";
+    return retVal;
+  }
+  if (!impl->lock()) {
+    retVal.detail = "bus mutex unusable";
+    return retVal;
+  }
+
+  Slot &mine = impl->segment->slots[impl->slotIndex];
+  if (mine.reservationActive == 0) {
+    impl->unlock();
+    retVal.detail = "instance holds no plan reservation";
+    return retVal;
+  }
+
+  beginWrite(mine);
+  mine.streamCount = mine.reservedStreamCount;
+  std::memcpy(mine.streams, mine.reservedStreams, sizeof(mine.streams));
+  std::memcpy(mine.counterPath, mine.reservedCounterPath, sizeof(mine.counterPath));
+  mine.reservationActive      = 0;
+  mine.reservedStreamCount    = 0;
+  mine.reservedCounterPath[0] = '\0';
+  endWrite(mine);
   impl->unlock();
 
   retVal.status = ClaimStatus::Claimed;
@@ -562,7 +700,7 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams) {
     return retVal;
   }
 
-  auto scratch = std::make_unique<Slot>();  // ~16 KiB -- na stercie, nie na stosie
+  auto scratch = std::make_unique<Slot>();  // ~53 KiB -- na stercie, nie na stosie
 
   for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
     if (std::cmp_equal(i, impl->slotIndex)) continue;  // wlasnych nazw nie sprawdzamy przeciw sobie
@@ -574,11 +712,9 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams) {
       continue;
     }
 
-    for (std::uint32_t s = 0; s < std::min(scratch->streamCount, static_cast<std::uint32_t>(kMaxStreams)); ++s) {
-      const std::string other = loadString(scratch->streams[s], kStreamNameSize);
-      if (std::ranges::find(toAdd, other) == toAdd.end()) continue;
+    if (const auto other = collidingStream(*scratch, toAdd)) {
       retVal.status    = ClaimStatus::Conflict;
-      retVal.stream    = other;
+      retVal.stream    = *other;
       retVal.ownerName = loadString(scratch->name, kInstanceNameSize);
       retVal.ownerPid  = scratch->pid;
       impl->unlock();

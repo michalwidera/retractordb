@@ -4,8 +4,8 @@
 # Segmentu magistrali z zalozenia nie kasuje nikt (bus.hpp): skasowanie go w chwili, gdy inna
 # instancja trzyma odwzorowanie, zerwaloby jej magistrale. Dla przestrzeni PULI ta ostroznosc
 # nie ma zastosowania, bo po przebiegu suity nie zyje juz zadna instancja, ktora ich uzywala,
-# a kazdy segment zajmuje 854 KiB REALNIE (jest zerowany przy tworzeniu, wiec strony sa
-# przydzielone). Szesnascie przestrzeni to 13,3 MiB, ktore po suicie zostawaly na stale --
+# a kazdy segment zajmuje okolo 1,7 MiB REALNIE (jest zerowany przy tworzeniu, wiec strony sa
+# przydzielone). Szesnascie przestrzeni to okolo 26,5 MiB, ktore po suicie zostawaly na stale --
 # w kontenerze CI z domyslnym /dev/shm 64 MiB to jedna piata calego zasobu.
 #
 # Uruchamiany jako test CTest z FIXTURES_CLEANUP, czyli PO wszystkich testach, ktore

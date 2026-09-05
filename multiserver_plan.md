@@ -318,33 +318,43 @@ slot, którego dotyczył przerwany zapis.
 
 ### Układ segmentu (stan bieżący)
 
-Segment nazywa się `xrdbbus_v3`, **874 560 B** (nagłówek 64 B + 32 sloty × 27 328 B) — zmierzone
-`ls -l /dev/shm/xrdbbus_v3`. Kod w `src/retractor/lib/bus.{hpp,cpp}`.
+Segment nazywa się `xrdbbus_v4`, **1 734 976 B** (nagłówek 64 B + 32 sloty × 54 216 B).
+Kod w `src/retractor/lib/bus.{hpp,cpp}`.
 
 W etapie 2b segment nazywał się `xrdbbus` i miał 862 272 B przy `layoutVersion` 1; etap 2e dołożył
 do slotu `unit` i `counterPath`, co podniosło wersję układu do 2 i — zgodnie z regułą opisaną niżej
 — przeniosło ją do nazwy segmentu. Etap 2h dołożył `modes`, czyli wersję 3; rozmiar slotu się nie
-zmienił, bo nowe pole weszło w wyrównanie, które slot i tak niósł. Poniższa tabela opisuje układ
-**aktualny**, nie historyczny.
+zmienił, bo nowe pole weszło w wyrównanie, które slot i tak niósł. Wersja 4 dodała osobny,
+niewidoczny dla `instances()` zestaw zasobów rezerwowanych przed wymianą planu. Poniższa tabela
+opisuje układ **aktualny**, nie historyczny.
 
 ```
 [ magic "XRDBBUS" (u64) ]               wpisywane JAKO OSTATNIE przy tworzeniu segmentu
-[ layoutVersion (u32) = 3 ]             niezgodność => praca bez magistrali
+[ layoutVersion (u32) = 4 ]             niezgodność => praca bez magistrali
 [ slotCount (u32) = 32 ]
 [ slotSize (u32) + reserved (u32) ]     zmiana POJEMNOŚCI bez bumpu wersji => odmowa
 [ pthread_mutex_t (robust, pshared) ]   używany przy roszczeniu i przy zwalnianiu slotu
-[ slot[0..31] ]                         27 328 B (27 324 B pól + wyrównanie do 8)
+[ slot[0..31] ]                         54 216 B
     seq          (u32)          seqlock: nieparzysty = zapis w toku
     pid          (i32)
     startTime    (u64)          pole 22 z /proc/<pid>/stat
     streamCount  (u32)
     modes        (u32)          maska trybów pracy (R/F/U/M/X/S); pole informacyjne
+    reservationActive   (u32)   1 = następny plan ma zarezerwowane zasoby
+    reservedStreamCount (u32)
     name         [40]
     queryFile    [256]          ścieżka bezwzględna; pole informacyjne, obcinane z ostrzeżeniem
     unit         [128]          jednostka systemd; pole informacyjne, obcinane z ostrzeżeniem
     counterPath  [256]          znormalizowana ścieżka licznika :ROTATION; za długa => odmowa
     streams      [128][208]     za długa nazwa => odmowa
+    reservedCounterPath [256]   licznik następnego planu; uczestniczy w kolizjach
+    reservedStreams [128][208]  nazwy następnego planu; uczestniczą w kolizjach
 ```
+
+Reset planu jest dwufazowy. `reservePlan()` pod muteksem sprawdza limity oraz aktywne i
+zarezerwowane zasoby innych slotów, po czym zapisuje rezerwację bez zmiany widoku aktywnego
+planu. Po zbudowaniu następnej epoki `activateReservedPlan()` atomowo przenosi rezerwację do
+pól aktywnych. Odmowa nie dotyka ani modelu, ani jego dotychczasowych roszczeń.
 
 Trzy odstępstwa od projektu wstępnego, każde z powodu:
 
@@ -370,9 +380,9 @@ Trzy odstępstwa od projektu wstępnego, każde z powodu:
 2. **Odczyt bez blokady.** Czytelnik używa seqlocka: czyta `seq`, kopiuje slot, czyta `seq`
    ponownie; nieparzysty albo zmieniony = powtórz. `xqry --bus`, routing strumienia i
    kierowanie `kill` nie mogą się o nic zaciąć, nawet gdy jakiś serwer właśnie kona.
-3. **Muteks tylko przy roszczeniu.** Jedyna operacja wymagająca serializacji to „sprawdź
-   rozłączność nazw strumieni ze wszystkimi żywymi slotami i zatwierdź swój" — raz przy starcie,
-   kilkadziesiąt mikrosekund, na strukturze POD.
+3. **Muteks tylko przy zmianie roszczeń.** Serializacji wymagają: początkowe roszczenie,
+   rezerwacja i aktywacja następnego planu, rozszerzenie ad-hoc oraz zwolnienie slotu. Odczyt
+   pozostaje bezblokadowy.
 
 ### Żywotność i sprzątanie
 
@@ -656,7 +666,7 @@ niżej.
   syntetyczny proces trzyma prawdziwy `flock`, a `systemctl` jest kontrolowaną atrapą.
 - `--autoname` nadal losuje raz, bez ponowienia przy trafieniu w nazwę żywej instancji.
 
-### Wersja w nazwie segmentu: `xrdbbus_v3`
+### Wersja w nazwie segmentu: `xrdbbus_v4`
 
 Segment o starym układzie zostaje w `/dev/shm` po podmianie binarki, a instancja, która odmówi się
 do niego podłączyć, **startuje bez egzekwowania rozłączności** — awaria jest cicha aż do pierwszej
@@ -710,7 +720,7 @@ Jedna zmienna środowiskowa `RDB_NAMESPACE` (`servername::environmentNamespace`)
 |---|---|
 | plik blokady instancji | wartość staje się nazwą instancji → `xretractor_service.<ns>.lock` |
 | obiekty IPC w `/dev/shm` | ta sama nazwa instancji → sufiks przez `ipc::names()` |
-| segment magistrali | `bus::segmentName()` → `xrdbbus_v3_<ns>` |
+| segment magistrali | `bus::segmentName()` → `xrdbbus_v4_<ns>` |
 | plik logu | osobny `TMPDIR` ustawiany razem z `RDB_NAMESPACE` |
 
 `xqry` bez `--server` celuje w instancję przestrzeni nazw; jawny `--server` pozostaje nadrzędny.
@@ -720,11 +730,11 @@ u niewinnego sąsiada.
 
 ### Pula szesnastu, a nie jedna przestrzeń na katalog
 
-Segment magistrali ma 874 KB i z założenia nikt go nie kasuje, a `/dev/shm` w kontenerze CI ma
-domyślnie 64 MB. Pięćdziesiąt kilka segmentów (po jednym na katalog) zmieściłoby się na styk,
+Segment magistrali ma około 1,7 MB i z założenia nikt go nie kasuje, a `/dev/shm` w kontenerze CI ma
+domyślnie 64 MB. Segmenty po jednym na katalog nie zmieściłyby się w tym budżecie,
 a przepełnienie `/dev/shm` **nie wywraca testu**: daje `ClaimStatus::Unavailable`, który jest
-fail-open, czyli po cichu zdejmuje izolację. Szesnaście przestrzeni to najwyżej 14 MB
-niezależnie od liczby katalogów — zmierzone po przebiegu dokładnie tyle.
+fail-open, czyli po cichu zdejmuje izolację. Szesnaście przestrzeni to najwyżej około 28 MB
+niezależnie od liczby katalogów.
 
 Przydział jest per katalog i niesie `RESOURCE_LOCK` na nazwie przestrzeni. Załatwia to dwa
 wykluczenia naraz: testy jednego katalogu dzielą katalog roboczy i `temp/`, więc i tak nie mogą

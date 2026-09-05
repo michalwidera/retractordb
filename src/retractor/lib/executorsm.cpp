@@ -103,13 +103,6 @@ std::atomic<bool> planResetRequested{false};
 /// Tresc przyjetego zestawu RQL. Chroniona przez core_mutex.
 std::string pendingPlanText;
 
-/// Tozsamosc uruchomienia potrzebna przy KAZDYM roszczeniu magistrali, nie tylko pierwszym.
-/// Wlasne kopie (nie string_view z ClaimRequest launchera), bo slot rosci sie ponownie przy
-/// kazdej wymianie planu, dlugo po tym, jak ramka launchera przestala istniec.
-std::string busInstanceName;
-std::string busUnitName;
-std::uint32_t busRunModes{0};
-
 /// Plik zapytan uslugi, do ktorego trafia przyjety plan i ktory jest oprozniany po bledzie
 /// krytycznym. PUSTY dla instancji, ktora usluga nie jest — plik operatora uruchamiajacego
 /// xretractor z terminala nie jest stanem uslugi i nie wolno go nadpisywac.
@@ -470,26 +463,37 @@ std::string executorsm::validatePlanText(const std::string &planText) {
   // Zestaw bez ani jednej instrukcji jest LEGALNY: tak sprowadza sie usluge do stanu
   // zerowego, w ktorym czeka na nastepny plan. To ta sama droga, ktora idzie start
   // z pustym plikiem zapytan.
-  if (candidate.empty()) return {};
+  if (!candidate.empty()) {
+    compiler localCompiler(candidate);
+    if (const std::string response = localCompiler.compile(); response != "OK") return "Fail compile:" + response;
+  }
 
-  compiler localCompiler(candidate);
-  if (const std::string response = localCompiler.compile(); response != "OK") return "Fail compile:" + response;
-
-  // Rozlacznosc nazw wzgledem POZOSTALYCH zywych instancji. Wlasna pomijamy: przeladowanie
-  // zwalnia jej dotychczasowe nazwy, wiec kolizja z samym soba kolizja nie jest. Sprawdzenie
-  // jest tutaj, a nie dopiero przy roszczeniu slotu, bo odmowa ma dojsc do klienta ZANIM
-  // dzialajacy plan zostanie rozebrany.
+  // Limity i rozlacznosc nazw sa rozstrzygane atomowo w magistrali, ZANIM resetCommit()
+  // opublikuje zadanie wymiany. Udane roszczenie jest zarazem rezerwacja nazw nowego planu:
+  // inna instancja nie moze ich zajac w oknie miedzy odpowiedzia dla klienta a granica epoki.
+  // Odmowa nie zmienia slotu, wiec stary plan zachowuje takze swoje dotychczasowe roszczenie.
   if (busPtr != nullptr) {
-    const std::vector<bus::InstanceInfo> instances = busPtr->instances();
-    if (const auto owner = bus::findForeignOwner(instances, busInstanceName, planStreamNames(candidate))) {
-      const std::string ownerName = owner->instance.empty() ? "the unnamed instance" : "instance '" + owner->instance + "'";
-      return "Rejected: stream '" + owner->stream + "' is already served by " + ownerName + " (pid " +
-             std::to_string(owner->pid) + ")";
-    }
-    if (const auto owner = bus::findForeignCounterOwner(instances, busInstanceName, planCounterPath(candidate))) {
-      const std::string ownerName = owner->instance.empty() ? "the unnamed instance" : "instance '" + owner->instance + "'";
-      return "Rejected: rotation counter file '" + owner->path + "' is already used by " + ownerName + " (pid " +
-             std::to_string(owner->pid) + ")";
+    const bus::ClaimResult claimed = busPtr->reservePlan(planStreamNames(candidate), planCounterPath(candidate));
+    switch (claimed.status) {
+      case bus::ClaimStatus::Claimed:
+        break;
+      case bus::ClaimStatus::Conflict: {
+        const std::string owner = claimed.ownerName.empty() ? "the unnamed instance" : "instance '" + claimed.ownerName + "'";
+        return "Rejected: stream '" + claimed.stream + "' is already served by " + owner + " (pid " +
+               std::to_string(claimed.ownerPid) + ")";
+      }
+      case bus::ClaimStatus::CounterConflict: {
+        const std::string owner = claimed.ownerName.empty() ? "the unnamed instance" : "instance '" + claimed.ownerName + "'";
+        return "Rejected: rotation counter file '" + claimed.detail + "' is already used by " + owner + " (pid " +
+               std::to_string(claimed.ownerPid) + ")";
+      }
+      case bus::ClaimStatus::TooLarge:
+      case bus::ClaimStatus::NoFreeSlot:
+        return "Rejected: cannot register the replacement plan on the xrdbbus bus: " + claimed.detail;
+      case bus::ClaimStatus::Unavailable:
+        if (busPtr->attached()) return "Rejected: cannot reserve the replacement plan on the xrdbbus bus: " + claimed.detail;
+        SPDLOG_WARN("xrdbbus unavailable ({}); replacement plan stream name uniqueness is NOT enforced.", claimed.detail);
+        break;
     }
   }
   return {};
@@ -831,37 +835,9 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
     }
   }
 
-  // Roszczenie slotu od nowa. Bus::claim() zaczyna od release(), wiec nazwy poprzedniego
-  // planu zwalniaja sie dokladnie w tej samej operacji, w ktorej rosci sie nowe.
-  const std::string queryFile                   = serviceQueryFilePath.empty() ? guard.getServiceQueryFile()  //
-                                                                               : serviceQueryFilePath;
-  const std::vector<std::string> claimedStreams = planStreamNames(*coreInstancePtr);
-  const std::string counterPath                 = planCounterPath(*coreInstancePtr);
-  const bus::ClaimResult claimed                = xrdbbus.claim({.name        = busInstanceName,
-                                                                 .queryFile   = queryFile,
-                                                                 .unit        = busUnitName,
-                                                                 .counterPath = counterPath,
-                                                                 .modes       = busRunModes,
-                                                                 .streams     = claimedStreams});
-  if (claimed.status != bus::ClaimStatus::Claimed && claimed.status != bus::ClaimStatus::Unavailable) {
-    // Wyscig z inna instancja, ktora zajela nazwe miedzy walidacja a ta chwila. Plan
-    // odpada w calosci, instancja wraca do stanu bezczynnego i zostaje na magistrali
-    // widoczna — slot bez strumieni jest nadal slotem tej instancji.
-    SPDLOG_ERROR("Plan reload refused by the bus ({}); falling back to idle mode.",
-                 claimed.stream.empty() ? claimed.detail : claimed.stream);
-    {
-      std::scoped_lock lock(core_mutex);
-      *coreInstancePtr = qTree{};
-      cmPtr->reset();
-      processedLines.clear();
-    }
-    xrdbbus.claim({.name        = busInstanceName,
-                   .queryFile   = queryFile,
-                   .unit        = busUnitName,
-                   .counterPath = {},
-                   .modes       = busRunModes,
-                   .streams     = {}});
-  }
+  const bus::ClaimResult activated = xrdbbus.activateReservedPlan();
+  if (activated.status != bus::ClaimStatus::Claimed && xrdbbus.attached())
+    FatalError("Cannot activate the reserved bus resources: {}", activated.detail);
 
   dropStalePlanArtifacts(*coreInstancePtr, *cmPtr, processedLines);
 
@@ -883,7 +859,7 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
 }
 
 int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrdbbus, compiler &cm, vm_map &vm,
-                    const AppConfig &cfg, std::string_view serverName, std::string_view systemdUnit, std::uint32_t runModes) {
+                    const AppConfig &cfg, std::string_view serverName, std::string_view systemdUnit) {
   executorsm::coreInstancePtr       = &coreInstance;
   executorsm::cmPtr                 = &cm;
   executorsm::cfgQueueBufferSeconds = cfg.ipcQueueBufferSeconds;
@@ -891,16 +867,12 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   executorsm::cfgRtPriority         = cfg.schedulingRtPriority;
   dataModelExpected                 = !coreInstance.empty();
   untilEofMode                      = vm.contains("until-eof");
-  busInstanceName                   = std::string(serverName);
-  busUnitName                       = std::string(systemdUnit);
-  busRunModes                       = runModes;
-
   // Plik zapytan uslugi. Nadpisuje go przyjety plan i oprozniaja skutki bledu krytycznego,
   // wiec wskazuje go WYLACZNIE instancja bedaca jednostka systemd: plik `.rql` operatora,
   // ktory uruchomil xretractor z terminala, jest jego wlasnoscia, a nie stanem uslugi.
-  if (!busUnitName.empty()) {
+  if (!systemdUnit.empty()) {
     serviceQueryFilePath = guard.getServiceQueryFile().empty() ? cfg.serviceQueryFile : guard.getServiceQueryFile();
-    SPDLOG_INFO("Service unit '{}': plan reloads are persisted to '{}'.", busUnitName, serviceQueryFilePath);
+    SPDLOG_INFO("Service unit '{}': plan reloads are persisted to '{}'.", systemdUnit, serviceQueryFilePath);
   }
 
   // Zakres waznosci wskaznika na straznika — patrz komentarz przy serviceGuardPtr.

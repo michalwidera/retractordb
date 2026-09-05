@@ -175,6 +175,53 @@ TEST_F(BusFixture, LongestAllowedStreamNameSurvivesRoundTrip) {
   EXPECT_EQ(instances[0].streams, (std::vector<std::string>{longest}));
 }
 
+TEST_F(BusFixture, ReservedPlanBlocksNamesUntilActivation) {
+  bus::Bus instance(kTestSegment);
+  bus::Bus other(kTestSegment);
+
+  ASSERT_EQ(
+      instance.claim({.name = "alfa", .queryFile = "plan.rql", .counterPath = "/tmp/old.cnt", .streams = {"old", "src"}}).status,
+      bus::ClaimStatus::Claimed);
+  ASSERT_EQ(instance.reservePlan({"new", "src"}, "/tmp/new.cnt").status, bus::ClaimStatus::Claimed);
+
+  const auto before = instance.instances();
+  ASSERT_EQ(before.size(), 1U);
+  EXPECT_EQ(before[0].streams, (std::vector<std::string>{"old", "src"}));
+  EXPECT_EQ(before[0].counterPath, "/tmp/old.cnt");
+  EXPECT_EQ(other.claim({.name = "beta", .queryFile = "b.rql", .streams = {"new"}}).status, bus::ClaimStatus::Conflict);
+  EXPECT_EQ(other.claim({.name = "beta", .queryFile = "b.rql", .counterPath = "/tmp/new.cnt", .streams = {"other"}}).status,
+            bus::ClaimStatus::CounterConflict);
+
+  ASSERT_EQ(instance.activateReservedPlan().status, bus::ClaimStatus::Claimed);
+  const auto after = instance.instances();
+  ASSERT_EQ(after.size(), 1U);
+  EXPECT_EQ(after[0].streams, (std::vector<std::string>{"new", "src"}));
+  EXPECT_EQ(after[0].counterPath, "/tmp/new.cnt");
+  EXPECT_EQ(other.claim({.name = "beta", .queryFile = "b.rql", .streams = {"old"}}).status, bus::ClaimStatus::Claimed);
+}
+
+TEST_F(BusFixture, RefusedPlanReplacementLeavesOwnResourcesIntact) {
+  bus::Bus first(kTestSegment);
+  bus::Bus second(kTestSegment);
+
+  ASSERT_EQ(
+      first.claim({.name = "alfa", .queryFile = "a.rql", .counterPath = "/tmp/old.cnt", .streams = {"old", "srca"}}).status,
+      bus::ClaimStatus::Claimed);
+  ASSERT_EQ(second.claim({.name = "beta", .queryFile = "b.rql", .streams = {"taken"}}).status, bus::ClaimStatus::Claimed);
+
+  std::vector<std::string> tooMany;
+  for (std::size_t i = 0; i <= bus::kMaxStreams; ++i)
+    tooMany.push_back("s" + std::to_string(i));
+  EXPECT_EQ(first.reservePlan(tooMany, "/tmp/new.cnt").status, bus::ClaimStatus::TooLarge);
+  EXPECT_EQ(first.reservePlan({"new", "taken"}, "/tmp/new.cnt").status, bus::ClaimStatus::Conflict);
+
+  const auto instances = first.instances();
+  EXPECT_EQ(streamsOf(instances, "alfa"), (std::vector<std::string>{"old", "srca"}));
+  const auto own = std::ranges::find_if(instances, [](const auto &instance) { return instance.name == "alfa"; });
+  ASSERT_NE(own, instances.end());
+  EXPECT_EQ(own->counterPath, "/tmp/old.cnt");
+}
+
 // Sedno rozszerzenia na ad-hoc: nazwa powolana w locie dochodzi do wlasnego slotu i od tej
 // chwili jest widoczna dla pozostalych instancji.
 TEST_F(BusFixture, ClaimAdditionalExtendsOwnSlot) {
@@ -478,7 +525,7 @@ TEST_F(BusFixture, OversizedCounterPathIsRefused) {
 // Podkreslenie zamiast kropki jest czescia kontraktu: obiekty IPC instancji nazywaja sie
 // "<obiekt>.<nazwa instancji>", wiec segment z kropka wpadlby pod wzorce sprzatajace /dev/shm/*.<nazwa>.
 TEST(BusSegmentName, CarriesLayoutVersionAndAvoidsInstanceNamespace) {
-  EXPECT_EQ(bus::kSegmentName, "xrdbbus_v3");
+  EXPECT_EQ(bus::kSegmentName, "xrdbbus_v4");
   EXPECT_EQ(bus::kSegmentName.find('.'), std::string_view::npos);
 }
 

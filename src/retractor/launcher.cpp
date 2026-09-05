@@ -730,7 +730,7 @@ int main(int argc, char *argv[]) try {
   dropStalePlanArtifacts(coreInstance, cm, processedLines);
 
   executorsm exec;
-  return exec.run(coreInstance, guard, xrdbbus, cm, vm, appCfg, earlyServerName, systemd.unit.value_or(std::string{}), runModes);
+  return exec.run(coreInstance, guard, xrdbbus, cm, vm, appCfg, earlyServerName, systemd.unit.value_or(std::string{}));
 } catch (const std::exception &error) {
   const char *const executable = argc > 0 && argv[0] != nullptr ? argv[0] : "xretractor";
   std::fputs(executable, stderr);

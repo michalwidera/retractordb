@@ -42,7 +42,7 @@ namespace bus {
 /// Podkreslenie, nie kropka: obiekty IPC instancji nazywaja sie "<obiekt>.<nazwa instancji>", wiec
 /// "xrdbbus.v2" wygladalby jak obiekt instancji o nazwie "v2" i wpadl pod wzorce sprzatajace
 /// postaci /dev/shm/*.<nazwa>.
-inline constexpr std::string_view kSegmentName = "xrdbbus_v3";
+inline constexpr std::string_view kSegmentName = "xrdbbus_v4";
 
 /// Nazwa segmentu dla BIEZACEGO uruchomienia: kSegmentName, a przy ustawionej przestrzeni
 /// nazw (servername::environmentNamespace) kSegmentName + "_" + przestrzen.
@@ -207,14 +207,26 @@ class Bus {
   [[nodiscard]] bool attached() const;
 
   /// Sprawdza rozlacznosc nazw strumieni ORAZ sciezki licznika :ROTATION ze wszystkimi zywymi
-  /// instancjami i -- gdy sa rozlaczne -- zatwierdza wlasny slot. Jedyna operacja wymagajaca
-  /// serializacji.
+  /// instancjami i -- gdy sa rozlaczne -- zatwierdza wlasny slot. Roszczenia, rezerwacje,
+  /// aktywacje i zwolnienia sa serializowane jednym muteksem magistrali.
   ///
   /// Licznik jest chroniony osobno, bo nie jest nazwa strumienia: PersistentCounter wczytuje
   /// wartosc przy starcie, a zapisuje ja dopiero w destruktorze, wiec dwie instancje na jednym
   /// pliku zapisuja te sama wartosc i gubia rotacje. Sciezke normalizuje WOLAJACY -- magistrala
   /// porownuje napisy, a nie pliki.
   ClaimResult claim(const ClaimRequest &request);
+
+  /// Rezerwuje nazwy strumieni i licznik rotacji dla nastepnego planu w JUZ posiadanym
+  /// slocie. Limity i kolizje sa rozstrzygane pod muteksem magistrali, zanim stary plan
+  /// zostanie rozebrany. Przy odmowie slot pozostaje nietkniety; przy sukcesie aktywne
+  /// zasoby nadal sa publikowane przez instances(), a rezerwacja blokuje obce roszczenia.
+  ///
+  /// Wymaga posiadanego slotu (po udanym claim()); bez niego zwraca Unavailable.
+  ClaimResult reservePlan(const std::vector<std::string> &streams, std::string_view counterPath);
+
+  /// Zastepuje aktywne zasoby uprzednio zarezerwowanymi. Operacja nie moze juz wejsc
+  /// w kolizje: od udanego reservePlan() rezerwacja uczestniczy we wszystkich roszczeniach.
+  ClaimResult activateReservedPlan();
 
   /// Dopisuje nazwy strumieni do JUZ posiadanego slotu, sprawdziwszy ich rozlacznosc
   /// z pozostalymi zywymi instancjami. Sluzy zapytaniom ad-hoc, ktore powiekszaja plan

@@ -137,5 +137,50 @@ grep -qE "^${live} " dir_final.txt || {
   exit 1
 }
 
+# Plan przekraczajacy pojemnosc slotu magistrali ma odpasc przed zakonczeniem
+# biezacej epoki. Poprzednio walidacja sprawdzala tylko kolizje nazw, a limit 128
+# wychodzil dopiero po rozebraniu modelu; klient dostawal sukces, a usluga zostawala
+# bez aktywnego planu.
+{
+  echo "STORAGE 'temp'"
+  echo "DECLARE a INTEGER STREAM oversized_src, 1 FILE 'data.txt'"
+  i=1
+  while [ "$i" -le 128 ]; do
+    echo "SELECT a+${i} STREAM oversized${i} FROM oversized_src"
+    i=$((i + 1))
+  done
+} > oversized.rql
+
+status=0
+xqry --reset oversized.rql > oversized_out.txt 2> oversized_err.txt || status=$?
+if [ "$status" -eq 0 ]; then
+  echo "plan ze 129 strumieniami zostal przyjety"
+  cat oversized_out.txt oversized_err.txt
+  exit 1
+fi
+grep -q 'plan reload refused' oversized_err.txt || {
+  echo "odmowa zbyt duzego planu nie dotarla do klienta"
+  cat oversized_err.txt
+  exit 1
+}
+grep -q 'plan has 129 streams' oversized_err.txt || {
+  echo "odmowa nie podala przekroczonego limitu magistrali"
+  cat oversized_err.txt
+  exit 1
+}
+
+# Odmowa zachowuje jednoczesnie model i jego roszczenie na magistrali.
+xqry -d > dir_after_oversized.txt
+grep -qE "^${live} " dir_after_oversized.txt || {
+  echo "odrzucony zbyt duzy plan usunal dzialajacy plan (${live})"
+  cat dir_after_oversized.txt
+  exit 1
+}
+wait_for_stream "$live"
+if ! kill -0 "$_server_pid" 2>/dev/null; then
+  echo "serwer nie przezyl odmowy zbyt duzego planu"
+  exit 1
+fi
+
 xqry -k > /dev/null
 server_wait_exit
