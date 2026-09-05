@@ -469,7 +469,14 @@ TEST(xqry, select_reports_stream_not_found_separately) {
 TEST(xqry, select_does_not_report_success_when_no_element_was_read) {
   qry_fake_known_stream obj_known(2);  // dwie proby otwarcia, zeby test byl szybki
   boost::program_options::variables_map vm;
-  const selectResult result = obj_known.select(vm, 0, "core0", {0, 0, 0});
+  // Przebieg z zadeklarowanym budzetem elementow (-m N), a nie nieograniczony: tylko taki
+  // jest odporny na klawisz i tylko w takim producent dostaje swoje proby otwarcia kolejki.
+  // Przebieg nieograniczony wiazal wynik testu ze stanem stdin: pod terminalem (CI daje
+  // krokom pty) `_kbhit()` konczyl petle w pierwszym obrocie, producent byl zrywany, zanim
+  // raz sprobowal, i select() slusznie meldowal `noData` -- bo o serwerze nie wiedzial nic.
+  // Lokalnie, bez terminala, ta sama sciezka konczyla sie `clientQueueMissing` i test
+  // przechodzil. Odtworzenie: `script -qec "test_xqry --gtest_filter=..." /dev/null`.
+  const selectResult result = obj_known.select(vm, 1, "core0", {0, 0, 0});
   EXPECT_NE(result, selectResult::ok) << "klient bez ani jednego przeczytanego elementu nie moze konczyc sie sukcesem";
   EXPECT_EQ(result, selectResult::clientQueueMissing);
 }
