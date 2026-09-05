@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/rational.hpp>
 
 #include "bus.hpp"
@@ -19,22 +20,13 @@
 
 namespace {
 
-// Uklad segmentu boost::interprocess::message_queue (mq_hdr_t::get_mem_size).
+// Uklad segmentu boost::interprocess::message_queue.
 //
-// Boost trzyma te funkcje jako skladowa prywatna message_queue, wiec nie da sie jej zawolac;
-// zostaje odtworzenie wzoru. Rozjazd z Boostem nie jest bledem kompilacji, wiec pilnuje go
-// test jednostkowy, ktory porownuje wynik z rozmiarem NAPRAWDE utworzonej kolejki.
-//
-// Wielkosci dla 64-bitowego celu: naglowek segmentu razem z ManagedOpenOrCreateUserOffset,
-// wpis indeksu (offset_ptr<msg_header>) i naglowek pojedynczej wiadomosci.
-constexpr std::uint64_t kQueueHeaderBytes        = 208;
-constexpr std::uint64_t kQueueIndexEntryBytes    = 8;
-constexpr std::uint64_t kQueueMessageHeaderBytes = 16;
-constexpr std::uint64_t kQueueAlignment          = 8;
-
-constexpr std::uint64_t roundUp(std::uint64_t value, std::uint64_t alignment) {
-  return (value + alignment - 1) / alignment * alignment;
-}
+// message_queue_t::get_mem_size jest skladowa prywatna, ale liczy ja publiczna statyczna
+// mq_hdr_t::get_mem_size z tego samego naglowka -- i to ona jest tu wolana. Odtwarzanie wzoru
+// stalymi bylo zwiazane z platforma: naglowek segmentu zawiera pthread_mutex_t, ktory ma 40 B
+// na x86_64 i 48 B na aarch64, wiec przypieta liczba 208 zanizala kazda kolejke o 8 B na ARM.
+using mqHeader = boost::interprocess::ipcdetail::mq_hdr_t<boost::interprocess::offset_ptr<void>>;
 
 /// Zapasowa droga pomiaru, gdy sonda shm_open nie przejdzie.
 shmbudget::Space spaceFromPath(const char *path) {
@@ -81,8 +73,7 @@ int responseQueueElements(const boost::rational<int> &interval, int bufferSecond
 }
 
 std::uint64_t messageQueueBytes(std::uint64_t maxMessages, std::uint64_t maxMessageSize) {
-  const std::uint64_t perMessage = roundUp(maxMessageSize, kQueueAlignment) + kQueueMessageHeaderBytes;
-  return kQueueHeaderBytes + maxMessages * kQueueIndexEntryBytes + maxMessages * perMessage;
+  return mqHeader::get_mem_size(maxMessageSize, maxMessages);
 }
 
 std::uint64_t responseQueueBytes(int maxElements) {
