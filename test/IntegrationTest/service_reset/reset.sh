@@ -96,6 +96,21 @@ grep -q 'plan reload refused' bad_err.txt || {
   cat bad_err.txt
   exit 1
 }
+# Odmowa ma NAZWAC blad, nie tylko go stwierdzic. Do 2026-09-05 werdykt brzmial
+# "Fail parse:Fail": tresc komunikatu zostawala na stderr procesu serwera, czyli w
+# journalu maszyny, gdzie autora zapytania nie ma. Wiersz 5 to pozycja bledu w bad.rql
+# liczona w PLIKU — parser dostaje instrukcje wyjeta z kontekstu i bez przekazanej
+# kotwicy wskazywalby wiersz 1.
+grep -Eq 'mismatched input|extraneous input' bad_err.txt || {
+  echo "odmowa nie niosla tresci bledu skladni"
+  cat bad_err.txt
+  exit 1
+}
+grep -q 'line 5:' bad_err.txt || {
+  echo "odmowa nie wskazala wiersza pliku, w ktorym stoi blad"
+  cat bad_err.txt
+  exit 1
+}
 wait_for_stream alpha
 xqry -s alpha -m 2 --server service > out_alpha_after_bad.txt
 if [ "$(wc -l < out_alpha_after_bad.txt)" -lt 2 ]; then

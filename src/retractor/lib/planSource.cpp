@@ -7,8 +7,10 @@
 
 #include <spdlog/spdlog.h>
 
-extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
-extern std::vector<std::string> readLogicalLines(std::istream &file);
+extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile,
+                                                                         std::vector<std::string> &statementKeywords,
+                                                                         size_t firstLine);
+extern std::vector<std::pair<std::string, size_t>> readLogicalLines(std::istream &file);
 
 namespace {
 
@@ -27,8 +29,11 @@ void dropArtifactFile(const std::filesystem::path &artifact_filename) {
 PlanSource parsePlanText(qTree &plan, const std::string &text) {
   PlanSource retVal;
   std::istringstream source(text);
-  for (const auto &stmt : readLogicalLines(source)) {
-    auto [status, first_keyword, stream_name] = parserRQLString(plan, stmt);
+  // Numer wiersza idzie do parsera, bo tylko tutaj wiadomo, w ktorym miejscu pliku stoi
+  // instrukcja: parser dostaje ja wyjeta z kontekstu i sam liczylby od jedynki.
+  std::vector<std::string> statementKeywords;
+  for (const auto &[stmt, firstLine] : readLogicalLines(source)) {
+    auto [status, first_keyword, stream_name] = parserRQLString(plan, stmt, statementKeywords, firstLine);
     if (status != "OK") {
       retVal.status = status;
       return retVal;

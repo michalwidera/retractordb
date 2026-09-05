@@ -1,1 +1,5 @@
+# Blad skladni stoi w wierszu 5, a nie w pierwszym: odmowa ma podac wiersz PLIKU,
+# a nie wiersz liczony wewnatrz pojedynczej instrukcji. Wiersze komentarza nie ida
+# do parsera, ale licza sie do numeracji.
+STORAGE 'temp'
 SELECT ((( STREAM broken FROM nowhere

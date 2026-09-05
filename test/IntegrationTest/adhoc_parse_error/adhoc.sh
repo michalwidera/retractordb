@@ -37,6 +37,16 @@ case "$bad_out" in
     exit 1
     ;;
 esac
+# Sam prefiks odmowy nie wystarczy: do 2026-09-05 klient dostawal "Fail parse:Fail", a
+# zdanie nazywajace przyczyne zostawalo na stderr PROCESU SERWERA. Tresc bledu wraca
+# teraz statusem parsera, czyli ta sama droga co blad semantyczny.
+case "$bad_out" in
+  *"line 1:"*"mismatched input"*) ;;
+  *)
+    echo "odmowa nie niosla pozycji ani tresci bledu skladni; dostal: $bad_out"
+    exit 1
+    ;;
+esac
 
 # (2) Serwer zyje. To jest wlasciwa teza tego testu.
 if ! kill -0 "$_server_pid" 2>/dev/null; then

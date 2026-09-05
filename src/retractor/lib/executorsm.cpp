@@ -60,7 +60,6 @@ struct ResetTransfer {
 std::map<int, ResetTransfer> resetTransfers;
 }  // namespace
 
-extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile,
                                                                          std::vector<std::string> &statementKeywords);
 
