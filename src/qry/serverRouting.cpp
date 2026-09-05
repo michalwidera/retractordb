@@ -130,7 +130,11 @@ std::vector<std::string> extractSourceStreams(std::string_view query) {
     return token == upper || token == lower;
   };
 
+  // `RULE nazwa ON strumien WHEN ...` nie ma klauzuli FROM, a mimo to ma jednoznacznego
+  // adresata: instancje, ktora serwuje strumien spod ON. `ON` wystepuje w gramatyce wylacznie
+  // w regule, wiec identyfikator zaraz za nim jest tym strumieniem i niczym innym.
   std::vector<std::string> retVal;
+  bool afterOn{false};
   bool inLiteral{false};
   bool inLineComment{false};
   std::size_t blockCommentDepth{0};
@@ -195,7 +199,12 @@ std::vector<std::string> extractSourceStreams(std::string_view query) {
 
       const std::string token(query.substr(begin, i - begin));
 
-      if (isKeyword(token, "FROM", "from")) {
+      if (afterOn) {
+        retVal.push_back(token);
+        afterOn = false;
+      } else if (isKeyword(token, "ON", "on")) {
+        afterOn = true;
+      } else if (isKeyword(token, "FROM", "from")) {
         inFrom = true;
       } else if (inFrom && (isKeyword(token, "FILE", "file") || isKeyword(token, "RETENTION", "retention") ||
                             isKeyword(token, "VOLATILE", "volatile") || isKeyword(token, "STORAGE", "storage"))) {

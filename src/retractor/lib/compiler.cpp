@@ -1178,6 +1178,20 @@ std::string compiler::resolveFieldReferences() {
     for (auto &r : q.lRules) {  // for each rule in query
       const std::string result{resolveTokenReferences(r.condition, q)};
       if (result != "OK") return result;
+      // Warunek reguly ewaluator liczy na payloadzie WYJSCIOWYM tego strumienia
+      // (streamInstance::constructRulesAndUpdate) i bierze z tokenu wylacznie indeks — nazwa
+      // schematu jest tam ignorowana. Odwolanie do cudzego strumienia czytaloby wiec pod tym
+      // indeksem wlasny rekord: cicho i zawsze zle, bo localizeFieldOffsets() warunkow regul
+      // nie tyka i nazwa dotrwa do wykonania bez zmian. Jedyne poprawne odwolanie to wlasne.
+      for (const auto &t : r.condition) {
+        if (t.getCommandID() != PUSH_ID) continue;
+        const auto [schema, index] = std::get<std::pair<std::string, int>>(t.getVT());
+        if (schema == q.id) continue;
+        return std::format(
+            "Stream '{}': rule '{}' refers to stream '{}', but a rule condition reads only the record of the stream "
+            "it is attached to. Refer to it by its own name, for example '{}[{}]'.",
+            q.id, r.name, schema, q.id, index);
+      }
     }  // end for each rule in query
   }
   return {"OK"};
@@ -1569,18 +1583,19 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
                    GetStringcommand_id(cmd.getCommandID()), q.id);
     }
 
-    // Bump capMap with dumpRange from rules (if they are negative and attached to query declaration)
+    // Ujemna czesc zakresu DUMP siega historii strumienia, NA KTORYM wisi regula: dumpManager
+    // czyta ja przez getPayload(q.id, k), a nie przez zrodlo z klauzuli FROM. Do 2026-09-05
+    // podbicie trafialo w arg1 programu strumienia, czyli w zrodlo — glebokosc historii
+    // dostawal ktos inny niz ten, kto z niej korzysta. Znaczenie ma to dla magazynu MEMORY,
+    // gdzie policy.second jest rozmiarem pierscienia i starszy rekord po prostu nie istnieje;
+    // magazyn plikowy trzyma cala historie niezaleznie od tej liczby.
     for (const auto &rule : q.lRules) {
       if (rule.action != rule::DUMP) continue;
       auto [l, r] = rule.dumpRange;
       if (l >= r) {
         FatalError("compiler: dump range invalid [{}..{}] for query '{}'", l, r, q.id);
       }
-      if (l < 0) {
-        auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
-        const auto nameSrc = arg1;
-        capMap[nameSrc]    = std::max(capMap[nameSrc], static_cast<int>(abs(l)));
-      }
+      if (l < 0) capMap[q.id] = std::max(capMap[q.id], static_cast<int>(abs(l)));
     }
   }
   return capMap;

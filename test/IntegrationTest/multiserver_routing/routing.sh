@@ -176,6 +176,15 @@ xqry --server alfa -d | grep -q 'adhoc_a' || {
 xqry --server beta -d | grep -q 'adhoc_a' && {
   echo "ad-hoc trafil takze do instancji beta"; exit 1; }
 
+# Regula nie ma klauzuli FROM, a mimo to ma jednoznacznego adresata: wlasciciela strumienia
+# spod ON. Bez tej sciezki routing nie mialby sie tu czego chwycic i zazadalby --server.
+xqry -a 'RULE r_beta ON dstb WHEN dstb[0] > 0 DO DUMP -1 TO 1' || {
+  echo "regula ad-hoc nie zostala skierowana do wlasciciela strumienia dstb"; exit 1; }
+
+expect_failure xqry -a 'RULE r_none ON nosuchstream WHEN nosuchstream[0] > 0 DO DUMP -1 TO 1'
+grep -q -- '--server' expect_out.txt || {
+  echo "regula na nieznanym strumieniu nie zazadala --server:"; cat expect_out.txt; exit 1; }
+
 xqry --server alfa -k
 xqry --server beta -k
 wait "$pid_a" 2>/dev/null || true

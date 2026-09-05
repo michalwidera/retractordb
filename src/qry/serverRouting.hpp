@@ -36,8 +36,9 @@ struct Resolution {
 /// bez spacji, więc wyjście `--bus` zostaje kolumnowo rozbieralne.
 [[nodiscard]] std::string instanceLabel(std::string_view name);
 
-/// Nazwy strumieni występujące w wyrażeniu FROM zapytania SELECT. Lekser zachowuje składnię
-/// RQL ID (`[A-Za-z][A-Za-z_$0-9]*`), pomija napisy i komentarze oraz odróżnia reduktory
+/// Nazwy strumieni, które rozstrzygają adresata zapytania: źródła z klauzuli FROM zapytania
+/// SELECT oraz strumień spod ON zapytania RULE. Lekser zachowuje składnię RQL ID
+/// (`[A-Za-z][A-Za-z_$0-9]*`), pomija napisy i komentarze oraz odróżnia reduktory
 /// MIN/MAX/AVG/SUMC i agregator po kropce od nazw źródeł.
 ///
 /// Słowa kluczowe rozpoznaje dokładnie w dwóch pisowniach z `RQL.g4` (`'FROM'|'from'`), bo

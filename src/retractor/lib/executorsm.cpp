@@ -151,6 +151,76 @@ ptree executorsm::collectStreamsParameters() {
   return ptRetval;
 }
 
+/// Dolaczenie reguly do zywego planu — droga rozlaczna z importem strumienia.
+///
+/// Regula nie powoluje zadnej nazwy: wisi na strumieniu, ktory juz istnieje. Nie ma wiec czego
+/// zaimportowac (compiler::importFrom przenosi WYLACZNIE wezly o nowych identyfikatorach, wiec
+/// dla reguly jego lista wyjsciowa bylaby pusta), nie ma czego zgloszic na magistrali i nie ma
+/// po co przebudowywac osi czasu — zbior interwalow planu zostaje ten sam, dlatego nie rusza
+/// tez adHocPlanRevision.
+ptree executorsm::attachAdHocRule(qTree &coreInstanceCopy, const std::string &streamName) {
+  ptree ptRetval;
+  const auto refuse = [&ptRetval](const std::string &message) {
+    ptRetval.put(std::string("db"), "Rejected: " + message);
+    SPDLOG_ERROR("AdHoc RULE rejected: {}", message);
+    return ptRetval;
+  };
+
+  // Istnienie celu, jego typ (nie deklaracja), niepusty zakres DUMP i unikalnosc nazwy reguly
+  // sprawdzil juz parser — bez tego nie byloby tu parseOut == "OK". Regula jest dokladnie jedna
+  // (statementKeywords.size() == 1), wiec parser dopisal ja na koniec listy celu.
+  query &copyTarget       = coreInstanceCopy.getQuery(streamName);
+  const rule parsed       = copyTarget.lRules.back();
+  const auto targetPolicy = copyTarget.policy;  // przed kompilacja kopii == polityka zywego strumienia
+
+  // SYSTEM przez kanal ad-hoc bylby wykonaniem dowolnego polecenia powloki na serwerze przez
+  // kazdego, kto otworzy segment IPC. W pliku planu autorem reguly jest ten, kto uruchamia
+  // usluge — i to jest cala roznica. Akcja zostaje, kanal nie.
+  if (parsed.action != rule::DUMP) return refuse("AdHoc RULE supports DO DUMP only; DO SYSTEM stays available in the plan file");
+
+  const long int historyDepth = parsed.dumpRange.first < 0 ? -parsed.dumpRange.first : 0;
+
+  // Pojemnosci nie da sie podniesc w locie: polityka trafia do deskryptora przy tworzeniu
+  // streamInstance, a storage::setCapacity() dla strumienia niedeklarowanego nic nie robi.
+  // Magazyn MEMORY jest pierscieniem o rozmiarze policy.second — glebszej historii tam nie ma
+  // i nie bedzie, wiec odmawiamy zamiast uzbrajac regule, ktora czekalaby w nieskonczonosc.
+  if (historyDepth > 0 && targetPolicy.first == "MEMORY" && static_cast<size_t>(historyDepth) > targetPolicy.second)
+    return refuse("stream '" + streamName + "' keeps only " + std::to_string(targetPolicy.second) +
+                  " record(s) in memory, so a dump range reaching " + std::to_string(historyDepth) +
+                  " record(s) back cannot be served");
+
+  compiler localCompiler(coreInstanceCopy);
+  const auto response = localCompiler.compile();
+  if (response != "OK") {
+    ptRetval.put(std::string("db"), "Fail local chain compiler:" + response);
+    SPDLOG_ERROR("Compile chain of adhoc rule failed: {}", response);
+    return ptRetval;
+  }
+
+  query &compiledTarget     = coreInstanceCopy.getQuery(streamName);
+  rule attached             = compiledTarget.lRules.back();
+  const auto compiledLayout = compiledTarget.descriptorStorage();
+
+  {
+    std::scoped_lock scoped_lock(core_mutex);
+    query &live = coreInstancePtr->getQuery(streamName);
+    // Warunek reguly adresuje rekord wyjsciowy celu po indeksie plaskim, wiec wolno go dolaczyc
+    // tylko wtedy, gdy rekord ma w obu planach ten sam ksztalt. Kompilacja kopii przebiega
+    // niezaleznie od tej, ktora zbudowala plan dzialajacy, a rownosc deskryptorow jest jedynym
+    // uczciwym sprawdzianem, ze indeks znaczy po obu stronach to samo.
+    if (!(compiledLayout == live.descriptorStorage()))
+      return refuse("stream '" + streamName + "' has a different record layout in the recompiled plan");
+
+    // Granica historii: regula rusza dopiero, gdy PO dolaczeniu przybedzie tyle rekordow, ile
+    // siega jej zakres. Do tej chwili zostaje nieuzbrojona — patrz rule::armAtCount.
+    attached.armAtCount = pProc->getStreamCount(streamName) + static_cast<size_t>(historyDepth);
+    live.lRules.push_back(std::move(attached));
+  }
+
+  ptRetval.put(std::string("db"), "OK");
+  return ptRetval;
+}
+
 ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   ptree ptRetval;
 
@@ -185,11 +255,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     return ptRetval;
   }
 
-  if (first_keyword == "RULE") {
-    ptRetval.put(std::string("db"), "Fail parse: AdHoc RULE not yet supported");
-    SPDLOG_ERROR("Parse adhoc query failed: AdHoc RULE not yet supported");
-    return ptRetval;
-  }
+  if (first_keyword == "RULE") return attachAdHocRule(coreInstanceCopy, stream_name);
 
   if (first_keyword == "STORAGE" ||   //
       first_keyword == "SUBSTRAT" ||  //

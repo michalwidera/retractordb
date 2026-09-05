@@ -130,6 +130,30 @@ TEST(serverRouting, adHocRoutesGeneratedDollarStream) {
   EXPECT_EQ(resolved.serverName, "alfa");
 }
 
+TEST(serverRouting, adHocRuleResolvesByItsOnStream) {
+  // RULE nie ma klauzuli FROM, wiec do 2026-09-05 bylo dla routingu nierozstrzygalne i bez
+  // --server nie trafialo nigdzie. Adresat jest jednak jednoznaczny: wlasciciel strumienia
+  // spod ON, bo tam regula zamieszka.
+  const routing::Resolution resolved = routing::forAdHoc(twoInstances(), "RULE watch ON dstb WHEN dstb[0] > 3 DO DUMP -2 TO 2");
+  EXPECT_EQ(resolved.status, routing::Status::Resolved);
+  EXPECT_EQ(resolved.serverName, "beta");
+}
+
+TEST(serverRouting, adHocRuleNameIsNotAStreamName) {
+  // Nazwa reguly stoi w tym samym zapisie co nazwa strumienia i w dodatku PRZED nia. Gdyby
+  // routing bral ja pod uwage, regula nazwana jak cudzy strumien jechalaby do cudzej instancji.
+  const routing::Resolution resolved = routing::forAdHoc(twoInstances(), "RULE dsta ON dstb WHEN dstb[0] > 3 DO DUMP -2 TO 2");
+  EXPECT_EQ(resolved.status, routing::Status::Resolved);
+  EXPECT_EQ(resolved.serverName, "beta");
+}
+
+TEST(serverRouting, adHocRuleOnUnknownStreamIsUndecidable) {
+  const routing::Resolution resolved =
+      routing::forAdHoc(twoInstances(), "RULE watch ON nowhere WHEN nowhere[0] > 3 DO DUMP -2 TO 2");
+  EXPECT_EQ(resolved.status, routing::Status::Ambiguous);
+  EXPECT_NE(resolved.detail.find("--server"), std::string::npos);
+}
+
 TEST(serverRouting, adHocAcrossInstancesIsRejected) {
   // Rozglaszanie ad-hoc jest wykluczone: getAdHoc modyfikuje PLAN serwera, wiec trafienie
   // w niewlasciwa instancje to trwaly skutek uboczny, a nie pomylka do powtorzenia.

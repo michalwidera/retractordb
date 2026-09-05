@@ -40,6 +40,7 @@ struct executorsm {
   static ptree commandProcessor(const ptree &ptInval);
   static ptree collectStreamsParameters();
   static ptree getAdHoc(const std::string &adHocQuery);
+  static ptree attachAdHocRule(qTree &coreInstanceCopy, const std::string &streamName);
 
   std::set<std::string> getAwaitedStreamsSet(CRationalStreamMath::TimeLine &tl, qTree *coreInstancePtr);
   std::string printRowValue(const std::string &query_name);

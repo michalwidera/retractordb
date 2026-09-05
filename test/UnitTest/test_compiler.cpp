@@ -79,6 +79,100 @@ TEST(xparser, check_multiline_backslash) {
   EXPECT_TRUE(instance.exists("str1"));
 }
 
+// --- reguly: odmowa zamiast abort(), bo ten sam parser obsluguje kanal ad-hoc -----------
+
+TEST(xparser, rule_on_missing_stream_is_refused_not_ignored) {
+  // Do 2026-09-05 petla szukajaca celu po prostu nic nie znajdowala i regula znikala bez sladu:
+  // w pliku planu byla to cicho martwa regula, w ad-hoc — odpowiedz "OK" na polecenie, ktore
+  // nie zrobilo nic.
+  qTree instance;
+  auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
+        SELECT core0[0] STREAM dst FROM core0
+        RULE r ON nosuch WHEN nosuch[0] > 0 DO DUMP -1 TO 1
+      )");
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("no such stream is defined"), std::string::npos) << result;
+}
+
+TEST(xparser, rule_on_declaration_is_refused_without_killing_the_process) {
+  qTree instance;
+  auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
+        RULE r ON core0 WHEN core0[0] > 0 DO DUMP -1 TO 1
+      )");
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("declaration stream"), std::string::npos) << result;
+}
+
+TEST(xparser, duplicate_rule_name_on_one_stream_is_refused) {
+  // Nazwa reguly wchodzi do nazwy pliku zrzutu (dumpManager::createDumpFile), wiec powtorka
+  // znaczy dwa zadania piszace do jednego pliku.
+  qTree instance;
+  auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
+        SELECT core0[0] STREAM dst FROM core0
+        RULE r ON dst WHEN dst[0] > 0 DO DUMP -1 TO 1
+        RULE r ON dst WHEN dst[0] > 1 DO DUMP -2 TO 2
+      )");
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("already defined"), std::string::npos) << result;
+}
+
+TEST(xparser, empty_dump_range_is_refused_by_the_parser) {
+  // Rownosc granic nie opisuje zadnego zrzutu, a nizej czekal na nia FatalError w
+  // compiler::computeRequiredCapacities() — czyli w kanale ad-hoc smierc serwera.
+  qTree instance;
+  auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
+        SELECT core0[0] STREAM dst FROM core0
+        RULE r ON dst WHEN dst[0] > 0 DO DUMP 5 TO 5
+      )");
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("is empty"), std::string::npos) << result;
+}
+
+TEST(xparser, dump_range_signs_are_read_from_the_neighbouring_child) {
+  // Znak jest opcjonalnym dzieckiem reguly `dumppart`, wiec pozycje dzieci przesuwaja sie wraz
+  // z jego obecnoscia. Odczyt ze stalej pozycji children[4] wychodzil dla zakresu BEZ znakow
+  // poza wektor — w Debug asercja biblioteki standardowej, w Release odczyt spoza zakresu.
+  struct Case {
+    std::string range;
+    long int left;
+    long int right;
+  };
+  for (const auto &testCase : {Case{"5 TO 8", 5, 8}, Case{"-5 TO 8", -5, 8}, Case{"-5 TO -1", -5, -1}}) {
+    qTree instance;
+    auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
+        SELECT core0[0] STREAM dst FROM core0
+        RULE r ON dst WHEN dst[0] > 0 DO DUMP )" + testCase.range + "\n");
+    ASSERT_EQ(result, "OK") << testCase.range;
+    const auto &attached = instance.getQuery("dst").lRules;
+    ASSERT_EQ(attached.size(), 1U) << testCase.range;
+    EXPECT_EQ(attached.front().dumpRange.first, testCase.left) << testCase.range;
+    EXPECT_EQ(attached.front().dumpRange.second, testCase.right) << testCase.range;
+  }
+}
+
+TEST(xcompiler, rule_condition_reaching_another_stream_is_refused) {
+  // Warunek reguly ewaluator liczy na payloadzie WYJSCIOWYM celu i bierze z tokenu wylacznie
+  // indeks — nazwa schematu jest ignorowana. Odwolanie do cudzego strumienia czytaloby wiec
+  // pod tym indeksem wlasny rekord: cicho i zawsze zle.
+  qTree instance;
+  auto [parseResult, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
+        SELECT core0[0] STREAM dst FROM core0
+        RULE r ON dst WHEN core0[0] > 0 DO DUMP -1 TO 1
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  const auto result = compilerInstance.compile();
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("only the record of the stream it is attached to"), std::string::npos) << result;
+}
+
 TEST(xcompiler, shares_commutative_add_select_computation) {
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(

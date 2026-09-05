@@ -70,8 +70,15 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
   std::tie(task.dumpFilename, task.fd)      = createDumpFile(streamName, task.taskName);
   task.dumpedRecordsToGo                    = static_cast<int>(abs(task.range.second - task.range.first));
   retentionSize[streamName + task.taskName] = static_cast<int>(task.retentionSize);
-  if (bookOfTasks[streamName].capacity() == 0) {
-    bookOfTasks[streamName].set_capacity(task.retentionSize > 0 ? task.retentionSize : 1);
+  // Pojemnosc ksiegi to liczba zadan JEDNOCZESNIE w locie na tym strumieniu, wiec musi
+  // wystarczyc najbardziej wymagajacej regule. Do 2026-09-05 ustawialo ja wylacznie zadanie
+  // pierwsze ("capacity() == 0"), czyli ta regula, ktora akurat odpalila najwczesniej: przy
+  // regule bez RETENTION ksiega miala pojemnosc 1 i kazde nastepne zadanie — takze cudze,
+  // z wlasnym RETENTION — wypychalo poprzednie, zamykajac mu deskryptor i ucinajac zrzut.
+  // Rosniemy, nigdy nie zwezamy: zwezenie skasowaloby zadania juz przyjete.
+  const size_t requiredBookSize = task.retentionSize > 0 ? task.retentionSize : 1;
+  if (bookOfTasks[streamName].capacity() < requiredBookSize) {
+    bookOfTasks[streamName].set_capacity(requiredBookSize);
   }
   // This push_back will overwrite oldest task if retentionSize is exceeded
   // Task destructor will close file descriptor if still open

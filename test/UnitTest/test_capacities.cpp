@@ -203,3 +203,26 @@ TEST(capacities, add_declared_matches_event_table) {
     EXPECT_EQ(instance.maxCapacity.at("right"), testCase.expectedRightCapacity) << rql;
   }
 }
+
+// Ujemny zakres DUMP siega historii strumienia, NA KTORYM wisi regula: `dumpManager`
+// czyta ja przez `getPayload(<strumien reguly>, k)`. Do 2026-09-05 kompilator podbijal
+// pojemnosc ZRODLA z klauzuli FROM, wiec glebokosc dostawal ktos inny niz ten, kto z niej
+// korzysta — a dla strumienia trzymanego w pamieci (MEMORY) znaczy to rekord, ktorego
+// po prostu nie ma.
+TEST(capacities, rule_history_depth_lands_on_the_rule_owner) {
+  constexpr int historyDepth = 7;
+
+  qTree instance;
+  auto [parseResult, keyword, name] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM src, 1 FILE 'src.dat'
+        SELECT src[0] STREAM dst FROM src
+        RULE r ON dst WHEN dst[0] > 0 DO DUMP -7 TO 1
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  ASSERT_EQ(compilerInstance.compile(), "OK");
+
+  EXPECT_GE(instance.maxCapacity.at("dst"), historyDepth);
+  EXPECT_LT(instance.maxCapacity.at("src"), historyDepth);
+}

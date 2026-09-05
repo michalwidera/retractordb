@@ -130,8 +130,66 @@ class ParserListener : public RQLBaseListener {
     program.push_back(token(id, arg1));
   };
 
+  /// Pierwszy blad semantyczny calego przebiegu — czyli taki, ktorego gramatyka nie lapie,
+  /// a ktory mimo to unieważnia zapytanie (regula na nieistniejacym strumieniu, na deklaracji,
+  /// powtorzona nazwa reguly). Do 2026-09-05 kazdy z tych przypadkow konczyl sie abort() albo
+  /// cisza; w procesie serwera pierwsze znaczylo smierc xretractora z powodu bledu w cudzym
+  /// zapytaniu ad-hoc, drugie — odpowiedz "OK" na polecenie, ktore nie zrobilo nic.
+  /// Rozstrzyga blad pierwszy: dalsze sa juz tylko jego nastepstwami.
+  std::string semanticError_;
+
+  void reportSemanticError(const std::string &message) {
+    std::cerr << "Error: " << message << '\n';
+    SPDLOG_ERROR("Parser: {}", message);
+    if (semanticError_.empty()) semanticError_ = message;
+  }
+
+  /// Dopina regule do strumienia wskazanego przez ON. Zwraca pusty napis albo powod odmowy;
+  /// przy odmowie plan pozostaje nietkniety, wiec wolajacy odrzuca calosc bez sladu po regule.
+  std::string buildRule(const std::string &stream_name, const std::string &rule_name) {
+    query *target = nullptr;
+    for (auto &i : coreInstance)
+      if (i.id == stream_name) {
+        target = &i;
+        break;
+      }
+
+    if (target == nullptr)
+      return "Rule '" + rule_name + "' refers to stream '" + stream_name + "', but no such stream is defined";
+    if (target->isDeclaration())
+      return "Rule '" + rule_name + "' cannot be attached to declaration stream '" + stream_name + "'";
+    for (const auto &existing : target->lRules)
+      if (existing.name == rule_name) return "Rule '" + rule_name + "' is already defined on stream '" + stream_name + "'";
+
+    rule ruleConstruct(rule_name, ruleCondition);
+    switch (actionType) {
+      case rule::DUMP:
+        // Zakres pusty odrzucamy juz tutaj, bo dalej czeka na niego FatalError w
+        // compiler::computeRequiredCapacities() — a w sciezce ad-hoc FatalError to smierc
+        // serwera. Rownosc granic nie opisuje zadnego zrzutu, wiec nic sie nie traci.
+        if (dump_left >= dump_right)
+          return "Rule '" + rule_name + "': dump range [" + std::to_string(dump_left) + ".." + std::to_string(dump_right) +
+                 "] is empty, left bound must be less than right bound";
+        ruleConstruct.action         = rule::DUMP;
+        ruleConstruct.dumpRange      = std::make_pair(dump_left, dump_right);
+        ruleConstruct.dump_retention = dump_retention;
+        break;
+      case rule::SYSTEM:
+        ruleConstruct.action        = rule::SYSTEM;
+        ruleConstruct.systemCommand = systemCommand;
+        break;
+      default:
+        return "Rule '" + rule_name + "' on stream '" + stream_name + "' has an unknown action";
+    }
+
+    target->lRules.push_back(std::move(ruleConstruct));
+    return {};
+  }
+
  public:
   ParserListener(qTree &coreInstance) : coreInstance(coreInstance) {};
+
+  [[nodiscard]] const std::string &semanticError() const { return semanticError_; }
 
   void enterProg(RQLParser::ProgContext *ctx) override {}
 
@@ -413,41 +471,11 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitRulez(RQLParser::RulezContext *ctx) override {
-    std::string stream_name(ctx->stream_name->getText());
-    rule ruleConstruct(rule(ctx->name->getText(), ruleCondition));
+    const std::string stream_name(ctx->stream_name->getText());
+    const std::string rule_name(ctx->name->getText());
 
-    for (auto &i : coreInstance) {
-      if (i.id == stream_name) {
-        if (i.isDeclaration()) {
-          std::cerr << "Error: Cannot attach rule to declaration stream: " << stream_name << " Rule: " << ctx->name->getText()
-                    << '\n';
-          SPDLOG_ERROR("Parser/Rule: Cannot attach rule to declaration stream: {} Rule: {}", stream_name, ctx->name->getText());
-          abort();
-        }
-        if (actionType == rule::DUMP) {
-          ruleConstruct.action    = rule::DUMP;
-          ruleConstruct.dumpRange = std::make_pair(dump_left, dump_right);
-          if (dump_left > dump_right) {
-            std::cerr << "Error: Dump left range cannot be greater than dump right range" << '\n';
-            SPDLOG_ERROR("Parser/Rule: Dump left range cannot be greater than dump right range");
-            abort();
-          }
-          ruleConstruct.dump_retention = dump_retention;
-        } else if (actionType == rule::SYSTEM) {
-          ruleConstruct.action        = rule::SYSTEM;
-          ruleConstruct.systemCommand = systemCommand;
-        } else {
-          std::cerr << "Error: Unknown action type: " << std::to_string(actionType) << " stream_name: " << stream_name
-                    << " Rule: " << ctx->name->getText() << '\n';
-          SPDLOG_ERROR("Parser/Rule: Unknown action type: {} stream_name: {} Rule: {}", std::to_string(actionType), stream_name,
-                       ctx->name->getText());
-          abort();
-        }
+    if (const std::string error = buildRule(stream_name, rule_name); !error.empty()) reportSemanticError(error);
 
-        i.lRules.push_back(ruleConstruct);
-        break;
-      }
-    }
     program.clear();
     dump_left      = 0;
     dump_right     = 0;
@@ -459,12 +487,29 @@ class ParserListener : public RQLBaseListener {
     fieldCount = 0;
   }
 
+  /// Czy tuz PRZED podana liczba stoi w zapisie znak minus.
+  ///
+  /// Znak jest w gramatyce osobnym, OPCJONALNYM dzieckiem (`'-'? DECIMAL`), wiec numery pozycji
+  /// przesuwaja sie razem z jego obecnoscia: `DUMP -5 TO 5` ma piecioro dzieci, `DUMP 5 TO 5` —
+  /// czworo. Odczyt ze stalej pozycji children[4] wychodzil w tym drugim przypadku poza wektor:
+  /// w Debug konczylo sie to asercja biblioteki standardowej, w Release odczytem spoza zakresu,
+  /// a z kanalu ad-hoc — smiercia serwera po `DO DUMP 5 TO 5`. Dlatego pytamy o sasiada samej
+  /// liczby, zamiast liczyc pozycje z gory.
+  static bool negatedBefore(RQLParser::DumppartContext *ctx, const antlr4::Token *number) {
+    for (size_t i = 1; i < ctx->children.size(); ++i) {
+      const auto *terminal = dynamic_cast<antlr4::tree::TerminalNode *>(ctx->children[i]);
+      if (terminal == nullptr || terminal->getSymbol() != number) continue;
+      return ctx->children[i - 1]->getText() == "-";
+    }
+    return false;
+  }
+
   void exitDumppart(RQLParser::DumppartContext *ctx) override {
     actionType = rule::DUMP;
     dump_left  = std::stoi(ctx->step_back->getText());
-    if (ctx->children[1]->getText() == "-") dump_left = -dump_left;
+    if (negatedBefore(ctx, ctx->step_back)) dump_left = -dump_left;
     dump_right = std::stoi(ctx->step_forward->getText());
-    if (ctx->children[4]->getText() == "-" || ctx->children[3]->getText() == "−") dump_right = -dump_right;
+    if (negatedBefore(ctx, ctx->step_forward)) dump_right = -dump_right;
 
     if (ctx->rule_retnetion != nullptr)
       dump_retention = std::stoi(ctx->rule_retnetion->getText());
@@ -654,6 +699,11 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
       streamName = ruleCtx->stream_name->getText();
     }
   }
+  // Blad semantyczny wraca ta sama droga co skladniowy — wolajacy (launcher albo
+  // executorsm::getAdHoc) ma jedno miejsce, w ktorym odrzuca plan lub kopie planu.
+  // Nazwa strumienia i slowo kluczowe ida z nim, zeby komunikat wskazywal instrukcje.
+  if (!parserListener.semanticError().empty()) return {parserListener.semanticError(), firsttoken, streamName};
+
   return {"OK", firsttoken, streamName};
 }
 
