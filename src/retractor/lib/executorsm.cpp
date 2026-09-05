@@ -1,6 +1,7 @@
 #include "executorsm.hpp"
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <cstdlib>
@@ -61,6 +62,18 @@ struct ResetTransfer {
   std::string text;
 };
 std::map<int, ResetTransfer> resetTransfers;
+
+/// Zycie EPOKI planu. Obiekt `dataModel` z petli epok i tresc `*coreInstancePtr` istnieja
+/// tylko miedzy opublikowaniem pProc a jego zgaszeniem. core_mutex tego nie pilnuje: chroni
+/// pojedyncza zmiane stanu, a handler komendy zwalnia go, ZANIM siegnie po model, i czyta
+/// globalny pProc na nowo przy kazdym uzyciu. Watek przetwarzania zdazyl w tym oknie zgasic
+/// wskaznik i rozebrac model -- `xqry -d` rownolegle z `xqry --reset` konczylo sie SIGSEGV
+/// w dataModel::streamStoredSize (this=0x0), w polowie petli po strumieniach.
+/// Ten muteks trzyma epoke w miejscu przez CALY czas obslugi komendy, a wymiana epoki czeka
+/// na jego zwolnienie. Wystarcza muteks zwykly, bo handlery i tak sa szeregowane -- IpcServer
+/// prowadzi dokladnie jedna petle odbioru komend. Kolejnosc zagniezdzenia jest zawsze
+/// plan_epoch_mutex -> core_mutex.
+std::mutex plan_epoch_mutex;
 }  // namespace
 
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile,
@@ -182,6 +195,25 @@ ptree executorsm::collectStreamsParameters() {
   if (coreInstancePtr == nullptr) FatalError("executorsm::collectStreamsParameters: coreInstancePtr is null");
   ptree ptRetval;
   if (pProc == nullptr) FatalError("executorsm::collectStreamsParameters: pProc is null");
+  // Hak diagnostyczny testu regresyjnego it_service_reset_race, ta sama droga co RDB_FAULT_SHOW.
+  //
+  // Zwykle opoznienie tu nie wystarcza i zostalo odrzucone po probie: okno, w ktorym pProc jest
+  // juz zgaszony, a nowa epoka jeszcze nie opublikowana, trwa kilkanascie milisekund, wiec
+  // handler uspiony na stale dwie sekundy budzil sie PO wymianie i konczyl poprawnie takze na
+  // silniku bez naprawy. Hak czeka wiec na SAM FAKT, a nie na uplyw czasu: krecac sie do
+  // wyczerpania budzetu (wartosc zmiennej w ms), az pProc zgasnie.
+  //
+  // Obie odpowiedzi sa jednoznaczne. Bez naprawy rozbiorka epoki przechodzi obok handlera,
+  // pProc gasnie, petla ponizej dereferencuje nulla -- SIGSEGV, dokladnie ten z rdzenia
+  // (dataModel::streamStoredSize, this=0x0). Z naprawa rozbiorka czeka na plan_epoch_mutex
+  // trzymany przez ten handler, wiec pProc NIE MA JAK zgasnac: hak wyczerpuje budzet i komenda
+  // konczy sie normalnie, na modelu odchodzacej epoki. Odczyt pProc bez blokady jest tu
+  // swiadomy -- to jest wlasnie badany odczyt.
+  if (const char *budgetMs = std::getenv("RDB_FAULT_GET_AWAIT_EPOCH_SWAP"); budgetMs != nullptr) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(std::atoi(budgetMs));
+    while (pProc != nullptr && std::chrono::steady_clock::now() < deadline)
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
   for (auto &q : *coreInstancePtr) {
     ptRetval.put(std::string("db.stream.") + q.id, q.id);
 
@@ -392,6 +424,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   std::string compileChainResult;
   std::string addFailedId;
   if (cmPtr == nullptr) FatalError("executorsm::getAdHoc: cmPtr is null");
+  if (pProc == nullptr) FatalError("executorsm::getAdHoc: pProc is null");
 
   // Publish the compiled tree and its runtime stream instances atomically with respect
   // to the execution loop.
@@ -547,6 +580,10 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
   std::string command = ptInval.get("db.message", "");
   try {
     const bool requiresDataModel = command == "get" || command == "adhoc" || command == "detail" || command == "show";
+    // Blokada epoki zyje az do wyjscia z handlera -- patrz plan_epoch_mutex. Brana dopiero PO
+    // przebudzeniu na core_mutex, nigdy przed: czekanie na model pod blokada epoki zamykaloby
+    // droge watkowi, ktory ten model ma dopiero opublikowac.
+    std::unique_lock<std::mutex> epochLock;
     if (requiresDataModel) {
       if (dataModelExpected.load()) {
         // Predykat obejmuje takze ZNIKNIECIE modelu: przeladowanie planu zdejmuje
@@ -555,6 +592,7 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
         std::unique_lock<std::mutex> lock(core_mutex);
         cv.wait(lock, [] { return pProc != nullptr || iLoopLimitCnt == executorsm::stop_now || !dataModelExpected.load(); });
       }
+      epochLock = std::unique_lock<std::mutex>(plan_epoch_mutex);
       // Brak modelu jest ODPOWIEDZIA, nie cisza. Do 2026-09-05 instancja bez planu
       // przepuszczala komendy przez wszystkie `if`-y i odsylala PUSTE ptree, a klient
       // meldowal brak kolejki odpowiedzi i wskazywal winnego po drugiej stronie IPC.
@@ -642,6 +680,10 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
       if (std::getenv("RDB_FAULT_SHOW") != nullptr)
         throw std::runtime_error("RDB_FAULT_SHOW: wstrzyknieta awaria handlera 'show'");
       ipcServer.subscribe(streamId, streamName, maxElements);
+      // Odstep na ustanie kolejki nie potrzebuje juz ani modelu, ani planu, a blokada epoki
+      // wstrzymuje w tym czasie slot. Zdejmujemy ja przed czekaniem, zeby subskrypcja nie
+      // dokladala tego milisekunda do kazdego slotu, w ktory trafi komenda `show`.
+      epochLock.unlock();
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
     }
     //
@@ -1027,7 +1069,9 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
 
         dataModel proc(*coreInstancePtr);
         {
-          std::scoped_lock lock(core_mutex);
+          // Publikacja pod obiema blokadami: blokada epoki wpuszcza handlery dopiero do
+          // modelu gotowego, core_mutex niesie powiadomienie do czekajacych na cv.
+          std::scoped_lock lock(plan_epoch_mutex, core_mutex);
           pProc = &proc;
         }
         cv.notify_all();
@@ -1160,11 +1204,21 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
             std::scoped_lock lock(core_mutex);
             inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
           }
-          slotBench.beginCompute();
-          proc.processRows(inSet, currentTimeSlot);  // mierzony rdzeń obliczeń jednego interwału (E1)
-          slotBench.endCompute();
-          ipcServer.broadcast(inSet, formatRow);
-          slotBench.endSlot();
+          {
+            // Slot liczy sie pod blokada epoki, bo MUTUJE model: processRows przepisuje payloady,
+            // a broadcast siega po nie przez getPayload (releaseOnHold/revRead). Handler komendy
+            // czyta te same liczniki i te sama mape qSet, wiec bez tego wykluczenia `xqry -d`
+            // czytalby stan w trakcie zmiany. Blokada jest brana PRZED beginCompute: czekanie na
+            // komende w locie nie ma prawa wejsc do mierzonego rdzenia E1, a samo zajecie
+            // nieobciazonego muteksu to kilkadziesiat nanosekund. endSlot zostaje w srodku, zeby
+            // zwolnienie blokady wypadlo poza pomiarem.
+            std::scoped_lock epoch(plan_epoch_mutex);
+            slotBench.beginCompute();
+            proc.processRows(inSet, currentTimeSlot);  // mierzony rdzeń obliczeń jednego interwału (E1)
+            slotBench.endCompute();
+            ipcServer.broadcast(inSet, formatRow);
+            slotBench.endSlot();
+          }
 
           // Deklaracje sa czytane na koncu slotu, a ich rekord konsumuje dopiero slot nastepny.
           // Wyjscie z petli w tym miejscu wypada wiec dokladnie przed pierwszym rekordem, ktory
@@ -1195,10 +1249,13 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
 
         // Koniec epoki: model znika, zanim `proc` wyjdzie z zakresu. Kolejnosc jest wymogiem
         // poprawnosci — watek komunikacyjny siega po pProc bez wlasnej wiedzy o epokach, wiec
-        // wskaznik musi zgasnac POD muteksem i z powiadomieniem, inaczej komenda obudzona
-        // w trakcie rozbiorki czytalaby zniszczony dataModel.
+        // wskaznik musi zgasnac POD BLOKADA EPOKI, a nie tylko pod core_mutex. Sam core_mutex
+        // zatrzymywal wylacznie komendy jeszcze nieprzebudzone; ta, ktora byla juz w srodku
+        // handlera, czytala pProc na nowo i dostawala nulla albo zniszczony model.
+        // plan_epoch_mutex czeka tu na handler w locie, a po jego zwolnieniu pProc jest juz
+        // nullem, wiec destrukcja `proc` ponizej nie ma komu wyrwac obiektu spod rak.
         {
-          std::scoped_lock lock(core_mutex);
+          std::scoped_lock lock(plan_epoch_mutex, core_mutex);
           pProc             = nullptr;
           dataModelExpected = false;
         }

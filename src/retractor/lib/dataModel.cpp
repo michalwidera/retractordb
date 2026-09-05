@@ -4,6 +4,7 @@
 #include <iostream>
 #include <memory>  // unique_ptr
 #include <mutex>
+#include <stdexcept>
 #include <utility>
 
 #include <spdlog/spdlog.h>
@@ -599,8 +600,19 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
   return retVal;
 }
 
-size_t dataModel::streamStoredSize(const std::string &instance) {
-  return qSet[instance]->outputPayload->descriptor.getSizeInBytes() * getStreamCount(instance);
+streamInstance &dataModel::streamRuntime(const std::string &instance) {
+  const auto found = qSet.find(instance);
+  if (found == qSet.end()) {
+    SPDLOG_ERROR("dataModel: stream '{}' is in the plan but not in the model", instance);
+    throw std::logic_error("Stream present in the plan is missing from the data model. (check log)");
+  }
+  return *found->second;
 }
 
-size_t dataModel::getStreamCount(const std::string &instance) { return qSet[instance]->outputPayload->getRecordsCount(); }
+size_t dataModel::streamStoredSize(const std::string &instance) {
+  return streamRuntime(instance).outputPayload->descriptor.getSizeInBytes() * getStreamCount(instance);
+}
+
+size_t dataModel::getStreamCount(const std::string &instance) {
+  return streamRuntime(instance).outputPayload->getRecordsCount();
+}

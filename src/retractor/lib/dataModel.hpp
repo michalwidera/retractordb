@@ -14,6 +14,16 @@ class dataModel {
 
   std::map<std::string, std::string> directive_{{":STORAGE", ""}, {":SUBSTRAT", ""}, {":ROTATION", ""}};
 
+  /// Instancja wykonawcza strumienia po nazwie, ktora MOZE nie istniec w modelu.
+  ///
+  /// Sciezka IPC (`xqry -d`, `xqry -t`) pyta o strumienie wypisane z planu, a plan i model
+  /// potrafia sie rozjechac: getAdHoc() wnosi wezly do zywego drzewa przez importFrom(), po
+  /// czym addQueryToModel() moze zawiesc, a wycofania nie ma. `qSet[id]` na takiej nazwie nie
+  /// zglaszalo bledu, tylko WSTAWIALO pusty unique_ptr i zaraz go luskalo -- czyli SIGSEGV
+  /// w odpowiedzi na komende. Brak nazwy jest tu bledem zgloszonym tak samo jak w
+  /// qTree::getQuery: wyjatkiem, ktory handler zamienia w `error.response` dla klienta.
+  [[nodiscard]] streamInstance &streamRuntime(const std::string &instance);
+
   [[nodiscard]] bool forwardRecordAvailable(const std::string &instance, int forwardIndex) const;
   [[nodiscard]] bool queryInputsAvailable(const query &qry, int logicalIndex);
   void bootstrapDeclaration(const query &qry);
