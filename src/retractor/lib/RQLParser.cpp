@@ -2,6 +2,7 @@
 #include <cctype>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
@@ -601,7 +602,9 @@ class ParserListener : public RQLBaseListener {
   }
 };
 
-std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet) {
+std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
+                                                                  std::vector<std::string> &statementKeywords) {
+  statementKeywords.clear();
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
   // to create a token stream.
@@ -632,9 +635,14 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
     return {"Fail", "UNRECOGNIZED", ""};
   }
 
-  std::string firsttoken = "UNRECOGNIZED";
-  if (!tree->children.empty() && !tree->children[0]->children.empty()) firsttoken = tree->children[0]->children[0]->getText();
-  std::ranges::transform(firsttoken, firsttoken.begin(), ::toupper);
+  for (const auto *child : tree->children) {
+    if (child->children.empty()) continue;  // EOF
+    std::string keyword = child->children[0]->getText();
+    std::ranges::transform(keyword, keyword.begin(), ::toupper);
+    statementKeywords.push_back(std::move(keyword));
+  }
+
+  const std::string firsttoken = statementKeywords.empty() ? "UNRECOGNIZED" : statementKeywords.front();
 
   std::string streamName;  // tree->children[1]->children[0]->getText();
   if (!tree->children.empty()) {
@@ -647,6 +655,11 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
     }
   }
   return {"OK", firsttoken, streamName};
+}
+
+std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet) {
+  std::vector<std::string> ignoredKeywords;
+  return parserRQLString(coreInstance, inlet, ignoredKeywords);
 }
 
 /// Wiersze logiczne pliku RQL: komentarze usuniete, kontynuacje `\\` sklejone.

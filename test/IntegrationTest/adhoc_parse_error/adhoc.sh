@@ -44,6 +44,30 @@ if ! kill -0 "$_server_pid" 2>/dev/null; then
   exit 1
 fi
 
+# Program zaczynajacy sie od SELECT nie moze przemycic drugiej instrukcji.
+# Parser RQL przyjmuje wiele instrukcji, ale jedna wiadomosc ad-hoc jest jedna
+# transakcja SELECT albo DECLARE.
+set +e
+multi_out=$(xqry -a $'SELECT a[0] STREAM hidden_select FROM core0\nDECLARE a INTEGER STREAM hidden_source, 0.2 FILE '\''source.dat'\''' 2>&1)
+multi_rc=$?
+set -e
+if [ "$multi_rc" -eq 0 ]; then
+  echo "wieloinstrukcyjny program ad-hoc zostal przyjety: $multi_out"
+  exit 1
+fi
+case "$multi_out" in
+  *"exactly one SELECT or DECLARE"*) ;;
+  *)
+    echo "nieoczekiwana odpowiedz na wieloinstrukcyjny ad-hoc: $multi_out"
+    exit 1
+    ;;
+esac
+if xqry -d | grep -Eq 'hidden_select|hidden_source'; then
+  echo "odrzucony program wieloinstrukcyjny zmienil plan serwera"
+  xqry -d
+  exit 1
+fi
+
 # (3) Kolejne poprawne zapytanie nadal dziala.
 ok_out=$(xqry -a 'select a[0] stream adhocok from core0' 2>&1) || {
   echo "poprawne zapytanie ad-hoc odrzucone po blednym: $ok_out"

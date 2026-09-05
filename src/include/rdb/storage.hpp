@@ -148,6 +148,7 @@ class storage {
 
   /// @brief Liczba rekordów dostępnych w historii bufora źródła deklarowanego.
   [[nodiscard]] size_t historySize() const { return buffer_.size(); }
+  [[nodiscard]] size_t historyCapacity() const { return buffer_.capacity(); }
 
   [[nodiscard]] bool isDeclared() const;
 

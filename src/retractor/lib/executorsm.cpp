@@ -45,6 +45,8 @@ constexpr std::chrono::milliseconds kIdleLoopSleep{100};
 }  // namespace
 
 extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
+extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile,
+                                                                         std::vector<std::string> &statementKeywords);
 
 std::unique_ptr<PersistentCounter> pCounterPtr;
 
@@ -60,6 +62,7 @@ std::atomic<bool> dataModelExpected{false};
 /// Osobny od iLoopLimitCnt swiadomie -- patrz komentarz przy bramce w run().
 std::atomic<bool> firstQueryReceived{false};
 std::atomic<std::uint64_t> adHocPlanRevision{0};
+bool untilEofMode{false};
 
 // variable connected with llimitqry (-m) parameter
 // counts remaining loop iterations; 0 = stop, inifitie_loop = run forever
@@ -153,7 +156,8 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
 
   qTree coreInstanceCopy = *coreInstancePtr;
 
-  auto [parseOut, first_keyword, stream_name] = parserRQLString(coreInstanceCopy, adHocQuery);
+  std::vector<std::string> statementKeywords;
+  auto [parseOut, first_keyword, stream_name] = parserRQLString(coreInstanceCopy, adHocQuery, statementKeywords);
 
   // Blad skladni rozstrzygamy PRZED first_keyword. Po bledzie parser zwraca "UNRECOGNIZED",
   // a kontrole slowa kluczowego koncza sie ponizej FatalError-em, czyli smiercia serwera —
@@ -172,6 +176,15 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     return ptRetval;
   }
 
+  // Parser przyjmuje caly program RQL. Kanal ad-hoc publikuje jednak jedna transakcje
+  // SELECT albo DECLARE; sprawdzenie tylko pierwszego slowa pozwalalo ukryc zakazana
+  // instrukcje jako drugi element programu zaczynajacego sie od SELECT.
+  if (statementKeywords.size() != 1) {
+    ptRetval.put(std::string("db"), "Fail parse: AdHoc accepts exactly one SELECT or DECLARE statement");
+    SPDLOG_ERROR("Parse adhoc query failed: expected one statement, got {}", statementKeywords.size());
+    return ptRetval;
+  }
+
   if (first_keyword == "RULE") {
     ptRetval.put(std::string("db"), "Fail parse: AdHoc RULE not yet supported");
     SPDLOG_ERROR("Parse adhoc query failed: AdHoc RULE not yet supported");
@@ -186,19 +199,19 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     return ptRetval;
   }
 
-  // Deklaracja dodana w locie nie dostaje runtime'owej bazy indeksu logicznego
-  // (processRows pomija deklaracje), więc pierwszy odczyt przez operator kończył
-  // się FatalError i śmiercią całego serwera (issue #227, śledztwo po 5f31051).
-  // Odrzucamy, dopóki ad-hoc DECLARE nie dostanie własnej ścieżki wyznaczania bazy.
-  if (first_keyword == "DECLARE") {
-    ptRetval.put(std::string("db"), "Fail parse: AdHoc DECLARE not supported");
-    SPDLOG_ERROR("Parse adhoc query failed: AdHoc DECLARE not supported");
+  if (first_keyword == "DECLARE" && coreInstancePtr->exists(stream_name)) {
+    ptRetval.put(std::string("db"), "Rejected: stream '" + stream_name + "' already exists in this instance");
+    SPDLOG_ERROR("AdHoc DECLARE rejected: stream '{}' already exists", stream_name);
     return ptRetval;
   }
 
-  if (first_keyword != "SELECT") {
+  if (first_keyword != "SELECT" && first_keyword != "DECLARE") {
     FatalError("executorsm::getAdHoc: unexpected first_keyword '{}' after filtering — parser logic error", first_keyword);
   }
+
+  // --until-eof jest trybem calego przebiegu. Deklaracja dolaczona pozniej musi
+  // odziedziczyc ONESHOT tak samo jak deklaracje planu startowego.
+  if (first_keyword == "DECLARE" && untilEofMode) coreInstanceCopy[stream_name].isOneShot = true;
 
   compiler localCompiler(coreInstanceCopy);
   auto response = localCompiler.compile();
@@ -270,6 +283,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     if (!mergedIds.empty()) adHocPlanRevision.fetch_add(1, std::memory_order_release);
     compileChainResult = cmPtr->compile();
     if (compileChainResult == "OK") {
+      pProc->syncDeclaredCapacities();
       for (const auto &id : mergedIds)
         if (!pProc->addQueryToModel(id)) {
           addFailedId = id;
@@ -478,6 +492,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   executorsm::cfgMinQueueElements   = cfg.ipcMinQueueElements;
   executorsm::cfgRtPriority         = cfg.schedulingRtPriority;
   dataModelExpected                 = !coreInstance.empty();
+  untilEofMode                      = vm.contains("until-eof");
 
   // Zakres waznosci wskaznika na straznika — patrz komentarz przy serviceGuardPtr.
   // RAII, a nie zerowanie przy kazdym `return`, bo run() ma ich kilka.
@@ -605,7 +620,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
       // zrodlo zawijane po koncu pliku wraca na jego poczatek i produkuje rekordy z danych, ktore
       // juz raz przeszly. Ustawienie musi nastapic PRZED konstrukcja dataModel, bo to ona tworzy
       // magazyny i przekazuje isOneShot do fabryki akcesorow.
-      const bool until_eof_mode = vm.contains("until-eof");
+      const bool until_eof_mode = untilEofMode;
       if (until_eof_mode)
         for (auto &q : *coreInstancePtr)
           if (q.isDeclaration()) q.isOneShot = true;

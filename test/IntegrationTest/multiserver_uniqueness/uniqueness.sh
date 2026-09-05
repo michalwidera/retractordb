@@ -230,11 +230,30 @@ if xqry --server gamma -d | grep -qw 'dst'; then
   exit 1
 fi
 
-# --- (7) nazwa przyjeta ad-hoc jest roszczona wobec pozostalych instancji -----------------
+# --- (7) deklaracja przyjeta ad-hoc jest roszczona wobec pozostalych instancji ------------
 
-xqry --server gamma -a "SELECT srcg[0]+8 STREAM adh FROM srcg"
+# DECLARE nie ma klauzuli FROM, wiec przy wielu serwerach klient nie moze sam
+# wybrac instancji. Odrzucenie musi nastapic przed zmiana ktoregokolwiek planu.
+set +e
+declare_auto_out=$(xqry -a "DECLARE vp INTEGER STREAM ambiguous_decl, 1 FILE 'data.txt'" 2>&1)
+declare_auto_rc=$?
+set -e
+if [ "$declare_auto_rc" -eq 0 ]; then
+  echo "DECLARE bez --server zostalo przyjete mimo wielu instancji"
+  exit 1
+fi
+case "$declare_auto_out" in
+  *"use --server"*) ;;
+  *)
+    echo "niejednoznaczny DECLARE nie wskazal --server:"
+    echo "$declare_auto_out"
+    exit 1
+    ;;
+esac
+
+xqry --server gamma -a "DECLARE vp INTEGER STREAM adh, 1 FILE 'data.txt'"
 xqry --server gamma -d | grep -qw 'adh' || {
-  echo "gamma nie przyjela ad-hoc strumienia 'adh'"
+  echo "gamma nie przyjela deklaracji ad-hoc 'adh'"
   xqry --server gamma -d
   exit 1
 }

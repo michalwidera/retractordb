@@ -14,6 +14,10 @@ class dataModel {
 
   std::map<std::string, std::string> directive_{{":STORAGE", ""}, {":SUBSTRAT", ""}, {":ROTATION", ""}};
 
+  [[nodiscard]] bool forwardRecordAvailable(const std::string &instance, int forwardIndex) const;
+  [[nodiscard]] bool queryInputsAvailable(const query &qry, int logicalIndex);
+  void bootstrapDeclaration(const query &qry);
+
  public:
   std::map<std::string, std::unique_ptr<streamInstance>> qSet;
 
@@ -23,6 +27,7 @@ class dataModel {
   dataModel() = delete;
 
   bool addQueryToModel(const std::string &id);
+  void syncDeclaredCapacities();
 
   std::unique_ptr<rdb::payload>::pointer getPayload(const std::string &instance,  //
                                                     int revOffset = 0);

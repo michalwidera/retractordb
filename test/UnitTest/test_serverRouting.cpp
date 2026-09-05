@@ -144,6 +144,13 @@ TEST(serverRouting, adHocWithoutKnownStreamIsUndecidable) {
   EXPECT_NE(resolved.detail.find("--server"), std::string::npos);
 }
 
+TEST(serverRouting, adHocDeclareRequiresExplicitTargetWithMultipleServers) {
+  const routing::Resolution resolved =
+      routing::forAdHoc(twoInstances(), "DECLARE value INTEGER STREAM late, 0.1 FILE 'late.txt'");
+  EXPECT_EQ(resolved.status, routing::Status::Ambiguous);
+  EXPECT_NE(resolved.detail.find("--server"), std::string::npos);
+}
+
 TEST(serverRouting, describeIsSortedAndCarriesStreams) {
   const std::vector<bus::InstanceInfo> instances{makeInstance("beta", 202, "beta.rql", {"srcb", "dstb"}),
                                                  makeInstance("alfa", 101, "/home/rdb/plans/alfa.rql", {"srca", "dsta"})};

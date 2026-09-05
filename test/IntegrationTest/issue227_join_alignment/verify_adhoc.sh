@@ -16,17 +16,25 @@ server_start query.rql -m 45
 sleep 0.6
 xqry -a 'SELECT * STREAM late FROM win'
 
-# Ad-hoc DECLARE jest odrzucane — serwer musi odpowiedzieć błędem i przetrwać.
-# Dołączona w locie deklaracja nie miałaby bazy indeksu logicznego; wcześniej
-# zapytanie z operatorem na takim źródle zabijało cały proces (issue #227).
-declare_out=$(xqry -a "DECLARE a INTEGER STREAM adhoc_src, 0.1 FILE 'datafile1.txt'" 2>&1) && {
-  echo "ad hoc: DECLARE nie zostalo odrzucone"
+# Pozne zrodlo dostaje baze z pierwszego naleznego slotu. HOLD nie jest do tego
+# potrzebny: zwykla deklaracja ma od razu dostarczyc dane konsumentom.
+declare_out=$(xqry -a "DECLARE a INTEGER STREAM adhoc_src, 0.1 FILE 'datafile1.txt'" 2>&1) || {
+  echo "ad hoc: DECLARE zostalo odrzucone: $declare_out"
   exit 1
 }
-case "$declare_out" in
-  *"DECLARE not supported"*) ;;
+xqry -a 'SELECT * STREAM adhoc_direct FROM adhoc_src'
+xqry -a 'SELECT * STREAM adhoc_shift FROM adhoc_src>2'
+xqry -a 'SELECT * STREAM adhoc_window FROM adhoc_src@(1,3)'
+
+# Ponowna deklaracja tej samej nazwy nie jest aktualizacja konfiguracji zrodla.
+duplicate_out=$(xqry -a "DECLARE a INTEGER STREAM adhoc_src, 0.1 FILE 'datafile2.txt'" 2>&1) && {
+  echo "ad hoc: ponowny DECLARE istniejacego strumienia zostal przyjety"
+  exit 1
+}
+case "$duplicate_out" in
+  *"already exists"*) ;;
   *)
-    echo "ad hoc: nieoczekiwana odpowiedz na DECLARE: $declare_out"
+    echo "ad hoc: nieoczekiwana odpowiedz na ponowny DECLARE: $duplicate_out"
     exit 1
     ;;
 esac
@@ -44,6 +52,42 @@ sleep 0.2
 xqry -a 'SELECT * STREAM late_right FROM late_hash%0.1'
 
 server_wait_exit
+
+check_sequence() {
+  local stream=$1
+  [ -s "temp/$stream" ] || {
+    echo "ad hoc: $stream nie zawiera rekordow"
+    return 1
+  }
+  od -An -v -w4 -td4 "temp/$stream" | awk '
+    NF != 1 || $1 == 0 { exit 1 }
+    NR > 1 && $1 != previous + 1 { exit 1 }
+    { previous = $1 }
+    END { if (NR < 3) exit 1 }
+  ' || {
+    echo "ad hoc: $stream nie jest kolejnym fragmentem poznego zrodla"
+    od -An -v -w4 -td4 "temp/$stream"
+    return 1
+  }
+}
+
+check_sequence adhoc_direct
+check_sequence adhoc_shift
+
+[ -s temp/adhoc_window ] || {
+  echo "ad hoc: adhoc_window nie zawiera rekordow"
+  exit 1
+}
+od -An -v -w12 -td4 temp/adhoc_window | awk '
+  NF != 3 || $1 == 0 || $1 != $2 + 1 || $2 != $3 + 1 { exit 1 }
+  NR > 1 && $1 != previous + 1 { exit 1 }
+  { previous = $1 }
+  END { if (NR < 3) exit 1 }
+' || {
+  echo "ad hoc: adhoc_window wystartowal przed zgromadzeniem pelnej historii"
+  od -An -v -w12 -td4 temp/adhoc_window
+  exit 1
+}
 
 [ -s temp/late_pair ] || {
   echo "ad hoc: late_pair nie zawiera rekordow"
