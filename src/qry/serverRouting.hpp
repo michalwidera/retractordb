@@ -53,7 +53,7 @@ struct Resolution {
 /// w niewłaściwą instancję nie jest pomyłką do powtórzenia, tylko trwałym skutkiem ubocznym.
 [[nodiscard]] Resolution forAdHoc(const std::vector<bus::InstanceInfo> &instances, std::string_view query);
 
-/// Komenda dotycząca całej instancji (-k, -d, -y, -l): rozstrzygalna tylko wtedy, gdy żywa
+/// Komenda dotycząca całej instancji (-k, -d, -l): rozstrzygalna tylko wtedy, gdy żywa
 /// instancja jest dokładnie jedna albo nie ma żadnej (wtedy nazwa pusta = tryb historyczny).
 [[nodiscard]] Resolution forSingleTarget(const std::vector<bus::InstanceInfo> &instances);
 
@@ -63,5 +63,11 @@ struct Resolution {
 /// rozjezdzaja wiersza. Kolumna MODE niesie litery trybow pracy instancji (R/F/U/M/X/S,
 /// N = zwykly), a ostatni wiersz tabeli to ich legenda.
 [[nodiscard]] std::vector<std::string> describe(const std::vector<bus::InstanceInfo> &instances);
+
+/// To samo co `describe`, w formie YAML (`apiVersion: xqry/v1`) dla `xqry --bus -y`.
+/// Kolejnosc instancji ta sama, litery trybow te same; legenda liter NIE jest wypisywana --
+/// w dokumencie do maszynowego odczytu bylaby szumem, a znaczenie liter niesie dokumentacja.
+/// Pusta magistrala daje `servers: []`, bo konsument formatu ma dostac dokument, nie nic.
+[[nodiscard]] std::vector<std::string> describeYaml(const std::vector<bus::InstanceInfo> &instances);
 
 }  // namespace routing

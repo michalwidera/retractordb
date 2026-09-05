@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -38,6 +39,11 @@ class qry {
   std::unique_ptr<IpcClient> transport_;
   std::unique_ptr<Formatter> formatter_;
 
+  /// Odpowiedz serwera na 'detail' albo puste, gdy serwer nie zna tej nazwy strumienia.
+  /// Wspolna dla obu form wydruku detalu, bo rozstrzygniecie "jest / nie ma" nalezy do
+  /// serwera i nie moze zalezec od wybranego formatu.
+  std::optional<boost::property_tree::ptree> detailNode(const std::string & /*input*/);
+
  public:
   formatMode outputFormatMode{formatMode::RAW};
   bool gnuplotRightToLeft{false};
@@ -54,6 +60,7 @@ class qry {
   std::string dirYaml();
   int hello();
   std::string detailShow(const std::string & /*input*/);
+  std::string detailShowYaml(const std::string & /*input*/);
   virtual boost::property_tree::ptree netClient(const std::string & /*cmd*/, const std::string & /*arg*/);
   virtual ~qry();
 };

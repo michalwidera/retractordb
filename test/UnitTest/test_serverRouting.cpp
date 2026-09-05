@@ -188,4 +188,40 @@ TEST(serverRouting, describeSpellsOutEveryRunMode) {
   EXPECT_EQ(lines[2], "alfa   | 1   | RFUMXS | plan.rql | dst1");
 }
 
+TEST(serverRouting, describeYamlKeepsOrderAndFullQueryPath) {
+  const std::vector<bus::InstanceInfo> instances{
+      makeInstance("beta", 202, "beta.rql", {"srcb"}, bus::mode::kService),
+      makeInstance("alfa", 101, "/home/rdb/plans/alfa.rql", {"srca", "dsta"})};
+  const std::vector<std::string> lines = routing::describeYaml(instances);
+  ASSERT_EQ(lines.size(), 16U);
+  EXPECT_EQ(lines[0], "---");
+  EXPECT_EQ(lines[1], "apiVersion: xqry/v1");
+  EXPECT_EQ(lines[2], "servers:");
+  EXPECT_EQ(lines[3], "  - name: alfa");
+  EXPECT_EQ(lines[4], "    pid: 101");
+  EXPECT_EQ(lines[5], "    modes: N");
+  // Sciezka W CALOSCI, inaczej niz skrocone `.../plans/alfa.rql` w tabeli.
+  EXPECT_EQ(lines[6], "    query: \"/home/rdb/plans/alfa.rql\"");
+  EXPECT_EQ(lines[7], "    streams:");
+  EXPECT_EQ(lines[8], "      - srca");
+  EXPECT_EQ(lines[9], "      - dsta");
+  EXPECT_EQ(lines[10], "  - name: beta");
+  EXPECT_EQ(lines[12], "    modes: S");
+}
+
+TEST(serverRouting, describeYamlDescribesEmptyBusAndEmptyFields) {
+  const std::vector<std::string> empty = routing::describeYaml({});
+  ASSERT_EQ(empty.size(), 3U);
+  EXPECT_EQ(empty[2], "servers: []");
+
+  // Instancja bezimienna bez pliku zapytania i bez strumieni: klucz `query` znika (nie ma
+  // czego podac), a pusta lista strumieni zostaje jawnym `[]`.
+  const std::vector<std::string> lines = routing::describeYaml({makeInstance("", 7, "", {})});
+  ASSERT_EQ(lines.size(), 7U);
+  EXPECT_EQ(lines[3], "  - name: (unnamed)");
+  EXPECT_EQ(lines[4], "    pid: 7");
+  EXPECT_EQ(lines[5], "    modes: N");
+  EXPECT_EQ(lines[6], "    streams: []");
+}
+
 }  // namespace

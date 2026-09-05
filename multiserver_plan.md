@@ -468,7 +468,7 @@ z samymi martwymi slotami i wymaga poniżej 1 s.
 | dokładnie 1 instancja | jej nazwa, **bez sprawdzania strumienia** |
 | ≥2, `-s`/`-t <strumień>` | właściciel z magistrali; brak → kod `2` (`no_such_file_or_directory`) |
 | ≥2, `-a` | wszystkie rozpoznane nazwy w jednej instancji → tam; inaczej kod `22` |
-| ≥2, `-k`/`-d`/`-y`/`-l` | odmowa z listą kandydatów, kod `22` |
+| ≥2, `-k`/`-d`/`-l` | odmowa z listą kandydatów, kod `22` |
 
 **Przy jednej instancji nie sprawdzamy strumienia celowo.** Diagnostyka „nie ma takiego
 strumienia" należy wtedy do serwera, dokładnie jak przed 2c — i to jest powód, dla którego

@@ -65,7 +65,7 @@ static routing::Resolution resolveTarget(const boost::program_options::variables
                                          const std::vector<bus::InstanceInfo> &instances, int elemLimit,
                                          const std::string &stream, const std::string &detail, const std::string &adHoc) {
   if (instances.size() <= 1) return routing::forSingleTarget(instances);
-  if (vm.contains("hello") || (vm.contains("kill") && elemLimit == 0) || vm.contains("dir") || vm.contains("diryaml"))
+  if (vm.contains("hello") || (vm.contains("kill") && elemLimit == 0) || vm.contains("dir"))
     return routing::forSingleTarget(instances);
   if (vm.contains("adhoc") && !adHoc.empty()) return routing::forAdHoc(instances, adHoc);
   if (vm.contains("detail")) return routing::forStream(instances, detail);
@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
         ("hello,l", "diagnostic - hello db world")                                                        //
         ("kill,k", "kill xretractor server")                                                              //
         ("dir,d", "list of queries")                                                                      //
-        ("diryaml,y", "list of queries in yaml format")                                                   //
+        ("yaml,y", "yaml output format for --dir, --detail and --bus")                                    //
         ("raw,r", "raw output mode (default)")                                                            //
         ("graphite,g", "graphite output mode")                                                            //
         ("influxdb,f", "influxDB output mode")                                                            //
@@ -185,6 +185,27 @@ int main(int argc, char *argv[]) {
       std::print(std::cerr, "--gnuplot-rtl requires --gnuplot/-p mode.");
       return system::errc::invalid_argument;
     }
+    // Komendy wykluczaja sie wzajemnie, bo rozgalezienie nizej wybiera PIERWSZA pasujaca i
+    // milczaco porzuca reszte. Ta cisza jest grozna, bo boost sklada wartosc z krotka opcja:
+    // literowka `-yaml` to dla parsera `-y -a ml`, czyli zapytanie ad-hoc "ml" wyslane do
+    // serwera zamiast zadanego detalu -- a bledne zapytanie ad-hoc konczy zycie serwera
+    // (listener parsera RQL wola exit()). Odmowa zatrzymuje literowke po stronie klienta.
+    //
+    // `-k` do zbioru NIE nalezy: `-s <strumien> -k -m N` (ubij po budzecie elementow) i
+    // `-k -a "..."` to celowe kombinacje, uzywane w testach integracyjnych.
+    const auto commandCount = vm.count("select") + vm.count("detail") + vm.count("adhoc") + vm.count("dir") +
+                              vm.count("bus") + vm.count("hello");
+    if (commandCount > 1) {
+      std::println(std::cerr, "xqry: only one command at a time (--select, --detail, --adhoc, --dir, --bus, --hello)");
+      return system::errc::invalid_argument;
+    }
+    // `-y` jest modyfikatorem formatu, nie komenda: sam z siebie nie wybiera niczego do
+    // wypisania. Przy komendzie bez formy YAML (-s, -a, -l, -k) odmawiamy zamiast milczec,
+    // bo flaga bez skutku wyglada dla operatora dokladnie tak jak flaga dzialajaca.
+    if (vm.contains("yaml") && !vm.contains("dir") && !vm.contains("detail") && !vm.contains("bus")) {
+      std::println(std::cerr, "xqry: --yaml/-y requires --dir/-d, --detail/-t or --bus/-b");
+      return system::errc::invalid_argument;
+    }
     if (vm.contains("wait-server") && !vm.contains("help")) {
       if (!waitForServer(appCfg.timingServerStartupWaitSeconds, appCfg.timingServerStartupPollIntervalMs, sServerName)) {
         SPDLOG_ERROR("server not available after {} seconds", appCfg.timingServerStartupWaitSeconds);
@@ -210,10 +231,13 @@ int main(int argc, char *argv[]) {
     }();
 
     if (vm.contains("bus")) {
-      const std::vector<std::string> lines = routing::describe(liveInstances);
+      const std::vector<std::string> lines =
+          vm.contains("yaml") ? routing::describeYaml(liveInstances) : routing::describe(liveInstances);
       for (const auto &line : lines)
         std::println("{}", line);
-      if (lines.empty()) std::println(std::cerr, "xqry: no live xretractor instance");
+      // Komunikat o pustej magistrali wynika z samej magistrali, a nie z liczby wypisanych
+      // wierszy: forma YAML wypisuje dokument `servers: []` takze wtedy, gdy nie ma czego opisac.
+      if (liveInstances.empty()) std::println(std::cerr, "xqry: no live xretractor instance");
       return system::errc::success;
     }
 
@@ -245,13 +269,11 @@ int main(int argc, char *argv[]) {
     if (vm.contains("kill") && elemLimit == 0) {
       obj.netClient("kill", "");
     } else if (vm.contains("dir")) {
-      std::print("{}", obj.dir());
-    } else if (vm.contains("diryaml")) {
-      std::print("{}", obj.dirYaml());
+      std::print("{}", vm.contains("yaml") ? obj.dirYaml() : obj.dir());
     } else if (vm.contains("adhoc") && !sAdHoc.empty()) {
       if (obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
     } else if (vm.contains("detail")) {
-      auto ret = obj.detailShow(sDetailStream);
+      auto ret = vm.contains("yaml") ? obj.detailShowYaml(sDetailStream) : obj.detailShow(sDetailStream);
       if (!ret.empty()) {
         std::print("{}", ret);
       } else

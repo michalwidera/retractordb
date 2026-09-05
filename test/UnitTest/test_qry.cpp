@@ -52,7 +52,7 @@ TEST(xqry, test_dir) {
 }
 
 // Command-aware fake - dispatches different responses based on netClient command.
-// Supports: hello, get, detail, adhoc, show. Used for detailShow, adhoc, and dirYaml tests.
+// Supports: hello, get, detail, adhoc, show. Used for detailShow/detailShowYaml, adhoc, and dirYaml tests.
 
 class qry_fake_detail : public qry {
  public:
@@ -88,11 +88,11 @@ boost::property_tree::ptree qry_fake_detail::netClient(const std::string &cmd, c
   return retval;
 }
 
-// Verify detailShow() produces correct YAML for an existing stream:
+// Verify detailShowYaml() produces correct YAML for an existing stream:
 // checks stream name, delta, query line, field names, field types, and apiVersion header
-TEST(xqry, test_detailShow_found) {
+TEST(xqry, test_detailShowYaml_found) {
   qry_fake_detail obj_detail;
-  auto result = obj_detail.detailShow("core0");
+  auto result = obj_detail.detailShowYaml("core0");
 
   EXPECT_TRUE(result.find("name: core0") != std::string::npos);
   EXPECT_TRUE(result.find("delta: 1") != std::string::npos);
@@ -104,12 +104,28 @@ TEST(xqry, test_detailShow_found) {
   EXPECT_TRUE(result.find("apiVersion: xqry/v1") != std::string::npos);
 }
 
-// Verify detailShow() returns empty string when queried stream does not exist
+// Verify detailShow() prints the stream header and the field list as two column tables,
+// in the same form as dir() and `xqry --bus`
+TEST(xqry, test_detailShow_found) {
+  qry_fake_detail obj_detail;
+  EXPECT_EQ(obj_detail.detailShow("core0"),
+            "name  | delta | query\n"
+            "------+-------+----------------------------------\n"
+            "core0 | 1     | SELECT * STREAM core0 FROM source\n"
+            "\n"
+            "field        | type\n"
+            "-------------+--------\n"
+            "core0.rname1 | INTEGER\n"
+            "core0.rname2 | FLOAT\n");
+}
+
+// Verify both detail forms return an empty string when the queried stream does not exist -
+// the empty result is what makes the launcher report "no such stream"
 TEST(xqry, test_detailShow_not_found) {
   qry_fake_detail obj_detail;
-  auto result = obj_detail.detailShow("nonexistent");
 
-  EXPECT_TRUE(result.empty());
+  EXPECT_TRUE(obj_detail.detailShow("nonexistent").empty());
+  EXPECT_TRUE(obj_detail.detailShowYaml("nonexistent").empty());
 }
 
 // Verify adhoc() returns false (success) when server acknowledges with "OK"
@@ -273,28 +289,28 @@ TEST(xqry, test_dirYaml_multi_stream) {
   EXPECT_TRUE(result.find("delta: 0.5") != std::string::npos);
 }
 
-// Verify detailShow() resolves correct stream (core0) from a multi-stream setup
-TEST(xqry, test_detailShow_multi_stream_core0) {
+// Verify detailShowYaml() resolves correct stream (core0) from a multi-stream setup
+TEST(xqry, test_detailShowYaml_multi_stream_core0) {
   qry_fake_multi obj_multi;
-  auto result = obj_multi.detailShow("core0");
+  auto result = obj_multi.detailShowYaml("core0");
 
   EXPECT_TRUE(result.find("name: core0") != std::string::npos);
   EXPECT_TRUE(result.find("delta: 1") != std::string::npos);
 }
 
-// Verify detailShow() resolves correct stream (core1) with its own delta from a multi-stream setup
-TEST(xqry, test_detailShow_multi_stream_core1) {
+// Verify detailShowYaml() resolves correct stream (core1) with its own delta from a multi-stream setup
+TEST(xqry, test_detailShowYaml_multi_stream_core1) {
   qry_fake_multi obj_multi;
-  auto result = obj_multi.detailShow("core1");
+  auto result = obj_multi.detailShowYaml("core1");
 
   EXPECT_TRUE(result.find("name: core1") != std::string::npos);
   EXPECT_TRUE(result.find("delta: 0.5") != std::string::npos);
 }
 
-// Verify detailShow() exact YAML for deterministic single-stream metadata
-TEST(xqry, test_detailShow_exact_output) {
+// Verify detailShowYaml() exact YAML for deterministic single-stream metadata
+TEST(xqry, test_detailShowYaml_exact_output) {
   qry_fake_detail obj_detail;
-  EXPECT_EQ(obj_detail.detailShow("core0"),
+  EXPECT_EQ(obj_detail.detailShowYaml("core0"),
             "---\n"
             "apiVersion: xqry/v1\n"
             "stream:\n"

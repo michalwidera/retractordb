@@ -6,8 +6,10 @@
 #include <array>
 #include <chrono>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <thread>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 #include <boost/system/system_error.hpp>
@@ -314,34 +316,85 @@ std::string qry::dir() {
 
 static const std::string indent = "  ";
 
-std::string qry::detailShow(const std::string &input) {
-  std::stringstream retval;
+// Tabela kolumnowa w formie wspolnej z `dir()` i `xqry --bus`: kolumny do lewej, laczone
+// " | ", bez brzegowych kresek, ostatnia kolumna niedopelniana (wiersz nie konczy sie
+// spacjami). Szerokosc kolumny wynika z najszerszej wartosci, naglowek wliczony.
+static std::string columnTable(const std::vector<std::string> &header, const std::vector<std::vector<std::string>> &rows) {
+  std::vector<std::size_t> widths;
+  widths.reserve(header.size());
+  for (std::size_t column = 0; column < header.size(); ++column) {
+    std::size_t width = header[column].length();
+    for (const auto &row : rows)
+      width = std::max(width, row[column].length());
+    widths.push_back(width);
+  }
+
+  auto emitRow = [&widths](const std::vector<std::string> &row) {
+    std::string line;
+    for (std::size_t column = 0; column < row.size(); ++column) {
+      line += row[column];
+      if (column + 1 != row.size()) line += std::string(widths[column] - row[column].length(), ' ') + " | ";
+    }
+    return line + "\n";
+  };
+
+  std::string retval = emitRow(header);
+  for (std::size_t column = 0; column < widths.size(); ++column)
+    retval += std::string(widths[column], '-') + (column + 1 == widths.size() ? "\n" : "-+-");
+  for (const auto &row : rows)
+    retval += emitRow(row);
+  return retval;
+}
+
+std::optional<ptree> qry::detailNode(const std::string &input) {
   ptree pt = netClient("get", "");
 
   const auto streams = pt.get_child("db.stream");
-  bool found         = std::ranges::any_of(streams, [&input](const auto &node) {
+  const bool found   = std::ranges::any_of(streams, [&input](const auto &node) {
     const ptree &v = node.second;
     return input == v.get<std::string>("");
   });
 
-  if (found) {
-    ptree ptsh = netClient("detail", input);
-    auto delta = ptsh.get_child("db.duration");
-    auto query = ptsh.get_child("db.processed_line");
-    auto id    = ptsh.get_child("db.stream");
-
-    retval << "---\napiVersion: xqry/v1\n";
-    retval << "stream:\n";
-    retval << indent << "name: " << id.get_value<std::string>() << "\n";
-    retval << indent << "delta: " << delta.get_value<std::string>() << "\n";
-    retval << "query: " << query.get_value<std::string>() << "\n";
-    retval << "fields:\n";
-    for (const auto &v : ptsh.get_child("db.field")) {
-      retval << indent << input << "." << v.second.get<std::string>("") << ":\n";
-      retval << indent << indent << "type: " << ptsh.get<std::string>("db.field_type." + v.second.get<std::string>("")) << "\n";
-    }
-  } else
+  if (!found) {
     SPDLOG_ERROR("not found");
+    return std::nullopt;
+  }
+  return netClient("detail", input);
+}
+
+std::string qry::detailShow(const std::string &input) {
+  const auto ptsh = detailNode(input);
+  if (!ptsh) return {};
+
+  std::vector<std::vector<std::string>> fields;
+  for (const auto &v : ptsh->get_child("db.field")) {
+    const std::string name = v.second.get<std::string>("");
+    fields.push_back({input + "." + name, ptsh->get<std::string>("db.field_type." + name)});
+  }
+
+  // Naglowek strumienia i lista pol to dwie osobne tabele: ich kolumny nie maja ze soba
+  // nic wspolnego, a wspolna szerokosc rozjezdzalaby obie.
+  return columnTable({"name", "delta", "query"}, {{ptsh->get_child("db.stream").get_value<std::string>(),
+                                                   ptsh->get_child("db.duration").get_value<std::string>(),
+                                                   ptsh->get_child("db.processed_line").get_value<std::string>()}}) +
+         "\n" + columnTable({"field", "type"}, fields);
+}
+
+std::string qry::detailShowYaml(const std::string &input) {
+  const auto ptsh = detailNode(input);
+  if (!ptsh) return {};
+
+  std::stringstream retval;
+  retval << "---\napiVersion: xqry/v1\n";
+  retval << "stream:\n";
+  retval << indent << "name: " << ptsh->get_child("db.stream").get_value<std::string>() << "\n";
+  retval << indent << "delta: " << ptsh->get_child("db.duration").get_value<std::string>() << "\n";
+  retval << "query: " << ptsh->get_child("db.processed_line").get_value<std::string>() << "\n";
+  retval << "fields:\n";
+  for (const auto &v : ptsh->get_child("db.field")) {
+    retval << indent << input << "." << v.second.get<std::string>("") << ":\n";
+    retval << indent << indent << "type: " << ptsh->get<std::string>("db.field_type." + v.second.get<std::string>("")) << "\n";
+  }
 
   return retval.str();
 }

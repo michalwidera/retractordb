@@ -86,6 +86,18 @@ std::string modeLegend() {
   return retVal;
 }
 
+/// Napis YAML w cudzyslowie: chroni wartosci, ktore jako goly skalar zmienilyby znaczenie
+/// (dwukropek w sciezce, wiodaca spacja). Uciekamy dokladnie to, co wymaga tego forma
+/// cytowana YAML-a: odwrotny ukosnik i cudzyslow.
+std::string yamlQuoted(std::string_view value) {
+  std::string retVal{"\""};
+  for (const char c : value) {
+    if (c == '\\' || c == '"') retVal += '\\';
+    retVal += c;
+  }
+  return retVal + "\"";
+}
+
 struct ServerRow {
   std::string server;
   std::string pid;
@@ -310,6 +322,36 @@ std::vector<std::string> describe(const std::vector<bus::InstanceInfo> &instance
   // czyli nie pasuje do zadnego wzorca kolumnowego -- skrypty dopasowujace wiersze instancji
   // po "^<nazwa> |" jej nie widza.
   retVal.push_back(modeLegend());
+  return retVal;
+}
+
+std::vector<std::string> describeYaml(const std::vector<bus::InstanceInfo> &instances) {
+  std::vector<std::string> retVal{"---", "apiVersion: xqry/v1"};
+  if (instances.empty()) {
+    retVal.emplace_back("servers: []");
+    return retVal;
+  }
+
+  // Sciezka zapytania trafia tu W CALOSCI, a nie skrocona jak w tabeli: skrot `.../` sluzy
+  // czytelnosci dla czlowieka, a odbiorca YAML-a ma dostac sciezke, ktora da sie otworzyc.
+  // Wartosc jest cytowana, bo sciezka moze zawierac dwukropek albo spacje.
+  std::vector<bus::InstanceInfo> ordered = instances;
+  std::ranges::sort(ordered, {}, [](const bus::InstanceInfo &instance) { return instanceLabel(instance.name); });
+
+  retVal.emplace_back("servers:");
+  for (const auto &instance : ordered) {
+    retVal.push_back("  - name: " + instanceLabel(instance.name));
+    retVal.push_back("    pid: " + std::to_string(instance.pid));
+    retVal.push_back("    modes: " + modeLabel(instance.modes));
+    if (!instance.queryFile.empty()) retVal.push_back("    query: " + yamlQuoted(instance.queryFile));
+    if (instance.streams.empty()) {
+      retVal.emplace_back("    streams: []");
+    } else {
+      retVal.emplace_back("    streams:");
+      for (const auto &stream : instance.streams)
+        retVal.push_back("      - " + stream);
+    }
+  }
   return retVal;
 }
 
