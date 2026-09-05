@@ -61,7 +61,7 @@ macro(add_test)
       # bo z testem w przestrzeni nazw taki test nie dzieli zadnego zasobu. Nie
       # dal nic mierzalnego (94,65 s wobec 94,34 s: ogon i tak konczy sie po
       # najdluzszym tescie jednostkowym), a multiserver_routing mierzy czas
-      # `--servers` z progiem 1 s, wiec obciazenie sasiadow moglo mu tylko
+      # `--bus` z progiem 1 s, wiec obciazenie sasiadow moglo mu tylko
       # zaszkodzic. Zostaje mocniejsza gwarancja.
       set_tests_properties(${_it_test_name} PROPERTIES RUN_SERIAL TRUE)
     else()

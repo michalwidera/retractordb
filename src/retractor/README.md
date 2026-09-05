@@ -192,7 +192,7 @@ If any of those checks fail, xretractor reports a configuration error and stops.
     `Instance name: <name>`.
   - Explicit `--name` wins over this key, silently.
   - Default `false` keeps the historical single-instance identity: empty name, lock file and
-    IPC objects without a suffix, reported by `xqry --servers` as `(unnamed)`.
+    IPC objects without a suffix, reported by `xqry --bus` as `(unnamed)`.
   - The generated name is random, so it differs after every restart — it identifies a running
     instance, not a durable service.
 

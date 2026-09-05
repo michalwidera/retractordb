@@ -2,12 +2,12 @@
 # Routing automatyczny w xqry (etap 2c): klient sam znajduje wlasciciela strumienia.
 #
 # Sprawdzane jest szesc rzeczy, bo dopiero razem znacza "routing dziala":
-#   1. --servers listuje obie instancje z ich strumieniami, BEZ kontaktu z serwerami,
+#   1. --bus listuje obie instancje z ich strumieniami, BEZ kontaktu z serwerami,
 #   2. -s <strumien> bez --server trafia do wlasciciela, i to do wlasciwego,
 #   3. nieznana nazwa konczy sie "nie ma takiego strumienia", a NIE timeoutem,
 #   4. komenda dotyczaca calej instancji (-k, -d) przy dwoch zywych zada --server,
 #   5. ad-hoc przez granice serwera jest odrzucany i NIE zmienia planu zadnego z nich,
-#   6. --servers nad OSIEROCONYM segmentem wraca natychmiast, a nie po budzecie klienta.
+#   6. --bus nad OSIEROCONYM segmentem wraca natychmiast, a nie po budzecie klienta.
 #
 # Punkt (6) jest regresja na zasadzie projektowa etapu 2b/2c: wykrywanie instancji nie moze
 # polegac na odpytywaniu serwerow z timeoutem, bo osierocony segment jest nieodroznialny od
@@ -89,7 +89,7 @@ pid_b=$!
 wait_for_lock "$LOCK_A" "$pid_a"
 wait_for_lock "$LOCK_B" "$pid_b"
 
-# (1) --servers: obie instancje ze swoimi strumieniami w czytelnej tabeli.
+# (1) --bus: obie instancje ze swoimi strumieniami w czytelnej tabeli.
 #
 # Plik zapytan jest w slocie sciezka BEZWZGLEDNA, tak samo jak w pliku blokady: slot czyta
 # operator (i przyszly wybor celu dostarczania w E3) z innego katalogu roboczego niz serwer,
@@ -97,15 +97,15 @@ wait_for_lock "$LOCK_B" "$pid_b"
 # ostatniego katalogu i nazwy pliku; pelna wartosc pozostaje w magistrali.
 # Kolumna MODE opisuje URUCHOMIENIE instancji: obie startuja bez zadnej opcji trybu, wiec
 # obie sa "N". Legenda liter jest ostatnim wierszem tabeli.
-xqry --servers > servers.txt
+xqry --bus > servers.txt
 grep -qE "^alfa[[:space:]]+\|[[:space:]]+$pid_a[[:space:]]+\|[[:space:]]+N[[:space:]]*\|[[:space:]]+\.\.\./multiserver_routing/alfa\.rql[[:space:]]+\|.*\bdsta\b" servers.txt || {
-  echo "--servers nie opisal instancji alfa:"; cat servers.txt; exit 1; }
+  echo "--bus nie opisal instancji alfa:"; cat servers.txt; exit 1; }
 grep -qE "^beta[[:space:]]+\|[[:space:]]+$pid_b[[:space:]]+\|[[:space:]]+N[[:space:]]*\|[[:space:]]+\.\.\./multiserver_routing/beta\.rql[[:space:]]+\|.*\bdstb\b" servers.txt || {
-  echo "--servers nie opisal instancji beta:"; cat servers.txt; exit 1; }
+  echo "--bus nie opisal instancji beta:"; cat servers.txt; exit 1; }
 grep -qE "^MODE: N=normal, R=realtime, .*S=service$" servers.txt || {
-  echo "--servers nie wypisal legendy trybow:"; cat servers.txt; exit 1; }
+  echo "--bus nie wypisal legendy trybow:"; cat servers.txt; exit 1; }
 [ "$(wc -l < servers.txt)" -eq 5 ] || {
-  echo "--servers wypisal tabele o nieoczekiwanej liczbie wierszy:"; cat servers.txt; exit 1; }
+  echo "--bus wypisal tabele o nieoczekiwanej liczbie wierszy:"; cat servers.txt; exit 1; }
 
 # (2) -s bez --server trafia do wlasciciela.
 #
@@ -185,17 +185,17 @@ pid_b=""
 
 # (6) Osierocony segment nie moze kosztowac budzetu klienta. Po zamknieciu obu serwerow
 #     segment /dev/shm/xrdbbus ZOSTAJE (nikt go nie kasuje, bo skasowanie zywego zerwaloby
-#     magistrale pozostalym), a jego sloty sa martwe. --servers musi to rozpoznac przez
+#     magistrale pozostalym), a jego sloty sa martwe. --bus musi to rozpoznac przez
 #     /proc, czyli natychmiast -- nie po 3 s odpytywania.
 start_ns=$(date +%s%N)
-xqry --servers > orphan.txt 2>orphan.err || true
+xqry --bus > orphan.txt 2>orphan.err || true
 elapsed_ms=$(( ($(date +%s%N) - start_ns) / 1000000 ))
 if [ "$elapsed_ms" -ge 1000 ]; then
-  echo "--servers nad osieroconym segmentem trwalo ${elapsed_ms} ms -- wykrywanie przez timeout?"
+  echo "--bus nad osieroconym segmentem trwalo ${elapsed_ms} ms -- wykrywanie przez timeout?"
   exit 1
 fi
 if grep -qE '^(alfa|beta)[[:space:]]+\|' orphan.txt; then
-  echo "--servers wypisal martwa instancje:"
+  echo "--bus wypisal martwa instancje:"
   cat orphan.txt
   exit 1
 fi

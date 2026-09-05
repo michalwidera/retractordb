@@ -259,17 +259,24 @@ std::string qry::dir() {
                          std::pair{std::string{"count"}, std::string{"count"}},
                          std::pair{std::string{"location"}, std::string{"location"}},
                          std::pair{std::string{"cap"}, std::string{"cap"}}};
+  // Forma tabeli jest wspolna z `xqry --bus` (routing::describe): kolumny do lewej,
+  // separator " | ", bez brzegowych kresek. Ostatnia kolumna nie jest dopelniana, wiec
+  // wiersz nie konczy sie spacjami.
   std::stringstream ss;
   std::stringstream separator;
-  for (const auto &[key, title] : vcols) {
-    std::size_t width = title.length();
+  for (std::size_t column = 0; column < vcols.size(); ++column) {
+    const auto &[key, title] = vcols[column];
+    std::size_t width        = title.length();
     for (const auto &v : pt.get_child("db.stream"))
       width = std::max(width, v.second.get<std::string>(key).length());
-    ss << "|%" << width << "s";
-    separator << "+" << std::string(width, '-');
+    const bool last = column + 1 == vcols.size();
+    if (last)
+      ss << "%s\n";
+    else
+      ss << "%-" << width << "s | ";
+    separator << std::string(width, '-') << (last ? "" : "-+-");
   }
-  ss << "|\n";
-  separator << "+\n";
+  separator << "\n";
 
   auto emitRow = [&](const std::string &name, const std::string &duration, const std::string &size, const std::string &count,
                      const std::string &location, const std::string &cap) {

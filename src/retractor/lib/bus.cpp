@@ -401,7 +401,7 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
 
   // Nazwa jednostki i plik zapytan sa POLAMI INFORMACYJNYMI: nie biora udzialu w rozstrzyganiu
   // rozlacznosci, wiec ich obciecie nie moze zablokowac startu tak jak obciecie nazwy strumienia
-  // czy sciezki licznika. Obciecie ma byc jednak glosne, bo `xqry --servers` pokaze wtedy napis
+  // czy sciezki licznika. Obciecie ma byc jednak glosne, bo `xqry --bus` pokaze wtedy napis
   // krotszy niz rzeczywisty i operator zobaczy przyciety identyfikator bez zadnego wyjasnienia.
   if (request.unit.size() >= kUnitNameSize)
     SPDLOG_WARN("Systemd unit name is longer than {} characters and will be truncated in the bus slot: {}", kUnitNameSize - 1,

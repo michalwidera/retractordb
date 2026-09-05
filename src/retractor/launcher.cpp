@@ -623,11 +623,11 @@ int main(int argc, char *argv[]) try {
   const std::string counterPath                 = normalizedRotationCounterPath(coreInstance);
   const SystemdIdentity systemd                 = detectSystemdIdentity();
   // Sciezka BEZWZGLEDNA, tak samo jak w pliku blokady (setServiceQueryFile wyzej). Slot czyta
-  // operator z innego katalogu roboczego niz serwer, wiec `xqry --servers` z pozycja wzgledna
+  // operator z innego katalogu roboczego niz serwer, wiec `xqry --bus` z pozycja wzgledna
   // wskazywalby plik, ktorego pod ta nazwa u niego nie ma.
   const std::string queryFile = vm.contains("queryfile") ? absolutePathOf(vm["queryfile"].as<std::string>()) : std::string{};
   // Tryb pracy jest wlasnoscia URUCHOMIENIA, nie planu: dwa serwery na tym samym pliku zapytan
-  // moga liczyc raz z zegarem, raz offline. Operator widzi wiec w `xqry --servers` to, co
+  // moga liczyc raz z zegarem, raz offline. Operator widzi wiec w `xqry --bus` to, co
   // wybrala linia polecen, a nie to, co da sie odczytac z .rql.
   //
   // Serwisem jest zarowno instancja z --service (log do journald), jak i ta wykryta jako

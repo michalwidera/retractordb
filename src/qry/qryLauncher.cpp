@@ -90,27 +90,28 @@ int main(int argc, char *argv[]) {
     std::string sConfig;
     std::string sServerName;
     std::tuple<int, int, int> gnuplotDim{0, 0, 0};
-    desc.add_options()                                                                                                        //
-        ("select,s", po::value<std::string>(&sInputStream), "show this stream")                                               //
-        ("detail,t", po::value<std::string>(&sDetailStream), "show details of this stream")                                   //
-        ("adhoc,a", po::value<std::string>(&sAdHoc), "adhoc query mode")                                                      //
-        ("elimitqry,m", po::value<int>(&elemLimit)->default_value(0), "limit of elements, 0 - no limit")                      //
-        ("null,n", "if null row appear - skip it in output")                                                                  //
-        ("hello,l", "diagnostic - hello db world")                                                                            //
-        ("kill,k", "kill xretractor server")                                                                                  //
-        ("dir,d", "list of queries")                                                                                          //
-        ("diryaml,y", "list of queries in yaml format")                                                                       //
-        ("raw,r", "raw output mode (default)")                                                                                //
-        ("graphite,g", "graphite output mode")                                                                                //
-        ("influxdb,f", "influxDB output mode")                                                                                //
-        ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                                      //
-        ("gnuplot-rtl,z", "gnuplot output: newest samples on the right (right-to-left scroll)")                               //
-        ("config,e", po::value<std::string>(&sConfig), "config file (TOML); overrides search")                                //
-        ("help,h", "produce help message")                                                                                    //
-        ("needctrlc,c", "force ctl+c for stop this tool")                                                                     //
-        ("wait-server,w", "poll until xretractor server is available before executing command")                               //
-        ("server", po::value<std::string>(&sServerName), "target xretractor instance name (default: resolved from the bus)")  //
-        ("servers", "list live xretractor instances and their streams");
+    desc.add_options()                                                                                    //
+        ("select,s", po::value<std::string>(&sInputStream), "show this stream")                           //
+        ("detail,t", po::value<std::string>(&sDetailStream), "show details of this stream")               //
+        ("adhoc,a", po::value<std::string>(&sAdHoc), "adhoc query mode")                                  //
+        ("elimitqry,m", po::value<int>(&elemLimit)->default_value(0), "limit of elements, 0 - no limit")  //
+        ("null,n", "if null row appear - skip it in output")                                              //
+        ("hello,l", "diagnostic - hello db world")                                                        //
+        ("kill,k", "kill xretractor server")                                                              //
+        ("dir,d", "list of queries")                                                                      //
+        ("diryaml,y", "list of queries in yaml format")                                                   //
+        ("raw,r", "raw output mode (default)")                                                            //
+        ("graphite,g", "graphite output mode")                                                            //
+        ("influxdb,f", "influxDB output mode")                                                            //
+        ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                  //
+        ("gnuplot-rtl,z", "gnuplot output: newest samples on the right (right-to-left scroll)")           //
+        ("config,e", po::value<std::string>(&sConfig), "config file (TOML); overrides search")            //
+        ("help,h", "produce help message")                                                                //
+        ("needctrlc,c", "force ctl+c for stop this tool")                                                 //
+        ("wait-server,w", "poll until xretractor server is available before executing command")           //
+        ("server,x", po::value<std::string>(&sServerName),
+         "target xretractor instance name (default: resolved from the bus)")  //
+        ("bus,b", "list live xretractor instances and their streams");
     po::positional_options_description p;  // Assume that select is the first option
     p.add("select", -1);
     po::variables_map vm;
@@ -208,7 +209,7 @@ int main(int argc, char *argv[]) {
       return xrdbbus.instances();
     }();
 
-    if (vm.contains("servers")) {
+    if (vm.contains("bus")) {
       const std::vector<std::string> lines = routing::describe(liveInstances);
       for (const auto &line : lines)
         std::println("{}", line);

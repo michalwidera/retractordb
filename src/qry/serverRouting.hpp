@@ -33,7 +33,7 @@ struct Resolution {
 };
 
 /// Nazwa instancji w komunikacie; instancja bez `--name` jako "(unnamed)" — jedno pole,
-/// bez spacji, więc wyjście `--servers` zostaje kolumnowo rozbieralne.
+/// bez spacji, więc wyjście `--bus` zostaje kolumnowo rozbieralne.
 [[nodiscard]] std::string instanceLabel(std::string_view name);
 
 /// Nazwy strumieni występujące w wyrażeniu FROM zapytania SELECT. Lekser zachowuje składnię
@@ -57,7 +57,7 @@ struct Resolution {
 /// instancja jest dokładnie jedna albo nie ma żadnej (wtedy nazwa pusta = tryb historyczny).
 [[nodiscard]] Resolution forSingleTarget(const std::vector<bus::InstanceInfo> &instances);
 
-/// Tabela wypisywana przez `xqry --servers`, posortowana po nazwie instancji. Bezwzgledna
+/// Tabela wypisywana przez `xqry --bus`, posortowana po nazwie instancji. Bezwzgledna
 /// sciezka zapytania jest prezentowana jako `.../<katalog>/<plik>`, a strumienie po przecinku.
 /// Szerokosc kazdej kolumny wynika z najszerszej wartosci, wiec nazwy z `--autoname` nie
 /// rozjezdzaja wiersza. Kolumna MODE niesie litery trybow pracy instancji (R/F/U/M/X/S,

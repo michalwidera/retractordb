@@ -368,7 +368,7 @@ Trzy odstępstwa od projektu wstępnego, każde z powodu:
 1. **Jeden pisarz na slot.** Serwer zapisuje wyłącznie swój slot, więc między serwerami nie ma
    konkurencji o zapis.
 2. **Odczyt bez blokady.** Czytelnik używa seqlocka: czyta `seq`, kopiuje slot, czyta `seq`
-   ponownie; nieparzysty albo zmieniony = powtórz. `xqry --servers`, routing strumienia i
+   ponownie; nieparzysty albo zmieniony = powtórz. `xqry --bus`, routing strumienia i
    kierowanie `kill` nie mogą się o nic zaciąć, nawet gdy jakiś serwer właśnie kona.
 3. **Muteks tylko przy roszczeniu.** Jedyna operacja wymagająca serializacji to „sprawdź
    rozłączność nazw strumieni ze wszystkimi żywymi slotami i zatwierdź swój" — raz przy starcie,
@@ -423,7 +423,7 @@ kończy się nieudany `flock`, żeby dwie różne diagnozy nie skleiły się w j
 ### Decyzje przyjęte w 2b
 
 - **Instancja bezimienna (bez `--name`) też rejestruje się w magistrali.** Inaczej kolizja
-  nazwana↔bezimienna przechodziłaby niewykryta, a `xqry --servers` w 2c nie widziałby serwera
+  nazwana↔bezimienna przechodziłaby niewykryta, a `xqry --bus` w 2c nie widziałby serwera
   historycznego. Cena: segment powstaje przy każdym starcie, także w użyciu jednoserwerowym.
 - **Przepełnienie slotu to odmowa startu, nie ciche obcięcie listy.** Slot z obciętą listą
   strumieni nie mógłby już odpowiadać na pytanie „czyja jest ta nazwa".
@@ -456,7 +456,7 @@ kończy się nieudany `flock`, żeby dwie różne diagnozy nie skleiły się w j
 Powód jest wprost przeniesiony z pomiaru z 2 września: osierocony segment jest nieodróżnialny
 od żywego aż do wyczerpania budżetu klienta (3,008 s), więc szukanie strumienia przez
 odpytywanie kosztowałoby N × 3 s dokładnie w najczęstszym przypadku — literówce. Punkt (6)
-w `multiserver_routing/routing.sh` jest na to regresją: mierzy czas `--servers` nad segmentem
+w `multiserver_routing/routing.sh` jest na to regresją: mierzy czas `--bus` nad segmentem
 z samymi martwymi slotami i wymaga poniżej 1 s.
 
 ### Reguły rozstrzygania
@@ -497,7 +497,7 @@ strumienia" należy wtedy do serwera, dokładnie jak przed 2c — i to jest pow�
   pthread/boost.interprocess/spdlog. Do biblioteki `qry` jej **nie** ma: testy jednostkowe
   linkują jednocześnie `qry` i `retractor`, a dwie kopie `bus.o` dałyby duplikaty symboli.
 
-### Format `xqry --servers`
+### Format `xqry --bus`
 
 Tabela z nagłówkiem, wyrównanymi kolumnami i instancjami sortowanymi po nazwie; instancja
 bezimienna jest pokazana jako `(unnamed)`, a brak pliku zapytań lub strumieni jako `-`.
@@ -740,7 +740,7 @@ obiekty IPC straciłyby pokrycie end-to-end.
 
 Próbowany był środek słabszy — wspólny `RESOURCE_LOCK` zamiast `RUN_SERIAL`, bo z testem
 w przestrzeni nazw taki test nie dzieli żadnego zasobu. Nie dał nic mierzalnego (94,65 s wobec
-94,34 s), a `multiserver_routing` mierzy czas `--servers` z progiem 1 s, więc obciążenie
+94,34 s), a `multiserver_routing` mierzy czas `--bus` z progiem 1 s, więc obciążenie
 sąsiadów mogło mu tylko zaszkodzić. Została mocniejsza gwarancja.
 
 ### Usterka wykryta przy okazji
@@ -919,12 +919,12 @@ Każda z nich kosztowała czas w sesji z 2 września 2026.
 | `src/retractor/launcher.cpp` | wczesny parser tożsamości, blokada i roszczenie przed artefaktami, nazwa IPC |
 | `src/qry/ipcClient.{hpp,cpp}` | klient zna nazwę instancji, z którą rozmawia |
 | `src/qry/serverRouting.{hpp,cpp}` | czyste reguły routingu nad migawką magistrali; bez IPC |
-| `src/qry/qryLauncher.cpp` | opcje `--server` / `--servers`, `resolveTarget`, `waitForServer` |
+| `src/qry/qryLauncher.cpp` | opcje `--server` / `--bus`, `resolveTarget`, `waitForServer` |
 | `test/IntegrationTest/CMakeLists.txt` | pula szesnastu przestrzeni nazw: `RDB_NAMESPACE` + `TMPDIR` + `RESOURCE_LOCK` per katalog; `IT_NO_NAMESPACE` wypisuje katalog z puli |
 | `test/IntegrationTest/serverlib.sh` | oprawa **jednoinstancyjna** (jedna instancja na przestrzeń nazw) — nie używać w testach wieloserwerowych; ścieżka blokady i bramka higieny podążają za `RDB_NAMESPACE` |
 | `test/IntegrationTest/multiserver_named/` | wzorzec testu dwuserwerowego z własną bramką higieny |
 | `test/IntegrationTest/multiserver_uniqueness/` | 11 punktów kontrolnych unikalności, kolejności startu i dostarczania; sam sprząta procesy i pliki |
-| `test/IntegrationTest/multiserver_routing/` | 6 punktów routingu; mierzy też czas `--servers` nad osieroconym segmentem |
+| `test/IntegrationTest/multiserver_routing/` | 6 punktów routingu; mierzy też czas `--bus` nad osieroconym segmentem |
 | `test/UnitTest/test_bus.cpp` | 26 przypadków magistrali pod valgrindem; pracuje na segmencie `xrdbbus_ut`, nie na produkcyjnym |
 | `test/UnitTest/test_serverRouting.cpp` | 17 przypadków reguł routingu; bez pamięci dzielonej i bez serwerów |
 

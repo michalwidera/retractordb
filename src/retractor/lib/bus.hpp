@@ -82,11 +82,11 @@ inline constexpr std::size_t kCounterPathSize  = 256;  ///< znormalizowana sciez
 /// obciety napis zrownalby dwa rozne zasoby albo rozdzielil jeden, czyli zawiesilby gwarancje
 /// po cichu. Pola INFORMACYJNE -- nazwa jednostki systemd i plik zapytan -- sa obcinane, bo
 /// odmowa startu z powodu dlugiej nazwy unitu byloby lekarstwem gorszym od choroby; obciecie
-/// jest wtedy zapisywane ostrzezeniem, zeby przyciety identyfikator w `xqry --servers` nie
+/// jest wtedy zapisywane ostrzezeniem, zeby przyciety identyfikator w `xqry --bus` nie
 /// wygladal na prawdziwy.
 
 /// Tryby pracy instancji, publikowane w slocie jako maska bitowa. Sluza WYLACZNIE prezentacji
-/// (`xqry --servers`): magistrala nie podejmuje na ich podstawie zadnej decyzji, wiec instancja
+/// (`xqry --bus`): magistrala nie podejmuje na ich podstawie zadnej decyzji, wiec instancja
 /// starszej binarki, ktora zglosi zero bitow, jest opisana jako zwykla -- a nie odrzucona.
 ///
 /// Tryby nie sa rozlaczne: --realtime idzie w parze z --service, a --no-clock z --until-eof.
