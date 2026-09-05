@@ -39,6 +39,11 @@ struct executorsm {
   // run() waits on this before publishLockInfo(), so PID appears in the lock file
   // only after IPC is fully initialized and xqry can connect safely.
   static std::atomic<bool> ipcReady;
+  // Ustawiane z wywolania zwrotnego onFailure, gdy watek komunikacyjny nie zdolal zbudowac
+  // zasobow IPC (najczestszy powod: brak miejsca w /dev/shm na kolejke komend). Bez tej flagi
+  // run() czekal na ipcReady BEZ LIMITU CZASU, a watek, ktory mial ja podniesc, juz nie zyl --
+  // proces stal w miejscu, nie liczac i nie odpowiadajac (odtworzone na tmpfs 512 KiB).
+  static std::atomic<bool> ipcFailed;
 
   static ptree commandProcessor(const ptree &ptInval);
   static ptree collectStreamsParameters();

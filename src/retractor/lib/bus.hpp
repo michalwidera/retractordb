@@ -57,6 +57,11 @@ inline constexpr std::string_view kSegmentName = "xrdbbus_v3";
 /// instancji ("<obiekt>.<nazwa instancji>") i wpadalaby pod wzorce sprzatajace.
 [[nodiscard]] std::string segmentName();
 
+/// Rozmiar segmentu magistrali w bajtach. Segment jest tworzony w calosci i od razu
+/// zerowany, wiec jest to miejsce ZAJETE w /dev/shm, a nie rezerwacja rosnaca z uzyciem.
+/// Udostepnione dla wyceny budzetu pamieci dzielonej (shmBudget); uklad zostaje prywatny.
+[[nodiscard]] std::size_t segmentBytes();
+
 /// Pojemnosci ukladu. Przekroczenie ktoregokolwiek limitu jest bledem startu, a nie cichym
 /// zawieszeniem gwarancji rozlacznosci -- slot z obcieta lista strumieni nie moglby juz
 /// odpowiadac na pytanie "czyja jest ta nazwa".

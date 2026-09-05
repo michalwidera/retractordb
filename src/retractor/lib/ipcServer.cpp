@@ -1,12 +1,15 @@
 #include "ipcServer.hpp"
 
 #include <array>
+#include <cstdint>
 #include <cstring>
+#include <format>
 #include <iostream>
 #include <list>
 #include <memory>
 #include <mutex>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <utility>
@@ -21,6 +24,7 @@
 
 #include "constants.hpp"
 #include "ipcTypes.hpp"
+#include "shmBudget.hpp"
 
 namespace IPC = boost::interprocess;
 
@@ -97,6 +101,21 @@ void IpcServer::removeClientQueues() {
 
 void IpcServer::subscribe(int clientId, const std::string &streamName, int maxElements) {
   const std::string queueName = names_.responseQueue(clientId);
+
+  // Straz miejsca PRZED utworzeniem kolejki. Kolejka boosta powstaje w calosci od razu (segment
+  // jest wypelniany przy tworzeniu), wiec 10 s zapasu przy takcie 1 ms to jednorazowe 10 MiB --
+  // a /dev/shm w kontenerze ma domyslnie 64 MiB. Bez tego sprawdzenia klient dostawal wylacznie
+  // "No space left on device", czyli komunikat, ktory nie mowi ani ile brakuje, ani dlaczego
+  // akurat ten strumien jest drogi. Pomiar nieudany (Space::known == false) PRZEPUSZCZA
+  // subskrypcje: odmowa na podstawie niewiedzy byla by gorsza od proby.
+  const std::uint64_t needed = shmbudget::responseQueueBytes(maxElements);
+  if (const shmbudget::Space fs = shmbudget::space(); fs.known && fs.available < needed)
+    throw std::runtime_error(
+        std::format("response queue for stream '{}' needs {} ({} elements of {} B), "
+                    "shared memory has {} free",
+                    streamName, shmbudget::humanBytes(needed), maxElements, ipc::kResponseQueueMaxMessageSize,
+                    shmbudget::humanBytes(fs.available)));
+
   // Pre-otwarcie kolejki TUTAJ, w watku komunikacyjnym (sledztwo ~40 ms,
   // JOURNAL.md 2026-07-18, Faza 3): tworzenie + mmap segmentu (~MB) nie moze
   // zostac w torze emisji watku RT -- lazy open_only w broadcast() kosztowal
@@ -259,6 +278,11 @@ void IpcServer::commandLoop() const {
       if (callbacks_.shouldStop()) loopRunning = false;
     }
   } catch (IPC::interprocess_exception &ex) {
-    std::cout << "Exception on server." << '\n' << ex.what() << '\n';
+    // Najczestsza przyczyna to brak miejsca w /dev/shm: sama kolejka komend zajmuje 1000 KiB,
+    // a w kontenerze caly tmpfs ma domyslnie 64 MiB. Zawiadomienie jest tu obowiazkowe --
+    // wolajacy czeka na gotowosc IPC i bez niego stanie na zawsze.
+    SPDLOG_ERROR("IPC resources could not be created: {}", ex.what());
+    std::cerr << "Exception on server." << '\n' << ex.what() << '\n';
+    if (callbacks_.onFailure) callbacks_.onFailure();
   }
 }

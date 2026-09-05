@@ -6,9 +6,11 @@
 #include <cstdlib>
 #include <ctime>  // kotwica osi czasu pętli: clock_gettime, timespec
 #include <filesystem>
+#include <format>
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <print>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -32,6 +34,7 @@
 #include "rdb/convertTypes.hpp"
 #include "rdb/probe.hpp"  // sondy E1/E2E, K6, E4
 #include "serviceControl.hpp"
+#include "shmBudget.hpp"
 #include "uxSysTermTools.hpp"
 
 // #include "antlr4-runtime/tree/ParseTree.h"
@@ -106,6 +109,7 @@ std::atomic<int> iLoopLimitCnt{executorsm::inifitie_loop};
 qTree *executorsm::coreInstancePtr = nullptr;
 compiler *executorsm::cmPtr        = nullptr;
 std::atomic<bool> executorsm::ipcReady{false};
+std::atomic<bool> executorsm::ipcFailed{false};
 int executorsm::cfgQueueBufferSeconds = appcfg::kDefaultIpcQueueBufferSeconds;
 int executorsm::cfgMinQueueElements   = appcfg::kDefaultIpcMinQueueElements;
 int executorsm::cfgRtPriority         = appcfg::kDefaultSchedulingRtPriority;
@@ -625,8 +629,11 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
       int streamId = boost::lexical_cast<int>(ptInval.get("db.id", ""));
       // 10-second buffer to prevent overflow on loaded systems
       // (1/delta gives elements/sec; multiply by 10 for 10s headroom)
-      int maxElements = boost::rational_cast<int>(1 / (*coreInstancePtr)[streamName].rInterval) * cfgQueueBufferSeconds;
-      maxElements     = std::max(maxElements, cfgMinQueueElements);
+      //
+      // Wzor mieszka w shmBudget, bo ta sama liczba wycenia kolejke w raporcie `-c --shmbudget`
+      // i w strazy miejsca w IpcServer::subscribe. Kopia wzoru rozjezdzalaby wycene z faktem.
+      const int maxElements =
+          shmbudget::responseQueueElements((*coreInstancePtr)[streamName].rInterval, cfgQueueBufferSeconds, cfgMinQueueElements);
       // Hak diagnostyczny testu regresyjnego it_show_handler_failure. Awaria handlera
       // 'show' na CI (2026-09-04) byla nieodtwarzalna lokalnie, a jej jedynym skutkiem
       // widocznym dla klienta byla ODPOWIEDZ WYGLADAJACA NA POPRAWNA — bo blok ponizej
@@ -908,6 +915,16 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
             }
             cv.notify_all();
           },
+      // Sciezka blizniacza do onReady i ta sama regula muteksu: predykat zmienia sie pod
+      // core_mutex, inaczej powiadomienie trafia w okno miedzy sprawdzeniem a zasnieciem.
+      .onFailure =
+          [] {
+            {
+              std::scoped_lock lock(core_mutex);
+              executorsm::ipcFailed = true;
+            }
+            cv.notify_all();
+          },
       .onMessageReceived =
           [] {
             // Fakt "przyszla pierwsza komenda" zapisujemy BEZWARUNKOWO i w osobnym
@@ -927,7 +944,22 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
 
   {
     std::unique_lock<std::mutex> lock(core_mutex);
-    cv.wait(lock, [] { return executorsm::ipcReady.load(); });
+    cv.wait(lock, [] { return executorsm::ipcReady.load() || executorsm::ipcFailed.load(); });
+  }
+
+  // Bez zasobow IPC instancja nie ma jak przyjac ani jednej komendy: nie odpowie na `xqry`,
+  // nie przyjmie planu i nie da sie jej zatrzymac inaczej niz sygnalem. Konczymy wiec od razu
+  // i z komunikatem, zamiast liczyc dla nikogo. Najczestsza przyczyna jest mierzalna z wyprzedzeniem
+  // -- `xretractor -c --shmbudget <plan>` pokazuje, ile miejsca w pamieci dzielonej potrzeba.
+  if (executorsm::ipcFailed.load()) {
+    const shmbudget::Space fs = shmbudget::space();
+    std::println(std::cerr, "xretractor: cannot create IPC resources; fixed reservation needs {}{}",  //
+                 shmbudget::humanBytes(shmbudget::fixedReservationBytes()),
+                 fs.known ? std::format(", shared memory has {} free", shmbudget::humanBytes(fs.available)) : std::string{});
+    SPDLOG_ERROR("Startup aborted: IPC resources unavailable.");
+    ipcServer.stop();
+    ipcServer.removeAllObjects();
+    return system::errc::no_buffer_space;
   }
 
   // Blokade mamy od poczatku run(), ale jej TRESC publikujemy dopiero teraz. Linia

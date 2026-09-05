@@ -33,6 +33,7 @@
 #include "lib/qTree.hpp"
 #include "lib/serverName.hpp"
 #include "lib/serviceControl.hpp"
+#include "lib/shmBudget.hpp"
 #include "rdb/probe.hpp"  // baner buildu z sondami pomiarowymi
 #include "uxSysTermTools.hpp"
 
@@ -251,7 +252,7 @@ int main(int argc, char *argv[]) try {
   // pelnego CLI: `--name alfa`, `--name=alfa` i sklejone `-nalfa`. allow_unregistered zostawia
   // pozostale opcje i argument pozycyjny dla pelnego parsera nizej.
   po::options_description earlyDesc;
-  earlyDesc.add_options()("name,n", po::value<std::string>())("autoname", "")("config,g", po::value<std::string>());
+  earlyDesc.add_options()("name,n", po::value<std::string>())("autoname,a", "")("config,g", po::value<std::string>());
   po::variables_map earlyVm;
   try {
     po::store(po::command_line_parser(argc, argv).options(earlyDesc).allow_unregistered().run(), earlyVm);
@@ -359,7 +360,7 @@ int main(int argc, char *argv[]) try {
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")     //
           ("quiet,r", "no output on screen, skip presenter")                         //
           ("dot,d", "create dot output")                                             //
-          ("csv,m", "create csv output")                                             // c->m
+          ("csv,m", "create csv output")                                             //
           ("fields,f", "show fields in dot file")                                    //
           ("tags,t", "show tags in dot file")                                        //
           ("streamprogs,s", "show stream programs in dot file")                      //
@@ -367,6 +368,7 @@ int main(int argc, char *argv[]) try {
           ("hideruleprog,i", "hide rule program in rules (-u) output")               //
           ("transparent,p", "make dot background transparent")                       //
           ("diagram,w", po::value<std::string>(&sDiagram), "create diagram output")  //
+          ("shmbudget,z", "show shared memory budget of the compiled plan")          //
           ;
     } else {
       desc.add_options()                                                          //
@@ -378,17 +380,17 @@ int main(int argc, char *argv[]) try {
           ("status,s", "check service status")                                    //
           ("verbose,v", "verbose mode (show stream params)")                      //
           ("xqrywait,x", "wait with processing for first query")                  //
-          ("name,n", po::value<std::string>(&sServerName),
-           "instance name; own IPC area and lock (default: single-instance mode)")                    //
-          ("autoname", "generate a docker-style instance name and print it")                          //
-          ("noanykey,k", "do not wait for any key to terminate")                                      //
-          ("service,j", "service mode: log to stderr (journald), no log file")                        //
-          ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")       //
-          ("no-clock,f", "offline mode: compute slots without waiting for the wall clock")            //
-          ("until-eof,u", "stop when a declared source runs out of input (forces one-shot sources)")  //
-          ("config,g", po::value<std::string>(&sConfig), "config file (TOML); overrides search")      //
-          ("llimitqry,m", po::value<int>(&loopLimitVar)->default_value(executorsm::inifitie_loop),    //
-           "loop iteration limit, 0 - no limit")                                                      //
+          ("name,n", po::value<std::string>(&sServerName),                        //
+           "instance name; own IPC area and lock")                                //
+          ("autoname,a", "generate a docker-style instance name")                 //
+          ("noanykey,k", "do not wait for any key to terminate")                  //
+          ("service,j", "service mode: log to stderr (journald)")                 //
+          ("realtime,t", "enable real-time scheduling")                           //
+          ("no-clock,f", "offline mode: compute slots without waiting")           //
+          ("until-eof,u", "forces one-shot all sources")                          //
+          ("config,g", po::value<std::string>(&sConfig), "config file (TOML); overrides search")    //
+          ("llimitqry,m", po::value<int>(&loopLimitVar)->default_value(executorsm::inifitie_loop),  //
+           "loop iteration limit, 0 - no limit")                                                    //
           ;
     }
     po::positional_options_description p;  // Assume that infile is the first option
@@ -512,6 +514,22 @@ int main(int argc, char *argv[]) try {
       }
 
       if (onlyCompile) {
+        // Budzet pamieci dzielonej jest osobnym pytaniem o plan, tak samo jak -d czy -w, wiec
+        // konczy prace zamiast dokladac sie do wyjscia prezentera: przy -d na stdout stoi plik
+        // dot, ktoremu doklejona tabela zepsulaby skladnie.
+        if (vm.contains("shmbudget")) {
+          std::cout << shmbudget::report(coreInstance, appCfg.ipcQueueBufferSeconds, appCfg.ipcMinQueueElements);
+          return system::errc::success;
+        }
+        // Rezerwacja stala nie zalezy od planu ani od liczby klientow: bez niej instancja nie
+        // wystartuje w ogole. Sprawdzenie idzie na kazdym -c, bo kompilacja jest ostatnim
+        // momentem, w ktorym cena jest znana PRZED proba startu. Nieudany pomiar (known ==
+        // false) przepuszcza -- patrz shmbudget::Space.
+        if (const shmbudget::Space fs = shmbudget::space(); fs.known && fs.available < shmbudget::fixedReservationBytes()) {
+          std::println(std::cerr, "{}: shared memory too small: fixed reservation needs {}, only {} free (see -c --shmbudget)",
+                       argv[0], shmbudget::humanBytes(shmbudget::fixedReservationBytes()), shmbudget::humanBytes(fs.available));
+          return system::errc::no_buffer_space;
+        }
         if (!vm.contains("quiet")) {
           presenter dm(coreInstance);
           return dm.run(vm);

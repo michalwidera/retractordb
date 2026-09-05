@@ -97,6 +97,23 @@ std::string loadString(const char *src, std::size_t capacity) {
   return {src, end != nullptr ? static_cast<std::size_t>(end - src) : capacity};
 }
 
+/// Kasuje segment, ktorego TEN proces jest tworca i ktoremu nie zdazyl opublikowac `magic`.
+///
+/// Bez tego nieudane tworzenie zostawia w /dev/shm obiekt zerowej dlugosci (przy braku miejsca
+/// pada `truncate`, a `shared_memory_object` nie kasuje pliku w destruktorze). Kolejny start,
+/// juz przy wolnej pamieci, nie jest wtedy tworca -- `create_only` odpada na istniejacej nazwie,
+/// `open_only` przechodzi, a segment nigdy nie dorosnie do sizeof(Segment). Instancja odczekuje
+/// kInitWaitLimit i startuje BEZ magistrali; stan jest trwaly az do recznego skasowania pliku.
+/// Sprawdzone eksperymentem: tmpfs 512 KiB zostawia `xrdbbus_v3` o rozmiarze 0 B.
+///
+/// Kasuje wylacznie tworca i wylacznie przed publikacja `magic`, czyli obiekt, ktorego zaden
+/// inny proces nie mogl jeszcze uznac za zdatny do uzytku. Po publikacji obowiazuje regula
+/// z naglowka: segmentu nie kasuje nikt.
+void removeUnpublishedSegment(bool creator, const std::string &name) {
+  if (!creator) return;
+  IPC::shared_memory_object::remove(name.c_str());
+}
+
 void beginWrite(Slot &slot) {
   std::atomic_ref<std::uint32_t> seq(slot.seq);
   seq.store(seq.load(std::memory_order_relaxed) + 1, std::memory_order_relaxed);
@@ -182,6 +199,8 @@ std::string segmentName() {
   if (runNamespace.empty() || !servername::isValid(runNamespace)) return std::string(kSegmentName);
   return std::string(kSegmentName) + '_' + runNamespace;
 }
+
+std::size_t segmentBytes() { return sizeof(Segment); }
 
 bool isProcessAlive(std::int32_t pid, std::uint64_t startTime) {
   if (pid <= 0) return false;
@@ -302,6 +321,7 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
         SPDLOG_WARN("xrdbbus: segment '{}' stayed undersized ({} B, expected {} B); remove /dev/shm/{} to repair.", name, size,
                     sizeof(Segment), name);
         impl->shm.reset();
+        removeUnpublishedSegment(creator, name);
         return;
       }
       std::this_thread::sleep_for(kInitPollInterval);
@@ -314,6 +334,7 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
     impl->region.reset();
     impl->shm.reset();
     impl->segment = nullptr;
+    removeUnpublishedSegment(creator, name);
     return;
   }
 
@@ -334,6 +355,9 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
     if (rc != 0) {
       SPDLOG_ERROR("xrdbbus: cannot initialize robust mutex, rc={} ({})", rc, std::strerror(rc));
       impl->segment = nullptr;
+      impl->region.reset();
+      impl->shm.reset();
+      removeUnpublishedSegment(creator, name);
       return;
     }
 

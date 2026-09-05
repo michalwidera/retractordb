@@ -84,9 +84,15 @@ macro(add_test)
         set(_it_tmpdir ${IT_NAMESPACE_ROOT}/${_it_namespace})
         file(MAKE_DIRECTORY ${_it_tmpdir})
       endif()
+      # FIXTURES_REQUIRED wiaze test z jednym zadaniem sprzatajacym: CTest
+      # uruchamia test oznaczony FIXTURES_CLEANUP dopiero po WSZYSTKICH testach
+      # wymagajacych tej oprawy, wiec kasowanie segmentow puli nie ma jak trafic
+      # w biegnaca instancje. Oprawa nie ma czesci SETUP -- pule zaklada sam
+      # start pierwszego serwera.
       set_tests_properties(
         ${_it_test_name}
-        PROPERTIES RESOURCE_LOCK ${_it_namespace} ENVIRONMENT
+        PROPERTIES RESOURCE_LOCK ${_it_namespace} FIXTURES_REQUIRED
+                   it_namespace_pool ENVIRONMENT
                    "RDB_NAMESPACE=${_it_namespace};TMPDIR=${_it_tmpdir}")
     endif()
   endif()
@@ -102,3 +108,18 @@ foreach(item ${V_GLOB})
     add_subdirectory(${item})
   endif()
 endforeach()
+
+# Zwrot pamieci dzielonej zajetej przez pule. Rejestracja przez _add_test, bo
+# makro powyzej doklada FIXTURES_REQUIRED -- test sprzatajacy wlasna oprawe
+# czekalby sam na siebie.
+_add_test(
+  NAME
+  it_namespace_pool-cleanup
+  WORKING_DIRECTORY
+  ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+  bash
+  shm_cleanup.sh
+  ${IT_NAMESPACE_POOL_SIZE})
+set_tests_properties(it_namespace_pool-cleanup PROPERTIES FIXTURES_CLEANUP
+                                                          it_namespace_pool)

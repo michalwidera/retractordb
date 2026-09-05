@@ -41,9 +41,15 @@ class IpcServer {
   struct Callbacks {
     CommandHandler onCommand;
     Notifier onReady;            // zasoby IPC gotowe -- raz, przed petla odbioru
+    Notifier onFailure;          // zasobow IPC nie da sie zbudowac -- watek konczy prace
     Notifier onMessageReceived;  // odebrano komende -- przed jej obsluga
     StopPredicate shouldStop;
   };
+
+  /// onReady i onFailure wykluczaja sie i razem sa WYCZERPUJACE: watek komunikacyjny zawsze
+  /// wola dokladnie jedno z nich, zanim skonczy prace. Bez onFailure zawiedziona budowa zasobow
+  /// (najczesciej brak miejsca w /dev/shm na kolejke komend) konczyla watek po cichu, a strona
+  /// czekajaca na gotowosc czekala bez konca.
 
   IpcServer()                             = default;
   IpcServer(const IpcServer &)            = delete;
