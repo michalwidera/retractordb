@@ -155,6 +155,17 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
 
   auto [parseOut, first_keyword, stream_name] = parserRQLString(coreInstanceCopy, adHocQuery);
 
+  // Blad skladni rozstrzygamy PRZED first_keyword. Po bledzie parser zwraca "UNRECOGNIZED",
+  // a kontrole slowa kluczowego koncza sie ponizej FatalError-em, czyli smiercia serwera —
+  // tego samego, przed ktora broni usuniecie exit(EPERM) z listenerow (patrz RQLParser.cpp).
+  // Zalozenie "slowo kluczowe zawsze rozpoznane" bylo prawdziwe wylacznie dlatego, ze blad
+  // parsowania konczyl proces, zanim ta kontrola zdazyla je sprawdzic.
+  if (parseOut != "OK") {
+    ptRetval.put(std::string("db"), "Fail parse:" + parseOut);
+    SPDLOG_ERROR("Parse adhoc query failed: {}", parseOut);
+    return ptRetval;
+  }
+
   if (first_keyword == "UNRECOGNIZED") {
     ptRetval.put(std::string("db"), "Unrecognized command. AdHoc query must start with SELECT");
     SPDLOG_ERROR("Unrecognized command in AdHoc query");
@@ -187,12 +198,6 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
 
   if (first_keyword != "SELECT") {
     FatalError("executorsm::getAdHoc: unexpected first_keyword '{}' after filtering — parser logic error", first_keyword);
-  }
-
-  if (parseOut != "OK") {
-    ptRetval.put(std::string("db"), "Fail parse:" + parseOut);
-    SPDLOG_ERROR("Parse adhoc query failed: {}", parseOut);
-    return ptRetval;
   }
 
   compiler localCompiler(coreInstanceCopy);

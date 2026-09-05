@@ -189,9 +189,8 @@ TEST(serverRouting, describeSpellsOutEveryRunMode) {
 }
 
 TEST(serverRouting, describeYamlKeepsOrderAndFullQueryPath) {
-  const std::vector<bus::InstanceInfo> instances{
-      makeInstance("beta", 202, "beta.rql", {"srcb"}, bus::mode::kService),
-      makeInstance("alfa", 101, "/home/rdb/plans/alfa.rql", {"srca", "dsta"})};
+  const std::vector<bus::InstanceInfo> instances{makeInstance("beta", 202, "beta.rql", {"srcb"}, bus::mode::kService),
+                                                 makeInstance("alfa", 101, "/home/rdb/plans/alfa.rql", {"srca", "dsta"})};
   const std::vector<std::string> lines = routing::describeYaml(instances);
   ASSERT_EQ(lines.size(), 16U);
   EXPECT_EQ(lines[0], "---");

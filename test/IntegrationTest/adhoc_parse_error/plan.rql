@@ -1,0 +1,9 @@
+# Plan tla dla it_adhoc_parse_error: minimalne zrodlo, na ktorym da sie zadac
+# poprawne zapytanie ad-hoc po tym, jak serwer odrzucil zapytanie bledne.
+# ctest -R adhoc_parse_error -V
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM core0, 0.2 FILE 'source.dat'
+
+SELECT a[0] STREAM dst FROM core0

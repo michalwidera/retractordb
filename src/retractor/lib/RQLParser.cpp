@@ -1,12 +1,10 @@
 #include <algorithm>
 #include <cctype>
-#include <cstdlib>
 #include <iostream>
 #include <string>
 
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
-#include <boost/cerrno.hpp>
 #include <boost/lexical_cast.hpp>
 
 // please note that the order of includes is important here
@@ -25,10 +23,18 @@
 using namespace antlrcpp;
 using namespace antlr4;
 
-std::string status = "OK";
-
 namespace {
 constexpr size_t kAgseWindowSignChildIndex = 5;
+
+/// Blad skladni RQL: przerywa parsowanie, zamiast konczyc proces.
+///
+/// Do 2026-09-05 oba listenery bledow wolaly exit(EPERM). W procesie serwera oznaczalo to
+/// smierc xretractora przy KAZDYM blednym zapytaniu ad-hoc — `xqry -a "ml"` wystarczalo.
+///
+/// Sam powrot z listenera nie zalatwia sprawy: ANTLR wchodzi wtedy w odzyskiwanie i wola
+/// dalej callbacki ParserListenera na kalekich kontekstach, gdzie np. ctx->ID() jest nullem.
+/// Rzut wychodzi z prog() przez generowany kod, bo ten lapie wylacznie RecognitionException.
+struct RQLSyntaxError {};
 
 /// Nazwa agregatu zlozona do malych liter. Lekser dopuszcza dwie pisownie ('MIN'|'min'),
 /// wiec ASCII wystarcza.
@@ -36,32 +42,52 @@ std::string lowercased(std::string text) {
   std::ranges::transform(text, text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   return text;
 }
+
+/// Zdejmuje ParserListenera i rzuca RQLSyntaxError.
+///
+/// Zdjecie listenera jest warunkiem KONIECZNYM, nie porzadkami: samo rozwijanie stosu
+/// przechodzi przez `finally` generowanego kodu (antlrcpp::FinalAction), ktore wola
+/// exitRule(), a to wola exitDeclare()/exitSelect()/... na kontekscie zatrzymanym w polowie
+/// budowy. Pierwsza wersja tej naprawy padala tam w exitDeclare() na `ctx->ID()` rownym
+/// nullptr — czyli segfaultem zamiast exit(EPERM), bez zadnej poprawy.
+/// Po removeParseListeners() petla triggerExitRuleEvent() chodzi po pustej liscie.
+///
+/// Listener bledow leksera dostaje ten sam parser, bo blad leksera rozwija stos przez
+/// dokladnie te same `finally` — token pobiera sie w srodku reguly parsera.
+[[noreturn]] void abortParse(antlr4::Parser &parser, size_t line, size_t charPositionInLine, const std::string &msg,
+                             Token *offendingSymbol) {
+  std::cerr << "Syntax error @Rql" << '\n';
+  std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << '\n';
+  std::cerr << "msg:" << msg << '\n';
+  parser.removeParseListeners();
+  throw RQLSyntaxError{};
+}
 }  // namespace
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
 
 class LexerErrorListener : public BaseErrorListener {
  public:
+  explicit LexerErrorListener(antlr4::Parser &parser) : parser_(parser) {}
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    std::cerr << "Syntax error @Rql" << '\n';
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << '\n';
-    std::cerr << "msg:" << msg << '\n';
-    status = "Fail";
-    exit(EPERM);
+    abortParse(parser_, line, charPositionInLine, msg, offendingSymbol);
   }
+
+ private:
+  antlr4::Parser &parser_;
 };
 
 class ParserErrorListener : public BaseErrorListener {
  public:
+  explicit ParserErrorListener(antlr4::Parser &parser) : parser_(parser) {}
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    std::cerr << "Syntax error @Rql" << '\n';
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << '\n';
-    std::cerr << "msg:" << msg << '\n';
-    status = "Fail";
-    exit(EPERM);
+    abortParse(parser_, line, charPositionInLine, msg, offendingSymbol);
   }
+
+ private:
+  antlr4::Parser &parser_;
 };
 
 /* Iterator - each new field gets new fieldCount number */
@@ -581,19 +607,31 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   // to create a token stream.
   RQLLexer lexer(&input);
   CommonTokenStream tokens(&lexer);
-  LexerErrorListener lexerErrorListener;
-  lexer.removeErrorListeners();
-  lexer.addErrorListener(&lexerErrorListener);
   // Create a parser which parses the token stream
   // to create a parse tree.
   RQLParser parser(&tokens);
-  ParserErrorListener parserErrorListener;
+  // Oba listenery bledow potrzebuja parsera (abortParse), wiec powstaja po nim — i przed nim
+  // sa niszczone, czyli w chwili, gdy nikt juz do nich nie siega.
+  LexerErrorListener lexerErrorListener(parser);
+  lexer.removeErrorListeners();
+  lexer.addErrorListener(&lexerErrorListener);
+  ParserErrorListener parserErrorListener(parser);
   ParserListener parserListener(coreInstance);
   parser.removeParseListeners();
   parser.removeErrorListeners();
   parser.addErrorListener(&parserErrorListener);
   parser.addParseListener(&parserListener);
-  tree::ParseTree *tree  = parser.prog();
+
+  // Powod wczesnego powrotu, a nie ogladania drzewa po bledzie: patrz RQLSyntaxError.
+  // Komunikat wypisal juz listener, a coreInstance moze zostac czesciowo zmieniony —
+  // wolajacy odrzuca wtedy caly plan (launcher) albo cala kopie planu (executorsm::getAdHoc).
+  tree::ParseTree *tree = nullptr;
+  try {
+    tree = parser.prog();
+  } catch (const RQLSyntaxError &) {
+    return {"Fail", "UNRECOGNIZED", ""};
+  }
+
   std::string firsttoken = "UNRECOGNIZED";
   if (!tree->children.empty() && !tree->children[0]->children.empty()) firsttoken = tree->children[0]->children[0]->getText();
   std::ranges::transform(firsttoken, firsttoken.begin(), ::toupper);
@@ -608,7 +646,7 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
       streamName = ruleCtx->stream_name->getText();
     }
   }
-  return {status, firsttoken, streamName};
+  return {"OK", firsttoken, streamName};
 }
 
 /// Wiersze logiczne pliku RQL: komentarze usuniete, kontynuacje `\\` sklejone.

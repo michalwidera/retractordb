@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <cctype>
-#include <cerrno>
 #include <format>
 #include <fstream>
 #include <map>
@@ -1326,11 +1325,28 @@ TEST(xcompiler, substrate_names_stay_identifiers) {
   EXPECT_TRUE(plan.exists("STREAM_DEHASH_DIV_STREAM_HASH_a_b_2_1"));
 }
 
+namespace {
+
+/// Parsuje `rql` i zwraca {status, diagnostyka wypisana na stderr}.
+///
+/// Do 2026-09-05 blad skladni konczyl proces przez exit(EPERM), wiec te testy pisalo sie
+/// przez EXPECT_EXIT, a tresc komunikatu ogladalo sie w wydruku umierajacego procesu.
+/// Parser wraca teraz z "Fail", a komunikat idzie na stderr NIEZMIENIONY — badamy jedno
+/// i drugie: sam status nie dowodzi, ze diagnostyka nadal wskazuje przyczyne.
+std::pair<std::string, std::string> parseCapturingStderr(const std::string &rql) {
+  qTree instance;
+  testing::internal::CaptureStderr();
+  auto [parseResult, keyword, name] = parserRQLString(instance, rql);
+  return {parseResult, testing::internal::GetCapturedStderr()};
+}
+
+}  // namespace
+
 // MIN/MAX/AVG/SUMC sa tokenami leksera stojacymi PRZED ID, wiec zaden strumien nie moze
 // sie tak nazywac — reguly stream_factor przyjmuja wylacznie ID. Zastrzezenie jest
 // dzialaniem gramatyki, nie osobna kontrola w kompilatorze, i ten test je przypina:
 // gdyby ktos zdjal MIN z leksera albo dodal go do ID, `SUMC(x)` przestaloby byc
-// jednoznaczne. parserRQLString konczy proces przy bledzie skladni, stad EXPECT_EXIT.
+// jednoznaczne.
 TEST(xparser, aggregate_keywords_are_reserved_stream_names) {
   for (const char *rql : {
            "DECLARE v INTEGER STREAM min, 1/500 FILE 'a.txt'",
@@ -1338,15 +1354,35 @@ TEST(xparser, aggregate_keywords_are_reserved_stream_names) {
            "DECLARE v INTEGER STREAM avg, 1/500 FILE 'a.txt'",
            "DECLARE v INTEGER STREAM SUMC, 1/500 FILE 'a.txt'",
        }) {
-    EXPECT_EXIT(
-        {
-          qTree instance;
-          (void)parserRQLString(instance, rql);
-          exit(0);
-        },
-        ::testing::ExitedWithCode(EPERM), "expecting ID")
-        << rql;
+    const auto [parseResult, diagnostics] = parseCapturingStderr(rql);
+    EXPECT_EQ(parseResult, "Fail") << rql;
+    EXPECT_TRUE(diagnostics.contains("expecting ID")) << rql << '\n' << diagnostics;
   }
+}
+
+// Status parsowania jest stanem POJEDYNCZEGO wywolania, nie stanem procesu.
+//
+// Do 2026-09-05 "Fail" ladowalo w zmiennej plikowej `status`, ktorej parserRQLString nie
+// zerowal na wejsciu. Bylo to nieszkodliwe wylacznie dlatego, ze exit(EPERM) wyprzedzal
+// kazde nastepne wywolanie. Po zdjeciu exit() bez tego straznika pierwsze bledne zapytanie
+// ad-hoc zatrulo by KAZDE nastepne w tym samym procesie serwera — takze poprawne.
+//
+// Drugie zapinane tu zalozenie nalezy do executorsm::getAdHoc: po bledzie skladni slowo
+// kluczowe jest "UNRECOGNIZED", wiec kontrola statusu musi stac PRZED kontrola slowa.
+TEST(xparser, parse_failure_does_not_poison_the_next_parse) {
+  qTree rejected;
+  testing::internal::CaptureStderr();
+  auto [failed, failedKeyword, failedName] = parserRQLString(rejected, "ml");
+  (void)testing::internal::GetCapturedStderr();
+  ASSERT_EQ(failed, "Fail");
+  EXPECT_EQ(failedKeyword, "UNRECOGNIZED");
+
+  qTree instance;
+  auto [parseResult, keyword, name] = parserRQLString(instance, "DECLARE v INTEGER STREAM src, 1/500 FILE 'a.txt'");
+  EXPECT_EQ(parseResult, "OK");
+  EXPECT_EQ(keyword, "DECLARE");
+  EXPECT_EQ(name, "src");
+  EXPECT_TRUE(instance.exists("src"));
 }
 
 namespace {
@@ -1754,13 +1790,9 @@ TEST(xparser, hash_operator_is_not_whitespace_sensitive) {
 // nazwa strumienia i ginie na nierozwiazanym odwolaniu — takze glosno. Komentarz konczacy
 // wiersz zapisuje sie `//`.
 TEST(xparser, trailing_hash_comment_is_rejected) {
-  EXPECT_EXIT(
-      {
-        qTree instance;
-        (void)parserRQLString(instance, "SELECT * STREAM t FROM a # komentarz na koncu wiersza");
-        exit(0);
-      },
-      ::testing::ExitedWithCode(EPERM), "extraneous input");
+  const auto [parseResult, diagnostics] = parseCapturingStderr("SELECT * STREAM t FROM a # komentarz na koncu wiersza");
+  EXPECT_EQ(parseResult, "Fail");
+  EXPECT_TRUE(diagnostics.contains("extraneous input")) << diagnostics;
 }
 
 // Komentarz zajmujacy caly wiersz — takze wciety — nadal jest komentarzem. Przechodzi
@@ -2393,17 +2425,12 @@ TEST(xcompiler, window_aggregate_never_changes_the_output_interval) {
 
   // Trzeci czlon nie jest juz skladnia. Bez tej kontroli test wyzej przechodzilby takze
   // wtedy, gdyby krok wrocil do gramatyki i tylko przestal byc uzywany.
-  // parserRQLString konczy proces przy bledzie skladni, stad EXPECT_EXIT.
-  EXPECT_EXIT(
-      {
-        qTree instance;
-        (void)parserRQLString(instance,
-                              "SUBSTRAT 'memory'\n"
-                              "DECLARE a INTEGER[3] STREAM src, 1/10 FILE 'src.txt'\n"
-                              "SELECT MIN(a[0] : 2 : 2) STREAM dst FROM src\n");
-        exit(0);
-      },
-      ::testing::ExitedWithCode(EPERM), "expecting ')'");
+  const auto [parseResult, diagnostics] = parseCapturingStderr(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER[3] STREAM src, 1/10 FILE 'src.txt'\n"
+      "SELECT MIN(a[0] : 2 : 2) STREAM dst FROM src\n");
+  EXPECT_EQ(parseResult, "Fail");
+  EXPECT_TRUE(diagnostics.contains("expecting ')'")) << diagnostics;
 }
 
 TEST(xcompiler, window_aggregate_origin_covers_the_whole_window) {

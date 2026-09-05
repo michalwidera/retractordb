@@ -193,8 +193,8 @@ int main(int argc, char *argv[]) {
     //
     // `-k` do zbioru NIE nalezy: `-s <strumien> -k -m N` (ubij po budzecie elementow) i
     // `-k -a "..."` to celowe kombinacje, uzywane w testach integracyjnych.
-    const auto commandCount = vm.count("select") + vm.count("detail") + vm.count("adhoc") + vm.count("dir") +
-                              vm.count("bus") + vm.count("hello");
+    const auto commandCount =
+        vm.count("select") + vm.count("detail") + vm.count("adhoc") + vm.count("dir") + vm.count("bus") + vm.count("hello");
     if (commandCount > 1) {
       std::println(std::cerr, "xqry: only one command at a time (--select, --detail, --adhoc, --dir, --bus, --hello)");
       return system::errc::invalid_argument;
