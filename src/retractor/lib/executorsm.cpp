@@ -167,6 +167,8 @@ std::atomic<bool> executorsm::ipcFailed{false};
 int executorsm::cfgQueueBufferSeconds = appcfg::kDefaultIpcQueueBufferSeconds;
 int executorsm::cfgMinQueueElements   = appcfg::kDefaultIpcMinQueueElements;
 int executorsm::cfgRtPriority         = appcfg::kDefaultSchedulingRtPriority;
+std::string executorsm::cfgStorageDir;
+std::string executorsm::activeStorageDir;
 
 // Transport IPC serwera. Obiekt o statycznym czasie zycia, bo sprzatanie musi byc
 // osiagalne z handlera atexit (cleanup ponizej): std::exit nie uruchamia destruktorow
@@ -428,14 +430,25 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     adHocStreams.push_back(q.id);
   }
 
+  // Sciezki magazynow bierzemy z CALEGO planu po scaleniu, a nie z samych nowych wezlow:
+  // claimAdditional pomija to, co juz stoi we wlasnym slocie, wiec zbior jest ten sam, a regula
+  // "co jest magazynem" zostaje w jednym miejscu (planStorePaths).
   if (busPtr != nullptr && !adHocStreams.empty()) {
-    const bus::ClaimResult claimed = busPtr->claimAdditional(adHocStreams);
+    const bus::ClaimResult claimed = busPtr->claimAdditional(adHocStreams, planStorePaths(coreInstanceCopy, activeStorageDir));
     switch (claimed.status) {
       case bus::ClaimStatus::Claimed:
         break;
       case bus::ClaimStatus::Conflict: {
         const std::string owner   = claimed.ownerName.empty() ? "the unnamed instance" : "instance '" + claimed.ownerName + "'";
         const std::string message = "Rejected: stream '" + claimed.stream + "' is already served by " + owner + " (pid " +
+                                    std::to_string(claimed.ownerPid) + ")";
+        ptRetval.put(std::string("db"), message);
+        SPDLOG_ERROR("AdHoc rejected: {}", message);
+        return ptRetval;
+      }
+      case bus::ClaimStatus::StoreConflict: {
+        const std::string owner   = claimed.ownerName.empty() ? "the unnamed instance" : "instance '" + claimed.ownerName + "'";
+        const std::string message = "Rejected: storage file '" + claimed.detail + "' is already written by " + owner + " (pid " +
                                     std::to_string(claimed.ownerPid) + ")";
         ptRetval.put(std::string("db"), message);
         SPDLOG_ERROR("AdHoc rejected: {}", message);
@@ -526,7 +539,8 @@ std::string executorsm::validatePlanText(const std::string &planText) {
   // inna instancja nie moze ich zajac w oknie miedzy odpowiedzia dla klienta a granica epoki.
   // Odmowa nie zmienia slotu, wiec stary plan zachowuje takze swoje dotychczasowe roszczenie.
   if (busPtr != nullptr) {
-    const bus::ClaimResult claimed = busPtr->reservePlan(planStreamNames(candidate), planCounterPath(candidate));
+    const bus::ClaimResult claimed =
+        busPtr->reservePlan(planStreamNames(candidate), planCounterPath(candidate), planStorePaths(candidate, cfgStorageDir));
     switch (claimed.status) {
       case bus::ClaimStatus::Claimed:
         break;
@@ -538,6 +552,11 @@ std::string executorsm::validatePlanText(const std::string &planText) {
       case bus::ClaimStatus::CounterConflict: {
         const std::string owner = claimed.ownerName.empty() ? "the unnamed instance" : "instance '" + claimed.ownerName + "'";
         return "Rejected: rotation counter file '" + claimed.detail + "' is already used by " + owner + " (pid " +
+               std::to_string(claimed.ownerPid) + ")";
+      }
+      case bus::ClaimStatus::StoreConflict: {
+        const std::string owner = claimed.ownerName.empty() ? "the unnamed instance" : "instance '" + claimed.ownerName + "'";
+        return "Rejected: storage file '" + claimed.detail + "' is already written by " + owner + " (pid " +
                std::to_string(claimed.ownerPid) + ")";
       }
       case bus::ClaimStatus::ServiceConflict:
@@ -932,6 +951,10 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
       storageDirective.filename = cfg.storageDir;
       coreInstancePtr->push_back(storageDirective);
     }
+
+    // Ostatnia chwila, w ktorej `:STORAGE` jest jeszcze w drzewie — dataModel usunie dyrektywy
+    // przy budowie modelu, a zapytania ad-hoc nastepnej epoki potrzebuja tego katalogu.
+    activeStorageDir = planStorageDir(*coreInstancePtr, cfg.storageDir);
   }
 
   // Oczekiwanie na model podniesione PRZED ogloszeniem planu na magistrali. Kolejnosc jest
@@ -975,8 +998,11 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   executorsm::cfgQueueBufferSeconds = cfg.ipcQueueBufferSeconds;
   executorsm::cfgMinQueueElements   = cfg.ipcMinQueueElements;
   executorsm::cfgRtPriority         = cfg.schedulingRtPriority;
-  dataModelExpected                 = !coreInstance.empty();
-  untilEofMode                      = vm.contains("until-eof");
+  executorsm::cfgStorageDir         = cfg.storageDir;
+  // Dyrektywy sa jeszcze w drzewie: dataModel usunie je dopiero przy budowie modelu.
+  executorsm::activeStorageDir = planStorageDir(coreInstance, cfg.storageDir);
+  dataModelExpected            = !coreInstance.empty();
+  untilEofMode                 = vm.contains("until-eof");
   // Plik zapytan uslugi. Nadpisuje go przyjety plan i oprozniaja skutki bledu krytycznego,
   // wiec wskazuje go WYLACZNIE instancja bedaca jednostka systemd: plik `.rql` operatora,
   // ktory uruchomil xretractor z terminala, jest jego wlasnoscia, a nie stanem uslugi.

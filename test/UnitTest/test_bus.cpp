@@ -182,7 +182,7 @@ TEST_F(BusFixture, ReservedPlanBlocksNamesUntilActivation) {
   ASSERT_EQ(
       instance.claim({.name = "alfa", .queryFile = "plan.rql", .counterPath = "/tmp/old.cnt", .streams = {"old", "src"}}).status,
       bus::ClaimStatus::Claimed);
-  ASSERT_EQ(instance.reservePlan({"new", "src"}, "/tmp/new.cnt").status, bus::ClaimStatus::Claimed);
+  ASSERT_EQ(instance.reservePlan({"new", "src"}, "/tmp/new.cnt", {}).status, bus::ClaimStatus::Claimed);
 
   const auto before = instance.instances();
   ASSERT_EQ(before.size(), 1U);
@@ -212,8 +212,8 @@ TEST_F(BusFixture, RefusedPlanReplacementLeavesOwnResourcesIntact) {
   std::vector<std::string> tooMany;
   for (std::size_t i = 0; i <= bus::kMaxStreams; ++i)
     tooMany.push_back("s" + std::to_string(i));
-  EXPECT_EQ(first.reservePlan(tooMany, "/tmp/new.cnt").status, bus::ClaimStatus::TooLarge);
-  EXPECT_EQ(first.reservePlan({"new", "taken"}, "/tmp/new.cnt").status, bus::ClaimStatus::Conflict);
+  EXPECT_EQ(first.reservePlan(tooMany, "/tmp/new.cnt", {}).status, bus::ClaimStatus::TooLarge);
+  EXPECT_EQ(first.reservePlan({"new", "taken"}, "/tmp/new.cnt", {}).status, bus::ClaimStatus::Conflict);
 
   const auto instances = first.instances();
   EXPECT_EQ(streamsOf(instances, "alfa"), (std::vector<std::string>{"old", "srca"}));
@@ -229,7 +229,7 @@ TEST_F(BusFixture, ClaimAdditionalExtendsOwnSlot) {
   bus::Bus second(kTestSegment);
 
   ASSERT_EQ(first.claim({.name = "alfa", .queryFile = "alfa.rql", .streams = {"srca"}}).status, bus::ClaimStatus::Claimed);
-  EXPECT_EQ(first.claimAdditional({"adhoc1"}).status, bus::ClaimStatus::Claimed);
+  EXPECT_EQ(first.claimAdditional({"adhoc1"}, {}).status, bus::ClaimStatus::Claimed);
 
   EXPECT_EQ(streamsOf(first.instances(), "alfa"), (std::vector<std::string>{"srca", "adhoc1"}));
   EXPECT_EQ(second.claim({.name = "beta", .queryFile = "beta.rql", .streams = {"adhoc1"}}).status, bus::ClaimStatus::Conflict);
@@ -248,7 +248,7 @@ TEST_F(BusFixture, ClaimAdditionalConflictLeavesOwnSlotIntact) {
   ASSERT_EQ(second.claim({.name = "beta", .queryFile = "beta.rql", .streams = {"srcb", "dstb"}}).status,
             bus::ClaimStatus::Claimed);
 
-  const auto refused = first.claimAdditional({"nowy", "dstb"});
+  const auto refused = first.claimAdditional({"nowy", "dstb"}, {});
   EXPECT_EQ(refused.status, bus::ClaimStatus::Conflict);
   EXPECT_EQ(refused.stream, "dstb");
   EXPECT_EQ(refused.ownerName, "beta");
@@ -265,8 +265,8 @@ TEST_F(BusFixture, ClaimAdditionalIsIdempotent) {
   bus::Bus instance(kTestSegment);
 
   ASSERT_EQ(instance.claim({.name = "alfa", .queryFile = "alfa.rql", .streams = {"srca"}}).status, bus::ClaimStatus::Claimed);
-  ASSERT_EQ(instance.claimAdditional({"adhoc1"}).status, bus::ClaimStatus::Claimed);
-  EXPECT_EQ(instance.claimAdditional({"srca", "adhoc1"}).status, bus::ClaimStatus::Claimed);
+  ASSERT_EQ(instance.claimAdditional({"adhoc1"}, {}).status, bus::ClaimStatus::Claimed);
+  EXPECT_EQ(instance.claimAdditional({"srca", "adhoc1"}, {}).status, bus::ClaimStatus::Claimed);
 
   EXPECT_EQ(streamsOf(instance.instances(), "alfa"), (std::vector<std::string>{"srca", "adhoc1"}));
 }
@@ -278,11 +278,11 @@ TEST_F(BusFixture, ClaimAdditionalWithoutSlotIsUnavailable) {
   bus::Bus instance(kTestSegment);
   ASSERT_TRUE(instance.attached());
 
-  EXPECT_EQ(instance.claimAdditional({"adhoc1"}).status, bus::ClaimStatus::Unavailable);
+  EXPECT_EQ(instance.claimAdditional({"adhoc1"}, {}).status, bus::ClaimStatus::Unavailable);
   EXPECT_TRUE(instance.instances().empty());
 
   // Pusta lista jest operacja pusta takze wtedy, gdy slotu nie ma.
-  EXPECT_EQ(instance.claimAdditional({}).status, bus::ClaimStatus::Claimed);
+  EXPECT_EQ(instance.claimAdditional({}, {}).status, bus::ClaimStatus::Claimed);
 }
 
 // Pojemnosc slotu obowiazuje takze przy dokladaniu, i tak samo nie wolno jej przekroczyc
@@ -295,11 +295,11 @@ TEST_F(BusFixture, ClaimAdditionalRespectsSlotCapacity) {
     full.push_back("s" + std::to_string(i));
   ASSERT_EQ(instance.claim({.name = "alfa", .queryFile = "alfa.rql", .streams = full}).status, bus::ClaimStatus::Claimed);
 
-  EXPECT_EQ(instance.claimAdditional({"jeszczejeden"}).status, bus::ClaimStatus::TooLarge);
+  EXPECT_EQ(instance.claimAdditional({"jeszczejeden"}, {}).status, bus::ClaimStatus::TooLarge);
   EXPECT_EQ(streamsOf(instance.instances(), "alfa").size(), bus::kMaxStreams);
 
   const std::string tooLong(bus::kStreamNameSize, 'x');
-  const auto refused = instance.claimAdditional({tooLong});
+  const auto refused = instance.claimAdditional({tooLong}, {});
   EXPECT_EQ(refused.status, bus::ClaimStatus::TooLarge);
   EXPECT_EQ(refused.stream, tooLong);
 }
@@ -360,11 +360,23 @@ TEST_F(BusFixture, ZombieSlotIsFreeAgain) {
 namespace {
 
 std::vector<bus::InstanceInfo> snapshotOf() {
-  return {bus::InstanceInfo{
-              .name = "alfa", .pid = 101, .queryFile = "alfa.rql", .counterPath = "/tmp/alfa.cnt", .streams = {"srca", "dst"}},
-          bus::InstanceInfo{
-              .name = "beta", .pid = 102, .queryFile = "beta.rql", .counterPath = "/tmp/beta.cnt", .streams = {"srcb", "dstb"}},
-          bus::InstanceInfo{.name = "", .pid = 103, .queryFile = "hist.rql", .streams = {"srce", "dste"}}};
+  return {bus::InstanceInfo{.name         = "alfa",
+                            .pid          = 101,
+                            .queryFile    = "alfa.rql",
+                            .counterPath  = "/tmp/alfa.cnt",
+                            .streams      = {"srca", "dst"},
+                            .storeDigests = {bus::storeDigest("/var/rdb/dst")}},
+          bus::InstanceInfo{.name         = "beta",
+                            .pid          = 102,
+                            .queryFile    = "beta.rql",
+                            .counterPath  = "/tmp/beta.cnt",
+                            .streams      = {"srcb", "dstb"},
+                            .storeDigests = {bus::storeDigest("/var/rdb/dstb")}},
+          bus::InstanceInfo{.name         = "",
+                            .pid          = 103,
+                            .queryFile    = "hist.rql",
+                            .streams      = {"srce", "dste"},
+                            .storeDigests = {bus::storeDigest("/var/rdb/dste")}}};
 }
 
 }  // namespace
@@ -553,6 +565,216 @@ TEST_F(BusFixture, OversizedCounterPathIsRefused) {
   EXPECT_TRUE(instance.instances().empty());
 }
 
+// --- pliki magazynu -----------------------------------------------------------------------
+
+// Sedno ochrony magazynu: nazwy strumieni sa ROZLACZNE (out_a vs out_b), a mimo to oba plany
+// pisza do jednego pliku, bo klauzula `FILE` odrywa nazwe pliku od nazwy zapytania. Nazwa
+// strumienia broni wylacznie deskryptora <id>.desc, wiec bez tego roszczenia dwa procesy
+// dopisywalyby rownolegle do tego samego magazynu.
+TEST_F(BusFixture, SharedStorageFileIsRefused) {
+  bus::Bus first(kTestSegment);
+  bus::Bus second(kTestSegment);
+
+  ASSERT_EQ(
+      first.claim({.name = "alfa", .queryFile = "alfa.rql", .streams = {"out_a"}, .stores = {"/var/lib/rdb/shared"}}).status,
+      bus::ClaimStatus::Claimed);
+
+  const auto refused =
+      second.claim({.name = "beta", .queryFile = "beta.rql", .streams = {"out_b"}, .stores = {"/var/lib/rdb/shared"}});
+  EXPECT_EQ(refused.status, bus::ClaimStatus::StoreConflict);
+  EXPECT_EQ(refused.detail, "/var/lib/rdb/shared");
+  EXPECT_EQ(refused.ownerName, "alfa");
+  EXPECT_EQ(refused.ownerPid, static_cast<std::int32_t>(getpid()));
+
+  // Odmowa nie zostawia po sobie slotu.
+  EXPECT_EQ(first.instances().size(), 1U);
+}
+
+// Rozne pliki wspolistnieja, a plan, ktory nic nie zapisuje (same deklaracje albo MEMORY),
+// ma liste pusta i nie koliduje z niczym.
+TEST_F(BusFixture, DistinctAndAbsentStoresCoexist) {
+  bus::Bus first(kTestSegment);
+  bus::Bus second(kTestSegment);
+  bus::Bus third(kTestSegment);
+
+  ASSERT_EQ(first.claim({.name = "alfa", .queryFile = "a.rql", .streams = {"dsta"}, .stores = {"/tmp/a"}}).status,
+            bus::ClaimStatus::Claimed);
+  EXPECT_EQ(second.claim({.name = "beta", .queryFile = "b.rql", .streams = {"dstb"}, .stores = {"/tmp/b"}}).status,
+            bus::ClaimStatus::Claimed);
+  EXPECT_EQ(third.claim({.name = "gamma", .queryFile = "g.rql", .streams = {"dstg"}}).status, bus::ClaimStatus::Claimed);
+
+  EXPECT_EQ(first.instances().size(), 3U);
+}
+
+// Slot niesie sciezki magazynow, bo to na ich podstawie odsiew przed dostarczeniem planu do
+// serwisu (findForeignStoreOwner) rozstrzyga kolizje, zanim czegokolwiek dotknie.
+TEST_F(BusFixture, SlotCarriesStores) {
+  bus::Bus instance(kTestSegment);
+
+  ASSERT_EQ(instance
+                .claim({.name      = "alfa",
+                        .queryFile = "alfa.rql",
+                        .streams   = {"dsta", "dstb"},
+                        .stores    = {"/var/lib/rdb/dsta", "/var/lib/rdb/shared"}})
+                .status,
+            bus::ClaimStatus::Claimed);
+
+  const auto instances = instance.instances();
+  ASSERT_EQ(instances.size(), 1U);
+  EXPECT_EQ(instances[0].storeDigests,
+            (std::vector<bus::StoreDigest>{bus::storeDigest("/var/lib/rdb/dsta"), bus::storeDigest("/var/lib/rdb/shared")}));
+}
+
+// Rezerwacja nastepnego planu blokuje jego magazyny tak samo jak jego nazwy: w oknie miedzy
+// przyjeciem `--reset` a granica epoki inna instancja nie moze zajac pliku, do ktorego ten
+// plan zaraz zacznie pisac.
+TEST_F(BusFixture, ReservedPlanBlocksStoresUntilActivation) {
+  bus::Bus instance(kTestSegment);
+  bus::Bus other(kTestSegment);
+
+  ASSERT_EQ(instance.claim({.name = "alfa", .queryFile = "plan.rql", .streams = {"old"}, .stores = {"/tmp/old"}}).status,
+            bus::ClaimStatus::Claimed);
+  ASSERT_EQ(instance.reservePlan({"new"}, "", {"/tmp/new"}).status, bus::ClaimStatus::Claimed);
+
+  const auto before = instance.instances();
+  ASSERT_EQ(before.size(), 1U);
+  EXPECT_EQ(before[0].storeDigests, (std::vector<bus::StoreDigest>{bus::storeDigest("/tmp/old")}));
+  EXPECT_EQ(other.claim({.name = "beta", .queryFile = "b.rql", .streams = {"inny"}, .stores = {"/tmp/new"}}).status,
+            bus::ClaimStatus::StoreConflict);
+
+  ASSERT_EQ(instance.activateReservedPlan().status, bus::ClaimStatus::Claimed);
+  const auto after = instance.instances();
+  ASSERT_EQ(after.size(), 1U);
+  EXPECT_EQ(after[0].storeDigests, (std::vector<bus::StoreDigest>{bus::storeDigest("/tmp/new")}));
+  // Magazyn poprzedniego planu jest od aktywacji wolny.
+  EXPECT_EQ(other.claim({.name = "beta", .queryFile = "b.rql", .streams = {"inny"}, .stores = {"/tmp/old"}}).status,
+            bus::ClaimStatus::Claimed);
+}
+
+// Odmowa rezerwacji nie rusza wlasnych zasobow -- stary plan dalej dziala i dalej je rosci.
+TEST_F(BusFixture, RefusedStoreReservationLeavesOwnStoresIntact) {
+  bus::Bus first(kTestSegment);
+  bus::Bus second(kTestSegment);
+
+  ASSERT_EQ(first.claim({.name = "alfa", .queryFile = "a.rql", .streams = {"old"}, .stores = {"/tmp/old"}}).status,
+            bus::ClaimStatus::Claimed);
+  ASSERT_EQ(second.claim({.name = "beta", .queryFile = "b.rql", .streams = {"taken"}, .stores = {"/tmp/taken"}}).status,
+            bus::ClaimStatus::Claimed);
+
+  const auto refused = first.reservePlan({"new"}, "", {"/tmp/taken"});
+  EXPECT_EQ(refused.status, bus::ClaimStatus::StoreConflict);
+  EXPECT_EQ(refused.detail, "/tmp/taken");
+  EXPECT_EQ(refused.ownerName, "beta");
+
+  const auto instances = first.instances();
+  const auto own       = std::ranges::find_if(instances, [](const auto &instance) { return instance.name == "alfa"; });
+  ASSERT_NE(own, instances.end());
+  EXPECT_EQ(own->storeDigests, (std::vector<bus::StoreDigest>{bus::storeDigest("/tmp/old")}));
+}
+
+// Zapytanie ad-hoc powoluje nowy strumien, a wiec i nowy plik. Od przyjecia jest on roszczony
+// wobec pozostalych instancji -- tak samo jak nazwa. Powtorzenie tego samego zestawu niczego
+// nie doklada (idempotencja).
+TEST_F(BusFixture, ClaimAdditionalClaimsStores) {
+  bus::Bus first(kTestSegment);
+  bus::Bus second(kTestSegment);
+
+  ASSERT_EQ(first.claim({.name = "alfa", .queryFile = "a.rql", .streams = {"srca"}, .stores = {"/tmp/srca"}}).status,
+            bus::ClaimStatus::Claimed);
+
+  ASSERT_EQ(first.claimAdditional({"adhoc"}, {"/tmp/srca", "/tmp/adhoc"}).status, bus::ClaimStatus::Claimed);
+  EXPECT_EQ(first.claimAdditional({"adhoc"}, {"/tmp/srca", "/tmp/adhoc"}).status, bus::ClaimStatus::Claimed);
+
+  const auto instances = first.instances();
+  const auto own       = std::ranges::find_if(instances, [](const auto &instance) { return instance.name == "alfa"; });
+  ASSERT_NE(own, instances.end());
+  EXPECT_EQ(own->storeDigests, (std::vector<bus::StoreDigest>{bus::storeDigest("/tmp/srca"), bus::storeDigest("/tmp/adhoc")}));
+
+  const auto refused = second.claim({.name = "beta", .queryFile = "b.rql", .streams = {"inny"}, .stores = {"/tmp/adhoc"}});
+  EXPECT_EQ(refused.status, bus::ClaimStatus::StoreConflict);
+  EXPECT_EQ(refused.ownerName, "alfa");
+}
+
+// Odmowa przy dokladaniu ad-hoc nie ma prawa zostawic sladu we wlasnym slocie: plan
+// dzialajacego serwera nie moze urosnac o zasob, ktorego nie dostal.
+TEST_F(BusFixture, ClaimAdditionalStoreConflictLeavesOwnSlotIntact) {
+  bus::Bus first(kTestSegment);
+  bus::Bus second(kTestSegment);
+
+  ASSERT_EQ(first.claim({.name = "alfa", .queryFile = "a.rql", .streams = {"srca"}, .stores = {"/tmp/srca"}}).status,
+            bus::ClaimStatus::Claimed);
+  ASSERT_EQ(second.claim({.name = "beta", .queryFile = "b.rql", .streams = {"srcb"}, .stores = {"/tmp/srcb"}}).status,
+            bus::ClaimStatus::Claimed);
+
+  const auto refused = first.claimAdditional({"nowy"}, {"/tmp/srcb"});
+  EXPECT_EQ(refused.status, bus::ClaimStatus::StoreConflict);
+  EXPECT_EQ(refused.detail, "/tmp/srcb");
+  EXPECT_EQ(refused.ownerName, "beta");
+
+  const auto instances = first.instances();
+  const auto own       = std::ranges::find_if(instances, [](const auto &instance) { return instance.name == "alfa"; });
+  ASSERT_NE(own, instances.end());
+  EXPECT_EQ(own->streams, (std::vector<std::string>{"srca"}));
+  EXPECT_EQ(own->storeDigests, (std::vector<bus::StoreDigest>{bus::storeDigest("/tmp/srca")}));
+}
+
+// Magazynow ogranicza wylacznie LICZBA. Sciezka dowolnej dlugosci przechodzi w calosci, bo
+// w slocie lezy jej skrot o stalej dlugosci -- inaczej niz nazwa strumienia i sciezka licznika,
+// ktore sa tam zapisane doslownie i za dlugie sa odmowa.
+TEST_F(BusFixture, StoreLimitCountsFilesNotPathLength) {
+  bus::Bus instance(kTestSegment);
+
+  std::vector<std::string> tooMany;
+  for (std::size_t i = 0; i <= bus::kMaxStores; ++i)
+    tooMany.push_back("/tmp/s" + std::to_string(i));
+  EXPECT_EQ(instance.claim({.name = "alfa", .queryFile = "alfa.rql", .streams = {"dsta"}, .stores = tooMany}).status,
+            bus::ClaimStatus::TooLarge);
+  EXPECT_TRUE(instance.instances().empty());
+
+  const std::string veryLong = "/tmp/" + std::string(4000, 'p') + "/dane.dat";
+  ASSERT_EQ(instance.claim({.name = "alfa", .queryFile = "alfa.rql", .streams = {"dsta"}, .stores = {veryLong}}).status,
+            bus::ClaimStatus::Claimed);
+
+  // Dluga sciezka jest nadal rozpoznawana co do znaku: rozni sie ostatnim.
+  bus::Bus second(kTestSegment);
+  EXPECT_EQ(second.claim({.name = "beta", .queryFile = "b.rql", .streams = {"dstb"}, .stores = {veryLong}}).status,
+            bus::ClaimStatus::StoreConflict);
+  EXPECT_EQ(second.claim({.name = "beta", .queryFile = "b.rql", .streams = {"dstb"}, .stores = {veryLong + "x"}}).status,
+            bus::ClaimStatus::Claimed);
+}
+
+// Skrot jedzie do pamieci dzielonej i porownuja go rozne procesy, wiec musi byc funkcja
+// napisu, a nie stanu procesu: ta sama sciezka zawsze ten sam skrot, rozne sciezki rozny.
+TEST(BusStoreDigest, IsAStableFunctionOfThePath) {
+  EXPECT_EQ(bus::storeDigest("/var/lib/rdb/dst"), bus::storeDigest("/var/lib/rdb/dst"));
+  EXPECT_FALSE(bus::storeDigest("/var/lib/rdb/dst") == bus::storeDigest("/var/lib/rdb/dsu"));
+  EXPECT_FALSE(bus::storeDigest("/var/lib/rdb/dst") == bus::storeDigest("/var/lib/rdb/dst/"));
+  EXPECT_FALSE(bus::storeDigest("") == bus::storeDigest("/"));
+
+  // Obie polowy niosa informacje: napisy rozniace sie jednym bitem nie moga dzielic zadnej.
+  const auto a = bus::storeDigest("/tmp/a");
+  const auto b = bus::storeDigest("/tmp/b");
+  EXPECT_NE(a.high, b.high);
+  EXPECT_NE(a.low, b.low);
+}
+
+TEST(BusForeignStoreOwner, ReportsForeignStoreBeforeDelivery) {
+  const auto owner = bus::findForeignStoreOwner(snapshotOf(), "beta", {"/var/rdb/dstb", "/var/rdb/dst"});
+  ASSERT_TRUE(owner.has_value());
+  EXPECT_EQ(owner->path, "/var/rdb/dst");
+  EXPECT_EQ(owner->instance, "alfa");
+  EXPECT_EQ(owner->pid, 101);
+}
+
+// Wlasne magazyny nie sa kolizja: restart serwisu zwalnia jego slot, wiec zestaw dostarczany
+// temu samemu serwisowi musi przejsc, choc jego pliki sa w magistrali.
+TEST(BusForeignStoreOwner, OwnDistinctAndEmptyStoresPass) {
+  EXPECT_FALSE(bus::findForeignStoreOwner(snapshotOf(), "alfa", {"/var/rdb/dst"}).has_value());
+  EXPECT_FALSE(bus::findForeignStoreOwner(snapshotOf(), "gamma", {"/var/rdb/nowy"}).has_value());
+  EXPECT_FALSE(bus::findForeignStoreOwner(snapshotOf(), "gamma", {}).has_value());
+  EXPECT_FALSE(bus::findForeignStoreOwner({}, "gamma", {"/var/rdb/dst"}).has_value());
+}
+
 // Nazwa segmentu niesie wersje ukladu i musi isc w gore razem z nia. Bez tego stary segment
 // zostaje w /dev/shm po podmianie binarki, a instancja, ktora odmowi sie do niego podlaczyc,
 // startuje BEZ egzekwowania rozlacznosci -- awaria cicha az do pierwszej kolizji.
@@ -560,7 +782,7 @@ TEST_F(BusFixture, OversizedCounterPathIsRefused) {
 // Podkreslenie zamiast kropki jest czescia kontraktu: obiekty IPC instancji nazywaja sie
 // "<obiekt>.<nazwa instancji>", wiec segment z kropka wpadlby pod wzorce sprzatajace /dev/shm/*.<nazwa>.
 TEST(BusSegmentName, CarriesLayoutVersionAndAvoidsInstanceNamespace) {
-  EXPECT_EQ(bus::kSegmentName, "xrdbbus_v4");
+  EXPECT_EQ(bus::kSegmentName, "xrdbbus_v5");
   EXPECT_EQ(bus::kSegmentName.find('.'), std::string_view::npos);
 }
 

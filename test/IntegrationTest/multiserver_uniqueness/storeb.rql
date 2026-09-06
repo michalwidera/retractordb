@@ -1,0 +1,2 @@
+DECLARE vsb INTEGER STREAM srcsb, 1 FILE 'data.txt'
+SELECT srcsb[0]+13 STREAM out_b FROM srcsb FILE 'shared_store.dat'

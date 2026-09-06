@@ -40,7 +40,7 @@ constexpr std::uint64_t kMagic = 0x5852'4442'4255'5300ULL;
 // ukladach nie spotykaja sie na jednym segmencie, wiec do tego sprawdzenia w ogole nie dochodzi.
 // Ten numer razem ze slotSize chroni przypadek, ktorego nazwa nie zlapie: zmiane znaczenia pol
 // przy zapomnianym bumpie nazwy oraz obcy obiekt o tej samej nazwie.
-constexpr std::uint32_t kLayoutVersion = 4;  // 4: osobna rezerwacja zasobow nastepnego planu
+constexpr std::uint32_t kLayoutVersion = 5;  // 5: skroty sciezek plikow magazynu obok nazw strumieni
 
 // Ile czasu instancja podlaczajaca sie czeka na dokonczenie inicjalizacji przez tworce.
 // Inicjalizacja to truncate + memset + pthread_mutex_init, czyli mikrosekundy; dwie sekundy
@@ -63,6 +63,8 @@ struct Slot {
   std::uint32_t modes;  ///< maska bus::mode::*; 0 => tryb zwykly
   std::uint32_t reservationActive;
   std::uint32_t reservedStreamCount;
+  std::uint32_t storeCount;
+  std::uint32_t reservedStoreCount;
   // NOLINTBEGIN(modernize-avoid-c-arrays): ustalony binarny format pamięci współdzielonej
   char name[kInstanceNameSize];
   char queryFile[kQueryFileSize];
@@ -71,6 +73,8 @@ struct Slot {
   char streams[kMaxStreams][kStreamNameSize];
   char reservedCounterPath[kCounterPathSize];
   char reservedStreams[kMaxStreams][kStreamNameSize];
+  StoreDigest stores[kMaxStores];
+  StoreDigest reservedStores[kMaxStores];
   // NOLINTEND(modernize-avoid-c-arrays)
 };
 
@@ -158,6 +162,40 @@ std::optional<std::string> collidingStream(const Slot &slot, const std::vector<s
   return std::nullopt;
 }
 
+/// Zwraca sciezke Z LISTY WOLAJACEGO, ktorej skrot stoi juz w slocie. Wynikiem jest wiec napis,
+/// ktory operator widzi w swoim zapytaniu, a nie cokolwiek odtworzonego ze skrotu.
+std::optional<std::string> collidingStore(const Slot &slot, const std::vector<std::string> &stores) {
+  if (stores.empty()) return std::nullopt;
+
+  std::vector<StoreDigest> wanted;
+  wanted.reserve(stores.size());
+  for (const auto &store : stores)
+    wanted.push_back(storeDigest(store));
+
+  const auto findCollision = [&](const auto &owned, std::uint32_t count) -> std::optional<std::string> {
+    for (std::uint32_t s = 0; s < std::min(count, static_cast<std::uint32_t>(kMaxStores)); ++s) {
+      const auto hit = std::ranges::find(wanted, owned[s]);
+      if (hit != wanted.end()) return stores[static_cast<std::size_t>(hit - wanted.begin())];
+    }
+    return std::nullopt;
+  };
+
+  if (const auto active = findCollision(slot.stores, slot.storeCount)) return active;
+  if (slot.reservationActive != 0) return findCollision(slot.reservedStores, slot.reservedStoreCount);
+  return std::nullopt;
+}
+
+/// Limit listy magazynow, wspolny dla claim() i reservePlan(). Ograniczona jest wylacznie ICH
+/// LICZBA: skrot ma stala dlugosc, wiec sciezka nie ma jak przekroczyc pola slotu -- w odroznieniu
+/// od nazwy strumienia i sciezki licznika, ktore w slocie leza doslownie.
+std::optional<ClaimResult> storesExceedSlot(const std::vector<std::string> &stores) {
+  if (stores.size() > kMaxStores)
+    return ClaimResult{.status = ClaimStatus::TooLarge,
+                       .detail = "plan writes " + std::to_string(stores.size()) + " storage files, the bus slot holds " +
+                                 std::to_string(kMaxStores)};
+  return std::nullopt;
+}
+
 bool collidesWithCounter(const Slot &slot, std::string_view counterPath) {
   if (counterPath.empty()) return false;
   if (loadString(slot.counterPath, kCounterPathSize) == counterPath) return true;
@@ -200,6 +238,8 @@ void clearSlot(Slot &slot) {
   slot.modes                  = 0;
   slot.reservationActive      = 0;
   slot.reservedStreamCount    = 0;
+  slot.storeCount             = 0;
+  slot.reservedStoreCount     = 0;
   slot.name[0]                = '\0';
   slot.queryFile[0]           = '\0';
   slot.unit[0]                = '\0';
@@ -209,6 +249,28 @@ void clearSlot(Slot &slot) {
 }
 
 }  // namespace
+
+StoreDigest storeDigest(const std::string_view path) {
+  // FNV-1a: kilka linii, zadnej zaleznosci i wartosc zapisana wprost w kodzie -- a to jest
+  // wymog, bo skrot jedzie do pamieci dzielonej i porownuja go ROZNE procesy. std::hash nie
+  // nadaje sie tu z definicji: jego wynik jest zalezny od implementacji biblioteki.
+  //
+  // Dwie polowy licza sie z DWOCH ROZNYCH wiadomosci (druga z sola), a nie z dwoch punktow
+  // startowych tego samego przebiegu -- inaczej obie bylyby ze soba powiazane i skrot mialby
+  // blizej 64 bitow niz 128.
+  constexpr std::uint64_t basis = 0xcbf2'9ce4'8422'2325ULL;
+  constexpr std::uint64_t prime = 0x0000'0100'0000'01B3ULL;
+
+  const auto fnv1a = [](const std::string_view data, std::uint64_t hash) {
+    for (const unsigned char byte : data) {
+      hash ^= byte;
+      hash *= prime;
+    }
+    return hash;
+  };
+
+  return StoreDigest{.high = fnv1a(path, fnv1a("rdb-store", basis)), .low = fnv1a(path, basis)};
+}
 
 std::uint64_t processStartTime(std::int32_t pid) {
   std::uint64_t startTime{0};
@@ -269,6 +331,19 @@ std::optional<CounterOwner> findForeignCounterOwner(const std::vector<InstanceIn
   for (const auto &instance : instances) {
     if (instance.name == selfName || instance.counterPath != counterPath) continue;
     return CounterOwner{.path = instance.counterPath, .instance = instance.name, .pid = instance.pid};
+  }
+  return std::nullopt;
+}
+
+std::optional<StoreOwner> findForeignStoreOwner(const std::vector<InstanceInfo> &instances, std::string_view selfName,
+                                                const std::vector<std::string> &stores) {
+  for (const auto &store : stores) {
+    const StoreDigest digest = storeDigest(store);
+    for (const auto &instance : instances) {
+      if (instance.name == selfName) continue;
+      if (std::ranges::find(instance.storeDigests, digest) == instance.storeDigests.end()) continue;
+      return StoreOwner{.path = store, .instance = instance.name, .pid = instance.pid};
+    }
   }
   return std::nullopt;
 }
@@ -449,6 +524,7 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
     retVal.detail = "counter file path is longer than " + std::to_string(kCounterPathSize - 1) + " characters";
     return retVal;
   }
+  if (const auto refused = storesExceedSlot(request.stores)) return *refused;
 
   // Nazwa jednostki i plik zapytan sa POLAMI INFORMACYJNYMI: nie biora udzialu w rozstrzyganiu
   // rozlacznosci, wiec ich obciecie nie moze zablokowac startu tak jak obciecie nazwy strumienia
@@ -469,7 +545,7 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
   }
 
   Segment &segment = *impl->segment;
-  auto scratch     = std::make_unique<Slot>();  // ~53 KiB -- na stercie, nie na stosie
+  auto scratch     = std::make_unique<Slot>();  // ~57 KiB -- na stercie, nie na stosie
   int freeSlot     = -1;
 
   for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
@@ -521,6 +597,17 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
       impl->unlock();
       return retVal;
     }
+
+    // Plik magazynu: sprawdzany PO nazwach, bo nazwa jest tym, co autor planu napisal, a sciezka
+    // tym, co z niej wyszlo -- przy kolizji obu nazwa jest komunikatem blizszym zapytaniu.
+    if (const auto owned = collidingStore(*scratch, request.stores)) {
+      retVal.status    = ClaimStatus::StoreConflict;
+      retVal.detail    = *owned;
+      retVal.ownerName = loadString(scratch->name, kInstanceNameSize);
+      retVal.ownerPid  = scratch->pid;
+      impl->unlock();
+      return retVal;
+    }
   }
 
   if (freeSlot < 0) {
@@ -538,6 +625,8 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
   mine.modes               = request.modes;
   mine.reservationActive   = 0;
   mine.reservedStreamCount = 0;
+  mine.storeCount          = static_cast<std::uint32_t>(request.stores.size());
+  mine.reservedStoreCount  = 0;
   storeString(mine.name, kInstanceNameSize, request.name);
   storeString(mine.queryFile, kQueryFileSize, request.queryFile);
   storeString(mine.unit, kUnitNameSize, request.unit);
@@ -545,6 +634,8 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
   mine.reservedCounterPath[0] = '\0';
   for (std::size_t s = 0; s < streams.size(); ++s)
     storeString(mine.streams[s], kStreamNameSize, streams[s]);
+  for (std::size_t s = 0; s < request.stores.size(); ++s)
+    mine.stores[s] = storeDigest(request.stores[s]);
   endWrite(mine);
 
   impl->slotIndex = freeSlot;
@@ -554,7 +645,8 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
   return retVal;
 }
 
-ClaimResult Bus::reservePlan(const std::vector<std::string> &streams, std::string_view counterPath) {
+ClaimResult Bus::reservePlan(const std::vector<std::string> &streams, std::string_view counterPath,
+                             const std::vector<std::string> &stores) {
   ClaimResult retVal;
 
   if (!attached() || impl->slotIndex < 0) {
@@ -579,6 +671,7 @@ ClaimResult Bus::reservePlan(const std::vector<std::string> &streams, std::strin
     retVal.detail = "counter file path is longer than " + std::to_string(kCounterPathSize - 1) + " characters";
     return retVal;
   }
+  if (const auto refused = storesExceedSlot(stores)) return *refused;
 
   if (!impl->lock()) {
     retVal.detail = "bus mutex unusable";
@@ -586,7 +679,7 @@ ClaimResult Bus::reservePlan(const std::vector<std::string> &streams, std::strin
   }
 
   Segment &segment = *impl->segment;
-  auto scratch     = std::make_unique<Slot>();  // ~53 KiB -- na stercie, nie na stosie
+  auto scratch     = std::make_unique<Slot>();  // ~57 KiB -- na stercie, nie na stosie
 
   for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
     if (std::cmp_equal(i, impl->slotIndex)) continue;
@@ -615,15 +708,27 @@ ClaimResult Bus::reservePlan(const std::vector<std::string> &streams, std::strin
       impl->unlock();
       return retVal;
     }
+
+    if (const auto owned = collidingStore(*scratch, stores)) {
+      retVal.status    = ClaimStatus::StoreConflict;
+      retVal.detail    = *owned;
+      retVal.ownerName = loadString(scratch->name, kInstanceNameSize);
+      retVal.ownerPid  = scratch->pid;
+      impl->unlock();
+      return retVal;
+    }
   }
 
   Slot &mine = segment.slots[impl->slotIndex];
   beginWrite(mine);
   mine.reservationActive   = 1;
   mine.reservedStreamCount = static_cast<std::uint32_t>(streams.size());
+  mine.reservedStoreCount  = static_cast<std::uint32_t>(stores.size());
   storeString(mine.reservedCounterPath, kCounterPathSize, counterPath);
   for (std::size_t s = 0; s < streams.size(); ++s)
     storeString(mine.reservedStreams[s], kStreamNameSize, streams[s]);
+  for (std::size_t s = 0; s < stores.size(); ++s)
+    mine.reservedStores[s] = storeDigest(stores[s]);
   endWrite(mine);
   impl->unlock();
 
@@ -652,10 +757,13 @@ ClaimResult Bus::activateReservedPlan() {
 
   beginWrite(mine);
   mine.streamCount = mine.reservedStreamCount;
+  mine.storeCount  = mine.reservedStoreCount;
   std::memcpy(mine.streams, mine.reservedStreams, sizeof(mine.streams));
+  std::memcpy(mine.stores, mine.reservedStores, sizeof(mine.stores));
   std::memcpy(mine.counterPath, mine.reservedCounterPath, sizeof(mine.counterPath));
   mine.reservationActive      = 0;
   mine.reservedStreamCount    = 0;
+  mine.reservedStoreCount     = 0;
   mine.reservedCounterPath[0] = '\0';
   endWrite(mine);
   impl->unlock();
@@ -664,10 +772,10 @@ ClaimResult Bus::activateReservedPlan() {
   return retVal;
 }
 
-ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams) {
+ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams, const std::vector<std::string> &stores) {
   ClaimResult retVal;
 
-  if (streams.empty()) {
+  if (streams.empty() && stores.empty()) {
     retVal.status = ClaimStatus::Claimed;
     return retVal;
   }
@@ -684,6 +792,7 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams) {
       retVal.detail = "stream name is longer than " + std::to_string(kStreamNameSize - 1) + " characters";
       return retVal;
     }
+  if (const auto refused = storesExceedSlot(stores)) return *refused;
 
   if (!impl->lock()) {
     retVal.detail = "bus mutex unusable";
@@ -695,7 +804,8 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams) {
 
   // Wlasny slot czytamy wprost, bez seqlocka: trzymamy muteks, a jedynym jego pisarzem
   // jest ta instancja -- takze release() bierze ten sam muteks.
-  const std::uint32_t owned = std::min(mine.streamCount, static_cast<std::uint32_t>(kMaxStreams));
+  const std::uint32_t owned      = std::min(mine.streamCount, static_cast<std::uint32_t>(kMaxStreams));
+  const std::uint32_t ownedStore = std::min(mine.storeCount, static_cast<std::uint32_t>(kMaxStores));
 
   std::vector<std::string> toAdd;
   for (const auto &stream : streams) {
@@ -705,7 +815,16 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams) {
     if (!alreadyMine) toAdd.push_back(stream);
   }
 
-  if (toAdd.empty()) {
+  std::vector<std::string> toAddStores;
+  for (const auto &store : stores) {
+    const StoreDigest digest = storeDigest(store);
+    bool alreadyMine         = false;
+    for (std::uint32_t s = 0; s < ownedStore && !alreadyMine; ++s)
+      alreadyMine = mine.stores[s] == digest;
+    if (!alreadyMine) toAddStores.push_back(store);
+  }
+
+  if (toAdd.empty() && toAddStores.empty()) {
     impl->unlock();
     retVal.status = ClaimStatus::Claimed;
     return retVal;
@@ -719,7 +838,15 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams) {
     return retVal;
   }
 
-  auto scratch = std::make_unique<Slot>();  // ~53 KiB -- na stercie, nie na stosie
+  if (ownedStore > kMaxStores || toAddStores.size() > kMaxStores - ownedStore) {
+    retVal.status = ClaimStatus::TooLarge;
+    retVal.detail = "plan would grow to " + std::to_string(ownedStore + toAddStores.size()) +
+                    " storage files, the bus slot holds " + std::to_string(kMaxStores);
+    impl->unlock();
+    return retVal;
+  }
+
+  auto scratch = std::make_unique<Slot>();  // ~57 KiB -- na stercie, nie na stosie
 
   for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
     if (std::cmp_equal(i, impl->slotIndex)) continue;  // wlasnych nazw nie sprawdzamy przeciw sobie
@@ -739,13 +866,26 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams) {
       impl->unlock();
       return retVal;
     }
+
+    if (const auto other = collidingStore(*scratch, toAddStores)) {
+      retVal.status    = ClaimStatus::StoreConflict;
+      retVal.detail    = *other;
+      retVal.ownerName = loadString(scratch->name, kInstanceNameSize);
+      retVal.ownerPid  = scratch->pid;
+      impl->unlock();
+      return retVal;
+    }
   }
 
   beginWrite(mine);
   const auto availableStreams = std::span{mine.streams}.subspan(owned);
   for (std::size_t s = 0; s < toAdd.size(); ++s)
     storeString(availableStreams[s], kStreamNameSize, toAdd[s]);
-  mine.streamCount = owned + static_cast<std::uint32_t>(toAdd.size());
+  mine.streamCount           = owned + static_cast<std::uint32_t>(toAdd.size());
+  const auto availableStores = std::span{mine.stores}.subspan(ownedStore);
+  for (std::size_t s = 0; s < toAddStores.size(); ++s)
+    availableStores[s] = storeDigest(toAddStores[s]);
+  mine.storeCount = ownedStore + static_cast<std::uint32_t>(toAddStores.size());
   endWrite(mine);
 
   impl->unlock();
@@ -786,6 +926,8 @@ std::vector<InstanceInfo> Bus::instances() const {
     info.modes       = scratch->modes;
     for (std::uint32_t s = 0; s < std::min(scratch->streamCount, static_cast<std::uint32_t>(kMaxStreams)); ++s)
       info.streams.push_back(loadString(scratch->streams[s], kStreamNameSize));
+    for (std::uint32_t s = 0; s < std::min(scratch->storeCount, static_cast<std::uint32_t>(kMaxStores)); ++s)
+      info.storeDigests.push_back(scratch->stores[s]);
     retVal.push_back(std::move(info));
   }
   return retVal;

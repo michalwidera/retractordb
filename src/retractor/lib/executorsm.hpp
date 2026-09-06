@@ -33,6 +33,13 @@ struct executorsm {
   static int cfgQueueBufferSeconds;
   static int cfgMinQueueElements;
   static int cfgRtPriority;
+  /// Domyslny katalog magazynu z konfiguracji. Uzywany przy wycenie zasobow planu, ktory
+  /// dopiero ma zostac przyjety (`--reset`) i sam nie niesie dyrektywy `:STORAGE`.
+  static std::string cfgStorageDir;
+  /// Katalog magazynu, w ktorym pisze plan DZIALAJACY. Trzymany osobno, bo dataModel usuwa
+  /// dyrektywy z drzewa planu — w czasie pracy `:STORAGE` nie da sie juz z niego odczytac,
+  /// a zapytanie ad-hoc musi roscic dokladnie te sciezki, ktore powstana na dysku.
+  static std::string activeStorageDir;
   // Set from IpcServer's onReady callback once all IPC resources are ready.
   // run() waits on this before publishLockInfo(), so PID appears in the lock file
   // only after IPC is fully initialized and xqry can connect safely.

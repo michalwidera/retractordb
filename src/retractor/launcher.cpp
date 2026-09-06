@@ -612,10 +612,15 @@ int main(int argc, char *argv[]) try {
         const std::string exemptName = deliverToService ? serviceName : earlyServerName;
 
         // Odsiew przed dostarczeniem planu do dzialajacego serwisu obejmuje wszystkie fizyczne
-        // zasoby publikowane w slocie: nazwy strumieni i licznik rotacji. Zwykly start nie polega
-        // juz na tej migawce: ponizej atomowo rości slot PRZED skasowaniem pierwszego artefaktu.
+        // zasoby publikowane w slocie: nazwy strumieni, licznik rotacji i pliki magazynu. Zwykly
+        // start nie polega juz na tej migawce: ponizej atomowo rości slot PRZED skasowaniem
+        // pierwszego artefaktu.
+        //
+        // Katalog magazynu z konfiguracji podajemy tutaj JAWNIE, bo dyrektywa `:STORAGE` z domyslu
+        // trafia do planu dopiero nizej — a odsiew ma porownywac te sciezki, ktore plan naprawde zapisze.
         const std::vector<std::string> plannedStreams = planStreamNames(coreInstance);
         const std::string counterPath                 = planCounterPath(coreInstance);
+        const std::vector<std::string> plannedStores  = planStorePaths(coreInstance, appCfg.storageDir);
         if (const auto owner = bus::findForeignOwner(instances, exemptName, plannedStreams)) {
           const std::string ownerName = ownerLabel(owner->instance);
           std::cerr << "xretractor: stream '" << owner->stream << "' is already served by " << ownerName << " (pid "
@@ -630,6 +635,14 @@ int main(int argc, char *argv[]) try {
                     << owner->pid << "); nothing was changed\n";
           SPDLOG_ERROR("Refused before any change: rotation counter file '{}' is already used by {} (pid {}).", owner->path,
                        ownerName, owner->pid);
+          return system::errc::device_or_resource_busy;
+        }
+        if (const auto owner = bus::findForeignStoreOwner(instances, exemptName, plannedStores)) {
+          const std::string ownerName = ownerLabel(owner->instance);
+          std::cerr << "xretractor: storage file '" << owner->path << "' is already written by " << ownerName << " (pid "
+                    << owner->pid << "); nothing was changed\n";
+          SPDLOG_ERROR("Refused before any change: storage file '{}' is already written by {} (pid {}).", owner->path, ownerName,
+                       owner->pid);
           return system::errc::device_or_resource_busy;
         }
 
@@ -694,6 +707,10 @@ int main(int argc, char *argv[]) try {
   bus::Bus xrdbbus(bus::segmentName());
   const std::vector<std::string> claimedStreams = planStreamNames(coreInstance);
   const std::string counterPath                 = planCounterPath(coreInstance);
+  // Domyslny `:STORAGE` z konfiguracji jest juz w planie (dopisany wyzej), wiec fallback zostaje
+  // pusty — a gdy plan nie ma zadnego katalogu, sciezki normalizuja sie wzgledem katalogu roboczego,
+  // czyli dokladnie tam, gdzie rdb::StoragePaths zalozy pliki.
+  const std::vector<std::string> claimedStores = planStorePaths(coreInstance, {});
   // Sciezka BEZWZGLEDNA, tak samo jak w pliku blokady (setServiceQueryFile wyzej). Slot czyta
   // operator z innego katalogu roboczego niz serwer, wiec `xqry --bus` z pozycja wzgledna
   // wskazywalby plik, ktorego pod ta nazwa u niego nie ma.
@@ -717,7 +734,8 @@ int main(int argc, char *argv[]) try {
                                                   .unit        = systemd.unit.value_or(std::string{}),
                                                   .counterPath = counterPath,
                                                   .modes       = runModes,
-                                                  .streams     = claimedStreams});
+                                                  .streams     = claimedStreams,
+                                                  .stores      = claimedStores});
 
   switch (claimed.status) {
     case bus::ClaimStatus::Claimed:
@@ -734,6 +752,13 @@ int main(int argc, char *argv[]) try {
       std::cerr << "xretractor: rotation counter file '" << claimed.detail << "' is already used by " << owner << " (pid "
                 << claimed.ownerPid << ")\n";
       SPDLOG_ERROR("Rotation counter file '{}' is already used by {} (pid {}).", claimed.detail, owner, claimed.ownerPid);
+      return system::errc::device_or_resource_busy;
+    }
+    case bus::ClaimStatus::StoreConflict: {
+      const std::string owner = ownerLabel(claimed.ownerName);
+      std::cerr << "xretractor: storage file '" << claimed.detail << "' is already written by " << owner << " (pid "
+                << claimed.ownerPid << ")\n";
+      SPDLOG_ERROR("Storage file '{}' is already written by {} (pid {}).", claimed.detail, owner, claimed.ownerPid);
       return system::errc::device_or_resource_busy;
     }
     case bus::ClaimStatus::ServiceConflict: {

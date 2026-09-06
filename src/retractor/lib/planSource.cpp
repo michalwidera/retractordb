@@ -90,6 +90,39 @@ std::string absolutePathOf(const std::string &path) {
   return ec ? absolute.string() : canonical.string();
 }
 
+std::string planStorageDir(const qTree &plan, const std::string_view defaultStorageDir) {
+  std::string retVal(defaultStorageDir);
+  for (const auto &q : plan)
+    if (q.id == ":STORAGE") retVal = q.filename;
+  return retVal;
+}
+
+std::vector<std::string> planStorePaths(const qTree &plan, const std::string_view defaultStorageDir) {
+  const std::string storageDir = planStorageDir(plan, defaultStorageDir);
+
+  std::vector<std::string> retVal;
+  for (const auto &q : plan) {
+    if (q.isCompilerDirective()) continue;
+    if (q.isDeclaration()) continue;
+
+    // Typ magazynu rozstrzygamy DOKLADNIE tak, jak zrobi to wykonanie: `VOLATILE` wpisuje
+    // `TYPE` do deskryptora (query::descriptorStorage), a ten w rdb::storage::attachStorage
+    // wygrywa z polityka z klauzuli `STORAGE`.
+    const std::string storageType = (q.policy.second != 0) ? q.policy.first : q.storage_policy;
+    if (storageType == "MEMORY") continue;
+
+    // Ta sama regula, co w streamInstance: `FILE` zastepuje nazwe zapytania nazwa pliku.
+    const std::string storageName = q.filename.empty() ? q.id : q.filename;
+    std::string path              = absolutePathOf((std::filesystem::path(storageDir) / storageName).string());
+
+    // Powtorzenie znaczy, ze plan sam w sobie kieruje dwa strumienie do jednego pliku. Roszczenie
+    // tego nie rozstrzyga -- porownanie idzie wylacznie miedzy instancjami -- wiec duplikat zajalby
+    // wpis w slocie i niczego nie wniosl.
+    if (std::ranges::find(retVal, path) == retVal.end()) retVal.push_back(std::move(path));
+  }
+  return retVal;
+}
+
 std::string planCounterPath(const qTree &plan) {
   for (const auto &q : plan)
     if (q.id == ":ROTATION" && !q.filename.empty()) return absolutePathOf(q.filename);

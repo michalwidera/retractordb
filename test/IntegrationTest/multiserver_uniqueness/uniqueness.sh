@@ -1,7 +1,7 @@
 #!/bin/bash
 # Magistrala xrdbbus egzekwuje rozlacznosc nazw strumieni miedzy instancjami xretractor.
 #
-# Sprawdzane jest jedenascie rzeczy, bo dopiero razem znacza "unikalnosc dziala i nie jest tepa":
+# Sprawdzane jest dwanascie rzeczy, bo dopiero razem znacza "unikalnosc dziala i nie jest tepa":
 #   1. druga instancja z kolidujaca nazwa strumienia ODMAWIA startu,
 #   2. odmowa wskazuje wlasciciela: nazwe instancji i jej PID,
 #   3. instancja o nazwach ROZLACZNYCH startuje normalnie (odmowa nie jest hurtowa),
@@ -23,7 +23,10 @@
 #   9. druga instancja o TEJ SAMEJ nazwie odpada na flock przed skasowaniem artefaktow pierwszej,
 #  10. dwa rownolegle starty z jedna nazwa strumienia daja dokladnie jednego wlasciciela, a
 #      przegrany nie usuwa artefaktow zwyciezcy.
-#  11. kolizja licznika jest wykrywana przed nadpisaniem pliku i restartem serwisu.
+#  11. kolizja licznika jest wykrywana przed nadpisaniem pliku i restartem serwisu,
+#  12. wspoldzielony PLIK MAGAZYNU jest odmowa mimo ROZLACZNYCH nazw strumieni -- klauzula
+#      FILE odrywa nazwe pliku od nazwy zapytania, wiec rozlacznosc nazw broni wylacznie
+#      deskryptora <id>.desc; sam plik danych dwa serwery pisalyby rownolegle.
 #
 # Test nie korzysta z ../serverlib.sh: tamta oprawa pilnuje pojedynczej instancji na stalej
 # sciezce blokady, czyli dokladnie tego zalozenia, ktore ten scenariusz znosi.
@@ -39,6 +42,7 @@ pid_r=""
 pid_race_a=""
 pid_race_b=""
 pid_service=""
+pid_sa=""
 
 # Kasuje slady instancji, ktora zginela od SIGKILL: po zabiciu procesu obiekty IPC zostaja
 # w /dev/shm bezterminowo, a plik blokady zostaje (choc flock jest zwolniony). Sprzatamy je
@@ -53,10 +57,10 @@ cleanup() {
   local status=$?
   trap - EXIT INT TERM
   xqry -k >/dev/null 2>&1 || true
-  for name in gamma delta rota racea raceb; do
+  for name in gamma delta rota racea raceb storea; do
     xqry --server "$name" -k >/dev/null 2>&1 || true
   done
-  for pid in "$pid_h" "$pid_a" "$pid_g" "$pid_d" "$pid_r" "$pid_race_a" "$pid_race_b" "$pid_service"; do
+  for pid in "$pid_h" "$pid_a" "$pid_g" "$pid_d" "$pid_r" "$pid_race_a" "$pid_race_b" "$pid_service" "$pid_sa"; do
     [ -n "$pid" ] || continue
     local waited=0
     while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt 50 ]; do
@@ -69,18 +73,18 @@ cleanup() {
   # Stabilne pliki flock pozostaja po normalnym koncu procesu. Test zna caly zbior swoich
   # nazw i usuwa je dopiero po zebraniu wszystkich dzieci.
   rm -f "$LOCK_DIR/xretractor_service.lock"
-  for name in alfa beta gamma delta epsilon rota rotb racea raceb svc; do
+  for name in alfa beta gamma delta epsilon rota rotb racea raceb svc storea storeb; do
     rm -f "$LOCK_DIR/xretractor_service.$name.lock"
   done
   # Bramka higieny: zaden obiekt IPC ani plik blokady tych instancji nie ma prawa zostac.
   if ls /dev/shm/*alfa* /dev/shm/*beta* /dev/shm/*gamma* /dev/shm/*delta* /dev/shm/*epsilon* /dev/shm/*rot?* \
-      /dev/shm/*racea* /dev/shm/*raceb* \
+      /dev/shm/*racea* /dev/shm/*raceb* /dev/shm/*store?* \
       >/dev/null 2>&1; then
     echo "higiena: zostaly obiekty IPC w /dev/shm:"
-    ls /dev/shm/ | grep -E 'alfa|beta|gamma|delta|epsilon|rota|rotb|racea|raceb' || true
+    ls /dev/shm/ | grep -E 'alfa|beta|gamma|delta|epsilon|rota|rotb|racea|raceb|storea|storeb' || true
     status=1
   fi
-  for name in alfa beta gamma delta epsilon rota rotb racea raceb svc; do
+  for name in alfa beta gamma delta epsilon rota rotb racea raceb svc storea storeb; do
     if [ -f "$LOCK_DIR/xretractor_service.$name.lock" ]; then
       echo "higiena: zostal plik blokady instancji $name"
       status=1
@@ -357,6 +361,43 @@ pid_service=""
 xqry --server rota -k
 wait "$pid_r" 2>/dev/null || true
 pid_r=""
+
+# --- (12) wspoldzielony PLIK MAGAZYNU jest odmowa mimo rozlacznych nazw --------------------
+
+# Nazwy strumieni sa tu ROZLACZNE (out_a vs out_b), a oba plany kieruja wynik do jednego
+# pliku klauzula FILE. Rozlacznosc nazw broni tylko deskryptorow (out_a.desc, out_b.desc),
+# wiec bez roszczenia sciezki magazynu oba procesy dopisywalyby do 'shared_store.dat'
+# rownolegle, kazdy z wlasnym licznikiem rekordow.
+xretractor storea.rql --noanykey --name storea </dev/null >storea.log 2>&1 &
+pid_sa=$!
+wait_for_lock "$LOCK_DIR/xretractor_service.storea.lock" "$pid_sa"
+
+set +e
+xretractor storeb.rql --noanykey --name storeb </dev/null >storeb.log 2>&1
+storeb_rc=$?
+set -e
+
+if [ "$storeb_rc" -eq 0 ]; then
+  echo "serwer storeb wystartowal mimo wspoldzielonego pliku magazynu"
+  cat storeb.log
+  exit 1
+fi
+grep -q "storage file .*shared_store.dat' is already written by instance 'storea' (pid $pid_sa)" storeb.log || {
+  echo "odmowa nie wskazuje wlasciciela pliku magazynu:"
+  cat storeb.log
+  exit 1
+}
+
+# Odmowa nastapila PRZED jakakolwiek szkoda: storea nadal serwuje swoj strumien.
+xqry --server storea -d | grep -qw 'out_a' || {
+  echo "storea przestala odpowiadac po odmowie startu storeb"
+  cat storea.log
+  exit 1
+}
+
+xqry --server storea -k
+wait "$pid_sa" 2>/dev/null || true
+pid_sa=""
 
 xqry --server gamma -k
 xqry --server delta -k

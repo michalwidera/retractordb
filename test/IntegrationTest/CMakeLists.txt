@@ -13,12 +13,12 @@
 # i dokleja sie do nazwy segmentu magistrali (bus::segmentName). Wlasny TMPDIR
 # odsuwa plik blokady i logi.
 #
-# Pula, a nie jedna przestrzen na katalog. Segment magistrali ma okolo 1,7 MB i
+# Pula, a nie jedna przestrzen na katalog. Segment magistrali ma okolo 1,8 MB i
 # z zalozenia nikt go nie kasuje (bus.hpp), a /dev/shm w kontenerze CI ma
 # domyslnie 64 MB: piecdziesiat kilka segmentow zmiescilo by sie na styk, a
 # przepelnienie /dev/shm NIE wywraca testu — daje ClaimStatus::Unavailable,
 # ktory jest fail-open, czyli po cichu zdejmuje izolacje i wraca do kolizji
-# nazw. Szesnascie przestrzeni to najwyzej 28 MB niezaleznie od liczby katalogow
+# nazw. Szesnascie przestrzeni to najwyzej 29 MB niezaleznie od liczby katalogow
 # i nadal wiecej rownoczesnych serwerow, niz `ctest -j $(nproc)` uruchomi na
 # typowej maszynie.
 #

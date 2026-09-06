@@ -84,3 +84,70 @@ TEST(PlanSource, directives_do_not_claim_stream_names) {
   EXPECT_EQ(claimed.front(), "src");
   EXPECT_TRUE(planCounterPath(plan).empty());
 }
+
+/// Nazwa strumienia nie chroni pliku danych: klauzula `FILE` odrywa nazwe pliku od nazwy
+/// zapytania, wiec magistrala musi dostac osobno ZNORMALIZOWANE sciezki magazynow.
+TEST(PlanSource, stores_follow_the_file_clause_and_the_storage_directive) {
+  qTree plan;
+  const PlanSource loaded = parsePlanText(plan,
+                                          "STORAGE 'temp'\n"
+                                          "DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'\n"
+                                          "SELECT a+1 STREAM dst FROM src\n"
+                                          "SELECT a+2 STREAM aliased FROM src FILE 'shared'\n");
+  ASSERT_EQ(loaded.status, "OK");
+
+  // Deklaracji nie ma na liscie: `data.txt` jest zrodlem TYLKO DO ODCZYTU (TEXTSOURCE),
+  // a wiele serwerow czytajacych jeden plik jest poprawne.
+  EXPECT_EQ(planStorePaths(plan, {}), (std::vector<std::string>{absolutePathOf("temp/dst"), absolutePathOf("temp/shared")}));
+}
+
+/// Strumien MEMORY zyje w pamieci procesu i nie dotyka systemu plikow — roszczenie jego
+/// sciezki byloby konfliktem o nic. Obie drogi do tego typu (VOLATILE i STORAGE memory)
+/// musza dawac ten sam wynik, bo w wykonaniu obie koncza sie tym samym akcesorem.
+TEST(PlanSource, memory_streams_do_not_claim_a_store) {
+  qTree plan;
+  const PlanSource loaded = parsePlanText(plan,
+                                          "DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'\n"
+                                          "SELECT a+1 STREAM vol FROM src VOLATILE\n"
+                                          "SELECT a+2 STREAM mem FROM src STORAGE memory\n"
+                                          "SELECT a+3 STREAM disk FROM src\n");
+  ASSERT_EQ(loaded.status, "OK");
+
+  EXPECT_EQ(planStorePaths(plan, {}), (std::vector<std::string>{absolutePathOf("disk")}));
+}
+
+/// Domyslny katalog z konfiguracji wchodzi tylko wtedy, gdy plan nie ma wlasnej dyrektywy —
+/// ta sama regula pierwszenstwa, co przy budowie planu w launcherze. Bez tego parametru
+/// rezerwacja wskazywalaby katalog roboczy, a plan pisalby gdzie indziej.
+TEST(PlanSource, default_storage_dir_yields_to_the_storage_directive) {
+  qTree bare;
+  ASSERT_EQ(parsePlanText(bare,
+                          "DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'\n"
+                          "SELECT a+1 STREAM dst FROM src\n")
+                .status,
+            "OK");
+  EXPECT_EQ(planStorageDir(bare, "/opt/rdb"), "/opt/rdb");
+  EXPECT_EQ(planStorePaths(bare, "/opt/rdb"), (std::vector<std::string>{absolutePathOf("/opt/rdb/dst")}));
+
+  qTree directed;
+  ASSERT_EQ(parsePlanText(directed,
+                          "STORAGE 'temp'\n"
+                          "DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'\n"
+                          "SELECT a+1 STREAM dst FROM src\n")
+                .status,
+            "OK");
+  EXPECT_EQ(planStorePaths(directed, "/opt/rdb"), (std::vector<std::string>{absolutePathOf("temp/dst")}));
+}
+
+/// Dwa strumienie jednego planu wskazujace jeden plik daja JEDEN wpis. Roszczenie porownuje
+/// plany miedzy soba, wiec duplikat zajalby wpis w slocie i niczego nie wniosl.
+TEST(PlanSource, aliased_streams_claim_one_store_once) {
+  qTree plan;
+  const PlanSource loaded = parsePlanText(plan,
+                                          "DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'\n"
+                                          "SELECT a+1 STREAM one FROM src FILE 'shared'\n"
+                                          "SELECT a+2 STREAM two FROM src FILE 'shared'\n");
+  ASSERT_EQ(loaded.status, "OK");
+
+  EXPECT_EQ(planStorePaths(plan, {}), (std::vector<std::string>{absolutePathOf("shared")}));
+}

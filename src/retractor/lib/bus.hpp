@@ -9,7 +9,8 @@
 #include <vector>
 
 /// @brief Magistrala xrdbbus: wspolny obszar wykrywania instancji xretractor i egzekwowania
-///        rozlacznosci nazw strumieni miedzy serwerami na jednej maszynie.
+///        rozlacznosci zasobow -- nazw strumieni i plikow magazynu -- miedzy serwerami
+///        na jednej maszynie.
 ///
 /// Obszar wspolny zawiera WYLACZNIE typy POD i tablice o stalym rozmiarze -- zadnego
 /// alokatora i zadnego kontenera Boosta. Powod jest konkretny: serwer zabity w trakcie
@@ -42,7 +43,7 @@ namespace bus {
 /// Podkreslenie, nie kropka: obiekty IPC instancji nazywaja sie "<obiekt>.<nazwa instancji>", wiec
 /// "xrdbbus.v2" wygladalby jak obiekt instancji o nazwie "v2" i wpadl pod wzorce sprzatajace
 /// postaci /dev/shm/*.<nazwa>.
-inline constexpr std::string_view kSegmentName = "xrdbbus_v4";
+inline constexpr std::string_view kSegmentName = "xrdbbus_v5";
 
 /// Nazwa segmentu dla BIEZACEGO uruchomienia: kSegmentName, a przy ustawionej przestrzeni
 /// nazw (servername::environmentNamespace) kSegmentName + "_" + przestrzen.
@@ -81,9 +82,13 @@ inline constexpr std::size_t kQueryFileSize    = 256;  ///< z terminatorem => sc
 inline constexpr std::size_t kUnitNameSize     = 128;  ///< nazwa jednostki systemd; limit systemd to 256, tu z zapasem
 inline constexpr std::size_t kCounterPathSize  = 256;  ///< znormalizowana sciezka licznika :ROTATION
 
+/// Magazynow jest co najwyzej tyle, co strumieni: kazdy zapisywalny wezel planu ma dokladnie
+/// jeden plik danych.
+inline constexpr std::size_t kMaxStores = kMaxStreams;
+
 /// Przekroczenie limitu ma DWA rozne skutki, i podzial nie jest dowolny.
 ///
-/// Pola ROZSTRZYGAJACE rozlacznosc -- nazwa strumienia i sciezka licznika -- to odmowa startu:
+/// Pola ROZSTRZYGAJACE rozlacznosc -- nazwa strumienia, sciezka licznika i sciezka magazynu -- to odmowa startu:
 /// obciety napis zrownalby dwa rozne zasoby albo rozdzielil jeden, czyli zawiesilby gwarancje
 /// po cichu. Pola INFORMACYJNE -- nazwa jednostki systemd i plik zapytan -- sa obcinane, bo
 /// odmowa startu z powodu dlugiej nazwy unitu byloby lekarstwem gorszym od choroby; obciecie
@@ -105,6 +110,39 @@ inline constexpr std::uint32_t kXqryWait  = 1U << 4;  ///< --xqrywait  (X)
 inline constexpr std::uint32_t kService   = 1U << 5;  ///< --service albo praca jako jednostka systemd (S)
 }  // namespace mode
 
+/// Skrot sciezki pliku magazynu -- to, co trafia do slotu ZAMIAST samej sciezki.
+///
+/// Powod jest pojemnosciowy i mierzalny. Sciezek jest do kMaxStores na slot, wiec tablica
+/// napisow po 256 bajtow (aktywna i zarezerwowana) urosla by slot z 54 KiB do 117 KiB, a segment
+/// z 1,65 MiB do 3,65 MiB. Testy integracyjne trzymaja pule SZESNASTU segmentow (patrz
+/// test/IntegrationTest/CMakeLists.txt) przeciwko /dev/shm, ktory w kontenerze CI ma domyslnie
+/// 64 MB -- 58 MiB samych magistrali zaczelo by wypychac kolejki IPC, a przepelnienie /dev/shm
+/// NIE wywraca startu: daje ClaimStatus::Unavailable, czyli po cichu zdejmuje egzekwowanie
+/// rozlacznosci. Skrot o stalej dlugosci zamyka slot na 58 KiB (segment 1,78 MiB).
+///
+/// Diagnostyka na tym nie traci: kolidujaca sciezka wypisywana operatorowi jest sciezka WLASNA
+/// -- ta, o ktora wlasnie prosilismy -- a te mamy w calosci. Slot cudzej instancji sluzy
+/// wylacznie do porownania.
+///
+/// Porownywana jest SCIEZKA JAKO NAPIS, dokladnie jak przy liczniku :ROTATION: normalizuje ja
+/// wolajacy (absolutePathOf), a magistrala nie zaglada do systemu plikow. Dowiazanie symboliczne
+/// prowadzace do tego samego pliku pod inna nazwa nie jest wiec wykrywane -- ani tu, ani tam.
+///
+/// Cena skrotu: kolizja dwoch ROZNYCH sciezek bylaby falszywa odmowa startu. Przy 128 bitach
+/// i skali rzedu tysiecy sciezek na maszyne prawdopodobienstwo jest rzedu 1e-31, czyli nizsze
+/// niz przeklamanie samej pamieci.
+struct StoreDigest {
+  std::uint64_t high{0};
+  std::uint64_t low{0};
+
+  [[nodiscard]] friend bool operator==(const StoreDigest &, const StoreDigest &) = default;
+};
+
+/// Skrot znormalizowanej sciezki magazynu. Wyliczany JAWNIE tutaj, a nie przez std::hash:
+/// wartosc jedzie do pamieci dzielonej i porownuja ja ROZNE procesy, wiec musi byc czescia
+/// formatu slotu, a nie szczegolem implementacji biblioteki standardowej.
+[[nodiscard]] StoreDigest storeDigest(std::string_view path);
+
 /// Opis jednej zywej instancji odczytany z magistrali.
 struct InstanceInfo {
   std::string name;  ///< pusta => instancja historyczna (bez --name)
@@ -114,6 +152,10 @@ struct InstanceInfo {
   std::string counterPath;  ///< sciezka licznika :ROTATION; pusta => plan bez rotacji
   std::uint32_t modes{0};   ///< maska bus::mode::*; 0 => tryb zwykly
   std::vector<std::string> streams;
+  /// Skroty sciezek plikow magazynu zapisywanych przez ten plan. NIE jest to lista rownolegla
+  /// do `streams`: deklaracje (zrodla tylko do odczytu) i strumienie MEMORY nie maja w niej
+  /// wpisu, a `FILE` zrywa zwiazek nazwy ze sciezka.
+  std::vector<StoreDigest> storeDigests;
 };
 
 /// Wlasciciel nazwy strumienia znaleziony w migawce magistrali.
@@ -125,6 +167,14 @@ struct StreamOwner {
 
 /// Wlasciciel pliku licznika rotacji znaleziony w migawce magistrali.
 struct CounterOwner {
+  std::string path;
+  std::string instance;
+  std::int32_t pid{0};
+};
+
+/// Wlasciciel pliku magazynu znaleziony w migawce magistrali. `path` jest sciezka Z ZAPYTANIA
+/// wolajacego -- slot niesie sam skrot, wiec to jedyna postac, ktora da sie pokazac czlowiekowi.
+struct StoreOwner {
   std::string path;
   std::string instance;
   std::int32_t pid{0};
@@ -144,10 +194,17 @@ struct CounterOwner {
 [[nodiscard]] std::optional<CounterOwner> findForeignCounterOwner(const std::vector<InstanceInfo> &instances,
                                                                   std::string_view selfName, std::string_view counterPath);
 
+/// Odpowiednik findForeignOwner dla znormalizowanych sciezek plikow magazynu. Chroni to, czego
+/// nazwa strumienia nie chroni: `FILE` odrywa nazwe pliku od nazwy zapytania, wiec dwa plany
+/// o ROZLACZNYCH nazwach moga wskazywac jeden magazyn.
+[[nodiscard]] std::optional<StoreOwner> findForeignStoreOwner(const std::vector<InstanceInfo> &instances,
+                                                              std::string_view selfName, const std::vector<std::string> &stores);
+
 enum class ClaimStatus : std::uint8_t {
   Claimed,          ///< slot zajety, nazwy strumieni rozlaczne ze wszystkimi zywymi instancjami
   Conflict,         ///< nazwa strumienia nalezy juz do zywej instancji
   CounterConflict,  ///< plik licznika :ROTATION jest juz uzywany przez zywa instancje
+  StoreConflict,    ///< plik magazynu strumienia jest juz zapisywany przez zywa instancje
   ServiceConflict,  ///< zywa instancja pracuje juz w trybie uslugowym; usluga jest dokladnie jedna
   TooLarge,         ///< plan przekracza pojemnosc slotu
   NoFreeSlot,       ///< wszystkie sloty zajete przez zywe instancje
@@ -159,7 +216,7 @@ struct ClaimResult {
   std::string stream;     ///< kolidujaca nazwa strumienia (Conflict)
   std::string ownerName;  ///< wlasciciel kolidujacego zasobu; pusty => bezimienny
   std::int32_t ownerPid{0};
-  std::string detail;  ///< sciezka licznika (CounterConflict), powod niedostepnosci albo limit
+  std::string detail;  ///< sciezka licznika (CounterConflict) albo magazynu (StoreConflict), powod niedostepnosci albo limit
 };
 
 /// Komplet danych, ktore instancja publikuje w swoim slocie.
@@ -170,6 +227,9 @@ struct ClaimRequest {
   std::string_view counterPath;  ///< znormalizowana sciezka licznika :ROTATION; pusta => brak rotacji
   std::uint32_t modes{0};        ///< maska bus::mode::*; 0 => tryb zwykly
   std::vector<std::string> streams;
+  /// Znormalizowane sciezki plikow magazynu; puste => plan nic nie zapisuje. Skrot z nich robi
+  /// dopiero magistrala: wolajacy operuje sciezkami, bo to one wracaja w komunikacie o kolizji.
+  std::vector<std::string> stores;
 };
 
 /// Czas startu procesu: pole 22 z /proc/<pid>/stat. Zwraca 0, gdy procesu nie ma
@@ -207,14 +267,19 @@ class Bus {
 
   [[nodiscard]] bool attached() const;
 
-  /// Sprawdza rozlacznosc nazw strumieni ORAZ sciezki licznika :ROTATION ze wszystkimi zywymi
-  /// instancjami i -- gdy sa rozlaczne -- zatwierdza wlasny slot. Roszczenia, rezerwacje,
-  /// aktywacje i zwolnienia sa serializowane jednym muteksem magistrali.
+  /// Sprawdza rozlacznosc nazw strumieni, sciezki licznika :ROTATION ORAZ sciezek plikow
+  /// magazynu ze wszystkimi zywymi instancjami i -- gdy sa rozlaczne -- zatwierdza wlasny slot.
+  /// Roszczenia, rezerwacje, aktywacje i zwolnienia sa serializowane jednym muteksem magistrali.
   ///
   /// Licznik jest chroniony osobno, bo nie jest nazwa strumienia: PersistentCounter wczytuje
   /// wartosc przy starcie, a zapisuje ja dopiero w destruktorze, wiec dwie instancje na jednym
   /// pliku zapisuja te sama wartosc i gubia rotacje. Sciezke normalizuje WOLAJACY -- magistrala
   /// porownuje napisy, a nie pliki.
+  ///
+  /// Magazyn jest chroniony osobno z tego samego powodu, choc wyglada na pochodna nazwy: klauzula
+  /// `FILE` odrywa nazwe pliku od nazwy zapytania (streamInstance bierze wtedy qry.filename), wiec
+  /// dwa plany o rozlacznych nazwach strumieni moga pisac do JEDNEGO pliku. Nazwa strumienia broni
+  /// wylacznie deskryptora `<qryID>.desc`, bo tylko on jest budowany z identyfikatora.
   ///
   /// Tu tez zapada rozstrzygniecie "usluga jest dokladnie jedna" (mode::kService). Kontrola musi
   /// byc TUTAJ, a nie u wolajacego przed roszczeniem: instances() czyta seqlockiem, bez muteksu,
@@ -223,29 +288,30 @@ class Bus {
   /// w ktorym maska trybow trafia do slotu, wiec pod jego muteksem sprawdzenie jest atomowe.
   ClaimResult claim(const ClaimRequest &request);
 
-  /// Rezerwuje nazwy strumieni i licznik rotacji dla nastepnego planu w JUZ posiadanym
+  /// Rezerwuje nazwy strumieni, licznik rotacji i pliki magazynu dla nastepnego planu w JUZ posiadanym
   /// slocie. Limity i kolizje sa rozstrzygane pod muteksem magistrali, zanim stary plan
   /// zostanie rozebrany. Przy odmowie slot pozostaje nietkniety; przy sukcesie aktywne
   /// zasoby nadal sa publikowane przez instances(), a rezerwacja blokuje obce roszczenia.
   ///
   /// Wymaga posiadanego slotu (po udanym claim()); bez niego zwraca Unavailable.
-  ClaimResult reservePlan(const std::vector<std::string> &streams, std::string_view counterPath);
+  ClaimResult reservePlan(const std::vector<std::string> &streams, std::string_view counterPath,
+                          const std::vector<std::string> &stores);
 
   /// Zastepuje aktywne zasoby uprzednio zarezerwowanymi. Operacja nie moze juz wejsc
   /// w kolizje: od udanego reservePlan() rezerwacja uczestniczy we wszystkich roszczeniach.
   ClaimResult activateReservedPlan();
 
-  /// Dopisuje nazwy strumieni do JUZ posiadanego slotu, sprawdziwszy ich rozlacznosc
-  /// z pozostalymi zywymi instancjami. Sluzy zapytaniom ad-hoc, ktore powiekszaja plan
-  /// dzialajacego serwera o nowe nazwy.
+  /// Dopisuje nazwy strumieni i sciezki ich magazynow do JUZ posiadanego slotu, sprawdziwszy
+  /// ich rozlacznosc z pozostalymi zywymi instancjami. Sluzy zapytaniom ad-hoc, ktore
+  /// powiekszaja plan dzialajacego serwera o nowe nazwy.
   ///
   /// To NIE jest claim() wolane powtornie: claim() zaczyna od release(), wiec odmowa
   /// zostawialaby dzialajacy serwer bez slotu, czyli takze bez roszczenia nazw, ktore
   /// juz obsluguje. Tutaj odmowa nie ma zadnego skutku ubocznego -- slot zostaje
-  /// nietkniety. Nazwy juz obecne w slocie sa pomijane, wiec operacja jest idempotentna.
+  /// nietkniety. Nazwy i sciezki juz obecne w slocie sa pomijane, wiec operacja jest idempotentna.
   ///
   /// Wymaga posiadanego slotu (po udanym claim()); bez niego zwraca Unavailable.
-  ClaimResult claimAdditional(const std::vector<std::string> &streams);
+  ClaimResult claimAdditional(const std::vector<std::string> &streams, const std::vector<std::string> &stores);
 
   /// Zwalnia slot tej instancji. Idempotentne; wolane takze z handlera atexit.
   void release();
