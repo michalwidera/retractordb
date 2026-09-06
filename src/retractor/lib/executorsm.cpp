@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
@@ -311,7 +312,7 @@ ptree executorsm::attachAdHocRule(qTree &coreInstanceCopy, const std::string &st
   // streamInstance, a storage::setCapacity() dla strumienia niedeklarowanego nic nie robi.
   // Magazyn MEMORY jest pierscieniem o rozmiarze policy.second — glebszej historii tam nie ma
   // i nie bedzie, wiec odmawiamy zamiast uzbrajac regule, ktora czekalaby w nieskonczonosc.
-  if (historyDepth > 0 && targetPolicy.first == "MEMORY" && static_cast<size_t>(historyDepth) > targetPolicy.second)
+  if (historyDepth > 0 && targetPolicy.first == "MEMORY" && std::cmp_greater(historyDepth, targetPolicy.second))
     return refuse("stream '" + streamName + "' keeps only " + std::to_string(targetPolicy.second) +
                   " record(s) in memory, so a dump range reaching " + std::to_string(historyDepth) +
                   " record(s) back cannot be served");

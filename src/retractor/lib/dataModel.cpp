@@ -184,11 +184,14 @@ void dataModel::bootstrapDeclaration(const query &qry) {
 
 bool dataModel::forwardRecordAvailable(const std::string &instance, const int forwardIndex) const {
   const auto found = qSet.find(instance);
-  if (found == qSet.end() || !found->second->logicalIndexBase.has_value()) return false;
+  if (found == qSet.end()) return false;
+
+  const auto &logicalIndexBase = found->second->logicalIndexBase;
+  if (!logicalIndexBase.has_value()) return false;
 
   const auto &output = *found->second->outputPayload;
   const int count    = static_cast<int>(output.getRecordsCount());
-  const int physical = forwardIndex - *found->second->logicalIndexBase;
+  const int physical = forwardIndex - logicalIndexBase.value();
   if (physical < 0 || physical >= count) return false;
   if (!output.isDeclared()) return true;
 
@@ -256,12 +259,10 @@ bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
   }
 
   if (!available) return false;
-  for (const auto &group : qry.windowGroups) {
-    if (!forwardRecordAvailable(group.source, logicalIndex - group.width + 1) ||
-        !forwardRecordAvailable(group.source, logicalIndex))
-      return false;
-  }
-  return true;
+  return std::ranges::all_of(qry.windowGroups, [&](const auto &group) {
+    return forwardRecordAvailable(group.source, logicalIndex - group.width + 1) &&
+           forwardRecordAvailable(group.source, logicalIndex);
+  });
 }
 
 void dataModel::processZeroStep() {

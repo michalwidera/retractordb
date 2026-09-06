@@ -54,7 +54,7 @@ std::string generate() {
 std::string environmentNamespace() {
   const char *env = std::getenv(kNamespaceEnv);
   if (env == nullptr) return {};
-  return std::string(env);
+  return {env};
 }
 
 bool isValid(std::string_view name) {

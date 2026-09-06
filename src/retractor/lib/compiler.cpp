@@ -1172,11 +1172,11 @@ std::string compiler::resolveFieldReferences() {
       FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
     }
     for (auto &f : q.lSchema) {  // for each field in query
-      const std::string result{resolveTokenReferences(f.lProgram, q)};
+      std::string result{resolveTokenReferences(f.lProgram, q)};
       if (result != "OK") return result;
     }  // end for each field in query
     for (auto &r : q.lRules) {  // for each rule in query
-      const std::string result{resolveTokenReferences(r.condition, q)};
+      std::string result{resolveTokenReferences(r.condition, q)};
       if (result != "OK") return result;
       // Warunek reguly ewaluator liczy na payloadzie WYJSCIOWYM tego strumienia
       // (streamInstance::constructRulesAndUpdate) i bierze z tokenu wylacznie indeks — nazwa

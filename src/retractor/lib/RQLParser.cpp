@@ -194,7 +194,14 @@ class ParserListener : public RQLBaseListener {
     if (target->isDeclaration())
       return "Rule '" + rule_name + "' cannot be attached to declaration stream '" + stream_name + "'";
     for (const auto &existing : target->lRules)
-      if (existing.name == rule_name) return "Rule '" + rule_name + "' is already defined on stream '" + stream_name + "'";
+      if (existing.name == rule_name) {
+        std::string message = "Rule '";
+        message += rule_name;
+        message += "' is already defined on stream '";
+        message += stream_name;
+        message += '\'';
+        return message;
+      }
 
     rule ruleConstruct(rule_name, ruleCondition);
     switch (actionType) {

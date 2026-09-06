@@ -518,8 +518,13 @@ std::expected<std::string, selectResult> qry::detailShow(const std::string &inpu
 
   std::vector<std::vector<std::string>> fields;
   for (const auto &v : ptsh->get_child("db.field")) {
-    const std::string name = v.second.get<std::string>("");
-    fields.push_back({input + "." + name, ptsh->get<std::string>("db.field_type." + name)});
+    const auto name           = v.second.get<std::string>("");
+    std::string qualifiedName = input;
+    qualifiedName += '.';
+    qualifiedName += name;
+    std::string typePath = "db.field_type.";
+    typePath += name;
+    fields.push_back({std::move(qualifiedName), ptsh->get<std::string>(typePath)});
   }
 
   // Naglowek strumienia i lista pol to dwie osobne tabele: ich kolumny nie maja ze soba

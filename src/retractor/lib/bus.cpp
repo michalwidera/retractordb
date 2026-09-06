@@ -151,7 +151,7 @@ bool snapshot(Slot &slot, Slot &out) {
 std::optional<std::string> collidingStream(const Slot &slot, const std::vector<std::string> &streams) {
   const auto findCollision = [&](const auto &ownedStreams, std::uint32_t count) -> std::optional<std::string> {
     for (std::uint32_t s = 0; s < std::min(count, static_cast<std::uint32_t>(kMaxStreams)); ++s) {
-      const std::string owned = loadString(ownedStreams[s], kStreamNameSize);
+      std::string owned = loadString(ownedStreams[s], kStreamNameSize);
       if (std::ranges::find(streams, owned) != streams.end()) return owned;
     }
     return std::nullopt;
