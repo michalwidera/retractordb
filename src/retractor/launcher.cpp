@@ -537,33 +537,13 @@ int main(int argc, char *argv[]) try {
         return system::errc::success;
       }
 
-      // Odsiew przed dostarczeniem planu do dzialajacego serwisu obejmuje wszystkie fizyczne
-      // zasoby publikowane w slocie: nazwy strumieni i licznik rotacji. Instancje docelowa
-      // pomijamy, bo restart zastapi jej dotychczasowy plan. Zwykly start nie polega juz na tej
-      // migawce: ponizej atomowo rości slot PRZED skasowaniem pierwszego artefaktu.
-      {
-        const std::vector<std::string> plannedStreams = planStreamNames(coreInstance);
-        const std::string counterPath                 = planCounterPath(coreInstance);
-        const bus::Bus xrdbbus(bus::segmentName(), false);
-        const std::vector<bus::InstanceInfo> instances = xrdbbus.instances();
-        if (const auto owner = bus::findForeignOwner(instances, earlyServerName, plannedStreams)) {
-          const std::string ownerName = ownerLabel(owner->instance);
-          std::cerr << "xretractor: stream '" << owner->stream << "' is already served by " << ownerName << " (pid "
-                    << owner->pid << "); nothing was changed\n";
-          SPDLOG_ERROR("Refused before any change: stream '{}' is already served by {} (pid {}).", owner->stream, ownerName,
-                       owner->pid);
-          return system::errc::device_or_resource_busy;
-        }
-        if (const auto owner = bus::findForeignCounterOwner(instances, earlyServerName, counterPath)) {
-          const std::string ownerName = ownerLabel(owner->instance);
-          std::cerr << "xretractor: rotation counter file '" << owner->path << "' is already used by " << ownerName << " (pid "
-                    << owner->pid << "); nothing was changed\n";
-          SPDLOG_ERROR("Refused before any change: rotation counter file '{}' is already used by {} (pid {}).", owner->path,
-                       ownerName, owner->pid);
-          return system::errc::device_or_resource_busy;
-        }
-      }
-
+      // Usluga docelowa musi byc znana PRZED odsiewem konfliktow: restart zastapi jej dotychczasowy
+      // plan, wiec nazwy strumieni i licznik, ktore ona trzyma dzisiaj, konfliktem nie sa. Konfliktem
+      // sa POZOSTALE zywe instancje. Do 2026-09-06 kolejnosc byla odwrotna, a odsiew pomijal nazwe
+      // NOWEGO uruchomienia zamiast nazwy uslugi: zwykle `xretractor plan.rql` przeciw usludze
+      // serwujacej ten sam plan konczylo sie device_or_resource_busy zamiast dostarczeniem planu.
+      // Z `--name service` defekt sie maskowal, bo tam obie nazwy sa te same.
+      //
       // E3: jeśli działa już instancja będąca serwisem systemd, nie startujemy drugiej —
       // dostarczamy zwalidowany (skompilowany powyżej) zestaw zapytań, nadpisując plik zapytań
       // serwisu i zlecając restart. Serwis załaduje nowy zestaw, zachowując konfigurację jednostki.
@@ -576,24 +556,57 @@ int main(int argc, char *argv[]) try {
       // znalezionej instancji — slot magistrali nie niesie zakresu system/user, a bez niego
       // nie da się złożyć poprawnego `systemctl [--user] restart`.
       {
+        const bus::Bus xrdbbus(bus::segmentName(), false);
+        const std::vector<bus::InstanceInfo> instances = xrdbbus.instances();
+
+        const auto isServicePeer = [](const FlockServiceGuard::PeerInfo &info) {
+          return info.kind == FlockServiceGuard::PeerInfo::Kind::Service && !info.unit.empty();
+        };
+
+        // Nazwa instancji wylaczonej z odsiewu. Domyslnie to uruchomienie, bo bez zywej uslugi
+        // samo za chwile stanie sie instancja; gdy usluga docelowa sie znajdzie, wylaczona jest ONA.
+        std::string exemptName = earlyServerName;
+
         FlockServiceGuard::PeerInfo peer;
         if (guard.isAnotherInstanceRunning()) peer = guard.readPeerInfo();
 
-        if (peer.kind != FlockServiceGuard::PeerInfo::Kind::Service || peer.unit.empty()) {
-          const bus::Bus xrdbbus(bus::segmentName(), false);
-          for (const auto &live : xrdbbus.instances()) {
+        if (!isServicePeer(peer)) {
+          for (const auto &live : instances) {
             if ((live.modes & bus::mode::kService) == 0U) continue;
             FlockServiceGuard peerGuard(executableName + "_service" + (live.name.empty() ? "" : "." + live.name));
             peerGuard.setLockDir(earlyAppCfg.lockDir);
             const FlockServiceGuard::PeerInfo found = peerGuard.readPeerInfo();
-            if (found.kind == FlockServiceGuard::PeerInfo::Kind::Service && !found.unit.empty()) {
-              peer = found;
+            if (isServicePeer(found)) {
+              peer       = found;
+              exemptName = live.name;
               break;
             }
           }
         }
 
-        if (peer.kind == FlockServiceGuard::PeerInfo::Kind::Service && !peer.unit.empty()) {
+        // Odsiew przed dostarczeniem planu do dzialajacego serwisu obejmuje wszystkie fizyczne
+        // zasoby publikowane w slocie: nazwy strumieni i licznik rotacji. Zwykly start nie polega
+        // juz na tej migawce: ponizej atomowo rości slot PRZED skasowaniem pierwszego artefaktu.
+        const std::vector<std::string> plannedStreams = planStreamNames(coreInstance);
+        const std::string counterPath                 = planCounterPath(coreInstance);
+        if (const auto owner = bus::findForeignOwner(instances, exemptName, plannedStreams)) {
+          const std::string ownerName = ownerLabel(owner->instance);
+          std::cerr << "xretractor: stream '" << owner->stream << "' is already served by " << ownerName << " (pid "
+                    << owner->pid << "); nothing was changed\n";
+          SPDLOG_ERROR("Refused before any change: stream '{}' is already served by {} (pid {}).", owner->stream, ownerName,
+                       owner->pid);
+          return system::errc::device_or_resource_busy;
+        }
+        if (const auto owner = bus::findForeignCounterOwner(instances, exemptName, counterPath)) {
+          const std::string ownerName = ownerLabel(owner->instance);
+          std::cerr << "xretractor: rotation counter file '" << owner->path << "' is already used by " << ownerName << " (pid "
+                    << owner->pid << "); nothing was changed\n";
+          SPDLOG_ERROR("Refused before any change: rotation counter file '{}' is already used by {} (pid {}).", owner->path,
+                       ownerName, owner->pid);
+          return system::errc::device_or_resource_busy;
+        }
+
+        if (isServicePeer(peer)) {
           const std::string target = peer.queryFile.empty() ? appCfg.serviceQueryFile : peer.queryFile;
           SPDLOG_INFO("Detected running service unit '{}'; delivering compiled query set to {}.", peer.unit, target);
           if (!servicecontrol::deliverQueryFile(sInputFile, target)) {
