@@ -1,4 +1,17 @@
 #!/usr/bin/env bash
+# Czesc KSZTALTU tozsamosci (A > i) # (B > k) -> (A # B) > (i + k), gdy
+# i*delta(A) == k*delta(B): asercje mowiace, ze przebieg R1 ZADZIALAL.
+#
+# Ten skrypt jest wylaczany (DISABLED) przy
+# RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=OFF i jest to dozwolone: bez przebiegu
+# plan MA zawierac substraty przesuniecia per wejscie, wiec asercja jest
+# tautologicznie falszywa, a nie czerwona. Czesc wynikowa siedzi w
+# verify_value.sh i biegnie w KAZDEJ konfiguracji przelacznikow.
+#
+# Rownosci bajtowe obu artefaktow stoja tutaj, a nie tam, bo pinuja naraz Val
+# i Lat: przy R1 OFF `matched` deklaruje ogon 2, a `CC` ogon 0, wiec przy tym
+# samym budzecie slotow `matched` konczy sie o dwa rekordy wczesniej i rozjezdza
+# sie zarowno plik danych, jak i licznik RLE w .meta.
 set -eu
 
 rm -f ./*.meta ./*.desc matched CC out_compile.txt
@@ -45,29 +58,5 @@ cmp <(tail -c +9 matched.meta) <(tail -c +9 CC.meta)
 # The emitted record sequence is unchanged; only its time address moved.
 grep -F 'matched(1/15)	origin=3' out_compile.txt
 grep -F 'CC(1/15)	origin=3' out_compile.txt
-
-# Formula-derived payload for delta(A)=1/10 and delta(B)=1/5:
-# A#B has the repeating order B,A,A. The equivalent shift of 2+1=3 output slots
-# is carried by tail plus origin, so no placeholder records precede the data —
-# the first stored record is interleave element 0: B[0],A[0],A[1],B[1],...
-actual=$(od -An -v -td4 matched | xargs)
-expected=$(
-  record_count=$(($(stat -c %s matched) / 4))
-  for element in $(seq 0 $((record_count - 1))); do
-    cycle=$((element / 3))
-    case $((element % 3)) in
-      0) echo $((100 * (cycle + 1))) ;;
-      1) echo $((2 * cycle + 1)) ;;
-      2) echo $((2 * cycle + 2)) ;;
-    esac
-  done | xargs
-)
-
-[ "$actual" = "$expected" ] || {
-  echo "matched payload mismatch"
-  echo "expected: $expected"
-  echo "actual:   $actual"
-  exit 1
-}
 
 echo OK

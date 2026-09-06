@@ -217,11 +217,23 @@ scripts/buildrdb.sh release-ablation     # interactive: set all five switches OF
 ctest --test-dir <katalog wypisany przez skrypt>/test -j 4
 ```
 
-Success is **the whole suite green**, exactly as in the default configuration — the switches are an efficiency knob,
-not a semantics knob. A test that holds only with a switch ON is either wrong or documents a real difference, and that
-difference belongs in `def:observable`: `Val` must be equal, `Lat` only non-increasing (see `research_plan.md` §14.20).
-Never paper over a red ablation run with `WILL_FAIL` or `DISABLED` — the matrix already carries a note from 2026-07-26
-explaining why those annotations were removed. CI runs this same floor as `ablation-all-off` in layer L3 of
+Success is **the whole suite green** — no failure, and no `DISABLED` beyond the ones the tree already carries. The
+switches are an efficiency knob, not a semantics knob, and any difference they do show belongs in `def:observable`:
+`Val` must be equal, `Lat` only non-increasing (see `research_plan.md` §14.20).
+
+One kind of assertion cannot hold without the pass: the one saying that the pass **fired** — a substrate name, a
+`PUSH_STREAM` target, the absence of a substrate the pass was supposed to absorb. With the switch off that assertion is
+tautologically false, not red, and it may carry `DISABLED TRUE` guarded by `if(NOT RDB_OPT_...)` and labelled
+`expected_ablation_failure;requires_<switch>`. **Nothing else may.** An assertion about the computed result — payload
+bytes, metadata, a value against an oracle — is never disabled: a red `Val` under ablation is a semantics regression or
+an open finding, and it goes to the human. Never paper one over with `WILL_FAIL` or `DISABLED` — the matrix already
+carries a note from 2026-07-26 explaining why those annotations were removed.
+
+A test mixing both kinds in one ctest entry has to be split, because a single `DISABLED` then takes the result
+assertion down together with the shape assertion. `issue202_hash_shift_e2e` is the worked example, split on 2026-09-06
+into `-shape` and `-value`: its one `cmp matched CC` pinned `Val` and `Lat` at the same time, so it could never be
+green under ablation, and disabling it removed the only end-to-end place where the tail divergence between
+`(A>2)#(B>1)` and `(A#B)>3` was visible at all. CI runs this same floor as `ablation-all-off` in layer L3 of
 `manual-nightly-full`, so a skipped local run gets caught within days, not weeks.
 
 ### Context hygiene
