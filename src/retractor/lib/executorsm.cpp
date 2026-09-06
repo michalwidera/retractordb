@@ -835,6 +835,13 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
     }
   }
 
+  // Oczekiwanie na model podniesione PRZED ogloszeniem planu na magistrali. Kolejnosc jest
+  // istotna: activateReservedPlan() czyni nazwy strumieni widocznymi dla klientow, a model
+  // powstaje dopiero na poczatku nastepnej epoki. Klient, ktory trafil w to okno, nie mial na
+  // czym czekac -- predykat cv widzial dataModelExpected == false z epoki bezczynnej i komenda
+  // wracala z "no active plan", choc plan zostal juz przyjety i ogloszony.
+  dataModelExpected.store(!coreInstancePtr->empty(), std::memory_order_release);
+
   const bus::ClaimResult activated = xrdbbus.activateReservedPlan();
   if (activated.status != bus::ClaimStatus::Claimed && xrdbbus.attached())
     FatalError("Cannot activate the reserved bus resources: {}", activated.detail);

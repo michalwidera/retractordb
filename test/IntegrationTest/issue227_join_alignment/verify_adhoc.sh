@@ -10,7 +10,7 @@ mkdir -p temp
 # server_start czeka na blokade NALEZACA do tego procesu. Samo istnienie pliku
 # blokady spelnialaby rowniez instancja zostawiona przez wczesniejszy test,
 # a zapytania ad hoc trafialyby wtedy do cudzego planu.
-server_start query.rql -m 45
+server_start query.rql -m 150
 
 # Plan ma już rekordy o indeksach większych niż origin=2.
 sleep 0.6
@@ -50,6 +50,21 @@ sleep 0.2
 xqry -a 'SELECT * STREAM late_left FROM late_hash&0.1'
 sleep 0.2
 xqry -a 'SELECT * STREAM late_right FROM late_hash%0.1'
+
+# Budzet slotow nie moze byc jedynym warunkiem konca przebiegu. Strumienie rejestruja sie
+# po kolei, wiec ostatni z nich zbiera najmniej rekordow, a jego udzial zalezy od tego, ile
+# czasu zabraly poprzednie wywolania xqry. Na obciazonym CI late_right dostal dokladnie
+# jeden rekord, a sprawdzenie ciagu potrzebuje co najmniej dwoch — test oblewal wtedy nie
+# z powodu bledu silnika, tylko wyscigu z zegarem. Czekamy zatem na dane, ktore test
+# faktycznie bada, i dopiero wtedy zatrzymujemy serwer; `-m 150` zostaje jako gorna granica
+# przebiegu (zrodlo ma 200 rekordow, wiec nie zdazy sie zawinac).
+i=0
+while [ "$i" -lt 200 ]; do
+  if [ "$(stat -c %s temp/late_right 2>/dev/null || echo 0)" -ge 48 ]; then break; fi
+  sleep 0.05
+  i=$((i + 1))
+done
+xqry -k >/dev/null 2>&1 || true
 
 server_wait_exit
 
