@@ -23,6 +23,22 @@ if(RESEARCH_GATE_STRICT)
   set(RESEARCH_GATE_STRICT_ARG "--strict")
 endif()
 
+# Katalogi robocze obu celow leza POZA `${CMAKE_BINARY_DIR}/test` i musza tam
+# zostac. test/CMakeLists.txt kasuje cale `${CMAKE_BINARY_DIR}/test`
+# (`file(REMOVE_RECURSE ...)`) przy KAZDEJ konfiguracji i regeneracji cmake, a
+# regeneracje wymusza dowolne `ninja` po zmianie ktoregokolwiek CMakeLists.
+# Dopoki katalogi robocze siedzialy pod `${CMAKE_CURRENT_BINARY_DIR}`, jedno
+# `cmake .` z drugiego terminala kasowalo katalog biegnacej wlasnie bramki.
+#
+# Objaw z 2026-09-06, ktory to ujawnil, czytal sie jak regresja silnika, a byl
+# awaria aparatury: kampania H10 w probie przechodzila (zdazyla sie zapisac),
+# kampania poza proba oblewala z CSV bez ani jednego wiersza obserwacji, a
+# wszystkie kroki H9 po niej oblewaly z `No such file or directory` na wlasnych
+# logach. Przebieg trwa od minuty (bramka) do kilkudziesieciu minut (dryf), wiec
+# okno jest szerokie, a dowod ginie razem z katalogiem — po fakcie nie ma czego
+# ogladac.
+set(RESEARCH_WORK_ROOT ${CMAKE_BINARY_DIR}/research-gate-work)
+
 # Profile ablacji H9 mieszkaja w build/K26v3-*. Bramka sprawdza, czy odcisk
 # tresci src/ zapisany przy ich budowie zgadza sie z biezacym. Rozjazd odcisku
 # automatycznie przebudowuje profile przed poziomem 84/84; brak profilu albo
@@ -31,8 +47,8 @@ add_custom_target(
   test_gate
   COMMAND
     ${CMAKE_CURRENT_SOURCE_DIR}/run_gate.sh --xretractor
-    $<TARGET_FILE:xretractor> --work ${CMAKE_CURRENT_BINARY_DIR}/gate-work
-    --count ${RESEARCH_GATE_COUNT} --profiles ${CMAKE_SOURCE_DIR}/build
+    $<TARGET_FILE:xretractor> --work ${RESEARCH_WORK_ROOT}/gate-work --count
+    ${RESEARCH_GATE_COUNT} --profiles ${CMAKE_SOURCE_DIR}/build
     ${RESEARCH_GATE_STRICT_ARG}
   DEPENDS xretractor
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -52,8 +68,8 @@ add_custom_target(
   test_drift
   COMMAND
     ${CMAKE_CURRENT_SOURCE_DIR}/run_drift.sh --xretractor
-    $<TARGET_FILE:xretractor> --work ${CMAKE_CURRENT_BINARY_DIR}/drift-work
-    --count ${RESEARCH_GATE_COUNT} --profiles ${CMAKE_SOURCE_DIR}/build
+    $<TARGET_FILE:xretractor> --work ${RESEARCH_WORK_ROOT}/drift-work --count
+    ${RESEARCH_GATE_COUNT} --profiles ${CMAKE_SOURCE_DIR}/build
   DEPENDS xretractor
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
   COMMENT "Fizyczna weryfikacja braku dryftu silnika wzgledem wynikow H9/H10"
