@@ -13,6 +13,12 @@ constexpr std::string_view Reserved_id_oob = "OUT_OF_BUSSINESS";
 /// Bez wspolnej stalej klient nie odroznial instancji bezczynnej od serwera, ktory nie
 /// odpowiedzial — i meldowal timeout tam, gdzie odpowiedz przyszla od razu.
 constexpr std::string_view kNoActivePlanReply = "no active plan";
+
+/// Odpowiedz serwera, ktory przyjal komende juz w trakcie wlasnego zamykania. Wspolna dla
+/// obu stron IPC z tego samego powodu co kNoActivePlanReply: bez niej klient wrzucal ten
+/// stan do worka "serwer nie odpowiedzial" i meldowal timeout tam, gdzie odpowiedz przyszla
+/// od razu i byla prawdziwa.
+constexpr std::string_view kServerStoppingReply = "server stopping";
 }  // namespace constants
 
 namespace ipc {

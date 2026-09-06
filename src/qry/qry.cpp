@@ -5,8 +5,8 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <expected>
 #include <iostream>
-#include <optional>
 #include <print>
 #include <sstream>
 #include <thread>
@@ -67,6 +67,73 @@ std::string serverVerdict(const boost::property_tree::ptree &pt) {
   return rcv;
 }
 
+/// Rozstrzygniecie odpowiedzi serwera PRZED siegnieciem po jej zawartosci. Dotyczy kazdej
+/// komendy wymagajacej modelu danych ('get', 'detail'), bo kazda z nich moze zastac te same
+/// stany instancji.
+enum class answerVerdict : std::uint8_t {
+  streams,     ///< odpowiedz niesie liste strumieni
+  idle,        ///< instancja odpowiedziala, ale nie ma wczytanego planu
+  stopping,    ///< instancja odpowiedziala, ale wlasnie sie zamyka
+  noResponse,  ///< serwer nie odpowiedzial w wyznaczonym czasie
+  malformed    ///< serwer odpowiedzial, ale odpowiedz nie niesie ani listy, ani znanego werdyktu
+};
+
+/// Kolejnosc jest tu cala trescia: brak odpowiedzi i kazdy stan bez planu tak samo NIE niosa
+/// `db.stream`, a to rozne awarie i rozne naprawy. Rozpoznanie po samym braku wezla kazalo
+/// `dir()` i `dirYaml()` meldowac zdrowo wygladajacy stan bezczynny wtedy, gdy serwer w ogole
+/// nie odpowiedzial — i konczyc sie zerem. Najpierw wiec `error.response`, potem DOKLADNE
+/// odpowiedzi serwera, a dopiero na koncu worek na wszystko inne.
+///
+/// Odpowiedz na 'detail' przechodzi tym samym sitem: `db.stream` jest w niej wezlem z nazwa
+/// strumienia, wiec udana odpowiedz daje `streams`, a przeladowanie planu miedzy 'get'
+/// a 'detail' — `idle` albo `stopping`, zamiast wyjatku o brakujacym `db.field`.
+answerVerdict classifyAnswer(const boost::property_tree::ptree &pt) {
+  if (pt.get_optional<std::string>("error.response")) return answerVerdict::noResponse;
+  if (pt.get_child_optional("db.stream")) return answerVerdict::streams;
+  const auto reason = pt.get_optional<std::string>("db");
+  if (!reason) return answerVerdict::malformed;
+  if (*reason == constants::kNoActivePlanReply) return answerVerdict::idle;
+  if (*reason == constants::kServerStoppingReply) return answerVerdict::stopping;
+  return answerVerdict::malformed;
+}
+
+/// Komunikat dla operatora, jeden na werdykt. Trzyma sie tu, przy klasyfikacji, bo kazde
+/// wywolanie 'get' opisuje ten sam stan serwera — komenda, ktora go zastala, niczego w nim
+/// nie zmienia.
+const char *describe(answerVerdict verdict) {
+  switch (verdict) {
+    case answerVerdict::streams:
+      return "server returned the stream list";
+    case answerVerdict::idle:
+      return "server has no plan loaded";
+    case answerVerdict::stopping:
+      return "server is shutting down";
+    case answerVerdict::noResponse:
+      return "server did not answer within the timeout";
+    case answerVerdict::malformed:
+      return "server response carries no stream list";
+  }
+  return "unknown server verdict";
+}
+
+/// Werdykt widziany przez operatora i przez kod wyjscia. Odpowiedz zepsuta idzie tu razem
+/// z brakiem odpowiedzi: dla wolajacego to ta sama porazka — listy nie ma — a rozroznia je
+/// komunikat z describe().
+selectResult toSelectResult(answerVerdict verdict) {
+  switch (verdict) {
+    case answerVerdict::streams:
+      return selectResult::ok;
+    case answerVerdict::idle:
+      return selectResult::noActivePlan;
+    case answerVerdict::stopping:
+      return selectResult::serverStopping;
+    case answerVerdict::noResponse:
+    case answerVerdict::malformed:
+      return selectResult::serverNoResponse;
+  }
+  return selectResult::serverNoResponse;
+}
+
 }  // namespace
 
 bool qry::reset(const std::string &planText) {
@@ -118,24 +185,15 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
   // i wywracała się wyjątkiem „No such node (db.stream)". Operator dostawał
   // komunikat o brakującym węźle zamiast informacji, że serwer nie zdążył
   // odpowiedzieć — a to dwie różne awarie i dwie różne naprawy (issue_215).
-  if (pt.get_optional<std::string>("error.response")) {
-    SPDLOG_ERROR("server did not answer the 'get' command within the timeout (stream: {})", input);
-    return selectResult::serverNoResponse;
-  }
-  const auto streamNode = pt.get_child_optional("db.stream");
-  if (!streamNode) {
-    // Instancja bezczynna ODPOWIADA — po prostu nie ma czego wyliczyc. Bez tego rozroznienia
-    // klient meldowal "server did not answer within the timeout", czyli obciazal serwer awaria,
-    // ktorej nie bylo, i kierowal diagnoze na IPC zamiast na brak planu.
-    if (const auto reason = pt.get_optional<std::string>("db"); reason && *reason == constants::kNoActivePlanReply) {
-      SPDLOG_ERROR("server has no plan loaded (stream: {})", input);
-      return selectResult::noActivePlan;
-    }
-    SPDLOG_ERROR("server response carries no stream list (stream: {})", input);
-    return selectResult::serverNoResponse;
+  // Rozpoznanie należy do `classifyAnswer`, wspólnego z `dir()`, `dirYaml()`
+  // i `detailNode()`: gdy każda z tych ścieżek miała własną kopię tej kolejności,
+  // trzy z nich się rozjechały i uznawały milczenie serwera za stan bezczynny.
+  if (const answerVerdict verdict = classifyAnswer(pt); verdict != answerVerdict::streams) {
+    SPDLOG_ERROR("{} (stream: {})", describe(verdict), input);
+    return toSelectResult(verdict);
   }
 
-  const bool found = std::ranges::any_of(*streamNode, [input, this](const auto &node) {
+  const bool found = std::ranges::any_of(pt.get_child("db.stream"), [input, this](const auto &node) {
     const ptree &v = node.second;
     bool ret       = (input == v.get<std::string>(""));
     if (ret) streamTable[input] = netClient("show", input);
@@ -264,6 +322,8 @@ const char *toString(selectResult result) {
       return "no data in stream";
     case selectResult::noActivePlan:
       return "server has no plan loaded (idle); load one with --reset";
+    case selectResult::serverStopping:
+      return "server is shutting down";
   }
   return "unknown";
 }
@@ -282,16 +342,21 @@ int qry::hello() {
   return system::errc::success;
 }
 
-std::string qry::dirYaml() {
+std::expected<std::string, selectResult> qry::dirYaml() {
   std::stringstream retval;
   ptree pt = netClient("get", "");
 
   retval << "---\napiVersion: xqry/v1\n";
+  const answerVerdict verdict = classifyAnswer(pt);
   // Instancja bez planu daje dokument z pusta lista, tak samo jak `--bus -y` przy pustej
   // magistrali. Konsument YAML-a ma dostac dokument, a nie wyjatek o brakujacym wezle.
-  if (!pt.get_child_optional("db.stream")) {
+  if (verdict == answerVerdict::idle) {
     retval << "streams: []\n";
     return retval.str();
+  }
+  if (verdict != answerVerdict::streams) {
+    SPDLOG_ERROR("qry::dirYaml: {}", describe(verdict));
+    return std::unexpected(toSelectResult(verdict));
   }
   retval << "streams:\n";
   for (const auto &v : pt.get_child("db.stream")) {
@@ -308,13 +373,19 @@ std::string qry::dirYaml() {
   return retval.str();
 }
 
-std::string qry::dir() {
+std::expected<std::string, selectResult> qry::dir() {
   std::stringstream retval;
   ptree pt = netClient("get", "");
-  // Instancja bez planu nie odsyla listy strumieni. Do 2026-09-05 get_child ponizej rzucalo
-  // wtedy "No such node (db.stream)", a wyjatek wychodzil do operatora jako "Std: ..." —
-  // komunikat o strukturze ptree zamiast o stanie serwera.
-  if (!pt.get_child_optional("db.stream")) return std::string(constants::kNoActivePlanReply) + "\n";
+  // Instancja bez planu nie odsyla listy strumieni, ale ODPOWIADA — i dostaje wlasny,
+  // niepusty wydruk. Do 2026-09-05 get_child ponizej rzucalo wtedy "No such node
+  // (db.stream)", a wyjatek wychodzil do operatora jako "Std: ..." — komunikat o strukturze
+  // ptree zamiast o stanie serwera.
+  const answerVerdict verdict = classifyAnswer(pt);
+  if (verdict == answerVerdict::idle) return std::string(constants::kNoActivePlanReply) + "\n";
+  if (verdict != answerVerdict::streams) {
+    SPDLOG_ERROR("qry::dir: {}", describe(verdict));
+    return std::unexpected(toSelectResult(verdict));
+  }
   // Klucz w ptree ("" to nazwa strumienia) i naglowek kolumny w wydruku.
   const std::array vcols{std::pair{std::string{""}, std::string{"name"}},
                          std::pair{std::string{"duration"}, std::string{"duration"}},
@@ -407,8 +478,17 @@ static std::string columnTable(const std::vector<std::string> &header, const std
   return retval;
 }
 
-std::optional<ptree> qry::detailNode(const std::string &input) {
+std::expected<ptree, selectResult> qry::detailNode(const std::string &input) {
   ptree pt = netClient("get", "");
+
+  // Brak listy strumieni nie jest niespodzianka w strukturze danych, tylko odpowiedzia.
+  // Do 2026-09-06 `get_child` ponizej rzucalo tu "No such node (db.stream)" — zarowno dla
+  // instancji bezczynnej, jak i dla milczacego serwera — a operator dostawal komunikat
+  // o wezle ptree zamiast o stanie serwera.
+  if (const answerVerdict verdict = classifyAnswer(pt); verdict != answerVerdict::streams) {
+    SPDLOG_ERROR("{} (stream: {})", describe(verdict), input);
+    return std::unexpected(toSelectResult(verdict));
+  }
 
   const auto streams = pt.get_child("db.stream");
   const bool found   = std::ranges::any_of(streams, [&input](const auto &node) {
@@ -417,15 +497,24 @@ std::optional<ptree> qry::detailNode(const std::string &input) {
   });
 
   if (!found) {
-    SPDLOG_ERROR("not found");
-    return std::nullopt;
+    SPDLOG_ERROR("not found: {}", input);
+    return std::unexpected(selectResult::streamNotFound);
   }
-  return netClient("detail", input);
+
+  // Drugi obrot IPC ma te same tryby porazki co pierwszy — i wlasny wyscig: plan moze zostac
+  // przeladowany MIEDZY 'get' a 'detail', wiec strumien policzony przed chwila juz nie
+  // istnieje. Bez tego sita `db.field` ponizej rzucalo w takim wyscigu wyjatkiem.
+  ptree detail = netClient("detail", input);
+  if (const answerVerdict verdict = classifyAnswer(detail); verdict != answerVerdict::streams) {
+    SPDLOG_ERROR("{} (stream: {})", describe(verdict), input);
+    return std::unexpected(toSelectResult(verdict));
+  }
+  return detail;
 }
 
-std::string qry::detailShow(const std::string &input) {
+std::expected<std::string, selectResult> qry::detailShow(const std::string &input) {
   const auto ptsh = detailNode(input);
-  if (!ptsh) return {};
+  if (!ptsh) return std::unexpected(ptsh.error());
 
   std::vector<std::vector<std::string>> fields;
   for (const auto &v : ptsh->get_child("db.field")) {
@@ -441,9 +530,9 @@ std::string qry::detailShow(const std::string &input) {
          "\n" + columnTable({"field", "type"}, fields);
 }
 
-std::string qry::detailShowYaml(const std::string &input) {
+std::expected<std::string, selectResult> qry::detailShowYaml(const std::string &input) {
   const auto ptsh = detailNode(input);
-  if (!ptsh) return {};
+  if (!ptsh) return std::unexpected(ptsh.error());
 
   std::stringstream retval;
   retval << "---\napiVersion: xqry/v1\n";

@@ -1,8 +1,8 @@
 #pragma once
 #include <cstdint>
+#include <expected>
 #include <map>
 #include <memory>
-#include <optional>
 #include <string>
 #include <string_view>
 
@@ -23,8 +23,11 @@ inline constexpr int kDefaultServerNoDataTimeoutMs{10'000};
 inline constexpr std::size_t kResetChunkBytes{400};
 inline constexpr int kDefaultClientResponseMaxFails{kIpcClientDefaultResponseMaxFails};
 
-/// Wynik `qry::select`. Rozróżnia tryby porażki, bo wszystkie trzy dawały
-/// wcześniej albo kod 0, albo mylący komunikat o innym błędzie (issue_215).
+/// Werdykt komendy wysłanej do serwera. Rozróżnia tryby porażki, bo wszystkie trzy dawały
+/// wcześniej albo kod 0, albo mylący komunikat o innym błędzie (issue_215). Wspólny dla
+/// wszystkich komend odpytujących serwer — `select`, `dir`/`dirYaml`, `detailShow*` — bo stan
+/// serwera nie zależy od tego, która komenda go zastała, więc jego nazwa i kod wyjścia też
+/// nie mogą.
 ///
 /// Zasada: klient, który nie przeczytał ani jednego elementu, NIGDY nie kończy
 /// się sukcesem. Cichy sukces bez danych wygląda w harnessie i w CI dokładnie
@@ -35,7 +38,8 @@ enum class selectResult : std::uint8_t {
   serverNoResponse,    ///< serwer nie odpowiedział na komendę w wyznaczonym czasie
   clientQueueMissing,  ///< serwer nie utworzył kolejki odpowiedzi tego klienta
   noData,              ///< dołączono do strumienia, ale nie przyszedł ani jeden element
-  noActivePlan         ///< serwer odpowiedział, ale nie ma wczytanego planu (tryb bezczynny)
+  noActivePlan,        ///< serwer odpowiedział, ale nie ma wczytanego planu (tryb bezczynny)
+  serverStopping       ///< serwer odpowiedział, ale właśnie się zamyka
 };
 
 /// Nazwa trybu do komunikatu dla operatora.
@@ -48,10 +52,10 @@ class qry {
   std::unique_ptr<IpcClient> transport_;
   std::unique_ptr<Formatter> formatter_;
 
-  /// Odpowiedz serwera na 'detail' albo puste, gdy serwer nie zna tej nazwy strumienia.
-  /// Wspolna dla obu form wydruku detalu, bo rozstrzygniecie "jest / nie ma" nalezy do
-  /// serwera i nie moze zalezec od wybranego formatu.
-  std::optional<boost::property_tree::ptree> detailNode(const std::string & /*input*/);
+  /// Odpowiedz serwera na 'detail' albo werdykt, dlaczego jej nie ma. Wspolna dla obu form
+  /// wydruku detalu, bo rozstrzygniecie "jest / nie ma" nalezy do serwera i nie moze zalezec
+  /// od wybranego formatu.
+  std::expected<boost::property_tree::ptree, selectResult> detailNode(const std::string & /*input*/);
 
  public:
   formatMode outputFormatMode{formatMode::RAW};
@@ -71,11 +75,18 @@ class qry {
   /// bezczynnego. Powod odmowy — komunikat serwera — trafia na stderr, bo jest to jedyna
   /// rzecz, ktora operator moze z ta odmowa zrobic.
   bool reset(const std::string & /*planText*/);
-  std::string dir();
-  std::string dirYaml();
+
+  /// Lista strumieni albo werdykt, dlaczego jej nie ma. Instancja bezczynna ma tu WARTOSC
+  /// (wlasny, niepusty wydruk), bo odpowiedziala — porazka jest zarezerwowana dla serwera,
+  /// ktory listy nie dostarczyl.
+  std::expected<std::string, selectResult> dir();
+  std::expected<std::string, selectResult> dirYaml();
   int hello();
-  std::string detailShow(const std::string & /*input*/);
-  std::string detailShowYaml(const std::string & /*input*/);
+  /// Wydruk detalu strumienia albo werdykt. Pusty wydruk nie odrozniał nieznanej nazwy od
+  /// milczacego serwera i od instancji bez planu — wszystkie trzy konczyly sie tym samym
+  /// kodem wyjscia i bez slowa na stderr, mimo ze kazdy z nich to inna naprawa.
+  std::expected<std::string, selectResult> detailShow(const std::string & /*input*/);
+  std::expected<std::string, selectResult> detailShowYaml(const std::string & /*input*/);
   virtual boost::property_tree::ptree netClient(const std::string & /*cmd*/, const std::string & /*arg*/);
   virtual ~qry();
 };

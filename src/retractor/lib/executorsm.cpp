@@ -711,7 +711,7 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
       // przepuszczala komendy przez wszystkie `if`-y i odsylala PUSTE ptree, a klient
       // meldowal brak kolejki odpowiedzi i wskazywal winnego po drugiej stronie IPC.
       if (pProc == nullptr) {
-        ptRetval.put("db", iLoopLimitCnt == executorsm::stop_now ? std::string("server stopping")
+        ptRetval.put("db", iLoopLimitCnt == executorsm::stop_now ? std::string(constants::kServerStoppingReply)
                                                                  : std::string(constants::kNoActivePlanReply));
         return ptRetval;
       }

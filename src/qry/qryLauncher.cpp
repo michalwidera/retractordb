@@ -32,6 +32,29 @@ using boost::property_tree::ptree;
 
 namespace IPC = boost::interprocess;
 
+/// Kod wyjscia dla werdyktu serwera. Wspolny dla --dir, --detail i --select, bo werdykt
+/// opisuje stan serwera, a nie komende, ktora go zastala: to samo zamykanie sie instancji nie
+/// moze konczyc jednej komendy jako timeout, a drugiej jako brak pliku.
+static int exitCodeFor(selectResult result) {
+  switch (result) {
+    case selectResult::ok:
+      return system::errc::success;
+    case selectResult::streamNotFound:
+      return system::errc::no_such_file_or_directory;
+    case selectResult::serverNoResponse:
+      return system::errc::timed_out;
+    case selectResult::clientQueueMissing:
+      return system::errc::no_stream_resources;
+    case selectResult::noData:
+      return system::errc::no_message_available;
+    case selectResult::noActivePlan:
+      return system::errc::no_such_file_or_directory;
+    case selectResult::serverStopping:
+      return system::errc::operation_canceled;
+  }
+  return system::errc::interrupted;
+}
+
 /// Czy obiekty IPC instancji o tej nazwie da sie otworzyc. Pusta nazwa to instancja
 /// historyczna (bez `--name`), dokladnie jak w routingu.
 static bool serverReachable(std::string_view serverName) {
@@ -342,7 +365,15 @@ int main(int argc, char *argv[]) {
     if (vm.contains("kill") && elemLimit == 0) {
       obj.netClient("kill", "");
     } else if (vm.contains("dir")) {
-      std::print("{}", vm.contains("yaml") ? obj.dirYaml() : obj.dir());
+      // Przedtem KAZDA odpowiedz bez listy strumieni — takze brak odpowiedzi — wygladala jak
+      // instancja bezczynna i konczyla sie zerem. Teraz stan serwera przychodzi tu werdyktem,
+      // a instancja bezczynna ma wartosc (wlasny wydruk), nie porazke.
+      const auto listing = vm.contains("yaml") ? obj.dirYaml() : obj.dir();
+      if (!listing) {
+        std::println(std::cerr, "xqry: {}", toString(listing.error()));
+        return exitCodeFor(listing.error());
+      }
+      std::print("{}", *listing);
     } else if (vm.contains("reset")) {
       // Plik czyta KLIENT, nie serwer: usluga chodzi zwykle na innym koncie (User=retractor
       // w jednostce systemd) i pliku operatora zwyczajnie nie otworzy. Kanalem IPC idzie
@@ -360,35 +391,24 @@ int main(int argc, char *argv[]) {
     } else if (vm.contains("adhoc") && !sAdHoc.empty()) {
       if (obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
     } else if (vm.contains("detail")) {
-      auto ret = vm.contains("yaml") ? obj.detailShowYaml(sDetailStream) : obj.detailShow(sDetailStream);
-      if (!ret.empty()) {
-        std::print("{}", ret);
-      } else
-        return system::errc::no_such_file_or_directory;
+      // Ten sam werdykt i ten sam kod wyjscia co dla --dir i --select. Przedtem kazda porazka
+      // — literowka w nazwie, milczacy serwer, instancja bez planu — wychodzila stad jako
+      // no_such_file_or_directory i bez slowa na stderr.
+      const auto detail = vm.contains("yaml") ? obj.detailShowYaml(sDetailStream) : obj.detailShow(sDetailStream);
+      if (!detail) {
+        std::println(std::cerr, "xqry: {}: {}", sDetailStream, toString(detail.error()));
+        return exitCodeFor(detail.error());
+      }
+      std::print("{}", *detail);
     } else if (vm.contains("select") && sInputStream != "none") {
       // Tryby porażki są rozróżnialne po kodzie wyjścia (issue_215). Przedtem
       // wszystkie kończyły się albo zerem, albo `no_such_file_or_directory`,
       // więc harness nie umiał odróżnić przeciążonego serwera od literówki
       // w nazwie strumienia — a to inna diagnoza i inna naprawa.
       const selectResult result = obj.select(vm, elemLimit, sInputStream, gnuplotDim, obj.gnuplotRightToLeft);
-      switch (result) {
-        case selectResult::ok:
-          break;
-        case selectResult::streamNotFound:
-          std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
-          return system::errc::no_such_file_or_directory;
-        case selectResult::serverNoResponse:
-          std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
-          return system::errc::timed_out;
-        case selectResult::clientQueueMissing:
-          std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
-          return system::errc::no_stream_resources;
-        case selectResult::noData:
-          std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
-          return system::errc::no_message_available;
-        case selectResult::noActivePlan:
-          std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
-          return system::errc::no_such_file_or_directory;
+      if (result != selectResult::ok) {
+        std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
+        return exitCodeFor(result);
       }
     } else {
       SPDLOG_ERROR("no argument.");
