@@ -7,7 +7,8 @@
 #   3. nieznana nazwa konczy sie "nie ma takiego strumienia", a NIE timeoutem,
 #   4. komenda dotyczaca calej instancji (-k, -d) przy dwoch zywych zada --server,
 #   5. ad-hoc przez granice serwera jest odrzucany i NIE zmienia planu zadnego z nich,
-#   6. --bus nad OSIEROCONYM segmentem wraca natychmiast, a nie po budzecie klienta.
+#   6. --bus nad OSIEROCONYM segmentem wraca natychmiast, a nie po budzecie klienta,
+#   7. -w czeka na instancje wskazana przez routing, a nie na bezimienna.
 #
 # Punkt (6) jest regresja na zasadzie projektowa etapu 2b/2c: wykrywanie instancji nie moze
 # polegac na odpytywaniu serwerow z timeoutem, bo osierocony segment jest nieodroznialny od
@@ -185,12 +186,44 @@ expect_failure xqry -a 'RULE r_none ON nosuchstream WHEN nosuchstream[0] > 0 DO 
 grep -q -- '--server' expect_out.txt || {
   echo "regula na nieznanym strumieniu nie zazadala --server:"; cat expect_out.txt; exit 1; }
 
-xqry --server alfa -k
+# (7) -w/--wait-server czeka na instancje WSKAZANA PRZEZ ROUTING, a nie na bezimienna.
+#     Czekanie rozstrzygane przed routingiem pytalo o obiekty IPC instancji bez nazwy, wiec
+#     przy samych nazwanych instancjach `xqry -l -w` konczylo sie timeoutem, choc to samo
+#     `xqry -l` dzialalo. Mierzymy czas, bo objawem bledu jest wlasnie wyczerpanie budzetu
+#     (domyslnie 30 s), a nie zly komunikat.
+#
+#     Przy DWOCH zywych instancjach komenda bez adresata ma odmowic natychmiast: routing i tak
+#     nie wskaze celu, wiec czekanie na cokolwiek byloby czekaniem na nic.
+start_ns=$(date +%s%N)
+expect_failure xqry -l -w
+elapsed_ms=$(( ($(date +%s%N) - start_ns) / 1000000 ))
+grep -q -- '--server' expect_out.txt || {
+  echo "xqry -l -w przy dwoch instancjach nie zazadal --server:"; cat expect_out.txt; exit 1; }
+if [ "$elapsed_ms" -ge 5000 ]; then
+  echo "xqry -l -w przy dwoch instancjach trwalo ${elapsed_ms} ms -- czekanie zamiast odmowy?"
+  exit 1
+fi
+
 xqry --server beta -k
-wait "$pid_a" 2>/dev/null || true
 wait "$pid_b" 2>/dev/null || true
-pid_a=""
 pid_b=""
+
+#     Przy JEDNEJ zywej instancji, i to nazwanej, czekanie musi ja znalezc przez magistrale.
+start_ns=$(date +%s%N)
+xqry -l -w || {
+  echo "xqry -l -w nie doczekal sie jedynej zywej instancji alfa"; exit 1; }
+elapsed_ms=$(( ($(date +%s%N) - start_ns) / 1000000 ))
+if [ "$elapsed_ms" -ge 5000 ]; then
+  echo "xqry -l -w przy jednej nazwanej instancji trwalo ${elapsed_ms} ms -- routing pominiety?"
+  exit 1
+fi
+xqry -s dsta -m 1 -w > wait_out.txt || {
+  echo "xqry -s dsta -w nie doczekal sie wlasciciela strumienia"; cat wait_out.txt; exit 1; }
+assert_values wait_out.txt '^(11|21|31|41|51|61)[[:space:]]*$' "wait/dsta"
+
+xqry --server alfa -k
+wait "$pid_a" 2>/dev/null || true
+pid_a=""
 
 # (6) Osierocony segment nie moze kosztowac budzetu klienta. Po zamknieciu obu serwerow
 #     segment /dev/shm/xrdbbus ZOSTAJE (nikt go nie kasuje, bo skasowanie zywego zerwaloby

@@ -525,10 +525,24 @@ beta   | 249248 | .../plans/beta.rql | srcb, dstb
 
 Brak żywych instancji: pusty stdout, jedna linia na stderr, kod `0`.
 
-### Czego 2c nie objęło
+### Czekanie a routing (uzupełnienie 2c)
 
-- `-w/--wait-server` nadal czeka na nazwy podane jawnie (albo historyczne), bo routing wymaga
-  żywej instancji, a `-w` służy dokładnie sytuacji, w której jej jeszcze nie ma.
+`-w/--wait-server` czekało pierwotnie wyłącznie na nazwę podaną jawnie (albo historyczną), bo
+routing wymaga żywej instancji, a `-w` służy sytuacji, w której jej jeszcze nie ma. Cena tego
+uproszczenia była jednak wyższa niż korzyść: przy jednej **nazwanej** instancji `xqry -l`
+działało, a `xqry -l -w` kończyło się timeoutem, bo czekanie pytało o obiekty IPC instancji
+bezimiennej.
+
+Czekanie odpytuje więc magistralę w pętli i rozstrzyga cel tymi samymi regułami, co wysyłka:
+
+- pusta magistrala → nazwa pusta, czyli zachowanie sprzed 2c (czekamy na instancję historyczną),
+- jedna żywa instancja → czekamy na **nią**, także gdy ma nazwę,
+- rozstrzygnięcie inne niż `Resolved` (dwie żywe instancje przy komendzie bez adresata, obcy
+  strumień, ad-hoc przez granicę) kończy czekanie natychmiast — czekanie tego nie zmieni, a
+  komunikat routingu jest treściwszy niż timeout.
+
+Jawny `--server` i `RDB_NAMESPACE` pozostają nadrzędne: wskazują instancję wprost, więc czekanie
+idzie po nazwie i nie dotyka magistrali. Sprawdza to punkt (7) w `it_multiserver_routing`.
 
 ---
 

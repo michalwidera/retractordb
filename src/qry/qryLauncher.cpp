@@ -31,19 +31,34 @@ using boost::property_tree::ptree;
 
 namespace IPC = boost::interprocess;
 
+/// Czy obiekty IPC instancji o tej nazwie da sie otworzyc. Pusta nazwa to instancja
+/// historyczna (bez `--name`), dokladnie jak w routingu.
+static bool serverReachable(std::string_view serverName) {
+  try {
+    const ipc::ServerNames names = ipc::names(serverName);
+    IPC::managed_shared_memory seg(IPC::open_only, names.shmemSegment.c_str());
+    IPC::message_queue mq(IPC::open_only, names.queryQueue.c_str());
+    return true;
+  } catch (...) {
+    return false;
+  }
+}
+
+/// Migawka magistrali: czysty odczyt seqlockiem, bez muteksu i BEZ kontaktu z serwerami.
+/// Klient nie zakłada segmentu (`createIfMissing = false`) — jego brak znaczy dokładnie
+/// tyle, że żaden serwer nie wystartował.
+static std::vector<bus::InstanceInfo> busSnapshot() {
+  const bus::Bus xrdbbus(bus::segmentName(), /*createIfMissing=*/false);
+  return xrdbbus.instances();
+}
+
 static bool waitForServer(int maxSeconds, int pollIntervalMs, std::string_view serverName) {
   const int safeSeconds      = std::max(1, maxSeconds);
   const int safePollInterval = std::max(1, pollIntervalMs);
   const int maxAttempts      = std::max(1, safeSeconds * 1000 / safePollInterval);
   for (int i = 0; i < maxAttempts; ++i) {
-    try {
-      const ipc::ServerNames names = ipc::names(serverName);
-      IPC::managed_shared_memory seg(IPC::open_only, names.shmemSegment.c_str());
-      IPC::message_queue mq(IPC::open_only, names.queryQueue.c_str());
-      return true;
-    } catch (...) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(safePollInterval));
-    }
+    if (serverReachable(serverName)) return true;
+    std::this_thread::sleep_for(std::chrono::milliseconds(safePollInterval));
   }
   return false;
 }
@@ -76,6 +91,34 @@ static routing::Resolution resolveTarget(const boost::program_options::variables
   if (vm.contains("detail")) return routing::forStream(instances, detail);
   if (vm.contains("select") && stream != "none") return routing::forStream(instances, stream);
   return routing::forSingleTarget(instances);
+}
+
+/// Czekanie na instancje docelowa, gdy nie wskazano jej jawnie.
+///
+/// Nazwy instancji nie da sie tu ustalic raz na wejsciu: bez `--server` i bez RDB_NAMESPACE
+/// wskazuje ja dopiero routing po magistrali, a magistrala jest pusta wlasnie wtedy, gdy `-w`
+/// ma sens. Czekanie odpytuje wiec magistrale w petli i rozstrzyga cel tymi samymi regulami,
+/// co wysylka nizej; inaczej `xqry -l -w` przy jednej NAZWANEJ instancji czekaloby na obiekty
+/// instancji bezimiennej, czyli do wyczerpania budzetu.
+///
+/// Pusta magistrala daje `forSingleTarget({})`, czyli nazwe pusta -- zachowanie sprzed etapu 2c
+/// zostaje nietkniete i dla instancji bezimiennej czekamy dokladnie tak jak dawniej.
+///
+/// Rozstrzygniecie inne niz Resolved (dwie zywe instancje przy komendzie bez adresata, obcy
+/// strumien, ad-hoc przez granice) konczy czekanie od razu: czekanie tego nie zmieni, a
+/// komunikat dla operatora nalezy do routingu nizej i jest tresciwszy niz timeout.
+static bool waitForRoutedServer(int maxSeconds, int pollIntervalMs, const boost::program_options::variables_map &vm,
+                                int elemLimit, const std::string &stream, const std::string &detail, const std::string &adHoc) {
+  const int safeSeconds      = std::max(1, maxSeconds);
+  const int safePollInterval = std::max(1, pollIntervalMs);
+  const int maxAttempts      = std::max(1, safeSeconds * 1000 / safePollInterval);
+  for (int i = 0; i < maxAttempts; ++i) {
+    const routing::Resolution resolved = resolveTarget(vm, busSnapshot(), elemLimit, stream, detail, adHoc);
+    if (resolved.status != routing::Status::Resolved) return true;
+    if (serverReachable(resolved.serverName)) return true;
+    std::this_thread::sleep_for(std::chrono::milliseconds(safePollInterval));
+  }
+  return false;
 }
 
 int main(int argc, char *argv[]) {
@@ -215,7 +258,15 @@ int main(int argc, char *argv[]) {
       return system::errc::invalid_argument;
     }
     if (vm.contains("wait-server") && !vm.contains("help")) {
-      if (!waitForServer(appCfg.timingServerStartupWaitSeconds, appCfg.timingServerStartupPollIntervalMs, sServerName)) {
+      // Jawny `--server` (i przestrzen nazw, ktora go zastepuje) wskazuje instancje wprost, wiec
+      // czekamy na nia po nazwie. Bez nich adresata wskazuje magistrala -- i czekanie musi to
+      // wykrywanie objac, inaczej mija sie z jedyna zywa instancja tylko dlatego, ze ma nazwe.
+      const bool ready =
+          (!vm.contains("server") && runNamespace.empty())
+              ? waitForRoutedServer(appCfg.timingServerStartupWaitSeconds, appCfg.timingServerStartupPollIntervalMs, vm,
+                                    elemLimit, sInputStream, sDetailStream, sAdHoc)
+              : waitForServer(appCfg.timingServerStartupWaitSeconds, appCfg.timingServerStartupPollIntervalMs, sServerName);
+      if (!ready) {
         SPDLOG_ERROR("server not available after {} seconds", appCfg.timingServerStartupWaitSeconds);
         return system::errc::no_child_process;
       }
@@ -230,13 +281,7 @@ int main(int argc, char *argv[]) {
       return system::errc::success;
     }
 
-    // Migawka magistrali: czysty odczyt seqlockiem, bez muteksu i BEZ kontaktu z serwerami.
-    // Klient nie zakłada segmentu (`createIfMissing = false`) — jego brak znaczy dokładnie
-    // tyle, że żaden serwer nie wystartował.
-    const std::vector<bus::InstanceInfo> liveInstances = [] {
-      const bus::Bus xrdbbus(bus::segmentName(), /*createIfMissing=*/false);
-      return xrdbbus.instances();
-    }();
+    const std::vector<bus::InstanceInfo> liveInstances = busSnapshot();
 
     if (vm.contains("bus")) {
       const std::vector<std::string> lines =
