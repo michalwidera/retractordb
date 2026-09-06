@@ -148,6 +148,7 @@ enum class ClaimStatus : std::uint8_t {
   Claimed,          ///< slot zajety, nazwy strumieni rozlaczne ze wszystkimi zywymi instancjami
   Conflict,         ///< nazwa strumienia nalezy juz do zywej instancji
   CounterConflict,  ///< plik licznika :ROTATION jest juz uzywany przez zywa instancje
+  ServiceConflict,  ///< zywa instancja pracuje juz w trybie uslugowym; usluga jest dokladnie jedna
   TooLarge,         ///< plan przekracza pojemnosc slotu
   NoFreeSlot,       ///< wszystkie sloty zajete przez zywe instancje
   Unavailable,      ///< magistrali nie da sie uzyc; start bez egzekwowania rozlacznosci
@@ -214,6 +215,12 @@ class Bus {
   /// wartosc przy starcie, a zapisuje ja dopiero w destruktorze, wiec dwie instancje na jednym
   /// pliku zapisuja te sama wartosc i gubia rotacje. Sciezke normalizuje WOLAJACY -- magistrala
   /// porownuje napisy, a nie pliki.
+  ///
+  /// Tu tez zapada rozstrzygniecie "usluga jest dokladnie jedna" (mode::kService). Kontrola musi
+  /// byc TUTAJ, a nie u wolajacego przed roszczeniem: instances() czyta seqlockiem, bez muteksu,
+  /// wiec instancja miedzy sprawdzeniem a zapisem swojego slotu jest dla drugiej niewidoczna
+  /// i dwa rownolegle starty z roznymi nazwami przechodzily oba. claim() jest jedynym miejscem,
+  /// w ktorym maska trybow trafia do slotu, wiec pod jego muteksem sprawdzenie jest atomowe.
   ClaimResult claim(const ClaimRequest &request);
 
   /// Rezerwuje nazwy strumieni i licznik rotacji dla nastepnego planu w JUZ posiadanym

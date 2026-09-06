@@ -507,6 +507,41 @@ TEST_F(BusFixture, SlotCarriesRunModes) {
   EXPECT_EQ(plain[0].modes, 0U);
 }
 
+// Usluga jest dokladnie jedna, a rozstrzyga to magistrala pod swoim muteksem. Kontrola stala
+// wczesniej u wolajacego, przed roszczeniem, na migawce instances() -- czyli na odczycie
+// seqlockiem, bez muteksu. Instancja miedzy sprawdzeniem a zapisem swojego slotu byla dla
+// drugiej niewidoczna, wiec dwa rownolegle starty z ROZNYMI nazwami (blokada plikowa jest per
+// nazwa) przechodzily oba. Test odtwarza to bez wyscigu: dwa roszczenia w jednym procesie sa
+// serializowane tym samym muteksem co dwa procesy, a slot pierwszej instancji juz istnieje.
+TEST_F(BusFixture, SecondServiceInstanceIsRefused) {
+  bus::Bus first(kTestSegment);
+  bus::Bus second(kTestSegment);
+
+  ASSERT_EQ(first.claim({.name = "alfa", .queryFile = "alfa.rql", .modes = bus::mode::kService, .streams = {"dsta"}}).status,
+            bus::ClaimStatus::Claimed);
+
+  // Nazwy strumieni i licznik sa rozlaczne -- odmowa moze wynikac wylacznie z trybu pracy.
+  const auto refused =
+      second.claim({.name = "beta", .queryFile = "beta.rql", .modes = bus::mode::kService, .streams = {"dstb"}});
+  EXPECT_EQ(refused.status, bus::ClaimStatus::ServiceConflict);
+  EXPECT_EQ(refused.ownerName, "alfa");
+  EXPECT_EQ(refused.ownerPid, static_cast<std::int32_t>(getpid()));
+
+  // Powod nadrzedny: druga usluga z tym samym planem koliduje takze na nazwie strumienia,
+  // ale operatorowi ma wrocic regula jednej uslugi -- tej nie obejdzie zmiana nazw strumieni.
+  EXPECT_EQ(second.claim({.name = "beta", .queryFile = "alfa.rql", .modes = bus::mode::kService, .streams = {"dsta"}}).status,
+            bus::ClaimStatus::ServiceConflict);
+
+  // Odmowa dotyczy WYLACZNIE drugiej uslugi: zwykly serwer wstaje obok niej bez przeszkod.
+  EXPECT_EQ(second.claim({.name = "beta", .queryFile = "beta.rql", .streams = {"dstb"}}).status, bus::ClaimStatus::Claimed);
+
+  // Slot zwolniony przez usluge przestaje blokowac nastepna.
+  first.release();
+  bus::Bus third(kTestSegment);
+  EXPECT_EQ(third.claim({.name = "gamma", .queryFile = "gamma.rql", .modes = bus::mode::kService, .streams = {"dstc"}}).status,
+            bus::ClaimStatus::Claimed);
+}
+
 // Sciezka dluzsza niz pole slotu jest odmowa, nie cichym obcieciem: obciety napis zrownalby
 // dwa rozne pliki licznika albo rozdzielil jeden.
 TEST_F(BusFixture, OversizedCounterPathIsRefused) {

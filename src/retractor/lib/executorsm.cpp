@@ -398,6 +398,11 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
         // wiec claimAdditional nigdy nie porownuje sciezki licznika.
         FatalError("executorsm::getAdHoc: bus reported a rotation counter conflict for an adhoc query");
         break;
+      case bus::ClaimStatus::ServiceConflict:
+        // Nieosiagalne: tryb pracy jest wlasnoscia URUCHOMIENIA i trafia do slotu wylacznie
+        // w claim(); claimAdditional dopisuje nazwy strumieni i maski trybow nie oglada.
+        FatalError("executorsm::getAdHoc: bus reported a service mode conflict for an adhoc query");
+        break;
       case bus::ClaimStatus::TooLarge:
       case bus::ClaimStatus::NoFreeSlot: {
         const std::string message = "Rejected: cannot register adhoc streams on the xrdbbus bus: " + claimed.detail;
@@ -487,6 +492,10 @@ std::string executorsm::validatePlanText(const std::string &planText) {
         return "Rejected: rotation counter file '" + claimed.detail + "' is already used by " + owner + " (pid " +
                std::to_string(claimed.ownerPid) + ")";
       }
+      case bus::ClaimStatus::ServiceConflict:
+        // Nieosiagalne z tego samego powodu co w getAdHoc: reservePlan nie dotyka maski trybow.
+        FatalError("executorsm::validatePlanText: bus reported a service mode conflict");
+        break;
       case bus::ClaimStatus::TooLarge:
       case bus::ClaimStatus::NoFreeSlot:
         return "Rejected: cannot register the replacement plan on the xrdbbus bus: " + claimed.detail;

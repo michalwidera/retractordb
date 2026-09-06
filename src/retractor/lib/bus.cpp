@@ -483,6 +483,25 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
       continue;
     }
 
+    // Serwerow zwyklych moze pracowac wiele; USLUGA jest dokladnie jedna. Dwie instancje
+    // uslugowe to dwa procesy, ktore systemd i operator traktuja jak jeden byt: obie
+    // odpowiadaja na `--reset`, obie pisza do pliku zapytan uslugi i obie sprowadzaja go do
+    // stanu zerowego po bledzie krytycznym. Blokada nazwy zatrzymuje tylko druga usluge
+    // bezimienna (obie chca nazwy "service"), bo jest per nazwa; usluga nazwana recznie
+    // przechodzila obok niej. Wlasnego slotu nie trzeba tu pomijac: claim() zaczyna od
+    // release(), wiec w tej petli go juz nie ma.
+    //
+    // Sprawdzane PRZED strumieniami i licznikiem: druga usluga startowana z tego samego planu
+    // koliduje jednoczesnie na obu, a operatorowi ma wrocic powod nadrzedny -- reguly jednej
+    // uslugi nie obejdzie zmiana nazw strumieni.
+    if ((request.modes & mode::kService) != 0U && (scratch->modes & mode::kService) != 0U) {
+      retVal.status    = ClaimStatus::ServiceConflict;
+      retVal.ownerName = loadString(scratch->name, kInstanceNameSize);
+      retVal.ownerPid  = scratch->pid;
+      impl->unlock();
+      return retVal;
+    }
+
     if (const auto owned = collidingStream(*scratch, streams)) {
       retVal.status    = ClaimStatus::Conflict;
       retVal.stream    = *owned;

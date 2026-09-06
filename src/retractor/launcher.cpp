@@ -668,23 +668,9 @@ int main(int argc, char *argv[]) try {
       (vm.contains("until-eof") ? bus::mode::kUntilEof : 0U) |
       (loopLimitVar != executorsm::inifitie_loop ? bus::mode::kLoopLimit : 0U) |
       (vm.contains("xqrywait") ? bus::mode::kXqryWait : 0U) | (serviceMode ? bus::mode::kService : 0U);
-  // Serwerow zwyklych moze pracowac wiele; USLUGA jest dokladnie jedna. Blokada nazwy
-  // zatrzymuje druga usluge bezimienna (obie chca nazwy "service"), ale nie zatrzymalaby
-  // uslugi nazwanej recznie — a dwie instancje w trybie uslugowym to dwa procesy, ktore
-  // systemd i operator traktuja jak jeden byt: obie odpowiadaja na `--reset`, obie pisza do
-  // pliku zapytan uslugi i obie sprowadzaja go do stanu zerowego po bledzie krytycznym.
-  // Migawka magistrali zawiera wylacznie instancje ZYWE (bus::instances filtruje po /proc).
-  if ((runModes & bus::mode::kService) != 0U) {
-    for (const auto &live : xrdbbus.instances()) {
-      if ((live.modes & bus::mode::kService) == 0U) continue;
-      if (live.name == earlyServerName) continue;  // wlasny, jeszcze nie zwolniony slot
-      std::cerr << "xretractor: a service instance is already running as " << ownerLabel(live.name) << " (pid " << live.pid
-                << "); only one service instance is allowed\n";
-      SPDLOG_ERROR("Refused: a service instance is already running as {} (pid {}).", ownerLabel(live.name), live.pid);
-      return system::errc::device_or_resource_busy;
-    }
-  }
-
+  // Reguly "usluga jest dokladnie jedna" pilnuje Bus::claim() pod muteksem magistrali — patrz
+  // komentarz przy jego deklaracji. Sprawdzenie po migawce instances() przed roszczeniem bylo
+  // nieatomowe i przepuszczalo dwa rownolegle starty z roznymi nazwami.
   const bus::ClaimResult claimed = xrdbbus.claim({.name        = earlyServerName,
                                                   .queryFile   = queryFile,
                                                   .unit        = systemd.unit.value_or(std::string{}),
@@ -707,6 +693,13 @@ int main(int argc, char *argv[]) try {
       std::cerr << "xretractor: rotation counter file '" << claimed.detail << "' is already used by " << owner << " (pid "
                 << claimed.ownerPid << ")\n";
       SPDLOG_ERROR("Rotation counter file '{}' is already used by {} (pid {}).", claimed.detail, owner, claimed.ownerPid);
+      return system::errc::device_or_resource_busy;
+    }
+    case bus::ClaimStatus::ServiceConflict: {
+      const std::string owner = ownerLabel(claimed.ownerName);
+      std::cerr << "xretractor: a service instance is already running as " << owner << " (pid " << claimed.ownerPid
+                << "); only one service instance is allowed\n";
+      SPDLOG_ERROR("Refused: a service instance is already running as {} (pid {}).", owner, claimed.ownerPid);
       return system::errc::device_or_resource_busy;
     }
     case bus::ClaimStatus::TooLarge:
