@@ -1,6 +1,6 @@
 #!/bin/bash
 # Bramka --xqrywait (-x) wstrzymuje przetwarzanie do pierwszej komendy klienta.
-# Ten test pilnuje dwoch niezaleznych wlasnosci tej bramki.
+# Ten test pilnuje trzech niezaleznych wlasnosci tej bramki.
 #
 # Pulapka 1 -- zgubiona pobudka. Watek komunikacyjny podnosil bramke tylko wtedy, gdy
 # widzial juz flage oczekiwania, a watek glowny ustawial ja DOPIERO po zbudowaniu
@@ -14,7 +14,12 @@
 # `xretractor -m 5` konczyl sie sam, `xretractor -x -m 5` chodzil bez konca. To wlasnosc
 # deterministyczna, bez zadnego wyscigu.
 #
-# Obserwabla jest w obu przypadkach ta sama i jednoznaczna: przy -m 5 serwer, ktoremu
+# Pulapka 3 -- bramka nie do zdjecia sygnalem. Czekanie bylo bezterminowe i pilnowalo
+# wylacznie zatrzasku pierwszej komendy, a handleSignal() ustawia sam licznik petli, bo
+# notify_all nie jest async-signal-safe. Proces, do ktorego nie przyszla ani jedna komenda,
+# przezywal wiec SIGTERM i schodzil dopiero na SIGKILL. Rowniez deterministyczna.
+#
+# Obserwabla jest w pierwszych dwoch przypadkach ta sama i jednoznaczna: przy -m 5 serwer, ktoremu
 # bramka zostala podniesiona, konczy sie SAM po budzecie. Zawieszona bramka albo
 # skasowany budzet znacza proces, ktory zyje dalej. Nie parsujemy stdout serwera --
 # przy przekierowaniu do pliku jest on buforowany blokowo i klamie.
@@ -79,3 +84,28 @@ for attempt in 1 2 3; do
   fi
   server_wait_exit
 done
+
+# --- Wlasnosc 3: zatrzymanie zdejmuje bramke (deterministyczna) ---
+# Czekanie na bramce bylo BEZTERMINOWE i pilnowalo wylacznie zatrzasku pierwszej komendy.
+# handleSignal() ustawia sam licznik petli (notify_all nie jest async-signal-safe), wiec nie
+# bylo komu przerwac czekania: `xretractor -x`, do ktorego nie przyszla ani jedna komenda,
+# przezywal SIGTERM i schodzil dopiero na SIGKILL — systemd czekal na to caly TimeoutStopSec.
+# Zadnej komendy tu nie wysylamy, bo badana jest wlasnie droga BEZ komendy.
+rm -rf temp
+mkdir -p temp
+server_start small.rql -k -x
+kill -TERM "$_server_pid"
+if ! wait_for_exit "$_server_pid"; then
+  echo "bramka -x nie zostala zdjeta przez SIGTERM: serwer zyje 15 s po sygnale"
+  exit 1
+fi
+server_wait_exit
+
+# Zatrzymanie na bramce nie ma prawa policzyc ani jednego kroku: rekord zerowy trafialby do
+# magazynu, choc nikt o niego nie prosil. Plik danych strumienia wynikowego ma zostac pusty
+# (sam plik i jego `.desc` powstaja wczesniej, przy budowie modelu).
+if [ -s temp/dst ]; then
+  echo "serwer zatrzymany na bramce -x zapisal rekordy do magazynu:"
+  ls -l temp/dst
+  exit 1
+fi

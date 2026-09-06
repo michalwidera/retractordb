@@ -103,6 +103,21 @@ std::atomic<bool> planResetRequested{false};
 /// Tresc przyjetego zestawu RQL. Chroniona przez core_mutex.
 std::string pendingPlanText;
 
+/// Czy trwa wymiana planu: od PRZYJECIA zestawu az do aktywacji jego rezerwacji na magistrali.
+/// Osobna od planResetRequested, bo tamta gasnie na POCZATKU wymiany, a rezerwacja zyje jeszcze
+/// przez cale budowanie planu. Roznica byla dziura: gniazdo magistrali trzyma DOKLADNIE JEDNA
+/// rezerwacje, wiec reset przyjety w oknie miedzy zabraniem tekstu a activateReservedPlan()
+/// nadpisywal rezerwacje planu wlasnie wchodzacego. Odchodzacy plan aktywowal wtedy cudza
+/// rezerwacje (oglaszajac na magistrali nazwy, ktorych nie liczy), a nastepna epoka nie miala
+/// juz czego aktywowac i konczyla sie FatalError -- w trybie --service takze wyczyszczeniem
+/// pliku zapytan, czyli restartem uslugi BEZ planu. Odtworzone dwoma rownoleglymi `xqry -q`.
+///
+/// Flaga ma dokladnie jednego pisarza z kazdej strony: podnosi ja watek komunikacyjny
+/// (IpcServer prowadzi jedna petle komend), zdejmuje watek glowny i dopiero PO aktywacji.
+/// Odczyt "false" znaczy wiec, ze ani rezerwacja nie wisi, ani wymiana nie trwa -- sprawdzenie
+/// w resetCommit() nie potrzebuje muteksu.
+std::atomic<bool> planSwapInFlight{false};
+
 /// Plik zapytan uslugi, do ktorego trafia przyjety plan i ktory jest oprozniany po bledzie
 /// krytycznym. PUSTY dla instancji, ktora usluga nie jest — plik operatora uruchamiajacego
 /// xretractor z terminala nie jest stanem uslugi i nie wolno go nadpisywac.
@@ -570,6 +585,16 @@ ptree executorsm::resetCommit(const ptree &ptInval) {
   std::string planText = std::move(it->second.text);
   resetTransfers.erase(it);
 
+  // Jedna wymiana naraz. Sprawdzenie musi wypasc PRZED validatePlanText(), bo to ona rezerwuje
+  // zasoby w gniezdzie magistrali, a rezerwacja jest tam pojedyncza — patrz planSwapInFlight.
+  // Odmowa jest przy okazji uczciwsza od poprzedniego "ostatni wygrywa": zestaw przyjety
+  // i nadpisany przez nastepny nigdy nie ruszal, a jego klient dostawal "OK".
+  if (planSwapInFlight.load(std::memory_order_acquire)) {
+    ptRetval.put("db", "Rejected: a plan reload is already in progress");
+    SPDLOG_ERROR("reset-commit rejected: a plan reload is already in progress");
+    return ptRetval;
+  }
+
   if (const std::string refusal = validatePlanText(planText); !refusal.empty()) {
     ptRetval.put("db", refusal);
     SPDLOG_ERROR("reset-commit rejected: {}", refusal);
@@ -580,6 +605,10 @@ ptree executorsm::resetCommit(const ptree &ptInval) {
     std::scoped_lock lock(core_mutex);
     pendingPlanText = std::move(planText);
   }
+  // Kolejnosc zapisow jest istotna: znacznik wymiany PRZED zadaniem wymiany. Odwrotnie watek
+  // glowny zdazylby przeprowadzic cala wymiane i zdjac flage, ktora dopiero potem zostalaby
+  // podniesiona — i zostalaby podniesiona na zawsze, odrzucajac kazdy nastepny reset.
+  planSwapInFlight.store(true, std::memory_order_release);
   planResetRequested.store(true, std::memory_order_release);
   cv.notify_all();
   SPDLOG_INFO("Plan reload accepted; the running plan will be replaced.");
@@ -798,6 +827,14 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
   }
   planResetRequested.store(false, std::memory_order_release);
 
+  // Hak diagnostyczny testu regresyjnego it_service_reset_double, ta sama droga co
+  // RDB_FAULT_GET_AWAIT_EPOCH_SWAP. Rozciaga (o podana liczbe ms) DOKLADNIE to okno, w ktorym
+  // tekst planu jest juz zabrany, a jego rezerwacja na magistrali jeszcze nie aktywowana.
+  // Wyscigu z dwoma klientami nie da sie zamowic — bez haka trafienie wymagalo omiatania
+  // przesuniecia miedzy dwoma `xqry -q` (trafienie 1 na 14 prob).
+  if (const char *delayMs = std::getenv("RDB_FAULT_PLAN_SWAP_DELAY"); delayMs != nullptr)
+    std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
+
   // Licznik rotacji nalezy do planu, ktory wlasnie odszedl. Nowy powstanie nizej, o ile
   // nowy plan w ogole niesie :ROTATION.
   pCounterPtr.reset();
@@ -854,6 +891,10 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
   const bus::ClaimResult activated = xrdbbus.activateReservedPlan();
   if (activated.status != bus::ClaimStatus::Claimed && xrdbbus.attached())
     FatalError("Cannot activate the reserved bus resources: {}", activated.detail);
+
+  // Rezerwacja jest zuzyta, wiec od tej chwili wolno przyjac nastepny reset. Ani chwili
+  // wczesniej: az dotad kolejne reservePlan() nadpisywaloby rezerwacje wlasnie aktywowana.
+  planSwapInFlight.store(false, std::memory_order_release);
 
   dropStalePlanArtifacts(*coreInstancePtr, *cmPtr, processedLines);
 
@@ -1064,6 +1105,12 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         }
         cv.notify_all();
 
+        // Czy bramke --xqrywait zdjelo zatrzymanie procesu, a nie komenda klienta. Osobna
+        // zmienna, a nie odczyt iLoopLimitCnt nizej: `stop_now` to wartosc 1, czyli dokladnie
+        // to, co w liczniku zostawia `-m 1`, wiec warunek na liczniku zmienialby zachowanie
+        // przebiegu z budzetem jednego slotu — a ten z bramka nie ma nic wspolnego.
+        bool gateStoppedProcess = false;
+
         if (vm.contains("xqrywait")) {
           if (vm.contains("verbose")) std::cout << "Waiting for first query to start process.\n";
           // Warunek na zatrzasku, a nie na liczniku petli. Licznik niesie budzet slotow
@@ -1072,9 +1119,19 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
           // wprost mierzalny -- `xretractor -m 5` konczyl sie sam, `xretractor -x -m 5`
           // chodzil bez konca. Zatrzask ustawiony PRZED wejsciem tutaj przepuszcza od razu,
           // wiec komenda z okna startowego nie ginie.
+          //
+          // Czekanie jest TERMINOWE, bo bramke musi zdejmowac takze zatrzymanie procesu, a
+          // sygnalu nie da sie tu uslyszec inaczej. handleSignal() ustawia wylacznie
+          // iLoopLimitCnt (notify_all nie jest async-signal-safe), wiec czekanie bezterminowe
+          // nie mialo kto przerwac: `xretractor -x` bez ani jednej komendy przezywal SIGTERM
+          // i schodzil dopiero na SIGKILL -- systemd czekal na to caly TimeoutStopSec.
+          // Rozszerzenie samego predykatu nic by nie dalo, potrzebna jest wlasnie pobudka
+          // z zegara. Takt 100 ms jest ponizej kazdego rozsadnego limitu zatrzymania.
           std::unique_lock<std::mutex> scoped_lock(core_mutex);
-          cv.wait(scoped_lock, [] { return firstQueryReceived.load(); });
-          if (vm.contains("verbose")) std::cout << "First query received, starting processing loop.\n";
+          while (!firstQueryReceived.load() && iLoopLimitCnt != executorsm::stop_now)
+            cv.wait_for(scoped_lock, kIdleLoopSleep);
+          gateStoppedProcess = !firstQueryReceived.load();
+          if (vm.contains("verbose") && !gateStoppedProcess) std::cout << "First query received, starting processing loop.\n";
         }
 
         if (vm.contains("verbose")) coreInstancePtr->dumpCore();
@@ -1101,8 +1158,15 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         std::set<std::string> inSet;
         for (const auto &it : *coreInstancePtr)
           if (it.isDeclaration()) inSet.insert(it.id);
-        proc.processZeroStep();
-        ipcServer.broadcast(inSet, formatRow);
+        // Zatrzymanie, ktore zdjelo bramke --xqrywait, nie ma prawa policzyc ani jednego kroku:
+        // proces konczony sygnalem zapisalby wtedy rekord zerowy do magazynu, choc nikt o niego
+        // nie prosil. Sama petla ponizej i tak nie wykona obrotu (warunek stop_now), a wyjscia
+        // `break` w tym miejscu byc nie moze -- ominieloby zgaszenie pProc na koncu epoki i
+        // zostawiloby watkowi komunikacyjnemu wskaznik na rozbierany dataModel.
+        if (!gateStoppedProcess) {
+          proc.processZeroStep();
+          ipcServer.broadcast(inSet, formatRow);
+        }
         // End of ZERO-step
 
         // Loop of data processing

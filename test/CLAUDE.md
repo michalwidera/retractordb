@@ -101,6 +101,32 @@ That mistake produced a false 5/5 during this investigation before it was caught
 Part A is timing-assisted: it can pass falsely if the window closes before `xqry` starts, but it
 cannot fail falsely, so it is repeated three times.
 
+A third property was added on 2026-09-06: **a stop signal must lift the gate too.** The wait was
+untimed and watched only the first-command latch, while `handleSignal` sets nothing but the loop
+counter (`notify_all` is not async-signal-safe), so nothing could interrupt it: `xretractor -x`
+that never received a command survived `SIGTERM` and needed `SIGKILL` — systemd waited out the
+whole `TimeoutStopSec`. The gate now waits in 100 ms steps and also watches `stop_now`. The test
+sends **no** command at all, and additionally asserts the storage file stays empty: a server
+stopped at the gate must not compute the ZERO-step record nobody asked for.
+
+### The double plan reload
+
+`it_service_reset_double` guards the bus reservation against two reloads overlapping in time. A
+bus slot holds **exactly one** reservation; `resetCommit` took it at *accept* time, while the
+request flag was cleared at the *start* of `applyPendingPlan`, ~60 lines before
+`activateReservedPlan`. A reload accepted inside that window overwrote the reservation of the plan
+then being installed: the outgoing plan activated a foreign reservation (advertising streams it
+does not compute) and the next epoch found nothing to activate — `FatalError`, which under
+`--service` also clears the query file, so the unit came back **with no plan**. Two operators
+running `xqry --reset` at once were enough.
+
+Racing it by hand cost a stagger sweep (one hit in fourteen), so the window is opened by the
+`RDB_FAULT_PLAN_SWAP_DELAY` hook, the same route as `RDB_FAULT_GET_AWAIT_EPOCH_SWAP`. The test
+checks four things, because the fix has two sides that break separately: a reload sent before the
+swap starts is refused, one sent **inside** the window is refused (the regression proper), the
+server survives and the accepted plan really took over, and — the mirror defect — a reload sent
+**after** the swap is accepted again. Without that last check, a "refuse always" fix would pass.
+
 ### Namespaces
 
 Each test directory gets `RDB_NAMESPACE`, its own `TMPDIR` and a `RESOURCE_LOCK`, assigned from a
