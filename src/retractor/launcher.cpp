@@ -314,7 +314,8 @@ int main(int argc, char *argv[]) try {
   // jawne --name wygrywa po cichu, tak samo jak dyrektywa :STORAGE z RQL wygrywa nad
   // storage.dir. --autoname i autoname=true nie sa konfliktem, tylko dwiema drogami do
   // tego samego skutku.
-  if (wantsAutoName || (earlyServerName.empty() && earlyAppCfg.serverAutoName)) {
+  const bool generatedName = wantsAutoName || (earlyServerName.empty() && earlyAppCfg.serverAutoName);
+  if (generatedName) {
     earlyServerName = servername::generate();
     // Nazwa musi trafic na standardowe wyjscie, nie tylko do logu: bez niej operator nie ma
     // jak wskazac tej instancji w `xqry --server`. Opróznienie bufora jest tu konieczne, a nie
@@ -563,26 +564,52 @@ int main(int argc, char *argv[]) try {
           return info.kind == FlockServiceGuard::PeerInfo::Kind::Service && !info.unit.empty();
         };
 
-        // Nazwa instancji wylaczonej z odsiewu. Domyslnie to uruchomienie, bo bez zywej uslugi
-        // samo za chwile stanie sie instancja; gdy usluga docelowa sie znajdzie, wylaczona jest ONA.
-        std::string exemptName = earlyServerName;
-
+        // Usluga docelowa, czyli instancja, ktora to uruchomienie ZASTAPI. Stoi albo na naszej
+        // wlasnej blokadzie (gdy dzieli z nami nazwe), albo gdziekolwiek na magistrali.
+        std::string serviceName;
         FlockServiceGuard::PeerInfo peer;
         if (guard.isAnotherInstanceRunning()) peer = guard.readPeerInfo();
 
-        if (!isServicePeer(peer)) {
+        if (isServicePeer(peer)) {
+          serviceName = earlyServerName;  // usluga trzyma blokade o NASZEJ nazwie
+        } else {
           for (const auto &live : instances) {
             if ((live.modes & bus::mode::kService) == 0U) continue;
             FlockServiceGuard peerGuard(executableName + "_service" + (live.name.empty() ? "" : "." + live.name));
             peerGuard.setLockDir(earlyAppCfg.lockDir);
             const FlockServiceGuard::PeerInfo found = peerGuard.readPeerInfo();
             if (isServicePeer(found)) {
-              peer       = found;
-              exemptName = live.name;
+              peer        = found;
+              serviceName = live.name;
               break;
             }
           }
         }
+
+        // Jawnie wskazana tozsamosc wygrywa nad dostarczeniem planu do uslugi -- tak samo jak
+        // wygrywa nad autoname z konfiguracji i jak :STORAGE z RQL wygrywa nad storage.dir.
+        // Bez tej reguly `xretractor plan.rql --name foo` przy zywej usludze konczylo sie kodem
+        // 0, nadpisanym planem uslugi i jej restartem, a instancja `foo` nie powstawala w ogole:
+        // zadanie "uruchom osobna instancje" wykonywalo "podmien plan cudzej uslugi". Nazwa
+        // ROWNA nazwie uslugi jest wskazaniem JEJ, wiec nadal dostarcza -- stad porownanie zamiast
+        // samego "czy podano --name". Przestrzeni nazw uruchomienia ta reguła nie potrzebuje:
+        // RDB_NAMESPACE zmienia nazwe segmentu magistrali, wiec usluga spoza przestrzeni jest
+        // niewidoczna, a usluga z tej samej przestrzeni ma te sama nazwe co my.
+        //
+        // Osobna instancja obok uslugi jest wykonalna, bo blokada, obiekty IPC i slot magistrali
+        // sa rozlaczne per nazwa. Reguly "usluga jest dokladnie jedna" ta droga nie obchodzi:
+        // trzyma ja atomowe roszczenie slotu (ClaimStatus::ServiceConflict), nie ten warunek.
+        const bool explicitIdentity = earlyVm.contains("name") || generatedName;
+        const bool deliverToService = isServicePeer(peer) && (!explicitIdentity || serviceName == earlyServerName);
+        if (isServicePeer(peer) && !deliverToService)
+          SPDLOG_INFO(
+              "Service unit '{}' is running, but instance name '{}' was requested explicitly; starting a separate instance.",
+              peer.unit, earlyServerName);
+
+        // Z odsiewu wypada dokladnie ta instancja, ktora to uruchomienie zastapi. Gdy planu do
+        // uslugi nie dostarczamy, zostaje ona ZYWA obok nowej instancji, wiec jej strumienie sa
+        // konfliktem jak kazde inne -- wylaczone jest wtedy samo to uruchomienie.
+        const std::string exemptName = deliverToService ? serviceName : earlyServerName;
 
         // Odsiew przed dostarczeniem planu do dzialajacego serwisu obejmuje wszystkie fizyczne
         // zasoby publikowane w slocie: nazwy strumieni i licznik rotacji. Zwykly start nie polega
@@ -606,7 +633,7 @@ int main(int argc, char *argv[]) try {
           return system::errc::device_or_resource_busy;
         }
 
-        if (isServicePeer(peer)) {
+        if (deliverToService) {
           const std::string target = peer.queryFile.empty() ? appCfg.serviceQueryFile : peer.queryFile;
           SPDLOG_INFO("Detected running service unit '{}'; delivering compiled query set to {}.", peer.unit, target);
           if (!servicecontrol::deliverQueryFile(sInputFile, target)) {
@@ -624,8 +651,9 @@ int main(int argc, char *argv[]) try {
           std::println("Query compiled OK and sent to running service '{}' (restart requested).", peer.unit);
           return system::errc::success;
         }
-        // Nie ma żywego serwisu — transakcja startowa poniżej albo wystartuje tę instancję,
-        // albo zgłosi brak dostępnej blokady (no_lock_available); nie próbujemy restartu.
+        // Nie ma żywego serwisu, albo jest, ale operator zażądał własnej tożsamości —
+        // transakcja startowa poniżej albo wystartuje tę instancję, albo zgłosi brak dostępnej
+        // blokady (no_lock_available); nie próbujemy restartu.
       }
     }
 

@@ -92,7 +92,8 @@ TimeoutStopSec=30
 ### Delivering a query set to a running service
 
 When `xretractor` is started with a query file while another instance is **already
-running as a systemd service**, it does not fail with a lock error. Instead it:
+running as a systemd service**, and the invocation does not ask for an identity of its
+own, it does not fail with a lock error. Instead it:
 
 1. detects that the running instance is a systemd unit (and whether it is a
    `system` or `--user` unit),
@@ -119,6 +120,14 @@ Notes:
   `SELECT`, `DECLARE` or `RULE`.
 - The running service is found on the **bus**, not by the lock file name: a service is named
   `service`, so a new invocation almost never shares its lock file.
+- **An explicitly requested identity wins over delivery.** `xretractor plan.rql --name foo`
+  (likewise `--autoname` or `[server] autoname = true`) starts a **separate instance** next to
+  the service; the service's query file is not touched and its unit is not restarted. `--name
+  service` — the name the service itself carries — still means "target that service" and
+  delivers. Such a separate instance may not claim a stream name or rotation counter the live
+  service holds: that is a normal conflict (`device_or_resource_busy`), because the two are meant
+  to run side by side. Starting a second instance in **service mode** stays refused regardless of
+  its name (see *One service, one name*).
 - Restarting a **system** unit needs privileges — run with `sudo` if `systemctl
   restart` is denied; a `--user` unit restarts without root.
 - Which file is overwritten: the service reports its own query file in the lock
