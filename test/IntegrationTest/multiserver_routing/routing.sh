@@ -204,6 +204,20 @@ if [ "$elapsed_ms" -ge 5000 ]; then
   exit 1
 fi
 
+#     `--bus` czyta wylacznie magistrale i zadnego serwera do tego nie potrzebuje, wiec `-w`
+#     jest dla niego bez znaczenia: ma wypisac tabele od razu, a nie odmowic po tej samej
+#     regule co `-l` -- odmowa dotyczylaby tu odpowiedzi, ktora ma pokazac obie instancje.
+start_ns=$(date +%s%N)
+xqry --bus -w > bus_wait.txt || {
+  echo "xqry --bus -w odmowil wypisania magistrali:"; cat bus_wait.txt; exit 1; }
+elapsed_ms=$(( ($(date +%s%N) - start_ns) / 1000000 ))
+if [ "$elapsed_ms" -ge 5000 ]; then
+  echo "xqry --bus -w trwalo ${elapsed_ms} ms -- czekanie na serwer przy odczycie magistrali?"
+  exit 1
+fi
+grep -qE "^alfa[[:space:]]+\\|" bus_wait.txt && grep -qE "^beta[[:space:]]+\\|" bus_wait.txt || {
+  echo "xqry --bus -w nie wypisal obu instancji:"; cat bus_wait.txt; exit 1; }
+
 xqry --server beta -k
 wait "$pid_b" 2>/dev/null || true
 pid_b=""
@@ -241,3 +255,17 @@ if grep -qE '^(alfa|beta)[[:space:]]+\|' orphan.txt; then
   cat orphan.txt
   exit 1
 fi
+
+#     To samo z `-w`: przy PUSTEJ magistrali czekanie nie ma na co czekac, bo --bus i tak nie
+#     odezwie sie do zadnego serwera. Bez wyjecia --bus spod czekania klient milczalby tu przez
+#     caly budzet (domyslnie 30 s) i konczyl bledem zamiast wypisac "brak zywych instancji".
+start_ns=$(date +%s%N)
+xqry --bus -w > orphan_wait.txt 2>orphan_wait.err || {
+  echo "xqry --bus -w nad pusta magistrala zwrocil blad:"; cat orphan_wait.err; exit 1; }
+elapsed_ms=$(( ($(date +%s%N) - start_ns) / 1000000 ))
+if [ "$elapsed_ms" -ge 5000 ]; then
+  echo "xqry --bus -w nad pusta magistrala trwalo ${elapsed_ms} ms -- czekanie na serwer?"
+  exit 1
+fi
+grep -q 'no live xretractor instance' orphan_wait.err || {
+  echo "xqry --bus -w nie zglosil pustej magistrali:"; cat orphan_wait.err; exit 1; }

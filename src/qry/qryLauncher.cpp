@@ -257,7 +257,12 @@ int main(int argc, char *argv[]) {
       std::println(std::cerr, "xqry: --yaml/-y requires --dir/-d, --detail/-t or --bus/-b");
       return system::errc::invalid_argument;
     }
-    if (vm.contains("wait-server") && !vm.contains("help")) {
+    // `--bus` i `--help` nie sa komendami do serwera: pierwsza czyta wylacznie magistrale (bez
+    // kontaktu z jakakolwiek instancja), druga w ogole nie dotyka IPC. Czekanie na serwer nie
+    // ma dla nich czego przyspieszyc ani czego doczekac, a przy dwoch zywych instancjach
+    // odmawialoby wypisania tabeli -- czyli dokladnie tej odpowiedzi, ktora ma te dwie
+    // instancje pokazac.
+    if (vm.contains("wait-server") && !vm.contains("help") && !vm.contains("bus")) {
       // Jawny `--server` (i przestrzen nazw, ktora go zastepuje) wskazuje instancje wprost, wiec
       // czekamy na nia po nazwie. Bez nich adresata wskazuje magistrala -- i czekanie musi to
       // wykrywanie objac, inaczej mija sie z jedyna zywa instancja tylko dlatego, ze ma nazwe.

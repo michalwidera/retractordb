@@ -542,7 +542,13 @@ Czekanie odpytuje więc magistralę w pętli i rozstrzyga cel tymi samymi reguł
   komunikat routingu jest treściwszy niż timeout.
 
 Jawny `--server` i `RDB_NAMESPACE` pozostają nadrzędne: wskazują instancję wprost, więc czekanie
-idzie po nazwie i nie dotyka magistrali. Sprawdza to punkt (7) w `it_multiserver_routing`.
+idzie po nazwie i nie dotyka magistrali.
+
+`--bus` jest spod czekania wyjęty (tak samo jak `--help`): czyta wyłącznie magistralę, bez
+kontaktu z jakąkolwiek instancją, więc `-w` nie ma tam czego doczekać — a przy dwóch żywych
+instancjach odmawiałby wypisania dokładnie tej tabeli, która ma je pokazać.
+
+Sprawdza to punkt (7) w `it_multiserver_routing`.
 
 ---
 
