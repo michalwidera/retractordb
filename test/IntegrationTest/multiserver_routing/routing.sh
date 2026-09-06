@@ -8,7 +8,8 @@
 #   4. komenda dotyczaca calej instancji (-k, -d) przy dwoch zywych zada --server,
 #   5. ad-hoc przez granice serwera jest odrzucany i NIE zmienia planu zadnego z nich,
 #   6. --bus nad OSIEROCONYM segmentem wraca natychmiast, a nie po budzecie klienta,
-#   7. -w czeka na instancje wskazana przez routing, a nie na bezimienna.
+#   7. -w czeka na instancje wskazana przez routing, a nie na bezimienna,
+#   8. -w z jawnym --server nie bierze osieroconych obiektow IPC za zywy serwer.
 #
 # Punkt (6) jest regresja na zasadzie projektowa etapu 2b/2c: wykrywanie instancji nie moze
 # polegac na odpytywaniu serwerow z timeoutem, bo osierocony segment jest nieodroznialny od
@@ -22,16 +23,20 @@ set -e
 LOCK_DIR="${TMPDIR:-/tmp}"
 LOCK_A="$LOCK_DIR/xretractor_service.alfa.lock"
 LOCK_B="$LOCK_DIR/xretractor_service.beta.lock"
+# Instancja punktu (8): ginie od SIGKILL, wiec plik blokady zostaje po niej na dysku.
+LOCK_G="$LOCK_DIR/xretractor_service.gamma.lock"
 
 pid_a=""
 pid_b=""
+pid_g=""
 
 cleanup() {
   local status=$?
   trap - EXIT INT TERM
   xqry --server alfa -k >/dev/null 2>&1 || true
   xqry --server beta -k >/dev/null 2>&1 || true
-  for pid in "$pid_a" "$pid_b"; do
+  xqry --server gamma -k >/dev/null 2>&1 || true
+  for pid in "$pid_a" "$pid_b" "$pid_g"; do
     [ -n "$pid" ] || continue
     local waited=0
     while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt 50 ]; do
@@ -42,14 +47,16 @@ cleanup() {
     wait "$pid" 2>/dev/null || true
   done
   # Stabilne pliki flock sa czescia protokolu; usuwamy pliki testowe dopiero po procesach.
-  rm -f "$LOCK_A" "$LOCK_B"
+  rm -f "$LOCK_A" "$LOCK_B" "$LOCK_G"
   # Bramka higieny: zaden obiekt IPC ani testowy plik blokady tych instancji nie ma prawa zostac.
-  if ls /dev/shm/*alfa* /dev/shm/*beta* >/dev/null 2>&1; then
+  # Instancja gamma ginie od SIGKILL, wiec jej obiekty kasuje sam scenariusz (punkt 8) --
+  # tutaj sprawdzamy juz tylko, czy naprawde po sobie posprzatal.
+  if ls /dev/shm/*alfa* /dev/shm/*beta* /dev/shm/*gamma* >/dev/null 2>&1; then
     echo "higiena: zostaly obiekty IPC w /dev/shm:"
-    ls /dev/shm/ | grep -E 'alfa|beta' || true
+    ls /dev/shm/ | grep -E 'alfa|beta|gamma' || true
     status=1
   fi
-  if [ -f "$LOCK_A" ] || [ -f "$LOCK_B" ]; then
+  if [ -f "$LOCK_A" ] || [ -f "$LOCK_B" ] || [ -f "$LOCK_G" ]; then
     echo "higiena: zostal plik blokady instancji"
     status=1
   fi
@@ -269,3 +276,43 @@ if [ "$elapsed_ms" -ge 5000 ]; then
 fi
 grep -q 'no live xretractor instance' orphan_wait.err || {
   echo "xqry --bus -w nie zglosil pustej magistrali:"; cat orphan_wait.err; exit 1; }
+
+# (8) Osierocone obiekty IPC to nie jest zywy serwer. Po SIGKILL segment, kolejka komend i
+#     mutex mapy ZOSTAJA w /dev/shm, bo skasowac je moze tylko sam proces. Sprawdzenie
+#     ograniczone do "czy da sie je otworzyc" melduje wtedy gotowosc serwera, ktorego nie ma,
+#     a komenda idzie do kolejki bez odbiorcy i klient wisi na odpowiedz, ktora nie nadejdzie.
+#     Zywotnosc rozstrzyga magistrala (PID + czas startu z /proc), tak samo jak w punkcie (6).
+#
+#     Budzet czekania scinamy wlasnym plikiem konfiguracyjnym: przedmiotem badania jest werdykt
+#     "serwera nie ma", a nie to, jak dlugo klient jest gotow czekac.
+cat > orphan.toml <<'TOML'
+[timing]
+server_startup_wait_s = 2
+server_startup_poll_ms = 50
+TOML
+
+xretractor alfa.rql --noanykey --name gamma </dev/null >gamma.log 2>&1 &
+pid_g=$!
+wait_for_lock "$LOCK_G" "$pid_g"
+kill -KILL "$pid_g"
+wait "$pid_g" 2>/dev/null || true
+pid_g=""
+
+# Zalozenie scenariusza, nie jego teza: bez pozostawionych obiektow IPC nie ma czego mylic
+# z zywym serwerem i test nie badalby niczego.
+ls /dev/shm | grep -q 'gamma' || {
+  echo "SIGKILL nie zostawil obiektow IPC instancji gamma -- scenariusz stracil przedmiot"; exit 1; }
+
+start_ns=$(date +%s%N)
+expect_failure xqry --config orphan.toml --server gamma -w -l
+elapsed_ms=$(( ($(date +%s%N) - start_ns) / 1000000 ))
+grep -q 'server not available' expect_out.txt || {
+  echo "xqry -w nad osieroconym IPC nie zglosil braku serwera:"; cat expect_out.txt; exit 1; }
+if [ "$elapsed_ms" -ge 10000 ]; then
+  echo "xqry -w nad osieroconym IPC trwalo ${elapsed_ms} ms przy budzecie 2 s"
+  exit 1
+fi
+
+# Sprzatanie po zabitej instancji: bramka higieny w cleanup() sprawdza to samo, ale tam
+# byloby juz tylko oskarzeniem bez wskazania winnego.
+rm -f /dev/shm/*gamma* "$LOCK_G"

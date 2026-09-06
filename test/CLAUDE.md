@@ -139,3 +139,9 @@ instance, or names it picks itself) opts out with `set(IT_NO_NAMESPACE TRUE)` be
 ninja && ninja install && cmake . && ninja && ctest
 ```
 
+One directory is deliberately exempt: `service_idle` gets `$<TARGET_FILE:xretractor>` as its first
+script argument and never calls `xretractor` from `PATH`. Its three tests assert service-mode INFO
+markers, which `SPDLOG_ACTIVE_LEVEL` strips in Release — so a Release copy left in `~/.local/bin`
+(a build of ablation profiles is enough) made them fail with an empty `stderr.txt`, and the symptom
+read as an engine regression. Everything else in the tree still uses the installed binary.
+

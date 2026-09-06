@@ -67,6 +67,17 @@ TEST(ShmBudget, ElementsFollowTickAndFloor) {
   EXPECT_EQ(shmbudget::responseQueueElements(ratio(0), kBufferSeconds, kMinElements), kMinElements);
 }
 
+TEST(ShmBudget, ElementsRoundUpOnFractionalFrequency) {
+  // Takt o niecalkowitej odwrotnosci. Obciecie czestotliwosci PRZED pomnozeniem przez czas
+  // bufora dawalo 22 * 10 = 220 zamiast 225: kolejka o piec elementow za krotka na kazdym
+  // takcie 22,5 Hz. Caly iloraz musi byc liczony wymiernie i zaokraglony w gore.
+  EXPECT_EQ(shmbudget::responseQueueElements(ratio(2, 45), kBufferSeconds, kMinElements), 225);
+  // To samo widoczne bez podlogi: 10 s / (2/3 s) = 15 probek.
+  EXPECT_EQ(shmbudget::responseQueueElements(ratio(2, 3), kBufferSeconds, /*minElements=*/1), 15);
+  // Zaokraglenie w gore, a nie do najblizszej: 10 s / (3 s) = 3,33 probki to cztery miejsca.
+  EXPECT_EQ(shmbudget::responseQueueElements(ratio(3), kBufferSeconds, /*minElements=*/1), 4);
+}
+
 TEST(ShmBudget, FixedReservationIsSumOfItsParts) {
   EXPECT_EQ(shmbudget::fixedReservationBytes(),
             bus::segmentBytes() + shmbudget::messageQueueBytes(ipc::kQueryQueueMaxMessages, ipc::kQueryQueueMaxMessageSize) +

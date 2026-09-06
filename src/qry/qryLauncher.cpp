@@ -9,6 +9,7 @@
 #include <string_view>
 #include <thread>
 #include <utility>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 #include <boost/interprocess/ipc/message_queue.hpp>
@@ -38,10 +39,24 @@ static bool serverReachable(std::string_view serverName) {
     const ipc::ServerNames names = ipc::names(serverName);
     IPC::managed_shared_memory seg(IPC::open_only, names.shmemSegment.c_str());
     IPC::message_queue mq(IPC::open_only, names.queryQueue.c_str());
-    return true;
   } catch (...) {
     return false;
   }
+  // Same obiekty IPC nie dowodza, ze ktokolwiek obsluguje kolejke: po SIGKILL segment i
+  // kolejka zostaja w /dev/shm, wiec `--wait-server` melduje gotowosc serwera, ktorego nie ma,
+  // a komenda idzie do kolejki bez odbiorcy. Magistrala wie wiecej -- Bus::instances() sprawdza
+  // PID i czas startu przez /proc, wiec martwa instancja z niej znika.
+  //
+  // Kolejnosc po stronie serwera pozwala wymagac OBU warunkow naraz: slot na magistrali
+  // powstaje w launcherze, jeszcze przed zbudowaniem obiektow IPC. Instancja widoczna na
+  // magistrali, ale bez kolejki, to instancja w trakcie startu -- czekanie ma wtedy trwac dalej.
+  const bus::Bus xrdbbus(bus::segmentName(), /*createIfMissing=*/false);
+  // Furtka zgodnosci: bez magistrali zostaje dotychczasowe kryterium. Instancja, ktora
+  // wystartowala przy ClaimStatus::Unavailable, nie ma slotu i po ostrzejszym sprawdzeniu
+  // przestalaby byc osiagalna dla wlasnego klienta.
+  if (!xrdbbus.attached()) return true;
+  const std::vector<bus::InstanceInfo> live = xrdbbus.instances();
+  return std::ranges::any_of(live, [serverName](const bus::InstanceInfo &instance) { return instance.name == serverName; });
 }
 
 /// Migawka magistrali: czysty odczyt seqlockiem, bez muteksu i BEZ kontaktu z serwerami.

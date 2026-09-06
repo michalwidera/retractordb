@@ -9,6 +9,13 @@
 # Logika scenariusza jest w service-idle.sh (kopiowanym do katalogu build przy
 # konfiguracji), a NIE w 'bash -c "...; ...; ..."', bo średnik w add_test() jest
 # separatorem listy CMake i rozbiłby skrypt na osobne argumenty.
+#
+# Skrypt dostaje SCIEZKE do zbudowanej binarki ($<TARGET_FILE:xretractor>), a
+# nie wola 'xretractor' z PATH. Reszta drzewa integracyjnego uzywa binarki
+# zainstalowanej i tak ma zostac, ale te trzy testy asercjonuja markery INFO,
+# ktorych Release nie kompiluje: kopia z ~/.local/bin zbudowana w Release (np.
+# po kampanii ablacyjnej) kladla je z pustym stderr.txt, a objaw wygladal jak
+# regresja silnika.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
@@ -16,17 +23,17 @@ set(TestID "it_${TestID}")
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND bash service-idle.sh)
+  COMMAND bash service-idle.sh $<TARGET_FILE:xretractor>)
 
 add_test(
   NAME ${TestID}-env
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND bash service-idle.sh env)
+  COMMAND bash service-idle.sh $<TARGET_FILE:xretractor> env)
 
 add_test(
   NAME ${TestID}-empty
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND bash service-idle.sh empty)
+  COMMAND bash service-idle.sh $<TARGET_FILE:xretractor> empty)
 
 # Logi INFO sa wkompilowane tylko poza Release (SPDLOG_ACTIVE_LEVEL, glowny
 # CMakeLists.txt). W Release tryb uslugowy nie emituje markerow INFO — skrypt

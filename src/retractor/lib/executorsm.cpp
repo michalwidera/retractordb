@@ -54,14 +54,47 @@ constexpr std::chrono::milliseconds kIdleLoopSleep{100};
 /// moze rosnac serwerowi w pamieci bez konca. 512 porcji to okolo 200 kB tekstu RQL.
 constexpr int kResetMaxChunks{512};
 
+/// Gorna granica sklejonego tekstu jednego transferu. Sama liczba porcji jej nie wyznacza:
+/// rozmiar porcji wybiera KLIENT, a kolejka komend przepuszcza do ipc::kQueryQueueMaxMessageSize
+/// bajtow, wiec 512 porcji po 1000 B to juz pol megabajta, a nie zapowiedziane 200 kB. Wartosc
+/// odpowiada 512 porcjom po 400 B, czyli temu, co naprawde wysyla xqry (kResetChunkBytes).
+constexpr std::size_t kResetMaxPlanBytes{204800};
+
+/// Ile transferow moze byc rozpoczetych naraz. Klucz mapy to PID klienta, wiec bez tego limitu
+/// wystarczy wolac `reset-begin` z kolejnych procesow i nigdy nie domykac: kazdy zostawia wpis
+/// do konca zycia serwera. Osiem transferow po 200 kB to 1,6 MB i tyle wynosi cala pamiec,
+/// ktora ten kanal jest w stanie zajac.
+constexpr std::size_t kResetMaxTransfers{8};
+
+/// Po tym czasie bez ani jednej porcji transfer jest uznawany za porzucony. Klient zabity
+/// miedzy `reset-begin` a `reset-commit` nie ma jak po sobie posprzatac, a serwer nie ma jak sie
+/// o tym dowiedziec: kanal IPC nie niesie rozlaczenia.
+constexpr std::chrono::seconds kResetTransferTtl{60};
+
 /// Transfer planu w toku, per klient (db.id). Trzymany BEZ muteksu, bo dotyka go wylacznie
 /// watek komunikacyjny — IpcServer prowadzi dokladnie jedna petle odbioru komend.
 struct ResetTransfer {
   int expectedChunks{0};
   int receivedChunks{0};
   std::string text;
+  std::chrono::steady_clock::time_point lastActivity{std::chrono::steady_clock::now()};
 };
 std::map<int, ResetTransfer> resetTransfers;
+
+/// Usuwa transfery, ktore od ostatniej porcji milcza dluzej niz kResetTransferTtl. Wolane
+/// wylacznie z resetBegin: sprzatac warto tam, gdzie o miejsce sie prosi, a osobny zegar dla
+/// kanalu uzywanego raz na wiele godzin bylby kosztem bez pokrycia.
+void purgeStaleResetTransfers(std::chrono::steady_clock::time_point now) {
+  for (auto it = resetTransfers.begin(); it != resetTransfers.end();) {
+    if (now - it->second.lastActivity > kResetTransferTtl) {
+      SPDLOG_WARN("reset transfer of client {} abandoned; {} of {} chunks dropped", it->first, it->second.receivedChunks,
+                  it->second.expectedChunks);
+      it = resetTransfers.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
 
 /// Zycie EPOKI planu. Obiekt `dataModel` z petli epok i tresc `*coreInstancePtr` istnieja
 /// tylko miedzy opublikowaniem pProc a jego zgaszeniem. core_mutex tego nie pilnuje: chroni
@@ -532,6 +565,16 @@ ptree executorsm::resetBegin(const ptree &ptInval) {
     SPDLOG_ERROR("reset-begin rejected: chunk count {} out of range", chunks);
     return ptRetval;
   }
+  purgeStaleResetTransfers(std::chrono::steady_clock::now());
+  // Odmowa, a nie usuniecie najstarszego transferu: cudzy zestaw w polowie drogi nalezy do
+  // klienta, ktory nadal czeka na odpowiedz, a odebranie mu miejsca zamienialoby jego transfer
+  // w niezrozumiale "no plan transfer in progress" przy nastepnej porcji. Odmowa jest przy tym
+  // samoleczaca -- najdalej po kResetTransferTtl miejsce zwalnia sprzatanie powyzej.
+  if (!resetTransfers.contains(clientId) && resetTransfers.size() >= kResetMaxTransfers) {
+    ptRetval.put("db", "Rejected: too many plan transfers in progress (" + std::to_string(kResetMaxTransfers) + ")");
+    SPDLOG_ERROR("reset-begin rejected: {} plan transfers already in progress", resetTransfers.size());
+    return ptRetval;
+  }
   // Nadpisanie transferu w toku jest zamierzone: klient, ktory zaczyna od nowa, przerwal
   // poprzedni. Bez tego porzucony transfer blokowalby nastepny az do konca procesu.
   resetTransfers[clientId] = ResetTransfer{.expectedChunks = chunks, .receivedChunks = 0, .text = {}};
@@ -559,8 +602,18 @@ ptree executorsm::resetChunk(const ptree &ptInval) {
     SPDLOG_ERROR("reset-chunk rejected: more chunks than the announced {} for client {}", expected, clientId);
     return ptRetval;
   }
-  it->second.text += ptInval.get("db.argument", "");
+  // Limit bajtow, a nie tylko porcji: rozmiar porcji nalezy do klienta, wiec zapowiedziane
+  // 512 porcji moze znaczyc i 200 kB, i pol megabajta -- patrz kResetMaxPlanBytes.
+  const std::string chunk = ptInval.get("db.argument", "");
+  if (it->second.text.size() + chunk.size() > kResetMaxPlanBytes) {
+    resetTransfers.erase(it);
+    ptRetval.put("db", "Rejected: plan text exceeds " + std::to_string(kResetMaxPlanBytes) + " bytes");
+    SPDLOG_ERROR("reset-chunk rejected: plan text of client {} exceeds {} bytes", clientId, kResetMaxPlanBytes);
+    return ptRetval;
+  }
+  it->second.text += chunk;
   ++it->second.receivedChunks;
+  it->second.lastActivity = std::chrono::steady_clock::now();
   ptRetval.put("db", "OK");
   return ptRetval;
 }

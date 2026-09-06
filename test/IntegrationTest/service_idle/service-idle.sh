@@ -1,11 +1,18 @@
 #!/bin/bash
-# Scenariusz trybu usługowego/idle xretractor. Argument $1:
+# Scenariusz trybu usługowego/idle xretractor. Argument $1 to ścieżka do binarki
+# xretractor (przekazywana z CMake jako $<TARGET_FILE:xretractor>), argument $2:
 #   (brak) -> tryb flagi --service
 #   env    -> tryb zmiennej środowiskowej XRETRACTOR_SERVICE=1
 #   empty  -> plik zapytań istnieje, ale nie niesie ani jednej instrukcji
 # Logikę trzymamy w skrypcie (nie w 'bash -c' w add_test), bo średniki w CMake
 # są separatorem listy i rozbiłyby polecenie na osobne argumenty.
 set -e
+
+# Binarka z katalogu budowy, a nie 'xretractor' z PATH: asercje niżej dotyczą
+# markerów INFO, których Release nie kompiluje, a w PATH bywa kopia z innego
+# profilu niż ten właśnie sprawdzany.
+xretractor="${1:?podaj sciezke do binarki xretractor}"
+mode="$2"
 
 # Nie czekamy tu na cudzą blokadę: xretractor biegnie poniżej pierwszoplanowo
 # (-m 5), a za to, żeby poprzedni test nie zostawił po sobie instancji, odpowiada
@@ -19,24 +26,24 @@ set -e
 # (build z INFO), gdy uruchamiany bez zmiennej.
 info_active="${RDB_INFO_ACTIVE:-1}"
 
-if [ "$1" = "empty" ]; then
+if [ "$mode" = "empty" ]; then
   # Plik zapytań bez ani jednej instrukcji = tryb bezczynny, a nie błąd. Jednostka systemd
   # wskazuje ExecStart-em stały plik (RETRACTOR_QUERY_FILE), a ten przy pierwszym starcie
   # systemu jest pusty — i tak jest udokumentowana w samej jednostce. Do 2026-09-05 taki
   # start kończył się kodem błędu ("Parse result:Empty file."), więc Restart=on-failure
   # zapętlał usługę zamiast pozostawić ją czekającą na plan.
   printf '# zestaw bez instrukcji\n\n' > empty-plan.rql
-  xretractor --service --noanykey -m 5 empty-plan.rql 2>stderr.txt
+  "$xretractor" --service --noanykey -m 5 empty-plan.rql 2>stderr.txt
   if [ "$info_active" = "1" ]; then
     grep -q 'holds no statements' stderr.txt
     grep -q 'Idle mode: no queries to process' stderr.txt
   fi
-elif [ "$1" = "env" ]; then
+elif [ "$mode" = "env" ]; then
   # Logowanie usługowe włączone zmienną środowiskową, bez flagi --service.
-  XRETRACTOR_SERVICE=1 xretractor --noanykey -m 5 2>stderr.txt
+  XRETRACTOR_SERVICE=1 "$xretractor" --noanykey -m 5 2>stderr.txt
 else
   # Logowanie usługowe włączone flagą --service; start bez pliku .rql = tryb idle.
-  xretractor --service --noanykey -m 5 2>stderr.txt
+  "$xretractor" --service --noanykey -m 5 2>stderr.txt
   if [ "$info_active" = "1" ]; then
     grep -q 'No query file provided' stderr.txt
     grep -q 'Idle mode: no queries to process' stderr.txt

@@ -69,7 +69,13 @@ Space space() {
 
 int responseQueueElements(const boost::rational<int> &interval, int bufferSeconds, int minElements) {
   if (interval == 0) return minElements;
-  return std::max(boost::rational_cast<int>(1 / interval) * bufferSeconds, minElements);
+  // Caly iloraz liczony wymiernie, zaokraglenie dopiero na koncu i W GORE. Obciecie
+  // czestotliwosci PRZED pomnozeniem przez czas bufora zanizalo kolejke kazdego taktu o
+  // niecalkowitej odwrotnosci: takt 2/45 s (22,5 Hz) dawal 22 * 10 = 220 elementow zamiast
+  // 225. Widoczne powyzej 10 Hz, bo nizej i tak wygrywa podloga minElements.
+  const boost::rational<int> elements = boost::rational<int>(bufferSeconds) / interval;
+  const int ceiled                    = (elements.numerator() + elements.denominator() - 1) / elements.denominator();
+  return std::max(ceiled, minElements);
 }
 
 std::uint64_t messageQueueBytes(std::uint64_t maxMessages, std::uint64_t maxMessageSize) {
