@@ -179,12 +179,16 @@ TEST(serverRouting, describeIsSortedAndCarriesStreams) {
   const std::vector<bus::InstanceInfo> instances{makeInstance("beta", 202, "beta.rql", {"srcb", "dstb"}),
                                                  makeInstance("alfa", 101, "/home/rdb/plans/alfa.rql", {"srca", "dsta"})};
   const std::vector<std::string> lines = routing::describe(instances);
-  ASSERT_EQ(lines.size(), 5U);
+  // Instancja o dwoch strumieniach zajmuje dwie linie: kolejne nazwy ida w liniach
+  // kontynuacji z pustymi kolumnami po lewej, wiec przynaleznosc nadal widac po kreskach.
+  ASSERT_EQ(lines.size(), 7U);
   EXPECT_EQ(lines[0], "SERVER | PID | MODE | QUERY              | STREAMS");
-  EXPECT_EQ(lines[1], "-------+-----+------+--------------------+-----------");
-  EXPECT_EQ(lines[2], "alfa   | 101 | N    | .../plans/alfa.rql | srca, dsta");
-  EXPECT_EQ(lines[3], "beta   | 202 | N    | beta.rql           | srcb, dstb");
-  EXPECT_EQ(lines[4], "MODE: N=normal, R=realtime, F=no-clock, U=until-eof, M=llimitqry, X=xqrywait, S=service");
+  EXPECT_EQ(lines[1], "-------+-----+------+--------------------+--------");
+  EXPECT_EQ(lines[2], "alfa   | 101 | N    | .../plans/alfa.rql | srca");
+  EXPECT_EQ(lines[3], "       |     |      |                    | dsta");
+  EXPECT_EQ(lines[4], "beta   | 202 | N    | beta.rql           | srcb");
+  EXPECT_EQ(lines[5], "       |     |      |                    | dstb");
+  EXPECT_EQ(lines[6], "MODE: N=normal, R=realtime, F=no-clock, U=until-eof, M=llimitqry, X=xqrywait, S=service");
 }
 
 TEST(serverRouting, describeMarksMissingQueryFile) {
@@ -196,6 +200,14 @@ TEST(serverRouting, describeMarksMissingQueryFile) {
   EXPECT_EQ(lines[2], "(unnamed) | 101 | N    | -     | dst1");
 }
 
+TEST(serverRouting, describeMarksInstanceWithoutStreams) {
+  // Instancja bez ani jednego strumienia nie moze dac wiersza urwanego na kresce: kolumna
+  // STREAMS dostaje myslnik, tak samo jak QUERY przy braku pliku zapytania.
+  const std::vector<std::string> lines = routing::describe({makeInstance("alfa", 101, "plan.rql", {})});
+  ASSERT_EQ(lines.size(), 4U);
+  EXPECT_EQ(lines[2], "alfa   | 101 | N    | plan.rql | -");
+}
+
 TEST(serverRouting, describeWidensColumnsForGeneratedNames) {
   // Nazwa z --autoname jest dluzsza od naglowka SERVER, a tryby moga wystapic razem: obie
   // kolumny musza sie rozsunac, a nie rozjechac wiersz.
@@ -205,6 +217,7 @@ TEST(serverRouting, describeWidensColumnsForGeneratedNames) {
   const std::vector<std::string> lines = routing::describe(instances);
   ASSERT_EQ(lines.size(), 5U);
   EXPECT_EQ(lines[0], "SERVER            | PID | MODE | QUERY    | STREAMS");
+  EXPECT_EQ(lines[1], "------------------+-----+------+----------+--------");
   EXPECT_EQ(lines[2], "alfa              | 101 | F    | plan.rql | dst2");
   EXPECT_EQ(lines[3], "nostalgic-ptolemy | 7   | RS   | plan.rql | dst1");
 }

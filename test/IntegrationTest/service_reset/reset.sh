@@ -25,15 +25,24 @@ SERVER_LOCK="${TMPDIR:-/tmp}/xretractor_service.service.lock"
 
 rm -rf ./temp && mkdir -p ./temp
 
-# Wiersz magistrali dla instancji `service`. Pusta kolumna STREAMS to znak '-'.
+# Wiersz magistrali dla instancji `service` -- ten, ktory niesie PID i tryb.
 service_row() { xqry --bus 2>/dev/null | grep -E '^service +\|' || true; }
+
+# Strumienie instancji `service`, po jednym na linie. `--bus` daje kazda nazwe we wlasnym
+# wierszu: pierwsza stoi w wierszu instancji, kazda nastepna w linii kontynuacji o pustych
+# kolumnach po lewej -- czyli `service_row` widzi tylko pierwsza z nich. Segment magistrali
+# nalezy do przestrzeni nazw tego testu, wiec jedyna instancja w tabeli jest nasza i ostatnia
+# kolumna kazdego wiersza danych to jej strumien. Plan pusty daje jedna linie ze znakiem '-'.
+service_streams() {
+  xqry --bus 2>/dev/null | sed -nE 's/^(service|[[:space:]]+) *\|.*\| (.+)$/\2/p' || true
+}
 
 # Czeka, az plan uslugi zacznie roscic dany strumien. Przeladowanie jest asynchroniczne:
 # `--reset` konczy sie na PRZYJECIU planu, a wymiana epoki nastepuje w watku przetwarzania.
 wait_for_stream() {
   local name="$1" i=0
   while [ "$i" -lt 100 ]; do
-    if service_row | grep -qE "[ |,]${name}(,|\$| )"; then return 0; fi
+    if service_streams | grep -qx "${name}"; then return 0; fi
     sleep 0.1
     i=$((i + 1))
   done
@@ -122,7 +131,7 @@ fi
 # --- 4. Podmiana planu: nowe nazwy wchodza, stare znikaja z magistrali. ---
 xqry --reset plan2.rql --server service
 wait_for_stream beta
-if service_row | grep -qE '[ |,]alpha(,|$| )'; then
+if service_streams | grep -qx alpha; then
   echo "po podmianie planu stary strumien alpha jest nadal roszczony"
   xqry --bus || true
   exit 1
@@ -138,11 +147,11 @@ fi
 xqry --reset empty.rql --server service
 i=0
 while [ "$i" -lt 100 ]; do
-  if ! service_row | grep -qE '[ |,]beta(,|$| )'; then break; fi
+  if ! service_streams | grep -qx beta; then break; fi
   sleep 0.1
   i=$((i + 1))
 done
-if service_row | grep -qE '[ |,]beta(,|$| )'; then
+if service_streams | grep -qx beta; then
   echo "pusty plan nie zwolnil nazw strumieni"
   xqry --bus || true
   exit 1

@@ -40,15 +40,6 @@ std::string queryPathLabel(std::string_view queryFile) {
   return shortened.size() < queryFile.size() ? shortened : std::string{queryFile};
 }
 
-std::string streamList(const std::vector<std::string> &streams) {
-  std::string retVal;
-  for (const auto &stream : streams) {
-    if (!retVal.empty()) retVal += ", ";
-    retVal += stream;
-  }
-  return retVal.empty() ? std::string{"-"} : retVal;
-}
-
 /// Litery trybow pracy w kolejnosci od najbardziej zmieniajacego przebieg do najmniej.
 /// Wybor liter: R jak realtime, F jak flag `-f` (--no-clock), U jak until-eof, M jak `-m`
 /// (--llimitqry), X jak `-x` (--xqrywait), S jak service. Tryby sie nie wykluczaja, wiec
@@ -103,17 +94,39 @@ struct ServerRow {
   std::string pid;
   std::string mode;
   std::string query;
-  std::string streams;
+  std::vector<std::string> streams;
+};
+
+struct ColumnWidths {
+  std::size_t server;
+  std::size_t pid;
+  std::size_t mode;
+  std::size_t query;
+  std::size_t streams;
 };
 
 /// Kazda kolumna jest dopelniana do szerokosci NAJSZERSZEJ wartosci w tabeli, wiec nazwa
 /// instancji wygenerowana przez --autoname (dluzsza od naglowka SERVER) rozsuwa kolumne
 /// zamiast rozjechac wiersz.
-std::string tableLine(const ServerRow &row, const ServerRow &widths) {
-  return row.server + std::string(widths.server.size() - row.server.size(), ' ') + " | " + row.pid +
-         std::string(widths.pid.size() - row.pid.size(), ' ') + " | " + row.mode +
-         std::string(widths.mode.size() - row.mode.size(), ' ') + " | " + row.query +
-         std::string(widths.query.size() - row.query.size(), ' ') + " | " + row.streams;
+///
+/// Strumienie ida po JEDNYM NA LINIE: pierwszy w wierszu instancji, kazdy nastepny w linii
+/// kontynuacji z pustymi kolumnami po lewej. Plan o kilkunastu strumieniach sklejony w jedna
+/// komorke dawal wiersz na kilkaset znakow, ktory terminal zawijal w nieczytelny blok --
+/// kreski kolumn zostaja, wiec wiadomo, do ktorej instancji nalezy dana nazwa.
+std::vector<std::string> tableLines(const ServerRow &row, const ColumnWidths &widths) {
+  const auto cell = [](std::string_view value, std::size_t width) {
+    return std::string{value} + std::string(width - value.size(), ' ');
+  };
+  const std::string head = cell(row.server, widths.server) + " | " + cell(row.pid, widths.pid) + " | " +
+                           cell(row.mode, widths.mode) + " | " + cell(row.query, widths.query) + " | ";
+  const std::string continuation = cell("", widths.server) + " | " + cell("", widths.pid) + " | " + cell("", widths.mode) +
+                                   " | " + cell("", widths.query) + " | ";
+
+  std::vector<std::string> retVal;
+  retVal.reserve(row.streams.size());
+  for (const auto &stream : row.streams)
+    retVal.push_back((retVal.empty() ? head : continuation) + stream);
+  return retVal;
 }
 
 }  // namespace
@@ -304,29 +317,36 @@ std::vector<std::string> describe(const std::vector<bus::InstanceInfo> &instance
                     .pid     = std::to_string(instance.pid),
                     .mode    = modeLabel(instance.modes),
                     .query   = queryPathLabel(instance.queryFile),
-                    .streams = streamList(instance.streams)});
+                    .streams = instance.streams.empty() ? std::vector<std::string>{"-"} : instance.streams});
 
   // Kolejnosc slotow w segmencie zalezy od kolejnosci startow, a wyjscie ma byc powtarzalne.
   std::ranges::sort(rows, {}, &ServerRow::server);
 
-  const ServerRow header{.server = "SERVER", .pid = "PID", .mode = "MODE", .query = "QUERY", .streams = "STREAMS"};
-  ServerRow widths = header;
+  const ServerRow header{.server = "SERVER", .pid = "PID", .mode = "MODE", .query = "QUERY", .streams = {"STREAMS"}};
+  ColumnWidths widths{.server  = header.server.size(),
+                      .pid     = header.pid.size(),
+                      .mode    = header.mode.size(),
+                      .query   = header.query.size(),
+                      .streams = header.streams.front().size()};
   for (const auto &row : rows) {
-    widths.server.resize(std::max(widths.server.size(), row.server.size()), ' ');
-    widths.pid.resize(std::max(widths.pid.size(), row.pid.size()), ' ');
-    widths.mode.resize(std::max(widths.mode.size(), row.mode.size()), ' ');
-    widths.query.resize(std::max(widths.query.size(), row.query.size()), ' ');
-    widths.streams.resize(std::max(widths.streams.size(), row.streams.size()), ' ');
+    widths.server = std::max(widths.server, row.server.size());
+    widths.pid    = std::max(widths.pid, row.pid.size());
+    widths.mode   = std::max(widths.mode, row.mode.size());
+    widths.query  = std::max(widths.query, row.query.size());
+    // Kolumne STREAMS mierzy POJEDYNCZA nazwa, a nie sklejona lista: kazda nazwa ma wlasna
+    // linie, wiec dlugosc calej listy nie mowi juz nic o szerokosci tabeli.
+    for (const auto &stream : row.streams)
+      widths.streams = std::max(widths.streams, stream.size());
   }
 
   std::vector<std::string> retVal;
-  retVal.reserve(rows.size() + 3);
-  retVal.push_back(tableLine(header, widths));
-  retVal.push_back(std::string(widths.server.size() + 1, '-') + "+" + std::string(widths.pid.size() + 2, '-') + "+" +
-                   std::string(widths.mode.size() + 2, '-') + "+" + std::string(widths.query.size() + 2, '-') + "+" +
-                   std::string(widths.streams.size() + 1, '-'));
+  retVal.push_back(tableLines(header, widths).front());
+  retVal.push_back(std::string(widths.server + 1, '-') + "+" + std::string(widths.pid + 2, '-') + "+" +
+                   std::string(widths.mode + 2, '-') + "+" + std::string(widths.query + 2, '-') + "+" +
+                   std::string(widths.streams + 1, '-'));
   for (const auto &row : rows)
-    retVal.push_back(tableLine(row, widths));
+    for (const auto &line : tableLines(row, widths))
+      retVal.push_back(line);
   // Legenda pod tabela, bo litery trybow nie sa odgadywalne. Wiersz zaczyna sie od "MODE:",
   // czyli nie pasuje do zadnego wzorca kolumnowego -- skrypty dopasowujace wiersze instancji
   // po "^<nazwa> |" jej nie widza.

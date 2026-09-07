@@ -105,14 +105,23 @@ wait_for_lock "$LOCK_B" "$pid_b"
 # ostatniego katalogu i nazwy pliku; pelna wartosc pozostaje w magistrali.
 # Kolumna MODE opisuje URUCHOMIENIE instancji: obie startuja bez zadnej opcji trybu, wiec
 # obie sa "N". Legenda liter jest ostatnim wierszem tabeli.
+#
+# Strumienie ida po jednym na linie, wiec ksztalt wiersza instancji i obecnosc strumienia
+# sa sprawdzane OSOBNO: `dsta` nie lezy juz w tej samej linii co pid i tryb, tylko w linii
+# kontynuacji o pustych kolumnach po lewej.
 xqry --bus > servers.txt
-grep -qE "^alfa[[:space:]]+\|[[:space:]]+$pid_a[[:space:]]+\|[[:space:]]+N[[:space:]]*\|[[:space:]]+\.\.\./multiserver_routing/alfa\.rql[[:space:]]+\|.*\bdsta\b" servers.txt || {
+grep -qE "^alfa[[:space:]]+\|[[:space:]]+$pid_a[[:space:]]+\|[[:space:]]+N[[:space:]]*\|[[:space:]]+\.\.\./multiserver_routing/alfa\.rql[[:space:]]+\|[[:space:]]+(srca|dsta)$" servers.txt || {
   echo "--bus nie opisal instancji alfa:"; cat servers.txt; exit 1; }
-grep -qE "^beta[[:space:]]+\|[[:space:]]+$pid_b[[:space:]]+\|[[:space:]]+N[[:space:]]*\|[[:space:]]+\.\.\./multiserver_routing/beta\.rql[[:space:]]+\|.*\bdstb\b" servers.txt || {
+grep -qE "^beta[[:space:]]+\|[[:space:]]+$pid_b[[:space:]]+\|[[:space:]]+N[[:space:]]*\|[[:space:]]+\.\.\./multiserver_routing/beta\.rql[[:space:]]+\|[[:space:]]+(srcb|dstb)$" servers.txt || {
   echo "--bus nie opisal instancji beta:"; cat servers.txt; exit 1; }
+for stream in srca dsta srcb dstb; do
+  grep -qE "\|[[:space:]]+${stream}$" servers.txt || {
+    echo "--bus nie wymienil strumienia ${stream}:"; cat servers.txt; exit 1; }
+done
 grep -qE "^MODE: N=normal, R=realtime, .*S=service$" servers.txt || {
   echo "--bus nie wypisal legendy trybow:"; cat servers.txt; exit 1; }
-[ "$(wc -l < servers.txt)" -eq 5 ] || {
+# Naglowek, separator, po dwie linie na instancje (srca+dsta, srcb+dstb) i legenda.
+[ "$(wc -l < servers.txt)" -eq 7 ] || {
   echo "--bus wypisal tabele o nieoczekiwanej liczbie wierszy:"; cat servers.txt; exit 1; }
 
 # (2) -s bez --server trafia do wlasciciela.
