@@ -1,14 +1,5 @@
 #!/bin/bash
 
-trap control_c SIGINT
-
-control_c()
-{
-    echo "Trapped CTRL-C"
-    xqry --server "$NAME" -k || true
-    if [ -t 0 ]; then stty sane; fi
-}
-
 STREAM=${1:-str1}
 QUERY=${2:-query.rql}
 SIZE=${3:-50,200}
@@ -37,6 +28,33 @@ fi
 
 \rm -rf temp && mkdir -p temp
 \rm -f nohup.out
+
+XRETRACTOR_PID=
+XQRY_PID=
+GNUPLOT_PID=
+PLOT_DIR=
+cleanup()
+{
+    # Sprzatamy tylko wlasne dzieci. Nazwa instancji mogla juz zostac przejeta
+    # przez nowy serwer, wiec koncowe `xqry --server "$NAME" -k` jest niebezpieczne.
+    trap - EXIT INT TERM
+    local pid
+    for pid in "$XQRY_PID" "$XRETRACTOR_PID"; do
+        if [ -n "$pid" ]; then kill -TERM "$pid" 2>/dev/null || true; fi
+    done
+    exec 4>&-
+    # Po zamknieciu producenta gnuplot dostaje EOF i zamyka takze okno Qt.
+    # SIGTERM do gnuplot omija to sprzatanie i zostawia osobny proces gnuplot_qt.
+    for pid in "$XQRY_PID" "$GNUPLOT_PID" "$XRETRACTOR_PID"; do
+        if [ -n "$pid" ]; then wait "$pid" 2>/dev/null || true; fi
+    done
+    if [ -n "$PLOT_DIR" ]; then rm -rf "$PLOT_DIR"; fi
+    if [ -t 0 ]; then stty sane; fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 nohup xretractor $QUERY --name "$NAME" -k -r &
 XRETRACTOR_PID=$!
 
@@ -51,7 +69,6 @@ for _ in $(seq 100); do
 done
 if [ -z "$READY" ]; then
     echo "xplot: instance '$NAME' failed to start; see nohup.out and the xretractor log" >&2
-    kill "$XRETRACTOR_PID" 2> /dev/null
     exit 1
 fi
 
@@ -68,7 +85,23 @@ fi
 case "$XQRY_EXTRA_FLAGS" in
   *--warmup*) echo "xplot: skipping the stream warm-up period; the plot window will appear shortly..." >&2 ;;
 esac
-{ printf 'bind "Close" "exit gnuplot"\n'; xqry --server "$NAME" -s "$STREAM" -p "$SIZE" $XQRY_EXTRA_FLAGS; } | gnuplot || true
-# gnuplot closed (window X or Ctrl+C) — cleanup
-xqry --server "$NAME" -k || true
-if [ -t 0 ]; then stty sane; fi
+# FIFO pozwala zachowac PID obu stron potoku jako bezposrednich dzieci skryptu.
+# Zwykly potok czekal na odrysowanie wszystkich zaleglych probek po smierci serwera.
+PLOT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/xplot.XXXXXXXX") || exit 1
+mkfifo "$PLOT_DIR/data" || exit 1
+exec 3<&0
+# Uchwyt otwarty w obie strony pozwala wystartowac czytnik takze wtedy, gdy
+# sygnal przerwie skrypt przed startem producenta. Sprzatanie zamyka ten uchwyt.
+exec 4<> "$PLOT_DIR/data"
+gnuplot < "$PLOT_DIR/data" 3<&- 4>&- &
+GNUPLOT_PID=$!
+{ printf 'bind "Close" "exit gnuplot"\n'; exec xqry --server "$NAME" -s "$STREAM" -p "$SIZE" $XQRY_EXTRA_FLAGS; } \
+    <&3 3<&- > "$PLOT_DIR/data" 4>&- &
+XQRY_PID=$!
+exec 3<&- 4>&-
+
+# Koniec dowolnego dziecka zamyka caly podglad, takze przy zapchanym potoku.
+# Sprawdzamy PID-y, bo `wait -n` moze pominac dziecko zakonczone przed jego wywolaniem.
+while kill -0 "$XRETRACTOR_PID" 2>/dev/null && kill -0 "$XQRY_PID" 2>/dev/null && kill -0 "$GNUPLOT_PID" 2>/dev/null; do
+    sleep 0.1
+done
