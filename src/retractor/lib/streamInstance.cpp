@@ -11,12 +11,11 @@
 
 #include "fatalError.hpp"
 
+#include "executorsmState.hpp"
 #include "expressionEvaluator.hpp"
 #include "persistentCounter.hpp"
 #include "rdb/convertTypes.hpp"
 #include "rdb/probe.hpp"
-
-extern std::unique_ptr<PersistentCounter> pCounterPtr;
 
 streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam)
     : coreInstance(coreInstance) {

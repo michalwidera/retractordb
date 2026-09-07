@@ -8,10 +8,9 @@
 
 #include "retractor/lib/presenter.hpp"
 #include "retractor/lib/qTree.hpp"
+#include "retractor/lib/RQLParser.hpp"
 
 // ctest -R '^ut-test_presenter' -V
-
-extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
 
 namespace po = boost::program_options;
 
@@ -52,7 +51,13 @@ TEST(presenter, tags_without_fields_returns_error) {
   EXPECT_TRUE(initCore());
   presenter p(coreInstance);
   auto vm = makeVM({"--tags"});
-  EXPECT_EQ(p.run(vm), (int)boost::system::errc::invalid_argument);
+
+  // Sciezka bledu tlumaczy sie operatorowi na stderr — asercja jest na kodzie powrotu.
+  testing::internal::CaptureStderr();
+  const int rc = p.run(vm);
+  testing::internal::GetCapturedStderr();
+
+  EXPECT_EQ(rc, (int)boost::system::errc::invalid_argument);
 }
 
 TEST(presenter, default_mode_returns_success) {
@@ -93,7 +98,12 @@ TEST(presenter, dot_mode_tags_requires_fields) {
   EXPECT_TRUE(initCore());
   presenter p(coreInstance);
   auto vm = makeVM({"--tags"});
-  EXPECT_NE(p.run(vm), (int)boost::system::errc::success);
+
+  testing::internal::CaptureStderr();
+  const int rc = p.run(vm);
+  testing::internal::GetCapturedStderr();
+
+  EXPECT_NE(rc, (int)boost::system::errc::success);
 }
 
 TEST(presenter, csv_mode_returns_success) {

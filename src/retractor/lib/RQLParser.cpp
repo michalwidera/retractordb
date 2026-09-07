@@ -1,3 +1,5 @@
+#include "RQLParser.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <iostream>
@@ -689,9 +691,6 @@ class ParserListener : public RQLBaseListener {
   }
 };
 
-/// Parsuje JEDNA porcje tekstu RQL. `firstLine` to numer wiersza, na ktorym ta porcja stoi
-/// w pliku zrodlowym — wolajacy, ktory tnie plik na instrukcje (parsePlanText,
-/// parserRQLFile_4Test), podaje tu pozycje instrukcji, reszta zostawia 1.
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
                                                                   std::vector<std::string> &statementKeywords,
                                                                   size_t firstLine) {

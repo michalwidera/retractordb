@@ -15,11 +15,9 @@
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/exprSimplify.hpp"
 #include "retractor/lib/qTree.hpp"
+#include "retractor/lib/RQLParser.hpp"
 
 // ctest -R '^ut-test_compiler' -V
-
-extern std::string parserRQLFile_4Test(qTree &coreInstance, const std::string &sInputFile);
-extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
 
 qTree coreInstance;
 
@@ -86,21 +84,25 @@ TEST(xparser, rule_on_missing_stream_is_refused_not_ignored) {
   // w pliku planu byla to cicho martwa regula, w ad-hoc — odpowiedz "OK" na polecenie, ktore
   // nie zrobilo nic.
   qTree instance;
+  testing::internal::CaptureStderr();
   auto [result, keyword, streamName] = parserRQLString(instance, R"(
         DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
         SELECT core0[0] STREAM dst FROM core0
         RULE r ON nosuch WHEN nosuch[0] > 0 DO DUMP -1 TO 1
       )");
+  testing::internal::GetCapturedStderr();
   EXPECT_NE(result, "OK");
   EXPECT_NE(result.find("no such stream is defined"), std::string::npos) << result;
 }
 
 TEST(xparser, rule_on_declaration_is_refused_without_killing_the_process) {
   qTree instance;
+  testing::internal::CaptureStderr();
   auto [result, keyword, streamName] = parserRQLString(instance, R"(
         DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
         RULE r ON core0 WHEN core0[0] > 0 DO DUMP -1 TO 1
       )");
+  testing::internal::GetCapturedStderr();
   EXPECT_NE(result, "OK");
   EXPECT_NE(result.find("declaration stream"), std::string::npos) << result;
 }
@@ -109,12 +111,14 @@ TEST(xparser, duplicate_rule_name_on_one_stream_is_refused) {
   // Nazwa reguly wchodzi do nazwy pliku zrzutu (dumpManager::createDumpFile), wiec powtorka
   // znaczy dwa zadania piszace do jednego pliku.
   qTree instance;
+  testing::internal::CaptureStderr();
   auto [result, keyword, streamName] = parserRQLString(instance, R"(
         DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
         SELECT core0[0] STREAM dst FROM core0
         RULE r ON dst WHEN dst[0] > 0 DO DUMP -1 TO 1
         RULE r ON dst WHEN dst[0] > 1 DO DUMP -2 TO 2
       )");
+  testing::internal::GetCapturedStderr();
   EXPECT_NE(result, "OK");
   EXPECT_NE(result.find("already defined"), std::string::npos) << result;
 }
@@ -123,11 +127,13 @@ TEST(xparser, empty_dump_range_is_refused_by_the_parser) {
   // Rownosc granic nie opisuje zadnego zrzutu, a nizej czekal na nia FatalError w
   // compiler::computeRequiredCapacities() — czyli w kanale ad-hoc smierc serwera.
   qTree instance;
+  testing::internal::CaptureStderr();
   auto [result, keyword, streamName] = parserRQLString(instance, R"(
         DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
         SELECT core0[0] STREAM dst FROM core0
         RULE r ON dst WHEN dst[0] > 0 DO DUMP 5 TO 5
       )");
+  testing::internal::GetCapturedStderr();
   EXPECT_NE(result, "OK");
   EXPECT_NE(result.find("is empty"), std::string::npos) << result;
 }

@@ -32,6 +32,24 @@ ninja descgrammar   # regenerate ANTLR4 grammar from DESC.g4
 ninja rqlgrammar    # regenerate ANTLR4 grammar from RQL.g4
 ```
 
+**CI locally, before pushing** (`scripts/test-ci.sh`, needs a running Docker):
+```bash
+ninja test-ci        # = test-ci-commit: the only job CircleCI runs after a push
+ninja test-ci-smoke  # Debug compile only, no tests (L1 of the nightly run)
+ninja test-ci-fast   # same job, build/ kept between runs — quick, NOT a faithful CI run
+scripts/test-ci.sh --list   # every profile with the CircleCI job it mirrors
+```
+Each profile copies the working tree into a container built from the CI image
+(`micwide/buildenv-retractordb`) capped at the CI executor's resources (4 vCPU / 8 GiB)
+and runs that job's steps. Outside `all` and outside `ninja test`. Profiles mirror
+`.circleci/config.yml` by hand: change that file, change `scripts/test-ci.sh`.
+
+Every `test-ci-*` profile builds from scratch, like the CI checkout — tens of minutes, and
+ccache does not shorten it (this tree compiles with `-fmodules-ts`, which ccache cannot cache).
+`test-ci-fast` trades that fidelity for speed by keeping `build/` in a per-profile Docker volume;
+use it to check a change before committing, not to conclude anything about a CI run.
+`scripts/test-ci.sh --profile <name> --reset-build` drops a kept build directory.
+
 **Single test:**
 ```bash
 ctest -R ut_payload     # by name

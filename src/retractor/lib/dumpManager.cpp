@@ -11,9 +11,8 @@
 #include <spdlog/spdlog.h>
 
 #include "dataModel.hpp"
+#include "executorsmState.hpp"
 #include "fatalError.hpp"
-
-extern dataModel *pProc;
 
 namespace {
 constexpr mode_t kDefaultDumpFileMode = 0644;

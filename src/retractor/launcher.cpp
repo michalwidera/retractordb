@@ -26,6 +26,7 @@
 #include "lib/compiler.hpp"
 #include "lib/executor_rt.hpp"
 #include "lib/executorsm.hpp"
+#include "lib/executorsmState.hpp"
 #include "lib/lockManager.hpp"
 #include "lib/persistentCounter.hpp"
 #include "lib/planSource.hpp"
@@ -127,10 +128,6 @@
 using namespace boost;
 
 using boost::lexical_cast;
-
-extern std::atomic<int> iLoopLimitCnt;
-
-extern std::vector<std::pair<std::string, std::string>> processedLines;
 
 static void handleSignal(int signum) {
   switch (signum) {

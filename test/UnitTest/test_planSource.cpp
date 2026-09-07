@@ -48,7 +48,9 @@ TEST(PlanSource, statements_land_in_the_plan_and_in_the_line_list) {
 
 TEST(PlanSource, a_broken_statement_stops_the_load_and_reports_the_reason) {
   qTree plan;
+  testing::internal::CaptureStderr();
   const PlanSource loaded = parsePlanText(plan, "SELECT ((( STREAM dst FROM src\n");
+  testing::internal::GetCapturedStderr();
 
   EXPECT_NE(loaded.status, "OK");
   EXPECT_TRUE(loaded.lines.empty());
@@ -58,10 +60,12 @@ TEST(PlanSource, a_broken_statement_stops_the_load_and_reports_the_reason) {
 /// od zadnego: skompilowalby sie i policzyl COS INNEGO, niz operator zapisal w pliku.
 TEST(PlanSource, load_stops_at_the_first_bad_statement) {
   qTree plan;
+  testing::internal::CaptureStderr();
   const PlanSource loaded = parsePlanText(plan,
                                           "DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'\n"
                                           "SELECT ((( STREAM broken FROM src\n"
                                           "SELECT a+2 STREAM never FROM src\n");
+  testing::internal::GetCapturedStderr();
 
   EXPECT_NE(loaded.status, "OK");
   ASSERT_EQ(loaded.lines.size(), 1U);

@@ -7,10 +7,7 @@
 
 #include <spdlog/spdlog.h>
 
-extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile,
-                                                                         std::vector<std::string> &statementKeywords,
-                                                                         size_t firstLine);
-extern std::vector<std::pair<std::string, size_t>> readLogicalLines(std::istream &file);
+#include "RQLParser.hpp"
 
 namespace {
 

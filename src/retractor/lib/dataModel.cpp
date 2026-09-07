@@ -10,6 +10,7 @@
 #include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
 
+#include "executorsmState.hpp"
 #include "fatalError.hpp"
 #include "rdb/convertTypes.hpp"
 #include "rdb/probe.hpp"

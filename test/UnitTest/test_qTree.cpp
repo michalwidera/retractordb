@@ -156,7 +156,11 @@ TEST(qTree, dumpCore_does_not_crash) {
   qt.push_back(makeQuery("s2", 1, 1));
   qt.maxCapacity["s1"] = 10;
   qt.maxCapacity["s2"] = 5;
+
+  // dumpCore() pisze tabele na stdout — to jego zadanie, nie hałas do logu testu.
+  testing::internal::CaptureStdout();
   qt.dumpCore();
+  testing::internal::GetCapturedStdout();
 }
 
 // ============================================================
