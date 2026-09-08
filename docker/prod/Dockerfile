@@ -80,9 +80,17 @@ CMD ["/sbin/init"]
 # How to run (systemd jako PID 1 wymaga dostępu do cgroup):
 #   docker run -d --name retractordb \
 #     --tmpfs /run --tmpfs /tmp \
+#     --shm-size=512m \
 #     -v /sys/fs/cgroup:/sys/fs/cgroup:rw \
 #     --cgroupns=host \
 #     retractordb:latest
+#
+# --shm-size: docker daje /dev/shm domyślnie 64 MiB, a obiekty IPC silnika leżą właśnie tam.
+# Rezerwacja stała to ~1,9 MiB (segment magistrali 854 KiB + kolejka komend 1000 KiB + segment
+# mapy 64 KiB), a każdy subskrybent `xqry` dokłada własną kolejkę: 10 s zapasu przy takcie
+# 1 ms to 10 MiB na klienta. Przy domyślnych 64 MiB szósty klient jest ostatnim, który się
+# mieści; 512 MiB daje zapas kilkudziesięciu. Wycena konkretnego planu:
+#   docker exec retractordb xretractor -c --shmbudget /etc/retractor/startup.rql
 #
 # Logowanie do kontenera (shell):
 #   docker exec -it retractordb bash              # jako root

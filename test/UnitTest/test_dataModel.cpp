@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
-#include <iostream>
 #include <locale>
 #include <sstream>
 #include <string>
@@ -15,12 +14,11 @@
 #include "rdb/probe.hpp"  // sonda E4 (liczy tylko w buildzie RDB_BENCH_PROBE)
 #include "rdb/storage.hpp"
 #include "retractor/lib/dataModel.hpp"
+#include "retractor/lib/executorsmState.hpp"
 #include "retractor/lib/qTree.hpp"  // coreInstance
+#include "retractor/lib/RQLParser.hpp"
 
 // ctest -R '^ut-test_dataModel' -V
-
-extern std::string parserRQLFile_4Test(qTree &coreInstance, const std::string &sInputFile);
-extern dataModel *pProc;
 
 qTree coreInstance;
 
@@ -126,7 +124,6 @@ TEST_F(xschema, check_construct_payload) {
     coutstring1 << rdb::singleLineFormat << payload->descriptor;
     std::stringstream coutstring2;
     coutstring2 << rdb::singleLineFormat << *payload;
-    std::cerr << rdb::singleLineFormat << *(payload) << '\n';
 
     EXPECT_TRUE(coutstring2.str() == "{ str1_0:16 str1_1:15 str1_2:14 str1_3:13 }");
     EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
@@ -151,7 +148,6 @@ TEST_F(xschema, check_construct_payload_mirror) {
 
     std::stringstream coutstring2;
     coutstring2 << rdb::singleLineFormat << *payload;
-    std::cout << rdb::singleLineFormat << *payload << '\n';
 
     EXPECT_TRUE(coutstring2.str() == "{ str1_0:13 str1_1:14 str1_2:15 str1_3:16 }");
     EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str1_2 INTEGER str1_3 }");
@@ -265,11 +261,9 @@ TEST_F(xschema, check_sum) {
 
     std::stringstream coutstring1;
     coutstring1 << rdb::singleLineFormat << payload.descriptor;
-    std::cout << coutstring1.str() << '\n';
 
     std::stringstream coutstring2;
     coutstring2 << rdb::singleLineFormat << payload;
-    std::cout << "!" << coutstring2.str() << '\n';
 
     EXPECT_TRUE(coutstring2.str() == "{ str1_0:15 str1_1:16 str2_0:333 }");
     EXPECT_TRUE(coutstring1.str() == "{ INTEGER str1_0 INTEGER str1_1 INTEGER str2_0 }");

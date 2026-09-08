@@ -5,9 +5,12 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <expected>
 #include <iostream>
+#include <print>
 #include <sstream>
 #include <thread>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 #include <boost/system/system_error.hpp>
@@ -25,9 +28,9 @@ using boost::property_tree::ptree;
 // Musi pomieścić jedną sformatowaną linię z nazwami wszystkich kolumn strumienia.
 constexpr int kDirLineBufferSize = 1024;
 
-qry::qry(int serverNoDataTimeoutMs, int clientResponseMaxFails, int responseQueueOpenMaxFails)
+qry::qry(int serverNoDataTimeoutMs, int clientResponseMaxFails, int responseQueueOpenMaxFails, std::string_view serverName)
     : serverNoDataTimeoutMs_(std::max(1, serverNoDataTimeoutMs)),
-      transport_(std::make_unique<IpcClient>(clientResponseMaxFails, responseQueueOpenMaxFails)),
+      transport_(std::make_unique<IpcClient>(clientResponseMaxFails, responseQueueOpenMaxFails, serverName)),
       formatter_(std::make_unique<Formatter>()) {}
 qry::~qry() = default;
 
@@ -52,10 +55,145 @@ bool qry::adhoc(const std::string &sAdhoc) {
   return false;
 }
 
+namespace {
+
+/// Werdykt serwera wyjety z odpowiedzi. Ten sam ksztalt co w qry::adhoc: serwer wpisuje
+/// jedna wartosc pod kluczem `db` albo `error.response`.
+std::string serverVerdict(const boost::property_tree::ptree &pt) {
+  std::string rcv("fail.");
+  for (const auto &[first, second] : pt) {
+    rcv = second.get<std::string>("");
+  }
+  return rcv;
+}
+
+/// Rozstrzygniecie odpowiedzi serwera PRZED siegnieciem po jej zawartosci. Dotyczy kazdej
+/// komendy wymagajacej modelu danych ('get', 'detail'), bo kazda z nich moze zastac te same
+/// stany instancji.
+enum class answerVerdict : std::uint8_t {
+  streams,     ///< odpowiedz niesie liste strumieni
+  idle,        ///< instancja odpowiedziala, ale nie ma wczytanego planu
+  stopping,    ///< instancja odpowiedziala, ale wlasnie sie zamyka
+  noResponse,  ///< serwer nie odpowiedzial w wyznaczonym czasie
+  malformed    ///< serwer odpowiedzial, ale odpowiedz nie niesie ani listy, ani znanego werdyktu
+};
+
+/// Kolejnosc jest tu cala trescia: brak odpowiedzi i kazdy stan bez planu tak samo NIE niosa
+/// `db.stream`, a to rozne awarie i rozne naprawy. Rozpoznanie po samym braku wezla kazalo
+/// `dir()` i `dirYaml()` meldowac zdrowo wygladajacy stan bezczynny wtedy, gdy serwer w ogole
+/// nie odpowiedzial — i konczyc sie zerem. Najpierw wiec `error.response`, potem DOKLADNE
+/// odpowiedzi serwera, a dopiero na koncu worek na wszystko inne.
+///
+/// Odpowiedz na 'detail' przechodzi tym samym sitem: `db.stream` jest w niej wezlem z nazwa
+/// strumienia, wiec udana odpowiedz daje `streams`, a przeladowanie planu miedzy 'get'
+/// a 'detail' — `idle` albo `stopping`, zamiast wyjatku o brakujacym `db.field`.
+answerVerdict classifyAnswer(const boost::property_tree::ptree &pt) {
+  if (pt.get_optional<std::string>("error.response")) return answerVerdict::noResponse;
+  if (pt.get_child_optional("db.stream")) return answerVerdict::streams;
+  const auto reason = pt.get_optional<std::string>("db");
+  if (!reason) return answerVerdict::malformed;
+  if (*reason == constants::kNoActivePlanReply) return answerVerdict::idle;
+  if (*reason == constants::kServerStoppingReply) return answerVerdict::stopping;
+  return answerVerdict::malformed;
+}
+
+/// Komunikat dla operatora, jeden na werdykt. Trzyma sie tu, przy klasyfikacji, bo kazde
+/// wywolanie 'get' opisuje ten sam stan serwera — komenda, ktora go zastala, niczego w nim
+/// nie zmienia.
+const char *describe(answerVerdict verdict) {
+  switch (verdict) {
+    case answerVerdict::streams:
+      return "server returned the stream list";
+    case answerVerdict::idle:
+      return "server has no plan loaded";
+    case answerVerdict::stopping:
+      return "server is shutting down";
+    case answerVerdict::noResponse:
+      return "server did not answer within the timeout";
+    case answerVerdict::malformed:
+      return "server response carries no stream list";
+  }
+  return "unknown server verdict";
+}
+
+/// Werdykt widziany przez operatora i przez kod wyjscia. Odpowiedz zepsuta idzie tu razem
+/// z brakiem odpowiedzi: dla wolajacego to ta sama porazka — listy nie ma — a rozroznia je
+/// komunikat z describe().
+selectResult toSelectResult(answerVerdict verdict) {
+  switch (verdict) {
+    case answerVerdict::streams:
+      return selectResult::ok;
+    case answerVerdict::idle:
+      return selectResult::noActivePlan;
+    case answerVerdict::stopping:
+      return selectResult::serverStopping;
+    case answerVerdict::noResponse:
+    case answerVerdict::malformed:
+      return selectResult::serverNoResponse;
+  }
+  return selectResult::serverNoResponse;
+}
+
+}  // namespace
+
+bool qry::reset(const std::string &planText) {
+  const std::size_t chunkCount = (planText.size() + kResetChunkBytes - 1) / kResetChunkBytes;
+
+  const auto refuse = [](const std::string &stage, const std::string &verdict) {
+    // Werdykt idzie na stderr raz. SPDLOG w xqry pisze wlasnie na stderr (i do pliku logu),
+    // wiec dolozenie tam drugiej kopii dawalo operatorowi ten sam komunikat dwa razy.
+    std::println(std::cerr, "xqry: plan reload refused at {}: {}", stage, verdict);
+    return true;
+  };
+
+  if (const std::string verdict = serverVerdict(netClient("reset-begin", std::to_string(chunkCount))); verdict != "OK")
+    return refuse("reset-begin", verdict);
+
+  for (std::size_t offset = 0; offset < planText.size(); offset += kResetChunkBytes) {
+    const std::string chunk = planText.substr(offset, kResetChunkBytes);
+    if (const std::string verdict = serverVerdict(netClient("reset-chunk", chunk)); verdict != "OK")
+      return refuse("reset-chunk", verdict);
+  }
+
+  // Dopiero commit uruchamia walidacje po stronie serwera: parsowanie, kompilacje i
+  // rozlacznosc nazw. Do tej chwili dzialajacy plan nie jest niczym dotkniety.
+  if (const std::string verdict = serverVerdict(netClient("reset-commit", "")); verdict != "OK")
+    return refuse("reset-commit", verdict);
+
+  return false;
+}
+
 selectResult qry::select(boost::program_options::variables_map &vm, const int iElemLimit, const std::string &input,
                          std::tuple<int, int, int> gnuplotDim, bool gnuplotRightToLeft) {
   elemLimitCnt = (iElemLimit > 0) ? iElemLimit + 1 : iElemLimit;
-  ptree pt     = netClient("get", "");
+
+  // Zatrzymanie klawiszem nalezy wylacznie do przebiegu NIEOGRANICZONEGO. Przebieg
+  // z zadeklarowanym budzetem elementow (-m N) konczy sie po tym budzecie i po niczym innym,
+  // bo jego wynik ma byc powtarzalny. Bez tego warunku bajt czekajacy na terminalu konczyl
+  // petle przed odczytaniem czegokolwiek: klient wychodzil z zerem elementow i -- co gorsza --
+  // z werdyktem obciazajacym serwer, bo watek producenta byl wtedy zrywany, zanim raz sprobowal
+  // otworzyc swoja kolejke. Tak padl it_fncall_runtime_case na CI (2026-09-04): stdin kroku jest
+  // tam terminalem, a CTest przekazuje go testom. Ta sama regula i to samo uzasadnienie co dla
+  // silnika w executorsm.cpp (`ignoreanykey`), gdzie ta pulapka wywrocila it_agse_array.
+  // Ctrl+C (SIGINT) zatrzymuje klienta bez zmian, obiema drogami.
+  const bool ignoreAnyKey = vm.contains("needctrlc") || iElemLimit > 0;
+
+  // SUBSKRYPCJA IDZIE PIERWSZA, przed jakakolwiek inna komenda. Serwer wstrzymany bramka
+  // --xqrywait rusza po PIERWSZEJ obsluzonej komendzie, a kolejke odpowiedzi tego klienta
+  // tworzy dopiero handler 'show'. Gdy przed nim szedl 'get' (walidacja nazwy strumienia),
+  // miedzy jedna komenda a druga serwer juz liczyl i emitowal do nikogo: przy takcie 1/8 s
+  // okno wynosilo 125 ms na wiersz, a wiersze z niego przepadaly bezpowrotnie. Lokalnie
+  // przerwa 'get'->'show' to pojedyncze milisekundy, na obciazonym kontenerze CI przekracza
+  // takt -- tak padl it_null_divide_by_zero (2026-09-08): zamiast 25, null, 20 klient dostal
+  // null, 20, null. Drugi czlon naprawy jest po stronie serwera (ipcServer.cpp: bramke
+  // zdejmuje komenda OBSLUZONA, nie odebrana), i dopiero oba razem zamykaja to okno.
+  //
+  // Walidacja nazwy nie znika, tylko idzie za subskrypcja: 'get' nizej rozstrzyga, czy
+  // strumien w ogole istnieje, i to jego werdykt pada pierwszy. Subskrypcja nieistniejacego
+  // strumienia jest po stronie serwera odmowa bez skutkow ubocznych -- kolejka nie powstaje.
+  streamTable[input] = netClient("show", input);
+
+  ptree pt = netClient("get", "");
 
   // Brak odpowiedzi serwera jest ODPOWIEDZIĄ, a nie niespodzianką w strukturze
   // danych. `netClient` po wyczerpaniu prób zwraca ptree z samym
@@ -63,26 +201,37 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
   // i wywracała się wyjątkiem „No such node (db.stream)". Operator dostawał
   // komunikat o brakującym węźle zamiast informacji, że serwer nie zdążył
   // odpowiedzieć — a to dwie różne awarie i dwie różne naprawy (issue_215).
-  if (pt.get_optional<std::string>("error.response")) {
-    SPDLOG_ERROR("server did not answer the 'get' command within the timeout (stream: {})", input);
-    return selectResult::serverNoResponse;
-  }
-  const auto streamNode = pt.get_child_optional("db.stream");
-  if (!streamNode) {
-    SPDLOG_ERROR("server response carries no stream list (stream: {})", input);
-    return selectResult::serverNoResponse;
+  // Rozpoznanie należy do `classifyAnswer`, wspólnego z `dir()`, `dirYaml()`
+  // i `detailNode()`: gdy każda z tych ścieżek miała własną kopię tej kolejności,
+  // trzy z nich się rozjechały i uznawały milczenie serwera za stan bezczynny.
+  if (const answerVerdict verdict = classifyAnswer(pt); verdict != answerVerdict::streams) {
+    SPDLOG_ERROR("{} (stream: {})", describe(verdict), input);
+    return toSelectResult(verdict);
   }
 
-  const bool found = std::ranges::any_of(*streamNode, [input, this](const auto &node) {
+  const bool found = std::ranges::any_of(pt.get_child("db.stream"), [input](const auto &node) {
     const ptree &v = node.second;
-    bool ret       = (input == v.get<std::string>(""));
-    if (ret) streamTable[input] = netClient("show", input);
-    return ret;
+    return input == v.get<std::string>("");
   });
 
   if (!found) {
     SPDLOG_ERROR("not found: {}", input);
     return selectResult::streamNotFound;
+  }
+
+  // Odpowiedź na 'show' sprawdzana tak samo jak odpowiedź na 'get' powyżej — i dopiero
+  // TERAZ, czyli po rozstrzygnięciu, że strumień istnieje: subskrypcja idzie pierwsza,
+  // więc dla nieznanej nazwy serwer odmawia jej, zanim ktokolwiek zdąży to nazwać, a
+  // werdyktem tego przypadku pozostaje `streamNotFound` powyżej, nie awaria kolejki. Do
+  // 2026-09-04 odpowiedź na 'show' nie była sprawdzana wcale, a handler 'show' nie wpisuje niczego do
+  // odpowiedzi TAKŻE po udanej subskrypcji — połknięty po stronie serwera wyjątek dawał
+  // więc odpowiedź nie do odróżnienia od powodzenia. Klient ruszał z wątkiem producenta
+  // i meldował dopiero brak kolejki, sekundę później i bez nazwania przyczyny; zdanie
+  // nazywające wyjątek zostawało w logu serwera. Werdykt jest ten sam
+  // (clientQueueMissing: kolejki faktycznie nie ma), ale pada od razu i z powodem.
+  if (const auto reason = streamTable[input].get_optional<std::string>("error.response")) {
+    SPDLOG_ERROR("server rejected the 'show' command (stream: {}): {}", input, *reason);
+    return selectResult::clientQueueMissing;
   }
 
   std::jthread producer_thread([this] { transport_->producer(); });
@@ -102,7 +251,7 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
   ptree e_value;
   try {
     while (!transport_->done) {
-      if (_kbhit(vm.contains("needctrlc"))) break;
+      if (_kbhit(ignoreAnyKey)) break;
       if (elemLimitCnt == 1) {
         if (vm.contains("kill")) {
           netClient("kill", "");
@@ -133,6 +282,12 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
             ++rendered;
             noDataCounter = 0;
           }
+        // Budzet elementow (-m N) musi zamykac TAKZE ta petle, nie tylko zewnetrzna.
+        // Pojedynczy obrot oproznia kolejke do konca, wiec gdy producent zdazyl wlozyc
+        // wiecej niz jeden wiersz, wszystkie szly na wyjscie i dopiero potem petla
+        // zewnetrzna sprawdzala budzet. `-m 1` na strumieniu z tablica dawalo dwie klatki
+        // gnuplota zamiast jednej -- wynik zalezny od wyscigu, a mial byc powtarzalny.
+        if (elemLimitCnt == 1) break;
       }
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
       if (++noDataCounter > serverNoDataTimeoutMs_) {
@@ -188,6 +343,10 @@ const char *toString(selectResult result) {
       return "server did not create the client response queue";
     case selectResult::noData:
       return "no data in stream";
+    case selectResult::noActivePlan:
+      return "server has no plan loaded (idle); load one with --reset";
+    case selectResult::serverStopping:
+      return "server is shutting down";
   }
   return "unknown";
 }
@@ -206,11 +365,22 @@ int qry::hello() {
   return system::errc::success;
 }
 
-std::string qry::dirYaml() {
+std::expected<std::string, selectResult> qry::dirYaml() {
   std::stringstream retval;
   ptree pt = netClient("get", "");
 
   retval << "---\napiVersion: xqry/v1\n";
+  const answerVerdict verdict = classifyAnswer(pt);
+  // Instancja bez planu daje dokument z pusta lista, tak samo jak `--bus -y` przy pustej
+  // magistrali. Konsument YAML-a ma dostac dokument, a nie wyjatek o brakujacym wezle.
+  if (verdict == answerVerdict::idle) {
+    retval << "streams: []\n";
+    return retval.str();
+  }
+  if (verdict != answerVerdict::streams) {
+    SPDLOG_ERROR("qry::dirYaml: {}", describe(verdict));
+    return std::unexpected(toSelectResult(verdict));
+  }
   retval << "streams:\n";
   for (const auto &v : pt.get_child("db.stream")) {
     auto location = v.second.get<std::string>("location");
@@ -226,76 +396,183 @@ std::string qry::dirYaml() {
   return retval.str();
 }
 
-std::string qry::dir() {
+std::expected<std::string, selectResult> qry::dir() {
   std::stringstream retval;
-  ptree pt                       = netClient("get", "");
-  std::vector<std::string> vcols = {"", "duration", "size", "count", "location", "cap"};
-  std::stringstream ss;
-  for (auto nName : vcols) {
-    auto stream    = pt.get_child("db.stream");
-    auto maxSizeIt = std::ranges::max_element(stream, [&nName](const auto &node1, const auto &node2) {
-      const ptree &v1 = node1.second;
-      const ptree &v2 = node2.second;
-      return v1.get<std::string>(nName).length() < v2.get<std::string>(nName).length();
-    });
-    ss << "|%" << maxSizeIt->second.get<std::string>(nName).length() << "s";
+  ptree pt = netClient("get", "");
+  // Instancja bez planu nie odsyla listy strumieni, ale ODPOWIADA — i dostaje wlasny,
+  // niepusty wydruk. Do 2026-09-05 get_child ponizej rzucalo wtedy "No such node
+  // (db.stream)", a wyjatek wychodzil do operatora jako "Std: ..." — komunikat o strukturze
+  // ptree zamiast o stanie serwera.
+  const answerVerdict verdict = classifyAnswer(pt);
+  if (verdict == answerVerdict::idle) return std::string(constants::kNoActivePlanReply) + "\n";
+  if (verdict != answerVerdict::streams) {
+    SPDLOG_ERROR("qry::dir: {}", describe(verdict));
+    return std::unexpected(toSelectResult(verdict));
   }
-  ss << "|\n";
+  // Klucz w ptree ("" to nazwa strumienia) i naglowek kolumny w wydruku.
+  const std::array vcols{std::pair{std::string{""}, std::string{"name"}},
+                         std::pair{std::string{"duration"}, std::string{"duration"}},
+                         std::pair{std::string{"size"}, std::string{"size"}},
+                         std::pair{std::string{"count"}, std::string{"count"}},
+                         std::pair{std::string{"location"}, std::string{"location"}},
+                         std::pair{std::string{"cap"}, std::string{"cap"}}};
+  // Forma tabeli jest wspolna z `xqry --bus` (routing::describe): kolumny do lewej,
+  // separator " | ", bez brzegowych kresek. Ostatnia kolumna nie jest dopelniana, wiec
+  // wiersz nie konczy sie spacjami.
+  std::stringstream ss;
+  std::stringstream separator;
+  for (std::size_t column = 0; column < vcols.size(); ++column) {
+    const auto &[key, title] = vcols[column];
+    std::size_t width        = title.length();
+    for (const auto &v : pt.get_child("db.stream"))
+      width = std::max(width, v.second.get<std::string>(key).length());
+    const bool last = column + 1 == vcols.size();
+    if (last)
+      ss << "%s\n";
+    else
+      ss << "%-" << width << "s | ";
+    separator << std::string(width, '-') << (last ? "" : "-+-");
+  }
+  separator << "\n";
 
-  std::array<char, static_cast<std::size_t>(kDirLineBufferSize)> buffer{};
-  for (const auto &v : pt.get_child("db.stream")) {
+  auto emitRow = [&](const std::string &name, const std::string &duration, const std::string &size, const std::string &count,
+                     const std::string &location, const std::string &cap) {
+    std::array<char, static_cast<std::size_t>(kDirLineBufferSize)> buffer{};
     int n = snprintf(buffer.data(), buffer.size(), ss.str().c_str(),  //
-                     v.second.get<std::string>("").c_str(),           //
-                     v.second.get<std::string>("duration").c_str(),   //
-                     v.second.get<std::string>("size").c_str(),       //
-                     v.second.get<std::string>("count").c_str(),      //
-                     v.second.get<std::string>("location").c_str(),   //
-                     v.second.get<std::string>("cap").c_str());
+                     name.c_str(),                                    //
+                     duration.c_str(),                                //
+                     size.c_str(),                                    //
+                     count.c_str(),                                   //
+                     location.c_str(),                                //
+                     cap.c_str());
     if (n < 0) {
-      SPDLOG_ERROR("qry::dir: snprintf failed while formatting stream '{}'", v.second.get<std::string>(""));
-      continue;
+      SPDLOG_ERROR("qry::dir: snprintf failed while formatting stream '{}'", name);
+      return;
     }
     if (static_cast<std::size_t>(n) >= buffer.size()) {
-      SPDLOG_ERROR("qry::dir: formatted output truncated for stream '{}' (required {}, buffer {})",
-                   v.second.get<std::string>(""), n, buffer.size());
+      SPDLOG_ERROR("qry::dir: formatted output truncated for stream '{}' (required {}, buffer {})", name, n, buffer.size());
       buffer[buffer.size() - 1] = '\0';
     }
     retval << buffer.data();
-  }
+  };
+
+  std::apply([&](const auto &...column) { emitRow(column.second...); }, vcols);
+  retval << separator.str();
+  for (const auto &v : pt.get_child("db.stream"))
+    emitRow(v.second.get<std::string>(""),          //
+            v.second.get<std::string>("duration"),  //
+            v.second.get<std::string>("size"),      //
+            v.second.get<std::string>("count"),     //
+            v.second.get<std::string>("location"),  //
+            v.second.get<std::string>("cap"));
 
   return retval.str();
 }
 
 static const std::string indent = "  ";
 
-std::string qry::detailShow(const std::string &input) {
-  std::stringstream retval;
+// Tabela kolumnowa w formie wspolnej z `dir()` i `xqry --bus`: kolumny do lewej, laczone
+// " | ", bez brzegowych kresek, ostatnia kolumna niedopelniana (wiersz nie konczy sie
+// spacjami). Szerokosc kolumny wynika z najszerszej wartosci, naglowek wliczony.
+static std::string columnTable(const std::vector<std::string> &header, const std::vector<std::vector<std::string>> &rows) {
+  std::vector<std::size_t> widths;
+  widths.reserve(header.size());
+  for (std::size_t column = 0; column < header.size(); ++column) {
+    std::size_t width = header[column].length();
+    for (const auto &row : rows)
+      width = std::max(width, row[column].length());
+    widths.push_back(width);
+  }
+
+  auto emitRow = [&widths](const std::vector<std::string> &row) {
+    std::string line;
+    for (std::size_t column = 0; column < row.size(); ++column) {
+      line += row[column];
+      if (column + 1 != row.size()) line += std::string(widths[column] - row[column].length(), ' ') + " | ";
+    }
+    return line + "\n";
+  };
+
+  std::string retval = emitRow(header);
+  for (std::size_t column = 0; column < widths.size(); ++column)
+    retval += std::string(widths[column], '-') + (column + 1 == widths.size() ? "\n" : "-+-");
+  for (const auto &row : rows)
+    retval += emitRow(row);
+  return retval;
+}
+
+std::expected<ptree, selectResult> qry::detailNode(const std::string &input) {
   ptree pt = netClient("get", "");
 
+  // Brak listy strumieni nie jest niespodzianka w strukturze danych, tylko odpowiedzia.
+  // Do 2026-09-06 `get_child` ponizej rzucalo tu "No such node (db.stream)" — zarowno dla
+  // instancji bezczynnej, jak i dla milczacego serwera — a operator dostawal komunikat
+  // o wezle ptree zamiast o stanie serwera.
+  if (const answerVerdict verdict = classifyAnswer(pt); verdict != answerVerdict::streams) {
+    SPDLOG_ERROR("{} (stream: {})", describe(verdict), input);
+    return std::unexpected(toSelectResult(verdict));
+  }
+
   const auto streams = pt.get_child("db.stream");
-  bool found         = std::ranges::any_of(streams, [&input](const auto &node) {
+  const bool found   = std::ranges::any_of(streams, [&input](const auto &node) {
     const ptree &v = node.second;
     return input == v.get<std::string>("");
   });
 
-  if (found) {
-    ptree ptsh = netClient("detail", input);
-    auto delta = ptsh.get_child("db.duration");
-    auto query = ptsh.get_child("db.processed_line");
-    auto id    = ptsh.get_child("db.stream");
+  if (!found) {
+    SPDLOG_ERROR("not found: {}", input);
+    return std::unexpected(selectResult::streamNotFound);
+  }
 
-    retval << "---\napiVersion: xqry/v1\n";
-    retval << "stream:\n";
-    retval << indent << "name: " << id.get_value<std::string>() << "\n";
-    retval << indent << "delta: " << delta.get_value<std::string>() << "\n";
-    retval << "query: " << query.get_value<std::string>() << "\n";
-    retval << "fields:\n";
-    for (const auto &v : ptsh.get_child("db.field")) {
-      retval << indent << input << "." << v.second.get<std::string>("") << ":\n";
-      retval << indent << indent << "type: " << ptsh.get<std::string>("db.field_type." + v.second.get<std::string>("")) << "\n";
-    }
-  } else
-    SPDLOG_ERROR("not found");
+  // Drugi obrot IPC ma te same tryby porazki co pierwszy — i wlasny wyscig: plan moze zostac
+  // przeladowany MIEDZY 'get' a 'detail', wiec strumien policzony przed chwila juz nie
+  // istnieje. Bez tego sita `db.field` ponizej rzucalo w takim wyscigu wyjatkiem.
+  ptree detail = netClient("detail", input);
+  if (const answerVerdict verdict = classifyAnswer(detail); verdict != answerVerdict::streams) {
+    SPDLOG_ERROR("{} (stream: {})", describe(verdict), input);
+    return std::unexpected(toSelectResult(verdict));
+  }
+  return detail;
+}
+
+std::expected<std::string, selectResult> qry::detailShow(const std::string &input) {
+  const auto ptsh = detailNode(input);
+  if (!ptsh) return std::unexpected(ptsh.error());
+
+  std::vector<std::vector<std::string>> fields;
+  for (const auto &v : ptsh->get_child("db.field")) {
+    const auto name           = v.second.get<std::string>("");
+    std::string qualifiedName = input;
+    qualifiedName += '.';
+    qualifiedName += name;
+    std::string typePath = "db.field_type.";
+    typePath += name;
+    fields.push_back({std::move(qualifiedName), ptsh->get<std::string>(typePath)});
+  }
+
+  // Naglowek strumienia i lista pol to dwie osobne tabele: ich kolumny nie maja ze soba
+  // nic wspolnego, a wspolna szerokosc rozjezdzalaby obie.
+  return columnTable({"name", "delta", "query"}, {{ptsh->get_child("db.stream").get_value<std::string>(),
+                                                   ptsh->get_child("db.duration").get_value<std::string>(),
+                                                   ptsh->get_child("db.processed_line").get_value<std::string>()}}) +
+         "\n" + columnTable({"field", "type"}, fields);
+}
+
+std::expected<std::string, selectResult> qry::detailShowYaml(const std::string &input) {
+  const auto ptsh = detailNode(input);
+  if (!ptsh) return std::unexpected(ptsh.error());
+
+  std::stringstream retval;
+  retval << "---\napiVersion: xqry/v1\n";
+  retval << "stream:\n";
+  retval << indent << "name: " << ptsh->get_child("db.stream").get_value<std::string>() << "\n";
+  retval << indent << "delta: " << ptsh->get_child("db.duration").get_value<std::string>() << "\n";
+  retval << "query: " << ptsh->get_child("db.processed_line").get_value<std::string>() << "\n";
+  retval << "fields:\n";
+  for (const auto &v : ptsh->get_child("db.field")) {
+    retval << indent << input << "." << v.second.get<std::string>("") << ":\n";
+    retval << indent << indent << "type: " << ptsh->get<std::string>("db.field_type." + v.second.get<std::string>("")) << "\n";
+  }
 
   return retval.str();
 }

@@ -41,8 +41,41 @@ It runs in the foreground (`Type=simple`) and shuts down cleanly on `SIGTERM`.
 Relevant options:
 - `-j` / `--service` — service mode: log to **stderr** (captured by journald), no log file in `/tmp`.
 - `-k` / `--noanykey` — do not wait for a key/TTY (required without a terminal).
-- starting **without** a query file boots an **idle** instance that stays alive until `SIGTERM`
-  (no crash-loop before any query is defined); pass a `.rql` file to load queries.
+- starting **without** a query file — or with a file that carries no statements at all — boots an
+  **idle** instance that stays alive until `SIGTERM` (no crash-loop before any query is defined);
+  pass a `.rql` file with statements to load queries at start-up, or send one later with
+  `xqry --reset` (below).
+
+### One service, one name
+
+An instance in service mode (`--service`, `XRETRACTOR_SERVICE=1`, or a detected systemd unit) is
+named **`service`** on the bus unless `--name` / `--autoname` / `RDB_NAMESPACE` says otherwise.
+The name is fixed on purpose: it is what an operator types (`xqry --server service ...`), and a
+name that must first be looked up on the bus cannot be written into a script.
+
+Several **plain** servers may run side by side, each with its own name, IPC area and plan. A
+**service** is exactly one. Two guards enforce it: the per-name instance lock (two unnamed
+services both want the name `service`) and a check of the bus at start-up, which refuses a second
+instance in service mode even under a different `--name`:
+
+```
+xretractor: a service instance is already running as instance 'service' (pid 4711);
+only one service instance is allowed
+```
+
+### Reloading the whole plan without a restart
+
+`xqry --reset <file.rql> --server service` replaces the entire plan of a running instance,
+including an instance that is still idle — that is how a service started at boot with no queries
+gets its first plan. The set is validated (parse, compile, stream-name disjointness against other
+live instances) **before** the running plan is touched, so a refusal costs nothing. A file with no
+statements returns the instance to the idle state. Details and examples: [xqry](../qry/README.md).
+
+For an instance that really is a systemd unit, an accepted plan is also written to the unit's
+query file, so a later restart resumes what the service is actually computing. The same file is
+**emptied** if the process dies on a critical error (`FatalError`): the unit then restarts into
+the idle state instead of coming up again on the plan that has just killed it. A plain process
+started from a terminal never has its `.rql` file rewritten this way.
 
 Service logging mode can also be enabled with the `XRETRACTOR_SERVICE` environment variable
 (any value other than empty or `0`), which is convenient in a systemd unit via `Environment=`:
@@ -59,7 +92,8 @@ TimeoutStopSec=30
 ### Delivering a query set to a running service
 
 When `xretractor` is started with a query file while another instance is **already
-running as a systemd service**, it does not fail with a lock error. Instead it:
+running as a systemd service**, and the invocation does not ask for an identity of its
+own, it does not fail with a lock error. Instead it:
 
 1. detects that the running instance is a systemd unit (and whether it is a
    `system` or `--user` unit),
@@ -77,9 +111,23 @@ xretractor my-new-queries.rql      # validated, delivered, service restarted
 ```
 
 Notes:
-- This is the path for a **full, persistent** query set (rules, `:STORAGE`,
-  `:SUBSTRAT`, rotation) — unlike the lightweight, transient ad-hoc injection over
-  IPC (`xqry --adhoc`), which only accepts `SELECT` / `DECLARE`.
+- Since `xqry --reset` exists, this is no longer the only way to hand a full query set to a
+  running service. Use it when you want the service **restarted** on the new set; use
+  `xqry --reset` when you want the plan swapped in place, without a restart and without
+  `systemctl` privileges.
+- Both are paths for a **full** query set (rules, `:STORAGE`, `:SUBSTRAT`, rotation) — unlike the
+  lightweight, transient ad-hoc injection over IPC (`xqry --adhoc`), which only accepts a single
+  `SELECT`, `DECLARE` or `RULE`.
+- The running service is found on the **bus**, not by the lock file name: a service is named
+  `service`, so a new invocation almost never shares its lock file.
+- **An explicitly requested identity wins over delivery.** `xretractor plan.rql --name foo`
+  (likewise `--autoname` or `[server] autoname = true`) starts a **separate instance** next to
+  the service; the service's query file is not touched and its unit is not restarted. `--name
+  service` — the name the service itself carries — still means "target that service" and
+  delivers. Such a separate instance may not claim a stream name or rotation counter the live
+  service holds: that is a normal conflict (`device_or_resource_busy`), because the two are meant
+  to run side by side. Starting a second instance in **service mode** stays refused regardless of
+  its name (see *One service, one name*).
 - Restarting a **system** unit needs privileges — run with `sudo` if `systemctl
   restart` is denied; a `--user` unit restarts without root.
 - Which file is overwritten: the service reports its own query file in the lock
@@ -184,6 +232,18 @@ If any of those checks fail, xretractor reports a configuration error and stops.
   - Empty means system temp directory.
   - Recommended for service deployments: `/var/run/retractor` or `$XDG_RUNTIME_DIR`.
 
+#### [server]
+
+- `server.autoname` (bool, default: `false`)
+  - When `true`, an instance started without `--name` and without `--autoname` gets a
+    generated docker-style name (same generator as `--autoname`), printed on stdout as
+    `Instance name: <name>`.
+  - Explicit `--name` wins over this key, silently.
+  - Default `false` keeps the historical single-instance identity: empty name, lock file and
+    IPC objects without a suffix, reported by `xqry --bus` as `(unnamed)`.
+  - The generated name is random, so it differs after every restart — it identifies a running
+    instance, not a durable service.
+
 #### [service]
 
 - `service.query_file` (string, default: `/etc/retractor/startup.rql`)
@@ -213,6 +273,9 @@ rt_priority = 50
 
 [paths]
 lock_dir = "/var/run/retractor"
+
+[server]
+autoname = false
 
 [service]
 query_file = "/etc/retractor/startup.rql"

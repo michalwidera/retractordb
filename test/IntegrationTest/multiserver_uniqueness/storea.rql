@@ -1,0 +1,2 @@
+DECLARE vsa INTEGER STREAM srcsa, 1 FILE 'data.txt'
+SELECT srcsa[0]+12 STREAM out_a FROM srcsa FILE 'shared_store.dat'

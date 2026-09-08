@@ -29,6 +29,19 @@ std::string Formatter::displayedValue(const ptree &row, int index, const std::st
   return mode == formatMode::GNUPLOT ? "NaN" : "null";
 }
 
+std::vector<Formatter::Column> Formatter::columns(const ptree &schema) {
+  std::vector<Column> ret;
+  const auto fields = schema.get_child_optional("db.field");
+  if (!fields) return ret;
+  for (const auto &v : *fields) {
+    const auto name = v.second.get_value<std::string>();
+    const int width = std::max(1, schema.get<int>("db.field_count." + name, 1));
+    for (int index = 0; index < width; ++index)
+      ret.push_back({name, index, width});
+  }
+  return ret;
+}
+
 void Formatter::initGnuplot(std::tuple<int, int, int> dim, bool rightToLeft) {
   std::println("set term qt noraise");
   std::println("set style fill transparent solid 0.5");
@@ -60,14 +73,23 @@ void Formatter::renderGnuplot(const ptree &row, int count, const std::string &nu
     if (gnuplot_lines_[i].size() > window) gnuplot_lines_[i].pop_back();
   }
 
+  // Liczba krzywych w poleceniu `plot` MUSI rownac sie liczbie blokow danych ponizej --
+  // gnuplot czyta dokladnie jeden blok na kazde '-'. Wiersz niesie jedna wartosc na ELEMENT,
+  // wiec lista pol schematu przestala go opisywac: dla INTEGER[3] szly trzy bloki przy jednej
+  // zadeklarowanej krzywej i gnuplot dlawil sie reszta. Tytuly biora sie teraz ze
+  // splaszczonych kolumn, a gdy schemat jest od wiersza krotszy (starszy serwer, bez
+  // db.field_count), brakujace dostaja nazwe zastepcza -- polecenie ma zostac poprawne.
+  const auto schemaColumns = columns(schema);
   std::print("plot");
-  int colIdx{0};
-  for (const auto &v : schema.get_child("db.field")) {
-    if (colIdx != 0) std::print(",");
-    auto columnName = v.second.get<std::string>("");
+  for (int i = 0; i < count; i++) {
+    if (i != 0) std::print(",");
+    std::string columnName = "col" + std::to_string(i);
+    if (std::cmp_less(i, schemaColumns.size())) {
+      const auto &column = schemaColumns[static_cast<std::size_t>(i)];
+      columnName         = column.width > 1 ? column.field + "[" + std::to_string(column.index) + "]" : column.field;
+    }
     std::ranges::replace(columnName, '_', '-');
-    std::print(" '-' u 1:2 t '[{}]' w lines lc rgb '{}'", columnName, colors_[colIdx % colors_.size()]);
-    colIdx++;
+    std::print(" '-' u 1:2 t '[{}]' w lines lc rgb '{}'", columnName, colors_[static_cast<std::size_t>(i) % colors_.size()]);
   }
   std::print("\r\n");
 
@@ -80,13 +102,16 @@ void Formatter::renderGnuplot(const ptree &row, int count, const std::string &nu
 
 void Formatter::renderGraphite(const ptree &row, const std::string &nullmap, const std::string &input, const ptree &schema) {
   int i{0};
-  for (const auto &v : schema.get_child("db.field")) {
-    if (isNullAt(nullmap, i)) {
-      ++i;
-      continue;
+  for (const auto &column : columns(schema)) {
+    if (!isNullAt(nullmap, i)) {
+      // Element tablicy dostaje wlasny czlon sciezki: w graphite kropka JEST separatorem
+      // hierarchii, wiec numbers.v.0 jest tam naturalna nazwa metryki. Pole jednoelementowe
+      // zostaje bez sufiksu -- inaczej kazdy istniejacy strumien skalarny zmienilby nazwy
+      // metryk, a nie o to w tej poprawce chodzi.
+      const std::string metric = column.width > 1 ? column.field + "." + std::to_string(column.index) : column.field;
+      std::println("{}.{} {} {}", input, metric, row.get(std::to_string(i), ""), (unsigned long long)time(nullptr));
     }
-    std::println("{}.{} {} {}", input, v.second.get<std::string>(""), row.get(std::to_string(i++), ""),
-                 (unsigned long long)time(nullptr));
+    ++i;
   }
 }
 
@@ -97,16 +122,18 @@ void Formatter::renderInfluxDB(const ptree &row, const std::string &nullmap, con
   bool firstValNoComma(true);
   std::stringstream line;
   line << input << " ";
-  for (const auto &v : schema.get_child("db.field")) {
-    if (isNullAt(nullmap, i)) {
-      ++i;
-      continue;
+  for (const auto &column : columns(schema)) {
+    if (!isNullAt(nullmap, i)) {
+      if (firstValNoComma)
+        firstValNoComma = false;
+      else
+        line << ",";
+      // Podkreslenie, nie kropka i nie nawias: w line protocol kropka rozdziela pomiar od
+      // klucza pola, a nawiasy w kluczu wymagaja escapowania. v_0 przechodzi bez obrobki.
+      const std::string key = column.width > 1 ? column.field + "_" + std::to_string(column.index) : column.field;
+      line << key << "=" << row.get(std::to_string(i), "");
     }
-    if (firstValNoComma)
-      firstValNoComma = false;
-    else
-      line << ",";
-    line << v.second.get<std::string>("") << "=" << row.get(std::to_string(i++), "");
+    ++i;
   }
   if (!firstValNoComma) {
     line << " " << duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count();

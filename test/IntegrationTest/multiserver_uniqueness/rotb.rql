@@ -1,0 +1,3 @@
+ROTATION 'shared_counter.txt'
+DECLARE vs INTEGER STREAM srcs, 1 FILE 'data.txt'
+SELECT srcs[0]+8 STREAM dsts FROM srcs

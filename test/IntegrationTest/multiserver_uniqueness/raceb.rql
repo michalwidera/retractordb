@@ -1,0 +1,2 @@
+DECLARE vb INTEGER STREAM srcrb, 1 FILE 'data.txt'
+SELECT srcrb[0]+11 STREAM race FROM srcrb

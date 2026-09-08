@@ -1,12 +1,15 @@
 #include "ipcServer.hpp"
 
 #include <array>
+#include <cstdint>
 #include <cstring>
+#include <format>
 #include <iostream>
 #include <list>
 #include <memory>
 #include <mutex>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <utility>
@@ -21,12 +24,15 @@
 
 #include "constants.hpp"
 #include "ipcTypes.hpp"
+#include "shmBudget.hpp"
 
 namespace IPC = boost::interprocess;
 
 using ipc::IPCMap;
 using ipc::IPCString;
 using ipc::ShmemAllocator;
+
+void IpcServer::setServerName(std::string_view serverName) { names_ = ipc::names(serverName); }
 
 void IpcServer::start(Callbacks callbacks) {
   callbacks_   = std::move(callbacks);
@@ -72,10 +78,10 @@ void IpcServer::removeAllObjects() {
   removeClientQueues();
 }
 
-void IpcServer::removeGlobalObjects() {
-  IPC::shared_memory_object::remove(std::string(ipc::kShmemSegment).c_str());
-  IPC::message_queue::remove(std::string(ipc::kQueryQueue).c_str());
-  IPC::named_mutex::remove(std::string(ipc::kMapMutex).c_str());
+void IpcServer::removeGlobalObjects() const {
+  IPC::shared_memory_object::remove(names_.shmemSegment.c_str());
+  IPC::message_queue::remove(names_.queryQueue.c_str());
+  IPC::named_mutex::remove(names_.mapMutex.c_str());
 }
 
 /// Kolejka odpowiedzi, ktora przetrwa smierc serwera, nie jest tylko smieciem w
@@ -88,14 +94,28 @@ void IpcServer::removeClientQueues() {
   // Najpierw zamkniecie mapowan, potem unlink -- ta sama kolejnosc co w broadcast().
   id2QueueCache_.clear();
   for (const auto &element : id2StreamNameRelation_) {
-    std::string queueName = std::string(ipc::kResponseQueuePrefix) + boost::lexical_cast<std::string>(element.first);
-    IPC::message_queue::remove(queueName.c_str());
+    IPC::message_queue::remove(names_.responseQueue(element.first).c_str());
   }
   id2StreamNameRelation_.clear();
 }
 
 void IpcServer::subscribe(int clientId, const std::string &streamName, int maxElements) {
-  std::string queueName = std::string(ipc::kResponseQueuePrefix) + boost::lexical_cast<std::string>(clientId);
+  const std::string queueName = names_.responseQueue(clientId);
+
+  // Straz miejsca PRZED utworzeniem kolejki. Kolejka boosta powstaje w calosci od razu (segment
+  // jest wypelniany przy tworzeniu), wiec 10 s zapasu przy takcie 1 ms to jednorazowe 10 MiB --
+  // a /dev/shm w kontenerze ma domyslnie 64 MiB. Bez tego sprawdzenia klient dostawal wylacznie
+  // "No space left on device", czyli komunikat, ktory nie mowi ani ile brakuje, ani dlaczego
+  // akurat ten strumien jest drogi. Pomiar nieudany (Space::known == false) PRZEPUSZCZA
+  // subskrypcje: odmowa na podstawie niewiedzy byla by gorsza od proby.
+  const std::uint64_t needed = shmbudget::responseQueueBytes(maxElements);
+  if (const shmbudget::Space fs = shmbudget::space(); fs.known && fs.available < needed)
+    throw std::runtime_error(
+        std::format("response queue for stream '{}' needs {} ({} elements of {} B), "
+                    "shared memory has {} free",
+                    streamName, shmbudget::humanBytes(needed), maxElements, ipc::kResponseQueueMaxMessageSize,
+                    shmbudget::humanBytes(fs.available)));
+
   // Pre-otwarcie kolejki TUTAJ, w watku komunikacyjnym (sledztwo ~40 ms,
   // JOURNAL.md 2026-07-18, Faza 3): tworzenie + mmap segmentu (~MB) nie moze
   // zostac w torze emisji watku RT -- lazy open_only w broadcast() kosztowal
@@ -117,6 +137,17 @@ void IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
   }
 }
 
+// Wolajacy MUSI trzymac clientMapsMutex_ (dostep do oversizedRowStreams_).
+bool IpcServer::rowFitsSlot(const std::string &row, const std::string &streamName) {
+  if (row.length() <= static_cast<std::size_t>(ipc::kResponseQueueMaxMessageSize)) return true;
+  if (oversizedRowStreams_.insert(streamName).second)
+    SPDLOG_ERROR(
+        "stream '{}': serialized row is {} B and does not fit the {} B response queue slot; "
+        "subscribers of this stream receive no data",
+        streamName, row.length(), ipc::kResponseQueueMaxMessageSize);
+  return false;
+}
+
 void IpcServer::broadcast(const std::set<std::string> &streams, const RowFormatter &formatRow) {
   // Muteks na caly przebieg emisji: kontencja tylko z krotkim wstawieniem do map
   // przy rejestracji klienta (watek komunikacyjny trzyma go nanosekundy), a koszt
@@ -129,17 +160,26 @@ void IpcServer::broadcast(const std::set<std::string> &streams, const RowFormatt
     // wiersz i tak byl wyrzucany (petla ponizej nie robila nic).
     std::string row;
     bool rowFormatted = false;
+    bool rowFits      = true;
     std::list<int> eraseList;
     for (const auto &element : id2StreamNameRelation_) {
       if (element.second == queryName) {
         if (!rowFormatted) {
           row          = formatRow(queryName);
           rowFormatted = true;
+          rowFits      = rowFitsSlot(row, queryName);
         }
+        // Wiersz dluzszy od slotu kolejki KONCZYL USLUGE. try_send rzuca wtedy
+        // interprocess_exception, a najblizszy catch stoi poza petla przetwarzania
+        // (executorsm.cpp), wiec pojedynczy subskrybent jednego szerokiego strumienia
+        // zabieral serwer wszystkim pozostalym -- kod wyjscia no_child_process. Wiersz
+        // niesie teraz jedna wartosc na ELEMENT, a nie na pole, wiec zwykle INTEGER[200]
+        // wystarczy, zeby przekroczyc slot. Pomijamy taki wiersz i emitujemy dalej.
+        if (!rowFits) break;
         //
         // Query discovery. queues are created by show command
         //
-        std::string queueName = std::string(ipc::kResponseQueuePrefix) + boost::lexical_cast<std::string>(element.first);
+        const std::string queueName = names_.responseQueue(element.first);
         // Uchwyt kolejki z cache -- otwarcie (shm_open+mmap) tylko przy pierwszej
         // emisji do danego klienta, nie w kazdym slocie (patrz komentarz przy
         // id2QueueCache_).
@@ -174,7 +214,7 @@ void IpcServer::broadcastOutOfBusiness() {
     // Queue may have been removed earlier (try_send overflow in broadcast).
     // Wrap in try-catch to avoid crash on open_only failure.
     //
-    std::string queueName = std::string(ipc::kResponseQueuePrefix) + boost::lexical_cast<std::string>(element.first);
+    const std::string queueName = names_.responseQueue(element.first);
     try {
       IPC::message_queue mq(IPC::open_only, queueName.c_str());
       //
@@ -198,20 +238,26 @@ void IpcServer::broadcastOutOfBusiness() {
 }
 
 // Procedura watku komunikacyjnego.
-void IpcServer::commandLoop() {
+void IpcServer::commandLoop() const {
   try {
-    IPC::message_queue::remove(std::string(ipc::kQueryQueue).c_str());
-    IPC::shared_memory_object::remove(std::string(ipc::kShmemSegment).c_str());
-    IPC::named_mutex::remove(std::string(ipc::kMapMutex).c_str());
+    // Kasowanie na wejsciu sprzata po poprzedniku, ktory PADL: po SIGKILL segment, kolejka
+    // i muteks zostaja w /dev/shm, a open_or_create trafiloby na nie i probowalo skonstruowac
+    // mape w segmencie, w ktorym ona juz jest. Jest to bezpieczne wylacznie dlatego, ze
+    // executorsm::run() przejmuje blokade instancji PRZED start() -- flock dowodzi, ze zaden
+    // inny ZYWY serwer tych obiektow nie uzywa. Nazwy pochodza z names_, wiec kasowanie nigdy
+    // nie siega poza obszar tego serwera.
+    IPC::message_queue::remove(names_.queryQueue.c_str());
+    IPC::shared_memory_object::remove(names_.shmemSegment.c_str());
+    IPC::named_mutex::remove(names_.mapMutex.c_str());
     // Segment and allocator for map purposes
-    IPC::managed_shared_memory mapSegment(IPC::open_or_create, std::string(ipc::kShmemSegment).c_str(), ipc::kShmemSegmentSize);
+    IPC::managed_shared_memory mapSegment(IPC::open_or_create, names_.shmemSegment.c_str(), ipc::kShmemSegmentSize);
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
-    IPC::named_mutex mapMutex(IPC::open_or_create, std::string(ipc::kMapMutex).c_str());
+    IPC::named_mutex mapMutex(IPC::open_or_create, names_.mapMutex.c_str());
     // Create a message_queue.
-    IPC::message_queue mq(IPC::open_or_create,                    // open or crate
-                          std::string(ipc::kQueryQueue).c_str(),  // name
-                          ipc::kQueryQueueMaxMessages,            // max message number
-                          ipc::kQueryQueueMaxMessageSize          // max message size
+    IPC::message_queue mq(IPC::open_or_create,            // open or crate
+                          names_.queryQueue.c_str(),      // name
+                          ipc::kQueryQueueMaxMessages,    // max message number
+                          ipc::kQueryQueueMaxMessageSize  // max message size
     );
     IPCMap *mymap = mapSegment.construct<IPCMap>(std::string(ipc::kMapObject).c_str())  // object name
                     (std::less<>(), allocatorShmemMapInstance);
@@ -226,15 +272,24 @@ void IpcServer::commandLoop() {
     bool loopRunning = true;
     while (loopRunning) {
       while (mq.try_receive(message.data(), ipc::kQueryQueueMaxMessageSize, recvd_size, priority)) {
-        callbacks_.onMessageReceived();
-
         message[recvd_size] = 0;
         std::stringstream strstream;
         strstream << message.data();
         memset(message.data(), 0, ipc::kQueryQueueMaxMessageSize);
         ptree pt;
         read_info(strstream, pt);
-        ptree pt_retval     = callbacks_.onCommand(pt);
+        ptree pt_retval = callbacks_.onCommand(pt);
+        // Sygnal idzie PO obsludze komendy, nie po jej odebraniu. Jedynym jego odbiorca jest
+        // bramka --xqrywait, a bramka zdjeta w chwili ODEBRANIA komendy wpuszczala watek
+        // przetwarzania jeszcze przed rejestracja subskrybenta: dla 'show' znaczylo to slot
+        // wyemitowany do klienta, ktorego kolejki odpowiedzi jeszcze nie ma, a takiego wiersza
+        // nikt juz nie odzyska. Samo subscribe() jest oslonione blokada epoki -- tej samej,
+        // ktora bierze slot -- wiec wyscig rozstrzygal sie na ZAJECIU tej blokady: wygrywal
+        // ten, kto siegnal po nia pierwszy. Przesuniecie sygnalu zamienia ten wyscig na
+        // porzadek: gdy bramka opada, subskrypcja jest juz w mapach IpcServer.
+        // Kontrakt bramki jest nietkniety -- podnosi ja nadal KAZDA komenda, takze 'hello'
+        // (patrz it_xqrywait_gate).
+        callbacks_.onCommandHandled();
         int clientProcessId = boost::lexical_cast<int>(pt.get("db.id", ""));
         // Sending answer
         std::stringstream response_stream;
@@ -252,6 +307,11 @@ void IpcServer::commandLoop() {
       if (callbacks_.shouldStop()) loopRunning = false;
     }
   } catch (IPC::interprocess_exception &ex) {
-    std::cout << "Exception on server." << '\n' << ex.what() << '\n';
+    // Najczestsza przyczyna to brak miejsca w /dev/shm: sama kolejka komend zajmuje 1000 KiB,
+    // a w kontenerze caly tmpfs ma domyslnie 64 MiB. Zawiadomienie jest tu obowiazkowe --
+    // wolajacy czeka na gotowosc IPC i bez niego stanie na zawsze.
+    SPDLOG_ERROR("IPC resources could not be created: {}", ex.what());
+    std::cerr << "Exception on server." << '\n' << ex.what() << '\n';
+    if (callbacks_.onFailure) callbacks_.onFailure();
   }
 }

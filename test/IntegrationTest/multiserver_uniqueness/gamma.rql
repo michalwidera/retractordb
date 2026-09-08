@@ -1,0 +1,2 @@
+DECLARE vg INTEGER STREAM srcg, 1 FILE 'data.txt'
+SELECT srcg[0]+3 STREAM dstg FROM srcg

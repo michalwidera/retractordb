@@ -9,24 +9,18 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <optional>
 #include <sstream>
 #include <string_view>
 
 #include <spdlog/spdlog.h>
 
-namespace {
-
-struct SystemdIdentity {
-  std::optional<std::string> unit;  // nazwa jednostki, gdy proces jest jednostką systemd
-  bool userScope{false};            // true => user.slice (systemctl --user), false => system
-};
-
 // Ustala własną tożsamość systemd na podstawie /proc/self/cgroup. systemd umieszcza jednostkę
 // w ścieżce cgroup typu ".../system.slice/xretractor.service" lub (dla --user)
 // ".../user.slice/user@1000.service/.../xretractor.service". Zwraca nazwę unitu, gdy proces jest
 // jednostką systemd; unit == nullopt gdy to zwykły proces.
+//
+// Deklaracja stoi w lockManager.hpp: tozsamosci jednostki potrzebuje takze magistrala xrdbbus.
 SystemdIdentity detectSystemdIdentity() {
   SystemdIdentity id;
 
@@ -62,8 +56,6 @@ SystemdIdentity detectSystemdIdentity() {
   return id;
 }
 
-}  // namespace
-
 FlockServiceGuard::FlockServiceGuard(const std::string &serviceName)
 
 {
@@ -93,7 +85,9 @@ bool FlockServiceGuard::acquireLock() {
   int flockResult = flock(lockFileDescriptor, LOCK_EX | LOCK_NB);
 
   if (flockResult == -1) {
-    std::cerr << "Another instance is running, errno: " << strerror(errno) << '\n';
+    // Komunikat dla operatora nalezy do wolajacego: tylko on wie, ktora tozsamosc probowal
+    // przejac i co odczytal z pliku blokady (patrz launcher.cpp). Tutaj zostaje sam log,
+    // zeby ta sama odmowa nie pojawiala sie na konsoli dwa razy.
     if (errno == EWOULDBLOCK || errno == EAGAIN) {
       SPDLOG_WARN("Other instance is already running, cannot acquire lock on: {}", lockFilePath);
     } else {
@@ -107,10 +101,23 @@ bool FlockServiceGuard::acquireLock() {
 
   isLocked = true;
 
-  if (!writeLockInfo()) {
-    SPDLOG_WARN("Cannot write process info to lock file: {}, bypass.", lockFilePath);
+  // Plik zerujemy natychmiast, ale opisu procesu jeszcze nie piszemy (patrz publishLockInfo).
+  // Po padzie poprzednika zostaje w pliku JEGO opis, a nikt go nie prostuje az do publikacji --
+  // pusty plik czyta sie jako "instancja wstaje", nie jako cudzy, nieaktualny serwer.
+  if (ftruncate(lockFileDescriptor, 0) == -1) {
+    SPDLOG_WARN("Cannot truncate lock file: {}, errno: {}", lockFilePath, strerror(errno));
   }
 
+  return true;
+}
+
+bool FlockServiceGuard::publishLockInfo() {
+  if (!isLockActive()) return false;
+
+  if (!writeLockInfo()) {
+    SPDLOG_WARN("Cannot write process info to lock file: {}, bypass.", lockFilePath);
+    return false;
+  }
   return true;
 }
 
@@ -128,8 +135,6 @@ void FlockServiceGuard::releaseLock() {
 
     lockFileDescriptor = -1;
     isLocked           = false;
-
-    cleanupLockFile();
   }
 }
 
@@ -157,7 +162,10 @@ FlockServiceGuard::PeerInfo FlockServiceGuard::readPeerInfo() const {
     std::istringstream ls(line);
     std::string key;
     ls >> key;
-    if (key == "MODE:") {
+    if (key == "PID:") {
+      ls >> info.pid;
+      if (ls.fail()) info.pid = 0;
+    } else if (key == "MODE:") {
       std::string value;
       ls >> value;
       if (value == "service")
@@ -224,5 +232,3 @@ bool FlockServiceGuard::writeLockInfo() const {
 
   return true;
 }
-
-void FlockServiceGuard::cleanupLockFile() { unlink(lockFilePath.c_str()); }

@@ -2,10 +2,23 @@
 
 #include <chrono>
 #include <cstddef>
+#include <string>
 #include <string_view>
 
 namespace constants {
 constexpr std::string_view Reserved_id_oob = "OUT_OF_BUSSINESS";
+
+/// Odpowiedz serwera na komende wymagajaca modelu danych, gdy instancja nie ma wczytanego
+/// planu (tryb bezczynny). Wspolna dla obu stron IPC: serwer ja wpisuje, klient rozpoznaje.
+/// Bez wspolnej stalej klient nie odroznial instancji bezczynnej od serwera, ktory nie
+/// odpowiedzial — i meldowal timeout tam, gdzie odpowiedz przyszla od razu.
+constexpr std::string_view kNoActivePlanReply = "no active plan";
+
+/// Odpowiedz serwera, ktory przyjal komende juz w trakcie wlasnego zamykania. Wspolna dla
+/// obu stron IPC z tego samego powodu co kNoActivePlanReply: bez niej klient wrzucal ten
+/// stan do worka "serwer nie odpowiedzial" i meldowal timeout tam, gdzie odpowiedz przyszla
+/// od razu i byla prawdziwa.
+constexpr std::string_view kServerStoppingReply = "server stopping";
 }  // namespace constants
 
 namespace ipc {
@@ -27,6 +40,47 @@ constexpr std::string_view kMapObject = "MyMap";
 
 // Prefiks nazwy kolejki odpowiedzi per-proces; pełna nazwa = prefiks + PID.
 constexpr std::string_view kResponseQueuePrefix = "brcdbr";
+
+// === Nazwy obiektów IPC jednego serwera ===
+//
+// Powyższe stałe są nazwami BAZOWYMI. Komplet obiektów jednego serwera wyróżnia nazwa
+// serwera doklejana jako sufiks, dzięki czemu obszary IPC kolejnych serwerów są rozłączne
+// i żaden z nich nie może skasować cudzych obiektów.
+//
+// Pusta nazwa serwera daje dokładnie nazwy historyczne (jednoserwerowe). To jest celowe:
+// sama parametryzacja niczego nie zmienia w zachowaniu, a rozdział obszarów włącza się
+// dopiero wtedy, gdy ktoś poda nazwę niepustą.
+struct ServerNames {
+  std::string shmemSegment;
+  std::string mapMutex;
+  std::string queryQueue;
+  std::string responseQueuePrefix;
+
+  /// Nazwa kolejki odpowiedzi konkretnego klienta.
+  [[nodiscard]] std::string responseQueue(int clientId) const { return responseQueuePrefix + std::to_string(clientId); }
+};
+
+/// Nazwa bazowa z sufiksem serwera; bez sufiksu, gdy nazwa serwera pusta.
+inline std::string withServerSuffix(std::string_view base, std::string_view serverName) {
+  std::string retVal(base);
+  if (!serverName.empty()) {
+    retVal += '.';
+    retVal += serverName;
+  }
+  return retVal;
+}
+
+inline ServerNames names(std::string_view serverName = {}) {
+  ServerNames retVal;
+  retVal.shmemSegment = withServerSuffix(kShmemSegment, serverName);
+  retVal.mapMutex     = withServerSuffix(kMapMutex, serverName);
+  retVal.queryQueue   = withServerSuffix(kQueryQueue, serverName);
+  // Prefiks kolejki odpowiedzi domyka się kropką, bo doklejany jest do niego identyfikator
+  // klienta: bez separatora "brcdbr.srv" + "12" i "brcdbr.srv1" + "2" dałyby tę samą nazwę.
+  retVal.responseQueuePrefix =
+      serverName.empty() ? std::string(kResponseQueuePrefix) : withServerSuffix(kResponseQueuePrefix, serverName) + ".";
+  return retVal;
+}
 
 // === Rozmiary buforów i kolejek ===
 

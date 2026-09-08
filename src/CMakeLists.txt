@@ -11,27 +11,24 @@ add_subdirectory(retractor)
 add_custom_target(
   simple
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh
-  WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_serial/simple)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple)
 
 add_custom_target(
   simple-max
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh str2
   WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_serial/simple_max)
+    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple_max)
 
 add_custom_target(
   simple-timeshift
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh str1 query-51.rql
   WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_serial/issue56_timeshift
-)
+    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/issue56_timeshift)
 
 add_custom_target(
   dsp
   COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh outputAll query.rql 50:256
-  WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_parallel/dsp)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/dsp)
 
 add_custom_target(
   ecg-clean
@@ -82,8 +79,7 @@ add_custom_target(
   simple-view
   COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
           out.png && feh out.png
-  WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_serial/simple)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple)
 
 add_custom_target(
   show-ninja-build
@@ -95,14 +91,13 @@ add_custom_target(
   COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
           out.png && feh out.png
   WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_serial/simple_max)
+    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple_max)
 
 add_custom_target(
   dsp-view
   COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
           out.png && feh out.png
-  WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest_parallel/dsp)
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/dsp)
 
 # python -m pip install clang-format cmakelang
 # https://zed0.co.uk/clang-format-configurator/ | $clang-format --version
@@ -124,12 +119,18 @@ find_program(PROG_CLANG_TIDY NAMES clang-tidy clang-tidy-19 clang-tidy-18
                                    clang-tidy-17 clang-tidy-16 clang-tidy-15)
 
 if(PROG_CLANG_TIDY)
+  set(CTIDY_COMPILATION_DATABASE
+      ${CMAKE_BINARY_DIR}/ctidy/compile_commands.json)
   add_custom_target(
     ctidy
     COMMAND
-      find ${CMAKE_SOURCE_DIR}/src -iname "*.cpp" -o -iname "*.cc" | grep
-      --invert-match '.antlr/' | xargs -r ${PROG_CLANG_TIDY}
-      -p=${CMAKE_BINARY_DIR}
+      ${CMAKE_COMMAND} -DINPUT=${CMAKE_BINARY_DIR}/compile_commands.json
+      -DOUTPUT=${CTIDY_COMPILATION_DATABASE} -P
+      ${CMAKE_SOURCE_DIR}/cmake/prepare_ctidy_compdb.cmake
+    COMMAND
+      ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+      -DCLANG_TIDY=${PROG_CLANG_TIDY} -DCOMPDB_DIR=${CMAKE_BINARY_DIR}/ctidy -P
+      ${CMAKE_SOURCE_DIR}/cmake/run_ctidy.cmake
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 else()
   message(STATUS "Optional tool not found: clang-tidy (ctidy target disabled)")
@@ -150,7 +151,6 @@ add_custom_target(
 add_custom_target(
   packages
   COMMAND cpack --config CPackConfig.cmake
-  COMMAND cpack --config CPackSourceConfig.cmake
   COMMAND ls -lart *.tar.gz
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 

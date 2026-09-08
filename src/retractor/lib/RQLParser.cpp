@@ -1,12 +1,14 @@
+#include "RQLParser.hpp"
+
 #include <algorithm>
 #include <cctype>
-#include <cstdlib>
 #include <iostream>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
-#include <boost/cerrno.hpp>
 #include <boost/lexical_cast.hpp>
 
 // please note that the order of includes is important here
@@ -25,10 +27,28 @@
 using namespace antlrcpp;
 using namespace antlr4;
 
-std::string status = "OK";
-
 namespace {
 constexpr size_t kAgseWindowSignChildIndex = 5;
+
+/// Blad skladni RQL: przerywa parsowanie, zamiast konczyc proces.
+///
+/// Do 2026-09-05 oba listenery bledow wolaly exit(EPERM). W procesie serwera oznaczalo to
+/// smierc xretractora przy KAZDYM blednym zapytaniu ad-hoc — `xqry -a "ml"` wystarczalo.
+///
+/// Sam powrot z listenera nie zalatwia sprawy: ANTLR wchodzi wtedy w odzyskiwanie i wola
+/// dalej callbacki ParserListenera na kalekich kontekstach, gdzie np. ctx->ID() jest nullem.
+/// Rzut wychodzi z prog() przez generowany kod, bo ten lapie wylacznie RecognitionException.
+struct RQLSyntaxError {
+  std::string message;
+};
+
+/// Gorne ograniczenie dlugosci komunikatu wracajacego do klienta.
+///
+/// Komunikat idzie do odpowiedzi serwera jako IPCString we WSPOLNYM segmencie 64 kB
+/// (ipc::kShmemSegmentSize). Lista `expecting {...}` przy blednym poczatku instrukcji
+/// wylicza kilkadziesiat tokenow; wyczerpanie segmentu konczy sie bad_alloc-iem lapanym
+/// POZA petla odbioru, czyli smiercia watku komunikacyjnego z dala od przyczyny.
+constexpr size_t kMaxSyntaxErrorMessage = 300;
 
 /// Nazwa agregatu zlozona do malych liter. Lekser dopuszcza dwie pisownie ('MIN'|'min'),
 /// wiec ASCII wystarcza.
@@ -36,32 +56,76 @@ std::string lowercased(std::string text) {
   std::ranges::transform(text, text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   return text;
 }
+
+/// Zdejmuje ParserListenera i rzuca RQLSyntaxError.
+///
+/// Zdjecie listenera jest warunkiem KONIECZNYM, nie porzadkami: samo rozwijanie stosu
+/// przechodzi przez `finally` generowanego kodu (antlrcpp::FinalAction), ktore wola
+/// exitRule(), a to wola exitDeclare()/exitSelect()/... na kontekscie zatrzymanym w polowie
+/// budowy. Pierwsza wersja tej naprawy padala tam w exitDeclare() na `ctx->ID()` rownym
+/// nullptr — czyli segfaultem zamiast exit(EPERM), bez zadnej poprawy.
+/// Po removeParseListeners() petla triggerExitRuleEvent() chodzi po pustej liscie.
+///
+/// Listener bledow leksera dostaje ten sam parser, bo blad leksera rozwija stos przez
+/// dokladnie te same `finally` — token pobiera sie w srodku reguly parsera.
+[[noreturn]] void abortParse(antlr4::Parser &parser, size_t firstLine, size_t line, size_t charPositionInLine,
+                             const std::string &msg, Token *offendingSymbol) {
+  // Lekser i parser licza wiersze wewnatrz PRZEKAZANEGO tekstu, a ten bywa pojedyncza
+  // instrukcja wyjeta z pliku planu przez readLogicalLines. firstLine przesuwa numer z
+  // powrotem na wiersz pliku — bez tego kazda odmowa wskazywala wiersz 1, niezaleznie od
+  // tego, w ktorym miejscu planu stoi blad.
+  const size_t sourceLine = firstLine + line - 1;
+
+  // Tekst obrazajacego tokenu, a nie jego adres. Listener leksera podaje tu nullptr, bo blad
+  // powstaje, zanim token zostanie zbudowany.
+  const std::string offendingText = (offendingSymbol != nullptr) ? offendingSymbol->getText() : std::string("<unknown>");
+
+  // Komunikat MUSI byc jednowierszowy: wraca do klienta jako wartosc ptree w formacie `info`,
+  // ktory znaki nowej linii escape'uje — wielowierszowiec dojechalby jako jeden ciag z
+  // widocznymi `\n`.
+  std::string message = "line " + std::to_string(sourceLine) + ":" + std::to_string(charPositionInLine) + " " + msg;
+  std::ranges::replace_if(message, [](char c) { return c == '\n' || c == '\r'; }, ' ');
+  if (message.size() > kMaxSyntaxErrorMessage) message.resize(kMaxSyntaxErrorMessage);
+
+  // Wydruk na stderr ZOSTAJE obok statusu: w trybie uslugowym stderr to journald, czyli
+  // jedyny slad po stronie serwera. Tak samo robi sciezka semantyczna (reportSemanticError).
+  // Tu idzie msg nieprzyciety — ograniczenie dotyczy wylacznie drogi przez pamiec dzielona.
+  std::cerr << "Syntax error @Rql" << '\n';
+  std::cerr << "line:" << sourceLine << ":" << charPositionInLine << " at " << offendingText << '\n';
+  std::cerr << "msg:" << msg << '\n';
+  SPDLOG_ERROR("Parser: {}", message);
+
+  parser.removeParseListeners();
+  throw RQLSyntaxError{std::move(message)};
+}
 }  // namespace
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
 
 class LexerErrorListener : public BaseErrorListener {
  public:
+  LexerErrorListener(antlr4::Parser &parser, size_t firstLine) : parser_(parser), firstLine_(firstLine) {}
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    std::cerr << "Syntax error @Rql" << '\n';
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << '\n';
-    std::cerr << "msg:" << msg << '\n';
-    status = "Fail";
-    exit(EPERM);
+    abortParse(parser_, firstLine_, line, charPositionInLine, msg, offendingSymbol);
   }
+
+ private:
+  antlr4::Parser &parser_;
+  size_t firstLine_;
 };
 
 class ParserErrorListener : public BaseErrorListener {
  public:
+  ParserErrorListener(antlr4::Parser &parser, size_t firstLine) : parser_(parser), firstLine_(firstLine) {}
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    std::cerr << "Syntax error @Rql" << '\n';
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << '\n';
-    std::cerr << "msg:" << msg << '\n';
-    status = "Fail";
-    exit(EPERM);
+    abortParse(parser_, firstLine_, line, charPositionInLine, msg, offendingSymbol);
   }
+
+ private:
+  antlr4::Parser &parser_;
+  size_t firstLine_;
 };
 
 /* Iterator - each new field gets new fieldCount number */
@@ -103,8 +167,73 @@ class ParserListener : public RQLBaseListener {
     program.push_back(token(id, arg1));
   };
 
+  /// Pierwszy blad semantyczny calego przebiegu — czyli taki, ktorego gramatyka nie lapie,
+  /// a ktory mimo to unieważnia zapytanie (regula na nieistniejacym strumieniu, na deklaracji,
+  /// powtorzona nazwa reguly). Do 2026-09-05 kazdy z tych przypadkow konczyl sie abort() albo
+  /// cisza; w procesie serwera pierwsze znaczylo smierc xretractora z powodu bledu w cudzym
+  /// zapytaniu ad-hoc, drugie — odpowiedz "OK" na polecenie, ktore nie zrobilo nic.
+  /// Rozstrzyga blad pierwszy: dalsze sa juz tylko jego nastepstwami.
+  std::string semanticError_;
+
+  void reportSemanticError(const std::string &message) {
+    std::cerr << "Error: " << message << '\n';
+    SPDLOG_ERROR("Parser: {}", message);
+    if (semanticError_.empty()) semanticError_ = message;
+  }
+
+  /// Dopina regule do strumienia wskazanego przez ON. Zwraca pusty napis albo powod odmowy;
+  /// przy odmowie plan pozostaje nietkniety, wiec wolajacy odrzuca calosc bez sladu po regule.
+  std::string buildRule(const std::string &stream_name, const std::string &rule_name) {
+    query *target = nullptr;
+    for (auto &i : coreInstance)
+      if (i.id == stream_name) {
+        target = &i;
+        break;
+      }
+
+    if (target == nullptr)
+      return "Rule '" + rule_name + "' refers to stream '" + stream_name + "', but no such stream is defined";
+    if (target->isDeclaration())
+      return "Rule '" + rule_name + "' cannot be attached to declaration stream '" + stream_name + "'";
+    for (const auto &existing : target->lRules)
+      if (existing.name == rule_name) {
+        std::string message = "Rule '";
+        message += rule_name;
+        message += "' is already defined on stream '";
+        message += stream_name;
+        message += '\'';
+        return message;
+      }
+
+    rule ruleConstruct(rule_name, ruleCondition);
+    switch (actionType) {
+      case rule::DUMP:
+        // Zakres pusty odrzucamy juz tutaj, bo dalej czeka na niego FatalError w
+        // compiler::computeRequiredCapacities() — a w sciezce ad-hoc FatalError to smierc
+        // serwera. Rownosc granic nie opisuje zadnego zrzutu, wiec nic sie nie traci.
+        if (dump_left >= dump_right)
+          return "Rule '" + rule_name + "': dump range [" + std::to_string(dump_left) + ".." + std::to_string(dump_right) +
+                 "] is empty, left bound must be less than right bound";
+        ruleConstruct.action         = rule::DUMP;
+        ruleConstruct.dumpRange      = std::make_pair(dump_left, dump_right);
+        ruleConstruct.dump_retention = dump_retention;
+        break;
+      case rule::SYSTEM:
+        ruleConstruct.action        = rule::SYSTEM;
+        ruleConstruct.systemCommand = systemCommand;
+        break;
+      default:
+        return "Rule '" + rule_name + "' on stream '" + stream_name + "' has an unknown action";
+    }
+
+    target->lRules.push_back(std::move(ruleConstruct));
+    return {};
+  }
+
  public:
   ParserListener(qTree &coreInstance) : coreInstance(coreInstance) {};
+
+  [[nodiscard]] const std::string &semanticError() const { return semanticError_; }
 
   void enterProg(RQLParser::ProgContext *ctx) override {}
 
@@ -386,41 +515,11 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitRulez(RQLParser::RulezContext *ctx) override {
-    std::string stream_name(ctx->stream_name->getText());
-    rule ruleConstruct(rule(ctx->name->getText(), ruleCondition));
+    const std::string stream_name(ctx->stream_name->getText());
+    const std::string rule_name(ctx->name->getText());
 
-    for (auto &i : coreInstance) {
-      if (i.id == stream_name) {
-        if (i.isDeclaration()) {
-          std::cerr << "Error: Cannot attach rule to declaration stream: " << stream_name << " Rule: " << ctx->name->getText()
-                    << '\n';
-          SPDLOG_ERROR("Parser/Rule: Cannot attach rule to declaration stream: {} Rule: {}", stream_name, ctx->name->getText());
-          abort();
-        }
-        if (actionType == rule::DUMP) {
-          ruleConstruct.action    = rule::DUMP;
-          ruleConstruct.dumpRange = std::make_pair(dump_left, dump_right);
-          if (dump_left > dump_right) {
-            std::cerr << "Error: Dump left range cannot be greater than dump right range" << '\n';
-            SPDLOG_ERROR("Parser/Rule: Dump left range cannot be greater than dump right range");
-            abort();
-          }
-          ruleConstruct.dump_retention = dump_retention;
-        } else if (actionType == rule::SYSTEM) {
-          ruleConstruct.action        = rule::SYSTEM;
-          ruleConstruct.systemCommand = systemCommand;
-        } else {
-          std::cerr << "Error: Unknown action type: " << std::to_string(actionType) << " stream_name: " << stream_name
-                    << " Rule: " << ctx->name->getText() << '\n';
-          SPDLOG_ERROR("Parser/Rule: Unknown action type: {} stream_name: {} Rule: {}", std::to_string(actionType), stream_name,
-                       ctx->name->getText());
-          abort();
-        }
+    if (const std::string error = buildRule(stream_name, rule_name); !error.empty()) reportSemanticError(error);
 
-        i.lRules.push_back(ruleConstruct);
-        break;
-      }
-    }
     program.clear();
     dump_left      = 0;
     dump_right     = 0;
@@ -432,12 +531,29 @@ class ParserListener : public RQLBaseListener {
     fieldCount = 0;
   }
 
+  /// Czy tuz PRZED podana liczba stoi w zapisie znak minus.
+  ///
+  /// Znak jest w gramatyce osobnym, OPCJONALNYM dzieckiem (`'-'? DECIMAL`), wiec numery pozycji
+  /// przesuwaja sie razem z jego obecnoscia: `DUMP -5 TO 5` ma piecioro dzieci, `DUMP 5 TO 5` —
+  /// czworo. Odczyt ze stalej pozycji children[4] wychodzil w tym drugim przypadku poza wektor:
+  /// w Debug konczylo sie to asercja biblioteki standardowej, w Release odczytem spoza zakresu,
+  /// a z kanalu ad-hoc — smiercia serwera po `DO DUMP 5 TO 5`. Dlatego pytamy o sasiada samej
+  /// liczby, zamiast liczyc pozycje z gory.
+  static bool negatedBefore(RQLParser::DumppartContext *ctx, const antlr4::Token *number) {
+    for (size_t i = 1; i < ctx->children.size(); ++i) {
+      const auto *terminal = dynamic_cast<antlr4::tree::TerminalNode *>(ctx->children[i]);
+      if (terminal == nullptr || terminal->getSymbol() != number) continue;
+      return ctx->children[i - 1]->getText() == "-";
+    }
+    return false;
+  }
+
   void exitDumppart(RQLParser::DumppartContext *ctx) override {
     actionType = rule::DUMP;
     dump_left  = std::stoi(ctx->step_back->getText());
-    if (ctx->children[1]->getText() == "-") dump_left = -dump_left;
+    if (negatedBefore(ctx, ctx->step_back)) dump_left = -dump_left;
     dump_right = std::stoi(ctx->step_forward->getText());
-    if (ctx->children[4]->getText() == "-" || ctx->children[3]->getText() == "−") dump_right = -dump_right;
+    if (negatedBefore(ctx, ctx->step_forward)) dump_right = -dump_right;
 
     if (ctx->rule_retnetion != nullptr)
       dump_retention = std::stoi(ctx->rule_retnetion->getText());
@@ -575,28 +691,53 @@ class ParserListener : public RQLBaseListener {
   }
 };
 
-std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet) {
+std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
+                                                                  std::vector<std::string> &statementKeywords,
+                                                                  size_t firstLine) {
+  statementKeywords.clear();
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
   // to create a token stream.
   RQLLexer lexer(&input);
   CommonTokenStream tokens(&lexer);
-  LexerErrorListener lexerErrorListener;
-  lexer.removeErrorListeners();
-  lexer.addErrorListener(&lexerErrorListener);
   // Create a parser which parses the token stream
   // to create a parse tree.
   RQLParser parser(&tokens);
-  ParserErrorListener parserErrorListener;
+  // Oba listenery bledow potrzebuja parsera (abortParse), wiec powstaja po nim — i przed nim
+  // sa niszczone, czyli w chwili, gdy nikt juz do nich nie siega.
+  LexerErrorListener lexerErrorListener(parser, firstLine);
+  lexer.removeErrorListeners();
+  lexer.addErrorListener(&lexerErrorListener);
+  ParserErrorListener parserErrorListener(parser, firstLine);
   ParserListener parserListener(coreInstance);
   parser.removeParseListeners();
   parser.removeErrorListeners();
   parser.addErrorListener(&parserErrorListener);
   parser.addParseListener(&parserListener);
-  tree::ParseTree *tree  = parser.prog();
-  std::string firsttoken = "UNRECOGNIZED";
-  if (!tree->children.empty() && !tree->children[0]->children.empty()) firsttoken = tree->children[0]->children[0]->getText();
-  std::ranges::transform(firsttoken, firsttoken.begin(), ::toupper);
+
+  // Powod wczesnego powrotu, a nie ogladania drzewa po bledzie: patrz RQLSyntaxError.
+  // Komunikat wypisal juz listener, a coreInstance moze zostac czesciowo zmieniony —
+  // wolajacy odrzuca wtedy caly plan (launcher) albo cala kopie planu (executorsm::getAdHoc).
+  tree::ParseTree *tree = nullptr;
+  try {
+    tree = parser.prog();
+  } catch (const RQLSyntaxError &e) {
+    // Tresc bledu wraca ta sama droga co blad semantyczny — statusem. Bez tego operator
+    // dostawal samo "Fail", a zdanie nazywajace przyczyne zostawalo na stderr PROCESU
+    // SERWERA, czyli w journalu maszyny, gdzie autora zapytania nie ma.
+    // Slowo kluczowe pozostaje "UNRECOGNIZED": opiera sie na tym executorsm::getAdHoc,
+    // ktory kontroluje status PRZED slowem kluczowym.
+    return {e.message, "UNRECOGNIZED", ""};
+  }
+
+  for (const auto *child : tree->children) {
+    if (child->children.empty()) continue;  // EOF
+    std::string keyword = child->children[0]->getText();
+    std::ranges::transform(keyword, keyword.begin(), ::toupper);
+    statementKeywords.push_back(std::move(keyword));
+  }
+
+  const std::string firsttoken = statementKeywords.empty() ? "UNRECOGNIZED" : statementKeywords.front();
 
   std::string streamName;  // tree->children[1]->children[0]->getText();
   if (!tree->children.empty()) {
@@ -608,7 +749,22 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
       streamName = ruleCtx->stream_name->getText();
     }
   }
-  return {status, firsttoken, streamName};
+  // Blad semantyczny wraca ta sama droga co skladniowy — wolajacy (launcher albo
+  // executorsm::getAdHoc) ma jedno miejsce, w ktorym odrzuca plan lub kopie planu.
+  // Nazwa strumienia i slowo kluczowe ida z nim, zeby komunikat wskazywal instrukcje.
+  if (!parserListener.semanticError().empty()) return {parserListener.semanticError(), firsttoken, streamName};
+
+  return {"OK", firsttoken, streamName};
+}
+
+std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
+                                                                  std::vector<std::string> &statementKeywords) {
+  return parserRQLString(coreInstance, inlet, statementKeywords, 1);
+}
+
+std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet) {
+  std::vector<std::string> ignoredKeywords;
+  return parserRQLString(coreInstance, inlet, ignoredKeywords, 1);
 }
 
 /// Wiersze logiczne pliku RQL: komentarze usuniete, kontynuacje `\\` sklejone.
@@ -620,20 +776,30 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
 ///
 /// Warunek patrzy na pierwszy NIEBIALY znak, bo wcieta linia komentarza szla dotad do
 /// leksera i lapala ja wlasnie usunieta regula.
-std::vector<std::string> readLogicalLines(std::ifstream &file) {
-  std::vector<std::string> result;
+///
+/// Z kazda instrukcja wraca numer wiersza PLIKU, na ktorym sie zaczyna. Bez tego numeru
+/// blad skladni wskazywal wiersz liczony wewnatrz pojedynczej instrukcji, czyli praktycznie
+/// zawsze 1 — pozycja, ktorej w pliku planu nie da sie odnalezc. Kotwica jest pierwszym
+/// wierszem instrukcji, bo kontynuacje `\\` sa sklejane w jeden wiersz logiczny.
+std::vector<std::pair<std::string, size_t>> readLogicalLines(std::istream &file) {
+  std::vector<std::pair<std::string, size_t>> result;
   std::string line;
   std::string accumulated;
+  size_t physicalLine         = 0;
+  size_t accumulatedFirstLine = 0;  // 0 znaczy: instrukcja jeszcze sie nie zaczela
   while (std::getline(file, line)) {
+    ++physicalLine;
     const auto firstVisible = line.find_first_not_of(" \t\r");
     if (firstVisible == std::string::npos || line[firstVisible] == '#') continue;
+    if (accumulatedFirstLine == 0) accumulatedFirstLine = physicalLine;
     if (line.back() == '\\') {
       accumulated += line.substr(0, line.size() - 1) + ' ';
       continue;
     }
     accumulated += line;
-    result.push_back(std::move(accumulated));
-    accumulated = {};
+    result.emplace_back(std::move(accumulated), accumulatedFirstLine);
+    accumulated          = {};
+    accumulatedFirstLine = 0;
   }
   return result;
 }
@@ -646,8 +812,9 @@ std::string parserRQLFile_4Test(qTree &coreInstance, const std::string &sInputFi
   }
 
   std::string status = "Empty file.";
-  for (const auto &stmt : readLogicalLines(file)) {
-    auto [result, first_keyword, stream_name] = parserRQLString(coreInstance, stmt);
+  std::vector<std::string> statementKeywords;
+  for (const auto &[stmt, firstLine] : readLogicalLines(file)) {
+    auto [result, first_keyword, stream_name] = parserRQLString(coreInstance, stmt, statementKeywords, firstLine);
     status                                    = result;
     if (status != "OK") {
       SPDLOG_ERROR("Error: Parsing failed on {}.\n{}", first_keyword, stmt);

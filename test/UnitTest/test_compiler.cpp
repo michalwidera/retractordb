@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <cctype>
-#include <cerrno>
 #include <format>
 #include <fstream>
 #include <map>
@@ -16,11 +15,9 @@
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/exprSimplify.hpp"
 #include "retractor/lib/qTree.hpp"
+#include "retractor/lib/RQLParser.hpp"
 
 // ctest -R '^ut-test_compiler' -V
-
-extern std::string parserRQLFile_4Test(qTree &coreInstance, const std::string &sInputFile);
-extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
 
 qTree coreInstance;
 
@@ -78,6 +75,108 @@ TEST(xparser, check_multiline_backslash) {
   EXPECT_EQ(result, "OK");
   EXPECT_TRUE(instance.exists("core0"));
   EXPECT_TRUE(instance.exists("str1"));
+}
+
+// --- reguly: odmowa zamiast abort(), bo ten sam parser obsluguje kanal ad-hoc -----------
+
+TEST(xparser, rule_on_missing_stream_is_refused_not_ignored) {
+  // Do 2026-09-05 petla szukajaca celu po prostu nic nie znajdowala i regula znikala bez sladu:
+  // w pliku planu byla to cicho martwa regula, w ad-hoc — odpowiedz "OK" na polecenie, ktore
+  // nie zrobilo nic.
+  qTree instance;
+  testing::internal::CaptureStderr();
+  auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
+        SELECT core0[0] STREAM dst FROM core0
+        RULE r ON nosuch WHEN nosuch[0] > 0 DO DUMP -1 TO 1
+      )");
+  testing::internal::GetCapturedStderr();
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("no such stream is defined"), std::string::npos) << result;
+}
+
+TEST(xparser, rule_on_declaration_is_refused_without_killing_the_process) {
+  qTree instance;
+  testing::internal::CaptureStderr();
+  auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
+        RULE r ON core0 WHEN core0[0] > 0 DO DUMP -1 TO 1
+      )");
+  testing::internal::GetCapturedStderr();
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("declaration stream"), std::string::npos) << result;
+}
+
+TEST(xparser, duplicate_rule_name_on_one_stream_is_refused) {
+  // Nazwa reguly wchodzi do nazwy pliku zrzutu (dumpManager::createDumpFile), wiec powtorka
+  // znaczy dwa zadania piszace do jednego pliku.
+  qTree instance;
+  testing::internal::CaptureStderr();
+  auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
+        SELECT core0[0] STREAM dst FROM core0
+        RULE r ON dst WHEN dst[0] > 0 DO DUMP -1 TO 1
+        RULE r ON dst WHEN dst[0] > 1 DO DUMP -2 TO 2
+      )");
+  testing::internal::GetCapturedStderr();
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("already defined"), std::string::npos) << result;
+}
+
+TEST(xparser, empty_dump_range_is_refused_by_the_parser) {
+  // Rownosc granic nie opisuje zadnego zrzutu, a nizej czekal na nia FatalError w
+  // compiler::computeRequiredCapacities() — czyli w kanale ad-hoc smierc serwera.
+  qTree instance;
+  testing::internal::CaptureStderr();
+  auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
+        SELECT core0[0] STREAM dst FROM core0
+        RULE r ON dst WHEN dst[0] > 0 DO DUMP 5 TO 5
+      )");
+  testing::internal::GetCapturedStderr();
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("is empty"), std::string::npos) << result;
+}
+
+TEST(xparser, dump_range_signs_are_read_from_the_neighbouring_child) {
+  // Znak jest opcjonalnym dzieckiem reguly `dumppart`, wiec pozycje dzieci przesuwaja sie wraz
+  // z jego obecnoscia. Odczyt ze stalej pozycji children[4] wychodzil dla zakresu BEZ znakow
+  // poza wektor — w Debug asercja biblioteki standardowej, w Release odczyt spoza zakresu.
+  struct Case {
+    std::string range;
+    long int left;
+    long int right;
+  };
+  for (const auto &testCase : {Case{"5 TO 8", 5, 8}, Case{"-5 TO 8", -5, 8}, Case{"-5 TO -1", -5, -1}}) {
+    qTree instance;
+    auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
+        SELECT core0[0] STREAM dst FROM core0
+        RULE r ON dst WHEN dst[0] > 0 DO DUMP )" + testCase.range + "\n");
+    ASSERT_EQ(result, "OK") << testCase.range;
+    const auto &attached = instance.getQuery("dst").lRules;
+    ASSERT_EQ(attached.size(), 1U) << testCase.range;
+    EXPECT_EQ(attached.front().dumpRange.first, testCase.left) << testCase.range;
+    EXPECT_EQ(attached.front().dumpRange.second, testCase.right) << testCase.range;
+  }
+}
+
+TEST(xcompiler, rule_condition_reaching_another_stream_is_refused) {
+  // Warunek reguly ewaluator liczy na payloadzie WYJSCIOWYM celu i bierze z tokenu wylacznie
+  // indeks — nazwa schematu jest ignorowana. Odwolanie do cudzego strumienia czytaloby wiec
+  // pod tym indeksem wlasny rekord: cicho i zawsze zle.
+  qTree instance;
+  auto [parseResult, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
+        SELECT core0[0] STREAM dst FROM core0
+        RULE r ON dst WHEN core0[0] > 0 DO DUMP -1 TO 1
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  const auto result = compilerInstance.compile();
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("only the record of the stream it is attached to"), std::string::npos) << result;
 }
 
 TEST(xcompiler, shares_commutative_add_select_computation) {
@@ -1326,11 +1425,32 @@ TEST(xcompiler, substrate_names_stay_identifiers) {
   EXPECT_TRUE(plan.exists("STREAM_DEHASH_DIV_STREAM_HASH_a_b_2_1"));
 }
 
+namespace {
+
+/// Parsuje `rql` i zwraca {status, diagnostyka wypisana na stderr}.
+///
+/// Do 2026-09-05 blad skladni konczyl proces przez exit(EPERM), wiec te testy pisalo sie
+/// przez EXPECT_EXIT, a tresc komunikatu ogladalo sie w wydruku umierajacego procesu.
+/// Parser wraca teraz Z TRESCIA bledu w statusie, a ten sam komunikat idzie dodatkowo na
+/// stderr — badamy obie drogi, bo sa niezalezne: status jest jedynym kanalem docierajacym
+/// do KLIENTA (xqry -a, xqry --reset), stderr jedynym sladem po stronie serwera.
+/// Asercje na status sprawdzaja fragment tresci, nie rownosc: tekst pochodzi z ANTLR-a
+/// i moze sie zmienic przy przebudowie gramatyki, a pilnowana wlasnosc to "przyczyna
+/// dojechala", nie "dojechala konkretna literowka".
+std::pair<std::string, std::string> parseCapturingStderr(const std::string &rql) {
+  qTree instance;
+  testing::internal::CaptureStderr();
+  auto [parseResult, keyword, name] = parserRQLString(instance, rql);
+  return {parseResult, testing::internal::GetCapturedStderr()};
+}
+
+}  // namespace
+
 // MIN/MAX/AVG/SUMC sa tokenami leksera stojacymi PRZED ID, wiec zaden strumien nie moze
 // sie tak nazywac — reguly stream_factor przyjmuja wylacznie ID. Zastrzezenie jest
 // dzialaniem gramatyki, nie osobna kontrola w kompilatorze, i ten test je przypina:
 // gdyby ktos zdjal MIN z leksera albo dodal go do ID, `SUMC(x)` przestaloby byc
-// jednoznaczne. parserRQLString konczy proces przy bledzie skladni, stad EXPECT_EXIT.
+// jednoznaczne.
 TEST(xparser, aggregate_keywords_are_reserved_stream_names) {
   for (const char *rql : {
            "DECLARE v INTEGER STREAM min, 1/500 FILE 'a.txt'",
@@ -1338,15 +1458,37 @@ TEST(xparser, aggregate_keywords_are_reserved_stream_names) {
            "DECLARE v INTEGER STREAM avg, 1/500 FILE 'a.txt'",
            "DECLARE v INTEGER STREAM SUMC, 1/500 FILE 'a.txt'",
        }) {
-    EXPECT_EXIT(
-        {
-          qTree instance;
-          (void)parserRQLString(instance, rql);
-          exit(0);
-        },
-        ::testing::ExitedWithCode(EPERM), "expecting ID")
-        << rql;
+    const auto [parseResult, diagnostics] = parseCapturingStderr(rql);
+    EXPECT_NE(parseResult, "OK") << rql;
+    EXPECT_TRUE(parseResult.contains("expecting ID")) << rql << '\n' << parseResult;
+    EXPECT_TRUE(diagnostics.contains("expecting ID")) << rql << '\n' << diagnostics;
   }
+}
+
+// Status parsowania jest stanem POJEDYNCZEGO wywolania, nie stanem procesu.
+//
+// Do 2026-09-05 "Fail" ladowalo w zmiennej plikowej `status`, ktorej parserRQLString nie
+// zerowal na wejsciu. Bylo to nieszkodliwe wylacznie dlatego, ze exit(EPERM) wyprzedzal
+// kazde nastepne wywolanie. Po zdjeciu exit() bez tego straznika pierwsze bledne zapytanie
+// ad-hoc zatrulo by KAZDE nastepne w tym samym procesie serwera — takze poprawne.
+//
+// Drugie zapinane tu zalozenie nalezy do executorsm::getAdHoc: po bledzie skladni slowo
+// kluczowe jest "UNRECOGNIZED", wiec kontrola statusu musi stac PRZED kontrola slowa.
+TEST(xparser, parse_failure_does_not_poison_the_next_parse) {
+  qTree rejected;
+  testing::internal::CaptureStderr();
+  auto [failed, failedKeyword, failedName] = parserRQLString(rejected, "ml");
+  (void)testing::internal::GetCapturedStderr();
+  ASSERT_NE(failed, "OK");
+  EXPECT_TRUE(failed.contains("mismatched input 'ml'")) << failed;
+  EXPECT_EQ(failedKeyword, "UNRECOGNIZED");
+
+  qTree instance;
+  auto [parseResult, keyword, name] = parserRQLString(instance, "DECLARE v INTEGER STREAM src, 1/500 FILE 'a.txt'");
+  EXPECT_EQ(parseResult, "OK");
+  EXPECT_EQ(keyword, "DECLARE");
+  EXPECT_EQ(name, "src");
+  EXPECT_TRUE(instance.exists("src"));
 }
 
 namespace {
@@ -1754,13 +1896,10 @@ TEST(xparser, hash_operator_is_not_whitespace_sensitive) {
 // nazwa strumienia i ginie na nierozwiazanym odwolaniu — takze glosno. Komentarz konczacy
 // wiersz zapisuje sie `//`.
 TEST(xparser, trailing_hash_comment_is_rejected) {
-  EXPECT_EXIT(
-      {
-        qTree instance;
-        (void)parserRQLString(instance, "SELECT * STREAM t FROM a # komentarz na koncu wiersza");
-        exit(0);
-      },
-      ::testing::ExitedWithCode(EPERM), "extraneous input");
+  const auto [parseResult, diagnostics] = parseCapturingStderr("SELECT * STREAM t FROM a # komentarz na koncu wiersza");
+  EXPECT_NE(parseResult, "OK");
+  EXPECT_TRUE(parseResult.contains("extraneous input")) << parseResult;
+  EXPECT_TRUE(diagnostics.contains("extraneous input")) << diagnostics;
 }
 
 // Komentarz zajmujacy caly wiersz — takze wciety — nadal jest komentarzem. Przechodzi
@@ -1784,6 +1923,50 @@ TEST(xparser, whole_line_hash_comment_survives) {
 
   // Komentarze zniknely, a `#` w klauzuli FROM zostal przeplotem.
   EXPECT_EQ(fromProgram(instance.getQuery("t")), "PUSH_STREAM(a);PUSH_STREAM(b);STREAM_HASH(0);");
+}
+
+// Numer wiersza w komunikacie o bledzie skladni jest numerem wiersza PLIKU.
+//
+// Parser dostaje pojedyncza instrukcje wyjeta przez readLogicalLines, wiec sam liczy od
+// jedynki: bez przekazanej kotwicy kazda odmowa wskazywala wiersz 1, takze dla bledu w
+// polowie duzego planu — a operator dostawal pozycje, ktorej w pliku nie da sie odnalezc.
+// Kotwica jest PIERWSZYM wierszem instrukcji, bo kontynuacje `\\` sa sklejane w jeden
+// wiersz logiczny i pozycja wewnatrz sklejki w pliku nie istnieje.
+TEST(xparser, syntax_error_reports_the_line_of_the_file) {
+  const std::string fileName("ut_error_line.rql");
+  {
+    std::ofstream out(fileName);
+    out << "# komentarz pelnowierszowy\n"
+        << "SUBSTRAT 'memory'\n"
+        << "\n"
+        << "DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'\n"
+        << "SELECT ((( STREAM t FROM a\n";
+  }
+
+  qTree instance;
+  testing::internal::CaptureStderr();
+  const std::string status      = parserRQLFile_4Test(instance, fileName);
+  const std::string diagnostics = testing::internal::GetCapturedStderr();
+  // Wiersz pusty i wiersz komentarza nie trafiaja do parsera, ale LICZA sie do numeracji.
+  EXPECT_TRUE(status.contains("line 5:")) << status;
+  EXPECT_TRUE(diagnostics.contains("line:5:")) << diagnostics;
+
+  const std::string continuedFileName("ut_error_line_continued.rql");
+  {
+    std::ofstream out(continuedFileName);
+    out << "SUBSTRAT 'memory'\n"
+        << "DECLARE v INTEGER STREAM a, \\\n"
+        << "        1/500 FILE 'a.txt'\n"
+        << "SELECT ((( STREAM t \\\n"
+        << "        FROM a\n";
+  }
+
+  qTree continued;
+  testing::internal::CaptureStderr();
+  const std::string continuedStatus = parserRQLFile_4Test(continued, continuedFileName);
+  (void)testing::internal::GetCapturedStderr();
+  // Bledna instrukcja zaczyna sie w wierszu 4 i jest sklejona z wierszem 5.
+  EXPECT_TRUE(continuedStatus.contains("line 4:")) << continuedStatus;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -2393,17 +2576,15 @@ TEST(xcompiler, window_aggregate_never_changes_the_output_interval) {
 
   // Trzeci czlon nie jest juz skladnia. Bez tej kontroli test wyzej przechodzilby takze
   // wtedy, gdyby krok wrocil do gramatyki i tylko przestal byc uzywany.
-  // parserRQLString konczy proces przy bledzie skladni, stad EXPECT_EXIT.
-  EXPECT_EXIT(
-      {
-        qTree instance;
-        (void)parserRQLString(instance,
-                              "SUBSTRAT 'memory'\n"
-                              "DECLARE a INTEGER[3] STREAM src, 1/10 FILE 'src.txt'\n"
-                              "SELECT MIN(a[0] : 2 : 2) STREAM dst FROM src\n");
-        exit(0);
-      },
-      ::testing::ExitedWithCode(EPERM), "expecting ')'");
+  const auto [parseResult, diagnostics] = parseCapturingStderr(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a INTEGER[3] STREAM src, 1/10 FILE 'src.txt'\n"
+      "SELECT MIN(a[0] : 2 : 2) STREAM dst FROM src\n");
+  EXPECT_NE(parseResult, "OK");
+  // Trzeci wiersz przekazanego tekstu — numer wiersza jest czescia komunikatu.
+  EXPECT_TRUE(parseResult.contains("line 3:")) << parseResult;
+  EXPECT_TRUE(parseResult.contains("expecting ')'")) << parseResult;
+  EXPECT_TRUE(diagnostics.contains("expecting ')'")) << diagnostics;
 }
 
 TEST(xcompiler, window_aggregate_origin_covers_the_whole_window) {

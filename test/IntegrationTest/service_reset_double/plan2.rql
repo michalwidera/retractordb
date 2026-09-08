@@ -1,0 +1,12 @@
+# Plan jest tu nosnikiem: badane jest przyjmowanie resetow w trakcie wymiany planu,
+# a nie to, co silnik liczy. Nazwy strumieni musza sie miedzy planami roznic, bo to
+# po nich (przez --bus) rozpoznajemy, ktory plan faktycznie wszedl.
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'
+
+SELECT a+1 STREAM beta1 FROM src
+SELECT a+2 STREAM beta2 FROM src
+SELECT a+3 STREAM beta3 FROM src
+SELECT a+4 STREAM beta4 FROM src

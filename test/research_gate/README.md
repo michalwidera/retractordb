@@ -83,6 +83,24 @@ Poziomy mają różne wymagania i `gate_requirements` instaluje te najwyższego:
 * przebieg nie zostawia śladów w drzewie: `__pycache__`, `work/` i
   `.gate-work/` są w `.gitignore`.
 
+## Czego ta bramka nie zobaczy
+
+Bramka porównuje **etykiety** reżimów z tablicą odniesienia, na dwóch
+**zamrożonych** ziarnach. Trzy rodzaje dryftu są dla niej niewidoczne
+z konstrukcji: dryft **wartości** (nie sprawdza, co silnik policzył), dryft
+**poza korpusem** tych dwóch ziaren, oraz dryft **wielkości** wewnątrz etykiety.
+
+Łapie je osobne polecenie, w tym samym katalogu — wykonuje silnik i konfrontuje
+go z modelem zdarzeniowym oraz z niezależnym portem w Apache Flink, na świeżo
+losowanym ziarnie:
+
+```bash
+ninja test_drift
+```
+
+Szczegóły — pięć poziomów, trójwartościowy wynik, i dlaczego próg czasowy H9
+tam nie mieszka — w [`DRIFT.md`](DRIFT.md).
+
 ## Zasada, na której to stoi
 
 **Nie poprawia się bramki, żeby zaświeciła na zielono.** Czerwone światło jest

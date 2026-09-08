@@ -30,7 +30,9 @@
 /// obciążałby dokładnie ten budżet slotu, który sonda mierzy.
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <ctime>
 #include <string>
@@ -339,7 +341,7 @@ struct capacityShape {
 
 /// Etapy, na których zdejmowana jest migawka planu. Spadek liczby tokenów/strumieni
 /// (zwłaszcza na etapie deduplikacji) to mierzalny efekt optymalizacji z sekcji E3.
-enum class planStage {
+enum class planStage : std::uint8_t {
   entry,      ///< surowy plan po parsowaniu
   preDedup,   ///< po kanonizacji do postaci pośredniej (dekompozycja)
   postDedup,  ///< po eliminacji zdublowanych substratów — właściwa redukcja planu
@@ -433,7 +435,7 @@ class planProbe {
   bool active_     = false;
   long startNs_    = 0;
   long overheadNs_ = 0;
-  planShape stages_[4]{};
+  std::array<planShape, 4> stages_{};
 };
 
 }  // namespace rdb::probe

@@ -1,0 +1,4 @@
+STORAGE 'temp'
+SUBSTRAT 'memory'
+DECLARE b INTEGER STREAM osrc, 0.2 FILE 'data.txt'
+SELECT b+1 STREAM beta FROM osrc

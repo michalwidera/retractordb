@@ -1,12 +1,15 @@
 #include <algorithm>
 #include <chrono>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <print>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <utility>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 #include <boost/interprocess/ipc/message_queue.hpp>
@@ -19,6 +22,9 @@
 #include "config.h"  // Add an automatically generated configuration file
 #include "constants.hpp"
 #include "qry.hpp"
+#include "retractor/lib/bus.hpp"
+#include "retractor/lib/serverName.hpp"
+#include "serverRouting.hpp"
 #include "uxSysTermTools.hpp"
 
 using namespace boost;
@@ -26,24 +32,131 @@ using boost::property_tree::ptree;
 
 namespace IPC = boost::interprocess;
 
-static bool waitForServer(int maxSeconds, int pollIntervalMs) {
+/// Kod wyjscia dla werdyktu serwera. Wspolny dla --dir, --detail i --select, bo werdykt
+/// opisuje stan serwera, a nie komende, ktora go zastala: to samo zamykanie sie instancji nie
+/// moze konczyc jednej komendy jako timeout, a drugiej jako brak pliku.
+static int exitCodeFor(selectResult result) {
+  switch (result) {
+    case selectResult::ok:
+      return system::errc::success;
+    case selectResult::streamNotFound:
+      return system::errc::no_such_file_or_directory;
+    case selectResult::serverNoResponse:
+      return system::errc::timed_out;
+    case selectResult::clientQueueMissing:
+      return system::errc::no_stream_resources;
+    case selectResult::noData:
+      return system::errc::no_message_available;
+    case selectResult::noActivePlan:
+      return system::errc::no_such_file_or_directory;
+    case selectResult::serverStopping:
+      return system::errc::operation_canceled;
+  }
+  return system::errc::interrupted;
+}
+
+/// Czy obiekty IPC instancji o tej nazwie da sie otworzyc. Pusta nazwa to instancja
+/// historyczna (bez `--name`), dokladnie jak w routingu.
+static bool serverReachable(std::string_view serverName) {
+  try {
+    const ipc::ServerNames names = ipc::names(serverName);
+    IPC::managed_shared_memory seg(IPC::open_only, names.shmemSegment.c_str());
+    IPC::message_queue mq(IPC::open_only, names.queryQueue.c_str());
+  } catch (...) {
+    return false;
+  }
+  // Same obiekty IPC nie dowodza, ze ktokolwiek obsluguje kolejke: po SIGKILL segment i
+  // kolejka zostaja w /dev/shm, wiec `--wait-server` melduje gotowosc serwera, ktorego nie ma,
+  // a komenda idzie do kolejki bez odbiorcy. Magistrala wie wiecej -- Bus::instances() sprawdza
+  // PID i czas startu przez /proc, wiec martwa instancja z niej znika.
+  //
+  // Kolejnosc po stronie serwera pozwala wymagac OBU warunkow naraz: slot na magistrali
+  // powstaje w launcherze, jeszcze przed zbudowaniem obiektow IPC. Instancja widoczna na
+  // magistrali, ale bez kolejki, to instancja w trakcie startu -- czekanie ma wtedy trwac dalej.
+  const bus::Bus xrdbbus(bus::segmentName(), /*createIfMissing=*/false);
+  // Furtka zgodnosci: bez magistrali zostaje dotychczasowe kryterium. Instancja, ktora
+  // wystartowala przy ClaimStatus::Unavailable, nie ma slotu i po ostrzejszym sprawdzeniu
+  // przestalaby byc osiagalna dla wlasnego klienta.
+  if (!xrdbbus.attached()) return true;
+  const std::vector<bus::InstanceInfo> live = xrdbbus.instances();
+  return std::ranges::any_of(live, [serverName](const bus::InstanceInfo &instance) { return instance.name == serverName; });
+}
+
+/// Migawka magistrali: czysty odczyt seqlockiem, bez muteksu i BEZ kontaktu z serwerami.
+/// Klient nie zakłada segmentu (`createIfMissing = false`) — jego brak znaczy dokładnie
+/// tyle, że żaden serwer nie wystartował.
+static std::vector<bus::InstanceInfo> busSnapshot() {
+  const bus::Bus xrdbbus(bus::segmentName(), /*createIfMissing=*/false);
+  return xrdbbus.instances();
+}
+
+static bool waitForServer(int maxSeconds, int pollIntervalMs, std::string_view serverName) {
   const int safeSeconds      = std::max(1, maxSeconds);
   const int safePollInterval = std::max(1, pollIntervalMs);
   const int maxAttempts      = std::max(1, safeSeconds * 1000 / safePollInterval);
   for (int i = 0; i < maxAttempts; ++i) {
-    try {
-      IPC::managed_shared_memory seg(IPC::open_only, std::string(ipc::kShmemSegment).c_str());
-      IPC::message_queue mq(IPC::open_only, std::string(ipc::kQueryQueue).c_str());
-      return true;
-    } catch (...) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(safePollInterval));
-    }
+    if (serverReachable(serverName)) return true;
+    std::this_thread::sleep_for(std::chrono::milliseconds(safePollInterval));
   }
   return false;
 }
 
 void cleanup() {
   spdlog::shutdown();  // flush logs on disk
+}
+
+/// Rozstrzyga instancję docelową dla komendy, która nie dostała jawnego `--server`.
+///
+/// Kolejność warunków odpowiada kolejności wysyłki w `main()`. To nie jest kosmetyka: gdyby
+/// się rozjechały, routing rozstrzygałby według innej komendy niż ta, która faktycznie
+/// poleci do serwera — np. `xqry -k -a "..."` zabija serwer, więc musi być rozstrzygany
+/// jak `-k`, a nie jak zapytanie ad-hoc.
+///
+/// Przy dokładnie jednej żywej instancji zwracamy jej nazwę BEZ sprawdzania strumienia.
+/// Diagnostyka "nie ma takiego strumienia" należy wtedy do serwera, dokładnie tak jak przed
+/// etapem 2c — dzięki temu żaden istniejący test integracyjny nie wymaga poprawki.
+static routing::Resolution resolveTarget(const boost::program_options::variables_map &vm,
+                                         const std::vector<bus::InstanceInfo> &instances, int elemLimit,
+                                         const std::string &stream, const std::string &detail, const std::string &adHoc) {
+  if (instances.size() <= 1) return routing::forSingleTarget(instances);
+  if (vm.contains("hello") || (vm.contains("kill") && elemLimit == 0) || vm.contains("dir"))
+    return routing::forSingleTarget(instances);
+  // Przeladowanie planu dotyczy CALEJ instancji, a nie strumienia — a instancja bezczynna
+  // nie serwuje zadnego strumienia, wiec po strumieniu nie da sie jej wskazac. Przy wiecej
+  // niz jednej zywej instancji `--reset` wymaga wiec jawnego `--server`.
+  if (vm.contains("reset")) return routing::forSingleTarget(instances);
+  if (vm.contains("adhoc") && !adHoc.empty()) return routing::forAdHoc(instances, adHoc);
+  if (vm.contains("detail")) return routing::forStream(instances, detail);
+  if (vm.contains("select") && stream != "none") return routing::forStream(instances, stream);
+  return routing::forSingleTarget(instances);
+}
+
+/// Czekanie na instancje docelowa, gdy nie wskazano jej jawnie.
+///
+/// Nazwy instancji nie da sie tu ustalic raz na wejsciu: bez `--server` i bez RDB_NAMESPACE
+/// wskazuje ja dopiero routing po magistrali, a magistrala jest pusta wlasnie wtedy, gdy `-w`
+/// ma sens. Czekanie odpytuje wiec magistrale w petli i rozstrzyga cel tymi samymi regulami,
+/// co wysylka nizej; inaczej `xqry -l -w` przy jednej NAZWANEJ instancji czekaloby na obiekty
+/// instancji bezimiennej, czyli do wyczerpania budzetu.
+///
+/// Pusta magistrala daje `forSingleTarget({})`, czyli nazwe pusta -- zachowanie sprzed etapu 2c
+/// zostaje nietkniete i dla instancji bezimiennej czekamy dokladnie tak jak dawniej.
+///
+/// Rozstrzygniecie inne niz Resolved (dwie zywe instancje przy komendzie bez adresata, obcy
+/// strumien, ad-hoc przez granice) konczy czekanie od razu: czekanie tego nie zmieni, a
+/// komunikat dla operatora nalezy do routingu nizej i jest tresciwszy niz timeout.
+static bool waitForRoutedServer(int maxSeconds, int pollIntervalMs, const boost::program_options::variables_map &vm,
+                                int elemLimit, const std::string &stream, const std::string &detail, const std::string &adHoc) {
+  const int safeSeconds      = std::max(1, maxSeconds);
+  const int safePollInterval = std::max(1, pollIntervalMs);
+  const int maxAttempts      = std::max(1, safeSeconds * 1000 / safePollInterval);
+  for (int i = 0; i < maxAttempts; ++i) {
+    const routing::Resolution resolved = resolveTarget(vm, busSnapshot(), elemLimit, stream, detail, adHoc);
+    if (resolved.status != routing::Status::Resolved) return true;
+    if (serverReachable(resolved.serverName)) return true;
+    std::this_thread::sleep_for(std::chrono::milliseconds(safePollInterval));
+  }
+  return false;
 }
 
 int main(int argc, char *argv[]) {
@@ -56,31 +169,41 @@ int main(int argc, char *argv[]) {
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
     int elemLimit{0};
+    int idleTimeoutMs{0};
     std::string sInputStream;
     std::string sDetailStream;
     std::string sAdHoc;
     std::string sGnuplotDim;
     std::string sConfig;
+    std::string sServerName;
+    std::string sResetFile;
     std::tuple<int, int, int> gnuplotDim{0, 0, 0};
-    desc.add_options()                                                                                    //
-        ("select,s", po::value<std::string>(&sInputStream), "show this stream")                           //
-        ("detail,t", po::value<std::string>(&sDetailStream), "show details of this stream")               //
-        ("adhoc,a", po::value<std::string>(&sAdHoc), "adhoc query mode")                                  //
-        ("elimitqry,m", po::value<int>(&elemLimit)->default_value(0), "limit of elements, 0 - no limit")  //
-        ("null,n", "if null row appear - skip it in output")                                              //
-        ("hello,l", "diagnostic - hello db world")                                                        //
-        ("kill,k", "kill xretractor server")                                                              //
-        ("dir,d", "list of queries")                                                                      //
-        ("diryaml,y", "list of queries in yaml format")                                                   //
-        ("raw,r", "raw output mode (default)")                                                            //
-        ("graphite,g", "graphite output mode")                                                            //
-        ("influxdb,f", "influxDB output mode")                                                            //
-        ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                  //
-        ("gnuplot-rtl,z", "gnuplot output: newest samples on the right (right-to-left scroll)")           //
-        ("config,e", po::value<std::string>(&sConfig), "config file (TOML); overrides search")            //
-        ("help,h", "produce help message")                                                                //
-        ("needctrlc,c", "force ctl+c for stop this tool")                                                 //
-        ("wait-server,w", "poll until xretractor server is available before executing command");
+    desc.add_options()                                                                       //
+        ("select,s", po::value<std::string>(&sInputStream), "show this stream")              //
+        ("detail,t", po::value<std::string>(&sDetailStream), "show details of this stream")  //
+        ("adhoc,a", po::value<std::string>(&sAdHoc), "adhoc query mode")                     //
+        ("reset,q", po::value<std::string>(&sResetFile),
+         "replace the whole plan of the target instance with this RQL file")                                          //
+        ("elimitqry,m", po::value<int>(&elemLimit)->default_value(0), "limit of elements, 0 - no limit")              //
+        ("null,n", "if null row appear - skip it in output")                                                          //
+        ("hello,l", "diagnostic - hello db world")                                                                    //
+        ("kill,k", "kill xretractor server")                                                                          //
+        ("dir,d", "list of queries")                                                                                  //
+        ("yaml,y", "yaml output format for --dir, --detail and --bus")                                                //
+        ("jsonl,j", "versioned JSON Lines API output")                                                                //
+        ("idle-timeout,i", po::value<int>(&idleTimeoutMs)->default_value(0), "JSONL idle timeout in ms; 0 disables")  //
+        ("raw,r", "raw output mode (default)")                                                                        //
+        ("graphite,g", "graphite output mode")                                                                        //
+        ("influxdb,f", "influxDB output mode")                                                                        //
+        ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                              //
+        ("gnuplot-rtl,z", "gnuplot output: newest samples on the right (right-to-left scroll)")                       //
+        ("config,e", po::value<std::string>(&sConfig), "config file (TOML); overrides search")                        //
+        ("help,h", "produce help message")                                                                            //
+        ("needctrlc,c", "force ctl+c for stop this tool")                                                             //
+        ("wait-server,w", "poll until xretractor server is available before executing command")                       //
+        ("server,x", po::value<std::string>(&sServerName),
+         "target xretractor instance name (default: resolved from the bus)")  //
+        ("bus,b", "list live xretractor instances and their streams");
     po::positional_options_description p;  // Assume that select is the first option
     p.add("select", -1);
     po::variables_map vm;
@@ -90,18 +213,46 @@ int main(int argc, char *argv[]) {
 
     const AppConfig appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
 
-    qry obj(appCfg.timingQueryNoDataTimeoutMs, appCfg.ipcClientResponseMaxFails);
+    // Przestrzen nazw uruchomienia (RDB_NAMESPACE) wskazuje instancje docelowa wprost, wiec
+    // musi byc znana PRZED --wait-server: czekanie odpytuje obiekty IPC konkretnej instancji,
+    // a bez nazwy czekaloby na obiekty instancji bezimiennej -- czyli w nieskonczonosc.
+    // Jawny --server pozostaje nadrzedny.
+    const std::string runNamespace = servername::environmentNamespace();
+    if (!runNamespace.empty() && !servername::isValid(runNamespace)) {
+      std::println(std::cerr, "xqry: invalid {} value '{}': expected [a-z][a-z0-9_-]{{0,{}}}", servername::kNamespaceEnv,
+                   runNamespace, servername::kMaxLength - 1);
+      return system::errc::invalid_argument;
+    }
+    if (!vm.contains("server") && !runNamespace.empty()) sServerName = runNamespace;
 
-    if (vm.count("graphite") + vm.count("raw") + vm.count("influxdb") + vm.count("gnuplot") > 1) {
+    // Format wyjścia rozbierany do zmiennych lokalnych, a nie wprost do obiektu `qry`:
+    // instancja docelowa jest znana dopiero po odczycie magistrali, więc `qry` powstaje
+    // niżej. Walidacja argumentów zostaje tam, gdzie była — przed jakimkolwiek IPC.
+    formatMode outputFormatMode{formatMode::RAW};
+    bool gnuplotRightToLeft{false};
+
+    // --idle-timeout ma sens wylacznie w torze JSONL. Przyjete po cichu poza nim wygladalo
+    // jak dzialajaca opcja i nie robilo nic.
+    if (!vm.contains("jsonl") && !vm["idle-timeout"].defaulted()) {
+      std::println(std::cerr, "xqry: --idle-timeout applies only to --jsonl");
+      return system::errc::invalid_argument;
+    }
+    if (vm.contains("jsonl") &&
+        (vm.contains("yaml") || vm.contains("kill") || vm.contains("null") || vm.contains("wait-server") || vm.contains("bus") ||
+         vm.contains("reset") || vm.contains("adhoc") || elemLimit < 0 || idleTimeoutMs < 0)) {
+      std::println(std::cerr, "xqry: --jsonl supports --hello, --dir, --detail or --select with nonnegative limits");
+      return system::errc::invalid_argument;
+    }
+    if (vm.count("jsonl") + vm.count("graphite") + vm.count("raw") + vm.count("influxdb") + vm.count("gnuplot") > 1) {
       std::println("Only one output format could be selected.");
       return system::errc::invalid_argument;
     }
-    if (vm.contains("graphite")) obj.outputFormatMode = formatMode::GRAPHITE;
-    if (vm.contains("raw")) obj.outputFormatMode = formatMode::RAW;
-    if (vm.contains("influxdb")) obj.outputFormatMode = formatMode::INFLUXDB;
+    if (vm.contains("graphite")) outputFormatMode = formatMode::GRAPHITE;
+    if (vm.contains("raw")) outputFormatMode = formatMode::RAW;
+    if (vm.contains("influxdb")) outputFormatMode = formatMode::INFLUXDB;
     if (vm.contains("gnuplot")) {
-      obj.outputFormatMode   = formatMode::GNUPLOT;
-      obj.gnuplotRightToLeft = vm.contains("gnuplot-rtl");
+      outputFormatMode   = formatMode::GNUPLOT;
+      gnuplotRightToLeft = vm.contains("gnuplot-rtl");
       std::stringstream ss(sGnuplotDim);
 
       auto delimetersCnt = std::count_if(sGnuplotDim.begin(), sGnuplotDim.end(), [](char c) { return c == ',' || c == ':'; });
@@ -138,8 +289,42 @@ int main(int argc, char *argv[]) {
       std::print(std::cerr, "--gnuplot-rtl requires --gnuplot/-p mode.");
       return system::errc::invalid_argument;
     }
-    if (vm.contains("wait-server") && !vm.contains("help")) {
-      if (!waitForServer(appCfg.timingServerStartupWaitSeconds, appCfg.timingServerStartupPollIntervalMs)) {
+    // Komendy wykluczaja sie wzajemnie, bo rozgalezienie nizej wybiera PIERWSZA pasujaca i
+    // milczaco porzuca reszte. Ta cisza jest grozna, bo boost sklada wartosc z krotka opcja:
+    // literowka `-yaml` to dla parsera `-y -a ml`, czyli zapytanie ad-hoc "ml" wyslane do
+    // serwera zamiast zadanego detalu -- a bledne zapytanie ad-hoc konczy zycie serwera
+    // (listener parsera RQL wola exit()). Odmowa zatrzymuje literowke po stronie klienta.
+    //
+    // `-k` do zbioru NIE nalezy: `-s <strumien> -k -m N` (ubij po budzecie elementow) i
+    // `-k -a "..."` to celowe kombinacje, uzywane w testach integracyjnych.
+    const auto commandCount = vm.count("select") + vm.count("detail") + vm.count("adhoc") + vm.count("dir") + vm.count("bus") +
+                              vm.count("hello") + vm.count("reset");
+    if (commandCount > 1) {
+      std::println(std::cerr, "xqry: only one command at a time (--select, --detail, --adhoc, --reset, --dir, --bus, --hello)");
+      return system::errc::invalid_argument;
+    }
+    // `-y` jest modyfikatorem formatu, nie komenda: sam z siebie nie wybiera niczego do
+    // wypisania. Przy komendzie bez formy YAML (-s, -a, -l, -k) odmawiamy zamiast milczec,
+    // bo flaga bez skutku wyglada dla operatora dokladnie tak jak flaga dzialajaca.
+    if (vm.contains("yaml") && !vm.contains("dir") && !vm.contains("detail") && !vm.contains("bus")) {
+      std::println(std::cerr, "xqry: --yaml/-y requires --dir/-d, --detail/-t or --bus/-b");
+      return system::errc::invalid_argument;
+    }
+    // `--bus` i `--help` nie sa komendami do serwera: pierwsza czyta wylacznie magistrale (bez
+    // kontaktu z jakakolwiek instancja), druga w ogole nie dotyka IPC. Czekanie na serwer nie
+    // ma dla nich czego przyspieszyc ani czego doczekac, a przy dwoch zywych instancjach
+    // odmawialoby wypisania tabeli -- czyli dokladnie tej odpowiedzi, ktora ma te dwie
+    // instancje pokazac.
+    if (vm.contains("wait-server") && !vm.contains("help") && !vm.contains("bus")) {
+      // Jawny `--server` (i przestrzen nazw, ktora go zastepuje) wskazuje instancje wprost, wiec
+      // czekamy na nia po nazwie. Bez nich adresata wskazuje magistrala -- i czekanie musi to
+      // wykrywanie objac, inaczej mija sie z jedyna zywa instancja tylko dlatego, ze ma nazwe.
+      const bool ready =
+          (!vm.contains("server") && runNamespace.empty())
+              ? waitForRoutedServer(appCfg.timingServerStartupWaitSeconds, appCfg.timingServerStartupPollIntervalMs, vm,
+                                    elemLimit, sInputStream, sDetailStream, sAdHoc)
+              : waitForServer(appCfg.timingServerStartupWaitSeconds, appCfg.timingServerStartupPollIntervalMs, sServerName);
+      if (!ready) {
         SPDLOG_ERROR("server not available after {} seconds", appCfg.timingServerStartupWaitSeconds);
         return system::errc::no_child_process;
       }
@@ -153,42 +338,100 @@ int main(int argc, char *argv[]) {
       std::println("{}", warranty);
       return system::errc::success;
     }
+
+    const std::vector<bus::InstanceInfo> liveInstances = busSnapshot();
+
+    if (vm.contains("bus")) {
+      const std::vector<std::string> lines =
+          vm.contains("yaml") ? routing::describeYaml(liveInstances) : routing::describe(liveInstances);
+      for (const auto &line : lines)
+        std::println("{}", line);
+      // Komunikat o pustej magistrali wynika z samej magistrali, a nie z liczby wypisanych
+      // wierszy: forma YAML wypisuje dokument `servers: []` takze wtedy, gdy nie ma czego opisac.
+      if (liveInstances.empty()) std::println(std::cerr, "xqry: no live xretractor instance");
+      return system::errc::success;
+    }
+
+    // Jawny `--server` wygrywa zawsze i pomija magistralę: operator, który wskazał instancję
+    // palcem, ma dostać dokładnie ją, także wtedy gdy magistrala jest niedostępna. Tak samo
+    // ustawiona przestrzeń nazw — jej instancja jest wskazana równie jednoznacznie.
+    if (!vm.contains("server") && runNamespace.empty()) {
+      const routing::Resolution resolved = resolveTarget(vm, liveInstances, elemLimit, sInputStream, sDetailStream, sAdHoc);
+      switch (resolved.status) {
+        case routing::Status::Resolved:
+          sServerName = resolved.serverName;
+          break;
+        case routing::Status::StreamNotFound:
+          std::println(std::cerr, "xqry: {}", resolved.detail);
+          return system::errc::no_such_file_or_directory;
+        case routing::Status::Ambiguous:
+        case routing::Status::CrossServer:
+          std::println(std::cerr, "xqry: {}", resolved.detail);
+          return system::errc::invalid_argument;
+      }
+    }
+
+    qry obj(appCfg.timingQueryNoDataTimeoutMs, appCfg.ipcClientResponseMaxFails, kIpcClientDefaultResponseQueueOpenMaxFails,
+            sServerName);
+    obj.outputFormatMode   = outputFormatMode;
+    obj.gnuplotRightToLeft = gnuplotRightToLeft;
+
+    if (vm.contains("jsonl")) {
+      if (vm.contains("hello")) return obj.jsonCommand("hello", "", 0, 0);
+      if (vm.contains("dir")) return obj.jsonCommand("dir", "", 0, 0);
+      if (vm.contains("detail")) return obj.jsonCommand("detail", sDetailStream, 0, 0);
+      if (vm.contains("select")) return obj.jsonCommand("select", sInputStream, elemLimit, idleTimeoutMs);
+      std::println(std::cerr, "xqry: --jsonl requires a command");
+      return system::errc::invalid_argument;
+    }
     if (vm.contains("hello")) return obj.hello();
     if (vm.contains("kill") && elemLimit == 0) {
       obj.netClient("kill", "");
     } else if (vm.contains("dir")) {
-      std::print("{}", obj.dir());
-    } else if (vm.contains("diryaml")) {
-      std::print("{}", obj.dirYaml());
+      // Przedtem KAZDA odpowiedz bez listy strumieni — takze brak odpowiedzi — wygladala jak
+      // instancja bezczynna i konczyla sie zerem. Teraz stan serwera przychodzi tu werdyktem,
+      // a instancja bezczynna ma wartosc (wlasny wydruk), nie porazke.
+      const auto listing = vm.contains("yaml") ? obj.dirYaml() : obj.dir();
+      if (!listing) {
+        std::println(std::cerr, "xqry: {}", toString(listing.error()));
+        return exitCodeFor(listing.error());
+      }
+      std::print("{}", *listing);
+    } else if (vm.contains("reset")) {
+      // Plik czyta KLIENT, nie serwer: usluga chodzi zwykle na innym koncie (User=retractor
+      // w jednostce systemd) i pliku operatora zwyczajnie nie otworzy. Kanalem IPC idzie
+      // wiec tresc, a nie sciezka.
+      std::ifstream planFile(sResetFile, std::ios::binary);
+      if (!planFile.is_open()) {
+        std::println(std::cerr, "xqry: cannot open plan file: {}", sResetFile);
+        return system::errc::no_such_file_or_directory;
+      }
+      std::ostringstream planText;
+      planText << planFile.rdbuf();
+      planFile.close();
+      if (obj.reset(planText.str())) return system::errc::protocol_error;
+      std::println("Plan accepted by the server and scheduled for loading: {}", sResetFile);
     } else if (vm.contains("adhoc") && !sAdHoc.empty()) {
       if (obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
     } else if (vm.contains("detail")) {
-      auto ret = obj.detailShow(sDetailStream);
-      if (!ret.empty()) {
-        std::print("{}", ret);
-      } else
-        return system::errc::no_such_file_or_directory;
+      // Ten sam werdykt i ten sam kod wyjscia co dla --dir i --select. Przedtem kazda porazka
+      // — literowka w nazwie, milczacy serwer, instancja bez planu — wychodzila stad jako
+      // no_such_file_or_directory i bez slowa na stderr.
+      const auto detail = vm.contains("yaml") ? obj.detailShowYaml(sDetailStream) : obj.detailShow(sDetailStream);
+      if (!detail) {
+        std::println(std::cerr, "xqry: {}: {}", sDetailStream, toString(detail.error()));
+        return exitCodeFor(detail.error());
+      }
+      std::print("{}", *detail);
     } else if (vm.contains("select") && sInputStream != "none") {
       // Tryby porażki są rozróżnialne po kodzie wyjścia (issue_215). Przedtem
       // wszystkie kończyły się albo zerem, albo `no_such_file_or_directory`,
       // więc harness nie umiał odróżnić przeciążonego serwera od literówki
       // w nazwie strumienia — a to inna diagnoza i inna naprawa.
       const selectResult result = obj.select(vm, elemLimit, sInputStream, gnuplotDim, obj.gnuplotRightToLeft);
-      switch (result) {
-        case selectResult::ok:
-          break;
-        case selectResult::streamNotFound:
-          std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
-          return system::errc::no_such_file_or_directory;
-        case selectResult::serverNoResponse:
-          std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
-          return system::errc::timed_out;
-        case selectResult::clientQueueMissing:
-          std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
-          return system::errc::no_stream_resources;
-        case selectResult::noData:
-          std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
-          return system::errc::no_message_available;
+      if (result != selectResult::ok) {
+        std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));
+        return exitCodeFor(result);
       }
     } else {
       SPDLOG_ERROR("no argument.");

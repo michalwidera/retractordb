@@ -1,0 +1,69 @@
+# make install && ctest -R simple_max -V
+
+# Weryfikuje operator .max na strumieniu: str0 zawiera dane z core0+core1, str1
+# = str0.max (wartość maksymalna), str2 = str0 + str1 (złączenie). Wynik
+# porównywany z pattern-run.txt via xtrdb. Test -vg-2 uruchamia valgrind z
+# wykrywaniem wycieków pamięci.
+
+# K24/H10a: przebieg wydluzony z 10 na 11 taktow. Ogon `+` wzrosl o jeden slot
+# (rekord wolniejszej skladowej jest okreslony dopiero na koncu jej wlasnego
+# slotu), wiec ten sam zestaw rekordow wymaga jednego taktu wiecej. Wzorzec
+# pozostaje bajtowo bez zmian - zmienila sie chwila emisji, nie tresc.
+
+get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+set(TestID "it_${TestID}")
+
+# Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
+# wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten
+# sam. Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera
+# -f znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+add_test(
+  NAME ${TestID}-vg-2
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+    valgrind --vgdb=no --error-exitcode=1 --leak-check=full
+    --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xretractor
+    query.rql -m 5 -f)
+
+# Bez czekania na plik blokady: serwer biegnie pierwszoplanowo (-m N), wiec po
+# jego powrocie proces juz nie istnieje. Usunieta petla odpytywala twardy /tmp i
+# tak czy tak nie dowodzila konca procesu — blokade kasuje destruktor przed
+# wyjsciem z main (zob. ../serverlib.sh).
+add_test(
+  NAME ${TestID}-run
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+    bash -c "
+set -e
+xretractor query.rql -m 11 -f
+${CMAKE_BINARY_DIR}/src/rdb/xtrdb noprompt < term.script > out.txt
+bash ../compare.sh --ignore-eol pattern-run.txt out.txt
+")
+
+# Testy kompilacyjne tego katalogu, do 2026-09-04 osobny katalog
+# IntegrationTest_parallel/simple_max. Podzial na drzewo "serial" i "parallel"
+# stracil sens, gdy testy serii dostaly przestrzenie nazw i zaczely biec
+# rownoczesnie; te testy i tak pracowaly na danych stad, tylko z drugiego
+# CMakeLists.
+
+add_test(
+  NAME ${TestID}-compile
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash -c "set -e && \
+    xretractor query.rql -c > out-compile.txt && \
+    bash ../compare.sh pattern.txt out-compile.txt")
+
+add_test(
+  NAME ${TestID}-dot
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash -c "set -e && \
+    xretractor query.rql -c -d -f -t -s > out.dot && \
+    bash ../compare.sh pattern-dot.txt out.dot")
+
+add_test(
+  NAME ${TestID}-vg-1
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND
+    valgrind --vgdb=no --error-exitcode=1 --leak-check=full
+    --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xretractor
+    query.rql -c)

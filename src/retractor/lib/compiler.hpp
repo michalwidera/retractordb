@@ -29,6 +29,15 @@ struct compiler {
   std::string compile();
   std::vector<std::string> importFrom(qTree &source);
 
+  /// Kasuje stan zebrany podczas kompilacji, zostawiajac wiazanie z tym samym drzewem.
+  ///
+  /// Potrzebne przy przeladowaniu planu w locie (`xqry --reset`): referencja `coreInstance`
+  /// jest nierebindowalna, wiec plan wymienia sie PRZEZ ZAWARTOSC tego samego obiektu.
+  /// Bez wyczyszczenia rodzin generatora i zapamietanych odwolan kompilacja nowego planu
+  /// widzialaby strumienie poprzedniego — a stawka jest kasowanie plikow artefaktow,
+  /// ktore idzie wlasnie po generatedStreams_.
+  void reset();
+
   /// Rodziny rozwiniete przez expandStreamGenerators(): nazwa szablonu -> nazwy instancji.
   ///
   /// Potrzebne POZA kompilatorem, bo generator lamie zalozenie „jedna linia RQL = jeden
@@ -81,8 +90,8 @@ struct compiler {
   std::string validateConstraints();
   std::map<std::string, int> computeRequiredCapacities();
   std::string applyCapacitiesToStreams(const std::map<std::string, int> &capMap);
-  std::map<std::string, std::vector<std::string>> snapshotUserFieldNames() const;
-  std::string verifyUserFieldNamesPreserved(const std::map<std::string, std::vector<std::string>> &before) const;
+  [[nodiscard]] std::map<std::string, std::vector<std::string>> snapshotUserFieldNames() const;
+  [[nodiscard]] std::string verifyUserFieldNamesPreserved(const std::map<std::string, std::vector<std::string>> &before) const;
   std::string computeLogicalOrigin();
   std::string computeStartupLatency();
   std::string factorMatchedHashTimeMoves();

@@ -1,13 +1,12 @@
 #include "rdb/storageShadow.hpp"
 
 #include <stdexcept>
-#include <utility>
 
 namespace rdb {
 
-storageShadow::storageShadow(const Descriptor &descriptor, std::string metaFilePath)
+storageShadow::storageShadow(const Descriptor &descriptor, const std::string &metaFilePath)
     : metaData(descriptor, metaFilePath),
-      shadow_(descriptor, std::move(metaFilePath)) {
+      shadow_(descriptor, metaFilePath) {
   shadow_.load();
 }
 

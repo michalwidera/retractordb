@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -21,14 +22,19 @@
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "lib/appConfig.hpp"
+#include "lib/bus.hpp"
 #include "lib/compiler.hpp"
 #include "lib/executor_rt.hpp"
 #include "lib/executorsm.hpp"
+#include "lib/executorsmState.hpp"
 #include "lib/lockManager.hpp"
 #include "lib/persistentCounter.hpp"
+#include "lib/planSource.hpp"
 #include "lib/presenter.hpp"
 #include "lib/qTree.hpp"
+#include "lib/serverName.hpp"
 #include "lib/serviceControl.hpp"
+#include "lib/shmBudget.hpp"
 #include "rdb/probe.hpp"  // baner buildu z sondami pomiarowymi
 #include "uxSysTermTools.hpp"
 
@@ -84,6 +90,17 @@
 /// - W przypadku rozpoznania funkcjonowania innej instancji programu, należy rozpoznać czy ta instancja działa jako serwis,
 ///   czy jako osobny proces, jeśli działa jako serwis zaraportować informację o tym fakcie i
 ///   przekompilować zapytania (sprawdzić poprawność) i przekazać zapytanie do tej instancji poprzez restart serwisu z zapytaniem (zachowując konfigurację serwisu).
+/// - Umożliwiać przeładowanie CAŁEGO planu działającej instancji jedną komendą klienta
+///   (`xqry --reset plan.rql`), bez restartu procesu i bez uprawnień do systemctl. Zestaw ma być
+///   sprawdzony (parsowanie, kompilacja, rozłączność nazw) PRZED dotknięciem planu działającego —
+///   odmowa nie może kosztować usługi. Zestaw pusty jest żądaniem poprawnym: sprowadza instancję
+///   do trybu bezczynnego.
+/// - Nadawać instancji usługowej stałą nazwę ("service"), o ile operator nie wskazał innej, i
+///   dopuszczać w systemie dokładnie jedną instancję w trybie usługowym; serwerów zwykłych może
+///   pracować wiele.
+/// - Po błędzie krytycznym (FatalError) sprowadzać jednostkę systemd do stanu bez planu: plik
+///   zapytań usługi jest opróżniany, więc restart podnosi ją w trybie bezczynnym zamiast wracać
+///   w kółko na plan, który ją zabił.
 /// - Udostępniać dane wynikowe strumieni klientom (xqry) przez współdzieloną pamięć / IPC (Boost.Interprocess)
 ///   obsługiwane w osobnym wątku komunikacyjnym, niezależnym od wątku przetwarzania danych.
 /// - Umożliwiać sterowanie startem przetwarzania z poziomu klienta (opcja --xqrywait: wstrzymanie pętli do
@@ -112,13 +129,6 @@ using namespace boost;
 
 using boost::lexical_cast;
 
-extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
-extern std::vector<std::string> readLogicalLines(std::ifstream &file);
-
-extern std::atomic<int> iLoopLimitCnt;
-
-extern std::vector<std::pair<std::string, std::string>> processedLines;
-
 static void handleSignal(int signum) {
   switch (signum) {
     case SIGINT:
@@ -139,14 +149,8 @@ static void handleSignal(int signum) {
   iLoopLimitCnt = executorsm::stop_now;
 }
 
-void dropArtifactFile(const std::filesystem::path &artifact_filename) {
-  if (std::filesystem::exists(artifact_filename)) {
-    std::error_code ec;
-    std::filesystem::remove(artifact_filename, ec);
-    if (ec) {
-      SPDLOG_WARN("Failed to remove file {}: {}", artifact_filename.string(), ec.message());
-    }
-  }
+static std::string ownerLabel(std::string_view instance) {
+  return instance.empty() ? "the unnamed instance" : "instance '" + std::string(instance) + "'";
 }
 
 static void validateConfiguredStorageDir(const AppConfig &cfg) {
@@ -209,11 +213,13 @@ static void printOptimizerBuildInfo() {
 #endif
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) try {
   qTree coreInstance;
   compiler cm(coreInstance);
 
   fixArgcv(argc, argv);
+
+  namespace po = boost::program_options;
 
   // Wczesny skan argumentów: tryb logowania usługowego musi być znany przed konfiguracją logera.
   // Tryb usługi można włączyć flagą (-j/--service) albo zmienną środowiskową XRETRACTOR_SERVICE
@@ -225,6 +231,12 @@ int main(int argc, char *argv[]) {
   if (const char *env = std::getenv("XRETRACTOR_SERVICE"); env != nullptr && env[0] != '\0' && strcmp(env, "0") != 0)
     serviceLog = true;
 
+  // Tozsamosc systemd musi byc znana TU, przed rozstrzygnieciem nazwy instancji: jednostka
+  // systemd jest usluga tak samo jak proces z --service, a nazwa uslugi wspoldecyduje
+  // o nazwie pliku blokady i o nazwach obiektow IPC.
+  const SystemdIdentity systemd = detectSystemdIdentity();
+  const bool serviceMode        = serviceLog || systemd.unit.has_value();
+
   const auto tempLocation = setupLoggerMain(std::string(argv[0]), false /* dual */, serviceLog);
 
   // Kompilacja z włączoną sondą pomiarową. Ostrzeżenie trafia do logu, a w trybie
@@ -232,15 +244,36 @@ int main(int argc, char *argv[]) {
   if constexpr (rdb::probe::enabled)
     SPDLOG_WARN("[warning: probe benchmark build] measurement probe compiled in (RDB_BENCH_PROBE) — NOT for production.");
 
-  // Wczesny skan argumentów: ścieżka --config musi być znana przed konstruowaniem FlockServiceGuard,
-  // aby lock dir z config trafił do guard przed acquireLock().
-  std::optional<std::string> earlyConfigPath;
-  for (int i = 0; i < argc - 1; ++i) {
-    if (strcmp(argv[i], "-g") == 0 || strcmp(argv[i], "--config") == 0) {
-      earlyConfigPath = argv[i + 1];
-      break;
-    }
+  // Nazwa instancji i sciezka konfiguracji musza byc znane przed zbudowaniem straznika blokady.
+  // Ten sam parser Boosta obsluguje wszystkie formy, ktore zaakceptuje pozniejsze parsowanie
+  // pelnego CLI: `--name alfa`, `--name=alfa` i sklejone `-nalfa`. allow_unregistered zostawia
+  // pozostale opcje i argument pozycyjny dla pelnego parsera nizej.
+  po::options_description earlyDesc;
+  earlyDesc.add_options()("name,n", po::value<std::string>())("autoname,a", "")("config,g", po::value<std::string>());
+  po::variables_map earlyVm;
+  try {
+    po::store(po::command_line_parser(argc, argv).options(earlyDesc).allow_unregistered().run(), earlyVm);
+    po::notify(earlyVm);
+  } catch (const po::error &e) {
+    std::println(std::cerr, "{}: {}", argv[0], e.what());
+    return system::errc::invalid_argument;
   }
+
+  const std::optional<std::string> earlyConfigPath =
+      earlyVm.contains("config") ? std::optional<std::string>(earlyVm["config"].as<std::string>()) : std::nullopt;
+  std::string earlyServerName = earlyVm.contains("name") ? earlyVm["name"].as<std::string>() : std::string{};
+  // --autoname to osobna flaga, a nie --name o opcjonalnej wartosci: przy opcjonalnej wartosci
+  // `xretractor --name plik.rql` bylo nierozroznialne od nazwy instancji podanej wprost, bo
+  // plik zapytan jest argumentem pozycyjnym. Osobna flaga nie ma tej dwuznacznosci.
+  const bool wantsAutoName = earlyVm.contains("autoname");
+  if (wantsAutoName && !earlyServerName.empty()) {
+    std::println(std::cerr, "{}: --autoname and --name are mutually exclusive", argv[0]);
+    return system::errc::invalid_argument;
+  }
+
+  // Konfiguracja musi byc znana przed rozstrzygnieciem nazwy, bo klucz [server] autoname
+  // wspoldecyduje o losowaniu. Sama sciezka konfiguracji zalezy tylko od --config, wiec
+  // przesuniecie tego ladowania przed blok nazwy nie tworzy cyklu.
   const AppConfig earlyAppCfg = [&]() -> AppConfig {
     try {
       return loadAppConfig(earlyConfigPath);
@@ -249,7 +282,51 @@ int main(int argc, char *argv[]) {
     }
   }();
 
-  namespace po = boost::program_options;
+  // Przestrzen nazw uruchomienia (RDB_NAMESPACE) rozstrzyga tozsamosc wtedy, gdy nie zrobil
+  // tego operator: jawne --name i --autoname sa wskazaniem palcem i wygrywaja. Razem
+  // z bus::segmentName daje to komplet rozlacznych zasobow -- plik blokady, obiekty IPC
+  // i magistrala -- czyli wszystko, co dwa rownolegle uruchomienia dzielilyby na maszynie.
+  if (!wantsAutoName && earlyServerName.empty()) {
+    if (const std::string runNamespace = servername::environmentNamespace(); !runNamespace.empty()) {
+      // Niepoprawna wartosc zatrzymuje program. Zignorowanie jej byloby najgorszym z wyjsc:
+      // proces wstalby na zasobach WSPOLNYCH, czyli dokladnie tam, przed czym przestrzen nazw
+      // mial go uchronic, a objawiloby sie to kolizja w innym, niewinnym uruchomieniu.
+      if (!servername::isValid(runNamespace)) {
+        std::println(std::cerr, "{}: invalid {} value '{}': expected [a-z][a-z0-9_-]{{0,{}}}", argv[0],
+                     servername::kNamespaceEnv, runNamespace, servername::kMaxLength - 1);
+        return system::errc::invalid_argument;
+      }
+      earlyServerName = runNamespace;
+    }
+  }
+
+  // Usluga ma jedna, stala nazwe. Bez niej instancja usluzgowa byla albo bezimienna (i wtedy
+  // nierozroznialna w `xqry --server` od kazdego innego bezimiennego serwera), albo nazwana
+  // recznie w jednostce systemd — czyli inaczej na kazdej maszynie. `xqry --server service`
+  // ma dzialac wszedzie tak samo. Wskazanie operatora (--name, --autoname) i przestrzen nazw
+  // uruchomienia sa nadrzedne: obie sa jawnym wyborem, a ta nazwa jest tylko domyslna.
+  if (!wantsAutoName && earlyServerName.empty() && serviceMode) earlyServerName = servername::kServiceInstanceName;
+
+  // Klucz konfiguracyjny dziala tylko wtedy, gdy operator nie rozstrzygnal nazwy sam:
+  // jawne --name wygrywa po cichu, tak samo jak dyrektywa :STORAGE z RQL wygrywa nad
+  // storage.dir. --autoname i autoname=true nie sa konfliktem, tylko dwiema drogami do
+  // tego samego skutku.
+  const bool generatedName = wantsAutoName || (earlyServerName.empty() && earlyAppCfg.serverAutoName);
+  if (generatedName) {
+    earlyServerName = servername::generate();
+    // Nazwa musi trafic na standardowe wyjscie, nie tylko do logu: bez niej operator nie ma
+    // jak wskazac tej instancji w `xqry --server`. Opróznienie bufora jest tu konieczne, a nie
+    // ostrozne: stdout przekierowany do pliku jest buforowany blokowo, wiec bez flush nazwa
+    // pojawia sie dopiero przy koncu procesu — czyli wtedy, gdy nie jest juz do niczego potrzebna.
+    std::println("Instance name: {}", earlyServerName);
+    std::fflush(stdout);
+  }
+  if (!earlyServerName.empty() && !servername::isValid(earlyServerName)) {
+    std::println(std::cerr, "{}: invalid instance name '{}': expected [a-z][a-z0-9_-]{{0,{}}}", argv[0], earlyServerName,
+                 servername::kMaxLength - 1);
+    return system::errc::invalid_argument;
+  }
+
   po::variables_map vm;
   po::options_description desc("Available options");
 
@@ -258,7 +335,11 @@ int main(int argc, char *argv[]) {
     if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--onlycompile") == 0) onlyCompile = true;
   }
 
-  const std::string serviceName = std::string(argv[0]) + "_service";
+  // Bez --name zostaje tozsamosc historyczna (jeden serwer na maszyne, ta sama nazwa blokady
+  // i te same obiekty IPC co dotad). Nazwa wlacza rezim wieloserwerowy i jest opcjonalna
+  // wlasnie po to, zeby dotychczasowe uzycie nie zmienilo sie ani o jeden plik.
+  const std::string executableName = std::filesystem::path(argv[0]).filename().string();
+  const std::string serviceName    = executableName + "_service" + (earlyServerName.empty() ? "" : "." + earlyServerName);
   FlockServiceGuard guard(serviceName);
   guard.setLockDir(earlyAppCfg.lockDir);
 
@@ -268,6 +349,7 @@ int main(int argc, char *argv[]) {
     std::string sInputFile;
     std::string sDiagram;
     std::string sConfig;
+    std::string sServerName;
     if (onlyCompile) {
       desc.add_options()                                                             //
           ("help,h", "show help options")                                            //
@@ -276,7 +358,7 @@ int main(int argc, char *argv[]) {
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")     //
           ("quiet,r", "no output on screen, skip presenter")                         //
           ("dot,d", "create dot output")                                             //
-          ("csv,m", "create csv output")                                             // c->m
+          ("csv,m", "create csv output")                                             //
           ("fields,f", "show fields in dot file")                                    //
           ("tags,t", "show tags in dot file")                                        //
           ("streamprogs,s", "show stream programs in dot file")                      //
@@ -284,6 +366,7 @@ int main(int argc, char *argv[]) {
           ("hideruleprog,i", "hide rule program in rules (-u) output")               //
           ("transparent,p", "make dot background transparent")                       //
           ("diagram,w", po::value<std::string>(&sDiagram), "create diagram output")  //
+          ("shmbudget,z", "show shared memory budget of the compiled plan")          //
           ;
     } else {
       desc.add_options()                                                          //
@@ -295,14 +378,17 @@ int main(int argc, char *argv[]) {
           ("status,s", "check service status")                                    //
           ("verbose,v", "verbose mode (show stream params)")                      //
           ("xqrywait,x", "wait with processing for first query")                  //
+          ("name,n", po::value<std::string>(&sServerName),                        //
+           "instance name; own IPC area and lock")                                //
+          ("autoname,a", "generate a docker-style instance name")                 //
           ("noanykey,k", "do not wait for any key to terminate")                  //
-          ("service,j", "service mode: log to stderr (journald), no log file")    //
-          ("realtime,t", "enable real-time scheduling (SCHED_FIFO, mlockall, absolute wakeup)")       //
-          ("no-clock,f", "offline mode: compute slots without waiting for the wall clock")            //
-          ("until-eof,u", "stop when a declared source runs out of input (forces one-shot sources)")  //
-          ("config,g", po::value<std::string>(&sConfig), "config file (TOML); overrides search")      //
-          ("llimitqry,m", po::value<int>(&loopLimitVar)->default_value(executorsm::inifitie_loop),    //
-           "loop iteration limit, 0 - no limit")                                                      //
+          ("service,j", "service mode: log to stderr (journald)")                 //
+          ("realtime,t", "enable real-time scheduling")                           //
+          ("no-clock,f", "offline mode: compute slots without waiting")           //
+          ("until-eof,u", "forces one-shot all sources")                          //
+          ("config,g", po::value<std::string>(&sConfig), "config file (TOML); overrides search")    //
+          ("llimitqry,m", po::value<int>(&loopLimitVar)->default_value(executorsm::inifitie_loop),  //
+           "loop iteration limit, 0 - no limit")                                                    //
           ;
     }
     po::positional_options_description p;  // Assume that infile is the first option
@@ -310,6 +396,14 @@ int main(int argc, char *argv[]) {
     po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
 
     po::notify(vm);
+
+    // Wczesny i pelny parser maja dawac jedna tozsamosc. Niezgodnosc oznaczalaby, ze blokada
+    // i IPC dostaly inna nazwe niz pozostala czesc programu. Przy --autoname nikt nie podal
+    // --name, wiec vm nie ma tego klucza i porownanie sie nie wykonuje: nazwa zostala
+    // wygenerowana wyzej i zadne pozniejsze parsowanie jej nie zna.
+    if (vm.contains("name") && vm["name"].as<std::string>() != earlyServerName) {
+      throw std::logic_error("early and full --name parsing produced different instance names");
+    }
 
     // Introspekcja binarki (jak --version): tylko odczyt flag kompilacji, obsługiwana przed
     // wczytaniem i walidacją konfiguracji — na hoście z niepoprawnym storage.dir zapytanie
@@ -381,27 +475,32 @@ int main(int argc, char *argv[]) {
         return system::errc::protocol_error;
       }
 
-      std::string parseOut = "Empty file.";
-      for (const auto &stmt : readLogicalLines(file)) {
-        auto [status, first_keyword, stream_name] = parserRQLString(coreInstance, stmt);
-        parseOut                                  = status;
-        if (status != "OK") break;
-        processedLines.emplace_back(stream_name, stmt);
-      }
-
+      std::ostringstream planText;
+      planText << file.rdbuf();
       file.close();
 
-      if (parseOut != "OK") {
+      const PlanSource loaded = parsePlanText(coreInstance, planText.str());
+      if (loaded.status != "OK") {
         std::cerr << "Input file:" << sInputFile << '\n'  //
-                  << "Parse result:" << parseOut << '\n';
+                  << "Parse result:" << loaded.status << '\n';
         return system::errc::protocol_error;
       }
+      processedLines = loaded.lines;
+    }
 
-      //
-      // Compile part
-      //
-      if (coreInstance.empty()) throw std::out_of_range("No queries to process found");
-
+    // Plan pusty — z braku argumentu albo z pliku bez ani jednej instrukcji. Dla usługi to
+    // stan poprawny (tryb bezczynny): jednostka systemd wskazuje ExecStart-em stały plik
+    // zapytań, a ten przy pierwszym starcie systemu jest pusty. Do 2026-09-05 pusty plik
+    // kończył proces błędem, więc udokumentowana w jednostce ścieżka "pusty plik = idle"
+    // nie działała, a Restart=on-failure zapętlał start. Dla --onlycompile to nadal błąd:
+    // nie ma czego skompilować.
+    if (coreInstance.empty()) {
+      if (onlyCompile) {
+        std::println("{}: fatal error: no queries to process", argv[0]);
+        return EPERM;  // ERROR defined in errno-base.h
+      }
+      if (vm.contains("queryfile")) SPDLOG_INFO("Query file holds no statements; starting in idle (service) mode.");
+    } else {
       std::string response;
 
       response = cm.compile();
@@ -413,6 +512,22 @@ int main(int argc, char *argv[]) {
       }
 
       if (onlyCompile) {
+        // Budzet pamieci dzielonej jest osobnym pytaniem o plan, tak samo jak -d czy -w, wiec
+        // konczy prace zamiast dokladac sie do wyjscia prezentera: przy -d na stdout stoi plik
+        // dot, ktoremu doklejona tabela zepsulaby skladnie.
+        if (vm.contains("shmbudget")) {
+          std::cout << shmbudget::report(coreInstance, appCfg.ipcQueueBufferSeconds, appCfg.ipcMinQueueElements);
+          return system::errc::success;
+        }
+        // Rezerwacja stala nie zalezy od planu ani od liczby klientow: bez niej instancja nie
+        // wystartuje w ogole. Sprawdzenie idzie na kazdym -c, bo kompilacja jest ostatnim
+        // momentem, w ktorym cena jest znana PRZED proba startu. Nieudany pomiar (known ==
+        // false) przepuszcza -- patrz shmbudget::Space.
+        if (const shmbudget::Space fs = shmbudget::space(); fs.known && fs.available < shmbudget::fixedReservationBytes()) {
+          std::println(std::cerr, "{}: shared memory too small: fixed reservation needs {}, only {} free (see -c --shmbudget)",
+                       argv[0], shmbudget::humanBytes(shmbudget::fixedReservationBytes()), shmbudget::humanBytes(fs.available));
+          return system::errc::no_buffer_space;
+        }
         if (!vm.contains("quiet")) {
           presenter dm(coreInstance);
           return dm.run(vm);
@@ -420,13 +535,115 @@ int main(int argc, char *argv[]) {
         return system::errc::success;
       }
 
-      // E3: jeśli działa już inna instancja będąca serwisem systemd, nie startujemy drugiej —
+      // Usluga docelowa musi byc znana PRZED odsiewem konfliktow: restart zastapi jej dotychczasowy
+      // plan, wiec nazwy strumieni i licznik, ktore ona trzyma dzisiaj, konfliktem nie sa. Konfliktem
+      // sa POZOSTALE zywe instancje. Do 2026-09-06 kolejnosc byla odwrotna, a odsiew pomijal nazwe
+      // NOWEGO uruchomienia zamiast nazwy uslugi: zwykle `xretractor plan.rql` przeciw usludze
+      // serwujacej ten sam plan konczylo sie device_or_resource_busy zamiast dostarczeniem planu.
+      // Z `--name service` defekt sie maskowal, bo tam obie nazwy sa te same.
+      //
+      // E3: jeśli działa już instancja będąca serwisem systemd, nie startujemy drugiej —
       // dostarczamy zwalidowany (skompilowany powyżej) zestaw zapytań, nadpisując plik zapytań
       // serwisu i zlecając restart. Serwis załaduje nowy zestaw, zachowując konfigurację jednostki.
       // Podwójna kompilacja (tu lokalnie + w serwisie po restarcie) jest zamierzona.
-      if (guard.isAnotherInstanceRunning()) {
-        const FlockServiceGuard::PeerInfo peer = guard.readPeerInfo();
-        if (peer.kind == FlockServiceGuard::PeerInfo::Kind::Service && !peer.unit.empty()) {
+      //
+      // Serwisu szuka MAGISTRALA, a nie własna blokada. Odkąd usługa ma stałą nazwę
+      // ("service"), nowe uruchomienie prawie nigdy nie dzieli z nią nazwy pliku blokady,
+      // więc pytanie „czy usługa już działa" trzeba zadać tam, gdzie widać wszystkie żywe
+      // instancje. Szczegóły jednostki (UNIT, SCOPE, QUERYFILE) czytamy potem z pliku blokady
+      // znalezionej instancji — slot magistrali nie niesie zakresu system/user, a bez niego
+      // nie da się złożyć poprawnego `systemctl [--user] restart`.
+      {
+        const bus::Bus xrdbbus(bus::segmentName(), false);
+        const std::vector<bus::InstanceInfo> instances = xrdbbus.instances();
+
+        const auto isServicePeer = [](const FlockServiceGuard::PeerInfo &info) {
+          return info.kind == FlockServiceGuard::PeerInfo::Kind::Service && !info.unit.empty();
+        };
+
+        // Usluga docelowa, czyli instancja, ktora to uruchomienie ZASTAPI. Stoi albo na naszej
+        // wlasnej blokadzie (gdy dzieli z nami nazwe), albo gdziekolwiek na magistrali.
+        std::string serviceName;
+        FlockServiceGuard::PeerInfo peer;
+        if (guard.isAnotherInstanceRunning()) peer = guard.readPeerInfo();
+
+        if (isServicePeer(peer)) {
+          serviceName = earlyServerName;  // usluga trzyma blokade o NASZEJ nazwie
+        } else {
+          for (const auto &live : instances) {
+            if ((live.modes & bus::mode::kService) == 0U) continue;
+            FlockServiceGuard peerGuard(executableName + "_service" + (live.name.empty() ? "" : "." + live.name));
+            peerGuard.setLockDir(earlyAppCfg.lockDir);
+            const FlockServiceGuard::PeerInfo found = peerGuard.readPeerInfo();
+            if (isServicePeer(found)) {
+              peer        = found;
+              serviceName = live.name;
+              break;
+            }
+          }
+        }
+
+        // Jawnie wskazana tozsamosc wygrywa nad dostarczeniem planu do uslugi -- tak samo jak
+        // wygrywa nad autoname z konfiguracji i jak :STORAGE z RQL wygrywa nad storage.dir.
+        // Bez tej reguly `xretractor plan.rql --name foo` przy zywej usludze konczylo sie kodem
+        // 0, nadpisanym planem uslugi i jej restartem, a instancja `foo` nie powstawala w ogole:
+        // zadanie "uruchom osobna instancje" wykonywalo "podmien plan cudzej uslugi". Nazwa
+        // ROWNA nazwie uslugi jest wskazaniem JEJ, wiec nadal dostarcza -- stad porownanie zamiast
+        // samego "czy podano --name". Przestrzeni nazw uruchomienia ta reguła nie potrzebuje:
+        // RDB_NAMESPACE zmienia nazwe segmentu magistrali, wiec usluga spoza przestrzeni jest
+        // niewidoczna, a usluga z tej samej przestrzeni ma te sama nazwe co my.
+        //
+        // Osobna instancja obok uslugi jest wykonalna, bo blokada, obiekty IPC i slot magistrali
+        // sa rozlaczne per nazwa. Reguly "usluga jest dokladnie jedna" ta droga nie obchodzi:
+        // trzyma ja atomowe roszczenie slotu (ClaimStatus::ServiceConflict), nie ten warunek.
+        const bool explicitIdentity = earlyVm.contains("name") || generatedName;
+        const bool deliverToService = isServicePeer(peer) && (!explicitIdentity || serviceName == earlyServerName);
+        if (isServicePeer(peer) && !deliverToService)
+          SPDLOG_INFO(
+              "Service unit '{}' is running, but instance name '{}' was requested explicitly; starting a separate instance.",
+              peer.unit, earlyServerName);
+
+        // Z odsiewu wypada dokladnie ta instancja, ktora to uruchomienie zastapi. Gdy planu do
+        // uslugi nie dostarczamy, zostaje ona ZYWA obok nowej instancji, wiec jej strumienie sa
+        // konfliktem jak kazde inne -- wylaczone jest wtedy samo to uruchomienie.
+        const std::string exemptName = deliverToService ? serviceName : earlyServerName;
+
+        // Odsiew przed dostarczeniem planu do dzialajacego serwisu obejmuje wszystkie fizyczne
+        // zasoby publikowane w slocie: nazwy strumieni, licznik rotacji i pliki magazynu. Zwykly
+        // start nie polega juz na tej migawce: ponizej atomowo rości slot PRZED skasowaniem
+        // pierwszego artefaktu.
+        //
+        // Katalog magazynu z konfiguracji podajemy tutaj JAWNIE, bo dyrektywa `:STORAGE` z domyslu
+        // trafia do planu dopiero nizej — a odsiew ma porownywac te sciezki, ktore plan naprawde zapisze.
+        const std::vector<std::string> plannedStreams = planStreamNames(coreInstance);
+        const std::string counterPath                 = planCounterPath(coreInstance);
+        const std::vector<std::string> plannedStores  = planStorePaths(coreInstance, appCfg.storageDir);
+        if (const auto owner = bus::findForeignOwner(instances, exemptName, plannedStreams)) {
+          const std::string ownerName = ownerLabel(owner->instance);
+          std::cerr << "xretractor: stream '" << owner->stream << "' is already served by " << ownerName << " (pid "
+                    << owner->pid << "); nothing was changed\n";
+          SPDLOG_ERROR("Refused before any change: stream '{}' is already served by {} (pid {}).", owner->stream, ownerName,
+                       owner->pid);
+          return system::errc::device_or_resource_busy;
+        }
+        if (const auto owner = bus::findForeignCounterOwner(instances, exemptName, counterPath)) {
+          const std::string ownerName = ownerLabel(owner->instance);
+          std::cerr << "xretractor: rotation counter file '" << owner->path << "' is already used by " << ownerName << " (pid "
+                    << owner->pid << "); nothing was changed\n";
+          SPDLOG_ERROR("Refused before any change: rotation counter file '{}' is already used by {} (pid {}).", owner->path,
+                       ownerName, owner->pid);
+          return system::errc::device_or_resource_busy;
+        }
+        if (const auto owner = bus::findForeignStoreOwner(instances, exemptName, plannedStores)) {
+          const std::string ownerName = ownerLabel(owner->instance);
+          std::cerr << "xretractor: storage file '" << owner->path << "' is already written by " << ownerName << " (pid "
+                    << owner->pid << "); nothing was changed\n";
+          SPDLOG_ERROR("Refused before any change: storage file '{}' is already written by {} (pid {}).", owner->path, ownerName,
+                       owner->pid);
+          return system::errc::device_or_resource_busy;
+        }
+
+        if (deliverToService) {
           const std::string target = peer.queryFile.empty() ? appCfg.serviceQueryFile : peer.queryFile;
           SPDLOG_INFO("Detected running service unit '{}'; delivering compiled query set to {}.", peer.unit, target);
           if (!servicecontrol::deliverQueryFile(sInputFile, target)) {
@@ -444,8 +661,9 @@ int main(int argc, char *argv[]) {
           std::println("Query compiled OK and sent to running service '{}' (restart requested).", peer.unit);
           return system::errc::success;
         }
-        // Inna instancja to zwykły proces (lub nierozpoznana) — dalsza ścieżka (exec.run) zgłosi
-        // brak dostępnej blokady (no_lock_available); nie próbujemy restartu.
+        // Nie ma żywego serwisu, albo jest, ale operator zażądał własnej tożsamości —
+        // transakcja startowa poniżej albo wystartuje tę instancję, albo zgłosi brak dostępnej
+        // blokady (no_lock_available); nie próbujemy restartu.
       }
     }
 
@@ -466,42 +684,119 @@ int main(int argc, char *argv[]) {
     return system::errc::interrupted;
   }
 
+  // Od tego miejsca zaczyna sie transakcja startowa zwyklej instancji. Najpierw blokada
+  // tozsamosci, potem atomowe roszczenie magistrali, dopiero potem kasowanie artefaktow.
+  // Przegrany rownolegly start nie dochodzi dzieki temu do zadnej czynnosci destrukcyjnej.
+  if (!guard.acquireLock()) {
+    // Odmowa startu musi byc widoczna tam, gdzie widac pozostale odmowy z tej transakcji
+    // (konflikt strumienia, licznika, magistrali) — czyli na stderr, nie tylko w logu. Skrypt,
+    // ktory startuje serwer w tle i po chwili odpytuje go klientem, nie ma innego sposobu, zeby
+    // zauwazyc, ze jego serwer nie wstal: bez komunikatu pracuje dalej na cudzej instancji.
+    const FlockServiceGuard::PeerInfo peer = guard.readPeerInfo();
+    std::cerr << "xretractor: " << ownerLabel(earlyServerName) << " is already running";
+    if (peer.pid != 0) std::cerr << " (pid " << peer.pid << ")";
+    if (!peer.queryFile.empty()) std::cerr << ", queries: " << peer.queryFile;
+    std::cerr << "\nxretractor: use --name <name> to run a second, independent instance\n";
+    SPDLOG_ERROR("Cannot acquire service lock, {} is already running (pid {}).", ownerLabel(earlyServerName), peer.pid);
+    return system::errc::no_lock_available;
+  }
+
+  bus::Bus xrdbbus(bus::segmentName());
+  const std::vector<std::string> claimedStreams = planStreamNames(coreInstance);
+  const std::string counterPath                 = planCounterPath(coreInstance);
+  // Domyslny `:STORAGE` z konfiguracji jest juz w planie (dopisany wyzej), wiec fallback zostaje
+  // pusty — a gdy plan nie ma zadnego katalogu, sciezki normalizuja sie wzgledem katalogu roboczego,
+  // czyli dokladnie tam, gdzie rdb::StoragePaths zalozy pliki.
+  const std::vector<std::string> claimedStores = planStorePaths(coreInstance, {});
+  // Sciezka BEZWZGLEDNA, tak samo jak w pliku blokady (setServiceQueryFile wyzej). Slot czyta
+  // operator z innego katalogu roboczego niz serwer, wiec `xqry --bus` z pozycja wzgledna
+  // wskazywalby plik, ktorego pod ta nazwa u niego nie ma.
+  const std::string queryFile = vm.contains("queryfile") ? absolutePathOf(vm["queryfile"].as<std::string>()) : std::string{};
+  // Tryb pracy jest wlasnoscia URUCHOMIENIA, nie planu: dwa serwery na tym samym pliku zapytan
+  // moga liczyc raz z zegarem, raz offline. Operator widzi wiec w `xqry --bus` to, co
+  // wybrala linia polecen, a nie to, co da sie odczytac z .rql.
+  //
+  // Serwisem jest zarowno instancja z --service (log do journald), jak i ta wykryta jako
+  // jednostka systemd: dla patrzacego na tabele to jeden fakt -- "tego nie zabijaj recznie".
+  const std::uint32_t runModes =
+      (vm.contains("realtime") ? bus::mode::kRealTime : 0U) | (vm.contains("no-clock") ? bus::mode::kNoClock : 0U) |
+      (vm.contains("until-eof") ? bus::mode::kUntilEof : 0U) |
+      (loopLimitVar != executorsm::inifitie_loop ? bus::mode::kLoopLimit : 0U) |
+      (vm.contains("xqrywait") ? bus::mode::kXqryWait : 0U) | (serviceMode ? bus::mode::kService : 0U);
+  // Reguly "usluga jest dokladnie jedna" pilnuje Bus::claim() pod muteksem magistrali — patrz
+  // komentarz przy jego deklaracji. Sprawdzenie po migawce instances() przed roszczeniem bylo
+  // nieatomowe i przepuszczalo dwa rownolegle starty z roznymi nazwami.
+  const bus::ClaimResult claimed = xrdbbus.claim({.name        = earlyServerName,
+                                                  .queryFile   = queryFile,
+                                                  .unit        = systemd.unit.value_or(std::string{}),
+                                                  .counterPath = counterPath,
+                                                  .modes       = runModes,
+                                                  .streams     = claimedStreams,
+                                                  .stores      = claimedStores});
+
+  switch (claimed.status) {
+    case bus::ClaimStatus::Claimed:
+      break;
+    case bus::ClaimStatus::Conflict: {
+      const std::string owner = ownerLabel(claimed.ownerName);
+      std::cerr << "xretractor: stream '" << claimed.stream << "' is already served by " << owner << " (pid " << claimed.ownerPid
+                << ")\n";
+      SPDLOG_ERROR("Stream '{}' is already served by {} (pid {}).", claimed.stream, owner, claimed.ownerPid);
+      return system::errc::device_or_resource_busy;
+    }
+    case bus::ClaimStatus::CounterConflict: {
+      const std::string owner = ownerLabel(claimed.ownerName);
+      std::cerr << "xretractor: rotation counter file '" << claimed.detail << "' is already used by " << owner << " (pid "
+                << claimed.ownerPid << ")\n";
+      SPDLOG_ERROR("Rotation counter file '{}' is already used by {} (pid {}).", claimed.detail, owner, claimed.ownerPid);
+      return system::errc::device_or_resource_busy;
+    }
+    case bus::ClaimStatus::StoreConflict: {
+      const std::string owner = ownerLabel(claimed.ownerName);
+      std::cerr << "xretractor: storage file '" << claimed.detail << "' is already written by " << owner << " (pid "
+                << claimed.ownerPid << ")\n";
+      SPDLOG_ERROR("Storage file '{}' is already written by {} (pid {}).", claimed.detail, owner, claimed.ownerPid);
+      return system::errc::device_or_resource_busy;
+    }
+    case bus::ClaimStatus::ServiceConflict: {
+      const std::string owner = ownerLabel(claimed.ownerName);
+      std::cerr << "xretractor: a service instance is already running as " << owner << " (pid " << claimed.ownerPid
+                << "); only one service instance is allowed\n";
+      SPDLOG_ERROR("Refused: a service instance is already running as {} (pid {}).", owner, claimed.ownerPid);
+      return system::errc::device_or_resource_busy;
+    }
+    case bus::ClaimStatus::TooLarge:
+    case bus::ClaimStatus::NoFreeSlot:
+      std::cerr << "xretractor: cannot register on the xrdbbus bus: " << claimed.detail << '\n';
+      SPDLOG_ERROR("Cannot register on the xrdbbus bus: {}", claimed.detail);
+      return system::errc::device_or_resource_busy;
+    case bus::ClaimStatus::Unavailable:
+      // Utrzymujemy dotychczasowa decyzje fail-open. Blokada instancji nadal chroni jej IPC,
+      // ale przy niedostepnej magistrali rozlacznosc zasobow miedzy nazwami nie jest wymuszana.
+      SPDLOG_WARN("xrdbbus unavailable ({}); stream name uniqueness is NOT enforced.", claimed.detail);
+      break;
+  }
+
   signal(SIGINT, handleSignal);   // Ctrl+C
   signal(SIGTERM, handleSignal);  // Terminate
   signal(SIGHUP, handleSignal);   // Hangup
 
-  bool rotation_enabled = std::ranges::any_of(coreInstance, [](const auto &it) { return it.id == ":ROTATION"; });
-
-  if (!rotation_enabled) {
-    std::string storage_location;
-
-    for (const auto &it : coreInstance)
-      if (it.id == ":STORAGE") {
-        storage_location = it.filename;
-      }
-
-    // Nazwa zwracana przez parser jest nazwa Z ZAPISU, a ta nie musi byc nazwa zapytania
-    // w planie: generator `STREAM cell[24]` daje jedna linie RQL i 24 strumienie `cell$0`..
-    // `cell$23`, a samego `cell` w planie nie ma. Rodziny bierzemy z kompilatora, bo to
-    // jedyne pewne zrodlo — patrz compiler::generatedStreams().
-    const auto &generatedStreams = cm.generatedStreams();
-    for (const auto &[stream_id, query_text] : processedLines) {
-      if (stream_id.empty()) continue;
-
-      const auto family = generatedStreams.find(stream_id);
-      const std::vector<std::string> definedStreams =
-          (family != generatedStreams.end()) ? family->second : std::vector<std::string>{stream_id};
-
-      for (const auto &defined_id : definedStreams) {
-        if (coreInstance[defined_id].isDeclaration()) continue;
-        if (coreInstance[defined_id].isCompilerDirective()) continue;
-        dropArtifactFile(std::filesystem::path(storage_location) / defined_id);
-        dropArtifactFile(std::filesystem::path(storage_location) / (defined_id + ".desc"));
-        dropArtifactFile(std::filesystem::path(storage_location) / (defined_id + ".meta"));
-      }
-    }
-  }
+  // Artefakty poprzedniego przebiegu znikaja ta sama droga co przy przeladowaniu planu
+  // w locie (`xqry --reset`) — patrz dropStalePlanArtifacts w planSource.cpp.
+  dropStalePlanArtifacts(coreInstance, cm, processedLines);
 
   executorsm exec;
-  return exec.run(coreInstance, guard, cm, vm, appCfg);
+  return exec.run(coreInstance, guard, xrdbbus, cm, vm, appCfg, earlyServerName, systemd.unit.value_or(std::string{}));
+} catch (const std::exception &error) {
+  const char *const executable = argc > 0 && argv[0] != nullptr ? argv[0] : "xretractor";
+  std::fputs(executable, stderr);
+  std::fputs(": unexpected error: ", stderr);
+  std::fputs(error.what(), stderr);
+  std::fputc('\n', stderr);
+  return EXIT_FAILURE;
+} catch (...) {
+  const char *const executable = argc > 0 && argv[0] != nullptr ? argv[0] : "xretractor";
+  std::fputs(executable, stderr);
+  std::fputs(": unexpected non-standard error\n", stderr);
+  return EXIT_FAILURE;
 }

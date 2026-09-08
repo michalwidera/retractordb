@@ -173,7 +173,10 @@ TEST(ExecutorRtAffinityTest, MovesThreadOffPinnedRtCore) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
   });
 
+  // Rozdzial rdzeni raportuje sie operatorowi na stdout — asercje sa na masce, nie na wydruku.
+  testing::internal::CaptureStdout();
   const bool moved = rtKeepThreadOffRtCpus(aux.native_handle());
+  testing::internal::GetCapturedStdout();
 
   cpu_set_t auxMask;
   CPU_ZERO(&auxMask);

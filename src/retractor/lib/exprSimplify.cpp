@@ -32,9 +32,9 @@ bool isExact(rdb::descFld type) {
 bool isNumeric(rdb::descFld type) { return type <= rdb::DOUBLE; }
 
 bool isConstantEqualTo(const rdb::descFldVT &value, int reference) {
-  return std::visit(Overload{[reference](uint8_t v) { return v == reference; },                          //
-                             [reference](int v) { return v == reference; },                              //
-                             [reference](unsigned v) { return v == static_cast<unsigned>(reference); },  //
+  return std::visit(Overload{[reference](uint8_t v) { return std::cmp_equal(v, reference); },   //
+                             [reference](int v) { return v == reference; },                     //
+                             [reference](unsigned v) { return std::cmp_equal(v, reference); },  //
                              [reference](boost::rational<int> v) { return v == boost::rational<int>(reference); },
                              [](const auto &) { return false; }},
                     value);
@@ -178,7 +178,8 @@ std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant
   result.program.emplace_back(tail.op);
   result.type = arithmeticResultType(tail.baseType, typeOfConstant(*value));
   // Wynik znów ma kształt ogona, więc łańcuch `E+1+1+1` zwija się w jednym przebiegu.
-  result.tail = constantTail{tail.op, *value, tail.constantOnLeft, tail.base, tail.baseType};
+  result.tail = constantTail{
+      .op = tail.op, .constant = *value, .constantOnLeft = tail.constantOnLeft, .base = tail.base, .baseType = tail.baseType};
   return result;
 }
 
@@ -385,9 +386,17 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
         if (cmd == ADD || cmd == SUBTRACT || cmd == MULTIPLY || cmd == DIVIDE || cmd == POWER) {
           result.type = arithmeticResultType(left->type, right->type);
           if (cmd != DIVIDE && cmd != POWER && right->constant.has_value() && !left->constant.has_value())
-            result.tail = constantTail{cmd, *right->constant, false, std::move(left->program), left->type};
+            result.tail = constantTail{.op             = cmd,
+                                       .constant       = *right->constant,
+                                       .constantOnLeft = false,
+                                       .base           = std::move(left->program),
+                                       .baseType       = left->type};
           else if (cmd != DIVIDE && cmd != POWER && left->constant.has_value() && !right->constant.has_value())
-            result.tail = constantTail{cmd, *left->constant, true, std::move(right->program), right->type};
+            result.tail = constantTail{.op             = cmd,
+                                       .constant       = *left->constant,
+                                       .constantOnLeft = true,
+                                       .base           = std::move(right->program),
+                                       .baseType       = right->type};
         }
         stack.push_back(std::move(result));
       } break;

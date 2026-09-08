@@ -24,9 +24,22 @@ Group=retractor
 # (EnvironmentFile poniżej; '-' = plik opcjonalny). Plik env jest czytany PO Environment=,
 # więc nadpisuje domyślną wartość. Wskazany plik musi istnieć (pusty = tryb idle).
 #
-# Pusty plik = tryb bezczynny (idle); serwis wstaje i czeka. Nową instancję xretractor
+# Pusty plik = tryb bezczynny (idle); serwis wstaje i czeka. Plan wczytuje się wtedy bez
+# restartu, komendą:
+#
+#   xqry --reset /ścieżka/plan.rql --server service
+#
+# Instancja usługowa nazywa się na magistrali "service" (chyba że jednostka poda --name), więc
+# adres jest ten sam na każdej maszynie. Usługa jest dokładnie jedna: druga instancja w trybie
+# usługowym jest odrzucana przy starcie. Przyjęty plan trafia też do tego pliku, żeby restart
+# wznowił to, co usługa faktycznie liczy.
+#
+# Drugą, starszą drogą jest przekazanie zestawu przez restart: nową instancję xretractor
 # uruchomioną z innym plikiem zapytań wykryje działający serwis, nadpisze ten plik zwalidowanym
-# zestawem i zleci restart jednostki (przekazanie zapytania, zachowanie konfiguracji).
+# zestawem i zleci restart jednostki (zachowując konfigurację jednostki).
+#
+# Błąd krytyczny (FatalError) opróżnia ten plik przed wyjściem procesu: jednostka wstaje wtedy
+# w trybie bezczynnym, zamiast wracać w kółko na plan, który ją właśnie zabił.
 #
 # Tryb usługowy logowania można też włączyć zmienną środowiskową zamiast flagi --service:
 #   Environment=XRETRACTOR_SERVICE=1

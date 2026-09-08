@@ -38,7 +38,7 @@ class storageShadow : public metaData {
   /// @param metaFilePath path of the main meta index file; the shadow index file is `<metaFilePath>.shadow`
   ///
   /// Loads any existing shadow overrides from disk.
-  storageShadow(const Descriptor &descriptor, std::string metaFilePath);
+  storageShadow(const Descriptor &descriptor, const std::string &metaFilePath);
 
   /// @brief Record the modification as a shadow override instead of rewriting the main index.
   /// @throws std::out_of_range if recordIndex >= totalRecords()

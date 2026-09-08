@@ -1,0 +1,10 @@
+# Plan tla dla it_adhoc_rule: strumien liczony, na ktory da sie dolaczyc regule w locie.
+# Rekordy rosna monotonicznie razem ze zrodlem, wiec wartosc rekordu w zrzucie mowi wprost,
+# z ktorej chwili on pochodzi — na tym opiera sie asercja o granicy historii.
+# ctest -R adhoc_rule -V
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM core0, 0.1 FILE 'source.dat'
+
+SELECT a[0] STREAM dst FROM core0

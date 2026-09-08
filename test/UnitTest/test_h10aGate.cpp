@@ -28,7 +28,6 @@
 #include <numeric>
 #include <optional>
 #include <string>
-#include <tuple>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -36,8 +35,7 @@
 
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/qTree.hpp"
-
-extern std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &sInputFile);
+#include "retractor/lib/RQLParser.hpp"
 
 namespace {
 

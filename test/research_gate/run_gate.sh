@@ -109,6 +109,39 @@ step() { # step <etykieta> <polecenie...>
   fi
 }
 
+check_h9_profiles() {
+  # Wynik zostaje w zmiennych globalnych, aby wywolujacy mogl zdecydowac, czy
+  # wolno przebudowac profile. Tylko rozjazd odcisku przy istniejacym profilu
+  # oznacza "zbuduj ponownie"; brak profilu lub odcisku pozostaje pominieciem.
+  H9_PROFILE_PROBLEM=""
+  H9_PROFILE_REBUILD=0
+
+  local cur_fp bin p stamp
+  cur_fp="$(src_fingerprint "$CODE_REPO")" || cur_fp=""
+  if [[ -z "$cur_fp" ]]; then
+    H9_PROFILE_PROBLEM="nie udalo sie policzyc odcisku tresci src/"
+    return 1
+  fi
+
+  for p in DEFAULT NO_R2_CANON NO_R1_FACTOR NO_R1_NO_R2; do
+    bin="$PROFILES/K26v3-$p/src/retractor/xretractor"
+    stamp="$PROFILES/K26v3-$p/$STAMP"
+    if [[ ! -x "$bin" ]]; then
+      H9_PROFILE_PROBLEM="brak profilu $p"
+      return 1
+    fi
+    if [[ ! -f "$stamp" ]]; then
+      H9_PROFILE_PROBLEM="profil $p bez odcisku zrodel (zbudowany starsza aparatura)"
+      return 1
+    fi
+    if [[ "$(cat "$stamp" 2>/dev/null)" != "$cur_fp" ]]; then
+      H9_PROFILE_PROBLEM="profil $p zbudowany z innej tresci src/"
+      H9_PROFILE_REBUILD=1
+      return 1
+    fi
+  done
+}
+
 echo "=============================================================="
 echo " Bramka badawcza H9/H10"
 echo "   silnik   : $ENGINE_SHA$([[ "$ENGINE_DIRTY" -gt 0 ]] && echo ' (drzewo BRUDNE)')"
@@ -149,11 +182,30 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
     step "H10 kampania $label ($COUNT planow, ziarno $seed)" python3 run_campaign.py \
         --seed "$seed" --count "$COUNT" --xretractor "$XRETRACTOR" \
         --out "$WORK/h10_$seed.csv"
-    [[ -s "$WORK/h10_$seed.csv" ]] || continue
+
+    # Kampania przerwana w polowie zostawia CSV z samym naglowkiem. `-s` taki plik
+    # przepuszcza, bo nie jest pusty, a `verdict.py` konczy sie na nim kodem 0
+    # i zapisuje werdykt "0 planow, zero bledow aparatury" z pusta tabela rezimow.
+    # Dopiero `compare_regimes.py` sie o to przewraca — kodem 2, wiec komunikat
+    # bramki wskazywal na odczyt werdyktu zamiast na kampanie, a w katalogu
+    # dowodowym zostawal werdykt orzekajacy o zerze obserwacji. Warunkiem jest
+    # wiersz obserwacji, nie niepusty plik.
+    rows="$(tail -n +2 "$WORK/h10_$seed.csv" 2>/dev/null | grep -c .)"
+    if [[ "${rows:-0}" -lt 1 ]]; then
+      fail "H10 kampania $label — CSV bez ani jednego wiersza obserwacji (sam naglowek)"
+      continue
+    fi
 
     step "H10 werdykt $label" python3 verdict.py --raw "$WORK/h10_$seed.csv" \
         --out "$WORK/h10_VERDICT_$seed.md" --seed "$seed" --engine "$ENGINE_SHA"
-    [[ -s "$WORK/h10_VERDICT_$seed.md" ]] || continue
+    # Brak werdyktu przerywa te iteracje, ale nie wolno mu jej WYCISZYC: samo
+    # `continue` kasowalo poziom "H10 rezimy" z listy, wiec przebieg konczyl sie
+    # bez ani jednego sladu po nim — ani oblany, ani pominiety. Werdykt okrojony,
+    # a nie brakujacy, lapie dalej `compare_regimes.py` kodem 2.
+    if [[ ! -s "$WORK/h10_VERDICT_$seed.md" ]]; then
+      fail "H10 rezimy $label — brak werdyktu do porownania"
+      continue
+    fi
 
     # Jadro bramki. Porownanie jest KIERUNKOWE: poprawa dokladnosci nie
     # zatrzymuje pracy, utrata dokladnosci zatrzymuje.
@@ -192,38 +244,58 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
     # (build_profiles.sh -> $STAMP). Profil zbudowany z innej tresci orzekalby
     # o innej rewizji niz badana — to falszywa zielen. Kierunek bledu jest
     # jednostronny: cokolwiek nie da sie potwierdzic, jest NIESWIEZE.
-    stale=""
-    cur_fp="$(src_fingerprint "$CODE_REPO")" || cur_fp=""
-    if [[ -z "$cur_fp" ]]; then
-      stale="nie udalo sie policzyc odcisku tresci src/"
+    h9_profiles_ready=0
+    if check_h9_profiles; then
+      h9_profiles_ready=1
+    elif [[ "$H9_PROFILE_REBUILD" -eq 1 ]]; then
+      echo "  ODTWARZANIE H9 profili — $H9_PROFILE_PROBLEM"
+      if RDB_CODE_REPO="$CODE_REPO" "$HERE/h9/build_profiles.sh"; then
+        if check_h9_profiles; then
+          h9_profiles_ready=1
+        else
+          fail "H9 profile po przebudowie — $H9_PROFILE_PROBLEM"
+        fi
+      else
+        fail "H9 przebudowa profili — $H9_PROFILE_PROBLEM"
+      fi
     else
-      for p in DEFAULT NO_R2_CANON NO_R1_FACTOR NO_R1_NO_R2; do
-        bin="$PROFILES/K26v3-$p/src/retractor/xretractor"
-        stamp="$PROFILES/K26v3-$p/$STAMP"
-        if [[ ! -x "$bin" ]]; then stale="brak profilu $p"; break; fi
-        # Brak odcisku = profil zbudowany aparatura sprzed tej zmiany. Nie ma
-        # czym potwierdzic tresci, wiec nie zalicza sie po cichu — przebudowa.
-        if [[ ! -f "$stamp" ]]; then
-          stale="profil $p bez odcisku zrodel (zbudowany starsza aparatura)"; break
-        fi
-        if [[ "$(cat "$stamp" 2>/dev/null)" != "$cur_fp" ]]; then
-          stale="profil $p zbudowany z innej tresci src/"; break
-        fi
-      done
+      skip "H9 84/84 kompilacji — $H9_PROFILE_PROBLEM" "h9-profile-stale"
+      echo "        Wymaga: $HERE/h9/build_profiles.sh"
     fi
 
-    if [[ -n "$stale" ]]; then
-      skip "H9 84/84 kompilacji — $stale" "h9-profile-stale"
-      echo "        Przebudowac: $HERE/h9/build_profiles.sh"
-    else
+    if [[ "$h9_profiles_ready" -eq 1 ]]; then
       # Na brudnym drzewie poziom nadal sie wykonuje — bramka chroni rozwoj,
       # a podczas rozwoju drzewo jest brudne. Dowod dostaje wtedy SHA z sufiksem
       # `-dirty` i nie jest dowodem proweniencji.
       dirty_args=()
       [[ "$ENGINE_DIRTY" -gt 0 ]] && dirty_args=(--allow-dirty)
-      step "H9 84/84 kompilacji + 4/4 odrzucone mutanty$([[ "$ENGINE_DIRTY" -gt 0 ]] && echo ' (drzewo brudne)')" \
-        env K26V3_BUILD_ROOT="$PROFILES" python3 validate_corpus.py \
-            --out "$WORK/h9_corpus_validation" "${dirty_args[@]}"
+
+      # `validate_corpus.py` z zasady nie nadpisuje katalogu dowodowego i ta
+      # odmowa ma zostac: dowod kampanii nie moze zniknac pod kolejnym
+      # przebiegiem. Tyle ze bramka podaje jej stala sciezke w `$WORK`, czyli
+      # w katalogu roboczym w drzewie buildu, wiec drugi `ninja test_gate` z rzedu
+      # oblewal na aparaturze, nie na silniku — a przy pracy nad `src/` drugi
+      # przebieg jest regula, nie wyjatkiem. Bramka sprzata WLASNY poprzedni
+      # dowod, rozpoznany po jego wlasnym ukladzie (manifest + tabela wynikow).
+      # Katalog o innej zawartosci nie jest kasowany: to albo cudzy dowod, albo
+      # przerwany przebieg, i decyzje podejmuje czlowiek.
+      evidence="$WORK/h9_corpus_validation"
+      evidence_ready=1
+      if [[ -d "$evidence" ]]; then
+        if [[ -f "$evidence/manifest.sha256" && -f "$evidence/corpus-validation.tsv" ]]; then
+          rm -rf "$evidence"
+        else
+          evidence_ready=0
+          fail "H9 84/84 kompilacji — $evidence istnieje i nie ma ukladu dowodu tej bramki"
+          echo "        Obejrzyj go i usun recznie, jesli jest do wyrzucenia."
+        fi
+      fi
+
+      if [[ "$evidence_ready" -eq 1 ]]; then
+        step "H9 84/84 kompilacji + 4/4 odrzucone mutanty$([[ "$ENGINE_DIRTY" -gt 0 ]] && echo ' (drzewo brudne)')" \
+          env K26V3_BUILD_ROOT="$PROFILES" python3 validate_corpus.py \
+              --out "$evidence" "${dirty_args[@]}"
+      fi
     fi
   else
     skip "H9 84/84 kompilacji na czterech profilach ablacji" "h9-profile"

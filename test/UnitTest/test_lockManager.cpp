@@ -1,9 +1,14 @@
-#include <gtest/gtest.h>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
+
+#include <gtest/gtest.h>
 
 #include "retractor/lib/lockManager.hpp"
 #include "retractor/lib/serviceControl.hpp"
@@ -85,6 +90,42 @@ TEST(LockManagerPeerInfo, missing_lock_file_yields_unknown) {
   EXPECT_EQ(info.kind, FlockServiceGuard::PeerInfo::Kind::Unknown);
 }
 
+TEST(LockManagerFlock, releaseKeepsStableInode) {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / ("ut_lockmgr_inode_" + std::to_string(getpid()));
+  const std::string serviceName   = "xretractor_service.alfa";
+  const std::filesystem::path lockPath = dir / (serviceName + ".lock");
+  std::filesystem::create_directories(dir);
+  std::filesystem::remove(lockPath);
+
+  FlockServiceGuard first(serviceName);
+  first.setLockDir(dir.string());
+  ASSERT_TRUE(first.acquireLock());
+
+  // Drugi uczestnik otwiera TEN SAM inode jeszcze przed zwolnieniem pierwszej blokady.
+  // Stary kod wykonywal potem unlink: drugi blokowal osierocony inode, a trzeci tworzyl
+  // pod ta sama sciezka nowy plik i rowniez zdobywal flock.
+  const int secondFd = open(lockPath.c_str(), O_RDWR | O_CLOEXEC);
+  ASSERT_NE(secondFd, -1);
+  struct stat original{};
+  ASSERT_EQ(fstat(secondFd, &original), 0);
+
+  first.releaseLock();
+  ASSERT_EQ(flock(secondFd, LOCK_EX | LOCK_NB), 0);
+
+  struct stat current{};
+  ASSERT_EQ(stat(lockPath.c_str(), &current), 0);
+  EXPECT_EQ(current.st_dev, original.st_dev);
+  EXPECT_EQ(current.st_ino, original.st_ino);
+
+  FlockServiceGuard third(serviceName);
+  third.setLockDir(dir.string());
+  EXPECT_FALSE(third.acquireLock());
+
+  EXPECT_EQ(flock(secondFd, LOCK_UN), 0);
+  EXPECT_EQ(close(secondFd), 0);
+  std::filesystem::remove_all(dir);
+}
+
 // --- restartService: składanie argv przez wstrzykiwalny runner ---
 
 TEST(ServiceControlRestart, builds_system_scope_argv) {
@@ -139,6 +180,53 @@ TEST(ServiceControlDeliver, overwrites_target_atomically) {
   EXPECT_EQ(content, "SELECT a FROM b;\n");
 
   std::filesystem::remove_all(dir);
+}
+
+// --- writeQueryFile: ta sama atomowa droga, ale dla TRESCI, nie pliku zrodlowego ---
+//
+// Uzywa jej przeladowanie planu w locie (`xqry --reset`): plan przychodzi kanalem IPC, wiec
+// pliku zrodlowego po stronie serwera nie ma. Tresc pusta jest zadaniem poprawnym — tak
+// sprowadza sie plik zapytan uslugi do stanu zerowego po bledzie krytycznym.
+
+TEST(ServiceControlWrite, writes_content_over_existing_target) {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_writequery";
+  std::filesystem::create_directories(dir);
+  const std::filesystem::path dst = dir / "startup.rql";
+  {
+    std::ofstream d(dst);
+    d << "OLD CONTENT\n";
+  }
+
+  EXPECT_TRUE(servicecontrol::writeQueryFile("SELECT a STREAM d FROM b\n", dst.string()));
+
+  std::ifstream check(dst);
+  const std::string content((std::istreambuf_iterator<char>(check)), std::istreambuf_iterator<char>());
+  EXPECT_EQ(content, "SELECT a STREAM d FROM b\n");
+
+  std::filesystem::remove_all(dir);
+}
+
+TEST(ServiceControlWrite, empty_content_truncates_the_target) {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_writequery_empty";
+  std::filesystem::create_directories(dir);
+  const std::filesystem::path dst = dir / "startup.rql";
+  {
+    std::ofstream d(dst);
+    d << "SELECT a STREAM d FROM b\n";
+  }
+
+  EXPECT_TRUE(servicecontrol::writeQueryFile("", dst.string()));
+
+  EXPECT_TRUE(std::filesystem::exists(dst));
+  EXPECT_EQ(std::filesystem::file_size(dst), 0U);
+
+  std::filesystem::remove_all(dir);
+}
+
+TEST(ServiceControlWrite, fails_when_the_target_directory_does_not_exist) {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_writequery_nodir";
+  std::filesystem::remove_all(dir);
+  EXPECT_FALSE(servicecontrol::writeQueryFile("x\n", (dir / "startup.rql").string()));
 }
 
 TEST(ServiceControlDeliver, fails_on_missing_source) {

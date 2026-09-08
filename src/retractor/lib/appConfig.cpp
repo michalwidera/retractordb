@@ -109,6 +109,8 @@ void applyTable(const toml::table &tbl, AppConfig &cfg) {
 
   if (auto v = tbl.at_path("paths.lock_dir").value<std::string>(); v) cfg.lockDir = *v;
 
+  if (auto v = tbl.at_path("server.autoname").value<bool>(); v) cfg.serverAutoName = *v;
+
   if (auto v = tbl.at_path("service.query_file").value<std::string>(); v) cfg.serviceQueryFile = *v;
 }
 

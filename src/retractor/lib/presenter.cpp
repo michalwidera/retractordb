@@ -8,13 +8,12 @@
 #include <boost/system/error_code.hpp>
 
 #include "CRSMath.hpp"
+#include "executorsmState.hpp"
 
 // https://ref.pencilcode.net/turtle/colors.html
 
 using namespace boost;
 using namespace CRationalStreamMath;
-
-extern std::vector<std::pair<std::string, std::string>> processedLines;
 
 void presenter::graphiz(std::ostream &xout, const boost::program_options::variables_map &vm) {
   //

@@ -1,0 +1,2 @@
+DECLARE va INTEGER STREAM srcra, 1 FILE 'data.txt'
+SELECT srcra[0]+10 STREAM race FROM srcra

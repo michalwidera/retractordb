@@ -124,7 +124,7 @@ constexpr int AgseStartupLatency(const int sourceWidth, const int step, const in
 //   =>  O = ceil( (sourceOrigin*F + abs(length) - 1) / step ).
 constexpr int AgseLogicalOrigin(const int sourceWidth, const int step, const int length, const int sourceOrigin) {
   const int lengthAbs = length < 0 ? -length : length;
-  return ceilR(boost::rational<int>(sourceOrigin * sourceWidth + lengthAbs - 1, step));
+  return ceilR(boost::rational<int>((sourceOrigin * sourceWidth) + lengthAbs - 1, step));
 }
 
 // Suma strumieni czyta składową o interwale deltaSource po indeksie
@@ -231,7 +231,7 @@ inline int HashStartupLatency(const rational<int> &deltaA, const rational<int> &
     const auto swapped = deltaB / deltaA;
     const auto denom   = static_cast<std::int64_t>(swapped.denominator());
     const auto advance = static_cast<std::int64_t>(swapped.numerator());
-    const int own      = static_cast<int>((denom + advance - 2) / denom + 1);
+    const int own      = static_cast<int>(((denom + advance - 2) / denom) + 1);
     const auto toSlots = [](const int w, const rational<int> &dSrc, const rational<int> &dDst) {
       return w <= 0 ? 0 : ceilR(rational<int>(w) * dSrc / dDst);
     };
@@ -249,7 +249,7 @@ inline int HashStartupLatency(const rational<int> &deltaA, const rational<int> &
     // dodatnie, więc ceil(a/b) = (a+b-1)/b.
     const auto numerator = static_cast<std::int64_t>(position + 1 + latencySrc) * deltaSrc.numerator() * deltaOut.denominator();
     const auto denominator = static_cast<std::int64_t>(deltaSrc.denominator()) * deltaOut.numerator();
-    const auto required    = (numerator + denominator - 1) / denominator - 1 - index;
+    const auto required    = ((numerator + denominator - 1) / denominator) - 1 - index;
     result                 = std::max(result, required);
   }
   return static_cast<int>(result);

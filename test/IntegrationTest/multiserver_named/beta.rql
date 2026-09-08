@@ -1,0 +1,2 @@
+DECLARE vb INTEGER STREAM srcb, 1 FILE 'data_beta.txt'
+SELECT srcb[0]+100 STREAM dstb FROM srcb

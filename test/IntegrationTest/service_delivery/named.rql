@@ -1,0 +1,4 @@
+STORAGE 'temp'
+SUBSTRAT 'memory'
+DECLARE n INTEGER STREAM nsrc, 0.2 FILE 'data.txt'
+SELECT n+1 STREAM ndst FROM nsrc

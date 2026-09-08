@@ -1,0 +1,2 @@
+DECLARE vd INTEGER STREAM srcd, 1 FILE 'data.txt'
+SELECT srcd[0]+4 STREAM dst FROM srcd

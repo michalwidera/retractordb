@@ -1,0 +1,16 @@
+# Plan jest tu nosnikiem: badana jest droga komendy `get` w chwili wymiany planu,
+# a nie to, co liczy silnik. Osiem strumieni po to, zeby handler `get` mial realna
+# prace do wykonania po zdjeciu haka opozniajacego.
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'
+
+SELECT a*1 STREAM beta1 FROM src
+SELECT a*2 STREAM beta2 FROM src
+SELECT a*3 STREAM beta3 FROM src
+SELECT a*4 STREAM beta4 FROM src
+SELECT a*5 STREAM beta5 FROM src
+SELECT a*6 STREAM beta6 FROM src
+SELECT a*7 STREAM beta7 FROM src
+SELECT a*8 STREAM beta8 FROM src

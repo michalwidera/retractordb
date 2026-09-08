@@ -1,0 +1,387 @@
+#include "serverRouting.hpp"
+
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <cstddef>
+#include <filesystem>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace routing {
+
+namespace {
+
+/// Czy instancja serwuje strumień o tej nazwie.
+bool serves(const bus::InstanceInfo &instance, std::string_view stream) {
+  return std::ranges::find(instance.streams, stream) != instance.streams.end();
+}
+
+/// Lista etykiet wszystkich instancji, po przecinku — do komunikatu o dwuznaczności.
+std::string labelList(const std::vector<bus::InstanceInfo> &instances) {
+  std::string retVal;
+  for (const auto &instance : instances) {
+    if (!retVal.empty()) retVal += ", ";
+    retVal += instanceLabel(instance.name);
+  }
+  return retVal;
+}
+
+/// Sciezka w magistrali pozostaje bezwzgledna, ale operatorowi wystarcza jej rozpoznawalny
+/// ogon: katalog planu i nazwa pliku. Krotszych sciezek nie wydluzamy prefiksem `.../`.
+std::string queryPathLabel(std::string_view queryFile) {
+  if (queryFile.empty()) return "-";
+
+  const std::filesystem::path path{queryFile};
+  if (!path.is_absolute() || path.parent_path().filename().empty()) return std::string{queryFile};
+
+  const std::string shortened = ".../" + (path.parent_path().filename() / path.filename()).string();
+  return shortened.size() < queryFile.size() ? shortened : std::string{queryFile};
+}
+
+/// Litery trybow pracy w kolejnosci od najbardziej zmieniajacego przebieg do najmniej.
+/// Wybor liter: R jak realtime, F jak flag `-f` (--no-clock), U jak until-eof, M jak `-m`
+/// (--llimitqry), X jak `-x` (--xqrywait), S jak service. Tryby sie nie wykluczaja, wiec
+/// pole jest napisem, nie jedna litera; brak ktoregokolwiek bitu to "N" -- zwykly przebieg.
+struct ModeLetter {
+  std::uint32_t bit;
+  char letter;
+  std::string_view option;
+};
+
+constexpr std::array kModeLetters{
+    ModeLetter{.bit = bus::mode::kRealTime, .letter = 'R', .option = "realtime"},
+    ModeLetter{.bit = bus::mode::kNoClock, .letter = 'F', .option = "no-clock"},
+    ModeLetter{.bit = bus::mode::kUntilEof, .letter = 'U', .option = "until-eof"},
+    ModeLetter{.bit = bus::mode::kLoopLimit, .letter = 'M', .option = "llimitqry"},
+    ModeLetter{.bit = bus::mode::kXqryWait, .letter = 'X', .option = "xqrywait"},
+    ModeLetter{.bit = bus::mode::kService, .letter = 'S', .option = "service"},
+};
+
+std::string modeLabel(std::uint32_t modes) {
+  std::string retVal;
+  for (const auto &entry : kModeLetters)
+    if ((modes & entry.bit) != 0U) retVal += entry.letter;
+  return retVal.empty() ? std::string{"N"} : retVal;
+}
+
+std::string modeLegend() {
+  std::string retVal{"MODE: N=normal"};
+  for (const auto &entry : kModeLetters) {
+    retVal += ", ";
+    retVal += entry.letter;
+    retVal += '=';
+    retVal += entry.option;
+  }
+  return retVal;
+}
+
+/// Napis YAML w cudzyslowie: chroni wartosci, ktore jako goly skalar zmienilyby znaczenie
+/// (dwukropek w sciezce, wiodaca spacja). Uciekamy dokladnie to, co wymaga tego forma
+/// cytowana YAML-a: odwrotny ukosnik i cudzyslow.
+std::string yamlQuoted(std::string_view value) {
+  std::string retVal{"\""};
+  for (const char c : value) {
+    if (c == '\\' || c == '"') retVal += '\\';
+    retVal += c;
+  }
+  return retVal + "\"";
+}
+
+struct ServerRow {
+  std::string server;
+  std::string pid;
+  std::string mode;
+  std::string query;
+  std::vector<std::string> streams;
+};
+
+struct ColumnWidths {
+  std::size_t server;
+  std::size_t pid;
+  std::size_t mode;
+  std::size_t query;
+  std::size_t streams;
+};
+
+/// Kazda kolumna jest dopelniana do szerokosci NAJSZERSZEJ wartosci w tabeli, wiec nazwa
+/// instancji wygenerowana przez --autoname (dluzsza od naglowka SERVER) rozsuwa kolumne
+/// zamiast rozjechac wiersz.
+///
+/// Strumienie ida po JEDNYM NA LINIE: pierwszy w wierszu instancji, kazdy nastepny w linii
+/// kontynuacji z pustymi kolumnami po lewej. Plan o kilkunastu strumieniach sklejony w jedna
+/// komorke dawal wiersz na kilkaset znakow, ktory terminal zawijal w nieczytelny blok --
+/// kreski kolumn zostaja, wiec wiadomo, do ktorej instancji nalezy dana nazwa.
+std::vector<std::string> tableLines(const ServerRow &row, const ColumnWidths &widths) {
+  const auto cell = [](std::string_view value, std::size_t width) {
+    return std::string{value} + std::string(width - value.size(), ' ');
+  };
+  const std::string head = cell(row.server, widths.server) + " | " + cell(row.pid, widths.pid) + " | " +
+                           cell(row.mode, widths.mode) + " | " + cell(row.query, widths.query) + " | ";
+  const std::string continuation = cell("", widths.server) + " | " + cell("", widths.pid) + " | " + cell("", widths.mode) +
+                                   " | " + cell("", widths.query) + " | ";
+
+  std::vector<std::string> retVal;
+  retVal.reserve(row.streams.size());
+  for (const auto &stream : row.streams)
+    retVal.push_back((retVal.empty() ? head : continuation) + stream);
+  return retVal;
+}
+
+}  // namespace
+
+std::string instanceLabel(std::string_view name) { return name.empty() ? std::string{"(unnamed)"} : std::string{name}; }
+
+std::vector<std::string> extractSourceStreams(std::string_view query) {
+  // RQL.g4 leksuje slowa kluczowe WIELKOSCIOWO: `FROM: 'FROM'|'from'`, i tak samo MIN, MAX, AVG,
+  // SUMC, FILE, RETENTION, VOLATILE i STORAGE. Pisownia mieszana NIE jest slowem kluczowym, tylko
+  // zwykla nazwa -- grammar mowi to wprost przy regule stream_fn_call ("`Min` pozostaje zwykla
+  // nazwa"). Skladanie tokenu do lowercase odbieraloby wiec strumieniowi nazwanemu `Min` albo
+  // `From` szanse na rozpoznanie, a routing gubilby jego wlasciciela.
+  const auto isKeyword = [](std::string_view token, std::string_view upper, std::string_view lower) {
+    return token == upper || token == lower;
+  };
+
+  // `RULE nazwa ON strumien WHEN ...` nie ma klauzuli FROM, a mimo to ma jednoznacznego
+  // adresata: instancje, ktora serwuje strumien spod ON. `ON` wystepuje w gramatyce wylacznie
+  // w regule, wiec identyfikator zaraz za nim jest tym strumieniem i niczym innym.
+  std::vector<std::string> retVal;
+  bool afterOn{false};
+  bool inLiteral{false};
+  bool inLineComment{false};
+  std::size_t blockCommentDepth{0};
+  bool inFrom{false};
+  char previousSignificant{'\0'};
+
+  for (std::size_t i = 0; i < query.size();) {
+    const char c    = query[i];
+    const char next = i + 1 < query.size() ? query[i + 1] : '\0';
+
+    if (inLineComment) {
+      if (c == '\n') inLineComment = false;
+      ++i;
+      continue;
+    }
+    if (blockCommentDepth != 0) {
+      if (c == '/' && next == '*') {
+        ++blockCommentDepth;
+        i += 2;
+      } else if (c == '*' && next == '/') {
+        --blockCommentDepth;
+        i += 2;
+      } else {
+        ++i;
+      }
+      continue;
+    }
+    if (inLiteral) {
+      if (c == '\\' && next != '\0') {
+        i += 2;
+      } else {
+        if (c == '\'') inLiteral = false;
+        ++i;
+      }
+      continue;
+    }
+    if (c == '/' && next == '/') {
+      inLineComment = true;
+      i += 2;
+      continue;
+    }
+    if (c == '/' && next == '*') {
+      blockCommentDepth = 1;
+      i += 2;
+      continue;
+    }
+    if (c == '\'') {
+      inLiteral = true;
+      ++i;
+      continue;
+    }
+
+    const auto uc = static_cast<unsigned char>(c);
+    if (std::isalpha(uc) != 0) {
+      const std::size_t begin = i++;
+      while (i < query.size()) {
+        const char inner = query[i];
+        const auto uci   = static_cast<unsigned char>(inner);
+        if (std::isalnum(uci) == 0 && inner != '_' && inner != '$') break;
+        ++i;
+      }
+
+      const std::string token(query.substr(begin, i - begin));
+
+      if (afterOn) {
+        retVal.push_back(token);
+        afterOn = false;
+      } else if (isKeyword(token, "ON", "on")) {
+        afterOn = true;
+      } else if (isKeyword(token, "FROM", "from")) {
+        inFrom = true;
+      } else if (inFrom && (isKeyword(token, "FILE", "file") || isKeyword(token, "RETENTION", "retention") ||
+                            isKeyword(token, "VOLATILE", "volatile") || isKeyword(token, "STORAGE", "storage"))) {
+        break;
+      } else if (inFrom && previousSignificant != '.' && !isKeyword(token, "MIN", "min") && !isKeyword(token, "MAX", "max") &&
+                 !isKeyword(token, "AVG", "avg") && !isKeyword(token, "SUMC", "sumc")) {
+        retVal.push_back(token);
+      }
+      previousSignificant = 'I';
+      continue;
+    }
+
+    if (std::isspace(uc) == 0) previousSignificant = c;
+    ++i;
+  }
+  return retVal;
+}
+
+Resolution forStream(const std::vector<bus::InstanceInfo> &instances, std::string_view stream) {
+  Resolution retVal;
+  for (const auto &instance : instances)
+    if (serves(instance, stream)) {
+      retVal.serverName = instance.name;
+      return retVal;
+    }
+
+  // Kod wyjścia tej ścieżki musi zostać kodem "nie ma takiego strumienia", a nie "serwer
+  // milczy": issue_215 celowo rozdzielił te dwie diagnozy, bo prowadzą do różnych napraw.
+  retVal.status = Status::StreamNotFound;
+  retVal.detail = std::string{stream} + ": stream not found on any live instance";
+  return retVal;
+}
+
+Resolution forAdHoc(const std::vector<bus::InstanceInfo> &instances, std::string_view query) {
+  Resolution retVal;
+  const bus::InstanceInfo *owner{nullptr};
+  bool crossed{false};
+  std::vector<std::string> reached;
+
+  for (const auto &token : extractSourceStreams(query))
+    for (const auto &instance : instances) {
+      if (!serves(instance, token)) continue;
+      // Ta sama nazwa pada w zapytaniu wielokrotnie (`dsta[0]` i `FROM dsta`), a komunikat
+      // ma wymieniac strumienie, nie ich wystapienia.
+      const std::string entry = token + "@" + instanceLabel(instance.name);
+      if (std::ranges::find(reached, entry) == reached.end()) reached.push_back(entry);
+      if (owner == nullptr)
+        owner = &instance;
+      else if (owner != &instance)
+        crossed = true;
+    }
+
+  if (crossed) {
+    std::string list;
+    for (const auto &entry : reached) {
+      if (!list.empty()) list += ", ";
+      list += entry;
+    }
+    retVal.status = Status::CrossServer;
+    retVal.detail = "ad-hoc query crosses a server boundary (" + list + ")";
+    return retVal;
+  }
+  if (owner == nullptr) {
+    // Zapytanie ad-hoc bez ani jednej znanej nazwy strumienia jest nierozstrzygalne: nie ma
+    // żadnej przesłanki, do której instancji miałoby trafić, a zgadywanie zmieniłoby plan
+    // przypadkowego serwera.
+    retVal.status = Status::Ambiguous;
+    retVal.detail = "ad-hoc query names no stream of any live instance (" + labelList(instances) + "); use --server <name>";
+    return retVal;
+  }
+
+  retVal.serverName = owner->name;
+  return retVal;
+}
+
+Resolution forSingleTarget(const std::vector<bus::InstanceInfo> &instances) {
+  Resolution retVal;
+  if (instances.size() <= 1) {
+    // Brak instancji => nazwa pusta, czyli nazwy historyczne. Zepsuta albo pusta magistrala
+    // nie może unieruchomić klienta: wtedy zachowuje się dokładnie tak jak przed etapem 2c.
+    if (!instances.empty()) retVal.serverName = instances.front().name;
+    return retVal;
+  }
+
+  retVal.status = Status::Ambiguous;
+  retVal.detail = std::to_string(instances.size()) + " live instances (" + labelList(instances) + "); use --server <name>";
+  return retVal;
+}
+
+std::vector<std::string> describe(const std::vector<bus::InstanceInfo> &instances) {
+  if (instances.empty()) return {};
+
+  std::vector<ServerRow> rows;
+  rows.reserve(instances.size());
+  for (const auto &instance : instances)
+    rows.push_back({.server  = instanceLabel(instance.name),
+                    .pid     = std::to_string(instance.pid),
+                    .mode    = modeLabel(instance.modes),
+                    .query   = queryPathLabel(instance.queryFile),
+                    .streams = instance.streams.empty() ? std::vector<std::string>{"-"} : instance.streams});
+
+  // Kolejnosc slotow w segmencie zalezy od kolejnosci startow, a wyjscie ma byc powtarzalne.
+  std::ranges::sort(rows, {}, &ServerRow::server);
+
+  const ServerRow header{.server = "SERVER", .pid = "PID", .mode = "MODE", .query = "QUERY", .streams = {"STREAMS"}};
+  ColumnWidths widths{.server  = header.server.size(),
+                      .pid     = header.pid.size(),
+                      .mode    = header.mode.size(),
+                      .query   = header.query.size(),
+                      .streams = header.streams.front().size()};
+  for (const auto &row : rows) {
+    widths.server = std::max(widths.server, row.server.size());
+    widths.pid    = std::max(widths.pid, row.pid.size());
+    widths.mode   = std::max(widths.mode, row.mode.size());
+    widths.query  = std::max(widths.query, row.query.size());
+    // Kolumne STREAMS mierzy POJEDYNCZA nazwa, a nie sklejona lista: kazda nazwa ma wlasna
+    // linie, wiec dlugosc calej listy nie mowi juz nic o szerokosci tabeli.
+    for (const auto &stream : row.streams)
+      widths.streams = std::max(widths.streams, stream.size());
+  }
+
+  std::vector<std::string> retVal;
+  retVal.push_back(tableLines(header, widths).front());
+  retVal.push_back(std::string(widths.server + 1, '-') + "+" + std::string(widths.pid + 2, '-') + "+" +
+                   std::string(widths.mode + 2, '-') + "+" + std::string(widths.query + 2, '-') + "+" +
+                   std::string(widths.streams + 1, '-'));
+  for (const auto &row : rows)
+    for (const auto &line : tableLines(row, widths))
+      retVal.push_back(line);
+  // Legenda pod tabela, bo litery trybow nie sa odgadywalne. Wiersz zaczyna sie od "MODE:",
+  // czyli nie pasuje do zadnego wzorca kolumnowego -- skrypty dopasowujace wiersze instancji
+  // po "^<nazwa> |" jej nie widza.
+  retVal.push_back(modeLegend());
+  return retVal;
+}
+
+std::vector<std::string> describeYaml(const std::vector<bus::InstanceInfo> &instances) {
+  std::vector<std::string> retVal{"---", "apiVersion: xqry/v1"};
+  if (instances.empty()) {
+    retVal.emplace_back("servers: []");
+    return retVal;
+  }
+
+  // Sciezka zapytania trafia tu W CALOSCI, a nie skrocona jak w tabeli: skrot `.../` sluzy
+  // czytelnosci dla czlowieka, a odbiorca YAML-a ma dostac sciezke, ktora da sie otworzyc.
+  // Wartosc jest cytowana, bo sciezka moze zawierac dwukropek albo spacje.
+  std::vector<bus::InstanceInfo> ordered = instances;
+  std::ranges::sort(ordered, {}, [](const bus::InstanceInfo &instance) { return instanceLabel(instance.name); });
+
+  retVal.emplace_back("servers:");
+  for (const auto &instance : ordered) {
+    retVal.push_back("  - name: " + instanceLabel(instance.name));
+    retVal.push_back("    pid: " + std::to_string(instance.pid));
+    retVal.push_back("    modes: " + modeLabel(instance.modes));
+    if (!instance.queryFile.empty()) retVal.push_back("    query: " + yamlQuoted(instance.queryFile));
+    if (instance.streams.empty()) {
+      retVal.emplace_back("    streams: []");
+    } else {
+      retVal.emplace_back("    streams:");
+      for (const auto &stream : instance.streams)
+        retVal.push_back("      - " + stream);
+    }
+  }
+  return retVal;
+}
+
+}  // namespace routing

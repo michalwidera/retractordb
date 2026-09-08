@@ -2,13 +2,13 @@
 
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <print>
 #include <span>
 #include <utility>
 #include <vector>
 
 #include "rdb/metaData.hpp"
+#include "rdb/rationalFormat.hpp"
 
 namespace {
 constexpr size_t kBitsPerByte = 8;
@@ -35,8 +35,7 @@ bool MetaCmd::execute(CommandContext &ctx) {
   const size_t nFields = ctx.dacc->descriptor.size();
 
   std::print("{}meta: {}\n", ctx.colors.BLUE, path);
-  std::cout << "interval: " << ctx.dacc->getSamplingInterval() << "  ";  // boost::rational — brak std::formatter
-  std::print("total records: {}\n{}", metaView.totalRecords(), ctx.colors.RESET);
+  std::print("interval: {}  total records: {}\n{}", ctx.dacc->getSamplingInterval(), metaView.totalRecords(), ctx.colors.RESET);
 
   size_t segIdx = 0;
   for (const auto &entry : segs) {
@@ -93,7 +92,7 @@ bool MetaRawCmd::execute(CommandContext &ctx) {
   std::print("{}meta raw: {}\n{}", ctx.colors.BLUE, path, ctx.colors.RESET);
   std::print("header size: {}\n", headerSize);
   std::print("entry size: {}\n", entrySize);
-  std::cout << "sampling interval: " << ctx.dacc->getSamplingInterval() << "\n";  // boost::rational — brak std::formatter
+  std::print("sampling interval: {}\n", ctx.dacc->getSamplingInterval());
 
   size_t entryIdx = 0;
   while (true) {

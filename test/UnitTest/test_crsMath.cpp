@@ -2,7 +2,6 @@
 #include <spdlog/spdlog.h>
 
 #include <filesystem>
-#include <fstream>
 #include <iomanip>
 #include <map>
 #include <variant>
@@ -14,16 +13,15 @@
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/CRSMath.hpp"
 #include "retractor/lib/dataModel.hpp"
+#include "retractor/lib/executorsmState.hpp"
 #include "retractor/lib/qTree.hpp"  // coreInstance
+#include "retractor/lib/RQLParser.hpp"
 
 // ctest -R "^ut_crsMath$" -V
 
 // https://github.com/google/googletest/blob/main/docs/index.md
 
 using namespace CRationalStreamMath;
-
-extern std::string parserRQLFile_4Test(qTree &coreInstance, const std::string &sInputFile);
-extern dataModel *pProc;
 
 qTree coreInstance;
 
@@ -109,12 +107,7 @@ const int TEST_COUNT = 15;
 // std::unique_ptr<dataModel> dataArea;
 
 struct crsMathTestInit {
-  crsMathTestInit() {
-    assert(std::filesystem::exists("ut_crsmath.rql") && "file ut_crsmath.rql does not exist!");
-    std::ifstream infl("ut_crsmath.rql");
-    for (std::string line; std::getline(infl, line);)
-      std::cout << line << '\n';
-  }
+  crsMathTestInit() { assert(std::filesystem::exists("ut_crsmath.rql") && "file ut_crsmath.rql does not exist!"); }
 
   ~crsMathTestInit() = default;
 

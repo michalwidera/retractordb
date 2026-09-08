@@ -6,10 +6,13 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <string_view>
 #include <thread>
 
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/property_tree/ptree.hpp>
+
+#include "constants.hpp"
 
 /// Transport IPC strony serwerowej: segment pamieci dzielonej z mapa odpowiedzi,
 /// kolejka komend, kolejki rozgloszeniowe per klient oraz watek komunikacyjny.
@@ -37,14 +40,25 @@ class IpcServer {
 
   struct Callbacks {
     CommandHandler onCommand;
-    Notifier onReady;            // zasoby IPC gotowe -- raz, przed petla odbioru
-    Notifier onMessageReceived;  // odebrano komende -- przed jej obsluga
+    Notifier onReady;           // zasoby IPC gotowe -- raz, przed petla odbioru
+    Notifier onFailure;         // zasobow IPC nie da sie zbudowac -- watek konczy prace
+    Notifier onCommandHandled;  // komenda OBSLUZONA -- po powrocie z onCommand
     StopPredicate shouldStop;
   };
+
+  /// onReady i onFailure wykluczaja sie i razem sa WYCZERPUJACE: watek komunikacyjny zawsze
+  /// wola dokladnie jedno z nich, zanim skonczy prace. Bez onFailure zawiedziona budowa zasobow
+  /// (najczesciej brak miejsca w /dev/shm na kolejke komend) konczyla watek po cichu, a strona
+  /// czekajaca na gotowosc czekala bez konca.
 
   IpcServer()                             = default;
   IpcServer(const IpcServer &)            = delete;
   IpcServer &operator=(const IpcServer &) = delete;
+
+  /// Nazwa serwera wyznaczajaca komplet nazw obiektow IPC tej instancji. Wolac PRZED start();
+  /// pozniejsza zmiana rozjechalaby nazwy juz utworzonych obiektow z nazwami uzywanymi do ich
+  /// kasowania. Nazwa pusta (domyslna) daje nazwy historyczne, jednoserwerowe.
+  void setServerName(std::string_view serverName);
 
   /// Startuje watek komunikacyjny. onReady wola sie z tego watku, gdy segment,
   /// muteks nazwany i kolejka komend juz istnieja.
@@ -75,17 +89,27 @@ class IpcServer {
   void removeAllObjects();
 
  private:
-  void commandLoop();
+  void commandLoop() const;
 
   /// Segment, kolejka komend, muteks nazwany. Nie dotyka stanu klientow.
-  static void removeGlobalObjects();
+  void removeGlobalObjects() const;
 
   /// Kolejki odpowiedzi klientow plus wyczyszczenie rejestru subskrypcji.
   /// Wolajacy MUSI trzymac clientMapsMutex_.
   void removeClientQueues();
 
+  /// Czy wiersz miesci sie w slocie kolejki odpowiedzi. Falsz melduje przyczyne raz na
+  /// strumien i jest rownoznaczny z pominieciem emisji -- nigdy z wyjatkiem, bo wyjatek
+  /// z try_send konczyl cala usluge. Wolajacy MUSI trzymac clientMapsMutex_.
+  bool rowFitsSlot(const std::string &row, const std::string &streamName);
+
   Callbacks callbacks_;
   std::thread commsThread_;
+
+  // Komplet nazw obiektow IPC tej instancji. Wszystkie sciezki -- tworzenie, emisja i KASOWANIE
+  // -- czytaja nazwy stad, nigdy ze stalych globalnych; to jest warunek tego, zeby serwer nie
+  // mogl skasowac obiektow innego serwera.
+  ipc::ServerNames names_{ipc::names()};
 
   // Mapa relacji processId -> nazwa wysylanego strumienia.
   std::map<const int, std::string> id2StreamNameRelation_;
@@ -97,6 +121,12 @@ class IpcServer {
   // usuwamy z cache przy usunieciu kolejki (przepelnienie) i re-rejestracji
   // klienta.
   std::map<const int, std::unique_ptr<boost::interprocess::message_queue>> id2QueueCache_;
+
+  // Strumienie, o ktorych zbyt dlugim wierszu juz zameldowalismy. Kryterium jest per strumien,
+  // nie per slot: wiersz nie miesci sie w kazdym slocie tak samo, a przy takcie 1 ms ten sam
+  // komunikat zalalby dziennik tysiac razy na sekunde. Czytane i pisane wylacznie w broadcast(),
+  // czyli pod clientMapsMutex_.
+  std::set<std::string> oversizedRowStreams_;
 
   // Muteks obu map klienckich (sledztwo ~40 ms, JOURNAL.md 2026-07-18, Faza 3):
   // mapy sa modyfikowane przez watek komunikacyjny (rejestracja show) i czytane/

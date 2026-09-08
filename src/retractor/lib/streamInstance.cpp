@@ -11,12 +11,11 @@
 
 #include "fatalError.hpp"
 
+#include "executorsmState.hpp"
 #include "expressionEvaluator.hpp"
 #include "persistentCounter.hpp"
 #include "rdb/convertTypes.hpp"
 #include "rdb/probe.hpp"
-
-extern std::unique_ptr<PersistentCounter> pCounterPtr;
 
 streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam)
     : coreInstance(coreInstance) {
@@ -120,7 +119,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   // przed początek źródła, a ogon (compiler::computeStartupLatency) — że górny koniec już
   // istnieje. Kontrola zakresu poniżej pozostaje ochroną przed uszkodzonym planem albo
   // bezpośrednim wywołaniem jednostkowym.
-  const auto windowStart = windowIndex * step - (lengthAbs - 1);
+  const auto windowStart = (windowIndex * step) - (lengthAbs - 1);
 
   rdb::probe::onAgseWindow(lengthAbs);
 
@@ -530,6 +529,9 @@ void streamInstance::constructRulesAndUpdate(const query &qry) {
     if (r.condition.empty()) FatalError("streamInstance::constructRulesAndUpdate: rule condition is empty");
     if (r.action != rule::DUMP && r.action != rule::SYSTEM)
       FatalError("streamInstance::constructRulesAndUpdate: unsupported rule action");
+    // Regula dolaczona ad-hoc jest nieuzbrojona, dopoki nie zbierze wlasnej historii —
+    // patrz rule::armAtCount. Reguly z planu maja tam zero i wchodza od razu.
+    if (outputPayload->getRecordsCount() < r.armAtCount) continue;
     auto condition = r.condition;
     expressionEvaluator expression;
     auto result = expression.eval(condition, &payload);

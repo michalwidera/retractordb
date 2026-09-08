@@ -108,7 +108,7 @@ void storage::resetForUnitTest() {
   accessor_->write(nullptr, 0);
   recordsCount_ = 0;
 
-  if (metaData_) metaData_->reset();
+  if (metaData_) (*metaData_).reset();
 
   if (recordsCount_ != accessor_->count()) {
     FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(),
@@ -165,7 +165,7 @@ void storage::purge() {
   accessor_->write(nullptr, 0);
   recordsCount_ = 0;
 
-  metaData_->reset();  // czyści indeks oraz liczniki maszyny gap
+  (*metaData_).reset();  // czyści indeks oraz liczniki maszyny gap
 }
 
 void storage::markTransmissionGap(size_t gapDuration) { metaData_->onTransmissionGap(gapDuration); }

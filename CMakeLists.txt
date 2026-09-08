@@ -273,23 +273,90 @@ set(RETRACTOR_QUERY_FILE
       "Kanoniczny plik zapytań serwisu xretractor (ExecStart / fallback AppConfig)"
 )
 
+# API klienckie (api/) jest rozwijane i testowane RAZEM z silnikiem, ale nie
+# WEWNATRZ niego: zaden cel z src/ nie linkuje niczego z api/. Katalog jest
+# konfigurowany zawsze (koszt konfiguracji, nie budowania); z `all`, z `ninja
+# install` i z pakietu wypada dwiema osobnymi drogami ponizej. Wejscia opt-in:
+# install-withapi, test-api oraz -DRDB_WITH_API=ON dla cpack.
+#
+# api/cpp jest tez samodzielnym projektem (README opisuje add_subdirectory z
+# obcego drzewa), wiec decyzja o komponencie nalezy do NAS, nie do niego:
+# przekazujemy ja zmienna, ktora u samodzielnego konsumenta jest pusta.
+set(RDB_API_INSTALL_COMPONENT COMPONENT api EXCLUDE_FROM_ALL)
+add_subdirectory(api/cpp)
+
+# EXCLUDE_FROM_ALL na celach, nie na katalogu: add_subdirectory z opcja
+# EXCLUDE_FROM_ALL odcina rowniez reguly install() od nadrzednego
+# cmake_install.cmake, przez co `cmake --install --component api` nie mialby
+# czego zainstalowac.
+set_target_properties(rdb_client rdb_api_json rdb_monitor
+                      PROPERTIES EXCLUDE_FROM_ALL TRUE)
 add_subdirectory(src)
 add_subdirectory(scripts)
 add_subdirectory(test)
 
+option(RDB_WITH_API "Dolacz API klienckie (api/) do pakietow cpack" OFF)
+
+# Testy API sa oznaczone etykieta `api` i domyslnie wypadaja z `ninja test`.
+# CMAKE_CTEST_ARGUMENTS steruje wywolaniem ctest w celu `test`; -LE api to
+# jedyny sposob, by je pominac bez usuwania ich z rejestru (DISABLED czynilby je
+# nieuruchamialnymi takze przez `ninja test-api`).
+if(NOT RDB_WITH_API)
+  list(APPEND CMAKE_CTEST_ARGUMENTS -LE api)
+endif()
+
+# `ninja install-withapi` — jedyne wejscie, ktore instaluje API. Zaleznosci
+# gwarantuja zbudowanie silnika i celow API przed instalacja; dwa wywolania
+# `cmake --install` odpowiadaja komponentowi domyslnemu i komponentowi `api`.
+add_custom_target(
+  install-withapi
+  COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}
+  COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --component api
+  COMMENT "Instalacja silnika wraz z API klienckim (komponent api)")
+add_dependencies(
+  install-withapi
+  xretractor
+  xqry
+  xtrdb
+  rdb_client
+  rdb_api_json
+  rdb_monitor)
+
+# `ninja test-api` — testy API, budowane i uruchamiane wylacznie na zadanie.
+add_custom_target(
+  test-api
+  COMMAND ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_BINARY_DIR} -L api
+          --output-on-failure
+  COMMENT "Testy API klienckiego (ctest -L api)")
+add_dependencies(test-api xretractor xqry test_api_client)
+
 include(InstallRequiredSystemLibraries)
 
 set(CPACK_GENERATOR "DEB;TGZ")
-set(CPACK_SOURCE_GENERATOR "DEB;TGZ")
+# Pakiet ZRODLOWY jest wylaczony. Nie bylo dla niego odbiorcy, a jego zawartosc
+# byla nieprawdziwa: wpisy CPACK_SOURCE_IGNORE_FILES to regexy na pelnej
+# sciezce, wiec `/lib/` wycinalo `src/rdb/lib/` i `src/retractor/lib/` — 84
+# pliki rdzenia silnika wraz z obiema gramatykami — a `README.md` wycinalo kazdy
+# README na kazdej glebokosci. Test pakowania tego nie lapal, bo sprawdzal
+# wylacznie NIEOBECNOSC artefaktow, nigdy obecnosc zrodel.
+#
+# Wylaczenie musi byc jawne. Samo usuniecie CPACK_SOURCE_GENERATOR wlacza
+# domyslne generatory CPacka (TBZ2, TGZ, TXZ, TZ) — bez listy ignorowanych
+# spakowalyby cale `build/`. Te opcje czyta include(CPack) nizej; CMP0077 (NEW
+# od cmake_minimum_required powyzej) sprawia, ze option() honoruje ustawiona tu
+# zmienna. Przywrocenie pakietu zrodlowego to osobne zadanie: wymaga
+# zakotwiczonych wzorcow i asercji POZYTYWNEJ w tescie pakowania.
+set(CPACK_SOURCE_RPM OFF)
+set(CPACK_SOURCE_TBZ2 OFF)
+set(CPACK_SOURCE_TGZ OFF)
+set(CPACK_SOURCE_TXZ OFF)
+set(CPACK_SOURCE_TZ OFF)
+set(CPACK_SOURCE_ZIP OFF)
 
-# Prefiks /usr dla pakietów BINARNYCH (DEB i TGZ): binaria -> /usr/bin,
-# jednostka systemd -> /usr/lib/systemd/system (ścieżka rozpoznawana przez
-# systemd). TGZ rozpakowany w / daje te same ścieżki. Dla pakietu ŹRÓDŁOWEGO
-# prefiks jest zerowany w project-config.cmake (drzewo źródeł w korzeniu
-# archiwum).
+# Prefiks /usr dla pakietow BINARNYCH (DEB i TGZ): binaria -> /usr/bin,
+# jednostka systemd -> /usr/lib/systemd/system (sciezka rozpoznawana przez
+# systemd). TGZ rozpakowany w / daje te same sciezki.
 set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
-set(CPACK_PROJECT_CONFIG_FILE
-    "${CMAKE_CURRENT_SOURCE_DIR}/packaging/cpack/project-config.cmake")
 
 # Jednostka systemd dla xretractor: ExecStart wskazuje realną ścieżkę binarium w
 # pakiecie (prefiks + bindir). Generowana z szablonu .in.
@@ -338,6 +405,12 @@ set(CPACK_DEB_COMPONENT_INSTALL ON)
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)
 set(CPACK_COMPONENTS_ALL Unspecified service)
+# Komponent 'api' dopisywany tylko przy -DRDB_WITH_API=ON. Cpack ustala
+# zawartosc pakietu na etapie konfiguracji, wiec tego jednego wejscia nie da sie
+# zastapic celem ninja — bez tej flagi API nigdy nie trafia do .deb/.tar.gz.
+if(RDB_WITH_API)
+  list(APPEND CPACK_COMPONENTS_ALL api)
+endif()
 
 set(CPACK_PACKAGE_NAME "retractordb")
 set(CPACK_PACKAGE_VERSION
@@ -349,53 +422,5 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "RetractorDB")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set(CPACK_PACKAGE_FILE_NAME
     "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
-
-set(CPACK_SOURCE_PACKAGE_FILE_NAME
-    "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-source-${CMAKE_SYSTEM_NAME}"
-)
-
-set(CPACK_SOURCE_IGNORE_FILES
-    /build/
-    /CMakeFiles/
-    /CMakeCache.txt
-    /bin/
-    /lib/
-    # Wygenerowane / lokalne artefakty — nie należą do pakietu źródłowego.
-    /coverage/
-    /Testing/
-    /dokumentacja-rdb/
-    /.claude/
-    /.venv/
-    /.cache/
-    /src/UML/
-    /src/retractor/UML/
-    /src/rdb/UML/
-    /.vscode/
-    /scripts/.vim/
-    /scripts/dev-test/
-    /scripts/sublime/
-    /.circleci/
-    /.github/
-    /.gitignore
-    /.gitattributes
-    /CMakeUserPresets.json
-    /examples/
-    /.git/
-    /test/
-    /embold.yaml
-    README.md
-    CONTRIBUTING.md
-    CODE_OF_CONDUCT.md
-    /docker/
-    Dockerfile
-    DockerConan.txt
-    sonar-project.properties
-    CLAUDE.md
-    .clang-format
-    .clang-tidy
-    .claudeignore
-    .dockerignore
-    ~$
-    ${CPACK_SOURCE_IGNORE_FILES})
 
 include(CPack) # include after setting variables above to take effect

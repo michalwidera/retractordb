@@ -66,7 +66,7 @@ void Descriptor::rebuildFieldMappings() const {
     dataSizeBytes_ += fieldSize(field);  // semantyka identyczna z dawnym getSizeInBytes (pola konfiguracyjne i NULLTYPE = 0)
     if (isConfigurationField(field.rtype)) continue;
 
-    const int flatCount = (field.rtype == rdb::STRING) ? 1 : field.rarray;
+    const int flatCount = rdb::flatElementCount(field);
     for (int arrayIndex = 0; arrayIndex < flatCount; ++arrayIndex) {
       flatToDescriptorIndexMap_.emplace_back(static_cast<int>(descriptorFieldIdx), arrayIndex);
       fieldByteOffsets_.push_back(offset);
@@ -138,8 +138,11 @@ bool Descriptor::operator==(const Descriptor &rhs) const {
 
   const int slots = flatElementCount();
   for (int slot = 0; slot < slots; ++slot) {
-    const auto &lhsField = (*this)[flatIndexToDescriptorPosition(slot)->first];
-    const auto &rhsField = rhs[rhs.flatIndexToDescriptorPosition(slot)->first];
+    const auto lhsPosition = flatIndexToDescriptorPosition(slot);
+    const auto rhsPosition = rhs.flatIndexToDescriptorPosition(slot);
+    if (!lhsPosition || !rhsPosition) return false;
+    const auto &lhsField = (*this)[lhsPosition->first];
+    const auto &rhsField = rhs[rhsPosition->first];
 
     if (flatSlotSize(lhsField) < flatSlotSize(rhsField) || lhsField.rtype < rhsField.rtype) return false;
   }
@@ -174,8 +177,11 @@ void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, D
   clear();
   const int width = lhs.flatElementCount();
   for (int i = 0; i < width; ++i) {
-    const auto &lhsField = lhs[lhs.flatIndexToDescriptorPosition(i)->first];
-    const auto &rhsField = rhs[rhs.flatIndexToDescriptorPosition(i)->first];
+    const auto lhsPosition = lhs.flatIndexToDescriptorPosition(i);
+    const auto rhsPosition = rhs.flatIndexToDescriptorPosition(i);
+    if (!lhsPosition || !rhsPosition) FatalError("descriptor: invalid flat field position");
+    const auto &lhsField = lhs[lhsPosition->first];
+    const auto &rhsField = rhs[rhsPosition->first];
     auto maxRtype        = std::max(lhsField.rtype, rhsField.rtype);
     auto maxRlen         = std::max(lhsField.rlen, rhsField.rlen);
     push_back(rField(fieldNamePrefix + "_" + std::to_string(i), maxRlen, 1, maxRtype));

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstddef>
 #include <cstring>
 #include <memory>
 #include <sstream>
@@ -25,14 +26,19 @@
 using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
 
-IpcClient::IpcClient(int clientResponseMaxFails, int responseQueueOpenMaxFails)
+namespace {
+constexpr std::size_t kNullTerminatorBytes{1};
+}
+
+IpcClient::IpcClient(int clientResponseMaxFails, int responseQueueOpenMaxFails, std::string_view serverName)
     : clientResponseMaxFails_(std::max(1, clientResponseMaxFails)),
-      responseQueueOpenMaxFails_(std::max(1, responseQueueOpenMaxFails)) {}
+      responseQueueOpenMaxFails_(std::max(1, responseQueueOpenMaxFails)),
+      names_(ipc::names(serverName)) {}
 
 bool IpcClient::popQueue(ptree &pt) { return spsc_queue_.pop(pt); }
 
 void IpcClient::producer() {
-  const std::string queueName = std::string(ipc::kResponseQueuePrefix) + std::to_string(getpid());
+  const std::string queueName = names_.responseQueue(getpid());
 
   // Kolejkę odpowiedzi tworzy SERWER w reakcji na rejestrację klienta, więc
   // `open_only` wołane natychmiast po starcie wątku bywa o krok za wcześnie.
@@ -40,7 +46,8 @@ void IpcClient::producer() {
   // `done`, przez co pętla `select()` nie wykonywała ani jednego obrotu,
   // a klient kończył się kodem 0 bez jednego przeczytanego elementu (issue_215).
   std::unique_ptr<IPC::message_queue> mq;
-  for (int attempt = 0; attempt < responseQueueOpenMaxFails_ && !done; ++attempt) {
+  int attempts = 0;
+  for (; attempts < responseQueueOpenMaxFails_ && !done; ++attempts) {
     try {
       mq = std::make_unique<IPC::message_queue>(IPC::open_only, queueName.c_str());
       break;
@@ -49,21 +56,37 @@ void IpcClient::producer() {
     }
   }
   if (!mq) {
-    SPDLOG_ERROR("ipcClient: response queue '{}' did not appear after {} attempts", queueName, responseQueueOpenMaxFails_);
-    responseQueueMissing = true;
-    done                 = true;
+    // Liczba FAKTYCZNYCH prob i powod wyjscia, a nie sam limit. Petla konczy sie takze
+    // na `done` ustawionym przez watek glowny, wiec zdanie "po 100 probach" opisywalo
+    // wtedy czekanie, ktorego nie bylo, i kierowalo diagnoze na wyscig z serwerem
+    // zamiast na przerwanie od strony klienta.
+    const bool abortedByClient = done;
+    SPDLOG_ERROR("ipcClient: response queue '{}' did not appear after {} of {} attempts ({})", queueName, attempts,
+                 responseQueueOpenMaxFails_, abortedByClient ? "aborted by client" : "budget exhausted");
+    // Werdykt "serwer nie utworzyl kolejki" ma prawo padac WYLACZNIE po wyczerpaniu budzetu.
+    // Producent zerwany przez watek glowny nie czekal, wiec o serwerze nie wie nic -- a mimo to
+    // obciazal go na rowni z producentem, ktory przeczekal cale 100 prob. Tak wygladala awaria
+    // it_fncall_runtime_case na CI (2026-09-04): klient konczyl petle na bajcie z terminala,
+    // a meldowal brak kolejki odpowiedzi i wskazywal winnego po drugiej stronie IPC.
+    if (!abortedByClient) responseQueueMissing = true;
+    done = true;
     return;
   }
 
   try {
-    std::array<char, ipc::kResponseQueueMaxMessageSize> message;
+    std::array<char, ipc::kResponseQueueMaxMessageSize + kNullTerminatorBytes> message;
     unsigned int priority{0};
     IPC::message_queue::size_type recvd_size = ipc::kResponseQueueMaxMessageSize;
     while (!done) {
       bool messageReceived = false;
+      // Interwal odpytywania nalezy do kolejki PUSTEJ. Sen po UDANYM odbiorze narzucal
+      // tempo jednego wiersza na milisekunde niezaleznie od zaleglosci, wiec klient, ktory
+      // zostal w tyle, nie mial jak nadrobic: nadganianie szlo dokladnie tak wolno, jak
+      // szedl biezacy strumien. Oproznienie pelnej kolejki (1024 wiersze) kosztowalo przez
+      // to ponad sekunde samego spania, i to na kazdym czekaniu, ktore jest juz obsluzone.
       while (!messageReceived && !done) {
         messageReceived = mq->try_receive(message.data(), ipc::kResponseQueueMaxMessageSize, recvd_size, priority);
-        std::this_thread::sleep_for(ipc::kQueuePollInterval);
+        if (!messageReceived) std::this_thread::sleep_for(ipc::kQueuePollInterval);
       }
       if (done) continue;
       message[recvd_size] = 0;
@@ -72,11 +95,11 @@ void IpcClient::producer() {
       memset(message.data(), 0, ipc::kResponseQueueMaxMessageSize);
       ptree pt;
       read_info(strstream, pt);
-      while (!spsc_queue_.push(pt))
+      while (!done && !spsc_queue_.push(pt))
         std::this_thread::sleep_for(ipc::kQueuePollInterval);
     }
-  } catch (IPC::interprocess_exception &e) {
-    SPDLOG_ERROR("IPC: {} (producer queue:{})", e.what(), std::string(ipc::kResponseQueuePrefix) + std::to_string(getpid()));
+  } catch (const std::exception &e) {
+    SPDLOG_ERROR("IPC: {} (producer queue:{})", e.what(), names_.responseQueue(getpid()));
     done = true;
   }
 }
@@ -85,13 +108,13 @@ ptree IpcClient::netClient(const std::string &netCommand, const std::string &net
   ptree pt_response;
   ptree pt_request;
   try {
-    IPC::managed_shared_memory mapSegment(IPC::open_only, std::string(ipc::kShmemSegment).c_str());
-    IPC::named_mutex mapMutex(IPC::open_only, std::string(ipc::kMapMutex).c_str());
+    IPC::managed_shared_memory mapSegment(IPC::open_only, names_.shmemSegment.c_str());
+    IPC::named_mutex mapMutex(IPC::open_only, names_.mapMutex.c_str());
     pt_request.put("db.message", netCommand);
     pt_request.put("db.id", getpid());
     if (!netArgument.empty()) pt_request.put("db.argument", netArgument);
 
-    IPC::message_queue mq(IPC::open_only, std::string(ipc::kQueryQueue).c_str());
+    IPC::message_queue mq(IPC::open_only, names_.queryQueue.c_str());
     std::stringstream request_stream;
     write_info(request_stream, pt_request);
     mq.send(request_stream.str().c_str(), request_stream.str().length(), 0);

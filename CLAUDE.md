@@ -32,13 +32,31 @@ ninja descgrammar   # regenerate ANTLR4 grammar from DESC.g4
 ninja rqlgrammar    # regenerate ANTLR4 grammar from RQL.g4
 ```
 
+**CI locally, before pushing** (`scripts/test-ci.sh`, needs a running Docker):
+```bash
+ninja test-ci        # = test-ci-commit: the only job CircleCI runs after a push
+ninja test-ci-smoke  # Debug compile only, no tests (L1 of the nightly run)
+ninja test-ci-fast   # same job, build/ kept between runs — quick, NOT a faithful CI run
+scripts/test-ci.sh --list   # every profile with the CircleCI job it mirrors
+```
+Each profile copies the working tree into a container built from the CI image
+(`micwide/buildenv-retractordb`) capped at the CI executor's resources (4 vCPU / 8 GiB)
+and runs that job's steps. Outside `all` and outside `ninja test`. Profiles mirror
+`.circleci/config.yml` by hand: change that file, change `scripts/test-ci.sh`.
+
+Every `test-ci-*` profile builds from scratch, like the CI checkout — tens of minutes, and
+ccache does not shorten it (this tree compiles with `-fmodules-ts`, which ccache cannot cache).
+`test-ci-fast` trades that fidelity for speed by keeping `build/` in a per-profile Docker volume;
+use it to check a change before committing, not to conclude anything about a CI run.
+`scripts/test-ci.sh --profile <name> --reset-build` drops a kept build directory.
+
 **Single test:**
 ```bash
 ctest -R ut_payload     # by name
 ctest -R ut_payload -V  # verbose
 ```
 
-Unit tests: valgrind + leak check. Integration tests: output matched against `test/IntegrationTest_serial/*/Pattern*/` and `test/IntegrationTest_parallel/*/Pattern*/`.
+Unit tests: valgrind + leak check. Integration tests: output matched against `test/IntegrationTest/*/Pattern*/`.
 
 CI: CircleCI, branches `master` or `issue_*`.
 
@@ -72,19 +90,9 @@ CI: CircleCI, branches `master` or `issue_*`.
 - `src/retractor/lib/RQL.g4` → `.antlr/` (regenerate: `ninja rqlgrammar`)
 - Never edit generated files by hand.
 
-**Tests layout:**
-```
-test/
-  UnitTest/                   # GTest + valgrind; one binary per source file
-  IntegrationTest_serial/     # serial shell tests; subdirs = scenarios
-  IntegrationTest_parallel/   # parallel shell tests
-```
-
 ## Code Style
 
 - **C++23**, clang-format Google style, 129-col limit, 2-space indent. Run `ninja cformat` before commit.
-- **Linker**: `mold` (via CMakeLists `-fuse-ld=mold`)
-- **Deps**: Boost, spdlog (header-only), fmt (header-only), ANTLR4 runtime, GTest, magic_enum — Conan.
 - Source comments in Polish — intentional.
 
 **Include order (5 blocks, blank-line separated):**
@@ -149,27 +157,9 @@ Layer B rewriting is not part of this rule.
 **Mandatory sequence before every commit and before every push.** No commit or push goes out — and no diff is
 handed over for human review — while the check reports a hit.
 
-```bash
-WM="${WATERMARKS_REMOVER:-$HOME/github/watermarks-remover}/service/scripts"
-TEXT='\.(md|txt|tex|bib|rql|desc|cpp|hpp|h|c|g4|sh|py|ya?ml|toml|json|cmake|in)$|CMakeLists\.txt$'
-
-# 1. Check the staged text files (empty output = clean)
-git diff --cached --name-only --diff-filter=ACM | grep -E "$TEXT" \
-  | while read -r f; do python3 "$WM/inspect_text.py" --json "$f" >/dev/null 2>&1 || echo "WATERMARK: $f"; done
-
-# 2. Report for a flagged file (which codepoints, where)
-python3 "$WM/inspect_text.py" <file>
-
-# 3. Clean it, then drop the backup the tool leaves behind
-python3 "$WM/clean_text.py" <file> --in-place --stats && rm -f <file>.bak
-
-# 4. Re-check, then re-stage
-python3 "$WM/inspect_text.py" --json <file> >/dev/null && git add <file>
-```
-
-Before a push, run the same check over the whole tracked tree — substitute `git ls-files` for
-`git diff --cached --name-only --diff-filter=ACM` in step 1. Optionally check the commit message too:
-`git log -1 --pretty=%B | python3 "$WM/inspect_text.py" -`.
+The command sequence — staged-file scan, per-file report, cleaning, re-check and re-stage, plus the
+whole-tree variant for a push and the commit-message check — is in the `watermark-check` skill.
+Invoke it before committing and before pushing.
 
 #### Source code — zero tolerance, strict mode
 
@@ -188,14 +178,9 @@ Consequences for the assistant:
 - Code uses **strict mode**, which the default check does not cover:
 
 ```bash
+WM="${WATERMARKS_REMOVER:-$HOME/github/watermarks-remover}/service/scripts"
 python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
 ```
-
-  Default mode misses Latin/Cyrillic confusables: `int value = 1;` whose `a` is a Cyrillic `U+0430` instead of
-  ASCII `a` passes it and is caught only by `--aggressive`. (Write such an example by naming the codepoint —
-  never paste the actual character into a rule file, a comment or a test.) `--strip-emoji-glue` additionally rejects the load-bearing invisibles that
-  are legitimate in prose but never in code. Verified against the whole `src/` and `scripts/` tree: strict
-  mode yields zero hits, and Polish diacritics in comments are not affected.
 
 - On a hit in a source file: **stop and report it to the human** with file, line and codepoint. Do not sweep
   the file with `--in-place`. The targeted repair is
@@ -203,32 +188,24 @@ python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
   a `git diff` confirming that only the offending codepoint changed.
 - Any `U+00A0` or invisible codepoint in code is a defect, never "informational".
 
-Rules:
-
-- **Never run `clean_text.py` on binary fixtures** (`test/**/*.dat`, `.meta`, `.shadow`, ECG records,
-  `examples/**` data files). It rewrites bytes and corrupts them, and integration tests compare output
-  byte-exactly. The extension filter above exists for that reason — do not widen it with `--force-text`.
-- `--in-place` writes a `.bak` next to the file. Delete it; never commit it.
-- `U+00A0` (no-break space) is reported as *informational*. In `.rql`, `.g4` and C++ sources it is always a
-  defect — normalize it. Elsewhere confirm it is not a deliberate typographic space before replacing.
-- If cleaning would change test fixtures or generated ANTLR files, stop and hand the case to the human instead
-  of editing them.
-
 ### Commits, push and CI
 
-- **`master` in the code repository** — commits and pushes are performed by the human only, after reviewing the diff. The
-  assistant must leave changes uncommitted, show the diff, and wait for the human to commit and push.
-- **Side branches** — the assistant may create local commits autonomously after verification, provided no CI process is
-  triggered.
+- **No commit is created without human review — on any branch, `master` and side branches alike.** After verification
+  the assistant shows the diff and stops. The human reads it and gives the go-ahead; only then does `git commit` run.
+  Verification passing is not the go-ahead: green tests say the change works, not that it is the change the human wants
+  in the history.
+- **`master` in the code repository** — commits and pushes are performed by the human only.
+- **Side branches** — the assistant may run `git commit` locally, but only on an explicit go-ahead for that specific
+  diff, and provided no CI process is triggered. Approval is per diff and does not carry over to the next change.
 - Permission to commit on a side branch does not include permission to push, open a pull request, or invoke CI manually.
   Those actions require an explicit human request.
 - If an action would trigger CI, stop and hand it over to the human.
 
 ### Session end
 
-Every session ends with either a permitted local commit on a side branch, an explicit handoff of the uncommitted diff on
-`master` for human review/commit/push, or an explicit note why no commit was created. No unexplained uncommitted progress
-is left behind.
+Every session ends with either a local commit on a side branch made on an explicit go-ahead, a handoff of the
+uncommitted diff for human review/commit/push, or an explicit note why no commit was created. No unexplained
+uncommitted progress is left behind.
 
 **Research gate — mandatory before closing.** Whenever the session touched engine sources (`src/`), run the gate and
 report its verdict before the commit or the handoff:
@@ -258,11 +235,23 @@ scripts/buildrdb.sh release-ablation     # interactive: set all five switches OF
 ctest --test-dir <katalog wypisany przez skrypt>/test -j 4
 ```
 
-Success is **the whole suite green**, exactly as in the default configuration — the switches are an efficiency knob,
-not a semantics knob. A test that holds only with a switch ON is either wrong or documents a real difference, and that
-difference belongs in `def:observable`: `Val` must be equal, `Lat` only non-increasing (see `research_plan.md` §14.20).
-Never paper over a red ablation run with `WILL_FAIL` or `DISABLED` — the matrix already carries a note from 2026-07-26
-explaining why those annotations were removed. CI runs this same floor as `ablation-all-off` in layer L3 of
+Success is **the whole suite green** — no failure, and no `DISABLED` beyond the ones the tree already carries. The
+switches are an efficiency knob, not a semantics knob, and any difference they do show belongs in `def:observable`:
+`Val` must be equal, `Lat` only non-increasing (see `research_plan.md` §14.20).
+
+One kind of assertion cannot hold without the pass: the one saying that the pass **fired** — a substrate name, a
+`PUSH_STREAM` target, the absence of a substrate the pass was supposed to absorb. With the switch off that assertion is
+tautologically false, not red, and it may carry `DISABLED TRUE` guarded by `if(NOT RDB_OPT_...)` and labelled
+`expected_ablation_failure;requires_<switch>`. **Nothing else may.** An assertion about the computed result — payload
+bytes, metadata, a value against an oracle — is never disabled: a red `Val` under ablation is a semantics regression or
+an open finding, and it goes to the human. Never paper one over with `WILL_FAIL` or `DISABLED` — the matrix already
+carries a note from 2026-07-26 explaining why those annotations were removed.
+
+A test mixing both kinds in one ctest entry has to be split, because a single `DISABLED` then takes the result
+assertion down together with the shape assertion. `issue202_hash_shift_e2e` is the worked example, split on 2026-09-06
+into `-shape` and `-value`: its one `cmp matched CC` pinned `Val` and `Lat` at the same time, so it could never be
+green under ablation, and disabling it removed the only end-to-end place where the tail divergence between
+`(A>2)#(B>1)` and `(A#B)>3` was visible at all. CI runs this same floor as `ablation-all-off` in layer L3 of
 `manual-nightly-full`, so a skipped local run gets caught within days, not weeks.
 
 ### Context hygiene
@@ -279,60 +268,7 @@ Then suggest either: (a) commit current state and end the session, or (b) defer 
 
 ## ANTLR4 Grammar — Known Pitfalls
 
-### COMMA ambiguity in `select_list` vs `function_call`
+Moved next to the code they govern, so they load when those files are in play:
 
-`select_list` uses `COMMA` to separate expressions. ANTLR4 SLL mode ignores call-stack context → `f(a, b)` inside multi-item SELECT parses as `f(a)`, `, b` treated as list separator.
-
-**Rule:** Never use `COMMA` in function arguments in `RQL.g4`. Use `COLON` or another token absent from `select_list`.
-
-Current pattern: `to_string(expr : N)` — `:` (COLON) = output field width.
-
-### Adding a scalar function
-
-Function names are **not** grammar literals. `function_call` takes a plain `ID`, and the single
-list of legal names lives in `src/include/rqlFunctions.hpp`. Adding a one-argument function:
-
-1. Add a row to `kRqlFunctions` in `src/include/rqlFunctions.hpp` — canonical name plus arity
-2. Add a branch in the `CALL` chain in `src/retractor/lib/expressionEvaluator.cpp` — match the
-   **lowercased** name; the parser stores the canonical spelling, the evaluator folds case
-3. No grammar edit, no `ninja rqlgrammar`, no new `command_id`
-
-`canonical` is what the parser writes into the token, regardless of how the author spelled it.
-Keep it stable: plan dumps print it (`CALL(Sqrt)`), integration `pattern.txt` files and the H9
-pilot plans under `test/research_gate/h9/pilot/out/` match on it, and `exitExpression` /
-`exprSimplify` compare `getStr_() == "to_string"` literally.
-
-`compiler::checkFunctionCalls()` rejects an unknown name or a bad arity through the
-`Check result:` channel, so `-c` is a gate: a program that cannot run does not compile.
-
-**Two-argument functions.** The grammar has exactly two shapes — `f(expr)` and
-`f(expr : DECIMAL)`. The second belongs to `to_string` alone: `N` is the declared output field
-width carried in the token as `IDXPAIR`, not a value on the stack. A future function taking two
-**evaluated** arguments needs one more grammar alternative
-(`fn=ID '(' expression_factor ( COLON expression_factor )* ')'` is verified to parse) plus the
-arity row — never a `COMMA` separator, see the rule above.
-
-**`min` is unavailable as a scalar function name.** `MIN`, `MAX`, `AVG` and `SUMC` are lexer
-tokens ahead of `ID` (stream reducers), so they never lex as a function name. A scalar minimum
-must be called something else.
-
-### Integration test file sync
-
-`test/CMakeLists.txt` copies `test/` → build dir at **cmake configure time**. After editing `.rql`, `data.txt`, or a test `.sh`:
-- Re-run cmake, **or** manually copy to `build/Debug/test/...`
-- `CTestTestfile.cmake` is CMake-generated — do NOT overwrite with `CMakeLists.txt`; different formats.
-
-**Reconfigure (`cmake .`) wipes built unit-test binaries.** The `test/` copy step regenerates the `build/Debug/test/` subtree, deleting `test_*` binaries → ctest fails with `No such file or directory` for ~all unit tests. After any `cmake .`, rebuild with `ninja` before `ctest`.
-
-**Integration tests run the *installed* binary + the *build-copied* script, not source.** Editing a `.sh` and the C++ it exercises requires syncing both: build, install, recopy script, rebuild test binaries. Full sequence after touching integration `.sh` + source:
-```bash
-ninja && ninja install && cmake . && ninja && ctest
-```
-
-### Descriptor field sizes for STRING expressions in SELECT
-
-`exitExpression` in `RQLParser.cpp` sums output field size from `program` tokens:
-- `CALL2` + `to_string` → `pair.second` (declared width)
-- `CALL` + `to_string` (no width) → 32 (default)
-- `PUSH_VAL` string literal → `string.length()`
-- Summed: `to_string(x:16)+'_test'` → 16+5=21
+- `src/retractor/lib/CLAUDE.md` — COMMA ambiguity in `select_list`, adding a scalar function, Descriptor field sizes for STRING expressions in SELECT.
+- `test/CLAUDE.md` — integration test file sync: cmake copy timing, reconfigure wiping unit-test binaries, installed-binary vs build-copied script.

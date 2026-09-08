@@ -42,11 +42,17 @@ boost::property_tree::ptree qry_fake::netClient(const std::string &cmd, const st
 // Verify hello handshake succeeds when server responds with "world"
 TEST(xqry, test_hello) { EXPECT_TRUE(obj.hello() == boost::system::errc::success); }
 
-// Verify dir() formats single-stream table with pipe-delimited columns
-TEST(xqry, test_dir) { EXPECT_TRUE(obj.dir() == "|core0|1|123|345|/dev/location|789|\n"); }
+// Verify dir() formats single-stream table in the shared xqry form: header row, separator,
+// columns left-aligned and joined by " | ", no edge pipes
+TEST(xqry, test_dir) {
+  EXPECT_EQ(obj.dir().value(),
+            "name  | duration | size | count | location      | cap\n"
+            "------+----------+------+-------+---------------+----\n"
+            "core0 | 1        | 123  | 345   | /dev/location | 789\n");
+}
 
 // Command-aware fake - dispatches different responses based on netClient command.
-// Supports: hello, get, detail, adhoc, show. Used for detailShow, adhoc, and dirYaml tests.
+// Supports: hello, get, detail, adhoc, show. Used for detailShow/detailShowYaml, adhoc, and dirYaml tests.
 
 class qry_fake_detail : public qry {
  public:
@@ -82,11 +88,11 @@ boost::property_tree::ptree qry_fake_detail::netClient(const std::string &cmd, c
   return retval;
 }
 
-// Verify detailShow() produces correct YAML for an existing stream:
+// Verify detailShowYaml() produces correct YAML for an existing stream:
 // checks stream name, delta, query line, field names, field types, and apiVersion header
-TEST(xqry, test_detailShow_found) {
+TEST(xqry, test_detailShowYaml_found) {
   qry_fake_detail obj_detail;
-  auto result = obj_detail.detailShow("core0");
+  auto result = obj_detail.detailShowYaml("core0").value();
 
   EXPECT_TRUE(result.find("name: core0") != std::string::npos);
   EXPECT_TRUE(result.find("delta: 1") != std::string::npos);
@@ -98,12 +104,30 @@ TEST(xqry, test_detailShow_found) {
   EXPECT_TRUE(result.find("apiVersion: xqry/v1") != std::string::npos);
 }
 
-// Verify detailShow() returns empty string when queried stream does not exist
+// Verify detailShow() prints the stream header and the field list as two column tables,
+// in the same form as dir() and `xqry --bus`
+TEST(xqry, test_detailShow_found) {
+  qry_fake_detail obj_detail;
+  EXPECT_EQ(obj_detail.detailShow("core0").value(),
+            "name  | delta | query\n"
+            "------+-------+----------------------------------\n"
+            "core0 | 1     | SELECT * STREAM core0 FROM source\n"
+            "\n"
+            "field        | type\n"
+            "-------------+--------\n"
+            "core0.rname1 | INTEGER\n"
+            "core0.rname2 | FLOAT\n");
+}
+
+// Verify both detail forms return an empty string when the queried stream does not exist -
+// the empty result is what makes the launcher report "no such stream"
 TEST(xqry, test_detailShow_not_found) {
   qry_fake_detail obj_detail;
-  auto result = obj_detail.detailShow("nonexistent");
 
-  EXPECT_TRUE(result.empty());
+  const auto detail = obj_detail.detailShow("nonexistent");
+  ASSERT_FALSE(detail.has_value());
+  EXPECT_EQ(detail.error(), selectResult::streamNotFound) << "literowka w nazwie to inna diagnoza niz cichy serwer";
+  EXPECT_EQ(obj_detail.detailShowYaml("nonexistent").error(), selectResult::streamNotFound);
 }
 
 // Verify adhoc() returns false (success) when server acknowledges with "OK"
@@ -173,7 +197,7 @@ TEST(xqry, test_hello_empty_response) {
 // and all stream properties (name, delta, size, count, location)
 TEST(xqry, test_dirYaml) {
   qry_fake_detail obj_detail;
-  auto result = obj_detail.dirYaml();
+  auto result = obj_detail.dirYaml().value();
 
   EXPECT_TRUE(result.find("apiVersion: xqry/v1") != std::string::npos);
   EXPECT_TRUE(result.find("streams:") != std::string::npos);
@@ -187,7 +211,7 @@ TEST(xqry, test_dirYaml) {
 // Verify dirYaml() exact output for a deterministic single-stream response
 TEST(xqry, test_dirYaml_exact_output) {
   qry_fake_detail obj_detail;
-  EXPECT_EQ(obj_detail.dirYaml(),
+  EXPECT_EQ(obj_detail.dirYaml().value(),
             "---\n"
             "apiVersion: xqry/v1\n"
             "streams:\n"
@@ -239,7 +263,7 @@ boost::property_tree::ptree qry_fake_multi::netClient(const std::string &cmd, co
 // Verify dir() output contains both streams and their respective sizes
 TEST(xqry, test_dir_multi_stream) {
   qry_fake_multi obj_multi;
-  auto result = obj_multi.dir();
+  auto result = obj_multi.dir().value();
 
   EXPECT_TRUE(result.find("core0") != std::string::npos);
   EXPECT_TRUE(result.find("core1") != std::string::npos);
@@ -250,43 +274,45 @@ TEST(xqry, test_dir_multi_stream) {
 // Verify dir() keeps column widths aligned across multi-stream output
 TEST(xqry, test_dir_multi_stream_exact_output) {
   qry_fake_multi obj_multi;
-  EXPECT_EQ(obj_multi.dir(),
-            "|core0|  1|100|200|/dev/loc0|300|\n"
-            "|core1|0.5|400|500|/dev/loc1|600|\n");
+  EXPECT_EQ(obj_multi.dir().value(),
+            "name  | duration | size | count | location  | cap\n"
+            "------+----------+------+-------+-----------+----\n"
+            "core0 | 1        | 100  | 200   | /dev/loc0 | 300\n"
+            "core1 | 0.5      | 400  | 500   | /dev/loc1 | 600\n");
 }
 
 // Verify dirYaml() lists both streams with correct names and deltas
 TEST(xqry, test_dirYaml_multi_stream) {
   qry_fake_multi obj_multi;
-  auto result = obj_multi.dirYaml();
+  auto result = obj_multi.dirYaml().value();
 
   EXPECT_TRUE(result.find("- name: core0") != std::string::npos);
   EXPECT_TRUE(result.find("- name: core1") != std::string::npos);
   EXPECT_TRUE(result.find("delta: 0.5") != std::string::npos);
 }
 
-// Verify detailShow() resolves correct stream (core0) from a multi-stream setup
-TEST(xqry, test_detailShow_multi_stream_core0) {
+// Verify detailShowYaml() resolves correct stream (core0) from a multi-stream setup
+TEST(xqry, test_detailShowYaml_multi_stream_core0) {
   qry_fake_multi obj_multi;
-  auto result = obj_multi.detailShow("core0");
+  auto result = obj_multi.detailShowYaml("core0").value();
 
   EXPECT_TRUE(result.find("name: core0") != std::string::npos);
   EXPECT_TRUE(result.find("delta: 1") != std::string::npos);
 }
 
-// Verify detailShow() resolves correct stream (core1) with its own delta from a multi-stream setup
-TEST(xqry, test_detailShow_multi_stream_core1) {
+// Verify detailShowYaml() resolves correct stream (core1) with its own delta from a multi-stream setup
+TEST(xqry, test_detailShowYaml_multi_stream_core1) {
   qry_fake_multi obj_multi;
-  auto result = obj_multi.detailShow("core1");
+  auto result = obj_multi.detailShowYaml("core1").value();
 
   EXPECT_TRUE(result.find("name: core1") != std::string::npos);
   EXPECT_TRUE(result.find("delta: 0.5") != std::string::npos);
 }
 
-// Verify detailShow() exact YAML for deterministic single-stream metadata
-TEST(xqry, test_detailShow_exact_output) {
+// Verify detailShowYaml() exact YAML for deterministic single-stream metadata
+TEST(xqry, test_detailShowYaml_exact_output) {
   qry_fake_detail obj_detail;
-  EXPECT_EQ(obj_detail.detailShow("core0"),
+  EXPECT_EQ(obj_detail.detailShowYaml("core0").value(),
             "---\n"
             "apiVersion: xqry/v1\n"
             "stream:\n"
@@ -326,7 +352,7 @@ boost::property_tree::ptree qry_fake_nosize::netClient(const std::string &cmd, c
 // Verify dirYaml() omits "size:" line when stream size is "-1" (unbounded)
 TEST(xqry, test_dirYaml_size_minus_one_omitted) {
   qry_fake_nosize obj_nosize;
-  auto result = obj_nosize.dirYaml();
+  auto result = obj_nosize.dirYaml().value();
 
   EXPECT_TRUE(result.find("- name: str0") != std::string::npos);
   EXPECT_TRUE(result.find("size:") == std::string::npos);
@@ -335,7 +361,7 @@ TEST(xqry, test_dirYaml_size_minus_one_omitted) {
 // Verify dirYaml() omits "location:" line when stream location is empty
 TEST(xqry, test_dirYaml_empty_location_omitted) {
   qry_fake_nosize obj_nosize;
-  auto result = obj_nosize.dirYaml();
+  auto result = obj_nosize.dirYaml().value();
 
   EXPECT_TRUE(result.find("location:") == std::string::npos);
 }
@@ -462,7 +488,14 @@ TEST(xqry, select_reports_stream_not_found_separately) {
 TEST(xqry, select_does_not_report_success_when_no_element_was_read) {
   qry_fake_known_stream obj_known(2);  // dwie proby otwarcia, zeby test byl szybki
   boost::program_options::variables_map vm;
-  const selectResult result = obj_known.select(vm, 0, "core0", {0, 0, 0});
+  // Przebieg z zadeklarowanym budzetem elementow (-m N), a nie nieograniczony: tylko taki
+  // jest odporny na klawisz i tylko w takim producent dostaje swoje proby otwarcia kolejki.
+  // Przebieg nieograniczony wiazal wynik testu ze stanem stdin: pod terminalem (CI daje
+  // krokom pty) `_kbhit()` konczyl petle w pierwszym obrocie, producent byl zrywany, zanim
+  // raz sprobowal, i select() slusznie meldowal `noData` -- bo o serwerze nie wiedzial nic.
+  // Lokalnie, bez terminala, ta sama sciezka konczyla sie `clientQueueMissing` i test
+  // przechodzil. Odtworzenie: `script -qec "test_xqry --gtest_filter=..." /dev/null`.
+  const selectResult result = obj_known.select(vm, 1, "core0", {0, 0, 0});
   EXPECT_NE(result, selectResult::ok) << "klient bez ani jednego przeczytanego elementu nie moze konczyc sie sukcesem";
   EXPECT_EQ(result, selectResult::clientQueueMissing);
 }
@@ -470,8 +503,9 @@ TEST(xqry, select_does_not_report_success_when_no_element_was_read) {
 // Każdy tryb ma własny, niepusty opis — komunikat operatora nie może być pusty
 // ani wspólny dla różnych awarii.
 TEST(xqry, select_result_descriptions_are_distinct) {
-  const std::array<selectResult, 5> all{selectResult::ok, selectResult::streamNotFound, selectResult::serverNoResponse,
-                                        selectResult::clientQueueMissing, selectResult::noData};
+  const std::array<selectResult, 7> all{
+      selectResult::ok,     selectResult::streamNotFound, selectResult::serverNoResponse, selectResult::clientQueueMissing,
+      selectResult::noData, selectResult::noActivePlan,   selectResult::serverStopping};
   std::set<std::string> seen;
   for (const auto result : all) {
     const std::string text = toString(result);
@@ -479,4 +513,100 @@ TEST(xqry, select_result_descriptions_are_distinct) {
     seen.insert(text);
   }
   EXPECT_EQ(seen.size(), all.size()) << "tryby awarii musza byc rozroznialne w komunikacie";
+}
+
+// === Weryfikacja zgloszenia [P2]: `xqry -d` maskuje brak odpowiedzi jako stan bezczynny ===
+
+// Instancja bezczynna ODPOWIADA: handler wpisuje jedna wartosc pod kluczem `db`.
+class qry_fake_idle : public qry {
+ public:
+  boost::property_tree::ptree netClient(const std::string & /*cmd*/, const std::string & /*arg*/) override {
+    boost::property_tree::ptree retval;
+    retval.put("db", "no active plan");
+    return retval;
+  }
+};
+
+// Serwer przyjal komende w trakcie wlasnego zamykania (executorsm: iLoopLimitCnt ==
+// stop_now). Odpowiedzial — wiec meldowanie timeoutu byloby klamstwem o przyczynie.
+class qry_fake_stopping : public qry {
+ public:
+  boost::property_tree::ptree netClient(const std::string & /*cmd*/, const std::string & /*arg*/) override {
+    boost::property_tree::ptree retval;
+    retval.put("db", "server stopping");
+    return retval;
+  }
+};
+
+TEST(xqry, dir_reports_no_response_instead_of_idle) {
+  qry_fake_no_response obj_no_response;
+  const auto listing = obj_no_response.dir();
+  ASSERT_FALSE(listing.has_value()) << "brak odpowiedzi serwera nie moze wygladac jak stan bezczynny";
+  EXPECT_EQ(listing.error(), selectResult::serverNoResponse);
+}
+
+TEST(xqry, dirYaml_reports_no_response_instead_of_empty_list) {
+  qry_fake_no_response obj_no_response;
+  const auto listing = obj_no_response.dirYaml();
+  ASSERT_FALSE(listing.has_value()) << "brak odpowiedzi serwera nie moze wygladac jak pusta lista";
+  EXPECT_EQ(listing.error(), selectResult::serverNoResponse);
+}
+
+TEST(xqry, dir_still_names_idle_instance) {
+  qry_fake_idle obj_idle;
+  EXPECT_EQ(obj_idle.dir().value(), "no active plan\n");
+}
+
+TEST(xqry, dirYaml_still_gives_empty_list_for_idle_instance) {
+  qry_fake_idle obj_idle;
+  EXPECT_EQ(obj_idle.dirYaml().value(), "---\napiVersion: xqry/v1\nstreams: []\n");
+}
+
+// Zamykajacy sie serwer ma wlasny werdykt: inny komunikat i inny kod wyjscia niz milczenie.
+TEST(xqry, dir_names_stopping_server_separately) {
+  qry_fake_stopping obj_stopping;
+  const auto listing = obj_stopping.dir();
+  ASSERT_FALSE(listing.has_value());
+  EXPECT_EQ(listing.error(), selectResult::serverStopping);
+}
+
+TEST(xqry, select_names_stopping_server_separately) {
+  qry_fake_stopping obj_stopping;
+  boost::program_options::variables_map vm;
+  EXPECT_EQ(obj_stopping.select(vm, 0, "core0", {0, 0, 0}), selectResult::serverStopping);
+}
+
+TEST(xqry, detailShow_does_not_throw_for_idle_instance) {
+  qry_fake_idle obj_idle;
+  EXPECT_NO_THROW({ EXPECT_EQ(obj_idle.detailShow("core0").error(), selectResult::noActivePlan); });
+  EXPECT_NO_THROW({ EXPECT_EQ(obj_idle.detailShowYaml("core0").error(), selectResult::noActivePlan); });
+}
+
+TEST(xqry, detailShow_does_not_throw_when_server_is_silent) {
+  qry_fake_no_response obj_no_response;
+  EXPECT_NO_THROW({ EXPECT_EQ(obj_no_response.detailShow("core0").error(), selectResult::serverNoResponse); });
+}
+
+// Plan przeladowany MIEDZY 'get' a 'detail': pierwsza odpowiedz niesie liste strumieni,
+// druga juz tylko werdykt instancji bez planu. Przedtem `db.field` rzucalo tu wyjatkiem.
+class qry_fake_plan_swapped_midway : public qry {
+  bool listDelivered_{false};
+
+ public:
+  boost::property_tree::ptree netClient(const std::string & /*cmd*/, const std::string & /*arg*/) override {
+    boost::property_tree::ptree retval;
+    if (listDelivered_) {
+      retval.put("db", "no active plan");
+      return retval;
+    }
+    listDelivered_ = true;
+    retval.put("db.stream.core0", "core0");
+    retval.put("db.stream.core0.duration", "1");
+    return retval;
+  }
+};
+
+TEST(xqry, detailShow_survives_plan_swap_between_get_and_detail) {
+  qry_fake_plan_swapped_midway obj_swapped;
+  EXPECT_NO_THROW({ EXPECT_EQ(obj_swapped.detailShow("core0").error(), selectResult::noActivePlan); });
 }

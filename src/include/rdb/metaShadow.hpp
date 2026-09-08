@@ -42,7 +42,7 @@ class metaShadow {
 
   /// @param descriptor   descriptor of the indexed data stream (determines entry size on disk)
   /// @param metaFilePath path of the main meta index file; the shadow file is `<metaFilePath>.shadow`
-  explicit metaShadow(const Descriptor &descriptor, std::string metaFilePath);
+  explicit metaShadow(const Descriptor &descriptor, const std::string &metaFilePath);
 
   /// @brief (Re)load overrides from `<metaFilePath>.shadow`, replacing any in-memory state.
   void load();

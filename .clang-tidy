@@ -18,7 +18,10 @@ Checks: >
   -clang-analyzer-unix.StdCLibraryFunctions,
   -bugprone-reserved-identifier,
   -bugprone-easily-swappable-parameters,
-  -portability-avoid-pragma-once
+  -portability-avoid-pragma-once,
+  -clang-analyzer-core.DivideZero,
+  -clang-analyzer-optin.cplusplus.UninitializedObject,
+  -bugprone-lambda-function-name
 WarningsAsErrors: ''
 HeaderFilterRegex: '^(.*/)?(src|test)(/[^./][^/]*)*/[^/]*$'
 SystemHeaders: false

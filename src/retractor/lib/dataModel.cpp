@@ -4,13 +4,17 @@
 #include <iostream>
 #include <memory>  // unique_ptr
 #include <mutex>
+#include <stdexcept>
+#include <utility>
 
 #include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
 
+#include "executorsmState.hpp"
 #include "fatalError.hpp"
 #include "rdb/convertTypes.hpp"
 #include "rdb/probe.hpp"
+#include "rdb/rationalFormat.hpp"
 #include "SOperations.hpp"
 
 // ctest -R '^ut-dataModel' -V
@@ -69,6 +73,16 @@ bool dataModel::addQueryToModel(const std::string &id) {
   return true;
 }
 
+void dataModel::syncDeclaredCapacities() {
+  for (auto &[id, runtime] : qSet) {
+    if (!runtime->outputPayload->isDeclared()) continue;
+    const auto required = coreInstance_.maxCapacity.find(id);
+    if (required == coreInstance_.maxCapacity.end()) continue;
+    const auto capacity = std::max(static_cast<size_t>(required->second), runtime->outputPayload->historyCapacity());
+    runtime->outputPayload->setCapacity(static_cast<int>(capacity));
+  }
+}
+
 std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &instance,  //
                                                              const int revOffset) {
   // This gePayload is called by constructInputPayload algebraic functions
@@ -97,7 +111,7 @@ rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffs
   out.releaseOnHold();
 
   const auto available              = static_cast<int>(out.getRecordsCount());
-  const bool outsideRetainedHistory = out.isDeclared() && revOffset >= static_cast<int>(out.historySize());
+  const bool outsideRetainedHistory = out.isDeclared() && std::cmp_greater_equal(revOffset, out.historySize());
   if (revOffset < 0 || revOffset >= available || outsideRetainedHistory) {
     // Rekord poza zgromadzoną historią — wartość nieokreślona, czyli all-null (pochłaniająca).
     // Ogon strumienia (query::startupLatency) jest tak dobrany, żeby ta ścieżka nie była
@@ -139,7 +153,7 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
   const int rev      = count - 1 - physical;
 
   const bool outOfRange = physical < 0 || rev < 0 ||  //
-                          (out.isDeclared() && rev >= static_cast<int>(out.historySize()));
+                          (out.isDeclared() && std::cmp_greater_equal(rev, out.historySize()));
   if (outOfRange) {
     // Rekord niedostępny (przyszłość na osi czasu źródła, przed początkiem logicznym
     // albo poza historią bufora) — rekord all-null; o jego losie decyduje ścieżka zapisu.
@@ -156,25 +170,127 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
   return *out.getPayload();
 }
 
+void dataModel::bootstrapDeclaration(const query &qry) {
+  auto &output = *qSet.at(qry.id)->outputPayload;
+  if (output.bufferState != rdb::sourceState::empty) {
+    FatalError("dataModel::bootstrapDeclaration: stream '{}' not in empty state", qry.id);
+  }
+  output.bufferState = rdb::sourceState::flux;
+  output.revRead(0);
+  output.fire();
+  if (output.bufferState != rdb::sourceState::armed) {
+    FatalError("dataModel::bootstrapDeclaration: stream '{}' not armed after fire()", qry.id);
+  }
+}
+
+bool dataModel::forwardRecordAvailable(const std::string &instance, const int forwardIndex) const {
+  const auto found = qSet.find(instance);
+  if (found == qSet.end()) return false;
+
+  const auto &logicalIndexBase = found->second->logicalIndexBase;
+  if (!logicalIndexBase.has_value()) return false;
+
+  const auto &output = *found->second->outputPayload;
+  const int count    = static_cast<int>(output.getRecordsCount());
+  const int physical = forwardIndex - logicalIndexBase.value();
+  if (physical < 0 || physical >= count) return false;
+  if (!output.isDeclared()) return true;
+
+  const int reverseIndex = count - 1 - physical;
+  return reverseIndex >= 0 && std::cmp_less(reverseIndex, output.historySize());
+}
+
+bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
+  if (qry.lProgram.empty()) return true;
+
+  std::vector<token> arg;
+  std::ranges::copy(qry.lProgram, std::back_inserter(arg));
+  const auto &operation = arg.back();
+  const auto cmd        = operation.getCommandID();
+
+  bool available = false;
+  switch (cmd) {
+    case PUSH_STREAM:
+      available = forwardRecordAvailable(operation.getStr_(), logicalIndex);
+      break;
+    case STREAM_TIMEMOVE:
+      available = forwardRecordAvailable(arg[0].getStr_(), logicalIndex - std::get<int>(operation.getVT()));
+      break;
+    case STREAM_DEHASH_MOD:
+      available = forwardRecordAvailable(arg[0].getStr_(), Mod(arg[1].getRI(), qry.rInterval, logicalIndex));
+      break;
+    case STREAM_DEHASH_DIV:
+      available = forwardRecordAvailable(arg[0].getStr_(), Div(qry.rInterval, arg[1].getRI(), logicalIndex));
+      break;
+    case STREAM_SUM:
+    case STREAM_AVG:
+    case STREAM_MIN:
+    case STREAM_MAX:
+      available = forwardRecordAvailable(arg[0].getStr_(), logicalIndex);
+      break;
+    case STREAM_SUBTRACT:
+      available = forwardRecordAvailable(
+          arg[0].getStr_(), Subtract(coreInstance_.getQuery(arg[0].getStr_()).rInterval, operation.getRI(), logicalIndex));
+      break;
+    case STREAM_ADD:
+      available = forwardRecordAvailable(arg[0].getStr_(),
+                                         Add(qry.rInterval, coreInstance_.getQuery(arg[0].getStr_()).rInterval, logicalIndex)) &&
+                  forwardRecordAvailable(arg[1].getStr_(),
+                                         Add(qry.rInterval, coreInstance_.getQuery(arg[1].getStr_()).rInterval, logicalIndex));
+      break;
+    case STREAM_AGSE: {
+      const auto source         = arg[0].getStr_();
+      const auto [step, length] = std::get<std::pair<int, int>>(operation.getVT());
+      const int sourceWidth     = coreInstance_.getQuery(source).descriptorStorage().flatElementCount();
+      const int lengthAbs       = length < 0 ? -length : length;
+      const int firstRecord     = floorDiv((logicalIndex * step) - (lengthAbs - 1), sourceWidth);
+      const int lastRecord      = floorDiv(logicalIndex * step, sourceWidth);
+      available                 = forwardRecordAvailable(source, firstRecord) && forwardRecordAvailable(source, lastRecord);
+    } break;
+    case STREAM_HASH: {
+      int forwardIndex  = 0;
+      const auto first  = arg[0].getStr_();
+      const auto second = arg[1].getStr_();
+      const bool takeSecond =
+          Hash(coreInstance_.getQuery(first).rInterval, coreInstance_.getQuery(second).rInterval, logicalIndex, forwardIndex);
+      available = forwardRecordAvailable(takeSecond ? second : first, forwardIndex);
+    } break;
+    default:
+      FatalError("dataModel::queryInputsAvailable: undefined command_id {}", static_cast<int>(cmd));
+  }
+
+  if (!available) return false;
+  return std::ranges::all_of(qry.windowGroups, [&](const auto &group) {
+    return forwardRecordAvailable(group.source, logicalIndex - group.width + 1) &&
+           forwardRecordAvailable(group.source, logicalIndex);
+  });
+}
+
 void dataModel::processZeroStep() {
   std::scoped_lock scoped_lock(core_mutex);
-  for (auto q : coreInstance_) {
-    if (!q.isDeclaration()) continue;
-
-    if (qSet.at(q.id)->outputPayload->bufferState != rdb::sourceState::empty) {
-      FatalError("dataModel::processZeroStep: stream '{}' not in empty state at start of cycle", q.id);
-    }
-    qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
-    qSet[q.id]->outputPayload->revRead(0);                            // state -> armed
-    qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
-    if (qSet.at(q.id)->outputPayload->bufferState != rdb::sourceState::armed) {
-      FatalError("dataModel::processZeroStep: stream '{}' not armed after fire()", q.id);
-    }
-  }
+  for (const auto &q : coreInstance_)
+    if (q.isDeclaration()) bootstrapDeclaration(q);
 }
 
 void dataModel::processRows(const std::set<std::string> &inSet, const boost::rational<int> &currentTimeSlot) {
   std::scoped_lock scoped_lock(core_mutex);
+
+  // Zrodlo dolaczone ad-hoc nie uczestniczylo w kroku zerowym. Uzbrajamy je
+  // przed konsumentami pierwszego naleznego slotu. Koncowa faza deklaracji
+  // pobierze wtedy rekord dla nastepnego slotu, tak jak po zwyklym kroku zerowym.
+  for (const auto &q : coreInstance_) {
+    if (!inSet.contains(q.id) || !q.isDeclaration()) continue;
+    auto &runtime = *qSet.at(q.id);
+    if (runtime.outputPayload->bufferState != rdb::sourceState::empty) continue;
+
+    const auto slotNumber = currentTimeSlot / q.rInterval;
+    if (slotNumber.denominator() != 1) {
+      FatalError("dataModel::processRows: current slot {} is not aligned with interval {} for declaration '{}'", currentTimeSlot,
+                 q.rInterval, q.id);
+    }
+    runtime.logicalIndexBase = slotNumber.numerator() - 1;
+    bootstrapDeclaration(q);
+  }
 
   // first - process all non-declaration queries
   for (const auto &q : coreInstance_) {
@@ -200,12 +316,11 @@ void dataModel::processRows(const std::set<std::string> &inSet, const boost::rat
       // wtedy bieżącą wartość oznaczoną historycznym indeksem.
       const auto slotNumber = currentTimeSlot / q.rInterval;
       if (slotNumber.denominator() != 1) {
-        FatalError("dataModel::processRows: current slot {}/{} is not aligned with interval {}/{} for '{}'",
-                   currentTimeSlot.numerator(), currentTimeSlot.denominator(), q.rInterval.numerator(),
-                   q.rInterval.denominator(), q.id);
+        FatalError("dataModel::processRows: current slot {} is not aligned with interval {} for '{}'", currentTimeSlot,
+                   q.rInterval, q.id);
       }
       const int firstLogicalIndex = slotNumber.numerator() - 1 - q.startupLatency;
-      if (firstLogicalIndex < q.logicalOrigin) continue;
+      if (firstLogicalIndex < q.logicalOrigin || !queryInputsAvailable(q, firstLogicalIndex)) continue;
 
       runtime.logicalIndexBase = firstLogicalIndex;
       // Bieżąca oś przeszła już origin i ogon. Ustawienie licznika na granicy
@@ -487,8 +602,19 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
   return retVal;
 }
 
-size_t dataModel::streamStoredSize(const std::string &instance) {
-  return qSet[instance]->outputPayload->descriptor.getSizeInBytes() * getStreamCount(instance);
+streamInstance &dataModel::streamRuntime(const std::string &instance) {
+  const auto found = qSet.find(instance);
+  if (found == qSet.end()) {
+    SPDLOG_ERROR("dataModel: stream '{}' is in the plan but not in the model", instance);
+    throw std::logic_error("Stream present in the plan is missing from the data model. (check log)");
+  }
+  return *found->second;
 }
 
-size_t dataModel::getStreamCount(const std::string &instance) { return qSet[instance]->outputPayload->getRecordsCount(); }
+size_t dataModel::streamStoredSize(const std::string &instance) {
+  return streamRuntime(instance).outputPayload->descriptor.getSizeInBytes() * getStreamCount(instance);
+}
+
+size_t dataModel::getStreamCount(const std::string &instance) {
+  return streamRuntime(instance).outputPayload->getRecordsCount();
+}

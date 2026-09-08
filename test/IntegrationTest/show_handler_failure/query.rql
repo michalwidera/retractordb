@@ -1,0 +1,8 @@
+# Plan jest tu tylko nosnikiem: badana jest droga bledu komendy 'show',
+# a nie to, co liczy silnik.
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM src, 1/8 FILE 'data.txt' ONESHOT
+
+SELECT src[0] STREAM dst FROM src

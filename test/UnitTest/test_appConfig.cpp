@@ -99,6 +99,20 @@ TEST_F(AppConfigTest, user_layer_overrides_service_query_file) {
   EXPECT_EQ(cfg.serviceQueryFile, "/srv/retractor/queries.rql");
 }
 
+TEST_F(AppConfigTest, server_autoname_defaults_to_off) {
+  // Brak klucza = tryb historyczny: instancja bez nazwy, blokada i IPC bez sufiksu.
+  const AppConfig cfg = loadAppConfig();
+  EXPECT_FALSE(cfg.serverAutoName);
+}
+
+TEST_F(AppConfigTest, user_layer_enables_server_autoname) {
+  writeFile(userConfigFile(), "[server]\nautoname = true\n");
+
+  const AppConfig cfg = loadAppConfig();
+
+  EXPECT_TRUE(cfg.serverAutoName);
+}
+
 TEST_F(AppConfigTest, explicit_config_path_is_read) {
   const fs::path explicitFile = tmpDir / "custom.toml";
   writeFile(explicitFile, "[storage]\ndir = \"/srv/rdb\"\n");
