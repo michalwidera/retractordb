@@ -79,9 +79,14 @@ void IpcClient::producer() {
     IPC::message_queue::size_type recvd_size = ipc::kResponseQueueMaxMessageSize;
     while (!done) {
       bool messageReceived = false;
+      // Interwal odpytywania nalezy do kolejki PUSTEJ. Sen po UDANYM odbiorze narzucal
+      // tempo jednego wiersza na milisekunde niezaleznie od zaleglosci, wiec klient, ktory
+      // zostal w tyle, nie mial jak nadrobic: nadganianie szlo dokladnie tak wolno, jak
+      // szedl biezacy strumien. Oproznienie pelnej kolejki (1024 wiersze) kosztowalo przez
+      // to ponad sekunde samego spania, i to na kazdym czekaniu, ktore jest juz obsluzone.
       while (!messageReceived && !done) {
         messageReceived = mq->try_receive(message.data(), ipc::kResponseQueueMaxMessageSize, recvd_size, priority);
-        std::this_thread::sleep_for(ipc::kQueuePollInterval);
+        if (!messageReceived) std::this_thread::sleep_for(ipc::kQueuePollInterval);
       }
       if (done) continue;
       message[recvd_size] = 0;

@@ -265,6 +265,12 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
             ++rendered;
             noDataCounter = 0;
           }
+        // Budzet elementow (-m N) musi zamykac TAKZE ta petle, nie tylko zewnetrzna.
+        // Pojedynczy obrot oproznia kolejke do konca, wiec gdy producent zdazyl wlozyc
+        // wiecej niz jeden wiersz, wszystkie szly na wyjscie i dopiero potem petla
+        // zewnetrzna sprawdzala budzet. `-m 1` na strumieniu z tablica dawalo dwie klatki
+        // gnuplota zamiast jednej -- wynik zalezny od wyscigu, a mial byc powtarzalny.
+        if (elemLimitCnt == 1) break;
       }
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
       if (++noDataCounter > serverNoDataTimeoutMs_) {
