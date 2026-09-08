@@ -60,13 +60,21 @@ else:
 '''
 
 
-def await_condition(predicate, message, timeout=3):
+# Limity sa hojne, bo kazdy krok scenariusza to kilka startow interpretera: pod obciazeniem CI
+# (4 vCPU, testy jednostkowe pod valgrindem obok) sa one kilkanascie razy wolniejsze niz lokalnie,
+# a stary limit 3 s miescil sie w tym rozrzucie. Czekanie przerywa sie od razu, gdy xplot juz
+# zakonczyl prace, wiec dlugi limit kosztuje czas tylko przy prawdziwym zawieszeniu.
+def await_condition(predicate, message, timeout=30, process=None):
     deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if predicate():
-            return
+    while not predicate():
+        if process is not None and process.poll() is not None:
+            break
+        if time.monotonic() >= deadline:
+            break
         time.sleep(0.02)
-    raise AssertionError(message)
+    if predicate():
+        return
+    raise AssertionError(message() if callable(message) else message)
 
 
 def alive(pid):
@@ -102,16 +110,21 @@ def run(source_root):
             processes.append(process)
             return process, state, env
 
-        def ready(state):
-            await_condition(lambda: (state / "rendered").exists(), "plot did not start: " + str(state))
+        def ready(process, state):
+            await_condition(
+                lambda: (state / "rendered").exists(),
+                lambda: "plot did not start: " + str(state) + "\n" + (state / "log").read_text(),
+                process=process,
+            )
             assert (state / "client-stdin").read_bytes() == b"keyboard\n", "client lost stdin"
             assert (state / "binding").read_bytes() == b'bind "Close" "exit gnuplot"\n'
 
         def stopped(process, state, expected=0):
             try:
-                status = process.wait(timeout=3)
+                status = process.wait(timeout=30)
             except subprocess.TimeoutExpired:
-                raise AssertionError("xplot kept running after stop: " + str(state)) from None
+                raise AssertionError("xplot kept running after stop: " + str(state) + "\n"
+                                     + (state / "log").read_text()) from None
             assert status == expected, (status, (state / "log").read_text())
             for pidfile in state.glob("*.pid"):
                 pid = int(pidfile.read_text())
@@ -121,10 +134,10 @@ def run(source_root):
         try:
             # Drugi podglad pozostaje zywy przez wszystkie scenariusze sprzatania.
             other, other_state, _ = start("other")
-            ready(other_state)
+            ready(other, other_state)
             for reason in ("server", "window", "interrupt", "terminate"):
                 process, state, env = start(reason)
-                ready(state)
+                ready(process, state)
                 if reason == "server":
                     subprocess.run([str(bindir / "xqry"), "-k", "--server", reason], env=env, check=True)
                 elif reason == "window":
