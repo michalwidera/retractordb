@@ -90,7 +90,7 @@ int qry::jsonCommand(const std::string &command, const std::string &input, int l
     const auto response = netClient("show", input);
     if (const auto error = response.get_optional<std::string>("error.response")) return fail("client_queue_missing", *error);
     // Destruktor zatrzymuje producenta takze przy wyjatku serializacji lub IPC.
-    std::jthread producer([this](std::stop_token stop) {
+    std::jthread producer([this](const std::stop_token &stop) {
       std::stop_callback stopProducer(stop, [this] { transport_->done = true; });
       transport_->producer();
     });
