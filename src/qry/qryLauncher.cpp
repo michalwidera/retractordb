@@ -169,6 +169,7 @@ int main(int argc, char *argv[]) {
     namespace po = boost::program_options;
     po::options_description desc("Allowed options");
     int elemLimit{0};
+    int idleTimeoutMs{0};
     std::string sInputStream;
     std::string sDetailStream;
     std::string sAdHoc;
@@ -182,22 +183,24 @@ int main(int argc, char *argv[]) {
         ("detail,t", po::value<std::string>(&sDetailStream), "show details of this stream")  //
         ("adhoc,a", po::value<std::string>(&sAdHoc), "adhoc query mode")                     //
         ("reset,q", po::value<std::string>(&sResetFile),
-         "replace the whole plan of the target instance with this RQL file")                              //
-        ("elimitqry,m", po::value<int>(&elemLimit)->default_value(0), "limit of elements, 0 - no limit")  //
-        ("null,n", "if null row appear - skip it in output")                                              //
-        ("hello,l", "diagnostic - hello db world")                                                        //
-        ("kill,k", "kill xretractor server")                                                              //
-        ("dir,d", "list of queries")                                                                      //
-        ("yaml,y", "yaml output format for --dir, --detail and --bus")                                    //
-        ("raw,r", "raw output mode (default)")                                                            //
-        ("graphite,g", "graphite output mode")                                                            //
-        ("influxdb,f", "influxDB output mode")                                                            //
-        ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                  //
-        ("gnuplot-rtl,z", "gnuplot output: newest samples on the right (right-to-left scroll)")           //
-        ("config,e", po::value<std::string>(&sConfig), "config file (TOML); overrides search")            //
-        ("help,h", "produce help message")                                                                //
-        ("needctrlc,c", "force ctl+c for stop this tool")                                                 //
-        ("wait-server,w", "poll until xretractor server is available before executing command")           //
+         "replace the whole plan of the target instance with this RQL file")                                          //
+        ("elimitqry,m", po::value<int>(&elemLimit)->default_value(0), "limit of elements, 0 - no limit")              //
+        ("null,n", "if null row appear - skip it in output")                                                          //
+        ("hello,l", "diagnostic - hello db world")                                                                    //
+        ("kill,k", "kill xretractor server")                                                                          //
+        ("dir,d", "list of queries")                                                                                  //
+        ("yaml,y", "yaml output format for --dir, --detail and --bus")                                                //
+        ("jsonl,j", "versioned JSON Lines API output")                                                                //
+        ("idle-timeout,i", po::value<int>(&idleTimeoutMs)->default_value(0), "JSONL idle timeout in ms; 0 disables")  //
+        ("raw,r", "raw output mode (default)")                                                                        //
+        ("graphite,g", "graphite output mode")                                                                        //
+        ("influxdb,f", "influxDB output mode")                                                                        //
+        ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                              //
+        ("gnuplot-rtl,z", "gnuplot output: newest samples on the right (right-to-left scroll)")                       //
+        ("config,e", po::value<std::string>(&sConfig), "config file (TOML); overrides search")                        //
+        ("help,h", "produce help message")                                                                            //
+        ("needctrlc,c", "force ctl+c for stop this tool")                                                             //
+        ("wait-server,w", "poll until xretractor server is available before executing command")                       //
         ("server,x", po::value<std::string>(&sServerName),
          "target xretractor instance name (default: resolved from the bus)")  //
         ("bus,b", "list live xretractor instances and their streams");
@@ -228,7 +231,19 @@ int main(int argc, char *argv[]) {
     formatMode outputFormatMode{formatMode::RAW};
     bool gnuplotRightToLeft{false};
 
-    if (vm.count("graphite") + vm.count("raw") + vm.count("influxdb") + vm.count("gnuplot") > 1) {
+    // --idle-timeout ma sens wylacznie w torze JSONL. Przyjete po cichu poza nim wygladalo
+    // jak dzialajaca opcja i nie robilo nic.
+    if (!vm.contains("jsonl") && !vm["idle-timeout"].defaulted()) {
+      std::println(std::cerr, "xqry: --idle-timeout applies only to --jsonl");
+      return system::errc::invalid_argument;
+    }
+    if (vm.contains("jsonl") &&
+        (vm.contains("yaml") || vm.contains("kill") || vm.contains("null") || vm.contains("wait-server") || vm.contains("bus") ||
+         vm.contains("reset") || vm.contains("adhoc") || elemLimit < 0 || idleTimeoutMs < 0)) {
+      std::println(std::cerr, "xqry: --jsonl supports --hello, --dir, --detail or --select with nonnegative limits");
+      return system::errc::invalid_argument;
+    }
+    if (vm.count("jsonl") + vm.count("graphite") + vm.count("raw") + vm.count("influxdb") + vm.count("gnuplot") > 1) {
       std::println("Only one output format could be selected.");
       return system::errc::invalid_argument;
     }
@@ -361,6 +376,14 @@ int main(int argc, char *argv[]) {
     obj.outputFormatMode   = outputFormatMode;
     obj.gnuplotRightToLeft = gnuplotRightToLeft;
 
+    if (vm.contains("jsonl")) {
+      if (vm.contains("hello")) return obj.jsonCommand("hello", "", 0, 0);
+      if (vm.contains("dir")) return obj.jsonCommand("dir", "", 0, 0);
+      if (vm.contains("detail")) return obj.jsonCommand("detail", sDetailStream, 0, 0);
+      if (vm.contains("select")) return obj.jsonCommand("select", sInputStream, elemLimit, idleTimeoutMs);
+      std::println(std::cerr, "xqry: --jsonl requires a command");
+      return system::errc::invalid_argument;
+    }
     if (vm.contains("hello")) return obj.hello();
     if (vm.contains("kill") && elemLimit == 0) {
       obj.netClient("kill", "");

@@ -137,6 +137,17 @@ void IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
   }
 }
 
+// Wolajacy MUSI trzymac clientMapsMutex_ (dostep do oversizedRowStreams_).
+bool IpcServer::rowFitsSlot(const std::string &row, const std::string &streamName) {
+  if (row.length() <= static_cast<std::size_t>(ipc::kResponseQueueMaxMessageSize)) return true;
+  if (oversizedRowStreams_.insert(streamName).second)
+    SPDLOG_ERROR(
+        "stream '{}': serialized row is {} B and does not fit the {} B response queue slot; "
+        "subscribers of this stream receive no data",
+        streamName, row.length(), ipc::kResponseQueueMaxMessageSize);
+  return false;
+}
+
 void IpcServer::broadcast(const std::set<std::string> &streams, const RowFormatter &formatRow) {
   // Muteks na caly przebieg emisji: kontencja tylko z krotkim wstawieniem do map
   // przy rejestracji klienta (watek komunikacyjny trzyma go nanosekundy), a koszt
@@ -149,13 +160,22 @@ void IpcServer::broadcast(const std::set<std::string> &streams, const RowFormatt
     // wiersz i tak byl wyrzucany (petla ponizej nie robila nic).
     std::string row;
     bool rowFormatted = false;
+    bool rowFits      = true;
     std::list<int> eraseList;
     for (const auto &element : id2StreamNameRelation_) {
       if (element.second == queryName) {
         if (!rowFormatted) {
           row          = formatRow(queryName);
           rowFormatted = true;
+          rowFits      = rowFitsSlot(row, queryName);
         }
+        // Wiersz dluzszy od slotu kolejki KONCZYL USLUGE. try_send rzuca wtedy
+        // interprocess_exception, a najblizszy catch stoi poza petla przetwarzania
+        // (executorsm.cpp), wiec pojedynczy subskrybent jednego szerokiego strumienia
+        // zabieral serwer wszystkim pozostalym -- kod wyjscia no_child_process. Wiersz
+        // niesie teraz jedna wartosc na ELEMENT, a nie na pole, wiec zwykle INTEGER[200]
+        // wystarczy, zeby przekroczyc slot. Pomijamy taki wiersz i emitujemy dalej.
+        if (!rowFits) break;
         //
         // Query discovery. queues are created by show command
         //

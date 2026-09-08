@@ -116,9 +116,13 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
       }
       for (const auto &s : (*coreInstancePtr)[streamName].lSchema) {
         ptRetval.put(std::string("db.field.") + s.field_.rname, s.field_.rname);
+        ptRetval.put(std::string("db.field_count.") + s.field_.rname, rdb::flatElementCount(s.field_));
         ptRetval.put(std::string("db.field_type.") + s.field_.rname, GetStringdescFld(s.field_.rtype));
       }
       ptRetval.put(std::string("db.stream"), streamName);
+      // UWAGA na dwa rozne "count" w tym protokole: 'db.count' w odpowiedzi 'detail' liczy POLA
+      // schematu, a 'count' w wierszu z printRowValue liczy WARTOSCI, czyli sloty plaskie. Dla
+      // strumienia z tablica te liczby sie roznia; przelicznikiem jest 'db.field_count.<pole>'.
       ptRetval.put(std::string("db.count"), boost::lexical_cast<std::string>((*coreInstancePtr)[streamName].lSchema.size()));
 
       auto duration = (*coreInstancePtr)[streamName].rInterval;
@@ -229,41 +233,43 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   ptree pt;
   pt.put("stream", query_name);
   const auto fields = payload->descriptor.dataFields();
-  pt.put("count", boost::lexical_cast<std::string>(fields.size()));
+  pt.put("count", boost::lexical_cast<std::string>(payload->descriptor.flatElementCount()));
 
   std::string nullmap;
-  nullmap.reserve(fields.size());
+  nullmap.reserve(payload->descriptor.flatElementCount());
 
   int i = 0;
   for (const auto &field : fields) {
-    //
-    // There is part of communication format - here data are formatted for
-    // transmission via internal queue.
-    //
-    // std::stringstream retVal;
-    // retVal << boost::rational_cast<double>(value); - now it's more complicated due types.
+    for (int element = 0; element < rdb::flatElementCount(field); ++element) {
+      //
+      // There is part of communication format - here data are formatted for
+      // transmission via internal queue.
+      //
+      // std::stringstream retVal;
+      // retVal << boost::rational_cast<double>(value); - now it's more complicated due types.
 
-    auto valueOpt = payload->getItem(i);
-    auto value    = valueOpt.has_value() ? any_to_variant_cast(valueOpt.value()) : nullFallbackValue(field.rtype);
-    nullmap.push_back(valueOpt.has_value() ? '0' : '1');
+      auto valueOpt = payload->getItem(i);
+      auto value    = valueOpt.has_value() ? any_to_variant_cast(valueOpt.value()) : nullFallbackValue(field.rtype);
+      nullmap.push_back(valueOpt.has_value() ? '0' : '1');
 
-    std::stringstream coutstring;
+      std::stringstream coutstring;
 
-    std::visit(
-        Overload{                                                                                                           //
-                 [&coutstring](std::monostate) { coutstring << "null"; },                                                   //
-                 [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                                   //
-                 [&coutstring](int a) { coutstring << a; },                                                                 //
-                 [&coutstring](unsigned a) { coutstring << a; },                                                            //
-                 [&coutstring](float a) { coutstring << a; },                                                               //
-                 [&coutstring](double a) { coutstring << a; },                                                              //
-                 [&coutstring](std::pair<int, int> a) { coutstring << a.first << "," << a.second; },                        //
-                 [&coutstring](const std::pair<std::string, int> &a) { coutstring << a.first << "[" << a.second << "]"; },  //
-                 [&coutstring](const std::string &a) { coutstring << a; },                                                  //
-                 [&coutstring](boost::rational<int> a) { coutstring << a; }},
-        value);
+      std::visit(
+          Overload{                                                                                                           //
+                   [&coutstring](std::monostate) { coutstring << "null"; },                                                   //
+                   [&coutstring](uint8_t a) { coutstring << (unsigned)a; },                                                   //
+                   [&coutstring](int a) { coutstring << a; },                                                                 //
+                   [&coutstring](unsigned a) { coutstring << a; },                                                            //
+                   [&coutstring](float a) { coutstring << a; },                                                               //
+                   [&coutstring](double a) { coutstring << a; },                                                              //
+                   [&coutstring](std::pair<int, int> a) { coutstring << a.first << "," << a.second; },                        //
+                   [&coutstring](const std::pair<std::string, int> &a) { coutstring << a.first << "[" << a.second << "]"; },  //
+                   [&coutstring](const std::string &a) { coutstring << a; },                                                  //
+                   [&coutstring](boost::rational<int> a) { coutstring << a; }},
+          value);
 
-    pt.put(boost::lexical_cast<std::string>(i++), coutstring.str());
+      pt.put(boost::lexical_cast<std::string>(i++), coutstring.str());
+    }
   }
   pt.put("nullmap", nullmap);
   std::stringstream strstream;

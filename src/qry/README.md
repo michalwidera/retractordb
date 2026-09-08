@@ -14,31 +14,35 @@ xqry - data query tool.
 Usage: xqry [option]
 
 Allowed options:
-  -s [ --select ] arg         show this stream
-  -t [ --detail ] arg         show details of this stream
-  -a [ --adhoc ] arg          adhoc query mode
-  -q [ --reset ] arg          replace the whole plan of the target instance
-                              with this RQL file
-  -m [ --elimitqry ] arg (=0) limit of elements, 0 - no limit
-  -n [ --null ]               if null row appear - skip it in output
-  -l [ --hello ]              diagnostic - hello db world
-  -k [ --kill ]               kill xretractor server
-  -d [ --dir ]                list of queries
-  -y [ --yaml ]               yaml output format for --dir, --detail and --bus
-  -r [ --raw ]                raw output mode (default)
-  -g [ --graphite ]           graphite output mode
-  -f [ --influxdb ]           influxDB output mode
-  -p [ --gnuplot ] arg        x,y - gnuplot output mode
-  -z [ --gnuplot-rtl ]        gnuplot output: newest samples on the right
-                              (right-to-left scroll)
-  -e [ --config ] arg         config file (TOML); overrides search
-  -h [ --help ]               produce help message
-  -c [ --needctrlc ]          force ctl+c for stop this tool
-  -w [ --wait-server ]        poll until xretractor server is available before
-                              executing command
-  -x [ --server ] arg         target xretractor instance name (default:
-                              resolved from the bus)
-  -b [ --bus ]                list live xretractor instances and their streams
+  -s [ --select ] arg            show this stream
+  -t [ --detail ] arg            show details of this stream
+  -a [ --adhoc ] arg             adhoc query mode
+  -q [ --reset ] arg             replace the whole plan of the target instance
+                                 with this RQL file
+  -m [ --elimitqry ] arg (=0)    limit of elements, 0 - no limit
+  -n [ --null ]                  if null row appear - skip it in output
+  -l [ --hello ]                 diagnostic - hello db world
+  -k [ --kill ]                  kill xretractor server
+  -d [ --dir ]                   list of queries
+  -y [ --yaml ]                  yaml output format for --dir, --detail and
+                                 --bus
+  -j [ --jsonl ]                 versioned JSON Lines API output
+  -i [ --idle-timeout ] arg (=0) JSONL idle timeout in ms; 0 disables
+  -r [ --raw ]                   raw output mode (default)
+  -g [ --graphite ]              graphite output mode
+  -f [ --influxdb ]              influxDB output mode
+  -p [ --gnuplot ] arg           x,y - gnuplot output mode
+  -z [ --gnuplot-rtl ]           gnuplot output: newest samples on the right
+                                 (right-to-left scroll)
+  -e [ --config ] arg            config file (TOML); overrides search
+  -h [ --help ]                  produce help message
+  -c [ --needctrlc ]             force ctl+c for stop this tool
+  -w [ --wait-server ]           poll until xretractor server is available
+                                 before executing command
+  -x [ --server ] arg            target xretractor instance name (default:
+                                 resolved from the bus)
+  -b [ --bus ]                   list live xretractor instances and their
+                                 streams
 Branch: issue_238-multiserver:XXXXXXXX, Code compiler: GNU Ver. 15.2.0, Build time: YYMMDDHHmm, Type: Release
 Log: /home/michal/.tmp/xqry.log
 This software is licensed under the MIT License and is provided ‘as is’,
@@ -211,3 +215,22 @@ servers:
       - srca
       - dsta
 ```
+
+## Application API: JSON Lines
+
+`--jsonl` (`-j`) provides versioned machine output for `--hello`, `--dir`,
+`--detail` and `--select`. Use an explicit `--server` name. `--idle-timeout N`
+(`-i N`) sets the JSONL idle timeout in milliseconds; zero disables it, and the
+option is rejected outside `--jsonl`. Other output formats and mutating commands
+cannot be combined with `--jsonl`.
+
+See the [wire contract](../../api/README.md), [Python client](../../api/python/README.md),
+and [C++ client](../../api/cpp/README.md). Numeric array fields are transmitted
+in full, in element order, including per-element NULL flags.
+
+Every output format carries all array elements, each under its own name in the
+notation its consumer expects: `stream.field.0` for graphite, `field_0` for
+influxDB, `field[0]` for a gnuplot curve title. A single-element field keeps its
+bare name in all of them. A record whose serialized form exceeds the 1024-byte
+response queue slot is dropped by the server, which logs the stream name once
+and keeps serving every other subscriber.

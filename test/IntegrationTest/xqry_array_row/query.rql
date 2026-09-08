@@ -1,0 +1,3 @@
+STORAGE 'temp'
+DECLARE v INTEGER[3] STREAM arr, 1/20 FILE 'data.txt'
+DECLARE w INTEGER[200] STREAM wide, 1/20 FILE 'wide.txt'

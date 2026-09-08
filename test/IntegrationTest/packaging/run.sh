@@ -1,17 +1,21 @@
 #!/bin/bash
-# Test poprawności pakietów CPack:
-#  - pakiet binarny DEB zawiera DOKŁADNIE wymagany zestaw plików (3 binaria +
-#    jednostka systemd) — żadnych nadmiarowych,
-#  - pakiet źródłowy NIE zawiera wygenerowanych/lokalnych artefaktów.
+# Test poprawności pakietów CPack: pakiet binarny DEB zawiera DOKŁADNIE wymagany
+# zestaw plików (3 binaria + jednostka systemd + przykłady konfiguracji) —
+# żadnych nadmiarowych.
 # Sprawdzamy tylko DEB (a nie TGZ) — whitelist jest identyczny dla obu (te same
 # reguły install + prefiks /usr), a budowanie obu podwajało czas (kompresja
 # dużych binariów Debug ~5 s/pakiet).
+#
+# Pakietu ŹRÓDŁOWEGO nie ma — został wyłączony, bo jego zawartość była
+# nieprawdziwa (brakowało w nim rdzenia silnika), a ta kontrola tego nie
+# wykrywała: sprawdzała wyłącznie nieobecność artefaktów, nigdy obecność
+# źródeł. Powód i warunki powrotu opisuje komentarz przy CPACK_SOURCE_* w
+# głównym CMakeLists.txt.
 # $1 = izolowany katalog wyjściowy, $2 = CMAKE_BINARY_DIR (z konfiguracjami CPack).
 set -e
 
 OUT="$1"
 CFG="$2/CPackConfig.cmake"
-SRCCFG="$2/CPackSourceConfig.cmake"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 test -f "$CFG"
@@ -42,23 +46,6 @@ if command -v dpkg-deb >/dev/null 2>&1; then
   assert_exact "DEB" "$(dpkg-deb -c "$DEB" | awk '$1 !~ /^d/ {print $NF}' | grep -oE 'usr/.*')"
 else
   echo "POMINIĘTO weryfikację pakietu binarnego: brak dpkg-deb"
-fi
-
-# --- Pakiet źródłowy: brak wygenerowanych/lokalnych artefaktów ---
-if [ -f "$SRCCFG" ]; then
-  cpack -G TGZ -B "$OUT" --config "$SRCCFG"
-  SRC=$(ls "$OUT"/*source*.tar.gz | head -1)
-  test -n "$SRC"
-  SRC_LIST=$(tar tzf "$SRC")
-  for bad in '/build/' '/coverage/' '/Testing/' '/dokumentacja-rdb/' '/[.]claude/' \
-             '/[.]git/' '/[.]github/' '/docker/' '/[.]venv/' '/bin/' \
-             '/CMakeCache' '[.]deb$'; do
-    if printf '%s\n' "$SRC_LIST" | grep -qE "$bad"; then
-      echo "BŁĄD: pakiet źródłowy zawiera zbędny artefakt pasujący do: $bad"
-      printf '%s\n' "$SRC_LIST" | grep -E "$bad" | head -3
-      exit 1
-    fi
-  done
 fi
 
 echo "packaging artifact check OK"

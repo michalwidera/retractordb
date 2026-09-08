@@ -98,6 +98,11 @@ class IpcServer {
   /// Wolajacy MUSI trzymac clientMapsMutex_.
   void removeClientQueues();
 
+  /// Czy wiersz miesci sie w slocie kolejki odpowiedzi. Falsz melduje przyczyne raz na
+  /// strumien i jest rownoznaczny z pominieciem emisji -- nigdy z wyjatkiem, bo wyjatek
+  /// z try_send konczyl cala usluge. Wolajacy MUSI trzymac clientMapsMutex_.
+  bool rowFitsSlot(const std::string &row, const std::string &streamName);
+
   Callbacks callbacks_;
   std::thread commsThread_;
 
@@ -116,6 +121,12 @@ class IpcServer {
   // usuwamy z cache przy usunieciu kolejki (przepelnienie) i re-rejestracji
   // klienta.
   std::map<const int, std::unique_ptr<boost::interprocess::message_queue>> id2QueueCache_;
+
+  // Strumienie, o ktorych zbyt dlugim wierszu juz zameldowalismy. Kryterium jest per strumien,
+  // nie per slot: wiersz nie miesci sie w kazdym slocie tak samo, a przy takcie 1 ms ten sam
+  // komunikat zalalby dziennik tysiac razy na sekunde. Czytane i pisane wylacznie w broadcast(),
+  // czyli pod clientMapsMutex_.
+  std::set<std::string> oversizedRowStreams_;
 
   // Muteks obu map klienckich (sledztwo ~40 ms, JOURNAL.md 2026-07-18, Faza 3):
   // mapy sa modyfikowane przez watek komunikacyjny (rejestracja show) i czytane/

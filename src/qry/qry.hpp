@@ -68,6 +68,7 @@ class qry {
                int responseQueueOpenMaxFails = kIpcClientDefaultResponseQueueOpenMaxFails, std::string_view serverName = {});
   selectResult select(boost::program_options::variables_map &vm, int /*iElemLimit*/, const std::string & /*input*/,
                       std::tuple<int, int, int> /*gnuplotDim*/, bool /*gnuplotRightToLeft*/ = false);
+  int jsonCommand(const std::string &command, const std::string &input, int limit, int idleTimeoutMs);
   bool adhoc(const std::string & /*sAdhoc*/);
 
   /// Przeladowanie CALEGO planu instancji trescia @p planText. Zwraca true przy odmowie

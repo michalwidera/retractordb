@@ -48,6 +48,15 @@ struct rField {
         rtype(type) {}
 };
 
+// Liczba SLOTOW PLASKICH zajmowanych przez pole w rekordzie. Jedna definicja dla calego
+// drzewa: mapowan deskryptora (Descriptor::rebuildFieldMappings), serializacji wiersza do
+// klienta (executorsm::printRowValue) i krotnosci pola w odpowiedzi 'detail'. Regula byla
+// przepisana recznie w kazdym z tych miejsc, a rozjazd miedzy nimi przesuwa indeksy plaskie
+// wzgledem wartosci — czyli po cichu podmienia wartosci pod nazwami pol.
+//
+// STRING[N] to JEDNA wartosc: N jest dlugoscia tekstu, nie krotnoscia pola.
+constexpr int flatElementCount(const rField &field) { return field.rtype == STRING ? 1 : field.rarray; }
+
 }  // namespace rdb
 // Support for std::visit over std::variant
 template <typename... Ts>

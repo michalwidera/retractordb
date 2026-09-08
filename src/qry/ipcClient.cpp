@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstddef>
 #include <cstring>
 #include <memory>
 #include <sstream>
@@ -24,6 +25,10 @@
 
 using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
+
+namespace {
+constexpr std::size_t kNullTerminatorBytes{1};
+}
 
 IpcClient::IpcClient(int clientResponseMaxFails, int responseQueueOpenMaxFails, std::string_view serverName)
     : clientResponseMaxFails_(std::max(1, clientResponseMaxFails)),
@@ -69,7 +74,7 @@ void IpcClient::producer() {
   }
 
   try {
-    std::array<char, ipc::kResponseQueueMaxMessageSize> message;
+    std::array<char, ipc::kResponseQueueMaxMessageSize + kNullTerminatorBytes> message;
     unsigned int priority{0};
     IPC::message_queue::size_type recvd_size = ipc::kResponseQueueMaxMessageSize;
     while (!done) {
@@ -85,10 +90,10 @@ void IpcClient::producer() {
       memset(message.data(), 0, ipc::kResponseQueueMaxMessageSize);
       ptree pt;
       read_info(strstream, pt);
-      while (!spsc_queue_.push(pt))
+      while (!done && !spsc_queue_.push(pt))
         std::this_thread::sleep_for(ipc::kQueuePollInterval);
     }
-  } catch (IPC::interprocess_exception &e) {
+  } catch (const std::exception &e) {
     SPDLOG_ERROR("IPC: {} (producer queue:{})", e.what(), names_.responseQueue(getpid()));
     done = true;
   }

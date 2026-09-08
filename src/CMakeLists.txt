@@ -151,7 +151,6 @@ add_custom_target(
 add_custom_target(
   packages
   COMMAND cpack --config CPackConfig.cmake
-  COMMAND cpack --config CPackSourceConfig.cmake
   COMMAND ls -lart *.tar.gz
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 

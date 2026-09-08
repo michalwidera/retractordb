@@ -4,7 +4,12 @@ project(xqry LANGUAGES CXX)
 
 # Logika klienta jako biblioteka statyczna — reużywana przez testy bez potrzeby
 # kompilowania ipcClient/formatters/qry dla każdego testu.
-add_library(qry STATIC qry.cpp ipcClient.cpp formatters.cpp serverRouting.cpp)
+add_library(qry STATIC qry.cpp jsonOutput.cpp boostJson.cpp ipcClient.cpp
+                       formatters.cpp serverRouting.cpp)
+
+# Boost.JSON kompilowany do wlasnej jednostki (boostJson.cpp), bez szukania
+# zbudowanej biblioteki systemowej.
+target_compile_definitions(qry PUBLIC BOOST_JSON_NO_LIB)
 
 # ${CMAKE_SOURCE_DIR}/src jest PUBLIC, bo serverRouting.hpp wystawia
 # bus::InstanceInfo w swoim interfejsie i dociaga "retractor/lib/bus.hpp" - tak

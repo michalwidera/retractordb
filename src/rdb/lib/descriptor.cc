@@ -66,7 +66,7 @@ void Descriptor::rebuildFieldMappings() const {
     dataSizeBytes_ += fieldSize(field);  // semantyka identyczna z dawnym getSizeInBytes (pola konfiguracyjne i NULLTYPE = 0)
     if (isConfigurationField(field.rtype)) continue;
 
-    const int flatCount = (field.rtype == rdb::STRING) ? 1 : field.rarray;
+    const int flatCount = rdb::flatElementCount(field);
     for (int arrayIndex = 0; arrayIndex < flatCount; ++arrayIndex) {
       flatToDescriptorIndexMap_.emplace_back(static_cast<int>(descriptorFieldIdx), arrayIndex);
       fieldByteOffsets_.push_back(offset);
