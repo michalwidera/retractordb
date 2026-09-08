@@ -272,15 +272,24 @@ void IpcServer::commandLoop() const {
     bool loopRunning = true;
     while (loopRunning) {
       while (mq.try_receive(message.data(), ipc::kQueryQueueMaxMessageSize, recvd_size, priority)) {
-        callbacks_.onMessageReceived();
-
         message[recvd_size] = 0;
         std::stringstream strstream;
         strstream << message.data();
         memset(message.data(), 0, ipc::kQueryQueueMaxMessageSize);
         ptree pt;
         read_info(strstream, pt);
-        ptree pt_retval     = callbacks_.onCommand(pt);
+        ptree pt_retval = callbacks_.onCommand(pt);
+        // Sygnal idzie PO obsludze komendy, nie po jej odebraniu. Jedynym jego odbiorca jest
+        // bramka --xqrywait, a bramka zdjeta w chwili ODEBRANIA komendy wpuszczala watek
+        // przetwarzania jeszcze przed rejestracja subskrybenta: dla 'show' znaczylo to slot
+        // wyemitowany do klienta, ktorego kolejki odpowiedzi jeszcze nie ma, a takiego wiersza
+        // nikt juz nie odzyska. Samo subscribe() jest oslonione blokada epoki -- tej samej,
+        // ktora bierze slot -- wiec wyscig rozstrzygal sie na ZAJECIU tej blokady: wygrywal
+        // ten, kto siegnal po nia pierwszy. Przesuniecie sygnalu zamienia ten wyscig na
+        // porzadek: gdy bramka opada, subskrypcja jest juz w mapach IpcServer.
+        // Kontrakt bramki jest nietkniety -- podnosi ja nadal KAZDA komenda, takze 'hello'
+        // (patrz it_xqrywait_gate).
+        callbacks_.onCommandHandled();
         int clientProcessId = boost::lexical_cast<int>(pt.get("db.id", ""));
         // Sending answer
         std::stringstream response_stream;

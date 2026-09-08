@@ -174,14 +174,18 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
             }
             cv.notify_all();
           },
-      .onMessageReceived =
+      .onCommandHandled =
           [] {
-            // Fakt "przyszla pierwsza komenda" zapisujemy BEZWARUNKOWO i w osobnym
+            // Fakt "pierwsza komenda zostala OBSLUZONA" zapisujemy BEZWARUNKOWO i w osobnym
             // zatrzasku. Poprzednia wersja podnosila bramke tylko wtedy, gdy widziala juz
             // iLoopLimitCnt == waitForXqry, a te flage watek glowny ustawia dopiero PO
             // zbudowaniu dataModel -- czyli dlugo po opublikowaniu blokady, na ktora czeka
             // klient. Komenda z tego okna gubila pobudke i serwer stal na bramce az do
             // nastepnej komendy (odtworzone 5/5 planem o 120 strumieniach).
+            //
+            // "Obsluzona", a nie "odebrana": zatrzask zdjety przed handlerem wpuszczal
+            // przetwarzanie w srodek subskrypcji i pierwsze wiersze szly do jeszcze
+            // nieistniejacej kolejki klienta -- uzasadnienie przy wywolaniu w ipcServer.cpp.
             {
               std::scoped_lock lock(core_mutex);
               firstQueryReceived = true;

@@ -40,9 +40,9 @@ class IpcServer {
 
   struct Callbacks {
     CommandHandler onCommand;
-    Notifier onReady;            // zasoby IPC gotowe -- raz, przed petla odbioru
-    Notifier onFailure;          // zasobow IPC nie da sie zbudowac -- watek konczy prace
-    Notifier onMessageReceived;  // odebrano komende -- przed jej obsluga
+    Notifier onReady;           // zasoby IPC gotowe -- raz, przed petla odbioru
+    Notifier onFailure;         // zasobow IPC nie da sie zbudowac -- watek konczy prace
+    Notifier onCommandHandled;  // komenda OBSLUZONA -- po powrocie z onCommand
     StopPredicate shouldStop;
   };
 

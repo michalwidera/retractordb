@@ -1,0 +1,9 @@
+# Plan sondy: ten sam co w null_divide_by_zero, bo jego wyjscie jest UPORZADKOWANE
+# i kazdy wiersz rozpoznawalny z osobna (25, null, 20 z danych 4, 0, 5). Zgubiony
+# pierwszy wiersz widac wiec wprost, a nie jako "o jeden za malo".
+
+STORAGE 'temp'
+
+DECLARE d INTEGER STREAM src, 1/8 FILE 'data.txt' ONESHOT
+
+SELECT 100/src[0] STREAM dst FROM src

@@ -177,7 +177,23 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
   // silnika w executorsm.cpp (`ignoreanykey`), gdzie ta pulapka wywrocila it_agse_array.
   // Ctrl+C (SIGINT) zatrzymuje klienta bez zmian, obiema drogami.
   const bool ignoreAnyKey = vm.contains("needctrlc") || iElemLimit > 0;
-  ptree pt                = netClient("get", "");
+
+  // SUBSKRYPCJA IDZIE PIERWSZA, przed jakakolwiek inna komenda. Serwer wstrzymany bramka
+  // --xqrywait rusza po PIERWSZEJ obsluzonej komendzie, a kolejke odpowiedzi tego klienta
+  // tworzy dopiero handler 'show'. Gdy przed nim szedl 'get' (walidacja nazwy strumienia),
+  // miedzy jedna komenda a druga serwer juz liczyl i emitowal do nikogo: przy takcie 1/8 s
+  // okno wynosilo 125 ms na wiersz, a wiersze z niego przepadaly bezpowrotnie. Lokalnie
+  // przerwa 'get'->'show' to pojedyncze milisekundy, na obciazonym kontenerze CI przekracza
+  // takt -- tak padl it_null_divide_by_zero (2026-09-08): zamiast 25, null, 20 klient dostal
+  // null, 20, null. Drugi czlon naprawy jest po stronie serwera (ipcServer.cpp: bramke
+  // zdejmuje komenda OBSLUZONA, nie odebrana), i dopiero oba razem zamykaja to okno.
+  //
+  // Walidacja nazwy nie znika, tylko idzie za subskrypcja: 'get' nizej rozstrzyga, czy
+  // strumien w ogole istnieje, i to jego werdykt pada pierwszy. Subskrypcja nieistniejacego
+  // strumienia jest po stronie serwera odmowa bez skutkow ubocznych -- kolejka nie powstaje.
+  streamTable[input] = netClient("show", input);
+
+  ptree pt = netClient("get", "");
 
   // Brak odpowiedzi serwera jest ODPOWIEDZIĄ, a nie niespodzianką w strukturze
   // danych. `netClient` po wyczerpaniu prób zwraca ptree z samym
@@ -193,11 +209,9 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
     return toSelectResult(verdict);
   }
 
-  const bool found = std::ranges::any_of(pt.get_child("db.stream"), [input, this](const auto &node) {
+  const bool found = std::ranges::any_of(pt.get_child("db.stream"), [input](const auto &node) {
     const ptree &v = node.second;
-    bool ret       = (input == v.get<std::string>(""));
-    if (ret) streamTable[input] = netClient("show", input);
-    return ret;
+    return input == v.get<std::string>("");
   });
 
   if (!found) {
@@ -205,8 +219,11 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
     return selectResult::streamNotFound;
   }
 
-  // Odpowiedź na 'show' sprawdzana tak samo jak odpowiedź na 'get' powyżej. Do
-  // 2026-09-04 nie była sprawdzana wcale, a handler 'show' nie wpisuje niczego do
+  // Odpowiedź na 'show' sprawdzana tak samo jak odpowiedź na 'get' powyżej — i dopiero
+  // TERAZ, czyli po rozstrzygnięciu, że strumień istnieje: subskrypcja idzie pierwsza,
+  // więc dla nieznanej nazwy serwer odmawia jej, zanim ktokolwiek zdąży to nazwać, a
+  // werdyktem tego przypadku pozostaje `streamNotFound` powyżej, nie awaria kolejki. Do
+  // 2026-09-04 odpowiedź na 'show' nie była sprawdzana wcale, a handler 'show' nie wpisuje niczego do
   // odpowiedzi TAKŻE po udanej subskrypcji — połknięty po stronie serwera wyjątek dawał
   // więc odpowiedź nie do odróżnienia od powodzenia. Klient ruszał z wątkiem producenta
   // i meldował dopiero brak kolejki, sekundę później i bez nazwania przyczyny; zdanie

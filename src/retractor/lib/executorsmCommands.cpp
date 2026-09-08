@@ -74,6 +74,16 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
   ptree ptRetval;
   std::string command = ptInval.get("db.message", "");
   try {
+    // Hak diagnostyczny testu regresyjnego it_xqrywait_first_row, ta sama droga co
+    // RDB_FAULT_PLAN_SWAP_DELAY. Rozciaga okno miedzy ODEBRANIEM komendy 'show' a jej
+    // obsluga -- jedyne okno, w ktorym bramka --xqrywait zdejmowana na odbiorze wpuszczala
+    // petle przetwarzania przed rejestracja subskrybenta. Wyscigu nie da sie zamowic inaczej:
+    // rejestracja idzie pod plan_epoch_mutex, tym samym, ktory bierze slot, wiec rozstrzyga
+    // sie on na zajeciu muteksu i trwa nanosekundy. Uspienie musi wypasc PRZED zajeciem
+    // blokady epoki, inaczej wstrzymywaloby slot i samo zaslanialoby badane okno.
+    if (const char *delayMs = std::getenv("RDB_FAULT_SHOW_DELAY"); delayMs != nullptr && command == "show")
+      std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
+
     const bool requiresDataModel = command == "get" || command == "adhoc" || command == "detail" || command == "show";
     // Blokada epoki zyje az do wyjscia z handlera -- patrz plan_epoch_mutex. Brana dopiero PO
     // przebudzeniu na core_mutex, nigdy przed: czekanie na model pod blokada epoki zamykaloby
