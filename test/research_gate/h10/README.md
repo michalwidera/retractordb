@@ -89,6 +89,55 @@ i przenosząca `>N` do origin wypchnęła `HASH` i `SHIFT` z reżimu dokładnego
 zawyżającego. Wyszło to dopiero w osobnym przebiegu badawczym tydzień później.
 Ta bramka istnieje po to, żeby wyszło przy commicie.
 
+## Poprawka reguły lokalnej A z 2026-09-12 — `>N` skraca ogon
+
+Reguła lokalna A liczyła dla `>N` sam ogon składowej przeliczony przez takt,
+podczas gdy postać dokładna to `max(0, W_src - N)`. Rozjazd miał postać zamkniętą
+`-min(N, W_src)` i był **ujemny**: reguła ZAWYŻAŁA ogon. Trafiał 5314/5314 węzłów
+`SHIFT` na ziarnie 20260804 i 5438/5438 na 20260807, czyli co do jednego.
+
+Historia jest pouczająca. Do K24r reguła miała wyjątek `+N`; usunięto go słusznie,
+bo po przestemplowaniu z 2026-08-06 `N` przeszło do `logicalOrigin` i ogonem nie
+jest. Usunięcie zostawiło jednak **brak członu** tam, gdzie prawda brzmi `-N` —
+reguła przeszła z zaniżania na zawyżanie zamiast trafić.
+
+**To nie był defekt silnika.** Na wszystkich tych węzłach `engine_tail == oracle_c1`;
+rozjazd żył wyłącznie między regułą diagnostyczną a postacią dokładną.
+
+Znaczenie dla członu (b) jest metodologiczne: `max(0, W_src - N)` zależy wyłącznie
+od ogona dziecka i od WŁASNEGO parametru węzła, więc jest w pełni **lokalna**.
+Reguła bez tego członu mierzyła własny brak, a nie nielokalność — była chochołem
+dla operatorów niosących parametr.
+
+Co ta poprawka zmienia, a czego nie:
+
+| wielkość | przed | po |
+|---|---:|---:|
+| HC_INT (dosłownie), ziarno 20260804 | 3168 | **2999** |
+| HC_INT (dosłownie), ziarno 20260807 | 3226 | **3039** |
+| HC_INT (węzły `#`, reguła lokalna B) | 346 / 340 | bez zmian |
+| HC_SINGLE, obie postaci | 0 | bez zmian |
+| człon (b): odsetek planów z rozjazdem | 52,4% / 52,7% | bez zmian |
+| człon (b): rozjazdy o predeklarowanej postaci | 353/353, 358/358 | bez zmian |
+| reżimy H10a (ogon i początek logiczny) | 9/9 dokładnych | bez zmian |
+
+Nagłówkowa liczba członu (b) jest odporna, bo **żaden** plan nie rozjeżdżał się
+wyłącznie na `SHIFT` — każdy rozjeżdżający się plan rozjeżdża się też na innym
+rodzaju węzła. Poprawka czyści kontrolę negatywną, a nie wynik.
+
+**`HC_INT` pozostaje ZŁAMANA** (2999 i 3039 rozjazdów), więc człon (b) nadal jest
+NIEOCENIALNY. Ta poprawka jest warunkiem koniecznym oceny, nie wystarczającym:
+wąskim gardłem zostaje człon pierwszej fazy `#`, o dokładnie jeden slot za krótki
+w 346 z 2859 węzłów o ilorazie całkowitym (rozkład rozjazdu to wyłącznie `{0, 1}`).
+
+**Pliki odniesienia zostają nietknięte.** `VERDICT.md` i `VERDICT_oos.md` są zapisem
+kampanii, która szła ze starą regułą, i mają nim pozostać — świeży werdykt różni się
+od nich w sekcji 3 dokładnie o wielkości z tabeli powyżej i **nie jest to dryft**.
+Jądro bramki (`compare_regimes.py`) czyta wyłącznie dwie tabele reżimów H10a, więc
+tej różnicy nie widzi i widzieć nie ma. Przeliczenie członu (b) poprawioną regułą
+wymaga własnej predeklaracji i osobnego przebiegu; dopasowanie kryterium do danych
+po fakcie unieważniłoby wynik.
+
 ## Defekt aparatury z 2026-08-19 — binarka nie może być zgadywana
 
 Poziom `test_closedform` oblał na CI z powodu, który **nie miał nic wspólnego

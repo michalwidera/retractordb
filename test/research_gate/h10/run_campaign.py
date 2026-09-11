@@ -45,6 +45,22 @@ def local_rule_a(plan, given_tails=None):
     ani w silniku, ani w modelu zdarzeniowym, i zafałszowałoby rozjazd, którym
     mierzy się człon (b). Populacja członu (b) (składowe deklarowane) jest na tę
     zmianę niewrażliwa; wpływ ma ona wyłącznie na kolumny diagnostyczne.
+
+    Poprawka z 2026-09-12: usunięcie `+N` było słuszne, ale zostawiło BRAK
+    członu, podczas gdy postać dokładna dla `>N` to `max(0, Wsrc - N)`. Reguła
+    liczyła więc `Wsrc` i ZAWYŻAŁA ogon. Rozjazd miał postać zamkniętą
+    `-min(N, Wsrc)` i trafiał 5314/5314 węzłów `SHIFT` na ziarnie 20260804 oraz
+    5438/5438 na 20260807 — czyli był w całości artefaktem reguły, a nie
+    własnością silnika (`engine_tail == oracle_c1` na wszystkich tych węzłach).
+
+    `max(0, Wsrc - N)` zależy wyłącznie od ogona dziecka i od WŁASNEGO parametru
+    węzła, więc jest w pełni lokalna. Reguła bez tego członu była chochołem:
+    mierzyła własny brak, nie nielokalność, i zawyżała kontrolę negatywną
+    `HC_INT` o 169 z 3168 rozjazdów.
+
+    Wpływ jest ograniczony do kolumn diagnostycznych (`local_a`, `divergence_a`)
+    i do kontroli negatywnych. Reżimy H10a liczą się z `engine_tail` wobec
+    `oracle_c1` i ta zmiana ich nie dotyka.
     """
     tails = {}
     for node in plan.nodes:
@@ -55,7 +71,12 @@ def local_rule_a(plan, given_tails=None):
         source_tails = given_tails if given_tails is not None else tails
         converted = [C.to_slots(source_tails[child.name], child.delta, node.delta)
                      for child in children]
-        tails[node.name] = max(converted)
+        own = max(converted)
+        # `>N` czyta starszy indeks logiczny, więc SKRACA ogon o N — to jest
+        # informacja lokalna (własny parametr węzła), a nie składnik fazowy.
+        if node.kind == SHIFT:
+            own = max(0, own - int(node.param))
+        tails[node.name] = own
     return tails
 
 
