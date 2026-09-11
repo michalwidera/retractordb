@@ -88,11 +88,11 @@ using fieldShapeLookup = std::function<std::optional<fieldShape>(const std::stri
 /// programu do PIERWSZEGO literału tekstowego — więc wyrażenie liczbowe z literałem gdziekolwiek
 /// w środku lądowało w polu `STRING` (`to_integer('42')+k`, pozycja 12 w usecases/requested.md).
 ///
-/// Wnioskowany jest WYŁĄCZNIE napis. Typy liczbowe zostają przy regule, którą stosuje
-/// `RQLParser::exitExpression`: `INTEGER`, chyba że ostatnim tokenem jest `to_float`
-/// albo `to_double`. Rozszerzenie na propagację `FLOAT`/`DOUBLE` byłoby zmianą znaczenia
-/// istniejących planów — `Ceil(x)` nad `DOUBLE` daje dziś pole `INTEGER` i tego wymaga
-/// test integracyjny `fncall_runtime_case`.
+/// Wnioskowany jest WYŁĄCZNIE napis, i to tylko na użytek `RQLParser::exitExpression`,
+/// któremu wystarczy wartość początkowa pola: publiczny kształt — łącznie z szerokością
+/// napisu — ustala `compiler::inferFieldShapes()` z całego programu ONP, przez
+/// `inferExpressionShape()` (expressionShape.hpp). Ta druga funkcja stosuje dla napisów
+/// dokładnie te same reguły stosu co ta, a dodatkowo wyprowadza typy liczbowe.
 ///
 /// Reguły stosu: `to_string` → napis zadeklarowanej szerokości (albo kToStringDefaultWidth),
 /// literał tekstowy → napis swojej długości, `PUSH_ID` → napis, gdy pole źródłowe jest

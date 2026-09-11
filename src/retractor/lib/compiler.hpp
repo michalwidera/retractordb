@@ -81,8 +81,7 @@ struct compiler {
   std::optional<int> descendSpan(const std::string &nodeId, int width, const std::string &name);
   std::string resolveFieldReferences();
   std::string resolveWindowAggregates();
-  std::string propagateCopiedFieldShapes();
-  std::string inferStringFieldTypes();
+  std::string inferFieldShapes();
   std::string localizeFieldOffsets();
   void collectTransitiveOffsets(const std::string &srcId, int baseOffset, bool viaHash, std::map<std::string, int> &result,
                                 std::set<std::string> &viaInterleave);

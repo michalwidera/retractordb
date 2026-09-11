@@ -5,6 +5,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -2471,17 +2472,26 @@ TEST(xcompiler, length_over_string_field_yields_integer_field) {
   EXPECT_EQ(text.rlen * text.rarray, 8);
 }
 
-// Wnioskowany jest WYLACZNIE napis. Typy liczbowe zostaja przy dotychczasowej regule
-// (INTEGER, chyba ze ostatnim tokenem jest to_float albo to_double) — `Ceil(x)` nad DOUBLE
-// ma dac pole INTEGER, bo tego wymaga test integracyjny fncall_runtime_case.
-TEST(xparser, numeric_result_types_are_unchanged) {
+// MIGRACJA KONTRAKTU (pozycja 16 w usecases/requested.md, granice 1 i 2).
+//
+// Do 2026-09-11 ten test pinowal regule „INTEGER, chyba ze OSTATNIM tokenem programu jest
+// to_float albo to_double": `Ceil(x)` nad DOUBLE dawalo pole INTEGER, a czysty odczyt
+// `src[1]` gubil typ producenta. Obie odpowiedzi byly niezgodne z tym, co liczy
+// expressionEvaluator — `callFun()` rzutuje wynik z powrotem na typ argumentu, a odczyt pola
+// oddaje wartosc w typie tego pola — wiec deskryptor opisywal cos innego niz payload.
+//
+// Typ pola ustala teraz compiler::inferFieldShapes() z calego programu ONP.
+TEST(xparser, numeric_result_types_follow_the_evaluator) {
   auto plan = compilePlan(
       "SUBSTRAT 'memory'\n"
       "DECLARE a INTEGER, b DOUBLE STREAM src, 1 FILE 'src.txt'\n"
       "SELECT Ceil(src[1]), src[1], to_float(src[0]), to_double(src[0]) STREAM dst FROM src\n");
 
-  EXPECT_EQ(outputField(plan, "dst", 0).rtype, rdb::INTEGER);
-  EXPECT_EQ(outputField(plan, "dst", 1).rtype, rdb::INTEGER);
+  // `Ceil` liczy w double i wraca rzutem na typ ARGUMENTU — patrz callFun().
+  EXPECT_EQ(outputField(plan, "dst", 0).rtype, rdb::DOUBLE);
+  // Czysty odczyt pola zachowuje typ i dlugosc producenta.
+  EXPECT_EQ(outputField(plan, "dst", 1).rtype, rdb::DOUBLE);
+  EXPECT_EQ(outputField(plan, "dst", 1).rlen, static_cast<int>(sizeof(double)));
   EXPECT_EQ(outputField(plan, "dst", 2).rtype, rdb::FLOAT);
   EXPECT_EQ(outputField(plan, "dst", 3).rtype, rdb::DOUBLE);
 }
@@ -2650,10 +2660,10 @@ TEST(xcompiler, explicit_to_integer_outranks_the_window_reduction_type) {
   EXPECT_EQ(outputField(plan, "dst", 0).rtype, rdb::INTEGER);
   // Bez rzutowania typ nadal bierze sie z reguly redukcji.
   EXPECT_EQ(outputField(plan, "dst", 1).rtype, rdb::RATIONAL);
-  // Granica naprawy: rozstrzyga OSTATNI token programu, wiec rzutowanie schowane pod
-  // arytmetyka nadal przegrywa. To jest reszta pozycji 12 z usecases/requested.md, czyli
-  // ogolne wnioskowanie typow liczbowych, a nie ta zmiana.
-  EXPECT_EQ(outputField(plan, "dst", 2).rtype, rdb::RATIONAL);
+  // Granica z 2026-08-31 ZAMKNIETA (pozycja 16, granica 3). Rzutowanie schowane pod
+  // arytmetyka wygrywa tak samo jak stojace na koncu, bo rozstrzyga caly program, a nie
+  // jego ostatni token: `to_integer(...)` daje INTEGER, a `INTEGER + 1` zostaje INTEGER-em.
+  EXPECT_EQ(outputField(plan, "dst", 2).rtype, rdb::INTEGER);
 }
 
 // Agregaty o tym samym zrodle, polu i szerokosci dziela JEDNO przejscie po oknie.
@@ -2933,4 +2943,197 @@ TEST(xcompiler, window_result_type_reaches_copies_of_the_window_stream) {
 
   for (const char *id : {"w", "plain", "shifted", "twice"})
     EXPECT_EQ(outputField(plan, id, 0).rtype, rdb::RATIONAL) << id;
+}
+
+// ============================================================================================
+// Kontrakt typu wyniku wyrazenia — pozycja 16 w paper-arXiv/usecases/requested.md.
+//
+// Typ, dlugosc i krotnosc pola ustala JEDEN przebieg (compiler::inferFieldShapes) z calego
+// programu ONP, a nie piec regul lokalnych, z ktorych kazda widziala inny jego fragment.
+// Reguly typow same w sobie pilnuje test_expressionShape.cpp; tutaj sprawdzane jest to, czy
+// docieraja do PUBLICZNEGO deskryptora i czy przenosza sie przez plan.
+// ============================================================================================
+
+// Trzy granice wymienione wprost w pozycji 16. Kazda kompilowala sie czysto i kazda dawala
+// deskryptor niezgodny z wartoscia, ktora silnik do niego zapisywal.
+TEST(xcompiler, requested16_three_documented_boundaries) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE d DOUBLE, k INTEGER STREAM source, 1 FILE 'source.txt'\n"
+      // 1. Czysty odczyt pola DOUBLE — kopia pola nie zachowywala typu zrodla.
+      "SELECT source[0] STREAM b1 FROM source\n"
+      // 2. Konwersja w SRODKU wyrazenia — program konczy sie mnozeniem, wiec regula
+      //    „ostatni token" jej nie widziala.
+      "SELECT to_float('2.5') * 2 STREAM b2 FROM source\n"
+      // 3. Rzutowanie nad oknem schowane pod arytmetyka — typ okna nadpisywal INTEGER.
+      "SELECT to_integer(AVG(k : 10)) + 1 STREAM b3 FROM source\n");
+
+  EXPECT_EQ(outputField(plan, "b1", 0).rtype, rdb::DOUBLE);
+  EXPECT_EQ(outputField(plan, "b1", 0).rlen, static_cast<int>(sizeof(double)));
+  EXPECT_EQ(outputField(plan, "b2", 0).rtype, rdb::FLOAT);
+  EXPECT_EQ(outputField(plan, "b3", 0).rtype, rdb::INTEGER);
+}
+
+// `SELECT *` kopiuje ksztalt PRODUCENTA, slot po slocie. Do 2026-09-11 wpisywal
+// `INTEGER` na sztywno, wiec kazdy typ inny niz INTEGER ginal razem z ukladem rekordu:
+// `DOUBLE` zajmuje 8 B, wiec zmiana przesuwa takze offsety kolejnych pol.
+TEST(xcompiler, fullscan_copies_every_producer_field_shape) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE d DOUBLE, f FLOAT, i INTEGER, u UINT, b BYTE, t STRING[8] STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT * STREAM copy FROM src\n");
+
+  const std::vector<rdb::descFld> expected{rdb::DOUBLE, rdb::FLOAT, rdb::INTEGER, rdb::UINT, rdb::BYTE, rdb::STRING};
+  for (size_t position = 0; position < expected.size(); ++position)
+    EXPECT_EQ(outputField(plan, "copy", static_cast<int>(position)).rtype, expected[position]) << position;
+
+  EXPECT_EQ(outputField(plan, "copy", 5).rlen * outputField(plan, "copy", 5).rarray, 8);
+
+  // Deskryptor wyjscia musi miec te sama szerokosc bajtowa co zrodlo — inaczej offsety pol
+  // rozjezdzaja sie z ukladem rekordu, a nie tylko nazwa typu w `.desc`.
+  EXPECT_EQ(plan.getQuery("copy").descriptorStorage().getSizeInBytes(),
+            plan.getQuery("src").descriptorStorage().getSizeInBytes());
+}
+
+// Propagacja przez WSZYSTKIE operatory kopiujace schemat: `>N`, `-`, `#`, `&`, `%` oraz
+// strumieniowe `+`. Kazdy z nich przenosi sloty zrodla bez zmiany ich znaczenia, wiec typ
+// pola ma przez niego przejsc.
+TEST(xcompiler, producer_field_shape_propagates_through_copying_operators) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE d DOUBLE STREAM a, 1 FILE 'a.txt'\n"
+      "DECLARE e DOUBLE STREAM b, 1 FILE 'b.txt'\n"
+      "SELECT * STREAM shifted FROM a>2\n"
+      "SELECT * STREAM decimated FROM a-2\n"
+      "SELECT * STREAM hashed FROM a#b\n"
+      "SELECT * STREAM leftHalf FROM (a#b)&2\n"
+      "SELECT * STREAM rightHalf FROM (a#b)%2\n"
+      "SELECT * STREAM joined FROM a+b\n");
+
+  for (const char *id : {"shifted", "decimated", "hashed", "leftHalf", "rightHalf"})
+    EXPECT_EQ(outputField(plan, id, 0).rtype, rdb::DOUBLE) << id;
+
+  // Suma strumieni skleja schematy, wiec oba pola maja byc DOUBLE.
+  EXPECT_EQ(outputField(plan, "joined", 0).rtype, rdb::DOUBLE);
+  EXPECT_EQ(outputField(plan, "joined", 1).rtype, rdb::DOUBLE);
+}
+
+// Punkt staly, a nie jeden przebieg: na tym etapie qTree jest posortowane po INTERWALE,
+// wiec konsument potrafi stac w wektorze przed swoim producentem. Lancuch ma tu cztery
+// ogniwa i jest zapisany w kolejnosci odwrotnej do zaleznosci.
+TEST(xcompiler, field_shape_crosses_several_intermediate_streams) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE d DOUBLE STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT * STREAM fourth FROM third\n"
+      "SELECT * STREAM third FROM second\n"
+      "SELECT * STREAM second FROM first\n"
+      "SELECT src[0] STREAM first FROM src\n");
+
+  for (const char *id : {"first", "second", "third", "fourth"})
+    EXPECT_EQ(outputField(plan, id, 0).rtype, rdb::DOUBLE) << id;
+}
+
+// Wezly, ktorych schemat SYNTETYZUJE ich wlasny operator, zostaja nietkniete. Token PUSH_ID
+// w programie ich pol jest MIEJSCEM w rekordzie, a nie odczytem pola zrodlowego: reduktor
+// daje jedno pole RATIONAL niezaleznie od typu `src[0]`, a `@` — pola typu NAJSZERSZEGO
+// z rekordu zrodla. Wnioskowanie z programu dalo by tam ksztalt cicho zly.
+TEST(xcompiler, synthesised_schemas_keep_their_own_field_shapes) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE b BYTE STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT * STREAM reduced FROM AVG(src)\n"
+      "SELECT * STREAM window FROM src@(1,3)\n");
+
+  EXPECT_EQ(outputField(plan, "reduced", 0).rtype, rdb::RATIONAL);
+  for (int position = 0; position < 3; ++position)
+    EXPECT_EQ(outputField(plan, "window", position).rtype, rdb::BYTE) << position;
+}
+
+// Typ wartosci wchodzacych do redukcji okiennej liczy sie z CALEGO programu argumentu,
+// a nie z najszerszego pola, po ktore ten program siega. `MIN(to_double(k) : 4)` nad polem
+// INTEGER redukuje wartosci DOUBLE, wiec wynik zostaje DOUBLE zamiast isc przez RATIONAL.
+TEST(xcompiler, window_argument_type_comes_from_its_whole_program) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE k INTEGER STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT MIN(k : 4) STREAM plain FROM src\n"
+      "SELECT MIN(to_double(k) : 4) STREAM converted FROM src\n");
+
+  EXPECT_EQ(outputField(plan, "plain", 0).rtype, rdb::RATIONAL);
+  EXPECT_EQ(plan.getQuery("plain").windowGroups.at(0).valueType, rdb::RATIONAL);
+
+  EXPECT_EQ(outputField(plan, "converted", 0).rtype, rdb::DOUBLE);
+  EXPECT_EQ(plan.getQuery("converted").windowGroups.at(0).valueType, rdb::DOUBLE);
+}
+
+// Deklaracja jest UMOWA z plikiem zrodlowym, a nie wynikiem rachunku — analizator jej nie
+// dotyka. Takze wtedy, gdy jej pole nosi typ, ktorego zaden SELECT w planie nie uzywa.
+TEST(xcompiler, declaration_shapes_are_authoritative) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE d DOUBLE, a INTEGER[3], t STRING[8] STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT src[0] STREAM dst FROM src\n");
+
+  EXPECT_EQ(outputField(plan, "src", 0).rtype, rdb::DOUBLE);
+  // Tablica zachowuje w DEKLARACJI zapis `T[N]`; splaszczenie dotyczy schematow pochodnych.
+  EXPECT_EQ(outputField(plan, "src", 1).rtype, rdb::INTEGER);
+  EXPECT_EQ(outputField(plan, "src", 1).rarray, 3);
+  EXPECT_EQ(outputField(plan, "src", 2).rtype, rdb::STRING);
+  EXPECT_EQ(outputField(plan, "src", 2).rarray, 8);
+}
+
+// Element tablicy liczbowej jest JEDNA liczba, wiec krotnosc kopii spada do jednego, a jej
+// typ i dlugosc zostaja.
+TEST(xcompiler, array_element_read_keeps_type_and_drops_arity) {
+  auto plan = compilePlan(
+      "SUBSTRAT 'memory'\n"
+      "DECLARE a DOUBLE[3] STREAM src, 1 FILE 'src.txt'\n"
+      "SELECT src[1] STREAM one FROM src\n");
+
+  EXPECT_EQ(outputField(plan, "one", 0).rtype, rdb::DOUBLE);
+  EXPECT_EQ(outputField(plan, "one", 0).rarray, 1);
+  EXPECT_EQ(outputField(plan, "one", 0).rlen, static_cast<int>(sizeof(double)));
+}
+
+// Ponowna kompilacja ZYWEGO planu nie rusza deskryptorow. Jest to wymog, nie ozdoba:
+// executorsm::getAdHoc() kompiluje plan po raz drugi, zeby dolaczyc do niego zapytanie ad hoc,
+// wiec przebieg z cala pewnoscia zobaczy zapytania rozwiazane w poprzednim przebiegu —
+// z programami juz uproszczonymi i z wypelniona tabela grup okien.
+TEST(xcompiler, field_shapes_are_stable_across_a_live_plan_recompilation) {
+  qTree live;
+  auto [parseResult, keyword, streamName] = parserRQLString(live, R"(
+        SUBSTRAT 'memory'
+        DECLARE d DOUBLE, k INTEGER STREAM src, 1 FILE 'src.txt'
+        SELECT src[0], to_float('2.5')*2, to_integer(AVG(k : 4)) + 1, AVG(k : 4) STREAM dst FROM src
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler liveCompiler(live);
+  ASSERT_EQ(liveCompiler.compile(), "OK");
+
+  const auto shapesOf = [](qTree &plan) {
+    std::vector<std::tuple<rdb::descFld, int, int>> result;
+    for (const auto &f : plan.getQuery("dst").lSchema)
+      result.emplace_back(f.field_.rtype, f.field_.rlen, f.field_.rarray);
+    return result;
+  };
+  const auto before = shapesOf(live);
+  ASSERT_EQ(before.size(), 4u);
+  EXPECT_EQ(std::get<0>(before[0]), rdb::DOUBLE);
+  EXPECT_EQ(std::get<0>(before[1]), rdb::FLOAT);
+  EXPECT_EQ(std::get<0>(before[2]), rdb::INTEGER);
+  EXPECT_EQ(std::get<0>(before[3]), rdb::RATIONAL);
+
+  // Droga ad hoc: skopiowany plan dostaje nowe zapytanie, a zywy kompilator importuje z niego
+  // WYLACZNIE nowe identyfikatory i kompiluje calosc ponownie.
+  qTree importedPlan                                 = live;
+  auto [adHocParseResult, adHocKeyword, adHocStream] = parserRQLString(importedPlan, "SELECT k STREAM ad FROM src");
+  ASSERT_EQ(adHocParseResult, "OK");
+  compiler importedCompiler(importedPlan);
+  ASSERT_EQ(importedCompiler.compile(), "OK");
+  ASSERT_FALSE(liveCompiler.importFrom(importedPlan).empty());
+  ASSERT_EQ(liveCompiler.compile(), "OK");
+
+  EXPECT_EQ(shapesOf(live), before);
 }

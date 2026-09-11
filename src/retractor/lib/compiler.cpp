@@ -21,7 +21,8 @@
 #include <boost/rational.hpp>
 #include <boost/regex.hpp>
 
-#include "exprSimplify.hpp"  // simplifyExpression, inferStringWidth
+#include "expressionShape.hpp"  // inferExpressionShape, exprShape
+#include "exprSimplify.hpp"     // simplifyExpression
 #include "fatalError.hpp"
 #include "rdb/probe.hpp"  // sonda E3: rozmiar planu, czas kompilacji
 #include "rdb/rationalFormat.hpp"
@@ -809,13 +810,27 @@ std::string compiler::expandSchemaWildcards() {
             // w PUSH_ID jest indeksem płaskim (patrz flattenArrayFields() i sourceFieldAt()).
             // Licząc wpisy, `SELECT * FROM x` nad `INTEGER[24]` dawało JEDNO pole zamiast
             // dwudziestu czterech i po cichu gubiło 23 wartości z rekordu.
+            //
+            // Ksztalt slotu bierze sie z PRODUCENTA, a nie z wpisu `INTEGER` na sztywno.
+            // Do 2026-09-11 stalo tu `rField(name, 4, 1, rdb::INTEGER)`, wiec `SELECT *`
+            // nad `DOUBLE` dawalo w artefakcie `INTEGER` — a razem z nim przesuniete
+            // offsety kolejnych pol rekordu (8 B kontra 4 B). To jest ta sama kopia pola,
+            // ktora ponizej liczy inferFieldShapes(); zapisana juz tutaj, zeby przebiegi
+            // stojace pomiedzy (rozwiazanie interwalow, deduplikacja substratow,
+            // rozwiazanie odwolan) nie czytaly ksztaltu, ktory jest po prostu nieprawdziwy.
+            //
+            // Wpis wieloslotowy wchodzi do kopii SLOTEM: zostaje typ i dlugosc, a krotnosc
+            // spada do jednego — ta sama regula co we flattenArrayFields(). `STRING[N]` jest
+            // jednym slotem i zachowuje `rarray = N`.
             int filedPosition = 0;
             for (const auto &s : coreInstance.getQuery(t.getStr_()).lSchema) {
-              for (int slot = 0; slot < flatSlotCount(s.field_); ++slot) {
+              const int slots = flatSlotCount(s.field_);
+              const int arity = (slots == 1) ? s.field_.rarray : 1;
+              for (int slot = 0; slot < slots; ++slot) {
                 std::list<token> lTempProgram;
                 lTempProgram.emplace_back(PUSH_ID, std::make_pair(nameOfscanningTable, filedPosition++));
                 std::string name = /*"Field_"*/ t.getStr_() + "_" + boost::lexical_cast<std::string>(fieldCountSh++);
-                q.lSchema.emplace_back(rdb::rField(name, 4, 1, rdb::INTEGER), lTempProgram);
+                q.lSchema.emplace_back(rdb::rField(name, s.field_.rlen, arity, s.field_.rtype), lTempProgram);
               }
             }
             break;
@@ -2372,24 +2387,6 @@ std::optional<rdb::rField> compiler::sourceFieldAt(const std::string &streamId, 
   return std::nullopt;
 }
 
-/// Typ pola wyjściowego, którego nie da się poznać przy parsowaniu — wynik jest napisem,
-/// bo napisem jest pole źródłowe.
-///
-/// `RQLParser::exitExpression` rozstrzyga to samo pytanie tą samą funkcją (inferStringWidth),
-/// ale bez znajomości schematów: w chwili parsowania odwołanie do pola jest jeszcze
-/// PUSH_ID1/2/3, a schematu strumienia, do którego sięga, może w ogóle nie być. Dlatego
-/// `SELECT txt` nad polem `STRING[8]` dawało pole `INTEGER` wypełnione zerami — pozycja 12
-/// w usecases/requested.md. Tutaj PUSH_ID niesie już parę (strumień, indeks płaski), więc
-/// kształt pola źródłowego jest dostępny.
-///
-/// Przebieg wyłącznie PODNOSI pole do `STRING`. Degradacja — wyrażenie liczbowe z literałem
-/// tekstowym w środku — jest w całości załatwiona regułą wyniku w parserze, a wnioskowania
-/// typów liczbowych tu NIE MA: `Ceil(x)` nad `DOUBLE` daje pole `INTEGER` i tego wymaga test
-/// integracyjny `fncall_runtime_case`.
-///
-/// Punkt stały zamiast jednego przebiegu, bo na tym etapie qTree jest posortowane po
-/// interwale (resolveStreamIntervals), a nie topologicznie: konsument potrafi stać przed
-/// swoim producentem, a typ musi się przez plan przenieść.
 /// Scala parę [PUSH_ID pola, WINDOW_*] w jeden token z indeksem grupy okna.
 ///
 /// Po tym przebiegu WINDOW_* jest bezargumentowym LIŚCIEM programu: nie zdejmuje niczego ze
@@ -2444,12 +2441,7 @@ std::string compiler::resolveWindowAggregates() {
           return "Stream '" + q.id + "' uses a window aggregate in a RULE condition, which is not supported";
 
     for (auto &f : q.lSchema) {
-      // Typ startowy jest NAJWĘŻSZY z arytmetycznych, a nie NULLTYPE: porządek enum descFld
-      // stawia NULLTYPE ZA typami liczbowymi, więc sentinel z NULLTYPE nigdy nie przegrałby
-      // porównania i pole zostawałoby bez typu.
       bool fieldHasWindow = false;
-      rdb::descFld windowType(rdb::BYTE);
-      int windowLen(static_cast<int>(sizeof(uint8_t)));
 
       // Praca na wektorze, bo argument okna jest ZAKRESEM pozycji, a nie jednym tokenem:
       // parser zapisal w tokenie poczatek podprogramu argumentu, koncem jest sam token okna.
@@ -2490,10 +2482,14 @@ std::string compiler::resolveWindowAggregates() {
         shape.width = width;
 
         // Zrodlo okna wyznaczaja odwolania argumentu i musi byc JEDNO: okno siega po historie
-        // strumienia, a historii zlaczenia nikt nie przechowuje. Typ wartosci bierzemy
-        // z NAJSZERSZEGO pola, po ktore argument siega — dla golego pola to po prostu jego typ.
-        rdb::descFld valueType(rdb::BYTE);
-        int valueLen(static_cast<int>(sizeof(uint8_t)));
+        // strumienia, a historii zlaczenia nikt nie przechowuje.
+        //
+        // TYPU wartosci ten przebieg juz NIE ustala. Do 2026-09-11 bral go z NAJSZERSZEGO
+        // pola, po ktore argument siega — regula trafna dla golego pola i myląca dla
+        // wyrazenia (`MIN(to_double(k) : 5)` nad polem INTEGER dawalo RATIONAL, bo funkcji
+        // nie widziala). Teraz typ argumentu liczy inferFieldShapes() z CALEGO programu
+        // argumentu i przepuszcza go przez reductionResultField() — w punkcie stalym, bo typ
+        // pola zrodlowego moze sam jeszcze czekac na ustalenie.
         bool anyReference(false);
         for (auto &t : argument) {
           if (t.getCommandID() == PUSH_VAL && std::holds_alternative<std::string>(t.getVT())) {
@@ -2528,10 +2524,6 @@ std::string compiler::resolveWindowAggregates() {
             return "Stream '" + q.id + "' aggregates a window over STRING field '" + field->rname + "' of '" + refSource +
                    "'; window aggregates are arithmetic";
           }
-          if (!anyReference || field->rtype > valueType) {
-            valueType = field->rtype;
-            valueLen  = field->rlen;
-          }
           shape.source = refSource;
           shape.slot   = slot;
           anyReference = true;
@@ -2547,16 +2539,11 @@ std::string compiler::resolveWindowAggregates() {
           shape.program = std::move(argument);
         }
 
-        // Typ wyniku tą samą regułą co reduktory strumieniowe — patrz reductionResultField().
-        const auto [resultType, resultLen] = reductionResultField(valueType, valueLen);
-        shape.valueType                    = resultType;
-
+        // `valueType` zostaje na wartosci domyslnej struktury; wypelni je inferFieldShapes().
+        // Dzieki temu grupy o jednym ksztalcie (zrodlo, szerokosc, program) scalaja sie tutaj
+        // NIEZALEZNIE od typu — a typ i tak wyjdzie im ten sam, bo liczy sie z tego programu.
         const int groupIndex = groupIndexFor(shape);
-        if (!fieldHasWindow || resultType > windowType) {
-          windowType = resultType;
-          windowLen  = resultLen;
-        }
-        fieldHasWindow = true;
+        fieldHasWindow       = true;
 
         prog[pos] = token(prog[pos].getCommandID(), groupIndex);
         prog.erase(prog.begin() + static_cast<std::ptrdiff_t>(argStart), prog.begin() + static_cast<std::ptrdiff_t>(pos));
@@ -2564,27 +2551,13 @@ std::string compiler::resolveWindowAggregates() {
 
       if (fieldHasWindow) f.lProgram.assign(prog.begin(), prog.end());
 
-      // `to_integer(MIN(x:10))` jest tak samo jawnym wyborem typu jak `to_double(...)`, ale
-      // rozpoznac go po SAMYM typie pola nie sposob: RQLParser::exitExpression zapisuje typ
-      // wprost wylacznie dla `to_float`, `to_double` i `to_string`, a `to_integer` zostawia
-      // domyslny INTEGER, czyli dokladnie ten sentinel, ktory znaczy „autor nic nie powiedzial".
-      // Do 2026-08-31 pole wychodzilo stad jako RATIONAL wbrew wywolaniu stojacemu w programie
-      // i `to_integer(AVG(t:12))` trafialo do artefaktu jako RATIONAL. Rozstrzyga wiec ostatni
-      // token programu, a nie typ. Ogolnego wnioskowania typow liczbowych to nie zastepuje —
-      // `to_integer(MIN(x:10))+1` nadal wraca do reguly ponizej (pozycja 12 w requested.md).
-      const bool explicitIntegerCast(!f.lProgram.empty() &&                       //
-                                     f.lProgram.back().getCommandID() == CALL &&  //
-                                     f.lProgram.back().getStr_() == "to_integer");
-
-      // Typ pola ustawiamy TYLKO wtedy, gdy parser zostawił swój domyślny INTEGER. Zapis
-      // `to_double(MIN(x:10))` albo `to_string(MIN(x:10):8)` ma typ ustalony przez funkcję
-      // zewnętrzną i nadpisanie go tutaj byłoby zgubieniem intencji autora; zapis
-      // `MIN(x:10)` i `MIN(x:10)+1` domyślnego typu nie mają skąd wziąć i biorą go stąd.
-      if (fieldHasWindow && f.field_.rtype == rdb::INTEGER && !explicitIntegerCast) {
-        f.field_.rtype  = windowType;
-        f.field_.rlen   = windowLen;
-        f.field_.rarray = 1;
-      }
+      // TYPU POLA ten przebieg juz nie ustala. Do 2026-09-11 stala tu para regul lokalnych:
+      // „nadpisz typem okna, jesli parser zostawil domyslny INTEGER" oraz wyjatek
+      // `explicitIntegerCast`, rozpoznajacy koncowe `to_integer` po OSTATNIM tokenie programu.
+      // Wyjatek zamykal `to_integer(AVG(t:12))` (pozycja 15 w requested.md) i z zalozenia nie
+      // siegal dalej: `to_integer(AVG(x:10)) + 1` konczy sie tokenem ADD, wiec wracal do
+      // nadpisania i wychodzil jako RATIONAL (pozycja 16, granica 3). Obie reguly zastepuje
+      // inferFieldShapes(), ktore czyta CALY program, a nie jego ostatni token.
     }
   }
   return {"OK"};
@@ -2616,94 +2589,98 @@ bool copiesOperandSchema(const query &q) {
 }
 }  // namespace
 
-/// Ksztalt pola SKOPIOWANEGO z okna bierze sie z pola, ktore ten wezel czyta.
+/// Ksztalt wyniku KAZDEGO pola SELECT — jeden przebieg wnioskowania dla calego planu.
 ///
-/// Schematy wezlow pochodnych materializuja sie w expandSchemaWildcards(), czyli PRZED
-/// resolveWindowAggregates(). Typ wyniku okna jeszcze wtedy nie istnieje — pole nosi domyslny
-/// INTEGER parsera — wiec kopia zabierala ten INTEGER i zostawala przy nim na zawsze:
-/// `SELECT * FROM okno` i `SELECT * FROM okno>1` przycinaly RATIONAL po cichu, 17/4 wychodzilo
-/// jako 4.
+/// Zastepuje cztery reguly lokalne, ktore do 2026-09-11 rozstrzygaly to pytanie kazda na
+/// wlasna reke i zadna do konca (pozycja 16 w `usecases/requested.md`):
 ///
-/// Przebieg rusza WYLACZNIE pola, ktore czytaja pole okna — bezposrednio albo przez lancuch
-/// kopii. Nie jest to ostroznosc, tylko zakres: kopiowanie ksztaltu wszystkich pol
-/// jednotokenowych zmienialoby takze `SELECT source[0]` nad polem BYTE, czyli typ w artefakcie
-/// zapytania, ktore z oknem nie ma nic wspolnego. Ze ta szersza regula tez ma swoja racje,
-/// widac po `SELECT * FROM s` nad polem DOUBLE, ktore do dzis daje INTEGER — ale to osobny
-/// defekt i osobna decyzja.
+///  * `propagateCopiedFieldShapes()` — przenosil ksztalt przez wezly kopiujace, ale
+///    WYLACZNIE dla pol czytajacych wynik okna rekordowego. `SELECT source[0]` nad polem
+///    `DOUBLE` zostawalo `INTEGER`, bo z oknem nie mialo nic wspolnego;
+///  * `inferStringFieldTypes()` — osobny przebieg tylko dla `STRING`;
+///  * nadpisanie typem okna i wyjatek `explicitIntegerCast` w `resolveWindowAggregates()`;
+///  * rozpoznawanie `to_float`/`to_double` po OSTATNIM tokenie w `RQLParser::exitExpression()`.
 ///
-/// Punkt staly, bo kopia kopii jest zwyklym zapisem (`(okno>1)>1`), a qTree nie jest tu
-/// posortowane topologicznie. Liczba rund ograniczona rozmiarem planu: dluzszego lancucha
-/// kopii niz liczba wezlow byc nie moze.
+/// Teraz ksztalt liczy `inferExpressionShape()` z CALEGO programu pola, odtwarzajac arytmetyke
+/// `expressionEvaluator` na stosie typow — wraz z promocja `BYTE`, jawnymi konwersjami
+/// w srodku wyrazenia i wynikiem okna. Reguly i ich uzasadnienie stoja w `expressionShape.hpp`.
 ///
-/// Pole jednotokenowe `PUSH_ID` to CALY rachunek tego pola, czyli czysty odczyt slotu zrodla.
-/// Pole z dluzszym programem cokolwiek liczy i swojego typu z pola zrodlowego nie bierze.
-std::string compiler::propagateCopiedFieldShapes() {
-  // Ziarno: pola, ktorych typ ustalil resolveWindowAggregates(). Klucz jest taki sam jak
-  // w PUSH_ID — nazwa strumienia i indeks PLASKI.
-  std::set<std::pair<std::string, int>> windowTyped;
-  for (const auto &q : coreInstance) {
-    if (!q.hasWindowAggregates()) continue;
-    int flatIndex = 0;
-    for (const auto &f : q.lSchema) {
-      if (std::ranges::any_of(f.lProgram, [](const token &t) { return isWindowAggregate(t.getCommandID()); }))
-        windowTyped.emplace(q.id, flatIndex);
-      flatIndex += flatSlotCount(f.field_);
-    }
-  }
-  if (windowTyped.empty()) return {"OK"};
-
-  for (std::size_t round = 0; round <= coreInstance.size(); ++round) {
-    bool changed = false;
-    for (auto &q : coreInstance) {
-      if (q.isCompilerDirective() || q.isDeclaration() || !copiesOperandSchema(q)) continue;
-      int flatIndex = 0;
-      for (auto &f : q.lSchema) {
-        const int slots = flatSlotCount(f.field_);
-        const int here  = flatIndex;
-        flatIndex += slots;
-
-        if (f.lProgram.size() != 1 || f.lProgram.front().getCommandID() != PUSH_ID) continue;
-        const auto *ref = std::get_if<std::pair<std::string, int>>(&f.lProgram.front().getVT());
-        if (ref == nullptr || !windowTyped.contains(*ref)) continue;
-        const auto sourceField = sourceFieldAt(ref->first, ref->second);
-        if (!sourceField.has_value()) continue;
-
-        // Wpis zrodla o wielu slotach plaskich wchodzi do kopii SLOTEM, wiec zostaje typ
-        // i dlugosc, a krotnosc spada do jednego — ta sama regula co w flattenArrayFields().
-        const int arity = (flatSlotCount(*sourceField) == 1) ? sourceField->rarray : 1;
-        if (windowTyped.emplace(q.id, here).second) changed = true;
-        if (f.field_.rtype == sourceField->rtype && f.field_.rlen == sourceField->rlen && f.field_.rarray == arity) continue;
-
-        f.field_.rtype  = sourceField->rtype;
-        f.field_.rlen   = sourceField->rlen;
-        f.field_.rarray = arity;
-        changed         = true;
-      }
-    }
-    if (!changed) break;
-  }
-  return {"OK"};
-}
-
-std::string compiler::inferStringFieldTypes() {
-  auto shapeOfField = [this](const std::string &streamId, int fieldIndex) -> std::optional<fieldShape> {
-    const auto sourceField = sourceFieldAt(streamId, fieldIndex);
+/// **Punkt staly**, bo `qTree` jest tu posortowane po INTERWALE (resolveStreamIntervals),
+/// a nie topologicznie: konsument potrafi stac przed swoim producentem, a ksztalt musi sie
+/// przez plan przeniesc. Liczba rund ograniczona rozmiarem planu — dluzszego lancucha
+/// zaleznosci niz liczba wezlow byc nie moze.
+///
+/// **Zakres.** Przebieg rusza wylacznie wezly, ktorych schemat NIE jest syntetyzowany przez
+/// wlasny operator FROM — czyli te, ktore `copiesOperandSchema()` uznaje za kopiujace.
+/// Dla reduktora `MIN/MAX/AVG/SUMC` i dla `@` token `PUSH_ID` w programie pola jest tylko
+/// MIEJSCEM w rekordzie, a nie odczytem pola zrodlowego: `AVG(s)` daje jedno pole `RATIONAL`
+/// niezaleznie od tego, co stoi w `s[0]`, a `s@(1,4)` daje cztery pola typu NAJSZERSZEGO
+/// z rekordu zrodla. Wnioskowanie z programu dalo by tam ksztalt cicho zly, wiec te wezly
+/// zachowuja schemat zbudowany przez `buildOutputSchema()`.
+///
+/// **Deklaracje sa autorytatywne** i przebieg ich nie dotyka: `DECLARE` jest umowa z plikiem
+/// zrodlowym, a nie wynikiem rachunku.
+///
+/// **Idempotentny.** Ksztalt liczy sie wylacznie z programu, wiec powtorna kompilacja zywego
+/// planu (`executorsm::getAdHoc()`) wyprowadza dokladnie te same wartosci. Program zdazy sie
+/// do tego czasu uproscic, ale `simplifyExpression()` jest zachowawcze typowo — regula C
+/// odmawia usuniecia elementu neutralnego o innej reprezentacji niz podwyrazenie (patrz
+/// `dropNeutralOperand`), wiec deskryptor nie zalezy ani od `RDB_OPT_SIMPLIFY_EXPRESSIONS`,
+/// ani od tego, ktory to raz plan przechodzi przez kompilator.
+std::string compiler::inferFieldShapes() {
+  auto shapeOfField = [this](const std::string &streamId, const int flatIndex) -> std::optional<exprShape> {
+    const auto sourceField = sourceFieldAt(streamId, flatIndex);
     if (!sourceField.has_value()) return std::nullopt;
-    return fieldShape{.type = sourceField->rtype, .width = sourceField->rlen * sourceField->rarray};
+    // NULLTYPE i pola konfiguracyjne deskryptora zajmuja pozycje, ale nie sa wartosciami.
+    if (sourceField->rtype > rdb::STRING) return std::nullopt;
+    // Wpis zrodla o wielu slotach plaskich wchodzi do odczytu SLOTEM, wiec zostaje typ
+    // i dlugosc, a krotnosc spada do jednego — ta sama regula co we flattenArrayFields().
+    // `STRING[N]` jest jednym slotem i zachowuje `rarray = N`.
+    const int arity = (flatSlotCount(*sourceField) == 1) ? sourceField->rarray : 1;
+    return exprShape{.rtype = sourceField->rtype, .rlen = sourceField->rlen, .rarray = arity};
   };
 
   for (std::size_t round = 0; round <= coreInstance.size(); ++round) {
     bool changed = false;
     for (auto &q : coreInstance) {
-      if (q.isCompilerDirective() || q.isDeclaration()) continue;
+      if (q.isCompilerDirective() || q.isDeclaration() || !copiesOperandSchema(q)) continue;
+
+      // NAJPIERW grupy okien, bo od ich typu zalezy ksztalt pol, ktore je czytaja.
+      //
+      // Typ wartosci wchodzacych do redukcji liczy sie z CALEGO programu argumentu —
+      // `MIN(to_double(k) : 5)` nad polem INTEGER daje DOUBLE, a nie RATIONAL — i dopiero
+      // ten typ idzie przez reductionResultField(), czyli te sama regule, ktora stosuja
+      // reduktory strumieniowe i streamInstance::reduceRecordWindow().
+      for (auto &g : q.windowGroups) {
+        const auto argument = g.program.empty() ? shapeOfField(g.source, g.slot) : [&] {
+          const auto inferred = inferExpressionShape(g.program, shapeOfField, {});
+          return inferred.resolved() ? std::optional<exprShape>{inferred.shape} : std::nullopt;
+        }();
+        if (!argument.has_value()) continue;
+        const auto [resultType, resultLen] = reductionResultField(argument->rtype, argument->rlen);
+        if (g.valueType == resultType) continue;
+        g.valueType = resultType;
+        changed     = true;
+      }
+
+      auto shapeOfWindow = [&q](const int groupIndex) -> std::optional<exprShape> {
+        if (groupIndex < 0 || std::cmp_greater_equal(groupIndex, q.windowGroups.size())) return std::nullopt;
+        return numericShape(q.windowGroups[static_cast<size_t>(groupIndex)].valueType);
+      };
+
       for (auto &f : q.lSchema) {
-        if (f.lProgram.empty()) continue;
-        const auto width = inferStringWidth(f.lProgram, shapeOfField);
-        if (!width.has_value()) continue;
-        if (f.field_.rtype == rdb::STRING && f.field_.rlen * f.field_.rarray == *width) continue;
-        f.field_.rtype  = rdb::STRING;
-        f.field_.rlen   = static_cast<int>(sizeof(uint8_t));
-        f.field_.rarray = *width;
+        const auto inferred = inferExpressionShape(f.lProgram, shapeOfField, shapeOfWindow);
+        // `unknown` i `illTyped` znacza tu to samo dla kompilatora: pole zostaje przy ksztalcie,
+        // ktory juz ma. Program bez wartosci (operand tekstowy pod `*`) ma polecic bledem
+        // W WYKONANIU, dokladnie tam, gdzie lecial dotad.
+        if (!inferred.resolved()) continue;
+        const rdb::rField &current = f.field_;
+        if (current.rtype == inferred.shape.rtype && current.rlen == inferred.shape.rlen &&
+            current.rarray == inferred.shape.rarray)
+          continue;
+        f.field_.rtype  = inferred.shape.rtype;
+        f.field_.rlen   = inferred.shape.rlen;
+        f.field_.rarray = inferred.shape.rarray;
         changed         = true;
       }
     }
@@ -3153,15 +3130,16 @@ std::string compiler::compile() {
   result = resolveWindowAggregates();
   if (result != "OK") return result;
 
-  // MUSI stac ZA resolveWindowAggregates(): typ wyniku okna ustala sie dopiero tam, a wezly
-  // kopiujace przepisaly pole juz w expandSchemaWildcards(), gdy nosilo domyslny INTEGER.
-  result = propagateCopiedFieldShapes();
-  if (result != "OK") return result;
-
+  // JEDYNY przebieg rozstrzygajacy publiczny ksztalt pola: typ, dlugosc i krotnosc.
+  //
+  // MUSI stac ZA resolveWindowAggregates(), bo dopiero tam token WINDOW_* staje sie lisciem
+  // o znanym indeksie grupy, i ZA resolveFieldReferences(), bo bez pary (strumien, slot)
+  // ksztaltu pola zrodlowego nie ma z czego odczytac.
+  //
   // MUSI stac PRZED upraszczaniem wyrazen, i nie jest to kwestia porzadku. Po zwinieciu stalych
   // `to_string(42:16)` jest literalem "42", wiec szerokosc pola wyszlaby 2 zamiast 16 — deskryptor
   // zaczalby zalezec od RDB_OPT_SIMPLIFY_EXPRESSIONS, czyli od przelacznika wydajnosciowego.
-  result = inferStringFieldTypes();
+  result = inferFieldShapes();
   if (result != "OK") return result;
 
 #if RDB_OPT_SIMPLIFY_EXPRESSIONS

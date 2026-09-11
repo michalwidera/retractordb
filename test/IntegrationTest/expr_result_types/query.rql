@@ -1,0 +1,14 @@
+# Kontrakt typu wyniku wyrazenia — pozycja 16 w paper-arXiv/usecases/requested.md.
+#
+# Kazde pole `dst` odpowiada za jedna regule kontraktu, a wartosci sa dobrane tak, zeby
+# ZLY typ w deskryptorze dalo sie zobaczyc w danych, a nie tylko w `.desc`:
+# 2,5 i 1,25 nie sa calkowite, wiec rzut na INTEGER by je uciął.
+
+STORAGE 'temp'
+
+DECLARE d DOUBLE, k INTEGER STREAM src, 1/8 FILE 'data.txt' ONESHOT
+
+SELECT src[0], src[0]*3, to_float('2.5')*2, to_double(k)/4, null2zero(src[0]) STREAM dst FROM src
+
+# Kopia calego schematu: `SELECT *` ma przeniesc ksztalt producenta slot po slocie.
+SELECT * STREAM copy FROM src
