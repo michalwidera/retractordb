@@ -36,6 +36,10 @@ FIELDS = ("plan", "stratum", "hard_classes", "depth", "node", "kind", "delta",
 def local_rule_a(plan, given_tails=None):
     """Reguła lokalna A (predeklarowana): własny ogon każdego operatora = 0.
 
+    JEDYNA definicja tej reguły w aparaturze — `run_member_b.py` ją importuje.
+    Nie wolno jej kopiować: dwa zapisy tej samej reguły rozjeżdżają się po cichu
+    i raz już to zrobiły (poprawka `>N` z 2026-09-12 trafiła tylko do jednego).
+
     Ogon składowej przeliczany przez takt wzorem ceil(w*D_src/D_dst). Dokładnie
     „suma ogonów operatorów przeliczona przez takt, bez składnika fazowego”.
 

@@ -125,10 +125,9 @@ Nagłówkowa liczba członu (b) jest odporna, bo **żaden** plan nie rozjeżdża
 wyłącznie na `SHIFT` — każdy rozjeżdżający się plan rozjeżdża się też na innym
 rodzaju węzła. Poprawka czyści kontrolę negatywną, a nie wynik.
 
-**`HC_INT` pozostaje ZŁAMANA** (2999 i 3039 rozjazdów), więc człon (b) nadal jest
-NIEOCENIALNY. Ta poprawka jest warunkiem koniecznym oceny, nie wystarczającym:
-wąskim gardłem zostaje człon pierwszej fazy `#`, o dokładnie jeden slot za krótki
-w 346 z 2859 węzłów o ilorazie całkowitym (rozkład rozjazdu to wyłącznie `{0, 1}`).
+Kontrola `HC_INT` była po tej poprawce nadal złamana (2999 i 3039 rozjazdów).
+Zbadanie tego, opisane w następnej sekcji, pokazało, że przyczyna nie leży ani
+w silniku, ani w regule lokalnej: sama kontrola jest źle postawiona.
 
 **Pliki odniesienia zostają nietknięte.** `VERDICT.md` i `VERDICT_oos.md` są zapisem
 kampanii, która szła ze starą regułą, i mają nim pozostać — świeży werdykt różni się
@@ -137,6 +136,61 @@ Jądro bramki (`compare_regimes.py`) czyta wyłącznie dwie tabele reżimów H10
 tej różnicy nie widzi i widzieć nie ma. Przeliczenie członu (b) poprawioną regułą
 wymaga własnej predeklaracji i osobnego przebiegu; dopasowanie kryterium do danych
 po fakcie unieważniłoby wynik.
+
+## Wycofanie kontroli `HC_INT` i dosłownej `HC_SINGLE` z 2026-09-12
+
+`verdict.controls` niosło zestaw kontroli z **pierwotnej** predeklaracji K24.
+Predeklaracja K24b (`rdb-experiment/results_20260804_K24b/PREDECLARATION.md`
+§1 i §4), zamrożona **2026-08-04 przed przebiegiem**, trzy z nich wycofała.
+Bramka w drzewie silnika nigdy za tym nie poszła i przez pięć tygodni orzekała
+`NIEOCENIALNY` na podstawie kontroli, których obowiązująca predeklaracja
+już nie zawiera.
+
+**`HC_INT` jest sprzeczna z twierdzeniem, które miała kontrolować.** Postać
+predeklarowana rozjazdu to `ceil((p+q-1)/p)`; przy ilorazie całkowitym `q = 1`,
+więc postać daje **1**, a kontrola żądała **0**. Zero jest tam nieosiągalne dla
+każdej reguły bez członu fazowego — kontrola nie sprawdzała reguły, tylko fałszywe
+założenie o jej degeneracji. Pomiar na obu ziarnach bramki potwierdza to co do
+węzła: w populacji twierdzenia (obie składowe `#` są deklaracjami) rozjazd wynosi
+dokładnie 1 w **544/544** i **545/545** węzłów o ilorazie całkowitym.
+
+Do tego dochodził błąd selekcji. `hard_classes` opisuje **plan**, a `HC_INT` jest
+własnością pojedynczego węzła `#`; plan potrafi nieść kilka `#` o różnych
+ilorazach i **38,4%** planów z `HC_INT` niosło również `HC_NONINT`. Wszystkie
+346 i 340 rzekomych złamań reguły lokalnej B siedziało w wciągniętych tak węzłach
+o ilorazie NIEcałkowitym — na właściwej populacji ta kontrola daje **0/1826**
+i **0/1844**.
+
+**`HC_SINGLE` w postaci dosłownej** dopuszcza `@` i `-`, które własny ogon mają.
+Na obu ziarnach przechodziła (0/3929), ale przechodziła **przypadkiem**: generator
+nie trafił na nich w plan jednotaktowy o niezerowym ogonie własnym. Kontrola
+spełniona przez dobór próby, a nie przez regułę, upada przy pierwszym korpusie,
+który taki plan zawiera.
+
+Zestaw kontroli jest teraz ten z K24b §4 — obie węzłowe i zawężone do operatorów
+bez własnego ogona:
+
+| Kontrola | ziarno 20260804 | ziarno 20260807 |
+|---|---:|---:|
+| plany bez `#` | 0 / 8442 | 0 / 8376 |
+| `HC_SINGLE` (operatory bez własnego ogona) | 0 / 3645 | 0 / 3691 |
+
+Skutek: `decision_rule.py` orzeka **H10b WSPARTA** na obu ziarnach — rozjazd
+52,4% i 52,7% przy progu 5%, postać 353/353 i 358/358. Człon (b) przestaje być
+nieocenialny, a liczba, która go blokowała, okazała się własnością kontroli.
+
+**To jest osłabienie aparatury o trzy kontrole i tak należy je czytać.**
+Zapisała je K24b REPORT §97 już wtedy, gdy je podejmowano. Nie jest natomiast
+dopasowaniem kryterium do danych: predeklaracja wycofująca jest starsza od
+każdego z powyższych pomiarów, a samotest `decision_rule.py --selftest` łamie
+teraz obie pozostałe kontrole **osobno** i wymaga, żeby każda z nich samodzielnie
+unieważniała człon (b).
+
+**Pliki odniesienia zostają nietknięte**, tak samo jak przy poprawce `SHIFT`.
+Jądro bramki (`compare_regimes.py`) czyta wyłącznie dwie tabele reżimów H10a;
+sekcja 3 świeżego werdyktu różni się od `VERDICT.md` zestawem wierszy i **nie
+jest to dryft**. Przeliczenie członu (b) jako wyniku badawczego wymaga własnej
+predeklaracji i osobnego przebiegu.
 
 ## Defekt aparatury z 2026-08-19 — binarka nie może być zgadywana
 

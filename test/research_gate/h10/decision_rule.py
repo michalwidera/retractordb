@@ -28,10 +28,12 @@ Progi (predeklaracja K24 §6, przepisane z `VERDICT.md`)
   precyzji, i zawsze jest wynikiem negatywnym.
 * **H10b** — rozjazd reguly lokalnej A z dokladna na >= 5% planow ORAZ 100%
   rozjazdow dodatnich o predeklarowanej postaci `ceil((p+q-1)/p)`. Ocena jest
-  warunkowa: wymaga, zeby predeklarowane kontrole negatywne HC_SINGLE i HC_INT
-  BYLY SPELNIONE i zeby mialy niepusta populacje. Zlamana kontrola znaczy zle
+  warunkowa: wymaga, zeby obie predeklarowane kontrole negatywne — „plany bez
+  `#`" i HC_SINGLE zawezone do operatorow bez wlasnego ogona (K24b §4) — BYLY
+  SPELNIONE i zeby mialy niepusta populacje. Zlamana kontrola znaczy zle
   zdefiniowana regula lokalna, a nie wynik — czlon (b) jest wtedy NIEOCENIALNY
-  i nie wolno go liczyc ani za, ani przeciw.
+  i nie wolno go liczyc ani za, ani przeciw. Definicja kontroli jest w
+  `verdict.controls` i tam tez jest zapisane, dlaczego HC_INT zostala wycofana.
 
 Kody wyjscia
 ------------
@@ -266,8 +268,9 @@ def _expect(label, rows, want_a, want_b=None, want_error=False):
 
 def selftest():
     ok = True
-    # Wersja poprawna. H10b nieocenialny, bo korpus samotestu nie ma populacji
-    # kontrolnej — dokladnie tak, jak nieocenialny bywa na prawdziwym przebiegu.
+    # Wersja poprawna. H10b nieocenialny, bo goly korpus samotestu nie ma ani
+    # jednego planu HC_SINGLE, wiec druga kontrola ma pusta populacje —
+    # dokladnie tak, jak nieocenialny bywa na prawdziwym przebiegu.
     ok &= _expect("wszystko dokladne", _corpus(), SUPPORTED, UNEVALUABLE)
     # Wersje obalone — kazda musi zostac odrzucona z INNEGO powodu.
     ok &= _expect("jedna klasa zawyza ogon",
@@ -284,20 +287,39 @@ def selftest():
 
     # Kontrola mocy czlonu (b): gdyby zadne dane nie mogly go uczynic ocenialnym,
     # jego progi bylyby martwa galezia, a status NIEOCENIALNY — tautologia.
+    #
+    # Populacje obu kontroli K24b §4 sa tu rozdzielone celowo. „Plany bez `#`"
+    # karmia plany zlozone WYLACZNIE z operatorow fazowo pustych; HC_SINGLE —
+    # plan jednotaktowy, ktory obok wezla fazowo pustego ma wezel z wlasnym
+    # ogonem, wiec do pierwszej kontroli nie wchodzi. Bez tego rozdzielenia
+    # jedno uszkodzenie gasiloby obie kontrole naraz i samotest nie odroznilby,
+    # ktora z nich faktycznie dziala.
     rows = _corpus()
     for plan in range(100, 200):
+        rows.append(_row(plan, "SHIFT"))
+    for plan in range(300, 400):
         rows.append(_row(plan, "PASS", hard="HC_SINGLE"))
-        rows.append(_row(1000 + plan, "HASH", hard="HC_INT"))
+        rows.append(_row(plan, "SUB", hard="HC_SINGLE"))
     for plan in range(200, 220):
         rows.append(_row(plan, "HASH", div_a=7, eligible=1, form=7))
     ok &= _expect("czlon (b) osiagalny i wsparty", rows, SUPPORTED, SUPPORTED)
 
-    broken = [dict(r) for r in rows]
-    for row in broken:
-        if row["hard_classes"] == "HC_INT" and row["divergence_a"] == "0":
+    # Kazda kontrola lamana OSOBNO: obie musza samodzielnie uniewazniac czlon (b).
+    broken_plain = [dict(r) for r in rows]
+    for row in broken_plain:
+        if row["kind"] == "SHIFT" and not row["hard_classes"]:
             row["divergence_a"] = "1"
             break
-    ok &= _expect("czlon (b) przy zlamanej kontroli", broken, SUPPORTED, UNEVALUABLE)
+    ok &= _expect("czlon (b) przy zlamanej kontroli planow bez `#`",
+                  broken_plain, SUPPORTED, UNEVALUABLE)
+
+    broken_single = [dict(r) for r in rows]
+    for row in broken_single:
+        if row["kind"] == "PASS" and row["hard_classes"] == "HC_SINGLE":
+            row["divergence_a"] = "1"
+            break
+    ok &= _expect("czlon (b) przy zlamanej kontroli HC_SINGLE",
+                  broken_single, SUPPORTED, UNEVALUABLE)
 
     mismatch = [dict(r) for r in rows]
     for row in mismatch:
