@@ -5,6 +5,7 @@
 #include <algorithm>  // std::ranges::transform, std::max
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>  // std::cmp_less
 #include <variant>
 #include <vector>
@@ -60,6 +61,72 @@ bool isBinaryShapeOperator(command_id cmd) {
     default:
       return false;
   }
+}
+
+/// Kombinacje funkcja+typ, ktorych silnik NIE UMIE policzyc poprawnie i ktore kompilator
+/// odrzuca, zamiast wydac zla liczbe. Pusty napis znaczy „wolno".
+///
+/// Dzisiaj jest tu jeden wpis: `Sqrt` nad `RATIONAL`.
+///
+/// DLACZEGO to jest blad, a nie niedokladnosc
+/// ------------------------------------------
+/// `callFun()` (expressionEvaluator.cpp) liczy funkcje matematyczne przez `double` i rzutuje
+/// wynik Z POWROTEM NA TYP ARGUMENTU. Dla `RATIONAL` droga powrotna idzie przez `Rationalize`
+/// z tolerancja 1e-6, bo `boost::rational<int>` nie ma jak zapisac liczby niewymiernej. Skutek
+/// jest taki, ze `Sqrt(2/1)` daje `19601/13860` — wartosc dobra do ~1,8e-9, ale o OGROMNYM
+/// mianowniku. `boost::rational<int>` trzyma licznik i mianownik w `int32` i NIE sprawdza
+/// zakresu, wiec dwa dalsze mnozenia przepelniaja go po cichu:
+///
+///     Sqrt(x)                    -> 19601/13860              = 1,41421356
+///     Sqrt(x)*Sqrt(x)            -> 384199201/192099600      = 2,0000000052
+///     Sqrt(x)*Sqrt(x)*Sqrt(x)    -> 1610868913/-379267520    = -4,247   (oczekiwane +2,828)
+///
+/// Zly rzad wielkosci i ZLY ZNAK, bez wyjatku i bez NULL. To nie jest strata precyzji, tylko
+/// cicha bledna wartosc, wiec bramka `-c` jest wlasciwym miejscem: program, ktory nie policzy
+/// poprawnie, nie ma sie kompilowac (ta sama zasada co w compiler::checkFunctionCalls()).
+///
+/// TODO: zdecydowac, ktora droga zamknac to na stale. Do tego czasu obowiazuje ta bramka.
+///
+/// Droga A — funkcje o niewymiernym przeciwdziedzinie zwracaja `DOUBLE` niezaleznie od typu
+/// argumentu (czyli wyjatek od reguly „callFun zachowuje typ argumentu" z pozycji 16).
+///   + `Sqrt(m[0])` zaczyna dzialac i daje pelna precyzje `double`;
+///   + znika cala klasa przepelnien, nie tylko ta zlapana tutaj;
+///   - lamie kontrakt typu ustalony w pozycji 16 i opisany w `functionResultType()`;
+///   - ZMIENIA DESKRYPTORY: pole zmienia sie z `RATIONAL` (8 B) na `DOUBLE` (8 B) — rozmiar
+///     ten sam, ale nazwa typu w `.desc` i interpretacja bajtow juz nie, wiec to zmiana
+///     formatu artefaktu i trzeba ja przeprowadzic przez bramki H9/H10 i korpus;
+///   - wymaga rozstrzygniecia, czy `Floor`/`Ceil`/`round`/`trunc` zostaja przy `RATIONAL`
+///     (sa bezpieczne, bo daja mianownik 1 — zmierzone), co daje NIEJEDNORODNA regule.
+///
+/// Droga B — `callFun` zostaje przy typie argumentu, ale rzutowanie `double -> RATIONAL`
+/// sprawdza zakres i podnosi blad zamiast przepelniac.
+///   + zgodne z zasada, ktora drzewo juz stosuje: `narrowInterval()` rzuca `std::out_of_range`
+///     zamiast przepelnic `boost::rational<int>`;
+///   + nie rusza kontraktu typu ani deskryptorow, wiec nie dotyka H9/H10;
+///   - `Sqrt(m[0])` nadal NIE dziala — zamiast zlej liczby uzytkownik dostaje blad wykonania,
+///     a chcial wyniku;
+///   - blad pojawia sie w WYKONANIU, nie w `-c`, czyli dokladnie ten wzorzec, ktory zamykala
+///     pozycja 1 w requested.md;
+///   - nie usuwa zrodla: mianowniki nadal rosna, tylko teraz glosno.
+///
+/// Droga C — zostawic bramke `-c` na stale i wymagac jawnego `to_double`.
+///   + najmniejszy kod, zero wplywu na deskryptory i na bramki badawcze;
+///   + uzytkownik pisze wprost, w jakiej arytmetyce liczy, a `Sqrt(to_double(m[0]))` daje
+///     poprawne 1,4142135623730951;
+///   - `Sqrt` nad reduktorem wymaga obejscia w kazdym zapytaniu, a reduktory sa z definicji
+///     `RATIONAL`, wiec dotyczy to czestego zapisu (RMS, odchylenie standardowe).
+///
+/// Zakres tej bramki jest WEZSZY niz defekt. Zmierzone na tej samej danej (`RATIONAL 2/1`):
+/// `Floor`, `Ceil`, `round` i `trunc` daja mianownik 1 i sa bezpieczne, natomiast `sin`
+/// (3109318/3419473) i `log` (2731/3940) maja dokladnie te sama wlasnosc co `Sqrt`.
+/// Blokowany jest na razie sam `Sqrt` — swiadomie, bo o to poprosil czlowiek; rozszerzenie
+/// na `sin`/`cos`/`tan`/`log`/`log2` jest czescia decyzji powyzej, nie osobna sprawa.
+std::string rejectedIrrationalOverExact(std::string_view name, rdb::descFld argumentType) {
+  if (name != "sqrt" || argumentType != rdb::RATIONAL) return {};
+
+  return "'Sqrt' over a RATIONAL value is not implemented: the result would be rationalized and "
+         "silently overflow boost::rational<int>. Convert explicitly, for example "
+         "Sqrt(to_double(x)). Note that stream reducers MIN/MAX/AVG/SUMC produce RATIONAL.";
 }
 
 }  // namespace
@@ -292,6 +359,12 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
           stack.push_back(right);
           break;
         }
+
+        // Kombinacja nieobslugiwana — zatrzymuje kompilacje, zamiast wydac zla wartosc.
+        // Stoi PRZED functionResultType(), bo pytanie nie brzmi „jakiego typu jest wynik",
+        // tylko „czy ten wynik w ogole da sie policzyc".
+        if (auto refusal = rejectedIrrationalOverExact(name, right.rtype); !refusal.empty())
+          return {.status = exprShapeStatus::rejected, .shape = {}, .reason = std::move(refusal)};
 
         const auto resultType = functionResultType(name, right.rtype);
         // Nazwa spoza tabeli nie dociera do planu: compiler::checkFunctionCalls() odrzuca ja

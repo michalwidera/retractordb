@@ -1,0 +1,10 @@
+# Odwolanie do wyniku reduktora wprost w liscie SELECT. `avg` nie jest tu polem, tylko
+# tokenem STRUMIENIOWYM, ktory gramatyka wpuszcza do wyrazenia skalarnego przez
+# `term : agregator`. Kompilator ma to odrzucic — do 2026-09-11 przechodzilo i padalo
+# dopiero w wykonaniu.
+
+STORAGE 'temp'
+
+DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'data.txt' ONESHOT
+
+SELECT avg STREAM o FROM AVG(src)

@@ -67,15 +67,25 @@ struct exprShape {
 ///                  pole nietkniete — blad ma polecic w WYKONANIU, dokladnie tam, gdzie
 ///                  lecial dotad.
 ///
+///  * `rejected` — program jest skladniowo poprawny i typ da sie policzyc, ale kombinacja
+///                  funkcji i typu argumentu NIE JEST ZAIMPLEMENTOWANA i policzylaby zla
+///                  wartosc. Wolajacy ZATRZYMUJE kompilacje i podaje `reason` uzytkownikowi.
+///                  Jedyny dzisiejszy przypadek to `Sqrt` nad `RATIONAL` — patrz TODO przy
+///                  `rejectedIrrationalOverExact()` w expressionShape.cpp.
+///
 /// Rozroznienie `unknown` od `illTyped` nie zmienia decyzji kompilatora; istnieje po to,
-/// zeby test mogl odroznic „jeszcze nie wiadomo" od „to sie nie policzy".
-enum class exprShapeStatus : std::uint8_t { resolved, unknown, illTyped };
+/// zeby test mogl odroznic „jeszcze nie wiadomo" od „to sie nie policzy". `rejected` jest
+/// inne od obu: to JEDYNY status, ktory konczy kompilacje bledem.
+enum class exprShapeStatus : std::uint8_t { resolved, unknown, illTyped, rejected };
 
 struct exprShapeResult {
   exprShapeStatus status = exprShapeStatus::unknown;
   exprShape shape;
+  /// Wypelniony WYLACZNIE dla `rejected` — komunikat dla kanalu `Check result:`.
+  std::string reason;
 
   [[nodiscard]] bool resolved() const { return status == exprShapeStatus::resolved; }
+  [[nodiscard]] bool rejected() const { return status == exprShapeStatus::rejected; }
 };
 
 /// Ksztalt pola zrodlowego, po nazwie strumienia i PLASKIM indeksie slotu.

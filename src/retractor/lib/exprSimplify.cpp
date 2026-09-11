@@ -297,7 +297,26 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
         result.program = std::move(operand->program);
         result.program.push_back(tk);
 
-        if (operand->constant.has_value()) {
+        // `to_string` NIE zwija sie nigdy, nawet nad stalym argumentem. Jego wynikiem jest
+        // napis, ale token niesie przy okazji DEKLARACJE szerokosci pola — jawna `N` w postaci
+        // CALL2 `to_string(expr : N)`, domyslna kToStringDefaultWidth w postaci CALL (patrz
+        // rqlFunctions.hpp). Deklaracja stoi w PROGRAMIE i nigdzie indziej, wiec zastapienie
+        // programu literalem tekstowym kasuje ja razem z nim: analiza ksztaltu widzi wtedy juz
+        // tylko dlugosc samego napisu i `SELECT to_string(42:16)` zwezalo sie z 16 na 2.
+        //
+        // Kolejnosc przebiegow (inferFieldShapes() PRZED simplifyFieldExpressions()) zamykala
+        // to wylacznie przy PIERWSZEJ kompilacji. Zywy plan kompilowany po raz drugi
+        // (executorsm::getAdHoc) dostawal program juz uproszczony i pole sie zwezalo — nie
+        // w artefakcie na dysku, ktory zostaje nietkniety, ale w planie, z ktorego schematy
+        // dziedzicza strumienie dolozone PO tej kompilacji.
+        //
+        // Zwijanie ARGUMENTU pod spodem dziala normalnie: `to_string(40+2 : 16)` zwija `40+2`
+        // do jednej stalej i zatrzymuje sie na `CALL2`. Warunek jest bezwarunkowy, a nie
+        // zalezny od tego, czy zadeklarowana szerokosc przekracza dlugosc literalu — inaczej
+        // i plan, i licznik R3 zalezalyby od WARTOSCI stalej.
+        const bool declaresFieldWidth = (cmd == CALL || cmd == CALL2) && lowercased(tk.getStr_()) == "to_string";
+
+        if (operand->constant.has_value() && !declaresFieldWidth) {
           if (auto value = foldConstants(result.program)) {
             stack.push_back(constantNode(std::move(*value)));
             ++rewrites;

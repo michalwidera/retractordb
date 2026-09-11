@@ -3137,3 +3137,171 @@ TEST(xcompiler, field_shapes_are_stable_across_a_live_plan_recompilation) {
 
   EXPECT_EQ(shapesOf(live), before);
 }
+
+// Szerokosc zadeklarowana w `to_string(expr : N)` ma byc wlasnoscia POLA, a nie skutkiem
+// ubocznym tego, ktory to raz plan przechodzi przez kompilator.
+//
+// Zapytanie ad hoc (executorsm::getAdHoc) kompiluje ZYWY plan po raz drugi, a do drugiego
+// przebiegu programy pol wchodza juz uproszczone. Do 2026-09-11 regula A zwijala wtedy caly
+// program `to_string(42 : 16)` do literalu tekstowego i deklaracja znikala razem z programem:
+// pole zwezalo sie z 16 na 2. Artefakt na dysku zostawal nietkniety, ale schemat dziedziczyly
+// z planu strumienie dolozone PO tej kompilacji, wiec `SELECT staly_0 ... FROM staly` dostawal
+// STRING[2] zamiast STRING[16].
+//
+// Test obejmuje OBA argumenty: staly, ktory defekt dotykal, i zmienny, ktory byl odporny —
+// zeby naprawa nie zamienila jednej asymetrii na druga.
+TEST(xcompiler, declared_to_string_width_survives_a_second_compilation) {
+  const auto widthOf = [](qTree &plan, const std::string &stream) {
+    const auto &schema = plan.getQuery(stream).lSchema;
+    EXPECT_EQ(schema.size(), 1u);
+    return schema.front().field_.rlen * schema.front().field_.rarray;
+  };
+
+  qTree plan;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, R"(
+        DECLARE k INTEGER, m INTEGER STREAM src, 1 FILE 'src.txt'
+        SELECT to_string(42 : 16) STREAM staly   FROM src
+        SELECT to_string(k  : 16) STREAM zmienny FROM src
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler live(plan);
+  ASSERT_EQ(live.compile(), "OK");
+  EXPECT_EQ(widthOf(plan, "staly"), 16);
+  EXPECT_EQ(widthOf(plan, "zmienny"), 16);
+
+  // Drugi przebieg po tym samym drzewie — dokladnie to, co robi getAdHoc().
+  ASSERT_EQ(live.compile(), "OK");
+  EXPECT_EQ(widthOf(plan, "staly"), 16) << "zadeklarowana szerokosc przepadla przy drugiej kompilacji";
+  EXPECT_EQ(widthOf(plan, "zmienny"), 16);
+
+  // I trzeci, bo zapytan ad hoc moze byc wiecej niz jedno.
+  ASSERT_EQ(live.compile(), "OK");
+  EXPECT_EQ(widthOf(plan, "staly"), 16);
+}
+
+// `SELECT avg STREAM o FROM AVG(src)` wyglada naturalnie, ale `avg` nie jest tam polem:
+// gramatyka wpuszcza `agregator` do wyrazenia skalarnego przez `term : agregator # ExpAgg`,
+// a listener dokleja ten sam token STREAM_AVG, ktory w klauzuli FROM jest OPERATOREM.
+// W programie pola nie wykona go zadna maszyna — do 2026-09-11 `-c` przechodzilo, a wykonanie
+// konczylo sie komunikatem `Unsupported token in expressionEvaluator` przy zerze rekordow.
+// Kanal `Check result:` zamyka ten wzorzec w kompilacji i nazywa obejscie.
+TEST(xcompiler, rejects_a_stream_reducer_used_as_a_field_reference) {
+  for (const auto &[reducer, spelling] :
+       std::vector<std::pair<std::string, std::string>>{{"AVG", "avg"}, {"MIN", "min"}, {"MAX", "max"}, {"SUMC", "sumc"}}) {
+    qTree plan;
+    auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, std::format(R"(
+        DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'src.txt'
+        SELECT {} STREAM o FROM {}(src)
+      )",
+                                                                                     spelling, reducer));
+    ASSERT_EQ(parseResult, "OK") << reducer;
+
+    compiler instance(plan);
+    const auto result = instance.compile();
+    EXPECT_NE(result, "OK") << reducer << " przeszlo kompilacje, a nie ma czego wykonac";
+    EXPECT_NE(result.find(reducer), std::string::npos) << "komunikat nie nazywa reduktora: " << result;
+    EXPECT_NE(result.find("Materialize"), std::string::npos) << "komunikat nie podaje obejscia: " << result;
+  }
+}
+
+// Kontrola pozytywna do powyzszego: obie postaci, ktore DZIALAJA, maja dzialac dalej. Bramka
+// siega po token STREAM_* w programie POLA, a pola syntetyzowane nad reduktorem przez
+// buildOutputSchema() niosa PUSH_ID — gdyby bramka byla szersza, zabralaby oba te zapisy.
+//
+// Dalsze obliczenie zapisane jest jako `m[0]*2`, a nie `Sqrt(m[0])`: `Sqrt` nad RATIONAL ma
+// wlasna bramke (patrz rejects_sqrt_over_a_rational_value), wiec mieszanie obu restrykcji
+// w jednym tescie nie powiedzialoby, ktora z nich zadziala.
+TEST(xcompiler, keeps_the_working_ways_of_reading_a_stream_reducer) {
+  qTree fullScan;
+  auto [scanParse, scanKeyword, scanStream] = parserRQLString(fullScan, R"(
+        DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'src.txt'
+        SELECT * STREAM o FROM AVG(src)
+      )");
+  ASSERT_EQ(scanParse, "OK");
+  compiler scanCompiler(fullScan);
+  ASSERT_EQ(scanCompiler.compile(), "OK");
+  ASSERT_EQ(fullScan.getQuery("o").lSchema.size(), 1u);
+  EXPECT_EQ(fullScan.getQuery("o").lSchema.front().field_.rtype, rdb::RATIONAL);
+
+  qTree materialized;
+  auto [matParse, matKeyword, matStream] = parserRQLString(materialized, R"(
+        DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'src.txt'
+        SELECT * STREAM m FROM AVG(src)
+        SELECT m[0]*2 STREAM o FROM m
+      )");
+  ASSERT_EQ(matParse, "OK");
+  compiler matCompiler(materialized);
+  ASSERT_EQ(matCompiler.compile(), "OK");
+  ASSERT_EQ(materialized.getQuery("o").lSchema.size(), 1u);
+  EXPECT_EQ(materialized.getQuery("o").lSchema.front().field_.rtype, rdb::RATIONAL);
+}
+
+// `Sqrt` nad RATIONAL jest ZABLOKOWANY w kompilatorze, dopoki nie zapadnie decyzja, ktora
+// droga go zaimplementowac (TODO przy rejectedIrrationalOverExact() w expressionShape.cpp).
+//
+// Powod nie jest kosmetyczny: callFun() liczy przez double i rzutuje z powrotem na typ
+// argumentu, a droga powrotna do RATIONAL rationalizuje z tolerancja 1e-6. Daje to ogromne
+// mianowniki, ktore po dwoch mnozeniach przepelniaja `boost::rational<int>` PO CICHU —
+// `Sqrt(x)*Sqrt(x)*Sqrt(x)` nad `2/1` dawalo -4,247 zamiast +2,828, ze zlym znakiem.
+// Zla wartosc bez bledu jest gorsza niz odmowa kompilacji.
+TEST(xcompiler, rejects_sqrt_over_a_rational_value) {
+  qTree plan;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, R"(
+        DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'src.txt'
+        SELECT * STREAM m FROM AVG(src)
+        SELECT Sqrt(m[0]) STREAM o FROM m
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler instance(plan);
+  const auto result = instance.compile();
+  EXPECT_NE(result, "OK") << "Sqrt nad RATIONAL przeszlo kompilacje";
+  EXPECT_NE(result.find("Sqrt"), std::string::npos) << result;
+  EXPECT_NE(result.find("to_double"), std::string::npos) << "komunikat nie podaje obejscia: " << result;
+}
+
+// Warunek reguly wykonuje ten sam expressionEvaluator, a inferFieldShapes() go nie oglada
+// (zawezony zakres + `q.lSchema` zamiast `q.lRules`), wiec bramke pilnuje osobny przebieg
+// compiler::checkRuleConditionShapes(). Bez niego RULE bylo droga naokolo.
+TEST(xcompiler, rejects_sqrt_over_a_rational_value_in_a_rule_condition) {
+  qTree plan;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, R"(
+        DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'src.txt'
+        SELECT * STREAM m FROM AVG(src)
+        RULE r1 ON m WHEN Sqrt(m[0]) > 1 DO DUMP -5 TO 5
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler instance(plan);
+  const auto result = instance.compile();
+  EXPECT_NE(result, "OK") << "Sqrt nad RATIONAL w warunku reguly przeszlo kompilacje";
+  EXPECT_NE(result.find("rule condition"), std::string::npos) << result;
+}
+
+// Kontrole pozytywne: bramka ma siegac WYLACZNIE po pare (Sqrt, RATIONAL).
+//
+// Jawne `to_double` jest obejsciem, ktore podaje komunikat, wiec musi dzialac; `Sqrt` nad
+// typami liczbowymi nie byl nigdy zagrozony, bo ich droga powrotna nie rationalizuje;
+// a funkcje zaokraglajace nad RATIONAL sa bezpieczne — zmierzone: `Floor`/`Ceil`/`round`/
+// `trunc` nad `2/1` daja mianownik 1, wiec nie ma czemu przepelnic.
+TEST(xcompiler, keeps_sqrt_where_it_was_never_unsafe) {
+  qTree plan;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, R"(
+        DECLARE d DOUBLE, k INTEGER STREAM src, 1 FILE 'src.txt'
+        SELECT * STREAM m FROM AVG(src)
+        SELECT Sqrt(to_double(m[0])) STREAM viaDouble FROM m
+        SELECT Sqrt(d) STREAM overDouble  FROM src
+        SELECT Sqrt(k) STREAM overInteger FROM src
+        SELECT Floor(m[0]) STREAM roundedDown FROM m
+        SELECT trunc(m[0]) STREAM truncated  FROM m
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler instance(plan);
+  ASSERT_EQ(instance.compile(), "OK");
+
+  // Obejscie podane w komunikacie naprawde daje DOUBLE, a nie RATIONAL.
+  ASSERT_EQ(plan.getQuery("viaDouble").lSchema.size(), 1u);
+  EXPECT_EQ(plan.getQuery("viaDouble").lSchema.front().field_.rtype, rdb::DOUBLE);
+}

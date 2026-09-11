@@ -2652,10 +2652,13 @@ std::string compiler::inferFieldShapes() {
       // ten typ idzie przez reductionResultField(), czyli te sama regule, ktora stosuja
       // reduktory strumieniowe i streamInstance::reduceRecordWindow().
       for (auto &g : q.windowGroups) {
+        std::string windowRefusal;
         const auto argument = g.program.empty() ? shapeOfField(g.source, g.slot) : [&] {
           const auto inferred = inferExpressionShape(g.program, shapeOfField, {});
+          if (inferred.rejected()) windowRefusal = inferred.reason;
           return inferred.resolved() ? std::optional<exprShape>{inferred.shape} : std::nullopt;
         }();
+        if (!windowRefusal.empty()) return "Stream '" + q.id + "': " + windowRefusal;
         if (!argument.has_value()) continue;
         const auto [resultType, resultLen] = reductionResultField(argument->rtype, argument->rlen);
         if (g.valueType == resultType) continue;
@@ -2670,6 +2673,10 @@ std::string compiler::inferFieldShapes() {
 
       for (auto &f : q.lSchema) {
         const auto inferred = inferExpressionShape(f.lProgram, shapeOfField, shapeOfWindow);
+        // `rejected` jest JEDYNYM statusem, ktory konczy kompilacje: program jest poprawny
+        // skladniowo i typ da sie policzyc, ale silnik wydalby zla WARTOSC. Patrz
+        // rejectedIrrationalOverExact() w expressionShape.cpp.
+        if (inferred.rejected()) return "Stream '" + q.id + "': " + inferred.reason;
         // `unknown` i `illTyped` znacza tu to samo dla kompilatora: pole zostaje przy ksztalcie,
         // ktory juz ma. Program bez wartosci (operand tekstowy pod `*`) ma polecic bledem
         // W WYKONANIU, dokladnie tam, gdzie lecial dotad.
@@ -2687,6 +2694,42 @@ std::string compiler::inferFieldShapes() {
     if (!changed) break;
   }
   return {"OK"};
+}
+
+/// Ta sama bramka co w inferFieldShapes(), ale dla WARUNKOW REGUL.
+///
+/// Osobny przebieg, bo inferFieldShapes() ma zawezony zakres — rusza wylacznie wezly, ktorych
+/// schemat kopiuje operand (`copiesOperandSchema`), i oglada `q.lSchema`, a nie `q.lRules`.
+/// Warunek reguly wykonuje jednak DOKLADNIE ten sam expressionEvaluator, wiec bez tego
+/// przebiegu `RULE ... WHEN Sqrt(m[0]) > 1` omijalby bramke i wracal do cichej zlej wartosci.
+/// Tutaj zakresu nie zawezamy: pytanie „czy to sie policzy" nie zalezy od tego, czy wezel
+/// syntetyzuje wlasny schemat.
+///
+/// Przebieg NIE ustala ksztaltow i niczego nie zapisuje — czyta tylko status `rejected`.
+std::string compiler::checkRuleConditionShapes() {
+  auto shapeOfField = [this](const std::string &streamId, const int flatIndex) -> std::optional<exprShape> {
+    const auto sourceField = sourceFieldAt(streamId, flatIndex);
+    if (!sourceField.has_value()) return std::nullopt;
+    if (sourceField->rtype > rdb::STRING) return std::nullopt;
+    const int arity = (flatSlotCount(*sourceField) == 1) ? sourceField->rarray : 1;
+    return exprShape{.rtype = sourceField->rtype, .rlen = sourceField->rlen, .rarray = arity};
+  };
+
+  for (const auto &q : coreInstance) {
+    if (q.isCompilerDirective() || q.isDeclaration()) continue;
+
+    auto shapeOfWindow = [&q](const int groupIndex) -> std::optional<exprShape> {
+      if (groupIndex < 0 || std::cmp_greater_equal(groupIndex, q.windowGroups.size())) return std::nullopt;
+      return numericShape(q.windowGroups[static_cast<size_t>(groupIndex)].valueType);
+    };
+
+    for (const auto &r : q.lRules) {
+      const auto inferred = inferExpressionShape(r.condition, shapeOfField, shapeOfWindow);
+      if (inferred.rejected()) return "Stream '" + q.id + "' rule condition: " + inferred.reason;
+    }
+  }
+
+  return "OK";
 }
 
 /// R3 — uproszczenia algebraiczne w programach pól i w warunkach reguł.
@@ -2952,6 +2995,71 @@ std::string compiler::checkFunctionCalls() {
   return "OK";
 }
 
+/// Odrzuca odwolanie do reduktora strumieniowego stojace w programie POLA albo w warunku reguly.
+///
+/// `SELECT avg STREAM o FROM AVG(src)` wyglada naturalnie i do 2026-09-11 przechodzilo `-c`,
+/// zeby wywrocic sie dopiero w wykonaniu: `expressionEvaluator::eval()` konczy na takim tokenie
+/// komunikatem `Unsupported token in expressionEvaluator`, zapytanie nie emituje ani jednego
+/// rekordu, a `INTEGER` w deskryptorze jest sentinelem planu, ktory nigdy nie ruszy.
+///
+/// Zrodlo jest w gramatyce: `agregator` wchodzi do wyrazenia skalarnego przez `term : agregator
+/// # ExpAgg` (RQL.g4), a listener `exitStreamMin/Max/Avg/Sum` jest WSPOLNY dla tej alternatywy
+/// i dla postaci strumieniowej, wiec w obu kontekstach dokleja ten sam token `STREAM_*`.
+/// W klauzuli FROM jest on operatorem i tam jest na miejscu; w liscie SELECT laduje w programie
+/// pola, gdzie zadna maszyna go nie wykona.
+///
+/// Bramka jest tu WASKA celowo: `STREAM_MIN/MAX/AVG/SUM` to jedyne tokeny strumieniowe, po
+/// ktore siega `term`, wiec tylko one moga ta droga trafic do programu pola. Pola syntetyzowane
+/// przez buildOutputSchema() nad reduktorem — z ktorych zyje dzialajace `SELECT * FROM AVG(src)`
+/// — nie niosa tokenu `STREAM_*`, tylko `PUSH_ID`, wiec ta kontrola ich nie oglada.
+///
+/// Stoi razem z checkFunctionCalls() i z tego samego powodu: PRZED expandStreamGenerators(),
+/// zeby jeden zly szablon nie zwielokrotnil sie w N identycznych bledow.
+std::string compiler::checkStreamReducerFieldRefs() {
+  const auto reducerName = [](const command_id cmd) -> const char * {
+    switch (cmd) {
+      case STREAM_MIN:
+        return "MIN";
+      case STREAM_MAX:
+        return "MAX";
+      case STREAM_AVG:
+        return "AVG";
+      case STREAM_SUM:
+        return "SUMC";
+      default:
+        return nullptr;
+    }
+  };
+
+  const auto checkProgram = [&reducerName](const std::list<token> &program, const std::string &owner) -> std::string {
+    for (const auto &t : program) {
+      const char *name = reducerName(t.getCommandID());
+      if (name == nullptr) continue;
+
+      SPDLOG_ERROR("Stream reducer '{}' used as a field reference in stream '{}'", name, owner);
+      return std::format(
+          "Stream '{}' reads the result of stream reducer '{}' directly in its SELECT list or rule condition; "
+          "that is not a field. Materialize the reducer first: "
+          "SELECT * STREAM <name> FROM {}(...) and then read <name>[0].",
+          owner, name, name);
+    }
+    return "OK";
+  };
+
+  for (const auto &q : coreInstance) {
+    for (const auto &f : q.lSchema) {
+      const auto result = checkProgram(f.lProgram, q.id);
+      if (result != "OK") return result;
+    }
+    for (const auto &r : q.lRules) {
+      const auto result = checkProgram(r.condition, q.id);
+      if (result != "OK") return result;
+    }
+  }
+
+  return "OK";
+}
+
 /// Rozwija generatory strumieni: jedno `SELECT cells[$] STREAM cell[24] FROM cells`
 /// w 24 zapytania `cell$0`..`cell$23`.
 ///
@@ -3074,6 +3182,9 @@ std::string compiler::compile() {
   result = checkFunctionCalls();
   if (result != "OK") return result;
 
+  result = checkStreamReducerFieldRefs();
+  if (result != "OK") return result;
+
   // PIERWSZY przebieg PRZEPISUJĄCY, przed wszystkim innym łącznie z migawką odwołań: po nim
   // plan jest nie do odróżnienia od ręcznie rozpisanego, więc dalsza część kompilatora
   // o generatorach nie wie i wiedzieć nie musi.
@@ -3140,6 +3251,9 @@ std::string compiler::compile() {
   // `to_string(42:16)` jest literalem "42", wiec szerokosc pola wyszlaby 2 zamiast 16 — deskryptor
   // zaczalby zalezec od RDB_OPT_SIMPLIFY_EXPRESSIONS, czyli od przelacznika wydajnosciowego.
   result = inferFieldShapes();
+  if (result != "OK") return result;
+
+  result = checkRuleConditionShapes();
   if (result != "OK") return result;
 
 #if RDB_OPT_SIMPLIFY_EXPRESSIONS

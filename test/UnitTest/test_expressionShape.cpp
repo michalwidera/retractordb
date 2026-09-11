@@ -501,21 +501,22 @@ TEST(xExpressionShape, simplification_does_not_change_the_inferred_shape) {
   }
 }
 
-// JEDYNY ksztalt programu, dla ktorego powyzszy niezmiennik NIE zachodzi — i powod, dla
-// ktorego compiler::inferFieldShapes() stoi PRZED simplifyFieldExpressions(), a nie po nim.
+// `to_string` NIE zwija sie nigdy — ani nad stalym argumentem, ani z zadeklarowana szerokoscia,
+// ani bez niej. Powod jest w tym, ze token niesie DEKLARACJE szerokosci pola, a nie tylko
+// operacje: jawna `N` w postaci CALL2 `to_string(expr : N)`, domyslna kToStringDefaultWidth
+// w postaci CALL (patrz rqlFunctions.hpp). Deklaracja stoi w PROGRAMIE i nigdzie indziej.
 //
-// `to_string(expr : N)` niesie N jako DEKLARACJE szerokosci pola, a nie jako wartosc na stosie.
-// Gdy caly argument jest stala, zwijanie (regula A) zastepuje program literalem tekstowym —
-// i razem z programem znika deklaracja. Analiza uproszczonego programu widzi juz tylko dlugosc
-// samego napisu.
+// Do 2026-09-11 regula A zastepowala caly taki program literalem tekstowym i kasowala deklaracje
+// razem z nim: analiza uproszczonego programu widziala juz tylko dlugosc samego napisu, wiec
+// `SELECT to_string(1+1 : 16)` zwezalo sie z 16 na 1. Kolejnosc przebiegow (inferFieldShapes()
+// PRZED simplifyFieldExpressions()) zamykala to przy PIERWSZEJ kompilacji, ale zywy plan
+// kompilowany po raz drugi (executorsm::getAdHoc) dostawal program juz uproszczony. Rozjazd nie
+// siegal artefaktu na dysku — ten zostaje nietkniety — tylko planu, z ktorego schemat dziedziczyly
+// strumienie dolozone PO tej kompilacji.
 //
-// Kolejnosc przebiegow zamyka to przy kompilacji planu z pliku. Zostaje jeden przypadek,
-// w ktorym program dociera do analizy juz uproszczony: PONOWNA kompilacja zywego planu
-// (executorsm::getAdHoc). Pole `SELECT to_string(42:16)` zwezaloby sie wtedy z 16 na 2.
-// Zachowanie jest STARSZE od tej analizy — compiler::inferStringFieldTypes() liczyl szerokosc
-// dokladnie tak samo — i dotyczy wylacznie szerokosci napisu, nie typu liczbowego. Test pinuje
-// je jawnie, zeby rozjazd nie przeszedl milczkiem, i nie udaje, ze jest zamierzony.
-TEST(xExpressionShape, constant_to_string_loses_its_declared_width_when_folded) {
+// Test pilnuje obu polowek naraz: szerokosc przezywa uproszczenie, a uproszczenie nadal dziala
+// POD `to_string` (argument `1+1` zwija sie do jednej stalej).
+TEST(xExpressionShape, constant_to_string_keeps_its_declared_width_when_simplified) {
   const auto typeOfField = [](const std::string &, int) -> std::optional<rdb::descFld> { return rdb::INTEGER; };
 
   std::list<token> program{token(PUSH_VAL, 1), token(PUSH_VAL, 1), token(ADD),
@@ -526,10 +527,34 @@ TEST(xExpressionShape, constant_to_string_loses_its_declared_width_when_folded) 
   EXPECT_EQ(before.shape.rtype, rdb::STRING);
   EXPECT_EQ(before.shape.rlen * before.shape.rarray, 16);
 
+  // Argument POD to_string nadal sie zwija: `1+1` -> jedna stala.
   ASSERT_GT(simplifyExpression(program, typeOfField), 0u);
+  EXPECT_EQ(program.size(), 2u) << "argument mial sie zwinac do jednej stalej pod CALL2";
+  ASSERT_EQ(program.back().getCommandID(), CALL2) << "CALL2 niesie deklaracje szerokosci i ma zostac";
 
   const auto after = analyse(program);
   ASSERT_TRUE(after.resolved());
   EXPECT_EQ(after.shape.rtype, rdb::STRING);
-  EXPECT_EQ(after.shape.rlen * after.shape.rarray, 1);  // dlugosc napisu "2"
+  EXPECT_EQ(after.shape.rlen * after.shape.rarray, 16) << "zadeklarowana szerokosc przepadla przy uproszczeniu";
+}
+
+// Ta sama wlasnosc dla postaci BEZ zadeklarowanej szerokosci. `to_string(expr)` deklaruje
+// szerokosc domyslna, wiec zwiniecie go do literalu gubi ja dokladnie tak samo — tyle ze cicho,
+// bo w RQL nie widac zadnej liczby, ktora mialaby przepasc.
+TEST(xExpressionShape, constant_to_string_without_width_keeps_the_default_width) {
+  const auto typeOfField = [](const std::string &, int) -> std::optional<rdb::descFld> { return rdb::INTEGER; };
+
+  std::list<token> program{token(PUSH_VAL, 1), token(PUSH_VAL, 1), token(ADD), token(CALL, std::string("to_string"))};
+
+  const auto before = analyse(program);
+  ASSERT_TRUE(before.resolved());
+  EXPECT_EQ(before.shape.rlen * before.shape.rarray, kToStringDefaultWidth);
+
+  simplifyExpression(program, typeOfField);
+  ASSERT_EQ(program.back().getCommandID(), CALL) << "CALL(to_string) niesie szerokosc domyslna i ma zostac";
+
+  const auto after = analyse(program);
+  ASSERT_TRUE(after.resolved());
+  EXPECT_EQ(after.shape.rtype, rdb::STRING);
+  EXPECT_EQ(after.shape.rlen * after.shape.rarray, kToStringDefaultWidth);
 }
