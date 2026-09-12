@@ -169,8 +169,10 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
     return rc;
   }
 
-  auto segmentIndex      = position / retention_.capacity;
-  auto positionInSegment = position % retention_.capacity;
+  // position to przesunięcie w bajtach, capacity liczy rekordy
+  const auto recordIndex = position / recordSize_;
+  auto segmentIndex      = recordIndex / retention_.capacity;
+  auto positionInSegment = (recordIndex % retention_.capacity) * recordSize_;
 
   if (segmentIndex < removedSegments_) return EXIT_FAILURE;
 
@@ -187,8 +189,10 @@ ssize_t groupFile<T>::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
 
   if (retention_.capacity == 0) FatalError("groupFile::read: retention capacity is zero");
 
-  auto segmentIndex      = position / retention_.capacity;
-  auto positionInSegment = position % retention_.capacity;
+  // position to przesunięcie w bajtach, capacity liczy rekordy
+  const auto recordIndex = position / recordSize_;
+  auto segmentIndex      = recordIndex / retention_.capacity;
+  auto positionInSegment = (recordIndex % retention_.capacity) * recordSize_;
 
   if (segmentIndex < removedSegments_) return EXIT_FAILURE;
 

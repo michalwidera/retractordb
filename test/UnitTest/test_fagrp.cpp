@@ -282,7 +282,7 @@ TEST_F(GroupFileTest, test_fagrp_update_in_place) {
 
   GTEST_ASSERT_EQ(gfa->count(), 3);
 
-  // Update record at byte position 1
+  // Update record 1 (position is a byte offset: index * recsize, here recsize = 1)
   record = 99;
   gfa->write(&record, 1);
 
@@ -340,6 +340,39 @@ TEST_F(GroupFileTest, test_fagrp_access_removed_segment_fails) {
   record = 99;
   GTEST_ASSERT_NE(gfa->read(&record, 0), 0);
   GTEST_ASSERT_NE(gfa->write(&record, 0), 0);
+}
+
+// Verify segment mapping for multi-byte records: position is a byte offset, capacity is in records.
+TEST_F(GroupFileTest, test_fagrp_multibyte_record_segment_mapping) {
+  const size_t size = sizeof(uint32_t);
+  uint32_t record;
+
+  auto retention = rdb::retention_t{3, 3};
+  auto gfa       = std::make_unique<rdb::groupFile<>>(filename, makeDesc(size), retention, -1);
+
+  // segment_0: [1,2,3], segment_1: [4,5]
+  for (uint32_t i = 1; i <= 5; i++) {
+    record = i;
+    GTEST_ASSERT_EQ(gfa->write(reinterpret_cast<uint8_t *>(&record)), 0);
+  }
+  GTEST_ASSERT_EQ(gfa->count(), 5);
+
+  for (uint32_t i = 0; i < 5; i++) {
+    record = 0;
+    GTEST_ASSERT_EQ(gfa->read(reinterpret_cast<uint8_t *>(&record), i * size), 0);
+    GTEST_ASSERT_EQ(record, i + 1);
+  }
+
+  // Update record 4 (segment_1, second record)
+  record = 99;
+  GTEST_ASSERT_EQ(gfa->write(reinterpret_cast<uint8_t *>(&record), 4 * size), 0);
+  GTEST_ASSERT_EQ(gfa->count(), 5);
+
+  for (uint32_t i = 0; i < 5; i++) {
+    record = 0;
+    GTEST_ASSERT_EQ(gfa->read(reinterpret_cast<uint8_t *>(&record), i * size), 0);
+    GTEST_ASSERT_EQ(record, i == 4 ? 99U : i + 1);
+  }
 }
 
 // Verify object state is restored after restart and append continues from restored state.
