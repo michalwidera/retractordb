@@ -27,7 +27,8 @@ Progi (predeklaracja K24 §6, przepisane z `VERDICT.md`)
   Jakosciowo inny od zawyzajacego: jest defektem poprawnosci, nie utrata
   precyzji, i zawsze jest wynikiem negatywnym.
 * **H10b** — rozjazd reguly lokalnej A z dokladna na >= 5% planow ORAZ 100%
-  rozjazdow dodatnich o predeklarowanej postaci `ceil((p+q-1)/p)`. Ocena jest
+  dodatnich deficytow o predeklarowanej postaci `ceil((p+q-1)/p)` wsrod
+  wezlow `#` z dwiema deklaracjami. Ocena jest
   warunkowa: wymaga, zeby obie predeklarowane kontrole negatywne — „plany bez
   `#`" i HC_SINGLE zawezone do operatorow bez wlasnego ogona (K24b §4) — BYLY
   SPELNIONE i zeby mialy niepusta populacje. Zlamana kontrola znaczy zle
@@ -67,7 +68,7 @@ EXPECTED_CLASSES = frozenset(
 #: H10b: minimalny udzial planow z rozjazdem reguly lokalnej A.
 H10B_MIN_SHARE = Fraction(5, 100)
 
-#: H10b: udzial rozjazdow dodatnich o predeklarowanej postaci. Rowny jeden —
+#: H10b: udzial wszystkich kwalifikujacych sie wezlow o zadanej postaci. Rowny jeden —
 #: jeden kontrprzyklad obala postac.
 H10B_FORM_SHARE = Fraction(1, 1)
 
@@ -139,15 +140,18 @@ def judge_b(rows):
                 "controls": ctl, "stats": stats}
 
     share = Fraction(stats["diverging"], max(stats["plans"], 1))
-    form = Fraction(stats["matching"], stats["positive"]) if stats["positive"] else None
-    if stats["positive"] == 0:
+    if stats["eligible"] == 0:
         return {"status": UNEVALUABLE,
-                "reason": "populacja predeklarowana bez ani jednego rozjazdu dodatniego",
+                "reason": "populacja predeklarowana jest pusta",
                 "controls": ctl, "stats": stats}
-    ok = share >= H10B_MIN_SHARE and form >= H10B_FORM_SHARE
+    form = Fraction(stats["matching"], stats["eligible"])
+    positive = Fraction(stats["positive"], stats["eligible"])
+    ok = (share >= H10B_MIN_SHARE and form >= H10B_FORM_SHARE
+          and positive == 1)
     return {"status": SUPPORTED if ok else REFUTED,
             "reason": f"rozjazd {float(share):.1%} (prog {float(H10B_MIN_SHARE):.0%}), "
-                      f"postac {stats['matching']}/{stats['positive']}",
+                      f"dodatnie {stats['positive']}/{stats['eligible']}, "
+                      f"postac {stats['matching']}/{stats['eligible']}",
             "controls": ctl, "stats": stats}
 
 
@@ -327,6 +331,15 @@ def selftest():
             row["predicted_form"] = "6"
             break
     ok &= _expect("czlon (b) z kontrprzykladem postaci", mismatch, SUPPORTED, REFUTED)
+
+    for deficit in (0, -1):
+        nonpositive = [dict(r) for r in rows]
+        for row in nonpositive:
+            if row["h10b_eligible"] == "1":
+                row["divergence_a"] = str(deficit)
+                break
+        ok &= _expect(f"czlon (b) z deficytem {deficit}",
+                      nonpositive, SUPPORTED, REFUTED)
 
     print("SAMOTEST: " + ("PRZESZEDL" if ok else "OBLAL"))
     return 0 if ok else 1

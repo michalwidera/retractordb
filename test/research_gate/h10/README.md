@@ -6,9 +6,9 @@
 policzyć **statycznie, z samego planu**, bez uruchamiania strumieni — i wynik
 tego rachunku zgadza się z modelem zdarzeniowym.
 
-**H10b.** Reguła lokalna wyznaczania ogona jest wystarczająca, to znaczy ogon
-węzła zależy wyłącznie od jego bezpośrednich wejść, a nie od dalszej struktury
-planu.
+**H10b.** Reguła lokalna A zaniża prawdziwy ogon na dodatniej części planów.
+Na węzłach `#` o obu bezpośrednich składowych będących deklaracjami deficyt
+wynosi `ceil((p+q-1)/p)`, gdzie `p/q` jest stosunkiem taktów składowych.
 
 Wynik jest **mieszany i taki pozostaje**. Na silniku, który te liczby wytworzył:
 
@@ -41,6 +41,8 @@ osiągniętej dokładności.
 | `tests/test_independence.py` | dowodzi, że postać zamknięta nie podgląda modelu zdarzeniowego |
 | `tests/test_oracle.py` | 44 przypadki ręczne, 220 porównań — model zdarzeniowy zgadza się z policzonym ręcznie |
 | `tests/test_mutants.py` | wstrzykuje błędy do modelu; wykrycie 100% jest warunkiem, żeby model cokolwiek orzekał |
+| `tests/test_h10b_population.py` | sprawdza wybór wielu niekorzeniowych `#` z deklaracjami i odrzucenie `#` ze składową obliczaną |
+| `decision_rule.py --selftest` | obala H10b po zerowym, ujemnym lub niezgodnym z postacią deficycie |
 | `tests/test_closedform.py` | replika postaci zamkniętej wierna wobec silnika |
 | `tests/test_phase_forms.py` | ogon `-`, `Θ` i `~Θ` wobec modelu zdarzeniowego dla `q` do 12 — poza zakresem korpusu losowego (`q <= 5`); ma własną kontrolę mocy detekcyjnej |
 | `run_campaign.py` | generuje 10 010 losowych planów, dla każdego czyta ogon i origin ze zrzutu `xretractor -c` i zestawia z modelem zdarzeniowym |
@@ -118,7 +120,7 @@ Co ta poprawka zmienia, a czego nie:
 | HC_INT (węzły `#`, reguła lokalna B) | 346 / 340 | bez zmian |
 | HC_SINGLE, obie postaci | 0 | bez zmian |
 | człon (b): odsetek planów z rozjazdem | 52,4% / 52,7% | bez zmian |
-| człon (b): rozjazdy o predeklarowanej postaci | 353/353, 358/358 | bez zmian |
+| człon (b): rozjazdy o predeklarowanej postaci według ówczesnej, błędnej selekcji | 353/353, 358/358 | bez zmian |
 | reżimy H10a (ogon i początek logiczny) | 9/9 dokładnych | bez zmian |
 
 Nagłówkowa liczba członu (b) jest odporna, bo **żaden** plan nie rozjeżdżał się
@@ -175,9 +177,9 @@ bez własnego ogona:
 | plany bez `#` | 0 / 8442 | 0 / 8376 |
 | `HC_SINGLE` (operatory bez własnego ogona) | 0 / 3645 | 0 / 3691 |
 
-Skutek: `decision_rule.py` orzeka **H10b WSPARTA** na obu ziarnach — rozjazd
-52,4% i 52,7% przy progu 5%, postać 353/353 i 358/358. Człon (b) przestaje być
-nieocenialny, a liczba, która go blokowała, okazała się własnością kontroli.
+W ówczesnej aparaturze `decision_rule.py` orzekał **H10b WSPARTA** na obu
+ziarnach — rozjazd 52,4% i 52,7% przy progu 5%, postać 353/353 i 358/358.
+Te liczniki postaci zastąpiło późniejsze przeliczenie opisane niżej.
 
 **To jest osłabienie aparatury o trzy kontrole i tak należy je czytać.**
 Zapisała je K24b REPORT §97 już wtedy, gdy je podejmowano. Nie jest natomiast
@@ -191,6 +193,29 @@ Jądro bramki (`compare_regimes.py`) czyta wyłącznie dwie tabele reżimów H10
 sekcja 3 świeżego werdyktu różni się od `VERDICT.md` zestawem wierszy i **nie
 jest to dryft**. Przeliczenie członu (b) jako wyniku badawczego wymaga własnej
 predeklaracji i osobnego przebiegu.
+
+## Poprawka aparatury H10b — populacja i dodatniość
+
+Predeklaracja K24b §3–4 definiuje populację jako **każdy węzeł `#` o obu
+bezpośrednich składowych będących deklaracjami**. Kampania błędnie wybierała
+wyłącznie korzenie planów z dokładnie jednym `#` i operatorami `PASS`/`>N`.
+Wciągała przez to również korzenie `PASS` i `SHIFT`, a pomijała wiele
+niekorzeniowych `#`. Reguła decyzyjna liczyła ponadto zgodność postaci tylko
+wśród dodatnich deficytów, więc pojedyncze zero nie obalało H10b.
+
+Selekcja jest teraz węzłowa, a **każdy** kwalifikujący się węzeł musi mieć
+deficyt ostro dodatni i równy `ceil((p+q-1)/p)`. Samotest obala werdykt
+osobno deficytem zerowym, ujemnym i niezgodną postacią. Na stałych ziarnach
+bramki przeliczenie daje:
+
+| Ziarno | Plany z rozjazdem | Populacja `#` | Dodatnie | Zgodne z postacią |
+|---|---:|---:|---:|---:|
+| `20260804` | 5250/10010 (52,4%) | 2327 | 2327/2327 | 2327/2327 |
+| `20260807` | 5275/10010 (52,7%) | 2329 | 2329/2329 | 2329/2329 |
+
+To naprawa odczytu **istniejących ziaren bramki**, nie nowy przebieg
+potwierdzający. Zamrożone `VERDICT.md` i `VERDICT_oos.md` pozostają historią;
+`compare_regimes.py` porównuje z nich wyłącznie reżimy H10a.
 
 ## Defekt aparatury z 2026-08-19 — binarka nie może być zgadywana
 

@@ -157,6 +157,8 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
   for t in test_independence test_oracle test_mutants; do
     step "H10 $t" python3 "tests/$t.py"
   done
+  step "H10 populacja H10b" python3 tests/test_h10b_population.py
+  step "H10 samotest reguly decyzyjnej" python3 decision_rule.py --selftest
 
   # test_closedform jako jedyny z tej czworki rozmawia z SILNIKIEM, wiec dostaje
   # binarke jawnie, jak test_phase_forms i kampanie nizej. Bez tego wpada w

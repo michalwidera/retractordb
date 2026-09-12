@@ -90,12 +90,13 @@ def member_b(rows):
     diverging_a = {row["plan"] for row in rows if row["divergence_a"] != "0"}
     eligible = [row for row in rows if row["h10b_eligible"] == "1"]
     positive = [row for row in eligible if int(row["divergence_a"]) > 0]
-    matching = [row for row in positive
+    matching = [row for row in eligible
                 if int(row["divergence_a"]) == int(row["predicted_form"])]
     return {"plans": len(plans), "diverging": len(diverging_a),
             "share": len(diverging_a) / max(len(plans), 1),
             "eligible": len(eligible), "positive": len(positive), "matching": len(matching),
-            "mismatch": [row for row in positive if row not in matching][:3]}
+            "mismatch": [row for row in eligible
+                         if int(row["divergence_a"]) != int(row["predicted_form"])][:3]}
 
 
 #: Operatory pozbawione własnego ogona. Reguła lokalna A zeruje własny ogon
@@ -261,11 +262,13 @@ def render(rows, out, seed="20260803", engine="5e3eb42"):
     lines += ["## 2. H10b — nielokalność", "",
               f"* rozjazd reguły lokalnej A z dokładną: **{b['diverging']} z {b['plans']} "
               f"planów = {b['share']:.1%}** (próg predeklarowany: >= 5%)",
-              f"* populacja predeklarowana (dokładnie jeden `#`, poza tym `PASS`/`>N`): "
-              f"**{b['eligible']} planów**, rozjazdów dodatnich **{b['positive']}**",
+              "* populacja predeklarowana: węzły `#` z dwiema bezpośrednimi "
+              "deklaracjami:",
+              f"  **{b['eligible']} węzłów**, deficyt dodatni w "
+              f"**{b['positive']} z {b['eligible']}**",
               f"* rozjazdów o predeklarowanej postaci `ceil((p+q-1)/p)`: "
-              f"**{b['matching']} z {b['positive']}** "
-              f"({b['matching'] / max(b['positive'], 1):.1%}; próg: 100%)", ""]
+              f"**{b['matching']} z {b['eligible']}** "
+              f"({b['matching'] / max(b['eligible'], 1):.1%}; próg: 100%)", ""]
 
     lines += ["## 3. Kontrole negatywne", "",
               "| Kontrola | Węzłów | Rozjazdów | Stan |", "|---|---:|---:|---|"]
@@ -317,7 +320,8 @@ def main():
     # Bez przymiotnika: o ocenialności członu (b) rozstrzygają kontrole niżej,
     # a nie ten druk. Zaszyte „(nieocenialny)" przeżyło swój powód o pięć tygodni.
     print(f"H10b: rozjazd {summary['b']['share']:.1%}, "
-          f"postać {summary['b']['matching']}/{summary['b']['positive']}")
+          f"dodatnie {summary['b']['positive']}/{summary['b']['eligible']}, "
+          f"postać {summary['b']['matching']}/{summary['b']['eligible']}")
     for label, (count, breaks) in summary["controls"].items():
         print(f"kontrola {label}: {breaks}/{count}")
 
