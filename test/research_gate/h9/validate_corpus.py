@@ -152,9 +152,17 @@ def checked_code_sha(expected=None):
     actual = completed.stdout.strip()
     if expected is not None and actual != expected:
         raise GateError(f"engine SHA {actual}, evidence/start pin {expected}")
-    dirty = subprocess.run(
+    reported = subprocess.run(
         ["git", "-C", CODE_REPO, "status", "--short"], check=True, text=True, capture_output=True
     ).stdout
+    # Dziennik dryftu lezy w drzewie zrodlowym i dopisuje go PRZEBIEG, ktory jest wlasnie
+    # stemplowany, wiec nie moze wchodzic do oceny czystosci tego samego drzewa. To samo
+    # wykluczenie robi run_drift.sh (DIRTY_COUNT), i wlasnie ta rozbieznosc byla wada:
+    # run_drift.sh widzialo drzewo jako czyste, nie dodawalo --allow-dirty, a ta funkcja
+    # przewracala sie na wierszu dziennika. Poziom "H9 mechanizm" wpadal wtedy w galaz
+    # S_MECH="DRYFT", czyli DRUGI Z RZEDU `ninja test_drift` orzekal FALSZYWY DRYFT —
+    # awarie aparatury nie do odroznienia od regresji silnika.
+    dirty = "".join(line + "\n" for line in reported.splitlines() if "DRIFT_JOURNAL.tsv" not in line)
     if dirty:
         # Dowod kampanii musi nazywac rewizje, wiec brudne drzewo jest bledem.
         # Bramka regresyjna pyta o co innego: czy 21 planow nadal kompiluje sie

@@ -723,6 +723,46 @@ TEST(xcompiler, still_reports_true_circular_dependency) {
   EXPECT_EQ(compilerInstance.compile(), "Circular dependency in stream definitions");
 }
 
+// Petla wlasna nad GOLYM odwolaniem — jedyny ksztalt samoodwolania, ktory NIE dochodzil do
+// detektora cykli. compiler::expandSchemaWildcards() stoi przed resolveStreamIntervals(),
+// a przy `FROM x` w strumieniu `x` iterowala po tej samej liscie `lSchema`, do ktorej
+// dopisywala: `xretractor -c` nie wracalo w 120 s i roslo w pamieci do wyczerpania
+// (pod `ulimit -v` konczylo sie `std::bad_alloc`).
+TEST(xcompiler, self_reference_over_bare_stream_is_rejected) {
+  qTree instance;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
+        DECLARE value INTEGER STREAM src, 1 FILE 'a.txt'
+        SELECT * STREAM x FROM x
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler compilerInstance(instance);
+  EXPECT_EQ(compilerInstance.compile(), "Stream 'x' reads itself in its FROM clause; a stream cannot be its own producer");
+}
+
+// Zapadka na "uproszczenie" bramki powyzej do jednej reguly wyzej w kompilatorze.
+//
+// Kazdy INNY ksztalt samoodwolania ma w programie wiecej niz jeden token, wiec galaz
+// `q.lProgram.size() == 1` sie nie wykonuje, plan dochodzi do resolveStreamIntervals()
+// i zostaje odrzucony przez detektor cykli. Te dwa komunikaty NIE SA wymienne: gdyby
+// ktos przeniosl detekcje przed expandSchemaWildcards(), ponizsze osiem przestaloby
+// mowic o cyklu, a granica miedzy "brak postepu" i "czyta siebie" przesunelaby sie
+// bez sladu w tescie.
+TEST(xcompiler, other_self_reference_shapes_stay_with_the_cycle_detector) {
+  for (const char *expression : {"x>1", "x-2", "x&2", "x%2", "x#x", "x+x", "x@(1,2)", "x.sumc"}) {
+    qTree instance;
+    const std::string plan = std::string(
+                                 "DECLARE value INTEGER STREAM src, 1 FILE 'a.txt'\n"
+                                 "SELECT * STREAM x FROM ") +
+                             expression + "\n";
+    auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, plan);
+    ASSERT_EQ(parseResult, "OK") << "wyrazenie: " << expression;
+
+    compiler compilerInstance(instance);
+    EXPECT_EQ(compilerInstance.compile(), "Circular dependency in stream definitions") << "wyrazenie: " << expression;
+  }
+}
+
 // Iloczyn interwalow wychodzil poza int juz dla licznikow rzedu 10^4, a
 // boost::rational<int> nie wykrywa przepelnienia. Objawem byl niezwiazany
 // komunikat walidacji planu ("faster div from slower source") dla planu, ktory

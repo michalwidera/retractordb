@@ -801,6 +801,23 @@ std::string compiler::expandSchemaWildcards() {
                   (*q.lProgram.begin()).getStrCommandID(), q.id);
             }
             auto nameOfscanningTable = (*q.lProgram.begin()).getStr_();
+            // Strumien czytajacy SIEBIE odrzucamy TUTAJ, przed rozwinieciem schematu.
+            //
+            // Petla ponizej idzie po `getQuery(zrodlo).lSchema`, a dopisuje do `q.lSchema`.
+            // Przy samoodwolaniu obie nazwy wskazuja TE SAMA liste, a `std::list` nie
+            // uniewaznia iteratorow przy dopisaniu — petla widzi wiec wlasne dopiski i nie
+            // ma konca. Objawem bylo `xretractor -c`, ktore nie wracalo w 120 s i roslo
+            // w pamieci do wyczerpania; pod `ulimit -v` konczylo sie `std::bad_alloc`.
+            //
+            // Cyklu NIE zostawiamy detektorowi w resolveStreamIntervals(), bo ten przebieg
+            // stoi PO tym miejscu i nie zostaje osiagniety. Detektor lapie za to kazdy inny
+            // ksztalt samoodwolania (`x>1`, `x-2`, `x&2`, `x%2`, `x#x`, `x+x`, `x@(1,2)`,
+            // `x.sumc` — zmierzone), bo tam program ma wiecej niz jeden token i ta galaz
+            // sie nie wykonuje. Dlatego bramka jest tutaj, a nie przed przebiegiem: szerzej
+            // nie ma czego domykac.
+            if (nameOfscanningTable == q.id) {
+              return "Stream '" + q.id + "' reads itself in its FROM clause; a stream cannot be its own producer";
+            }
             // Remove of TSCAN
             eraseList.push_back(it);
             // q.lSchema =  getQuery(t.getStr()).lSchema;
