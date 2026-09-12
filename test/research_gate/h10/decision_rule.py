@@ -65,6 +65,29 @@ import verdict as V
 EXPECTED_CLASSES = frozenset(
     {"ADD", "AGSE", "HASH", "NTHETA", "PASS", "REDUCE", "SHIFT", "SUB", "THETA"})
 
+#: Klasa okna REKORDOWEGO w liscie SELECT (K24f). NIE jest czescia predeklarowanej
+#: dziewiatki, bo korpus z oknem jest INNYM korpusem: strata wchodzi do generatora
+#: jawnie (`run_campaign.py --with-window`), a dla zamrozonych ziaren K24e korpus
+#: zostaje dziewiecioklasowy.
+WINDOW_CLASS = "WINDOW"
+
+
+def expected_classes(rows):
+    """Predeklarowany zestaw klas DLA TEGO korpusu.
+
+    Oczekiwanie bierze sie ze STRATY zapisanej w wierszach, a nie z przelacznika
+    wolajacego. CSV jest zapisem tego, co korpus mial wyprodukowac, wiec nie ma jak
+    rozejsc sie z tym, co faktycznie przebieglo — a przelacznik podany w jednym
+    miejscu i pominiety w drugim dalby blad o mylacej tresci.
+
+    Straznik zostaje nietkniety w obie strony: klasa brakujaca i klasa nadmiarowa
+    nadal daja BRAK WERDYKTU. W szczegolnosci korpus, ktory MIAL miec okno, a nie
+    ma ani jednego wezla `WINDOW`, jest bledem, a nie orzeczeniem o dziewieciu.
+    """
+    if any(row["stratum"] == WINDOW_CLASS for row in rows):
+        return set(EXPECTED_CLASSES) | {WINDOW_CLASS}
+    return set(EXPECTED_CLASSES)
+
 #: H10b: minimalny udzial planow z rozjazdem reguly lokalnej A.
 H10B_MIN_SHARE = Fraction(5, 100)
 
@@ -87,10 +110,11 @@ def judge_a(rows):
     tail = V.classify(rows)
     origin = V.classify_origin(rows)
 
+    expected = expected_classes(rows)
     seen = set(tail)
-    if seen != set(EXPECTED_CLASSES):
-        missing = sorted(EXPECTED_CLASSES - seen)
-        extra = sorted(seen - EXPECTED_CLASSES)
+    if seen != expected:
+        missing = sorted(expected - seen)
+        extra = sorted(seen - expected)
         raise VerdictError(
             f"zestaw klas rozny od predeklarowanego; brak={missing or 'brak'} "
             f"nadmiarowe={extra or 'brak'}")
@@ -218,10 +242,10 @@ def render(report, seed, engine):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _row(plan, kind, tail_gap=0, origin_gap=0, hard="", div_a=0, div_b=0,
-         eligible=0, form=""):
+         eligible=0, form="", stratum="s"):
     oracle_c1, oracle_origin = 10, 3
     return {
-        "plan": str(plan), "stratum": "s", "hard_classes": hard, "depth": "2",
+        "plan": str(plan), "stratum": stratum, "hard_classes": hard, "depth": "2",
         "node": f"n{plan}", "kind": kind, "delta": "1/1",
         "engine_tail": str(oracle_c1 + tail_gap), "oracle_c1": str(oracle_c1),
         "oracle_c2": str(oracle_c1), "replica_tail": str(oracle_c1 + tail_gap),
@@ -288,6 +312,18 @@ def selftest():
                   [r for r in _corpus() if r["kind"] != "AGSE"], None, want_error=True)
     ok &= _expect("klasa spoza predeklaracji",
                   _corpus() + [_row(99, "NOWA")], None, want_error=True)
+
+    # Korpus z oknem REKORDOWYM: dziesiec klas jest wtedy zestawem POPRAWNYM,
+    # a ta sama dziesiatka bez straty `WINDOW` w wierszach — nadmiarowa. Obie
+    # strony osobno, bo `expected_classes()` da sie zepsuc w kazda z nich.
+    ok &= _expect("korpus z oknem: dziesiec klas przechodzi",
+                  _corpus() + [_row(98, WINDOW_CLASS, stratum=WINDOW_CLASS)],
+                  SUPPORTED, UNEVALUABLE)
+    ok &= _expect("klasa WINDOW bez straty WINDOW jest nadmiarowa",
+                  _corpus() + [_row(98, WINDOW_CLASS)], None, want_error=True)
+    ok &= _expect("strata WINDOW bez ani jednego wezla WINDOW",
+                  _corpus() + [_row(98, "PASS", stratum=WINDOW_CLASS)],
+                  None, want_error=True)
 
     # Kontrola mocy czlonu (b): gdyby zadne dane nie mogly go uczynic ocenialnym,
     # jego progi bylyby martwa galezia, a status NIEOCENIALNY — tautologia.

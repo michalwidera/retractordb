@@ -24,16 +24,16 @@ sys.path.insert(0, str(ROOT / "oracle"))
 import engine as E  # noqa: E402
 import execute as X  # noqa: E402
 import plan as P  # noqa: E402
-from generator import STRATA, generate  # noqa: E402
+from generator import STRATA, STRATA_WITH_WINDOW, generate  # noqa: E402
 
 RECORDS = 12
 SCALES = (Fraction(1, 200), Fraction(1, 100))   # docelowy interwał najszybszego strumienia
 BUDGET = Fraction(8)                            # sekundy na pojedynczy przebieg
 
 
-def select(corpus, per_stratum):
+def select(corpus, per_stratum, strata=STRATA):
     chosen = []
-    counts = {name: 0 for name in STRATA}
+    counts = {name: 0 for name in strata}
     for index, (stratum, item) in enumerate(corpus):
         if counts[stratum] >= per_stratum:
             continue
@@ -77,12 +77,19 @@ def main():
     parser.add_argument("--per-stratum", type=int, default=8)
     parser.add_argument("--xretractor", default=None)
     parser.add_argument("--out", default=str(ROOT / "raw" / "mapping_gate.csv"))
+    # Korpus z oknem rekordowym — patrz run_campaign.py. Bramka odwzorowania jest
+    # JEDYNYM miejscem, gdzie model TRESCI okna jest sprawdzany wobec bajtow
+    # artefaktu; bez tego przelacznika galaz WINDOW w model.content() bylaby
+    # aparatura nieuruchomiona.
+    parser.add_argument("--with-window", action="store_true",
+                        help="dolacz strate okna rekordowego (korpus K24f)")
     args = parser.parse_args()
 
     binary = E.resolve_binary(args.xretractor)
     workroot = ROOT / "work" / "mapping"
     workroot.mkdir(parents=True, exist_ok=True)
-    chosen = select(generate(args.seed, args.count), args.per_stratum)
+    strata = STRATA_WITH_WINDOW if args.with_window else STRATA
+    chosen = select(generate(args.seed, args.count, strata=strata), args.per_stratum, strata)
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -23,7 +23,7 @@ from fractions import Fraction
 from math import gcd
 
 from plan import (ADD, AGSE, HASH, NTHETA, PASS, REDUCE, SHIFT, SOURCE, SUB,
-                  THETA)
+                  THETA, WINDOW, window_span)
 
 # compiler.cpp: kOriginSearchLimit
 ORIGIN_SEARCH_LIMIT = 1 << 24
@@ -262,6 +262,18 @@ def evaluate_origins(plan, mutation=None, given_origins=None):
 
         if node.kind in (PASS, REDUCE):
             result = o1
+        elif node.kind == WINDOW:
+            # compiler.cpp, computeLogicalOrigin(): galaz `q.lProgram.size() == 1`
+            #   if (const auto width = windowWidthOf(q, err); width) result = o1 + *width - 1;
+            # `windowWidthOf` zwraca NAJSZERSZE okno listy SELECT, stad window_span().
+            #
+            # Postac jest tu DOKLADNA, nie szukana polowieniem: odwzorowanie okna
+            # nie ma czlonu fazowego, wiec `firstIndexReaching` nie jest potrzebne.
+            span = window_span(node)
+            if mutation.get("window_drop_span", False):
+                result = o1
+            else:
+                result = o1 + span - 1 + mutation.get("window_origin_delta", 0)
         elif node.kind == SHIFT:
             result = o1 + (0 if mutation.get("shift_drop_origin", False) else node.param)
         elif node.kind == AGSE:
@@ -399,6 +411,14 @@ def evaluate(plan, mutation=None, given_tails=None):
                 result = agse_tail(first.width, step, w1)
         elif node.kind == REDUCE:
             pass
+        elif node.kind == WINDOW:
+            # Okno rekordowe NIE rusza ogona. Rachunek silnika idzie tu ta sama
+            # sciezka co czysty przepis (jeden token PUSH_STREAM), a
+            # computeStartupLatency() o oknie nie wie — windowWidthOf() jest
+            # wolane wylacznie z resolveStreamIntervals(), computeLogicalOrigin()
+            # i computeRequiredCapacities(). Zmierzone: okno nad `s#t` o ogonie 1
+            # ma ogon 1, nie inny.
+            result = w1
         else:
             raise ReplicaError(f"replika: nieznany węzeł {node.kind}")
 

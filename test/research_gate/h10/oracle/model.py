@@ -40,7 +40,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 
 from plan import (ADD, AGSE, HASH, NTHETA, PASS, REDUCE, SHIFT, SOURCE, SUB,
-                  THETA, period_hint)
+                  THETA, WINDOW, period_hint, window_span)
 
 C1 = "C1"
 C2 = "C2"
@@ -141,6 +141,20 @@ def dependencies(node, children, n):
         src = children[0]
         first, last = agse_record_range(node, src, n)
         return [(src.name, index, Fraction(0)) for index in range(first, last + 1)]
+    if kind == WINDOW:
+        # Okno REKORDOWE jest PRZESUWNE i stemplowane KONCEM przedzialu: rekord n
+        # obejmuje rekordy zrodla n-(W-1) ... n, po jednej wartosci z kazdego.
+        # To jest DEFINICJA operatora (patrz `test/IntegrationTest/window_aggregate/`),
+        # a nie odbicie rachunku silnika: nie ma tu ani `O_src + W - 1`, ani zadnej
+        # innej postaci zamknietej — origin i ogon wyprowadza z tej listy skan
+        # w _origin_over_scan() i _tail_over_window().
+        #
+        # O ISTNIENIU rekordu decyduje NAJSTARSZY z zaleznosci, wiec przy kilku
+        # agregatach w liscie liczy sie okno najszersze; zaleznosci wezszych sa
+        # jego podzbiorem, bo wszystkie koncza sie na tym samym rekordzie n.
+        src = children[0]
+        span = window_span(node)
+        return [(src.name, n - offset, Fraction(0)) for offset in range(span)]
     raise OracleError(f"oracle: brak modelu dla węzła {kind}")
 
 
@@ -359,4 +373,23 @@ def content(plan, name, n, source_order=None):
         if length > 0:
             fields.reverse()
         return tuple(fields)
+    if node.kind == WINDOW:
+        reducer, widths = node.param
+        src = children[0]
+        values = []
+        for index, width in enumerate(widths):
+            slot = index % src.width
+            window = [content(plan, src.name, n - offset, source_order)[slot] for offset in range(width)]
+            # Kazde pole okna jest RATIONAL, wiec wchodzi do krotki para
+            # (licznik, mianownik) — tak samo jak przy reduktorze strumieniowym.
+            if reducer == "sumc":
+                values.extend((sum(window), 1))
+            elif reducer == "min":
+                values.extend((min(window), 1))
+            elif reducer == "max":
+                values.extend((max(window), 1))
+            else:
+                average = Fraction(sum(window), len(window))
+                values.extend((average.numerator, average.denominator))
+        return tuple(values)
     raise OracleError(f"oracle: brak modelu treści dla {node.kind}")

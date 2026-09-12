@@ -73,6 +73,25 @@ ORIGIN_MUTANTS = {
     # Przeplot patrzy tylko na lewą składową; prawa może wtedy być czytana
     # przed swoim początkiem.
     "hash_origin_left_only": {"hash_origin_left_only": True},
+    # --- dolozone w K24f: regula okna REKORDOWEGO w liscie SELECT -----------
+    #
+    # `O = O_src + W - 1`. Regula weszla po K24e (compiler.cpp, galaz
+    # `q.lProgram.size() == 1` w computeLogicalOrigin) i do K24f nie zmierzyla
+    # jej zadna kampania ani bramka — korpus wypisywal wylacznie `SELECT *`,
+    # wiec `windowWidthOf()` nie mialo w czym znalezc tokena WINDOW_*.
+    #
+    # Bez tych mutantow poziom test_mutants nie orzeka o nowej regule: przeszedlby
+    # na samych mutantach starszych klas, a okno bylo by w bramce niewidoczne.
+    #
+    # Okno bez rozpietosci — origin zapomina, ze rekord n siega wstecz o W-1.
+    # To jest stan SPRZED reguly: dokladnie to, co silnik liczyl do `b5e92d9`.
+    "window_drop_span": {"window_drop_span": True},
+    # Blad o jeden w obie strony. Mutant `+1` (czyli `O_src + W`) jest tu
+    # najwazniejszy: rozni sie od reguly o jeden slot dla KAZDEGO W >= 1, wiec
+    # gdyby oracle liczyl okno przez te sama postac zamknieta co replika, ten
+    # mutant przeszedlby niewykryty i bylo by to widac.
+    "window_origin_plus_one": {"window_origin_delta": 1},
+    "window_origin_minus_one": {"window_origin_delta": -1},
 }
 
 # Zachowana pod starą nazwą, żeby skrypty odwołujące się do MUTANTS działały

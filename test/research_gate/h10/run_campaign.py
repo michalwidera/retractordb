@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT / "oracle"))
 import closedform as C  # noqa: E402
 import engine as E  # noqa: E402
 import model as M  # noqa: E402
-from generator import generate, _hard_classes_of  # noqa: E402
+from generator import STRATA_WITH_WINDOW, generate, _hard_classes_of  # noqa: E402
 from plan import HASH, SHIFT, SOURCE, to_rql  # noqa: E402
 
 FIELDS = ("plan", "stratum", "hard_classes", "depth", "node", "kind", "delta",
@@ -188,12 +188,19 @@ def main():
     parser.add_argument("--xretractor", default=None)
     parser.add_argument("--out", default=str(ROOT / "raw" / "campaign.csv"))
     parser.add_argument("--workers", type=int, default=8)
+    # Korpus z oknem REKORDOWYM w liscie SELECT jest INNYM korpusem, nie poszerzeniem
+    # zamrozonego: dolozenie straty przesuwa wszystkie losowania dla danego ziarna.
+    # Domyslnie zostaje zestaw K24e, zeby `ninja test_gate` porownywalo sie z wlasnymi
+    # zamrozonymi werdyktami; K24f i `ninja test_drift` zamawiaja korpus szerszy jawnie.
+    parser.add_argument("--with-window", action="store_true",
+                        help="dolacz strate okna rekordowego (korpus K24f, nie K24e)")
     args = parser.parse_args()
 
     binary = E.resolve_binary(args.xretractor)
     workroot = ROOT / "work" / "campaign"
     workroot.mkdir(parents=True, exist_ok=True)
-    corpus = generate(args.seed, args.count)
+    corpus = generate(args.seed, args.count,
+                      strata=STRATA_WITH_WINDOW if args.with_window else None)
     payload = [(index, stratum, plan, str(binary), str(workroot))
                for index, (stratum, plan) in enumerate(corpus)]
 

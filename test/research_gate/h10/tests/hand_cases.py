@@ -253,4 +253,65 @@ def hand_cases():
         [a, b, window3, P.make_hash("n1", window3, b)],
         {"n0": 2, "n1": 3}, {"n0": 3, "n1": 5}, {"n0": 0, "n1": 0})
 
+    # --- okno REKORDOWE w liście SELECT (K24f) ---------------------------------
+    #
+    # Okno jest przesuwne i stemplowane KOŃCEM: rekord n obejmuje rekordy źródła
+    # n-(S-1) ... n, gdzie S jest NAJSZERSZYM oknem listy SELECT. Interwał wyjścia
+    # jest równy interwałowi źródła.
+    #
+    # origin: rekord n istnieje, gdy n-(S-1) >= O_src, czyli O = O_src + S - 1.
+    # ogon:   o dostępności decyduje rekord NAJNOWSZY, czyli n — ten sam, który
+    #         czyta czysty przepis. Deficyt jest więc identyczny jak przy `pass`
+    #         i ogon nie zależy od S. Nad źródłem daje to 0 przy C1 i 1 przy C2.
+    #
+    # Ta niezależność ogona od S jest tu istotna: gdyby okno dokładało cokolwiek
+    # do ogona, poniższe liczby by tego nie przepuściły — a rozdzielenie „okno
+    # rusza wyłącznie origin” jest treścią reguły.
+    for span in (1, 3, 5):
+        a = _src("s0", Fraction(1, 10))
+        add(f"window min(:{span}) over source",
+            [a, P.make_window("n0", a, "min", (span,))],
+            {"n0": 0}, {"n0": 1}, {"n0": span - 1})
+
+    # Dwa agregaty różnej szerokości: o origin decyduje SZERSZY (silnik bierze
+    # `widest` w windowWidthOf). Węższe okno domyka się wcześniej, więc nie
+    # stawia żadnego wymagania ponad tamto.
+    a = _src("s0", Fraction(1, 10))
+    add("window avg(:2),avg(:5) over source — szerszy decyduje",
+        [a, P.make_window("n0", a, "avg", (2, 5))],
+        {"n0": 0}, {"n0": 1}, {"n0": 4})
+
+    # Okno nad przesunięciem: origin się SKŁADA, O = N + S - 1. Ogon zostaje
+    # zerowy, bo `>N` też go nie ma nad źródłem.
+    a = _src("s0", Fraction(1, 10))
+    shifted = P.make_shift("n0", a, 2)
+    add("window sumc(:3) over shift >2",
+        [a, shifted, P.make_window("n1", shifted, "sumc", (3,))],
+        {"n0": 0, "n1": 0}, {"n0": 0, "n1": 1}, {"n0": 2, "n1": 4})
+
+    # Okno nad przeplotem 1#1 (Delta = 1/2, ogon C1 = 1, C2 = 2, origin 0) —
+    # przypadek, w którym producent MA ogon, więc widać, że okno go dziedziczy,
+    # a nie zeruje ani nie powiększa.
+    #   C1: avail_h(j) = (j+1+1)*1/2, najnowsza zależność j = n,
+    #       deficyt = ((n+2)/2)/(1/2) - (n+1) = 1  ->  ogon 1;
+    #   C2: ogon składowej jest 2, więc avail_h(j) = (j+3)*1/2,
+    #       deficyt = (n+3) - (n+1) = 2, kandydat floor(2)+1 = 3.
+    s0, s1 = _src("s0", 1), _src("s1", 1)
+    hashed = P.make_hash("n0", s0, s1)
+    add("window max(:4) over hash 1#1",
+        [s0, s1, hashed, P.make_window("n1", hashed, "max", (4,))],
+        {"n0": 1, "n1": 1}, {"n0": 2, "n1": 3}, {"n0": 0, "n1": 3})
+
+    # Okno nad oknem. Kształt WYŁĄCZONY z generatora (węzeł okna ma pola
+    # RATIONAL, więc model treści liczyłby słowa źródła źle), ale reguła origin
+    # składa się tu tak samo jak wszędzie — i to jest jedyne miejsce, gdzie ten
+    # kształt jest w ogóle pilnowany.
+    #   O(n0) = 3-1 = 2, O(n1) = 2 + 2-1 = 3.
+    #   C2(n1): ogon n0 jest 1, więc avail(j) = (j+2)*Delta, deficyt 1, kandydat 2.
+    a = _src("s0", Fraction(1, 10))
+    inner = P.make_window("n0", a, "min", (3,))
+    add("window over window",
+        [a, inner, P.make_window("n1", inner, "avg", (2,))],
+        {"n0": 0, "n1": 0}, {"n0": 1, "n1": 2}, {"n0": 2, "n1": 3})
+
     return out

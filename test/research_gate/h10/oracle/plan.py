@@ -24,10 +24,15 @@ THETA = "THETA"
 NTHETA = "NTHETA"
 AGSE = "AGSE"
 REDUCE = "REDUCE"
+WINDOW = "WINDOW"
 
-OPERATOR_CLASSES = (PASS, SHIFT, HASH, ADD, SUB, THETA, NTHETA, AGSE, REDUCE)
+OPERATOR_CLASSES = (PASS, SHIFT, HASH, ADD, SUB, THETA, NTHETA, AGSE, REDUCE, WINDOW)
 
 REDUCERS = ("sumc", "avg", "min", "max")
+
+# Agregaty okna REKORDOWEGO — te same nazwy co reduktory strumieniowe, ale inna
+# konstrukcja: `MIN(pole : W)` w liscie SELECT, nie `FROM MIN(strumien)`.
+WINDOW_REDUCERS = ("sumc", "avg", "min", "max")
 
 
 class PlanError(ValueError):
@@ -149,6 +154,41 @@ def make_reduce(name, src, reducer):
     return Node(name=name, kind=REDUCE, delta=src.delta, width=1, children=(src.name,), param=reducer)
 
 
+def make_window(name, src, reducer, widths):
+    """Okno REKORDOWE w liscie SELECT: `MIN(zrodlo[i] : W)`.
+
+    Wezel ma WLASNA tozsamosc w modelu planu, bo ta konstrukcja nie jest
+    wyrazeniem strumieniowym i nie mieszka w klauzuli FROM — FROM jest tu
+    pojedynczym odwolaniem do zrodla, a okno stoi w liscie SELECT. Interwal
+    wyjscia jest ROWNY interwalowi zrodla: lista SELECT nie rusza osi czasu.
+
+    ``widths`` to szerokosci poszczegolnych agregatow listy, po jednym polu na
+    agregat. Krotka dluzsza niz jednoelementowa jest tu po to, zeby model
+    obejmowal wybor NAJSZERSZEGO okna — silnik liczy origin z maksimum
+    (`compiler::windowWidthOf` zwraca `widest`), a wezel o jednej szerokosci
+    tej galezi nie dotyka.
+    """
+    if reducer not in WINDOW_REDUCERS:
+        raise PlanError(f"nieznany agregat okna {reducer}")
+    widths = tuple(int(width) for width in widths)
+    if not widths:
+        raise PlanError("okno rekordowe wymaga co najmniej jednego agregatu")
+    if any(width < 1 for width in widths):
+        raise PlanError("szerokosc okna rekordowego musi byc >= 1")
+    return Node(name=name, kind=WINDOW, delta=src.delta, width=len(widths),
+                children=(src.name,), param=(reducer, widths))
+
+
+def window_widths(node):
+    """Szerokosci okien wezla ``WINDOW``, w kolejnosci pol listy SELECT."""
+    return node.param[1]
+
+
+def window_span(node):
+    """Najszersze okno wezla — ta wielkosc wchodzi do origin."""
+    return max(window_widths(node))
+
+
 def rational_text(value):
     value = Fraction(value)
     if value.denominator == 1:
@@ -177,7 +217,27 @@ def node_expression(node):
         return f"{node.children[0]}@({step},{length})"
     if node.kind == REDUCE:
         return f"{node.children[0]}.{node.param}"
+    if node.kind == WINDOW:
+        # Okno nie jest wyrazeniem strumieniowym: FROM to samo zrodlo, a agregaty
+        # wchodza do listy SELECT przez window_select_list().
+        return node.children[0]
     raise PlanError(f"nieznany rodzaj węzła {node.kind}")
+
+
+def window_select_list(node, source):
+    """Lista SELECT wezla ``WINDOW``.
+
+    Argument agregatu zapisujemy jako `zrodlo[slot]`, a nie nazwa pola zrodla.
+    Oba zapisy znacza po stronie okna to samo (patrz `test/IntegrationTest/
+    window_aggregate/`), ale slot NIE zalezy od nazw pol generowanych przez
+    `SELECT *` u producenta — a te dla wezla nie-zrodlowego sa nieznane modelowi
+    planu. Slot krazy po szerokosci zrodla, bo agregatow moze byc wiecej niz pol.
+    """
+    reducer, widths = node.param
+    src = node.children[0]
+    return ", ".join(
+        f"{reducer.upper()}({src}[{index % source.width}] : {width})"
+        for index, width in enumerate(widths))
 
 
 def to_rql(plan, storage=".", substrat="memory", data_file=None):
@@ -193,6 +253,10 @@ def to_rql(plan, storage=".", substrat="memory", data_file=None):
     for node in plan.nodes:
         if node.kind == SOURCE:
             continue
+        if node.kind == WINDOW:
+            select_list = window_select_list(node, plan.by_name(node.children[0]))
+            lines.append(f"SELECT {select_list} STREAM {node.name} FROM {node_expression(node)}")
+            continue
         lines.append(f"SELECT * STREAM {node.name} FROM {node_expression(node)}")
     lines.append("")
     return "\n".join(lines)
@@ -202,9 +266,15 @@ def payload_words(node):
     """Liczba słów 32-bitowych w rekordzie artefaktu.
 
     Reduktory zapisują pole RATIONAL (licznik + mianownik), pozostałe operatory
-    zachowują szerokość INTEGER-ową źródła.
+    zachowują szerokość INTEGER-ową źródła. Agregat okna rekordowego jest tym
+    samym reduktorem policzonym po rekordach, więc KAŻDE jego pole jest
+    RATIONAL — zmierzone na `MIN`/`MAX`/`SUMC`/`AVG`.
     """
-    return 2 if node.kind == REDUCE else node.width
+    if node.kind == REDUCE:
+        return 2
+    if node.kind == WINDOW:
+        return 2 * node.width
+    return node.width
 
 
 def rescale(plan, factor):

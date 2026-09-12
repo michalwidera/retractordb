@@ -239,8 +239,19 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
     S_H10A="NIESPRAWDZONY"; S_H10B="NIESPRAWDZONY"
   else
     raw="$WORK/h10_$SEED.csv"
-    if ! aux "H10 kampania ($COUNT planow, ziarno $SEED)" python3 run_campaign.py \
-             --seed "$SEED" --count "$COUNT" --xretractor "$XRETRACTOR" --out "$raw"; then
+    # `--with-window` WLACZONE tu, a NIE w run_gate.sh, i to nie jest niekonsekwencja.
+    #
+    # `test_gate` porownuje etykiety rezimow z ZAMROZONA tablica odniesienia
+    # (h10/VERDICT.md, VERDICT_oos.md), a compare_regimes.py zwraca kod 2 przy
+    # jakiejkolwiek zmianie zestawu klas — dolozenie klasy WINDOW oblalo by bramke
+    # z powodu korpusu, nie silnika. Dryft nie ma czego zepsuc: losuje ziarno za
+    # kazdym razem i porownuje z MODELEM ZDARZENIOWYM, nie z tablica.
+    #
+    # Bez tego regula okna rekordowego nie mialaby zadnego biezacego pokrycia —
+    # dokladnie ten stan, ktory K24f zastala: regula weszla po K24e i zadna bramka
+    # nie miala jak jej zobaczyc, bo korpus wypisywal wylacznie `SELECT *`.
+    if ! aux "H10 kampania ($COUNT planow, ziarno $SEED, z oknem rekordowym)" python3 run_campaign.py \
+             --seed "$SEED" --count "$COUNT" --with-window --xretractor "$XRETRACTOR" --out "$raw"; then
       undecided "H10 — kampania nie doszla do konca" "h10-kampania"
       S_H10A="NIESPRAWDZONY"; S_H10B="NIESPRAWDZONY"
     else
