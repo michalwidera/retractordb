@@ -640,6 +640,23 @@ rdb::descFldVT callFun(rdb::descFldVT &inVar, const std::function<double(double)
   throw std::runtime_error("callFun: unsupported type - math functions require numeric operand");
 }
 
+/// Funkcje o niewymiernej przeciwdziedzinie (`sin`, `cos`, `exp`) oddaja DOUBLE, bez
+/// stratnego powrotu na typ argumentu, ktory robi callFun(). Wynik niefinitywny — `exp(1000)`
+/// albo NaN — jest NULL, tak samo jak przy operatorze potegowania.
+///
+/// RATIONAL jest tu policzony, mimo ze kompilator ODRZUCA go dla tych trzech nazw
+/// (rejectedIrrationalOverExact w expressionShape.cpp). Ewaluator stoi PONIZEJ tej bramki
+/// i wykonuje takze programy skladane z pominieciem kompilatora, wiec nie powtarza jego
+/// decyzji o kontrakcie jezyka; rachunek przez double jest tu poprawny i nie ma czego
+/// zabraniac.
+rdb::descFldVT callRealFun(const rdb::descFldVT &inVar, const std::function<double(double)> &fnName) {
+  if (isNullValue(inVar)) return std::monostate{};
+  if (inVar.index() < rdb::BYTE || inVar.index() > rdb::DOUBLE)
+    throw std::runtime_error("callRealFun: math functions require numeric operand");
+  const double result = fnName(std::get<double>(castFldVT(inVar, rdb::DOUBLE)));
+  return std::isfinite(result) ? rdb::descFldVT{result} : rdb::descFldVT{std::monostate{}};
+}
+
 rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::payload *payload,
                                          const std::vector<windowStats> *windowValues) {
   // Kontener stosu: small_vector z inline-storage zamiast domyślnej std::deque.
@@ -758,9 +775,11 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         else if (tkStr == "round")
           rStack.push(callFun(b, round));
         else if (tkStr == "sin")
-          rStack.push(callFun(b, sin));
+          rStack.push(callRealFun(b, sin));
         else if (tkStr == "cos")
-          rStack.push(callFun(b, cos));
+          rStack.push(callRealFun(b, cos));
+        else if (tkStr == "exp")
+          rStack.push(callRealFun(b, exp));
         else if (tkStr == "tan")
           rStack.push(callFun(b, tan));
         else if (tkStr == "log")

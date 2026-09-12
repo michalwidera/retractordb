@@ -21,7 +21,7 @@ import closedform as C  # noqa: E402
 import engine as E  # noqa: E402
 import model as M  # noqa: E402
 from generator import generate, _hard_classes_of  # noqa: E402
-from plan import HASH, PASS, SHIFT, SOURCE, to_rql  # noqa: E402
+from plan import HASH, SHIFT, SOURCE, to_rql  # noqa: E402
 
 FIELDS = ("plan", "stratum", "hard_classes", "depth", "node", "kind", "delta",
           "engine_tail", "oracle_c1", "oracle_c2", "replica_tail",
@@ -36,6 +36,10 @@ FIELDS = ("plan", "stratum", "hard_classes", "depth", "node", "kind", "delta",
 def local_rule_a(plan, given_tails=None):
     """Reguła lokalna A (predeklarowana): własny ogon każdego operatora = 0.
 
+    JEDYNA definicja tej reguły w aparaturze — `run_member_b.py` ją importuje.
+    Nie wolno jej kopiować: dwa zapisy tej samej reguły rozjeżdżają się po cichu
+    i raz już to zrobiły (poprawka `>N` z 2026-09-12 trafiła tylko do jednego).
+
     Ogon składowej przeliczany przez takt wzorem ceil(w*D_src/D_dst). Dokładnie
     „suma ogonów operatorów przeliczona przez takt, bez składnika fazowego”.
 
@@ -45,6 +49,22 @@ def local_rule_a(plan, given_tails=None):
     ani w silniku, ani w modelu zdarzeniowym, i zafałszowałoby rozjazd, którym
     mierzy się człon (b). Populacja członu (b) (składowe deklarowane) jest na tę
     zmianę niewrażliwa; wpływ ma ona wyłącznie na kolumny diagnostyczne.
+
+    Poprawka z 2026-09-12: usunięcie `+N` było słuszne, ale zostawiło BRAK
+    członu, podczas gdy postać dokładna dla `>N` to `max(0, Wsrc - N)`. Reguła
+    liczyła więc `Wsrc` i ZAWYŻAŁA ogon. Rozjazd miał postać zamkniętą
+    `-min(N, Wsrc)` i trafiał 5314/5314 węzłów `SHIFT` na ziarnie 20260804 oraz
+    5438/5438 na 20260807 — czyli był w całości artefaktem reguły, a nie
+    własnością silnika (`engine_tail == oracle_c1` na wszystkich tych węzłach).
+
+    `max(0, Wsrc - N)` zależy wyłącznie od ogona dziecka i od WŁASNEGO parametru
+    węzła, więc jest w pełni lokalna. Reguła bez tego członu była chochołem:
+    mierzyła własny brak, nie nielokalność, i zawyżała kontrolę negatywną
+    `HC_INT` o 169 z 3168 rozjazdów.
+
+    Wpływ jest ograniczony do kolumn diagnostycznych (`local_a`, `divergence_a`)
+    i do kontroli negatywnych. Reżimy H10a liczą się z `engine_tail` wobec
+    `oracle_c1` i ta zmiana ich nie dotyka.
     """
     tails = {}
     for node in plan.nodes:
@@ -55,7 +75,12 @@ def local_rule_a(plan, given_tails=None):
         source_tails = given_tails if given_tails is not None else tails
         converted = [C.to_slots(source_tails[child.name], child.delta, node.delta)
                      for child in children]
-        tails[node.name] = max(converted)
+        own = max(converted)
+        # `>N` czyta starszy indeks logiczny, więc SKRACA ogon o N — to jest
+        # informacja lokalna (własny parametr węzła), a nie składnik fazowy.
+        if node.kind == SHIFT:
+            own = max(0, own - int(node.param))
+        tails[node.name] = own
     return tails
 
 
@@ -71,21 +96,18 @@ def local_rule_b(plan, given_tails=None):
     return C.evaluate(plan, mutation={"hash_first_phase": True}, given_tails=given_tails)
 
 
-def h10b_form(plan):
-    """Predeklarowana postać rozjazdu: ceil((p+q-1)/p) dla jedynego `#`."""
-    hashes = [node for node in plan.nodes if node.kind == HASH]
-    if len(hashes) != 1:
-        return None
-    left, right = (plan.by_name(name) for name in hashes[0].children)
+def eligible_h10b(plan, node):
+    """Populacja K24b: każdy `#` z dwiema bezpośrednimi deklaracjami."""
+    return node.kind == HASH and len(node.children) == 2 and all(
+        plan.by_name(name).kind == SOURCE for name in node.children)
+
+
+def h10b_form(plan, node):
+    """Predeklarowana postać rozjazdu dla kwalifikującego się węzła `#`."""
+    left, right = (plan.by_name(name) for name in node.children)
     ratio = left.delta / right.delta
     p, q = ratio.numerator, ratio.denominator
     return -((-(p + q - 1)) // p)
-
-
-def eligible_h10b(plan):
-    operators = [node for node in plan.nodes if node.kind != SOURCE]
-    kinds = {node.kind for node in operators}
-    return kinds <= {PASS, SHIFT, HASH} and sum(1 for n in operators if n.kind == HASH) == 1
 
 
 def evaluate_one(item):
@@ -119,9 +141,6 @@ def evaluate_one(item):
     local_a = local_rule_a(plan, given_tails=oracle1)
     local_b = local_rule_b(plan, given_tails=oracle1)
     hard = ",".join(sorted(_hard_classes_of(plan.nodes)))
-    eligible = eligible_h10b(plan)
-    form = h10b_form(plan) if eligible else None
-
     for node in plan.nodes:
         if node.kind == SOURCE:
             continue
@@ -131,7 +150,7 @@ def evaluate_one(item):
         interval, tail, origin = got
         if interval != node.delta:
             return {"error": f"plan {index}: interwał {node.name} {node.delta} vs {interval}"}
-        is_root = node.name == plan.root.name
+        eligible = eligible_h10b(plan, node)
         engine_silence = tail + origin
         oracle_silence = oracle1[node.name] + oracle_origin[node.name]
         rows.append({
@@ -154,10 +173,10 @@ def evaluate_one(item):
             "engine_silence": engine_silence, "oracle_silence": oracle_silence,
             "agree_silence": int(engine_silence == oracle_silence),
             "local_a": local_a[node.name], "local_b": local_b[node.name],
-            "h10b_eligible": int(eligible and is_root),
+            "h10b_eligible": int(eligible),
             "divergence_a": oracle1[node.name] - local_a[node.name],
             "divergence_b": oracle1[node.name] - local_b[node.name],
-            "predicted_form": form if (eligible and is_root) else "",
+            "predicted_form": h10b_form(plan, node) if eligible else "",
         })
     return {"rows": rows}
 

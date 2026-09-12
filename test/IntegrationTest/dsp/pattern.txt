@@ -175,5 +175,5 @@ outputAll(1/50)	tail=49	origin=24
 		DIVIDE
 		PUSH_VAL(1000)
 		DIVIDE
-	outputAll_1: INTEGER
+	outputAll_1: BYTE
 		PUSH_ID(outputAll[1])

@@ -231,6 +231,7 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
   done
   aux "H10 aparatura test_closedform" python3 tests/test_closedform.py "$XRETRACTOR" || h10_ready=0
   aux "H10 aparatura test_phase_forms" python3 tests/test_phase_forms.py "$XRETRACTOR" || h10_ready=0
+  aux "H10 populacja H10b" python3 tests/test_h10b_population.py || h10_ready=0
   aux "H10 samotest reguly decyzyjnej" python3 decision_rule.py --selftest || h10_ready=0
 
   if [[ "$h10_ready" -eq 0 ]]; then

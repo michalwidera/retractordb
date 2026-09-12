@@ -622,15 +622,25 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitExpression(RQLParser::ExpressionContext *ctx) override {
+    // SENTINEL, nie rozstrzygniecie. Publiczny ksztalt pola ustala compiler::inferFieldShapes()
+    // z calego programu ONP, kiedy odwolania do pol i agregaty okienne sa juz rozwiazane.
+    // Parser zna wtedy wylacznie wlasne tokeny: schematow obcych strumieni na tym etapie nie
+    // ma i miec nie moze, wiec `SELECT source[0]` jest dla niego nieodroznialne od `SELECT 1`.
+    //
+    // Do 2026-09-11 stalo tu jeszcze rozpoznawanie konwersji po OSTATNIM tokenie programu
+    // (`to_float` i `to_double`). Regula trafiala w `to_double(k)` i chybiala we wszystkim,
+    // co po konwersji jeszcze cokolwiek liczy: `to_float('2.5') * 2` konczy sie tokenem
+    // MULTIPLY, wiec pole wychodzilo `INTEGER` mimo wartosci zmiennoprzecinkowej
+    // (pozycja 16 w usecases/requested.md, granica 2). Wnioskowanie po ostatnim tokenie
+    // nie daje sie na to naprawic — zastepuje je przejscie po calym programie.
     auto outType = rdb::INTEGER;
     int outLen   = 4;
     int outArr   = 1;
 
-    // Napis rozstrzyga wynik CALEGO wyrazenia, a nie pierwszy napotkany literal — inaczej
-    // `to_integer('42')+k` ladowalo w polu STRING (pozycja 12 w usecases/requested.md).
-    // Ksztaltow pol obcych strumieni na etapie parsowania nie ma i miec nie moze, wiec
-    // odwolanie do pola wchodzi tu jako liczba; przypadek `SELECT txt` nad polem STRING
-    // domyka compiler::inferStringFieldTypes(), gdy schematy sa juz rozwiazane.
+    // Napis zostaje TUTAJ, bo jego szerokosc bierze sie z literalow i deklaracji `to_string`,
+    // czyli z rzeczy, ktore parser widzi w calosci. Jest to nadal tylko wartosc poczatkowa:
+    // inferFieldShapes() liczy ja ponownie tym samym zestawem regul, juz ze znajomoscia pol
+    // zrodlowych (`SELECT txt` nad polem `STRING[8]`).
     const auto stringWidth =
         inferStringWidth(program, [](const std::string &, int) -> std::optional<fieldShape> { return std::nullopt; });
 
@@ -638,18 +648,6 @@ class ParserListener : public RQLBaseListener {
       outType = rdb::STRING;
       outLen  = 1;
       outArr  = *stringWidth;
-    } else if (!program.empty()) {
-      auto &last = program.back();
-      if (last.getCommandID() == CALL) {
-        auto fn = last.getStr_();
-        if (fn == "to_float") {
-          outType = rdb::FLOAT;
-          outLen  = 4;
-        } else if (fn == "to_double") {
-          outType = rdb::DOUBLE;
-          outLen  = static_cast<int>(sizeof(double));
-        }
-      }
     }
     qry.lSchema.emplace_back(
         rdb::rField(/*Field_*/ "_" + boost::lexical_cast<std::string>(fieldCount++), outLen, outArr, outType), program);

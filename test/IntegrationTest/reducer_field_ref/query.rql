@@ -1,0 +1,9 @@
+# Postac ZMATERIALIZOWANA — obejscie podane w komunikacie bramki. Ma dzialac i dawac
+# wartosci reduktora.
+
+STORAGE 'temp'
+
+DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'data.txt' ONESHOT
+
+SELECT * STREAM m FROM AVG(src)
+SELECT m[0]*2 STREAM mul FROM m

@@ -4,7 +4,6 @@
 #include <cctype>     // std::tolower
 #include <exception>
 #include <iterator>
-#include <set>
 #include <utility>  // std::move, std::pair
 #include <variant>
 #include <vector>
@@ -12,6 +11,7 @@
 #include <boost/rational.hpp>
 
 #include "expressionEvaluator.hpp"
+#include "expressionShape.hpp"  // functionResultType, isExactType, normalizedOperandType
 
 namespace {
 
@@ -25,9 +25,10 @@ rdb::descFld typeOfConstant(const rdb::descFldVT &value) { return static_cast<rd
 ///
 /// FLOAT i DOUBLE są poza zbiorem świadomie: reasocjacja zmienia tam liczbę zaokrągleń.
 /// Dla float x = 2^24 mamy (x+1)+1 == x, ale x+2 == x+2 — przepisanie zmieniłoby wynik.
-bool isExact(rdb::descFld type) {
-  return type == rdb::BYTE || type == rdb::INTEGER || type == rdb::UINT || type == rdb::RATIONAL;
-}
+///
+/// Definicja jest JEDNA dla całego drzewa (expressionShape.hpp) — ta sama, której używa
+/// `power()` w ewaluatorze, decydując o dokładnym iloczynie zamiast `std::pow`.
+bool isExact(rdb::descFld type) { return isExactType(type); }
 
 bool isNumeric(rdb::descFld type) { return type <= rdb::DOUBLE; }
 
@@ -50,31 +51,30 @@ std::string lowercased(std::string text) {
 /// Typ wyniku wywołania funkcji. Nieznana nazwa daje nullopt, co blokuje reguły B i C —
 /// odmowa uproszczenia jest zawsze bezpieczna, zgadywanie typu nie jest.
 std::optional<rdb::descFld> typeOfCall(const token &call, std::optional<rdb::descFld> argumentType) {
-  // Funkcje matematyczne zachowują typ argumentu (callFun liczy w double i rzutuje z powrotem).
-  static const std::set<std::string> typePreserving{"floor", "ceil", "sqrt", "round", "sin",
-                                                    "cos",   "tan",  "log",  "log2",  "trunc"};
   const auto name = lowercased(call.getStr_());
-  if (name == "to_integer") return rdb::INTEGER;
-  if (name == "to_float") return rdb::FLOAT;
-  if (name == "to_double") return rdb::DOUBLE;
-  if (name == "to_string") return rdb::STRING;
-  if (name == "isnull") return rdb::INTEGER;
-  // Funkcje dopisane 2026-08-30. Bez tych czterech wierszy typ wychodzil nullopt, czyli
-  // „nie wiadomo" — odpowiedz bezpieczna, ale blokujaca reguly B i C w kazdym wyrazeniu,
-  // ktore ich uzywa. Zadna z nich nie liczy w double przez callFun, wiec nie naleza do
-  // typePreserving mimo ze `Abs` zachowuje typ argumentu.
-  if (name == "abs") return argumentType;
-  // IsZero/IsNonZero/Length zwracaja INTEGER NIEZALEZNIE od typu argumentu — predykat 0/1
-  // i dlugosc napisu sa liczbami calkowitymi, a nie wartoscia w typie wejscia.
-  if (name == "iszero" || name == "isnonzero" || name == "length") return rdb::INTEGER;
-  if (typePreserving.contains(name)) return argumentType;
-  return std::nullopt;
+
+  // `null2zero` jest JEDYNĄ funkcją z tabeli, dla której ten przebieg świadomie odmawia
+  // odpowiedzi, mimo że `functionResultType()` ją zna (typ argumentu — wartość nie-NULL
+  // przechodzi bez zmiany). Nullopt blokuje reguły B i C w wyrażeniu, które jej używa,
+  // czyli utrzymuje DOKŁADNIE ten zbiór przepisań, który przebieg stosował dotąd.
+  // Poszerzenie go byłoby nowym przepisaniem ONP podnoszącym licznik R3, a takie należą do
+  // przełącznika `aggressive_expr_optimization`, nie do zmiany typowania deskryptorów.
+  if (name == "null2zero") return std::nullopt;
+
+  return functionResultType(name, argumentType);
 }
 
-/// Wynik operatora arytmetycznego — odwzorowanie normalize(): wygrywa wyższy indeks wariantu.
+/// Typ OPERANDÓW po normalize(): wygrywa wyższy indeks wariantu.
+///
+/// Świadomie NIE jest to `arithmeticValueType()`, czyli typ WARTOŚCI — ten dokłada jeszcze
+/// promocję `BYTE` do `int`. Tutaj potrzebna jest reprezentacja, w której operacja zostanie
+/// wykonana, bo to ona decyduje, czy wolno usunąć element neutralny (`dropNeutralOperand`
+/// porównuje typ stałej z typem podwyrażenia). Model dokładniejszy byłby tu bezpieczny
+/// i pozwalałby uprościć `(bajt+bajt)+0`, ale jest to NOWE przepisanie podnoszące licznik
+/// R3 — a takie należą do `aggressive_expr_optimization`, nie do zmiany typowania.
 std::optional<rdb::descFld> arithmeticResultType(std::optional<rdb::descFld> left, std::optional<rdb::descFld> right) {
   if (!left.has_value() || !right.has_value()) return std::nullopt;
-  return std::max(*left, *right);
+  return normalizedOperandType(*left, *right);
 }
 
 /// Liczy program pozbawiony odwołań do payloadu PRODUKCYJNYM ewaluatorem. To jedyne miejsce,
@@ -297,7 +297,26 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
         result.program = std::move(operand->program);
         result.program.push_back(tk);
 
-        if (operand->constant.has_value()) {
+        // `to_string` NIE zwija sie nigdy, nawet nad stalym argumentem. Jego wynikiem jest
+        // napis, ale token niesie przy okazji DEKLARACJE szerokosci pola — jawna `N` w postaci
+        // CALL2 `to_string(expr : N)`, domyslna kToStringDefaultWidth w postaci CALL (patrz
+        // rqlFunctions.hpp). Deklaracja stoi w PROGRAMIE i nigdzie indziej, wiec zastapienie
+        // programu literalem tekstowym kasuje ja razem z nim: analiza ksztaltu widzi wtedy juz
+        // tylko dlugosc samego napisu i `SELECT to_string(42:16)` zwezalo sie z 16 na 2.
+        //
+        // Kolejnosc przebiegow (inferFieldShapes() PRZED simplifyFieldExpressions()) zamykala
+        // to wylacznie przy PIERWSZEJ kompilacji. Zywy plan kompilowany po raz drugi
+        // (executorsm::getAdHoc) dostawal program juz uproszczony i pole sie zwezalo — nie
+        // w artefakcie na dysku, ktory zostaje nietkniety, ale w planie, z ktorego schematy
+        // dziedzicza strumienie dolozone PO tej kompilacji.
+        //
+        // Zwijanie ARGUMENTU pod spodem dziala normalnie: `to_string(40+2 : 16)` zwija `40+2`
+        // do jednej stalej i zatrzymuje sie na `CALL2`. Warunek jest bezwarunkowy, a nie
+        // zalezny od tego, czy zadeklarowana szerokosc przekracza dlugosc literalu — inaczej
+        // i plan, i licznik R3 zalezalyby od WARTOSCI stalej.
+        const bool declaresFieldWidth = (cmd == CALL || cmd == CALL2) && lowercased(tk.getStr_()) == "to_string";
+
+        if (operand->constant.has_value() && !declaresFieldWidth) {
           if (auto value = foldConstants(result.program)) {
             stack.push_back(constantNode(std::move(*value)));
             ++rewrites;

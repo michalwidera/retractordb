@@ -90,28 +90,71 @@ def member_b(rows):
     diverging_a = {row["plan"] for row in rows if row["divergence_a"] != "0"}
     eligible = [row for row in rows if row["h10b_eligible"] == "1"]
     positive = [row for row in eligible if int(row["divergence_a"]) > 0]
-    matching = [row for row in positive
+    matching = [row for row in eligible
                 if int(row["divergence_a"]) == int(row["predicted_form"])]
     return {"plans": len(plans), "diverging": len(diverging_a),
             "share": len(diverging_a) / max(len(plans), 1),
             "eligible": len(eligible), "positive": len(positive), "matching": len(matching),
-            "mismatch": [row for row in positive if row not in matching][:3]}
+            "mismatch": [row for row in eligible
+                         if int(row["divergence_a"]) != int(row["predicted_form"])][:3]}
+
+
+#: Operatory pozbawione własnego ogona. Reguła lokalna A zeruje własny ogon
+#: KAŻDEGO operatora, więc tylko na tych trzech może z definicji trafić — i tylko
+#: na nich zero rozjazdu jest kontrolą reguły, a nie kontrolą jej znanego braku.
+PHASE_FREE = ("PASS", "SHIFT", "REDUCE")
 
 
 def controls(rows):
-    literal_single = [row for row in rows if "HC_SINGLE" in row["hard_classes"].split(",")]
-    literal_int = [row for row in rows if "HC_INT" in row["hard_classes"].split(",")]
-    phase_free = [row for row in literal_single if row["kind"] in ("PASS", "SHIFT", "REDUCE")]
-    int_hash = [row for row in literal_int if row["kind"] == "HASH"]
+    """Kontrole negatywne członu (b) — predeklaracja K24b §4 z 2026-08-04.
+
+    Obie są **węzłowe i zawężone do operatorów bez własnego ogona**. Zawężenie
+    nie jest wygodą: na `@`, `-`, `Θ`, `~Θ`, `+` i `#` reguła A rozjeżdża się
+    z konstrukcji, więc zero jest tam nieosiągalne dla każdej reguły bez fazy.
+
+    Trzy kontrole z pierwotnej predeklaracji K24 zostały wycofane:
+
+    * `HC_INT` w obu postaciach — K24b PREDECLARATION §1 i §4. Predeklarowana
+      postać rozjazdu `ceil((p+q-1)/p)` daje przy ilorazie całkowitym (`q = 1`)
+      wartość **1**, a kontrola żądała **0**: była sprzeczna z twierdzeniem,
+      które miała kontrolować. Zmierzone 2026-09-12 na obu ziarnach bramki —
+      w populacji twierdzenia rozjazd wynosi dokładnie 1 w 544/544 i 545/545
+      węzłów o ilorazie całkowitym, czyli kontrola mierzyła zgodność z postacią,
+      nie odstępstwo od niej.
+    * `HC_SINGLE (dosłownie)` — K24b PREDECLARATION §4. Dopuszcza `@` i `-`,
+      które własny ogon mają. Na ziarnach bramki przechodziła (0/3929), ale
+      przechodziła PRZYPADKIEM: generator nie trafił na nich w plan jednotaktowy
+      o niezerowym ogonie własnym. Kontrola spełniona przez dobór próby,
+      a nie przez regułę, upada przy pierwszym korpusie, który ten plan zawiera.
+
+    Usunięcie trzech kontroli jest **osłabieniem aparatury** i tak jest opisane
+    w README.md. Nie jest dopasowaniem kryterium do danych: predeklaracja je
+    wycofująca pochodzi z 2026-08-04 i jest starsza od każdego z tych pomiarów.
+
+    Selekcja jest węzłowa także z drugiego powodu. `hard_classes` opisuje PLAN,
+    nie węzeł, a jeden plan potrafi nieść kilka `#` o różnych ilorazach. Wybór
+    węzłów po etykiecie planu mieszał populacje: 38,4% planów z `HC_INT` niosło
+    również `HC_NONINT`, i wszystkie rzekome złamania reguły lokalnej B siedziały
+    właśnie w tych węzłach o ilorazie NIEcałkowitym.
+    """
+    by_plan = collections.defaultdict(list)
+    for row in rows:
+        by_plan[row["plan"]].append(row)
+    # „Plan bez `#`" jest warunkiem o planie, nie o węźle: wchodzą wszystkie
+    # węzły planu, o ile KAŻDY z nich jest fazowo pusty. Wiersze SOURCE nie
+    # trafiają do kampanii, więc grupa to dokładnie operatory planu.
+    phase_free_plans = [row for plan in by_plan.values()
+                        if all(item["kind"] in PHASE_FREE for item in plan)
+                        for row in plan]
+    single = [row for row in rows if "HC_SINGLE" in row["hard_classes"].split(",")
+              and row["kind"] in PHASE_FREE]
 
     def breaches(selected, column):
         return sum(1 for row in selected if row[column] != "0")
 
     return {
-        "HC_SINGLE (dosłownie)": (len(literal_single), breaches(literal_single, "divergence_a")),
-        "HC_SINGLE (operatory bez własnego ogona)": (len(phase_free), breaches(phase_free, "divergence_a")),
-        "HC_INT (dosłownie)": (len(literal_int), breaches(literal_int, "divergence_a")),
-        "HC_INT (węzły `#`, reguła lokalna B)": (len(int_hash), breaches(int_hash, "divergence_b")),
+        "plany bez `#`": (len(phase_free_plans), breaches(phase_free_plans, "divergence_a")),
+        "HC_SINGLE (operatory bez własnego ogona)": (len(single), breaches(single, "divergence_a")),
     }
 
 
@@ -219,11 +262,13 @@ def render(rows, out, seed="20260803", engine="5e3eb42"):
     lines += ["## 2. H10b — nielokalność", "",
               f"* rozjazd reguły lokalnej A z dokładną: **{b['diverging']} z {b['plans']} "
               f"planów = {b['share']:.1%}** (próg predeklarowany: >= 5%)",
-              f"* populacja predeklarowana (dokładnie jeden `#`, poza tym `PASS`/`>N`): "
-              f"**{b['eligible']} planów**, rozjazdów dodatnich **{b['positive']}**",
+              "* populacja predeklarowana: węzły `#` z dwiema bezpośrednimi "
+              "deklaracjami:",
+              f"  **{b['eligible']} węzłów**, deficyt dodatni w "
+              f"**{b['positive']} z {b['eligible']}**",
               f"* rozjazdów o predeklarowanej postaci `ceil((p+q-1)/p)`: "
-              f"**{b['matching']} z {b['positive']}** "
-              f"({b['matching'] / max(b['positive'], 1):.1%}; próg: 100%)", ""]
+              f"**{b['matching']} z {b['eligible']}** "
+              f"({b['matching'] / max(b['eligible'], 1):.1%}; próg: 100%)", ""]
 
     lines += ["## 3. Kontrole negatywne", "",
               "| Kontrola | Węzłów | Rozjazdów | Stan |", "|---|---:|---:|---|"]
@@ -231,11 +276,20 @@ def render(rows, out, seed="20260803", engine="5e3eb42"):
         state = "**przeszła**" if breaks == 0 else "**ZŁAMANA**"
         lines.append(f"| {label} | {count} | {breaks} | {state} |")
 
-    lines += ["", "Obie kontrole predeklarowane **w postaci dosłownej są złamane**.",
-              "Zgodnie z kryterium §6 oznacza to źle zdefiniowaną regułę",
-              "lokalną, a nie wynik — dlatego **człon (b) jest nieocenialny na tej",
-              "aparaturze** i powyższe liczby H10b nie stanowią werdyktu. Diagnoza",
-              "sprzeczności w specyfikacji członu (b): REPORT.md §5.", ""]
+    # Stan kontroli rozstrzyga, czy sekcja 2 jest werdyktem, czy tylko liczbami.
+    # Kontrola o pustej populacji nie jest kontrolą spełnioną, lecz kontrolą,
+    # której nie było czym sprawdzić — kierunek błędu jest jednostronny.
+    failing = [label for label, (count, breaks) in ctl.items() if breaks or count == 0]
+    if failing:
+        lines += ["", "Kontrola negatywna złamana albo o pustej populacji znaczy **źle",
+                  "zdefiniowaną regułę lokalną, a nie wynik** — człon (b) jest wtedy",
+                  "nieocenialny i liczby z sekcji 2 nie stanowią werdyktu.",
+                  "Niespełnione: " + ", ".join(failing) + ".", ""]
+    else:
+        lines += ["", "Obie kontrole predeklarowane (K24b §4) są spełnione na niepustej",
+                  "populacji, więc liczby z sekcji 2 są oceną członu (b). Werdykt",
+                  "formalny wydaje `decision_rule.py`; ten plik jest jego źródłem,",
+                  "nie zastępstwem.", ""]
 
     Path(out).write_text("\n".join(lines) + "\n", encoding="utf-8")
     return {"exact": exact, "over": over, "under": under, "b": b, "controls": ctl,
@@ -263,8 +317,11 @@ def main():
     print(f"zawyżające: {summary['over']}")
     print(f"zaniżające: {summary['under']}")
     print(f"origin — klasy z zaniżeniem: {summary['origin_under'] or 'brak'}")
-    print(f"H10b (nieocenialny): rozjazd {summary['b']['share']:.1%}, "
-          f"postać {summary['b']['matching']}/{summary['b']['positive']}")
+    # Bez przymiotnika: o ocenialności członu (b) rozstrzygają kontrole niżej,
+    # a nie ten druk. Zaszyte „(nieocenialny)" przeżyło swój powód o pięć tygodni.
+    print(f"H10b: rozjazd {summary['b']['share']:.1%}, "
+          f"dodatnie {summary['b']['positive']}/{summary['b']['eligible']}, "
+          f"postać {summary['b']['matching']}/{summary['b']['eligible']}")
     for label, (count, breaks) in summary["controls"].items():
         print(f"kontrola {label}: {breaks}/{count}")
 

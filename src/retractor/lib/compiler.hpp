@@ -69,6 +69,7 @@ struct compiler {
 
   // compile chain steps
   std::string checkFunctionCalls();
+  std::string checkStreamReducerFieldRefs();
   std::string expandStreamGenerators();
   std::string substituteOrdinal(query &instance, int ordinal);
   std::string validateGeneratedFieldIndex(const std::string &owner, const std::string &source, int index);
@@ -81,8 +82,8 @@ struct compiler {
   std::optional<int> descendSpan(const std::string &nodeId, int width, const std::string &name);
   std::string resolveFieldReferences();
   std::string resolveWindowAggregates();
-  std::string propagateCopiedFieldShapes();
-  std::string inferStringFieldTypes();
+  std::string inferFieldShapes();
+  std::string checkRuleConditionShapes();
   std::string localizeFieldOffsets();
   void collectTransitiveOffsets(const std::string &srcId, int baseOffset, bool viaHash, std::map<std::string, int> &result,
                                 std::set<std::string> &viaInterleave);

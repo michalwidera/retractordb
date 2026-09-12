@@ -3,8 +3,9 @@
 
 Pochodzi z kampanii K24b. Populacja twierdzenia,
 progi i predeklarowana postać rozjazdu są **bez zmian**; zmienił się wyłącznie
-oracle (origin jako osobna wielkość) oraz reguła lokalna A, z której zniknął
-wyjątek dla `>N` — patrz komentarz przy local_rule_a().
+oracle (origin jako osobna wielkość) oraz reguła lokalna A — jej definicja
+mieszka od 2026-09-12 w `run_campaign.local_rule_a` i jest tu importowana,
+a nie przepisywana.
 
 Oryginalny opis K24b:
 
@@ -33,42 +34,21 @@ import model as M  # noqa: E402
 from generator import generate  # noqa: E402
 from plan import (AGSE, HASH, NTHETA, PASS, REDUCE, SHIFT, SOURCE, SUB,  # noqa: E402
                   THETA)
+from run_campaign import local_rule_a  # noqa: E402
 
 # Operatory pozbawione własnego ogona — jedyne, w których reguła lokalna
 # z definicji nie może się rozjechać. `@` i `-` własny ogon mają, więc dosłowna
 # kontrola HC_SINGLE z K24 pękała na nich (defekt kontroli, nie wynik).
 PHASE_FREE = (PASS, SHIFT, REDUCE)
 
-
-def _to_slots(width, delta_source, delta_target):
-    if width <= 0:
-        return 0
-    value = (width * delta_source) / delta_target
-    return -((-value.numerator) // value.denominator)
-
-
-def local_rule_a(plan, oracle_tails):
-    """Wariant A: własny ogon każdego operatora zero, ogon składowej przez takt.
-
-    Ogony składowych brane z oracle'a — atrybucja izolowana, żeby rozjazd
-    w węźle nie był dziedziczony po dziecku.
-
-    K24p: wyjątek `tails = oracle_tails[skladowa] + N` dla `>N` USUNIĘTY.
-    Po przestemplowaniu z 2026-08-06 `N` nie jest ogonem — przeszło do origin —
-    więc reguła lokalna z członem `+N` przypisywałaby przesunięciu ogon, którego
-    nie ma ani w silniku, ani w modelu zdarzeniowym. Skutkiem byłby sztucznie
-    zawyżony próg gęstości (kryterium 1), liczony na korzyść H10b. Populacja
-    twierdzenia (węzły `#` o obu składowych DEKLAROWANYCH) jest na tę zmianę
-    niewrażliwa: składowe deklarowane mają ogon i origin zerowe.
-    """
-    tails = {}
-    for node in plan.nodes:
-        if node.kind == SOURCE:
-            tails[node.name] = 0
-            continue
-        children = [plan.by_name(name) for name in node.children]
-        tails[node.name] = max(_to_slots(oracle_tails[c.name], c.delta, node.delta) for c in children)
-    return tails
+# Reguła lokalna A jest IMPORTOWANA, nie przepisana. Do 2026-09-12 ten plik
+# niósł własną kopię, identyczną co do znaku z kopią w `run_campaign.py` —
+# aż do dnia, w którym poprawka `>N` (człon `max(0, Wsrc - N)`) trafiła tylko
+# do jednej z nich. Rozjazd nie zmienił wtedy żadnej liczby, bo w planach
+# czysto fazowych każdy `>N` ma `Wsrc = 0`, więc człon jest nieaktywny — i to
+# jest dokładnie ten rodzaj rozjazdu, który daje o sobie znać dopiero wtedy,
+# gdy już coś zepsuł. Precedens w tym projekcie jest zapisany: predeklaracja
+# K26v3 §6, serializer kanoniczny, dwa opisy tej samej rzeczy.
 
 
 def predeclared_form(left, right):
@@ -87,7 +67,7 @@ def analyse(seed, count):
         except M.OracleError:
             continue
         plans_total += 1
-        local = local_rule_a(plan, oracle)
+        local = local_rule_a(plan, given_tails=oracle)
         operators = [n for n in plan.nodes if n.kind != SOURCE]
         if any(oracle[n.name] != local[n.name] for n in operators):
             plans_with_divergence += 1
