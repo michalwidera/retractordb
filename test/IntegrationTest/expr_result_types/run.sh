@@ -21,6 +21,10 @@ server_start query.rql -k -x
 xqry -s copy -k -m 3 > copy.txt
 server_wait_exit
 
+server_start query.rql -k -x
+xqry -s real_math -k -m 3 > real_math.txt
+server_wait_exit
+
 # --- artefakty: przebieg OFFLINE, zeby liczba rekordow byla deterministyczna ---------------
 # Serwer czekajacy na klienta liczy sloty do chwili zatrzymania, wiec liczba rekordow
 # w artefakcie zalezy od czasu. `--until-eof --no-clock` konczy prace na wyczerpaniu zrodla:
@@ -74,3 +78,26 @@ grep -F 'some nulls' map_dst.txt
 
 # Kopia calego schematu niesie ten sam NULL.
 grep -E '^null 5[[:space:]]*$' copy.txt
+
+# sin/cos/exp zwracaja DOUBLE nawet nad INTEGER. Czwarta kolumna przenosi NULL
+# ze zrodla i nie zmienia typu pola w deskryptorze.
+for index in 0 1 2 3; do grep -F "DOUBLE real_math_$index" temp/real_math.desc; done
+xtrdb -n -s temp/real_math > map_real_math.txt
+grep -E 'Record size: +32 B' map_real_math.txt
+grep -E 'Records: 3' map_real_math.txt
+python3 - <<'PY'
+import math
+from pathlib import Path
+
+rows = [line.split() for line in Path("real_math.txt").read_text().splitlines() if line.strip()]
+assert len(rows) == 3, rows
+expected = (math.sin(5), math.cos(5), math.exp(5))
+for row, fourth in zip(rows, (math.exp(2.5), None, math.exp(-1.25))):
+    assert len(row) == 4, row
+    for actual, target in zip(row[:3], expected):
+        assert math.isclose(float(actual), target, rel_tol=2e-5, abs_tol=1e-6), row
+    if fourth is None:
+        assert row[3] == "null", row
+    else:
+        assert math.isclose(float(row[3]), fourth, rel_tol=2e-5, abs_tol=1e-6), row
+PY

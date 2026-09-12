@@ -12,3 +12,6 @@ SELECT src[0], src[0]*3, to_float('2.5')*2, to_double(k)/4, null2zero(src[0]) ST
 
 # Kopia calego schematu: `SELECT *` ma przeniesc ksztalt producenta slot po slocie.
 SELECT * STREAM copy FROM src
+
+# Funkcje rzeczywiste nie moga obcinac wyniku do typu argumentu INTEGER.
+SELECT sin(src[1]), cos(src[1]), exp(src[1]), exp(src[0]) STREAM real_math FROM src

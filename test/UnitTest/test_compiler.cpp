@@ -1553,12 +1553,12 @@ TEST(xparser, implemented_functions_are_reachable_from_rql) {
   }
 }
 
-// Funkcje dopisane 2026-08-30. `Abs` liczy sie wprost na wariancie, zeby nie tracic
+// Funkcje dopisane po zamknieciu listy parsera. `Abs` liczy sie wprost na wariancie, zeby nie tracic
 // dokladnosci wartosci wymiernej; `IsZero`/`IsNonZero` wnosza predykat do wyrazenia
 // w SELECT, gdzie porownania z `term_logic` nie sa dostepne.
 TEST(xparser, newly_implemented_functions_compile) {
   // `Length` doszedl 30.08.2026, po doprowadzeniu pola STRING do wyrazenia (pozycja 12).
-  for (const char *call : {"Abs(a)", "abs(a)", "IsZero(a)", "isnonzero(a)", "Length(a)", "LENGTH(a)"}) {
+  for (const char *call : {"Abs(a)", "abs(a)", "IsZero(a)", "isnonzero(a)", "Length(a)", "LENGTH(a)", "exp(a)", "EXP(a)"}) {
     EXPECT_EQ(compileRql(selectRql(call)), "OK") << call;
   }
 }
@@ -3237,8 +3237,7 @@ TEST(xcompiler, keeps_the_working_ways_of_reading_a_stream_reducer) {
   EXPECT_EQ(materialized.getQuery("o").lSchema.front().field_.rtype, rdb::RATIONAL);
 }
 
-// `Sqrt` nad RATIONAL jest ZABLOKOWANY w kompilatorze, dopoki nie zapadnie decyzja, ktora
-// droga go zaimplementowac (TODO przy rejectedIrrationalOverExact() w expressionShape.cpp).
+// `Sqrt` nad RATIONAL jest ZABLOKOWANY w kompilatorze.
 //
 // Powod nie jest kosmetyczny: callFun() liczy przez double i rzutuje z powrotem na typ
 // argumentu, a droga powrotna do RATIONAL rationalizuje z tolerancja 1e-6. Daje to ogromne
@@ -3304,4 +3303,103 @@ TEST(xcompiler, keeps_sqrt_where_it_was_never_unsafe) {
   // Obejscie podane w komunikacie naprawde daje DOUBLE, a nie RATIONAL.
   ASSERT_EQ(plan.getQuery("viaDouble").lSchema.size(), 1u);
   EXPECT_EQ(plan.getQuery("viaDouble").lSchema.front().field_.rtype, rdb::DOUBLE);
+}
+
+// Bramka nad RATIONAL obejmuje siedem funkcji o niewymiernej przeciwdziedzinie, z dwoch
+// roznych powodow.
+//
+// `tan`, `log` i `log2` dziela z `Sqrt` DEFEKT: licza przez callFun(), ktore rzutuje wynik
+// z powrotem na typ argumentu, a powrot do RATIONAL rationalizuje z ogromnym mianownikiem
+// (zmierzone: log(2/1) daje 2731/3940) i po cichu przepelnia sie w dalszym rachunku.
+//
+// `sin`, `cos` i `exp` dziela z `Sqrt` tylko bramke. Ich droga powrotna nie istnieje —
+// callRealFun() konczy na DOUBLE — wiec `cos(m[0])` policzyloby sie z pelna dokladnoscia.
+// Ich odrzucenie jest decyzja o kontrakcie jezyka (2026-09-12): jedna regula „funkcja
+// niewymierna nad RATIONAL wymaga jawnego to_double" zamiast listy wyjatkow, ktora
+// uzytkownik musialby pamietac.
+TEST(xcompiler, rejects_irrational_functions_over_a_rational_value) {
+  for (const char *call : {"sin(m[0])", "cos(m[0])", "exp(m[0])", "tan(m[0])", "log(m[0])", "log2(m[0])"}) {
+    qTree plan;
+    auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, std::format(R"(
+        DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'src.txt'
+        SELECT * STREAM m FROM AVG(src)
+        SELECT {} STREAM o FROM m
+      )",
+                                                                                     call));
+    ASSERT_EQ(parseResult, "OK") << call;
+
+    compiler instance(plan);
+    const auto result = instance.compile();
+    EXPECT_NE(result, "OK") << call << " nad RATIONAL przeszlo kompilacje";
+    EXPECT_NE(result.find("to_double"), std::string::npos) << "komunikat nie podaje obejscia: " << result;
+  }
+}
+
+// Warunek reguly idzie osobnym przebiegiem (checkRuleConditionShapes), wiec poszerzenie
+// bramki musi go objac razem z SELECT — inaczej RULE zostaje droga naokolo, tak jak bylo
+// dla samego `Sqrt`.
+TEST(xcompiler, rejects_irrational_functions_over_a_rational_value_in_a_rule_condition) {
+  for (const char *call : {"sin(m[0])", "cos(m[0])", "exp(m[0])", "tan(m[0])", "log(m[0])", "log2(m[0])"}) {
+    qTree plan;
+    auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, std::format(R"(
+        DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'src.txt'
+        SELECT * STREAM m FROM AVG(src)
+        RULE r1 ON m WHEN {} > 1 DO DUMP -5 TO 5
+      )",
+                                                                                     call));
+    ASSERT_EQ(parseResult, "OK") << call;
+
+    compiler instance(plan);
+    const auto result = instance.compile();
+    EXPECT_NE(result, "OK") << call << " nad RATIONAL w warunku reguly przeszlo kompilacje";
+    EXPECT_NE(result.find("rule condition"), std::string::npos) << result;
+  }
+}
+
+// Kontrola pozytywna: poza para (funkcja niewymierna, RATIONAL) nic sie nie zmienia, a typem
+// wyniku jest DOUBLE takze nad argumentem calkowitym — to jest cala tresc kontraktu
+// sin/cos/exp w deskryptorze.
+TEST(xcompiler, irrational_functions_yield_double_over_inexact_and_integer_arguments) {
+  qTree plan;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, R"(
+        DECLARE d DOUBLE, k INTEGER STREAM src, 1 FILE 'src.txt'
+        SELECT * STREAM m FROM AVG(src)
+        SELECT sin(to_double(m[0])) STREAM viaDouble    FROM m
+        SELECT cos(d)               STREAM overDouble   FROM src
+        SELECT exp(k)               STREAM overInteger  FROM src
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler instance(plan);
+  ASSERT_EQ(instance.compile(), "OK");
+
+  for (const char *stream : {"viaDouble", "overDouble", "overInteger"}) {
+    ASSERT_EQ(plan.getQuery(stream).lSchema.size(), 1u) << stream;
+    EXPECT_EQ(plan.getQuery(stream).lSchema.front().field_.rtype, rdb::DOUBLE) << stream;
+  }
+}
+
+// Poszerzenie bramki o `tan`, `log` i `log2` NIE MOZE ruszyc ich typu wyniku: nad INTEGER
+// nadal wracaja na INTEGER, bo nadal ida przez callFun(). Gdyby ktos zalatwil je przy okazji
+// tak jak sin/cos/exp, zmienilby typ pola w `.desc` — czyli format artefaktu, ktory ma wlasna
+// droge przez bramki H9/H10. Ten test jest zapadka na taka zmiane zrobiona mimochodem.
+TEST(xcompiler, gating_tan_log_log2_leaves_their_result_type_alone) {
+  qTree plan;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, R"(
+        DECLARE d DOUBLE, k INTEGER STREAM src, 1 FILE 'src.txt'
+        SELECT tan(k)  STREAM tanOverInteger  FROM src
+        SELECT log(k)  STREAM logOverInteger  FROM src
+        SELECT log2(k) STREAM log2OverInteger FROM src
+        SELECT log(d)  STREAM logOverDouble   FROM src
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler instance(plan);
+  ASSERT_EQ(instance.compile(), "OK");
+
+  for (const char *stream : {"tanOverInteger", "logOverInteger", "log2OverInteger"}) {
+    ASSERT_EQ(plan.getQuery(stream).lSchema.size(), 1u) << stream;
+    EXPECT_EQ(plan.getQuery(stream).lSchema.front().field_.rtype, rdb::INTEGER) << stream;
+  }
+  EXPECT_EQ(plan.getQuery("logOverDouble").lSchema.front().field_.rtype, rdb::DOUBLE);
 }

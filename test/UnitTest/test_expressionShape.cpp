@@ -248,7 +248,7 @@ TEST(xExpressionShape, every_rql_function_has_a_declared_result_type) {
   };
 
   const std::vector<functionCase> cases{
-      // Funkcje matematyczne licza w double i wracaja rzutem na typ ARGUMENTU (callFun).
+      // Funkcje przez callFun wracaja do typu argumentu.
       {"Sqrt", sDouble, rdb::DOUBLE},
       {"Sqrt", sInt, rdb::INTEGER},
       {"Ceil", sDouble, rdb::DOUBLE},
@@ -256,8 +256,15 @@ TEST(xExpressionShape, every_rql_function_has_a_declared_result_type) {
       {"Floor", sDouble, rdb::DOUBLE},
       {"round", sDouble, rdb::DOUBLE},
       {"trunc", sDouble, rdb::DOUBLE},
+      // Funkcje o niewymiernej przeciwdziedzinie zostaja przy DOUBLE takze nad typem
+      // dokladnym. RATIONAL nie ma tu wiersza, bo jest ODRZUCANY — patrz
+      // rejects_irrational_functions_over_a_rational_argument.
+      {"sin", sInt, rdb::DOUBLE},
+      {"cos", sByte, rdb::DOUBLE},
+      {"exp", sFloat, rdb::DOUBLE},
       {"sin", sDouble, rdb::DOUBLE},
       {"cos", sDouble, rdb::DOUBLE},
+      {"exp", sDouble, rdb::DOUBLE},
       {"tan", sDouble, rdb::DOUBLE},
       {"log", sDouble, rdb::DOUBLE},
       {"log2", sDouble, rdb::DOUBLE},
@@ -293,6 +300,41 @@ TEST(xExpressionShape, every_rql_function_has_a_declared_result_type) {
 
   for (const auto &fn : rdb::kRqlFunctions)
     EXPECT_TRUE(covered.contains(std::string(fn.canonical))) << "brak wiersza kontraktu dla " << fn.canonical;
+}
+
+// Bramka `rejected` obejmuje SIEDEM nazw nad RATIONAL, z dwoch roznych powodow. `Sqrt`,
+// `tan`, `log` i `log2` licza przez callFun(), ktore rzutuje wynik z powrotem na RATIONAL
+// i po cichu przepelnia boost::rational<int>. `sin`, `cos` i `exp` policzylyby sie poprawnie
+// (koncza na DOUBLE), ale kontrakt jezyka jest jeden dla wszystkich funkcji o niewymiernej
+// przeciwdziedzinie — patrz opis przy rejectedIrrationalOverExact() w expressionShape.cpp.
+TEST(xExpressionShape, rejects_irrational_functions_over_a_rational_argument) {
+  for (const char *name : {"Sqrt", "sin", "cos", "exp", "tan", "log", "log2"}) {
+    std::list<token> program{readField(sRational), token(CALL, std::string(name))};
+    const auto inferred = analyse(program);
+    EXPECT_EQ(inferred.status, exprShapeStatus::rejected) << name;
+    EXPECT_NE(inferred.reason.find("to_double"), std::string::npos) << name << ": " << inferred.reason;
+    EXPECT_NE(inferred.reason.find(name), std::string::npos) << name << ": " << inferred.reason;
+  }
+}
+
+// Kontrola negatywna do testu wyzej: bramka siega WYLACZNIE po pare (funkcja niewymierna,
+// RATIONAL). Zaokraglenia nad RATIONAL sa bezpieczne, bo ich wynik jest calkowity, czyli ma
+// mianownik 1, a `Abs` liczy wprost na wariancie i mianownika nie rusza w ogole.
+//
+// Druga petla pilnuje, ze bramka NIE rozlala sie na typy nieprzyblizane. To ona odroznia
+// „odrzuc pare z RATIONAL" od „odrzuc te funkcje", czyli od zmiany, ktora zabralaby
+// `tan`/`log`/`log2` typ wyniku i ruszyla deskryptory.
+TEST(xExpressionShape, keeps_functions_that_the_gate_must_not_reach) {
+  for (const char *name : {"Floor", "Ceil", "round", "trunc", "Abs"}) {
+    std::list<token> program{readField(sRational), token(CALL, std::string(name))};
+    EXPECT_NE(analyse(program).status, exprShapeStatus::rejected) << name;
+  }
+  for (const char *name : {"Sqrt", "sin", "cos", "exp", "tan", "log", "log2"}) {
+    for (const int slot : {sByte, sInt, sUint, sFloat, sDouble}) {
+      std::list<token> program{readField(slot), token(CALL, std::string(name))};
+      EXPECT_NE(analyse(program).status, exprShapeStatus::rejected) << name << "(" << slot << ")";
+    }
+  }
 }
 
 TEST(xExpressionShape, to_string_width_comes_from_the_declaration) {

@@ -70,8 +70,9 @@ struct exprShape {
 ///  * `rejected` — program jest skladniowo poprawny i typ da sie policzyc, ale kombinacja
 ///                  funkcji i typu argumentu NIE JEST ZAIMPLEMENTOWANA i policzylaby zla
 ///                  wartosc. Wolajacy ZATRZYMUJE kompilacje i podaje `reason` uzytkownikowi.
-///                  Jedyny dzisiejszy przypadek to `Sqrt` nad `RATIONAL` — patrz TODO przy
-///                  `rejectedIrrationalOverExact()` w expressionShape.cpp.
+///                  Dzisiejsze przypadki to `Sqrt`, `sin`, `cos` i `exp` nad `RATIONAL` —
+///                  patrz opis przy `rejectedIrrationalOverExact()` w expressionShape.cpp,
+///                  gdzie stoi, dlaczego kazda z tych nazw trafila tam z innego powodu.
 ///
 /// Rozroznienie `unknown` od `illTyped` nie zmienia decyzji kompilatora; istnieje po to,
 /// zeby test mogl odroznic „jeszcze nie wiadomo" od „to sie nie policzy". `rejected` jest
@@ -126,8 +127,11 @@ rdb::descFld arithmeticValueType(rdb::descFld left, rdb::descFld right);
 ///  * `isnull`, `IsZero`, `IsNonZero`, `Length` — zawsze `INTEGER`;
 ///  * `to_integer`, `to_float`, `to_double`, `to_string` — typ docelowy, takze wewnatrz
 ///    wiekszego wyrazenia;
-///  * `Abs`, `null2zero` oraz funkcje matematyczne liczone przez `callFun`
-///    (`Sqrt`, `Ceil`, `Floor`, `round`, `trunc`, `sin`, `cos`, `tan`, `log`, `log2`) —
+///  * `sin`, `cos`, `exp` — zawsze `DOUBLE`, takze nad argumentem calkowitym; kat jest
+///    w RADIANACH, `NULL` przechodzi dalej, a wynik niefinitywny (`exp(1000)`) staje sie
+///    `NULL`. Argument `RATIONAL` jest ODRZUCANY przy kompilacji, nie liczony;
+///  * `Abs`, `null2zero` oraz pozostale funkcje matematyczne liczone przez `callFun`
+///    (`Sqrt`, `Ceil`, `Floor`, `round`, `trunc`, `tan`, `log`, `log2`) —
 ///    typ ARGUMENTU. `callFun` liczy w `double` i rzutuje z powrotem na typ wejscia, wiec
 ///    `Ceil` nad `DOUBLE` daje `DOUBLE`, a nie `INTEGER`.
 ///

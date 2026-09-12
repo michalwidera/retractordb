@@ -44,3 +44,41 @@ add_test(
 
 set_tests_properties(harness_command_integrity
                      PROPERTIES DEPENDS harness_guard-selftest)
+
+# Dryft dokumentacji. Lista funkcji skalarnych stoi w rqlFunctions.hpp, ale
+# dokumentacja uzytkownika powtarza ja wlasnym tekstem w dwoch osobnych
+# repozytoriach i cicho sie z nia rozjezdza. Ani bramka `-c`, ani `test_drift`
+# tego nie widza: pierwsza nie kompiluje tekstow, druga konfrontuje silnik z
+# modelem zdarzeniowym.
+#
+# Dokumentacja jest POZA tym drzewem, wiec test rejestruje sie tylko wtedy, gdy
+# oba pliki sa na dysku. Bezwarunkowa rejestracja zapalilaby `ninja test` i
+# kazdy kontener CI, ktory kopiuje wylacznie to repozytorium.
+set(RDB_DOCS_PL
+    "$ENV{HOME}/github/dokumentacja-rdb"
+    CACHE PATH "Repozytorium dokumentacji PL (dryft listy funkcji)")
+set(RDB_DOCS_EN
+    "$ENV{HOME}/github/documentation-rdb"
+    CACHE PATH "Repozytorium dokumentacji EN (dryft listy funkcji)")
+
+set(RDB_DOC_PL_FUNCTIONS
+    "${RDB_DOCS_PL}/konstrukcja-jezyka-zapytan/polecenie-select/wyrazenia-pol-i-funkcje-skalarne.md"
+)
+set(RDB_DOC_EN_FUNCTIONS
+    "${RDB_DOCS_EN}/query-language-construction/select-command/field-expressions-and-scalar-functions.md"
+)
+
+if(EXISTS "${RDB_DOC_PL_FUNCTIONS}" AND EXISTS "${RDB_DOC_EN_FUNCTIONS}")
+  add_test(
+    NAME doc_drift_scalar_functions
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMAND
+      python3 doc_drift_scalar_functions.py
+      ${CMAKE_SOURCE_DIR}/src/include/rqlFunctions.hpp
+      "PL=${RDB_DOC_PL_FUNCTIONS}" "EN=${RDB_DOC_EN_FUNCTIONS}")
+else()
+  message(
+    STATUS
+      "doc_drift_scalar_functions: NIESPRAWDZONY - brak dokumentacji (RDB_DOCS_PL/RDB_DOCS_EN)"
+  )
+endif()

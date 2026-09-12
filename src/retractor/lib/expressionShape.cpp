@@ -13,6 +13,7 @@
 #include <boost/rational.hpp>
 
 #include "exprSimplify.hpp"  // kToStringDefaultWidth
+#include "rqlFunctions.hpp"  // findRqlFunction — kanoniczna pisownia w komunikacie bramki
 
 namespace {
 
@@ -37,9 +38,15 @@ exprShape stringShape(int width) {
 /// wraca rzutem na typ ARGUMENTU. Stad `Ceil(DOUBLE)` jest `DOUBLE`, a `Sqrt(INTEGER)` —
 /// `INTEGER`.
 const std::set<std::string> &typePreservingFunctions() {
-  static const std::set<std::string> names{"floor", "ceil", "sqrt", "round", "sin", "cos", "tan", "log", "log2", "trunc"};
+  static const std::set<std::string> names{"floor", "ceil", "sqrt", "round", "tan", "log", "log2", "trunc"};
   return names;
 }
+
+/// Funkcje o niewymiernej przeciwdziedzinie liczone przez `callRealFun()`: wynik jest
+/// `DOUBLE` NIEZALEZNIE od typu argumentu, bez stratnego powrotu do `INTEGER` czy `RATIONAL`.
+/// To wyjatek od reguly `typePreservingFunctions()` powyzej — patrz opis przy
+/// `rejectedIrrationalOverExact()`, dlaczego `tan`, `log` i `log2` jeszcze tu nie stoja.
+bool isRealValuedFunction(std::string_view name) { return name == "sin" || name == "cos" || name == "exp"; }
 
 /// Operatory zdejmujace DWA operandy ze stosu ksztaltow.
 bool isBinaryShapeOperator(command_id cmd) {
@@ -63,13 +70,15 @@ bool isBinaryShapeOperator(command_id cmd) {
   }
 }
 
-/// Kombinacje funkcja+typ, ktorych silnik NIE UMIE policzyc poprawnie i ktore kompilator
-/// odrzuca, zamiast wydac zla liczbe. Pusty napis znaczy „wolno".
+/// Kombinacje funkcja+typ, ktorych kompilator ODRZUCA, zamiast wydac zla wartosc albo
+/// wpuscic uzytkownika w niejednorodna regule. Pusty napis znaczy „wolno".
 ///
-/// Dzisiaj jest tu jeden wpis: `Sqrt` nad `RATIONAL`.
+/// Bramka obejmuje SIEDEM funkcji o niewymiernej przeciwdziedzinie nad `RATIONAL`, ale nie
+/// wszystkie stoja tutaj z tego samego powodu i te powody trzeba trzymac osobno — inaczej
+/// ktos zdejmie bramke z trojki, ktora defektu nie ma, i nie zauwazy, ze reszcie zostaje.
 ///
-/// DLACZEGO to jest blad, a nie niedokladnosc
-/// ------------------------------------------
+/// `Sqrt` — CICHA ZLA WARTOSC
+/// -------------------------
 /// `callFun()` (expressionEvaluator.cpp) liczy funkcje matematyczne przez `double` i rzutuje
 /// wynik Z POWROTEM NA TYP ARGUMENTU. Dla `RATIONAL` droga powrotna idzie przez `Rationalize`
 /// z tolerancja 1e-6, bo `boost::rational<int>` nie ma jak zapisac liczby niewymiernej. Skutek
@@ -85,48 +94,54 @@ bool isBinaryShapeOperator(command_id cmd) {
 /// cicha bledna wartosc, wiec bramka `-c` jest wlasciwym miejscem: program, ktory nie policzy
 /// poprawnie, nie ma sie kompilowac (ta sama zasada co w compiler::checkFunctionCalls()).
 ///
-/// TODO: zdecydowac, ktora droga zamknac to na stale. Do tego czasu obowiazuje ta bramka.
+/// `tan`, `log`, `log2` — TEN SAM DEFEKT, TA SAMA DROGA
+/// ----------------------------------------------------
+/// Nadal licza przez `callFun()` i wracaja rzutem na typ argumentu, wiec nad `RATIONAL`
+/// rationalizuja tak samo jak `Sqrt` (zmierzone: `log(2/1)` daje `2731/3940`) i tak samo po
+/// cichu przepelniaja sie w dalszym rachunku. Bramka zamyka to BEZ ruszania ich typu wyniku:
+/// odrzucenie dotyczy WYLACZNIE pary z `RATIONAL`, a nad `INTEGER`, `FLOAT` i `DOUBLE` nic
+/// sie nie zmienia, wiec ZADEN deskryptor nie zmienia typu pola i bramki H9/H10 tego nie widza.
 ///
-/// Droga A — funkcje o niewymiernym przeciwdziedzinie zwracaja `DOUBLE` niezaleznie od typu
-/// argumentu (czyli wyjatek od reguly „callFun zachowuje typ argumentu" z pozycji 16).
-///   + `Sqrt(m[0])` zaczyna dzialac i daje pelna precyzje `double`;
-///   + znika cala klasa przepelnien, nie tylko ta zlapana tutaj;
-///   - lamie kontrakt typu ustalony w pozycji 16 i opisany w `functionResultType()`;
-///   - ZMIENIA DESKRYPTORY: pole zmienia sie z `RATIONAL` (8 B) na `DOUBLE` (8 B) — rozmiar
-///     ten sam, ale nazwa typu w `.desc` i interpretacja bajtow juz nie, wiec to zmiana
-///     formatu artefaktu i trzeba ja przeprowadzic przez bramki H9/H10 i korpus;
-///   - wymaga rozstrzygniecia, czy `Floor`/`Ceil`/`round`/`trunc` zostaja przy `RATIONAL`
-///     (sa bezpieczne, bo daja mianownik 1 — zmierzone), co daje NIEJEDNORODNA regule.
+/// `sin`, `cos`, `exp` — JEDNOLITOSC REGULY, NIE DEFEKT
+/// ---------------------------------------------------
+/// Te trzy funkcje NIE MAJA powyzszego defektu: ida przez `callRealFun()`, ktore konczy na
+/// `DOUBLE` i nigdy nie wraca do `RATIONAL`, wiec `cos(m[0])` policzyloby sie z pelna
+/// dokladnoscia `double`. Odrzucenie jest decyzja o KONTRAKCIE JEZYKA, podjeta swiadomie
+/// (2026-09-12): uzytkownik nie ma pamietac, ktora funkcja o niewymiernej przeciwdziedzinie
+/// przyjmuje wartosc wymierna, a ktora nie. Jedna regula brzmi „funkcja niewymierna nad
+/// `RATIONAL` wymaga jawnego `to_double`" i obowiazuje dla wszystkich siedmiu.
 ///
-/// Droga B — `callFun` zostaje przy typie argumentu, ale rzutowanie `double -> RATIONAL`
-/// sprawdza zakres i podnosi blad zamiast przepelniac.
-///   + zgodne z zasada, ktora drzewo juz stosuje: `narrowInterval()` rzuca `std::out_of_range`
-///     zamiast przepelnic `boost::rational<int>`;
-///   + nie rusza kontraktu typu ani deskryptorow, wiec nie dotyka H9/H10;
-///   - `Sqrt(m[0])` nadal NIE dziala — zamiast zlej liczby uzytkownik dostaje blad wykonania,
-///     a chcial wyniku;
-///   - blad pojawia sie w WYKONANIU, nie w `-c`, czyli dokladnie ten wzorzec, ktory zamykala
-///     pozycja 1 w requested.md;
-///   - nie usuwa zrodla: mianowniki nadal rosna, tylko teraz glosno.
+/// Cena tej decyzji jest realna i zostala przyjeta: reduktory `MIN`/`MAX`/`AVG`/`SUMC` sa
+/// z definicji `RATIONAL`, wiec `to_double` bedzie potrzebne w kazdym zapytaniu w rodzaju RMS.
 ///
-/// Droga C — zostawic bramke `-c` na stale i wymagac jawnego `to_double`.
-///   + najmniejszy kod, zero wplywu na deskryptory i na bramki badawcze;
-///   + uzytkownik pisze wprost, w jakiej arytmetyce liczy, a `Sqrt(to_double(m[0]))` daje
-///     poprawne 1,4142135623730951;
-///   - `Sqrt` nad reduktorem wymaga obejscia w kazdym zapytaniu, a reduktory sa z definicji
-///     `RATIONAL`, wiec dotyczy to czestego zapisu (RMS, odchylenie standardowe).
+/// CO ZOSTAJE OTWARTE po tej bramce
+/// --------------------------------
+/// Klasa CICHEJ ZLEJ WARTOSCI jest zamknieta: `RATIONAL` jest jedynym typem, ktorego droga
+/// powrotna rationalizuje, i dla wszystkich siedmiu nazw jest teraz odrzucany. Otwarty
+/// zostaje sam KONTRAKT TYPU `tan`/`log`/`log2`: nad `INTEGER` nadal wracaja na `INTEGER`,
+/// czyli obcinaja czesc ulamkowa — strata JAWNA i udokumentowana, nie przepelnienie.
+/// Doprowadzenie ich do `DOUBLE` jak `sin`/`cos`/`exp` zmienia typ pola w `.desc`, czyli jest
+/// zmiana formatu artefaktu i musi przejsc przez bramki H9/H10 oraz korpus. To jest osobne
+/// zadanie i NIE jest juz pilne, bo zla liczba nie ma juz ktoredy wyjsc.
 ///
-/// Zakres tej bramki jest WEZSZY niz defekt. Zmierzone na tej samej danej (`RATIONAL 2/1`):
-/// `Floor`, `Ceil`, `round` i `trunc` daja mianownik 1 i sa bezpieczne, natomiast `sin`
-/// (3109318/3419473) i `log` (2731/3940) maja dokladnie te sama wlasnosc co `Sqrt`.
-/// Blokowany jest na razie sam `Sqrt` — swiadomie, bo o to poprosil czlowiek; rozszerzenie
-/// na `sin`/`cos`/`tan`/`log`/`log2` jest czescia decyzji powyzej, nie osobna sprawa.
-std::string rejectedIrrationalOverExact(std::string_view name, rdb::descFld argumentType) {
-  if (name != "sqrt" || argumentType != rdb::RATIONAL) return {};
+/// Funkcje zaokraglajace `Floor`, `Ceil`, `round` i `trunc` nad `RATIONAL` sa bezpieczne
+/// i zostaja przy typie argumentu: ich wynik jest calkowity, czyli ma mianownik 1 (zmierzone).
+/// `Abs` liczy wprost na wariancie, wiec mianownika nie rusza w ogole.
+bool hasIrrationalRange(std::string_view name) {
+  static const std::set<std::string, std::less<>> names{"sqrt", "sin", "cos", "exp", "tan", "log", "log2"};
+  return names.contains(name);
+}
 
-  return "'Sqrt' over a RATIONAL value is not implemented: the result would be rationalized and "
-         "silently overflow boost::rational<int>. Convert explicitly, for example "
-         "Sqrt(to_double(x)). Note that stream reducers MIN/MAX/AVG/SUMC produce RATIONAL.";
+std::string rejectedIrrationalOverExact(std::string_view name, rdb::descFld argumentType) {
+  if (argumentType != rdb::RATIONAL || !hasIrrationalRange(name)) return {};
+
+  const auto canonical = rdb::findRqlFunction(name);
+  const std::string shown{canonical ? canonical->canonical : name};
+
+  return "'" + shown +
+         "' over a RATIONAL value is not implemented: functions with an irrational range "
+         "require an explicit conversion. Write " +
+         shown + "(to_double(x)). Note that stream reducers MIN/MAX/AVG/SUMC produce RATIONAL.";
 }
 
 }  // namespace
@@ -187,6 +202,7 @@ std::optional<rdb::descFld> functionResultType(const std::string_view name, cons
   // przy tej galezi w inferExpressionShape().
   if (key == "null2zero") return argumentType;
 
+  if (isRealValuedFunction(key)) return rdb::DOUBLE;
   if (typePreservingFunctions().contains(key)) return argumentType;
 
   return std::nullopt;
@@ -365,6 +381,8 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
         // tylko „czy ten wynik w ogole da sie policzyc".
         if (auto refusal = rejectedIrrationalOverExact(name, right.rtype); !refusal.empty())
           return {.status = exprShapeStatus::rejected, .shape = {}, .reason = std::move(refusal)};
+
+        if (isRealValuedFunction(name) && right.rtype > rdb::DOUBLE) return illTyped;
 
         const auto resultType = functionResultType(name, right.rtype);
         // Nazwa spoza tabeli nie dociera do planu: compiler::checkFunctionCalls() odrzuca ja

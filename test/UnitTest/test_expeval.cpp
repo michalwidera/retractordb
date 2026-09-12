@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 #include <boost/rational.hpp>
 
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -1058,6 +1059,49 @@ TEST(xExpressionEval, call_cos_zero) {
 
   ASSERT_TRUE(std::holds_alternative<double>(result));
   EXPECT_EQ(std::get<double>(result), 1.0);
+}
+
+// Argument RATIONAL jest tu policzony CELOWO, mimo ze kompilator odrzuca te trzy nazwy nad
+// RATIONAL (rejects_irrational_functions_over_a_rational_value w test_compiler). Bramka jest
+// decyzja o kontrakcie JEZYKA i stoi w expressionShape; ewaluator wykonuje takze programy
+// skladane z pominieciem kompilatora, a rachunek przez double jest dla nich poprawny. Gdyby
+// ktos przeniosl bramke pietro nizej, ten test zapali sie pierwszy i pokaze, ze zmienil sie
+// kontrakt, a nie tylko miejsce sprawdzenia.
+TEST(xExpressionEval, real_functions_return_double_for_exact_arguments) {
+  for (const auto &[name, expected] :
+       std::vector<std::pair<std::string, double>>{{"sin", std::sin(1.0)}, {"cos", std::cos(1.0)}, {"exp", std::exp(1.0)}}) {
+    for (const auto &argument : {rdb::descFldVT{1}, rdb::descFldVT{boost::rational<int>(1)}}) {
+      std::list<token> program;
+      program.emplace_back(PUSH_VAL, argument);
+      program.emplace_back(CALL, name);
+      expressionEvaluator evaluator;
+      const auto result = evaluator.eval(program);
+      ASSERT_TRUE(std::holds_alternative<double>(result)) << name;
+      EXPECT_NEAR(std::get<double>(result), expected, 1e-12) << name;
+    }
+  }
+}
+
+TEST(xExpressionEval, real_functions_propagate_null_and_reject_text) {
+  for (const char *name : {"sin", "cos", "exp"}) {
+    std::list<token> missing;
+    missing.emplace_back(PUSH_VAL, rdb::descFldVT{std::monostate{}});
+    missing.emplace_back(CALL, std::string(name));
+    std::list<token> text;
+    text.emplace_back(PUSH_VAL, std::string("text"));
+    text.emplace_back(CALL, std::string(name));
+    expressionEvaluator evaluator;
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(evaluator.eval(missing))) << name;
+    EXPECT_THROW(evaluator.eval(text), std::runtime_error) << name;
+  }
+}
+
+TEST(xExpressionEval, exp_overflow_returns_null) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, 1000.0);
+  program.emplace_back(CALL, std::string("exp"));
+  expressionEvaluator evaluator;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(evaluator.eval(program)));
 }
 
 TEST(xExpressionEval, call_tan_zero) {
