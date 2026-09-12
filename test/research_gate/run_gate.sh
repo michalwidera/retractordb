@@ -175,6 +175,14 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
   # regula nie roznilaby sie od modelu w zadnym przypadku, konczy sie kodem 2.
   step "H10 test_phase_forms" python3 tests/test_phase_forms.py "$XRETRACTOR"
 
+  # Wymiarowanie przebiegu end-to-end (`execute.horizon_of`, `execute.wakeup_budget`).
+  # Aparatura, nie hipoteza: przebieg wymierzony za krotko daje artefakt bez
+  # rekordow, a skrypty czytaja brak rekordow jako rozbieznosc tresci albo objaw
+  # niedomiaru pojemnosci — czyli jako wynik o silniku. Tak wlasnie zatrzymal sie
+  # poziom bramki odwzorowania w K24f. Poziom niesie wlasna kontrole mocy: jesli
+  # wymiarowanie sprzed naprawy wystarcza na kazdym jego planie, konczy sie kodem 2.
+  step "H10 test_sizing" python3 tests/test_sizing.py "$XRETRACTOR"
+
   # Dwa ziarna: w probie i poza proba. Kazde ma wlasny zamrozony werdykt
   # odniesienia, wiec kazde jest osobnym porownaniem.
   for pair in "20260804:VERDICT.md:w probie" "20260807:VERDICT_oos.md:poza proba"; do

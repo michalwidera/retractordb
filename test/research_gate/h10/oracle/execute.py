@@ -11,6 +11,7 @@ rozbieżność ogona, a nie jako różnicę w definicji operatora.
 import os
 import struct
 import subprocess
+from fractions import Fraction
 from pathlib import Path
 
 from engine import EngineError
@@ -63,6 +64,59 @@ def null_flags(entries):
             continue
         flags.extend([any(entry["null"])] * entry["records"])
     return flags
+
+
+def horizon_of(plan, origins, tails, records):
+    """Czas scienny, po ktorym KAZDY wezel ma juz `records` rekordow.
+
+    Rekord n jest emitowany w chwili (n+1+W)*Delta, a PIERWSZYM istniejacym jest
+    rekord o indeksie `origin` — przed nim rekordow nie ma. Ostatni potrzebny ma
+    wiec indeks origin+records-1 i to on wyznacza horyzont.
+
+    `origins` i `tails` sa wielkosciami INDEKSOWYMI i maja pochodzic z MODELU
+    ZDARZENIOWEGO (`model.evaluate`), nie z repliki postaci zamknietej: skrypt,
+    ktory wymiarowalby przebieg rachunkiem silnika, badalby silnik jego wlasna
+    miara. Funkcja ich nie liczy sama wlasnie po to, zeby zrodlo bylo widoczne
+    w wywolaniu.
+
+    Do 2026-09-12 tego rachunku nie bylo: przebieg wymiarowala sama ROZPIETOSC
+    interwalow (`(records+8)*spread`), a origin do wzoru nie wchodzil. W planie,
+    w ktorym `>N` skladaja sie w lancuch, origin narasta (zmierzone: 8 -> 13 ->
+    26 -> 34) i budzet konczyl sie, zanim najglebszy wezel doszedl do wlasnego
+    origin. Artefakt zostawal pusty — poprawnie, bo przed origin nie ma rekordow
+    — a bramka odwzorowania raportowala to jako `zero rekordow`, czyli ROZBIEZNOSC
+    TRESCI. Byla to granica aparatury podana jako wynik o silniku; trzy takie
+    przypadki zatrzymaly poziom bramki w K24f (patrz jej STOP.md).
+
+    JEDYNA definicja tego rachunku w aparaturze — `run_mapping_gate.py`
+    i `check_agse_capacity.py` ja importuja. Nie wolno jej kopiowac: dwa zapisy
+    tej samej reguly rozjezdzaja sie po cichu i raz juz to zrobily (naprawa
+    z 2026-09-12 trafila najpierw tylko do bramki odwzorowania).
+    """
+    worst = Fraction(0)
+    for node in plan.nodes:
+        if node.kind == SOURCE:
+            continue
+        last = origins[node.name] + records - 1
+        worst = max(worst, (Fraction(last) + 1 + tails[node.name]) * node.delta)
+    return worst
+
+
+def wakeup_budget(plan, horizon):
+    """Gorne ograniczenie liczby pobudek w czasie `horizon`.
+
+    `-m N` jest budzetem SLOTOW, a slot jest chwila, w ktorej tyka co najmniej
+    jeden strumien — nie taktem najszybszego strumienia. Pobudek jest wiec
+    najwyzej tyle, ile sumarycznie tykniec wszystkich strumieni w horyzoncie;
+    chwile wspolne tylko zmniejszaja te liczbe, wiec suma jest bezpieczna.
+    Wlasnosc "suma tykniec >= liczba roznych chwil" sprawdza wprost
+    `tests/test_sizing.py`, wyliczajac te chwile.
+
+    Stary wzor mylil te dwie wielkosci i przez to zanizal budzet takze tam,
+    gdzie origin byl zerowy: plan wielotaktowy ma WIECEJ pobudek niz taktow
+    najszybszego strumienia.
+    """
+    return sum(int(horizon / node.delta) + 1 for node in plan.nodes)
 
 
 def run_plan(plan, binary, workdir, loops, records=512, timeout=120):

@@ -43,62 +43,25 @@ def select(corpus, per_stratum, strata=STRATA):
     return chosen
 
 
-def horizon_of(plan, origins, tails):
-    """Czas scienny, po ktorym KAZDY wezel ma juz RECORDS rekordow.
-
-    Rekord n jest emitowany w chwili (n+1+W)*Delta, a PIERWSZYM istniejacym jest
-    rekord o indeksie `origin` — przed nim rekordow nie ma. Ostatni potrzebny ma
-    wiec indeks origin+RECORDS-1 i to on wyznacza horyzont.
-
-    Do 2026-09-12 tego rachunku tu nie bylo: przebieg wymiarowala sama
-    ROZPIETOSC interwalow (`(RECORDS+8)*spread`), a origin do wzoru nie wchodzil.
-    W planie, w ktorym `>N` skladaja sie w lancuch, origin narasta (zmierzone:
-    8 -> 13 -> 26 -> 34) i budzet konczyl sie, zanim najglebszy wezel doszedl do
-    wlasnego origin. Artefakt zostawal pusty — poprawnie, bo przed origin nie ma
-    rekordow — a bramka raportowala to jako `zero rekordow`, czyli ROZBIEZNOSC
-    TRESCI. Byla to granica aparatury podana jako wynik o silniku; trzy takie
-    przypadki zatrzymaly poziom bramki w K24f (patrz STOP.md tej kampanii).
-    """
-    worst = Fraction(0)
-    for node in plan.nodes:
-        if node.kind == P.SOURCE:
-            continue
-        last = origins[node.name] + RECORDS - 1
-        worst = max(worst, (Fraction(last) + 1 + tails[node.name]) * node.delta)
-    return worst
-
-
-def wakeup_budget(plan, horizon):
-    """Gorne ograniczenie liczby pobudek w czasie `horizon`.
-
-    `-m N` jest budzetem SLOTOW, a slot jest chwila, w ktorej tyka co najmniej
-    jeden strumien — nie taktem najszybszego strumienia. Pobudek jest wiec
-    najwyzej tyle, ile sumarycznie tykniec wszystkich strumieni w horyzoncie;
-    chwile wspolne tylko zmniejszaja te liczbe, wiec suma jest bezpieczna.
-
-    Stary wzor mylil te dwie wielkosci i przez to zanizal budzet takze tam,
-    gdzie origin byl zerowy: plan wielotaktowy ma WIECEJ pobudek niz taktow
-    najszybszego strumienia.
-    """
-    return sum(int(horizon / node.delta) + 1 for node in plan.nodes)
-
-
 def run_one(index, stratum, item, binary, workroot):
     outcomes = []
     # Origin i ogon sa wielkosciami INDEKSOWYMI i zaleza wylacznie od ilorazow
     # interwalow, wiec sa te same w obu skalach — liczymy je raz, na planie
     # nieprzeskalowanym. Zrodlem jest MODEL ZDARZENIOWY, nie replika: bramka
     # odwzorowania nie ma prawa wpuscic rachunku silnika do wykonania.
+    # Sam rachunek horyzontu i budzetu slotow mieszka w `oracle/execute.py`
+    # (jedyna definicja; `check_agse_capacity.py` uzywa tej samej), a jego
+    # wlasnosci pilnuje `tests/test_sizing.py`.
     results = M.evaluate(item, convention=M.C1)
     origins = {r.name: r.origin for r in results}
     tails = {r.name: r.tail for r in results}
     for scale in SCALES:
         scaled = P.rescale(item, scale / P.fastest(item))
-        horizon = horizon_of(scaled, origins, tails)
+        horizon = X.horizon_of(scaled, origins, tails, RECORDS)
         if horizon > BUDGET:
             return {"plan": index, "stratum": stratum, "status": "poza budżetem",
                     "detail": f"horyzont {float(horizon):.2f} s > {BUDGET} s"}
-        loops = wakeup_budget(scaled, horizon) + 24
+        loops = X.wakeup_budget(scaled, horizon) + 24
         workdir = Path(workroot) / f"p{index}_s{scale.denominator}"
         try:
             X.run_plan(scaled, binary, workdir, loops=loops, records=1024)

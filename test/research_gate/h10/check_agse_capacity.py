@@ -83,13 +83,34 @@ def main():
     rows = []
     for index, stratum, item, consumer, child, needed, provided in candidates[:args.limit]:
         scaled = P.rescale(item, SCALE / P.fastest(item))
-        spread = P.slowest(scaled) / P.fastest(scaled)
-        loops = int((RECORDS + 8) * spread) + 24
-        if loops * P.fastest(scaled) > BUDGET:
+        # Wymiarowanie przebiegu — ten sam rachunek, co w bramce odwzorowania
+        # (`oracle/execute.py`, jedyna jego definicja). Do 2026-09-12 stała tu
+        # KOPIA wzoru sprzed naprawy K24f: budżet z samej rozpiętości interwałów,
+        # bez narosłego początku logicznego i z myleniem slotów z taktami
+        # najszybszego strumienia. Skutek byłby tu gorszy niż w bramce: zbyt
+        # krótki przebieg daje artefakt bez rekordów, a ten skrypt czyta brak
+        # rekordów jako OBJAW NIEDOMIARU POJEMNOŚCI — czyli jako wynik o silniku.
+        #
+        # Origin i ogon biorą się z MODELU ZDARZENIOWEGO, nie z repliki postaci
+        # zamkniętej (`closedform`, używanej wyżej do wyboru kandydatów):
+        # przebieg wymiarowany rachunkiem silnika badałby silnik jego własną miarą.
+        try:
+            results = M.evaluate(item, convention=M.C1)
+        except M.OracleError as exc:
             rows.append({"plan": index, "stratum": stratum, "consumer": consumer,
                          "child": child, "needed": needed, "provided": provided,
-                         "status": "poza budżetem", "detail": ""})
+                         "status": "awaria", "detail": f"oracle: {exc}"[:180]})
             continue
+        origins = {r.name: r.origin for r in results}
+        tails = {r.name: r.tail for r in results}
+        horizon = X.horizon_of(scaled, origins, tails, RECORDS)
+        if horizon > BUDGET:
+            rows.append({"plan": index, "stratum": stratum, "consumer": consumer,
+                         "child": child, "needed": needed, "provided": provided,
+                         "status": "poza budżetem",
+                         "detail": f"horyzont {float(horizon):.2f} s > {BUDGET} s"})
+            continue
+        loops = X.wakeup_budget(scaled, horizon) + 24
         workdir = workroot / f"p{index}"
         try:
             X.run_plan(scaled, binary, workdir, loops=loops, records=1024)
