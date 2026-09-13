@@ -82,3 +82,24 @@ else()
       "doc_drift_scalar_functions: NIESPRAWDZONY - brak dokumentacji (RDB_DOCS_PL/RDB_DOCS_EN)"
   )
 endif()
+
+# Dryft wobec dowodow Lean. Wartosci sprawdza ut_proofOracle na tablicach z
+# proofOracle.hpp; ten test pilnuje, ze kazde twierdzenie z Profs ma wiersz w
+# proof_manifest.tsv i ze tablice nie sa starsze od dowodow. Dowody sa POZA tym
+# drzewem, wiec rejestracja jest warunkowa, jak przy dokumentacji.
+set(RDB_PROOFS
+    "$ENV{HOME}/github/paper-arXiv/profs"
+    CACHE PATH "Projekt Lean z dowodami (dryft silnika wobec dowodow)")
+
+if(EXISTS "${RDB_PROOFS}/Profs")
+  add_test(
+    NAME proof_drift
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMAND
+      python3 ${CMAKE_CURRENT_SOURCE_DIR}/proof_drift.py ${RDB_PROOFS}
+      ${CMAKE_CURRENT_SOURCE_DIR}/proof_manifest.tsv
+      ${CMAKE_CURRENT_SOURCE_DIR}/UnitTest/test_proofOracle.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/UnitTest/proofOracle.hpp)
+else()
+  message(STATUS "proof_drift: NIESPRAWDZONY - brak dowodow Lean (RDB_PROOFS)")
+endif()

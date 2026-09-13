@@ -1,0 +1,83 @@
+# Powiazanie twierdzen z paper-arXiv/profs/Profs/*.lean z testami silnika.
+# Kazde twierdzenie z Profs ma tu dokladnie jeden wiersz; sprawdza to test/proof_drift.py.
+#
+# plik<TAB>twierdzenie<TAB>status
+#   TEST:<Zestaw.test>        - test w test/UnitTest/test_proofOracle.cpp sprawdza skutek dla silnika
+#   NIEPOKRYTE:<powod>        - twierdzenie dotyczy silnika, ale testu jeszcze nie ma (liczy sie do dryftu)
+#   POZA_ZAKRESEM:<powod>     - lemat pomocniczy albo postac bez odpowiednika w silniku
+BeattyModel	slopes_conjugate	POZA_ZAKRESEM:nachylenia Beatty'ego w liczbach rzeczywistych
+BeattyPartition	positive_positions_partition	TEST:ProofOracle.selectors_bijective
+BeattyPartition	zero_is_residue	TEST:ProofOracle.deinterleave_table
+BeattyPartition	residue_formula	POZA_ZAKRESEM:postac Beatty'ego na liczbach calkowitych; wzor silnika sprawdza deinterleave_table
+BeattyPartition	recovered_formula	POZA_ZAKRESEM:postac Beatty'ego na liczbach calkowitych; wzor silnika sprawdza deinterleave_table
+BeattyPartition	floor_strictMono	POZA_ZAKRESEM:lemat pomocniczy
+BeattyPartition	ceil_strictMono	POZA_ZAKRESEM:lemat pomocniczy
+BeattyPartition	residue_position_injective	POZA_ZAKRESEM:postac Beatty'ego; odpowiednik silnika to residue_index_injective
+BeattyPartition	recovered_position_injective	POZA_ZAKRESEM:postac Beatty'ego; odpowiednik silnika to original_index_injective
+CausalShift	originReady_exists	NIEPOKRYTE:poczatek logiczny przeplotu (compiler::computeLogicalOrigin) nie jest wydzielona funkcja
+CausalShift	interleaveOrigin_le_iff	NIEPOKRYTE:poczatek logiczny przeplotu (compiler::computeLogicalOrigin) nie jest wydzielona funkcja
+CausalShift	originReady_shift	NIEPOKRYTE:poczatek logiczny przeplotu (compiler::computeLogicalOrigin) nie jest wydzielona funkcja
+CausalShift	interleaveOrigin_shift	NIEPOKRYTE:poczatek logiczny przeplotu (compiler::computeLogicalOrigin) nie jest wydzielona funkcja
+CausalShift	causalShift_read	NIEPOKRYTE:odczyt n-m operatora > jest w dataModel; wymaga testu przez skompilowany plan
+CausalShift	causalShift_tail_exact	NIEPOKRYTE:ogon > (STREAM_TIMEMOVE) liczony inline w compiler::computeStartupLatency
+CausalShift	causalShift_available_source	NIEPOKRYTE:ogon > (STREAM_TIMEMOVE) liczony inline w compiler::computeStartupLatency
+CausalShift	causalInterleave_interval	NIEPOKRYTE:interwal wyniku # liczony w kompilatorze, nie w SOperations.hpp
+CausalShift	causalInterleave_inputs_defined	NIEPOKRYTE:poczatek logiczny przeplotu (compiler::computeLogicalOrigin) nie jest wydzielona funkcja
+CausalShift	delayed_interleave_values	TEST:ProofOracle.shift_matching_values
+CausalShift	causal_shift_matching_read	NIEPOKRYTE:laczy odczyt z poczatkiem logicznym; czesc wartosci sprawdza shift_matching_values
+CausalShift	causal_shift_matching_tail	TEST:ProofOracle.exact_tail_rewrite
+CausalShift	causal_shift_matching	NIEPOKRYTE:laczy interwal, poczatek, odczyt i dostepnosc; wymaga testu przez skompilowany plan
+Deinterleave	progress_residue	POZA_ZAKRESEM:lemat pomocniczy recover_residue
+Deinterleave	recover_residue	TEST:ProofOracle.deinterleave_inverts_interleave
+Deinterleave	progress_original	POZA_ZAKRESEM:lemat pomocniczy recover_original
+Deinterleave	recover_original	TEST:ProofOracle.deinterleave_inverts_interleave
+Deinterleave	residue_index_eq_position	POZA_ZAKRESEM:zwiazek z postacia Beatty'ego
+Deinterleave	original_index_eq_position	POZA_ZAKRESEM:zwiazek z postacia Beatty'ego
+Deinterleave	residue_index_injective	TEST:ProofOracle.selectors_bijective
+Deinterleave	original_index_injective	TEST:ProofOracle.selectors_bijective
+Deinterleave	selectors_disjoint	TEST:ProofOracle.selectors_bijective
+Deinterleave	every_slot_selected	TEST:ProofOracle.selectors_bijective
+EventOrder	tau_prefix	TEST:ProofOracle.tau_prefix
+EventOrder	event_order_counterexample	TEST:ProofOracle.event_order_counterexample
+ExactInvertibility	selectors_bijective	TEST:ProofOracle.selectors_bijective
+ExactInvertibility	deinterleave_inverts_interleave	TEST:ProofOracle.deinterleave_inverts_interleave
+ExactInvertibility	resample_roundtrip	NIEPOKRYTE:indeks sumy (sampleIndex) liczony w dataModel, nie w SOperations.hpp
+ExactInvertibility	diff_recovers_sum	NIEPOKRYTE:indeks sumy (sampleIndex) liczony w dataModel, nie w SOperations.hpp
+InterleaveCovering	interleaveAt_map	POZA_ZAKRESEM:naturalnosc wzgledem wartosci; silnik wybiera tylko indeksy
+InterleaveCovering	interleaveAt_id	POZA_ZAKRESEM:lemat pomocniczy
+InterleaveCovering	indexA_le	POZA_ZAKRESEM:lemat pomocniczy interleave_sequential_covering
+InterleaveCovering	indexA_step	POZA_ZAKRESEM:lemat pomocniczy interleave_sequential_covering
+InterleaveCovering	indexA_multiple	POZA_ZAKRESEM:lemat pomocniczy interleave_sequential_covering
+InterleaveCovering	step_hits	POZA_ZAKRESEM:lemat pomocniczy interleave_sequential_covering
+InterleaveCovering	step_order	POZA_ZAKRESEM:lemat pomocniczy interleave_sequential_covering
+InterleaveCovering	selects_A_iff	POZA_ZAKRESEM:lemat pomocniczy interleave_sequential_covering
+InterleaveCovering	indexB_step	POZA_ZAKRESEM:lemat pomocniczy interleave_sequential_covering
+InterleaveCovering	selects_B_iff	POZA_ZAKRESEM:lemat pomocniczy interleave_sequential_covering
+InterleaveCovering	indexB_multiple	POZA_ZAKRESEM:lemat pomocniczy interleave_sequential_covering
+InterleaveCovering	covering_of_step	POZA_ZAKRESEM:lemat pomocniczy interleave_sequential_covering
+InterleaveCovering	interleave_sequential_covering	TEST:ProofOracle.interleave_sequential_covering
+InterleaveTailExact	progress_period	POZA_ZAKRESEM:lemat pomocniczy exactInterleaveTail_exact
+InterleaveTailExact	selectsA_period	POZA_ZAKRESEM:lemat pomocniczy exactInterleaveTail_exact
+InterleaveTailExact	phaseRequirement_period	POZA_ZAKRESEM:lemat pomocniczy exactInterleaveTail_exact
+InterleaveTailExact	tailRequirement_period	POZA_ZAKRESEM:lemat pomocniczy; skutek dla silnika sprawdza exactInterleaveTail_exact
+InterleaveTailExact	tailRequirement_add_mul	POZA_ZAKRESEM:lemat pomocniczy exactInterleaveTail_exact
+InterleaveTailExact	tailRequirement_mod	POZA_ZAKRESEM:lemat pomocniczy exactInterleaveTail_exact
+InterleaveTailExact	phaseMax_le_iff	POZA_ZAKRESEM:lemat pomocniczy exactInterleaveTail_exact
+InterleaveTailExact	ready_iff_requirement	POZA_ZAKRESEM:lemat pomocniczy exactInterleaveTail_exact
+InterleaveTailExact	interleaveReady_iff	POZA_ZAKRESEM:lemat pomocniczy exactInterleaveTail_exact
+InterleaveTailExact	exactInterleaveTail_exact	TEST:ProofOracle.exactInterleaveTail_exact
+InterleaveTailExact	causalInterleave_tail_exact	TEST:ProofOracle.exactInterleaveTail_exact
+ShiftMatching	interleave_starts_with_right	TEST:ProofOracle.interleaveAt_table
+ShiftMatching	progress_shift	POZA_ZAKRESEM:lemat pomocniczy shift_matching_values
+ShiftMatching	progress_le_slot	POZA_ZAKRESEM:lemat pomocniczy shift_matching_values
+ShiftMatching	shift_matching_values	TEST:ProofOracle.shift_matching_values
+ShiftMatching	phase_requirement_shift	POZA_ZAKRESEM:lemat pomocniczy shift_matching_tail
+ShiftMatching	phaseMax_shift	POZA_ZAKRESEM:lemat pomocniczy shift_matching_tail
+ShiftMatching	ratioA_match	POZA_ZAKRESEM:lemat pomocniczy shift_matching_tail
+ShiftMatching	ratioB_match	POZA_ZAKRESEM:lemat pomocniczy shift_matching_tail
+ShiftMatching	shift_matching_tail	TEST:ProofOracle.exact_tail_rewrite
+ShiftMatching	exact_tail_rewrite	TEST:ProofOracle.exact_tail_rewrite
+ShiftMatching	tail_can_be_strict	TEST:ProofOracle.tail_can_be_strict
+SumCommutativity	sample_self	NIEPOKRYTE:indeks sumy (sampleIndex) liczony w dataModel, nie w SOperations.hpp
+SumCommutativity	sum_commutativity	NIEPOKRYTE:indeks sumy (sampleIndex) liczony w dataModel, nie w SOperations.hpp
+SumCommutativity	sum_fast_left	NIEPOKRYTE:indeks sumy (sampleIndex) liczony w dataModel, nie w SOperations.hpp
