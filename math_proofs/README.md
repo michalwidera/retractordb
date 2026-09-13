@@ -65,12 +65,14 @@ sprawdza także dokumenty i zgodność wstawionych fragmentów kodu z plikami
 
 `OracleMain.lean` (plik wykonywalny `profs_oracle`) liczy definicjami z
 `Profs/` tablice przeplotu, rozplotu, różnicy i dokładnego ogona przeplotu.
-`./gen-oracle.sh` zapisuje je razem ze skrótami SHA-256 plików `Profs/*.lean`
-do `test/UnitTest/proofOracle.hpp`. Tam `ut_proofOracle`
+`./gen-oracle.sh` zapisuje je razem ze skrótami SHA-256 plików `Profs/*.lean`,
+`OracleMain.lean` i przypięć wersji (`lakefile.lean`, `lean-toolchain`,
+`lake-manifest.json`) do `test/UnitTest/proofOracle.hpp`. Tam `ut_proofOracle`
 porównuje z nimi funkcje z `SOperations.hpp` i sprawdza wypowiedzi twierdzeń
 jako własności, a `proof_drift` pilnuje, żeby każde twierdzenie miało wiersz
 w `test/proof_manifest.tsv` i żeby tablice nie były starsze od dowodów. Po
-każdej zmianie w `Profs/` trzeba ponownie uruchomić `./gen-oracle.sh`, a nowe
+każdej zmianie tych plików, także po `./install-lean.sh --upgrade`, trzeba
+ponownie uruchomić `./gen-oracle.sh`, a nowe
 twierdzenie dopisać do manifestu.
 
 Formalizacja wykorzystuje uogólnione twierdzenie Rayleigha z Mathlib do

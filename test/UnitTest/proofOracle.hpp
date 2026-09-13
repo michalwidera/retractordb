@@ -19,6 +19,10 @@ inline constexpr ProofSource kProofSources[] = {
     {"Profs/InterleaveTailExact.lean", "ff4d691923100f9cc251e9506e0ea197465756bd3c9d99c850bf1efb22cb7749"},
     {"Profs/ShiftMatching.lean", "d74a5a242e5d5dc879ee2708ed607c6ee0ae74eb03bd01f8b47782b74457ba7a"},
     {"Profs/SumCommutativity.lean", "502c21dc6b6413b1c707c51de9bff8341e1f1c03879b91130f0d0376401c29ed"},
+    {"OracleMain.lean", "4165f610ca923a07b11357d458b964d92ab8dcb123303b6fe4fda529c97afd66"},
+    {"lakefile.lean", "36132fc8f52d7622f00145b2baae75edda31f8eab5cc2561f7dd84c6d7a1ab5c"},
+    {"lean-toolchain", "302cd63c54178885b89e669f33b38f12f4dd7ae7e5cac537b3203e3768d8fb2b"},
+    {"lake-manifest.json", "987278633fffeb173c7870194bc5d99386139f224dfe1fca1a152e73c1eb8cd7"},
 };
 
 // interleaveAt a b id id n oraz deinterleaveLeft/Right a b id n.

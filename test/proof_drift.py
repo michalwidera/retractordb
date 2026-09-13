@@ -8,8 +8,10 @@ tego, czego sam test nie widzi z konstrukcji:
 - twierdzenia dopisanego do Profs bez wiersza w proof_manifest.tsv (nowy dowod, ktorego nikt
   nie zestawil z silnikiem), albo wiersza po twierdzeniu, ktorego juz nie ma;
 - wiersza TEST: wskazujacego test, ktorego nie ma w test_proofOracle.cpp;
-- przeterminowanej wyroczni: skroty plikow Profs/*.lean inne niz te, z ktorych policzono
-  proofOracle.hpp. Zielony ut_proofOracle porownuje wtedy silnik ze stara wersja dowodow.
+- przeterminowanej wyroczni: skroty plikow inne niz te, z ktorych policzono proofOracle.hpp.
+  Zielony ut_proofOracle porownuje wtedy silnik ze stara wersja dowodow. Obok Profs/*.lean
+  liczone sa generator OracleMain.lean i przypiecia Lean/Mathlib/Verso, bo CI nie buduje Lean:
+  bez nich podniesienie Mathlib, ktore psuje dowody albo zmienia tablice, zostaloby zielone.
 
 Werdykt: ZGODNY (kod 0) albo DRYFT (kod 1). Pokrycie to udzial twierdzen TEST wsrod
 twierdzen dotyczacych silnika (TEST + NIEPOKRYTE); lematy POZA_ZAKRESEM sie nie licza.
@@ -25,7 +27,9 @@ import sys
 
 THEOREM = re.compile(r"^\s*(?:private\s+)?(?:theorem|lemma)\s+([A-Za-z_][A-Za-z0-9_'.]*)", re.MULTILINE)
 GTEST = re.compile(r"\bTEST\(\s*(\w+)\s*,\s*(\w+)\s*\)")
-SOURCE = re.compile(r'\{\s*"(Profs/[^"]+\.lean)"\s*,\s*"([0-9a-f]{64})"\s*\}')
+SOURCE = re.compile(r'\{\s*"([^"]+)"\s*,\s*"([0-9a-f]{64})"\s*\}')
+# Ta sama lista co petla w math_proofs/gen-oracle.sh (poza Profs/*.lean).
+SOURCES = ("OracleMain.lean", "lakefile.lean", "lean-toolchain", "lake-manifest.json")
 STATUSES = ("TEST", "NIEPOKRYTE", "POZA_ZAKRESEM")
 
 
@@ -81,6 +85,9 @@ def main() -> int:
         f"Profs/{path.name}": hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted((profs / "Profs").glob("*.lean"))
     }
+    for name in SOURCES:
+        path = profs / name
+        current[name] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else "brak pliku"
     stale = sorted(f for f in recorded.keys() | current.keys() if recorded.get(f) != current.get(f))
     for file in stale:
         problems.append(f"{file}: inny niz przy generowaniu {oracle_path.name} - uruchom math_proofs/gen-oracle.sh")
