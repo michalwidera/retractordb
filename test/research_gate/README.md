@@ -54,7 +54,7 @@ ninja test_gate                                    # calosc
 sie ja bezwzglednie; sciezka wzgledna cicho pomija poziom 84/84.
 
 **W CI** bramka ma wlasny job `research-gate` (warstwa 3 workflow
-`manual-nightly-full`, trzy razy w miesiacu, Release). Job buduje najpierw
+`manual-nightly-full`, dwa razy w miesiacu, Release). Job buduje najpierw
 cztery profile ablacji, bo bez nich poziom 84/84 jest pomijany, i konfiguruje
 drzewo z `-DRESEARCH_GATE_STRICT=ON`. W tym trybie **pominiety poziom oblewa
 przebieg**: pominiecie znaczy "nie uruchomiono", a zielona bramka o niepelnym

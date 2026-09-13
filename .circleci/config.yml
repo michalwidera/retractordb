@@ -7,7 +7,7 @@ parameters:
     type: boolean
     default: false
   # Mimo nazwy nie jest to wylacznie uruchomienie reczne: ten sam parametr ustawia
-  # trigger `cron-shedule` skonfigurowany w UI CircleCI (0 4 5,15,25 * *, galaz
+  # trigger `cron-shedule` skonfigurowany w UI CircleCI (0 4 5,20 * *, galaz
   # master). Nazwa zostaje, bo trigger przekazuje ja doslownie — zmiana wymagalaby
   # rownoczesnej edycji triggera po stronie UI.
   run_manual_nightly_full:
@@ -20,7 +20,7 @@ parameters:
   # bramki przewiduje uruchomienie "recznie przed wysłaniem artykułu do
   # recenzji", a dotad jedynym wejsciem byl trigger `cron-shedule` razem z
   # calym `manual-nightly-full`. Harmonogramu ten parametr nie ma i miec nie
-  # musi — bramka biegnie dalej 3 razy w miesiacu w warstwie L3 tamtego
+  # musi — bramka biegnie dalej 2 razy w miesiacu w warstwie L3 tamtego
   # workflow, z cieplym ccache po build-release-ninja-mydocker.
   run_manual_research_gate:
     type: boolean
@@ -62,7 +62,7 @@ workflows:
     jobs:
       - build-ARM
 
-  # Pelny przebieg: trzy razy w miesiacu z triggera `cron-shedule` albo recznie.
+  # Pelny przebieg: dwa razy w miesiacu z triggera `cron-shedule` albo recznie.
   # Do 2026-08-18 istnial obok blizniaczy workflow `nightly-full` z wlasnym
   # `triggers.schedule` o tym samym cronie — scalony tutaj, zeby jeden harmonogram
   # nie byl zapisany w dwoch miejscach.
@@ -206,26 +206,9 @@ workflows:
           requires:
             - ablation-all-off
 
-  nightly-partial:
-    triggers:
-      - schedule:
-          # 0 19 * * 1
-          # At 19:00 on Monday..
-          cron: "0 19 * * 1"
-          filters:
-            branches:
-              only:
-                - /[Ii]ssue_.*/
-    jobs:
-      - build-release-ninja-mydocker
-      - build-debug-ninja-mydocker:
-          check_skipci: false
-      - build-ARM:
-          filters:
-            branches:
-              only:
-                - /[Ii]ssue_.*/
-
+  # Do 2026-09-13 byl tu `nightly-partial`: co poniedzialek Release, Debug i ARM na kazdej
+  # galezi `issue_*`, takze na juz scalonej. Usuniety dla kosztu - jedynym harmonogramem
+  # jest `cron-shedule` uruchamiajacy `manual-nightly-full`.
 
 executors:
   debian-mydocker:
