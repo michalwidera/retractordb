@@ -1,5 +1,4 @@
-// WYGENEROWANE przez paper-arXiv/profs/gen-oracle.sh - nie edytowac recznie.
-// Rewizja dowodow: 914de916d27ced9d97806f6cc3c9fe210e89d9d8-dirty
+// WYGENEROWANE przez math_proofs/gen-oracle.sh - nie edytowac recznie.
 #pragma once
 // clang-format off
 

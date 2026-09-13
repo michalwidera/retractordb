@@ -1,4 +1,4 @@
-# Powiazanie twierdzen z paper-arXiv/profs/Profs/*.lean z testami silnika.
+# Powiazanie twierdzen z math_proofs/Profs/*.lean z testami silnika.
 # Kazde twierdzenie z Profs ma tu dokladnie jeden wiersz; sprawdza to test/proof_drift.py.
 #
 # plik<TAB>twierdzenie<TAB>status

@@ -70,3 +70,8 @@ test/research_gate/.drift.lock
 # To dowody kompilacji konkretnej rewizji, nie zrodla — do repozytorium nie wchodza.
 test/research_gate/**/corpus_validation/
 test/research_gate/**/raw/
+
+# Dowody Lean (math_proofs/): katalog roboczy Lake to dowiazanie do ~/.cache (link-lake.sh).
+# Wzorzec BEZ koncowego ukosnika - `.lake/` pasuje tylko do katalogu, nie do dowiazania,
+# i test-ci.sh (git ls-files -co --exclude-standard) wrzucilby zerwany link do kontenera.
+.lake

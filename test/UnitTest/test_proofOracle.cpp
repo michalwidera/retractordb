@@ -11,7 +11,7 @@
 
 // ctest -R '^ut_proofOracle' -V
 //
-// Zgodnosc SOperations.hpp z dowodami Lean w paper-arXiv/profs. Nazwa kazdego testu jest nazwa
+// Zgodnosc SOperations.hpp z dowodami Lean w math_proofs. Nazwa kazdego testu jest nazwa
 // twierdzenia (albo definicji z sufiksem _table), ktore sprawdza; powiazanie twierdzen z testami
 // trzyma test/proof_manifest.tsv, a jego kompletnosc i swiezosc tablic sprawdza test proof_drift.
 //

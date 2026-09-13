@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dryft silnika wobec dowodow Lean z paper-arXiv/profs.
+"""Dryft silnika wobec dowodow Lean z math_proofs.
 
 Wartosci sprawdza ut_proofOracle: tablice policzone definicjami z Profs (proofOracle.hpp) i
 wypowiedzi twierdzen przepisane na wlasnosci funkcji z SOperations.hpp. Ten skrypt pilnuje
@@ -83,7 +83,7 @@ def main() -> int:
     }
     stale = sorted(f for f in recorded.keys() | current.keys() if recorded.get(f) != current.get(f))
     for file in stale:
-        problems.append(f"{file}: inny niz przy generowaniu {oracle_path.name} - uruchom profs/gen-oracle.sh")
+        problems.append(f"{file}: inny niz przy generowaniu {oracle_path.name} - uruchom math_proofs/gen-oracle.sh")
 
     engine = [key for key in manifest if key in theorems and manifest[key][0] != "POZA_ZAKRESEM"]
     covered = [key for key in engine if manifest[key][0] == "TEST"]
