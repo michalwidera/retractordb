@@ -219,8 +219,8 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
   std::vector<exprShape> stack;
   stack.reserve(program.size());
 
-  const auto unknown  = exprShapeResult{.status = exprShapeStatus::unknown, .shape = {}};
-  const auto illTyped = exprShapeResult{.status = exprShapeStatus::illTyped, .shape = {}};
+  auto unknown  = exprShapeResult{.status = exprShapeStatus::unknown, .shape = {}};
+  auto illTyped = exprShapeResult{.status = exprShapeStatus::illTyped, .shape = {}};
 
   for (const auto &tk : program) {
     const command_id cmd = tk.getCommandID();
@@ -229,7 +229,11 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
     // expressionEvaluator::eval(). Pusty stos znaczy program bez wartosci, a nie „nie wiadomo".
     exprShape left;
     exprShape right;
-    const int operands = isBinaryShapeOperator(cmd) ? 2 : (cmd == CALL || cmd == CALL2 || cmd == NEGATE || cmd == NOT) ? 1 : 0;
+    int operands = 0;
+    if (isBinaryShapeOperator(cmd))
+      operands = 2;
+    else if (cmd == CALL || cmd == CALL2 || cmd == NEGATE || cmd == NOT)
+      operands = 1;
     if (operands > 0) {
       if (std::cmp_less(stack.size(), operands)) return illTyped;
       right = stack.back();
