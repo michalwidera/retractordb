@@ -252,7 +252,8 @@ assertion down together with the shape assertion. `issue202_hash_shift_e2e` is t
 into `-shape` and `-value`: its one `cmp matched CC` pinned `Val` and `Lat` at the same time, so it could never be
 green under ablation, and disabling it removed the only end-to-end place where the tail divergence between
 `(A>2)#(B>1)` and `(A#B)>3` was visible at all. CI runs this same floor as `ablation-all-off` in layer L3 of
-`manual-nightly-full`, so a skipped local run gets caught within days, not weeks.
+`manual-nightly-full`, which the `cron-shedule` trigger starts on the 5th and 20th of every month, so a skipped local run
+gets caught at the next of those runs — up to about two weeks later, which is why the local run is not optional.
 
 ### Context hygiene
 
