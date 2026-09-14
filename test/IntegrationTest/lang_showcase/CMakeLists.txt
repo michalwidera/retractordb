@@ -1,5 +1,6 @@
 # make install && ctest -R lang_showcase -V
 
+# cmake-format: off
 # Trzeci przyklad ze strony projektu: w jednym malym planie cechy wlasciwe RQL.
 #   core[_]  - dziki indeks, rozwija sie w tyle pol, ile slotow wnosi blok `core@(1,2)`
 #   @(1,2)   - okno AGSE po ciagu wartosci (krok 1, szerokosc 2), stad interwal 1/20
@@ -9,6 +10,7 @@
 #
 # Test -dot pilnuje tez, ze nazwy z `$` wychodza w DOT w cudzyslowie: bez tego
 # `dot` odrzucal plik bledem skladni, a sam wzorzec tekstowy by tego nie wykryl.
+# cmake-format: on
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
@@ -23,7 +25,8 @@ add_test(
 add_test(
   NAME ${TestID}-dot
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND bash -c "set -e && \
+  COMMAND
+    bash -c "set -e && \
     xretractor query.rql -c -d -f -t -s > out.dot && \
     bash ../compare.sh pattern-dot.txt out.dot && \
     dot -Tsvg out.dot -o out.svg")

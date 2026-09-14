@@ -1,0 +1,30 @@
+storage temp
+open ch$0
+size
+desc
+list 7
+open ch$1
+size
+desc
+list 7
+open win
+size
+desc
+list 5
+open peak
+size
+desc
+list 5
+open gap$0
+size
+desc
+list 5
+open gap$1
+size
+desc
+list 5
+open gap$2
+size
+desc
+list 5
+quit

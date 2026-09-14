@@ -1,0 +1,10 @@
+STORAGE 'temp'
+
+DECLARE a INTEGER, b INTEGER STREAM pair, 0.1 FILE 'pairs.txt'
+SELECT pair[_]*10 STREAM ten FROM pair
+SELECT ten[$] STREAM ch[2] FROM ten
+
+DECLARE v INTEGER STREAM single, 0.1 FILE 'singles.txt'
+SELECT * STREAM win FROM single@(1,3)
+SELECT * STREAM peak FROM MAX(win)
+SELECT peak[0]-win[$] STREAM gap[3] FROM peak+win

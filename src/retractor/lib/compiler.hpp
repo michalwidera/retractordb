@@ -61,6 +61,14 @@ struct compiler {
   ///    z wyszukania pola w schematach argumentów. PUSH_ID3 wystawia wyłącznie parser.
   std::map<std::string, std::set<std::string>> namedSourceRefs_;
   std::map<std::string, std::vector<std::string>> generatedStreams_;
+  /// Indeksy pol zwiniete z `$`, czekajace na kontrole zakresu w checkGeneratedFieldIndexes().
+  /// Poza planem, bo plan po expandStreamGenerators() ma byc nie do odroznienia od recznego.
+  struct generatedFieldRef {
+    std::string owner;
+    std::string source;
+    int index;
+  };
+  std::vector<generatedFieldRef> generatedFieldRefs_;
   std::list<field> buildOutputSchema(const std::string &sName1, const std::string &sName2, token &cmd_token);
   [[nodiscard]] std::optional<rdb::rField> sourceFieldAt(const std::string &streamId, int flatIndex) const;
   std::string composeStreamName(const std::string &sName1, const std::string &sName2, const token &cmd);
@@ -72,7 +80,7 @@ struct compiler {
   std::string checkStreamReducerFieldRefs();
   std::string expandStreamGenerators();
   std::string substituteOrdinal(query &instance, int ordinal);
-  std::string validateGeneratedFieldIndex(const std::string &owner, const std::string &source, int index);
+  std::string checkGeneratedFieldIndexes();
   std::string resolveStreamIntervals();
   std::string extractIntermediateStreams();
   std::string expandSchemaWildcards();

@@ -3006,24 +3006,31 @@ bool mentionsOrdinal(const query &q) {
 
 /// Kontrola zakresu indeksu pola dla odwolan pochodzacych z generatora.
 ///
-/// Dziala tylko tam, gdzie szerokosc zrodla jest znana ZARAZ po parsowaniu: dla DECLARE
-/// i dla SELECT-ow z jawna lista pol. Zrodlo zapisane jako `SELECT *` ma pusty schemat az do
-/// expandSchemaWildcards(), wiec tam kontrola jest pomijana — swiadomie, bo przeniesienie
-/// calego przebiegu za rozwijanie gwiazdki zabiloby jego glowna wlasnosc: po ekspansji plan
-/// ma byc nie do odroznienia od recznie rozpisanego, a wiec zadne pozniejsze przebiegi
-/// nie moga o generatorach wiedziec.
+/// Stoi ZA expandSchemaWildcards(), nie w samym expandStreamGenerators(). Do 2026-09-14 stala
+/// w ekspansji i liczyla szerokosc zrodla sprzed rozwiniec: `SELECT core[_]*10 STREAM ten`
+/// ma jedna POZYCJE listy, a dwa pola, a `SELECT * STREAM win FROM core@(1,3)` nad jednopolowym
+/// `core` ma trzy pola, nie jedno. `ten[$]` i `win[$]` odpadaly wiec z komunikatem „has only
+/// 1 element(s)”, choc po rozwinieciu byly poprawne. Pominiecie kontroli dla takich zrodel nie
+/// wchodzilo w gre: indeks faktycznie poza zakresem kompiluje sie wtedy bez slowa do PUSH_ID
+/// za koncem bufora wejsciowego, bo galaz `strumien[k]` w resolveTokenReferences() granicy nie
+/// sprawdza.
+///
+/// Sama ekspansja zostaje pierwszym przebiegiem, a plan po niej nadal jest nie do odroznienia
+/// od recznego: indeksy do sprawdzenia czekaja w generatedFieldRefs_, poza planem.
 ///
 /// Kontrola obejmuje WYLACZNIE indeksy zwiniete z `$`. Literal `a[99]` na czteroelementowym
 /// polu przechodzi tedy tak samo jak dotad — w kompilatorze nie ma dzis zadnej kontroli
 /// zakresu indeksu pola i jej dolozenie jest osobnym zadaniem, nie skutkiem ubocznym tego.
-std::string compiler::validateGeneratedFieldIndex(const std::string &owner, const std::string &source, int index) {
-  if (!coreInstance.exists(source)) return {"OK"};
-  query &src = coreInstance.getQuery(source);
-  if (src.lSchema.empty()) return {"OK"};
-  const int width = src.descriptorStorage().flatElementCount();
-  if (index >= width)
-    return "Stream '" + owner + "' references '" + source + "[" + std::to_string(index) + "]' but '" + source + "' has only " +
-           std::to_string(width) + " element(s)";
+std::string compiler::checkGeneratedFieldIndexes() {
+  for (const auto &[owner, source, index] : generatedFieldRefs_) {
+    // Nie strumien, tylko pole tablicowe (`cell[$]` przy `DECLARE cell INTEGER[4]`) — jego
+    // zakres sprawdza resolveTokenReferences().
+    if (!coreInstance.exists(source)) continue;
+    const int width = coreInstance.getQuery(source).descriptorStorage().flatElementCount();
+    if (index >= width)
+      return "Stream '" + owner + "' references '" + source + "[" + std::to_string(index) + "]' but '" + source + "' has only " +
+             std::to_string(width) + " element(s)";
+  }
   return {"OK"};
 }
 
@@ -3053,8 +3060,7 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
       if (index < 0)
         return "Stream '" + instance.id + "' references '" + parts->first + "[" + std::to_string(index) +
                "]' — field index must not be negative";
-      if (const std::string status = validateGeneratedFieldIndex(instance.id, parts->first, index); status != "OK")
-        return status;
+      generatedFieldRefs_.push_back({instance.id, parts->first, index});
       t = token(PUSH_ID2, parts->first + "[" + std::to_string(index) + "]");
     }
   return {"OK"};
@@ -3190,8 +3196,8 @@ std::string compiler::checkStreamReducerFieldRefs() {
 /// Stoi jako PIERWSZY przebieg kompilacji i to jest jego cala istota. Po nim qTree jest nie do
 /// odroznienia od planu z recznie rozpisanych SELECT-ow, wiec zaden dalszy przebieg, zaden
 /// ksztalt DAG i zaden fragment silnika nie musi o generatorach wiedziec. Cena za to jest
-/// jedna: wszystko, co przebieg chce sprawdzic, musi dac sie sprawdzic PRZED rozwiazaniem
-/// schematow — stad ograniczenie kontroli zakresu opisane przy validateGeneratedFieldIndex().
+/// jedna: to, czego nie da sie sprawdzic PRZED rozwiazaniem schematow, musi poczekac poza
+/// planem — tak jest z kontrola zakresu, opisana przy checkGeneratedFieldIndexes().
 ///
 /// Numer instancji wchodzi w trzy miejsca, wszystkie zapisywane tym samym `$`:
 ///   * indeks pola     `cells[$]`, `cells[23-$]`  — zwijany do literalu,
@@ -3287,6 +3293,7 @@ void compiler::reset() {
   selectSharingScope_.clear();
   namedSourceRefs_.clear();
   generatedStreams_.clear();
+  generatedFieldRefs_.clear();
 }
 
 std::string compiler::compile() {
@@ -3322,6 +3329,10 @@ std::string compiler::compile() {
   if (result != "OK") return result;
 
   result = expandSchemaWildcards();
+  if (result != "OK") return result;
+
+  // Dopiero tu szerokosci zrodel z `[_]`, `*` i `@` sa ostateczne — patrz definicja.
+  result = checkGeneratedFieldIndexes();
   if (result != "OK") return result;
 
   result = resolveStreamIntervals();

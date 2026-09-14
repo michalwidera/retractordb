@@ -2182,6 +2182,59 @@ TEST(xcompiler, rejects_generated_field_index_beyond_source) {
   EXPECT_NE(verdict.find("has only 4 element"), std::string::npos) << verdict;
 }
 
+/// Szerokosc zrodla powstaje dopiero w rozwinieciu: `[_]` daje dwa pola z jednej pozycji listy,
+/// okno `@(1,3)` trzy pola z jednopolowego strumienia. Do 2026-09-14 kontrola zakresu liczyla
+/// szerokosc sprzed rozwiniec i odrzucala oba zapytania z "has only 1 element(s)". Porownanie
+/// z planem recznym, a nie samo "OK", bo liczy sie takze to, ze indeks trafia we wlasciwy slot.
+TEST(xcompiler, generator_index_over_expanded_source_matches_hand_written_plan) {
+  const auto render = [](const std::string &rql) {
+    qTree plan;
+    auto [parseResult, keyword, streamName] = parserRQLString(plan, rql);
+    EXPECT_EQ(parseResult, "OK") << rql;
+    compiler compilerInstance(plan);
+    EXPECT_EQ(compilerInstance.compile(), "OK") << rql;
+    return renderPlan(plan);
+  };
+
+  const std::string indexWildcard = R"(
+        DECLARE a INTEGER, b INTEGER STREAM core, 1/10 FILE 'core.txt'
+        SELECT core[_]*10 STREAM ten FROM core
+      )";
+  EXPECT_EQ(render(indexWildcard + "SELECT ten[$] STREAM ch[2] FROM ten\n"),
+            render(indexWildcard + "SELECT ten[0] STREAM ch$0 FROM ten\n"
+                                   "SELECT ten[1] STREAM ch$1 FROM ten\n"));
+
+  const std::string window = R"(
+        DECLARE a INTEGER STREAM core, 1/10 FILE 'core.txt'
+        SELECT * STREAM win FROM core@(1,3)
+        SELECT * STREAM peak FROM MAX(win)
+      )";
+  EXPECT_EQ(render(window + "SELECT peak[0]-win[$] STREAM gap[3] FROM peak+win\n"),
+            render(window + "SELECT peak[0]-win[0] STREAM gap$0 FROM peak+win\n"
+                            "SELECT peak[0]-win[1] STREAM gap$1 FROM peak+win\n"
+                            "SELECT peak[0]-win[2] STREAM gap$2 FROM peak+win\n"));
+}
+
+/// Przeniesienie kontroli za rozwiniecia nie moze jej zgubic: indeks poza szerokoscia PO
+/// rozwinieciu dalej jest bledem kompilacji. Bez niej zapis przeszedlby po cichu, bo recznie
+/// napisane `ten[2]` kompiluje sie dzis do PUSH_ID za koncem bufora wejsciowego.
+TEST(xcompiler, rejects_generated_field_index_beyond_expanded_source) {
+  const std::string indexWildcard = compileRql(R"(
+        DECLARE a INTEGER, b INTEGER STREAM core, 1/10 FILE 'core.txt'
+        SELECT core[_]*10 STREAM ten FROM core
+        SELECT ten[$] STREAM ch[3] FROM ten
+      )");
+  EXPECT_NE(indexWildcard.find("'ten[2]' but 'ten' has only 2 element"), std::string::npos) << indexWildcard;
+
+  const std::string window = compileRql(R"(
+        DECLARE a INTEGER STREAM core, 1/10 FILE 'core.txt'
+        SELECT * STREAM win FROM core@(1,3)
+        SELECT * STREAM peak FROM MAX(win)
+        SELECT peak[0]-win[$] STREAM gap[5] FROM peak+win
+      )");
+  EXPECT_NE(window.find("'win[3]' but 'win' has only 3 element"), std::string::npos) << window;
+}
+
 /// Wyrazenie moze zejsc ponizej zera, zanim wyjdzie poza zrodlo — osobny komunikat.
 TEST(xcompiler, rejects_negative_generated_field_index) {
   const std::string verdict = compileRql(R"(

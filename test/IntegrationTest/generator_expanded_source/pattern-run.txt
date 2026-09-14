@@ -1,0 +1,69 @@
+7 Record(s)
+4 Byte(s) per record.
+{	INTEGER ch$0_0
+}
+{ ch$0_0:30 }
+{ ch$0_0:80 }
+{ ch$0_0:50 }
+{ ch$0_0:10 }
+{ ch$0_0:60 }
+{ ch$0_0:90 }
+{ ch$0_0:30 }
+7 Record(s)
+4 Byte(s) per record.
+{	INTEGER ch$1_0
+}
+{ ch$1_0:70 }
+{ ch$1_0:20 }
+{ ch$1_0:50 }
+{ ch$1_0:90 }
+{ ch$1_0:40 }
+{ ch$1_0:0 }
+{ ch$1_0:70 }
+5 Record(s)
+12 Byte(s) per record.
+{	INTEGER single_0
+	INTEGER single_1
+	INTEGER single_2
+}
+{ single_0:4 single_1:1 single_2:5 }
+{ single_0:2 single_1:4 single_2:1 }
+{ single_0:8 single_1:2 single_2:4 }
+{ single_0:3 single_1:8 single_2:2 }
+{ single_0:7 single_1:3 single_2:8 }
+5 Record(s)
+8 Byte(s) per record.
+{	RATIONAL max
+}
+{ max:5/1 }
+{ max:4/1 }
+{ max:8/1 }
+{ max:8/1 }
+{ max:8/1 }
+5 Record(s)
+8 Byte(s) per record.
+{	RATIONAL gap$0_0
+}
+{ gap$0_0:1/1 }
+{ gap$0_0:2/1 }
+{ gap$0_0:0/1 }
+{ gap$0_0:5/1 }
+{ gap$0_0:1/1 }
+5 Record(s)
+8 Byte(s) per record.
+{	RATIONAL gap$1_0
+}
+{ gap$1_0:4/1 }
+{ gap$1_0:0/1 }
+{ gap$1_0:6/1 }
+{ gap$1_0:0/1 }
+{ gap$1_0:5/1 }
+5 Record(s)
+8 Byte(s) per record.
+{	RATIONAL gap$2_0
+}
+{ gap$2_0:0/1 }
+{ gap$2_0:3/1 }
+{ gap$2_0:4/1 }
+{ gap$2_0:6/1 }
+{ gap$2_0:0/1 }
