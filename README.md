@@ -45,10 +45,10 @@ install a prebuilt package from the GitHub Releases page.
 Prebuilt packages are published on the
 [GitHub Releases page](https://github.com/michalwidera/retractordb/releases).
 Each release ships a Debian package and a portable tarball, named after the
-project version and the target system, for example (version `0.1.8`):
+project version and the target system, for example (version `0.1.9`):
 
-- `retractordb-0.1.8-Linux.deb`
-- `retractordb-0.1.8-Linux.tar.gz`
+- `retractordb-0.1.9-Linux.deb`
+- `retractordb-0.1.9-Linux.tar.gz`
 
 **Debian / Ubuntu (`.deb`)** — installs binaries into `/usr/bin` and wires up the
 systemd service automatically:
@@ -74,8 +74,8 @@ for the packaged systemd unit details.
 **Portable tarball (`.tar.gz`)** — no service integration, just the binaries:
 
 ```bash
-tar xzf retractordb-0.1.8-Linux.tar.gz
-sudo cp retractordb-0.1.8-Linux/bin/* /usr/local/bin/   # or anywhere on $PATH
+tar xzf retractordb-0.1.9-Linux.tar.gz
+sudo cp retractordb-0.1.9-Linux/bin/* /usr/local/bin/   # or anywhere on $PATH
 ```
 
 After install, verify the three binaries are reachable:
