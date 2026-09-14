@@ -55,7 +55,7 @@ systemd service automatically:
 
 ```bash
 # Download the .deb from the Releases page, then:
-sudo apt install ./retractordb-0.1.7-Linux.deb
+sudo apt install ./retractordb-0.1.9-Linux.deb
 ```
 
 The package `postinst` creates the system user `retractor` and runs
