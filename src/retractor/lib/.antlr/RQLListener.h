@@ -17,6 +17,9 @@ public:
   virtual void enterProg(RQLParser::ProgContext *ctx) = 0;
   virtual void exitProg(RQLParser::ProgContext *ctx) = 0;
 
+  virtual void enterDefaultOption(RQLParser::DefaultOptionContext *ctx) = 0;
+  virtual void exitDefaultOption(RQLParser::DefaultOptionContext *ctx) = 0;
+
   virtual void enterCoption(RQLParser::CoptionContext *ctx) = 0;
   virtual void exitCoption(RQLParser::CoptionContext *ctx) = 0;
 

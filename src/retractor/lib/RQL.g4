@@ -3,8 +3,12 @@ grammar RQL;
 prog                : ( select_statement
                       | declare_statement
                       | compiler_option
+                      | default_statement
                       | rule_statement
                       )+ EOF
+                    ;
+
+default_statement   : DEFAULT VOLATILE # DefaultOption
                     ;
 
 compiler_option     : directive=( ROTATION | STORAGE | SUBSTRAT ) value=( STRING_PROFILE | STRING ) 
@@ -16,8 +20,8 @@ select_statement    : SELECT select_list
                       FROM stream_expression
                       (FILE file_name=STRING)?
                       (retention_from)?
-                      (VOLATILE)?
-                      (STORAGE type_name=TYPE_PROFILE)?
+                      (VOLATILE | PERSISTENT)?
+                      (STORAGE type_name=(TYPE_PROFILE | DEFAULT))?
                     # Select
                     ;
 
@@ -331,6 +335,8 @@ DISPOSABLE:         'DISPOSABLE'|'disposable';
 ONESHOT:            'ONESHOT'|'oneshot';
 HOLD:               'HOLD'|'hold';
 VOLATILE:           'VOLATILE'|'volatile';
+PERSISTENT:         'PERSISTENT'|'persistent';
+DEFAULT:            'DEFAULT'|'default';
 ON:                 'ON'|'on';
 WHEN:               'WHEN'|'when';
 DUMP:               'DUMP'|'dump';
@@ -346,8 +352,8 @@ MAX:                'MAX'|'max';
 AVG:                'AVG'|'avg';
 SUMC:               'SUMC'|'sumc';
 
-TYPE_PROFILE:       'MEMORY'|'memory'|'DEFAULT'|'default'|'DIRECT'|'direct'|'POSIX'|'posix'|'POSIXSHD'|'posixshd'|'GENERIC'|'generic'|'DEVICE'|'device'|'TEXTSOURCE'|'textsource';
-STRING_PROFILE:    '\'' TYPE_PROFILE '\'';
+TYPE_PROFILE:       'MEMORY'|'memory'|'DIRECT'|'direct'|'POSIX'|'posix'|'POSIXSHD'|'posixshd'|'GENERIC'|'generic'|'DEVICE'|'device'|'TEXTSOURCE'|'textsource';
+STRING_PROFILE:    '\'' (TYPE_PROFILE | DEFAULT) '\'';
 
 // UWAGA: `to_integer`, `to_float`, `to_double` i `to_string` mialy tu do 2026-08-30 wlasne
 // tokeny leksera, wiec byly slowami ZASTRZEZONYMI. Teraz leksuja sie jako ID, tak samo jak

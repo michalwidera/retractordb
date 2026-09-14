@@ -607,7 +607,7 @@ TODO: Stream_MAX,MIN,AVG...
 std::string compiler::extractIntermediateStreams() {
   coreInstance.sort();
 
-  auto substratType_C = std::string("DEFAULT");
+  auto substratType_C = std::string(coreInstance.exists(":DEFAULT") ? "MEMORY" : "DEFAULT");
   auto substratTypeIt = std::ranges::find_if(coreInstance,  //
                                              [](const auto &qry) { return qry.id == ":SUBSTRAT"; });
   if (substratTypeIt != std::end(coreInstance)) substratType_C = substratTypeIt->filename;
@@ -2244,7 +2244,7 @@ std::string compiler::validateSubstratNameUniqueness() {
 std::string compiler::shareEquivalentSelectComputations() {
   // Współdziel tylko kosztowne programy pól. Publiczne SELECT-y pozostają
   // osobnymi strumieniami, dzięki czemu zachowują storage, reguły i deskryptory.
-  auto substratType = std::string("DEFAULT");
+  auto substratType = std::string(coreInstance.exists(":DEFAULT") ? "MEMORY" : "DEFAULT");
   auto directiveIt  = std::ranges::find_if(coreInstance, [](const query &qry) { return qry.id == ":SUBSTRAT"; });
   if (directiveIt != coreInstance.end()) substratType = directiveIt->filename;
   std::ranges::transform(substratType, substratType.begin(), ::toupper);

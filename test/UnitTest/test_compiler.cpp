@@ -15,6 +15,7 @@
 
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/exprSimplify.hpp"
+#include "retractor/lib/planSource.hpp"
 #include "retractor/lib/qTree.hpp"
 #include "retractor/lib/RQLParser.hpp"
 
@@ -3497,4 +3498,103 @@ TEST(xcompiler, gating_tan_log_log2_leaves_their_result_type_alone) {
     EXPECT_EQ(plan.getQuery(stream).lSchema.front().field_.rtype, rdb::INTEGER) << stream;
   }
   EXPECT_EQ(plan.getQuery("logOverDouble").lSchema.front().field_.rtype, rdb::DOUBLE);
+}
+
+// Domyslnosc ma dac ten sam plan co jawne VOLATILE, takze dla okien,
+// wspoldzielonych obliczen i instancji generatora. Obie drogi wczytywania.
+TEST(xcompiler, default_volatile_matches_explicit_plan) {
+  for (const bool splitLines : {false, true}) {
+    qTree explicitPlan, defaultPlan;
+    const auto source = [](bool defaults) {
+      const std::string suffix = defaults ? "\n" : " VOLATILE\n";
+      return std::string(defaults ? "DEFAULT VOLATILE\n" : "SUBSTRAT 'memory'\n") +
+             "DECLARE a INTEGER[4] STREAM src, 1 FILE 'a.txt'\n" + "SELECT src[0]*2 STREAM calc FROM src" + suffix +
+             "SELECT calc[0] STREAM out FROM SUMC(calc@(1,3))" + (defaults ? " PERSISTENT\n" : "\n") +
+             "SELECT src[0]*src[0] STREAM sq1 FROM src" + suffix + "SELECT src[0]*src[0] STREAM sq2 FROM src" + suffix +
+             "SELECT src[$]+1 STREAM family[2] FROM src" + suffix;
+    };
+    const auto parse = [splitLines](qTree &plan, const std::string &text) {
+      return splitLines ? parsePlanText(plan, text).status : std::get<0>(parserRQLString(plan, text));
+    };
+    ASSERT_EQ(parse(explicitPlan, source(false)), "OK");
+    ASSERT_EQ(parse(defaultPlan, source(true)), "OK");
+    ASSERT_EQ(compiler(explicitPlan).compile(), "OK");
+    ASSERT_EQ(compiler(defaultPlan).compile(), "OK");
+    EXPECT_EQ(planStreamNames(defaultPlan), planStreamNames(explicitPlan));
+    auto defaultCapacities  = defaultPlan.maxCapacity;
+    auto explicitCapacities = explicitPlan.maxCapacity;
+    std::erase_if(defaultCapacities, [](const auto &entry) { return entry.first.starts_with(":"); });
+    std::erase_if(explicitCapacities, [](const auto &entry) { return entry.first.starts_with(":"); });
+    EXPECT_EQ(defaultCapacities, explicitCapacities);
+    for (auto &q : explicitPlan) {
+      if (q.isCompilerDirective()) continue;
+      auto &actual = defaultPlan.getQuery(q.id);
+      EXPECT_EQ(actual.policy, q.policy) << q.id;
+      EXPECT_EQ(actual.storage_policy, q.storage_policy) << q.id;
+      EXPECT_EQ(actual.rInterval, q.rInterval) << q.id;
+      EXPECT_EQ(actual.logicalOrigin, q.logicalOrigin) << q.id;
+      EXPECT_EQ(actual.startupLatency, q.startupLatency) << q.id;
+      std::ostringstream expectedDesc, actualDesc;
+      expectedDesc << q.descriptorStorage();
+      actualDesc << actual.descriptorStorage();
+      EXPECT_EQ(actualDesc.str(), expectedDesc.str()) << q.id;
+    }
+    EXPECT_GT(defaultPlan.maxCapacity.at("calc"), 1);
+    EXPECT_EQ(defaultPlan.getQuery("out").policy.first, "DEFAULT");
+    EXPECT_EQ(defaultPlan.getQuery("src").policy.first, "DEFAULT");
+  }
+}
+
+TEST(xparser, explicit_storage_overrides_default_without_leaking_to_next_select) {
+  qTree plan;
+  ASSERT_EQ(std::get<0>(parserRQLString(plan, R"(
+    default volatile
+    DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'
+    SELECT * STREAM mem FROM src STORAGE MEMORY
+    SELECT * STREAM disk FROM src persistent
+    SELECT * STREAM normal FROM src STORAGE DEFAULT
+    SELECT * STREAM lower FROM src STORAGE default
+    SELECT * STREAM tmp FROM src
+    SELECT * STREAM explicit_tmp FROM src VOLATILE STORAGE DEFAULT
+  )")),
+            "OK");
+  EXPECT_EQ(plan.getQuery("mem").storage_policy, "MEMORY");
+  for (const auto *id : {"disk", "normal", "lower"}) {
+    EXPECT_EQ(plan.getQuery(id).policy.first, "DEFAULT");
+    EXPECT_EQ(plan.getQuery(id).storage_policy, "DEFAULT");
+  }
+  EXPECT_EQ(plan.getQuery("tmp").policy.first, "MEMORY");
+  EXPECT_EQ(plan.getQuery("explicit_tmp").policy.first, "MEMORY");
+}
+
+TEST(xcompiler, explicit_substrate_profile_overrides_default_in_either_header_order) {
+  for (const auto *header : {"DEFAULT VOLATILE\nSUBSTRAT 'default'\n", "SUBSTRAT 'DEFAULT'\nDEFAULT VOLATILE\n"}) {
+    qTree plan;
+    ASSERT_EQ(parsePlanText(plan, std::string(header) + "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n"
+                                                        "SELECT src[0] STREAM out FROM SUMC(src@(1,3))\n")
+                  .status,
+              "OK");
+    ASSERT_EQ(compiler(plan).compile(), "OK");
+    bool found = false;
+    for (const auto &q : plan) {
+      if (!q.isSubstrat) continue;
+      found = true;
+      EXPECT_EQ(q.policy.first, "DEFAULT");
+    }
+    EXPECT_TRUE(found);
+    EXPECT_EQ(plan.getQuery("out").policy.first, "MEMORY");
+  }
+}
+
+TEST(xparser, rejects_misplaced_duplicate_or_conflicting_persistence) {
+  for (const auto *source :
+       {"DEFAULT VOLATILE\nDEFAULT VOLATILE\n", "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\nDEFAULT VOLATILE\n",
+        "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\nSELECT * STREAM dst FROM src VOLATILE PERSISTENT\n",
+        "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\nSELECT * STREAM dst FROM src PERSISTENT STORAGE MEMORY\n"}) {
+    qTree plan;
+    testing::internal::CaptureStderr();
+    const auto result = parsePlanText(plan, source).status;
+    testing::internal::GetCapturedStderr();
+    EXPECT_NE(result, "OK") << source;
+  }
 }

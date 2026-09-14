@@ -4,7 +4,7 @@
 # Rozni sie od oryginalu wylacznie:
 #   - nazwa pliku zrodlowego ('ecgdata' zamiast 'rec205' — prefiks 2000 probek),
 #   - dyrektywa STORAGE,
-#   - zdjeciem VOLATILE z trzech obserwowanych strumieni (bp_out, mwi, qrs_out),
+#   - PERSISTENT na obserwowanych strumieniach,
 #     bez czego nie powstalby zaden artefakt do porownania ze wzorcem.
 # Zadna z tych roznic nie dotyka operatora okna @ ani sumy strumieni +, czyli
 # wielkosci, ktorych ten test broni.
@@ -18,10 +18,8 @@
 
 STORAGE 'temp'
 
-# Okna wydzielone z klauzuli FROM sa substratami kompilatora, wiec nie obejmuje ich
-# VOLATILE zapytania nadrzednego. 'memory' trzyma je tam, gdzie stalyby nazwane okna
-# w oryginale — w pamieci, a nie w temp/.
-SUBSTRAT 'memory'
+# Domyslnie wyniki i substraty pozostaja w pamieci; PERSISTENT zachowuje artefakty testu.
+DEFAULT VOLATILE
 
 DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 FILE 'ecgdata'
 DECLARE bp_coef INTEGER[25] STREAM bpf, 1 FILE 'bp_coef.txt'
@@ -36,27 +34,27 @@ DECLARE d_coef INTEGER[5] STREAM df, 1 FILE 'd_coef.txt'
 # bajt w bajt, wiec pattern.txt sie nie zmienil.
 
 # Wyodrebnienie kanalu MLII
-SELECT ecg.MLII STREAM mlii FROM ecg VOLATILE
+SELECT ecg.MLII STREAM mlii FROM ecg
 
 # 1. Filtr pasmowoprzepustowy (5-15 Hz) — splot FIR 25-tap
-SELECT mlii[_]*bpf[_] STREAM bp_acc FROM mlii@(1,25)+bpf VOLATILE
-SELECT int(bp_acc[0]/1000) STREAM bp_out FROM SUMC(bp_acc)
+SELECT mlii[_]*bpf[_] STREAM bp_acc FROM mlii@(1,25)+bpf
+SELECT int(bp_acc[0]/1000) STREAM bp_out FROM SUMC(bp_acc) PERSISTENT
 
 # 2. Rozniczkowanie — splot FIR 5-tap
-SELECT bp_out[_]*df[_] STREAM d_acc FROM bp_out@(1,5)+df VOLATILE
-SELECT int(d_acc[0]) STREAM d_out FROM SUMC(d_acc) VOLATILE
+SELECT bp_out[_]*df[_] STREAM d_acc FROM bp_out@(1,5)+df
+SELECT int(d_acc[0]) STREAM d_out FROM SUMC(d_acc)
 
 # 3. Kwadrat (dzielenie /1000 zapobiega przepelnieniu int32)
-SELECT d_out[0]^2/1000 STREAM sq_out FROM d_out VOLATILE
+SELECT d_out[0]^2/1000 STREAM sq_out FROM d_out
 
 # 4. Calkowanie w oknie ruchomym 30 probek (~83 ms)
-SELECT int(sq_out[0]) STREAM mwi FROM AVG(sq_out@(1,30))
+SELECT int(sq_out[0]) STREAM mwi FROM AVG(sq_out@(1,30)) PERSISTENT
 
 # 5. Prog adaptacyjny — srednia ruchoma 180 probek (0.5 s)
-SELECT int(mwi[0]) STREAM mwi_thr FROM AVG(mwi@(1,180)) VOLATILE
+SELECT int(mwi[0]) STREAM mwi_thr FROM AVG(mwi@(1,180))
 
 # Wyjscie: MLII wycentrowane, obwiednia x5, sygnal detekcji x5
-SELECT mlii[0]-900, mwi[0]*5, (mwi[0]-mwi_thr[0]*2)*5 STREAM qrs_out FROM mlii+mwi+mwi_thr
+SELECT mlii[0]-900, mwi[0]*5, (mwi[0]-mwi_thr[0]*2)*5 STREAM qrs_out FROM mlii+mwi+mwi_thr PERSISTENT
 
 # 6. Zdziesiatkowana obwiednia szczytowa filtru pasmowego (~51,4 Hz)
 #    — WEZEL DODANY WZGLEDEM ORYGINALU.
@@ -72,4 +70,4 @@ SELECT mlii[0]-900, mwi[0]*5, (mwi[0]-mwi_thr[0]*2)*5 STREAM qrs_out FROM mlii+m
 # tylko trzy (calkowita srednia kwadratow podzielonych przez 1000) — po
 # zdziesiatkowaniu mwi wzorzec rozrozniałby przesuniecie wylacznie liczba
 # rekordow, nie trescia.
-SELECT int(bp_out[0]) STREAM bp_dec FROM MAX(bp_out@(7,-21))
+SELECT int(bp_out[0]) STREAM bp_dec FROM MAX(bp_out@(7,-21)) PERSISTENT

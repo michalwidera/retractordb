@@ -11,7 +11,7 @@ syn keyword rqlKey          SELECT select STREAM stream FROM from DECLARE declar
 syn keyword rqlKey          FILE file VOLATILE volatile RULE rule ON on
 syn keyword rqlKey          WHEN when DO do DUMP dump TO to SYSTEM system
 syn keyword rqlKey          DISPOSABLE disposable ONESHOT oneshot HOLD hold
-syn keyword rqlKey          RETENTION retention
+syn keyword rqlKey          RETENTION retention PERSISTENT persistent
 
 " Compiler option directives
 syn keyword rqlDirective    STORAGE storage ROTATION rotation SUBSTRAT substrat

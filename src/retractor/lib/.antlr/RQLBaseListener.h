@@ -19,6 +19,9 @@ public:
   virtual void enterProg(RQLParser::ProgContext * /*ctx*/) override { }
   virtual void exitProg(RQLParser::ProgContext * /*ctx*/) override { }
 
+  virtual void enterDefaultOption(RQLParser::DefaultOptionContext * /*ctx*/) override { }
+  virtual void exitDefaultOption(RQLParser::DefaultOptionContext * /*ctx*/) override { }
+
   virtual void enterCoption(RQLParser::CoptionContext * /*ctx*/) override { }
   virtual void exitCoption(RQLParser::CoptionContext * /*ctx*/) override { }
 

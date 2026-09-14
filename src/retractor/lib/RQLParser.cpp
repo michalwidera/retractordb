@@ -477,7 +477,10 @@ class ParserListener : public RQLBaseListener {
     }
 
     qry.lProgram = program;
-    if (ctx->VOLATILE() != nullptr) {
+    // Domyslnosc jest w planie, bo plik moze byc parsowany po jednej instrukcji.
+    // Jawna polityka SELECT wygrywa; DECLARE nie dziedziczy tego ustawienia.
+    const bool inheritVolatile = coreInstance.exists(":DEFAULT") && ctx->PERSISTENT() == nullptr && ctx->STORAGE() == nullptr;
+    if (ctx->VOLATILE() != nullptr || inheritVolatile) {
       qry.policy = std::make_pair("MEMORY", 1);
     }
 
@@ -495,11 +498,14 @@ class ParserListener : public RQLBaseListener {
       qry.storage_policy = ctx->type_name->getText();
       std::ranges::transform(qry.storage_policy, qry.storage_policy.begin(), ::toupper);  // to upper case
     }
+    if (ctx->PERSISTENT() != nullptr && qry.storage_policy == "MEMORY")
+      reportSemanticError("PERSISTENT conflicts with STORAGE MEMORY");
 
     coreInstance.push_back(qry);
     program.clear();
     qry.reset();
-    fieldCount = 0;
+    qry.storage_policy = "DEFAULT";
+    fieldCount         = 0;
   }
 
   void exitRetention(RQLParser::RetentionContext *ctx) override {
@@ -567,6 +573,21 @@ class ParserListener : public RQLBaseListener {
     // This removes ''
     systemCommand.erase(systemCommand.size() - 1);
     systemCommand.erase(0, 1);
+  }
+
+  void exitDefaultOption(RQLParser::DefaultOptionContext *ctx) override {
+    if (coreInstance.exists(":DEFAULT")) {
+      reportSemanticError("DEFAULT VOLATILE may occur only once");
+      return;
+    }
+    if (std::ranges::any_of(coreInstance, [](const query &q) { return !q.isCompilerDirective(); })) {
+      reportSemanticError("DEFAULT VOLATILE must precede DECLARE, SELECT and RULE");
+      return;
+    }
+    query option;
+    option.id       = ":DEFAULT";
+    option.filename = "VOLATILE";
+    coreInstance.push_back(option);
   }
 
   void exitCoption(RQLParser::CoptionContext *ctx) override {

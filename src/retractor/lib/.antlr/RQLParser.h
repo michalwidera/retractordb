@@ -16,26 +16,27 @@ public:
     INTEGER_T = 8, FLOAT_T = 9, DOUBLE_T = 10, SELECT = 11, STREAM = 12, 
     FROM = 13, DECLARE = 14, RETENTION = 15, FILE = 16, STORAGE = 17, ROTATION = 18, 
     SUBSTRAT = 19, RULE = 20, DISPOSABLE = 21, ONESHOT = 22, HOLD = 23, 
-    VOLATILE = 24, ON = 25, WHEN = 26, DUMP = 27, SYSTEM = 28, DO = 29, 
-    TO = 30, AND_C = 31, OR_C = 32, NOT_C = 33, MIN = 34, MAX = 35, AVG = 36, 
-    SUMC = 37, TYPE_PROFILE = 38, STRING_PROFILE = 39, ID = 40, STRING = 41, 
-    FLOAT = 42, DECIMAL = 43, REAL = 44, IS_EQ = 45, IS_NQ = 46, IS_GR = 47, 
-    IS_LS = 48, IS_GE = 49, IS_LE = 50, EXCLAMATION = 51, DOUBLE_BAR = 52, 
-    DOT = 53, UNDERLINE = 54, AT = 55, SHARP = 56, AND = 57, MOD = 58, DOLLAR = 59, 
-    COMMA = 60, SEMI = 61, COLON = 62, DOUBLE_COLON = 63, STAR = 64, DIVIDE = 65, 
-    PLUS = 66, MINUS = 67, BIT_NOT = 68, BIT_OR = 69, BIT_XOR = 70, SPACE = 71, 
-    COMMENT = 72, LINE_COMMENT2 = 73
+    VOLATILE = 24, PERSISTENT = 25, DEFAULT = 26, ON = 27, WHEN = 28, DUMP = 29, 
+    SYSTEM = 30, DO = 31, TO = 32, AND_C = 33, OR_C = 34, NOT_C = 35, MIN = 36, 
+    MAX = 37, AVG = 38, SUMC = 39, TYPE_PROFILE = 40, STRING_PROFILE = 41, 
+    ID = 42, STRING = 43, FLOAT = 44, DECIMAL = 45, REAL = 46, IS_EQ = 47, 
+    IS_NQ = 48, IS_GR = 49, IS_LS = 50, IS_GE = 51, IS_LE = 52, EXCLAMATION = 53, 
+    DOUBLE_BAR = 54, DOT = 55, UNDERLINE = 56, AT = 57, SHARP = 58, AND = 59, 
+    MOD = 60, DOLLAR = 61, COMMA = 62, SEMI = 63, COLON = 64, DOUBLE_COLON = 65, 
+    STAR = 66, DIVIDE = 67, PLUS = 68, MINUS = 69, BIT_NOT = 70, BIT_OR = 71, 
+    BIT_XOR = 72, SPACE = 73, COMMENT = 74, LINE_COMMENT2 = 75
   };
 
   enum {
-    RuleProg = 0, RuleCompiler_option = 1, RuleSelect_statement = 2, RuleDeclare_statement = 3, 
-    RuleRule_statement = 4, RuleDumppart = 5, RuleSystempart = 6, RuleRational_se = 7, 
-    RuleRetention_from = 8, RuleFraction_rule = 9, RuleField_declaration = 10, 
-    RuleField_type = 11, RuleSelect_list = 12, RuleField_id = 13, RuleUnary_op_expression = 14, 
-    RuleAsterisk = 15, RuleExpression = 16, RuleLogic = 17, RuleExpression_logic = 18, 
-    RuleTerm_logic = 19, RuleExpression_factor = 20, RuleTerm = 21, RuleStream_expression = 22, 
-    RuleStream_factor = 23, RuleGen_index = 24, RuleAgregator = 25, RuleStream_fn_call = 26, 
-    RuleWindow_agg = 27, RuleFunction_call = 28
+    RuleProg = 0, RuleDefault_statement = 1, RuleCompiler_option = 2, RuleSelect_statement = 3, 
+    RuleDeclare_statement = 4, RuleRule_statement = 5, RuleDumppart = 6, 
+    RuleSystempart = 7, RuleRational_se = 8, RuleRetention_from = 9, RuleFraction_rule = 10, 
+    RuleField_declaration = 11, RuleField_type = 12, RuleSelect_list = 13, 
+    RuleField_id = 14, RuleUnary_op_expression = 15, RuleAsterisk = 16, 
+    RuleExpression = 17, RuleLogic = 18, RuleExpression_logic = 19, RuleTerm_logic = 20, 
+    RuleExpression_factor = 21, RuleTerm = 22, RuleStream_expression = 23, 
+    RuleStream_factor = 24, RuleGen_index = 25, RuleAgregator = 26, RuleStream_fn_call = 27, 
+    RuleWindow_agg = 28, RuleFunction_call = 29
   };
 
   explicit RQLParser(antlr4::TokenStream *input);
@@ -56,6 +57,7 @@ public:
 
 
   class ProgContext;
+  class Default_statementContext;
   class Compiler_optionContext;
   class Select_statementContext;
   class Declare_statementContext;
@@ -96,6 +98,8 @@ public:
     Declare_statementContext* declare_statement(size_t i);
     std::vector<Compiler_optionContext *> compiler_option();
     Compiler_optionContext* compiler_option(size_t i);
+    std::vector<Default_statementContext *> default_statement();
+    Default_statementContext* default_statement(size_t i);
     std::vector<Rule_statementContext *> rule_statement();
     Rule_statementContext* rule_statement(size_t i);
 
@@ -105,6 +109,31 @@ public:
   };
 
   ProgContext* prog();
+
+  class  Default_statementContext : public antlr4::ParserRuleContext {
+  public:
+    Default_statementContext(antlr4::ParserRuleContext *parent, size_t invokingState);
+   
+    Default_statementContext() = default;
+    void copyFrom(Default_statementContext *context);
+    using antlr4::ParserRuleContext::copyFrom;
+
+    virtual size_t getRuleIndex() const override;
+
+   
+  };
+
+  class  DefaultOptionContext : public Default_statementContext {
+  public:
+    DefaultOptionContext(Default_statementContext *ctx);
+
+    antlr4::tree::TerminalNode *DEFAULT();
+    antlr4::tree::TerminalNode *VOLATILE();
+    virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
+    virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
+  };
+
+  Default_statementContext* default_statement();
 
   class  Compiler_optionContext : public antlr4::ParserRuleContext {
   public:
@@ -165,11 +194,13 @@ public:
     antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *FILE();
     Retention_fromContext *retention_from();
-    antlr4::tree::TerminalNode *VOLATILE();
     antlr4::tree::TerminalNode *STORAGE();
     antlr4::tree::TerminalNode *DECIMAL();
     antlr4::tree::TerminalNode *STRING();
+    antlr4::tree::TerminalNode *VOLATILE();
+    antlr4::tree::TerminalNode *PERSISTENT();
     antlr4::tree::TerminalNode *TYPE_PROFILE();
+    antlr4::tree::TerminalNode *DEFAULT();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };

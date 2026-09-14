@@ -59,6 +59,14 @@ diff shape-pattern.txt shape.txt || {
 # znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
 xretractor query.rql -r -k -m "$kBudget" -f > run.out 2> run.err
 
+# DEFAULT VOLATILE ma zachowac tylko cztery jawnie utrwalane wyniki.
+for stream in mlii bp_acc d_acc d_out sq_out mwi_thr; do
+  [ ! -e "temp/$stream" ] || {
+    echo "ecg_qrs: domyslnie ulotny strumien $stream zostal zapisany na dysku"
+    exit 1
+  }
+done
+
 for pair in $kExpected; do
   stream=${pair%%:*}
   want=${pair##*:}

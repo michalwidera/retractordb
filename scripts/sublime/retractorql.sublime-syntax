@@ -20,7 +20,7 @@ scope: source.rql
 contexts:
   main:
     # RQL statement keywords
-    - match: \b(SELECT|select|STREAM|stream|FROM|from|DECLARE|declare|FILE|file|VOLATILE|volatile|RULE|rule|ON|on|WHEN|when|DO|do|DUMP|dump|TO|to|SYSTEM|system|DISPOSABLE|disposable|ONESHOT|oneshot|HOLD|hold|RETENTION|retention)\b
+    - match: \b(SELECT|select|STREAM|stream|FROM|from|DECLARE|declare|FILE|file|VOLATILE|volatile|PERSISTENT|persistent|RULE|rule|ON|on|WHEN|when|DO|do|DUMP|dump|TO|to|SYSTEM|system|DISPOSABLE|disposable|ONESHOT|oneshot|HOLD|hold|RETENTION|retention)\b
       scope: keyword.control.rql
     # Compiler option directives
     - match: \b(STORAGE|storage|ROTATION|rotation|SUBSTRAT|substrat)\b
