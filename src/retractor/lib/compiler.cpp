@@ -1362,7 +1362,25 @@ std::string compiler::localizeFieldOffsets() {
       for (auto &t : f.lProgram) {          // for each token in query field - do:
         if (t.getCommandID() == PUSH_ID) {  // fix only PUSH_ID tokens
           auto [schema, offset] = std::get<std::pair<std::string, int>>(t.getVT());
-          if (schema != q.id) t = token(PUSH_ID, std::make_pair(q.id, offsetMap[q.id][schema] + offset));
+          if (schema == q.id) continue;
+          // Offset znamy tylko dla zrodel z FROM i zrodel osiagalnych przez substraty. Do
+          // 2026-09-14 brakujacy klucz operator[] wstawial z zerem: `core1[0]` przy `FROM merged`
+          // (merged = core0 + core1) czytalo po cichu `core0.a`. Zapytanie uzytkownika ma wlasny
+          // takt i bufor, wiec pozycji jego zrodel w buforze wejsciowym nie ma czym wyznaczyc.
+          const auto &offsets = offsetMap[q.id];
+          const auto base     = offsets.find(schema);
+          if (base == offsets.end()) {
+            const auto refs = namedSourceRefs_.find(q.id);
+            if (refs == namedSourceRefs_.end() || !refs->second.contains(schema))
+              FatalError("compiler: stream '{}' holds a compiler-generated reference to '{}' outside its FROM clause", q.id,
+                         schema);
+            return std::format(
+                "Stream '{}' refers to '{}', which is not in its FROM clause. A field list reads only the streams "
+                "named in FROM: refer to the field by its position in the record of a stream in FROM, or move the "
+                "reference to a query whose FROM names '{}'.",
+                q.id, schema, schema);
+          }
+          t = token(PUSH_ID, std::make_pair(q.id, base->second + offset));
         }
       }
     }
