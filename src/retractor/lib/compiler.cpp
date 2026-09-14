@@ -2663,8 +2663,21 @@ bool copiesOperandSchema(const query &q) {
 /// `dropNeutralOperand`), wiec deskryptor nie zalezy ani od `RDB_OPT_SIMPLIFY_EXPRESSIONS`,
 /// ani od tego, ktory to raz plan przechodzi przez kompilator.
 std::string compiler::inferFieldShapes() {
-  auto shapeOfField = [this](const std::string &streamId, const int flatIndex) -> std::optional<exprShape> {
-    const auto sourceField = sourceFieldAt(streamId, flatIndex);
+  // Zapytanie biezaco wnioskowane i jego rekord FROM. Rekord liczony od nowa w kazdej rundzie,
+  // bo typy zrodel moga sie miedzy rundami zmienic.
+  std::string currentId;
+  rdb::Descriptor inputRecord;
+  auto shapeOfField = [this, &currentId, &inputRecord](const std::string &streamId,
+                                                       const int flatIndex) -> std::optional<exprShape> {
+    // `q.id[k]` w programie pola znaczy „slot k MOJEGO payloadu wejsciowego" (patrz
+    // localizeFieldOffsets()), a nie pole k wlasnego wyjscia, ktore czytaloby sourceFieldAt().
+    // Wejscie to query::descriptorFrom() — z niego streamInstance buduje inputPayload.
+    const auto sourceField = [&]() -> std::optional<rdb::rField> {
+      if (streamId != currentId) return sourceFieldAt(streamId, flatIndex);
+      const auto position = inputRecord.flatIndexToDescriptorPosition(flatIndex);
+      if (!position.has_value()) return std::nullopt;
+      return inputRecord[static_cast<size_t>(position->first)];
+    }();
     if (!sourceField.has_value()) return std::nullopt;
     // NULLTYPE i pola konfiguracyjne deskryptora zajmuja pozycje, ale nie sa wartosciami.
     if (sourceField->rtype > rdb::STRING) return std::nullopt;
@@ -2679,6 +2692,8 @@ std::string compiler::inferFieldShapes() {
     bool changed = false;
     for (auto &q : coreInstance) {
       if (q.isCompilerDirective() || q.isDeclaration() || !copiesOperandSchema(q)) continue;
+      currentId   = q.id;
+      inputRecord = q.descriptorFrom(coreInstance);
 
       // NAJPIERW grupy okien, bo od ich typu zalezy ksztalt pol, ktore je czytaja.
       //

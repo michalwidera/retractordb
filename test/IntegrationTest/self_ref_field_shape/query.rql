@@ -1,0 +1,16 @@
+# Odwolanie WLASNA nazwa (`merged[k]`) nad FROM o roznych typach pol: `merged[0]` to `core0.a`
+# (BYTE), `merged[2]` to `core1.c` (INTEGER). Przyklad z rozdzialu "Aliasowanie" dokumentacji.
+
+STORAGE 'temp'
+
+DECLARE a BYTE, b INTEGER \
+STREAM core0, 0.1 \
+FILE 'sensor_a.txt'
+
+DECLARE c INTEGER, d FLOAT \
+STREAM core1, 0.2 \
+FILE 'sensor_b.txt'
+
+SELECT merged[0], merged[2], core0[0], core1[0] \
+STREAM merged \
+FROM core0 + core1
