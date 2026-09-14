@@ -1040,7 +1040,9 @@ std::string compiler::expandIndexWildcards(query &q) {
 /// kompilatora, a inne wywróceniem procesu z tekstem wyjątku — mimo że jedne i drugie są
 /// zwyczajną pomyłką w zapisie zapytania, a nie awarią silnika. FatalError zostaje tam, gdzie
 /// był: sygnalizuje niezgodność gramatyki z kompilatorem, czyli błąd WEWNĘTRZNY.
-std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &q) {
+///
+/// `ruleName` pusty — program pola; niepusty — warunek tej reguly.
+std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &q, const std::string &ruleName) {
   for (auto &t : lProgram) {  // for each token in query field
     const command_id cmd(t.getCommandID());
     const std::string text(t.getStr_());
@@ -1076,7 +1078,40 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
 
           // `strumien[k]` — pozycja PŁASKA w rekordzie źródła. W tej postaci buildOutputSchema()
           // wystawia też schematy substratów i rozwinięcie `SELECT *`.
+          //
+          // Górna granica NIE jest szerokością strumienia `name`. Do 2026-09-14 granicy nie było
+          // wcale: `ten[5]` nad dwupolowym `ten` kompilowało się do PUSH_ID za końcem bufora
+          // wejściowego i wywracało serwis przy pierwszym rekordzie (`payload: flat position out
+          // of range`). Szerokość strumienia odrzuciłaby jednak poprawne plany: schemat okna
+          // `core@(1,3)` wystawia `core[2]` nad jednopolowym `core`, a `acc[0]` przy
+          // `FROM SUMC(acc)` ma jeden slot, choć `acc` ma ich pięć. Granicą jest więc liczba
+          // slotów, które odwołanie może przeczytać:
+          //  * obcy strumień na liście pól — jego rozpiętość w FROM, ta sama co dla `[_]`;
+          //  * własna nazwa na liście pól — rekord wejściowy (localizeFieldOffsets() jej nie
+          //    przesuwa, więc indeks wskazuje bufor FROM, nie wyjście);
+          //  * własna nazwa w warunku reguły — rekord wyjściowy, na którym liczy ewaluator.
+          // Obcej nazwy w regule nie ograniczamy, bo odrzuca ją resolveFieldReferences().
+          // Rozpiętość nieznana (nazwa spoza FROM albo schowana za węzłem mieszającym sloty)
+          // zostaje bez kontroli — pierwszy przypadek odrzuca localizeFieldOffsets().
+          //
+          // To jedyne miejsce kontroli także dla generatora: `ten[$]` jest tu już zwykłym
+          // `ten[2]`, więc komunikat jest identyczny z zapisem ręcznym.
           if (coreInstance.exists(name)) {
+            if (!ruleName.empty()) {
+              const int width = q.descriptorStorage().flatElementCount();
+              if (name == q.id && offset1 >= width)
+                return std::format(
+                    "Stream '{}': rule '{}' reads the record of '{}', which has {} element(s), so '{}' is out of range", q.id,
+                    ruleName, q.id, width, text);
+            } else if (name == q.id) {
+              const int width = q.descriptorFrom(coreInstance).flatElementCount();
+              if (offset1 >= width)
+                return std::format("Stream '{}': the FROM record of '{}' has {} element(s), so '{}' is out of range", q.id, q.id,
+                                   width, text);
+            } else if (const auto span = sourceSpanInFrom(q, name); span && offset1 >= *span) {
+              return std::format("Stream '{}': stream '{}' has {} element(s) in its FROM clause, so '{}' is out of range", q.id,
+                                 name, *span, text);
+            }
             t = token(PUSH_ID, std::make_pair(name, offset1));
             break;
           }
@@ -1198,11 +1233,11 @@ std::string compiler::resolveFieldReferences() {
       FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
     }
     for (auto &f : q.lSchema) {  // for each field in query
-      std::string result{resolveTokenReferences(f.lProgram, q)};
+      std::string result{resolveTokenReferences(f.lProgram, q, "")};
       if (result != "OK") return result;
     }  // end for each field in query
     for (auto &r : q.lRules) {  // for each rule in query
-      std::string result{resolveTokenReferences(r.condition, q)};
+      std::string result{resolveTokenReferences(r.condition, q, r.name)};
       if (result != "OK") return result;
       // Warunek reguly ewaluator liczy na payloadzie WYJSCIOWYM tego strumienia
       // (streamInstance::constructRulesAndUpdate) i bierze z tokenu wylacznie indeks — nazwa
@@ -3004,36 +3039,6 @@ bool mentionsOrdinal(const query &q) {
 }
 }  // namespace
 
-/// Kontrola zakresu indeksu pola dla odwolan pochodzacych z generatora.
-///
-/// Stoi ZA expandSchemaWildcards(), nie w samym expandStreamGenerators(). Do 2026-09-14 stala
-/// w ekspansji i liczyla szerokosc zrodla sprzed rozwiniec: `SELECT core[_]*10 STREAM ten`
-/// ma jedna POZYCJE listy, a dwa pola, a `SELECT * STREAM win FROM core@(1,3)` nad jednopolowym
-/// `core` ma trzy pola, nie jedno. `ten[$]` i `win[$]` odpadaly wiec z komunikatem „has only
-/// 1 element(s)”, choc po rozwinieciu byly poprawne. Pominiecie kontroli dla takich zrodel nie
-/// wchodzilo w gre: indeks faktycznie poza zakresem kompiluje sie wtedy bez slowa do PUSH_ID
-/// za koncem bufora wejsciowego, bo galaz `strumien[k]` w resolveTokenReferences() granicy nie
-/// sprawdza.
-///
-/// Sama ekspansja zostaje pierwszym przebiegiem, a plan po niej nadal jest nie do odroznienia
-/// od recznego: indeksy do sprawdzenia czekaja w generatedFieldRefs_, poza planem.
-///
-/// Kontrola obejmuje WYLACZNIE indeksy zwiniete z `$`. Literal `a[99]` na czteroelementowym
-/// polu przechodzi tedy tak samo jak dotad — w kompilatorze nie ma dzis zadnej kontroli
-/// zakresu indeksu pola i jej dolozenie jest osobnym zadaniem, nie skutkiem ubocznym tego.
-std::string compiler::checkGeneratedFieldIndexes() {
-  for (const auto &[owner, source, index] : generatedFieldRefs_) {
-    // Nie strumien, tylko pole tablicowe (`cell[$]` przy `DECLARE cell INTEGER[4]`) — jego
-    // zakres sprawdza resolveTokenReferences().
-    if (!coreInstance.exists(source)) continue;
-    const int width = coreInstance.getQuery(source).descriptorStorage().flatElementCount();
-    if (index >= width)
-      return "Stream '" + owner + "' references '" + source + "[" + std::to_string(index) + "]' but '" + source + "' has only " +
-             std::to_string(width) + " element(s)";
-  }
-  return {"OK"};
-}
-
 /// Podstawia numer instancji w jednej kopii szablonu generatora.
 ///
 /// Po tym kroku po `$` nie ma w kopii sladu: PUSH_GENIDX staje sie zwyklym PUSH_VAL,
@@ -3060,7 +3065,6 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
       if (index < 0)
         return "Stream '" + instance.id + "' references '" + parts->first + "[" + std::to_string(index) +
                "]' — field index must not be negative";
-      generatedFieldRefs_.push_back({instance.id, parts->first, index});
       t = token(PUSH_ID2, parts->first + "[" + std::to_string(index) + "]");
     }
   return {"OK"};
@@ -3195,9 +3199,9 @@ std::string compiler::checkStreamReducerFieldRefs() {
 ///
 /// Stoi jako PIERWSZY przebieg kompilacji i to jest jego cala istota. Po nim qTree jest nie do
 /// odroznienia od planu z recznie rozpisanych SELECT-ow, wiec zaden dalszy przebieg, zaden
-/// ksztalt DAG i zaden fragment silnika nie musi o generatorach wiedziec. Cena za to jest
-/// jedna: to, czego nie da sie sprawdzic PRZED rozwiazaniem schematow, musi poczekac poza
-/// planem — tak jest z kontrola zakresu, opisana przy checkGeneratedFieldIndexes().
+/// ksztalt DAG i zaden fragment silnika nie musi o generatorach wiedziec. Dotyczy to takze
+/// kontroli zakresu indeksu pola: sprawdza go resolveTokenReferences() dla kazdego `strumien[k]`,
+/// bez znaczenia, czy napisal go czlowiek, czy zwinal go `$`.
 ///
 /// Numer instancji wchodzi w trzy miejsca, wszystkie zapisywane tym samym `$`:
 ///   * indeks pola     `cells[$]`, `cells[23-$]`  — zwijany do literalu,
@@ -3293,7 +3297,6 @@ void compiler::reset() {
   selectSharingScope_.clear();
   namedSourceRefs_.clear();
   generatedStreams_.clear();
-  generatedFieldRefs_.clear();
 }
 
 std::string compiler::compile() {
@@ -3329,10 +3332,6 @@ std::string compiler::compile() {
   if (result != "OK") return result;
 
   result = expandSchemaWildcards();
-  if (result != "OK") return result;
-
-  // Dopiero tu szerokosci zrodel z `[_]`, `*` i `@` sa ostateczne — patrz definicja.
-  result = checkGeneratedFieldIndexes();
   if (result != "OK") return result;
 
   result = resolveStreamIntervals();

@@ -95,7 +95,7 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
         std::ranges::replace(name, '{', '/');
         std::ranges::replace(name, '}', '/');
         xout << name;
-        std::cout << "(" << GetStringdescFld(f.field_.rtype) << ")";
+        xout << "(" << GetStringdescFld(f.field_.rtype) << ")";
       }
       xout << "}";
     }  // if ( bShowFileds ) - end of fields in stream

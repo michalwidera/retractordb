@@ -93,7 +93,9 @@ set_tests_properties(ut_dataModel-compare
                      PROPERTIES DEPENDS "ut_dataModel-compile;ut_dataModel")
 
 # ut_ipcServer kasuje globalne nazwy IPC (segment, kolejka komend, muteks mapy),
-# wiec nie moze biec obok testu, ktory ich uzywa.
+# wiec nie moze biec obok testu, ktory ich uzywa. ut_ipcClient przy `ctest -j 8`
+# rzucal boost::interprocess_exception::library_error (2026-09-14), a
+# samodzielnie przechodzil; przyczyny nie badano.
 set_tests_properties(
   ut_rdb
   ut_xqry
@@ -102,4 +104,5 @@ set_tests_properties(
   ut_dataModel-compare
   ut_soperations
   ut_ipcServer
+  ut_ipcClient
   PROPERTIES RUN_SERIAL TRUE)

@@ -2171,15 +2171,15 @@ TEST(xcompiler, rejects_zero_sized_generator) {
   EXPECT_NE(verdict.find("positive size"), std::string::npos) << verdict;
 }
 
-/// Zwiniety indeks musi miescic sie w zrodle. Kontrola dziala, bo szerokosc DECLARE jest
-/// znana juz po parsowaniu.
+/// Zwiniety indeks musi miescic sie w zrodle.
 TEST(xcompiler, rejects_generated_field_index_beyond_source) {
   const std::string verdict = compileRql(R"(
         DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
         SELECT cells[$] STREAM cell[9] FROM cells
       )");
   EXPECT_NE(verdict, "OK");
-  EXPECT_NE(verdict.find("has only 4 element"), std::string::npos) << verdict;
+  EXPECT_NE(verdict.find("'cells' has 4 element(s) in its FROM clause, so 'cells[4]' is out of range"), std::string::npos)
+      << verdict;
 }
 
 /// Szerokosc zrodla powstaje dopiero w rozwinieciu: `[_]` daje dwa pola z jednej pozycji listy,
@@ -2215,16 +2215,15 @@ TEST(xcompiler, generator_index_over_expanded_source_matches_hand_written_plan) 
                             "SELECT peak[0]-win[2] STREAM gap$2 FROM peak+win\n"));
 }
 
-/// Przeniesienie kontroli za rozwiniecia nie moze jej zgubic: indeks poza szerokoscia PO
-/// rozwinieciu dalej jest bledem kompilacji. Bez niej zapis przeszedlby po cichu, bo recznie
-/// napisane `ten[2]` kompiluje sie dzis do PUSH_ID za koncem bufora wejsciowego.
+/// Indeks poza szerokoscia PO rozwinieciu dalej jest bledem kompilacji.
 TEST(xcompiler, rejects_generated_field_index_beyond_expanded_source) {
   const std::string indexWildcard = compileRql(R"(
         DECLARE a INTEGER, b INTEGER STREAM core, 1/10 FILE 'core.txt'
         SELECT core[_]*10 STREAM ten FROM core
         SELECT ten[$] STREAM ch[3] FROM ten
       )");
-  EXPECT_NE(indexWildcard.find("'ten[2]' but 'ten' has only 2 element"), std::string::npos) << indexWildcard;
+  EXPECT_NE(indexWildcard.find("'ten' has 2 element(s) in its FROM clause, so 'ten[2]' is out of range"), std::string::npos)
+      << indexWildcard;
 
   const std::string window = compileRql(R"(
         DECLARE a INTEGER STREAM core, 1/10 FILE 'core.txt'
@@ -2232,7 +2231,109 @@ TEST(xcompiler, rejects_generated_field_index_beyond_expanded_source) {
         SELECT * STREAM peak FROM MAX(win)
         SELECT peak[0]-win[$] STREAM gap[5] FROM peak+win
       )");
-  EXPECT_NE(window.find("'win[3]' but 'win' has only 3 element"), std::string::npos) << window;
+  EXPECT_NE(window.find("'win' has 3 element(s) in its FROM clause, so 'win[3]' is out of range"), std::string::npos) << window;
+}
+
+/// Ogolna granica indeksu `strumien[k]` (2026-09-14). Do tej daty recznie napisane `ten[5]` nad
+/// dwupolowym `ten` kompilowalo sie do PUSH_ID za koncem bufora wejsciowego, a serwis padal przy
+/// pierwszym rekordzie na `payload: flat position out of range`.
+TEST(xcompiler, rejects_stream_index_beyond_from_slots) {
+  const std::string indexWildcard = compileRql(R"(
+        DECLARE a INTEGER, b INTEGER STREAM core, 1/10 FILE 'core.txt'
+        SELECT core[_]*10 STREAM ten FROM core
+        SELECT ten[5] STREAM ch5 FROM ten
+      )");
+  EXPECT_EQ(indexWildcard, "Stream 'ch5': stream 'ten' has 2 element(s) in its FROM clause, so 'ten[5]' is out of range");
+
+  const std::string window = compileRql(R"(
+        DECLARE a INTEGER STREAM core, 1/10 FILE 'core.txt'
+        SELECT * STREAM win FROM core@(1,3)
+        SELECT * STREAM peak FROM MAX(win)
+        SELECT peak[0]-win[5] STREAM gap5 FROM peak+win
+      )");
+  EXPECT_EQ(window, "Stream 'gap5': stream 'win' has 3 element(s) in its FROM clause, so 'win[5]' is out of range");
+
+  // Granica to sloty czytane przez zapytanie, nie szerokosc strumienia: po reduktorze jeden.
+  const std::string reducer = compileRql(R"(
+        DECLARE a INTEGER STREAM core, 1/10 FILE 'core.txt'
+        SELECT * STREAM acc FROM core@(1,5)
+        SELECT acc[1] STREAM total FROM SUMC(acc)
+      )");
+  EXPECT_EQ(reducer, "Stream 'total': stream 'acc' has 1 element(s) in its FROM clause, so 'acc[1]' is out of range");
+}
+
+/// Ostatni slot jest w zakresie, a okno w FROM poszerza zrodlo: `core[2]` przy `core@(1,3)`
+/// czyta trzeci slot okna, choc `core` ma jedno pole — tak samo jak rozwiniete `core[_]`.
+TEST(xcompiler, accepts_stream_index_on_last_from_slot) {
+  EXPECT_EQ(compileRql(R"(
+        DECLARE a INTEGER, b INTEGER STREAM core, 1/10 FILE 'core.txt'
+        SELECT core[_]*10 STREAM ten FROM core
+        SELECT ten[1] STREAM ch1 FROM ten
+      )"),
+            "OK");
+  EXPECT_EQ(compileRql(R"(
+        DECLARE a INTEGER STREAM core, 1/10 FILE 'core.txt'
+        SELECT core[2] STREAM last FROM core@(1,3)
+      )"),
+            "OK");
+}
+
+/// Wlasna nazwa na liscie pol wskazuje rekord WEJSCIOWY (localizeFieldOffsets() jej nie
+/// przesuwa), wiec granica jest szerokosc FROM, a nie jednopolowego wyjscia.
+TEST(xcompiler, bounds_self_index_by_from_record) {
+  EXPECT_EQ(compileRql(R"(
+        DECLARE a INTEGER, b INTEGER STREAM core, 1/10 FILE 'core.txt'
+        SELECT out[1] STREAM out FROM core
+      )"),
+            "OK");
+  EXPECT_EQ(compileRql(R"(
+        DECLARE a INTEGER, b INTEGER STREAM core, 1/10 FILE 'core.txt'
+        SELECT out[2] STREAM out FROM core
+      )"),
+            "Stream 'out': the FROM record of 'out' has 2 element(s), so 'out[2]' is out of range");
+}
+
+/// Warunek reguly liczy sie na rekordzie wyjsciowym strumienia, wiec tam jest granica.
+TEST(xcompiler, bounds_rule_condition_index_by_own_record) {
+  const std::string query = R"(
+        DECLARE a INTEGER, b INTEGER STREAM core, 1/10 FILE 'core.txt'
+        SELECT core[0] STREAM y FROM core
+      )";
+  EXPECT_EQ(compileRql(query + "RULE r ON y WHEN y[0] > 1 DO DUMP -1 TO 1\n"), "OK");
+  EXPECT_EQ(compileRql(query + "RULE r ON y WHEN y[1] > 1 DO DUMP -1 TO 1\n"),
+            "Stream 'y': rule 'r' reads the record of 'y', which has 1 element(s), so 'y[1]' is out of range");
+}
+
+/// Generator nie ma wlasnej kontroli zakresu: zwiniete `ten[$]` jest zwyklym `ten[k]`, wiec
+/// komunikat jest identyczny z zapisem recznym, a zrodlo poszerzone oknem przyjmuje go tak samo.
+/// Do 2026-09-14 osobny przebieg generatora liczyl szerokosc strumienia i odrzucal `core[$]`
+/// przy `FROM core@(1,3)`, choc reczne `core[2]` przechodzilo.
+TEST(xcompiler, generator_index_bound_matches_hand_written) {
+  const std::string source      = R"(
+        DECLARE a INTEGER, b INTEGER STREAM core, 1/10 FILE 'core.txt'
+        SELECT core[_]*10 STREAM ten FROM core
+      )";
+  const std::string generated   = compileRql(source + "SELECT ten[$] STREAM ch[3] FROM ten\n");
+  const std::string handWritten = compileRql(source +
+                                             "SELECT ten[0] STREAM ch$0 FROM ten\n"
+                                             "SELECT ten[1] STREAM ch$1 FROM ten\n"
+                                             "SELECT ten[2] STREAM ch$2 FROM ten\n");
+  EXPECT_NE(generated, "OK");
+  EXPECT_EQ(generated, handWritten);
+
+  const auto render = [](const std::string &rql) {
+    qTree plan;
+    auto [parseResult, keyword, streamName] = parserRQLString(plan, rql);
+    EXPECT_EQ(parseResult, "OK") << rql;
+    compiler compilerInstance(plan);
+    EXPECT_EQ(compilerInstance.compile(), "OK") << rql;
+    return renderPlan(plan);
+  };
+  const std::string window = "DECLARE a INTEGER STREAM core, 1/10 FILE 'core.txt'\n";
+  EXPECT_EQ(render(window + "SELECT core[$] STREAM g[3] FROM core@(1,3)\n"),
+            render(window + "SELECT core[0] STREAM g$0 FROM core@(1,3)\n"
+                            "SELECT core[1] STREAM g$1 FROM core@(1,3)\n"
+                            "SELECT core[2] STREAM g$2 FROM core@(1,3)\n"));
 }
 
 /// Wyrazenie moze zejsc ponizej zera, zanim wyjdzie poza zrodlo — osobny komunikat.
