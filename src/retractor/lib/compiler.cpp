@@ -2811,11 +2811,31 @@ std::string compiler::simplifyFieldExpressions() {
     // W programie pola `q.id[k]` znaczy „slot k MOJEGO payloadu wejsciowego" (patrz
     // localizeFieldOffsets()), a nie pole k wlasnego wyjscia, ktore czyta typeOfField(). Ten
     // sam warunek co w inferFieldShapes(), zeby R3 widzialo typ, ktory stoi w deskryptorze.
-    // Rekord FROM liczony dopiero przy pierwszym takim odwolaniu.
+    //
+    // Wezly SYNTETYZUJACE schemat (`@`, reduktory) maja jedno zrodlo pod offsetem 0, a ich
+    // rekord wejsciowy sklada sie ze slotow typu NAJSZERSZEGO z rekordu zrodla. Tam slot k
+    // wejscia nie jest ani polem k wyjscia, ani polem k zrodla, wiec z rekordu wejsciowego
+    // bierze typ KAZDE odwolanie, takze nazwa zrodla. Lista pozytywna: descriptorFrom() zna
+    // tylko te operatory.
+    //
+    // Rekord FROM liczony dopiero przy pierwszym odwolaniu, ktore go potrzebuje.
     std::optional<rdb::Descriptor> inputRecord;
     const bool selfRefReadsInput = !q.isDeclaration() && copiesOperandSchema(q);
-    auto typeOfSelectField       = [&](const std::string &streamId, int fieldIndex) -> std::optional<rdb::descFld> {
-      if (streamId != q.id || !selfRefReadsInput) return typeOfField(streamId, fieldIndex);
+    const bool anyRefReadsInput  = !q.isDeclaration() && !q.lProgram.empty() && [&] {
+      switch (q.lProgram.back().getCommandID()) {
+        case STREAM_AGSE:
+        case STREAM_AVG:
+        case STREAM_MAX:
+        case STREAM_MIN:
+        case STREAM_SUM:
+          return true;
+        default:
+          return false;
+      }
+    }();
+    auto typeOfSelectField = [&](const std::string &streamId, int fieldIndex) -> std::optional<rdb::descFld> {
+      const bool readsInput = anyRefReadsInput || (selfRefReadsInput && streamId == q.id);
+      if (!readsInput) return typeOfField(streamId, fieldIndex);
       if (!inputRecord.has_value()) inputRecord = q.descriptorFrom(coreInstance);
       const auto position = inputRecord->flatIndexToDescriptorPosition(fieldIndex);
       if (!position.has_value()) return std::nullopt;
