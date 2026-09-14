@@ -2807,8 +2807,25 @@ std::string compiler::simplifyFieldExpressions() {
 
   for (auto &q : coreInstance) {
     if (q.isCompilerDirective()) continue;
+
+    // W programie pola `q.id[k]` znaczy „slot k MOJEGO payloadu wejsciowego" (patrz
+    // localizeFieldOffsets()), a nie pole k wlasnego wyjscia, ktore czyta typeOfField(). Ten
+    // sam warunek co w inferFieldShapes(), zeby R3 widzialo typ, ktory stoi w deskryptorze.
+    // Rekord FROM liczony dopiero przy pierwszym takim odwolaniu.
+    std::optional<rdb::Descriptor> inputRecord;
+    const bool selfRefReadsInput = !q.isDeclaration() && copiesOperandSchema(q);
+    auto typeOfSelectField       = [&](const std::string &streamId, int fieldIndex) -> std::optional<rdb::descFld> {
+      if (streamId != q.id || !selfRefReadsInput) return typeOfField(streamId, fieldIndex);
+      if (!inputRecord.has_value()) inputRecord = q.descriptorFrom(coreInstance);
+      const auto position = inputRecord->flatIndexToDescriptorPosition(fieldIndex);
+      if (!position.has_value()) return std::nullopt;
+      const auto rtype = (*inputRecord)[static_cast<size_t>(position->first)].rtype;
+      if (rtype > rdb::STRING) return std::nullopt;
+      return rtype;
+    };
+
     for (auto &f : q.lSchema)
-      rdb::probe::onRewriteR3(simplifyExpression(f.lProgram, typeOfField));
+      rdb::probe::onRewriteR3(simplifyExpression(f.lProgram, typeOfSelectField));
     for (auto &r : q.lRules)
       rdb::probe::onRewriteR3(simplifyExpression(r.condition, typeOfField));
 

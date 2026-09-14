@@ -1,0 +1,17 @@
+# Odwolanie WLASNA nazwa (`merged[3]`) w wyrazeniu podlegajacym R3: `merged[3]` to slot 3 rekordu FROM,
+# czyli `core1.d` (FLOAT), a nie wlasne pole wyjsciowe `merged_3` (`core0[1]`, INTEGER).
+# `core1[1]` to to samo pole wejsciowe, zapisane nazwa zrodla — kontrola.
+
+STORAGE 'temp'
+
+DECLARE a BYTE, b INTEGER \
+STREAM core0, 0.1 \
+FILE 'sensor_a.txt'
+
+DECLARE c INTEGER, d FLOAT \
+STREAM core1, 0.1 \
+FILE 'sensor_b.txt'
+
+SELECT merged[3] + 1 + 2, core1[1] + 1 + 2, core0[0], core0[1] \
+STREAM merged \
+FROM core0 + core1
