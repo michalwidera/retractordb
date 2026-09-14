@@ -63,7 +63,12 @@ void cleanup() {
                       serviceQueryFilePath);
   }
   {
-    std::scoped_lock lock(core_mutex);
+    // try_lock, nie lock. FatalError w slocie przetwarzania uruchamia ten handler W WATKU,
+    // ktory trzyma core_mutex przez caly dataModel::processRows(); bezwarunkowe lock() czekalo
+    // do 2026-09-14 na muteks trzymany przez samego siebie i proces wisial do SIGKILL. Licznik
+    // jest atomowy, muteks sluzy tylko temu, zeby czekajacy na cv nie zgubili pobudki -- a gdy
+    // go nie dostaniemy, trzyma go watek, ktory wlasnie konczy proces.
+    std::unique_lock lock(core_mutex, std::try_to_lock);
     if (iLoopLimitCnt != executorsm::stop_now) {
       SPDLOG_WARN("Cleanup: Setting iLoopLimitCnt to stop_now.");
       iLoopLimitCnt = executorsm::stop_now;

@@ -1,6 +1,7 @@
 #include "ipcServer.hpp"
 
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <format>
@@ -36,7 +37,10 @@ void IpcServer::setServerName(std::string_view serverName) { names_ = ipc::names
 
 void IpcServer::start(Callbacks callbacks) {
   callbacks_   = std::move(callbacks);
-  commsThread_ = std::thread([this] { commandLoop(); });
+  commsThread_ = std::thread([this] {
+    commandLoop();
+    commsFinished_ = true;
+  });
 }
 
 void IpcServer::stop() {
@@ -55,12 +59,29 @@ void IpcServer::shutdownFromExitHandler() {
   // SIGABRT-em zamiast zakonczyc go z EXIT_FAILURE, i to juz po wypisaniu wlasciwej
   // diagnostyki. Watek i tak konczy sie razem z procesem, wiec pominiecie join() niczego
   // nie zostawia w locie; sprzatanie IPC ponizej wykonuje sie wtedy normalnie.
+  //
+  // Obcego watku tez nie dolaczamy bez limitu. FatalError w slocie przetwarzania biegnie pod
+  // plan_epoch_mutex, a komenda wymagajaca modelu (`get`, `show`, `detail`, `adhoc`) czeka na
+  // te blokade w commandProcessor. Watek, ktory jej nie dostanie nigdy, nie wraca do petli
+  // i join() wisial do 2026-09-14 do SIGKILL. Watek wolny wychodzi z petli w jednym takcie
+  // odpytywania, wiec limit dotyczy wylacznie watku zablokowanego -- ten ODPINAMY: stoi na
+  // muteksie i do konca procesu niczego juz nie dotknie.
   if (commsThread_.joinable()) {
-    if (commsThread_.get_id() == std::this_thread::get_id())
+    if (commsThread_.get_id() == std::this_thread::get_id()) {
       commsThread_.detach();  // samego siebie nie da sie dolaczyc; ODPINAMY, bo destruktor
                               // std::thread nad watkiem dolaczalnym wola std::terminate
-    else
-      commsThread_.join();
+    } else {
+      constexpr auto kExitJoinBudget = std::chrono::seconds(2);
+      const auto deadline            = std::chrono::steady_clock::now() + kExitJoinBudget;
+      while (!commsFinished_ && std::chrono::steady_clock::now() < deadline)
+        std::this_thread::sleep_for(ipc::kQueuePollInterval);
+      if (commsFinished_) {
+        commsThread_.join();
+      } else {
+        SPDLOG_WARN("Communication thread did not stop within {} s of exit; detaching it.", kExitJoinBudget.count());
+        commsThread_.detach();
+      }
+    }
   }
   removeGlobalObjects();
   // Kolejki klientow tylko pod try_lock. Handler atexit biegnie ROWNOLEGLE do watku

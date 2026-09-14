@@ -47,6 +47,69 @@ if [ "$status" -ne 1 ]; then
   exit 1
 fi
 
+# --- Sciezki 3 i 4: blad krytyczny w SLOCIE przetwarzania. ---
+# Do 2026-09-14 proces w ogole sie nie konczyl. dataModel::processRows() trzyma core_mutex,
+# a executorsm::run() plan_epoch_mutex przez caly slot. FatalError wola std::exit, ktory
+# uruchamia cleanup() w TYM SAMYM watku, a cleanup():
+#   3. bral core_mutex -- watek czekal na muteks, ktory sam trzymal (bez klienta);
+#   4. dolaczal watek komunikacyjny, ktory stal w handlerze komendy na plan_epoch_mutex
+#      (z klientem, ktorego komenda trafila w slot).
+# Obie sytuacje wisialy do SIGKILL, z niezwolnionym IPC i blokada uslugi. Po W3 zadne znane
+# RQL nie prowadzi do bledu krytycznego w slocie, stad hak RDB_FAULT_FATAL_IN_SLOT: wypisuje
+# znacznik po wzieciu blokad, czeka zadane ms i wola FatalError. Na znacznik czekamy, zeby
+# komenda klienta na pewno trafila w slot, a nie przed niego.
+wait_for_exit() {
+  local pid="$1" left=300
+  while [ "$left" -gt 0 ]; do
+    kill -0 "$pid" 2>/dev/null || return 0
+    sleep 0.1
+    left=$((left - 1))
+  done
+  return 1
+}
+
+fatal_in_slot() {
+  local label="$1" withClient="$2" i=0 clientPid=""
+  rm -rf ./temp && mkdir -p ./temp
+  rm -f ./*.desc ./*.meta ./*.shadow ./slot.err
+  export RDB_FAULT_FATAL_IN_SLOT=3000
+  server_start query.rql -k -r 2>slot.err
+  unset RDB_FAULT_FATAL_IN_SLOT
+
+  while ! grep -q "RDB_FAULT_FATAL_IN_SLOT: slot locked" slot.err 2>/dev/null; do
+    i=$((i + 1))
+    if [ "$i" -gt 300 ]; then
+      echo "$label: hak nie zglosil wejscia w slot w ciagu 30 s"
+      exit 1
+    fi
+    sleep 0.1
+  done
+
+  if [ "$withClient" = "client" ]; then
+    timeout 30 xqry -t w >/dev/null 2>&1 &
+    clientPid=$!
+  fi
+
+  if ! wait_for_exit "$_server_pid"; then
+    echo "$label: serwer zyje 30 s po wejsciu w slot z bledem krytycznym (zawieszone wyjscie)"
+    exit 1
+  fi
+  status=$(server_wait_status)
+  [ -n "$clientPid" ] && { wait "$clientPid" 2>/dev/null || true; }
+  if [ "$status" -ne 1 ]; then
+    echo "$label: kod wyjscia $status, oczekiwano 1"
+    exit 1
+  fi
+  if ! grep -q "FATAL: fault hook RDB_FAULT_FATAL_IN_SLOT" slot.err; then
+    echo "$label: brak komunikatu bledu krytycznego na stderr:"
+    cat slot.err
+    exit 1
+  fi
+}
+
+fatal_in_slot "blad krytyczny w slocie bez klienta" ""
+fatal_in_slot "blad krytyczny w slocie z komenda klienta na blokadzie epoki" client
+
 # Blokada uslugi ma znikac SAMA. std::exit nie uruchamia destruktorow obiektow
 # automatycznych, wiec FlockServiceGuard::~FlockServiceGuard() przy bledzie krytycznym
 # sie nie wykonuje — plik kasuje executorsm::cleanup() zarejestrowany przez atexit.

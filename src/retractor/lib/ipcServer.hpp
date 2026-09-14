@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <map>
 #include <memory>
@@ -105,6 +106,9 @@ class IpcServer {
 
   Callbacks callbacks_;
   std::thread commsThread_;
+  /// Watek komunikacyjny wyszedl z commandLoop(). shutdownFromExitHandler() czeka na to
+  /// z limitem, zamiast dolaczac bez konca watek, ktory moze stac na blokadzie epoki.
+  std::atomic<bool> commsFinished_{false};
 
   // Komplet nazw obiektow IPC tej instancji. Wszystkie sciezki -- tworzenie, emisja i KASOWANIE
   // -- czytaja nazwy stad, nigdy ze stalych globalnych; to jest warunek tego, zeby serwer nie

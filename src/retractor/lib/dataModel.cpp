@@ -1,10 +1,13 @@
 #include "dataModel.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include <memory>  // unique_ptr
 #include <mutex>
 #include <stdexcept>
+#include <thread>
 #include <utility>
 
 #include <spdlog/spdlog.h>
@@ -274,6 +277,17 @@ void dataModel::processZeroStep() {
 
 void dataModel::processRows(const std::set<std::string> &inSet, const boost::rational<int> &currentTimeSlot) {
   std::scoped_lock scoped_lock(core_mutex);
+
+  // Hak testu it_fatal_exit_path, ta sama droga co RDB_FAULT_PLAN_SWAP_DELAY. FatalError
+  // w srodku slotu pada pod core_mutex i pod plan_epoch_mutex (bierze go executorsm::run),
+  // a po W3 z 2026-09-14 zadne znane RQL nie prowadzi juz do niego w wykonaniu. Uspienie
+  // przed bledem otwiera okno na komende klienta, ktora stanie na blokadzie epoki. Znacznik na
+  // stderr mowi testowi, ze blokady sa juz wziete, wiec okna nie trzeba trafiac zegarem.
+  if (const char *delayMs = std::getenv("RDB_FAULT_FATAL_IN_SLOT"); delayMs != nullptr) {
+    std::cerr << "RDB_FAULT_FATAL_IN_SLOT: slot locked" << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
+    FatalError("fault hook RDB_FAULT_FATAL_IN_SLOT: fatal error inside a processing slot");
+  }
 
   // Zrodlo dolaczone ad-hoc nie uczestniczylo w kroku zerowym. Uzbrajamy je
   // przed konsumentami pierwszego naleznego slotu. Koncowa faza deklaracji
