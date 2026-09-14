@@ -85,6 +85,7 @@ struct compiler {
   std::string inferFieldShapes();
   std::string checkRuleConditionShapes();
   std::string localizeFieldOffsets();
+  std::map<std::string, int> sourceOffsetsInFrom(query &q, std::set<std::string> &viaInterleave);
   void collectTransitiveOffsets(const std::string &srcId, int baseOffset, bool viaHash, std::map<std::string, int> &result,
                                 std::set<std::string> &viaInterleave);
   std::string validateSubstratNameUniqueness();

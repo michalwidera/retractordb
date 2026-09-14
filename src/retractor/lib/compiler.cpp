@@ -713,20 +713,14 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
     lRetVal = flattenArrayFields(coreInstance.getQuery(sName1).lSchema);
   else if (cmd == STREAM_TIMEMOVE)
     lRetVal = flattenArrayFields(coreInstance.getQuery(sName1).lSchema);
-  else if (cmd == STREAM_AVG) {
-    field intf(rdb::rField("avg", sizeof(boost::rational<int>), 1, rdb::RATIONAL), token(PUSH_ID, std::make_pair(sName1, 0)));
-    lRetVal.push_back(intf);
-    return lRetVal;
-  } else if (cmd == STREAM_MIN) {
-    field intf(rdb::rField("min", sizeof(boost::rational<int>), 1, rdb::RATIONAL), token(PUSH_ID, std::make_pair(sName1, 0)));
-    lRetVal.push_back(intf);
-    return lRetVal;
-  } else if (cmd == STREAM_MAX) {
-    field intf(rdb::rField("max", sizeof(boost::rational<int>), 1, rdb::RATIONAL), token(PUSH_ID, std::make_pair(sName1, 0)));
-    lRetVal.push_back(intf);
-    return lRetVal;
-  } else if (cmd == STREAM_SUM) {
-    field intf(rdb::rField("sum", sizeof(boost::rational<int>), 1, rdb::RATIONAL), token(PUSH_ID, std::make_pair(sName1, 0)));
+  else if (cmd == STREAM_AVG || cmd == STREAM_MIN || cmd == STREAM_MAX || cmd == STREAM_SUM) {
+    // Typ pola ten sam co slotu rekordu wejsciowego (query::descriptorFrom). Do 2026-09-14 stal tu
+    // RATIONAL na sztywno, wiec `SELECT * FROM x.max` nad DOUBLE 3000000000.5 zapisywalo
+    // przepelniony `rational<int>`, a nad 0.333333333333 — 1/3.
+    const char *name = (cmd == STREAM_AVG) ? "avg" : (cmd == STREAM_MIN) ? "min" : (cmd == STREAM_MAX) ? "max" : "sum";
+    auto [sourceType, sourceLen]   = coreInstance[sName1].descriptorStorage().widestFieldType();
+    auto [reducedType, reducedLen] = reductionResultField(sourceType, sourceLen);
+    field intf(rdb::rField(name, reducedLen, 1, reducedType), token(PUSH_ID, std::make_pair(sName1, 0)));
     lRetVal.push_back(intf);
     return lRetVal;
   } else if (cmd == STREAM_AGSE) {
@@ -1292,6 +1286,35 @@ void compiler::collectTransitiveOffsets(const std::string &srcId, int baseOffset
   }
 }
 
+/// Offset bloku kazdego strumienia osiagalnego z FROM zapytania `q` w jego rekordzie wejsciowym:
+/// zrodla bezposrednie i zrodla schowane za substratami kompilatora. `viaInterleave` dostaje
+/// skladowe, ktorych tozsamosc zniosl `#`.
+///
+/// Jedno zrodlo prawdy dla localizeFieldOffsets(), ktore wedlug tej mapy przepisuje odwolania na
+/// sloty payloadu wejsciowego, i dla typowania odwolan (inferFieldShapes(), R3) — typ ma pochodzic
+/// z TEGO slotu, ktory odwolanie przeczyta w wykonaniu.
+std::map<std::string, int> compiler::sourceOffsetsInFrom(query &q, std::set<std::string> &viaInterleave) {
+  auto offset{0};                         //
+  std::map<std::string, int> offsetItem;  //
+  for (auto &f : q.lProgram) {            // for each token in stream program
+    if (f.getCommandID() == PUSH_STREAM) {
+      offsetItem[f.getStr_()] = offset;
+      offset += coreInstance[f.getStr_()].descriptorStorage().flatElementCount();
+    }
+    if (f.getCommandID() == STREAM_HASH) {
+      for (auto &i : offsetItem) {
+        i.second = 0;
+        viaInterleave.insert(i.first);
+      }
+    }
+  }
+  // Extend with transitive sources from system-generated substrats.
+  std::vector<std::pair<std::string, int>> directSources(offsetItem.begin(), offsetItem.end());
+  for (const auto &[srcName, srcBase] : directSources)
+    collectTransitiveOffsets(srcName, srcBase, viaInterleave.contains(srcName), offsetItem, viaInterleave);
+  return offsetItem;
+}
+
 std::string compiler::localizeFieldOffsets() {
   std::map<std::string, std::map<std::string, int>> offsetMap;
   std::map<std::string, std::set<std::string>> interleavedSources;
@@ -1301,26 +1324,8 @@ std::string compiler::localizeFieldOffsets() {
     if (q.isReductionRequired()) {
       FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
     }  // that has at least two arguments
-    auto offset{0};                         //
-    std::map<std::string, int> offsetItem;  //
-    std::set<std::string> viaInterleave;    // składowe, których tożsamość zniosło `#`
-    for (auto &f : q.lProgram) {            // for each token in stream program
-      if (f.getCommandID() == PUSH_STREAM) {
-        offsetItem[f.getStr_()] = offset;
-        offset += coreInstance[f.getStr_()].descriptorStorage().flatElementCount();
-      }
-      if (f.getCommandID() == STREAM_HASH) {
-        for (auto &i : offsetItem) {
-          i.second = 0;
-          viaInterleave.insert(i.first);
-        }
-      }
-    }
-    // Extend with transitive sources from system-generated substrats.
-    std::vector<std::pair<std::string, int>> directSources(offsetItem.begin(), offsetItem.end());
-    for (const auto &[srcName, srcBase] : directSources)
-      collectTransitiveOffsets(srcName, srcBase, viaInterleave.contains(srcName), offsetItem, viaInterleave);
-    offsetMap[q.id]          = offsetItem;
+    std::set<std::string> viaInterleave;  // składowe, których tożsamość zniosło `#`
+    offsetMap[q.id]          = sourceOffsetsInFrom(q, viaInterleave);
     interleavedSources[q.id] = viaInterleave;
   }
 
@@ -2604,9 +2609,8 @@ namespace {
 /// Lista POZYTYWNA, tak samo i z tego samego powodu co w consumesTwoPrecedingTokens():
 /// nowy operator jest domyslnie syntetyzujacy, wiec pominiecie go w tej liscie niczego nie
 /// psuje. Kopiuja: `SELECT * FROM x` (sam PUSH_STREAM), `>N`, `-r`, `#`, `&`, `%` oraz `+`.
-/// Syntetyzuja i dlatego NIE moga tu byc: reduktory MIN/MAX/AVG/SUMC (ich pole jest zawsze
-/// RATIONAL, a token PUSH_ID w programie jest tylko miejscem w rekordzie, nie odczytem)
-/// oraz `@` (pole ma typ NAJSZERSZY z rekordu zrodla, nie typ pola zerowego).
+/// Syntetyzuja i dlatego NIE moga tu byc: reduktory MIN/MAX/AVG/SUMC oraz `@` — patrz
+/// synthesizesOperandSchema().
 bool copiesOperandSchema(const query &q) {
   if (q.lProgram.empty()) return false;
   if (q.lProgram.size() == 1) return q.lProgram.front().getCommandID() == PUSH_STREAM;
@@ -2621,6 +2625,47 @@ bool copiesOperandSchema(const query &q) {
     default:
       return false;
   }
+}
+
+/// Czy schemat wezla SYNTETYZUJE operator FROM: okno `@` i reduktory MIN/MAX/AVG/SUMC.
+///
+/// Rekord wejsciowy takiego wezla (query::descriptorFrom) sklada sie ze slotow typu NAJSZERSZEGO
+/// z rekordu zrodla — dla reduktora przepuszczonego przez reductionResultField(). Slot k wejscia
+/// nie jest wiec ani polem k wyjscia, ani polem k zrodla. Lista pozytywna: descriptorFrom() zna
+/// tylko te operatory.
+bool synthesizesOperandSchema(const query &q) {
+  if (q.lProgram.empty()) return false;
+  switch (q.lProgram.back().getCommandID()) {
+    case STREAM_AGSE:
+    case STREAM_AVG:
+    case STREAM_MAX:
+    case STREAM_MIN:
+    case STREAM_SUM:
+      return true;
+    default:
+      return false;
+  }
+}
+
+/// Slot rekordu wejsciowego (query::descriptorFrom), ktory odwolanie `streamId[k]` w programie POLA
+/// zapytania `q` czyta w wykonaniu — albo nullopt, gdy `streamId` nie stoi w FROM.
+///
+/// localizeFieldOffsets() przepisuje odwolanie na slot `offset bloku + k` wedlug mapy
+/// compiler::sourceOffsetsInFrom(), a payload wejsciowy streamInstance buduje z descriptorFrom().
+/// Pole k strumienia `streamId` ma ten sam ksztalt tylko wtedy, gdy blok jest KOPIA jego rekordu.
+/// Tak nie jest dla wlasnej nazwy (slot wejscia, nie pole wyjscia), w wezle `@` i reduktora (typ
+/// najszerszy albo z reductionResultField()) ani dla zrodla za substratem okna w FROM
+/// (`c2[k]` przy `FROM c2@(1,3)+kf` to slot k okna, a `c2` ma jedno pole).
+///
+/// Jedna regula dla inferFieldShapes() i R3, zeby typ, ktory R3 widzi, byl typem z deskryptora.
+/// Nie dotyczy warunkow regul (czytaja payload WYJSCIOWY) ani programow grup okien (czytaja
+/// historie zrodla).
+std::optional<int> inputSlotOfReference(const query &q, const std::map<std::string, int> &fromOffsets,
+                                        const std::string &streamId, const int flatIndex) {
+  if (streamId == q.id) return flatIndex;
+  const auto base = fromOffsets.find(streamId);
+  if (base == fromOffsets.end()) return std::nullopt;
+  return base->second + flatIndex;
 }
 }  // namespace
 
@@ -2645,13 +2690,13 @@ bool copiesOperandSchema(const query &q) {
 /// przez plan przeniesc. Liczba rund ograniczona rozmiarem planu — dluzszego lancucha
 /// zaleznosci niz liczba wezlow byc nie moze.
 ///
-/// **Zakres.** Przebieg rusza wylacznie wezly, ktorych schemat NIE jest syntetyzowany przez
-/// wlasny operator FROM — czyli te, ktore `copiesOperandSchema()` uznaje za kopiujace.
-/// Dla reduktora `MIN/MAX/AVG/SUMC` i dla `@` token `PUSH_ID` w programie pola jest tylko
-/// MIEJSCEM w rekordzie, a nie odczytem pola zrodlowego: `AVG(s)` daje jedno pole `RATIONAL`
-/// niezaleznie od tego, co stoi w `s[0]`, a `s@(1,4)` daje cztery pola typu NAJSZERSZEGO
-/// z rekordu zrodla. Wnioskowanie z programu dalo by tam ksztalt cicho zly, wiec te wezly
-/// zachowuja schemat zbudowany przez `buildOutputSchema()`.
+/// **Zakres.** Przebieg rusza wezly kopiujace schemat operandu (`copiesOperandSchema()`) i wezly
+/// syntetyzujace go (`synthesizesOperandSchema()`: `@` i reduktory). W tych drugich odwolanie
+/// w programie pola czyta slot rekordu wejsciowego, a nie pole zrodla — patrz
+/// inputSlotOfReference(). Do 2026-09-14 wezly syntetyzujace byly pomijane, wiec jawna
+/// lista pol (`SELECT w[0] FROM c@(1,2)` nad FLOAT, `SELECT a[0] FROM x.avg`) zostawala przy
+/// domyslnym INTEGER z parsera i obcinala wartosc przy zapisie, podczas gdy `SELECT *` nad tym
+/// samym wezlem mialo typ slotu.
 ///
 /// **Deklaracje sa autorytatywne** i przebieg ich nie dotyka: `DECLARE` jest umowa z plikiem
 /// zrodlowym, a nie wynikiem rachunku.
@@ -2665,19 +2710,10 @@ bool copiesOperandSchema(const query &q) {
 std::string compiler::inferFieldShapes() {
   // Zapytanie biezaco wnioskowane i jego rekord FROM. Rekord liczony od nowa w kazdej rundzie,
   // bo typy zrodel moga sie miedzy rundami zmienic.
-  std::string currentId;
+  const query *current = nullptr;
   rdb::Descriptor inputRecord;
-  auto shapeOfField = [this, &currentId, &inputRecord](const std::string &streamId,
-                                                       const int flatIndex) -> std::optional<exprShape> {
-    // `q.id[k]` w programie pola znaczy „slot k MOJEGO payloadu wejsciowego" (patrz
-    // localizeFieldOffsets()), a nie pole k wlasnego wyjscia, ktore czytaloby sourceFieldAt().
-    // Wejscie to query::descriptorFrom() — z niego streamInstance buduje inputPayload.
-    const auto sourceField = [&]() -> std::optional<rdb::rField> {
-      if (streamId != currentId) return sourceFieldAt(streamId, flatIndex);
-      const auto position = inputRecord.flatIndexToDescriptorPosition(flatIndex);
-      if (!position.has_value()) return std::nullopt;
-      return inputRecord[static_cast<size_t>(position->first)];
-    }();
+  std::map<std::string, int> fromOffsets;
+  auto shapeOfSlot = [](const std::optional<rdb::rField> &sourceField) -> std::optional<exprShape> {
     if (!sourceField.has_value()) return std::nullopt;
     // NULLTYPE i pola konfiguracyjne deskryptora zajmuja pozycje, ale nie sa wartosciami.
     if (sourceField->rtype > rdb::STRING) return std::nullopt;
@@ -2687,13 +2723,27 @@ std::string compiler::inferFieldShapes() {
     const int arity = (flatSlotCount(*sourceField) == 1) ? sourceField->rarray : 1;
     return exprShape{.rtype = sourceField->rtype, .rlen = sourceField->rlen, .rarray = arity};
   };
+  // Program grupy okna czyta HISTORIE zrodla, wiec zawsze pole zrodla.
+  auto shapeOfSourceField = [this, &shapeOfSlot](const std::string &streamId, const int flatIndex) -> std::optional<exprShape> {
+    return shapeOfSlot(sourceFieldAt(streamId, flatIndex));
+  };
+  auto shapeOfField = [&](const std::string &streamId, const int flatIndex) -> std::optional<exprShape> {
+    const auto slot = inputSlotOfReference(*current, fromOffsets, streamId, flatIndex);
+    if (!slot.has_value()) return shapeOfSourceField(streamId, flatIndex);
+    const auto position = inputRecord.flatIndexToDescriptorPosition(*slot);
+    if (!position.has_value()) return std::nullopt;
+    return shapeOfSlot(inputRecord[static_cast<size_t>(position->first)]);
+  };
 
   for (std::size_t round = 0; round <= coreInstance.size(); ++round) {
     bool changed = false;
     for (auto &q : coreInstance) {
-      if (q.isCompilerDirective() || q.isDeclaration() || !copiesOperandSchema(q)) continue;
-      currentId   = q.id;
+      if (q.isCompilerDirective() || q.isDeclaration()) continue;
+      if (!copiesOperandSchema(q) && !synthesizesOperandSchema(q)) continue;
+      current     = &q;
       inputRecord = q.descriptorFrom(coreInstance);
+      std::set<std::string> viaInterleave;
+      fromOffsets = sourceOffsetsInFrom(q, viaInterleave);
 
       // NAJPIERW grupy okien, bo od ich typu zalezy ksztalt pol, ktore je czytaja.
       //
@@ -2703,8 +2753,8 @@ std::string compiler::inferFieldShapes() {
       // reduktory strumieniowe i streamInstance::reduceRecordWindow().
       for (auto &g : q.windowGroups) {
         std::string windowRefusal;
-        const auto argument = g.program.empty() ? shapeOfField(g.source, g.slot) : [&] {
-          const auto inferred = inferExpressionShape(g.program, shapeOfField, {});
+        const auto argument = g.program.empty() ? shapeOfSourceField(g.source, g.slot) : [&] {
+          const auto inferred = inferExpressionShape(g.program, shapeOfSourceField, {});
           if (inferred.rejected()) windowRefusal = inferred.reason;
           return inferred.resolved() ? std::optional<exprShape>{inferred.shape} : std::nullopt;
         }();
@@ -2749,7 +2799,7 @@ std::string compiler::inferFieldShapes() {
 /// Ta sama bramka co w inferFieldShapes(), ale dla WARUNKOW REGUL.
 ///
 /// Osobny przebieg, bo inferFieldShapes() ma zawezony zakres — rusza wylacznie wezly, ktorych
-/// schemat kopiuje operand (`copiesOperandSchema`), i oglada `q.lSchema`, a nie `q.lRules`.
+/// schemat kopiuje lub syntetyzuje operator FROM, i oglada `q.lSchema`, a nie `q.lRules`.
 /// Warunek reguly wykonuje jednak DOKLADNIE ten sam expressionEvaluator, wiec bez tego
 /// przebiegu `RULE ... WHEN Sqrt(m[0]) > 1` omijalby bramke i wracal do cichej zlej wartosci.
 /// Tutaj zakresu nie zawezamy: pytanie „czy to sie policzy" nie zalezy od tego, czy wezel
@@ -2808,36 +2858,23 @@ std::string compiler::simplifyFieldExpressions() {
   for (auto &q : coreInstance) {
     if (q.isCompilerDirective()) continue;
 
-    // W programie pola `q.id[k]` znaczy „slot k MOJEGO payloadu wejsciowego" (patrz
-    // localizeFieldOffsets()), a nie pole k wlasnego wyjscia, ktore czyta typeOfField(). Ten
-    // sam warunek co w inferFieldShapes(), zeby R3 widzialo typ, ktory stoi w deskryptorze.
+    // Odwolanie w programie pola bierze typ z rekordu wejsciowego wedlug tej samej reguly co
+    // w inferFieldShapes() — patrz inputSlotOfReference() — zeby R3 widzialo typ, ktory stoi
+    // w deskryptorze.
     //
-    // Wezly SYNTETYZUJACE schemat (`@`, reduktory) maja jedno zrodlo pod offsetem 0, a ich
-    // rekord wejsciowy sklada sie ze slotow typu NAJSZERSZEGO z rekordu zrodla. Tam slot k
-    // wejscia nie jest ani polem k wyjscia, ani polem k zrodla, wiec z rekordu wejsciowego
-    // bierze typ KAZDE odwolanie, takze nazwa zrodla. Lista pozytywna: descriptorFrom() zna
-    // tylko te operatory.
-    //
-    // Rekord FROM liczony dopiero przy pierwszym odwolaniu, ktore go potrzebuje.
+    // Rekord FROM i offsety blokow liczone dopiero przy pierwszym odwolaniu, ktore ich potrzebuje.
     std::optional<rdb::Descriptor> inputRecord;
-    const bool selfRefReadsInput = !q.isDeclaration() && copiesOperandSchema(q);
-    const bool anyRefReadsInput  = !q.isDeclaration() && !q.lProgram.empty() && [&] {
-      switch (q.lProgram.back().getCommandID()) {
-        case STREAM_AGSE:
-        case STREAM_AVG:
-        case STREAM_MAX:
-        case STREAM_MIN:
-        case STREAM_SUM:
-          return true;
-        default:
-          return false;
-      }
-    }();
+    std::optional<std::map<std::string, int>> fromOffsets;
     auto typeOfSelectField = [&](const std::string &streamId, int fieldIndex) -> std::optional<rdb::descFld> {
-      const bool readsInput = anyRefReadsInput || (selfRefReadsInput && streamId == q.id);
-      if (!readsInput) return typeOfField(streamId, fieldIndex);
+      if (q.isDeclaration()) return typeOfField(streamId, fieldIndex);
+      if (!fromOffsets.has_value()) {
+        std::set<std::string> viaInterleave;
+        fromOffsets = sourceOffsetsInFrom(q, viaInterleave);
+      }
+      const auto slot = inputSlotOfReference(q, *fromOffsets, streamId, fieldIndex);
+      if (!slot.has_value()) return typeOfField(streamId, fieldIndex);
       if (!inputRecord.has_value()) inputRecord = q.descriptorFrom(coreInstance);
-      const auto position = inputRecord->flatIndexToDescriptorPosition(fieldIndex);
+      const auto position = inputRecord->flatIndexToDescriptorPosition(*slot);
       if (!position.has_value()) return std::nullopt;
       const auto rtype = (*inputRecord)[static_cast<size_t>(position->first)].rtype;
       if (rtype > rdb::STRING) return std::nullopt;

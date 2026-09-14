@@ -1,6 +1,6 @@
 # Wezly SYNTETYZUJACE schemat (`@` i reduktor): `w[k]`, `r[k]` i `core1[k]` w programie pola to slot k
 # rekordu wejsciowego, ktory ma typ NAJSZERSZY z rekordu `core1` — tu FLOAT. Ani wlasne pole wyjsciowe
-# (INTEGER), ani pole `core1.c` (INTEGER).
+# (do 2026-09-14 INTEGER), ani pole `core1.c` (INTEGER).
 
 STORAGE 'temp'
 

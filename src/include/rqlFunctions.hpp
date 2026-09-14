@@ -37,6 +37,14 @@ struct RqlFunction {
   std::string_view canonical;
   int minArgs;
   int maxArgs;
+  /// Druga dopuszczalna pisownia w zapytaniu (2026-09-14: skroty konwersji, zeby zapis potoku
+  /// miescil sie w kolumnie artykulu). Parser zapisuje do tokena `canonical`, wiec skrot nie siega
+  /// ani ewaluatora, ani typowania, ani zrzutow planu.
+  ///
+  /// Skrot dziala bez wzgledu na wielkosc liter, z JEDNYM wyjatkiem: `FLOAT` i `Float` leksuja sie
+  /// jako token typu z DECLARE (RQL.g4), a nie jako ID, wiec `Float(x)` jest bledem skladni.
+  /// Dziala `float(x)`.
+  std::string_view alias{};
 };
 
 /// Arnosc jest DANYMI, nie ksztaltem gramatyki. Gramatyka zna dzis dwa ksztalty
@@ -49,32 +57,33 @@ struct RqlFunction {
 /// stojacymi PRZED `ID` (reduktory strumieniowe), wiec `min` nigdy nie zaleksuje sie
 /// jako nazwa funkcji skalarnej. Skalarne minimum bedzie musialo nazywac sie inaczej.
 inline constexpr std::array<RqlFunction, 21> kRqlFunctions{{
-    {.canonical = "Sqrt", .minArgs = 1, .maxArgs = 1},        //
-    {.canonical = "Ceil", .minArgs = 1, .maxArgs = 1},        //
-    {.canonical = "Floor", .minArgs = 1, .maxArgs = 1},       //
-    {.canonical = "Abs", .minArgs = 1, .maxArgs = 1},         //
-    {.canonical = "round", .minArgs = 1, .maxArgs = 1},       //
-    {.canonical = "trunc", .minArgs = 1, .maxArgs = 1},       //
-    {.canonical = "sin", .minArgs = 1, .maxArgs = 1},         //
-    {.canonical = "cos", .minArgs = 1, .maxArgs = 1},         //
-    {.canonical = "exp", .minArgs = 1, .maxArgs = 1},         //
-    {.canonical = "tan", .minArgs = 1, .maxArgs = 1},         //
-    {.canonical = "log", .minArgs = 1, .maxArgs = 1},         //
-    {.canonical = "log2", .minArgs = 1, .maxArgs = 1},        //
-    {.canonical = "isnull", .minArgs = 1, .maxArgs = 1},      //
-    {.canonical = "null2zero", .minArgs = 1, .maxArgs = 1},   // NULL -> 0; wartosc nie-NULL przechodzi bez zmian
-    {.canonical = "IsZero", .minArgs = 1, .maxArgs = 1},      //
-    {.canonical = "IsNonZero", .minArgs = 1, .maxArgs = 1},   //
-    {.canonical = "Length", .minArgs = 1, .maxArgs = 1},      // WYLACZNIE nad napisem — argument liczbowy jest bledem wykonania
-    {.canonical = "to_integer", .minArgs = 1, .maxArgs = 1},  //
-    {.canonical = "to_float", .minArgs = 1, .maxArgs = 1},    //
-    {.canonical = "to_double", .minArgs = 1, .maxArgs = 1},   //
+    {.canonical = "Sqrt", .minArgs = 1, .maxArgs = 1},       //
+    {.canonical = "Ceil", .minArgs = 1, .maxArgs = 1},       //
+    {.canonical = "Floor", .minArgs = 1, .maxArgs = 1},      //
+    {.canonical = "Abs", .minArgs = 1, .maxArgs = 1},        //
+    {.canonical = "round", .minArgs = 1, .maxArgs = 1},      //
+    {.canonical = "trunc", .minArgs = 1, .maxArgs = 1},      //
+    {.canonical = "sin", .minArgs = 1, .maxArgs = 1},        //
+    {.canonical = "cos", .minArgs = 1, .maxArgs = 1},        //
+    {.canonical = "exp", .minArgs = 1, .maxArgs = 1},        //
+    {.canonical = "tan", .minArgs = 1, .maxArgs = 1},        //
+    {.canonical = "log", .minArgs = 1, .maxArgs = 1},        //
+    {.canonical = "log2", .minArgs = 1, .maxArgs = 1},       //
+    {.canonical = "isnull", .minArgs = 1, .maxArgs = 1},     //
+    {.canonical = "null2zero", .minArgs = 1, .maxArgs = 1},  // NULL -> 0; wartosc nie-NULL przechodzi bez zmian
+    {.canonical = "IsZero", .minArgs = 1, .maxArgs = 1},     //
+    {.canonical = "IsNonZero", .minArgs = 1, .maxArgs = 1},  //
+    {.canonical = "Length", .minArgs = 1, .maxArgs = 1},     // WYLACZNIE nad napisem — argument liczbowy jest bledem wykonania
+    {.canonical = "to_integer", .minArgs = 1, .maxArgs = 1, .alias = "int"},  //
+    {.canonical = "to_float", .minArgs = 1, .maxArgs = 1, .alias = "float"},  // `FLOAT`/`Float` to token typu
+    {.canonical = "to_double", .minArgs = 1, .maxArgs = 1, .alias = "real"},  //
     {.canonical = "to_string",
      .minArgs   = 1,
-     .maxArgs   = 2},  // drugi argument to ZADEKLAROWANA SZEROKOSC pola, nie wartosc na stosie
+     .maxArgs   = 2,
+     .alias     = "str"},  // drugi argument to ZADEKLAROWANA SZEROKOSC pola, nie wartosc na stosie
 }};
 
-/// @brief Znajdz funkcje po nazwie, ignorujac wielkosc liter.
+/// @brief Znajdz funkcje po nazwie albo skrocie, ignorujac wielkosc liter.
 /// @param name nazwa tak, jak napisal ja autor zapytania
 /// @return wpis tabeli albo nullopt, gdy nazwa jest nieznana
 inline std::optional<RqlFunction> findRqlFunction(std::string_view name) {
@@ -84,8 +93,9 @@ inline std::optional<RqlFunction> findRqlFunction(std::string_view name) {
            });
   };
 
-  const auto *const it =
-      std::ranges::find_if(kRqlFunctions, [&](const RqlFunction &fn) { return sameIgnoringCase(fn.canonical, name); });
+  const auto *const it = std::ranges::find_if(kRqlFunctions, [&](const RqlFunction &fn) {
+    return sameIgnoringCase(fn.canonical, name) || (!fn.alias.empty() && sameIgnoringCase(fn.alias, name));
+  });
   if (it == kRqlFunctions.end()) return std::nullopt;
   return *it;
 }

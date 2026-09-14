@@ -1585,6 +1585,34 @@ TEST(xparser, function_name_is_canonicalized_in_token) {
   }
 }
 
+// Skroty konwersji (2026-09-14 — zapis potoku EKG musial zmiescic sie w kolumnie artykulu):
+// `int` = `to_integer`, `float` = `to_float`, `real` = `to_double`, `str` = `to_string`. Skrot zyje
+// wylacznie w parserze: do tokena idzie postac kanoniczna, wiec ewaluator, typowanie i zrzuty planu
+// go nie znaja. `str(a:8)` sprawdza, ze skrot przechodzi takze przez postac z szerokoscia (CALL2).
+TEST(xparser, conversion_aliases_are_canonicalized_in_token) {
+  const std::vector<std::tuple<std::string, command_id, std::string, rdb::descFld>> cases{
+      {"int(a)", CALL, "to_integer", rdb::INTEGER},  {"INT(a)", CALL, "to_integer", rdb::INTEGER},
+      {"float(a)", CALL, "to_float", rdb::FLOAT},    {"real(a)", CALL, "to_double", rdb::DOUBLE},
+      {"str(a:8)", CALL2, "to_string", rdb::STRING},
+  };
+  for (const auto &[call, command, canonical, type] : cases) {
+    qTree instance;
+    auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, selectRql(call));
+    ASSERT_EQ(parseResult, "OK") << call;
+
+    bool found = false;
+    for (const auto &q : instance)
+      for (const auto &f : q.lSchema)
+        for (const auto &tk : f.lProgram)
+          if (tk.getCommandID() == command && tk.getStr_() == canonical) found = true;
+    EXPECT_TRUE(found) << call;
+
+    compiler compilerInstance(instance);
+    ASSERT_EQ(compilerInstance.compile(), "OK") << call;
+    EXPECT_EQ(instance.getQuery("out").lSchema.front().field_.rtype, type) << call;
+  }
+}
+
 // Siedem funkcji bylo zaimplementowanych w ewaluatorze, ale nie stalo ich w gramatyce,
 // wiec byly z RQL nieosiagalne. To odwrotna polowa tej samej rozbieznosci list.
 TEST(xparser, implemented_functions_are_reachable_from_rql) {
@@ -3255,7 +3283,7 @@ TEST(xcompiler, rejects_a_stream_reducer_used_as_a_field_reference) {
 TEST(xcompiler, keeps_the_working_ways_of_reading_a_stream_reducer) {
   qTree fullScan;
   auto [scanParse, scanKeyword, scanStream] = parserRQLString(fullScan, R"(
-        DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'src.txt'
+        DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'
         SELECT * STREAM o FROM AVG(src)
       )");
   ASSERT_EQ(scanParse, "OK");
@@ -3266,7 +3294,7 @@ TEST(xcompiler, keeps_the_working_ways_of_reading_a_stream_reducer) {
 
   qTree materialized;
   auto [matParse, matKeyword, matStream] = parserRQLString(materialized, R"(
-        DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'src.txt'
+        DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'
         SELECT * STREAM m FROM AVG(src)
         SELECT m[0]*2 STREAM o FROM m
       )");
@@ -3287,7 +3315,7 @@ TEST(xcompiler, keeps_the_working_ways_of_reading_a_stream_reducer) {
 TEST(xcompiler, rejects_sqrt_over_a_rational_value) {
   qTree plan;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, R"(
-        DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'src.txt'
+        DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'
         SELECT * STREAM m FROM AVG(src)
         SELECT Sqrt(m[0]) STREAM o FROM m
       )");
@@ -3306,7 +3334,7 @@ TEST(xcompiler, rejects_sqrt_over_a_rational_value) {
 TEST(xcompiler, rejects_sqrt_over_a_rational_value_in_a_rule_condition) {
   qTree plan;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, R"(
-        DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'src.txt'
+        DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'
         SELECT * STREAM m FROM AVG(src)
         RULE r1 ON m WHEN Sqrt(m[0]) > 1 DO DUMP -5 TO 5
       )");
@@ -3316,6 +3344,31 @@ TEST(xcompiler, rejects_sqrt_over_a_rational_value_in_a_rule_condition) {
   const auto result = instance.compile();
   EXPECT_NE(result, "OK") << "Sqrt nad RATIONAL w warunku reguly przeszlo kompilacje";
   EXPECT_NE(result.find("rule condition"), std::string::npos) << result;
+}
+
+// Zrodla reduktorow w testach bramki sa CALKOWITE, bo tylko nad nimi redukcja daje RATIONAL
+// (reductionResultField). Do 2026-09-14 testy braly zrodlo DOUBLE i trafialy w RATIONAL wylacznie
+// dzieki temu, ze buildOutputSchema() wpisywal go na sztywno — nad DOUBLE wynik jest DOUBLE
+// i `Sqrt` jest tam poprawny.
+//
+// Ten wpis to warunek reguly nad JAWNA lista pol reduktora. Warunek czyta pole WYJSCIOWE, a do
+// 2026-09-14 jawna lista nad reduktorem zostawala przy INTEGER z parsera — `Sqrt(m[0])` przechodzilo
+// bramke, choc w rekordzie lezy obciety wynik redukcji RATIONAL.
+TEST(xcompiler, rejects_sqrt_in_a_rule_over_an_explicit_reducer_field) {
+  qTree plan;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, R"(
+        DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'
+        SELECT m[0] STREAM m FROM AVG(src)
+        RULE r1 ON m WHEN Sqrt(m[0]) > 1 DO DUMP -5 TO 5
+      )");
+  ASSERT_EQ(parseResult, "OK");
+
+  compiler instance(plan);
+  const auto result = instance.compile();
+  EXPECT_NE(result, "OK") << "Sqrt nad polem reduktora w warunku reguly przeszlo kompilacje";
+  EXPECT_NE(result.find("rule condition"), std::string::npos) << result;
+  ASSERT_EQ(plan.getQuery("m").lSchema.size(), 1u);
+  EXPECT_EQ(plan.getQuery("m").lSchema.front().field_.rtype, rdb::RATIONAL);
 }
 
 // Kontrole pozytywne: bramka ma siegac WYLACZNIE po pare (Sqrt, RATIONAL).
@@ -3328,7 +3381,8 @@ TEST(xcompiler, keeps_sqrt_where_it_was_never_unsafe) {
   qTree plan;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, R"(
         DECLARE d DOUBLE, k INTEGER STREAM src, 1 FILE 'src.txt'
-        SELECT * STREAM m FROM AVG(src)
+        DECLARE i INTEGER STREAM isrc, 1 FILE 'isrc.txt'
+        SELECT * STREAM m FROM AVG(isrc)
         SELECT Sqrt(to_double(m[0])) STREAM viaDouble FROM m
         SELECT Sqrt(d) STREAM overDouble  FROM src
         SELECT Sqrt(k) STREAM overInteger FROM src
@@ -3361,7 +3415,7 @@ TEST(xcompiler, rejects_irrational_functions_over_a_rational_value) {
   for (const char *call : {"sin(m[0])", "cos(m[0])", "exp(m[0])", "tan(m[0])", "log(m[0])", "log2(m[0])"}) {
     qTree plan;
     auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, std::format(R"(
-        DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'src.txt'
+        DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'
         SELECT * STREAM m FROM AVG(src)
         SELECT {} STREAM o FROM m
       )",
@@ -3382,7 +3436,7 @@ TEST(xcompiler, rejects_irrational_functions_over_a_rational_value_in_a_rule_con
   for (const char *call : {"sin(m[0])", "cos(m[0])", "exp(m[0])", "tan(m[0])", "log(m[0])", "log2(m[0])"}) {
     qTree plan;
     auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, std::format(R"(
-        DECLARE a DOUBLE, b DOUBLE STREAM src, 1 FILE 'src.txt'
+        DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'
         SELECT * STREAM m FROM AVG(src)
         RULE r1 ON m WHEN {} > 1 DO DUMP -5 TO 5
       )",
@@ -3403,7 +3457,8 @@ TEST(xcompiler, irrational_functions_yield_double_over_inexact_and_integer_argum
   qTree plan;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, R"(
         DECLARE d DOUBLE, k INTEGER STREAM src, 1 FILE 'src.txt'
-        SELECT * STREAM m FROM AVG(src)
+        DECLARE i INTEGER STREAM isrc, 1 FILE 'isrc.txt'
+        SELECT * STREAM m FROM AVG(isrc)
         SELECT sin(to_double(m[0])) STREAM viaDouble    FROM m
         SELECT cos(d)               STREAM overDouble   FROM src
         SELECT exp(k)               STREAM overInteger  FROM src

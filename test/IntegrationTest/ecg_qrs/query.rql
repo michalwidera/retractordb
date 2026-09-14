@@ -27,25 +27,33 @@ DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 FILE 'ecgdata'
 DECLARE bp_coef INTEGER[25] STREAM bpf, 1 FILE 'bp_coef.txt'
 DECLARE d_coef INTEGER[5] STREAM df, 1 FILE 'd_coef.txt'
 
+# Potok liczy w arytmetyce CALKOWITEJ: kazdy wynik reduktora (SUMC, AVG, MAX) wraca
+# do INTEGER jawnym `int` (skrot `to_integer`). Wynik reduktora nad polem calkowitym
+# jest RATIONAL. Do 2026-09-14 jawna lista pol nad reduktorem zapisywala go po cichu
+# jako INTEGER, z obcieciem — i na tym obcieciu stal ten potok. Bez rzutowan mianowniki
+# rosna etap po etapie (/1000, kwadrat, srednia z 30) i `rational<int>` przepelnia sie
+# bez ostrzezenia: `mwi` wychodzilo ujemne. Rzutowania odtwarzaja dotychczasowy wynik
+# bajt w bajt, wiec pattern.txt sie nie zmienil.
+
 # Wyodrebnienie kanalu MLII
 SELECT ecg.MLII STREAM mlii FROM ecg VOLATILE
 
 # 1. Filtr pasmowoprzepustowy (5-15 Hz) — splot FIR 25-tap
 SELECT mlii[_]*bpf[_] STREAM bp_acc FROM mlii@(1,25)+bpf VOLATILE
-SELECT bp_acc[0]/1000 STREAM bp_out FROM SUMC(bp_acc)
+SELECT int(bp_acc[0]/1000) STREAM bp_out FROM SUMC(bp_acc)
 
 # 2. Rozniczkowanie — splot FIR 5-tap
 SELECT bp_out[_]*df[_] STREAM d_acc FROM bp_out@(1,5)+df VOLATILE
-SELECT d_acc[0] STREAM d_out FROM SUMC(d_acc) VOLATILE
+SELECT int(d_acc[0]) STREAM d_out FROM SUMC(d_acc) VOLATILE
 
 # 3. Kwadrat (dzielenie /1000 zapobiega przepelnieniu int32)
 SELECT d_out[0]^2/1000 STREAM sq_out FROM d_out VOLATILE
 
 # 4. Calkowanie w oknie ruchomym 30 probek (~83 ms)
-SELECT sq_out[0] STREAM mwi FROM AVG(sq_out@(1,30))
+SELECT int(sq_out[0]) STREAM mwi FROM AVG(sq_out@(1,30))
 
 # 5. Prog adaptacyjny — srednia ruchoma 180 probek (0.5 s)
-SELECT mwi[0] STREAM mwi_thr FROM AVG(mwi@(1,180)) VOLATILE
+SELECT int(mwi[0]) STREAM mwi_thr FROM AVG(mwi@(1,180)) VOLATILE
 
 # Wyjscie: MLII wycentrowane, obwiednia x5, sygnal detekcji x5
 SELECT mlii[0]-900, mwi[0]*5, (mwi[0]-mwi_thr[0]*2)*5 STREAM qrs_out FROM mlii+mwi+mwi_thr
@@ -61,6 +69,7 @@ SELECT mlii[0]-900, mwi[0]*5, (mwi[0]-mwi_thr[0]*2)*5 STREAM qrs_out FROM mlii+m
 # ogon = ceil(360/7)-1 = 51, a przy floor 50.
 #
 # Zrodlem jest bp_out, a nie mwi, bo bp_out niesie 76 roznych wartosci, a mwi
-# tylko trzy — po zdziesiatkowaniu mwi wzorzec rozrozniałby przesuniecie
-# wylacznie liczba rekordow, nie trescia.
-SELECT bp_out[0] STREAM bp_dec FROM MAX(bp_out@(7,-21))
+# tylko trzy (calkowita srednia kwadratow podzielonych przez 1000) — po
+# zdziesiatkowaniu mwi wzorzec rozrozniałby przesuniecie wylacznie liczba
+# rekordow, nie trescia.
+SELECT int(bp_out[0]) STREAM bp_dec FROM MAX(bp_out@(7,-21))

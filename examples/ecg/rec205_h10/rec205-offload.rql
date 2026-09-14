@@ -43,6 +43,10 @@ DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 FILE '../rec205/rec205'
 DECLARE bp_coef INTEGER[25] STREAM bpf, 1 FILE '../rec205/bp_coef.txt'
 DECLARE d_coef INTEGER[5] STREAM df, 1 FILE '../rec205/d_coef.txt'
 
+# Potok liczy w arytmetyce CALKOWITEJ: wynik SUMC/AVG nad polem INTEGER jest RATIONAL,
+# wiec kazdy wraca do INTEGER jawnym `int` (skrot `to_integer`). Bez rzutowan mianowniki
+# rosna etap po etapie i `rational<int>` przepelnia sie bez ostrzezenia.
+
 # Odniesienie: to, co lacze musialoby przeniesc surowo (oba kanaly, pelne tempo)
 SELECT ecg.MLII, ecg.V1 STREAM ecg_raw FROM ecg
 
@@ -54,20 +58,20 @@ SELECT ecg.MLII STREAM mlii FROM ecg VOLATILE
 # `[_]` bierze szerokosc ze schematu tej klauzuli, czyli 25 slotow, ktore wnosi tam okno
 # nad `mlii` — a nie z wlasnej szerokosci strumienia `mlii`.
 SELECT mlii[_]*bpf[_] STREAM bp_acc FROM mlii@(1,25)+bpf VOLATILE
-SELECT bp_acc[0]/1000 STREAM bp_out FROM SUMC(bp_acc) VOLATILE
+SELECT int(bp_acc[0]/1000) STREAM bp_out FROM SUMC(bp_acc) VOLATILE
 
 # 2. Rozniczkowanie — splot FIR 5-tap, ten sam zapis co krok 1
 SELECT bp_out[_]*df[_] STREAM d_acc FROM bp_out@(1,5)+df VOLATILE
-SELECT d_acc[0] STREAM d_out FROM SUMC(d_acc) VOLATILE
+SELECT int(d_acc[0]) STREAM d_out FROM SUMC(d_acc) VOLATILE
 
 # 3. Kwadrat (dzielenie /1000 zapobiega przepelnieniu int32)
 SELECT d_out[0]^2/1000 STREAM sq_out FROM d_out VOLATILE
 
 # 4. Calkowanie w oknie ruchomym 30 probek (~83 ms) — ogranicza pasmo
-SELECT sq_out[0] STREAM mwi FROM AVG(sq_out@(1,30)) VOLATILE
+SELECT int(sq_out[0]) STREAM mwi FROM AVG(sq_out@(1,30)) VOLATILE
 
 # 5. Prog adaptacyjny — srednia ruchoma 180 probek (0.5 s)
-SELECT mwi[0] STREAM mwi_thr FROM AVG(mwi@(1,180)) VOLATILE
+SELECT int(mwi[0]) STREAM mwi_thr FROM AVG(mwi@(1,180)) VOLATILE
 
 # Cecha przesylana dalej: obwiednia i sygnal detekcji, pelne tempo
 SELECT mwi[0]*5, (mwi[0]-mwi_thr[0]*2)*5 STREAM qrs_feat FROM mwi+mwi_thr VOLATILE

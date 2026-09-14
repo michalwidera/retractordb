@@ -20,7 +20,7 @@ str0(1/10)	tail=1
 str1(1/10)	tail=1
 	:- PUSH_STREAM(str0)
 	:- STREAM_MAX
-	str1_0: INTEGER
+	str1_0: RATIONAL
 		PUSH_ID(str1[0])
 str2(1/10)	tail=1
 	:- PUSH_STREAM(str0)
@@ -30,5 +30,5 @@ str2(1/10)	tail=1
 		PUSH_ID(str2[0])
 	str0_1: INTEGER
 		PUSH_ID(str2[1])
-	str1_2: INTEGER
+	str1_2: RATIONAL
 		PUSH_ID(str2[2])
