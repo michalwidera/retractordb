@@ -6,7 +6,7 @@
 #include <algorithm>   // std::ranges::transform
 #include <cctype>      // std::tolower
 #include <cmath>       // sqrt, std::fabs
-#include <cstdlib>     // std::abs
+#include <cstdlib>     // atoi
 #include <functional>  // std::function
 #include <limits>      // std::numeric_limits
 #include <optional>
@@ -19,6 +19,7 @@
 #include <variant>
 #include "fatalError.hpp"
 
+#include "checkedArith.hpp"
 #include "rdb/convertTypes.hpp"
 #include "rdb/probe.hpp"
 
@@ -91,6 +92,14 @@ pairVar normalize(const rdb::descFldVT &a, const rdb::descFldVT &b) {
   return {castFldVT(a, static_cast<rdb::descFld>(b.index())), b};
 }
 
+/// Wynik z checkedArith jako wartosc wyrazenia. Przepelnienie INTEGER albo RATIONAL nie ma wyniku
+/// w zbiorze wartosci typu, wiec jest NULL — ta sama decyzja co przy dzieleniu przez zero ponizej.
+/// Do 2026-09-14 wynik zawijal sie po cichu: `9/1 * 1000000000` zapisywalo 410065408/1.
+template <typename T>
+rdb::descFldVT orNull(const std::optional<T> &value) {
+  return value.has_value() ? rdb::descFldVT{*value} : rdb::descFldVT{std::monostate{}};
+}
+
 rdb::descFldVT operator+(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
   if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
@@ -100,14 +109,14 @@ rdb::descFldVT operator+(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   if (typeid(a) != typeid(b)) FatalError("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },       //
-                 [&retVal](uint8_t a, uint8_t b) { retVal = a + b; },                            //
-                 [&retVal](int a, int b) { retVal = a + b; },                                    //
-                 [&retVal](unsigned a, unsigned b) { retVal = a + b; },                          //
-                 [&retVal](const std::string &a, const std::string &b) { retVal = a + b; },      //
-                 [&retVal](double a, double b) { retVal = a + b; },                              //
-                 [&retVal](float a, float b) { retVal = a + b; },                                //
-                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a + b; },  //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                                 //
+                 [&retVal](uint8_t a, uint8_t b) { retVal = a + b; },                                                      //
+                 [&retVal](int a, int b) { retVal = orNull(checkedArith::add(a, b)); },                                    //
+                 [&retVal](unsigned a, unsigned b) { retVal = a + b; },                                                    //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = a + b; },                                //
+                 [&retVal](double a, double b) { retVal = a + b; },                                                        //
+                 [&retVal](float a, float b) { retVal = a + b; },                                                          //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::add(a, b)); },  //
                  [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
                    retVal = std::make_pair(a.first + b.first, a.second + b.second);
                  },
@@ -132,14 +141,14 @@ rdb::descFldVT operator-(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },  //
                  [&retVal](uint8_t a, uint8_t b) { retVal = a - b; },                       //
-                 [&retVal](int a, int b) { retVal = a - b; },                               //
+                 [&retVal](int a, int b) { retVal = orNull(checkedArith::sub(a, b)); },     //
                  [&retVal](unsigned a, unsigned b) { retVal = a - b; },                     //
                  [](const std::string &, const std::string &) {
                    throw std::runtime_error("Operator '-' not defined for string operands");
-                 },                                                                              //
-                 [&retVal](double a, double b) { retVal = a - b; },                              //
-                 [&retVal](float a, float b) { retVal = a - b; },                                //
-                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a - b; },  //
+                 },                                                                                                        //
+                 [&retVal](double a, double b) { retVal = a - b; },                                                        //
+                 [&retVal](float a, float b) { retVal = a - b; },                                                          //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::sub(a, b)); },  //
                  [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
                    retVal = std::make_pair(a.first - b.first, a.second - b.second);
                  },
@@ -164,14 +173,14 @@ rdb::descFldVT operator*(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },  //
                  [&retVal](uint8_t a, uint8_t b) { retVal = a * b; },                       //
-                 [&retVal](int a, int b) { retVal = a * b; },                               //
+                 [&retVal](int a, int b) { retVal = orNull(checkedArith::mul(a, b)); },     //
                  [&retVal](unsigned a, unsigned b) { retVal = a * b; },                     //
                  [](const std::string &, const std::string &) {
                    throw std::runtime_error("Operator '*' not defined for string operands");
-                 },                                                                              //
-                 [&retVal](double a, double b) { retVal = a * b; },                              //
-                 [&retVal](float a, float b) { retVal = a * b; },                                //
-                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a * b; },  //
+                 },                                                                                                        //
+                 [&retVal](double a, double b) { retVal = a * b; },                                                        //
+                 [&retVal](float a, float b) { retVal = a * b; },                                                          //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::mul(a, b)); },  //
                  [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
                    retVal = std::make_pair(a.first * b.first, a.second * b.second);
                  },
@@ -215,14 +224,14 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },  //
                  [&retVal](uint8_t a, uint8_t b) { retVal = a / b; },                       //
-                 [&retVal](int a, int b) { retVal = a / b; },                               //
+                 [&retVal](int a, int b) { retVal = orNull(checkedArith::div(a, b)); },     //
                  [&retVal](unsigned a, unsigned b) { retVal = a / b; },                     //
                  [](const std::string &, const std::string &) {
                    throw std::runtime_error("Operator '/' not defined for string operands");
-                 },                                                                              //
-                 [&retVal](double a, double b) { retVal = a / b; },                              //
-                 [&retVal](float a, float b) { retVal = a / b; },                                //
-                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = a / b; },  //
+                 },                                                                                                        //
+                 [&retVal](double a, double b) { retVal = a / b; },                                                        //
+                 [&retVal](float a, float b) { retVal = a / b; },                                                          //
+                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::div(a, b)); },  //
                  [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
                    retVal = std::make_pair(a.first / b.first, a.second / b.second);
                  },  //
@@ -542,9 +551,9 @@ rdb::descFldVT neg(const rdb::descFldVT &inVar) {
   std::visit(Overload{
                  [&retVal](std::monostate) { retVal = std::monostate{}; },                            //
                  [&retVal](uint8_t a) { retVal = static_cast<uint8_t>(~a); },                         // xor ?
-                 [&retVal](int a) { retVal = -a; },                                                   //
+                 [&retVal](int a) { retVal = orNull(checkedArith::neg(a)); },                         //
                  [&retVal](unsigned a) { retVal = (~a); },                                            // xor ?
-                 [&retVal](boost::rational<int> a) { retVal = -a; },                                  //
+                 [&retVal](boost::rational<int> a) { retVal = orNull(checkedArith::neg(a)); },        //
                  [&retVal](float a) { retVal = -a; },                                                 //
                  [&retVal](double a) { retVal = -a; },                                                //
                  [&retVal](std::pair<int, int> a) { retVal = std::make_pair(-a.first, -a.second); },  //
@@ -574,13 +583,13 @@ rdb::descFldVT absolute(const rdb::descFldVT &inVar) {
   if (isNullValue(inVar)) return std::monostate{};
 
   rdb::descFldVT retVal;
-  std::visit(Overload{[&retVal](std::monostate) { retVal = std::monostate{}; },  //
-                      [&retVal](uint8_t a) { retVal = a; },                      // bez znaku — tozsamosc
-                      [&retVal](int a) { retVal = std::abs(a); },                //
-                      [&retVal](unsigned a) { retVal = a; },                     // bez znaku — tozsamosc
-                      [&retVal](boost::rational<int> a) { retVal = (a < boost::rational<int>(0)) ? -a : a; },  //
-                      [&retVal](float a) { retVal = std::fabs(a); },                                           //
-                      [&retVal](double a) { retVal = std::fabs(a); },                                          //
+  std::visit(Overload{[&retVal](std::monostate) { retVal = std::monostate{}; },                 //
+                      [&retVal](uint8_t a) { retVal = a; },                                     // bez znaku — tozsamosc
+                      [&retVal](int a) { retVal = a < 0 ? orNull(checkedArith::neg(a)) : a; },  //
+                      [&retVal](unsigned a) { retVal = a; },                                    // bez znaku — tozsamosc
+                      [&retVal](boost::rational<int> a) { retVal = a < 0 ? orNull(checkedArith::neg(a)) : a; },  //
+                      [&retVal](float a) { retVal = std::fabs(a); },                                             //
+                      [&retVal](double a) { retVal = std::fabs(a); },                                            //
                       [](std::pair<int, int>) { throw std::runtime_error("Function 'Abs' not defined for INTPAIR operands"); },
                       [](const std::pair<std::string, int> &) {
                         throw std::runtime_error("Function 'Abs' not defined for IDXPAIR operands");

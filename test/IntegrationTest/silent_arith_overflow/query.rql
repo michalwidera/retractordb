@@ -1,0 +1,52 @@
+# Przepelnienie arytmetyki wartosci daje NULL w polu, tak jak dzielenie przez zero.
+# INTEGER to int32, RATIONAL to boost::rational<int>. W kazdej parze pole na granicy liczy sie
+# dokladnie, a pole o krok dalej przepelnia sie i ma byc NULL, nie zawinieta liczba.
+#
+# Zadne wyrazenie nie ma dwoch stalych przy `+`, `-` ani `*`, zeby regula B (reasocjacja stalych) nie miala
+# czego przepisywac — wynik nie zalezy od RDB_OPT_SIMPLIFY_EXPRESSIONS.
+
+STORAGE 'temp'
+
+DECLARE a INTEGER, b INTEGER \
+STREAM s, 1 \
+FILE 's.txt'
+
+DECLARE c INTEGER, d INTEGER \
+STREAM big, 1 \
+FILE 'big.txt'
+
+DECLARE e INTEGER \
+STREAM lo, 1 \
+FILE 'lo.txt'
+
+# t = 7 + 2 = 9/1 (RATIONAL)
+SELECT t[0] \
+STREAM t \
+FROM s.sumc
+
+SELECT t[0] * 200000000, t[0] * 1000000000, t[0] + 2147483638, t[0] + 2147483639, t[0] / 1000000000 / 2, t[0] / 1000000000 / 7 \
+STREAM v \
+FROM t
+
+SELECT s[0] * 300000000, s[0] * 1000000000, s[0] + 2147483640, s[0] + 2147483641 \
+STREAM iv \
+FROM s
+
+# lo = -2147483646; lo - 2 to dokladnie INT_MIN
+SELECT lo[0] - 2, lo[0] - 3 \
+STREAM ilo \
+FROM lo
+
+# big = 2000000000 w obu polach kazdego rekordu. Reduktor sumuje pola rekordu, okno SUMC/AVG
+# sumuje big[0] z dwoch kolejnych rekordow — w obu przypadkach suma dwoch wartosci przepelnia int32.
+SELECT * \
+STREAM bs \
+FROM big.sumc
+
+SELECT * \
+STREAM ba \
+FROM big.avg
+
+SELECT SUMC(big[0]:2), AVG(big[0]:2), MAX(big[0]:2) \
+STREAM bw \
+FROM big

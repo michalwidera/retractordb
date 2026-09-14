@@ -4,6 +4,7 @@
 #include <boost/rational.hpp>
 
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -1857,4 +1858,99 @@ TEST(xExpressionEval, pow_on_exact_types_matches_multiplication) {
     expressionEvaluator test;
     EXPECT_TRUE(test.eval(asPower) == test.eval(asProduct)) << "wykladnik " << item.exponent;
   }
+}
+
+// Przepelnienie arytmetyki wartosci (2026-09-14). INTEGER to int32, RATIONAL to
+// boost::rational<int>; wynik spoza zakresu jest NULL, tak jak dzielenie przez zero — nie
+// zawinieta liczba. Kazdy przypadek ma pare: wynik dokladnie na granicy i o krok za nia.
+namespace {
+
+rdb::descFldVT evalBinary(const rdb::descFldVT &a, const rdb::descFldVT &b, command_id op) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, a);
+  program.emplace_back(PUSH_VAL, b);
+  program.emplace_back(op);
+  expressionEvaluator test;
+  return test.eval(program);
+}
+
+rdb::descFldVT evalUnary(const rdb::descFldVT &a, const token &op) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, a);
+  program.push_back(op);
+  expressionEvaluator test;
+  return test.eval(program);
+}
+
+bool isNull(const rdb::descFldVT &value) { return std::holds_alternative<std::monostate>(value); }
+
+constexpr int intMax = std::numeric_limits<int>::max();
+constexpr int intMin = std::numeric_limits<int>::min();
+
+}  // namespace
+
+TEST(xExpressionEval, int_overflow_returns_null) {
+  EXPECT_EQ(evalBinary(7, 300000000, MULTIPLY), rdb::descFldVT{2100000000});
+  EXPECT_TRUE(isNull(evalBinary(7, 1000000000, MULTIPLY)));
+  EXPECT_EQ(evalBinary(-2, 1073741824, MULTIPLY), rdb::descFldVT{intMin});
+  EXPECT_TRUE(isNull(evalBinary(2, 1073741824, MULTIPLY)));
+
+  EXPECT_EQ(evalBinary(intMax - 7, 7, ADD), rdb::descFldVT{intMax});
+  EXPECT_TRUE(isNull(evalBinary(intMax - 6, 7, ADD)));
+  EXPECT_EQ(evalBinary(intMin + 3, 3, SUBTRACT), rdb::descFldVT{intMin});
+  EXPECT_TRUE(isNull(evalBinary(intMin + 2, 3, SUBTRACT)));
+
+  EXPECT_EQ(evalBinary(intMin, 1, DIVIDE), rdb::descFldVT{intMin});
+  EXPECT_TRUE(isNull(evalBinary(intMin, -1, DIVIDE)));
+
+  EXPECT_EQ(evalUnary(intMin + 1, token(NEGATE)), rdb::descFldVT{intMax});
+  EXPECT_TRUE(isNull(evalUnary(intMin, token(NEGATE))));
+  EXPECT_EQ(evalUnary(intMin + 1, token(CALL, std::string("Abs"))), rdb::descFldVT{intMax});
+  EXPECT_TRUE(isNull(evalUnary(intMin, token(CALL, std::string("Abs")))));
+
+  // `^` nad typem dokladnym jest iloczynem, wiec dziedziczy te sama kontrole.
+  EXPECT_EQ(evalBinary(2, 30, POWER), rdb::descFldVT{1073741824});
+  EXPECT_TRUE(isNull(evalBinary(2, 31, POWER)));
+
+  // BYTE promuje sie do int, wiec 255*255 nie jest przepelnieniem.
+  EXPECT_EQ(evalBinary(uint8_t(255), uint8_t(255), MULTIPLY), rdb::descFldVT{65025});
+}
+
+TEST(xExpressionEval, rational_overflow_returns_null) {
+  using R = boost::rational<int>;
+
+  EXPECT_EQ(evalBinary(R(9), R(200000000), MULTIPLY), rdb::descFldVT{R(1800000000)});
+  EXPECT_TRUE(isNull(evalBinary(R(9), R(1000000000), MULTIPLY)));
+  // Skrocenie na krzyz miesci wynik, choc iloczyn licznikow nie miesci sie w int32.
+  EXPECT_EQ(evalBinary(R(2000000000, 3), R(3, 2000000000), MULTIPLY), rdb::descFldVT{R(1)});
+  EXPECT_TRUE(isNull(evalBinary(R(9, 1000000000), R(1, 7), MULTIPLY)));
+
+  EXPECT_EQ(evalBinary(R(9), R(1000000000), DIVIDE), rdb::descFldVT{R(9, 1000000000)});
+  EXPECT_TRUE(isNull(evalBinary(R(9, 1000000000), R(7), DIVIDE)));
+
+  EXPECT_EQ(evalBinary(R(intMax - 9), R(9), ADD), rdb::descFldVT{R(intMax)});
+  EXPECT_TRUE(isNull(evalBinary(R(intMax - 8), R(9), ADD)));
+  // Wspolny mianownik poza int32, ale wynik po skroceniu sie miesci: 1/65536 + 1/65536 = 1/32768.
+  EXPECT_EQ(evalBinary(R(1, 65536), R(1, 65536), ADD), rdb::descFldVT{R(1, 32768)});
+  EXPECT_TRUE(isNull(evalBinary(R(1, 65536), R(1, 65537), ADD)));
+  EXPECT_EQ(evalBinary(R(intMin + 9), R(9), SUBTRACT), rdb::descFldVT{R(intMin)});
+  EXPECT_TRUE(isNull(evalBinary(R(intMin + 8), R(9), SUBTRACT)));
+  // Te same granice poza skrotem calkowitym (mianownik rozny od 1) liczy sciezka int64.
+  EXPECT_EQ(evalBinary(R(3, 65536), R(1, 65536), SUBTRACT), rdb::descFldVT{R(1, 32768)});
+  EXPECT_TRUE(isNull(evalBinary(R(1, 65536), R(1, 65537), SUBTRACT)));
+  EXPECT_EQ(evalBinary(R(intMax, 2), R(intMax, 2), ADD), rdb::descFldVT{R(intMax)});
+
+  EXPECT_TRUE(isNull(evalUnary(R(intMin), token(NEGATE))));
+  EXPECT_TRUE(isNull(evalUnary(R(intMin), token(CALL, std::string("Abs")))));
+  EXPECT_EQ(evalUnary(R(intMin + 1, 3), token(NEGATE)), rdb::descFldVT{R(intMax, 3)});
+
+  // Po przepelnieniu wynik NULL pochlania dalsza arytmetyke, jak kazdy NULL.
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, R(9));
+  program.emplace_back(PUSH_VAL, R(1000000000));
+  program.emplace_back(MULTIPLY);
+  program.emplace_back(PUSH_VAL, R(1000000000));
+  program.emplace_back(DIVIDE);
+  expressionEvaluator test;
+  EXPECT_TRUE(isNull(test.eval(program)));
 }

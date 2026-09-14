@@ -11,6 +11,7 @@
 
 #include "fatalError.hpp"
 
+#include "checkedArith.hpp"
 #include "executorsmState.hpp"
 #include "expressionEvaluator.hpp"
 #include "persistentCounter.hpp"
@@ -175,10 +176,40 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
 
 enum opType : std::uint8_t { maxop, minop, sumop, avgop };
 
+// Suma i iloraz redukcji, zapisywane wprost do wyniku. RATIONAL idzie przez checkedArith:
+// przepelnienie daje NULL (monostate), tak jak w expressionEvaluator. Do 2026-09-14 suma dwoch
+// 2e9 zapisywala -294967296/1. FLOAT i DOUBLE licza sie jak dotad.
+template <typename T>
+void storeSum(T a, T b, rdb::descFldVT &result) {
+  result = a + b;
+}
+
+template <typename T>
+void storeQuotient(T a, T b, rdb::descFldVT &result) {
+  result = a / b;
+}
+
+void storeChecked(const std::optional<boost::rational<int>> &value, rdb::descFldVT &result) {
+  if (value.has_value())
+    result = *value;
+  else
+    result = std::monostate{};
+}
+
+void storeSum(boost::rational<int> a, boost::rational<int> b, rdb::descFldVT &result) {
+  storeChecked(checkedArith::add(a, b), result);
+}
+
+void storeQuotient(boost::rational<int> a, boost::rational<int> b, rdb::descFldVT &result) {
+  storeChecked(checkedArith::div(a, b), result);
+}
+
 // P1-E3b: operacja redukcji na wariancie zamiast na std::any. Argument przez
 // referencje (byl przez wartosc -> kopia any per element okna redukcji).
 template <typename T>
 void fnOp(opType op, const rdb::descFldVT &value, rdb::descFldVT &valueRet) {
+  // NULL po przepelnieniu sumy pochlania reszte redukcji, lacznie ze srednia.
+  if (std::holds_alternative<std::monostate>(valueRet)) return;
   T val1 = std::get<T>(valueRet);
   T val2 = std::get<T>(value);
   switch (op) {
@@ -189,14 +220,10 @@ void fnOp(opType op, const rdb::descFldVT &value, rdb::descFldVT &valueRet) {
       if (val1 > val2) valueRet = value;
       break;
     case sumop:
-      try {
-        valueRet = val1 + val2;
-      } catch (...) {
-        valueRet = std::numeric_limits<T>::max();
-      }
+      storeSum(val1, val2, valueRet);
       break;
     case avgop:
-      valueRet = val1 / val2;
+      storeQuotient(val1, val2, valueRet);
       break;
     default:
       FatalError("streamInstance::fnOp: unsupported opType");
@@ -461,7 +488,11 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   }
 
   auto postion{0};
-  localPayload.setItemVT(postion, valueRet);
+  // monostate w std::optional nie jest NULL-em dla setItemVT — przepelnienie trzeba zapisac jawnie.
+  if (std::holds_alternative<std::monostate>(valueRet))
+    localPayload.setItemVT(postion, std::nullopt);
+  else
+    localPayload.setItemVT(postion, valueRet);
 
   return localPayload;
 }

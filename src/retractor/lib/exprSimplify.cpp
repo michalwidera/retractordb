@@ -145,6 +145,15 @@ std::optional<command_id> foldOperator(command_id tailOp, command_id op, bool co
 }
 
 /// Reguła B — łączy dwie stałe rozdzielone podwyrażeniem.
+///
+/// Przepełnienie INTEGER i RATIONAL daje w ewaluatorze NULL (od 2026-09-14, checkedArith.hpp).
+/// Przepisanie może więc usunąć przepełnienie pośrednie: `(E+1)-1` dla E = INT_MAX bez reguły
+/// daje NULL, bo przepełnia się `E+1`, a po przepisaniu na `E+0` daje dokładnie INT_MAX.
+/// Odwrotnie być nie może: stała zwija się tylko wtedy, gdy `c1 ? c2` się mieści (foldConstants
+/// oddaje nullopt dla NULL), a jedynym wynikiem pośrednim formy przepisanej jest wynik końcowy,
+/// który forma krokowa i tak musiała osiągnąć. Przy RDB_OPT_SIMPLIFY_EXPRESSIONS=ON wynik jest
+/// zatem co najwyżej BARDZIEJ określony: NULL (OFF) wobec dokładnej wartości (ON), nigdy inna
+/// liczba. Decyzja z 2026-09-14: przyjęte i opisane, reguła bez zmian.
 std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant, command_id op) {
   if (!left.tail.has_value()) return std::nullopt;
   const auto &tail = *left.tail;
