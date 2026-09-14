@@ -169,11 +169,12 @@ outputAll(1/50)	tail=49	origin=24
 	:- PUSH_STREAM(output)
 	:- PUSH_STREAM(source)
 	:- STREAM_ADD
-	outputAll_0: RATIONAL
+	outputAll_0: INTEGER
 		PUSH_ID(outputAll[0])
 		PUSH_VAL(25)
 		DIVIDE
 		PUSH_VAL(1000)
 		DIVIDE
+		CALL(to_integer)
 	outputAll_1: BYTE
 		PUSH_ID(outputAll[1])
