@@ -1,0 +1,33 @@
+# Reduktory nad polami jednego rekordu.
+#
+# MAX nad FLOAT/DOUBLE startowal od numeric_limits<T>::min(), czyli od NAJMNIEJSZEJ DODATNIEJ
+# liczby, wiec maksimum samych ujemnych wartosci wychodzilo 1.17549e-38. MIN jest kontrola.
+#
+# AVG dzielil sume przez liczbe pol rzutowana na uint8_t: 256 pol dawalo dzielenie przez zero
+# (bad_rational, silnik konczyl sie bledem), 257 pol dzielilo przez 1.
+
+STORAGE 'temp'
+
+DECLARE a FLOAT, b FLOAT \
+STREAM f, 1 \
+FILE 'f.txt'
+
+DECLARE x DOUBLE, y DOUBLE \
+STREAM d, 1 \
+FILE 'd.txt'
+
+DECLARE c INTEGER[256] \
+STREAM w256, 1 \
+FILE 'w256.txt'
+
+DECLARE e INTEGER[257] \
+STREAM w257, 1 \
+FILE 'w257.txt'
+
+SELECT * STREAM fmax FROM f.max
+SELECT * STREAM fmin FROM f.min
+SELECT * STREAM dmax FROM d.max
+
+# srednia 1..256 = 257/2, srednia 1..257 = 129
+SELECT * STREAM avg256 FROM w256.avg
+SELECT * STREAM avg257 FROM w257.avg

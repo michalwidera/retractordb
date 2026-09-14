@@ -384,10 +384,10 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         maxType_ = rdb::RATIONAL;
         break;
       case rdb::FLOAT:
-        valueRet = std::numeric_limits<float>::min();
+        valueRet = std::numeric_limits<float>::lowest();  // min() to najmniejsza DODATNIA
         break;
       case rdb::DOUBLE:
-        valueRet = std::numeric_limits<double>::min();
+        valueRet = std::numeric_limits<double>::lowest();  // min() to najmniejsza DODATNIA
         break;
       default:
         FatalError("streamInstance: unsupported aggregation type");
@@ -457,7 +457,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   }
 
   if (cmd == STREAM_AVG) {
-    rdb::descFldVT value = castVT(rdb::descFldVT{static_cast<uint8_t>(validItemCount)}, maxType_);
+    rdb::descFldVT value = castVT(rdb::descFldVT{validItemCount}, maxType_);
     switch (maxType_) {
       case rdb::BYTE:
       case rdb::INTEGER:
