@@ -1,0 +1,7 @@
+STORAGE 'temp'
+
+DECLARE a INTEGER, b INTEGER STREAM core, 0.1 FILE 'datafile.txt'
+
+SELECT core[_]*10 STREAM win FROM core@(1,2)
+SELECT * STREAM peak FROM MAX(win)
+SELECT peak[0]-core[$] STREAM gap[2] FROM peak+core

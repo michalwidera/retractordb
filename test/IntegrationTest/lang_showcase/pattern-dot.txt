@@ -1,0 +1,32 @@
+digraph structs {
+ node	[shape=record];
+ core	[shape=record,style=filled,fillcolor="#FFF2CC",color=Black,label="core\ninterval=1/10\nDeclaration|{<tag0>a(INTEGER)|<tag1>b(INTEGER)}"]
+ win	[shape=record,style="filled",fillcolor=Gray,color=Black,label="win\ninterval=1/20\ntail=1|{<tag0>win_0(INTEGER)|<tag1>win_1(INTEGER)}"]
+ prg_win	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM core\nSTREAM_AGSE 1,2\n"]
+ peak	[shape=record,style="filled",fillcolor=Gray,color=Black,label="peak\ninterval=1/20\ntail=1|{<tag0>max(RATIONAL)}"]
+ prg_peak	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM win\nSTREAM_MAX 0\n"]
+ "gap$0"	[shape=record,style="filled",fillcolor=Gray,color=Black,label="gap$0\ninterval=1/20\ntail=1|{<tag0>gap$0_0(RATIONAL)}"]
+ "prg_gap$0"	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM peak\nPUSH_STREAM core\nSTREAM_ADD \n"]
+ "gap$1"	[shape=record,style="filled",fillcolor=Gray,color=Black,label="gap$1\ninterval=1/20\ntail=1|{<tag0>gap$1_0(RATIONAL)}"]
+ "prg_gap$1"	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM peak\nPUSH_STREAM core\nSTREAM_ADD \n"]
+"gap$0" -> "prg_gap$0"
+"gap$1" -> "prg_gap$1"
+peak -> prg_peak
+win -> prg_win
+ win_tag0	[shape=record,label="win_0|{PUSH_ID(win[0])|PUSH_VAL(10)|MULTIPLY}"]
+ win_tag1	[shape=record,label="win_1|{PUSH_ID(win[1])|PUSH_VAL(10)|MULTIPLY}"]
+ peak_tag0	[shape=record,label="max|{PUSH_ID(peak[0])}"]
+ "gap$0_tag0"	[shape=record,label="gap$0_0|{PUSH_ID(gap$0[0])|PUSH_ID(gap$0[1])|SUBTRACT}"]
+ "gap$1_tag0"	[shape=record,label="gap$1_0|{PUSH_ID(gap$1[0])|PUSH_ID(gap$1[2])|SUBTRACT}"]
+"gap$0":tag0 -> "gap$0_tag0" [style=dotted]
+"gap$1":tag0 -> "gap$1_tag0" [style=dotted]
+"prg_gap$0" -> core
+"prg_gap$0" -> peak
+"prg_gap$1" -> core
+"prg_gap$1" -> peak
+peak:tag0 -> peak_tag0 [style=dotted]
+prg_peak -> win
+prg_win -> core
+win:tag0 -> win_tag0 [style=dotted]
+win:tag1 -> win_tag1 [style=dotted]
+}

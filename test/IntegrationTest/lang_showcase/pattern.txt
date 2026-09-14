@@ -1,0 +1,36 @@
+:STORAGE	temp/
+core(1/10)	datafile.txt
+	a: INTEGER
+	b: INTEGER
+win(1/20)	tail=1	origin=1
+	:- PUSH_STREAM(core)
+	:- STREAM_AGSE(1,2)
+	win_0: INTEGER
+		PUSH_ID(win[0])
+		PUSH_VAL(10)
+		MULTIPLY
+	win_1: INTEGER
+		PUSH_ID(win[1])
+		PUSH_VAL(10)
+		MULTIPLY
+peak(1/20)	tail=1	origin=1
+	:- PUSH_STREAM(win)
+	:- STREAM_MAX
+	max: RATIONAL
+		PUSH_ID(peak[0])
+gap$0(1/20)	tail=1	origin=1
+	:- PUSH_STREAM(peak)
+	:- PUSH_STREAM(core)
+	:- STREAM_ADD
+	gap$0_0: RATIONAL
+		PUSH_ID(gap$0[0])
+		PUSH_ID(gap$0[1])
+		SUBTRACT
+gap$1(1/20)	tail=1	origin=1
+	:- PUSH_STREAM(peak)
+	:- PUSH_STREAM(core)
+	:- STREAM_ADD
+	gap$1_0: RATIONAL
+		PUSH_ID(gap$1[0])
+		PUSH_ID(gap$1[2])
+		SUBTRACT

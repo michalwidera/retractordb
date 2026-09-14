@@ -1,0 +1,53 @@
+9 Record(s)
+8 Byte(s) per record.
+{	INTEGER win_0
+	INTEGER win_1
+}
+{ win_0:70 win_1:30 }
+{ win_0:80 win_1:70 }
+{ win_0:20 win_1:80 }
+{ win_0:50 win_1:20 }
+{ win_0:50 win_1:50 }
+{ win_0:10 win_1:50 }
+{ win_0:90 win_1:10 }
+{ win_0:60 win_1:90 }
+{ win_0:40 win_1:60 }
+9 Record(s)
+8 Byte(s) per record.
+{	RATIONAL max
+}
+{ max:70/1 }
+{ max:80/1 }
+{ max:80/1 }
+{ max:50/1 }
+{ max:50/1 }
+{ max:50/1 }
+{ max:90/1 }
+{ max:90/1 }
+{ max:60/1 }
+9 Record(s)
+8 Byte(s) per record.
+{	RATIONAL gap$0_0
+}
+{ gap$0_0:67/1 }
+{ gap$0_0:72/1 }
+{ gap$0_0:72/1 }
+{ gap$0_0:45/1 }
+{ gap$0_0:45/1 }
+{ gap$0_0:49/1 }
+{ gap$0_0:89/1 }
+{ gap$0_0:84/1 }
+{ gap$0_0:54/1 }
+9 Record(s)
+8 Byte(s) per record.
+{	RATIONAL gap$1_0
+}
+{ gap$1_0:63/1 }
+{ gap$1_0:78/1 }
+{ gap$1_0:78/1 }
+{ gap$1_0:45/1 }
+{ gap$1_0:45/1 }
+{ gap$1_0:41/1 }
+{ gap$1_0:81/1 }
+{ gap$1_0:86/1 }
+{ gap$1_0:56/1 }

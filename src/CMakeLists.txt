@@ -94,6 +94,19 @@ add_custom_target(
     ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple_max)
 
 add_custom_target(
+  lang-showcase
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh win
+  WORKING_DIRECTORY
+    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/lang_showcase)
+
+add_custom_target(
+  lang-showcase-view
+  COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
+          out.png && feh out.png
+  WORKING_DIRECTORY
+    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/lang_showcase)
+
+add_custom_target(
   dsp-view
   COMMAND xretractor query.rql -c -d -f -t -s > out.dot && dot -Tpng out.dot -o
           out.png && feh out.png

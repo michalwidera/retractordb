@@ -1,6 +1,7 @@
 #include "presenter.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <iostream>  // for operator<<
 
 #include <boost/lexical_cast.hpp>  // for lexical_cast
@@ -14,6 +15,17 @@
 
 using namespace boost;
 using namespace CRationalStreamMath;
+
+namespace {
+// Identyfikator wezla w DOT. Goly ID dot przyjmuje tylko z [A-Za-z0-9_] i bez cyfry na poczatku;
+// nazwa z generatora strumieni (`ch$0`, `STREAM_AGSE_1_3_ch$0`) konczyla sie bledem skladni.
+// Nazwy zwykle wychodza bez cudzyslowu, wiec istniejace wzorce pattern-dot.txt sie nie zmieniaja.
+std::string dotId(const std::string &id) {
+  const bool plain = !id.empty() && !std::isdigit(static_cast<unsigned char>(id.front())) &&
+                     std::ranges::all_of(id, [](unsigned char c) { return std::isalnum(c) || c == '_'; });
+  return plain ? id : "\"" + id + "\"";
+}
+}  // namespace
 
 void presenter::graphiz(std::ostream &xout, const boost::program_options::variables_map &vm) {
   //
@@ -39,7 +51,7 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
     // Stream presentation
     //
     xout << " ";
-    xout << q.id << "\t";
+    xout << dotId(q.id) << "\t";
     xout << "[shape=record,";
     if (q.isDeclaration()) {
       auto desc = q.descriptorStorage();
@@ -58,6 +70,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
     xout << "\\ninterval=" << q.rInterval;
     if (q.isDeclaration()) xout << "\\nDeclaration";
     if (q.isGenerated()) xout << ", Auto";
+    // Ogon jak w onlyCompileShowProgram(): tylko niezerowy.
+    if (q.startupLatency > 0) xout << "\\ntail=" << q.startupLatency;
     // end stream specific
     //
     // fields in stream
@@ -92,7 +106,7 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
     xout << '\n';
     if (!q.isDeclaration()) {
       if (bShowStreamProgs) {
-        xout << " prg_" << q.id << "\t";
+        xout << " " << dotId("prg_" + q.id) << "\t";
         xout << "[shape=box,style=filled,";
         if (q.isReductionRequired()) {
           xout << "fillcolor=Green,color=Black,";
@@ -119,12 +133,12 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
         //
         // Relation stream plan to stream
         //
-        std::string relation(q.id + " -> " + "prg_" + q.id);
+        std::string relation(dotId(q.id) + " -> " + dotId("prg_" + q.id));
         planStreamRelationsSet.insert(relation);
       }
       if (bShowRules && !q.lRules.empty()) {
         for (const auto &r : q.lRules) {
-          xout << " rule_" << r.name << "\t";
+          xout << " " << dotId("rule_" + r.name) << "\t";
           xout << "[shape=record,style=filled,";
           xout << "fillcolor=cyan,color=Black,";
           xout << "label=\"";
@@ -169,7 +183,7 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
           xout << "]";   // end shape
           xout << '\n';
 
-          std::string relation(q.id + " -> rule_" + r.name + " [color=\"red\" dir=none]");
+          std::string relation(dotId(q.id) + " -> " + dotId("rule_" + r.name) + " [color=\"red\" dir=none]");
           planStreamRelationsSet.insert(relation);
         }
       }
@@ -190,7 +204,7 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
       for (const auto &f : q.lSchema) {
         if (q.isDeclaration()) continue;
         xout << " ";
-        xout << q.id << "_tag" << dTag << "\t";
+        xout << dotId(q.id + "_tag" + std::to_string(dTag)) << "\t";
         if (q.isDeclaration())
           xout << "[shape=record,style=filled,fillcolor=Sienna,color=Black,"
                   "label=\"";
@@ -226,8 +240,8 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
         xout << "]";
         xout << '\n';
         // Relation1
-        std::string relation(q.id + ":" + "tag" + lexical_cast<std::string>(dTag) + " -> " + q.id + "_tag" +
-                             lexical_cast<std::string>(dTag) + " [style=dotted]");
+        std::string relation(dotId(q.id) + ":" + "tag" + lexical_cast<std::string>(dTag) + " -> " +
+                             dotId(q.id + "_tag" + lexical_cast<std::string>(dTag)) + " [style=dotted]");
         streamRelationsSet.insert(relation);
         ++dTag;
       }
@@ -240,8 +254,7 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
     for (auto t : q.lProgram) {
       if (t.getStrCommandID() == "PUSH_STREAM") {
         if (q.isDeclaration()) continue;
-        std::string relation(q.id + " -> " + t.getStr_());
-        if (bShowStreamProgs) relation.insert(0, "prg_");
+        std::string relation(dotId((bShowStreamProgs ? "prg_" : "") + q.id) + " -> " + dotId(t.getStr_()));
         streamRelationsSet.insert(relation);
       }
     }

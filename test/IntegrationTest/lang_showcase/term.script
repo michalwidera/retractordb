@@ -1,0 +1,18 @@
+storage temp
+open win
+size
+desc
+list 9
+open peak
+size
+desc
+list 9
+open gap$0
+size
+desc
+list 9
+open gap$1
+size
+desc
+list 9
+quit
