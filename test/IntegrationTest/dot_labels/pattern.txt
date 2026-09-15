@@ -1,0 +1,48 @@
+core(1/10)	data.txt
+	a: INTEGER
+lit(1/10)
+	:- PUSH_STREAM(core)
+	lit_0: STRING
+		PUSH_ID(lit[0])
+		CALL2(to_string[8])
+		PUSH_VAL(a|b{c}<d>)
+		ADD
+quote(1/10)
+	:- PUSH_STREAM(core)
+	quote_0: STRING
+		PUSH_ID(quote[0])
+		PUSH_VAL(x"y\z)
+		ADD
+fn(1/10)
+	:- PUSH_STREAM(core)
+	fn_0: INTEGER
+		PUSH_ID(fn[0])
+		CALL(Sqrt)
+	RULE r1
+		PUSH_ID(fn[0])
+		PUSH_VAL(0)
+		CMP_GT
+		DO SYSTEM 'echo a|b > f'
+w(1/10)	origin=2
+	:- PUSH_STREAM(core)
+	w_0: RATIONAL
+		WINDOW_MIN(0)
+	w_1: RATIONAL
+		WINDOW_AVG(1)
+	w_2: RATIONAL
+		WINDOW_MAX(0)
+	WINDOW 0: core[0] rows=3
+	WINDOW 1: core rows=2
+		PUSH_ID(core[0])
+		PUSH_VAL(2)
+		MULTIPLY
+ch$0(1/10)
+	:- PUSH_STREAM(core)
+	ch$0_0: INTEGER
+		PUSH_ID(ch$0[0])
+ch$1(1/10)
+	:- PUSH_STREAM(core)
+	ch$1_0: INTEGER
+		PUSH_ID(ch$1[0])
+		PUSH_VAL(1)
+		ADD

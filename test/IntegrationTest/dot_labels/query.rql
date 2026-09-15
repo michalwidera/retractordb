@@ -1,0 +1,7 @@
+DECLARE a INTEGER STREAM core, 0.1 FILE 'data.txt'
+SELECT to_string(core[0]:8)+'a|b{c}<d>' STREAM lit FROM core
+SELECT core[0]+'x"y\z' STREAM quote FROM core
+SELECT sqrt(core[0]) STREAM fn FROM core
+SELECT MIN(core[0] : 3), AVG(core[0]*2 : 2), MAX(core[0] : 3) STREAM w FROM core
+SELECT core[0]+$ STREAM ch[2] FROM core
+RULE r1 ON fn WHEN fn[0] > 0 DO SYSTEM 'echo a|b > f'

@@ -1,0 +1,51 @@
+digraph structs {
+ node	[shape=record];
+ core	[shape=record,style=filled,fillcolor="#FFF2CC",color=Black,label="core\ninterval=1/10\nDeclaration|{<tag0>a(INTEGER)}"]
+ lit	[shape=record,style="filled",fillcolor=Gray,color=Black,label="lit\ninterval=1/10|{<tag0>lit_0(STRING)}"]
+ prg_lit	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM core\n"]
+ quote	[shape=record,style="filled",fillcolor=Gray,color=Black,label="quote\ninterval=1/10|{<tag0>quote_0(STRING)}"]
+ prg_quote	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM core\n"]
+ fn	[shape=record,style="filled",fillcolor=Gray,color=Black,label="fn\ninterval=1/10|{<tag0>fn_0(INTEGER)}"]
+ prg_fn	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM core\n"]
+ rule_r1	[shape=record,style=filled,fillcolor=cyan,color=Black,label="{r1|DO SYSTEM \n'echo a\|b \> f'}|{PUSH_ID(fn[0])|PUSH_VAL(0)|CMP_GT}"]
+ w	[shape=record,style="filled",fillcolor=Gray,color=Black,label="w\ninterval=1/10\norigin=2|{<tag0>w_0(RATIONAL)|<tag1>w_1(RATIONAL)|<tag2>w_2(RATIONAL)}"]
+ prg_w	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM core\n"]
+ "ch$0"	[shape=record,style="filled",fillcolor=Gray,color=Black,label="ch$0\ninterval=1/10|{<tag0>ch$0_0(INTEGER)}"]
+ "prg_ch$0"	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM core\n"]
+ "ch$1"	[shape=record,style="filled",fillcolor=Gray,color=Black,label="ch$1\ninterval=1/10|{<tag0>ch$1_0(INTEGER)}"]
+ "prg_ch$1"	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM core\n"]
+"ch$0" -> "prg_ch$0"
+"ch$1" -> "prg_ch$1"
+fn -> prg_fn
+fn -> rule_r1 [color="red" dir=none]
+lit -> prg_lit
+quote -> prg_quote
+w -> prg_w
+ lit_tag0	[shape=record,label="lit_0|{PUSH_ID(lit[0])|CALL2(to_string[8])|PUSH_VAL(a\|b\{c\}\<d\>)|ADD}"]
+ quote_tag0	[shape=record,label="quote_0|{PUSH_ID(quote[0])|PUSH_VAL(x\"y\\z)|ADD}"]
+ fn_tag0	[shape=record,label="fn_0|{PUSH_ID(fn[0])|CALL(Sqrt)}"]
+ w_tag0	[shape=record,label="w_0|{WINDOW_MIN(0)}"]
+ w_tag1	[shape=record,label="w_1|{WINDOW_AVG(1)}"]
+ w_tag2	[shape=record,label="w_2|{WINDOW_MAX(0)}"]
+ w_window0	[shape=record,label="WINDOW 0: core[0] rows=3"]
+ w_window1	[shape=record,label="WINDOW 1: core rows=2|{PUSH_ID(core[0])|PUSH_VAL(2)|MULTIPLY}"]
+ "ch$0_tag0"	[shape=record,label="ch$0_0|{PUSH_ID(ch$0[0])}"]
+ "ch$1_tag0"	[shape=record,label="ch$1_0|{PUSH_ID(ch$1[0])|PUSH_VAL(1)|ADD}"]
+"ch$0":tag0 -> "ch$0_tag0" [style=dotted]
+"ch$1":tag0 -> "ch$1_tag0" [style=dotted]
+"prg_ch$0" -> core
+"prg_ch$1" -> core
+fn:tag0 -> fn_tag0 [style=dotted]
+lit:tag0 -> lit_tag0 [style=dotted]
+prg_fn -> core
+prg_lit -> core
+prg_quote -> core
+prg_w -> core
+quote:tag0 -> quote_tag0 [style=dotted]
+w:tag0 -> w_tag0 [style=dotted]
+w:tag1 -> w_tag1 [style=dotted]
+w:tag2 -> w_tag2 [style=dotted]
+w_tag0 -> w_window0 [style=dotted]
+w_tag1 -> w_window1 [style=dotted]
+w_tag2 -> w_window0 [style=dotted]
+}

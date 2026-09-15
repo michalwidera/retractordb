@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cctype>
 #include <iostream>  // for operator<<
+#include <sstream>
+#include <string_view>
 
 #include <boost/lexical_cast.hpp>  // for lexical_cast
 #include <boost/regex.hpp>         // IWYU pragma: keep
@@ -24,6 +26,38 @@ std::string dotId(const std::string &id) {
   const bool plain = !id.empty() && !std::isdigit(static_cast<unsigned char>(id.front())) &&
                      std::ranges::all_of(id, [](unsigned char c) { return std::isalnum(c) || c == '_'; });
   return plain ? id : "\"" + id + "\"";
+}
+
+// Tekst wstawiany do etykiety wezla shape=record. `| { } < >` sa tam skladnia rekordu, `"` konczy
+// napis, a `\` zaczyna sekwencje; nieescapowany literal RQL (`'a|b'`) albo komenda DO SYSTEM z `>`
+// dawaly "bad label format" lub blad skladni.
+std::string recordLabel(const std::string &text) {
+  std::string out;
+  for (char c : text) {
+    if (std::string_view("\\\"|{}<>").contains(c)) out += '\\';
+    out += c;
+  }
+  return out;
+}
+
+// Program jako pola rekordu rozdzielone `|`. Tokeny z argumentem pokazuja go tak jak listing -c
+// (CALL(Sqrt), CALL2(to_string[8]), WINDOW_MIN(0)).
+void recordProgram(std::ostream &xout, const std::list<token> &program) {
+  bool isFirst(true);
+  for (auto t : program) {
+    if (isFirst)
+      isFirst = false;
+    else
+      xout << "|";
+    const std::string sTokenName(t.getStrCommandID());
+    if (sTokenName == "PUSH_ID" || sTokenName == "PUSH_VAL" || sTokenName == "CALL" || sTokenName == "CALL2" ||
+        sTokenName.starts_with("WINDOW_")) {
+      std::ostringstream arg;
+      arg << t;
+      xout << recordLabel(arg.str());
+    } else
+      xout << recordLabel(sTokenName);
+  }
 }
 }  // namespace
 
@@ -72,6 +106,7 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
     if (q.isGenerated()) xout << ", Auto";
     // Ogon jak w onlyCompileShowProgram(): tylko niezerowy.
     if (q.startupLatency > 0) xout << "\\ntail=" << q.startupLatency;
+    if (q.logicalOrigin > 0) xout << "\\norigin=" << q.logicalOrigin;
     // end stream specific
     //
     // fields in stream
@@ -87,14 +122,7 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
         else
           xout << "|";
         if (bShowTags) xout << "<tag" << dTag++ << ">";
-        //
-        // Patch on gramma problem -
-        // dot program is using { as important sign - we need to convert { to <
-        //
-        std::string name(f.field_.rname);
-        std::ranges::replace(name, '{', '/');
-        std::ranges::replace(name, '}', '/');
-        xout << name;
+        xout << recordLabel(f.field_.rname);
         xout << "(" << GetStringdescFld(f.field_.rtype) << ")";
       }
       xout << "}";
@@ -142,16 +170,13 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
           xout << "[shape=record,style=filled,";
           xout << "fillcolor=cyan,color=Black,";
           xout << "label=\"";
-          xout << "{" << r.name << "|";
+          xout << "{" << recordLabel(r.name) << "|";
 
           if (r.action == rule::DUMP) {
             xout << "DO DUMP " << r.dumpRange.first << " TO " << r.dumpRange.second;
             if (r.dump_retention != 0) xout << "\\n RETENTION " << r.dump_retention;
           } else if (r.action == rule::SYSTEM) {
-            std::string cmd(r.systemCommand);
-            std::ranges::replace(cmd, '"', '=');
-            std::ranges::replace(cmd, '\'', '=');
-            xout << "DO SYSTEM \\n'" << cmd << "'";
+            xout << "DO SYSTEM \\n'" << recordLabel(r.systemCommand) << "'";
           } else {
             xout << "UNKNOWN_ACTION";
           };
@@ -160,22 +185,7 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
 
           if (bShowRuleProgram) {
             xout << "|{";
-            bool isFirst(true);
-            for (auto t : r.condition) {
-              if (isFirst)
-                isFirst = false;
-              else
-                xout << "|";
-              std::string sTokenName(t.getStrCommandID());
-              if (sTokenName == "PUSH_ID" || sTokenName == "PUSH_VAL")
-                xout << t;
-              else {
-                std::ranges::replace(sTokenName, '{', '/');
-                std::ranges::replace(sTokenName, '}', '/');
-                xout << sTokenName;
-              }
-            }
-
+            recordProgram(xout, r.condition);
             xout << "}";
           }
 
@@ -210,31 +220,13 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
                   "label=\"";
         else
           xout << "[shape=record,label=\"";
-        std::string sFieldName(f.field_.rname);
-        std::ranges::replace(sFieldName, '{', '/');
-        std::ranges::replace(sFieldName, '}', '/');
-        xout << sFieldName;
+        xout << recordLabel(f.field_.rname);
         xout << "|";
         xout << "{";
-        bool isFirst(true);
         if (q.isDeclaration())
           xout << "Declaration";
         else
-          for (auto t : f.lProgram) {
-            if (isFirst)
-              isFirst = false;
-            else
-              xout << "|";
-
-            std::string sTokenName(t.getStrCommandID());
-            if (sTokenName == "PUSH_ID" || sTokenName == "PUSH_VAL")
-              xout << t;
-            else {
-              std::ranges::replace(sTokenName, '{', '/');
-              std::ranges::replace(sTokenName, '}', '/');
-              xout << sTokenName;
-            }
-          }
+          recordProgram(xout, f.lProgram);
         xout << "}";
         xout << "\"";
         xout << "]";
@@ -243,7 +235,28 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
         std::string relation(dotId(q.id) + ":" + "tag" + lexical_cast<std::string>(dTag) + " -> " +
                              dotId(q.id + "_tag" + lexical_cast<std::string>(dTag)) + " [style=dotted]");
         streamRelationsSet.insert(relation);
+        // Pole z agregatem okna wskazuje wezel swojej grupy; kilka pol moze czytac jedna grupe.
+        for (auto t : f.lProgram)
+          if (t.getStrCommandID().starts_with("WINDOW_"))
+            streamRelationsSet.insert(dotId(q.id + "_tag" + std::to_string(dTag)) + " -> " +
+                                      dotId(q.id + "_window" + std::to_string(std::get<int>(t.getVT()))) + " [style=dotted]");
         ++dTag;
+      }
+      // Tabela grup okna jak w onlyCompileShowProgram(): zrodlo, szerokosc i program wartosci rekordu.
+      for (size_t windowIndex = 0; windowIndex < q.windowGroups.size(); ++windowIndex) {
+        const auto &group = q.windowGroups[windowIndex];
+        xout << " " << dotId(q.id + "_window" + std::to_string(windowIndex)) << "\t";
+        xout << "[shape=record,label=\"";
+        std::string header("WINDOW " + std::to_string(windowIndex) + ": " + group.source);
+        if (group.program.empty()) header += "[" + std::to_string(group.slot) + "]";
+        header += " rows=" + std::to_string(group.width);
+        xout << recordLabel(header);
+        if (!group.program.empty()) {
+          xout << "|{";
+          recordProgram(xout, group.program);
+          xout << "}";
+        }
+        xout << "\"]" << '\n';
       }
     }
   }
@@ -379,8 +392,8 @@ void presenter::onlyCompileShowProgram() {
       // agregatow o jednym ksztalcie dzieli jedna grupe — bez tej liczby nie widac w planie,
       // ktore pola czytaja to samo okno.
       for (auto tf : f.lProgram)
-        if ((tf.getStrCommandID() == "PUSH_ID") || (tf.getStrCommandID() == "CALL") || (tf.getStrCommandID() == "PUSH_VAL") ||
-            tf.getStrCommandID().starts_with("WINDOW_"))
+        if ((tf.getStrCommandID() == "PUSH_ID") || (tf.getStrCommandID() == "CALL") || (tf.getStrCommandID() == "CALL2") ||
+            (tf.getStrCommandID() == "PUSH_VAL") || tf.getStrCommandID().starts_with("WINDOW_"))
           std::cout << "\t\t" << tf << '\n';
         else
           std::cout << "\t\t" << tf.getStrCommandID() << '\n';
@@ -396,7 +409,8 @@ void presenter::onlyCompileShowProgram() {
       if (group.program.empty()) std::cout << '[' << group.slot << ']';
       std::cout << " rows=" << group.width << '\n';
       for (auto tw : group.program) {
-        if ((tw.getStrCommandID() == "PUSH_ID") || (tw.getStrCommandID() == "CALL") || (tw.getStrCommandID() == "PUSH_VAL"))
+        if ((tw.getStrCommandID() == "PUSH_ID") || (tw.getStrCommandID() == "CALL") || (tw.getStrCommandID() == "CALL2") ||
+            (tw.getStrCommandID() == "PUSH_VAL"))
           std::cout << "\t\t" << tw << '\n';
         else
           std::cout << "\t\t" << tw.getStrCommandID() << '\n';
@@ -407,7 +421,8 @@ void presenter::onlyCompileShowProgram() {
       std::cout << "\tRULE " << r.name << '\n';
 
       for (auto tf1 : r.condition) {
-        if ((tf1.getStrCommandID() == "PUSH_ID") || (tf1.getStrCommandID() == "CALL") || (tf1.getStrCommandID() == "PUSH_VAL"))
+        if ((tf1.getStrCommandID() == "PUSH_ID") || (tf1.getStrCommandID() == "CALL") || (tf1.getStrCommandID() == "CALL2") ||
+            (tf1.getStrCommandID() == "PUSH_VAL"))
           std::cout << "\t\t" << tf1 << '\n';
         else
           std::cout << "\t\t" << tf1.getStrCommandID() << '\n';
