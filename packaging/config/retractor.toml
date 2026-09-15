@@ -1,0 +1,14 @@
+# RetractorDB configuration installed with the portable CLI archive.
+# xretractor loads /etc/retractor/retractor.toml for a system installation,
+# or $XDG_CONFIG_HOME/retractor/retractor.toml for a user installation.
+# Existing local configuration is preserved during upgrades.
+
+[ipc]
+queue_buffer_seconds = 10
+min_queue_elements = 100
+client_response_max_fails = 300
+
+# Set a storage directory only after creating it and granting xretractor
+# write access. The built-in default leaves storage.dir unset.
+# [storage]
+# dir = "/var/lib/retractor"

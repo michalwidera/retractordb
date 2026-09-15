@@ -364,8 +364,18 @@ set(RETRACTOR_BIN "${CPACK_PACKAGING_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}")
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/packaging/systemd/xretractor.service.in
   ${CMAKE_BINARY_DIR}/xretractor.service @ONLY)
-install(FILES ${CMAKE_BINARY_DIR}/xretractor.service
-        DESTINATION lib/systemd/system)
+install(
+  FILES ${CMAKE_BINARY_DIR}/xretractor.service
+  DESTINATION lib/systemd/system
+  COMPONENT service)
+install(
+  FILES ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE
+  DESTINATION share/doc/retractordb
+  COMPONENT portable)
+install(
+  FILES ${CMAKE_CURRENT_SOURCE_DIR}/packaging/config/retractor.toml
+  DESTINATION share/retractordb
+  COMPONENT portable)
 
 # Przykładowa konfiguracja: instalowana jako .example, NIGDY jako żywy plik —
 # nie nadpisuje konfiguracji administratora. DESTINATION jest WZGLĘDNY (pod
@@ -394,17 +404,16 @@ set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
     "${CMAKE_BINARY_DIR}/debian/postinst;${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postrm"
 )
 
-# Komponenty pakietu: 'Unspecified' to domyślny komponent binarek (install bez
-# COMPONENT), 'service' to pliki .example oznaczone EXCLUDE_FROM_ALL. Pliki
-# EXCLUDE_FROM_ALL trafiają do pakietu TYLKO przy włączonym component-install
-# (DEB/ARCHIVE) i jawnym wymienieniu komponentu w CPACK_COMPONENTS_ALL — w
-# trybie monolitycznym cpack je pomija. GROUPING=ALL_COMPONENTS_IN_ONE scala oba
-# komponenty z powrotem w jeden .deb/.tar.gz (nie rozbija na pakiety
-# per-komponent).
+# Komponenty pakietu: 'portable' zawiera trzy binaria, a 'service' jednostke
+# systemd i pliki .example oznaczone EXCLUDE_FROM_ALL. Pliki EXCLUDE_FROM_ALL
+# trafiają do pakietu TYLKO przy włączonym component-install (DEB/ARCHIVE) i
+# jawnym wymienieniu komponentu w CPACK_COMPONENTS_ALL — w trybie monolitycznym
+# cpack je pomija. GROUPING=ALL_COMPONENTS_IN_ONE scala oba komponenty z
+# powrotem w jeden .deb/.tar.gz (nie rozbija na pakiety per-komponent).
 set(CPACK_DEB_COMPONENT_INSTALL ON)
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)
-set(CPACK_COMPONENTS_ALL Unspecified service)
+set(CPACK_COMPONENTS_ALL portable service)
 # Komponent 'api' dopisywany tylko przy -DRDB_WITH_API=ON. Cpack ustala
 # zawartosc pakietu na etapie konfiguracji, wiec tego jednego wejscia nie da sie
 # zastapic celem ninja — bez tej flagi API nigdy nie trafia do .deb/.tar.gz.
@@ -424,3 +433,22 @@ set(CPACK_PACKAGE_FILE_NAME
     "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}")
 
 include(CPack) # include after setting variables above to take effect
+
+# Archiwum CLI mozna instalowac w ~/.local albo /usr/local. Zawiera trzy
+# programy w bin/ bez sciezek systemd. CPack pakuje binaria z tej konfiguracji;
+# dla AArch64 trzeba najpierw zbudowac osobna konfiguracje.
+add_custom_target(
+  package-portable
+  COMMAND
+    ${CMAKE_CPACK_COMMAND} -G TGZ --config ${CMAKE_BINARY_DIR}/CPackConfig.cmake
+    -D CPACK_COMPONENTS_ALL=portable -D CPACK_PACKAGING_INSTALL_PREFIX=/ -D
+    CPACK_PACKAGE_FILE_NAME=retractordb-${CPACK_PACKAGE_VERSION}-linux-${CMAKE_SYSTEM_PROCESSOR}-portable
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+  DEPENDS xretractor xqry xtrdb)
+
+# Lokalna budowa ARM64 przez Docker. Cel nie nalezy do all, test ani jobow CI.
+# Skrypt sprawdza architekture ELF wszystkich trzech programow w paczce.
+add_custom_target(
+  package-portable-arm64
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/package-portable-arm64.sh
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})

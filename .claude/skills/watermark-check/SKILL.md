@@ -50,3 +50,7 @@ mode yields zero hits, and Polish diacritics in comments are not affected.
   defect — normalize it. Elsewhere confirm it is not a deliberate typographic space before replacing.
 - If cleaning would change test fixtures or generated ANTLR files, stop and hand the case to the human instead
   of editing them.
+- The `U+FE0F VARIATION SELECTOR-16` in the warning icon before
+  `**This is work in progress:**` in `README.md` is the narrow Markdown
+  exception recorded in `CLAUDE.md`. Keep that icon unchanged. On a strict
+  scan, inspect the codepoint and its position; do not exempt any other hit.

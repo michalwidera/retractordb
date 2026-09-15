@@ -44,8 +44,8 @@ install a prebuilt package from the GitHub Releases page.
 
 Prebuilt packages are published on the
 [GitHub Releases page](https://github.com/michalwidera/retractordb/releases).
-Each release ships a Debian package and a portable tarball, named after the
-project version and the target system, for example (version `0.1.9`):
+Existing releases ship a Debian package and a system-layout tarball, named
+after the project version and target system, for example (version `0.1.9`):
 
 - `retractordb-0.1.9-Linux.deb`
 - `retractordb-0.1.9-Linux.tar.gz`
@@ -71,12 +71,27 @@ journalctl -u xretractor           # logs
 See [src/retractor/README.md](src/retractor/README.md#running-as-a-systemd-service)
 for the packaged systemd unit details.
 
-**Portable tarball (`.tar.gz`)** — no service integration, just the binaries:
+**System-layout tarball (`.tar.gz`)** — contains `usr/bin/` and a systemd unit.
+To copy only the CLI binaries from it:
 
 ```bash
-tar xzf retractordb-0.1.9-Linux.tar.gz
-sudo cp retractordb-0.1.9-Linux/bin/* /usr/local/bin/   # or anywhere on $PATH
+mkdir -p /tmp/retractordb-0.1.9
+tar xzf retractordb-0.1.9-Linux.tar.gz -C /tmp/retractordb-0.1.9
+sudo cp /tmp/retractordb-0.1.9/usr/bin/x{retractor,qry,trdb} /usr/local/bin/
 ```
+
+For new releases, `ninja package-portable` builds a separate CLI archive with
+`bin/` paths relative to any install prefix, named
+`retractordb-VERSION-linux-ARCH-portable.tar.gz`. It also includes the license
+under `share/doc/retractordb/` and a safe default `retractor.toml` under
+`share/retractordb/`. The
+[website installer](https://retractordb.com/install/) selects the x86-64 or
+AArch64 asset and offers `--service` for a systemd service on request. It
+requires the archive to be uploaded as a release asset with the SHA-256 digest
+provided by GitHub Releases.
+The installer copies `retractor.toml` to `/etc/retractor/` for a system install
+or the user's XDG configuration directory, only if no local configuration
+exists. xretractor reads it automatically, including when run as a service.
 
 After install, verify the three binaries are reachable:
 
@@ -127,6 +142,19 @@ To produce your own `.deb` / `.tar.gz` packages locally:
 ```bash
 scripts/buildrdb.sh release package
 ```
+
+To prepare portable release assets locally, from a configured Release build:
+
+```bash
+cd build/Release
+ninja package-portable          # x86-64 on an x86-64 host
+ninja package-portable-arm64    # local Docker ARM64 build; output in build/ARM64-Packages
+```
+
+The ARM64 target uses Docker's `linux/arm64` platform to compile natively
+under emulation on an x86-64 host, then checks that all three archive members
+are AArch64 ELF binaries. It is a manual target and is not run by CI. CPack
+only packages binaries built for the configured target architecture.
 
 ### Optimizer ablation build options
 

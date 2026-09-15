@@ -1,6 +1,6 @@
 #!/bin/bash
 # Test poprawności pakietów CPack: pakiet binarny DEB zawiera DOKŁADNIE wymagany
-# zestaw plików (3 binaria + jednostka systemd + przykłady konfiguracji) —
+# zestaw plików (3 binaria + licencja + jednostka systemd + przykłady konfiguracji) —
 # żadnych nadmiarowych.
 # Sprawdzamy tylko DEB (a nie TGZ) — whitelist jest identyczny dla obu (te same
 # reguły install + prefiks /usr), a budowanie obu podwajało czas (kompresja
@@ -26,6 +26,8 @@ EXPECTED=$(printf '%s\n' \
   usr/bin/xretractor \
   usr/bin/xtrdb \
   usr/lib/systemd/system/xretractor.service \
+  usr/share/doc/retractordb/LICENSE \
+  usr/share/retractordb/retractor.toml \
   usr/share/retractordb/retractor.toml.example \
   usr/share/retractordb/service.env.example | sort)
 
@@ -46,6 +48,23 @@ if command -v dpkg-deb >/dev/null 2>&1; then
   assert_exact "DEB" "$(dpkg-deb -c "$DEB" | awk '$1 !~ /^d/ {print $NF}' | grep -oE 'usr/.*')"
 else
   echo "POMINIĘTO weryfikację pakietu binarnego: brak dpkg-deb"
+fi
+
+# Archiwum przenosne zawiera CLI, licencje i sciezki wzgledne wobec prefiksu.
+PORTABLE="$OUT/portable"
+mkdir -p "$PORTABLE"
+cpack -G TGZ -B "$PORTABLE" --config "$CFG" \
+  -D CPACK_COMPONENTS_ALL=portable \
+  -D CPACK_PACKAGING_INSTALL_PREFIX=/ \
+  -D CPACK_PACKAGE_FILE_NAME=retractordb-portable-test
+ARCHIVE="$PORTABLE/retractordb-portable-test.tar.gz"
+test -f "$ARCHIVE"
+PORTABLE_EXPECTED=$(printf '%s\n' bin/xqry bin/xretractor bin/xtrdb share/doc/retractordb/LICENSE share/retractordb/retractor.toml | sort)
+PORTABLE_GOT=$(tar -tzf "$ARCHIVE" | grep -v '/$' | sort)
+if [ "$PORTABLE_GOT" != "$PORTABLE_EXPECTED" ]; then
+  echo "ERROR: portable archive has unexpected files:"
+  diff <(printf '%s\n' "$PORTABLE_EXPECTED") <(printf '%s\n' "$PORTABLE_GOT") || true
+  exit 1
 fi
 
 echo "packaging artifact check OK"

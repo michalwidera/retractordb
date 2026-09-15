@@ -143,6 +143,9 @@ The `.deb` produced by `make packages` ships the unit and wires it up automatica
 - the unit installs to `/usr/lib/systemd/system/xretractor.service`,
 - its `ExecStart` loads the canonical query file `/etc/retractor/startup.rql`
   (an **empty** file = idle); `postinst` creates it empty if absent,
+- `postinst` copies the packaged `retractor.toml` to
+  `/etc/retractor/retractor.toml` only when no local configuration exists;
+  xretractor loads that path automatically at startup,
 - the `postinst` maintainer script creates the system user `retractor` and runs
   `systemctl enable xretractor.service` (the service starts on next boot; it is **not**
   started immediately — use `systemctl start xretractor` to start it now),

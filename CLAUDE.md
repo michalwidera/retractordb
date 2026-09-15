@@ -161,6 +161,12 @@ The command sequence — staged-file scan, per-file report, cleaning, re-check a
 whole-tree variant for a push and the commit-message check — is in the `watermark-check` skill.
 Invoke it before committing and before pushing.
 
+**Markdown exception:** The warning icon in `README.md` immediately before
+`**This is work in progress:**` contains `U+FE0F VARIATION SELECTOR-16`.
+This exact icon is intentional and must remain unchanged. If a strict scan
+reports it, verify its location and codepoint; every other reported hit still
+needs investigation. The default staged-file scan does not flag this emoji.
+
 #### Source code — zero tolerance, strict mode
 
 Documentation can be fixed later; **source code cannot**. A zero-width character or a Cyrillic lookalike

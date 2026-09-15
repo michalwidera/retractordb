@@ -22,4 +22,5 @@ target_link_libraries(
   descparser
   rqlparser)
 
-install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+                                        COMPONENT portable)
