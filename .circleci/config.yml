@@ -743,6 +743,23 @@ jobs:
       - check-skipci:
           enabled: false
       - prep-env-ci
+      # ConanCenter nie ma binarki cmake dla Linux armv8, wiec tool_requires z
+      # conanfile.py wolalo build() recepty, a ten pobiera archiwum z cmake.org.
+      # 2026-09-15 cmake.org oddawal 403 na wszystko i job padl. Kolo z PyPI
+      # (najnowsze, jakie jest dla aarch64) zglaszamy conanowi jako narzedzie
+      # platformy — cmake.org znika ze sciezki joba. Podloga z conanfile.py
+      # nadal obowiazuje: wpis ponizej [>=4.4.2] conan pomija i wraca do recepty
+      # (czyli znow do cmake.org), a nie buduje starszym cmake.
+      - run:
+          name: Use newest PyPI cmake as Conan platform tool (ARM)
+          command: |
+            pip install --upgrade --only-binary=:all: cmake
+            case "$(command -v cmake)" in
+              "$HOME"/.venv/bin/cmake) ;;
+              *) echo "Error: cmake z PATH nie pochodzi z ~/.venv: $(command -v cmake)"; exit 1 ;;
+            esac
+            cmake_ver=$(cmake --version | head -n1 | awk '{print $3}')
+            printf '\n[platform_tool_requires]\ncmake/%s\n' "$cmake_ver" >> ~/.conan2/profiles/default
       - run:
           name: Toolchain diagnostics (ARM)
           command: |
