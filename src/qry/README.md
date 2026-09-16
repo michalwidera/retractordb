@@ -43,23 +43,26 @@ Allowed options:
                                  resolved from the bus)
   -b [ --bus ]                   list live xretractor instances and their
                                  streams
-Branch: issue_238-multiserver:XXXXXXXX, Code compiler: GNU Ver. 15.2.0, Build time: YYMMDDHHmm, Type: Release
-Log: /home/michal/.tmp/xqry.log
+Branch: <branch>:<commit>, Code compiler: <compiler>, Build time: <timestamp>, Type: <build type>
+Log: <system temporary directory>/xqry.log
 This software is licensed under the MIT License and is provided ‘as is’,
 without warranty of any kind. For more information, see the LICENSE file.
 ```
 
-> ## Before you call xqry ... 
-> xqry tool reads data from working xretractor process.
->
-> xretractor must be active and working in background.
-> If there is no xretator in background you will see follwoing
-> output: 
->```
->$ xqry -d
->IPC: No such file or directory
->```
->as result of listing active queries request.
+## Before you call xqry
+
+Server-directed commands (`--select`, `--detail`, `--adhoc`, `--reset`,
+`--dir`, `--hello`, and `--kill`) require a running `xretractor` instance.
+Without one, a request such as `xqry -d` normally ends with an IPC error:
+
+```
+$ xqry -d
+IPC: No such file or directory
+```
+
+`--bus` is different: it reads the shared instance registry without contacting
+a server and therefore also works when no instance is live. `--help` performs no
+IPC either.
 
 
 ## Listing streams - `xqry -d`
@@ -98,6 +101,26 @@ query `ml` sent to the server instead of the requested detail.
 
 `-k` is not part of the set - `xqry -s <stream> -m N -k` (kill after the element
 budget) and `xqry -k -a "..."` are deliberate combinations.
+
+## Selecting an xretractor instance
+
+An explicit `--server <name>` always selects the target and bypasses automatic
+routing. If `--server` is absent, a non-empty `RDB_NAMESPACE` environment
+variable has the same targeting role. The command-line option takes precedence
+when both are present.
+
+Without an explicit target, a single live instance is selected automatically.
+When several instances are live, routing depends on the command:
+
+- `--select` and `--detail` go to the instance that publishes the named stream.
+- `--adhoc` goes to the common owner of its recognized source streams. A query
+  spanning multiple instances is rejected, and a query with no recognized
+  source requires `--server`.
+- Instance-wide commands (`--dir`, `--hello`, `--kill`, and `--reset`) are
+  ambiguous and require `--server`.
+
+`--bus` does not select or contact an instance. Use it to discover valid server
+names and their streams.
 
 ## Reloading the plan - `xqry --reset <file.rql>`
 
@@ -210,7 +233,7 @@ servers:
   - name: smokea
     pid: 116472
     modes: N
-    query: "/home/michal/plans/alfa.rql"
+    query: "/srv/retractor/plans/alfa.rql"
     streams:
       - srca
       - dsta

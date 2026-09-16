@@ -53,6 +53,21 @@ The descriptor grammar used by `xtrdb` accepts the following data field types:
 - **Layout**: Records are fixed-size and headerless; fields are stored consecutively in the native representation
 - **Positional access**: Prefer `set` for general input; `setpos` currently handles only BYTE, INTEGER, DOUBLE, and STRING fields
 
+## Command-line Modes
+
+```
+xtrdb -h
+xtrdb -n
+xtrdb -s datafile
+```
+
+- `-h` / `--help` prints the command-line help and exits.
+- `-n` / `--noprompt` suppresses the prompt, colours, and `ok` responses for
+  scripted input. The legacy positional spelling `xtrdb noprompt` is also
+  accepted.
+- `-s <file>` / `--storagemap <file>` prints the storage-family map for the
+  named data file and exits without starting the interactive terminal.
+
 ## Interactive Terminal Interface
 
 ### Starting xtrdb
@@ -70,12 +85,12 @@ At the `.` prompt, type `help` (shown as `.help` below) to see all available com
 ```
 .help
 exit|quit|q                      Exit xtrdb terminal
-quitdrop|qd                      Exit and remove managed data, .desc, and .meta files
+quitdrop|qd                      Exit and remove base data, .desc, .meta, and .meta.shadow
 storage [path]                  Set storage path for database
 policy [name]                   Set storage policy
 open file [schema]               Open existing file or create new with schema
                                  Example: .open test_db { INTEGER data STRING name[3] }
-dropfile [file1] ... }           Remove listed files; end the list with }
+dropfile [file1] [file2] ... }   Remove listed files; end the list with }
 desc|descc                       Display schema (multiline/compact)
 read|rread [n]                   Read record from the start/end into the payload
 write [n]                        Write payload buffer to record number n
@@ -129,6 +144,17 @@ help|h                           Show help
 
 Supply a schema to `open` only when the corresponding `.desc` file does not exist. When it already exists, use `open file` and let `xtrdb` load that descriptor.
 
+`policy` accepts `DEFAULT`, `DIRECT`, `MEMORY`, `POSIX`, `POSIXSHD`,
+`GENERIC`, `DEVICE`, and `TEXTSOURCE` (case-insensitive). `DEVICE` and
+`TEXTSOURCE` are read-only source accessors. A `TYPE` entry loaded from an
+existing descriptor overrides the policy selected at the prompt.
+
+`quitdrop` removes the base data file, `.desc`, `.meta`, and `.meta.shadow`.
+It is not a complete artifact-family cleanup: a data `.shadow` file and
+retention segments can remain. Use `dropfile { file1 file2 ... }` to remove
+explicitly named leftovers after verifying that no running `xretractor`
+instance owns them.
+
 ## Usage Examples
 
 ### Example 1: Creating a New Storage File
@@ -158,6 +184,8 @@ ok                              # File created successfully
 **Files created:**
 - `testfile` - Binary data file (records)
 - `testfile.desc` - Text descriptor file (schema metadata)
+- `testfile.meta` - Null and transmission-gap metadata index
+- `testfile.shadow` - Correction file used by the default storage policy
 
 **Use case:** Creating test data for a multi-sensor monitoring system where each record contains sensor name, raw data bytes, control flags, integer counters, and floating-point measurements.
 
@@ -622,6 +650,7 @@ Iterative query development:
 - ✅ Use `.print` to preview before `.append`
 - ✅ Use `.size` to check record count
 - ✅ Treat data, `.desc`, `.meta`, and shadow files as one artifact family
+- ✅ Check for shadow and retention files after using `.quitdrop`
 - ✅ Use meaningful field names in schemas
 - ✅ Test with small datasets first
 
@@ -636,14 +665,16 @@ Iterative query development:
 
 ### Quick Record Creation
 ```bash
-# Method 1: Individual sets
-.set field1 value1
-.set field2 value2
+# Example schema: { INTEGER timestamp DOUBLE value }
+
+# Method 1: Named fields
+.set timestamp 1000
+.set value 12.5
 .append
 
-# Method 2: Using setpos (positional)
-.setpos 0 value1
-.setpos 1 value2
+# Method 2: Descriptor positions (zero-based)
+.setpos 0 1001
+.setpos 1 13.25
 .append
 ```
 

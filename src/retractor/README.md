@@ -16,22 +16,30 @@ Usage: xretractor queryfile [option]
 
 Available options:
   -h [ --help ]               Show program options
+  -b [ --build-info ]         show optimizer build configuration
   -c [ --onlycompile ]        compile only mode
   -q [ --queryfile ] arg      query set file
   -r [ --quiet ]              no output on screen, skip presenter
   -s [ --status ]             check service status
   -v [ --verbose ]            verbose mode (show stream params)
   -x [ --xqrywait ]           wait with processing for first query
+  -n [ --name ] arg           instance name; own IPC area and lock
+  -a [ --autoname ]           generate a docker-style instance name
   -k [ --noanykey ]           do not wait for any key to terminate
-  -j [ --service ]            service mode: log to stderr (journald), no log file
-  -t [ --realtime ]           enable real-time scheduling (SCHED_FIFO, mlockall,
-                              absolute wakeup)
+  -j [ --service ]            service mode: log to stderr (journald)
+  -t [ --realtime ]           enable real-time scheduling
+  -f [ --no-clock ]           offline mode: compute slots without waiting
+  -u [ --until-eof ]          forces one-shot all sources
   -g [ --config ] arg         config file (TOML); overrides search
   -m [ --llimitqry ] arg (=0) loop iteration limit, 0 - no limit
-Log: /tmp/xretractor.log
+Branch: <branch>:<commit>, Code compiler: <compiler>, Build time: <timestamp>, Type: <build type>
+Log: <system temporary directory>/xretractor.log
 This software is licensed under the MIT License and is provided ‘as is’,
 without warranty of any kind. For more information, see the LICENSE file.
 ```
+
+The query file is optional in execution mode, where omitting it starts an idle
+instance. Compile-only mode requires a query file.
 
 ## Running as a systemd service
 
@@ -39,8 +47,10 @@ xretractor can run as a Linux systemd service without any wrapper/supervisor pro
 It runs in the foreground (`Type=simple`) and shuts down cleanly on `SIGTERM`.
 
 Relevant options:
-- `-j` / `--service` — service mode: log to **stderr** (captured by journald), no log file in `/tmp`.
-- `-k` / `--noanykey` — do not wait for a key/TTY (required without a terminal).
+- `-j` / `--service` — service mode: log to **stderr** (captured by journald), with no per-process log file.
+- `-k` / `--noanykey` — ignore key presses from an attached terminal. Input is
+  ignored automatically when stdin is not a TTY; the packaged service still
+  passes this option explicitly.
 - starting **without** a query file — or with a file that carries no statements at all — boots an
   **idle** instance that stays alive until `SIGTERM` (no crash-loop before any query is defined);
   pass a `.rql` file with statements to load queries at start-up, or send one later with
@@ -117,7 +127,8 @@ Notes:
   `systemctl` privileges.
 - Both are paths for a **full** query set (rules, `:STORAGE`, `:SUBSTRAT`, rotation) — unlike the
   lightweight, transient ad-hoc injection over IPC (`xqry --adhoc`), which only accepts a single
-  `SELECT`, `DECLARE` or `RULE`.
+  `SELECT`, `DECLARE` or `RULE`. An ad-hoc `RULE` may use `DO DUMP`; `DO SYSTEM` is rejected over
+  IPC.
 - The running service is found on the **bus**, not by the lock file name: a service is named
   `service`, so a new invocation almost never shares its lock file.
 - **An explicitly requested identity wins over delivery.** `xretractor plan.rql --name foo`
@@ -137,7 +148,7 @@ Notes:
 
 ### Packaged unit (DEB)
 
-The `.deb` produced by `make packages` ships the unit and wires it up automatically:
+The `.deb` produced by `scripts/buildrdb.sh package` ships the unit and wires it up automatically:
 
 - binaries install to `/usr/bin/` (so `ExecStart=/usr/bin/xretractor`),
 - the unit installs to `/usr/lib/systemd/system/xretractor.service`,
@@ -168,9 +179,11 @@ xretractor and xqry support optional TOML configuration loaded in layers:
 - user: `$XDG_CONFIG_HOME/retractor/retractor.toml` (or `~/.config/retractor/retractor.toml`)
 
 The later layer overrides keys from previous layers.
-If `--config <file>` is used, only that file is loaded.
+If `--config <file>` is used, only that file is loaded; a missing or invalid
+explicit file is an error.
 
-Missing configuration file is a valid state (defaults are used).
+Missing implicit system and user configuration files are valid (defaults are
+used).
 
 ### Validation and warnings
 
@@ -204,13 +217,13 @@ If any of those checks fail, xretractor reports a configuration error and stops.
   - Minimum queue capacity regardless of stream interval.
 
 - `ipc.client_response_max_fails` (int, default: `300`, must be `> 0`)
-  - Budget for xqry waiting for a response in shared memory.
+  - Retry budget for xqry waiting for a response in shared memory; the value is
+    a count, not a time unit.
   - Effective wait time is a wall-clock deadline of
     `client_response_max_fails * kClientResponsePollInterval` (300 × 10 ms = 3 s).
-  - The default is measured in seconds, not milliseconds, on purpose: the
-    server's command thread is SCHED_OTHER while its processing thread may run
-    SCHED_FIFO on the same pinned core, so it can wait a whole RT throttling
-    period before being scheduled (issue_217).
+  - The 3-second default accommodates a command thread running as SCHED_OTHER
+    beside a SCHED_FIFO processing thread on the same pinned core; scheduling
+    can delay a response for an RT throttling period (issue_217).
 
 #### [timing]
 
@@ -284,16 +297,18 @@ autoname = false
 query_file = "/etc/retractor/startup.rql"
 ```
 
-Please notice that this tool has second face when you call it with "only compile" option. This face is required for _Show Diagram_ or _Show query Plan_ actions.
+The tool has a separate compile-only interface used to inspect a query plan or
+generate its diagrams.
 
 ```
 $xretractor -c -h
 xretractor - compiler & data processing tool.
 
-Usage: xretractor queryfile [option]
+Usage: xretractor -c queryfile [option]
 
 Available options:
   -h [ --help ]          show help options
+  -b [ --build-info ]    show optimizer build configuration
   -c [ --onlycompile ]   compile only mode
   -q [ --queryfile ] arg query set file
   -r [ --quiet ]         no output on screen, skip presenter
@@ -306,11 +321,13 @@ Available options:
   -i [ --hideruleprog ]  hide rule program in rules (-u) output
   -p [ --transparent ]   make dot background transparent
   -w [ --diagram ] arg   create diagram output
-Log: /tmp/xretractor.log
+  -z [ --shmbudget ]     show shared memory budget of the compiled plan
+Branch: <branch>:<commit>, Code compiler: <compiler>, Build time: <timestamp>, Type: <build type>
+Log: <system temporary directory>/xretractor.log
 This software is licensed under the MIT License and is provided ‘as is’,
 without warranty of any kind. For more information, see the LICENSE file.
 ```
 
 ## Storage state machine
 
-![Use Case Diagram](http://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/michalwidera/retractordb/master/src/retractor/UML/storage-access-state.puml)
+![Declared-source state machine](https://www.plantuml.com/plantuml/proxy?cache=no&src=https://raw.githubusercontent.com/michalwidera/retractordb/master/src/retractor/UML/storage-access-state.puml)

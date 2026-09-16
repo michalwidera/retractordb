@@ -1,9 +1,9 @@
 @startuml
 
-title Processing data sequence \n for Device one-time read-only data source (OTRO)
+title Declared-source prefetch state machine
 [*] --> Storage
 
-state Storage as "One-Time Data Source accessor State Machine" {
+state Storage as "Declared DEVICE/TEXTSOURCE accessor" {
 
   state ZeroStep as "ZERO Step" {
     [*] --> Empty
@@ -11,13 +11,14 @@ state Storage as "One-Time Data Source accessor State Machine" {
   }
 
   state MainLoop as "Main Processing Loop" {
-    state Armed : data in chamber_ ready
-    state Flux : chamber_ moved to payload
-    Flux --> Armed : fire chamber_ data into c-buf
-    Armed --> Flux : read data from source
+    state Flux : physical source read enabled
+    state Armed : chamber_ contains the prefetched record
+    Flux --> Armed : revRead(0): read source into chamber_
+    Armed --> Armed : fire(): publish chamber_ to payload/history
+    Armed --> Flux : end of slot: unlock next source read
   }
 
-  Empty -> Armed : first read from source
+  Empty -> Flux : bootstrap declaration
 
   }
 
