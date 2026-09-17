@@ -94,6 +94,8 @@ CI: CircleCI, branches `master` or `issue_*`.
 
 - **C++23**, clang-format Google style, 129-col limit, 2-space indent. Run `ninja cformat` before commit.
 - Source comments in Polish - intentional.
+- **Dashes:** Prefer the ASCII hyphen-minus (`-`, U+002D) in repository text. Use a typographic dash only when
+  preserving an exact quotation or when the character itself is semantically significant.
 
 **Include order (5 blocks, blank-line separated):**
 ```cpp
