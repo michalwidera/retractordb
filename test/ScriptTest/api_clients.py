@@ -14,7 +14,7 @@ import uuid
 source, xqry, xretractor, cpp, mode = sys.argv[1:]
 
 # Klient C++ (test_api_client) jest EXCLUDE_FROM_ALL: buduje go dopiero
-# `ninja test-api`. Gole `ctest` — tak testy odpala CI — trafia wiec na jego
+# `ninja test-api`. Gole `ctest` - tak testy odpala CI - trafia wiec na jego
 # brak i to nie jest awaria, tylko nieodebrana opcja. 77 = SKIP_RETURN_CODE
 # ustawiony w CMakeLists.txt, dzieki czemu ctest raportuje pominiecie zamiast
 # bledu. `ninja test` w ogole tu nie dochodzi: filtruje etykiete `api`.

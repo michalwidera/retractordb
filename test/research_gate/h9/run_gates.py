@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sterownik bramek P6 — K26 / H9. Produkuje `gates.tsv` dla `verdict.py`.
+"""Sterownik bramek P6 - K26 / H9. Produkuje `gates.tsv` dla `verdict.py`.
 
 Kolejnosc jest czescia bramki
 -----------------------------
@@ -19,7 +19,7 @@ Siedem bramek `REQUIRED_GATES` skryptu werdyktu
   near_miss_controls    kontrole nierownowaznosci NIE zostaly scalone (§7.2)
   no_materialization    program bez etapu posredniego: zero bajtow substratow
 
-Klasyfikacja statusu FAIL nalezy do CZLOWIEKA (STOP-6) — skrypt zostawia wtedy
+Klasyfikacja statusu FAIL nalezy do CZLOWIEKA (STOP-6) - skrypt zostawia wtedy
 `classification` puste, a `verdict.py` odmawia wydania werdyktu. Dozwolone
 rozstrzygniecia to `engine_or_profile`, `apparatus` i `corpus`; nieznana etykieta
 nadal jest odrzucana fail-closed.
@@ -58,7 +58,7 @@ FLINK_PREFIX = {"F9_R2": "f9r2", "F9_R1": "f9r1", "F9_X": "f9x"}
 TAIL_ALLOWANCE = {"F9_R2": 1, "F9_R1": 4, "F9_X": 4}
 
 # Kontrole `bez etapu materializowanego` (§7.2): oczekiwane ZERO bajtow substratow.
-# Wynik zerowy jest tu OCZEKIWANY, a nie dowodem niedzialania aparatury — dlatego
+# Wynik zerowy jest tu OCZEKIWANY, a nie dowodem niedzialania aparatury - dlatego
 # obok niego sprawdzamy, ze mianownik komorki jest niezerowy.
 NO_MATERIALIZATION_PLANS = ["F9_R2_controls", "F9_R1_controls", "F9_X_controls"]
 
@@ -127,7 +127,7 @@ def named_results(rql_path):
 
 def gate_mutants(rdb_dir, work_dir, report):
     """Bramka wlasna oracle'a. Trzy predeklarowane klasy mutantow (faza/shift,
-    kolejnosc pola, mapa NULL/luka) plus luka i brak rekordu ogona — na artefakcie
+    kolejnosc pola, mapa NULL/luka) plus luka i brak rekordu ogona - na artefakcie
     KAZDEGO z trzech mechanizmow."""
     cases = []
     for family in FAMILIES:
@@ -219,7 +219,7 @@ def gate_public_identity(rdb_dir, rql_dir, report):
 
 
 def gate_oracle_values(rdb_dir, flink_dir, rql_dir, report):
-    """RetractorDB wobec Flinka na danych glownych — >= 2000 rekordow KAZDEGO
+    """RetractorDB wobec Flinka na danych glownych - >= 2000 rekordow KAZDEGO
     nazwanego wyniku. Oba warianty Flinka, bo `manual` jest kontrola best case
     i musi dawac te same WARTOSCI co `natural`."""
     checked = 0
@@ -249,12 +249,12 @@ def gate_oracle_values(rdb_dir, flink_dir, rql_dir, report):
 
 # Pary near-miss: rownowazne "prawie", wiec KAZDA strona musi zachowac WLASNY
 # substrat. Kryterium jest rozlacznosc zbiorow substratow obu stron, czytana
-# z planu — a nie porownanie bajtow DEFAULT z ablacja, bo R1 wolno przebudowac
+# z planu - a nie porownanie bajtow DEFAULT z ablacja, bo R1 wolno przebudowac
 # WNETRZE pojedynczego monitora i taka przebudowa scaleniem pary nie jest.
 def parse_plan(path):
     """Zrzut planu -> {strumien: {"sources": [...], "declared": bool}}.
 
-    Zaleznosci czytamy z `:- PUSH_STREAM(X)`, a nie z nazw — nazwa substratu bywa
+    Zaleznosci czytamy z `:- PUSH_STREAM(X)`, a nie z nazw - nazwa substratu bywa
     mylaca i klasyfikacja po konwencji nazw jest dokladnie tym defektem, ktory §7.2
     predeklaracji kazal naprawic.
     """
@@ -289,12 +289,12 @@ def transitive_sources(plan, name, seen=None):
 
 
 def gate_no_materialization_structure(plan_dir, rql_dir, report):
-    """Program bez etapu materializowanego nie tworzy SUBSTRATU — sprawdzone na
+    """Program bez etapu materializowanego nie tworzy SUBSTRATU - sprawdzone na
     planie, nie na nazwie.
 
     `z1`/`z2` czytaja wylacznie zrodlo `ZA`, ktorego zaden inny monitor planu
     kontrolnego nie uzywa. Warunek: zaden substrat planu (strumien obecny w planie,
-    ktorego nazwy NIE MA w `.rql` — ta sama granica, co w `mechanism_table.py`) nie
+    ktorego nazwy NIE MA w `.rql` - ta sama granica, co w `mechanism_table.py`) nie
     ma `ZA` w domknieciu przechodnim swoich zrodel.
 
     Warunek NIE JEST pusty: `ZA` jest w planie i sa nad nim strumienie (`z1`, `z2`),
@@ -318,14 +318,14 @@ def gate_no_materialization_structure(plan_dir, rql_dir, report):
             guilty = [n for n in substrates if "ZA" in transitive_sources(plan, n)]
             if guilty:
                 problems[family].append(
-                    f"{control}/{profile}: substrat nad zrodlem ZA: {guilty} — program bez "
+                    f"{control}/{profile}: substrat nad zrodlem ZA: {guilty} - program bez "
                     f"etapu materializowanego jednak materializuje")
             report(f"   {control}/{profile}: substratow {len(substrates)}, "
                    f"strumieni nad ZA {sorted(over_za)}, z tego substratow {len(guilty)}")
     return problems
 
 
-# Ablacja minimalna rodziny (§5 predeklaracji) — potrzebna kontroli `Q=1`.
+# Ablacja minimalna rodziny (§5 predeklaracji) - potrzebna kontroli `Q=1`.
 MINIMAL_ABLATION = {"F9_R2": "NO_R2_CANON", "F9_R1": "NO_R1_FACTOR", "F9_X": "NO_R1_NO_R2"}
 
 NEAR_MISS_PAIRS = {
@@ -336,7 +336,7 @@ NEAR_MISS_PAIRS = {
 
 
 def substrates_of(plan, name, rql_names):
-    """Substraty, z ktorych korzysta strumien `name` — domkniecie przechodnie
+    """Substraty, z ktorych korzysta strumien `name` - domkniecie przechodnie
     ograniczone do strumieni, ktorych nazwy NIE MA w `.rql`."""
     return {s for s in transitive_sources(plan, name) if s not in rql_names}
 
@@ -345,7 +345,7 @@ def gate_near_miss(rdb_dir, plan_dir, rql_dir, report):
     """Kontrole nierownowaznosci NIE zostaly scalone (§7.2).
 
     Dwa warunki, oba predeklarowane:
-      * pary near-miss maja ROZLACZNE zbiory substratow w kazdym profilu —
+      * pary near-miss maja ROZLACZNE zbiory substratow w kazdym profilu -
         nieoczekiwane scalenie przy poprawnej aparaturze to BRAK WSPARCIA H9
         w rodzinie, nie uniewaznienie iteracji;
       * `Q=1` nie daje redukcji wewnetrznej: bajty substratow sa te same we
@@ -362,13 +362,13 @@ def gate_near_miss(rdb_dir, plan_dir, rql_dir, report):
         # §7.2: przy `Q=1` nie ma klasy rownowaznosci, wiec nie ma czego wspoldzielic
         # i `DEFAULT` NIE MOZE BYC TANSZY od ablacji minimalnej. Warunkiem jest brak
         # REDUKCJI, a nie rownosc: R1 wolno przebudowac wnetrze pojedynczego monitora,
-        # co bajty zmienia — ale przebudowa, ktora ich nie obniza, redukcja nie jest.
+        # co bajty zmienia - ale przebudowa, ktora ich nie obniza, redukcja nie jest.
         ablation = MINIMAL_ABLATION[family]
         if per_profile["DEFAULT"] < per_profile[ablation]:
             problems[family].append(
                 f"{plan_q1}: przy Q=1 DEFAULT jest TANSZY od ablacji minimalnej "
                 f"({per_profile['DEFAULT']} wobec {per_profile[ablation]} bajtow "
-                f"substratow) — redukcja bez klasy rownowaznosci")
+                f"substratow) - redukcja bez klasy rownowaznosci")
         report(f"   {plan_q1}: bajty substratow per profil {per_profile} "
                f"(ablacja minimalna: {MINIMAL_ABLATION[family]})")
 
@@ -391,17 +391,17 @@ def gate_near_miss(rdb_dir, plan_dir, rql_dir, report):
                 left_subs = substrates_of(plan, left, rql_names)
                 right_subs = substrates_of(plan, right, rql_names)
                 shared = left_subs & right_subs
-                # SCALENIEM jest wspolny wezel `STREAM_SELECT_*` — to jego tworzy
+                # SCALENIEM jest wspolny wezel `STREAM_SELECT_*` - to jego tworzy
                 # `shareEquivalentSelectComputations()`, czyli mechanizm, ktorego
                 # kontrola near-miss dotyczy, i to jego liczbe zlicza §3.1/§2.1
                 # predeklaracji. Wspolny `STREAM_TIMEMOVE_*`/`STREAM_HASH_*` jest
                 # dzielem R1 nad PODWYRAZENIEM, ktore w danej parze naprawde jest
-                # rowne — w F9-X kontrola jest wprost tak zbudowana ("jedna para
+                # rowne - w F9-X kontrola jest wprost tak zbudowana ("jedna para
                 # dopasowana, druga nie"), wiec taki wspolny wezel jest zamierzony.
                 merged = {n for n in shared if n.startswith("STREAM_SELECT_")}
                 if merged:
                     problems[family].append(
-                        f"{control}/{profile}: para near-miss ({left},{right}) SCALONA — "
+                        f"{control}/{profile}: para near-miss ({left},{right}) SCALONA - "
                         f"wspolny wezel select {sorted(merged)}")
                 report(f"   {control}/{profile}: ({left},{right}) substraty "
                        f"{sorted(left_subs)} | {sorted(right_subs)}; wspolne {sorted(shared)}; "
@@ -413,7 +413,7 @@ def gate_no_materialization(rdb_dir, report):
     """Program bez etapu materializowanego: `z1`/`z2` nie moga materializowac nic.
 
     Wynik zerowy jest OCZEKIWANY, ale sam w sobie nie dowodzi, ze aparatura
-    dziala — dlatego warunkiem rownoleglym jest NIEZEROWY mianownik tej samej
+    dziala - dlatego warunkiem rownoleglym jest NIEZEROWY mianownik tej samej
     komorki. Zerowy licznik przy zerowym mianowniku znaczylby, ze plan sie nie
     policzyl, i to jest ta sama pulapka, na ktorej padla iteracja 1.
     """
@@ -425,7 +425,7 @@ def gate_no_materialization(rdb_dir, report):
             public = counters.get("public_appends", 0)
             if public <= 0:
                 problems[family].append(
-                    f"{plan}/{profile}: mianownik pusty — komorka sie nie policzyla")
+                    f"{plan}/{profile}: mianownik pusty - komorka sie nie policzyla")
         report(f"   {plan}: mianownik niezerowy w kazdym profilu")
     return problems
 
@@ -438,7 +438,7 @@ GATE_ORDER = ["corpus_validity", "oracle_values", "oracle_mutants", "counter_kno
 
 def write_gates(path, status):
     """`gates.tsv` w formacie, ktorego zada `verdict.py`: (family, gate, status,
-    classification). Przy FAIL kolumna `classification` zostaje PUSTA — nalezy do
+    classification). Przy FAIL kolumna `classification` zostaje PUSTA - nalezy do
     czlowieka (STOP-6), a skrypt werdyktu bez niej werdyktu nie wyda."""
     with open(path, "w", encoding="utf-8") as handle:
         handle.write("family\tgate\tstatus\tclassification\n")
@@ -476,12 +476,12 @@ def main():
             status[family][gate] = "PASS" if not issues else "FAIL"
             detail[family][gate] = issues
 
-    print("== 0. Waznosc zamrozonego korpusu — przed bramkami runtime ==")
+    print("== 0. Waznosc zamrozonego korpusu - przed bramkami runtime ==")
     problems = gate_corpus_validity(report)
     print(f"   rozbieznosci: {sum(len(v) for v in problems.values())}\n")
     record("corpus_validity", problems)
 
-    print("== 1. BRAMKA MUTANTOW — pokazana PRZED wariantem poprawnym ==")
+    print("== 1. BRAMKA MUTANTOW - pokazana PRZED wariantem poprawnym ==")
     count = gate_mutants(args.rdb, args.work, report)
     print(f"   OK: {count} mutantow odrzuconych przez warunki ZAMIERZONE\n")
     record("oracle_mutants", {family: [] for family in FAMILIES})
@@ -530,7 +530,7 @@ def main():
             print(f"-- {FAMILY_TAG[family]} / {gate}: {len(detail[family][gate])} rozbieznosci")
             for problem in detail[family][gate][:8]:
                 print(f"   {problem}")
-        print("\nKolumna `classification` w gates.tsv jest przy FAIL PUSTA — `verdict.py`")
+        print("\nKolumna `classification` w gates.tsv jest przy FAIL PUSTA - `verdict.py`")
         print("bez niej werdyktu nie wyda (kod 2). To jest zamierzone, nie usterka.")
         return 6
     print("\nWszystkie siedem bramek czyste w kazdej z trzech rodzin.")

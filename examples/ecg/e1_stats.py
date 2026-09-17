@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =============================================================================
-# e1_stats.py — analiza pomiaru E1 (budżet czasowy) i E2E (latencja end-to-end)
+# e1_stats.py - analiza pomiaru E1 (budżet czasowy) i E2E (latencja end-to-end)
 # =============================================================================
 #
 # CO ROBI
@@ -13,11 +13,11 @@
 #       0,18342                    0,18342,41210,60113
 #       ...                        ...
 #
-#   compute_ns  — czas jednego wywołania proc.processRows() (rdzeń obliczeń
+#   compute_ns  - czas jednego wywołania proc.processRows() (rdzeń obliczeń
 #                 jednego interwału, E1); pacing/sleep pętli NIE jest wliczony.
-#   wake_lag_ns — spóźnienie pobudki pętli względem deadline'u interwału
+#   wake_lag_ns - spóźnienie pobudki pętli względem deadline'u interwału
 #                 (jitter planisty OS).
-#   e2e_ns      — latencja end-to-end: od deadline'u interwału (nominalny
+#   e2e_ns      - latencja end-to-end: od deadline'u interwału (nominalny
 #                 moment pojawienia się krotki wejściowej w modelu czasowym)
 #                 do końca boradcast() (emisja wyniku do kolejek IPC).
 #                 W przybliżeniu: e2e ≈ wake_lag + compute + emisja.
@@ -26,10 +26,10 @@
 #   budżetu czasu rzeczywistego (domyślnie 1/360 s = 2,78 ms, częstotliwość
 #   próbkowania rekordu MIT-BIH 205). Podaje też przepustowość "unpaced"
 #   (N interwałów / suma czasów obliczeń). Dla nowego formatu dodatkowo
-#   raportuje statystyki E2E i wake_lag (z p99,9 — ogon pochodzi z planisty).
+#   raportuje statystyki E2E i wake_lag (z p99,9 - ogon pochodzi z planisty).
 #
 # JAK URUCHOMIĆ POMIAR (z build/Release)
-#   # (a) tryb zwykły — uwaga: sleep względny, dryf kumuluje się w e2e;
+#   # (a) tryb zwykły - uwaga: sleep względny, dryf kumuluje się w e2e;
 #   #     kolumny E2E miarodajne tylko dla trybu (b):
 #   RDB_BENCH_CSV=/tmp/e1_normal.csv \
 #       ./xretractor <ścieżka>/rec205-detect.rql -k -m 650000
@@ -84,7 +84,7 @@ def main():
                 e2e_ns.append(int(cols[3]))
 
     if not ns:
-        raise SystemExit("Pusty zbiór pomiarów — sprawdź, czy RDB_BENCH_CSV był ustawiony.")
+        raise SystemExit("Pusty zbiór pomiarów - sprawdź, czy RDB_BENCH_CSV był ustawiony.")
 
     budget_us = 1e6 / args.fs                     # budżet na interwał w mikrosekundach
 
@@ -104,7 +104,7 @@ def main():
     print(f"przepustowość  : {len(us) / total_s:,.0f} próbek/s (unpaced)")
 
     if not e2e_ns:
-        return  # stary format CSV — tylko raport E1
+        return  # stary format CSV - tylko raport E1
 
     e2e_us = sorted(x / 1000.0 for x in e2e_ns)
     wake_us = sorted(x / 1000.0 for x in wake_ns)

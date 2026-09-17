@@ -36,7 +36,7 @@ add_test(
   COMMAND bash service-idle.sh $<TARGET_FILE:xretractor> empty)
 
 # Logi INFO sa wkompilowane tylko poza Release (SPDLOG_ACTIVE_LEVEL, glowny
-# CMakeLists.txt). W Release tryb uslugowy nie emituje markerow INFO — skrypt
+# CMakeLists.txt). W Release tryb uslugowy nie emituje markerow INFO - skrypt
 # pomija wtedy asercje INFO (podaza za cichym, efektywnym Release). Przekazujemy
 # efektywny stan INFO przez zmienna srodowiskowa testu.
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -50,7 +50,7 @@ set_tests_properties(${TestID}-run ${TestID}-env ${TestID}-empty
 
 # DOPISANIE, nie ustawienie: ENVIRONMENT niesie juz przestrzen nazw uruchomienia
 # (RDB_NAMESPACE, TMPDIR) nadana przez makro add_test w katalogu nadrzednym, a
-# set_tests_properties zastapiloby ja w calosci — test startowalby wtedy na
+# set_tests_properties zastapiloby ja w calosci - test startowalby wtedy na
 # zasobach wspolnych i kolidowal z sasiadem biegnacym rownoczesnie.
 set_property(
   TEST ${TestID}-run ${TestID}-env ${TestID}-empty

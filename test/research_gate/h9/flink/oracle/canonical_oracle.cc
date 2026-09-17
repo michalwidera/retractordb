@@ -1,4 +1,4 @@
-// Oracle kanonicznego serializera K26 — strona C++.
+// Oracle kanonicznego serializera K26 - strona C++.
 //
 // Program NIE zawiera wlasnej implementacji metryki: buduje rdb::Descriptor z opisu
 // tekstowego i wola rdb::probe::canonicalRecordBytes(), czyli DOKLADNIE te funkcje,
@@ -6,10 +6,10 @@
 // porownanie z Java nie jest porownaniem dwoch przepisan tej samej specyfikacji,
 // tylko porownaniem implementacji Javy z kodem silnika.
 //
-// Zadna linia retractordb nie jest tu modyfikowana — program linkuje sie z librdb.a
+// Zadna linia retractordb nie jest tu modyfikowana - program linkuje sie z librdb.a
 // zbudowanym w drzewie build/ (patrz build_oracle.sh).
 //
-// Wejscie:  plik wektorow (label <TAB> pola <TAB> oczekiwane) — kolumna oczekiwana
+// Wejscie:  plik wektorow (label <TAB> pola <TAB> oczekiwane) - kolumna oczekiwana
 //           jest ignorowana, oracle jest zrodlem prawdy.
 // Wyjscie:  label <TAB> bajty  na stdout, po jednym wektorze na wiersz.
 

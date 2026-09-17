@@ -14,8 +14,8 @@ live monitoring, not durable or lossless delivery.
 ## Building the API
 
 The API is developed and tested alongside the engine but is not part of it.
-No engine target links anything under `api/`, and every default entry point —
-`ninja`, `ninja install`, `ninja test`, `ninja package` — leaves the API out.
+No engine target links anything under `api/`, and every default entry point -
+`ninja`, `ninja install`, `ninja test`, `ninja package` - leaves the API out.
 Each opt-in is separate:
 
 | Command | Effect |
@@ -29,7 +29,7 @@ name; `EXCLUDE_FROM_ALL` keeps them out of `all`, and the install rules carry
 `COMPONENT api EXCLUDE_FROM_ALL`. Only the packaging switch is a configure-time
 flag: cpack fixes package contents while configuring, so no build target can
 change them. Without `-DRDB_WITH_API=ON` the `.deb` and `.tar.gz` contain the
-three engine binaries, the systemd unit and the config examples — never the
+three engine binaries, the systemd unit and the config examples - never the
 API. `it_packaging` asserts exactly that set.
 
 The engine keeps its own Boost.JSON translation unit in `src/qry/boostJson.cpp`
@@ -134,7 +134,7 @@ ninja -C build/Debug test-api
 
 Two mechanisms keep them off the default path, because the two ways of running
 tests need different ones. `ninja test` passes `-LE api` and never reaches
-them. A bare `ctest` — how CI invokes the suite — ignores that filter, so
+them. A bare `ctest` - how CI invokes the suite - ignores that filter, so
 `api_clients.py` exits 77 (`SKIP_RETURN_CODE`) when `test_api_client` has not
 been built, and ctest reports `Skipped` rather than a failure. Once the binary
 exists, a bare `ctest` runs the API tests for real.

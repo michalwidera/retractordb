@@ -133,9 +133,9 @@ payload &payload::operator=(const payload &other) {
   *this = other.descriptor;  // call operator=(const Descriptor
   std::copy(other.span().begin(), other.span().end(), span().begin());
 
-  // Bit NULL jest per WPIS deskryptora, a zgodnosc ukladow — per SLOT PLASKI (patrz
+  // Bit NULL jest per WPIS deskryptora, a zgodnosc ukladow - per SLOT PLASKI (patrz
   // Descriptor::operator==). Dwa zgodne zapisy tego samego rekordu moga miec rozna liczbe
-  // wpisow: `INTEGER[3]` niesie JEDEN bit na trzy sloty, trzy pola `INTEGER` — trzy bity.
+  // wpisow: `INTEGER[3]` niesie JEDEN bit na trzy sloty, trzy pola `INTEGER` - trzy bity.
   // Kopia wprost dalaby wtedy bitset innej dlugosci niz deskryptor tego payloadu, czyli
   // odczyt poza zakresem przy pierwszym getItemVT/setItemVT.
   //
@@ -185,7 +185,7 @@ payload &payload::operator=(const Descriptor &other) {
       // descriptor = other; <- Just change field names - descriptor remains the same, payload remains the same
       // pass
     } else
-      FatalError("payload: descriptor not empty before assign — schema mismatch");
+      FatalError("payload: descriptor not empty before assign - schema mismatch");
   }
   return *this;
 }

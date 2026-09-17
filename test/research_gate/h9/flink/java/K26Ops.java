@@ -1,13 +1,13 @@
 // Operatory wspolne trzech rodzin K26 po stronie Flinka.
 //
 // ZAMROZONA GRANULACJA (decyzja tego kroku, do wpisania w predeklaracje):
-// job Flinka odwzorowuje plan RQL WEZEL W WEZEL —
+// job Flinka odwzorowuje plan RQL WEZEL W WEZEL -
 //   * kazdy wezel substratu planu RetractorDB  -> jeden operator Flinka, ktorego rekordy
 //     wyjsciowe licza sie do LICZNIKA metryki (Canon.onSubstrateWrite),
 //   * wlasny szczytowy wezel `FROM` monitora razem z jego programem pol -> JEDEN koncowy
 //     operator, ktorego wynik jest rekordem PUBLICZNYM (MIANOWNIK) i idzie na sink.
 // Dzieki temu po obu stronach zgadzaja sie: schematy, kanoniczne szerokosci i liczba
-// rekordow kazdego wezla — rozni sie wylacznie LICZBA INSTANCJI, czyli dokladnie to,
+// rekordow kazdego wezla - rozni sie wylacznie LICZBA INSTANCJI, czyli dokladnie to,
 // o co pyta H9.
 //
 // Ta granulacja jest KONSERWATYWNA. Idiomatyczny DataStream rozbilby jeszcze operator
@@ -15,7 +15,7 @@
 // materializacji i PODNIOSLO redukcje na korzysc H9. Wybor przeciwny hipotezie jest
 // swiadomy; skutek liczbowy podano w PLANY_FLINKA.md §6.
 //
-// Czego tu NIE MA: zadnego pomiaru czasu. Zrodla nie spia i nie maja zegara sciennego —
+// Czego tu NIE MA: zadnego pomiaru czasu. Zrodla nie spia i nie maja zegara sciennego -
 // czasem logicznym jest wylacznie indeks slotu. §10 zakazuje porownywania czasu
 // RetractorDB z czasem JVM, wiec aparatura nie daje nawet mozliwosci pomylki.
 import org.apache.flink.api.common.functions.OpenContext;
@@ -40,28 +40,28 @@ public final class K26Ops {
 
   private K26Ops() {}
 
-  /** Rekord strumienia rodzin K26: jedno pole INTEGER — kanonicznie 9 B (SZKIC_RODZIN.md §3.4). */
+  /** Rekord strumienia rodzin K26: jedno pole INTEGER - kanonicznie 9 B (SZKIC_RODZIN.md §3.4). */
   public static final Canon.Descriptor RECORD = Canon.singleInteger("v");
 
   /** Kanoniczna szerokosc rekordu, ta sama po obu stronach porownania. */
   public static final long W = Canon.recordBytes(RECORD);
 
   //
-  // ─── Dlugosci programow pol — ODCZYTANE ze zrzutow planu pilota ──────────────────────────
+  // ─── Dlugosci programow pol - ODCZYTANE ze zrzutow planu pilota ──────────────────────────
   //
   // Zrodlo: `pilot/out/DEFAULT_F9_{R1,R2,X}_Q8.plan` i `NO_R1_NO_R2_F9_X_Q8.plan`, czyli
-  // `RDB_BENCH_PLAN=1 xretractor -c`. Liczby NIE sa oszacowane — sa zliczeniem tokenow
+  // `RDB_BENCH_PLAN=1 xretractor -c`. Liczby NIE sa oszacowane - sa zliczeniem tokenow
   // wypisanych przez kompilator. Parytet dlugosci programu po obu stronach jest warunkiem
   // porownywalnosci licznika `evalTokens`.
 
-  /** `PUSH_ID(x[0])` — monitor czytajacy gotowy substrat oraz programy substratow `>`/`#`. */
+  /** `PUSH_ID(x[0])` - monitor czytajacy gotowy substrat oraz programy substratow `>`/`#`. */
   public static final int TOKENS_PASSTHROUGH = 1;
 
-  /** `PUSH_ID, PUSH_ID, MULTIPLY` — program pola monitora F9-R1 (`m[0]*m[0]`). */
+  /** `PUSH_ID, PUSH_ID, MULTIPLY` - program pola monitora F9-R1 (`m[0]*m[0]`). */
   public static final int TOKENS_SQUARE = 3;
 
   /**
-   * `PUSH_ID, PUSH_ID, MULTIPLY, PUSH_ID, PUSH_ID, MULTIPLY, ADD, CALL(Sqrt)` — KOSZTOWNY
+   * `PUSH_ID, PUSH_ID, MULTIPLY, PUSH_ID, PUSH_ID, MULTIPLY, ADD, CALL(Sqrt)` - KOSZTOWNY
    * program pol rodzin F9-R2 i F9-X, w planie widoczny jako program `STREAM_SELECT_*`.
    */
   public static final int TOKENS_SQRT_TWO_TERMS = 8;
@@ -228,9 +228,9 @@ public final class K26Ops {
    *
    * <p>Uzywana w dwoch rolach:
    * <ul>
-   *   <li>F9-R2 — wezel substratu `STREAM_SELECT_*` o programie {PUSH A, PUSH B, STREAM_ADD}
+   *   <li>F9-R2 - wezel substratu `STREAM_SELECT_*` o programie {PUSH A, PUSH B, STREAM_ADD}
    *       i schemacie jednego INTEGER (wynik `Sqrt`), czyli `substrate = true`;
-   *   <li>F9-X — szczytowy wezel `FROM` monitora razem z programem
+   *   <li>F9-X - szczytowy wezel `FROM` monitora razem z programem
    *       `Sqrt(front*front + rear*rear)`,
    *       czyli `substrate = false` (rekord publiczny).
    * </ul>
@@ -293,7 +293,7 @@ public final class K26Ops {
 
   /**
    * Etap publiczny monitora, ktory czyta gotowy substrat: odpowiednik `m_i :- PUSH_STREAM(...)`
-   * w planie RetractorDB. Nie wnosi bajtow do licznika — jego wynik jest rekordem publicznym.
+   * w planie RetractorDB. Nie wnosi bajtow do licznika - jego wynik jest rekordem publicznym.
    */
   public static class MonitorOutput extends RichMapFunction<Tuple3<Long, Long, Integer>, Tuple3<Long, Long, Integer>> {
     @Override
@@ -389,7 +389,7 @@ public final class K26Ops {
   }
 
   /**
-   * Alokacja monitorow na postacie — regula zamrozona przez czlowieka 2026-08-08
+   * Alokacja monitorow na postacie - regula zamrozona przez czlowieka 2026-08-08
    * (SZKIC_RODZIN.md §3.3): `F(Q) = min(F_max, floor(Q/2))`, monitory rozdzielone rowno
    * miedzy pierwsze `F(Q)` postaci w zamrozonej kolejnosci; przy `F(Q) <= 1` wszystkie
    * monitory dostaja postac pierwsza.

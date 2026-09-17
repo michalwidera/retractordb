@@ -78,7 +78,7 @@ TEST(KbHit, returns_zero_when_ignore_any_key) { EXPECT_EQ(_kbhit(true), 0); }
 // uruchamiany ze stdin przekierowanym z pliku wychodził kodem 0, nie
 // przeczytawszy ani jednego elementu strumienia.
 //
-// Podmieniamy stdin na plik z zawartością — czyli dokładnie ten przypadek,
+// Podmieniamy stdin na plik z zawartością - czyli dokładnie ten przypadek,
 // w którym stara implementacja meldowała „naciśnięto klawisz".
 class KbHitRedirectedStdin : public ::testing::Test {
  protected:
@@ -193,7 +193,7 @@ TEST_F(SetupLoggerMainTest, service_mode_emits_sd_daemon_priority_prefix) {
   const std::string out = ss.str();
 
   // Test podaza za decyzja projektowa: ciche raportowanie w Release
-  // (SPDLOG_ACTIVE_LEVEL=ERROR — zwiazane z efektywnoscia) odfiltrowuje INFO na
+  // (SPDLOG_ACTIVE_LEVEL=ERROR - zwiazane z efektywnoscia) odfiltrowuje INFO na
   // poziomie runtime (setupLoggerMain ustawia poziom = SPDLOG_ACTIVE_LEVEL), wiec
   // marker INFO w Release LEGALNIE nie powstaje. Prefiks INFO=><6> sprawdzamy tylko
   // gdy build przepuszcza INFO (Debug); prefiks ERROR=><3> obowiazuje zawsze.

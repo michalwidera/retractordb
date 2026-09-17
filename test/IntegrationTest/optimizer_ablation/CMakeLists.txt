@@ -75,9 +75,9 @@ set_tests_properties(
 # Do 2026-07-26 dwa testy tej macierzy były oznaczone WILL_FAIL jako jawnie
 # oczekiwane porażki ablacyjne:
 #
-# factor_runtime_semantic_divergence  — bez przebiegu faktoryzacji runtime
+# factor_runtime_semantic_divergence  - bez przebiegu faktoryzacji runtime
 # wykonywał przesunięcia na osobnych zegarach wejściowych i nie dawał tego
-# samego payloadu co (A#B)>(i+k); dedup_startup_prefix_divergence     — przy
+# samego payloadu co (A#B)>(i+k); dedup_startup_prefix_divergence     - przy
 # jednocześnie wyłączonych dedup, faktoryzacji i współdzieleniu SELECT badany
 # wynik dostawał o jeden rekord zerowego prefiksu więcej niż konfiguracja
 # domyślna.
@@ -85,7 +85,7 @@ set_tests_properties(
 # Obie przyczyny zostały usunięte (porządek topologiczny planu, przyczynowe
 # opóźnienie przeplotu, jedna konwencja tau, ogon zamiast prefiksu), więc oba
 # testy przechodzą w KAŻDEJ konfiguracji przełączników. Adnotacje WILL_FAIL są
-# tym samym nieaktualne — a test oznaczony WILL_FAIL, który przechodzi, jest
+# tym samym nieaktualne - a test oznaczony WILL_FAIL, który przechodzi, jest
 # raportowany jako porażka, więc ich pozostawienie psułoby macierz.
 #
 # Zweryfikowane przebiegiem w profilu wszystkich przełączników OFF.

@@ -42,8 +42,8 @@ void qTree::topologicalSort() {
                         { reordered.push_back(coreInstance[qname]); });
 
   // Podmieniana jest wyłącznie zawartość wektora. Przypisanie całego qTree
-  // (coreInstance = tempInstance) nadpisywało też pola składowe klasy — w tym
-  // maxCapacity — wartościami domyślnymi. Było to nieszkodliwe dopóki sortowanie
+  // (coreInstance = tempInstance) nadpisywało też pola składowe klasy - w tym
+  // maxCapacity - wartościami domyślnymi. Było to nieszkodliwe dopóki sortowanie
   // wywoływano wyłącznie przed computeRequiredCapacities().
   static_cast<std::vector<query> &>(coreInstance) = std::move(reordered);
 }
@@ -103,7 +103,7 @@ std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
   std::set<boost::rational<int>> lstTimeIntervals;
   for (const auto &it : *this) {
     if (it.rInterval == 0) {
-      FatalError("qTree: query '{}' rInterval is zero — check :STORAGE directive", it.id);
+      FatalError("qTree: query '{}' rInterval is zero - check :STORAGE directive", it.id);
     }
     if (it.isCompilerDirective()) continue;
     lstTimeIntervals.insert(it.rInterval);

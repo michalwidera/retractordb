@@ -1,8 +1,8 @@
 #!/bin/bash
-# Kontrakt typu wyniku wyrazenia — pozycja 16 w paper-arXiv/usecases/requested.md.
+# Kontrakt typu wyniku wyrazenia - pozycja 16 w paper-arXiv/usecases/requested.md.
 #
 # Do 2026-09-11 kompilator wyprowadzal typ pola z czterech regul lokalnych, z ktorych zadna
-# nie widziala calego programu ONP. Kazde z piaciu pol `dst` wychodzilo wtedy jako INTEGER —
+# nie widziala calego programu ONP. Kazde z piaciu pol `dst` wychodzilo wtedy jako INTEGER -
 # a wartosci, ktore silnik do nich zapisywal, calkowite nie byly.
 #
 # Test sprawdza CZTERY rzeczy naraz, bo kazda z osobna przepuszcza inny blad: nazwy typow

@@ -2,7 +2,7 @@
 # Bledne zapytanie ad-hoc nie ma prawa zakonczyc procesu serwera.
 #
 # Do 2026-09-05 listenery bledow ANTLR-a w RQLParser.cpp wolaly exit(EPERM). W kliencie
-# byl to zwykly kod wyjscia, ale w SERWERZE — smierc calej instancji: `xqry -a "ml"`
+# byl to zwykly kod wyjscia, ale w SERWERZE - smierc calej instancji: `xqry -a "ml"`
 # ubijalo xretractora razem z planem i wszystkimi klientami, 5/5 prob. Zadna literowka
 # w opcjach klienta nie byla do tego potrzebna, wystarczylo bledne zapytanie.
 #

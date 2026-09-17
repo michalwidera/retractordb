@@ -6,7 +6,7 @@
 #
 # Test dowodzi trzech rzeczy:
 #  1. --until-eof bez zadnego -m daje DOKLADNIE ten sam artefakt, co recznie dobrane -m,
-#  2. --until-eof nie zawija zrodla, choc plan nie niesie ONESHOT — a bez tej flagi zawija
+#  2. --until-eof nie zawija zrodla, choc plan nie niesie ONESHOT - a bez tej flagi zawija
 #     (kontrola negatywna, bez ktorej punkt 1 przeszedlby takze przy zignorowanym trybie),
 #  3. przy wielu zrodlach przebieg konczy sie na PIERWSZYM wyczerpanym wejsciu.
 set -e

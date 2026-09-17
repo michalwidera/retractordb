@@ -81,12 +81,12 @@ enum class answerVerdict : std::uint8_t {
 /// Kolejnosc jest tu cala trescia: brak odpowiedzi i kazdy stan bez planu tak samo NIE niosa
 /// `db.stream`, a to rozne awarie i rozne naprawy. Rozpoznanie po samym braku wezla kazalo
 /// `dir()` i `dirYaml()` meldowac zdrowo wygladajacy stan bezczynny wtedy, gdy serwer w ogole
-/// nie odpowiedzial — i konczyc sie zerem. Najpierw wiec `error.response`, potem DOKLADNE
+/// nie odpowiedzial - i konczyc sie zerem. Najpierw wiec `error.response`, potem DOKLADNE
 /// odpowiedzi serwera, a dopiero na koncu worek na wszystko inne.
 ///
 /// Odpowiedz na 'detail' przechodzi tym samym sitem: `db.stream` jest w niej wezlem z nazwa
 /// strumienia, wiec udana odpowiedz daje `streams`, a przeladowanie planu miedzy 'get'
-/// a 'detail' — `idle` albo `stopping`, zamiast wyjatku o brakujacym `db.field`.
+/// a 'detail' - `idle` albo `stopping`, zamiast wyjatku o brakujacym `db.field`.
 answerVerdict classifyAnswer(const boost::property_tree::ptree &pt) {
   if (pt.get_optional<std::string>("error.response")) return answerVerdict::noResponse;
   if (pt.get_child_optional("db.stream")) return answerVerdict::streams;
@@ -98,7 +98,7 @@ answerVerdict classifyAnswer(const boost::property_tree::ptree &pt) {
 }
 
 /// Komunikat dla operatora, jeden na werdykt. Trzyma sie tu, przy klasyfikacji, bo kazde
-/// wywolanie 'get' opisuje ten sam stan serwera — komenda, ktora go zastala, niczego w nim
+/// wywolanie 'get' opisuje ten sam stan serwera - komenda, ktora go zastala, niczego w nim
 /// nie zmienia.
 const char *describe(answerVerdict verdict) {
   switch (verdict) {
@@ -117,7 +117,7 @@ const char *describe(answerVerdict verdict) {
 }
 
 /// Werdykt widziany przez operatora i przez kod wyjscia. Odpowiedz zepsuta idzie tu razem
-/// z brakiem odpowiedzi: dla wolajacego to ta sama porazka — listy nie ma — a rozroznia je
+/// z brakiem odpowiedzi: dla wolajacego to ta sama porazka - listy nie ma - a rozroznia je
 /// komunikat z describe().
 selectResult toSelectResult(answerVerdict verdict) {
   switch (verdict) {
@@ -200,7 +200,7 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
   // `error.response`; poprzednia wersja szła prosto do `get_child("db.stream")`
   // i wywracała się wyjątkiem „No such node (db.stream)". Operator dostawał
   // komunikat o brakującym węźle zamiast informacji, że serwer nie zdążył
-  // odpowiedzieć — a to dwie różne awarie i dwie różne naprawy (issue_215).
+  // odpowiedzieć - a to dwie różne awarie i dwie różne naprawy (issue_215).
   // Rozpoznanie należy do `classifyAnswer`, wspólnego z `dir()`, `dirYaml()`
   // i `detailNode()`: gdy każda z tych ścieżek miała własną kopię tej kolejności,
   // trzy z nich się rozjechały i uznawały milczenie serwera za stan bezczynny.
@@ -219,12 +219,12 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
     return selectResult::streamNotFound;
   }
 
-  // Odpowiedź na 'show' sprawdzana tak samo jak odpowiedź na 'get' powyżej — i dopiero
+  // Odpowiedź na 'show' sprawdzana tak samo jak odpowiedź na 'get' powyżej - i dopiero
   // TERAZ, czyli po rozstrzygnięciu, że strumień istnieje: subskrypcja idzie pierwsza,
   // więc dla nieznanej nazwy serwer odmawia jej, zanim ktokolwiek zdąży to nazwać, a
   // werdyktem tego przypadku pozostaje `streamNotFound` powyżej, nie awaria kolejki. Do
   // 2026-09-04 odpowiedź na 'show' nie była sprawdzana wcale, a handler 'show' nie wpisuje niczego do
-  // odpowiedzi TAKŻE po udanej subskrypcji — połknięty po stronie serwera wyjątek dawał
+  // odpowiedzi TAKŻE po udanej subskrypcji - połknięty po stronie serwera wyjątek dawał
   // więc odpowiedź nie do odróżnienia od powodzenia. Klient ruszał z wątkiem producenta
   // i meldował dopiero brak kolejki, sekundę później i bez nazwania przyczyny; zdanie
   // nazywające wyjątek zostawało w logu serwera. Werdykt jest ten sam
@@ -309,10 +309,10 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
 
   // Werdykt producenta trzeba ODEBRAĆ, a nie podejrzeć w locie. `responseQueueMissing`
   // ustawia wątek producenta dopiero wtedy, gdy wyczerpie próby otwarcia własnej kolejki
-  // odpowiedzi. Pętla powyżej wychodzi zwykle na `done` OD producenta — ale nie zawsze:
+  // odpowiedzi. Pętla powyżej wychodzi zwykle na `done` OD producenta - ale nie zawsze:
   // `_kbhit()` (klawisz operatora, a na CI terminal z bajtem w buforze), limit elementów
   // albo wyjątek kończą ją WCZEŚNIEJ. Bez `join()` flaga była wtedy jeszcze fałszem
-  // i klient melduje „brak danych" zamiast „serwer nie utworzył kolejki" — czyli mylną
+  // i klient melduje „brak danych" zamiast „serwer nie utworzył kolejki" - czyli mylną
   // diagnozę tej samej awarii. `done` jest już ustawione, a każda pętla producenta
   // sprawdza tę flagę, więc oczekiwanie jest krótkie.
   producer_thread.join();
@@ -399,9 +399,9 @@ std::expected<std::string, selectResult> qry::dirYaml() {
 std::expected<std::string, selectResult> qry::dir() {
   std::stringstream retval;
   ptree pt = netClient("get", "");
-  // Instancja bez planu nie odsyla listy strumieni, ale ODPOWIADA — i dostaje wlasny,
+  // Instancja bez planu nie odsyla listy strumieni, ale ODPOWIADA - i dostaje wlasny,
   // niepusty wydruk. Do 2026-09-05 get_child ponizej rzucalo wtedy "No such node
-  // (db.stream)", a wyjatek wychodzil do operatora jako "Std: ..." — komunikat o strukturze
+  // (db.stream)", a wyjatek wychodzil do operatora jako "Std: ..." - komunikat o strukturze
   // ptree zamiast o stanie serwera.
   const answerVerdict verdict = classifyAnswer(pt);
   if (verdict == answerVerdict::idle) return std::string(constants::kNoActivePlanReply) + "\n";
@@ -505,8 +505,8 @@ std::expected<ptree, selectResult> qry::detailNode(const std::string &input) {
   ptree pt = netClient("get", "");
 
   // Brak listy strumieni nie jest niespodzianka w strukturze danych, tylko odpowiedzia.
-  // Do 2026-09-06 `get_child` ponizej rzucalo tu "No such node (db.stream)" — zarowno dla
-  // instancji bezczynnej, jak i dla milczacego serwera — a operator dostawal komunikat
+  // Do 2026-09-06 `get_child` ponizej rzucalo tu "No such node (db.stream)" - zarowno dla
+  // instancji bezczynnej, jak i dla milczacego serwera - a operator dostawal komunikat
   // o wezle ptree zamiast o stanie serwera.
   if (const answerVerdict verdict = classifyAnswer(pt); verdict != answerVerdict::streams) {
     SPDLOG_ERROR("{} (stream: {})", describe(verdict), input);
@@ -524,7 +524,7 @@ std::expected<ptree, selectResult> qry::detailNode(const std::string &input) {
     return std::unexpected(selectResult::streamNotFound);
   }
 
-  // Drugi obrot IPC ma te same tryby porazki co pierwszy — i wlasny wyscig: plan moze zostac
+  // Drugi obrot IPC ma te same tryby porazki co pierwszy - i wlasny wyscig: plan moze zostac
   // przeladowany MIEDZY 'get' a 'detail', wiec strumien policzony przed chwila juz nie
   // istnieje. Bez tego sita `db.field` ponizej rzucalo w takim wyscigu wyjatkiem.
   ptree detail = netClient("detail", input);

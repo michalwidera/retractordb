@@ -208,7 +208,7 @@ bool FlockServiceGuard::writeLockInfo() const {
   processInfo += "PPID: " + std::to_string(getppid()) + "\n";
 
   // Tryb działania: serwis (jednostka systemd) vs zwykły proces. Tożsamość systemd ustalamy
-  // z własnego /proc/self/cgroup — pewniej niż z flagi logowania (-j), która nie oznacza,
+  // z własnego /proc/self/cgroup - pewniej niż z flagi logowania (-j), która nie oznacza,
   // że proces jest restartowalną jednostką. UNIT/SCOPE są potrzebne do systemctl [--user] restart,
   // a QUERYFILE wskazuje plik zapytań do nadpisania przez inną instancję przed restartem.
   const SystemdIdentity id = detectSystemdIdentity();

@@ -2,7 +2,7 @@
 #
 # Regresja precesji (issue #227): strumien pochodny musi byc zlaczany z ta
 # chwila zrodla, ktorej odpowiada. Test pokrywa luke, ktora zostawily testy
-# sasiednie — dsp i issue96_substrat_reference porownuja wylacznie listing
+# sasiednie - dsp i issue96_substrat_reference porownuja wylacznie listing
 # kompilacji, wiec zmiana TRESCI zlaczenia przechodzila przez nie niezauwazona.
 #
 # Oczekiwania sa w verify.sh wyprowadzane z definicji operatorow, nie przepisane

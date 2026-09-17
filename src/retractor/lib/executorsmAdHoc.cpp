@@ -18,12 +18,12 @@
 // juz dziala. Stan wspolny opisuje executorsmState.hpp.
 using namespace esm;
 
-/// Dolaczenie reguly do zywego planu — droga rozlaczna z importem strumienia.
+/// Dolaczenie reguly do zywego planu - droga rozlaczna z importem strumienia.
 ///
 /// Regula nie powoluje zadnej nazwy: wisi na strumieniu, ktory juz istnieje. Nie ma wiec czego
 /// zaimportowac (compiler::importFrom przenosi WYLACZNIE wezly o nowych identyfikatorach, wiec
 /// dla reguly jego lista wyjsciowa bylaby pusta), nie ma czego zgloszic na magistrali i nie ma
-/// po co przebudowywac osi czasu — zbior interwalow planu zostaje ten sam, dlatego nie rusza
+/// po co przebudowywac osi czasu - zbior interwalow planu zostaje ten sam, dlatego nie rusza
 /// tez adHocPlanRevision.
 ptree executorsm::attachAdHocRule(qTree &coreInstanceCopy, const std::string &streamName) {
   ptree ptRetval;
@@ -34,7 +34,7 @@ ptree executorsm::attachAdHocRule(qTree &coreInstanceCopy, const std::string &st
   };
 
   // Istnienie celu, jego typ (nie deklaracja), niepusty zakres DUMP i unikalnosc nazwy reguly
-  // sprawdzil juz parser — bez tego nie byloby tu parseOut == "OK". Regula jest dokladnie jedna
+  // sprawdzil juz parser - bez tego nie byloby tu parseOut == "OK". Regula jest dokladnie jedna
   // (statementKeywords.size() == 1), wiec parser dopisal ja na koniec listy celu.
   query &copyTarget       = coreInstanceCopy.getQuery(streamName);
   const rule parsed       = copyTarget.lRules.back();
@@ -42,14 +42,14 @@ ptree executorsm::attachAdHocRule(qTree &coreInstanceCopy, const std::string &st
 
   // SYSTEM przez kanal ad-hoc bylby wykonaniem dowolnego polecenia powloki na serwerze przez
   // kazdego, kto otworzy segment IPC. W pliku planu autorem reguly jest ten, kto uruchamia
-  // usluge — i to jest cala roznica. Akcja zostaje, kanal nie.
+  // usluge - i to jest cala roznica. Akcja zostaje, kanal nie.
   if (parsed.action != rule::DUMP) return refuse("AdHoc RULE supports DO DUMP only; DO SYSTEM stays available in the plan file");
 
   const long int historyDepth = parsed.dumpRange.first < 0 ? -parsed.dumpRange.first : 0;
 
   // Pojemnosci nie da sie podniesc w locie: polityka trafia do deskryptora przy tworzeniu
   // streamInstance, a storage::setCapacity() dla strumienia niedeklarowanego nic nie robi.
-  // Magazyn MEMORY jest pierscieniem o rozmiarze policy.second — glebszej historii tam nie ma
+  // Magazyn MEMORY jest pierscieniem o rozmiarze policy.second - glebszej historii tam nie ma
   // i nie bedzie, wiec odmawiamy zamiast uzbrajac regule, ktora czekalaby w nieskonczonosc.
   if (historyDepth > 0 && targetPolicy.first == "MEMORY" && std::cmp_greater(historyDepth, targetPolicy.second))
     return refuse("stream '" + streamName + "' keeps only " + std::to_string(targetPolicy.second) +
@@ -79,7 +79,7 @@ ptree executorsm::attachAdHocRule(qTree &coreInstanceCopy, const std::string &st
       return refuse("stream '" + streamName + "' has a different record layout in the recompiled plan");
 
     // Granica historii: regula rusza dopiero, gdy PO dolaczeniu przybedzie tyle rekordow, ile
-    // siega jej zakres. Do tej chwili zostaje nieuzbrojona — patrz rule::armAtCount.
+    // siega jej zakres. Do tej chwili zostaje nieuzbrojona - patrz rule::armAtCount.
     attached.armAtCount = pProc->getStreamCount(streamName) + static_cast<size_t>(historyDepth);
     live.lRules.push_back(std::move(attached));
   }
@@ -97,7 +97,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   auto [parseOut, first_keyword, stream_name] = parserRQLString(coreInstanceCopy, adHocQuery, statementKeywords);
 
   // Blad skladni rozstrzygamy PRZED first_keyword. Po bledzie parser zwraca "UNRECOGNIZED",
-  // a kontrole slowa kluczowego koncza sie ponizej FatalError-em, czyli smiercia serwera —
+  // a kontrole slowa kluczowego koncza sie ponizej FatalError-em, czyli smiercia serwera -
   // tego samego, przed ktora broni usuniecie exit(EPERM) z listenerow (patrz RQLParser.cpp).
   // Zalozenie "slowo kluczowe zawsze rozpoznane" bylo prawdziwe wylacznie dlatego, ze blad
   // parsowania konczyl proces, zanim ta kontrola zdazyla je sprawdzic.
@@ -139,7 +139,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   }
 
   if (first_keyword != "SELECT" && first_keyword != "DECLARE") {
-    FatalError("executorsm::getAdHoc: unexpected first_keyword '{}' after filtering — parser logic error", first_keyword);
+    FatalError("executorsm::getAdHoc: unexpected first_keyword '{}' after filtering - parser logic error", first_keyword);
   }
 
   // --until-eof jest trybem calego przebiegu. Deklaracja dolaczona pozniej musi
@@ -159,7 +159,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   // wezly posrednie, ktore kompilator dolozyl do planu) i PRZED importFrom, czyli przed
   // jakakolwiek zmiana planu dzialajacego serwera. Bez tego nazwa dodana w locie zylaby
   // w drugiej instancji bez roszczenia, a rdb::StoragePaths nadpisalby jej <qryID>.desc
-  // we wspolnym katalogu magazynu — ta sama fizyczna kolizja, przed ktora broni start.
+  // we wspolnym katalogu magazynu - ta sama fizyczna kolizja, przed ktora broni start.
   //
   // Zbior nowych nazw wyznaczamy dokladnie ta sama regula co compiler::importFrom:
   // wezly nie bedace dyrektywa, ktorych plan serwera jeszcze nie zna.
@@ -213,7 +213,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
       }
       case bus::ClaimStatus::Unavailable:
         // Spojnie ze sciezka startowa: niedostepna magistrala nie zatrzymuje pracy, cena jest
-        // wypisana wprost — rozlacznosc nazw nie jest wtedy egzekwowana.
+        // wypisana wprost - rozlacznosc nazw nie jest wtedy egzekwowana.
         SPDLOG_WARN("xrdbbus unavailable ({}); adhoc stream name uniqueness is NOT enforced.", claimed.detail);
         break;
     }

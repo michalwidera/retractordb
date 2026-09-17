@@ -1,17 +1,17 @@
-# Detekcja QRS metoda Pan-Tompkins — rekord 205
+# Detekcja QRS metoda Pan-Tompkins - rekord 205
 # Czestotliwosc: 360 Hz, interwal 1/360 s
 #
 # Potok algorytmu:
-#  1. Filtr pasmowoprzepustowy 5-15 Hz — FIR 25-tap (okno Hamminga)
-#  2. Rozniczkowanie            — FIR 5-tap: [-1,-2,0,2,1]
-#  3. Kwadrat                   — eliminuje znak, wzmacnia QRS
+#  1. Filtr pasmowoprzepustowy 5-15 Hz - FIR 25-tap (okno Hamminga)
+#  2. Rozniczkowanie            - FIR 5-tap: [-1,-2,0,2,1]
+#  3. Kwadrat                   - eliminuje znak, wzmacnia QRS
 #  4. Calkowani w oknie ruchomym 30 probek (~83 ms)
-#  5. Prog adaptacyjny          — 2x srednia ruchoma 180 probek (0.5 s)
+#  5. Prog adaptacyjny          - 2x srednia ruchoma 180 probek (0.5 s)
 #
 # Wyjscie qrs_out (3 sygnaly):
-#  [0] mlii-900   — surowe EKG wycentrowane do zera
-#  [1] mwi*5      — obwiednia Pan-Tompkins (amplituda x5)
-#  [2] detekcja*5 — sygnal detekcji QRS: wartosc >0 = wykryty QRS
+#  [0] mlii-900   - surowe EKG wycentrowane do zera
+#  [1] mwi*5      - obwiednia Pan-Tompkins (amplituda x5)
+#  [2] detekcja*5 - sygnal detekcji QRS: wartosc >0 = wykryty QRS
 #
 # Uruchamiac z katalogu zawierajacego pliki danych:
 #   cd examples/ecg/rec205
@@ -31,15 +31,15 @@ DECLARE d_coef INTEGER[5] STREAM df, 1 FILE 'd_coef.txt'
 # Wyodrebnienie kanalu MLII
 SELECT ecg.MLII STREAM mlii FROM ecg
 
-# 1. Filtr pasmowoprzepustowy (5-15 Hz) — splot FIR 25-tap
+# 1. Filtr pasmowoprzepustowy (5-15 Hz) - splot FIR 25-tap
 #
 # Okno stoi w klauzuli FROM, wiec nie potrzebuje wlasnego zapytania. Gwiazdka indeksowa
 # `[_]` bierze szerokosc ze schematu tej klauzuli, czyli 25 slotow, ktore wnosi tam okno
-# nad `mlii` — a nie z wlasnej szerokosci strumienia `mlii`.
+# nad `mlii` - a nie z wlasnej szerokosci strumienia `mlii`.
 SELECT mlii[_]*bpf[_] STREAM bp_acc FROM mlii@(1,25)+bpf
 SELECT int(bp_acc[0]/1000) STREAM bp_out FROM SUMC(bp_acc)
 
-# 2. Rozniczkowanie — splot FIR 5-tap, ten sam zapis co krok 1
+# 2. Rozniczkowanie - splot FIR 5-tap, ten sam zapis co krok 1
 SELECT bp_out[_]*df[_] STREAM d_acc FROM bp_out@(1,5)+df
 SELECT int(d_acc[0]) STREAM d_out FROM SUMC(d_acc)
 
@@ -49,7 +49,7 @@ SELECT d_out[0]^2/1000 STREAM sq_out FROM d_out
 # 4. Calkowani w oknie ruchomym 30 probek (~83 ms)
 SELECT int(sq_out[0]) STREAM mwi FROM AVG(sq_out@(1,30))
 
-# 5. Prog adaptacyjny — srednia ruchoma 180 probek (0.5 s)
+# 5. Prog adaptacyjny - srednia ruchoma 180 probek (0.5 s)
 SELECT int(mwi[0]) STREAM mwi_thr FROM AVG(mwi@(1,180))
 
 # Wyjscie: MLII wycentrowane, obwiednia x5, sygnal detekcji x5

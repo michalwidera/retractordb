@@ -60,7 +60,7 @@ XRETRACTOR_PID=$!
 
 # Czekamy na gotowosc WLASNEJ instancji zamiast na staly `sleep 1`. Petla pilnuje takze, czy
 # proces serwera jeszcze zyje: odmowa startu (zajeta nazwa) konczy go od razu, a wtedy nie wolno
-# isc dalej — klient poszedlby do cudzej instancji i to ja zabiloby sprzatanie.
+# isc dalej - klient poszedlby do cudzej instancji i to ja zabiloby sprzatanie.
 READY=
 for _ in $(seq 100); do
     if ! kill -0 "$XRETRACTOR_PID" 2>/dev/null ; then break ; fi
@@ -77,7 +77,7 @@ then
 export DISPLAY=:0
 fi
 
-# Bez --warmup xqry rysuje od pierwszego rekordu i okno pojawia sie od razu — tak dziala
+# Bez --warmup xqry rysuje od pierwszego rekordu i okno pojawia sie od razu - tak dziala
 # wiekszosc celow, bo ich strumienie nie maja czego odcinac. Z --warmup xqry odrzuca podana
 # liczbe rekordow i czeka na pelny kadr (patrz Formatter::gnuplot_warmup_), wiec przez ten
 # czas gnuplot nie dostaje zadnego `plot` i nie tworzy okna. Bez ostrzezenia wyglada to na

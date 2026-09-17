@@ -1,4 +1,4 @@
-# Stabilnosc odtworzenia — twierdzenie z sekcji Exactness and Replay Stability
+# Stabilnosc odtworzenia - twierdzenie z sekcji Exactness and Replay Stability
 # artykulu: ta sama rewizja, te same wejscia, dwa przebiegi, artefakty
 # identyczne co do bajtu poza 8-bajtowym znacznikiem utworzenia w naglowku
 # .meta.

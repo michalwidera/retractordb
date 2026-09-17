@@ -26,7 +26,7 @@ must() {
   }
 }
 
-# Napis NIE MOZE wystapic — to jest wlasnie ta polowa asercji, ktora wymuszala `if`.
+# Napis NIE MOZE wystapic - to jest wlasnie ta polowa asercji, ktora wymuszala `if`.
 must_not() {
   if grep -F "$1" "$out"; then
     echo "napis nie powinien wystapic: $1"

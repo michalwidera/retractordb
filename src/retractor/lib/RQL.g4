@@ -118,15 +118,15 @@ expression_factor   : expression_factor PLUS expression_factor   # ExpPlus
                     ;
 
 // Potegowanie `a^b`. Stoi PIERWSZE, wiec wiaze mocniej niz `*` i `/`: `a*b^2` to `a*(b^2)`.
-// Laczne PRAWOSTRONNIE, jak w matematyce — `2^3^2` to `2^(3^2)` = 512, a nie 64. Jest to
+// Laczne PRAWOSTRONNIE, jak w matematyce - `2^3^2` to `2^(3^2)` = 512, a nie 64. Jest to
 // jedyny operator w tej gramatyce, ktory nie jest lewostronny; wolno tak, bo ta drabina
 // buduje program ONP dla expressionEvaluator, a nie nazwe substratu (tam lewostronnosc
-// jest wymogiem — patrz komentarz przy stream_expression).
+// jest wymogiem - patrz komentarz przy stream_expression).
 //
 // UWAGA na jednoargumentowy minus: `-2^2` daje 4, a `-x^2` daje -(x^2). Nie jest to
 // niedopatrzenie tylko skutek tego, ze literal ujemny (`'-'? DECIMAL`) jest PRYMITYWEM
 // tego samego pietra, a `unary_op_expression` siega po cale `expression`. Dla `*` ta sama
-// asymetria nie zmieniala wyniku, dla `^` zmienia — zamiar zapisuje sie nawiasem.
+// asymetria nie zmieniala wyniku, dla `^` zmienia - zamiar zapisuje sie nawiasem.
 //
 // Token to BIT_XOR, zdefiniowany w lekserze od poczatku i do 2026-08-29 nieuzywany w
 // zadnej regule parsera. `^` nie koliduje z pozostalymi znakami interpunkcyjnymi RQL
@@ -159,10 +159,10 @@ term                : <assoc=right> term BIT_XOR term  # ExpPow
 // rekurencyjnej, wiec kolejnosc alternatyw ponizej JEST ta drabina. Przestawienie ich
 // zmienia znaczenie jezyka, nie tylko zapis.
 //
-// Poziom 2 skupia SZESC operatorow o jednej postaci — operator plus literal, jeden strumien
+// Poziom 2 skupia SZESC operatorow o jednej postaci - operator plus literal, jeden strumien
 // na wejsciu. Do 2026-08-29 byly rozrzucone na dwa pietra: `@`, `&`, `%` i `.agg` wiazaly
 // mocniej niz `#`, a `>` i `-` slabiej. Bylo to niespojne szczegolnie dla `&` i `%`, ktore sa
-// ODWROTNOSCIAMI `#` — staly pod operatorem, ktory odwracaja, podczas gdy `>` stal nad nim.
+// ODWROTNOSCIAMI `#` - staly pod operatorem, ktory odwracaja, podczas gdy `>` stal nad nim.
 // Zadny z nich nie dawal sie tez lancuchowac, bo wszystkie zadaly `stream_factor`.
 //
 // Jedyna zmiana ZNACZENIA wzgledem tamtego stanu dotyczy `X#Y>N` i `X#Y-r`: znaczyly
@@ -170,7 +170,7 @@ term                : <assoc=right> term BIT_XOR term  # ExpPow
 // sie nawiasem, a roznice pilnuje test xparser.shift_binds_tighter_than_hash.
 //
 // Granica 3|4 wynika z typowania: `#` zada zgodnych schematow, `+` schemat poszerza, wiec
-// `a#b+c` ma tylko jeden dobrze otypowany odczyt — `(a#b)+c`.
+// `a#b+c` ma tylko jeden dobrze otypowany odczyt - `(a#b)+c`.
 //
 // Lacznosc operatorow binarnych musi zostac LEWOSTRONNA: compiler sklada nazwe substratu
 // lewostronnie (`OP _arg2 _arg1`), a ta nazwa jest nazwa pliku na dysku.
@@ -187,7 +187,7 @@ stream_expression   : stream_expression AT '(' step=DECIMAL COMMA '-'? window=DE
 
 // Wywolanie reduktora jest PRYMITYWEM, a nie pietrem operatorowym: jego argument domykaja
 // wlasne nawiasy, tak samo jak `( e )`. Do 2026-08-29 stalo alternatywa `stream_term`, czyli
-// o pietro za wysoko, wiec przechodzilo wylacznie na szczycie termu — `a#MAX(b)`,
+// o pietro za wysoko, wiec przechodzilo wylacznie na szczycie termu - `a#MAX(b)`,
 // `MIN(a)@(1,4)` i `MIN(a)&2` byly bledami skladni, a `MIN(a)#(MAX(b))` wymagalo nawiasu
 // dokladanego wylacznie po to, zeby zejsc na poziom `stream_factor`.
 stream_factor       : ID
@@ -199,7 +199,7 @@ stream_factor       : ID
 // Indeks generatora strumieni: wyrazenie CALKOWITE nad `$` i literalami, zwijane do liczby
 // przez compiler::expandStreamGenerators() ZANIM ruszy jakikolwiek inny przebieg. `$` znaczy
 // numer porzadkowy instancji, wiec `cells[23-$]` w rodzinie `cell[24]` daje kolejno
-// cells[23], cells[22], ... — a po zwinieciu token jest nie do odroznienia od recznie
+// cells[23], cells[22], ... - a po zwinieciu token jest nie do odroznienia od recznie
 // napisanego `cells[22]`. Dzieki temu generator nie dotyka ani DAG, ani silnika.
 //
 // Regula jest CELOWO zamknieta: ewaluator w kompilatorze obsluguje dokladnie te produkcje
@@ -243,12 +243,12 @@ stream_fn_call      : ( MIN
 // Agregat okna REKORDOWEGO w liscie SELECT: `MIN(cells[0] : 10)`.
 //
 // Drugi argument liczy HISTORYCZNE WIERSZE: okno redukuje DOKLADNIE tyle wartosci, po jednej
-// z kazdego z 10 kolejnych rekordow zrodla, i wydaje wynik co rekord — jest PRZESUWNE i innym
+// z kazdego z 10 kolejnych rekordow zrodla, i wydaje wynik co rekord - jest PRZESUWNE i innym
 // byc nie moze. Redukcja idzie wiec wylacznie po CZASIE.
 //
 // Do 2026-08-31 argumentem mogla byc cala tablica i wtedy `MIN(cells : 10)` nad `INTEGER[24]`
 // redukowalo 240 wartosci, mieszajac czas z 24 ROWNOLEGLYMI kanalami jednego rekordu. Nazwa
-// tablicy nie jest nazwa pola — polami sa jej elementy `cells[0]`, `cells[1]`, ... — wiec
+// tablicy nie jest nazwa pola - polami sa jej elementy `cells[0]`, `cells[1]`, ... - wiec
 // argumentem jest element. Redukcja po kanalach jednego rekordu ma wlasny zapis po stronie
 // FROM (`FROM MIN(strumien)`) i pozostaje bez zmian.
 //
@@ -256,7 +256,7 @@ stream_fn_call      : ( MIN
 // `MIN(cells : 10 : 10)`, ktory wydawal wynik co 10 rekordow, mnozac przez 10 interwal
 // strumienia wyjsciowego. Byla to JEDYNA konstrukcja w tym jezyku, w ktorej lista SELECT
 // zmieniala takt strumienia; wszedzie indziej interwal wynika wylacznie z klauzuli FROM.
-// Kazde okno z krokiem zapisuje sie po stronie FROM — albo przez AGSE `@(krok, szerokosc)`,
+// Kazde okno z krokiem zapisuje sie po stronie FROM - albo przez AGSE `@(krok, szerokosc)`,
 // albo przez rozrzedzenie wyniku operatorem `-`. Rozrzedzenie wyniku zachowuje przy tym
 // tresc okna (te same W kolejnych rekordow), a rozni sie od dawnego kroku wylacznie faza,
 // czyli tym, ktore okno okresu zostaje wydane.
@@ -265,19 +265,19 @@ stream_fn_call      : ( MIN
 // rekordu i zostaje bez zmian. Roznica jest widoczna w gramatyce: tamten stoi w
 // stream_expression i bierze strumien, ten stoi w `term` i bierze POLE.
 //
-// Separatorem jest COLON, nie COMMA — przecinek rozdziela pozycje `select_list`, a pulapka
+// Separatorem jest COLON, nie COMMA - przecinek rozdziela pozycje `select_list`, a pulapka
 // SLL opisana przy tej regule zamienilaby `MIN(a, 10)` w `MIN(a)` plus smiec `10`. Ten sam
 // powod i ten sam znak co w `to_string(expr : N)`.
 //
 // Argumentem jest WYRAZENIE, nie samo odwolanie do pola: `MIN(a[0]*10 - a[1] : 3)` jest
 // legalne. Wyrazenie liczy sie osobno dla KAZDEGO rekordu okna, na jego wlasnym payloadzie,
-// wiec do redukcji wchodzi po jednej wartosci na rekord — tak samo jak przy golym polu.
+// wiec do redukcji wchodzi po jednej wartosci na rekord - tak samo jak przy golym polu.
 // Wszystkie odwolania w wyrazeniu musza siegac po JEDEN strumien: okno czyta historie
 // jednego zrodla i innej nie ma skad wziac. Kompilator odrzuca tez okno w oknie oraz
 // wyrazenie, ktore nie czyta zadnego pola albo daje napis.
 //
 // Podwyrazenie WYCHODZI z programu pola w compiler::resolveWindowAggregates() i laduje
-// w tabeli grup okna, czyli PRZED przebiegami upraszczajacymi — stale w nim nie sa zwijane.
+// w tabeli grup okna, czyli PRZED przebiegami upraszczajacymi - stale w nim nie sa zwijane.
 //
 // Alternatywa stoi w `term` PRZED `agregator`, bo `agregator` to sam token MIN i pasuje do
 // prefiksu. ANTLR poradzilby sobie predykcja adaptacyjna, ale kolejnosc jest darmowa.
@@ -293,20 +293,20 @@ window_agg          : ( MIN
 // compiler::checkFunctionCalls(), wiec `-c` jest bramka.
 //
 // Do 2026-08-30 nazwy byly literalami tej reguly. Mialo to dwa skutki naraz. Wielkosc
-// liter byla czescia SKLADNI — `Sqrt(x)` przechodzilo, `sqrt(x)` bylo bledem, a dla
-// `to_integer` i `isnull` odwrotnie — bo ewaluator sklada wielkosc liter przed
+// liter byla czescia SKLADNI - `Sqrt(x)` przechodzilo, `sqrt(x)` bylo bledem, a dla
+// `to_integer` i `isnull` odwrotnie - bo ewaluator sklada wielkosc liter przed
 // dopasowaniem, a gramatyka nie. I trzynascie nazw bez implementacji kompilowalo sie
 // czysto, zeby wywrocic proces dopiero w wykonaniu. Oba znika, gdy nazwa jest ID.
 //
 // `ID` nie koliduje tu z `field_id : column_name=ID`, bo rozroznia je JEDEN token
 // wyprzedzenia (`(` po nazwie); zadna alternatywa `field_id` nie zaczyna sie `ID '('`.
-// Pulapka SLL opisana przy `select_list` tego nie dotyczy — tam obie sciezki byly
+// Pulapka SLL opisana przy `select_list` tego nie dotyczy - tam obie sciezki byly
 // poprawne, tu tylko jedna.
 //
 // Dwa ksztalty wywolania, bo drugi argument `to_string` NIE jest wartoscia na stosie,
 // tylko zadeklarowana szerokoscia pola wyjsciowego, i jedzie w tokenie jako IDXPAIR.
 // Gdyby stal tu `expression_factor`, jego wlasny token PUSH_VAL zostalby na stosie
-// jako smiec, bo CALL2 zdejmuje jeden argument. Separatorem jest COLON, nie COMMA —
+// jako smiec, bo CALL2 zdejmuje jeden argument. Separatorem jest COLON, nie COMMA -
 // patrz regula przy `select_list`. Liczbe argumentow sprawdza tabela arnosci.
 function_call       : fn=ID '(' expression_factor ')'
                     | fn=ID '(' expression_factor COLON DECIMAL ')'
@@ -357,7 +357,7 @@ STRING_PROFILE:    '\'' (TYPE_PROFILE | DEFAULT) '\'';
 
 // UWAGA: `to_integer`, `to_float`, `to_double` i `to_string` mialy tu do 2026-08-30 wlasne
 // tokeny leksera, wiec byly slowami ZASTRZEZONYMI. Teraz leksuja sie jako ID, tak samo jak
-// pozostale nazwy funkcji — inaczej nie przeszlyby przez `function_call : fn=ID ...`.
+// pozostale nazwy funkcji - inaczej nie przeszlyby przez `function_call : fn=ID ...`.
 ID:                 ([A-Za-z]) ([A-Za-z_$0-9])*;
 STRING:             '\'' (~'\'' | '\'\'')* '\'';
 FLOAT:              DEC_DOT_DEC;
@@ -396,7 +396,7 @@ BIT_XOR:            '^';
 SPACE:              [ \t\r\n]+    -> skip;
 COMMENT:            '/*' (COMMENT | .)*? '*/' -> channel(HIDDEN);
 // Komentarz `#` NIE jest tokenem leksera: wiersz, ktorego pierwszym niebialym znakiem jest
-// `#`, odrzuca readLogicalLines() jeszcze przed parserem — tak samo w produkcji
+// `#`, odrzuca readLogicalLines() jeszcze przed parserem - tak samo w produkcji
 // (launcher.cpp) jak i w testach (parserRQLFile_4Test). Dzieki temu `#` W LEKSERZE znaczy
 // zawsze przeplot, niezaleznie od otaczajacych spacji.
 //
@@ -405,7 +405,7 @@ COMMENT:            '/*' (COMMENT | .)*? '*/' -> channel(HIDDEN);
 // Odstep po `#` nie rozwiazywal jej jednak, tylko przenosil skutek w cisza: `FROM a # b`
 // przechodzilo kompilacje jako `FROM a`, gubiac `b` BEZ zadnego komunikatu. Po usunieciu
 // reguly ten sam zapis jest przeplotem, a `SELECT ... # komentarz na koncu wiersza` jest
-// bledem skladni — glosnym, a nie cichym. Komentarz konczacy wiersz zapisuje sie `//`.
+// bledem skladni - glosnym, a nie cichym. Komentarz konczacy wiersz zapisuje sie `//`.
 LINE_COMMENT2:      '//' ~[\r\n]* -> channel(HIDDEN);
 
 fragment LETTER:    [A-Z_];

@@ -17,7 +17,7 @@ namespace rdb {
 /// @brief Klasa utrzymująca trwały indeks informacji o wartościach null dla rekordów przechowywanych w storage.
 ///
 /// Posiadanie metaindeksu pozwala magazynowi uwzględnić wartości null poszczególnych pól oraz przerwy
-/// w transmisji danych — informacje, których binarna zawartość rekordów sama nie koduje. Jest to mechanizm
+/// w transmisji danych - informacje, których binarna zawartość rekordów sama nie koduje. Jest to mechanizm
 /// niezależny od pliku cienia danych (.shadow), który służy zachowaniu oryginalnej zarejestrowanej zawartości.
 ///
 /// Obiekt klasy metaData powinien:
@@ -40,15 +40,15 @@ namespace rdb {
 /// - udostępniać flushPendingGap() zapisujące zaakumulowaną przerwę jako wpis gap (wywoływane przez storage także przy
 ///   zamykaniu magazynu),
 /// - nie przechowywać znacznika czasu dla każdego rekordu ani żadnego innego; nagłówek pliku jest 8-bajtowym polem
-///   zarezerwowanym, zapisywanym jako zero (do 2026-09-02 niósł czas utworzenia indeksu — pole wycofane),
+///   zarezerwowanym, zapisywanym jako zero (do 2026-09-02 niósł czas utworzenia indeksu - pole wycofane),
 /// - zarządzać własnymi zasobami w sposób bezpieczny i bez wycieków pamięci.
 /// - przyjąć od obiektu storage informację o przerwie w transmisji danych (wraz z jej długością w jednostkach próbkowania) i zapisać ją jako wpis gap w indeksie,
 /// - przyjąć od obiektu storage informację o rotacji pliku danych i wykonać rotację indeksu: skopiować obecny plik indeksu z rozszerzeniem .old/percounter, następnie stworzyć nowy, czysty plik indeksu (bez wpisu gap),
 /// - jeśli plik danych nie zrotował, przyjąć od obiektu storage informację o brakujących danych i dopisać odpowiedni wpis gap przed pierwszym nowym rekordem.
 /// - gwarantować, że plik indeksu nigdy nie zawiera przestarzałych (nadpisanych logicznie) wpisów: jeśli bieżący segment RLE został wciągnięty do pamięci w celu rozszerzenia (mechanizm lazy overwrite), każda operacja dopisująca nowe wpisy do pliku musi najpierw zastąpić ten przestarzały wpis zamiast dopisywać za nim.
 /// - udostępniać metodę wymuszającą natychmiastowy zapis pending entry na dysk (flushCurrentEntry()), aby null metadata przeżyła awarię lub otwarcie pliku przez drugi obiekt storage.
-/// - umożliwiać wyczyszczenie całej zawartości indeksu (reset()) odpowiadające wywołaniu purge() w storage — usunięcie wszystkich wpisów (wraz z licznikami maszyny gap, lecz bez wyłączania skonfigurowanej detekcji) przy zachowaniu 8-bajtowego zarezerwowanego nagłówka pliku.
-/// - udostępniać abandonFile() odłączające indeks od pliku (dalsze operacje I/O stają się no-opem) — wywoływane
+/// - umożliwiać wyczyszczenie całej zawartości indeksu (reset()) odpowiadające wywołaniu purge() w storage - usunięcie wszystkich wpisów (wraz z licznikami maszyny gap, lecz bez wyłączania skonfigurowanej detekcji) przy zachowaniu 8-bajtowego zarezerwowanego nagłówka pliku.
+/// - udostępniać abandonFile() odłączające indeks od pliku (dalsze operacje I/O stają się no-opem) - wywoływane
 ///   przez storage dla magazynów dysponowalnych PRZED skasowaniem pliku .meta, aby destruktor (niejawny
 ///   flushCurrentEntry()) nie odtworzył właśnie usuniętego pliku.
 /// - stanowić polimorficzną bazę dla wariantów zachowania wstrzykiwanych do storage: metody onRecordModified(),
@@ -57,18 +57,18 @@ namespace rdb {
 /// @note Indeks przechowuje metadane o wartościach null niezależnie od binarnej zawartości rekordów w storage.
 /// @note Wpisy gap są markerami przerw transmisji danych między rekordami i nie są wliczane do numeracji logicznych rekordów zwracanej przez totalRecords().
 /// @note Interfejs klasy jest ograniczony do operacji potrzebnych do dopisywania, modyfikacji, odczytu i trwałego utrzymania indeksu null.
-/// @note Instancja z pustą ścieżką pliku jest wariantem inertnym (bez persystencji) — storage wstrzykuje ją dla
+/// @note Instancja z pustą ścieżką pliku jest wariantem inertnym (bez persystencji) - storage wstrzykuje ją dla
 ///       źródeł deklarowanych (DEVICE/TEXTSOURCE), które nie utrzymują indeksu null.
 /// @note Klasa pełni rolę koordynatora spinającego wydzielone jednostki: format wpisu definiuje IndexRecord
 ///       (indexRecord.hpp), persystencję pliku .meta realizuje MetaIndexStore (metaIndexStore.hpp), stan detekcji
-///       przerw GapDetector (gapDetector.hpp), a operacje na segmentach RLE — splitSegment()/sumNonGapRecords()
+///       przerw GapDetector (gapDetector.hpp), a operacje na segmentach RLE - splitSegment()/sumNonGapRecords()
 ///       (rleSegment.hpp); przy metaData pozostaje polityka RLE (lazy overwrite, DiskTailState) i numeracja rekordów.
 
 class metaData {
  public:
   // ── Nested types ───────────────────────────────────────────────────
 
-  /// @brief Alias kept for source compatibility — the type now lives standalone (indexRecord.hpp).
+  /// @brief Alias kept for source compatibility - the type now lives standalone (indexRecord.hpp).
   using IndexRecord = rdb::IndexRecord;
 
   // ── Construction / destruction ──────────────────────────────────────
@@ -162,7 +162,7 @@ class metaData {
   /// @brief Feed an appended record's null bit-set into the gap-detection machine.
   ///
   /// Returns true when the record was absorbed into the pending gap (all-null
-  /// beyond the nullfill phase) — the caller must NOT write it to storage.
+  /// beyond the nullfill phase) - the caller must NOT write it to storage.
   /// A non-null record flushes the pending gap and resets the nullfill counter.
   /// No-op returning false when gap detection is not configured.
   bool absorbAppend(const std::vector<bool> &nullBitset);

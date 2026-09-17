@@ -1,38 +1,38 @@
 #!/usr/bin/env python3
-"""Regula decyzyjna H10 — orzeka o SUROWYM wyniku kampanii, bez odniesienia.
+"""Regula decyzyjna H10 - orzeka o SUROWYM wyniku kampanii, bez odniesienia.
 
 Czym ten plik rozni sie od `../compare_regimes.py`
 --------------------------------------------------
 `compare_regimes.py` jest jadrem BRAMKI REGRESYJNEJ: porownuje rezimy biezacego
 przebiegu z zamrozona tablica `VERDICT.md`. Odpowiada na pytanie „czy silnik sie
-cofnal", i tylko na nie — przebieg, ktory zgadza sie z odniesieniem, przechodzi
+cofnal", i tylko na nie - przebieg, ktory zgadza sie z odniesieniem, przechodzi
 niezaleznie od tego, czy odniesienie w ogole wspiera H10.
 
 Ten plik odpowiada na pytanie inne: „czy H10 jest wsparta NA TYM silniku".
 Nie zaglada do zadnego pliku odniesienia. Stosuje progi predeklaracji K24 §6 do
 liczb policzonych w tym przebiegu i konczy sie werdyktem.
 
-Zrodlem metryki jest `verdict.py` z tego katalogu — `classify`, `classify_origin`,
+Zrodlem metryki jest `verdict.py` z tego katalogu - `classify`, `classify_origin`,
 `regime`, `member_b` i `controls` sa importowane, nie przepisywane. Dwa
 przepisania tej samej definicji rozjezdzaja sie po cichu; ten projekt ma juz taki
 przypadek zapisany (predeklaracja K26v3 §6, serializer kanoniczny).
 
 Progi (predeklaracja K24 §6, przepisane z `VERDICT.md`)
 ------------------------------------------------------
-* **H10a** — zgodnosc 100% w klasie jest JEDYNYM wsparciem H10a w tej klasie;
+* **H10a** - zgodnosc 100% w klasie jest JEDYNYM wsparciem H10a w tej klasie;
   jedna niezgodnosc falsyfikuje H10a w tej klasie. Werdyktem jest atrybucja
   IZOLOWANA (postac zamknieta z ogonow skladowych wzietych z oracle'a), nie
   propagowana. Dotyczy osobno ogona startowego i poczatku logicznego.
-* **rezim zanizajacy** — rekord wyemitowany, zanim jego zaleznosci sa okreslone.
+* **rezim zanizajacy** - rekord wyemitowany, zanim jego zaleznosci sa okreslone.
   Jakosciowo inny od zawyzajacego: jest defektem poprawnosci, nie utrata
   precyzji, i zawsze jest wynikiem negatywnym.
-* **H10b** — rozjazd reguly lokalnej A z dokladna na >= 5% planow ORAZ 100%
+* **H10b** - rozjazd reguly lokalnej A z dokladna na >= 5% planow ORAZ 100%
   dodatnich deficytow o predeklarowanej postaci `ceil((p+q-1)/p)` wsrod
   wezlow `#` z dwiema deklaracjami. Ocena jest
-  warunkowa: wymaga, zeby obie predeklarowane kontrole negatywne — „plany bez
-  `#`" i HC_SINGLE zawezone do operatorow bez wlasnego ogona (K24b §4) — BYLY
+  warunkowa: wymaga, zeby obie predeklarowane kontrole negatywne - „plany bez
+  `#`" i HC_SINGLE zawezone do operatorow bez wlasnego ogona (K24b §4) - BYLY
   SPELNIONE i zeby mialy niepusta populacje. Zlamana kontrola znaczy zle
-  zdefiniowana regula lokalna, a nie wynik — czlon (b) jest wtedy NIEOCENIALNY
+  zdefiniowana regula lokalna, a nie wynik - czlon (b) jest wtedy NIEOCENIALNY
   i nie wolno go liczyc ani za, ani przeciw. Definicja kontroli jest w
   `verdict.controls` i tam tez jest zapisane, dlaczego HC_INT zostala wycofana.
 
@@ -40,8 +40,8 @@ Kody wyjscia
 ------------
 0  H10a WSPARTA na badanym korpusie
 1  H10a BEZ WSPARCIA (falsyfikacja w co najmniej jednej klasie albo defekt
-   zanizania) — wazny wynik negatywny, nigdy awaria aparatury
-2  BRAK WERDYKTU (pusty korpus, rozjazd zestawu klas, blad odczytu) — kod 1 jest
+   zanizania) - wazny wynik negatywny, nigdy awaria aparatury
+2  BRAK WERDYKTU (pusty korpus, rozjazd zestawu klas, blad odczytu) - kod 1 jest
    zarezerwowany dla wyniku o silniku i nie moze byc osiagalny przez awarie
 """
 
@@ -55,12 +55,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import verdict as V
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  ZAMROZONE STALE — predeklaracja K24 §6. Nie sa parametrami CLI: prog, ktory
+#  ZAMROZONE STALE - predeklaracja K24 §6. Nie sa parametrami CLI: prog, ktory
 #  da sie podac z wiersza polecen, nie jest predeklarowany.
 # ══════════════════════════════════════════════════════════════════════════════
 
 #: Dziewiec klas operatorow korpusu. Klasa brakujaca znaczy, ze proba jej nie
-#: pokryla, klasa nadmiarowa — ze generator albo silnik nazywa cos inaczej.
+#: pokryla, klasa nadmiarowa - ze generator albo silnik nazywa cos inaczej.
 #: Oba przypadki to BRAK WERDYKTU, nigdy ciche orzeczenie o dziewieciu z osmiu.
 EXPECTED_CLASSES = frozenset(
     {"ADD", "AGSE", "HASH", "NTHETA", "PASS", "REDUCE", "SHIFT", "SUB", "THETA"})
@@ -77,7 +77,7 @@ def expected_classes(rows):
 
     Oczekiwanie bierze sie ze STRATY zapisanej w wierszach, a nie z przelacznika
     wolajacego. CSV jest zapisem tego, co korpus mial wyprodukowac, wiec nie ma jak
-    rozejsc sie z tym, co faktycznie przebieglo — a przelacznik podany w jednym
+    rozejsc sie z tym, co faktycznie przebieglo - a przelacznik podany w jednym
     miejscu i pominiety w drugim dalby blad o mylacej tresci.
 
     Straznik zostaje nietkniety w obie strony: klasa brakujaca i klasa nadmiarowa
@@ -91,7 +91,7 @@ def expected_classes(rows):
 #: H10b: minimalny udzial planow z rozjazdem reguly lokalnej A.
 H10B_MIN_SHARE = Fraction(5, 100)
 
-#: H10b: udzial wszystkich kwalifikujacych sie wezlow o zadanej postaci. Rowny jeden —
+#: H10b: udzial wszystkich kwalifikujacych sie wezlow o zadanej postaci. Rowny jeden -
 #: jeden kontrprzyklad obala postac.
 H10B_FORM_SHARE = Fraction(1, 1)
 
@@ -143,7 +143,7 @@ def judge_a(rows):
 
 
 def judge_b(rows):
-    """Czlon (b): ocena WARUNKOWA — najpierw predeklarowane kontrole negatywne.
+    """Czlon (b): ocena WARUNKOWA - najpierw predeklarowane kontrole negatywne.
 
     Kontrola o zerowej populacji nie jest kontrola spelniona, tylko kontrola,
     ktorej nie bylo czym sprawdzic. Kierunek bledu jest jednostronny: cokolwiek
@@ -181,7 +181,7 @@ def judge_b(rows):
 
 def judge(rows):
     if not rows:
-        raise VerdictError("korpus pusty — zero obserwacji wezlowych")
+        raise VerdictError("korpus pusty - zero obserwacji wezlowych")
     per_class = judge_a(rows)
     member_a = SUPPORTED if all(c["supported"] for c in per_class.values()) else REFUTED
     return {
@@ -197,12 +197,12 @@ def judge(rows):
 def render(report, seed, engine):
     per = report["per_class"]
     lines = [
-        "# H10 — werdykt regulą decyzyjną, bez odniesienia", "",
+        "# H10 - werdykt regulą decyzyjną, bez odniesienia", "",
         f"Korpus: **{report['plans']} planów**, **{report['observations']} obserwacji "
         f"węzłowych**. Ziarno **{seed}**, silnik `{engine}`.", "",
         "Progi pochodzą z predeklaracji K24 §6 i są w kodzie stałymi. Ten plik nie",
-        "porównuje się z żadną tablicą odniesienia — orzeka o silniku, nie o regresji.", "",
-        "## H10a — dokładność rachunku, per klasa operatora", "",
+        "porównuje się z żadną tablicą odniesienia - orzeka o silniku, nie o regresji.", "",
+        "## H10a - dokładność rachunku, per klasa operatora", "",
         "| Klasa | Węzłów | Ogon (izol.) | Reżim ogona | Origin (izol.) | Reżim origin | Werdykt |",
         "|---|---:|---:|---|---:|---|---|",
     ]
@@ -213,17 +213,17 @@ def render(report, seed, engine):
             f"| `{cls}` | {item['n']} | {float(item['tail_share']):.1%} | {item['tail_regime']} | "
             f"{float(item['origin_share']):.1%} | {item['origin_regime']} | {mark} |")
     exact = sum(1 for v in per.values() if v["supported"])
-    lines += ["", f"**H10a: {report['a']}** — {exact}/{len(per)} klas dokładnych "
+    lines += ["", f"**H10a: {report['a']}** - {exact}/{len(per)} klas dokładnych "
                   "w obu wielkościach jednocześnie."]
     if report["under"]:
-        lines += ["", "**DEFEKT — reżim zaniżający:** " +
+        lines += ["", "**DEFEKT - reżim zaniżający:** " +
                   ", ".join(f"`{c}`" for c in report["under"]) + ". Rekord wyemitowany,",
                   "zanim wszystkie jego zależności są określone. To defekt poprawności,",
                   "nie utrata precyzji."]
 
     b = report["b"]
-    lines += ["", "## H10b — wystarczalność reguły lokalnej", "",
-              f"**H10b: {b['status']}** — {b['reason']}", "",
+    lines += ["", "## H10b - wystarczalność reguły lokalnej", "",
+              f"**H10b: {b['status']}** - {b['reason']}", "",
               "| Kontrola negatywna | Węzłów | Rozjazdów | Stan |", "|---|---:|---:|---|"]
     for name, (count, breaches) in b["controls"].items():
         state = "**ZŁAMANA**" if breaches else ("**PUSTA**" if count == 0 else "przeszła")
@@ -236,7 +236,7 @@ def render(report, seed, engine):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Samotest — regula decyzyjna jest aparatura i podlega tej samej regule co
+#  Samotest - regula decyzyjna jest aparatura i podlega tej samej regule co
 #  reszta: musi umiec odroznic wersje obalona. Bramka, ktora przepuszcza kazde
 #  dane, nie orzeka o niczym.
 # ══════════════════════════════════════════════════════════════════════════════
@@ -265,7 +265,7 @@ def _row(plan, kind, tail_gap=0, origin_gap=0, hard="", div_a=0, div_b=0,
 
 
 def _corpus(**overrides):
-    """Dziewiec klas, po jednym wezle, wszystko dokladne — chyba ze nadpisane."""
+    """Dziewiec klas, po jednym wezle, wszystko dokladne - chyba ze nadpisane."""
     rows = []
     for index, cls in enumerate(sorted(EXPECTED_CLASSES)):
         rows.append(_row(index, cls, **overrides.get(cls, {})))
@@ -297,10 +297,10 @@ def _expect(label, rows, want_a, want_b=None, want_error=False):
 def selftest():
     ok = True
     # Wersja poprawna. H10b nieocenialny, bo goly korpus samotestu nie ma ani
-    # jednego planu HC_SINGLE, wiec druga kontrola ma pusta populacje —
+    # jednego planu HC_SINGLE, wiec druga kontrola ma pusta populacje -
     # dokladnie tak, jak nieocenialny bywa na prawdziwym przebiegu.
     ok &= _expect("wszystko dokladne", _corpus(), SUPPORTED, UNEVALUABLE)
-    # Wersje obalone — kazda musi zostac odrzucona z INNEGO powodu.
+    # Wersje obalone - kazda musi zostac odrzucona z INNEGO powodu.
     ok &= _expect("jedna klasa zawyza ogon",
                   _corpus(HASH={"tail_gap": 1}), REFUTED)
     ok &= _expect("jedna klasa zanizza ogon",
@@ -314,7 +314,7 @@ def selftest():
                   _corpus() + [_row(99, "NOWA")], None, want_error=True)
 
     # Korpus z oknem REKORDOWYM: dziesiec klas jest wtedy zestawem POPRAWNYM,
-    # a ta sama dziesiatka bez straty `WINDOW` w wierszach — nadmiarowa. Obie
+    # a ta sama dziesiatka bez straty `WINDOW` w wierszach - nadmiarowa. Obie
     # strony osobno, bo `expected_classes()` da sie zepsuc w kazda z nich.
     ok &= _expect("korpus z oknem: dziesiec klas przechodzi",
                   _corpus() + [_row(98, WINDOW_CLASS, stratum=WINDOW_CLASS)],
@@ -326,10 +326,10 @@ def selftest():
                   None, want_error=True)
 
     # Kontrola mocy czlonu (b): gdyby zadne dane nie mogly go uczynic ocenialnym,
-    # jego progi bylyby martwa galezia, a status NIEOCENIALNY — tautologia.
+    # jego progi bylyby martwa galezia, a status NIEOCENIALNY - tautologia.
     #
     # Populacje obu kontroli K24b §4 sa tu rozdzielone celowo. „Plany bez `#`"
-    # karmia plany zlozone WYLACZNIE z operatorow fazowo pustych; HC_SINGLE —
+    # karmia plany zlozone WYLACZNIE z operatorow fazowo pustych; HC_SINGLE -
     # plan jednotaktowy, ktory obok wezla fazowo pustego ma wezel z wlasnym
     # ogonem, wiec do pierwszej kontroli nie wchodzi. Bez tego rozdzielenia
     # jedno uszkodzenie gasiloby obie kontrole naraz i samotest nie odroznilby,
@@ -412,8 +412,8 @@ def main():
     exact = sum(1 for v in report["per_class"].values() if v["supported"])
     print(f"H10a: {report['a']} ({exact}/{len(report['per_class'])} klas dokladnych)")
     if report["under"]:
-        print(f"DEFEKT — rezim zanizajacy: {', '.join(report['under'])}")
-    print(f"H10b: {report['b']['status']} — {report['b']['reason']}")
+        print(f"DEFEKT - rezim zanizajacy: {', '.join(report['under'])}")
+    print(f"H10b: {report['b']['status']} - {report['b']['reason']}")
     return 0 if report["a"] == SUPPORTED else 1
 
 

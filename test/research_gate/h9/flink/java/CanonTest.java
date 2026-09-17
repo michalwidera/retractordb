@@ -3,7 +3,7 @@
 //
 // Test jest podwojnie zamkniety:
 //   1. wobec kolumny oczekiwanej w canonical_vectors.tsv (przypadki o ZNANEJ odpowiedzi,
-//      przepisane z test/UnitTest/test_probe.cpp — bramki tej metryki po stronie C++),
+//      przepisane z test/UnitTest/test_probe.cpp - bramki tej metryki po stronie C++),
 //   2. wobec wyjscia oracle/canonical_oracle, ktory nie ma wlasnej implementacji, tylko
 //      linkuje funkcje silnika.
 //
@@ -94,9 +94,9 @@ public class CanonTest {
 
     System.out.println("wektory=" + checked + " porownane_z_oracle=" + againstOracle + " bledy=" + failed);
     if (failed > 0) {
-      System.out.println("WYNIK: ROZBIEZNOSC — metryka miedzysystemowa niewazna");
+      System.out.println("WYNIK: ROZBIEZNOSC - metryka miedzysystemowa niewazna");
       System.exit(1);
     }
-    System.out.println("WYNIK: OK — serializer Flinka zgodny z rdb::probe::canonicalRecordBytes");
+    System.out.println("WYNIK: OK - serializer Flinka zgodny z rdb::probe::canonicalRecordBytes");
   }
 }

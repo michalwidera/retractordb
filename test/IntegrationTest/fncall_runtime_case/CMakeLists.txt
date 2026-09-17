@@ -4,7 +4,7 @@ get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
 # Gramatyka zna funkcje wyłącznie w postaci 'Sqrt', 'Ceil', 'Floor', a ewaluator
-# dopasowywał nazwy tylko małymi literami — plan kompilował się i wywracał
+# dopasowywał nazwy tylko małymi literami - plan kompilował się i wywracał
 # dopiero w wykonaniu. Test uruchamia plan i sprawdza wartości.
 
 add_test(

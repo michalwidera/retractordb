@@ -11,7 +11,7 @@
 #include "token.hpp"    // token, std::list
 
 /// @file
-/// Ksztalt wyniku programu ONP — JEDEN analizator typu dla calego kompilatora.
+/// Ksztalt wyniku programu ONP - JEDEN analizator typu dla calego kompilatora.
 ///
 /// Do 2026-09-11 na pytanie „jakiego typu jest to pole" odpowiadalo piec niezaleznych
 /// od siebie regul lokalnych, kazda dopisana przy okazji innej awarii:
@@ -31,19 +31,19 @@
 /// `paper-arXiv/usecases/requested.md` opisuje wszystkie trzy granice.
 ///
 /// Ten modul zastepuje tamte reguly jednym przejsciem po stosie typow. Zasada jest jedna
-/// i brzmi: **analizator odtwarza to, co robi `expressionEvaluator`** — nie kolejnosc enum,
+/// i brzmi: **analizator odtwarza to, co robi `expressionEvaluator`** - nie kolejnosc enum,
 /// nie intuicje, tylko rzeczywista arytmetyka wariantu. Tam, gdzie ewaluator promuje
 /// (`uint8_t + uint8_t` daje `int`), promuje i analizator; tam, gdzie zachowuje typ
 /// (`neg`, `Abs`, funkcje matematyczne przez `callFun`), zachowuje i analizator.
 ///
 /// Analizator NIE zalezy od upraszczania wyrazen: `simplifyExpression()` jest z zalozenia
 /// zachowawcze typowo (regula C odmawia usuniecia elementu neutralnego o innej
-/// reprezentacji niz podwyrazenie — patrz `dropNeutralOperand`), wiec deskryptor jest
+/// reprezentacji niz podwyrazenie - patrz `dropNeutralOperand`), wiec deskryptor jest
 /// ten sam przy `RDB_OPT_SIMPLIFY_EXPRESSIONS` wlaczonym i wylaczonym.
 
 /// Ksztalt wartosci: typ, dlugosc JEDNEGO elementu w bajtach i krotnosc.
 ///
-/// Dla typow liczbowych `rarray` wynosi zawsze 1 — wartoscia wyrazenia jest jedna liczba,
+/// Dla typow liczbowych `rarray` wynosi zawsze 1 - wartoscia wyrazenia jest jedna liczba,
 /// nawet gdy operand byl elementem tablicy. Dla `STRING` obowiazuje zapis deskryptora
 /// `rlen = 1`, `rarray = szerokosc w bajtach`.
 struct exprShape {
@@ -58,19 +58,19 @@ struct exprShape {
 
 /// Wynik analizy programu.
 ///
-///  * `resolved`  — ksztalt znany;
-///  * `unknown`   — program siega po cos, czego na tym etapie nie da sie rozstrzygnac
+///  * `resolved`  - ksztalt znany;
+///  * `unknown`   - program siega po cos, czego na tym etapie nie da sie rozstrzygnac
 ///                  (nierozwiazane `PUSH_ID1/2/3`, token spoza zestawu ewaluatora,
 ///                  nieznana grupa okna). Wolajacy ZOSTAWIA pole nietkniete;
-///  * `illTyped`  — program nie ma wartosci: operand tekstowy pod operatorem liczbowym,
+///  * `illTyped`  - program nie ma wartosci: operand tekstowy pod operatorem liczbowym,
 ///                  pusty stos, wiecej niz jedna wartosc na koncu. Wolajacy takze zostawia
-///                  pole nietkniete — blad ma polecic w WYKONANIU, dokladnie tam, gdzie
+///                  pole nietkniete - blad ma polecic w WYKONANIU, dokladnie tam, gdzie
 ///                  lecial dotad.
 ///
-///  * `rejected` — program jest skladniowo poprawny i typ da sie policzyc, ale kombinacja
+///  * `rejected` - program jest skladniowo poprawny i typ da sie policzyc, ale kombinacja
 ///                  funkcji i typu argumentu NIE JEST ZAIMPLEMENTOWANA i policzylaby zla
 ///                  wartosc. Wolajacy ZATRZYMUJE kompilacje i podaje `reason` uzytkownikowi.
-///                  Dzisiejsze przypadki to `Sqrt`, `sin`, `cos` i `exp` nad `RATIONAL` —
+///                  Dzisiejsze przypadki to `Sqrt`, `sin`, `cos` i `exp` nad `RATIONAL` -
 ///                  patrz opis przy `rejectedIrrationalOverExact()` w expressionShape.cpp,
 ///                  gdzie stoi, dlaczego kazda z tych nazw trafila tam z innego powodu.
 ///
@@ -82,7 +82,7 @@ enum class exprShapeStatus : std::uint8_t { resolved, unknown, illTyped, rejecte
 struct exprShapeResult {
   exprShapeStatus status = exprShapeStatus::unknown;
   exprShape shape;
-  /// Wypelniony WYLACZNIE dla `rejected` — komunikat dla kanalu `Check result:`.
+  /// Wypelniony WYLACZNIE dla `rejected` - komunikat dla kanalu `Check result:`.
   std::string reason;
 
   [[nodiscard]] bool resolved() const { return status == exprShapeStatus::resolved; }
@@ -101,7 +101,7 @@ using exprFieldShapeFn = std::function<std::optional<exprShape>(const std::strin
 /// Pusty `std::function` znaczy „plan bez okien" i kazdy token `WINDOW_*` daje `unknown`.
 using exprWindowShapeFn = std::function<std::optional<exprShape>(int groupIndex)>;
 
-/// Dlugosc jednego elementu pola danego typu, w bajtach — jedna definicja dla calego drzewa.
+/// Dlugosc jednego elementu pola danego typu, w bajtach - jedna definicja dla calego drzewa.
 int fieldLengthOfType(rdb::descFld type);
 
 /// Ksztalt pola liczbowego danego typu (`rarray = 1`).
@@ -109,7 +109,7 @@ exprShape numericShape(rdb::descFld type);
 
 /// Typ operandow po `normalize()` z `expressionEvaluator`: wygrywa WYZSZY indeks wariantu.
 ///
-/// To NIE jest typ wyniku operacji arytmetycznej — dla `BYTE` operator C++ promuje jeszcze
+/// To NIE jest typ wyniku operacji arytmetycznej - dla `BYTE` operator C++ promuje jeszcze
 /// do `int`. Patrz `arithmeticValueType()`.
 rdb::descFld normalizedOperandType(rdb::descFld left, rdb::descFld right);
 
@@ -124,14 +124,14 @@ rdb::descFld arithmeticValueType(rdb::descFld left, rdb::descFld right);
 /// Typ wyniku funkcji skalarnej, po nazwie (bez wzgledu na wielkosc liter) i typie argumentu.
 ///
 /// Jedna polityka dla calego drzewa:
-///  * `isnull`, `IsZero`, `IsNonZero`, `Length` — zawsze `INTEGER`;
-///  * `to_integer`, `to_float`, `to_double`, `to_string` — typ docelowy, takze wewnatrz
+///  * `isnull`, `IsZero`, `IsNonZero`, `Length` - zawsze `INTEGER`;
+///  * `to_integer`, `to_float`, `to_double`, `to_string` - typ docelowy, takze wewnatrz
 ///    wiekszego wyrazenia;
-///  * `sin`, `cos`, `exp` — zawsze `DOUBLE`, takze nad argumentem calkowitym; kat jest
+///  * `sin`, `cos`, `exp` - zawsze `DOUBLE`, takze nad argumentem calkowitym; kat jest
 ///    w RADIANACH, `NULL` przechodzi dalej, a wynik niefinitywny (`exp(1000)`) staje sie
 ///    `NULL`. Argument `RATIONAL` jest ODRZUCANY przy kompilacji, nie liczony;
 ///  * `Abs`, `null2zero` oraz pozostale funkcje matematyczne liczone przez `callFun`
-///    (`Sqrt`, `Ceil`, `Floor`, `round`, `trunc`, `tan`, `log`, `log2`) —
+///    (`Sqrt`, `Ceil`, `Floor`, `round`, `trunc`, `tan`, `log`, `log2`) -
 ///    typ ARGUMENTU. `callFun` liczy w `double` i rzutuje z powrotem na typ wejscia, wiec
 ///    `Ceil` nad `DOUBLE` daje `DOUBLE`, a nie `INTEGER`.
 ///
@@ -139,10 +139,10 @@ rdb::descFld arithmeticValueType(rdb::descFld left, rdb::descFld right);
 /// wyniku od niego zalezy.
 std::optional<rdb::descFld> functionResultType(std::string_view name, std::optional<rdb::descFld> argumentType);
 
-/// Typy o arytmetyce DOKLADNEJ i lacznej — `BYTE`, `INTEGER`, `UINT`, `RATIONAL`.
+/// Typy o arytmetyce DOKLADNEJ i lacznej - `BYTE`, `INTEGER`, `UINT`, `RATIONAL`.
 bool isExactType(rdb::descFld type);
 
-/// @brief Ksztalt wyniku programu ONP — typ, dlugosc elementu i krotnosc.
+/// @brief Ksztalt wyniku programu ONP - typ, dlugosc elementu i krotnosc.
 ///
 /// Wykonuje program na stosie KSZTALTOW, tak samo jak `expressionEvaluator::eval()`
 /// wykonuje go na stosie WARTOSCI, i obsluguje ten sam zestaw tokenow: `PUSH_VAL`,

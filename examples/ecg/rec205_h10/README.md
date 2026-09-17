@@ -1,4 +1,4 @@
-# rec205_h10 — ogon startowy jako składnik budżetu łącza
+# rec205_h10 - ogon startowy jako składnik budżetu łącza
 
 Aparatura do samodzielnego powtórzenia pomiaru odciążenia łącza dla potoku EKG
 z redukcją tempa. Katalog jest samowystarczalny: dane wejściowe bierze przez
@@ -19,7 +19,7 @@ wspólnych z `rec205-qrs.rql`, a tamte są w repozytorium śledzone.
 Iloraz bajtów surowe/wysyłane dąży do 10, a różnica między ilorazem zmierzonym
 a 10 jest w całości **ubytkiem ogona startowego** strumienia wysyłanego.
 
-Ogon jest funkcją planu, nie przebiegu — więc ubytek musi być **tą samą liczbą
+Ogon jest funkcją planu, nie przebiegu - więc ubytek musi być **tą samą liczbą
 rekordów** niezależnie od długości przebiegu. Gdyby rósł z długością, nie byłby
 ogonem, tylko wyciekiem. To jest H10 (`plan-derived startup boundaries`)
 pokazane jako składnik budżetu łącza, a nie jako warunek poprawności.
@@ -36,7 +36,7 @@ Bramka `experiment.sh`:
 żądała „iloraz w najdłuższym przebiegu poniżej 10,05" i **padła na własnym
 domyślnym zestawie**: przy stałym ogonie odchylenie maleje jak 1/N, więc każdy
 próg bezwzględny jest osiągalny dopiero powyżej pewnej długości przebiegu.
-Domyślny zestaw kończy się na 300 s i daje 10,0558 — próg był nieosiągalny
+Domyślny zestaw kończy się na 300 s i daje 10,0558 - próg był nieosiągalny
 z konstrukcji, co jest defektem aparatury, nie wynikiem silnika.
 
 Zastąpiony niezmiennikiem niezależnym od długości przebiegu: iloczyn
@@ -44,7 +44,7 @@ Zastąpiony niezmiennikiem niezależnym od długości przebiegu: iloczyn
 do `10·t/360`; przy `t = 590` daje to 16,4. Zmierzone: 16,74…16,92, rozrzut
 1,08%. Wyciek rosnący z długością przebiegu rozsadziłby ten iloczyn
 natychmiast, a próg bezwzględny by go przepuścił przy dostatecznie długim
-przebiegu — dlatego ta postać jest ostrzejsza, a nie łagodniejsza.
+przebiegu - dlatego ta postać jest ostrzejsza, a nie łagodniejsza.
 
 ## Wymagania
 
@@ -85,7 +85,7 @@ SELECT * STREAM qrs_ship FROM qrs_feat&1/324
 
 Argument rozplotu to **delta strumienia usuwanego**. Dla decymacji 10× z `1/360`
 jest to `1/324`, ponieważ `(1/36 · 1/324)/(1/36 + 1/324) = 1/360`. Odstępu nie
-trzeba deklarować — kompilator wyprowadza `1/36` z planu; można to zobaczyć bez
+trzeba deklarować - kompilator wyprowadza `1/36` z planu; można to zobaczyć bez
 uruchamiania przebiegu:
 
 ```bash
@@ -95,7 +95,7 @@ xretractor -q rec205-offload.rql -c -m | head -3
 **Umiejscowienie decymacji jest merytoryczne, nie kosmetyczne.** Rozplot dobiera
 podciąg zapisanych krotek i **nie filtruje**, więc stoi **za** scaleniem w oknie
 ruchomym z kroku 4, które ogranicza pasmo obwiedni do ok. 12 Hz wobec Nyquista
-18 Hz strumienia wysyłanego. Postawiony przed krokiem 4 aliasowałby — i to jest
+18 Hz strumienia wysyłanego. Postawiony przed krokiem 4 aliasowałby - i to jest
 dokładnie zastrzeżenie, które artykuł stawia w ograniczeniach („a thinned
 constituent can alias").
 
@@ -123,7 +123,7 @@ osobno. We wszystkich czterech zachodzi dokładnie
 Stan ustalony: 8 B × 360/s = **2880 B/s** wobec 8 B × 36/s = **287 B/s**, czyli
 dokładnie **10×**, redukcja **90,0%**.
 
-Ubytek ogona jest **stały (59 rekordów)** w obu przebiegach — to jest właśnie
+Ubytek ogona jest **stały (59 rekordów)** w obu przebiegach - to jest właśnie
 sprawdzana teza. Wartości bezwzględne mogą się różnić, jeśli zmieni się rachunek
 ogona w silniku; stałość ubytku zmienić się nie może.
 

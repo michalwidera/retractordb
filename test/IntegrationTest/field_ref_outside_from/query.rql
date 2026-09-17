@@ -1,4 +1,4 @@
-# Postac poprawna — obejscie podane w komunikacie bramki: pola zrodel `merged` wskazuje
+# Postac poprawna - obejscie podane w komunikacie bramki: pola zrodel `merged` wskazuje
 # pozycja w rekordzie `merged`. `core0.b` lezy na pozycji 1, `core1.c` na pozycji 2.
 
 STORAGE 'temp'

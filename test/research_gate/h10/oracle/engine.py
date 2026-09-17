@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Most do silnika: kompilacja planu i odczyt rachunku silnika ze zrzutu.
 
-Most nie liczy niczego — wyłącznie uruchamia `xretractor <plan> -c` i parsuje
+Most nie liczy niczego - wyłącznie uruchamia `xretractor <plan> -c` i parsuje
 zrzut planu. Zerowy ogon i zerowy origin nie są drukowane (presenter.cpp
 raportuje je tylko gdy niezerowe), więc brak `tail=` i brak `origin=` czytamy
 jako 0.
@@ -18,13 +18,13 @@ TAIL = re.compile(r"tail=(\d+)")
 ORIGIN = re.compile(r"origin=(\d+)")
 
 class EngineError(RuntimeError):
-    """Awaria aparatury silnika — zatrzymuje iterację."""
+    """Awaria aparatury silnika - zatrzymuje iterację."""
 
 
 def resolve_binary(explicit=None):
     """Binarka silnika WYŁĄCZNIE ze wskazania wołającego.
 
-    Nie ma tu ani ścieżki domyślnej, ani szukania `xretractor` w PATH — i to
+    Nie ma tu ani ścieżki domyślnej, ani szukania `xretractor` w PATH - i to
     jest cała treść tej funkcji.
 
     2026-08-19 poziom `H10 test_closedform` oblał na CI, bo `run_gate.sh` jako
@@ -32,7 +32,7 @@ def resolve_binary(explicit=None):
     wskazywała `parents[3]/retractordb/build/Debug/...`, czyli układ katalogów
     repozytorium eksperymentu, nieistniejący po przeniesieniu aparatury do
     drzewa silnika. Zostawał więc fallback na PATH: na CI nie ma tam nic i
-    poziom oblewał, a lokalnie stała tam binarka ZAINSTALOWANA — poziom
+    poziom oblewał, a lokalnie stała tam binarka ZAINSTALOWANA - poziom
     przechodził, mierząc co innego niż reszta bramki. Zielone światło z cicho
     podstawionej binarki jest gorsze od czerwonego, bo nie widać, że kłamie.
 
@@ -40,7 +40,7 @@ def resolve_binary(explicit=None):
     """
     if not explicit:
         raise EngineError(
-            "brak binarki xretractor — podaj ją jawnie (--xretractor albo argv[1]); "
+            "brak binarki xretractor - podaj ją jawnie (--xretractor albo argv[1]); "
             "aparatura celowo nie zgaduje, którą binarkę mierzy")
     binary = Path(explicit).resolve()
     if not binary.is_file() or not os.access(binary, os.X_OK):
@@ -81,7 +81,7 @@ def compile_plan(rql_text, binary, workdir, timeout=30):
         raise EngineError(f"kompilacja nieudana ({done.returncode}):\n{done.stdout}\n{done.stderr}")
     merged = done.stdout + done.stderr
     if "unresolved startup latency" in merged:
-        raise EngineError("postać zamknięta nie rozwiązała ogona — nierozwiązany węzeł planu")
+        raise EngineError("postać zamknięta nie rozwiązała ogona - nierozwiązany węzeł planu")
     if "unresolved logical origin" in merged:
-        raise EngineError("rachunek nie rozwiązał początku logicznego — nierozwiązany węzeł planu")
+        raise EngineError("rachunek nie rozwiązał początku logicznego - nierozwiązany węzeł planu")
     return done.stdout, done.stderr

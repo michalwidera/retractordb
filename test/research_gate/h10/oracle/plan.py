@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reprezentacja planu K24 — węzły, interwały i serializacja do RQL.
+"""Reprezentacja planu K24 - węzły, interwały i serializacja do RQL.
 
 Plan jest zdekomponowany: każdy operator ma własny, jawnie nazwany strumień
 wyjściowy. Dzięki temu każdy węzeł planu jest obserwowalny w zrzucie planu
@@ -30,13 +30,13 @@ OPERATOR_CLASSES = (PASS, SHIFT, HASH, ADD, SUB, THETA, NTHETA, AGSE, REDUCE, WI
 
 REDUCERS = ("sumc", "avg", "min", "max")
 
-# Agregaty okna REKORDOWEGO — te same nazwy co reduktory strumieniowe, ale inna
+# Agregaty okna REKORDOWEGO - te same nazwy co reduktory strumieniowe, ale inna
 # konstrukcja: `MIN(pole : W)` w liscie SELECT, nie `FROM MIN(strumien)`.
 WINDOW_REDUCERS = ("sumc", "avg", "min", "max")
 
 
 class PlanError(ValueError):
-    """Plan niepoprawny — generator nie ma prawa go wyprodukować."""
+    """Plan niepoprawny - generator nie ma prawa go wyprodukować."""
 
 
 @dataclass(frozen=True)
@@ -116,7 +116,7 @@ def _dehash_delta(src, other, symbol):
     if other == src.delta:
         raise PlanError(f"{symbol} wymaga argumentu różnego od interwału źródła")
     delta = src.delta * other / abs(src.delta - other)
-    # Składowa rozplotu nie może być szybsza od strumienia rozplatanego —
+    # Składowa rozplotu nie może być szybsza od strumienia rozplatanego -
     # kompilator odrzuca taki plan ("You cannot make faster div from slower
     # source", compiler.cpp:103 i :123).
     if src.delta > delta:
@@ -125,14 +125,14 @@ def _dehash_delta(src, other, symbol):
 
 
 def make_theta(name, src, other):
-    """Θ — odzyskanie lewej składowej; ``other`` to interwał prawej składowej."""
+    """Θ - odzyskanie lewej składowej; ``other`` to interwał prawej składowej."""
     other = _frac(other)
     delta = _dehash_delta(src, other, "Θ")
     return Node(name=name, kind=THETA, delta=delta, width=src.width, children=(src.name,), param=other)
 
 
 def make_ntheta(name, src, other):
-    """~Θ — reszta rozplotu; ``other`` to interwał lewej składowej."""
+    """~Θ - reszta rozplotu; ``other`` to interwał lewej składowej."""
     other = _frac(other)
     delta = _dehash_delta(src, other, "~Θ")
     return Node(name=name, kind=NTHETA, delta=delta, width=src.width, children=(src.name,), param=other)
@@ -158,13 +158,13 @@ def make_window(name, src, reducer, widths):
     """Okno REKORDOWE w liscie SELECT: `MIN(zrodlo[i] : W)`.
 
     Wezel ma WLASNA tozsamosc w modelu planu, bo ta konstrukcja nie jest
-    wyrazeniem strumieniowym i nie mieszka w klauzuli FROM — FROM jest tu
+    wyrazeniem strumieniowym i nie mieszka w klauzuli FROM - FROM jest tu
     pojedynczym odwolaniem do zrodla, a okno stoi w liscie SELECT. Interwal
     wyjscia jest ROWNY interwalowi zrodla: lista SELECT nie rusza osi czasu.
 
     ``widths`` to szerokosci poszczegolnych agregatow listy, po jednym polu na
     agregat. Krotka dluzsza niz jednoelementowa jest tu po to, zeby model
-    obejmowal wybor NAJSZERSZEGO okna — silnik liczy origin z maksimum
+    obejmowal wybor NAJSZERSZEGO okna - silnik liczy origin z maksimum
     (`compiler::windowWidthOf` zwraca `widest`), a wezel o jednej szerokosci
     tej galezi nie dotyka.
     """
@@ -185,7 +185,7 @@ def window_widths(node):
 
 
 def window_span(node):
-    """Najszersze okno wezla — ta wielkosc wchodzi do origin."""
+    """Najszersze okno wezla - ta wielkosc wchodzi do origin."""
     return max(window_widths(node))
 
 
@@ -230,7 +230,7 @@ def window_select_list(node, source):
     Argument agregatu zapisujemy jako `zrodlo[slot]`, a nie nazwa pola zrodla.
     Oba zapisy znacza po stronie okna to samo (patrz `test/IntegrationTest/
     window_aggregate/`), ale slot NIE zalezy od nazw pol generowanych przez
-    `SELECT *` u producenta — a te dla wezla nie-zrodlowego sa nieznane modelowi
+    `SELECT *` u producenta - a te dla wezla nie-zrodlowego sa nieznane modelowi
     planu. Slot krazy po szerokosci zrodla, bo agregatow moze byc wiecej niz pol.
     """
     reducer, widths = node.param
@@ -268,7 +268,7 @@ def payload_words(node):
     Reduktory zapisują pole RATIONAL (licznik + mianownik), pozostałe operatory
     zachowują szerokość INTEGER-ową źródła. Agregat okna rekordowego jest tym
     samym reduktorem policzonym po rekordach, więc KAŻDE jego pole jest
-    RATIONAL — zmierzone na `MIN`/`MAX`/`SUMC`/`AVG`.
+    RATIONAL - zmierzone na `MIN`/`MAX`/`SUMC`/`AVG`.
     """
     if node.kind == REDUCE:
         return 2

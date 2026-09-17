@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Kampania K24 — porównanie postaci zamkniętej z oracle'em na całym korpusie.
+"""Kampania K24 - porównanie postaci zamkniętej z oracle'em na całym korpusie.
 
 Wynik jest zapisywany per węzeł, nigdy agregatem. Kampania nie mierzy czasu,
 nie zajmuje workera i nie porównuje systemów: dla każdego planu kompiluje plan
@@ -36,7 +36,7 @@ FIELDS = ("plan", "stratum", "hard_classes", "depth", "node", "kind", "delta",
 def local_rule_a(plan, given_tails=None):
     """Reguła lokalna A (predeklarowana): własny ogon każdego operatora = 0.
 
-    JEDYNA definicja tej reguły w aparaturze — `run_member_b.py` ją importuje.
+    JEDYNA definicja tej reguły w aparaturze - `run_member_b.py` ją importuje.
     Nie wolno jej kopiować: dwa zapisy tej samej reguły rozjeżdżają się po cichu
     i raz już to zrobiły (poprawka `>N` z 2026-09-12 trafiła tylko do jednego).
 
@@ -44,7 +44,7 @@ def local_rule_a(plan, given_tails=None):
     „suma ogonów operatorów przeliczona przez takt, bez składnika fazowego”.
 
     Zmiana wobec K24r: wyjątek dla `>N` (ogon składowej + N) zniknął, bo po
-    przestemplowaniu z 2026-08-06 `N` nie jest już ogonem — przeszło do origin.
+    przestemplowaniu z 2026-08-06 `N` nie jest już ogonem - przeszło do origin.
     Utrzymanie starego wyjątku dokładałoby regule lokalnej człon, którego nie ma
     ani w silniku, ani w modelu zdarzeniowym, i zafałszowałoby rozjazd, którym
     mierzy się człon (b). Populacja członu (b) (składowe deklarowane) jest na tę
@@ -54,7 +54,7 @@ def local_rule_a(plan, given_tails=None):
     członu, podczas gdy postać dokładna dla `>N` to `max(0, Wsrc - N)`. Reguła
     liczyła więc `Wsrc` i ZAWYŻAŁA ogon. Rozjazd miał postać zamkniętą
     `-min(N, Wsrc)` i trafiał 5314/5314 węzłów `SHIFT` na ziarnie 20260804 oraz
-    5438/5438 na 20260807 — czyli był w całości artefaktem reguły, a nie
+    5438/5438 na 20260807 - czyli był w całości artefaktem reguły, a nie
     własnością silnika (`engine_tail == oracle_c1` na wszystkich tych węzłach).
 
     `max(0, Wsrc - N)` zależy wyłącznie od ogona dziecka i od WŁASNEGO parametru
@@ -76,7 +76,7 @@ def local_rule_a(plan, given_tails=None):
         converted = [C.to_slots(source_tails[child.name], child.delta, node.delta)
                      for child in children]
         own = max(converted)
-        # `>N` czyta starszy indeks logiczny, więc SKRACA ogon o N — to jest
+        # `>N` czyta starszy indeks logiczny, więc SKRACA ogon o N - to jest
         # informacja lokalna (własny parametr węzła), a nie składnik fazowy.
         if node.kind == SHIFT:
             own = max(0, own - int(node.param))
@@ -86,12 +86,12 @@ def local_rule_a(plan, given_tails=None):
 
 def local_rule_b(plan, given_tails=None):
     """Reguła lokalna B (diagnostyczna): pełna postać zamknięta z członem
-    pierwszej fazy `ceil(q/p)` w miejscu `ceil((p+q-1)/p)` — wariant sprzed K2.
+    pierwszej fazy `ceil(q/p)` w miejscu `ceil((p+q-1)/p)` - wariant sprzed K2.
 
     Wariant B jest jedynym, przy którym kontrola negatywna `HC_INT` może
     wypaść zerowa, bo dla ilorazu całkowitego oba człony się pokrywają.
     Nie jest to reguła predeklarowana; służy diagnozie sprzeczności
-    w specyfikacji członu (b) — patrz REPORT.md §5.
+    w specyfikacji członu (b) - patrz REPORT.md §5.
     """
     return C.evaluate(plan, mutation={"hash_first_phase": True}, given_tails=given_tails)
 
@@ -125,7 +125,7 @@ def evaluate_one(item):
         results1 = M.evaluate(plan, convention=M.C1)
         results2 = M.evaluate(plan, convention=M.C2)
     except M.OracleError as exc:
-        return {"error": f"plan {index}: oracle — {exc}"}
+        return {"error": f"plan {index}: oracle - {exc}"}
     oracle1 = {item.name: item.tail for item in results1}
     oracle2 = {item.name: item.tail for item in results2}
     # Origin nie ma konwencji dostępności: istnienie rekordu nie zależy od tego,
@@ -224,7 +224,7 @@ def main():
     for line in errors[:20]:
         print(f"APARATURA {line}")
     if errors:
-        print("KAMPANIA ZATRZYMANA — plan odrzucony przez kompilator jest błędem aparatury")
+        print("KAMPANIA ZATRZYMANA - plan odrzucony przez kompilator jest błędem aparatury")
         return 1
     return 0
 

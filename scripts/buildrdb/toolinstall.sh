@@ -88,7 +88,7 @@ install_pinned_cmake_if_needed() {
     # jest pokryty.
     if ! pip install --only-binary=:all: "cmake>=$RDB_CMAKE_MIN_VERSION"; then
         echo "-- WARNING: brak koła cmake>=$RDB_CMAKE_MIN_VERSION dla tej platformy."
-        echo "-- WARNING: build nadal zadziala — conan wciaga wlasnego cmake — ale"
+        echo "-- WARNING: build nadal zadziala - conan wciaga wlasnego cmake - ale"
         echo "--          'cmake' wolane wprost z PATH bedzie starsza wersja."
         return 0
     fi
@@ -181,7 +181,7 @@ ensure_cxx23_gcc() {
         echo "-- Attempting GCC ladder install (highest available first)..."
         install_best_gcc_for_cxx23 || { echo "Error: Could not install a C++23-capable GCC (tried versions 20..14). Please install one manually."; exit 1; }
     fi
-    echo "-- C++23 OK — g++ $(g++ -dumpversion)"
+    echo "-- C++23 OK - g++ $(g++ -dumpversion)"
 }
 
 # Faza instalacyjna: zamienia listy brakow policzone przez ensure_tools_for_option

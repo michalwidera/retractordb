@@ -67,7 +67,7 @@ test/research_gate/.drift.lock
 
 # Wyjscia uruchomienia bramki badawczej pisane obok aparatury: `validate_corpus.py`
 # bez --out zapisuje corpus_validation/, `run_campaign.py` bez --out zapisuje raw/.
-# To dowody kompilacji konkretnej rewizji, nie zrodla — do repozytorium nie wchodza.
+# To dowody kompilacji konkretnej rewizji, nie zrodla - do repozytorium nie wchodza.
 test/research_gate/**/corpus_validation/
 test/research_gate/**/raw/
 

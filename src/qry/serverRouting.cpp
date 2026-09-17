@@ -18,7 +18,7 @@ bool serves(const bus::InstanceInfo &instance, std::string_view stream) {
   return std::ranges::find(instance.streams, stream) != instance.streams.end();
 }
 
-/// Lista etykiet wszystkich instancji, po przecinku — do komunikatu o dwuznaczności.
+/// Lista etykiet wszystkich instancji, po przecinku - do komunikatu o dwuznaczności.
 std::string labelList(const std::vector<bus::InstanceInfo> &instances) {
   std::string retVal;
   for (const auto &instance : instances) {

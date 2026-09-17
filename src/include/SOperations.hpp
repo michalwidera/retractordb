@@ -15,7 +15,7 @@ using namespace boost;
 constexpr int floorR(boost::rational<int> const &num) { return static_cast<int>(num.numerator() / num.denominator()); }
 
 // Dzielenie całkowite z zaokrągleniem W DÓŁ. Wbudowane `/` zaokrągla w stronę zera, co dla
-// ujemnych liczników daje inny rekord niż model zdarzeniowy — a ujemne pozycje spłaszczone
+// ujemnych liczników daje inny rekord niż model zdarzeniowy - a ujemne pozycje spłaszczone
 // pojawiają się naturalnie w oknie stemplowanym końcem przedziału (n*step-(|L|-1)).
 constexpr int floorDiv(const int numerator, const int denominator) {
   const int quotient = numerator / denominator;
@@ -79,7 +79,7 @@ constexpr int Subtract(const rational<int> &deltaSource, const rational<int> &de
 //   c_n = (a_n, b_{⌊n·Delta_a/Delta_b⌋})   gdy Delta_a <= Delta_b
 //   c_n = (a_{⌊n·Delta_b/Delta_a⌋}, b_n)   w przeciwnym razie
 // Oba przypadki mają jedną postać: indeks składowej o interwale deltaSrc to
-// ⌊n·Delta_c/deltaSrc⌋ — dla składowej szybszej (deltaSrc == Delta_c) daje n.
+// ⌊n·Delta_c/deltaSrc⌋ - dla składowej szybszej (deltaSrc == Delta_c) daje n.
 // Wynik jest indeksem POSTĘPUJĄCYM (0-bazowym) w strumieniu składowej.
 constexpr int Add(const rational<int> &deltaOut, const rational<int> &deltaSrc, const int n) {
   if (deltaOut == deltaSrc) return n;
@@ -95,7 +95,7 @@ constexpr int agse(int offset, int step) { return floorR(boost::rational<int>(of
 // własnym źródłem (potok FIR) nie wyprzedza sygnału.
 //
 // Cena konwencji: dla małych n okno sięga przed początek źródła. Te rekordy
-// nie powstają — patrz AgseLogicalOrigin() i query::logicalOrigin. NULL nie
+// nie powstają - patrz AgseLogicalOrigin() i query::logicalOrigin. NULL nie
 // jest tu rezerwacją miejsca (zasada brzegu), więc brakujące okna są nieobecne,
 // a nie wypełnione.
 //
@@ -111,7 +111,7 @@ constexpr int agse(int offset, int step) { return floorR(boost::rational<int>(of
 //
 // Wobec postaci sprzed przestemplowania (K24/H10a) znika człon fazowy
 //   P = floor((abs(length)-1)/gcd(step,F))*gcd(step,F),
-// bo rozpiętość okna nie jest już czekaniem — przeszła do origin. Ogon zatem
+// bo rozpiętość okna nie jest już czekaniem - przeszła do origin. Ogon zatem
 // maleje, ale nie zaniża: to samo czekanie liczy teraz origin + ogon.
 constexpr int AgseStartupLatency(const int sourceWidth, const int step, const int sourceLatency) {
   return ceilR(boost::rational<int>((1 + sourceLatency) * sourceWidth, step)) - 1;
@@ -136,7 +136,7 @@ constexpr int AgseLogicalOrigin(const int sourceWidth, const int step, const int
 //
 // K24/H10a: poprzednia postać ceil(W_src*Delta_src/Delta_out) zgadzała się
 // z granicą zdarzeniową dla 42,3% węzłów `+` w korpusie i zaniżała ogon dla
-// pozostałych — dla składowej o zerowym ogonie dawała zero niezależnie od
+// pozostałych - dla składowej o zerowym ogonie dawała zero niezależnie od
 // tego, jak wolna jest składowa. Postać powyższa zgadza się dla 2527 z 2527.
 constexpr int AddStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget, const int sourceLatency) {
   return ceilR(rational<int>(1 + sourceLatency) * deltaSource / deltaTarget) - 1;
@@ -152,8 +152,8 @@ constexpr int AddStartupLatency(const rational<int> &deltaSource, const rational
 // sufit, kasując -n:
 //   W >= ceil( (e(n) + 1 + W_src) / r ) - 1.
 // Prawa strona zależy od n wyłącznie przez e(n), więc maksimum wypada tam, gdzie e(n)
-// osiąga kres. Kres jest OSIĄGANY — reszty przebiegają wszystkie klasy modulo mianownik,
-// bo po skróceniu gcd = 1 — i dlatego postać jest DOKŁADNA, a nie oszacowaniem z góry.
+// osiąga kres. Kres jest OSIĄGANY - reszty przebiegają wszystkie klasy modulo mianownik,
+// bo po skróceniu gcd = 1 - i dlatego postać jest DOKŁADNA, a nie oszacowaniem z góry.
 //
 // Do 2026-08-18 każdy z trzech operatorów miał tu własną regułę zawyżającą o slot
 // (`-` 19,1% zgodności z modelem zdarzeniowym, `Θ` 59,7%, `~Θ` 99,2%). Wspólną
@@ -178,7 +178,7 @@ constexpr int SubtractStartupLatency(const rational<int> &deltaSource, const rat
 
 // Θ czyta pozycję i + ceil((i+1)*Da/Db) przeplotu (patrz Div()). Przy a/b = Delta_out/param
 // po skróceniu faza wynosi (a-t)/b dla t = 0 i (a+b-t)/b dla t > 0, gdzie t = (n+1)*a mod b,
-// więc kres to (a+b-1)/b — osiągany, bo gcd(a,b) = 1. Dla ilorazu całkowitego (b = 1) kres
+// więc kres to (a+b-1)/b - osiągany, bo gcd(a,b) = 1. Dla ilorazu całkowitego (b = 1) kres
 // wynosi a i po podzieleniu przez r daje ogon własny ZERO, nie jeden.
 constexpr int ThetaStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget, const rational<int> &other,
                                   const int sourceLatency) {
@@ -189,14 +189,14 @@ constexpr int ThetaStartupLatency(const rational<int> &deltaSource, const ration
 
 // ~Θ czyta pozycję i + floor(i*Db/Da) (patrz Mod()), więc e(n) = -(n*a mod b)/b <= 0
 // i kres wynosi 0, osiągany dla n = 0. Ogon jest zatem samym przeliczeniem dostępności
-// pierwszego rekordu — bez zaokrąglenia ogona składowej w górę, które zawyżało wynik przy
+// pierwszego rekordu - bez zaokrąglenia ogona składowej w górę, które zawyżało wynik przy
 // niezerowym W_src.
 constexpr int NThetaStartupLatency(const rational<int> &deltaSource, const rational<int> &deltaTarget, const int sourceLatency) {
   return PhaseStartupLatency(rational<int>(0), deltaTarget / deltaSource, sourceLatency);
 }
 
 // Najdłuższy okres fazowy przeplotu, dla którego ogon liczy się DOKŁADNIE.
-// Powyżej rachunek wraca do postaci O(1), która zawyża — koszt przeglądu rośnie
+// Powyżej rachunek wraca do postaci O(1), która zawyża - koszt przeglądu rośnie
 // liniowo z p+q, a p+q jest iloczynem liczników i mianowników delt składowych.
 // Korpus kampanijny K24 ma maksimum 24 557, więc próg nie jest w nim osiągany.
 constexpr std::int64_t kHashPhaseScanLimit = 100'000;
@@ -214,12 +214,12 @@ constexpr std::int64_t kHashPhaseScanLimit = 100'000;
 //
 // Wynik jest DOKŁADNY: 5960/5960 i 5998/5998 węzłów `#` korpusu K24p wobec
 // niezależnego modelu zdarzeniowego, zero zaniżeń (dwa ziarna). Zastąpiona
-// postać O(1) — max(conv(W_A), conv(W_B) + ceil((p+q-1)/p)) — zgadzała się
+// postać O(1) - max(conv(W_A), conv(W_B) + ceil((p+q-1)/p)) - zgadzała się
 // z granicą zdarzeniową w 92,1% węzłów i zawyżała ogon o slot w pozostałych:
 // człon fazowy chroni najgorszą fazę odczytu drugiego argumentu, ale nie wie,
 // czy ta faza w ogóle wypada na rekord, który czeka najdłużej.
 //
-// Powyżej kHashPhaseScanLimit wraca postać O(1) — zawyżająca, więc bezpieczna:
+// Powyżej kHashPhaseScanLimit wraca postać O(1) - zawyżająca, więc bezpieczna:
 // zaniżenie ogona oznacza rekord wyemitowany przed określeniem zależności,
 // zawyżenie tylko slot opóźnienia.
 inline int HashStartupLatency(const rational<int> &deltaA, const rational<int> &deltaB, const rational<int> &deltaOut,

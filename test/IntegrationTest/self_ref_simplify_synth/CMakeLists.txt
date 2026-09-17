@@ -9,7 +9,7 @@ set(TestID "it_${TestID}")
 # Rekord wejsciowy takiego wezla (query::descriptorFrom) ma sloty typu
 # NAJSZERSZEGO z rekordu zrodla. compiler::simplifyFieldExpressions() bralo typ
 # odwolania przez sourceFieldAt(): dla wlasnej nazwy z pola wyjsciowego, dla
-# nazwy zrodla z pola `core1[k]` — w obu przypadkach INTEGER zamiast FLOAT.
+# nazwy zrodla z pola `core1[k]` - w obu przypadkach INTEGER zamiast FLOAT.
 # Reasocjacja stalych przepisywala `(x+1)+2` na `x+3` i przy x = 2^24 pole
 # zapisywalo 16777220 zamiast 16777218, tylko przy
 # RDB_OPT_SIMPLIFY_EXPRESSIONS=ON.

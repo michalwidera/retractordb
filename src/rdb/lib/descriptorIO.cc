@@ -46,7 +46,7 @@ void verifyDescriptorMatch(const Descriptor &provided, const Descriptor &existin
   SPDLOG_ERROR("Descriptors do not match.");
   std::cerr << "Error in data descriptor file: " << descriptorFile << '\n';
   std::cerr << "Provided Descriptor:\n" << provided << "\nExisting Descriptor:\n" << existing << '\n';
-  FatalError("storage: descriptor schema mismatch — remove data files and restart");
+  FatalError("storage: descriptor schema mismatch - remove data files and restart");
 }
 
 }  // namespace rdb

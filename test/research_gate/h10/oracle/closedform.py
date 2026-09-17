@@ -2,7 +2,7 @@
 """Replika rachunku silnika: ``compiler::computeLogicalOrigin()``
 i ``compiler::computeStartupLatency()``.
 
-UWAGA — ten moduł istnieje **wyłącznie** na potrzeby bramki mutantów. Oracle
+UWAGA - ten moduł istnieje **wyłącznie** na potrzeby bramki mutantów. Oracle
 (model.py) nie importuje go i nie ma prawa go importować. Replika odtwarza
 rachunek z `src/retractor/lib/compiler.cpp` oraz `src/include/SOperations.hpp`
 w wersji przypiętej tagiem kampanii; jej wierność sprawdza test_closedform.py,
@@ -15,7 +15,7 @@ by oracle odróżnił replikę od każdego mutanta.
 wielkości zamiast jednej. Origin nie jest w pełni postacią zamkniętą: dla `+`,
 `#`, `-`, `Θ` i `~Θ` silnik szuka najmniejszego indeksu spełniającego warunek
 przez połowienie po niemalejącym odwzorowaniu (``firstIndexReaching``), a nie
-przez wzór. Replika odtwarza to wiernie — razem z tym ograniczeniem, które jest
+przez wzór. Replika odtwarza to wiernie - razem z tym ograniczeniem, które jest
 przedmiotem raportu, a nie usterką repliki.
 """
 
@@ -66,12 +66,12 @@ def map_subtract(delta_source, delta_target, n):
 
 
 def map_div(delta_a, delta_b, n):
-    """Θ — lewa składowa: a_i = c_{i+ceil((i+1)*dA/dB)}."""
+    """Θ - lewa składowa: a_i = c_{i+ceil((i+1)*dA/dB)}."""
     return n + _ceil(Fraction(n + 1) * delta_a / delta_b)
 
 
 def map_mod(delta_a, delta_b, n):
-    """~Θ — prawa składowa: b_i = c_{i+floor(i*dB/dA)}."""
+    """~Θ - prawa składowa: b_i = c_{i+floor(i*dB/dA)}."""
     return n + _floor(Fraction(n) * delta_b / delta_a)
 
 
@@ -101,7 +101,7 @@ def first_index_reaching(mapping, threshold, node_id="?"):
 # --- postacie zamknięte ogona -------------------------------------------------
 
 def hash_pick(delta_left, delta_right, n):
-    """(strona, indeks) dla rekordu ``n`` przeplotu — replika ``Hash()``.
+    """(strona, indeks) dla rekordu ``n`` przeplotu - replika ``Hash()``.
 
     Zwraca ``('right', j)`` albo ``('left', j)``; ``j`` jest indeksem
     postępującym w wybranej składowej.
@@ -117,11 +117,11 @@ HASH_PHASE_SCAN_LIMIT = 100_000
 
 
 def hash_tail(delta_left, delta_right, delta_out, tail_left, tail_right):
-    """Ogon przeplotu — replika ``HashStartupLatency()`` (krok 3c, 2026-08-07).
+    """Ogon przeplotu - replika ``HashStartupLatency()`` (krok 3c, 2026-08-07).
 
     Maksimum po jednym okresie fazowym ``p+q`` z warunku dostępności
     ``W >= ceil((j(i)+1+W_src(i))*D_src(i)/D_c) - 1 - i``. Powyżej progu silnik
-    wraca do postaci O(1) i replika musi wrócić razem z nim — inaczej bramka
+    wraca do postaci O(1) i replika musi wrócić razem z nim - inaczej bramka
     wierności repliki (test_closedform.py) zgłosiłaby rozjazd, którego w silniku
     nie ma.
     """
@@ -155,7 +155,7 @@ def hash_tail_o1(delta_left, delta_right, delta_out, tail_left, tail_right, **kw
 def hash_own(delta1, delta2, phase_delta=0, swap=False, drop_own=False, first_phase=False):
     """Własny ogon przeplotu: ceil((p+q-1)/p) dla zredukowanego delta1/delta2.
 
-    ``first_phase`` daje wariant sprzed K2 — człon pierwszej fazy ceil(q/p),
+    ``first_phase`` daje wariant sprzed K2 - człon pierwszej fazy ceil(q/p),
     który chroni B[0], ale nie najgorszą fazę późniejszą. Używa go reguła
     lokalna B w analizie członu (b); nie jest to mutant.
     """
@@ -203,7 +203,7 @@ def theta_tail(delta_source, delta_target, other, source_tail):
     """`Θ`: e(n) = (a-t)/b dla t = 0, inaczej (a+b-t)/b; kres (a+b-1)/b.
 
     Przy ilorazie całkowitym (b = 1) kres wynosi a, co po podzieleniu przez r
-    daje ogon własny ZERO — dlatego stała jedynka sprzed 2026-08-18 zawyżała
+    daje ogon własny ZERO - dlatego stała jedynka sprzed 2026-08-18 zawyżała
     w 40,3% węzłów `Θ`.
     """
     span = delta_target / other
@@ -340,7 +340,7 @@ def evaluate(plan, mutation=None, given_tails=None):
         elif node.kind == SHIFT:
             # Rekord n czyta rekord n-N producenta, czyli STARSZY od bieżącego.
             # `N` siedzi w origin, a deficyt przesunięcia jest stały i równy
-            # W_src - N, więc ogonem jest max(0, W_src - N) — krok 3d, 2026-08-07.
+            # W_src - N, więc ogonem jest max(0, W_src - N) - krok 3d, 2026-08-07.
             # Dwie postacie historyczne zostają jako mutanty:
             #   shift_tail_keeps_n     -> W_src + N   (semantyka sprzed 2026-08-06)
             #   shift_tail_keeps_source -> W_src      (db4a360, fetchBack offsetem względnym)
@@ -364,7 +364,7 @@ def evaluate(plan, mutation=None, given_tails=None):
                                       drop_own=mutation.get("hash_drop_own", False),
                                       first_phase=mutation.get("hash_first_phase", False))
             elif mutation.get("hash_scan_half_period", False):
-                # Mutant: przegląd o połowę za krótki — sprawdza, czy bramka
+                # Mutant: przegląd o połowę za krótki - sprawdza, czy bramka
                 # wykryje regułę, która trafia w większość węzłów, ale nie we
                 # wszystkie. To jest realny sposób, w jaki ten rachunek może się
                 # zepsuć przy refaktoryzacji.
@@ -383,8 +383,8 @@ def evaluate(plan, mutation=None, given_tails=None):
             result = max(add_tail(first.delta, node.delta, w1),
                          add_tail(second.delta, node.delta, source_tails[second.name]))
         elif node.kind == THETA:
-            # Postać sprzed 2026-08-18 — stały człon własny doklejany do
-            # przeliczonego ogona składowej — jest teraz mutantem
+            # Postać sprzed 2026-08-18 - stały człon własny doklejany do
+            # przeliczonego ogona składowej - jest teraz mutantem
             # (`theta_constant_own`), tak jak `hash_closed_form_o1` w K24d.
             if mutation.get("theta_constant_own", False):
                 result += 0 if mutation.get("theta_zero_own", False) else 1
@@ -394,7 +394,7 @@ def evaluate(plan, mutation=None, given_tails=None):
                 result = theta_tail(first.delta, node.delta, node.param, w1)
         elif node.kind == NTHETA:
             # Sprzed 2026-08-18: samo przeliczenie ogona składowej przez takt,
-            # z zaokrągleniem w górę liczonym OSOBNO — mutant
+            # z zaokrągleniem w górę liczonym OSOBNO - mutant
             # `ntheta_rounds_source_tail`.
             if not mutation.get("ntheta_rounds_source_tail", False):
                 result = ntheta_tail(first.delta, node.delta, w1)
@@ -414,7 +414,7 @@ def evaluate(plan, mutation=None, given_tails=None):
         elif node.kind == WINDOW:
             # Okno rekordowe NIE rusza ogona. Rachunek silnika idzie tu ta sama
             # sciezka co czysty przepis (jeden token PUSH_STREAM), a
-            # computeStartupLatency() o oknie nie wie — windowWidthOf() jest
+            # computeStartupLatency() o oknie nie wie - windowWidthOf() jest
             # wolane wylacznie z resolveStreamIntervals(), computeLogicalOrigin()
             # i computeRequiredCapacities(). Zmierzone: okno nad `s#t` o ogonie 1
             # ma ogon 1, nie inny.

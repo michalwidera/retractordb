@@ -12,7 +12,7 @@ class PrintCmd : public ICommand {
 
  public:
   explicit PrintCmd(bool tabular) : tabular_(tabular) {}
-  // printt is an alias — suppress duplicate help entry
+  // printt is an alias - suppress duplicate help entry
   [[nodiscard]] std::pair<std::string, std::vector<std::string>> usage() const override {
     if (tabular_) return {};
     return {"print|printt", {"show payload (printt: single-line tabular)"}};
@@ -31,7 +31,7 @@ class HexCmd : public ICommand {
 
  public:
   explicit HexCmd(bool hex) : hex_(hex) {}
-  // dec is an alias — suppress duplicate help entry
+  // dec is an alias - suppress duplicate help entry
   [[nodiscard]] std::pair<std::string, std::vector<std::string>> usage() const override {
     if (!hex_) return {};
     return {"hex|dec", {"type of input/output of byte/number fields"}};

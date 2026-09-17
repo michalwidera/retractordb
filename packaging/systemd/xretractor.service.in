@@ -1,5 +1,5 @@
 # Jednostka systemd dla serwera RetractorDB (xretractor).
-# UWAGA: plik generowany z xretractor.service.in przez configure_file() —
+# UWAGA: plik generowany z xretractor.service.in przez configure_file() -
 # @RETRACTOR_BIN@ jest podstawiane na ścieżkę instalacji binarium. Nie edytuj
 # wygenerowanej kopii; zmiany nanoś w szablonie .in.
 #
@@ -20,7 +20,7 @@ Group=retractor
 #
 # Plik zapytań wskazuje zmienna RETRACTOR_QUERY_FILE. Domyślnie @RETRACTOR_QUERY_FILE@
 # (jedno źródło: CMake RETRACTOR_QUERY_FILE). Administrator może nadpisać ścieżkę BEZ edycji
-# tej jednostki — wpisując RETRACTOR_QUERY_FILE=/ścieżka w /etc/retractor/service.env
+# tej jednostki - wpisując RETRACTOR_QUERY_FILE=/ścieżka w /etc/retractor/service.env
 # (EnvironmentFile poniżej; '-' = plik opcjonalny). Plik env jest czytany PO Environment=,
 # więc nadpisuje domyślną wartość. Wskazany plik musi istnieć (pusty = tryb idle).
 #

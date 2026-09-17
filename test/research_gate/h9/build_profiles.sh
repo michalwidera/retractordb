@@ -3,13 +3,13 @@
 # build/K26v3-<slug> repozytorium kodu i weryfikuje --build-info bajtowo.
 #
 # KOPIA aparatury K6c z DWIEMA zmianami (i tylko nimi):
-#   1. liczba profili nie jest już zaszyta jako 5 — wynika z profiles.tsv, bo
+#   1. liczba profili nie jest już zaszyta jako 5 - wynika z profiles.tsv, bo
 #      K26v3 ma cztery profile (`OFF` nie jest kontrolą przyczynową H9);
 #      reguła "zero zbudowanych profili nie jest sukcesem" zachowana jawnie;
 #   2. prefiks katalogu builda K6- → K26v3-, żeby kampania nie mieszała binariów
 #      z K6c ani K23 w tym samym drzewie kodu.
 # Nazwy zmiennych środowiskowych zostają K6_*, bo zmiana ich nazw nie ma pokrycia
-# w żadnym uruchomieniu — harness jest przeniesiony, nie przepisany.
+# w żadnym uruchomieniu - harness jest przeniesiony, nie przepisany.
 #
 # Ten sam skrypt działa na nadzorcy (kontrola wejściowa liczników, compile-only)
 # i na workerze (kampania pomiarowa). Różnicę robią zmienne środowiskowe:
@@ -25,7 +25,7 @@
 # `K6_CCACHE` jest bezpieczne dla kampanii pomiarowej: przełączniki `RDB_OPT_*`
 # są definicjami **wyłącznie celu `retractor`** (`src/retractor/lib/CMakeLists.txt`),
 # więc reszta drzewa ma między profilami identyczne wyjście preprocesora i trafia
-# w cache. ccache nie zmienia wynikowej binarki — `--build-info` i tak jest
+# w cache. ccache nie zmienia wynikowej binarki - `--build-info` i tak jest
 # weryfikowane bajtowo dla każdego profilu.
 #
 # `K6_RUN_CTEST` wymaga zbudowania WSZYSTKICH celów, co na Raspberry Pi trwa
@@ -51,7 +51,7 @@ raw_dir=${K6_RAW_DIR:-"$code_repo/build/gate-profiles-logs"}
   || { echo "BLAD: $code_repo nie wyglada na drzewo zrodel RetractorDB" >&2; exit 1; }
 
 # Przypięcie builda. W czasie budowania nie trwa żaden pomiar, więc wolno użyć
-# także izolowanego rdzenia 3 — ale nigdy w trakcie kampanii.
+# także izolowanego rdzenia 3 - ale nigdy w trakcie kampanii.
 build_wrapper=()
 if [ -n "${K6_CPUS:-}" ]; then
   build_wrapper=(taskset -c "$K6_CPUS")
@@ -79,7 +79,7 @@ run_logged() { # run_logged <plik logu> <opis> <komenda...>
   shift 2
   "$@" >"$logfile" 2>&1 || rc=$?
   if [ "$rc" -ne 0 ]; then
-    log "$what — kod wyjscia $rc; ostatnie 40 linii $logfile:"
+    log "$what - kod wyjscia $rc; ostatnie 40 linii $logfile:"
     tail -n 40 "$logfile" >&2 || true
   fi
   return "$rc"
@@ -117,7 +117,7 @@ verify_probe_binary_profile() {
 # powstaje PRZED buildem, wiec opisuje zrodla, z ktorych profile sa budowane.
 gate_sh="$here/../run_gate.sh"
 stamp_name=".gate-src-fingerprint"   # nazwa uzgodniona z run_gate.sh ($STAMP)
-[ -x "$gate_sh" ] || die "brak wykonywalnego $gate_sh — nie ma czym policzyc odcisku zrodel"
+[ -x "$gate_sh" ] || die "brak wykonywalnego $gate_sh - nie ma czym policzyc odcisku zrodel"
 src_fp=$("$gate_sh" --print-src-fingerprint --code-repo "$code_repo") \
   || die "nie udalo sie policzyc odcisku tresci src/ w $code_repo"
 log "odcisk tresci src/: $src_fp"

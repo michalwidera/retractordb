@@ -1,5 +1,5 @@
 # Weryfikuje poprawną identyfikację pól gdy kilka strumieni ma te same nazwy
-# (issue #17): coreAB, core0, core1 z polami a/b — kompilator musi rozróżniać
+# (issue #17): coreAB, core0, core1 z polami a/b - kompilator musi rozróżniać
 # pola po indeksie strumienia. Sprawdza też strumień samoreferencyjny (str1
 # korzysta z własnych pól). Wynik kompilatora porównywany z pattern.txt.
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Kompilacja strony Flinka K26 przypietym JDK 17 wobec przypietego Flinka 2.3.0.
-# Bez Mavena — ten sam wzorzec, co aparatura K22 (javac + classpath z lib/).
+# Bez Mavena - ten sam wzorzec, co aparatura K22 (javac + classpath z lib/).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -87,7 +87,7 @@ TEST(dumpManager, buildDumpChunk_rejects_negative_fd) {
 }
 
 // ============================================================
-// buildDumpChunk — opóźnienie (delayDumpRecordsToGo > 0)
+// buildDumpChunk - opóźnienie (delayDumpRecordsToGo > 0)
 // ============================================================
 
 TEST(dumpManager, buildDumpChunk_delay_decrements_returns_false) {
@@ -99,7 +99,7 @@ TEST(dumpManager, buildDumpChunk_delay_decrements_returns_false) {
   dumpTask task("task", {2, 4}, 0);
   task.dumpedRecordsToGo    = 2;
   task.delayDumpRecordsToGo = 2;
-  task.fd                   = 0;  // wrapping nie jest potrzebne — zapis nie nastąpi
+  task.fd                   = 0;  // wrapping nie jest potrzebne - zapis nie nastąpi
 
   const bool result = manager.buildDumpChunk(task, payload.get());
 
@@ -141,7 +141,7 @@ TEST(dumpManager, buildDumpChunk_delay_exhausted_then_writes) {
 }
 
 // ============================================================
-// buildDumpChunk — wiele rekordów
+// buildDumpChunk - wiele rekordów
 // ============================================================
 
 TEST(dumpManager, buildDumpChunk_multiple_records_not_done_until_last) {
@@ -176,7 +176,7 @@ TEST(dumpManager, buildDumpChunk_multiple_records_not_done_until_last) {
 }
 
 // ============================================================
-// buildDumpChunk — FatalError dla ujemnych wartości
+// buildDumpChunk - FatalError dla ujemnych wartości
 // ============================================================
 
 TEST(dumpManager, buildDumpChunk_negative_dumpedRecordsToGo_fatals) {
@@ -208,7 +208,7 @@ TEST(dumpManager, buildDumpChunk_negative_delayDumpRecordsToGo_fatals) {
 }
 
 // ============================================================
-// dumpTask — semantyka move i destruktor
+// dumpTask - semantyka move i destruktor
 // ============================================================
 
 TEST(dumpTask, move_constructor_transfers_fd) {
@@ -260,7 +260,7 @@ TEST(dumpTask, destructor_closes_fd) {
 
 TEST(dumpTask, destructor_with_negative_fd_does_not_crash) {
   dumpTask task("t", {0, 1}, 0);
-  // task.fd = -1 domyślnie — destruktor nie wywołuje close
+  // task.fd = -1 domyślnie - destruktor nie wywołuje close
 }
 
 // ============================================================

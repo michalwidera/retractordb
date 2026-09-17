@@ -5,7 +5,7 @@
 # Skrypt zamiast `add_test(COMMAND sh -c "...")`: makro add_test zdefiniowane w
 # test/IntegrationTest/CMakeLists.txt jest w CMake globalne i obejmuje
 # rowniez ten katalog. Przekazuje argumenty przez `_add_test(${ARGV})`, a
-# `${ARGV}` w makrze jest lista sklejona srednikami — ponowne rozwiniecie tnie
+# `${ARGV}` w makrze jest lista sklejona srednikami - ponowne rozwiniecie tnie
 # argument po jego WEWNETRZNYCH srednikach. Wykonywalo sie samo `set -e`, wiec
 # test byl zawsze zielony i nigdy nic nie sprawdzil.
 set -e

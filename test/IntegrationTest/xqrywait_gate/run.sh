@@ -89,7 +89,7 @@ done
 # Czekanie na bramce bylo BEZTERMINOWE i pilnowalo wylacznie zatrzasku pierwszej komendy.
 # handleSignal() ustawia sam licznik petli (notify_all nie jest async-signal-safe), wiec nie
 # bylo komu przerwac czekania: `xretractor -x`, do ktorego nie przyszla ani jedna komenda,
-# przezywal SIGTERM i schodzil dopiero na SIGKILL — systemd czekal na to caly TimeoutStopSec.
+# przezywal SIGTERM i schodzil dopiero na SIGKILL - systemd czekal na to caly TimeoutStopSec.
 # Zadnej komendy tu nie wysylamy, bo badana jest wlasnie droga BEZ komendy.
 rm -rf temp
 mkdir -p temp

@@ -21,7 +21,7 @@ TEST(GapDetectorTest, configure_enables_it) {
 
 // ---------------------------------------------------------------------------
 // Faza nullfill: pierwsze nullFillCount obserwacji all-null przechodzą do zapisu
-// (absorb() zwraca false — wywołujący ma je zapisać fizycznie, R17).
+// (absorb() zwraca false - wywołujący ma je zapisać fizycznie, R17).
 // ---------------------------------------------------------------------------
 TEST(GapDetectorTest, nullfill_phase_passes_through) {
   rdb::GapDetector d;
@@ -44,16 +44,16 @@ TEST(GapDetectorTest, absorbs_beyond_nullfill_phase) {
   d.absorb(true);  // nullfill 1
   d.absorb(true);  // nullfill 2
 
-  EXPECT_TRUE(d.absorb(true));  // pochłonięty — przerwa=1
-  EXPECT_TRUE(d.absorb(true));  // pochłonięty — przerwa=2
+  EXPECT_TRUE(d.absorb(true));  // pochłonięty - przerwa=1
+  EXPECT_TRUE(d.absorb(true));  // pochłonięty - przerwa=2
 
   EXPECT_EQ(d.takePendingGap(), 2U);
-  EXPECT_EQ(d.takePendingGap(), 0U);  // odebrane — reset do 0
+  EXPECT_EQ(d.takePendingGap(), 0U);  // odebrane - reset do 0
 }
 
 // ---------------------------------------------------------------------------
 // Pierwszy rekord nie-null po przerwie: nie jest pochłaniany (caller ma go
-// zapisać), a oczekująca przerwa czeka na takePendingGap() — GapDetector
+// zapisać), a oczekująca przerwa czeka na takePendingGap() - GapDetector
 // sam nie decyduje, co z nią zrobić (brak I/O w tej klasie).
 // ---------------------------------------------------------------------------
 TEST(GapDetectorTest, non_null_after_gap_leaves_pending_gap_for_caller) {
@@ -62,18 +62,18 @@ TEST(GapDetectorTest, non_null_after_gap_leaves_pending_gap_for_caller) {
 
   d.absorb(true);
   d.absorb(true);
-  d.absorb(true);  // pochłonięty — przerwa=1
+  d.absorb(true);  // pochłonięty - przerwa=1
 
   EXPECT_FALSE(d.absorb(false));  // rekord nie-null: nie pochłonięty
   EXPECT_EQ(d.takePendingGap(), 1U);
 
-  // Licznik fazy nullfill wyzerowany — kolejne 2 rekordy all-null znów przechodzą.
+  // Licznik fazy nullfill wyzerowany - kolejne 2 rekordy all-null znów przechodzą.
   EXPECT_FALSE(d.absorb(true));
   EXPECT_FALSE(d.absorb(true));
 }
 
 // ---------------------------------------------------------------------------
-// Bez configure() maszyna jest nieaktywna — absorb() zawsze zwraca false,
+// Bez configure() maszyna jest nieaktywna - absorb() zawsze zwraca false,
 // niezależnie od wzorca (to sam wywołujący sprawdza enabled() przed absorb()).
 // ---------------------------------------------------------------------------
 TEST(GapDetectorTest, disabled_detector_still_reports_no_pending_gap) {

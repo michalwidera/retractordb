@@ -25,7 +25,7 @@ inline constexpr int kDefaultClientResponseMaxFails{kIpcClientDefaultResponseMax
 
 /// Werdykt komendy wysłanej do serwera. Rozróżnia tryby porażki, bo wszystkie trzy dawały
 /// wcześniej albo kod 0, albo mylący komunikat o innym błędzie (issue_215). Wspólny dla
-/// wszystkich komend odpytujących serwer — `select`, `dir`/`dirYaml`, `detailShow*` — bo stan
+/// wszystkich komend odpytujących serwer - `select`, `dir`/`dirYaml`, `detailShow*` - bo stan
 /// serwera nie zależy od tego, która komenda go zastała, więc jego nazwa i kod wyjścia też
 /// nie mogą.
 ///
@@ -73,18 +73,18 @@ class qry {
 
   /// Przeladowanie CALEGO planu instancji trescia @p planText. Zwraca true przy odmowie
   /// (spojnie z adhoc()). Tekst pusty jest zadaniem poprawnym: sprowadza instancje do stanu
-  /// bezczynnego. Powod odmowy — komunikat serwera — trafia na stderr, bo jest to jedyna
+  /// bezczynnego. Powod odmowy - komunikat serwera - trafia na stderr, bo jest to jedyna
   /// rzecz, ktora operator moze z ta odmowa zrobic.
   bool reset(const std::string & /*planText*/);
 
   /// Lista strumieni albo werdykt, dlaczego jej nie ma. Instancja bezczynna ma tu WARTOSC
-  /// (wlasny, niepusty wydruk), bo odpowiedziala — porazka jest zarezerwowana dla serwera,
+  /// (wlasny, niepusty wydruk), bo odpowiedziala - porazka jest zarezerwowana dla serwera,
   /// ktory listy nie dostarczyl.
   std::expected<std::string, selectResult> dir();
   std::expected<std::string, selectResult> dirYaml();
   int hello();
   /// Wydruk detalu strumienia albo werdykt. Pusty wydruk nie odrozniał nieznanej nazwy od
-  /// milczacego serwera i od instancji bez planu — wszystkie trzy konczyly sie tym samym
+  /// milczacego serwera i od instancji bez planu - wszystkie trzy konczyly sie tym samym
   /// kodem wyjscia i bez slowa na stderr, mimo ze kazdy z nich to inna naprawa.
   std::expected<std::string, selectResult> detailShow(const std::string & /*input*/);
   std::expected<std::string, selectResult> detailShowYaml(const std::string & /*input*/);

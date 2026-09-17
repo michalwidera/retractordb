@@ -793,7 +793,7 @@ TEST(BusSegmentName, CarriesLayoutVersionAndAvoidsInstanceNamespace) {
 // Wartosc niepoprawna NIE MOZE trafic do nazwy obiektu /dev/shm. Launchery odrzucaja ja
 // wczesniej z komunikatem, a tutaj obowiazuje zasada odwrotna do cichej zguby izolacji:
 // zly znak dalby blad otwarcia segmentu, ktory przeszedlby jako zwykle "magistrala
-// niedostepna" — czyli fail-open bez sladu w logu testu.
+// niedostepna" - czyli fail-open bez sladu w logu testu.
 class BusSegmentNamespace : public ::testing::Test {
  protected:
   void TearDown() override { unsetenv(servername::kNamespaceEnv); }

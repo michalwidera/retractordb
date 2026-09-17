@@ -1,8 +1,8 @@
 #!/bin/sh
 # postinst dla pakietu retractordb: tworzy użytkownika usługi i włącza jednostkę
-# systemd (bez natychmiastowego startu — wystartuje przy następnym boocie).
+# systemd (bez natychmiastowego startu - wystartuje przy następnym boocie).
 #
-# UWAGA: plik generowany z postinst.in przez configure_file() — @RETRACTOR_QUERY_FILE@
+# UWAGA: plik generowany z postinst.in przez configure_file() - @RETRACTOR_QUERY_FILE@
 # podstawiane z CMake (jedno źródło prawdy, wspólne z ExecStart jednostki). Nie edytuj
 # wygenerowanej kopii; zmiany nanoś w szablonie .in.
 set -e
@@ -30,7 +30,7 @@ case "$1" in
     fi
 
     # Przykład konfiguracji do /etc/retractor (sshd-style). Kopiujemy tylko gdy go
-    # tam nie ma — nie nadpisujemy zmian administratora.
+    # tam nie ma - nie nadpisujemy zmian administratora.
     if [ -f /usr/share/retractordb/retractor.toml.example ]; then
       mkdir -p /etc/retractor
       if [ ! -f /etc/retractor/retractor.toml.example ]; then
@@ -38,7 +38,7 @@ case "$1" in
       fi
     fi
 
-    # Przykład env-file jednostki (EnvironmentFile). Tylko .example — żywy service.env
+    # Przykład env-file jednostki (EnvironmentFile). Tylko .example - żywy service.env
     # NIE jest tworzony: jego brak to poprawny stan (jednostka używa domyślnej ścieżki).
     if [ -f /usr/share/retractordb/service.env.example ]; then
       mkdir -p /etc/retractor

@@ -357,7 +357,7 @@ TEST(xExpressionEval, divide_null_by_zero_yields_null) {
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
 }
 
-// Zero w LICZNIKU to zwykla dana — wynik istnieje i musi pozostac wartoscia, nie NULL-em.
+// Zero w LICZNIKU to zwykla dana - wynik istnieje i musi pozostac wartoscia, nie NULL-em.
 // Kontrola odroznia "pochlanianie braku wyniku" od "pochlaniania wszystkiego, co zawiera zero".
 TEST(xExpressionEval, zero_divided_by_value_stays_a_value) {
   std::list<token> program;
@@ -913,7 +913,7 @@ TEST(xExpressionEval, call_unknown_function_keeps_author_spelling) {
 
 // Funkcje dopisane 2026-08-30. `Abs` liczy się wprost na wariancie, żeby nie tracić dokładności
 // wartości wymiernej na okrążeniu przez double, które robi callFun. `IsZero` i `IsNonZero`
-// zwracają INTEGER 0/1 niezależnie od typu argumentu — to jest ich cała wartość użytkowa, bo
+// zwracają INTEGER 0/1 niezależnie od typu argumentu - to jest ich cała wartość użytkowa, bo
 // porównania żyją w regule `term_logic` i nie są dostępne wewnątrz wyrażenia w SELECT.
 TEST(xExpressionEval, call_abs_preserves_type) {
   const std::vector<std::pair<int, int>> intCases{{-9, 9}, {9, 9}, {0, 0}};
@@ -975,7 +975,7 @@ TEST(xExpressionEval, call_length_counts_value_not_field_width) {
   }
 }
 
-// Argument nietekstowy jest błędem, a nie cichą konwersją przez to_string — symetrycznie do
+// Argument nietekstowy jest błędem, a nie cichą konwersją przez to_string - symetrycznie do
 // `Abs` i `IsZero`, które odrzucają napis. `Length(k)` nad polem INTEGER jest niemal na pewno
 // literówką; kto chce długości zapisu dziesiętnego, pisze `Length(to_string(k))`.
 TEST(xExpressionEval, call_length_rejects_numeric_operand) {
@@ -1327,7 +1327,7 @@ TEST(xExpressionEval, isnull_returns_0_for_non_null) {
 }
 
 // null2zero zamienia wartosc POCHLANIAJACA na zero: dziure w danych, dzielenie przez zero
-// albo okno bez ani jednej wartosci. Ogona strumienia nie dotyczy — tam nie ma rekordu,
+// albo okno bez ani jednej wartosci. Ogona strumienia nie dotyczy - tam nie ma rekordu,
 // wiec nie ma czego zamieniac (patrz query::startupLatency).
 TEST(xExpressionEval, null2zero_replaces_null_with_zero) {
   std::list<token> program;
@@ -1341,7 +1341,7 @@ TEST(xExpressionEval, null2zero_replaces_null_with_zero) {
   EXPECT_EQ(std::get<int>(result), 0);
 }
 
-// Wartosc nie-NULL przechodzi BEZ ZMIANY — takze co do typu, zeby zawiniecie pola nie
+// Wartosc nie-NULL przechodzi BEZ ZMIANY - takze co do typu, zeby zawiniecie pola nie
 // przycinalo wyniku okna z RATIONAL do liczby calkowitej.
 TEST(xExpressionEval, null2zero_passes_a_value_through_unchanged) {
   std::list<token> program;
@@ -1746,7 +1746,7 @@ TEST(xExpressionEval, pow_operand_order) {
 }
 
 // Typ wyniku ustala normalize(), tak samo jak dla `*`. Kwadrat pola INTEGER zostaje
-// INTEGER-em — inaczej `pole ^ 2` nie bylby zamiennikiem dla `pole * pole`.
+// INTEGER-em - inaczej `pole ^ 2` nie bylby zamiennikiem dla `pole * pole`.
 TEST(xExpressionEval, pow_int_int_stays_integer) {
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 7);
@@ -1760,7 +1760,7 @@ TEST(xExpressionEval, pow_int_int_stays_integer) {
   EXPECT_EQ(std::get<int>(result), 49);
 }
 
-// Wykladnik ulamkowy promuje wynik do DOUBLE — normalize() bierze wyzszy indeks wariantu.
+// Wykladnik ulamkowy promuje wynik do DOUBLE - normalize() bierze wyzszy indeks wariantu.
 TEST(xExpressionEval, pow_int_double_promotes_to_double) {
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 2);
@@ -1861,7 +1861,7 @@ TEST(xExpressionEval, pow_on_exact_types_matches_multiplication) {
 }
 
 // Przepelnienie arytmetyki wartosci (2026-09-14). INTEGER to int32, RATIONAL to
-// boost::rational<int>; wynik spoza zakresu jest NULL, tak jak dzielenie przez zero — nie
+// boost::rational<int>; wynik spoza zakresu jest NULL, tak jak dzielenie przez zero - nie
 // zawinieta liczba. Kazdy przypadek ma pare: wynik dokladnie na granicy i o krok za nia.
 namespace {
 

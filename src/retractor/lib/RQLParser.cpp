@@ -33,7 +33,7 @@ constexpr size_t kAgseWindowSignChildIndex = 5;
 /// Blad skladni RQL: przerywa parsowanie, zamiast konczyc proces.
 ///
 /// Do 2026-09-05 oba listenery bledow wolaly exit(EPERM). W procesie serwera oznaczalo to
-/// smierc xretractora przy KAZDYM blednym zapytaniu ad-hoc — `xqry -a "ml"` wystarczalo.
+/// smierc xretractora przy KAZDYM blednym zapytaniu ad-hoc - `xqry -a "ml"` wystarczalo.
 ///
 /// Sam powrot z listenera nie zalatwia sprawy: ANTLR wchodzi wtedy w odzyskiwanie i wola
 /// dalej callbacki ParserListenera na kalekich kontekstach, gdzie np. ctx->ID() jest nullem.
@@ -63,16 +63,16 @@ std::string lowercased(std::string text) {
 /// przechodzi przez `finally` generowanego kodu (antlrcpp::FinalAction), ktore wola
 /// exitRule(), a to wola exitDeclare()/exitSelect()/... na kontekscie zatrzymanym w polowie
 /// budowy. Pierwsza wersja tej naprawy padala tam w exitDeclare() na `ctx->ID()` rownym
-/// nullptr — czyli segfaultem zamiast exit(EPERM), bez zadnej poprawy.
+/// nullptr - czyli segfaultem zamiast exit(EPERM), bez zadnej poprawy.
 /// Po removeParseListeners() petla triggerExitRuleEvent() chodzi po pustej liscie.
 ///
 /// Listener bledow leksera dostaje ten sam parser, bo blad leksera rozwija stos przez
-/// dokladnie te same `finally` — token pobiera sie w srodku reguly parsera.
+/// dokladnie te same `finally` - token pobiera sie w srodku reguly parsera.
 [[noreturn]] void abortParse(antlr4::Parser &parser, size_t firstLine, size_t line, size_t charPositionInLine,
                              const std::string &msg, Token *offendingSymbol) {
   // Lekser i parser licza wiersze wewnatrz PRZEKAZANEGO tekstu, a ten bywa pojedyncza
   // instrukcja wyjeta z pliku planu przez readLogicalLines. firstLine przesuwa numer z
-  // powrotem na wiersz pliku — bez tego kazda odmowa wskazywala wiersz 1, niezaleznie od
+  // powrotem na wiersz pliku - bez tego kazda odmowa wskazywala wiersz 1, niezaleznie od
   // tego, w ktorym miejscu planu stoi blad.
   const size_t sourceLine = firstLine + line - 1;
 
@@ -81,7 +81,7 @@ std::string lowercased(std::string text) {
   const std::string offendingText = (offendingSymbol != nullptr) ? offendingSymbol->getText() : std::string("<unknown>");
 
   // Komunikat MUSI byc jednowierszowy: wraca do klienta jako wartosc ptree w formacie `info`,
-  // ktory znaki nowej linii escape'uje — wielowierszowiec dojechalby jako jeden ciag z
+  // ktory znaki nowej linii escape'uje - wielowierszowiec dojechalby jako jeden ciag z
   // widocznymi `\n`.
   std::string message = "line " + std::to_string(sourceLine) + ":" + std::to_string(charPositionInLine) + " " + msg;
   std::ranges::replace_if(message, [](char c) { return c == '\n' || c == '\r'; }, ' ');
@@ -89,7 +89,7 @@ std::string lowercased(std::string text) {
 
   // Wydruk na stderr ZOSTAJE obok statusu: w trybie uslugowym stderr to journald, czyli
   // jedyny slad po stronie serwera. Tak samo robi sciezka semantyczna (reportSemanticError).
-  // Tu idzie msg nieprzyciety — ograniczenie dotyczy wylacznie drogi przez pamiec dzielona.
+  // Tu idzie msg nieprzyciety - ograniczenie dotyczy wylacznie drogi przez pamiec dzielona.
   std::cerr << "Syntax error @Rql" << '\n';
   std::cerr << "line:" << sourceLine << ":" << charPositionInLine << " at " << offendingText << '\n';
   std::cerr << "msg:" << msg << '\n';
@@ -167,11 +167,11 @@ class ParserListener : public RQLBaseListener {
     program.push_back(token(id, arg1));
   };
 
-  /// Pierwszy blad semantyczny calego przebiegu — czyli taki, ktorego gramatyka nie lapie,
+  /// Pierwszy blad semantyczny calego przebiegu - czyli taki, ktorego gramatyka nie lapie,
   /// a ktory mimo to unieważnia zapytanie (regula na nieistniejacym strumieniu, na deklaracji,
   /// powtorzona nazwa reguly). Do 2026-09-05 kazdy z tych przypadkow konczyl sie abort() albo
   /// cisza; w procesie serwera pierwsze znaczylo smierc xretractora z powodu bledu w cudzym
-  /// zapytaniu ad-hoc, drugie — odpowiedz "OK" na polecenie, ktore nie zrobilo nic.
+  /// zapytaniu ad-hoc, drugie - odpowiedz "OK" na polecenie, ktore nie zrobilo nic.
   /// Rozstrzyga blad pierwszy: dalsze sa juz tylko jego nastepstwami.
   std::string semanticError_;
 
@@ -209,7 +209,7 @@ class ParserListener : public RQLBaseListener {
     switch (actionType) {
       case rule::DUMP:
         // Zakres pusty odrzucamy juz tutaj, bo dalej czeka na niego FatalError w
-        // compiler::computeRequiredCapacities() — a w sciezce ad-hoc FatalError to smierc
+        // compiler::computeRequiredCapacities() - a w sciezce ad-hoc FatalError to smierc
         // serwera. Rownosc granic nie opisuje zadnego zrzutu, wiec nic sie nie traci.
         if (dump_left >= dump_right)
           return "Rule '" + rule_name + "': dump range [" + std::to_string(dump_left) + ".." + std::to_string(dump_right) +
@@ -242,7 +242,7 @@ class ParserListener : public RQLBaseListener {
   void exitFieldIDColumnName(RQLParser::FieldIDColumnNameContext *ctx) override { recpToken(PUSH_ID1, ctx->getText()); }
   void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) override { recpToken(PUSH_ID2, ctx->getText()); }
 
-  /// `cells[$]`, `cells[23-$]` — indeks z numerem instancji generatora.
+  /// `cells[$]`, `cells[23-$]` - indeks z numerem instancji generatora.
   ///
   /// Wystawia DOKLADNIE ten sam token co `cells[3]`: rozny jest wylacznie tekst, ktory
   /// compiler::expandStreamGenerators() zwija do postaci literalowej zanim zobaczy go
@@ -264,35 +264,35 @@ class ParserListener : public RQLBaseListener {
   void exitExpLe(RQLParser::ExpLeContext *ctx) override { recpToken(CMP_LE); }
   void exitExpNot(RQLParser::ExpNotContext *ctx) override { recpToken(NOT); }
 
-  /// `$` poza nawiasami kwadratowymi — numer instancji jako wartosc.
+  /// `$` poza nawiasami kwadratowymi - numer instancji jako wartosc.
   ///
   /// Wartosci jeszcze nie znamy (jest nia numer instancji, ktory powstanie dopiero przy
   /// ekspansji), wiec token jest tymczasowy: expandStreamGenerators() zamienia go na
-  /// PUSH_VAL. PUSH_GENIDX, ktory przezyl ten przebieg, jest bledem kompilacji — znaczy
+  /// PUSH_VAL. PUSH_GENIDX, ktory przezyl ten przebieg, jest bledem kompilacji - znaczy
   /// `$` uzyte poza generatorem.
   void exitExpGenIndex(RQLParser::ExpGenIndexContext *ctx) override { recpToken(PUSH_GENIDX); }
 
-  /// Poczatki podprogramow argumentow okna — pozycja w `program` w chwili wejscia w regule.
+  /// Poczatki podprogramow argumentow okna - pozycja w `program` w chwili wejscia w regule.
   ///
   /// Stos, a nie pojedyncza zmienna, bo gramatyka dopuszcza `MIN(MAX(a[0]:2):3)`: znacznik
   /// wewnetrznego okna musi zdjac sie przed zewnetrznym. Samo zagniezdzenie odrzuca dopiero
   /// kompilator, ktory jako jedyny widzi, ze historia zrodla nie zawiera wynikow okna.
   ///
-  /// Znaczniki sa wazne w obrebie JEDNEGO wyrazenia — `program` czysci exitExpression().
+  /// Znaczniki sa wazne w obrebie JEDNEGO wyrazenia - `program` czysci exitExpression().
   std::vector<size_t> windowArgMarks;
 
   void enterWindow_agg(RQLParser::Window_aggContext *ctx) override { windowArgMarks.push_back(program.size()); }
 
-  /// `MIN(cells[0] : 10)` — agregat okna REKORDOWEGO w liscie SELECT.
+  /// `MIN(cells[0] : 10)` - agregat okna REKORDOWEGO w liscie SELECT.
   ///
   /// Argument jest WYRAZENIEM, wiec jego tokeny doklada juz podregula `expression_factor`;
   /// ten listener dopisuje operator, ktory niesie DWIE liczby: szerokosc okna i pozycje
   /// pierwszego tokenu argumentu. Bez tej drugiej nie da sie odroznic argumentu od tego, co
-  /// stalo w programie wczesniej — `x + MIN(y[0]:2)` i `MIN(x+y[0]:2)` roznia sie wylacznie
+  /// stalo w programie wczesniej - `x + MIN(y[0]:2)` i `MIN(x+y[0]:2)` roznia sie wylacznie
   /// nia. compiler::resolveWindowAggregates() zabiera oba i zostawia jeden bezargumentowy
   /// token z indeksem grupy okna.
   ///
-  /// Okno jest zawsze PRZESUWNE co rekord — powod przy regule `window_agg` w RQL.g4.
+  /// Okno jest zawsze PRZESUWNE co rekord - powod przy regule `window_agg` w RQL.g4.
   /// Szerokosc NIE jest tu sprawdzana: listener parsera nie ma lagodnego kanalu bledu
   /// (zostaje FatalError), a szerokosc niedodatnia jest bledem PLANU, ktory kompilator
   /// raportuje przez `Check result:` razem z pozostalymi kontrolami.
@@ -346,7 +346,7 @@ class ParserListener : public RQLBaseListener {
   void exitStreamAvg(RQLParser::StreamAvgContext *ctx) override { recpToken(STREAM_AVG); }
   void exitStreamSum(RQLParser::StreamSumContext *ctx) override { recpToken(STREAM_SUM); }
 
-  // Notacja przyrostkowa `strumien.avg` jest wygaszana na rzecz AVG(strumien) — patrz
+  // Notacja przyrostkowa `strumien.avg` jest wygaszana na rzecz AVG(strumien) - patrz
   // exitStream_fn_call(). Ostrzezenie stoi TUTAJ, a nie w exitStreamMin/Max/Avg/Sum,
   // bo reguly `agregator` uzywa takze `term : agregator # ExpAgg`, gdzie `avg` jest
   // odwolaniem do POLA wyniku reduktora, a nie operatorem strumieniowym. Ostrzezenie
@@ -361,7 +361,7 @@ class ParserListener : public RQLBaseListener {
   /// AVG/MIN/MAX/SUMC w postaci funkcyjnej nad WYRAZENIEM strumieniowym.
   ///
   /// Nie wnosi nic do wykonania: dokleja ten sam token reduktora, ktory dokladalaby notacja
-  /// przyrostkowa. Roznica jest w zasiegu — postac funkcyjna domyka argument wlasnymi
+  /// przyrostkowa. Roznica jest w zasiegu - postac funkcyjna domyka argument wlasnymi
   /// nawiasami, wiec bierze cale wyrazenie niezaleznie od drabiny priorytetow, podczas gdy
   /// `.agg` siega tylko po operand poziomu postfiksowego. Do 2026-08-29 `.agg` przyjmowalo
   /// wylacznie stream_factor i okno trzeba bylo materializowac osobnym zapytaniem:
@@ -371,7 +371,7 @@ class ParserListener : public RQLBaseListener {
   ///
   /// Postac funkcyjna bierze cale stream_expression, wiec ta sama para to jedno zapytanie
   /// `FROM SUMC(sq@(125,1000))`. Program klauzuli FROM wychodzi identyczny po sklejeniu
-  /// — [PUSH_STREAM sq, STREAM_AGSE(125,1000), STREAM_SUM] — a rozbija go z powrotem na dwa
+  /// - [PUSH_STREAM sq, STREAM_AGSE(125,1000), STREAM_SUM] - a rozbija go z powrotem na dwa
   /// wezly compiler::extractIntermediateStreams(). DAG jest ten sam; znika tylko koniecznosc
   /// nazwania okna w RQL.
   void exitStream_fn_call(RQLParser::Stream_fn_callContext *ctx) override {
@@ -403,7 +403,7 @@ class ParserListener : public RQLBaseListener {
 
   /// Nazwa funkcji jest w gramatyce zwyklym ID, wiec autor moze ja napisac dowolna
   /// wielkoscia liter. Do tokena idzie postac KANONICZNA z rqlFunctions.hpp, a nie ta
-  /// napisana w zapytaniu — uzasadnienie przy definicji tabeli.
+  /// napisana w zapytaniu - uzasadnienie przy definicji tabeli.
   ///
   /// Nazwy NIEZNANEJ nie odrzucamy tutaj. Listener parsera nie ma kanalu na lagodny
   /// blad (zostaje FatalError), a `compiler::checkFunctionCalls()` raportuje ja przez
@@ -540,10 +540,10 @@ class ParserListener : public RQLBaseListener {
   /// Czy tuz PRZED podana liczba stoi w zapisie znak minus.
   ///
   /// Znak jest w gramatyce osobnym, OPCJONALNYM dzieckiem (`'-'? DECIMAL`), wiec numery pozycji
-  /// przesuwaja sie razem z jego obecnoscia: `DUMP -5 TO 5` ma piecioro dzieci, `DUMP 5 TO 5` —
+  /// przesuwaja sie razem z jego obecnoscia: `DUMP -5 TO 5` ma piecioro dzieci, `DUMP 5 TO 5` -
   /// czworo. Odczyt ze stalej pozycji children[4] wychodzil w tym drugim przypadku poza wektor:
   /// w Debug konczylo sie to asercja biblioteki standardowej, w Release odczytem spoza zakresu,
-  /// a z kanalu ad-hoc — smiercia serwera po `DO DUMP 5 TO 5`. Dlatego pytamy o sasiada samej
+  /// a z kanalu ad-hoc - smiercia serwera po `DO DUMP 5 TO 5`. Dlatego pytamy o sasiada samej
   /// liczby, zamiast liczyc pozycje z gory.
   static bool negatedBefore(RQLParser::DumppartContext *ctx, const antlr4::Token *number) {
     for (size_t i = 1; i < ctx->children.size(); ++i) {
@@ -614,8 +614,8 @@ class ParserListener : public RQLBaseListener {
     recpToken(STREAM_TIMEMOVE, std::stoi(ctx->DECIMAL()->getText()));
   }
 
-  /// Nazwa strumienia. Pozostale alternatywy `stream_factor` — `( e )` i wywolanie
-  /// reduktora — nie wnosza wlasnego tokenu: ich tresc dolozyly juz wezly nizej.
+  /// Nazwa strumienia. Pozostale alternatywy `stream_factor` - `( e )` i wywolanie
+  /// reduktora - nie wnosza wlasnego tokenu: ich tresc dolozyly juz wezly nizej.
   ///
   /// Rozroznienie idzie po ctx->ID(), a nie po liczbie dzieci: od chwili, gdy prymitywem
   /// stalo sie takze `stream_fn_call`, JEDNO dziecko maja dwie alternatywy, a `MIN(a)`
@@ -653,7 +653,7 @@ class ParserListener : public RQLBaseListener {
     // co po konwersji jeszcze cokolwiek liczy: `to_float('2.5') * 2` konczy sie tokenem
     // MULTIPLY, wiec pole wychodzilo `INTEGER` mimo wartosci zmiennoprzecinkowej
     // (pozycja 16 w usecases/requested.md, granica 2). Wnioskowanie po ostatnim tokenie
-    // nie daje sie na to naprawic — zastepuje je przejscie po calym programie.
+    // nie daje sie na to naprawic - zastepuje je przejscie po calym programie.
     auto outType = rdb::INTEGER;
     int outLen   = 4;
     int outArr   = 1;
@@ -722,7 +722,7 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   // Create a parser which parses the token stream
   // to create a parse tree.
   RQLParser parser(&tokens);
-  // Oba listenery bledow potrzebuja parsera (abortParse), wiec powstaja po nim — i przed nim
+  // Oba listenery bledow potrzebuja parsera (abortParse), wiec powstaja po nim - i przed nim
   // sa niszczone, czyli w chwili, gdy nikt juz do nich nie siega.
   LexerErrorListener lexerErrorListener(parser, firstLine);
   lexer.removeErrorListeners();
@@ -735,13 +735,13 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   parser.addParseListener(&parserListener);
 
   // Powod wczesnego powrotu, a nie ogladania drzewa po bledzie: patrz RQLSyntaxError.
-  // Komunikat wypisal juz listener, a coreInstance moze zostac czesciowo zmieniony —
+  // Komunikat wypisal juz listener, a coreInstance moze zostac czesciowo zmieniony -
   // wolajacy odrzuca wtedy caly plan (launcher) albo cala kopie planu (executorsm::getAdHoc).
   tree::ParseTree *tree = nullptr;
   try {
     tree = parser.prog();
   } catch (const RQLSyntaxError &e) {
-    // Tresc bledu wraca ta sama droga co blad semantyczny — statusem. Bez tego operator
+    // Tresc bledu wraca ta sama droga co blad semantyczny - statusem. Bez tego operator
     // dostawal samo "Fail", a zdanie nazywajace przyczyne zostawalo na stderr PROCESU
     // SERWERA, czyli w journalu maszyny, gdzie autora zapytania nie ma.
     // Slowo kluczowe pozostaje "UNRECOGNIZED": opiera sie na tym executorsm::getAdHoc,
@@ -768,7 +768,7 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
       streamName = ruleCtx->stream_name->getText();
     }
   }
-  // Blad semantyczny wraca ta sama droga co skladniowy — wolajacy (launcher albo
+  // Blad semantyczny wraca ta sama droga co skladniowy - wolajacy (launcher albo
   // executorsm::getAdHoc) ma jedno miejsce, w ktorym odrzuca plan lub kopie planu.
   // Nazwa strumienia i slowo kluczowe ida z nim, zeby komunikat wskazywal instrukcje.
   if (!parserListener.semanticError().empty()) return {parserListener.semanticError(), firsttoken, streamName};
@@ -790,7 +790,7 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
 ///
 /// Komentarz `#` jest obslugiwany TUTAJ, a nie w lekserze, i zajmuje CALY wiersz. Lekser
 /// zna `#` wylacznie jako operator przeplotu, wiec `FROM a # b` jest przeplotem niezaleznie
-/// od spacji — do 2026-08-29 regula leksera `'# '` zjadala taki zapis do `FROM a` i plan
+/// od spacji - do 2026-08-29 regula leksera `'# '` zjadala taki zapis do `FROM a` i plan
 /// kompilowal sie po cichu bez `b`. Komentarz konczacy wiersz zapisuje sie `//`.
 ///
 /// Warunek patrzy na pierwszy NIEBIALY znak, bo wcieta linia komentarza szla dotad do
@@ -798,7 +798,7 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
 ///
 /// Z kazda instrukcja wraca numer wiersza PLIKU, na ktorym sie zaczyna. Bez tego numeru
 /// blad skladni wskazywal wiersz liczony wewnatrz pojedynczej instrukcji, czyli praktycznie
-/// zawsze 1 — pozycja, ktorej w pliku planu nie da sie odnalezc. Kotwica jest pierwszym
+/// zawsze 1 - pozycja, ktorej w pliku planu nie da sie odnalezc. Kotwica jest pierwszym
 /// wierszem instrukcji, bo kontynuacje `\\` sa sklejane w jeden wiersz logiczny.
 std::vector<std::pair<std::string, size_t>> readLogicalLines(std::istream &file) {
   std::vector<std::pair<std::string, size_t>> result;

@@ -61,10 +61,10 @@ report_validation_status() {
 
     # Osobny wiersz, bo to inne pytanie niz "czy w ogole da sie zbudowac".
     # Tutaj chodzi o to, czy `cmake` z PATH nie jest STARSZY niz wersja, dla
-    # ktorej zachowania polityk sa ustalone. Nowszy jest w porzadku — dryft
+    # ktorej zachowania polityk sa ustalone. Nowszy jest w porzadku - dryft
     # narzedzia w gore jest oczekiwany i nie jest ani bledem, ani ostrzezeniem.
     # Starszy jest tylko ostrzezeniem: build i tak przejdzie, bo conan wciaga
-    # wlasnego cmake, ale drzewo generuja wtedy dwie rozne wersje — a wlasnie
+    # wlasnego cmake, ale drzewo generuja wtedy dwie rozne wersje - a wlasnie
     # tak powstalo ostrzezenie CMP0219 widoczne wylacznie w CI (2026-08-18).
     if [ -n "$cmake_ver" ] && version_ge "$cmake_ver" "$RDB_CMAKE_MIN_VERSION"; then
         compat_status="ok"

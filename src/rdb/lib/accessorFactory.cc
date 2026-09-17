@@ -19,8 +19,8 @@ std::unique_ptr<FileInterface> makeAccessor(const std::string_view storageType, 
                                             Descriptor &descriptor,              //
                                             const bool oneShot,                  //
                                             const int percounter) {
-  if (storageFile.empty()) FatalError("storage: storage file path is empty — storage not properly configured");
-  if (storageType.empty()) FatalError("storage: storage type is empty — storage type not set");
+  if (storageFile.empty()) FatalError("storage: storage file path is empty - storage not properly configured");
+  if (storageType.empty()) FatalError("storage: storage type is empty - storage type not set");
 
   if (storageType == "DEFAULT") {
     return std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile, descriptor, descriptor.retention(),
@@ -55,13 +55,13 @@ std::unique_ptr<metaData> makeMetaIndex(const bool declared,           //
                                         const Descriptor &descriptor,  //
                                         const std::string &metaIndexFile) {
   if (declared) {
-    // Źródła deklarowane są tylko do odczytu — wstrzykiwany jest wariant inertny (pusta ścieżka = bez persystencji).
+    // Źródła deklarowane są tylko do odczytu - wstrzykiwany jest wariant inertny (pusta ścieżka = bez persystencji).
     return std::make_unique<rdb::metaData>(descriptor, "");
   }
 
   // Posiadanie pliku cienia danych (hasShadow) jest niezależne od posiadania metaindeksu: cień chroni
   // oryginalną zarejestrowaną zawartość danych, metaindeks rejestruje wartości null i przerwy w transmisji.
-  // Magazyny z cieniem danych dostają storageShadow (aktualizacje → cień indeksu .meta.shadow); pozostałe —
+  // Magazyny z cieniem danych dostają storageShadow (aktualizacje → cień indeksu .meta.shadow); pozostałe -
   // bazowy metaData.
   if (hasShadow) {
     return std::make_unique<rdb::storageShadow>(descriptor, metaIndexFile);

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Bramka wymiarowania przebiegu — czy budżet `-m` wystarcza, żeby każdy węzeł
+"""Bramka wymiarowania przebiegu - czy budżet `-m` wystarcza, żeby każdy węzeł
 doszedł do RECORDS rekordów.
 
 Poziom nie orzeka o silniku i nie należy do żadnej hipotezy. Pilnuje APARATURY:
 `execute.horizon_of()` i `execute.wakeup_budget()` wymiarują każdy przebieg
-end-to-end, a przebieg wymierzony za krótko daje artefakt bez rekordów — co
+end-to-end, a przebieg wymierzony za krótko daje artefakt bez rekordów - co
 skrypty czytają jako rozbieżność treści (`run_mapping_gate.py`) albo jako objaw
 niedomiaru pojemności (`check_agse_capacity.py`). Jedno i drugie jest wtedy
 granicą aparatury podaną jako wynik o silniku; dokładnie to zatrzymało poziom
@@ -12,14 +12,14 @@ bramki odwzorowania w K24f i dokładnie tego ten poziom ma nie dopuścić ponown
 
 Trzy poziomy, żaden nie powtarza wzoru, który sprawdza:
 
-1. **wystarczalność wobec silnika** — plany o znanej trudności wymiarowania
+1. **wystarczalność wobec silnika** - plany o znanej trudności wymiarowania
    uruchomione na policzonym budżecie; każdy węzeł niebędący źródłem musi mieć
    co najmniej RECORDS rekordów w artefakcie;
-2. **budżet slotów jako ograniczenie górne** — liczba RÓŻNYCH chwil tyknięcia
+2. **budżet slotów jako ograniczenie górne** - liczba RÓŻNYCH chwil tyknięcia
    w horyzoncie, wyliczona wprost przez wypisanie tych chwil, musi mieścić się
    w `wakeup_budget()`. Slot jest chwilą, w której tyka co najmniej jeden
    strumień, więc suma tyknięć wszystkich strumieni ma być bezpieczna;
-3. **moc detekcyjna** — wzór sprzed naprawy K24f (`(RECORDS+8)*spread+24`,
+3. **moc detekcyjna** - wzór sprzed naprawy K24f (`(RECORDS+8)*spread+24`,
    budżet liczony taktem najszybszego strumienia) musi być niewystarczający co
    najmniej na jednym z tych planów. Gdyby wystarczał na wszystkich, poziom 1
    przechodziłby niezależnie od naprawy i nie znaczyłby nic; taki wynik kończy
@@ -49,7 +49,7 @@ MAX_INSTANTS = 200_000          # zabezpieczenie poziomu 2 przed planem o skrajn
 
 
 def engine_cases():
-    """Plany o znanej trudności wymiarowania — po jednej trudności na plan."""
+    """Plany o znanej trudności wymiarowania - po jednej trudności na plan."""
     cases = []
 
     # Łańcuch `>N`: origin narasta wzdłuż planu (8, 13, 26, 34), więc najgłębszy
@@ -64,7 +64,7 @@ def engine_cases():
 
     # Plan wielotaktowy: przeplot 1 # 1/3 daje trzeci interwał, różny od obu
     # składowych. Liczba pobudek jest tu WIĘKSZA niż liczba taktów najszybszego
-    # strumienia — druga połowa naprawy K24f, niezależna od origin.
+    # strumienia - druga połowa naprawy K24f, niezależna od origin.
     b0 = P.make_source("s0", 1, 1)
     b1 = P.make_source("s1", Fraction(1, 3), 1)
     h = P.make_hash("n0", b0, b1)
@@ -82,7 +82,7 @@ def engine_cases():
 
 
 def sized(item):
-    """Plan przeskalowany do wykonania wraz z jego budżetem — jak w skryptach."""
+    """Plan przeskalowany do wykonania wraz z jego budżetem - jak w skryptach."""
     scaled = P.rescale(item, SCALE / P.fastest(item))
     results = M.evaluate(item, convention=M.C1)
     origins = {r.name: r.origin for r in results}
@@ -92,7 +92,7 @@ def sized(item):
 
 
 def legacy_budget(scaled):
-    """Wzór sprzed 2026-09-12 — wyłącznie do pomiaru mocy detekcyjnej."""
+    """Wzór sprzed 2026-09-12 - wyłącznie do pomiaru mocy detekcyjnej."""
     spread = P.slowest(scaled) / P.fastest(scaled)
     return int((RECORDS + 8) * spread) + 24
 
@@ -112,7 +112,7 @@ def record_counts(scaled, binary, workdir, loops):
 
 
 def level_sufficiency(binary, workroot):
-    """Poziom 1 — policzony budżet musi doprowadzić KAŻDY węzeł do RECORDS."""
+    """Poziom 1 - policzony budżet musi doprowadzić KAŻDY węzeł do RECORDS."""
     failures = []
     for number, (label, item) in enumerate(engine_cases()):
         scaled, horizon, loops = sized(item)
@@ -126,7 +126,7 @@ def level_sufficiency(binary, workroot):
 
 
 def level_slot_bound():
-    """Poziom 2 — `wakeup_budget` musi ograniczać liczbę RÓŻNYCH chwil z góry.
+    """Poziom 2 - `wakeup_budget` musi ograniczać liczbę RÓŻNYCH chwil z góry.
 
     Chwile są wypisywane, nie liczone wzorem: gdyby poziom liczył je tą samą
     sumą, sprawdzałby, że wzór równa się sobie.
@@ -150,12 +150,12 @@ def level_slot_bound():
             failures.append(f"{label}: chwil {len(instants)}, budżet {budget}")
     print(f"  planów sprawdzonych: {checked}, pominiętych (ponad {MAX_INSTANTS} chwil): {skipped}")
     if checked == 0:
-        failures.append("żaden plan nie wszedł do poziomu — ograniczenie nie zostało sprawdzone")
+        failures.append("żaden plan nie wszedł do poziomu - ograniczenie nie zostało sprawdzone")
     return failures
 
 
 def level_power(binary, workroot):
-    """Poziom 3 — stary wzór musi być na tych planach niewystarczający."""
+    """Poziom 3 - stary wzór musi być na tych planach niewystarczający."""
     witnesses = []
     for number, (label, item) in enumerate(engine_cases()):
         scaled, _, _ = sized(item)
@@ -172,26 +172,26 @@ def main(argv):
     binary = E.resolve_binary(argv[1] if len(argv) > 1 else None)
     workroot = ROOT / "work" / "sizing"
 
-    print("poziom 1 — wystarczalność budżetu wobec silnika")
+    print("poziom 1 - wystarczalność budżetu wobec silnika")
     try:
         failures = level_sufficiency(binary, workroot)
     except EngineError as exc:
-        print(f"BRAMKA WYMIAROWANIA: BŁĄD APARATURY — {exc}")
+        print(f"BRAMKA WYMIAROWANIA: BŁĄD APARATURY - {exc}")
         return 2
 
-    print("poziom 2 — budżet slotów jako ograniczenie górne")
+    print("poziom 2 - budżet slotów jako ograniczenie górne")
     failures += level_slot_bound()
 
-    print("poziom 3 — moc detekcyjna wobec wzoru sprzed K24f")
+    print("poziom 3 - moc detekcyjna wobec wzoru sprzed K24f")
     try:
         witnesses = level_power(binary, workroot)
     except EngineError as exc:
-        print(f"BRAMKA WYMIAROWANIA: BŁĄD APARATURY — {exc}")
+        print(f"BRAMKA WYMIAROWANIA: BŁĄD APARATURY - {exc}")
         return 2
     for witness in witnesses:
         print(f"  {witness}")
     if not witnesses:
-        print("BRAMKA WYMIAROWANIA: BŁĄD APARATURY — zerowa moc detekcyjna, "
+        print("BRAMKA WYMIAROWANIA: BŁĄD APARATURY - zerowa moc detekcyjna, "
               "dawne wymiarowanie wystarcza na każdym planie tego poziomu")
         return 2
 

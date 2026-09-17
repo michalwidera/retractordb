@@ -62,10 +62,10 @@ struct subtractCapacityCase {
 };
 
 // K24/H10 (2026-08-18): ogon spadl z 1 na 0 we wszystkich siedmiu przypadkach, bo
-// znikla galaz deklaracyjna w SubtractStartupLatency() — dokladala slot ZAWSZE, choc
+// znikla galaz deklaracyjna w SubtractStartupLatency() - dokladala slot ZAWSZE, choc
 // deklaracja ma ogon zerowy. Wartosci ogona pochodza z modelu zdarzeniowego kampanii
 // K24 (2669/2669 i 2670/2670 wezlow `-` o skladowej deklarowanej na obu ziarnach),
-// pojemnosci z eventCapacity() ponizej — czyli z niezaleznego przegladu okresu, ktory
+// pojemnosci z eventCapacity() ponizej - czyli z niezaleznego przegladu okresu, ktory
 // test i tak sprawdza osobnym EXPECT_EQ. Pojemnosc jest funkcja ogona, wiec zawyzony
 // ogon zawyzal tez wymagana historie.
 const std::vector<subtractCapacityCase> subtractCases{
@@ -205,7 +205,7 @@ TEST(capacities, add_declared_matches_event_table) {
 // Ujemny zakres DUMP siega historii strumienia, NA KTORYM wisi regula: `dumpManager`
 // czyta ja przez `getPayload(<strumien reguly>, k)`. Do 2026-09-05 kompilator podbijal
 // pojemnosc ZRODLA z klauzuli FROM, wiec glebokosc dostawal ktos inny niz ten, kto z niej
-// korzysta — a dla strumienia trzymanego w pamieci (MEMORY) znaczy to rekord, ktorego
+// korzysta - a dla strumienia trzymanego w pamieci (MEMORY) znaczy to rekord, ktorego
 // po prostu nie ma.
 TEST(capacities, rule_history_depth_lands_on_the_rule_owner) {
   constexpr int historyDepth = 7;

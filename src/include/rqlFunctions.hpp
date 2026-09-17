@@ -7,12 +7,12 @@
 #include <optional>
 #include <string_view>
 
-/// Jedna lista funkcji skalarnych RQL — wspolna dla kontroli w kompilatorze i dla
+/// Jedna lista funkcji skalarnych RQL - wspolna dla kontroli w kompilatorze i dla
 /// ewaluatora. Do 2026-08-30 listy byly dwie i rozjezdzaly sie w OBIE strony:
 ///
 /// - `RQL.g4` wymienial `Abs`, `Sign`, `Chr`, `Length`, `ToNumber`, `ToTimeStamp`,
 ///   `FloatCast`, `IntCast`, `Count`, `Crc`, `Sum`, `IsZero`, `IsNonZero`, ktorych
-///   ewaluator nie znal. Program kompilowal sie czysto, a `-c` przechodzilo — proces
+///   ewaluator nie znal. Program kompilowal sie czysto, a `-c` przechodzilo - proces
 ///   ginal dopiero w wykonaniu na `Unsupported function call`. `Abs`, `IsZero` i `IsNonZero`
 ///   zostaly wtedy zaimplementowane, `Length` doszedl 30.08.2026, reszta znikla;
 /// - `round`, `trunc`, `sin`, `cos`, `tan`, `log` i `log2` byly zaimplementowane
@@ -22,7 +22,7 @@
 /// byla czescia skladni: `Sqrt(x)` przechodzilo, `sqrt(x)` bylo bledem skladni, a dla
 /// `to_integer` i `isnull` bylo odwrotnie.
 ///
-/// `canonical` jest postacia zapisywana do tokena — NIE ta, ktora napisal autor
+/// `canonical` jest postacia zapisywana do tokena - NIE ta, ktora napisal autor
 /// zapytania. To jest istotne w dwoch miejscach naraz:
 ///
 /// - zrzuty planu pokazuja `CALL(Sqrt)` i tak wygladaja wzorce testow integracyjnych
@@ -51,7 +51,7 @@ struct RqlFunction {
 /// wywolania (jednoargumentowy i `to_string(expr : N)`), ale liczbe argumentow
 /// sprawdza compiler::checkFunctionCalls() z tej tabeli. Gdy pojawi sie funkcja
 /// dwuargumentowa nad wyrazeniami, zmienia sie tabela i jedna alternatywa w regule
-/// `function_call` — reszta potoku zostaje bez zmian.
+/// `function_call` - reszta potoku zostaje bez zmian.
 ///
 /// UWAGA na przyszly `min(a, b)`: `MIN`, `MAX`, `AVG` i `SUMC` sa tokenami leksera
 /// stojacymi PRZED `ID` (reduktory strumieniowe), wiec `min` nigdy nie zaleksuje sie
@@ -73,7 +73,7 @@ inline constexpr std::array<RqlFunction, 21> kRqlFunctions{{
     {.canonical = "null2zero", .minArgs = 1, .maxArgs = 1},  // NULL -> 0; wartosc nie-NULL przechodzi bez zmian
     {.canonical = "IsZero", .minArgs = 1, .maxArgs = 1},     //
     {.canonical = "IsNonZero", .minArgs = 1, .maxArgs = 1},  //
-    {.canonical = "Length", .minArgs = 1, .maxArgs = 1},     // WYLACZNIE nad napisem — argument liczbowy jest bledem wykonania
+    {.canonical = "Length", .minArgs = 1, .maxArgs = 1},     // WYLACZNIE nad napisem - argument liczbowy jest bledem wykonania
     {.canonical = "to_integer", .minArgs = 1, .maxArgs = 1, .alias = "int"},  //
     {.canonical = "to_float", .minArgs = 1, .maxArgs = 1, .alias = "float"},  // `FLOAT`/`Float` to token typu
     {.canonical = "to_double", .minArgs = 1, .maxArgs = 1, .alias = "real"},  //

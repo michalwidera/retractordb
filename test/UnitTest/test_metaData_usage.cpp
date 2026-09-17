@@ -74,7 +74,7 @@ TEST_F(UsageFixture, scenariusz_nagrywanie_rekordow) {
 }
 
 // ---------------------------------------------------------------------------
-// Scenariusz 2: Kompresja RLE — jeden segment dla wielu takich samych rekordów
+// Scenariusz 2: Kompresja RLE - jeden segment dla wielu takich samych rekordów
 //
 // Kiedy wiele kolejnych rekordów ma identyczny wzorzec null, klasa przechowuje
 // jeden wpis (segment) z licznikiem, zamiast N osobnych wpisów. Dzięki temu
@@ -91,7 +91,7 @@ TEST_F(UsageFixture, scenariusz_kompresja_rle) {
 
   EXPECT_EQ(meta.totalRecords(), 700U);
 
-  // Mimo 700 rekordów — tylko 2 segmenty RLE.
+  // Mimo 700 rekordów - tylko 2 segmenty RLE.
   auto segs = meta.segments();
   EXPECT_EQ(segs.size(), 2U);
 
@@ -103,13 +103,13 @@ TEST_F(UsageFixture, scenariusz_kompresja_rle) {
 }
 
 // ---------------------------------------------------------------------------
-// Scenariusz 3: Persystencja — odtworzenie stanu po restarcie procesu
+// Scenariusz 3: Persystencja - odtworzenie stanu po restarcie procesu
 //
 // Destruktor klasy automatycznie zapisuje buforowany segment do pliku.
 // Nowy obiekt otwierający ten sam plik odtwarza pełny indeks null.
 // ---------------------------------------------------------------------------
 TEST_F(UsageFixture, scenariusz_persystencja_po_restarcie) {
-  // Pierwsza sesja — program zapisuje dane i kończy pracę.
+  // Pierwsza sesja - program zapisuje dane i kończy pracę.
   {
     rdb::metaData meta(descriptor, file);
 
@@ -122,7 +122,7 @@ TEST_F(UsageFixture, scenariusz_persystencja_po_restarcie) {
     // Destruktor ~metaData() automatycznie zapisuje ostatni segment.
   }
 
-  // Druga sesja — program rusza od nowa, otwiera istniejący plik.
+  // Druga sesja - program rusza od nowa, otwiera istniejący plik.
   {
     rdb::metaData meta(descriptor, file);
 
@@ -136,7 +136,7 @@ TEST_F(UsageFixture, scenariusz_persystencja_po_restarcie) {
 }
 
 // ---------------------------------------------------------------------------
-// Scenariusz 4: Przerwa w transmisji — gap detection
+// Scenariusz 4: Przerwa w transmisji - gap detection
 //
 // Kiedy źródło danych przestaje dostarczać dane (np. utrata połączenia),
 // storage wywołuje onTransmissionGap(). Czytelnik strumienia może sprawdzić
@@ -154,7 +154,7 @@ TEST_F(UsageFixture, scenariusz_przerwa_w_transmisji) {
   meta.onTransmissionGap(5);
 
   // Odbiór wznowiony.
-  meta.onRecordAppended(allPresent);  // rekord 3 — pierwszy po przerwie
+  meta.onRecordAppended(allPresent);  // rekord 3 - pierwszy po przerwie
   meta.onRecordAppended(allPresent);  // rekord 4
 
   EXPECT_EQ(meta.totalRecords(), 5U);
@@ -163,7 +163,7 @@ TEST_F(UsageFixture, scenariusz_przerwa_w_transmisji) {
   EXPECT_FALSE(meta.isGapBefore(0));
   EXPECT_FALSE(meta.isGapBefore(2));
 
-  // Rekord 3 ma przerwę przed sobą — tu nastąpiła utrata danych.
+  // Rekord 3 ma przerwę przed sobą - tu nastąpiła utrata danych.
   EXPECT_TRUE(meta.isGapBefore(3));
 
   // Rekord 4 nie ma nowej przerwy.
@@ -178,7 +178,7 @@ TEST_F(UsageFixture, scenariusz_przerwa_w_transmisji) {
 }
 
 // ---------------------------------------------------------------------------
-// Scenariusz 5: Bezpieczeństwo przy awarii — flushCurrentEntry()
+// Scenariusz 5: Bezpieczeństwo przy awarii - flushCurrentEntry()
 //
 // storage wywołuje flushCurrentEntry() po każdym write(), żeby zapewnić,
 // że metadane przeżyją crash. Klasa używa mechanizmu overwrite-in-place
@@ -194,19 +194,19 @@ TEST_F(UsageFixture, scenariusz_flush_dla_bezpieczenstwa) {
   meta.flushCurrentEntry();  // rekord 0 bezpiecznie na dysku
 
   meta.onRecordAppended(allPresent);
-  meta.flushCurrentEntry();  // rekord 1 — nadpisuje wpis [allPresent,1] → [allPresent,2]
+  meta.flushCurrentEntry();  // rekord 1 - nadpisuje wpis [allPresent,1] → [allPresent,2]
 
   meta.onRecordAppended(allPresent);
-  meta.flushCurrentEntry();  // rekord 2 — nadpisuje → [allPresent,3]
+  meta.flushCurrentEntry();  // rekord 2 - nadpisuje → [allPresent,3]
 
   meta.onRecordAppended(valNull);
-  meta.flushCurrentEntry();  // rekord 3 — inny wzorzec, nowy wpis na dysku
+  meta.flushCurrentEntry();  // rekord 3 - inny wzorzec, nowy wpis na dysku
 
   EXPECT_EQ(meta.totalRecords(), 4U);
   EXPECT_EQ(meta.getNullBitset(0), allPresent);
   EXPECT_EQ(meta.getNullBitset(3), valNull);
 
-  // Mimo 3 takich samych rekordów — tylko 2 segmenty (kompresja działa).
+  // Mimo 3 takich samych rekordów - tylko 2 segmenty (kompresja działa).
   auto segs = meta.segments();
   EXPECT_EQ(segs.size(), 2U);
   EXPECT_EQ(segs[0].recordCount, 3U);
@@ -227,7 +227,7 @@ TEST_F(UsageFixture, scenariusz_modyfikacja_rekordu) {
   for (int i = 0; i < 5; ++i)
     meta.onRecordAppended(allNull);
 
-  // Okazuje się, że rekord 2 jednak miał dane — korekta po fakcie.
+  // Okazuje się, że rekord 2 jednak miał dane - korekta po fakcie.
   meta.onRecordModified(2, allPresent);
 
   EXPECT_EQ(meta.totalRecords(), 5U);
@@ -252,7 +252,7 @@ TEST_F(UsageFixture, scenariusz_modyfikacja_rekordu) {
 }
 
 // ---------------------------------------------------------------------------
-// Scenariusz 7: Reset — wyczyszczenie indeksu i ponowne użycie
+// Scenariusz 7: Reset - wyczyszczenie indeksu i ponowne użycie
 //
 // storage.purge() wywołuje reset() klasy, żeby przygotować strumień
 // do zapisu od nowa (np. przy rotacji pliku danych).
@@ -260,13 +260,13 @@ TEST_F(UsageFixture, scenariusz_modyfikacja_rekordu) {
 TEST_F(UsageFixture, scenariusz_reset_strumienia) {
   rdb::metaData meta(descriptor, file);
 
-  // Pierwsza seria — 10 rekordów.
+  // Pierwsza seria - 10 rekordów.
   for (int i = 0; i < 10; ++i)
     meta.onRecordAppended(allPresent);
   EXPECT_EQ(meta.totalRecords(), 10U);
   EXPECT_FALSE(meta.isEmpty());
 
-  // Rotacja — strumień zaczyna od nowa.
+  // Rotacja - strumień zaczyna od nowa.
   meta.reset();
 
   EXPECT_TRUE(meta.isEmpty());
@@ -286,7 +286,7 @@ TEST_F(UsageFixture, scenariusz_reset_strumienia) {
 // all-null trafiają do fizycznego magazynu (faza nullfill), a które są
 // pochłaniane do oczekującej przerwy (absorbAppend() == true). Pierwszy rekord
 // nie-null opróżnia przerwę jako wpis gap przed tym rekordem.
-// Uwaga: wynik false oznacza "zapisz rekord" — wtedy storage woła onRecordAppended().
+// Uwaga: wynik false oznacza "zapisz rekord" - wtedy storage woła onRecordAppended().
 // ---------------------------------------------------------------------------
 TEST_F(UsageFixture, scenariusz_maszyna_gap) {
   rdb::metaData meta(descriptor, file);
@@ -324,7 +324,7 @@ TEST_F(UsageFixture, scenariusz_maszyna_gap) {
 // Scenariusz 9: Bez abandonFile() destruktor odtwarza właśnie skasowany plik
 //
 // Dopóki w currentEntry_ czeka niezapisany wpis (recordCount > 0),
-// ~metaData() -> flushCurrentEntry() zapisze go na dysk — a appendEntry()
+// ~metaData() -> flushCurrentEntry() zapisze go na dysk - a appendEntry()
 // otwiera plik trybem ios::app, który TWORZY plik, jeśli nie istnieje.
 // To odtwarza plik nawet jeśli ktoś skasował go, póki obiekt jeszcze żyje
 // (dokładnie sytuacja storage::~storage() dla magazynu dysponowalnego,
@@ -338,7 +338,7 @@ TEST_F(UsageFixture, scenariusz_bez_abandonFile_odtwarza_usuniety_plik) {
     std::remove(file.c_str());  // np. storage kasuje plik dysponowalnego magazynu
     ASSERT_FALSE(std::filesystem::exists(file));
 
-    // Obiekt nie wie o usunięciu — nadal trzyma pending wpis i ścieżkę pliku.
+    // Obiekt nie wie o usunięciu - nadal trzyma pending wpis i ścieżkę pliku.
   }
   // ~metaData() odtworzył właśnie skasowany plik.
   EXPECT_TRUE(std::filesystem::exists(file));
@@ -349,7 +349,7 @@ TEST_F(UsageFixture, scenariusz_bez_abandonFile_odtwarza_usuniety_plik) {
 //
 // storage::~storage() woła metaData_->abandonFile() tuż PRZED skasowaniem
 // plików magazynu dysponowalnego. Odłączenie czyści metaFilePath_, więc
-// każda kolejna próba zapisu — łącznie z tą z destruktora — staje się
+// każda kolejna próba zapisu - łącznie z tą z destruktora - staje się
 // no-opem (ten sam wariant inertny, co dla źródeł deklarowanych).
 // ---------------------------------------------------------------------------
 TEST_F(UsageFixture, scenariusz_abandonFile_zapobiega_odtworzeniu) {
@@ -360,7 +360,7 @@ TEST_F(UsageFixture, scenariusz_abandonFile_zapobiega_odtworzeniu) {
     std::remove(file.c_str());
     ASSERT_FALSE(std::filesystem::exists(file));
 
-    meta.abandonFile();  // odłączenie PRZED usunięciem — jak w storage::~storage()
+    meta.abandonFile();  // odłączenie PRZED usunięciem - jak w storage::~storage()
   }
   // Destruktor nie mógł nic zapisać: metaFilePath_ jest puste.
   EXPECT_FALSE(std::filesystem::exists(file));

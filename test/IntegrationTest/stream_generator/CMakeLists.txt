@@ -2,7 +2,7 @@
 #
 # Generator strumieni (`SELECT cells[$] STREAM cell[4] FROM cells`)
 # koncem-do-konca: wynik rowny co do bitu recznie rozpisanym SELECT-om ORAZ
-# zgodny z definicja zrodla. Sciezka uruchomieniowa, nie sam kompilator — patrz
+# zgodny z definicja zrodla. Sciezka uruchomieniowa, nie sam kompilator - patrz
 # naglowek verify.sh.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)

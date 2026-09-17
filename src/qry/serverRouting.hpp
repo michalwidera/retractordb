@@ -11,12 +11,12 @@
 ///
 /// Funkcje są CZYSTE: pracują na gotowej migawce magistrali i nie dotykają IPC. Dzięki temu
 /// reguły routingu da się sprawdzić testem jednostkowym, bez startowania serwerów i bez
-/// pamięci dzielonej — a to jest właśnie ta część, w której łatwo o pomyłkę.
+/// pamięci dzielonej - a to jest właśnie ta część, w której łatwo o pomyłkę.
 ///
 /// Zasada nadrzędna: rozstrzygnięcie NIGDY nie odpytuje serwerów. Osierocony segment w
 /// /dev/shm jest nieodróżnialny od żywego aż do wyczerpania budżetu klienta (3 s), więc
 /// szukanie strumienia przez odpytywanie kosztowałoby N × 3 s dokładnie w najczęstszym
-/// przypadku — literówce w nazwie. Żywotność instancji rozstrzyga `/proc`, nie timeout.
+/// przypadku - literówce w nazwie. Żywotność instancji rozstrzyga `/proc`, nie timeout.
 namespace routing {
 
 enum class Status : std::uint8_t {
@@ -32,7 +32,7 @@ struct Resolution {
   std::string detail;      ///< gotowa treść komunikatu dla operatora
 };
 
-/// Nazwa instancji w komunikacie; instancja bez `--name` jako "(unnamed)" — jedno pole,
+/// Nazwa instancji w komunikacie; instancja bez `--name` jako "(unnamed)" - jedno pole,
 /// bez spacji, więc wyjście `--bus` zostaje kolumnowo rozbieralne.
 [[nodiscard]] std::string instanceLabel(std::string_view name);
 
@@ -42,7 +42,7 @@ struct Resolution {
 /// MIN/MAX/AVG/SUMC i agregator po kropce od nazw źródeł.
 ///
 /// Słowa kluczowe rozpoznaje dokładnie w dwóch pisowniach z `RQL.g4` (`'FROM'|'from'`), bo
-/// tylko te dwie są tam słowami kluczowymi — `Min` czy `From` to zwykłe nazwy strumieni.
+/// tylko te dwie są tam słowami kluczowymi - `Min` czy `From` to zwykłe nazwy strumieni.
 [[nodiscard]] std::vector<std::string> extractSourceStreams(std::string_view query);
 
 /// Właściciel strumienia. Magistrala pilnuje rozłączności nazw, więc właściciel jest co
@@ -50,7 +50,7 @@ struct Resolution {
 [[nodiscard]] Resolution forStream(const std::vector<bus::InstanceInfo> &instances, std::string_view stream);
 
 /// Właściciel zapytania ad-hoc: wszystkie rozpoznane nazwy strumieni muszą należeć do jednej
-/// instancji. Rozgłaszanie jest wykluczone — `getAdHoc` modyfikuje PLAN serwera, więc trafienie
+/// instancji. Rozgłaszanie jest wykluczone - `getAdHoc` modyfikuje PLAN serwera, więc trafienie
 /// w niewłaściwą instancję nie jest pomyłką do powtórzenia, tylko trwałym skutkiem ubocznym.
 [[nodiscard]] Resolution forAdHoc(const std::vector<bus::InstanceInfo> &instances, std::string_view query);
 

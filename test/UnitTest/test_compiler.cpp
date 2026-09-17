@@ -83,7 +83,7 @@ TEST(xparser, check_multiline_backslash) {
 
 TEST(xparser, rule_on_missing_stream_is_refused_not_ignored) {
   // Do 2026-09-05 petla szukajaca celu po prostu nic nie znajdowala i regula znikala bez sladu:
-  // w pliku planu byla to cicho martwa regula, w ad-hoc — odpowiedz "OK" na polecenie, ktore
+  // w pliku planu byla to cicho martwa regula, w ad-hoc - odpowiedz "OK" na polecenie, ktore
   // nie zrobilo nic.
   qTree instance;
   testing::internal::CaptureStderr();
@@ -127,7 +127,7 @@ TEST(xparser, duplicate_rule_name_on_one_stream_is_refused) {
 
 TEST(xparser, empty_dump_range_is_refused_by_the_parser) {
   // Rownosc granic nie opisuje zadnego zrzutu, a nizej czekal na nia FatalError w
-  // compiler::computeRequiredCapacities() — czyli w kanale ad-hoc smierc serwera.
+  // compiler::computeRequiredCapacities() - czyli w kanale ad-hoc smierc serwera.
   qTree instance;
   testing::internal::CaptureStderr();
   auto [result, keyword, streamName] = parserRQLString(instance, R"(
@@ -143,7 +143,7 @@ TEST(xparser, empty_dump_range_is_refused_by_the_parser) {
 TEST(xparser, dump_range_signs_are_read_from_the_neighbouring_child) {
   // Znak jest opcjonalnym dzieckiem reguly `dumppart`, wiec pozycje dzieci przesuwaja sie wraz
   // z jego obecnoscia. Odczyt ze stalej pozycji children[4] wychodzil dla zakresu BEZ znakow
-  // poza wektor — w Debug asercja biblioteki standardowej, w Release odczyt spoza zakresu.
+  // poza wektor - w Debug asercja biblioteki standardowej, w Release odczyt spoza zakresu.
   struct Case {
     std::string range;
     long int left;
@@ -165,7 +165,7 @@ TEST(xparser, dump_range_signs_are_read_from_the_neighbouring_child) {
 
 TEST(xcompiler, rule_condition_reaching_another_stream_is_refused) {
   // Warunek reguly ewaluator liczy na payloadzie WYJSCIOWYM celu i bierze z tokenu wylacznie
-  // indeks — nazwa schematu jest ignorowana. Odwolanie do cudzego strumienia czytaloby wiec
+  // indeks - nazwa schematu jest ignorowana. Odwolanie do cudzego strumienia czytaloby wiec
   // pod tym indeksem wlasny rekord: cicho i zawsze zle.
   qTree instance;
   auto [parseResult, keyword, streamName] = parserRQLString(instance, R"(
@@ -358,7 +358,7 @@ TEST(xcompiler, toggles_matched_hash_time_move_factorization) {
   compiler compilerInstance(instance);
   ASSERT_EQ(compilerInstance.compile(), "OK");
 
-  // Nazwa substratu przesuniecia niesie wielkosc przesuniecia — `A>2` daje
+  // Nazwa substratu przesuniecia niesie wielkosc przesuniecia - `A>2` daje
   // STREAM_TIMEMOVE_2_A. Patrz compiler::composeStreamName().
 #if RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES
   EXPECT_TRUE(instance.exists("STREAM_HASH_A_B"));
@@ -448,7 +448,7 @@ TEST(xcompiler, computes_startup_latency) {
   EXPECT_EQ(instance.getQuery("a").startupLatency, 0);
   // Przepisanie bez operatora nie wnosi opoznienia.
   EXPECT_EQ(instance.getQuery("mid").startupLatency, 0);
-  // tau_N to N slotow opoznienia, kumulowanych wzdluz lancucha — ale po przestemplowaniu
+  // tau_N to N slotow opoznienia, kumulowanych wzdluz lancucha - ale po przestemplowaniu
   // to opoznienie jest ORIGIN, nie ogonem: rekord n ma tresc rekordu n-N, wiec rekordy ponizej
   // N nie maja definicji. Ogon wynosi max(0, W_src - N): rekord n-N jest STARSZY od biezacego,
   // wiec producent o ogonie nie wiekszym od N nie kaze na niego czekac ani slotu.
@@ -469,18 +469,18 @@ TEST(xcompiler, computes_startup_latency) {
   EXPECT_EQ(instance.getQuery("added").startupLatency, 0);
   // AGSE po przestemplowaniu na koniec przedzialu: rekord n obejmuje pozycje
   // n-3 ... n, wiec czeka wylacznie na pole najnowsze (pozycja n), dostepne w
-  // jego wlasnym slocie — ogon 0. Czekanie na komplet okna przeszlo do origin:
+  // jego wlasnym slocie - ogon 0. Czekanie na komplet okna przeszlo do origin:
   // pierwsze pelne okno konczy sie na pozycji 3, czyli O = ceil(3/1) = 3.
   // Liczba i tresc emitowanych rekordow sie nie zmienia, zmienia sie ich indeks
-  // logiczny — i to on naprawia zlaczenie okna z wlasnym zrodlem.
+  // logiczny - i to on naprawia zlaczenie okna z wlasnym zrodlem.
   EXPECT_EQ(instance.getQuery("agse4").startupLatency, 0);
   EXPECT_EQ(instance.getQuery("agse4").logicalOrigin, 3);
-  // Znak dlugosci jest wylacznie konwencja kolejnosci pol — ogon i origin te same.
+  // Znak dlugosci jest wylacznie konwencja kolejnosci pol - ogon i origin te same.
   EXPECT_EQ(instance.getQuery("agse4_mirror").startupLatency, 0);
   EXPECT_EQ(instance.getQuery("agse4_mirror").logicalOrigin, 3);
   // Różnica nie ma własnego członu: ogon wynika z kresu fazy odczytu, a ten po podzieleniu
   // przez iloraz taktów daje zero zarówno dla producenta deklarowanego, jak i obliczanego.
-  // Do 2026-08-18 stały tu jedynki — dawna reguła dokładała slot deklaracji zawsze,
+  // Do 2026-08-18 stały tu jedynki - dawna reguła dokładała slot deklaracji zawsze,
   // a fazę 3/2 traktowała jako pełne oczekiwanie (K24: zgodność 19,1%).
   EXPECT_EQ(instance.getQuery("sub_declared").startupLatency, 0);
   EXPECT_EQ(instance.getQuery("sub_computed").startupLatency, 0);
@@ -508,7 +508,7 @@ TEST(xcompiler, computes_startup_latency) {
   // K24/H10 (2026-08-18): wynik spadl z 4 na 3, bo Wout tego wezla spadl z 1 na 0 wraz
   // z naprawa ogona `-`. Pojemnosc jest FUNKCJA ogona, wiec zawyzony ogon zawyzal tez
   // wymagana historie; formula sie nie zmienila. Kierunek jest bezpieczny, bo konsument
-  // czyta te same rekordy, tylko zaczyna o slot wczesniej — potwierdza to model
+  // czyta te same rekordy, tylko zaczyna o slot wczesniej - potwierdza to model
   // pojemnosci kampanii (bramka badawcza, `ninja test_gate`).
   EXPECT_EQ(instance.maxCapacity.at("subsrc"), 3);
 }
@@ -519,7 +519,7 @@ TEST(xcompiler, computes_startup_latency) {
 // (rdb-experiment/investigation_K24H10/PHASE2.md §4), nie z postaci zamkniętej silnika.
 // Cztery pierwsze przypadki zmieniają wynik wobec reguł sprzed 2026-08-18, piąty jest
 // bramką regresyjną: tam slot jest prawdziwy i ma zostać. Trybem porażki tego testu jest
-// powrót zawyżenia — zaniżenie łapie osobna bramka `EXPECT_GE` w ut_h10aGate.
+// powrót zawyżenia - zaniżenie łapie osobna bramka `EXPECT_GE` w ut_h10aGate.
 TEST(xcompiler, exact_tail_for_subtract_and_dehash) {
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
@@ -542,7 +542,7 @@ TEST(xcompiler, exact_tail_for_subtract_and_dehash) {
   EXPECT_EQ(instance.getQuery("sub_decl").startupLatency, 0);
   // `Θ` przy ilorazie całkowitym: własny ogon zerowy (dawniej 1).
   EXPECT_EQ(instance.getQuery("theta_int").startupLatency, 0);
-  // `Θ` przy ilorazie ułamkowym: slot jest prawdziwy — bramka regresyjna.
+  // `Θ` przy ilorazie ułamkowym: slot jest prawdziwy - bramka regresyjna.
   EXPECT_EQ(instance.getQuery("theta_frac").startupLatency, 1);
   // `-` nad składową obliczaną o ogonie 1: ogon nie dziedziczy się w skali 1:1 (dawniej 1).
   EXPECT_EQ(instance.getQuery("sub_over").startupLatency, 0);
@@ -554,7 +554,7 @@ TEST(xcompiler, exact_tail_for_subtract_and_dehash) {
 // Pojemnosc bufora zrodla okna to odleglosc do najstarszego pola okna PLUS jeden:
 // w buforze musza sie zmiescic oba konce zakresu. Regresja (plaski wykres detekcji
 // QRS w examples/ecg): dla zrodla o szerokosci 1 odleglosc wypada calkowita, wiec
-// zaokraglenie w gore dawalo o jeden rekord za malo — kolowy bufor MEMORY
+// zaokraglenie w gore dawalo o jeden rekord za malo - kolowy bufor MEMORY
 // nadpisywal najstarsze pole okna rekordem najnowszym.
 TEST(xcompiler, agse_capacity_covers_whole_window_over_computed_source) {
   qTree instance;
@@ -570,7 +570,7 @@ TEST(xcompiler, agse_capacity_covers_whole_window_over_computed_source) {
   ASSERT_EQ(compilerInstance.compile(), "OK");
 
   // Okno 3-polowe nad deklaracja o szerokosci 1: rekord n czyta pozycje n-2..n,
-  // wiec czeka tylko na pozycje n — ogon 0, a niedefiniowalny poczatek to origin
+  // wiec czeka tylko na pozycje n - ogon 0, a niedefiniowalny poczatek to origin
   // ceil(2/1) = 2. Przepisanie (mid) propaguje jedno i drugie.
   EXPECT_EQ(instance.getQuery("win1").startupLatency, 0);
   EXPECT_EQ(instance.getQuery("win1").logicalOrigin, 2);
@@ -581,21 +581,21 @@ TEST(xcompiler, agse_capacity_covers_whole_window_over_computed_source) {
   EXPECT_EQ(instance.getQuery("win2").startupLatency, 0);
   EXPECT_EQ(instance.getQuery("win2").logicalOrigin, 4);
   // win2 czyta rekordy mid o indeksach n-2..n. W chwili emisji rekordu n=4 mid ma
-  // wydane rekordy do indeksu 4, a najstarszy potrzebny to 2 — dystans 2, plus jeden
+  // wydane rekordy do indeksu 4, a najstarszy potrzebny to 2 - dystans 2, plus jeden
   // rekord na drugi koniec zakresu.
   EXPECT_EQ(instance.maxCapacity.at("mid"), 3);
 }
 
 // Tozsamosc R1 jest ROWNOSCIA WYNIKOW i NIEROWNOSCIA OPOZNIEN (`thm:shift-match`).
 // Obie postaci zgadzaja sie co do interwalu, poczatku logicznego i ciagu rekordow,
-// a strona prawa ma ogon NIE WIEKSZY od lewej — dla niektorych taktow scisle
+// a strona prawa ma ogon NIE WIEKSZY od lewej - dla niektorych taktow scisle
 // mniejszy. `def:observable` zada `Val(P) = Val(Q)` dokladnie, ale tylko
 // `Lat(Q) <= Lat(P)`: przepisaniu wolno skrocic oczekiwanie, nigdy wydluzyc.
 //
 // Zadanie ROWNOSCI ogonow byloby wiec ostrzejsze niz relacja obserwowalnosci i
 // odrzucaloby przepisanie, ktore teoria dopuszcza. Dokladnie tak oblala bramka
 // `public_identity` kampanii K23 (znalezisko A, decyzja D1 z 2026-08-09,
-// `research_plan.md` §14.20) — i dlatego test sprawdza nierownosc, nie rownosc.
+// `research_plan.md` §14.20) - i dlatego test sprawdza nierownosc, nie rownosc.
 //
 // Przy R1 ON obie strony i tak schodza sie do jednego ksztaltu; niezmiennik jest
 // nietrywialny dopiero przy R1 OFF, gdzie lewa ma ogon 2, a prawa 0.
@@ -614,7 +614,7 @@ TEST(xcompiler, shift_matching_identity_does_not_lengthen_startup_latency) {
   compiler compilerInstance(instance);
   ASSERT_EQ(compilerInstance.compile(), "OK");
 
-  // Czesc wartosciowa: poczatek logiczny musi byc IDENTYCZNY po obu stronach — to on
+  // Czesc wartosciowa: poczatek logiczny musi byc IDENTYCZNY po obu stronach - to on
   // niesie tozsamosc, w kazdej konfiguracji przelacznikow.
   EXPECT_EQ(instance.getQuery("lhs").logicalOrigin, instance.getQuery("rhs").logicalOrigin);
   // Czesc opoznieniowa: strona prawa (sfaktoryzowana) nie moze czekac DLUZEJ niz lewa.
@@ -623,7 +623,7 @@ TEST(xcompiler, shift_matching_identity_does_not_lengthen_startup_latency) {
   EXPECT_LE(instance.getQuery("rhs").startupLatency, instance.getQuery("lhs").startupLatency);
   // Ogon przeplotu to 2, ale tau_3 nad nim NIE dokłada nic i wręcz go pochłania:
   // W = max(0, 2 - 3) = 0. Rekord 3 niesie rekord 0 przeplotu, dostepny w chwili 3*Delta,
-  // a slot 3 konczy sie w 4*Delta — czekac nie ma na co. Do 2026-08-07 stalo tu 2, bo
+  // a slot 3 konczy sie w 4*Delta - czekac nie ma na co. Do 2026-08-07 stalo tu 2, bo
   // adresowanie wzgledne w fetchBack wymuszalo W = W_src (K24p §2.2).
   EXPECT_EQ(instance.getQuery("rhs").startupLatency, 0);
   EXPECT_EQ(instance.getQuery("rhs").logicalOrigin, 3);  // przesuniecie 2+1 slotow wyjscia
@@ -633,7 +633,7 @@ TEST(xcompiler, shift_matching_identity_does_not_lengthen_startup_latency) {
 //
 // Scenariusz najbardziej narazony: deduplikacja scala substrat STREAM_ADD_s1_s2 z uzytkownikowym
 // `mysum`, mimo ze ich schematy roznia sie NAZWAMI pol (predykat scalania porownuje tylko typ,
-// dlugosc i krotnosc — i ma do tego prawo, bo scala wezly wewnetrzne). Po scaleniu `out` czyta
+// dlugosc i krotnosc - i ma do tego prawo, bo scala wezly wewnetrzne). Po scaleniu `out` czyta
 // z `mysum`, ale jego wlasny deskryptor musi pozostac nietkniety.
 //
 // Kontrola niepustosci sprawdzana mutacyjnie: wstrzykniecie zmiany nazwy pola w
@@ -662,7 +662,7 @@ TEST(xcompiler, rewrites_preserve_observable_field_names) {
   EXPECT_EQ(fieldNames("out"), (std::vector<std::string>{"out_0"}));
 
 #if RDB_OPT_DEDUP_SUBSTRATES
-  // Scalenie faktycznie zaszlo — inaczej test nie sprawdzalby niczego o przepisaniu.
+  // Scalenie faktycznie zaszlo - inaczej test nie sprawdzalby niczego o przepisaniu.
   ASSERT_EQ(instance.getQuery("out").lProgram.front().getStr_(), "mysum");
   EXPECT_EQ(std::ranges::count_if(instance, [](const query &q) { return q.id.starts_with("STREAM_ADD_"); }), 0);
 #endif
@@ -671,13 +671,13 @@ TEST(xcompiler, rewrites_preserve_observable_field_names) {
 // Rozwiazywanie interwalow nie moze zalezec od kolejnosci planu.
 //
 // resolveStreamIntervals() liczy interwaly iteracyjnie; nierozwiazane zrodlo daje delte 0.
-// Dwie sciezki przyjmowaly to zero bez zadania kolejnego przebiegu — program jednoelementowy
-// (SELECT expr STREAM x FROM y) oraz STREAM_AGSE — wiec strumien dostawal interwal 0 na stale.
+// Dwie sciezki przyjmowaly to zero bez zadania kolejnego przebiegu - program jednoelementowy
+// (SELECT expr STREAM x FROM y) oraz STREAM_AGSE - wiec strumien dostawal interwal 0 na stale.
 // Zaleznie od kolejnosci po coreInstance.sort() konczylo sie to albo zerowym mianownikiem,
 // albo falszywym "Circular dependency": warunek konca (unresolvedCount >= prevUnresolved)
 // wymagal SCISLEGO spadku licznika w kazdym przebiegu, czyli byl heurystyka postepu.
 //
-// Ten sam plan z 3 lancuchami kompilowal sie poprawnie, z 4, 5, 6, 8 i 12 — nie; z 7, 9, 10,
+// Ten sam plan z 3 lancuchami kompilowal sie poprawnie, z 4, 5, 6, 8 i 12 - nie; z 7, 9, 10,
 // 16, 20 i 32 znowu tak. Niemonotonicznosc w liczbie zapytan jest wlasnie objawem zaleznosci
 // od kolejnosci, a nie od poprawnosci planu.
 TEST(xcompiler, resolves_intervals_independently_of_plan_order) {
@@ -704,7 +704,7 @@ TEST(xcompiler, resolves_intervals_independently_of_plan_order) {
     EXPECT_EQ(compilerInstance.compile(), "OK") << "lancuchow: " << chains;
 
     // Zerowy interwal jest drugim objawem tej samej wady: strumien nigdy nie zostal
-    // rozwiazany, a mimo to przepuszczono go dalej — konczylo sie zerowym mianownikiem.
+    // rozwiazany, a mimo to przepuszczono go dalej - konczylo sie zerowym mianownikiem.
     for (const auto &q : instance)
       if (!q.isCompilerDirective()) EXPECT_NE(q.rInterval, 0) << "nierozwiazany interwal: " << q.id << ", lancuchow: " << chains;
   }
@@ -724,7 +724,7 @@ TEST(xcompiler, still_reports_true_circular_dependency) {
   EXPECT_EQ(compilerInstance.compile(), "Circular dependency in stream definitions");
 }
 
-// Petla wlasna nad GOLYM odwolaniem — jedyny ksztalt samoodwolania, ktory NIE dochodzil do
+// Petla wlasna nad GOLYM odwolaniem - jedyny ksztalt samoodwolania, ktory NIE dochodzil do
 // detektora cykli. compiler::expandSchemaWildcards() stoi przed resolveStreamIntervals(),
 // a przy `FROM x` w strumieniu `x` iterowala po tej samej liscie `lSchema`, do ktorej
 // dopisywala: `xretractor -c` nie wracalo w 120 s i roslo w pamieci do wyczerpania
@@ -787,7 +787,7 @@ TEST(xcompiler, deep_dehash_chain_does_not_overflow_interval) {
 }
 
 // Interwal, ktorego nie da sie zapisac w typie interwalu, musi dawac komunikat
-// o zakresie — a nie cichy smiec ani komunikat o innej wadzie planu.
+// o zakresie - a nie cichy smiec ani komunikat o innej wadzie planu.
 TEST(xcompiler, unrepresentable_interval_reports_range_error) {
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
@@ -815,7 +815,7 @@ TEST(xcompiler, unrepresentable_interval_reports_range_error) {
 // compiler::computeLogicalOrigin() i compiler::computeStartupLatency() konczyly sie
 // petla, ktora dla wezla nieobecnego w mapie wynikow robila SPDLOG_WARN i przechodzila
 // dalej. query::logicalOrigin i query::startupLatency maja wartosc domyslna 0, wiec taki
-// wezel dostawal ZERO — rezim ZANIZAJACY, ten sam, ktory tabela dokladnosci ogona
+// wezel dostawal ZERO - rezim ZANIZAJACY, ten sam, ktory tabela dokladnosci ogona
 // wyklucza dla wszystkich dziewieciu klas. Ostrzezenie szlo do logu, ktorego ctest nie
 // czyta.
 //
@@ -824,7 +824,7 @@ TEST(xcompiler, unrepresentable_interval_reports_range_error) {
 // (kazdy inny ksztalt zatrzymuje wczesniej resolveStreamIntervals), a deklaracje
 // i dyrektywy sa zaszczepiane zerem przed petla. Przeglad 233 ksztaltow planu nad
 // wszystkimi dziewiecioma klasami nie znalazl ani jednego przypadku nierozwiazanego.
-// Dlatego bramka wola requireResolvedForEveryNode() wprost, z mapa podana recznie —
+// Dlatego bramka wola requireResolvedForEveryNode() wprost, z mapa podana recznie -
 // inaczej test broniacy tej reguly nie mialby jak jej naruszyc.
 
 TEST(xcompiler, unresolved_node_is_a_compilation_error) {
@@ -832,7 +832,7 @@ TEST(xcompiler, unresolved_node_is_a_compilation_error) {
   plan.push_back(query(boost::rational<int>(1), "src"));
   plan.push_back(query(boost::rational<int>(1), "consumer"));
 
-  // Mapa pokrywa producenta, ale nie konsumenta — dokladnie stan, w ktorym stara
+  // Mapa pokrywa producenta, ale nie konsumenta - dokladnie stan, w ktorym stara
   // wersja przepisywala konsumentowi ciche zero.
   const std::map<std::string, int> partial{{"src", 0}};
 
@@ -881,7 +881,7 @@ TEST(xcompiler, every_node_of_a_nine_class_plan_is_resolved) {
   compiler compilerInstance(instance);
   ASSERT_EQ(compilerInstance.compile(), "OK");
 
-  // Plan po kompilacji zawiera takze wezly wygenerowane (STREAM_*) — one rowniez
+  // Plan po kompilacji zawiera takze wezly wygenerowane (STREAM_*) - one rowniez
   // przechodza przez ta sama bramke, wiec korpus jest szerszy niz lista SELECT-ow.
   ASSERT_GE(instance.size(), 11u);
   for (const auto &q : instance) {
@@ -892,7 +892,7 @@ TEST(xcompiler, every_node_of_a_nine_class_plan_is_resolved) {
 
 // --- F9/S3: odwolanie do skladnika przeplotu jest bledem kompilacji ------------------
 //
-// `A[0]` na liscie pol NIE znaczy „biezaca wartosc strumienia A" — znaczy pozycje
+// `A[0]` na liscie pol NIE znaczy „biezaca wartosc strumienia A" - znaczy pozycje
 // w schemacie strumienia z FROM, liczona od miejsca wejscia A do zlaczenia (aliasowanie).
 // Przeplot wymaga IDENTYCZNYCH schematow obu argumentow i wydaje jeden strumien o tym
 // samym schemacie, wiec pozycja k skladnika lewego i pozycja k skladnika prawego to
@@ -901,11 +901,11 @@ TEST(xcompiler, every_node_of_a_nine_class_plan_is_resolved) {
 // Skutkiem bylo, ze `A[0]-B[0]` nad `A#B` kompilowalo sie po cichu do `roznica[0]-roznica[0]`,
 // czyli tozsamosciowego zera, mimo ze A i B to rozne strumienie. Dwa syntaktycznie rozne
 // odwolania dawaly tozsamy wynik i kompilator nie mowil o tym ani slowa. Odzyskanie
-// skladnika ma w algebrze wlasny operator — rozplot & / % — a siegania po skladnik nazwa
+// skladnika ma w algebrze wlasny operator - rozplot & / % - a siegania po skladnik nazwa
 // przez wezel # algebra nie przewiduje wcale.
 //
 // Rozstrzygniecie F9 (D-F1 = S3, 2026-08-09): takie odwolanie jest bledem kompilacji,
-// nie wynikiem. Nie zmienia sie wartosc — odmawia sie planu.
+// nie wynikiem. Nie zmienia sie wartosc - odmawia sie planu.
 
 TEST(xcompiler, interleave_constituent_reference_is_a_compilation_error) {
   qTree instance;
@@ -943,7 +943,7 @@ TEST(xcompiler, interleave_constituent_reference_is_rejected_through_substrates)
   EXPECT_NE(compilerInstance.compile(), "OK") << "ksztalt F9-X skompilowal sie po cichu";
 }
 
-// KONTROLA NEGATYWNA — bramka, ktora odrzuca takze plany poprawne, jest bezwartosciowa.
+// KONTROLA NEGATYWNA - bramka, ktora odrzuca takze plany poprawne, jest bezwartosciowa.
 // Suma sklada schematy przez konkatenacje, wiec `a[0]` i `b[0]` maja ROZNE offsety
 // i pozostaja rozroznialne. To jest udokumentowane aliasowanie (Pattern7) i musi dzialac.
 TEST(xcompiler, sum_keeps_constituent_identity) {
@@ -970,7 +970,7 @@ TEST(xcompiler, sum_keeps_constituent_identity) {
   EXPECT_NE(offsets[0], offsets[1]) << "suma zgubila tozsamosc skladnikow";
 }
 
-// KONTROLA NEGATYWNA — nad przeplotem legalne pozostaje odwolanie nazwa strumienia
+// KONTROLA NEGATYWNA - nad przeplotem legalne pozostaje odwolanie nazwa strumienia
 // WYNIKOWEGO. Ono nie jest dwuznaczne: wskazuje pozycje w jedynym schemacie, jaki po #
 // istnieje. Gdyby bramka odrzucala i to, odcielaby przeplot od listy pol w ogole.
 TEST(xcompiler, interleave_allows_reference_by_output_stream_name) {
@@ -988,7 +988,7 @@ TEST(xcompiler, interleave_allows_reference_by_output_stream_name) {
 }
 
 // Ta sama utrata tozsamosci zapisana gola nazwa pola. `v` jest polem A, `w` polem B,
-// wiec autor jawnie wskazal DWA rozne strumienie — a nad `A#B` oba odwolania trafialy
+// wiec autor jawnie wskazal DWA rozne strumienie - a nad `A#B` oba odwolania trafialy
 // na pozycje 0 tego samego schematu i roznica byla tozsamosciowym zerem. Bramka, ktora
 // lapie `A[0]-B[0]`, ale przepuszcza `v-w`, nie zamyka defektu.
 TEST(xcompiler, interleave_constituent_reference_is_rejected_for_bare_field_names) {
@@ -1117,7 +1117,7 @@ TEST(xcompiler, index_wildcard_expands_in_place_beside_other_select_items) {
   compiler compilerInstance(instance);
   ASSERT_EQ(compilerInstance.compile(), "OK");
 
-  // Rozwiniecie dwoch pol `a` plus jedno pole `b` — i w tej kolejnosci, w jakiej stoja w SELECT.
+  // Rozwiniecie dwoch pol `a` plus jedno pole `b` - i w tej kolejnosci, w jakiej stoja w SELECT.
   EXPECT_EQ(slotsOf(instance.getQuery("przed")), (std::vector<int>{0, 1, 2}));
   EXPECT_EQ(slotsOf(instance.getQuery("po")), (std::vector<int>{2, 0, 1}));
 
@@ -1126,8 +1126,8 @@ TEST(xcompiler, index_wildcard_expands_in_place_beside_other_select_items) {
   EXPECT_EQ(namesOf(instance.getQuery("po")), (std::vector<std::string>{"po_0", "po_1", "po_2"}));
 }
 
-// Straz przy deskryptorze: dla listy JEDNOPOZYCYJNEJ — jedynego ksztaltu, ktory ten przebieg
-// obslugiwal do 2026-08-31 — nazwy pol musza wyjsc dokladnie takie jak dawniej, inaczej
+// Straz przy deskryptorze: dla listy JEDNOPOZYCYJNEJ - jedynego ksztaltu, ktory ten przebieg
+// obslugiwal do 2026-08-31 - nazwy pol musza wyjsc dokladnie takie jak dawniej, inaczej
 // przenumerowanie zmienialoby `.desc` istniejacych planow.
 TEST(xcompiler, sole_index_wildcard_keeps_its_historical_field_names) {
   qTree instance;
@@ -1195,17 +1195,17 @@ TEST(xcompiler, rule_rejects_interleave_constituent_reference) {
 // extractIntermediateStreams() wydziela operatory z klauzuli FROM do substratow. Liczbe
 // poprzedzajacych tokenow, ktore operator konsumuje, ustalala CZARNA LISTA: wszystko poza
 // `>N` i `-` uznawano za dwuargumentowe. `@` niesie jednak swoje parametry (krok, szerokosc)
-// W SAMYM TOKENIE, wiec konsumuje JEDEN token — tak samo jak `>N`.
+// W SAMYM TOKENIE, wiec konsumuje JEDEN token - tak samo jak `>N`.
 //
 // Dla `(A@(1,4))>1` program ma trzy tokeny [PUSH_STREAM, STREAM_AGSE, STREAM_TIMEMOVE].
 // Po wydzieleniu `@` i zdjeciu jego jedynego argumentu lista ma juz tylko [STREAM_TIMEMOVE],
 // a kod siegal po drugi argument: dereferencjonowal WARTOWNIKA listy i go kasowal. Skutkiem
-// bylo uszkodzenie sterty — `SIGSEGV` albo `free(): invalid size`, zaleznie od parametrow —
+// bylo uszkodzenie sterty - `SIGSEGV` albo `free(): invalid size`, zaleznie od parametrow -
 // ujawniane dopiero w qTree::topologicalSort() jako odczyt zwolnionej pamieci.
 //
 // Defekt jest WCZESNIEJSZY niz naprawa F9: odtworzony na `ebd8aab` (abort) i `530c80e`
 // (SIGSEGV). Zaden test ani plan integracyjny nie zestawial `@` z `>N` w jednej klauzuli
-// FROM, wiec `ctest` 186/186 tego nie lapal — to byla luka pokrycia, nie tylko defekt.
+// FROM, wiec `ctest` 186/186 tego nie lapal - to byla luka pokrycia, nie tylko defekt.
 //
 // TRYBEM PORAZKI TEGO TESTU JEST SMIERC PROCESU, nie asercja: przed naprawa binarka testu
 // przerywa sie w tym miejscu.
@@ -1224,7 +1224,7 @@ TEST(xcompiler, shift_over_agse_in_one_from_clause_does_not_corrupt_heap) {
   EXPECT_TRUE(instance.exists("m"));
 }
 
-// KONTROLA POZYTYWNA — sam brak wywrotki nie wystarczy. Postac jednoklauzulowa musi dac
+// KONTROLA POZYTYWNA - sam brak wywrotki nie wystarczy. Postac jednoklauzulowa musi dac
 // DOKLADNIE ten sam brzeg co rownowazna postac dwuetapowa, ktora dzialala takze przed
 // naprawa. Bez tej kontroli przechodzilaby rowniez „naprawa”, ktora tylko przestaje
 // kasowac wartownika, ale gubi argument albo przesuwa origin.
@@ -1284,7 +1284,7 @@ TEST(xcompiler, malformed_intermediate_operator_is_rejected_before_iterator_unde
 
 namespace {
 
-/// Program klauzuli FROM jako tekst — do porownan ksztaltu planu.
+/// Program klauzuli FROM jako tekst - do porownan ksztaltu planu.
 std::string fromProgram(query &q) {
   std::ostringstream out;
   for (auto &t : q.lProgram)
@@ -1305,7 +1305,7 @@ qTree compilePlan(const std::string &rql) {
 }  // namespace
 
 // Rdzen zgloszenia. Jedno zapytanie `FROM SUMC(sq@(125,1000))` ma dac DOKLADNIE ten plan,
-// co para zapytan z nazwanym oknem — az do brzegu (origin, ogon) i deskryptora wyjscia.
+// co para zapytan z nazwanym oknem - az do brzegu (origin, ogon) i deskryptora wyjscia.
 // Rozna jest tylko nazwa wezla okna: uzytkownik nadal moze ja nadac sam, ale nie musi.
 TEST(xcompiler, stream_function_matches_the_two_step_form) {
   auto oneClause = compilePlan(R"(
@@ -1331,14 +1331,14 @@ TEST(xcompiler, stream_function_matches_the_two_step_form) {
   EXPECT_EQ(oneResult.descriptorFrom(oneClause), twoResult.descriptorFrom(twoStep));
 
   // Wezel okna powstaje jako substrat kompilatora, a nie znika: rachunek brzegu
-  // ma na czym stanac. Nazwa niesie parametry okna — patrz composeStreamName().
+  // ma na czym stanac. Nazwa niesie parametry okna - patrz composeStreamName().
   ASSERT_TRUE(oneClause.exists("STREAM_AGSE_125_1000_sq"));
   auto &window = oneClause.getQuery("STREAM_AGSE_125_1000_sq");
   EXPECT_TRUE(window.isSubstrat);
   EXPECT_EQ(fromProgram(window), "PUSH_STREAM(sq);STREAM_AGSE(125,1000);");
   EXPECT_EQ(fromProgram(oneResult), "PUSH_STREAM(STREAM_AGSE_125_1000_sq);STREAM_SUM(0);");
 
-  // Brzeg wezla okna tez musi sie zgadzac, nie tylko brzeg wyniku — inaczej rownosc
+  // Brzeg wezla okna tez musi sie zgadzac, nie tylko brzeg wyniku - inaczej rownosc
   // na `s` mogla by wyjsc z dwoch bledow znoszacych sie nawzajem.
   auto &namedWindow = twoStep.getQuery("w");
   EXPECT_EQ(window.rInterval, namedWindow.rInterval);
@@ -1361,7 +1361,7 @@ TEST(xcompiler, stream_functions_compose_with_other_from_operators) {
         SELECT * STREAM u FROM SUMC(a+b)
       )");
 
-  // Kazdy wezel planu ma po wydzieleniu DOKLADNIE jeden operator — tego wymaga
+  // Kazdy wezel planu ma po wydzieleniu DOKLADNIE jeden operator - tego wymaga
   // wykonanie (GetArgs odrzuca program dluzszy niz trzy tokeny).
   for (auto &q : plan)
     if (!q.isDeclaration() && !q.isCompilerDirective()) EXPECT_LE(q.lProgram.size(), 3u) << "wezel " << q.id;
@@ -1428,7 +1428,7 @@ TEST(xcompiler, distinct_windows_over_one_source_get_distinct_substrates) {
   EXPECT_NE(plan.getQuery("m1").rInterval, plan.getQuery("m2").rInterval);
 }
 
-// Identyczne wezly nadal maja sie scalac — parametr w nazwie nie moze wylaczyc
+// Identyczne wezly nadal maja sie scalac - parametr w nazwie nie moze wylaczyc
 // deduplikacji, bo wtedy naprawa kolizji kosztowalaby powielenie planu.
 TEST(xcompiler, identical_windows_over_one_source_still_share_one_substrate) {
   auto plan = compilePlan(R"(
@@ -1443,7 +1443,7 @@ TEST(xcompiler, identical_windows_over_one_source_still_share_one_substrate) {
 }
 
 // Nazwa substratu jest zarazem nazwa artefaktu na dysku, wiec musi byc identyfikatorem.
-// `-` liczby ujemnej idzie na "N", a `/` liczby wymiernej na "_" — do 2026-08-29 nazwa
+// `-` liczby ujemnej idzie na "N", a `/` liczby wymiernej na "_" - do 2026-08-29 nazwa
 // substratu `&` niosla kreske ulamkowa, czyli separator sciezki, wprost z token::getStr_().
 TEST(xcompiler, substrate_names_stay_identifiers) {
   auto plan = compilePlan(R"(
@@ -1463,7 +1463,7 @@ TEST(xcompiler, substrate_names_stay_identifiers) {
   EXPECT_TRUE(plan.exists("STREAM_SUBTRACT_1_4_a"));
   EXPECT_TRUE(plan.exists("STREAM_AGSE_1_N10_a"));
   // `&` niesie swoj parametr jako OPERAND, nie w tokenie operatora, wiec liczba wymierna
-  // stoi na koncu nazwy — po nazwie strumienia, a nie po nazwie operatora.
+  // stoi na koncu nazwy - po nazwie strumienia, a nie po nazwie operatora.
   EXPECT_TRUE(plan.exists("STREAM_DEHASH_DIV_STREAM_HASH_a_b_2_1"));
 }
 
@@ -1474,7 +1474,7 @@ namespace {
 /// Do 2026-09-05 blad skladni konczyl proces przez exit(EPERM), wiec te testy pisalo sie
 /// przez EXPECT_EXIT, a tresc komunikatu ogladalo sie w wydruku umierajacego procesu.
 /// Parser wraca teraz Z TRESCIA bledu w statusie, a ten sam komunikat idzie dodatkowo na
-/// stderr — badamy obie drogi, bo sa niezalezne: status jest jedynym kanalem docierajacym
+/// stderr - badamy obie drogi, bo sa niezalezne: status jest jedynym kanalem docierajacym
 /// do KLIENTA (xqry -a, xqry --reset), stderr jedynym sladem po stronie serwera.
 /// Asercje na status sprawdzaja fragment tresci, nie rownosc: tekst pochodzi z ANTLR-a
 /// i moze sie zmienic przy przebudowie gramatyki, a pilnowana wlasnosc to "przyczyna
@@ -1489,7 +1489,7 @@ std::pair<std::string, std::string> parseCapturingStderr(const std::string &rql)
 }  // namespace
 
 // MIN/MAX/AVG/SUMC sa tokenami leksera stojacymi PRZED ID, wiec zaden strumien nie moze
-// sie tak nazywac — reguly stream_factor przyjmuja wylacznie ID. Zastrzezenie jest
+// sie tak nazywac - reguly stream_factor przyjmuja wylacznie ID. Zastrzezenie jest
 // dzialaniem gramatyki, nie osobna kontrola w kompilatorze, i ten test je przypina:
 // gdyby ktos zdjal MIN z leksera albo dodal go do ID, `SUMC(x)` przestaloby byc
 // jednoznaczne.
@@ -1512,7 +1512,7 @@ TEST(xparser, aggregate_keywords_are_reserved_stream_names) {
 // Do 2026-09-05 "Fail" ladowalo w zmiennej plikowej `status`, ktorej parserRQLString nie
 // zerowal na wejsciu. Bylo to nieszkodliwe wylacznie dlatego, ze exit(EPERM) wyprzedzal
 // kazde nastepne wywolanie. Po zdjeciu exit() bez tego straznika pierwsze bledne zapytanie
-// ad-hoc zatrulo by KAZDE nastepne w tym samym procesie serwera — takze poprawne.
+// ad-hoc zatrulo by KAZDE nastepne w tym samym procesie serwera - takze poprawne.
 //
 // Drugie zapinane tu zalozenie nalezy do executorsm::getAdHoc: po bledzie skladni slowo
 // kluczowe jest "UNRECOGNIZED", wiec kontrola statusu musi stac PRZED kontrola slowa.
@@ -1538,7 +1538,7 @@ namespace {
 /// Sparsuj i skompiluj `rql`, zwracajac wynik compiler::compile().
 ///
 /// Nazwa funkcji jest w gramatyce zwyklym ID, wiec bledna nazwa NIE jest bledem skladni
-/// i nie konczy procesu — wychodzi lagodnie przez wartosc zwracana z compile(), tym samym
+/// i nie konczy procesu - wychodzi lagodnie przez wartosc zwracana z compile(), tym samym
 /// kanalem co pozostale kontrole planu. Dlatego te testy nie potrzebuja EXPECT_EXIT.
 std::string compileRql(const std::string &rql) {
   qTree instance;
@@ -1559,7 +1559,7 @@ std::string selectRql(const std::string &selectList) {
 
 // Wielkosc liter w nazwie funkcji przestala byc czescia skladni. Do 2026-08-29 gramatyka
 // miala literaly 'Sqrt', 'Ceil', 'Floor', a ewaluator skladal nazwe do malych liter przed
-// dopasowaniem — `Sqrt(x)` przechodzilo, `sqrt(x)` bylo bledem skladni, a dla `to_integer`
+// dopasowaniem - `Sqrt(x)` przechodzilo, `sqrt(x)` bylo bledem skladni, a dla `to_integer`
 // i `isnull` bylo odwrotnie.
 TEST(xparser, function_name_is_case_insensitive) {
   for (const char *call : {"Sqrt(a)", "sqrt(a)", "SQRT(a)", "SqRt(a)"}) {
@@ -1568,7 +1568,7 @@ TEST(xparser, function_name_is_case_insensitive) {
 }
 
 // Do tokena idzie postac KANONICZNA z rqlFunctions.hpp, a nie ta napisana przez autora.
-// Trzyma to zrzuty planu stabilne — wzorce testow integracyjnych i zapisy planow pilota H9
+// Trzyma to zrzuty planu stabilne - wzorce testow integracyjnych i zapisy planow pilota H9
 // pokazuja `CALL(Sqrt)` niezaleznie od pisowni w zrodle. Bez kanonizacji porownania
 // `getStr_() == "to_string"` w exitExpression i exprSimplify przestalyby dzialac.
 TEST(xparser, function_name_is_canonicalized_in_token) {
@@ -1586,7 +1586,7 @@ TEST(xparser, function_name_is_canonicalized_in_token) {
   }
 }
 
-// Skroty konwersji (2026-09-14 — zapis potoku EKG musial zmiescic sie w kolumnie artykulu):
+// Skroty konwersji (2026-09-14 - zapis potoku EKG musial zmiescic sie w kolumnie artykulu):
 // `int` = `to_integer`, `float` = `to_float`, `real` = `to_double`, `str` = `to_string`. Skrot zyje
 // wylacznie w parserze: do tokena idzie postac kanoniczna, wiec ewaluator, typowanie i zrzuty planu
 // go nie znaja. `str(a:8)` sprawdza, ze skrot przechodzi takze przez postac z szerokoscia (CALL2).
@@ -1656,7 +1656,7 @@ TEST(xparser, unknown_function_in_rule_condition_is_rejected) {
   EXPECT_NE(result.find("not a known RQL function"), std::string::npos) << result;
 }
 
-// Zadeklarowana szerokosc `f(expr : N)` nalezy wylacznie do `to_string` — N jest szerokoscia
+// Zadeklarowana szerokosc `f(expr : N)` nalezy wylacznie do `to_string` - N jest szerokoscia
 // pola wyjsciowego, a nie wartoscia na stosie. Arnosc sprawdza tabela w rqlFunctions.hpp,
 // a nie ksztalt gramatyki, wiec dodanie funkcji o innej arnosci nie wymaga regeneracji ANTLR.
 TEST(xparser, declared_width_is_rejected_for_functions_without_width) {
@@ -1672,7 +1672,7 @@ namespace {
 
 /// Plan z jedna szeroka klauzula FROM: `str01 + str02 + ... + strNN`.
 ///
-/// Nazwa substratu rosnie LINIOWO z liczba skladnikow — kazdy poziom doklada
+/// Nazwa substratu rosnie LINIOWO z liczba skladnikow - kazdy poziom doklada
 /// "STREAM_ADD_" (11), podkreslenie i piecioznakowa nazwe operandu, czyli 17 bajtow.
 /// Dwa skladniki daja 22 bajty, wiec prog 200 wypada miedzy 12. a 13. skladnikiem.
 std::string wideFromClause(int operandCount) {
@@ -1689,7 +1689,7 @@ std::string wideAdditionPlan(int operandCount) {
   return rql + "SELECT * STREAM wide FROM " + wideFromClause(operandCount) + "\n";
 }
 
-/// Nazwa szczytowego substratu planu — pierwszego operandu programu zapytania `wide`.
+/// Nazwa szczytowego substratu planu - pierwszego operandu programu zapytania `wide`.
 ///
 /// To ten wezel niesie CALY lancuch skladnikow, wiec to on jako pierwszy uderza w NAME_MAX.
 /// Ostatni STREAM_ADD zostaje w samym zapytaniu publicznym i substratu nie dostaje, wiec
@@ -1708,7 +1708,7 @@ TEST(xcompiler, substrate_name_stays_readable_below_threshold) {
   EXPECT_EQ(longest,
             "STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_"
             "str01_str02_str03_str04_str05_str06_str07_str08_str09_str10_str11");
-  // Blisko progu, ale ponizej — inaczej test przestaje pilnowac granicy.
+  // Blisko progu, ale ponizej - inaczej test przestaje pilnowac granicy.
   EXPECT_GT(longest.size(), 150u);
   EXPECT_LE(longest.size(), 200u);
 }
@@ -1733,7 +1733,7 @@ TEST(xcompiler, wide_from_clause_falls_back_to_digest) {
       })) << q.id;
     }
   }
-  EXPECT_TRUE(sawDigest) << "prog nie zadzialal — zaden wezel nie dostal skrotu";
+  EXPECT_TRUE(sawDigest) << "prog nie zadzialal - zaden wezel nie dostal skrotu";
 }
 
 // Skrot liczy sie z CALEJ nazwy czytelnej, wiec pozostaje CZYSTA FUNKCJA trojki
@@ -1749,18 +1749,18 @@ TEST(xcompiler, digest_name_is_a_pure_function_of_the_readable_name) {
     return names;
   };
 
-  // Ta sama szeroka klauzula w dwoch zapytaniach — jeden wspolny wezel, nie dwa.
+  // Ta sama szeroka klauzula w dwoch zapytaniach - jeden wspolny wezel, nie dwa.
   auto shared            = compilePlan(wideAdditionPlan(14) + "SELECT * STREAM twin FROM " + wideFromClause(14) + "\n");
   const auto sharedNames = digestNames(shared);
   ASSERT_EQ(sharedNames.size(), 1u);
 
-  // Powtorna kompilacja daje ten sam skrot — nie zalezy on od kolejnosci w planie,
+  // Powtorna kompilacja daje ten sam skrot - nie zalezy on od kolejnosci w planie,
   // od adresow ani od liczby konsumentow.
   auto again = compilePlan(wideAdditionPlan(14));
   EXPECT_EQ(digestNames(again), sharedNames);
 
   // Inna kolejnosc skladnikow to INNY program, wiec musi dac inna nazwe. Gdyby skrot
-  // nie zalezal od operandow, oba plany uzylyby jednej nazwy dla dwoch roznych wezlow —
+  // nie zalezal od operandow, oba plany uzylyby jednej nazwy dla dwoch roznych wezlow -
   // dokladnie ta cicha zla odpowiedz, ktorej pilnuje validateSubstratNameUniqueness().
   std::string reversedClause("str14");
   for (int index = 13; index >= 1; --index)
@@ -1772,7 +1772,7 @@ TEST(xcompiler, digest_name_is_a_pure_function_of_the_readable_name) {
 }
 
 // Reduktor nad wezlem o skroconej nazwie. Sam substrat okna dziedziczy dluga nazwe zrodla,
-// wiec rowniez przechodzi w galaz skrotu — a plan ma nadal miec ksztalt "okno, potem suma".
+// wiec rowniez przechodzi w galaz skrotu - a plan ma nadal miec ksztalt "okno, potem suma".
 TEST(xcompiler, reducer_over_a_digest_named_substrate_keeps_its_shape) {
   auto plan = compilePlan(wideAdditionPlan(14) + "SELECT * STREAM reduced FROM SUMC(wide@(1,3))\n");
 
@@ -1788,8 +1788,8 @@ TEST(xcompiler, reducer_over_a_digest_named_substrate_keeps_its_shape) {
 
 // --- Issue 236: drabina priorytetow operatorow strumieniowych ---------------------
 //
-// Do 2026-08-29 szesc operatorow o jednej postaci — operator plus literal nad jednym
-// strumieniem — bylo rozrzuconych na dwa pietra gramatyki: `@`, `&`, `%` i `.agg` wiazaly
+// Do 2026-08-29 szesc operatorow o jednej postaci - operator plus literal nad jednym
+// strumieniem - bylo rozrzuconych na dwa pietra gramatyki: `@`, `&`, `%` i `.agg` wiazaly
 // mocniej niz `#`, a `>` i `-` slabiej. Zaden z nich nie dawal sie lancuchowac, bo wszystkie
 // zadaly `stream_factor`, a wywolanie reduktora stalo o pietro za wysoko, wiec `a#MAX(b)`
 // bylo bledem skladni. RQL.g4 opisuje docelowa drabine; ponizsze testy przypinaja KAZDA
@@ -1834,7 +1834,7 @@ void expectSameGrouping(const std::string &bare, const std::string &parenthesize
 }  // namespace
 
 // Poziom 1. Wywolanie reduktora domykaja wlasne nawiasy, wiec jest PRYMITYWEM i stoi tam,
-// gdzie nazwa strumienia — po obu stronach `#` i pod kazdym postfiksem. Nawias w
+// gdzie nazwa strumienia - po obu stronach `#` i pod kazdym postfiksem. Nawias w
 // `MIN(a)#(MAX(b))` byl dokladany wylacznie po to, zeby zejsc na poziom stream_factor.
 TEST(xparser, function_call_is_a_primary) {
   expectSameGrouping("MIN(a)#MAX(b)", "(MIN(a))#(MAX(b))");
@@ -1844,7 +1844,7 @@ TEST(xparser, function_call_is_a_primary) {
   expectSameGrouping("MIN(a)&2", "(MIN(a))&2");
 }
 
-// Granica 2|3 — JEDYNA zmiana znaczenia wzgledem stanu sprzed 2026-08-29. `>` i `-` sa
+// Granica 2|3 - JEDYNA zmiana znaczenia wzgledem stanu sprzed 2026-08-29. `>` i `-` sa
 // postfiksami unarnymi tak samo jak `&` i `%`, wiec wiaza mocniej niz przeplot.
 //
 // Test musi pokazac ROZNICE, a nie tylko rownowaznosc: oba grupowania sa poprawne i daja
@@ -1883,7 +1883,7 @@ TEST(xparser, binary_stream_operators_are_left_associative) {
 
 namespace {
 
-/// Program pola SELECT-a w postaci ONP — do porownan grupowania w wyrazeniu skalarnym.
+/// Program pola SELECT-a w postaci ONP - do porownan grupowania w wyrazeniu skalarnym.
 ///
 /// Sam PARSER, bez kompilacji: uproszczenia algebraiczne (R3) zwinelyby stale i zatarly
 /// roznice, o ktore chodzi. Zrodlem jest jeden strumien o dwoch polach, wiec `v` i `w` sa
@@ -1905,7 +1905,7 @@ std::string selectFieldProgram(const std::string &expression) {
 
 }  // namespace
 
-// `^` stoi PIERWSZE w regule `term`, wiec wiaze mocniej niz `*` i `/` — a te z kolei
+// `^` stoi PIERWSZE w regule `term`, wiec wiaze mocniej niz `*` i `/` - a te z kolei
 // mocniej niz `+`. Test pokazuje ROZNICE, nie tylko rownowaznosc: `v*w^2` i `(v*w)^2` to
 // dwa rozne wyrazenia i tylko pierwsze ma znaczyc to, co zapis bez nawiasow.
 TEST(xparser, power_binds_tighter_than_multiplication) {
@@ -1917,7 +1917,7 @@ TEST(xparser, power_binds_tighter_than_multiplication) {
 }
 
 // Jedyny prawostronnie laczny operator tej gramatyki. Wolno tak, bo drabina `term` buduje
-// program ONP dla expressionEvaluator, a nie nazwe substratu — lewostronnosc jest wymogiem
+// program ONP dla expressionEvaluator, a nie nazwe substratu - lewostronnosc jest wymogiem
 // tylko po stronie stream_expression, gdzie nazwa wezla jest nazwa pliku na dysku.
 TEST(xparser, power_is_right_associative) {
   EXPECT_EQ(selectFieldProgram("v^w^2"), selectFieldProgram("v^(w^2)"));
@@ -1925,7 +1925,7 @@ TEST(xparser, power_is_right_associative) {
 }
 
 // Literal ujemny jest PRYMITYWEM tego samego pietra, a `unary_op_expression` siega po cale
-// `expression` — stad asymetria, ktorej dla `*` nie bylo widac, bo tam nie zmieniala wyniku.
+// `expression` - stad asymetria, ktorej dla `*` nie bylo widac, bo tam nie zmieniala wyniku.
 // Test utrwala stan faktyczny: dla `^` zamiar zapisuje sie nawiasem.
 TEST(xparser, power_and_unary_minus_group_differently_for_literals_and_fields) {
   EXPECT_EQ(selectFieldProgram("-2^2"), selectFieldProgram("(-2)^2"));
@@ -1939,7 +1939,7 @@ TEST(xparser, postfix_stream_operators_chain) {
   expectSameGrouping("a&2&2", "(a&2)&2");
   expectSameGrouping("a@(1,4)&2", "(a@(1,4))&2");
   // `-` przetaktowuje do ZADANEGO interwalu, wiec ogniwa lancucha musza isc od szybszego
-  // do wolniejszego — inaczej plan pada na wiezie SUBTRACT, a nie na skladni.
+  // do wolniejszego - inaczej plan pada na wiezie SUBTRACT, a nie na skladni.
   expectSameGrouping("a-1/4-1/2", "(a-1/4)-1/2");
   expectSameGrouping("a@(1,4).sumc", "(a@(1,4)).sumc");
 }
@@ -1963,7 +1963,7 @@ TEST(xparser, hash_operator_is_not_whitespace_sensitive) {
 
 // Komentarz na koncu wiersza po `#` ma byc odrzucony GLOSNO. Tresc komentarza jest tu
 // wielowyrazowa, wiec konczy sie bledem skladni; komentarz jednowyrazowy trafia dalej jako
-// nazwa strumienia i ginie na nierozwiazanym odwolaniu — takze glosno. Komentarz konczacy
+// nazwa strumienia i ginie na nierozwiazanym odwolaniu - takze glosno. Komentarz konczacy
 // wiersz zapisuje sie `//`.
 TEST(xparser, trailing_hash_comment_is_rejected) {
   const auto [parseResult, diagnostics] = parseCapturingStderr("SELECT * STREAM t FROM a # komentarz na koncu wiersza");
@@ -1972,7 +1972,7 @@ TEST(xparser, trailing_hash_comment_is_rejected) {
   EXPECT_TRUE(diagnostics.contains("extraneous input")) << diagnostics;
 }
 
-// Komentarz zajmujacy caly wiersz — takze wciety — nadal jest komentarzem. Przechodzi
+// Komentarz zajmujacy caly wiersz - takze wciety - nadal jest komentarzem. Przechodzi
 // przez readLogicalLines(), a nie przez lekser, wiec wymaga sciezki plikowej.
 TEST(xparser, whole_line_hash_comment_survives) {
   const std::string fileName("ut_hash_comment.rql");
@@ -1999,7 +1999,7 @@ TEST(xparser, whole_line_hash_comment_survives) {
 //
 // Parser dostaje pojedyncza instrukcje wyjeta przez readLogicalLines, wiec sam liczy od
 // jedynki: bez przekazanej kotwicy kazda odmowa wskazywala wiersz 1, takze dla bledu w
-// polowie duzego planu — a operator dostawal pozycje, ktorej w pliku nie da sie odnalezc.
+// polowie duzego planu - a operator dostawal pozycje, ktorej w pliku nie da sie odnalezc.
 // Kotwica jest PIERWSZYM wierszem instrukcji, bo kontynuacje `\\` sa sklejane w jeden
 // wiersz logiczny i pozycja wewnatrz sklejki w pliku nie istnieje.
 TEST(xparser, syntax_error_reports_the_line_of_the_file) {
@@ -2048,7 +2048,7 @@ namespace {
 /// Plan w postaci porownywalnej: strumienie posortowane po nazwie, kazdy z pelna trescia.
 ///
 /// Poza operatorem query::operator<< (id, plik, interwal, schemat, program) doklada ogon
-/// i poczatek logiczny, bo to one niosa skutki czasowe planu — a wlasnie o brak roznicy
+/// i poczatek logiczny, bo to one niosa skutki czasowe planu - a wlasnie o brak roznicy
 /// w skutkach chodzi w tescie rownowaznosci.
 std::string renderPlan(qTree &plan) {
   std::vector<std::string> rendered;
@@ -2150,7 +2150,7 @@ TEST(xcompiler, generator_expands_ordinal_in_from_clause) {
   EXPECT_EQ(std::ranges::count_if(instance, [](const query &qry) { return qry.id.find('[') != std::string::npos; }), 0);
 }
 
-/// Generator bez `$` wyprodukowalby N identycznych strumieni pod roznymi nazwami — to zawsze
+/// Generator bez `$` wyprodukowalby N identycznych strumieni pod roznymi nazwami - to zawsze
 /// pomylka zapisu, nigdy zamiar, wiec kompilator ma ja zatrzymac.
 TEST(xcompiler, rejects_generator_without_ordinal) {
   const std::string verdict = compileRql(R"(
@@ -2161,7 +2161,7 @@ TEST(xcompiler, rejects_generator_without_ordinal) {
   EXPECT_NE(verdict.find("uses no '$'"), std::string::npos) << verdict;
 }
 
-/// `[0]` musi byc odrozniane od braku generatora — inaczej stalby sie po cichu strumieniem `cell`.
+/// `[0]` musi byc odrozniane od braku generatora - inaczej stalby sie po cichu strumieniem `cell`.
 TEST(xcompiler, rejects_zero_sized_generator) {
   const std::string verdict = compileRql(R"(
         DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
@@ -2263,7 +2263,7 @@ TEST(xcompiler, rejects_stream_index_beyond_from_slots) {
 }
 
 /// Ostatni slot jest w zakresie, a okno w FROM poszerza zrodlo: `core[2]` przy `core@(1,3)`
-/// czyta trzeci slot okna, choc `core` ma jedno pole — tak samo jak rozwiniete `core[_]`.
+/// czyta trzeci slot okna, choc `core` ma jedno pole - tak samo jak rozwiniete `core[_]`.
 TEST(xcompiler, accepts_stream_index_on_last_from_slot) {
   EXPECT_EQ(compileRql(R"(
         DECLARE a INTEGER, b INTEGER STREAM core, 1/10 FILE 'core.txt'
@@ -2336,7 +2336,7 @@ TEST(xcompiler, generator_index_bound_matches_hand_written) {
                             "SELECT core[2] STREAM g$2 FROM core@(1,3)\n"));
 }
 
-/// Wyrazenie moze zejsc ponizej zera, zanim wyjdzie poza zrodlo — osobny komunikat.
+/// Wyrazenie moze zejsc ponizej zera, zanim wyjdzie poza zrodlo - osobny komunikat.
 TEST(xcompiler, rejects_negative_generated_field_index) {
   const std::string verdict = compileRql(R"(
         DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
@@ -2348,7 +2348,7 @@ TEST(xcompiler, rejects_negative_generated_field_index) {
 
 /// Rodzina nie przezywa ekspansji: po expandStreamGenerators() istnieja tylko instancje
 /// `cell$0`, `cell$1`, ... `cell[k]` na LISCIE POL znaczy wiec „slot k strumienia cell", tak
-/// samo jak wszedzie indziej, i zadnej instancji nie wskazuje — indeksem rodziny `[]` jest
+/// samo jak wszedzie indziej, i zadnej instancji nie wskazuje - indeksem rodziny `[]` jest
 /// wylacznie w klauzuli FROM. Instancja jest osiagalna wlasna nazwa (`$` jest zwyklym znakiem
 /// ID), wiec komunikat ma ja podac; do 2026-08-31 mowil tylko „there is no stream or field",
 /// o strumieniu, ktory autor przed chwila zadeklarowal.
@@ -2468,7 +2468,7 @@ TEST(xcompiler, index_wildcard_schema_survives_being_joined) {
 
 namespace {
 
-/// Programy pol zapytania jako tekst — do porownan schematu miedzy dwoma zapisami planu.
+/// Programy pol zapytania jako tekst - do porownan schematu miedzy dwoma zapisami planu.
 /// Sam program klauzuli FROM sie rozni (raz nazwane okno, raz substrat kompilatora), wiec
 /// porownanie idzie po tym, co zapytanie LICZY, a nie po nazwie wezla, z ktorego czyta.
 std::string fieldPrograms(query &q) {
@@ -2504,7 +2504,7 @@ TEST(xcompiler, index_wildcard_width_comes_from_the_from_clause) {
   auto &namedProduct  = namedWindow.getQuery("prod");
   auto &inlineProduct = inlineWindow.getQuery("prod");
 
-  // Piec tapow, nie jeden — i te same offsety, bo `[_]` ma byc czystym skrotem.
+  // Piec tapow, nie jeden - i te same offsety, bo `[_]` ma byc czystym skrotem.
   EXPECT_EQ(inlineProduct.lSchema.size(), 5u);
   EXPECT_EQ(fieldPrograms(inlineProduct), fieldPrograms(namedProduct));
   EXPECT_EQ(inlineProduct.descriptorFrom(inlineWindow), namedProduct.descriptorFrom(namedWindow));
@@ -2517,7 +2517,7 @@ TEST(xcompiler, index_wildcard_width_comes_from_the_from_clause) {
   EXPECT_EQ(inlineWindow.getQuery("out").startupLatency, namedWindow.getQuery("out").startupLatency);
 }
 
-// Bezposredni operand zachowuje sie jak dotad — to jest zapis uzywany w calym korpusie
+// Bezposredni operand zachowuje sie jak dotad - to jest zapis uzywany w calym korpusie
 // (`examples/ecg/*`, `select_cse_commutative_add`), wiec poprawka nie moze go ruszyc.
 TEST(xcompiler, index_wildcard_over_direct_operands_is_unchanged) {
   auto plan = compilePlan(R"(
@@ -2568,7 +2568,7 @@ TEST(xcompiler, index_wildcard_through_a_width_changing_join_is_refused) {
 
 // Indeks pola w PUSH_ID jest PLASKI: `f FLOAT[4]` zajmuje cztery indeksy, wiec `src[1]` to
 // `f[1]`, a nie kolejne pole schematu. Odwzorowanie liczone wprost po pozycji w lSchema
-// dawalo tu FLOAT-owi typ nastepnego pola — a to nie jest „typ nieznany", tylko typ ZLY:
+// dawalo tu FLOAT-owi typ nastepnego pola - a to nie jest „typ nieznany", tylko typ ZLY:
 // regula D przepisywalaby na `^` mnozenie zmiennoprzecinkowe, ktorego przepisac nie wolno.
 TEST(xcompiler, field_type_lookup_uses_flat_element_index) {
   auto floatArray = compilePlan(
@@ -2581,7 +2581,7 @@ TEST(xcompiler, field_type_lookup_uses_flat_element_index) {
 
   // Kontrola dodatnia na tym samym ksztalcie schematu: dla tablicy INTEGER przepisanie
   // ma zadzialac na KAZDYM elemencie, nie tylko na zerowym. Bez agresywnych przepisan
-  // zostaje mnozenie — przelaczniki zmieniaja POSTAC programu, nigdy jego wynik.
+  // zostaje mnozenie - przelaczniki zmieniaja POSTAC programu, nigdy jego wynik.
   auto intArray = compilePlan(
       "SUBSTRAT 'memory'\n"
       "DECLARE v INTEGER[4], n INTEGER STREAM src, 1 FILE 'a.txt'\n"
@@ -2602,7 +2602,7 @@ TEST(xcompiler, field_type_lookup_uses_flat_element_index) {
 
 namespace {
 
-/// Pole schematu strumienia po numerze pozycji — typ i szerokosc, czyli to, co trafia
+/// Pole schematu strumienia po numerze pozycji - typ i szerokosc, czyli to, co trafia
 /// do deskryptora artefaktu.
 const rdb::rField &outputField(qTree &plan, const std::string &streamId, const int position) {
   const auto &schema = plan.getQuery(streamId).lSchema;
@@ -2626,7 +2626,7 @@ TEST(xcompiler, string_field_reaches_output_descriptor) {
   EXPECT_EQ(text.rtype, rdb::STRING);
   EXPECT_EQ(text.rlen * text.rarray, 8);
 
-  // Kontrola, ze przebieg podnosi WYLACZNIE napisy — sasiednie pole liczbowe zostaje.
+  // Kontrola, ze przebieg podnosi WYLACZNIE napisy - sasiednie pole liczbowe zostaje.
   EXPECT_EQ(outputField(plan, "dst", 1).rtype, rdb::INTEGER);
 }
 
@@ -2700,8 +2700,8 @@ TEST(xcompiler, length_over_string_field_yields_integer_field) {
 // Do 2026-09-11 ten test pinowal regule „INTEGER, chyba ze OSTATNIM tokenem programu jest
 // to_float albo to_double": `Ceil(x)` nad DOUBLE dawalo pole INTEGER, a czysty odczyt
 // `src[1]` gubil typ producenta. Obie odpowiedzi byly niezgodne z tym, co liczy
-// expressionEvaluator — `callFun()` rzutuje wynik z powrotem na typ argumentu, a odczyt pola
-// oddaje wartosc w typie tego pola — wiec deskryptor opisywal cos innego niz payload.
+// expressionEvaluator - `callFun()` rzutuje wynik z powrotem na typ argumentu, a odczyt pola
+// oddaje wartosc w typie tego pola - wiec deskryptor opisywal cos innego niz payload.
 //
 // Typ pola ustala teraz compiler::inferFieldShapes() z calego programu ONP.
 TEST(xparser, numeric_result_types_follow_the_evaluator) {
@@ -2710,7 +2710,7 @@ TEST(xparser, numeric_result_types_follow_the_evaluator) {
       "DECLARE a INTEGER, b DOUBLE STREAM src, 1 FILE 'src.txt'\n"
       "SELECT Ceil(src[1]), src[1], to_float(src[0]), to_double(src[0]) STREAM dst FROM src\n");
 
-  // `Ceil` liczy w double i wraca rzutem na typ ARGUMENTU — patrz callFun().
+  // `Ceil` liczy w double i wraca rzutem na typ ARGUMENTU - patrz callFun().
   EXPECT_EQ(outputField(plan, "dst", 0).rtype, rdb::DOUBLE);
   // Czysty odczyt pola zachowuje typ i dlugosc producenta.
   EXPECT_EQ(outputField(plan, "dst", 1).rtype, rdb::DOUBLE);
@@ -2725,7 +2725,7 @@ TEST(xparser, numeric_result_types_follow_the_evaluator) {
 // Do 2026-08-30 nie wydawal: rozwiniecie `*` i buildOutputSchema() liczyly WPISY schematu
 // zrodla, a nie sloty plaskie rekordu. `SELECT * FROM x` nad `INTEGER[24]` dawalo jedno
 // pole zamiast dwudziestu czterech, a numeracja `zrodlo[offset]` rozjezdzala sie z ukladem
-// rekordu — po cichu, bo plan kompilowal sie bez bledu. Sama deklaracja zachowuje `T[N]`:
+// rekordu - po cichu, bo plan kompilowal sie bez bledu. Sama deklaracja zachowuje `T[N]`:
 // splaszczenie dotyczy wylacznie schematow pochodnych.
 TEST(xcompiler, derived_schema_width_is_flat_for_array_fields) {
   const std::vector<std::pair<std::string, std::string>> forms{
@@ -2775,7 +2775,7 @@ TEST(xcompiler, derived_schema_width_is_flat_for_array_fields) {
 // Rodzina ORTOGONALNA wobec `FROM MIN(strumien)`: tamten redukuje pola JEDNEGO rekordu,
 // ten redukuje `szerokosc` kolejnych rekordow, a przy polu tablicowym `szerokosc*N` wartosci.
 //
-// Okno jest PRZESUWNE co rekord i innego kroku miec nie moze — kazda zmiana taktu nalezy do
+// Okno jest PRZESUWNE co rekord i innego kroku miec nie moze - kazda zmiana taktu nalezy do
 // klauzuli FROM. Stad brzeg:
 //   interwal = interwal zrodla
 //   origin   = origin zrodla + szerokosc - 1
@@ -2790,7 +2790,7 @@ std::string compileStatus(const std::string &rql) {
 }
 }  // namespace
 
-// Lista SELECT NIE rusza osi czasu — to jest wlasnie powod, dla ktorego trzeci czlon
+// Lista SELECT NIE rusza osi czasu - to jest wlasnie powod, dla ktorego trzeci czlon
 // `AGG(pole : szerokosc : krok)` zostal usuniety 31.08.2026. Mnozyl interwal wyjscia przez
 // krok, czyli byl jedyna konstrukcja tego jezyka, w ktorej takt strumienia wynikal z listy
 // SELECT, a nie z klauzuli FROM. Okno co k rekordow zapisuje sie dzis po stronie FROM.
@@ -2814,7 +2814,7 @@ TEST(xcompiler, window_aggregate_never_changes_the_output_interval) {
       "DECLARE a INTEGER[3] STREAM src, 1/10 FILE 'src.txt'\n"
       "SELECT MIN(a[0] : 2 : 2) STREAM dst FROM src\n");
   EXPECT_NE(parseResult, "OK");
-  // Trzeci wiersz przekazanego tekstu — numer wiersza jest czescia komunikatu.
+  // Trzeci wiersz przekazanego tekstu - numer wiersza jest czescia komunikatu.
   EXPECT_TRUE(parseResult.contains("line 3:")) << parseResult;
   EXPECT_TRUE(parseResult.contains("expecting ')'")) << parseResult;
   EXPECT_TRUE(diagnostics.contains("expecting ')'")) << diagnostics;
@@ -2830,12 +2830,12 @@ TEST(xcompiler, window_aggregate_origin_covers_the_whole_window) {
     // origin = origin zrodla + szerokosc - 1: dopiero wtedy caly zakres okna, ktore konczy
     // sie na rekordzie n, miesci sie w istniejacym strumieniu.
     EXPECT_EQ(plan.getQuery("dst").logicalOrigin, width - 1) << "width=" << width;
-    // Ogon zostaje ogonem zrodla — okno czeka dokladnie tyle co czysty przepis.
+    // Ogon zostaje ogonem zrodla - okno czeka dokladnie tyle co czysty przepis.
     EXPECT_EQ(plan.getQuery("dst").startupLatency, 0) << "width=" << width;
   }
 
   // Sciezka wyrazeniowa czeka tak samo: wartosc powstaje dopiero z PELNEGO okna, a wczesniejsze
-  // sloty nie sa rekordami (ani zerami, ani NULL-ami — zasada brzegu strumienia z query.hpp).
+  // sloty nie sa rekordami (ani zerami, ani NULL-ami - zasada brzegu strumienia z query.hpp).
   for (const int width : {1, 2, 7}) {
     auto plan = compilePlan(
         "SUBSTRAT 'memory'\n"
@@ -2890,7 +2890,7 @@ TEST(xcompiler, explicit_to_integer_outranks_the_window_reduction_type) {
 }
 
 // Agregaty o tym samym zrodle, polu i szerokosci dziela JEDNO przejscie po oknie.
-// Rozny ksztalt to rozna grupa — inaczej `MAX(a:2)` czytalby okno `MAX(a:3)`.
+// Rozny ksztalt to rozna grupa - inaczej `MAX(a:2)` czytalby okno `MAX(a:3)`.
 TEST(xcompiler, window_aggregates_of_one_shape_share_a_group) {
   auto plan = compilePlan(
       "SUBSTRAT 'memory'\n"
@@ -2904,7 +2904,7 @@ TEST(xcompiler, window_aggregates_of_one_shape_share_a_group) {
   EXPECT_EQ(plan.getQuery("other").windowGroups.size(), 2u);
 }
 
-// Okno adresuje JEDEN slot plaski rekordu zrodla — redukuje po czasie, nie po elementach
+// Okno adresuje JEDEN slot plaski rekordu zrodla - redukuje po czasie, nie po elementach
 // jednego rekordu. Nazwa tablicy nie jest nazwa pola, wiec argumentem jest element `a[k]`.
 TEST(xcompiler, window_group_addresses_a_single_flat_slot) {
   auto plan = compilePlan(
@@ -2921,7 +2921,7 @@ TEST(xcompiler, window_group_addresses_a_single_flat_slot) {
   EXPECT_EQ(groups[2].slot, 3);
 }
 
-// Gola nazwa tablicy nie jest odwolaniem do pola i nie moze przejsc — ani w oknie, ani
+// Gola nazwa tablicy nie jest odwolaniem do pola i nie moze przejsc - ani w oknie, ani
 // w zwyklym wyrazeniu. Do 2026-08-31 pierwsze czytalo wszystkie elementy naraz (redukcja
 // po kanalach zamiast po czasie), drugie po cichu element zerowy.
 TEST(xcompiler, bare_array_name_is_not_a_field_reference) {
@@ -2957,7 +2957,7 @@ TEST(xcompiler, window_argument_spellings_describe_one_window) {
   EXPECT_EQ(plan.getQuery("dst").windowGroups[0].source, "src");
   EXPECT_EQ(plan.getQuery("dst").windowGroups[0].slot, 0);
 
-  // Pole skalarne stoi za tablica, wiec jego slot plaski to 3 — i wszystkie trzy zapisy
+  // Pole skalarne stoi za tablica, wiec jego slot plaski to 3 - i wszystkie trzy zapisy
   // musza tam trafic tak samo.
   ASSERT_EQ(plan.getQuery("scal").windowGroups.size(), 1u);
   EXPECT_EQ(plan.getQuery("scal").windowGroups[0].slot, 3);
@@ -2997,7 +2997,7 @@ TEST(xcompiler, window_aggregate_accepts_an_expression_argument) {
 // RDB_OPT_SIMPLIFY_EXPRESSIONS=OFF w grupie zostaje `a*1` i policzy dokladnie to samo.
 // Rownosc wartosci w obu konfiguracjach pilnuje it_window_aggregate (strumien `expr1`).
 #if RDB_OPT_SIMPLIFY_EXPRESSIONS
-// Podwyrazenie okna przechodzi przez upraszczanie wyrazen tak samo jak program pola — mimo ze
+// Podwyrazenie okna przechodzi przez upraszczanie wyrazen tak samo jak program pola - mimo ze
 // stoi w tabeli grup, a nie w programie. Rachunek zwiniety do samego odczytu pola wraca przy
 // okazji na szybka sciezke, wiec `MIN(x*1 : W)` daje DOKLADNIE ten sam plan co `MIN(x : W)`.
 TEST(xcompiler, window_subexpression_goes_through_expression_simplification) {
@@ -3018,7 +3018,7 @@ TEST(xcompiler, window_subexpression_goes_through_expression_simplification) {
 }
 #endif
 
-// Rozny rachunek to rozna grupa — inaczej `MIN(a[0]*11:2)` czytalby okno `MIN(a[0]*10:2)`.
+// Rozny rachunek to rozna grupa - inaczej `MIN(a[0]*11:2)` czytalby okno `MIN(a[0]*10:2)`.
 TEST(xcompiler, window_aggregates_over_different_expressions_get_different_groups) {
   auto plan = compilePlan(
       "SUBSTRAT 'memory'\n"
@@ -3029,7 +3029,7 @@ TEST(xcompiler, window_aggregates_over_different_expressions_get_different_group
 }
 
 // Typ wartosci wchodzacych do redukcji bierze sie z NAJSZERSZEGO pola, po ktore siega
-// wyrazenie — deskryptor zrodla na to pytanie nie odpowie, bo wyrazenie nie jest polem.
+// wyrazenie - deskryptor zrodla na to pytanie nie odpowie, bo wyrazenie nie jest polem.
 TEST(xcompiler, window_over_an_expression_takes_the_widest_field_type) {
   auto plan = compilePlan(
       "SUBSTRAT 'memory'\n"
@@ -3052,13 +3052,13 @@ TEST(xcompiler, window_over_an_expression_rejects_what_it_cannot_execute) {
   EXPECT_NE(compileStatus(declare + "SELECT MIN(MAX(a : 2) + 1 : 3) STREAM dst FROM src\n"), "OK");
   // Bez odwolania do pola okno nie ma po czym isc wstecz.
   EXPECT_NE(compileStatus(declare + "SELECT MIN(1 + 2 : 3) STREAM dst FROM src\n"), "OK");
-  // Agregaty sa arytmetyczne — takze wtedy, gdy napis wchodzi literalem.
+  // Agregaty sa arytmetyczne - takze wtedy, gdy napis wchodzi literalem.
   EXPECT_NE(compileStatus(declare + "SELECT MIN(a + 'x' : 2) STREAM dst FROM src\n"), "OK");
   EXPECT_NE(compileStatus(declare + "SELECT MIN(t + 'x' : 2) STREAM dst FROM src\n"), "OK");
   // Okno czyta historie JEDNEGO strumienia.
   EXPECT_NE(compileStatus(declare + "SELECT MIN(a + b : 2) STREAM dst FROM src+other\n"), "OK");
 
-  // Postac poprawna — zeby powyzsze EXPECT_NE nie przechodzily z powodu literowki w RQL.
+  // Postac poprawna - zeby powyzsze EXPECT_NE nie przechodzily z powodu literowki w RQL.
   EXPECT_EQ(compileStatus(declare + "SELECT MIN(a * 2 + 1 : 2) STREAM dst FROM src\n"), "OK");
 }
 
@@ -3067,7 +3067,7 @@ TEST(xcompiler, window_over_an_expression_rejects_what_it_cannot_execute) {
 // caly lancuch (executorsm.cpp, getAdHoc). Przebiegi okna musza wiec byc idempotentne.
 //
 // Bez tego pierwsze zapytanie ad hoc do planu z oknem zabijalo serwer. Token WINDOW_* niesie
-// przed rozwiazaniem szerokosc okna, a po nim indeks grupy — obie postaci to zwykly `int`,
+// przed rozwiazaniem szerokosc okna, a po nim indeks grupy - obie postaci to zwykly `int`,
 // wiec o etapie rozstrzyga tabela grup zapytania, a nie sam token. Powtorna kompilacja, ktora
 // wzielaby indeks za szerokosc, przeliczylaby brzeg od nowa i to wlasnie tu ma sie wywalic.
 TEST(xcompiler, window_aggregate_survives_recompilation_of_a_live_plan) {
@@ -3119,7 +3119,7 @@ TEST(xcompiler, window_aggregate_rejects_plans_it_cannot_execute) {
                                     "RULE r ON dst WHEN MIN(a : 2) > 1 DO DUMP -1 TO 1\n"),
             "OK");
 
-  // Postac poprawna — zeby powyzsze EXPECT_NE nie przechodzily z powodu literowki w RQL.
+  // Postac poprawna - zeby powyzsze EXPECT_NE nie przechodzily z powodu literowki w RQL.
   EXPECT_EQ(compileStatus(declare + "SELECT MIN(a : 2), MAX(a : 3) STREAM dst FROM src\n"), "OK");
 }
 
@@ -3131,7 +3131,7 @@ TEST(xcompiler, window_aggregate_rejects_plans_it_cannot_execute) {
 // do konsumenta ogon swojego rachunku i `SELECT * FROM s>1` konczylo sie komunikatem
 // `No field of given name in stream schema ID3`; pole `MIN(a:2)` przenosilo tam token
 // WINDOW_*, przez ktory straznik okna odrzucal KAZDY wezel fullscan nad strumieniem
-// z oknem — lacznie z substratami, ktore kompilator wystawia sam.
+// z oknem - lacznie z substratami, ktore kompilator wystawia sam.
 TEST(xcompiler, derived_field_is_a_reference_not_a_copy_of_the_producer_program) {
   auto plan = compilePlan(
       "SUBSTRAT 'memory'\n"
@@ -3169,7 +3169,7 @@ TEST(xcompiler, window_result_type_reaches_copies_of_the_window_stream) {
 }
 
 // ============================================================================================
-// Kontrakt typu wyniku wyrazenia — pozycja 16 w paper-arXiv/usecases/requested.md.
+// Kontrakt typu wyniku wyrazenia - pozycja 16 w paper-arXiv/usecases/requested.md.
 //
 // Typ, dlugosc i krotnosc pola ustala JEDEN przebieg (compiler::inferFieldShapes) z calego
 // programu ONP, a nie piec regul lokalnych, z ktorych kazda widziala inny jego fragment.
@@ -3183,12 +3183,12 @@ TEST(xcompiler, requested16_three_documented_boundaries) {
   auto plan = compilePlan(
       "SUBSTRAT 'memory'\n"
       "DECLARE d DOUBLE, k INTEGER STREAM source, 1 FILE 'source.txt'\n"
-      // 1. Czysty odczyt pola DOUBLE — kopia pola nie zachowywala typu zrodla.
+      // 1. Czysty odczyt pola DOUBLE - kopia pola nie zachowywala typu zrodla.
       "SELECT source[0] STREAM b1 FROM source\n"
-      // 2. Konwersja w SRODKU wyrazenia — program konczy sie mnozeniem, wiec regula
+      // 2. Konwersja w SRODKU wyrazenia - program konczy sie mnozeniem, wiec regula
       //    „ostatni token" jej nie widziala.
       "SELECT to_float('2.5') * 2 STREAM b2 FROM source\n"
-      // 3. Rzutowanie nad oknem schowane pod arytmetyka — typ okna nadpisywal INTEGER.
+      // 3. Rzutowanie nad oknem schowane pod arytmetyka - typ okna nadpisywal INTEGER.
       "SELECT to_integer(AVG(k : 10)) + 1 STREAM b3 FROM source\n");
 
   EXPECT_EQ(outputField(plan, "b1", 0).rtype, rdb::DOUBLE);
@@ -3212,7 +3212,7 @@ TEST(xcompiler, fullscan_copies_every_producer_field_shape) {
 
   EXPECT_EQ(outputField(plan, "copy", 5).rlen * outputField(plan, "copy", 5).rarray, 8);
 
-  // Deskryptor wyjscia musi miec te sama szerokosc bajtowa co zrodlo — inaczej offsety pol
+  // Deskryptor wyjscia musi miec te sama szerokosc bajtowa co zrodlo - inaczej offsety pol
   // rozjezdzaja sie z ukladem rekordu, a nie tylko nazwa typu w `.desc`.
   EXPECT_EQ(plan.getQuery("copy").descriptorStorage().getSizeInBytes(),
             plan.getQuery("src").descriptorStorage().getSizeInBytes());
@@ -3259,7 +3259,7 @@ TEST(xcompiler, field_shape_crosses_several_intermediate_streams) {
 
 // Wezly, ktorych schemat SYNTETYZUJE ich wlasny operator, zostaja nietkniete. Token PUSH_ID
 // w programie ich pol jest MIEJSCEM w rekordzie, a nie odczytem pola zrodlowego: reduktor
-// daje jedno pole RATIONAL niezaleznie od typu `src[0]`, a `@` — pola typu NAJSZERSZEGO
+// daje jedno pole RATIONAL niezaleznie od typu `src[0]`, a `@` - pola typu NAJSZERSZEGO
 // z rekordu zrodla. Wnioskowanie z programu dalo by tam ksztalt cicho zly.
 TEST(xcompiler, synthesised_schemas_keep_their_own_field_shapes) {
   auto plan = compilePlan(
@@ -3290,7 +3290,7 @@ TEST(xcompiler, window_argument_type_comes_from_its_whole_program) {
   EXPECT_EQ(plan.getQuery("converted").windowGroups.at(0).valueType, rdb::DOUBLE);
 }
 
-// Deklaracja jest UMOWA z plikiem zrodlowym, a nie wynikiem rachunku — analizator jej nie
+// Deklaracja jest UMOWA z plikiem zrodlowym, a nie wynikiem rachunku - analizator jej nie
 // dotyka. Takze wtedy, gdy jej pole nosi typ, ktorego zaden SELECT w planie nie uzywa.
 TEST(xcompiler, declaration_shapes_are_authoritative) {
   auto plan = compilePlan(
@@ -3321,7 +3321,7 @@ TEST(xcompiler, array_element_read_keeps_type_and_drops_arity) {
 
 // Ponowna kompilacja ZYWEGO planu nie rusza deskryptorow. Jest to wymog, nie ozdoba:
 // executorsm::getAdHoc() kompiluje plan po raz drugi, zeby dolaczyc do niego zapytanie ad hoc,
-// wiec przebieg z cala pewnoscia zobaczy zapytania rozwiazane w poprzednim przebiegu —
+// wiec przebieg z cala pewnoscia zobaczy zapytania rozwiazane w poprzednim przebiegu -
 // z programami juz uproszczonymi i z wypelniona tabela grup okien.
 TEST(xcompiler, field_shapes_are_stable_across_a_live_plan_recompilation) {
   qTree live;
@@ -3371,7 +3371,7 @@ TEST(xcompiler, field_shapes_are_stable_across_a_live_plan_recompilation) {
 // z planu strumienie dolozone PO tej kompilacji, wiec `SELECT staly_0 ... FROM staly` dostawal
 // STRING[2] zamiast STRING[16].
 //
-// Test obejmuje OBA argumenty: staly, ktory defekt dotykal, i zmienny, ktory byl odporny —
+// Test obejmuje OBA argumenty: staly, ktory defekt dotykal, i zmienny, ktory byl odporny -
 // zeby naprawa nie zamienila jednej asymetrii na druga.
 TEST(xcompiler, declared_to_string_width_survives_a_second_compilation) {
   const auto widthOf = [](qTree &plan, const std::string &stream) {
@@ -3393,7 +3393,7 @@ TEST(xcompiler, declared_to_string_width_survives_a_second_compilation) {
   EXPECT_EQ(widthOf(plan, "staly"), 16);
   EXPECT_EQ(widthOf(plan, "zmienny"), 16);
 
-  // Drugi przebieg po tym samym drzewie — dokladnie to, co robi getAdHoc().
+  // Drugi przebieg po tym samym drzewie - dokladnie to, co robi getAdHoc().
   ASSERT_EQ(live.compile(), "OK");
   EXPECT_EQ(widthOf(plan, "staly"), 16) << "zadeklarowana szerokosc przepadla przy drugiej kompilacji";
   EXPECT_EQ(widthOf(plan, "zmienny"), 16);
@@ -3406,7 +3406,7 @@ TEST(xcompiler, declared_to_string_width_survives_a_second_compilation) {
 // `SELECT avg STREAM o FROM AVG(src)` wyglada naturalnie, ale `avg` nie jest tam polem:
 // gramatyka wpuszcza `agregator` do wyrazenia skalarnego przez `term : agregator # ExpAgg`,
 // a listener dokleja ten sam token STREAM_AVG, ktory w klauzuli FROM jest OPERATOREM.
-// W programie pola nie wykona go zadna maszyna — do 2026-09-11 `-c` przechodzilo, a wykonanie
+// W programie pola nie wykona go zadna maszyna - do 2026-09-11 `-c` przechodzilo, a wykonanie
 // konczylo sie komunikatem `Unsupported token in expressionEvaluator` przy zerze rekordow.
 // Kanal `Check result:` zamyka ten wzorzec w kompilacji i nazywa obejscie.
 TEST(xcompiler, rejects_a_stream_reducer_used_as_a_field_reference) {
@@ -3430,7 +3430,7 @@ TEST(xcompiler, rejects_a_stream_reducer_used_as_a_field_reference) {
 
 // Kontrola pozytywna do powyzszego: obie postaci, ktore DZIALAJA, maja dzialac dalej. Bramka
 // siega po token STREAM_* w programie POLA, a pola syntetyzowane nad reduktorem przez
-// buildOutputSchema() niosa PUSH_ID — gdyby bramka byla szersza, zabralaby oba te zapisy.
+// buildOutputSchema() niosa PUSH_ID - gdyby bramka byla szersza, zabralaby oba te zapisy.
 //
 // Dalsze obliczenie zapisane jest jako `m[0]*2`, a nie `Sqrt(m[0])`: `Sqrt` nad RATIONAL ma
 // wlasna bramke (patrz rejects_sqrt_over_a_rational_value), wiec mieszanie obu restrykcji
@@ -3464,7 +3464,7 @@ TEST(xcompiler, keeps_the_working_ways_of_reading_a_stream_reducer) {
 //
 // Powod nie jest kosmetyczny: callFun() liczy przez double i rzutuje z powrotem na typ
 // argumentu, a droga powrotna do RATIONAL rationalizuje z tolerancja 1e-6. Daje to ogromne
-// mianowniki, ktore po dwoch mnozeniach przepelniaja `boost::rational<int>` PO CICHU —
+// mianowniki, ktore po dwoch mnozeniach przepelniaja `boost::rational<int>` PO CICHU -
 // `Sqrt(x)*Sqrt(x)*Sqrt(x)` nad `2/1` dawalo -4,247 zamiast +2,828, ze zlym znakiem.
 // Zla wartosc bez bledu jest gorsza niz odmowa kompilacji.
 TEST(xcompiler, rejects_sqrt_over_a_rational_value) {
@@ -3503,11 +3503,11 @@ TEST(xcompiler, rejects_sqrt_over_a_rational_value_in_a_rule_condition) {
 
 // Zrodla reduktorow w testach bramki sa CALKOWITE, bo tylko nad nimi redukcja daje RATIONAL
 // (reductionResultField). Do 2026-09-14 testy braly zrodlo DOUBLE i trafialy w RATIONAL wylacznie
-// dzieki temu, ze buildOutputSchema() wpisywal go na sztywno — nad DOUBLE wynik jest DOUBLE
+// dzieki temu, ze buildOutputSchema() wpisywal go na sztywno - nad DOUBLE wynik jest DOUBLE
 // i `Sqrt` jest tam poprawny.
 //
 // Ten wpis to warunek reguly nad JAWNA lista pol reduktora. Warunek czyta pole WYJSCIOWE, a do
-// 2026-09-14 jawna lista nad reduktorem zostawala przy INTEGER z parsera — `Sqrt(m[0])` przechodzilo
+// 2026-09-14 jawna lista nad reduktorem zostawala przy INTEGER z parsera - `Sqrt(m[0])` przechodzilo
 // bramke, choc w rekordzie lezy obciety wynik redukcji RATIONAL.
 TEST(xcompiler, rejects_sqrt_in_a_rule_over_an_explicit_reducer_field) {
   qTree plan;
@@ -3530,7 +3530,7 @@ TEST(xcompiler, rejects_sqrt_in_a_rule_over_an_explicit_reducer_field) {
 //
 // Jawne `to_double` jest obejsciem, ktore podaje komunikat, wiec musi dzialac; `Sqrt` nad
 // typami liczbowymi nie byl nigdy zagrozony, bo ich droga powrotna nie rationalizuje;
-// a funkcje zaokraglajace nad RATIONAL sa bezpieczne — zmierzone: `Floor`/`Ceil`/`round`/
+// a funkcje zaokraglajace nad RATIONAL sa bezpieczne - zmierzone: `Floor`/`Ceil`/`round`/
 // `trunc` nad `2/1` daja mianownik 1, wiec nie ma czemu przepelnic.
 TEST(xcompiler, keeps_sqrt_where_it_was_never_unsafe) {
   qTree plan;
@@ -3561,8 +3561,8 @@ TEST(xcompiler, keeps_sqrt_where_it_was_never_unsafe) {
 // z powrotem na typ argumentu, a powrot do RATIONAL rationalizuje z ogromnym mianownikiem
 // (zmierzone: log(2/1) daje 2731/3940) i po cichu przepelnia sie w dalszym rachunku.
 //
-// `sin`, `cos` i `exp` dziela z `Sqrt` tylko bramke. Ich droga powrotna nie istnieje —
-// callRealFun() konczy na DOUBLE — wiec `cos(m[0])` policzyloby sie z pelna dokladnoscia.
+// `sin`, `cos` i `exp` dziela z `Sqrt` tylko bramke. Ich droga powrotna nie istnieje -
+// callRealFun() konczy na DOUBLE - wiec `cos(m[0])` policzyloby sie z pelna dokladnoscia.
 // Ich odrzucenie jest decyzja o kontrakcie jezyka (2026-09-12): jedna regula „funkcja
 // niewymierna nad RATIONAL wymaga jawnego to_double" zamiast listy wyjatkow, ktora
 // uzytkownik musialby pamietac.
@@ -3585,7 +3585,7 @@ TEST(xcompiler, rejects_irrational_functions_over_a_rational_value) {
 }
 
 // Warunek reguly idzie osobnym przebiegiem (checkRuleConditionShapes), wiec poszerzenie
-// bramki musi go objac razem z SELECT — inaczej RULE zostaje droga naokolo, tak jak bylo
+// bramki musi go objac razem z SELECT - inaczej RULE zostaje droga naokolo, tak jak bylo
 // dla samego `Sqrt`.
 TEST(xcompiler, rejects_irrational_functions_over_a_rational_value_in_a_rule_condition) {
   for (const char *call : {"sin(m[0])", "cos(m[0])", "exp(m[0])", "tan(m[0])", "log(m[0])", "log2(m[0])"}) {
@@ -3606,7 +3606,7 @@ TEST(xcompiler, rejects_irrational_functions_over_a_rational_value_in_a_rule_con
 }
 
 // Kontrola pozytywna: poza para (funkcja niewymierna, RATIONAL) nic sie nie zmienia, a typem
-// wyniku jest DOUBLE takze nad argumentem calkowitym — to jest cala tresc kontraktu
+// wyniku jest DOUBLE takze nad argumentem calkowitym - to jest cala tresc kontraktu
 // sin/cos/exp w deskryptorze.
 TEST(xcompiler, irrational_functions_yield_double_over_inexact_and_integer_arguments) {
   qTree plan;
@@ -3631,7 +3631,7 @@ TEST(xcompiler, irrational_functions_yield_double_over_inexact_and_integer_argum
 
 // Poszerzenie bramki o `tan`, `log` i `log2` NIE MOZE ruszyc ich typu wyniku: nad INTEGER
 // nadal wracaja na INTEGER, bo nadal ida przez callFun(). Gdyby ktos zalatwil je przy okazji
-// tak jak sin/cos/exp, zmienilby typ pola w `.desc` — czyli format artefaktu, ktory ma wlasna
+// tak jak sin/cos/exp, zmienilby typ pola w `.desc` - czyli format artefaktu, ktory ma wlasna
 // droge przez bramki H9/H10. Ten test jest zapadka na taka zmiane zrobiona mimochodem.
 TEST(xcompiler, gating_tan_log_log2_leaves_their_result_type_alone) {
   qTree plan;

@@ -164,7 +164,7 @@ TEST(xrdb, test_storage) {
 
 // ---------------------------------------------------------------------------
 // Dysponowalny storage (setDisposable(true)) nie zostawia po sobie żadnych
-// plików po destrukcji — ani danych, ani deskryptora, ani indeksu metadanych
+// plików po destrukcji - ani danych, ani deskryptora, ani indeksu metadanych
 // (.meta). Bez odłączenia metaData_ od pliku przed usunięciem
 // (storage::~storage() woła metaData_->abandonFile()), automatyczny
 // destruktor metaData_ (flushCurrentEntry()) odtworzyłby właśnie skasowany
@@ -404,7 +404,7 @@ TEST(xrdb, storage_gap_flushed_on_destructor) {
     // Gap phase: 1 more all-null record NOT written (activeGapDuration_ = 1)
     ASSERT_TRUE(s.write());
 
-    // Destructor fires here — flushPendingGap() must persist the gap to meta file
+    // Destructor fires here - flushPendingGap() must persist the gap to meta file
   }
 
   // Reopen and verify gap was saved
@@ -476,7 +476,7 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_modify) {
     // Wait longer than threshold
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-    // Modify existing record — auto-gap should NOT be triggered for modifications
+    // Modify existing record - auto-gap should NOT be triggered for modifications
     pl->setItem(0, 99);
     ASSERT_TRUE(s.write(0));
 
@@ -568,7 +568,7 @@ TEST(xrdb, storage_detects_rotation_and_rotates_meta) {
 }
 
 // When data and meta counts match (no rotation), configureGapDetection must NOT
-// rotate the meta index — existing records remain accessible.
+// rotate the meta index - existing records remain accessible.
 TEST(xrdb, storage_no_rotation_when_counts_match) {
   const std::string qryID2    = "ut-no-rotation";
   const std::string dataFile2 = "ut-no-rotation.bin";

@@ -6,15 +6,15 @@
 // per-monitorowy sink sa POZA metryka; publiczne rekordy monitorow sa MIANOWNIKIEM.
 //
 // Konwencja nazw operatorow, po ktorej liczy ten plik:
-//   SUB:<monitor>:<wezel>   — wezel BADANEGO PODPLANU (licznik metryki),
-//   PUB:<monitor>           — etap publiczny monitora (mianownik),
-//   SINK:<monitor>          — zapis wyniku publicznego (poza metryka),
-//   SRC:<strumien>          — zadeklarowane zrodlo (ingress, poza metryka).
+//   SUB:<monitor>:<wezel>   - wezel BADANEGO PODPLANU (licznik metryki),
+//   PUB:<monitor>           - etap publiczny monitora (mianownik),
+//   SINK:<monitor>          - zapis wyniku publicznego (poza metryka),
+//   SRC:<strumien>          - zadeklarowane zrodlo (ingress, poza metryka).
 //
-// Waga wezla to liczba jego zapisow w przebiegu wyrazona w JEDNOSTKACH `n_h` — tak samo, jak
+// Waga wezla to liczba jego zapisow w przebiegu wyrazona w JEDNOSTKACH `n_h` - tak samo, jak
 // w RAPORT_PILOTA.md §2, gdzie 1 jednostka = liczba slotow strumienia przeplecionego (150 Hz)
-// razy kanoniczna szerokosc rekordu. Wezel 150 Hz ma wage 1, wezel 100 Hz — 2/3,
-// wezel 50 Hz — 1/3. Jednostki sa arytmetyka predeklaracyjna (rate x szerokosc), nie odczytem
+// razy kanoniczna szerokosc rekordu. Wezel 150 Hz ma wage 1, wezel 100 Hz - 2/3,
+// wezel 50 Hz - 1/3. Jednostki sa arytmetyka predeklaracyjna (rate x szerokosc), nie odczytem
 // licznika: ten krok nie uruchamia pomiaru, dokladnie jak pilot compile-only.
 //
 // Rejestr wag jest weryfikowany wobec ZBUDOWANEGO grafu: kazdy wezel `SUB:` musi wystapic
@@ -49,7 +49,7 @@ public final class PlanDump {
   public static final double UNIT_100 = 2.0 / 3.0;
   public static final double UNIT_50 = 1.0 / 3.0;
 
-  /** Rodzaj operatora — decyduje, ktory licznik pracy on obsluguje. */
+  /** Rodzaj operatora - decyduje, ktory licznik pracy on obsluguje. */
   public enum Kind {
     /** Jedno wejscie, jeden rekord na rekord: przesuniecie albo przejscie monitora. */
     MAP,
@@ -66,7 +66,7 @@ public final class PlanDump {
   private static int costlyProgramTokens = 0;
 
   /**
-   * Deklaruje, ktory program rodziny jest KOSZTOWNY — jego liczba wykonan na slot jest
+   * Deklaruje, ktory program rodziny jest KOSZTOWNY - jego liczba wykonan na slot jest
    * wielkoscia odporna na ciecie obliczenia na operatory, wiec to ona niesie twierdzenie
    * o zduplikowanej pracy (§10, metryki mechanizmu). Wartosc w tokenach, odczytana ze zrzutu
    * planu pilota (`K26Ops.TOKENS_*`).
@@ -82,7 +82,7 @@ public final class PlanDump {
     return register("SUB:" + name, stream, new Node(true, unitWeight, programTokens, kind));
   }
 
-  /** Etap publiczny monitora — mianownik metryki bajtowej, ale JEGO PRACA sie liczy. */
+  /** Etap publiczny monitora - mianownik metryki bajtowej, ale JEGO PRACA sie liczy. */
   public static DataStream<Tuple3<Long, Long, Integer>> pub(
       SingleOutputStreamOperator<Tuple3<Long, Long, Integer>> stream, String monitor, double unitWeight,
       int programTokens, Kind kind) {
@@ -103,7 +103,7 @@ public final class PlanDump {
   }
 
   /**
-   * Zapisuje oba plany i wiersz zestawienia. Nie wywoluje `env.execute()` — plan powstaje
+   * Zapisuje oba plany i wiersz zestawienia. Nie wywoluje `env.execute()` - plan powstaje
    * z transformacji, bez uruchomienia joba i bez jakiegokolwiek pomiaru.
    */
   public static void dump(StreamExecutionEnvironment env, String family, String variant, int q, String outDir)
@@ -116,11 +116,11 @@ public final class PlanDump {
     Files.createDirectories(results);
     String stem = family + "_" + variant + "_Q" + q;
 
-    // 1. Plan LOGICZNY — graf strumieniowy w postaci, w ktorej podaje go sam Flink.
+    // 1. Plan LOGICZNY - graf strumieniowy w postaci, w ktorej podaje go sam Flink.
     Files.writeString(plans.resolve(stem + "_logical.json"), streamGraph.getStreamingPlanAsJSON() + "\n",
         StandardCharsets.UTF_8);
 
-    // 2. Plan logiczny w postaci tabelarycznej — wezel, rownoleglosc, krawedzie.
+    // 2. Plan logiczny w postaci tabelarycznej - wezel, rownoleglosc, krawedzie.
     List<StreamNode> nodes = new ArrayList<>(streamGraph.getStreamNodes());
     nodes.sort((x, y) -> Integer.compare(x.getId(), y.getId()));
     StringBuilder logical = new StringBuilder("node_id\toperator\tparallelism\trole\tinputs\n");
@@ -138,7 +138,7 @@ public final class PlanDump {
     }
     Files.writeString(plans.resolve(stem + "_logical.tsv"), logical.toString(), StandardCharsets.UTF_8);
 
-    // 3. Plan FIZYCZNY — wierzcholki JobGraphu po scaleniu lancuchow operatorow.
+    // 3. Plan FIZYCZNY - wierzcholki JobGraphu po scaleniu lancuchow operatorow.
     //    Lancuchowanie NIE jest wylaczane: §10 zabrania blokowania optymalizacji Flinka.
     JobGraph jobGraph = streamGraph.getJobGraph();
     StringBuilder physical = new StringBuilder("vertex_id\tvertex_name\tparallelism\tchained_operators\n");
@@ -178,7 +178,7 @@ public final class PlanDump {
     }
 
     // 5. Praca przewidziana z planu. Wielkosci wazone rate'em, w jednostkach `n_h`, tak samo
-    //    jak bajty: `evalCalls` na jednostke slotow przeplotu. To jest arytmetyka planu —
+    //    jak bajty: `evalCalls` na jednostke slotow przeplotu. To jest arytmetyka planu -
     //    licznik runtime (Canon.workReport) czyta te same liczby w P6.
     int subplanNodes = 0;
     int publicStages = 0;

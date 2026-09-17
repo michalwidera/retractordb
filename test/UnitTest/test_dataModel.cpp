@@ -161,18 +161,18 @@ TEST_F(xschema, check_construct_payload_mirror) {
 // str1: 11,12 / 13,14 / 15,16   -> recordsCount=3, descriptorSrcSize=2
 // Okno (length=4, step=1, windowIndex=5) jest stemplowane koncem przedzialu:
 // windowStart = 5*1 - (4-1) = 2, pozycje płaskie 2,3,4,5 -> recordIndex = 2/2, 3/2, 4/2, 5/2 = 1,1,2,2.
-// Geometria (a wiec i praca) jest ta sama co przed przestemplowaniem — zmienil sie
+// Geometria (a wiec i praca) jest ta sama co przed przestemplowaniem - zmienil sie
 // wylacznie indeks, pod ktorym to okno wystepuje.
 //
 // Stąd dokładnie:
 //   agseWindows  = 1  (jedna konstrukcja okna)
-//   agseElements = 4  (cztery odwiedziny elementów — TO jest praca, której nie widzą
+//   agseElements = 4  (cztery odwiedziny elementów - TO jest praca, której nie widzą
 //                      liczniki planu: w planie okno jest jednym tokenem)
 //   agseReads    = 2  (dwa różne rekordy źródła; cache lastReadPosition oszczędza dwa
-//                      odczyty z czterech odwiedzin — dlatego odczyty i odwiedziny są
+//                      odczyty z czterech odwiedzin - dlatego odczyty i odwiedziny są
 //                      liczone ROZDZIELNIE)
 TEST_F(xschema, probe_e4_agse_window_work_counts) {
-  // Test kompiluje się i URUCHAMIA w obu wariantach — to jest sens stałych rdb_probe_*
+  // Test kompiluje się i URUCHAMIA w obu wariantach - to jest sens stałych rdb_probe_*
   // zamiast #ifdef. Mnożnik `on` koduje drugą połowę kontraktu: w buildzie bez sond
   // przejście przez to samo okno nie ma prawa ruszyć żadnego licznika.
   constexpr unsigned long long on = rdb_probe_work ? 1 : 0;
@@ -188,7 +188,7 @@ TEST_F(xschema, probe_e4_agse_window_work_counts) {
   EXPECT_EQ(after.agseElements, 4 * on);
   EXPECT_EQ(after.agseReads, 2 * on);
 
-  // Drugie okno musi DOŁOŻYĆ dokładnie tyle samo — liczniki są procesowe i akumulują,
+  // Drugie okno musi DOŁOŻYĆ dokładnie tyle samo - liczniki są procesowe i akumulują,
   // a analiza dzieli je przez liczbę slotów. Gdyby akumulacja gubiła wywołania, model
   // kosztu dostałby zaniżoną pracę i to jest dokładnie ta klasa błędu, przez którą
   // upadł model K20 etap 1.
@@ -199,7 +199,7 @@ TEST_F(xschema, probe_e4_agse_window_work_counts) {
   EXPECT_EQ(twice.agseElements, 8 * on);
   EXPECT_EQ(twice.agseReads, 4 * on);
 
-  // Okno lustrzane ma tę samą geometrię, więc tę samą pracę — znak steruje kolejnością
+  // Okno lustrzane ma tę samą geometrię, więc tę samą pracę - znak steruje kolejnością
   // pól w wyniku, nie liczbą odwiedzin.
   rdb::probe::workReset();
   { auto payload = data.constructAgsePayload(-4, 1, "str1", 5); }
@@ -208,13 +208,13 @@ TEST_F(xschema, probe_e4_agse_window_work_counts) {
   EXPECT_EQ(mirrored.agseElements, 4 * on);
   EXPECT_EQ(mirrored.agseReads, 2 * on);
 
-  // Reset musi naprawdę zerować — bez tego przebiegi kampanii sumowałyby się nawzajem.
+  // Reset musi naprawdę zerować - bez tego przebiegi kampanii sumowałyby się nawzajem.
   rdb::probe::workReset();
   EXPECT_EQ(rdb::probe::workReport().agseElements, 0u);
   EXPECT_EQ(rdb::probe::workReport().agseWindows, 0u);
 }
 
-// Praca okna musi rosnąć LINIOWO z jego długością — to jest cała teza tej sondy: cecha
+// Praca okna musi rosnąć LINIOWO z jego długością - to jest cała teza tej sondy: cecha
 // rośnie z pracą wykonywaną w slocie, a nie z rozmiarem planu (który dla obu tych okien
 // jest identyczny: jeden token STREAM_AGSE).
 TEST_F(xschema, probe_e4_agse_elements_scale_with_window_length) {
@@ -354,7 +354,7 @@ TEST_F(xschema, reduceFieldsToPayload_avg) {
   // str1 last record: {15, 16} → AVG = 31/2.
   // K24/D4: wynik redukcji jest polem RATIONAL i pozostaje dokladny. Wczesniej
   // przechodzil przez rational_cast<int> i dawal 15, mimo ze pole wyjsciowe
-  // zadeklarowane przez kompilator bylo RATIONAL — stad mianownik zawsze 1.
+  // zadeklarowane przez kompilator bylo RATIONAL - stad mianownik zawsze 1.
   auto result = data.reduceFieldsToPayload(STREAM_AVG, "str1");
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;

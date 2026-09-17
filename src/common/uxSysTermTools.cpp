@@ -66,7 +66,7 @@ class SdPriorityFlag : public spdlog::custom_flag_formatter {
 bool _kbhit(bool ignoreAnyKey) {
   if (ignoreAnyKey) return false;
   // Bez terminala nie ma czego nacisnąć. Gdy stdin jest plikiem albo potokiem,
-  // `getchar()` zwraca pierwszy bajt WEJŚCIA, a nie klawisz operatora — pętla
+  // `getchar()` zwraca pierwszy bajt WEJŚCIA, a nie klawisz operatora - pętla
   // czytająca dane kończyła się wtedy natychmiast i, co gorsza, wyglądało to na
   // normalne zakończenie. Wykryte w kampanii K6b (issue_215): `xqry` ze stdin
   // przekierowanym z pliku konsumował ten plik i wychodził kodem 0, nie
@@ -120,7 +120,7 @@ std::string setupLoggerMain(const std::string &loggerFile, bool dual, bool servi
   // bez pliku w /tmp, bez własnego znacznika czasu i bez kodów ANSI; flush po każdej linii.
   if (service) {
     auto journal_sink = std::make_shared<spdlog::sinks::stderr_sink_mt>();
-    // Pattern z prefiksem priorytetu sd-daemon "<N>" (flaga '%*') na początku linii — journald
+    // Pattern z prefiksem priorytetu sd-daemon "<N>" (flaga '%*') na początku linii - journald
     // klasyfikuje wagę. Dalej zwięźle: poziom + treść, bez własnego znacznika czasu i bez ANSI.
     auto journal_formatter = std::make_unique<spdlog::pattern_formatter>();
     journal_formatter->add_flag<SdPriorityFlag>('*').set_pattern("<%*>[%L] %v");

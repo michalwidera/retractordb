@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Werdykt K24d — automatyczny, per klasa operatora, nigdy agregatem.
+"""Werdykt K24d - automatyczny, per klasa operatora, nigdy agregatem.
 
 Raportowane są dwie wielkości osobno (ogon i początek logiczny) oraz ich suma.
 Mieszanie ich ukryłoby przesunięcie milczenia między członami przy zachowanej
-sumie — czyli dokładnie to, co zrobiło przestemplowanie z 2026-08-06.
+sumie - czyli dokładnie to, co zrobiło przestemplowanie z 2026-08-06.
 
 Czyta `raw/campaign.csv` i wypisuje `VERDICT.md`. Progi pochodzą
 z zamrożonych kryteriów kampanii K24 §6; ten skrypt nie podejmuje
@@ -55,7 +55,7 @@ def classify_origin(rows):
     """To samo, ale dla początku logicznego i dla sumy slotów milczenia.
 
     Kierunek różnicy znaczy tu co innego niż przy ogonie. Origin **zaniżony**
-    to rekord wyemitowany, mimo że jego definicja sięga przed początek źródła —
+    to rekord wyemitowany, mimo że jego definicja sięga przed początek źródła -
     czyli odczyt poza historią, nie opóźnienie. Origin **zawyżony** to rekord
     porzucony, mimo że dawał się policzyć: strumień milczy dłużej, niż musi.
     """
@@ -100,13 +100,13 @@ def member_b(rows):
 
 
 #: Operatory pozbawione własnego ogona. Reguła lokalna A zeruje własny ogon
-#: KAŻDEGO operatora, więc tylko na tych trzech może z definicji trafić — i tylko
+#: KAŻDEGO operatora, więc tylko na tych trzech może z definicji trafić - i tylko
 #: na nich zero rozjazdu jest kontrolą reguły, a nie kontrolą jej znanego braku.
 PHASE_FREE = ("PASS", "SHIFT", "REDUCE")
 
 
 def controls(rows):
-    """Kontrole negatywne członu (b) — predeklaracja K24b §4 z 2026-08-04.
+    """Kontrole negatywne członu (b) - predeklaracja K24b §4 z 2026-08-04.
 
     Obie są **węzłowe i zawężone do operatorów bez własnego ogona**. Zawężenie
     nie jest wygodą: na `@`, `-`, `Θ`, `~Θ`, `+` i `#` reguła A rozjeżdża się
@@ -114,14 +114,14 @@ def controls(rows):
 
     Trzy kontrole z pierwotnej predeklaracji K24 zostały wycofane:
 
-    * `HC_INT` w obu postaciach — K24b PREDECLARATION §1 i §4. Predeklarowana
+    * `HC_INT` w obu postaciach - K24b PREDECLARATION §1 i §4. Predeklarowana
       postać rozjazdu `ceil((p+q-1)/p)` daje przy ilorazie całkowitym (`q = 1`)
       wartość **1**, a kontrola żądała **0**: była sprzeczna z twierdzeniem,
-      które miała kontrolować. Zmierzone 2026-09-12 na obu ziarnach bramki —
+      które miała kontrolować. Zmierzone 2026-09-12 na obu ziarnach bramki -
       w populacji twierdzenia rozjazd wynosi dokładnie 1 w 544/544 i 545/545
       węzłów o ilorazie całkowitym, czyli kontrola mierzyła zgodność z postacią,
       nie odstępstwo od niej.
-    * `HC_SINGLE (dosłownie)` — K24b PREDECLARATION §4. Dopuszcza `@` i `-`,
+    * `HC_SINGLE (dosłownie)` - K24b PREDECLARATION §4. Dopuszcza `@` i `-`,
       które własny ogon mają. Na ziarnach bramki przechodziła (0/3929), ale
       przechodziła PRZYPADKIEM: generator nie trafił na nich w plan jednotaktowy
       o niezerowym ogonie własnym. Kontrola spełniona przez dobór próby,
@@ -165,16 +165,16 @@ def render(rows, out, seed="20260803", engine="5e3eb42"):
     plans = len({row["plan"] for row in rows})
 
     lines = [
-        "# K24d / H10 — werdykt", "",
+        "# K24d / H10 - werdykt", "",
         f"Korpus: **{plans} planów**, **{len(rows)} obserwacji węzłowych**, "
         f"zero błędów aparatury. Ziarno {seed}, silnik `{engine}`.", "",
         "Werdykt jest raportowany per klasa operatora. Zgodność 100% jest jedynym",
         "wsparciem H10a w klasie; jedna niezgodność falsyfikuje H10a w tej klasie.", "",
-        "## 1. H10a — dokładność, per klasa operatora", "",
+        "## 1. H10a - dokładność, per klasa operatora", "",
         "Kolumna **izolowana** jest werdyktem: postać zamknięta policzona z ogonów",
         "składowych wziętych z oracle'a, więc niezgodność pochodzi z reguły tego",
         "węzła. Kolumna **propagowana** to zgodność zrzutu planu silnika z oracle'em",
-        "na całym planie — zawiera skutki niezgodności odziedziczonych po dzieciach.", "",
+        "na całym planie - zawiera skutki niezgodności odziedziczonych po dzieciach.", "",
         "| Klasa | Węzłów | Izolowana C1 | Izolowana C2 | Propagowana C1 | Reżim | Werdykt H10a |",
         "|---|---:|---:|---:|---:|---|---|",
     ]
@@ -224,9 +224,9 @@ def render(rows, out, seed="20260803", engine="5e3eb42"):
                              f"{row['oracle_c1']} |")
 
     origin_stats = classify_origin(rows)
-    lines += ["", "## 1b. H10a — początek logiczny, per klasa operatora", "",
+    lines += ["", "## 1b. H10a - początek logiczny, per klasa operatora", "",
               "Wielkość wprowadzona przestemplowaniem z 2026-08-06 i nieobecna",
-              "w kampaniach K24/K24r. Kolumna **suma** porównuje origin+ogon —",
+              "w kampaniach K24/K24r. Kolumna **suma** porównuje origin+ogon -",
               "to jedyna wielkość wspólna z kampaniami sprzed zmiany.", "",
               "| Klasa | Węzłów | Izolowana | Propagowana | Suma (origin+ogon) | Reżim | Werdykt |",
               "|---|---:|---:|---:|---:|---|---|"]
@@ -259,7 +259,7 @@ def render(rows, out, seed="20260803", engine="5e3eb42"):
     lines += ["", f"Origin zaniżony (odczyt przed początkiem źródła): "
                   f"{', '.join(f'`{k}`' for k in origin_under) or '**brak**'}.", ""]
 
-    lines += ["## 2. H10b — nielokalność", "",
+    lines += ["## 2. H10b - nielokalność", "",
               f"* rozjazd reguły lokalnej A z dokładną: **{b['diverging']} z {b['plans']} "
               f"planów = {b['share']:.1%}** (próg predeklarowany: >= 5%)",
               "* populacja predeklarowana: węzły `#` z dwiema bezpośrednimi "
@@ -278,11 +278,11 @@ def render(rows, out, seed="20260803", engine="5e3eb42"):
 
     # Stan kontroli rozstrzyga, czy sekcja 2 jest werdyktem, czy tylko liczbami.
     # Kontrola o pustej populacji nie jest kontrolą spełnioną, lecz kontrolą,
-    # której nie było czym sprawdzić — kierunek błędu jest jednostronny.
+    # której nie było czym sprawdzić - kierunek błędu jest jednostronny.
     failing = [label for label, (count, breaks) in ctl.items() if breaks or count == 0]
     if failing:
         lines += ["", "Kontrola negatywna złamana albo o pustej populacji znaczy **źle",
-                  "zdefiniowaną regułę lokalną, a nie wynik** — człon (b) jest wtedy",
+                  "zdefiniowaną regułę lokalną, a nie wynik** - człon (b) jest wtedy",
                   "nieocenialny i liczby z sekcji 2 nie stanowią werdyktu.",
                   "Niespełnione: " + ", ".join(failing) + ".", ""]
     else:
@@ -309,14 +309,14 @@ def main():
     # Puste listy `zawyżające` i `zaniżające` są stanem NAJLEPSZYM, nie awarią.
     # Trzy reżimy są rozłączne i sumują się do wszystkich klas, więc komplet
     # klas w `dokładne` z konieczności zostawia dwie pozostałe listy puste.
-    # Zapis `[]` bywa czytany jako brak danych — stąd ta uwaga przy samym druku:
+    # Zapis `[]` bywa czytany jako brak danych - stąd ta uwaga przy samym druku:
     # niepusta lista `zaniżające` oznacza defekt poprawności (rekord wyemitowany,
     # zanim jego zależności są określone), a niepusta `zawyżające` utratę
-    # dokładności wobec zamrożonego odniesienia — dopiero to oblewa bramkę.
+    # dokładności wobec zamrożonego odniesienia - dopiero to oblewa bramkę.
     print(f"dokładne: {summary['exact']}")
     print(f"zawyżające: {summary['over']}")
     print(f"zaniżające: {summary['under']}")
-    print(f"origin — klasy z zaniżeniem: {summary['origin_under'] or 'brak'}")
+    print(f"origin - klasy z zaniżeniem: {summary['origin_under'] or 'brak'}")
     # Bez przymiotnika: o ocenialności członu (b) rozstrzygają kontrole niżej,
     # a nie ten druk. Zaszyte „(nieocenialny)" przeżyło swój powód o pięć tygodni.
     print(f"H10b: rozjazd {summary['b']['share']:.1%}, "

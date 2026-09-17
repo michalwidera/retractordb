@@ -1,14 +1,14 @@
 # K24/P1: pojemnosc historii dla operatorow czytajacych w przod.
 #
-# sub3/sub4/sub5 — roznica o calkowitym ilorazie >= 3. Przed poprawka caly strumien
+# sub3/sub4/sub5 - roznica o calkowitym ilorazie >= 3. Przed poprawka caly strumien
 # skladal sie z rekordow all-NULL przy poprawnej ich liczbie (cichy defekt).
 #
-# win/lag/mix — AGSE nad deklaracja o ilorazie 3 oraz `>N` pod `#`. Przed
+# win/lag/mix - AGSE nad deklaracja o ilorazie 3 oraz `>N` pod `#`. Przed
 # poprawka lancuch konczyl sie przerwaniem procesu w storage::revRead.
 #
 # K24/H10 (2026-08-18): liczby rekordow sub3/sub4/sub5 wzrosly o jeden (13/10/7 ->
 # 14/11/8). Ogon `-` spadl z 1 na 0, wiec strumien milczy o slot krocej przy tej samej
-# dlugosci przebiegu. Tresc rekordow bez zmian — ciag pozostaje arytmetyczny.
+# dlugosci przebiegu. Tresc rekordow bez zmian - ciag pozostaje arytmetyczny.
 
 DECLARE value INTEGER STREAM source, 1/100 FILE 'data.txt'
 

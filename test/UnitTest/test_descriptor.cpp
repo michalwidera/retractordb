@@ -297,7 +297,7 @@ TEST(descriptor, copy_constructor) {
 // Zgodnosc deskryptorow idzie po SLOTACH PLASKICH rekordu, nie po wpisach: numeryczne
 // `T[N]` i N pol `T` opisuja te same bajty pod tymi samymi offsetami. Do 2026-08-30
 // porownanie szlo po wpisach, wiec ta para wychodzila NIEZGODNA i payload::operator=
-// konczylo sie bledem krytycznym — tak wywracal sie przeplot `#` nad polem tablicowym.
+// konczylo sie bledem krytycznym - tak wywracal sie przeplot `#` nad polem tablicowym.
 TEST(descriptor, array_field_is_compatible_with_the_same_flat_scalar_fields) {
   const rdb::Descriptor arrayForm("cells", 4, 3, rdb::INTEGER);
   const auto scalarForm{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
@@ -322,7 +322,7 @@ TEST(descriptor, different_flat_width_stays_incompatible) {
   EXPECT_FALSE(threeElements == oneScalar);
 }
 
-// STRING[N] jest JEDNYM slotem o dlugosci N bajtow, a nie N slotami — inaczej niz typy
+// STRING[N] jest JEDNYM slotem o dlugosci N bajtow, a nie N slotami - inaczej niz typy
 // liczbowe. Ta sama regula co w Descriptor::rebuildFieldMappings().
 TEST(descriptor, string_array_stays_one_flat_slot) {
   const rdb::Descriptor text("name", 1, 8, rdb::STRING);

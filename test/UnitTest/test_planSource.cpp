@@ -6,7 +6,7 @@
 #include "retractor/lib/planSource.hpp"
 #include "retractor/lib/qTree.hpp"
 
-/// @brief Wczytywanie zestawu RQL z tekstu — wspolne zrodlo startu z pliku i przeladowania
+/// @brief Wczytywanie zestawu RQL z tekstu - wspolne zrodlo startu z pliku i przeladowania
 /// w locie (`xqry --reset`).
 ///
 /// Przedmiotem badania jest jedna rzecz, ktora rozni sie tu od dawnego kodu launchera: zestaw
@@ -105,7 +105,7 @@ TEST(PlanSource, stores_follow_the_file_clause_and_the_storage_directive) {
   EXPECT_EQ(planStorePaths(plan, {}), (std::vector<std::string>{absolutePathOf("temp/dst"), absolutePathOf("temp/shared")}));
 }
 
-/// Strumien MEMORY zyje w pamieci procesu i nie dotyka systemu plikow — roszczenie jego
+/// Strumien MEMORY zyje w pamieci procesu i nie dotyka systemu plikow - roszczenie jego
 /// sciezki byloby konfliktem o nic. Obie drogi do tego typu (VOLATILE i STORAGE memory)
 /// musza dawac ten sam wynik, bo w wykonaniu obie koncza sie tym samym akcesorem.
 TEST(PlanSource, memory_streams_do_not_claim_a_store) {
@@ -120,7 +120,7 @@ TEST(PlanSource, memory_streams_do_not_claim_a_store) {
   EXPECT_EQ(planStorePaths(plan, {}), (std::vector<std::string>{absolutePathOf("disk")}));
 }
 
-/// Domyslny katalog z konfiguracji wchodzi tylko wtedy, gdy plan nie ma wlasnej dyrektywy —
+/// Domyslny katalog z konfiguracji wchodzi tylko wtedy, gdy plan nie ma wlasnej dyrektywy -
 /// ta sama regula pierwszenstwa, co przy budowie planu w launcherze. Bez tego parametru
 /// rezerwacja wskazywalaby katalog roboczy, a plan pisalby gdzie indziej.
 TEST(PlanSource, default_storage_dir_yields_to_the_storage_directive) {

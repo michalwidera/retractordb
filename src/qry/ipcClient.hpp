@@ -20,7 +20,7 @@ constexpr int kSpscQueueCapacity = 1024;
 // dostaje SCHED_FIFO; przy pracy pod `taskset` na jednym rdzeniu wątek
 // komunikacyjny dostaje CPU dopiero w oknie throttlingu RT, którego okres jest
 // rzędu sekundy. Klient poddawał się, zanim serwer w ogóle został zaszeregowany
-// — i kończył się kodem `timed_out`, co harness pomiarowy odczytywał jako
+// - i kończył się kodem `timed_out`, co harness pomiarowy odczytywał jako
 // zniknięcie klienta (issue_217).
 constexpr int kIpcClientDefaultResponseMaxFails = 300;
 
@@ -45,7 +45,7 @@ class IpcClient {
 
   // Producent nie zdołał otworzyć własnej kolejki odpowiedzi mimo ponowień.
   // Bez tego rozróżnienia `done` po nieudanym otwarciu wyglądało identycznie
-  // jak `done` po normalnym końcu strumienia — i klient kończył się zerem, nie
+  // jak `done` po normalnym końcu strumienia - i klient kończył się zerem, nie
   // przeczytawszy nic (issue_215).
   std::atomic<bool> responseQueueMissing{false};
 

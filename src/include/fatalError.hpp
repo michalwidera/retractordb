@@ -17,7 +17,7 @@ inline std::atomic<bool> fatalErrorRaised{false};
 
 // [[noreturn]] replacement for the old FATAL_ERROR macro.
 // The struct+CTAD idiom allows std::source_location as a defaulted trailing
-// parameter alongside a variadic template — impossible with a plain function.
+// parameter alongside a variadic template - impossible with a plain function.
 // Format string is checked at compile time via fmt::format_string<Args...>.
 template <typename... Args>
 struct FatalError {
@@ -31,7 +31,7 @@ struct FatalError {
       logger->log(spdlog::source_loc{loc.file_name(), static_cast<int>(loc.line()), loc.function_name()},
                   spdlog::level::critical, msg);
       // FLUSH, nie shutdown. std::exit ponizej uruchamia funkcje zarejestrowane przez
-      // std::atexit, a te loguja — executorsm::cleanup() zaczyna od SPDLOG_WARN. Po
+      // std::atexit, a te loguja - executorsm::cleanup() zaczyna od SPDLOG_WARN. Po
       // spdlog::shutdown() rejestr jest pusty i default_logger_raw() zwraca nullptr, wiec
       // makro SPDLOG_* wolalo should_log() na wskazniku zerowym: KAZDY blad krytyczny
       // konczyl sie SIGSEGV w atexit, tuz po wypisaniu wlasciwego komunikatu. Proces
@@ -40,7 +40,7 @@ struct FatalError {
       // ginal przed swoimi wywolaniami remove().
       //
       // Flush wystarcza do trwalosci: wszystkie sinki tego projektu sa SYNCHRONICZNE
-      // (basic_file_sink_mt, stderr_sink_mt — patrz uxSysTermTools.cpp::logger), nie ma
+      // (basic_file_sink_mt, stderr_sink_mt - patrz uxSysTermTools.cpp::logger), nie ma
       // ani jednego loggera asynchronicznego, ktory wymagalby drenowania kolejki.
       // Rejestr zamyka sie sam przy destrukcji statykow, juz PO handlerach atexit:
       // spdlog::registry::instance() powstaje przy konfiguracji logowania, czyli wczesniej

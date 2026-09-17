@@ -6,7 +6,7 @@
 #
 # Split in two on 2026-09-06. `-shape` asserts that the rewrite fired, so it
 # cannot hold with the pass off and is disabled there. `-value` asserts the
-# computed result and runs in every switch configuration — a single test could
+# computed result and runs in every switch configuration - a single test could
 # not do both, because one `cmp` over the whole artifact pins `Val` and `Lat` at
 # once. The reasoning is in the header of each script.
 

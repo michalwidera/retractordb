@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Skrypt werdyktu K26 / H9 — liczy progi sam i wydaje werdykt bez interpretacji.
+"""Skrypt werdyktu K26 / H9 - liczy progi sam i wydaje werdykt bez interpretacji.
 
 Pozycja w protokole
 -------------------
 §10 („Zamrożenie i produkt") wymienia wykonywalny skrypt werdyktu wśród pozycji
 zamrażanych PRZED pomiarem, a §5 Krok 8 mówi: „werdykt wydany przez skrypt, nie
 przez interpretację". Ten plik jest tą pozycją. Progi, ablacje minimalne, siatka
-`Q`, komórka rozstrzygająca i reguła 2/3 są tu STAŁYMI, nie parametrami — nie da
+`Q`, komórka rozstrzygająca i reguła 2/3 są tu STAŁYMI, nie parametrami - nie da
 się ich podać z wiersza poleceń, bo wtedy zamrożenie niczego by nie znaczyło.
 
 Wejście (katalog `--matrix`)
 ----------------------------
-`mechanism.tsv`  — wielkości DETERMINISTYCZNE, jeden wiersz na (rodzina, system,
+`mechanism.tsv`  - wielkości DETERMINISTYCZNE, jeden wiersz na (rodzina, system,
                    profil, Q): instancje, `STREAM_SELECT_*`, substraty, r1, r2,
                    bajty substratów, publiczne dopisania, liczniki pracy.
-`timing.tsv`     — wielkość ZMIENNA, jeden wiersz na (rodzina, profil, Q, blok):
+`timing.tsv`     - wielkość ZMIENNA, jeden wiersz na (rodzina, profil, Q, blok):
                    `compute_median_ns`, `compute_p99_ns`, `slot_ns`,
                    `lost_records`.
-`gates.tsv`      — bramki poprawności/mechanizmu: (rodzina, bramka, status,
+`gates.tsv`      - bramki poprawności/mechanizmu: (rodzina, bramka, status,
                    klasyfikacja). Klasyfikacja rozstrzyga, czy porażka bramki
                    liczy się PRZECIW H9 (`engine_or_profile`), czy unieważnia
                    iterację bez werdyktu (`apparatus` albo `corpus`).
@@ -26,7 +26,7 @@ Kody wyjścia
 ------------
 0  H9 WSPARTA        (co najmniej 2/3 ważnych rodzin przechodzi komplet progów)
 1  H9 BEZ WSPARCIA   (rodziny ważne, progi nieosiągnięte)
-2  BRAK WERDYKTU     (iteracja technicznie nieważna albo niepełna — §10 zabrania
+2  BRAK WERDYKTU     (iteracja technicznie nieważna albo niepełna - §10 zabrania
                       wtedy wydawania werdyktu; powtórzyć w NOWYM katalogu)
 
 Bramka własna
@@ -44,7 +44,7 @@ from fractions import Fraction
 from pathlib import Path
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  ZAMROŻONE STAŁE — predeklaracji kampanii K26v3 §7. Zmiana którejkolwiek wymaga NOWEJ
+#  ZAMROŻONE STAŁE - predeklaracji kampanii K26v3 §7. Zmiana którejkolwiek wymaga NOWEJ
 #  predeklaracji i nowego katalogu wyników (§10). Nie są parametrami CLI.
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -52,10 +52,10 @@ FAMILIES = ["F9-R2", "F9-R1", "F9-X"]
 Q_GRID = [1, 2, 4, 8, 16, 32]
 
 #: Komórka rozstrzygająca. `Q=1,2,4` są kontrolą trendu, `Q=16,32` pomiarem
-#: skalowania — NIE dodatkowymi szansami na zaliczenie progu (§10).
+#: skalowania - NIE dodatkowymi szansami na zaliczenie progu (§10).
 DECISIVE_Q = 8
 
-#: Ablacja minimalna rodziny — profil różniący się od `DEFAULT` DOKŁADNIE jednym
+#: Ablacja minimalna rodziny - profil różniący się od `DEFAULT` DOKŁADNIE jednym
 #: przełącznikiem badanego mechanizmu (dla F9-X komórka kontrolna układu 2×2).
 MINIMAL_ABLATION = {"F9-R2": "NO_R2_CANON", "F9-R1": "NO_R1_FACTOR", "F9-X": "NO_R1_NO_R2"}
 
@@ -84,13 +84,13 @@ CI_LOWER_PCT, CI_UPPER_PCT = 2.5, 97.5
 SLOT_BUDGET_STOP = Fraction(80, 100)
 
 #: Która wielkość pracy ROZDZIELA w danej rodzinie. Rozstrzygnięte osobno per
-#: rodzina, bo w F9-R1 program pola daje 0,0% — współdzielenie dotyczy tam
+#: rodzina, bo w F9-R1 program pola daje 0,0% - współdzielenie dotyczy tam
 #: przeplotu, nie arytmetyki (PLANY_FLINKA.md §4.3). Jedna reguła na trzy różne
 #: mechanizmy dawałaby fałszywy wynik zerowy w F9-R1.
 RESOLVING_WORK = {"F9-R2": "work_costly_evals", "F9-R1": "work_hash_picks", "F9-X": "work_costly_evals"}
 
 #: Predeklarowana krzywa redukcji WEWNĘTRZNEJ (wobec ablacji minimalnej).
-#: Nasyca się na `1 − 1/F` — NIE rośnie z `Q` powyżej progu postaci. Skrypt nie
+#: Nasyca się na `1 − 1/F` - NIE rośnie z `Q` powyżej progu postaci. Skrypt nie
 #: ma prawa oczekiwać po tej stronie trendu rosnącego (SZKIC_RODZIN.md §3.3).
 PREDECLARED_RDB = {
     "F9-R2": {1: Fraction(0), 2: Fraction(0), 4: Fraction(1, 2), 8: Fraction(1, 2),
@@ -101,7 +101,7 @@ PREDECLARED_RDB = {
              16: Fraction(7, 12), 32: Fraction(7, 12)},
 }
 
-#: Predeklarowana krzywa redukcji wobec `FLINK_NATURAL` — liniowa w `Q`, więc
+#: Predeklarowana krzywa redukcji wobec `FLINK_NATURAL` - liniowa w `Q`, więc
 #: `1 − 1/Q` dla rodzin jednowęzłowych i `1 − 5/(4Q)` dla F9-X (pięć węzłów
 #: wspólnego podplanu). PRZY `Q=1` W F9-X JEST UJEMNA (−25%) i tak ma być:
 #: `FLINK_NATURAL` ma tam 4 jednostki wobec 5 w `DEFAULT` (PLANY_FLINKA.md §4.2).
@@ -147,7 +147,7 @@ INVALIDATING_CLASSIFICATIONS = {"apparatus", "corpus"}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Narzędzia liczbowe — bez zależności zewnętrznych, żeby werdykt nie zależał od
+#  Narzędzia liczbowe - bez zależności zewnętrznych, żeby werdykt nie zależał od
 #  wersji biblioteki zainstalowanej na maszynie liczącej.
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -183,7 +183,7 @@ def paired_bootstrap_ratio(default_by_block, ablation_by_block):
 
     Statystyka: `median_bloków(DEFAULT) / median_bloków(ablacja)`.
     Sparowanie: replikacja losuje INDEKSY BLOKÓW, a nie wartości osobno dla
-    każdego profilu — bloki są jednostką losowania, bo profile biegły w nich
+    każdego profilu - bloki są jednostką losowania, bo profile biegły w nich
     razem, na tej samej maszynie i w tej samej kolejności z zamrożonego ziarna.
     """
     blocks = sorted(default_by_block)
@@ -229,7 +229,7 @@ def read_tsv(path, columns):
 
 
 class Problem(Exception):
-    """Iteracja technicznie nieważna albo niepełna — werdyktu nie wolno wydać."""
+    """Iteracja technicznie nieważna albo niepełna - werdyktu nie wolno wydać."""
 
 
 def load(matrix_dir):
@@ -267,7 +267,7 @@ def metric(cell):
     """Metryka pierwotna: logiczne bajty zapisów do badanego podplanu na jeden
     publiczny rekord wyjściowy. Mianownik MUSI być niezerowy (§10)."""
     if cell["public_appends"] <= 0:
-        raise Problem("mianownik metryki jest zerowy — §10 wymaga niezerowej liczby "
+        raise Problem("mianownik metryki jest zerowy - §10 wymaga niezerowej liczby "
                       "publicznych rekordów wyjściowych")
     return Fraction(cell["substrate_bytes"], cell["public_appends"])
 
@@ -277,7 +277,7 @@ def reduction(default_cell, reference_cell):
 
     Oryginał K26v2 liczył wprost `1 − m(D)/m(ref)` i przerywał się
     `ZeroDivisionError`, gdy substrat nie zmaterializował się po żadnej ze stron
-    — a tak jest w F9-R2 przy `Q=1`, gdzie nie ma klasy równoważności (D6).
+    - a tak jest w F9-R2 przy `Q=1`, gdzie nie ma klasy równoważności (D6).
     Predeklaracja podaje tam wartość 0, więc redukcja MUSI być określona:
 
       * `m(ref) = 0` i `m(D) = 0` → redukcja 0; nie było czego zredukować;
@@ -289,14 +289,14 @@ def reduction(default_cell, reference_cell):
     if reference == 0:
         if default == 0:
             return Fraction(0)
-        raise Problem("metryka odniesienia jest zerowa przy niezerowym DEFAULT — §7.4 "
+        raise Problem("metryka odniesienia jest zerowa przy niezerowym DEFAULT - §7.4 "
                       "zabrania werdyktu w tym przypadku")
     return 1 - default / reference
 
 
 def need(mech, key):
     if key not in mech:
-        raise Problem(f"brak komorki {key} — iteracja niepelna")
+        raise Problem(f"brak komorki {key} - iteracja niepelna")
     return mech[key]
 
 
@@ -311,17 +311,17 @@ def evaluate_family(family, mech, time, gate):
     family_gates = gate.get(family, {})
     for name in REQUIRED_GATES:
         if name not in family_gates:
-            raise Problem(f"{family}: brak wpisu bramki '{name}' — iteracja niepelna")
+            raise Problem(f"{family}: brak wpisu bramki '{name}' - iteracja niepelna")
     gates_clean = True
     for name, (status, classification) in sorted(family_gates.items()):
         if status == "PASS":
             continue
         if classification in INVALIDATING_CLASSIFICATIONS:
             raise Problem(f"{family}: bramka '{name}' nieczysta i sklasyfikowana jako defekt "
-                          f"{classification} — STOP-6, nowa iteracja bez laczenia danych")
+                          f"{classification} - STOP-6, nowa iteracja bez laczenia danych")
         if classification != "engine_or_profile":
             raise Problem(f"{family}: bramka '{name}' nieczysta o nieznanej klasyfikacji "
-                          f"'{classification}' — bez klasyfikacji werdyktu wydac nie wolno")
+                          f"'{classification}' - bez klasyfikacji werdyktu wydac nie wolno")
         gates_clean = False
         detail["notes"].append(f"bramka '{name}' nieczysta, przypisana silnikowi/profilowi")
 
@@ -330,17 +330,17 @@ def evaluate_family(family, mech, time, gate):
         for profile in ("DEFAULT", ablation):
             key = (family, profile, q)
             if key not in time:
-                raise Problem(f"brak pomiarow czasu {key} — iteracja niepelna")
+                raise Problem(f"brak pomiarow czasu {key} - iteracja niepelna")
             blocks = time[key]
             if len(blocks) != BOOTSTRAP_BLOCKS:
                 raise Problem(f"{key}: {len(blocks)} blokow, predeklarowano {BOOTSTRAP_BLOCKS}")
             for index, block in sorted(blocks.items()):
                 if block["lost"] > 0:
-                    raise Problem(f"{key} blok {index}: zgubiony rekord — STOP-8, rodzina "
+                    raise Problem(f"{key} blok {index}: zgubiony rekord - STOP-8, rodzina "
                                   f"zatrzymana bez werdyktu")
                 if Fraction(block["p99"], block["slot"]) > SLOT_BUDGET_STOP:
                     raise Problem(f"{key} blok {index}: p99 = {float(Fraction(block['p99'], block['slot'])):.3f} "
-                                  f"slotu > {float(SLOT_BUDGET_STOP)} — STOP-8, rodzina zatrzymana "
+                                  f"slotu > {float(SLOT_BUDGET_STOP)} - STOP-8, rodzina zatrzymana "
                                   f"bez werdyktu")
 
     # ── Krzywe deterministyczne po obu stronach porównania. Dwie różne krzywe,
@@ -352,7 +352,7 @@ def evaluate_family(family, mech, time, gate):
     #    Krzywa jest PRZEWIDYWANIEM, a nie bramką; bramką struktury planu jest
     #    tabela mechanizmu z P6 (`gates.tsv`), którą przy rozbieżności klasyfikuje
     #    człowiek na STOP-6. Gdyby skrypt unieważniał iterację za samo odejście od
-    #    przewidywania, żaden wynik negatywny nie mógłby się nigdy wydarzyć —
+    #    przewidywania, żaden wynik negatywny nie mógłby się nigdy wydarzyć -
     #    a to jest dokładnie ta postać bramki, która w tym projekcie zawiodła.
     controls_clean = True
     for q in Q_GRID:
@@ -378,21 +378,21 @@ def evaluate_family(family, mech, time, gate):
         # redukcja jest UJEMNA i tak zostalo predeklarowane wyzej.
         #
         # §10: „kazde nieoczekiwane scalenie kontroli nierownowaznosci przy
-        # poprawnej aparaturze oznacza BRAK WSPARCIA H9 W RODZINIE" — a wiec
+        # poprawnej aparaturze oznacza BRAK WSPARCIA H9 W RODZINIE" - a wiec
         # NO_SUPPORT, nie uniewaznienie iteracji.
         if q == 1 and abs(got_rdb) > CONTROL_TOLERANCE:
             controls_clean = False
             detail["notes"].append(
                 f"przy Q=1 redukcja wewnetrzna wynosi {float(got_rdb) * 100:.3f}%, choc klasy "
-                f"rownowaznosci nie ma — nieoczekiwane scalenie kontroli")
+                f"rownowaznosci nie ma - nieoczekiwane scalenie kontroli")
 
         # Pulapka potwierdzona w tym luku: liczba instancji pokazuje efekt tam,
         # gdzie go nie ma. Sama w sobie nie jest metryka i nie wolno jej czytac
-        # jako wyniku — sprawdzamy wylacznie spojnosc kierunku planu, ktora nalezy
+        # jako wyniku - sprawdzamy wylacznie spojnosc kierunku planu, ktora nalezy
         # do struktury, a nie do wyniku (stad STOP-6).
         if rdb_default["instances"] > rdb_ablation["instances"]:
             raise Problem(f"{family} Q={q}: DEFAULT ma WIECEJ instancji wspolnego podplanu "
-                          f"niz ablacja — plan nie izoluje mechanizmu (STOP-6)")
+                          f"niz ablacja - plan nie izoluje mechanizmu (STOP-6)")
 
     # ── Kontrola pusta: profil bez czego dopasowac musi dac liczby DEFAULT.
     empty = EMPTY_CONTROL[family]
@@ -402,7 +402,7 @@ def evaluate_family(family, mech, time, gate):
             b = need(mech, (family, "RDB", empty, q))
             if (a["substrate_bytes"], a["instances"]) != (b["substrate_bytes"], b["instances"]):
                 raise Problem(f"{family} Q={q}: kontrola pusta {empty} rozni sie od DEFAULT "
-                              f"— plan nie izoluje mechanizmu (STOP-6)")
+                              f"- plan nie izoluje mechanizmu (STOP-6)")
 
     # ── Punkt 4 progu: publiczne wyniki zachowują Obs. Liczba dopisań nie musi
     # być identyczna: R1 może skrócić ogon, więc Lat(Q) <= Lat(P). Semantyczną
@@ -467,7 +467,7 @@ def run(matrix_dir, stream=sys.stdout):
             problems[family] = str(exc)
 
     print("=" * 78, file=stream)
-    print("WERDYKT K26 / H9 — automatyczny, wg progow zamrozonych w predeklaracji kampanii K26v3 §7", file=stream)
+    print("WERDYKT K26 / H9 - automatyczny, wg progow zamrozonych w predeklaracji kampanii K26v3 §7", file=stream)
     print("=" * 78, file=stream)
 
     for family in FAMILIES:
@@ -499,7 +499,7 @@ def run(matrix_dir, stream=sys.stdout):
 
     print("\n" + "=" * 78, file=stream)
     if problems:
-        print(f"BRAK WERDYKTU — {len(problems)} rodzin(a) technicznie niewaznych lub niepelnych.",
+        print(f"BRAK WERDYKTU - {len(problems)} rodzin(a) technicznie niewaznych lub niepelnych.",
               file=stream)
         print("§10: taka iteracja nie wydaje werdyktu i musi zostac powtorzona w NOWYM", file=stream)
         print("katalogu; danych miedzy iteracjami nie wolno laczyc.", file=stream)
@@ -523,7 +523,7 @@ def run(matrix_dir, stream=sys.stdout):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Bramka skryptu — sztuczne dane o znanej odpowiedzi
+#  Bramka skryptu - sztuczne dane o znanej odpowiedzi
 # ══════════════════════════════════════════════════════════════════════════════
 
 #: Jednostki predeklarowane (RAPORT_PILOTA.md §2, PLANY_FLINKA.md §5), w `n_h*w`.
@@ -606,7 +606,7 @@ def synthetic_matrix(path, *, families=FAMILIES):
 
 
 def patch_tsv(path, name, columns, predicate, changes):
-    """Podmienia pola w wierszach spelniajacych `predicate` — mutacja sztucznych
+    """Podmienia pola w wierszach spelniajacych `predicate` - mutacja sztucznych
     danych o znanej odpowiedzi."""
     rows = read_tsv(path / name, columns)
     for row in rows:
@@ -841,7 +841,7 @@ def guarded_main():
 
     W K26v2 nieprzechwycony `ZeroDivisionError` zakonczyl skrypt kodem 1, czyli
     dokladnie tym samym kodem co legalne „brak wsparcia H9" (D6). Kazdy wyjatek
-    jest tu zamieniany na kod 2 — BRAK WERDYKTU — a slad pozostaje na stderr.
+    jest tu zamieniany na kod 2 - BRAK WERDYKTU - a slad pozostaje na stderr.
     """
     try:
         return main()
@@ -849,7 +849,7 @@ def guarded_main():
         raise
     except BaseException:  # noqa: BLE001 - kazda awaria ma dac BRAK WERDYKTU
         traceback.print_exc()
-        print("BRAK WERDYKTU — skrypt werdyktu przerwal sie awaria (§7.5); "
+        print("BRAK WERDYKTU - skrypt werdyktu przerwal sie awaria (§7.5); "
               "kod 2, nie 1.", file=sys.stderr)
         return 2
 

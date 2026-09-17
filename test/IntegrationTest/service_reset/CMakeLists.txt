@@ -11,7 +11,7 @@
 # separatorem listy CMake i rozbilby skrypt na osobne argumenty.
 
 # Katalog poza pula przestrzeni nazw: przedmiotem badania jest tozsamosc
-# GLOBALNA maszyny — stala nazwa instancji uslugowej ("service") i to, ze taka
+# GLOBALNA maszyny - stala nazwa instancji uslugowej ("service") i to, ze taka
 # instancja jest tylko jedna. RDB_NAMESPACE nadpisalaby te nazwe wlasna, wiec
 # makro add_test w katalogu nadrzednym daje temu testowi wylacznosc (RUN_SERIAL)
 # zamiast przestrzeni nazw.

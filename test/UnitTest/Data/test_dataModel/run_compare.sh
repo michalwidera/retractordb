@@ -3,7 +3,7 @@
 # Deskryptory pochodza z szablonow .tpl, zeby porownanie nie zalezalo od tego,
 # ktory test wytworzyl je jako ostatni.
 #
-# Skrypt zamiast `add_test(COMMAND bash -c "...")` — powod jak w run_compile.sh.
+# Skrypt zamiast `add_test(COMMAND bash -c "...")` - powod jak w run_compile.sh.
 set -e
 
 BUILD_DIR="${1:?usage: run_compare.sh <CMAKE_BINARY_DIR>}"

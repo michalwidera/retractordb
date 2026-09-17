@@ -14,8 +14,8 @@
 #include "ipcServer.hpp"
 #include "persistentCounter.hpp"
 
-// Definicje stanu opisanego w executorsmState.hpp. Komentarze — czym kazdy z tych obiektow
-// jest, kto go pisze i pod jakim muteksem — mieszkaja przy deklaracjach w naglowku.
+// Definicje stanu opisanego w executorsmState.hpp. Komentarze - czym kazdy z tych obiektow
+// jest, kto go pisze i pod jakim muteksem - mieszkaja przy deklaracjach w naglowku.
 
 std::unique_ptr<PersistentCounter> pCounterPtr;
 std::vector<std::pair<std::string, std::string>> processedLines;

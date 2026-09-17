@@ -1,15 +1,15 @@
-// Rodzina F9-R1 — rational-rate delayed fusion. Dwa warianty jednego joba.
+// Rodzina F9-R1 - rational-rate delayed fusion. Dwa warianty jednego joba.
 //
 // Postacie monitorow odwzorowuja postacie RQL z SZKIC_RODZIN.md §5.2, ze stalymi
 // rozstrzygnietymi przez czlowieka 2026-08-08 (§9 pkt 4):
 //   Delta_A = 1/100, Delta_B = 1/50, i = 2, k = 1, przesuniecie laczne 3.
 //   P1: SELECT m_i[0]*m_i[0] STREAM m_i FROM (A>2)#(B>1)   "skompensuj tor, potem przeplataj"
 //   P2: SELECT m_i[0]*m_i[0] STREAM m_i FROM (A#B)>3       "przeplataj, potem skompensuj"
-// Warunek reguly: i*Delta_A = 2/100 = 1/50 = k*Delta_B — spelniony.
+// Warunek reguly: i*Delta_A = 2/100 = 1/50 = k*Delta_B - spelniony.
 //
 // Podzial na wezly odwzorowuje plan RQL (SZKIC_RODZIN.md §5.3):
-//   P1 — substraty `A>2` i `B>1`; szczytowy `#` razem z programem pola jest ETAPEM PUBLICZNYM,
-//   P2 — substrat `A#B`; szczytowe `>3` razem z programem pola jest ETAPEM PUBLICZNYM
+//   P1 - substraty `A>2` i `B>1`; szczytowy `#` razem z programem pola jest ETAPEM PUBLICZNYM,
+//   P2 - substrat `A#B`; szczytowe `>3` razem z programem pola jest ETAPEM PUBLICZNYM
 //        (przesuniecie laczne zostaje w programie monitora, wiec nie wnosi zapisow).
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -41,11 +41,11 @@ public class F9R1Job {
     env.setParallelism(1);
     PlanDump.reset();
     // W F9-R1 kosztowny program pol to `m[0]*m[0]` (3 tokeny). Uwaga metodyczna: ta rodzina
-    // NIE rozdziela sie liczba wykonan programu — kazdy monitor liczy swoj kwadrat w kazdym
+    // NIE rozdziela sie liczba wykonan programu - kazdy monitor liczy swoj kwadrat w kazdym
     // profilu. Wielkoscia rozdzielajaca jest tu praca przeplotu (`hash_picks_nh`).
     PlanDump.costlyProgram(K26Ops.TOKENS_SQUARE);
 
-    // A = drgania 100 Hz, B = prad 50 Hz — na tym samym czasie logicznym B ma polowe rekordow.
+    // A = drgania 100 Hz, B = prad 50 Hz - na tym samym czasie logicznym B ma polowe rekordow.
     DataStream<Tuple3<Long, Long, Integer>> srcA =
         env.addSource(new K26Ops.DeclaredSource(vibration, slots, K26Ops.TAG_A)).name("SRC:A").uid("SRC:A");
     DataStream<Tuple3<Long, Long, Integer>> srcB =

@@ -12,9 +12,9 @@ namespace rdb {
 ///
 /// Obiekt klasy StoragePaths powinien:
 /// - przy konstrukcji walidować niepuste qryID i fileName; ścieżka deskryptora to qryID + ".desc",
-/// - jeśli podano katalog storageParam — sprawdzić, że istnieje, i osadzić w nim ścieżki deskryptora oraz danych,
+/// - jeśli podano katalog storageParam - sprawdzić, że istnieje, i osadzić w nim ścieżki deskryptora oraz danych,
 /// - utrzymywać w jednym miejscu niezmiennik metaIndexFile() == storageFile() + ".meta" przy każdej zmianie ścieżki danych,
-/// - realizować relokację pliku danych wg pola REF deskryptora (relocateFromRef()) — deskryptor może wskazać
+/// - realizować relokację pliku danych wg pola REF deskryptora (relocateFromRef()) - deskryptor może wskazać
 ///   inne położenie pliku danych; brak ścieżki danych po relokacji kończy się przez FatalError,
 /// - usuwać komplet plików magazynu (removeAllFiles()) dla magazynów dysponowalnych: plik danych, deskryptor,
 ///   indeks .meta oraz cień indeksu .meta.shadow,

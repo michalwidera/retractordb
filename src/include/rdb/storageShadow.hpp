@@ -16,16 +16,16 @@ namespace rdb {
 /// - być wstrzykiwany do storage zamiast bazowego metaData, gdy accessor magazynu utrzymuje plik cienia
 ///   danych (FileInterface::hasShadow(), np. posixBinaryFileWithShadow), tak aby write/read w storage nie
 ///   zawierały żadnych rozgałęzień zależnych od obecności cienia; posiadanie pliku cienia jest niezależne od
-///   posiadania metaindeksu — cień danych zachowuje oryginalną zarejestrowaną zawartość, metaindeks rejestruje
+///   posiadania metaindeksu - cień danych zachowuje oryginalną zarejestrowaną zawartość, metaindeks rejestruje
 ///   wartości null i przerwy w transmisji,
 /// - kierować aktualizacje rekordów (onRecordModified()) do cienia indeksu (.meta.shadow, obiekt metaShadow),
-///   nie modyfikując głównego pliku indeksu — główny indeks pozostaje spójny z głównym plikiem danych,
+///   nie modyfikując głównego pliku indeksu - główny indeks pozostaje spójny z głównym plikiem danych,
 /// - podążać za plikiem cienia danych (.shadow): cień indeksu jest aktualizowany przy każdej aktualizacji
 ///   rekordu oraz scalany/usuwany razem z cieniem danych, aby uniknąć rozbieżności między nimi,
 /// - przy odczycie (getNullBitset()) zwracać nadpisanie z cienia, jeśli istnieje; pozostałe rekordy prezentować
 ///   z głównego indeksu,
 /// - przy tworzeniu obiektu wczytywać istniejące nadpisania z pliku cienia indeksu (persystencja po restarcie),
-/// - udostępniać mergeShadow() scalające nadpisania (w kolejności zapisu — ostatnie nadpisanie pozycji wygrywa)
+/// - udostępniać mergeShadow() scalające nadpisania (w kolejności zapisu - ostatnie nadpisanie pozycji wygrywa)
 ///   do głównego indeksu i usuwające cień, lustrzanie do merge() pliku cienia danych,
 /// - udostępniać discardShadow() odrzucające cień bez scalania, lustrzanie do usunięcia pliku .shadow danych,
 /// - przy reset() (purge/rotacja w storage) czyścić główny indeks i odrzucać cień,

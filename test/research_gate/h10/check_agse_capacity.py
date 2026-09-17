@@ -12,7 +12,7 @@ Rozstrzygnąć może to wyłącznie wykonanie: niedomiar pojemności historii ob
 się rekordem all-NULL albo przerwaniem w `storage::revRead`, nigdy cicho.
 Skrypt bierze WYŁĄCZNIE plany, dla których model przewiduje niedomiar, i puszcza
 je end-to-end. Zero objawów na próbie tej wielkości oznacza, że przewidywanie
-pochodzi z założenia modelu, a nie z silnika — i tak ma być raportowane.
+pochodzi z założenia modelu, a nie z silnika - i tak ma być raportowane.
 
     python3 check_agse_capacity.py --seed 20260804 --limit 60
 """
@@ -83,13 +83,13 @@ def main():
     rows = []
     for index, stratum, item, consumer, child, needed, provided in candidates[:args.limit]:
         scaled = P.rescale(item, SCALE / P.fastest(item))
-        # Wymiarowanie przebiegu — ten sam rachunek, co w bramce odwzorowania
+        # Wymiarowanie przebiegu - ten sam rachunek, co w bramce odwzorowania
         # (`oracle/execute.py`, jedyna jego definicja). Do 2026-09-12 stała tu
         # KOPIA wzoru sprzed naprawy K24f: budżet z samej rozpiętości interwałów,
         # bez narosłego początku logicznego i z myleniem slotów z taktami
         # najszybszego strumienia. Skutek byłby tu gorszy niż w bramce: zbyt
         # krótki przebieg daje artefakt bez rekordów, a ten skrypt czyta brak
-        # rekordów jako OBJAW NIEDOMIARU POJEMNOŚCI — czyli jako wynik o silniku.
+        # rekordów jako OBJAW NIEDOMIARU POJEMNOŚCI - czyli jako wynik o silniku.
         #
         # Origin i ogon biorą się z MODELU ZDARZENIOWEGO, nie z repliki postaci
         # zamkniętej (`closedform`, używanej wyżej do wyboru kandydatów):

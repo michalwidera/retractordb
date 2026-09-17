@@ -9,14 +9,14 @@
 # pomagaja: drugi rownoczesny start odpada z ClaimStatus::Conflict.
 #
 # RDB_NAMESPACE (servername::environmentNamespace) rozdziela wszystkie cztery
-# naraz — nadaje instancji nazwe, przez co blokada i obiekty IPC dostaja sufiks,
+# naraz - nadaje instancji nazwe, przez co blokada i obiekty IPC dostaja sufiks,
 # i dokleja sie do nazwy segmentu magistrali (bus::segmentName). Wlasny TMPDIR
 # odsuwa plik blokady i logi.
 #
 # Pula, a nie jedna przestrzen na katalog. Segment magistrali ma okolo 1,8 MB i
 # z zalozenia nikt go nie kasuje (bus.hpp), a /dev/shm w kontenerze CI ma
 # domyslnie 64 MB: piecdziesiat kilka segmentow zmiescilo by sie na styk, a
-# przepelnienie /dev/shm NIE wywraca testu — daje ClaimStatus::Unavailable,
+# przepelnienie /dev/shm NIE wywraca testu - daje ClaimStatus::Unavailable,
 # ktory jest fail-open, czyli po cichu zdejmuje izolacje i wraca do kolizji
 # nazw. Szesnascie przestrzeni to najwyzej 29 MB niezaleznie od liczby katalogow
 # i nadal wiecej rownoczesnych serwerow, niz `ctest -j $(nproc)` uruchomi na
@@ -46,7 +46,7 @@ macro(add_test)
     set(_it_test_name ${ARGV0})
   endif()
 
-  # Poza drzewem IntegrationTest makro ma byc przezroczyste — testy jednostkowe
+  # Poza drzewem IntegrationTest makro ma byc przezroczyste - testy jednostkowe
   # i skryptowe rzadza sie wlasnymi zasadami i nie startuja silnika przez to
   # makro.
   string(FIND "${CMAKE_CURRENT_SOURCE_DIR}" "${IT_TREE_ROOT}" _it_in_tree)
@@ -57,7 +57,7 @@ macro(add_test)
       # zmienilaby tu przedmiot badania, wiec zamiast niej zostaje wylacznosc na
       # czas testu.
       #
-      # Probowany byl slabszy srodek — wspolny RESOURCE_LOCK zamiast RUN_SERIAL,
+      # Probowany byl slabszy srodek - wspolny RESOURCE_LOCK zamiast RUN_SERIAL,
       # bo z testem w przestrzeni nazw taki test nie dzieli zadnego zasobu. Nie
       # dal nic mierzalnego (94,65 s wobec 94,34 s: ogon i tak konczy sie po
       # najdluzszym tescie jednostkowym), a multiserver_routing mierzy czas
@@ -69,7 +69,7 @@ macro(add_test)
       # w jednym CMakeLists, a testy jednego katalogu i tak nie moga biec obok
       # siebie: dziela katalog roboczy i podkatalog magazynu (`temp/`), wiec
       # pisza po tych samych artefaktach. RESOURCE_LOCK na nazwie przestrzeni
-      # zalatwia oba wykluczenia naraz — wewnatrz katalogu i miedzy katalogami,
+      # zalatwia oba wykluczenia naraz - wewnatrz katalogu i miedzy katalogami,
       # ktore trafily na ten sam slot puli. Makro nie tworzy zakresu, wiec
       # _it_namespace zostaje ustawione dla calego CMakeLists tego katalogu.
       if(NOT DEFINED _it_namespace)

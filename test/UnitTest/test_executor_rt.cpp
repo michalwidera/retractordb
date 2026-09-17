@@ -148,7 +148,7 @@ TEST(ExecutorRtActivateTest, WithoutRootReturnsFalse) {
 // Wątek komunikacyjny silnika jest SCHED_OTHER i dzieli rdzeń z wątkiem
 // SCHED_FIFO, gdy operator przypina cały proces (`taskset -c 3`). Powyżej 100 %
 // obciążenia slotu wątek RT nigdy nie oddaje rdzenia i wątek komunikacyjny nie
-// jest szeregowany wcale — klient nie zdąży się zarejestrować.
+// jest szeregowany wcale - klient nie zdąży się zarejestrować.
 //
 // Samego zagłodzenia nie da się odtworzyć w teście jednostkowym bez CAP_SYS_NICE
 // i bez ryzyka zawieszenia rdzenia biegaczowi testów, więc testowany jest
@@ -161,7 +161,7 @@ TEST(ExecutorRtAffinityTest, MovesThreadOffPinnedRtCore) {
   CPU_ZERO(&original);
   ASSERT_EQ(sched_getaffinity(0, sizeof(original), &original), 0);
 
-  // Udajemy wątek RT przypięty do jednego rdzenia — to konfiguracja kampanii.
+  // Udajemy wątek RT przypięty do jednego rdzenia - to konfiguracja kampanii.
   cpu_set_t pinned;
   CPU_ZERO(&pinned);
   CPU_SET(0, &pinned);
@@ -173,7 +173,7 @@ TEST(ExecutorRtAffinityTest, MovesThreadOffPinnedRtCore) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
   });
 
-  // Rozdzial rdzeni raportuje sie operatorowi na stdout — asercje sa na masce, nie na wydruku.
+  // Rozdzial rdzeni raportuje sie operatorowi na stdout - asercje sa na masce, nie na wydruku.
   testing::internal::CaptureStdout();
   const bool moved = rtKeepThreadOffRtCpus(aux.native_handle());
   testing::internal::GetCapturedStdout();
@@ -192,7 +192,7 @@ TEST(ExecutorRtAffinityTest, MovesThreadOffPinnedRtCore) {
   EXPECT_GT(CPU_COUNT(&auxMask), 0) << "watek pomocniczy zostal bez zadnego rdzenia";
 }
 
-// Bez przypięcia nie ma zagłodzenia i nie ma czego naprawiać — funkcja musi
+// Bez przypięcia nie ma zagłodzenia i nie ma czego naprawiać - funkcja musi
 // wtedy zostawić powinowactwo w spokoju, zamiast zawężać je na własną rękę.
 TEST(ExecutorRtAffinityTest, LeavesUnpinnedThreadAlone) {
   const long online = sysconf(_SC_NPROCESSORS_ONLN);

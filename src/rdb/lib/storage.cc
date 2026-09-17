@@ -56,7 +56,7 @@ void storage::attachDescriptor(const Descriptor *descriptorParam) {
 }
 
 void storage::attachStorage() {
-  if (paths_.storageFile().empty()) FatalError("storage: storage file path is empty — storage not properly configured");
+  if (paths_.storageFile().empty()) FatalError("storage: storage file path is empty - storage not properly configured");
 
   auto it1 = std::ranges::find_if(descriptor,  //
                                   [](const auto &item) { return item.rtype == rdb::TYPE; });
@@ -67,7 +67,7 @@ void storage::attachStorage() {
 
   initializeAccessor();
 
-  // Wstrzyknięcie wariantu metadanych — dobór wariantu (inertny/cień indeksu/bazowy) realizuje fabryka.
+  // Wstrzyknięcie wariantu metadanych - dobór wariantu (inertny/cień indeksu/bazowy) realizuje fabryka.
   metaData_ = makeMetaIndex(isDeclared(), accessor_->hasShadow(), descriptor, paths_.metaIndexFile());
 
   if (isDeclared()) return;
@@ -95,7 +95,7 @@ void storage::initializeAccessor() {
 }
 
 void storage::resetForUnitTest() {
-  if (paths_.storageFile().empty()) FatalError("storage: storage file path is empty — storage not properly configured");
+  if (paths_.storageFile().empty()) FatalError("storage: storage file path is empty - storage not properly configured");
 
   if (!accessor_) return;  // no accessor initialized - no need to reset.
 
@@ -141,16 +141,16 @@ size_t storage::getRecordsCount() const { return recordsCount_; }
 
 void storage::abortIfStorageNotPrepared() {
   if (descriptor.empty()) {
-    FatalError("storage: descriptor is empty — storage not initialized");
+    FatalError("storage: descriptor is empty - storage not initialized");
   }
   if (!accessor_) {
-    FatalError("storage: data file not opened — accessor not initialized");
+    FatalError("storage: data file not opened - accessor not initialized");
   }
   if (!storagePayload_) {
     FatalError("storage: payload not attached");
   }
   if (!metaData_) {
-    FatalError("storage: meta index not attached — attachDescriptor() not called");
+    FatalError("storage: meta index not attached - attachDescriptor() not called");
   }
 }
 
@@ -173,7 +173,7 @@ void storage::markTransmissionGap(size_t gapDuration) { metaData_->onTransmissio
 bool storage::hasGapBefore(size_t recordIndex) const { return metaData_->isGapBefore(recordIndex); }
 
 bool storage::isMetaIndexEmpty() const {
-  // Źródła deklarowane mają inertny indeks — o pustości decyduje licznik rekordów storage.
+  // Źródła deklarowane mają inertny indeks - o pustości decyduje licznik rekordów storage.
   if (isDeclared()) return recordsCount_ == 0;
   return metaData_->isEmpty();
 }
@@ -229,7 +229,7 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   }
 
   if (!isDeclared()) {
-    // Spójność recordsCount_ vs accessor_->count() weryfikuje read() — dla magazynów
+    // Spójność recordsCount_ vs accessor_->count() weryfikuje read() - dla magazynów
     // plikowych count() to syscall (stat), więc nie powtarzamy tego sprawdzenia tutaj.
     const auto recordPositionFromBack = recordsCount_ - recordIndexFromBack - 1;
     return read(recordPositionFromBack, destination);
@@ -327,7 +327,7 @@ bool storage::write(const size_t recordIndex) {
       FatalError("storage::write: overwrite to '{}' at index {} failed (result={})", paths_.storageFile(), recordIndex, result);
     }
     // Nadpisanie nie zwiększa objętości magazynu, więc nie wchodzi do `bytes`. Do metryki
-    // K23 wchodzi, bo tam jednostką jest zapis rekordu, nie przyrost objętości — inaczej
+    // K23 wchodzi, bo tam jednostką jest zapis rekordu, nie przyrost objętości - inaczej
     // substrat na buforze kołowym raportowałby zero.
     if constexpr (rdb_probe_materialize) {
       probe::onMaterializedOverwrite(isMemoryBackedStorage());
@@ -356,7 +356,7 @@ void storage::detectStartupState() {
     return;
   }
 
-  // Fresh start with no previous records — nothing to gap from
+  // Fresh start with no previous records - nothing to gap from
   if (metaData_->isEmpty()) return;
 
   // Existing data: compute gap since data file was last written

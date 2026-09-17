@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Zestawienie „przed/po" dla bramki odwzorowania — krok 2.9 planu naprawy.
+"""Zestawienie „przed/po" dla bramki odwzorowania - krok 2.9 planu naprawy.
 
 Porównuje dwa przebiegi `run_mapping_gate.py` plan po planie i wypisuje, co
 faktycznie zmieniła naprawa. Każda zmiana statusu jest wypisana z nazwą planu,
@@ -46,7 +46,7 @@ def main():
         print(f"  plan {plan:>5s}: {was} -> {now}   [{mark}]")
 
     regressions = [item for item in changed if item[1] == "zgodne" and item[2] != "zgodne"]
-    print("\nREGRESJE: " + (f"{len(regressions)} — patrz wyżej" if regressions else "brak"))
+    print("\nREGRESJE: " + (f"{len(regressions)} - patrz wyżej" if regressions else "brak"))
 
 
 if __name__ == "__main__":

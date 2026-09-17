@@ -9,12 +9,12 @@ namespace rdb {
 /// Obiekt klasy GapDetector powinien:
 /// - być nieaktywny (enabled() == false), dopóki configure() nie zostanie wywołane,
 /// - po skonfigurowaniu (configure(nullFillCount)) przepuszczać pierwsze nullFillCount kolejnych
-///   obserwacji all-null (absorb(true) zwraca false — wywołujący ma je zapisać fizycznie, faza nullfill),
+///   obserwacji all-null (absorb(true) zwraca false - wywołujący ma je zapisać fizycznie, faza nullfill),
 /// - dalsze obserwacje all-null pochłaniać (absorb(true) zwraca true), akumulując długość oczekującej przerwy,
 /// - przy pierwszej obserwacji nie-null (absorb(false)) zerować licznik fazy nullfill, zwracając false;
-///   ewentualna oczekująca przerwa NIE jest tu odrzucana — pozostaje do odebrania przez takePendingGap(),
+///   ewentualna oczekująca przerwa NIE jest tu odrzucana - pozostaje do odebrania przez takePendingGap(),
 /// - udostępniać takePendingGap() zwracające zaakumulowaną długość przerwy i zerujące ją do 0,
-/// - nie wykonywać żadnego I/O — decyzję, co zrobić z przerwą (np. zapisać wpis gap), podejmuje wywołujący.
+/// - nie wykonywać żadnego I/O - decyzję, co zrobić z przerwą (np. zapisać wpis gap), podejmuje wywołujący.
 class GapDetector {
  public:
   /// @brief Enable the state machine; @p nullFillCount all-null observations pass through before absorbing.
@@ -34,7 +34,7 @@ class GapDetector {
 
   /// @brief Reset the running counters (consecutive-null count, pending gap duration).
   ///
-  /// Does not change enabled()/nullFillCount_ — called by metaData::reset() when clearing
+  /// Does not change enabled()/nullFillCount_ - called by metaData::reset() when clearing
   /// index data (purge/rotation), which must not silently disable gap detection.
   void resetCounters();
 

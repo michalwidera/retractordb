@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Regresja precesji (issue #227). Wartosci oczekiwane sa tu WYPROWADZANE z definicji
-# operatorow, nie przepisane z wyjscia silnika — inaczej test utrwalilby dowolne
+# operatorow, nie przepisane z wyjscia silnika - inaczej test utrwalilby dowolne
 # zachowanie, w tym to bledne, ktore mial wykryc.
 set -eu
 rm -rf temp
@@ -30,7 +30,7 @@ xretractor query.rql -m 40
 # Rekord fizyczny k to zatem (102+k, 102+k, 101+k, 100+k).
 #
 # ISTOTA TESTU: pole 0 i pole 1 musza byc ROWNE. Pole 0 to biezaca probka, pole 1 to
-# najnowszy element okna — rownosc znaczy dokladnie tyle, ze okno konczy sie na
+# najnowszy element okna - rownosc znaczy dokladnie tyle, ze okno konczy sie na
 # biezacej probce. Przy stemplowaniu poczatkiem przedzialu pole 1 bylo fast[n+2],
 # czyli okno wyprzedzalo sygnal o cala swoja rozpietosc.
 actual_win=$(od -An -v -td4 temp/win_join | xargs)
@@ -47,7 +47,7 @@ expected_win=$(
   exit 1
 }
 [ "$record_count" -gt 0 ] || {
-  echo "win_join: brak rekordow — test porownalby dwa puste ciagi"
+  echo "win_join: brak rekordow - test porownalby dwa puste ciagi"
   exit 1
 }
 
@@ -73,7 +73,7 @@ expected_shift=$(
   exit 1
 }
 [ "$shift_count" -gt 0 ] || {
-  echo "shift_join: brak rekordow — test porownalby dwa puste ciagi"
+  echo "shift_join: brak rekordow - test porownalby dwa puste ciagi"
   exit 1
 }
 

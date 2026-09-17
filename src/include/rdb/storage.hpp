@@ -23,14 +23,14 @@ namespace rdb {
 ///   oraz kasowaniem kompletu plików magazynów dysponowalnych,
 /// - tworzyć odpowiednią implementację FileInterface na podstawie konfiguracji i typu magazynu zakodowanego w Descriptor,
 ///   delegując samo odwzorowanie typu magazynu na konkretną klasę akcesora oraz dobór wariantu indeksu metadanych
-///   do fabryki (accessorFactory.hpp) — storage zna wyłącznie abstrakcyjny FileInterface,
+///   do fabryki (accessorFactory.hpp) - storage zna wyłącznie abstrakcyjny FileInterface,
 /// - zarządzać plikiem deskryptora oraz inicjalizacją właściwego magazynu danych; odczyt, zapis
 ///   i weryfikację zgodności pliku .desc delegować do funkcji descriptorIO (descriptorIO.hpp),
 /// - udostępniać odczyt i zapis rekordów przez logiczne indeksy rekordów, mapowane wewnętrznie na pozycje właściwe dla accessor_,
 /// - delegować całość metadanych null i gap do wstrzykniętego obiektu metaData, którego wariant jest wybierany
 ///   przy attachStorage(): storageShadow gdy accessor utrzymuje plik cienia danych (FileInterface::hasShadow()),
 ///   bazowy metaData dla pozostałych zapisywalnych, wariant inertny (pusta ścieżka pliku) dla źródeł
-///   deklarowanych — dzięki temu write()/read() nie zawierają rozgałęzień zależnych od wariantu magazynu,
+///   deklarowanych - dzięki temu write()/read() nie zawierają rozgałęzień zależnych od wariantu magazynu,
 /// - traktować posiadanie pliku cienia danych i posiadanie metaindeksu jako niezależne własności magazynu:
 ///   plik cienia zachowuje oryginalną, zarejestrowaną zawartość danych (aktualizacje trafiają do cienia aż do
 ///   merge), a metaindeks pozwala uwzględnić wartości null oraz przerwy w transmisji,
@@ -75,7 +75,7 @@ class storage {
 
   /// Rola strumienia dla sondy logicznych zapisów (K23): substrat to materializowany
   /// podplan, strumień publiczny wchodzi do mianownika metryki. `storage` sam tego nie
-  /// wie — `isSubstrat` należy do planu, więc rolę ustawia właściciel przy konstrukcji.
+  /// wie - `isSubstrat` należy do planu, więc rolę ustawia właściciel przy konstrukcji.
   bool isSubstrate_ = false;
 
   /// Kanoniczna szerokość rekordu, liczona raz i pamiętana: iteracja po polach przy każdym

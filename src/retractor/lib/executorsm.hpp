@@ -37,7 +37,7 @@ struct executorsm {
   /// dopiero ma zostac przyjety (`--reset`) i sam nie niesie dyrektywy `:STORAGE`.
   static std::string cfgStorageDir;
   /// Katalog magazynu, w ktorym pisze plan DZIALAJACY. Trzymany osobno, bo dataModel usuwa
-  /// dyrektywy z drzewa planu — w czasie pracy `:STORAGE` nie da sie juz z niego odczytac,
+  /// dyrektywy z drzewa planu - w czasie pracy `:STORAGE` nie da sie juz z niego odczytac,
   /// a zapytanie ad-hoc musi roscic dokladnie te sciezki, ktore powstana na dysku.
   static std::string activeStorageDir;
   // Set from IpcServer's onReady callback once all IPC resources are ready.
@@ -68,7 +68,7 @@ struct executorsm {
 
   /// Wymienia plan na przyjety wczesniej `pendingPlanText` i przygotowuje kolejna epoke:
   /// aktywacja rezerwacji magistrali, skasowanie artefaktow, licznik rotacji, plik zapytan.
-  /// Plan, ktorego nie da sie tu zbudowac, konczy sie epoka PUSTA (tryb bezczynny) —
+  /// Plan, ktorego nie da sie tu zbudowac, konczy sie epoka PUSTA (tryb bezczynny) -
   /// nigdy smiercia procesu.
   void applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, const AppConfig &cfg);
 

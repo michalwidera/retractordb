@@ -2,11 +2,11 @@
 """
 Konwertuje nagranie MIT-BIH (format 212) na binarny plik retractordb.
 
-Wejście:  <rekord>.hea  — nagłówek MIT-BIH (kanały, częstotliwość, liczba próbek)
-          <rekord>.dat  — dane binarne format 212 (12-bit packed, 2 próbki / 3 bajty)
+Wejście:  <rekord>.hea  - nagłówek MIT-BIH (kanały, częstotliwość, liczba próbek)
+          <rekord>.dat  - dane binarne format 212 (12-bit packed, 2 próbki / 3 bajty)
 
-Wyjście:  <rekord>            — plik binarny retractordb (N × INTEGER na rekord, int32 LE)
-          <rekord>-replay.rql — skrypt RQL DECLARE + SELECT odtwarzający sygnał w pętli
+Wyjście:  <rekord>            - plik binarny retractordb (N × INTEGER na rekord, int32 LE)
+          <rekord>-replay.rql - skrypt RQL DECLARE + SELECT odtwarzający sygnał w pętli
 
 Plik <rekord>.desc jest tworzony przez build.sh za pomocą xretractor (nie przez ten skrypt).
 
@@ -43,7 +43,7 @@ def parse_hea(hea_path: str) -> tuple:
         fmt      = int(p[1])
         gain     = int(p[2].split('/')[0])
         baseline = int(p[4]) if len(p) > 4 else 0
-        # Nazwa kanału — ostatni token; musi pasować do gramatyki DESC: litera + [litera|cyfra|_|$]*
+        # Nazwa kanału - ostatni token; musi pasować do gramatyki DESC: litera + [litera|cyfra|_|$]*
         name = p[8] if len(p) > 8 else f'ch{len(signals)}'
         signals.append({'filename': filename, 'format': fmt, 'gain': gain, 'baseline': baseline, 'name': name})
 
@@ -130,7 +130,7 @@ def write_rql(rql_path: str, record: str, bin_name: str, fs: int, signals: list[
     duration_s   = 1.0 / fs
 
     with open(rql_path, 'w') as f:
-        f.write(f'# Odtwarzanie EKG — rekord {record}\n')
+        f.write(f'# Odtwarzanie EKG - rekord {record}\n')
         f.write(f'# Kanaly: {", ".join(s["name"] for s in signals)}\n')
         f.write(f'# Czestotliwosc: {fs} Hz, interwal {duration_s:.6f} s ({interval} s w RQL)\n')
         f.write(f'# Uruchamiac z katalogu zawierajacego pliki danych:\n')

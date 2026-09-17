@@ -83,7 +83,7 @@ static bool serverReachable(std::string_view serverName) {
 }
 
 /// Migawka magistrali: czysty odczyt seqlockiem, bez muteksu i BEZ kontaktu z serwerami.
-/// Klient nie zakłada segmentu (`createIfMissing = false`) — jego brak znaczy dokładnie
+/// Klient nie zakłada segmentu (`createIfMissing = false`) - jego brak znaczy dokładnie
 /// tyle, że żaden serwer nie wystartował.
 static std::vector<bus::InstanceInfo> busSnapshot() {
   const bus::Bus xrdbbus(bus::segmentName(), /*createIfMissing=*/false);
@@ -109,19 +109,19 @@ void cleanup() {
 ///
 /// Kolejność warunków odpowiada kolejności wysyłki w `main()`. To nie jest kosmetyka: gdyby
 /// się rozjechały, routing rozstrzygałby według innej komendy niż ta, która faktycznie
-/// poleci do serwera — np. `xqry -k -a "..."` zabija serwer, więc musi być rozstrzygany
+/// poleci do serwera - np. `xqry -k -a "..."` zabija serwer, więc musi być rozstrzygany
 /// jak `-k`, a nie jak zapytanie ad-hoc.
 ///
 /// Przy dokładnie jednej żywej instancji zwracamy jej nazwę BEZ sprawdzania strumienia.
 /// Diagnostyka "nie ma takiego strumienia" należy wtedy do serwera, dokładnie tak jak przed
-/// etapem 2c — dzięki temu żaden istniejący test integracyjny nie wymaga poprawki.
+/// etapem 2c - dzięki temu żaden istniejący test integracyjny nie wymaga poprawki.
 static routing::Resolution resolveTarget(const boost::program_options::variables_map &vm,
                                          const std::vector<bus::InstanceInfo> &instances, int elemLimit,
                                          const std::string &stream, const std::string &detail, const std::string &adHoc) {
   if (instances.size() <= 1) return routing::forSingleTarget(instances);
   if (vm.contains("hello") || (vm.contains("kill") && elemLimit == 0) || vm.contains("dir"))
     return routing::forSingleTarget(instances);
-  // Przeladowanie planu dotyczy CALEJ instancji, a nie strumienia — a instancja bezczynna
+  // Przeladowanie planu dotyczy CALEJ instancji, a nie strumienia - a instancja bezczynna
   // nie serwuje zadnego strumienia, wiec po strumieniu nie da sie jej wskazac. Przy wiecej
   // niz jednej zywej instancji `--reset` wymaga wiec jawnego `--server`.
   if (vm.contains("reset")) return routing::forSingleTarget(instances);
@@ -227,7 +227,7 @@ int main(int argc, char *argv[]) {
 
     // Format wyjścia rozbierany do zmiennych lokalnych, a nie wprost do obiektu `qry`:
     // instancja docelowa jest znana dopiero po odczycie magistrali, więc `qry` powstaje
-    // niżej. Walidacja argumentów zostaje tam, gdzie była — przed jakimkolwiek IPC.
+    // niżej. Walidacja argumentów zostaje tam, gdzie była - przed jakimkolwiek IPC.
     formatMode outputFormatMode{formatMode::RAW};
     bool gnuplotRightToLeft{false};
 
@@ -354,7 +354,7 @@ int main(int argc, char *argv[]) {
 
     // Jawny `--server` wygrywa zawsze i pomija magistralę: operator, który wskazał instancję
     // palcem, ma dostać dokładnie ją, także wtedy gdy magistrala jest niedostępna. Tak samo
-    // ustawiona przestrzeń nazw — jej instancja jest wskazana równie jednoznacznie.
+    // ustawiona przestrzeń nazw - jej instancja jest wskazana równie jednoznacznie.
     if (!vm.contains("server") && runNamespace.empty()) {
       const routing::Resolution resolved = resolveTarget(vm, liveInstances, elemLimit, sInputStream, sDetailStream, sAdHoc);
       switch (resolved.status) {
@@ -388,7 +388,7 @@ int main(int argc, char *argv[]) {
     if (vm.contains("kill") && elemLimit == 0) {
       obj.netClient("kill", "");
     } else if (vm.contains("dir")) {
-      // Przedtem KAZDA odpowiedz bez listy strumieni — takze brak odpowiedzi — wygladala jak
+      // Przedtem KAZDA odpowiedz bez listy strumieni - takze brak odpowiedzi - wygladala jak
       // instancja bezczynna i konczyla sie zerem. Teraz stan serwera przychodzi tu werdyktem,
       // a instancja bezczynna ma wartosc (wlasny wydruk), nie porazke.
       const auto listing = vm.contains("yaml") ? obj.dirYaml() : obj.dir();
@@ -415,7 +415,7 @@ int main(int argc, char *argv[]) {
       if (obj.adhoc(sAdHoc)) return system::errc::no_such_file_or_directory;
     } else if (vm.contains("detail")) {
       // Ten sam werdykt i ten sam kod wyjscia co dla --dir i --select. Przedtem kazda porazka
-      // — literowka w nazwie, milczacy serwer, instancja bez planu — wychodzila stad jako
+      // - literowka w nazwie, milczacy serwer, instancja bez planu - wychodzila stad jako
       // no_such_file_or_directory i bez slowa na stderr.
       const auto detail = vm.contains("yaml") ? obj.detailShowYaml(sDetailStream) : obj.detailShow(sDetailStream);
       if (!detail) {
@@ -427,7 +427,7 @@ int main(int argc, char *argv[]) {
       // Tryby porażki są rozróżnialne po kodzie wyjścia (issue_215). Przedtem
       // wszystkie kończyły się albo zerem, albo `no_such_file_or_directory`,
       // więc harness nie umiał odróżnić przeciążonego serwera od literówki
-      // w nazwie strumienia — a to inna diagnoza i inna naprawa.
+      // w nazwie strumienia - a to inna diagnoza i inna naprawa.
       const selectResult result = obj.select(vm, elemLimit, sInputStream, gnuplotDim, obj.gnuplotRightToLeft);
       if (result != selectResult::ok) {
         std::println(std::cerr, "xqry: {}: {}", sInputStream, toString(result));

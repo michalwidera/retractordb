@@ -24,9 +24,9 @@ rdb::descFld typeOfConstant(const rdb::descFldVT &value) { return static_cast<rd
 /// także w arytmetyce modulo 2^n) oraz wymierne.
 ///
 /// FLOAT i DOUBLE są poza zbiorem świadomie: reasocjacja zmienia tam liczbę zaokrągleń.
-/// Dla float x = 2^24 mamy (x+1)+1 == x, ale x+2 == x+2 — przepisanie zmieniłoby wynik.
+/// Dla float x = 2^24 mamy (x+1)+1 == x, ale x+2 == x+2 - przepisanie zmieniłoby wynik.
 ///
-/// Definicja jest JEDNA dla całego drzewa (expressionShape.hpp) — ta sama, której używa
+/// Definicja jest JEDNA dla całego drzewa (expressionShape.hpp) - ta sama, której używa
 /// `power()` w ewaluatorze, decydując o dokładnym iloczynie zamiast `std::pow`.
 bool isExact(rdb::descFld type) { return isExactType(type); }
 
@@ -41,20 +41,20 @@ bool isConstantEqualTo(const rdb::descFldVT &value, int reference) {
                     value);
 }
 
-/// Nazwa funkcji złożona do małych liter — gramatyka dopuszcza `Sqrt` i `sqrt`, a ewaluator
+/// Nazwa funkcji złożona do małych liter - gramatyka dopuszcza `Sqrt` i `sqrt`, a ewaluator
 /// dopasowuje nazwy właśnie po złożeniu wielkości liter.
 std::string lowercased(std::string text) {
   std::ranges::transform(text, text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   return text;
 }
 
-/// Typ wyniku wywołania funkcji. Nieznana nazwa daje nullopt, co blokuje reguły B i C —
+/// Typ wyniku wywołania funkcji. Nieznana nazwa daje nullopt, co blokuje reguły B i C -
 /// odmowa uproszczenia jest zawsze bezpieczna, zgadywanie typu nie jest.
 std::optional<rdb::descFld> typeOfCall(const token &call, std::optional<rdb::descFld> argumentType) {
   const auto name = lowercased(call.getStr_());
 
   // `null2zero` jest JEDYNĄ funkcją z tabeli, dla której ten przebieg świadomie odmawia
-  // odpowiedzi, mimo że `functionResultType()` ją zna (typ argumentu — wartość nie-NULL
+  // odpowiedzi, mimo że `functionResultType()` ją zna (typ argumentu - wartość nie-NULL
   // przechodzi bez zmiany). Nullopt blokuje reguły B i C w wyrażeniu, które jej używa,
   // czyli utrzymuje DOKŁADNIE ten zbiór przepisań, który przebieg stosował dotąd.
   // Poszerzenie go byłoby nowym przepisaniem ONP podnoszącym licznik R3, a takie należą do
@@ -66,19 +66,19 @@ std::optional<rdb::descFld> typeOfCall(const token &call, std::optional<rdb::des
 
 /// Typ OPERANDÓW po normalize(): wygrywa wyższy indeks wariantu.
 ///
-/// Świadomie NIE jest to `arithmeticValueType()`, czyli typ WARTOŚCI — ten dokłada jeszcze
+/// Świadomie NIE jest to `arithmeticValueType()`, czyli typ WARTOŚCI - ten dokłada jeszcze
 /// promocję `BYTE` do `int`. Tutaj potrzebna jest reprezentacja, w której operacja zostanie
 /// wykonana, bo to ona decyduje, czy wolno usunąć element neutralny (`dropNeutralOperand`
 /// porównuje typ stałej z typem podwyrażenia). Model dokładniejszy byłby tu bezpieczny
 /// i pozwalałby uprościć `(bajt+bajt)+0`, ale jest to NOWE przepisanie podnoszące licznik
-/// R3 — a takie należą do `aggressive_expr_optimization`, nie do zmiany typowania.
+/// R3 - a takie należą do `aggressive_expr_optimization`, nie do zmiany typowania.
 std::optional<rdb::descFld> arithmeticResultType(std::optional<rdb::descFld> left, std::optional<rdb::descFld> right) {
   if (!left.has_value() || !right.has_value()) return std::nullopt;
   return normalizedOperandType(*left, *right);
 }
 
 /// Liczy program pozbawiony odwołań do payloadu PRODUKCYJNYM ewaluatorem. To jedyne miejsce,
-/// w którym powstaje wartość zwiniętej stałej — kompilator nie ma własnej kopii arytmetyki,
+/// w którym powstaje wartość zwiniętej stałej - kompilator nie ma własnej kopii arytmetyki,
 /// więc zwijanie nie może się rozjechać z wykonaniem.
 ///
 /// nullopt oznacza „zostaw program w spokoju": albo ewaluator rzucił (np. `'a'-'b'`, nieznana
@@ -96,7 +96,7 @@ std::optional<rdb::descFldVT> foldConstants(const std::list<token> &program) {
   }
 }
 
-/// Ogon postaci `(E op c)` albo `(c op E)` — materiał dla reguł B i C.
+/// Ogon postaci `(E op c)` albo `(c op E)` - materiał dla reguł B i C.
 struct constantTail {
   command_id op;                         ///< operacja węzła: ADD, SUBTRACT albo MULTIPLY
   rdb::descFldVT constant;               ///< stały operand
@@ -106,7 +106,7 @@ struct constantTail {
 };
 
 #if aggressive_expr_optimization
-/// Podwyrażenie zwinięte już do postaci `E ^ k` — materiał dla reguły D.
+/// Podwyrażenie zwinięte już do postaci `E ^ k` - materiał dla reguły D.
 struct powerForm {
   std::list<token> base;  ///< program podwyrażenia E
   int exponent;           ///< wykładnik, zawsze >= 2
@@ -144,7 +144,7 @@ std::optional<command_id> foldOperator(command_id tailOp, command_id op, bool co
   return op;
 }
 
-/// Reguła B — łączy dwie stałe rozdzielone podwyrażeniem.
+/// Reguła B - łączy dwie stałe rozdzielone podwyrażeniem.
 ///
 /// Przepełnienie INTEGER i RATIONAL daje w ewaluatorze NULL (od 2026-09-14, checkedArith.hpp).
 /// Przepisanie może więc usunąć przepełnienie pośrednie: `(E+1)-1` dla E = INT_MAX bez reguły
@@ -192,7 +192,7 @@ std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant
   return result;
 }
 
-/// Reguła C — usuwa element neutralny.
+/// Reguła C - usuwa element neutralny.
 std::optional<node> dropNeutralOperand(const node &left, const rdb::descFldVT &constant, command_id op) {
   if (!left.type.has_value() || !isExact(*left.type)) return std::nullopt;
   // Stała musi mieć TĘ SAMĄ reprezentację co podwyrażenie. Inaczej usunięcie operatora
@@ -221,7 +221,7 @@ node powerNode(std::list<token> base, int exponent, rdb::descFld baseType) {
   result.program = base;
   result.program.emplace_back(PUSH_VAL, exponent);
   result.program.emplace_back(POWER);
-  // Wykładnik jest literałem INTEGER, więc normalize() podniesie do niego podstawę —
+  // Wykładnik jest literałem INTEGER, więc normalize() podniesie do niego podstawę -
   // stąd typ wyniku jest maksimum z obu, a nie samym typem podstawy. Dla BYTE daje to
   // INTEGER, czyli dokładnie to, co daje `bajt * bajt` (promocja do int w operator*).
   result.type    = std::max(baseType, rdb::INTEGER);
@@ -229,27 +229,27 @@ node powerNode(std::list<token> base, int exponent, rdb::descFld baseType) {
   return result;
 }
 
-/// Reguła D — powtórzony czynnik zwija się do potęgi: `a*a` to `a^2`, `a*a*a` to `a^3`.
+/// Reguła D - powtórzony czynnik zwija się do potęgi: `a*a` to `a^2`, `a*a*a` to `a^3`.
 ///
 /// Wygrana jest w liczbie ODCZYTÓW pola, nie w liczbie mnożeń: `a*a` czyta payload dwa
 /// razy, `a^2` raz. Mnożeń jest tyle samo.
 ///
 /// Warunkiem jest DOKŁADNA arytmetyka czynnika. Dla FLOAT i DOUBLE przepisanie byłoby
-/// niepoprawne — `x*x` to jedno mnożenie IEEE, a `x^2` liczy się przez std::pow, który nie
+/// niepoprawne - `x*x` to jedno mnożenie IEEE, a `x^2` liczy się przez std::pow, który nie
 /// ma gwarancji poprawnego zaokrąglenia. Dla typów dokładnych różnicy nie ma z definicji:
 /// exactPower() w expressionEvaluator liczy je tym samym operator*, którego użyłby MULTIPLY,
 /// więc zawinięcie modulo 2^n i promocja BYTE do int zostają zachowane. Na tej równości
-/// stoi też niezmiennik ablacyjny — przy RDB_OPT_SIMPLIFY_EXPRESSIONS=OFF zostaje `a*a`
+/// stoi też niezmiennik ablacyjny - przy RDB_OPT_SIMPLIFY_EXPRESSIONS=OFF zostaje `a*a`
 /// i musi policzyć dokładnie to samo.
 std::optional<node> foldRepeatedFactor(const node &left, const node &right) {
   // Stałe należą do reguły A; `2*2` ma się zwinąć do 4, a nie do `2^2`.
   if (left.constant.has_value() || right.constant.has_value()) return std::nullopt;
   if (!right.type.has_value() || !isExact(*right.type)) return std::nullopt;
 
-  // `a * a` — pierwszy krok łańcucha.
+  // `a * a` - pierwszy krok łańcucha.
   if (sameProgram(left.program, right.program)) return powerNode(right.program, 2, *right.type);
 
-  // `a^k * a` — kolejny krok. Lewostronna łączność `*` daje wyłącznie to ustawienie stron.
+  // `a^k * a` - kolejny krok. Lewostronna łączność `*` daje wyłącznie to ustawienie stron.
   if (left.asPower.has_value() && sameProgram(left.asPower->base, right.program))
     return powerNode(right.program, left.asPower->exponent + 1, *right.type);
 
@@ -286,7 +286,7 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
 
       case PUSH_ID:
       case PUSH_ID2: {
-        // PUSH_ID niesie parę (nazwa strumienia, indeks pola) — stąd typ. PUSH_ID2 trzyma
+        // PUSH_ID niesie parę (nazwa strumienia, indeks pola) - stąd typ. PUSH_ID2 trzyma
         // odwołanie tekstowe i zostaje bez typu; to wyłącza reguły B i C, ale nie zwijanie.
         node leaf;
         leaf.program.push_back(tk);
@@ -307,7 +307,7 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
         result.program.push_back(tk);
 
         // `to_string` NIE zwija sie nigdy, nawet nad stalym argumentem. Jego wynikiem jest
-        // napis, ale token niesie przy okazji DEKLARACJE szerokosci pola — jawna `N` w postaci
+        // napis, ale token niesie przy okazji DEKLARACJE szerokosci pola - jawna `N` w postaci
         // CALL2 `to_string(expr : N)`, domyslna kToStringDefaultWidth w postaci CALL (patrz
         // rqlFunctions.hpp). Deklaracja stoi w PROGRAMIE i nigdzie indziej, wiec zastapienie
         // programu literalem tekstowym kasuje ja razem z nim: analiza ksztaltu widzi wtedy juz
@@ -315,13 +315,13 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
         //
         // Kolejnosc przebiegow (inferFieldShapes() PRZED simplifyFieldExpressions()) zamykala
         // to wylacznie przy PIERWSZEJ kompilacji. Zywy plan kompilowany po raz drugi
-        // (executorsm::getAdHoc) dostawal program juz uproszczony i pole sie zwezalo — nie
+        // (executorsm::getAdHoc) dostawal program juz uproszczony i pole sie zwezalo - nie
         // w artefakcie na dysku, ktory zostaje nietkniety, ale w planie, z ktorego schematy
         // dziedzicza strumienie dolozone PO tej kompilacji.
         //
         // Zwijanie ARGUMENTU pod spodem dziala normalnie: `to_string(40+2 : 16)` zwija `40+2`
         // do jednej stalej i zatrzymuje sie na `CALL2`. Warunek jest bezwarunkowy, a nie
-        // zalezny od tego, czy zadeklarowana szerokosc przekracza dlugosc literalu — inaczej
+        // zalezny od tego, czy zadeklarowana szerokosc przekracza dlugosc literalu - inaczej
         // i plan, i licznik R3 zalezalyby od WARTOSCI stalej.
         const bool declaresFieldWidth = (cmd == CALL || cmd == CALL2) && lowercased(tk.getStr_()) == "to_string";
 
@@ -333,7 +333,7 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
           }
         }
         // NOT normalizuje wartość do 1/0 w typie operandu, ale przez logicResultAsType,
-        // a nie przez normalize — nie wchodzi w rachunek typów reguł B i C.
+        // a nie przez normalize - nie wchodzi w rachunek typów reguł B i C.
         if (cmd == NEGATE)
           result.type = operand->type;
         else if (cmd == CALL || cmd == CALL2)
@@ -349,7 +349,7 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
       // z `^` nie wypadalo na `default: return 0`, blokujac uproszczenia w calym polu.
       // Regul B i C nie dotyka: potegowanie nie jest ani laczne, ani przemienne, wiec
       // `E^c1^c2` nie zwija sie do `E^(c1?c2)`. Trzy warunki nizej pilnuja tego same z
-      // siebie — foldOperator() nie zna POWER, dropNeutralOperand() nie zna POWER, a
+      // siebie - foldOperator() nie zna POWER, dropNeutralOperand() nie zna POWER, a
       // galaz „stala po lewej" wpuszcza tylko ADD i MULTIPLY.
       case POWER:
       case CMP_EQUAL:
@@ -368,7 +368,7 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
         combined.insert(combined.end(), right->program.begin(), right->program.end());
         combined.push_back(tk);
 
-        // A — całe podwyrażenie jest stałe.
+        // A - całe podwyrażenie jest stałe.
         if (left->constant.has_value() && right->constant.has_value()) {
           if (auto value = foldConstants(combined)) {
             stack.push_back(constantNode(std::move(*value)));
@@ -378,7 +378,7 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
         }
 
 #if aggressive_expr_optimization
-        // D — powtórzony czynnik jako potęga.
+        // D - powtórzony czynnik jako potęga.
         if (cmd == MULTIPLY) {
           if (auto rewritten = foldRepeatedFactor(*left, *right)) {
             stack.push_back(std::move(*rewritten));
@@ -388,7 +388,7 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
         }
 #endif
 
-        // B i C — stała po prawej.
+        // B i C - stała po prawej.
         if (right->constant.has_value() && !left->constant.has_value()) {
           if (auto rewritten = rewriteWithConstantOnRight(*left, *right->constant, cmd)) {
             stack.push_back(std::move(*rewritten));
@@ -397,7 +397,7 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
           }
         }
 
-        // Stała po lewej — te same reguły po zamianie stron. Wolno tylko dla przemiennych
+        // Stała po lewej - te same reguły po zamianie stron. Wolno tylko dla przemiennych
         // operatorów i wyłącznie na liczbach: dla łańcuchów `'a'+x` i `x+'a'` to dwa różne
         // wyniki, a mieszany `'a'+liczba` promuje się do konkatenacji.
         if (left->constant.has_value() && !right->constant.has_value() && (cmd == ADD || cmd == MULTIPLY) &&
@@ -430,7 +430,7 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
       } break;
 
       default:
-        // Token spoza zestawu ewaluatora (PUSH_STREAM, COUNT, PUSH_IDX...) — nie znamy jego
+        // Token spoza zestawu ewaluatora (PUSH_STREAM, COUNT, PUSH_IDX...) - nie znamy jego
         // arytmetyki stosu, więc nie ruszamy programu w ogóle.
         return 0;
     }
@@ -444,7 +444,7 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
 namespace {
 
 /// Wartość na stosie wnioskowania typu wyniku: napis o znanej szerokości albo liczba.
-/// Liczba wchodząca w konkatenację ma szerokość 0 — tak samo, jak liczyła ją reguła
+/// Liczba wchodząca w konkatenację ma szerokość 0 - tak samo, jak liczyła ją reguła
 /// sprzed 2026-08-30, więc szerokości pól w istniejących planach się nie zmieniają.
 struct inferredValue {
   bool isString;
@@ -478,7 +478,7 @@ std::optional<int> inferStringWidth(const std::list<token> &program, const field
       // Odwołanie do pola. Kształt zna wyłącznie PUSH_ID, bo tylko on niesie parę
       // (nazwa strumienia, indeks płaski). Pozostałe postaci są przedrozwiązaniowe:
       // PUSH_ID1/PUSH_ID3 trzymają sam tekst, a PUSH_ID2 wprawdzie parę, ale jej pierwszy
-      // element to odwołanie `strumień[offset]`, a nie nazwa. Wchodzą więc jako liczba —
+      // element to odwołanie `strumień[offset]`, a nie nazwa. Wchodzą więc jako liczba -
       // i jest to dokładnie stan wiedzy parsera, którego domyślnym typem pola jest INTEGER.
       case PUSH_ID:
       case PUSH_ID1:
@@ -504,7 +504,7 @@ std::optional<int> inferStringWidth(const std::list<token> &program, const field
           stack.push_back({false, 0});
           break;
         }
-        // Szerokość zadeklarowana `to_string(expr : N)` siedzi w tokenie jako IDXPAIR —
+        // Szerokość zadeklarowana `to_string(expr : N)` siedzi w tokenie jako IDXPAIR -
         // jest deklaracją pola, a nie wartością na stosie (patrz rqlFunctions.hpp).
         int width = kToStringDefaultWidth;
         if (cmd == CALL2)
@@ -519,7 +519,7 @@ std::optional<int> inferStringWidth(const std::list<token> &program, const field
         break;
 
       // Konkatenacja: `operator+` ewaluatora normalizuje operandy do wyższego indeksu
-      // wariantu, a STRING stoi wyżej niż każdy typ liczbowy — więc `'a'+1` daje napis.
+      // wariantu, a STRING stoi wyżej niż każdy typ liczbowy - więc `'a'+1` daje napis.
       case ADD: {
         auto right = pop();
         auto left  = pop();
@@ -549,7 +549,7 @@ std::optional<int> inferStringWidth(const std::list<token> &program, const field
       } break;
 
       default:
-        // Token spoza zestawu ewaluatora (PUSH_STREAM, COUNT, PUSH_TSCAN...) — nie znamy
+        // Token spoza zestawu ewaluatora (PUSH_STREAM, COUNT, PUSH_TSCAN...) - nie znamy
         // jego arytmetyki stosu, więc odmawiamy odpowiedzi zamiast zgadywać.
         return std::nullopt;
     }

@@ -55,7 +55,7 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_on_disk) {
   meta.onRecordAppended(null_);    // rec 0
   meta.onRecordAppended(null_);    // rec 1
   meta.onRecordAppended(null_);    // rec 2
-  meta.onRecordAppended(noNull_);  // rec 3 — forces recs 0-2 to disk
+  meta.onRecordAppended(noNull_);  // rec 3 - forces recs 0-2 to disk
 
   EXPECT_EQ(meta.segments().size(), 2U);
 
@@ -209,11 +209,11 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_file_size_stable) {
 
   EXPECT_EQ(std::filesystem::file_size(metaFile), kExpectedSize);
 
-  meta.onRecordAppended(patA);  // tailDirty_=true — file must NOT shrink
+  meta.onRecordAppended(patA);  // tailDirty_=true - file must NOT shrink
 
   EXPECT_EQ(std::filesystem::file_size(metaFile), kExpectedSize);
 
-  meta.flushCurrentEntry();  // overwrite-in-place — still same size
+  meta.flushCurrentEntry();  // overwrite-in-place - still same size
 
   EXPECT_EQ(std::filesystem::file_size(metaFile), kExpectedSize);
 }
@@ -229,7 +229,7 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_persistence) {
     meta.onRecordAppended(patA);  // rec 0
     meta.onRecordAppended(patA);  // rec 1
     meta.flushCurrentEntry();     // disk: [A,2]
-    meta.onRecordAppended(patA);  // rec 2 — tailDirty_=true
+    meta.onRecordAppended(patA);  // rec 2 - tailDirty_=true
     meta.onRecordAppended(patA);  // rec 3
     // destructor: overwrite disk → [A,4]
   }
@@ -253,7 +253,7 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_gap_flushes_dirty_tail) {
   meta.onRecordAppended(patA);  // rec 1
   meta.onRecordAppended(patA);  // rec 2
   meta.flushCurrentEntry();     // disk: [A,3]
-  meta.onRecordAppended(patA);  // rec 3 — tailDirty_=true, currentEntry_={A,4}
+  meta.onRecordAppended(patA);  // rec 3 - tailDirty_=true, currentEntry_={A,4}
   meta.onTransmissionGap();     // must overwrite [A,3]→[A,4] then append gap
 
   auto committed = meta.segments();
@@ -406,7 +406,7 @@ TEST_F(MetaTestFixture, test_modify_non_last_in_current_entry_while_tail_dirty) 
   meta.onRecordAppended(A);  // rec 2
   meta.flushCurrentEntry();  // disk: [{A,3}], pendingCommittedCount_=3
 
-  meta.onRecordAppended(A);  // rec 3 — tailDirty_=true, currentEntry_={A,4}, committed=0
+  meta.onRecordAppended(A);  // rec 3 - tailDirty_=true, currentEntry_={A,4}, committed=0
 
   // Modify non-last record in currentEntry_ (rec 1, offset 1, two records follow).
   // The stale on-disk entry [{A,3}] must be overwritten with the prefix [{A,1}],
@@ -439,7 +439,7 @@ TEST_F(MetaTestFixture, test_modify_non_last_in_current_entry_while_tail_dirty) 
 // EARLIER committed entry, onRecordModified() used to rewrite
 // the file from readCommittedEntries(), which still contained the stale
 // tail. The stale entry was then persisted AND counted, while currentEntry_
-// still represented the same records — double counting (totalRecords off
+// still represented the same records - double counting (totalRecords off
 // by the stale count) and wrong patterns at the logical tail.
 
 TEST_F(MetaTestFixture, test_modify_committed_entry_while_tail_dirty) {
@@ -457,7 +457,7 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_while_tail_dirty) {
   meta.flushCurrentEntry();  // disk: [{A,3}]
   meta.onRecordAppended(B);  // rec 3
   meta.flushCurrentEntry();  // disk: [{A,3},{B,1}]
-  meta.onRecordAppended(B);  // rec 4 — re-absorb {B,1}: tailDirty_=true, currentEntry_={B,2}
+  meta.onRecordAppended(B);  // rec 4 - re-absorb {B,1}: tailDirty_=true, currentEntry_={B,2}
 
   ASSERT_EQ(meta.totalRecords(), 5U);
 

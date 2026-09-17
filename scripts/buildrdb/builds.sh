@@ -28,7 +28,7 @@ require_pristine_source_tree() {
 }
 
 # Wariant kontroli dla 'release-dirty'. Drzewo wolno mieć zmiany, ale sam build
-# nadal nie może go ruszać — dlatego zamiast pustego statusu porównujemy stan
+# nadal nie może go ruszać - dlatego zamiast pustego statusu porównujemy stan
 # z migawką wykonaną przed pierwszym krokiem.
 release_dirty_baseline=""
 
@@ -106,7 +106,7 @@ verify_optimizer_build_info() {
         return 1
     fi
 
-    # Konfiguracja domyślna (wszystkie optymalizacje ON, sonda OFF) jest cicha —
+    # Konfiguracja domyślna (wszystkie optymalizacje ON, sonda OFF) jest cicha -
     # raportujemy tylko odchylenia: wyłączoną optymalizację albo włączoną sondę.
     if [ "$dedup" != "ON" ] || [ "$share" != "ON" ] || [ "$commutative" != "ON" ] || [ "$factor" != "ON" ] ||
         [ "$simplify" != "ON" ] || [ "$probe" != "OFF" ]; then
@@ -122,7 +122,7 @@ run_build_option() {
             # Produkcyjny Release powstaje wyłącznie z czystego drzewa źródeł,
             # świeżego katalogu i jawnej konfiguracji. Typowe zmienne wstrzykujące
             # flagi są usuwane z procesu, a gotowa binarka jest kontrolowana poniżej.
-            # Wariant 'release-dirty' buduje z drzewa takiego, jakie jest — służy do
+            # Wariant 'release-dirty' buduje z drzewa takiego, jakie jest - służy do
             # weryfikacji zmian przed commitem i NIE jest wydaniem produkcyjnym.
             if [ "$opt" = "release-dirty" ]; then
                 release_allow_dirty=ON
@@ -178,7 +178,7 @@ run_build_option() {
             build_jobs=$(compute_build_jobs)
             cmake --build "$pkg_dir" --parallel "$build_jobs"
             cd "$pkg_dir" || exit 1
-            cpack || echo "-- cpack zgłosił błędy (np. brak dpkg-deb dla DEB) — sprawdzam wynik."
+            cpack || echo "-- cpack zgłosił błędy (np. brak dpkg-deb dla DEB) - sprawdzam wynik."
             # Śmieci po packagingu: katalog stagingu i manifest instalacji. Finalne
             # archiwa (.deb/.tar.gz) zostają.
             rm -rf _CPack_Packages install_manifest.txt
@@ -190,7 +190,7 @@ run_build_option() {
             gcov_exec="gcov-${gcc_ver}"
             echo "-- GCC $gcc_ver detected, checking coverage tools..."
 
-            # gcov — optional install path: install only when missing.
+            # gcov - optional install path: install only when missing.
             if ! command -v "$gcov_exec" &>/dev/null; then
                 echo "-- $gcov_exec not found, installing $gcov_exec..."
                 sudo apt-get install -y gcc-${gcc_ver} || { echo "Error: Failed to install $gcov_exec"; exit 1; }
@@ -204,7 +204,7 @@ run_build_option() {
             gcov_ver=$("$gcov_exec" --version | head -1 | grep -oP '\d+' | head -1)
             echo "-- OK: $gcov_exec version $gcov_ver matches GCC $gcc_ver"
 
-            # gcovr — narzędzie raportujące
+            # gcovr - narzędzie raportujące
             if ! command -v gcovr &>/dev/null; then
                 echo "-- gcovr not found, installing..."
                 pip3 install gcovr || { echo "Error: Failed to install gcovr"; exit 1; }

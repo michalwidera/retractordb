@@ -1,9 +1,9 @@
-# K24d / H10 — werdykt
+# K24d / H10 - werdykt
 
 > **Odniesienie bramki zaktualizowane 2026-08-18 (K24/H10, faza 3).** Trzy klasy
 > przeszły z reżimu zawyżającego do dokładnego: `SUB`, `THETA`, `NTHETA`. Bramka
 > zgłosiła POPRAWĘ na obu ziarnach, a plik odniesienia jest aktualizowany w tym
-> samym commicie co zmiana silnika — inaczej regresja z powrotem do zawyżania
+> samym commicie co zmiana silnika - inaczej regresja z powrotem do zawyżania
 > nie byłaby wykrywana (README.md, „Gdy bramka oblewa”).
 >
 > Ten plik jest **odniesieniem regresyjnym**, nie werdyktem kampanii. Werdyktem
@@ -11,7 +11,7 @@
 > silnik `34db1a2`) do czasu kampanii K24e z własną predeklaracją i własnym
 > ziarnem. Liczby poniżej pochodzą z przebiegu bramki na drzewie roboczym
 > `0f273d5` + zmiana fazy 3; po commicie SHA w nagłówku będzie inny, co bramki
-> nie dotyczy — porównuje ona reżimy, nie rewizje.
+> nie dotyczy - porównuje ona reżimy, nie rewizje.
 
 
 Korpus: **10010 planów**, **35544 obserwacji węzłowych**, zero błędów aparatury. Ziarno 20260804, silnik `0f273d5`.
@@ -19,12 +19,12 @@ Korpus: **10010 planów**, **35544 obserwacji węzłowych**, zero błędów apar
 Werdykt jest raportowany per klasa operatora. Zgodność 100% jest jedynym
 wsparciem H10a w klasie; jedna niezgodność falsyfikuje H10a w tej klasie.
 
-## 1. H10a — dokładność, per klasa operatora
+## 1. H10a - dokładność, per klasa operatora
 
 Kolumna **izolowana** jest werdyktem: postać zamknięta policzona z ogonów
 składowych wziętych z oracle'a, więc niezgodność pochodzi z reguły tego
 węzła. Kolumna **propagowana** to zgodność zrzutu planu silnika z oracle'em
-na całym planie — zawiera skutki niezgodności odziedziczonych po dzieciach.
+na całym planie - zawiera skutki niezgodności odziedziczonych po dzieciach.
 
 | Klasa | Węzłów | Izolowana C1 | Izolowana C2 | Propagowana C1 | Reżim | Werdykt H10a |
 |---|---:|---:|---:|---:|---|---|
@@ -67,10 +67,10 @@ wszystkie jego zależności są określone.
 | Klasa | Kierunek | Plan | Węzeł | Interwał | Silnik | Postać zamknięta (izol.) | Oracle C1 |
 |---|---|---:|---|---|---:|---:|---:|
 
-## 1b. H10a — początek logiczny, per klasa operatora
+## 1b. H10a - początek logiczny, per klasa operatora
 
 Wielkość wprowadzona przestemplowaniem z 2026-08-06 i nieobecna
-w kampaniach K24/K24r. Kolumna **suma** porównuje origin+ogon —
+w kampaniach K24/K24r. Kolumna **suma** porównuje origin+ogon -
 to jedyna wielkość wspólna z kampaniami sprzed zmiany.
 
 | Klasa | Węzłów | Izolowana | Propagowana | Suma (origin+ogon) | Reżim | Werdykt |
@@ -101,7 +101,7 @@ to jedyna wielkość wspólna z kampaniami sprzed zmiany.
 
 Origin zaniżony (odczyt przed początkiem źródła): **brak**.
 
-## 2. H10b — nielokalność
+## 2. H10b - nielokalność
 
 * rozjazd reguły lokalnej A z dokładną: **5250 z 10010 planów = 52.4%** (próg predeklarowany: >= 5%)
 * populacja predeklarowana (dokładnie jeden `#`, poza tym `PASS`/`>N`): **515 planów**, rozjazdów dodatnich **353**
@@ -118,7 +118,7 @@ Origin zaniżony (odczyt przed początkiem źródła): **brak**.
 
 Obie kontrole predeklarowane **w postaci dosłownej są złamane**.
 Zgodnie z kryterium §6 oznacza to źle zdefiniowaną regułę
-lokalną, a nie wynik — dlatego **człon (b) jest nieocenialny na tej
+lokalną, a nie wynik - dlatego **człon (b) jest nieocenialny na tej
 aparaturze** i powyższe liczby H10b nie stanowią werdyktu. Diagnoza
 sprzeczności w specyfikacji członu (b): REPORT.md §5.
 

@@ -88,7 +88,7 @@ TEST(IpcClient, producer_waits_for_late_response_queue) {
   IpcClient transport(kIpcClientDefaultResponseMaxFails, 200);
 
   std::thread creator([] {
-    // Kolejka pojawia się dopiero po chwili — dokładnie ten wyścig, który
+    // Kolejka pojawia się dopiero po chwili - dokładnie ten wyścig, który
     // wywracał klienta przy starcie obciążonego serwera.
     std::this_thread::sleep_for(std::chrono::milliseconds(120));
     boost::interprocess::message_queue(boost::interprocess::create_only, responseQueueName().c_str(), 8,
@@ -107,7 +107,7 @@ TEST(IpcClient, producer_waits_for_late_response_queue) {
 }
 
 // Gdy kolejka nie powstanie nigdy, producent musi to ZAMELDOWAĆ osobną flagą.
-// Samo `done` jest nieodróżnialne od normalnego końca strumienia — i to była
+// Samo `done` jest nieodróżnialne od normalnego końca strumienia - i to była
 // przyczyna, dla której klient kończył się zerem bez danych.
 TEST(IpcClient, producer_reports_missing_queue_distinctly_from_normal_end) {
   QueueEraser eraser;
@@ -210,7 +210,7 @@ class SilentServer {
 TEST(IpcClient, netClient_default_budget_survives_briefly_starved_server) {
   const SilentServer server;
 
-  IpcClient transport;  // domyślny budżet — to on był defektem
+  IpcClient transport;  // domyślny budżet - to on był defektem
   const auto start = std::chrono::steady_clock::now();
   const auto pt    = transport.netClient("get", "");
   const auto spent = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);

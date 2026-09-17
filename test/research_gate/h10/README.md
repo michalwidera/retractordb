@@ -1,9 +1,9 @@
-# Bramka H10 — rachunek początku logicznego i ogona startowego
+# Bramka H10 - rachunek początku logicznego i ogona startowego
 
 ## Hipoteza, której wyniki ta bramka chroni
 
 **H10a.** Początek logiczny i ogon startowy każdego węzła planu dają się
-policzyć **statycznie, z samego planu**, bez uruchamiania strumieni — i wynik
+policzyć **statycznie, z samego planu**, bez uruchamiania strumieni - i wynik
 tego rachunku zgadza się z modelem zdarzeniowym.
 
 **H10b.** Reguła lokalna A zaniża prawdziwy ogon na dodatniej części planów.
@@ -16,18 +16,18 @@ Wynik jest **mieszany i taki pozostaje**. Na silniku, który te liczby wytworzy�
 |---|---|---|
 | **dokładna** | wszystkie dziewięć | postać zamknięta równa modelowi zdarzeniowemu wszędzie |
 | **zawyżająca** | brak | nigdy nie zaniża; kosztuje slot opóźnienia |
-| **zaniżająca** | brak | — |
+| **zaniżająca** | brak | - |
 
 Początek logiczny jest dokładny we **wszystkich dziewięciu** klasach.
 H10b pozostaje wsparta w swojej zawężonej populacji.
 
-**Zmiana z 2026-08-18 (K24/H10, faza 3).** Do tego dnia trzy klasy — `SUB`,
-`THETA`, `NTHETA` — były zawyżające, i była to zapisana falsyfikacja H10a
+**Zmiana z 2026-08-18 (K24/H10, faza 3).** Do tego dnia trzy klasy - `SUB`,
+`THETA`, `NTHETA` - były zawyżające, i była to zapisana falsyfikacja H10a
 w mocnej postaci. Wyprowadzenie postaci dokładnych
 (`rdb-experiment/investigation_K24H10/DERIVATION.md`) domknęło je: wszystkie
 trzy przeszły do reżimu dokładnego, bramka zgłosiła POPRAWĘ na obu ziarnach.
 Dokumentem obowiązującym dla artykułu pozostaje jednak kampania K24d do czasu
-przebiegu K24e z własną predeklaracją — bramka jest zabezpieczeniem rozwoju,
+przebiegu K24e z własną predeklaracją - bramka jest zabezpieczeniem rozwoju,
 nie dowodem.
 
 ## Na czym polega bramka
@@ -39,15 +39,15 @@ osiągniętej dokładności.
 | Krok | Co robi |
 |---|---|
 | `tests/test_independence.py` | dowodzi, że postać zamknięta nie podgląda modelu zdarzeniowego |
-| `tests/test_oracle.py` | 44 przypadki ręczne, 220 porównań — model zdarzeniowy zgadza się z policzonym ręcznie |
+| `tests/test_oracle.py` | 44 przypadki ręczne, 220 porównań - model zdarzeniowy zgadza się z policzonym ręcznie |
 | `tests/test_mutants.py` | wstrzykuje błędy do modelu; wykrycie 100% jest warunkiem, żeby model cokolwiek orzekał |
 | `tests/test_h10b_population.py` | sprawdza wybór wielu niekorzeniowych `#` z deklaracjami i odrzucenie `#` ze składową obliczaną |
 | `decision_rule.py --selftest` | obala H10b po zerowym, ujemnym lub niezgodnym z postacią deficycie |
 | `tests/test_closedform.py` | replika postaci zamkniętej wierna wobec silnika |
-| `tests/test_phase_forms.py` | ogon `-`, `Θ` i `~Θ` wobec modelu zdarzeniowego dla `q` do 12 — poza zakresem korpusu losowego (`q <= 5`); ma własną kontrolę mocy detekcyjnej |
+| `tests/test_phase_forms.py` | ogon `-`, `Θ` i `~Θ` wobec modelu zdarzeniowego dla `q` do 12 - poza zakresem korpusu losowego (`q <= 5`); ma własną kontrolę mocy detekcyjnej |
 | `run_campaign.py` | generuje 10 010 losowych planów, dla każdego czyta ogon i origin ze zrzutu `xretractor -c` i zestawia z modelem zdarzeniowym |
 | `verdict.py` | klasyfikuje każdą klasę operatora do jednego z trzech reżimów |
-| `../compare_regimes.py` | **jądro bramki** — porównuje reżimy z odniesieniem, kierunkowo |
+| `../compare_regimes.py` | **jądro bramki** - porównuje reżimy z odniesieniem, kierunkowo |
 
 Kampania idzie na dwóch ziarnach: `20260804` (odniesienie
 [`VERDICT.md`](VERDICT.md)) i `20260807` (odniesienie poza próbą,
@@ -63,10 +63,10 @@ zaniżająca  <  zawyżająca  <  dokładna
 
 | Zmiana | Reakcja bramki |
 |---|---|
-| `zawyżająca` → `dokładna` | **POPRAWA** — bramka przechodzi. To pożądany kierunek rozwoju |
-| `dokładna` → `zawyżająca` | **REGRESJA** — bramka oblewa |
-| cokolwiek → `zaniżająca` | **DEFEKT** — bramka oblewa zawsze |
-| zmiana zestawu klas | **BŁĄD** — kod 2, bramka nie orzeka |
+| `zawyżająca` → `dokładna` | **POPRAWA** - bramka przechodzi. To pożądany kierunek rozwoju |
+| `dokładna` → `zawyżająca` | **REGRESJA** - bramka oblewa |
+| cokolwiek → `zaniżająca` | **DEFEKT** - bramka oblewa zawsze |
+| zmiana zestawu klas | **BŁĄD** - kod 2, bramka nie orzeka |
 
 Reżim zaniżający jest jakościowo inny od zawyżającego: zawyżenie opóźnia
 emisję o slot, zaniżenie oznacza **rekord wyemitowany, zanim wszystkie jego
@@ -75,13 +75,13 @@ już go zawierało.
 
 Gdy bramka zgłosi POPRAWĘ, wypisze też przypomnienie: artykuł twierdzi sześć
 klas dokładnych i to twierdzenie staje się wtedy **zachowawcze**. Poprawa nie
-wymaga żadnej reakcji w kodzie — wymaga odnotowania.
+wymaga żadnej reakcji w kodzie - wymaga odnotowania.
 
 ## Gdy bramka oblewa
 
 **Nie poprawiaj bramki.** Czerwone światło znaczy, że zmieniła się semantyka
 początku logicznego albo ogona startowego. Kolejność działań: ustal, która
-zmiana silnika to spowodowała; rozstrzygnij, czy była zamierzona; jeśli tak —
+zmiana silnika to spowodowała; rozstrzygnij, czy była zamierzona; jeśli tak -
 zaktualizuj plik odniesienia w tym samym commicie i odnotuj zmianę. Podmiana
 oczekiwanych wartości bez tego zapisu kasuje jedyną ochronę, jaką ten katalog
 daje.
@@ -91,7 +91,7 @@ i przenosząca `>N` do origin wypchnęła `HASH` i `SHIFT` z reżimu dokładnego
 zawyżającego. Wyszło to dopiero w osobnym przebiegu badawczym tydzień później.
 Ta bramka istnieje po to, żeby wyszło przy commicie.
 
-## Poprawka reguły lokalnej A z 2026-09-12 — `>N` skraca ogon
+## Poprawka reguły lokalnej A z 2026-09-12 - `>N` skraca ogon
 
 Reguła lokalna A liczyła dla `>N` sam ogon składowej przeliczony przez takt,
 podczas gdy postać dokładna to `max(0, W_src - N)`. Rozjazd miał postać zamkniętą
@@ -100,7 +100,7 @@ podczas gdy postać dokładna to `max(0, W_src - N)`. Rozjazd miał postać zamk
 
 Historia jest pouczająca. Do K24r reguła miała wyjątek `+N`; usunięto go słusznie,
 bo po przestemplowaniu z 2026-08-06 `N` przeszło do `logicalOrigin` i ogonem nie
-jest. Usunięcie zostawiło jednak **brak członu** tam, gdzie prawda brzmi `-N` —
+jest. Usunięcie zostawiło jednak **brak członu** tam, gdzie prawda brzmi `-N` -
 reguła przeszła z zaniżania na zawyżanie zamiast trafić.
 
 **To nie był defekt silnika.** Na wszystkich tych węzłach `engine_tail == oracle_c1`;
@@ -108,7 +108,7 @@ rozjazd żył wyłącznie między regułą diagnostyczną a postacią dokładną
 
 Znaczenie dla członu (b) jest metodologiczne: `max(0, W_src - N)` zależy wyłącznie
 od ogona dziecka i od WŁASNEGO parametru węzła, więc jest w pełni **lokalna**.
-Reguła bez tego członu mierzyła własny brak, a nie nielokalność — była chochołem
+Reguła bez tego członu mierzyła własny brak, a nie nielokalność - była chochołem
 dla operatorów niosących parametr.
 
 Co ta poprawka zmienia, a czego nie:
@@ -124,7 +124,7 @@ Co ta poprawka zmienia, a czego nie:
 | reżimy H10a (ogon i początek logiczny) | 9/9 dokładnych | bez zmian |
 
 Nagłówkowa liczba członu (b) jest odporna, bo **żaden** plan nie rozjeżdżał się
-wyłącznie na `SHIFT` — każdy rozjeżdżający się plan rozjeżdża się też na innym
+wyłącznie na `SHIFT` - każdy rozjeżdżający się plan rozjeżdża się też na innym
 rodzaju węzła. Poprawka czyści kontrolę negatywną, a nie wynik.
 
 Kontrola `HC_INT` była po tej poprawce nadal złamana (2999 i 3039 rozjazdów).
@@ -132,7 +132,7 @@ Zbadanie tego, opisane w następnej sekcji, pokazało, że przyczyna nie leży a
 w silniku, ani w regule lokalnej: sama kontrola jest źle postawiona.
 
 **Pliki odniesienia zostają nietknięte.** `VERDICT.md` i `VERDICT_oos.md` są zapisem
-kampanii, która szła ze starą regułą, i mają nim pozostać — świeży werdykt różni się
+kampanii, która szła ze starą regułą, i mają nim pozostać - świeży werdykt różni się
 od nich w sekcji 3 dokładnie o wielkości z tabeli powyżej i **nie jest to dryft**.
 Jądro bramki (`compare_regimes.py`) czyta wyłącznie dwie tabele reżimów H10a, więc
 tej różnicy nie widzi i widzieć nie ma. Przeliczenie członu (b) poprawioną regułą
@@ -151,7 +151,7 @@ już nie zawiera.
 **`HC_INT` jest sprzeczna z twierdzeniem, które miała kontrolować.** Postać
 predeklarowana rozjazdu to `ceil((p+q-1)/p)`; przy ilorazie całkowitym `q = 1`,
 więc postać daje **1**, a kontrola żądała **0**. Zero jest tam nieosiągalne dla
-każdej reguły bez członu fazowego — kontrola nie sprawdzała reguły, tylko fałszywe
+każdej reguły bez członu fazowego - kontrola nie sprawdzała reguły, tylko fałszywe
 założenie o jej degeneracji. Pomiar na obu ziarnach bramki potwierdza to co do
 węzła: w populacji twierdzenia (obie składowe `#` są deklaracjami) rozjazd wynosi
 dokładnie 1 w **544/544** i **545/545** węzłów o ilorazie całkowitym.
@@ -160,7 +160,7 @@ Do tego dochodził błąd selekcji. `hard_classes` opisuje **plan**, a `HC_INT` 
 własnością pojedynczego węzła `#`; plan potrafi nieść kilka `#` o różnych
 ilorazach i **38,4%** planów z `HC_INT` niosło również `HC_NONINT`. Wszystkie
 346 i 340 rzekomych złamań reguły lokalnej B siedziało w wciągniętych tak węzłach
-o ilorazie NIEcałkowitym — na właściwej populacji ta kontrola daje **0/1826**
+o ilorazie NIEcałkowitym - na właściwej populacji ta kontrola daje **0/1826**
 i **0/1844**.
 
 **`HC_SINGLE` w postaci dosłownej** dopuszcza `@` i `-`, które własny ogon mają.
@@ -169,7 +169,7 @@ nie trafił na nich w plan jednotaktowy o niezerowym ogonie własnym. Kontrola
 spełniona przez dobór próby, a nie przez regułę, upada przy pierwszym korpusie,
 który taki plan zawiera.
 
-Zestaw kontroli jest teraz ten z K24b §4 — obie węzłowe i zawężone do operatorów
+Zestaw kontroli jest teraz ten z K24b §4 - obie węzłowe i zawężone do operatorów
 bez własnego ogona:
 
 | Kontrola | ziarno 20260804 | ziarno 20260807 |
@@ -178,7 +178,7 @@ bez własnego ogona:
 | `HC_SINGLE` (operatory bez własnego ogona) | 0 / 3645 | 0 / 3691 |
 
 W ówczesnej aparaturze `decision_rule.py` orzekał **H10b WSPARTA** na obu
-ziarnach — rozjazd 52,4% i 52,7% przy progu 5%, postać 353/353 i 358/358.
+ziarnach - rozjazd 52,4% i 52,7% przy progu 5%, postać 353/353 i 358/358.
 Te liczniki postaci zastąpiło późniejsze przeliczenie opisane niżej.
 
 **To jest osłabienie aparatury o trzy kontrole i tak należy je czytać.**
@@ -194,7 +194,7 @@ sekcja 3 świeżego werdyktu różni się od `VERDICT.md` zestawem wierszy i **n
 jest to dryft**. Przeliczenie członu (b) jako wyniku badawczego wymaga własnej
 predeklaracji i osobnego przebiegu.
 
-## Poprawka aparatury H10b — populacja i dodatniość
+## Poprawka aparatury H10b - populacja i dodatniość
 
 Predeklaracja K24b §3–4 definiuje populację jako **każdy węzeł `#` o obu
 bezpośrednich składowych będących deklaracjami**. Kampania błędnie wybierała
@@ -217,7 +217,7 @@ To naprawa odczytu **istniejących ziaren bramki**, nie nowy przebieg
 potwierdzający. Zamrożone `VERDICT.md` i `VERDICT_oos.md` pozostają historią;
 `compare_regimes.py` porównuje z nich wyłącznie reżimy H10a.
 
-## Defekt aparatury z 2026-08-19 — binarka nie może być zgadywana
+## Defekt aparatury z 2026-08-19 - binarka nie może być zgadywana
 
 Poziom `test_closedform` oblał na CI z powodu, który **nie miał nic wspólnego
 z silnikiem**: `run_gate.sh` jako jedynemu testowi rozmawiającemu z silnikiem
@@ -229,14 +229,14 @@ zachowania i oba były pułapkami:
    drzewa silnika ta ścieżka nie istnieje i nigdy nie zadziałała.
 2. Po niej wchodził fallback na `xretractor` z `PATH`. Na CI nie ma tam nic
    (job bramki nie robi `ninja install`), więc poziom oblewał. Lokalnie stoi tam
-   binarka **zainstalowana**, więc poziom przechodził — sprawdzając inną binarkę
+   binarka **zainstalowana**, więc poziom przechodził - sprawdzając inną binarkę
    niż cała reszta bramki.
 
 Drugi przypadek jest groźniejszy od pierwszego: czerwone światło widać, a ciche
 podstawienie binarki wygląda jak dowód. Poprawka jest w dwóch miejscach:
 `run_gate.sh` podaje `$XRETRACTOR` jawnie każdemu wywołaniu, a
 `engine.resolve_binary` nie ma już ani ścieżki domyślnej, ani fallbacku na
-`PATH` — bez jawnego wskazania podnosi `EngineError`. Wołający zawsze wie, którą
+`PATH` - bez jawnego wskazania podnosi `EngineError`. Wołający zawsze wie, którą
 binarkę bada.
 
 Zanim to naprawiono, test uruchomiono ręcznie na binarce z `build/Release`:

@@ -137,7 +137,7 @@ ptree IpcClient::netClient(const std::string &netCommand, const std::string &net
 
     // Budżet liczony ZEGAREM, a nie liczbą obrotów pętli. Obrót to sen plus
     // `lock` na muteksie współdzielonym z wątkiem emisji serwera, więc na
-    // obciążonej maszynie trwa dłużej niż sam interwał — a wtedy liczenie prób
+    // obciążonej maszynie trwa dłużej niż sam interwał - a wtedy liczenie prób
     // skracało faktyczne czekanie dokładnie w sytuacji, w której potrzebne było
     // najdłuższe (issue_217).
     const auto deadline = std::chrono::steady_clock::now() + clientResponseMaxFails_ * ipc::kClientResponsePollInterval;

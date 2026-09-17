@@ -29,7 +29,7 @@ TEST(ServerName, accepts_expected_shapes) {
   EXPECT_TRUE(servername::isValid(std::string(servername::kMaxLength, 'a')));
 }
 
-// Generator ma produkowac nazwy, ktore przechodza wlasna walidacje — inaczej wylosowana
+// Generator ma produkowac nazwy, ktore przechodza wlasna walidacje - inaczej wylosowana
 // nazwa bylaby odrzucana przez sciezke, ktora ma ja przyjac.
 TEST(ServerName, generated_names_are_always_valid) {
   for (int i = 0; i < 200; ++i) {
@@ -48,7 +48,7 @@ TEST(ServerName, generated_names_vary) {
 }
 
 // Przestrzen nazw uruchomienia jest czytana SUROWO. Ocena nalezy do wolajacego wlasnie po to,
-// zeby zla wartosc zatrzymala program z komunikatem zamiast zostac po cichu zignorowana —
+// zeby zla wartosc zatrzymala program z komunikatem zamiast zostac po cichu zignorowana -
 // zignorowana cofnelaby rownolegle uruchomienie na zasoby wspolne.
 TEST(ServerName, environment_namespace_is_returned_verbatim) {
   ASSERT_EQ(setenv(servername::kNamespaceEnv, "it03", 1), 0);

@@ -20,11 +20,11 @@
 // arytmetykę sondy. Tu każdy przypadek przechodzi PRAWDZIWĄ ścieżką zapisu `storage::write()`,
 // bo §10 pyta o „rzeczywisty zapis jednego rekordu pośredniego podczas wykonania planu".
 // Defekt wpięcia (zła rola, zgubiony zapis, policzony rekord pochłonięty przez detekcję gap)
-// jest widoczny tylko na tym poziomie — licznik sam z siebie przechodziłby dalej.
+// jest widoczny tylko na tym poziomie - licznik sam z siebie przechodziłby dalej.
 //
 // Każdy przypadek działa w OBU wariantach kompilacji. Przy wyłączonej sondzie oczekiwaną
 // wartością jest zero: to kontrola, że instrument nie przecieka do produkcji. Stąd mnożnik
-// `probeOn` — kontrakt jest dwustronny, nie ma tu GTEST_SKIP.
+// `probeOn` - kontrakt jest dwustronny, nie ma tu GTEST_SKIP.
 //
 namespace {
 
@@ -50,7 +50,7 @@ class writableStorage {
     storage_.write();
   }
 
-  /// Nadpisanie rekordu o podanym indeksie — druga gałąź `storage::write()`.
+  /// Nadpisanie rekordu o podanym indeksie - druga gałąź `storage::write()`.
   void overwrite(std::size_t recordIndex) {
     auto *payload = storage_.getPayload();
     payload->setNullBitset(std::vector<bool>(descriptor_.size(), false));
@@ -119,7 +119,7 @@ TEST(probeLogicalGate, single_substrate_append_lands_on_the_substrate_counter) {
 
 TEST(probeLogicalGate, roles_do_not_bleed_into_each_other) {
   // Mianownik metryki (rekordy publiczne) i licznik (bajty substratu) muszą pozostać
-  // rozdzielne w jednym procesie — plan K23 ma zawsze oba rodzaje strumieni naraz.
+  // rozdzielne w jednym procesie - plan K23 ma zawsze oba rodzaje strumieni naraz.
   rdb::probe::logicalWriteReset();
   writableStorage substrate("gate_mixed_sub", oneInteger(), true);
   writableStorage stream("gate_mixed_pub", oneInteger(), false);
@@ -198,7 +198,7 @@ TEST(probeLogicalGate, eight_instances_match_the_decisive_q) {
 }
 
 TEST(probeLogicalGate, one_shared_instance_is_eight_times_cheaper_than_eight) {
-  // Ten sam pomiar po scaleniu — to jest liczba, którą kampania porówna z powyższą.
+  // Ten sam pomiar po scaleniu - to jest liczba, którą kampania porówna z powyższą.
   const auto descriptor  = oneInteger();
   const auto recordBytes = rdb::probe::canonicalRecordBytes(descriptor);
 
@@ -274,14 +274,14 @@ TEST(probeLogicalGate, two_records_of_the_same_stream_sum_up) {
 
 TEST(probeLogicalGate, null_values_do_not_change_the_canonical_width) {
   // Mapa NULL ma stałą szerokość, więc rekord z wartościami puste kosztuje tyle samo.
-  // Metryka pierwotna ma być deterministyczna — inaczej iloraz zależałby od danych.
+  // Metryka pierwotna ma być deterministyczna - inaczej iloraz zależałby od danych.
   const auto descriptor  = oneInteger();
   const auto recordBytes = rdb::probe::canonicalRecordBytes(descriptor);
 
   rdb::probe::logicalWriteReset();
   {
     writableStorage stream("gate_null_value", descriptor, true);
-    stream.write(true);  // rekord all-null, ale BEZ detekcji gap — trafia do magazynu
+    stream.write(true);  // rekord all-null, ale BEZ detekcji gap - trafia do magazynu
   }
 
   const auto l = rdb::probe::logicalWriteReport();
@@ -311,7 +311,7 @@ TEST(probeLogicalGate, nullfill_records_are_real_writes) {
 TEST(probeLogicalGate, records_absorbed_into_a_gap_are_not_writes) {
   // NAJWAŻNIEJSZY przypadek bramki. Rekord all-null pochłonięty przez maszynę gap nigdy
   // nie dociera do magazynu, więc nie jest materializacją. Policzenie go zawyżałoby
-  // metrykę pierwotną tym bardziej, im więcej przerw ma źródło — czyli różnicowałoby
+  // metrykę pierwotną tym bardziej, im więcej przerw ma źródło - czyli różnicowałoby
   // profile ablacyjne wielkością niezwiązaną ze współdzieleniem.
   const auto descriptor  = oneInteger();
   const auto recordBytes = rdb::probe::canonicalRecordBytes(descriptor);
@@ -320,10 +320,10 @@ TEST(probeLogicalGate, records_absorbed_into_a_gap_are_not_writes) {
   {
     writableStorage stream("gate_gap_absorbed", descriptor, true);
     stream.configureGapDetection(2);
-    stream.write(true);  // nullfill 1 — zapis
-    stream.write(true);  // nullfill 2 — zapis
-    stream.write(true);  // pochłonięty do przerwy — NIE zapis
-    stream.write(true);  // pochłonięty do przerwy — NIE zapis
+    stream.write(true);  // nullfill 1 - zapis
+    stream.write(true);  // nullfill 2 - zapis
+    stream.write(true);  // pochłonięty do przerwy - NIE zapis
+    stream.write(true);  // pochłonięty do przerwy - NIE zapis
   }
 
   const auto l = rdb::probe::logicalWriteReport();
@@ -342,8 +342,8 @@ TEST(probeLogicalGate, overwrite_is_counted_with_its_bytes) {
   rdb::probe::logicalWriteReset();
   {
     writableStorage stream("gate_overwrite", descriptor, true);
-    stream.write();       // rekord 0 — dopisanie
-    stream.overwrite(0);  // ten sam rekord — nadpisanie
+    stream.write();       // rekord 0 - dopisanie
+    stream.overwrite(0);  // ten sam rekord - nadpisanie
   }
 
   const auto l = rdb::probe::logicalWriteReport();

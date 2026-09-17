@@ -61,7 +61,7 @@ TEST_F(FaccfsTest, write_and_read_single_record) {
 }
 
 // ============================================================
-// count() — previously 0% coverage
+// count() - previously 0% coverage
 // ============================================================
 
 TEST_F(FaccfsTest, count_returns_zero_for_new_file) {
@@ -181,7 +181,7 @@ TEST_F(FaccfsTest, update_in_place_modifies_correct_record) {
 }
 
 // ============================================================
-// Destructor with percounter >= 0 — file rotation
+// Destructor with percounter >= 0 - file rotation
 // ============================================================
 
 TEST_F(FaccfsTest, destructor_rotates_file_when_percounter_set) {
@@ -235,7 +235,7 @@ TEST_F(FaccfsTest, destructor_no_rotation_when_percounter_negative) {
     std::memcpy(data, "no rotate!", AREA_SIZE);
     gf.write(data);
   }
-  // File should still exist at original path — no rotation
+  // File should still exist at original path - no rotation
   EXPECT_TRUE(std::filesystem::exists(path));
   EXPECT_FALSE(std::filesystem::exists(path + ".old-1"));
 }
@@ -358,7 +358,7 @@ TEST_F(FaccfsTest, destructor_rotation_nonexistent_file_no_crash) {
   auto path = sandboxPath("nonexistent");
 
   {
-    // percounter=5 but no file written — destructor should not crash
+    // percounter=5 but no file written - destructor should not crash
     rdb::genericBinaryFile gf(path, desc, 5);
   }
   EXPECT_FALSE(std::filesystem::exists(path));

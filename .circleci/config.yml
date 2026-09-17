@@ -8,7 +8,7 @@ parameters:
     default: false
   # Mimo nazwy nie jest to wylacznie uruchomienie reczne: ten sam parametr ustawia
   # trigger `cron-shedule` skonfigurowany w UI CircleCI (0 4 5,20 * *, galaz
-  # master). Nazwa zostaje, bo trigger przekazuje ja doslownie — zmiana wymagalaby
+  # master). Nazwa zostaje, bo trigger przekazuje ja doslownie - zmiana wymagalaby
   # rownoczesnej edycji triggera po stronie UI.
   run_manual_nightly_full:
     type: boolean
@@ -20,7 +20,7 @@ parameters:
   # bramki przewiduje uruchomienie "recznie przed wysłaniem artykułu do
   # recenzji", a dotad jedynym wejsciem byl trigger `cron-shedule` razem z
   # calym `manual-nightly-full`. Harmonogramu ten parametr nie ma i miec nie
-  # musi — bramka biegnie dalej 2 razy w miesiacu w warstwie L3 tamtego
+  # musi - bramka biegnie dalej 2 razy w miesiacu w warstwie L3 tamtego
   # workflow, z cieplym ccache po build-release-ninja-mydocker.
   run_manual_research_gate:
     type: boolean
@@ -64,18 +64,18 @@ workflows:
 
   # Pelny przebieg: dwa razy w miesiacu z triggera `cron-shedule` albo recznie.
   # Do 2026-08-18 istnial obok blizniaczy workflow `nightly-full` z wlasnym
-  # `triggers.schedule` o tym samym cronie — scalony tutaj, zeby jeden harmonogram
+  # `triggers.schedule` o tym samym cronie - scalony tutaj, zeby jeden harmonogram
   # nie byl zapisany w dwoch miejscach.
   #
   # Trzy warstwy, kazda odcina nastepna:
-  #   L1  smoke  — sama kompilacja Debug; zatrzymuje reszte w kilka minut;
+  #   L1  smoke  - sama kompilacja Debug; zatrzymuje reszte w kilka minut;
   #   L2  pelny zestaw testow (189) w Debug i Release na obrazie projektu;
-  #   L3  bramka badawcza H9/H10 — najdrozszy job przebiegu.
+  #   L3  bramka badawcza H9/H10 - najdrozszy job przebiegu.
   #
   # Od 2026-08-19 wylacznie budy na ninja i na obrazie projektu. Budy makefile
   # (czysta Ubuntu, ARM) wyjechaly do `manual-make-build`, a `build-debug` na
   # czystej Ubuntu zniknal calkiem: jego pokrycie bylo przecieciem dwoch innych
-  # jobow — przenosnosc na stockowym toolchainie sprawdza `build-release` (ktory
+  # jobow - przenosnosc na stockowym toolchainie sprawdza `build-release` (ktory
   # jako jedyny robi tez `run-package`), a pelny zestaw Debug `build-debug-
   # ninja-mydocker`.
   manual-nightly-full:
@@ -97,7 +97,7 @@ workflows:
             - build-release-ninja-mydocker
       # PODLOGA matrycy ablacyjnej, jeden job zamiast siedmiu. Pelna matryca
       # `manual-ablation` odpowiada na pytanie "ktory przelacznik", a ta konfiguracja
-      # na pytanie "czy w ogole" — i to ona wychwytuje regresje. Dowod z 2026-08-19:
+      # na pytanie "czy w ogole" - i to ona wychwytuje regresje. Dowod z 2026-08-19:
       # matryca byla zepsuta od zmiany reguly `>N` z 2026-08-07, dwanascie dni bez
       # wykrycia, bo `manual-ablation` jest wylacznie reczna; wszystkie cztery awarie
       # zlapal wlasnie wariant all-off, warianty jednoczynnikowe nie dolozyly zadnej.
@@ -114,7 +114,7 @@ workflows:
             - build-release-ninja-mydocker
       # Kontrakt tekstowy sondy. Wiersze WORK/MATERIALIZED/LOGICAL/PLAN bench sa
       # porownywane co do znaku przez `ut_probe`, ale tylko w buildzie z
-      # RDB_BENCH_PROBE=ON — poza ta konfiguracja galezie `if constexpr` oczekuja
+      # RDB_BENCH_PROBE=ON - poza ta konfiguracja galezie `if constexpr` oczekuja
       # pustego stderr i format nie jest sprawdzany przez nic. Dowod z 2026-09-04:
       # konwersja fprintf -> println scalila sklejane literaly i zgubila podwojne
       # spacje rozdzielajace grupy; caly przebieg commitowy byl zielony, awarie
@@ -130,12 +130,12 @@ workflows:
             - build-release-ninja-mydocker
 
   # Sama bramka badawcza H9/H10, bez L1 i L2. Uruchamiana z reki, gdy trzeba
-  # potwierdzic, ze wyniki sie nie cofnely — np. przed zgloszeniem artykulu —
+  # potwierdzic, ze wyniki sie nie cofnely - np. przed zgloszeniem artykulu -
   # zamiast czekac na najblizszy przebieg `manual-nightly-full`.
   #
   # Bez `requires`, wiec job idzie od razu. Cena: ccache zapisywany przez
   # build-release-ninja-mydocker jest tu tylko ODCZYTYWANY, a poza przebiegiem
-  # nocnym nie ma wpisu dla tego samego commita — zaladuje sie klucz prefiksowy
+  # nocnym nie ma wpisu dla tego samego commita - zaladuje sie klucz prefiksowy
   # ze starszej rewizji i pierwszy profil ablacji zbuduje sie dluzej. Dlatego
   # ten workflow jest dodatkiem, a nie zamiennikiem warstwy L3.
   research-gate-only:
@@ -145,10 +145,10 @@ workflows:
 
   # Budy na generatorze Makefile, poza przebiegiem nocnym. Odpowiadaja na jedno
   # pytanie: czy projekt stawia sie na stockowym toolchainie, poza obrazem
-  # projektu — na czystej Ubuntu (`build-release`, wraz z pakietem CPack) i na
+  # projektu - na czystej Ubuntu (`build-release`, wraz z pakietem CPack) i na
   # ARM. Bez `requires`: oba joby sa niezalezne i maja lecac rownolegle.
   #
-  # `build-ARM` jest osiagalny takze przez `manual-arm` — to jest celowe: tamten
+  # `build-ARM` jest osiagalny takze przez `manual-arm` - to jest celowe: tamten
   # workflow uruchamia sam ARM, ten caly zestaw makefile.
   manual-make-build:
     when: << pipeline.parameters.run_manual_make_build >>
@@ -156,7 +156,7 @@ workflows:
       - build-release
       - build-ARM
 
-  # Optimizer ablation matrix — manual only, never scheduled and never
+  # Optimizer ablation matrix - manual only, never scheduled and never
   # commit-triggered. One-factor-at-a-time over the RDB_OPT_* switches plus the
   # all-off floor and a probe-instrumented build. The all-off configuration runs
   # first: it is the one most likely to fail, so the remaining variants are not
@@ -199,7 +199,7 @@ workflows:
           requires:
             - ablation-all-off
       - build-release-ablation:
-          # Measurement instrumentation, not an optimizer switch — kept in the
+          # Measurement instrumentation, not an optimizer switch - kept in the
           # matrix so the probe code cannot rot unnoticed.
           name: ablation-probe-on
           probe: "ON"
@@ -241,7 +241,7 @@ commands:
                 name: Check whether commit-triggered CI can be skipped
                 command: |
                   if git log -1 --pretty=%B | grep -qF '[skipci]'; then
-                    echo "Commit message contains [skipci] — skipping CI."
+                    echo "Commit message contains [skipci] - skipping CI."
                     circleci step halt
                   fi
       - unless:
@@ -249,7 +249,7 @@ commands:
           steps:
             - run:
                 name: Commit skip check disabled (scheduled/manual workflow)
-                command: echo "Ignoring the [skipci] check — this is not a commit-triggered workflow."
+                command: echo "Ignoring the [skipci] check - this is not a commit-triggered workflow."
 
   prep-env-ci:
     parameters:
@@ -296,7 +296,7 @@ commands:
                 name: Configure Ninja generator
                 command: scripts/buildrdb.sh ninja
 
-  # ccache przeżywa job tylko dzięki cache'owi CircleCI — kontener startuje pusty.
+  # ccache przeżywa job tylko dzięki cache'owi CircleCI - kontener startuje pusty.
   # Podpięcie ccache jako CMAKE_CXX_COMPILER_LAUNCHER robi CMakeLists.txt samo,
   # gdy znajdzie binarkę (RDB_USE_CCACHE, domyślnie ON).
   # Używane wyłącznie w jobach na executorze debian-mydocker: tylko tam ccache jest
@@ -333,7 +333,7 @@ commands:
           name: ccache statistics
           command: ccache -s
       - save_cache:
-          # Klucze CircleCI są niezmienne — {{ .Revision }} daje nowy wpis na commit,
+          # Klucze CircleCI są niezmienne - {{ .Revision }} daje nowy wpis na commit,
           # a prefiksy w restore_cache pozwalają odziedziczyć cache poprzedniego.
           key: ccache-v1-<< parameters.cache_id >>-{{ arch }}-{{ .Branch }}-{{ .Revision }}
           paths:
@@ -392,7 +392,7 @@ commands:
             xtrdb -h
       # Diagnostyka porazki jest w TYM SAMYM kroku co ctest, zeby kolektor dostal jego
       # prawdziwy kod wyjscia. Powod: 2026-09-04 `it_agse_array` oblal tutaj, a jedynym
-      # sladem byl wpis w test_results.xml z pustym <system-out/> — czyli wiadomo bylo,
+      # sladem byl wpis w test_results.xml z pustym <system-out/> - czyli wiadomo bylo,
       # ZE oblal, i nic ponadto. Awaria nie powtorzyla sie lokalnie w 31 pelnych
       # przebiegach, wiec bez zebranych dowodow kolejne takie zdarzenie tez byloby
       # nie do zbadania.
@@ -416,7 +416,7 @@ commands:
           destination: test_results.xml
       # Raport niesie takze kopie calego LastTest.log (pelne wyjscie kazdego testu, bo CI
       # biegnie z -V). Osobnego artefaktu z oryginalu NIE ma celowo: kolektor buduje liste
-      # testow przez `ctest --show-only`, a to nadpisuje LastTest.log pustym naglowkiem —
+      # testow przez `ctest --show-only`, a to nadpisuje LastTest.log pustym naglowkiem -
       # zapisany bylby wiec pusty plik. Kopia powstaje przed tym wolaniem.
       - store_artifacts:
           when: always
@@ -451,15 +451,15 @@ commands:
 
 jobs:
   # L1 pelnego przebiegu: SAMA kompilacja Debug. Zadanie tego jobu to odciac
-  # warstwe 2, kiedy drzewo sie nie kompiluje — zamiast dowiadywac sie o tym po
+  # warstwe 2, kiedy drzewo sie nie kompiluje - zamiast dowiadywac sie o tym po
   # pelnym zestawie 189 testow. Zapisuje cache ccache dla `mydocker-debug`, wiec
   # build-debug-ninja-mydocker w warstwie 2 startuje z goracego cache.
   #
-  # Do 2026-08-19 byl tu jeszcze krok `ctest -R '^ut_'` — zdjety, bo byla to
+  # Do 2026-08-19 byl tu jeszcze krok `ctest -R '^ut_'` - zdjety, bo byla to
   # JEDYNA czesc tego jobu nieznajdujaca sie juz w `build-debug-ninja-mydocker`
-  # (ten sam obraz, te same kroki, ten sam klucz ccache — tylko pelne `run-test`
+  # (ten sam obraz, te same kroki, ten sam klucz ccache - tylko pelne `run-test`
   # zamiast samych `ut_`), a zarazem najdrozsza: 45 binarek jednostkowych pod
-  # valgrindem, liczonych dwa razy w jednym przebiegu. Pokrycie nie ginie — te
+  # valgrindem, liczonych dwa razy w jednym przebiegu. Pokrycie nie ginie - te
   # same testy wykonuje warstwa L2 kilkanascie minut pozniej.
   smoke-debug-ninja-mydocker:
     working_directory: ~/retractordb
@@ -537,7 +537,7 @@ jobs:
           build_type: Debug
           build_tool: ninja
 
-  # Bramka badawcza H9/H10 — ochrona osiagnietych wynikow przed regresja silnika
+  # Bramka badawcza H9/H10 - ochrona osiagnietych wynikow przed regresja silnika
   # (test/research_gate/README.md). Celowo poza `ninja` i poza `ninja test`, wiec
   # musi byc wywolana jawnie; L3, bo to najdrozszy job w przebiegu.
   #
@@ -573,23 +573,23 @@ jobs:
               -DRESEARCH_GATE_STRICT=ON
       # Poziom 84/84 hipotezy H9 odroznia R1 od R2 wylacznie na czterech profilach
       # ablacji. Bez nich bramka ten poziom POMIJA, a w trybie strict pominiecie
-      # jest bledem — wiec profile musza powstac tutaj, w tym samym jobie i z tej
+      # jest bledem - wiec profile musza powstac tutaj, w tym samym jobie i z tej
       # samej tresci src/ (bramka sprawdza odcisk).
       #
       # Rownoleglosc: 4, nie `$(nproc)`. W kontenerze `nproc` podaje rdzenie
-      # HOSTA (36), nie przydzial kontenera — a wiazacym limitem i tak jest
+      # HOSTA (36), nie przydzial kontenera - a wiazacym limitem i tak jest
       # pamiec: jedna jednostka kompilacji tego drzewa siega ~1 GiB RSS
       # (zmierzone: executorsm.cpp 0,93 GiB, launcher.cpp 0,86 GiB), executor
       # `large` ma 8 GiB. 36 rownoleglych g++ to ~30 GiB, czyli OOM: 2026-08-19
       # krok padl po 45 s bez jednej linii bledu i bez artefaktow, bo zabity
       # krok nie dochodzi do store_artifacts. Inne joby przechodza dlatego, ze
       # buduje je `conan build`, a conan liczy rownoleglosc z limitu cgroup, nie
-      # z `nproc`. Liczba 4 idzie za `resource_class: large` (4 vCPU / 8 GiB) —
+      # z `nproc`. Liczba 4 idzie za `resource_class: large` (4 vCPU / 8 GiB) -
       # przy zmianie klasy executora zmienic tutaj.
       #
       # DRUGIE ZRODLO TEJ SAMEJ REGULY: `compute_build_jobs()` w
       # scripts/buildrdb.sh (~850 MB na zadanie, ~500 MB marginesu, wynik
-      # ograniczony liczba rdzeni) — to jest ta sama arytmetyka, policzona dla
+      # ograniczony liczba rdzeni) - to jest ta sama arytmetyka, policzona dla
       # maszyny lokalnej. Kroku CI nie da sie do niej podpiac: kazdy `run:` to
       # osobna powloka, a funkcja siedzi w srodku 1500-liniowego skryptu. Stad
       # duplikat; przy zmianie zalozen poprawic OBA miejsca.
@@ -600,7 +600,7 @@ jobs:
       # drukuje dopiero werdykt poziomu. Miedzy dwiema liniami "profil X ->"
       # mieszcza sie minuty pierwszego, zimnego profilu (lokalnie 4 min 20 s przy
       # -j4; na 4 vCPU kontenera odpowiednio dluzej), a w kroku bramki cala
-      # kampania 2 x 10010 planow. Dzielenie tego na osobne kroki NIE pomaga —
+      # kampania 2 x 10010 planow. Dzielenie tego na osobne kroki NIE pomaga -
       # limit liczy sie per krok, nie per job. Kolejne profile sa tansze: rozne
       # miedzy nimi sa tylko 19 ze 112 jednostek kompilacji (cel `retractor`),
       # reszta trafia w ccache.
@@ -614,7 +614,7 @@ jobs:
           no_output_timeout: 30m
           command: |
             cmake --build build/Release --target test_gate --parallel 4
-      # `when: always`: artefakty sa potrzebne WLASNIE wtedy, gdy bramka padla —
+      # `when: always`: artefakty sa potrzebne WLASNIE wtedy, gdy bramka padla -
       # bez tego nieudany przebieg nie zostawia ani logow builda profili, ani
       # katalogu roboczego bramki.
       - store_artifacts:
@@ -693,13 +693,13 @@ jobs:
               -DRDB_OPT_SIMPLIFY_EXPRESSIONS=<< parameters.simplify >> \
               -DRDB_BENCH_PROBE=<< parameters.probe >>
       # Rownoleglosc 4, nie `$(nproc)` i nie domyslna ninja (`nproc`+2): powod
-      # jak w jobie research-gate wyzej — w kontenerze `nproc` podaje rdzenie
+      # jak w jobie research-gate wyzej - w kontenerze `nproc` podaje rdzenie
       # HOSTA, a jedna jednostka kompilacji tego drzewa siega ~1 GiB RSS przy
       # 8 GiB executora `large`. Odpowiednik `compute_build_jobs()` z
       # scripts/buildrdb.sh, policzony recznie dla tego executora.
       #
       # Od 2026-08-19 ten job jest tez podloga ablacyjna warstwy L3 przebiegu
-      # nocnego (`ablation-all-off`), a nie tylko czescia recznej matrycy —
+      # nocnego (`ablation-all-off`), a nie tylko czescia recznej matrycy -
       # `--parallel 4` przestalo byc zabezpieczeniem teoretycznym.
       - run:
           name: Build and install ablation variant
@@ -747,7 +747,7 @@ jobs:
       # conanfile.py wolalo build() recepty, a ten pobiera archiwum z cmake.org.
       # 2026-09-15 cmake.org oddawal 403 na wszystko i job padl. Kolo z PyPI
       # (najnowsze, jakie jest dla aarch64) zglaszamy conanowi jako narzedzie
-      # platformy — cmake.org znika ze sciezki joba. Podloga z conanfile.py
+      # platformy - cmake.org znika ze sciezki joba. Podloga z conanfile.py
       # nadal obowiazuje: wpis ponizej [>=4.4.2] conan pomija i wraca do recepty
       # (czyli znow do cmake.org), a nie buduje starszym cmake.
       - run:

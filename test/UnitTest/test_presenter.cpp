@@ -52,7 +52,7 @@ TEST(presenter, tags_without_fields_returns_error) {
   presenter p(coreInstance);
   auto vm = makeVM({"--tags"});
 
-  // Sciezka bledu tlumaczy sie operatorowi na stderr — asercja jest na kodzie powrotu.
+  // Sciezka bledu tlumaczy sie operatorowi na stderr - asercja jest na kodzie powrotu.
   testing::internal::CaptureStderr();
   const int rc = p.run(vm);
   testing::internal::GetCapturedStderr();

@@ -15,7 +15,7 @@ class token {
  public:
   [[nodiscard]] std::string getStr_() const;
   [[nodiscard]] boost::rational<int> getRI() const;
-  // S1: zwrot przez referencje — bylo przez wartosc, wiec kazdy odczyt kopiowal wariant
+  // S1: zwrot przez referencje - bylo przez wartosc, wiec kazdy odczyt kopiowal wariant
   // (a ten trzyma std::string / pair<string,int>). W goracej petli eval to alokacja per token.
   [[nodiscard]] constexpr const rdb::descFldVT &getVT() const { return valueVT_; };
 

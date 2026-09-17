@@ -2,8 +2,8 @@
 # Pomiar odciazenia lacza dla potoku EKG z redukcja tempa (znalezisko B / H10).
 #
 # Porownuje w JEDNYM przebiegu dwa zmaterializowane strumienie:
-#   ecg_raw   2 x INTEGER @ 1/360 — to, co lacze musialoby przeniesc surowo
-#   qrs_ship  2 x INTEGER @ 1/36  — to, co idzie w lacze po potoku
+#   ecg_raw   2 x INTEGER @ 1/360 - to, co lacze musialoby przeniesc surowo
+#   qrs_ship  2 x INTEGER @ 1/36  - to, co idzie w lacze po potoku
 #
 # Uzycie:  ./measure.sh [slotow]      (domyslnie 180000 = 500 s sygnalu)
 #

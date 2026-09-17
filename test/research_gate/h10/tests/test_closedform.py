@@ -41,9 +41,9 @@ def main(argv):
             if interval != node.delta:
                 failures.append(f"{label} {node.name}: interwał {node.delta} vs {interval}")
             if tail != replica[node.name]:
-                failures.append(f"{label} {node.name}: ogon — silnik {tail}, replika {replica[node.name]}")
+                failures.append(f"{label} {node.name}: ogon - silnik {tail}, replika {replica[node.name]}")
             if origin != replica_origins[node.name]:
-                failures.append(f"{label} {node.name}: origin — silnik {origin}, "
+                failures.append(f"{label} {node.name}: origin - silnik {origin}, "
                                 f"replika {replica_origins[node.name]}")
 
     print(f"węzłów porównanych: {checked}")

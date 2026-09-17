@@ -36,7 +36,7 @@ int valueOf(const rdb::payload &p) {
 
 // ---------------------------------------------------------------------------
 // Pojemność bufora historii: źródło deklarowane musi utrzymywać co najmniej
-// jeden rekord — setCapacity(0) podnosi pojemność do 1.
+// jeden rekord - setCapacity(0) podnosi pojemność do 1.
 // ---------------------------------------------------------------------------
 TEST(SourceBufferTest, capacity_is_at_least_one) {
   rdb::SourceBuffer buffer;
@@ -72,7 +72,7 @@ TEST(SourceBufferTest, read_current_fills_out_from_source) {
 
 // ---------------------------------------------------------------------------
 // readCurrent po wyczerpaniu źródła (bez zapętlenia): źródło deklarowane samo
-// zwraca dane wyzerowane z wzorcem all-null — SourceBuffer przekazuje je dalej.
+// zwraca dane wyzerowane z wzorcem all-null - SourceBuffer przekazuje je dalej.
 // ---------------------------------------------------------------------------
 TEST(SourceBufferTest, read_current_after_eof_returns_null_row) {
   createTextFile("sb_eof.txt", "7\n");
@@ -112,7 +112,7 @@ TEST(SourceBufferTest, fire_pushes_chamber_into_history) {
     EXPECT_EQ(valueOf(out), expected);
   }
 
-  EXPECT_EQ(buffer.size(), 2U);              // pojemność 2 — najstarszy rekord wypchnięty
+  EXPECT_EQ(buffer.size(), 2U);              // pojemność 2 - najstarszy rekord wypchnięty
   EXPECT_EQ(valueOf(buffer.history(0)), 3);  // najnowszy
   EXPECT_EQ(valueOf(buffer.history(1)), 2);
 

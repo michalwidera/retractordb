@@ -1,6 +1,6 @@
 #!/bin/bash
 # Issue 167: HASH lewostronnie rekurencyjny, substrat wspolny z out2, -m 30.
-# faccmemory implementuje kolowy bufor — teza testu to BRAK crashu przy HASH
+# faccmemory implementuje kolowy bufor - teza testu to BRAK crashu przy HASH
 # z retPosValue > 0. Wzorce planu i przebiegu sa dodatkowym zabezpieczeniem.
 #
 # Skrypt zamiast `add_test(COMMAND sh -c "...")`: makro add_test z katalogu
@@ -22,7 +22,7 @@ xretractor -c query.rql > out_compile.txt
 # Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
 # wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
 # Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
-# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+# znaczy 'fields' w wyjsciu DOT - do wywolan kompilacyjnych jej NIE dodawac.
 xretractor query.rql -m 30 -f
 "$XTRDB" noprompt < term.script > out_run.txt
 

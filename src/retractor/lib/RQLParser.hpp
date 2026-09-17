@@ -10,14 +10,14 @@
 /// Wejscie do parsera RQL (RQLParser.cpp). Naglowek jest JEDYNYM miejscem, w ktorym te
 /// symbole sa deklarowane: do 2026-09-07 kazdy konsument robil to u siebie wlasnym `extern`,
 /// a przy trzech przeciazeniach `parserRQLString` taka deklaracja nie tylko moze rozjechac
-/// sie z definicja — moze po cichu wskazac INNE przeciazenie, bo przeciazenia nie daja
+/// sie z definicja - moze po cichu wskazac INNE przeciazenie, bo przeciazenia nie daja
 /// bledu linkowania, tylko wybor. RQLParser.cpp takze wlacza ten naglowek, wiec definicje
 /// sa sprawdzane wzgledem deklaracji.
 
 class qTree;
 
 /// Parsuje JEDNA porcje tekstu RQL. `firstLine` to numer wiersza, na ktorym ta porcja stoi
-/// w pliku zrodlowym — wolajacy, ktory tnie plik na instrukcje (parsePlanText,
+/// w pliku zrodlowym - wolajacy, ktory tnie plik na instrukcje (parsePlanText,
 /// parserRQLFile_4Test), podaje tu pozycje instrukcji, reszta zostawia 1.
 ///
 /// Zwraca {status, pierwsze slowo kluczowe, nazwa strumienia}. Status "OK" albo tresc bledu;
@@ -33,7 +33,7 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet);
 
 /// Wiersze logiczne pliku RQL: komentarze `#` usuniete, kontynuacje `\` sklejone. Z kazda
-/// instrukcja wraca numer wiersza PLIKU, na ktorym sie ona zaczyna — powody obu regul stoja
+/// instrukcja wraca numer wiersza PLIKU, na ktorym sie ona zaczyna - powody obu regul stoja
 /// przy definicji.
 std::vector<std::pair<std::string, size_t>> readLogicalLines(std::istream &file);
 

@@ -11,7 +11,7 @@
 
 namespace rdb {
 
-/// @brief Klasa utrzymująca cień indeksu (.meta.shadow) — nadpisania wzorców null dla magazynów
+/// @brief Klasa utrzymująca cień indeksu (.meta.shadow) - nadpisania wzorców null dla magazynów
 ///        posiadających plik cienia danych (.shadow, zob. posixBinaryFileWithShadow).
 ///
 /// Obiekt klasy metaShadow powinien:
@@ -27,7 +27,7 @@ namespace rdb {
 ///   warstwy (np. storageShadow, storage) mogły się do niej odwołać bez duplikowania sufiksu,
 /// - zarządzać własnymi zasobami w sposób bezpieczny i bez wycieków pamięci.
 /// @note Klasa nie zna pojęcia całkowitej liczby rekordów głównego indeksu ani nie waliduje zakresu
-///       recordIndex — to odpowiedzialność wywołującego (storageShadow).
+///       recordIndex - to odpowiedzialność wywołującego (storageShadow).
 /// @note Format wpisu na dysku jest zgodny z dawnym IndexRecord (flaga(1B) + size_t + size_t + bitset), aby
 ///       istniejące pliki .meta.shadow pozostały czytelne po tej refaktoryzacji.
 class metaShadow {

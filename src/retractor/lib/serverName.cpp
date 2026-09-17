@@ -39,7 +39,7 @@ constexpr std::array<std::string_view, 64> kSurnames{
 std::string generate() {
   // Losowosc bierzemy z urzadzenia systemowego, nie z zegara: dwa serwery startowane przez ten
   // sam skrypt w tej samej sekundzie dostawalyby z zegara identyczne ziarno, czyli identyczna
-  // nazwe — dokladnie w sytuacji, dla ktorej ten mechanizm istnieje.
+  // nazwe - dokladnie w sytuacji, dla ktorej ten mechanizm istnieje.
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<std::size_t> adjective(0, kAdjectives.size() - 1);

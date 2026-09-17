@@ -10,7 +10,7 @@ rm -f temp/*
 xretractor query.rql -f -k -r -m 4
 
 # FLOAT 2^24 gubi +1: (x+1)+2 = 16777218, przepisane x+3 = 16777220. Oba pola sa FLOAT, bo typ wyjscia
-# wezla syntetyzujacego to typ slotu wejsciowego (it_synth_node_output_shape) — rekord ma 8 bajtow.
+# wezla syntetyzujacego to typ slotu wejsciowego (it_synth_node_output_shape) - rekord ma 8 bajtow.
 # Do 2026-09-14 deskryptor deklarowal oba pola jako INTEGER; zmienil sie uklad rekordu, nie wartosc.
 expected="16777218 16777218"
 

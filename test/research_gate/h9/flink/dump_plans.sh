@@ -2,7 +2,7 @@
 # Krok D: dla kazdego z szesciu jobow (3 rodziny x 2 warianty) zapisz plan LOGICZNY
 # i FIZYCZNY oraz policz instancje operatorow badanego podplanu.
 #
-# `--plan-only` buduje graf transformacji i NIE wola env.execute() — zaden job nie jest
+# `--plan-only` buduje graf transformacji i NIE wola env.execute() - zaden job nie jest
 # uruchamiany, wiec ten krok nie moze wygenerowac zadnego wyniku kosztowego. Predeklaracja
 # jest niezamrozona (STOP-5), wiec pomiar kosztowy jest zabroniony.
 set -euo pipefail
@@ -14,7 +14,7 @@ Q="${Q:-8}"
 
 CP="$HERE/build:$(find "$FLINK_HOME/lib" -maxdepth 1 -name '*.jar' | sort | paste -sd:)"
 
-# Oba zestawienia sa dopisywane przez PlanDump, wiec oba musza zniknac przed przebiegiem —
+# Oba zestawienia sa dopisywane przez PlanDump, wiec oba musza zniknac przed przebiegiem -
 # inaczej kolejne uruchomienie skryptu dokleja wiersze do poprzednich.
 rm -f "$HERE/results/flink_instances.tsv" "$HERE/results/flink_work.tsv"
 rm -rf "$HERE/plans"

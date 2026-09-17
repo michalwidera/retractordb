@@ -15,7 +15,7 @@
 
 namespace {
 
-/// Schemat testowy: pole 0 INTEGER, 1 FLOAT, 2 STRING, 3 BYTE. Pole 9 celowo poza mapą —
+/// Schemat testowy: pole 0 INTEGER, 1 FLOAT, 2 STRING, 3 BYTE. Pole 9 celowo poza mapą -
 /// reprezentuje odwołanie o nieznanym typie (np. do strumienia, którego nie ma w planie).
 std::optional<rdb::descFld> testFieldType(const std::string &, int index) {
   static const std::map<int, rdb::descFld> schema{{0, rdb::INTEGER}, {1, rdb::FLOAT}, {2, rdb::STRING}, {3, rdb::BYTE}};
@@ -35,7 +35,7 @@ std::string dump(const std::list<token> &program) {
   return out.str();
 }
 
-/// Sprawdza, że uproszczenie NIE zmienia wyniku — na programie policzonym oboma wersjami
+/// Sprawdza, że uproszczenie NIE zmienia wyniku - na programie policzonym oboma wersjami
 /// nad tym samym payloadem. To jest właściwe kryterium poprawności reguł; kształt programu
 /// jest tylko środkiem.
 void expectSameResult(const std::list<token> &original, const std::list<token> &simplified, int fieldValue) {
@@ -90,7 +90,7 @@ TEST(exprSimplify, leaves_expression_the_evaluator_cannot_compute) {
 }
 
 TEST(exprSimplify, leaves_division_by_constant_zero) {
-  // Dzielenie przez zero daje w wykonaniu NULL — nie ma literału, którym dałoby się
+  // Dzielenie przez zero daje w wykonaniu NULL - nie ma literału, którym dałoby się
   // ten wynik wstawić z powrotem do programu.
   const std::list<token> original{token(PUSH_VAL, 1), token(PUSH_VAL, 0), token(DIVIDE)};
   std::list<token> program = original;
@@ -182,7 +182,7 @@ TEST(exprSimplify, concatenates_string_tail) {
 }
 
 TEST(exprSimplify, keeps_string_constants_apart_when_they_surround_the_field) {
-  // 'a' + pole + 'b' NIE zwija się do 'ab' + pole — konkatenacja nie jest przemienna.
+  // 'a' + pole + 'b' NIE zwija się do 'ab' + pole - konkatenacja nie jest przemienna.
   const std::list<token> original{pushString("a"), pushId(2), token(ADD), pushString("b"), token(ADD)};
   std::list<token> program = original;
 
@@ -191,7 +191,7 @@ TEST(exprSimplify, keeps_string_constants_apart_when_they_surround_the_field) {
 }
 
 TEST(exprSimplify, keeps_float_expression_untouched) {
-  // Dla float reasocjacja zmienia liczbę zaokrągleń — reguła musi odmówić.
+  // Dla float reasocjacja zmienia liczbę zaokrągleń - reguła musi odmówić.
   const std::list<token> original{pushId(1), token(PUSH_VAL, 1), token(ADD), token(PUSH_VAL, 1), token(ADD)};
   std::list<token> program = original;
 
@@ -238,7 +238,7 @@ TEST(exprSimplify, drops_neutral_operand_written_on_the_left) {
 }
 
 TEST(exprSimplify, keeps_multiplication_by_zero) {
-  // NULL * 0 daje NULL, a nie 0 — pochłanianie złamałoby logikę trójwartościową.
+  // NULL * 0 daje NULL, a nie 0 - pochłanianie złamałoby logikę trójwartościową.
   const std::list<token> original{pushId(0), token(PUSH_VAL, 0), token(MULTIPLY)};
   std::list<token> program = original;
 
@@ -261,7 +261,7 @@ TEST(exprSimplify, keeps_neutral_operand_of_a_wider_type) {
 //
 
 TEST(exprSimplify, refuses_program_with_token_outside_the_evaluator) {
-  // PUSH_STREAM należy do algebry strumieni — nie znamy jego arytmetyki stosu,
+  // PUSH_STREAM należy do algebry strumieni - nie znamy jego arytmetyki stosu,
   // więc program zostaje nietknięty w całości, razem ze zwijalnymi stałymi.
   const std::list<token> original{token(PUSH_STREAM, rdb::descFldVT(std::string("A"))), token(PUSH_VAL, 1), token(PUSH_VAL, 1),
                                   token(ADD)};
@@ -300,7 +300,7 @@ TEST(exprSimplify, constant_square_folds_to_value_not_to_power) {
 //
 // ─── D: powtórzony czynnik jako potęga ──────────────────────────────────────────
 //
-// Cała reguła stoi za `aggressive_expr_optimization`, domyślnie wyłączonym — powód jest
+// Cała reguła stoi za `aggressive_expr_optimization`, domyślnie wyłączonym - powód jest
 // w exprSimplify.hpp (korpus H9). Przy wyłączonym przełączniku sprawdzamy to, co ma być
 // wtedy prawdą: program zostaje nietknięty.
 //
@@ -319,7 +319,7 @@ TEST(exprSimplify, folds_squared_factor_into_power) {
   EXPECT_EQ(program.back().getCommandID(), POWER);
   expectSameResult(original, program, 7);
   expectSameResult(original, program, -3);
-  // Przekręcenie int też ma wyjść tak samo — na tym stoi ścieżka dokładna w power().
+  // Przekręcenie int też ma wyjść tak samo - na tym stoi ścieżka dokładna w power().
   expectSameResult(original, program, 100000);
 }
 
@@ -356,7 +356,7 @@ TEST(exprSimplify, does_not_fold_repeated_factor_for_inexact_types) {
   EXPECT_EQ(dump(program), dump(std::list<token>{pushId(1), pushId(1), token(MULTIPLY)}));
 }
 
-// Nieznany typ podwyrażenia — odmowa uproszczenia jest zawsze bezpieczna.
+// Nieznany typ podwyrażenia - odmowa uproszczenia jest zawsze bezpieczna.
 TEST(exprSimplify, does_not_fold_repeated_factor_of_unknown_type) {
   std::list<token> program{pushId(9), pushId(9), token(MULTIPLY)};
   EXPECT_EQ(simplifyExpression(program, testFieldType), 0u);

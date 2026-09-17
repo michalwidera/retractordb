@@ -3,8 +3,8 @@
 #
 # Twierdzenie: `SELECT cells[$] STREAM cell[4] FROM cells` daje DOKLADNIE to samo, co
 # cztery recznie rozpisane SELECT-y. Sprawdzane na dwa sposoby, bo kazdy lapie co innego:
-#   1) wyniki obu wariantow rowne co do bitu — generator nie zmienia NICZEGO w wykonaniu;
-#   2) wartosci zgodne z definicja zrodla — oba warianty nie moga byc zgodnie bledne.
+#   1) wyniki obu wariantow rowne co do bitu - generator nie zmienia NICZEGO w wykonaniu;
+#   2) wartosci zgodne z definicja zrodla - oba warianty nie moga byc zgodnie bledne.
 #
 # Test biegnie przez pelna sciezke uruchomieniowa, nie przez sam kompilator, i to jest jego
 # powod istnienia: pierwsza wersja generatora kompilowala sie do planu nie do odroznienia od
@@ -22,7 +22,7 @@ cp manual.rql man/
 # Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
 # wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
 # Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
-# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+# znaczy 'fields' w wyjsciu DOT - do wywolan kompilacyjnych jej NIE dodawac.
 (cd gen && xretractor query.rql -r -k -m 4 -f >/dev/null)
 (cd man && xretractor manual.rql -r -k -m 4 -f >/dev/null)
 

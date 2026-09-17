@@ -75,7 +75,7 @@ ssize_t binaryDeviceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, co
   if (outcome == readOutcome::error) return markAllNullAndZero(EXIT_FAILURE);
   if (outcome == readOutcome::endOfFile) {  // dev/random has no seek - but binary files should loop?
     if (!loopToBeginningIfEOF_) {
-      // Koniec strumienia bez zawijania to koniec danych — przebieg z --until-eof ma sie tu zatrzymac.
+      // Koniec strumienia bez zawijania to koniec danych - przebieg z --until-eof ma sie tu zatrzymac.
       exhausted_ = true;
       return markAllNullAndZero(EXIT_SUCCESS);
     }

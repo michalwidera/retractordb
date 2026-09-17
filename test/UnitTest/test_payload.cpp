@@ -361,10 +361,10 @@ TEST(payload, vt_interface_null_matches_any_interface) {
   EXPECT_TRUE(std::equal(a.span().begin(), a.span().end(), v.span().begin()));
 }
 
-// Uklad pola RATIONAL w rekordzie — para int32 (licznik, mianownik), licznik pierwszy,
+// Uklad pola RATIONAL w rekordzie - para int32 (licznik, mianownik), licznik pierwszy,
 // 8 bajtow na wartosc. Jest to format ZEWNETRZNY: czytelnik artefaktu spoza silnika rozbiera
 // te bajty wprost, a opis w dokumentacji (format-zapisu-danych/pliki.md, "Uklad pola RATIONAL")
-// twierdzi dokladnie to. Do 2026-08-30 dokumentacja podawala 16 B i pare int64 — bledny opis
+// twierdzi dokladnie to. Do 2026-08-30 dokumentacja podawala 16 B i pare int64 - bledny opis
 // przeszedl niezauwazony, bo nic go nie sprawdzalo. Ten test jest ta kontrola.
 TEST(payload, rational_field_layout_is_two_int32_numerator_first) {
   static_assert(sizeof(boost::rational<int>) == 2 * sizeof(int32_t));
@@ -381,7 +381,7 @@ TEST(payload, rational_field_layout_is_two_int32_numerator_first) {
   EXPECT_EQ(numerator, -8);
   EXPECT_EQ(denominator, 3);
 
-  // Bajty wprost — tak, jak widzi je hexdump artefaktu na maszynie little-endian.
+  // Bajty wprost - tak, jak widzi je hexdump artefaktu na maszynie little-endian.
   if constexpr (std::endian::native == std::endian::little) {
     const std::array<uint8_t, 8> expected{0xf8, 0xff, 0xff, 0xff, 0x03, 0x00, 0x00, 0x00};
     EXPECT_TRUE(std::equal(expected.begin(), expected.end(), p.span().begin()));
@@ -413,7 +413,7 @@ TEST(payload, rational_field_is_stored_in_normalized_form) {
 
 // Przypisanie miedzy dwoma ZGODNYMI zapisami tego samego rekordu: `INTEGER[3]` i trzy pola
 // `INTEGER`. Bajty ida wprost, bo uklad jest ten sam; znaczniki NULL wymagaja odwzorowania,
-// bo sa per WPIS deskryptora — jeden bit po stronie tablicy, trzy po stronie skalarow.
+// bo sa per WPIS deskryptora - jeden bit po stronie tablicy, trzy po stronie skalarow.
 TEST(payload, assign_between_array_and_scalar_record_forms) {
   const rdb::Descriptor arrayForm("cells", 4, 3, rdb::INTEGER);
   const auto scalarForm{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
@@ -441,7 +441,7 @@ TEST(payload, assign_between_array_and_scalar_record_forms) {
 
 // Pole tablicowe niesie JEDEN bit NULL na wszystkie elementy, wiec zwiniecie trzech pol
 // skalarnych musi je scalic: NULL na dowolnym elemencie oznacza NULL calego pola. Rozwiniecie
-// idzie w druga strone — jeden bit rozklada sie na wszystkie sloty.
+// idzie w druga strone - jeden bit rozklada sie na wszystkie sloty.
 TEST(payload, null_flags_survive_the_change_of_record_form) {
   const rdb::Descriptor arrayForm("cells", 4, 3, rdb::INTEGER);
   const auto scalarForm{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //

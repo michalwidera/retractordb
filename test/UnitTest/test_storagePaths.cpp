@@ -73,7 +73,7 @@ TEST(StoragePathsTest, relocate_without_ref_keeps_paths) {
 
 // ---------------------------------------------------------------------------
 // removeAllFiles: kasuje plik danych, deskryptor, indeks .meta oraz cień
-// indeksu .meta.shadow — porządkowanie magazynów dysponowalnych.
+// indeksu .meta.shadow - porządkowanie magazynów dysponowalnych.
 // ---------------------------------------------------------------------------
 TEST(StoragePathsTest, remove_all_files_deletes_whole_set) {
   rdb::StoragePaths paths("qry_rm", "data_rm", "");

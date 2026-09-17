@@ -1,4 +1,4 @@
-# F9-R1 — kontrole near-miss na danych głównych. Wygenerowane przez
+# F9-R1 - kontrole near-miss na danych głównych. Wygenerowane przez
 # gen_corpus.py; nie edytować ręcznie (bramka: `gen_corpus.py --check`).
 #
 # Kryterium wspólne: nad źródłami kontrolnymi NIE MOŻE powstać wspólny
@@ -20,7 +20,7 @@ DECLARE v INTEGER STREAM IB2, 1/50  FILE 'cur.txt'
 SELECT i1[0]*i1[0] STREAM i1 FROM (IA>2)#(IB>1)
 SELECT i2[0]*i2[0] STREAM i2 FROM (IA2#IB2)>3
 
-# near-miss 3: granica obserwowalności — publiczny strumień nazwany
+# near-miss 3: granica obserwowalności - publiczny strumień nazwany
 # konwencją kompilatora, o przestawionym schemacie
 DECLARE cx INTEGER, cy INTEGER STREAM CA, 1/100 FILE 'vib.txt'
 DECLARE cx INTEGER, cy INTEGER STREAM CB, 1/50  FILE 'cur.txt'

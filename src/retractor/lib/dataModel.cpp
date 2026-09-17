@@ -30,7 +30,7 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   // fetch all ':*' - and remove them from coreInstance
   //
 
-  if (coreInstance_.empty()) FatalError("dataModel: coreInstance is empty — no queries to process");
+  if (coreInstance_.empty()) FatalError("dataModel: coreInstance is empty - no queries to process");
 
   for (const auto &it : coreInstance_)
     if (it.isCompilerDirective()) {
@@ -100,11 +100,11 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &
 }
 
 rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffset) {
-  // Odczyt wsteczny o revOffset rekordów — nośnik konwencji operatora przesunięcia.
+  // Odczyt wsteczny o revOffset rekordów - nośnik konwencji operatora przesunięcia.
   //
   // tau_N jest OPÓŹNIENIEM: wynik ma tę samą treść co źródło i pojawia się N slotów później.
   // Konwencja wybrana świadomie, bo odczyt w przód (s_{n+m}) jest nieprzyczynowy dla źródła
-  // pracującego na żywo — nie da się wydać próbki, która jeszcze nie powstała.
+  // pracującego na żywo - nie da się wydać próbki, która jeszcze nie powstała.
   //
   // Wcześniej offset był honorowany wyłącznie dla strumieni obliczanych, więc dla źródeł
   // deklarowanych operator przesunięcia był operacją pustą (dwie różne konwencje w jednym
@@ -116,7 +116,7 @@ rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffs
   const auto available              = static_cast<int>(out.getRecordsCount());
   const bool outsideRetainedHistory = out.isDeclared() && std::cmp_greater_equal(revOffset, out.historySize());
   if (revOffset < 0 || revOffset >= available || outsideRetainedHistory) {
-    // Rekord poza zgromadzoną historią — wartość nieokreślona, czyli all-null (pochłaniająca).
+    // Rekord poza zgromadzoną historią - wartość nieokreślona, czyli all-null (pochłaniająca).
     // Ogon strumienia (query::startupLatency) jest tak dobrany, żeby ta ścieżka nie była
     // wykorzystywana na starcie; pozostaje zabezpieczeniem, nie normalną drogą.
     //
@@ -139,13 +139,13 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
   out.releaseOnHold();
 
   // Konwersja indeksu postępującego na offset wsteczny względem bieżącej
-  // liczby rekordów źródła — uniezależnia odczyt od kadencji prefetch
+  // liczby rekordów źródła - uniezależnia odczyt od kadencji prefetch
   // źródeł deklarowanych i od siatki slotów.
   //
   // forwardIndex jest indeksem LOGICZNYM (walutą wszystkich odwzorowań z SOperations.hpp).
   // Strumień nie ma rekordów o indeksach mniejszych od swojej runtime'owej bazy logicznej,
   // więc rekord o indeksie równym bazie jest fizycznie rekordem 0 w buforze. To jedyne miejsce,
-  // w którym ta różnica jest przeliczana — dzięki temu ADD, SUBTRACT, HASH i rozplot dostają
+  // w którym ta różnica jest przeliczana - dzięki temu ADD, SUBTRACT, HASH i rozplot dostają
   // poprawkę raz, a nie każdy z osobna.
   const auto count        = static_cast<int>(out.getRecordsCount());
   const auto &logicalBase = qSet[instance]->logicalIndexBase;
@@ -159,7 +159,7 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
                           (out.isDeclared() && std::cmp_greater_equal(rev, out.historySize()));
   if (outOfRange) {
     // Rekord niedostępny (przyszłość na osi czasu źródła, przed początkiem logicznym
-    // albo poza historią bufora) — rekord all-null; o jego losie decyduje ścieżka zapisu.
+    // albo poza historią bufora) - rekord all-null; o jego losie decyduje ścieżka zapisu.
     // Poziom ERROR z tego samego powodu co w fetchBack powyżej.
     SPDLOG_ERROR("fetchForward {}: record {} not available (count={}, base={})", instance, forwardIndex, count, *logicalBase);
     rdb::payload nullRecord(out.descriptor);
@@ -312,7 +312,7 @@ void dataModel::processRows(const std::set<std::string> &inSet, const boost::rat
     if (q.isDeclaration()) continue;      // Declarations already processed
 
     // Ogon strumienia: w tych slotach wynik nie jest jeszcze zdefiniowany, więc strumień NIE emituje
-    // rekordu — ani zerowego, ani all-null. NULL jest wartością pochłaniającą (dane oczekiwane a
+    // rekordu - ani zerowego, ani all-null. NULL jest wartością pochłaniającą (dane oczekiwane a
     // nieobecne, wynik nieistniejący w zbiorze wartości), nigdy rezerwacją miejsca na dane. Długość
     // ogona jest zadeklarowana w planie (query::startupLatency) i raportowana jako 'tail'.
     //
@@ -388,7 +388,7 @@ void dataModel::computeWindowAggregates(const query &qry) {
     return *logicalBase;
   };
 
-  // Indeks logiczny rekordu, ktory wlasnie powstaje — ta sama definicja co w
+  // Indeks logiczny rekordu, ktory wlasnie powstaje - ta sama definicja co w
   // constructInputPayload(). Rekord n obejmuje rekordy zrodla n-(width-1) ... n, czyli konczy
   // sie na rekordzie zrodla o TYM SAMYM indeksie logicznym.
   const int n = static_cast<int>(runtime.outputPayload->getRecordsCount()) + baseOf(qry.id);
@@ -407,7 +407,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
   const query &qry = coreInstance_[instance];
 
   if (qry.lProgram.size() >= 4) {
-    FatalError("dataModel::constructInputPayload: program not optimized — {} tokens for query '{}', expected < 4",
+    FatalError("dataModel::constructInputPayload: program not optimized - {} tokens for query '{}', expected < 4",
                qry.lProgram.size(), instance);
   }
 
@@ -454,7 +454,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       // tau_N adresowane INDEKSEM LOGICZNYM: rekord n niesie treść rekordu n-N producenta.
       // Poprzednio szło to przez fetchBack z offsetem WZGLĘDNYM wobec czoła źródła, co wiązało
-      // ogon przesunięcia z ogonem producenta (W = W_src) — bo tylko przy tej równości offset
+      // ogon przesunięcia z ogonem producenta (W = W_src) - bo tylko przy tej równości offset
       // względny trafiał w żądany rekord. Model zdarzeniowy wymaga mniej: deficyt przesunięcia
       // jest stały i równy W_src - N, więc dokładnym ogonem jest max(0, W_src - N) (K24p §2.2).
       // Adresowanie bezwzględne uwalnia ogon od tego związku; origin nadal gwarantuje, że
@@ -478,20 +478,20 @@ void dataModel::constructInputPayload(const std::string &instance) {
         FatalError("dataModel::constructInputPayload: DEHASH rational argument must be positive");
       }
 
-      // n — 0-bazowy indeks rekordu wyjściowego; Div/Mod (SOperations.hpp)
+      // n - 0-bazowy indeks rekordu wyjściowego; Div/Mod (SOperations.hpp)
       // zwracają indeks POSTĘPUJĄCY elementu w strumieniu przeplecionym.
       const auto n = logicalIndex(instance);
 
       int fwdPos = -1;
       if (cmd == STREAM_DEHASH_DIV) {
-        // Θ: a_n = c_{n+⌈(n+1)·Δa/Δb⌉} — element c o tym indeksie powstaje dopiero PO slocie n
+        // Θ: a_n = c_{n+⌈(n+1)·Δa/Δb⌉} - element c o tym indeksie powstaje dopiero PO slocie n
         // strumienia wynikowego (definicja jest o jeden slot nieprzyczynowa). Przyczynowość
         // zapewnia ogon strumienia (query::startupLatency zawiera dla Θ dodatkowy slot): przez ten
         // slot strumień nie emituje niczego. Rekord n jest więc już a_n, bez przesunięcia o jeden
-        // i bez rekordu-zastępnika — placeholder byłby użyciem NULL/zera jako rezerwacji miejsca.
+        // i bez rekordu-zastępnika - placeholder byłby użyciem NULL/zera jako rezerwacji miejsca.
         fwdPos = Div(qry.rInterval, rationalArgument, n);
       } else {
-        // ~Θ: b_n = c_{n+⌊n·Δb/Δa⌋} — dostępny w swoim slocie.
+        // ~Θ: b_n = c_{n+⌊n·Δb/Δa⌋} - dostępny w swoim slocie.
         fwdPos = Mod(rationalArgument, qry.rInterval, n);
       }
       *(qSet[instance]->inputPayload) = fetchForward(nameSrc, fwdPos);
@@ -529,10 +529,10 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       // K24/P2 wariant A: składowe są czytane po indeksie POSTĘPUJĄCYM z Definicji sumy
       // strumieni (c_n = (a_n, b_{⌊nΔa/Δb⌋})), a nie jako bieżący payload obu składowych.
-      // Bieżący payload dawał b_{⌊(n+1)Δa/Δb⌋} — rekord wolniejszej składowej domknięty
+      // Bieżący payload dawał b_{⌊(n+1)Δa/Δb⌋} - rekord wolniejszej składowej domknięty
       // dopiero na koniec slotu, czyli w slocie n jeszcze nieokreślony.
       //
-      // n — 0-bazowy indeks rekordu wyjściowego (indeks c_n z definicji).
+      // n - 0-bazowy indeks rekordu wyjściowego (indeks c_n z definicji).
       const auto n = logicalIndex(instance);
 
       const auto fwdPos1 = Add(qry.rInterval, coreInstance_.getQuery(nameSrc1).rInterval, n);
@@ -575,7 +575,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto intervalSrc1 = coreInstance_.getQuery(nameSrc1).rInterval;
       const auto intervalSrc2 = coreInstance_.getQuery(nameSrc2).rInterval;
 
-      // n — 0-bazowy indeks rekordu wyjściowego (indeks c_n z definicji
+      // n - 0-bazowy indeks rekordu wyjściowego (indeks c_n z definicji
       // przeplotu); Hash zwraca indeks POSTĘPUJĄCY elementu składowej.
       const auto n = logicalIndex(instance);
 

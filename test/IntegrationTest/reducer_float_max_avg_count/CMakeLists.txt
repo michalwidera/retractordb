@@ -5,8 +5,8 @@ set(TestID "it_${TestID}")
 
 # Reduktory nad polami rekordu (streamInstance::reduceFieldsToPayload).
 #
-# MAX nad FLOAT/DOUBLE startowal od numeric_limits<T>::min() — najmniejszej
-# DODATNIEJ liczby — wiec maksimum samych ujemnych wartosci bylo 1.17549e-38.
+# MAX nad FLOAT/DOUBLE startowal od numeric_limits<T>::min() - najmniejszej
+# DODATNIEJ liczby - wiec maksimum samych ujemnych wartosci bylo 1.17549e-38.
 # AVG dzielil przez liczbe pol rzutowana na uint8_t: 256 pol konczylo silnik
 # wyjatkiem bad_rational, 257 dzielilo przez 1.
 #

@@ -5,7 +5,7 @@ DECLARE val INTEGER STREAM s2, 1 FILE 'data2.dat'
 DECLARE val INTEGER STREAM s3, 1 FILE 'data3.dat'
 DECLARE val INTEGER STREAM s4, 1 FILE 'data4.dat'
 
-# Przeplot znosi tozsamosc skladnikow — w out2/out3/out5 wszystkie odwolania siegajace
+# Przeplot znosi tozsamosc skladnikow - w out2/out3/out5 wszystkie odwolania siegajace
 # przez `#` trafialy na te sama pozycje, wiec `s1[0]+s2[0]+s3[0]` liczylo POTROJONA
 # wartosc przeplotu, a nie sume trzech strumieni. Od bramki F9 (D-F1 = S3) taki zapis
 # jest bledem kompilacji; ponizej ta sama wartosc zapisana jawnie. Przedmiotem tych

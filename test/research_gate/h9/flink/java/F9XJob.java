@@ -1,4 +1,4 @@
-// Rodzina F9-X — zlozenie R1 -> R2. Dwa warianty jednego joba.
+// Rodzina F9-X - zlozenie R1 -> R2. Dwa warianty jednego joba.
 //
 // Cztery postacie z SZKIC_RODZIN.md §6.2 powstaja z DWOCH niezaleznych, arbitralnych decyzji
 // autora: postac R1 kazdej pary x kolejnosc par w sumie.
@@ -6,13 +6,13 @@
 //   W2  FROM ((C>2)#(D>1)) + ((A>2)#(B>1))
 //   W3  FROM ((A#B)>3)     + ((C#D)>3)
 //   W4  FROM ((C#D)>3)     + ((A#B)>3)
-// Zamrozona kolejnosc postaci przy redukcji F(Q): W1, W4, W2, W3 — pierwsza para rozni sie
+// Zamrozona kolejnosc postaci przy redukcji F(Q): W1, W4, W2, W3 - pierwsza para rozni sie
 // w OBU wymiarach naraz, wiec przy Q=4 rodzina nadal dotyka obu mechanizmow.
 //
 // Postac zlozenia INLINE jest ZAMROZONA dla wszystkich Q monitorow (D-3, SZKIC_D3.md §3.3):
 // nazwanie strumieni posrednich kasuje warstwe R2 i przenosi materializacje do strumieni
 // PUBLICZNYCH, czyli z licznika metryki do mianownika (RAPORT_PILOTA.md §6a). Po stronie
-// Flinka odpowiada temu to, ze pary zlozone NIE maja wlasnego sinka — sink ma wylacznie
+// Flinka odpowiada temu to, ze pary zlozone NIE maja wlasnego sinka - sink ma wylacznie
 // monitor.
 //
 // Program pola czyta wspolne schematy WYNIKOW przeplotu: `front` z A#B i `rear` z C#D.
@@ -64,7 +64,7 @@ public class F9XJob {
 
     if (variant.equals("manual")) {
       // Reczne wydzielenie do postaci, ktora DEFAULT osiaga sam: dwa przeploty, dwa
-      // przesuniecia laczne i jeden wspolny wezel cechy (5 wezlow — SZKIC_RODZIN.md §6.3).
+      // przesuniecia laczne i jeden wspolny wezel cechy (5 wezlow - SZKIC_RODZIN.md §6.3).
       DataStream<Tuple3<Long, Long, Integer>> sharedAB = hashThenShift(srcA, srcB, "shared", "AB");
       DataStream<Tuple3<Long, Long, Integer>> sharedCD = hashThenShift(srcC, srcD, "shared", "CD");
       DataStream<Tuple3<Long, Long, Integer>> select = PlanDump.sub(
@@ -93,7 +93,7 @@ public class F9XJob {
         DataStream<Tuple3<Long, Long, Integer>> left = frontFirst ? pairAB : pairCD;
         DataStream<Tuple3<Long, Long, Integer>> right = frontFirst ? pairCD : pairAB;
 
-        // Szczytowy `+` z programem Sqrt(front^2 + rear^2) — etap PUBLICZNY monitora.
+        // Szczytowy `+` z programem Sqrt(front^2 + rear^2) - etap PUBLICZNY monitora.
         SingleOutputStreamOperator<Tuple3<Long, Long, Integer>> stage = left.connect(right)
             .process(new K26Ops.AddFeature(false));
         sink(PlanDump.pub(stage, monitor + "_" + form, PlanDump.UNIT_150, K26Ops.TOKENS_SQRT_TWO_TERMS,

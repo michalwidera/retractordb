@@ -102,7 +102,7 @@ while [ "$hits" -lt 3 ] && [ "$attempt" -lt 12 ]; do
   }
 
   if grep -q 'no active plan' "dir_${attempt}.txt"; then
-    echo "proba ${attempt}: pudlo (rozbiorka wyprzedzila komende) — runda od nowa"
+    echo "proba ${attempt}: pudlo (rozbiorka wyprzedzila komende) - runda od nowa"
   else
     # Komenda obsluzona: musiala zostac obsluzona DO KONCA na modelu epoki odchodzacej.
     grep -qE "^${live} " "dir_${attempt}.txt" || {

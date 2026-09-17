@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""Generator korpusu kampanii K26 — dane główne, dane kalibracyjne i plany RQL.
+"""Generator korpusu kampanii K26 - dane główne, dane kalibracyjne i plany RQL.
 
 JEDYNE źródło danych i planów kampanii. Wszystko, co ten skrypt wypisuje, jest
-funkcją zamrożonych stałych z predeklaracji kampanii K26v3 §4 i §6 — bez wejścia z zewnątrz,
+funkcją zamrożonych stałych z predeklaracji kampanii K26v3 §4 i §6 - bez wejścia z zewnątrz,
 bez zegara, bez `random` biblioteki standardowej (jej strumień zależy od wersji
 Pythona, a korpus ma być identyczny na hoście i na workerze).
 
-Generator PRNG: SplitMix64 — algorytm zapisany tutaj w całości, więc odtworzenie
+Generator PRNG: SplitMix64 - algorytm zapisany tutaj w całości, więc odtworzenie
 korpusu nie zależy od żadnej biblioteki.
 
 Uruchomienie:
     ./gen_corpus.py            # zapisuje data/ i rql/
     ./gen_corpus.py --check    # tylko sprawdza, że pliki na dysku zgadzają się
                                # z tym, co generator wypisałby teraz (kod 1 przy
-                               # rozbieżności) — bramka niezmienności korpusu
+                               # rozbieżności) - bramka niezmienności korpusu
 """
 import argparse
 import hashlib
@@ -36,7 +36,7 @@ SEED_CALIB = 20260809_2602
 #: Zakres wartości źródła. Górna granica dobrana tak, by `A*C + B*D` przy czterech
 #: źródłach nie wyszło poza zakres 64-bitowy z ogromnym zapasem, a `Sqrt` miało
 #: sensowny argument. Nie ma wpływu na metrykę pierwotną (ta zależy wyłącznie od
-#: deskryptora i liczby zapisów) — jest tu, żeby korpus był w ogóle określony.
+#: deskryptora i liczby zapisów) - jest tu, żeby korpus był w ogóle określony.
 VALUE_MAX = 1000
 
 #: Dane kalibracyjne są krótsze: kalibracja szuka rate'u, nie liczy metryki.
@@ -47,7 +47,7 @@ Q_GRID = [1, 2, 4, 8, 16, 32]
 
 # ─── Rodziny ─────────────────────────────────────────────────────────────────
 #
-# `forms` są w ZAMROŻONEJ kolejności — ta sama, którą realizuje `K26Ops.formOf`
+# `forms` są w ZAMROŻONEJ kolejności - ta sama, którą realizuje `K26Ops.formOf`
 # po stronie Flinka. Dla F9-X kolejność to W1, W4, W2, W3 (SZKIC_RODZIN.md §6.2):
 # pierwsza para różni się w obu wymiarach naraz, więc przy Q=4 rodzina nadal
 # dotyka obu mechanizmów.
@@ -69,7 +69,7 @@ FAMILIES = {
             ("v", "A", "1/100", "vib.txt", RECORDS_FAST),
             ("v", "B", "1/50", "cur.txt", RECORDS_SLOW),
         ],
-        "select": None,  # program pola odwołuje się do własnego strumienia — patrz niżej
+        "select": None,  # program pola odwołuje się do własnego strumienia - patrz niżej
         "forms": ["(A>2)#(B>1)", "(A#B)>3"],
         "form_names": ["P1", "P2"],
     },
@@ -112,7 +112,7 @@ def series(seed, count):
 
 
 def source_seed(base, name):
-    """Ziarno pojedynczego źródła — pochodna ziarna zestawu i nazwy pliku.
+    """Ziarno pojedynczego źródła - pochodna ziarna zestawu i nazwy pliku.
 
     Każde źródło ma własny strumień wartości; gdyby dwa źródła dostały ten sam,
     `A+B` i `A#B` liczyłyby się na zduplikowanym sygnale, co nie zmienia metryki,
@@ -123,7 +123,7 @@ def source_seed(base, name):
 
 
 def formsForQ(q, f_max):
-    """`F(Q) = min(F_max, floor(Q/2))`, minimum 1 — reguła zamrożona 2026-08-08."""
+    """`F(Q) = min(F_max, floor(Q/2))`, minimum 1 - reguła zamrożona 2026-08-08."""
     return max(1, min(f_max, q // 2))
 
 
@@ -135,7 +135,7 @@ def formOf(i, q, f_max):
 def monitor_select(family, name):
     """Program pola monitora.
 
-    F9-R1 odwołuje się do WŁASNEGO strumienia (`m1[0]*m1[0]`) — wzorzec
+    F9-R1 odwołuje się do WŁASNEGO strumienia (`m1[0]*m1[0]`) - wzorzec
     `dedup_shifted` z `optimizer_ablation`. W tej rodzinie jest to zamierzone:
     współdzielenie realizuje R1 + dedup substratów, a nie przejście R2, więc
     dyskwalifikacja z SZKIC_RODZIN.md §2 (U-3) niczego tu nie psuje.
@@ -151,7 +151,7 @@ def render_family(family, q):
     forms, f_max = spec["forms"], spec["f_max"]
     active = formsForQ(q, f_max)
     lines = [
-        f"# {family}, Q={q} — plan kampanii K26. Wygenerowany przez gen_corpus.py;",
+        f"# {family}, Q={q} - plan kampanii K26. Wygenerowany przez gen_corpus.py;",
         "# nie edytować ręcznie (bramka: `gen_corpus.py --check`).",
         f"# Postacie czynne przy tym Q: {active} z {f_max}"
         f" ({', '.join(spec['form_names'][:active])}).",
@@ -178,7 +178,7 @@ def render_controls(family):
     """Kontrole negatywne i near-miss rodziny, nad danymi głównymi.
 
     Treść przeniesiona z planów kontrolnych pilota (`pilot/F9_*_controls.rql`),
-    które przeszły w P4 — zmieniają się wyłącznie nazwy plików źródeł, bo pilot
+    które przeszły w P4 - zmieniają się wyłącznie nazwy plików źródeł, bo pilot
     biegał na danych miniaturowych, a bramki P6 biegną na danych głównych.
     Kontrola `Q=1` NIE jest tu powtórzona: realizuje ją komórka `Q=1` siatki.
     """
@@ -188,7 +188,7 @@ def render_controls(family):
     fourth = {"F9-X": "rear_cur.txt"}.get(family, slow)
 
     head = [
-        f"# {family} — kontrole near-miss na danych głównych. Wygenerowane przez",
+        f"# {family} - kontrole near-miss na danych głównych. Wygenerowane przez",
         "# gen_corpus.py; nie edytować ręcznie (bramka: `gen_corpus.py --check`).",
         "#",
         "# Kryterium wspólne: nad źródłami kontrolnymi NIE MOŻE powstać wspólny",
@@ -240,7 +240,7 @@ def render_controls(family):
             "SELECT i1[0]*i1[0] STREAM i1 FROM (IA>2)#(IB>1)",
             "SELECT i2[0]*i2[0] STREAM i2 FROM (IA2#IB2)>3",
             "",
-            "# near-miss 3: granica obserwowalności — publiczny strumień nazwany",
+            "# near-miss 3: granica obserwowalności - publiczny strumień nazwany",
             "# konwencją kompilatora, o przestawionym schemacie",
             f"DECLARE cx INTEGER, cy INTEGER STREAM CA, 1/100 FILE '{fast}'",
             f"DECLARE cx INTEGER, cy INTEGER STREAM CB, 1/50  FILE '{slow}'",

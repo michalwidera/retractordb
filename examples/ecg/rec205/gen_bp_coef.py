@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Generuje bp_coef.txt — wspolczynniki filtra pasmowoprzepustowego FIR
+# Generuje bp_coef.txt - wspolczynniki filtra pasmowoprzepustowego FIR
 # stosowanego w kroku 1 algorytmu Pan-Tompkins.
 #
 # Metoda: okienkowa (windowed sinc)
@@ -14,7 +14,7 @@
 #   fs  = 360 Hz czestotliwosc probkowania (MIT-BIH)
 #   skala = 1000 mnoznik calkowitoliczbowy (dzielony w RQL przez 1000)
 #
-# Wyjscie: bp_coef.txt — jeden wspolczynnik INTEGER na linie, 25 linii.
+# Wyjscie: bp_coef.txt - jeden wspolczynnik INTEGER na linie, 25 linii.
 # Uzycie w RQL:
 #   DECLARE bp_coef INTEGER[25] STREAM bpf, 1 FILE 'bp_coef.txt'
 #   SELECT mlii_win[_]*bpf[_] STREAM bp_acc FROM mlii_win+bpf

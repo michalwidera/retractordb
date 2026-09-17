@@ -41,7 +41,7 @@
 namespace IPC = boost::interprocess;
 
 using namespace CRationalStreamMath;
-// Stan wspolny wykonawcy — patrz executorsmState.hpp.
+// Stan wspolny wykonawcy - patrz executorsmState.hpp.
 using namespace esm;
 
 namespace {
@@ -52,7 +52,7 @@ void cleanup() {
   // Blad krytyczny w usludze systemd: plan, ktory zabil proces, nie moze wrocic przy
   // restarcie. Plik zapytan zostaje oprozniony, wiec jednostka wstaje w trybie bezczynnym
   // i czeka na kolejne `xqry --reset`. Bez tego Restart=on-failure zapetla start na tym
-  // samym planie — a stan zerowy jest jedynym stanem, o ktorym wiadomo, ze wstanie.
+  // samym planie - a stan zerowy jest jedynym stanem, o ktorym wiadomo, ze wstanie.
   // Pierwsza czynnosc sprzatania: dalej zwalniamy blokade, po ktorej moze juz wystartowac
   // nastepna instancja i przeczytac ten plik.
   if (fatalErrorRaised.load(std::memory_order_acquire) && !serviceQueryFilePath.empty()) {
@@ -115,7 +115,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
     SPDLOG_INFO("Service unit '{}': plan reloads are persisted to '{}'.", systemdUnit, serviceQueryFilePath);
   }
 
-  // Zakres waznosci wskaznika na straznika — patrz komentarz przy serviceGuardPtr.
+  // Zakres waznosci wskaznika na straznika - patrz komentarz przy serviceGuardPtr.
   // RAII, a nie zerowanie przy kazdym `return`, bo run() ma ich kilka.
   struct LockGuardScope {
     explicit LockGuardScope(FlockServiceGuard &g) { serviceGuardPtr = &g; }
@@ -244,7 +244,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
 
     // Petla EPOK planu. Jedna epoka to jeden plan: pusty (tryb bezczynny) albo policzalny
     // (dataModel + os czasu + petla slotow). Epoka konczy sie zatrzymaniem procesu, klawiszem,
-    // wyczerpaniem budzetu — albo przyjeta komenda `reset`, i tylko wtedy zaczyna sie nastepna.
+    // wyczerpaniem budzetu - albo przyjeta komenda `reset`, i tylko wtedy zaczyna sie nastepna.
     // Bez tej petli tryb bezczynny byl slepym zaulkiem: instancja bez planu nie miala jak go
     // przyjac inaczej niz przez restart procesu.
     while (iLoopLimitCnt != executorsm::stop_now) {
@@ -252,9 +252,9 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
 
       if (coreInstancePtr->empty()) {
         //
-        // Tryb bezczynny (idle): brak zapytań — nie budujemy dataModel ani TimeLine
+        // Tryb bezczynny (idle): brak zapytań - nie budujemy dataModel ani TimeLine
         // (uniknięcie FatalError). Czekamy na zatrzymanie (SIGTERM / klawisz / limit iteracji),
-        // utrzymując wątek komunikacyjny i blokadę usługi. pProc pozostaje null —
+        // utrzymując wątek komunikacyjny i blokadę usługi. pProc pozostaje null -
         // wątek komunikacyjny obsługuje to (komendy działają tylko gdy pProc != nullptr).
         //
         SPDLOG_INFO("Idle mode: no queries to process, waiting for a plan or a shutdown signal.");
@@ -274,7 +274,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         }
       } else {
         // Tryb liczenia do konca wejscia: zrodla deklarowane czytamy bez zawijania, tak jakby kazda
-        // deklaracja niosla ONESHOT. Bez tego pytanie "czy wejscie sie skonczylo" nie ma odpowiedzi —
+        // deklaracja niosla ONESHOT. Bez tego pytanie "czy wejscie sie skonczylo" nie ma odpowiedzi -
         // zrodlo zawijane po koncu pliku wraca na jego poczatek i produkuje rekordy z danych, ktore
         // juz raz przeszly. Ustawienie musi nastapic PRZED konstrukcja dataModel, bo to ona tworzy
         // magazyny i przekazuje isOneShot do fabryki akcesorow.
@@ -295,7 +295,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         // Czy bramke --xqrywait zdjelo zatrzymanie procesu, a nie komenda klienta. Osobna
         // zmienna, a nie odczyt iLoopLimitCnt nizej: `stop_now` to wartosc 1, czyli dokladnie
         // to, co w liczniku zostawia `-m 1`, wiec warunek na liczniku zmienialby zachowanie
-        // przebiegu z budzetem jednego slotu — a ten z bramka nie ma nic wspolnego.
+        // przebiegu z budzetem jednego slotu - a ten z bramka nie ma nic wspolnego.
         bool gateStoppedProcess = false;
 
         if (vm.contains("xqrywait")) {
@@ -365,7 +365,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
 
         struct timespec loop_anchor{};
         const bool rt_mode = vm.contains("realtime");
-        // Tryb offline: oś czasu planu (interwały, wyrównanie slotów, ogon) pozostaje nietknięta —
+        // Tryb offline: oś czasu planu (interwały, wyrównanie slotów, ogon) pozostaje nietknięta -
         // znika wyłącznie czekanie na zegar ścienny, więc ciąg wyliczonych rekordów jest ten sam
         // co w przebiegu taktowanym. Wyklucza się z rt_mode; sprzeczność odrzuca launcher.
         const bool no_clock_mode = vm.contains("no-clock");
@@ -465,7 +465,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
           if (until_eof_mode) {
             const auto exhausted = proc.exhaustedInputStream();
             if (!exhausted.empty()) {
-              SPDLOG_INFO("End of input on declared stream '{}' — stopping (--until-eof).", exhausted);
+              SPDLOG_INFO("End of input on declared stream '{}' - stopping (--until-eof).", exhausted);
               if (vm.contains("verbose")) std::cout << "End of input on stream '" << exhausted << "'. Stopping.\n";
               // Ta sama droga wyjscia co przy wyczerpaniu --llimitqry: stop_now zdejmuje czekanie
               // na klawisz ponizej petli, wiec przebieg wsadowy konczy sie sam.
@@ -487,7 +487,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         //
 
         // Koniec epoki: model znika, zanim `proc` wyjdzie z zakresu. Kolejnosc jest wymogiem
-        // poprawnosci — watek komunikacyjny siega po pProc bez wlasnej wiedzy o epokach, wiec
+        // poprawnosci - watek komunikacyjny siega po pProc bez wlasnej wiedzy o epokach, wiec
         // wskaznik musi zgasnac POD BLOKADA EPOKI, a nie tylko pod core_mutex. Sam core_mutex
         // zatrzymywal wylacznie komendy jeszcze nieprzebudzone; ta, ktora byla juz w srodku
         // handlera, czytala pProc na nowo i dostawala nulla albo zniszczony model.
@@ -505,7 +505,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
       if (!planResetRequested.load(std::memory_order_acquire)) break;
       applyPendingPlan(guard, xrdbbus, cfg);
     }
-    // Klawisz, ktory zakonczyl OSTATNIA epoke, zdejmujemy raz — epoka przerwana
+    // Klawisz, ktory zakonczyl OSTATNIA epoke, zdejmujemy raz - epoka przerwana
     // przeladowaniem planu nie konczy sie klawiszem, wiec nie ma tam czego pobierac.
     if (iLoopLimitCnt != executorsm::stop_now) _getch();  // no wait ... feed key from kbhit
   } catch (IPC::interprocess_exception &ex) {

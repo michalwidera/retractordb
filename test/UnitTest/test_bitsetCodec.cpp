@@ -3,7 +3,7 @@
 // packBits/unpackBits to jedno źródło prawdy formatu pakowania wzorców null,
 // współdzielone przez IndexRecord (indeks .meta) i metaShadow::ShadowOverride
 // (cień indeksu .meta.shadow). Kluczowy przypadek: bitset dłuższy niż 8 bitów
-// (deskryptor z >8 polami) — pakowanie przekracza granicę bajtu, czego testy
+// (deskryptor z >8 polami) - pakowanie przekracza granicę bajtu, czego testy
 // serializacji rekordów nie ćwiczą wprost.
 
 #include <gtest/gtest.h>

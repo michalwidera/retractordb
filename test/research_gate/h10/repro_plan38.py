@@ -3,7 +3,7 @@
 
 Bramka zgłosiła dla węzła `n3` (klasa `-`) „zero rekordów". Skrypt uruchamia
 ten jeden plan w kilku długościach przebiegu i wypisuje, ile rekordów faktycznie
-powstało w każdym węźle — wobec liczby, której oczekuje model zdarzeniowy.
+powstało w każdym węźle - wobec liczby, której oczekuje model zdarzeniowy.
 
 Rozstrzygane pytanie: czy zero rekordów jest defektem silnika, czy skutkiem
 zbyt krótkiego przebiegu. Budżet bramki (`loops`) jest liczony z rozpiętości
@@ -32,7 +32,7 @@ SCALE = Fraction(1, 200)
 
 
 def main(argv):
-    # Binarka z argumentu, bo engine.resolve_binary jej nie zgaduje — patrz
+    # Binarka z argumentu, bo engine.resolve_binary jej nie zgaduje - patrz
     # komentarz przy tej funkcji w oracle/engine.py.
     binary = E.resolve_binary(argv[1] if len(argv) > 1 else None)
     target = None

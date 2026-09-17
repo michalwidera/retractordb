@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
 
   if (vm.contains("help")) {
     std::print("{} - data accessing tool.\n\nUsage: {} [option]\n\n", argv[0], argv[0]);
-    std::cout << desc;  // boost::program_options::options_description — brak std::formatter
+    std::cout << desc;  // boost::program_options::options_description - brak std::formatter
     std::print("{}\nLog: {}\n{}\n", config_line, filelog, warranty);
     spdlog::shutdown();
     return 0;
@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
       const bool running = (flock(fd, LOCK_SH | LOCK_NB) == -1 && (errno == EWOULDBLOCK || errno == EAGAIN));
       close(fd);
       if (running) {
-        std::cerr << "xretractor is running — stop it before using xtrdb.\n";
+        std::cerr << "xretractor is running - stop it before using xtrdb.\n";
         spdlog::shutdown();
         return 1;
       }
@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
 
   std::string cmd;
   while (true) {
-    if (cmd != "#") std::cout << prompt;  // std::cout (powiązany z std::cin) gwarantuje flush przed odczytem — std::print nie
+    if (cmd != "#") std::cout << prompt;  // std::cout (powiązany z std::cin) gwarantuje flush przed odczytem - std::print nie
     std::cin >> cmd;
     if (cmd == "exit" || cmd == "quit" || cmd == "q") break;
     if (cmd == "#" || cmd == "rem") {

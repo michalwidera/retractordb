@@ -11,7 +11,7 @@
 #   bash ../compare.sh [--ignore-eol] <wzorzec> <wynik>
 #
 # --ignore-eol znaczy to samo, co w `cmake -E compare_files`: pomijane sa roznice
-# w zakonczeniu linii. Obejmuje to DWIE rzeczy, nie jedna — CR na koncu linii ORAZ brak
+# w zakonczeniu linii. Obejmuje to DWIE rzeczy, nie jedna - CR na koncu linii ORAZ brak
 # znaku nowej linii na koncu pliku. Drugie ujawnil od razu it_rotation_test, ktorego
 # count.pattern ma jeden bajt "4" bez konca linii, a wynik "4\n": samo
 # `diff --strip-trailing-cr` uznaje to za roznice, a compare_files nie. Normalizujemy

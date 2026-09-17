@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -eu
 
-# Sufit NAME_MAX na nazwie substratu — wytworzenie i redukcja szerokiej klauzuli FROM.
+# Sufit NAME_MAX na nazwie substratu - wytworzenie i redukcja szerokiej klauzuli FROM.
 #
 # Nazwa substratu jest zarazem nazwa pliku, a rosnie LINIOWO z arnoscia FROM: kazdy poziom
 # doklada operator, podkreslenie i nazwe operandu. Przy 14 skladnikach nazwa czytelna
-# przekracza NAME_MAX i plan staje sie niezapisywalny — obejsciem bylo reczne rozbicie na
+# przekracza NAME_MAX i plan staje sie niezapisywalny - obejsciem bylo reczne rozbicie na
 # zapytania pomocnicze. compiler::composeStreamName() zastepuje ja skrotem po przekroczeniu
 # progu 200 bajtow.
 #
@@ -17,12 +17,12 @@ rm -f ./*.desc ./*.meta ./*.shadow ./STREAM_ADD_* ./STREAM_AGSE_* wide reduced o
 
 xretractor query.rql -c > out_compile.txt
 
-# Galaz czytelna. 12 skladnikow, 192 bajty — ponizej progu, wiec nazwa jak dotad.
+# Galaz czytelna. 12 skladnikow, 192 bajty - ponizej progu, wiec nazwa jak dotad.
 readable='STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_STREAM_ADD_str01_str02_str03_str04_str05_str06_str07_str08_str09_str10_str11_str12'
 [ "${#readable}" = 192 ]
 grep -F "${readable}(1/1)" out_compile.txt
 
-# Galaz skrotu. 13 skladnikow — nazwa czytelna mialaby 209 bajtow.
+# Galaz skrotu. 13 skladnikow - nazwa czytelna mialaby 209 bajtow.
 #
 # Wartosc skrotu jest PRZYPIETA, nie tylko jego ksztalt: skrot trafia na dysk jako nazwa
 # pliku, wiec musi byc stabilny miedzy wersjami biblioteki standardowej i miedzy platformami.
@@ -36,7 +36,7 @@ grep -F ":- PUSH_STREAM(${digest})" out_compile.txt
 [ "$(grep -c "^${digest}(" out_compile.txt)" = 1 ]
 
 # Reduktor nad dlugim artefaktem. `wide` nie przekracza progu, wiec jego wezel okna
-# zostaje czytelny — sprawdzamy, ze prog nie zadziala tam, gdzie nie musi.
+# zostaje czytelny - sprawdzamy, ze prog nie zadziala tam, gdzie nie musi.
 grep -F 'STREAM_AGSE_1_3_wide(1/14)' out_compile.txt
 grep -F ':- PUSH_STREAM(STREAM_AGSE_1_3_wide)' out_compile.txt
 grep -F ':- STREAM_SUM' out_compile.txt
@@ -44,7 +44,7 @@ grep -F ':- STREAM_SUM' out_compile.txt
 # Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
 # wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
 # Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
-# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+# znaczy 'fields' w wyjsciu DOT - do wywolan kompilacyjnych jej NIE dodawac.
 xretractor query.rql -r -k -m 60 -f
 
 # Wytworzenie artefaktu. SUBSTRAT 'default', wiec wezel skrotu ma na dysku komplet:
@@ -62,7 +62,7 @@ done
 }
 
 # Wlasciwa teza: ZADNA nazwa pliku nie przekracza NAME_MAX. Bez skrotu wezel 13-skladnikowy
-# dawalby 209 bajtow nazwy plus sufiks — czyli plan, ktorego nie da sie zapisac.
+# dawalby 209 bajtow nazwy plus sufiks - czyli plan, ktorego nie da sie zapisac.
 too_long=$(find . -maxdepth 1 -type f -printf '%f\n' | awk 'length($0) > 255')
 [ -z "$too_long" ] || {
   echo "nazwa pliku przekracza NAME_MAX:"
@@ -72,7 +72,7 @@ too_long=$(find . -maxdepth 1 -type f -printf '%f\n' | awk 'length($0) > 255')
 
 # Poprawnosc redukcji. Strumien str0k emituje stala k, wiec `wide` to rekord (1..14), a `@`
 # czyta go jako plaski ciag wartosci v[i] = (i mod 14) + 1. SUMC nad oknem 3 daje wiec
-# v[i] + v[i+1] + v[i+2] — z zawinieciem na granicy rekordu (…,39,28,17,6,…), ktore jest
+# v[i] + v[i+1] + v[i+2] - z zawinieciem na granicy rekordu (…,39,28,17,6,…), ktore jest
 # jedyna nietrywialna czescia wyroczni.
 #
 # Pole `sum` jest typu RATIONAL, czyli para (licznik, mianownik): bierzemy co drugie slowo

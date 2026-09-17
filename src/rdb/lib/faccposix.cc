@@ -77,7 +77,7 @@ posixBinaryFile::~posixBinaryFile() {
 auto posixBinaryFile::name() -> std::string & { return filename_; }
 
 size_t posixBinaryFile::count() {
-  // Wolane na goracej sciezce odczytu — pojedynczy stat(), ENOENT to zwykly brak pliku.
+  // Wolane na goracej sciezce odczytu - pojedynczy stat(), ENOENT to zwykly brak pliku.
   struct stat stat_buf;
   if (stat(filename_.c_str(), &stat_buf) != 0) {
     if (errno == ENOENT) return 0;

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bramka niezależności oracle'a — wykrycie 100% zamrożonych mutantów.
+"""Bramka niezależności oracle'a - wykrycie 100% zamrożonych mutantów.
 
 Mutant jest wykryty, gdy istnieje węzeł korpusu bramkowego, na którym
 oracle == replika != mutant. Warunek zgodności oracle'a z repliką jest
@@ -7,7 +7,7 @@ istotny: bez niego „wykryciem” byłaby dowolna stała różnica.
 
 Bramka biegnie osobno dla obu wielkości, które silnik niesie po
 przestemplowaniu z 2026-08-06: mutanty ogona sprawdzane są na ogonie, mutanty
-początku logicznego — na początku logicznym. Mieszanie ich (np. porównywanie
+początku logicznego - na początku logicznym. Mieszanie ich (np. porównywanie
 sumy origin+ogon) ukryłoby dokładnie te błędy, dla których origin powstał:
 przesunięcie milczenia między członami przy zachowanej sumie.
 """
@@ -63,7 +63,7 @@ def main():
             if not hits:
                 missing.append(f"{title}/{name}")
     print("BRAMKA MUTANTÓW: " + ("PRZESZŁA (100%)" if not missing
-                                 else f"NIE PRZESZŁA — niewykryte: {', '.join(missing)}"))
+                                 else f"NIE PRZESZŁA - niewykryte: {', '.join(missing)}"))
     return 1 if missing else 0
 
 

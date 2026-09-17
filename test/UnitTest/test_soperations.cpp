@@ -36,7 +36,7 @@ TEST(xSOperations, hash_operations) {
 }
 
 // Wzorzec wyprowadzony z definicji przeplotu (def:interleave):
-// z = deltaB/(deltaA+deltaB) = 2/3 dla pary (1/16, 1/8) — wzorzec B,A,A,...
+// z = deltaB/(deltaA+deltaB) = 2/3 dla pary (1/16, 1/8) - wzorzec B,A,A,...
 // Stary kod używał delta_c zamiast z w retPos, co było maskowane w teście
 // wyżej przez deltaA == 1 (wtedy delta_c == z liczbowo).
 TEST(xSOperations, hash_operations_nonunit_delta) {
@@ -64,7 +64,7 @@ TEST(xSOperations, hash_operations_nonunit_delta) {
   }
 }
 
-// Równe delty (perfect shuffle): z = 1/2 — wzorzec B,A,B,A,...
+// Równe delty (perfect shuffle): z = 1/2 - wzorzec B,A,B,A,...
 TEST(xSOperations, hash_operations_equal_delta) {
   auto delta = boost::rational<int>(1, 360);
 
@@ -142,7 +142,7 @@ TEST(xSOperations, divmod_operations) {
 
 // Spójność rozplotu z przeplotem (cor:exact): pozycja z Div/Mod musi
 // wskazywać w strumieniu przeplecionym element WŁAŚCIWEJ składowej o tym
-// samym indeksie — Θ (Div) trafia w gałąź A, ~Θ (Mod) w gałąź B.
+// samym indeksie - Θ (Div) trafia w gałąź A, ~Θ (Mod) w gałąź B.
 TEST(xSOperations, divmod_inverts_hash) {
   std::vector<std::pair<boost::rational<int>, boost::rational<int>>> pairs{
       {{1, 1}, {1, 2}},      //
@@ -176,7 +176,7 @@ TEST(xSOperations, subtract_uses_forward_target_index) {
 }
 
 // Definicja sumy strumieni (def:sum): c_n = (a_n, b_{⌊n·Δa/Δb⌋}) dla Δa <= Δb.
-// Silnik odwzorowywał wcześniej b_{⌊(n+1)·Δa/Δb⌋} (bieżący payload składowej) —
+// Silnik odwzorowywał wcześniej b_{⌊(n+1)·Δa/Δb⌋} (bieżący payload składowej) -
 // stąd wartości oczekiwane wypisane wprost, a nie wyprowadzone drugą kopią wzoru.
 TEST(xSOperations, add_pairs_slower_component_by_floor_index) {
   const boost::rational<int> fast{1, 2};
@@ -185,12 +185,12 @@ TEST(xSOperations, add_pairs_slower_component_by_floor_index) {
   for (int n = 0; n < 20; ++n)
     EXPECT_EQ(n, Add(fast, fast, n));
 
-  // Iloraz całkowity: Δsrc = 2·Δout — b_0, b_0, b_1, b_1, ...
+  // Iloraz całkowity: Δsrc = 2·Δout - b_0, b_0, b_1, b_1, ...
   const std::vector<int> ratioTwo{0, 0, 1, 1, 2, 2, 3, 3};
   for (int n = 0; n < static_cast<int>(ratioTwo.size()); ++n)
     EXPECT_EQ(ratioTwo[n], Add(fast, boost::rational<int>{1}, n));
 
-  // Iloraz niecałkowity: Δsrc = 3/4, Δout = 1/2 — ⌊2n/3⌋.
+  // Iloraz niecałkowity: Δsrc = 3/4, Δout = 1/2 - ⌊2n/3⌋.
   const std::vector<int> ratioThreeQuarters{0, 0, 1, 2, 2, 3, 4, 4};
   for (int n = 0; n < static_cast<int>(ratioThreeQuarters.size()); ++n)
     EXPECT_EQ(ratioThreeQuarters[n], Add(fast, boost::rational<int>{3, 4}, n));
@@ -198,7 +198,7 @@ TEST(xSOperations, add_pairs_slower_component_by_floor_index) {
 
 // Okno stemplowane KOŃCEM przedziału: rekord n obejmuje pozycje n*step-(|len|-1) ... n*step.
 // Ogon zabezpiecza wyłącznie NAJNOWSZE pole (n*step), bo dolny koniec zakresu jest domeną
-// origin — stąd brak zależności od długości okna i brak członu fazowego. Wartości poniżej
+// origin - stąd brak zależności od długości okna i brak członu fazowego. Wartości poniżej
 // wyprowadzone z warunku dostępności: rekord floor(n*step/F) jest określony w chwili
 // (floor(n*step/F)+1+W_src)*Delta_src, a slot n kończy się w (n+1+W)*Delta_out.
 TEST(xSOperations, agse_startup_latency_covers_newest_field) {
@@ -210,7 +210,7 @@ TEST(xSOperations, agse_startup_latency_covers_newest_field) {
   EXPECT_EQ(4, AgseStartupLatency(5, 1, 0));
   // Producent obliczany o własnym ogonie 2: pierwszy rekord źródła dopiero w chwili 3*D_src.
   EXPECT_EQ(1, AgseStartupLatency(2, 3, 2));
-  // Krok większy od szerokości źródła — slot wyjścia dłuższy niż rekord źródła, ogon zerowy.
+  // Krok większy od szerokości źródła - slot wyjścia dłuższy niż rekord źródła, ogon zerowy.
   EXPECT_EQ(0, AgseStartupLatency(2, 3, 0));
   EXPECT_EQ(1, AgseStartupLatency(6, 4, 0));
 }
@@ -220,11 +220,11 @@ TEST(xSOperations, agse_startup_latency_covers_newest_field) {
 TEST(xSOperations, agse_logical_origin_skips_incomplete_windows) {
   // F=1, step=1, len=4: pierwsze pełne okno kończy się na pozycji 3.
   EXPECT_EQ(3, AgseLogicalOrigin(1, 1, 4, 0));
-  // Znak długości jest wyłącznie konwencją kolejności pól — origin jest ten sam.
+  // Znak długości jest wyłącznie konwencją kolejności pól - origin jest ten sam.
   EXPECT_EQ(3, AgseLogicalOrigin(1, 1, -4, 0));
   // Krok 2: okno kończące się na pozycji 2*n musi sięgnąć 2*n-1 >= 0, czyli n >= 1.
   EXPECT_EQ(1, AgseLogicalOrigin(1, 2, 2, 0));
-  // Okno o długości 1 nigdy nie sięga wstecz — strumień zaczyna się od rekordu 0.
+  // Okno o długości 1 nigdy nie sięga wstecz - strumień zaczyna się od rekordu 0.
   EXPECT_EQ(0, AgseLogicalOrigin(1, 1, 1, 0));
   // Origin źródła przesuwa jego pozycje spłaszczone o O_src*F i propaguje się w górę:
   // ceil((2*3 + 4 - 1) / 2) = ceil(9/2) = 5.
@@ -239,7 +239,7 @@ TEST(xSOperations, add_startup_latency_covers_slower_component) {
   // Składowa o interwale wyjścia i zerowym ogonie nie wnosi opóźnienia.
   EXPECT_EQ(0, AddStartupLatency(fast, fast, 0));
   // Składowa dwa razy wolniejsza: jej rekord 0 powstaje w chwili 1*D_src,
-  // czyli po dwóch slotach wyjścia — ogon 1. Poprzednia postać dawała 0.
+  // czyli po dwóch slotach wyjścia - ogon 1. Poprzednia postać dawała 0.
   EXPECT_EQ(1, AddStartupLatency(boost::rational<int>{1}, fast, 0));
   // Ta sama składowa z własnym ogonem 2: rekord 0 dopiero w chwili 3*D_src.
   EXPECT_EQ(5, AddStartupLatency(boost::rational<int>{1}, fast, 2));
@@ -250,7 +250,7 @@ TEST(xSOperations, add_startup_latency_covers_slower_component) {
 
 // Ogon `-`, `Θ` i `~Θ` liczony z kresu fazy odczytu. Wartości oczekiwane pochodzą
 // z modelu zdarzeniowego (investigation_K24H10, weryfikacja per węzeł), nie z tej samej
-// postaci zamkniętej — inaczej test potwierdzałby wyłącznie sam siebie.
+// postaci zamkniętej - inaczej test potwierdzałby wyłącznie sam siebie.
 TEST(xSOperations, subtract_startup_latency_covers_fractional_phase) {
   const boost::rational<int> source{1, 2};
 
@@ -258,7 +258,7 @@ TEST(xSOperations, subtract_startup_latency_covers_fractional_phase) {
   // Do 2026-08-18 gałąź deklaracyjna dokładała tu slot, choć deklaracja ma ogon zerowy.
   EXPECT_EQ(0, SubtractStartupLatency(source, boost::rational<int>{1}, 0));
   // Faza ułamkowa: r = 3/2, kres fazy 1/2, więc ceil((1/2+1)/(3/2))-1 = 0.
-  // Dawna postać dawała 1 — to jest ten slot zawyżenia, który mierzyła kampania K24.
+  // Dawna postać dawała 1 - to jest ten slot zawyżenia, który mierzyła kampania K24.
   EXPECT_EQ(0, SubtractStartupLatency(source, boost::rational<int>{3, 4}, 0));
   // Ogon składowej wchodzi liniowo: ceil((1/2+2)/(3/2))-1 = 1.
   EXPECT_EQ(1, SubtractStartupLatency(source, boost::rational<int>{3, 4}, 1));
@@ -270,7 +270,7 @@ TEST(xSOperations, dehash_startup_latency_follows_the_phase_bound) {
   const boost::rational<int> source{1, 2};
 
   // Iloraz całkowity: kres fazy Θ wynosi a, po podzieleniu przez r daje ogon ZERO.
-  // Dawne bezwarunkowe ++result dawało tu 1 — 40,3% węzłów `Θ` korpusu K24.
+  // Dawne bezwarunkowe ++result dawało tu 1 - 40,3% węzłów `Θ` korpusu K24.
   EXPECT_EQ(0, ThetaStartupLatency(source, boost::rational<int>{1}, boost::rational<int>{1}, 0));
   // Iloraz ułamkowy: a/b = (3/4)/(3/2) = 1/2, kres (1+2-1)/2 = 1, r = 3/2,
   // więc ceil((1+1)/(3/2))-1 = 1. Tu slot jest prawdziwy i zostaje.
@@ -290,7 +290,7 @@ TEST(xSOperations, dehash_startup_latency_follows_the_phase_bound) {
 //
 // Obie były w ctest NIEOSIĄGALNE. Postać O(1) powyżej kHashPhaseScanLimit nie wykonuje
 // się nigdy w korpusie kampanijnym (maksimum okresu 24 557 wobec progu 100 000), a
-// rachunek w int64 wprowadzono świadomie — komentarz przy HashStartupLatency() mówi, że
+// rachunek w int64 wprowadzono świadomie - komentarz przy HashStartupLatency() mówi, że
 // rational<int> mnoży przed skróceniem i wychodzi poza zakres int. Powrót do rational<int>
 // nie zapalał dotąd w ctest ani jednej lampki.
 // =====================================================================================
@@ -299,7 +299,7 @@ namespace {
 
 // Niezależny przegląd okresu fazowego w 64 bitach. Powtarza WARUNEK DOSTĘPNOŚCI
 // z definicji, nie implementację: wybór składowej bierze z Hash() (tu chodzi
-// o arytmetykę, nie o regułę wyboru — tę strzeże ut_h10aGate).
+// o arytmetykę, nie o regułę wyboru - tę strzeże ut_h10aGate).
 std::int64_t hashTailByScan(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB,
                             const boost::rational<int> &deltaOut, int latencyA, int latencyB, std::int64_t period) {
   std::int64_t result = 0;
@@ -316,7 +316,7 @@ std::int64_t hashTailByScan(const boost::rational<int> &deltaA, const boost::rat
 }
 
 boost::rational<int> interleavedInterval(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB) {
-  // Delta_c = Da*Db/(Da+Db), liczone w 64 bitach — tak jak robi to kompilator przez
+  // Delta_c = Da*Db/(Da+Db), liczone w 64 bitach - tak jak robi to kompilator przez
   // widen()/narrowInterval(). Bez tego świadkiem byłby błąd aparatury testu.
   const auto numerator   = static_cast<std::int64_t>(deltaA.numerator()) * deltaB.numerator();
   const auto denominator = static_cast<std::int64_t>(deltaA.numerator()) * deltaB.denominator() +
@@ -331,7 +331,7 @@ boost::rational<int> interleavedInterval(const boost::rational<int> &deltaA, con
 // dla Da = Db = 99991/100000 i ogona składowej 30 000 iloczyn (pos+1+W)*num_src*den_out
 // wynosi ~6e14, a już pierwszy człon (1+W)*99991 przekracza zakres int mimo skracania,
 // które boost::rational wykonuje przed mnożeniem. Postać rational<int> zwraca w tym
-// przypadku 17 047 zamiast 60 000 — czyli ZANIŻA ogon o ponad 42 000 slotów.
+// przypadku 17 047 zamiast 60 000 - czyli ZANIŻA ogon o ponad 42 000 slotów.
 //
 // Zaniżenie jest tą klasą defektu, której cały reżim bezpieczny ma nie dopuszczać:
 // oznacza rekord wydany, zanim jego zależności są określone.
@@ -354,7 +354,7 @@ TEST(xSOperations, hash_startup_latency_uses_64bit_intermediate_arithmetic) {
 
 // Gałąź awaryjna powyżej progu przeglądu. Reżim deklarowany w komentarzu przy
 // kHashPhaseScanLimit: postać O(1) ZAWYŻA, więc jest bezpieczna. Test wymaga tego wprost
-// — wartość zwrócona nie może spaść poniżej granicy zdarzeniowej wyliczonej przeglądem
+// - wartość zwrócona nie może spaść poniżej granicy zdarzeniowej wyliczonej przeglądem
 // całego okresu. Bez tego testu gałąź nie wykonuje się w ctest ani razu.
 TEST(xSOperations, hash_startup_latency_above_scan_limit_stays_safe) {
   const boost::rational<int> deltaA{1, 1};
@@ -376,11 +376,11 @@ TEST(xSOperations, hash_startup_latency_above_scan_limit_stays_safe) {
 
 // Kontrola progu. Sam próg nie jest strzeżony ani przez test dokładności, ani przez test
 // bezpieczeństwa: gałąź awaryjna ZAWYŻA, więc obniżenie kHashPhaseScanLimit do zera nie
-// złamałoby żadnego z nich — po cichu cofnęłoby tylko klasę `#` z reżimu dokładnego do
+// złamałoby żadnego z nich - po cichu cofnęłoby tylko klasę `#` z reżimu dokładnego do
 // zawyżającego, czyli o krok 3c z 2026-08-07.
 //
 // Świadkiem jest przypadek, w którym obie postacie DAJĄ RÓŻNE liczby: Da=1, Db=2/5,
-// W_B=1 — przegląd okresu daje 3, zastąpiona postać O(1) daje 4. Test wymaga od silnika
+// W_B=1 - przegląd okresu daje 3, zastąpiona postać O(1) daje 4. Test wymaga od silnika
 // wartości dokładnej i osobno sprawdza, że postać O(1) jest tu naprawdę wyższa; bez
 // drugiej połowy pierwsza sprawdzałaby zgodność dwóch identycznych liczb.
 TEST(xSOperations, hash_scan_limit_keeps_the_exact_branch_in_use) {

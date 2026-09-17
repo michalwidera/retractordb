@@ -16,12 +16,12 @@
 
 #include <spdlog/spdlog.h>
 
-// Pozycje bitów w CapEff (linux/capability.h) — wartości standardu POSIX.1e.
+// Pozycje bitów w CapEff (linux/capability.h) - wartości standardu POSIX.1e.
 // Bity w /proc/self/status CapEff odpowiadają numerom capability z <sys/capability.h>.
-constexpr int kCapSysNiceBit = 23;  // CAP_SYS_NICE  — wymagane do SCHED_FIFO
-constexpr int kCapIpcLockBit = 14;  // CAP_IPC_LOCK  — wymagane do mlockall
+constexpr int kCapSysNiceBit = 23;  // CAP_SYS_NICE  - wymagane do SCHED_FIFO
+constexpr int kCapIpcLockBit = 14;  // CAP_IPC_LOCK  - wymagane do mlockall
 
-// Stałe konwersji czasu — używane przy obliczaniu timespec dla clock_nanosleep.
+// Stałe konwersji czasu - używane przy obliczaniu timespec dla clock_nanosleep.
 constexpr long kNsPerMs              = 1'000'000L;      // nanosekundy na milisekundę
 constexpr long kNsPerSec             = 1'000'000'000L;  // nanosekundy na sekundę
 constexpr size_t kCapEffPrefixLength = 7;
@@ -79,16 +79,16 @@ bool rtCheckAndPrint() {
   auto rec = [](bool v) { return v ? "[OK]  " : "[WARN]"; };
 
   std::cout << "\n=== RT requirements check ===\n";
-  std::cout << ok(hasSysNice) << " CAP_SYS_NICE / root        — required for SCHED_FIFO\n";
-  std::cout << ok(hasIpcLock) << " CAP_IPC_LOCK / root        — required for mlockall\n";
+  std::cout << ok(hasSysNice) << " CAP_SYS_NICE / root        - required for SCHED_FIFO\n";
+  std::cout << ok(hasIpcLock) << " CAP_IPC_LOCK / root        - required for mlockall\n";
   std::cout << rec(hasRTKernel)
-            << " PREEMPT_RT kernel          — /sys/kernel/realtime=" << (rtKernelVal.empty() ? "missing" : rtKernelVal) << "\n";
+            << " PREEMPT_RT kernel          - /sys/kernel/realtime=" << (rtKernelVal.empty() ? "missing" : rtKernelVal) << "\n";
   std::cout << rec(rtThrottleOff)
-            << " RT throttling disabled     — sched_rt_runtime_us=" << (rtThrottleVal.empty() ? "missing" : rtThrottleVal)
+            << " RT throttling disabled     - sched_rt_runtime_us=" << (rtThrottleVal.empty() ? "missing" : rtThrottleVal)
             << (rtThrottleOff ? "" : "  (set to -1 to disable throttling)") << "\n";
-  std::cout << rec(memlockUnlimited) << " RLIMIT_MEMLOCK unlimited   — cur="
+  std::cout << rec(memlockUnlimited) << " RLIMIT_MEMLOCK unlimited   - cur="
             << (memlockRl.rlim_cur == RLIM_INFINITY ? "unlimited" : std::to_string(memlockRl.rlim_cur) + " bytes") << "\n";
-  std::cout << "      Current scheduler      — " << policyName << "\n";
+  std::cout << "      Current scheduler      - " << policyName << "\n";
   std::cout << "=============================\n\n";
 
   const bool critical = hasSysNice && hasIpcLock;
@@ -142,7 +142,7 @@ bool rtActivate(int priority) {
 bool rtKeepThreadOffRtCpus(pthread_t handle) {
   // Dlaczego to istnieje. Wątek komunikacyjny (`commandProcessorLoop`) powstaje
   // PRZED `rtActivate`, a `sched_setscheduler(0, …)` dotyczy wyłącznie wątku
-  // wołającego — wątek komunikacyjny zostaje więc SCHED_OTHER. Gdy operator
+  // wołającego - wątek komunikacyjny zostaje więc SCHED_OTHER. Gdy operator
   // przypina CAŁY proces do jednego rdzenia (`taskset -c 3`, zwykle rdzeń
   // izolowany przez `isolcpus`), oba wątki lądują na tym samym rdzeniu. Dopóki
   // pętla przetwarzania mieści się w slocie, wątek RT oddaje rdzeń na czas snu
@@ -156,7 +156,7 @@ bool rtKeepThreadOffRtCpus(pthread_t handle) {
   // 212 %, klient bez odpowiedzi przez pełne 3 s budżetu).
   //
   // Naprawa: wątek pomocniczy dostaje dopełnienie maski wątku RT. Gdy wątek RT
-  // nie jest przypięty, dopełnienie jest puste i nie robimy nic — planista sam
+  // nie jest przypięty, dopełnienie jest puste i nie robimy nic - planista sam
   // rozłoży wątki i zagłodzenia nie ma.
   cpu_set_t rtCpus;
   CPU_ZERO(&rtCpus);
@@ -177,7 +177,7 @@ bool rtKeepThreadOffRtCpus(pthread_t handle) {
     if (!CPU_ISSET(static_cast<int>(cpu), &rtCpus)) CPU_SET(static_cast<int>(cpu), &auxCpus);
 
   if (CPU_COUNT(&auxCpus) == 0) {
-    // Wątek RT widzi wszystkie rdzenie — nie ma dokąd przenieść, i nie trzeba.
+    // Wątek RT widzi wszystkie rdzenie - nie ma dokąd przenieść, i nie trzeba.
     return false;
   }
 

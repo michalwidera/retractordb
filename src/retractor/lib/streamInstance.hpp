@@ -32,7 +32,7 @@ struct streamInstance {
   ///
   /// Potrzebna, bo od czasu wprowadzenia ogona (query::startupLatency) liczba rekordów NIE jest już równa
   /// numerowi slotu: przez pierwsze startupLatency slotów strumień nie emituje niczego. Licznik rozdziela
-  /// te dwie wielkości — outputPayload->getRecordsCount() pozostaje indeksem elementu, ten licznik jest
+  /// te dwie wielkości - outputPayload->getRecordsCount() pozostaje indeksem elementu, ten licznik jest
   /// pozycją na siatce slotów.
   size_t elapsedSlots = 0;
 
@@ -56,16 +56,16 @@ struct streamInstance {
    */
   [[nodiscard]] rdb::payload reduceFieldsToPayload(command_id cmd, const std::string &instance) const;
 
-  /// Redukcja okna REKORDOWEGO nad polem TEGO strumienia — jedno przejście, cztery agregaty.
+  /// Redukcja okna REKORDOWEGO nad polem TEGO strumienia - jedno przejście, cztery agregaty.
   ///
   /// Okno obejmuje rekordy logiczne `lastLogicalIndex-(group.width-1) ... lastLogicalIndex`.
   /// Który rekord jest ostatni, rozstrzyga wołający (dataModel::computeWindowAggregates);
-  /// dla slotu n konsumenta jest to rekord n — patrz windowGroup. Z każdego rekordu wchodzi
-  /// do redukcji JEDNA wartość — slot `group.slot` — więc okno redukuje dokładnie `width`
+  /// dla slotu n konsumenta jest to rekord n - patrz windowGroup. Z każdego rekordu wchodzi
+  /// do redukcji JEDNA wartość - slot `group.slot` - więc okno redukuje dokładnie `width`
   /// wartości, po jednej na rekord.
   ///
   /// Rekordy spoza historii są pomijane (nie zerowane). Przy poprawnym planie ten przypadek
-  /// nie występuje — origin gwarantuje, że całe okno leży w istniejącej części strumienia,
+  /// nie występuje - origin gwarantuje, że całe okno leży w istniejącej części strumienia,
   /// a compiler::computeRequiredCapacities() zamawia dla niego pojemność.
   [[nodiscard]] windowStats reduceRecordWindow(const windowGroup &group, int lastLogicalIndex, int sourceIndexBase) const;
 

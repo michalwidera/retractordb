@@ -3,7 +3,7 @@
 #
 # Synchronizacja jest ZDARZENIOWA, nie czasowa. Poprzednia wersja czekala na sam
 # fakt istnienia pliku blokady (co spelniala rowniez blokada CUDZEGO serwera)
-# i odmierzala `sleep 0.1` do `xqry -k`, po czym kasowala plik blokady — takze
+# i odmierzala `sleep 0.1` do `xqry -k`, po czym kasowala plik blokady - takze
 # nie swoj. Wspolna oprawa ../serverlib.sh zalatwia start, koniec i higiene;
 # tutaj zostaje to, co specyficzne dla ad hoc: sprawdzenie wyniku `xqry -a`
 # (xqry pisze diagnostyke na stdout, nie stderr) i oczekiwanie na artefakty.

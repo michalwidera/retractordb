@@ -9,11 +9,11 @@ set(TestID "it_${TestID}")
 # compiler::inferFieldShapes() bralo ksztalt `merged[k]` przez
 # sourceFieldAt("merged", k), czyli z WLASNEGO schematu wyjsciowego `merged`, a
 # nie z rekordu FROM. `merged_0` wychodzilo INTEGER zamiast BYTE, `merged_1`
-# BYTE zamiast INTEGER — i 400 z `core1.c` zapisywalo sie jako 144, bez
+# BYTE zamiast INTEGER - i 400 z `core1.c` zapisywalo sie jako 144, bez
 # ostrzezenia.
 #
 # DWA wpisy: asercja o ksztalcie planu i asercja o policzonej wartosci nie
-# dziela jednego wpisu ctest — patrz regula przy issue202_hash_shift_e2e w
+# dziela jednego wpisu ctest - patrz regula przy issue202_hash_shift_e2e w
 # CLAUDE.md. Zaden nie zalezy od przelacznikow RDB_OPT_*, wiec zaden nie dostaje
 # DISABLED pod ablacja.
 

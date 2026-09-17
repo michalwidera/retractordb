@@ -2,7 +2,7 @@
 //
 // Fabryka skupia w jednym miejscu odwzorowanie nazwy typu magazynu na konkretną
 // implementację FileInterface oraz dobór wariantu indeksu metadanych null
-// (inertny/cień indeksu/bazowy) — wydzielone z klasy storage, która zna odtąd
+// (inertny/cień indeksu/bazowy) - wydzielone z klasy storage, która zna odtąd
 // wyłącznie abstrakcyjny FileInterface.
 
 #include <gtest/gtest.h>

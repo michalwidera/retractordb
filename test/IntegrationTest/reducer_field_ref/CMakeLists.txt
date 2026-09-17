@@ -11,7 +11,7 @@ set(TestID "it_${TestID}")
 # result:` zamyka ten wzorzec w kompilacji i nazywa obejscie.
 #
 # DWA wpisy, a nie jeden: asercja o ksztalcie planu (czy sie kompiluje) i
-# asercja o policzonej wartosci nie moga dzielic jednego wpisu ctest — patrz
+# asercja o policzonej wartosci nie moga dzielic jednego wpisu ctest - patrz
 # regula przy issue202_hash_shift_e2e w CLAUDE.md.
 
 add_test(

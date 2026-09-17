@@ -19,10 +19,10 @@ namespace rdb {
 /// - rozstrzygać, czy typ magazynu jest źródłem deklarowanym tylko do odczytu (isDeclaredType()),
 /// - dobierać wariant indeksu metadanych null (makeMetaIndex()): wariant inertny (pusta ścieżka pliku)
 ///   dla źródeł deklarowanych, storageShadow gdy accessor utrzymuje plik cienia danych, bazowy metaData
-///   dla pozostałych zapisywalnych — posiadanie pliku cienia danych i posiadanie metaindeksu są
+///   dla pozostałych zapisywalnych - posiadanie pliku cienia danych i posiadanie metaindeksu są
 ///   niezależnymi własnościami magazynu (cień chroni oryginalną zarejestrowaną zawartość danych,
 ///   metaindeks rejestruje wartości null i przerwy w transmisji),
-/// - skupiać całą wiedzę o konkretnych typach akcesorów w jednym miejscu — storage zna wyłącznie
+/// - skupiać całą wiedzę o konkretnych typach akcesorów w jednym miejscu - storage zna wyłącznie
 ///   abstrakcyjny FileInterface.
 
 /// @brief Whether the storage type is a read-only declared source (DEVICE/TEXTSOURCE).

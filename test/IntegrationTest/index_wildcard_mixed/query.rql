@@ -1,7 +1,7 @@
 # Dziki indeks `[_]` jako POZYCJA listy SELECT, a nie caly jej ksztalt.
 #
 # `x[_]` rozwija sie w tyle pol, ile slotow wnosi `x` do schematu klauzuli FROM. Pozycje
-# stojace za nim zjezdzaja o tyle, ile ich przybylo — i to jest tresc tego testu, bo
+# stojace za nim zjezdzaja o tyle, ile ich przybylo - i to jest tresc tego testu, bo
 # rozwiniecie zmienia UKLAD PAYLOADU, a nie tylko liczbe pol w deskryptorze. Sama
 # kompilacja tego nie pokaze.
 #

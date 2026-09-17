@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Generator korpusu planów K24 — zamrożony, deterministyczny, stratyfikowany.
+"""Generator korpusu planów K24 - zamrożony, deterministyczny, stratyfikowany.
 
 Generator produkuje wyłącznie plany poprawne. Plan odrzucony przez kompilator
 jest błędem aparatury i zatrzymuje iterację; nie wolno go cicho pominąć.
 
 Stratyfikacja: dziewięć klas operatorów i pięć predeklarowanych klas trudnych.
 Każda strata dostaje równą liczbę planów, więc przy N = 10 010 każda ma 715
-instancji — powyżej predeklarowanego progu 500.
+instancji - powyżej predeklarowanego progu 500.
 
 Klasy trudne:
-  HC_NONINT  — `#` o ilorazie taktów p/q z q niedzielącym p (klasa członu (b))
-  HC_SHIFT_UNDER_HASH — `>` zagnieżdżone pod `#`
-  HC_INT     — `#` o ilorazie całkowitym (kontrola negatywna członu (b))
-  HC_SINGLE  — plan jednotaktowy bez `#` (kontrola negatywna członu (b))
-  HC_DEEP    — kompozycja głębokości >= 4
+  HC_NONINT  - `#` o ilorazie taktów p/q z q niedzielącym p (klasa członu (b))
+  HC_SHIFT_UNDER_HASH - `>` zagnieżdżone pod `#`
+  HC_INT     - `#` o ilorazie całkowitym (kontrola negatywna członu (b))
+  HC_SINGLE  - plan jednotaktowy bez `#` (kontrola negatywna członu (b))
+  HC_DEEP    - kompozycja głębokości >= 4
 
 Strata WINDOW (okno rekordowe w liście SELECT) jest DOŁOŻONA i domyślnie wyłączona:
 wchodzi tylko przez `generate(..., strata=STRATA_WITH_WINDOW)`. Powód przy definicji
-`STRATA_WITH_WINDOW` — dołożenie straty do `STRATA` zmieniłoby korpus zamrożony w K24e.
+`STRATA_WITH_WINDOW` - dołożenie straty do `STRATA` zmieniłoby korpus zamrożony w K24e.
 """
 
 import random
@@ -59,12 +59,12 @@ HARD_CLASSES = (HC_NONINT, HC_SHIFT_UNDER_HASH, HC_INT, HC_SINGLE, HC_DEEP)
 OPERATOR_STRATA = (PASS, SHIFT, HASH, ADD, SUB, THETA, NTHETA, AGSE, REDUCE)
 STRATA = OPERATOR_STRATA + HARD_CLASSES
 
-# Strata okna REKORDOWEGO — DOLOZONA, nie wlaczona domyslnie.
+# Strata okna REKORDOWEGO - DOLOZONA, nie wlaczona domyslnie.
 #
 # Strata przydzielana jest ROTACYJNIE po indeksie planu (`STRATA[index % len(STRATA)]`),
 # a kazdy plan ciagnie z tego samego `random.Random(seed)`. Dopisanie pietnastej straty
 # do `STRATA` przesuwa wiec WSZYSTKIE losowania i daje dla zamrozonych ziaren INNY
-# korpus — a `compare_regimes.py` zwraca kod 2 przy jakiejkolwiek zmianie zestawu klas,
+# korpus - a `compare_regimes.py` zwraca kod 2 przy jakiejkolwiek zmianie zestawu klas,
 # czyli `ninja test_gate` przestalby przechodzic z powodu korpusu, nie silnika.
 # Korpus zamrozony w K24e musi zostac bajtowo ten sam, wiec strata wchodzi wylacznie
 # przez jawne `strata=` w generate().
@@ -78,7 +78,7 @@ WINDOW_AGGREGATE_COUNTS = (1, 1, 2, 3)
 
 
 class GeneratorError(RuntimeError):
-    """Generator nie potrafił wyprodukować planu dla straty — błąd aparatury."""
+    """Generator nie potrafił wyprodukować planu dla straty - błąd aparatury."""
 
 
 def _bounded(delta):
@@ -95,7 +95,7 @@ def _candidates(kind, nodes, rng):
     # `WINDOW` jest liściem tak samo jak `REDUCE`: oba wydają pola RATIONAL, a
     # `payload_words()` i `content()` liczą słowa INTEGER-owe źródła. Wpuszczenie
     # takiego węzła jako producenta dałoby węzeł o szerokości 1 nad rekordem
-    # dwusłowowym, czyli po cichu zły model treści — i to jest powód wykluczenia,
+    # dwusłowowym, czyli po cichu zły model treści - i to jest powód wykluczenia,
     # nie żadne ograniczenie reguły origin (okno nad oknem kompiluje się i liczy
     # origin poprawnie, zmierzone; ten kształt pilnuje przypadek ręczny).
     usable = [node for node in nodes if node.kind not in (REDUCE, WINDOW)]
@@ -190,7 +190,7 @@ def build(rng, stratum):
         if stratum == HC_SINGLE:
             allowed = [PASS, SHIFT, REDUCE, SUB, AGSE]
         # Strata okna buduje plan MIESZANY z wymogiem obecności okna, a nie łańcuch
-        # samych okien — okno jest liściem (patrz _candidates), więc łańcuch nie ma
+        # samych okien - okno jest liściem (patrz _candidates), więc łańcuch nie ma
         # jak powstać, a kompozycja `okno nad <dowolnym operatorem>` jest tym, o co
         # pyta twierdzenie: reguła musi trafiać nad producentem o dowolnym origin.
         if stratum == WINDOW:

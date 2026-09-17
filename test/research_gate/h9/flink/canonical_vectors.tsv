@@ -1,8 +1,8 @@
 # Wektory o ZNANEJ odpowiedzi dla kanonicznego serializera metryki pierwotnej K26.
 #
 # Ten plik jest WSPOLNYM wejsciem dla obu stron:
-#   * C++  — oracle/canonical_oracle (linkuje rdb::probe::canonicalRecordBytes z librdb.a),
-#   * Java — java/CanonTest (wywoluje Canon.recordBytes).
+#   * C++  - oracle/canonical_oracle (linkuje rdb::probe::canonicalRecordBytes z librdb.a),
+#   * Java - java/CanonTest (wywoluje Canon.recordBytes).
 # Zgodnosc obu wyjsc jest bramka kroku B: rozbieznosc uniewaznia metryke miedzysystemowa.
 #
 # Format:  label <TAB> pola <TAB> oczekiwane_bajty

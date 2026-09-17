@@ -81,14 +81,14 @@ TEST(MemoryTest, test_faccmemory_retention) {
 
   GTEST_ASSERT_EQ(mfa->count(), 4);
 
-  // Positions 2 and 3 map to ring slots 0 and 1 — current values 3 and 4
+  // Positions 2 and 3 map to ring slots 0 and 1 - current values 3 and 4
   GTEST_ASSERT_EQ(mfa->read(&record.data, 2), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record.data, 3);
 
   GTEST_ASSERT_EQ(mfa->read(&record.data, 3), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record.data, 4);
 
-  // Position 0 maps to ring slot 0 — returns the record currently at that slot (value 3)
+  // Position 0 maps to ring slot 0 - returns the record currently at that slot (value 3)
   GTEST_ASSERT_EQ(mfa->read(&record.data, 0), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record.data, 3);
 
@@ -196,7 +196,7 @@ TEST(MemoryTest, test_faccmemory_empty_count) {
 }
 
 // Verify retention ring boundary: ring of size 3 overwrites slot 0 on the 4th write.
-// All reads succeed via modular mapping — no EXIT_FAILURE for wrapped positions.
+// All reads succeed via modular mapping - no EXIT_FAILURE for wrapped positions.
 TEST(MemoryTest, test_faccmemory_retention_boundary) {
   BYTE record;
 
@@ -206,7 +206,7 @@ TEST(MemoryTest, test_faccmemory_retention_boundary) {
   auto retention = std::pair<std::string, size_t>("MEMORY", 3);
   auto mfa       = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
 
-  // Write 3 records — ring fills up, no overwrite yet
+  // Write 3 records - ring fills up, no overwrite yet
   for (BYTE i = 1; i <= 3; i++) {
     record = i;
     mfa->write(&record);
@@ -220,21 +220,21 @@ TEST(MemoryTest, test_faccmemory_retention_boundary) {
   GTEST_ASSERT_EQ(mfa->read(&record, 2), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 3);
 
-  // Write 4th record — wraps to slot 0, overwrites value 1 with value 4
+  // Write 4th record - wraps to slot 0, overwrites value 1 with value 4
   record = 4;
   mfa->write(&record);
 
   GTEST_ASSERT_EQ(mfa->count(), 4);
 
-  // Position 0 maps to slot 0 — now holds value 4 (overwritten)
+  // Position 0 maps to slot 0 - now holds value 4 (overwritten)
   GTEST_ASSERT_EQ(mfa->read(&record, 0), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 4);
 
-  // Position 3 also maps to slot 0 — same value
+  // Position 3 also maps to slot 0 - same value
   GTEST_ASSERT_EQ(mfa->read(&record, 3), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 4);
 
-  // Write 5th record — wraps to slot 1, overwrites value 2 with value 5
+  // Write 5th record - wraps to slot 1, overwrites value 2 with value 5
   record = 5;
   mfa->write(&record);
 

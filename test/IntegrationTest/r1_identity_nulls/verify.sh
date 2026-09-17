@@ -2,7 +2,7 @@
 # Tozsamosc R1 nad danymi z NULL-ami:
 #   phi(tau_i(A), tau_k(B)) == tau_(i+k)(phi(A, B))   gdy i*deltaA == k*deltaB
 #
-# ZAKRES TOZSAMOSCI — ustalony 2026-08-07 (decyzja A po pomiarze K24p).
+# ZAKRES TOZSAMOSCI - ustalony 2026-08-07 (decyzja A po pomiarze K24p).
 # R1 jest tozsamoscia CIAGU REKORDOW: treaci, indeksu logicznego i poczatku logicznego.
 # NIE jest tozsamoscia opoznienia. Gdy faktoryzacja R1 zostanie zastosowana, obie strony
 # maja identyczny ogon; gdy jest ZABLOKOWANA (publiczne przesuniecia posrednie), strona
@@ -15,10 +15,10 @@
 # Wniosek, ktory ten test utrwala: faktoryzacja R1 jest OPTYMALIZACJA OPOZNIENIA, a nie
 # przepisaniem neutralnym. Bezpieczenstwo obserwacyjne (H1) dotyczy tresci i indeksu,
 # nie chwili emisji. Do 2026-08-07 obie strony mialy ten sam ogon wylacznie dlatego, ze
-# tau_N zawyzalo swoj ogon o min(W_src, N) — zawyzenie zmierzone w K24p §2.2.
+# tau_N zawyzalo swoj ogon o min(W_src, N) - zawyzenie zmierzone w K24p §2.2.
 #
-# Porownanie samych bajtow nie wystarcza — rekord all-null i rekord o wartosci zero maja
-# te sama zawartosc binarna, a rozna denotacje — wiec porownujemy takze mape null.
+# Porownanie samych bajtow nie wystarcza - rekord all-null i rekord o wartosci zero maja
+# te sama zawartosc binarna, a rozna denotacje - wiec porownujemy takze mape null.
 set -eu
 rm -rf temp
 mkdir -p temp
@@ -36,7 +36,7 @@ factor=$(xretractor --build-info | sed -n 's/^RDB_OPT_FACTOR_MATCHED_HASH_TIMEMO
 # to samo: ogon 0 (tau_3 nad przeplotem o ogonie 2 pochlania go w calosci:
 # max(0, 2-3) = 0) i origin 3 (przesuniecia skladaja sie na niedefiniowalnosc).
 #
-# Przy R1 OFF lhs zostaje niefaktoryzowane i ma ogon DODATNI — czeka na skladowe po ich
+# Przy R1 OFF lhs zostaje niefaktoryzowane i ma ogon DODATNI - czeka na skladowe po ich
 # wlasnym przesunieciu. Sprawdzamy wtedy sam KIERUNEK (ogon jest, origin ten sam), a nie
 # jego wartosc: `def:observable` zada rownosci `Val`, ale tylko `Lat(prawa) <= Lat(lewa)`,
 # wiec dluzsze oczekiwanie strony niefaktoryzowanej jest dozwolone (znalezisko A,
@@ -50,14 +50,14 @@ grep -F 'rhs(1/15)	origin=3' out_compile.txt
 
 # phase_lhs ma faktoryzacje ZABLOKOWANA przez publiczne przesuniecia posrednie, wiec
 # wykonuje sie z najgorsza faza przeplotu i jego ogon jest scisle wiekszy. Origin jest
-# ten sam po obu stronach — to on niesie tozsamosc.
+# ten sam po obu stronach - to on niesie tozsamosc.
 grep -F 'phase_lhs(3/25)	tail=2	origin=5' out_compile.txt
 grep -F 'phase_rhs(3/25)	origin=5' out_compile.txt
 
 # Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
 # wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
 # Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
-# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+# znaczy 'fields' w wyjsciu DOT - do wywolan kompilacyjnych jej NIE dodawac.
 xretractor query.rql -r -k -m 48 -f
 
 # --- narzedzia porownania -----------------------------------------------------------
@@ -72,7 +72,7 @@ null_flags() {
     done
 }
 
-# Strona krotsza musi byc PREFIKSEM dluzszej — co do bajtow i co do mapy null.
+# Strona krotsza musi byc PREFIKSEM dluzszej - co do bajtow i co do mapy null.
 compare_common_prefix() {
   local left="$1" right="$2" label="$3"
   local size_left size_right common flags_left flags_right records
@@ -80,7 +80,7 @@ compare_common_prefix() {
   size_right=$(stat -c %s "$right")
   common=$(( size_left < size_right ? size_left : size_right ))
   [ "$common" -gt 0 ] || {
-    echo "$label: pusty wspolny prefiks — test porownalby dwa puste ciagi"
+    echo "$label: pusty wspolny prefiks - test porownalby dwa puste ciagi"
     exit 1
   }
   cmp -n "$common" "$left" "$right" || {
@@ -101,12 +101,12 @@ compare_common_prefix() {
 # porownywalby dane bez NULL-i i nie sprawdzal tego, po co powstal.
 nulls=$(xtrdb -n -s temp/lhs | grep -c 'all nulls')
 [ "$nulls" -gt 0 ] || {
-  echo "brak rekordow all-null w wyniku — dziedzina z NULL-ami nie zostala przetestowana"
+  echo "brak rekordow all-null w wyniku - dziedzina z NULL-ami nie zostala przetestowana"
   exit 1
 }
 phase_nulls=$(xtrdb -n -s temp/phase_lhs | grep -c 'all nulls')
 [ "$phase_nulls" -gt 0 ] || {
-  echo "brak rekordow all-null w fazowej LHS — regresja K2/G3 ma pusta dziedzine NULL"
+  echo "brak rekordow all-null w fazowej LHS - regresja K2/G3 ma pusta dziedzine NULL"
   exit 1
 }
 
@@ -127,12 +127,12 @@ else
 fi
 
 # Faktoryzacja zablokowana: rownosc jest tozsamoscia ciagu rekordow, wiec porownujemy
-# wspolny prefiks. Strona sfaktoryzowana (phase_rhs) ma byc SCISLE DLUZSZA — gdyby byla
+# wspolny prefiks. Strona sfaktoryzowana (phase_rhs) ma byc SCISLE DLUZSZA - gdyby byla
 # rowna albo krotsza, znaczyloby to, ze optymalizacja opoznienia zniknela i test
 # przestalby pilnowac tego, po co powstal.
 compare_common_prefix temp/phase_lhs temp/phase_rhs "phase R1"
 [ "$(stat -c %s temp/phase_rhs)" -gt "$(stat -c %s temp/phase_lhs)" ] || {
-  echo "phase R1: strona sfaktoryzowana nie wyprzedza niefaktoryzowanej — ogon tau_N znow zawyza"
+  echo "phase R1: strona sfaktoryzowana nie wyprzedza niefaktoryzowanej - ogon tau_N znow zawyza"
   exit 1
 }
 

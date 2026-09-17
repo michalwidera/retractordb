@@ -7,10 +7,10 @@
 # sie nie wykonywalo:
 #
 #   1. FatalError wolal spdlog::shutdown() przed std::exit, a std::exit uruchamia handlery
-#      atexit — executorsm::cleanup() zaczyna od SPDLOG_WARN. Po shutdown() rejestr jest
+#      atexit - executorsm::cleanup() zaczyna od SPDLOG_WARN. Po shutdown() rejestr jest
 #      pusty, wiec makro wolalo should_log() na wskazniku zerowym: SIGSEGV, kod 139.
 #
-#   2. cleanup() robil bt.join() takze wtedy, gdy sam biegl w watku komunikacyjnym —
+#   2. cleanup() robil bt.join() takze wtedy, gdy sam biegl w watku komunikacyjnym -
 #      a biegnie tam, bo getAdHoc() wola compile(), a kompilator ma wiele wywolan
 #      FatalError. join() na watku biezacym rzuca std::system_error, wyjatek z handlera
 #      atexit to std::terminate: SIGABRT, kod 134.
@@ -27,7 +27,7 @@ status=0
 xretractor missing_storage.rql -m 4 -f >/dev/null 2>&1 || status=$?
 if [ "$status" -ne 1 ]; then
   echo "start z brakujacym katalogiem STORAGE: kod wyjscia $status, oczekiwano 1"
-  echo "  (139 = SIGSEGV w atexit, 134 = SIGABRT — obie znacza regresje sciezki wyjscia)"
+  echo "  (139 = SIGSEGV w atexit, 134 = SIGABRT - obie znacza regresje sciezki wyjscia)"
   exit 1
 fi
 
@@ -112,7 +112,7 @@ fatal_in_slot "blad krytyczny w slocie z komenda klienta na blokadzie epoki" cli
 
 # Blokada uslugi ma znikac SAMA. std::exit nie uruchamia destruktorow obiektow
 # automatycznych, wiec FlockServiceGuard::~FlockServiceGuard() przy bledzie krytycznym
-# sie nie wykonuje — plik kasuje executorsm::cleanup() zarejestrowany przez atexit.
+# sie nie wykonuje - plik kasuje executorsm::cleanup() zarejestrowany przez atexit.
 # Bramka higieny w serverlib.sh sprawdza to za nas i oblewa test, jesli blokada zostanie;
 # ten komentarz stoi tu po to, zeby bylo wiadomo, ze jej milczenie JEST asercja.
 

@@ -14,7 +14,7 @@
 
 namespace {
 
-// Kod wyjścia dziecka, gdy execvp() się nie powiedzie — konwencja powłoki "command not found".
+// Kod wyjścia dziecka, gdy execvp() się nie powiedzie - konwencja powłoki "command not found".
 constexpr int kExecFailedExitCode{127};
 
 // Domyślny wykonawca: fork + execvp("systemctl", argv). Bez shella (brak ryzyka interpretacji argv).

@@ -11,7 +11,7 @@
 #include <sstream>
 #include <vector>
 
-#include <fmt/ranges.h>                    // fmt::join — łączenie listy ścieżek konfiguracyjnych
+#include <fmt/ranges.h>                    // fmt::join - łączenie listy ścieżek konfiguracyjnych
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 #include <boost/algorithm/string.hpp>
@@ -56,12 +56,12 @@
 /// - Nie zakłada obecności kanału sterującego nadzorcy ani jego API (REST/gRPC); własny cykl życia
 ///   (start, praca, zatrzymanie) realizuje samodzielnie poprzez argumenty CLI i sygnały systemowe.
 /// - Cała koordynacja stanu odbywa się przez własne mechanizmy procesu: blokadę pojedynczej instancji
-///   (FlockServiceGuard), kanał IPC do klientów (xqry) oraz sygnały — bez zależności od procesu nadzorcy.
+///   (FlockServiceGuard), kanał IPC do klientów (xqry) oraz sygnały - bez zależności od procesu nadzorcy.
 /// - Ewentualny supervisor pełni wyłącznie rolę zewnętrznego zarządcy plików/uruchomień i może zostać
 ///   przebudowany lub usunięty bez wpływu na zdolność xretractor do samodzielnej pracy.
 ///
 /// Praca jako usługa systemd:
-/// - Działać w trybie pierwszoplanowym (foreground), bez samodzielnej demonizacji — zgodnie z `Type=simple`.
+/// - Działać w trybie pierwszoplanowym (foreground), bez samodzielnej demonizacji - zgodnie z `Type=simple`.
 /// - Umożliwiać start bez pliku .rql (tryb idle), tak aby jednostka systemd mogła wstać przy starcie systemu
 ///   i pozostać aktywna, zanim zostaną zdefiniowane jakiekolwiek zapytania (bez pętli restartów/crash-loop).
 /// - Reagować na SIGTERM bezpiecznym, kontrolowanym zatrzymaniem (graceful shutdown) w skończonym czasie,
@@ -73,16 +73,16 @@
 /// Logowanie w trybie usługi systemowej:
 /// - W trybie usługi kierować logi na standardowe wyjście procesu (stdout/stderr), tak aby były przechwytywane
 ///   przez journald i dostępne przez `journalctl -u`; nie pisać logów do pliku w katalogu tymczasowym (/tmp).
-/// - Nie duplikować znacznika czasu w komunikacie — czas nadaje journald; format usługowy ma być zwięzły
+/// - Nie duplikować znacznika czasu w komunikacie - czas nadaje journald; format usługowy ma być zwięzły
 ///   (poziom + treść), bez własnego timestampu.
-/// - Nie emitować kodów ANSI/kolorów w trybie usługowym, gdy wyjście nie jest terminalem (brak TTY) — log do journala musi być
+/// - Nie emitować kodów ANSI/kolorów w trybie usługowym, gdy wyjście nie jest terminalem (brak TTY) - log do journala musi być
 ///   czystym tekstem.
-/// - Nie wykonywać własnej rotacji ani retencji plików logów — pozostawić to menedżerowi journald.
+/// - Nie wykonywać własnej rotacji ani retencji plików logów - pozostawić to menedżerowi journald.
 /// - Zapewniać natychmiastowy zrzut (flush) po każdej linii, aby wpisy pojawiały się w dzienniku na bieżąco.
 /// - Mapować poziom logowania na priorytety syslog (prefiks `<0>`..`<7>` wg sd-daemon),
 ///   aby journald poprawnie klasyfikował wagę komunikatów w trybie usługowym.
 /// - Umożliwiać włączenie trybu usługowego logowania zarówno flagą CLI (--service), jak i zmienną
-///   środowiskową XRETRACTOR_SERVICE — dla wygody konfiguracji jednostki systemd przez Environment=.
+///   środowiskową XRETRACTOR_SERVICE - dla wygody konfiguracji jednostki systemd przez Environment=.
 ///
 /// Interfejs komunikacji i funkcjonalność:
 /// - Wymuszać pojedynczą instancję programu w systemie poprzez blokadę plikową (FlockServiceGuard); kolejna próba startu
@@ -92,7 +92,7 @@
 ///   przekompilować zapytania (sprawdzić poprawność) i przekazać zapytanie do tej instancji poprzez restart serwisu z zapytaniem (zachowując konfigurację serwisu).
 /// - Umożliwiać przeładowanie CAŁEGO planu działającej instancji jedną komendą klienta
 ///   (`xqry --reset plan.rql`), bez restartu procesu i bez uprawnień do systemctl. Zestaw ma być
-///   sprawdzony (parsowanie, kompilacja, rozłączność nazw) PRZED dotknięciem planu działającego —
+///   sprawdzony (parsowanie, kompilacja, rozłączność nazw) PRZED dotknięciem planu działającego -
 ///   odmowa nie może kosztować usługi. Zestaw pusty jest żądaniem poprawnym: sprowadza instancję
 ///   do trybu bezczynnego.
 /// - Nadawać instancji usługowej stałą nazwę ("service"), o ile operator nie wskazał innej, i
@@ -223,7 +223,7 @@ int main(int argc, char *argv[]) try {
 
   // Wczesny skan argumentów: tryb logowania usługowego musi być znany przed konfiguracją logera.
   // Tryb usługi można włączyć flagą (-j/--service) albo zmienną środowiskową XRETRACTOR_SERVICE
-  // (dowolna wartość poza pustą i "0") — wygodne dla jednostki systemd przez Environment=.
+  // (dowolna wartość poza pustą i "0") - wygodne dla jednostki systemd przez Environment=.
   bool serviceLog{false};
   for (int i = 0; i < argc; ++i) {
     if (strcmp(argv[i], "-j") == 0 || strcmp(argv[i], "--service") == 0) serviceLog = true;
@@ -240,9 +240,9 @@ int main(int argc, char *argv[]) try {
   const auto tempLocation = setupLoggerMain(std::string(argv[0]), false /* dual */, serviceLog);
 
   // Kompilacja z włączoną sondą pomiarową. Ostrzeżenie trafia do logu, a w trybie
-  // usługowym (-j) do journald — operator usługi widzi, że to build benchmarkowy, nie produkcyjny.
+  // usługowym (-j) do journald - operator usługi widzi, że to build benchmarkowy, nie produkcyjny.
   if constexpr (rdb::probe::enabled)
-    SPDLOG_WARN("[warning: probe benchmark build] measurement probe compiled in (RDB_BENCH_PROBE) — NOT for production.");
+    SPDLOG_WARN("[warning: probe benchmark build] measurement probe compiled in (RDB_BENCH_PROBE) - NOT for production.");
 
   // Nazwa instancji i sciezka konfiguracji musza byc znane przed zbudowaniem straznika blokady.
   // Ten sam parser Boosta obsluguje wszystkie formy, ktore zaakceptuje pozniejsze parsowanie
@@ -302,7 +302,7 @@ int main(int argc, char *argv[]) try {
 
   // Usluga ma jedna, stala nazwe. Bez niej instancja usluzgowa byla albo bezimienna (i wtedy
   // nierozroznialna w `xqry --server` od kazdego innego bezimiennego serwera), albo nazwana
-  // recznie w jednostce systemd — czyli inaczej na kazdej maszynie. `xqry --server service`
+  // recznie w jednostce systemd - czyli inaczej na kazdej maszynie. `xqry --server service`
   // ma dzialac wszedzie tak samo. Wskazanie operatora (--name, --autoname) i przestrzen nazw
   // uruchomienia sa nadrzedne: obie sa jawnym wyborem, a ta nazwa jest tylko domyslna.
   if (!wantsAutoName && earlyServerName.empty() && serviceMode) earlyServerName = servername::kServiceInstanceName;
@@ -317,7 +317,7 @@ int main(int argc, char *argv[]) try {
     // Nazwa musi trafic na standardowe wyjscie, nie tylko do logu: bez niej operator nie ma
     // jak wskazac tej instancji w `xqry --server`. Opróznienie bufora jest tu konieczne, a nie
     // ostrozne: stdout przekierowany do pliku jest buforowany blokowo, wiec bez flush nazwa
-    // pojawia sie dopiero przy koncu procesu — czyli wtedy, gdy nie jest juz do niczego potrzebna.
+    // pojawia sie dopiero przy koncu procesu - czyli wtedy, gdy nie jest juz do niczego potrzebna.
     std::println("Instance name: {}", earlyServerName);
     std::fflush(stdout);
   }
@@ -406,7 +406,7 @@ int main(int argc, char *argv[]) try {
     }
 
     // Introspekcja binarki (jak --version): tylko odczyt flag kompilacji, obsługiwana przed
-    // wczytaniem i walidacją konfiguracji — na hoście z niepoprawnym storage.dir zapytanie
+    // wczytaniem i walidacją konfiguracji - na hoście z niepoprawnym storage.dir zapytanie
     // "czym jest ta binarka" musi nadal dać czysty wynik na stdout.
     if (vm.contains("build-info")) {
       printOptimizerBuildInfo();
@@ -452,7 +452,7 @@ int main(int argc, char *argv[]) try {
     }
 
     // Brak pliku z zapytaniami: w trybie --onlycompile to błąd (nie ma czego kompilować),
-    // w trybie usługowym oznacza start bezczynny (idle) — pomijamy parsowanie i kompilację.
+    // w trybie usługowym oznacza start bezczynny (idle) - pomijamy parsowanie i kompilację.
     if (!vm.contains("queryfile")) {
       if (onlyCompile) {
         std::println("{}: fatal error: no input file", argv[0]);
@@ -488,7 +488,7 @@ int main(int argc, char *argv[]) try {
       processedLines = loaded.lines;
     }
 
-    // Plan pusty — z braku argumentu albo z pliku bez ani jednej instrukcji. Dla usługi to
+    // Plan pusty - z braku argumentu albo z pliku bez ani jednej instrukcji. Dla usługi to
     // stan poprawny (tryb bezczynny): jednostka systemd wskazuje ExecStart-em stały plik
     // zapytań, a ten przy pierwszym starcie systemu jest pusty. Do 2026-09-05 pusty plik
     // kończył proces błędem, więc udokumentowana w jednostce ścieżka "pusty plik = idle"
@@ -542,7 +542,7 @@ int main(int argc, char *argv[]) try {
       // serwujacej ten sam plan konczylo sie device_or_resource_busy zamiast dostarczeniem planu.
       // Z `--name service` defekt sie maskowal, bo tam obie nazwy sa te same.
       //
-      // E3: jeśli działa już instancja będąca serwisem systemd, nie startujemy drugiej —
+      // E3: jeśli działa już instancja będąca serwisem systemd, nie startujemy drugiej -
       // dostarczamy zwalidowany (skompilowany powyżej) zestaw zapytań, nadpisując plik zapytań
       // serwisu i zlecając restart. Serwis załaduje nowy zestaw, zachowując konfigurację jednostki.
       // Podwójna kompilacja (tu lokalnie + w serwisie po restarcie) jest zamierzona.
@@ -551,7 +551,7 @@ int main(int argc, char *argv[]) try {
       // ("service"), nowe uruchomienie prawie nigdy nie dzieli z nią nazwy pliku blokady,
       // więc pytanie „czy usługa już działa" trzeba zadać tam, gdzie widać wszystkie żywe
       // instancje. Szczegóły jednostki (UNIT, SCOPE, QUERYFILE) czytamy potem z pliku blokady
-      // znalezionej instancji — slot magistrali nie niesie zakresu system/user, a bez niego
+      // znalezionej instancji - slot magistrali nie niesie zakresu system/user, a bez niego
       // nie da się złożyć poprawnego `systemctl [--user] restart`.
       {
         const bus::Bus xrdbbus(bus::segmentName(), false);
@@ -614,7 +614,7 @@ int main(int argc, char *argv[]) try {
         // pierwszego artefaktu.
         //
         // Katalog magazynu z konfiguracji podajemy tutaj JAWNIE, bo dyrektywa `:STORAGE` z domyslu
-        // trafia do planu dopiero nizej — a odsiew ma porownywac te sciezki, ktore plan naprawde zapisze.
+        // trafia do planu dopiero nizej - a odsiew ma porownywac te sciezki, ktore plan naprawde zapisze.
         const std::vector<std::string> plannedStreams = planStreamNames(coreInstance);
         const std::string counterPath                 = planCounterPath(coreInstance);
         const std::vector<std::string> plannedStores  = planStorePaths(coreInstance, appCfg.storageDir);
@@ -661,7 +661,7 @@ int main(int argc, char *argv[]) try {
           std::println("Query compiled OK and sent to running service '{}' (restart requested).", peer.unit);
           return system::errc::success;
         }
-        // Nie ma żywego serwisu, albo jest, ale operator zażądał własnej tożsamości —
+        // Nie ma żywego serwisu, albo jest, ale operator zażądał własnej tożsamości -
         // transakcja startowa poniżej albo wystartuje tę instancję, albo zgłosi brak dostępnej
         // blokady (no_lock_available); nie próbujemy restartu.
       }
@@ -669,7 +669,7 @@ int main(int argc, char *argv[]) try {
 
     // Domyślny katalog storage z opcjonalnego pliku konfiguracyjnego (toml++).
     // Stosowany tylko gdy zestaw RQL nie podał własnej dyrektywy :STORAGE (RQL ma
-    // pierwszeństwo) i gdy istnieją realne zapytania — w trybie idle coreInstance jest
+    // pierwszeństwo) i gdy istnieją realne zapytania - w trybie idle coreInstance jest
     // pusty, dataModel nie powstaje, więc domyślny storage nie ma tam zastosowania.
     if (!appCfg.storageDir.empty() && !coreInstance.empty() &&
         std::ranges::none_of(coreInstance, [](const auto &it) { return it.id == ":STORAGE"; })) {
@@ -689,7 +689,7 @@ int main(int argc, char *argv[]) try {
   // Przegrany rownolegly start nie dochodzi dzieki temu do zadnej czynnosci destrukcyjnej.
   if (!guard.acquireLock()) {
     // Odmowa startu musi byc widoczna tam, gdzie widac pozostale odmowy z tej transakcji
-    // (konflikt strumienia, licznika, magistrali) — czyli na stderr, nie tylko w logu. Skrypt,
+    // (konflikt strumienia, licznika, magistrali) - czyli na stderr, nie tylko w logu. Skrypt,
     // ktory startuje serwer w tle i po chwili odpytuje go klientem, nie ma innego sposobu, zeby
     // zauwazyc, ze jego serwer nie wstal: bez komunikatu pracuje dalej na cudzej instancji.
     const FlockServiceGuard::PeerInfo peer = guard.readPeerInfo();
@@ -705,7 +705,7 @@ int main(int argc, char *argv[]) try {
   const std::vector<std::string> claimedStreams = planStreamNames(coreInstance);
   const std::string counterPath                 = planCounterPath(coreInstance);
   // Domyslny `:STORAGE` z konfiguracji jest juz w planie (dopisany wyzej), wiec fallback zostaje
-  // pusty — a gdy plan nie ma zadnego katalogu, sciezki normalizuja sie wzgledem katalogu roboczego,
+  // pusty - a gdy plan nie ma zadnego katalogu, sciezki normalizuja sie wzgledem katalogu roboczego,
   // czyli dokladnie tam, gdzie rdb::StoragePaths zalozy pliki.
   const std::vector<std::string> claimedStores = planStorePaths(coreInstance, {});
   // Sciezka BEZWZGLEDNA, tak samo jak w pliku blokady (setServiceQueryFile wyzej). Slot czyta
@@ -723,7 +723,7 @@ int main(int argc, char *argv[]) try {
       (vm.contains("until-eof") ? bus::mode::kUntilEof : 0U) |
       (loopLimitVar != executorsm::inifitie_loop ? bus::mode::kLoopLimit : 0U) |
       (vm.contains("xqrywait") ? bus::mode::kXqryWait : 0U) | (serviceMode ? bus::mode::kService : 0U);
-  // Reguly "usluga jest dokladnie jedna" pilnuje Bus::claim() pod muteksem magistrali — patrz
+  // Reguly "usluga jest dokladnie jedna" pilnuje Bus::claim() pod muteksem magistrali - patrz
   // komentarz przy jego deklaracji. Sprawdzenie po migawce instances() przed roszczeniem bylo
   // nieatomowe i przepuszczalo dwa rownolegle starty z roznymi nazwami.
   const bus::ClaimResult claimed = xrdbbus.claim({.name        = earlyServerName,
@@ -782,7 +782,7 @@ int main(int argc, char *argv[]) try {
   signal(SIGHUP, handleSignal);   // Hangup
 
   // Artefakty poprzedniego przebiegu znikaja ta sama droga co przy przeladowaniu planu
-  // w locie (`xqry --reset`) — patrz dropStalePlanArtifacts w planSource.cpp.
+  // w locie (`xqry --reset`) - patrz dropStalePlanArtifacts w planSource.cpp.
   dropStalePlanArtifacts(coreInstance, cm, processedLines);
 
   executorsm exec;

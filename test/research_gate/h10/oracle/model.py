@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Niezależny oracle zdarzeniowy K24p — początek logiczny i ogon strumienia,
+"""Niezależny oracle zdarzeniowy K24p - początek logiczny i ogon strumienia,
 wyprowadzone z definicji operatorów i czasu zdarzeń.
 
 Oracle NIE używa postaci zamkniętej z ``compiler::computeStartupLatency()``
@@ -7,11 +7,11 @@ ani z ``compiler::computeLogicalOrigin()``. Nie występuje tu ani
 ``ceil((p+q-1)/p)``, ani ``AgseStartupLatency``, ani ``AgseLogicalOrigin``,
 ani ``SubtractStartupLatency``. Obie wielkości są tu **wyprowadzone**:
 
-    origin O_S — najmniejszy indeks n, dla którego rekord n ma komplet
+    origin O_S - najmniejszy indeks n, dla którego rekord n ma komplet
                  istniejących zależności. Rekordy o indeksie mniejszym nie
                  istnieją: ich definicja sięga przed początek strumienia
                  źródłowego. To nie jest oczekiwanie, tylko brak definicji;
-    ogon  W_S  — rekord n strumienia S jest emitowany w chwili
+    ogon  W_S  - rekord n strumienia S jest emitowany w chwili
                  (n + 1 + W_S) * Delta_S; W_S jest najmniejszą liczbą
                  całkowitą >= 0, dla której emisja **każdego istniejącego**
                  rekordu (n >= O_S) wypada nie wcześniej niż dostępność
@@ -19,7 +19,7 @@ ani ``SubtractStartupLatency``. Obie wielkości są tu **wyprowadzone**:
 
 Rozdzielenie tych dwóch wielkości jest przedmiotem K24p. Do 2026-08-06 silnik
 niósł jedną wielkość (ogon), w której oba człony były zsumowane; `>N` trzymało
-opóźnienie w ogonie, a okno `@` — swoją rozpiętość. Suma slotów milczenia
+opóźnienie w ogonie, a okno `@` - swoją rozpiętość. Suma slotów milczenia
 (origin + ogon) jest niezmiennikiem: ciąg wydanych rekordów jest ten sam,
 zmienia się wyłącznie indeks logiczny, pod którym rekord się pojawia.
 
@@ -28,11 +28,11 @@ z definicji operatorów w §Formal Foundations artykułu, czyli z semantyki,
 a nie z rachunku ogona.
 
 Konwencja dostępności (zamrożona w kampanii K24):
-  C1 — nieostra: rekord dostępny w chwili swojej emisji; konsument o slocie
+  C1 - nieostra: rekord dostępny w chwili swojej emisji; konsument o slocie
        kończącym się w tej samej chwili może go użyć (producenci publikują
-       przed konsumentami w takcie — dataModel::processRows przetwarza
+       przed konsumentami w takcie - dataModel::processRows przetwarza
        deklaracje jako pierwsze, dalej porządek topologiczny).
-  C2 — ostra: odczyt w tym samym takcie jest niedozwolony.
+  C2 - ostra: odczyt w tym samym takcie jest niedozwolony.
 Werdykt główny liczony jest w C1; C2 raportowany jest jako kolumna wrażliwości.
 """
 
@@ -45,18 +45,18 @@ from plan import (ADD, AGSE, HASH, NTHETA, PASS, REDUCE, SHIFT, SOURCE, SUB,
 C1 = "C1"
 C2 = "C2"
 
-ADD_MAPPING = "spec"   # "spec" | "engine" — patrz dependencies(); kampania: "spec"
+ADD_MAPPING = "spec"   # "spec" | "engine" - patrz dependencies(); kampania: "spec"
 
 MIN_PROBE = 64
 PROBE_FACTOR = 4
 
 # Origin jest ograniczony rozpiętością okien i przesunięć w planie, więc realnie
 # jest małą liczbą (generator: |L| <= 4, N <= 8, głębokość <= 6). Limit chroni
-# wyłącznie przed odwzorowaniem, które wbrew założeniu nie rośnie — wtedy
+# wyłącznie przed odwzorowaniem, które wbrew założeniu nie rośnie - wtedy
 # poszukiwanie nie ma prawa zakończyć się cicho.
 #
 # K24e (2026-08-18): stała była WARTOŚCIĄ BEZWZGLĘDNĄ, nie powiązaną z oknem
-# sondowania, przez co strzelała w planach o dużym okresie fazowym — czyli
+# sondowania, przez co strzelała w planach o dużym okresie fazowym - czyli
 # w przebiegu całkowicie legalnym. Skan potrzebuje `last_missing + window`
 # kroków, a window = 4*(p+q); korpusy bramki mają maksymalne okno 98 228 przy
 # limicie 100 000, czyli zapas 1,8%, o którym nikt nie wiedział. Ziarno spoza
@@ -70,7 +70,7 @@ ORIGIN_LIMIT = 100_000
 
 
 class OracleError(RuntimeError):
-    """Awaria aparatury oracle'a — zatrzymuje iterację, nie jest wynikiem."""
+    """Awaria aparatury oracle'a - zatrzymuje iterację, nie jest wynikiem."""
 
 
 def _floor(value):
@@ -86,7 +86,7 @@ def dependencies(node, children, n):
 
     Zwracane są **wszystkie** rekordy składowych, od których zależy rekord n,
     a nie tylko ten wiążący czasowo. Dla okna `@` to cały zakres rekordów
-    pokrytych oknem: o dostępności decyduje najnowszy z nich, a o istnieniu —
+    pokrytych oknem: o dostępności decyduje najnowszy z nich, a o istnieniu -
     najstarszy, i oracle nie ma prawa przesądzać, który to który.
 
     Opóźnienie jest czasem fizycznym doklejanym do dostępności. Po
@@ -100,8 +100,8 @@ def dependencies(node, children, n):
         return [(children[0].name, n, Fraction(0))]
     if kind == SHIFT:
         # tau_N jest OPÓŹNIENIEM: rekord n niesie treść rekordu n-N producenta.
-        # Rekordy o indeksie mniejszym od N nie mają definicji — sięgałyby przed
-        # początek producenta — więc `N` jest tu przesunięciem indeksu, czyli
+        # Rekordy o indeksie mniejszym od N nie mają definicji - sięgałyby przed
+        # początek producenta - więc `N` jest tu przesunięciem indeksu, czyli
         # składnikiem origin, a nie doklejonym czasem oczekiwania.
         return [(children[0].name, n - node.param, Fraction(0))]
     if kind == REDUCE:
@@ -117,7 +117,7 @@ def dependencies(node, children, n):
         # ADD_MAPPING == "spec": odwzorowanie z Definicji sumy strumieni
         # (artykuł, eq. sum): c_n = (a_n, b_{floor(n*D_a/D_b)}).
         # ADD_MAPPING == "engine": odwzorowanie zaobserwowane w silniku,
-        # b_{floor((n+1)*D_a/D_b)} — wariant WYŁĄCZNIE diagnostyczny, do
+        # b_{floor((n+1)*D_a/D_b)} - wariant WYŁĄCZNIE diagnostyczny, do
         # rozstrzygnięcia, ile z rozbieżności klasy `+` pochodzi z różnicy
         # definicji, a ile z rachunku ogona. Kampania używa "spec".
         offset = 1 if ADD_MAPPING == "engine" else 0
@@ -146,7 +146,7 @@ def dependencies(node, children, n):
         # obejmuje rekordy zrodla n-(W-1) ... n, po jednej wartosci z kazdego.
         # To jest DEFINICJA operatora (patrz `test/IntegrationTest/window_aggregate/`),
         # a nie odbicie rachunku silnika: nie ma tu ani `O_src + W - 1`, ani zadnej
-        # innej postaci zamknietej — origin i ogon wyprowadza z tej listy skan
+        # innej postaci zamknietej - origin i ogon wyprowadza z tej listy skan
         # w _origin_over_scan() i _tail_over_window().
         #
         # O ISTNIENIU rekordu decyduje NAJSTARSZY z zaleznosci, wiec przy kilku
@@ -165,7 +165,7 @@ def agse_window_positions(node, n):
     n*step-(|L|-1) ... n*step, więc jego najnowsze pole leży dokładnie
     w pozycji n*step, a indeks logiczny okna oznacza tę samą chwilę co indeks
     logiczny źródła. Ceną konwencji jest to, że dla małych n okno sięga przed
-    początek źródła — te rekordy nie powstają, patrz origin.
+    początek źródła - te rekordy nie powstają, patrz origin.
     """
     step, length = node.param
     start = n * step - (abs(length) - 1)
@@ -177,7 +177,7 @@ def agse_record_range(node, src, n):
     positions = agse_window_positions(node, n)
     # Dzielenie Pythona zaokrągla w dół także dla ujemnych liczników, więc
     # pozycja sprzed początku strumienia trafia do rekordu ujemnego, a nie do
-    # rekordu 0 — dokładnie ta pomyłka, przed którą broni się origin.
+    # rekordu 0 - dokładnie ta pomyłka, przed którą broni się origin.
     return positions[0] // src.width, positions[-1] // src.width
 
 
@@ -212,7 +212,7 @@ def _origin_over_scan(node, children, origins, window):
     różnicę: przy składowych o różnych początkach rekord 0 może mieć komplet
     (bo w slocie 0 wypada element składowej o origin zerowym), a rekord 1 już
     nie (bo wypada element składowej przesuniętej). Strumień jest ciągiem
-    rekordów, nie zbiorem z dziurami — zasada brzegu zabrania wypełnić dziurę
+    rekordów, nie zbiorem z dziurami - zasada brzegu zabrania wypełnić dziurę
     NULL-em, a przesunięcie kolejnych rekordów zmieniłoby odwzorowanie indeksu.
     Początkiem logicznym jest więc pierwszy indeks, od którego nie ma już ani
     jednej luki.
@@ -237,7 +237,7 @@ def _origin_over_scan(node, children, origins, window):
 def _tail_over_window(node, children, avail, origin, window, convention):
     """Ogon wymuszony przez istniejące sloty ``origin..origin+window-1``.
 
-    Sloty przed origin nie są rekordami, więc nie stawiają żadnego wymagania —
+    Sloty przed origin nie są rekordami, więc nie stawiają żadnego wymagania -
     liczenie ogona od zera dokładałoby do niego wymagania rekordów, które nie
     powstają, i mieszałoby obie wielkości z powrotem w jedną.
     """
@@ -301,8 +301,8 @@ def origins_by_name(plan, convention=C1):
 
 def silence_by_name(plan, convention=C1):
     """Sloty milczenia = origin + ogon. Niezmiennik przestemplowania: ta suma
-    jest tą samą wielkością przed i po zmianie z 2026-08-06, więc na niej —
-    i tylko na niej — wolno porównywać obie kampanie."""
+    jest tą samą wielkością przed i po zmianie z 2026-08-06, więc na niej -
+    i tylko na niej - wolno porównywać obie kampanie."""
     return {result.name: result.origin + result.tail
             for result in evaluate(plan, convention=convention)}
 
@@ -330,7 +330,7 @@ def content(plan, name, n, source_order=None):
     pozycję w pliku na indeks logiczny, zanim tu zajrzy.
     """
     if n < 0:
-        raise OracleError(f"oracle: żądanie treści rekordu {n} strumienia {name} — "
+        raise OracleError(f"oracle: żądanie treści rekordu {n} strumienia {name} - "
                           f"indeks przed początkiem logicznym nie jest rekordem")
     if source_order is None:
         source_order = [node.name for node in plan.nodes if node.kind == SOURCE]
@@ -350,7 +350,7 @@ def content(plan, name, n, source_order=None):
         return left + right
     if node.kind == REDUCE:
         values = content(plan, deps[0][0], deps[0][1], source_order)
-        # Reduktory zwracają pole RATIONAL — para (licznik, mianownik).
+        # Reduktory zwracają pole RATIONAL - para (licznik, mianownik).
         if node.param == "sumc":
             return (sum(values), 1)
         if node.param == "min":
@@ -381,7 +381,7 @@ def content(plan, name, n, source_order=None):
             slot = index % src.width
             window = [content(plan, src.name, n - offset, source_order)[slot] for offset in range(width)]
             # Kazde pole okna jest RATIONAL, wiec wchodzi do krotki para
-            # (licznik, mianownik) — tak samo jak przy reduktorze strumieniowym.
+            # (licznik, mianownik) - tak samo jak przy reduktorze strumieniowym.
             if reducer == "sumc":
                 values.extend((sum(window), 1))
             elif reducer == "min":

@@ -24,7 +24,7 @@ bool deliverQueryFile(const std::string &source, const std::string &target);
 // Atomowo zapisuje podaną TREŚĆ do pliku docelowego (temp + rename), tą samą drogą co
 // deliverQueryFile. Używane przez przeładowanie w locie (`xqry --reset`): plan przychodzi
 // kanałem IPC, więc pliku źródłowego po stronie serwera nie ma. Treść pusta = plik pusty,
-// czyli plan zerowy — tą drogą usługa sprowadzana jest do trybu bezczynnego.
+// czyli plan zerowy - tą drogą usługa sprowadzana jest do trybu bezczynnego.
 bool writeQueryFile(const std::string &content, const std::string &target);
 
 }  // namespace servicecontrol

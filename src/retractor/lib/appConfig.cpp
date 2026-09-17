@@ -21,7 +21,7 @@ constexpr int kWarnHighTimingQueryNoDataTimeoutMs{600'000};
 constexpr int kWarnHighSchedulingRtPriority{80};
 
 // Normalizuje katalog storage: niepusty bez końcowego '/' dostaje '/'
-// — spójnie z konwencją dyrektywy :STORAGE w RQLParser.
+// - spójnie z konwencją dyrektywy :STORAGE w RQLParser.
 std::string normalizeStorageDir(std::string dir) {
   if (!dir.empty() && dir.back() != '/') dir.push_back('/');
   return dir;
@@ -129,7 +129,7 @@ AppConfig loadAppConfig(const std::optional<std::string> &cliPath) {
   AppConfig cfg;
 
   if (cliPath) {
-    // Jawnie podana ścieżka: plik musi istnieć i być poprawny — błąd jest twardy
+    // Jawnie podana ścieżka: plik musi istnieć i być poprawny - błąd jest twardy
     // (toml::parse_file rzuca toml::parse_error). Wywołujący raportuje go użytkownikowi.
     const toml::table tbl = toml::parse_file(*cliPath);
     applyTable(tbl, cfg);
@@ -151,7 +151,7 @@ AppConfig loadAppConfig(const std::optional<std::string> &cliPath) {
       applyTable(tbl, cfg);
       cfg.loadedFrom.push_back(path.string());
     } catch (const toml::parse_error &e) {
-      SPDLOG_WARN("Config parse error in {}: {} — skipping this layer", path.string(), e.what());
+      SPDLOG_WARN("Config parse error in {}: {} - skipping this layer", path.string(), e.what());
     }
   }
 

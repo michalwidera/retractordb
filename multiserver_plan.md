@@ -1,4 +1,4 @@
-# Wieloserwerowość xretractor — plan i stan prac
+# Wieloserwerowość xretractor - plan i stan prac
 
 Dokument roboczy gałęzi `issue_238-multiserver`. Powstał po zamknięciu etapów 0, 1 i 2a, żeby
 kolejny etap dało się zacząć od czystego kontekstu bez powtarzania rozpoznania.
@@ -7,7 +7,7 @@ kolejny etap dało się zacząć od czystego kontekstu bez powtarzania rozpoznan
 
 ## Zadanie bieżącej sesji
 
-> **Cel:** etap 2f — usunąć sześć usterek wykrytych w przeglądzie etapów 0–2e: parsowanie nazwy,
+> **Cel:** etap 2f - usunąć sześć usterek wykrytych w przeglądzie etapów 0–2e: parsowanie nazwy,
 > stabilność blokad, kolejność rezerwacji przed szkodą, licznik rotacji przy dostarczaniu oraz
 > poprawność routingu ad-hoc.
 > **Gotowe gdy:** każdy punkt ma test regresyjny, skupiony zestaw multiserver przechodzi, pełne
@@ -31,7 +31,7 @@ może wybierać właściciela DAG-u z magistrali zamiast z pojedynczego pliku bl
 | 2d | Roszczenie nazw ad-hoc + zombie jako martwy slot | **zrobione**, commit `52a7d76` |
 | 2e | Odsiew przed czynnościami nieodwracalnymi; licznik `:ROTATION` i `unit` w slocie (`layoutVersion` 2, segment `xrdbbus_v2`) | **zrobione**, commit `52a7d76` |
 | 2f | Naprawy usterek 1–6 z przeglądu wieloserwerowości plus 8 znalezisk z przeglądu diffu | **zrobione**, commit `52a7d76`; Debug/Release 213/213, `test_gate` **zielona** |
-| 2g | Usterka: cele wykresowe (`ninja dsp`, `ninja simple`) walczące o jedną tożsamość — `xplot.sh` na nazwanych instancjach | **zrobione**, commit `fbc51c8`; Debug/Release 213/213, `test_gate` **zielona** |
+| 2g | Usterka: cele wykresowe (`ninja dsp`, `ninja simple`) walczące o jedną tożsamość - `xplot.sh` na nazwanych instancjach | **zrobione**, commit `fbc51c8`; Debug/Release 213/213, `test_gate` **zielona** |
 | 2h | Tryb pracy instancji w slocie i kolumna `MODE` w `xqry --servers` (`layoutVersion` 3, segment `xrdbbus_v3`) | **zrobione**, niezacommitowane; Debug/Release 213/213, `test_gate` **zielona** |
 | 2i | Przestrzenie nazw dla równoczesnych testów integracyjnych: `RDB_NAMESPACE` + `bus::segmentName()` | **zrobione**, niezacommitowane; Debug/Release 213/213 przy `-j 4` i `-j 24`, `test_gate` **zielona** |
 | 2j | Scalenie `IntegrationTest_serial` i `IntegrationTest_parallel` w jedno drzewo `test/IntegrationTest`, prefiks `it_` dla całości | **zrobione**, niezacommitowane; Debug/Release 213/213 przy `-j 4` i `-j 24` |
@@ -64,7 +64,7 @@ na podstawie samego odsiewu migawki: kryterium wymaga rezerwacji utrzymywanej pr
 czynnością destrukcyjną. Punkt 4 obejmuje istniejące dostarczanie do serwisu; pełny wybór serwisu
 docelowego z magistrali nadal należy do E3.
 
-#### Dziennik 2f — punkty 1, 2 i 6
+#### Dziennik 2f - punkty 1, 2 i 6
 
 - Wczesny parser używa teraz Boost.Program_options z `allow_unregistered`, więc nie utrzymuje
   drugiej, uboższej składni opcji. Pełny parser sprawdza dodatkowo, że otrzymał tę samą nazwę.
@@ -76,7 +76,7 @@ docelowego z magistrali nadal należy do E3.
 - Oprawy integracyjne usuwają własne stabilne pliki dopiero po zebraniu procesów. Skupiony zestaw
   16 testów multiserver/bus/IPC/lock/routing przechodzi po zmianie.
 
-#### Dziennik 2f — punkty 3 i 4
+#### Dziennik 2f - punkty 3 i 4
 
 - Launcher po kompilacji najpierw przejmuje blokadę instancji, następnie wykonuje atomowe
   `Bus::claim`, a dopiero po obu sukcesach kasuje artefakty. Obiekt magistrali z zajętym slotem
@@ -90,7 +90,7 @@ docelowego z magistrali nadal należy do E3.
   Punkt 11 trzyma syntetyczny lock `MODE: service`, podstawia atrapę `systemctl` i dowodzi, że
   konflikt nie zmienia pliku zapytań ani nie wywołuje restartu.
 
-#### Dziennik 2f — punkt 5
+#### Dziennik 2f - punkt 5
 
 - Routing ad-hoc nie zbiera już wszystkich identyfikatorów. Lekser pomocniczy czyta tylko
   wyrażenie `FROM`, zgodnie z alfabetem `ID` z `RQL.g4`, łącznie ze znakiem `$`.
@@ -99,18 +99,18 @@ docelowego z magistrali nadal należy do E3.
 - Jednostkowo pokryte są `cell$0`, kolizje nazwy pola/funkcji/wyniku/agregatora, komentarze oraz
   rzeczywiste źródła z dwóch instancji. Istniejący test integracyjny routingu nadal przechodzi.
 
-#### Dziennik 2f — przegląd przed commitem (3 września 2026)
+#### Dziennik 2f - przegląd przed commitem (3 września 2026)
 
 Osiem znalezisk z przeglądu diffu, wszystkie naprawione w tej samej sesji:
 
 - Sekcja „Układ segmentu" opisywała stan sprzed 2e (`xrdbbus`, `layoutVersion` 1, 862 272 B).
   Opisuje teraz stan bieżący, z historią w jednym akapicie zamiast w milczącej rozbieżności.
 - `launcher.cpp`: komentarz przy ścieżce E3 wskazywał `exec.run` jako miejsce zgłoszenia braku
-  blokady — blokada jest brana w `main()` od etapu 2f.
+  blokady - blokada jest brana w `main()` od etapu 2f.
 - `launcher.cpp`: komentarz przy kontroli zgodności parserów twierdził, że pełny parser nie ma
   opcji `name`; ma ją, tylko `vm` jej nie zawiera przy `--autoname`.
 - `launcher.cpp`: plik zapytań publikowany w slocie był ścieżką jak wpisaną. Jest bezwzględny,
-  tak samo jak w pliku blokady — slot czyta operator z innego katalogu roboczego niż serwer.
+  tak samo jak w pliku blokady - slot czyta operator z innego katalogu roboczego niż serwer.
   Normalizację obu ścieżek robi teraz jeden `absolutePathOf`.
 - `bus.cpp`: `unit` i `queryFile` były jedynymi polami obcinanymi bez śladu. Zostają obcinane
   (odmowa startu z powodu długiej nazwy unitu byłaby lekarstwem gorszym od choroby), ale
@@ -119,13 +119,13 @@ Osiem znalezisk z przeglądu diffu, wszystkie naprawione w tej samej sesji:
   wielkościowo (`'FROM'|'from'`). Strumień nazwany `Min` albo `From` byłby pominięty w klauzuli
   FROM. Regresja: `serverRouting.sourceStreamsTreatMixedCaseKeywordsAsStreamNames`.
 - `uniqueness.sh` punkt (10): sam brak procesu przegranego nie dowodził, że odpadł **na
-  roszczeniu** — odpadłby tak samo po skasowaniu artefaktów. Test wymaga teraz komunikatu
+  roszczeniu** - odpadłby tak samo po skasowaniu artefaktów. Test wymaga teraz komunikatu
   magistrali w logu przegranego i kompletu artefaktów zwycięzcy.
 - `serverName.cpp`: wymiana całej listy `kSurnames` **nie należy do zakresu 2f**. Zmiana jest
   nieszkodliwa (64 pozycje, bez duplikatów, nic się do starych nazw nie odwołuje), ale idzie
-  osobnym commitem — inaczej opis 2f nie opisuje własnego diffu.
+  osobnym commitem - inaczej opis 2f nie opisuje własnego diffu.
 
-#### Dziennik 2f — weryfikacja końcowa (3 września 2026)
+#### Dziennik 2f - weryfikacja końcowa (3 września 2026)
 
 - Skupiony zestaw 16 testów multiserver/bus/IPC/lock/routing: **16/16 przeszło**.
 - Pełny CTest Debug: **213/213 przeszło** w 144,29 s.
@@ -142,8 +142,8 @@ Przebieg po naprawach z przeglądu (ta sama sesja, drzewo z poprawkami):
   dokładne 9/9, **reżimy H10a zgodne z odniesieniem w próbie i poza próbą**, H9 korpus,
   samotesty i **84/84 kompilacji + 4/4 odrzucone mutanty**.
 
-Wcześniejszy czerwony wynik bramki — brak wierszy z reżimem w `H10a` i pominięty poziom
-H9 84/84 — pochodził **w całości z nieświeżych artefaktów bramki**, nie ze zmian 2f: profile
+Wcześniejszy czerwony wynik bramki - brak wierszy z reżimem w `H10a` i pominięty poziom
+H9 84/84 - pochodził **w całości z nieświeżych artefaktów bramki**, nie ze zmian 2f: profile
 `build/K26v3-*` niosły odcisk starszej treści `src/`, a katalog `gate-work` został po
 poprzednim przebiegu. Naprawa jest ta z pułapki nr 1 w `CLAUDE.md`: `rm -rf build/K26v3-*`,
 `test/research_gate/h9/build_profiles.sh` (4 profile, ok. 7 min), `rm -rf` katalogu `gate-work`,
@@ -153,9 +153,9 @@ naraz i wyglądać jak dwie osobne awarie badawcze.
 Kolejność ma znaczenie: profile buduje się **po** ostatniej zmianie w `src/`, bo ich odcisk
 liczy się z treści drzewa. Przebudowa przed poprawkami byłaby pracą do wyrzucenia.
 
-#### Usterka 2g — cele wykresowe walczą o jedną tożsamość (3 września 2026)
+#### Usterka 2g - cele wykresowe walczą o jedną tożsamość (3 września 2026)
 
-Objaw zgłoszony przez operatora: `ninja dsp` w jednym terminalu i `ninja simple` w drugim —
+Objaw zgłoszony przez operatora: `ninja dsp` w jednym terminalu i `ninja simple` w drugim -
 oba procesy giną. Odtworzone z logów, przyczyna jest jedna i leży **poza silnikiem**.
 
 `scripts/xplot.sh` był napisany dla jednego serwera na maszynę: startował `xretractor` bez
@@ -164,10 +164,10 @@ globalnym `xqry -k`. Przy dwóch celach naraz przebieg wyglądał tak:
 
 1. `dsp` przejmuje blokadę `xretractor_service`; `simple` odpada na `acquireLock`
    (`launcher.cpp:589`) i nie startuje wcale;
-2. `xplot.sh` celu `simple` nie sprawdza, czy jego serwer żyje — po `sleep 1` pyta o `str1`
+2. `xplot.sh` celu `simple` nie sprawdza, czy jego serwer żyje - po `sleep 1` pyta o `str1`
    i trafia do **jedynej** żywej instancji, czyli do `dsp` (`routing::forSingleTarget`);
-3. `not found: str1` kończy klienta, gnuplot się zamyka, a sprzątanie `xqry -k` — znów jedyna
-   instancja — **zabija serwer celu `dsp`**;
+3. `not found: str1` kończy klienta, gnuplot się zamyka, a sprzątanie `xqry -k` - znów jedyna
+   instancja - **zabija serwer celu `dsp`**;
 4. w pierwszym terminalu klient traci serwer i jego skrypt też woła `xqry -k`, tym razem
    w pustkę (`IPC: No such file or directory`).
 
@@ -178,7 +178,7 @@ Naprawa, w trzech miejscach:
 - `scripts/xplot.sh` nadaje instancji nazwę wyprowadzoną z katalogu roboczego celu
   (`dsp`, `simple`, `rec205`, …; piąty argument nadpisuje), czeka na gotowość **własnej**
   instancji zamiast `sleep 1` i pilnuje przy tym, czy proces serwera jeszcze żyje, a każde
-  `xqry` — z zapytaniem o strumień i z zabiciem — dostaje `--server "$NAME"`. Odsiew
+  `xqry` - z zapytaniem o strumień i z zabiciem - dostaje `--server "$NAME"`. Odsiew
   „ta nazwa już działa" stoi **przed** `rm -rf temp`, bo drugie uruchomienie tego samego celu
   kasowało magazyn działającej instancji, zanim silnik zdążył odmówić startu.
 - `launcher.cpp` przy nieudanym `acquireLock` wypisuje na stderr, kto trzyma tożsamość
@@ -186,7 +186,7 @@ Naprawa, w trzech miejscach:
   instancję. Dotychczasowe `Another instance is running, errno: …` z `lockManager.cpp` nie
   mówiło ani która to instancja, ani czyja; zostało usunięte, żeby ta sama odmowa nie
   pojawiała się na konsoli dwa razy. Diagnostyka niskiego poziomu zostaje w logu.
-- `FlockServiceGuard::PeerInfo` czyta z pliku blokady także `PID:` — bez tego komunikat
+- `FlockServiceGuard::PeerInfo` czyta z pliku blokady także `PID:` - bez tego komunikat
   odmowy nie miał czym wskazać właściciela.
 
 Regresja: `it_multiserver_no_clobber` wymaga teraz, żeby odmowa startu wskazywała PID
@@ -197,27 +197,27 @@ odpada przed skasowaniem czegokolwiek.
 
 Weryfikacja: CTest Debug **213/213** (230,40 s), CTest Release **213/213** (104,91 s),
 `ninja -C build/Release test_gate` **zielona** po przebudowie profili (odcisk `src/`
-`5d502ea3…0a767fa`) — H10 5/5, obie kampanie 10 010 planów, oba werdykty 9/9, reżimy zgodne
+`5d502ea3…0a767fa`) - H10 5/5, obie kampanie 10 010 planów, oba werdykty 9/9, reżimy zgodne
 z odniesieniem, H9 korpus, samotesty i 84/84 kompilacji + 4/4 odrzucone mutanty. Podłoga
 ablacyjna nie dotyczy tej zmiany: żaden przełącznik `RDB_OPT_*`, `compiler.cpp` ani reguły
 ogona nie były ruszane.
 
-#### Etap 2h — tryb pracy instancji w tabeli `--servers` (3 września 2026)
+#### Etap 2h - tryb pracy instancji w tabeli `--servers` (3 września 2026)
 
 Tabela odpowiadała dotąd na „kto serwuje ten strumień", ale nie na „w jakim trybie to liczy".
-Dwa serwery z tego samego `.rql` mogą pracować zupełnie inaczej — jeden z zegarem ściennym,
-drugi offline — a operator nie miał tego skąd zobaczyć bez zaglądania do `ps`.
+Dwa serwery z tego samego `.rql` mogą pracować zupełnie inaczej - jeden z zegarem ściennym,
+drugi offline - a operator nie miał tego skąd zobaczyć bez zaglądania do `ps`.
 
 Tryb jest własnością URUCHOMIENIA, nie planu, więc jego źródłem jest linia poleceń, a nośnikiem
 slot magistrali: nowe pole `modes` (maska bitowa) obok `queryFile` i `unit`. Pole jest czysto
-informacyjne — magistrala nie podejmuje na jego podstawie żadnej decyzji, więc slot zapisany
+informacyjne - magistrala nie podejmuje na jego podstawie żadnej decyzji, więc slot zapisany
 zerem (instancja starszej binarki) opisuje się jako zwykły, a nie jako błąd.
 
 Litery w kolumnie `MODE`, wypisywane w stałej kolejności i łączone, bo tryby nie są rozłączne:
 
 | Litera | Opcja | Znaczenie |
 |---|---|---|
-| `N` | — | żaden z poniższych: zwykły przebieg taktowany zegarem |
+| `N` | - | żaden z poniższych: zwykły przebieg taktowany zegarem |
 | `R` | `--realtime` | SCHED_FIFO, `mlockall`, bezwzględne pobudki |
 | `F` | `--no-clock` | pełna semantyka interwałów, bez czekania na zegar |
 | `U` | `--until-eof` | stop w slocie, w którym pierwsze źródło wyczerpie dane |
@@ -225,12 +225,12 @@ Litery w kolumnie `MODE`, wypisywane w stałej kolejności i łączone, bo tryby
 | `X` | `--xqrywait` | przetwarzanie wstrzymane do pierwszego zapytania |
 | `S` | `--service` lub jednostka systemd | proces, którego nie zatrzymuje się ręcznie |
 
-Legenda jest ostatnim wierszem tabeli — litery nie są odgadywalne, a wiersz zaczyna się od
+Legenda jest ostatnim wierszem tabeli - litery nie są odgadywalne, a wiersz zaczyna się od
 `MODE:`, więc nie pasuje do wzorców kolumnowych, którymi skrypty łapią wiersze instancji.
 Szerokość każdej kolumny nadal wynika z najszerszej wartości, więc nazwa z `--autoname`
 (`objective_galileo`) rozsuwa kolumnę `SERVER` zamiast rozjechać wiersz.
 
-Zmiana układu slotu podnosi `layoutVersion` do 3 i — zgodnie z regułą niżej — nazwę segmentu do
+Zmiana układu slotu podnosi `layoutVersion` do 3 i - zgodnie z regułą niżej - nazwę segmentu do
 `xrdbbus_v3`. Rozmiar slotu się nie zmienił (27 328 B): `modes` wszedł w wyrównanie, które slot
 i tak niósł, więc segment ma nadal 874 560 B.
 
@@ -239,7 +239,7 @@ i tak niósł, więc segment ma nadal 874 560 B.
 ## Ustalenia, których nie trzeba powtarzać
 
 Rozpoznanie zrobione i zweryfikowane pomiarowo w sesji z 2 września 2026. Poniższe fakty są
-podstawą projektu 2b — nie trzeba ich odtwarzać.
+podstawą projektu 2b - nie trzeba ich odtwarzać.
 
 ### Gdzie fizycznie leżą obiekty IPC
 
@@ -258,18 +258,18 @@ Enumeracja instancji jest więc wykonalna zwykłym `readdir("/dev/shm")`. Nazwy 
 
 Po `kill -KILL` serwera segmenty **zostają w `/dev/shm` bezterminowo**, a plik blokady zostaje
 (choć `flock` jest zwolniony). `xqry --hello` wobec osieroconego segmentu kończy się po
-**3,008 s** komunikatem „server not found" — to dokładnie budżet klienta
+**3,008 s** komunikatem „server not found" - to dokładnie budżet klienta
 (`kDefaultIpcClientResponseMaxFails` = 300 × `kClientResponsePollInterval` = 10 ms).
 
 Wniosek dla projektu: **wykrywanie nie może polegać na odpytywaniu serwerów z timeoutem.**
 Osierocony segment jest nieodróżnialny od żywego aż do wyczerpania budżetu, a przy N instancjach
-szukanie nieistniejącego strumienia (czyli literówka — najczęstszy przypadek) kosztowałoby N × 3 s.
+szukanie nieistniejącego strumienia (czyli literówka - najczęstszy przypadek) kosztowałoby N × 3 s.
 Dodatkowo `issue_215` celowo rozdzielił kody wyjścia `streamNotFound` i `serverNoResponse`;
 wykrywanie przez timeout skleiłoby te dwie diagnozy z powrotem.
 
 ### Robust mutex działa na tej maszynie
 
-`pthread_mutex` z `PTHREAD_PROCESS_SHARED | PTHREAD_MUTEX_ROBUST` w pamięci dzielonej —
+`pthread_mutex` z `PTHREAD_PROCESS_SHARED | PTHREAD_MUTEX_ROBUST` w pamięci dzielonej -
 zweryfikowane eksperymentem (dziecko ginie trzymając muteks):
 
 ```
@@ -278,7 +278,7 @@ pthread_mutex_consistent: 0
 kolejny lock: rc=0        → magistrala żyje dalej
 ```
 
-Boost **nie** udostępnia tego atrybutu — `boost::interprocess::named_mutex` nie jest robust i
+Boost **nie** udostępnia tego atrybutu - `boost::interprocess::named_mutex` nie jest robust i
 proces, który zginie trzymając go, zawiesza wszystkich pozostałych. Dlatego w części wspólnej
 używamy surowego `pthread_mutex_t` umieszczonego w segmencie zarządzanym przez Boosta.
 
@@ -299,12 +299,12 @@ dwukropka (`:STORAGE`, `:ROTATION`).
   strumieni. Minimum na przyszłość: ostrzeżenie przy kolizji ścieżki licznika.
 - Tor danych zostaje **prywatny per serwer**. Do magistrali trafiają wyłącznie metadane.
 - Zużycie `/dev/shm` rośnie liniowo z liczbą serwerów: ~1 MB na kolejkę komend, a subskrypcja
-  strumienia to `(1/interval) × 10 s × 1024 B` — przy 720 Hz to **~7,4 MB na jednego subskrybenta**.
+  strumienia to `(1/interval) × 10 s × 1024 B` - przy 720 Hz to **~7,4 MB na jednego subskrybenta**.
   Na workerze Pi 400 to realne ograniczenie; rozważyć `ipcQueueBufferSeconds` per instancja.
 
 ---
 
-## Magistrala `xrdbbus` — stan zrealizowany (etap 2b)
+## Magistrala `xrdbbus` - stan zrealizowany (etap 2b)
 
 ### Zasada nadrzędna
 
@@ -312,7 +312,7 @@ dwukropka (`:STORAGE`, `:ROTATION`).
 > kontenerów Boosta.
 
 Powód jest konkretny: serwer zabity w trakcie `insert` do kontenera z alokatorem zostawia
-niespójną stertę w pamięci dzielonej, a `EOWNERDEAD` wtedy nie pomaga — nie ma jak „naprawić"
+niespójną stertę w pamięci dzielonej, a `EOWNERDEAD` wtedy nie pomaga - nie ma jak „naprawić"
 półrozpiętego drzewa. Przy stałych slotach naprawa niezmiennika to jedna operacja: unieważnić
 slot, którego dotyczył przerwany zapis.
 
@@ -322,8 +322,8 @@ Segment nazywa się `xrdbbus_v4`, **1 734 976 B** (nagłówek 64 B + 32 sloty ×
 Kod w `src/retractor/lib/bus.{hpp,cpp}`.
 
 W etapie 2b segment nazywał się `xrdbbus` i miał 862 272 B przy `layoutVersion` 1; etap 2e dołożył
-do slotu `unit` i `counterPath`, co podniosło wersję układu do 2 i — zgodnie z regułą opisaną niżej
-— przeniosło ją do nazwy segmentu. Etap 2h dołożył `modes`, czyli wersję 3; rozmiar slotu się nie
+do slotu `unit` i `counterPath`, co podniosło wersję układu do 2 i - zgodnie z regułą opisaną niżej
+\- przeniosło ją do nazwy segmentu. Etap 2h dołożył `modes`, czyli wersję 3; rozmiar slotu się nie
 zmienił, bo nowe pole weszło w wyrównanie, które slot i tak niósł. Wersja 4 dodała osobny,
 niewidoczny dla `instances()` zestaw zasobów rezerwowanych przed wymianą planu. Poniższa tabela
 opisuje układ **aktualny**, nie historyczny.
@@ -362,13 +362,13 @@ Trzy odstępstwa od projektu wstępnego, każde z powodu:
   Pole 32-bajtowe było błędem: `it_wide_from_names` wywraca się na nim natychmiast, bo
   `compiler::composeStreamName` produkuje nazwy w rodzaju
   `STREAM_ADD_STREAM_ADD_..._str01_..._str12` (ponad 130 znaków). Nazwa jest ograniczona od
-  góry przez `substratNameBudget_C = 200` (`compiler.cpp:424`) — dłuższe kompilator zastępuje
-  skrótem — więc 208 B pokrywa wszystko, co silnik potrafi wygenerować. Liczba strumieni ma
+  góry przez `substratNameBudget_C = 200` (`compiler.cpp:424`) - dłuższe kompilator zastępuje
+  skrótem - więc 208 B pokrywa wszystko, co silnik potrafi wygenerować. Liczba strumieni ma
   zapas 2,5× wobec największego skompilowanego planu w repozytorium (53 węzły,
   `optimizer_ablation`).
 - **Pole `unit` (nazwa jednostki systemd) pominięte w 2b, dołożone w 2e.** W 2b nie było
   potrzebne, a jego wypełnienie wymagało wyniesienia `detectSystemdIdentity()` z
-  `lockManager.cpp` — więc zostało odłożone zamiast zarezerwowane na zapas. Etap 2e je dołożył
+  `lockManager.cpp` - więc zostało odłożone zamiast zarezerwowane na zapas. Etap 2e je dołożył
   razem z `counterPath` i zapłacił za to zapowiedzianym bumpem `layoutVersion` z 1 na 2.
 - **Pole `slotSize` dodane.** Numer wersji chroni przed zmianą znaczenia pól, a nie przed
   zmianą pojemności; pomyłka w tym miejscu kosztowała jeden przebieg testów podczas 2b.
@@ -387,13 +387,13 @@ Trzy odstępstwa od projektu wstępnego, każde z powodu:
 ### Żywotność i sprzątanie
 
 Slot jest żywy wtedy i tylko wtedy, gdy `/proc/<pid>` istnieje **i** `starttime` się zgadza.
-Sam `kill(pid, 0)` nie wystarcza — PID-y są reużywane. Slot martwy jest wolny; kasuje go ten,
+Sam `kill(pid, 0)` nie wystarcza - PID-y są reużywane. Slot martwy jest wolny; kasuje go ten,
 kto to zauważy. Bez demona i bez heartbeatów.
 
 ### Protokół odzyskiwania po `EOWNERDEAD`
 
 1. `pthread_mutex_lock` zwraca `EOWNERDEAD`.
-2. Przejrzeć sloty; slot z nieparzystym `seq` był w trakcie zapisu — wyzerować go w całości.
+2. Przejrzeć sloty; slot z nieparzystym `seq` był w trakcie zapisu - wyzerować go w całości.
 3. `pthread_mutex_consistent`, potem normalna praca.
 
 Dlatego `release()` też bierze muteks, choć pisze wyłącznie własny slot: dzięki temu
@@ -404,8 +404,8 @@ całą podstawą powyższej naprawy.
 
 ```
 kompilacja planu                           (launcher)
-acquireLock()                              <— przed artefaktami i IPC
-xrdbbus: attach + claim zasobów            <— atomowa odmowa przed artefaktami
+acquireLock()                              <- przed artefaktami i IPC
+xrdbbus: attach + claim zasobów            <- atomowa odmowa przed artefaktami
 kasowanie własnych artefaktów              (tylko po obu sukcesach)
 ipcServer.setServerName                    (executor)
 std::atexit(cleanup)
@@ -427,7 +427,7 @@ xretractor: stream 'dst' is already served by instance 'alfa' (pid 178735)
 xretractor: stream 'dst' is already served by the unnamed instance (pid 178901)
 ```
 
-Kod wyjścia: `system::errc::device_or_resource_busy` — odrębny od `no_lock_available`, którym
+Kod wyjścia: `system::errc::device_or_resource_busy` - odrębny od `no_lock_available`, którym
 kończy się nieudany `flock`, żeby dwie różne diagnozy nie skleiły się w jedną.
 
 ### Decyzje przyjęte w 2b
@@ -438,7 +438,7 @@ kończy się nieudany `flock`, żeby dwie różne diagnozy nie skleiły się w j
 - **Przepełnienie slotu to odmowa startu, nie ciche obcięcie listy.** Slot z obciętą listą
   strumieni nie mógłby już odpowiadać na pytanie „czyja jest ta nazwa".
 - **Niedostępna magistrala nie zatrzymuje serwera** (`ClaimStatus::Unavailable`): jeden
-  uszkodzony segment nie może unieruchomić maszyny. Cena jest wypisana wprost w logu —
+  uszkodzony segment nie może unieruchomić maszyny. Cena jest wypisana wprost w logu -
   rozłączność nazw nie jest wtedy egzekwowana.
 - **Segmentu nikt nie kasuje.** Usunięcie go w chwili, gdy inna instancja trzyma odwzorowanie,
   zerwałoby jej magistralę. Naprawa uszkodzonego segmentu jest ręczna i komunikat mówi wprost
@@ -450,13 +450,13 @@ kończy się nieudany `flock`, żeby dwie różne diagnozy nie skleiły się w j
   zapisany na końcu zapisem zwalniającym; pozostali czekają na magic do 2 s), ale twórca
   segmentu, który zginie **między** `create_only` a zapisem magic, zostawia segment martwy na
   stałe. Okno to mikrosekundy, a wyjście z sytuacji jest w komunikacie. Automatycznej naprawy
-  świadomie nie ma — wymagałaby drugiego protokołu wzajemnego wykluczania nad tym samym
+  świadomie nie ma - wymagałaby drugiego protokołu wzajemnego wykluczania nad tym samym
   segmentem.
 - Kolizja ścieżki licznika `:ROTATION` i katalogu `:STORAGE` nadal nie jest wykrywana.
 
 ---
 
-## Etap 2c — routing w xqry (stan zrealizowany)
+## Etap 2c - routing w xqry (stan zrealizowany)
 
 ### Zasada nadrzędna
 
@@ -465,7 +465,7 @@ kończy się nieudany `flock`, żeby dwie różne diagnozy nie skleiły się w j
 
 Powód jest wprost przeniesiony z pomiaru z 2 września: osierocony segment jest nieodróżnialny
 od żywego aż do wyczerpania budżetu klienta (3,008 s), więc szukanie strumienia przez
-odpytywanie kosztowałoby N × 3 s dokładnie w najczęstszym przypadku — literówce. Punkt (6)
+odpytywanie kosztowałoby N × 3 s dokładnie w najczęstszym przypadku - literówce. Punkt (6)
 w `multiserver_routing/routing.sh` jest na to regresją: mierzy czas `--bus` nad segmentem
 z samymi martwymi slotami i wymaga poniżej 1 s.
 
@@ -481,19 +481,19 @@ z samymi martwymi slotami i wymaga poniżej 1 s.
 | ≥2, `-k`/`-d`/`-l` | odmowa z listą kandydatów, kod `22` |
 
 **Przy jednej instancji nie sprawdzamy strumienia celowo.** Diagnostyka „nie ma takiego
-strumienia" należy wtedy do serwera, dokładnie jak przed 2c — i to jest powód, dla którego
+strumienia" należy wtedy do serwera, dokładnie jak przed 2c - i to jest powód, dla którego
 żaden istniejący test integracyjny ani `serverlib.sh` nie wymagał poprawki.
 
 ### Decyzje przyjęte w 2c
 
 - **Klient nie zakłada magistrali.** `Bus` dostał `createIfMissing`; `xqry` woła z `false`.
   Pusty segment 862 kB założony przez proces jednorazowy nie niesie żadnej informacji, a jego
-  brak znaczy dokładnie tyle, że żaden serwer nie wystartował — stan normalny, nie awaria.
+  brak znaczy dokładnie tyle, że żaden serwer nie wystartował - stan normalny, nie awaria.
 - **Kolejność warunków w `resolveTarget` odpowiada kolejności wysyłki w `main()`.** Gdyby się
   rozjechały, routing rozstrzygałby według innej komendy niż ta, która faktycznie poleci do
   serwera: `xqry -k -a "..."` zabija serwer, więc musi być rozstrzygany jak `-k`.
 - **Tokenizacja ad-hoc pomija literały w apostrofach.** Bez tego napis `'dstb'` w wyrażeniu
-  przekierowałby zapytanie do obcej instancji — a `getAdHoc` modyfikuje **plan** serwera
+  przekierowałby zapytanie do obcej instancji - a `getAdHoc` modyfikuje **plan** serwera
   (`executorsm.cpp:252`), więc trafienie w niewłaściwą instancję to trwały skutek uboczny,
   nie pomyłka do powtórzenia. Punkt (5) testu sprawdza planami przed i po, że odrzucony
   ad-hoc nie zostawił śladu.
@@ -503,7 +503,7 @@ strumienia" należy wtedy do serwera, dokładnie jak przed 2c — i to jest pow�
 - **Logika rozstrzygania jest czysta i wydzielona** (`src/qry/serverRouting.{hpp,cpp}`): pracuje
   na gotowej migawce, nie dotyka IPC. Dzięki temu 15 przypadków w `test_serverRouting` biegnie
   pod valgrindem bez pamięci dzielonej i bez startowania serwerów.
-- **`bus.cpp` dokładana źródłowo do binarki `xqry`**, tak jak `appConfig.cpp` — zależy tylko od
+- **`bus.cpp` dokładana źródłowo do binarki `xqry`**, tak jak `appConfig.cpp` - zależy tylko od
   pthread/boost.interprocess/spdlog. Do biblioteki `qry` jej **nie** ma: testy jednostkowe
   linkują jednocześnie `qry` i `retractor`, a dwie kopie `bus.o` dałyby duplikaty symboli.
 
@@ -538,28 +538,28 @@ Czekanie odpytuje więc magistralę w pętli i rozstrzyga cel tymi samymi reguł
 - pusta magistrala → nazwa pusta, czyli zachowanie sprzed 2c (czekamy na instancję historyczną),
 - jedna żywa instancja → czekamy na **nią**, także gdy ma nazwę,
 - rozstrzygnięcie inne niż `Resolved` (dwie żywe instancje przy komendzie bez adresata, obcy
-  strumień, ad-hoc przez granicę) kończy czekanie natychmiast — czekanie tego nie zmieni, a
+  strumień, ad-hoc przez granicę) kończy czekanie natychmiast - czekanie tego nie zmieni, a
   komunikat routingu jest treściwszy niż timeout.
 
 Jawny `--server` i `RDB_NAMESPACE` pozostają nadrzędne: wskazują instancję wprost, więc czekanie
 idzie po nazwie i nie dotyka magistrali.
 
 `--bus` jest spod czekania wyjęty (tak samo jak `--help`): czyta wyłącznie magistralę, bez
-kontaktu z jakąkolwiek instancją, więc `-w` nie ma tam czego doczekać — a przy dwóch żywych
+kontaktu z jakąkolwiek instancją, więc `-w` nie ma tam czego doczekać - a przy dwóch żywych
 instancjach odmawiałby wypisania dokładnie tej tabeli, która ma je pokazać.
 
 Sprawdza to punkt (7) w `it_multiserver_routing`.
 
 ---
 
-## Etap 2d — roszczenie nazw powołanych ad-hoc (stan zrealizowany)
+## Etap 2d - roszczenie nazw powołanych ad-hoc (stan zrealizowany)
 
 ### Dlaczego to nie jest kosmetyka
 
 `getAdHoc` modyfikuje **plan działającego serwera** (`executorsm.cpp`, `importFrom` +
 `addQueryToModel`), a `rdb::StoragePaths` zakłada `<qryID>.desc` dla każdego wpisu planu.
 Nazwa dołożona w locie w drugiej instancji nadpisywała więc deskryptor cudzego strumienia
-we wspólnym katalogu magazynu — dokładnie ta sama **fizyczna** kolizja, przed którą broni
+we wspólnym katalogu magazynu - dokładnie ta sama **fizyczna** kolizja, przed którą broni
 etap 2b, tyle że wpuszczana tylnymi drzwiami. Skutek jest trwały, bo plan zostaje zmieniony.
 
 ### `Bus::claimAdditional` zamiast powtórnego `claim`
@@ -574,7 +574,7 @@ obsługuje. Stąd osobna operacja:
 - nazwy już obecne w slocie odfiltrowuje, więc powtórzone zapytanie przechodzi i slot nie
   rośnie o duplikaty,
 - pojemność slotu sprawdza po odfiltrowaniu, przed jakimkolwiek zapisem,
-- **odmowa nie ma żadnego skutku ubocznego** — slot zostaje bit w bit taki, jaki był.
+- **odmowa nie ma żadnego skutku ubocznego** - slot zostaje bit w bit taki, jaki był.
 
 ### Miejsce sprawdzenia w `getAdHoc`
 
@@ -607,7 +607,7 @@ długo**: zombie zachowuje `/proc/<pid>/stat` razem z niezmienionym `starttime`,
 żywotności były spełnione (sprawdzone eksperymentem). Kolejna instancja dostawała odmowę
 wskazującą proces, który już nie przetwarza.
 
-Odpytywanie serwerów przez `hello` odpadło z tego samego powodu co w 2b i 2c — 3,008 s budżetu
+Odpytywanie serwerów przez `hello` odpadło z tego samego powodu co w 2b i 2c - 3,008 s budżetu
 klienta na każdy martwy slot, i to na ścieżce startu. Rozwiązanie kosztuje zero: `processStartTime`
 i tak czytał `/proc/<pid>/stat` i i tak przeskakiwał nad polem 3 w drodze do pola 22. `readProcStat`
 zwraca teraz oba pola z tej samej linii, a `isProcessAlive` odrzuca stan `'Z'`.
@@ -616,14 +616,14 @@ Sprzątania nie trzeba było dopisywać: gdy `isProcessAlive` mówi „martwy", 
 w `claim()` i `claimAdditional()` sama woła `clearSlot` i uznaje slot za wolny.
 
 Odrzucany jest **wyłącznie** `'Z'`. `'T'` (zatrzymany SIGSTOP-em) i `'D'` (nieprzerywalny sen) to
-procesy żywe, które wznawiają pracę — uznanie ich za martwe wpuściłoby drugą instancję na ten sam
+procesy żywe, które wznawiają pracę - uznanie ich za martwe wpuściłoby drugą instancję na ten sam
 `<qryID>.desc`. Regresja: `test_bus` · `ZombieSlotIsFreeAgain` (fork, SIGKILL bez `waitpid`,
 przejęcie nazwy przez rodzica, `waitpid` na końcu).
 
 ### Czego 2d nie objęło
 
 - `xqry -a` bez `--server` przy ≥2 instancjach nadal rozstrzyga się regułami 2c (wszystkie
-  rozpoznane nazwy w jednej instancji), a nazwa **nowa** z definicji nie należy do nikogo —
+  rozpoznane nazwy w jednej instancji), a nazwa **nowa** z definicji nie należy do nikogo -
   routing wybiera więc instancję po nazwach źródeł, nie po nazwie tworzonego strumienia.
 - Ścieżka dostarczania E3 w `launcher.cpp` wybiera cel z pliku blokady (`readPeerInfo`),
   a nie z magistrali: przy wielu instancjach trafia w tę spod blokady, nie we właściciela
@@ -631,20 +631,20 @@ przejęcie nazwy przez rodzica, `waitpid` na końcu).
 
 ---
 
-## Etap 2e — odsiew przed szkodą, licznik rotacji, `unit` w slocie
+## Etap 2e - odsiew przed szkodą, licznik rotacji, `unit` w slocie
 
 ### Odsiew rozłączności w `launcher.cpp`
 
 Roszczenie w `executorsm::run` przychodziło **za późno wobec dwóch czynności nieodwracalnych**,
 które launcher wykonuje wcześniej:
 
-1. dostarczenie zestawu do działającego serwisu — nadpisanie jego pliku zapytań i restart
+1. dostarczenie zestawu do działającego serwisu - nadpisanie jego pliku zapytań i restart
    (`deliverQueryFile` + `restartService`),
 2. skasowanie artefaktów strumieni planu (`dropArtifactFile`, gdy plan nie ma `:ROTATION`).
 
 Instancja kolidująca i tak kończyła się odmową, więc **jedynym jej skutkiem była szkoda**: przy (1)
 serwis zostawał w stanie failed z nadpisanym zestawem, przy (2) tracił dane działający serwer.
-Punkt (2) nie jest teorią — ujawnił go nowy punkt (7) testu unikalności: `epsilon` kasowała
+Punkt (2) nie jest teorią - ujawnił go nowy punkt (7) testu unikalności: `epsilon` kasowała
 artefakty strumienia `adh`, powołanego ad-hoc w `gamma`, a `gamma` padała z
 `FATAL: storage: internal record count mismatch ... in adh` i wieszała test na `wait`.
 
@@ -662,7 +662,7 @@ licznika, a kolizja kończy się `ClaimStatus::CounterConflict` ze wskazaniem w�
 
 Ścieżkę normalizuje **wołający**, i to `absolute()` **przed** `weakly_canonical()`: plik licznika
 przy pierwszym starcie jeszcze nie istnieje, a `weakly_canonical` nad nieistniejącą ścieżką
-względną zwraca ją bez zmiany — czyli bez katalogu roboczego, o który w tej normalizacji chodzi.
+względną zwraca ją bez zmiany - czyli bez katalogu roboczego, o który w tej normalizacji chodzi.
 
 Sam `:STORAGE` **nie** jest osobno chroniony i nie musi być: pliki są per nazwa strumienia, a te są
 rozłączne.
@@ -676,7 +676,7 @@ jednostkę zatrzymać, żeby zwolnić kolidującą nazwę.
 Slot urósł o `unit[128]` i `counterPath[256]`, więc `layoutVersion` idzie z 1 na 2, a `slotSize`
 w nagłówku i tak wyłapałby samą zmianę pojemności.
 
-Pułapkę wdrożeniową, którą to za sobą ciągnie, rozwiązuje **wersja w nazwie segmentu** — patrz
+Pułapkę wdrożeniową, którą to za sobą ciągnie, rozwiązuje **wersja w nazwie segmentu** - patrz
 niżej.
 
 ### Czego 2e nie objęło, a 2f domknęło
@@ -689,22 +689,22 @@ niżej.
 ### Wersja w nazwie segmentu: `xrdbbus_v4`
 
 Segment o starym układzie zostaje w `/dev/shm` po podmianie binarki, a instancja, która odmówi się
-do niego podłączyć, **startuje bez egzekwowania rozłączności** — awaria jest cicha aż do pierwszej
+do niego podłączyć, **startuje bez egzekwowania rozłączności** - awaria jest cicha aż do pierwszej
 kolizji. Nazwa niesie więc wersję układu i idzie w górę razem z `layoutVersion` przy każdej zmianie
 układu slotu. Nowa binarka po prostu zakłada własny segment, stary zostaje nieużywanym śmieciem do
 restartu maszyny. Zweryfikowane: pełny `it_multiserver` przechodzi przy obecnym w `/dev/shm`
 segmencie o poprzedniej nazwie, bez żadnego ręcznego `rm`.
 
 **Automatycznego kasowania świadomie nie ma.** Rozważony wariant „sprawdź, czy żyją inne instancje,
-i jeśli nie — skasuj segment" ma dwie wady, obie w miejscu, w którym miałby pomóc:
+i jeśli nie - skasuj segment" ma dwie wady, obie w miejscu, w którym miałby pomóc:
 
 1. **Nieczytelnego segmentu nie da się zapytać o żywotność.** Przy obcym układzie `pid` i
-   `startTime` czyta się jako śmieć, więc źródłem prawdy musiałby być skan `/proc` — czyli coś
+   `startTime` czyta się jako śmieć, więc źródłem prawdy musiałby być skan `/proc` - czyli coś
    spoza magistrali.
 2. **Kasowanie jest wyścigiem, i to psującym cicho.** `shm_unlink` usuwa nazwę, ale istniejące
    odwzorowania żyją dalej: instancja, która skasuje segment tuż po tym, jak inna go założyła,
    doprowadza do stanu **dwóch segmentów**, w którym każda instancja widzi tylko siebie i
-   rozłączność nazw przestaje obowiązywać — bez jednego komunikatu. Dzisiejsza odmowa podłączenia
+   rozłączność nazw przestaje obowiązywać - bez jednego komunikatu. Dzisiejsza odmowa podłączenia
    jest zła, ale **głośna**. Zamknięcie tego wyścigu wymagałoby `flock` obejmującego całe
    podłączenie, czyli drugiego protokołu wzajemnego wykluczania nad tym samym segmentem.
 
@@ -713,20 +713,20 @@ Podkreślenie zamiast kropki jest częścią kontraktu: obiekty IPC instancji na
 i wpadłby pod wzorce sprzątające postaci `/dev/shm/*.<nazwa>`. Regresja:
 `test_bus` · `BusSegmentName.CarriesLayoutVersionAndAvoidsInstanceNamespace`.
 
-## Etap 2i — przestrzenie nazw równoczesnych testów integracyjnych
+## Etap 2i - przestrzenie nazw równoczesnych testów integracyjnych
 
 ### Skąd wziął się problem
 
 Gwarancja z etapu 2b ma skutek uboczny w zestawie testów. Rozłączność nazw strumieni jest
 własnością **maszyny**, a nie katalogu roboczego, więc dwa testy integracyjne uruchomione
-równocześnie nie mogą użyć tej samej nazwy strumienia — drugi start kończy się
+równocześnie nie mogą użyć tej samej nazwy strumienia - drugi start kończy się
 `ClaimStatus::Conflict`. Nazwy powtarzają się w testach masowo: `core0` w czternastu
 katalogach, `src` w trzynastu, `dst` w jedenastu, `str1` w dziewięciu. Dlatego 67 testów
 integracyjnych stało pod `RUN_SERIAL` i dawało ~67 s ściśle sekwencyjnego ogona.
 
 Zmiana nazw strumieni w 72 plikach `.rql` była rozważona i **odrzucona**: nazwa strumienia
-przenika oracle testów — `term.script` (`open str1`), nazwy pól we wzorcach (`INTEGER str1_0`),
-listing `temp/` w `pattern-ls.txt`, wyjścia DOT — więc trzeba by regenerować wzorce, czyli
+przenika oracle testów - `term.script` (`open str1`), nazwy pól we wzorcach (`INTEGER str1_0`),
+listing `temp/` w `pattern-ls.txt`, wyjścia DOT - więc trzeba by regenerować wzorce, czyli
 oddać ich wartość regresyjną za jeden przebieg. Do tego `it_wide_from_names` ma nazwy złożone
 powyżej 130 znaków przy budżecie `substratNameBudget_C` = 200; prefiks mógłby przełączyć
 kompilator na skracanie nazw i zmienić wynik.
@@ -744,7 +744,7 @@ Jedna zmienna środowiskowa `RDB_NAMESPACE` (`servername::environmentNamespace`)
 | plik logu | osobny `TMPDIR` ustawiany razem z `RDB_NAMESPACE` |
 
 `xqry` bez `--server` celuje w instancję przestrzeni nazw; jawny `--server` pozostaje nadrzędny.
-Wartość niepoprawna **zatrzymuje** oba programy z komunikatem — zignorowanie jej po cichu
+Wartość niepoprawna **zatrzymuje** oba programy z komunikatem - zignorowanie jej po cichu
 cofnęłoby równoległe uruchomienie na zasoby wspólne, a awaria ujawniłaby się jako kolizja
 u niewinnego sąsiada.
 
@@ -765,10 +765,10 @@ biec obok siebie, a katalogi, które trafiły na ten sam slot puli, dzielą toż
 Pięć katalogów zostaje przy `RUN_SERIAL`, bo badają tożsamość globalną maszyny, a przestrzeń
 nazw zmieniłaby tam przedmiot badania: cztery `multiserver_*` (własne nazwy `alfa`/`beta`,
 instancja bezimienna, produkcyjny segment magistrali) oraz `issue6_adhoc`, zostawiony jako
-**jedyny strażnik ścieżki historycznej** — bez niego instancja bezimienna, jej blokada i jej
+**jedyny strażnik ścieżki historycznej** - bez niego instancja bezimienna, jej blokada i jej
 obiekty IPC straciłyby pokrycie end-to-end.
 
-Próbowany był środek słabszy — wspólny `RESOURCE_LOCK` zamiast `RUN_SERIAL`, bo z testem
+Próbowany był środek słabszy - wspólny `RESOURCE_LOCK` zamiast `RUN_SERIAL`, bo z testem
 w przestrzeni nazw taki test nie dzieli żadnego zasobu. Nie dał nic mierzalnego (94,65 s wobec
 94,34 s), a `multiserver_routing` mierzy czas `--bus` z progiem 1 s, więc obciążenie
 sąsiadów mogło mu tylko zaszkodzić. Została mocniejsza gwarancja.
@@ -787,9 +787,9 @@ zarówno na końcu nazwy (obiekty serwera), jak i w środku (kolejki klientów).
 | Konfiguracja | Przed | Po |
 |---|---|---|
 | Debug, `ctest -j 4` | 141,13 s | 94,4 / 95,9 / 94,3 s |
-| Debug, `ctest -j 24` | — | 93,4 / 93,5 s |
+| Debug, `ctest -j 24` | - | 93,4 / 93,5 s |
 | Release, `ctest -j 4` | ~70 s (zapis z 2g) | 44,9 / 42,9 s |
-| Release, `ctest -j 24` | — | 32,1 / 31,7 / 31,7 s |
+| Release, `ctest -j 24` | - | 32,1 / 31,7 / 31,7 s |
 
 Wszystkie przebiegi 213/213. Sufit Debug to teraz **nie** testy integracyjne, tylko
 `ut_h10aGate` (~61 s w jednym procesie) plus ~33 s ogona `RUN_SERIAL`, w tym siedem testów
@@ -807,7 +807,7 @@ tamtych, a nie testów integracyjnych.
 - Plik logu ścieżki bezimiennej nadal rośnie w `TMPDIR` bez rotacji (`xretractor.log` na tej
   maszynie ma 94 MB). Poza zakresem.
 
-## Etap 2j — scalenie drzewa testów integracyjnych
+## Etap 2j - scalenie drzewa testów integracyjnych
 
 Po 2i podział na `IntegrationTest_serial` i `IntegrationTest_parallel` przestał cokolwiek znaczyć:
 oba drzewa biegną równolegle, a drzewo „parallel" i tak w sześciu przypadkach pracowało na danych
@@ -817,10 +817,10 @@ z drzewa „serial", tylko z drugiego `CMakeLists.txt`. Scalone w `test/Integrat
 Przeprowadzka rozpadła się na trzy grupy:
 
 - **6 katalogów bez własnych plików** (`Data`, `issue42_rule`, `issue56_timeshift`,
-  `issue61_tmpmem`, `simple`, `simple_max`) — miały tylko `DATA_DIR` wskazujący na bliźniaka.
+  `issue61_tmpmem`, `simple`, `simple_max`) - miały tylko `DATA_DIR` wskazujący na bliźniaka.
   Ich `add_test` przeszły do tamtego `CMakeLists.txt`, `DATA_DIR` zastąpił `CMAKE_CURRENT_BINARY_DIR`.
-- **19 katalogów z własnymi danymi** — `git mv` w całości, zero kolizji nazw.
-- **7 katalogów z pułapką średnika** — patrz niżej.
+- **19 katalogów z własnymi danymi** - `git mv` w całości, zero kolizji nazw.
+- **7 katalogów z pułapką średnika** - patrz niżej.
 
 ### Pułapka średnika była tu prawdziwą robotą
 
@@ -828,27 +828,27 @@ Przeprowadzka rozpadła się na trzy grupy:
 `issue202_hash_shift_factorization` i `issue31_doc` miały `bash -c "set -e ; a ; b"`. Działało to
 **wyłącznie dlatego**, że drzewo równoległe nie miało makra `add_test`: jest dodawane alfabetycznie
 przed `IntegrationTest_serial`, więc makro jeszcze nie istniało. W jednym drzewie każdy z nich
-przechodzi przez `_add_test(${ARGV})`, które tnie argument po wewnętrznych średnikach — powłoka
+przechodzi przez `_add_test(${ARGV})`, które tnie argument po wewnętrznych średnikach - powłoka
 wykonałaby samo `set -e` i test byłby zawsze zielony, nic nie sprawdzając. To ta sama awaria, po
 której powstał `harness_command_integrity`.
 
-Pięć przypadków to proste łańcuchy — `;` zamienione na `&&`. Dwa wymagały czegoś więcej:
+Pięć przypadków to proste łańcuchy - `;` zamienione na `&&`. Dwa wymagały czegoś więcej:
 `issue202_hash_shift_factorization` ma asercje postaci `if grep ... ; then exit 1 ; fi`, których
-nie da się zapisać bez średnika, więc logika trafiła do `verify.sh` z parą `must` / `must_not` —
+nie da się zapisać bez średnika, więc logika trafiła do `verify.sh` z parą `must` / `must_not` -
 zgodnie z regułą domową ze strażnika. `issue31_doc` dał się przerobić na `&&` po usunięciu
 zawieszonego separatora na końcu łańcucha.
 
 ### Czym to sprawdzone
 
-Sam zielony przebieg **nie jest** tu dowodem — awaria średnika objawia się właśnie zielenią.
+Sam zielony przebieg **nie jest** tu dowodem - awaria średnika objawia się właśnie zielenią.
 Dlatego:
 
-1. Zbiór nazw z `ctest -N` przed i po scaleniu **identyczny** (213, modulo `pt_` → `it_`) —
+1. Zbiór nazw z `ctest -N` przed i po scaleniu **identyczny** (213, modulo `pt_` → `it_`) -
    żaden test nie zginął w przeprowadzce ani się nie zdublował.
-2. `harness_command_integrity` zielony — po `-c` stoi dokładnie jeden argument.
+2. `harness_command_integrity` zielony - po `-c` stoi dokładnie jeden argument.
 3. Testy przerobione oblewają, gdy mają oblewać: zepsute `pattern.txt` wywraca `it_Pattern1`,
    zepsute oczekiwanie w `verify.sh` wywraca `it_issue202_hash_shift_factorization-matched`,
-   i to **obiema** gałęziami — `must` i `must_not`.
+   i to **obiema** gałęziami - `must` i `must_not`.
 4. Łańcuchy dochodzą do ostatniego kroku: `issue113_meta_autocreate` zostawia `out_meta.txt`
    (krok piąty z siedmiu), `issue31_doc` cztery pliki `*.out.2.svg` (krok ostatni).
 
@@ -856,7 +856,7 @@ Dlatego:
 
 40 testów kompilacyjnych weszło pod `RESOURCE_LOCK` swojego katalogu. To **ostrzejsze** niż przed
 scaleniem: `pt_simple-compile` pisał `out-compile.txt` do tego samego katalogu roboczego, w którym
-`it_simple-run` prowadził swój przebieg. Czas nie ucierpiał — 110 testów w 16 przestrzeniach,
+`it_simple-run` prowadził swój przebieg. Czas nie ucierpiał - 110 testów w 16 przestrzeniach,
 Debug `-j 4` nadal 94,4 s, Release `-j 24` 32,2 s.
 
 ## Protokół weryfikacji
@@ -886,7 +886,7 @@ python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <plik>
 
 Bramka ablacyjna **nie jest wymagana**, dopóki etap nie dotyka `compiler.cpp`, `SOperations.hpp`,
 `computeStartupLatency` ani kodu za przełącznikami `RDB_OPT_*`. Etapy 0–2c jej nie dotykały.
-Bramka badawcza jest wymagana od 2b wzwyż — te etapy zmieniają `src/`, więc profile H9 trzeba
+Bramka badawcza jest wymagana od 2b wzwyż - te etapy zmieniają `src/`, więc profile H9 trzeba
 przebudować, inaczej poziom 84/84 zostaje pominięty (pułapka 1).
 
 ---
@@ -904,13 +904,13 @@ Każda z nich kosztowała czas w sesji z 2 września 2026.
    rm -rf build/Release/test/research_gate/gate-work
    ninja -C build/Release test_gate
    ```
-   Katalog `gate-work` trzeba skasować także przed **drugim** przebiegiem bramki — inaczej oblewa.
+   Katalog `gate-work` trzeba skasować także przed **drugim** przebiegiem bramki - inaczej oblewa.
 
 2. **`pkill -f xretractor` zabija własną powłokę**, bo wzorzec pasuje do linii poleceń procesu,
    który go uruchomił. Używać `pgrep -x xretractor` i zabijać po PID.
 
 3. **Asercje na konkretne wartości strumienia są chybotliwe.** Źródła są czytane w pętli, a klient
-   dołącza w dowolnym jej miejscu — ta sama komenda daje raz `11,21,31`, raz `41,51,61`. Sprawdzać
+   dołącza w dowolnym jej miejscu - ta sama komenda daje raz `11,21,31`, raz `41,51,61`. Sprawdzać
    **przynależność do zbioru**, nie konkretną trójkę.
 
 4. **`std::println` na przekierowany stdout jest buforowane blokowo.** Wszystko, co ma być widoczne
@@ -923,7 +923,7 @@ Każda z nich kosztowała czas w sesji z 2 września 2026.
 
 7. **Nazwy strumieni generowane przez kompilator bywają bardzo długie.** `it_wide_from_names`
    ma węzeł o ponad 130 znakach. Każda struktura o stałym rozmiarze indeksowana nazwą strumienia
-   musi mieć co najmniej `substratNameBudget_C = 200` znaków (`compiler.cpp:424`) — powyżej tego
+   musi mieć co najmniej `substratNameBudget_C = 200` znaków (`compiler.cpp:424`) - powyżej tego
    progu `composeStreamName` sam podmienia nazwę na skrót, więc 200 jest twardą górną granicą.
 
 8. **Zmiana pojemności struktury w pamięci dzielonej bez zmiany numeru wersji jest niewidoczna.**
@@ -932,7 +932,7 @@ Każda z nich kosztowała czas w sesji z 2 września 2026.
    układu: `rm -f /dev/shm/xrdbbus`.
 
 9. **`cmake .` kasuje zbudowane binarki testów jednostkowych.** Po każdym `cmake .` zrobić `ninja`
-   przed `ctest`. Testy integracyjne uruchamiają binarkę **zainstalowaną** — przed `ctest` zawsze
+   przed `ctest`. Testy integracyjne uruchamiają binarkę **zainstalowaną** - przed `ctest` zawsze
    `ninja install`, i uwaga na to, który profil (Debug/Release) stoi w `~/.local/bin`.
 
 ---
@@ -941,9 +941,9 @@ Każda z nich kosztowała czas w sesji z 2 września 2026.
 
 | Plik | Rola |
 |---|---|
-| `src/include/constants.hpp` | `ipc::names(serverName)` — nazwy obiektów IPC instancji |
+| `src/include/constants.hpp` | `ipc::names(serverName)` - nazwy obiektów IPC instancji |
 | `src/retractor/lib/serverName.{hpp,cpp}` | generator nazw w stylu dockera + walidacja |
-| `src/retractor/lib/lockManager.{hpp,cpp}` | `acquireLock()` (wyłączność) i `publishLockInfo()` (treść) — rozdzielone celowo |
+| `src/retractor/lib/lockManager.{hpp,cpp}` | `acquireLock()` (wyłączność) i `publishLockInfo()` (treść) - rozdzielone celowo |
 | `src/retractor/lib/bus.{hpp,cpp}` | magistrala `xrdbbus`: `claim()`, `claimAdditional()`, `release()`, `instances()`, odsiew właścicieli i `isProcessAlive()` |
 | `src/retractor/lib/executorsm.cpp` | `run()` przyjmuje aktywną blokadę i slot; `cleanup()` zwalnia oba po IPC |
 | `src/retractor/launcher.cpp` | wczesny parser tożsamości, blokada i roszczenie przed artefaktami, nazwa IPC |
@@ -951,19 +951,19 @@ Każda z nich kosztowała czas w sesji z 2 września 2026.
 | `src/qry/serverRouting.{hpp,cpp}` | czyste reguły routingu nad migawką magistrali; bez IPC |
 | `src/qry/qryLauncher.cpp` | opcje `--server` / `--bus`, `resolveTarget`, `waitForServer` |
 | `test/IntegrationTest/CMakeLists.txt` | pula szesnastu przestrzeni nazw: `RDB_NAMESPACE` + `TMPDIR` + `RESOURCE_LOCK` per katalog; `IT_NO_NAMESPACE` wypisuje katalog z puli |
-| `test/IntegrationTest/serverlib.sh` | oprawa **jednoinstancyjna** (jedna instancja na przestrzeń nazw) — nie używać w testach wieloserwerowych; ścieżka blokady i bramka higieny podążają za `RDB_NAMESPACE` |
+| `test/IntegrationTest/serverlib.sh` | oprawa **jednoinstancyjna** (jedna instancja na przestrzeń nazw) - nie używać w testach wieloserwerowych; ścieżka blokady i bramka higieny podążają za `RDB_NAMESPACE` |
 | `test/IntegrationTest/multiserver_named/` | wzorzec testu dwuserwerowego z własną bramką higieny |
 | `test/IntegrationTest/multiserver_uniqueness/` | 11 punktów kontrolnych unikalności, kolejności startu i dostarczania; sam sprząta procesy i pliki |
 | `test/IntegrationTest/multiserver_routing/` | 6 punktów routingu; mierzy też czas `--bus` nad osieroconym segmentem |
 | `test/UnitTest/test_bus.cpp` | 26 przypadków magistrali pod valgrindem; pracuje na segmencie `xrdbbus_ut`, nie na produkcyjnym |
 | `test/UnitTest/test_serverRouting.cpp` | 17 przypadków reguł routingu; bez pamięci dzielonej i bez serwerów |
 
-## Zgodność wsteczna — reguła obowiązująca do końca prac
+## Zgodność wsteczna - reguła obowiązująca do końca prac
 
 Brak `--name` **i** brak `RDB_NAMESPACE` oznacza tryb historyczny: te same nazwy obiektów IPC, ten
 sam plik blokady, to samo zachowanie. Kryterium przyjęte w etapie 1 i utrzymane w 2a brzmiało:
 **pełny `ctest` przechodzi bez jednej zmiany w testach integracyjnych ani w `serverlib.sh`**.
 Obowiązywało do 2h włącznie. Etap 2i znosi je świadomie i tylko w jedną stronę: testy dostają
 przestrzeń nazw, żeby mogły biec równocześnie, ale **żaden plik wzorcowy ani `.rql` się nie zmienił**
-— gdyby zmiana sięgnęła wzorców, znaczyłoby to, że coś przeciekło poza warstwę nazw. Utrzymać je w 2b i 2c — jeśli któryś
+\- gdyby zmiana sięgnęła wzorców, znaczyłoby to, że coś przeciekło poza warstwę nazw. Utrzymać je w 2b i 2c - jeśli któryś
 istniejący test wymaga poprawki, to sygnał, że coś przeciekło poza warstwę nazw.

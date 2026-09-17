@@ -8,7 +8,7 @@ add_custom_target(
 # Lokalne odtworzenie jobow CircleCI w kontenerze dockerowym.
 #
 # Poza `all` i poza `ninja test`: kazdy profil stawia kontener, przenosi do
-# niego drzewo robocze i buduje od zera na 4 vCPU — to sa minuty do
+# niego drzewo robocze i buduje od zera na 4 vCPU - to sa minuty do
 # kilkudziesieciu minut, nie sekundy. Uruchamia sie jawnie, przed commitem,
 # zamiast sprawdzac gałąź przebiegiem CI.
 #
@@ -28,7 +28,7 @@ foreach(rdb_ci_profile IN LISTS RDB_TEST_CI_PROFILES)
     USES_TERMINAL VERBATIM)
 endforeach()
 
-# Skrot na profil commitowy — jedyny job, ktory CircleCI uruchamia po pushu na
+# Skrot na profil commitowy - jedyny job, ktory CircleCI uruchamia po pushu na
 # galaz (workflow `commit`).
 add_custom_target(test-ci COMMENT "CI lokalnie w dockerze: profil commit")
 add_dependencies(test-ci test-ci-commit)

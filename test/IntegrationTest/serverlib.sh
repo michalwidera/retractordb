@@ -32,7 +32,7 @@ _server_started="" # PID startowany przez ten test, do kontroli higieny
 
 # Bramka higieny: test nie ma prawa zostawic po sobie ani procesu, ani blokady.
 # Zostawiony serwer trzyma blokade instancji i wywraca KAZDY nastepny test, ktory
-# probuje wystartowac silnik — awaria ujawnia sie wtedy u niewinnej ofiary,
+# probuje wystartowac silnik - awaria ujawnia sie wtedy u niewinnej ofiary,
 # daleko od przyczyny. Sprawdzenie jest per-test wlasnie po to, zeby wskazywalo
 # winowajce.
 server_cleanup() {
@@ -55,7 +55,7 @@ server_cleanup() {
     status=1
   fi
   # Obiekty IPC tej przestrzeni nazw. Serwer sprzata je sam przy wyjsciu, wiec pozostalosc
-  # jest usterka, a nie smieciem do cichego skasowania — i usterka WLASNIE tego testu,
+  # jest usterka, a nie smieciem do cichego skasowania - i usterka WLASNIE tego testu,
   # bo czlon nazwy nalezy do jego przestrzeni. Segmentu magistrali celowo nie ruszamy:
   # nikt go nie kasuje z zalozenia (bus.hpp), a pula jest skonczona, wiec bywa reuzywany.
   #
@@ -86,7 +86,7 @@ server_cleanup() {
 }
 trap server_cleanup EXIT INT TERM
 
-# server_start <argumenty xretractor> — startuje serwer i czeka, az przejmie blokade.
+# server_start <argumenty xretractor> - startuje serwer i czeka, az przejmie blokade.
 server_start() {
   xretractor "$@" </dev/null &
   _server_pid=$!
@@ -107,15 +107,15 @@ server_start() {
     echo "blokade trzyma:"
     head -3 "$SERVER_LOCK"
   else
-    echo "plik blokady nie istnieje — serwer nie wstal"
+    echo "plik blokady nie istnieje - serwer nie wstal"
   fi
   return 1
 }
 
-# server_wait_status — czeka na koniec procesu serwera i WYPISUJE jego kod wyjscia.
+# server_wait_status - czeka na koniec procesu serwera i WYPISUJE jego kod wyjscia.
 #
 # Rozni sie od server_wait_exit tym, ze kodu nie ocenia. Uzywaja jej testy, w ktorych
-# zakonczenie serwera jest oczekiwanym WYNIKIEM, a nie awaria — na przyklad sprawdzajace,
+# zakonczenie serwera jest oczekiwanym WYNIKIEM, a nie awaria - na przyklad sprawdzajace,
 # ze blad krytyczny konczy proces czysto (EXIT_FAILURE), a nie SIGABRT-em czy SIGSEGV.
 server_wait_status() {
   local pid="$_server_pid"
@@ -126,7 +126,7 @@ server_wait_status() {
   echo "$status"
 }
 
-# server_wait_exit — czeka na FAKTYCZNE zakonczenie procesu serwera.
+# server_wait_exit - czeka na FAKTYCZNE zakonczenie procesu serwera.
 server_wait_exit() {
   local pid="$_server_pid"
   [ -n "$pid" ] || return 0

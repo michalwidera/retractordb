@@ -3,7 +3,7 @@
 # zatrzymanie i kontrola, ze kolejki w /dev/shm nie zostaly po nas.
 #
 # Poprzednia wersja zaczynala od `pkill xretractor`, czyli ubijala KAZDA
-# instancje w systemie — takze cudza, nie swoja. Za to, zeby poprzedni test nie
+# instancje w systemie - takze cudza, nie swoja. Za to, zeby poprzedni test nie
 # zostawil po sobie serwera, odpowiada teraz bramka higieny w ../serverlib.sh:
 # obarcza winowajce zamiast pozwalac mu sprzatac po sobie cudzymi rekami.
 set -e
@@ -20,7 +20,7 @@ rm -f str*
 
 # Kolejki odpowiedzi TEJ przestrzeni nazw, a nie wszystkie w systemie. Nazwa kolejki to
 # "brcdbr.<instancja>.<klient>" (ipc::names w constants.hpp), wiec globalne brcdbr* liczy
-# takze klientow testu biegnacego rownoczesnie w innej przestrzeni — i pokazuje ich jako
+# takze klientow testu biegnacego rownoczesnie w innej przestrzeni - i pokazuje ich jako
 # WLASNY wyciek. Pod `ctest -j 24` wywracalo to test na cudzych kolejkach.
 QUEUE_GLOB="/dev/shm/brcdbr${RDB_NAMESPACE:+.$RDB_NAMESPACE}"*
 QUEUES_BEFORE=$(ls $QUEUE_GLOB 2>/dev/null | wc -l)

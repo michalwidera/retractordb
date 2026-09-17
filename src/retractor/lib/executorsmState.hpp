@@ -16,7 +16,7 @@
 /// Obiekty dziela sie na dwie grupy i granica miedzy nimi jest istotna:
 ///  * grupa PIERWSZA to zmienne, po ktore siegaja takze inne jednostki biblioteki
 ///    (dataModel, dumpManager, presenter, streamInstance, launcher). Kazda z nich deklarowala
-///    je dawniej u siebie wlasnym `extern` — piec niezaleznych deklaracji tego samego obiektu,
+///    je dawniej u siebie wlasnym `extern` - piec niezaleznych deklaracji tego samego obiektu,
 ///    ktorych rozjazd typu jest naruszeniem ODR niewidocznym dla kompilatora. Teraz wszystkie
 ///    biora je stad i to jest jedyne zrodlo. Zostaja w przestrzeni globalnej: `esm::` kazalaby
 ///    kwalifikowac kazde uzycie w tamtych jednostkach, nic w zamian nie dajac;
@@ -39,7 +39,7 @@ class Bus;
 /// Licznik rotacji planu; pusty, gdy plan nie niesie `:ROTATION`. Czyta go streamInstance.
 extern std::unique_ptr<PersistentCounter> pCounterPtr;
 
-/// Muteks stanu planu; definiowany w dataModel.cpp, ktory takze wlacza ten naglowek — dzieki
+/// Muteks stanu planu; definiowany w dataModel.cpp, ktory takze wlacza ten naglowek - dzieki
 /// temu definicja jest sprawdzana wzgledem deklaracji. Kolejnosc zagniezdzenia wzgledem
 /// plan_epoch_mutex opisana nizej.
 extern std::mutex core_mutex;
@@ -47,7 +47,7 @@ extern std::mutex core_mutex;
 /// Wiersze zrodlowe planu (id strumienia -> tekst zapytania). Czyta je presenter i launcher.
 extern std::vector<std::pair<std::string, std::string>> processedLines;
 
-/// Model danych BIEZACEJ epoki; null w trybie bezczynnym i miedzy epokami — patrz plan_epoch_mutex.
+/// Model danych BIEZACEJ epoki; null w trybie bezczynnym i miedzy epokami - patrz plan_epoch_mutex.
 extern dataModel *pProc;
 
 // variable connected with llimitqry (-m) parameter
@@ -89,7 +89,7 @@ extern std::atomic<std::uint64_t> adHocPlanRevision;
 extern bool untilEofMode;
 
 /// Zadanie przeladowania planu przyjete przez kanal IPC. Podnosi je resetCommit() po pelnej
-/// walidacji, zdejmuje applyPendingPlan(). Petla epok traktuje je jak warunek konca epoki —
+/// walidacji, zdejmuje applyPendingPlan(). Petla epok traktuje je jak warunek konca epoki -
 /// dokladnie tak samo jak `stop_now`, tyle ze po niej zaczyna sie epoka nastepna, nie koniec
 /// procesu.
 extern std::atomic<bool> planResetRequested;
@@ -112,7 +112,7 @@ extern std::string pendingPlanText;
 extern std::atomic<bool> planSwapInFlight;
 
 /// Plik zapytan uslugi, do ktorego trafia przyjety plan i ktory jest oprozniany po bledzie
-/// krytycznym. PUSTY dla instancji, ktora usluga nie jest — plik operatora uruchamiajacego
+/// krytycznym. PUSTY dla instancji, ktora usluga nie jest - plik operatora uruchamiajacego
 /// xretractor z terminala nie jest stanem uslugi i nie wolno go nadpisywac.
 extern std::string serviceQueryFilePath;
 
@@ -122,18 +122,18 @@ extern std::string serviceQueryFilePath;
 // handlerach zarejestrowanych pozniej niz ich konstrukcja.
 extern IpcServer ipcServer;
 
-/// Straznik blokady uslugi — wskaznik wazny WYLACZNIE na czas trwania executorsm::run().
+/// Straznik blokady uslugi - wskaznik wazny WYLACZNIE na czas trwania executorsm::run().
 ///
-/// std::exit — przez ktory konczy sie FatalError — nie uruchamia destruktorow obiektow
+/// std::exit - przez ktory konczy sie FatalError - nie uruchamia destruktorow obiektow
 /// AUTOMATYCZNYCH. Przy bledzie krytycznym cleanup() jest jedynym miejscem, ktore jeszcze
 /// dziala, wiec to on musi zwolnic flock. Stabilny plik blokady pozostaje na dysku celowo.
 ///
 /// Zerowany przed powrotem z run() (patrz lockGuardScope), i to jest wymog poprawnosci:
 /// handlery atexit wykonuja sie PO zakonczeniu main, a straznik jest tam obiektem
-/// automatycznym — po normalnym wyjsciu wskaznik wskazywalby na obiekt juz zniszczony.
+/// automatycznym - po normalnym wyjsciu wskaznik wskazywalby na obiekt juz zniszczony.
 extern FlockServiceGuard *serviceGuardPtr;
 
-/// Magistrala xrdbbus — wskaznik wazny na tych samych zasadach co serviceGuardPtr powyzej.
+/// Magistrala xrdbbus - wskaznik wazny na tych samych zasadach co serviceGuardPtr powyzej.
 /// Slot instancji musi zniknac takze na sciezce FatalError, inaczej martwy wpis blokowalby
 /// nazwy strumieni az do chwili, gdy ktos go zauwazy i sprzatnie.
 extern bus::Bus *busPtr;

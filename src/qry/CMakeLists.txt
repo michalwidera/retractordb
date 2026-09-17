@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20...4.4 FATAL_ERROR)
 
 project(xqry LANGUAGES CXX)
 
-# Logika klienta jako biblioteka statyczna — reużywana przez testy bez potrzeby
+# Logika klienta jako biblioteka statyczna - reużywana przez testy bez potrzeby
 # kompilowania ipcClient/formatters/qry dla każdego testu.
 add_library(qry STATIC qry.cpp jsonOutput.cpp boostJson.cpp ipcClient.cpp
                        formatters.cpp serverRouting.cpp)

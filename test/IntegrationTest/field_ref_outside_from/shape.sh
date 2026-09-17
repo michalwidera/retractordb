@@ -24,7 +24,7 @@ for f in reject reject_core1; do
   fi
 done
 
-# Pierwsze bledne odwolanie w reject.rql to `core0[0]`; w reject_core1.rql — `core1[0]`,
+# Pierwsze bledne odwolanie w reject.rql to `core0[0]`; w reject_core1.rql - `core1[0]`,
 # ktorego cichy offset 0 dawal zla wartosc.
 grep -F "Stream 'result' refers to 'core0'" reject.txt
 grep -F "Stream 'result' refers to 'core1'" reject_core1.txt

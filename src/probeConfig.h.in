@@ -6,17 +6,17 @@
 // zmiany nanoś w szablonie .in albo przez -DRDB_BENCH_PROBE.
 //
 // Stabilny: zmienia się wyłącznie wtedy, gdy przełączysz sondy. Dlatego stałe
-// sond mieszkają tutaj, a nie w config.h — ten drugi zawiera znacznik czasu
+// sond mieszkają tutaj, a nie w config.h - ten drugi zawiera znacznik czasu
 // budowania, więc każde `cmake .` wymuszałoby przebudowę wszystkich jednostek
 // kompilacji z sondami (dokładnie tak samo osobno stoi serviceDefaults.h.in).
 //
 // Sondy pomiarowe (rdb/probe.hpp) włącza opcja CMake RDB_BENCH_PROBE
-// (scripts/buildrdb.sh probe) — jedna opcja ustawia wszystkie cztery stałe, bo
+// (scripts/buildrdb.sh probe) - jedna opcja ustawia wszystkie cztery stałe, bo
 // tak sondy wprowadzają eksperymenty. Rozbicie na osobne stałe pozwala
 // w przyszłości zbudować wariant z jedną sondą, bez kosztu pozostałych.
 //
 // Stała false wycina kod sondy na etapie kompilacji (if constexpr), ale sam kod
-// przechodzi przez kompilator w KAŻDYM buildzie — to jest różnica wobec #ifdef,
+// przechodzi przez kompilator w KAŻDYM buildzie - to jest różnica wobec #ifdef,
 // pod którym sondy gniły niezauważone aż do włączenia wariantu pomiarowego.
 
 constexpr bool rdb_probe_slot        = @RDB_PROBE_SLOT@;         // E1/E2E: czas slotu i latencja end-to-end (RDB_BENCH_CSV)

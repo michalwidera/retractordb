@@ -183,7 +183,7 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
           shmbudget::responseQueueElements((*coreInstancePtr)[streamName].rInterval, cfgQueueBufferSeconds, cfgMinQueueElements);
       // Hak diagnostyczny testu regresyjnego it_show_handler_failure. Awaria handlera
       // 'show' na CI (2026-09-04) byla nieodtwarzalna lokalnie, a jej jedynym skutkiem
-      // widocznym dla klienta byla ODPOWIEDZ WYGLADAJACA NA POPRAWNA — bo blok ponizej
+      // widocznym dla klienta byla ODPOWIEDZ WYGLADAJACA NA POPRAWNA - bo blok ponizej
       // nie wpisuje do ptRetval niczego takze wtedy, gdy sie powiedzie. Test musi wiec
       // umiec wymusic wyjatek, zamiast czekac na warunki wyscigu.
       if (std::getenv("RDB_FAULT_SHOW") != nullptr)
@@ -197,7 +197,7 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
     }
     //
     // Przeladowanie calego planu: transfer porcjami, potem walidacja i publikacja zadania.
-    // Dziala takze przy pProc == nullptr — to jest cala rzecz, po ktora ten kanal istnieje:
+    // Dziala takze przy pProc == nullptr - to jest cala rzecz, po ktora ten kanal istnieje:
     // instancja bezczynna musi umiec przyjac pierwszy plan.
     //
     if (command == "reset-begin") ptRetval = resetBegin(ptInval);

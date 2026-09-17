@@ -43,7 +43,7 @@ class dataModel {
                                                     int revOffset = 0);
 
   /*
-   * Rekord strumienia po indeksie POSTĘPUJĄCYM (0-bazowym) na osi czasu źródła —
+   * Rekord strumienia po indeksie POSTĘPUJĄCYM (0-bazowym) na osi czasu źródła -
    * używane przez przeplot (#) i rozplot (&, %), których formuły (SOperations.hpp)
    * zwracają indeksy postępujące. Indeks spoza dostępnego zakresu (przyszłość,
    * poza pojemnością historii) daje rekord all-null.

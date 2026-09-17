@@ -1,7 +1,7 @@
 #!/bin/bash
 # WARTOSC: postac zmaterializowana WYKONUJE sie i daje wlasciwe liczby.
 #
-# Samo `-c` nie wystarcza — caly defekt polegal na tym, ze `-c` przechodzilo, a plan ginal
+# Samo `-c` nie wystarcza - caly defekt polegal na tym, ze `-c` przechodzilo, a plan ginal
 # w wykonaniu przy zerze rekordow. Dlatego ten wpis uruchamia silnik i czyta artefakt.
 #
 # Przebieg jest OFFLINE (`--until-eof --no-clock`): serwer czekajacy na klienta liczy sloty
@@ -15,7 +15,7 @@ rm -f temp/m temp/m.desc temp/m.meta temp/mul temp/mul.desc temp/mul.meta
 xretractor query.rql -k -u -f
 
 # --- 1. Typ i liczba rekordow --------------------------------------------------------------
-# Reduktor daje JEDNO pole typu z reductionResultField(): nad zrodlem DOUBLE — DOUBLE. Do 2026-09-14
+# Reduktor daje JEDNO pole typu z reductionResultField(): nad zrodlem DOUBLE - DOUBLE. Do 2026-09-14
 # stal tu RATIONAL, wpisywany przez buildOutputSchema() na sztywno niezaleznie od typu zrodla.
 xtrdb -n -s temp/m > map_m.txt
 grep -E 'DOUBLE +avg' map_m.txt

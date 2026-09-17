@@ -40,7 +40,7 @@ RetractorDB consists of three main programs:
 RetractorDB targets Linux (x64 and ARM64). You can either build it from source or
 install a prebuilt package from the GitHub Releases page.
 
-### Option A — install from a release package
+### Option A - install from a release package
 
 Prebuilt packages are published on the
 [GitHub Releases page](https://github.com/michalwidera/retractordb/releases).
@@ -50,7 +50,7 @@ after the project version and target system, for example (version `0.1.9`):
 - `retractordb-0.1.9-Linux.deb`
 - `retractordb-0.1.9-Linux.tar.gz`
 
-**Debian / Ubuntu (`.deb`)** — installs binaries into `/usr/bin` and wires up the
+**Debian / Ubuntu (`.deb`)** - installs binaries into `/usr/bin` and wires up the
 systemd service automatically:
 
 ```bash
@@ -60,7 +60,7 @@ sudo apt install ./retractordb-0.1.9-Linux.deb
 
 The package `postinst` creates the system user `retractor` and runs
 `systemctl enable xretractor.service`. The service is enabled (starts on next
-boot) but **not** started immediately — start it now with:
+boot) but **not** started immediately - start it now with:
 
 ```bash
 sudo systemctl start xretractor
@@ -71,7 +71,7 @@ journalctl -u xretractor           # logs
 See [src/retractor/README.md](src/retractor/README.md#running-as-a-systemd-service)
 for the packaged systemd unit details.
 
-**System-layout tarball (`.tar.gz`)** — contains `usr/bin/` and a systemd unit.
+**System-layout tarball (`.tar.gz`)** - contains `usr/bin/` and a systemd unit.
 To copy only the CLI binaries from it:
 
 ```bash
@@ -101,7 +101,7 @@ xqry -h
 xtrdb -h
 ```
 
-### Option B — build from source
+### Option B - build from source
 
 The build uses **Conan 2 + CMake + Ninja** and requires **GCC 14+** (C++23,
 including `std::println`/`<print>`, absent from libstdc++ 13).
@@ -128,7 +128,7 @@ scripts/buildrdb.sh bashrc        # then restart the shell or: source ~/.bashrc
 scripts/buildrdb.sh debug
 ```
 
-Install the binaries (no sudo — prefix defaults to `~/.local`) and run the test
+Install the binaries (no sudo - prefix defaults to `~/.local`) and run the test
 suite from the build directory:
 
 ```bash
@@ -202,7 +202,7 @@ suite, packaging, and CI do not require it.
 
 ### What the experiments are
 
-They are the research record behind the project's publications — not demos and
+They are the research record behind the project's publications - not demos and
 not example queries. Two families live there:
 
 - **Performance campaigns.** A supervisor machine drives a worker running
@@ -213,14 +213,14 @@ not example queries. Two families live there:
   located rather than guessed. These runs supply the *Performance Evaluation*
   section of the paper.
 - **Semantic experiments.** Machine validation of the algebra against
-  independent oracles — for example the equivalence of the interleave operator
+  independent oracles - for example the equivalence of the interleave operator
   with explicit CSDF and block SDF realizations, checked over several million
   output positions.
 
 Each campaign directory keeps its own `README.md` with the research goal,
 the machine state captured before and after every run, and the raw samples.
 `JOURNAL.md` records the chronological research log, including hypotheses that
-turned out wrong — they are part of the path, not something to be edited out.
+turned out wrong - they are part of the path, not something to be edited out.
 `REQUIREMENTS.md` defines how a campaign must be conducted to stay
 reproducible.
 
@@ -270,12 +270,12 @@ scheduled and manual workflows ignore it and run regardless.
 ## Initial configuration
 
 RetractorDB runs with sensible defaults and **needs no configuration file** to
-start — a missing config is a valid state. Configuration is optional TOML, loaded
+start - a missing config is a valid state. Configuration is optional TOML, loaded
 in layers (later layers override earlier ones):
 
 1. system: `/etc/retractor/retractor.toml`
 2. user: `$XDG_CONFIG_HOME/retractor/retractor.toml` (or `~/.config/retractor/retractor.toml`)
-3. explicit: `xretractor --config <file>` — when given, **only** that file is loaded
+3. explicit: `xretractor --config <file>` - when given, **only** that file is loaded
 
 Both `xretractor` and `xqry` use the same search. Logs go to `/tmp/xretractor.log`
 and `/tmp/xqry.log` (in `--service` mode `xretractor` logs to stderr/journald
@@ -284,7 +284,7 @@ instead).
 **Storage.** Where stream data and `.desc` / `.meta` artifacts are written is
 controlled by the `:STORAGE` directive inside the RQL file. The `[storage] dir`
 config key only provides a *default* used when the RQL has no `:STORAGE`
-directive — **RQL always wins**. If `storage.dir` is set, the directory must
+directive - **RQL always wins**. If `storage.dir` is set, the directory must
 already exist and be writable by the xretractor process, otherwise startup fails
 with a configuration error.
 
@@ -302,7 +302,7 @@ For the full list of keys (`[ipc]`, `[timing]`, `[scheduling]`, `[paths]`,
 ## Running your first query
 
 A query set is a `.rql` file with stream `DECLARE`s and continuous `SELECT`s.
-The example below needs no input data files — it reads bytes from `/dev/urandom`.
+The example below needs no input data files - it reads bytes from `/dev/urandom`.
 Save it as `first.rql`:
 
 ```sql
@@ -320,7 +320,7 @@ number of fields.
 (More ready-made examples live under [examples/](examples/), e.g.
 [examples/session-record-1/query.rql](examples/session-record-1/query.rql).)
 
-**1. Sanity-check (compile only)** — no data processing, just validate the query
+**1. Sanity-check (compile only)** - no data processing, just validate the query
 set:
 
 ```bash
@@ -337,7 +337,7 @@ xretractor first.rql
 
 If you installed via the `.deb`, the engine usually runs as a systemd service
 instead. To load a query set into an **already running** service, just start
-`xretractor` with your `.rql` file — it detects the running service, validates
+`xretractor` with your `.rql` file - it detects the running service, validates
 (compiles) the queries, overwrites the service's query file and restarts the unit
 to apply them, keeping the unit configuration:
 
@@ -352,7 +352,7 @@ as opposed to the transient ad-hoc injection over IPC (`xqry --adhoc`). Use
 for details.
 
 **3. Query the running engine** with the `xqry` client (in a second terminal).
-`xretractor` must be running — `xqry` reads results from shared memory:
+`xretractor` must be running - `xqry` reads results from shared memory:
 
 ```bash
 xqry -d              # list active streams/queries

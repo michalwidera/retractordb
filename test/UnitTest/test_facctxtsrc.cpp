@@ -267,7 +267,7 @@ TEST_F(TextSourceROTest, test_read_string_unquoted) {
 }
 
 // Sedno objawu z pozycji 12: dla `DECLARE txt STRING[8], k INTEGER` nad wierszem `42 7`
-// pole txt wychodzilo puste, a k dostawalo 42 — czyli PIERWSZY token wiersza.
+// pole txt wychodzilo puste, a k dostawalo 42 - czyli PIERWSZY token wiersza.
 TEST_F(TextSourceROTest, test_read_unquoted_string_and_int_stay_aligned) {
   auto filename = createTestFile("test_str_plain_int.txt", "42 7\n43 8\n");
 

@@ -24,7 +24,7 @@ set(LIBRARY_TEST_SET
     rqlparser
     descparser)
 
-# launch/main.cpp kompilowany raz jako OBJECT library — reużywany przez
+# launch/main.cpp kompilowany raz jako OBJECT library - reużywany przez
 # wszystkie testy zamiast być kompilowany 26× oddzielnie.
 add_library(test_main_obj OBJECT launch/main.cpp)
 target_link_libraries(test_main_obj PRIVATE gtest::gtest

@@ -5,7 +5,7 @@
 // aktualizacje rekordów trafiają do cienia indeksu (.meta.shadow, obiekt
 // metaShadow) zamiast do głównego indeksu, a przy odczycie nadpisanie z cienia
 // wygrywa. Cień danych zachowuje oryginalną zarejestrowaną zawartość; metaindeks
-// rejestruje wartości null i przerwy w transmisji — to niezależne mechanizmy.
+// rejestruje wartości null i przerwy w transmisji - to niezależne mechanizmy.
 
 #include <gtest/gtest.h>
 
@@ -115,7 +115,7 @@ TEST_F(StorageShadowFixture, scenariusz_persystencja_i_merge) {
   rdb::storageShadow meta(descriptor, file);
   EXPECT_EQ(meta.getNullBitset(2), allPresent);
 
-  // Scalenie cienia do głównego indeksu — jak merge() pliku cienia danych.
+  // Scalenie cienia do głównego indeksu - jak merge() pliku cienia danych.
   meta.mergeShadow();
 
   // Teraz główny indeks jest rozbity na 3 segmenty, a cień usunięty.
@@ -129,7 +129,7 @@ TEST_F(StorageShadowFixture, scenariusz_persystencja_i_merge) {
 // ---------------------------------------------------------------------------
 // Scenariusz 3: discardShadow() odrzuca cień bez scalania; reset() czyści oba
 //
-// discardShadow() odzwierciedla usunięcie pliku .shadow danych bez merge —
+// discardShadow() odzwierciedla usunięcie pliku .shadow danych bez merge -
 // widok wraca do głównego indeksu. reset() (purge/rotacja w storage) czyści
 // główny indeks i odrzuca cień.
 // ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ TEST_F(StorageShadowFixture, scenariusz_discard_i_reset) {
   ASSERT_TRUE(std::filesystem::exists(shadowFile));
 
   meta.discardShadow();
-  EXPECT_EQ(meta.getNullBitset(1), allNull);  // nadpisanie odrzucone — widok z głównego indeksu
+  EXPECT_EQ(meta.getNullBitset(1), allNull);  // nadpisanie odrzucone - widok z głównego indeksu
   EXPECT_FALSE(std::filesystem::exists(shadowFile));
 
   meta.onRecordModified(1, allPresent);

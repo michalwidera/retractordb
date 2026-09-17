@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wspolny oracle wartosci K26 / H9 — bramka poprawnosci P6 (predeklaracja kampanii K26v3 §7.1).
+"""Wspolny oracle wartosci K26 / H9 - bramka poprawnosci P6 (predeklaracja kampanii K26v3 §7.1).
 
 Co ten plik jest, a czego nie jest
 ----------------------------------
@@ -7,12 +7,12 @@ Co ten plik jest, a czego nie jest
 wyniku po ogonie, a porownanie ma obejmowac: liczbe i nazwy wynikow, deskryptory,
 kolejnosc, wartosci, `NULL`, luki oraz brak rekordow ogona. Dla RetractorDB
 dodatkowo identycznosc publicznych artefaktow MIEDZY PROFILAMI. To jest ten
-oracle. Nie mierzy zadnego kosztu — czyta wylacznie artefakty publiczne.
+oracle. Nie mierzy zadnego kosztu - czyta wylacznie artefakty publiczne.
 
 Dlaczego oracle NIE ma wlasnej implementacji semantyki
 -----------------------------------------------------
 Gdyby oracle liczyl `Sqrt(A*A+B*B)` po swojemu, sprawdzalby zgodnosc dwoch
-przepisan tej samej specyfikacji — a projekt ma juz przypadek, w ktorym dwa
+przepisan tej samej specyfikacji - a projekt ma juz przypadek, w ktorym dwa
 przepisania zgadzaly sie ze soba i OBA rozjezdzaly z kodem (§6 predeklaracji,
 serializer kanoniczny). Dlatego oracle jest ROZJEMCA miedzy dwoma niezaleznymi
 wykonaniami: RetractorDB (cztery profile) i Flink (dwa warianty). Rozbieznosc
@@ -20,7 +20,7 @@ jest faktem do sklasyfikowania przez czlowieka (STOP-6), a nie do rozstrzygnieci
 przez trzecia implementacje.
 
 Mapa NULL/luk pochodzi z `xtrdb`, czyli z CZYTNIKA SILNIKA, a nie z wlasnego
-parsera `.meta` — z tego samego powodu.
+parsera `.meta` - z tego samego powodu.
 
 Warunki, w ustalonej kolejnosci
 -------------------------------
@@ -48,7 +48,7 @@ import struct
 import subprocess
 import sys
 
-MIN_WINDOW = 2000           # §7.1 — twarde, nie parametr
+MIN_WINDOW = 2000           # §7.1 - twarde, nie parametr
 XTRDB = os.environ.get("XTRDB", os.path.expanduser("~/.local/bin/xtrdb"))
 
 CONDITIONS = ["results_count_names", "descriptor", "record_count_tail",
@@ -163,7 +163,7 @@ def read_flink_csv(path):
 # ── Warunki ──────────────────────────────────────────────────────────────────
 
 def check_results(left_names, right_names, left_tag, right_tag):
-    """C1 — liczba i nazwy nazwanych wynikow."""
+    """C1 - liczba i nazwy nazwanych wynikow."""
     if sorted(left_names) != sorted(right_names):
         only_l = sorted(set(left_names) - set(right_names))
         only_r = sorted(set(right_names) - set(left_names))
@@ -173,7 +173,7 @@ def check_results(left_names, right_names, left_tag, right_tag):
 
 
 def check_descriptor(left, right, tag):
-    """C2 — deskryptor: liczba pol, typy, KOLEJNOSC pol, szerokosc rekordu."""
+    """C2 - deskryptor: liczba pol, typy, KOLEJNOSC pol, szerokosc rekordu."""
     lt = [t for t, _ in left["fields"]]
     rt = [t for t, _ in right["fields"]]
     if lt != rt:
@@ -187,10 +187,10 @@ def check_descriptor(left, right, tag):
 
 
 def check_counts(left_n, right_n, tail_allowance, tag):
-    """C3 — liczby rekordow i ZADEKLAROWANE wyrownanie ogona.
+    """C3 - liczby rekordow i ZADEKLAROWANE wyrownanie ogona.
 
     `tail_allowance` to DOKLADNA liczba rekordow, o ktore prawa strona ma byc
-    dluzsza — glebokosc potoku, ktora lewa strona traci na ogonie. Warunek jest
+    dluzsza - glebokosc potoku, ktora lewa strona traci na ogonie. Warunek jest
     rownoscia, nie nierownoscia: `<=` przepuscilby wersje, ktorej brakuje rekordow,
     a bramka, ktora nie odroznia wersji obalonej, nie jest bramka.
     """
@@ -202,7 +202,7 @@ def check_counts(left_n, right_n, tail_allowance, tag):
 
 
 def check_values(left_records, right_records, tag):
-    """C4 — kolejnosc i wartosci na wspolnym oknie."""
+    """C4 - kolejnosc i wartosci na wspolnym oknie."""
     n = min(len(left_records), len(right_records))
     for i in range(n):
         if left_records[i] != right_records[i]:
@@ -212,13 +212,13 @@ def check_values(left_records, right_records, tag):
 
 
 def check_nullmap(left, right, tag):
-    """C5 — mapa NULL i luk."""
+    """C5 - mapa NULL i luk."""
     if left["nullmap"] != right["nullmap"]:
         raise Mismatch("null_gap_map", f"{tag}: {left['nullmap']} wobec {right['nullmap']}")
 
 
 def check_window(n, tag):
-    """C6 — okno porownania >= 2000 rekordow (§7.1)."""
+    """C6 - okno porownania >= 2000 rekordow (§7.1)."""
     if n < MIN_WINDOW:
         raise Mismatch("window_size", f"{tag}: okno {n} rekordow, wymagane >= {MIN_WINDOW}")
 
@@ -226,7 +226,7 @@ def check_window(n, tag):
 # ── Porownania zlozone ───────────────────────────────────────────────────────
 
 def compare_rdb_pair(a, b, tag, tail_allowance=0):
-    """Dwa artefakty RetractorDB — komplet warunkow w ustalonej kolejnosci."""
+    """Dwa artefakty RetractorDB - komplet warunkow w ustalonej kolejnosci."""
     check_descriptor(a, b, tag)
     check_counts(len(a["records"]), len(b["records"]), tail_allowance, tag)
     n = check_values(a["records"], b["records"], tag)
@@ -294,12 +294,12 @@ def evaluate_all(a, b, tag, tail_allowance=0):
 
 def compare_rdb_vs_flink(rdb, flink_rows, tag, tail_allowance):
     """RetractorDB wobec Flinka. Flink niesie slot jawnie, wiec sprawdzamy takze,
-    ze sloty sa ciagle — inaczej `kolejnosc` bylaby sprawdzona tylko po jednej
+    ze sloty sa ciagle - inaczej `kolejnosc` bylaby sprawdzona tylko po jednej
     stronie."""
     slots = [s for s, _ in flink_rows]
     # Sloty maja byc CIAGLE; ich POCZATEK moze byc przesuniety, bo wariant `manual`
     # stosuje `>3` na strumieniu przeplecionym i numeruje od 3. Przesuniecie etykiety
-    # nie jest roznica semantyczna — dowodem jest to, ze `natural` i `manual` daja
+    # nie jest roznica semantyczna - dowodem jest to, ze `natural` i `manual` daja
     # identyczne CIAGI WARTOSCI. Roznica w ciaglosci bylaby luka i musi byc zlapana.
     if slots and slots != list(range(slots[0], slots[0] + len(slots))):
         raise Mismatch("order_values", f"{tag}: sloty Flinka nie sa ciagle "
@@ -316,13 +316,13 @@ def compare_rdb_vs_flink(rdb, flink_rows, tag, tail_allowance):
 # ── Mutanty: bramka wlasna oracle'a ──────────────────────────────────────────
 #
 # §7.1: "Dla kazdego mechanizmu co najmniej trzy mutanty: zmieniona faza/shift,
-# kolejnosc pola, mapa NULL/luka — oracle ma wykryc wszystkie."
+# kolejnosc pola, mapa NULL/luka - oracle ma wykryc wszystkie."
 #
 # Regula tego luku dokłada do tego drugi warunek, twardszy: NAJPIERW pokaz, ze
 # oracle ODRZUCA mutanty, dopiero potem, ze akceptuje wariant poprawny; i pokaz,
 # ze przypadek odrzucany DOCHODZI do warunku, ktory ma go zlapac. Mutant zlapany
 # przez warunek wczesniejszy niz zamierzony NIE JEST dowodem, ze zamierzony
-# warunek dziala — dlatego kazdy mutant ma tu pole `expects` i bramka sprawdza
+# warunek dziala - dlatego kazdy mutant ma tu pole `expects` i bramka sprawdza
 # rownosc, nie samo "cokolwiek padlo".
 #
 # Mutanty sa liczone na KOPII artefaktu. Zamrozonych plikow nie dotykaja.
@@ -344,7 +344,7 @@ def _copy_artifact(src_dir, dst_dir, name):
 def mutate_phase_shift(art_dir, name):
     """Zmieniona faza: ciag rekordow przesuniety o jeden slot, DLUGOSC ZACHOWANA.
 
-    Zachowanie dlugosci jest istotne — mutant ma dojsc do warunku wartosci,
+    Zachowanie dlugosci jest istotne - mutant ma dojsc do warunku wartosci,
     a nie zostac zatrzymany wczesniej na liczbie rekordow.
     """
     path = os.path.join(art_dir, name)
@@ -356,7 +356,7 @@ def mutate_phase_shift(art_dir, name):
 
 
 def mutate_field_order(art_dir, name):
-    """Kolejnosc pola. Przy wielu polach — prawdziwa zamiana dwoch pierwszych pol
+    """Kolejnosc pola. Przy wielu polach - prawdziwa zamiana dwoch pierwszych pol
     w deskryptorze i w bajtach rekordu. Przy jednym polu zamiana jest niewyrazalna,
     wiec mutacja dotyka POZYCJI pola (`m1_0` -> `m1_1`): wynik deklaruje, ze niesie
     inna pozycje rekordu zrodlowego niz naprawde niesie."""
@@ -395,7 +395,7 @@ def mutate_gap(art_dir, name):
 
 
 def mutate_missing_tail(art_dir, name):
-    """Brak rekordu ogona — dowod, ze warunek liczby rekordow nie jest pusty."""
+    """Brak rekordu ogona - dowod, ze warunek liczby rekordow nie jest pusty."""
     path = os.path.join(art_dir, name)
     fields, _ = parse_descriptor(path + ".desc")
     raw = open(path, "rb").read()
@@ -445,7 +445,7 @@ def run_mutant_gate(cases, work_dir, report):
             if passed != expected_before:
                 raise SystemExit(
                     f"BLAD BRAMKI: mutant '{label}' mechanizmu {mechanism} NIE DOSZEDL do warunku "
-                    f"'{expects}' — zdane przed nim: {passed}, oczekiwano {expected_before}.")
+                    f"'{expects}' - zdane przed nim: {passed}, oczekiwano {expected_before}.")
             report(f"   ok  mutant {label:<20} odrzucony przez '{failure.condition}' "
                    f"po zdanych {passed}")
             ok += 1

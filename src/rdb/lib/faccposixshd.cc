@@ -21,7 +21,7 @@ std::string posixBinaryFileWithShadow::shadowName() const { return filename_ + "
 
 /// @brief Wyszukuje rekord w pliku cienia na podstawie pozycji.
 /// Shadow file przechowuje pary (size_t position, uint8_t data[recordSize_]).
-/// Przeszukuje wpisy od końca — ostatni wpis z daną pozycją jest aktualny.
+/// Przeszukuje wpisy od końca - ostatni wpis z daną pozycją jest aktualny.
 ssize_t posixBinaryFileWithShadow::shadowFind(uint8_t *ptrData, size_t position) const {
   struct stat stat_buf;
   if (fstat(fd_shadow, &stat_buf) != 0) return EXIT_FAILURE;
@@ -30,7 +30,7 @@ ssize_t posixBinaryFileWithShadow::shadowFind(uint8_t *ptrData, size_t position)
   const ssize_t numEntries = stat_buf.st_size / entrySize;
   if (numEntries == 0) return EXIT_FAILURE;
 
-  // Szukaj od końca — ostatni wpis z daną pozycją ma najnowsze dane
+  // Szukaj od końca - ostatni wpis z daną pozycją ma najnowsze dane
   for (ssize_t i = numEntries - 1; i >= 0; --i) {
     size_t storedPos;
     ssize_t rd = ::pread(fd_shadow, &storedPos, sizeof(size_t), static_cast<__off_t>(i * entrySize));
@@ -147,7 +147,7 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
   if (fd < 0) return errno;
 
   if (ptrData == nullptr && position == 0) {
-    // Truncate — czyści oba pliki
+    // Truncate - czyści oba pliki
     std::filesystem::remove(name());
     std::filesystem::remove(name() + ".shadow");
     return EXIT_SUCCESS;
@@ -225,7 +225,7 @@ ssize_t posixBinaryFileWithShadow::read(uint8_t *ptrData, std::vector<bool> &nul
   // Najpierw szukaj w pliku cienia
   if (shadowFind(ptrData, position) == EXIT_SUCCESS) return EXIT_SUCCESS;
 
-  // Fallback — odczyt z głównego pliku
+  // Fallback - odczyt z głównego pliku
   constexpr int maxRetries = 5;
   for (int attempt = 0; attempt < maxRetries; ++attempt) {
     ssize_t read_size = ::pread(fd, ptrData, recordSize_, static_cast<off_t>(position));
@@ -243,7 +243,7 @@ ssize_t posixBinaryFileWithShadow::read(uint8_t *ptrData, std::vector<bool> &nul
 }
 
 size_t posixBinaryFileWithShadow::count() {
-  // Wolane na goracej sciezce odczytu — pojedynczy stat(), ENOENT to zwykly brak pliku.
+  // Wolane na goracej sciezce odczytu - pojedynczy stat(), ENOENT to zwykly brak pliku.
   struct stat stat_buf;
   if (stat(filename_.c_str(), &stat_buf) != 0) {
     if (errno != ENOENT) SPDLOG_ERROR("::stat {} failed: {}", filename_, strerror(errno));

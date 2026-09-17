@@ -4,7 +4,7 @@
 # Cala pozostala weryfikacja reguly biegnie na danych bez NULL-i, wiec twierdzenie
 # o zachowaniu obserwowalnego wyniku nie obejmowaloby tej dziedziny. NULL jest
 # wartoscia POCHLANIAJACA, wiec musi przejsc przez przeplot i przesuniecie tak samo
-# po obu stronach — razem z mapa null w pliku .meta, nie tylko z bajtami.
+# po obu stronach - razem z mapa null w pliku .meta, nie tylko z bajtami.
 
 STORAGE 'temp'
 

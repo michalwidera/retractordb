@@ -37,7 +37,7 @@ TEST(DescriptorIOTest, save_and_load_round_trip) {
 
 // ---------------------------------------------------------------------------
 // Weryfikacja zgodności: identyczne deskryptory przechodzą bez efektów
-// ubocznych (niezgodność kończy proces przez FatalError — poza zasięgiem
+// ubocznych (niezgodność kończy proces przez FatalError - poza zasięgiem
 // testu jednostkowego, tak jak pozostałe ścieżki FatalError w repo).
 // ---------------------------------------------------------------------------
 TEST(DescriptorIOTest, verify_match_accepts_equal_descriptors) {

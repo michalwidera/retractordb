@@ -6,7 +6,7 @@
 # poziomie połączenia klienta (okno między "get"+"show" a otwarciem kolejki).
 #
 # xretractor startuje pierwszy (lock file jako sygnał gotowości), potem xqry
-# synchronicznie — unika race condition xqry-przed-xretractorem.
+# synchronicznie - unika race condition xqry-przed-xretractorem.
 #
 # Weryfikacja awk: - core1 (≥100) rosnące, core0 (<100) rosnące - między
 # kolejnymi core1 dokładnie 2 core0 (stosunek rate 1/8 : 1/16) - sprawdzenie

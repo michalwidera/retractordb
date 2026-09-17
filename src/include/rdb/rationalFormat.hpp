@@ -5,10 +5,10 @@
 #include <fmt/format.h>
 #include <boost/rational.hpp>
 
-/// Liczba wymierna wypisywana jako "licznik/mianownik" — dokładnie tak, jak boost::operator<<,
+/// Liczba wymierna wypisywana jako "licznik/mianownik" - dokładnie tak, jak boost::operator<<,
 /// z mianownikiem także wtedy, gdy równy 1. Ani Boost 1.91, ani fmt nie dostarczają tego same,
 /// a projekt formatuje przez oba silniki: std::print/std::format oraz fmt (spdlog, FatalError).
-/// Stąd dwie bliźniacze specjalizacje. Żadna nie obsługuje specyfikatora formatu — dopuszczalne
+/// Stąd dwie bliźniacze specjalizacje. Żadna nie obsługuje specyfikatora formatu - dopuszczalne
 /// jest wyłącznie puste "{}".
 ///
 /// Uwaga przy podnoszeniu Boosta: gdyby biblioteka dodała własny std::formatter dla rational,

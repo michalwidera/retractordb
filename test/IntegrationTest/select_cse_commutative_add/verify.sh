@@ -33,7 +33,7 @@ grep -F 'n2(1/10)' out_compile.txt
 # Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
 # wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
 # Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
-# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+# znaczy 'fields' w wyjsciu DOT - do wywolan kompilacyjnych jej NIE dodawac.
 xretractor query.rql -r -k -m 18 -f
 
 cmp temp/c1 temp/c2

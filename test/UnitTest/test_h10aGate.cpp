@@ -1,4 +1,4 @@
-// Bramka H10a dla klas `@` (AGSE) i `>` (SHIFT) — przeniesiona do ctest z kampanii K24
+// Bramka H10a dla klas `@` (AGSE) i `>` (SHIFT) - przeniesiona do ctest z kampanii K24
 // (rdb-experiment/results_20260804_K24r). Werdykt z 2026-08-04 mówił „dokładna" dla obu klas
 // (AGSE 4309/4309, SHIFT 5484/5484); obie liczby dotyczyły semantyki sprzed przestemplowania
 // (okno stemplowane POCZĄTKIEM przedziału, `>N` z opóźnieniem ukrytym w ogonie), więc nie da
@@ -43,7 +43,7 @@ using ratio = boost::rational<int>;
 
 // --- model zdarzeniowy --------------------------------------------------------------
 
-// Dzielenie w dół — świadomie własne, żeby model nie dzielił z silnikiem ani jednej
+// Dzielenie w dół - świadomie własne, żeby model nie dzielił z silnikiem ani jednej
 // linii kodu. Gdyby korzystał z floorDiv() z SOperations.hpp, wspólny błąd znaku
 // przeszedłby przez bramkę niezauważony.
 int floorOf(int numerator, int denominator) {
@@ -87,7 +87,7 @@ struct agseOracle {
   ratio delta;
 };
 
-// Ogon i origin liczone przeglądem slotów, nie postacią zamkniętą — o to chodzi
+// Ogon i origin liczone przeglądem slotów, nie postacią zamkniętą - o to chodzi
 // w niezależności bramki.
 agseOracle evaluate(const streamModel &source, int step, int length, int probeMultiplier = 1) {
   const int lengthAbs = length < 0 ? -length : length;
@@ -131,12 +131,12 @@ agseOracle evaluate(const streamModel &source, int step, int length, int probeMu
 //
 // Historia konwencji tej klasy jest trzystopniowa i warto ją tu mieć, bo dwa razy zmieniła
 // się liczba, którą bramka sprawdza:
-//   K24 (do 2026-08-06) — odwzorowanie tożsamościowe z opóźnieniem N*Delta doklejonym do
+//   K24 (do 2026-08-06) - odwzorowanie tożsamościowe z opóźnieniem N*Delta doklejonym do
 //     dostępności: W = W_src + N, opóźnienie NIEWIDOCZNE w złączeniu (rekord n brał rekord n);
-//   K24p (2026-08-07)  — rekord n bierze rekord n-N, ale fetchBack adresował offsetem
+//   K24p (2026-08-07)  - rekord n bierze rekord n-N, ale fetchBack adresował offsetem
 //     WZGLĘDNYM, co wymuszało W = W_src; kampania zmierzyła to jako zawyżenie o min(W_src, N)
 //     na 6,6% węzłów klasy;
-//   dziś              — fetchForward adresuje indeksem LOGICZNYM, więc ogon jest wolny
+//   dziś              - fetchForward adresuje indeksem LOGICZNYM, więc ogon jest wolny
 //     i równy granicy zdarzeniowej.
 struct shiftOracle {
   int origin;
@@ -145,10 +145,10 @@ struct shiftOracle {
 };
 
 // Rekord n przesunięcia niesie treść rekordu n-N producenta, więc:
-//   origin — rekordy poniżej O_src+N nie mają definicji;
-//   ogon   — deficyt slotu n wynosi (n-N+1+W_src) - (n+1) = W_src - N i jest STAŁY,
+//   origin - rekordy poniżej O_src+N nie mają definicji;
+//   ogon   - deficyt slotu n wynosi (n-N+1+W_src) - (n+1) = W_src - N i jest STAŁY,
 //            stąd W = max(0, W_src - N);
-//   pojemność — odległość wsteczna rev = W - W_src + N = N - min(N, W_src), plus jeden
+//   pojemność - odległość wsteczna rev = W - W_src + N = N - min(N, W_src), plus jeden
 //            na oba końce zakresu, plus wyprzedzenie czoła, jeżeli producent jest deklaracją.
 shiftOracle evaluateShift(const streamModel &source, int offset, bool sourceDeclared) {
   const int tail = std::max(0, source.tail - offset);
@@ -159,7 +159,7 @@ shiftOracle evaluateShift(const streamModel &source, int offset, bool sourceDecl
 
 // Przeplot `#`: rekord n niesie rekord jednej ze składowych, wybranej regułą Beatty'ego.
 // Mapowanie wyprowadzone tu z DEFINICJI przeplotu, celowo bez wołania Hash() z SOperations.hpp
-// — wspólny błąd w regule wyboru przeszedłby przez bramkę niezauważony.
+// - wspólny błąd w regule wyboru przeszedłby przez bramkę niezauważony.
 struct hashPick {
   bool fromB;
   int position;
@@ -178,7 +178,7 @@ struct hashOracle {
 
 // Ogon przeglądem slotów: deficyt slotu n to (chwila dostępności wybranej składowej)/Delta_c
 // minus (n+1). Okno sondowania jest WIELOKROTNOŚCIĄ okresu fazowego p+q, żeby test mówił
-// również o tym, że jeden okres wystarcza — na tym stoi rachunek w HashStartupLatency().
+// również o tym, że jeden okres wystarcza - na tym stoi rachunek w HashStartupLatency().
 hashOracle evaluateHash(const streamModel &left, const streamModel &right, int periodMultiplier = 4) {
   hashOracle result{};
   result.delta       = left.delta * right.delta / (left.delta + right.delta);
@@ -194,8 +194,8 @@ hashOracle evaluateHash(const streamModel &left, const streamModel &right, int p
   return result;
 }
 
-// Początek logiczny przeplotu. Obie pozycje — floor(z*n) dla pierwszej składowej
-// i n-floor(z*n) dla drugiej — są niemalejące, więc rekordy bez definicji tworzą
+// Początek logiczny przeplotu. Obie pozycje - floor(z*n) dla pierwszej składowej
+// i n-floor(z*n) dla drugiej - są niemalejące, więc rekordy bez definicji tworzą
 // prefiks. Szukamy go przeglądem, a nie maksimum dwóch progów, żeby model nie
 // powtarzał rachunku silnika.
 int evaluateHashOrigin(const streamModel &left, const streamModel &right, int probeMultiplier = 1) {
@@ -219,7 +219,7 @@ int evaluateHashOrigin(const streamModel &left, const streamModel &right, int pr
 //
 // Rekord n sumy o interwale Delta_c = min(Delta_1, Delta_2) niesie krotkę złożoną
 // z rekordów obu składowych: składowa o interwale Delta_src wnosi rekord
-// floor(n*Delta_c/Delta_src) — szybsza dostaje n, wolniejsza swój bieżący.
+// floor(n*Delta_c/Delta_src) - szybsza dostaje n, wolniejsza swój bieżący.
 // Odwzorowanie wyprowadzone z DEFINICJI sumy, celowo bez wołania Add()
 // ani AddStartupLatency() z SOperations.hpp.
 struct sumOracle {
@@ -258,12 +258,12 @@ sumOracle evaluateSum(const streamModel &left, const streamModel &right, int pro
 //
 // C-Delta wybiera z producenta rekord ceil(n*Delta/Delta_src); dla równych interwałów
 // wybór jest tożsamością. Model daje ogon w konwencji C1, czyli DOLNE ograniczenie,
-// i bramka wymaga tu bezpieczeństwa (EXPECT_GE), a nie równości — trybem porażki jest
+// i bramka wymaga tu bezpieczeństwa (EXPECT_GE), a nie równości - trybem porażki jest
 // zaniżenie, bo ono oznacza rekord wyemitowany przed określeniem zależności.
 //
 // Do 2026-08-18 klasa `-` była w tab:tail-exactness zawyżająca: silnik dokładał
 // deklaracji własny slot, uzasadniając to publikacją źródła po konsumentach w takcie.
-// Ta gałąź zniknęła (K24/H10 faza 3) — dokładała slot ZAWSZE, stawiając `-` w konwencji
+// Ta gałąź zniknęła (K24/H10 faza 3) - dokładała slot ZAWSZE, stawiając `-` w konwencji
 // dostępności innej niż siedem pozostałych klas silnika. Bramka zostaje kierunkowa:
 // dokładność jest dziś osiągana, ale chronione jest to, żeby nigdy nie spaść poniżej.
 struct subtractOracle {
@@ -290,12 +290,12 @@ subtractOracle evaluateSubtract(const streamModel &source, const ratio &target, 
 // --- rozplot `&` (Theta) i `%` (~Theta) ---------------------------------------------
 //
 // Rekord i lewej składowej leży w przeplocie na pozycji i + ceil((i+1)*Da/Db), prawej
-// — na pozycji i + floor(i*Db/Da). Oba odwzorowania wyprowadzone z DEFINICJI rozplotu,
+// - na pozycji i + floor(i*Db/Da). Oba odwzorowania wyprowadzone z DEFINICJI rozplotu,
 // celowo bez wołania Div()/Mod() z SOperations.hpp: wspólny błąd odwzorowania
 // przeszedłby przez bramkę niezauważony.
 //
-// Theta bywa o slot NIEPRZYCZYNOWA — jej pozycja w przeplocie potrafi wypaść po własnym
-// slocie — i stąd bierze się jej ogon. Slot ten NIE jest jednak stały: przy ilorazie
+// Theta bywa o slot NIEPRZYCZYNOWA - jej pozycja w przeplocie potrafi wypaść po własnym
+// slocie - i stąd bierze się jej ogon. Slot ten NIE jest jednak stały: przy ilorazie
 // całkowitym kres fazy odczytu daje ogon zerowy, co silnik od 2026-08-18 liczy dokładnie
 // (K24/H10). Bramka wykazuje, że tam, gdzie slot jest prawdziwy, nie da się go usunąć.
 struct dehashOracle {
@@ -408,7 +408,7 @@ TEST(h10aGate, closed_form_matches_event_model_over_single_window_corpus) {
           ASSERT_EQ(parseResult, "OK") << rql;
 
           compiler compilerInstance(instance);
-          // Plan odrzucony przez kompilator jest awarią aparatury, nie wynikiem —
+          // Plan odrzucony przez kompilator jest awarią aparatury, nie wynikiem -
           // ta sama zasada co w kampanii K24.
           ASSERT_EQ(compilerInstance.compile(), "OK") << rql;
 
@@ -420,7 +420,7 @@ TEST(h10aGate, closed_form_matches_event_model_over_single_window_corpus) {
           EXPECT_EQ(win.logicalOrigin, expected.origin) << rql;
           EXPECT_EQ(win.startupLatency, expected.tail) << rql;
           // Deklaracja ma dwa rekordy przed pierwszym wykonaniem konsumenta (uzbrojenie
-          // storage i zerowy prefetch) — model zdarzeniowy tego nie widzi, bo to szczegół
+          // storage i zerowy prefetch) - model zdarzeniowy tego nie widzi, bo to szczegół
           // realizacji źródła, nie semantyki operatora. Niezależnie wyprowadzony jest
           // dystans wsteczny i to on jest treścią bramki.
           EXPECT_EQ(instance.maxCapacity.at("src"), expected.sourceCapacity + kDeclarationPrefetch - 1) << rql;
@@ -471,7 +471,7 @@ TEST(h10aGate, array_field_and_scalar_fields_have_the_same_window_model) {
 }
 
 // Korpus dwuwęzłowy: okno nad oknem. Dopiero tu producent ma NIEZEROWY ogon i NIEZEROWY
-// origin, więc sprawdzana jest propagacja obu wielkości — a nie tylko przypadek brzegowy
+// origin, więc sprawdzana jest propagacja obu wielkości - a nie tylko przypadek brzegowy
 // nad deklaracją.
 TEST(h10aGate, closed_form_matches_event_model_over_stacked_windows) {
   const std::vector<ratio> deltas{ratio(1, 1), ratio(1, 2), ratio(3, 10)};
@@ -495,7 +495,7 @@ TEST(h10aGate, closed_form_matches_event_model_over_stacked_windows) {
 
           const streamModel source{.delta = delta, .width = width, .tail = 0, .origin = 0};
           const agseOracle first = evaluate(source, step1, len1);
-          // Szerokość okna to liczba jego pól — tyle wnosi do spłaszczenia u konsumenta.
+          // Szerokość okna to liczba jego pól - tyle wnosi do spłaszczenia u konsumenta.
           const streamModel middle{
               .delta = first.delta, .width = len1 < 0 ? -len1 : len1, .tail = first.tail, .origin = first.origin};
           const agseOracle second = evaluate(middle, step2, len2);
@@ -529,7 +529,7 @@ TEST(h10aGate, probe_window_is_wide_enough) {
 }
 
 // Kontrola negatywna: model zdarzeniowy MUSI odrzucać ogon o jeden za mały. Bez niej
-// bramka przechodziłaby również dla postaci zamkniętej, która systematycznie zaniża —
+// bramka przechodziłaby również dla postaci zamkniętej, która systematycznie zaniża -
 // a to jest dokładnie ta klasa defektu (rekord wydany, zanim jego zależności są określone),
 // którą kampania K24 nazwała reżimem zaniżającym.
 TEST(h10aGate, event_model_rejects_a_tail_one_slot_too_small) {
@@ -558,7 +558,7 @@ TEST(h10aGate, event_model_rejects_a_tail_one_slot_too_small) {
 
 // Klasa SHIFT nad deklaracją: pełna siatka (F, N, Delta). Ogon musi być ZEROWY (producent
 // o ogonie zerowym nie każe czekać na rekord STARSZY od bieżącego), a całe opóźnienie ma
-// siedzieć w origin — przed przestemplowaniem było odwrotnie i dlatego `>N` nie było
+// siedzieć w origin - przed przestemplowaniem było odwrotnie i dlatego `>N` nie było
 // widoczne w złączeniu.
 TEST(h10aGate, closed_form_matches_event_model_over_shift_corpus) {
   int checked = 0;
@@ -620,7 +620,7 @@ TEST(h10aGate, shift_over_window_composes_both_quantities) {
 }
 
 // Okno NAD przesunięciem: producent o ogonie ZEROWYM i origin NIEZEROWYM. Korpus okien
-// piętrowych tego nie obejmuje — tam origin i ogon producenta rosną razem — więc dopiero
+// piętrowych tego nie obejmuje - tam origin i ogon producenta rosną razem - więc dopiero
 // ten przypadek rozdziela wpływ obu wielkości na regułę węzła `@`.
 TEST(h10aGate, window_over_shift_separates_origin_from_tail) {
   int checked = 0;
@@ -653,7 +653,7 @@ TEST(h10aGate, window_over_shift_separates_origin_from_tail) {
 }
 
 // Klasa HASH nad dwiema deklaracjami: siatka par delt. Obie składowe mają ogon zerowy,
-// więc każdy przypadek testuje wyłącznie regułę węzła `#` — a ta od 2026-08-07 jest
+// więc każdy przypadek testuje wyłącznie regułę węzła `#` - a ta od 2026-08-07 jest
 // przeglądem okresu fazowego, nie postacią O(1) z członem ceil((p+q-1)/p).
 TEST(h10aGate, closed_form_matches_event_model_over_hash_corpus) {
   const std::vector<ratio> deltas{ratio(1, 1), ratio(1, 2), ratio(1, 3), ratio(2, 5), ratio(3, 10), ratio(5, 7)};
@@ -722,7 +722,7 @@ TEST(h10aGate, hash_over_two_windows_uses_the_constituent_selected_per_record) {
 
               EXPECT_EQ(instance.getQuery("c").rInterval, expected.delta) << rql;
               EXPECT_EQ(instance.getQuery("c").startupLatency, expected.tail) << rql;
-              // Origin przeplotu nad składowymi o NIEZEROWYM origin — korpus nad deklaracjami
+              // Origin przeplotu nad składowymi o NIEZEROWYM origin - korpus nad deklaracjami
               // sprawdza tylko przypadek zerowy, więc dopiero tu widać, że obie pozycje
               // przeplotu przenoszą niedefiniowalność.
               EXPECT_EQ(instance.getQuery("c").logicalOrigin, evaluateHashOrigin(left, right)) << rql;
@@ -732,7 +732,7 @@ TEST(h10aGate, hash_over_two_windows_uses_the_constituent_selected_per_record) {
 }
 
 // Kontrola aparatury: jeden okres fazowy musi wystarczyć. Gdyby maksimum deficytu wypadało
-// dalej niż p+q, rachunek w HashStartupLatency() zaniżałby ogon — a zaniżenie jest tą klasą
+// dalej niż p+q, rachunek w HashStartupLatency() zaniżałby ogon - a zaniżenie jest tą klasą
 // defektu, której reżim bezpieczny miał nie dopuszczać.
 TEST(h10aGate, one_phase_period_is_enough_for_the_hash_tail) {
   const std::vector<ratio> deltas{ratio(1, 1), ratio(1, 2), ratio(1, 3), ratio(2, 5), ratio(3, 10), ratio(5, 7)};
@@ -752,12 +752,12 @@ TEST(h10aGate, one_phase_period_is_enough_for_the_hash_tail) {
 // Powód: tab:tail-exactness w artykule podaje reżim dla DZIEWIĘCIU klas, a bramka
 // pilnowała trzech. Klasy `Θ` i `~Θ` nie miały żadnej kontroli, mimo że ich własny ogon
 // jest w compiler::computeStartupLatency() pojedynczą instrukcją (`++result` i jej brak).
-// Usunięcie tej instrukcji dawało reżim ZANIŻAJĄCY — rekord wydany przed określeniem
-// zależności — i nie zapalało w ctest ani jednej lampki.
+// Usunięcie tej instrukcji dawało reżim ZANIŻAJĄCY - rekord wydany przed określeniem
+// zależności - i nie zapalało w ctest ani jednej lampki.
 //
 // Asercje są ASYMETRYCZNE, zgodnie z twierdzeniem: równość dla klas dokładnych,
 // nierówność `silnik >= model` dla klas zawyżających. Origin jest wymagany dokładnie
-// we wszystkich klasach — artykuł podaje dla niego 100% w dziewięciu na dziewięć.
+// we wszystkich klasach - artykuł podaje dla niego 100% w dziewięciu na dziewięć.
 // =====================================================================================
 
 namespace {
@@ -830,15 +830,15 @@ TEST(h10aGate, sum_probe_window_is_wide_enough) {
 
 // Klasa `-` nad oknem: producent ma niezerowy ogon i niezerowy origin, więc sprawdzana
 // jest propagacja obu wielkości, a nie tylko przypadek brzegowy nad deklaracją (ten
-// pokrywa ut_capacities). Reżim klasy jest ZAWYŻAJĄCY — w kampanii K24d 19,1% zgodności
-// — więc asercją ogona jest nierówność. Origin musi być dokładny.
+// pokrywa ut_capacities). Reżim klasy jest ZAWYŻAJĄCY - w kampanii K24d 19,1% zgodności
+// - więc asercją ogona jest nierówność. Origin musi być dokładny.
 TEST(h10aGate, subtract_never_falls_below_the_event_model) {
   int checked     = 0;
   int tight       = 0;
   int originMoved = 0;
   // Okno pięciopolowe, a nie dwupolowe: przy origin producenta równym 1 odwzorowanie
   // ceil(n*Delta/Delta_src) zwraca dokładnie ten sam próg, więc korpus przechodziłby
-  // także dla silnika PRZEPISUJĄCEGO origin producenta bez odwzorowania — sprawdzone
+  // także dla silnika PRZEPISUJĄCEGO origin producenta bez odwzorowania - sprawdzone
   // mutacyjnie 2026-08-07. Origin 4 (krok 1) i 2 (krok 2) rozdziela te dwie reguły.
   for (const auto &delta : kPairDeltas)
     for (int width : kPairWidths)
@@ -879,7 +879,7 @@ TEST(h10aGate, subtract_never_falls_below_the_event_model) {
   // Moc detekcyjna, dwa świadki. Ogon: gdyby nierówność nigdzie nie była ciasna,
   // przechodziłaby też dla reguły zawyżającej dowolnie mocno, czyli nie strzegłaby
   // niczego poza znakiem. Origin: musi być w korpusie przypadek, w którym odwzorowanie
-  // różnicy PRZESUWA origin producenta — inaczej sprawdzana jest tożsamość, nie reguła.
+  // różnicy PRZESUWA origin producenta - inaczej sprawdzana jest tożsamość, nie reguła.
   EXPECT_GT(tight, 0);
   EXPECT_GT(originMoved, 0);
 }
@@ -897,7 +897,7 @@ TEST(h10aGate, subtract_probe_window_is_wide_enough) {
 }
 
 // Klasy `&` i `%` nad przeplotem DWÓCH DEKLARACJI. Producent ma zerowy origin, więc każdy
-// przypadek testuje wyłącznie własny wkład operatora rozplotu — a ten jest w silniku
+// przypadek testuje wyłącznie własny wkład operatora rozplotu - a ten jest w silniku
 // stałą: jeden slot dla Theta, zero dla ~Theta.
 TEST(h10aGate, dehash_never_falls_below_the_event_model) {
   const std::vector<ratio> deltas{ratio(1, 1), ratio(1, 2), ratio(2, 5), ratio(5, 7)};
@@ -930,7 +930,7 @@ TEST(h10aGate, dehash_never_falls_below_the_event_model) {
       const auto &rightNode = instance.getQuery("right");
       EXPECT_EQ(leftNode.rInterval, deltaA) << rql;
       EXPECT_EQ(rightNode.rInterval, deltaB) << rql;
-      // Θ i ~Θ są od K24/H10 klasami DOKŁADNYMI — patrz komentarz przy różnicy.
+      // Θ i ~Θ są od K24/H10 klasami DOKŁADNYMI - patrz komentarz przy różnicy.
       EXPECT_GE(leftNode.startupLatency, theta.tail) << "ZANIŻENIE Θ\n" << rql;
       EXPECT_GE(rightNode.startupLatency, notTheta.tail) << "ZANIŻENIE ~Θ\n" << rql;
       EXPECT_EQ(leftNode.startupLatency, theta.tail) << rql;
@@ -949,7 +949,7 @@ TEST(h10aGate, dehash_never_falls_below_the_event_model) {
 
 // Klasy `&` i `%` nad przeplotem DWÓCH OKIEN: producent ma niezerowy ogon ORAZ niezerowy
 // origin. To jedyne miejsce, w którym sprawdzana jest propagacja niedefiniowalności przez
-// odwzorowania rozplotu — a te rosną szybciej niż liniowo, więc origin nie przenosi się
+// odwzorowania rozplotu - a te rosną szybciej niż liniowo, więc origin nie przenosi się
 // tu przez proste dodanie.
 TEST(h10aGate, dehash_over_two_windows_propagates_origin_and_tail) {
   int checked = 0;
@@ -998,10 +998,10 @@ TEST(h10aGate, dehash_over_two_windows_propagates_origin_and_tail) {
   EXPECT_EQ(checked, 3 * 2 * 3 * 2);
 }
 
-// Kontrola negatywna klasy Theta — dowód mocy detekcyjnej bramki, a nie jej założenie.
+// Kontrola negatywna klasy Theta - dowód mocy detekcyjnej bramki, a nie jej założenie.
 // Lekcja z §14.14/§14.15 planu badawczego: korpus, który przechodzi także dla reguły
 // obalonej, niczego nie strzeże. Sprawdzamy WPROST, że wartość o slot mniejsza od
-// deklarowanej przez silnik — czyli dokładnie wynik usunięcia `++result` — wypada PONIŻEJ
+// deklarowanej przez silnik - czyli dokładnie wynik usunięcia `++result` - wypada PONIŻEJ
 // granicy zdarzeniowej, więc dopuszczałaby emisję rekordu przed określeniem zależności.
 TEST(h10aGate, event_model_rejects_theta_without_its_own_slot) {
   const std::vector<ratio> deltas{ratio(1, 1), ratio(1, 2), ratio(2, 5), ratio(5, 7)};
@@ -1037,7 +1037,7 @@ TEST(h10aGate, dehash_probe_window_is_wide_enough) {
       }
 }
 
-// Projekcja i redukcje: klasy dokładne, bo NIE mają własnego wkładu — działają na bieżącej
+// Projekcja i redukcje: klasy dokładne, bo NIE mają własnego wkładu - działają na bieżącej
 // krotce producenta i przenoszą obie wielkości bez zmiany. Korpus ma producenta
 // o niezerowym ogonie ORAZ niezerowym origin, żeby przenoszenie każdej z nich osobno było
 // widoczne; dotąd sprawdzały to pojedyncze wartości wpisane wprost w ut_compiler.
@@ -1079,10 +1079,10 @@ TEST(h10aGate, projection_and_reduction_carry_both_quantities_unchanged) {
   EXPECT_GT(checked, 0);
 }
 
-// Origin przeplotu — korpus DEDYKOWANY, wymuszony przez kontrolę mutacyjną. Korpusy
+// Origin przeplotu - korpus DEDYKOWANY, wymuszony przez kontrolę mutacyjną. Korpusy
 // ogona (`closed_form_matches_event_model_over_hash_corpus` i `hash_over_two_windows_...`)
 // mają origin składowych zawsze zdominowany przez pierwszą z nich, więc przechodzą także
-// wtedy, gdy silnik liczy origin przeplotu WYŁĄCZNIE z pierwszej składowej — sprawdzone
+// wtedy, gdy silnik liczy origin przeplotu WYŁĄCZNIE z pierwszej składowej - sprawdzone
 // mutacyjnie 2026-08-07. Bramka, która przechodzi dla reguły obalonej, niczego nie strzeże.
 //
 // Tu obie składowe są oknami o RÓŻNYCH origin (krok okna rozstrzyga: ceil((L-1)/step)),
@@ -1152,25 +1152,25 @@ TEST(h10aGate, hash_origin_probe_span_is_wide_enough) {
 }
 
 // =====================================================================================
-// L6 — miniatura kampanii K24 na KOMPOZYCJACH (2026-08-07).
+// L6 - miniatura kampanii K24 na KOMPOZYCJACH (2026-08-07).
 //
 // Bramki wyzej sprawdzaja dziewiec klas operatorow, ale KAZDA OSOBNO, na korpusach
-// dobranych pod te jedna klase. Regresja w PROPAGACJI miedzy klasami — na przyklad
-// origin przechodzacy przez roznice do okna — przejdzie przez wszystkie z nich, bo zaden
+// dobranych pod te jedna klase. Regresja w PROPAGACJI miedzy klasami - na przyklad
+// origin przechodzacy przez roznice do okna - przejdzie przez wszystkie z nich, bo zaden
 // nie sklada tych dwoch operatorow. Kampania K24d (rdb-experiment/results_20260807_K24d)
 // robi to na 10 010 planach glebokosci 1-6, ale chodzi recznie i tylko przy przypinaniu SHA.
 //
 // Ta miniatura generuje plany MIESZANE o glebokosci 2-4 i sprawdza KAZDY wezel osobno.
 // Trzy rzeczy sa tu istotne:
 //
-//  1. Generator jest DETERMINISTYCZNY, z ziarnem wpisanym w test — nie losowanym z zegara.
+//  1. Generator jest DETERMINISTYCZNY, z ziarnem wpisanym w test - nie losowanym z zegara.
 //     Korpus, ktory zmienia sie miedzy przebiegami, nie jest bramka, tylko loteria.
 //  2. Oracle jest REKURENCYJNY nad drzewem planu i sklada sie wylacznie z modeli
 //     zdarzeniowych zdefiniowanych wyzej w tym pliku. Zaden z nich nie wola funkcji
 //     silnika (ani AgseStartupLatency, ani HashStartupLatency, ani Hash/Div/Mod/Add/
 //     Subtract z SOperations.hpp). Ta niezaleznosc jest jedynym powodem, dla ktorego
 //     test cokolwiek znaczy.
-//  3. Plan odrzucony przez kompilator jest AWARIA APARATURY i zatrzymuje test — nie jest
+//  3. Plan odrzucony przez kompilator jest AWARIA APARATURY i zatrzymuje test - nie jest
 //     cicho pomijany. Ta sama zasada co w kampanii K24. Generator dobiera wiec parametry
 //     tak, zeby produkowac wylacznie plany poprawne (kontrola reprezentowalnosci
 //     interwalu i szerokosci okna sondowania PRZED emisja wezla).
@@ -1196,8 +1196,8 @@ TEST(h10aGate, hash_origin_probe_span_is_wide_enough) {
 //   M13 ogon przesuniecia bez odjecia N
 //   M14 projekcja gubiaca ogon producenta
 // M1-M9 to lista z planu L6; M10-M14 dopisane, zeby kazda z dziewieciu klas miala
-// wlasnego mutanta zarowno dla ogona, jak i dla origin. M4 i M8 — te, ktore przeszly
-// przez pierwsza wersje korpusow L1 — sa tu wykrywane od razu, bo korpus WYMAGA
+// wlasnego mutanta zarowno dla ogona, jak i dla origin. M4 i M8 - te, ktore przeszly
+// przez pierwsza wersje korpusow L1 - sa tu wykrywane od razu, bo korpus WYMAGA
 // swiadkow rozrozniajacych obie sytuacje (asercje na koncu testu).
 // =====================================================================================
 
@@ -1251,19 +1251,19 @@ struct planNode {
   // a stojace nad nim `>1` dziedziczy te roznice. Skazenie idzie wiec w gore drzewa.
   bool tailExact = true;
 
-  // Skladowe przeplotu — potrzebne do zbudowania nad nim rozplotu ORAZ do swiadkow
+  // Skladowe przeplotu - potrzebne do zbudowania nad nim rozplotu ORAZ do swiadkow
   // dominacji origin (mutant M4: origin przeplotu liczony z jednej skladowej).
   bool isHash = false;
   streamModel left{};
   streamModel right{};
 
-  // Producent wezla jednoargumentowego — potrzebny do swiadka M8 (origin roznicy
+  // Producent wezla jednoargumentowego - potrzebny do swiadka M8 (origin roznicy
   // bez odwzorowania Subtract jest tozsamoscia na origin producenta).
   int producerOrigin = 0;
 };
 
 // Interwal, ktorego licznik albo mianownik wychodzi poza ten prog, prowadzi w kompilatorze
-// do bledu zakresu — plan bylby odrzucony, a odrzucony plan jest awaria aparatury.
+// do bledu zakresu - plan bylby odrzucony, a odrzucony plan jest awaria aparatury.
 constexpr int kMaxIntervalTerm = 20000;
 // Gorne ograniczenia okien sondowania oracle'a: bez nich glebokie kompozycje przeplotow
 // daja okresy fazowe rzedu 10^4 slotow i test przestaje miescic sie w budzecie.
@@ -1492,7 +1492,7 @@ TEST(h10aGate, mixed_plan_corpus_matches_the_recursive_event_model) {
   std::array<int, kOpClassCount> exactTailChecks{};
   int nodesChecked = 0;
 
-  // Swiadkowie mocy detekcyjnej — patrz komentarz przy asercjach na koncu testu.
+  // Swiadkowie mocy detekcyjnej - patrz komentarz przy asercjach na koncu testu.
   int hashLeftDominates = 0, hashRightDominates = 0;
   int subtractOriginMoved = 0, subtractTight = 0, thetaTight = 0;
 
@@ -1569,15 +1569,15 @@ TEST(h10aGate, mixed_plan_corpus_matches_the_recursive_event_model) {
   EXPECT_GT(hashLeftDominates, 0);
   EXPECT_GT(hashRightDominates, 0);
   EXPECT_GT(subtractOriginMoved, 0);
-  // Nierownosci musza byc gdzies CIASNE — inaczej przechodzilyby takze dla reguly
+  // Nierownosci musza byc gdzies CIASNE - inaczej przechodzilyby takze dla reguly
   // zawyzajacej dowolnie mocno, czyli nie strzeglyby niczego poza znakiem.
   EXPECT_GT(subtractTight, 0);
   EXPECT_GT(thetaTight, 0);
 }
 
 // Kontrola aparatury miniatury: oracle rekurencyjny na planach JEDNOWEZLOWYCH musi dawac
-// to samo co bramki jednoklasowe wyzej. Plan glebokosci 1 to dokladnie ich ksztalt —
-// jeden operator nad deklaracjami — wiec ten test sprawdza maszynerie skladania, a nie
+// to samo co bramki jednoklasowe wyzej. Plan glebokosci 1 to dokladnie ich ksztalt -
+// jeden operator nad deklaracjami - wiec ten test sprawdza maszynerie skladania, a nie
 // same reguly. Bez niej blad w rekurencji (na przyklad zla szerokosc przekazana w gore)
 // mogby udawac blad silnika albo, gorzej, kompensowac sie z nim.
 TEST(h10aGate, recursive_oracle_reduces_to_the_single_node_gates) {
@@ -1611,7 +1611,7 @@ TEST(h10aGate, recursive_oracle_reduces_to_the_single_node_gates) {
     }
   }
 
-  // Kontrola aparatury tez musi byc stratyfikowana — inaczej moglaby nie dotknac
+  // Kontrola aparatury tez musi byc stratyfikowana - inaczej moglaby nie dotknac
   // polowy klas i milczaco potwierdzac maszynerie, ktorej nie uruchomila.
   for (int i = 0; i < kOpClassCount; ++i)
     EXPECT_GT(classCount[i], 0) << "klasa " << nameOf(static_cast<opClass>(i)) << " nieobecna w kontroli aparatury";

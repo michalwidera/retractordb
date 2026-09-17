@@ -1,4 +1,4 @@
-// Rodzina F9-R2 — przemienny multi-sensor feature. Dwa warianty jednego joba.
+// Rodzina F9-R2 - przemienny multi-sensor feature. Dwa warianty jednego joba.
 //
 // Postacie monitorow odwzorowuja postacie RQL z SZKIC_RODZIN.md §4.2:
 //   P1: SELECT Sqrt(A[0]*A[0]+B[0]*B[0]) STREAM m_i FROM A+B
@@ -9,7 +9,7 @@
 //
 // FLINK_NATURAL: Q niezaleznie nazwanych monitorow, kazdy z wlasnym egzemplarzem swojego
 //                podplanu; BEZ recznego wydzielania czegokolwiek.
-// FLINK_MANUAL:  ten sam job po recznym wydzieleniu wspolnego wezla — kontrola best case,
+// FLINK_MANUAL:  ten sam job po recznym wydzieleniu wspolnego wezla - kontrola best case,
 //                niewchodzaca do progu (§10).
 //
 // Wspolne dla obu: rownoleglosc 1, te same zrodla, ten sam czas logiczny (indeks slotu),
@@ -39,7 +39,7 @@ public class F9R2Job {
     PlanDump.reset();
     PlanDump.costlyProgram(K26Ops.TOKENS_SQRT_TWO_TERMS);
 
-    // Oba zrodla 100 Hz — os X i os Y tego samego czujnika drgan (SZKIC_RODZIN.md §4.1).
+    // Oba zrodla 100 Hz - os X i os Y tego samego czujnika drgan (SZKIC_RODZIN.md §4.1).
     DataStream<Tuple3<Long, Long, Integer>> srcA =
         env.addSource(new K26Ops.DeclaredSource(axisX, slots, K26Ops.TAG_A)).name("SRC:A").uid("SRC:A");
     DataStream<Tuple3<Long, Long, Integer>> srcB =

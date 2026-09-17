@@ -1,5 +1,5 @@
 #!/bin/bash
-# Krok A kampanii K26 — inwentarz srodowiska HOSTA (strona Flinka), zapisany maszynowo.
+# Krok A kampanii K26 - inwentarz srodowiska HOSTA (strona Flinka), zapisany maszynowo.
 #
 # To ma byc ODCZYT, nie przepisanie z planu: wszystkie wersje i sumy SHA-256 pochodzia
 # z uruchomienia narzedzi i z plikow, nie z dokumentu. Wynik wchodzi do predeklaracji
@@ -28,7 +28,7 @@ fail() { echo "BLAD INWENTARZA: $*" >&2; exit 2; }
 {
   printf 'key\tvalue\n'
   printf 'captured_utc\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf 'role\thost (Flink) — worker mierzy wylacznie RetractorDB (D-2)\n'
+  printf 'role\thost (Flink) - worker mierzy wylacznie RetractorDB (D-2)\n'
   printf 'hostname\t%s\n' "$(hostname)"
   printf 'kernel\t%s\n' "$(uname -srm)"
   printf 'os\t%s\n' "$(. /etc/os-release && echo "$PRETTY_NAME")"
@@ -55,7 +55,7 @@ fail() { echo "BLAD INWENTARZA: $*" >&2; exit 2; }
   if [[ -r "$FLINK_HOME.sha512" ]]; then
     printf 'flink_tarball_sha512_declared\t%s\n' "$(awk '{print $1}' "$FLINK_HOME.sha512")"
   fi
-  # Wszystkie jary z lib/ — job kompiluje sie wobec calego lib, wiec caly lib jest przypieciem.
+  # Wszystkie jary z lib/ - job kompiluje sie wobec calego lib, wiec caly lib jest przypieciem.
   while IFS= read -r jar; do
     printf 'flink_lib_sha256\t%s  %s\n' "$(sha256sum "$jar" | awk '{print $1}')" "$(basename "$jar")"
   done < <(find "$FLINK_HOME/lib" -maxdepth 1 -name '*.jar' | sort)

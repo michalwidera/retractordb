@@ -3,7 +3,7 @@
 
 Powod istnienia. 2026-09-04 `it_agse_array` oblal na CI i jedynym sladem byl wpis
 w test_results.xml z pustym <system-out/>. Z czasu trwania dalo sie wyliczyc, ze test
-wykonal caly lancuch i przegral na porownaniu bajtowym — ale nie bylo wiadomo NA CZYM,
+wykonal caly lancuch i przegral na porownaniu bajtowym - ale nie bylo wiadomo NA CZYM,
 a lokalnie awaria nie wystapila ani razu w 31 pelnych przebiegach. Diagnostyka po fakcie
 jest wiec warunkiem, zeby kolejne takie zdarzenie w ogole dalo sie zbadac.
 
@@ -19,7 +19,7 @@ Mapowanie nazwy testu na katalog roboczy pochodzi z `ctest --show-only=json-v1`
 (wlasnosc WORKING_DIRECTORY), a nie ze zgadywania z nazwy: nazwa testu i nazwa katalogu
 rozjezdzaja sie (it_simple-vg-run, it_issue31_doc-q-31.a.rql-graph).
 
-Skrypt jest DIAGNOSTYCZNY i konczy sie zerem takze wtedy, gdy nie ma czego zebrac —
+Skrypt jest DIAGNOSTYCZNY i konczy sie zerem takze wtedy, gdy nie ma czego zebrac -
 nie jego rola jest decydowac o wyniku joba.
 """
 
@@ -40,7 +40,7 @@ kCollectSuffixes = (".txt", ".dot", ".log", ".out", ".err", ".pattern", ".script
 
 
 def ctestRoot(buildDir: Path) -> Path | None:
-    """Katalog, z ktorego uruchomiono ctest — tam lezy Testing/Temporary.
+    """Katalog, z ktorego uruchomiono ctest - tam lezy Testing/Temporary.
 
     CI wola `cd build/<typ>/test && ctest`, a udokumentowany przebieg lokalny
     `cd build/Debug && ctest`. Oba uklady sa poprawne i oba maja wlasny
@@ -142,7 +142,7 @@ def patternPairs(workDir: Path) -> list[tuple[Path, Path]]:
 
     Konwencja drzewa jest regularna: pattern.txt -> out.txt, pattern-run.txt -> out-run.txt
     albo out.txt, pattern-dot.txt -> out.dot, count.pattern -> count.txt. Parujemy po
-    przyrostku nazwy, a gdy to nie wychodzi — kazdy wzorzec z kazdym wynikiem byloby
+    przyrostku nazwy, a gdy to nie wychodzi - kazdy wzorzec z kazdym wynikiem byloby
     myleniem, wiec zostaje sam pattern.txt/out.txt.
     """
     pairs = []
@@ -211,7 +211,7 @@ def collectOne(name: str, info: dict, lastTestLog: str, reportDir: Path) -> list
 
     # Logi silnika i klienta z katalogu przestrzeni nazw. Ida do wlasnego podkatalogu,
     # bo przestrzen jest WSPOLNA dla kilku katalogow testowych (pula ma 16 slotow, a
-    # testow jest wiecej) — plik moze wiec zawierac takze przebieg sasiada z tego samego
+    # testow jest wiecej) - plik moze wiec zawierac takze przebieg sasiada z tego samego
     # slotu. RESOURCE_LOCK gwarantuje rozlacznosc w czasie, nie rozlacznosc tresci.
     tmpRaw = info.get("tmpDir")
     if tmpRaw and Path(tmpRaw).is_dir():
@@ -246,7 +246,7 @@ def discardStaleReport(reportDir: Path) -> None:
 
     Raport ma zawsze opisywac ten przebieg, ktory wlasnie sie odbyl. Zostawiony po
     zielonym biegu byl by gorszy niz jego brak: ktos pobralby z CI dowody z awarii,
-    ktorej w tym przebiegu nie bylo. Kasujemy tylko katalog, ktory sami zbudowalismy —
+    ktorej w tym przebiegu nie bylo. Kasujemy tylko katalog, ktory sami zbudowalismy -
     rozpoznajemy go po SUMMARY.txt, zeby nie ruszyc cudzej sciezki podanej z linii polecen.
     """
     if (reportDir / "SUMMARY.txt").is_file():
@@ -260,7 +260,7 @@ def main() -> int:
     parser.add_argument("reportDir", type=Path, nargs="?", default=None,
                         help="katalog raportu (domyslnie <buildDir>/test-failure-report)")
     # Kod wyjscia ctest jest JEDYNYM pewnym sygnalem, czy biezacy przebieg cos oblal.
-    # CTest NIE kasuje LastTestsFailed.log po udanym przebiegu — plik z czerwonego biegu
+    # CTest NIE kasuje LastTestsFailed.log po udanym przebiegu - plik z czerwonego biegu
     # zostaje i kolejny, zielony, wygladalby przez niego na czerwony. Sprawdzone wprost.
     parser.add_argument("--ctest-status", type=int, default=None,
                         help="kod wyjscia ctest z tego przebiegu; 0 = nie ma czego zbierac")
@@ -270,14 +270,14 @@ def main() -> int:
     reportDir = args.reportDir or buildDir / "test-failure-report"
 
     if args.ctest_status == 0:
-        print("collect-test-failures: ctest zakonczyl sie zerem — raport niepotrzebny")
+        print("collect-test-failures: ctest zakonczyl sie zerem - raport niepotrzebny")
         discardStaleReport(reportDir)
         return 0
 
     testDir = ctestRoot(buildDir)
     if testDir is None:
         print(f"collect-test-failures: nie znaleziono Testing/Temporary pod {buildDir} "
-              f"— czy ctest w ogole biegl?")
+              f"- czy ctest w ogole biegl?")
         discardStaleReport(reportDir)
         return 0
 
@@ -288,7 +288,7 @@ def main() -> int:
 
     names = [name for name in failedTests(testDir) if failedInThisRun(lastTestLog, name)]
     if not names:
-        print("collect-test-failures: brak testow, ktore oblaly w tym przebiegu — "
+        print("collect-test-failures: brak testow, ktore oblaly w tym przebiegu - "
               "raport niepotrzebny")
         discardStaleReport(reportDir)
         return 0
@@ -297,7 +297,7 @@ def main() -> int:
         shutil.rmtree(reportDir)
     reportDir.mkdir(parents=True)
     # Kopia calego logu ladzie w raporcie, bo oryginal na dysku zaraz przestanie
-    # istniec w tej postaci — i tak czy tak nie byloby czego pobrac z CI.
+    # istniec w tej postaci - i tak czy tak nie byloby czego pobrac z CI.
     if lastTestLog:
         (reportDir / "LastTest.log").write_text(lastTestLog, encoding="utf-8")
 

@@ -22,7 +22,7 @@
 // Testy sond pomiarowych (rdb/probe.hpp).
 //
 // Każdy test uruchamia się w OBU wariantach kompilacji i w obu coś sprawdza. To celowe:
-// wariant bez sond ma równie mocny kontrakt co wariant z sondami — wywołanie sondy nie
+// wariant bez sond ma równie mocny kontrakt co wariant z sondami - wywołanie sondy nie
 // może mieć ŻADNEGO efektu. Stąd mnożniki `workOn`/`materializeOn`: oczekiwana liczba to
 // albo wartość wynikająca z geometrii zdarzeń (build z sondą), albo zero (build bez sondy).
 // Testy pomijane przez GTEST_SKIP nie pilnowałyby tej drugiej połowy kontraktu, a to
@@ -33,7 +33,7 @@ namespace {
 constexpr unsigned long long workOn        = rdb_probe_work ? 1 : 0;
 constexpr unsigned long long materializeOn = rdb_probe_materialize ? 1 : 0;
 
-/// Zmienna środowiskowa przywracana po teście — sondy czytają je przy uzbrajaniu,
+/// Zmienna środowiskowa przywracana po teście - sondy czytają je przy uzbrajaniu,
 /// więc przeciek między testami zmieniałby wynik następnego.
 class envGuard {
  public:
@@ -98,7 +98,7 @@ TEST(probeWork, counters_accumulate_per_event) {
   rdb::probe::workReset();
 
   // Okna o RÓŻNEJ długości: praca okna rośnie z liczbą odwiedzonych elementów, a nie
-  // z liczbą okien — to jest cała teza sondy E4 (w planie oba okna to jeden token).
+  // z liczbą okien - to jest cała teza sondy E4 (w planie oba okna to jeden token).
   rdb::probe::onAgseWindow(4);
   rdb::probe::onAgseWindow(6);
   rdb::probe::onAgseRead();
@@ -118,7 +118,7 @@ TEST(probeWork, counters_accumulate_per_event) {
 }
 
 TEST(probeWork, counters_accumulate_across_slots) {
-  // Liczniki są procesowe i sumują się przez cały przebieg — analiza dzieli je dopiero
+  // Liczniki są procesowe i sumują się przez cały przebieg - analiza dzieli je dopiero
   // przez liczbę slotów. Gubienie zdarzeń zaniżałoby pracę, a to jest dokładnie ta klasa
   // błędu, przez którą upadł model kosztu K20 etap 1.
   rdb::probe::workReset();
@@ -173,7 +173,7 @@ TEST(probeWork, report_is_a_snapshot_not_a_view) {
 
 TEST(probeMaterialization, persistent_and_memory_storage_counted_separately) {
   // Bez tego podziału plan z SUBSTRAT 'memory' raportowałby objętość, której nigdy nie
-  // zapisał na dysk — a to jest liczba, którą artykuł nazywa „objętością materializacji".
+  // zapisał na dysk - a to jest liczba, którą artykuł nazywa „objętością materializacji".
   rdb::probe::materializationReset();
   rdb::probe::onMaterializedAppend(false, 100);
   rdb::probe::onMaterializedAppend(false, 40);
@@ -187,7 +187,7 @@ TEST(probeMaterialization, persistent_and_memory_storage_counted_separately) {
 }
 
 TEST(probeMaterialization, overwrite_costs_a_write_but_no_volume) {
-  // Nadpisanie nie zwiększa objętości magazynu, tylko koszt zapisu — dlatego nie ma
+  // Nadpisanie nie zwiększa objętości magazynu, tylko koszt zapisu - dlatego nie ma
   // parametru z liczbą bajtów i nie wolno mu ruszyć licznika `bytes`.
   rdb::probe::materializationReset();
   rdb::probe::onMaterializedAppend(false, 50);
@@ -221,7 +221,7 @@ TEST(probeMaterialization, reset_zeroes_every_counter) {
 //
 // ─── K23: kanoniczne zapisy logiczne ────────────────────────────────────────────
 //
-// Przypadki o ZNANEJ odpowiedzi — bramka §10 planu K23. Serializer jest czystą funkcją
+// Przypadki o ZNANEJ odpowiedzi - bramka §10 planu K23. Serializer jest czystą funkcją
 // deskryptora, więc działa identycznie w obu wariantach kompilacji (bez mnożnika);
 // mnożnik dotyczy tylko liczników zdarzeń.
 //
@@ -254,7 +254,7 @@ TEST(probeCanonicalRecord, width_per_type_follows_the_frozen_mapping) {
 
 TEST(probeCanonicalRecord, string_keeps_its_declared_width) {
   // Napis jest jedynym typem, dla którego szerokość zadeklarowana JEST szerokością
-  // kanoniczną — nie ma neutralnego rozmiaru napisu do podstawienia.
+  // kanoniczną - nie ma neutralnego rozmiaru napisu do podstawienia.
   const rdb::Descriptor descriptor{{"s", 16, 1, rdb::STRING}};
 
   EXPECT_EQ(rdb::probe::canonicalRecordBytes(descriptor), 16u + 1u);
@@ -288,7 +288,7 @@ TEST(probeCanonicalRecord, configuration_fields_and_nulltype_carry_no_width) {
 }
 
 TEST(probeCanonicalRecord, result_is_independent_of_record_contents) {
-  // Metryka bajtowa jest deterministycznym wynikiem mechanizmu — dwa odczyty tego samego
+  // Metryka bajtowa jest deterministycznym wynikiem mechanizmu - dwa odczyty tego samego
   // deskryptora muszą dać tę samą liczbę, niezależnie od tego, co stoi w rekordzie.
   const rdb::Descriptor descriptor{{"a", sizeof(int), 2, rdb::INTEGER}, {"s", 8, 1, rdb::STRING}};
 
@@ -336,7 +336,7 @@ TEST(probeLogicalWrite, overwrite_carries_bytes_unlike_the_native_counter) {
 
 TEST(probeLogicalWrite, q_copies_of_the_same_subplan_scale_linearly) {
   // Geometria progu H9: bez współdzielenia Q instancji zapisuje Q×b, po współdzieleniu b.
-  // Ten test pilnuje samego licznika, nie mechanizmu — ale bez niego liczba 1−1/Q nie ma
+  // Ten test pilnuje samego licznika, nie mechanizmu - ale bez niego liczba 1−1/Q nie ma
   // podstawy pomiarowej.
   constexpr unsigned long long recordBytes = 17;
   constexpr int q                          = 8;
@@ -382,7 +382,7 @@ TEST(probeLogicalWrite, reset_zeroes_every_counter) {
 // ─── E3: kształt planu ──────────────────────────────────────────────────────────
 //
 // Te funkcje są czystymi przekształceniami danych, więc działają identycznie w obu
-// wariantach kompilacji — mnożników tu nie ma. Mierzone na PRAWDZIWYCH typach planu
+// wariantach kompilacji - mnożników tu nie ma. Mierzone na PRAWDZIWYCH typach planu
 // (qTree/query/field), bo to z nimi szablon jest instancjonowany w compiler.cpp.
 //
 
@@ -400,7 +400,7 @@ TEST(probePlanShape, directives_are_not_part_of_the_plan) {
 
 TEST(probePlanShape, substrates_counted_apart_from_public_streams) {
   // Substrat nie ma tożsamości obserwowalnej, więc to on jest właściwą jednostką
-  // redukcji strukturalnej — liczony osobno od strumieni publicznych.
+  // redukcji strukturalnej - liczony osobno od strumieni publicznych.
   qTree plan;
   plan.push_back(makeQuery("public1", false, 1, {}));
   plan.push_back(makeQuery("public2", false, 1, {}));
@@ -437,7 +437,7 @@ TEST(probePlanShape, empty_plan_has_zero_shape) {
 
 TEST(probePlanShape, capacities_summed_and_maximum_reported) {
   // Suma jest proporcjonalna do zajętości pamięci planu, maksimum wskazuje najgłębszy
-  // bufor — ten decydujący o najgorszym przypadku.
+  // bufor - ten decydujący o najgorszym przypadku.
   const std::map<std::string, int> capacities{{"a", 3}, {"b", 7}, {"c", 1}};
 
   const auto shape = rdb::probe::shapeOfCapacities(capacities);
@@ -520,7 +520,7 @@ TEST(probeReport, materialization_line_printed_when_armed) {
 
 TEST(probeReport, logical_line_is_armed_by_its_own_variable) {
   // Dwie osobne zmienne, bo to dwie różne wielkości: MATERIALIZED opisuje objętość
-  // magazynu w reprezentacji natywnej, LOGICAL — kanoniczne bajty zapisów wg roli.
+  // magazynu w reprezentacji natywnej, LOGICAL - kanoniczne bajty zapisów wg roli.
   const envGuard noMaterialize("RDB_BENCH_MATERIALIZE", nullptr);
   const envGuard logical("RDB_BENCH_LOGICAL", "1");
   const envGuard noWork("RDB_BENCH_WORK", nullptr);
@@ -568,15 +568,15 @@ TEST(probePlanReport, stages_and_rewrites_reported_when_armed) {
   bench.capture(rdb::probe::planStage::entry, plan);
   plan.push_back(makeQuery("STREAM_ADD_a_b", true, 1, {}));  // dekompozycja: przybył substrat
   bench.capture(rdb::probe::planStage::preDedup, plan);
-  plan.pop_back();  // deduplikacja: substrat zniknął — to jest właściwa redukcja planu
+  plan.pop_back();  // deduplikacja: substrat zniknął - to jest właściwa redukcja planu
   bench.capture(rdb::probe::planStage::postDedup, plan);
 
   rdb::probe::onRewriteR1();
   rdb::probe::onRewriteR1();
   rdb::probe::onRewriteR2("nodeA");
-  rdb::probe::onRewriteR2("nodeA");  // ten sam węzeł — metryka liczy WĘZŁY, nie zastosowania
+  rdb::probe::onRewriteR2("nodeA");  // ten sam węzeł - metryka liczy WĘZŁY, nie zastosowania
   rdb::probe::onRewriteR2("nodeB");
-  rdb::probe::onRewriteR3(3);  // R3 liczy SUMĘ przepisań — jedno wyrażenie może zwinąć kilka stałych
+  rdb::probe::onRewriteR3(3);  // R3 liczy SUMĘ przepisań - jedno wyrażenie może zwinąć kilka stałych
   rdb::probe::onRewriteR3(2);
 
   testing::internal::CaptureStderr();
@@ -597,7 +597,7 @@ TEST(probePlanReport, stages_and_rewrites_reported_when_armed) {
 }
 
 TEST(probePlanReport, dedup_switch_is_visible_in_the_report) {
-  // Profil ablacyjny musi dać się rozpoznać po samym wierszu raportu — bez tego wyniki
+  // Profil ablacyjny musi dać się rozpoznać po samym wierszu raportu - bez tego wyniki
   // dwóch profili są nierozróżnialne w zbiorczym logu kampanii.
   const envGuard planEnv("RDB_BENCH_PLAN", "1");
 
@@ -656,10 +656,10 @@ TEST(probeSlot, csv_has_header_and_one_row_per_slot) {
       bench.endCompute();
       bench.endSlot();
     }
-  }  // destruktor domyka plik — bez tego ostatnie wiersze zostałyby w buforze
+  }  // destruktor domyka plik - bez tego ostatnie wiersze zostałyby w buforze
 
   if constexpr (!rdb_probe_slot) {
-    // Build bez sondy nie tworzy pliku NAWET z ustawioną zmienną — to jest dowód, że
+    // Build bez sondy nie tworzy pliku NAWET z ustawioną zmienną - to jest dowód, że
     // sonda nie przecieka do wariantu produkcyjnego.
     EXPECT_FALSE(std::filesystem::exists(csv));
     return;

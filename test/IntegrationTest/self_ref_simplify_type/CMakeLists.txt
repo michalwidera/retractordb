@@ -10,11 +10,11 @@ set(TestID "it_${TestID}")
 # sourceFieldAt("merged", 3), czyli z WLASNEGO pola wyjsciowego `merged_3`
 # (INTEGER), a nie ze slotu 3 rekordu FROM (`core1.d`, FLOAT). Reasocjacja
 # stalych, dopuszczalna tylko dla typow dokladnych, przepisywala `(d+1)+2` na
-# `d+3` — i przy d = 2^24 pole zapisywalo 16777220 zamiast 16777218, bez
+# `d+3` - i przy d = 2^24 pole zapisywalo 16777220 zamiast 16777218, bez
 # ostrzezenia i tylko przy RDB_OPT_SIMPLIFY_EXPRESSIONS=ON.
 #
 # DWA wpisy: asercja o ksztalcie planu i asercja o policzonej wartosci nie
-# dziela jednego wpisu ctest — patrz regula przy issue202_hash_shift_e2e w
+# dziela jednego wpisu ctest - patrz regula przy issue202_hash_shift_e2e w
 # CLAUDE.md. Oczekiwany ksztalt (brak przepisania) jest prawdziwy takze przy
 # wylaczonym przebiegu, wiec zaden wpis nie dostaje DISABLED pod ablacja.
 

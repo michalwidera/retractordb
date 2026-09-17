@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bramka oracle'a — przypadki o ręcznie wyprowadzonej odpowiedzi.
+"""Bramka oracle'a - przypadki o ręcznie wyprowadzonej odpowiedzi.
 
 Każdy początek logiczny i każdy ogon poniżej wyprowadzono z definicji, nie
 odczytano z silnika ani z jego rachunku. Reguły wyprowadzania są dwie:
@@ -15,12 +15,12 @@ Wyprowadzenia rodzinami (pełne rachunki w REPORT.md §2):
 
 * przeplot A#B, oba źródła W=0, O=0: odwzorowanie indeksu jest nieujemne od
   n=0, więc origin jest zerowy; deficyt maksymalizuje się na slocie, w którym
-  wypada element B o najgorszej fazie — dla 1#1 daje 1, dla 1#2 daje 2,
+  wypada element B o najgorszej fazie - dla 1#1 daje 1, dla 1#2 daje 2,
   dla 2#1 daje 1, dla 1/3#1/2 daje 2;
 * przesunięcie >N: rekord n niesie rekord n-N producenta, więc rekordy
   o indeksie < N nie istnieją i O = O_src + N. Deficyt slotu n wynosi
   (n-N+1+W_src) - (n+1) = W_src - N, jest STAŁY, więc
-  W = max(0, W_src - N). Nad źródłem (W_src=0) daje ogon zerowy — całe
+  W = max(0, W_src - N). Nad źródłem (W_src=0) daje ogon zerowy - całe
   milczenie siedzi w origin;
 * różnica o całkowitym ilorazie r: rekord n czyta indeks r*n, dostępny
   w chwili (rn+1)*Delta_zrodla, a slot n kończy się w (n+1)*r*Delta_zrodla;
@@ -167,7 +167,7 @@ def hand_cases():
 
     # Przesunięcie pod PRAWĄ składową przeplotu. Rekord 0 wypada na składową
     # prawą (indeks 0), której jeszcze nie ma, a rekord 1 na lewą, która już
-    # jest — brakujące rekordy nie tworzą prefiksu, więc origin jest pierwszym
+    # jest - brakujące rekordy nie tworzą prefiksu, więc origin jest pierwszym
     # indeksem, od którego strumień jest ciągły: 1. Ogon: maksimum deficytu
     # wypada na slotach z elementem składowej prawej (n=3, 6), i wynosi 2.
     a, b = _src("s0", 1), _src("s1", 2)
@@ -213,7 +213,7 @@ def hand_cases():
     # jednego węzła `#`, na którym zastąpiona postać O(1) różni się od reguły
     # dokładnej: różnica wymaga, żeby OBIE składowe miały niezerowy ogon,
     # a wszystkie przypadki `#` korpusu miały co najwyżej jedną taką składową.
-    # Bramka mutantów przechodziła więc również dla postaci obalonej w K24 —
+    # Bramka mutantów przechodziła więc również dla postaci obalonej w K24 -
     # ta sama pułapka, którą wykryto w bramce `ctest` silnika (§14.14 planu).
     #
     # (1#1) # (1#1/2). Składowe: n0 = 1#1 -> Delta 1/2, W = 1 (jak w korpusie
@@ -225,7 +225,7 @@ def hand_cases():
     #   n=2 -> n0[0]: ceil(2*(1/2)/(1/5))-1-2 = 5-3 = 2
     #   n=3 -> n1[2]: ceil(4*(1/3)/(1/5))-1-3 = 7-4 = 3
     #   n=4 -> n0[1]: ceil(3*(1/2)/(1/5))-1-4 = 8-5 = 3
-    # daje W = 3. Postać O(1) dałaby max(3, 2+2) = 4 — o slot za dużo.
+    # daje W = 3. Postać O(1) dałaby max(3, 2+2) = 4 - o slot za dużo.
     s0, s1 = _src("s0", 1), _src("s1", 1)
     s2, s3 = _src("s2", 1), _src("s3", Fraction(1, 2))
     left = P.make_hash("n0", s0, s1)
@@ -236,7 +236,7 @@ def hand_cases():
         {"n0": 0, "n1": 0, "n2": 0})
 
     # Przeplot, w którym maksimum deficytu wypada w DRUGIEJ połowie okresu
-    # fazowego — kontrola tego, że przegląd musi objąć cały okres.
+    # fazowego - kontrola tego, że przegląd musi objąć cały okres.
     # n0 = s0@(1,1), F = 3, Delta_src = 3: Delta = 3*1/3 = 1, O = 0,
     #   W = ceil(3*(1+0)/1) - 1 = 2.
     # n1 = n0 # s1, Delta_a = 1, Delta_b = 2: z = 2/3, Delta = 2/3,
@@ -244,7 +244,7 @@ def hand_cases():
     #   n=0 -> s1[0]:  ceil(1*2/(2/3))-1-0 = 3-1 = 2
     #   n=1 -> n0[0]:  ceil(3*1/(2/3))-1-1 = 5-2 = 3
     #   n=2 -> n0[1]:  ceil(4*1/(2/3))-1-2 = 6-3 = 3
-    # daje W = 3, ale maksimum pojawia się dopiero na slocie 1 — przegląd
+    # daje W = 3, ale maksimum pojawia się dopiero na slocie 1 - przegląd
     # skrócony do połowy okresu (slot 0) zwróciłby 2.
     a = _src("s0", 3, 3)
     b = _src("s1", 2)
@@ -260,12 +260,12 @@ def hand_cases():
     # jest równy interwałowi źródła.
     #
     # origin: rekord n istnieje, gdy n-(S-1) >= O_src, czyli O = O_src + S - 1.
-    # ogon:   o dostępności decyduje rekord NAJNOWSZY, czyli n — ten sam, który
+    # ogon:   o dostępności decyduje rekord NAJNOWSZY, czyli n - ten sam, który
     #         czyta czysty przepis. Deficyt jest więc identyczny jak przy `pass`
     #         i ogon nie zależy od S. Nad źródłem daje to 0 przy C1 i 1 przy C2.
     #
     # Ta niezależność ogona od S jest tu istotna: gdyby okno dokładało cokolwiek
-    # do ogona, poniższe liczby by tego nie przepuściły — a rozdzielenie „okno
+    # do ogona, poniższe liczby by tego nie przepuściły - a rozdzielenie „okno
     # rusza wyłącznie origin” jest treścią reguły.
     for span in (1, 3, 5):
         a = _src("s0", Fraction(1, 10))
@@ -277,7 +277,7 @@ def hand_cases():
     # `widest` w windowWidthOf). Węższe okno domyka się wcześniej, więc nie
     # stawia żadnego wymagania ponad tamto.
     a = _src("s0", Fraction(1, 10))
-    add("window avg(:2),avg(:5) over source — szerszy decyduje",
+    add("window avg(:2),avg(:5) over source - szerszy decyduje",
         [a, P.make_window("n0", a, "avg", (2, 5))],
         {"n0": 0}, {"n0": 1}, {"n0": 4})
 
@@ -289,7 +289,7 @@ def hand_cases():
         [a, shifted, P.make_window("n1", shifted, "sumc", (3,))],
         {"n0": 0, "n1": 0}, {"n0": 0, "n1": 1}, {"n0": 2, "n1": 4})
 
-    # Okno nad przeplotem 1#1 (Delta = 1/2, ogon C1 = 1, C2 = 2, origin 0) —
+    # Okno nad przeplotem 1#1 (Delta = 1/2, ogon C1 = 1, C2 = 2, origin 0) -
     # przypadek, w którym producent MA ogon, więc widać, że okno go dziedziczy,
     # a nie zeruje ani nie powiększa.
     #   C1: avail_h(j) = (j+1+1)*1/2, najnowsza zależność j = n,
@@ -304,7 +304,7 @@ def hand_cases():
 
     # Okno nad oknem. Kształt WYŁĄCZONY z generatora (węzeł okna ma pola
     # RATIONAL, więc model treści liczyłby słowa źródła źle), ale reguła origin
-    # składa się tu tak samo jak wszędzie — i to jest jedyne miejsce, gdzie ten
+    # składa się tu tak samo jak wszędzie - i to jest jedyne miejsce, gdzie ten
     # kształt jest w ogóle pilnowany.
     #   O(n0) = 3-1 = 2, O(n1) = 2 + 2-1 = 3.
     #   C2(n1): ogon n0 jest 1, więc avail(j) = (j+2)*Delta, deficyt 1, kandydat 2.

@@ -43,7 +43,7 @@ if(ENABLE_UNITY_BUILD)
   set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD ON)
 endif()
 
-# Precompiled headers — te same co rdb, skraca czas kompilacji ~20 plików .cpp.
+# Precompiled headers - te same co rdb, skraca czas kompilacji ~20 plików .cpp.
 target_precompile_headers(
   ${PROJECT_NAME}
   PRIVATE #

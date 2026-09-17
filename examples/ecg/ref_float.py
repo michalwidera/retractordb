@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =============================================================================
-# ref_float.py — referencja zmiennoprzecinkowa dla eksperymentu E2 (dokładność)
+# ref_float.py - referencja zmiennoprzecinkowa dla eksperymentu E2 (dokładność)
 # =============================================================================
 #
 # CEL EKSPERYMENTU E2
@@ -8,10 +8,10 @@
 #   i deterministyczne nad liczbami wymiernymi (Tw. 2, Wniosek o determinizmie).
 #   Porównujemy dwie ścieżki tego samego potoku Pan–Tompkins:
 #
-#     (a) ścieżka WYMIERNA  — RetractorDB (arytmetyka całkowita/wymierna);
+#     (a) ścieżka WYMIERNA  - RetractorDB (arytmetyka całkowita/wymierna);
 #                             wynik przechwytujemy z xqry, jest bit-dokładny
 #                             i powtarzalny między uruchomieniami i platformami.
-#     (b) ścieżka FLOAT     — TEN skrypt: identyczna struktura operacji, ale
+#     (b) ścieżka FLOAT     - TEN skrypt: identyczna struktura operacji, ale
 #                             w double i z prawdziwym dzieleniem; akumuluje
 #                             błąd zaokrągleń. To "naiwny baseline".
 #
@@ -27,9 +27,9 @@
 #
 #   UWAGA O ORIENTACJI OKNA: zakładamy, że operator @(1,N) tworzy okno
 #   [próbka n-(N-1) .. próbka n] (od najstarszej do najnowszej) i paruje je
-#   ze współczynnikami w kolejności pliku — co odpowiada splotowi przyczynowemu
+#   ze współczynnikami w kolejności pliku - co odpowiada splotowi przyczynowemu
 #   z odwróconym wektorem współczynników. Dla bp_coef (symetryczny) orientacja
-#   jest bez znaczenia, ale dla d_coef (antysymetryczny) — istotna. Przed
+#   jest bez znaczenia, ale dla d_coef (antysymetryczny) - istotna. Przed
 #   raportowaniem liczb do artykułu należy potwierdzić tę orientację względem
 #   faktycznej semantyki AGSE w kodzie (kompilacja-zapytan/przetwarzanie-symbolu-_).
 #

@@ -356,7 +356,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_multibyte_record) {
   EXPECT_EQ(buf[2], 0xF3);
   EXPECT_EQ(buf[3], 0xF4);
 
-  // Position 1*multiRecSize (byte offset for second record) — unchanged
+  // Position 1*multiRecSize (byte offset for second record) - unchanged
   GTEST_ASSERT_EQ(shd->read(buf, 1 * multiRecSize), EXIT_SUCCESS);
   EXPECT_EQ(buf[0], 0x0A);
   EXPECT_EQ(buf[1], 0x0B);

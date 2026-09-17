@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Wykonanie planu i porównanie treści rekordów — bramka poprawności
+"""Wykonanie planu i porównanie treści rekordów - bramka poprawności
 odwzorowania oracle'a.
 
 Bramka nie mierzy czasu i nie porównuje systemów. Sprawdza jedno: czy silnik
@@ -70,7 +70,7 @@ def horizon_of(plan, origins, tails, records):
     """Czas scienny, po ktorym KAZDY wezel ma juz `records` rekordow.
 
     Rekord n jest emitowany w chwili (n+1+W)*Delta, a PIERWSZYM istniejacym jest
-    rekord o indeksie `origin` — przed nim rekordow nie ma. Ostatni potrzebny ma
+    rekord o indeksie `origin` - przed nim rekordow nie ma. Ostatni potrzebny ma
     wiec indeks origin+records-1 i to on wyznacza horyzont.
 
     `origins` i `tails` sa wielkosciami INDEKSOWYMI i maja pochodzic z MODELU
@@ -83,12 +83,12 @@ def horizon_of(plan, origins, tails, records):
     interwalow (`(records+8)*spread`), a origin do wzoru nie wchodzil. W planie,
     w ktorym `>N` skladaja sie w lancuch, origin narasta (zmierzone: 8 -> 13 ->
     26 -> 34) i budzet konczyl sie, zanim najglebszy wezel doszedl do wlasnego
-    origin. Artefakt zostawal pusty — poprawnie, bo przed origin nie ma rekordow
-    — a bramka odwzorowania raportowala to jako `zero rekordow`, czyli ROZBIEZNOSC
+    origin. Artefakt zostawal pusty - poprawnie, bo przed origin nie ma rekordow
+    - a bramka odwzorowania raportowala to jako `zero rekordow`, czyli ROZBIEZNOSC
     TRESCI. Byla to granica aparatury podana jako wynik o silniku; trzy takie
     przypadki zatrzymaly poziom bramki w K24f (patrz jej STOP.md).
 
-    JEDYNA definicja tego rachunku w aparaturze — `run_mapping_gate.py`
+    JEDYNA definicja tego rachunku w aparaturze - `run_mapping_gate.py`
     i `check_agse_capacity.py` ja importuja. Nie wolno jej kopiowac: dwa zapisy
     tej samej reguly rozjezdzaja sie po cichu i raz juz to zrobily (naprawa
     z 2026-09-12 trafila najpierw tylko do bramki odwzorowania).
@@ -106,7 +106,7 @@ def wakeup_budget(plan, horizon):
     """Gorne ograniczenie liczby pobudek w czasie `horizon`.
 
     `-m N` jest budzetem SLOTOW, a slot jest chwila, w ktorej tyka co najmniej
-    jeden strumien — nie taktem najszybszego strumienia. Pobudek jest wiec
+    jeden strumien - nie taktem najszybszego strumienia. Pobudek jest wiec
     najwyzej tyle, ile sumarycznie tykniec wszystkich strumieni w horyzoncie;
     chwile wspolne tylko zmniejszaja te liczbe, wiec suma jest bezpieczna.
     Wlasnosc "suma tykniec >= liczba roznych chwil" sprawdza wprost
@@ -142,7 +142,7 @@ def compare_content(plan, workdir, limit=24):
 
     Pozycja w artefakcie jest indeksem FIZYCZNYM. Strumień o niezerowym
     początku logicznym nie ma rekordów przed origin, więc jego rekord fizyczny
-    0 nosi indeks logiczny równy origin — i to pod tym indeksem trzeba pytać
+    0 nosi indeks logiczny równy origin - i to pod tym indeksem trzeba pytać
     model o treść. Porównywanie pozycji z pozycją dawałoby fałszywe
     rozbieżności dla każdego planu z `@` albo `>N`.
     """

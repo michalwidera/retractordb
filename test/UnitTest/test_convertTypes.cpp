@@ -81,7 +81,7 @@ TEST(any_to_variant_cast, unsupported_type_throws) {
   EXPECT_THROW(any_to_variant_cast(std::any(std::vector<int>{1, 2})), std::bad_any_cast);
 }
 
-// ── cast<descFldVT> — NULLTYPE ────────────────────────────────────────────────
+// ── cast<descFldVT> - NULLTYPE ────────────────────────────────────────────────
 
 TEST(cast_variant, nulltype_returns_monostate) {
   cast<rdb::descFldVT> c;
@@ -90,7 +90,7 @@ TEST(cast_variant, nulltype_returns_monostate) {
   EXPECT_TRUE(std::holds_alternative<std::monostate>(result));
 }
 
-// ── cast<descFldVT> — null input fallback ────────────────────────────────────
+// ── cast<descFldVT> - null input fallback ────────────────────────────────────
 
 TEST(cast_variant, monostate_input_returns_fallback_for_integer) {
   cast<rdb::descFldVT> c;
@@ -99,7 +99,7 @@ TEST(cast_variant, monostate_input_returns_fallback_for_integer) {
   EXPECT_EQ(std::get<int>(result), 0);
 }
 
-// ── cast<descFldVT> — numeric conversions ────────────────────────────────────
+// ── cast<descFldVT> - numeric conversions ────────────────────────────────────
 
 TEST(cast_variant, int_to_byte) {
   cast<rdb::descFldVT> c;
@@ -137,7 +137,7 @@ TEST(cast_variant, rational_to_float) {
   EXPECT_FLOAT_EQ(std::get<float>(c(in, rdb::FLOAT)), 0.5F);
 }
 
-// Zaokraglenie przy rzutowaniu na INTEGER — OBCIECIE W STRONE ZERA, nie podloga.
+// Zaokraglenie przy rzutowaniu na INTEGER - OBCIECIE W STRONE ZERA, nie podloga.
 // Regula jest udokumentowana (operatory-agregujace.md, sekcja "Zaokraglenie") i korpus
 // UC04/UC06/UC08 opiera na niej swoje modele w Pythonie, gdzie `//` PODLOGUJE. Roznica
 // widac tylko na wartosciach ujemnych, wiec bez tych przypadkow zmiana rational_cast na
@@ -153,14 +153,14 @@ TEST(cast_variant, rational_to_integer_truncates_toward_zero) {
   EXPECT_EQ(std::get<int>(c(negativeSmall, rdb::INTEGER)), -1);  // podloga dalaby -2
 }
 
-// Ta sama regula dla argumentu zmiennoprzecinkowego — to_integer nie rozroznia zrodla.
+// Ta sama regula dla argumentu zmiennoprzecinkowego - to_integer nie rozroznia zrodla.
 TEST(cast_variant, double_to_integer_truncates_toward_zero) {
   cast<rdb::descFldVT> c;
   rdb::descFldVT in = -2.6666666666666665;
   EXPECT_EQ(std::get<int>(c(in, rdb::INTEGER)), -2);  // podloga dalaby -3
 }
 
-// ── cast<descFldVT> — STRING ──────────────────────────────────────────────────
+// ── cast<descFldVT> - STRING ──────────────────────────────────────────────────
 
 TEST(cast_variant, int_to_string) {
   cast<rdb::descFldVT> c;
@@ -193,7 +193,7 @@ TEST(cast_variant, rational_to_string) {
   EXPECT_EQ(std::get<std::string>(c(in, rdb::STRING)), "2/3");
 }
 
-// ── cast<descFldVT> — RATIONAL ───────────────────────────────────────────────
+// ── cast<descFldVT> - RATIONAL ───────────────────────────────────────────────
 
 TEST(cast_variant, int_to_rational) {
   cast<rdb::descFldVT> c;
@@ -216,7 +216,7 @@ TEST(cast_variant, string_to_rational) {
   EXPECT_EQ(std::get<boost::rational<int>>(c(in, rdb::RATIONAL)), boost::rational<int>(3, 4));
 }
 
-// ── cast<descFldVT> — INTPAIR ────────────────────────────────────────────────
+// ── cast<descFldVT> - INTPAIR ────────────────────────────────────────────────
 
 TEST(cast_variant, int_to_intpair) {
   using P = std::pair<int, int>;
@@ -251,7 +251,7 @@ TEST(cast_variant, string_to_intpair) {
   EXPECT_EQ(result, expected);
 }
 
-// ── cast<std::any> — numeric conversions ─────────────────────────────────────
+// ── cast<std::any> - numeric conversions ─────────────────────────────────────
 
 TEST(cast_any, nulltype_returns_monostate) {
   cast<std::any> c;

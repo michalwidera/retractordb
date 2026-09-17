@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Generuje d_coef.txt — wspolczynniki filtra rozniczkujacego FIR
+# Generuje d_coef.txt - wspolczynniki filtra rozniczkujacego FIR
 # stosowanego w kroku 2 algorytmu Pan-Tompkins.
 #
 # Filtr 5-punktowy (przyblizona pierwsza pochodna) wg Pan & Tompkins (1985):
@@ -9,10 +9,10 @@
 #   h = [-1, -2, 0, 2, 1]
 #
 # Wlasciwosci:
-#   - Suma wspolczynnikow = 0  (zerowe wzmocnienie DC — eliminuje ofsety)
+#   - Suma wspolczynnikow = 0  (zerowe wzmocnienie DC - eliminuje ofsety)
 #   - Maksymalizuje pochodna na czestotliwosciach QRS (~10-25 Hz)
 #   - Przy fs=360 Hz czynnik skalujacy (1/8T) = 360/8 = 45 Hz
-#     (pomijany w implementacji — nie wplywa na detekcje szczytow)
+#     (pomijany w implementacji - nie wplywa na detekcje szczytow)
 #
 # Uzycie w RQL:
 #   DECLARE d_coef INTEGER[5] STREAM df, 1 FILE 'd_coef.txt'

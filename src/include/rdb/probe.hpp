@@ -1,6 +1,6 @@
 #pragma once
 
-/// @brief Sondy pomiarowe kampanii benchmarkowych — jedno miejsce dla całej instrumentacji.
+/// @brief Sondy pomiarowe kampanii benchmarkowych - jedno miejsce dla całej instrumentacji.
 ///
 /// Sondy nie są funkcją produktu: mierzą go na potrzeby eksperymentów (E1/E2E czas slotu,
 /// E3 rozmiar planu, E4 praca na slot, K6 objętość materializacji). Dlatego ich kod jest
@@ -9,7 +9,7 @@
 ///
 /// Włączanie: opcja CMake `RDB_BENCH_PROBE` (scripts/buildrdb.sh probe) ustawia stałe
 /// `rdb_probe_*` w `probeConfig.h`. Gdy stała jest `false`, `if constexpr` odrzuca treść sondy
-/// — w wyniku nie zostaje po niej ani instrukcja. Kod sondy mimo to przechodzi przez
+/// - w wyniku nie zostaje po niej ani instrukcja. Kod sondy mimo to przechodzi przez
 /// kompilator w KAŻDYM buildzie, więc nie może zgnić niezauważony; poprzednia wersja
 /// (`#ifdef RDB_BENCH_PROBE`) tej własności nie miała.
 ///
@@ -21,7 +21,7 @@
 /// `streamInstance.cpp.o` symbole sondy mimo `rdb_probe_work == false`.
 ///
 /// Gdy wyliczenie ARGUMENTU samo kosztuje (np. storage::isMemoryBackedStorage() porównuje
-/// napisy), `if constexpr` musi objąć całe wywołanie w miejscu pomiaru — wrapper wycina
+/// napisy), `if constexpr` musi objąć całe wywołanie w miejscu pomiaru - wrapper wycina
 /// swoje ciało, ale argumenty wylicza wywołujący.
 ///
 /// Wątkowość: wszystkie liczniki są procesowe i NIE są atomowe. Inkrementacje zachodzą
@@ -48,7 +48,7 @@ class Descriptor;
 
 namespace rdb::probe {
 
-/// Czy jakakolwiek sonda jest wkompilowana — do banerów ostrzegawczych.
+/// Czy jakakolwiek sonda jest wkompilowana - do banerów ostrzegawczych.
 constexpr bool enabled = rdb_probe_slot || rdb_probe_plan || rdb_probe_materialize || rdb_probe_work;
 
 //
@@ -63,10 +63,10 @@ constexpr bool enabled = rdb_probe_slot || rdb_probe_plan || rdb_probe_materiali
 
 struct workCounters {
   unsigned long long agseWindows  = 0;  ///< konstrukcje okna agregatu (wywołania constructAgsePayload)
-  unsigned long long agseElements = 0;  ///< odwiedziny elementów okna — praca rosnąca z długością okna
+  unsigned long long agseElements = 0;  ///< odwiedziny elementów okna - praca rosnąca z długością okna
   unsigned long long agseReads    = 0;  ///< odczyty rekordu źródła (revRead); mniej niż elementów, gdy cache trafia
   unsigned long long evalCalls    = 0;  ///< wywołania ewaluatora wyrażeń
-  unsigned long long evalTokens   = 0;  ///< wykonania tokenów RPN — praca arytmetyczna
+  unsigned long long evalTokens   = 0;  ///< wykonania tokenów RPN - praca arytmetyczna
   unsigned long long hashPicks    = 0;  ///< wybory składowej przeplotu (STREAM_HASH)
   unsigned long long addMerges    = 0;  ///< scalenia payloadów sumy strumieni (STREAM_ADD)
 };
@@ -75,10 +75,10 @@ struct workCounters {
 ///
 /// Liczone są wyłącznie zapisy, które faktycznie dotarły do accessora; rekord all-null
 /// pochłonięty przez detekcję gap nie jest materializacją. Nadpisanie nie zwiększa
-/// objętości magazynu, tylko koszt zapisu — stąd rozdział dopisań i nadpisań.
+/// objętości magazynu, tylko koszt zapisu - stąd rozdział dopisań i nadpisań.
 ///
 /// Magazyn trwały i pamięciowy są liczone ROZDZIELNIE. Bez tego plan z `SUBSTRAT 'memory'`
-/// raportowałby objętość materializacji, której nigdy nie zapisał na dysk — a to jest
+/// raportowałby objętość materializacji, której nigdy nie zapisał na dysk - a to jest
 /// dokładnie ta liczba, którą artykuł nazwałby „objętością materializacji".
 struct materializationCounters {
   unsigned long long appends          = 0;
@@ -89,25 +89,25 @@ struct materializationCounters {
   unsigned long long memoryBytes      = 0;
 };
 
-/// Kanoniczne zapisy logiczne (K23/H9) — metryka PIERWOTNA kampanii K23, obok
+/// Kanoniczne zapisy logiczne (K23/H9) - metryka PIERWOTNA kampanii K23, obok
 /// `materializationCounters`, nie zamiast nich.
 ///
 /// Trzy różnice wobec licznika natywnego wynikają wprost ze specyfikacji metryki:
 ///
-/// 1. **bajty są kanoniczne, nie natywne** — liczone przez canonicalRecordBytes() wg
+/// 1. **bajty są kanoniczne, nie natywne** - liczone przez canonicalRecordBytes() wg
 ///    odwzorowania niezależnego od reprezentacji obu porównywanych systemów, wraz
 ///    z kanoniczną mapą NULL/luk. Natywne `mat_bytes` są nieporównywalne między
 ///    RetractorDB a Flinkiem, bo opisują dwa różne formaty rekordu.
-/// 2. **rola strumienia jest rozdzielona** — metryka pyta o zapisy do materializowanego
+/// 2. **rola strumienia jest rozdzielona** - metryka pyta o zapisy do materializowanego
 ///    podplanu (substraty), a mianownikiem jest liczba publicznych rekordów wyjściowych.
 ///    Licznik natywny jest globalny, więc jednej ani drugiej wielkości nie daje.
-/// 3. **nadpisanie wnosi bajty** — jednostką jest RZECZYWISTY ZAPIS rekordu pośredniego,
+/// 3. **nadpisanie wnosi bajty** - jednostką jest RZECZYWISTY ZAPIS rekordu pośredniego,
 ///    nie przyrost objętości magazynu. Substrat na buforze kołowym (`SUBSTRAT 'memory'`)
 ///    po zawinięciu idzie ścieżką nadpisania; licznik natywny pokazałby tam zero bajtów,
 ///    czyli bramka mechanizmu przeszłaby, a metryka pierwotna skłamała. Dopisania
 ///    i nadpisania zostają rozdzielne, żeby ten reżim był widoczny w raporcie.
 ///
-/// Zapis pochłonięty przez detekcję gap nie jest liczony — wynika to z położenia sondy
+/// Zapis pochłonięty przez detekcję gap nie jest liczony - wynika to z położenia sondy
 /// za `metaData_->absorbAppend()`, nie z osobnej reguły tutaj.
 struct logicalWriteCounters {
   unsigned long long substrateAppends    = 0;
@@ -120,11 +120,11 @@ struct logicalWriteCounters {
 
 namespace detail {
 // Stan sond ścieżki gorącej (okno agregatu, ewaluator, zapis rekordu) leży w nagłówku, bo
-// inkrementacja musi się inline'ować — skok do innej jednostki kompilacji byłby w pomiarze
+// inkrementacja musi się inline'ować - skok do innej jednostki kompilacji byłby w pomiarze
 // widoczny. Przy wyłączonej sondzie te obiekty nadal istnieją (kilkadziesiąt bajtów
 // w .bss), ale nikt ich nie dotyka. Stan sondy planu jest zamknięty w probe.cc: jest zimny
 // (raz na kompilację), a std::set w nagłówku oznaczałby dynamiczną inicjalizację w każdej
-// jednostce kompilacji dołączającej ten plik — także tam, gdzie sond nie ma.
+// jednostce kompilacji dołączającej ten plik - także tam, gdzie sond nie ma.
 inline workCounters work{};
 inline materializationCounters materialization{};
 inline logicalWriteCounters logicalWrite{};
@@ -151,7 +151,7 @@ void countRewriteR3(std::size_t applied);
 }
 
 /// Wykonanie programu wyrażenia: praca arytmetyczna slotu to LICZBA WYKONANYCH tokenów,
-/// nie rozmiar programu w planie — ten sam program wykonuje się raz na slot na każdy
+/// nie rozmiar programu w planie - ten sam program wykonuje się raz na slot na każdy
 /// strumień, który go używa.
 [[gnu::always_inline]] inline void onEval(std::size_t tokens) noexcept {
   if constexpr (rdb_probe_work) {
@@ -205,12 +205,12 @@ void materializationReset();
 ///
 /// **To jest serializer metryki pierwotnej K23 i jedyne miejsce, w którym wolno go zmienić.**
 /// Ta sama definicja obowiązuje job Flinka; predeklaracja kampanii ją zamraża. Wynik zależy
-/// wyłącznie od deskryptora, nie od zawartości rekordu — metryka bajtowa jest
+/// wyłącznie od deskryptora, nie od zawartości rekordu - metryka bajtowa jest
 /// deterministycznym wynikiem mechanizmu, więc nie może się zmieniać z danymi.
 std::size_t canonicalRecordBytes(const Descriptor &descriptor);
 
 /// Zapis rekordu do magazynu strumienia: `substrate` rozdziela materializowany podplan od
-/// wyniku publicznego, `append` — dopisanie od nadpisania.
+/// wyniku publicznego, `append` - dopisanie od nadpisania.
 [[gnu::always_inline]] inline void onLogicalWrite(bool substrate, bool append, std::size_t canonicalBytes) noexcept {
   if constexpr (rdb_probe_materialize) {
     auto &counters = detail::logicalWrite;
@@ -233,7 +233,7 @@ std::size_t canonicalRecordBytes(const Descriptor &descriptor);
 logicalWriteCounters logicalWriteReport();
 void logicalWriteReset();
 
-/// Raport liczników runtime (K6 + K23 + E4) na stderr, po zakończeniu mierzonej pętli — żeby
+/// Raport liczników runtime (K6 + K23 + E4) na stderr, po zakończeniu mierzonej pętli - żeby
 /// zliczanie nie obciążało budżetu slotu. Każdy wiersz sterowany osobną zmienną
 /// środowiskową (`RDB_BENCH_MATERIALIZE`, `RDB_BENCH_LOGICAL`, `RDB_BENCH_WORK`), bo to różne
 /// wielkości: tam objętość zapisów w reprezentacji natywnej, obok kanoniczne bajty zapisów
@@ -248,13 +248,13 @@ void logicalWriteReset();
 
 /// Sonda slotu: CSV z czasem obliczeń i latencją end-to-end, analizowany przez
 /// examples/ecg/e1_stats.py. Kolumny:
-///   compute_ns  — czas processRows() (E1, czysty rdzeń obliczeń),
-///   wake_lag_ns — spóźnienie pobudki względem deadline'u interwału (kotwica + interwał;
-///                 ten sam cel, do którego dąży rtAbsoluteSleep) — jitter planisty,
-///   e2e_ns      — od deadline'u (nominalny moment pojawienia się krotki wejściowej
+///   compute_ns  - czas processRows() (E1, czysty rdzeń obliczeń),
+///   wake_lag_ns - spóźnienie pobudki względem deadline'u interwału (kotwica + interwał;
+///                 ten sam cel, do którego dąży rtAbsoluteSleep) - jitter planisty,
+///   e2e_ns      - od deadline'u (nominalny moment pojawienia się krotki wejściowej
 ///                 w modelu czasowym) do końca emisji wyniku do kolejek IPC.
 /// Aktywna dopiero, gdy `RDB_BENCH_CSV` wskazuje plik wyjściowy. Uwaga: bez `-t` pętla
-/// śpi względnie, więc dryf kumuluje się w wake_lag/e2e — do CDF E2E miarodajny jest
+/// śpi względnie, więc dryf kumuluje się w wake_lag/e2e - do CDF E2E miarodajny jest
 /// przebieg z `-t`.
 class slotProbe {
  public:
@@ -271,7 +271,7 @@ class slotProbe {
     if constexpr (rdb_probe_slot) openCsv();
   }
 
-  /// Kotwica osi czasu — dokładnie ta sama, względem której planowany jest sen slotu.
+  /// Kotwica osi czasu - dokładnie ta sama, względem której planowany jest sen slotu.
   [[gnu::always_inline]] void anchor(const std::timespec &origin) {
     if constexpr (rdb_probe_slot) setAnchor(origin);
   }
@@ -289,7 +289,7 @@ class slotProbe {
     if constexpr (rdb_probe_slot) markComputeEnd();
   }
 
-  /// Koniec slotu — po emisji wyniku; dopisuje wiersz CSV.
+  /// Koniec slotu - po emisji wyniku; dopisuje wiersz CSV.
   [[gnu::always_inline]] void endSlot() {
     if constexpr (rdb_probe_slot) writeRow();
   }
@@ -317,10 +317,10 @@ class slotProbe {
 //
 
 /// Plan opisany czwórką liczb, z pominięciem dyrektyw kompilatora:
-///   * strumienie publiczne i substraty osobno — substrat nie ma tożsamości obserwowalnej,
+///   * strumienie publiczne i substraty osobno - substrat nie ma tożsamości obserwowalnej,
 ///     więc to on jest właściwą jednostką redukcji strukturalnej;
-///   * tokeny drzewa FROM (query::lProgram) — tam widać efekt R1 i deduplikacji;
-///   * tokeny programów pól (field::lProgram) — tam i TYLKO tam widać efekt R2.
+///   * tokeny drzewa FROM (query::lProgram) - tam widać efekt R1 i deduplikacji;
+///   * tokeny programów pól (field::lProgram) - tam i TYLKO tam widać efekt R2.
 /// Ostatni składnik jest konieczny: współdzielenie równoważnych SELECT przenosi kosztowny
 /// program pól do jednego substratu, nie zmieniając ani jednego tokenu w lProgram.
 struct planShape {
@@ -330,7 +330,7 @@ struct planShape {
   std::size_t fieldTokens   = 0;
 };
 
-/// Rozmiar buforów planu (K6, §9.2) — wynik computeRequiredCapacities(). Suma jest
+/// Rozmiar buforów planu (K6, §9.2) - wynik computeRequiredCapacities(). Suma jest
 /// proporcjonalna do zajętości pamięci planu, maksimum wskazuje najgłębszy bufor,
 /// czyli ten decydujący o najgorszym przypadku.
 struct capacityShape {
@@ -344,12 +344,12 @@ struct capacityShape {
 enum class planStage : std::uint8_t {
   entry,      ///< surowy plan po parsowaniu
   preDedup,   ///< po kanonizacji do postaci pośredniej (dekompozycja)
-  postDedup,  ///< po eliminacji zdublowanych substratów — właściwa redukcja planu
+  postDedup,  ///< po eliminacji zdublowanych substratów - właściwa redukcja planu
   exit        ///< końcowy, zoptymalizowany plan
 };
 
 /// Kształt planu. Szablon, bo typy planu (qTree/query/field) należą do biblioteki
-/// retractor, a sonda leży poziom niżej — w rdb, gdzie sięga po nią także storage.
+/// retractor, a sonda leży poziom niżej - w rdb, gdzie sięga po nią także storage.
 template <class Plan>
 planShape shapeOf(const Plan &plan) {
   planShape acc;
@@ -379,13 +379,13 @@ capacityShape shapeOfCapacities(const CapacityMap &capacities) {
   if constexpr (rdb_probe_plan) detail::countRewriteR1();
 }
 
-/// Zastosowanie reguły R2 (przemienność ADD przy odciskach) w danym węźle — liczone
+/// Zastosowanie reguły R2 (przemienność ADD przy odciskach) w danym węźle - liczone
 /// po węzłach, bo ta sama reguła może odpalić w jednym węźle wielokrotnie.
 [[gnu::always_inline]] inline void onRewriteR2(const std::string &node) {
   if constexpr (rdb_probe_plan) detail::countRewriteR2(node);
 }
 
-/// Zastosowania reguły R3 (uproszczenia algebraiczne wyrażeń) — liczone sumą przepisań,
+/// Zastosowania reguły R3 (uproszczenia algebraiczne wyrażeń) - liczone sumą przepisań,
 /// bo jedno wyrażenie może zwinąć wiele stałych naraz, a metryka pyta o rozmiar planu.
 [[gnu::always_inline]] inline void onRewriteR3(std::size_t applied) {
   if constexpr (rdb_probe_plan) detail::countRewriteR3(applied);
@@ -396,7 +396,7 @@ capacityShape shapeOfCapacities(const CapacityMap &capacities) {
 ///
 /// Czas instrumentacji jest ODEJMOWANY od czasu kompilacji: migawka iteruje cały plan,
 /// więc jej koszt zależy od rozmiaru planu, a ten różni się między profilami ablacyjnymi
-/// — bez odjęcia profil o większym planie wyglądałby na wolniejszy częściowo z powodu
+/// - bez odjęcia profil o większym planie wyglądałby na wolniejszy częściowo z powodu
 /// własnego pomiaru.
 class planProbe {
  public:

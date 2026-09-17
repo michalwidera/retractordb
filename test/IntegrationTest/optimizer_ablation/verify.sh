@@ -45,7 +45,7 @@ expected_r2=0
 # Dwa ostatnie są możliwe dopiero od zniesienia warunku jednego konsumenta.
 [ "$factor" = "ON" ] && expected_r1=4
 [ "$commutative" = "ON" ] && expected_r2=1
-# query.rql nie ma w polach ani jednej stałej do zwinięcia — R3 nie ma tu czego przepisać
+# query.rql nie ma w polach ani jednej stałej do zwinięcia - R3 nie ma tu czego przepisać
 # niezależnie od przełącznika, i to jest treść oczekiwania: reguła nie rusza wyrażeń,
 # w których nie ma stałych.
 expected_r3=0
@@ -53,7 +53,7 @@ expected_r3=0
 if [ "$probe" = "ON" ]; then
   grep -Fx "REWRITE_APPLIED r1=$expected_r1 r2=$expected_r2 r3=$expected_r3" out_probe.txt
 
-  # Czas kompilacji (K6). Wartość musi być dodatnia, a narzut sondy odjęty —
+  # Czas kompilacji (K6). Wartość musi być dodatnia, a narzut sondy odjęty -
   # mutacja usuwająca odjęcie zostawia sonda=0 i wtedy ten test nie zabija,
   # dlatego sprawdzany jest osobno warunek narzut > 0.
   compile_ns=$(sed -n 's/^COMPILE_NS \([0-9]*\) sonda=\([0-9]*\)$/\1/p' out_probe.txt)
@@ -165,13 +165,13 @@ fi
 # Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
 # wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
 # Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
-# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+# znaczy 'fields' w wyjsciu DOT - do wywolan kompilacyjnych jej NIE dodawac.
 RDB_BENCH_MATERIALIZE=1 "$xretractor_bin" query.rql -r -k -m 48 -f 2> out_run.txt
 
 if [ "$probe" = "ON" ]; then
   # Licznik materializacji (K6) ma wyrocznię: zadeklarowana objętość trwała musi
   # równać się sumie rozmiarów plików danych na dysku. Plan ma SUBSTRAT 'memory',
-  # więc część zapisów NIE trafia na dysk — bez rozdzielenia trwałych od
+  # więc część zapisów NIE trafia na dysk - bez rozdzielenia trwałych od
   # pamięciowych ta równość by nie zachodziła.
   reported=$(sed -n 's/^MATERIALIZED trwale: dopisania=[0-9]* nadpisania=[0-9]* bajty=\([0-9]*\) .*$/\1/p' out_run.txt)
   on_disk=$(find temp -type f ! -name '*.desc' ! -name '*.meta' ! -name '*.shadow' -printf '%s\n' | awk '{s+=$1} END {print s+0}')
@@ -188,7 +188,7 @@ fi
 # obie postaci daja ten sam ciag rekordow, a strona sfaktoryzowana ma ogon NIE WIEKSZY.
 # Przy factor=ON obie strony schodza sie do jednego ksztaltu i rownosc jest PELNA,
 # lacznie z dlugoscia. Przy factor=OFF strona niefaktoryzowana naprawde czeka dluzej
-# (czyta skladowe PO ich wlasnym przesunieciu), wiec wydaje mniej rekordow — i to jest
+# (czyta skladowe PO ich wlasnym przesunieciu), wiec wydaje mniej rekordow - i to jest
 # zachowanie DOZWOLONE przez `def:observable`, ktore zada rownosci `Val`, ale tylko
 # `Lat(prawa) <= Lat(lewa)`. Zadanie rownosci dlugosci byloby ostrzejsze niz relacja
 # obserwowalnosci; dokladnie tak oblala bramka `public_identity` kampanii K23
@@ -209,7 +209,7 @@ compare_identity() { # compare_identity <niefaktoryzowana> <sfaktoryzowana> <ety
   size_right=$(stat -c %s "$right")
   common=$(( size_left < size_right ? size_left : size_right ))
   [ "$common" -gt 0 ] || { echo "$label: pusty wspolny prefiks"; exit 1; }
-  # Tresc na wspolnym prefiksie musi byc identyczna — to jest rownosc `Val`.
+  # Tresc na wspolnym prefiksie musi byc identyczna - to jest rownosc `Val`.
   cmp -n "$common" "$left" "$right"
   # Kierunek nierownosci: strona sfaktoryzowana wyprzedza. Rownosc albo odwrotna
   # nierownosc znaczylaby, ze optymalizacja opoznienia zniknela.
@@ -231,14 +231,14 @@ elif [ "$mode" = "factor-shared-substrate-semantic" ]; then
   cmp <(tail -c +9 temp/mixed_shift.meta) <(tail -c +9 temp/mixed_shift_reference.meta)
 elif [ "$mode" = "factor-name-collision-semantic" ]; then
   # Gdyby reguła użyła ponownie cudzej projekcji, collide_user dostałby pola
-  # w odwrotnej kolejności — różnica jest widoczna bajtowo.
+  # w odwrotnej kolejności - różnica jest widoczna bajtowo.
   #
-  # ZAKRES ROWNOSCI — decyzja A z 2026-08-07. collide_user ma faktoryzacje R1
+  # ZAKRES ROWNOSCI - decyzja A z 2026-08-07. collide_user ma faktoryzacje R1
   # ZABLOKOWANA przez kolizje nazw, wiec wykonuje sie jako (CA>2)#(CB>1), a jego ogon jest
   # SCISLE WIEKSZY od ogona collide_reference zapisanego wprost jako (CA2#CB2)>3: strona
   # niefaktoryzowana czyta skladowe PO ich wlasnym przesunieciu, wiec na te sama tresc
   # czeka dluzej. Rownosc jest wiec tozsamoscia ciagu rekordow (tresc + indeks logiczny
-  # + origin), nie opoznienia — porownujemy wspolny prefiks.
+  # + origin), nie opoznienia - porownujemy wspolny prefiks.
   #
   # Do 2026-08-07 obie strony mialy ten sam ogon wylacznie dlatego, ze tau_N zawyzalo swoj
   # o min(W_src, N). Zawyzenie zmierzono w kampanii K24p (§2.2) i zdjeto adresowaniem
@@ -248,7 +248,7 @@ elif [ "$mode" = "factor-name-collision-semantic" ]; then
   common=$(( size_user < size_reference ? size_user : size_reference ))
   [ "$common" -gt 0 ]
   cmp -n "$common" temp/collide_user temp/collide_reference
-  # Origin jest ten sam po obu stronach — to on niesie tozsamosc; rozni sie ogon.
+  # Origin jest ten sam po obu stronach - to on niesie tozsamosc; rozni sie ogon.
   grep -F 'collide_user(1/15)	tail=2	origin=3' out_compile.txt
   grep -F 'collide_reference(1/15)	origin=3' out_compile.txt
   # Strona sfaktoryzowana ma byc SCISLE DLUZSZA. Rownosc albo odwrotna nierownosc
@@ -256,7 +256,7 @@ elif [ "$mode" = "factor-name-collision-semantic" ]; then
   [ "$size_reference" -gt "$size_user" ]
 elif [ "$mode" = "factor-multiquery-semantic" ]; then
   # multi1 i multi2 to ten SAM ksztalt zapytania, wiec ich rownosc jest pelna
-  # niezaleznie od przelacznikow — tu porownanie dlugosci nadal obowiazuje.
+  # niezaleznie od przelacznikow - tu porownanie dlugosci nadal obowiazuje.
   cmp temp/multi1 temp/multi2
   cmp <(tail -c +9 temp/multi1.meta) <(tail -c +9 temp/multi2.meta)
   # Wobec postaci jawnie sfaktoryzowanej obowiazuje juz nierownosc opoznien.

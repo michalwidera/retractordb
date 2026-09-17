@@ -15,7 +15,7 @@ set(XRETRACTOR_GRAPH_PARAM_2 "-d -f -t -s -u -p")
 
 # Jedyne miejsce w calym drzewie testow, ktore wola graphviza: pozostale testy
 # `-dot` porownuja sam TEKST DOT z xretractora i `dot` im niepotrzebny. Test bez
-# narzedzia nie ma sie degradowac do slabszego sprawdzenia — ma sie NIE
+# narzedzia nie ma sie degradowac do slabszego sprawdzenia - ma sie NIE
 # ZAREJESTROWAC, zeby zielony przebieg nie znaczyl czegos innego na maszynie bez
 # graphviza. Obraz projektu (docker/ci/Dockerfile) ma graphviza, wiec na CI z
 # tego obrazu testy istnieja jak dotad.
@@ -23,7 +23,7 @@ find_program(RDB_DOT_EXECUTABLE dot)
 if(NOT RDB_DOT_EXECUTABLE)
   message(
     STATUS
-      "graphviz (dot) nieobecny — testy ${TestID}-*-graph NIE sa rejestrowane")
+      "graphviz (dot) nieobecny - testy ${TestID}-*-graph NIE sa rejestrowane")
   return()
 endif()
 

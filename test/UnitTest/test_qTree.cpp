@@ -108,7 +108,7 @@ TEST(qTree, topologicalSort_single_node_unchanged) {
 }
 
 TEST(qTree, topologicalSort_places_dependency_before_dependent) {
-  // A zależy od B — po sortowaniu B musi być przed A
+  // A zależy od B - po sortowaniu B musi być przed A
   qTree qt;
 
   query a = makeQuery("A");
@@ -157,7 +157,7 @@ TEST(qTree, dumpCore_does_not_crash) {
   qt.maxCapacity["s1"] = 10;
   qt.maxCapacity["s2"] = 5;
 
-  // dumpCore() pisze tabele na stdout — to jego zadanie, nie hałas do logu testu.
+  // dumpCore() pisze tabele na stdout - to jego zadanie, nie hałas do logu testu.
   testing::internal::CaptureStdout();
   qt.dumpCore();
   testing::internal::GetCapturedStdout();
@@ -171,7 +171,7 @@ TEST(qTree, getAvailableTimeIntervals_returns_unique_intervals) {
   qTree qt;
   qt.push_back(makeQuery("s1", 1, 2));
   qt.push_back(makeQuery("s2", 1, 1));
-  qt.push_back(makeQuery("s3", 1, 2));  // duplikat — zbiór nie powtarza
+  qt.push_back(makeQuery("s3", 1, 2));  // duplikat - zbiór nie powtarza
 
   auto intervals = qt.getAvailableTimeIntervals();
 

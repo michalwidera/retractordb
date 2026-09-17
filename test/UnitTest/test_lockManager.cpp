@@ -185,7 +185,7 @@ TEST(ServiceControlDeliver, overwrites_target_atomically) {
 // --- writeQueryFile: ta sama atomowa droga, ale dla TRESCI, nie pliku zrodlowego ---
 //
 // Uzywa jej przeladowanie planu w locie (`xqry --reset`): plan przychodzi kanalem IPC, wiec
-// pliku zrodlowego po stronie serwera nie ma. Tresc pusta jest zadaniem poprawnym — tak
+// pliku zrodlowego po stronie serwera nie ma. Tresc pusta jest zadaniem poprawnym - tak
 // sprowadza sie plik zapytan uslugi do stanu zerowego po bledzie krytycznym.
 
 TEST(ServiceControlWrite, writes_content_over_existing_target) {

@@ -7,17 +7,17 @@
 # do etykiety rezimu per klasa i zestawia ja z tablica odniesienia. Trzy rodzaje
 # dryftu sa dla niej niewidoczne Z KONSTRUKCJI:
 #
-#   1. dryft WARTOSCI — bramka nie sprawdza, co silnik policzyl. Zle liczby przy
+#   1. dryft WARTOSCI - bramka nie sprawdza, co silnik policzyl. Zle liczby przy
 #      nietknietych rezimach i nietknietych kompilacjach przechodza na zielono;
-#   2. dryft POZA KORPUSEM dwoch zamrozonych ziaren — zawsze te same 2 x 10 010
+#   2. dryft POZA KORPUSEM dwoch zamrozonych ziaren - zawsze te same 2 x 10 010
 #      planow, wiec zmiana zachowania poza nimi nie ma jak sie ujawnic;
-#   3. dryft WIELKOSCI wewnatrz etykiety — klasa juz zawyzajaca moze zawyzac
+#   3. dryft WIELKOSCI wewnatrz etykiety - klasa juz zawyzajaca moze zawyzac
 #      coraz mocniej, a etykieta sie nie zmieni (dzis uspiony: wszystkie dziewiec
 #      klas jest dokladnych, gdzie etykieta jest ciasna).
 #
 # Ten skrypt WYKONUJE silnik i konfrontuje go z czyms niezaleznym od niego:
 #
-#   1. losuje ZIARNO w chwili uruchomienia — kazdy przebieg przemiata inny
+#   1. losuje ZIARNO w chwili uruchomienia - kazdy przebieg przemiata inny
 #      wycinek przestrzeni planow generatora, zamiast wracac w to samo miejsce;
 #   2. zestawia wynik z MODELEM ZDARZENIOWYM (H10) i z NIEZALEZNA IMPLEMENTACJA
 #      w Apache Flink (H9, wartosci), a nie z tablica odniesienia;
@@ -43,11 +43,11 @@ CODE_REPO="$(cd "$HERE/../.." && pwd)"
 JOURNAL="$HERE/DRIFT_JOURNAL.tsv"
 
 # Ziarna kampanii, na ktorych hipoteza H10 zostala postawiona. Przebieg na nich
-# nie jest proba spoza — skrypt na to pozwala (odtworzenie wpisu z dziennika),
+# nie jest proba spoza - skrypt na to pozwala (odtworzenie wpisu z dziennika),
 # ale mowi o tym glosno.
 FROZEN_SEEDS=("20260803" "20260804" "20260806" "20260807")
 
-# Wolanie zapamietane PRZED petla parsujaca — ta zjada argumenty `shift`-em,
+# Wolanie zapamietane PRZED petla parsujaca - ta zjada argumenty `shift`-em,
 # wiec pozniej `$*` jest juz puste, a opis w blokadzie ma nazywac przebieg,
 # ktory ja trzyma.
 INVOCATION="$0 $*"
@@ -105,7 +105,7 @@ else
 fi
 
 # Wylacznosc przebiegu. Poziomy H9 pisza i czytaja DOWOD KOMPILACJI pod stala
-# sciezka w drzewie zrodlowym — `h9/corpus_validation` — bo tam, i tylko tam,
+# sciezka w drzewie zrodlowym - `h9/corpus_validation` - bo tam, i tylko tam,
 # szuka go `run_gates.py` (przez `validate_corpus.HERE`). Dwa przebiegi naraz
 # nadpisalyby sobie ten dowod: jeden kasowalby katalog w chwili, gdy drugi go
 # czyta, i bramka `corpus_validity` orzekalaby o cudzych plikach albo o pustce.
@@ -113,11 +113,11 @@ fi
 # `flock` zwalnia sie z zamknieciem deskryptora, wiec przebieg ubity albo
 # przerwany nie zostawia blokady do recznego sprzatania. Deskryptor otwierany
 # jest w trybie DOPISYWANIA: `>` obcinaloby plik przy samym otwarciu, czyli
-# jeszcze przed proba zajecia blokady — drugi przebieg kasowalby wtedy opis
+# jeszcze przed proba zajecia blokady - drugi przebieg kasowalby wtedy opis
 # pierwszemu, zanim dowie sie, ze ma sie wycofac.
 LOCK="$HERE/.drift.lock"
 if ! command -v flock >/dev/null 2>&1; then
-  echo "BLAD: brak flock — bez niego nie da sie zapewnic wylacznosci przebiegu" >&2
+  echo "BLAD: brak flock - bez niego nie da sie zapewnic wylacznosci przebiegu" >&2
   exit 2
 fi
 exec 9>>"$LOCK" || { echo "BLAD: nie da sie otworzyc $LOCK" >&2; exit 2; }
@@ -158,7 +158,7 @@ aux() { # aux <etykieta> <polecenie...>
     printf '  .            %s\n' "$label"
     return 0
   fi
-  printf '  .            %s — AWARIA APARATURY (log: %s)\n' "$label" "$(log_of "$label")"
+  printf '  .            %s - AWARIA APARATURY (log: %s)\n' "$label" "$(log_of "$label")"
   return 1
 }
 
@@ -170,7 +170,7 @@ echo "   ziarno   : $SEED ($SEED_ORIGIN)"
 echo "   katalog  : $WORK"
 echo "=============================================================="
 
-# Ile razy ta sama rewizja byla juz sprawdzana. Nie jest to zakaz — kazdy
+# Ile razy ta sama rewizja byla juz sprawdzana. Nie jest to zakaz - kazdy
 # przebieg bierze inne ziarno, wiec powtorzenie poszerza pokrycie. Jest to
 # informacja: dziennik ma pokazywac, ktora rewizja byla sprawdzona i z jakim
 # wynikiem, wiec warto wiedziec, ze wpisow o tej rewizji bedzie kilka.
@@ -178,7 +178,7 @@ if [[ -f "$JOURNAL" ]]; then
   PRIOR="$(awk -F'\t' -v sha="$ENGINE_SHA" '$2 == sha' "$JOURNAL" | wc -l)"
   if [[ "${PRIOR:-0}" -gt 0 ]]; then
     echo
-    echo "  UWAGA: rewizja $ENGINE_SHA byla juz sprawdzana $PRIOR raz(y) — patrz $JOURNAL."
+    echo "  UWAGA: rewizja $ENGINE_SHA byla juz sprawdzana $PRIOR raz(y) - patrz $JOURNAL."
     echo "  Kolejny przebieg bierze inne ziarno, wiec poszerza pokrycie, a nie powtarza"
     echo "  tego samego sprawdzenia."
   fi
@@ -190,7 +190,7 @@ fi
 # przypadkiem: drzewo musi byc brudne, jedyna bramka ze statusem FAIL musi byc
 # `corpus_validity`, a kazda linia rozbieznosci wypisana w sekcji STOP-6 musi byc
 # tym samym SHA po obu stronach, roznym tylko sufiksem `-dirty`. Cokolwiek innego
-# w tej sekcji — inne SHA, inna bramka, dodatkowa linia — konczy sie NIE.
+# w tej sekcji - inne SHA, inna bramka, dodatkowa linia - konczy sie NIE.
 only_provenance_failed() { # only_provenance_failed <gates.tsv> <log>
   local gates="$1" log="$2" failed
   [[ "$TREE" == "BRUDNE" ]] || return 1
@@ -236,7 +236,7 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
   aux "H10 samotest reguly decyzyjnej" python3 decision_rule.py --selftest || h10_ready=0
 
   if [[ "$h10_ready" -eq 0 ]]; then
-    undecided "H10 — aparatura nie przeszla wlasnych kontroli, wynik o silniku nie powstaje" "h10-aparatura"
+    undecided "H10 - aparatura nie przeszla wlasnych kontroli, wynik o silniku nie powstaje" "h10-aparatura"
     S_H10A="NIESPRAWDZONY"; S_H10B="NIESPRAWDZONY"
   else
     raw="$WORK/h10_$SEED.csv"
@@ -244,16 +244,16 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
     #
     # `test_gate` porownuje etykiety rezimow z ZAMROZONA tablica odniesienia
     # (h10/VERDICT.md, VERDICT_oos.md), a compare_regimes.py zwraca kod 2 przy
-    # jakiejkolwiek zmianie zestawu klas — dolozenie klasy WINDOW oblalo by bramke
+    # jakiejkolwiek zmianie zestawu klas - dolozenie klasy WINDOW oblalo by bramke
     # z powodu korpusu, nie silnika. Dryft nie ma czego zepsuc: losuje ziarno za
     # kazdym razem i porownuje z MODELEM ZDARZENIOWYM, nie z tablica.
     #
-    # Bez tego regula okna rekordowego nie mialaby zadnego biezacego pokrycia —
+    # Bez tego regula okna rekordowego nie mialaby zadnego biezacego pokrycia -
     # dokladnie ten stan, ktory K24f zastala: regula weszla po K24e i zadna bramka
     # nie miala jak jej zobaczyc, bo korpus wypisywal wylacznie `SELECT *`.
     if ! aux "H10 kampania ($COUNT planow, ziarno $SEED, z oknem rekordowym)" python3 run_campaign.py \
              --seed "$SEED" --count "$COUNT" --with-window --xretractor "$XRETRACTOR" --out "$raw"; then
-      undecided "H10 — kampania nie doszla do konca" "h10-kampania"
+      undecided "H10 - kampania nie doszla do konca" "h10-kampania"
       S_H10A="NIESPRAWDZONY"; S_H10B="NIESPRAWDZONY"
     else
       out="$WORK/H10_DRIFT_$SEED.md"
@@ -261,19 +261,19 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
               --seed "$SEED" --engine "$ENGINE_SHA" >"$WORK/h10_rule.txt" 2>&1
       rc=$?
       sed 's/^/        /' "$WORK/h10_rule.txt"
-      S_H10B="$(sed -n 's/^H10b: \(.*\) — .*/\1/p' "$WORK/h10_rule.txt" | head -1)"
+      S_H10B="$(sed -n 's/^H10b: \(.*\) - .*/\1/p' "$WORK/h10_rule.txt" | head -1)"
       S_H10B="${S_H10B:-nieznany}"
       case "$rc" in
         0) confirm "H10a na swiezej probie (ziarno $SEED, werdykt: $out)"
            S_H10A="ZGODNY" ;;
         1) refute  "H10a na swiezej probie (ziarno $SEED, werdykt: $out)"
            S_H10A="DRYFT" ;;
-        *) undecided "H10a — regula decyzyjna odmowila werdyktu (kod $rc)" "h10-werdykt"
+        *) undecided "H10a - regula decyzyjna odmowila werdyktu (kod $rc)" "h10-werdykt"
            S_H10A="NIESPRAWDZONY" ;;
       esac
       # Czlon (b) ma wlasny status i nie chowa sie w statusie czlonu (a).
       if [[ "$S_H10B" == "NIEOCENIALNY" ]]; then
-        undecided "H10b — nieocenialny na tej aparaturze (zlamana kontrola negatywna)" "h10b"
+        undecided "H10b - nieocenialny na tej aparaturze (zlamana kontrola negatywna)" "h10b"
       fi
     fi
   fi
@@ -286,7 +286,7 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
   cd "$HERE/h9" || exit 2
 
   # H9 nie ma odpowiednika swiezego ziarna: korpus 21 planow jest PREDEKLAROWANY
-  # i zamrozony. To nie jest slabosc — korpus powstal przed ta rewizja silnika,
+  # i zamrozony. To nie jest slabosc - korpus powstal przed ta rewizja silnika,
   # wiec przebieg na nowym silniku jest potwierdzeniem, dopoki korpusu sie nie
   # rusza. Pierwszy poziom sprawdza wlasnie to.
   mech_ready=1
@@ -296,10 +296,10 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
   aux "H9 tablica mechanizmu (znana odpowiedz)" python3 mechanism_table.py --gate || mech_ready=0
 
   if [[ "$mech_ready" -eq 0 ]]; then
-    undecided "H9 mechanizm — aparatura nie przeszla wlasnych kontroli" "h9-aparatura"
+    undecided "H9 mechanizm - aparatura nie przeszla wlasnych kontroli" "h9-aparatura"
     S_MECH="NIESPRAWDZONY"
   elif [[ -z "$PROFILES" ]]; then
-    undecided "H9 mechanizm — bez profili ablacji nie da sie odroznic R1 od R2" "h9-profile"
+    undecided "H9 mechanizm - bez profili ablacji nie da sie odroznic R1 od R2" "h9-profile"
     S_MECH="NIESPRAWDZONY"
   else
     # Dowod kompilacji laduje tam, gdzie szuka go `run_gates.py`
@@ -317,7 +317,7 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
         rm -rf "$evidence"
       else
         evidence_ready=0
-        undecided "H9 mechanizm — $evidence istnieje i nie ma ukladu dowodu tej aparatury" "h9-dowod"
+        undecided "H9 mechanizm - $evidence istnieje i nie ma ukladu dowodu tej aparatury" "h9-dowod"
         echo "        Obejrzyj go i usun recznie, jesli jest do wyrzucenia."
         S_MECH="NIESPRAWDZONY"
       fi
@@ -328,12 +328,12 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
       : # poziom juz odnotowany jako niesprawdzony
     elif K26V3_BUILD_ROOT="$PROFILES" python3 validate_corpus.py --out "$evidence" \
          "${dirty_args[@]}" >"$(log_of "H9 84 kompilacje")" 2>&1; then
-      confirm "H9 mechanizm — 84/84 kompilacji na czterech profilach, 4/4 odrzucone mutanty"
+      confirm "H9 mechanizm - 84/84 kompilacji na czterech profilach, 4/4 odrzucone mutanty"
       S_MECH="ZGODNY"
     else
       # Rozjazd tablicy mechanizmu jest wynikiem o silniku, nie awaria: znaczy,
       # ze rozpoznawanie rownowaznych obliczen dziala inaczej niz w kampanii.
-      refute "H9 mechanizm — 84/84 kompilacji (log: $(log_of "H9 84 kompilacje"))"
+      refute "H9 mechanizm - 84/84 kompilacji (log: $(log_of "H9 84 kompilacje"))"
       S_MECH="DRYFT"
     fi
   fi
@@ -350,10 +350,10 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
   [[ "$S_MECH" == "ZGODNY" ]]      || values_missing+=" dowod-84/84"
 
   if [[ "$WANT_VALUES" -eq 0 ]]; then
-    undecided "H9 wartosci wobec Flinka — pominiete na zadanie (--no-values)" "h9-wartosci"
+    undecided "H9 wartosci wobec Flinka - pominiete na zadanie (--no-values)" "h9-wartosci"
     S_VALUES="NIESPRAWDZONY"
   elif [[ -n "$values_missing" ]]; then
-    undecided "H9 wartosci wobec Flinka — brak:$values_missing" "h9-wartosci"
+    undecided "H9 wartosci wobec Flinka - brak:$values_missing" "h9-wartosci"
     S_VALUES="NIESPRAWDZONY"
     echo "        Zaleznosci instaluje: scripts/buildrdb.sh gate_requirements"
   else
@@ -368,31 +368,31 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
             ./run_main_flink.sh || values_ready=0
 
     if [[ "$values_ready" -eq 0 ]]; then
-      undecided "H9 wartosci wobec Flinka — przebiegi nie doszly do konca" "h9-wartosci"
+      undecided "H9 wartosci wobec Flinka - przebiegi nie doszly do konca" "h9-wartosci"
       S_VALUES="NIESPRAWDZONY"
     elif XTRDB="$XTRDB_PIN" python3 run_gates.py --rdb "$WORK/h9_rdb" --flink "$WORK/h9_flink" \
            --plans "$WORK/h9_plans" --work "$WORK/h9_mutants" --out "$WORK/gates.tsv" \
            >"$(log_of "H9 bramki P6")" 2>&1; then
-      confirm "H9 wartosci — siedem bramek P6 przeszlo ($WORK/gates.tsv)"
+      confirm "H9 wartosci - siedem bramek P6 przeszlo ($WORK/gates.tsv)"
       S_VALUES="ZGODNY"
     elif only_provenance_failed "$WORK/gates.tsv" "$(log_of "H9 bramki P6")"; then
       # Na brudnym drzewie `corpus_validity` NIE MA JAK przejsc i nie jest to
       # dryft. `validate_corpus.py --allow-dirty` stempluje dowod pinem
       # `<sha>-dirty`, a `run_gates.py` porownuje ten pin z czystym SHA i widzi
-      # rozjazd. Merytoryczna zawartosc tej bramki — dokladny inwentarz 21 planow,
-      # 84/84 kompilacje, 4/4 mutanty, zamkniety manifest — zostala w tym samym
+      # rozjazd. Merytoryczna zawartosc tej bramki - dokladny inwentarz 21 planow,
+      # 84/84 kompilacje, 4/4 mutanty, zamkniety manifest - zostala w tym samym
       # przebiegu sprawdzona na poziomie mechanizmu. Bramka dodaje ponad to
       # wylacznie PROWENIENCJE, ktorej brudne drzewo z definicji nie spelnia.
       #
       # Zejscie jest waskie i sprawdzane, nie zalozone: musi zawiesc DOKLADNIE
       # `corpus_validity` i kazda zgloszona rozbieznosc musi byc tym jednym pinem.
-      confirm "H9 wartosci — 6/6 bramek merytorycznych przeszlo ($WORK/gates.tsv)"
+      confirm "H9 wartosci - 6/6 bramek merytorycznych przeszlo ($WORK/gates.tsv)"
       S_VALUES="ZGODNY-bez-prow"
       echo "        corpus_validity odpadla WYLACZNIE na pinie SHA (drzewo brudne)."
-      echo "        Wartosci sa sprawdzone, proweniencja nie — powtorz na czystym drzewie,"
+      echo "        Wartosci sa sprawdzone, proweniencja nie - powtorz na czystym drzewie,"
       echo "        jesli przebieg ma nazywac rewizje."
     else
-      refute "H9 wartosci — bramka P6 nie przeszla (log: $(log_of "H9 bramki P6"))"
+      refute "H9 wartosci - bramka P6 nie przeszla (log: $(log_of "H9 bramki P6"))"
       S_VALUES="DRYFT"
       echo "        Klasyfikacja porazki bramki nalezy do czlowieka (STOP-6):"
       echo "        engine_or_profile liczy sie PRZECIW H9, apparatus/corpus uniewaznia przebieg."
@@ -403,11 +403,11 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
   #
   # Jedyny poziom, ktorego ta aparatura NIE sprawdza i sprawdzac nie bedzie.
   # Nie z lenistwa: prog jest wielkoscia ZMIENNA, mierzona na przypietej maszynie
-  # brzegowej pod PREEMPT_RT — 1440 komorek, okolo 48 godzin zegara. Nie da sie
+  # brzegowej pod PREEMPT_RT - 1440 komorek, okolo 48 godzin zegara. Nie da sie
   # tego wykonac w celu budowania, a orzekanie o nim z macierzy zmierzonej na
   # INNEJ rewizji silnika byloby zielonym swiatlem dla wlasnosci, ktorej biezacy
-  # silnik nigdy nie dotknal — czyli dokladnym przeciwienstwem weryfikacji dryftu.
-  undecided "H9 prog czasowy — poza zakresem tej aparatury" "h9-czas"
+  # silnik nigdy nie dotknal - czyli dokladnym przeciwienstwem weryfikacji dryftu.
+  undecided "H9 prog czasowy - poza zakresem tej aparatury" "h9-czas"
   S_TIMING="NIESPRAWDZONY"
   echo "        Wielkosc zmienna: 1440 komorek na przypietym pi400 pod PREEMPT_RT, ok. 48 h."
   echo "        Dryft progu czasowego wykrywa kampania pomiarowa, nie to polecenie."
@@ -449,7 +449,7 @@ cat <<'EOF'
      jesli poziom wartosci sie wykonal, z niezalezna implementacja w Flinku;
    * NIE jest powtorzeniem kampanii i nie zastepuje K24d ani K26v3 jako
      dokumentu obowiazujacego dla artykulu;
-   * nie siega poza zbadana klase — H10 pyta o korpus generatora (q <= 5,
+   * nie siega poza zbadana klase - H10 pyta o korpus generatora (q <= 5,
      dziewiec klas operatorow), H9 o klase Q=8 w trzech rodzinach;
    * nie obejmuje progu czasowego H9, ktory jest wielkoscia mierzona, nie
      obliczana, i wymaga kampanii na maszynie brzegowej.

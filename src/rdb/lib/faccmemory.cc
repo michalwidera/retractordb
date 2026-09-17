@@ -12,7 +12,7 @@
 
 static std::map<std::string, std::vector<std::vector<uint8_t>>> memoryStorage;
 static std::map<std::string, std::vector<std::vector<bool>>> memoryNullStorage;
-// Globalny licznik zapisów na strumień — utrzymuje logiczną pozycję niezależnie od instancji.
+// Globalny licznik zapisów na strumień - utrzymuje logiczną pozycję niezależnie od instancji.
 static std::map<std::string, size_t> memoryWriteCount;
 
 namespace rdb {

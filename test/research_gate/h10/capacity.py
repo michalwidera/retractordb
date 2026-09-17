@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""P1 — wyprowadzenie odległości wstecznej i porównanie z modelem pojemności.
+"""P1 - wyprowadzenie odległości wstecznej i porównanie z modelem pojemności.
 
 Kroki 2.1–2.2 z `plan-naprawy-defektow.md` §7. Skrypt liczy dwie rzeczy dla
 każdej pary (konsument, składowa) w korpusie K24:
 
-  * **odległość żądaną** — ile rekordów wstecz od czoła składowej sięga
+  * **odległość żądaną** - ile rekordów wstecz od czoła składowej sięga
     konsument w chwili, w której faktycznie czyta. Wyprowadzona z modelu
     zdarzeniowego, tym samym odwzorowaniem rekordów co oracle;
-  * **pojemność zapewnioną** — replika `compiler::computeRequiredCapacities()`.
+  * **pojemność zapewnioną** - replika `compiler::computeRequiredCapacities()`.
 
 Defektem jest każda para, w której zapewniona pojemność nie pokrywa żądanej
-odległości. Skrypt nie proponuje poprawki — dostarcza liczb do kroku 2.3.
+odległości. Skrypt nie proponuje poprawki - dostarcza liczb do kroku 2.3.
 
 Model odległości
 ----------------
@@ -55,11 +55,11 @@ PROBE_SLOTS = 96          # sondowanie slotów konsumenta
 # Człon wykryty empirycznie: bez niego model uznawał plany 10 i 32 podpróby za
 # pokryte, a silnik emitował tam rekord all-NULL.
 #
-# UWAGA — człon nie jest jednolity. Zastosowany do WSZYSTKICH ścieżek odczytu
+# UWAGA - człon nie jest jednolity. Zastosowany do WSZYSTKICH ścieżek odczytu
 # daje przewidywania niedomiaru dla `>N`, `#`, `Θ` i `~Θ`, których nie
 # potwierdza żadna obserwacja: w podpróbie 112 planów wykonanych end-to-end
 # te klasy nie dały ani jednego rekordu all-NULL ani awarii. Dla `>N` jest to
-# wytłumaczalne — `fetchBack` adresuje wstecznie, więc wyprzedzenie czoła się
+# wytłumaczalne - `fetchBack` adresuje wstecznie, więc wyprzedzenie czoła się
 # skraca. Dla `#`, `Θ` i `~Θ` pozostaje nierozstrzygnięte i jest raportowane
 # osobno jako przewidywanie bez potwierdzenia (patrz sekcja "nierozstrzygnięte"
 # w wyniku skryptu), a nie jako defekt.
@@ -68,7 +68,7 @@ PROBE_SLOTS = 96          # sondowanie slotów konsumenta
 # bramka odwzorowania nie pokazała ani jednego rekordu all-NULL pochodzącego
 # ze składowej DEKLAROWANEJ. Dwa rekordy z NULL, które w bramce zostały,
 # pochodzą ze składowych OBLICZANYCH (plany 55 i 97) i są skutkiem zaniżonego
-# ogona `+`, nie pojemności — dla strumieni obliczanych limit pojemności nie
+# ogona `+`, nie pojemności - dla strumieni obliczanych limit pojemności nie
 # wiąże (patrz komentarz przy `binding` w main()).
 DECLARATION_PREFETCH = 2
 PREFETCH_CONFIRMED = (SUB, AGSE, ADD)
@@ -98,7 +98,7 @@ def deepest_indexes(node, children, n):
 
     Dla większości operatorów jest to ten sam indeks, co w `dependencies()`.
     AGSE jest wyjątkiem: o dostępności decyduje pole najnowsze, a o pojemności
-    historii — najstarsze pole okna.
+    historii - najstarsze pole okna.
     """
     if node.kind == AGSE:
         src = children[0]
@@ -106,7 +106,7 @@ def deepest_indexes(node, children, n):
         # Okno stemplowane KOŃCEM przedziału: najstarsze pole leży w pozycji
         # n*step-(|L|-1), a nie n*step. Dzielenie Pythona zaokrągla w dół także
         # dla ujemnych liczników, więc pozycja sprzed początku źródła trafia do
-        # rekordu ujemnego — tak jak floorDiv() w silniku.
+        # rekordu ujemnego - tak jak floorDiv() w silniku.
         return {src.name: (n * step - abs(length) + 1) // src.width}
     result = {}
     for child_name, index, _delay in M.dependencies(node, children, n):
@@ -240,7 +240,7 @@ def main():
     # historię tylko pod warunkiem isDeclared(). Strumienie obliczane czytają
     # z magazynu, który zachowuje komplet rekordów. Zawężenie potwierdzone
     # empirycznie: bez niego model daje 4 fałszywe alarmy na planach, które
-    # przeszły bramkę odwzorowania czysto; z nim — zero.
+    # przeszły bramkę odwzorowania czysto; z nim - zero.
     binding = [row for row in rows if row["child_declared"] == 1]
     per = collections.defaultdict(lambda: {"n": 0, "bad": 0, "worst": 0, "witness": None})
     for row in binding:

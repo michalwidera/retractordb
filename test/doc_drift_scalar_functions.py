@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Dryft dokumentacji: lista funkcji skalarnych w dokumentacji wobec rqlFunctions.hpp.
 
-Jedyna lista nazw i arnosci funkcji skalarnych RQL stoi w `src/include/rqlFunctions.hpp` —
+Jedyna lista nazw i arnosci funkcji skalarnych RQL stoi w `src/include/rqlFunctions.hpp` -
 czyta ja i kompilator (`checkFunctionCalls`), i ewaluator. Dokumentacja uzytkownika powtarza
 te liste wlasnym tekstem, w dwoch repozytoriach (PL i EN), i wlasnie dlatego cicho sie
 rozjezdza: funkcja dopisana do tabeli w naglowku dziala, ale nikt o niej nie wie, a funkcja
 usunieta z naglowka zostaje w dokumentacji jako obietnica bez pokrycia.
 
-Bramka `-c` tego nie zlapie — dokumentacja nie jest kompilowana. Nie zlapie tego takze
+Bramka `-c` tego nie zlapie - dokumentacja nie jest kompilowana. Nie zlapie tego takze
 `test_drift`, ktory konfrontuje SILNIK z modelem zdarzeniowym i z portem we Flinku:
 teksty sa dla niego niewidoczne z konstrukcji.
 
@@ -23,7 +23,7 @@ import pathlib
 import re
 import sys
 
-# `.canonical = "Sqrt"` — pole wyliczane wprost w kRqlFunctions, jeden wpis na linie.
+# `.canonical = "Sqrt"` - pole wyliczane wprost w kRqlFunctions, jeden wpis na linie.
 CANONICAL = re.compile(r'\.canonical\s*=\s*"([^"]+)"')
 
 # Naglowki tabeli funkcji w obu jezykach. Tabela jest rozpoznawana po naglowku, a nie po
@@ -36,7 +36,7 @@ BACKTICKED = re.compile(r"`([^`]+)`")
 def canonical_names(header: pathlib.Path) -> list[str]:
     names = CANONICAL.findall(header.read_text(encoding="utf-8"))
     if not names:
-        sys.exit(f"{header}: nie znaleziono ani jednego `.canonical` — zmienil sie ksztalt tabeli?")
+        sys.exit(f"{header}: nie znaleziono ani jednego `.canonical` - zmienil sie ksztalt tabeli?")
     return names
 
 
@@ -81,7 +81,7 @@ def main() -> int:
         found = documented_names(doc)
 
         if found is None:
-            problems.append(f"{label}: w {doc} nie ma tabeli funkcji skalarnych — rozdzial zniknal albo zmienil naglowek")
+            problems.append(f"{label}: w {doc} nie ma tabeli funkcji skalarnych - rozdzial zniknal albo zmienil naglowek")
             continue
 
         missing = [name for name in expected if name not in found]

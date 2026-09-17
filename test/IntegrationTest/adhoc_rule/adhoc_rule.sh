@@ -4,20 +4,20 @@
 # Teza: `xqry -a "RULE ... ON <strumien> ... DO DUMP -N TO M"` uzbraja regule na ZYWYM planie,
 # a ujemna czesc zakresu siega WYLACZNIE rekordow powstalych po dolaczeniu. Silnik nie wiedzial
 # wczesniej, ze ma dla tej reguly cokolwiek gromadzic, wiec historii sprzed dolaczenia nie ma
-# prawa wydac, chocby nadal lezala w magazynie — a leży, bo `dumpManager` czyta ja wprost ze
+# prawa wydac, chocby nadal lezala w magazynie - a leży, bo `dumpManager` czyta ja wprost ze
 # storage (dumpManager.cpp), po pozycji bezwzglednej.
 #
 # Obserwabla jest wartosc rekordu: zrodlo rosnie monotonicznie od zera, wiec wartosc N-tego
 # rekordu strumienia `dst` rowna sie N. Pierwsza liczba w pliku zrzutu mowi zatem wprost,
 # z ktorej chwili pochodzi najstarszy zrzucony rekord. Bez bramki `rule::armAtCount` regula
 # odpalilaby na pierwszym rekordzie po dolaczeniu i wciagnela do zrzutu trzy rekordy sprzed
-# niego — czyli liczby mniejsze niz stan licznika odczytany przed dolaczeniem.
+# niego - czyli liczby mniejsze niz stan licznika odczytany przed dolaczeniem.
 set -e
 . "$(dirname "$0")/../serverlib.sh"
 
 # Zrzut PIERWSZEGO zadzialania reguly. Numer w nazwie bierze sie z RETENTION: bez niego
 # kazde kolejne zadzialanie nadpisywaloby ten sam plik, a warunek `dst[0] > 0` jest prawdziwy
-# w kazdym slocie. Obserwabla musi byc chwila NAJWCZESNIEJSZA — to ona rozstrzyga o granicy
+# w kazdym slocie. Obserwabla musi byc chwila NAJWCZESNIEJSZA - to ona rozstrzyga o granicy
 # historii; okno zrzucone kilka sekund pozniej lezy juz po dolaczeniu tak czy inaczej.
 DUMP_FILE=temp/dst_histguard_dump_0.tmp
 STREAM_FILE=temp/dst
@@ -47,7 +47,7 @@ newest_value() {
 # Zrzuty z poprzedniego przebiegu przezywaja start serwera: `dropArtifactFile` w launcherze
 # kasuje artefakty STRUMIENI (dane, .desc, .meta), plikow regul nie zna, a katalog roboczy
 # testu zostaje miedzy wywolaniami ctest. Bez tego sprzatania asercja o granicy historii
-# czytalaby zrzut sprzed poprzedniego przebiegu i przechodzila zawsze — sprawdzone.
+# czytalaby zrzut sprzed poprzedniego przebiegu i przechodzila zawsze - sprawdzone.
 rm -f temp/*_dump*.tmp
 
 xretractor plan.rql -c
@@ -55,7 +55,7 @@ server_start plan.rql
 
 # ---------------------------------------------------------------- odmowy
 # Kazda z nich ma zostawic serwer nietkniety: to jest wlasciwa teza tej czesci. Do 2026-09-05
-# regula na deklaracji konczyla sie abort() W PROCESIE SERWERA, a pusty zakres DUMP —
+# regula na deklaracji konczyla sie abort() W PROCESIE SERWERA, a pusty zakres DUMP -
 # FatalError-em w kompilatorze, czyli tez smiercia instancji z powodu cudzej literowki.
 expect_refusal() { # <fragment komunikatu> <zapytanie ad-hoc>
   local needle="$1" query="$2" out rc
@@ -111,7 +111,7 @@ before=$(newest_value) || {
 # Regula bez RETENTION dolaczana PRZED wlasciwa: jej zadania sa krotkie i wchodza do ksiegi
 # zrzutow pierwsze. Do 2026-09-05 pojemnosc ksiegi ustawialo dokladnie to pierwsze zadanie
 # ("capacity() == 0"), wiec zostawala 1 na caly czas zycia strumienia i kazde nastepne
-# zadanie — takze cudze — wypychalo poprzednie, zamykajac mu deskryptor. Zrzut `histguard`
+# zadanie - takze cudze - wypychalo poprzednie, zamykajac mu deskryptor. Zrzut `histguard`
 # nie dobilby wtedy do kompletu i ten test skonczylby sie czerwono.
 filler_out=$(xqry -a 'RULE bookfiller ON dst WHEN dst[0] > 0 DO DUMP -1 TO 1' 2>&1) || {
   echo "pomocnicza regula ad-hoc odrzucona: $filler_out"
@@ -126,7 +126,7 @@ attach_out=$(xqry -a 'RULE histguard ON dst WHEN dst[0] > 0 DO DUMP -20 TO 3 RET
 # Nazwa powtorzona jest bledem takze wtedy, gdy pierwsza regula juz wisi na planie.
 expect_refusal "already defined" 'RULE histguard ON dst WHEN dst[0] > 0 DO DUMP -1 TO 1'
 
-# Zrzut jest kompletny dopiero, gdy ma wszystkie 21 rekordow — dopiero wtedy wiadomo, ze
+# Zrzut jest kompletny dopiero, gdy ma wszystkie 21 rekordow - dopiero wtedy wiadomo, ze
 # regula sie uzbroila, a nie ze wlasnie trwa zapis historii.
 expected_bytes=$((DUMP_RECORDS * RECORD_BYTES))
 for _ in $(seq 1 400); do
@@ -150,7 +150,7 @@ fi
 # Ostra nierownosc, nie "wiekszy lub rowny": rekord o wartosci `before` byl NAJNOWSZYM w chwili
 # poprzedzajacej dolaczenie, wiec kazdy rekord, ktory regula ma prawo zobaczyc, jest od niego
 # pozniejszy. Bez bramki `rule::armAtCount` pierwsze zadzialanie wypadaloby zaraz po dolaczeniu,
-# a jego okno siegaloby HISTORY_DEPTH rekordow wstecz — czyli gleboko przed `before`.
+# a jego okno siegaloby HISTORY_DEPTH rekordow wstecz - czyli gleboko przed `before`.
 if [ "$first" -le "$before" ]; then
   echo "zrzut siega sprzed dolaczenia reguly: pierwszy rekord $first, stan strumienia przed dolaczeniem $before"
   od -An -td4 "$DUMP_FILE"

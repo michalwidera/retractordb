@@ -60,8 +60,8 @@ bool GetPosCmd::execute(CommandContext &ctx) {
     std::print("{}\n", static_cast<unsigned int>(std::any_cast<uint8_t>(value)));
   else if (value.type() == typeid(float))
     std::cout << std::any_cast<float>(value)
-              << "\n";  // std::cout: domyślny format (6 cyfr znaczących) — std::print dałby inny zapis
+              << "\n";  // std::cout: domyślny format (6 cyfr znaczących) - std::print dałby inny zapis
   else if (value.type() == typeid(double))
-    std::cout << std::any_cast<double>(value) << "\n";  // jw. — zachowanie zgodne z dotychczasowym wyjściem
+    std::cout << std::any_cast<double>(value) << "\n";  // jw. - zachowanie zgodne z dotychczasowym wyjściem
   return true;
 }

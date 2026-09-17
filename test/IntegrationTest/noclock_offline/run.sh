@@ -4,8 +4,8 @@
 # skracana do kilkudziesieciu rekordow, zeby dala sie w ogole weryfikowac w petli.
 #
 # Test dowodzi dwoch rzeczy naraz:
-#  1. --no-clock nie zmienia WYNIKU  — artefakt jest bajtowo identyczny,
-#  2. --no-clock zmienia CZAS        — przebieg schodzi ponizej polowy taktowanego.
+#  1. --no-clock nie zmienia WYNIKU  - artefakt jest bajtowo identyczny,
+#  2. --no-clock zmienia CZAS        - przebieg schodzi ponizej polowy taktowanego.
 #
 # Punkt 2 jest tu potrzebny, bo sam warunek rownosci przeszedlby rowniez wtedy,
 # gdyby przelacznik byl ignorowany.

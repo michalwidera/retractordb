@@ -31,7 +31,7 @@ class PersistentCounterTest : public ::testing::Test {
 };
 
 // ============================================================
-// Pierwszy użycie — brak pliku
+// Pierwszy użycie - brak pliku
 // ============================================================
 
 TEST_F(PersistentCounterTest, starts_at_zero_when_no_file) {
@@ -91,7 +91,7 @@ TEST_F(PersistentCounterTest, getCount_is_idempotent_before_destruction) {
 }
 
 // ============================================================
-// Uszkodzony plik — fallback do zera
+// Uszkodzony plik - fallback do zera
 // ============================================================
 
 TEST_F(PersistentCounterTest, corrupted_file_defaults_to_zero) {

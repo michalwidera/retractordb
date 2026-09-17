@@ -14,16 +14,16 @@ namespace rdb {
 /// @brief Stan bufora źródła deklarowanego: empty → flux (odczyt fizyczny dozwolony) → armed (rekord pobrany).
 enum class sourceState : std::uint8_t { empty, flux, armed };
 
-/// @brief Bufor bieżącego rekordu i historii dla źródeł deklarowanych (DEVICE/TEXTSOURCE) — wydzielony z klasy storage.
+/// @brief Bufor bieżącego rekordu i historii dla źródeł deklarowanych (DEVICE/TEXTSOURCE) - wydzielony z klasy storage.
 ///
 /// Obiekt klasy SourceBuffer powinien:
-/// - po attach(descriptor) utrzymywać komorę (chamber) — payload bieżącego rekordu odczytanego ze źródła,
+/// - po attach(descriptor) utrzymywać komorę (chamber) - payload bieżącego rekordu odczytanego ze źródła,
 /// - realizować jedyne miejsce fizycznego odczytu ze źródła deklarowanego (readCurrent()): rekord i jego
-///   wzorzec null pochodzą z null-aware read() akcesora — źródła deklarowane przy błędzie same zwracają
+///   wzorzec null pochodzą z null-aware read() akcesora - źródła deklarowane przy błędzie same zwracają
 ///   dane wyzerowane z wzorcem all-null, co jest logowane jako ostrzeżenie,
-/// - kopiować komorę do payloadu wyjściowego i do historii przez fire() — jedyne miejsce zasilania bufora
+/// - kopiować komorę do payloadu wyjściowego i do historii przez fire() - jedyne miejsce zasilania bufora
 ///   historii; pojemność zero kończy się przez FatalError,
-/// - utrzymywać bufor historii o pojemności co najmniej 1 (setCapacity()) — spójność źródeł deklarowanych
+/// - utrzymywać bufor historii o pojemności co najmniej 1 (setCapacity()) - spójność źródeł deklarowanych
 ///   wymaga zachowania przynajmniej bieżącego rekordu,
 /// - udostępniać rekordy historii przez history(index) dla index < size(); kontrola zakresu względem
 ///   pojemności i rozmiaru należy do wywołującego (storage), bo to on decyduje o wartościach zastępczych.

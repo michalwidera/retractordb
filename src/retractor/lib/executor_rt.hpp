@@ -1,7 +1,7 @@
 #pragma once
 
 // Moduł czasu rzeczywistego: SCHED_FIFO, mlockall, powinowactwo CPU, sen absolutny.
-// Interfejsy wyłącznie linuksowe — i tak jest nim cały projekt (flock, pread, shm),
+// Interfejsy wyłącznie linuksowe - i tak jest nim cały projekt (flock, pread, shm),
 // więc kod nie jest zabezpieczany #ifdef-em: build na innej platformie i tak nie
 // przechodzi, a warunek tylko udawał przenośność.
 
@@ -21,5 +21,5 @@ void rtAbsoluteSleep(const struct timespec &anchor, long interval_ms);
 /// Wołać po `rtActivate`, z uchwytem wątku, który MUSI być szeregowany mimo
 /// obciążenia wątku RT. Zwraca `true`, gdy powinowactwo zostało zmienione.
 /// Gdy wątek RT nie jest przypięty do podzbioru rdzeni, dopełnienie jest puste
-/// i funkcja nie robi nic — bez przypięcia planista i tak rozłoży wątki.
+/// i funkcja nie robi nic - bez przypięcia planista i tak rozłoży wątki.
 bool rtKeepThreadOffRtCpus(pthread_t handle);

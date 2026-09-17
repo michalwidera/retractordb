@@ -4,7 +4,7 @@
 # redukuje dokladnie tyle wartosci: po jednej z rekordu, wstecz w czasie.
 # Wzorzec jest policzony recznie: porownanie z inna konstrukcja silnika
 # sprawdzaloby zgodnosc dwoch implementacji, a nie zgodnosc z definicja. Jedyny
-# wyjatek jest tozsamoscia — MIN(a[1]:1) kontra odczyt a[1] wprost — i wlasnie
+# wyjatek jest tozsamoscia - MIN(a[1]:1) kontra odczyt a[1] wprost - i wlasnie
 # dlatego nadaje sie na kotwice.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)

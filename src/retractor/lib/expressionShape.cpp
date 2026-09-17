@@ -13,29 +13,29 @@
 #include <boost/rational.hpp>
 
 #include "exprSimplify.hpp"  // kToStringDefaultWidth
-#include "rqlFunctions.hpp"  // findRqlFunction — kanoniczna pisownia w komunikacie bramki
+#include "rqlFunctions.hpp"  // findRqlFunction - kanoniczna pisownia w komunikacie bramki
 
 namespace {
 
-/// Nazwa funkcji zlozona do malych liter — parser zapisuje postac kanoniczna, ale ewaluator
+/// Nazwa funkcji zlozona do malych liter - parser zapisuje postac kanoniczna, ale ewaluator
 /// i tak sklada wielkosc liter, wiec analizator robi to samo.
 std::string lowercased(std::string text) {
   std::ranges::transform(text, text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   return text;
 }
 
-/// Szerokosc napisu w bajtach. Wartosc LICZBOWA wnosi do konkatenacji ZERO — tak samo, jak
+/// Szerokosc napisu w bajtach. Wartosc LICZBOWA wnosi do konkatenacji ZERO - tak samo, jak
 /// liczyla to regula sprzed 2026-08-30 (`inferStringWidth`), wiec szerokosci pol
 /// `STRING` w istniejacych planach sie nie zmieniaja.
 int stringBytes(const exprShape &shape) { return shape.rtype == rdb::STRING ? shape.rlen * shape.rarray : 0; }
 
-/// Ksztalt pola `STRING` o zadanej szerokosci — zapis deskryptora to `rlen = 1`, `rarray = N`.
+/// Ksztalt pola `STRING` o zadanej szerokosci - zapis deskryptora to `rlen = 1`, `rarray = N`.
 exprShape stringShape(int width) {
   return exprShape{.rtype = rdb::STRING, .rlen = static_cast<int>(sizeof(uint8_t)), .rarray = width};
 }
 
 /// Funkcje matematyczne liczone przez `callFun()`: rachunek idzie przez `double`, a wynik
-/// wraca rzutem na typ ARGUMENTU. Stad `Ceil(DOUBLE)` jest `DOUBLE`, a `Sqrt(INTEGER)` —
+/// wraca rzutem na typ ARGUMENTU. Stad `Ceil(DOUBLE)` jest `DOUBLE`, a `Sqrt(INTEGER)` -
 /// `INTEGER`.
 const std::set<std::string> &typePreservingFunctions() {
   static const std::set<std::string> names{"floor", "ceil", "sqrt", "round", "tan", "log", "log2", "trunc"};
@@ -44,7 +44,7 @@ const std::set<std::string> &typePreservingFunctions() {
 
 /// Funkcje o niewymiernej przeciwdziedzinie liczone przez `callRealFun()`: wynik jest
 /// `DOUBLE` NIEZALEZNIE od typu argumentu, bez stratnego powrotu do `INTEGER` czy `RATIONAL`.
-/// To wyjatek od reguly `typePreservingFunctions()` powyzej — patrz opis przy
+/// To wyjatek od reguly `typePreservingFunctions()` powyzej - patrz opis przy
 /// `rejectedIrrationalOverExact()`, dlaczego `tan`, `log` i `log2` jeszcze tu nie stoja.
 bool isRealValuedFunction(std::string_view name) { return name == "sin" || name == "cos" || name == "exp"; }
 
@@ -74,15 +74,15 @@ bool isBinaryShapeOperator(command_id cmd) {
 /// wpuscic uzytkownika w niejednorodna regule. Pusty napis znaczy „wolno".
 ///
 /// Bramka obejmuje SIEDEM funkcji o niewymiernej przeciwdziedzinie nad `RATIONAL`, ale nie
-/// wszystkie stoja tutaj z tego samego powodu i te powody trzeba trzymac osobno — inaczej
+/// wszystkie stoja tutaj z tego samego powodu i te powody trzeba trzymac osobno - inaczej
 /// ktos zdejmie bramke z trojki, ktora defektu nie ma, i nie zauwazy, ze reszcie zostaje.
 ///
-/// `Sqrt` — CICHA ZLA WARTOSC
+/// `Sqrt` - CICHA ZLA WARTOSC
 /// -------------------------
 /// `callFun()` (expressionEvaluator.cpp) liczy funkcje matematyczne przez `double` i rzutuje
 /// wynik Z POWROTEM NA TYP ARGUMENTU. Dla `RATIONAL` droga powrotna idzie przez `Rationalize`
 /// z tolerancja 1e-6, bo `boost::rational<int>` nie ma jak zapisac liczby niewymiernej. Skutek
-/// jest taki, ze `Sqrt(2/1)` daje `19601/13860` — wartosc dobra do ~1,8e-9, ale o OGROMNYM
+/// jest taki, ze `Sqrt(2/1)` daje `19601/13860` - wartosc dobra do ~1,8e-9, ale o OGROMNYM
 /// mianowniku. `boost::rational<int>` trzyma licznik i mianownik w `int32` i NIE sprawdza
 /// zakresu, wiec dwa dalsze mnozenia przepelniaja go po cichu:
 ///
@@ -94,7 +94,7 @@ bool isBinaryShapeOperator(command_id cmd) {
 /// cicha bledna wartosc, wiec bramka `-c` jest wlasciwym miejscem: program, ktory nie policzy
 /// poprawnie, nie ma sie kompilowac (ta sama zasada co w compiler::checkFunctionCalls()).
 ///
-/// `tan`, `log`, `log2` — TEN SAM DEFEKT, TA SAMA DROGA
+/// `tan`, `log`, `log2` - TEN SAM DEFEKT, TA SAMA DROGA
 /// ----------------------------------------------------
 /// Nadal licza przez `callFun()` i wracaja rzutem na typ argumentu, wiec nad `RATIONAL`
 /// rationalizuja tak samo jak `Sqrt` (zmierzone: `log(2/1)` daje `2731/3940`) i tak samo po
@@ -102,7 +102,7 @@ bool isBinaryShapeOperator(command_id cmd) {
 /// odrzucenie dotyczy WYLACZNIE pary z `RATIONAL`, a nad `INTEGER`, `FLOAT` i `DOUBLE` nic
 /// sie nie zmienia, wiec ZADEN deskryptor nie zmienia typu pola i bramki H9/H10 tego nie widza.
 ///
-/// `sin`, `cos`, `exp` — JEDNOLITOSC REGULY, NIE DEFEKT
+/// `sin`, `cos`, `exp` - JEDNOLITOSC REGULY, NIE DEFEKT
 /// ---------------------------------------------------
 /// Te trzy funkcje NIE MAJA powyzszego defektu: ida przez `callRealFun()`, ktore konczy na
 /// `DOUBLE` i nigdy nie wraca do `RATIONAL`, wiec `cos(m[0])` policzyloby sie z pelna
@@ -119,7 +119,7 @@ bool isBinaryShapeOperator(command_id cmd) {
 /// Klasa CICHEJ ZLEJ WARTOSCI jest zamknieta: `RATIONAL` jest jedynym typem, ktorego droga
 /// powrotna rationalizuje, i dla wszystkich siedmiu nazw jest teraz odrzucany. Otwarty
 /// zostaje sam KONTRAKT TYPU `tan`/`log`/`log2`: nad `INTEGER` nadal wracaja na `INTEGER`,
-/// czyli obcinaja czesc ulamkowa — strata JAWNA i udokumentowana, nie przepelnienie.
+/// czyli obcinaja czesc ulamkowa - strata JAWNA i udokumentowana, nie przepelnienie.
 /// Doprowadzenie ich do `DOUBLE` jak `sin`/`cos`/`exp` zmienia typ pola w `.desc`, czyli jest
 /// zmiana formatu artefaktu i musi przejsc przez bramki H9/H10 oraz korpus. To jest osobne
 /// zadanie i NIE jest juz pilne, bo zla liczba nie ma juz ktoredy wyjsc.
@@ -189,7 +189,7 @@ std::optional<rdb::descFld> functionResultType(const std::string_view name, cons
   if (key == "to_double") return rdb::DOUBLE;
   if (key == "to_string") return rdb::STRING;
 
-  // Predykaty i dlugosc napisu sa liczbami calkowitymi NIEZALEZNIE od typu argumentu —
+  // Predykaty i dlugosc napisu sa liczbami calkowitymi NIEZALEZNIE od typu argumentu -
   // patrz isnull(), isZeroValue() i stringLength() w expressionEvaluator.
   if (key == "isnull" || key == "iszero" || key == "isnonzero" || key == "length") return rdb::INTEGER;
 
@@ -198,7 +198,7 @@ std::optional<rdb::descFld> functionResultType(const std::string_view name, cons
   if (key == "abs") return argumentType;
 
   // `null2zero` przepuszcza wartosc nie-NULL BEZ ZMIANY TYPU, wiec typem statycznym jest typ
-  // argumentu. Dla wartosci NULL ewaluator klada na stos calkowite zero — patrz komentarz
+  // argumentu. Dla wartosci NULL ewaluator klada na stos calkowite zero - patrz komentarz
   // przy tej galezi w inferExpressionShape().
   if (key == "null2zero") return argumentType;
 
@@ -225,7 +225,7 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
   for (const auto &tk : program) {
     const command_id cmd = tk.getCommandID();
 
-    // Operandy zdejmujemy PRZED rozpoznaniem operacji — tak samo jak robi to petla
+    // Operandy zdejmujemy PRZED rozpoznaniem operacji - tak samo jak robi to petla
     // expressionEvaluator::eval(). Pusty stos znaczy program bez wartosci, a nie „nie wiadomo".
     exprShape left;
     exprShape right;
@@ -252,7 +252,7 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
         }
         const auto index = static_cast<rdb::descFld>(tk.getVT().index());
         // Literal `null` nie istnieje w gramatyce, a pary INTPAIR/IDXPAIR nie sa wartosciami
-        // wyrazenia — obie postaci znacza, ze program nie jest programem WARTOSCI.
+        // wyrazenia - obie postaci znacza, ze program nie jest programem WARTOSCI.
         if (index > rdb::DOUBLE) return unknown;
         stack.push_back(numericShape(index));
       } break;
@@ -281,7 +281,7 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
       case WINDOW_SUM: {
         // Po resolveWindowAggregates() token jest LISCIEM: niesie indeks grupy i kladzie
         // gotowy wynik okna. Przed tym przebiegiem niesie szerokosc okna i poprzedza go
-        // PUSH_ID argumentu — obie liczby sa zwyklym `int`, wiec etapu po samym tokenie
+        // PUSH_ID argumentu - obie liczby sa zwyklym `int`, wiec etapu po samym tokenie
         // rozpoznac nie sposob. Rozstrzyga wolajacy: bez tablicy grup nie ma odpowiedzi.
         const auto *groupIndex = std::get_if<int>(&tk.getVT());
         if (groupIndex == nullptr || !shapeOfWindow) return unknown;
@@ -335,9 +335,9 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
       case AND:
       case OR:
         // `is_logic_and`/`is_logic_or` oddaja wynik w typie operandu wskazanego przez
-        // logicResultTypeRef(): LEWEGO, chyba ze lewy jest NULL — wtedy prawego. Typ zalezy
+        // logicResultTypeRef(): LEWEGO, chyba ze lewy jest NULL - wtedy prawego. Typ zalezy
         // wiec od WARTOSCI i jednego statycznego nie ma. Operatory logiczne zyja w regule
-        // `term_logic`, czyli w warunku RULE, a nie w liscie SELECT — deskryptora nie
+        // `term_logic`, czyli w warunku RULE, a nie w liscie SELECT - deskryptora nie
         // opisuja i ta niejednoznacznosc nie dociera do artefaktu. Analizator podaje typ
         // lewego operandu i zaznacza to komentarzem, zamiast udawac, ze pytanie jest
         // rozstrzygniete.
@@ -364,7 +364,7 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
       case CALL2: {
         const auto name = lowercased(tk.getStr_());
         if (name == "to_string") {
-          // Szerokosc zadeklarowana `to_string(expr : N)` siedzi w tokenie jako IDXPAIR —
+          // Szerokosc zadeklarowana `to_string(expr : N)` siedzi w tokenie jako IDXPAIR -
           // jest DEKLARACJA pola, a nie wartoscia na stosie (patrz rqlFunctions.hpp).
           int width = kToStringDefaultWidth;
           if (cmd == CALL2)
@@ -380,7 +380,7 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
           break;
         }
 
-        // Kombinacja nieobslugiwana — zatrzymuje kompilacje, zamiast wydac zla wartosc.
+        // Kombinacja nieobslugiwana - zatrzymuje kompilacje, zamiast wydac zla wartosc.
         // Stoi PRZED functionResultType(), bo pytanie nie brzmi „jakiego typu jest wynik",
         // tylko „czy ten wynik w ogole da sie policzyc".
         if (auto refusal = rejectedIrrationalOverExact(name, right.rtype); !refusal.empty())
@@ -393,14 +393,14 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
         // przez `Check result:`. Zostaje dla programow budowanych z pominieciem kompilatora.
         if (!resultType.has_value()) return unknown;
         // `Abs` i funkcje matematyczne zachowuja typ argumentu, ale nad napisem sa bledem
-        // wykonania — programu bez wartosci nie typujemy. `isnull`, `IsZero`, `IsNonZero`
+        // wykonania - programu bez wartosci nie typujemy. `isnull`, `IsZero`, `IsNonZero`
         // i `Length` daja INTEGER niezaleznie od argumentu i przechodza tedy bez zmian.
         if (*resultType == rdb::STRING) return illTyped;
         stack.push_back(numericShape(*resultType));
       } break;
 
       default:
-        // Token spoza zestawu ewaluatora (PUSH_STREAM, PUSH_TSCAN, COUNT, STREAM_*...) —
+        // Token spoza zestawu ewaluatora (PUSH_STREAM, PUSH_TSCAN, COUNT, STREAM_*...) -
         // arytmetyki stosu dla niego nie znamy, wiec odmawiamy odpowiedzi zamiast zgadywac.
         return unknown;
     }
@@ -409,7 +409,7 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
   if (stack.size() != 1) return illTyped;
 
   auto result = stack.front();
-  // Napis o zerowej szerokosci (`SELECT ''`) dostaje szerokosc domyslna `to_string` — ta sama
+  // Napis o zerowej szerokosci (`SELECT ''`) dostaje szerokosc domyslna `to_string` - ta sama
   // regula, ktora stosowal inferStringWidth(), zeby nie powstalo pole `STRING[0]`.
   if (result.rtype == rdb::STRING && result.rlen * result.rarray <= 0) result = stringShape(kToStringDefaultWidth);
 

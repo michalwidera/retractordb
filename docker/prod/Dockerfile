@@ -1,10 +1,10 @@
 # https://hub.docker.com/_/debian
 # Runtime instaluje xretractor/xqry z opublikowanego pakietu .deb i uruchamia
-# usługę xretractor przez systemd (PID 1) — tak jak na realnym systemie.
+# usługę xretractor przez systemd (PID 1) - tak jak na realnym systemie.
 
 FROM debian:trixie-slim
 
-# Wersja bez wartości domyślnej — jedyne źródło prawdy to plik VERSION w korzeniu
+# Wersja bez wartości domyślnej - jedyne źródło prawdy to plik VERSION w korzeniu
 # repo. Przekazywana przy buildzie: --build-arg RDB_VERSION="$(cat ../../VERSION)".
 ARG RDB_VERSION
 
@@ -37,7 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/retractordb.deb
 
-# Instalacja usługi: włącz jednostkę (symlink w multi-user.target.wants — wykonywane
+# Instalacja usługi: włącz jednostkę (symlink w multi-user.target.wants - wykonywane
 # offline, bez działającego systemd). Na boocie kontenera systemd ją wystartuje.
 RUN systemctl enable xretractor.service
 

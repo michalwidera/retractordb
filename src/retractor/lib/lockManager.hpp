@@ -53,7 +53,7 @@ class FlockServiceGuard {
   bool publishLockInfo();
 
   void setLockDir(const std::string &dir);
-  // Ścieżka pliku zapytań tej instancji — zapisywana do locka jako QUERYFILE, by inna instancja
+  // Ścieżka pliku zapytań tej instancji - zapisywana do locka jako QUERYFILE, by inna instancja
   // wiedziała, który plik nadpisać przed restartem serwisu. Ustawić przed acquireLock().
   void setServiceQueryFile(const std::string &queryFile);
   // Plik zapytań tej instancji (pusty => nie podano). Czyta go przeładowanie w locie:

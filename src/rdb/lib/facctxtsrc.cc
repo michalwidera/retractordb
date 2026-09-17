@@ -1,6 +1,6 @@
 #include "rdb/facctxtsrc.hpp"
 
-#include <sys/stat.h>  // stat, S_ISREG — rozpoznanie pliku zwykłego przy doborze buforowania
+#include <sys/stat.h>  // stat, S_ISREG - rozpoznanie pliku zwykłego przy doborze buforowania
 
 #include <spdlog/spdlog.h>
 
@@ -39,11 +39,11 @@ T parseAs(const std::string &token) {
   T var{0};
   // std::from_chars nie alokuje i nie buduje obiektu strumienia, więc zdejmuje stały koszt konstrukcji
   // std::istringstream ponoszony na każdy token. Składnie, których from_chars nie przyjmuje (wiodący '+',
-  // wartość ujemna dla typu bez znaku), obsługuje niezmieniona ścieżka strumieniowa poniżej — zbiór
+  // wartość ujemna dla typu bez znaku), obsługuje niezmieniona ścieżka strumieniowa poniżej - zbiór
   // akceptowanych tokenów i wynik parsowania pozostają takie same jak dotąd.
   //
   // Tylko typy całkowite: dla zmiennoprzecinkowych from_chars przyjmuje "inf"/"nan", na których ścieżka
-  // strumieniowa daje 0 — to byłaby cicha zmiana zawartości strumienia, więc FLOAT/DOUBLE zostają na
+  // strumieniowa daje 0 - to byłaby cicha zmiana zawartości strumienia, więc FLOAT/DOUBLE zostają na
   // std::istringstream.
   if constexpr (std::is_integral_v<T>) {
     if (std::from_chars(token.data(), token.data() + token.size(), var).ec == std::errc{}) return var;
@@ -150,7 +150,7 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
         myFile_ >> std::ws;
         // Powrót na początek musi nastąpić PRZED rozpoznaniem cudzysłowu. Inaczej na końcu pliku
         // peek() zwraca EOF, sterowanie wchodzi w ścieżkę tokenu, ta zawija plik i konsumuje jego
-        // pierwszy napis, a skan poniżej sięga po następny — pierwszy rekord pliku wypadał wtedy
+        // pierwszy napis, a skan poniżej sięga po następny - pierwszy rekord pliku wypadał wtedy
         // z cyklu przy każdym zawinięciu (dla "aa","bb","cc" ciąg odczytów był aa,bb,cc,bb,cc,...).
         if (myFile_.eof() && loopToBeginningIfEOF_) {
           myFile_.clear();
@@ -159,11 +159,11 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
         }
         auto strLen = item.rlen * item.rarray;
 
-        // Napis BEZ cudzyslowu jest zwyklym tokenem rozdzielanym bialym znakiem — jego wartosc
+        // Napis BEZ cudzyslowu jest zwyklym tokenem rozdzielanym bialym znakiem - jego wartosc
         // idzie do pola tak samo, jak wartosc pola liczbowego. Do 2026-08-30 przeczytany token
         // byl tu wyrzucany, a sterowanie schodzilo do skanu cudzyslowu ponizej: ten konsumowal
         // reszte pliku, zawijal go i rozjezdzal caly rekord. Dla `DECLARE txt STRING[8], k INTEGER`
-        // nad wierszem `42 7` pole txt wychodzilo puste, a k dostawalo 42 — czyli pierwszy token
+        // nad wierszem `42 7` pole txt wychodzilo puste, a k dostawalo 42 - czyli pierwszy token
         // wiersza (pozycja 12 w usecases/requested.md).
         if (myFile_.peek() != '"') {
           auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
@@ -226,7 +226,7 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
   }
 
   // Plik zakonczony znakiem nowej linii nie ustawia eofbit na ostatnim tokenie, wiec bramka
-  // na wejsciu do read() go nie zlapie — konczy sie dopiero ekstrakcja tokenu w TYM rekordzie.
+  // na wejsciu do read() go nie zlapie - konczy sie dopiero ekstrakcja tokenu w TYM rekordzie.
   // failbit po petli oznacza rekord skladany z brakujacych tokenow, czyli pierwszy rekord za
   // koncem wejscia. Rekord kompletny zostawia czysty failbit, nawet jesli eofbit juz stoi.
   if (!loopToBeginningIfEOF_ && myFile_.fail()) exhausted_ = true;

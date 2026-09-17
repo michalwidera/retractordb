@@ -20,7 +20,7 @@ inline constexpr int kDefaultSchedulingRtPriority{50};
 inline constexpr int kRtPriorityMin{1};
 inline constexpr int kRtPriorityMax{99};
 
-// Kanoniczny plik zapytań serwisu — fallback, gdy działający serwis nie zaraportował
+// Kanoniczny plik zapytań serwisu - fallback, gdy działający serwis nie zaraportował
 // własnego QUERYFILE w pliku blokady. Jedno źródło prawdy: CMake RETRACTOR_QUERY_FILE
 // (to samo zasila ExecStart jednostki i postinst), spójność gwarantowana w build-time.
 inline constexpr const char *kDefaultServiceQueryFile{kBuildDefaultServiceQueryFile};
@@ -28,7 +28,7 @@ inline constexpr const char *kDefaultServiceQueryFile{kBuildDefaultServiceQueryF
 
 /// Konfiguracja usługi xretractor wczytywana z opcjonalnego pliku TOML (toml++).
 ///
-/// Pliki konfiguracyjne są OPCJONALNE — ich brak to stan poprawny (program startuje
+/// Pliki konfiguracyjne są OPCJONALNE - ich brak to stan poprawny (program startuje
 /// z wartościami domyślnymi, nie jest to błąd). Wyszukiwanie warstwowe (styl usług
 /// systemu, np. sshd):
 ///   1. /etc/retractor/retractor.toml            (systemowy)
@@ -39,7 +39,7 @@ struct AppConfig {
   // === [storage] ===
 
   /// Domyślny katalog na artefakty (storage). Pusty = brak ustawienia (zachowanie jak
-  /// dziś — bieżący katalog procesu). Jeśli niepusty, gwarantuje końcowy '/'. Stosowany
+  /// dziś - bieżący katalog procesu). Jeśli niepusty, gwarantuje końcowy '/'. Stosowany
   /// tylko gdy zestaw RQL nie zdefiniował własnej dyrektywy :STORAGE (RQL ma pierwszeństwo).
   std::string storageDir;
 
@@ -81,7 +81,7 @@ struct AppConfig {
 
   /// Losowanie nazwy instancji, gdy nie podano ani `--name`, ani `--autoname`. Wartosc `false`
   /// (domyslna) zostawia tryb historyczny: pusta nazwa, blokada i obiekty IPC bez sufiksu.
-  /// Jawne `--name` wygrywa nad tym kluczem — wskazanie operatora jest nadrzedne wobec configu.
+  /// Jawne `--name` wygrywa nad tym kluczem - wskazanie operatora jest nadrzedne wobec configu.
   bool serverAutoName{false};
 
   // === [service] ===
@@ -100,7 +100,7 @@ struct AppConfig {
 
 /// Wczytuje konfigurację.
 /// - cliPath != nullopt → czyta WYŁĄCZNIE ten plik; brak pliku lub błąd składni są twarde
-///   (rzucają wyjątek) — to jawne żądanie użytkownika.
+///   (rzucają wyjątek) - to jawne żądanie użytkownika.
 /// - cliPath == nullopt → wyszukiwanie warstwowe; brak plików → wartości domyślne; błąd
 ///   składni TOML w którejś warstwie → ostrzeżenie i pominięcie warstwy (usługa nie pada).
 AppConfig loadAppConfig(const std::optional<std::string> &cliPath = std::nullopt);

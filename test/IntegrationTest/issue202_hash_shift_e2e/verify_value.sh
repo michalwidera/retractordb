@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Czesc WYNIKOWA (Val) tozsamosci (A > i) # (B > k) -> (A # B) > (i + k), gdy
 # i*delta(A) == k*delta(B). Biegnie w KAZDEJ konfiguracji przelacznikow, takze
-# przy RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=OFF — asercje ksztaltu planu, ktore
+# przy RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES=OFF - asercje ksztaltu planu, ktore
 # bez tego przebiegu nie maja szans przejsc, stoja osobno w verify_shape.sh.
 #
 # Podzial powstal 2026-09-06. Do tego dnia jedno `cmp matched CC` pinowalo naraz
@@ -25,16 +25,16 @@ xretractor query.rql -c > out_compile.txt
 # Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
 # wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
 # Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
-# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+# znaczy 'fields' w wyjsciu DOT - do wywolan kompilacyjnych jej NIE dodawac.
 xretractor query.rql -r -k -m 48 -f
 
 # Formula-derived payload for delta(A)=1/10 and delta(B)=1/5:
 # A#B has the repeating order B,A,A. The equivalent shift of 2+1=3 output slots
-# is carried by tail plus origin, so no placeholder records precede the data —
+# is carried by tail plus origin, so no placeholder records precede the data -
 # the first stored record is interleave element 0: B[0],A[0],A[1],B[1],...
 #
 # Wzor jest funkcja NUMERU elementu przeplotu, a nie dlugosci przebiegu, wiec
-# przyklada sie do kazdej ze stron z jej wlasna liczba rekordow — o to wlasnie
+# przyklada sie do kazdej ze stron z jej wlasna liczba rekordow - o to wlasnie
 # chodzi w oracle'u niezaleznym od ogona.
 check_payload() {
   local stream="$1"
@@ -75,7 +75,7 @@ cc_size=$(stat -c %s CC)
 # Val: rownosci obu stron na wspolnym prefiksie NIE pilnuje tu osobny `cmp` i
 # jest to swiadome. Ten sam oracle przylozony do obu artefaktow juz ja wymusza:
 # skoro kazda strona zgadza sie ze wzorem dla WLASNEJ liczby rekordow, ich
-# wspolny prefiks jest bajtowo rowny z definicji. Sprawdzone mutacja —
+# wspolny prefiks jest bajtowo rowny z definicji. Sprawdzone mutacja -
 # przekrecenie bajtu w CC oblewa `check_payload CC`, wiec `cmp` prefiksu nie
 # mialby jak oblac, a asercja, ktora nie moze oblac, jest w tym drzewie
 # defektem aparatury, nie zabezpieczeniem.

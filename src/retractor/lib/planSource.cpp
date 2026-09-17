@@ -52,7 +52,7 @@ void dropStalePlanArtifacts(qTree &plan, const compiler &cm, const std::vector<s
   // Nazwa zwracana przez parser jest nazwa Z ZAPISU, a ta nie musi byc nazwa zapytania
   // w planie: generator `STREAM cell[24]` daje jedna linie RQL i 24 strumienie `cell$0`..
   // `cell$23`, a samego `cell` w planie nie ma. Rodziny bierzemy z kompilatora, bo to
-  // jedyne pewne zrodlo — patrz compiler::generatedStreams().
+  // jedyne pewne zrodlo - patrz compiler::generatedStreams().
   const auto &generatedStreams = cm.generatedStreams();
   for (const auto &[stream_id, query_text] : lines) {
     if (stream_id.empty()) continue;

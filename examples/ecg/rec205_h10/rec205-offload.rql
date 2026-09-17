@@ -1,4 +1,4 @@
-# Odciazenie lacza — rekord 205 MIT-BIH, 360 Hz
+# Odciazenie lacza - rekord 205 MIT-BIH, 360 Hz
 #
 # Ten sam potok Pan-Tompkinsa co rec205-qrs.rql, ale zakonczony REDUKCJA TEMPA.
 # rec205-qrs.rql tempa nie redukuje: wejscie to 2 wartosci na probke przy
@@ -13,8 +13,8 @@
 # Argument rozplotu = delta strumienia USUWANEGO. Dla decymacji 10x z 1/360
 # jest to 1/324, bo (1/36 * 1/324) / (1/36 + 1/324) = 1/360.
 #
-#   ecg_raw   2 x INTEGER @ 1/360  — to, co lacze musialoby przeniesc surowo
-#   qrs_ship  2 x INTEGER @ 1/36   — to, co idzie w lacze po potoku
+#   ecg_raw   2 x INTEGER @ 1/360  - to, co lacze musialoby przeniesc surowo
+#   qrs_ship  2 x INTEGER @ 1/36   - to, co idzie w lacze po potoku
 #
 # Zmierzone (master:6dec187, Release, -m 180000, czyli 500 s sygnalu):
 #   ecg_raw  179999 rek. x 8 B = 1 439 992 B = 2880,0 B/s
@@ -48,25 +48,25 @@ SELECT ecg.MLII, ecg.V1 STREAM ecg_raw FROM ecg PERSISTENT
 
 SELECT ecg.MLII STREAM mlii FROM ecg
 
-# 1. Filtr pasmowoprzepustowy (5-15 Hz) — splot FIR 25-tap
+# 1. Filtr pasmowoprzepustowy (5-15 Hz) - splot FIR 25-tap
 #
 # Okno stoi w klauzuli FROM, wiec nie potrzebuje wlasnego zapytania. Gwiazdka indeksowa
 # `[_]` bierze szerokosc ze schematu tej klauzuli, czyli 25 slotow, ktore wnosi tam okno
-# nad `mlii` — a nie z wlasnej szerokosci strumienia `mlii`.
+# nad `mlii` - a nie z wlasnej szerokosci strumienia `mlii`.
 SELECT mlii[_]*bpf[_] STREAM bp_acc FROM mlii@(1,25)+bpf
 SELECT int(bp_acc[0]/1000) STREAM bp_out FROM SUMC(bp_acc)
 
-# 2. Rozniczkowanie — splot FIR 5-tap, ten sam zapis co krok 1
+# 2. Rozniczkowanie - splot FIR 5-tap, ten sam zapis co krok 1
 SELECT bp_out[_]*df[_] STREAM d_acc FROM bp_out@(1,5)+df
 SELECT int(d_acc[0]) STREAM d_out FROM SUMC(d_acc)
 
 # 3. Kwadrat (dzielenie /1000 zapobiega przepelnieniu int32)
 SELECT d_out[0]^2/1000 STREAM sq_out FROM d_out
 
-# 4. Calkowanie w oknie ruchomym 30 probek (~83 ms) — ogranicza pasmo
+# 4. Calkowanie w oknie ruchomym 30 probek (~83 ms) - ogranicza pasmo
 SELECT int(sq_out[0]) STREAM mwi FROM AVG(sq_out@(1,30))
 
-# 5. Prog adaptacyjny — srednia ruchoma 180 probek (0.5 s)
+# 5. Prog adaptacyjny - srednia ruchoma 180 probek (0.5 s)
 SELECT int(mwi[0]) STREAM mwi_thr FROM AVG(mwi@(1,180))
 
 # Cecha przesylana dalej: obwiednia i sygnal detekcji, pelne tempo

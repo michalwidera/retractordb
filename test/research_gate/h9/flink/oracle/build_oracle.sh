@@ -1,6 +1,6 @@
 #!/bin/bash
 # Buduje oracle kanonicznego serializera (strona C++) linkujac go z librdb.a
-# z DRZEWA BUDOWY retractordb. Nie modyfikuje ani jednego pliku w retractordb —
+# z DRZEWA BUDOWY retractordb. Nie modyfikuje ani jednego pliku w retractordb -
 # uzywa wylacznie naglowkow i skompilowanych bibliotek.
 #
 # Domyslnie bierze profil K26v3-DEFAULT (ten, w ktorym pilot mierzyl mechanizm).
@@ -11,7 +11,7 @@ CODE_REPO="${CODE_REPO:-/home/michal/github/retractordb}"
 BUILD="${BUILD:-$CODE_REPO/build/K26v3-DEFAULT}"
 
 for lib in src/rdb/lib/librdb.a src/rdb/lib/.antlr/libdescparser.a src/common/libcommon.a; do
-  [[ -r "$BUILD/$lib" ]] || { echo "brak $BUILD/$lib — zbuduj profil najpierw" >&2; exit 2; }
+  [[ -r "$BUILD/$lib" ]] || { echo "brak $BUILD/$lib - zbuduj profil najpierw" >&2; exit 2; }
 done
 
 # Sciezki naglowkow i runtime ANTLR-a odczytane z compile_commands.json profilu,

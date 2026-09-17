@@ -84,7 +84,7 @@ TEST_F(IpcServerQueues, removeAllObjects_removes_every_client_queue) {
 // Regresja: sciezka atexit/FatalError kasowala wylacznie segment i kolejke komend,
 // wiec po smierci serwera zostawaly kolejki `brcdbr<pid>`. Nie jest to sam smiec:
 // subscribe() otwiera je przez open_or_create, ktory przy istniejacej kolejce
-// IGNORUJE zadana pojemnosc — klient z powtorzonym PID-em dostawal glebokosc
+// IGNORUJE zadana pojemnosc - klient z powtorzonym PID-em dostawal glebokosc
 // z poprzedniego przebiegu.
 TEST_F(IpcServerQueues, exit_handler_removes_client_queues_too) {
   IpcServer server;

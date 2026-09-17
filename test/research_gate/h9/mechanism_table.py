@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tabela liczb mechanizmu ze zrzutów planu — aparatura K26.
+"""Tabela liczb mechanizmu ze zrzutów planu - aparatura K26.
 
 Wersja obalona z K23 rozpoznawała substraty po konwencji nazw. K26 nie przenosi
 tego skryptu jako aparatury; zachowuje jedynie jego minimalną funkcję
@@ -9,13 +9,13 @@ Na czym polega poprawka
 -----------------------
 Klasyfikacja nie po nazwie, lecz po ŹRÓDLE NAZWY: substratem jest strumień
 obecny w planie, którego nazwa NIE WYSTĘPUJE w `.rql`. Wszystko, co autor
-nazwał — czy to `DECLARE ... STREAM X`, czy `SELECT ... STREAM Y` — jest
+nazwał - czy to `DECLARE ... STREAM X`, czy `SELECT ... STREAM Y` - jest
 publiczne, niezależnie od tego, jak wygląda. To odwzorowuje granicę, którą
 naprawdę rozróżnia silnik (`qry.isSubstrat` → `storage::markAsSubstrate()`), bo
 substraty są jedynymi strumieniami, których nazwy tworzy kompilator.
 
 Zrzut planu nie niesie flagi `isSubstrat`, więc bez `.rql` tej granicy odtworzyć
-nie można — i dlatego skrypt wymaga obu plików, zamiast zgadywać z jednego.
+nie można - i dlatego skrypt wymaga obu plików, zamiast zgadywać z jednego.
 
 Uruchomienie:
     ./mechanism_table.py --plan-dir DIR --rql-dir DIR [--plans A B ...]
@@ -34,7 +34,7 @@ PROFILES = ["DEFAULT", "NO_R2_CANON", "NO_R1_FACTOR", "NO_R1_NO_R2"]
 HEAD = re.compile(r"^(?P<name>[A-Za-z_][A-Za-z0-9_]*)\((?P<num>\d+)/(?P<den>\d+)\)")
 FIELD = re.compile(r"^\t[A-Za-z_][A-Za-z0-9_]*: (?P<type>[A-Z]+)")
 PUSH = re.compile(r"^\t:- PUSH_STREAM\((?P<src>[^)]+)\)")
-#: Nazwa nadana przez AUTORA — w `DECLARE ... STREAM X` i w `SELECT ... STREAM Y`.
+#: Nazwa nadana przez AUTORA - w `DECLARE ... STREAM X` i w `SELECT ... STREAM Y`.
 RQL_STREAM = re.compile(r"\bSTREAM\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)")
 
 #: Jednostka odniesienia: `n_h*w` przy 150 Hz i jednym polu INTEGER (RAPORT_PILOTA.md §1).
@@ -147,15 +147,15 @@ def report(plan_dir, rql_dir, plans, profiles, verbose=True):
 # ─── Bramka o znanej odpowiedzi ──────────────────────────────────────────────
 #
 # Reguła łuku K26/K24: bramka musi umieć odróżnić wersję OBALONĄ. Sprawdzenie
-# „nowy skrypt daje sensowne liczby" jej nie spełnia — spełniają ją dopiero DWA
+# „nowy skrypt daje sensowne liczby" jej nie spełnia - spełniają ją dopiero DWA
 # warunki naraz:
 #
 #   (a) na sześciu planach pilota, na których stoi zamknięty RAPORT_PILOTA.md §2,
-#       nowa klasyfikacja daje liczby IDENTYCZNE ze starą — poprawka nie rusza
+#       nowa klasyfikacja daje liczby IDENTYCZNE ze starą - poprawka nie rusza
 #       niczego, czego ruszać nie miała;
 #   (b) na planach kontrolnych nowa klasyfikacja RÓŻNI SIĘ od starej dokładnie o
 #       publiczne nazwy, których mutant nie rozpoznaje: `z1`, `z2` oraz w F9-R1
-#       `STREAM_HASH_CA_CB` — gdyby nie różniła się niczym, poprawka nie byłaby
+#       `STREAM_HASH_CA_CB` - gdyby nie różniła się niczym, poprawka nie byłaby
 #       dowiedziona.
 #
 # Warunek (b) jest tym, którego brak przepuścił defekt w wersji pilota.
@@ -163,7 +163,7 @@ def report(plan_dir, rql_dir, plans, profiles, verbose=True):
 GATE_MAIN_PLANS = ["F9_R2_Q8", "F9_R1_Q8", "F9_X_Q8"]
 GATE_CONTROL_PLANS = ["F9_R2_controls", "F9_R1_controls", "F9_X_controls"]
 
-#: Stara klasyfikacja — przepisana z `pilot/mechanism_table.py` DOSŁOWNIE, żeby
+#: Stara klasyfikacja - przepisana z `pilot/mechanism_table.py` DOSŁOWNIE, żeby
 #: bramka porównywała się z wersją obaloną, a nie z jej opisem.
 LEGACY_USER = re.compile(r"(m|q|n|d|x|i|h|mm|collide_user)\d*")
 
@@ -178,7 +178,7 @@ def gate():
     plan_dir = HERE / "pilot" / "out"
     rql_dir = HERE / "rql"
     if not plan_dir.exists():
-        sys.exit("brak zrzutow pilota — bramki nie da sie uruchomic")
+        sys.exit("brak zrzutow pilota - bramki nie da sie uruchomic")
 
     failures, differences = [], []
 
@@ -204,7 +204,7 @@ def gate():
     if not differences:
         failures.append(
             "(b) nowa klasyfikacja nie rozni sie od starej na ZADNYM planie kontrolnym "
-            "— poprawka nie jest dowiedziona"
+            "- poprawka nie jest dowiedziona"
         )
     elif removed != {("z1", "z2"), ("STREAM_HASH_CA_CB", "z1", "z2")} or added != {()}:
         failures.append(
@@ -222,7 +222,7 @@ def gate():
     if "STREAM_HASH_CA_CB" in ctrl["substrates"]:
         failures.append("(c) STREAM_HASH_CA_CB nadal liczony jako substrat")
     if ctrl["public_appends"] <= 0:
-        failures.append("(c) mianownik pusty — publiczne zapisy nie sa liczone")
+        failures.append("(c) mianownik pusty - publiczne zapisy nie sa liczone")
 
     for line in failures:
         print(f"BLAD BRAMKI: {line}", file=sys.stderr)

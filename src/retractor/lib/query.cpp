@@ -51,7 +51,7 @@ int query::getFieldIndex(const field &f_arg) {
 
 /// Czy klauzula FROM ma wiecej niz jeden operator, czyli wymaga wydzielenia substratow.
 ///
-/// Wykonanie przyjmuje program klauzuli FROM o DOKLADNIE jednym operatorze — patrz GetArgs(),
+/// Wykonanie przyjmuje program klauzuli FROM o DOKLADNIE jednym operatorze - patrz GetArgs(),
 /// ktore odrzuca program dluzszy niz trzy tokeny, i dataModel::constructInputPayload().
 /// Kompilator sprowadza do tej postaci extractIntermediateStreams(), a ta funkcja decyduje,
 /// kiedy go uruchomic.
@@ -59,7 +59,7 @@ int query::getFieldIndex(const field &f_arg) {
 /// Reduktory (`.avg`/`.min`/`.max`/`.sumc` oraz rownowazne AVG()/MIN()/MAX()/SUMC()) sa na
 /// tej liscie od 2026-08-29. Bez nich program `[PUSH_STREAM, STREAM_AGSE, STREAM_SUM]` mial
 /// licznik 1 i nie trafial do wydzielenia, a GetArgs() czytal go jako dwa argumenty
-/// i operator — bral STREAM_AGSE za nazwe strumienia. Postac dwuoperatorowa byla wczesniej
+/// i operator - bral STREAM_AGSE za nazwe strumienia. Postac dwuoperatorowa byla wczesniej
 /// nieosiagalna sposobem innym niz `(a.sumc)>2`, ktore konczylo sie
 /// `FATAL: unexpected program size in computeRequiredCapacities`.
 bool query::isReductionRequired() {
@@ -202,7 +202,7 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   std::string sArg1;
   std::string sArg2;
   if (prog.size() >= 4) {
-    FatalError("query::GetArgs: program too large — {} tokens, expected at most 3", prog.size());
+    FatalError("query::GetArgs: program too large - {} tokens, expected at most 3", prog.size());
   }
   if (prog.size() == 1) sArg1 = (*eIt).getStr_();   // 1
   if (prog.size() > 1) sArg1 = (*eIt++).getStr_();  // 2,3

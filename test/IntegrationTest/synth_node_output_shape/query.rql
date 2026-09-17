@@ -10,17 +10,17 @@ DECLARE d DOUBLE STREAM cb, 1 FILE 'big.txt'
 DECLARE d DOUBLE STREAM ct, 1 FILE 'third.txt'
 DECLARE k INTEGER[3] STREAM kf, 1 FILE 'k.txt'
 
-# B — jawna lista pol nad `@` i nad reduktorem ma typ slotu wejsciowego, tak jak `SELECT *`.
+# B - jawna lista pol nad `@` i nad reduktorem ma typ slotu wejsciowego, tak jak `SELECT *`.
 SELECT w[0], w[1] STREAM w FROM c@(1,2)
 SELECT * STREAM ws FROM c@(1,2)
 SELECT av[0], av[0] * 2, ci[0] STREAM av FROM ci.avg
 SELECT * STREAM avs FROM ci.avg
 SELECT mx[0], cf[0] STREAM mx FROM cf.max
 
-# C — `SELECT *` nad reduktorem ze zrodlem DOUBLE jest DOUBLE (reductionResultField), nie RATIONAL.
+# C - `SELECT *` nad reduktorem ze zrodlem DOUBLE jest DOUBLE (reductionResultField), nie RATIONAL.
 SELECT * STREAM sb FROM cb.max
 SELECT * STREAM st FROM ct.max
 
-# D — `c2[k]` przy `FROM c2@(1,3)+kf` czyta slot k bloku okna, a nie pole k strumienia `c2`.
+# D - `c2[k]` przy `FROM c2@(1,3)+kf` czyta slot k bloku okna, a nie pole k strumienia `c2`.
 SELECT * STREAM c2 FROM c
 SELECT c2[_]*kf[_] STREAM acc FROM c2@(1,3)+kf

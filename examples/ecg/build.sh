@@ -6,7 +6,7 @@ rec_dir="$script_dir/rec205"
 
 python3 "$script_dir/mitbih2rdb.py" "$rec_dir/205.hea"
 
-# rec205.desc — format identyczny z tym co generuje xretractor po DECLARE ... FILE 'rec205'.
+# rec205.desc - format identyczny z tym co generuje xretractor po DECLARE ... FILE 'rec205'.
 # Odwzorowuje dokładnie operator<< klasy Descriptor (descriptor.cc):
 # '{' + TAB + pola, bez newline po '{', z REF i TYPE DEVICE na końcu.
 printf '{' >  "$rec_dir/rec205.desc"

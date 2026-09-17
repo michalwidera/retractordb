@@ -12,8 +12,8 @@
 /// Zatrzymuje kompilację, jeżeli którykolwiek węzeł planu nie ma wyliczonej wielkości.
 ///
 /// Wspólna bramka obu przebiegów rachunku indeksu logicznego
-/// (compiler::computeLogicalOrigin i compiler::computeStartupLatency). Uzasadnienie —
-/// dlaczego nierozwiązany węzeł jest błędem, a nie stanem dopuszczalnym — jest przy
+/// (compiler::computeLogicalOrigin i compiler::computeStartupLatency). Uzasadnienie -
+/// dlaczego nierozwiązany węzeł jest błędem, a nie stanem dopuszczalnym - jest przy
 /// definicji w compiler.cpp.
 ///
 /// Zadeklarowana w nagłówku, bo poza dwoma miejscami użycia w kompilatorze woła ją
@@ -34,7 +34,7 @@ struct compiler {
   /// Potrzebne przy przeladowaniu planu w locie (`xqry --reset`): referencja `coreInstance`
   /// jest nierebindowalna, wiec plan wymienia sie PRZEZ ZAWARTOSC tego samego obiektu.
   /// Bez wyczyszczenia rodzin generatora i zapamietanych odwolan kompilacja nowego planu
-  /// widzialaby strumienie poprzedniego — a stawka jest kasowanie plikow artefaktow,
+  /// widzialaby strumienie poprzedniego - a stawka jest kasowanie plikow artefaktow,
   /// ktore idzie wlasnie po generatedStreams_.
   void reset();
 
@@ -51,13 +51,13 @@ struct compiler {
   qTree &coreInstance;
   bool restrictSelectSharing_ = false;
   std::set<std::string> selectSharingScope_;
-  /// Nazwy strumieni, po których sięgnął UŻYTKOWNIK, per zapytanie — sprawdzane przez bramkę
+  /// Nazwy strumieni, po których sięgnął UŻYTKOWNIK, per zapytanie - sprawdzane przez bramkę
   /// przeplotu w localizeFieldOffsets(). Zbierane z dwóch miejsc, bo formy zapisu różnią się
   /// momentem, w którym znana jest nazwa strumienia:
-  ///  * `A[0]` i `A.pole` — snapshotNamedSourceRefs(), przed pierwszym przebiegiem, bo później
+  ///  * `A[0]` i `A.pole` - snapshotNamedSourceRefs(), przed pierwszym przebiegiem, bo później
   ///    buildOutputSchema() syntetyzuje własne PUSH_ID2 i typ tokenu przestaje odróżniać
   ///    użytkownika od kompilatora (te syntetyczne dwuznaczne nie są);
-  ///  * goła nazwa pola — resolveTokenReferences(), bo nazwa strumienia powstaje dopiero
+  ///  * goła nazwa pola - resolveTokenReferences(), bo nazwa strumienia powstaje dopiero
   ///    z wyszukania pola w schematach argumentów. PUSH_ID3 wystawia wyłącznie parser.
   std::map<std::string, std::set<std::string>> namedSourceRefs_;
   std::map<std::string, std::vector<std::string>> generatedStreams_;

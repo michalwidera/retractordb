@@ -9,7 +9,7 @@
 
 # Compile and run a small C++23 probe.
 # Tests std::ranges::fold_left, the uz size_t literal and std::println (<print>)
-# — all C++23 and used in the codebase.
+# - all C++23 and used in the codebase.
 # Requires GCC 14+ (libstdc++ 13 has no <print> at all).  Returns 0 on success.
 check_cxx23() {
     local tmpdir rc
@@ -54,7 +54,7 @@ tool_installed() {
     local tool="$1"
     case "$tool" in
         cmake-pinned)
-            # Sama obecnosc `cmake` nie wystarcza — liczy sie, czy w PATH stoi
+            # Sama obecnosc `cmake` nie wystarcza - liczy sie, czy w PATH stoi
             # wersja nie starsza niz podloga. Nowsza spelnia warunek i NIE jest
             # cofana do podlogi: dryft w gore jest oczekiwany.
             local ver
@@ -173,7 +173,7 @@ tool_specs_for_option() {
                 # it_issue31_doc, ktory bez `dot` sam sie nie rejestruje. Na obrazie
                 # projektu graphviz jest, wiec x86 nie traci nic. Joby uzywajace tej
                 # listy (ARM, czysta Ubuntu) przestaja przez to ciagnac zaleznosci
-                # graphviza z apt — a to wlasnie na nich lustro ports.ubuntu.com
+                # graphviza z apt - a to wlasnie na nich lustro ports.ubuntu.com
                 # oddawalo okresowo 503 na fonts-liberation.
                 #
                 # POZIOM TRZYMAC SPOJNIE Z LISTA `validate`: ona ma wlasny zestaw

@@ -38,7 +38,7 @@ if grep -F 'STREAM_TIMEMOVE_1_B2(' out_compile.txt; then exit 1; fi
 # Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
 # wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
 # Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera -f
-# znaczy 'fields' w wyjsciu DOT — do wywolan kompilacyjnych jej NIE dodawac.
+# znaczy 'fields' w wyjsciu DOT - do wywolan kompilacyjnych jej NIE dodawac.
 xretractor query.rql -r -k -m 48 -f
 
 # Physical equality covers the complete stored INTEGER payload. The .meta header is
@@ -53,7 +53,7 @@ cmp <(tail -c +9 matched.meta) <(tail -c +9 CC.meta)
 # Both sides are factored to the same shape here, so both declare tail 0 and
 # origin 3. Two restampings led to this: tau_N stopped being "not ready yet"
 # (tail) and became "this record has no definition" (origin), and then tau_N
-# stopped inflating its own tail — tau_3 over an interleave of tail 2 absorbs it
+# stopped inflating its own tail - tau_3 over an interleave of tail 2 absorbs it
 # entirely, max(0, 2 - 3) = 0, because record n reads the OLDER record n-3.
 # The emitted record sequence is unchanged; only its time address moved.
 grep -F 'matched(1/15)	origin=3' out_compile.txt

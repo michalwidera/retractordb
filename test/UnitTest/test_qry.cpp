@@ -432,7 +432,7 @@ class qry_fake_other_stream : public qry {
 
 // Serwer zna strumień, więc `select()` wchodzi w pętlę i uruchamia producenta.
 // W teście jednostkowym nie ma serwera IPC, więc kolejka odpowiedzi nigdy nie
-// powstanie — to jest dokładnie tryb, który wcześniej dawał cichy sukces.
+// powstanie - to jest dokładnie tryb, który wcześniej dawał cichy sukces.
 class qry_fake_known_stream : public qry {
  public:
   explicit qry_fake_known_stream(int responseQueueOpenMaxFails)
@@ -451,7 +451,7 @@ class qry_fake_known_stream : public qry {
 
 // B: brak odpowiedzi serwera musi być własnym trybem, a nie wyjątkiem
 // „No such node (db.stream)". Stara wersja rzucała z `get_child`, launcher
-// łapał to jako std::exception i zwracał `interrupted` — operator dostawał
+// łapał to jako std::exception i zwracał `interrupted` - operator dostawał
 // informację o przerwaniu zamiast o przeciążonym serwerze.
 TEST(xqry, select_reports_server_no_response_instead_of_throwing) {
   qry_fake_no_response obj_no_response;
@@ -462,7 +462,7 @@ TEST(xqry, select_reports_server_no_response_instead_of_throwing) {
   });
 }
 
-// B: odpowiedź bez listy strumieni jest tym samym trybem — serwer nie dostarczył
+// B: odpowiedź bez listy strumieni jest tym samym trybem - serwer nie dostarczył
 // tego, o co pytano.
 TEST(xqry, select_reports_server_no_response_on_malformed_answer) {
   qry_fake_malformed obj_malformed;
@@ -500,7 +500,7 @@ TEST(xqry, select_does_not_report_success_when_no_element_was_read) {
   EXPECT_EQ(result, selectResult::clientQueueMissing);
 }
 
-// Każdy tryb ma własny, niepusty opis — komunikat operatora nie może być pusty
+// Każdy tryb ma własny, niepusty opis - komunikat operatora nie może być pusty
 // ani wspólny dla różnych awarii.
 TEST(xqry, select_result_descriptions_are_distinct) {
   const std::array<selectResult, 7> all{
@@ -528,7 +528,7 @@ class qry_fake_idle : public qry {
 };
 
 // Serwer przyjal komende w trakcie wlasnego zamykania (executorsm: iLoopLimitCnt ==
-// stop_now). Odpowiedzial — wiec meldowanie timeoutu byloby klamstwem o przyczynie.
+// stop_now). Odpowiedzial - wiec meldowanie timeoutu byloby klamstwem o przyczynie.
 class qry_fake_stopping : public qry {
  public:
   boost::property_tree::ptree netClient(const std::string & /*cmd*/, const std::string & /*arg*/) override {

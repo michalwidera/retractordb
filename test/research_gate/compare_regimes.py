@@ -9,14 +9,14 @@ Porzadek rezimow, od najgorszego do najlepszego:
 
     zanizajaca  <  zawyzajaca  <  dokladna
 
-* ``zanizajaca`` — ogon krotszy niz wymaga model zdarzeniowy. Rekord wychodzi,
+* ``zanizajaca`` - ogon krotszy niz wymaga model zdarzeniowy. Rekord wychodzi,
   zanim wszystkie jego zaleznosci sa okreslone. To defekt poprawnosci, nie
   utrata precyzji: BLAD zawsze, takze gdy odniesienie juz go mialo.
-* ``zawyzajaca`` — nigdy nie zaniza, ale nie jest rowna. Bezpieczne, kosztuje
+* ``zawyzajaca`` - nigdy nie zaniza, ale nie jest rowna. Bezpieczne, kosztuje
   slot opoznienia.
-* ``dokladna`` — postac zamknieta rowna oracle'owi wszedzie.
+* ``dokladna`` - postac zamknieta rowna oracle'owi wszedzie.
 
-Kody wyjscia: 0 — bez regresji (mozliwe poprawy); 1 — regresja; 2 — blad
+Kody wyjscia: 0 - bez regresji (mozliwe poprawy); 1 - regresja; 2 - blad
 odczytu albo rozjazd zestawu klas.
 """
 
@@ -30,10 +30,10 @@ HEADING = re.compile(r"^##\s")
 
 # Werdykt ma dwie tabele z ta sama kolumna rezimu: ogon startowy (sekcja 1)
 # i poczatek logiczny (sekcja 1b). Bez zakotwiczenia w sekcji druga nadpisuje
-# pierwsza — i bramka orzeka o czym innym, niz mysli.
+# pierwsza - i bramka orzeka o czym innym, niz mysli.
 SECTIONS = {
-    "ogon startowy": "H10a — dokładność, per klasa operatora",
-    "początek logiczny": "H10a — początek logiczny, per klasa operatora",
+    "ogon startowy": "H10a - dokładność, per klasa operatora",
+    "początek logiczny": "H10a - początek logiczny, per klasa operatora",
 }
 
 
@@ -49,7 +49,7 @@ def read_regimes(path, section):
 
     Czyta tabele, nie liste wypunktowana pod nia: lista jest streszczeniem,
     a tabela zrodlem. Brak sekcji albo brak wierszy jest BLEDEM, nie pustym
-    wynikiem — pusta strona porownania zamienilaby bramke w tautologie.
+    wynikiem - pusta strona porownania zamienilaby bramke w tautologie.
     """
     out = {}
     inside = False
@@ -107,7 +107,7 @@ def compare(ref, cur, label):
               "i to twierdzenie staje sie zachowawcze.")
 
     for item in unsafe:
-        print(f"  DEFEKT    {item} — wartosc mniejsza niz wymaga model zdarzeniowy")
+        print(f"  DEFEKT    {item} - wartosc mniejsza niz wymaga model zdarzeniowy")
     for item in regressions:
         print(f"  REGRESJA  {item}")
 

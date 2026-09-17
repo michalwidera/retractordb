@@ -1,8 +1,8 @@
-# Potok EKG Pan-Tompkins — flagowy przyklad artykulu (sekcja "Example D").
+# Potok EKG Pan-Tompkins - flagowy przyklad artykulu (sekcja "Example D").
 #
 # Plan wyprowadzony z examples/ecg/rec205/rec205-qrs.rql BEZ ZMIAN SEMANTYCZNYCH.
 # Rozni sie od oryginalu wylacznie:
-#   - nazwa pliku zrodlowego ('ecgdata' zamiast 'rec205' — prefiks 2000 probek),
+#   - nazwa pliku zrodlowego ('ecgdata' zamiast 'rec205' - prefiks 2000 probek),
 #   - dyrektywa STORAGE,
 #   - PERSISTENT na obserwowanych strumieniach,
 #     bez czego nie powstalby zaden artefakt do porownania ze wzorcem.
@@ -11,7 +11,7 @@
 #
 # Powod istnienia testu: scalenie 5f31051 ("Issue 227 precesja") przestemplowalo
 # okno @ z poczatku na koniec przedzialu i przenioslo rozpietosc okna z ogona do
-# query::logicalOrigin — czyli dotknelo dokladnie operatora, na ktorym ten potok
+# query::logicalOrigin - czyli dotknelo dokladnie operatora, na ktorym ten potok
 # stoi. Regresja "plaski wykres detekcji QRS" byla kiedys znaleziona przez ten
 # przyklad, a nie przez zestaw testow (patrz komentarz w test_compiler.cpp przy
 # agse_capacity_covers_whole_window_over_computed_source).
@@ -28,7 +28,7 @@ DECLARE d_coef INTEGER[5] STREAM df, 1 FILE 'd_coef.txt'
 # Potok liczy w arytmetyce CALKOWITEJ: kazdy wynik reduktora (SUMC, AVG, MAX) wraca
 # do INTEGER jawnym `int` (skrot `to_integer`). Wynik reduktora nad polem calkowitym
 # jest RATIONAL. Do 2026-09-14 jawna lista pol nad reduktorem zapisywala go po cichu
-# jako INTEGER, z obcieciem — i na tym obcieciu stal ten potok. Bez rzutowan mianowniki
+# jako INTEGER, z obcieciem - i na tym obcieciu stal ten potok. Bez rzutowan mianowniki
 # rosna etap po etapie (/1000, kwadrat, srednia z 30) i `rational<int>` przepelnia sie
 # bez ostrzezenia: `mwi` wychodzilo ujemne. Rzutowania odtwarzaja dotychczasowy wynik
 # bajt w bajt, wiec pattern.txt sie nie zmienil.
@@ -36,11 +36,11 @@ DECLARE d_coef INTEGER[5] STREAM df, 1 FILE 'd_coef.txt'
 # Wyodrebnienie kanalu MLII
 SELECT ecg.MLII STREAM mlii FROM ecg
 
-# 1. Filtr pasmowoprzepustowy (5-15 Hz) — splot FIR 25-tap
+# 1. Filtr pasmowoprzepustowy (5-15 Hz) - splot FIR 25-tap
 SELECT mlii[_]*bpf[_] STREAM bp_acc FROM mlii@(1,25)+bpf
 SELECT int(bp_acc[0]/1000) STREAM bp_out FROM SUMC(bp_acc) PERSISTENT
 
-# 2. Rozniczkowanie — splot FIR 5-tap
+# 2. Rozniczkowanie - splot FIR 5-tap
 SELECT bp_out[_]*df[_] STREAM d_acc FROM bp_out@(1,5)+df
 SELECT int(d_acc[0]) STREAM d_out FROM SUMC(d_acc)
 
@@ -50,24 +50,24 @@ SELECT d_out[0]^2/1000 STREAM sq_out FROM d_out
 # 4. Calkowanie w oknie ruchomym 30 probek (~83 ms)
 SELECT int(sq_out[0]) STREAM mwi FROM AVG(sq_out@(1,30)) PERSISTENT
 
-# 5. Prog adaptacyjny — srednia ruchoma 180 probek (0.5 s)
+# 5. Prog adaptacyjny - srednia ruchoma 180 probek (0.5 s)
 SELECT int(mwi[0]) STREAM mwi_thr FROM AVG(mwi@(1,180))
 
 # Wyjscie: MLII wycentrowane, obwiednia x5, sygnal detekcji x5
 SELECT mlii[0]-900, mwi[0]*5, (mwi[0]-mwi_thr[0]*2)*5 STREAM qrs_out FROM mlii+mwi+mwi_thr PERSISTENT
 
 # 6. Zdziesiatkowana obwiednia szczytowa filtru pasmowego (~51,4 Hz)
-#    — WEZEL DODANY WZGLEDEM ORYGINALU.
+#    - WEZEL DODANY WZGLEDEM ORYGINALU.
 #
 # Powod: caly potok Pan-Tompkinsa uzywa okien o kroku 1 nad zrodlami o jednym
 # polu, wiec iloraz (1+W_src)*F/step jest w kazdym jego wezle CALKOWITY i
 # mutacja ceil->floor w AgseStartupLatency nie zmienia w nim niczego. Bramka,
-# ktora przechodzi takze dla reguly obalonej, niczego nie strzeze — potrzebny
+# ktora przechodzi takze dla reguly obalonej, niczego nie strzeze - potrzebny
 # jest wezel o ilorazie ulamkowym. Krok 7 nad bp_out (W_src=359, F=1) daje
 # ogon = ceil(360/7)-1 = 51, a przy floor 50.
 #
 # Zrodlem jest bp_out, a nie mwi, bo bp_out niesie 76 roznych wartosci, a mwi
-# tylko trzy (calkowita srednia kwadratow podzielonych przez 1000) — po
+# tylko trzy (calkowita srednia kwadratow podzielonych przez 1000) - po
 # zdziesiatkowaniu mwi wzorzec rozrozniałby przesuniecie wylacznie liczba
 # rekordow, nie trescia.
 SELECT int(bp_out[0]) STREAM bp_dec FROM MAX(bp_out@(7,-21)) PERSISTENT

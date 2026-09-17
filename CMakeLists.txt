@@ -1,5 +1,5 @@
 # Zakres `<min>...<max>`, nie jedna liczba: dolna granica mowi, czym da sie ten
-# projekt skonfigurowac (3.20), gorna — z ktorej wersji brane sa DOMYSLNE
+# projekt skonfigurowac (3.20), gorna - z ktorej wersji brane sa DOMYSLNE
 # ZACHOWANIA polityk (4.4). Nowszy cmake dostaje wiec zachowanie NEW zamiast
 # ostrzegac, a starszy nadal konfiguruje projekt.
 #
@@ -8,13 +8,13 @@
 # rozjazd ujawnil sie jako CMP0219 (od 4.4) w testach integracyjnych, gdzie
 # `add_test` jest przeslonione makrem: przy zachowaniu OLD ginal backslash i
 # `grep '\.shadow$'` stawal sie `grep '.shadow$'`. Podloga wersji stoi teraz w
-# conanfile.py i w RDB_CMAKE_MIN_VERSION w scripts/buildrdb.sh — dryft w gore
+# conanfile.py i w RDB_CMAKE_MIN_VERSION w scripts/buildrdb.sh - dryft w gore
 # jest dozwolony, a te trzy miejsca podnosi sie razem i swiadomie.
 cmake_minimum_required(VERSION 3.20...4.4 FATAL_ERROR)
 
 # Jedyne źródło prawdy o wersji: plik VERSION w korzeniu repo. Czytany też przez
 # conanfile.py (set_version) i Dockerfile (--build-arg). NIE wpisywać wersji
-# tutaj na sztywno — zmieniać wyłącznie plik VERSION.
+# tutaj na sztywno - zmieniać wyłącznie plik VERSION.
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" RDB_VERSION)
 
 project(
@@ -29,9 +29,9 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 # install` działał bez sudo (domyślny /usr/local wymaga roota → Permission
 # denied). Warunek łapie: świeżą konfigurację (INITIALIZED_TO_DEFAULT),
 # istniejący cache z nietkniętym /usr/local oraz prefiks wskazujący w drzewo
-# źródeł (CMAKE_SOURCE_DIR) — instalacja do korzenia repo zaśmieca bin/ lib/
+# źródeł (CMAKE_SOURCE_DIR) - instalacja do korzenia repo zaśmieca bin/ lib/
 # share/ i jest zawsze błędna. Własny sensowny prefiks (dowolny inny) jest
-# uszanowany. Pakiety CPack używają CPACK_PACKAGING_INSTALL_PREFIX (/usr) — bez
+# uszanowany. Pakiety CPack używają CPACK_PACKAGING_INSTALL_PREFIX (/usr) - bez
 # zmian.
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT
    OR CMAKE_INSTALL_PREFIX STREQUAL "/usr/local"
@@ -44,7 +44,7 @@ endif()
 add_definitions(-DSPDLOG_FMT_EXTERNAL)
 add_definitions(-DFMT_HEADER_ONLY)
 # Polityka logowania per konfiguracja: na urządzeniu pomiarowym (rpi400) /tmp
-# leży na karcie SD, a logger flushuje każdą linię — w Release do logu mogą
+# leży na karcie SD, a logger flushuje każdą linię - w Release do logu mogą
 # trafiać wyłącznie błędy (makra poniżej ERROR są wycinane w kompilacji). W
 # Debug pełna diagnostyka łącznie z SPDLOG_DEBUG (m.in. rotacja segmentów).
 # Poziom runtime dopasowuje setupLoggerMain() na podstawie SPDLOG_ACTIVE_LEVEL.
@@ -57,7 +57,7 @@ add_definitions(-DHAS_BOOST)
 option(ENABLE_COVERAGE "Enable code coverage" OFF)
 # Unity Build łączy wiele .cpp w jedną jednostkę kompilacji, zmniejszając liczbę
 # uruchomień kompilatora i wielokrotne parsowanie nagłówków. Może ujawnić
-# konflikty nazw między TU (np. anonimowe namespace, statyczne zmienne) — testuj
+# konflikty nazw między TU (np. anonimowe namespace, statyczne zmienne) - testuj
 # przed włączeniem. Użycie: scripts/buildrdb.sh debug -DENABLE_UNITY_BUILD=ON
 option(ENABLE_UNITY_BUILD "Enable unity build for faster compilation" OFF)
 
@@ -74,14 +74,14 @@ option(RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES
 option(RDB_OPT_SIMPLIFY_EXPRESSIONS
        "Fold constants and simplify algebraic field expressions" ON)
 
-# Agresywne przepisania wyrazenia — regula D w R3 (`a*a` -> `a^2`). CELOWO poza
+# Agresywne przepisania wyrazenia - regula D w R3 (`a*a` -> `a^2`). CELOWO poza
 # rodzina RDB_OPT_*: tamte piec przelacznikow tworzy macierz ablacyjna i sa
 # wypisywane przez `xretractor --build-info`, a korpus H9 weryfikuje ZBIOR
 # kluczy tego wypisu dokladnie (test/research_gate/h9/validate_corpus.py). Nowy
 # klucz zapalilby bramke badawcza.
 #
 # Domyslnie OFF, i nie z powodu poprawnosci: regula D nie zmienia wyniku (patrz
-# exactPower w expressionEvaluator). Powodem jest APARATURA — mierzone plany H9
+# exactPower w expressionEvaluator). Powodem jest APARATURA - mierzone plany H9
 # stoja na normie `Sqrt(A[0]*A[0]+B[0]*B[0])`, a bramka wymaga, zeby R3 nie
 # ruszyla ich ani razu. Wlaczenie: scripts/buildrdb.sh release
 # -Daggressive_expr_optimization=ON
@@ -98,8 +98,8 @@ endif()
 # Sondy pomiarowe benchmarku (E1 czas slotu, E3 rozmiar planu, E4 praca na slot,
 # K6 materializacja). Domyślnie WYŁĄCZONE: kod sond jest wtedy wycinany przez
 # kompilator (if constexpr na stałych rdb_probe_* z probeConfig.h), zero kosztu
-# — ale nadal PRZECHODZI przez kompilator, więc nie może zgnić niezauważony.
-# Włączenie tylko do pomiarów wydajności — NIE dla produkcji. Użycie:
+# - ale nadal PRZECHODZI przez kompilator, więc nie może zgnić niezauważony.
+# Włączenie tylko do pomiarów wydajności - NIE dla produkcji. Użycie:
 # scripts/buildrdb.sh probe
 #
 # Jedna opcja steruje wszystkimi sondami, bo tak wprowadzają je eksperymenty.
@@ -115,7 +115,7 @@ if(RDB_BENCH_PROBE)
   set(RDB_PROBE_WORK true)
   message(
     WARNING
-      "RDB_BENCH_PROBE=ON — benchmark probes compiled in; NOT a production build."
+      "RDB_BENCH_PROBE=ON - benchmark probes compiled in; NOT a production build."
   )
 else()
   set(RDB_PROBE_SLOT false)
@@ -138,7 +138,7 @@ message(STATUS "RDB_BENCH_PROBE=${RDB_BENCH_PROBE}")
 # mold jest domyślnym linkerem (szybszy niż ld/lld), ale na platformach z
 # ograniczoną pamięcią (np. RPi) potrafi zgłaszać błędy alokacji przy
 # linkowaniu. RDB_USE_MOLD=OFF w env wymusza (FORCE) wyłączenie przy każdej
-# konfiguracji — działa też przez 'conan build', które nie pozwala wstrzyknąć -D
+# konfiguracji - działa też przez 'conan build', które nie pozwala wstrzyknąć -D
 # (patrz scripts/buildrdb.sh: opcje 'mold'/'nomold').
 if(DEFINED ENV{RDB_USE_MOLD})
   set(RDB_USE_MOLD
@@ -200,7 +200,7 @@ find_package(antlr4 CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
 find_package(tomlplusplus CONFIG REQUIRED)
 
-# Oznacz wszystkie importowane targety (Conan) jako systemowe — clang-tidy z
+# Oznacz wszystkie importowane targety (Conan) jako systemowe - clang-tidy z
 # SystemHeaders:false pomija ich nagłówki (brak ostrzeżeń i notatek z .conan2/).
 get_property(
   _imported_targets
@@ -247,11 +247,11 @@ include_directories(
   ${fmt_INCLUDE_DIR}
   ${magic_enum_INCLUDE_DIR}
   ${antlr4-runtime_INCLUDE_DIR}
-  ${PROJECT_BINARY_DIR}/generated # config.h, serviceDefaults.h, probeConfig.h —
+  ${PROJECT_BINARY_DIR}/generated # config.h, serviceDefaults.h, probeConfig.h -
                                   # per katalog build
   src/include)
 
-# toml++ jako include SYSTEMOWY (-isystem) — wycisza ostrzeżenia z jego
+# toml++ jako include SYSTEMOWY (-isystem) - wycisza ostrzeżenia z jego
 # nagłówków (np. -Wdeprecated-literal-operator pod C++23). To kod zewnętrzny,
 # header-only, nie chcemy go diagnozować jak własnego (-I).
 include_directories(SYSTEM ${tomlplusplus_INCLUDE_DIR})
@@ -305,7 +305,7 @@ if(NOT RDB_WITH_API)
   list(APPEND CMAKE_CTEST_ARGUMENTS -LE api)
 endif()
 
-# `ninja install-withapi` — jedyne wejscie, ktore instaluje API. Zaleznosci
+# `ninja install-withapi` - jedyne wejscie, ktore instaluje API. Zaleznosci
 # gwarantuja zbudowanie silnika i celow API przed instalacja; dwa wywolania
 # `cmake --install` odpowiadaja komponentowi domyslnemu i komponentowi `api`.
 add_custom_target(
@@ -322,7 +322,7 @@ add_dependencies(
   rdb_api_json
   rdb_monitor)
 
-# `ninja test-api` — testy API, budowane i uruchamiane wylacznie na zadanie.
+# `ninja test-api` - testy API, budowane i uruchamiane wylacznie na zadanie.
 add_custom_target(
   test-api
   COMMAND ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_BINARY_DIR} -L api
@@ -335,13 +335,13 @@ include(InstallRequiredSystemLibraries)
 set(CPACK_GENERATOR "DEB;TGZ")
 # Pakiet ZRODLOWY jest wylaczony. Nie bylo dla niego odbiorcy, a jego zawartosc
 # byla nieprawdziwa: wpisy CPACK_SOURCE_IGNORE_FILES to regexy na pelnej
-# sciezce, wiec `/lib/` wycinalo `src/rdb/lib/` i `src/retractor/lib/` — 84
-# pliki rdzenia silnika wraz z obiema gramatykami — a `README.md` wycinalo kazdy
+# sciezce, wiec `/lib/` wycinalo `src/rdb/lib/` i `src/retractor/lib/` - 84
+# pliki rdzenia silnika wraz z obiema gramatykami - a `README.md` wycinalo kazdy
 # README na kazdej glebokosci. Test pakowania tego nie lapal, bo sprawdzal
 # wylacznie NIEOBECNOSC artefaktow, nigdy obecnosc zrodel.
 #
 # Wylaczenie musi byc jawne. Samo usuniecie CPACK_SOURCE_GENERATOR wlacza
-# domyslne generatory CPacka (TBZ2, TGZ, TXZ, TZ) — bez listy ignorowanych
+# domyslne generatory CPacka (TBZ2, TGZ, TXZ, TZ) - bez listy ignorowanych
 # spakowalyby cale `build/`. Te opcje czyta include(CPack) nizej; CMP0077 (NEW
 # od cmake_minimum_required powyzej) sprawia, ze option() honoruje ustawiona tu
 # zmienna. Przywrocenie pakietu zrodlowego to osobne zadanie: wymaga
@@ -377,7 +377,7 @@ install(
   DESTINATION share/retractordb
   COMPONENT portable)
 
-# Przykładowa konfiguracja: instalowana jako .example, NIGDY jako żywy plik —
+# Przykładowa konfiguracja: instalowana jako .example, NIGDY jako żywy plik -
 # nie nadpisuje konfiguracji administratora. DESTINATION jest WZGLĘDNY (pod
 # prefiks /usr → /usr/share/retractordb), bo bezwzględny /etc łamie staging
 # cpack (próba zapisu do realnego /etc). Na Debianie postinst kopiuje przykład
@@ -407,7 +407,7 @@ set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
 # Komponenty pakietu: 'portable' zawiera trzy binaria, a 'service' jednostke
 # systemd i pliki .example oznaczone EXCLUDE_FROM_ALL. Pliki EXCLUDE_FROM_ALL
 # trafiają do pakietu TYLKO przy włączonym component-install (DEB/ARCHIVE) i
-# jawnym wymienieniu komponentu w CPACK_COMPONENTS_ALL — w trybie monolitycznym
+# jawnym wymienieniu komponentu w CPACK_COMPONENTS_ALL - w trybie monolitycznym
 # cpack je pomija. GROUPING=ALL_COMPONENTS_IN_ONE scala oba komponenty z
 # powrotem w jeden .deb/.tar.gz (nie rozbija na pakiety per-komponent).
 set(CPACK_DEB_COMPONENT_INSTALL ON)
@@ -416,7 +416,7 @@ set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)
 set(CPACK_COMPONENTS_ALL portable service)
 # Komponent 'api' dopisywany tylko przy -DRDB_WITH_API=ON. Cpack ustala
 # zawartosc pakietu na etapie konfiguracji, wiec tego jednego wejscia nie da sie
-# zastapic celem ninja — bez tej flagi API nigdy nie trafia do .deb/.tar.gz.
+# zastapic celem ninja - bez tej flagi API nigdy nie trafia do .deb/.tar.gz.
 if(RDB_WITH_API)
   list(APPEND CPACK_COMPONENTS_ALL api)
 endif()

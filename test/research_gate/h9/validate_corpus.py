@@ -160,7 +160,7 @@ def checked_code_sha(expected=None):
     # wykluczenie robi run_drift.sh (DIRTY_COUNT), i wlasnie ta rozbieznosc byla wada:
     # run_drift.sh widzialo drzewo jako czyste, nie dodawalo --allow-dirty, a ta funkcja
     # przewracala sie na wierszu dziennika. Poziom "H9 mechanizm" wpadal wtedy w galaz
-    # S_MECH="DRYFT", czyli DRUGI Z RZEDU `ninja test_drift` orzekal FALSZYWY DRYFT —
+    # S_MECH="DRYFT", czyli DRUGI Z RZEDU `ninja test_drift` orzekal FALSZYWY DRYFT -
     # awarie aparatury nie do odroznienia od regresji silnika.
     dirty = "".join(line + "\n" for line in reported.splitlines() if "DRIFT_JOURNAL.tsv" not in line)
     if dirty:

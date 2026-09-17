@@ -25,7 +25,7 @@ inline constexpr size_t kGeneratedPrefixLength = sizeof("STREAM_") - 1;
 /// RATIONAL, a rachunek redukcji idzie po boost::rational<int>. Deskryptor
 /// wejściowy (query::descriptorFrom) i payload wyniku
 /// (streamInstance::reduceFieldsToPayload) używały typu ŹRÓDŁA, więc wartość
-/// przechodziła przez rational_cast<int> — średnia z dwóch pól o sumie
+/// przechodziła przez rational_cast<int> - średnia z dwóch pól o sumie
 /// nieparzystej dawała 2000003/2 jako 1000001/1. Reguła jest tu jedna dla obu
 /// miejsc właśnie po to, żeby nie mogły się ponownie rozjechać.
 inline std::pair<rdb::descFld, int> reductionResultField(rdb::descFld sourceType, int sourceLength) {
@@ -35,18 +35,18 @@ inline std::pair<rdb::descFld, int> reductionResultField(rdb::descFld sourceType
   return {rdb::RATIONAL, static_cast<int>(sizeof(boost::rational<int>))};
 }
 
-/// Grupa okna rekordowego — cel jednego przejscia po historii zrodla.
+/// Grupa okna rekordowego - cel jednego przejscia po historii zrodla.
 ///
 /// Okno rekordu wyjsciowego n obejmuje rekordy zrodla `n-(width-1) ... n`, czyli konczy sie
 /// na rekordzie o TYM SAMYM indeksie logicznym. Interwal wyjscia jest rowny interwalowi
-/// zrodla — lista SELECT nie rusza osi czasu — a brzeg:
+/// zrodla - lista SELECT nie rusza osi czasu - a brzeg:
 ///   origin = origin zrodla + width - 1
 ///   ogon   = ogon zrodla
 ///
 /// Okno jest wiec zawsze PRZESUWNE. Kroku ta konstrukcja nie ma: okno co k rekordow zapisuje
 /// sie po stronie FROM, bo tam mieszka kazda zmiana taktu (patrz regula `window_agg`
 /// w RQL.g4). Stemplowanie koncem daje przy okazji tozsamosc `AGG(pole:1)` z reduktorem
-/// `FROM AGG(strumien)` — okno n to rekord n — i gwarantuje, ze okno siega po NAJSWIEZSZY
+/// `FROM AGG(strumien)` - okno n to rekord n - i gwarantuje, ze okno siega po NAJSWIEZSZY
 /// rekord dostepny w slocie n.
 ///
 /// Wzgledem bazowego UC07 znika przy tym kompensacja `>1`: tam agregat wydany pod indeksem
@@ -57,12 +57,12 @@ inline std::pair<rdb::descFld, int> reductionResultField(rdb::descFld sourceType
 ///
 /// Do 2026-08-31 argumentem mogla byc cala tablica i wtedy okno redukowalo `width * N` wartosci
 /// (`MIN(a : 2)` nad `INTEGER[3]` mieszalo 6 liczb). Mieszalo to dwie rozne redukcje: po czasie
-/// i po ROWNOLEGLYCH kanalach jednego rekordu. Nazwa tablicy nie jest nazwa pola — polami sa jej
-/// elementy `a[0]`, `a[1]`, ... — wiec argumentem okna jest element, a `slot` wskazuje jeden
+/// i po ROWNOLEGLYCH kanalach jednego rekordu. Nazwa tablicy nie jest nazwa pola - polami sa jej
+/// elementy `a[0]`, `a[1]`, ... - wiec argumentem okna jest element, a `slot` wskazuje jeden
 /// slot PLASKI rekordu zrodla.
 /// Wartoscia rekordu moze byc takze WYRAZENIE (`MIN(a[0]*10 - a[1] : 3)`). Wtedy `program`
 /// niesie jego tokeny, a `slot` nie znaczy nic: wartosc powstaje z przeliczenia programu na
-/// payloadzie kazdego rekordu okna z osobna. Pusty `program` to argument bedacy golym polem —
+/// payloadzie kazdego rekordu okna z osobna. Pusty `program` to argument bedacy golym polem -
 /// szybka sciezka, ktora czyta slot wprost, bez ewaluatora.
 ///
 /// `valueType` ustala KOMPILACJA (typ pola albo najszerszy typ pol wyrazenia, przepuszczony
@@ -85,14 +85,14 @@ struct windowGroup {
   }
 };
 
-/// Wynik JEDNEGO przejścia po oknie grupy — wszystkie cztery agregaty naraz.
+/// Wynik JEDNEGO przejścia po oknie grupy - wszystkie cztery agregaty naraz.
 ///
 /// Liczymy komplet, a nie tylko żądany agregat, bo przejście po oknie jest kosztem
 /// dominującym, a same porównania są darmowe. Dzięki temu `MIN(cells:10)` i
 /// `MAX(cells:10)` w jednej liście SELECT czytają historię źródła raz.
 ///
 /// `count` liczy wartości NIE-NULL. NULL-e są pomijane (nie zerowane), a okno bez ani
-/// jednej wartości daje NULL we wszystkich czterech polach — zasada brzegu: brak wyniku
+/// jednej wartości daje NULL we wszystkich czterech polach - zasada brzegu: brak wyniku
 /// nie jest zerem.
 struct windowStats {
   rdb::descFldVT minValue{std::monostate{}};
@@ -119,17 +119,17 @@ class query {
   ///
   /// Ustawia parser z zapisu `STREAM cell[24]`, kasuje compiler::expandStreamGenerators()
   /// przy tworzeniu kazdej z N instancji. Zadne zapytanie z nieujemna wartoscia tego pola nie
-  /// moze przezyc pierwszego przebiegu kompilacji — dalsze przebiegi go nie znaja.
+  /// moze przezyc pierwszego przebiegu kompilacji - dalsze przebiegi go nie znaja.
   ///
   /// UJEMNA wartosc znaczy „to nie jest generator", a nie „generator o zerowej licznosci".
-  /// Rozroznienie jest konieczne, bo `STREAM cell[0]` jest bledem, ktory trzeba zglosic —
+  /// Rozroznienie jest konieczne, bo `STREAM cell[0]` jest bledem, ktory trzeba zglosic -
   /// przy wartowniku 0 zapis ten stalby sie po cichu zwyklym strumieniem `cell`.
   static constexpr int notAGenerator = -1;
   int generatorSize                  = notAGenerator;
 
   /// @brief Ogon strumienia: liczba początkowych slotów WŁASNEGO interwału, w których wynik nie jest jeszcze zdefiniowany.
   ///
-  /// Zasada brzegu strumienia: te sloty NIE są rekordami — ani zerami, ani NULL-ami. Strumień po prostu jeszcze nie
+  /// Zasada brzegu strumienia: te sloty NIE są rekordami - ani zerami, ani NULL-ami. Strumień po prostu jeszcze nie
   /// emituje, a system raportuje ogon. NULL jest zarezerwowany dla wartości pochłaniającej: danych oczekiwanych
   /// a nieobecnych albo wyniku nieistniejącego w zbiorze wartości (np. dzielenie przez zero). NULL nigdy nie oznacza
   /// „system przewiduje tu miejsce na dane”.
@@ -139,7 +139,7 @@ class query {
 
   /// @brief Początek logiczny strumienia: indeks PIERWSZEGO rekordu, który w ogóle istnieje.
   ///
-  /// Rekordy o indeksie mniejszym od origin nie powstają — nie dlatego, że jeszcze ich nie ma (od tego jest ogon),
+  /// Rekordy o indeksie mniejszym od origin nie powstają - nie dlatego, że jeszcze ich nie ma (od tego jest ogon),
   /// tylko dlatego, że ich definicja sięga przed początek strumienia źródłowego. Okno `@(k,L)` stemplowane końcem
   /// przedziału obejmuje pozycje n*k-(|L|-1) ... n*k, więc dla małych n sięga w nieistniejącą przeszłość; te sloty
   /// są niedefiniowalne, a nie „puste”. Zasada brzegu z komentarza przy startupLatency zabrania wypełniać je NULL-em.
@@ -158,7 +158,7 @@ class query {
   std::list<field> lSchema;
   std::list<token> lProgram;
 
-  /// Grupy okien rekordowych tego zapytania — jedna pozycja na trojke
+  /// Grupy okien rekordowych tego zapytania - jedna pozycja na trojke
   /// (zrodlo, pole, szerokosc). Token WINDOW_* niesie indeks do tej tabeli.
   ///
   /// Tabela jest skladowa ZAPYTANIA, nie planu, i to jest wymog poprawnosci. Zapytania
@@ -169,7 +169,7 @@ class query {
   ///
   /// Grupa niesie WSZYSTKIE cztery wartosci (min, max, sum, count) z jednego przejscia po
   /// oknie, wiec `MIN(cells:10)` i `MAX(cells:10)` w tej samej liscie SELECT czytaja okno
-  /// raz — o to chodzi we wspolnym stanie dla agregatow o identycznym ksztalcie.
+  /// raz - o to chodzi we wspolnym stanie dla agregatow o identycznym ksztalcie.
   std::vector<windowGroup> windowGroups;
 
   [[nodiscard]] bool hasWindowAggregates() const { return !windowGroups.empty(); }

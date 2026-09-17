@@ -14,7 +14,7 @@
 # offsetMap i domyślnie użyje offsetu 0 (offset s3, nie mysum).
 #
 # Pokrycie kodu: ścieżka PUSH_ID w nowym bloku aktualizacji lSchema w
-# deduplicateSubstrats() — compiler.cpp.
+# deduplicateSubstrats() - compiler.cpp.
 #
 # Weryfikacja: PUSH_ID(merged[2]) pojawia się tylko gdy mysum trafia na offset 1
 # (po s3), a nie na błędny offset 0.

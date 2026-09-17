@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Zrzuty planu dla planow kontrolnych, cztery profile — wejscie strukturalnego
+# Zrzuty planu dla planow kontrolnych, cztery profile - wejscie strukturalnego
 # warunku bramki `no_materialization`.
 #
 # Tu compile-only jest na miejscu i nie jest obejsciem reguly: twierdzenie brzmi

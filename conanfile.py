@@ -74,7 +74,7 @@ class Retractor(ConanFile):
         "boost/*:without_regex": False,
         "boost/*:without_system": False,
         "boost/*:without_stacktrace": False,
-        # Boost compiled libraries not used — disabled to reduce build time
+        # Boost compiled libraries not used - disabled to reduce build time
         "boost/*:without_atomic": True,
         "boost/*:without_charconv": True,
         "boost/*:without_chrono": True,
@@ -114,7 +114,7 @@ class Retractor(ConanFile):
     def build_requirements(self):
         # PODLOGA, nie zamrozenie: dryft w gore jest dozwolony, zejscie ponizej
         # nie. Dawne [>=3.25] pozwalalo swiezemu kontenerowi CI wziac wersje, dla
-        # ktorej zachowania polityk nie byly w tym drzewie ustalone — 2026-08-18
+        # ktorej zachowania polityk nie byly w tym drzewie ustalone - 2026-08-18
         # wyszlo to jako CMP0219 (polityka od 4.4), widoczne wylacznie w CI.
         # Prog trzyma sie razem z RDB_CMAKE_MIN_VERSION w scripts/buildrdb.sh
         # i z zakresem cmake_minimum_required(VERSION 3.20...4.4) w CMakeLists.

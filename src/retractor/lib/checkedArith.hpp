@@ -9,11 +9,11 @@
 
 /// Arytmetyka WARTOSCI pol z wykrywaniem przepelnienia: INTEGER (int32) i RATIONAL
 /// (boost::rational<int>). nullopt oznacza, ze wyniku nie da sie zapisac w typie, a wolajacy
-/// zamienia go na NULL — tak jak dzielenie przez zero w expressionEvaluator.
+/// zamienia go na NULL - tak jak dzielenie przez zero w expressionEvaluator.
 ///
 /// boost::rational 1.91 niczego tu nie sprawdza: `9/1 * 1000000000/1` daje po cichu 410065408/1.
 /// Ta sama klasa liczy tez os czasu (CRSMath, SOperations.hpp), ale tamtej sciezki ten plik nie
-/// dotyczy — sluzy wylacznie ewaluatorowi wyrazen i reduktorom w streamInstance.
+/// dotyczy - sluzy wylacznie ewaluatorowi wyrazen i reduktorom w streamInstance.
 ///
 /// Dzielnik rozny od zera jest warunkiem wstepnym `div`; zero obsluguje wolajacy.
 namespace checkedArith {
@@ -50,7 +50,7 @@ inline std::optional<int> neg(int a) {
 namespace detail {
 
 /// Ulamek policzony na int64 sprowadzony do najnizszych terminow. Dopiero wtedy wiadomo, czy
-/// wartosc NAPRAWDE nie miesci sie w rational<int> — skrocona postac jest jedyna, wiec nie ma
+/// wartosc NAPRAWDE nie miesci sie w rational<int> - skrocona postac jest jedyna, wiec nie ma
 /// falszywych alarmow (`1/65536 + 1/65536` przechodzi przez mianownik 2^32 i daje 1/32768).
 inline std::optional<boost::rational<int>> narrowed(std::int64_t numerator, std::int64_t denominator) {
   const auto divisor = std::gcd(numerator, denominator);
@@ -71,7 +71,7 @@ inline std::optional<boost::rational<int>> narrowed(std::int64_t numerator, std:
 // Skladniki sa znormalizowane (mianownik dodatni, |licznik| <= 2^31), wiec kazdy iloczyn ponizej
 // miesci sie w 2^62, a suma dwoch takich w int64.
 
-// Ulamki calkowite (mianownik 1) ida skrotem przez int32 bez gcd — to typowa suma reduktora
+// Ulamki calkowite (mianownik 1) ida skrotem przez int32 bez gcd - to typowa suma reduktora
 // nad polami INTEGER promowanymi do RATIONAL.
 
 inline std::optional<boost::rational<int>> add(boost::rational<int> a, boost::rational<int> b) {

@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.20...4.4 FATAL_ERROR)
 # Bramka badawcza H9/H10.
 #
 # CELOWO poza `ninja` (brak ALL) i poza `ninja test` (brak add_test): praca przy
-# zrodlach silnika nie ma sie o nia zatrzymywac. Uruchamia sie jawnie — `ninja
-# test_gate` — z CI okresowego albo recznie przed zgloszeniem artykulu.
+# zrodlach silnika nie ma sie o nia zatrzymywac. Uruchamia sie jawnie - `ninja
+# test_gate` - z CI okresowego albo recznie przed zgloszeniem artykulu.
 #
 # Skrypt dziala na katalogu ZRODLOWYM, a wszystko zapisuje do katalogu buildu.
 # Nie korzysta z kopii `test/` robionej przez test/CMakeLists.txt, wiec edycja
@@ -35,7 +35,7 @@ endif()
 # kampania poza proba oblewala z CSV bez ani jednego wiersza obserwacji, a
 # wszystkie kroki H9 po niej oblewaly z `No such file or directory` na wlasnych
 # logach. Przebieg trwa od minuty (bramka) do kilkudziesieciu minut (dryf), wiec
-# okno jest szerokie, a dowod ginie razem z katalogiem — po fakcie nie ma czego
+# okno jest szerokie, a dowod ginie razem z katalogiem - po fakcie nie ma czego
 # ogladac.
 set(RESEARCH_WORK_ROOT ${CMAKE_BINARY_DIR}/research-gate-work)
 
@@ -55,14 +55,14 @@ add_custom_target(
   COMMENT "Bramka badawcza H9/H10 (mechanizm, nie potwierdzenie hipotez)"
   USES_TERMINAL VERBATIM)
 
-# Fizyczna weryfikacja braku dryftu — inne pytanie niz `test_gate`. Bramka
+# Fizyczna weryfikacja braku dryftu - inne pytanie niz `test_gate`. Bramka
 # porownuje ETYKIETY rezimow z zamrozona tablica odniesienia na dwoch
 # zamrozonych ziarnach. Ten cel WYKONUJE silnik: na swiezo wylosowanej probie
 # planow i wobec niezaleznej implementacji (Apache Flink), czyli lapie dryft
-# wartosci i dryft poza korpusem tych dwoch ziaren — jedno i drugie jest dla
+# wartosci i dryft poza korpusem tych dwoch ziaren - jedno i drugie jest dla
 # bramki niewidoczne z konstrukcji.
 #
-# Tak samo poza `all` i poza `ninja test`, i z tego samego powodu co bramka —
+# Tak samo poza `all` i poza `ninja test`, i z tego samego powodu co bramka -
 # tyle ze mocniejszego: przebieg z poziomem wartosci trwa kilkadziesiat minut.
 add_custom_target(
   test_drift

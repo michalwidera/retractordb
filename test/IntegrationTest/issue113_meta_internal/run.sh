@@ -2,7 +2,7 @@
 # Wewnetrzny format sidecara .meta po przebiegu z nullami (issue #113):
 # naglowek, rozmiar wpisu, interwal probkowania i bitset per rekord.
 #
-# Logika wyniesiona z `bash -c` w add_test — powod jak w operations/run.sh.
+# Logika wyniesiona z `bash -c` w add_test - powod jak w operations/run.sh.
 # Wczesniejsza wersja poprzedzala start czekaniem na zwolnienie blokady przez
 # obca instancje; to zadanie przejela bramka higieny w ../serverlib.sh, ktora
 # obarcza winowajce zamiast nastepnej ofiary.

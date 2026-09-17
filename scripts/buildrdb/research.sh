@@ -121,7 +121,7 @@ run_research_option() {
             ;;
         "probe")
             # Budowa Release z WŁĄCZONĄ sondą pomiarową (benchmark E1/E3). Release, bo
-            # sonda służy do pomiarów wydajności — mierzymy kod zoptymalizowany, nie Debug.
+            # sonda służy do pomiarów wydajności - mierzymy kod zoptymalizowany, nie Debug.
             # Osobny katalog nie pozwala tej binarce przeniknąć do build/Release.
             probe_build_dir="$rdb_source_dir/build/Release-Probe"
             probe_conan_dir="$rdb_source_dir/build/Conan-Release-Probe"
@@ -235,7 +235,7 @@ run_research_option() {
                     echo "   Poziom 84/84: $gate_dir/run_gate.sh --only h9 --profiles $rdb_source_dir/build"
                     ;;
                 stare)
-                    echo "-- Uwaga: profile ablacji sa STARSZE od src/ — orzekalyby o innej"
+                    echo "-- Uwaga: profile ablacji sa STARSZE od src/ - orzekalyby o innej"
                     echo "   rewizji niz badana. Bramka pominie poziom 84/84. Przebuduj:"
                     echo "     $gate_dir/h9/build_profiles.sh"
                     ;;

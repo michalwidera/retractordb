@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bramka oracle'a: zgodność z przypadkami o ręcznie wyprowadzonej odpowiedzi.
 
-Bramka jest warunkiem wstępnym kampanii. Nie dotyka silnika — porównuje
+Bramka jest warunkiem wstępnym kampanii. Nie dotyka silnika - porównuje
 wyłącznie oracle z rachunkiem ręcznym: ogon w obu konwencjach dostępności
 i początek logiczny, który konwencji nie ma (istnienie rekordu nie zależy od
 tego, czy odczyt w tym samym takcie jest dozwolony).
@@ -25,7 +25,7 @@ def main():
             try:
                 results = M.evaluate(plan, convention=convention)
             except M.OracleError as exc:
-                failures.append(f"{label} [{convention}]: awaria oracle'a — {exc}")
+                failures.append(f"{label} [{convention}]: awaria oracle'a - {exc}")
                 continue
             tails = {item.name: item.tail for item in results}
             origins = {item.name: item.origin for item in results}

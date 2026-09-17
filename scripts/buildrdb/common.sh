@@ -1,17 +1,17 @@
 # shellcheck shell=bash
 
 # PODLOGA wersji CMake, nie zamrozenie. Dryft narzedzia w gore jest normalny
-# i ma przechodzic bez bledu i bez ostrzezenia — nowszy cmake spelnia ten prog.
+# i ma przechodzic bez bledu i bez ostrzezenia - nowszy cmake spelnia ten prog.
 # Chodzi wylacznie o to, zeby nie zejsc PONIZEJ wersji, dla ktorej zachowania
 # polityk sa ustalone: zakres cmake_minimum_required(VERSION 3.20...4.4) w
 # CMakeLists i dolna granica tool_requires w conanfile.py mowia to samo.
 #
 # Po co: dopoki conanfile mowil [>=3.25], `conan build` bral dowolna nowsza
-# wersje, a `cmake` wolane wprost z PATH bylo tym z apt albo z venv — dwie rozne
+# wersje, a `cmake` wolane wprost z PATH bylo tym z apt albo z venv - dwie rozne
 # wersje generowaly to samo drzewo. 2026-08-18 wyszlo to jako ostrzezenie CMP0219
 # (polityka od 4.4) widoczne wylacznie w CI i niereprodukowalne lokalnie (4.2.3).
 # Gdy nowszy cmake zacznie ostrzegac o kolejnej polityce, podnosi sie gorna
-# granice zakresu w CMakeLists — swiadomie, w commicie.
+# granice zakresu w CMakeLists - swiadomie, w commicie.
 RDB_CMAKE_MIN_VERSION="4.4.2"
 
 command_exists() {

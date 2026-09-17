@@ -1,7 +1,7 @@
 # https://hub.docker.com/_/debian
 FROM debian:trixie-slim
 
-# Wersja bez wartości domyślnej — jedyne źródło prawdy to plik VERSION w korzeniu
+# Wersja bez wartości domyślnej - jedyne źródło prawdy to plik VERSION w korzeniu
 # repo. Przekazywana przy buildzie: --build-arg RDB_VERSION="$(cat VERSION)".
 ARG RDB_VERSION
 
@@ -61,7 +61,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     && rm -rf /var/lib/apt/lists/*
 
 # Verify C++23 support.
-# Tests std::ranges::fold_left (<algorithm>) and the uz size_t literal — both C++23,
+# Tests std::ranges::fold_left (<algorithm>) and the uz size_t literal - both C++23,
 # both used in the RetractorDB codebase.  Build fails here if the compiler is too old.
 RUN echo '#include <algorithm>'                                                           > /tmp/cxx23check.cpp \
     && echo '#include <cstddef>'                                                         >> /tmp/cxx23check.cpp \
@@ -75,7 +75,7 @@ RUN echo '#include <algorithm>'                                                 
     && g++ -std=c++23 -o /tmp/cxx23check /tmp/cxx23check.cpp \
     && /tmp/cxx23check \
     && rm /tmp/cxx23check.cpp /tmp/cxx23check \
-    && echo "C++23 OK — g++ $(g++ -dumpversion)"
+    && echo "C++23 OK - g++ $(g++ -dumpversion)"
 
 # Create a non-root user for development (optional but recommended)
 RUN useradd -m -s /bin/bash developer && \
@@ -105,12 +105,12 @@ RUN bash /tmp/gen_dockerconan.sh /tmp/conanfile.py /home/developer/workspace/Doc
 
 # Venv w $HOME, nie w WORKDIR: scripts/buildrdb.sh wykrywa conana wyłącznie po
 # ~/.venv/bin/conan (tool_installed). Przy venv w katalogu roboczym CI go nie
-# widzi i przy każdym jobie stawia drugi venv z pip install conan od zera —
+# widzi i przy każdym jobie stawia drugi venv z pip install conan od zera -
 # CircleCI i tak pracuje w ~/retractordb, nie w WORKDIR obrazu.
 #
 # CMake przypięty w tym samym venv, bo apt-owy z trixie (3.31) jest poniżej
 # podłogi projektu. Bez tego `scripts/buildrdb.sh toolchain` dociąga koło cmake
-# w KAŻDYM jobie CI — siedem razy na przebieg nocny; instalacja tutaj kasuje ten
+# w KAŻDYM jobie CI - siedem razy na przebieg nocny; instalacja tutaj kasuje ten
 # koszt raz na obraz. `--only-binary`: PyPI ma dla cmake także sdist, a jego
 # budowa to kompilacja całego CMake ze źródeł.
 #
@@ -144,7 +144,7 @@ CMD ["/bin/bash"]
 # Optional: Expose ports if your application needs them
 # EXPOSE 8080
 
-# Podgląd rozmiaru warstw — dive: https://github.com/wagoodman/dive
+# Podgląd rozmiaru warstw - dive: https://github.com/wagoodman/dive
 # (na Windows najpierw uruchom Docker Desktop)
 #   docker image ls
 #   dive <IMAGE ID>
@@ -153,21 +153,21 @@ CMD ["/bin/bash"]
 #
 # 1. Budowa. Wywoływać z KORZENIA repo: kontekst musi objąć conanfile.py oraz
 #    docker/ci/gen_dockerconan.sh, oba kopiowane niżej. Buduj po każdej zmianie
-#    zależności w conanfile.py — inaczej joby -mydocker dobudowują je w locie.
+#    zależności w conanfile.py - inaczej joby -mydocker dobudowują je w locie.
 #
 #      docker build --build-arg RDB_VERSION="$(cat VERSION)" -f docker/ci/Dockerfile -t buildenv-retractordb .
 #
-#    Uwaga: docker/ci/DockerConan.txt z repo NIE trafia do obrazu — jest tylko
+#    Uwaga: docker/ci/DockerConan.txt z repo NIE trafia do obrazu - jest tylko
 #    lokalnym podglądem (i jest w .gitignore). Listę zależności generuje
 #    gen_dockerconan.sh wewnątrz kontenera z conanfile.py, więc ręczne zmiany
 #    w tym pliku nie mają na obraz żadnego wpływu.
 #
-# 2. Weryfikacja przed pushem — czy cache ma wersje z conanfile.py (i te
+# 2. Weryfikacja przed pushem - czy cache ma wersje z conanfile.py (i te
 #    z additional_docker_requires, jeśli krotka istnieje):
 #
 #      docker run --rm buildenv-retractordb bash -c 'PATH=~/.venv/bin:$PATH conan list "*"'
 #
-#    Kontrola venv — musi być w $HOME, bo tam i tylko tam szuka conana
+#    Kontrola venv - musi być w $HOME, bo tam i tylko tam szuka conana
 #    scripts/buildrdb.sh; przy złej ścieżce CI stawia drugi venv przy każdym jobie:
 #
 #      docker run --rm buildenv-retractordb ls -d /home/developer/.venv
@@ -177,7 +177,7 @@ CMD ["/bin/bash"]
 #      docker run -it buildenv-retractordb
 #
 # 3. Publikacja. Po pushu joby -mydocker biorą nowy :latest przy następnym
-#    uruchomieniu pipeline'u — CircleCI nie buduje tego obrazu samo.
+#    uruchomieniu pipeline'u - CircleCI nie buduje tego obrazu samo.
 #
 #      docker login
 #      docker tag buildenv-retractordb micwide/buildenv-retractordb:latest
@@ -186,5 +186,5 @@ CMD ["/bin/bash"]
 # Sprzątanie po budowach (przebudowa tego obrazu zostawia sporo śmieci):
 #   docker system df               # co ile zajmuje
 #   docker image prune -f          # obrazy osierocone (dangling)
-#   docker builder prune -f        # cache BuildKita — rośnie do dziesiątek GB
+#   docker builder prune -f        # cache BuildKita - rośnie do dziesiątek GB
 # https://stackoverflow.com/questions/44785585/how-can-i-delete-all-local-docker-images

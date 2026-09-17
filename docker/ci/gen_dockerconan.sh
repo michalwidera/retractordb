@@ -65,7 +65,7 @@ timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 def render(refs):
     lines = [
         f"# Wygenerowano automatycznie przez scripts/gen_dockerconan.sh ({timestamp}).",
-        "# Nie modyfikować ręcznie — zmiany wprowadzać w conanfile.py.",
+        "# Nie modyfikować ręcznie - zmiany wprowadzać w conanfile.py.",
         "",
         "[requires]",
         *refs,

@@ -35,7 +35,7 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::strin
   auto desc = qry.descriptorStorage();
   outputPayload->attachDescriptor(&desc);
 
-  // Jedyne miejsce, w którym rola z planu (`isSubstrat`) spotyka się z magazynem — sonda
+  // Jedyne miejsce, w którym rola z planu (`isSubstrat`) spotyka się z magazynem - sonda
   // logicznych zapisów (K23) rozdziela materializowany podplan od publicznego wyniku.
   // `if constexpr` obejmuje wywołanie, żeby build produkcyjny nie różnił się od wersji
   // bez sondy nawet o zapis tego jednego pola.
@@ -117,7 +117,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   // co indeks logiczny źródła i złączenie okna z jego źródłem nie wyprzedza sygnału.
   //
   // Origin (compiler::computeLogicalOrigin) gwarantuje, że dolny koniec zakresu nie sięga
-  // przed początek źródła, a ogon (compiler::computeStartupLatency) — że górny koniec już
+  // przed początek źródła, a ogon (compiler::computeStartupLatency) - że górny koniec już
   // istnieje. Kontrola zakresu poniżej pozostaje ochroną przed uszkodzonym planem albo
   // bezpośrednim wywołaniem jednostkowym.
   const auto windowStart = (windowIndex * step) - (lengthAbs - 1);
@@ -129,7 +129,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
     const auto flatPosition = windowStart + i;
     // Dzielenie z zaokrągleniem W DÓŁ, nie w stronę zera: pozycja ujemna (okno sięgające
     // przed początek strumienia) ma trafiać do rekordu -1, a nie do rekordu 0. W silniku
-    // ten przypadek nie występuje — origin go wyklucza — ale wywołanie jednostkowe może
+    // ten przypadek nie występuje - origin go wyklucza - ale wywołanie jednostkowe może
     // podać dowolny indeks i cicha pomyłka o jeden rekord byłaby tu trudna do zauważenia.
     auto fp = std::div(flatPosition, descriptorSrcSize);
     if (fp.rem < 0) {
@@ -237,7 +237,7 @@ windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const i
   const auto &source = outputPayload;
 
   // Typ wyniku ustalila KOMPILACJA (windowGroup::valueType): dla golego pola jest to jego typ
-  // przepuszczony przez reductionResultField(), dla wyrazenia — najszerszy typ pol, po ktore
+  // przepuszczony przez reductionResultField(), dla wyrazenia - najszerszy typ pol, po ktore
   // siega. Deskryptor zrodla nie odpowie na to drugie pytanie, bo wyrazenie nie jest polem.
   const auto resultType = group.valueType;
   if (resultType != rdb::RATIONAL && resultType != rdb::FLOAT && resultType != rdb::DOUBLE) {
@@ -260,7 +260,7 @@ windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const i
     if (!source->revRead(reversePosition)) continue;
 
     // JEDNA wartosc z rekordu: okno idzie po czasie, nie po slotach rekordu (patrz windowGroup).
-    // Wyrazenie liczy sie na payloadzie TEGO rekordu — ewaluator dostaje program grupy
+    // Wyrazenie liczy sie na payloadzie TEGO rekordu - ewaluator dostaje program grupy
     // i historyczny rekord zrodla, a nie biezacy payload wejsciowy konsumenta.
     std::optional<rdb::descFldVT> valueOpt;
     if (group.program.empty()) {
@@ -298,7 +298,7 @@ windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const i
     ++stats.count;
   }
 
-  source->revRead(0);  // Reset source — ten sam porzadek co w constructAgsePayload
+  source->revRead(0);  // Reset source - ten sam porzadek co w constructAgsePayload
 
   // Okno bez ani jednej wartosci nie ma sredniej ani sumy: zostaja NULL-e z konstrukcji.
   if (stats.count == 0) return stats;
@@ -330,7 +330,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   auto [sourceType, sourceLen] = outputPayload->descriptor.widestFieldType();
 
   // K24/D4: typ wyniku redukcji wyprowadzany jest jedną regułą, wspólną
-  // z query::descriptorFrom — patrz reductionResultField() w query.hpp.
+  // z query::descriptorFrom - patrz reductionResultField() w query.hpp.
   auto [maxType, maxLen] = reductionResultField(sourceType, sourceLen);
   auto maxType_          = maxType;
 
@@ -339,7 +339,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   // same as core[instance].descriptorFrom()
 
   // Second construct payload
-  // S2: obiekt lokalny zamiast make_unique — wczesniej payload powstawal na stercie,
+  // S2: obiekt lokalny zamiast make_unique - wczesniej payload powstawal na stercie,
   // a 'return *(localPayload)' KOPIOWAL go w calosci do wyniku. Lokalna zmienna +
   // NRVO usuwa i alokacje, i kopie (ten sam wzorzec co w constructAgsePayload).
   rdb::payload localPayload(descriptor);
@@ -480,7 +480,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   // K24/D4: gałęzie BYTE/INTEGER/UINT usunięte razem z rozjazdem typów. Typ
   // arytmetyczny jest tu zawsze promowany do RATIONAL (patrz komentarz przy
   // budowie deskryptora), więc te gałęzie były nieosiągalne po promocji, a
-  // przed nią realizowały obcięcie i nasycenie wyniku do zakresu typu ŹRÓDŁA —
+  // przed nią realizowały obcięcie i nasycenie wyniku do zakresu typu ŹRÓDŁA -
   // czyli sam defekt. Pole wyjściowe jest typu RATIONAL i nie ma do czego
   // nasycać: wynik zostaje dokładny.
   if (maxType != rdb::RATIONAL && maxType != rdb::FLOAT && maxType != rdb::DOUBLE) {
@@ -488,7 +488,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   }
 
   auto postion{0};
-  // monostate w std::optional nie jest NULL-em dla setItemVT — przepelnienie trzeba zapisac jawnie.
+  // monostate w std::optional nie jest NULL-em dla setItemVT - przepelnienie trzeba zapisac jawnie.
   if (std::holds_alternative<std::monostate>(valueRet))
     localPayload.setItemVT(postion, std::nullopt);
   else
@@ -509,7 +509,7 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) cons
       continue;
     }
 
-    // P1-E2: zapis wprost z wariantu (cast<descFldVT> + setItemVT) — bez owijania
+    // P1-E2: zapis wprost z wariantu (cast<descFldVT> + setItemVT) - bez owijania
     // wyniku eval w std::any i bez cast<std::any>. Ewaluator zwraca descFldVT,
     // payload przyjmuje descFldVT: znika cala konwersja any<->wariant na tej
     // (najciezszej) sciezce. Parytet z wariantem any-owym potwierdzony round-trip
@@ -548,7 +548,7 @@ bool boolCast(const rdb::descFldVT &inVar) {
 }
 
 void streamInstance::constructRulesAndUpdate(const query &qry) {
-  // Kopia payloadu jest potrzebna tylko do ewaluacji warunkow regul — bez regul nie placimy za nia co interwal.
+  // Kopia payloadu jest potrzebna tylko do ewaluacji warunkow regul - bez regul nie placimy za nia co interwal.
   if (qry.lRules.empty()) {
     dumpMgr.processStreamChunk(qry.id);
     return;
@@ -560,7 +560,7 @@ void streamInstance::constructRulesAndUpdate(const query &qry) {
     if (r.condition.empty()) FatalError("streamInstance::constructRulesAndUpdate: rule condition is empty");
     if (r.action != rule::DUMP && r.action != rule::SYSTEM)
       FatalError("streamInstance::constructRulesAndUpdate: unsupported rule action");
-    // Regula dolaczona ad-hoc jest nieuzbrojona, dopoki nie zbierze wlasnej historii —
+    // Regula dolaczona ad-hoc jest nieuzbrojona, dopoki nie zbierze wlasnej historii -
     // patrz rule::armAtCount. Reguly z planu maja tam zero i wchodza od razu.
     if (outputPayload->getRecordsCount() < r.armAtCount) continue;
     auto condition = r.condition;

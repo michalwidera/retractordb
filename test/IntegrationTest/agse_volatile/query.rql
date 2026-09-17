@@ -1,7 +1,7 @@
 # Regresja: AGSE nad strumieniem VOLATILE (bufor MEMORY) musi widziec cale okno.
 #
 # win2 czyta okno 3 pol ze strumienia mid, ktory ma wlasny ogon (jest wynikiem
-# okna win1). Pojemnosc bufora mid musi pomiescic oba konce zakresu okna —
+# okna win1). Pojemnosc bufora mid musi pomiescic oba konce zakresu okna -
 # przy zbyt malej pojemnosci kolowy bufor nadpisuje najstarsze pole i AGSE
 # czyta w jego miejsce rekord najnowszy (okno [x_n, x_n-1, x_n+1]).
 

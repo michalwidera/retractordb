@@ -3,7 +3,7 @@
 #
 # Sprawdzane sa trzy rzeczy naraz, bo dopiero razem znacza "wieloserwerowosc dziala":
 #   1. oba procesy zyja jednoczesnie (osobne pliki blokady, osobne obszary IPC),
-#   2. kazdy serwuje SWOJE dane — wynik nie jest przypadkiem cudzym planem,
+#   2. kazdy serwuje SWOJE dane - wynik nie jest przypadkiem cudzym planem,
 #   3. serwer nie zna strumienia drugiego serwera (DAG-i sa rozdzielone).
 #
 # Test nie korzysta z ../serverlib.sh: tamta oprawa pilnuje pojedynczej instancji na stalej

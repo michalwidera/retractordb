@@ -4,7 +4,7 @@
 # Defekt, ktory ten test zamyka (odtworzony 2026-09-06). Gniazdo magistrali trzyma
 # DOKLADNIE JEDNA rezerwacje planu: reservePlan() ja nadpisuje, activateReservedPlan()
 # zuzywa. resetCommit() rezerwowal zasoby juz przy PRZYJECIU zestawu, a wymiana zdejmowala
-# znacznik zadania (planResetRequested) na samym POCZATKU applyPendingPlan() — czyli okolo
+# znacznik zadania (planResetRequested) na samym POCZATKU applyPendingPlan() - czyli okolo
 # szescdziesieciu linii przed aktywacja. W oknie miedzy zabraniem tekstu planu a jego
 # aktywacja kolejny reset nadpisywal rezerwacje planu wlasnie wchodzacego:
 #
@@ -22,14 +22,14 @@
 #
 # UKLAD DOSWIADCZENIA. Trafienie w okno przez sam wyscig kosztowalo omiatanie przesuniecia
 # miedzy dwoma klientami (jedno trafienie na czternascie prob), wiec okno otwiera hak
-# RDB_FAULT_PLAN_SWAP_DELAY — ta sama droga co RDB_FAULT_GET_AWAIT_EPOCH_SWAP w
+# RDB_FAULT_PLAN_SWAP_DELAY - ta sama droga co RDB_FAULT_GET_AWAIT_EPOCH_SWAP w
 # it_service_reset_race. Hak wstrzymuje wymiane dokladnie tam, gdzie tekst planu jest juz
 # zabrany, a rezerwacja jeszcze nie aktywowana.
 #
 # Test sprawdza CZTERY rzeczy, bo naprawa ma dwie strony i obie da sie zepsuc osobno:
 #   1. reset przyslany, zanim wymiana ruszy, jest odrzucony (zestaw przyjety i nadpisany
 #      przez nastepny nigdy nie ruszal, a jego klient dostawal "OK");
-#   2. reset przyslany W OKNIE wymiany jest odrzucony — to jest sedno regresji;
+#   2. reset przyslany W OKNIE wymiany jest odrzucony - to jest sedno regresji;
 #   3. serwer zyje, a plan, ktory zostal przyjety, faktycznie wszedl;
 #   4. reset przyslany PO wymianie jest przyjety. Bez tego naprawa "odrzucaj zawsze"
 #      przechodzilaby trzy pierwsze punkty i unieruchamiala przeladowanie planu na stale.
@@ -113,7 +113,7 @@ fi
 # --- 4. Po zakonczonej wymianie reset znowu jest przyjmowany ---
 reset_plan plan3.rql accepted_after.txt
 if grep -q "refused" accepted_after.txt; then
-  echo "po zakonczonej wymianie reset nadal jest odrzucany — znacznik zostal podniesiony:"
+  echo "po zakonczonej wymianie reset nadal jest odrzucany - znacznik zostal podniesiony:"
   cat accepted_after.txt
   exit 1
 fi

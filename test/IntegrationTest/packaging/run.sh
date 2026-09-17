@@ -1,12 +1,12 @@
 #!/bin/bash
 # Test poprawności pakietów CPack: pakiet binarny DEB zawiera DOKŁADNIE wymagany
-# zestaw plików (3 binaria + licencja + jednostka systemd + przykłady konfiguracji) —
+# zestaw plików (3 binaria + licencja + jednostka systemd + przykłady konfiguracji) -
 # żadnych nadmiarowych.
-# Sprawdzamy tylko DEB (a nie TGZ) — whitelist jest identyczny dla obu (te same
+# Sprawdzamy tylko DEB (a nie TGZ) - whitelist jest identyczny dla obu (te same
 # reguły install + prefiks /usr), a budowanie obu podwajało czas (kompresja
 # dużych binariów Debug ~5 s/pakiet).
 #
-# Pakietu ŹRÓDŁOWEGO nie ma — został wyłączony, bo jego zawartość była
+# Pakietu ŹRÓDŁOWEGO nie ma - został wyłączony, bo jego zawartość była
 # nieprawdziwa (brakowało w nim rdzenia silnika), a ta kontrola tego nie
 # wykrywała: sprawdzała wyłącznie nieobecność artefaktów, nigdy obecność
 # źródeł. Powód i warunki powrotu opisuje komentarz przy CPACK_SOURCE_* w

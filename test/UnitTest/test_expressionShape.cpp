@@ -1,9 +1,9 @@
-// Kontrakt typu wyniku wyrazenia — tabela regul i jej konfrontacja z ewaluatorem.
+// Kontrakt typu wyniku wyrazenia - tabela regul i jej konfrontacja z ewaluatorem.
 //
 // Ten plik odpowiada za jedno zdanie z expressionShape.hpp: **analizator odtwarza to, co robi
 // expressionEvaluator**. Wiekszosc przypadkow nie sprawdza wiec analizatora wobec wartosci
 // wpisanej recznie do testu, tylko wobec `expressionEvaluator::eval()` puszczonego na tym
-// SAMYM programie — bo to ewaluator, a nie ten test, jest miara poprawnosci.
+// SAMYM programie - bo to ewaluator, a nie ten test, jest miara poprawnosci.
 //
 // ctest -R '^ut_expressionShape' -V
 
@@ -30,7 +30,7 @@ namespace {
 
 using ratio = boost::rational<int>;
 
-/// Sloty plaskie testowego rekordu — po jednym polu na typ liczbowy, plus napis i tablica.
+/// Sloty plaskie testowego rekordu - po jednym polu na typ liczbowy, plus napis i tablica.
 enum slot : int { sByte = 0, sInt, sUint, sRational, sFloat, sDouble, sText, sArray0, sArray1, sArray2, sNull };
 
 /// Rekord, na ktorym liczy ewaluator. Wartosci dobrane tak, zeby dzielenie bylo dokladne
@@ -168,7 +168,7 @@ TEST(xExpressionShape, binary_arithmetic_matrix_matches_the_evaluator) {
 
         // Ewaluator liczy na WARTOSCIACH z dwoch rekordow: lewy operand rowny 6, prawy 3.
         // Dzieki temu dzielenie jest niezerowe i dokladne w kazdym z szesciu typow, a potega
-        // ma nieujemny calkowity wykladnik — czyli idzie sciezka exactPower dla typow
+        // ma nieujemny calkowity wykladnik - czyli idzie sciezka exactPower dla typow
         // dokladnych i przez std::pow dla FLOAT/DOUBLE.
         const std::list<token> literals{token(PUSH_VAL, *record.getItemVT(slotOf(leftType))),
                                         token(PUSH_VAL, *right.getItemVT(slotOf(rightType))), token(op)};
@@ -183,8 +183,8 @@ TEST(xExpressionShape, binary_arithmetic_matrix_matches_the_evaluator) {
 
 // `bajt ^ 0` jest jedynym miejscem, w ktorym typ wyniku zalezy od WARTOSCI wykladnika:
 // exactPower() startuje od jedynki w typie podstawy i przy zerowym wykladniku nie wykonuje
-// ani jednego mnozenia, wiec nie ma promocji. Kontrakt statyczny podaje INTEGER — czyli
-// odpowiedz dla kazdego wykladnika >= 1 — a wartosc 1 zapisuje sie do pola INTEGER bez straty.
+// ani jednego mnozenia, wiec nie ma promocji. Kontrakt statyczny podaje INTEGER - czyli
+// odpowiedz dla kazdego wykladnika >= 1 - a wartosc 1 zapisuje sie do pola INTEGER bez straty.
 TEST(xExpressionShape, byte_power_zero_is_the_documented_value_dependent_case) {
   auto record = testPayload(0);
 
@@ -201,7 +201,7 @@ TEST(xExpressionShape, byte_power_zero_is_the_documented_value_dependent_case) {
 
 // --- operatory jednoargumentowe --------------------------------------------------------
 
-// `neg()` i `logic_not()` ZACHOWUJA typ argumentu — promocji tu nie ma, inaczej niz przy
+// `neg()` i `logic_not()` ZACHOWUJA typ argumentu - promocji tu nie ma, inaczej niz przy
 // operatorach dwuargumentowych. Dla BYTE `neg` liczy `~a` i oddaje `uint8_t`.
 TEST(xExpressionShape, unary_operators_keep_the_argument_type) {
   auto record = testPayload(6);
@@ -220,7 +220,7 @@ TEST(xExpressionShape, unary_operators_keep_the_argument_type) {
 // --- porownania i logika ---------------------------------------------------------------
 
 // Porownanie NIE promuje BYTE: `is_eq` zapisuje wprost `uint8_t(1)`. Operatory te zyja
-// w regule `term_logic`, czyli w warunku RULE — deskryptora nie opisuja, ale analizator
+// w regule `term_logic`, czyli w warunku RULE - deskryptora nie opisuja, ale analizator
 // musi je znac, bo przez ten sam program chodzi upraszczanie wyrazen.
 TEST(xExpressionShape, comparison_result_is_the_normalized_operand_type) {
   auto record = testPayload(6);
@@ -257,7 +257,7 @@ TEST(xExpressionShape, every_rql_function_has_a_declared_result_type) {
       {"round", sDouble, rdb::DOUBLE},
       {"trunc", sDouble, rdb::DOUBLE},
       // Funkcje o niewymiernej przeciwdziedzinie zostaja przy DOUBLE takze nad typem
-      // dokladnym. RATIONAL nie ma tu wiersza, bo jest ODRZUCANY — patrz
+      // dokladnym. RATIONAL nie ma tu wiersza, bo jest ODRZUCANY - patrz
       // rejects_irrational_functions_over_a_rational_argument.
       {"sin", sInt, rdb::DOUBLE},
       {"cos", sByte, rdb::DOUBLE},
@@ -306,7 +306,7 @@ TEST(xExpressionShape, every_rql_function_has_a_declared_result_type) {
 // `tan`, `log` i `log2` licza przez callFun(), ktore rzutuje wynik z powrotem na RATIONAL
 // i po cichu przepelnia boost::rational<int>. `sin`, `cos` i `exp` policzylyby sie poprawnie
 // (koncza na DOUBLE), ale kontrakt jezyka jest jeden dla wszystkich funkcji o niewymiernej
-// przeciwdziedzinie — patrz opis przy rejectedIrrationalOverExact() w expressionShape.cpp.
+// przeciwdziedzinie - patrz opis przy rejectedIrrationalOverExact() w expressionShape.cpp.
 TEST(xExpressionShape, rejects_irrational_functions_over_a_rational_argument) {
   for (const char *name : {"Sqrt", "sin", "cos", "exp", "tan", "log", "log2"}) {
     std::list<token> program{readField(sRational), token(CALL, std::string(name))};
@@ -349,7 +349,7 @@ TEST(xExpressionShape, to_string_width_comes_from_the_declaration) {
 }
 
 TEST(xExpressionShape, string_concatenation_sums_widths_and_numbers_add_nothing) {
-  // `to_string(i:16) + '_test'` — 16 + 5.
+  // `to_string(i:16) + '_test'` - 16 + 5.
   std::list<token> program{readField(sInt), token(CALL2, std::make_pair(std::string("to_string"), 16)),
                            token(PUSH_VAL, std::string("_test")), token(ADD)};
   const auto inferred = analyse(program);
@@ -357,7 +357,7 @@ TEST(xExpressionShape, string_concatenation_sums_widths_and_numbers_add_nothing)
   EXPECT_EQ(inferred.shape.rtype, rdb::STRING);
   EXPECT_EQ(inferred.shape.rlen * inferred.shape.rarray, 21);
 
-  // Liczba w konkatenacji nie wnosi szerokosci — regula zachowana z inferStringWidth().
+  // Liczba w konkatenacji nie wnosi szerokosci - regula zachowana z inferStringWidth().
   const std::list<token> withNumber{token(PUSH_VAL, std::string("ab")), readField(sInt), token(ADD)};
   const auto mixed = analyse(withNumber);
   ASSERT_TRUE(mixed.resolved());
@@ -393,7 +393,7 @@ TEST(xExpressionShape, explicit_conversion_decides_inside_a_larger_expression) {
 // --- null2zero i NULL --------------------------------------------------------------------
 
 // NULL nie jest typem statycznym: pole ma typ, a brak wartosci jest BITEM w nullBitset.
-// Analizator nigdy nie oddaje NULLTYPE — takze dla programu, ktory na tym rekordzie policzy
+// Analizator nigdy nie oddaje NULLTYPE - takze dla programu, ktory na tym rekordzie policzy
 // sie na NULL.
 TEST(xExpressionShape, null_value_does_not_change_the_static_type) {
   auto record = testPayload(6);
@@ -403,7 +403,7 @@ TEST(xExpressionShape, null_value_does_not_change_the_static_type) {
   ASSERT_TRUE(inferred.resolved());
   EXPECT_EQ(inferred.shape.rtype, rdb::DOUBLE);
 
-  // Ewaluator oddaje na tym rekordzie NULL — i to jest zgodne: pole zostaje DOUBLE,
+  // Ewaluator oddaje na tym rekordzie NULL - i to jest zgodne: pole zostaje DOUBLE,
   // a jego wartosc jest nieobecna.
   EXPECT_EQ(evaluatedType(program, record), rdb::NULLTYPE);
 }
@@ -411,7 +411,7 @@ TEST(xExpressionShape, null_value_does_not_change_the_static_type) {
 // `null2zero` jest jedyna funkcja, ktorej typ WYNIKU zalezy w wykonaniu od tego, czy
 // argument byl NULL: wartosc nie-NULL przechodzi bez zmiany, a NULL zastepuje calkowite zero.
 // Kontrakt statyczny podaje typ ARGUMENTU. Rozjazd nie dociera do artefaktu, bo
-// payload::setItemVT() rzutuje zapisywana wartosc na typ pola — zero jest dokladnie
+// payload::setItemVT() rzutuje zapisywana wartosc na typ pola - zero jest dokladnie
 // reprezentowalne w kazdym typie liczbowym, wiec `null2zero(d)` daje w polu DOUBLE 0.0.
 TEST(xExpressionShape, null2zero_static_type_is_the_argument_type) {
   std::list<token> program{readField(sDouble), token(CALL, std::string("null2zero"))};
@@ -448,7 +448,7 @@ TEST(xExpressionShape, window_aggregate_shape_comes_from_its_group) {
   ASSERT_TRUE(alone.resolved());
   EXPECT_EQ(alone.shape.rtype, rdb::RATIONAL);
 
-  // `to_integer(AVG(x:10)) + 1` — granica 3 z pozycji 16.
+  // `to_integer(AVG(x:10)) + 1` - granica 3 z pozycji 16.
   std::list<token> casted{token(WINDOW_AVG, 0), token(CALL, std::string("to_integer")), token(PUSH_VAL, 1), token(ADD)};
   const auto result = inferExpressionShape(casted, shapes(), windows);
   ASSERT_TRUE(result.resolved());
@@ -473,10 +473,10 @@ TEST(xExpressionShape, unresolved_program_reports_unknown) {
 }
 
 // Program bez wartosci daje `illTyped`, a nie zgadniety typ. Kompilator traktuje to tak samo
-// jak `unknown` — pole zostaje przy sentinelu — zeby blad polecial w WYKONANIU, dokladnie
+// jak `unknown` - pole zostaje przy sentinelu - zeby blad polecial w WYKONANIU, dokladnie
 // tam, gdzie lecial dotad.
 TEST(xExpressionShape, ill_typed_program_reports_ill_typed) {
-  // `'abc' * 2` — ewaluator rzuca `Operator '*' not defined for string operands`.
+  // `'abc' * 2` - ewaluator rzuca `Operator '*' not defined for string operands`.
   std::list<token> product{readField(sText), token(PUSH_VAL, 2), token(MULTIPLY)};
   EXPECT_EQ(analyse(product).status, exprShapeStatus::illTyped);
   auto record = testPayload(2);
@@ -491,7 +491,7 @@ TEST(xExpressionShape, ill_typed_program_reports_ill_typed) {
 // --- niezaleznosc od upraszczania wyrazen ------------------------------------------------
 
 // Deskryptor nie moze zalezec od `RDB_OPT_SIMPLIFY_EXPRESSIONS`. Kompilator zapewnia to
-// PORZADKIEM — inferFieldShapes() stoi przed simplifyFieldExpressions() — ale sam niezmiennik
+// PORZADKIEM - inferFieldShapes() stoi przed simplifyFieldExpressions() - ale sam niezmiennik
 // jest mocniejszy i to on jest tu sprawdzany: `simplifyExpression()` nie zmienia KSZTALTU
 // wyrazenia, wiec ponowna analiza uproszczonego programu daje te sama odpowiedz.
 //
@@ -516,7 +516,7 @@ TEST(xExpressionShape, simplification_does_not_change_the_inferred_shape) {
       // bo usuniecie operatora skasowaloby promocje. Ksztalt zostaje INTEGER w obie strony.
       {"b*1", {readField(sByte), token(PUSH_VAL, 1), token(MULTIPLY)}},
       {"b+0", {readField(sByte), token(PUSH_VAL, 0), token(ADD)}},
-      // Konwersja pod arytmetyka — program, ktory regula „ostatniego tokenu" gubila.
+      // Konwersja pod arytmetyka - program, ktory regula „ostatniego tokenu" gubila.
       {"to_double(i)+0", {readField(sInt), token(CALL, std::string("to_double")), token(PUSH_VAL, 0), token(ADD)}},
       // Powtorzony czynnik: przy aggressive_expr_optimization=ON przechodzi w `^2`, przy OFF
       // zostaje iloczynem. Ksztalt ma byc ten sam w obu budowach.
@@ -543,7 +543,7 @@ TEST(xExpressionShape, simplification_does_not_change_the_inferred_shape) {
   }
 }
 
-// `to_string` NIE zwija sie nigdy — ani nad stalym argumentem, ani z zadeklarowana szerokoscia,
+// `to_string` NIE zwija sie nigdy - ani nad stalym argumentem, ani z zadeklarowana szerokoscia,
 // ani bez niej. Powod jest w tym, ze token niesie DEKLARACJE szerokosci pola, a nie tylko
 // operacje: jawna `N` w postaci CALL2 `to_string(expr : N)`, domyslna kToStringDefaultWidth
 // w postaci CALL (patrz rqlFunctions.hpp). Deklaracja stoi w PROGRAMIE i nigdzie indziej.
@@ -553,7 +553,7 @@ TEST(xExpressionShape, simplification_does_not_change_the_inferred_shape) {
 // `SELECT to_string(1+1 : 16)` zwezalo sie z 16 na 1. Kolejnosc przebiegow (inferFieldShapes()
 // PRZED simplifyFieldExpressions()) zamykala to przy PIERWSZEJ kompilacji, ale zywy plan
 // kompilowany po raz drugi (executorsm::getAdHoc) dostawal program juz uproszczony. Rozjazd nie
-// siegal artefaktu na dysku — ten zostaje nietkniety — tylko planu, z ktorego schemat dziedziczyly
+// siegal artefaktu na dysku - ten zostaje nietkniety - tylko planu, z ktorego schemat dziedziczyly
 // strumienie dolozone PO tej kompilacji.
 //
 // Test pilnuje obu polowek naraz: szerokosc przezywa uproszczenie, a uproszczenie nadal dziala
@@ -581,7 +581,7 @@ TEST(xExpressionShape, constant_to_string_keeps_its_declared_width_when_simplifi
 }
 
 // Ta sama wlasnosc dla postaci BEZ zadeklarowanej szerokosci. `to_string(expr)` deklaruje
-// szerokosc domyslna, wiec zwiniecie go do literalu gubi ja dokladnie tak samo — tyle ze cicho,
+// szerokosc domyslna, wiec zwiniecie go do literalu gubi ja dokladnie tak samo - tyle ze cicho,
 // bo w RQL nie widac zadnej liczby, ktora mialaby przepasc.
 TEST(xExpressionShape, constant_to_string_without_width_keeps_the_default_width) {
   const auto typeOfField = [](const std::string &, int) -> std::optional<rdb::descFld> { return rdb::INTEGER; };

@@ -37,7 +37,7 @@ constexpr auto isConfigurationField(const rdb::descFld index) {
 ///
 /// Dla pola nietablicowego jest to rozmiar calego pola, czyli dokladnie to, co liczy
 /// fieldSize(). Numeryczne `T[N]` zajmuje N slotow po `rlen` bajtow; `STRING[N]` pozostaje
-/// JEDNYM slotem o dlugosci N — ten sam podzial, ktorego uzywa rebuildFieldMappings()
+/// JEDNYM slotem o dlugosci N - ten sam podzial, ktorego uzywa rebuildFieldMappings()
 /// przy wyznaczaniu offsetow.
 constexpr int flatSlotSize(const rField &field) {
   if (isConfigurationField(field.rtype)) return 0;
@@ -78,7 +78,7 @@ void Descriptor::rebuildFieldMappings() const {
 }
 
 // flatIndexToDescriptorPosition / flatElementCount / byteOffsetAtFlatIndex sa
-// teraz inline w descriptor.hpp (P2, speed_improvement) — hot-path bez wywolan
+// teraz inline w descriptor.hpp (P2, speed_improvement) - hot-path bez wywolan
 // cross-TU. Tu zostaje tylko zimna sciezka bledu byteOffsetAtFlatIndex.
 void Descriptor::flatIndexOutOfRange(const int flatIndex) const {
   rebuildFieldMappings();
@@ -126,7 +126,7 @@ Descriptor &Descriptor::operator+=(const Descriptor &rhs) {
 // 4,INT  == 4,INT    1
 //
 // Zgodnosc idzie po SLOTACH PLASKICH, nie po wpisach deskryptora. `INTEGER[3]` i trzy pola
-// `INTEGER` opisuja ten sam rekord — te same bajty pod tymi samymi offsetami — ale maja
+// `INTEGER` opisuja ten sam rekord - te same bajty pod tymi samymi offsetami - ale maja
 // odpowiednio jeden i trzy wpisy. Liczac wpisy, para taka wychodzila NIEZGODNA i
 // payload::operator= konczylo sie bledem krytycznym; dotykalo to kazdego przypisania miedzy
 // tymi dwoma zapisami rekordu, w tym przeplotu `#` nad polem tablicowym.

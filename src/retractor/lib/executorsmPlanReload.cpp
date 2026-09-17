@@ -46,7 +46,7 @@ constexpr std::size_t kResetMaxTransfers{8};
 constexpr std::chrono::seconds kResetTransferTtl{60};
 
 /// Transfer planu w toku, per klient (db.id). Trzymany BEZ muteksu, bo dotyka go wylacznie
-/// watek komunikacyjny — IpcServer prowadzi dokladnie jedna petle odbioru komend.
+/// watek komunikacyjny - IpcServer prowadzi dokladnie jedna petle odbioru komend.
 struct ResetTransfer {
   int expectedChunks{0};
   int receivedChunks{0};
@@ -161,7 +161,7 @@ ptree executorsm::resetChunk(const ptree &ptInval) {
     return ptRetval;
   }
   // Kolejnosc porcji gwarantuje sam protokol: klient wysyla nastepna dopiero po odpowiedzi
-  // na poprzednia, a kolejka komend zachowuje kolejnosc. Sprawdzana jest za to LICZBA —
+  // na poprzednia, a kolejka komend zachowuje kolejnosc. Sprawdzana jest za to LICZBA -
   // nadmiarowa porcja znaczy, ze po drugiej stronie dzieje sie cos innego niz zapowiedziany
   // transfer, a wtedy plan nie moze zostac sklejony "prawie dobrze".
   if (it->second.receivedChunks >= it->second.expectedChunks) {
@@ -208,7 +208,7 @@ ptree executorsm::resetCommit(const ptree &ptInval) {
   resetTransfers.erase(it);
 
   // Jedna wymiana naraz. Sprawdzenie musi wypasc PRZED validatePlanText(), bo to ona rezerwuje
-  // zasoby w gniezdzie magistrali, a rezerwacja jest tam pojedyncza — patrz planSwapInFlight.
+  // zasoby w gniezdzie magistrali, a rezerwacja jest tam pojedyncza - patrz planSwapInFlight.
   // Odmowa jest przy okazji uczciwsza od poprzedniego "ostatni wygrywa": zestaw przyjety
   // i nadpisany przez nastepny nigdy nie ruszal, a jego klient dostawal "OK".
   if (planSwapInFlight.load(std::memory_order_acquire)) {
@@ -229,7 +229,7 @@ ptree executorsm::resetCommit(const ptree &ptInval) {
   }
   // Kolejnosc zapisow jest istotna: znacznik wymiany PRZED zadaniem wymiany. Odwrotnie watek
   // glowny zdazylby przeprowadzic cala wymiane i zdjac flage, ktora dopiero potem zostalaby
-  // podniesiona — i zostalaby podniesiona na zawsze, odrzucajac kazdy nastepny reset.
+  // podniesiona - i zostalaby podniesiona na zawsze, odrzucajac kazdy nastepny reset.
   planSwapInFlight.store(true, std::memory_order_release);
   planResetRequested.store(true, std::memory_order_release);
   cv.notify_all();
@@ -250,7 +250,7 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
   // Hak diagnostyczny testu regresyjnego it_service_reset_double, ta sama droga co
   // RDB_FAULT_GET_AWAIT_EPOCH_SWAP. Rozciaga (o podana liczbe ms) DOKLADNIE to okno, w ktorym
   // tekst planu jest juz zabrany, a jego rezerwacja na magistrali jeszcze nie aktywowana.
-  // Wyscigu z dwoma klientami nie da sie zamowic — bez haka trafienie wymagalo omiatania
+  // Wyscigu z dwoma klientami nie da sie zamowic - bez haka trafienie wymagalo omiatania
   // przesuniecia miedzy dwoma `xqry -q` (trafienie 1 na 14 prob).
   if (const char *delayMs = std::getenv("RDB_FAULT_PLAN_SWAP_DELAY"); delayMs != nullptr)
     std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
@@ -263,7 +263,7 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
     std::scoped_lock lock(core_mutex);
     // Plan wymienia sie PRZEZ ZAWARTOSC tego samego obiektu: `cm` i wszystkie wskazniki na
     // qTree sa zwiazane z nim na stale. Przypisanie pustego drzewa czysci takze maxCapacity
-    // i stan sortowania topologicznego — czego samo clear() na wektorze bazowym nie robi.
+    // i stan sortowania topologicznego - czego samo clear() na wektorze bazowym nie robi.
     *coreInstancePtr = qTree{};
     cmPtr->reset();
     processedLines.clear();
@@ -273,7 +273,7 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
     if (loaded.status != "OK") {
       // Nieosiagalne przez kanal `reset`: resetCommit() przepuszcza wylacznie zestaw, ktory
       // przeszedl te sama droge na kopii. Gdyby jednak tu wyladowalo, epoka ma byc PUSTA,
-      // a nie polowiczna — instancja z na wpol wczytanym planem liczylaby cos, czego nikt
+      // a nie polowiczna - instancja z na wpol wczytanym planem liczylaby cos, czego nikt
       // nie zamowil.
       SPDLOG_ERROR("Plan reload failed at parse stage: {}; falling back to idle mode.", loaded.status);
       *coreInstancePtr = qTree{};
@@ -290,7 +290,7 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
       }
     }
 
-    // Domyslny katalog storage z konfiguracji — ta sama regula co przy starcie: dyrektywa
+    // Domyslny katalog storage z konfiguracji - ta sama regula co przy starcie: dyrektywa
     // :STORAGE z RQL ma pierwszenstwo, a w planie pustym nie ma czego kierowac.
     if (!cfg.storageDir.empty() && !coreInstancePtr->empty() &&
         std::ranges::none_of(*coreInstancePtr, [](const auto &it) { return it.id == ":STORAGE"; })) {
@@ -300,7 +300,7 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
       coreInstancePtr->push_back(storageDirective);
     }
 
-    // Ostatnia chwila, w ktorej `:STORAGE` jest jeszcze w drzewie — dataModel usunie dyrektywy
+    // Ostatnia chwila, w ktorej `:STORAGE` jest jeszcze w drzewie - dataModel usunie dyrektywy
     // przy budowie modelu, a zapytania ad-hoc nastepnej epoki potrzebuja tego katalogu.
     activeStorageDir = planStorageDir(*coreInstancePtr, cfg.storageDir);
   }
@@ -327,7 +327,7 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
 
   // Trwalosc planu: usluga, ktora zostanie zrestartowana, ma wstac z tym, co faktycznie
   // liczy, a nie z zestawem sprzed przeladowania. Niepowodzenie zapisu nie zatrzymuje
-  // pracy — plan juz dziala, traci sie wylacznie jego przetrwanie restartu.
+  // pracy - plan juz dziala, traci sie wylacznie jego przetrwanie restartu.
   if (!serviceQueryFilePath.empty()) {
     if (servicecontrol::writeQueryFile(planText, serviceQueryFilePath))
       SPDLOG_INFO("Plan persisted to '{}'.", serviceQueryFilePath);

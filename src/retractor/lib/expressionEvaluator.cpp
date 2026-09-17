@@ -30,7 +30,7 @@ expressionEvaluator::expressionEvaluator(/* args */) = default;
 using pairVar = std::pair<rdb::descFldVT, rdb::descFldVT>;
 
 /// Nazwa funkcji złożona do małych liter. Nazwy pochodzą z gramatyki, więc ASCII wystarcza,
-/// a wynik mieści się w SSO — dopasowanie nazwy nie alokuje.
+/// a wynik mieści się w SSO - dopasowanie nazwy nie alokuje.
 static std::string lowercased(std::string text) {
   std::ranges::transform(text, text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   return text;
@@ -93,7 +93,7 @@ pairVar normalize(const rdb::descFldVT &a, const rdb::descFldVT &b) {
 }
 
 /// Wynik z checkedArith jako wartosc wyrazenia. Przepelnienie INTEGER albo RATIONAL nie ma wyniku
-/// w zbiorze wartosci typu, wiec jest NULL — ta sama decyzja co przy dzieleniu przez zero ponizej.
+/// w zbiorze wartosci typu, wiec jest NULL - ta sama decyzja co przy dzieleniu przez zero ponizej.
 /// Do 2026-09-14 wynik zawijal sie po cichu: `9/1 * 1000000000` zapisywalo 410065408/1.
 template <typename T>
 rdb::descFldVT orNull(const std::optional<T> &value) {
@@ -208,7 +208,7 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
                  b);
 
   if (divisorIsZero) {
-    // Dzielenie przez zero nie ma wyniku w zbiorze wartości, więc jest wartością POCHŁANIAJĄCĄ —
+    // Dzielenie przez zero nie ma wyniku w zbiorze wartości, więc jest wartością POCHŁANIAJĄCĄ -
     // tym samym, czym dane oczekiwane a nieobecne. Strumień oddaje NULL i pracuje dalej.
     //
     // Wcześniej leciał tu std::domain_error, czyli pojedyncza próbka o zerowym mianowniku
@@ -245,13 +245,13 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   return retVal;
 }
 
-/// Potegowanie `b ^ a` — operator ExpPow z RQL.g4.
+/// Potegowanie `b ^ a` - operator ExpPow z RQL.g4.
 ///
 /// Typ wyniku ustala normalize(), tak samo jak dla `+`, `-`, `*` i `/`: wygrywa wyzszy
 /// indeks wariantu. Dzieki temu `pole ^ 2` na polu INTEGER zostaje INTEGER-em (dokladny
 /// odpowiednik dotychczasowego `pole * pole`), a `pole ^ 0.5` promuje sie do FLOAT.
 ///
-/// Rachunek idzie przez double — tak samo jak callFun() dla Sqrt/Log/Sin — bo std::pow nie
+/// Rachunek idzie przez double - tak samo jak callFun() dla Sqrt/Log/Sin - bo std::pow nie
 /// ma przeciazenia dla boost::rational, a wykladnik ulamkowy i tak wyprowadza poza ciala
 /// calkowite. Rzut z powrotem na typ znormalizowany robi ten sam castFldVT, ktorego uzywa
 /// reszta pliku.
@@ -264,12 +264,12 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
 /// Operand tekstowy jest bledem, jak dla `*`, `-` i `/`. normalize() promuje wtedy druga
 namespace {
 
-/// Typy o arytmetyce DOKLADNEJ — te same, ktore isExact() wyroznia w exprSimplify.
+/// Typy o arytmetyce DOKLADNEJ - te same, ktore isExact() wyroznia w exprSimplify.
 bool hasExactArithmetic(rdb::descFld type) {
   return type == rdb::BYTE || type == rdb::INTEGER || type == rdb::UINT || type == rdb::RATIONAL;
 }
 
-/// Wykladnik jako nieujemna liczba calkowita — o ile nia jest.
+/// Wykladnik jako nieujemna liczba calkowita - o ile nia jest.
 std::optional<int> integralExponent(const rdb::descFldVT &value) {
   return std::visit(
       Overload{[](uint8_t v) -> std::optional<int> { return v; },
@@ -290,14 +290,14 @@ std::optional<int> integralExponent(const rdb::descFldVT &value) {
 /// To nie jest optymalizacja, tylko warunek poprawnosci przepisania `a*a` -> `a^2`
 /// (regula D w exprSimplify): gdyby `^` szlo tu przez std::pow, przepisanie zmienialoby
 /// wynik wszedzie tam, gdzie mnozenie sie przekreca albo promuje typ. Przy tej definicji
-/// `a^k` JEST iloczynem `a*a*...*a` — z zawinieciem, promocja BYTE do int i dokladna
+/// `a^k` JEST iloczynem `a*a*...*a` - z zawinieciem, promocja BYTE do int i dokladna
 /// arytmetyka wymierna wlacznie.
 ///
 /// Potegowanie przez kwadraty wolno tu zastosowac, bo mnozenie w tych typach jest laczne
 /// (takze modulo 2^n), wiec grupowanie nie zmienia wyniku. Chroni to przed `a^1000000000`
 /// w petli na kazdym interwale.
 ///
-/// Wynik NIE jest rzutowany z powrotem na typ podstawy — typ ma byc dokladnie ten, ktory
+/// Wynik NIE jest rzutowany z powrotem na typ podstawy - typ ma byc dokladnie ten, ktory
 /// dalby zapisany wprost iloczyn (dla BYTE jest to INTEGER, bo `uint8_t * uint8_t`
 /// promuje sie do int).
 rdb::descFldVT exactPower(const rdb::descFldVT &base, int exponent) {
@@ -323,7 +323,7 @@ rdb::descFldVT power(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   if (resultType > rdb::DOUBLE) throw std::runtime_error("Operator '^' not defined for non-numeric operands");
 
   // Typ dokladny + calkowity nieujemny wykladnik: liczymy iloczynem, nie std::pow. Patrz
-  // exactPower() — od tego zalezy, czy `a*a` wolno przepisac na `a^2`.
+  // exactPower() - od tego zalezy, czy `a*a` wolno przepisac na `a^2`.
   if (hasExactArithmetic(resultType))
     if (const auto steps = integralExponent(exponent)) return exactPower(base, *steps);
 
@@ -576,7 +576,7 @@ rdb::descFldVT isnull(const rdb::descFldVT &inVar) { return isNullValue(inVar) ?
 /// Wartosc bezwzgledna, napisana wprost na wariancie, a NIE przez callFun.
 ///
 /// callFun przepuszcza argument przez double i z powrotem (castFldVT), a droga powrotna dla
-/// RATIONAL idzie przez Rationalize z tolerancja 1e-6 — czyli gubi dokladna wartosc wymierna.
+/// RATIONAL idzie przez Rationalize z tolerancja 1e-6 - czyli gubi dokladna wartosc wymierna.
 /// Dla `Abs` ta strata bylaby czysto zbedna: wartosc bezwzgledna nie zmienia ani typu, ani
 /// mianownika. Wzorzec wziety z neg() powyzej, ktore jest tym samym rodzajem operacji.
 rdb::descFldVT absolute(const rdb::descFldVT &inVar) {
@@ -584,9 +584,9 @@ rdb::descFldVT absolute(const rdb::descFldVT &inVar) {
 
   rdb::descFldVT retVal;
   std::visit(Overload{[&retVal](std::monostate) { retVal = std::monostate{}; },                 //
-                      [&retVal](uint8_t a) { retVal = a; },                                     // bez znaku — tozsamosc
+                      [&retVal](uint8_t a) { retVal = a; },                                     // bez znaku - tozsamosc
                       [&retVal](int a) { retVal = a < 0 ? orNull(checkedArith::neg(a)) : a; },  //
-                      [&retVal](unsigned a) { retVal = a; },                                    // bez znaku — tozsamosc
+                      [&retVal](unsigned a) { retVal = a; },                                    // bez znaku - tozsamosc
                       [&retVal](boost::rational<int> a) { retVal = a < 0 ? orNull(checkedArith::neg(a)) : a; },  //
                       [&retVal](float a) { retVal = std::fabs(a); },                                             //
                       [&retVal](double a) { retVal = std::fabs(a); },                                            //
@@ -600,12 +600,12 @@ rdb::descFldVT absolute(const rdb::descFldVT &inVar) {
   return retVal;
 }
 
-/// IsZero / IsNonZero — predykat liczbowy zwracajacy 0 albo 1 jako INTEGER.
+/// IsZero / IsNonZero - predykat liczbowy zwracajacy 0 albo 1 jako INTEGER.
 ///
 /// Wynik jest INTEGER, a nie typem argumentu (inaczej niz w logic_not), bo na tym polega cala
 /// ich wartosc uzytkowa: porownania (`>=`, `<`, ...) zyja w regule `term_logic` i nie sa dostepne
 /// wewnatrz wyrazenia w SELECT. Te dwie funkcje sa jedynym sposobem wniesienia predykatu do
-/// wyrazenia jako wartosci 0/1 — stad ich przydatnosc obok RULE.
+/// wyrazenia jako wartosci 0/1 - stad ich przydatnosc obok RULE.
 ///
 /// Dla stringa predykat nie ma sensu i jest bledem, a nie cicha konwersja: toLogicValue()
 /// uznaje kazdy niepusty napis za prawde, co dla nazwy `IsZero` byloby mylace.
@@ -620,13 +620,13 @@ rdb::descFldVT isZeroValue(const rdb::descFldVT &inVar, bool wantZero) {
   return (isZero == wantZero) ? 1 : 0;
 }
 
-/// Length — liczba bajtow wartosci tekstowej, jako INTEGER.
+/// Length - liczba bajtow wartosci tekstowej, jako INTEGER.
 ///
 /// Liczona jest WARTOSC, nie zadeklarowana szerokosc pola: payload::getItemVT przycina pole
 /// STRING na pierwszym bajcie zerowym, wiec `STRING[8]` z wartoscia `42` dochodzi tu jako
 /// dwuznakowy napis. Zadeklarowanej szerokosci ewaluator nie widzi i widziec nie moze.
 ///
-/// Argument nietekstowy jest bledem, a nie cicha konwersja przez to_string — symetrycznie do
+/// Argument nietekstowy jest bledem, a nie cicha konwersja przez to_string - symetrycznie do
 /// Abs i IsZero, ktore odrzucaja napis. `Length(k)` nad polem INTEGER jest niemal na pewno
 /// literowka, a nie prosba o dlugosc zapisu dziesietnego; kto chce tej drugiej rzeczy, pisze
 /// `Length(to_string(k))` i mowi to wprost.
@@ -650,8 +650,8 @@ rdb::descFldVT callFun(rdb::descFldVT &inVar, const std::function<double(double)
 }
 
 /// Funkcje o niewymiernej przeciwdziedzinie (`sin`, `cos`, `exp`) oddaja DOUBLE, bez
-/// stratnego powrotu na typ argumentu, ktory robi callFun(). Wynik niefinitywny — `exp(1000)`
-/// albo NaN — jest NULL, tak samo jak przy operatorze potegowania.
+/// stratnego powrotu na typ argumentu, ktory robi callFun(). Wynik niefinitywny - `exp(1000)`
+/// albo NaN - jest NULL, tak samo jak przy operatorze potegowania.
 ///
 /// RATIONAL jest tu policzony, mimo ze kompilator ODRZUCA go dla tych trzech nazw
 /// (rejectedIrrationalOverExact w expressionShape.cpp). Ewaluator stoi PONIZEJ tej bramki
@@ -670,10 +670,10 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
                                          const std::vector<windowStats> *windowValues) {
   // Kontener stosu: small_vector z inline-storage zamiast domyślnej std::deque.
   // std::deque alokuje mapę + blok już przy konstrukcji pustego stosu (~2 alok.),
-  // a eval() jest wołane raz na pole/regułę co interwał (gorąca ścieżka K1 —
+  // a eval() jest wołane raz na pole/regułę co interwał (gorąca ścieżka K1 -
   // 52.8% alokacji processRows). Inline 16 pokrywa typowe głębokości wyrażeń RPN
   // bez sterty; głębsze spilują na stertę (bezpieczny fallback). API std::stack
-  // bez zmian — ciało eval() nietknięte. Patrz speed_improvement (run_alloc.sh).
+  // bez zmian - ciało eval() nietknięte. Patrz speed_improvement (run_alloc.sh).
   std::stack<rdb::descFldVT, boost::container::small_vector<rdb::descFldVT, 16>> rStack;
   rdb::descFldVT a;
   rdb::descFldVT b;
@@ -690,7 +690,7 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
   rdb::probe::onEval(program.size());
 
   // S1: token przez referencje (byl przez wartosc -> kopia tokena per iteracja, a token
-  // trzyma descFldVT, ktory moze zawierac std::string). getStr_() liczone LENIWIE — tylko
+  // trzyma descFldVT, ktory moze zawierac std::string). getStr_() liczone LENIWIE - tylko
   // CALL/CALL2/PUSH_ID2 go potrzebuja, a wczesniej budowal sie string dla kazdego tokena
   // (arytmetyka, PUSH_VAL, PUSH_ID) tylko po to, by go wyrzucic.
   for (const auto &tk : program) {
@@ -769,7 +769,7 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         break;
       case CALL: {
         // Parser zapisuje do tokena postać KANONICZNĄ z rqlFunctions.hpp ('Sqrt', 'to_integer'),
-        // więc dopasowanie po złożeniu wielkości liter jest tu nadmiarowe — i zostaje właśnie
+        // więc dopasowanie po złożeniu wielkości liter jest tu nadmiarowe - i zostaje właśnie
         // dlatego, że jest tanie, a chroni przed rozjazdem, gdyby ktoś dopisał do tabeli nazwę
         // o innej pisowni niż gałąź poniżej.
         const auto original = tk.getStr_();
@@ -801,7 +801,7 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
           rStack.push(isnull(b));
         // NULL -> 0, reszta bez zmian. Zeruje wartosc POCHLANIAJACA (dziura w danych, dzielenie
         // przez zero, okno bez ani jednej wartosci), a NIE ogon strumienia: sloty ogona nie sa
-        // rekordami, wiec nie ma w nich czego zamienic — patrz query::startupLatency.
+        // rekordami, wiec nie ma w nich czego zamienic - patrz query::startupLatency.
         else if (tkStr == "null2zero")
           rStack.push(isNullValue(b) ? rdb::descFldVT{0} : b);
         else if (tkStr == "abs")
@@ -824,7 +824,7 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
           // Nieosiągalne z RQL od 2026-08-30: compiler::checkFunctionCalls() odrzuca nieznaną
           // nazwę przez `Check result:`, więc plan z taką nazwą nie dochodzi do wykonania.
           // Rzut zostaje jako kontrola dla ścieżek omijających kompilator (testy jednostkowe
-          // budujące program tokenów wprost) — tak samo jak FatalError przy nierozwiązanym
+          // budujące program tokenów wprost) - tak samo jak FatalError przy nierozwiązanym
           // węźle planu.
           throw std::runtime_error(std::string("Unsupported function call: ") + original);
       } break;
@@ -838,7 +838,7 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
       case PUSH_ID: {
         if (payload == nullptr) throw std::runtime_error("PUSH_ID: payload is null");
         auto instancePosition = get<std::pair<std::string, int>>(tk.getVT());
-        // P1-E1: odczyt wprost do wariantu (getItemVT) — bez posrednika std::any
+        // P1-E1: odczyt wprost do wariantu (getItemVT) - bez posrednika std::any
         // i any_to_variant_cast. Parytet z getItem potwierdzony w test_payload.
         auto valueOpt = payload->getItemVT(instancePosition.second);
         if (!valueOpt.has_value()) {
@@ -891,7 +891,7 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         const std::string sOffset1(what[2]);
         const int offset1(atoi(sOffset1.c_str()));
 
-        // P1-E1: odczyt wprost do wariantu (getItemVT) — patrz PUSH_ID wyzej.
+        // P1-E1: odczyt wprost do wariantu (getItemVT) - patrz PUSH_ID wyzej.
         auto valueOpt = payload->getItemVT(offset1);
         if (!valueOpt.has_value()) {
           rStack.emplace(std::monostate{});

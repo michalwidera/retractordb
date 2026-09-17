@@ -8,11 +8,11 @@
 # deweloperska ma wielokrotnie wiecej rdzeni i inny obraz systemu, wiec awaria
 # zalezna od rownoleglosci, pamieci albo wersji pakietow nie odtwarza sie tu z
 # definicji. Ten skrypt stawia te sama konfiguracje i wykonuje te same kroki, co
-# wybrany job — zeby czerwony CI dalo sie zbadac bez pushowania kolejnych
+# wybrany job - zeby czerwony CI dalo sie zbadac bez pushowania kolejnych
 # commitow "a moze teraz".
 #
 # ZRODLEM PRAWDY POZOSTAJE .circleci/config.yml. Kazdy profil nizej jest recznym
-# odwzorowaniem jednego joba i przy zmianie tamtego pliku trzeba go poprawic —
+# odwzorowaniem jednego joba i przy zmianie tamtego pliku trzeba go poprawic -
 # nie ma mechanizmu, ktory by to zrobil sam.
 #
 # Uruchamiac z dowolnego katalogu; drzewo zrodlowe wynika ze sciezki skryptu.
@@ -57,7 +57,7 @@ profile_build_type() {
 
 profile_desc() {
     case "$1" in
-        commit)            echo "Debug + pelny zestaw testow — to, co idzie po commicie" ;;
+        commit)            echo "Debug + pelny zestaw testow - to, co idzie po commicie" ;;
         release)           echo "Release + pelny zestaw testow" ;;
         smoke)             echo "sama kompilacja Debug, bez testow" ;;
         ablation-all-off)  echo "Release z piecioma RDB_OPT_* = OFF + pelny zestaw testow" ;;
@@ -84,9 +84,9 @@ show_help() {
     echo "  --list             Wypisz profile i zakoncz"
     echo "  --out-dir <kat>    Katalog na wyniki testow (domyslnie: build/test-ci)"
     echo "  --image <obraz>    Obraz dockerowy (domyslnie: $default_image)"
-    echo "  --cpus <n>         Limit CPU kontenera (domyslnie: $default_cpus — jak resource_class: large)"
-    echo "  --memory <rozmiar> Limit RAM kontenera (domyslnie: $default_memory — jak resource_class: large)"
-    echo "  --shm-size <r>     Rozmiar /dev/shm (domyslnie: $default_shm_size — domyslna wartosc dockera)"
+    echo "  --cpus <n>         Limit CPU kontenera (domyslnie: $default_cpus - jak resource_class: large)"
+    echo "  --memory <rozmiar> Limit RAM kontenera (domyslnie: $default_memory - jak resource_class: large)"
+    echo "  --shm-size <r>     Rozmiar /dev/shm (domyslnie: $default_shm_size - domyslna wartosc dockera)"
     echo "  --pull             Wymus pobranie obrazu przed uruchomieniem"
     echo "  --keep             Nie usuwaj kontenera po zakonczeniu (do grzebania recznie)"
     echo "  --reuse-build      Zachowaj katalog build/ miedzy przebiegami (szybko, ale NIE jak CI)"
@@ -98,13 +98,13 @@ show_help() {
 # Obraz i limity ida za executorem `debian-mydocker` z `resource_class: large`
 # (4 vCPU / 8 GiB). --memory-swap zrownany z --memory: bez tego docker daje
 # kontenerowi tyle samo swapu co RAM-u, wiec przekroczenie budzetu objawia sie
-# spowolnieniem zamiast zabiciem procesu — a w CI zabija.
+# spowolnieniem zamiast zabiciem procesu - a w CI zabija.
 default_image="micwide/buildenv-retractordb:latest"
 default_cpus="4"
 default_memory="8g"
 # /dev/shm: 64 MiB to domyslna wartosc dockera i tyle samo ma executor
 # dockerowy CircleCI. Wielkosc jest istotna, bo silnik trzyma tam segment
-# magistrali i kolejki odpowiedzi (patrz src/retractor/lib/shmBudget.hpp) —
+# magistrali i kolejki odpowiedzi (patrz src/retractor/lib/shmBudget.hpp) -
 # podniesienie jej tutaj ukryloby odmowe, ktora w CI wystapi.
 default_shm_size="64m"
 
@@ -154,7 +154,7 @@ build_type="$(profile_build_type "$profile")"
 # ── Wykrycie dzialajacego dockera ────────────────────────────────────────────
 #
 # Trzy osobne warunki z trzema osobnymi komunikatami, bo trzy rozne naprawy:
-# brak klienta, zatrzymany demon, brak obrazu. Zaden nie ma sciezki zapasowej —
+# brak klienta, zatrzymany demon, brak obrazu. Zaden nie ma sciezki zapasowej -
 # build lokalny NIE jest odpowiedzia na "sprawdz to tak jak CI".
 if ! command -v docker > /dev/null 2>&1; then
     echo "Blad: nie znaleziono polecenia 'docker'." >&2
@@ -194,7 +194,7 @@ work_dir="/home/developer/workspace/retractordb"
 # Gdy ta przyczyna zniknie, wolumen ma sens i wraca tutaj.
 
 # --reuse-build: katalog build/ w nazwanym wolumenie, osobnym dla kazdego
-# profilu. Osobnym, bo profile roznia sie konfiguracja tego samego katalogu —
+# profilu. Osobnym, bo profile roznia sie konfiguracja tego samego katalogu -
 # `release` i `ablation-all-off` pisza oba do build/Release, ale z innymi
 # RDB_OPT_*, i jeden wolumen dawalby drzewo skonfigurowane pod poprzedni
 # przebieg.
@@ -203,7 +203,7 @@ work_dir="/home/developer/workspace/retractordb"
 # cena jest realna: zachowany katalog niesie CMakeCache, obiekty plikow, ktore
 # w miedzyczasie zniknely, i skopiowane katalogi testow. Awaria widoczna
 # wylacznie przy budowie od zera tu nie wyjdzie. Do sprawdzenia "czy przejdzie
-# na CI" przed pushem — tak; jako dowod przed zgloszeniem czegokolwiek — nie.
+# na CI" przed pushem - tak; jako dowod przed zgloszeniem czegokolwiek - nie.
 build_volume="rdb-test-ci-build-${profile}"
 run_opts=(--cpus "$cpus" --memory "$memory" --memory-swap "$memory" --shm-size "$shm_size")
 if [ "$reuse_build" -eq 1 ]; then
@@ -229,7 +229,7 @@ echo "   obraz:   $image"
 echo "   zasoby:  --cpus $cpus --memory $memory --shm-size $shm_size"
 echo "   wyniki:  $out_dir/$profile"
 if [ "$reuse_build" -eq 1 ]; then
-    echo "   build:   wolumen $build_volume — przebudowa inkrementalna, NIE jak czysty checkout CI"
+    echo "   build:   wolumen $build_volume - przebudowa inkrementalna, NIE jak czysty checkout CI"
 fi
 
 docker run --detach --name "$container" "${run_opts[@]}" \
@@ -237,7 +237,7 @@ docker run --detach --name "$container" "${run_opts[@]}" \
     "$image" sleep infinity > /dev/null
 
 # Punkt montowania wolumenu docker tworzy jako katalog roota, razem z brakujacym
-# katalogiem nadrzednym — bez tego rozpakowanie drzewa przez uzytkownika
+# katalogiem nadrzednym - bez tego rozpakowanie drzewa przez uzytkownika
 # `developer` konczy sie odmowa dostepu.
 if [ "$reuse_build" -eq 1 ]; then
     docker exec --user root "$container" chown developer:developer "$work_dir" "$work_dir/build"
@@ -245,7 +245,7 @@ fi
 
 # Testowana tresc: pliki sledzone + niesledzone nieignorowane, czyli drzewo
 # roboczne tak, jakby zmiany byly zacommitowane. Ignorowane katalogi (build/,
-# coverage/) nie jada — kontener ma budowac od zera, jak checkout w CI.
+# coverage/) nie jada - kontener ma budowac od zera, jak checkout w CI.
 # --ignore-failed-read: `git ls-files -c` wypisuje takze pliki skasowane w
 # drzewie roboczym, a tar nie ma ich juz czego przeczytac.
 echo "-- Kopiuje drzewo robocze do kontenera"
@@ -299,7 +299,7 @@ smoke_test() {
 }
 
 # ctest z `-j $(nproc)` doslownie jak w config.yml. W kontenerze `nproc` podaje
-# rdzenie HOSTA, nie przydzial cgroup — dokladnie tak samo jak w CI, wiec i
+# rdzenie HOSTA, nie przydzial cgroup - dokladnie tak samo jak w CI, wiec i
 # przesubskrybowanie jest to samo. Kod wyjscia wraca po zebraniu raportu.
 run_tests() {
     step "Integration & Unit test"
@@ -396,7 +396,7 @@ INSIDE
 # ── Wyniki ───────────────────────────────────────────────────────────────────
 #
 # Odpowiednik store_test_results / store_artifacts: to, co w CI zostaje po
-# nieudanym jobie, ma zostac i tutaj — kontener zaraz znika.
+# nieudanym jobie, ma zostac i tutaj - kontener zaraz znika.
 profile_out="$out_dir/$profile"
 mkdir -p "$profile_out"
 

@@ -1,14 +1,14 @@
-# Test tree — known pitfalls
+# Test tree - known pitfalls
 
 ### Integration test file sync
 
 `test/CMakeLists.txt` copies `test/` → build dir at **cmake configure time**. After editing `.rql`, `data.txt`, or a test `.sh`:
 - Re-run cmake, **or** manually copy to `build/Debug/test/...`
-- `CTestTestfile.cmake` is CMake-generated — do NOT overwrite with `CMakeLists.txt`; different formats.
+- `CTestTestfile.cmake` is CMake-generated - do NOT overwrite with `CMakeLists.txt`; different formats.
 
 **Reconfigure (`cmake .`) wipes built unit-test binaries.** The `test/` copy step regenerates the `build/Debug/test/` subtree, deleting `test_*` binaries → ctest fails with `No such file or directory` for ~all unit tests. After any `cmake .`, rebuild with `ninja` before `ctest`.
 
-### One tree, one macro — semicolons are a trap
+### One tree, one macro - semicolons are a trap
 
 Since the `IntegrationTest_serial` / `IntegrationTest_parallel` merge, **every** integration test
 goes through the `add_test` macro in `test/IntegrationTest/CMakeLists.txt`, which re-expands
@@ -18,8 +18,8 @@ arguments via `_add_test(${ARGV})`. That splits each argument on its **internal 
 add_test(NAME t COMMAND sh -c "set -e ; a ; b")   # WRONG: shell runs only `set -e`
 ```
 
-registers a test that is always green and checks nothing. Chain with `&&`, or — when the script
-needs shell syntax that requires `;` (`if ... ; then ... ; fi`) — put it in its own `run.sh` /
+registers a test that is always green and checks nothing. Chain with `&&`, or - when the script
+needs shell syntax that requires `;` (`if ... ; then ... ; fi`) - put it in its own `run.sh` /
 `verify.sh` invoked as `COMMAND bash verify.sh`. The `harness_command_integrity` test enforces
 this: after `-c` there must be exactly one argument.
 
@@ -32,7 +32,7 @@ COMMAND bash -c "set -e && <produce out.txt> && bash ../compare.sh --ignore-eol 
 ```
 
 `cmake -E compare_files` only reports *that* the files differ. When `it_agse_array` failed on CI
-on 2026-09-04 that was the whole evidence — and the failure never reproduced locally, so there was
+on 2026-09-04 that was the whole evidence - and the failure never reproduced locally, so there was
 nothing else to go on. `compare.sh` prints a unified diff plus both file sizes, so the CI step log
 alone is enough to diagnose. `--ignore-eol` mirrors the cmake flag exactly: it ignores trailing CR
 **and** a missing final newline (`it_rotation_test`'s `count.pattern` has no trailing newline).
@@ -57,7 +57,7 @@ directory, and it is the only place that names a swallowed server-side exception
 `it_fncall_runtime_case` failed on CI on 2026-09-04 the client reported nothing but a missing
 response queue; the sentence naming the cause (`Command processor failure: …`) was written to
 `xretractor.log` in `TMPDIR` and thrown away with the container. Note that a namespace slot is
-shared by several directories, so such a log may also contain a neighbour's run — `RESOURCE_LOCK`
+shared by several directories, so such a log may also contain a neighbour's run - `RESOURCE_LOCK`
 separates them in time, not in file content.
 
 Two traps it works around, both found the hard way:
@@ -85,8 +85,8 @@ the server's reason and still carries `did not appear after`.
 `it_xqrywait_gate` guards two properties of the `-x` gate, both broken until 2026-09-04 and both
 fixed by the same change (the gate now waits on its own latch instead of borrowing `iLoopLimitCnt`).
 
-- **A command from the startup window must lift the gate.** The lock file's `PID:` line — the
-  `server_start` contract — is published well before `dataModel` is built, and the gate flag was
+- **A command from the startup window must lift the gate.** The lock file's `PID:` line - the
+  `server_start` contract - is published well before `dataModel` is built, and the gate flag was
   set only after. The window measured ~90 ms for a 120-stream plan, and a command landing in it was
   lost: the server waited for the *next* one. Reproduced 5/5.
 - **`--llimitqry` must survive the gate.** The gate flag lived in the slot-budget counter, so
@@ -94,7 +94,7 @@ fixed by the same change (the gate now waits on its own latch instead of borrowi
   forever. Deterministic, no race involved.
 
 The observable for both is the same and unambiguous: with `-m 5` a server whose gate was lifted
-exits by itself. Do **not** assert on the server's stdout instead — redirected to a file it is
+exits by itself. Do **not** assert on the server's stdout instead - redirected to a file it is
 block-buffered, and a grep will report a gate that is merely unflushed as a gate that is stuck.
 That mistake produced a false 5/5 during this investigation before it was caught.
 
@@ -104,7 +104,7 @@ cannot fail falsely, so it is repeated three times.
 A third property was added on 2026-09-06: **a stop signal must lift the gate too.** The wait was
 untimed and watched only the first-command latch, while `handleSignal` sets nothing but the loop
 counter (`notify_all` is not async-signal-safe), so nothing could interrupt it: `xretractor -x`
-that never received a command survived `SIGTERM` and needed `SIGKILL` — systemd waited out the
+that never received a command survived `SIGTERM` and needed `SIGKILL` - systemd waited out the
 whole `TimeoutStopSec`. The gate now waits in 100 ms steps and also watches `stop_now`. The test
 sends **no** command at all, and additionally asserts the storage file stays empty: a server
 stopped at the gate must not compute the ZERO-step record nobody asked for.
@@ -121,23 +121,23 @@ for good. Locally the gap is milliseconds; on a loaded CI container it exceeded 
 
 The fix has two halves that break separately, so the test has a part for each:
 
-- **The client subscribes with its first command** — `show` before `get` (`qry.cpp`), and before
+- **The client subscribes with its first command** - `show` before `get` (`qry.cpp`), and before
   `detail` on the JSON path (`jsonOutput.cpp`).
 - **The gate is lifted by a command that has been *handled*, not merely received** (`ipcServer.cpp`,
   callback `onCommandHandled`). The reorder alone is not enough: signalling on receipt let the
   processing loop past the gate before the `show` handler registered the subscriber. `subscribe()`
   runs under `plan_epoch_mutex`, the same lock a slot takes, so that residual race was decided on acquiring
-  the lock — nanoseconds, and unorderable by hand.
+  the lock - nanoseconds, and unorderable by hand.
 
 Neither window can be opened with a clock, so each part widens its own through a fault hook, the
 same route as `RDB_FAULT_PLAN_SWAP_DELAY`: `RDB_FAULT_GET_AWAIT_EPOCH_SWAP` for the client half and
-`RDB_FAULT_SHOW_DELAY` (a sleep at the top of `commandProcessor`, *before* the epoch lock is taken —
+`RDB_FAULT_SHOW_DELAY` (a sleep at the top of `commandProcessor`, *before* the epoch lock is taken -
 inside it, the sleep would stall the slot and hide the very window under test) for the server half.
 A timing probe would be worthless here: it would measure whether the window closed in time, not
 whether it is gone.
 
 What this test does **not** cover: the gate is still lifted by *any* command, including someone
-else's (`hello` from a neighbouring `xqry -l`) — that is the contract `it_xqrywait_gate` pins. A
+else's (`hello` from a neighbouring `xqry -l`) - that is the contract `it_xqrywait_gate` pins. A
 server whose gate was lifted by another process computes without a subscriber and its rows are lost
 exactly as before. The fix covers the case where the client is first, which is all fourteen
 `-x` + `ONESHOT` tests in this tree.
@@ -149,7 +149,7 @@ bus slot holds **exactly one** reservation; `resetCommit` took it at *accept* ti
 request flag was cleared at the *start* of `applyPendingPlan`, ~60 lines before
 `activateReservedPlan`. A reload accepted inside that window overwrote the reservation of the plan
 then being installed: the outgoing plan activated a foreign reservation (advertising streams it
-does not compute) and the next epoch found nothing to activate — `FatalError`, which under
+does not compute) and the next epoch found nothing to activate - `FatalError`, which under
 `--service` also clears the query file, so the unit came back **with no plan**. Two operators
 running `xqry --reset` at once were enough.
 
@@ -157,7 +157,7 @@ Racing it by hand cost a stagger sweep (one hit in fourteen), so the window is o
 `RDB_FAULT_PLAN_SWAP_DELAY` hook, the same route as `RDB_FAULT_GET_AWAIT_EPOCH_SWAP`. The test
 checks four things, because the fix has two sides that break separately: a reload sent before the
 swap starts is refused, one sent **inside** the window is refused (the regression proper), the
-server survives and the accepted plan really took over, and — the mirror defect — a reload sent
+server survives and the accepted plan really took over, and - the mirror defect - a reload sent
 **after** the swap is accepted again. Without that last check, a "refuse always" fix would pass.
 
 ### Namespaces
@@ -174,7 +174,7 @@ ninja && ninja install && cmake . && ninja && ctest
 
 One directory is deliberately exempt: `service_idle` gets `$<TARGET_FILE:xretractor>` as its first
 script argument and never calls `xretractor` from `PATH`. Its three tests assert service-mode INFO
-markers, which `SPDLOG_ACTIVE_LEVEL` strips in Release — so a Release copy left in `~/.local/bin`
+markers, which `SPDLOG_ACTIVE_LEVEL` strips in Release - so a Release copy left in `~/.local/bin`
 (a build of ablation profiles is enough) made them fail with an empty `stderr.txt`, and the symptom
 read as an engine regression. Everything else in the tree still uses the installed binary.
 

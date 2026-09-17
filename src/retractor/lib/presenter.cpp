@@ -368,7 +368,7 @@ void presenter::onlyCompileShowProgram() {
     // Ogon zapytania: ile początkowych slotów nie ma jeszcze zdefiniowanego wyniku. Raportowany
     // tylko gdy niezerowy, żeby listing planów bez opóźnienia pozostał niezmieniony.
     if (q.startupLatency > 0) std::cout << "\ttail=" << q.startupLatency;
-    // Origin: indeks pierwszego istniejącego rekordu. Ta sama zasada raportowania co dla ogona —
+    // Origin: indeks pierwszego istniejącego rekordu. Ta sama zasada raportowania co dla ogona -
     // tylko gdy niezerowy, żeby plany bez okien wyglądały jak dotąd.
     if (q.logicalOrigin > 0) std::cout << "\torigin=" << q.logicalOrigin;
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
@@ -389,7 +389,7 @@ void presenter::onlyCompileShowProgram() {
       std::cout << f.field_.rname << ": " << GetStringdescFld(f.field_.rtype);
       std::cout << '\n';
       // Agregat okna rekordowego niesie numer swojej grupy (query::windowGroups), a kilka
-      // agregatow o jednym ksztalcie dzieli jedna grupe — bez tej liczby nie widac w planie,
+      // agregatow o jednym ksztalcie dzieli jedna grupe - bez tej liczby nie widac w planie,
       // ktore pola czytaja to samo okno.
       for (auto tf : f.lProgram)
         if ((tf.getStrCommandID() == "PUSH_ID") || (tf.getStrCommandID() == "CALL") || (tf.getStrCommandID() == "CALL2") ||
@@ -399,7 +399,7 @@ void presenter::onlyCompileShowProgram() {
           std::cout << "\t\t" << tf.getStrCommandID() << '\n';
     }
 
-    // Tabela grup okna. Bez niej `WINDOW_MIN(0)` nie mowi, PO CZYM idzie okno — a od
+    // Tabela grup okna. Bez niej `WINDOW_MIN(0)` nie mowi, PO CZYM idzie okno - a od
     // 2026-08-31 argumentem moze byc cale wyrazenie, ktore w programie pola juz nie stoi:
     // resolveWindowAggregates() przenosi je tutaj. Wypisujemy wylacznie zapytania, ktore okna
     // maja, wiec zrzut planu bez okien jest bajtowo taki sam jak przedtem.

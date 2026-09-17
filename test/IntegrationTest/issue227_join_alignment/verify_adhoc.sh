@@ -54,7 +54,7 @@ xqry -a 'SELECT * STREAM late_right FROM late_hash%0.1'
 # Budzet slotow nie moze byc jedynym warunkiem konca przebiegu. Strumienie rejestruja sie
 # po kolei, wiec ostatni z nich zbiera najmniej rekordow, a jego udzial zalezy od tego, ile
 # czasu zabraly poprzednie wywolania xqry. Na obciazonym CI late_right dostal dokladnie
-# jeden rekord, a sprawdzenie ciagu potrzebuje co najmniej dwoch — test oblewal wtedy nie
+# jeden rekord, a sprawdzenie ciagu potrzebuje co najmniej dwoch - test oblewal wtedy nie
 # z powodu bledu silnika, tylko wyscigu z zegarem. Czekamy zatem na dane, ktore test
 # faktycznie bada, i dopiero wtedy zatrzymujemy serwer; `-m 150` zostaje jako gorna granica
 # przebiegu (zrodlo ma 200 rekordow, wiec nie zdazy sie zawinac).

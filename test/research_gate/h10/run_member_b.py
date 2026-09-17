@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""K24d — kontrola członu (b) H10 na silniku po naprawach 3d i 3c.
+"""K24d - kontrola członu (b) H10 na silniku po naprawach 3d i 3c.
 
 Pochodzi z kampanii K24b. Populacja twierdzenia,
 progi i predeklarowana postać rozjazdu są **bez zmian**; zmienił się wyłącznie
-oracle (origin jako osobna wielkość) oraz reguła lokalna A — jej definicja
+oracle (origin jako osobna wielkość) oraz reguła lokalna A - jej definicja
 mieszka od 2026-09-12 w `run_campaign.local_rule_a` i jest tu importowana,
 a nie przepisywana.
 
@@ -14,10 +14,10 @@ z predeklaracji §2) z **prawdziwym ogonem** z modelu zdarzeniowego (oracle),
 na całym korpusie i w populacji twierdzenia.
 
 Kryteria (zamrożone w kampanii K24b, §4):
-  1. próg gęstości  — rozjazd w >= 5% planów korpusu;
-  2. postać         — deficyt == ceil((p+q-1)/p) w 100% populacji twierdzenia;
-  3. dodatniość     — deficyt ostro dodatni w 100% populacji.
-Kontrole negatywne — zero rozjazdu w planach bez `#` oraz w HC_SINGLE
+  1. próg gęstości  - rozjazd w >= 5% planów korpusu;
+  2. postać         - deficyt == ceil((p+q-1)/p) w 100% populacji twierdzenia;
+  3. dodatniość     - deficyt ostro dodatni w 100% populacji.
+Kontrole negatywne - zero rozjazdu w planach bez `#` oraz w HC_SINGLE
 ograniczonym do operatorów bez własnego ogona.
 """
 
@@ -36,16 +36,16 @@ from plan import (AGSE, HASH, NTHETA, PASS, REDUCE, SHIFT, SOURCE, SUB,  # noqa:
                   THETA)
 from run_campaign import local_rule_a  # noqa: E402
 
-# Operatory pozbawione własnego ogona — jedyne, w których reguła lokalna
+# Operatory pozbawione własnego ogona - jedyne, w których reguła lokalna
 # z definicji nie może się rozjechać. `@` i `-` własny ogon mają, więc dosłowna
 # kontrola HC_SINGLE z K24 pękała na nich (defekt kontroli, nie wynik).
 PHASE_FREE = (PASS, SHIFT, REDUCE)
 
 # Reguła lokalna A jest IMPORTOWANA, nie przepisana. Do 2026-09-12 ten plik
-# niósł własną kopię, identyczną co do znaku z kopią w `run_campaign.py` —
+# niósł własną kopię, identyczną co do znaku z kopią w `run_campaign.py` -
 # aż do dnia, w którym poprawka `>N` (człon `max(0, Wsrc - N)`) trafiła tylko
 # do jednej z nich. Rozjazd nie zmienił wtedy żadnej liczby, bo w planach
-# czysto fazowych każdy `>N` ma `Wsrc = 0`, więc człon jest nieaktywny — i to
+# czysto fazowych każdy `>N` ma `Wsrc = 0`, więc człon jest nieaktywny - i to
 # jest dokładnie ten rodzaj rozjazdu, który daje o sobie znać dopiero wtedy,
 # gdy już coś zepsuł. Precedens w tym projekcie jest zapisany: predeklaracja
 # K26v3 §6, serializer kanoniczny, dwa opisy tej samej rzeczy.

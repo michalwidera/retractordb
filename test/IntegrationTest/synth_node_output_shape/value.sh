@@ -32,14 +32,14 @@ check() {
   done
 }
 
-# B — do 2026-09-14: w = 2 2, av = 1 3 1, mx = 2 2.
+# B - do 2026-09-14: w = 2 2, av = 1 3 1, mx = 2 2.
 check w tf4 2 "2.5 2.5"
 check ws tf4 2 "2.5 2.5"
 check av td4 6 "3 2 3 1 3 2"
 check avs td4 2 "3 2"
 check mx tf4 2 "2.5 2.5"
-# C — do 2026-09-14: sb = 1705032705/2 (przepelniony rational<int>), st = 1/3.
+# C - do 2026-09-14: sb = 1705032705/2 (przepelniony rational<int>), st = 1/3.
 check sb tf8 1 "3000000000.5"
 check st tf8 1 "$(awk 'BEGIN { printf "%.17g", 0.333333333333 }')"
-# D — do 2026-09-14: acc = 2.5 5 7.
+# D - do 2026-09-14: acc = 2.5 5 7.
 check acc tf4 3 "2.5 5 7.5"

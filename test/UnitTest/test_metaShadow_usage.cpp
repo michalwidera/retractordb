@@ -60,7 +60,7 @@ TEST_F(ShadowUsageFixture, scenariusz_nadpisanie_widoczne) {
 }
 
 // ---------------------------------------------------------------------------
-// Scenariusz 3: Wielokrotne nadpisania tej samej pozycji — ostatnie wygrywa.
+// Scenariusz 3: Wielokrotne nadpisania tej samej pozycji - ostatnie wygrywa.
 // ---------------------------------------------------------------------------
 TEST_F(ShadowUsageFixture, scenariusz_ostatnie_nadpisanie_wygrywa) {
   rdb::metaShadow shadow(descriptor, file);
@@ -75,7 +75,7 @@ TEST_F(ShadowUsageFixture, scenariusz_ostatnie_nadpisanie_wygrywa) {
 }
 
 // ---------------------------------------------------------------------------
-// Scenariusz 4: Persystencja — nowa instancja odczytuje nadpisania z pliku cienia po load().
+// Scenariusz 4: Persystencja - nowa instancja odczytuje nadpisania z pliku cienia po load().
 // ---------------------------------------------------------------------------
 TEST_F(ShadowUsageFixture, scenariusz_persystencja_po_restarcie) {
   {

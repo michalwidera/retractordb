@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bramka postaci fazowych `-`, `Theta` i `~Theta` — przemiatanie poza korpusem.
+"""Bramka postaci fazowych `-`, `Theta` i `~Theta` - przemiatanie poza korpusem.
 
 Kampania K24e zmierzyła te trzy klasy na 10 010 losowych planach i zastała je
 dokładne. Korpus losowy ma jednak wąski zakres: mianownik zredukowanego ilorazu
@@ -9,13 +9,13 @@ silnik wprost.
 
 Trzy rzeczy sprawdzane per przypadek:
 
-  1. ogon silnika == ogon modelu zdarzeniowego (konwencja C1) — dokładność;
-  2. ogon silnika >= ogon modelu — osobno, bo ZANIŻENIE jest defektem
+  1. ogon silnika == ogon modelu zdarzeniowego (konwencja C1) - dokładność;
+  2. ogon silnika >= ogon modelu - osobno, bo ZANIŻENIE jest defektem
      poprawności, a zawyżenie tylko utratą dokładności; komunikat ma je
      rozróżniać nawet wtedy, gdy oba oblewają ten sam warunek;
   3. moc detekcyjna: dawna reguła każdej z trzech klas (sprzed 2026-08-18) musi
      dla części przypadków dawać INNY wynik niż model. Bez tego przemiatanie
-     przechodziłoby także dla silnika, który niczego nie naprawił — a wtedy nie
+     przechodziłoby także dla silnika, który niczego nie naprawił - a wtedy nie
      strzeże niczego.
 
 Model zdarzeniowy jest tu jedynym źródłem prawdy; postać zamknięta silnika NIE
@@ -36,7 +36,7 @@ import model as M  # noqa: E402
 import plan as P  # noqa: E402
 
 # Zakres przemiatania. Korpus kampanijny sięga q <= 5; tutaj idziemy do 12, co
-# przy trzech klasach i trzech ogonach składowej daje kilkaset kompilacji —
+# przy trzech klasach i trzech ogonach składowej daje kilkaset kompilacji -
 # bramka ma być sekundowa, nie godzinna.
 Q_MAX = 12
 SOURCE_TAILS = (0, 1, 3)
@@ -46,7 +46,7 @@ def _cases():
     """Plany jednowęzłowe i dwuwęzłowe o systematycznie rosnącym `q`.
 
     Ogon składowej wprowadzamy przez `#` nad dwiema deklaracjami, bo tylko tak
-    da się go dostać BEZ użycia naprawianych klas — inaczej przypadek testowałby
+    da się go dostać BEZ użycia naprawianych klas - inaczej przypadek testowałby
     regułę samą sobą.
     """
     for q in range(1, Q_MAX + 1):
@@ -77,7 +77,7 @@ def _cases():
 
 
 def _legacy_tail(node, child, source_tail):
-    """Reguła sprzed 2026-08-18 — wyłącznie do pomiaru mocy detekcyjnej."""
+    """Reguła sprzed 2026-08-18 - wyłącznie do pomiaru mocy detekcyjnej."""
     generic = 0 if source_tail <= 0 else -((-source_tail * child.delta) // node.delta)
     generic = int(generic)
     if node.kind == P.THETA:
@@ -103,7 +103,7 @@ def main(argv):
         try:
             dump, _ = E.compile_plan(P.to_rql(plan), binary, workdir)
         except E.EngineError as exc:
-            mismatches.append(f"{label}: silnik nie skompilował planu — {exc}")
+            mismatches.append(f"{label}: silnik nie skompilował planu - {exc}")
             continue
         engine_plan = E.parse_plan(dump)
         oracle = {item.name: item.tail for item in M.evaluate(plan, convention=M.C1)}
@@ -118,9 +118,9 @@ def main(argv):
         expected = oracle[node.name]
         checked += 1
         if tail < expected:
-            understated.append(f"{label}: ZANIŻENIE — silnik {tail}, model {expected}")
+            understated.append(f"{label}: ZANIŻENIE - silnik {tail}, model {expected}")
         elif tail != expected:
-            mismatches.append(f"{label}: zawyżenie — silnik {tail}, model {expected}")
+            mismatches.append(f"{label}: zawyżenie - silnik {tail}, model {expected}")
         if _legacy_tail(node, child, 0) != expected:
             witnesses += 1
 
@@ -130,7 +130,7 @@ def main(argv):
     print(f"świadków mocy detekcyjnej (dawna reguła != model): {witnesses}")
 
     if witnesses == 0:
-        print("BRAMKA POSTACI FAZOWYCH: BŁĄD APARATURY — zerowa moc detekcyjna")
+        print("BRAMKA POSTACI FAZOWYCH: BŁĄD APARATURY - zerowa moc detekcyjna")
         return 2
     ok = not understated and not mismatches
     print("BRAMKA POSTACI FAZOWYCH: " + ("PRZESZŁA" if ok else "NIE PRZESZŁA"))

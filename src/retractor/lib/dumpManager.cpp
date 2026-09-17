@@ -72,8 +72,8 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
   // Pojemnosc ksiegi to liczba zadan JEDNOCZESNIE w locie na tym strumieniu, wiec musi
   // wystarczyc najbardziej wymagajacej regule. Do 2026-09-05 ustawialo ja wylacznie zadanie
   // pierwsze ("capacity() == 0"), czyli ta regula, ktora akurat odpalila najwczesniej: przy
-  // regule bez RETENTION ksiega miala pojemnosc 1 i kazde nastepne zadanie — takze cudze,
-  // z wlasnym RETENTION — wypychalo poprzednie, zamykajac mu deskryptor i ucinajac zrzut.
+  // regule bez RETENTION ksiega miala pojemnosc 1 i kazde nastepne zadanie - takze cudze,
+  // z wlasnym RETENTION - wypychalo poprzednie, zamykajac mu deskryptor i ucinajac zrzut.
   // Rosniemy, nigdy nie zwezamy: zwezenie skasowaloby zadania juz przyjete.
   const size_t requiredBookSize = task.retentionSize > 0 ? task.retentionSize : 1;
   if (bookOfTasks[streamName].capacity() < requiredBookSize) {

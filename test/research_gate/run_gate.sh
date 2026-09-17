@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bramka badawcza — czy biezacy silnik nadal przechodzi bramki mechanizmowe
+# Bramka badawcza - czy biezacy silnik nadal przechodzi bramki mechanizmowe
 # hipotez H9 i H10.
 #
 # NIE jest to powtorzenie kampanii i NIE potwierdza hipotez. Patrz README.md,
@@ -10,7 +10,7 @@
 #                 [--only h9|h10] [--profiles <katalog buildow ablacji>] [--strict]
 #
 # --strict: poziom POMINIETY konczy przebieg bledem. Pominiecie znaczy "nie
-# uruchomiono", nigdy "zaliczono" — bez tej opcji przebieg bez profili ablacji
+# uruchomiono", nigdy "zaliczono" - bez tej opcji przebieg bez profili ablacji
 # konczy sie kodem 0 i w CI wygladalby na zaliczona bramke. Praca lokalna
 # domyslnie pominiecie dopuszcza, CI nigdy.
 #
@@ -40,7 +40,7 @@ src_fingerprint() { # src_fingerprint <repozytorium> -> odcisk na stdout
   local repo="$1" list hashes
   list="$(git -C "$repo" ls-files -c -o --exclude-standard -- src 2>/dev/null | LC_ALL=C sort -u)" || return 1
   [[ -n "$list" ]] || return 1
-  # Plik sledzony, ale usuniety z dysku, przewraca `hash-object` — i slusznie:
+  # Plik sledzony, ale usuniety z dysku, przewraca `hash-object` - i slusznie:
   # nieobliczalny odcisk ma znaczyc "nieswiezy", nigdy "swiezy".
   hashes="$(printf '%s\n' "$list" | git -C "$repo" hash-object --stdin-paths 2>/dev/null)" || return 1
   printf '%s\n%s\n' "$list" "$hashes" | sha256sum | awk '{print $1}'
@@ -165,12 +165,12 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
   # resolve_binary(None) z oracle/engine.py: DEFAULT_BINARY wskazuje tam sciezke
   # z repozytorium eksperymentu, nieistniejaca w tym drzewie, wiec zostaje
   # fallback na `xretractor` z PATH. Na CI nie ma go wcale (job bramki nie robi
-  # `ninja install`) i poziom oblewa; lokalnie jest, wiec poziom przechodzi —
+  # `ninja install`) i poziom oblewa; lokalnie jest, wiec poziom przechodzi -
   # tyle ze sprawdzajac ZAINSTALOWANA binarke, a nie te, ktora bada reszta bramki.
   step "H10 test_closedform" python3 tests/test_closedform.py "$XRETRACTOR"
 
   # Postacie fazowe `-`, `Theta` i `~Theta` (K24/H10, 2026-08-18). Osobny poziom,
-  # bo korpus losowy siega q <= 5, a twierdzenie dotyczy kazdego q — przemiatanie
+  # bo korpus losowy siega q <= 5, a twierdzenie dotyczy kazdego q - przemiatanie
   # pyta silnik wprost dla q do 12. Poziom niesie wlasna kontrole mocy: jesli dawna
   # regula nie roznilaby sie od modelu w zadnym przypadku, konczy sie kodem 2.
   step "H10 test_phase_forms" python3 tests/test_phase_forms.py "$XRETRACTOR"
@@ -178,7 +178,7 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
   # Wymiarowanie przebiegu end-to-end (`execute.horizon_of`, `execute.wakeup_budget`).
   # Aparatura, nie hipoteza: przebieg wymierzony za krotko daje artefakt bez
   # rekordow, a skrypty czytaja brak rekordow jako rozbieznosc tresci albo objaw
-  # niedomiaru pojemnosci — czyli jako wynik o silniku. Tak wlasnie zatrzymal sie
+  # niedomiaru pojemnosci - czyli jako wynik o silniku. Tak wlasnie zatrzymal sie
   # poziom bramki odwzorowania w K24f. Poziom niesie wlasna kontrole mocy: jesli
   # wymiarowanie sprzed naprawy wystarcza na kazdym jego planie, konczy sie kodem 2.
   step "H10 test_sizing" python3 tests/test_sizing.py "$XRETRACTOR"
@@ -196,13 +196,13 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
     # Kampania przerwana w polowie zostawia CSV z samym naglowkiem. `-s` taki plik
     # przepuszcza, bo nie jest pusty, a `verdict.py` konczy sie na nim kodem 0
     # i zapisuje werdykt "0 planow, zero bledow aparatury" z pusta tabela rezimow.
-    # Dopiero `compare_regimes.py` sie o to przewraca — kodem 2, wiec komunikat
+    # Dopiero `compare_regimes.py` sie o to przewraca - kodem 2, wiec komunikat
     # bramki wskazywal na odczyt werdyktu zamiast na kampanie, a w katalogu
     # dowodowym zostawal werdykt orzekajacy o zerze obserwacji. Warunkiem jest
     # wiersz obserwacji, nie niepusty plik.
     rows="$(tail -n +2 "$WORK/h10_$seed.csv" 2>/dev/null | grep -c .)"
     if [[ "${rows:-0}" -lt 1 ]]; then
-      fail "H10 kampania $label — CSV bez ani jednego wiersza obserwacji (sam naglowek)"
+      fail "H10 kampania $label - CSV bez ani jednego wiersza obserwacji (sam naglowek)"
       continue
     fi
 
@@ -210,10 +210,10 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
         --out "$WORK/h10_VERDICT_$seed.md" --seed "$seed" --engine "$ENGINE_SHA"
     # Brak werdyktu przerywa te iteracje, ale nie wolno mu jej WYCISZYC: samo
     # `continue` kasowalo poziom "H10 rezimy" z listy, wiec przebieg konczyl sie
-    # bez ani jednego sladu po nim — ani oblany, ani pominiety. Werdykt okrojony,
+    # bez ani jednego sladu po nim - ani oblany, ani pominiety. Werdykt okrojony,
     # a nie brakujacy, lapie dalej `compare_regimes.py` kodem 2.
     if [[ ! -s "$WORK/h10_VERDICT_$seed.md" ]]; then
-      fail "H10 rezimy $label — brak werdyktu do porownania"
+      fail "H10 rezimy $label - brak werdyktu do porownania"
       continue
     fi
 
@@ -226,12 +226,12 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h10" ]]; then
     printf '%s\n' "$out" | grep -E 'POPRAWA|REGRESJA|DEFEKT|BLAD|dokladne' | sed 's/^ */        /'
     case "$rc" in
       0) if printf '%s' "$out" | grep -q POPRAWA; then
-           pass "H10 rezimy $label — bez regresji, z POPRAWA (kierunek rozwoju)"
+           pass "H10 rezimy $label - bez regresji, z POPRAWA (kierunek rozwoju)"
          else
            pass "H10 rezimy $label zgodne z odniesieniem"
          fi ;;
-      1) fail "H10 rezimy $label — REGRESJA dokladnosci" ;;
-      *) fail "H10 rezimy $label — blad odczytu werdyktu (kod $rc)" ;;
+      1) fail "H10 rezimy $label - REGRESJA dokladnosci" ;;
+      *) fail "H10 rezimy $label - blad odczytu werdyktu (kod $rc)" ;;
     esac
   done
 fi
@@ -246,35 +246,35 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
   step "H9 samotest procedury decyzyjnej" python3 verdict.py --selftest
   step "H9 tablica mechanizmu (znana odpowiedz)" python3 mechanism_table.py --gate
 
-  # Poziom 2 — 84 kompilacje na czterech profilach ablacji. Wymaga zbudowanych
+  # Poziom 2 - 84 kompilacje na czterech profilach ablacji. Wymaga zbudowanych
   # profili, bo bez nich nie da sie odroznic R1 od R2.
   if [[ -n "$PROFILES" ]]; then
     # Binarka nie niesie SHA zrodla (`--build-info` podaje tylko flagi), wiec
     # swiezosc rozstrzyga odcisk tresci src/ zapisany przy budowie profilu
     # (build_profiles.sh -> $STAMP). Profil zbudowany z innej tresci orzekalby
-    # o innej rewizji niz badana — to falszywa zielen. Kierunek bledu jest
+    # o innej rewizji niz badana - to falszywa zielen. Kierunek bledu jest
     # jednostronny: cokolwiek nie da sie potwierdzic, jest NIESWIEZE.
     h9_profiles_ready=0
     if check_h9_profiles; then
       h9_profiles_ready=1
     elif [[ "$H9_PROFILE_REBUILD" -eq 1 ]]; then
-      echo "  ODTWARZANIE H9 profili — $H9_PROFILE_PROBLEM"
+      echo "  ODTWARZANIE H9 profili - $H9_PROFILE_PROBLEM"
       if RDB_CODE_REPO="$CODE_REPO" "$HERE/h9/build_profiles.sh"; then
         if check_h9_profiles; then
           h9_profiles_ready=1
         else
-          fail "H9 profile po przebudowie — $H9_PROFILE_PROBLEM"
+          fail "H9 profile po przebudowie - $H9_PROFILE_PROBLEM"
         fi
       else
-        fail "H9 przebudowa profili — $H9_PROFILE_PROBLEM"
+        fail "H9 przebudowa profili - $H9_PROFILE_PROBLEM"
       fi
     else
-      skip "H9 84/84 kompilacji — $H9_PROFILE_PROBLEM" "h9-profile-stale"
+      skip "H9 84/84 kompilacji - $H9_PROFILE_PROBLEM" "h9-profile-stale"
       echo "        Wymaga: $HERE/h9/build_profiles.sh"
     fi
 
     if [[ "$h9_profiles_ready" -eq 1 ]]; then
-      # Na brudnym drzewie poziom nadal sie wykonuje — bramka chroni rozwoj,
+      # Na brudnym drzewie poziom nadal sie wykonuje - bramka chroni rozwoj,
       # a podczas rozwoju drzewo jest brudne. Dowod dostaje wtedy SHA z sufiksem
       # `-dirty` i nie jest dowodem proweniencji.
       dirty_args=()
@@ -284,7 +284,7 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
       # odmowa ma zostac: dowod kampanii nie moze zniknac pod kolejnym
       # przebiegiem. Tyle ze bramka podaje jej stala sciezke w `$WORK`, czyli
       # w katalogu roboczym w drzewie buildu, wiec drugi `ninja test_gate` z rzedu
-      # oblewal na aparaturze, nie na silniku — a przy pracy nad `src/` drugi
+      # oblewal na aparaturze, nie na silniku - a przy pracy nad `src/` drugi
       # przebieg jest regula, nie wyjatkiem. Bramka sprzata WLASNY poprzedni
       # dowod, rozpoznany po jego wlasnym ukladzie (manifest + tabela wynikow).
       # Katalog o innej zawartosci nie jest kasowany: to albo cudzy dowod, albo
@@ -296,7 +296,7 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
           rm -rf "$evidence"
         else
           evidence_ready=0
-          fail "H9 84/84 kompilacji — $evidence istnieje i nie ma ukladu dowodu tej bramki"
+          fail "H9 84/84 kompilacji - $evidence istnieje i nie ma ukladu dowodu tej bramki"
           echo "        Obejrzyj go i usun recznie, jesli jest do wyrzucenia."
         fi
       fi
@@ -333,9 +333,9 @@ fi
 cat <<'EOF'
 
  Czego ta bramka NIE sprawdzila, niezaleznie od wyniku:
-   * progu czasowego H9 (redukcja >=40%, gorna granica CI <=1,05) — wymaga
+   * progu czasowego H9 (redukcja >=40%, gorna granica CI <=1,05) - wymaga
      1440 komorek na przypietym pi400 pod PREEMPT_RT, ok. 48 h;
-   * bramki oracle_values H9 wobec Flinka — wymaga Flink 2.3.0 i JDK 17;
+   * bramki oracle_values H9 wobec Flinka - wymaga Flink 2.3.0 i JDK 17;
    * niczego, co czynilo kampanie dowodem: predeklaracji, zamrozenia,
      jednokrotnego uruchomienia procedury decyzyjnej.
  Zielona bramka znaczy "mechanizm nadal dziala tak samo", nie "hipoteza

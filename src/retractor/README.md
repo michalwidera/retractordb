@@ -47,11 +47,11 @@ xretractor can run as a Linux systemd service without any wrapper/supervisor pro
 It runs in the foreground (`Type=simple`) and shuts down cleanly on `SIGTERM`.
 
 Relevant options:
-- `-j` / `--service` — service mode: log to **stderr** (captured by journald), with no per-process log file.
-- `-k` / `--noanykey` — ignore key presses from an attached terminal. Input is
+- `-j` / `--service` - service mode: log to **stderr** (captured by journald), with no per-process log file.
+- `-k` / `--noanykey` - ignore key presses from an attached terminal. Input is
   ignored automatically when stdin is not a TTY; the packaged service still
   passes this option explicitly.
-- starting **without** a query file — or with a file that carries no statements at all — boots an
+- starting **without** a query file - or with a file that carries no statements at all - boots an
   **idle** instance that stays alive until `SIGTERM` (no crash-loop before any query is defined);
   pass a `.rql` file with statements to load queries at start-up, or send one later with
   `xqry --reset` (below).
@@ -76,7 +76,7 @@ only one service instance is allowed
 ### Reloading the whole plan without a restart
 
 `xqry --reset <file.rql> --server service` replaces the entire plan of a running instance,
-including an instance that is still idle — that is how a service started at boot with no queries
+including an instance that is still idle - that is how a service started at boot with no queries
 gets its first plan. The set is validated (parse, compile, stream-name disjointness against other
 live instances) **before** the running plan is touched, so a refusal costs nothing. A file with no
 statements returns the instance to the idle state. Details and examples: [xqry](../qry/README.md).
@@ -108,7 +108,7 @@ own, it does not fail with a lock error. Instead it:
 1. detects that the running instance is a systemd unit (and whether it is a
    `system` or `--user` unit),
 2. compiles the new query set locally to validate it (a parse/compile error stops
-   here — nothing is delivered),
+   here - nothing is delivered),
 3. overwrites the service's query file with the validated set (atomically), and
 4. restarts the unit (`systemctl restart` / `systemctl --user restart`), so the
    service reloads the new queries while keeping its unit configuration.
@@ -125,7 +125,7 @@ Notes:
   running service. Use it when you want the service **restarted** on the new set; use
   `xqry --reset` when you want the plan swapped in place, without a restart and without
   `systemctl` privileges.
-- Both are paths for a **full** query set (rules, `:STORAGE`, `:SUBSTRAT`, rotation) — unlike the
+- Both are paths for a **full** query set (rules, `:STORAGE`, `:SUBSTRAT`, rotation) - unlike the
   lightweight, transient ad-hoc injection over IPC (`xqry --adhoc`), which only accepts a single
   `SELECT`, `DECLARE` or `RULE`. An ad-hoc `RULE` may use `DO DUMP`; `DO SYSTEM` is rejected over
   IPC.
@@ -134,12 +134,12 @@ Notes:
 - **An explicitly requested identity wins over delivery.** `xretractor plan.rql --name foo`
   (likewise `--autoname` or `[server] autoname = true`) starts a **separate instance** next to
   the service; the service's query file is not touched and its unit is not restarted. `--name
-  service` — the name the service itself carries — still means "target that service" and
+  service` - the name the service itself carries - still means "target that service" and
   delivers. Such a separate instance may not claim a stream name or rotation counter the live
   service holds: that is a normal conflict (`device_or_resource_busy`), because the two are meant
   to run side by side. Starting a second instance in **service mode** stays refused regardless of
   its name (see *One service, one name*).
-- Restarting a **system** unit needs privileges — run with `sudo` if `systemctl
+- Restarting a **system** unit needs privileges - run with `sudo` if `systemctl
   restart` is denied; a `--user` unit restarts without root.
 - Which file is overwritten: the service reports its own query file in the lock
   file; if that is unavailable, the `[service] query_file` config default is used.
@@ -159,7 +159,7 @@ The `.deb` produced by `scripts/buildrdb.sh package` ships the unit and wires it
   xretractor loads that path automatically at startup,
 - the `postinst` maintainer script creates the system user `retractor` and runs
   `systemctl enable xretractor.service` (the service starts on next boot; it is **not**
-  started immediately — use `systemctl start xretractor` to start it now),
+  started immediately - use `systemctl start xretractor` to start it now),
 - `postrm` disables the unit on package removal.
 
 The unit is generated from the template
@@ -257,7 +257,7 @@ If any of those checks fail, xretractor reports a configuration error and stops.
   - Explicit `--name` wins over this key, silently.
   - Default `false` keeps the historical single-instance identity: empty name, lock file and
     IPC objects without a suffix, reported by `xqry --bus` as `(unnamed)`.
-  - The generated name is random, so it differs after every restart — it identifies a running
+  - The generated name is random, so it differs after every restart - it identifies a running
     instance, not a durable service.
 
 #### [service]
@@ -266,7 +266,7 @@ If any of those checks fail, xretractor reports a configuration error and stops.
   - Query file overwritten when delivering a set to a running service
     (see "Delivering a query set to a running service").
   - Fallback only: normally the running service reports its own query file in the lock.
-  - Must match the unit's `ExecStart` argument — this key does **not** change `ExecStart`.
+  - Must match the unit's `ExecStart` argument - this key does **not** change `ExecStart`.
 
 ### Example configuration
 

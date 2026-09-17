@@ -36,17 +36,17 @@ void requireResolvedForEveryNode(const qTree &plan, const std::map<std::string, 
   // Reguła: kompilator nie wypuszcza planu z węzłem, dla którego nie policzył origin albo ogona.
   //
   // Do 2026-08-07 stało tu SPDLOG_WARN i `continue`. Ponieważ query::logicalOrigin
-  // i query::startupLatency mają wartość domyślną 0, węzeł pominięty dostawał ZERO — czyli
+  // i query::startupLatency mają wartość domyślną 0, węzeł pominięty dostawał ZERO - czyli
   // najgroźniejszą z możliwych wartości: nie ma w niej ani niedefiniowalności, ani oczekiwania.
   // To jest dokładnie reżim ZANIŻAJĄCY, który tabela dokładności ogona wyklucza dla wszystkich
   // dziewięciu klas operatorów. Ostrzeżenie szło przy tym do logu, którego ctest nie czyta,
   // więc plan degradował po cichu.
   //
   // Że to błąd, a nie stan dopuszczalny, wynika z kształtu programu klauzuli FROM: ma on 1, 2
-  // albo 3 tokeny i ZAWSZE zaczyna się od PUSH_STREAM — każdy inny kształt zatrzymuje wcześniej
+  // albo 3 tokeny i ZAWSZE zaczyna się od PUSH_STREAM - każdy inny kształt zatrzymuje wcześniej
   // compiler::resolveStreamIntervals(). Deklaracje i dyrektywy kompilatora są zaszczepiane
   // zerem przed pętlą. Nie ma więc legalnego planu, który zostawia węzeł nierozwiązany;
-  // jeżeli tak się stanie, jest to defekt kompilatora — awaria aparatury, nie wynik.
+  // jeżeli tak się stanie, jest to defekt kompilatora - awaria aparatury, nie wynik.
   for (const auto &q : plan)
     if (!resolved.contains(q.id)) FatalError("{}: unresolved {} for '{}'", pass, quantity, q.id);
 }
@@ -57,7 +57,7 @@ namespace {
 /// Wzory operatorów mnożą licznik przez licznik i mianownik przez mianownik
 /// ((D_a*D_b)/(D_a+D_b) dla przeplotu, (D_a*D_b)/|D_a-D_b| dla rozplotu), więc
 /// dla interwałów o licznikach rzędu 10^4 iloczyn wychodzi poza int.
-/// boost::rational<int> nie wykrywa przepełnienia — wynik jest wtedy cichym
+/// boost::rational<int> nie wykrywa przepełnienia - wynik jest wtedy cichym
 /// śmieciem, który ujawnia się dopiero jako niezwiązany błąd walidacji planu
 /// ("You cannot make faster div from slower source"). Liczymy więc w 64 bitach
 /// i sprawdzamy, czy wynik daje się w ogóle zapisać w typie interwału.
@@ -71,7 +71,7 @@ boost::rational<int> narrowInterval(const wideRational &value, const std::string
   constexpr std::int64_t limit = std::numeric_limits<int>::max();
   if (value.numerator() > limit || value.numerator() < std::numeric_limits<int>::min() || value.denominator() > limit) {
     SPDLOG_ERROR("compiler: interval {} of stream '{}' ({}) is out of representable range", value, id, formula);
-    throw std::out_of_range("Stream interval out of representable range — simplify the plan or use coarser intervals");
+    throw std::out_of_range("Stream interval out of representable range - simplify the plan or use coarser intervals");
   }
   return boost::rational<int>{static_cast<int>(value.numerator()), static_cast<int>(value.denominator())};
 }
@@ -85,14 +85,14 @@ bool isWindowAggregate(command_id cmd) {
 ///
 /// Czyta token WINDOW_* w OBU jego postaciach, bo przebiegi kompilatora widzą obie: szerokość
 /// przed compiler::resolveWindowAggregates(), indeks grupy po nim. Obie są zwykłym `int`,
-/// więc etap rozstrzyga tabela grup zapytania — pusta znaczy „jeszcze nierozwiązane".
+/// więc etap rozstrzyga tabela grup zapytania - pusta znaczy „jeszcze nierozwiązane".
 ///
 /// Obsługa OBU postaci jest wymogiem poprawności, nie wygodą: ścieżka zapytań ad hoc
 /// (executorsm::getAdHoc) kompiluje ŻYWY plan po raz drugi, więc przebiegi widzą wtedy
 /// zapytania już rozwiązane. Bez tego indeks grupy uchodziłby za szerokość okna i psuł
 /// origin przy pierwszym zapytaniu ad hoc do planu z oknem.
 ///
-/// Różne szerokości w jednej liście SELECT są w porządku — to ten sam takt, inne okna.
+/// Różne szerokości w jednej liście SELECT są w porządku - to ten sam takt, inne okna.
 /// Największa rozstrzyga origin, bo rekord powstaje dopiero wtedy, gdy definiują się
 /// wszystkie jego pola.
 std::optional<int> windowWidthOf(const query &q, std::string &error) {
@@ -139,7 +139,7 @@ namespace localContext {
 // Klasa `[\w$]` zamiast `\w`: nazwa fizyczna instancji generatora zawiera `$` (`cell$0`),
 // a `\w` sie na nim urywa. regex_search bral wtedy dopasowanie ZA `$` i z `cell$0[0]`
 // wyciagal nazwe strumienia "0". Do 2026-08-31 nie bylo tego widac, bo nieznana nazwa
-// degradowala sie po cichu do offsetu 0 bufora wejsciowego — czyli akurat do wartosci
+// degradowala sie po cichu do offsetu 0 bufora wejsciowego - czyli akurat do wartosci
 // poprawnej dla jednozrodlowego konsumenta.
 boost::regex xprFieldId5(R"(([\w$]*)\[(\d*)\]\[(\d*)\])");  // something[1][1]
 boost::regex xprFieldId4(R"(([\w$]*)\[(\d*)\,(\d*)\])");    // something[1,1]
@@ -179,7 +179,7 @@ std::string compiler::resolveStreamIntervals() {
         token tInstance(*(q.lProgram.begin()));
         // Źródło nierozwiązane w tym przebiegu daje deltę 0. Bez tej kontroli
         // strumień dostawał interwał 0 na stałe i NIKT nie prosił o kolejny
-        // przebieg — o wyniku decydowała kolejność po coreInstance.sort().
+        // przebieg - o wyniku decydowała kolejność po coreInstance.sort().
         const boost::rational<int> sourceDelta = coreInstance.getDelta(tInstance.getStr_());
         if (sourceDelta == 0) {
           bOnceAgain = true;
@@ -337,7 +337,7 @@ std::string compiler::resolveStreamIntervals() {
     // Cyklem jest dopiero BRAK POSTĘPU: przebieg, w którym nie rozwiązano ani
     // jednego strumienia. Dawny warunek (unresolvedCount >= prevUnresolved)
     // wymagał ŚCISŁEGO spadku licznika w każdym przebiegu, więc był heurystyką
-    // postępu, a nie detektorem cykli — i odrzucał plany bezcykliczne zależnie
+    // postępu, a nie detektorem cykli - i odrzucał plany bezcykliczne zależnie
     // od tego, jak coreInstance.sort() ustawił kolejność oceny.
     if (resolvedThisPass == 0) {
       SPDLOG_ERROR("Circular dependency: stream interval resolution stalled with {} unresolved streams", unresolvedCount);
@@ -354,8 +354,8 @@ namespace {
 ///
 /// Rozstrzyga o tym to samo co w consumesTwoPrecedingTokens(): miejsce parametru.
 /// `&`, `%` niosa swoj parametr jako OPERAND (PUSH_VAL), wiec trafia on do nazwy przez
-/// argumenty; `#`, `+` i reduktory parametru nie maja w ogole. Pozostale — `@(k,L)`, `>N`,
-/// `-r` — trzymaja go w tokenie i tylko one potrzebuja osobnego fragmentu nazwy.
+/// argumenty; `#`, `+` i reduktory parametru nie maja w ogole. Pozostale - `@(k,L)`, `>N`,
+/// `-r` - trzymaja go w tokenie i tylko one potrzebuja osobnego fragmentu nazwy.
 ///
 /// Lista jest NEGATYWNA celowo, odwrotnie niz w consumesTwoPrecedingTokens(). Tam pomylka
 /// w strone "dwuargumentowy" siegala poza poczatek listy tokenow, wiec bezpieczny domysl
@@ -382,10 +382,10 @@ bool carriesParameterInToken(command_id cmd) {
 ///
 /// Nazwa substratu jest zarazem nazwa artefaktu na dysku, wiec fragment musi byc
 /// identyfikatorem: cyfry, litery i podkreslenie. Stad dwa zabiegi:
-///   * kreska ulamkowa liczby wymiernej idzie na podkreslenie (1/4 -> "1_4") — do 2026-08-29
+///   * kreska ulamkowa liczby wymiernej idzie na podkreslenie (1/4 -> "1_4") - do 2026-08-29
 ///     nazwa substratu `&`/`%` niosla `/` wprost z token::getStr_(), czyli separator sciezki
 ///     w nazwie pliku;
-///   * minus liczby ujemnej idzie na "N" (-10 -> "N10") — okno `@(1,-10)` jest legalne,
+///   * minus liczby ujemnej idzie na "N" (-10 -> "N10") - okno `@(1,-10)` jest legalne,
 ///     a `-` w nazwie strumienia nie jest.
 std::string streamNameFragment(const rdb::descFldVT &value) {
   auto number = [](long long v) { return v < 0 ? "N" + std::to_string(-v) : std::to_string(v); };
@@ -403,7 +403,7 @@ std::string streamNameFragment(const rdb::descFldVT &value) {
         else if constexpr (std::is_same_v<T, std::pair<std::string, int>>)
           return v.first + "_" + number(v.second);
         else
-          // Zadna klauzula FROM nie niesie zmiennoprzecinkowego parametru — wariant istnieje,
+          // Zadna klauzula FROM nie niesie zmiennoprzecinkowego parametru - wariant istnieje,
           // bo descFldVT sluzy takze wyrazeniom pol. Rationalize() w parserze zamienia ulamek
           // dziesietny na wymierny, zanim token trafi do programu strumienia.
           return number(static_cast<long long>(v));
@@ -411,7 +411,7 @@ std::string streamNameFragment(const rdb::descFldVT &value) {
       value);
 }
 
-/// Prog, powyzej ktorego nazwa czytelna ustepuje skrotowi — patrz compiler::composeStreamName().
+/// Prog, powyzej ktorego nazwa czytelna ustepuje skrotowi - patrz compiler::composeStreamName().
 ///
 /// Sufit twardy to NAME_MAX (255) MINUS najdluzszy sufiks artefaktu. Sufiksy w drzewie:
 /// `.desc`, `.meta`, `.shadow`, `.duration`, `.tmp`, przy czym `.tmp` NAKLADA sie na `.meta`
@@ -420,7 +420,7 @@ std::string streamNameFragment(const rdb::descFldVT &value) {
 ///
 /// Od gory prog lezy POWYZEJ wszystkiego, co dzis istnieje: najdluzsza nazwa substratu
 /// w drzewie testow ma 49 B, a w przypadkach uzycia z paper-arXiv 142 B. Galaz skrotu nie
-/// odpala sie wiec w zadnym istniejacym planie — zdejmuje sufit, nie przemianowuje dorobku.
+/// odpala sie wiec w zadnym istniejacym planie - zdejmuje sufit, nie przemianowuje dorobku.
 constexpr std::size_t substratNameBudget_C = 200;
 constexpr std::uint64_t kFnv1aOffsetBasis  = 14'695'981'039'346'656'037ULL;
 constexpr std::uint64_t kFnv1aPrime        = 1'099'511'628'211ULL;
@@ -460,15 +460,15 @@ std::string nameDigest(const std::string &text) {
 /// zagniezdzenia dokleja operator, podkreslenie i nazwe operandu. Przy nazwach 7-znakowych
 /// `STREAM_HASH` konczy sie okolo 13. operandu, bo nazwa substratu jest zarazem nazwa pliku,
 /// a ta ma sufit NAME_MAX. Plaski przeplot kilkunastu strumieni jest wiec dzis niezapisywalny
-/// i wymaga recznego rozbicia na pomocnicze zapytania — obejscie widoczne w RQL i psujace
+/// i wymaga recznego rozbicia na pomocnicze zapytania - obejscie widoczne w RQL i psujace
 /// teze, ze program odzwierciedla strukture zadania.
 ///
 /// Skracanie prefiksow (`H_` zamiast `STREAM_HASH_`) przesuwa ten prog, ale go nie usuwa:
 /// wzrost pozostaje liniowy, a krotszy prefiks czesciej zderza sie z przestrzenia nazw
 /// uzytkownika. Dlatego po przekroczeniu progu nazwa czytelna ustepuje skrotowi:
 ///
-///     STREAM_HASH_a_b_c            (ponizej progu — jak dotad)
-///     STREAM_HASH_x7f3a91c48d20e6b5 (powyzej progu — sufit staly)
+///     STREAM_HASH_a_b_c            (ponizej progu - jak dotad)
+///     STREAM_HASH_x7f3a91c48d20e6b5 (powyzej progu - sufit staly)
 ///
 /// Skrot liczy sie z CALEJ nazwy czytelnej, wiec nazwa pozostaje czysta funkcja tej samej
 /// trojki co dotad. To utrzymuje oba niezmienniki: „rowna nazwa oznacza rowny program" oraz
@@ -496,9 +496,9 @@ namespace {
 /// Czy operator klauzuli FROM zjada DWA poprzedzające tokeny, czy jeden.
 ///
 /// Rozstrzyga o tym miejsce parametru, nie „dwuargumentowość" w potocznym sensie:
-///   * `#`, `+` — dwa strumienie, więc dwa tokeny PUSH_STREAM;
-///   * `&`, `%` — strumień i liczba wymierna, więc PUSH_STREAM + PUSH_VAL;
-///   * `>N`, `-r`, `@(k,L)` — parametr siedzi W SAMYM TOKENIE operatora
+///   * `#`, `+` - dwa strumienie, więc dwa tokeny PUSH_STREAM;
+///   * `&`, `%` - strumień i liczba wymierna, więc PUSH_STREAM + PUSH_VAL;
+///   * `>N`, `-r`, `@(k,L)` - parametr siedzi W SAMYM TOKENIE operatora
 ///     (patrz RQLParser: `recpToken(STREAM_TIMEMOVE, int)`, `recpToken(STREAM_SUBTRACT, rational)`,
 ///     `program.emplace_back(STREAM_AGSE, pair)`), więc poprzedza je JEDEN token.
 ///
@@ -508,7 +508,7 @@ namespace {
 /// już tylko `[STREAM_TIMEMOVE]`, a kod sięgał po drugi argument: dereferencjonował
 /// WARTOWNIKA listy i go kasował. Skutkiem było uszkodzenie sterty ujawniane dopiero
 /// w qTree::topologicalSort() jako odczyt zwolnionej pamięci. Czarna lista milczy przy
-/// każdym nowym operatorze; pozytywna zawodzi w stronę bezpieczną — nowy operator jest
+/// każdym nowym operatorze; pozytywna zawodzi w stronę bezpieczną - nowy operator jest
 /// domyślnie jednotokenowy i nie sięga poza początek listy.
 bool consumesTwoPrecedingTokens(command_id cmd) {
   switch (cmd) {
@@ -552,11 +552,11 @@ std::optional<std::pair<int, int>> namedEntrySlots(const query &q, const std::st
   return std::nullopt;
 }
 
-/// Slot pola wskazanego GOLA NAZWA — czyli wpisu, ktory MUSI byc pojedynczy.
+/// Slot pola wskazanego GOLA NAZWA - czyli wpisu, ktory MUSI byc pojedynczy.
 ///
 /// Nazwa tablicy nie jest nazwa pola: `DECLARE a INTEGER[3]` deklaruje trzy pola `a[0]`,
 /// `a[1]`, `a[2]`, a `a` jest nazwa calego wpisu. Do 2026-08-31 goła nazwa tablicy czytala
-/// po cichu element zerowy, a w oknie znaczyla jeszcze co innego — redukcje po WSZYSTKICH
+/// po cichu element zerowy, a w oknie znaczyla jeszcze co innego - redukcje po WSZYSTKICH
 /// elementach rekordu naraz, czyli po rownoleglych kanalach zamiast po czasie.
 /// @param error wypelniany, gdy nazwa wskazuje wpis TABLICOWY; pusty, gdy wpisu po prostu nie ma
 std::optional<int> singleFieldSlot(const query &q, const std::string &name, const std::string &streamId, std::string &error) {
@@ -565,7 +565,7 @@ std::optional<int> singleFieldSlot(const query &q, const std::string &name, cons
   const auto [firstSlot, slots] = *entry;
   if (slots > 1) {
     error = "'" + name + "' names an array of " + std::to_string(slots) + " fields in stream '" + streamId +
-            "', not a single field — index one element: " + name + "[0] .. " + name + "[" + std::to_string(slots - 1) + "]";
+            "', not a single field - index one element: " + name + "[0] .. " + name + "[" + std::to_string(slots - 1) + "]";
     return std::nullopt;
   }
   return firstSlot;
@@ -579,11 +579,11 @@ std::optional<int> singleFieldSlot(const query &q, const std::string &name, cons
 /// streamInstance::constructOutputPayload() zapisuje jedną wartość na wpis schematu.
 /// Wpis z `rarray > 1` łamie tę zgodność: zajmuje N slotów rekordu, ale przesuwa licznik
 /// o jeden. Elementy 1..N-1 nie zostają wtedy nigdy zapisane, a dalsza numeracja rozjeżdża
-/// się z układem rekordu — stąd zera w oknie nad `(cells>1)` i jednopolowy wynik `SELECT *`
+/// się z układem rekordu - stąd zera w oknie nad `(cells>1)` i jednopolowy wynik `SELECT *`
 /// nad `INTEGER[24]`.
 ///
 /// Rozwinięcie dotyczy WYŁĄCZNIE schematów pochodnych. Deklaracja zachowuje `T[N]`: to jest
-/// jej zapis w `.desc` i umowa polecenia DECLARE. Układ bajtów się nie zmienia — N pól
+/// jej zapis w `.desc` i umowa polecenia DECLARE. Układ bajtów się nie zmienia - N pól
 /// skalarnych `T` zajmuje tyle samo miejsca co `T[N]`.
 std::list<field> flattenArrayFields(const std::list<field> &schema) {
   std::list<field> result;
@@ -636,7 +636,7 @@ std::string compiler::extractIntermediateStreams() {
           // z nich i wycinamy cały podciąg [argumenty..., operator] jednym erase().
           //
           // Dawniej robiło to erase() przeplatane z `--it2`. Gdy kasowany token stał na początku
-          // listy, dekrementacja schodziła PRZED begin() — formalnie zachowanie niezdefiniowane,
+          // listy, dekrementacja schodziła PRZED begin() - formalnie zachowanie niezdefiniowane,
           // działające wyłącznie dlatego, że std::list w libstdc++ jest cyklem z wartownikiem
           // i `++` wracało na begin(). Ta sama konstrukcja o jeden krok dalej (sięgnięcie po
           // nieistniejący drugi argument `@`) kasowała wartownika i psuła stertę.
@@ -651,7 +651,7 @@ std::string compiler::extractIntermediateStreams() {
           // Kolejność w substracie zostaje taka jak w programie źródłowym.
           newQuery.lProgram.assign(firstArg, afterOperator);
 
-          // arg1 to token STOJĄCY BEZPOŚREDNIO PRZED operatorem, arg2 — ten przed nim.
+          // arg1 to token STOJĄCY BEZPOŚREDNIO PRZED operatorem, arg2 - ten przed nim.
           //
           // Fragment nazwy, nie token::getStr_(): dla PUSH_STREAM oba dają tę samą nazwę
           // strumienia, ale dla PUSH_VAL `&`/`%` getStr_() renderuje liczbę wymierną z kreską
@@ -716,7 +716,7 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
   else if (cmd == STREAM_AVG || cmd == STREAM_MIN || cmd == STREAM_MAX || cmd == STREAM_SUM) {
     // Typ pola ten sam co slotu rekordu wejsciowego (query::descriptorFrom). Do 2026-09-14 stal tu
     // RATIONAL na sztywno, wiec `SELECT * FROM x.max` nad DOUBLE 3000000000.5 zapisywalo
-    // przepelniony `rational<int>`, a nad 0.333333333333 — 1/3.
+    // przepelniony `rational<int>`, a nad 0.333333333333 - 1/3.
     const char *name = (cmd == STREAM_AVG) ? "avg" : (cmd == STREAM_MIN) ? "min" : (cmd == STREAM_MAX) ? "max" : "sum";
     auto [sourceType, sourceLen]   = coreInstance[sName1].descriptorStorage().widestFieldType();
     auto [reducedType, reducedLen] = reductionResultField(sourceType, sourceLen);
@@ -744,13 +744,13 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
   // Stad program pola jest ZAWSZE jednotokenowy.
   //
   // Do 2026-08-31 stalo tu `pop_front()` + `emplace_front()`, czyli podmiana PIERWSZEGO
-  // tokena. Dla galezi kopiujacych schemat operandu (HASH, DEHASH, SUBTRACT, TIMEMOVE —
+  // tokena. Dla galezi kopiujacych schemat operandu (HASH, DEHASH, SUBTRACT, TIMEMOVE -
   // przez flattenArrayFields) program operandu wchodzil w calosci, a podmiana zdejmowala
   // tylko jego pierwszy token. Pole `a+b` producenta dawalo wiec w konsumencie program
   // `PUSH_ID2(s[0]); PUSH_ID(b); ADD` i `SELECT * STREAM t FROM s>1` konczylo sie
   // komunikatem `No field of given name in stream schema ID3`; pole `MIN(a:2)` przenosilo
   // do konsumenta token WINDOW_*, przez ktory straznik okna w resolveStreamIntervals()
-  // odrzucal kazdy wezel fullscan nad strumieniem z oknem — lacznie z substratami, ktore
+  // odrzucal kazdy wezel fullscan nad strumieniem z oknem - lacznie z substratami, ktore
   // kompilator wystawia sam. Jednotokenowe programy dzialaly, bo dla nich podmiana
   // pierwszego tokena i wyczyszczenie listy znacza to samo.
   int offset(0);
@@ -776,7 +776,7 @@ std::string compiler::expandSchemaWildcards() {
   for (auto &q : coreInstance) {
     for (auto &t : q.lProgram) {
       if (q.lProgram.size() >= 4) {
-        FatalError("compiler::expandSchemaWildcards: program not optimized — {} tokens for query '{}', expected < 4",
+        FatalError("compiler::expandSchemaWildcards: program not optimized - {} tokens for query '{}', expected < 4",
                    q.lProgram.size(), q.id);
       }
       // fail of above check means that all streams are
@@ -799,14 +799,14 @@ std::string compiler::expandSchemaWildcards() {
             //
             // Petla ponizej idzie po `getQuery(zrodlo).lSchema`, a dopisuje do `q.lSchema`.
             // Przy samoodwolaniu obie nazwy wskazuja TE SAMA liste, a `std::list` nie
-            // uniewaznia iteratorow przy dopisaniu — petla widzi wiec wlasne dopiski i nie
+            // uniewaznia iteratorow przy dopisaniu - petla widzi wiec wlasne dopiski i nie
             // ma konca. Objawem bylo `xretractor -c`, ktore nie wracalo w 120 s i roslo
             // w pamieci do wyczerpania; pod `ulimit -v` konczylo sie `std::bad_alloc`.
             //
             // Cyklu NIE zostawiamy detektorowi w resolveStreamIntervals(), bo ten przebieg
             // stoi PO tym miejscu i nie zostaje osiagniety. Detektor lapie za to kazdy inny
             // ksztalt samoodwolania (`x>1`, `x-2`, `x&2`, `x%2`, `x#x`, `x+x`, `x@(1,2)`,
-            // `x.sumc` — zmierzone), bo tam program ma wiecej niz jeden token i ta galaz
+            // `x.sumc` - zmierzone), bo tam program ma wiecej niz jeden token i ta galaz
             // sie nie wykonuje. Dlatego bramka jest tutaj, a nie przed przebiegiem: szerzej
             // nie ma czego domykac.
             if (nameOfscanningTable == q.id) {
@@ -817,21 +817,21 @@ std::string compiler::expandSchemaWildcards() {
             // q.lSchema =  getQuery(t.getStr()).lSchema;
             // copy list of fields from one to another
             //
-            // Pętla idzie po SLOTACH PŁASKICH źródła, nie po jego wpisach schematu — indeks
+            // Pętla idzie po SLOTACH PŁASKICH źródła, nie po jego wpisach schematu - indeks
             // w PUSH_ID jest indeksem płaskim (patrz flattenArrayFields() i sourceFieldAt()).
             // Licząc wpisy, `SELECT * FROM x` nad `INTEGER[24]` dawało JEDNO pole zamiast
             // dwudziestu czterech i po cichu gubiło 23 wartości z rekordu.
             //
             // Ksztalt slotu bierze sie z PRODUCENTA, a nie z wpisu `INTEGER` na sztywno.
             // Do 2026-09-11 stalo tu `rField(name, 4, 1, rdb::INTEGER)`, wiec `SELECT *`
-            // nad `DOUBLE` dawalo w artefakcie `INTEGER` — a razem z nim przesuniete
+            // nad `DOUBLE` dawalo w artefakcie `INTEGER` - a razem z nim przesuniete
             // offsety kolejnych pol rekordu (8 B kontra 4 B). To jest ta sama kopia pola,
             // ktora ponizej liczy inferFieldShapes(); zapisana juz tutaj, zeby przebiegi
             // stojace pomiedzy (rozwiazanie interwalow, deduplikacja substratow,
             // rozwiazanie odwolan) nie czytaly ksztaltu, ktory jest po prostu nieprawdziwy.
             //
             // Wpis wieloslotowy wchodzi do kopii SLOTEM: zostaje typ i dlugosc, a krotnosc
-            // spada do jednego — ta sama regula co we flattenArrayFields(). `STRING[N]` jest
+            // spada do jednego - ta sama regula co we flattenArrayFields(). `STRING[N]` jest
             // jednym slotem i zachowuje `rarray = N`.
             int filedPosition = 0;
             for (const auto &s : coreInstance.getQuery(t.getStr_()).lSchema) {
@@ -858,7 +858,7 @@ std::string compiler::expandSchemaWildcards() {
         q.lSchema.erase(eraseIt);
     }
     // Rozwinięcie [_] musi się dziać TUTAJ, w tej samej pętli topologicznej, zaraz po
-    // rozwinięciu `*` dla tego zapytania — nie w osobnym, późniejszym przebiegu.
+    // rozwinięciu `*` dla tego zapytania - nie w osobnym, późniejszym przebiegu.
     // buildOutputSchema() materializuje schemat węzła pochodnego kopiując listy pól
     // operandów, więc konsument złączenia zobaczyłby strumień z nierozwiniętym [_]
     // jako jednopolowy i schemat rozjechałby się z układem rekordu.
@@ -870,7 +870,7 @@ std::string compiler::expandSchemaWildcards() {
 }
 
 namespace {
-/// Nazwa fizyczna instancji rodziny — ta sama, ktora trafia na dysk i do `xqry`.
+/// Nazwa fizyczna instancji rodziny - ta sama, ktora trafia na dysk i do `xqry`.
 ///
 /// Stoi TUTAJ, a nie przy pozostalych pomocnikach generatora, bo siega po nia takze
 /// resolveFieldReferences(), zeby rozpoznac odwolanie do rodziny po jej wlasnej nazwie.
@@ -890,7 +890,7 @@ std::vector<std::string> streamOperandsOf(const query &node) {
 /// Wolane z descendSpan() i wzajemnie z nim rekurencyjne. Rozdzial szerokosci idzie po
 /// ksztalcie klauzuli FROM: operator JEDNOARGUMENTOWY (`@`, reduktor, `>`, `-`, `&`, `%`)
 /// zastepuje schemat swojego jedynego zrodla wlasnym, wiec cala szerokosc wezla nalezy do
-/// tego zrodla; konkatenacja daje kazdemu zrodlu jego wlasna szerokosc, a przeplot — cala,
+/// tego zrodla; konkatenacja daje kazdemu zrodlu jego wlasna szerokosc, a przeplot - cala,
 /// bo po `#` oba argumenty dziela jeden schemat.
 std::optional<int> compiler::sourceSpanIn(query &node, int nodeWidth, const std::string &name) {
   const auto sources = streamOperandsOf(node);
@@ -901,8 +901,8 @@ std::optional<int> compiler::sourceSpanIn(query &node, int nodeWidth, const std:
   auto flatOf       = [this](const std::string &id) { return coreInstance.getQuery(id).descriptorStorage().flatElementCount(); };
 
   // Wezel wieloargumentowy dzieli swoja szerokosc miedzy zrodla tylko wtedy, gdy jest to
-  // nadal ta szerokosc, ktora sam wydal. Jezeli operator stojacy WYZEJ ja zmienil — okno
-  // albo reduktor nad konkatenacja — sloty zrodel sa przemieszane albo zwiniete i wkladu
+  // nadal ta szerokosc, ktora sam wydal. Jezeli operator stojacy WYZEJ ja zmienil - okno
+  // albo reduktor nad konkatenacja - sloty zrodel sa przemieszane albo zwiniete i wkladu
   // pojedynczego zrodla nie opisuje zadna liczba. Zgadywanie dawaloby cichy zly wynik,
   // wiec sciezka konczy sie odmowa.
   if (isHash) {
@@ -920,7 +920,7 @@ std::optional<int> compiler::sourceSpanIn(query &node, int nodeWidth, const std:
 }
 
 /// Zejscie o jeden wezel w dol klauzuli FROM. Przezroczyste sa WYLACZNIE substraty
-/// kompilatora — tak samo jak w collectTransitiveOffsets(), ktore liczy dla tych samych
+/// kompilatora - tak samo jak w collectTransitiveOffsets(), ktore liczy dla tych samych
 /// nazw offsety. Strumien nazwany przez uzytkownika jest lisciem: jego wlasne zrodla nie
 /// sa widoczne w rekordzie czytanym przez zapytanie.
 std::optional<int> compiler::descendSpan(const std::string &nodeId, int width, const std::string &name) {
@@ -934,14 +934,14 @@ std::optional<int> compiler::descendSpan(const std::string &nodeId, int width, c
 ///
 /// To jest szerokosc, ktorej potrzebuje `[_]`, i NIE jest nia wlasna szerokosc strumienia
 /// `name`. Do 2026-08-29 expandIndexWildcards() bralo te druga, wiec `x[_]` przy
-/// `FROM x@(1,5)+y` rozwijalo sie do JEDNEGO skladnika zamiast pieciu — po cichu i z blednym
+/// `FROM x@(1,5)+y` rozwijalo sie do JEDNEGO skladnika zamiast pieciu - po cichu i z blednym
 /// wynikiem, bo offsety liczone pozniej przez collectTransitiveOffsets() byly juz poprawne.
 ///
 /// Szerokosc wyjsciowa bierze sie z descriptorFrom(), bo wlasny operator zapytania nie ma
 /// substratu, w ktorym moglaby byc juz policzona: `FROM SUMC(a@(1,5))` czyta JEDEN slot,
 /// mimo ze stojacy w FROM substrat okna ma ich piec.
 ///
-/// `nullopt` znaczy „nazwa nie wnosi do tego schematu spojnego bloku pol" — jest spoza FROM
+/// `nullopt` znaczy „nazwa nie wnosi do tego schematu spojnego bloku pol" - jest spoza FROM
 /// albo osiagalna wylacznie przez wezel, ktory jej sloty przemieszal z cudzymi.
 std::optional<int> compiler::sourceSpanInFrom(query &q, const std::string &name) {
   return sourceSpanIn(q, q.descriptorFrom(coreInstance).flatElementCount(), name);
@@ -952,7 +952,7 @@ std::optional<int> compiler::sourceSpanInFrom(query &q, const std::string &name)
 /// kolejności przebiegów by nie wystarczyło: źródłem [_] bywa `SELECT *`, a źródłem `*` bywa
 /// strumień z [_], więc zależność idzie w obie strony i rozstrzyga ją dopiero porządek
 /// topologiczny. Na tym etapie PUSH_IDX niesie jeszcze tekst `strumien[_]` prosto z parsera,
-/// nie parę — stąd regex i normalizacja tokenu na miejscu. descriptorStorage() liczy się
+/// nie parę - stąd regex i normalizacja tokenu na miejscu. descriptorStorage() liczy się
 /// wyłącznie z lSchema, więc szerokość źródła jest tu już dostępna.
 std::string compiler::expandIndexWildcards(query &q) {
   std::list<field> expanded;
@@ -1022,8 +1022,8 @@ std::string compiler::expandIndexWildcards(query &q) {
 
   // Przenumerowanie CALEJ listy, bo rozwiniecie przesuwa pozycje pol stojacych za nim.
   // Konwencja jest ta sama, ktora nadaje nazwy parser (RQLParser::exitSelect: `_N` z
-  // przedrostkiem nazwy strumienia), wiec dla listy jednopozycyjnej — jedynej, ktora ten
-  // przebieg obslugiwal do 2026-08-31 — nazwy wychodza identyczne jak dawniej i zaden
+  // przedrostkiem nazwy strumienia), wiec dla listy jednopozycyjnej - jedynej, ktora ten
+  // przebieg obslugiwal do 2026-08-31 - nazwy wychodza identyczne jak dawniej i zaden
   // istniejacy `.desc` sie nie zmienia.
   int position(0);
   for (auto &f : expanded)
@@ -1037,11 +1037,11 @@ std::string compiler::expandIndexWildcards(query &q) {
 ///
 /// Do 2026-08-31 ta funkcja rzucała `std::logic_error` / `std::out_of_range` na każdą nieznaną
 /// nazwę pola. Kanał był przez to niespójny: `-c` raportowało jedne błędy planu komunikatem
-/// kompilatora, a inne wywróceniem procesu z tekstem wyjątku — mimo że jedne i drugie są
+/// kompilatora, a inne wywróceniem procesu z tekstem wyjątku - mimo że jedne i drugie są
 /// zwyczajną pomyłką w zapisie zapytania, a nie awarią silnika. FatalError zostaje tam, gdzie
 /// był: sygnalizuje niezgodność gramatyki z kompilatorem, czyli błąd WEWNĘTRZNY.
 ///
-/// `ruleName` pusty — program pola; niepusty — warunek tej reguly.
+/// `ruleName` pusty - program pola; niepusty - warunek tej reguly.
 std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &q, const std::string &ruleName) {
   for (auto &t : lProgram) {  // for each token in query field
     const command_id cmd(t.getCommandID());
@@ -1076,7 +1076,7 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
           const std::string sOffset1(what[2]);
           const int offset1(atoi(sOffset1.c_str()));
 
-          // `strumien[k]` — pozycja PŁASKA w rekordzie źródła. W tej postaci buildOutputSchema()
+          // `strumien[k]` - pozycja PŁASKA w rekordzie źródła. W tej postaci buildOutputSchema()
           // wystawia też schematy substratów i rozwinięcie `SELECT *`.
           //
           // Górna granica NIE jest szerokością strumienia `name`. Do 2026-09-14 granicy nie było
@@ -1086,13 +1086,13 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
           // `core@(1,3)` wystawia `core[2]` nad jednopolowym `core`, a `acc[0]` przy
           // `FROM SUMC(acc)` ma jeden slot, choć `acc` ma ich pięć. Granicą jest więc liczba
           // slotów, które odwołanie może przeczytać:
-          //  * obcy strumień na liście pól — jego rozpiętość w FROM, ta sama co dla `[_]`;
-          //  * własna nazwa na liście pól — rekord wejściowy (localizeFieldOffsets() jej nie
+          //  * obcy strumień na liście pól - jego rozpiętość w FROM, ta sama co dla `[_]`;
+          //  * własna nazwa na liście pól - rekord wejściowy (localizeFieldOffsets() jej nie
           //    przesuwa, więc indeks wskazuje bufor FROM, nie wyjście);
-          //  * własna nazwa w warunku reguły — rekord wyjściowy, na którym liczy ewaluator.
+          //  * własna nazwa w warunku reguły - rekord wyjściowy, na którym liczy ewaluator.
           // Obcej nazwy w regule nie ograniczamy, bo odrzuca ją resolveFieldReferences().
           // Rozpiętość nieznana (nazwa spoza FROM albo schowana za węzłem mieszającym sloty)
-          // zostaje bez kontroli — pierwszy przypadek odrzuca localizeFieldOffsets().
+          // zostaje bez kontroli - pierwszy przypadek odrzuca localizeFieldOffsets().
           //
           // To jedyne miejsce kontroli także dla generatora: `ten[$]` jest tu już zwykłym
           // `ten[2]`, więc komunikat jest identyczny z zapisem ręcznym.
@@ -1116,14 +1116,14 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
             break;
           }
 
-          // `pole[k]` — ELEMENT pola tablicowego ze schematu z FROM. Nazwa tablicy nie jest
+          // `pole[k]` - ELEMENT pola tablicowego ze schematu z FROM. Nazwa tablicy nie jest
           // nazwą pola, więc dopiero ten zapis wskazuje wartość.
           //
           // Do 2026-08-31 tej gałęzi nie było: nieznana nazwa szła dalej jako nazwa strumienia,
           // a localizeFieldOffsets() zamieniało ją po cichu na offset 0 bufora wejściowego.
           // `a[1]` trafiało wtedy we właściwy element wyłącznie wtedy, gdy `a` było pierwszym
           // polem jedynego strumienia z FROM; przy dwóch źródłach czytało cudzą wartość, a przy
-          // indeksie spoza tablicy — sąsiednie pole. Nikt tego nie zgłaszał.
+          // indeksie spoza tablicy - sąsiednie pole. Nikt tego nie zgłaszał.
           auto [schema1, schema2, cmdFrom]{GetArgs(q.lProgram)};
           bool bFieldFound(false);
           for (const auto &schema : {schema1, schema2}) {
@@ -1138,7 +1138,7 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
             namedSourceRefs_[q.id].insert(schema);
             bFieldFound = true;
           }
-          // Rodzina generatora po expandStreamGenerators() nie istnieje juz pod wlasna nazwa —
+          // Rodzina generatora po expandStreamGenerators() nie istnieje juz pod wlasna nazwa -
           // sa tylko jej instancje `nazwa$0`, `nazwa$1`, ... Zapis `nazwa[k]` na LISCIE POL
           // znaczy „slot k strumienia nazwa", tak samo jak wszedzie indziej w tym jezyku, wiec
           // instancji nie wskazuje i wskazywac nie moze; instancje wskazuje `nazwa[k]` wylacznie
@@ -1174,7 +1174,7 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
             if (!arrayError.empty()) return "Stream '" + q.id + "': " + arrayError;
             if (flatIndex.has_value()) {
               t = token(PUSH_ID, std::make_pair(schema1, *flatIndex));
-              // Goła nazwa pola też wskazuje składową — `v-w` nad `A#B` znosi tożsamość
+              // Goła nazwa pola też wskazuje składową - `v-w` nad `A#B` znosi tożsamość
               // dokładnie tak jak `A[0]-B[0]`. PUSH_ID3 wystawia wyłącznie parser, więc
               // zapis tutaj nie łapie tokenów kompilatora; migawka wejściowa nie da rady,
               // bo nazwa strumienia powstaje dopiero z tego wyszukiwania.
@@ -1230,7 +1230,7 @@ push_idXXX is searched in all stream program after reduction */
 std::string compiler::resolveFieldReferences() {
   for (auto &q : coreInstance) {  // for each query
     if (q.isReductionRequired()) {
-      FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
+      FatalError("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id);
     }
     for (auto &f : q.lSchema) {  // for each field in query
       std::string result{resolveTokenReferences(f.lProgram, q, "")};
@@ -1240,7 +1240,7 @@ std::string compiler::resolveFieldReferences() {
       std::string result{resolveTokenReferences(r.condition, q, r.name)};
       if (result != "OK") return result;
       // Warunek reguly ewaluator liczy na payloadzie WYJSCIOWYM tego strumienia
-      // (streamInstance::constructRulesAndUpdate) i bierze z tokenu wylacznie indeks — nazwa
+      // (streamInstance::constructRulesAndUpdate) i bierze z tokenu wylacznie indeks - nazwa
       // schematu jest tam ignorowana. Odwolanie do cudzego strumienia czytaloby wiec pod tym
       // indeksem wlasny rekord: cicho i zawsze zle, bo localizeFieldOffsets() warunkow regul
       // nie tyka i nazwa dotrwa do wykonania bez zmian. Jedyne poprawne odwolanie to wlasne.
@@ -1258,7 +1258,7 @@ std::string compiler::resolveFieldReferences() {
   return {"OK"};
 }
 
-/// Migawka odwołań, które NAPISAŁ użytkownik — `A[0]`, `A.pole`, `A[_]` i `A.*`.
+/// Migawka odwołań, które NAPISAŁ użytkownik - `A[0]`, `A.pole`, `A[_]` i `A.*`.
 ///
 /// Zdejmowana z planu prosto po parsowaniu, przed jakimkolwiek przebiegiem, bo później takiej
 /// informacji już nie ma: buildOutputSchema() sam syntetyzuje PUSH_ID2 o tekście `lewy[offset]`
@@ -1326,7 +1326,7 @@ void compiler::collectTransitiveOffsets(const std::string &srcId, int baseOffset
 /// skladowe, ktorych tozsamosc zniosl `#`.
 ///
 /// Jedno zrodlo prawdy dla localizeFieldOffsets(), ktore wedlug tej mapy przepisuje odwolania na
-/// sloty payloadu wejsciowego, i dla typowania odwolan (inferFieldShapes(), R3) — typ ma pochodzic
+/// sloty payloadu wejsciowego, i dla typowania odwolan (inferFieldShapes(), R3) - typ ma pochodzic
 /// z TEGO slotu, ktory odwolanie przeczyta w wykonaniu.
 std::map<std::string, int> compiler::sourceOffsetsInFrom(query &q, std::set<std::string> &viaInterleave) {
   auto offset{0};                         //
@@ -1357,7 +1357,7 @@ std::string compiler::localizeFieldOffsets() {
   // This loop fill&create OffsetMap structure.
   for (auto &q : coreInstance) {  // for each query
     if (q.isReductionRequired()) {
-      FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
+      FatalError("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id);
     }  // that has at least two arguments
     std::set<std::string> viaInterleave;  // składowe, których tożsamość zniosło `#`
     offsetMap[q.id]          = sourceOffsetsInFrom(q, viaInterleave);
@@ -1365,14 +1365,14 @@ std::string compiler::localizeFieldOffsets() {
   }
 
   // Bramka F9 (D-F1 = S3, 2026-08-09). `A[0]` na liście pól nie znaczy „bieżąca wartość
-  // strumienia A" — znaczy pozycję w schemacie strumienia z FROM, liczoną od miejsca wejścia
+  // strumienia A" - znaczy pozycję w schemacie strumienia z FROM, liczoną od miejsca wejścia
   // A do złączenia. Przeplot wymaga IDENTYCZNYCH schematów obu argumentów i wydaje jeden
   // strumień o tym samym schemacie, więc pozycja k lewej składowej i pozycja k prawej to TA
-  // SAMA pozycja — pętla wyżej zeruje offsety obu. Skutkiem było, że `A[0]-B[0]` nad `A#B`
+  // SAMA pozycja - pętla wyżej zeruje offsety obu. Skutkiem było, że `A[0]-B[0]` nad `A#B`
   // kompilowało się po cichu do `roznica[0]-roznica[0]`, czyli tożsamościowego zera: dwa
   // syntaktycznie różne odwołania dawały tożsamy wynik, a kompilator o tym nie mówił.
   //
-  // Odzyskanie składowej ma w algebrze własny operator — rozplot Theta / ~Theta (`&`, `%`).
+  // Odzyskanie składowej ma w algebrze własny operator - rozplot Theta / ~Theta (`&`, `%`).
   // Sięgania po składową nazwą PRZEZ węzeł `#` algebra nie przewiduje wcale, więc nie ma tu
   // poprawnej wartości do wyliczenia i jedynym uczciwym wyjściem jest odmowa planu.
   //
@@ -1396,7 +1396,7 @@ std::string compiler::localizeFieldOffsets() {
   // This loop converts with help of offsetMap
   for (auto &q : coreInstance) {  // for each query
     if (q.isReductionRequired()) {
-      FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
+      FatalError("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id);
     }  // that has at least two arguments and
     for (auto &f : q.lSchema) {             // for each field in query and
       for (auto &t : f.lProgram) {          // for each token in query field - do:
@@ -1432,7 +1432,7 @@ std::string compiler::validateConstraints() {
   for (auto &q : coreInstance) {      // for each query
     if (q.isDeclaration()) continue;  // do not check declaration in constraints.
     if (q.isReductionRequired()) {
-      FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
+      FatalError("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id);
     }  // process data only with two or less arguments
     auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
     switch (cmd.getCommandID()) {
@@ -1484,7 +1484,7 @@ std::string compiler::applyCapacitiesToStreams(const std::map<std::string, int> 
 }
 
 std::map<std::string, int> compiler::computeRequiredCapacities() {
-  // Głębokość historii dla źródeł przeplotu (#) i rozplotu (&, %) — stała
+  // Głębokość historii dla źródeł przeplotu (#) i rozplotu (&, %) - stała
   // w jednostkach rekordów, patrz komentarz przy STREAM_HASH poniżej.
   constexpr int kJunctionHistory = 4;
   // Deklaracja wyprzedza konsumenta o rekord uzbrojony przy otwarciu storage
@@ -1501,7 +1501,7 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
   for (auto &q : coreInstance) {      // for each query
     if (q.isDeclaration()) continue;  // that is not declaration
     if (q.isReductionRequired()) {
-      FatalError("compiler: query '{}' requires reduction at this stage — pipeline invariant violated", q.id);
+      FatalError("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id);
     }  // process data only with two or less arguments
     auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
     switch (cmd.getCommandID()) {
@@ -1521,7 +1521,7 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
           //   j_max = n + W_out - W_src,
           // a najstarszy potrzebny to n - (width-1). Różnica NIE zależy od n:
           //   dystans = W_out - W_src + width - 1,
-          // więc — inaczej niż w AGSE, gdzie fazy elementów płaskich wymuszają przegląd okresu —
+          // więc - inaczej niż w AGSE, gdzie fazy elementów płaskich wymuszają przegląd okresu -
           // postać zamknięta jest tu dokładna, a nie oszacowaniem.
           std::string windowError;
           if (const auto width = windowWidthOf(q, windowError); width.has_value()) {
@@ -1575,12 +1575,12 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         // czyta wstecz o całą rozpiętość okna, więc pojemność źródła musi ją pomieścić.
         //
         // Odległość wsteczna w chwili emisji rekordu n:
-        //   j_max(n) = floor((n+1+Wout)*step/F) - Wsrc - 1   — najnowszy rekord źródła,
-        //   r_old(n) = floor((n*step-|L|+1)/F)               — najstarsze pole okna,
+        //   j_max(n) = floor((n+1+Wout)*step/F) - Wsrc - 1   - najnowszy rekord źródła,
+        //   r_old(n) = floor((n*step-|L|+1)/F)               - najstarsze pole okna,
         //   dystans  = j_max(n) - r_old(n).
         // Obie części zmieniają się o step/gcd(step,F) przy wzroście n o F/gcd(step,F), więc
         // dystans jest okresowy i maksimum liczymy DOKŁADNIE, przeglądając jeden pełny okres
-        // od origin. Postać zamknięta byłaby tu domysłem — a to jest wzór, którego zaniżenie
+        // od origin. Postać zamknięta byłaby tu domysłem - a to jest wzór, którego zaniżenie
         // oznacza odczyt poza historią (defekt D1 z K24), nie tylko slot opóźnienia.
         const int period     = sourceWidth / std::gcd(sourceWidth, step);
         int maxDistance      = 0;
@@ -1599,7 +1599,7 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
       case STREAM_HASH:
         // Przeplot/rozplot czytają elementy składowych po indeksie
         // postępującym (fetchForward), konsumując je w tempie produkcji
-        // źródła — offset wsteczny nie zależy od proporcji delt (inaczej niż
+        // źródła - offset wsteczny nie zależy od proporcji delt (inaczej niż
         // w AGSE, gdzie lookback rośnie z długością okna): najstarszy
         // potrzebny rekord to bieżący element składowej, cofnięty najwyżej
         // o jeden okres źródła (<=1) + prefetch źródła deklarowanego (+1);
@@ -1624,14 +1624,14 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         break;
       case STREAM_ADD: {
         // K24/P2 wariant A: suma strumieni czyta składową po indeksie postępującym
-        // ⌊n·Δout/Δsrc⌋ (Definicja sumy strumieni), więc — inaczej niż przed poprawką,
-        // gdy brała bieżący payload — wchodzi do modelu pojemności.
+        // ⌊n·Δout/Δsrc⌋ (Definicja sumy strumieni), więc - inaczej niż przed poprawką,
+        // gdy brała bieżący payload - wchodzi do modelu pojemności.
         // Odległość wsteczna w chwili slotu n wynosi
         //   count_src(t_n) - 1 - ⌊n·ratio⌋,  ratio = Δout/Δsrc <= 1,
         // a potrzebna pojemność to maksimum po n z count_src(t_n) - ⌊n·ratio⌋, czyli
         //   max_n [ ⌊(n+1+Wout)·ratio⌋ - ⌊n·ratio⌋ ] - Wsrc = ⌈(1+Wout)·ratio⌉ - Wsrc.
         // Dla deklaracji dochodzi wyprzedzenie czoła (uzbrojenie storage i zerowy
-        // prefetch) — ten sam człon co w STREAM_SUBTRACT i STREAM_AGSE.
+        // prefetch) - ten sam człon co w STREAM_SUBTRACT i STREAM_AGSE.
         for (const auto &nameSrc : {arg1, arg2}) {
           const auto &source = coreInstance[nameSrc];
           const auto ratio   = q.rInterval / source.rInterval;
@@ -1657,12 +1657,12 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         // K24/P1: formuła dla deklaracji zaniżała pojemność dla 39,1% par
         // (konsument, deklaracja) w korpusie 10 010 planów. Przy ilorazie
         // całkowitym >= 3 odczyt wypadał poza historią i dawał CICHY rekord
-        // all-NULL — cały strumień wyjściowy był pusty przy poprawnej liczbie
+        // all-NULL - cały strumień wyjściowy był pusty przy poprawnej liczbie
         // rekordów. Odległość wsteczna z modelu zdarzeniowego wynosi dla
         // deklaracji (Wsrc=0)
         //   max_n [ floor((n+1+Wout)*ratio) - ceil(n*ratio) ] = floor((1+Wout)*ratio),
         // co potwierdzono wyczerpująco na 2070 parach (ratio, Wout).
-        // Maksimum obu wartości — patrz komentarz przy STREAM_AGSE.
+        // Maksimum obu wartości - patrz komentarz przy STREAM_AGSE.
         if (source.isDeclaration()) {
           required = std::max(required, floorR(boost::rational<int>(1 + q.startupLatency) * ratio) + kDeclarationPrefetch);
         }
@@ -1675,7 +1675,7 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
 
     // Ujemna czesc zakresu DUMP siega historii strumienia, NA KTORYM wisi regula: dumpManager
     // czyta ja przez getPayload(q.id, k), a nie przez zrodlo z klauzuli FROM. Do 2026-09-05
-    // podbicie trafialo w arg1 programu strumienia, czyli w zrodlo — glebokosc historii
+    // podbicie trafialo w arg1 programu strumienia, czyli w zrodlo - glebokosc historii
     // dostawal ktos inny niz ten, kto z niej korzysta. Znaczenie ma to dla magazynu MEMORY,
     // gdzie policy.second jest rozmiarem pierscienia i starszy rekord po prostu nie istnieje;
     // magazyn plikowy trzyma cala historie niezaleznie od tej liczby.
@@ -1721,7 +1721,7 @@ void compiler::replaceStreamReferences(const std::string &oldName, const std::st
 }
 
 std::map<std::string, std::vector<std::string>> compiler::snapshotUserFieldNames() const {
-  // Nazwy pól nazwanych strumieni użytkownika — to one trafiają do pliku .desc, więc są
+  // Nazwy pól nazwanych strumieni użytkownika - to one trafiają do pliku .desc, więc są
   // obserwowalne. Substraty i deklaracje pomijamy: substrat nie ma odrębnej tożsamości
   // obserwowalnej (na tym opiera się deduplikacja), a deklaracja nie jest wynikiem planu.
   std::map<std::string, std::vector<std::string>> snapshot;
@@ -1738,7 +1738,7 @@ std::string compiler::verifyUserFieldNamesPreserved(const std::map<std::string, 
   // Niezmiennik D3: przepisania planu (faktoryzacja, deduplikacja, współdzielenie SELECT) nie mogą
   // zmienić deskryptora żadnego nazwanego strumienia użytkownika.
   //
-  // Predykaty scalania celowo porównują schematy BEZ nazw — scalają węzły wewnętrzne, więc mają do
+  // Predykaty scalania celowo porównują schematy BEZ nazw - scalają węzły wewnętrzne, więc mają do
   // tego prawo, a zawężenie ich o nazwy zmniejszyłoby liczbę scaleń, czyli sam mierzony wynik.
   // Nazwy są jednak obserwowalne (plik .desc), więc zamiast osłabiać scalanie, pilnujemy skutku:
   // to, co widzi użytkownik, ma być takie samo przed optymalizacją i po niej.
@@ -1767,7 +1767,7 @@ std::string compiler::verifyUserFieldNamesPreserved(const std::map<std::string, 
 namespace {
 
 // Origin jest ograniczony rozpiętością okien w planie, więc realnie jest małą liczbą.
-// Limit chroni wyłącznie przed odwzorowaniem, które wbrew założeniu nie rośnie —
+// Limit chroni wyłącznie przed odwzorowaniem, które wbrew założeniu nie rośnie -
 // bez niego pętla podwajania byłaby nieskończona.
 constexpr int kOriginSearchLimit = 1 << 24;
 
@@ -1800,7 +1800,7 @@ int firstIndexReaching(const Mapping &mapping, const int threshold, const std::s
 }  // namespace
 
 std::string compiler::computeLogicalOrigin() {
-  // Początek logiczny (query::logicalOrigin) — indeks pierwszego rekordu, który W OGÓLE istnieje.
+  // Początek logiczny (query::logicalOrigin) - indeks pierwszego rekordu, który W OGÓLE istnieje.
   // Różnica wobec ogona: ogon mówi „jeszcze nie teraz", origin mówi „ten rekord nie ma definicji".
   // Źródłem origin jest wyłącznie okno `@` stemplowane końcem przedziału: jego wczesne rekordy
   // sięgałyby przed początek strumienia źródłowego. Reszta planu origin tylko przenosi, przez
@@ -1838,7 +1838,7 @@ std::string compiler::computeLogicalOrigin() {
       int result        = o1;
 
       if (q.lProgram.size() == 1) {
-        // Czysty PUSH_STREAM czyta bieżący payload producenta — ten sam rekord, ten sam origin.
+        // Czysty PUSH_STREAM czyta bieżący payload producenta - ten sam rekord, ten sam origin.
         //
         // Okno rekordowe w liście SELECT to wyjątek: rekord n obejmuje rekordy źródła
         // n-(width-1) ... n, więc pierwszy definiowalny rekord wypada tam, gdzie całe okno
@@ -1848,7 +1848,7 @@ std::string compiler::computeLogicalOrigin() {
         if (const auto width = windowWidthOf(q, windowError); width.has_value()) result = o1 + *width - 1;
       } else if (op == STREAM_TIMEMOVE) {
         // tau_N jest OPÓŹNIENIEM: rekord n ma treść rekordu n-N producenta. Rekordy o indeksie
-        // mniejszym od N nie mają definicji — sięgałyby przed początek producenta — więc
+        // mniejszym od N nie mają definicji - sięgałyby przed początek producenta - więc
         // niedefiniowalność jest tu origin, a nie ogon.
         //
         // Dotąd `N` siedziało w ogonie, przez co przesunięcie było w złączeniach NIEWIDOCZNE:
@@ -1856,7 +1856,7 @@ std::string compiler::computeLogicalOrigin() {
         // precesja co w oknie stemplowanym początkiem przedziału.
         //
         // Suma slotów milczenia (origin + ogon) zostaje bez zmian, więc ciąg wydanych rekordów
-        // jest identyczny — przesuwa się wyłącznie ich adres w czasie.
+        // jest identyczny - przesuwa się wyłącznie ich adres w czasie.
         result = o1 + std::get<int>(q.lProgram.back().getVT());
       } else if (op == STREAM_AVG || op == STREAM_MIN || op == STREAM_MAX || op == STREAM_SUM) {
         // Redukcje działają na bieżącej krotce producenta.
@@ -1886,8 +1886,8 @@ std::string compiler::computeLogicalOrigin() {
           result           = std::max(firstIndexReaching([&](int n) { return Add(delta, delta1, n); }, o1, q.id),
                                       firstIndexReaching([&](int n) { return Add(delta, delta2, n); }, o2, q.id));
         } else {
-          // Przeplot czyta w slocie n tylko JEDNĄ składową, ale obie pozycje — floor(z*n) dla
-          // pierwszej i n-floor(z*n) dla drugiej — są niemalejące. Najmniejsze n, od którego
+          // Przeplot czyta w slocie n tylko JEDNĄ składową, ale obie pozycje - floor(z*n) dla
+          // pierwszej i n-floor(z*n) dla drugiej - są niemalejące. Najmniejsze n, od którego
           // KAŻDY dalszy slot trafia w istniejący rekord swojej składowej, to maksimum progów.
           const auto zet = delta2 / (delta1 + delta2);
           result         = std::max(firstIndexReaching([&](int n) { return floorR(zet * n); }, o1, q.id),
@@ -1907,17 +1907,17 @@ std::string compiler::computeLogicalOrigin() {
 }
 
 std::string compiler::computeStartupLatency() {
-  // Ogon strumienia (query::startupLatency) — liczba początkowych slotów własnego interwału, w których
+  // Ogon strumienia (query::startupLatency) - liczba początkowych slotów własnego interwału, w których
   // wynik nie jest jeszcze zdefiniowany. Zasada brzegu: te sloty nie są rekordami. NULL zostaje wyłącznie
   // wartością pochłaniającą (dane oczekiwane a nieobecne, wynik nieistniejący w zbiorze wartości), nigdy
   // rezerwacją miejsca na dane.
   //
   // Ten przebieg WYLICZA ogon i zapisuje go w query::startupLatency. Emisję doprowadza do zgodności
-  // z nim dataModel::processRows() — przez pierwsze startupLatency slotów strumień nie emituje niczego
+  // z nim dataModel::processRows() - przez pierwsze startupLatency slotów strumień nie emituje niczego
   // (porównanie z streamInstance::elapsedSlots). Wartość jest raportowana jako 'tail' przez presenter.
 
   // Ogon źródła przeliczony na sloty konsumenta: w slotów źródła to w*dSrc sekund, czyli ceil(w*dSrc/dDst)
-  // slotów konsumenta. Zaokrąglamy w górę — pół slotu opóźnienia to wciąż slot, w którym nie ma czego wydać.
+  // slotów konsumenta. Zaokrąglamy w górę - pół slotu opóźnienia to wciąż slot, w którym nie ma czego wydać.
   auto toSlots = [](int w, const boost::rational<int> &dSrc, const boost::rational<int> &dDst) -> int {
     if (w <= 0) return 0;
     return ceilR(boost::rational<int>(w) * dSrc / dDst);
@@ -1953,7 +1953,7 @@ std::string compiler::computeStartupLatency() {
       int result        = toSlots(w1, delta1, q.rInterval);
 
       if (q.lProgram.size() == 1) {
-        // Czysty PUSH_STREAM — ten sam interwał, ten sam ogon. Okno rekordowe niczego tu nie
+        // Czysty PUSH_STREAM - ten sam interwał, ten sam ogon. Okno rekordowe niczego tu nie
         // zmienia: rekord n czyta najświeższy rekord źródła o TYM SAMYM indeksie, więc czeka
         // dokładnie tyle co przepis, a niedefiniowalność całego okna niesie origin.
         result = w1;
@@ -1974,7 +1974,7 @@ std::string compiler::computeStartupLatency() {
         int w2      = 0;
         if (second->getCommandID() != PUSH_STREAM || !latencyOf(second->getStr_(), w2)) continue;
         const auto delta2 = deltaOf(second->getStr_());
-        // Ogon przeplotu liczy się DOKŁADNIE, przeglądem jednego okresu fazowego —
+        // Ogon przeplotu liczy się DOKŁADNIE, przeglądem jednego okresu fazowego -
         // patrz HashStartupLatency() w SOperations.hpp. Do 2026-08-07 stała tu postać O(1)
         // max(conv(W_A), conv(W_B) + ceil((p+q-1)/p)); kampania K24 zmierzyła jej zgodność
         // z granicą zdarzeniową na 92,1% węzłów `#`, z zawyżeniem o slot w pozostałych.
@@ -1984,12 +1984,12 @@ std::string compiler::computeStartupLatency() {
         int w2      = 0;
         if (second->getCommandID() != PUSH_STREAM || !latencyOf(second->getStr_(), w2)) continue;
         // Ogon musi zabezpieczyć dostępność rekordu KAŻDEJ składowej pod indeksem
-        // z Definicji sumy strumieni, a nie tylko przeliczyć ogon składowej przez takt —
+        // z Definicji sumy strumieni, a nie tylko przeliczyć ogon składowej przez takt -
         // patrz AddStartupLatency() w SOperations.hpp.
         result =
             std::max(AddStartupLatency(delta1, q.rInterval, w1), AddStartupLatency(deltaOf(second->getStr_()), q.rInterval, w2));
       } else if (op == STREAM_DEHASH_DIV) {
-        // Ogon Θ liczy się DOKŁADNIE z kresu fazy odczytu — patrz ThetaStartupLatency()
+        // Ogon Θ liczy się DOKŁADNIE z kresu fazy odczytu - patrz ThetaStartupLatency()
         // w SOperations.hpp. Do 2026-08-18 stało tu bezwarunkowe ++result z uzasadnieniem
         // "jeden slot jest dokładnym własnym ogonem operatora"; kampania K24 zmierzyła
         // zgodność tej reguły z granicą zdarzeniową na 59,7% węzłów `Θ`, a przy ilorazie
@@ -1997,7 +1997,7 @@ std::string compiler::computeStartupLatency() {
         result = ThetaStartupLatency(delta1, q.rInterval, std::next(q.lProgram.begin())->getRI(), w1);
       } else if (op == STREAM_DEHASH_MOD) {
         // ~Θ wybiera pozycję floor(n*DeltaOut/DeltaSource), dostępną najpóźniej w bieżącym
-        // slocie, więc kres fazy wynosi zero — ale ogon składowej wchodzi do rachunku bez
+        // slocie, więc kres fazy wynosi zero - ale ogon składowej wchodzi do rachunku bez
         // zaokrąglania w górę, które zawyżało wynik w 0,8% węzłów korpusu (K24d).
         result = NThetaStartupLatency(delta1, q.rInterval, w1);
       } else if (op == STREAM_SUBTRACT) {
@@ -2058,7 +2058,7 @@ std::string compiler::factorMatchedHashTimeMoves() {
 
   // Liczba OBCYCH odwołań do strumienia. Musi obejmować programy pól, bo
   // przekierowanie odwołań jest punktowe (zmienia się wyłącznie dopasowane
-  // zapytanie), więc substrat wolno usunąć dopiero, gdy nie używa go już nikt —
+  // zapytanie), więc substrat wolno usunąć dopiero, gdy nie używa go już nikt -
   // a odwołanie potrafi siedzieć wyłącznie w PUSH_ID/PUSH_ID2 programu pola.
   // Odwołania własne są pomijane: każdy substrat czyta sam siebie w programie
   // pola i bez tego wyłączenia żaden nie zostałby nigdy uznany za osierocony.
@@ -2136,7 +2136,7 @@ std::string compiler::factorMatchedHashTimeMoves() {
         // Ponownie użyć wolno wyłącznie substratu. Konwencja nazewnicza kompilatora
         // nie jest zarezerwowana dla nazw użytkownika, więc zapytanie publiczne może
         // nazywać się jak węzeł przeplotu i mieć program {PUSH X, PUSH Y, STREAM_HASH}.
-        // Jego wyjściem jest wtedy projekcja, a nie surowy przeplot — a schemasMatch
+        // Jego wyjściem jest wtedy projekcja, a nie surowy przeplot - a schemasMatch
         // porównuje tylko typy, długości i liczności pól, więc projekcja zgodna
         // typowo, lecz o innej kolejności pól przechodzi tę kontrolę.
         if (!coreInstance.at(hashIndex).isSubstrat || !matchesHash(coreInstance.at(hashIndex), leftSource, rightSource) ||
@@ -2146,7 +2146,7 @@ std::string compiler::factorMatchedHashTimeMoves() {
       } else {
         // Węzeł przeplotu powstaje jako NOWY element planu. Dawniej reguła
         // przemianowywała substrat A>i w miejscu i przekierowywała wszystkie
-        // odwołania globalnie — poprawne wyłącznie dlatego, że wcześniejszy
+        // odwołania globalnie - poprawne wyłącznie dlatego, że wcześniejszy
         // strażnik dopuszczał dokładnie jednego konsumenta. Ten strażnik był
         // zarazem warunkiem "brak współdzielenia", więc wyłączał regułę dokładnie
         // w planach wielozapytaniowych. Mutacja w miejscu bez niego psuje plan,
@@ -2160,14 +2160,14 @@ std::string compiler::factorMatchedHashTimeMoves() {
             token(PUSH_STREAM, rightSource),
             token(STREAM_HASH),
         };
-        // Kopia niesie odwołanie programu pola do starej nazwy — przenieść je na nową.
+        // Kopia niesie odwołanie programu pola do starej nazwy - przenieść je na nową.
         retargetSchemaReferences(hashQuery, leftShiftName, hashName);
         coreInstance.push_back(hashQuery);  // unieważnia referencje do elementów qTree
       }
 
       // Przekierowanie jest punktowe: zmienia się wyłącznie dopasowane zapytanie.
       // Pozostali konsumenci substratów przesunięć zachowują swoje odwołania.
-      // Obok drzewa FROM trzeba przenieść także schemat — przy SELECT * pola
+      // Obok drzewa FROM trzeba przenieść także schemat - przy SELECT * pola
       // dopasowanego zapytania odwołują się do substratów przesunięć przez
       // PUSH_ID2, a po przepisaniu ich źródłem jest węzeł przeplotu.
       auto &matched = coreInstance.at(queryIndex);
@@ -2238,14 +2238,14 @@ std::string compiler::deduplicateSubstrats() {
   return {"OK"};
 }
 
-/// Dwa substraty o rownej nazwie musza miec rowny program — inaczej plan ma niejednoznaczne
+/// Dwa substraty o rownej nazwie musza miec rowny program - inaczej plan ma niejednoznaczne
 /// odwolanie.
 ///
 /// Duplikat nazwy jest tu stanem NORMALNYM i przejsciowym: extractIntermediateStreams()
 /// wydziela wezel osobno dla kazdego zapytania, wiec dwa identyczne okna nad tym samym
 /// zrodlem daja dwa wezly o tej samej nazwie, a scala je dopiero deduplicateSubstrats().
 /// Przy RDB_OPT_DEDUP_SUBSTRATES=OFF zostaja rozdzielone do konca kompilacji. Dlatego
-/// sprawdzenie pyta o ROWNOSC PROGRAMU, nie o unikalnosc nazwy, i stoi POZA `#if` — jest
+/// sprawdzenie pyta o ROWNOSC PROGRAMU, nie o unikalnosc nazwy, i stoi POZA `#if` - jest
 /// kontrola poprawnosci, a nie optymalizacja.
 ///
 /// Zakres to wylacznie substraty. Konwencja nazewnicza kompilatora nie jest zarezerwowana
@@ -2255,7 +2255,7 @@ std::string compiler::deduplicateSubstrats() {
 ///
 /// Praktycznie jedyna droga do naruszenia jest kolizja skrotu z composeStreamName(). Przy
 /// 64 bitach jest ona rzadsza od bledu sprzetu, ale poprawnosc nie ma sie opierac na
-/// prawdopodobienstwie: bez tej kontroli kolizja daje cicha zla odpowiedz, z nia — glosna
+/// prawdopodobienstwie: bez tej kontroli kolizja daje cicha zla odpowiedz, z nia - glosna
 /// awarie. Stad FatalError, tak samo jak w requireResolvedForEveryNode().
 std::string compiler::validateSubstratNameUniqueness() {
   std::map<std::string, const query *> seen;
@@ -2434,13 +2434,13 @@ std::string compiler::shareEquivalentSelectComputations() {
   return {"OK"};
 }
 
-/// Pole schematu, po które sięga PUSH_ID — nazwa strumienia i PŁASKI indeks.
+/// Pole schematu, po które sięga PUSH_ID - nazwa strumienia i PŁASKI indeks.
 ///
 /// Indeks w PUSH_ID liczy ELEMENTY, nie pozycje w schemacie. Pole zadeklarowane jako
 /// `a INTEGER[4]` zajmuje cztery kolejne indeksy pod JEDNĄ pozycją lSchema, a pola
 /// konfiguracyjne deskryptora nie zajmują żadnego. Odwzorowanie wprost po pozycji w liście
 /// zgadza się więc tylko dla schematów złożonych wyłącznie ze skalarów; dla
-/// `DECLARE f FLOAT[4], n INTEGER` indeks 1 to `f[1]` (FLOAT), a nie `n` (INTEGER) — czyli typ
+/// `DECLARE f FLOAT[4], n INTEGER` indeks 1 to `f[1]` (FLOAT), a nie `n` (INTEGER) - czyli typ
 /// wychodził NIE TEN, a nie tylko „nieznany".
 ///
 /// Reguła płaskiego indeksu musi być TA SAMA, co w Descriptor::rebuildFieldMappings(), bo to
@@ -2453,7 +2453,7 @@ std::optional<rdb::rField> compiler::sourceFieldAt(const std::string &streamId, 
   for (const auto &item : source->lSchema) {
     const auto type = item.field_.rtype;
     // Pola konfiguracyjne deskryptora (TYPE, REF, RETENTION, RETMEMORY) nie są wartościami
-    // wyrażeń i nie zajmują indeksów płaskich — Descriptor pomija je tak samo.
+    // wyrażeń i nie zajmują indeksów płaskich - Descriptor pomija je tak samo.
     if (type == rdb::TYPE || type == rdb::REF || type == rdb::RETENTION || type == rdb::RETMEMORY) continue;
     const int flatCount = (type == rdb::STRING) ? 1 : item.field_.rarray;
     if (remaining < flatCount) return item.field_;
@@ -2465,8 +2465,8 @@ std::optional<rdb::rField> compiler::sourceFieldAt(const std::string &streamId, 
 /// Scala parę [PUSH_ID pola, WINDOW_*] w jeden token z indeksem grupy okna.
 ///
 /// Po tym przebiegu WINDOW_* jest bezargumentowym LIŚCIEM programu: nie zdejmuje niczego ze
-/// stosu i kładzie gotową wartość okna. Dzięki temu późniejsze przebiegi — upraszczanie
-/// wyrażeń, współdzielenie obliczeń, lokalizacja offsetów — widzą go jako zwykły operand
+/// stosu i kładzie gotową wartość okna. Dzięki temu późniejsze przebiegi - upraszczanie
+/// wyrażeń, współdzielenie obliczeń, lokalizacja offsetów - widzą go jako zwykły operand
 /// i nie muszą o oknach wiedzieć. W szczególności PUSH_ID okna MUSI zniknąć przed
 /// localizeFieldOffsets(), bo tamten przebieg przepisuje offsety na bufor wejściowy
 /// konsumenta, a okno adresuje sloty ŹRÓDŁA.
@@ -2475,26 +2475,26 @@ std::optional<rdb::rField> compiler::sourceFieldAt(const std::string &streamId, 
 /// i `MAX(cells:10)` w jednej liście SELECT dzielą jedno przejście po oknie.
 ///
 /// Przebieg jest IDEMPOTENTNY: zapytanie z niepustą tabelą grup jest już rozwiązane
-/// i zostaje nietknięte. Jest to wymóg, nie ozdoba — executorsm::getAdHoc() kompiluje żywy
+/// i zostaje nietknięte. Jest to wymóg, nie ozdoba - executorsm::getAdHoc() kompiluje żywy
 /// plan po raz drugi, żeby dołączyć do niego zapytanie ad hoc, więc ten przebieg z całą
 /// pewnością zobaczy zapytania rozwiązane w poprzednim przebiegu. Zapytanie rozwiązane ma
 /// już własną, spójną tabelę grup i nic w nim nie wymaga poprawki.
 ///
 /// Etapu NIE da się rozpoznać po samym tokenie: szerokość okna i indeks grupy są oba zwykłym
-/// `int`. Dlatego rozstrzyga tabela grup — pusta znaczy „nierozwiązane", a przebieg albo
+/// `int`. Dlatego rozstrzyga tabela grup - pusta znaczy „nierozwiązane", a przebieg albo
 /// wypełnia ją w całości, albo zwraca błąd i kompilacja się kończy.
 std::string compiler::resolveWindowAggregates() {
   for (auto &q : coreInstance) {
     if (!q.windowGroups.empty()) continue;
 
-    // `q.id[k]` na liście pól znaczy „slot k MOJEGO payloadu wejściowego" — tak samo, jak po
+    // `q.id[k]` na liście pól znaczy „slot k MOJEGO payloadu wejściowego" - tak samo, jak po
     // localizeFieldOffsets() znaczy je każde odwołanie do pola. Dla okna to jednak za mało:
     // okno musi wskazać strumień, którego HISTORIĘ czyta, a własnej historii konsument w tym
-    // miejscu nie ma — jego rekord dopiero powstaje. Bez tej podmiany `MIN(w[0] : 2)` zakładało
+    // miejscu nie ma - jego rekord dopiero powstaje. Bez tej podmiany `MIN(w[0] : 2)` zakładało
     // grupę nad strumieniem `w`, czyli czytało wyjście, które właśnie liczy, zamiast wejścia.
     //
-    // FROM jest tu POJEDYNCZYM odwołaniem do strumienia — pilnuje tego resolveStreamIntervals(),
-    // zanim ten przebieg ruszy — więc podmiana jest jednoznaczna i `MIN(a[0]:2)`, `MIN(src[0]:2)`
+    // FROM jest tu POJEDYNCZYM odwołaniem do strumienia - pilnuje tego resolveStreamIntervals(),
+    // zanim ten przebieg ruszy - więc podmiana jest jednoznaczna i `MIN(a[0]:2)`, `MIN(src[0]:2)`
     // oraz `MIN(w[0]:2)` opisują jedno i to samo okno.
     const std::string fromStream =
         (q.lProgram.size() == 1 && q.lProgram.front().getCommandID() == PUSH_STREAM) ? q.lProgram.front().getStr_() : "";
@@ -2532,7 +2532,7 @@ std::string compiler::resolveWindowAggregates() {
 
       // Zagniezdzenie odrzucamy PRZED jakakolwiek zmiana programu: znaczniki argumentow sa
       // pozycjami w TYM programie, a po pierwszym wycieciu wewnetrzne przestaja cokolwiek
-      // znaczyc. Okno w oknie i tak jest nie do policzenia — historia zrodla trzyma jego
+      // znaczyc. Okno w oknie i tak jest nie do policzenia - historia zrodla trzyma jego
       // rekordy, a nie wyniki innego okna nad nimi.
       for (const auto &[pos, shape] : windows) {
         if (shape.second < 0 || std::cmp_greater_equal(shape.second, pos)) {
@@ -2560,10 +2560,10 @@ std::string compiler::resolveWindowAggregates() {
         // strumienia, a historii zlaczenia nikt nie przechowuje.
         //
         // TYPU wartosci ten przebieg juz NIE ustala. Do 2026-09-11 bral go z NAJSZERSZEGO
-        // pola, po ktore argument siega — regula trafna dla golego pola i myląca dla
+        // pola, po ktore argument siega - regula trafna dla golego pola i myląca dla
         // wyrazenia (`MIN(to_double(k) : 5)` nad polem INTEGER dawalo RATIONAL, bo funkcji
         // nie widziala). Teraz typ argumentu liczy inferFieldShapes() z CALEGO programu
-        // argumentu i przepuszcza go przez reductionResultField() — w punkcie stalym, bo typ
+        // argumentu i przepuszcza go przez reductionResultField() - w punkcie stalym, bo typ
         // pola zrodlowego moze sam jeszcze czekac na ustalenie.
         bool anyReference(false);
         for (auto &t : argument) {
@@ -2575,7 +2575,7 @@ std::string compiler::resolveWindowAggregates() {
           if (ref == nullptr) return "Stream '" + q.id + "' has a malformed field reference in a window aggregate";
 
           const int slot = ref->second;
-          // Odwolanie wlasna nazwa wskazuje payload WEJSCIOWY — normalizujemy je do strumienia
+          // Odwolanie wlasna nazwa wskazuje payload WEJSCIOWY - normalizujemy je do strumienia
           // z FROM, zeby wszystkie trzy zapisy tego samego okna trafily w jedna grupe.
           std::string refSource = (ref->first == q.id) ? fromStream : ref->first;
           if (refSource.empty()) {
@@ -2616,7 +2616,7 @@ std::string compiler::resolveWindowAggregates() {
 
         // `valueType` zostaje na wartosci domyslnej struktury; wypelni je inferFieldShapes().
         // Dzieki temu grupy o jednym ksztalcie (zrodlo, szerokosc, program) scalaja sie tutaj
-        // NIEZALEZNIE od typu — a typ i tak wyjdzie im ten sam, bo liczy sie z tego programu.
+        // NIEZALEZNIE od typu - a typ i tak wyjdzie im ten sam, bo liczy sie z tego programu.
         const int groupIndex = groupIndexFor(shape);
         fieldHasWindow       = true;
 
@@ -2644,7 +2644,7 @@ namespace {
 /// Lista POZYTYWNA, tak samo i z tego samego powodu co w consumesTwoPrecedingTokens():
 /// nowy operator jest domyslnie syntetyzujacy, wiec pominiecie go w tej liscie niczego nie
 /// psuje. Kopiuja: `SELECT * FROM x` (sam PUSH_STREAM), `>N`, `-r`, `#`, `&`, `%` oraz `+`.
-/// Syntetyzuja i dlatego NIE moga tu byc: reduktory MIN/MAX/AVG/SUMC oraz `@` — patrz
+/// Syntetyzuja i dlatego NIE moga tu byc: reduktory MIN/MAX/AVG/SUMC oraz `@` - patrz
 /// synthesizesOperandSchema().
 bool copiesOperandSchema(const query &q) {
   if (q.lProgram.empty()) return false;
@@ -2665,7 +2665,7 @@ bool copiesOperandSchema(const query &q) {
 /// Czy schemat wezla SYNTETYZUJE operator FROM: okno `@` i reduktory MIN/MAX/AVG/SUMC.
 ///
 /// Rekord wejsciowy takiego wezla (query::descriptorFrom) sklada sie ze slotow typu NAJSZERSZEGO
-/// z rekordu zrodla — dla reduktora przepuszczonego przez reductionResultField(). Slot k wejscia
+/// z rekordu zrodla - dla reduktora przepuszczonego przez reductionResultField(). Slot k wejscia
 /// nie jest wiec ani polem k wyjscia, ani polem k zrodla. Lista pozytywna: descriptorFrom() zna
 /// tylko te operatory.
 bool synthesizesOperandSchema(const query &q) {
@@ -2683,7 +2683,7 @@ bool synthesizesOperandSchema(const query &q) {
 }
 
 /// Slot rekordu wejsciowego (query::descriptorFrom), ktory odwolanie `streamId[k]` w programie POLA
-/// zapytania `q` czyta w wykonaniu — albo nullopt, gdy `streamId` nie stoi w FROM.
+/// zapytania `q` czyta w wykonaniu - albo nullopt, gdy `streamId` nie stoi w FROM.
 ///
 /// localizeFieldOffsets() przepisuje odwolanie na slot `offset bloku + k` wedlug mapy
 /// compiler::sourceOffsetsInFrom(), a payload wejsciowy streamInstance buduje z descriptorFrom().
@@ -2704,30 +2704,30 @@ std::optional<int> inputSlotOfReference(const query &q, const std::map<std::stri
 }
 }  // namespace
 
-/// Ksztalt wyniku KAZDEGO pola SELECT — jeden przebieg wnioskowania dla calego planu.
+/// Ksztalt wyniku KAZDEGO pola SELECT - jeden przebieg wnioskowania dla calego planu.
 ///
 /// Zastepuje cztery reguly lokalne, ktore do 2026-09-11 rozstrzygaly to pytanie kazda na
 /// wlasna reke i zadna do konca (pozycja 16 w `usecases/requested.md`):
 ///
-///  * `propagateCopiedFieldShapes()` — przenosil ksztalt przez wezly kopiujace, ale
+///  * `propagateCopiedFieldShapes()` - przenosil ksztalt przez wezly kopiujace, ale
 ///    WYLACZNIE dla pol czytajacych wynik okna rekordowego. `SELECT source[0]` nad polem
 ///    `DOUBLE` zostawalo `INTEGER`, bo z oknem nie mialo nic wspolnego;
-///  * `inferStringFieldTypes()` — osobny przebieg tylko dla `STRING`;
+///  * `inferStringFieldTypes()` - osobny przebieg tylko dla `STRING`;
 ///  * nadpisanie typem okna i wyjatek `explicitIntegerCast` w `resolveWindowAggregates()`;
 ///  * rozpoznawanie `to_float`/`to_double` po OSTATNIM tokenie w `RQLParser::exitExpression()`.
 ///
 /// Teraz ksztalt liczy `inferExpressionShape()` z CALEGO programu pola, odtwarzajac arytmetyke
-/// `expressionEvaluator` na stosie typow — wraz z promocja `BYTE`, jawnymi konwersjami
+/// `expressionEvaluator` na stosie typow - wraz z promocja `BYTE`, jawnymi konwersjami
 /// w srodku wyrazenia i wynikiem okna. Reguly i ich uzasadnienie stoja w `expressionShape.hpp`.
 ///
 /// **Punkt staly**, bo `qTree` jest tu posortowane po INTERWALE (resolveStreamIntervals),
 /// a nie topologicznie: konsument potrafi stac przed swoim producentem, a ksztalt musi sie
-/// przez plan przeniesc. Liczba rund ograniczona rozmiarem planu — dluzszego lancucha
+/// przez plan przeniesc. Liczba rund ograniczona rozmiarem planu - dluzszego lancucha
 /// zaleznosci niz liczba wezlow byc nie moze.
 ///
 /// **Zakres.** Przebieg rusza wezly kopiujace schemat operandu (`copiesOperandSchema()`) i wezly
 /// syntetyzujace go (`synthesizesOperandSchema()`: `@` i reduktory). W tych drugich odwolanie
-/// w programie pola czyta slot rekordu wejsciowego, a nie pole zrodla — patrz
+/// w programie pola czyta slot rekordu wejsciowego, a nie pole zrodla - patrz
 /// inputSlotOfReference(). Do 2026-09-14 wezly syntetyzujace byly pomijane, wiec jawna
 /// lista pol (`SELECT w[0] FROM c@(1,2)` nad FLOAT, `SELECT a[0] FROM x.avg`) zostawala przy
 /// domyslnym INTEGER z parsera i obcinala wartosc przy zapisie, podczas gdy `SELECT *` nad tym
@@ -2738,7 +2738,7 @@ std::optional<int> inputSlotOfReference(const query &q, const std::map<std::stri
 ///
 /// **Idempotentny.** Ksztalt liczy sie wylacznie z programu, wiec powtorna kompilacja zywego
 /// planu (`executorsm::getAdHoc()`) wyprowadza dokladnie te same wartosci. Program zdazy sie
-/// do tego czasu uproscic, ale `simplifyExpression()` jest zachowawcze typowo — regula C
+/// do tego czasu uproscic, ale `simplifyExpression()` jest zachowawcze typowo - regula C
 /// odmawia usuniecia elementu neutralnego o innej reprezentacji niz podwyrazenie (patrz
 /// `dropNeutralOperand`), wiec deskryptor nie zalezy ani od `RDB_OPT_SIMPLIFY_EXPRESSIONS`,
 /// ani od tego, ktory to raz plan przechodzi przez kompilator.
@@ -2753,7 +2753,7 @@ std::string compiler::inferFieldShapes() {
     // NULLTYPE i pola konfiguracyjne deskryptora zajmuja pozycje, ale nie sa wartosciami.
     if (sourceField->rtype > rdb::STRING) return std::nullopt;
     // Wpis zrodla o wielu slotach plaskich wchodzi do odczytu SLOTEM, wiec zostaje typ
-    // i dlugosc, a krotnosc spada do jednego — ta sama regula co we flattenArrayFields().
+    // i dlugosc, a krotnosc spada do jednego - ta sama regula co we flattenArrayFields().
     // `STRING[N]` jest jednym slotem i zachowuje `rarray = N`.
     const int arity = (flatSlotCount(*sourceField) == 1) ? sourceField->rarray : 1;
     return exprShape{.rtype = sourceField->rtype, .rlen = sourceField->rlen, .rarray = arity};
@@ -2782,8 +2782,8 @@ std::string compiler::inferFieldShapes() {
 
       // NAJPIERW grupy okien, bo od ich typu zalezy ksztalt pol, ktore je czytaja.
       //
-      // Typ wartosci wchodzacych do redukcji liczy sie z CALEGO programu argumentu —
-      // `MIN(to_double(k) : 5)` nad polem INTEGER daje DOUBLE, a nie RATIONAL — i dopiero
+      // Typ wartosci wchodzacych do redukcji liczy sie z CALEGO programu argumentu -
+      // `MIN(to_double(k) : 5)` nad polem INTEGER daje DOUBLE, a nie RATIONAL - i dopiero
       // ten typ idzie przez reductionResultField(), czyli te sama regule, ktora stosuja
       // reduktory strumieniowe i streamInstance::reduceRecordWindow().
       for (auto &g : q.windowGroups) {
@@ -2833,14 +2833,14 @@ std::string compiler::inferFieldShapes() {
 
 /// Ta sama bramka co w inferFieldShapes(), ale dla WARUNKOW REGUL.
 ///
-/// Osobny przebieg, bo inferFieldShapes() ma zawezony zakres — rusza wylacznie wezly, ktorych
+/// Osobny przebieg, bo inferFieldShapes() ma zawezony zakres - rusza wylacznie wezly, ktorych
 /// schemat kopiuje lub syntetyzuje operator FROM, i oglada `q.lSchema`, a nie `q.lRules`.
 /// Warunek reguly wykonuje jednak DOKLADNIE ten sam expressionEvaluator, wiec bez tego
 /// przebiegu `RULE ... WHEN Sqrt(m[0]) > 1` omijalby bramke i wracal do cichej zlej wartosci.
 /// Tutaj zakresu nie zawezamy: pytanie „czy to sie policzy" nie zalezy od tego, czy wezel
 /// syntetyzuje wlasny schemat.
 ///
-/// Przebieg NIE ustala ksztaltow i niczego nie zapisuje — czyta tylko status `rejected`.
+/// Przebieg NIE ustala ksztaltow i niczego nie zapisuje - czyta tylko status `rejected`.
 std::string compiler::checkRuleConditionShapes() {
   auto shapeOfField = [this](const std::string &streamId, const int flatIndex) -> std::optional<exprShape> {
     const auto sourceField = sourceFieldAt(streamId, flatIndex);
@@ -2867,19 +2867,19 @@ std::string compiler::checkRuleConditionShapes() {
   return "OK";
 }
 
-/// R3 — uproszczenia algebraiczne w programach pól i w warunkach reguł.
+/// R3 - uproszczenia algebraiczne w programach pól i w warunkach reguł.
 ///
 /// Reguły i ich uzasadnienie są przy simplifyExpression() (exprSimplify.hpp); tutaj jest
 /// tylko dostarczenie typów pól i obejście planu.
 ///
-/// Miejsce w łańcuchu nie jest dowolne — przebieg musi stać MIĘDZY resolveFieldReferences()
+/// Miejsce w łańcuchu nie jest dowolne - przebieg musi stać MIĘDZY resolveFieldReferences()
 /// a localizeFieldOffsets(). Wcześniej odwołania do pól są jeszcze nierozwiązane
 /// (PUSH_ID1/PUSH_ID2/PUSH_ID3) i typu nie ma z czego odczytać; później PUSH_ID wskazuje
 /// offset w LOKALNYM buforze wejściowym zapytania, więc nazwa strumienia źródłowego
 /// przestaje prowadzić do schematu. Typ jest tu konieczny: reasocjacja stałych jest
 /// niepoprawna dla FLOAT/DOUBLE i dla podwyrażeń o nieznanym typie.
 ///
-/// Przed shareEquivalentSelectComputations(), bo odciski liczą się z tokenów — kanoniczna
+/// Przed shareEquivalentSelectComputations(), bo odciski liczą się z tokenów - kanoniczna
 /// postać wyrażenia zwiększa liczbę wykrytych równoważności.
 std::string compiler::simplifyFieldExpressions() {
   auto typeOfField = [this](const std::string &streamId, int fieldIndex) -> std::optional<rdb::descFld> {
@@ -2894,7 +2894,7 @@ std::string compiler::simplifyFieldExpressions() {
     if (q.isCompilerDirective()) continue;
 
     // Odwolanie w programie pola bierze typ z rekordu wejsciowego wedlug tej samej reguly co
-    // w inferFieldShapes() — patrz inputSlotOfReference() — zeby R3 widzialo typ, ktory stoi
+    // w inferFieldShapes() - patrz inputSlotOfReference() - zeby R3 widzialo typ, ktory stoi
     // w deskryptorze.
     //
     // Rekord FROM i offsety blokow liczone dopiero przy pierwszym odwolaniu, ktore ich potrzebuje.
@@ -2921,15 +2921,15 @@ std::string compiler::simplifyFieldExpressions() {
     for (auto &r : q.lRules)
       rdb::probe::onRewriteR3(simplifyExpression(r.condition, typeOfField));
 
-    // Podwyrazenia okien stoja w tabeli grup, a nie w programie pola — resolveWindowAggregates()
+    // Podwyrazenia okien stoja w tabeli grup, a nie w programie pola - resolveWindowAggregates()
     // wyjmuje je stamtad wczesniej, bo okno adresuje sloty ZRODLA. Bez tej petli `MIN(x*1 : 3)`
     // zostawaloby nieuproszczone tylko z powodu kolejnosci przebiegow, a nie z powodu reguly.
     // Odwolania w programie grupy niosa numeracje zrodla, czyli dokladnie te, ktorej oczekuje
-    // typeOfField() — tak samo jak programy pol przed localizeFieldOffsets().
+    // typeOfField() - tak samo jak programy pol przed localizeFieldOffsets().
     for (auto &g : q.windowGroups) {
       if (g.program.empty()) continue;
       rdb::probe::onRewriteR3(simplifyExpression(g.program, typeOfField));
-      // Rachunek zwiniety do samego odczytu pola wraca na szybka sciezke — bez ewaluatora
+      // Rachunek zwiniety do samego odczytu pola wraca na szybka sciezke - bez ewaluatora
       // w petli po rekordach okna. Grup zwinietych do tego samego ksztaltu ten przebieg nie
       // scala: wymagaloby to przenumerowania indeksow w programach pol, a kosztem duplikatu
       // jest jedno dodatkowe przejscie po oknie, nie roznica w wyniku.
@@ -2944,11 +2944,11 @@ std::string compiler::simplifyFieldExpressions() {
 
 namespace {
 
-/// Zwija wyrazenie indeksu generatora — regule `gen_index` z RQL.g4 — do liczby calkowitej.
+/// Zwija wyrazenie indeksu generatora - regule `gen_index` z RQL.g4 - do liczby calkowitej.
 ///
 /// `$` ma wartosc numeru instancji. Tekst pochodzi z ANTLR-owego getText(), wiec nie zawiera
 /// bialych znakow, a jego ksztalt gwarantuje gramatyka. Kazde odstepstwo od niej jest wiec
-/// bledem WEWNETRZNYM — rozjechala sie gramatyka z ewaluatorem — a nie bledem uzytkownika,
+/// bledem WEWNETRZNYM - rozjechala sie gramatyka z ewaluatorem - a nie bledem uzytkownika,
 /// i stad FatalError zamiast komunikatu zwracanego do wolajacego.
 class genIndexFolder {
  public:
@@ -3042,7 +3042,7 @@ bool mentionsOrdinal(const query &q) {
 /// Podstawia numer instancji w jednej kopii szablonu generatora.
 ///
 /// Po tym kroku po `$` nie ma w kopii sladu: PUSH_GENIDX staje sie zwyklym PUSH_VAL,
-/// a `cells[23-$]` zwyklym `cells[22]` — tokenem nie do odroznienia od recznie napisanego.
+/// a `cells[23-$]` zwyklym `cells[22]` - tokenem nie do odroznienia od recznie napisanego.
 std::string compiler::substituteOrdinal(query &instance, int ordinal) {
   for (auto &t : instance.lProgram) {
     if (t.getCommandID() != PUSH_STREAM || !dependsOnOrdinal(t.getStr_())) continue;
@@ -3064,13 +3064,13 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
       const int index = genIndexFolder(parts->second, ordinal).fold();
       if (index < 0)
         return "Stream '" + instance.id + "' references '" + parts->first + "[" + std::to_string(index) +
-               "]' — field index must not be negative";
+               "]' - field index must not be negative";
       t = token(PUSH_ID2, parts->first + "[" + std::to_string(index) + "]");
     }
   return {"OK"};
 }
 
-/// Kontrola nazw i arnosci funkcji skalarnych — jedyne miejsce, w ktorym plan moze odpasc
+/// Kontrola nazw i arnosci funkcji skalarnych - jedyne miejsce, w ktorym plan moze odpasc
 /// z powodu wywolania funkcji.
 ///
 /// Do 2026-08-30 takiego miejsca nie bylo: lista dozwolonych nazw stala w gramatyce, a lista
@@ -3083,13 +3083,13 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
 /// ten przebieg. Dzieki temu `-c` JEST bramka: program, ktory nie ma prawa sie wykonac, nie
 /// przechodzi kompilacji.
 ///
-/// Przebieg jest czysto kontrolny — niczego nie przepisuje — wiec moze stac przed rozwinieciem
+/// Przebieg jest czysto kontrolny - niczego nie przepisuje - wiec moze stac przed rozwinieciem
 /// generatorow. Rodziny powielaja gotowe programy pol, a wywolanie funkcji nie zmienia sie przy
 /// podstawianiu numeru instancji: nazwa zla w szablonie jest zla w kazdej instancji, a nazwa
 /// dobra pozostaje dobra. Sprawdzanie 24 kopii tego samego bledu tylko powielaloby komunikat.
 std::string compiler::checkFunctionCalls() {
   // CALL2 niesie pare <nazwa, zadeklarowana szerokosc>, CALL samo nazwe. Obie postaci maja te
-  // sama nazwe funkcji, wiec rozstrzyga o niej getStr_(), a o arnosci — command_id.
+  // sama nazwe funkcji, wiec rozstrzyga o niej getStr_(), a o arnosci - command_id.
   const auto checkProgram = [](const std::list<token> &program, const std::string &owner) -> std::string {
     for (const auto &t : program) {
       const auto cmd = t.getCommandID();
@@ -3144,8 +3144,8 @@ std::string compiler::checkFunctionCalls() {
 ///
 /// Bramka jest tu WASKA celowo: `STREAM_MIN/MAX/AVG/SUM` to jedyne tokeny strumieniowe, po
 /// ktore siega `term`, wiec tylko one moga ta droga trafic do programu pola. Pola syntetyzowane
-/// przez buildOutputSchema() nad reduktorem — z ktorych zyje dzialajace `SELECT * FROM AVG(src)`
-/// — nie niosa tokenu `STREAM_*`, tylko `PUSH_ID`, wiec ta kontrola ich nie oglada.
+/// przez buildOutputSchema() nad reduktorem - z ktorych zyje dzialajace `SELECT * FROM AVG(src)`
+/// - nie niosa tokenu `STREAM_*`, tylko `PUSH_ID`, wiec ta kontrola ich nie oglada.
 ///
 /// Stoi razem z checkFunctionCalls() i z tego samego powodu: PRZED expandStreamGenerators(),
 /// zeby jeden zly szablon nie zwielokrotnil sie w N identycznych bledow.
@@ -3204,9 +3204,9 @@ std::string compiler::checkStreamReducerFieldRefs() {
 /// bez znaczenia, czy napisal go czlowiek, czy zwinal go `$`.
 ///
 /// Numer instancji wchodzi w trzy miejsca, wszystkie zapisywane tym samym `$`:
-///   * indeks pola     `cells[$]`, `cells[23-$]`  — zwijany do literalu,
-///   * wartosc         `cells[0]+$`               — PUSH_GENIDX staje sie PUSH_VAL,
-///   * nazwa strumienia w klauzuli FROM `cell[$]` — staje sie nazwa fizyczna `cell$3`.
+///   * indeks pola     `cells[$]`, `cells[23-$]`  - zwijany do literalu,
+///   * wartosc         `cells[0]+$`               - PUSH_GENIDX staje sie PUSH_VAL,
+///   * nazwa strumienia w klauzuli FROM `cell[$]` - staje sie nazwa fizyczna `cell$3`.
 std::string compiler::expandStreamGenerators() {
   std::map<std::string, int> families;
   std::set<std::string> plainNames;
@@ -3231,13 +3231,13 @@ std::string compiler::expandStreamGenerators() {
     }
 
     if (!q.filename.empty())
-      return "Stream generator '" + q.id + "' must not carry a FILE directive — one file name cannot serve " +
+      return "Stream generator '" + q.id + "' must not carry a FILE directive - one file name cannot serve " +
              std::to_string(q.generatorSize) + " streams";
 
     // Bez `$` kazda z N instancji liczylaby to samo z tego samego zrodla. Rozniloby je
     // wylacznie imie, wiec generator jest wtedy pomylka zapisu, a nie skrotem.
     if (!mentionsOrdinal(q))
-      return "Stream generator '" + q.id + "' uses no '$' — it would produce " + std::to_string(q.generatorSize) +
+      return "Stream generator '" + q.id + "' uses no '$' - it would produce " + std::to_string(q.generatorSize) +
              " identical streams under different names";
 
     for (int ordinal = 0; ordinal < q.generatorSize; ++ordinal) {
@@ -3248,7 +3248,7 @@ std::string compiler::expandStreamGenerators() {
       if (plainNames.contains(instance.id) || !generatedNames.insert(instance.id).second)
         return "Generated stream '" + instance.id + "' collides with a stream that already exists";
 
-      // Prefiks nazwy pola bierze sie z nazwy INSTANCJI, nie szablonu — dlatego parser go
+      // Prefiks nazwy pola bierze sie z nazwy INSTANCJI, nie szablonu - dlatego parser go
       // dla generatora nie doklada. Inaczej pole nazywaloby sie `cell_0` zamiast `cell$0_0`
       // i plan przestalby byc rownowazny recznemu zapisowi.
       for (auto &f : instance.lSchema)
@@ -3325,7 +3325,7 @@ std::string compiler::compile() {
   result = expandStreamGenerators();
   if (result != "OK") return result;
 
-  // Musi być PRZED pierwszym przebiegiem — patrz uzasadnienie przy definicji.
+  // Musi być PRZED pierwszym przebiegiem - patrz uzasadnienie przy definicji.
   snapshotNamedSourceRefs();
 
   result = extractIntermediateStreams();
@@ -3339,7 +3339,7 @@ std::string compiler::compile() {
 
   // Niezmiennik D3 sprawdzany wokół KAŻDEGO przebiegu przepisującego z osobna. Jednego snapshotu
   // "przed optymalizacjami" zrobić się nie da, bo przebiegi przepisujące są przeplecione
-  // z przebiegami dopełniającymi schemat (resolveFieldReferences) — te legalnie zmieniają
+  // z przebiegami dopełniającymi schemat (resolveFieldReferences) - te legalnie zmieniają
   // listę pól. Rozwinięcie [_] jest już za nami: dzieje się w expandSchemaWildcards().
   std::map<std::string, std::vector<std::string>> namesBeforeRewrite;
 
@@ -3361,7 +3361,7 @@ std::string compiler::compile() {
 #endif
   planBench.capture(rdb::probe::planStage::postDedup, coreInstance);
 
-  // POZA `#if` — kontrola poprawnosci, nie optymalizacja. Musi widziec plan po deduplikacji,
+  // POZA `#if` - kontrola poprawnosci, nie optymalizacja. Musi widziec plan po deduplikacji,
   // bo przed nia duplikaty nazw sa stanem normalnym.
   result = validateSubstratNameUniqueness();
   if (result != "OK") return result;
@@ -3370,7 +3370,7 @@ std::string compiler::compile() {
   if (result != "OK") return result;
 
   // MUSI stac po rozwiazaniu odwolan do pol (potrzebuje pary strumien+pole) i PRZED
-  // localizeFieldOffsets(), ktore przepisuje offsety PUSH_ID na bufor wejsciowy konsumenta —
+  // localizeFieldOffsets(), ktore przepisuje offsety PUSH_ID na bufor wejsciowy konsumenta -
   // okno adresuje sloty ZRODLA, wiec jego PUSH_ID musi wczesniej zniknac z programu.
   result = resolveWindowAggregates();
   if (result != "OK") return result;
@@ -3382,7 +3382,7 @@ std::string compiler::compile() {
   // ksztaltu pola zrodlowego nie ma z czego odczytac.
   //
   // MUSI stac PRZED upraszczaniem wyrazen, i nie jest to kwestia porzadku. Po zwinieciu stalych
-  // `to_string(42:16)` jest literalem "42", wiec szerokosc pola wyszlaby 2 zamiast 16 — deskryptor
+  // `to_string(42:16)` jest literalem "42", wiec szerokosc pola wyszlaby 2 zamiast 16 - deskryptor
   // zaczalby zalezec od RDB_OPT_SIMPLIFY_EXPRESSIONS, czyli od przelacznika wydajnosciowego.
   result = inferFieldShapes();
   if (result != "OK") return result;
@@ -3411,7 +3411,7 @@ std::string compiler::compile() {
   result = localizeFieldOffsets();
   if (result != "OK") return result;
 
-  // Po wszystkich przepisaniach planu — ogon liczymy dla planu, który faktycznie pójdzie do wykonania.
+  // Po wszystkich przepisaniach planu - ogon liczymy dla planu, który faktycznie pójdzie do wykonania.
   // Pojemność historii zależy od tej wartości: opóźniony konsument może nadal
   // potrzebować wczesnych rekordów szybszego producenta.
   //
@@ -3435,7 +3435,7 @@ std::string compiler::compile() {
   // Kolejność elementów qTree jest kolejnością przetwarzania w takcie
   // (dataModel::processRows). Musi być topologiczna: producent przed
   // konsumentem. resolveStreamIntervals() sortuje qTree po rInterval
-  // (qTree::sort, operator< na query), co ten porządek niszczy — a przywracał
+  // (qTree::sort, operator< na query), co ten porządek niszczy - a przywracał
   // go dotąd wyłącznie factorMatchedHashTimeMoves(), i tylko gdy reguła
   // faktycznie coś przepisała. Skutkiem była zależność semantyki planu od tego,
   // czy odpaliła niezwiązana optymalizacja. Najdotkliwiej dla przeplotu:

@@ -3,7 +3,7 @@
 # dokladnie, a pole o krok dalej przepelnia sie i ma byc NULL, nie zawinieta liczba.
 #
 # Zadne wyrazenie nie ma dwoch stalych przy `+`, `-` ani `*`, zeby regula B (reasocjacja stalych) nie miala
-# czego przepisywac — wynik nie zalezy od RDB_OPT_SIMPLIFY_EXPRESSIONS.
+# czego przepisywac - wynik nie zalezy od RDB_OPT_SIMPLIFY_EXPRESSIONS.
 
 STORAGE 'temp'
 
@@ -38,7 +38,7 @@ STREAM ilo \
 FROM lo
 
 # big = 2000000000 w obu polach kazdego rekordu. Reduktor sumuje pola rekordu, okno SUMC/AVG
-# sumuje big[0] z dwoch kolejnych rekordow — w obu przypadkach suma dwoch wartosci przepelnia int32.
+# sumuje big[0] z dwoch kolejnych rekordow - w obu przypadkach suma dwoch wartosci przepelnia int32.
 SELECT * \
 STREAM bs \
 FROM big.sumc

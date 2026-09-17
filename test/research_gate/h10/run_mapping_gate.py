@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bramka odwzorowania — podpróba wykonywana end-to-end, w dwóch skalach.
+"""Bramka odwzorowania - podpróba wykonywana end-to-end, w dwóch skalach.
 
 Cel: rozstrzygnąć, czy rozbieżność ogona jest rozbieżnością ogona, czy różnicą
 w definicji operatora. Silnik jest uruchamiany, a treść rekordów porównywana
@@ -7,7 +7,7 @@ z modelem treści oracle'a.
 
 Bramka skali (kryterium zamrozone w kampanii K24, §9): ogon i odwzorowanie zależą wyłącznie od
 ilorazów interwałów, więc ten sam plan uruchomiony w dwóch skalach musi dać tę
-samą treść. Różnica między skalami oznacza, że silnik nie nadążył — przebieg
+samą treść. Różnica między skalami oznacza, że silnik nie nadążył - przebieg
 jest wtedy dyskwalifikowany jako aparatura, a nie raportowany jako znalezisko.
 """
 
@@ -46,7 +46,7 @@ def select(corpus, per_stratum, strata=STRATA):
 def run_one(index, stratum, item, binary, workroot):
     outcomes = []
     # Origin i ogon sa wielkosciami INDEKSOWYMI i zaleza wylacznie od ilorazow
-    # interwalow, wiec sa te same w obu skalach — liczymy je raz, na planie
+    # interwalow, wiec sa te same w obu skalach - liczymy je raz, na planie
     # nieprzeskalowanym. Zrodlem jest MODEL ZDARZENIOWY, nie replika: bramka
     # odwzorowania nie ma prawa wpuscic rachunku silnika do wykonania.
     # Sam rachunek horyzontu i budzetu slotow mieszka w `oracle/execute.py`
@@ -88,7 +88,7 @@ def main():
     parser.add_argument("--per-stratum", type=int, default=8)
     parser.add_argument("--xretractor", default=None)
     parser.add_argument("--out", default=str(ROOT / "raw" / "mapping_gate.csv"))
-    # Korpus z oknem rekordowym — patrz run_campaign.py. Bramka odwzorowania jest
+    # Korpus z oknem rekordowym - patrz run_campaign.py. Bramka odwzorowania jest
     # JEDYNYM miejscem, gdzie model TRESCI okna jest sprawdzany wobec bajtow
     # artefaktu; bez tego przelacznika galaz WINDOW w model.content() bylaby
     # aparatura nieuruchomiona.
