@@ -450,5 +450,5 @@ add_custom_target(
 # Skrypt sprawdza architekture ELF wszystkich trzech programow w paczce.
 add_custom_target(
   package-portable-arm64
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/package-portable-arm64.sh
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/release_package/package-portable-arm64.sh
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
