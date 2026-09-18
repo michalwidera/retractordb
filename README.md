@@ -1,7 +1,6 @@
 # RetractorDB
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CircleCI](https://dl.circleci.com/status-badge/img/circleci/JNsMwQGBP38ArHVd2CGwAF/WU9ujc7GeVXvtLjU2b5mSf/tree/master.svg?style=shield)](https://dl.circleci.com/status-badge/redirect/circleci/JNsMwQGBP38ArHVd2CGwAF/WU9ujc7GeVXvtLjU2b5mSf/tree/master)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![CircleCI](https://dl.circleci.com/status-badge/img/circleci/JNsMwQGBP38ArHVd2CGwAF/WU9ujc7GeVXvtLjU2b5mSf/tree/master.svg?style=shield)](https://dl.circleci.com/status-badge/redirect/circleci/JNsMwQGBP38ArHVd2CGwAF/WU9ujc7GeVXvtLjU2b5mSf/tree/master)
 
 [comment]: # (VSCode view: Ctrl+k,v)
 
@@ -37,30 +36,23 @@ RetractorDB consists of three main programs:
 
 ## Installation
 
-RetractorDB targets Linux (x64 and ARM64). You can either build it from source or
-install a prebuilt package from the GitHub Releases page.
+RetractorDB targets Linux (x64 and ARM64). You can either build it from source or install a prebuilt package from the GitHub Releases page.
 
 ### Option A - install from a release package
 
-Prebuilt packages are published on the
-[GitHub Releases page](https://github.com/michalwidera/retractordb/releases).
-Existing releases ship a Debian package and a system-layout tarball, named
-after the project version and target system, for example (version `0.1.9`):
+Prebuilt packages are published on the [GitHub Releases page](https://github.com/michalwidera/retractordb/releases). Existing releases ship a Debian package and a system-layout tarball, named after the project version and target system, for example (version `0.1.9`):
 
 - `retractordb-0.1.9-Linux.deb`
 - `retractordb-0.1.9-Linux.tar.gz`
 
-**Debian / Ubuntu (`.deb`)** - installs binaries into `/usr/bin` and wires up the
-systemd service automatically:
+**Debian / Ubuntu (`.deb`)** - installs binaries into `/usr/bin` and wires up the systemd service automatically:
 
 ```bash
 # Download the .deb from the Releases page, then:
 sudo apt install ./retractordb-0.1.9-Linux.deb
 ```
 
-The package `postinst` creates the system user `retractor` and runs
-`systemctl enable xretractor.service`. The service is enabled (starts on next
-boot) but **not** started immediately - start it now with:
+The package `postinst` creates the system user `retractor` and runs `systemctl enable xretractor.service`. The service is enabled (starts on next boot) but **not** started immediately - start it now with:
 
 ```bash
 sudo systemctl start xretractor
@@ -68,11 +60,9 @@ systemctl status xretractor        # or: xretractor --status
 journalctl -u xretractor           # logs
 ```
 
-See [src/retractor/README.md](src/retractor/README.md#running-as-a-systemd-service)
-for the packaged systemd unit details.
+See [src/retractor/README.md](src/retractor/README.md#running-as-a-systemd-service) for the packaged systemd unit details.
 
-**System-layout tarball (`.tar.gz`)** - contains `usr/bin/` and a systemd unit.
-To copy only the CLI binaries from it:
+**System-layout tarball (`.tar.gz`)** - contains `usr/bin/` and a systemd unit. To copy only the CLI binaries from it:
 
 ```bash
 mkdir -p /tmp/retractordb-0.1.9
@@ -80,18 +70,7 @@ tar xzf retractordb-0.1.9-Linux.tar.gz -C /tmp/retractordb-0.1.9
 sudo cp /tmp/retractordb-0.1.9/usr/bin/x{retractor,qry,trdb} /usr/local/bin/
 ```
 
-For new releases, `ninja package-portable` builds a separate CLI archive with
-`bin/` paths relative to any install prefix, named
-`retractordb-VERSION-linux-ARCH-portable.tar.gz`. It also includes the license
-under `share/doc/retractordb/` and a safe default `retractor.toml` under
-`share/retractordb/`. The
-[website installer](https://retractordb.com/install/) selects the x86-64 or
-AArch64 asset and offers `--service` for a systemd service on request. It
-requires the archive to be uploaded as a release asset with the SHA-256 digest
-provided by GitHub Releases.
-The installer copies `retractor.toml` to `/etc/retractor/` for a system install
-or the user's XDG configuration directory, only if no local configuration
-exists. xretractor reads it automatically, including when run as a service.
+For new releases, `ninja package-portable` builds a separate CLI archive with `bin/` paths relative to any install prefix, named `retractordb-VERSION-linux-ARCH-portable.tar.gz`. It also includes the license under `share/doc/retractordb/` and a safe default `retractor.toml` under `share/retractordb/`. The [website installer](https://retractordb.com/install/) selects the x86-64 or AArch64 asset and offers `--service` for a systemd service on request. It requires the archive to be uploaded as a release asset with the SHA-256 digest provided by GitHub Releases. The installer copies `retractor.toml` to `/etc/retractor/` for a system install or the user's XDG configuration directory, only if no local configuration exists. xretractor reads it automatically, including when run as a service.
 
 After install, verify the three binaries are reachable:
 
@@ -103,11 +82,7 @@ xtrdb -h
 
 ### Option B - build from source
 
-The build uses **Conan 2 + CMake + Ninja** and requires **GCC 14+** (C++23,
-including `std::println`/`<print>`, absent from libstdc++ 13).
-A helper script, [`scripts/buildrdb.sh`](scripts/buildrdb.sh), bootstraps the
-toolchain and drives the build. Run it from the repo root, `scripts/`, or
-`build/Debug/`.
+The build uses **Conan 2 + CMake + Ninja** and requires **GCC 14+** (C++23, including `std::println`/`<print>`, absent from libstdc++ 13). A helper script, [`scripts/buildrdb.sh`](scripts/buildrdb.sh), bootstraps the toolchain and drives the build. Run it from the repo root, `scripts/`, or `build/Debug/`.
 
 ```bash
 git clone https://github.com/michalwidera/retractordb.git
@@ -128,8 +103,7 @@ scripts/buildrdb.sh bashrc        # then restart the shell or: source ~/.bashrc
 scripts/buildrdb.sh debug
 ```
 
-Install the binaries (no sudo - prefix defaults to `~/.local`) and run the test
-suite from the build directory:
+Install the binaries (no sudo - prefix defaults to `~/.local`) and run the test suite from the build directory:
 
 ```bash
 cd build/Debug
@@ -151,15 +125,11 @@ ninja package-portable          # x86-64 on an x86-64 host
 ninja package-portable-arm64    # local Docker ARM64 build; output in build/ARM64-Packages
 ```
 
-The ARM64 target uses Docker's `linux/arm64` platform to compile natively
-under emulation on an x86-64 host, then checks that all three archive members
-are AArch64 ELF binaries. It is a manual target and is not run by CI. CPack
-only packages binaries built for the configured target architecture.
+The ARM64 target uses Docker's `linux/arm64` platform to compile natively under emulation on an x86-64 host, then checks that all three archive members are AArch64 ELF binaries. It is a manual target and is not run by CI. CPack only packages binaries built for the configured target architecture.
 
 ### Optimizer ablation build options
 
-The following CMake options control independent query-plan optimizations. All
-are `ON` by default, so a normal build preserves the production optimizer:
+The following CMake options control independent query-plan optimizations. All are `ON` by default, so a normal build preserves the production optimizer:
 
 | Option | Default | Controlled transformation |
 |--------|---------|---------------------------|
@@ -168,10 +138,7 @@ are `ON` by default, so a normal build preserves the production optimizer:
 | `RDB_OPT_COMMUTATIVE_ADD` | `ON` | Treats `A+B` and `B+A` as equivalent while fingerprinting plans for shared `SELECT` computations. |
 | `RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES` | `ON` | Rewrites matched `(A>i)#(B>k)` plans to `(A#B)>(i+k)`. |
 
-`RDB_OPT_COMMUTATIVE_ADD=ON` requires
-`RDB_OPT_SHARE_EQUIVALENT_SELECTS=ON`; CMake rejects the otherwise ineffective
-combination. Disabling commutativity alone still allows syntactically identical
-`A+B` plans to share their computation.
+`RDB_OPT_COMMUTATIVE_ADD=ON` requires `RDB_OPT_SHARE_EQUIVALENT_SELECTS=ON`; CMake rejects the otherwise ineffective combination. Disabling commutativity alone still allows syntactically identical `A+B` plans to share their computation.
 
 Configure every experimental variant in its own build directory:
 
@@ -184,65 +151,32 @@ cmake --build build/abl-no-comm
 build/abl-no-comm/src/retractor/xretractor --build-info
 ```
 
-CMake option values persist in `CMakeCache.txt`. Use a fresh build directory or
-pass every `RDB_OPT_*` value explicitly when changing variants.
-`scripts/buildrdb.sh release` and `scripts/buildrdb.sh package` explicitly
-restore all production optimizer options to `ON`.
+CMake option values persist in `CMakeCache.txt`. Use a fresh build directory or pass every `RDB_OPT_*` value explicitly when changing variants. `scripts/buildrdb.sh release` and `scripts/buildrdb.sh package` explicitly restore all production optimizer options to `ON`.
 
-`RDB_BENCH_PROBE` is independent measurement instrumentation, not an optimizer
-switch. Any valid optimizer combination can be configured with the probe either
-`ON` or `OFF`; production release and packaging force it to `OFF`.
+`RDB_BENCH_PROBE` is independent measurement instrumentation, not an optimizer switch. Any valid optimizer combination can be configured with the probe either `ON` or `OFF`; production release and packaging force it to `OFF`.
 
 ## Experiments
 
-[rdb-experiment](https://github.com/michalwidera/rdb-experiment) is an
-independent repository containing the scripts, journal, and results of
-RetractorDB research. It is not part of this repository, and the build, test
-suite, packaging, and CI do not require it.
+[rdb-experiment](https://github.com/michalwidera/rdb-experiment) is an independent repository containing the scripts, journal, and results of RetractorDB research. It is not part of this repository, and the build, test suite, packaging, and CI do not require it.
 
 ### What the experiments are
 
-They are the research record behind the project's publications - not demos and
-not example queries. Two families live there:
+They are the research record behind the project's publications - not demos and not example queries. Two families live there:
 
-- **Performance campaigns.** A supervisor machine drives a worker running
-  RetractorDB on real hardware (a Raspberry Pi 400 under a `PREEMPT_RT`
-  kernel). Each campaign raises the input rate or the number of attached
-  `xqry` clients and records slot-level latency, CPU load, memory, and
-  temperature, so the sustained-rate ceiling of a given platform can be
-  located rather than guessed. These runs supply the *Performance Evaluation*
-  section of the paper.
-- **Semantic experiments.** Machine validation of the algebra against
-  independent oracles - for example the equivalence of the interleave operator
-  with explicit CSDF and block SDF realizations, checked over several million
-  output positions.
+- **Performance campaigns.** A supervisor machine drives a worker running RetractorDB on real hardware (a Raspberry Pi 400 under a `PREEMPT_RT` kernel). Each campaign raises the input rate or the number of attached `xqry` clients and records slot-level latency, CPU load, memory, and temperature, so the sustained-rate ceiling of a given platform can be located rather than guessed. These runs supply the *Performance Evaluation* section of the paper.
+- **Semantic experiments.** Machine validation of the algebra against independent oracles - for example the equivalence of the interleave operator with explicit CSDF and block SDF realizations, checked over several million output positions.
 
-Each campaign directory keeps its own `README.md` with the research goal,
-the machine state captured before and after every run, and the raw samples.
-`JOURNAL.md` records the chronological research log, including hypotheses that
-turned out wrong - they are part of the path, not something to be edited out.
-`REQUIREMENTS.md` defines how a campaign must be conducted to stay
-reproducible.
+Each campaign directory keeps its own `README.md` with the research goal, the machine state captured before and after every run, and the raw samples. `JOURNAL.md` records the chronological research log, including hypotheses that turned out wrong - they are part of the path, not something to be edited out. `REQUIREMENTS.md` defines how a campaign must be conducted to stay reproducible.
 
 ### Why a separate repository
 
-Experimental data grows far faster than source code, and it grows
-monotonically: every campaign adds raw samples that must never be rewritten,
-because reproducibility is the point. Keeping that growing history in the main
-repository would make every `git clone`, CI job, and packaging build fetch
-measurement data it will never read.
+Experimental data grows far faster than source code, and it grows monotonically: every campaign adds raw samples that must never be rewritten, because reproducibility is the point. Keeping that growing history in the main repository would make every `git clone`, CI job, and packaging build fetch measurement data it will never read.
 
-Keeping it separate leaves the engine repository small and makes the boundary
-explicit: the engine is the product, while experiments are evidence about it.
-The two repositories have separate histories and evolve on different
-schedules. Each experiment manifest records the full engine commit and the
-base commit of the experiment repository used for that campaign.
+Keeping it separate leaves the engine repository small and makes the boundary explicit: the engine is the product, while experiments are evidence about it. The two repositories have separate histories and evolve on different schedules. Each experiment manifest records the full engine commit and the base commit of the experiment repository used for that campaign.
 
 ### When you need it
 
-Clone it separately when you need to reproduce a published measurement, audit
-raw data, or run a campaign. The standard supervisor layout keeps both
-repositories as siblings:
+Clone it separately when you need to reproduce a published measurement, audit raw data, or run a campaign. The standard supervisor layout keeps both repositories as siblings:
 
 ```bash
 cd /path/to/parent
@@ -250,11 +184,7 @@ git clone https://github.com/michalwidera/retractordb.git
 git clone https://github.com/michalwidera/rdb-experiment.git
 ```
 
-Run experiment commands from the `rdb-experiment` checkout. Its `README.md`
-describes the supervisor and worker layout, while `REQUIREMENTS.md` defines the
-reproducibility, clean-tree, build, and artifact rules. The supervisor accepts
-`--code-repo` and related path options when the checkouts do not use its
-documented default locations.
+Run experiment commands from the `rdb-experiment` checkout. Its `README.md` describes the supervisor and worker layout, while `REQUIREMENTS.md` defines the reproducibility, clean-tree, build, and artifact rules. The supervisor accepts `--code-repo` and related path options when the checkouts do not use its documented default locations.
 
 ### What this does to CI
 
@@ -263,30 +193,19 @@ documented default locations.
 | Commit and push in `rdb-experiment` | Does not trigger this repository's CircleCI pipeline |
 | Commit in this repository | Runs according to this repository's branch and workflow filters |
 
-CircleCI does not fetch the experiment repository. The `[skipci]` commit
-message marker remains available for explicit commit-triggered skips;
-scheduled and manual workflows ignore it and run regardless.
+CircleCI does not fetch the experiment repository. The `[skipci]` commit message marker remains available for explicit commit-triggered skips; scheduled and manual workflows ignore it and run regardless.
 
 ## Initial configuration
 
-RetractorDB runs with sensible defaults and **needs no configuration file** to
-start - a missing config is a valid state. Configuration is optional TOML, loaded
-in layers (later layers override earlier ones):
+RetractorDB runs with sensible defaults and **needs no configuration file** to start - a missing config is a valid state. Configuration is optional TOML, loaded in layers (later layers override earlier ones):
 
 1. system: `/etc/retractor/retractor.toml`
 2. user: `$XDG_CONFIG_HOME/retractor/retractor.toml` (or `~/.config/retractor/retractor.toml`)
 3. explicit: `xretractor --config <file>` - when given, **only** that file is loaded
 
-Both `xretractor` and `xqry` use the same search. Logs go to `/tmp/xretractor.log`
-and `/tmp/xqry.log` (in `--service` mode `xretractor` logs to stderr/journald
-instead).
+Both `xretractor` and `xqry` use the same search. Logs go to `/tmp/xretractor.log` and `/tmp/xqry.log` (in `--service` mode `xretractor` logs to stderr/journald instead).
 
-**Storage.** Where stream data and `.desc` / `.meta` artifacts are written is
-controlled by the `:STORAGE` directive inside the RQL file. The `[storage] dir`
-config key only provides a *default* used when the RQL has no `:STORAGE`
-directive - **RQL always wins**. If `storage.dir` is set, the directory must
-already exist and be writable by the xretractor process, otherwise startup fails
-with a configuration error.
+**Storage.** Where stream data and `.desc` / `.meta` artifacts are written is controlled by the `:STORAGE` directive inside the RQL file. The `[storage] dir` config key only provides a *default* used when the RQL has no `:STORAGE` directive - **RQL always wins**. If `storage.dir` is set, the directory must already exist and be writable by the xretractor process, otherwise startup fails with a configuration error.
 
 A minimal config that sets a default storage directory:
 
@@ -295,15 +214,11 @@ A minimal config that sets a default storage directory:
 dir = "/var/lib/retractor/data"
 ```
 
-For the full list of keys (`[ipc]`, `[timing]`, `[scheduling]`, `[paths]`,
-`[service]`), validation rules, and the systemd service setup, see
-[src/retractor/README.md](src/retractor/README.md#configuration-toml).
+For the full list of keys (`[ipc]`, `[timing]`, `[scheduling]`, `[paths]`, `[service]`), validation rules, and the systemd service setup, see [src/retractor/README.md](src/retractor/README.md#configuration-toml).
 
 ## Running your first query
 
-A query set is a `.rql` file with stream `DECLARE`s and continuous `SELECT`s.
-The example below needs no input data files - it reads bytes from `/dev/urandom`.
-Save it as `first.rql`:
+A query set is a `.rql` file with stream `DECLARE`s and continuous `SELECT`s. The example below needs no input data files - it reads bytes from `/dev/urandom`. Save it as `first.rql`:
 
 ```sql
 # declaration of input time series
@@ -314,45 +229,31 @@ SELECT core0[0],b STREAM str1 FROM core0#core1
 SELECT core1[0]/2+1,a,a+1,b STREAM str2 FROM core1+core0
 ```
 
-Note: the interlace operator `#` requires both input streams to have the same
-number of fields.
+Note: the interlace operator `#` requires both input streams to have the same number of fields.
 
-(More ready-made examples live under [examples/](examples/), e.g.
-[examples/session-record-1/query.rql](examples/session-record-1/query.rql).)
+(More ready-made examples live under [examples/](examples/), e.g. [examples/session-record-1/query.rql](examples/session-record-1/query.rql).)
 
-**1. Sanity-check (compile only)** - no data processing, just validate the query
-set:
+**1. Sanity-check (compile only)** - no data processing, just validate the query set:
 
 ```bash
 xretractor -c first.rql
 ```
 
-**2. Start the engine.** `xretractor` compiles the queries and then runs them
-continuously until terminated. Start it (here in the foreground; press a key to
-stop, or use `-k` to disable that):
+**2. Start the engine.** `xretractor` compiles the queries and then runs them continuously until terminated. Start it (here in the foreground; press a key to stop, or use `-k` to disable that):
 
 ```bash
 xretractor first.rql
 ```
 
-If you installed via the `.deb`, the engine usually runs as a systemd service
-instead. To load a query set into an **already running** service, just start
-`xretractor` with your `.rql` file - it detects the running service, validates
-(compiles) the queries, overwrites the service's query file and restarts the unit
-to apply them, keeping the unit configuration:
+If you installed via the `.deb`, the engine usually runs as a systemd service instead. To load a query set into an **already running** service, just start `xretractor` with your `.rql` file - it detects the running service, validates (compiles) the queries, overwrites the service's query file and restarts the unit to apply them, keeping the unit configuration:
 
 ```bash
 xretractor my-new-queries.rql      # delivered to the running service via restart
 ```
 
-This is the path for a full, persistent query set (rules, `:STORAGE`, rotation),
-as opposed to the transient ad-hoc injection over IPC (`xqry --adhoc`). Use
-`systemctl`/`journalctl` to manage and inspect the service. See
-[src/retractor/README.md](src/retractor/README.md#delivering-a-query-set-to-a-running-service)
-for details.
+This is the path for a full, persistent query set (rules, `:STORAGE`, rotation), as opposed to the transient ad-hoc injection over IPC (`xqry --adhoc`). Use `systemctl`/`journalctl` to manage and inspect the service. See [src/retractor/README.md](src/retractor/README.md#delivering-a-query-set-to-a-running-service) for details.
 
-**3. Query the running engine** with the `xqry` client (in a second terminal).
-`xretractor` must be running - `xqry` reads results from shared memory:
+**3. Query the running engine** with the `xqry` client (in a second terminal). `xretractor` must be running - `xqry` reads results from shared memory:
 
 ```bash
 xqry -d              # list active streams/queries
@@ -360,10 +261,7 @@ xqry -s str1         # stream out results of stream 'str1'
 xqry -s str2
 ```
 
-`xqry` also offers other output modes (`--graphite`, `--influxdb`, `--gnuplot`)
-and an ad-hoc query mode (`--adhoc`); see
-[src/qry/README.md](src/qry/README.md) and `xqry -h`. To stop the engine you can
-also run `xqry --kill`.
+`xqry` also offers other output modes (`--graphite`, `--influxdb`, `--gnuplot`) and an ad-hoc query mode (`--adhoc`); see [src/qry/README.md](src/qry/README.md) and `xqry -h`. To stop the engine you can also run `xqry --kill`.
 
 ## Contributing
 

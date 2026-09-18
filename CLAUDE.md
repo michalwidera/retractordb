@@ -1,9 +1,6 @@
 # CLAUDE.md
 
-This file is the binding source for build, testing, style, collaboration, and commit/push/CI rules. `AGENTS.md`
-adds the agent-facing entry points it does not duplicate: the indexed system knowledge in the sibling
-`knowledge-index` repository (referenced here through `.agents/skills/retractordb-system`), and
-`scripts/install-codex-skill.sh`, which installs that external skill for other workspaces.
+This file is the binding source for build, testing, style, collaboration, and commit/push/CI rules. `AGENTS.md` adds the agent-facing entry points it does not duplicate: the indexed system knowledge in the sibling `knowledge-index` repository (referenced here through `.agents/skills/retractordb-system`), and `scripts/install-codex-skill.sh`, which installs that external skill for other workspaces.
 
 ## Build
 
@@ -39,16 +36,9 @@ ninja test-ci-smoke  # Debug compile only, no tests (L1 of the nightly run)
 ninja test-ci-fast   # same job, build/ kept between runs - quick, NOT a faithful CI run
 scripts/test-ci.sh --list   # every profile with the CircleCI job it mirrors
 ```
-Each profile copies the working tree into a container built from the CI image
-(`micwide/buildenv-retractordb`) capped at the CI executor's resources (4 vCPU / 8 GiB)
-and runs that job's steps. Outside `all` and outside `ninja test`. Profiles mirror
-`.circleci/config.yml` by hand: change that file, change `scripts/test-ci.sh`.
+Each profile copies the working tree into a container built from the CI image (`micwide/buildenv-retractordb`) capped at the CI executor's resources (4 vCPU / 8 GiB) and runs that job's steps. Outside `all` and outside `ninja test`. Profiles mirror `.circleci/config.yml` by hand: change that file, change `scripts/test-ci.sh`.
 
-Every `test-ci-*` profile builds from scratch, like the CI checkout - tens of minutes, and
-ccache does not shorten it (this tree compiles with `-fmodules-ts`, which ccache cannot cache).
-`test-ci-fast` trades that fidelity for speed by keeping `build/` in a per-profile Docker volume;
-use it to check a change before committing, not to conclude anything about a CI run.
-`scripts/test-ci.sh --profile <name> --reset-build` drops a kept build directory.
+Every `test-ci-*` profile builds from scratch, like the CI checkout - tens of minutes, and ccache does not shorten it (this tree compiles with `-fmodules-ts`, which ccache cannot cache). `test-ci-fast` trades that fidelity for speed by keeping `build/` in a per-profile Docker volume; use it to check a change before committing, not to conclude anything about a CI run. `scripts/test-ci.sh --profile <name> --reset-build` drops a kept build directory.
 
 **Single test:**
 ```bash
@@ -94,8 +84,7 @@ CI: CircleCI, branches `master` or `issue_*`.
 
 - **C++23**, clang-format Google style, 129-col limit, 2-space indent. Run `ninja cformat` before commit.
 - Source comments in Polish - intentional.
-- **Dashes:** Prefer the ASCII hyphen-minus (`-`, U+002D) in repository text. Use a typographic dash only when
-  preserving an exact quotation or when the character itself is semantically significant.
+- **Dashes:** Prefer the ASCII hyphen-minus (`-`, U+002D) in repository text. Use a typographic dash only when preserving an exact quotation or when the character itself is semantically significant.
 
 **Include order (5 blocks, blank-line separated):**
 ```cpp
@@ -118,9 +107,7 @@ Sorted case-insensitively within each block. `IncludeBlocks: Preserve` - blank l
 
 1. **Ask before implementing** - state assumptions, surface ambiguities, push back on overcomplicated requests.
 2. **Minimum code** - no speculative features, no single-use abstractions, no impossible-scenario error handling.
-3. **Surgical edits** - touch only what the task requires; don't improve adjacent code even if it looks wrong; match
-   existing style. Report what looks wrong at the end of the task, with file and line and one sentence on why.
-   Whether it gets fixed is the human's decision; fixing it is a separate task and needs a separate go-ahead.
+3. **Surgical edits** - touch only what the task requires; don't improve adjacent code even if it looks wrong; match existing style. Report what looks wrong at the end of the task, with file and line and one sentence on why. Whether it gets fixed is the human's decision; fixing it is a separate task and needs a separate go-ahead.
 4. **Clean your orphans** - remove imports/vars/functions YOUR changes made unused; leave pre-existing dead code alone.
 5. **Verify before reporting done** - never claim success without running the relevant `ctest`.
 
@@ -147,42 +134,24 @@ Never start a new topic on top of unrelated uncommitted work.
 
 ### AI watermark hygiene (text)
 
-Every text artifact that enters the repository must be free of AI provenance marks - invisible Unicode
-(zero-width, bidi, tag chars, variation selectors, private use) and space homoglyphs. **Images are out of
-scope: marks in `.png` / `.jpg` / `.pdf` / figures may stay.** The requirement covers only text: sources,
-scripts, `.md`, `.rql`, `.g4`, CMake, TOML/YAML and commit messages.
+Every text artifact that enters the repository must be free of AI provenance marks - invisible Unicode (zero-width, bidi, tag chars, variation selectors, private use) and space homoglyphs. **Images are out of scope: marks in `.png` / `.jpg` / `.pdf` / figures may stay.** The requirement covers only text: sources, scripts, `.md`, `.rql`, `.g4`, CMake, TOML/YAML and commit messages.
 
-Tool: `watermarks-remover` (default `~/github/watermarks-remover`), used through its local scripts - **do not
-start the Docker/HTTP service for this check**. Layer A only (deterministic Unicode scrub); statistical
-Layer B rewriting is not part of this rule.
+Tool: `watermarks-remover` (default `~/github/watermarks-remover`), used through its local scripts - **do not start the Docker/HTTP service for this check**. Layer A only (deterministic Unicode scrub); statistical Layer B rewriting is not part of this rule.
 
-**Mandatory sequence before every commit and before every push.** No commit or push goes out - and no diff is
-handed over for human review - while the check reports a hit.
+**Mandatory sequence before every commit and before every push.** No commit or push goes out - and no diff is handed over for human review - while the check reports a hit.
 
-The command sequence - staged-file scan, per-file report, cleaning, re-check and re-stage, plus the
-whole-tree variant for a push and the commit-message check - is in the `watermark-check` skill.
-Invoke it before committing and before pushing.
+The command sequence - staged-file scan, per-file report, cleaning, re-check and re-stage, plus the whole-tree variant for a push and the commit-message check - is in the `watermark-check` skill. Invoke it before committing and before pushing.
 
-**Markdown exception:** The warning icon in `README.md` immediately before
-`**This is work in progress:**` contains `U+FE0F VARIATION SELECTOR-16`.
-This exact icon is intentional and must remain unchanged. If a strict scan
-reports it, verify its location and codepoint; every other reported hit still
-needs investigation. The default staged-file scan does not flag this emoji.
+**Markdown exception:** The warning icon in `README.md` immediately before `**This is work in progress:**` contains `U+FE0F VARIATION SELECTOR-16`. This exact icon is intentional and must remain unchanged. If a strict scan reports it, verify its location and codepoint; every other reported hit still needs investigation. The default staged-file scan does not flag this emoji.
 
 #### Source code - zero tolerance, strict mode
 
-Documentation can be fixed later; **source code cannot**. A zero-width character or a Cyrillic lookalike
-inside an identifier, string literal, RQL query or grammar rule compiles, diffs and reviews as normal text,
-and the resulting failure is practically undebuggable by hand. Nothing may ever introduce such a character
-into `.cpp` / `.hpp` / `.h` / `.c` / `.g4` / `.rql` / `.desc` / `.sh` / `.py` / `.cmake` / `CMakeLists.txt` /
-`.toml` / `.yml` / `.json`.
+Documentation can be fixed later; **source code cannot**. A zero-width character or a Cyrillic lookalike inside an identifier, string literal, RQL query or grammar rule compiles, diffs and reviews as normal text, and the resulting failure is practically undebuggable by hand. Nothing may ever introduce such a character into `.cpp` / `.hpp` / `.h` / `.c` / `.g4` / `.rql` / `.desc` / `.sh` / `.py` / `.cmake` / `CMakeLists.txt` / `.toml` / `.yml` / `.json`.
 
 Consequences for the assistant:
 
-- **Never paste model, browser or chat output straight into a source file.** Retype it as ASCII, or clean it
-  before it lands on disk.
-- **Check code immediately after editing it** - right after the edit, before `ninja cformat` and before the
-  build, not at commit time. A defect found at push has already been built and tested against.
+- **Never paste model, browser or chat output straight into a source file.** Retype it as ASCII, or clean it before it lands on disk.
+- **Check code immediately after editing it** - right after the edit, before `ninja cformat` and before the build, not at commit time. A defect found at push has already been built and tested against.
 - Code uses **strict mode**, which the default check does not cover:
 
 ```bash
@@ -190,78 +159,43 @@ WM="${WATERMARKS_REMOVER:-$HOME/github/watermarks-remover}/service/scripts"
 python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
 ```
 
-- On a hit in a source file: **stop and report it to the human** with file, line and codepoint. Do not sweep
-  the file with `--in-place`. The targeted repair is
-  `python3 "$WM/clean_text.py" <file> --aggressive-homoglyphs --strip-emoji-glue -o <file>.fixed`, followed by
-  a `git diff` confirming that only the offending codepoint changed.
+- On a hit in a source file: **stop and report it to the human** with file, line and codepoint. Do not sweep the file with `--in-place`. The targeted repair is `python3 "$WM/clean_text.py" <file> --aggressive-homoglyphs --strip-emoji-glue -o <file>.fixed`, followed by a `git diff` confirming that only the offending codepoint changed.
 - Any `U+00A0` or invisible codepoint in code is a defect, never "informational".
 
 ### Commits, push and CI
 
-- **No commit is created without human review - on any branch, `master` and side branches alike.** After verification
-  the assistant shows the diff and stops. The human reads it and gives the go-ahead; only then does `git commit` run.
-  Verification passing is not the go-ahead: green tests say the change works, not that it is the change the human wants
-  in the history.
+- **No commit is created without human review - on any branch, `master` and side branches alike.** After verification the assistant shows the diff and stops. The human reads it and gives the go-ahead; only then does `git commit` run. Verification passing is not the go-ahead: green tests say the change works, not that it is the change the human wants in the history.
 - **`master` in the code repository** - commits and pushes are performed by the human only.
-- **Side branches** - the assistant may run `git commit` locally, but only on an explicit go-ahead for that specific
-  diff, and provided no CI process is triggered. Approval is per diff and does not carry over to the next change.
-- Permission to commit on a side branch does not include permission to push, open a pull request, or invoke CI manually.
-  Those actions require an explicit human request.
+- **Side branches** - the assistant may run `git commit` locally, but only on an explicit go-ahead for that specific diff, and provided no CI process is triggered. Approval is per diff and does not carry over to the next change.
+- Permission to commit on a side branch does not include permission to push, open a pull request, or invoke CI manually. Those actions require an explicit human request.
 - If an action would trigger CI, stop and hand it over to the human.
 
 ### Session end
 
-Every session ends with either a local commit on a side branch made on an explicit go-ahead, a handoff of the
-uncommitted diff for human review/commit/push, or an explicit note why no commit was created. No unexplained
-uncommitted progress is left behind.
+Every session ends with either a local commit on a side branch made on an explicit go-ahead, a handoff of the uncommitted diff for human review/commit/push, or an explicit note why no commit was created. No unexplained uncommitted progress is left behind.
 
-**Research gate - mandatory before closing.** Whenever the session touched engine sources (`src/`), run the gate and
-report its verdict before the commit or the handoff:
+**Research gate - mandatory before closing.** Whenever the session touched engine sources (`src/`), run the gate and report its verdict before the commit or the handoff:
 
 ```bash
 ninja test_gate          # from build/Debug or build/Release
 ```
 
-It is deliberately outside `ninja` and `ninja test` (see `test/research_gate/README.md`), so nothing runs it
-implicitly. It is directional: a result worse than the reference is an **error** and stops the work; equal passes;
-better passes and is recorded. A skipped level (missing or stale H9 ablation profiles) counts as *not run*, never as
-passed - report it as such. No commit and no handoff goes out with an unreported or failing gate; a red gate is
-handed to the human, not worked around.
+It is deliberately outside `ninja` and `ninja test` (see `test/research_gate/README.md`), so nothing runs it implicitly. It is directional: a result worse than the reference is an **error** and stops the work; equal passes; better passes and is recorded. A skipped level (missing or stale H9 ablation profiles) counts as *not run*, never as passed - report it as such. No commit and no handoff goes out with an unreported or failing gate; a red gate is handed to the human, not worked around.
 
-Sessions that touched only tests, scripts or documentation do not need the gate - say explicitly that it was skipped
-and why.
+Sessions that touched only tests, scripts or documentation do not need the gate - say explicitly that it was skipped and why.
 
-**Ablation floor - mandatory when the session touched an optimizer pass.** The `RDB_OPT_*` switches must not change
-what the engine computes, only how fast it gets there. That invariant rots silently: the matrix broke with the `>N`
-tail rule change of 2026-08-07 and nobody noticed for twelve days, because `manual-ablation` runs only by hand. Whenever
-the session touched `src/retractor/lib/compiler.cpp`, the startup-latency or tail rules (`SOperations.hpp`,
-`computeStartupLatency`), or any code behind an `RDB_OPT_*` switch, build the all-off configuration and run the full
-suite before the commit or the handoff:
+**Ablation floor - mandatory when the session touched an optimizer pass.** The `RDB_OPT_*` switches must not change what the engine computes, only how fast it gets there. That invariant rots silently: the matrix broke with the `>N` tail rule change of 2026-08-07 and nobody noticed for twelve days, because `manual-ablation` runs only by hand. Whenever the session touched `src/retractor/lib/compiler.cpp`, the startup-latency or tail rules (`SOperations.hpp`, `computeStartupLatency`), or any code behind an `RDB_OPT_*` switch, build the all-off configuration and run the full suite before the commit or the handoff:
 
 ```bash
 scripts/buildrdb.sh release-ablation     # interactive: set all five switches OFF, probe OFF
 ctest --test-dir <katalog wypisany przez skrypt>/test -j 4
 ```
 
-Success is **the whole suite green** - no failure, and no `DISABLED` beyond the ones the tree already carries. The
-switches are an efficiency knob, not a semantics knob, and any difference they do show belongs in `def:observable`:
-`Val` must be equal, `Lat` only non-increasing (see `research_plan.md` §14.20).
+Success is **the whole suite green** - no failure, and no `DISABLED` beyond the ones the tree already carries. The switches are an efficiency knob, not a semantics knob, and any difference they do show belongs in `def:observable`: `Val` must be equal, `Lat` only non-increasing (see `research_plan.md` §14.20).
 
-One kind of assertion cannot hold without the pass: the one saying that the pass **fired** - a substrate name, a
-`PUSH_STREAM` target, the absence of a substrate the pass was supposed to absorb. With the switch off that assertion is
-tautologically false, not red, and it may carry `DISABLED TRUE` guarded by `if(NOT RDB_OPT_...)` and labelled
-`expected_ablation_failure;requires_<switch>`. **Nothing else may.** An assertion about the computed result - payload
-bytes, metadata, a value against an oracle - is never disabled: a red `Val` under ablation is a semantics regression or
-an open finding, and it goes to the human. Never paper one over with `WILL_FAIL` or `DISABLED` - the matrix already
-carries a note from 2026-07-26 explaining why those annotations were removed.
+One kind of assertion cannot hold without the pass: the one saying that the pass **fired** - a substrate name, a `PUSH_STREAM` target, the absence of a substrate the pass was supposed to absorb. With the switch off that assertion is tautologically false, not red, and it may carry `DISABLED TRUE` guarded by `if(NOT RDB_OPT_...)` and labelled `expected_ablation_failure;requires_<switch>`. **Nothing else may.** An assertion about the computed result - payload bytes, metadata, a value against an oracle - is never disabled: a red `Val` under ablation is a semantics regression or an open finding, and it goes to the human. Never paper one over with `WILL_FAIL` or `DISABLED` - the matrix already carries a note from 2026-07-26 explaining why those annotations were removed.
 
-A test mixing both kinds in one ctest entry has to be split, because a single `DISABLED` then takes the result
-assertion down together with the shape assertion. `issue202_hash_shift_e2e` is the worked example, split on 2026-09-06
-into `-shape` and `-value`: its one `cmp matched CC` pinned `Val` and `Lat` at the same time, so it could never be
-green under ablation, and disabling it removed the only end-to-end place where the tail divergence between
-`(A>2)#(B>1)` and `(A#B)>3` was visible at all. CI runs this same floor as `ablation-all-off` in layer L3 of
-`manual-nightly-full`, which the `cron-shedule` trigger starts on the 5th and 20th of every month, so a skipped local run
-gets caught at the next of those runs - up to about two weeks later, which is why the local run is not optional.
+A test mixing both kinds in one ctest entry has to be split, because a single `DISABLED` then takes the result assertion down together with the shape assertion. `issue202_hash_shift_e2e` is the worked example, split on 2026-09-06 into `-shape` and `-value`: its one `cmp matched CC` pinned `Val` and `Lat` at the same time, so it could never be green under ablation, and disabling it removed the only end-to-end place where the tail divergence between `(A>2)#(B>1)` and `(A#B)>3` was visible at all. CI runs this same floor as `ablation-all-off` in layer L3 of `manual-nightly-full`, which the `cron-shedule` trigger starts on the 5th and 20th of every month, so a skipped local run gets caught at the next of those runs - up to about two weeks later, which is why the local run is not optional.
 
 ### Context hygiene
 

@@ -94,8 +94,7 @@ Enhancement suggestions are tracked as [GitHub issues](https://github.com/michal
 ## On AI use in RetractorDB
 Guidelines for AI use when contributing to RetractorDB.
 
-For security reports and other issues
-If you asked an AI tool to find problems in curl, you must make sure to reveal this fact in your report.
+For security reports and other issues If you asked an AI tool to find problems in curl, you must make sure to reveal this fact in your report.
 
 You must also double-check the findings carefully before reporting them to us to validate that the issues are indeed existing and working exactly as the AI says. AI-based tools frequently generate inaccurate or fabricated results.
 

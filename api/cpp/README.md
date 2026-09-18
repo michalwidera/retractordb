@@ -1,12 +1,8 @@
 # C++ API
 
-Requires Linux and C++23. Building from source also needs CMake and Boost
-headers with Boost.JSON, provided by the repository's Conan setup. The public
-header uses only the standard library.
+Requires Linux and C++23. Building from source also needs CMake and Boost headers with Boost.JSON, provided by the repository's Conan setup. The public header uses only the standard library.
 
-The normal repository build produces `rdb_client`, `rdb_api_json` and the
-`rdb_monitor` example. Installation includes both static libraries, the public
-header and CMake package configuration.
+The normal repository build produces `rdb_client`, `rdb_api_json` and the `rdb_monitor` example. Installation includes both static libraries, the public header and CMake package configuration.
 
 ```sh
 cmake --build build/Debug --target rdb_monitor
@@ -44,21 +40,10 @@ int main() {
 }
 ```
 
-Use `Options{.xqry="/path/to/xqry", .timeout=...}` for the binary and
-command/schema timeout. `SubscribeOptions` exposes `limit`, `idleTimeout` and
-`capacity`. Timeouts use `std::chrono::milliseconds`.
+Use `Options{.xqry="/path/to/xqry", .timeout=...}` for the binary and command/schema timeout. `SubscribeOptions` exposes `limit`, `idleTimeout` and `capacity`. Timeouts use `std::chrono::milliseconds`.
 
-`next(timeout)` returns `std::optional<Record>`; empty means normal completion
-or explicit closure. Errors throw `retractordb::Error` with a string `code`.
-A `read_timeout` keeps the subscription open. `schema()` returns the schema;
-`endReason()` identifies normal completion and `pid()` identifies the child.
-Explicit `close()` and destructors reap that child. Subscriptions are move-only.
-Destroying the client closes all its subscriptions, including surviving handles.
+`next(timeout)` returns `std::optional<Record>`; empty means normal completion or explicit closure. Errors throw `retractordb::Error` with a string `code`. A `read_timeout` keeps the subscription open. `schema()` returns the schema; `endReason()` identifies normal completion and `pid()` identifies the child. Explicit `close()` and destructors reap that child. Subscriptions are move-only. Destroying the client closes all its subscriptions, including surviving handles.
 
-`Record.values` maps names to vectors of `Value`: scalars have one element,
-arrays have their full length. Use `std::get_if` or `std::visit` for the
-alternatives in [the shared contract](../README.md). NULL is `std::monostate`.
+`Record.values` maps names to vectors of `Value`: scalars have one element, arrays have their full length. Use `std::get_if` or `std::visit` for the alternatives in [the shared contract](../README.md). NULL is `std::monostate`.
 
-Two subscriptions own different processes. Serialize calls on each handle.
-The example handles SIGINT/SIGTERM with a stop flag and timed reads; the library
-does not change the application's signal handlers.
+Two subscriptions own different processes. Serialize calls on each handle. The example handles SIGINT/SIGTERM with a stop flag and timed reads; the library does not change the application's signal handlers.

@@ -9,5 +9,4 @@ Inwestygacja jest procesem, który powinien:
 - po zakończeniu procesu poszukiwań ustalić wniosek, poprawkę do kodu lub wskazać dalszy kierunek poszukiwań.
 - inwestygacja nie jest eksperymentem - nie jest dokumentowana w dzienniku, są to poszukiwania po omacku.
 
-@note Branch repozytorium w katalogu /home/michal/github/retractordb
-@note Przed rozpoczęciem inwestygacji na branchu nie ma żadnych zmian i zawiera on to co znajduje się w głęzi master.
+@note Branch repozytorium w katalogu /home/michal/github/retractordb @note Przed rozpoczęciem inwestygacji na branchu nie ma żadnych zmian i zawiera on to co znajduje się w głęzi master.

@@ -25,8 +25,7 @@ core0(1/10)     datafile1.dat
 core1(1/5)      datafile2.dat
         a: INTEGER
 
-Oczekujemy że w planie realizacji zapytania substrat STREAM_TIMEMOVE_2_core0 zostanie zredukowany i zastąpiony przez str2 w odwołaniu PUSH_STREAM(STREAM_TIMEMOVE_2_core0).
-Redukacja może nastąpić wtedy i tylko wtedy kiedy schematy są takie same, delty są takie same oraz polecenia przetwarzania strumieni są też takie same.
+Oczekujemy że w planie realizacji zapytania substrat STREAM_TIMEMOVE_2_core0 zostanie zredukowany i zastąpiony przez str2 w odwołaniu PUSH_STREAM(STREAM_TIMEMOVE_2_core0). Redukacja może nastąpić wtedy i tylko wtedy kiedy schematy są takie same, delty są takie same oraz polecenia przetwarzania strumieni są też takie same.
 
 Oczekiwany plan realizacji zapytania przedstawia się po redukcji następująco:
 
@@ -46,6 +45,4 @@ core0(1/10)     datafile1.dat
 core1(1/5)      datafile2.dat
         a: INTEGER
 
-Test pokrywa ten przypadek.
-Usuwane są tylko wytworzone substraty.
-Zapytania, które nie zostały wygenerowane nie są redukowane.  
+Test pokrywa ten przypadek. Usuwane są tylko wytworzone substraty. Zapytania, które nie zostały wygenerowane nie są redukowane.

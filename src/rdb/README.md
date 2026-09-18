@@ -62,11 +62,8 @@ xtrdb -s datafile
 ```
 
 - `-h` / `--help` prints the command-line help and exits.
-- `-n` / `--noprompt` suppresses the prompt, colours, and `ok` responses for
-  scripted input. The legacy positional spelling `xtrdb noprompt` is also
-  accepted.
-- `-s <file>` / `--storagemap <file>` prints the storage-family map for the
-  named data file and exits without starting the interactive terminal.
+- `-n` / `--noprompt` suppresses the prompt, colours, and `ok` responses for scripted input. The legacy positional spelling `xtrdb noprompt` is also accepted.
+- `-s <file>` / `--storagemap <file>` prints the storage-family map for the named data file and exits without starting the interactive terminal.
 
 ## Interactive Terminal Interface
 
@@ -144,16 +141,9 @@ help|h                           Show help
 
 Supply a schema to `open` only when the corresponding `.desc` file does not exist. When it already exists, use `open file` and let `xtrdb` load that descriptor.
 
-`policy` accepts `DEFAULT`, `DIRECT`, `MEMORY`, `POSIX`, `POSIXSHD`,
-`GENERIC`, `DEVICE`, and `TEXTSOURCE` (case-insensitive). `DEVICE` and
-`TEXTSOURCE` are read-only source accessors. A `TYPE` entry loaded from an
-existing descriptor overrides the policy selected at the prompt.
+`policy` accepts `DEFAULT`, `DIRECT`, `MEMORY`, `POSIX`, `POSIXSHD`, `GENERIC`, `DEVICE`, and `TEXTSOURCE` (case-insensitive). `DEVICE` and `TEXTSOURCE` are read-only source accessors. A `TYPE` entry loaded from an existing descriptor overrides the policy selected at the prompt.
 
-`quitdrop` removes the base data file, `.desc`, `.meta`, and `.meta.shadow`.
-It is not a complete artifact-family cleanup: a data `.shadow` file and
-retention segments can remain. Use `dropfile { file1 file2 ... }` to remove
-explicitly named leftovers after verifying that no running `xretractor`
-instance owns them.
+`quitdrop` removes the base data file, `.desc`, `.meta`, and `.meta.shadow`. It is not a complete artifact-family cleanup: a data `.shadow` file and retention segments can remain. Use `dropfile { file1 file2 ... }` to remove explicitly named leftovers after verifying that no running `xretractor` instance owns them.
 
 ## Usage Examples
 

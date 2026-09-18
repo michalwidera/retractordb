@@ -53,26 +53,19 @@ without warranty of any kind. For more information, see the LICENSE file.
 
 ## Before you call xqry
 
-Server-directed commands (`--select`, `--detail`, `--adhoc`, `--reset`,
-`--dir`, `--hello`, and `--kill`) require a running `xretractor` instance.
-Without one, a request such as `xqry -d` normally ends with an IPC error:
+Server-directed commands (`--select`, `--detail`, `--adhoc`, `--reset`, `--dir`, `--hello`, and `--kill`) require a running `xretractor` instance. Without one, a request such as `xqry -d` normally ends with an IPC error:
 
 ```
 $ xqry -d
 IPC: No such file or directory
 ```
 
-`--bus` is different: it reads the shared instance registry without contacting
-a server and therefore also works when no instance is live. `--help` performs no
-IPC either.
+`--bus` is different: it reads the shared instance registry without contacting a server and therefore also works when no instance is live. `--help` performs no IPC either.
 
 
 ## Listing streams - `xqry -d`
 
-`-d` prints one row per stream, under a header naming the columns and a
-separator line. Column widths adapt to the widest value (header included), so
-the table stays aligned. The form is the same as in `xqry --bus`: columns
-left-aligned, joined by `" | "`, without edge pipes.
+`-d` prints one row per stream, under a header naming the columns and a separator line. Column widths adapt to the widest value (header included), so the table stays aligned. The form is the same as in `xqry --bus`: columns left-aligned, joined by `" | "`, without edge pipes.
 
 ```
 $ xqry -d
@@ -95,79 +88,49 @@ str2  | 1/2      | 0    | 0     |               | 0
 
 ## One command at a time
 
-`-s`, `-t`, `-a`, `-q`, `-d`, `-b` and `-l` each do something different, so giving
-two of them at once is refused with exit code `22` instead of silently running
-the first one. This also stops a whole class of typos: boost glues a value onto
-a short option, so `xqry -t str1 -yaml` parses as `-y -a ml`, i.e. an ad-hoc
-query `ml` sent to the server instead of the requested detail.
+`-s`, `-t`, `-a`, `-q`, `-d`, `-b` and `-l` each do something different, so giving two of them at once is refused with exit code `22` instead of silently running the first one. This also stops a whole class of typos: boost glues a value onto a short option, so `xqry -t str1 -yaml` parses as `-y -a ml`, i.e. an ad-hoc query `ml` sent to the server instead of the requested detail.
 
-`-k` is not part of the set - `xqry -s <stream> -m N -k` (kill after the element
-budget) and `xqry -k -a "..."` are deliberate combinations.
+`-k` is not part of the set - `xqry -s <stream> -m N -k` (kill after the element budget) and `xqry -k -a "..."` are deliberate combinations.
 
 ## Selecting an xretractor instance
 
-An explicit `--server <name>` always selects the target and bypasses automatic
-routing. If `--server` is absent, a non-empty `RDB_NAMESPACE` environment
-variable has the same targeting role. The command-line option takes precedence
-when both are present.
+An explicit `--server <name>` always selects the target and bypasses automatic routing. If `--server` is absent, a non-empty `RDB_NAMESPACE` environment variable has the same targeting role. The command-line option takes precedence when both are present.
 
-Without an explicit target, a single live instance is selected automatically.
-When several instances are live, routing depends on the command:
+Without an explicit target, a single live instance is selected automatically. When several instances are live, routing depends on the command:
 
 - `--select` and `--detail` go to the instance that publishes the named stream.
-- `--adhoc` goes to the common owner of its recognized source streams. A query
-  spanning multiple instances is rejected, and a query with no recognized
-  source requires `--server`.
-- Instance-wide commands (`--dir`, `--hello`, `--kill`, and `--reset`) are
-  ambiguous and require `--server`.
+- `--adhoc` goes to the common owner of its recognized source streams. A query spanning multiple instances is rejected, and a query with no recognized source requires `--server`.
+- Instance-wide commands (`--dir`, `--hello`, `--kill`, and `--reset`) are ambiguous and require `--server`.
 
-`--bus` does not select or contact an instance. Use it to discover valid server
-names and their streams.
+`--bus` does not select or contact an instance. Use it to discover valid server names and their streams.
 
 ## Reloading the plan - `xqry --reset <file.rql>`
 
-`--reset` (short `-q`) replaces the **whole** query plan of the target instance with the
-contents of an RQL file. It is not `--adhoc`: ad-hoc adds a single statement to a running
-plan, `--reset` swaps the plan itself, including directives (`STORAGE`, `SUBSTRAT`,
-`:ROTATION`) that ad-hoc refuses.
+`--reset` (short `-q`) replaces the **whole** query plan of the target instance with the contents of an RQL file. It is not `--adhoc`: ad-hoc adds a single statement to a running plan, `--reset` swaps the plan itself, including directives (`STORAGE`, `SUBSTRAT`, `:ROTATION`) that ad-hoc refuses.
 
 ```
 $ xqry --reset plan.rql --server service
 Plan accepted by the server and scheduled for loading: plan.rql
 ```
 
-The client reads the file and sends its **contents**, not the path: the service usually runs
-under its own account (`User=retractor` in the systemd unit) and could not open the
-operator's file.
+The client reads the file and sends its **contents**, not the path: the service usually runs under its own account (`User=retractor` in the systemd unit) and could not open the operator's file.
 
-The server validates the whole set - parse, compile, and stream-name disjointness against the
-other live instances - **before** it touches the running plan. A refusal therefore costs
-nothing; the previous plan keeps computing and the exit code is non-zero:
+The server validates the whole set - parse, compile, and stream-name disjointness against the other live instances - **before** it touches the running plan. A refusal therefore costs nothing; the previous plan keeps computing and the exit code is non-zero:
 
 ```
 $ xqry --reset broken.rql --server service
 xqry: plan reload refused at reset-commit: Fail compile:...
 ```
 
-An accepted plan replaces the running one at the end of the current slot: stream artifacts of
-the old plan are dropped exactly as at start-up (unless the plan carries `:ROTATION`),
-subscribed clients are told the show is over, and the new names are claimed on the bus. A file
-with no statements at all is a legal request - it returns the instance to the **idle** state,
-serving nothing and waiting for the next plan.
+An accepted plan replaces the running one at the end of the current slot: stream artifacts of the old plan are dropped exactly as at start-up (unless the plan carries `:ROTATION`), subscribed clients are told the show is over, and the new names are claimed on the bus. A file with no statements at all is a legal request - it returns the instance to the **idle** state, serving nothing and waiting for the next plan.
 
-An instance started as a service (`--service`, `XRETRACTOR_SERVICE=1`, or a systemd unit) is
-named `service` on the bus unless `--name` says otherwise, so the target is the same on every
-machine: `--server service`. With exactly one live instance `--server` may be omitted.
+An instance started as a service (`--service`, `XRETRACTOR_SERVICE=1`, or a systemd unit) is named `service` on the bus unless `--name` says otherwise, so the target is the same on every machine: `--server service`. With exactly one live instance `--server` may be omitted.
 
 ## Output format - `-y`
 
-`-y` is a format modifier, not a command on its own: it switches the answer of
-`-d`, `-t` and `--bus` to YAML (`apiVersion: xqry/v1`). Combined with any other
-command (`-s`, `-a`, `-l`, `-k`) - or given alone - it is refused with exit code
-`22`, so a flag that cannot take effect never looks like one that did.
+`-y` is a format modifier, not a command on its own: it switches the answer of `-d`, `-t` and `--bus` to YAML (`apiVersion: xqry/v1`). Combined with any other command (`-s`, `-a`, `-l`, `-k`) - or given alone - it is refused with exit code `22`, so a flag that cannot take effect never looks like one that did.
 
-`xqry -d -y` reports the stream listing without the `cap` column, and with
-`size` omitted for declared streams:
+`xqry -d -y` reports the stream listing without the `cap` column, and with `size` omitted for declared streams:
 
 ```
 $ xqry -d -y
@@ -186,8 +149,7 @@ streams:
 
 ## Stream details - `xqry -t <stream>`
 
-`-t` prints the stream header and its field list as two column tables, in the
-same form as `-d` and `--bus`:
+`-t` prints the stream header and its field list as two column tables, in the same form as `-d` and `--bus`:
 
 ```
 $ xqry -t dsta
@@ -219,13 +181,7 @@ An unknown stream name prints nothing and exits with code `2`, in both forms.
 
 ## Live instances - `xqry --bus`
 
-`--bus` lists the live xretractor instances read from the bus segment, without
-contacting any server. `--bus -y` reports the same list in YAML. Two differences
-follow from the format: the query path is given **in full** (the table shortens
-it to `.../<dir>/<file>` for readability, which a consumer cannot open), and the
-MODE letter legend is not printed - its meaning belongs in this documentation,
-not in a machine-readable document. An empty bus still yields a document:
-`servers: []` on stdout, with the `no live xretractor instance` note on stderr.
+`--bus` lists the live xretractor instances read from the bus segment, without contacting any server. `--bus -y` reports the same list in YAML. Two differences follow from the format: the query path is given **in full** (the table shortens it to `.../<dir>/<file>` for readability, which a consumer cannot open), and the MODE letter legend is not printed - its meaning belongs in this documentation, not in a machine-readable document. An empty bus still yields a document: `servers: []` on stdout, with the `no live xretractor instance` note on stderr.
 
 ```
 $ xqry --bus -y
@@ -243,19 +199,8 @@ servers:
 
 ## Application API: JSON Lines
 
-`--jsonl` (`-j`) provides versioned machine output for `--hello`, `--dir`,
-`--detail` and `--select`. Use an explicit `--server` name. `--idle-timeout N`
-(`-i N`) sets the JSONL idle timeout in milliseconds; zero disables it, and the
-option is rejected outside `--jsonl`. Other output formats and mutating commands
-cannot be combined with `--jsonl`.
+`--jsonl` (`-j`) provides versioned machine output for `--hello`, `--dir`, `--detail` and `--select`. Use an explicit `--server` name. `--idle-timeout N` (`-i N`) sets the JSONL idle timeout in milliseconds; zero disables it, and the option is rejected outside `--jsonl`. Other output formats and mutating commands cannot be combined with `--jsonl`.
 
-See the [wire contract](../../api/README.md), [Python client](../../api/python/README.md),
-and [C++ client](../../api/cpp/README.md). Numeric array fields are transmitted
-in full, in element order, including per-element NULL flags.
+See the [wire contract](../../api/README.md), [Python client](../../api/python/README.md), and [C++ client](../../api/cpp/README.md). Numeric array fields are transmitted in full, in element order, including per-element NULL flags.
 
-Every output format carries all array elements, each under its own name in the
-notation its consumer expects: `stream.field.0` for graphite, `field_0` for
-influxDB, `field[0]` for a gnuplot curve title. A single-element field keeps its
-bare name in all of them. A record whose serialized form exceeds the 1024-byte
-response queue slot is dropped by the server, which logs the stream name once
-and keeps serving every other subscriber.
+Every output format carries all array elements, each under its own name in the notation its consumer expects: `stream.field.0` for graphite, `field_0` for influxDB, `field[0]` for a gnuplot curve title. A single-element field keeps its bare name in all of them. A record whose serialized form exceeds the 1024-byte response queue slot is dropped by the server, which logs the stream name once and keeps serving every other subscriber.
