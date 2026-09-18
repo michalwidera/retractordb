@@ -10,10 +10,10 @@ digraph structs {
  rule_r1	[shape=record,style=filled,fillcolor=cyan,color=Black,label="{r1|DO SYSTEM \n'echo a\|b \> f'}|{PUSH_ID(fn[0])|PUSH_VAL(0)|CMP_GT}"]
  w	[shape=record,style="filled",fillcolor=Gray,color=Black,label="w\ninterval=1/10\norigin=2|{<tag0>w_0(RATIONAL)|<tag1>w_1(RATIONAL)|<tag2>w_2(RATIONAL)}"]
  prg_w	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM core\n"]
- "ch$0"	[shape=record,style="filled",fillcolor=Gray,color=Black,label="ch$0\ninterval=1/10|{<tag0>ch$0_0(INTEGER)}"]
- "prg_ch$0"	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM core\n"]
- "ch$1"	[shape=record,style="filled",fillcolor=Gray,color=Black,label="ch$1\ninterval=1/10|{<tag0>ch$1_0(INTEGER)}"]
- "prg_ch$1"	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM core\n"]
+ "ch$0"	[shape=record,style="filled",fillcolor=Gray,color=Black,label="ch$0\ninterval=1/10\norigin=2|{<tag0>ch$0_0(RATIONAL)}"]
+ "prg_ch$0"	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM w\n"]
+ "ch$1"	[shape=record,style="filled",fillcolor=Gray,color=Black,label="ch$1\ninterval=1/10\norigin=2|{<tag0>ch$1_0(RATIONAL)}"]
+ "prg_ch$1"	[shape=box,style=filled,fillcolor=Orange,color=Black,label="PUSH_STREAM w\n"]
 "ch$0" -> "prg_ch$0"
 "ch$1" -> "prg_ch$1"
 fn -> prg_fn
@@ -30,11 +30,11 @@ w -> prg_w
  w_window0	[shape=record,label="WINDOW 0: core[0] rows=3"]
  w_window1	[shape=record,label="WINDOW 1: core rows=2|{PUSH_ID(core[0])|PUSH_VAL(2)|MULTIPLY}"]
  "ch$0_tag0"	[shape=record,label="ch$0_0|{PUSH_ID(ch$0[0])}"]
- "ch$1_tag0"	[shape=record,label="ch$1_0|{PUSH_ID(ch$1[0])|PUSH_VAL(1)|ADD}"]
+ "ch$1_tag0"	[shape=record,label="ch$1_0|{PUSH_ID(ch$1[1])}"]
 "ch$0":tag0 -> "ch$0_tag0" [style=dotted]
 "ch$1":tag0 -> "ch$1_tag0" [style=dotted]
-"prg_ch$0" -> core
-"prg_ch$1" -> core
+"prg_ch$0" -> w
+"prg_ch$1" -> w
 fn:tag0 -> fn_tag0 [style=dotted]
 lit:tag0 -> lit_tag0 [style=dotted]
 prg_fn -> core

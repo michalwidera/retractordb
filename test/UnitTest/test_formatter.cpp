@@ -128,6 +128,65 @@ TEST(Formatter, renderGnuplot_null_value_becomes_NaN) {
   EXPECT_NE(out.find("NaN"), std::string::npos);
 }
 
+// ---- renderGnuplotOhlc ----
+
+namespace {
+std::string feedOhlc(Formatter &fmt, const std::vector<std::vector<std::string>> &rows, const std::string &nullmap, int window) {
+  testing::internal::CaptureStdout();
+  for (const auto &values : rows) {
+    ptree row;
+    for (size_t i = 0; i < values.size(); ++i)
+      row.put(std::to_string(i), values[i]);
+    fmt.renderGnuplotOhlc(row, static_cast<int>(values.size()), nullmap, "chart", {window, 0, 100});
+  }
+  return testing::internal::GetCapturedStdout();
+}
+}  // namespace
+
+// Wiersz: open, high, low, close, probki w kolejnosci naplywu. Najnowsza probka stoi w x = 0,
+// a swieca nad srodkiem swoich probek - dane swiecy ida w porzadku gnuplota: x open low high close.
+TEST(Formatter, renderGnuplotOhlc_places_candle_over_its_samples) {
+  Formatter fmt;
+  auto out = feedOhlc(fmt, {{"10", "40", "5", "30", "10", "40", "5", "30"}}, "", 20);
+
+  EXPECT_NE(out.find("1.5 10 5 40 30 3.2\r\ne\r\n"), std::string::npos) << out;
+  EXPECT_NE(out.find("e\r\n0 30\r\n1 5\r\n2 40\r\n3 10\r\ne\r\n"), std::string::npos) << out;
+}
+
+// Okno -p liczy probki: 8 probek to dwie swiece po 4, wiec pierwszy wiersz wypada.
+TEST(Formatter, renderGnuplotOhlc_window_counts_samples) {
+  Formatter fmt;
+  auto out             = feedOhlc(fmt,
+                                  {{"1", "1", "1", "1", "1", "1", "1", "1"},
+                                   {"2", "2", "2", "2", "2", "2", "2", "2"},
+                                   {"3", "3", "3", "3", "3", "3", "3", "3"}},
+                                  "", 8);
+  const auto lastFrame = out.substr(out.rfind("plot"));
+
+  EXPECT_NE(lastFrame.find("\r\n1.5 3 3 3 3 3.2\r\n5.5 2 2 2 2 3.2\r\n"
+                           "e\r\n0 3\r\n1 3\r\n2 3\r\n3 3\r\n4 2\r\n5 2\r\n6 2\r\n7 2\r\ne\r\n"),
+            std::string::npos)
+      << lastFrame;
+}
+
+// Swieca z NULL-em znika w calosci, jej probki zostaja.
+TEST(Formatter, renderGnuplotOhlc_null_candle_is_skipped) {
+  Formatter fmt;
+  auto out = feedOhlc(fmt, {{"", "40", "5", "30", "7"}}, "10000", 5);
+
+  EXPECT_NE(out.find("\r\ne\r\n0 7\r\ne\r\n"), std::string::npos) << out;
+}
+
+TEST(Formatter, renderGnuplotOhlc_row_without_samples_plots_nothing) {
+  Formatter fmt;
+  testing::internal::CaptureStderr();
+  auto out         = feedOhlc(fmt, {{"10", "40", "5", "30"}}, "", 5);
+  const auto error = testing::internal::GetCapturedStderr();
+
+  EXPECT_TRUE(out.empty()) << out;
+  EXPECT_NE(error.find("--gnuplot-ohlc"), std::string::npos) << error;
+}
+
 // ---- renderGraphite ----
 
 TEST(Formatter, renderGraphite_format) {

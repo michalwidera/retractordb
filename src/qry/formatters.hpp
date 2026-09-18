@@ -10,6 +10,7 @@ enum class formatMode : std::uint8_t { RAW, GRAPHITE, INFLUXDB, GNUPLOT };
 
 class Formatter {
   std::vector<std::deque<std::string>> gnuplot_lines_;
+  bool ohlcShapeReported_{false};
   static const std::vector<std::string> colors_;
 
  public:
@@ -36,6 +37,10 @@ class Formatter {
   static void renderRaw(const boost::property_tree::ptree &row, int count, const std::string &nullmap, bool skipNull);
   void renderGnuplot(const boost::property_tree::ptree &row, int count, const std::string &nullmap, const std::string &input,
                      const boost::property_tree::ptree &schema, std::tuple<int, int, int> dim);
+  /// Tryb swiecowy (--gnuplot-ohlc): wiersz to open, high, low, close i dalej probki, ktore
+  /// swieca obejmuje, w kolejnosci naplywu. Rysuje swiece nad jej probkami na wspolnej osi.
+  void renderGnuplotOhlc(const boost::property_tree::ptree &row, int count, const std::string &nullmap, const std::string &input,
+                         std::tuple<int, int, int> dim);
   static void renderGraphite(const boost::property_tree::ptree &row, const std::string &nullmap, const std::string &input,
                              const boost::property_tree::ptree &schema);
   static void renderInfluxDB(const boost::property_tree::ptree &row, const std::string &nullmap, const std::string &input,

@@ -34,6 +34,8 @@ Allowed options:
   -p [ --gnuplot ] arg           x,y - gnuplot output mode
   -z [ --gnuplot-rtl ]           gnuplot output: newest samples on the right
                                  (right-to-left scroll)
+  --gnuplot-ohlc                 gnuplot output: row = open, high, low, close,
+                                 then the samples of that candle
   -e [ --config ] arg            config file (TOML); overrides search
   -h [ --help ]                  produce help message
   -c [ --needctrlc ]             force ctl+c for stop this tool

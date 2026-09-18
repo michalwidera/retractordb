@@ -197,6 +197,7 @@ int main(int argc, char *argv[]) {
         ("influxdb,f", "influxDB output mode")                                                                        //
         ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                              //
         ("gnuplot-rtl,z", "gnuplot output: newest samples on the right (right-to-left scroll)")                       //
+        ("gnuplot-ohlc", "gnuplot output: row = open, high, low, close, then the samples of that candle")             //
         ("config,e", po::value<std::string>(&sConfig), "config file (TOML); overrides search")                        //
         ("help,h", "produce help message")                                                                            //
         ("needctrlc,c", "force ctl+c for stop this tool")                                                             //
@@ -289,6 +290,10 @@ int main(int argc, char *argv[]) {
       std::print(std::cerr, "--gnuplot-rtl requires --gnuplot/-p mode.");
       return system::errc::invalid_argument;
     }
+    if (vm.contains("gnuplot-ohlc") && !vm.contains("gnuplot")) {
+      std::print(std::cerr, "--gnuplot-ohlc requires --gnuplot/-p mode.");
+      return system::errc::invalid_argument;
+    }
     // Komendy wykluczaja sie wzajemnie, bo rozgalezienie nizej wybiera PIERWSZA pasujaca i
     // milczaco porzuca reszte. Ta cisza jest grozna, bo boost sklada wartosc z krotka opcja:
     // literowka `-yaml` to dla parsera `-y -a ml`, czyli zapytanie ad-hoc "ml" wyslane do
@@ -375,6 +380,7 @@ int main(int argc, char *argv[]) {
             sServerName);
     obj.outputFormatMode   = outputFormatMode;
     obj.gnuplotRightToLeft = gnuplotRightToLeft;
+    obj.gnuplotOhlc        = vm.contains("gnuplot-ohlc");
 
     if (vm.contains("jsonl")) {
       if (vm.contains("hello")) return obj.jsonCommand("hello", "", 0, 0);

@@ -914,6 +914,10 @@ std::optional<int> compiler::sourceSpanIn(query &node, int nodeWidth, const std:
     if (total != nodeWidth) return std::nullopt;
   }
 
+  // Bezposrednie operandy przed poddrzewami - ta sama kolejnosc, w ktorej
+  // collectTransitiveOffsets() przydziela offset pierwszemu wystapieniu nazwy.
+  for (const auto &s : sources)
+    if (s == name) return isHash ? nodeWidth : flatOf(s);
   for (const auto &s : sources)
     if (const auto span = descendSpan(s, isHash ? nodeWidth : flatOf(s), name)) return span;
   return std::nullopt;
@@ -1301,24 +1305,35 @@ void compiler::snapshotNamedSourceRefs() {
 
 /* This function will convert fields list where stream a from b#c
 clause from b[x1],c[x2] int a[y1],a[y2] according to offset of from operation */
+///
+/// Nazwa moze pojawic sie w klauzuli FROM wiecej niz raz: `bar + MAX(bar)`, `src + src>1`,
+/// `src@(1,5) + src@(2,3)`. Offset dostaje wtedy PIERWSZE wystapienie, a kolejnosc jest na
+/// kazdym wezle ta sama: najpierw jego bezposrednie operandy w kolejnosci zapisu, dopiero potem
+/// ich poddrzewa. Dzieki temu operand stojacy wprost w FROM wskazuje zawsze wlasna pozycje -
+/// na tym opiera sie `SELECT *`, ktore odwoluje sie do operandow po nazwie. Do 2026-09-18
+/// wygrywalo wystapienie OSTATNIE (a operandy szczytu szly alfabetycznie): `bar + MAX(bar)`
+/// czytalo `bar` spod reduktora i wywracalo proces na slocie spoza rekordu, a `src + src>1`
+/// dawalo po cichu dwie kopie przesunietego strumienia. Te sama kolejnosc stosuje
+/// sourceSpanIn(), bo kontrola zakresu musi mierzyc to wystapienie, ktore odwolanie przeczyta.
 void compiler::collectTransitiveOffsets(const std::string &srcId, int baseOffset, bool viaHash,
                                         std::map<std::string, int> &result, std::set<std::string> &viaInterleave) {
   auto &srcQuery = coreInstance.getQuery(srcId);
   if (!srcQuery.isSubstrat) return;
   bool isHash = std::ranges::any_of(srcQuery.lProgram, [](token &t) { return t.getCommandID() == STREAM_HASH; });
-  int offset  = 0;
+  // Raz wejdziemy pod przeplot i tożsamość nie wraca: niżej wszystko dzieli tę samą pozycję.
+  const bool subViaHash = viaHash || isHash;
+  std::vector<std::pair<std::string, int>> operands;
+  int offset = 0;
   for (auto &t : srcQuery.lProgram) {
     if (t.getCommandID() == PUSH_STREAM) {
-      const std::string &sub = t.getStr_();
-      const int globalOffset = isHash ? baseOffset : (baseOffset + offset);
-      // Raz wejdziemy pod przeplot i tożsamość nie wraca: niżej wszystko dzieli tę samą pozycję.
-      const bool subViaHash = viaHash || isHash;
-      result[sub]           = globalOffset;
-      if (subViaHash) viaInterleave.insert(sub);
-      collectTransitiveOffsets(sub, globalOffset, subViaHash, result, viaInterleave);
-      if (!isHash) offset += coreInstance[sub].descriptorStorage().flatElementCount();
+      operands.emplace_back(t.getStr_(), isHash ? baseOffset : (baseOffset + offset));
+      if (!isHash) offset += coreInstance[t.getStr_()].descriptorStorage().flatElementCount();
     }
   }
+  for (const auto &[sub, globalOffset] : operands)
+    if (result.try_emplace(sub, globalOffset).second && subViaHash) viaInterleave.insert(sub);
+  for (const auto &[sub, globalOffset] : operands)
+    collectTransitiveOffsets(sub, globalOffset, subViaHash, result, viaInterleave);
 }
 
 /// Offset bloku kazdego strumienia osiagalnego z FROM zapytania `q` w jego rekordzie wejsciowym:
@@ -1329,24 +1344,22 @@ void compiler::collectTransitiveOffsets(const std::string &srcId, int baseOffset
 /// sloty payloadu wejsciowego, i dla typowania odwolan (inferFieldShapes(), R3) - typ ma pochodzic
 /// z TEGO slotu, ktory odwolanie przeczyta w wykonaniu.
 std::map<std::string, int> compiler::sourceOffsetsInFrom(query &q, std::set<std::string> &viaInterleave) {
-  auto offset{0};                         //
-  std::map<std::string, int> offsetItem;  //
-  for (auto &f : q.lProgram) {            // for each token in stream program
+  const bool isHash = std::ranges::any_of(q.lProgram, [](const token &t) { return t.getCommandID() == STREAM_HASH; });
+  auto offset{0};
+  std::vector<std::pair<std::string, int>> directSources;  // w kolejnosci zapisu w FROM
+  for (auto &f : q.lProgram) {                             // for each token in stream program
     if (f.getCommandID() == PUSH_STREAM) {
-      offsetItem[f.getStr_()] = offset;
+      directSources.emplace_back(f.getStr_(), isHash ? 0 : offset);
       offset += coreInstance[f.getStr_()].descriptorStorage().flatElementCount();
     }
-    if (f.getCommandID() == STREAM_HASH) {
-      for (auto &i : offsetItem) {
-        i.second = 0;
-        viaInterleave.insert(i.first);
-      }
-    }
   }
-  // Extend with transitive sources from system-generated substrats.
-  std::vector<std::pair<std::string, int>> directSources(offsetItem.begin(), offsetItem.end());
+  // Pierwsze wystapienie wygrywa - regula opisana przy collectTransitiveOffsets().
+  std::map<std::string, int> offsetItem;
   for (const auto &[srcName, srcBase] : directSources)
-    collectTransitiveOffsets(srcName, srcBase, viaInterleave.contains(srcName), offsetItem, viaInterleave);
+    if (offsetItem.try_emplace(srcName, srcBase).second && isHash) viaInterleave.insert(srcName);
+  // Extend with transitive sources from system-generated substrats.
+  for (const auto &[srcName, srcBase] : directSources)
+    collectTransitiveOffsets(srcName, srcBase, isHash, offsetItem, viaInterleave);
   return offsetItem;
 }
 

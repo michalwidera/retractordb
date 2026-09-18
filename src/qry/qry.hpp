@@ -60,6 +60,7 @@ class qry {
  public:
   formatMode outputFormatMode{formatMode::RAW};
   bool gnuplotRightToLeft{false};
+  bool gnuplotOhlc{false};
 
   /// serverName pusta => serwer jednoinstancyjny (nazwy historyczne); niepusta => instancja
   /// o tej nazwie, czyli jej wlasny obszar IPC.

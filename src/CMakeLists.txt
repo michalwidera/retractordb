@@ -31,6 +31,12 @@ add_custom_target(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/dsp)
 
 add_custom_target(
+  candlestick
+  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh chart candlestick.rql 250,64,192
+          "--gnuplot-ohlc --gnuplot-rtl"
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/candlestick)
+
+add_custom_target(
   ecg-clean
   COMMAND
     sh -c "rm -f ecg.desc *.shadow STREAM_ADD* bpf.desc df.desc \

@@ -1442,6 +1442,56 @@ TEST(xcompiler, identical_windows_over_one_source_still_share_one_substrate) {
   EXPECT_TRUE(plan.exists("STREAM_AGSE_1_4_a"));
 }
 
+namespace {
+
+/// Sloty rekordu wejsciowego czytane przez pola zapytania `id`, po localizeFieldOffsets().
+std::vector<int> fieldSlots(qTree &plan, const std::string &id) {
+  std::vector<int> slots;
+  for (const auto &f : plan.getQuery(id).lSchema)
+    for (const auto &t : f.lProgram)
+      if (t.getCommandID() == PUSH_ID) slots.push_back(std::get<std::pair<std::string, int>>(t.getVT()).second);
+  return slots;
+}
+
+}  // namespace
+
+// Nazwa stoi w FROM dwa razy - wprost i pod innym operatorem. Operand stojacy wprost wskazuje
+// wlasna pozycje: `SELECT *` odwoluje sie do operandow po nazwie, wiec kazda inna odpowiedz
+// przestawia mu kolumny. Do 2026-09-18 `bar + MAX(bar)` czytalo `bar` spod reduktora (sloty
+// 3..5 rekordu o 4 slotach - FATAL w wykonaniu), a `src + src>1` i `src>1 + src` dawaly dwie
+// kopie strumienia przesunietego.
+TEST(xcompiler, direct_operand_keeps_its_own_slots_beside_a_nested_occurrence) {
+  auto reduced = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER[3] STREAM bar, 1/50 FILE 'a.txt'
+        SELECT * STREAM chk FROM bar + MAX(bar)
+      )");
+  EXPECT_EQ(fieldSlots(reduced, "chk"), (std::vector<int>{0, 1, 2, 3}));
+
+  for (const auto *from : {"src + src>1", "src>1 + src"}) {
+    auto shifted = compilePlan(std::format(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM src, 1/50 FILE 'a.txt'
+        SELECT * STREAM chk FROM {}
+      )",
+                                           from));
+    EXPECT_EQ(fieldSlots(shifted, "chk"), (std::vector<int>{0, 1})) << from;
+  }
+}
+
+// Nazwa osiagalna wylacznie przez dwa rozne okna. Kontrola zakresu (sourceSpanIn) i offset
+// (collectTransitiveOffsets) musza wskazac TO SAMO wystapienie - pierwsze. Do 2026-09-18
+// zakres mierzyl pierwsze okno (5 slotow), a offset bral drugie: `src[4]` przechodzilo
+// kontrole i czytalo slot 9 rekordu o 8 slotach.
+TEST(xcompiler, range_check_and_offset_agree_on_a_name_reached_twice) {
+  auto plan = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE v INTEGER STREAM src, 1/50 FILE 'a.txt'
+        SELECT src[4] STREAM chk FROM src@(1,5) + src@(2,3)
+      )");
+  EXPECT_EQ(fieldSlots(plan, "chk"), (std::vector<int>{4}));
+}
+
 // Nazwa substratu jest zarazem nazwa artefaktu na dysku, wiec musi byc identyfikatorem.
 // `-` liczby ujemnej idzie na "N", a `/` liczby wymiernej na "_" - do 2026-08-29 nazwa
 // substratu `&` niosla kreske ulamkowa, czyli separator sciezki, wprost z token::getStr_().

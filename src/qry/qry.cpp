@@ -271,6 +271,8 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
             const int count = std::stoi(e_value.get("count", ""));
             if (outputFormatMode == formatMode::RAW)
               Formatter::renderRaw(e_value, count, nullmap, vm.contains("null"));
+            else if (outputFormatMode == formatMode::GNUPLOT && gnuplotOhlc)
+              formatter_->renderGnuplotOhlc(e_value, count, nullmap, input, gnuplotDim);
             else if (outputFormatMode == formatMode::GNUPLOT)
               formatter_->renderGnuplot(e_value, count, nullmap, input, schema, gnuplotDim);
             else if (outputFormatMode == formatMode::GRAPHITE)

@@ -1,0 +1,21 @@
+# Wykres swiecowy (OHLC) nalozony na dane zrodlowe.
+# Uruchomienie: ninja candlestick (z build/Debug albo build/Release)
+#
+# Zrodlo czyta bajty z /dev/random co 20 ms (50 Hz). Srednia kroczaca z 25 probek
+# zamienia bialy szum w przebieg przypominajacy kurs. Okno rozlaczne po 10 probkach
+# daje jedna swiece co 200 ms: open to pierwsza probka okna, close ostatnia, high
+# i low to maksimum i minimum okna. Strumien chart niesie w jednym rekordzie swiece
+# i dziesiec probek, z ktorych powstala, wiec `xqry --gnuplot-ohlc` rysuje je na
+# wspolnej osi bez zadnego dopasowywania w czasie.
+
+STORAGE 'temp'
+DEFAULT VOLATILE
+
+DECLARE v BYTE STREAM source, 0.02 FILE '/dev/random'
+
+SELECT int(AVG(source[0] : 25)) STREAM price FROM source
+SELECT * STREAM bar FROM price@(10,-10)
+SELECT * STREAM hi FROM MAX(bar)
+SELECT * STREAM lo FROM MIN(bar)
+SELECT bar[0], int(hi[0]), int(lo[0]), bar[9] STREAM ohlc FROM bar + hi + lo
+SELECT * STREAM chart FROM ohlc + bar
