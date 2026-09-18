@@ -652,7 +652,7 @@ class ParserListener : public RQLBaseListener {
     // (`to_float` i `to_double`). Regula trafiala w `to_double(k)` i chybiala we wszystkim,
     // co po konwersji jeszcze cokolwiek liczy: `to_float('2.5') * 2` konczy sie tokenem
     // MULTIPLY, wiec pole wychodzilo `INTEGER` mimo wartosci zmiennoprzecinkowej
-    // (pozycja 16 w usecases/requested.md, granica 2). Wnioskowanie po ostatnim tokenie
+    // (pozycja 16 w paper-arXiv/debs/done/requested.md, granica 2). Wnioskowanie po ostatnim tokenie
     // nie daje sie na to naprawic - zastepuje je przejscie po calym programie.
     auto outType = rdb::INTEGER;
     int outLen   = 4;

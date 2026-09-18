@@ -1,6 +1,6 @@
 #!/bin/bash
 # Pole STRING ze zrodla tekstowego ma dotrzec do wyrazenia w SELECT, a jego typ do
-# deskryptora artefaktu (pozycja 12 w usecases/requested.md).
+# deskryptora artefaktu (pozycja 12 w paper-arXiv/debs/done/requested.md).
 #
 # Zrodlo jest CELOWO bez cudzyslowow - to ten wariant byl zepsuty. Przeczytany token
 # byl wyrzucany, a skan cudzyslowu konsumowal reszte pliku, wiec dla wiersza `42 7`

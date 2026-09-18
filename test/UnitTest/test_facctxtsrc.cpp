@@ -252,7 +252,7 @@ TEST_F(TextSourceROTest, test_read_string_null_token) {
 
 // Napis BEZ cudzyslowu jest zwyklym tokenem i jego wartosc ma trafic do pola. Do 2026-08-30
 // przeczytany token byl wyrzucany, a skan cudzyslowu ponizej konsumowal reszte pliku
-// (pozycja 12 w usecases/requested.md).
+// (pozycja 12 w paper-arXiv/debs/done/requested.md).
 TEST_F(TextSourceROTest, test_read_string_unquoted) {
   auto filename = createTestFile("test_str_plain.txt", "hello\n");
 

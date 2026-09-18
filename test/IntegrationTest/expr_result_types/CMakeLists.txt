@@ -4,7 +4,7 @@ get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
 # Kontrakt typu wyniku wyrazenia (pozycja 16 w
-# paper-arXiv/usecases/requested.md).
+# paper-arXiv/debs/done/requested.md).
 #
 # Test sprawdza JEDNOCZESNIE cztery rzeczy, bo kazda z osobna przepuszcza inny
 # blad: nazwy typow w `.desc`, rozmiar rekordu i rozklad bajtow na pola,

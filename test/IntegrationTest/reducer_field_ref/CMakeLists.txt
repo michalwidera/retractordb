@@ -4,7 +4,7 @@ get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
 # Odwolanie do pola reduktora w liscie SELECT (znalezisko przy zamykaniu pozycji
-# 16 w paper-arXiv/usecases/requested.md).
+# 16 w paper-arXiv/debs/done/requested.md).
 #
 # `SELECT avg STREAM o FROM AVG(src)` kompilowalo sie i ginelo w wykonaniu na
 # `Unsupported token in expressionEvaluator`, przy zerze rekordow. Bramka `Check

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pozycja 6 z usecases/requested.md: nie bylo trybu "licz do konca wejscia". Jednostka -m
+# Pozycja 6 z paper-arXiv/debs/done/requested.md: nie bylo trybu "licz do konca wejscia". Jednostka -m
 # to liczba pobudek planisty, wiec wartosc trzeba bylo dobierac probowaniem dla kazdej serii
 # danych osobno, a po wyczerpaniu wejscia zrodlo tekstowe zawijalo sie na poczatek pliku
 # i po cichu produkowalo rekordy z danych, ktore juz raz przeszly.

@@ -86,7 +86,7 @@ using fieldShapeLookup = std::function<std::optional<fieldShape>(const std::stri
 /// Odpowiada na jedno pytanie: czy wartość, która ZOSTAJE NA STOSIE po wykonaniu programu,
 /// jest napisem, i jak szeroka. Do 2026-08-30 pytanie to było zadawane inaczej - przez skan
 /// programu do PIERWSZEGO literału tekstowego - więc wyrażenie liczbowe z literałem gdziekolwiek
-/// w środku lądowało w polu `STRING` (`to_integer('42')+k`, pozycja 12 w usecases/requested.md).
+/// w środku lądowało w polu `STRING` (`to_integer('42')+k`, pozycja 12 w paper-arXiv/debs/done/requested.md).
 ///
 /// Wnioskowany jest WYŁĄCZNIE napis, i to tylko na użytek `RQLParser::exitExpression`,
 /// któremu wystarczy wartość początkowa pola: publiczny kształt - łącznie z szerokością

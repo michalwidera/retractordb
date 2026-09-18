@@ -164,7 +164,7 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
         // byl tu wyrzucany, a sterowanie schodzilo do skanu cudzyslowu ponizej: ten konsumowal
         // reszte pliku, zawijal go i rozjezdzal caly rekord. Dla `DECLARE txt STRING[8], k INTEGER`
         // nad wierszem `42 7` pole txt wychodzilo puste, a k dostawalo 42 - czyli pierwszy token
-        // wiersza (pozycja 12 w usecases/requested.md).
+        // wiersza (pozycja 12 w paper-arXiv/debs/done/requested.md).
         if (myFile_.peek() != '"') {
           auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
           if (!token.has_value() || isNullToken(*token)) {

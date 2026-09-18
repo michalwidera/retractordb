@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pozycja 7 z usecases/requested.md: wykonanie bylo taktowane zegarem sciennym,
+# Pozycja 7 z paper-arXiv/debs/done/requested.md: wykonanie bylo taktowane zegarem sciennym,
 # bez trybu "policz najszybciej jak sie da". Rodzina wolnej telemetrii musiala byc
 # skracana do kilkudziesieciu rekordow, zeby dala sie w ogole weryfikowac w petli.
 #

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Kontrakt typu wyniku wyrazenia - pozycja 16 w paper-arXiv/usecases/requested.md.
+# Kontrakt typu wyniku wyrazenia - pozycja 16 w paper-arXiv/debs/done/requested.md.
 #
 # Do 2026-09-11 kompilator wyprowadzal typ pola z czterech regul lokalnych, z ktorych zadna
 # nie widziala calego programu ONP. Kazde z piaciu pol `dst` wychodzilo wtedy jako INTEGER -

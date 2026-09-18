@@ -1,4 +1,4 @@
-# Kontrakt typu wyniku wyrazenia - pozycja 16 w paper-arXiv/usecases/requested.md.
+# Kontrakt typu wyniku wyrazenia - pozycja 16 w paper-arXiv/debs/done/requested.md.
 #
 # Kazde pole `dst` odpowiada za jedna regule kontraktu, a wartosci sa dobrane tak, zeby
 # ZLY typ w deskryptorze dalo sie zobaczyc w danych, a nie tylko w `.desc`:

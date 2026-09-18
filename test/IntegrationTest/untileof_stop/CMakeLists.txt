@@ -3,9 +3,9 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
-# Pozycja 6 z usecases/requested.md: brak trybu "licz do konca wejscia". Test
-# porownuje artefakt przebiegu z --until-eof z przebiegiem o recznie dobranym -m
-# i sprawdza, ze bez tego trybu zrodlo nadal sie zawija.
+# Pozycja 6 z paper-arXiv/debs/done/requested.md: brak trybu "licz do konca
+# wejscia". Test porownuje artefakt przebiegu z --until-eof z przebiegiem o
+# recznie dobranym -m i sprawdza, ze bez tego trybu zrodlo nadal sie zawija.
 
 add_test(
   NAME ${TestID}-run

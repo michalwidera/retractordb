@@ -1682,7 +1682,7 @@ TEST(xparser, newly_implemented_functions_compile) {
   }
 }
 
-// Sedno pozycji 1 z usecases/requested.md: `-c` jest bramka. Te nazwy stały w gramatyce
+// Sedno pozycji 1 z paper-arXiv/debs/done/requested.md: `-c` jest bramka. Te nazwy stały w gramatyce
 // bez implementacji, wiec plan kompilowal sie czysto i ginal dopiero w wykonaniu na
 // `Unsupported function call`. Teraz odpadaja na kompilacji, kanalem `Check result:`.
 TEST(xparser, unknown_function_is_rejected_at_compile_time) {
@@ -2647,7 +2647,7 @@ TEST(xcompiler, field_type_lookup_uses_flat_element_index) {
 }
 
 // ---------------------------------------------------------------------------
-// Typ pola wyjsciowego (pozycja 12 w usecases/requested.md)
+// Typ pola wyjsciowego (pozycja 12 w paper-arXiv/debs/done/requested.md)
 // ---------------------------------------------------------------------------
 
 namespace {
@@ -2745,7 +2745,7 @@ TEST(xcompiler, length_over_string_field_yields_integer_field) {
   EXPECT_EQ(text.rlen * text.rarray, 8);
 }
 
-// MIGRACJA KONTRAKTU (pozycja 16 w usecases/requested.md, granice 1 i 2).
+// MIGRACJA KONTRAKTU (pozycja 16 w paper-arXiv/debs/done/requested.md, granice 1 i 2).
 //
 // Do 2026-09-11 ten test pinowal regule „INTEGER, chyba ze OSTATNIM tokenem programu jest
 // to_float albo to_double": `Ceil(x)` nad DOUBLE dawalo pole INTEGER, a czysty odczyt
@@ -3219,7 +3219,7 @@ TEST(xcompiler, window_result_type_reaches_copies_of_the_window_stream) {
 }
 
 // ============================================================================================
-// Kontrakt typu wyniku wyrazenia - pozycja 16 w paper-arXiv/usecases/requested.md.
+// Kontrakt typu wyniku wyrazenia - pozycja 16 w paper-arXiv/debs/done/requested.md.
 //
 // Typ, dlugosc i krotnosc pola ustala JEDEN przebieg (compiler::inferFieldShapes) z calego
 // programu ONP, a nie piec regul lokalnych, z ktorych kazda widziala inny jego fragment.

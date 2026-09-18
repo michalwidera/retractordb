@@ -28,7 +28,7 @@
 /// Zadna z nich nie znala wyniku posredniego, wiec `to_float('2.5')*2` konczylo sie polem
 /// `INTEGER`, `SELECT source[0]` nad `DOUBLE` gubilo typ producenta, a
 /// `to_integer(AVG(x:10))+1` wracalo do `RATIONAL`. Pozycja 16 w
-/// `paper-arXiv/usecases/requested.md` opisuje wszystkie trzy granice.
+/// `paper-arXiv/debs/done/requested.md` opisuje wszystkie trzy granice.
 ///
 /// Ten modul zastepuje tamte reguly jednym przejsciem po stosie typow. Zasada jest jedna
 /// i brzmi: **analizator odtwarza to, co robi `expressionEvaluator`** - nie kolejnosc enum,

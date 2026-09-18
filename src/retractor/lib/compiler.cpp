@@ -2642,7 +2642,7 @@ std::string compiler::resolveWindowAggregates() {
       // TYPU POLA ten przebieg juz nie ustala. Do 2026-09-11 stala tu para regul lokalnych:
       // „nadpisz typem okna, jesli parser zostawil domyslny INTEGER" oraz wyjatek
       // `explicitIntegerCast`, rozpoznajacy koncowe `to_integer` po OSTATNIM tokenie programu.
-      // Wyjatek zamykal `to_integer(AVG(t:12))` (pozycja 15 w requested.md) i z zalozenia nie
+      // Wyjatek zamykal `to_integer(AVG(t:12))` (pozycja 15 w paper-arXiv/debs/done/requested.md) i z zalozenia nie
       // siegal dalej: `to_integer(AVG(x:10)) + 1` konczy sie tokenem ADD, wiec wracal do
       // nadpisania i wychodzil jako RATIONAL (pozycja 16, granica 3). Obie reguly zastepuje
       // inferFieldShapes(), ktore czyta CALY program, a nie jego ostatni token.
@@ -2720,7 +2720,7 @@ std::optional<int> inputSlotOfReference(const query &q, const std::map<std::stri
 /// Ksztalt wyniku KAZDEGO pola SELECT - jeden przebieg wnioskowania dla calego planu.
 ///
 /// Zastepuje cztery reguly lokalne, ktore do 2026-09-11 rozstrzygaly to pytanie kazda na
-/// wlasna reke i zadna do konca (pozycja 16 w `usecases/requested.md`):
+/// wlasna reke i zadna do konca (pozycja 16 w `paper-arXiv/debs/done/requested.md`):
 ///
 ///  * `propagateCopiedFieldShapes()` - przenosil ksztalt przez wezly kopiujace, ale
 ///    WYLACZNIE dla pol czytajacych wynik okna rekordowego. `SELECT source[0]` nad polem
