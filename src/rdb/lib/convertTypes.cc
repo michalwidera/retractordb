@@ -73,8 +73,8 @@ void visit_descFld(const K &inVar, K &retVal) {
                    [&retVal](int a) { retVal = static_cast<T>(a); },                                            //
                    [&retVal](unsigned a) { retVal = static_cast<T>(a); },                                       //
                    [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<T>(a); },                  //
-                   [&retVal](float a) { retVal = narrowFloatTo<T>(a); },                                          //
-                   [&retVal](double a) { retVal = narrowFloatTo<T>(a); },                                         //
+                   [&retVal](float a) { retVal = narrowFloatTo<T>(a); },                                        //
+                   [&retVal](double a) { retVal = narrowFloatTo<T>(a); },                                       //
                    [&retVal](std::pair<int, int> a) { SPDLOG_ERROR("TODO - pair-int->T"); },                    //
                    [&retVal](const std::pair<std::string, int> &a) { SPDLOG_ERROR("TODO - idxpair-int->T"); },  //
                    [&retVal](const std::string &a) { parse_string<T>(a, retVal); }                              //

@@ -131,7 +131,7 @@ TEST(ExecutorRtCheckTest, OutputUsesOkOrFailMarkers) {
 
   const auto &out = captured.str();
   bool hasMarker  = out.find("[OK]") != std::string::npos || out.find("[FAIL]") != std::string::npos ||
-                    out.find("[WARN]") != std::string::npos;
+                   out.find("[WARN]") != std::string::npos;
   EXPECT_TRUE(hasMarker);
 }
 

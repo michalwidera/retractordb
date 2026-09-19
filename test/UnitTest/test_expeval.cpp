@@ -1976,8 +1976,8 @@ TEST(xExpressionEval, rational_overflow_returns_null) {
 // stalych, wiec dodawanie dzieje sie w RUNTIME i pyta o faktyczny tryb zaokraglania.
 TEST(xExpressionEval, float_hardware_rounding_is_ties_to_even_at_2p24) {
   volatile float base = 16777216.0F;  // 2^24
-  volatile float one = 1.0F;
-  volatile float two = 2.0F;
+  volatile float one  = 1.0F;
+  volatile float two  = 2.0F;
 
   const float afterOne = base + one;
   const float afterTwo = afterOne + two;
@@ -2014,8 +2014,7 @@ TEST(xExpressionEval, float_chain_rounds_at_every_step_at_2p24) {
   rdb::descFldVT result = test.eval(program);
 
   ASSERT_TRUE(std::holds_alternative<float>(result)) << "indeks wyniku: " << result.index();
-  EXPECT_EQ(std::get<float>(result), 16777218.0F)
-      << "16777220 znaczy DOUBLE w posredniku albo przepisanie na x+3";
+  EXPECT_EQ(std::get<float>(result), 16777218.0F) << "16777220 znaczy DOUBLE w posredniku albo przepisanie na x+3";
 }
 
 // (3b) TEN SAM LANCUCH NAD SLOTEM FLOAT REKORDU - `w[1] + 1 + 2` jeden do jednego.
