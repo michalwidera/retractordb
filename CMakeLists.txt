@@ -220,7 +220,9 @@ set(RDB_SANITIZE
 )
 if(RDB_SANITIZE)
   message(STATUS "RDB_SANITIZE=${RDB_SANITIZE}")
-  add_compile_options(-fsanitize=${RDB_SANITIZE} -fno-omit-frame-pointer -g)
+  add_compile_options(
+    -fsanitize=${RDB_SANITIZE} -fno-sanitize-recover=undefined
+    -fno-omit-frame-pointer -g)
   add_link_options(-fsanitize=${RDB_SANITIZE})
 endif()
 
@@ -459,7 +461,7 @@ add_custom_target(
   COMMAND ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_BINARY_DIR} -L api
           --output-on-failure
   COMMENT "Testy API klienckiego (ctest -L api)")
-add_dependencies(test-api xretractor xqry test_api_client)
+add_dependencies(test-api xretractor xqry test_api_client test_api_spawn)
 
 include(InstallRequiredSystemLibraries)
 

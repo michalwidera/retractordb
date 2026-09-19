@@ -33,12 +33,14 @@ target_link_libraries(
 # linkowanie calej biblioteki `retractor` do klienta byloby za drogie.
 # serverName.cpp dochodzi z tego samego powodu - bus.cpp czyta przez nia
 # przestrzen nazw uruchomienia, a sama zalezy wylacznie od biblioteki
-# standardowej. W bibliotece `qry` zadnej z nich NIE ma celowo - testy
+# standardowej. lockFile.cpp tak samo: bus.cpp bierze przez nia blokade
+# obecnosci na segmencie. W bibliotece `qry` zadnej z nich NIE ma celowo - testy
 # jednostkowe linkuja jednoczesnie `qry` i `retractor`, a dwie kopie bus.o
 # daloby duplikaty symboli.
 add_executable(
-  ${PROJECT_NAME} qryLauncher.cpp ../retractor/lib/appConfig.cpp
-                  ../retractor/lib/bus.cpp ../retractor/lib/serverName.cpp)
+  ${PROJECT_NAME}
+  qryLauncher.cpp ../retractor/lib/appConfig.cpp ../retractor/lib/bus.cpp
+  ../retractor/lib/lockFile.cpp ../retractor/lib/serverName.cpp)
 
 target_include_directories(${PROJECT_NAME}
                            PRIVATE ${CMAKE_SOURCE_DIR}/src/retractor/lib)

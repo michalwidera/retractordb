@@ -46,6 +46,11 @@ using namespace esm;
 
 namespace {
 constexpr std::chrono::milliseconds kIdleLoopSleep{100};
+
+/// Katalog blokad instancji dla sprzatania przy wyjsciu. Kopia, a nie odczyt przez
+/// serviceGuardPtr: po normalnym powrocie z run() straznika juz nie ma, a sprzatac trzeba
+/// takze wtedy. Obiekt statyczny zbudowany przed rejestracja cleanup() niszczy sie po niej.
+std::string exitSweepLockDir;
 }  // namespace
 
 void cleanup() {
@@ -76,7 +81,10 @@ void cleanup() {
     }
   }
   cv.notify_all();
-  ipcServer.shutdownFromExitHandler();
+  // Obiekty IPC kasujemy tylko z wnetrza run(). Po normalnym powrocie run() zrobil to sam, a straznik
+  // zwolnil juz blokade tozsamosci: kasowanie po nazwie trafialoby w obiekty instancji, ktora
+  // zdazyla wystartowac pod ta sama nazwa.
+  if (serviceGuardPtr != nullptr) ipcServer.shutdownFromExitHandler();
   // Slot magistrali przed blokada, w tej samej kolejnosci co reszta sprzatania: dopiero
   // zwolniona blokada wpuszcza kolejna instancje, a ta czyta magistrale.
   if (busPtr != nullptr) busPtr->release();
@@ -84,6 +92,11 @@ void cleanup() {
   // zwalniamy ja dopiero, gdy IPC jest posprzatane. releaseLock() jest idempotentny,
   // wiec pozniejszy destruktor straznika na sciezce normalnej nie zrobi nic drugi raz.
   if (serviceGuardPtr != nullptr) serviceGuardPtr->releaseLock();
+  // Na koniec pozostalosci po instancjach zabitych, ktore same nie posprzataly (SIGKILL, OOM).
+  // Bezpieczne takze obok zywych instancji - patrz sweepAbandonedResources. Wlasny segment
+  // magistrali zostaje na sciezce FatalError: odwzorowanie trwa do konca procesu, wiec
+  // skasuje go dopiero nastepne sprzatanie.
+  if (!exitSweepLockDir.empty()) sweepAbandonedResources(exitSweepLockDir);
 }
 
 std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl, qTree *coreInstancePtr) {
@@ -126,6 +139,8 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
     explicit BusScope(bus::Bus &b) { busPtr = &b; }
     ~BusScope() { busPtr = nullptr; }
   } busScope(xrdbbus);
+
+  exitSweepLockDir = guard.lockDirectory();
 
   // Launcher musi wejsc tutaj z przejeta blokada i roszczeniem magistrali. To jest granica
   // transakcji startowej: oba zasoby zostaly zdobyte przed kasowaniem artefaktow i pozostaja

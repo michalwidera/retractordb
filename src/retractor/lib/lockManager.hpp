@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 
 /// Tozsamosc systemd biezacego procesu, ustalona z /proc/self/cgroup.
 struct SystemdIdentity {
@@ -34,8 +36,10 @@ class FlockServiceGuard {
 
  private:
   std::string lockFilePath;
+  std::string ipcLockPath;
   std::string serviceQueryFile;  // plik zapytań tej instancji; zapisywany do locka jako QUERYFILE
   int lockFileDescriptor{-1};
+  int ipcLockDescriptor{-1};
   bool isLocked{false};
 
  public:
@@ -48,11 +52,19 @@ class FlockServiceGuard {
   // przed klientami, ktorzy czekaja na linie "PID: <pid>".
   bool acquireLock();
 
+  // Druga blokada chroni faktyczna nazwe IPC, takze przy kolizji skrotow nazw.
+  // Wspolna dla wszystkich TMPDIR i przestrzeni magistrali. Przed dotknieciem IPC.
+  bool acquireIpcLock(std::string_view objectName);
+
+  // Pliki obu blokad kasuje releaseLock(), zgodnie z protokolem z lockFile.hpp.
+
   // Zapisuje do trzymanej blokady informacje o procesie. Wolac dopiero gdy instancja jest
   // gotowa obsluzyc klientow -- pojawienie sie linii "PID: <pid>" jest dla nich sygnalem startu.
   bool publishLockInfo();
 
   void setLockDir(const std::string &dir);
+  // Katalog pliku blokady instancji (TMPDIR albo paths.lock_dir) - tam sprzata sweepAbandonedResources.
+  [[nodiscard]] std::string lockDirectory() const;
   // Ścieżka pliku zapytań tej instancji - zapisywana do locka jako QUERYFILE, by inna instancja
   // wiedziała, który plik nadpisać przed restartem serwisu. Ustawić przed acquireLock().
   void setServiceQueryFile(const std::string &queryFile);
@@ -70,3 +82,17 @@ class FlockServiceGuard {
  private:
   [[nodiscard]] bool writeLockInfo() const;
 };
+
+/// Liczba usunietych pozostalosci, osobno dla kazdego rodzaju.
+struct SweepReport {
+  std::size_t serviceLocks{0};   ///< pliki blokad instancji w katalogu blokad
+  std::size_t ipcIdentities{0};  ///< blokady tozsamosci IPC razem z globalnymi obiektami IPC
+  std::size_t busSegments{0};    ///< segmenty magistrali, ktorych nikt nie mapuje
+};
+
+/// Usuwa pozostalosci instancji, ktore nie zyja: pliki blokad, globalne obiekty IPC i segmenty
+/// magistrali. Normalny koniec procesu sprzata po sobie sam; tu trafia to, co zostawil proces
+/// zabity (SIGKILL, OOM, awaria zasilania). Bezpieczne w kazdej chwili i przy dzialajacych
+/// instancjach: usuwa wylacznie to, czego blokade udalo sie zajac wylacznie (lockFile.hpp),
+/// a zywa instancja trzyma swoje blokady do konca.
+SweepReport sweepAbandonedResources(const std::string &serviceLockDir);

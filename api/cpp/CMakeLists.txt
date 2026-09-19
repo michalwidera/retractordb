@@ -11,6 +11,19 @@ if(NOT TARGET boost::boost AND NOT TARGET Boost::headers)
   find_package(Boost CONFIG REQUIRED)
 endif()
 
+# Sondy lokalne: API musi dzialac takze bez konfiguracji silnika.
+include(CheckCXXSymbolExists)
+check_cxx_symbol_exists(pipe2 "fcntl.h;unistd.h" RDB_API_HAS_PIPE2)
+check_cxx_symbol_exists(POSIX_SPAWN_CLOEXEC_DEFAULT "spawn.h"
+                        RDB_API_HAS_SPAWN_CLOEXEC_DEFAULT)
+if(NOT RDB_API_HAS_PIPE2 AND NOT RDB_API_HAS_SPAWN_CLOEXEC_DEFAULT)
+  message(
+    FATAL_ERROR
+      "API requires pipe2 or POSIX_SPAWN_CLOEXEC_DEFAULT for safe descriptor inheritance"
+  )
+endif()
+configure_file(apiPlatform.h.in generated/apiPlatform.h)
+
 add_library(rdb_api_json STATIC src/json.cpp)
 target_link_libraries(rdb_api_json PRIVATE $<BUILD_INTERFACE:Boost::headers>)
 target_compile_definitions(rdb_api_json PUBLIC BOOST_JSON_NO_LIB)
@@ -21,6 +34,8 @@ add_library(RetractorDB::client ALIAS rdb_client)
 set_target_properties(rdb_client PROPERTIES EXPORT_NAME client
                                             POSITION_INDEPENDENT_CODE ON)
 target_compile_features(rdb_client PUBLIC cxx_std_23)
+target_include_directories(rdb_client
+                           PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
 target_include_directories(
   rdb_client PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                     $<INSTALL_INTERFACE:include>)

@@ -126,7 +126,7 @@ extern IpcServer ipcServer;
 ///
 /// std::exit - przez ktory konczy sie FatalError - nie uruchamia destruktorow obiektow
 /// AUTOMATYCZNYCH. Przy bledzie krytycznym cleanup() jest jedynym miejscem, ktore jeszcze
-/// dziala, wiec to on musi zwolnic flock. Stabilny plik blokady pozostaje na dysku celowo.
+/// dziala, wiec to on musi zwolnic flock - razem z plikiem blokady (lockFile.hpp).
 ///
 /// Zerowany przed powrotem z run() (patrz lockGuardScope), i to jest wymog poprawnosci:
 /// handlery atexit wykonuja sie PO zakonczeniu main, a straznik jest tam obiektem

@@ -263,10 +263,9 @@ xqry --server alfa -k
 wait "$pid_a" 2>/dev/null || true
 pid_a=""
 
-# (6) Osierocony segment nie moze kosztowac budzetu klienta. Po zamknieciu obu serwerow
-#     segment /dev/shm/xrdbbus ZOSTAJE (nikt go nie kasuje, bo skasowanie zywego zerwaloby
-#     magistrale pozostalym), a jego sloty sa martwe. --bus musi to rozpoznac przez
-#     /proc, czyli natychmiast -- nie po 3 s odpytywania.
+# (6) Pusta magistrala nie moze kosztowac budzetu klienta. Po normalnym zamknieciu obu serwerow
+#     segmentu juz nie ma - kasuje go ostatni wychodzacy (protokol obecnosci, bus.hpp). Segment
+#     z martwymi slotami zostaje tylko po SIGKILL; ten przypadek sprawdza punkt (8).
 start_ns=$(now_ns)
 xqry --bus > orphan.txt 2>orphan.err || true
 elapsed_ms=$(( ($(now_ns) - start_ns) / 1000000 ))
@@ -323,6 +322,23 @@ if [ "$gamma_status" -ne 0 ]; then
   echo "POMINIETO: higiena IPC niesprawdzalna na tej platformie"
 elif [ -z "$gamma_objects" ]; then
   echo "SIGKILL nie zostawil obiektow IPC instancji gamma -- scenariusz stracil przedmiot"; exit 1
+fi
+
+#     Segment po SIGKILL jedynej instancji zostaje z jej martwym slotem. --bus musi to rozpoznac
+#     przez /proc, czyli natychmiast -- nie po 3 s odpytywania. Jako ostatni wychodzacy kasuje
+#     przy tym segment, wiec ponizsze `-w` bada juz sciezke BEZ magistrali: tam o zyciu
+#     rozstrzyga blokada tozsamosci IPC, ktora po SIGKILL zwolnilo jadro.
+start_ns=$(now_ns)
+xqry --bus > orphan_slot.txt 2>orphan_slot.err || true
+elapsed_ms=$(( ($(now_ns) - start_ns) / 1000000 ))
+if [ "$elapsed_ms" -ge 1000 ]; then
+  echo "--bus nad segmentem z martwym slotem trwalo ${elapsed_ms} ms -- wykrywanie przez timeout?"
+  exit 1
+fi
+if grep -qE '^gamma[[:space:]]+\|' orphan_slot.txt; then
+  echo "--bus wypisal martwa instancje:"
+  cat orphan_slot.txt
+  exit 1
 fi
 
 start_ns=$(now_ns)

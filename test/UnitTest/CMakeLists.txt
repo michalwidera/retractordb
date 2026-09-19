@@ -141,3 +141,11 @@ set_tests_properties(
   ut_ipcServer
   ut_ipcClient
   PROPERTIES RUN_SERIAL TRUE)
+
+# Takze z valgrindem musi byc ograniczenie dla regresji zakleszczenia.
+set_tests_properties(ut_busFallback PROPERTIES TIMEOUT 60)
+# test_busFallback dolacza bus.cpp jako zrodlo; GCC ostrzega wtedy o typach z
+# przestrzeni anonimowej uzytych w polach Bus::Impl, choc w tej jednostce
+# kompilacji sa jedyne.
+target_compile_options(test_busFallback
+                       PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-subobject-linkage>)

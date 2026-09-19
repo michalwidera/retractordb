@@ -29,21 +29,28 @@
 /// isProcessAlive ponizej.
 namespace bus {
 
-/// Nazwa segmentu w /dev/shm. Segment nie jest przez nikogo kasowany: usuniecie go w chwili,
-/// gdy inna instancja trzyma odwzorowanie, zerwaloby jej magistrale.
+/// Nazwa segmentu w /dev/shm.
+///
+/// Kasowania pilnuje protokol obecnosci. Kto segment mapuje, trzyma LOCK_SH na pliku
+/// <ipc::kMachineLockDir>/<nazwa segmentu>.lock - zajmuje go PRZED otwarciem segmentu, zwalnia
+/// po zamknieciu odwzorowania. Segment kasuje wylacznie ten, kto zajmie ten plik LOCK_EX, czyli gdy
+/// nie mapuje go nikt: ostatni wychodzacy (Bus::~Bus) albo sprzatacz po procesach zabitych
+/// (sweepAbandonedSegments). Samo "sprawdz, czy nikt nie zyje, i skasuj" byloby wyscigiem, w ktorym
+/// dwie instancje koncza na DWOCH segmentach, kazda widzac tylko siebie; blokada obecnosci go
+/// zamyka, a regule sprawdzania i-wezla po zajeciu blokady opisuje lockFile.hpp.
 ///
 /// NAZWA NIESIE WERSJE UKLADU i przy KAZDEJ zmianie ukladu slotu musi isc w gore razem
 /// z kLayoutVersion. Powod jest wdrozeniowy: segment o starym ukladzie zostaje w /dev/shm po
 /// podmianie binarki, a instancja, ktora odmowi sie do niego podlaczyc, startuje BEZ egzekwowania
 /// rozlacznosci nazw -- czyli awaria jest cicha az do pierwszej kolizji. Z wersja w nazwie nowa
 /// binarka po prostu zaklada wlasny segment, a stary zostaje nieuzywanym smieciem do restartu
-/// maszyny. Automatycznego kasowania swiadomie nie ma: "sprawdz, czy nikt nie zyje, i skasuj" jest
-/// wyscigiem, w ktorym dwie instancje moga skonczyc na DWOCH segmentach, kazda widzac tylko siebie.
+/// maszyny. Sprzatacz innych wersji nie rusza: binarki sprzed protokolu obecnosci (v5 i starsze)
+/// blokady nie biora, wiec jej brak nic o nich nie mowi.
 ///
 /// Podkreslenie, nie kropka: obiekty IPC instancji nazywaja sie "<obiekt>.<nazwa instancji>", wiec
 /// "xrdbbus.v2" wygladalby jak obiekt instancji o nazwie "v2" i wpadl pod wzorce sprzatajace
 /// postaci /dev/shm/*.<nazwa>.
-inline constexpr std::string_view kSegmentName = "xrdbbus_v5";
+inline constexpr std::string_view kSegmentName = "xrdbbus_v6";
 
 /// Nazwa segmentu dla BIEZACEGO uruchomienia: kSegmentName, a przy ustawionej przestrzeni
 /// nazw (servername::environmentNamespace) kSegmentName + "_" + przestrzen.
@@ -57,6 +64,10 @@ inline constexpr std::string_view kSegmentName = "xrdbbus_v5";
 /// Podkreslenie, tak samo jak przy czlonie wersji: kropka jest zarezerwowana dla obiektow
 /// instancji ("<obiekt>.<nazwa instancji>") i wpadalaby pod wzorce sprzatajace.
 [[nodiscard]] std::string segmentName();
+
+/// Kasuje segmenty tej wersji ukladu, ktorych nikt nie mapuje - pozostalosci po procesach zabitych,
+/// ktore nie zdazyly posprzatac jako ostatni wychodzacy. Zwraca liczbe usunietych.
+std::size_t sweepAbandonedSegments();
 
 /// Rozmiar segmentu magistrali w bajtach. Segment jest tworzony w calosci i od razu
 /// zerowany, wiec jest to miejsce ZAJETE w /dev/shm, a nie rezerwacja rosnaca z uzyciem.

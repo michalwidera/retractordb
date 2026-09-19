@@ -3,14 +3,21 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <boost/interprocess/ipc/message_queue.hpp>
+#include <boost/interprocess/shared_memory_object.hpp>
+#include <boost/interprocess/sync/named_mutex.hpp>
 
+#include "constants.hpp"
 #include "platformConfig.h"
+#include "retractor/lib/lockFile.hpp"
 #include "retractor/lib/lockManager.hpp"
 #include "retractor/lib/serviceControl.hpp"
 
@@ -92,7 +99,7 @@ TEST(LockManagerPeerInfo, missing_lock_file_yields_unknown) {
   EXPECT_EQ(info.kind, FlockServiceGuard::PeerInfo::Kind::Unknown);
 }
 
-TEST(LockManagerFlock, releaseKeepsStableInode) {
+TEST(LockManagerFlock, releaseRemovesFileAndOrphanedOpenerCannotWin) {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / ("ut_lockmgr_inode_" + std::to_string(getpid()));
   const std::string serviceName   = "xretractor_service.alfa";
   const std::filesystem::path lockPath = dir / (serviceName + ".lock");
@@ -103,28 +110,28 @@ TEST(LockManagerFlock, releaseKeepsStableInode) {
   first.setLockDir(dir.string());
   ASSERT_TRUE(first.acquireLock());
 
-  // Drugi uczestnik otwiera TEN SAM inode jeszcze przed zwolnieniem pierwszej blokady.
-  // Stary kod wykonywal potem unlink: drugi blokowal osierocony inode, a trzeci tworzyl
-  // pod ta sama sciezka nowy plik i rowniez zdobywal flock.
+  // Drugi uczestnik otwiera TEN SAM i-wezel jeszcze przed zwolnieniem pierwszej blokady. Po
+  // skasowaniu pliku zajmie flock na i-wezle bez nazwy. Dawne kasowanie przy zwolnieniu dawalo
+  // wtedy dwoch wlascicieli, bo trzeci tworzyl pod ta sciezka nowy plik; wyscig zamyka
+  // sprawdzenie i-wezla po zajeciu blokady (lockFile.hpp).
   const int secondFd = open(lockPath.c_str(), O_RDWR | O_CLOEXEC);
   ASSERT_NE(secondFd, -1);
-  struct stat original{};
-  ASSERT_EQ(fstat(secondFd, &original), 0);
 
   first.releaseLock();
+  EXPECT_FALSE(std::filesystem::exists(lockPath)) << "wlasciciel nie skasowal pliku przy zwolnieniu";
   ASSERT_EQ(flock(secondFd, LOCK_EX | LOCK_NB), 0);
+  EXPECT_FALSE(lockfile::stillLinked(secondFd, lockPath.string())) << "blokada na osieroconym i-wezle wyglada na wazna";
 
-  struct stat current{};
-  ASSERT_EQ(stat(lockPath.c_str(), &current), 0);
-  EXPECT_EQ(current.st_dev, original.st_dev);
-  EXPECT_EQ(current.st_ino, original.st_ino);
-
+  // Uczestnicy protokolu widza jednego wlasciciela: trzeci zajmuje nowy plik, czwarty odpada.
   FlockServiceGuard third(serviceName);
   third.setLockDir(dir.string());
-  EXPECT_FALSE(third.acquireLock());
+  EXPECT_TRUE(third.acquireLock());
+  FlockServiceGuard fourth(serviceName);
+  fourth.setLockDir(dir.string());
+  EXPECT_FALSE(fourth.acquireLock());
 
-  EXPECT_EQ(flock(secondFd, LOCK_UN), 0);
   EXPECT_EQ(close(secondFd), 0);
+  third.releaseLock();
   std::filesystem::remove_all(dir);
 }
 
@@ -257,5 +264,154 @@ TEST(ServiceControlDeliver, fails_on_missing_source) {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_deliver_missing";
   std::filesystem::create_directories(dir);
   EXPECT_FALSE(deliverQueryFile((dir / "nope.rql").string(), (dir / "out.rql").string()));
+  std::filesystem::remove_all(dir);
+}
+
+TEST(LockManagerFlock, HashCollisionCannotAcquireTheSameIpcIdentity) {
+  // Dwie rozne poprawne nazwy, ten sam skrot FNV. Kolizja wymuszona danymi,
+  // nie podmiana funkcji haszujacej; test dziala tez na Linuksie.
+  const std::string firstName  = "review_collision_65273";
+  const std::string secondName = "review_collision_108288";
+  ASSERT_EQ(ipc::shortServerTag(firstName), ipc::shortServerTag(secondName));
+  const std::string object = "ut_ipc_" + std::to_string(getpid()) + "." + ipc::shortServerTag(firstName);
+  const auto dir           = std::filesystem::temp_directory_path() / ("ut_ipc_guard_" + std::to_string(getpid()));
+  std::filesystem::create_directories(dir / "a");
+  std::filesystem::create_directories(dir / "b");
+  {
+    FlockServiceGuard first(firstName);
+    FlockServiceGuard second(secondName);
+    first.setLockDir((dir / "a").string());
+    second.setLockDir((dir / "b").string());
+    ASSERT_TRUE(first.acquireLock());
+    ASSERT_TRUE(second.acquireLock());
+    ASSERT_TRUE(first.acquireIpcLock(object));
+    EXPECT_FALSE(second.acquireIpcLock(object));
+    second.releaseLock();
+    ASSERT_TRUE(second.acquireLock());
+    EXPECT_FALSE(second.acquireIpcLock(object)) << "odrzucony uczestnik zwolnil cudza blokade";
+    first.releaseLock();
+    EXPECT_TRUE(second.acquireIpcLock(object));
+  }
+  std::filesystem::remove_all(dir);
+  std::filesystem::remove("/tmp/xretractor_ipc." + object + ".lock");
+}
+
+TEST(IpcIdentity, HashedNamesCannotAliasLiteralNames) {
+  EXPECT_EQ(ipc::shortServerTag("review_long_name_10"), "0cb235fc4");
+  EXPECT_NE(ipc::serverNameToken("review_long_name_10"), ipc::serverNameToken("cb235fc4"));
+  const auto names = ipc::names("review_long_name_10");
+  EXPECT_LE(names.mapMutex.size() + 1, ipc::kMaxObjectNameLength);
+  EXPECT_LE(names.queryQueue.size() + 1, ipc::kMaxObjectNameLength);
+  EXPECT_LE(names.responseQueue(2147483647).size() + 1, ipc::kMaxObjectNameLength);
+}
+
+// --- Protokol kasowalnych blokad (lockFile.hpp) i sprzatanie pozostalosci ---
+
+namespace IPC = boost::interprocess;
+
+namespace {
+bool shmExists(const std::string &name) {
+  try {
+    IPC::shared_memory_object probe(IPC::open_only, name.c_str(), IPC::read_only);
+    return true;
+  } catch (const IPC::interprocess_exception &) {
+    return false;
+  }
+}
+}  // namespace
+
+TEST(LockFile, ExclusiveAcquireWaitsOutTransientHolder) {
+  // Sprzatacz i proces kasujacy plik trzymaja blokade przez chwile. Startujaca instancja nie moze
+  // wtedy odpasc z "juz dziala" - czeka krotko i dostaje nowy plik.
+  const std::string path =
+      (std::filesystem::temp_directory_path() / ("ut_lockfile_transient_" + std::to_string(getpid()) + ".lock")).string();
+  int holder = -1;
+  ASSERT_EQ(lockfile::acquire(path, true, false, holder), lockfile::Result::Acquired);
+  std::thread releaser([&] {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    lockfile::removeAndRelease(path, holder);
+  });
+  int fd = -1;
+  EXPECT_EQ(lockfile::acquire(path, true, false, fd), lockfile::Result::Acquired);
+  releaser.join();
+  ASSERT_NE(fd, -1);
+  EXPECT_TRUE(lockfile::stillLinked(fd, path));
+  lockfile::removeAndRelease(path, fd);
+  EXPECT_FALSE(std::filesystem::exists(path));
+}
+
+TEST(LockFile, LiveHolderMeansBusyAndIsVisible) {
+  const std::string path =
+      (std::filesystem::temp_directory_path() / ("ut_lockfile_live_" + std::to_string(getpid()) + ".lock")).string();
+  int holder = -1;
+  ASSERT_EQ(lockfile::acquire(path, true, false, holder), lockfile::Result::Acquired);
+  int fd = -1;
+  EXPECT_EQ(lockfile::acquire(path, true, false, fd), lockfile::Result::Busy);
+  EXPECT_TRUE(lockfile::isHeld(path));
+  EXPECT_EQ(lockfile::claimAbandoned(path), -1) << "sprzatacz zajal blokade zywego wlasciciela";
+  lockfile::removeAndRelease(path, holder);
+  EXPECT_FALSE(lockfile::isHeld(path));
+}
+
+TEST(LockManagerFlock, IpcIdentityLockNeedsNoWriteAccess) {
+  // Blokada tozsamosci lezy w /tmp i moze nalezec do innego uzytkownika: 0644, a przy
+  // fs.protected_regular jadro odrzuca nawet O_CREAT na takim pliku. Plik bez prawa zapisu
+  // odtwarza to bez drugiego konta (pod rootem test przechodzi trywialnie).
+  const std::string object = "ut_ipc_ro_" + std::to_string(getpid());
+  const std::string path   = ipc::identityLockPath(object);
+  { std::ofstream touch(path); }
+  ASSERT_EQ(chmod(path.c_str(), S_IRUSR | S_IRGRP | S_IROTH), 0);
+  const auto dir = std::filesystem::temp_directory_path() / ("ut_ipc_ro_" + std::to_string(getpid()));
+  std::filesystem::create_directories(dir);
+  {
+    FlockServiceGuard guard("ut_ipc_ro");
+    guard.setLockDir(dir.string());
+    ASSERT_TRUE(guard.acquireLock());
+    EXPECT_TRUE(guard.acquireIpcLock(object));
+  }
+  EXPECT_FALSE(std::filesystem::exists(path)) << "wlasciciel nie skasowal pliku przy zwolnieniu";
+  std::filesystem::remove(path);
+  std::filesystem::remove_all(dir);
+}
+
+TEST(LockManagerSweep, RemovesOnlyAbandonedLocksAndTheirIpcObjects) {
+  const std::string pid            = std::to_string(getpid());
+  const auto dir                   = std::filesystem::temp_directory_path() / ("ut_sweep_" + pid);
+  const std::string dead           = "utdead" + pid;
+  const std::string live           = "utlive" + pid;
+  const ipc::ServerNames deadNames = ipc::names(dead);
+  const ipc::ServerNames liveNames = ipc::names(live);
+  std::filesystem::create_directories(dir);
+
+  // Instancja zabita SIGKILL-em: pliki blokad bez wlasciciela i komplet globalnych obiektow IPC.
+  { std::ofstream touch(dir / ("xretractor_service." + dead + ".lock")); }
+  { std::ofstream touch(ipc::identityLockPath(deadNames.queryQueue)); }
+  IPC::shared_memory_object(IPC::create_only, deadNames.shmemSegment.c_str(), IPC::read_write);
+  IPC::message_queue(IPC::create_only, deadNames.queryQueue.c_str(), 1, 16);
+  IPC::named_mutex(IPC::create_only, deadNames.mapMutex.c_str());
+
+  // Instancja zywa: te same rodzaje zasobow, ale blokady trzyma jej straznik.
+  FlockServiceGuard liveGuard("xretractor_service." + live);
+  liveGuard.setLockDir(dir.string());
+  ASSERT_TRUE(liveGuard.acquireLock());
+  ASSERT_TRUE(liveGuard.acquireIpcLock(liveNames.queryQueue));
+  IPC::shared_memory_object(IPC::create_only, liveNames.shmemSegment.c_str(), IPC::read_write);
+
+  const SweepReport swept = sweepAbandonedResources(dir.string());
+  EXPECT_EQ(swept.serviceLocks, 1U);
+  EXPECT_GE(swept.ipcIdentities, 1U);  // /tmp jest wspolny: moga trafic sie cudze porzucone
+
+  EXPECT_FALSE(std::filesystem::exists(dir / ("xretractor_service." + dead + ".lock")));
+  EXPECT_FALSE(std::filesystem::exists(ipc::identityLockPath(deadNames.queryQueue)));
+  EXPECT_FALSE(shmExists(deadNames.shmemSegment));
+  EXPECT_FALSE(IPC::message_queue::remove(deadNames.queryQueue.c_str())) << "kolejka komend przetrwala sprzatanie";
+  EXPECT_FALSE(IPC::named_mutex::remove(deadNames.mapMutex.c_str())) << "muteks mapy przetrwal sprzatanie";
+
+  EXPECT_TRUE(std::filesystem::exists(dir / ("xretractor_service." + live + ".lock")));
+  EXPECT_TRUE(std::filesystem::exists(ipc::identityLockPath(liveNames.queryQueue)));
+  EXPECT_TRUE(shmExists(liveNames.shmemSegment)) << "sprzatacz skasowal obiekty zywej instancji";
+
+  liveGuard.releaseLock();
+  IPC::shared_memory_object::remove(liveNames.shmemSegment.c_str());
   std::filesystem::remove_all(dir);
 }

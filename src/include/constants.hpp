@@ -91,8 +91,9 @@ inline std::string shortServerTag(std::string_view serverName) {
     hash *= 0x0000'0100'0000'01B3ULL;
   }
   // NOLINTNEXTLINE(modernize-avoid-c-arrays): bufor dla snprintf
-  char buffer[9];
-  std::snprintf(buffer, sizeof(buffer), "%08x", static_cast<unsigned>(hash ^ (hash >> 32)));
+  char buffer[10];
+  // Nazwa uzytkownika zaczyna sie litera, wiec 0 oddziela skroty od nazw doslownych.
+  std::snprintf(buffer, sizeof(buffer), "0%08x", static_cast<unsigned>(hash ^ (hash >> 32)));
   return {buffer};
 }
 
@@ -119,20 +120,37 @@ inline std::string withServerSuffix(std::string_view base, std::string_view serv
   return retVal;
 }
 
-inline ServerNames names(std::string_view serverName = {}) {
+/// Komplet nazw dla gotowego czlonu instancji (patrz serverNameToken). Sprzatacz pozostalosci
+/// zna wylacznie czlon - odczytany z nazwy pliku blokady tozsamosci - a nie nazwe serwera.
+inline ServerNames namesForToken(std::string_view token) {
   ServerNames retVal;
-  // Czlon instancji liczony RAZ i uzyty we wszystkich czterech nazwach - patrz
-  // serverNameToken. Na Linuksie jest to zawsze sama nazwa serwera.
-  const std::string token = serverNameToken(serverName);
-  retVal.shmemSegment     = withServerSuffix(kShmemSegment, token);
-  retVal.mapMutex         = withServerSuffix(kMapMutex, token);
-  retVal.queryQueue       = withServerSuffix(kQueryQueue, token);
+  retVal.shmemSegment = withServerSuffix(kShmemSegment, token);
+  retVal.mapMutex     = withServerSuffix(kMapMutex, token);
+  retVal.queryQueue   = withServerSuffix(kQueryQueue, token);
   // Prefiks kolejki odpowiedzi domyka się kropką, bo doklejany jest do niego identyfikator
   // klienta: bez separatora "brcdbr.srv" + "12" i "brcdbr.srv1" + "2" dałyby tę samą nazwę.
   retVal.responseQueuePrefix =
       token.empty() ? std::string(kResponseQueuePrefix) : withServerSuffix(kResponseQueuePrefix, token) + ".";
   return retVal;
 }
+
+/// Katalog blokad wspolnych dla calej maszyny: tozsamosci IPC i obecnosci na magistrali.
+/// Nie TMPDIR: obiekty chronione tymi blokadami widac ze wszystkich katalogow tymczasowych.
+inline constexpr std::string_view kMachineLockDir = "/tmp";
+
+/// Przedrostek pliku blokady tozsamosci IPC. Pelna nazwa: przedrostek + nazwa kolejki komend + ".lock".
+inline constexpr std::string_view kIdentityLockPrefix = "xretractor_ipc.";
+
+/// Plik blokady tozsamosci IPC. Serwer trzyma ja wylacznie od chwili PRZED utworzeniem swoich
+/// obiektow IPC do chwili PO ich skasowaniu, a po jego smierci zwalnia ja jadro - dlatego jest
+/// zarazem najpewniejszym dowodem, ze serwer o tym czlonie zyje.
+inline std::string identityLockPath(std::string_view queryQueue) {
+  return std::string(kMachineLockDir) + "/" + std::string(kIdentityLockPrefix) + std::string(queryQueue) + ".lock";
+}
+
+/// Czlon instancji liczony RAZ i uzyty we wszystkich czterech nazwach - patrz serverNameToken.
+/// Na Linuksie jest to zawsze sama nazwa serwera.
+inline ServerNames names(std::string_view serverName = {}) { return namesForToken(serverNameToken(serverName)); }
 
 // === Rozmiary buforów i kolejek ===
 

@@ -74,8 +74,8 @@ cleanup() {
     kill -KILL "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
   done
-  # Stabilne pliki flock pozostaja po normalnym koncu procesu. Test zna caly zbior swoich
-  # nazw i usuwa je dopiero po zebraniu wszystkich dzieci.
+  # Plik blokady kasuje sam proces przy normalnym koncu, ale po SIGKILL zostaje. Test zna caly
+  # zbior swoich nazw i usuwa pozostalosci dopiero po zebraniu wszystkich dzieci.
   rm -f "$LOCK_DIR/xretractor_service.lock"
   for name in alfa beta gamma delta epsilon rota rotb racea raceb svc storea storeb; do
     rm -f "$LOCK_DIR/xretractor_service.$name.lock"

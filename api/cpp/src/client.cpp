@@ -20,6 +20,8 @@
 
 #include <boost/json.hpp>
 
+#include "apiPlatform.h"
+
 // Tablica srodowiska dla posix_spawn. Na Darwinie `environ` jest widoczne
 // wylacznie w glownym module programu: biblioteka wspoldzielona dostaje sie do
 // niego przez _NSGetEnviron() z <crt_externs.h>. Ten kod jest dzis budowany jako
@@ -194,17 +196,20 @@ class Process {
       if (code) throw Error("spawn_error", std::strerror(code));
     };
     try {
-      // pipe(2) + FD_CLOEXEC zamiast pipe2(2): pipe2 jest rozszerzeniem Linuksa i
-      // FreeBSD, ktorego jadra BSD-owe (w tym Darwin) nie maja wcale. Jedyna roznica
-      // wzgledem pipe2 to okno miedzy utworzeniem potoku a ustawieniem FD_CLOEXEC,
-      // w ktorym ROWNOLEGLY watek moglby odziedziczyc deskryptor do swojego potomka.
-      // Tutaj to okno nie ma znaczenia: potomka tworzy wylacznie ten fragment, pod
-      // jednym watkiem, a posix_spawn_file_actions_addclose nizej i tak zamyka
-      // wszystkie cztery deskryptory po stronie dziecka.
+#if RDB_API_HAS_PIPE2
+      if (::pipe2(out, O_CLOEXEC) || ::pipe2(err, O_CLOEXEC)) throw Error("spawn_error", std::strerror(errno));
+#else
       if (::pipe(out) || ::pipe(err)) throw Error("spawn_error", std::strerror(errno));
       for (int fd : {out[0], out[1], err[0], err[1]})
         if (::fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) throw Error("spawn_error", std::strerror(errno));
-      check(posix_spawnattr_setflags(&attributes, POSIX_SPAWN_SETPGROUP));
+#endif
+      short spawnFlags = POSIX_SPAWN_SETPGROUP;
+#if RDB_API_HAS_SPAWN_CLOEXEC_DEFAULT
+      // Dziecko dostaje tylko deskryptory jawnie przekazane w file_actions.
+      // Chroni tez przed potokiem innego watku utworzonym tuz przed jego fcntl.
+      spawnFlags |= POSIX_SPAWN_CLOEXEC_DEFAULT;
+#endif
+      check(posix_spawnattr_setflags(&attributes, spawnFlags));
       check(posix_spawnattr_setpgroup(&attributes, 0));
       check(posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0));
       check(posix_spawn_file_actions_adddup2(&actions, out[1], STDOUT_FILENO));

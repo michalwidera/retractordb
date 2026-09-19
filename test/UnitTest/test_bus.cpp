@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <chrono>
 #include <csignal>
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -782,7 +783,7 @@ TEST(BusForeignStoreOwner, OwnDistinctAndEmptyStoresPass) {
 // Podkreslenie zamiast kropki jest czescia kontraktu: obiekty IPC instancji nazywaja sie
 // "<obiekt>.<nazwa instancji>", wiec segment z kropka wpadlby pod wzorce sprzatajace /dev/shm/*.<nazwa>.
 TEST(BusSegmentName, CarriesLayoutVersionAndAvoidsInstanceNamespace) {
-  EXPECT_EQ(bus::kSegmentName, "xrdbbus_v5");
+  EXPECT_EQ(bus::kSegmentName, "xrdbbus_v6");
   EXPECT_EQ(bus::kSegmentName.find('.'), std::string_view::npos);
 }
 
@@ -816,4 +817,66 @@ TEST_F(BusSegmentNamespace, InvalidValueNeverReachesTheObjectName) {
     ASSERT_EQ(setenv(servername::kNamespaceEnv, bad, 1), 0);
     EXPECT_EQ(bus::segmentName(), bus::kSegmentName) << "niepoprawna wartosc trafila do nazwy segmentu: " << bad;
   }
+}
+
+// --- Protokol obecnosci (bus.hpp, kSegmentName) ---
+
+namespace {
+bool segmentExists(const std::string &name) {
+  try {
+    IPC::shared_memory_object probe(IPC::open_only, name.c_str(), IPC::read_only);
+    return true;
+  } catch (const IPC::interprocess_exception &) {
+    return false;
+  }
+}
+
+std::string presenceFile(const std::string &segment) { return "/tmp/" + segment + ".lock"; }
+}  // namespace
+
+// Segment kasuje dopiero ostatni wychodzacy. Wczesniejsze kasowanie zerwaloby magistrale temu,
+// kto ja jeszcze mapuje, a zostawianie segmentu na zawsze zapelnialo /dev/shm po 1,8 MB na
+// kazda przestrzen nazw.
+TEST(BusPresence, LastMapperRemovesSegment) {
+  const std::string name = std::string(bus::kSegmentName) + "_utlast" + std::to_string(getpid());
+  {
+    bus::Bus first(name);
+    ASSERT_TRUE(first.attached());
+    {
+      bus::Bus second(name);
+      ASSERT_TRUE(second.attached());
+    }
+    EXPECT_TRUE(segmentExists(name)) << "segment zniknal, choc mapuje go jeszcze first";
+    EXPECT_TRUE(std::filesystem::exists(presenceFile(name)));
+  }
+  EXPECT_FALSE(segmentExists(name));
+  EXPECT_FALSE(std::filesystem::exists(presenceFile(name)));
+}
+
+// Proces zabity nie posprzata jako ostatni wychodzacy: segment zostaje, ale jego LOCK_SH znika
+// razem z procesem. Sprzatacz usuwa taki segment i wylacznie taki.
+TEST(BusPresence, SweepRemovesOnlyUnmappedSegments) {
+  const std::string pid  = std::to_string(getpid());
+  const std::string dead = std::string(bus::kSegmentName) + "_utdead" + pid;
+  const std::string live = std::string(bus::kSegmentName) + "_utlive" + pid;
+
+  const pid_t child = fork();
+  ASSERT_NE(child, -1);
+  if (child == 0) {
+    bus::Bus orphan(dead);
+    _exit(orphan.attached() ? 0 : 1);  // _exit: bez destruktora, tak jak po SIGKILL
+  }
+  int status = 0;
+  ASSERT_EQ(waitpid(child, &status, 0), child);
+  ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+  ASSERT_TRUE(segmentExists(dead));
+
+  bus::Bus holder(live);
+  ASSERT_TRUE(holder.attached());
+
+  EXPECT_GE(bus::sweepAbandonedSegments(), 1U);  // /tmp jest wspolny: moga trafic sie cudze porzucone
+  EXPECT_FALSE(segmentExists(dead));
+  EXPECT_FALSE(std::filesystem::exists(presenceFile(dead)));
+  EXPECT_TRUE(segmentExists(live)) << "sprzatacz skasowal segment, ktory ktos mapuje";
+  EXPECT_TRUE(std::filesystem::exists(presenceFile(live)));
 }

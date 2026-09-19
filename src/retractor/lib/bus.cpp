@@ -1,6 +1,7 @@
 #include "bus.hpp"
 
 #include <pthread.h>
+#include <sys/file.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -18,6 +19,8 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
 
+#include "constants.hpp"
+#include "lockFile.hpp"
 #include "osPlatform.hpp"
 #include "platformConfig.h"
 #include "serverName.hpp"
@@ -40,7 +43,7 @@ constexpr std::uint64_t kMagic = 0x5852'4442'4255'5300ULL;
 // ukladach nie spotykaja sie na jednym segmencie, wiec do tego sprawdzenia w ogole nie dochodzi.
 // Ten numer razem ze slotSize chroni przypadek, ktorego nazwa nie zlapie: zmiane znaczenia pol
 // przy zapomnianym bumpie nazwy oraz obcy obiekt o tej samej nazwie.
-constexpr std::uint32_t kLayoutVersion = 5;  // 5: skroty sciezek plikow magazynu obok nazw strumieni
+constexpr std::uint32_t kLayoutVersion = 6;  // 6: obecnosc na segmencie przez flock (sprzatanie)
 
 // Ile czasu instancja podlaczajaca sie czeka na dokonczenie inicjalizacji przez tworce.
 // Inicjalizacja to truncate + memset + pthread_mutex_init, czyli mikrosekundy; dwie sekundy
@@ -58,14 +61,9 @@ constexpr int kSnapshotRetries = 8;
 /// przez jedno memcpy slotu, wiec kazda dodatnia wartosc jest tu duzo wiecej niz trzeba.
 constexpr std::chrono::microseconds kLockPollInterval{200};
 
-/// Po tym czasie zamek uznaje sie za porzucony NAWET wtedy, gdy jego wlasciciel
-/// wyglada na zywego. To jest wylacznie siatka bezpieczenstwa pod jeden przypadek:
-/// znacznik startu procesu jest w bilecie zamka obciety do 32 bitow, wiec teoretycznie
-/// dwie inkarnacje tego samego PID-u moga miec rowne mlodsze 32 bity i smierc
-/// wlasciciela zostalaby przeoczona. Prawdziwe trzymanie zamka to mikrosekundy, wiec
-/// ten prog nie ma prawa zadzialac na sprawnym systemie - a gdy zadzial, zapisuje sie
-/// bledem, bo znaczy, ze stalo sie cos, czego ten kod nie przewiduje.
-constexpr std::chrono::seconds kAbandonedLockLimit{10};
+// Prog diagnostyczny. Czas oczekiwania nie dowodzi smierci wlasciciela:
+// SIGSTOP albo debugger moga zatrzymac go w srodku zapisu na dowolnie dlugo.
+constexpr std::chrono::seconds kLongLockWait{10};
 #endif
 
 /// Slot jednej instancji. Wylacznie POD -- patrz komentarz naglowka.
@@ -259,6 +257,12 @@ void clearSlot(Slot &slot) {
   endWrite(slot);
 }
 
+/// Plik obecnosci segmentu: LOCK_SH trzyma kazdy, kto segment mapuje; LOCK_EX oznacza, ze nie
+/// mapuje go nikt i wolno go skasowac. Katalog wspolny dla maszyny, bo segment tez jest wspolny.
+std::string presencePath(std::string_view segment) {
+  return std::string(ipc::kMachineLockDir) + "/" + std::string(segment) + ".lock";
+}
+
 }  // namespace
 
 StoreDigest storeDigest(const std::string_view path) {
@@ -296,6 +300,22 @@ std::string segmentName() {
 }
 
 std::size_t segmentBytes() { return sizeof(Segment); }
+
+std::size_t sweepAbandonedSegments() {
+  // Wylacznie segmenty tej wersji ukladu: starsze nazwy mapuja binarki sprzed protokolu
+  // obecnosci, ktore blokady nie biora, wiec jej brak niczego o nich nie mowi.
+  const auto isSegmentPresence = [](std::string_view file) {
+    if (!file.ends_with(".lock")) return false;
+    const std::string_view segment = file.substr(0, file.size() - 5);
+    if (segment == kSegmentName) return true;
+    return segment.size() > kSegmentName.size() + 1 && segment.starts_with(kSegmentName) &&
+           segment[kSegmentName.size()] == '_' && servername::isValid(segment.substr(kSegmentName.size() + 1));
+  };
+  return lockfile::sweep(std::string(ipc::kMachineLockDir), isSegmentPresence, [](std::string_view file) {
+    const std::string segment(file.substr(0, file.size() - 5));
+    IPC::shared_memory_object::remove(segment.c_str());
+  });
+}
 
 bool isProcessAlive(std::int32_t pid, std::uint64_t startTime) {
   if (pid <= 0) return false;
@@ -358,6 +378,9 @@ struct Bus::Impl {
   std::unique_ptr<IPC::mapped_region> region;
   Segment *segment{nullptr};
   int slotIndex{-1};
+  std::string segmentName;
+  std::string presenceFile;  ///< plik obecnosci, patrz kSegmentName w bus.hpp
+  int presenceFd{-1};        ///< LOCK_SH na presenceFile przez caly czas odwzorowania
 
   /// Wynik proby zajecia zamka. `ownerDied` znaczy, ze poprzedni wlasciciel zginal
   /// trzymajac zamek -- wtedy, i tylko wtedy, trzeba naprawic niezmiennik slotow.
@@ -431,7 +454,8 @@ struct Bus::Impl {
   [[nodiscard]] LockOutcome acquire() {
     std::atomic_ref<std::uint64_t> owner(segment->mutex.owner);
     const std::uint64_t mine = selfTicket();
-    const auto deadline      = std::chrono::steady_clock::now() + kAbandonedLockLimit;
+    const auto deadline      = std::chrono::steady_clock::now() + kLongLockWait;
+    bool warned              = false;
 
     for (;;) {
       std::uint64_t current = owner.load(std::memory_order_acquire);
@@ -453,12 +477,12 @@ struct Bus::Impl {
       // PID-u, ale nadal poprawnie odrzuca wlasciciela, po ktorym nie ma sladu.
       const bool holderDead =
           !holder.found || holder.zombie || (holderStart != 0 && static_cast<std::uint32_t>(holder.startTime) != holderStart);
-      const bool abandoned = std::chrono::steady_clock::now() > deadline;
+      if (!holderDead && !warned && std::chrono::steady_clock::now() > deadline) {
+        SPDLOG_WARN("xrdbbus: still waiting for bus lock held by live pid {} after {} s.", holderPid, kLongLockWait.count());
+        warned = true;
+      }
 
-      if (holderDead || abandoned) {
-        if (abandoned && !holderDead)
-          SPDLOG_ERROR("xrdbbus: bus lock held by live pid {} for over {} s; taking it over.", holderPid,
-                       kAbandonedLockLimit.count());
+      if (holderDead) {
         if (owner.compare_exchange_strong(current, mine, std::memory_order_acq_rel, std::memory_order_acquire)) {
           heldTicket = mine;
           return {.ok = true, .ownerDied = true};
@@ -492,6 +516,20 @@ struct Bus::Impl {
 
 Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_unique<Impl>()) {
   const std::string name(segmentName);
+
+  // Obecnosc PRZED otwarciem segmentu: od tej chwili nikt go nie skasuje, az jej nie zwolnimy.
+  // Bez niej odwzorowanie nie jest bezpieczne, wiec magistrala zostaje niedostepna - tak samo
+  // glosno jak przy kazdej innej przyczynie ponizej.
+  impl->segmentName  = name;
+  impl->presenceFile = presencePath(name);
+  if (lockfile::acquire(impl->presenceFile, false, false, impl->presenceFd) != lockfile::Result::Acquired) {
+    if (createIfMissing)
+      SPDLOG_WARN("xrdbbus: cannot mark presence on bus segment '{}' ({}): {}", name, impl->presenceFile, std::strerror(errno));
+    else
+      SPDLOG_DEBUG("xrdbbus: cannot mark presence on bus segment '{}' ({}): {}", name, impl->presenceFile, std::strerror(errno));
+    impl->presenceFd = -1;
+    return;
+  }
 
   bool creator = false;
   if (createIfMissing) {
@@ -586,9 +624,9 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
     const auto deadline = std::chrono::steady_clock::now() + kInitWaitLimit;
     while (magic.load(std::memory_order_acquire) == 0) {
       if (std::chrono::steady_clock::now() > deadline) {
-        // Tworca segmentu zginal miedzy create_only a zapisem magic. Segmentu nie kasujemy
-        // samoczynnie -- operator usuwa go recznie, bo skasowanie zywego segmentu zerwaloby
-        // magistrale pozostalym instancjom.
+        // Tworca segmentu zginal miedzy create_only a zapisem magic. Tutaj segmentu nie kasujemy:
+        // mapujemy go my i byc moze inni. Skasuje go ostatni wychodzacy albo sprzatacz, gdy nikt
+        // juz go nie mapuje (protokol obecnosci, bus.hpp).
         SPDLOG_ERROR("xrdbbus: segment '{}' was never initialized; remove /dev/shm/{} to repair.", name, name);
         impl->segment = nullptr;
         return;
@@ -609,7 +647,21 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
 
 Bus::~Bus() {
   release();
-  // Segmentu nie kasujemy: inne instancje trzymaja jego odwzorowanie.
+  impl->segment = nullptr;
+  impl->region.reset();
+  impl->shm.reset();
+  if (impl->presenceFd == -1) return;
+  // Ostatni wychodzacy sprzata. Blokada wylaczna na pliku obecnosci znaczy, ze segmentu nie mapuje
+  // juz nikt inny, a kto zechce go otworzyc, najpierw poczeka na nasze zwolnienie i sprawdzi
+  // i-wezel pliku. Nieudana zamiana LOCK_SH na LOCK_EX moze zdjac nasza LOCK_SH - bez znaczenia,
+  // bo odwzorowanie jest juz zamkniete.
+  if (::flock(impl->presenceFd, LOCK_EX | LOCK_NB) == 0 && lockfile::stillLinked(impl->presenceFd, impl->presenceFile)) {
+    IPC::shared_memory_object::remove(impl->segmentName.c_str());
+    lockfile::removeAndRelease(impl->presenceFile, impl->presenceFd);
+  } else {
+    ::close(impl->presenceFd);
+  }
+  impl->presenceFd = -1;
 }
 
 bool Bus::attached() const { return impl->segment != nullptr; }
