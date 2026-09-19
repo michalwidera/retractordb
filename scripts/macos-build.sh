@@ -336,7 +336,12 @@ if [ "$run_tests" = "1" ]; then
   stage "cmake build (po rekonfiguracji)" cmake --build "$build_dir" --parallel "$jobs" -- -k 0
   banner "CTEST"
   # --output-on-failure: bez tego z dziennika nie da sie odczytac, CO padlo.
-  ( cd "$build_dir" && ctest --output-on-failure -j "$jobs" ) 2>&1 | tee -a "$log_file"
+  # --output-junit: ten sam plik, ktory zbiera job linuksowy (patrz run-test w
+  # .circleci/config.yml), zeby CircleCI pokazywal wyniki macOS w tej samej
+  # zakladce, a nie tylko jako dziennik. Lokalnie to jeden plik wiecej w katalogu
+  # budowy i nic poza tym. Powtorka nieudanych nizej junita NIE nadpisuje.
+  ( cd "$build_dir" && ctest --output-on-failure -j "$jobs" --output-junit test_results.xml ) 2>&1 |
+    tee -a "$log_file"
   ctest_status=${PIPESTATUS[0]}
   if [ "$ctest_status" -ne 0 ]; then
     failures=$((failures + 1))
