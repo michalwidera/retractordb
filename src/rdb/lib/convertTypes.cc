@@ -5,11 +5,47 @@
 #include "fatalError.hpp"
 
 #include <charconv>
+#include <cmath>
 #include <istream>
+#include <limits>
 #include <stack>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
+
+/// Zwezenie ZMIENNOPRZECINKOWE -> CALKOWITE bez zachowania nieokreslonego.
+///
+/// `static_cast<int>(1e30)` jest w C++ zachowaniem NIEOKRESLONYM, a procesory rozstrzygaja
+/// je ROZNIE: x86-64 (cvttsd2si) oddaje wzorzec "integer indefinite", czyli INT_MIN, a
+/// arm64 (fcvtzs) NASYCA do INT_MAX; dla NaN jest to odpowiednio INT_MIN i 0. Ta sama baza
+/// i to samo zapytanie dawaly wiec na dwoch maszynach rozne liczby, po cichu i bez bledu.
+/// Apple wymienia to wprost jako roznice do audytu przy przenosinach na arm64
+/// ("Audit Code that Contains Float-to-Int Conversions", Addressing architectural
+/// differences in your macOS code), a Arm jako jeden z dwoch dozwolonych rozjazdow miedzy
+/// architekturami (Floating-point behavior learning path).
+///
+/// Regula: NASYCENIE do granic typu, NaN -> 0. To zachowanie arm64 zapisane WPROST, wiec
+/// macOS nie zmienia wyniku, a Linux przestaje oddawac liczbe ujemna za ogromna dodatnia.
+/// Gdyby wynik spoza zakresu mial byc NULL (regula checkedArith dla przepelnienia
+/// arytmetyki), miejscem na to jest `to_integer` w ewaluatorze, gdzie NULL jest wyrazalny -
+/// nie ten konwerter, ktory oddaje wartosc takze do std::any i do slotow rekordu.
+///
+/// Granice licza sie PO rzucie na typ zrodlowy, bo `max()` nie zawsze da sie w nim zapisac:
+/// `static_cast<float>(INT_MAX)` to 2^31, czyli juz poza zakresem int. Porownanie
+/// nieostre wzgledem tak policzonej granicy jest wiec poprawne w obie strony.
+template <typename T, typename F>
+static T narrowFloatTo(F value) {
+  static_assert(std::is_floating_point_v<F>);
+
+  if constexpr (std::is_floating_point_v<T>) {
+    return static_cast<T>(value);
+  } else {
+    if (std::isnan(value)) return T{0};
+    if (value >= static_cast<F>(std::numeric_limits<T>::max())) return std::numeric_limits<T>::max();
+    if (value <= static_cast<F>(std::numeric_limits<T>::lowest())) return std::numeric_limits<T>::lowest();
+    return static_cast<T>(value);
+  }
+}
 
 template <typename T, typename K>
 static void parse_string(const std::string &a, K &retVal) {
@@ -37,8 +73,8 @@ void visit_descFld(const K &inVar, K &retVal) {
                    [&retVal](int a) { retVal = static_cast<T>(a); },                                            //
                    [&retVal](unsigned a) { retVal = static_cast<T>(a); },                                       //
                    [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<T>(a); },                  //
-                   [&retVal](float a) { retVal = static_cast<T>(a); },                                          //
-                   [&retVal](double a) { retVal = static_cast<T>(a); },                                         //
+                   [&retVal](float a) { retVal = narrowFloatTo<T>(a); },                                          //
+                   [&retVal](double a) { retVal = narrowFloatTo<T>(a); },                                         //
                    [&retVal](std::pair<int, int> a) { SPDLOG_ERROR("TODO - pair-int->T"); },                    //
                    [&retVal](const std::pair<std::string, int> &a) { SPDLOG_ERROR("TODO - idxpair-int->T"); },  //
                    [&retVal](const std::string &a) { parse_string<T>(a, retVal); }                              //
@@ -56,9 +92,9 @@ void visit_descFld(const K &inVar, K &retVal) {
     } else if (inVar.type() == typeid(boost::rational<int>)) {
       retVal = boost::rational_cast<T>(std::any_cast<boost::rational<int>>(inVar));
     } else if (inVar.type() == typeid(float)) {
-      retVal = static_cast<T>(std::any_cast<float>(inVar));
+      retVal = narrowFloatTo<T>(std::any_cast<float>(inVar));
     } else if (inVar.type() == typeid(double)) {
-      retVal = static_cast<T>(std::any_cast<double>(inVar));
+      retVal = narrowFloatTo<T>(std::any_cast<double>(inVar));
     } else if (inVar.type() == typeid(std::pair<int, int>)) {
       SPDLOG_ERROR("No cast INTPAIR to any type here");
       retVal = static_cast<T>(0);

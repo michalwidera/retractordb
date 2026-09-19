@@ -1,7 +1,9 @@
 #include <algorithm>
+#include <cerrno>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -9,6 +11,7 @@
 #include <optional>
 #include <print>
 #include <sstream>
+#include <stdexcept>
 #include <vector>
 
 #include <fmt/ranges.h>                    // fmt::join - łączenie listy ścieżek konfiguracyjnych

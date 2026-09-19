@@ -10,6 +10,8 @@
 #include <spdlog/spdlog.h>
 #include <toml++/toml.hpp>
 
+#include "platformConfig.h"
+
 namespace {
 
 constexpr int kWarnHighIpcQueueBufferSeconds{3600};
@@ -140,7 +142,19 @@ AppConfig loadAppConfig(const std::optional<std::string> &cliPath) {
   }
 
   // Wyszukiwanie warstwowe: system → użytkownik (kolejne nadpisują klucze).
+  //
+  // Warstwa systemowa ma WIĘCEJ niż jedną ścieżkę, bo katalog konfiguracji systemowej
+  // nie jest uniwersalny. Na Linuksie jest to /etc. Na macOS /etc należy do systemu
+  // (chroni je SIP, a aktualizacje systemu potrafią je nadpisać) i oprogramowanie
+  // spoza systemu kładzie konfigurację w prefiksie własnej instalacji: /usr/local/etc
+  // dla instalacji ręcznej i /opt/homebrew/etc dla Homebrew na Apple Silicon.
+  // Kolejność jest od najbardziej ogólnej do najbardziej szczegółowej, a plik, którego
+  // nie ma, nie jest błędem - więc lista dłuższa niż potrzeba nic nie kosztuje.
   std::vector<std::filesystem::path> candidates{"/etc/retractor/retractor.toml"};
+#if RDB_OS_DARWIN
+  candidates.emplace_back("/usr/local/etc/retractor/retractor.toml");
+  candidates.emplace_back("/opt/homebrew/etc/retractor/retractor.toml");
+#endif
   if (auto up = userConfigPath(); up) candidates.push_back(*up);
 
   for (const auto &path : candidates) {

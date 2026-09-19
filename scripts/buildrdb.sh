@@ -4,8 +4,46 @@
 # https://zfredenburg.medium.com/force-a-bash-script-to-exit-on-error-ec50b374c98d
 set -o errexit
 
-echo "-- Last two lines of ~/.bashrc are:"
-tail -n 2 ~/.bashrc
+# `tail -n 2 ~/.bashrc` pod `set -o errexit` zabijalo caly skrypt jeszcze przed
+# pierwsza opcja na maszynie, ktora tego pliku nie ma (macOS loguje sie przez
+# zsh i ~/.bashrc zwykle nie istnieje). Pokazujemy wiec pierwszy rc, ktory
+# NAPRAWDE jest, i nazywamy go wprost.
+#
+# To jedyne miejsce poza common.sh pytajace `uname`: rdb_shell_rc() - jedyny
+# decydent o pliku do ZAPISU - jest sourcowany dopiero nizej, a do tego tworzy
+# plik, czego baner robic nie ma. Na Linuksie kandydat jest dokladnie jeden,
+# wiec wyjscie pozostaje takie jak dotad.
+if [ "$(uname -s 2>/dev/null)" = "Darwin" ]; then
+    case "${SHELL:-}" in
+        */bash) rdb_rc_candidates=("$HOME/.bash_profile" "$HOME/.zshrc" "$HOME/.bashrc") ;;
+        *) rdb_rc_candidates=("$HOME/.zshrc" "$HOME/.bash_profile" "$HOME/.bashrc") ;;
+    esac
+else
+    rdb_rc_candidates=("$HOME/.bashrc")
+fi
+
+rdb_rc_shown=""
+for rdb_rc_file in "${rdb_rc_candidates[@]}"; do
+    if [ -f "$rdb_rc_file" ]; then
+        rdb_rc_shown="$rdb_rc_file"
+        case "$rdb_rc_shown" in
+            "$HOME"/*) rdb_rc_shown="~${rdb_rc_shown#$HOME}" ;;
+        esac
+        echo "-- Last two lines of $rdb_rc_shown are:"
+        tail -n 2 "$rdb_rc_file"
+        break
+    fi
+done
+if [ -z "$rdb_rc_shown" ]; then
+    rdb_rc_looked=""
+    for rdb_rc_file in "${rdb_rc_candidates[@]}"; do
+        case "$rdb_rc_file" in
+            "$HOME"/*) rdb_rc_file="~${rdb_rc_file#$HOME}" ;;
+        esac
+        rdb_rc_looked="$rdb_rc_looked $rdb_rc_file"
+    done
+    echo "-- No shell rc file found (looked for:$rdb_rc_looked); nothing to show."
+fi
 
 # The source tree is located from this script's own path, not from the name of the
 # current directory. Matching directory names ("retractordb", "build", "Release", ...)
@@ -51,7 +89,7 @@ show_help() {
             echo "  validate   - Show required/recommended/optional tool status and install state"
             echo "  conan      - Detect conan profile and set C++23 standard"
             echo "  ninja      - Add Ninja generator to conan profile"
-            echo "  bashrc     - Add ~/.local/bin to PATH in ~/.bashrc (and create it)"
+            echo "  bashrc     - Add ~/.local/bin to PATH in $(rdb_display_path "$(rdb_shell_rc_path)") (and create it)"
             echo "  coverage   - Build tests with code coverage enabled"
             echo "  gate_requirements - Install deps of the research gate (JDK 17 + Flink 2.3.0) and verify them"
             echo "  attach_knowledge - Clone and attach the sibling RetractorDB knowledge index"

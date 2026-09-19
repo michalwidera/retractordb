@@ -45,9 +45,20 @@ ensure_tools_for_option() {
             display_cmd="bat/batcat"
         fi
 
+        # Wpis zdemotowany przez rdb_demote_not_applicable_specs (toolmatrix.sh):
+        # narzedzia na tej platformie nie ma i nie bedzie. Nie jest wiec ani
+        # brakiem, ani kandydatem do instalacji - w raporcie `validate` pokazujemy
+        # je mimo to, zeby wiersz nie znikal z tabeli bez sladu.
+        if [ "$requirement" = "n/a" ]; then
+            if [ "$validate_only" -eq 1 ]; then
+                printf "%-16s | %-12s | %-10s\n" "$display_cmd" "n/a (macos)" "skipped"
+            fi
+            continue
+        fi
+
         if ! tool_installed "$cmd"; then
             status="missing"
-            pkg=$(cmd_to_apt_package "$cmd")
+            pkg=$(cmd_to_platform_package "$cmd")
 
             case "$requirement" in
                 required)

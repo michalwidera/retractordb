@@ -15,8 +15,16 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 JAVA_HOME_PINNED="${JAVA_HOME_PINNED:-/usr/lib/jvm/java-17-openjdk-amd64}"
 FLINK_HOME="${FLINK_HOME:-/home/michal/opt/flink-2.3.0}"
 
+# Katalog tymczasowy. `mktemp -d` bez szablonu jest rozszerzeniem GNU; BSD
+# `mktemp` wymaga szablonu i bez niego wypisuje uzycie na stderr, a podstawienie
+# wychodzi PUSTE. Oryginal: test/IntegrationTest/portable.sh (make_temp_dir);
+# kopia lokalna, bo bramka badawcza jest samodzielna wzgledem kopii test/.
+make_temp_dir() {
+  mktemp -d "${TMPDIR:-/tmp}/rdbgate.XXXXXXXX"
+}
+
 CP="$HERE/build:$(find "$FLINK_HOME/lib" -maxdepth 1 -name '*.jar' | sort | paste -sd:)"
-WORK="$(mktemp -d)"
+WORK="$(make_temp_dir)"
 trap 'rm -rf "$WORK"' EXIT
 
 for q in 1 2 4 8 16 32; do

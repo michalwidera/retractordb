@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -eu
+. "$(dirname "$0")/../portable.sh"
 
 xretractor_bin=$1
 mode=$2
@@ -174,7 +175,7 @@ if [ "$probe" = "ON" ]; then
   # więc część zapisów NIE trafia na dysk - bez rozdzielenia trwałych od
   # pamięciowych ta równość by nie zachodziła.
   reported=$(sed -n 's/^MATERIALIZED trwale: dopisania=[0-9]* nadpisania=[0-9]* bajty=\([0-9]*\) .*$/\1/p' out_run.txt)
-  on_disk=$(find temp -type f ! -name '*.desc' ! -name '*.meta' ! -name '*.shadow' -printf '%s\n' | awk '{s+=$1} END {print s+0}')
+  on_disk=$(find temp -type f ! -name '*.desc' ! -name '*.meta' ! -name '*.shadow' -exec cat {} + | wc -c | tr -d ' ')
   [ -n "$reported" ] && [ "$reported" = "$on_disk" ]
 
   # Substraty pamięciowe muszą być policzone, ale nie jako trwałe.
@@ -205,12 +206,12 @@ compare_identity() { # compare_identity <niefaktoryzowana> <sfaktoryzowana> <ety
     cmp <(tail -c +9 "$left.meta") <(tail -c +9 "$right.meta")
     return 0
   fi
-  size_left=$(stat -c %s "$left")
-  size_right=$(stat -c %s "$right")
+  size_left=$(file_size "$left")
+  size_right=$(file_size "$right")
   common=$(( size_left < size_right ? size_left : size_right ))
   [ "$common" -gt 0 ] || { echo "$label: pusty wspolny prefiks"; exit 1; }
   # Tresc na wspolnym prefiksie musi byc identyczna - to jest rownosc `Val`.
-  cmp -n "$common" "$left" "$right"
+  cmp_prefix "$common" "$left" "$right"
   # Kierunek nierownosci: strona sfaktoryzowana wyprzedza. Rownosc albo odwrotna
   # nierownosc znaczylaby, ze optymalizacja opoznienia zniknela.
   [ "$size_right" -gt "$size_left" ] || {
@@ -243,11 +244,11 @@ elif [ "$mode" = "factor-name-collision-semantic" ]; then
   # Do 2026-08-07 obie strony mialy ten sam ogon wylacznie dlatego, ze tau_N zawyzalo swoj
   # o min(W_src, N). Zawyzenie zmierzono w kampanii K24p (§2.2) i zdjeto adresowaniem
   # indeksem logicznym w dataModel::fetchForward.
-  size_user=$(stat -c %s temp/collide_user)
-  size_reference=$(stat -c %s temp/collide_reference)
+  size_user=$(file_size temp/collide_user)
+  size_reference=$(file_size temp/collide_reference)
   common=$(( size_user < size_reference ? size_user : size_reference ))
   [ "$common" -gt 0 ]
-  cmp -n "$common" temp/collide_user temp/collide_reference
+  cmp_prefix "$common" temp/collide_user temp/collide_reference
   # Origin jest ten sam po obu stronach - to on niesie tozsamosc; rozni sie ogon.
   grep -F 'collide_user(1/15)	tail=2	origin=3' out_compile.txt
   grep -F 'collide_reference(1/15)	origin=3' out_compile.txt
@@ -266,12 +267,15 @@ elif [ "$mode" = "dedup-exact-semantic" ]; then
   cmp <(tail -c +9 temp/dedup_shifted.meta) <(tail -c +9 temp/dedup_reference.meta)
 elif [ "$mode" = "dedup-steady-semantic" ]; then
   steady_records() {
-    od -An -v -w8 -td4 "$1" | awk '
+    # Limit 20 wierszy siedzi w awk, a nie w `head`: `head` zamykalby potok
+    # przedwczesnie, a `xargs` (ktory zastapil `od -w8`) raportuje wtedy na stderr
+    # "echo: terminated by signal 13". Wynik jest ten sam, znika tylko szum.
+    od -An -v -td4 "$1" | xargs -n2 | awk '
       started || $1 != 0 || $2 != 0 {
         started = 1
-        print $1, $2
+        if (++printed <= 20) print $1, $2
       }
-    ' | head -n 20
+    '
   }
   cmp <(steady_records temp/dedup_shifted) <(steady_records temp/dedup_reference)
 else

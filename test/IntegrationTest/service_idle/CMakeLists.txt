@@ -51,8 +51,13 @@ set_tests_properties(${TestID}-run ${TestID}-env ${TestID}-empty
 # DOPISANIE, nie ustawienie: ENVIRONMENT niesie juz przestrzen nazw uruchomienia
 # (RDB_NAMESPACE, TMPDIR) nadana przez makro add_test w katalogu nadrzednym, a
 # set_tests_properties zastapiloby ja w calosci - test startowalby wtedy na
-# zasobach wspolnych i kolidowal z sasiadem biegnacym rownoczesnie.
+# zasobach wspolnych i kolidowal z sasiadem biegnacym rownoczesnie. Prefiks
+# priorytetu sd-daemon ("<6>[I] ") powstaje WYLACZNIE tam, gdzie po drugiej
+# stronie stoi journald - poza systemd setupLoggerMain emituje sam "[I] ".
+# Skrypt nie ma jak tego zgadnac, wiec dostaje te sama wartosc, z ktora
+# kompilowal sie silnik.
 set_property(
   TEST ${TestID}-run ${TestID}-env ${TestID}-empty
   APPEND
-  PROPERTY ENVIRONMENT "RDB_INFO_ACTIVE=${_rdbInfoActive}")
+  PROPERTY ENVIRONMENT "RDB_INFO_ACTIVE=${_rdbInfoActive}"
+           "RDB_SD_PREFIX=${RDB_HAS_SYSTEMD}")

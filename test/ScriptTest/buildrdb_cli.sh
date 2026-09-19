@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+# Warstwa przenosnosci powloki testow integracyjnych - jedno miejsce na caly test/.
+. "$(dirname "$0")/../IntegrationTest/portable.sh"
 
 source_root="${1:?usage: buildrdb_cli.sh SOURCE_ROOT}"
 buildrdb="$source_root/scripts/buildrdb.sh"
-test_root=$(mktemp -d)
+test_root=$(make_temp_dir)
 trap 'rm -rf "$test_root"' EXIT
 
 fail() {
   echo "FAIL: $*" >&2
   exit 1
 }
+
+# Kazde niepowodzenie POZA `fail` konczylo ten test w ciszy: `set -e` przerywa,
+# a `trap ... EXIT` sprzata katalog i po tescie zostaje samo "***Failed" bez
+# jednego slowa o przyczynie. Kosztowalo to osobny przebieg diagnostyczny przy
+# porcie na macOS, wiec numer linii jest teraz wypisywany zawsze.
+trap 'status=$?; [ "$status" -ne 0 ] && echo "FAIL: buildrdb_cli.sh przerwany w linii $LINENO (kod $status)" >&2; exit $status' ERR
 
 assert_contains() {
   local output="$1"
@@ -160,6 +168,17 @@ if [[ "${1:-}" == "--version" ]]; then
 fi
 EOF
 chmod +x "$coverage_stubs/gcov-15"
+# Na macOS narzedziem pokrycia jest `xcrun llvm-cov gcov`, a nie `gcov-N`, wiec
+# zestaw namiastek musi obejmowac takze xcrun - inaczej buildrdb.sh slusznie
+# przerywa z "xcrun not found", a caly test przewraca sie na czyms, czego wcale
+# nie badal. Namiastka jest potrzebna na obu systemach: na Linuksie nikt jej nie
+# wola, a jej obecnosc niczego nie zmienia.
+cat > "$coverage_stubs/xcrun" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s %s\n' "${0##*/}" "$*" >> "$RDB_TEST_COVERAGE_LOG"
+EOF
+chmod +x "$coverage_stubs/xcrun"
 coverage_log="$test_root/coverage.log"
 HOME="$coverage_home" PATH="$coverage_stubs:$PATH" RDB_TEST_COVERAGE_LOG="$coverage_log" \
   "$coverage_source/scripts/buildrdb.sh" coverage >"$test_root/coverage-output.log" 2>&1
@@ -170,5 +189,12 @@ assert_contains "$coverage_calls" "-DCMAKE_BUILD_TYPE=Debug"
 assert_contains "$coverage_calls" "-DCMAKE_TOOLCHAIN_FILE=$coverage_source/build/Debug/generators/conan_toolchain.cmake"
 assert_contains "$coverage_calls" "-DENABLE_COVERAGE=ON"
 [[ "$coverage_calls" != *"--preset"* ]] || fail "coverage still depends on a CMake preset"
+# Wybor narzedzia pokrycia jest ROZNY na kazdym systemie i dotad nie byl sprawdzany
+# wcale - a to wlasnie ta linia decyduje, czy raport w ogole powstanie.
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  assert_contains "$coverage_calls" "--gcov-executable xcrun llvm-cov gcov"
+else
+  assert_contains "$coverage_calls" "--gcov-executable gcov-15"
+fi
 
 echo "buildrdb CLI tests passed"

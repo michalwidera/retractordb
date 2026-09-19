@@ -1954,3 +1954,106 @@ TEST(xExpressionEval, rational_overflow_returns_null) {
   expressionEvaluator test;
   EXPECT_TRUE(isNull(test.eval(program)));
 }
+
+// --- FLOAT na granicy 2^24: gdzie dokladnie gubi sie zaokraglenie ---
+//
+// Regresja it_self_ref_simplify_synth-value (macOS arm64, 2026-09-18): pole FLOAT
+// `w[1] + 1 + 2` nad x = 2^24 dalo 16777220 zamiast 16777218, a wpis -shape tego samego
+// testu PRZESZEDL, czyli plan pola nie zostal przepisany na `x + 3`. Roznica siedzi wiec
+// ponizej kompilatora - w eval() albo w samym FPU. Sa dokladnie trzy mozliwe przyczyny
+// i ponizsze testy rozdzielaja je tak, ze ten, ktory padnie, wskazuje winnego:
+//
+//   (1) tryb zaokraglania nie jest round-to-nearest-even  -> pada float_hardware_rounding_*
+//   (2) normalize() podnosi FLOAT + INTEGER na DOUBLE     -> pada float_add_int_stays_float_*
+//   (3) lancuch liczy sie w DOUBLE i rzutuje raz na koncu -> pada float_chain_rounds_*
+//
+// 2^24 = 16777216 jest ostatnia liczba calkowita, po ktorej FLOAT ma ULP = 2. 16777217 stoi
+// w polowie miedzy 16777216 a 16777218, a 16777219 w polowie miedzy 16777218 a 16777220 -
+// obie polowki rozstrzyga reguly ties-to-even, i to wlasnie ona odroznia wynik poprawny
+// (16777218) od wyniku przez DOUBLE (16777220).
+
+// (1) KONTROLA JEZYKA I SPRZETU: bez wariantu, bez eval(). `volatile` zdejmuje zwijanie
+// stalych, wiec dodawanie dzieje sie w RUNTIME i pyta o faktyczny tryb zaokraglania.
+TEST(xExpressionEval, float_hardware_rounding_is_ties_to_even_at_2p24) {
+  volatile float base = 16777216.0F;  // 2^24
+  volatile float one = 1.0F;
+  volatile float two = 2.0F;
+
+  const float afterOne = base + one;
+  const float afterTwo = afterOne + two;
+
+  EXPECT_EQ(afterOne, 16777216.0F) << "tryb zaokraglania FPU nie jest round-to-nearest-even";
+  EXPECT_EQ(afterTwo, 16777218.0F) << "tryb zaokraglania FPU nie jest round-to-nearest-even";
+}
+
+// (2) JEDEN KROK PRZEZ WARIANT: FLOAT + INTEGER ma zostac FLOAT i zaokraglic sie TERAZ.
+TEST(xExpressionEval, float_add_int_stays_float_at_2p24) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, 16777216.0F);
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(ADD);
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<float>(result))
+      << "normalize() podniosl FLOAT + INTEGER ponad FLOAT; indeks wyniku: " << result.index();
+  EXPECT_EQ(std::get<float>(result), 16777216.0F);
+}
+
+// (3) CALY LANCUCH Z PROGRAMU POLA: dokladnie to, co liczy it_self_ref_simplify_synth.
+TEST(xExpressionEval, float_chain_rounds_at_every_step_at_2p24) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, 16777216.0F);
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(ADD);
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(ADD);
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<float>(result)) << "indeks wyniku: " << result.index();
+  EXPECT_EQ(std::get<float>(result), 16777218.0F)
+      << "16777220 znaczy DOUBLE w posredniku albo przepisanie na x+3";
+}
+
+// (3b) TEN SAM LANCUCH NAD SLOTEM FLOAT REKORDU - `w[1] + 1 + 2` jeden do jednego.
+// Odroznia blad arytmetyki od bledu ODCZYTU slotu (gdyby PUSH_ID oddawal DOUBLE).
+TEST(xExpressionEval, float_slot_chain_rounds_at_every_step_at_2p24) {
+  auto desc = rdb::Descriptor("x", 4, 1, rdb::FLOAT);
+  rdb::payload p(desc);
+  p.setItemVT(0, rdb::descFldVT{16777216.0F});
+
+  std::list<token> program;
+  program.emplace_back(PUSH_ID, rdb::descFldVT(std::pair<std::string, int>("x", 0)));
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(ADD);
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(ADD);
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program, &p);
+
+  ASSERT_TRUE(std::holds_alternative<float>(result)) << "indeks wyniku: " << result.index();
+  EXPECT_EQ(std::get<float>(result), 16777218.0F);
+}
+
+// KONTRAST: ten sam lancuch w DOUBLE jest dokladny i konczy na 16777219. Zapis takiej
+// wartosci do slotu FLOAT daje 16777220 - czyli dokladnie liczbe z regresji. Test stoi tu
+// po to, zeby przy nastepnej awarii bylo widac, ze 16777220 to slad DOUBLE, nie przypadek.
+TEST(xExpressionEval, double_chain_at_2p24_is_exact_and_narrows_to_16777220) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, 16777216.0);
+  program.emplace_back(PUSH_VAL, 1);
+  program.emplace_back(ADD);
+  program.emplace_back(PUSH_VAL, 2);
+  program.emplace_back(ADD);
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<double>(result));
+  EXPECT_EQ(std::get<double>(result), 16777219.0);
+  EXPECT_EQ(static_cast<float>(std::get<double>(result)), 16777220.0F);
+}

@@ -19,6 +19,7 @@
 # Test nie korzysta z ../serverlib.sh: tamta oprawa pilnuje pojedynczej instancji na stalej
 # sciezce blokady, czyli dokladnie tego zalozenia, ktore ten scenariusz znosi.
 set -e
+. "$(dirname "$0")/../portable.sh"
 
 LOCK_DIR="${TMPDIR:-/tmp}"
 LOCK_A="$LOCK_DIR/xretractor_service.alfa.lock"
@@ -51,9 +52,16 @@ cleanup() {
   # Bramka higieny: zaden obiekt IPC ani testowy plik blokady tych instancji nie ma prawa zostac.
   # Instancja gamma ginie od SIGKILL, wiec jej obiekty kasuje sam scenariusz (punkt 8) --
   # tutaj sprawdzamy juz tylko, czy naprawde po sobie posprzatal.
-  if ls /dev/shm/*alfa* /dev/shm/*beta* /dev/shm/*gamma* >/dev/null 2>&1; then
-    echo "higiena: zostaly obiekty IPC w /dev/shm:"
-    ls /dev/shm/ | grep -E 'alfa|beta|gamma' || true
+  # shm_list zwraca 2, gdy nie da sie ustalic, gdzie leza obiekty IPC (brak /dev/shm
+  # i brak katalogu Boost.Interprocess). Cicho zdana kontrola higieny bylaby gorsza niz
+  # jej brak, wiec taki przypadek jest jawnym pominieciem, a nie sukcesem.
+  local leftovers shm_status=0
+  leftovers=$(shm_list 'alfa|beta|gamma') || shm_status=$?
+  if [ "$shm_status" -ne 0 ]; then
+    echo "POMINIETO: higiena IPC niesprawdzalna na tej platformie"
+  elif [ -n "$leftovers" ]; then
+    echo "higiena: zostaly obiekty IPC:"
+    echo "$leftovers"
     status=1
   fi
   if [ -f "$LOCK_A" ] || [ -f "$LOCK_B" ] || [ -f "$LOCK_G" ]; then
@@ -210,9 +218,9 @@ grep -q -- '--server' expect_out.txt || {
 #
 #     Przy DWOCH zywych instancjach komenda bez adresata ma odmowic natychmiast: routing i tak
 #     nie wskaze celu, wiec czekanie na cokolwiek byloby czekaniem na nic.
-start_ns=$(date +%s%N)
+start_ns=$(now_ns)
 expect_failure xqry -l -w
-elapsed_ms=$(( ($(date +%s%N) - start_ns) / 1000000 ))
+elapsed_ms=$(( ($(now_ns) - start_ns) / 1000000 ))
 grep -q -- '--server' expect_out.txt || {
   echo "xqry -l -w przy dwoch instancjach nie zazadal --server:"; cat expect_out.txt; exit 1; }
 if [ "$elapsed_ms" -ge 5000 ]; then
@@ -223,10 +231,10 @@ fi
 #     `--bus` czyta wylacznie magistrale i zadnego serwera do tego nie potrzebuje, wiec `-w`
 #     jest dla niego bez znaczenia: ma wypisac tabele od razu, a nie odmowic po tej samej
 #     regule co `-l` -- odmowa dotyczylaby tu odpowiedzi, ktora ma pokazac obie instancje.
-start_ns=$(date +%s%N)
+start_ns=$(now_ns)
 xqry --bus -w > bus_wait.txt || {
   echo "xqry --bus -w odmowil wypisania magistrali:"; cat bus_wait.txt; exit 1; }
-elapsed_ms=$(( ($(date +%s%N) - start_ns) / 1000000 ))
+elapsed_ms=$(( ($(now_ns) - start_ns) / 1000000 ))
 if [ "$elapsed_ms" -ge 5000 ]; then
   echo "xqry --bus -w trwalo ${elapsed_ms} ms -- czekanie na serwer przy odczycie magistrali?"
   exit 1
@@ -239,10 +247,10 @@ wait "$pid_b" 2>/dev/null || true
 pid_b=""
 
 #     Przy JEDNEJ zywej instancji, i to nazwanej, czekanie musi ja znalezc przez magistrale.
-start_ns=$(date +%s%N)
+start_ns=$(now_ns)
 xqry -l -w || {
   echo "xqry -l -w nie doczekal sie jedynej zywej instancji alfa"; exit 1; }
-elapsed_ms=$(( ($(date +%s%N) - start_ns) / 1000000 ))
+elapsed_ms=$(( ($(now_ns) - start_ns) / 1000000 ))
 if [ "$elapsed_ms" -ge 5000 ]; then
   echo "xqry -l -w przy jednej nazwanej instancji trwalo ${elapsed_ms} ms -- routing pominiety?"
   exit 1
@@ -259,9 +267,9 @@ pid_a=""
 #     segment /dev/shm/xrdbbus ZOSTAJE (nikt go nie kasuje, bo skasowanie zywego zerwaloby
 #     magistrale pozostalym), a jego sloty sa martwe. --bus musi to rozpoznac przez
 #     /proc, czyli natychmiast -- nie po 3 s odpytywania.
-start_ns=$(date +%s%N)
+start_ns=$(now_ns)
 xqry --bus > orphan.txt 2>orphan.err || true
-elapsed_ms=$(( ($(date +%s%N) - start_ns) / 1000000 ))
+elapsed_ms=$(( ($(now_ns) - start_ns) / 1000000 ))
 if [ "$elapsed_ms" -ge 1000 ]; then
   echo "--bus nad osieroconym segmentem trwalo ${elapsed_ms} ms -- wykrywanie przez timeout?"
   exit 1
@@ -275,10 +283,10 @@ fi
 #     To samo z `-w`: przy PUSTEJ magistrali czekanie nie ma na co czekac, bo --bus i tak nie
 #     odezwie sie do zadnego serwera. Bez wyjecia --bus spod czekania klient milczalby tu przez
 #     caly budzet (domyslnie 30 s) i konczyl bledem zamiast wypisac "brak zywych instancji".
-start_ns=$(date +%s%N)
+start_ns=$(now_ns)
 xqry --bus -w > orphan_wait.txt 2>orphan_wait.err || {
   echo "xqry --bus -w nad pusta magistrala zwrocil blad:"; cat orphan_wait.err; exit 1; }
-elapsed_ms=$(( ($(date +%s%N) - start_ns) / 1000000 ))
+elapsed_ms=$(( ($(now_ns) - start_ns) / 1000000 ))
 if [ "$elapsed_ms" -ge 5000 ]; then
   echo "xqry --bus -w nad pusta magistrala trwalo ${elapsed_ms} ms -- czekanie na serwer?"
   exit 1
@@ -309,12 +317,17 @@ pid_g=""
 
 # Zalozenie scenariusza, nie jego teza: bez pozostawionych obiektow IPC nie ma czego mylic
 # z zywym serwerem i test nie badalby niczego.
-ls /dev/shm | grep -q 'gamma' || {
-  echo "SIGKILL nie zostawil obiektow IPC instancji gamma -- scenariusz stracil przedmiot"; exit 1; }
+gamma_status=0
+gamma_objects=$(shm_list 'gamma') || gamma_status=$?
+if [ "$gamma_status" -ne 0 ]; then
+  echo "POMINIETO: higiena IPC niesprawdzalna na tej platformie"
+elif [ -z "$gamma_objects" ]; then
+  echo "SIGKILL nie zostawil obiektow IPC instancji gamma -- scenariusz stracil przedmiot"; exit 1
+fi
 
-start_ns=$(date +%s%N)
+start_ns=$(now_ns)
 expect_failure xqry --config orphan.toml --server gamma -w -l
-elapsed_ms=$(( ($(date +%s%N) - start_ns) / 1000000 ))
+elapsed_ms=$(( ($(now_ns) - start_ns) / 1000000 ))
 grep -q 'server not available' expect_out.txt || {
   echo "xqry -w nad osieroconym IPC nie zglosil braku serwera:"; cat expect_out.txt; exit 1; }
 if [ "$elapsed_ms" -ge 10000 ]; then
@@ -324,4 +337,5 @@ fi
 
 # Sprzatanie po zabitej instancji: bramka higieny w cleanup() sprawdza to samo, ale tam
 # byloby juz tylko oskarzeniem bez wskazania winnego.
-rm -f /dev/shm/*gamma* "$LOCK_G"
+shm_remove 'gamma' || true
+rm -f "$LOCK_G"

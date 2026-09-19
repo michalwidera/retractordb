@@ -9,6 +9,7 @@
 # Test nie korzysta z ../serverlib.sh: tamta oprawa pilnuje pojedynczej instancji na stalej
 # sciezce blokady, czyli dokladnie tego zalozenia, ktore ten scenariusz znosi.
 set -e
+. "$(dirname "$0")/../portable.sh"
 
 LOCK_DIR="${TMPDIR:-/tmp}"
 LOCK_A="$LOCK_DIR/xretractor_service.alfa.lock"
@@ -36,9 +37,15 @@ cleanup() {
   # procesow, gdy nikt nie moze miec otwartego starego inode.
   rm -f "$LOCK_A" "$LOCK_B"
   # Bramka higieny: zaden obiekt IPC ani testowy plik blokady tych instancji nie ma prawa zostac.
-  if ls /dev/shm/*alfa* /dev/shm/*beta* >/dev/null 2>&1; then
-    echo "higiena: zostaly obiekty IPC w /dev/shm:"
-    ls /dev/shm/ | grep -E 'alfa|beta' || true
+  # shm_list konczy sie kodem 2, gdy katalogu obiektow IPC nie da sie ustalic - kontrola
+  # jest wtedy jawnie POMINIETA, a nie uznana za zdana.
+  local leftovers shm_status=0
+  leftovers=$(shm_list 'alfa|beta') || shm_status=$?
+  if [ "$shm_status" -ne 0 ]; then
+    echo "POMINIETO: higiena IPC niesprawdzalna na tej platformie"
+  elif [ -n "$leftovers" ]; then
+    echo "higiena: zostaly obiekty IPC:"
+    echo "$leftovers"
     status=1
   fi
   if [ -f "$LOCK_A" ] || [ -f "$LOCK_B" ]; then

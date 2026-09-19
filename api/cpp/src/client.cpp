@@ -20,7 +20,19 @@
 
 #include <boost/json.hpp>
 
+// Tablica srodowiska dla posix_spawn. Na Darwinie `environ` jest widoczne
+// wylacznie w glownym module programu: biblioteka wspoldzielona dostaje sie do
+// niego przez _NSGetEnviron() z <crt_externs.h>. Ten kod jest dzis budowany jako
+// biblioteka STATYCZNA, wiec deklaracja `extern` by wystarczyla - ale przelaczenie
+// celu na SHARED zamienialoby to w blad linkowania, i to jedyny moment, w ktorym
+// dalo by sie o tym dowiedziec. Rozroznienie jest tu po nazwie systemu, a nie po
+// probie, bo _NSGetEnviron jest interfejsem Apple'a, a nie opcjonalna funkcja POSIX.
+#if defined(__APPLE__) && defined(__MACH__)
+#include <crt_externs.h>
+#define environ (*_NSGetEnviron())
+#else
 extern char **environ;
+#endif
 
 namespace retractordb {
 namespace {
@@ -182,7 +194,16 @@ class Process {
       if (code) throw Error("spawn_error", std::strerror(code));
     };
     try {
-      if (pipe2(out, O_CLOEXEC) || pipe2(err, O_CLOEXEC)) throw Error("spawn_error", std::strerror(errno));
+      // pipe(2) + FD_CLOEXEC zamiast pipe2(2): pipe2 jest rozszerzeniem Linuksa i
+      // FreeBSD, ktorego jadra BSD-owe (w tym Darwin) nie maja wcale. Jedyna roznica
+      // wzgledem pipe2 to okno miedzy utworzeniem potoku a ustawieniem FD_CLOEXEC,
+      // w ktorym ROWNOLEGLY watek moglby odziedziczyc deskryptor do swojego potomka.
+      // Tutaj to okno nie ma znaczenia: potomka tworzy wylacznie ten fragment, pod
+      // jednym watkiem, a posix_spawn_file_actions_addclose nizej i tak zamyka
+      // wszystkie cztery deskryptory po stronie dziecka.
+      if (::pipe(out) || ::pipe(err)) throw Error("spawn_error", std::strerror(errno));
+      for (int fd : {out[0], out[1], err[0], err[1]})
+        if (::fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) throw Error("spawn_error", std::strerror(errno));
       check(posix_spawnattr_setflags(&attributes, POSIX_SPAWN_SETPGROUP));
       check(posix_spawnattr_setpgroup(&attributes, 0));
       check(posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0));

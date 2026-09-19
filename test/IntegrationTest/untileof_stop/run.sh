@@ -10,6 +10,7 @@
 #     (kontrola negatywna, bez ktorej punkt 1 przeszedlby takze przy zignorowanym trybie),
 #  3. przy wielu zrodlach przebieg konczy sie na PIERWSZYM wyczerpanym wejsciu.
 set -e
+. "$(dirname "$0")/../portable.sh"
 
 rm -rf temp oracle two
 mkdir -p temp oracle two
@@ -23,10 +24,10 @@ cmp oracle/dst temp/dst
 
 # 2. Kontrola negatywna: ten sam plan bez -u, z zapasem pobudek, zawija zrodlo i wychodzi
 #    poza rozmiar wejscia. Gdyby -u byl ignorowany, artefakt z punktu 1 mialby ten rozmiar.
-size_untileof=$(stat -c %s temp/dst)
+size_untileof=$(file_size temp/dst)
 rm -rf temp && mkdir temp
 xretractor query.rql -k -r -f -m 14
-size_wrapped=$(stat -c %s temp/dst)
+size_wrapped=$(file_size temp/dst)
 
 echo "until-eof=${size_untileof} B  wrapped=${size_wrapped} B"
 
@@ -37,8 +38,8 @@ fi
 
 # 3. Dwa zrodla, 8 i 3 rekordy: stop na pierwszym wyczerpanym, wiec oba wyjscia po 3 rekordy.
 xretractor two_sources.rql -k -r -f -u
-d1=$(stat -c %s two/d1)
-d2=$(stat -c %s two/d2)
+d1=$(file_size two/d1)
+d2=$(file_size two/d2)
 
 echo "d1=${d1} B  d2=${d2} B"
 

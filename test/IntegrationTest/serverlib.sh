@@ -22,6 +22,10 @@
 #   xqry -s dst -k -m 3 > out.txt
 #   server_wait_exit
 
+# Warstwa przenosnosci powloki (file_size, shm_list, lock_is_free, ...). Sciezka jest
+# wzgledna wzgledem katalogu testu, dokladnie tak samo jak sciezka do tego pliku.
+. "$(dirname "$0")/../portable.sh"
+
 # Sciezka blokady podaza za przestrzenia nazw uruchomienia: przy ustawionej RDB_NAMESPACE
 # xretractor bierze ja za nazwe instancji, wiec plik nazywa sie
 # xretractor_service.<przestrzen>.lock, a nie xretractor_service.lock. Oprawa, ktora
@@ -61,10 +65,15 @@ server_cleanup() {
   #
   # Wzorzec dopuszcza czlon przestrzeni na koncu nazwy (obiekty serwera: segment, muteks,
   # kolejka komend) oraz w srodku (kolejki odpowiedzi klientow, "brcdbr.<instancja>.<klient>").
+  #
+  # shm_list konczy sie kodem 2, gdy katalogu obiektow IPC nie da sie ustalic. Kontrola
+  # jest wtedy jawnie POMINIETA - cicho zdana bramka higieny bylaby gorsza niz jej brak.
   if [ -n "$RDB_NAMESPACE" ]; then
-    local leftovers
-    leftovers=$(ls /dev/shm/ 2>/dev/null | grep -E "\.${RDB_NAMESPACE}(\.|\$)" || true)
-    if [ -n "$leftovers" ]; then
+    local leftovers shm_status=0
+    leftovers=$(shm_list "\.${RDB_NAMESPACE}(\.|\$)") || shm_status=$?
+    if [ "$shm_status" -ne 0 ]; then
+      echo "POMINIETO: higiena IPC niesprawdzalna na tej platformie"
+    elif [ -n "$leftovers" ]; then
       echo "higiena: zostaly obiekty IPC przestrzeni $RDB_NAMESPACE:"
       echo "$leftovers"
       status=1
@@ -74,7 +83,7 @@ server_cleanup() {
   if [ -n "$_server_started" ] && [ -e "$SERVER_LOCK" ]; then
     # Tresc pozostaje diagnostyczna po zwolnieniu flock. Oprawa usuwa plik tylko wtedy,
     # gdy potrafi sama przejac blokade; aktywnego inode nie wolno odlaczyc od sciezki.
-    if flock -n "$SERVER_LOCK" true; then
+    if lock_is_free "$SERVER_LOCK"; then
       rm -f "$SERVER_LOCK"
     else
       echo "higiena: test zostawil aktywna blokade $SERVER_LOCK"

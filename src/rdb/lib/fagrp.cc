@@ -210,4 +210,10 @@ size_t groupFile<T>::count() {
   return sumCount + (removedSegments_ * retention_.capacity);  // compensate for removed segments
 }
 
+// DEFINICJA instancjacji - na koncu pliku, bo tu i tylko tu widac CIALA wszystkich
+// skladowych. To jest jedyne miejsce, w ktorym powstaja symbole groupFile<...>;
+// naglowek niesie odpowiadajace `extern template` (patrz komentarz przy nim).
+template class groupFile<posixBinaryFileWithShadow>;
+template class groupFile<posixBinaryFile>;
+
 }  // namespace rdb

@@ -36,7 +36,7 @@ RetractorDB consists of three main programs:
 
 ## Installation
 
-RetractorDB targets Linux (x64 and ARM64). You can either build it from source or install a prebuilt package from the GitHub Releases page.
+RetractorDB runs on Linux (x64 and ARM64) and on macOS (Apple silicon and Intel). Prebuilt packages are published for Linux only; on macOS you build from source. See [Option B](#option-b---build-from-source) and the macOS notes below it.
 
 ### Option A - install from a release package
 
@@ -86,7 +86,7 @@ xtrdb -h
 
 ### Option B - build from source
 
-The build uses **Conan 2 + CMake + Ninja** and requires **GCC 14+** (C++23, including `std::println`/`<print>`, absent from libstdc++ 13). A helper script, [`scripts/buildrdb.sh`](scripts/buildrdb.sh), bootstraps the toolchain and drives the build. Run it from the repo root, `scripts/`, or `build/Debug/`.
+The build uses **Conan 2 + CMake + Ninja**. On Linux it requires **GCC 14+** (C++23, including `std::println`/`<print>`, absent from libstdc++ 13); on macOS it requires the **Xcode 16.3+ command-line tools** and a deployment target of **macOS 14.4 or newer** - `std::print` carries an availability annotation in Apple's libc++, so an older target fails to compile. A helper script, [`scripts/buildrdb.sh`](scripts/buildrdb.sh), bootstraps the toolchain and drives the build. Run it from the repo root, `scripts/`, or `build/Debug/`.
 
 ```bash
 git clone https://github.com/michalwidera/retractordb.git
@@ -114,6 +114,21 @@ cd build/Debug
 ninja install     # installs xretractor, xqry, xtrdb to ~/.local/bin
 ninja test        # optional: unit + integration tests
 ```
+
+#### macOS
+
+`scripts/buildrdb.sh` covers macOS as well: `toolchain` installs through Homebrew instead of apt, and `mold` and `valgrind` - neither of which exists on Apple silicon - are reported as not applicable rather than missing. There is also a single-shot script that runs the whole sequence and writes one log:
+
+```bash
+scripts/macos-build.sh              # Debug: configure, build, install, ctest
+scripts/macos-build.sh release
+scripts/macos-build.sh --sanitize   # -fsanitize=address,undefined
+```
+
+Two differences are worth knowing before you read the results:
+
+- **Memory checking.** Unit tests run under Valgrind on Linux; there is no Valgrind for Apple silicon, so on macOS they run directly and the equivalent check is a sanitizer build (`-DRDB_SANITIZE=address,undefined`, which `--sanitize` passes for you).
+- **Real time and the service.** `SCHED_FIFO` is set per thread rather than per process, CPU affinity has no macOS equivalent (`--realtime` reports this instead of silently doing nothing), and there is no `PREEMPT_RT` counterpart, so macOS is a development and test target rather than a measurement platform. Service mode talks to launchd rather than systemd, and no unit file is packaged.
 
 To produce your own `.deb` / `.tar.gz` packages locally:
 

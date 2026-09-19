@@ -81,7 +81,29 @@ def error(code):
 
 
 def reaped(pid):
-    assert not Path(f"/proc/{pid}").exists(), f"Child left behind: {pid}"
+    """Czy dziecko zostalo zebrane (nie wisi juz jako zywy proces).
+
+    Do teraz warunkiem bylo `not Path(f"/proc/{pid}").exists()`. Na Darwinie
+    /proc nie istnieje w ogole, wiec warunek byl spelniony ZAWSZE i kontrola nie
+    badala niczego - cicho przechodzila takze wtedy, gdy klient naprawde
+    zostawial dziecko. Przenosny odpowiednik to sygnal 0: ProcessLookupError
+    znaczy "takiego PID-u nie ma", czyli proces zebrany. Zombie na sygnal 0
+    nadal odpowiada, wiec stan dopytujemy przez `ps`; 'Z' albo pusty wynik
+    znaczy, ze nie zyje. PermissionError znaczy, ze PID nalezy juz do kogos
+    innego, czyli tym bardziej nie do naszego dziecka.
+    """
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return
+    except PermissionError:
+        return
+    state = subprocess.run(
+        ["ps", "-o", "stat=", "-p", str(pid)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    ).stdout.decode(errors="replace").strip()
+    assert not state or state.startswith("Z"), f"Child left behind: {pid} ({state})"
 
 
 def python_fake(binary):

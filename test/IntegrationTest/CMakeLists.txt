@@ -37,6 +37,35 @@ set(IT_TREE_ROOT
     CACHE INTERNAL "korzen drzewa testow integracyjnych")
 set_property(GLOBAL PROPERTY IT_NAMESPACE_NEXT 0)
 
+# Testy integracyjne wolaja xretractor / xqry / xtrdb GOLA NAZWA, czyli z PATH-u
+# - i celowo, bo sprawdzaja binarium ZAINSTALOWANE, a nie to z drzewa budowy
+# (patrz test/CLAUDE.md). Katalog instalacji jest jednak katalogiem uzytkownika
+# (${CMAKE_INSTALL_PREFIX}/bin, domyslnie ~/.local/bin), a tego nie ma w PATH
+# powloki nielogowanej ani na macOS, ani w wielu konfiguracjach Linuksa - i
+# wtedy WSZYSTKIE te testy padaja na "command not found", bez zwiazku z tym, co
+# badaja. Dopisujemy wiec katalog instalacji z przodu PATH-u kazdego testu,
+# zamiast liczyc na srodowisko tego, kto uruchamia ctest. Opakowanie valgrindem
+# dla tych testow integracyjnych, ktore sprawdzaja nie tylko wynik, ale i
+# czystosc pamieci silnika. PUSTE tam, gdzie valgrinda nie ma (Apple silicon nie
+# ma go i miec nie bedzie) - test wykonuje sie wtedy bez opakowania, czyli
+# sprawdza samo zachowanie, a straz pamieci przechodzi na konfiguracje z
+# -DRDB_SANITIZE=address,undefined. Lepsze to niz "command not found" w
+# dziewieciu testach, ktore z pamiecia nie maja nic wspolnego.
+if(PROG_VALGRIND)
+  set(IT_VALGRIND
+      ${PROG_VALGRIND} --vgdb=no --error-exitcode=1 --leak-check=full
+      --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../valgrind.supp
+      CACHE INTERNAL "opakowanie valgrindem dla testow integracyjnych")
+else()
+  set(IT_VALGRIND
+      ""
+      CACHE INTERNAL "opakowanie valgrindem dla testow integracyjnych")
+endif()
+
+set(IT_TEST_PATH
+    "${CMAKE_INSTALL_PREFIX}/bin:$ENV{PATH}"
+    CACHE INTERNAL "PATH przekazywany testom integracyjnym")
+
 macro(add_test)
   _add_test(${ARGV})
   cmake_parse_arguments(_at "" "NAME" "" ${ARGV})
@@ -63,7 +92,9 @@ macro(add_test)
       # najdluzszym tescie jednostkowym), a multiserver_routing mierzy czas
       # `--bus` z progiem 1 s, wiec obciazenie sasiadow moglo mu tylko
       # zaszkodzic. Zostaje mocniejsza gwarancja.
-      set_tests_properties(${_it_test_name} PROPERTIES RUN_SERIAL TRUE)
+      set_tests_properties(
+        ${_it_test_name} PROPERTIES RUN_SERIAL TRUE ENVIRONMENT
+                                    "PATH=${IT_TEST_PATH}")
     else()
       # Przydzial jest per KATALOG, nie per test. Makro jest wolane wielokrotnie
       # w jednym CMakeLists, a testy jednego katalogu i tak nie moga biec obok
@@ -91,9 +122,14 @@ macro(add_test)
       # start pierwszego serwera.
       set_tests_properties(
         ${_it_test_name}
-        PROPERTIES RESOURCE_LOCK ${_it_namespace} FIXTURES_REQUIRED
-                   it_namespace_pool ENVIRONMENT
-                   "RDB_NAMESPACE=${_it_namespace};TMPDIR=${_it_tmpdir}")
+        PROPERTIES
+          RESOURCE_LOCK
+          ${_it_namespace}
+          FIXTURES_REQUIRED
+          it_namespace_pool
+          ENVIRONMENT
+          "RDB_NAMESPACE=${_it_namespace};TMPDIR=${_it_tmpdir};PATH=${IT_TEST_PATH}"
+      )
     endif()
   endif()
   unset(_it_test_name)

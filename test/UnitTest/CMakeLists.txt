@@ -8,6 +8,29 @@ file(
   LIST_DIRECTORIES false
   "*.cpp")
 
+# Opakowanie kazdego testu jednostkowego. Na Linuksie jest to valgrind - taka
+# jest tam definicja "test przeszedl": bez wycieku i bez odczytu
+# niezainicjowanej pamieci. Gdzie valgrinda nie ma (Apple Silicon nie ma go i
+# miec nie bedzie), lista jest PUSTA i ctest uruchamia binarium wprost;
+# rownowaznikiem strazy pamieci jest wtedy konfiguracja z
+# -DRDB_SANITIZE=address,undefined, ktora wkompilowuje kontrole w same binaria.
+if(PROG_VALGRIND)
+  set(RDB_UT_LAUNCHER ${PROG_VALGRIND} --vgdb=no --error-exitcode=1
+                      --leak-check=full)
+else()
+  set(RDB_UT_LAUNCHER "")
+endif()
+
+# Limit czasu POZA valgrindem. Bez opakowania test jednostkowy konczy sie w
+# ulamku sekundy (najdluzszy w drzewie: ~2 s), wiec dwie minuty nie sa progiem
+# wydajnosci - sa granica miedzy "wolno" a "zawieszony". Rozroznienie jest
+# praktyczne: zawieszony test bez limitu zatrzymuje CALA suite i nie wiadomo
+# nawet, ktory to byl. Tak wlasnie stanelo pierwsze uruchomienie na macOS, gdzie
+# rtAbsoluteSleep liczylo termin na niewlasciwej osi zegara i spalo bez konca.
+# Pod valgrindem limitu nie ustawiamy: tam czasy sa o rzad wielkosci wieksze i
+# zalezne od obciazenia maszyny, wiec kazda liczba bylaby zgadywaniem.
+set(RDB_UT_TIMEOUT 120)
+
 list(FILTER V_GLOB EXCLUDE REGEX ".*test_qry\\.cpp$")
 
 # foreach(item ${V_GLOB}) message( ${item}) endforeach()
@@ -39,14 +62,21 @@ foreach(item ${V_GLOB})
   target_link_libraries(${OUTPUT_FILE_NOEXT} PRIVATE ${LIBRARY_TEST_SET})
   file(MAKE_DIRECTORY
        ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT})
-  if(OUTPUT_FILE_NOEXT STREQUAL "test_faccposix" OR OUTPUT_FILE_NOEXT STREQUAL
-                                                    "test_faccposixshd")
-    target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=pread
-                        -Wl,--wrap=write)
-  endif()
-  if(OUTPUT_FILE_NOEXT STREQUAL "test_dumpManager")
-    target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=lseek
-                        -Wl,--wrap=write)
+  # Przejecie wywolan systemowych w trzech testach. Opcja --wrap jest
+  # rozszerzeniem GNU ld/lld; konsolidatory bez niej dostaja to samo przez
+  # definicje symbolu o nazwie systemowej w pliku obiektowym testu (makro
+  # RDB_WRAP_SYSCALL, test/UnitTest/syscallWrap.hpp) i wtedy nie ma tu nic do
+  # dodania na linii konsolidacji.
+  if(RDB_HAS_LD_WRAP)
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_faccposix"
+       OR OUTPUT_FILE_NOEXT STREQUAL "test_faccposixshd")
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=pread
+                          -Wl,--wrap=write)
+    endif()
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_dumpManager")
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=lseek
+                          -Wl,--wrap=write)
+    endif()
   endif()
   # test_uxSysTermTools: symbole uxSysTermTools dostępne przez retractor →
   # common (PUBLIC) test_formatter i test_ipcClient: symbole dostępne przez
@@ -63,10 +93,13 @@ foreach(item ${V_GLOB})
     NAME ut_${TEST_SHORT}
     WORKING_DIRECTORY
       ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
-    COMMAND valgrind --vgdb=no --error-exitcode=1 --leak-check=full
+    COMMAND ${RDB_UT_LAUNCHER}
             ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
   set_tests_properties(ut_${TEST_SHORT} PROPERTIES FIXTURES_REQUIRED
                                                    ut_${TEST_SHORT}-fixture)
+  if(NOT PROG_VALGRIND)
+    set_tests_properties(ut_${TEST_SHORT} PROPERTIES TIMEOUT ${RDB_UT_TIMEOUT})
+  endif()
 endforeach()
 
 add_executable(test_xqry test_qry.cpp $<TARGET_OBJECTS:test_main_obj>)
@@ -75,8 +108,10 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry)
 add_test(
   NAME ut_xqry
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry
-  COMMAND valgrind --vgdb=no --error-exitcode=1 --leak-check=full
-          ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
+  COMMAND ${RDB_UT_LAUNCHER} ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
+if(NOT PROG_VALGRIND)
+  set_tests_properties(ut_xqry PROPERTIES TIMEOUT ${RDB_UT_TIMEOUT})
+endif()
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel)
 add_test(

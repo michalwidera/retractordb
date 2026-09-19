@@ -1,6 +1,6 @@
 #include "streamInstance.hpp"
 
-#include <spdlog/spdlog.h>
+#include <sys/wait.h>  // WIFEXITED, WEXITSTATUS dla wyniku ::system()
 
 #include <cstdint>
 #include <cstdlib>  // std::div
@@ -8,6 +8,8 @@
 #include <optional>
 #include <utility>
 #include <variant>  // std::get, std::holds_alternative (P1-E3b)
+
+#include <spdlog/spdlog.h>
 
 #include "fatalError.hpp"
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -eu
+. "$(dirname "$0")/../portable.sh"
 
 # Sufit NAME_MAX na nazwie substratu - wytworzenie i redukcja szerokiej klauzuli FROM.
 #
@@ -63,7 +64,7 @@ done
 
 # Wlasciwa teza: ZADNA nazwa pliku nie przekracza NAME_MAX. Bez skrotu wezel 13-skladnikowy
 # dawalby 209 bajtow nazwy plus sufiks - czyli plan, ktorego nie da sie zapisac.
-too_long=$(find . -maxdepth 1 -type f -printf '%f\n' | awk 'length($0) > 255')
+too_long=$(find . -maxdepth 1 -type f | sed 's|.*/||' | awk 'length($0) > 255')
 [ -z "$too_long" ] || {
   echo "nazwa pliku przekracza NAME_MAX:"
   echo "$too_long"
@@ -77,7 +78,7 @@ too_long=$(find . -maxdepth 1 -type f -printf '%f\n' | awk 'length($0) > 255')
 #
 # Pole `sum` jest typu RATIONAL, czyli para (licznik, mianownik): bierzemy co drugie slowo
 # i osobno zadamy mianownika 1.
-record_count=$(($(stat -c %s reduced) / 8))
+record_count=$(($(file_size reduced) / 8))
 [ "$record_count" -gt 20 ]
 
 actual=$(od -An -v -td4 reduced | awk '{ for (i = 1; i <= NF; i += 2) printf "%s ", $i }')

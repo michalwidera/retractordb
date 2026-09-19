@@ -17,6 +17,8 @@
 # `diff --strip-trailing-cr` uznaje to za roznice, a compare_files nie. Normalizujemy
 # wiec oba pliki i dopiero je porownujemy. Bez tej flagi porownanie jest bajtowe.
 set -u
+# Warstwa przenosnosci powloki - ten plik lezy obok, wiec sciezka jest bez "..".
+. "$(dirname "$0")/portable.sh"
 
 readonly kDiffLineBudget=200
 
@@ -78,8 +80,8 @@ fi
 # znormalizowana: `sub(/\r$/, "")` zdejmuje CR, a `print` dokleja brakujacy koniec
 # ostatniej linii.
 if [ "$ignoreEol" -eq 1 ]; then
-  normalizedPattern=$(mktemp)
-  normalizedActual=$(mktemp)
+  normalizedPattern=$(make_temp_file)
+  normalizedActual=$(make_temp_file)
   trap 'rm -f "$normalizedPattern" "$normalizedActual"' EXIT
   awk '{ sub(/\r$/, ""); print }' "$pattern" >"$normalizedPattern"
   awk '{ sub(/\r$/, ""); print }' "$actual" >"$normalizedActual"

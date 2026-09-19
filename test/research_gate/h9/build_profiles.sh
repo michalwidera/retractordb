@@ -43,7 +43,12 @@ here=$(pwd)
 # eksperymentu: repozytorium kodu to trzy poziomy wyzej, a logi builda ida do
 # build/, ktore jest w .gitignore. Wyjscia uruchomienia nie wchodza do zrodel.
 code_repo=${RDB_CODE_REPO:-"$here/../../.."}
-code_repo=$(realpath "$code_repo")
+# `realpath` jest z GNU coreutils; starsze macOS go nie maja, a pusty wynik
+# zamienia sie tu w mylacy komunikat "nie wyglada na drzewo zrodel". `cd` + `pwd -P`
+# daje dla istniejacego katalogu dokladnie to samo i jest w POSIX-ie.
+code_repo_raw=$code_repo
+code_repo=$(cd "$code_repo_raw" 2>/dev/null && pwd -P) \
+  || { echo "BLAD: katalog $code_repo_raw nie istnieje" >&2; exit 1; }
 jobs=${K6_BUILD_JOBS:-4}
 raw_dir=${K6_RAW_DIR:-"$code_repo/build/gate-profiles-logs"}
 
@@ -54,7 +59,14 @@ raw_dir=${K6_RAW_DIR:-"$code_repo/build/gate-profiles-logs"}
 # także izolowanego rdzenia 3 - ale nigdy w trakcie kampanii.
 build_wrapper=()
 if [ -n "${K6_CPUS:-}" ]; then
-  build_wrapper=(taskset -c "$K6_CPUS")
+  # `taskset` jest z util-linux; na BSD/macOS nie ma ani jego, ani przypiecia do
+  # rdzeni w tej postaci. Krok jest wtedy POMINIETY z komunikatem - milczace
+  # zignorowanie K6_CPUS dawaloby build nieprzypiety podany za przypiety.
+  if command -v taskset >/dev/null 2>&1; then
+    build_wrapper=(taskset -c "$K6_CPUS")
+  else
+    echo "POMINIETO: brak taskset na tej platformie - build NIE jest przypiety do rdzeni $K6_CPUS" >&2
+  fi
 fi
 ccache_args=()
 if [ "${K6_CCACHE:-0}" = "1" ]; then
@@ -66,7 +78,9 @@ fi
 # funkcji. Sa tu PRZENIESIONE DOSLOWNIE, nie przepisane: verify_probe_binary_profile
 # porownuje `--build-info` bajtowo i to porownanie jest jedynym dowodem, ze
 # zbudowany profil jest tym, za ktory sie podaje.
-log()  { printf '[%(%Y-%m-%d %H:%M:%S)T] %s\n' -1 "$*" >&2; }
+# `%(...)T` w `printf` to rozszerzenie basha 4.0; macOS ma basha 3.2, gdzie ten
+# format wychodzi doslownie. `date` daje ten sam napis na obu systemach.
+log()  { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2; }
 die()  { log "BLAD: $*"; exit 1; }
 
 # Kazde wywolanie narzedzia idzie do pliku, zeby log kroku nie tonal w wyjsciu
@@ -176,10 +190,18 @@ while IFS=$'\t' read -r profile slug dedup share commutative factor; do
   if [ "${K6_SETCAP:-0}" = "1" ]; then
     # R7: sonda mierzy pod SCHED_FIFO i mlockall, więc capabilities muszą być
     # na KAŻDEJ z czterech binarek, nie tylko na zainstalowanej.
-    sudo -n setcap cap_sys_nice,cap_ipc_lock+ep "$binary" ||
-      die "nie można nadać capabilities RT na $binary"
-    getcap "$binary" | grep -q "cap_ipc_lock,cap_sys_nice=ep\|cap_sys_nice,cap_ipc_lock=ep" ||
-      die "binarka $binary nie ma wymaganych capabilities RT"
+    #
+    # capabilities(7) to mechanizm Linuksa: na BSD/macOS nie ma ani setcap, ani
+    # getcap. Krok jest wtedy POMINIETY z komunikatem - cicha zgoda znaczylaby
+    # pomiar bez uprawnien RT podany za pomiar z nimi.
+    if command -v setcap >/dev/null 2>&1 && command -v getcap >/dev/null 2>&1; then
+      sudo -n setcap cap_sys_nice,cap_ipc_lock+ep "$binary" ||
+        die "nie można nadać capabilities RT na $binary"
+      getcap "$binary" | grep -q "cap_ipc_lock,cap_sys_nice=ep\|cap_sys_nice,cap_ipc_lock=ep" ||
+        die "binarka $binary nie ma wymaganych capabilities RT"
+    else
+      log "POMINIETO: brak setcap/getcap na tej platformie - capabilities RT na $binary NIE zostaly nadane"
+    fi
   fi
 
   if [ "${K6_RUN_CTEST:-0}" = "1" ]; then

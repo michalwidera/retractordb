@@ -7,6 +7,7 @@
 # zostawil po sobie serwera, odpowiada teraz bramka higieny w ../serverlib.sh:
 # obarcza winowajce zamiast pozwalac mu sprzatac po sobie cudzymi rekami.
 set -e
+. "$(dirname "$0")/../portable.sh"
 
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
   echo "Usage: $0 <query.rql> <stream1> <stream2>"
@@ -22,8 +23,13 @@ rm -f str*
 # "brcdbr.<instancja>.<klient>" (ipc::names w constants.hpp), wiec globalne brcdbr* liczy
 # takze klientow testu biegnacego rownoczesnie w innej przestrzeni - i pokazuje ich jako
 # WLASNY wyciek. Pod `ctest -j 24` wywracalo to test na cudzych kolejkach.
-QUEUE_GLOB="/dev/shm/brcdbr${RDB_NAMESPACE:+.$RDB_NAMESPACE}"*
-QUEUES_BEFORE=$(ls $QUEUE_GLOB 2>/dev/null | wc -l)
+QUEUE_ERE="^brcdbr${RDB_NAMESPACE:+\.$RDB_NAMESPACE}"
+# shm_list konczy sie kodem 2, gdy katalogu obiektow IPC nie da sie ustalic. Kontrola
+# wycieku jest wtedy jawnie POMINIETA, a nie uznana za zdana.
+SHM_STATUS=0
+QUEUES_BEFORE_LIST=$(shm_list "$QUEUE_ERE") || SHM_STATUS=$?
+count_lines() { [ -n "$1" ] || { echo 0; return 0; }; printf '%s\n' "$1" | wc -l | tr -d ' '; }
+QUEUES_BEFORE=$(count_lines "$QUEUES_BEFORE_LIST")
 
 xretractor "$1" -c
 
@@ -59,9 +65,14 @@ xqry -l
 xqry -k || true
 server_wait_exit
 
-QUEUES_AFTER=$(ls $QUEUE_GLOB 2>/dev/null | wc -l)
-if [ "$QUEUES_AFTER" -gt "$QUEUES_BEFORE" ]; then
-  echo "LEAK: brcdbr queue count increased from $QUEUES_BEFORE to $QUEUES_AFTER"
-  ls $QUEUE_GLOB 2>/dev/null
-  exit 1
+if [ "$SHM_STATUS" -ne 0 ]; then
+  echo "POMINIETO: higiena IPC niesprawdzalna na tej platformie"
+else
+  QUEUES_AFTER_LIST=$(shm_list "$QUEUE_ERE") || true
+  QUEUES_AFTER=$(count_lines "$QUEUES_AFTER_LIST")
+  if [ "$QUEUES_AFTER" -gt "$QUEUES_BEFORE" ]; then
+    echo "LEAK: brcdbr queue count increased from $QUEUES_BEFORE to $QUEUES_AFTER"
+    printf '%s\n' "$QUEUES_AFTER_LIST"
+    exit 1
+  fi
 fi

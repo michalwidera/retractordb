@@ -18,6 +18,111 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# --- Platforma ----------------------------------------------------------
+# Jedno miejsce odpowiadajace na pytanie "na czym to dziala". Pozostale moduly
+# nie wolaja `uname` same z siebie - pytaja tutaj. Powod: macOS rozni sie od
+# Linuksa w kilkunastu drobiazgach (rc powloki, menedzer pakietow, kompilator,
+# licznik rdzeni, linker) i bez jednego punktu decyzyjnego rozeszloby sie to
+# po wszystkich plikach.
+rdb_os() {
+    case "$(uname -s 2>/dev/null)" in
+        Linux) echo "linux" ;;
+        Darwin) echo "macos" ;;
+        *) echo "unknown" ;;
+    esac
+}
+
+# Sciezka do POKAZANIA w komunikacie: $HOME skracamy do '~'. Dzieki temu
+# komunikat nazywa plik, ktorego naprawde uzyto, a na Linuksie brzmi dokladnie
+# tak samo jak wtedy, gdy '~/.bashrc' bylo w nim wpisane na sztywno.
+rdb_display_path() {
+    if [ -n "${HOME:-}" ]; then
+        case "$1" in
+            "$HOME"/*)
+                echo "~${1#$HOME}"
+                return 0
+                ;;
+        esac
+    fi
+    echo "$1"
+}
+
+# Ktory plik rc powloki dopisujemy (PATH, aktywacja venv) - sam wybor, bez
+# skutkow ubocznych. Linux: zawsze ~/.bashrc (bez zmian). macOS: logowanie
+# idzie przez zsh, wiec ~/.zshrc; ~/.bash_profile tylko wtedy, gdy $SHELL
+# jawnie wskazuje bash. Gdy $SHELL nic nie mowi, zostaje ~/.zshrc - to
+# domyslna powloka macOS.
+rdb_shell_rc_path() {
+    if [ "$(rdb_os)" = "macos" ]; then
+        case "${SHELL:-}" in
+            */bash) echo "$HOME/.bash_profile" ;;
+            *) echo "$HOME/.zshrc" ;;
+        esac
+    else
+        echo "$HOME/.bashrc"
+    fi
+}
+
+# To samo, ale plik po wyjsciu ma istniec - tak jak dotad tworzyl go
+# ensure_single_bashrc_line dla ~/.bashrc.
+rdb_shell_rc() {
+    local rc
+    rc=$(rdb_shell_rc_path)
+    touch "$rc" 2>/dev/null || true
+    echo "$rc"
+}
+
+# Instalacja pakietow systemowych. Linux: apt-get - dokladnie te same dwa
+# wywolania, ktore staly wczesniej w install_missing_tools. macOS: brew i
+# NIGDY przez sudo (Homebrew w /opt/homebrew jest per-uzytkownik i pod sudo
+# odmawia pracy).
+rdb_pkg_install() {
+    [ $# -gt 0 ] || return 0
+    if [ "$(rdb_os)" = "macos" ]; then
+        if ! command_exists brew; then
+            echo "Error: cannot auto-install packages without Homebrew. Missing packages: $*"
+            echo "-- Install Homebrew from https://brew.sh and re-run."
+            return 1
+        fi
+        brew install "$@"
+    else
+        if ! command_exists sudo || ! command_exists apt-get; then
+            echo "Error: cannot auto-install apt packages without sudo and apt-get. Missing packages: $*"
+            return 1
+        fi
+        # Acquire::Retries: lustra potrafia oddac 503 na POJEDYNCZYM pliku, a bez
+        # ponowien wywraca to caly job. Na CI ARM (us-east-1.ec2.ports.ubuntu.com)
+        # zdarza sie to okresowo na fonts-liberation, ciagnietym jako zaleznosc
+        # graphviza z listy `toolchain_required`. apt ponawia samo POBRANIE pozycji,
+        # wiec to jest ta warstwa, na ktorej awaria lustra ma byc obsluzona.
+        sudo apt-get -o Acquire::Retries=5 update
+        sudo apt-get -o Acquire::Retries=5 -y install "$@"
+    fi
+}
+
+# Kompilator, ktorym sprawdzamy C++23 (check_cxx23 w toolmatrix.sh) i ktory
+# nazywaja komunikaty bledow. Linux: zawsze `g++`. macOS: kompilatorem jest
+# AppleClang, a `g++` to tylko jego shim - pytamy wiec o $CXX, domyslnie `c++`.
+rdb_cxx23_probe_compiler() {
+    if [ "$(rdb_os)" = "macos" ]; then
+        echo "${CXX:-c++}"
+    else
+        echo "g++"
+    fi
+}
+
+# Wersja kompilatora do raportu. AppleClang ODRZUCA -dumpfullversion (blad, nie
+# pusty wynik - stad "missing/fail" w tabeli validate), wiec na macOS czytamy
+# pierwsza linie `--version`.
+rdb_cxx_version() {
+    local cxx="$1"
+    if [ "$(rdb_os)" = "macos" ]; then
+        extract_first_version "$("$cxx" --version 2>/dev/null | head -n1)"
+    else
+        "$cxx" -dumpfullversion -dumpversion 2>/dev/null | head -n1
+    fi
+}
+
 append_unique() {
     local value="$1"
     shift
@@ -64,8 +169,20 @@ compute_build_jobs() {
         return 0
     fi
     local nproc_count mem_kb mem_mb jobs_by_mem
-    nproc_count=$(nproc 2>/dev/null || echo 1)
-    mem_kb=$(awk '/MemTotal/{print $2}' /proc/meminfo 2>/dev/null)
+    # Liczba rdzeni: `nproc` (Linux), `sysctl -n hw.ncpu` (macOS), a gdyby i
+    # tego nie bylo - POSIX-owe getconf. Bez tego macOS schodzil cicho do
+    # jednego zadania i kazdy build trwal wiecznosc.
+    nproc_count=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+    # RAM: /proc/meminfo (Linux, kB) albo `sysctl -n hw.memsize` (macOS, bajty).
+    # Obie drogi normalizujemy do kB, zeby formula RAM-owa nizej pozostala ta
+    # sama - to jest jedyne miejsce, ktore wie, skad wzielo sie `mem_kb`.
+    mem_kb=$(awk '/MemTotal/{print $2}' /proc/meminfo 2>/dev/null || echo "")
+    if [ -z "$mem_kb" ]; then
+        mem_kb=$(( $(sysctl -n hw.memsize 2>/dev/null || echo 0) / 1024 ))
+        if [ "$mem_kb" -le 0 ]; then
+            mem_kb=""
+        fi
+    fi
     if [ -z "$mem_kb" ]; then
         echo "$nproc_count"
         return 0
@@ -92,6 +209,9 @@ extract_major() {
     echo "$ver" | cut -d. -f1
 }
 
+# Nazwa jest historyczna: funkcja od zawsze dostaje plik parametrem i nie wie
+# nic o ~/.bashrc. Plik wskazuje rdb_shell_rc() - na macOS bedzie to ~/.zshrc
+# albo ~/.bash_profile. Zmiana nazwy przeszlaby przez trzy moduly, wiec zostaje.
 ensure_single_bashrc_line() {
     local file="$1"
     local desired_line="$2"
@@ -138,8 +258,15 @@ run_common_option() {
     local opt="$1"
     case "$opt" in
         "mold")
-            export RDB_USE_MOLD=ON
-            echo "-- mold linker ENABLED for subsequent build options in this invocation."
+            if [ "$(rdb_os)" = "macos" ]; then
+                # mold nie linkuje Mach-O i nie bedzie. RDB_USE_MOLD zostaje
+                # NIEUSTAWIONE, zeby CMake uzyl swojego domyslnego OFF spoza
+                # Linuksa - wyeksportowanie ON tylko wywracaloby konfiguracje.
+                echo "-- mold does not link Mach-O; ignoring 'mold' on macOS (RDB_USE_MOLD left unset, i.e. OFF)."
+            else
+                export RDB_USE_MOLD=ON
+                echo "-- mold linker ENABLED for subsequent build options in this invocation."
+            fi
             ;;
         "nomold")
             export RDB_USE_MOLD=OFF

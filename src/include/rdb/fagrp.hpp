@@ -62,6 +62,21 @@ class groupFile : public FileInterface {
   [[nodiscard]] bool hasShadow() const override { return !vec_.empty() && vec_.front()->hasShadow(); }
 };
 
-template class groupFile<posixBinaryFileWithShadow>;
-template class groupFile<posixBinaryFile>;
+/// DEKLARACJA instancjacji, nie definicja - definicja stoi na koncu fagrp.cc, za
+/// cialami metod.
+///
+/// Wczesniej bylo tu `template class groupFile<...>;`, czyli DEFINICJA instancjacji
+/// w miejscu, w ktorym widac same deklaracje skladowych. Standard nie kaze tego
+/// zglaszac, wiec kompilator po prostu nie emituje cial, ktorych nie widzi, i czy
+/// symbole powstana, zalezy od tego, KIEDY dany kompilator wykonuje instancjacje.
+/// GCC odklada ja do konca jednostki, wiec w fagrp.cc trafiala juz na definicje
+/// nizej i symbole powstawaly. Clang instancjuje w miejscu zapisu - a tam nie ma
+/// jeszcze czego instancjowac - wiec konstruktor groupFile nie powstawal w ogole
+/// i jedenascie celow nie linkowalo sie na ten jeden brakujacy symbol.
+///
+/// `extern template` mowi wprost to, co i tak jest prawda: tej instancjacji nie
+/// rob tutaj, ona jest gdzie indziej. Poza korzysciami z poprawnosci oszczedza tez
+/// kazdej jednostce prob instancjacji.
+extern template class groupFile<posixBinaryFileWithShadow>;
+extern template class groupFile<posixBinaryFile>;
 }  // namespace rdb

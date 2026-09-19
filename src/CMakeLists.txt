@@ -211,6 +211,10 @@ endif()
 # src/include/ dawał jedną wspólną kopię - wygrywał katalog konfigurowany jako
 # ostatni, więc binarka Debug mogła raportować "Type: Release".
 configure_file(config.h.in ${PROJECT_BINARY_DIR}/generated/config.h @ONLY)
+# Mozliwosci platformy wykryte probami w cmake/PlatformChecks.cmake (wolane z
+# korzenia, wiec zmienne RDB_HAS_* / RDB_OS_* sa tu juz ustawione).
+configure_file(platformConfig.h.in
+               ${PROJECT_BINARY_DIR}/generated/platformConfig.h @ONLY)
 configure_file(serviceDefaults.h.in
                ${PROJECT_BINARY_DIR}/generated/serviceDefaults.h @ONLY)
 configure_file(probeConfig.h.in ${PROJECT_BINARY_DIR}/generated/probeConfig.h

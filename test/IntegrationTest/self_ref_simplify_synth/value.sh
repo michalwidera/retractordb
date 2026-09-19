@@ -4,6 +4,7 @@
 # Przebieg OFFLINE (`-f`) z budzetem slotow: liczba rekordow nie zalezy od zegara.
 # Wartosci czytamy z ARTEFAKTOW, nie przez klienta.
 set -e
+. "$(dirname "$0")/../portable.sh"
 mkdir -p temp
 rm -f temp/*
 
@@ -15,8 +16,9 @@ xretractor query.rql -f -k -r -m 4
 expected="16777218 16777218"
 
 for stream in w r; do
-  # `%.17g` zdejmuje z liczb dopelnienie formatu `od`; 2^24+2 jest w FLOAT dokladne.
-  values=($(od -An -v -tf4 temp/$stream | awk '{ for (i = 1; i <= NF; i++) printf "%.17g\n", $i }'))
+  # `od -tf4` drukuje na BSD tylko 7 cyfr znaczacych i sam gubi 16777218 -> 16777220,
+  # wiec bajty czyta read_binary_values (portable.sh), bez posrednictwa `od`.
+  values=($(read_binary_values temp/$stream f4))
   test ${#values[@]} -gt 0 && test $((${#values[@]} % 2)) = 0 || {
     echo "REGRESJA: rozmiar '$stream' (${#values[@]} wartosci FLOAT) nie jest dodatnia wielokrotnoscia rekordu 2 x FLOAT"
     cat temp/$stream.desc

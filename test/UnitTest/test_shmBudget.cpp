@@ -6,13 +6,17 @@
 
 #include <sys/stat.h>
 
+#include <filesystem>
 #include <string>
+#include <system_error>
 
 #include <gtest/gtest.h>
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/rational.hpp>
 
 #include "constants.hpp"
+#include "osPlatform.hpp"
+#include "platformConfig.h"
 #include "retractor/lib/bus.hpp"
 #include "retractor/lib/shmBudget.hpp"
 
@@ -33,8 +37,27 @@ std::uint64_t realQueueBytes(std::uint64_t maxMessages, std::uint64_t maxMessage
   std::uint64_t retVal{0};
   {
     IPC::message_queue mq(IPC::create_only, name.c_str(), maxMessages, maxMessageSize);
+    // Obiekt trzeba znalezc na dysku, a jego sciezka nie jest ta sama wszedzie:
+    // z obiektami POSIX-owej pamieci dzielonej Boost tworzy wpis w /dev/shm,
+    // a bez nich - zwykly plik w swoim katalogu roboczym. Szukamy wiec pod oboma
+    // korzeniami, po nazwie, ktora sami nadalismy.
     struct stat st{};
-    if (stat(("/dev/shm/" + name).c_str(), &st) == 0) retVal = static_cast<std::uint64_t>(st.st_size);
+    if (stat(("/dev/shm/" + name).c_str(), &st) == 0) {
+      retVal = static_cast<std::uint64_t>(st.st_size);
+    } else {
+      for (const char *root : {"/tmp/boost_interprocess", "/tmp"}) {
+        std::error_code ec;
+        for (const auto &entry : std::filesystem::recursive_directory_iterator(
+                 root, std::filesystem::directory_options::skip_permission_denied, ec)) {
+          if (ec) break;
+          if (entry.is_regular_file(ec) && entry.path().filename() == name) {
+            retVal = static_cast<std::uint64_t>(std::filesystem::file_size(entry.path(), ec));
+            break;
+          }
+        }
+        if (retVal != 0) break;
+      }
+    }
   }
   IPC::message_queue::remove(name.c_str());
   return retVal;
@@ -45,7 +68,9 @@ TEST(ShmBudget, QueueFormulaMatchesRealSegment) {
        {std::pair<std::uint64_t, std::uint64_t>{100, 1024}, std::pair<std::uint64_t, std::uint64_t>{1000, 1000},
         std::pair<std::uint64_t, std::uint64_t>{250, 1024}}) {
     const std::uint64_t real = realQueueBytes(messages, size);
-    ASSERT_GT(real, 0U) << "kolejki nie da sie utworzyc w /dev/shm; pomiar odniesienia nie powstal";
+    if (real == 0)
+      GTEST_SKIP() << "segmentu kolejki nie da sie znalezc w systemie plikow na tej platformie; "
+                      "pomiar odniesienia nie powstal, a wzoru nie ma z czym porownac";
     EXPECT_EQ(shmbudget::messageQueueBytes(messages, size), real)
         << "wzor rozjechal sie z boostem dla " << messages << " wiadomosci po " << size << " B";
   }
@@ -86,7 +111,7 @@ TEST(ShmBudget, FixedReservationIsSumOfItsParts) {
 
 TEST(ShmBudget, SpaceIsMeasurableWhereSharedMemoryWorks) {
   const shmbudget::Space fs = shmbudget::space();
-  ASSERT_TRUE(fs.known) << "pomiar nie przeszedl na maszynie, na ktorej testy uzywaja /dev/shm";
+  ASSERT_TRUE(fs.known) << "pomiar nie przeszedl dla systemu plikow obiektow IPC (" << osplat::sharedMemoryBackingPath() << ")";
   EXPECT_GT(fs.total, 0U);
   EXPECT_LE(fs.available, fs.total);
 }

@@ -5,6 +5,7 @@
 # Wartosci czytamy z ARTEFAKTOW przez `xtrdb list`, ktore wypisuje NULL jako `null`.
 # Do 2026-09-14 kazde `null` ponizej bylo zawinieta liczba (np. 410065408/1, -1589934592).
 set -e
+. "$(dirname "$0")/../portable.sh"
 mkdir -p temp
 rm -f temp/*
 
@@ -14,7 +15,7 @@ check() {
   local stream=$1 records=$2 expected=$3
   local lines
   # `xtrdb` otwiera artefakt z katalogu biezacego; spoza `temp` czeka w nieskonczonosc na wejscie.
-  lines=$(cd temp && printf 'open %s\nlist 10\nquit\n' "$stream" | timeout 10 xtrdb -n 2>&1 | grep -F '{' || true)
+  lines=$(cd temp && printf 'open %s\nlist 10\nquit\n' "$stream" | run_timeout 10 xtrdb -n 2>&1 | grep -F '{' || true)
   local count
   count=$(printf '%s\n' "$lines" | grep -c -F '{' || true)
   test "$count" = "$records" || {

@@ -9,6 +9,7 @@
 # to dokladnie dwa rekordy. Wartosci czytamy z ARTEFAKTU, a nie przez klienta: klient
 # subskrybuje sie juz w trakcie i jego pierwsze sloty zaleza od wyscigu ze startem planu.
 set -e
+. "$(dirname "$0")/../portable.sh"
 mkdir -p temp
 rm -f temp/m temp/m.desc temp/m.meta temp/mul temp/mul.desc temp/mul.meta
 
@@ -26,8 +27,9 @@ grep -E 'DOUBLE +mul_0' map_mul.txt
 grep -E 'Records: 2' map_mul.txt
 
 # --- 2. Wartosci ---------------------------------------------------------------------------
-# `%.17g` zdejmuje z liczb dopelnienie formatu `od`.
-doubles() { od -An -v -tf8 "$1" | awk '{ for (i = 1; i <= NF; i++) printf "%.17g ", $i }' | sed 's/ $//'; }
+# Nie przez `od`: jego format `f4`/`f8` obcina cyfry inaczej na GNU i na BSD (patrz
+# read_binary_values w portable.sh).
+doubles() { read_binary_values "$1" f8; }
 
 # AVG redukuje WSZYSTKIE sloty biezacego rekordu: (3+5)/2 = 4, (7+11)/2 = 9.
 test "$(doubles temp/m)" = "4 9" || {

@@ -11,49 +11,20 @@
 #include <fstream>
 #include <optional>
 #include <sstream>
-#include <string_view>
 
 #include <spdlog/spdlog.h>
 
-// Ustala własną tożsamość systemd na podstawie /proc/self/cgroup. systemd umieszcza jednostkę
-// w ścieżce cgroup typu ".../system.slice/xretractor.service" lub (dla --user)
-// ".../user.slice/user@1000.service/.../xretractor.service". Zwraca nazwę unitu, gdy proces jest
-// jednostką systemd; unit == nullopt gdy to zwykły proces.
+#include "osPlatform.hpp"
+
+// Ustala wlasna tozsamosc w menedzerze uslug systemu. Sam odczyt jest platformowy i siedzi
+// w osplat::detectServiceIdentity (Linux: /proc/self/cgroup i jednostka systemd; Darwin:
+// etykieta zadania launchd). Tutaj zostaje samo przeniesienie wyniku do typu, ktorego
+// uzywa reszta drzewa.
 //
 // Deklaracja stoi w lockManager.hpp: tozsamosci jednostki potrzebuje takze magistrala xrdbbus.
 SystemdIdentity detectSystemdIdentity() {
-  SystemdIdentity id;
-
-  std::ifstream cgroup("/proc/self/cgroup");
-  if (!cgroup.is_open()) return id;
-
-  std::string line;
-  while (std::getline(cgroup, line)) {
-    // Format: "hierarchy:controllers:path" (v2: "0::/...path"). Interesuje nas ostatnie pole.
-    const auto lastColon = line.rfind(':');
-    if (lastColon == std::string::npos) continue;
-    std::string_view path(line);
-    path.remove_prefix(lastColon + 1);
-
-    // Zakres user, gdy ścieżka cgroup biegnie przez user.slice / user@<uid>.service.
-    const bool userScope = path.find("/user.slice") != std::string_view::npos || path.find("/user@") != std::string_view::npos;
-
-    // Ostatni (najgłębszy) segment ścieżki kończący się na ".service" jest nazwą naszego unitu;
-    // pomijamy user@<uid>.service, który jest menedżerem sesji, nie naszą jednostką.
-    std::string_view scan = path;
-    while (!scan.empty()) {
-      const auto slash     = scan.rfind('/');
-      std::string_view seg = (slash == std::string_view::npos) ? scan : scan.substr(slash + 1);
-      if (seg.ends_with(".service") && !seg.starts_with("user@")) {
-        id.unit      = std::string(seg);
-        id.userScope = userScope;
-        return id;
-      }
-      if (slash == std::string_view::npos) break;
-      scan = scan.substr(0, slash);
-    }
-  }
-  return id;
+  const osplat::ServiceIdentity identity = osplat::detectServiceIdentity();
+  return SystemdIdentity{.unit = identity.unit, .userScope = identity.userScope};
 }
 
 FlockServiceGuard::FlockServiceGuard(const std::string &serviceName)

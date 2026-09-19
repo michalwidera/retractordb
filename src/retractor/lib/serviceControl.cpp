@@ -12,14 +12,16 @@
 
 #include <spdlog/spdlog.h>
 
+#include "platformConfig.h"
+
 namespace {
 
 // Kod wyjścia dziecka, gdy execvp() się nie powiedzie - konwencja powłoki "command not found".
 constexpr int kExecFailedExitCode{127};
 
-// Domyślny wykonawca: fork + execvp("systemctl", argv). Bez shella (brak ryzyka interpretacji argv).
-// Zwraca kod wyjścia systemctl albo -1 przy błędzie fork/wait.
-int execSystemctl(const std::vector<std::string> &argv) {
+// Domyślny wykonawca: fork + execvp(menedżer usług, argv). Bez shella (brak ryzyka
+// interpretacji argv). Zwraca kod wyjścia programu albo -1 przy błędzie fork/wait.
+int execServiceManager(const std::vector<std::string> &argv) {
   const pid_t pid = fork();
   if (pid < 0) {
     SPDLOG_ERROR("restartService: fork() failed before systemctl exec");
@@ -43,13 +45,27 @@ int execSystemctl(const std::vector<std::string> &argv) {
 
 namespace servicecontrol {
 
-int restartService(bool userScope, const std::string &unit, const SystemctlRunner &runner) {
-  std::vector<std::string> argv{"systemctl"};
-  if (userScope) argv.emplace_back("--user");
-  argv.emplace_back("restart");
-  argv.push_back(unit);
+std::vector<std::string> restartCommand(bool userScope, const std::string &unit) {
+#if RDB_HAS_LAUNCHD
+  // launchd nie zna slowa "restart". Odpowiednikiem jest `kickstart -k`: zabij
+  // zadanie, jesli biegnie, i uruchom je od nowa. Adresem jest CEL DOMENY, a nie
+  // sama etykieta - "system/<label>" dla LaunchDaemons, "gui/<uid>/<label>" dla
+  // LaunchAgents - i to jest tutaj rola userScope, dokladnie ta sama co "--user"
+  // w wywolaniu systemctl.
+  const std::string domain = userScope ? "gui/" + std::to_string(getuid()) : std::string("system");
+  return {"launchctl", "kickstart", "-k", domain + "/" + unit};
+#else
+  std::vector<std::string> retVal{"systemctl"};
+  if (userScope) retVal.emplace_back("--user");
+  retVal.emplace_back("restart");
+  retVal.push_back(unit);
+  return retVal;
+#endif
+}
 
-  return runner ? runner(argv) : execSystemctl(argv);
+int restartService(bool userScope, const std::string &unit, const SystemctlRunner &runner) {
+  const std::vector<std::string> argv = restartCommand(userScope, unit);
+  return runner ? runner(argv) : execServiceManager(argv);
 }
 
 bool deliverQueryFile(const std::string &source, const std::string &target) {

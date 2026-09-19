@@ -11,6 +11,7 @@
 #include <sstream>
 #include <string>
 
+#include "platformConfig.h"
 #include "uxSysTermTools.hpp"
 
 // --- fixArgcv tests ---
@@ -185,7 +186,11 @@ TEST_F(SetupLoggerMainTest, service_mode_emits_sd_daemon_priority_prefix) {
   close(savedStderr);
   close(captureFd);
 
+#if RDB_HAS_SYSTEMD
   EXPECT_EQ(result, "journald (stderr)");
+#else
+  EXPECT_EQ(result, "system log (stderr)");
+#endif
 
   std::ifstream in(captureFile);
   std::stringstream ss;
@@ -197,10 +202,22 @@ TEST_F(SetupLoggerMainTest, service_mode_emits_sd_daemon_priority_prefix) {
   // poziomie runtime (setupLoggerMain ustawia poziom = SPDLOG_ACTIVE_LEVEL), wiec
   // marker INFO w Release LEGALNIE nie powstaje. Prefiks INFO=><6> sprawdzamy tylko
   // gdy build przepuszcza INFO (Debug); prefiks ERROR=><3> obowiazuje zawsze.
+  //
+  // Prefiks "<N>" jest PROTOKOLEM sd-daemon i powstaje tylko tam, gdzie po drugiej
+  // stronie stoi journald. Bez systemd log uslugowy ma sam poziom i tresc - patrz
+  // setupLoggerMain - wiec asercja na prefiks bylaby tam asercja na smiec w logu.
+#if RDB_HAS_SYSTEMD
 #if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_INFO
   EXPECT_NE(out.find("<6>[I] idle marker"), std::string::npos);
 #endif
   EXPECT_NE(out.find("<3>[E] error marker"), std::string::npos);
+#else
+#if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_INFO
+  EXPECT_NE(out.find("[I] idle marker"), std::string::npos);
+#endif
+  EXPECT_NE(out.find("[E] error marker"), std::string::npos);
+  EXPECT_EQ(out.find('<'), std::string::npos) << "prefiks sd-daemon nie ma prawa powstac poza systemd";
+#endif
 
   fs::remove(captureFile);
 }

@@ -22,6 +22,34 @@ project(
   VERSION ${RDB_VERSION}
   LANGUAGES CXX)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# Watki sa potrzebne samym probom z PlatformChecks (pthread_mutexattr_setrobust,
+# pthread_attr_setschedparam): bez biblioteki watkow na linii linkowania probe
+# wyszlaby falszywie ujemna na Linuksie. Na Darwinie Threads::Threads jest
+# pusty, bo pthreads siedza w libSystem.
+find_package(Threads REQUIRED)
+
+# Wykrywanie mozliwosci platformy PROBAMI KOMPILACYJNYMI, nie nazwa systemu.
+# Wynik: zmienne RDB_HAS_* / RDB_OS_*, podstawiane do generated/platformConfig.h
+# przez src/CMakeLists.txt. Uzasadnienie doboru metody stoi w samym module.
+include(PlatformChecks)
+
+# Cel wdrozeniowy macOS. NIE jest tu ustawiany - decyduje o nim profil Conana
+# (os.version) albo, przy jego braku, wersja hosta - ale jest SPRAWDZANY.
+# std::print i std::println sa w libc++ Apple'a oznaczone dostepnoscia: dla celu
+# starszego niz macOS 14.4 kazde z ~150 wywolan w tym drzewie jest twardym
+# bledem kompilacji ("introduced in macOS 14.4"). Blad z tego miejsca mowi, co
+# zmienic; blad z libc++ mowi to samo sto piecdziesiat razy.
+if(APPLE
+   AND CMAKE_OSX_DEPLOYMENT_TARGET
+   AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS 14.4)
+  message(
+    FATAL_ERROR
+      "CMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET} jest za niski: std::print/std::println wymagaja macOS 14.4+. Ustaw os.version>=14.4 w profilu Conana albo -DCMAKE_OSX_DEPLOYMENT_TARGET=14.4."
+  )
+endif()
+
 set(CMAKE_SKIP_BUILD_RPATH FALSE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 
@@ -139,18 +167,56 @@ message(STATUS "RDB_BENCH_PROBE=${RDB_BENCH_PROBE}")
 # ograniczoną pamięcią (np. RPi) potrafi zgłaszać błędy alokacji przy
 # linkowaniu. RDB_USE_MOLD=OFF w env wymusza (FORCE) wyłączenie przy każdej
 # konfiguracji - działa też przez 'conan build', które nie pozwala wstrzyknąć -D
-# (patrz scripts/buildrdb.sh: opcje 'mold'/'nomold').
+# (patrz scripts/buildrdb.sh: opcje 'mold'/'nomold'). Domyslna wartosc zalezy od
+# systemu, bo mold linkuje WYLACZNIE ELF. Na Darwinie formatem wykonywalnym jest
+# Mach-O i -fuse-ld=mold odbija sie od ld64 bledem "invalid linker name", wiec
+# ON byloby tam gwarantowana awaria linkowania.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(RDB_MOLD_DEFAULT ON)
+else()
+  set(RDB_MOLD_DEFAULT OFF)
+endif()
 if(DEFINED ENV{RDB_USE_MOLD})
   set(RDB_USE_MOLD
       $ENV{RDB_USE_MOLD}
       CACHE BOOL "Use mold linker" FORCE)
 else()
-  option(RDB_USE_MOLD "Use mold linker" ON)
+  option(RDB_USE_MOLD "Use mold linker" ${RDB_MOLD_DEFAULT})
+endif()
+if(RDB_USE_MOLD AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(
+    STATUS
+      "RDB_USE_MOLD=ON pominiete: mold linkuje tylko ELF, a ten system uzywa innego formatu."
+  )
+  set(RDB_USE_MOLD OFF)
 endif()
 
-set(CMAKE_CXX_FLAGS "-std=c++23")
+# Standard jezyka przez wlasciwosc CMake, a nie przez PRZYPISANIE do
+# CMAKE_CXX_FLAGS. Przypisanie kasowalo wszystko, co wlozyl tam toolchain: na
+# Darwinie sa to -arch, -isysroot i -mmacosx-version-min, czyli flagi, bez
+# ktorych nie kompiluje sie ani jeden plik. CMAKE_CXX_EXTENSIONS=OFF utrzymuje
+# dotychczasowe -std=c++23 (a nie -std=gnu++23 z profilu Conana), wiec zbior
+# widocznych rozszerzen sie nie zmienia.
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 if(RDB_USE_MOLD)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fuse-ld=mold")
+  string(APPEND CMAKE_CXX_FLAGS " -fuse-ld=mold")
+endif()
+
+# Sanitizery: odpowiednik valgrinda tam, gdzie valgrinda nie ma (Apple Silicon).
+# Pusta wartosc = wylaczone, czyli dotychczasowe zachowanie na kazdej
+# platformie. Uzycie: scripts/buildrdb.sh debug -DRDB_SANITIZE=address,undefined
+set(RDB_SANITIZE
+    ""
+    CACHE
+      STRING
+      "Lista sanitizerow dla -fsanitize= (np. address,undefined). Pusta = bez sanitizerow."
+)
+if(RDB_SANITIZE)
+  message(STATUS "RDB_SANITIZE=${RDB_SANITIZE}")
+  add_compile_options(-fsanitize=${RDB_SANITIZE} -fno-omit-frame-pointer -g)
+  add_link_options(-fsanitize=${RDB_SANITIZE})
 endif()
 
 # ccache buforuje wyniki kompilacji, przyspieszając powtórne budowanie (np.
@@ -200,6 +266,48 @@ find_package(antlr4 CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
 find_package(tomlplusplus CONFIG REQUIRED)
 
+# Czym sa dla Boost.Interprocess "obiekty pamieci dzielonej" na TEJ platformie.
+#
+# Gdy biblioteka ma do dyspozycji obiekty POSIX-owe, segmenty i kolejki powstaja
+# przez shm_open i na Linuksie widac je jako pliki w /dev/shm. Gdy nie ma (macOS
+# deklaruje _POSIX_SHARED_MEMORY_OBJECTS jako wartosc UJEMNA, wiec Boost nawet
+# nie probuje), sa to ZWYKLE PLIKI w katalogu roboczym biblioteki pod /tmp.
+#
+# Rozstrzygamy to proba kompilacyjna na realnym makrze biblioteki, a nie nazwa
+# systemu: gdyby Boost kiedykolwiek zmienil te decyzje, sprawdzenie zauwazy to
+# przy pierwszej rekonfiguracji. Wynik trafia do shmEnv.sh, ktory czytaja
+# kontrole higieny IPC w testach integracyjnych
+# (test/IntegrationTest/portable.sh).
+get_target_property(_rdb_boost_includes boost::boost
+                    INTERFACE_INCLUDE_DIRECTORIES)
+if(NOT _rdb_boost_includes)
+  # Nazwa wlasciwosci zalezy od tego, jak generator Conana zlozyl cel. Gdy jej
+  # nie ma, zostaje zmienna z find_package; a gdy i tej nie ma, proba pojdzie
+  # bez dodatkowych katalogow i po prostu sie nie powiedzie - czyli wynik bedzie
+  # "zaloz warianty plikowy", a to jest bezpieczniejsza z dwoch odpowiedzi.
+  set(_rdb_boost_includes ${Boost_INCLUDE_DIRS})
+endif()
+set(CMAKE_REQUIRED_INCLUDES ${_rdb_boost_includes})
+check_cxx_source_compiles(
+  "#include <boost/interprocess/detail/workaround.hpp>
+   #if !defined(BOOST_INTERPROCESS_POSIX_SHARED_MEMORY_OBJECTS)
+   #error brak obiektow POSIX
+   #endif
+   int main() { return 0; }"
+  RDB_BOOST_POSIX_SHM)
+unset(CMAKE_REQUIRED_INCLUDES)
+if(RDB_BOOST_POSIX_SHM)
+  set(RDB_BOOST_POSIX_SHM_01 1)
+  set(RDB_SHM_DIR_HINT "/dev/shm")
+else()
+  set(RDB_BOOST_POSIX_SHM_01 0)
+  set(RDB_SHM_DIR_HINT "/tmp")
+endif()
+message(
+  STATUS
+    "RDB_BOOST_POSIX_SHM=${RDB_BOOST_POSIX_SHM_01} (obiekty IPC pod ${RDB_SHM_DIR_HINT})"
+)
+
 # Oznacz wszystkie importowane targety (Conan) jako systemowe - clang-tidy z
 # SystemHeaders:false pomija ich nagłówki (brak ostrzeżeń i notatek z .conan2/).
 get_property(
@@ -216,8 +324,26 @@ foreach(_target ${_imported_targets})
   endif()
 endforeach()
 
-find_program(PROG_VALGRIND valgrind REQUIRED)
-message(STATUS "Required tool: ${PROG_VALGRIND}")
+# Valgrind opakowuje KAZDY test jednostkowy (test/UnitTest/CMakeLists.txt), wiec
+# na Linuksie jego brak ma zatrzymac konfiguracje, a nie ujawnic sie dopiero
+# przy `ninja test` jako 51 razy "command not found". Poza Linuksem narzedzia
+# nie ma: dla Apple Silicon port valgrinda nie istnieje. REQUIRED zatrzymywaloby
+# tam konfiguracje, zanim cokolwiek zdazyloby sie skompilowac, wiec rola strazy
+# pamieci przechodzi na sanitizery (RDB_SANITIZE), a ctest uruchamia binaria
+# wprost.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  find_program(PROG_VALGRIND valgrind REQUIRED)
+else()
+  find_program(PROG_VALGRIND valgrind)
+endif()
+if(PROG_VALGRIND)
+  message(STATUS "Memory checker: ${PROG_VALGRIND}")
+else()
+  message(
+    STATUS
+      "Memory checker: brak - testy jednostkowe biegna bez opakowania (rownowaznik: -DRDB_SANITIZE=address,undefined)"
+  )
+endif()
 
 if(DEFINED antlr4_PACKAGE_FOLDER_DEBUG)
   set(antlr4Path ${antlr4_PACKAGE_FOLDER_DEBUG})
@@ -332,7 +458,14 @@ add_dependencies(test-api xretractor xqry test_api_client)
 
 include(InstallRequiredSystemLibraries)
 
-set(CPACK_GENERATOR "DEB;TGZ")
+# Generatory pakietow zaleza od systemu. .deb ma sens wylacznie tam, gdzie
+# istnieje dpkg i systemd; poza Linuksem zostaje przenosne archiwum, ktore
+# rozpakowuje sie w prefiksie i nie udaje pakietu systemowego.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(CPACK_GENERATOR "DEB;TGZ")
+else()
+  set(CPACK_GENERATOR "TGZ")
+endif()
 # Pakiet ZRODLOWY jest wylaczony. Nie bylo dla niego odbiorcy, a jego zawartosc
 # byla nieprawdziwa: wpisy CPACK_SOURCE_IGNORE_FILES to regexy na pelnej
 # sciezce, wiec `/lib/` wycinalo `src/rdb/lib/` i `src/retractor/lib/` - 84
@@ -356,18 +489,30 @@ set(CPACK_SOURCE_ZIP OFF)
 # Prefiks /usr dla pakietow BINARNYCH (DEB i TGZ): binaria -> /usr/bin,
 # jednostka systemd -> /usr/lib/systemd/system (sciezka rozpoznawana przez
 # systemd). TGZ rozpakowany w / daje te same sciezki.
-set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
+else()
+  # Poza Linuksem /usr jest zarezerwowane dla systemu (na macOS chroni je SIP),
+  # a konwencja dla oprogramowania spoza dystrybucji to /usr/local.
+  set(CPACK_PACKAGING_INSTALL_PREFIX "/usr/local")
+endif()
 
 # Jednostka systemd dla xretractor: ExecStart wskazuje realną ścieżkę binarium w
 # pakiecie (prefiks + bindir). Generowana z szablonu .in.
+#
+# Wylacznie na Linuksie. Jednostka .service jest formatem systemd i poza nim nie
+# ma odbiorcy: macOS uruchamia uslugi przez launchd (plist w LaunchDaemons), a
+# wstawienie pliku do <prefiks>/lib/systemd/system byloby smieciem w pakiecie.
 set(RETRACTOR_BIN "${CPACK_PACKAGING_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}")
-configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/packaging/systemd/xretractor.service.in
-  ${CMAKE_BINARY_DIR}/xretractor.service @ONLY)
-install(
-  FILES ${CMAKE_BINARY_DIR}/xretractor.service
-  DESTINATION lib/systemd/system
-  COMPONENT service)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/packaging/systemd/xretractor.service.in
+    ${CMAKE_BINARY_DIR}/xretractor.service @ONLY)
+  install(
+    FILES ${CMAKE_BINARY_DIR}/xretractor.service
+    DESTINATION lib/systemd/system
+    COMPONENT service)
+endif()
 install(
   FILES ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE
   DESTINATION share/doc/retractordb
@@ -398,11 +543,13 @@ install(
 # bez natychmiastowego startu). postinst generowany z .in (podstawienie
 # @RETRACTOR_QUERY_FILE@), by ścieżka pliku zapytań pochodziła z tego samego
 # źródła co ExecStart jednostki.
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postinst.in
-               ${CMAKE_BINARY_DIR}/debian/postinst @ONLY)
-set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
-    "${CMAKE_BINARY_DIR}/debian/postinst;${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postrm"
-)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postinst.in
+                 ${CMAKE_BINARY_DIR}/debian/postinst @ONLY)
+  set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+      "${CMAKE_BINARY_DIR}/debian/postinst;${CMAKE_CURRENT_SOURCE_DIR}/packaging/debian/postrm"
+  )
+endif()
 
 # Komponenty pakietu: 'portable' zawiera trzy binaria, a 'service' jednostke
 # systemd i pliki .example oznaczone EXCLUDE_FROM_ALL. Pliki EXCLUDE_FROM_ALL
@@ -413,7 +560,13 @@ set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEB_COMPONENT_INSTALL ON)
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)
-set(CPACK_COMPONENTS_ALL portable service)
+# Komponent 'service' niesie jednostke systemd i pliki .example dla /etc - obie
+# rzeczy istnieja tylko na Linuksie, wiec poza nim pakiet ma sam 'portable'.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(CPACK_COMPONENTS_ALL portable service)
+else()
+  set(CPACK_COMPONENTS_ALL portable)
+endif()
 # Komponent 'api' dopisywany tylko przy -DRDB_WITH_API=ON. Cpack ustala
 # zawartosc pakietu na etapie konfiguracji, wiec tego jednego wejscia nie da sie
 # zastapic celem ninja - bez tej flagi API nigdy nie trafia do .deb/.tar.gz.
@@ -434,6 +587,10 @@ set(CPACK_PACKAGE_FILE_NAME
 
 include(CPack) # include after setting variables above to take effect
 
+# Znacznik systemu w nazwie paczki przenosnej. Wczesniej wpisany na sztywno jako
+# "linux", co na innym systemie dawaloby archiwum Mach-O z nazwa obiecujaca ELF.
+string(TOLOWER "${CMAKE_SYSTEM_NAME}" RDB_PACKAGE_OS_TAG)
+
 # Archiwum CLI mozna instalowac w ~/.local albo /usr/local. Zawiera trzy
 # programy w bin/ bez sciezek systemd. CPack pakuje binaria z tej konfiguracji;
 # dla AArch64 trzeba najpierw zbudowac osobna konfiguracje.
@@ -442,7 +599,7 @@ add_custom_target(
   COMMAND
     ${CMAKE_CPACK_COMMAND} -G TGZ --config ${CMAKE_BINARY_DIR}/CPackConfig.cmake
     -D CPACK_COMPONENTS_ALL=portable -D CPACK_PACKAGING_INSTALL_PREFIX=/ -D
-    CPACK_PACKAGE_FILE_NAME=retractordb-${CPACK_PACKAGE_VERSION}-linux-${CMAKE_SYSTEM_PROCESSOR}-portable
+    CPACK_PACKAGE_FILE_NAME=retractordb-${CPACK_PACKAGE_VERSION}-${RDB_PACKAGE_OS_TAG}-${CMAKE_SYSTEM_PROCESSOR}-portable
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
   DEPENDS xretractor xqry xtrdb)
 

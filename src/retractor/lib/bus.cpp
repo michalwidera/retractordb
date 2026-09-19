@@ -8,10 +8,8 @@
 #include <cerrno>
 #include <chrono>
 #include <cstring>
-#include <fstream>
 #include <optional>
 #include <span>
-#include <sstream>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -20,6 +18,8 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
 
+#include "osPlatform.hpp"
+#include "platformConfig.h"
 #include "serverName.hpp"
 
 namespace IPC = boost::interprocess;
@@ -51,8 +51,22 @@ constexpr std::chrono::milliseconds kInitPollInterval{1};
 // Ile razy czytelnik ponawia migawke slotu, zanim uzna go za nieczytelny. Zapis slotu trwa
 // jeden memcpy, wiec kilka prob wystarcza; limit istnieje po to, by odczyt nie mogl zawisnac
 // nad slotem instancji, ktora zginela w polowie zapisu.
-constexpr int kSnapshotRetries        = 8;
-constexpr int kProcStatStartTimeField = 22;
+constexpr int kSnapshotRetries = 8;
+
+#if !RDB_HAS_ROBUST_MUTEX
+/// Jak dlugo czekac miedzy probami przejecia zamka magistrali. Zamek jest trzymany
+/// przez jedno memcpy slotu, wiec kazda dodatnia wartosc jest tu duzo wiecej niz trzeba.
+constexpr std::chrono::microseconds kLockPollInterval{200};
+
+/// Po tym czasie zamek uznaje sie za porzucony NAWET wtedy, gdy jego wlasciciel
+/// wyglada na zywego. To jest wylacznie siatka bezpieczenstwa pod jeden przypadek:
+/// znacznik startu procesu jest w bilecie zamka obciety do 32 bitow, wiec teoretycznie
+/// dwie inkarnacje tego samego PID-u moga miec rowne mlodsze 32 bity i smierc
+/// wlasciciela zostalaby przeoczona. Prawdziwe trzymanie zamka to mikrosekundy, wiec
+/// ten prog nie ma prawa zadzialac na sprawnym systemie - a gdy zadzial, zapisuje sie
+/// bledem, bo znaczy, ze stalo sie cos, czego ten kod nie przewiduje.
+constexpr std::chrono::seconds kAbandonedLockLimit{10};
+#endif
 
 /// Slot jednej instancji. Wylacznie POD -- patrz komentarz naglowka.
 struct Slot {
@@ -78,6 +92,31 @@ struct Slot {
   // NOLINTEND(modernize-avoid-c-arrays)
 };
 
+#if RDB_HAS_ROBUST_MUTEX
+/// Zamek magistrali tam, gdzie jadro potrafi zglosic smierc wlasciciela:
+/// pthread_mutex_t z atrybutami pshared + robust.
+using BusMutex = pthread_mutex_t;
+#else
+/// Zamek magistrali dla platform BEZ PTHREAD_MUTEX_ROBUST -- m.in. Darwina, gdzie
+/// pthread nie ma ani atrybutu robust, ani pthread_mutex_consistent.
+///
+/// Dlaczego nie zwykly pshared pthread_mutex_t: dzialalby, ale po smierci wlasciciela
+/// zostawalby zablokowany na zawsze, a naprawianie go przez ponowne pthread_mutex_init
+/// na cudzym, nieznanym stanie nie jest niczym zdefiniowanym. Zamiast tego caly stan
+/// zamka siedzi w JEDNYM slowie 64-bitowym, ktore wolno czytac i podmieniac atomowo,
+/// wiec przejecie po martwym wlascicielu jest zwyklym compare_exchange, a nie naprawa.
+///
+/// Uklad slowa: starsze 32 bity to PID wlasciciela, mlodsze 32 to mlodsze bity jego
+/// znacznika startu. Oba pola w JEDNYM slowie, a nie obok siebie, i to jest istota
+/// rzeczy: gdyby znacznik lezal osobno, istnialoby okno miedzy opublikowaniem PID-u
+/// a zapisaniem znacznika, w ktorym inny proces porownywalby zywy PID ze znacznikiem
+/// POPRZEDNIKA, uznal wlasciciela za martwego i przejal zamek trzymany naprawde.
+/// Zero znaczy "wolny".
+struct BusMutex {
+  std::uint64_t owner;
+};
+#endif
+
 struct Segment {
   std::uint64_t magic;
   std::uint32_t layoutVersion;
@@ -87,7 +126,7 @@ struct Segment {
   // przeoczyc przy bumpie wersji. Bez niego segment o starym ukladzie czytalby sie jako smiec.
   std::uint32_t slotSize;
   std::uint32_t reserved;  // wyrownanie muteksu do 8 bajtow
-  pthread_mutex_t mutex;   ///< robust + pshared; NIE boost::named_mutex -- patrz nizej
+  BusMutex mutex;          ///< odporny na smierc wlasciciela; NIE boost::named_mutex -- patrz nizej
   // NOLINTNEXTLINE(modernize-avoid-c-arrays): ustalony binarny format pamięci współdzielonej
   Slot slots[kMaxSlots];
 };
@@ -202,34 +241,6 @@ bool collidesWithCounter(const Slot &slot, std::string_view counterPath) {
   return slot.reservationActive != 0 && loadString(slot.reservedCounterPath, kCounterPathSize) == counterPath;
 }
 
-/// Jeden odczyt /proc/<pid>/stat: stan procesu (pole 3) i czas startu (pole 22). Oba pola
-/// pochodza z tej samej linii, wiec sprawdzenie stanu nie kosztuje ani jednego dodatkowego
-/// wywolania systemowego -- token pola 3 i tak przechodzil przez petle szukajaca pola 22.
-///
-/// Pole 2 (comm) jest w nawiasach i moze zawierac spacje oraz nawiasy, wiec parsowanie
-/// zaczyna sie od OSTATNIEGO ')' w linii. Za nim stoi pole 3 (state), a starttime jest
-/// polem 22 -- czyli dziewietnastym tokenem za stanem.
-bool readProcStat(std::int32_t pid, std::uint64_t &startTime, char &state) {
-  std::ifstream stat("/proc/" + std::to_string(pid) + "/stat");
-  if (!stat.is_open()) return false;
-
-  std::string line;
-  if (!std::getline(stat, line)) return false;
-
-  const auto lastParen = line.rfind(')');
-  if (lastParen == std::string::npos) return false;
-
-  std::istringstream fields(line.substr(lastParen + 1));
-  std::string token;
-  state = '\0';
-  for (int index = 3; index < kProcStatStartTimeField; ++index) {
-    if (!(fields >> token)) return false;
-    if (index == 3 && !token.empty()) state = token.front();
-  }
-
-  return static_cast<bool>(fields >> startTime);
-}
-
 void clearSlot(Slot &slot) {
   beginWrite(slot);
   slot.pid                    = 0;
@@ -272,12 +283,7 @@ StoreDigest storeDigest(const std::string_view path) {
   return StoreDigest{.high = fnv1a(path, fnv1a("rdb-store", basis)), .low = fnv1a(path, basis)};
 }
 
-std::uint64_t processStartTime(std::int32_t pid) {
-  std::uint64_t startTime{0};
-  char state{'\0'};
-  if (!readProcStat(pid, startTime, state)) return 0;
-  return startTime;
-}
+std::uint64_t processStartTime(std::int32_t pid) { return osplat::inspectProcess(pid).startTime; }
 
 std::string segmentName() {
   const std::string runNamespace = servername::environmentNamespace();
@@ -294,23 +300,22 @@ std::size_t segmentBytes() { return sizeof(Segment); }
 bool isProcessAlive(std::int32_t pid, std::uint64_t startTime) {
   if (pid <= 0) return false;
 
-  std::uint64_t current{0};
-  char state{'\0'};
-  if (!readProcStat(pid, current, state)) return false;
+  const osplat::ProcessSnapshot snapshot = osplat::inspectProcess(pid);
+  if (!snapshot.found) return false;
 
-  // Zombie (stan 'Z') to proces JUZ ZAKONCZONY: zwolnil pamiec, deskryptory i odwzorowania
-  // /dev/shm, nie przetwarza i nie moze wznowic pracy -- zostal po nim wylacznie wpis
-  // w tablicy procesow, czekajacy na wait() rodzica. Slot takiego serwera jest wiec martwy
-  // i ma zostac sprzatniety przez pierwsze roszczenie, ktore go zobaczy. Bez tego warunku
-  // /proc/<pid>/stat istnieje razem z niezmienionym starttime, wiec zombie trzymalby swoje
-  // nazwy strumieni az do chwili, gdy rodzic go zbierze (sprawdzone eksperymentem).
+  // Zombie to proces JUZ ZAKONCZONY: zwolnil pamiec, deskryptory i odwzorowania obiektow
+  // IPC, nie przetwarza i nie moze wznowic pracy -- zostal po nim wylacznie wpis w tablicy
+  // procesow, czekajacy na wait() rodzica. Slot takiego serwera jest wiec martwy i ma
+  // zostac sprzatniety przez pierwsze roszczenie, ktore go zobaczy. Bez tego warunku wpis
+  // istnieje razem z niezmienionym znacznikiem startu, wiec zombie trzymalby swoje nazwy
+  // strumieni az do chwili, gdy rodzic go zbierze (sprawdzone eksperymentem).
   //
-  // Odrzucamy WYLACZNIE 'Z'. Stan 'T' (zatrzymany SIGSTOP-em) i 'D' (nieprzerywalny sen)
-  // to procesy zywe, ktore wznawiaja prace -- uznanie ich za martwe wpuscilo by druga
-  // instancje na te same nazwy strumieni, czyli na ten sam <qryID>.desc.
-  if (state == 'Z') return false;
+  // Odrzucany jest WYLACZNIE stan zombie. Proces zatrzymany sygnalem i proces w
+  // nieprzerywalnym snie sa zywe i wznawiaja prace -- uznanie ich za martwe wpuscilo by
+  // druga instancje na te same nazwy strumieni, czyli na ten sam <qryID>.desc.
+  if (snapshot.zombie) return false;
 
-  return current != 0 && current == startTime;
+  return snapshot.startTime != 0 && snapshot.startTime == startTime;
 }
 
 std::optional<StreamOwner> findForeignOwner(const std::vector<InstanceInfo> &instances, std::string_view selfName,
@@ -354,15 +359,24 @@ struct Bus::Impl {
   Segment *segment{nullptr};
   int slotIndex{-1};
 
-  /// Bierze muteks magistrali, obslugujac smierc poprzedniego wlasciciela.
+  /// Wynik proby zajecia zamka. `ownerDied` znaczy, ze poprzedni wlasciciel zginal
+  /// trzymajac zamek -- wtedy, i tylko wtedy, trzeba naprawic niezmiennik slotow.
+  struct LockOutcome {
+    bool ok{false};
+    bool ownerDied{false};
+  };
+
+  /// Bierze zamek magistrali, obslugujac smierc poprzedniego wlasciciela.
   ///
-  /// Boost NIE udostepnia atrybutu robust (named_mutex nie jest robust, wiec proces
-  /// zabity z muteksem w reku zawiesilby wszystkie pozostale). Stad surowy pthread_mutex_t
-  /// w segmencie: przy EOWNERDEAD stan da sie naprawic.
-  [[nodiscard]] bool lock() const {
-    int rc = pthread_mutex_lock(&segment->mutex);
-    if (rc == EOWNERDEAD) {
-      // Poprzedni wlasciciel zginal trzymajac muteks. Trzymanie muteksu jest tu dowodem,
+  /// Boost NIE udostepnia zamka odpornego na smierc wlasciciela (named_mutex nie jest
+  /// robust, wiec proces zabity z muteksem w reku zawiesilby wszystkie pozostale). Stad
+  /// wlasny zamek w segmencie -- pthread_mutex_t z atrybutem robust tam, gdzie jadro go
+  /// ma, i slowo atomowe z biletem wlasciciela tam, gdzie nie ma (patrz BusMutex).
+  [[nodiscard]] bool lock() {
+    const LockOutcome outcome = acquire();
+    if (!outcome.ok) return false;
+    if (outcome.ownerDied) {
+      // Poprzedni wlasciciel zginal trzymajac zamek. Trzymanie zamka jest tu dowodem,
       // ze zadna ZYWA instancja nie jest w trakcie zapisu slotu, wiec slot o nieparzystym
       // seq to slot przerwany w polowie -- jego tresc jest smieciem i musi zniknac.
       for (std::uint32_t i = 0; i < segment->slotCount; ++i) {
@@ -372,14 +386,108 @@ struct Bus::Impl {
         SPDLOG_WARN("xrdbbus: slot {} interrupted mid-write by a dead owner, invalidating.", i);
         std::memset(&slot, 0, sizeof(Slot));
       }
-      pthread_mutex_consistent(&segment->mutex);
-      rc = 0;
+      markConsistent();
     }
-    if (rc != 0) SPDLOG_ERROR("xrdbbus: cannot lock bus mutex, rc={} ({})", rc, std::strerror(rc));
-    return rc == 0;
+    return true;
   }
 
+#if RDB_HAS_ROBUST_MUTEX
+
+  [[nodiscard]] LockOutcome acquire() const {
+    const int rc = pthread_mutex_lock(&segment->mutex);
+    if (rc == EOWNERDEAD) return {.ok = true, .ownerDied = true};
+    if (rc != 0) {
+      SPDLOG_ERROR("xrdbbus: cannot lock bus mutex, rc={} ({})", rc, std::strerror(rc));
+      return {};
+    }
+    return {.ok = true, .ownerDied = false};
+  }
+
+  /// Wolane PO naprawie slotow: dopiero wtedy stan chroniony zamkiem jest spojny,
+  /// wiec dopiero wtedy wolno to oglosic jadru.
+  void markConsistent() const { pthread_mutex_consistent(&segment->mutex); }
+
   void unlock() const { pthread_mutex_unlock(&segment->mutex); }
+
+#else
+
+  /// Bilet wlasciciela: PID w starszych 32 bitach, mlodsze 32 bity znacznika startu
+  /// w mlodszych. Zero jest zarezerwowane dla stanu "wolny", wiec bilet nigdy nie
+  /// moze wyjsc zerowy -- PID zawsze jest dodatni, wiec i nie wychodzi.
+  [[nodiscard]] static std::uint64_t ticketFor(std::int32_t pid, std::uint64_t startTime) {
+    return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(pid)) << 32) | static_cast<std::uint32_t>(startTime);
+  }
+
+  /// Bilet TEGO procesu, ustalany raz. Odczyt wpisu procesu kosztuje wywolanie jadra,
+  /// a odpowiedz na pytanie "kim jestem" nie zmienia sie przez cale zycie procesu.
+  [[nodiscard]] static std::uint64_t selfTicket() {
+    static const std::uint64_t retVal = [] {
+      const auto self = static_cast<std::int32_t>(getpid());
+      return ticketFor(self, osplat::inspectProcess(self).startTime);
+    }();
+    return retVal;
+  }
+
+  [[nodiscard]] LockOutcome acquire() {
+    std::atomic_ref<std::uint64_t> owner(segment->mutex.owner);
+    const std::uint64_t mine = selfTicket();
+    const auto deadline      = std::chrono::steady_clock::now() + kAbandonedLockLimit;
+
+    for (;;) {
+      std::uint64_t current = owner.load(std::memory_order_acquire);
+
+      if (current == 0) {
+        if (owner.compare_exchange_weak(current, mine, std::memory_order_acq_rel, std::memory_order_acquire)) {
+          heldTicket = mine;
+          return {.ok = true, .ownerDied = false};
+        }
+        continue;  // ktos byl szybszy; czytamy stan na nowo
+      }
+
+      const auto holderPid                 = static_cast<std::int32_t>(current >> 32);
+      const std::uint32_t holderStart      = static_cast<std::uint32_t>(current);
+      const osplat::ProcessSnapshot holder = osplat::inspectProcess(holderPid);
+
+      // Znacznik rowny zeru znaczy "nie udalo sie go ustalic przy zajmowaniu zamka".
+      // Rozstrzyga wtedy sama obecnosc procesu -- gorzej, bo nie odroznia inkarnacji
+      // PID-u, ale nadal poprawnie odrzuca wlasciciela, po ktorym nie ma sladu.
+      const bool holderDead =
+          !holder.found || holder.zombie || (holderStart != 0 && static_cast<std::uint32_t>(holder.startTime) != holderStart);
+      const bool abandoned = std::chrono::steady_clock::now() > deadline;
+
+      if (holderDead || abandoned) {
+        if (abandoned && !holderDead)
+          SPDLOG_ERROR("xrdbbus: bus lock held by live pid {} for over {} s; taking it over.", holderPid,
+                       kAbandonedLockLimit.count());
+        if (owner.compare_exchange_strong(current, mine, std::memory_order_acq_rel, std::memory_order_acquire)) {
+          heldTicket = mine;
+          return {.ok = true, .ownerDied = true};
+        }
+        continue;  // przejal go kto inny; zaczynamy od nowa
+      }
+
+      std::this_thread::sleep_for(kLockPollInterval);
+    }
+  }
+
+  /// Na tej platformie nie ma czego oglaszac jadru: zajecie zamka po martwym
+  /// wlascicielu jest zwyklym compare_exchange, a nie stanem do zatwierdzenia.
+  void markConsistent() const {}
+
+  void unlock() {
+    std::atomic_ref<std::uint64_t> owner(segment->mutex.owner);
+    std::uint64_t mine = heldTicket;
+    // Zwalniamy PRZEZ PODMIANE swojego biletu, nie przez zwykly zapis zera. Gdyby
+    // ten proces zostal uznany za martwy i zamek przejeto by w miedzyczasie, zapis
+    // zera zdjalby zamek KOMUS INNEMU w srodku jego pracy.
+    if (!owner.compare_exchange_strong(mine, 0, std::memory_order_acq_rel, std::memory_order_relaxed))
+      SPDLOG_WARN("xrdbbus: bus lock was taken over while held by this instance; not releasing it.");
+    heldTicket = 0;
+  }
+
+  std::uint64_t heldTicket{0};  ///< bilet, z ktorym ten proces trzyma zamek; 0 = nie trzyma
+
+#endif
 };
 
 Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_unique<Impl>()) {
@@ -448,14 +556,22 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
     impl->segment->slotCount     = kMaxSlots;
     impl->segment->slotSize      = static_cast<std::uint32_t>(sizeof(Slot));
 
+#if RDB_HAS_ROBUST_MUTEX
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
     pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST);
     const int rc = pthread_mutex_init(&impl->segment->mutex, &attr);
     pthread_mutexattr_destroy(&attr);
+#else
+    // Zamek atomowy nie ma czego inicjowac poza stanem "wolny", a ten przyszedl juz
+    // z memset powyzej. Zostaje to zapisane jawnie, zeby kolejnosc "zeruj segment,
+    // potem opublikuj magic" byla widoczna takze na tej galezi.
+    impl->segment->mutex.owner = 0;
+    const int rc               = 0;
+#endif
     if (rc != 0) {
-      SPDLOG_ERROR("xrdbbus: cannot initialize robust mutex, rc={} ({})", rc, std::strerror(rc));
+      SPDLOG_ERROR("xrdbbus: cannot initialize bus lock, rc={} ({})", rc, std::strerror(rc));
       impl->segment = nullptr;
       impl->region.reset();
       impl->shm.reset();

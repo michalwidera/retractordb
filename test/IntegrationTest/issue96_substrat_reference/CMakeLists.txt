@@ -15,10 +15,7 @@ add_test(
 add_test(
   NAME ${TestID}-vg-compile
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND
-    valgrind --vgdb=no --error-exitcode=1 --leak-check=full
-    --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xretractor
-    queryWithSubstrats.rql -c)
+  COMMAND ${IT_VALGRIND} xretractor queryWithSubstrats.rql -c)
 
 if(NOT RDB_OPT_DEDUP_SUBSTRATES)
   set_tests_properties(

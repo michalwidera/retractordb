@@ -10,10 +10,12 @@
 
 #include <gtest/gtest.h>
 
+#include "platformConfig.h"
 #include "retractor/lib/lockManager.hpp"
 #include "retractor/lib/serviceControl.hpp"
 
 using servicecontrol::deliverQueryFile;
+using servicecontrol::restartCommand;
 using servicecontrol::restartService;
 
 namespace {
@@ -136,8 +138,21 @@ TEST(ServiceControlRestart, builds_system_scope_argv) {
   });
 
   EXPECT_EQ(rc, 0);
+  // Program i skladnia zaleza od menedzera uslug systemu, wiec oczekiwanie bierzemy
+  // z restartCommand - jedynego miejsca, w ktorym ta roznica jest zapisana. Test
+  // pilnuje tego, co go naprawde dotyczy: ze restartService NIE ZMIENIA polecenia
+  // po drodze i podaje je runnerowi w calosci.
+  EXPECT_EQ(captured, restartCommand(/*userScope=*/false, "xretractor.service"));
+#if RDB_HAS_SYSTEMD
   const std::vector<std::string> expected{"systemctl", "restart", "xretractor.service"};
   EXPECT_EQ(captured, expected);
+#elif RDB_HAS_LAUNCHD
+  ASSERT_GE(captured.size(), 4U);
+  EXPECT_EQ(captured[0], "launchctl");
+  EXPECT_EQ(captured[1], "kickstart");
+  EXPECT_EQ(captured[2], "-k");
+  EXPECT_EQ(captured[3], "system/xretractor.service");
+#endif
 }
 
 TEST(ServiceControlRestart, builds_user_scope_argv) {
@@ -147,8 +162,17 @@ TEST(ServiceControlRestart, builds_user_scope_argv) {
     return 0;
   });
 
+  EXPECT_EQ(captured, restartCommand(/*userScope=*/true, "xretractor.service"));
+#if RDB_HAS_SYSTEMD
   const std::vector<std::string> expected{"systemctl", "--user", "restart", "xretractor.service"};
   EXPECT_EQ(captured, expected);
+#elif RDB_HAS_LAUNCHD
+  // Zakres uzytkownika to u launchd INNA DOMENA, a nie dodatkowy przelacznik.
+  ASSERT_GE(captured.size(), 4U);
+  EXPECT_EQ(captured[0], "launchctl");
+  EXPECT_TRUE(captured[3].starts_with("gui/")) << "polecenie nie trafia w domene uzytkownika: " << captured[3];
+  EXPECT_TRUE(captured[3].ends_with("/xretractor.service"));
+#endif
 }
 
 TEST(ServiceControlRestart, propagates_runner_exit_code) {

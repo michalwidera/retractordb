@@ -25,7 +25,7 @@ namespace IPC = boost::interprocess;
 // nie moze byc kasowana ani zasmiecana przez przebieg testu.
 constexpr const char *kTestSegment = "xrdbbus_ut";
 
-// Kazdy test zaczyna i konczy sie bez sladu po sobie w /dev/shm, niezaleznie od wyniku.
+// Kazdy test zaczyna i konczy sie bez sladu po sobie w magazynie obiektow IPC, niezaleznie od wyniku.
 class BusFixture : public ::testing::Test {
  protected:
   void SetUp() override { IPC::shared_memory_object::remove(kTestSegment); }
@@ -304,10 +304,10 @@ TEST_F(BusFixture, ClaimAdditionalRespectsSlotCapacity) {
   EXPECT_EQ(refused.stream, tooLong);
 }
 
-// Serwer zabity, ale niezebrany przez rodzica, zostaje procesem zombie: /proc/<pid>/stat
-// istnieje nadal, razem z niezmienionym starttime. Bez sprawdzenia stanu taki slot
-// trzymalby swoje nazwy strumieni az do wait() rodzica -- czyli dowolnie dlugo, bo to
-// rodzic decyduje, kiedy zbierze potomka.
+// Serwer zabity, ale niezebrany przez rodzica, zostaje procesem zombie: jego wpis
+// w tablicy procesow istnieje nadal, razem z niezmienionym znacznikiem startu. Bez
+// sprawdzenia stanu taki slot trzymalby swoje nazwy strumieni az do wait() rodzica --
+// czyli dowolnie dlugo, bo to rodzic decyduje, kiedy zbierze potomka.
 TEST_F(BusFixture, ZombieSlotIsFreeAgain) {
   bus::Bus parent(kTestSegment);
   ASSERT_TRUE(parent.attached());

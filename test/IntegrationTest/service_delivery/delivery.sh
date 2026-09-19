@@ -30,6 +30,7 @@
 # IT_NO_NAMESPACE w CMakeLists.txt i RUN_SERIAL. Z tego samego powodu nie korzysta
 # z ../serverlib.sh: tamta oprawa pilnuje jednej instancji na sciezce blokady przestrzeni nazw.
 set -e
+. "$(dirname "$0")/../portable.sh"
 
 LOCK_DIR="${TMPDIR:-/tmp}"
 SERVICE_LOCK="$LOCK_DIR/xretractor_service.service.lock"
@@ -66,14 +67,22 @@ cleanup() {
   rm -f "$SERVICE_LOCK" "$OTHER_LOCK" "$FOO_LOCK"
   if [ -n "$auto_name" ]; then rm -f "$LOCK_DIR/xretractor_service.$auto_name.lock"; fi
 
-  if ls /dev/shm/*.service /dev/shm/*.other /dev/shm/*.foo >/dev/null 2>&1; then
-    echo "higiena: zostaly obiekty IPC w /dev/shm:"
-    ls /dev/shm | grep -E '\.(service|other|foo)$' || true
-    status=1
-  fi
-  if [ -n "$auto_name" ] && ls /dev/shm/*."$auto_name" >/dev/null 2>&1; then
-    echo "higiena: zostaly obiekty IPC instancji $auto_name"
-    status=1
+  # shm_list konczy sie kodem 2, gdy katalogu obiektow IPC nie da sie ustalic - kontrola
+  # jest wtedy jawnie POMINIETA, a nie uznana za zdana.
+  local leftovers shm_status=0
+  leftovers=$(shm_list '\.(service|other|foo)$') || shm_status=$?
+  if [ "$shm_status" -ne 0 ]; then
+    echo "POMINIETO: higiena IPC niesprawdzalna na tej platformie"
+  else
+    if [ -n "$leftovers" ]; then
+      echo "higiena: zostaly obiekty IPC:"
+      echo "$leftovers"
+      status=1
+    fi
+    if [ -n "$auto_name" ] && [ -n "$(shm_list "\.${auto_name}\$")" ]; then
+      echo "higiena: zostaly obiekty IPC instancji $auto_name"
+      status=1
+    fi
   fi
   exit "$status"
 }
@@ -93,8 +102,14 @@ wait_for_lock() {
 
 rm -rf ./temp && mkdir -p ./temp
 mkdir -p fakebin
+# Namiastka pod OBIEMA nazwami: silnik wola menedzera uslug wlasciwego dla systemu
+# (systemctl pod systemd, launchctl pod launchd - patrz servicecontrol::restartCommand).
+# Bez tej drugiej nazwy na macOS wolany byl PRAWDZIWY launchctl, ktory odpowiadal
+# "Could not find service ... in domain for user gui" i test padal na tym, czego
+# wcale nie badal.
 cp fake_systemctl.sh fakebin/systemctl
-chmod +x fakebin/systemctl
+cp fake_systemctl.sh fakebin/launchctl
+chmod +x fakebin/systemctl fakebin/launchctl
 
 # Instancja obca startuje PRZED usluga. Odwrotna kolejnosc jest niewykonalna: przy zywej
 # usludze kazde `xretractor <plan>` jest dostarczeniem planu, a nie startem drugiej instancji.

@@ -11,8 +11,10 @@ set -e
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 GUARD="$HERE/harness_command_integrity.py"
+# Warstwa przenosnosci powloki; kopia test/ zachowuje ten uklad katalogow.
+. "$HERE/IntegrationTest/portable.sh"
 
-work=$(mktemp -d)
+work=$(make_temp_dir)
 trap 'rm -rf "$work"' EXIT
 cp "$HERE/harness_guard_sample.txt" "$work/CTestTestfile.cmake"
 

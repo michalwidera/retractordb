@@ -1,5 +1,6 @@
 #include "cmdMeta.hpp"
 
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <print>

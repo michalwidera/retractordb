@@ -13,6 +13,7 @@
 # Dlugosc przebiegu nie jest czescia twierdzenia: liczba rekordow zalezy od budzetu
 # -m, wiec kazdy strumien porownujemy z prefiksem jego wzorca o dlugosci faktycznej.
 set -e
+. "$(dirname "$0")/../portable.sh"
 rm -f ./*.meta ./*.desc ./*.shadow c a2 b2
 # Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
 # wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten sam.
@@ -21,7 +22,7 @@ rm -f ./*.meta ./*.desc ./*.shadow c a2 b2
 xretractor query.rql -r -k -m 48 -f
 
 dump() { od -An -v -tu4 "$1" | xargs; }
-records() { echo $(($(stat -c %s "$1") / 4)); }
+records() { record_count "$1" 4; }
 
 # Prefiks wzorca o dlugosci n rekordow.
 head_n() { echo "$1" | tr ' ' '\n' | head -n "$2" | xargs; }
