@@ -53,9 +53,9 @@ int resolveFieldIndexOrAbort(const Descriptor &descriptor, const int positionFla
     SPDLOG_ERROR("{} out of descriptor req:{} available len: {}", context, positionFlat, flatCount);
     if (std::string_view(context) == "Read") {
 #if RDB_HAS_ADDR2LINE
-      std::cerr << "Collecting stack trace (addr2line) - this may take more than 60 s, the process is not hung." << std::endl;
+      std::cerr << "Collecting stack trace (addr2line) - this may take more than 60 s, the process is not hung." << '\n';
 #else
-      std::cerr << "Collecting stack trace." << std::endl;
+      std::cerr << "Collecting stack trace." << '\n';
 #endif
       std::stringstream message;
       message << boost::stacktrace::stacktrace();

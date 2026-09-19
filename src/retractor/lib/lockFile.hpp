@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -20,7 +21,7 @@
 /// a porzucony plik moze skasowac kazdy, komu uda sie zajac go wylacznie.
 namespace lockfile {
 
-enum class Result { Acquired, Busy, Error };
+enum class Result : std::uint8_t { Acquired, Busy, Error };
 
 /// Zajmuje blokade pliku `path`, tworzac go w razie potrzeby.
 ///

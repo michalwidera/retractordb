@@ -53,6 +53,10 @@ class groupFile : public FileInterface {
 
   using FileInterface::read;
   using FileInterface::write;
+  // Wirtualne skladowe instancjuje JAWNIE `template class groupFile<...>` na koncu fagrp.cc,
+  // wiec nie zaleza od tego, czy dany kompilator instancjuje je niejawnie - a o to pyta
+  // portability-template-virtual-member-function przy `extern template` nizej.
+  // NOLINTBEGIN(portability-template-virtual-member-function)
   ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, size_t position) override;
   ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) override;
   ssize_t purge();
@@ -60,6 +64,7 @@ class groupFile : public FileInterface {
   auto name() -> std::string & override;
   size_t count() override;
   [[nodiscard]] bool hasShadow() const override { return !vec_.empty() && vec_.front()->hasShadow(); }
+  // NOLINTEND(portability-template-virtual-member-function)
 };
 
 /// DEKLARACJA instancjacji, nie definicja - definicja stoi na koncu fagrp.cc, za

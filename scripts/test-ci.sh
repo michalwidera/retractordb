@@ -34,24 +34,23 @@ fi
 # Kolumny: nazwa | job w config.yml | build_type | opis.
 # `gate` jest w tej liscie, ale poza domyslnym uzyciem: to najdrozszy job
 # przebiegu nocnego (budowa czterech profili ablacji H9 + kampania 2 x 10010
-# planow), liczony w dziesiatkach minut takze na goracym ccache.
-profile_names=(commit release smoke ablation-all-off ablation-probe-on gate)
+# planow), liczony w dziesiatkach minut.
+profile_names=(commit release ablation-all-off ablation-probe-on gate)
 
 profile_job() {
     case "$1" in
         commit)            echo "build-debug-ninja-mydocker (workflow: commit)" ;;
-        release)           echo "build-release-ninja-mydocker (L2 manual-nightly-full)" ;;
-        smoke)             echo "smoke-debug-ninja-mydocker (L1 manual-nightly-full)" ;;
-        ablation-all-off)  echo "build-release-ablation / ablation-all-off (L3)" ;;
-        ablation-probe-on) echo "build-release-ablation / ablation-probe-on (L3)" ;;
-        gate)              echo "research-gate (L3 manual-nightly-full)" ;;
+        release)           echo "build-release-ninja-mydocker (L1 manual-nightly-full)" ;;
+        ablation-all-off)  echo "build-release-ablation / ablation-all-off (L2)" ;;
+        ablation-probe-on) echo "build-release-ablation / ablation-probe-on (L2)" ;;
+        gate)              echo "research-gate (L2 manual-nightly-full)" ;;
     esac
 }
 
 profile_build_type() {
     case "$1" in
-        commit|smoke) echo "Debug" ;;
-        *)            echo "Release" ;;
+        commit) echo "Debug" ;;
+        *)      echo "Release" ;;
     esac
 }
 
@@ -59,7 +58,6 @@ profile_desc() {
     case "$1" in
         commit)            echo "Debug + pelny zestaw testow - to, co idzie po commicie" ;;
         release)           echo "Release + pelny zestaw testow" ;;
-        smoke)             echo "sama kompilacja Debug, bez testow" ;;
         ablation-all-off)  echo "Release z piecioma RDB_OPT_* = OFF + pelny zestaw testow" ;;
         ablation-probe-on) echo "Release z RDB_BENCH_PROBE=ON + pelny zestaw testow" ;;
         gate)              echo "bramka badawcza H9/H10 w trybie strict (dlugi przebieg)" ;;
@@ -184,14 +182,10 @@ fi
 container="rdb-test-ci-${profile}-$$"
 work_dir="/home/developer/workspace/retractordb"
 
-# BEZ nazwanego wolumenu na ccache, mimo ze config.yml ma pare
-# ccache-restore / ccache-save. Powod jest pomiarowy: w tym drzewie ccache nie
-# buforuje NICZEGO. CMake wlacza skanowanie modulow C++20 (CMAKE_CXX_STANDARD
-# 23 + Ninja + GCC), wiec kazda linia kompilacji niesie `-fmodules-ts` i
-# `-fmodule-mapper=`, a ccache 4.11 liczy to jako "Unsupported compiler
-# option". Zmierzone na profilu smoke: 132 wywolania, 132 nieburzowalne, zero
-# zapisow. Wolumen bylby wiec pustym katalogiem udajacym oszczednosc.
-# Gdy ta przyczyna zniknie, wolumen ma sens i wraca tutaj.
+# BEZ nazwanego wolumenu na ccache: profil odwzorowuje job CI, a ten startuje
+# z pustym cache, bo config.yml nie przenosi go miedzy jobami (uzasadnienie w
+# sekcji `commands` tamtego pliku). Cieply cache dawalby tu czasy kompilacji,
+# jakich CI nie ma.
 
 # --reuse-build: katalog build/ w nazwanym wolumenie, osobnym dla kazdego
 # profilu. Osobnym, bo profile roznia sie konfiguracja tego samego katalogu -
@@ -353,10 +347,6 @@ ablation_build() {
 
 status=0
 case "$profile" in
-    smoke)
-        conan_install
-        conan_build
-        ;;
     commit|release)
         conan_install
         conan_build
@@ -384,7 +374,7 @@ case "$profile" in
             -DCMAKE_TOOLCHAIN_FILE="$PWD/build/Release/generators/conan_toolchain.cmake" \
             -DRESEARCH_GATE_STRICT=ON
         step "Build H9 ablation profiles"
-        K6_CCACHE=1 K6_BUILD_JOBS=4 test/research_gate/h9/build_profiles.sh
+        K6_BUILD_JOBS=4 test/research_gate/h9/build_profiles.sh
         step "Research gate H9/H10"
         cmake --build build/Release --target test_gate --parallel 4
         ;;

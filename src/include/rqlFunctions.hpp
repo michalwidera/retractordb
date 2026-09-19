@@ -44,7 +44,7 @@ struct RqlFunction {
   /// Skrot dziala bez wzgledu na wielkosc liter, z JEDNYM wyjatkiem: `FLOAT` i `Float` leksuja sie
   /// jako token typu z DECLARE (RQL.g4), a nie jako ID, wiec `Float(x)` jest bledem skladni.
   /// Dziala `float(x)`.
-  std::string_view alias{};
+  std::string_view alias;
 };
 
 /// Arnosc jest DANYMI, nie ksztaltem gramatyki. Gramatyka zna dzis dwa ksztalty

@@ -50,7 +50,7 @@ std::string intervalText(const boost::rational<int> &interval) {
 namespace shmbudget {
 
 Space space() {
-#if defined(BOOST_INTERPROCESS_POSIX_SHARED_MEMORY_OBJECTS)
+#ifdef BOOST_INTERPROCESS_POSIX_SHARED_MEMORY_OBJECTS
   // Sonda: obiekt pamieci dzielonej powstaje ta sama droga co obiekty silnika (shm_open),
   // wiec fstatvfs na jego deskryptorze opisuje system plikow, ktory NAPRAWDE ich dotyczy --
   // niezaleznie od tego, gdzie libc go zamontowala. Obiekt ma zerowa dlugosc, wiec sam pomiar

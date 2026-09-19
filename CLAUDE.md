@@ -45,13 +45,12 @@ scripts/macos-build.sh --sanitize   # -DRDB_SANITIZE=address,undefined
 **CI locally, before pushing** (`scripts/test-ci.sh`, needs a running Docker):
 ```bash
 ninja test-ci        # = test-ci-commit: the only job CircleCI runs after a push
-ninja test-ci-smoke  # Debug compile only, no tests (L1 of the nightly run)
 ninja test-ci-fast   # same job, build/ kept between runs - quick, NOT a faithful CI run
 scripts/test-ci.sh --list   # every profile with the CircleCI job it mirrors
 ```
 Each profile copies the working tree into a container built from the CI image (`micwide/buildenv-retractordb`) capped at the CI executor's resources (4 vCPU / 8 GiB) and runs that job's steps. Outside `all` and outside `ninja test`. Profiles mirror `.circleci/config.yml` by hand: change that file, change `scripts/test-ci.sh`.
 
-Every `test-ci-*` profile builds from scratch, like the CI checkout - tens of minutes, and ccache does not shorten it (this tree compiles with `-fmodules-ts`, which ccache cannot cache). `test-ci-fast` trades that fidelity for speed by keeping `build/` in a per-profile Docker volume; use it to check a change before committing, not to conclude anything about a CI run. `scripts/test-ci.sh --profile <name> --reset-build` drops a kept build directory.
+Every `test-ci-*` profile builds from scratch, like the CI checkout - tens of minutes, and ccache does not shorten it (the container starts with an empty cache, as a CI job does). `test-ci-fast` trades that fidelity for speed by keeping `build/` in a per-profile Docker volume; use it to check a change before committing, not to conclude anything about a CI run. `scripts/test-ci.sh --profile <name> --reset-build` drops a kept build directory.
 
 **Single test:**
 ```bash
@@ -208,7 +207,7 @@ Success is **the whole suite green** - no failure, and no `DISABLED` beyond the 
 
 One kind of assertion cannot hold without the pass: the one saying that the pass **fired** - a substrate name, a `PUSH_STREAM` target, the absence of a substrate the pass was supposed to absorb. With the switch off that assertion is tautologically false, not red, and it may carry `DISABLED TRUE` guarded by `if(NOT RDB_OPT_...)` and labelled `expected_ablation_failure;requires_<switch>`. **Nothing else may.** An assertion about the computed result - payload bytes, metadata, a value against an oracle - is never disabled: a red `Val` under ablation is a semantics regression or an open finding, and it goes to the human. Never paper one over with `WILL_FAIL` or `DISABLED` - the matrix already carries a note from 2026-07-26 explaining why those annotations were removed.
 
-A test mixing both kinds in one ctest entry has to be split, because a single `DISABLED` then takes the result assertion down together with the shape assertion. `issue202_hash_shift_e2e` is the worked example, split on 2026-09-06 into `-shape` and `-value`: its one `cmp matched CC` pinned `Val` and `Lat` at the same time, so it could never be green under ablation, and disabling it removed the only end-to-end place where the tail divergence between `(A>2)#(B>1)` and `(A#B)>3` was visible at all. CI runs this same floor as `ablation-all-off` in layer L3 of `manual-nightly-full`, which the `cron-shedule` trigger starts on the 5th and 20th of every month, so a skipped local run gets caught at the next of those runs - up to about two weeks later, which is why the local run is not optional.
+A test mixing both kinds in one ctest entry has to be split, because a single `DISABLED` then takes the result assertion down together with the shape assertion. `issue202_hash_shift_e2e` is the worked example, split on 2026-09-06 into `-shape` and `-value`: its one `cmp matched CC` pinned `Val` and `Lat` at the same time, so it could never be green under ablation, and disabling it removed the only end-to-end place where the tail divergence between `(A>2)#(B>1)` and `(A#B)>3` was visible at all. CI runs this same floor as `ablation-all-off` in layer L2 of `manual-nightly-full`, which the `cron-shedule` trigger starts on the 5th and 20th of every month, so a skipped local run gets caught at the next of those runs - up to about two weeks later, which is why the local run is not optional.
 
 ### Context hygiene
 

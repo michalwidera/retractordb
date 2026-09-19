@@ -718,7 +718,13 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
     // Typ pola ten sam co slotu rekordu wejsciowego (query::descriptorFrom). Do 2026-09-14 stal tu
     // RATIONAL na sztywno, wiec `SELECT * FROM x.max` nad DOUBLE 3000000000.5 zapisywalo
     // przepelniony `rational<int>`, a nad 0.333333333333 - 1/3.
-    const char *name = (cmd == STREAM_AVG) ? "avg" : (cmd == STREAM_MIN) ? "min" : (cmd == STREAM_MAX) ? "max" : "sum";
+    const char *name = "sum";
+    if (cmd == STREAM_AVG)
+      name = "avg";
+    else if (cmd == STREAM_MIN)
+      name = "min";
+    else if (cmd == STREAM_MAX)
+      name = "max";
     auto [sourceType, sourceLen]   = coreInstance[sName1].descriptorStorage().widestFieldType();
     auto [reducedType, reducedLen] = reductionResultField(sourceType, sourceLen);
     field intf(rdb::rField(name, reducedLen, 1, reducedType), token(PUSH_ID, std::make_pair(sName1, 0)));

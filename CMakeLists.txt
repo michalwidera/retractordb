@@ -205,6 +205,12 @@ endif()
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+# Bez skanowania modulow C++20. CMake wlacza je sam przy C++20+ z Ninja, a
+# projekt modulow nie uzywa (zero `export module`/`import`) - skanowanie
+# dokladalo tylko przebieg preprocesora na kazda jednostke i flagi -fmodules-ts
+# oraz -fmodule-mapper, przy ktorych ccache nie buforuje niczego ("Unsupported
+# compiler option"; zmierzone 2026-09-19 w obrazie CI).
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 if(RDB_USE_MOLD)
   string(APPEND CMAKE_CXX_FLAGS " -fuse-ld=mold")
 endif()
@@ -243,7 +249,14 @@ endif()
 if(RDB_USE_CCACHE)
   find_program(CCACHE_PROGRAM ccache)
   if(CCACHE_PROGRAM)
-    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+    # Sloppiness pod precompiled headers (rdb, retractor): bez niej ccache
+    # odrzuca kazda jednostke z PCH jako "Could not use precompiled header" -
+    # zmierzone 57 z 68 wywolan celu xretractor. time_macros jest bezpieczne, bo
+    # kod nie uzywa __DATE__/__TIME__. Przez cmake -E env, nie przez argument
+    # ccache KEY=VALUE, bo tej formy nie maja starsze wersje ccache.
+    set(CMAKE_CXX_COMPILER_LAUNCHER
+        ${CMAKE_COMMAND} -E env CCACHE_SLOPPINESS=pch_defines,time_macros
+        ${CCACHE_PROGRAM})
     message(
       STATUS "ccache found, enabling as compiler launcher: ${CCACHE_PROGRAM}")
   else()

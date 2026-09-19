@@ -395,6 +395,9 @@ struct Bus::Impl {
   /// robust, wiec proces zabity z muteksem w reku zawiesilby wszystkie pozostale). Stad
   /// wlasny zamek w segmencie -- pthread_mutex_t z atrybutem robust tam, gdzie jadro go
   /// ma, i slowo atomowe z biletem wlasciciela tam, gdzie nie ma (patrz BusMutex).
+  // Nie const, choc clang-tidy to proponuje: acquire() jest const tylko w galezi
+  // RDB_HAS_ROBUST_MUTEX, w zapasowej (Darwin) nie, i tam const by sie nie skompilowalo.
+  // NOLINTNEXTLINE(readability-make-member-function-const)
   [[nodiscard]] bool lock() {
     const LockOutcome outcome = acquire();
     if (!outcome.ok) return false;
@@ -821,6 +824,9 @@ ClaimResult Bus::reservePlan(const std::vector<std::string> &streams, std::strin
     retVal.detail = "instance holds no bus slot";
     return retVal;
   }
+  // Odczytany raz: analizator clang-tidy po wywolaniach w petli nizej zaklada, ze pole mogl
+  // zmienic ktos inny, i zglasza indeks ujemny w segment.slots[...].
+  const int slotIndex = impl->slotIndex;
 
   if (streams.size() > kMaxStreams) {
     retVal.status = ClaimStatus::TooLarge;
@@ -850,7 +856,7 @@ ClaimResult Bus::reservePlan(const std::vector<std::string> &streams, std::strin
   auto scratch     = std::make_unique<Slot>();  // ~57 KiB -- na stercie, nie na stosie
 
   for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
-    if (std::cmp_equal(i, impl->slotIndex)) continue;
+    if (std::cmp_equal(i, slotIndex)) continue;
     Slot &slot = segment.slots[i];
     if (!snapshot(slot, *scratch)) continue;
 
@@ -887,7 +893,7 @@ ClaimResult Bus::reservePlan(const std::vector<std::string> &streams, std::strin
     }
   }
 
-  Slot &mine = segment.slots[impl->slotIndex];
+  Slot &mine = segment.slots[slotIndex];
   beginWrite(mine);
   mine.reservationActive   = 1;
   mine.reservedStreamCount = static_cast<std::uint32_t>(streams.size());

@@ -284,7 +284,7 @@ void dataModel::processRows(const std::set<std::string> &inSet, const boost::rat
   // przed bledem otwiera okno na komende klienta, ktora stanie na blokadzie epoki. Znacznik na
   // stderr mowi testowi, ze blokady sa juz wziete, wiec okna nie trzeba trafiac zegarem.
   if (const char *delayMs = std::getenv("RDB_FAULT_FATAL_IN_SLOT"); delayMs != nullptr) {
-    std::cerr << "RDB_FAULT_FATAL_IN_SLOT: slot locked" << std::endl;
+    std::cerr << "RDB_FAULT_FATAL_IN_SLOT: slot locked" << '\n';
     std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
     FatalError("fault hook RDB_FAULT_FATAL_IN_SLOT: fatal error inside a processing slot");
   }

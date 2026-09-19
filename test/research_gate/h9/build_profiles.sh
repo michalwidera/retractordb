@@ -24,9 +24,12 @@
 #
 # `K6_CCACHE` jest bezpieczne dla kampanii pomiarowej: przełączniki `RDB_OPT_*`
 # są definicjami **wyłącznie celu `retractor`** (`src/retractor/lib/CMakeLists.txt`),
-# więc reszta drzewa ma między profilami identyczne wyjście preprocesora i trafia
-# w cache. ccache nie zmienia wynikowej binarki - `--build-info` i tak jest
-# weryfikowane bajtowo dla każdego profilu.
+# więc reszta drzewa ma między profilami identyczne wyjście preprocesora.
+# ccache nie zmienia wynikowej binarki - `--build-info` i tak jest
+# weryfikowane bajtowo dla każdego profilu. Zysk jest jednak niewielki: każdy
+# profil ma własny katalog build/K26v3-*, a ścieżka katalogu (PCH, pliki
+# wynikowe) wchodzi do klucza ccache - zmierzone 2026-09-19: drugi profil
+# trafia w 8 z 68 jednostek celu xretractor.
 #
 # `K6_RUN_CTEST` wymaga zbudowania WSZYSTKICH celów, co na Raspberry Pi trwa
 # godziny. Macierz funkcjonalną można wykonać na nadzorcy dla tego samego

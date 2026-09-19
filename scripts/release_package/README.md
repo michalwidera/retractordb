@@ -33,7 +33,7 @@ The host toolchain (Conan, GCC, CMake) is not used: both builds run in the `debi
    scripts/release_package/release.sh
    ```
 
-   The script repeats the preflight, builds x86-64 and then AArch64 (one after another - two builds with `-fmodules-ts` at once do not fit in RAM), and copies the three assets to `build/Release-Assets/v<VERSION>/`:
+   The script repeats the preflight, builds x86-64 and then AArch64 (one after another - two builds at once do not fit in RAM), and copies the three assets to `build/Release-Assets/v<VERSION>/`:
 
    - `retractordb-<VERSION>-Linux.deb`
    - `retractordb-<VERSION>-linux-x86_64-portable.tar.gz`

@@ -35,7 +35,7 @@ constexpr std::string_view kLockSuffix        = ".lock";
 /// malych cyfr szesnastkowych, patrz ipc::shortServerTag).
 bool isInstanceToken(std::string_view token) {
   if (servername::isValid(token)) return true;
-  return token.size() == 9 && token.front() == '0' &&
+  return token.size() == ipc::kShortServerTagLength && token.front() == '0' &&
          std::ranges::all_of(token, [](unsigned char c) { return std::isdigit(c) || (c >= 'a' && c <= 'f'); });
 }
 

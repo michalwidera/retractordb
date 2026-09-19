@@ -79,21 +79,27 @@ inline constexpr std::size_t kMaxObjectNameLength = RDB_OS_DARWIN ? 31 : 200;
 /// w nazwie kolejki odpowiedzi plus ukosnik, ktory Boost stawia z przodu.
 inline constexpr std::size_t kObjectNameTailBudget = 12;
 
+/// Dlugosc skrotu z shortServerTag: "0" i osiem cyfr szesnastkowych.
+inline constexpr std::size_t kShortServerTagLength = 9;
+
 /// Skrot nazwy serwera: osiem cyfr szesnastkowych FNV-1a.
 ///
 /// Liczony JAWNIE, a nie przez std::hash, z tego samego powodu co skrot sciezki
 /// magazynu w bus.hpp: wartosc musi byc identyczna po obu stronach IPC, a wynik
 /// std::hash jest szczegolem implementacji biblioteki standardowej.
 inline std::string shortServerTag(std::string_view serverName) {
-  std::uint64_t hash = 0xcbf2'9ce4'8422'2325ULL;
+  constexpr std::uint64_t basis = 0xcbf2'9ce4'8422'2325ULL;
+  constexpr std::uint64_t prime = 0x0000'0100'0000'01B3ULL;
+  constexpr unsigned halfBits   = 32;  // skrot 32-bitowy: polowki 64-bitowego XOR-owane
+  std::uint64_t hash            = basis;
   for (const unsigned char byte : serverName) {
     hash ^= byte;
-    hash *= 0x0000'0100'0000'01B3ULL;
+    hash *= prime;
   }
   // NOLINTNEXTLINE(modernize-avoid-c-arrays): bufor dla snprintf
-  char buffer[10];
+  char buffer[kShortServerTagLength + 1];
   // Nazwa uzytkownika zaczyna sie litera, wiec 0 oddziela skroty od nazw doslownych.
-  std::snprintf(buffer, sizeof(buffer), "0%08x", static_cast<unsigned>(hash ^ (hash >> 32)));
+  std::snprintf(buffer, sizeof(buffer), "0%08x", static_cast<unsigned>(hash ^ (hash >> halfBits)));
   return {buffer};
 }
 

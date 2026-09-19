@@ -23,7 +23,7 @@ namespace {
 // nazwa z generatora strumieni (`ch$0`, `STREAM_AGSE_1_3_ch$0`) konczyla sie bledem skladni.
 // Nazwy zwykle wychodza bez cudzyslowu, wiec istniejace wzorce pattern-dot.txt sie nie zmieniaja.
 std::string dotId(const std::string &id) {
-  const bool plain = !id.empty() && !std::isdigit(static_cast<unsigned char>(id.front())) &&
+  const bool plain = !id.empty() && std::isdigit(static_cast<unsigned char>(id.front())) == 0 &&
                      std::ranges::all_of(id, [](unsigned char c) { return std::isalnum(c) || c == '_'; });
   return plain ? id : "\"" + id + "\"";
 }

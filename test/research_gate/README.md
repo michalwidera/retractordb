@@ -42,9 +42,9 @@ ninja test_gate                                    # calosc
 
 `--profiles` przyjmuje sciezke uzywana po `cd` do katalogu poziomu, wiec podaje sie ja bezwzglednie; sciezka wzgledna cicho pomija poziom 84/84.
 
-**W CI** bramka ma wlasny job `research-gate` (warstwa 3 workflow `manual-nightly-full`, dwa razy w miesiacu, Release). Job buduje najpierw cztery profile ablacji, bo bez nich poziom 84/84 jest pomijany, i konfiguruje drzewo z `-DRESEARCH_GATE_STRICT=ON`. W tym trybie **pominiety poziom oblewa przebieg**: pominiecie znaczy "nie uruchomiono", a zielona bramka o niepelnym zakresie jest gorsza niz jej brak. Praca lokalna zostaje przy domyslnym OFF, gdzie pominiecie jest tylko odnotowane.
+**W CI** bramka ma wlasny job `research-gate` (warstwa 2 workflow `manual-nightly-full`, dwa razy w miesiacu, Release). Job buduje najpierw cztery profile ablacji, bo bez nich poziom 84/84 jest pomijany, i konfiguruje drzewo z `-DRESEARCH_GATE_STRICT=ON`. W tym trybie **pominiety poziom oblewa przebieg**: pominiecie znaczy "nie uruchomiono", a zielona bramka o niepelnym zakresie jest gorsza niz jej brak. Praca lokalna zostaje przy domyslnym OFF, gdzie pominiecie jest tylko odnotowane.
 
-Ten sam job wchodzi takze do workflow `research-gate-only`, uruchamianego z reki przez parametr pipeline'u `run_manual_research_gate` - sama bramka, bez warstw L1 i L2, na potrzeby sprawdzenia przed zgloszeniem artykulu. Jest to dodatek, nie zamiennik: przebieg nocny daje bramce ccache zapisany dla tej samej rewizji, uruchomienie samodzielne startuje z cache'a starszego.
+Ten sam job wchodzi takze do workflow `research-gate-only`, uruchamianego z reki przez parametr pipeline'u `run_manual_research_gate` - sama bramka, bez reszty przebiegu nocnego, na potrzeby sprawdzenia przed zgloszeniem artykulu. Buduje i sprawdza to samo co przebieg nocny: oba kompiluja od zera, bo CI nie przenosi cache ccache miedzy jobami (patrz uwaga w sekcji `commands` pliku `.circleci/config.yml`).
 
 Poziomy mają różne wymagania i `gate_requirements` instaluje te najwyższego:
 

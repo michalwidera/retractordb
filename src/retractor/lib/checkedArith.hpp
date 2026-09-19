@@ -79,7 +79,7 @@ inline std::optional<boost::rational<int>> add(boost::rational<int> a, boost::ra
     const auto sum = add(a.numerator(), b.numerator());
     return sum.has_value() ? std::optional<boost::rational<int>>{*sum} : std::nullopt;
   }
-  return detail::narrowed(std::int64_t{a.numerator()} * b.denominator() + std::int64_t{b.numerator()} * a.denominator(),
+  return detail::narrowed((std::int64_t{a.numerator()} * b.denominator()) + (std::int64_t{b.numerator()} * a.denominator()),
                           std::int64_t{a.denominator()} * b.denominator());
 }
 
@@ -88,7 +88,7 @@ inline std::optional<boost::rational<int>> sub(boost::rational<int> a, boost::ra
     const auto difference = sub(a.numerator(), b.numerator());
     return difference.has_value() ? std::optional<boost::rational<int>>{*difference} : std::nullopt;
   }
-  return detail::narrowed(std::int64_t{a.numerator()} * b.denominator() - std::int64_t{b.numerator()} * a.denominator(),
+  return detail::narrowed((std::int64_t{a.numerator()} * b.denominator()) - (std::int64_t{b.numerator()} * a.denominator()),
                           std::int64_t{a.denominator()} * b.denominator());
 }
 
