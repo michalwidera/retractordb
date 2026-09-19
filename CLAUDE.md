@@ -29,7 +29,7 @@ ninja descgrammar   # regenerate ANTLR4 grammar from DESC.g4
 ninja rqlgrammar    # regenerate ANTLR4 grammar from RQL.g4
 ```
 
-**macOS** (Apple silicon or Intel, Xcode 16.3+ CLT, deployment target 14.4+):
+**macOS** (sprawdzone tylko na Apple silicon z macOS 27 i Apple clang 21; Intel i starsze wydania nietestowane. Xcode 16.3+ CLT i deployment target 14.4+ to minimum wymuszone przez `std::print`, nie konfiguracja sprawdzona):
 ```bash
 scripts/macos-build.sh          # jeden przebieg: konfiguracja + budowa + install + ctest, log w build/macos-build.log
 scripts/macos-build.sh release
@@ -40,6 +40,7 @@ scripts/macos-build.sh --sanitize   # -DRDB_SANITIZE=address,undefined
 - **Czas rzeczywisty jest slabszy z zasady**: SCHED_FIFO obejmuje WATEK, nie proces (`sched_setscheduler` nie istnieje), masek powinowactwa nie ma wcale, `mlockall` zglasza ENOSYS, a odpowiednika PREEMPT_RT nie ma. macOS jest platforma rozwojowa i testowa, nie pomiarowa - bramka badawcza (`ninja test_gate`) tego nie zmienia.
 - **Usluga to launchd, nie systemd**: `restartCommand` sklada `launchctl kickstart -k`, tozsamosc jednostki bierze sie z `XPC_SERVICE_NAME`, a pakiet nie niesie zadnej jednostki `.service`.
 - **Wybor galezi platformowej** nie zapada po nazwie systemu, tylko przez `RDB_HAS_*` z `generated/platformConfig.h` (probe kompilacyjne w `cmake/PlatformChecks.cmake`). Nowy kod platformowy pisze sie tak samo: `#if RDB_HAS_X`, nigdy `#ifdef __APPLE__`.
+- **Galaz zapasowa tylko z deklaracji**: proba, ktorej 0 wybiera slabsza galaz, musi to 0 miec zadeklarowane w `RDB_PLATFORM_FALLBACKS` (na Linuksie lista jest pusta, na Darwinie zawiera zera zmierzone na Apple silicon); kazde niezadeklarowane 0 zatrzymuje konfiguracje. Nowa galaz zapasowa oznacza nowa pozycje na liscie kontrolowanych prob w `cmake/PlatformChecks.cmake`.
 
 **CI locally, before pushing** (`scripts/test-ci.sh`, needs a running Docker):
 ```bash

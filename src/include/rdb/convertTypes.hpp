@@ -13,7 +13,9 @@ struct cast {
   /// @brief Convert input value to requested descriptor type.
   /// @param inVar source value (std::variant or std::any specializations are used in this project)
   /// @param reqType target rdb field type
-  /// @return converted value represented as type T
+  /// @return converted value represented as type T, or std::monostate (NULL) when the value has
+  ///         no representation in the requested type: a floating-point value outside an integer
+  ///         type's range (NaN and infinity included), or a string that does not parse
   T operator()(const T &inVar, rdb::descFld reqType);
 };
 

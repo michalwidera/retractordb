@@ -12,12 +12,6 @@
 # `dot` odrzucal plik bledem skladni, a sam wzorzec tekstowy by tego nie wykryl.
 # cmake-format: on
 
-# Graphviz jest zalezoscia OPCJONALNA (patrz issue31_doc): bez programu `dot`
-# renderowanie grafu planu nie ma czym sie odbyc, a "dot: command not found" nie
-# jest regresja silnika. Rejestrujemy wtedy pozostale testy tego katalogu i
-# pomijamy sam render - tak samo jak robi to issue31_doc.
-find_program(RDB_DOT_EXECUTABLE dot)
-
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
@@ -28,18 +22,20 @@ add_test(
     xretractor query.rql -c > out-compile.txt && \
     bash ../compare.sh pattern.txt out-compile.txt")
 
-# Renderowanie grafu wymaga graphviz, a to zaleznosc OPCJONALNA (ten sam wzorzec
-# co w issue31_doc). Bez programu `dot` odpada SAM RENDER - porownanie
-# wygenerowanego tekstu DOT z plikiem wzorcowym, czyli to, co ten test naprawde
-# sprawdza, zostaje. Z zainstalowanym graphvizem polecenie jest co do znaku
-# takie jak dotad.
-if(RDB_DOT_EXECUTABLE)
-  set(_dotRender " && dot -Tsvg out.dot -o out.svg")
-else()
-  set(_dotRender "")
-  message(
-    STATUS
-      "graphviz (dot) not found - ${TestID}-dot will check the DOT text only")
+# Render `dot -Tsvg` jest czescia asercji (patrz naglowek): sam wzorzec tekstowy
+# nie wykryje pliku DOT, ktorego graphviz nie przyjmie. Na Linuksie zostaje wiec
+# BEZWARUNKOWY - brak programu `dot` ma dac czerwony test, a nie po cichu
+# slabsze sprawdzenie. Poza Linuksem graphviz jest zaleznoscia opcjonalna (macOS
+# go nie ma): bez `dot` odpada sam render, a konfiguracja mowi to wprost.
+set(_dotRender " && dot -Tsvg out.dot -o out.svg")
+if(NOT RDB_OS_LINUX)
+  find_program(RDB_DOT_EXECUTABLE dot)
+  if(NOT RDB_DOT_EXECUTABLE)
+    set(_dotRender "")
+    message(
+      STATUS
+        "graphviz (dot) not found - ${TestID}-dot will check the DOT text only")
+  endif()
 endif()
 
 add_test(

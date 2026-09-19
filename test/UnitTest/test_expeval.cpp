@@ -1610,6 +1610,36 @@ TEST(xExpressionEval, call_to_integer_null_propagates_null) {
   EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
 }
 
+// Wartosc, ktorej INTEGER nie pomiesci, nie ma wyniku: NULL, jak przepelnienie arytmetyki.
+// Na x86-64 bylo to INT_MIN (zachowanie nieokreslone), w a0082a34 INT_MAX (nasycenie).
+TEST(xExpressionEval, call_to_integer_out_of_range_is_null) {
+  const std::vector<double> cases{1e30, -1e30, std::numeric_limits<double>::infinity(),
+                                  std::numeric_limits<double>::quiet_NaN()};
+  for (const double in : cases) {
+    std::list<token> program;
+    program.emplace_back(PUSH_VAL, in);
+    program.emplace_back(CALL, std::string("to_integer"));
+
+    expressionEvaluator test;
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program))) << in;
+  }
+}
+
+// Funkcja matematyczna nad INTEGER wraca przez double do INTEGER (callFun). Wynik bez
+// odpowiednika w INTEGER - NaN z Sqrt(-4) i log(-1), -inf z log(0) - jest NULL-em, tak samo
+// jak niefinitywny wynik `^` i sin/cos/exp. Przedtem x86-64 oddawalo tu INT_MIN.
+TEST(xExpressionEval, call_math_over_integer_without_integer_result_is_null) {
+  const std::vector<std::pair<std::string, int>> cases{{"Sqrt", -4}, {"log", 0}, {"log", -1}, {"log2", 0}};
+  for (const auto &[name, arg] : cases) {
+    std::list<token> program;
+    program.emplace_back(PUSH_VAL, arg);
+    program.emplace_back(CALL, name);
+
+    expressionEvaluator test;
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program))) << name << "(" << arg << ")";
+  }
+}
+
 // --- to_float ---
 
 TEST(xExpressionEval, call_to_float_from_string) {

@@ -149,3 +149,89 @@ foreach(
   endif()
   message(STATUS "${_rdb_feature}=${${_rdb_feature}}")
 endforeach()
+
+# --- sciezki zapasowe: tylko z deklaracji, nigdy z przypadku ------------
+# Kazda proba z listy ponizej wybiera w kodzie galaz GLOWNA (1) albo ZAPASOWA (0):
+#
+#   CLOCK_NANOSLEEP     sen absolutny na mach_wait_until zamiast clock_nanosleep
+#   ABSOLUTE_SLEEP      sen WZGLEDNY - blad kazdego slotu sie kumuluje (dryf);
+#                       0 tylko wtedy, gdy nie ma ani clock_nanosleep, ani mach_time
+#   SCHED_SETSCHEDULER  SCHED_FIFO wylacznie dla watku wolajacego, nie procesu
+#   PTHREAD_SCHEDPARAM  na nim stoi zapasowa galaz SCHED_SETSCHEDULER
+#   SCHED_AFFINITY      bez rozdzielenia watku RT i watku komunikacji
+#   MLOCKALL            strony pamieci nieblokowane
+#   MCL_ONFAULT         samo MCL_CURRENT, bez blokowania nowych mapowan
+#   ROBUST_MUTEX        zamek atomowy magistrali zamiast robust mutexa (bus.cpp)
+#   LD_WRAP             podmiana wywolan systemowych w testach przez dlsym
+#   ADDR2LINE           slad stosu bez numerow linii (payload.cc)
+#
+# Falszywe 0 - brak _GNU_SOURCE, nietypowe naglowki, inny konsolidator - nie
+# daje zadnego bledu kompilacji, tylko po cichu inna binarke: na Linuksie zamek
+# atomowy zamiast robust mutexa albo sen wzgledny zamiast clock_nanosleep.
+# Galaz zapasowa wolno wiec wybrac WYLACZNIE z deklaracji: RDB_PLATFORM_FALLBACKS
+# wylicza dopuszczone, a kazde 0 spoza tej listy zatrzymuje konfiguracje. Na
+# Linuksie lista jest pusta - to platforma pomiarowa, a na master zadnej z tych
+# galezi nie bylo. Na Darwinie sa to zera zmierzone przy portowaniu na Apple
+# silicon (macOS 27, Apple clang 21). Proba, ktora da 1, wybiera galaz glowna i
+# nie wymaga zadnej deklaracji - tak Darwin skorzysta z clock_nanosleep albo
+# robust mutexa, jesli kiedys sie pojawia.
+#
+# ABSOLUTE_SLEEP nie trafia do platformConfig.h: to warunek na dwie proby naraz
+# (galaz #else w rtAbsoluteSleep, executor_rt.cpp), potrzebny tylko tej kontroli.
+if(RDB_HAS_CLOCK_NANOSLEEP OR RDB_HAS_MACH_TIME_H)
+  set(RDB_HAS_ABSOLUTE_SLEEP 1)
+else()
+  set(RDB_HAS_ABSOLUTE_SLEEP 0)
+endif()
+
+if(RDB_OS_DARWIN)
+  set(_rdb_default_fallbacks
+      CLOCK_NANOSLEEP
+      SCHED_SETSCHEDULER
+      SCHED_AFFINITY
+      MCL_ONFAULT
+      ROBUST_MUTEX
+      LD_WRAP
+      ADDR2LINE)
+else()
+  set(_rdb_default_fallbacks "")
+endif()
+set(RDB_PLATFORM_FALLBACKS
+    "${_rdb_default_fallbacks}"
+    CACHE STRING
+          "Swiadomie dopuszczone sciezki zapasowe (lista nazw, patrz cmake/PlatformChecks.cmake)")
+
+set(_rdb_fallback_chosen "")
+set(_rdb_fallback_undeclared "")
+foreach(
+  _rdb_probe
+  CLOCK_NANOSLEEP
+  ABSOLUTE_SLEEP
+  SCHED_SETSCHEDULER
+  PTHREAD_SCHEDPARAM
+  SCHED_AFFINITY
+  MLOCKALL
+  MCL_ONFAULT
+  ROBUST_MUTEX
+  LD_WRAP
+  ADDR2LINE)
+  if(NOT RDB_HAS_${_rdb_probe})
+    if(_rdb_probe IN_LIST RDB_PLATFORM_FALLBACKS)
+      list(APPEND _rdb_fallback_chosen ${_rdb_probe})
+    else()
+      list(APPEND _rdb_fallback_undeclared ${_rdb_probe})
+    endif()
+  endif()
+endforeach()
+
+if(_rdb_fallback_undeclared)
+  message(
+    FATAL_ERROR
+      "Proby platformy wybralyby niezadeklarowane sciezki zapasowe: ${_rdb_fallback_undeclared}\n"
+      "Najpierw sprawdz, czy to nie falszywe 0 - wynik kazdej proby jest w CMakeFiles/CMakeConfigureLog.yaml. "
+      "Jesli sciezka zapasowa jest zamierzona, zadeklaruj ja jawnie: "
+      "-DRDB_PLATFORM_FALLBACKS=\"<nazwy oddzielone srednikiem>\" (obecnie: '${RDB_PLATFORM_FALLBACKS}').")
+endif()
+if(_rdb_fallback_chosen)
+  message(STATUS "Swiadomie wybrane sciezki zapasowe: ${_rdb_fallback_chosen}")
+endif()

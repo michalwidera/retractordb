@@ -194,9 +194,14 @@ endif()
 # Standard jezyka przez wlasciwosc CMake, a nie przez PRZYPISANIE do
 # CMAKE_CXX_FLAGS. Przypisanie kasowalo wszystko, co wlozyl tam toolchain: na
 # Darwinie sa to -arch, -isysroot i -mmacosx-version-min, czyli flagi, bez
-# ktorych nie kompiluje sie ani jeden plik. CMAKE_CXX_EXTENSIONS=OFF utrzymuje
-# dotychczasowe -std=c++23 (a nie -std=gnu++23 z profilu Conana), wiec zbior
-# widocznych rozszerzen sie nie zmienia.
+# ktorych nie kompiluje sie ani jeden plik. CMAKE_CXX_EXTENSIONS=OFF daje
+# -std=c++23 - i jest to ZMIANA, nie kontynuacja. Przed portem linia kompilacji
+# niosla dwie flagi: -std=c++23 z CMAKE_CXX_FLAGS i dopisane za nia -std=gnu++23
+# (toolchain Conana ustawia CMAKE_CXX_EXTENSIONS=ON dla compiler.cppstd=gnu23),
+# a wygrywa ostatnia, wiec efektywnym standardem bylo gnu++23. Przejscie na
+# c++23 sprawdzono przy przegladzie portu (2026-09-19): drzewo buduje sie i
+# przechodzi testy, a atrybuty [[gnu::...]], np. always_inline, nie zaleza od
+# trybu gnu.
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)

@@ -24,26 +24,33 @@
 /// differences in your macOS code), a Arm jako jeden z dwoch dozwolonych rozjazdow miedzy
 /// architekturami (Floating-point behavior learning path).
 ///
-/// Regula: NASYCENIE do granic typu, NaN -> 0. To zachowanie arm64 zapisane WPROST, wiec
-/// macOS nie zmienia wyniku, a Linux przestaje oddawac liczbe ujemna za ogromna dodatnia.
-/// Gdyby wynik spoza zakresu mial byc NULL (regula checkedArith dla przepelnienia
-/// arytmetyki), miejscem na to jest `to_integer` w ewaluatorze, gdzie NULL jest wyrazalny -
-/// nie ten konwerter, ktory oddaje wartosc takze do std::any i do slotow rekordu.
+/// Regula: wartosc, ktorej typ docelowy nie pomiesci (takze NaN i nieskonczonosc), daje NULL
+/// - ta sama regula co przepelnienie arytmetyki (checkedArith) i niefinitywny wynik `^`.
+/// Nasycenie tez byloby okreslone, ale oddawaloby liczbe, ktorej nikt nie policzyl: 1e30 jako
+/// INT_MAX, 300.0 w polu BYTE jako 255. Decyzja 2026-09-19, przeglad portu na macOS.
 ///
-/// Granice licza sie PO rzucie na typ zrodlowy, bo `max()` nie zawsze da sie w nim zapisac:
-/// `static_cast<float>(INT_MAX)` to 2^31, czyli juz poza zakresem int. Porownanie
-/// nieostre wzgledem tak policzonej granicy jest wiec poprawne w obie strony.
-template <typename T, typename F>
-static T narrowFloatTo(F value) {
+/// NULL wychodzi stad jako std::monostate, tak jak z parse_string ponizej. Dochodzi wiec do
+/// `to_integer` i funkcji matematycznych nad typami calkowitymi (callFun), a zapis do rekordu
+/// (payload::setItem / setItemVT) zamienia go na bit w nullBitset.
+///
+/// Zakres sprawdza sie na wartosci OBCIETEJ, bo tak konwertuje jezyk: 2147483647.5 miesci
+/// sie w int (daje INT_MAX), 2147483648.0 juz nie. Gorna granica to 2^digits, potega dwojki,
+/// wiec zapisuje sie dokladnie w float i double - inaczej niz `max()`, ktore we float
+/// zaokragla sie do 2^31, czyli juz poza zakres int. Dolna granica (-2^31 albo 0) jest
+/// dokladna z tego samego powodu. NaN nie spelnia zadnego porownania i wypada jako NULL.
+template <typename T, typename F, typename K>
+static void narrowFloatTo(F value, K &retVal) {
   static_assert(std::is_floating_point_v<F>);
 
   if constexpr (std::is_floating_point_v<T>) {
-    return static_cast<T>(value);
+    retVal = static_cast<T>(value);
   } else {
-    if (std::isnan(value)) return T{0};
-    if (value >= static_cast<F>(std::numeric_limits<T>::max())) return std::numeric_limits<T>::max();
-    if (value <= static_cast<F>(std::numeric_limits<T>::lowest())) return std::numeric_limits<T>::lowest();
-    return static_cast<T>(value);
+    const F truncated      = std::trunc(value);
+    const F upperExclusive = std::ldexp(F{1}, std::numeric_limits<T>::digits);
+    if (truncated >= static_cast<F>(std::numeric_limits<T>::lowest()) && truncated < upperExclusive)
+      retVal = static_cast<T>(value);
+    else
+      retVal = std::monostate{};
   }
 }
 
@@ -73,8 +80,8 @@ void visit_descFld(const K &inVar, K &retVal) {
                    [&retVal](int a) { retVal = static_cast<T>(a); },                                            //
                    [&retVal](unsigned a) { retVal = static_cast<T>(a); },                                       //
                    [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<T>(a); },                  //
-                   [&retVal](float a) { retVal = narrowFloatTo<T>(a); },                                        //
-                   [&retVal](double a) { retVal = narrowFloatTo<T>(a); },                                       //
+                   [&retVal](float a) { narrowFloatTo<T>(a, retVal); },                                         //
+                   [&retVal](double a) { narrowFloatTo<T>(a, retVal); },                                        //
                    [&retVal](std::pair<int, int> a) { SPDLOG_ERROR("TODO - pair-int->T"); },                    //
                    [&retVal](const std::pair<std::string, int> &a) { SPDLOG_ERROR("TODO - idxpair-int->T"); },  //
                    [&retVal](const std::string &a) { parse_string<T>(a, retVal); }                              //
@@ -92,9 +99,9 @@ void visit_descFld(const K &inVar, K &retVal) {
     } else if (inVar.type() == typeid(boost::rational<int>)) {
       retVal = boost::rational_cast<T>(std::any_cast<boost::rational<int>>(inVar));
     } else if (inVar.type() == typeid(float)) {
-      retVal = narrowFloatTo<T>(std::any_cast<float>(inVar));
+      narrowFloatTo<T>(std::any_cast<float>(inVar), retVal);
     } else if (inVar.type() == typeid(double)) {
-      retVal = narrowFloatTo<T>(std::any_cast<double>(inVar));
+      narrowFloatTo<T>(std::any_cast<double>(inVar), retVal);
     } else if (inVar.type() == typeid(std::pair<int, int>)) {
       SPDLOG_ERROR("No cast INTPAIR to any type here");
       retVal = static_cast<T>(0);

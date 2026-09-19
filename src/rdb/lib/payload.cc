@@ -282,6 +282,12 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
     nullBitset_[position] = false;
     cast<std::any> castAny;
     value = castAny(valueParam.value(), requestedType);
+    // Wartosc bez odpowiednika w typie pola (np. 1e30 do INTEGER) jest NULL-em, nie liczba -
+    // patrz narrowFloatTo w convertTypes.cc. Pole NULLTYPE przechowuje monostate jako wartosc.
+    if (requestedType != rdb::NULLTYPE && value.type() == typeid(std::monostate)) {
+      nullBitset_[position] = true;
+      std::visit([&value](const auto &v) { value = std::any(v); }, nullFallbackValue(requestedType));
+    }
   }
 
   auto writeStringField = [&]() {
@@ -470,7 +476,13 @@ void payload::setItemVT(const int positionFlat, std::optional<rdb::descFldVT> va
   } else {
     nullBitset_[position] = false;
     cast<rdb::descFldVT> castVT;
-    value = castVT(valueParam.value(), requestedType);  // gwarantuje alternatywe wariantu = requestedType
+    value = castVT(valueParam.value(), requestedType);  // alternatywa = requestedType albo monostate
+    // Wartosc bez odpowiednika w typie pola (np. 1e30 do INTEGER) jest NULL-em, nie liczba -
+    // patrz narrowFloatTo w convertTypes.cc. Pole NULLTYPE przechowuje monostate jako wartosc.
+    if (requestedType != rdb::NULLTYPE && std::holds_alternative<std::monostate>(value)) {
+      nullBitset_[position] = true;
+      value                 = nullFallbackValue(requestedType);
+    }
   }
 
   const auto offsetFlat = descriptor.byteOffsetAtFlatIndex(positionFlat);

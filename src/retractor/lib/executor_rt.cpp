@@ -222,19 +222,27 @@ bool rtActivate(int priority) {
   // tak. Liczenie tego jako bledu sprowadzaloby rtActivate do false na kazdym
   // uruchomieniu, a wolajacy odczytalby to jako brak uprawnien, ktorych nie brakuje.
   const auto lockAll = [&ok](int flags) {
-    if (mlockall(flags) == 0) return;
+    if (mlockall(flags) == 0) return true;
     if (errno == ENOSYS) {
       SPDLOG_DEBUG("mlockall not implemented by this kernel; continuing without locked pages");
-      return;
+      return true;
     }
     SPDLOG_WARN("mlockall failed: {}", strerror(errno));
     ok = false;
+    return false;
   };
 
   if (mlockMode == "onfault") {
 #if RDB_HAS_MCL_ONFAULT
-    lockAll(MCL_CURRENT);
-    lockAll(MCL_FUTURE | MCL_ONFAULT);
+    // MCL_FUTURE wolno wlaczyc WYLACZNIE po udanym MCL_CURRENT. Po porazce (bez
+    // CAP_IPC_LOCK przy niskim RLIMIT_MEMLOCK) samo MCL_FUTURE|MCL_ONFAULT
+    // przechodzi, a wtedy kazde nowe mapowanie liczy sie do limitu: mmap segmentu
+    // kolejki i pthread_create koncza sie EAGAIN. Produkcyjnie zaslania to
+    // rtCheckAndPrint (wymaga CAP_IPC_LOCK), ale test WithoutRootReturnsFalse wola
+    // rtActivate bez uprawnien - przy `ulimit -l 64` dwa kolejne testy tego
+    // binarium tracily wtedy watki (sprawdzone 2026-09-19). Tak dzialal skrot `||`
+    // sprzed portu.
+    if (lockAll(MCL_CURRENT)) lockAll(MCL_FUTURE | MCL_ONFAULT);
 #else
     // Bez MCL_ONFAULT zostaje samo MCL_CURRENT: blokujemy to, co juz jest odwzorowane,
     // i NIE wlaczamy MCL_FUTURE, bo to wlasnie ono kosztowalo ~25 ms na mmapie kolejki.

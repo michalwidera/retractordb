@@ -36,7 +36,7 @@ RetractorDB consists of three main programs:
 
 ## Installation
 
-RetractorDB runs on Linux (x64 and ARM64) and on macOS (Apple silicon and Intel). Prebuilt packages are published for Linux only; on macOS you build from source. See [Option B](#option-b---build-from-source) and the macOS notes below it.
+RetractorDB runs on Linux (x64 and ARM64) and on macOS. The macOS port is tested on Apple silicon only, with macOS 27 and Apple clang 21; Intel Macs and older macOS releases are untested. Prebuilt packages are published for Linux only; on macOS you build from source. See [Option B](#option-b---build-from-source) and the macOS notes below it.
 
 ### Option A - install from a release package
 
@@ -86,7 +86,7 @@ xtrdb -h
 
 ### Option B - build from source
 
-The build uses **Conan 2 + CMake + Ninja**. On Linux it requires **GCC 14+** (C++23, including `std::println`/`<print>`, absent from libstdc++ 13); on macOS it requires the **Xcode 16.3+ command-line tools** and a deployment target of **macOS 14.4 or newer** - `std::print` carries an availability annotation in Apple's libc++, so an older target fails to compile. A helper script, [`scripts/buildrdb.sh`](scripts/buildrdb.sh), bootstraps the toolchain and drives the build. Run it from the repo root, `scripts/`, or `build/Debug/`.
+The build uses **Conan 2 + CMake + Ninja**. On Linux it requires **GCC 14+** (C++23, including `std::println`/`<print>`, absent from libstdc++ 13); on macOS it requires the **Xcode 16.3+ command-line tools** and a deployment target of **macOS 14.4 or newer** - `std::print` carries an availability annotation in Apple's libc++, so an older target fails to compile. That is the floor the code imposes, not a tested configuration. A helper script, [`scripts/buildrdb.sh`](scripts/buildrdb.sh), bootstraps the toolchain and drives the build. Run it from the repo root, `scripts/`, or `build/Debug/`.
 
 ```bash
 git clone https://github.com/michalwidera/retractordb.git

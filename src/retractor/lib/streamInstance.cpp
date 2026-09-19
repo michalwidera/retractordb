@@ -523,7 +523,12 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) cons
     cast<rdb::descFldVT> castVT;
     rdb::descFldVT value = castVT(retVal, (outputPayload->descriptor[i]).rtype);
 
-    outputPayload->getPayload()->setItemVT(i, value);
+    // Rzut na typ pola moze nie miec wyniku (FLOAT poza zakresem INTEGER daje monostate), a
+    // monostate w std::optional nie jest NULL-em dla setItemVT - zapisujemy go jawnie.
+    if (std::holds_alternative<std::monostate>(value))
+      outputPayload->getPayload()->setItemVT(i, std::nullopt);
+    else
+      outputPayload->getPayload()->setItemVT(i, value);
 
     i++;
   }
