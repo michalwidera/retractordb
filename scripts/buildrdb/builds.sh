@@ -178,36 +178,59 @@ run_build_option() {
             build_jobs=$(compute_build_jobs)
             cmake --build "$pkg_dir" --parallel "$build_jobs"
             cd "$pkg_dir" || exit 1
-            cpack || echo "-- cpack zgłosił błędy (np. brak dpkg-deb dla DEB) - sprawdzam wynik."
+            cpack || echo "-- cpack zgłosił błędy (np. brak dpkg-deb dla DEB) - poza Linuksem powstaje tylko TGZ - sprawdzam wynik."
             # Śmieci po packagingu: katalog stagingu i manifest instalacji. Finalne
             # archiwa (.deb/.tar.gz) zostają.
             rm -rf _CPack_Packages install_manifest.txt
             echo "-- Packaging artifacts in $pkg_dir:"
-            ls -1 *.deb *.tar.gz 2>/dev/null || echo "   (none produced)"
+            # Brak .deb nie jest bledem - poza Linuksem cpack robi wylacznie TGZ.
+            # Samo `ls -1 *.deb *.tar.gz` konczylo sie niezerowo juz za niedopasowany
+            # wzorzec *.deb i dopisywalo "(none produced)" nawet wtedy, gdy .tar.gz
+            # powstal i byl wypisany linijke wyzej.
+            packaged_files=$(ls -1 *.deb *.tar.gz 2>/dev/null || true)
+            if [ -n "$packaged_files" ]; then
+                printf '%s\n' "$packaged_files"
+            else
+                echo "   (none produced)"
+            fi
             ;;
         "coverage")
-            gcc_ver=$(gcc -dumpversion | cut -d. -f1)
-            gcov_exec="gcov-${gcc_ver}"
-            echo "-- GCC $gcc_ver detected, checking coverage tools..."
+            # Na macOS nie ma ani gcov-N, ani apt-get: narzedziem pokrycia jest
+            # `llvm-cov gcov` (tryb zgodnosci z gcov) wolane przez xcrun, zeby
+            # trafic w aktywne SDK. gcovr przyjmuje --gcov-executable z
+            # argumentami, wiec ta wielowyrazowa nazwa jest dla niego w porzadku
+            # - `command -v` juz nie, dlatego sprawdzamy sam xcrun.
+            if [ "$(rdb_os)" = "macos" ]; then
+                gcov_exec="xcrun llvm-cov gcov"
+                echo "-- AppleClang detected, using '$gcov_exec' for coverage..."
+                command_exists xcrun || { echo "Error: xcrun not found - install the Xcode command line tools (xcode-select --install)"; exit 1; }
+            else
+                gcc_ver=$(gcc -dumpversion | cut -d. -f1)
+                gcov_exec="gcov-${gcc_ver}"
+                echo "-- GCC $gcc_ver detected, checking coverage tools..."
 
-            # gcov - optional install path: install only when missing.
-            if ! command -v "$gcov_exec" &>/dev/null; then
-                echo "-- $gcov_exec not found, installing $gcov_exec..."
-                sudo apt-get install -y gcc-${gcc_ver} || { echo "Error: Failed to install $gcov_exec"; exit 1; }
-
-                # Verify only when we had to install.
+                # gcov - optional install path: install only when missing.
                 if ! command -v "$gcov_exec" &>/dev/null; then
-                    echo "Error: $gcov_exec still not available after install attempt"; exit 1
-                fi
-            fi
+                    echo "-- $gcov_exec not found, installing $gcov_exec..."
+                    sudo apt-get install -y gcc-${gcc_ver} || { echo "Error: Failed to install $gcov_exec"; exit 1; }
 
-            gcov_ver=$("$gcov_exec" --version | head -1 | grep -oP '\d+' | head -1)
-            echo "-- OK: $gcov_exec version $gcov_ver matches GCC $gcc_ver"
+                    # Verify only when we had to install.
+                    if ! command -v "$gcov_exec" &>/dev/null; then
+                        echo "Error: $gcov_exec still not available after install attempt"; exit 1
+                    fi
+                fi
+
+                # grep -oE zamiast -oP: PCRE ma tylko GNU grep, a BSD grep na macOS
+                # konczy sie na -P bledem. Dla wejscia ASCII '\d+' i '[0-9]+' daja
+                # ten sam wynik, wiec na Linuksie nic sie nie zmienia.
+                gcov_ver=$("$gcov_exec" --version | head -1 | grep -oE '[0-9]+' | head -1)
+                echo "-- OK: $gcov_exec version $gcov_ver matches GCC $gcc_ver"
+            fi
 
             # gcovr - narzędzie raportujące
             if ! command -v gcovr &>/dev/null; then
                 echo "-- gcovr not found, installing..."
-                pip3 install gcovr || { echo "Error: Failed to install gcovr"; exit 1; }
+                rdb_pip_install gcovr || { echo "Error: Failed to install gcovr"; exit 1; }
             fi
 
             cd "$rdb_source_dir"

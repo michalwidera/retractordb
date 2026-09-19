@@ -24,7 +24,7 @@ set -e
 rm -f str*
 xretractor query.rql -m 2 -f
 xretractor query.rql -m 2 -f
-ls str* | grep --invert-match '\\.shadow$' | wc -l > count.txt
+ls str* | grep --invert-match '\\.shadow$' | wc -l | tr -d ' ' > count.txt
 bash ../compare.sh --ignore-eol count.pattern count.txt
 ")
 

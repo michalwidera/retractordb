@@ -28,3 +28,15 @@ foreach(mode fake real)
                                                  SKIP_RETURN_CODE 77)
 endforeach()
 set_tests_properties(st_api_real PROPERTIES RUN_SERIAL TRUE)
+
+# Ten sam kod Process, z kontrolowanym przeplotem tworzenia dwoch potokow.
+add_executable(test_api_spawn EXCLUDE_FROM_ALL api_spawn.cpp)
+target_compile_features(test_api_spawn PRIVATE cxx_std_23)
+target_include_directories(
+  test_api_spawn PRIVATE ${CMAKE_SOURCE_DIR}/api/cpp/include
+                         ${CMAKE_BINARY_DIR}/api/cpp/generated)
+target_link_libraries(test_api_spawn PRIVATE rdb_api_json Boost::headers
+                                             Threads::Threads)
+# Dolaczony client.cpp: to samo ostrzezenie GCC co przy test_busFallback.
+target_compile_options(test_api_spawn
+                       PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-subobject-linkage>)

@@ -9,8 +9,10 @@
 #include <ctime>
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <thread>
 
+#include "platformConfig.h"
 #include "retractor/lib/executor_rt.hpp"
 
 // ctest -R '^ut-test_executor_rt' -V
@@ -101,13 +103,24 @@ TEST(ExecutorRtCheckTest, OutputContainsAllRequiredSections) {
   std::cout.rdbuf(old);
 
   const auto &out = captured.str();
+  // Wiersze wspolne dla kazdej platformy: ramka, limit blokowania pamieci,
+  // wzmianka o dlawieniu RT i biezaca polityka szeregowania.
   EXPECT_NE(out.find("RT requirements check"), std::string::npos);
-  EXPECT_NE(out.find("CAP_SYS_NICE"), std::string::npos);
-  EXPECT_NE(out.find("CAP_IPC_LOCK"), std::string::npos);
-  EXPECT_NE(out.find("PREEMPT_RT"), std::string::npos);
   EXPECT_NE(out.find("RT throttling"), std::string::npos);
   EXPECT_NE(out.find("RLIMIT_MEMLOCK"), std::string::npos);
   EXPECT_NE(out.find("Current scheduler"), std::string::npos);
+
+#if RDB_HAS_PROCFS
+  // Capabilities POSIX.1e i latka PREEMPT_RT sa pojeciami jadra Linuksa. Wiersz
+  // "CAP_SYS_NICE" na jadrze bez capabilities bylby nieprawda w formacie raportu
+  // zgodnosci, wiec tam raport wypisuje inne pozycje - patrz executor_rt.cpp.
+  EXPECT_NE(out.find("CAP_SYS_NICE"), std::string::npos);
+  EXPECT_NE(out.find("CAP_IPC_LOCK"), std::string::npos);
+  EXPECT_NE(out.find("PREEMPT_RT"), std::string::npos);
+#else
+  EXPECT_NE(out.find("SCHED_FIFO available"), std::string::npos);
+  EXPECT_NE(out.find("Real-time kernel"), std::string::npos);
+#endif
 }
 
 TEST(ExecutorRtCheckTest, OutputUsesOkOrFailMarkers) {
@@ -135,6 +148,8 @@ TEST(ExecutorRtCheckTest, FalseReturnImpliesErrorInOutput) {
 
 // --- rtActivate ---
 
+#if RDB_HAS_SCHED_SETSCHEDULER
+
 TEST(ExecutorRtActivateTest, WithoutRootReturnsFalse) {
   if (geteuid() == 0) {
     GTEST_SKIP() << "Running as root; cannot test unprivileged path";
@@ -142,6 +157,34 @@ TEST(ExecutorRtActivateTest, WithoutRootReturnsFalse) {
   bool result = rtActivate();
   EXPECT_FALSE(result);
 }
+
+#else
+
+// Na jadrach, w ktorych polityka szeregowania jest wlasnoscia WATKU, a nie calego
+// procesu, podniesienie do SCHED_FIFO nie jest zastrzezone dla roota tak jak na
+// Linuksie - wiec "bez roota ma sie nie udac" nie jest tu zdaniem prawdziwym
+// i nie ma czego asercjonowac. Sprawdzalne jest natomiast, ze wynik NIE KLAMIE:
+// gdy rtActivate melduje sukces, wolajacy watek naprawde biegnie pod SCHED_FIFO.
+TEST(ExecutorRtActivateTest, SuccessImpliesRealTimePolicyOnCallingThread) {
+  int policyBefore = SCHED_OTHER;
+  struct sched_param paramBefore{};
+  ASSERT_EQ(pthread_getschedparam(pthread_self(), &policyBefore, &paramBefore), 0);
+
+  const bool activated = rtActivate();
+
+  int policyAfter = SCHED_OTHER;
+  struct sched_param paramAfter{};
+  ASSERT_EQ(pthread_getschedparam(pthread_self(), &policyAfter, &paramAfter), 0);
+
+  // Polityke przywracamy ZAWSZE i przed asercja: gdyby test zostawil watek
+  // testowy pod SCHED_FIFO, kazdy nastepny test w tym binarium biegl by z
+  // priorytetem czasu rzeczywistego.
+  pthread_setschedparam(pthread_self(), policyBefore, &paramBefore);
+
+  if (activated) EXPECT_EQ(policyAfter, SCHED_FIFO);
+}
+
+#endif
 
 // --- rtKeepThreadOffRtCpus (issue_217, badanie W8) ---
 //
@@ -153,6 +196,8 @@ TEST(ExecutorRtActivateTest, WithoutRootReturnsFalse) {
 // Samego zagłodzenia nie da się odtworzyć w teście jednostkowym bez CAP_SYS_NICE
 // i bez ryzyka zawieszenia rdzenia biegaczowi testów, więc testowany jest
 // mechanizm, który mu zapobiega: rozdział rdzeni.
+
+#if RDB_HAS_SCHED_AFFINITY
 
 TEST(ExecutorRtAffinityTest, MovesThreadOffPinnedRtCore) {
   if (sysconf(_SC_NPROCESSORS_ONLN) < 2) GTEST_SKIP() << "test wymaga co najmniej dwoch rdzeni online";
@@ -222,5 +267,34 @@ TEST(ExecutorRtAffinityTest, LeavesUnpinnedThreadAlone) {
 
   EXPECT_FALSE(moved) << "bez przypiecia watku RT nie wolno ruszac powinowactwa watku pomocniczego";
 }
+
+#else
+
+// Bez masek powinowactwa nie ma czego przestawiac i nie ma tez zaglodzenia,
+// przed ktorym tamten mechanizm broni: rtActivate podnosi wtedy do SCHED_FIFO
+// sam watek wolajacy, wiec watek komunikacyjny zostaje przy polityce domyslnej.
+// Kontrakt, ktory MUSI obowiazywac takze tutaj: funkcja melduje false, czyli
+// "niczego nie zmieniono", zamiast udawac, ze watek zostal przeniesiony.
+TEST(ExecutorRtAffinityTest, ReportsNoMoveWhereAffinityIsUnavailable) {
+  std::atomic<bool> stop{false};
+  std::thread aux([&stop] {
+    while (!stop)
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  });
+
+  testing::internal::CaptureStdout();
+  const bool moved      = rtKeepThreadOffRtCpus(aux.native_handle());
+  const std::string out = testing::internal::GetCapturedStdout();
+
+  stop = true;
+  aux.join();
+
+  EXPECT_FALSE(moved);
+  // Komunikat wypisywany jest RAZ na proces, wiec przy drugim wywolaniu w tym
+  // samym binarium bedzie pusty - stad asercja tylko o tresci, gdy cos padlo.
+  if (!out.empty()) EXPECT_NE(out.find("CPU affinity is not available"), std::string::npos);
+}
+
+#endif
 
 }  // namespace

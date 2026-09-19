@@ -1,0 +1,14 @@
+# GENEROWANY przez CMake z test/IntegrationTest/shmEnv.sh.in - nie edytowac kopii
+# w drzewie budowy.
+#
+# Odpowiada na jedno pytanie, ktorego skrypt powloki sam sobie zadac nie moze:
+# czy Boost.Interprocess, tak jak zostal skompilowany dla TEJ konfiguracji, uzywa
+# POSIX-owych obiektow pamieci dzielonej (shm_open), czy zwyklych plikow w swoim
+# katalogu roboczym. Od tego zalezy, gdzie kontrole higieny testow integracyjnych
+# maja szukac pozostawionych obiektow - i czy w ogole maja gdzie szukac.
+#
+# Wartosc bierze sie z realnego makra biblioteki
+# (BOOST_INTERPROCESS_POSIX_SHARED_MEMORY_OBJECTS), sprawdzonego proba
+# kompilacyjna przy konfiguracji, a nie z nazwy systemu.
+RDB_SHM_POSIX=@RDB_BOOST_POSIX_SHM_01@
+RDB_SHM_DIR_HINT="@RDB_SHM_DIR_HINT@"

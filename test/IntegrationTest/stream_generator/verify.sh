@@ -11,6 +11,7 @@
 # recznego, a mimo to przerywala start, bo launcher mapowal linie RQL na jeden strumien.
 # Testy jednostkowe planu takiego defektu zobaczyc nie moga.
 set -e
+. "$(dirname "$0")/../portable.sh"
 rm -rf gen man
 for variant in gen man; do
   mkdir -p "$variant"
@@ -45,7 +46,7 @@ for i in 0 1 2 3; do
 
   # cells.txt to 1..16, pole ma 4 elementy, wiec rekord k niesie 4k+1 .. 4k+4,
   # a strumien cell$i to kolejne 4k+i+1. Wzorzec przyciety do liczby rekordow.
-  records=$(($(stat -c %s "gen/$name") / 4))
+  records=$(record_count "gen/$name" 4)
   expected=$(for k in $(seq 0 $((records - 1))); do echo $((4 * k + i + 1)); done | xargs)
   [ "$(dump "gen/$name")" = "$expected" ] || {
     echo "$name: wartosci niezgodne z definicja zrodla"

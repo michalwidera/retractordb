@@ -53,6 +53,10 @@ class groupFile : public FileInterface {
 
   using FileInterface::read;
   using FileInterface::write;
+  // Wirtualne skladowe instancjuje JAWNIE `template class groupFile<...>` na koncu fagrp.cc,
+  // wiec nie zaleza od tego, czy dany kompilator instancjuje je niejawnie - a o to pyta
+  // portability-template-virtual-member-function przy `extern template` nizej.
+  // NOLINTBEGIN(portability-template-virtual-member-function)
   ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, size_t position) override;
   ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) override;
   ssize_t purge();
@@ -60,8 +64,24 @@ class groupFile : public FileInterface {
   auto name() -> std::string & override;
   size_t count() override;
   [[nodiscard]] bool hasShadow() const override { return !vec_.empty() && vec_.front()->hasShadow(); }
+  // NOLINTEND(portability-template-virtual-member-function)
 };
 
-template class groupFile<posixBinaryFileWithShadow>;
-template class groupFile<posixBinaryFile>;
+/// DEKLARACJA instancjacji, nie definicja - definicja stoi na koncu fagrp.cc, za
+/// cialami metod.
+///
+/// Wczesniej bylo tu `template class groupFile<...>;`, czyli DEFINICJA instancjacji
+/// w miejscu, w ktorym widac same deklaracje skladowych. Standard nie kaze tego
+/// zglaszac, wiec kompilator po prostu nie emituje cial, ktorych nie widzi, i czy
+/// symbole powstana, zalezy od tego, KIEDY dany kompilator wykonuje instancjacje.
+/// GCC odklada ja do konca jednostki, wiec w fagrp.cc trafiala juz na definicje
+/// nizej i symbole powstawaly. Clang instancjuje w miejscu zapisu - a tam nie ma
+/// jeszcze czego instancjowac - wiec konstruktor groupFile nie powstawal w ogole
+/// i jedenascie celow nie linkowalo sie na ten jeden brakujacy symbol.
+///
+/// `extern template` mowi wprost to, co i tak jest prawda: tej instancjacji nie
+/// rob tutaj, ona jest gdzie indziej. Poza korzysciami z poprawnosci oszczedza tez
+/// kazdej jednostce prob instancjacji.
+extern template class groupFile<posixBinaryFileWithShadow>;
+extern template class groupFile<posixBinaryFile>;
 }  // namespace rdb

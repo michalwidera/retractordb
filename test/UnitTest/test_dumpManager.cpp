@@ -15,6 +15,7 @@
 
 #include "rdb/descriptor.hpp"
 #include "rdb/payload.hpp"
+#include "syscallWrap.hpp"
 
 extern "C" off_t __real_lseek(int fd, off_t offset, int whence);
 extern "C" ssize_t __real_write(int fd, const void *buf, size_t count);
@@ -42,6 +43,10 @@ extern "C" ssize_t __wrap_write(int fd, const void *buf, size_t count) {
   wrappedLastFd = fd;
   return static_cast<ssize_t>(count);
 }
+
+// Spiecie __wrap_/__real_ z prawdziwym wywolaniem systemowym - patrz syscallWrap.hpp.
+RDB_WRAP_SYSCALL(off_t, lseek, (int fd, off_t offset, int whence), (fd, offset, whence));
+RDB_WRAP_SYSCALL(ssize_t, write, (int fd, const void *buf, size_t count), (fd, buf, count));
 
 TEST(dumpManager, buildDumpChunk_accepts_fd_zero_as_valid) {
   dumpManager manager;

@@ -30,10 +30,14 @@ QRY_LOG="${TMPDIR:-/tmp}/xqry.log"
 rc=0
 xqry -s dst -m 2 > out.txt 2> err.txt || rc=$?
 
-# 63 = no_stream_resources, czyli selectResult::clientQueueMissing. Kolejki faktycznie
+# no_stream_resources, czyli selectResult::clientQueueMissing. Kolejki faktycznie
 # nie ma, wiec werdykt jest ten sam co przed naprawa -- zmienia sie moment i uzasadnienie.
-if [ "$rc" -ne 63 ]; then
-  echo "xqry zakonczyl sie kodem $rc, oczekiwano 63"
+#
+# Liczbe bierzemy z nazwy stalej: boost::system::errc::no_stream_resources to ENOSR,
+# a to jest 63 na Linuksie i 98 na macOS.
+expected_rc=$(errno_value ENOSR)
+if [ "$rc" -ne "$expected_rc" ]; then
+  echo "xqry zakonczyl sie kodem $rc, oczekiwano $expected_rc"
   cat out.txt err.txt
   exit 1
 fi

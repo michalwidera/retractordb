@@ -25,6 +25,18 @@ CODE_REPO="$(cd "$HERE/../.." && pwd)"
 # profilu. Uzgodniona miedzy tymi dwoma skryptami i nigdzie indziej.
 STAMP=".gate-src-fingerprint"
 
+# Suma kontrolna SHA-256 ze standardowego wejscia, sam skrot. GNU ma sha256sum,
+# BSD/macOS ma `shasum -a 256`. Odpowiednik sha256_of z
+# test/IntegrationTest/portable.sh (tam wersja plikowa); kopia lokalna, bo bramka
+# badawcza jest z zalozenia samodzielna wzgledem kopii test/.
+sha256_of_stdin() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | awk '{print $1}'
+  else
+    shasum -a 256 | awk '{print $1}'
+  fi
+}
+
 # Odcisk TRESCI src/, a nie czasu modyfikacji. Git przepisuje mtime przy kazdym
 # `checkout` i `pull --rebase`, wiec profil zbudowany z dokladnie tej samej
 # tresci wygladal na nieswiezy i poziom 84/84 byl pomijany bez powodu
@@ -43,7 +55,7 @@ src_fingerprint() { # src_fingerprint <repozytorium> -> odcisk na stdout
   # Plik sledzony, ale usuniety z dysku, przewraca `hash-object` - i slusznie:
   # nieobliczalny odcisk ma znaczyc "nieswiezy", nigdy "swiezy".
   hashes="$(printf '%s\n' "$list" | git -C "$repo" hash-object --stdin-paths 2>/dev/null)" || return 1
-  printf '%s\n%s\n' "$list" "$hashes" | sha256sum | awk '{print $1}'
+  printf '%s\n%s\n' "$list" "$hashes" | sha256_of_stdin
 }
 
 XRETRACTOR=""

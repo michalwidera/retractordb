@@ -33,11 +33,11 @@ ssize_t posixBinaryFileWithShadow::shadowFind(uint8_t *ptrData, size_t position)
   // Szukaj od końca - ostatni wpis z daną pozycją ma najnowsze dane
   for (ssize_t i = numEntries - 1; i >= 0; --i) {
     size_t storedPos;
-    ssize_t rd = ::pread(fd_shadow, &storedPos, sizeof(size_t), static_cast<__off_t>(i * entrySize));
+    ssize_t rd = ::pread(fd_shadow, &storedPos, sizeof(size_t), static_cast<off_t>(i * entrySize));
     if (rd != sizeof(size_t)) continue;
 
     if (storedPos == position) {
-      rd = ::pread(fd_shadow, ptrData, recordSize_, static_cast<__off_t>(i * entrySize) + static_cast<__off_t>(sizeof(size_t)));
+      rd = ::pread(fd_shadow, ptrData, recordSize_, static_cast<off_t>(i * entrySize) + static_cast<off_t>(sizeof(size_t)));
       if (rd != recordSize_) return EXIT_FAILURE;
       return EXIT_SUCCESS;
     }
@@ -267,11 +267,10 @@ ssize_t posixBinaryFileWithShadow::merge() {
 
   for (ssize_t i = 0; i < numEntries; ++i) {
     size_t storedPos;
-    ssize_t rd = ::pread(fd_shadow, &storedPos, sizeof(size_t), static_cast<__off_t>(i * entrySize));
+    ssize_t rd = ::pread(fd_shadow, &storedPos, sizeof(size_t), static_cast<off_t>(i * entrySize));
     if (rd != sizeof(size_t)) continue;
 
-    rd = ::pread(fd_shadow, buffer.data(), recordSize_,
-                 static_cast<__off_t>(i * entrySize) + static_cast<__off_t>(sizeof(size_t)));
+    rd = ::pread(fd_shadow, buffer.data(), recordSize_, static_cast<off_t>(i * entrySize) + static_cast<off_t>(sizeof(size_t)));
     if (rd != recordSize_) continue;
 
     // Nadpisz rekord w głównym pliku

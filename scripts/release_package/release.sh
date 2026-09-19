@@ -130,7 +130,7 @@ if ((failures > 0)); then
 fi
 ((check_only == 0)) || exit 0
 
-# Kolejno, nie rownolegle: dwa buildy z -fmodules-ts naraz nie mieszcza sie w RAM.
+# Kolejno, nie rownolegle: dwa buildy naraz nie mieszcza sie w RAM.
 "$repo_dir/scripts/release_package/package-portable-x86.sh" --fresh
 "$repo_dir/scripts/release_package/package-portable-arm64.sh" --fresh
 

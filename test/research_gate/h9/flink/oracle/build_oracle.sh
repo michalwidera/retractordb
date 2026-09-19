@@ -16,7 +16,12 @@ done
 
 # Sciezki naglowkow i runtime ANTLR-a odczytane z compile_commands.json profilu,
 # zeby skrypt nie powtarzal wersji pakietow Conana za CMakiem.
-readarray -t CONAN_INC < <(python3 - "$BUILD/compile_commands.json" <<'PY'
+# `readarray`/`mapfile` pojawily sie w bashu 4.0; macOS ma basha 3.2, gdzie ta
+# linia jest bledem skladni. Petla `while read` daje ten sam wynik na obu.
+CONAN_INC=()
+while IFS= read -r conan_inc_line; do
+  CONAN_INC+=("$conan_inc_line")
+done < <(python3 - "$BUILD/compile_commands.json" <<'PY'
 import json, sys, shlex
 entries = json.load(open(sys.argv[1]))
 probe = next(e for e in entries if e["file"].endswith("/probe.cc"))

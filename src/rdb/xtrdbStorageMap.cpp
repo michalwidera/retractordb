@@ -1,6 +1,7 @@
 #include "xtrdbStorageMap.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>

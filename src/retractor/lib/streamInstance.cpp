@@ -1,6 +1,6 @@
 #include "streamInstance.hpp"
 
-#include <spdlog/spdlog.h>
+#include <sys/wait.h>  // WIFEXITED, WEXITSTATUS dla wyniku ::system()
 
 #include <cstdint>
 #include <cstdlib>  // std::div
@@ -8,6 +8,8 @@
 #include <optional>
 #include <utility>
 #include <variant>  // std::get, std::holds_alternative (P1-E3b)
+
+#include <spdlog/spdlog.h>
 
 #include "fatalError.hpp"
 
@@ -521,7 +523,12 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) cons
     cast<rdb::descFldVT> castVT;
     rdb::descFldVT value = castVT(retVal, (outputPayload->descriptor[i]).rtype);
 
-    outputPayload->getPayload()->setItemVT(i, value);
+    // Rzut na typ pola moze nie miec wyniku (FLOAT poza zakresem INTEGER daje monostate), a
+    // monostate w std::optional nie jest NULL-em dla setItemVT - zapisujemy go jawnie.
+    if (std::holds_alternative<std::monostate>(value))
+      outputPayload->getPayload()->setItemVT(i, std::nullopt);
+    else
+      outputPayload->getPayload()->setItemVT(i, value);
 
     i++;
   }

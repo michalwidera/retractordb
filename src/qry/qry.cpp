@@ -5,10 +5,12 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstdio>
 #include <expected>
 #include <iostream>
 #include <print>
 #include <sstream>
+#include <stop_token>
 #include <thread>
 #include <vector>
 

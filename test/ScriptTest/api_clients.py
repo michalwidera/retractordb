@@ -18,9 +18,12 @@ source, xqry, xretractor, cpp, mode = sys.argv[1:]
 # brak i to nie jest awaria, tylko nieodebrana opcja. 77 = SKIP_RETURN_CODE
 # ustawiony w CMakeLists.txt, dzieki czemu ctest raportuje pominiecie zamiast
 # bledu. `ninja test` w ogole tu nie dochodzi: filtruje etykiete `api`.
-if not os.path.exists(cpp):
-    print("SKIP brak " + cpp + " - zbuduj `ninja test-api`", flush=True)
-    sys.exit(77)
+# test_api_spawn powstaje w tym samym kroku; sprawdzamy oba, bo samo `ninja test_api_client`
+# zostawia drugi niezbudowany, a tryb fake wolalby go wtedy z FileNotFoundError zamiast pominac.
+for binary in (cpp, str(Path(cpp).with_name("test_api_spawn"))):
+    if not os.path.exists(binary):
+        print("SKIP brak " + binary + " - zbuduj `ninja test-api`", flush=True)
+        sys.exit(77)
 
 sys.path.insert(0, str(Path(source) / "api/python"))
 from retractordb import Client, Error, ReadTimeout
@@ -80,8 +83,44 @@ def error(code):
         raise AssertionError("Expected " + code)
 
 
-def reaped(pid):
-    assert not Path(f"/proc/{pid}").exists(), f"Child left behind: {pid}"
+def reaped(pid, timeout=0.5):
+    """Obserwuje znikniecie dziecka; nie zbiera go za badanego klienta."""
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return
+        except PermissionError as exc:
+            raise AssertionError(f"Cannot verify reaping of child {pid}") from exc
+        if time.monotonic() >= deadline:
+            raise AssertionError(f"Child left behind (including zombie): {pid}")
+        time.sleep(0.01)
+
+
+def check_reaped_guard():
+    # Potomek musi byc zombie, zanim sprawdzimy asercje. ps tylko obserwuje
+    # stan, nie zastepuje waitpid klienta.
+    pid = os.fork()
+    if pid == 0:
+        os._exit(0)
+    try:
+        deadline = time.monotonic() + 2
+        while True:
+            state = subprocess.check_output(["ps", "-o", "stat=", "-p", str(pid)], text=True).strip()
+            if state.startswith("Z"):
+                break
+            assert time.monotonic() < deadline, "child did not become a zombie"
+            time.sleep(0.01)
+        try:
+            reaped(pid, timeout=0)
+        except AssertionError:
+            pass
+        else:
+            raise AssertionError("reaped accepted a zombie")
+    finally:
+        os.waitpid(pid, 0)
+    reaped(pid)
 
 
 def python_fake(binary):
@@ -198,6 +237,8 @@ SELECT 'hello world', 'null' STREAM words FROM numbers
 with tempfile.TemporaryDirectory(prefix="rdb-api-test-") as tmp:
     root = Path(tmp)
     if mode == "fake":
+        check_reaped_guard()
+        subprocess.run([str(Path(cpp).with_name("test_api_spawn"))], check=True, timeout=15)
         stub = root / "fake xqry"
         stub.write_text(STUB, encoding="ascii")
         stub.chmod(0o755)

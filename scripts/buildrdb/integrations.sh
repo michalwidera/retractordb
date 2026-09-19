@@ -29,12 +29,26 @@ attach_knowledge_index() {
         return 1
     fi
 
-    if [ "$resolved_skill_dir" != "$knowledge_index_dir" ] || [ ! -f "$resolved_skill_dir/SKILL.md" ]; then
+    # Porownanie na sciezkach FIZYCZNYCH, komunikaty na logicznych.
+    #
+    # `resolved_skill_dir` powstaje przez `pwd -P`, wiec jest fizyczna zawsze;
+    # `knowledge_index_dir` idzie z `dirname` i zostaje taka, jaka widzi uzytkownik.
+    # Na Linuksie to zwykle to samo, ale na macOS /var i /tmp sa dowiazaniami do
+    # /private/..., wiec poprawnie podpiety indeks wygladal jak niezgodny:
+    # "/private/var/..." kontra "/var/...". Rozdzielamy wiec te dwie role zamiast
+    # normalizowac jedna z nich - komunikat ma pokazywac sciezke, ktora czytelnik
+    # rozpozna, a porownanie ma byc odporne na dowiazania.
+    local knowledge_index_real
+    knowledge_index_real=$(cd "$knowledge_index_dir" 2>/dev/null && pwd -P) || knowledge_index_real="$knowledge_index_dir"
+
+    if [ "$resolved_skill_dir" != "$knowledge_index_real" ] || [ ! -f "$resolved_skill_dir/SKILL.md" ]; then
         echo "Error: $skill_link does not point to a valid knowledge index at $knowledge_index_dir"
         return 1
     fi
 
-    echo "-- RetractorDB knowledge index attached: $resolved_skill_dir"
+    # Sciezka LOGICZNA, tak jak w komunikacie wyzej: rownosc z fizyczna zostala
+    # wlasnie sprawdzona, a czytelnik ma zobaczyc te sama postac, ktorej sam uzywa.
+    echo "-- RetractorDB knowledge index attached: $knowledge_index_dir"
 }
 run_integration_option() {
     local opt="$1"

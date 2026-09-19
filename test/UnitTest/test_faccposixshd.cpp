@@ -10,6 +10,7 @@
 
 #include "rdb/descriptor.hpp"
 #include "rdb/faccposixshd.hpp"
+#include "syscallWrap.hpp"
 
 // Tests intentionally use raw byte arrays for low-level shared-file behavior checks.
 // NOLINTBEGIN(modernize-avoid-c-arrays)
@@ -56,6 +57,12 @@ ssize_t __wrap_write(int fd, const void *buf, size_t count) {
   return __real_write(fd, buf, count);
 }
 }
+
+// Spiecie __wrap_/__real_ z prawdziwym wywolaniem systemowym. Na konsolidatorze
+// z --wrap nie generuje niczego; bez niego dostarcza definicje __real_* i symbol
+// o nazwie systemowej - patrz syscallWrap.hpp.
+RDB_WRAP_SYSCALL(ssize_t, pread, (int fd, void *buf, size_t count, off_t offset), (fd, buf, count, offset));
+RDB_WRAP_SYSCALL(ssize_t, write, (int fd, const void *buf, size_t count), (fd, buf, count));
 
 // --- Helpers ---
 

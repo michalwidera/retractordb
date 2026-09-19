@@ -2,6 +2,7 @@
 # Regresja epoki logicznej zapytań ad hoc. Późny pass-through musi zachować
 # bieżący indeks źródła zarówno w złączeniu, jak i w oknie AGSE.
 set -eu
+. "$(dirname "$0")/../portable.sh"
 . "$(dirname "$0")/../serverlib.sh"
 
 rm -rf temp
@@ -60,7 +61,7 @@ xqry -a 'SELECT * STREAM late_right FROM late_hash%0.1'
 # przebiegu (zrodlo ma 200 rekordow, wiec nie zdazy sie zawinac).
 i=0
 while [ "$i" -lt 200 ]; do
-  if [ "$(stat -c %s temp/late_right 2>/dev/null || echo 0)" -ge 48 ]; then break; fi
+  if [ "$(file_size temp/late_right)" -ge 48 ]; then break; fi
   sleep 0.05
   i=$((i + 1))
 done
@@ -74,14 +75,14 @@ check_sequence() {
     echo "ad hoc: $stream nie zawiera rekordow"
     return 1
   }
-  od -An -v -w4 -td4 "temp/$stream" | awk '
+  od -An -v -td4 "temp/$stream" | xargs -n1 | awk '
     NF != 1 || $1 == 0 { exit 1 }
     NR > 1 && $1 != previous + 1 { exit 1 }
     { previous = $1 }
     END { if (NR < 3) exit 1 }
   ' || {
     echo "ad hoc: $stream nie jest kolejnym fragmentem poznego zrodla"
-    od -An -v -w4 -td4 "temp/$stream"
+    od -An -v -td4 "temp/$stream" | xargs -n1
     return 1
   }
 }
@@ -93,14 +94,14 @@ check_sequence adhoc_shift
   echo "ad hoc: adhoc_window nie zawiera rekordow"
   exit 1
 }
-od -An -v -w12 -td4 temp/adhoc_window | awk '
+od -An -v -td4 temp/adhoc_window | xargs -n3 | awk '
   NF != 3 || $1 == 0 || $1 != $2 + 1 || $2 != $3 + 1 { exit 1 }
   NR > 1 && $1 != previous + 1 { exit 1 }
   { previous = $1 }
   END { if (NR < 3) exit 1 }
 ' || {
   echo "ad hoc: adhoc_window wystartowal przed zgromadzeniem pelnej historii"
-  od -An -v -w12 -td4 temp/adhoc_window
+  od -An -v -td4 temp/adhoc_window | xargs -n3
   exit 1
 }
 
@@ -111,12 +112,12 @@ od -An -v -w12 -td4 temp/adhoc_window | awk '
 
 # Każdy rekord ma dwa 3-polowe okna. Obie połowy muszą być identyczne:
 # late[n] jest pass-through win[n], a nie bieżącą wartością podpisaną origin=2.
-od -An -v -w24 -td4 temp/late_pair | awk '
+od -An -v -td4 temp/late_pair | xargs -n6 | awk '
   NF != 6 || $1 == 0 || $1 != $4 || $2 != $5 || $3 != $6 { exit 1 }
   END { if (NR == 0) exit 1 }
 ' || {
   echo "ad hoc: polaczono rekordy z roznych indeksow logicznych"
-  od -An -v -w24 -td4 temp/late_pair
+  od -An -v -td4 temp/late_pair | xargs -n6
   exit 1
 }
 
@@ -129,12 +130,12 @@ od -An -v -w24 -td4 temp/late_pair | awk '
 # kończące się na pierwszym polu bieżącego rekordu: [curr[0], prev[2], prev[1]].
 # Wynik musi pozostać pełny zamiast all-NULL powstałego przez odjęcie statycznego
 # origin zamiast runtime'owej bazy.
-od -An -v -w12 -td4 temp/late_window | awk '
+od -An -v -td4 temp/late_window | xargs -n3 | awk '
   NF != 3 || $1 == 0 || $2 == 0 || $3 == 0 || $1 != $2 + 3 || $1 != $3 + 2 { exit 1 }
   END { if (NR == 0) exit 1 }
 ' || {
   echo "ad hoc: AGSE uzyl niewlasciwej bazy indeksu logicznego"
-  od -An -v -w12 -td4 temp/late_window
+  od -An -v -td4 temp/late_window | xargs -n3
   exit 1
 }
 
@@ -146,14 +147,14 @@ od -An -v -w12 -td4 temp/late_window | awk '
 # Różnica o dwukrotnie wolniejszym takcie wybiera co drugi rekord late.
 # Sprawdzamy zarówno zawartość okna, jak i krok między rekordami; rozpoczęcie
 # indeksowania ponownie od zera dawałoby tu odczyt sprzed runtime'owej bazy.
-od -An -v -w12 -td4 temp/late_sub | awk '
+od -An -v -td4 temp/late_sub | xargs -n3 | awk '
   NF != 3 || $1 == 0 || $1 != $2 + 1 || $2 != $3 + 1 { exit 1 }
   NR > 1 && $1 != previous + 2 { exit 1 }
   { previous = $1 }
   END { if (NR < 2) exit 1 }
 ' || {
   echo "ad hoc: SUB uzyl niewlasciwego indeksu logicznego"
-  od -An -v -w12 -td4 temp/late_sub
+  od -An -v -td4 temp/late_sub | xargs -n3
   exit 1
 }
 
@@ -165,7 +166,7 @@ od -An -v -w12 -td4 temp/late_sub | awk '
 # late i win mają ten sam takt i tę samą treść logiczną. Przeplot powtarza
 # zatem każde kolejne okno dwa razy. Wymagamy obu faz: powtórzenia i przejścia
 # do następnego indeksu, a nie tylko niezerowego pliku wynikowego.
-od -An -v -w12 -td4 temp/late_hash | awk '
+od -An -v -td4 temp/late_hash | xargs -n3 | awk '
   NF != 3 || $1 == 0 || $1 != $2 + 1 || $2 != $3 + 1 { exit 1 }
   NR > 1 {
     delta = $1 - previous
@@ -177,7 +178,7 @@ od -An -v -w12 -td4 temp/late_hash | awk '
   END { if (NR < 3 || !seen_same || !seen_next) exit 1 }
 ' || {
   echo "ad hoc: HASH uzyl niewlasciwego indeksu logicznego"
-  od -An -v -w12 -td4 temp/late_hash
+  od -An -v -td4 temp/late_hash | xargs -n3
   exit 1
 }
 
@@ -190,14 +191,14 @@ check_dehash() {
 
   # Rozplot przeplotu dwóch identycznych strumieni ma odzyskać kolejne pełne
   # okna. Osobne sprawdzenie obu gałęzi chroni różne odwzorowania Div i Mod.
-  od -An -v -w12 -td4 "temp/$stream" | awk '
+  od -An -v -td4 "temp/$stream" | xargs -n3 | awk '
     NF != 3 || $1 == 0 || $1 != $2 + 1 || $2 != $3 + 1 { exit 1 }
     NR > 1 && $1 != previous + 1 { exit 1 }
     { previous = $1 }
     END { if (NR < 2) exit 1 }
   ' || {
     echo "ad hoc: $stream uzyl niewlasciwego indeksu logicznego"
-    od -An -v -w12 -td4 "temp/$stream"
+    od -An -v -td4 "temp/$stream" | xargs -n3
     return 1
   }
 }

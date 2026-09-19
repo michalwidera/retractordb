@@ -361,6 +361,43 @@ TEST(payload, vt_interface_null_matches_any_interface) {
   EXPECT_TRUE(std::equal(a.span().begin(), a.span().end(), v.span().begin()));
 }
 
+// Wartosc bez odpowiednika w typie pola (1e30 do INTEGER, 300.0 do BYTE) zapisuje sie jako
+// NULL - bit w nullBitset i bajty zastepcze, dokladnie jak nullopt - a nie jako liczba
+// nasycona albo przycieta (narrowFloatTo w convertTypes.cc). Obie drogi zapisu naraz.
+TEST(payload, out_of_range_float_writes_null_through_both_interfaces) {
+  auto desc = rdb::Descriptor("i", 4, 1, rdb::INTEGER) + rdb::Descriptor("b", 1, 1, rdb::BYTE);
+
+  rdb::payload v(desc);
+  v.setItemVT(0, rdb::descFldVT{123});  // wczesniejsza wartosc ma zostac zastapiona NULL-em
+  v.setItemVT(0, rdb::descFldVT{1e30});
+  v.setItemVT(1, rdb::descFldVT{300.0});
+  EXPECT_FALSE(v.getItemVT(0).has_value());
+  EXPECT_FALSE(v.getItemVT(1).has_value());
+
+  rdb::payload a(desc);
+  a.setItem(0, 123);
+  a.setItem(0, std::any(1e30));
+  a.setItem(1, std::any(300.0));
+  EXPECT_FALSE(a.getItem(0).has_value());
+  EXPECT_FALSE(a.getItem(1).has_value());
+
+  rdb::payload n(desc);
+  n.setItemVT(0, std::nullopt);
+  n.setItemVT(1, std::nullopt);
+  EXPECT_EQ(v.getNullBitset(), n.getNullBitset());
+  EXPECT_EQ(a.getNullBitset(), n.getNullBitset());
+  EXPECT_TRUE(std::equal(n.span().begin(), n.span().end(), v.span().begin()));
+  EXPECT_TRUE(std::equal(n.span().begin(), n.span().end(), a.span().begin()));
+}
+
+TEST(payload, in_range_float_writes_value_truncated_toward_zero) {
+  auto desc = rdb::Descriptor("i", 4, 1, rdb::INTEGER);
+  rdb::payload p(desc);
+  p.setItemVT(0, rdb::descFldVT{-2.7});
+  ASSERT_TRUE(p.getItemVT(0).has_value());
+  EXPECT_EQ(std::get<int>(*p.getItemVT(0)), -2);
+}
+
 // Uklad pola RATIONAL w rekordzie - para int32 (licznik, mianownik), licznik pierwszy,
 // 8 bajtow na wartosc. Jest to format ZEWNETRZNY: czytelnik artefaktu spoza silnika rozbiera
 // te bajty wprost, a opis w dokumentacji (format-zapisu-danych/pliki.md, "Uklad pola RATIONAL")

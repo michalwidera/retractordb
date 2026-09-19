@@ -11,6 +11,13 @@ install_python_venv_support() {
     local py pyver pkg
     py=$(find_python3) || { echo "Error: python3 not found"; exit 1; }
     if ! "$py" -m venv --help >/dev/null 2>&1 || ! "$py" -c 'import ensurepip' >/dev/null 2>&1; then
+        if [ "$(rdb_os)" = "macos" ]; then
+            # Poza Debianem nie ma osobnego pakietu pythonX.Y-venv - venv jest
+            # czescia pakietu `python` z Homebrew, wiec instalujemy jego.
+            echo "-- Installing Homebrew python for venv support..."
+            rdb_pkg_install python || { echo "Error: could not install a python with venv support"; exit 1; }
+            return 0
+        fi
         pyver=$(echo "$py" | grep -oE '[0-9]+\.[0-9]+' | head -n1)
         if [ -n "$pyver" ]; then
             pkg="python${pyver}-venv"
@@ -36,18 +43,24 @@ ensure_venv() {
     pip install --upgrade pip
 }
 
+# Nazwa historyczna (patrz ensure_single_bashrc_line): plik rc wskazuje
+# rdb_shell_rc, wiec na macOS bedzie to ~/.zshrc albo ~/.bash_profile. Na
+# Linuksie jest to ~/.bashrc i komunikaty brzmia dokladnie tak jak dotad.
 add_venv_to_bashrc() {
-    local bashrc="$HOME/.bashrc"
+    local bashrc
+    local shown
+    bashrc=$(rdb_shell_rc)
+    shown=$(rdb_display_path "$bashrc")
     local desired="source ~/.venv/bin/activate"
     local regex='^(source|\.)[[:space:]]+(.*/)?\.venv/bin/activate$'
     if grep -qF "$desired" "$bashrc" 2>/dev/null; then
-        echo "-- venv activation already in ~/.bashrc, skipping"
+        echo "-- venv activation already in $shown, skipping"
         return 0
     fi
     if grep -qE "$regex" "$bashrc" 2>/dev/null; then
-        echo "-- Updating venv activation line in ~/.bashrc"
+        echo "-- Updating venv activation line in $shown"
     else
-        echo "-- Adding venv activation to ~/.bashrc"
+        echo "-- Adding venv activation to $shown"
     fi
     ensure_single_bashrc_line "$bashrc" "$desired" "$regex"
 }
@@ -67,12 +80,25 @@ install_conan_if_missing() {
     command_exists conan
 }
 
+# pip poza Linuksem odmawia instalacji do srodowiska zarzadzanego przez
+# menedzer pakietow (PEP 668, "externally-managed-environment") - na macOS
+# dotyczy to i pythona z Homebrew, i systemowego. Kierujemy wiec te instalacje
+# do projektowego ~/.venv. Na Linuksie zostaje goly `pip3 install`, jak dotad.
+rdb_pip_install() {
+    if [ "$(rdb_os)" = "macos" ]; then
+        ensure_venv
+        pip install "$@"
+    else
+        pip3 install "$@"
+    fi
+}
+
 install_gcovr_if_missing() {
     if command_exists gcovr; then
         return 0
     fi
 
-    pip3 install gcovr
+    rdb_pip_install gcovr
     command_exists gcovr
 }
 
@@ -104,7 +130,7 @@ install_cmake_format_if_missing() {
         return 0
     fi
 
-    pip3 install cmakelang
+    rdb_pip_install cmakelang
     command_exists cmake-format
 }
 
@@ -126,6 +152,16 @@ install_missing_special_tool() {
         cmake-pinned)
             install_pinned_cmake_if_needed
             ;;
+        gcc|g++|cc|c++)
+            # Na macOS kompilator nie jest pakietem menedzera (cmd_to_brew_package
+            # zwraca tu puste), tylko czescia Xcode Command Line Tools.
+            if [ "$(rdb_os)" = "macos" ]; then
+                echo "-- macOS: the C/C++ compiler comes with the Xcode command line tools."
+                echo "-- Run: xcode-select --install"
+                return 1
+            fi
+            command_exists "$cmd"
+            ;;
         *)
             command_exists "$cmd"
             ;;
@@ -134,8 +170,22 @@ install_missing_special_tool() {
 
 # Install the highest available GCC from a descending version ladder,
 # switch system alternatives to it, and verify C++23 support.
+# macOS has neither the ladder nor an alternatives system: the compiler is
+# AppleClang from the Xcode command line tools, apt-cache/update-alternatives
+# and /usr/bin/gcc-N simply do not exist there.  All that can be done - and all
+# that needs to be done - is to say whether that compiler speaks C++23.
 install_best_gcc_for_cxx23() {
-    local ver priority
+    local ver priority cxx
+    if [ "$(rdb_os)" = "macos" ]; then
+        cxx=$(rdb_cxx23_probe_compiler)
+        echo "-- macOS: no GCC ladder and no update-alternatives here; verifying AppleClang instead."
+        if check_cxx23; then
+            echo "-- C++23 OK - $cxx $(rdb_cxx_version "$cxx") (AppleClang)."
+            return 0
+        fi
+        echo "-- $cxx cannot compile the C++23 probe. Update the Xcode command line tools: xcode-select --install"
+        return 1
+    fi
     for ver in 20 19 18 17 16 15 14; do
         if ! apt-cache show "gcc-$ver" >/dev/null 2>&1 || ! apt-cache show "g++-$ver" >/dev/null 2>&1; then
             continue
@@ -173,8 +223,22 @@ install_best_gcc_for_cxx23() {
 # Verify C++23 support (probe) and, if missing, install the best available GCC
 # via the ladder above. Exits the script on failure.
 ensure_cxx23_gcc() {
-    local gcc_ver
+    local gcc_ver cxx cxx_ver
     echo "-- Verifying C++23 support..."
+    if [ "$(rdb_os)" = "macos" ]; then
+        # Nie ma czego instalowac: albo AppleClang z Xcode CLT umie C++23, albo
+        # trzeba zaktualizowac same CLT. Progu "GCC >= 14" nie da sie tu
+        # przelozyc na nic sensownego, wiec kryterium jest sama sonda.
+        cxx=$(rdb_cxx23_probe_compiler)
+        if ! check_cxx23; then
+            cxx_ver=$(rdb_cxx_version "$cxx")
+            echo "-- C++23 not supported by $cxx ${cxx_ver:-unknown}."
+            echo "Error: update the Xcode command line tools (xcode-select --install) and re-run."
+            exit 1
+        fi
+        echo "-- C++23 OK - $cxx $(rdb_cxx_version "$cxx") (AppleClang; nothing to install)"
+        return 0
+    fi
     if ! check_cxx23; then
         gcc_ver=$(gcc -dumpversion 2>/dev/null | cut -d. -f1)
         echo "-- C++23 not supported (GCC ${gcc_ver:-unknown}). Minimum required: GCC 14."
@@ -253,17 +317,11 @@ install_missing_tools() {
     fi
 
     if [ ${#apt_to_install[@]} -gt 0 ]; then
-        if ! command_exists sudo || ! command_exists apt-get; then
-            echo "Error: cannot auto-install apt packages without sudo and apt-get. Missing packages: ${apt_to_install[*]}"
-            exit 1
-        fi
-        # Acquire::Retries: lustra potrafia oddac 503 na POJEDYNCZYM pliku, a bez
-        # ponowien wywraca to caly job. Na CI ARM (us-east-1.ec2.ports.ubuntu.com)
-        # zdarza sie to okresowo na fonts-liberation, ciagnietym jako zaleznosc
-        # graphviza z listy `toolchain_required`. apt ponawia samo POBRANIE pozycji,
-        # wiec to jest ta warstwa, na ktorej awaria lustra ma byc obsluzona.
-        sudo apt-get -o Acquire::Retries=5 update
-        sudo apt-get -o Acquire::Retries=5 -y install "${apt_to_install[@]}"
+        # Menedzer pakietow i jego obsluga bledow siedza w rdb_pkg_install
+        # (common.sh): apt-get na Linuksie - te same dwa wywolania, co tu stalo -
+        # brew na macOS. Tablica nadal nazywa sie `apt_to_install`, bo czyta ja
+        # takze dependencies.sh; zmiana nazwy przeszlaby przez trzy moduly.
+        rdb_pkg_install "${apt_to_install[@]}" || exit 1
     fi
 
     for cmd in "${special_to_install[@]}"; do

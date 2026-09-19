@@ -18,6 +18,7 @@
 # Test sprawdza OBIE sciezki po kodzie wyjscia, bo to jedyna wielkosc, ktora odroznia
 # zakonczenie czyste (1) od segfaultu (139) i od abortu (134).
 set -e
+. "$(dirname "$0")/../portable.sh"
 . "$(dirname "$0")/../serverlib.sh"
 
 # --- Sciezka 1: blad krytyczny przy starcie, jeszcze przed uruchomieniem serwera. ---
@@ -86,7 +87,7 @@ fatal_in_slot() {
   done
 
   if [ "$withClient" = "client" ]; then
-    timeout 30 xqry -t w >/dev/null 2>&1 &
+    run_timeout 30 xqry -t w >/dev/null 2>&1 &
     clientPid=$!
   fi
 

@@ -1,6 +1,28 @@
 #include "rdb/payload.hpp"
 
+// Wybor zaplecza boost::stacktrace. addr2line rozwiazuje adresy najdokladniej
+// (nazwa pliku i numer linii), ale jest osobnym programem z binutils, ktorego na
+// czesci systemow nie ma w ogole - na macOS odpowiednikiem jest atos, o innym
+// interfejsie. Bez tego makra Boost bierze zaplecze domyslne (backtrace + dladdr):
+// slad jest krotszy o numery linii, ale POWSTAJE, zamiast czekac 60 s na program,
+// ktorego nie ma. Obecnosc addr2line sprawdza find_program w
+// cmake/PlatformChecks.cmake, wiec decyzja zapada raz, przy konfiguracji.
+#include "platformConfig.h"
+
+#if RDB_HAS_ADDR2LINE
 #define BOOST_STACKTRACE_USE_ADDR2LINE
+#endif
+
+// Zaplecze domyslne (rozwijanie stosu + dladdr) stoi na _Unwind_Backtrace, a Boost
+// odmawia jego uzycia, dopoki nie zobaczy _GNU_SOURCE. To jest warunek o GLIBC, nie
+// o dostepnosci samej funkcji: na Linuksie _GNU_SOURCE definiuje za nas libstdc++,
+// wiec byl spelniony przypadkiem i nikt go nie zauwazyl. Poza glibc
+// _Unwind_Backtrace pochodzi z libunwind i jest deklarowane bezwarunkowo, wiec nie
+// ma tu czego sprawdzac - i tyle Boostowi mowimy. Bez tego jedyny plik w drzewie
+// uzywajacy boost::stacktrace nie kompiluje sie wcale.
+#if !defined(_GNU_SOURCE) && !defined(BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED)
+#define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
+#endif
 
 #include <spdlog/spdlog.h>
 
@@ -30,7 +52,11 @@ int resolveFieldIndexOrAbort(const Descriptor &descriptor, const int positionFla
   if (positionFlat < 0 || positionFlat > flatCount - 1) {
     SPDLOG_ERROR("{} out of descriptor req:{} available len: {}", context, positionFlat, flatCount);
     if (std::string_view(context) == "Read") {
-      std::cerr << "Collecting stack trace (addr2line) - this may take more than 60 s, the process is not hung." << std::endl;
+#if RDB_HAS_ADDR2LINE
+      std::cerr << "Collecting stack trace (addr2line) - this may take more than 60 s, the process is not hung." << '\n';
+#else
+      std::cerr << "Collecting stack trace." << '\n';
+#endif
       std::stringstream message;
       message << boost::stacktrace::stacktrace();
       SPDLOG_ERROR("Stack: {}", message.str());
@@ -256,6 +282,12 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
     nullBitset_[position] = false;
     cast<std::any> castAny;
     value = castAny(valueParam.value(), requestedType);
+    // Wartosc bez odpowiednika w typie pola (np. 1e30 do INTEGER) jest NULL-em, nie liczba -
+    // patrz narrowFloatTo w convertTypes.cc. Pole NULLTYPE przechowuje monostate jako wartosc.
+    if (requestedType != rdb::NULLTYPE && value.type() == typeid(std::monostate)) {
+      nullBitset_[position] = true;
+      std::visit([&value](const auto &v) { value = std::any(v); }, nullFallbackValue(requestedType));
+    }
   }
 
   auto writeStringField = [&]() {
@@ -444,7 +476,13 @@ void payload::setItemVT(const int positionFlat, std::optional<rdb::descFldVT> va
   } else {
     nullBitset_[position] = false;
     cast<rdb::descFldVT> castVT;
-    value = castVT(valueParam.value(), requestedType);  // gwarantuje alternatywe wariantu = requestedType
+    value = castVT(valueParam.value(), requestedType);  // alternatywa = requestedType albo monostate
+    // Wartosc bez odpowiednika w typie pola (np. 1e30 do INTEGER) jest NULL-em, nie liczba -
+    // patrz narrowFloatTo w convertTypes.cc. Pole NULLTYPE przechowuje monostate jako wartosc.
+    if (requestedType != rdb::NULLTYPE && std::holds_alternative<std::monostate>(value)) {
+      nullBitset_[position] = true;
+      value                 = nullFallbackValue(requestedType);
+    }
   }
 
   const auto offsetFlat = descriptor.byteOffsetAtFlatIndex(positionFlat);

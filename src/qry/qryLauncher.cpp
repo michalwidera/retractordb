@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cerrno>
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -23,6 +24,7 @@
 #include "constants.hpp"
 #include "qry.hpp"
 #include "retractor/lib/bus.hpp"
+#include "retractor/lib/lockFile.hpp"
 #include "retractor/lib/serverName.hpp"
 #include "serverRouting.hpp"
 #include "uxSysTermTools.hpp"
@@ -58,8 +60,8 @@ static int exitCodeFor(selectResult result) {
 /// Czy obiekty IPC instancji o tej nazwie da sie otworzyc. Pusta nazwa to instancja
 /// historyczna (bez `--name`), dokladnie jak w routingu.
 static bool serverReachable(std::string_view serverName) {
+  const ipc::ServerNames names = ipc::names(serverName);
   try {
-    const ipc::ServerNames names = ipc::names(serverName);
     IPC::managed_shared_memory seg(IPC::open_only, names.shmemSegment.c_str());
     IPC::message_queue mq(IPC::open_only, names.queryQueue.c_str());
   } catch (...) {
@@ -74,10 +76,11 @@ static bool serverReachable(std::string_view serverName) {
   // powstaje w launcherze, jeszcze przed zbudowaniem obiektow IPC. Instancja widoczna na
   // magistrali, ale bez kolejki, to instancja w trakcie startu -- czekanie ma wtedy trwac dalej.
   const bus::Bus xrdbbus(bus::segmentName(), /*createIfMissing=*/false);
-  // Furtka zgodnosci: bez magistrali zostaje dotychczasowe kryterium. Instancja, ktora
-  // wystartowala przy ClaimStatus::Unavailable, nie ma slotu i po ostrzejszym sprawdzeniu
-  // przestalaby byc osiagalna dla wlasnego klienta.
-  if (!xrdbbus.attached()) return true;
+  // Bez magistrali o zyciu rozstrzyga blokada tozsamosci IPC. Brak segmentu nie znaczy juz
+  // "magistrala nieuzywana": segment kasuje ostatni wychodzacy, a po SIGKILL jedynej instancji
+  // zostaja same obiekty IPC. Blokada obejmuje tez instancje, ktora wystartowala przy
+  // ClaimStatus::Unavailable - nie ma slotu, ale swoja tozsamosc trzyma jak kazda inna.
+  if (!xrdbbus.attached()) return lockfile::isHeld(ipc::identityLockPath(names.queryQueue));
   const std::vector<bus::InstanceInfo> live = xrdbbus.instances();
   return std::ranges::any_of(live, [serverName](const bus::InstanceInfo &instance) { return instance.name == serverName; });
 }

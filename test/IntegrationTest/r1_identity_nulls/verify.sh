@@ -20,6 +20,7 @@
 # Porownanie samych bajtow nie wystarcza - rekord all-null i rekord o wartosci zero maja
 # te sama zawartosc binarna, a rozna denotacje - wiec porownujemy takze mape null.
 set -eu
+. "$(dirname "$0")/../portable.sh"
 rm -rf temp
 mkdir -p temp
 
@@ -66,7 +67,10 @@ xretractor query.rql -r -k -m 48 -f
 # .meta nie zadziala miedzy strumieniami o roznej dlugosci: ostatni przebieg krotszego
 # strumienia ma mniejsza krotnosc, wiec prefiks bajtow rozjezdza sie mimo zgodnej denotacji.
 null_flags() {
-  xtrdb -n -s "$1" | sed -n 's/.*\[[=~]*\][[:space:]]*\([0-9]*\) records,[[:space:]]*\(no\|all\) nulls.*/\1 \2/p' |
+  # sed -E (skladnia rozszerzona): alternacja `\|` w wyrazeniu PODSTAWOWYM jest
+  # rozszerzeniem GNU, ktorego BSD sed nie zna - wzorzec nie pasowal do niczego,
+  # null_flags dawalo pustke i test meldowal "brak rekordow w mapie null".
+  xtrdb -n -s "$1" | sed -n -E 's/.*\[[=~]*\][[:space:]]*([0-9]*) records,[[:space:]]*(no|all) nulls.*/\1 \2/p' |
     while read -r count kind; do
       for _ in $(seq 1 "$count"); do echo "$kind"; done
     done
@@ -76,14 +80,14 @@ null_flags() {
 compare_common_prefix() {
   local left="$1" right="$2" label="$3"
   local size_left size_right common flags_left flags_right records
-  size_left=$(stat -c %s "$left")
-  size_right=$(stat -c %s "$right")
+  size_left=$(file_size "$left")
+  size_right=$(file_size "$right")
   common=$(( size_left < size_right ? size_left : size_right ))
   [ "$common" -gt 0 ] || {
     echo "$label: pusty wspolny prefiks - test porownalby dwa puste ciagi"
     exit 1
   }
-  cmp -n "$common" "$left" "$right" || {
+  cmp_prefix "$common" "$left" "$right" || {
     echo "$label: rozna tresc na wspolnym prefiksie ($common bajtow)"
     exit 1
   }
@@ -120,7 +124,7 @@ else
   # Bez R1 para lhs/rhs zachowuje sie dokladnie tak jak para fazowa nizej: ten sam ciag
   # rekordow, krotsze oczekiwanie po stronie sfaktoryzowanej. Ten sam wzorzec porownania.
   compare_common_prefix temp/lhs temp/rhs "R1 bez faktoryzacji"
-  [ "$(stat -c %s temp/rhs)" -gt "$(stat -c %s temp/lhs)" ] || {
+  [ "$(file_size temp/rhs)" -gt "$(file_size temp/lhs)" ] || {
     echo "R1 bez faktoryzacji: strona sfaktoryzowana nie wyprzedza niefaktoryzowanej"
     exit 1
   }
@@ -131,7 +135,7 @@ fi
 # rowna albo krotsza, znaczyloby to, ze optymalizacja opoznienia zniknela i test
 # przestalby pilnowac tego, po co powstal.
 compare_common_prefix temp/phase_lhs temp/phase_rhs "phase R1"
-[ "$(stat -c %s temp/phase_rhs)" -gt "$(stat -c %s temp/phase_lhs)" ] || {
+[ "$(file_size temp/phase_rhs)" -gt "$(file_size temp/phase_lhs)" ] || {
   echo "phase R1: strona sfaktoryzowana nie wyprzedza niefaktoryzowanej - ogon tau_N znow zawyza"
   exit 1
 }

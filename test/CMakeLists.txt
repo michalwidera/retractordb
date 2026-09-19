@@ -96,3 +96,10 @@ add_test(
     ${CMAKE_CURRENT_SOURCE_DIR}/proof_manifest.tsv
     ${CMAKE_CURRENT_SOURCE_DIR}/UnitTest/test_proofOracle.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UnitTest/proofOracle.hpp)
+
+# Srodowisko kontroli higieny IPC dla skryptow testowych. Generowane PO
+# file(COPY ...) wyzej, bo trafia do tego samego katalogu w drzewie budowy i
+# kopia skasowalaby plik wygenerowany wczesniej. Tresc i uzasadnienie: patrz
+# IntegrationTest/shmEnv.sh.in oraz blok RDB_BOOST_POSIX_SHM w korzeniu.
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/IntegrationTest/shmEnv.sh.in
+               ${CMAKE_CURRENT_BINARY_DIR}/IntegrationTest/shmEnv.sh @ONLY)

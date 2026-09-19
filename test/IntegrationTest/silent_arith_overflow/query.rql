@@ -32,6 +32,12 @@ SELECT s[0] * 300000000, s[0] * 1000000000, s[0] + 2147483640, s[0] + 2147483641
 STREAM iv \
 FROM s
 
+# Rzut na INTEGER wartosci, ktorej int32 nie pomiesci: to_integer(7e10) i Sqrt(-3) nad INTEGER
+# (NaN wracajacy przez double) daja NULL. Przedtem x86-64 oddawalo tu INT_MIN, arm64 INT_MAX i 0.
+SELECT to_integer(s[0] * 10000000000.0), to_integer(s[0] * 100000000.0), Sqrt(s[0] - 10) \
+STREAM ci \
+FROM s
+
 # lo = -2147483646; lo - 2 to dokladnie INT_MIN
 SELECT lo[0] - 2, lo[0] - 3 \
 STREAM ilo \

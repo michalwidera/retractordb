@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <iostream>
+#include <stop_token>
 #include <thread>
 
 #include <boost/json.hpp>

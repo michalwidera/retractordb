@@ -28,7 +28,22 @@ report_validation_status() {
     printf -- "-----------------------------+----------------+----------+-------------------\n"
 
     gcc_ver=""
-    if command_exists gcc; then
+    # Na macOS kompilatorem jest AppleClang. `gcc -dumpfullversion` konczy sie
+    # tam BLEDEM (nie pustym wynikiem), wiec ten wiersz pokazywal "missing/fail"
+    # dla zupelnie sprawnego kompilatora. Wersje bierzemy z `--version`, a prog
+    # "GCC >= 14" zastepujemy jedynym kryterium, ktore ma tu sens: czy sonda
+    # C++23 (check_cxx23) przechodzi.
+    if [ "$(rdb_os)" = "macos" ]; then
+        cxx_probe=$(rdb_cxx23_probe_compiler)
+        gcc_ver=$(rdb_cxx_version "$cxx_probe")
+        if command_exists "$cxx_probe" && check_cxx23; then
+            compat_status="ok"
+        else
+            compat_status="fail"
+            compat_failures=$((compat_failures + 1))
+        fi
+        printf "%-28s | %-14s | %-8s | %-18s\n" "AppleClang version" "${gcc_ver:-missing}" "$compat_status" "c++23 probe"
+    elif command_exists gcc; then
         gcc_ver=$(gcc -dumpfullversion -dumpversion 2>/dev/null | head -n1)
         if [ -n "$gcc_ver" ] && version_ge "$gcc_ver" "14"; then
             compat_status="ok"
@@ -90,19 +105,32 @@ report_validation_status() {
         printf "%-28s | %-14s | %-8s | %-18s\n" "conan version" "missing" "$compat_status" ">= 2.0"
     fi
 
-    if command_exists g++ && check_cxx23; then
+    # Kompilator sondy nazywa rdb_cxx23_probe_compiler: `g++` na Linuksie (jak
+    # dotad), `${CXX:-c++}` na macOS. Etykieta wiersza mowi, co naprawde
+    # sprawdzono, zeby raport nie twierdzil "g++", gdy probowano AppleClanga.
+    cxx_probe=$(rdb_cxx23_probe_compiler)
+    if command_exists "$cxx_probe" && check_cxx23; then
         compat_status="ok"
     else
         compat_status="fail"
         compat_failures=$((compat_failures + 1))
     fi
-    gpp_ver="unknown"
-    if command_exists g++; then
-        gpp_ver=$(g++ -dumpfullversion -dumpversion 2>/dev/null | head -n1)
-    fi
-    printf "%-28s | %-14s | %-8s | %-18s\n" "g++ c++23 probe" "${gpp_ver:-unknown}" "$compat_status" "must pass"
+    gpp_ver=$(rdb_cxx_version "$cxx_probe")
+    printf "%-28s | %-14s | %-8s | %-18s\n" "$cxx_probe c++23 probe" "${gpp_ver:-unknown}" "$compat_status" "must pass"
 
-    if [ -n "$gcc_ver" ]; then
+    # gcov-N to pojecie GCC. Na macOS odpowiednikiem jest `llvm-cov gcov` z
+    # Xcode - tego samego uzywa opcja `coverage` - a dopasowanie majora do GCC
+    # nie dotyczy tej platformy w ogole.
+    if [ "$(rdb_os)" = "macos" ]; then
+        if command_exists xcrun && xcrun llvm-cov --version >/dev/null 2>&1; then
+            gcov_ver=$(extract_first_version "$(xcrun llvm-cov --version 2>/dev/null)")
+            compat_status="ok"
+            printf "%-28s | %-14s | %-8s | %-18s\n" "gcov tool" "${gcov_ver:-unknown}" "$compat_status" "llvm-cov gcov"
+        else
+            compat_status="warn"
+            printf "%-28s | %-14s | %-8s | %-18s\n" "gcov tool" "not applicable" "$compat_status" "llvm-cov gcov"
+        fi
+    elif [ -n "$gcc_ver" ]; then
         gcc_major=$(extract_major "$gcc_ver")
         gcov_exec="gcov-${gcc_major}"
         gcov_ver=""

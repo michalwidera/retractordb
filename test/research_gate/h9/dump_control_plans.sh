@@ -13,13 +13,21 @@ HERE="$(pwd)"
 CODE_REPO="${CODE_REPO:-/home/michal/github/retractordb}"
 OUT="${OUT:-$HOME/k26v3_gates_plans}"
 
+# Katalog tymczasowy. `mktemp -d` bez szablonu jest rozszerzeniem GNU; BSD
+# `mktemp` wymaga szablonu i bez niego wypisuje uzycie na stderr, a podstawienie
+# wychodzi PUSTE. Oryginal: test/IntegrationTest/portable.sh (make_temp_dir);
+# kopia lokalna, bo bramka badawcza jest samodzielna wzgledem kopii test/.
+make_temp_dir() {
+  mktemp -d "${TMPDIR:-/tmp}/rdbgate.XXXXXXXX"
+}
+
 rm -rf "$OUT"
 for profile in DEFAULT NO_R2_CANON NO_R1_FACTOR NO_R1_NO_R2; do
   binary="$CODE_REPO/build/K26v3-$profile/src/retractor/xretractor"
   [ -x "$binary" ] || { echo "BLAD: brak binarki profilu $profile" >&2; exit 2; }
   mkdir -p "$OUT/$profile"
   for control in F9_R2_controls F9_R1_controls F9_X_controls; do
-    work="$(mktemp -d)"
+    work="$(make_temp_dir)"
     cp "$HERE/rql/$control.rql" "$work/"
     cp "$HERE"/data/main/*.txt "$work/"
     mkdir -p "$work/temp"

@@ -50,9 +50,18 @@ else
   fi
 fi
 
-# Format logu usługowego: prefiks priorytetu sd-daemon '<N>' + 'poziom + treść' na stderr,
-# bez znacznika czasu. Linia INFO ma priorytet 6 (LOG_INFO) => '<6>[I] ' - obecna
-# tylko gdy INFO jest wkompilowane (poza Release).
+# Format logu usługowego: 'poziom + treść' na stderr, bez znacznika czasu. Pod systemd
+# linia niesie dodatkowo prefiks priorytetu sd-daemon '<N>' (INFO => '<6>'), bo czyta go
+# journald i zamienia na wagę komunikatu; poza systemd tego prefiksu NIE MA i mieć nie
+# powinien - launchd przepisuje stderr usługi do pliku dosłownie, więc byłby to śmieć na
+# początku każdej linii (patrz setupLoggerMain). Który wariant obowiązuje, mówi CMake
+# przez RDB_SD_PREFIX - to ta sama wartość, z której kompilował się silnik.
+# Linia INFO jest obecna tylko gdy INFO jest wkompilowane (poza Release).
 if [ "$info_active" = "1" ]; then
-  grep -qE '^<6>\[I\] ' stderr.txt
+  if [ "${RDB_SD_PREFIX:-1}" = "1" ]; then
+    grep -qE '^<6>\[I\] ' stderr.txt
+  else
+    grep -qE '^\[I\] ' stderr.txt
+    grep -qv '^<' stderr.txt
+  fi
 fi

@@ -4,6 +4,7 @@
 #include <chrono>
 #include <ctime>
 #include <iostream>
+#include <numeric>
 #include <print>
 #include <sstream>
 #include <utility>
@@ -134,22 +135,26 @@ void Formatter::renderGnuplotOhlc(const ptree &row, int count, const std::string
       " '-' u 1:2 t '[{}]' w lines lc rgb 'blue'\r\n",
       title, title);
 
-  const auto n    = static_cast<size_t>(samples);
-  const auto rows = gnuplot_lines_[0].size();
+  const auto n                  = static_cast<size_t>(samples);
+  const auto rows               = gnuplot_lines_[0].size();
+  constexpr double bodyFraction = 0.8;  // czesc przedzialu wiersza zajeta przez korpus swiecy
   for (size_t k = 0; k < rows; k++) {
-    const auto &open = gnuplot_lines_[0][k], &high = gnuplot_lines_[1][k];
-    const auto &low = gnuplot_lines_[2][k], &close = gnuplot_lines_[3][k];
+    const auto &open  = gnuplot_lines_[0][k];
+    const auto &high  = gnuplot_lines_[1][k];
+    const auto &low   = gnuplot_lines_[2][k];
+    const auto &close = gnuplot_lines_[3][k];
     // Swieca z NULL-em nie ma ksztaltu: gnuplot pomija cala tylko wtedy, gdy NaN stoi
     // wszedzie, a z jednym NaN rysuje knot do krawedzi wykresu.
     if (open == "NaN" || high == "NaN" || low == "NaN" || close == "NaN") continue;
-    std::print("{} {} {} {} {} {}\r\n", static_cast<double>(k * n) + static_cast<double>(n - 1) / 2.0, open, low, high, close,
-               static_cast<double>(n) * 0.8);
+    const auto first = static_cast<double>(k * n);
+    std::print("{} {} {} {} {} {}\r\n", std::midpoint(first, first + static_cast<double>(n - 1)), open, low, high, close,
+               static_cast<double>(n) * bodyFraction);
   }
   std::print("e\r\n");
   // Probki w porzadku rosnacego x - `w lines` laczy punkty w kolejnosci danych.
   for (size_t k = 0; k < rows; k++)
     for (size_t x = 0; x < n; x++)
-      std::print("{} {}\r\n", k * n + x, gnuplot_lines_[kOhlc + n - 1 - x][k]);
+      std::print("{} {}\r\n", (k * n) + x, gnuplot_lines_[kOhlc + n - 1 - x][k]);
   std::print("e\r\n");
 }
 

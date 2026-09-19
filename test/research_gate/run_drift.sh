@@ -52,6 +52,25 @@ FROZEN_SEEDS=("20260803" "20260804" "20260806" "20260807")
 # ktory ja trzyma.
 INVOCATION="$0 $*"
 
+# --- warstwa przenosnosci powloki -------------------------------------------
+# Kopie funkcji z test/IntegrationTest/portable.sh (tam jest oryginal i pelne
+# uzasadnienie). Bramka badawcza jest z zalozenia SAMODZIELNA wzgledem kopii
+# test/ robionej przez test/CMakeLists.txt, wiec nie siega po tamten plik.
+
+# Sciezka bezwzgledna. Zastepuje `readlink -f` (GNU); BSD `readlink` nie zna -f
+# i wypisuje blad, a podstawienie wychodzi PUSTE - czyli test szuka binarki pod
+# sciezka "".
+abs_path() {
+  ( cd "$(dirname "$1")" && printf '%s/%s\n' "$(pwd -P)" "$(basename "$1")" )
+}
+
+# Znacznik czasu ISO-8601 z przesunieciem strefy. Zastepuje `date -Is` (GNU);
+# BSD `date` nie zna -I. `sed` doklada dwukropek w przesunieciu, zeby format
+# byl znak w znak taki sam jak dotad (wpisy w DRIFT_JOURNAL.tsv sa porownywalne).
+iso_now() {
+  date +%Y-%m-%dT%H:%M:%S%z | sed 's/\(..\)$/:\1/'
+}
+
 XRETRACTOR=""
 WORK=""
 COUNT=10010
@@ -90,7 +109,7 @@ if [[ ! -x "$XRETRACTOR" ]]; then
 fi
 # Sciezka bezwzgledna, bo poziomy uruchamiaja sie po `cd` do katalogu hipotezy;
 # sciezka wzgledna wygladalaby tam na brak binarki, czyli na awarie aparatury.
-XRETRACTOR="$(readlink -f "$XRETRACTOR")"
+XRETRACTOR="$(abs_path "$XRETRACTOR")"
 
 # Ziarno losowane z /dev/urandom, nie z zegara: przebieg wykonany dwa razy w tej
 # samej sekundzie ma dostac dwie rozne proby.
@@ -116,19 +135,24 @@ fi
 # jeszcze przed proba zajecia blokady - drugi przebieg kasowalby wtedy opis
 # pierwszemu, zanim dowie sie, ze ma sie wycofac.
 LOCK="$HERE/.drift.lock"
-if ! command -v flock >/dev/null 2>&1; then
-  echo "BLAD: brak flock - bez niego nie da sie zapewnic wylacznosci przebiegu" >&2
-  exit 2
-fi
+# `flock(1)` jest programem z util-linux i na BSD/macOS go nie ma - dotad skrypt
+# odmawial tam pracy w calosci. Samo wywolanie systemowe flock(2) jest na obu
+# systemach, wiec blokade zajmuje python3 na ODZIEDZICZONYM deskryptorze 9,
+# dokladnie tak, jak robil to `flock -n 9`: blokada wisi na opisie otwartego
+# pliku, wiec zostaje zajeta po wyjsciu pythona (powloka nadal trzyma fd 9)
+# i zwalnia sie dopiero, gdy przebieg sie konczy.
+#
+# `lock_is_free` z test/IntegrationTest/portable.sh odpowiada tylko na pytanie
+# "czy wolna" i zwalnia blokade natychmiast, wiec sam nie zapewnia wylacznosci.
 exec 9>>"$LOCK" || { echo "BLAD: nie da sie otworzyc $LOCK" >&2; exit 2; }
-if ! flock -n 9; then
+if ! python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)' 2>/dev/null; then
   echo "BLAD: inny przebieg weryfikacji dryftu juz biegnie." >&2
   echo "  Trzyma: $(tail -1 "$LOCK" 2>/dev/null || echo 'nieznany')" >&2
   echo "  Rownolegle przebiegi nadpisalyby sobie dowod w h9/corpus_validation." >&2
   exit 2
 fi
 : >"$LOCK"
-printf 'pid=%s start=%s cmd=%s\n' "$$" "$(date -Is)" "$INVOCATION" >>"$LOCK"
+printf 'pid=%s start=%s cmd=%s\n' "$$" "$(iso_now)" "$INVOCATION" >>"$LOCK"
 
 mkdir -p "$WORK"
 ENGINE_SHA="$(git -C "$CODE_REPO" rev-parse --short HEAD 2>/dev/null || echo nieznany)"
@@ -430,7 +454,7 @@ else
   OVERALL="BEZ DRYFTU, zakres niepelny"
 fi
 printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-  "$(date -Is)" "$ENGINE_SHA" "$TREE" "$SEED" \
+  "$(iso_now)" "$ENGINE_SHA" "$TREE" "$SEED" \
   "$S_H10A" "$S_H10B" "$S_MECH" "$S_VALUES" "$S_TIMING" "$OVERALL" >>"$JOURNAL"
 
 # -------------------------------------------------------------- podsumowanie

@@ -2,58 +2,81 @@
 
 #include <fcntl.h>
 #include <sys/file.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
+#include <algorithm>
+#include <cctype>
 #include <cerrno>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <optional>
 #include <sstream>
-#include <string_view>
 
 #include <spdlog/spdlog.h>
+#include <boost/interprocess/ipc/message_queue.hpp>
+#include <boost/interprocess/shared_memory_object.hpp>
+#include <boost/interprocess/sync/named_mutex.hpp>
 
-// Ustala własną tożsamość systemd na podstawie /proc/self/cgroup. systemd umieszcza jednostkę
-// w ścieżce cgroup typu ".../system.slice/xretractor.service" lub (dla --user)
-// ".../user.slice/user@1000.service/.../xretractor.service". Zwraca nazwę unitu, gdy proces jest
-// jednostką systemd; unit == nullopt gdy to zwykły proces.
+#include "bus.hpp"
+#include "constants.hpp"
+#include "lockFile.hpp"
+#include "osPlatform.hpp"
+#include "serverName.hpp"
+
+namespace IPC = boost::interprocess;
+
+namespace {
+
+constexpr std::string_view kServiceLockFamily = "xretractor_service";
+constexpr std::string_view kLockSuffix        = ".lock";
+
+/// Czy napis jest czlonem instancji z nazw IPC: sama nazwa serwera albo jej skrot ("0" i osiem
+/// malych cyfr szesnastkowych, patrz ipc::shortServerTag).
+bool isInstanceToken(std::string_view token) {
+  if (servername::isValid(token)) return true;
+  return token.size() == ipc::kShortServerTagLength && token.front() == '0' &&
+         std::ranges::all_of(token, [](unsigned char c) { return std::isdigit(c) || (c >= 'a' && c <= 'f'); });
+}
+
+/// Czlon instancji odczytany z nazwy pliku blokady tozsamosci IPC, pusty dla instancji
+/// bezimiennej; nullopt, gdy plik nie jest taka blokada.
+std::optional<std::string_view> ipcTokenOf(std::string_view file) {
+  constexpr std::string_view prefix = ipc::kIdentityLockPrefix;
+  if (file.size() < prefix.size() + kLockSuffix.size() || !file.starts_with(prefix) || !file.ends_with(kLockSuffix))
+    return std::nullopt;
+  const std::string_view queue = file.substr(prefix.size(), file.size() - prefix.size() - kLockSuffix.size());
+  if (queue == ipc::kQueryQueue) return std::string_view{};
+  if (queue.size() <= ipc::kQueryQueue.size() + 1 || !queue.starts_with(ipc::kQueryQueue) ||
+      queue[ipc::kQueryQueue.size()] != '.')
+    return std::nullopt;
+  const std::string_view token = queue.substr(ipc::kQueryQueue.size() + 1);
+  if (!isInstanceToken(token)) return std::nullopt;
+  return token;
+}
+
+/// Czy plik jest blokada instancji: xretractor_service.lock albo xretractor_service.<nazwa>.lock.
+/// Binarka o innej nazwie zaklada blokady z inna rodzina i tych sprzatacz nie rusza.
+bool isServiceLockName(std::string_view file) {
+  if (file.size() < kServiceLockFamily.size() + kLockSuffix.size() || !file.starts_with(kServiceLockFamily) ||
+      !file.ends_with(kLockSuffix))
+    return false;
+  const std::string_view middle =
+      file.substr(kServiceLockFamily.size(), file.size() - kServiceLockFamily.size() - kLockSuffix.size());
+  return middle.empty() || (middle.front() == '.' && servername::isValid(middle.substr(1)));
+}
+
+}  // namespace
+
+// Ustala wlasna tozsamosc w menedzerze uslug systemu. Sam odczyt jest platformowy i siedzi
+// w osplat::detectServiceIdentity (Linux: /proc/self/cgroup i jednostka systemd; Darwin:
+// etykieta zadania launchd). Tutaj zostaje samo przeniesienie wyniku do typu, ktorego
+// uzywa reszta drzewa.
 //
 // Deklaracja stoi w lockManager.hpp: tozsamosci jednostki potrzebuje takze magistrala xrdbbus.
 SystemdIdentity detectSystemdIdentity() {
-  SystemdIdentity id;
-
-  std::ifstream cgroup("/proc/self/cgroup");
-  if (!cgroup.is_open()) return id;
-
-  std::string line;
-  while (std::getline(cgroup, line)) {
-    // Format: "hierarchy:controllers:path" (v2: "0::/...path"). Interesuje nas ostatnie pole.
-    const auto lastColon = line.rfind(':');
-    if (lastColon == std::string::npos) continue;
-    std::string_view path(line);
-    path.remove_prefix(lastColon + 1);
-
-    // Zakres user, gdy ścieżka cgroup biegnie przez user.slice / user@<uid>.service.
-    const bool userScope = path.find("/user.slice") != std::string_view::npos || path.find("/user@") != std::string_view::npos;
-
-    // Ostatni (najgłębszy) segment ścieżki kończący się na ".service" jest nazwą naszego unitu;
-    // pomijamy user@<uid>.service, który jest menedżerem sesji, nie naszą jednostką.
-    std::string_view scan = path;
-    while (!scan.empty()) {
-      const auto slash     = scan.rfind('/');
-      std::string_view seg = (slash == std::string_view::npos) ? scan : scan.substr(slash + 1);
-      if (seg.ends_with(".service") && !seg.starts_with("user@")) {
-        id.unit      = std::string(seg);
-        id.userScope = userScope;
-        return id;
-      }
-      if (slash == std::string_view::npos) break;
-      scan = scan.substr(0, slash);
-    }
-  }
-  return id;
+  const osplat::ServiceIdentity identity = osplat::detectServiceIdentity();
+  return SystemdIdentity{.unit = identity.unit, .userScope = identity.userScope};
 }
 
 FlockServiceGuard::FlockServiceGuard(const std::string &serviceName)
@@ -72,31 +95,21 @@ void FlockServiceGuard::setLockDir(const std::string &dir) {
 
 void FlockServiceGuard::setServiceQueryFile(const std::string &queryFile) { serviceQueryFile = queryFile; }
 
+std::string FlockServiceGuard::lockDirectory() const { return std::filesystem::path(lockFilePath).parent_path().string(); }
+
 bool FlockServiceGuard::acquireLock() {
-  // Open or create the lock file
-  lockFileDescriptor = open(lockFilePath.c_str(), O_CREAT | O_RDWR | O_CLOEXEC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-
-  if (lockFileDescriptor == -1) {
-    SPDLOG_ERROR("Failed to open lock file: {} ,errno: {}", lockFilePath, strerror(errno));
-    return false;
-  }
-
-  // Non-blocking exclusive lock
-  int flockResult = flock(lockFileDescriptor, LOCK_EX | LOCK_NB);
-
-  if (flockResult == -1) {
-    // Komunikat dla operatora nalezy do wolajacego: tylko on wie, ktora tozsamosc probowal
-    // przejac i co odczytal z pliku blokady (patrz launcher.cpp). Tutaj zostaje sam log,
-    // zeby ta sama odmowa nie pojawiala sie na konsoli dwa razy.
-    if (errno == EWOULDBLOCK || errno == EAGAIN) {
+  // Komunikat dla operatora nalezy do wolajacego: tylko on wie, ktora tozsamosc probowal
+  // przejac i co odczytal z pliku blokady (patrz launcher.cpp). Tutaj zostaje sam log,
+  // zeby ta sama odmowa nie pojawiala sie na konsoli dwa razy.
+  switch (lockfile::acquire(lockFilePath, true, true, lockFileDescriptor)) {
+    case lockfile::Result::Acquired:
+      break;
+    case lockfile::Result::Busy:
       SPDLOG_WARN("Other instance is already running, cannot acquire lock on: {}", lockFilePath);
-    } else {
-      SPDLOG_ERROR("Unexpected error while locking: {} , errno: {}", lockFilePath, strerror(errno));
-    }
-
-    close(lockFileDescriptor);
-    lockFileDescriptor = -1;
-    return false;
+      return false;
+    case lockfile::Result::Error:
+      SPDLOG_ERROR("Cannot acquire lock file: {} , errno: {}", lockFilePath, strerror(errno));
+      return false;
   }
 
   isLocked = true;
@@ -108,6 +121,27 @@ bool FlockServiceGuard::acquireLock() {
     SPDLOG_WARN("Cannot truncate lock file: {}, errno: {}", lockFilePath, strerror(errno));
   }
 
+  return true;
+}
+
+bool FlockServiceGuard::acquireIpcLock(std::string_view objectName) {
+  if (!isLockActive() || ipcLockDescriptor != -1) return false;
+  // Nie uzywamy TMPDIR ani lock.dir: te same obiekty IPC moga byc osiagalne
+  // z roznych katalogow blokad instancji.
+  const std::string path = ipc::identityLockPath(objectName);
+  int fd                 = -1;
+  switch (lockfile::acquire(path, true, false, fd)) {
+    case lockfile::Result::Acquired:
+      break;
+    case lockfile::Result::Busy:
+      SPDLOG_ERROR("IPC identity lock {} is held by another instance.", path);
+      return false;
+    case lockfile::Result::Error:
+      SPDLOG_ERROR("Cannot acquire IPC identity lock {}: {}", path, strerror(errno));
+      return false;
+  }
+  ipcLockPath       = path;
+  ipcLockDescriptor = fd;
   return true;
 }
 
@@ -124,15 +158,14 @@ bool FlockServiceGuard::publishLockInfo() {
 bool FlockServiceGuard::isLockActive() const { return isLocked && lockFileDescriptor != -1; }
 
 void FlockServiceGuard::releaseLock() {
+  // Pliki kasuje wlasciciel, jeszcze pod blokada - patrz lockFile.hpp. Wczesniej zostawaly na
+  // dysku, po jednym na kazda nazwe instancji, ktora kiedykolwiek wystartowala.
+  if (ipcLockDescriptor != -1) {
+    lockfile::removeAndRelease(ipcLockPath, ipcLockDescriptor);
+    ipcLockDescriptor = -1;
+  }
   if (isLocked && lockFileDescriptor != -1) {
-    if (flock(lockFileDescriptor, LOCK_UN) == -1) {
-      SPDLOG_WARN("Failed to release lock: {} , errno: {}", lockFilePath, strerror(errno));
-    }
-
-    if (close(lockFileDescriptor) == -1) {
-      SPDLOG_WARN("Failed to close lock file descriptor: {} , errno: {}", lockFilePath, strerror(errno));
-    }
-
+    lockfile::removeAndRelease(lockFilePath, lockFileDescriptor);
     lockFileDescriptor = -1;
     isLocked           = false;
   }
@@ -231,4 +264,23 @@ bool FlockServiceGuard::writeLockInfo() const {
   }
 
   return true;
+}
+
+SweepReport sweepAbandonedResources(const std::string &serviceLockDir) {
+  SweepReport retVal;
+  retVal.serviceLocks = lockfile::sweep(serviceLockDir, isServiceLockName, [](std::string_view) {});
+  // Porzucona blokada tozsamosci dowodzi, ze zaden zywy serwer nie uzywa obiektow tego czlonu:
+  // serwer zajmuje ja przed ich utworzeniem i zwalnia dopiero po ich skasowaniu. Kolejek
+  // odpowiedzi klientow nie da sie tu wyliczyc bez listowania /dev/shm, wiec zostaja - usuwa je
+  // serwer przy wyjsciu, a klient, ktory dostanie ten sam identyfikator, zaklada je od nowa.
+  retVal.ipcIdentities = lockfile::sweep(
+      std::string(ipc::kMachineLockDir), [](std::string_view file) { return ipcTokenOf(file).has_value(); },
+      [](std::string_view file) {
+        const ipc::ServerNames names = ipc::namesForToken(*ipcTokenOf(file));
+        IPC::shared_memory_object::remove(names.shmemSegment.c_str());
+        IPC::message_queue::remove(names.queryQueue.c_str());
+        IPC::named_mutex::remove(names.mapMutex.c_str());
+      });
+  retVal.busSegments = bus::sweepAbandonedSegments();
+  return retVal;
 }

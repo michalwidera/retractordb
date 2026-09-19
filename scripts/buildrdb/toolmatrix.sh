@@ -10,9 +10,13 @@
 # Compile and run a small C++23 probe.
 # Tests std::ranges::fold_left, the uz size_t literal and std::println (<print>)
 # - all C++23 and used in the codebase.
-# Requires GCC 14+ (libstdc++ 13 has no <print> at all).  Returns 0 on success.
+# The compiler is whatever rdb_cxx23_probe_compiler names: g++ on Linux, where
+# this still means GCC 14+ (libstdc++ 13 has no <print> at all), and ${CXX:-c++}
+# on macOS, where the compiler is AppleClang and `g++` is only a shim for it -
+# there is no GCC version floor to speak of there.  Returns 0 on success.
 check_cxx23() {
-    local tmpdir rc
+    local tmpdir rc cxx
+    cxx=$(rdb_cxx23_probe_compiler)
     tmpdir=$(mktemp -d)
     cat > "$tmpdir/cxx23check.cpp" << 'EOF'
 #include <algorithm>
@@ -27,7 +31,7 @@ int main() {
   return s == 6 ? 0 : 1;
 }
 EOF
-    g++ -std=c++23 -o "$tmpdir/cxx23check" "$tmpdir/cxx23check.cpp" 2>/dev/null \
+    "$cxx" -std=c++23 -o "$tmpdir/cxx23check" "$tmpdir/cxx23check.cpp" 2>/dev/null \
         && "$tmpdir/cxx23check" >/dev/null 2>&1
     rc=$?
     rm -rf "$tmpdir"
@@ -121,6 +125,88 @@ cmd_to_apt_package() {
         conan|gcovr|cmake-format|cmake-pinned) echo "" ;;
         *) echo "$cmd" ;;
     esac
+}
+
+# Odpowiednik tabeli apt dla Homebrew. Pusta nazwa znaczy to samo co wyzej:
+# narzedzie ma wlasny instalator (pip/venv) albo jest czescia systemu.
+# gcc/g++ na macOS to shimy AppleClanga z Xcode CLT - nie ma pakietu brew,
+# ktory mialoby sens tu podstawic (`brew install gcc` dalby PRAWDZIWE GCC, a
+# projekt buduje sie tu AppleClangiem), wiec obsluguje je osobno
+# install_missing_special_tool.
+cmd_to_brew_package() {
+    local cmd="$1"
+    case "$cmd" in
+        gcc) echo "" ;;
+        g++) echo "" ;;
+        cmake) echo "cmake" ;;
+        ninja) echo "ninja" ;;
+        make) echo "make" ;;
+        git) echo "git" ;;
+        gdb) echo "gdb" ;;
+        python3) echo "python" ;;
+        python3-venv) echo "" ;;
+        pip3) echo "python" ;;
+        cppcheck) echo "cppcheck" ;;
+        ccache) echo "ccache" ;;
+        graphviz) echo "graphviz" ;;
+        dot) echo "graphviz" ;;
+        tmux) echo "tmux" ;;
+        gnuplot) echo "gnuplot" ;;
+        clang-format) echo "clang-format" ;;
+        clang-tidy) echo "llvm" ;;
+        shellcheck) echo "shellcheck" ;;
+        rg) echo "ripgrep" ;;
+        bat|batcat) echo "bat" ;;
+        # hexdump jest czescia bazowego macOS - nie ma czego instalowac.
+        hexdump) echo "" ;;
+        conan|gcovr|cmake-format|cmake-pinned) echo "" ;;
+        *) echo "$cmd" ;;
+    esac
+}
+
+# Jedno wejscie dla obu tabel: kto pyta o pakiet, dostaje nazwe wlasciwa dla
+# tej platformy. Na Linuksie to dokladnie cmd_to_apt_package, jak dotad.
+cmd_to_platform_package() {
+    if [ "$(rdb_os)" = "macos" ]; then
+        cmd_to_brew_package "$1"
+    else
+        cmd_to_apt_package "$1"
+    fi
+}
+
+# Narzedzia, ktorych na tej platformie NIE MA I NIE BEDZIE. To nie jest "brak"
+# - to "nie dotyczy": mold nie linkuje Mach-O, valgrind nie wspiera arm64 macOS,
+# build-essential/apt-get/sudo/setcap to swiat dpkg, a feh to X11. Traktowanie
+# ich jako brakow oznaczaloby, ze `validate` na macOS zawsze konczy sie bledem,
+# a `toolchain*` w kolko probuje instalowac nieistniejace pakiety.
+rdb_tool_not_applicable() {
+    local cmd="$1"
+    [ "$(rdb_os)" = "macos" ] || return 1
+    case "$cmd" in
+        mold|valgrind|build-essential|sudo|apt-get|setcap|feh) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Demotuje wpisy niedotyczace platformy do poziomu `n/a`, ktory
+# ensure_tools_for_option raportuje i pomija. Robimy to JEDNYM przebiegiem na
+# koncu tabeli zamiast rozgalezniac kazda liste z osobna - inaczej `mold` i
+# `valgrind` (wpisane jako `required` w toolchain_required, toolchain_all,
+# coverage i validate) wywracalyby macOS w czterech miejscach naraz.
+rdb_demote_not_applicable_specs() {
+    local spec cmd
+    local -a filtered
+    [ "$(rdb_os)" = "macos" ] || return 0
+    filtered=()
+    for spec in "${tool_specs[@]}"; do
+        cmd=${spec%%:*}
+        if rdb_tool_not_applicable "$cmd"; then
+            filtered+=("$cmd:n/a")
+        else
+            filtered+=("$spec")
+        fi
+    done
+    tool_specs=("${filtered[@]}")
 }
 
 # Tabela wymagan: dla opcji `opt` ustawia `tool_specs` (i `validate_only` dla
@@ -221,4 +307,6 @@ tool_specs_for_option() {
             tool_specs=()
             ;;
     esac
+
+    rdb_demote_not_applicable_specs
 }

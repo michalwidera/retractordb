@@ -10,14 +10,15 @@
 # Punkt 2 jest tu potrzebny, bo sam warunek rownosci przeszedlby rowniez wtedy,
 # gdyby przelacznik byl ignorowany.
 set -e
+. "$(dirname "$0")/../portable.sh"
 
 run_plan() {
   rm -rf temp
   mkdir -p temp
   local start end
-  start=$(date +%s%N)
+  start=$(now_ns)
   xretractor query.rql -k -r -m 8 "$@"
-  end=$(date +%s%N)
+  end=$(now_ns)
   echo $(((end - start) / 1000000))  # milisekundy
 }
 

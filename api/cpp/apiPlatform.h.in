@@ -1,0 +1,4 @@
+#pragma once
+
+#cmakedefine01 RDB_API_HAS_PIPE2
+#cmakedefine01 RDB_API_HAS_SPAWN_CLOEXEC_DEFAULT

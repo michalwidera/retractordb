@@ -46,7 +46,10 @@ run_profile_option() {
     local opt="$1"
     case "$opt" in
         "conan")
-            check_cxx23 || { echo "Error: C++23 not supported by g++ $(g++ -dumpversion 2>/dev/null). Run 'toolchain' first."; exit 1; }
+            # Nazwa kompilatora z rdb_cxx23_probe_compiler, zeby komunikat mowil
+            # o tym, co naprawde sprawdzono: g++ na Linuksie, AppleClang na macOS.
+            cxx_probe=$(rdb_cxx23_probe_compiler)
+            check_cxx23 || { echo "Error: C++23 not supported by $cxx_probe $("$cxx_probe" -dumpversion 2>/dev/null). Run 'toolchain' first."; exit 1; }
             conan profile detect -f
             sed 's/compiler.cppstd=gnu17/compiler.cppstd=gnu23/g' <~/.conan2/profiles/default >~/.conan2/profiles/temp && mv ~/.conan2/profiles/temp ~/.conan2/profiles/default
             ;;
@@ -58,7 +61,10 @@ run_profile_option() {
             ;;
         "bashrc")
             cd "$rdb_source_dir"
-            bashrc_file="$HOME/.bashrc"
+            # Plik rc wybiera rdb_shell_rc (common.sh): ~/.bashrc na Linuksie,
+            # ~/.zshrc albo ~/.bash_profile na macOS. Nazwa opcji zostaje
+            # 'bashrc' - jest w help, w menu i w tescie CLI.
+            bashrc_file=$(rdb_shell_rc)
             # Binaria instalują się do ~/.local/bin (prefiks ustawiany w CMakeLists).
             # Tworzymy katalog, by wpis PATH był poprawny nawet przed pierwszym 'ninja
             # install'. Regex '.*/bin' przy podmianie usuwa też stare wpisy <repo>/bin.
@@ -70,8 +76,8 @@ run_profile_option() {
             # pasował i wpisy PATH się duplikowały). Teraz podmienia stare <repo>/bin.
             ensure_single_bashrc_line "$bashrc_file" "$desired_path_line" '^export PATH=".*/bin:\\$PATH"$'
             ensure_single_bashrc_line "$bashrc_file" "$desired_venv_line" '^(source|\.)[[:space:]]+(.*/)?\.venv/bin/activate$'
-            echo "-- Last two lines of ~/.bashrc are:"
-            tail -n 2 ~/.bashrc
+            echo "-- Last two lines of $(rdb_display_path "$bashrc_file") are:"
+            tail -n 2 "$bashrc_file"
             ;;
     esac
 }

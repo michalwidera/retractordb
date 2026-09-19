@@ -1,7 +1,9 @@
 #include <algorithm>
+#include <cerrno>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -9,6 +11,7 @@
 #include <optional>
 #include <print>
 #include <sstream>
+#include <stdexcept>
 #include <vector>
 
 #include <fmt/ranges.h>                    // fmt::join - łączenie listy ścieżek konfiguracyjnych
@@ -21,6 +24,7 @@
 #include <boost/system/error_code.hpp>
 
 #include "config.h"  // Add an automatically generated configuration file
+#include "constants.hpp"
 #include "lib/appConfig.hpp"
 #include "lib/bus.hpp"
 #include "lib/compiler.hpp"
@@ -69,6 +73,8 @@
 /// - W trybie usługi nie oczekiwać na klawisz/terminal (opcja --noanykey), działając bez TTY.
 /// - Zwracać kody wyjścia zgodne z konwencją POSIX, aby systemd mógł poprawnie ocenić stan i politykę Restart.
 /// - Udostępniać kontrolę stanu działania (opcja --status) na potrzeby zewnętrznego monitoringu/healthcheck.
+/// - Sprzątać pozostałości instancji zabitych (pliki blokad, obiekty IPC, segmenty magistrali) przy każdym
+///   wyjściu i na żądanie (opcja --cleanup, np. z timera systemd), nie ruszając niczego, co należy do żywej instancji.
 ///
 /// Logowanie w trybie usługi systemowej:
 /// - W trybie usługi kierować logi na standardowe wyjście procesu (stdout/stderr), tak aby były przechwytywane
@@ -376,6 +382,7 @@ int main(int argc, char *argv[]) try {
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
           ("quiet,r", "no output on screen, skip presenter")                      //
           ("status,s", "check service status")                                    //
+          ("cleanup", "remove leftovers of dead instances and exit")              //
           ("verbose,v", "verbose mode (show stream params)")                      //
           ("xqrywait,x", "wait with processing for first query")                  //
           ("name,n", po::value<std::string>(&sServerName),                        //
@@ -427,6 +434,15 @@ int main(int argc, char *argv[]) try {
       bool isRunning = guard.isAnotherInstanceRunning();
       std::println("{}: {}", serviceName, isRunning ? "Running" : "Stopped");
       return isRunning ? system::errc::no_lock_available : system::errc::success;
+    }
+
+    // Sprzatanie na zadanie - dla crona albo timera systemd przy usludze, ktora dziala
+    // miesiacami. Kazda instancja sprzata tak samo przy wyjsciu (cleanup w executorsm.cpp).
+    if (vm.contains("cleanup")) {
+      const SweepReport swept = sweepAbandonedResources(guard.lockDirectory());
+      std::println("Removed leftovers of dead instances: {} instance lock(s), {} IPC identity set(s), {} bus segment(s).",
+                   swept.serviceLocks, swept.ipcIdentities, swept.busSegments);
+      return system::errc::success;
     }
 
     if (vm.contains("help")) {
@@ -698,6 +714,12 @@ int main(int argc, char *argv[]) try {
     if (!peer.queryFile.empty()) std::cerr << ", queries: " << peer.queryFile;
     std::cerr << "\nxretractor: use --name <name> to run a second, independent instance\n";
     SPDLOG_ERROR("Cannot acquire service lock, {} is already running (pid {}).", ownerLabel(earlyServerName), peer.pid);
+    return system::errc::no_lock_available;
+  }
+
+  if (!guard.acquireIpcLock(ipc::names(earlyServerName).queryQueue)) {
+    std::cerr << "xretractor: cannot acquire IPC identity for " << ownerLabel(earlyServerName)
+              << "; another instance may own the same IPC objects\n";
     return system::errc::no_lock_available;
   }
 

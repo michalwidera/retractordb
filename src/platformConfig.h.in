@@ -1,0 +1,57 @@
+#pragma once
+
+// Mozliwosci platformy wykryte przy konfiguracji (cmake/PlatformChecks.cmake).
+//
+// Plik jest GENEROWANY - edytuj src/platformConfig.h.in, nigdy kopii w
+// build/*/generated. Kazda stala jest 0 albo 1, wiec uzywa sie ich przez
+// `#if RDB_HAS_X`, a nie `#ifdef`: literowka w nazwie daje wtedy blad
+// kompilacji zamiast cichego wyboru gorszej galezi.
+//
+// Zasada doboru: mozliwosc BIBLIOTEKI sprawdza probe kompilacyjne (zalecenie
+// Apple z "Porting UNIX/Linux Applications to macOS"), a kontrakt JADRA - /proc
+// kontra sysctl, systemd kontra launchd - wybiera nazwa systemu, bo nie stoi za
+// nim zadna funkcja, ktorej obecnosc dalo by sie sprawdzic.
+
+// --- rodzina systemu ----------------------------------------------------
+#define RDB_OS_LINUX @RDB_OS_LINUX@
+#define RDB_OS_DARWIN @RDB_OS_DARWIN@
+
+// --- kontrakty jadra ----------------------------------------------------
+#define RDB_HAS_PROCFS @RDB_HAS_PROCFS@   ///< /proc/<pid>/stat, /proc/self/status, /proc/self/cgroup
+#define RDB_HAS_SYSTEMD @RDB_HAS_SYSTEMD@  ///< jednostki .service, systemctl, cgroup jednostki
+#define RDB_HAS_LAUNCHD @RDB_HAS_LAUNCHD@  ///< launchd: LaunchAgents/LaunchDaemons, launchctl
+
+// --- czas ---------------------------------------------------------------
+#define RDB_HAS_CLOCK_NANOSLEEP @RDB_HAS_CLOCK_NANOSLEEP@  ///< sen ABSOLUTNY na osi CLOCK_MONOTONIC
+#define RDB_HAS_MACH_TIME_H @RDB_HAS_MACH_TIME_H@      ///< mach_absolute_time / mach_wait_until
+
+// --- szeregowanie czasu rzeczywistego -----------------------------------
+#define RDB_HAS_SCHED_SETSCHEDULER @RDB_HAS_SCHED_SETSCHEDULER@  ///< SCHED_FIFO dla CALEGO procesu
+#define RDB_HAS_SCHED_AFFINITY @RDB_HAS_SCHED_AFFINITY@      ///< cpu_set_t, sched_[gs]etaffinity
+#define RDB_HAS_MLOCKALL @RDB_HAS_MLOCKALL@            ///< mlockall(2)
+#define RDB_HAS_MCL_ONFAULT @RDB_HAS_MCL_ONFAULT@         ///< leniwe blokowanie nowych mapowan
+#define RDB_HAS_PTHREAD_SCHEDPARAM @RDB_HAS_PTHREAD_SCHEDPARAM@  ///< SCHED_FIFO dla POJEDYNCZEGO watku
+
+// --- synchronizacja miedzyprocesowa -------------------------------------
+#define RDB_HAS_ROBUST_MUTEX @RDB_HAS_ROBUST_MUTEX@  ///< PTHREAD_MUTEX_ROBUST + pthread_mutex_consistent
+
+// --- procesy ------------------------------------------------------------
+#define RDB_HAS_SYSCTL_KERN_PROC @RDB_HAS_SYSCTL_KERN_PROC@  ///< sysctl KERN_PROC_PID -> struct kinfo_proc
+
+// --- konsolidator -------------------------------------------------------
+#define RDB_HAS_LD_WRAP @RDB_HAS_LD_WRAP@  ///< -Wl,--wrap=<symbol> (GNU ld / lld)
+
+// --- narzedzia zewnetrzne -----------------------------------------------
+#define RDB_HAS_ADDR2LINE @RDB_HAS_ADDR2LINE@  ///< program addr2line (binutils) dla boost::stacktrace
+
+// --- rozne --------------------------------------------------------------
+#define RDB_HAS_PIPE2 @RDB_HAS_PIPE2@    ///< pipe2(2) z O_CLOEXEC w jednym wywolaniu
+#define RDB_HAS_STATVFS @RDB_HAS_STATVFS@  ///< statvfs / fstatvfs
+
+// Zywotnosc procesu musi dac sie ustalic NA PEWNO: magistrala xrdbbus zwalnia na
+// tej podstawie sloty po martwych instancjach, a falszywe "zyje" zatrzymuje start
+// nastepnej instancji na tych samych nazwach strumieni. Brak obu drog jest bledem
+// portu, nie stanem do obslugi w czasie wykonania.
+#if !RDB_HAS_PROCFS && !RDB_HAS_SYSCTL_KERN_PROC
+#error "Brak sposobu na ustalenie zywotnosci procesu: ani /proc, ani sysctl KERN_PROC."
+#endif

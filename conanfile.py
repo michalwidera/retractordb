@@ -128,7 +128,16 @@ class Retractor(ConanFile):
     def package_info(self):
         """Set libraries required for compile and execute."""
         self.cpp_info.libs = tools.collect_libs(self)
-        self.cpp_info.system_libs = ["pthread", "rt", "dl"]
+        # librt i libdl sa bibliotekami glibc. Na macOS ich nie ma jako osobnych
+        # plikow: clock_gettime, shm_open i dlopen siedza w libSystem, ktora
+        # dolinkowuje sie do kazdego programu automatycznie. "-lrt" konczy sie
+        # tam bledem "library not found for -lrt", wiec lista musi byc zalezna
+        # od systemu. libpthread na macOS istnieje jako dowiazanie do libSystem,
+        # wiec zostaje wszedzie - jest nieszkodliwa i upraszcza warunek.
+        if self.settings.os == "Macos":
+            self.cpp_info.system_libs = ["pthread"]
+        else:
+            self.cpp_info.system_libs = ["pthread", "rt", "dl"]
         self.cpp_info.compiler = "23"
 
     def build(self):

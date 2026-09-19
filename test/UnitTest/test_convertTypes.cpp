@@ -2,6 +2,7 @@
 
 #include <any>
 #include <boost/rational.hpp>
+#include <limits>
 #include <string>
 #include <utility>
 
@@ -351,4 +352,109 @@ TEST(cast_any, idxpair_to_string) {
   cast<std::any> c;
   std::any in = P{"abc", 3};
   EXPECT_EQ(std::any_cast<std::string>(c(in, rdb::STRING)), "abc,3");
+}
+
+// --- zwezenie float/double -> typ calkowity POZA ZAKRESEM ---
+//
+// `static_cast<int>(1e30)` jest w C++ zachowaniem nieokreslonym i architektury rozstrzygaja
+// je roznie: x86-64 (cvttsd2si) oddaje INT_MIN, arm64 (fcvtzs) nasyca do INT_MAX; dla NaN
+// odpowiednio INT_MIN i 0. Baza dawala wiec na dwoch maszynach rozne liczby, bez bledu i bez
+// sladu w logu. narrowFloatTo() w convertTypes.cc przypina regule: wartosc, ktorej typ
+// docelowy nie pomiesci (NaN i nieskonczonosc wlacznie), daje NULL (std::monostate).
+//
+// Testy sa architektonicznie neutralne - to ta sama oczekiwana wartosc na kazdej maszynie -
+// wiec ich zadaniem jest padac na tej, ktora by sie wylamala.
+
+TEST(cast_variant, double_above_integer_range_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 1e30;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::INTEGER)));
+}
+TEST(cast_variant, double_below_integer_range_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = -1e30;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::INTEGER)));
+}
+TEST(cast_variant, double_infinity_to_integer_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT plus  = std::numeric_limits<double>::infinity();
+  rdb::descFldVT minus = -std::numeric_limits<double>::infinity();
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(plus, rdb::INTEGER)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(minus, rdb::INTEGER)));
+}
+TEST(cast_variant, double_nan_to_integer_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::INTEGER)));
+}
+// Granica DOKLADNA: INT_MAX i INT_MIN da sie zapisac w double, wiec maja przejsc bez zmiany,
+// a nie wpasc w NULL o jeden krok za wczesnie.
+TEST(cast_variant, double_at_integer_bounds_is_exact) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT hi = static_cast<double>(std::numeric_limits<int>::max());
+  rdb::descFldVT lo = static_cast<double>(std::numeric_limits<int>::lowest());
+  EXPECT_EQ(std::get<int>(c(hi, rdb::INTEGER)), std::numeric_limits<int>::max());
+  EXPECT_EQ(std::get<int>(c(lo, rdb::INTEGER)), std::numeric_limits<int>::lowest());
+}
+// Pierwsza liczba calkowita za kazda granica jest juz NULL-em.
+TEST(cast_variant, double_one_past_integer_bounds_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT hi = 2147483648.0;
+  rdb::descFldVT lo = -2147483649.0;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(hi, rdb::INTEGER)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(lo, rdb::INTEGER)));
+}
+// Zakres sprawdza sie na wartosci OBCIETEJ w strone zera, tak jak konwertuje jezyk: czesc
+// ulamkowa za granica nie wyprowadza wartosci poza zakres.
+TEST(cast_variant, fraction_past_integer_bounds_truncates_into_range) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT hi = 2147483647.5;
+  rdb::descFldVT lo = -2147483648.5;
+  EXPECT_EQ(std::get<int>(c(hi, rdb::INTEGER)), std::numeric_limits<int>::max());
+  EXPECT_EQ(std::get<int>(c(lo, rdb::INTEGER)), std::numeric_limits<int>::lowest());
+}
+// FLOAT nie umie zapisac INT_MAX - `static_cast<float>(INT_MAX)` to 2^31, juz poza zakresem.
+// Najwieksza liczba FLOAT ponizej 2^31 to 2147483520 i ta ma przejsc bez zmiany; 2^31 nie.
+TEST(cast_variant, float_just_below_integer_range_is_exact) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 2147483520.0F;
+  EXPECT_EQ(std::get<int>(c(in, rdb::INTEGER)), 2147483520);
+}
+TEST(cast_variant, float_at_2p31_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 2147483648.0F;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::INTEGER)));
+}
+TEST(cast_variant, negative_double_to_uint_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = -1.0;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::UINT)));
+}
+// -0.5 obcina sie do 0, a 0 miesci sie w UINT.
+TEST(cast_variant, negative_fraction_to_uint_truncates_to_zero) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = -0.5;
+  EXPECT_EQ(std::get<unsigned>(c(in, rdb::UINT)), 0U);
+}
+TEST(cast_variant, double_above_uint_range_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 5e9;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::UINT)));
+}
+// Zmiana zachowania takze na arm64: surowy rzut zwezal 300.0 do 8 bitow (44), a nasycenie
+// z a0082a34 dawalo 255. Obie liczby byly zmyslone; teraz jest NULL.
+TEST(cast_variant, double_above_byte_range_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 300.0;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::BYTE)));
+}
+TEST(cast_variant, double_at_byte_bound_is_exact) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 255.9;
+  EXPECT_EQ(std::get<uint8_t>(c(in, rdb::BYTE)), 255);
+}
+TEST(cast_any, double_above_integer_range_is_null) {
+  cast<std::any> c;
+  std::any in = 1e30;
+  EXPECT_EQ(c(in, rdb::INTEGER).type(), typeid(std::monostate));
 }

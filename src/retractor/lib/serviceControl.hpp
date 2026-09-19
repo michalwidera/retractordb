@@ -13,8 +13,15 @@ namespace servicecontrol {
 // Wykonanie polecenia systemctl: argv -> kod wyjścia. Wstrzykiwalne dla testów (bez realnego systemd).
 using SystemctlRunner = std::function<int(const std::vector<std::string> &)>;
 
-// Restart jednostki systemd. userScope => "systemctl --user restart", inaczej "systemctl restart".
-// Zwraca kod wyjścia systemctl (0 = sukces, -1 = błąd fork/exec). runner pusty => realny fork/exec.
+// Polecenie restartu jednostki, w postaci argv dla menedżera usług TEGO systemu:
+// systemd => {"systemctl", ["--user"], "restart", <unit>},
+// launchd => {"launchctl", "kickstart", "-k", <domena>/<unit>}.
+// Wydzielone z restartService, bo jest jedynym miejscem różniącym się między systemami
+// i jedyną częścią, którą da się sprawdzić testem bez uruchamiania menedżera usług.
+[[nodiscard]] std::vector<std::string> restartCommand(bool userScope, const std::string &unit);
+
+// Restart jednostki usługowej poleceniem z restartCommand.
+// Zwraca kod wyjścia menedżera usług (0 = sukces, -1 = błąd fork/exec). runner pusty => realny fork/exec.
 int restartService(bool userScope, const std::string &unit, const SystemctlRunner &runner = {});
 
 // Atomowo nadpisuje plik docelowy treścią pliku źródłowego (zapis do temp w katalogu docelowym

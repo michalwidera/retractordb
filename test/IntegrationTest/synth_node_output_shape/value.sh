@@ -4,6 +4,7 @@
 # Przebieg OFFLINE (`-f`) z budzetem slotow: liczba rekordow nie zalezy od zegara.
 # Wartosci czytamy z ARTEFAKTOW, nie przez klienta.
 set -e
+. "$(dirname "$0")/../portable.sh"
 mkdir -p temp
 rm -f temp/*
 
@@ -13,8 +14,9 @@ xretractor query.rql -f -k -r -m 6
 # liczba wartosci w rekordzie (RATIONAL = dwie wartosci int32: licznik i mianownik).
 check() {
   local stream=$1 fmt=$2 size=$3 expected=$4
-  # `%.17g` zdejmuje z liczb zmiennoprzecinkowych dopelnienie formatu `od` (`2.5000000`).
-  local values=($(od -An -v -"$fmt" temp/$stream | awk '{ for (i = 1; i <= NF; i++) printf "%.17g\n", $i }'))
+  # Nie przez `od`: jego format `f4` ma na BSD tylko 7 cyfr znaczacych i sam zaokragla
+  # wartosci powyzej 2^23. read_binary_values (portable.sh) bierze kod bez wiodacego `t`.
+  local values=($(read_binary_values temp/$stream "${fmt#t}"))
   test ${#values[@]} -gt 0 && test $((${#values[@]} % size)) = 0 || {
     echo "REGRESJA: rozmiar '$stream' (${#values[@]} wartosci $fmt) nie jest dodatnia wielokrotnoscia rekordu ($size)"
     cat temp/$stream.desc

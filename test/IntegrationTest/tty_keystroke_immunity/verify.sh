@@ -13,6 +13,7 @@
 # wynikla z tego, ze OBA przebiegi nic nie policzyly.
 
 set -e
+. "$(dirname "$0")/../portable.sh"
 
 buildDir="${1:?podaj katalog buildu}"
 xretractor="${buildDir}/src/retractor/xretractor"
@@ -23,7 +24,7 @@ run_clean() {
 }
 
 size_of() {
-  [ -f keyproof ] && stat -c%s keyproof || echo 0
+  file_size keyproof
 }
 
 # Przebieg odniesienia: stdin nie jest terminalem, wiec klawiatura nie wchodzi w gre.

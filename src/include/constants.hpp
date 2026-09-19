@@ -2,8 +2,12 @@
 
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
+#include <cstdio>
 #include <string>
 #include <string_view>
+
+#include "platformConfig.h"
 
 namespace constants {
 constexpr std::string_view Reserved_id_oob = "OUT_OF_BUSSINESS";
@@ -60,6 +64,58 @@ struct ServerNames {
   [[nodiscard]] std::string responseQueue(int clientId) const { return responseQueuePrefix + std::to_string(clientId); }
 };
 
+/// Najdluzsza nazwa obiektu IPC, ktora jadro przyjmie.
+///
+/// Na jadrach BSD-owych nazwy POSIX-owych semaforow i obiektow pamieci dzielonej
+/// sa ograniczone do PSEMNAMLEN / PSHMNAMLEN, czyli 31 znakow, a dluzsza konczy
+/// sie ENAMETOOLONG ("File name too long") juz przy TWORZENIU obiektu. Dotyczy to
+/// takze obiektow, ktorych sami nie zakladamy: Boost.Interprocess realizuje tam
+/// named_mutex przez sem_open, bo Darwin nie ma muteksow wspoldzielonych miedzy
+/// procesami. Na Linuksie limitem jest NAME_MAX (255) i zapas jest tak duzy, ze
+/// warunek ponizej nigdy nie zadziala - nazwy zostaja doslownie takie jak dotad.
+inline constexpr std::size_t kMaxObjectNameLength = RDB_OS_DARWIN ? 31 : 200;
+
+/// Zapas na czlon doklejany PO zlozeniu nazwy bazowej: identyfikator klienta
+/// w nazwie kolejki odpowiedzi plus ukosnik, ktory Boost stawia z przodu.
+inline constexpr std::size_t kObjectNameTailBudget = 12;
+
+/// Dlugosc skrotu z shortServerTag: "0" i osiem cyfr szesnastkowych.
+inline constexpr std::size_t kShortServerTagLength = 9;
+
+/// Skrot nazwy serwera: osiem cyfr szesnastkowych FNV-1a.
+///
+/// Liczony JAWNIE, a nie przez std::hash, z tego samego powodu co skrot sciezki
+/// magazynu w bus.hpp: wartosc musi byc identyczna po obu stronach IPC, a wynik
+/// std::hash jest szczegolem implementacji biblioteki standardowej.
+inline std::string shortServerTag(std::string_view serverName) {
+  constexpr std::uint64_t basis = 0xcbf2'9ce4'8422'2325ULL;
+  constexpr std::uint64_t prime = 0x0000'0100'0000'01B3ULL;
+  constexpr unsigned halfBits   = 32;  // skrot 32-bitowy: polowki 64-bitowego XOR-owane
+  std::uint64_t hash            = basis;
+  for (const unsigned char byte : serverName) {
+    hash ^= byte;
+    hash *= prime;
+  }
+  // NOLINTNEXTLINE(modernize-avoid-c-arrays): bufor dla snprintf
+  char buffer[kShortServerTagLength + 1];
+  // Nazwa uzytkownika zaczyna sie litera, wiec 0 oddziela skroty od nazw doslownych.
+  std::snprintf(buffer, sizeof(buffer), "0%08x", static_cast<unsigned>(hash ^ (hash >> halfBits)));
+  return {buffer};
+}
+
+/// Czlon nazwy obiektu odpowiadajacy tej instancji: sama nazwa serwera, a gdy
+/// komplet nazw nie miescilby sie w limicie platformy - jej skrot.
+///
+/// Decyzje podejmuje NAJDLUZSZA z nazw (kolejka odpowiedzi z identyfikatorem
+/// klienta), zeby wszystkie obiekty jednej instancji byly nazwane jednakowo:
+/// serwer i klient licza to niezaleznie i musza dojsc do tej samej nazwy.
+inline std::string serverNameToken(std::string_view serverName) {
+  if (serverName.empty()) return {};
+  const std::size_t longest = kResponseQueuePrefix.size() + 1 + serverName.size() + 1 + kObjectNameTailBudget;
+  if (longest <= kMaxObjectNameLength) return std::string(serverName);
+  return shortServerTag(serverName);
+}
+
 /// Nazwa bazowa z sufiksem serwera; bez sufiksu, gdy nazwa serwera pusta.
 inline std::string withServerSuffix(std::string_view base, std::string_view serverName) {
   std::string retVal(base);
@@ -70,17 +126,37 @@ inline std::string withServerSuffix(std::string_view base, std::string_view serv
   return retVal;
 }
 
-inline ServerNames names(std::string_view serverName = {}) {
+/// Komplet nazw dla gotowego czlonu instancji (patrz serverNameToken). Sprzatacz pozostalosci
+/// zna wylacznie czlon - odczytany z nazwy pliku blokady tozsamosci - a nie nazwe serwera.
+inline ServerNames namesForToken(std::string_view token) {
   ServerNames retVal;
-  retVal.shmemSegment = withServerSuffix(kShmemSegment, serverName);
-  retVal.mapMutex     = withServerSuffix(kMapMutex, serverName);
-  retVal.queryQueue   = withServerSuffix(kQueryQueue, serverName);
+  retVal.shmemSegment = withServerSuffix(kShmemSegment, token);
+  retVal.mapMutex     = withServerSuffix(kMapMutex, token);
+  retVal.queryQueue   = withServerSuffix(kQueryQueue, token);
   // Prefiks kolejki odpowiedzi domyka się kropką, bo doklejany jest do niego identyfikator
   // klienta: bez separatora "brcdbr.srv" + "12" i "brcdbr.srv1" + "2" dałyby tę samą nazwę.
   retVal.responseQueuePrefix =
-      serverName.empty() ? std::string(kResponseQueuePrefix) : withServerSuffix(kResponseQueuePrefix, serverName) + ".";
+      token.empty() ? std::string(kResponseQueuePrefix) : withServerSuffix(kResponseQueuePrefix, token) + ".";
   return retVal;
 }
+
+/// Katalog blokad wspolnych dla calej maszyny: tozsamosci IPC i obecnosci na magistrali.
+/// Nie TMPDIR: obiekty chronione tymi blokadami widac ze wszystkich katalogow tymczasowych.
+inline constexpr std::string_view kMachineLockDir = "/tmp";
+
+/// Przedrostek pliku blokady tozsamosci IPC. Pelna nazwa: przedrostek + nazwa kolejki komend + ".lock".
+inline constexpr std::string_view kIdentityLockPrefix = "xretractor_ipc.";
+
+/// Plik blokady tozsamosci IPC. Serwer trzyma ja wylacznie od chwili PRZED utworzeniem swoich
+/// obiektow IPC do chwili PO ich skasowaniu, a po jego smierci zwalnia ja jadro - dlatego jest
+/// zarazem najpewniejszym dowodem, ze serwer o tym czlonie zyje.
+inline std::string identityLockPath(std::string_view queryQueue) {
+  return std::string(kMachineLockDir) + "/" + std::string(kIdentityLockPrefix) + std::string(queryQueue) + ".lock";
+}
+
+/// Czlon instancji liczony RAZ i uzyty we wszystkich czterech nazwach - patrz serverNameToken.
+/// Na Linuksie jest to zawsze sama nazwa serwera.
+inline ServerNames names(std::string_view serverName = {}) { return namesForToken(serverNameToken(serverName)); }
 
 // === Rozmiary buforów i kolejek ===
 

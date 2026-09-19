@@ -3,6 +3,7 @@
 # operatorow, nie przepisane z wyjscia silnika - inaczej test utrwalilby dowolne
 # zachowanie, w tym to bledne, ktore mial wykryc.
 set -eu
+. "$(dirname "$0")/../portable.sh"
 rm -rf temp
 mkdir -p temp
 
@@ -34,7 +35,7 @@ xretractor query.rql -m 40
 # biezacej probce. Przy stemplowaniu poczatkiem przedzialu pole 1 bylo fast[n+2],
 # czyli okno wyprzedzalo sygnal o cala swoja rozpietosc.
 actual_win=$(od -An -v -td4 temp/win_join | xargs)
-record_count=$(($(stat -c %s temp/win_join) / 16))
+record_count=$(($(file_size temp/win_join) / 16))
 expected_win=$(
   for k in $(seq 0 $((record_count - 1))); do
     echo "$((102 + k)) $((102 + k)) $((101 + k)) $((100 + k))"
@@ -60,7 +61,7 @@ expected_win=$(
 # Gdy opoznienie siedzialo w ogonie, rekord n niosl fast[n] i tau_2 bylo w parze
 # nieodroznialne od operacji pustej.
 actual_shift=$(od -An -v -td4 temp/shift_join | xargs)
-shift_count=$(($(stat -c %s temp/shift_join) / 8))
+shift_count=$(($(file_size temp/shift_join) / 8))
 expected_shift=$(
   for k in $(seq 0 $((shift_count - 1))); do
     echo "$((100 + k)) $((500 + (k + 2) / 2))"

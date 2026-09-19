@@ -18,6 +18,39 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 HERE="$(pwd)"
+
+# Uruchomienie z limitem czasu. `timeout` jest z GNU coreutils; macOS nie ma go
+# wcale, a z Homebrew nazywa sie `gtimeout`. Ostatnia droga to wlasny straznik
+# w tle - zwraca 124 po uplywie czasu, tak samo jak `timeout`.
+# Oryginal: test/IntegrationTest/portable.sh (run_timeout). Kopia lokalna, bo
+# bramka badawcza jest z zalozenia samodzielna wzgledem kopii test/.
+run_timeout() {
+  local seconds="$1"
+  shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$seconds" "$@"
+    return $?
+  fi
+  if command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$seconds" "$@"
+    return $?
+  fi
+  "$@" &
+  local child=$!
+  (
+    sleep "$seconds"
+    kill -TERM "$child" 2>/dev/null
+  ) &
+  local guard=$!
+  local status=0
+  wait "$child" 2>/dev/null || status=$?
+  kill -TERM "$guard" 2>/dev/null
+  wait "$guard" 2>/dev/null || true
+  # 143 = 128 + SIGTERM: proces zostal zabity przez straznika, czyli uplynal czas.
+  [ "$status" -eq 143 ] && status=124
+  return "$status"
+}
+
 CODE_REPO="${CODE_REPO:-/home/michal/github/retractordb}"
 OUT="${OUT:-$HOME/k26v3_gates_rdb}"
 # Proba generalna procedury decyzyjnej (§7.5) biegnie na danych pilota.
@@ -66,7 +99,11 @@ controls=(F9_R2_controls F9_R1_controls F9_X_controls)
 # procesu, ktory sam go uruchomil.
 if pgrep -x xretractor >/dev/null; then
   echo "BLAD: w systemie biegnie xretractor - najpierw sprzatnij" >&2
-  pgrep -ax xretractor >&2
+  # `pgrep -a` (wiersz polecen obok PID-u) to procps-ng; BSD/macOS go nie zna.
+  # Ten sam opis skladamy z `pgrep -x` i `ps -o command=`.
+  for stray_pid in $(pgrep -x xretractor); do
+    printf '%s %s\n' "$stray_pid" "$(ps -o command= -p "$stray_pid" 2>/dev/null)" >&2
+  done
   exit 2
 fi
 
@@ -101,7 +138,7 @@ for profile in "${profiles[@]}"; do
       cp "$HERE/rql/$plan.rql" .
       cp "$DATA"/*.txt .
       set +e
-      RDB_BENCH_LOGICAL=1 RDB_BENCH_WORK=1 timeout 1800 \
+      RDB_BENCH_LOGICAL=1 RDB_BENCH_WORK=1 run_timeout 1800 \
         "$binary" "$plan.rql" -m "$slots" -r -k >cell.out 2>cell.counters
       echo $? >cell.rc
       set -e

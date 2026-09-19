@@ -17,6 +17,7 @@
 #     przylozenia oracle'a do obu, nie z osobnego `cmp` (powod nizej),
 #   - dlugosci wiaze nierownosc, nie rownosc.
 set -eu
+. "$(dirname "$0")/../portable.sh"
 
 rm -f ./*.meta ./*.desc matched CC out_compile.txt
 
@@ -41,14 +42,20 @@ check_payload() {
   local actual expected
   actual=$(od -An -v -td4 "$stream" | xargs)
   expected=$(
-    record_count=$(($(stat -c %s "$stream") / 4))
+    record_count=$(($(file_size "$stream") / 4))
     for element in $(seq 0 $((record_count - 1))); do
       cycle=$((element / 3))
-      case $((element % 3)) in
-        0) echo $((100 * (cycle + 1))) ;;
-        1) echo $((2 * cycle + 1)) ;;
-        2) echo $((2 * cycle + 2)) ;;
-      esac
+      # if/elif, a nie `case`: parser basha 3.2 (czyli /bin/bash na macOS) myli
+      # nawias zamykajacy wzorzec `case` z koncem podstawienia $( ), i cala
+      # funkcja wywracala sie na "syntax error near unexpected token `;;'"'"'".
+      slot=$((element % 3))
+      if [ "$slot" = 0 ]; then
+        echo $((100 * (cycle + 1)))
+      elif [ "$slot" = 1 ]; then
+        echo $((2 * cycle + 1))
+      else
+        echo $((2 * cycle + 2))
+      fi
     done | xargs
   )
   [ "$actual" = "$expected" ] || {
@@ -62,8 +69,8 @@ check_payload() {
 check_payload matched
 check_payload CC
 
-matched_size=$(stat -c %s matched)
-cc_size=$(stat -c %s CC)
+matched_size=$(file_size matched)
+cc_size=$(file_size CC)
 
 # Prog przeciw zielonemu wynikowi na pustce: przy budzecie -m 48 najkrotsza
 # znana konfiguracja (wszystkie przelaczniki OFF) daje 30 rekordow po 4 bajty.

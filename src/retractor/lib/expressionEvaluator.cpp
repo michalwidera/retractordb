@@ -639,6 +639,15 @@ rdb::descFldVT stringLength(const rdb::descFldVT &inVar) {
   return static_cast<int>(text->length());
 }
 
+/// Przeciazenie <double(double)> funkcji matematycznej, wskazane JAWNIE.
+///
+/// `floor` nie jest pojedyncza funkcja, tylko zbiorem przeciazen (float, double,
+/// long double), a w libc++ dodatkowo szablonem dla typow calkowitych. Sama nazwa nie
+/// ma wiec jak przejsc na std::function<double(double)>: nie da sie wybrac, o ktora
+/// wersje chodzi. Pod libstdc++ wybor wypadal jednoznacznie i rzutowanie nie bylo
+/// potrzebne, ale to byla wlasciwosc TAMTEJ biblioteki, a nie gwarancja jezyka.
+using mathFn = double (*)(double);
+
 rdb::descFldVT callFun(rdb::descFldVT &inVar, const std::function<double(double)> &fnName) {
   if (isNullValue(inVar)) return std::monostate{};
   auto backResultType = inVar.index();
@@ -776,27 +785,27 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         const auto tkStr    = lowercased(original);
         // https://learnmoderncpp.com/2020/06/01/strings-as-switch-case-labels/ (?)
         if (tkStr == "floor")
-          rStack.push(callFun(b, floor));
+          rStack.push(callFun(b, static_cast<mathFn>(std::floor)));
         else if (tkStr == "ceil")
-          rStack.push(callFun(b, ceil));
+          rStack.push(callFun(b, static_cast<mathFn>(std::ceil)));
         else if (tkStr == "sqrt")
-          rStack.push(callFun(b, sqrt));
+          rStack.push(callFun(b, static_cast<mathFn>(std::sqrt)));
         else if (tkStr == "round")
-          rStack.push(callFun(b, round));
+          rStack.push(callFun(b, static_cast<mathFn>(std::round)));
         else if (tkStr == "sin")
-          rStack.push(callRealFun(b, sin));
+          rStack.push(callRealFun(b, static_cast<mathFn>(std::sin)));
         else if (tkStr == "cos")
-          rStack.push(callRealFun(b, cos));
+          rStack.push(callRealFun(b, static_cast<mathFn>(std::cos)));
         else if (tkStr == "exp")
-          rStack.push(callRealFun(b, exp));
+          rStack.push(callRealFun(b, static_cast<mathFn>(std::exp)));
         else if (tkStr == "tan")
-          rStack.push(callFun(b, tan));
+          rStack.push(callFun(b, static_cast<mathFn>(std::tan)));
         else if (tkStr == "log")
-          rStack.push(callFun(b, log));
+          rStack.push(callFun(b, static_cast<mathFn>(std::log)));
         else if (tkStr == "log2")
-          rStack.push(callFun(b, log2));
+          rStack.push(callFun(b, static_cast<mathFn>(std::log2)));
         else if (tkStr == "trunc")
-          rStack.push(callFun(b, trunc));
+          rStack.push(callFun(b, static_cast<mathFn>(std::trunc)));
         else if (tkStr == "isnull")
           rStack.push(isnull(b));
         // NULL -> 0, reszta bez zmian. Zeruje wartosc POCHLANIAJACA (dziura w danych, dzielenie

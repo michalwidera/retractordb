@@ -31,6 +31,7 @@
 # Test nie korzysta z ../serverlib.sh: tamta oprawa pilnuje pojedynczej instancji na stalej
 # sciezce blokady, czyli dokladnie tego zalozenia, ktore ten scenariusz znosi.
 set -e
+. "$(dirname "$0")/../portable.sh"
 
 LOCK_DIR="${TMPDIR:-/tmp}"
 
@@ -50,7 +51,10 @@ pid_sa=""
 # normalnie, a nie zaslaniac skutki wlasnego kill -KILL.
 scrub_killed_instance() {
   local name="$1"
-  rm -f /dev/shm/*."$name" /dev/shm/sem.*."$name" "$LOCK_DIR/xretractor_service.$name.lock"
+  # Wzorzec dopasowuje sama nazwe obiektu; "\.<nazwa>$" pokrywa i obiekty
+  # "*.<nazwa>", i semafory "sem.*.<nazwa>", czyli dokladnie stary zbior globow.
+  shm_remove "\.${name}\$" || true
+  rm -f "$LOCK_DIR/xretractor_service.$name.lock"
 }
 
 cleanup() {
@@ -70,18 +74,22 @@ cleanup() {
     kill -KILL "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
   done
-  # Stabilne pliki flock pozostaja po normalnym koncu procesu. Test zna caly zbior swoich
-  # nazw i usuwa je dopiero po zebraniu wszystkich dzieci.
+  # Plik blokady kasuje sam proces przy normalnym koncu, ale po SIGKILL zostaje. Test zna caly
+  # zbior swoich nazw i usuwa pozostalosci dopiero po zebraniu wszystkich dzieci.
   rm -f "$LOCK_DIR/xretractor_service.lock"
   for name in alfa beta gamma delta epsilon rota rotb racea raceb svc storea storeb; do
     rm -f "$LOCK_DIR/xretractor_service.$name.lock"
   done
   # Bramka higieny: zaden obiekt IPC ani plik blokady tych instancji nie ma prawa zostac.
-  if ls /dev/shm/*alfa* /dev/shm/*beta* /dev/shm/*gamma* /dev/shm/*delta* /dev/shm/*epsilon* /dev/shm/*rot?* \
-      /dev/shm/*racea* /dev/shm/*raceb* /dev/shm/*store?* \
-      >/dev/null 2>&1; then
-    echo "higiena: zostaly obiekty IPC w /dev/shm:"
-    ls /dev/shm/ | grep -E 'alfa|beta|gamma|delta|epsilon|rota|rotb|racea|raceb|storea|storeb' || true
+  # shm_list konczy sie kodem 2, gdy katalogu obiektow IPC nie da sie ustalic - kontrola
+  # jest wtedy jawnie POMINIETA, a nie uznana za zdana.
+  local leftovers shm_status=0
+  leftovers=$(shm_list 'alfa|beta|gamma|delta|epsilon|rota|rotb|racea|raceb|storea|storeb') || shm_status=$?
+  if [ "$shm_status" -ne 0 ]; then
+    echo "POMINIETO: higiena IPC niesprawdzalna na tej platformie"
+  elif [ -n "$leftovers" ]; then
+    echo "higiena: zostaly obiekty IPC:"
+    echo "$leftovers"
     status=1
   fi
   for name in alfa beta gamma delta epsilon rota rotb racea raceb svc storea storeb; do
@@ -325,15 +333,35 @@ grep -q "rotation counter file .*shared_counter.txt' is already used by instance
 rm -f service_ready systemctl_called
 printf 'STARY PLAN\n' >service_target.rql
 mkdir -p fakebin
+# Obie nazwy - systemd i launchd (patrz komentarz w service_delivery/delivery.sh).
 cp fake_systemctl.sh fakebin/systemctl
-chmod +x fakebin/systemctl
-(
-  exec 9>"$LOCK_DIR/xretractor_service.svc.lock"
-  flock -x 9
-  printf 'PID: %s\nMODE: service\nUNIT: fake-xretractor.service\nSCOPE: user\nQUERYFILE: %s/service_target.rql\n' "$BASHPID" "$PWD" >&9
-  : >service_ready
-  while true; do sleep 1; done
-) &
+cp fake_systemctl.sh fakebin/launchctl
+chmod +x fakebin/systemctl fakebin/launchctl
+# Syntetyczna instancja uslugowa: trzyma WYLACZNA blokade swojego pliku i zapisuje w nim
+# metadane, ktore xretractor czyta przy dostarczaniu planu.
+#
+# Poprzednio robila to podpowloka przez `exec 9>plik; flock -x 9`. `flock(1)` jest
+# programem z util-linux i na BSD/macOS go nie ma, a `$BASHPID` pojawil sie dopiero
+# w bashu 4.0 - na bashu 3.2 z macOS wpisalby pusty PID. Samo wywolanie flock(2) jest
+# na obu systemach, wiec blokade trzyma tu python3 (twarda zaleznosc tego zestawu
+# testow): otwiera plik, bierze LOCK_EX i zyje az do `kill` nizej - dokladnie tyle,
+# ile poprzednio zyl deskryptor 9. Jadro zwalnia blokade wraz ze smiercia procesu.
+python3 - "$LOCK_DIR/xretractor_service.svc.lock" "$PWD" <<'PY' &
+import fcntl, os, sys, time
+
+lock_path = sys.argv[1]
+workdir = sys.argv[2]
+handle = open(lock_path, "w")
+fcntl.flock(handle, fcntl.LOCK_EX)
+handle.write(
+    "PID: {0}\nMODE: service\nUNIT: fake-xretractor.service\n"
+    "SCOPE: user\nQUERYFILE: {1}/service_target.rql\n".format(os.getpid(), workdir)
+)
+handle.flush()
+open(os.path.join(workdir, "service_ready"), "w").close()
+while True:
+    time.sleep(1)
+PY
 pid_service=$!
 i=0
 while [ ! -f service_ready ] && [ "$i" -lt 100 ]; do

@@ -20,10 +20,7 @@ set(TestID "it_${TestID}")
 add_test(
   NAME ${TestID}-vg-2
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND
-    valgrind --vgdb=no --error-exitcode=1 --leak-check=full
-    --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xretractor
-    query.rql -m 5 -f)
+  COMMAND ${IT_VALGRIND} xretractor query.rql -m 5 -f)
 
 # Bez czekania na plik blokady: serwer biegnie pierwszoplanowo (-m N), wiec po
 # jego powrocie proces juz nie istnieje. Usunieta petla odpytywala twardy /tmp i
@@ -63,7 +60,4 @@ add_test(
 add_test(
   NAME ${TestID}-vg-1
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND
-    valgrind --vgdb=no --error-exitcode=1 --leak-check=full
-    --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xretractor
-    query.rql -c)
+  COMMAND ${IT_VALGRIND} xretractor query.rql -c)

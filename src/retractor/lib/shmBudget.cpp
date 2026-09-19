@@ -11,11 +11,13 @@
 #include <string>
 #include <vector>
 
+#include <boost/interprocess/detail/workaround.hpp>
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/rational.hpp>
 
 #include "bus.hpp"
 #include "constants.hpp"
+#include "osPlatform.hpp"
 #include "qTree.hpp"
 
 namespace {
@@ -48,23 +50,32 @@ std::string intervalText(const boost::rational<int> &interval) {
 namespace shmbudget {
 
 Space space() {
+#ifdef BOOST_INTERPROCESS_POSIX_SHARED_MEMORY_OBJECTS
   // Sonda: obiekt pamieci dzielonej powstaje ta sama droga co obiekty silnika (shm_open),
   // wiec fstatvfs na jego deskryptorze opisuje system plikow, ktory NAPRAWDE ich dotyczy --
   // niezaleznie od tego, gdzie libc go zamontowala. Obiekt ma zerowa dlugosc, wiec sam pomiar
   // nie zajmuje miejsca, ktore mierzy.
   const std::string probeName = std::format("/rdb_shm_probe_{}", getpid());
   const int fd                = shm_open(probeName.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-  if (fd < 0) return spaceFromPath("/dev/shm");
+  if (fd < 0) return spaceFromPath(osplat::sharedMemoryBackingPath().c_str());
 
   struct statvfs vfs{};
   const bool measured = fstatvfs(fd, &vfs) == 0;
   close(fd);
   shm_unlink(probeName.c_str());
-  if (!measured) return spaceFromPath("/dev/shm");
+  if (!measured) return spaceFromPath(osplat::sharedMemoryBackingPath().c_str());
 
   return {.known     = true,
           .total     = static_cast<std::uint64_t>(vfs.f_blocks) * vfs.f_frsize,
           .available = static_cast<std::uint64_t>(vfs.f_bavail) * vfs.f_frsize};
+#else
+  // Warunek jest o BIBLIOTECE, nie o systemie. Gdy Boost.Interprocess nie ma do dyspozycji
+  // obiektow POSIX-owej pamieci dzielonej (na Darwinie _POSIX_SHARED_MEMORY_OBJECTS jest
+  // ujemne, wiec makro nie powstaje), segmenty i kolejki sa ZWYKLYMI PLIKAMI w katalogu
+  // roboczym biblioteki. Sonda shm_open dalaby sie tam wykonac, ale zmierzylaby system
+  // plikow, na ktorym silnik nie trzyma niczego -- czyli liczbe gorsza niz brak pomiaru.
+  return spaceFromPath(osplat::sharedMemoryBackingPath().c_str());
+#endif
 }
 
 int responseQueueElements(const boost::rational<int> &interval, int bufferSeconds, int minElements) {
@@ -129,7 +140,7 @@ std::string report(const qTree &plan, int bufferSeconds, int minElements) {
   const Space fs            = space();
   const std::uint64_t fixed = fixedReservationBytes();
 
-  std::string retVal = "Shared memory budget (shm_open filesystem, usually /dev/shm)\n";
+  std::string retVal = std::format("Shared memory budget (filesystem behind {})\n", osplat::sharedMemoryBackingPath());
   if (fs.known)
     retVal += std::format("  capacity                 {:>12}\n  free now                 {:>12}\n", humanBytes(fs.total),
                           humanBytes(fs.available));

@@ -19,9 +19,12 @@
 #include <spdlog/spdlog.h>
 
 #include "fatalError.hpp"
+#include "platformConfig.h"
 
 namespace {
 constexpr char kCarriageReturn = '\r';
+
+#if RDB_HAS_SYSTEMD
 
 // Priorytety syslog (man sd-daemon / RFC 5424) używane w prefiksie sd-daemon "<N>".
 constexpr int kPrioCrit    = 2;  // LOG_CRIT
@@ -61,6 +64,8 @@ class SdPriorityFlag : public spdlog::custom_flag_formatter {
 
   [[nodiscard]] std::unique_ptr<custom_flag_formatter> clone() const override { return std::make_unique<SdPriorityFlag>(); }
 };
+
+#endif  // RDB_HAS_SYSTEMD
 }  // namespace
 
 bool _kbhit(bool ignoreAnyKey) {
@@ -123,7 +128,14 @@ std::string setupLoggerMain(const std::string &loggerFile, bool dual, bool servi
     // Pattern z prefiksem priorytetu sd-daemon "<N>" (flaga '%*') na początku linii - journald
     // klasyfikuje wagę. Dalej zwięźle: poziom + treść, bez własnego znacznika czasu i bez ANSI.
     auto journal_formatter = std::make_unique<spdlog::pattern_formatter>();
+#if RDB_HAS_SYSTEMD
     journal_formatter->add_flag<SdPriorityFlag>('*').set_pattern("<%*>[%L] %v");
+#else
+    // Prefiks "<N>" jest PROTOKOLEM sd-daemon: journald go zjada i zamienia na wage
+    // komunikatu. Poza systemd nikt go nie czyta - launchd przepisuje stderr uslugi
+    // do pliku doslownie - wiec bylby to tylko smiec na poczatku kazdej linii.
+    journal_formatter->set_pattern("[%L] %v");
+#endif
     journal_sink->set_formatter(std::move(journal_formatter));
     journal_sink->set_level(spdlog::level::trace);
 
@@ -132,7 +144,11 @@ std::string setupLoggerMain(const std::string &loggerFile, bool dual, bool servi
     // Poziom runtime = poziom kompilacji (Release: tylko błędy, Debug: pełna diagnostyka).
     spdlog::set_level(static_cast<spdlog::level::level_enum>(SPDLOG_ACTIVE_LEVEL));
     spdlog::flush_on(spdlog::level::trace);
+#if RDB_HAS_SYSTEMD
     return "journald (stderr)";
+#else
+    return "system log (stderr)";
+#endif
   }
 
   // Functional description: system first checks if in current folder

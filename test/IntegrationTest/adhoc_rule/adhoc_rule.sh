@@ -13,6 +13,7 @@
 # odpalilaby na pierwszym rekordzie po dolaczeniu i wciagnela do zrzutu trzy rekordy sprzed
 # niego - czyli liczby mniejsze niz stan licznika odczytany przed dolaczeniem.
 set -e
+. "$(dirname "$0")/../portable.sh"
 . "$(dirname "$0")/../serverlib.sh"
 
 # Zrzut PIERWSZEGO zadzialania reguly. Numer w nazwie bierze sie z RETENTION: bez niego
@@ -34,7 +35,7 @@ WARMUP_RECORDS=25
 # Obserwable czytamy wprost z magazynu strumienia, a nie przez klienta: `xqry -t` podaje
 # schemat i takt, licznika rekordow nie wystawia, a plik `temp/dst` jest ciagiem rekordow
 # stalej dlugosci, wiec mowi i ile ich jest, i co niosa.
-stream_bytes() { stat -c %s "$STREAM_FILE" 2>/dev/null || echo 0; }
+stream_bytes() { file_size "$STREAM_FILE"; }
 
 # Wartosc ostatniego zapisanego rekordu strumienia.
 newest_value() {
@@ -130,13 +131,13 @@ expect_refusal "already defined" 'RULE histguard ON dst WHEN dst[0] > 0 DO DUMP 
 # regula sie uzbroila, a nie ze wlasnie trwa zapis historii.
 expected_bytes=$((DUMP_RECORDS * RECORD_BYTES))
 for _ in $(seq 1 400); do
-  [ -s "$DUMP_FILE" ] && [ "$(stat -c %s "$DUMP_FILE")" -ge "$expected_bytes" ] && break
+  [ -s "$DUMP_FILE" ] && [ "$(file_size "$DUMP_FILE")" -ge "$expected_bytes" ] && break
   sleep 0.05
 done
-if [ ! -s "$DUMP_FILE" ] || [ "$(stat -c %s "$DUMP_FILE")" -lt "$expected_bytes" ]; then
+if [ ! -s "$DUMP_FILE" ] || [ "$(file_size "$DUMP_FILE")" -lt "$expected_bytes" ]; then
   # Dwie przyczyny, obie realne: regula sie nie uzbroila (brak pliku) albo jej zadanie zostalo
   # wypchniete z ksiegi zrzutow przed dokonczeniem (plik krotszy, deskryptor zamkniety).
-  echo "zrzut niekompletny: $DUMP_FILE ma $(stat -c %s "$DUMP_FILE" 2>/dev/null || echo brak) B zamiast $expected_bytes B"
+  echo "zrzut niekompletny: $DUMP_FILE ma $([ -f "$DUMP_FILE" ] && file_size "$DUMP_FILE" || echo brak) B zamiast $expected_bytes B"
   ls -la temp
   echo "odpowiedz xqry -a: $attach_out"
   exit 1

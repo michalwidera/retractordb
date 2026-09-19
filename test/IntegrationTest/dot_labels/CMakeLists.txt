@@ -22,20 +22,32 @@ add_test(
     xretractor query.rql -c > out-compile.txt && \
     bash ../compare.sh pattern.txt out-compile.txt")
 
+# Render `dot -Tsvg` jest czescia asercji (patrz naglowek): sam wzorzec tekstowy
+# nie wykryje pliku DOT, ktorego graphviz nie przyjmie. Na Linuksie zostaje wiec
+# BEZWARUNKOWY - brak programu `dot` ma dac czerwony test, a nie po cichu
+# slabsze sprawdzenie. Poza Linuksem graphviz jest zaleznoscia opcjonalna (macOS
+# go nie ma): bez `dot` odpada sam render, a konfiguracja mowi to wprost.
+set(_dotRender
+    " && dot -Tsvg out.dot -o out.svg 2> dot-stderr.txt && test ! -s dot-stderr.txt"
+)
+if(NOT RDB_OS_LINUX)
+  find_program(RDB_DOT_EXECUTABLE dot)
+  if(NOT RDB_DOT_EXECUTABLE)
+    set(_dotRender "")
+    message(
+      STATUS
+        "graphviz (dot) not found - ${TestID}-dot will check the DOT text only")
+  endif()
+endif()
+
 add_test(
   NAME ${TestID}-dot
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND
-    bash -c "set -e && \
+  COMMAND bash -c "set -e && \
     xretractor query.rql -c -d -f -t -s -u > out.dot && \
-    bash ../compare.sh pattern-dot.txt out.dot && \
-    dot -Tsvg out.dot -o out.svg 2> dot-stderr.txt && \
-    test ! -s dot-stderr.txt")
+    bash ../compare.sh pattern-dot.txt out.dot${_dotRender}")
 
 add_test(
   NAME ${TestID}-vg-compile
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-  COMMAND
-    valgrind --vgdb=no --error-exitcode=1 --leak-check=full
-    --suppressions=${CMAKE_CURRENT_SOURCE_DIR}/../../valgrind.supp xretractor
-    query.rql -c)
+  COMMAND ${IT_VALGRIND} xretractor query.rql -c)

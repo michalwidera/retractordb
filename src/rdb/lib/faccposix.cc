@@ -99,7 +99,7 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> &
     auto result = ::lseek(fd, 0, SEEK_END);
     if (result == -1) return errno;  // Error status
   } else {
-    auto result = ::lseek(fd, static_cast<__off_t>(position), SEEK_SET);
+    auto result = ::lseek(fd, static_cast<off_t>(position), SEEK_SET);
     if (result == -1) return errno;  // Error status
   }
   ssize_t sizesh(recordSize_);

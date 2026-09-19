@@ -5,11 +5,54 @@
 #include "fatalError.hpp"
 
 #include <charconv>
+#include <cmath>
 #include <istream>
+#include <limits>
 #include <stack>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
+
+/// Zwezenie ZMIENNOPRZECINKOWE -> CALKOWITE bez zachowania nieokreslonego.
+///
+/// `static_cast<int>(1e30)` jest w C++ zachowaniem NIEOKRESLONYM, a procesory rozstrzygaja
+/// je ROZNIE: x86-64 (cvttsd2si) oddaje wzorzec "integer indefinite", czyli INT_MIN, a
+/// arm64 (fcvtzs) NASYCA do INT_MAX; dla NaN jest to odpowiednio INT_MIN i 0. Ta sama baza
+/// i to samo zapytanie dawaly wiec na dwoch maszynach rozne liczby, po cichu i bez bledu.
+/// Apple wymienia to wprost jako roznice do audytu przy przenosinach na arm64
+/// ("Audit Code that Contains Float-to-Int Conversions", Addressing architectural
+/// differences in your macOS code), a Arm jako jeden z dwoch dozwolonych rozjazdow miedzy
+/// architekturami (Floating-point behavior learning path).
+///
+/// Regula: wartosc, ktorej typ docelowy nie pomiesci (takze NaN i nieskonczonosc), daje NULL
+/// - ta sama regula co przepelnienie arytmetyki (checkedArith) i niefinitywny wynik `^`.
+/// Nasycenie tez byloby okreslone, ale oddawaloby liczbe, ktorej nikt nie policzyl: 1e30 jako
+/// INT_MAX, 300.0 w polu BYTE jako 255. Decyzja 2026-09-19, przeglad portu na macOS.
+///
+/// NULL wychodzi stad jako std::monostate, tak jak z parse_string ponizej. Dochodzi wiec do
+/// `to_integer` i funkcji matematycznych nad typami calkowitymi (callFun), a zapis do rekordu
+/// (payload::setItem / setItemVT) zamienia go na bit w nullBitset.
+///
+/// Zakres sprawdza sie na wartosci OBCIETEJ, bo tak konwertuje jezyk: 2147483647.5 miesci
+/// sie w int (daje INT_MAX), 2147483648.0 juz nie. Gorna granica to 2^digits, potega dwojki,
+/// wiec zapisuje sie dokladnie w float i double - inaczej niz `max()`, ktore we float
+/// zaokragla sie do 2^31, czyli juz poza zakres int. Dolna granica (-2^31 albo 0) jest
+/// dokladna z tego samego powodu. NaN nie spelnia zadnego porownania i wypada jako NULL.
+template <typename T, typename F, typename K>
+static void narrowFloatTo(F value, K &retVal) {
+  static_assert(std::is_floating_point_v<F>);
+
+  if constexpr (std::is_floating_point_v<T>) {
+    retVal = static_cast<T>(value);
+  } else {
+    const F truncated      = std::trunc(value);
+    const F upperExclusive = std::ldexp(F{1}, std::numeric_limits<T>::digits);
+    if (truncated >= static_cast<F>(std::numeric_limits<T>::lowest()) && truncated < upperExclusive)
+      retVal = static_cast<T>(value);
+    else
+      retVal = std::monostate{};
+  }
+}
 
 template <typename T, typename K>
 static void parse_string(const std::string &a, K &retVal) {
@@ -37,8 +80,8 @@ void visit_descFld(const K &inVar, K &retVal) {
                    [&retVal](int a) { retVal = static_cast<T>(a); },                                            //
                    [&retVal](unsigned a) { retVal = static_cast<T>(a); },                                       //
                    [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<T>(a); },                  //
-                   [&retVal](float a) { retVal = static_cast<T>(a); },                                          //
-                   [&retVal](double a) { retVal = static_cast<T>(a); },                                         //
+                   [&retVal](float a) { narrowFloatTo<T>(a, retVal); },                                         //
+                   [&retVal](double a) { narrowFloatTo<T>(a, retVal); },                                        //
                    [&retVal](std::pair<int, int> a) { SPDLOG_ERROR("TODO - pair-int->T"); },                    //
                    [&retVal](const std::pair<std::string, int> &a) { SPDLOG_ERROR("TODO - idxpair-int->T"); },  //
                    [&retVal](const std::string &a) { parse_string<T>(a, retVal); }                              //
@@ -56,9 +99,9 @@ void visit_descFld(const K &inVar, K &retVal) {
     } else if (inVar.type() == typeid(boost::rational<int>)) {
       retVal = boost::rational_cast<T>(std::any_cast<boost::rational<int>>(inVar));
     } else if (inVar.type() == typeid(float)) {
-      retVal = static_cast<T>(std::any_cast<float>(inVar));
+      narrowFloatTo<T>(std::any_cast<float>(inVar), retVal);
     } else if (inVar.type() == typeid(double)) {
-      retVal = static_cast<T>(std::any_cast<double>(inVar));
+      narrowFloatTo<T>(std::any_cast<double>(inVar), retVal);
     } else if (inVar.type() == typeid(std::pair<int, int>)) {
       SPDLOG_ERROR("No cast INTPAIR to any type here");
       retVal = static_cast<T>(0);

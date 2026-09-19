@@ -5,29 +5,85 @@
 #include <sys/resource.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cinttypes>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <fstream>
 #include <iostream>
 #include <string>
 #include <string_view>
 
 #include <spdlog/spdlog.h>
 
+#include "platformConfig.h"
+
+#if RDB_HAS_PROCFS
+#include <fstream>
+#endif
+
+#if !RDB_HAS_CLOCK_NANOSLEEP && RDB_HAS_MACH_TIME_H
+#include <mach/mach_time.h>
+#endif
+
+// Stałe konwersji czasu - używane przy obliczaniu timespec dla snu absolutnego.
+constexpr long kNsPerMs  = 1'000'000L;      // nanosekundy na milisekundę
+constexpr long kNsPerSec = 1'000'000'000L;  // nanosekundy na sekundę
+
+namespace {
+
+/// Wypis zgodnosci: dwa poziomy istotnosci, ten sam szeroki na szesc znakow prefiks.
+const char *ok(bool v) { return v ? "[OK]  " : "[FAIL]"; }
+const char *rec(bool v) { return v ? "[OK]  " : "[WARN]"; }
+
+/// Priorytet SCHED_FIFO sprowadzony do zakresu, ktory ten planista naprawde przyjmuje.
+///
+/// Zakresy roznia sie miedzy jadrami: Linux daje SCHED_FIFO 1..99, jadra BSD-owe
+/// (w tym Darwin) zwykle 15..47. Domyslne 50 z appcfg mieści sie w pierwszym i NIE
+/// mieści w drugim, gdzie dawalo EINVAL - czyli ciche zejscie do SCHED_OTHER na
+/// kazdym uruchomieniu. Ograniczenie zakresem jest bezczynne tam, gdzie wartosc i tak
+/// jest poprawna, wiec na Linuksie nie zmienia niczego.
+int clampRtPriority(int priority) {
+  const int lowest  = sched_get_priority_min(SCHED_FIFO);
+  const int highest = sched_get_priority_max(SCHED_FIFO);
+  if (lowest < 0 || highest < 0) return priority;
+  const int clamped = std::clamp(priority, lowest, highest);
+  if (clamped != priority)
+    SPDLOG_WARN("SCHED_FIFO priority {} out of range [{}, {}] on this kernel, using {}", priority, lowest, highest, clamped);
+  return clamped;
+}
+
+/// Nazwa biezacej polityki szeregowania. Na Linuksie pytamy o CALY proces
+/// (sched_getscheduler), gdzie indziej o WOLAJACY WATEK (pthread_getschedparam) -
+/// bo tam polityka jest wlasnoscia watku i procesowego odpowiednika po prostu nie ma.
+const char *currentSchedulerName() {
+#if RDB_HAS_SCHED_SETSCHEDULER
+  const int policy = sched_getscheduler(0);
+#else
+  int policy = SCHED_OTHER;
+  struct sched_param sp{};
+  if (pthread_getschedparam(pthread_self(), &policy, &sp) != 0) return "unknown";
+#endif
+  if (policy == SCHED_FIFO) return "SCHED_FIFO";
+  if (policy == SCHED_RR) return "SCHED_RR";
+  if (policy == SCHED_OTHER) return "SCHED_OTHER";
+  return "unknown";
+}
+
+std::string memlockLimitText(const struct rlimit &limit) {
+  return limit.rlim_cur == RLIM_INFINITY ? std::string("unlimited") : std::to_string(limit.rlim_cur) + " bytes";
+}
+
+#if RDB_HAS_PROCFS
+
 // Pozycje bitów w CapEff (linux/capability.h) - wartości standardu POSIX.1e.
 // Bity w /proc/self/status CapEff odpowiadają numerom capability z <sys/capability.h>.
-constexpr int kCapSysNiceBit = 23;  // CAP_SYS_NICE  - wymagane do SCHED_FIFO
-constexpr int kCapIpcLockBit = 14;  // CAP_IPC_LOCK  - wymagane do mlockall
-
-// Stałe konwersji czasu - używane przy obliczaniu timespec dla clock_nanosleep.
-constexpr long kNsPerMs              = 1'000'000L;      // nanosekundy na milisekundę
-constexpr long kNsPerSec             = 1'000'000'000L;  // nanosekundy na sekundę
+constexpr int kCapSysNiceBit         = 23;  // CAP_SYS_NICE  - wymagane do SCHED_FIFO
+constexpr int kCapIpcLockBit         = 14;  // CAP_IPC_LOCK  - wymagane do mlockall
 constexpr size_t kCapEffPrefixLength = 7;
-constexpr int kRtSchedulerPriority   = 50;
 
-static std::string rtReadFile(const char *path) {
+std::string rtReadFile(const char *path) {
   std::ifstream f(path);
   if (!f) return {};
   std::string v;
@@ -35,7 +91,7 @@ static std::string rtReadFile(const char *path) {
   return v;
 }
 
-static uint64_t rtEffectiveCapabilities() {
+uint64_t rtEffectiveCapabilities() {
   std::ifstream f("/proc/self/status");
   std::string line;
   while (std::getline(f, line)) {
@@ -48,7 +104,8 @@ static uint64_t rtEffectiveCapabilities() {
   return 0;
 }
 
-bool rtCheckAndPrint() {
+/// Wypis zgodnosci dla jadra Linuksa: capabilities, PREEMPT_RT, dlawienie RT.
+bool checkLinux() {
   const uint64_t caps   = rtEffectiveCapabilities();
   const bool isRoot     = (geteuid() == 0);
   const bool hasSysNice = isRoot || (((caps >> kCapSysNiceBit) & 1U) != 0U);  // CAP_SYS_NICE
@@ -64,20 +121,6 @@ bool rtCheckAndPrint() {
   getrlimit(RLIMIT_MEMLOCK, &memlockRl);
   const bool memlockUnlimited = (memlockRl.rlim_cur == RLIM_INFINITY);
 
-  const int curPolicy = sched_getscheduler(0);
-  const char *policyName;
-  if (curPolicy == SCHED_FIFO)
-    policyName = "SCHED_FIFO";
-  else if (curPolicy == SCHED_RR)
-    policyName = "SCHED_RR";
-  else if (curPolicy == SCHED_OTHER)
-    policyName = "SCHED_OTHER";
-  else
-    policyName = "unknown";
-
-  auto ok  = [](bool v) { return v ? "[OK]  " : "[FAIL]"; };
-  auto rec = [](bool v) { return v ? "[OK]  " : "[WARN]"; };
-
   std::cout << "\n=== RT requirements check ===\n";
   std::cout << ok(hasSysNice) << " CAP_SYS_NICE / root        - required for SCHED_FIFO\n";
   std::cout << ok(hasIpcLock) << " CAP_IPC_LOCK / root        - required for mlockall\n";
@@ -86,9 +129,8 @@ bool rtCheckAndPrint() {
   std::cout << rec(rtThrottleOff)
             << " RT throttling disabled     - sched_rt_runtime_us=" << (rtThrottleVal.empty() ? "missing" : rtThrottleVal)
             << (rtThrottleOff ? "" : "  (set to -1 to disable throttling)") << "\n";
-  std::cout << rec(memlockUnlimited) << " RLIMIT_MEMLOCK unlimited   - cur="
-            << (memlockRl.rlim_cur == RLIM_INFINITY ? "unlimited" : std::to_string(memlockRl.rlim_cur) + " bytes") << "\n";
-  std::cout << "      Current scheduler      - " << policyName << "\n";
+  std::cout << rec(memlockUnlimited) << " RLIMIT_MEMLOCK unlimited   - cur=" << memlockLimitText(memlockRl) << "\n";
+  std::cout << "      Current scheduler      - " << currentSchedulerName() << "\n";
   std::cout << "=============================\n\n";
 
   const bool critical = hasSysNice && hasIpcLock;
@@ -101,6 +143,58 @@ bool rtCheckAndPrint() {
   if (!rtThrottleOff) std::cout << "WARN:  RT throttling active. Disable: echo -1 > /proc/sys/kernel/sched_rt_runtime_us\n\n";
 
   return critical;
+}
+
+#else
+
+/// Wypis zgodnosci dla jader bez capabilities POSIX.1e i bez /proc.
+///
+/// Nazwy wierszy sa tu INNE niz na Linuksie i to jest celowe: wiersz
+/// "CAP_SYS_NICE" na systemie, ktory nie ma capabilities, bylby nieprawda
+/// podana w formacie raportu zgodnosci. Zachowana jest za to ramka i te wiersze,
+/// ktore maja sens wszedzie - limit blokowania pamieci i biezaca polityka.
+///
+/// Co realnie daje sie tu sprawdzic:
+///   - polityke czasu rzeczywistego dla WATKU (pthread_setschedparam) - jest zawsze,
+///     ale wysokie priorytety wymagaja uprawnien, wiec sprawdzamy realny zakres;
+///   - RLIMIT_MEMLOCK - istnieje tak samo jak na Linuksie;
+///   - blokowanie CALEJ przestrzeni adresowej - patrz rtActivate, bywa niezaimplementowane.
+/// Czego sprawdzic sie nie da, bo nie istnieje: jadra PREEMPT_RT i dlawienia RT.
+bool checkGeneric() {
+  struct rlimit memlockRl{};
+  getrlimit(RLIMIT_MEMLOCK, &memlockRl);
+  const bool memlockUnlimited = (memlockRl.rlim_cur == RLIM_INFINITY);
+
+  const int lowest      = sched_get_priority_min(SCHED_FIFO);
+  const int highest     = sched_get_priority_max(SCHED_FIFO);
+  const bool rtPolicyOk = (lowest >= 0 && highest >= lowest);
+
+  std::cout << "\n=== RT requirements check ===\n";
+  std::cout << ok(rtPolicyOk) << " SCHED_FIFO available       - thread RT policy, priority range " << lowest << ".." << highest
+            << "\n";
+  std::cout << rec(geteuid() == 0) << " Privileged process         - high RT priorities usually need root\n";
+  std::cout << rec(false) << " Real-time kernel           - not available: this kernel has no PREEMPT_RT equivalent\n";
+  std::cout << rec(false) << " RT throttling disabled     - not applicable: this kernel does not throttle RT tasks\n";
+  std::cout << rec(memlockUnlimited) << " RLIMIT_MEMLOCK unlimited   - cur=" << memlockLimitText(memlockRl) << "\n";
+  std::cout << "      Current scheduler      - " << currentSchedulerName() << "\n";
+  std::cout << "=============================\n\n";
+
+  if (!rtPolicyOk) std::cout << "ERROR: SCHED_FIFO is not offered by this kernel; the RT loop cannot be prioritised.\n\n";
+  std::cout << "WARN:  Best-effort real time only. This kernel gives no deadline guarantee comparable to PREEMPT_RT.\n\n";
+
+  return rtPolicyOk;
+}
+
+#endif  // RDB_HAS_PROCFS
+
+}  // namespace
+
+bool rtCheckAndPrint() {
+#if RDB_HAS_PROCFS
+  return checkLinux();
+#else
+  return checkGeneric();
+#endif
 }
 
 bool rtActivate(int priority) {
@@ -120,26 +214,74 @@ bool rtActivate(int priority) {
   //   off                 -- bez mlockall (WYLACZNIE diagnostycznie; nie-RT-safe)
   const char *mlockEnv = std::getenv("RDB_MLOCKALL");
   std::string_view mlockMode(mlockEnv != nullptr ? mlockEnv : "onfault");
-  if (mlockMode == "onfault") {
-    if (mlockall(MCL_CURRENT) != 0 || mlockall(MCL_FUTURE | MCL_ONFAULT) != 0) {
-      SPDLOG_WARN("mlockall failed: {}", strerror(errno));
-      ok = false;
+
+#if RDB_HAS_MLOCKALL
+  // Niepowodzenie z ENOSYS nie jest bledem tej instalacji, tylko brakiem funkcji
+  // w jadrze: mlockall istnieje wtedy jako symbol (wiec probe kompilacyjne je widzi),
+  // ale nie robi nic i zglasza "nie zaimplementowano". Darwin zachowuje sie dokladnie
+  // tak. Liczenie tego jako bledu sprowadzaloby rtActivate do false na kazdym
+  // uruchomieniu, a wolajacy odczytalby to jako brak uprawnien, ktorych nie brakuje.
+  const auto lockAll = [&ok](int flags) {
+    if (mlockall(flags) == 0) return true;
+    if (errno == ENOSYS) {
+      SPDLOG_DEBUG("mlockall not implemented by this kernel; continuing without locked pages");
+      return true;
     }
-  } else if (mlockMode != "off" && mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
     SPDLOG_WARN("mlockall failed: {}", strerror(errno));
     ok = false;
+    return false;
+  };
+
+  if (mlockMode == "onfault") {
+#if RDB_HAS_MCL_ONFAULT
+    // MCL_FUTURE wolno wlaczyc WYLACZNIE po udanym MCL_CURRENT. Po porazce (bez
+    // CAP_IPC_LOCK przy niskim RLIMIT_MEMLOCK) samo MCL_FUTURE|MCL_ONFAULT
+    // przechodzi, a wtedy kazde nowe mapowanie liczy sie do limitu: mmap segmentu
+    // kolejki i pthread_create koncza sie EAGAIN. Produkcyjnie zaslania to
+    // rtCheckAndPrint (wymaga CAP_IPC_LOCK), ale test WithoutRootReturnsFalse wola
+    // rtActivate bez uprawnien - przy `ulimit -l 64` dwa kolejne testy tego
+    // binarium tracily wtedy watki (sprawdzone 2026-09-19). Tak dzialal skrot `||`
+    // sprzed portu.
+    if (lockAll(MCL_CURRENT)) lockAll(MCL_FUTURE | MCL_ONFAULT);
+#else
+    // Bez MCL_ONFAULT zostaje samo MCL_CURRENT: blokujemy to, co juz jest odwzorowane,
+    // i NIE wlaczamy MCL_FUTURE, bo to wlasnie ono kosztowalo ~25 ms na mmapie kolejki.
+    lockAll(MCL_CURRENT);
+#endif
+  } else if (mlockMode != "off") {
+    lockAll(MCL_CURRENT | MCL_FUTURE);
   }
+#else
+  if (mlockMode != "off") SPDLOG_DEBUG("mlockall unavailable on this platform; continuing without locked pages");
+#endif
+
   if (mlockMode != "onfault") SPDLOG_WARN("RDB_MLOCKALL={} (diagnostic mode)", mlockMode);
+
+  const int effective = clampRtPriority(priority);
   struct sched_param sp{};
-  sp.sched_priority = priority;
+  sp.sched_priority = effective;
+
+#if RDB_HAS_SCHED_SETSCHEDULER
   if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0) {
     SPDLOG_WARN("SCHED_FIFO failed: {}", strerror(errno));
     ok = false;
   }
+#else
+  // Odpowiednik dla jader, w ktorych polityka szeregowania jest wlasnoscia WATKU,
+  // a nie procesu (m.in. Darwin: sched_setscheduler tam nie istnieje). Roznica jest
+  // realna i warto ja znac: obejmuje wylacznie watek wolajacy, wiec watek komunikacyjny
+  // zostaje przy polityce domyslnej -- co akurat jest tu pozadane, bo dokladnie temu
+  // sluzy rtKeepThreadOffRtCpus na Linuksie.
+  if (const int rc = pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp); rc != 0) {
+    SPDLOG_WARN("SCHED_FIFO failed: {}", strerror(rc));
+    ok = false;
+  }
+#endif
   return ok;
 }
 
-bool rtKeepThreadOffRtCpus(pthread_t handle) {
+bool rtKeepThreadOffRtCpus([[maybe_unused]] pthread_t handle) {
+#if RDB_HAS_SCHED_AFFINITY
   // Dlaczego to istnieje. Wątek komunikacyjny (`commandProcessorLoop`) powstaje
   // PRZED `rtActivate`, a `sched_setscheduler(0, …)` dotyczy wyłącznie wątku
   // wołającego - wątek komunikacyjny zostaje więc SCHED_OTHER. Gdy operator
@@ -191,6 +333,30 @@ bool rtKeepThreadOffRtCpus(pthread_t handle) {
   // zmiana powinowactwa musi być widoczna w logu przebiegu pomiarowego.
   std::cout << "[INFO] RT: comms thread moved off the RT cores (auxiliary cores: " << CPU_COUNT(&auxCpus) << ")\n";
   return true;
+#else
+  // Ten system nie ma masek powinowactwa procesora.
+  //
+  // Najblizszym odpowiednikiem na Darwinie jest thread_policy_set z
+  // THREAD_AFFINITY_POLICY, ale to NIE jest przypiecie do rdzenia, tylko podpowiedz
+  // dla planisty, ktore watki dzielic po tym samym L2; na Apple Silicon jadro zwraca
+  // z niej KERN_NOT_SUPPORTED. Wolanie jej tutaj wygladaloby jak przeniesienie watku
+  // i nie bylo by nim, wiec funkcja mowi wprost, ze nic nie zrobila.
+  //
+  // Zagłodzenia, przed ktorym broni galaz linuksowa, na tym systemie zreszta nie ma:
+  // rtActivate podnosi do SCHED_FIFO sam WATEK wolajacy (nie ma tam odpowiednika
+  // sched_setscheduler dla calego procesu), wiec watek komunikacyjny i tak zostaje
+  // przy polityce domyslnej i jest szeregowany.
+  //
+  // Komunikat na stdout i tylko RAZ - z tego samego powodu co w galezi wyzej:
+  // w Release SPDLOG_WARN jest wycinany w kompilacji, a log przebiegu pomiarowego
+  // ma nieść informację, że powinowactwo nie zostało ustawione.
+  static bool announced = false;
+  if (!announced) {
+    announced = true;
+    std::cout << "[INFO] RT: CPU affinity is not available on this platform; comms thread left to the scheduler\n";
+  }
+  return false;
+#endif
 }
 
 void rtAbsoluteSleep(const struct timespec &anchor, long interval_ms) {
@@ -202,5 +368,59 @@ void rtAbsoluteSleep(const struct timespec &anchor, long interval_ms) {
     t.tv_sec++;
     t.tv_nsec -= kNsPerSec;
   }
+
+#if RDB_HAS_CLOCK_NANOSLEEP
   clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t, nullptr);
+#elif RDB_HAS_MACH_TIME_H
+  // Sen ABSOLUTNY bez clock_nanosleep, na jadrach Macha.
+  //
+  // PULAPKA, przez ktora to juz raz zawislo: mach_wait_until czeka na osi
+  // mach_absolute_time, a kotwica przyszla z clock_gettime(CLOCK_MONOTONIC) - i na
+  // Darwinie to NIE jest ta sama os. CLOCK_MONOTONIC tyka takze wtedy, gdy maszyna
+  // spi (odpowiednik mach_continuous_time), a mach_absolute_time staje na czas
+  // uspienia. Roznica miedzy nimi to suma wszystkich uspien od startu systemu -
+  // na laptopie godziny. Przeliczony CLOCK_MONOTONIC podstawiony wprost pod
+  // mach_wait_until dawal wiec termin oddalony o te godziny i sen nie konczyl sie
+  // nigdy (test ut_executor_rt wisial).
+  //
+  // Liczymy zatem POZOSTALY CZAS wzgledem tego samego zegara, z ktorego pochodzi
+  // kotwica, i dopiero ten odcinek przenosimy na os Macha. Wlasnosc, dla ktorej ta
+  // funkcja istnieje, zostaje zachowana: kotwica jest stala miedzy slotami, wiec
+  // blad kazdego snu liczy sie od niej na nowo i NIE KUMULUJE sie - inaczej niz
+  // przy naiwnym "spij interval_ms od teraz".
+  static mach_timebase_info_data_t timebase = [] {
+    mach_timebase_info_data_t info{};
+    mach_timebase_info(&info);
+    return info;
+  }();
+  if (timebase.numer == 0 || timebase.denom == 0) return;
+
+  struct timespec now{};
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  const std::int64_t remainingNs = (static_cast<std::int64_t>(t.tv_sec) - static_cast<std::int64_t>(now.tv_sec)) * kNsPerSec +
+                                   (static_cast<std::int64_t>(t.tv_nsec) - static_cast<std::int64_t>(now.tv_nsec));
+  if (remainingNs <= 0) return;  // termin juz minal
+
+  // Mnozenie rozbite na iloraz i reszte, zeby nie przepelnic 64 bitow; wynik jest
+  // identyczny jak remainingNs * denom / numer.
+  const std::uint64_t left  = static_cast<std::uint64_t>(remainingNs);
+  const std::uint64_t numer = timebase.numer;
+  const std::uint64_t denom = timebase.denom;
+  const std::uint64_t ticks = (left / numer) * denom + ((left % numer) * denom) / numer;
+  mach_wait_until(mach_absolute_time() + ticks);
+#else
+  // Ostatnia droga: sen WZGLEDNY o pozostaly czas. Rozni sie od dwoch powyzszych
+  // tym, ze miedzy odczytem zegara a zasnieciem moze wypasc wywlaszczenie i ten
+  // kawalek czasu przepada - czyli dryf, ktoremu sen absolutny wlasnie zapobiega.
+  // Zostaje jako zabezpieczenie na jadro, ktore nie ma ani jednego, ani drugiego.
+  struct timespec now{};
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  struct timespec delta{.tv_sec = t.tv_sec - now.tv_sec, .tv_nsec = t.tv_nsec - now.tv_nsec};
+  if (delta.tv_nsec < 0) {
+    delta.tv_sec -= 1;
+    delta.tv_nsec += kNsPerSec;
+  }
+  if (delta.tv_sec < 0) return;  // termin juz minal
+  nanosleep(&delta, nullptr);
+#endif
 }

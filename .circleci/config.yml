@@ -20,14 +20,14 @@ parameters:
   # bramki przewiduje uruchomienie "recznie przed wysłaniem artykułu do
   # recenzji", a dotad jedynym wejsciem byl trigger `cron-shedule` razem z
   # calym `manual-nightly-full`. Harmonogramu ten parametr nie ma i miec nie
-  # musi - bramka biegnie dalej 2 razy w miesiacu w warstwie L3 tamtego
-  # workflow, z cieplym ccache po build-release-ninja-mydocker.
+  # musi - bramka biegnie dalej 2 razy w miesiacu w warstwie L2 tamtego
+  # workflow.
   run_manual_research_gate:
     type: boolean
     default: false
   # Budy na generatorze Makefile: czysta Ubuntu (z pakietowaniem) i ARM. Wyjete
   # 2026-08-19 z `manual-nightly-full`, ktory zostal przy samym ninja na obrazie
-  # projektu. Powod: te dwa joby nie maja ani ccache, ani prebuiltow conana z
+  # projektu. Powod: te dwa joby nie maja prebuiltow conana z
   # docker/ci/Dockerfile, wiec kosztuja wielokrotnie wiecej niz ich odpowiedniki
   # ninja, a sprawdzaja co innego (przenosnosc na stockowym toolchainie, nie
   # zachowanie silnika). Uruchamiane z reki, gdy pyta sie wlasnie o przenosnosc.
@@ -67,10 +67,17 @@ workflows:
   # `triggers.schedule` o tym samym cronie - scalony tutaj, zeby jeden harmonogram
   # nie byl zapisany w dwoch miejscach.
   #
-  # Trzy warstwy, kazda odcina nastepna:
-  #   L1  smoke  - sama kompilacja Debug; zatrzymuje reszte w kilka minut;
-  #   L2  pelny zestaw testow (189) w Debug i Release na obrazie projektu;
-  #   L3  bramka badawcza H9/H10 - najdrozszy job przebiegu.
+  # Dwie warstwy, pierwsza odcina druga:
+  #   L1  pelny zestaw testow (189) w Debug i Release na obrazie projektu;
+  #   L2  bramka badawcza H9/H10 (najdrozszy job przebiegu) i podloga ablacyjna.
+  #
+  # Do 2026-09-19 przed nimi stal smoke - sama kompilacja Debug, ktora miala
+  # zatrzymac reszte, gdy drzewo sie nie kompiluje. Usuniety, bo placil w kazdym
+  # przebiegu, a zwracal tylko przy awarii kompilacji: bez niego takie drzewo
+  # kosztuje dwie kompilacje L1 (L2 i tak nie rusza), z nim jedna. Oplacalby sie
+  # dopiero przy wiecej niz polowie przebiegow z niekompilujacym sie masterem, a
+  # kazdy push na master przechodzi juz workflow `commit`. Cache ccache, ktory
+  # smoke przekazywal dalej, byl pusty - patrz uwaga w sekcji `commands`.
   #
   # Od 2026-08-19 wylacznie budy na ninja i na obrazie projektu. Budy makefile
   # (czysta Ubuntu, ARM) wyjechaly do `manual-make-build`, a `build-debug` na
@@ -82,16 +89,10 @@ workflows:
     when: << pipeline.parameters.run_manual_nightly_full >>
     jobs:
       # -- L1 ---------------------------------------------------------------
-      - smoke-debug-ninja-mydocker
-      # -- L2 ---------------------------------------------------------------
-      - build-release-ninja-mydocker:
-          requires:
-            - smoke-debug-ninja-mydocker
+      - build-release-ninja-mydocker
       - build-debug-ninja-mydocker:
           check_skipci: false
-          requires:
-            - smoke-debug-ninja-mydocker
-      # -- L3 ---------------------------------------------------------------
+      # -- L2 ---------------------------------------------------------------
       - research-gate:
           requires:
             - build-release-ninja-mydocker
@@ -101,8 +102,9 @@ workflows:
       # matryca byla zepsuta od zmiany reguly `>N` z 2026-08-07, dwanascie dni bez
       # wykrycia, bo `manual-ablation` jest wylacznie reczna; wszystkie cztery awarie
       # zlapal wlasnie wariant all-off, warianty jednoczynnikowe nie dolozyly zadnej.
-      # Trzy przebiegi w miesiacu skracaja okno wykrycia z tygodni do dni za koszt
-      # jednego jobu dockerowego.
+      # Dwa przebiegi w miesiacu (5. i 20.) ograniczaja okno wykrycia do ok. dwoch
+      # tygodni - sama reczna matryca nie ogranicza go wcale - za koszt jednego
+      # jobu dockerowego.
       - build-release-ablation:
           name: ablation-all-off
           dedup: "OFF"
@@ -129,15 +131,13 @@ workflows:
           requires:
             - build-release-ninja-mydocker
 
-  # Sama bramka badawcza H9/H10, bez L1 i L2. Uruchamiana z reki, gdy trzeba
-  # potwierdzic, ze wyniki sie nie cofnely - np. przed zgloszeniem artykulu -
-  # zamiast czekac na najblizszy przebieg `manual-nightly-full`.
+  # Sama bramka badawcza H9/H10, bez reszty przebiegu nocnego. Uruchamiana z
+  # reki, gdy trzeba potwierdzic, ze wyniki sie nie cofnely - np. przed
+  # zgloszeniem artykulu - zamiast czekac na najblizszy przebieg
+  # `manual-nightly-full`.
   #
-  # Bez `requires`, wiec job idzie od razu. Cena: ccache zapisywany przez
-  # build-release-ninja-mydocker jest tu tylko ODCZYTYWANY, a poza przebiegiem
-  # nocnym nie ma wpisu dla tego samego commita - zaladuje sie klucz prefiksowy
-  # ze starszej rewizji i pierwszy profil ablacji zbuduje sie dluzej. Dlatego
-  # ten workflow jest dodatkiem, a nie zamiennikiem warstwy L3.
+  # Bez `requires`, wiec job idzie od razu. Buduje i sprawdza to samo co job
+  # warstwy L2 tamtego workflow - oba kompiluja od zera.
   research-gate-only:
     when: << pipeline.parameters.run_manual_research_gate >>
     jobs:
@@ -296,48 +296,21 @@ commands:
                 name: Configure Ninja generator
                 command: scripts/buildrdb.sh ninja
 
-  # ccache przeżywa job tylko dzięki cache'owi CircleCI - kontener startuje pusty.
-  # Podpięcie ccache jako CMAKE_CXX_COMPILER_LAUNCHER robi CMakeLists.txt samo,
-  # gdy znajdzie binarkę (RDB_USE_CCACHE, domyślnie ON).
-  # Używane wyłącznie w jobach na executorze debian-mydocker: tylko tam ccache jest
-  # pewny (wbudowany w obraz). prep-env-ci wywołuje toolchain_required, gdzie ccache
-  # jest 'optional' i nie instaluje się automatycznie.
-  ccache-restore:
-    parameters:
-      cache_id:
-        type: string
-    steps:
-      - run:
-          name: Configure ccache
-          command: |
-            # ccache 4.x domyślnie trzyma cache w ~/.cache/ccache (XDG). Bez jawnego
-            # CCACHE_DIR save_cache zapisywałby pusty ~/.ccache i nic by nie działało.
-            echo 'export CCACHE_DIR="$HOME/.ccache"' >> "$BASH_ENV"
-            # Domyślne 5 GiB to o rząd wielkości za dużo jak na cache CircleCI.
-            echo 'export CCACHE_MAXSIZE=500M' >> "$BASH_ENV"
-      - restore_cache:
-          keys:
-            - ccache-v1-<< parameters.cache_id >>-{{ arch }}-{{ .Branch }}-{{ .Revision }}
-            - ccache-v1-<< parameters.cache_id >>-{{ arch }}-{{ .Branch }}-
-            - ccache-v1-<< parameters.cache_id >>-{{ arch }}-master-
-      - run:
-          name: Reset ccache statistics
-          command: ccache -z
-
-  ccache-save:
-    parameters:
-      cache_id:
-        type: string
-    steps:
-      - run:
-          name: ccache statistics
-          command: ccache -s
-      - save_cache:
-          # Klucze CircleCI są niezmienne - {{ .Revision }} daje nowy wpis na commit,
-          # a prefiksy w restore_cache pozwalają odziedziczyć cache poprzedniego.
-          key: ccache-v1-<< parameters.cache_id >>-{{ arch }}-{{ .Branch }}-{{ .Revision }}
-          paths:
-            - ~/.ccache
+  # Do 2026-09-19 byla tu para ccache-restore / ccache-save, przenoszaca
+  # ~/.ccache miedzy jobami przez cache CircleCI. Nie dzialala: skanowanie
+  # modulow C++20 (flagi `-fmodules-ts -fmodule-mapper=`) i precompiled headers
+  # bez sloppiness robily z niemal kazdej kompilacji wywolanie niebuforowalne -
+  # zmierzone w obrazie CI, buforowalne byly 3 ze 144 jednostek. Obie przyczyny
+  # usuwa od tego samego dnia CMakeLists.txt (CMAKE_CXX_SCAN_FOR_MODULES OFF,
+  # CCACHE_SLOPPINESS w launcherze): przebudowa celu xretractor w tym samym
+  # katalogu z cieplym cache trwa 10 s zamiast 58 s (8 CPU).
+  #
+  # Pary mimo to nie przywrocono. ccache biegnie teraz w kazdym jobie na obrazie
+  # projektu (CMakeLists.txt podpina go sam, obraz go ma), ale job kompiluje
+  # drzewo raz, wiec bez cache przenoszonego miedzy jobami nic nie zyskuje.
+  # Czy przenoszenie sie oplaci - ile joba commitowego zajmuje kompilacja, a ile
+  # testy pod valgrindem, i ile kosztuje przeslanie cache - to osobna decyzja,
+  # do podjecia po pomiarze na CircleCI.
 
   conan-install:
     parameters:
@@ -450,40 +423,6 @@ commands:
             cd build/<<parameters.build_type>> && <<parameters.build_tool>> packages
 
 jobs:
-  # L1 pelnego przebiegu: SAMA kompilacja Debug. Zadanie tego jobu to odciac
-  # warstwe 2, kiedy drzewo sie nie kompiluje - zamiast dowiadywac sie o tym po
-  # pelnym zestawie 189 testow. Zapisuje cache ccache dla `mydocker-debug`, wiec
-  # build-debug-ninja-mydocker w warstwie 2 startuje z goracego cache.
-  #
-  # Do 2026-08-19 byl tu jeszcze krok `ctest -R '^ut_'` - zdjety, bo byla to
-  # JEDYNA czesc tego jobu nieznajdujaca sie juz w `build-debug-ninja-mydocker`
-  # (ten sam obraz, te same kroki, ten sam klucz ccache - tylko pelne `run-test`
-  # zamiast samych `ut_`), a zarazem najdrozsza: 45 binarek jednostkowych pod
-  # valgrindem, liczonych dwa razy w jednym przebiegu. Pokrycie nie ginie - te
-  # same testy wykonuje warstwa L2 kilkanascie minut pozniej.
-  smoke-debug-ninja-mydocker:
-    working_directory: ~/retractordb
-    executor: debian-mydocker
-    steps:
-      - checkout:
-          method: blobless
-      - check-skipci:
-          enabled: false
-      - prep-env:
-          use_ninja: true
-      - ccache-restore:
-          cache_id: mydocker-debug
-      - conan-install:
-          build_type: Debug
-          build_param: --build missing
-          build_tool: ninja
-      - conan-build:
-          build_type: Debug
-          build_param: --build missing
-          build_tool: ninja
-      - ccache-save:
-          cache_id: mydocker-debug
-
   build-release-ninja-mydocker:
     working_directory: ~/retractordb
     executor: debian-mydocker
@@ -494,16 +433,12 @@ jobs:
           enabled: false
       - prep-env:
           use_ninja: true
-      - ccache-restore:
-          cache_id: mydocker-release
       - conan-install:
           build_param: --build missing
           build_tool: ninja
       - conan-build:
           build_param: --build missing
           build_tool: ninja
-      - ccache-save:
-          cache_id: mydocker-release
       - run-test:
           build_tool: ninja
 
@@ -521,8 +456,6 @@ jobs:
           enabled: << parameters.check_skipci >>
       - prep-env:
           use_ninja: true
-      - ccache-restore:
-          cache_id: mydocker-debug
       - conan-install:
           build_type: Debug
           build_param: --build missing
@@ -531,15 +464,13 @@ jobs:
           build_type: Debug
           build_param: --build missing
           build_tool: ninja
-      - ccache-save:
-          cache_id: mydocker-debug
       - run-test:
           build_type: Debug
           build_tool: ninja
 
   # Bramka badawcza H9/H10 - ochrona osiagnietych wynikow przed regresja silnika
   # (test/research_gate/README.md). Celowo poza `ninja` i poza `ninja test`, wiec
-  # musi byc wywolana jawnie; L3, bo to najdrozszy job w przebiegu.
+  # musi byc wywolana jawnie; L2, bo to najdrozszy job w przebiegu.
   #
   # Release, nie Debug: bramka wykonuje ok. 20 000 kompilacji planow przez
   # xretractor. Sprawdzane zachowanie jest w obu konfiguracjach identyczne, czas
@@ -554,10 +485,6 @@ jobs:
           enabled: false
       - prep-env:
           use_ninja: true
-      # Sam odczyt. Klucz `mydocker-release` zapisuje build-release-ninja-mydocker,
-      # ktory w tym workflow konczy sie przed tym jobem.
-      - ccache-restore:
-          cache_id: mydocker-release
       - conan-install:
           build_param: --build missing
           build_tool: ninja
@@ -598,17 +525,17 @@ jobs:
       # wartosc) nie napisal ani znaku. Oba te kroki sa z zalozenia MILCZACE:
       # wyjscie kompilatora idzie do plikow w build/gate-profiles-logs, a bramka
       # drukuje dopiero werdykt poziomu. Miedzy dwiema liniami "profil X ->"
-      # mieszcza sie minuty pierwszego, zimnego profilu (lokalnie 4 min 20 s przy
-      # -j4; na 4 vCPU kontenera odpowiednio dluzej), a w kroku bramki cala
-      # kampania 2 x 10010 planow. Dzielenie tego na osobne kroki NIE pomaga -
-      # limit liczy sie per krok, nie per job. Kolejne profile sa tansze: rozne
-      # miedzy nimi sa tylko 19 ze 112 jednostek kompilacji (cel `retractor`),
-      # reszta trafia w ccache.
+      # mieszcza sie minuty kompilacji jednego profilu (lokalnie 4 min 20 s przy
+      # -j4; na 4 vCPU kontenera odpowiednio dluzej) - kazdego prawie od zera,
+      # bo profile maja osobne katalogi, a sciezka katalogu wchodzi do klucza
+      # ccache (zmierzone 2026-09-19: drugi profil trafia w 8 z 68 jednostek) -
+      # a w kroku bramki cala kampania 2 x 10010 planow. Dzielenie tego na osobne
+      # kroki NIE pomaga - limit liczy sie per krok, nie per job.
       - run:
           name: Build H9 ablation profiles
           no_output_timeout: 30m
           command: |
-            K6_CCACHE=1 K6_BUILD_JOBS=4 test/research_gate/h9/build_profiles.sh
+            K6_BUILD_JOBS=4 test/research_gate/h9/build_profiles.sh
       - run:
           name: Research gate H9/H10
           no_output_timeout: 30m
@@ -698,7 +625,7 @@ jobs:
       # 8 GiB executora `large`. Odpowiednik `compute_build_jobs()` z
       # scripts/buildrdb.sh, policzony recznie dla tego executora.
       #
-      # Od 2026-08-19 ten job jest tez podloga ablacyjna warstwy L3 przebiegu
+      # Od 2026-08-19 ten job jest tez podloga ablacyjna warstwy L2 przebiegu
       # nocnego (`ablation-all-off`), a nie tylko czescia recznej matrycy -
       # `--parallel 4` przestalo byc zabezpieczeniem teoretycznym.
       - run:

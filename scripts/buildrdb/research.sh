@@ -152,7 +152,13 @@ run_research_option() {
             #   2. H9, 84 kompilacje             -> cztery profile ablacji;
             #   3. H9, oracle wartosci vs Flink  -> JDK 17 + Flink 2.3.0.
             gate_dir="$rdb_source_dir/test/research_gate"
-            jdk_home="${JAVA_HOME_PINNED:-/usr/lib/jvm/java-17-openjdk-amd64}"
+            # /usr/lib/jvm to uklad Debiana; na macOS o KONKRETNA wersje JDK
+            # pyta sie /usr/libexec/java_home -v 17.
+            if [ "$(rdb_os)" = "macos" ]; then
+                jdk_home="${JAVA_HOME_PINNED:-$(/usr/libexec/java_home -v 17 2>/dev/null || true)}"
+            else
+                jdk_home="${JAVA_HOME_PINNED:-/usr/lib/jvm/java-17-openjdk-amd64}"
+            fi
             flink_home="${FLINK_HOME:-$HOME/opt/flink-2.3.0}"
             flink_tgz="flink-2.3.0-bin-scala_2.12.tgz"
             flink_url="${FLINK_URL:-https://archive.apache.org/dist/flink/flink-2.3.0/$flink_tgz}"
@@ -162,15 +168,27 @@ run_research_option() {
             [ -d "$gate_dir" ] || { echo "Error: brak $gate_dir"; exit 1; }
 
             echo "-- 1/4 python3"
-            command -v python3 >/dev/null || { echo "-- installing python3..."; sudo apt-get install -y python3; }
+            command -v python3 >/dev/null || { echo "-- installing python3..."; rdb_pkg_install "$(cmd_to_platform_package python3)"; }
             echo "   OK: $(python3 --version)"
 
             # JDK 17 jest PRZYPIETY, nie 'jakas Java'. Domyslna java systemu bywa
             # nowsza i aparatura Flinka jej nie akceptuje.
             echo "-- 2/4 JDK 17 (przypiety: $jdk_home)"
             if [ ! -x "$jdk_home/bin/javac" ]; then
-                echo "   brak, instaluje openjdk-17-jdk..."
-                sudo apt-get install -y openjdk-17-jdk || { echo "Error: instalacja JDK 17 nie powiodla sie"; exit 1; }
+                if [ "$(rdb_os)" = "macos" ]; then
+                    echo "   brak, instaluje openjdk@17 (brew)..."
+                    rdb_pkg_install openjdk@17 || { echo "Error: instalacja JDK 17 nie powiodla sie"; exit 1; }
+                    # Beczka openjdk@17 jest keg-only i java_home jej nie widzi,
+                    # dopoki nie zalinkuje sie jej recznie - dlatego pytamy
+                    # najpierw java_home, a potem wprost o prefiks brew.
+                    jdk_home="${JAVA_HOME_PINNED:-$(/usr/libexec/java_home -v 17 2>/dev/null || true)}"
+                    if [ ! -x "$jdk_home/bin/javac" ] && [ -x "$(brew --prefix 2>/dev/null)/opt/openjdk@17/bin/javac" ]; then
+                        jdk_home="$(brew --prefix)/opt/openjdk@17"
+                    fi
+                else
+                    echo "   brak, instaluje openjdk-17-jdk..."
+                    rdb_pkg_install openjdk-17-jdk || { echo "Error: instalacja JDK 17 nie powiodla sie"; exit 1; }
+                fi
             fi
             [ -x "$jdk_home/bin/javac" ] || { echo "Error: nadal brak $jdk_home/bin/javac"; exit 1; }
             echo "   OK: $("$jdk_home/bin/java" -version 2>&1 | head -1)"
@@ -181,12 +199,17 @@ run_research_option() {
                 tgz_path="$(dirname "$flink_home")/$flink_tgz"
                 if [ ! -f "$tgz_path" ]; then
                     echo "   pobieram $flink_url (ok. 600 MB)..."
-                    command -v curl >/dev/null || sudo apt-get install -y curl
+                    command -v curl >/dev/null || rdb_pkg_install curl
                     curl -fL --retry 3 -o "$tgz_path" "$flink_url" \
                         || { echo "Error: pobranie Flinka nie powiodlo sie"; exit 1; }
                 fi
                 echo "   weryfikuje sume kontrolna..."
-                actual_sha="$(sha512sum "$tgz_path" | cut -d' ' -f1)"
+                # sha512sum jest z coreutils; macOS ma w zamian `shasum -a 512`.
+                if command_exists sha512sum; then
+                    actual_sha="$(sha512sum "$tgz_path" | cut -d' ' -f1)"
+                else
+                    actual_sha="$(shasum -a 512 "$tgz_path" | cut -d' ' -f1)"
+                fi
                 if [ "$actual_sha" != "$flink_sha512" ]; then
                     echo "Error: suma SHA-512 archiwum Flinka sie nie zgadza."
                     echo "  oczekiwano: $flink_sha512"
@@ -225,7 +248,10 @@ run_research_option() {
             for p in DEFAULT NO_R2_CANON NO_R1_FACTOR NO_R1_NO_R2; do
                 gate_bin="$rdb_source_dir/build/K26v3-$p/src/retractor/xretractor"
                 if [ ! -x "$gate_bin" ]; then profiles_state="brak"; break; fi
-                if [ -n "$(find "$rdb_source_dir/src" -type f -newer "$gate_bin" -print -quit 2>/dev/null)" ]; then
+                # BSD find (macOS) nie zna -quit: konczyl sie bledem, ktory
+                # 2>/dev/null polykalo, wiec kontrola swiezosci ZAWSZE orzekala
+                # "profile sa swieze". `head -1` daje to samo, co -quit, na obu.
+                if [ -n "$(find "$rdb_source_dir/src" -type f -newer "$gate_bin" -print 2>/dev/null | head -1)" ]; then
                     profiles_state="stare"; break
                 fi
             done
