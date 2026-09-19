@@ -49,7 +49,12 @@ int main() {
   try {
     auto shortTask = std::async(std::launch::async, [] {
       pausePipe = true;
-      retractordb::Process quick({"/bin/true"}, 10);
+      // `/bin/sleep 0`, a nie `/bin/true`: na macOS /bin/true NIE ISTNIEJE (true i false
+      // stoja w /usr/bin), wiec posix_spawnp oddawalo ENOENT i test padal na "No such file
+      // or directory", zanim zdazyl sprawdzic cokolwiek o deskryptorach. Biorac ten sam
+      // program, co zadanie dlugie, test zalezy od JEDNEJ bezwzglednej sciezki zamiast
+      // dwoch - a rozni sie od niej dokladnie tym, o co w nim chodzi: czasem zycia dziecka.
+      retractordb::Process quick({"/bin/sleep", "0"}, 10);
       try {
         quick.read(500ms);
       } catch (const retractordb::Error &error) {
