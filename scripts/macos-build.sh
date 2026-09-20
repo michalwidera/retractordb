@@ -170,11 +170,21 @@ rm -rf "$probe_dir"
 
 # --- brakujace narzedzia -------------------------------------------------
 banner "NARZEDZIA BUDOWY"
-# Conan i Ninja sa wymagane; ccache tylko przyspiesza. Instalujemy przez Homebrew,
-# bo python z Homebrew odmawia `pip install` poza srodowiskiem wirtualnym (PEP 668),
-# wiec sciezka pipowa i tak konczylaby sie tutaj.
+# Conan, Ninja i CMake sa wymagane; ccache tylko przyspiesza. Instalujemy przez
+# Homebrew, bo python z Homebrew odmawia `pip install` poza srodowiskiem wirtualnym
+# (PEP 668), wiec sciezka pipowa i tak konczylaby sie tutaj.
+#
+# CMake jest na tej liscie, chociaz conanfile.py przypina wlasny (tool_requires
+# cmake/[>=4.4.2]) i to ON liczy sie przy budowie: `conanbuild.sh` nizej stawia go
+# na poczatku PATH. Ale `conan install --build missing` na ZIMNYM cache buduje
+# recepty zaleznosci, a receptura, ktora nie deklaruje wlasnego tool_requires,
+# siega po cmake z PATH - wiec jakis cmake musi tu byc WCZESNIEJ. Na maszynie
+# developera zwykle juz jest i dlatego ta sciezka nie byla przebiegnieta do
+# 2026-09-20, kiedy oblal pierwszy job macOS na CircleCI: lista instalacyjna miala
+# `conan ninja`, a lista kontrolna ponizej `conan ninja cmake`. Obie MUSZA byc te
+# same - inaczej skrypt sprawdza cos, czego nie zainstalowal.
 missing=""
-for tool in conan ninja; do
+for tool in conan ninja cmake; do
   command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
 done
 if [ -n "$missing" ]; then
@@ -336,7 +346,12 @@ if [ "$run_tests" = "1" ]; then
   stage "cmake build (po rekonfiguracji)" cmake --build "$build_dir" --parallel "$jobs" -- -k 0
   banner "CTEST"
   # --output-on-failure: bez tego z dziennika nie da sie odczytac, CO padlo.
-  ( cd "$build_dir" && ctest --output-on-failure -j "$jobs" ) 2>&1 | tee -a "$log_file"
+  # --output-junit: ten sam plik, ktory zbiera job linuksowy (patrz run-test w
+  # .circleci/config.yml), zeby CircleCI pokazywal wyniki macOS w tej samej
+  # zakladce, a nie tylko jako dziennik. Lokalnie to jeden plik wiecej w katalogu
+  # budowy i nic poza tym. Powtorka nieudanych nizej junita NIE nadpisuje.
+  ( cd "$build_dir" && ctest --output-on-failure -j "$jobs" --output-junit test_results.xml ) 2>&1 |
+    tee -a "$log_file"
   ctest_status=${PIPESTATUS[0]}
   if [ "$ctest_status" -ne 0 ]; then
     failures=$((failures + 1))

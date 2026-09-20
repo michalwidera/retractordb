@@ -35,6 +35,16 @@ parameters:
     type: boolean
     default: false
 
+  # Buda macOS/arm64 na runnerze Apple silicon. Wylacznie z reki, tak samo jak
+  # `run_manual_arm` i z tego samego powodu: minuta runnera macOS kosztuje
+  # wielokrotnie wiecej niz minuta kontenera linuksowego, a job sprawdza
+  # PRZENOSNOSC - a ta nie zmienia sie z commita na commit. Tak samo jak ARM nie
+  # ma tez prebuiltow conana z docker/ci/Dockerfile (obraz CircleCI nie jest
+  # naszym obrazem), wiec pierwszy przebieg buduje Boost i ANTLR ze zrodel.
+  run_manual_macos:
+    type: boolean
+    default: false
+
 workflows:
   # Warstwa commitowa. Jeden job: kompilacja Debug i pelny zestaw testow.
   commit:
@@ -48,6 +58,7 @@ workflows:
         - not: << pipeline.parameters.run_manual_ablation >>
         - not: << pipeline.parameters.run_manual_research_gate >>
         - not: << pipeline.parameters.run_manual_make_build >>
+        - not: << pipeline.parameters.run_manual_macos >>
     jobs:
       - build-debug-ninja-mydocker:
           filters:
@@ -61,6 +72,11 @@ workflows:
     when: << pipeline.parameters.run_manual_arm >>
     jobs:
       - build-ARM
+
+  manual-macos:
+    when: << pipeline.parameters.run_manual_macos >>
+    jobs:
+      - build-debug-macos
 
   # Pelny przebieg: dwa razy w miesiacu z triggera `cron-shedule` albo recznie.
   # Do 2026-08-18 istnial obok blizniaczy workflow `nightly-full` z wlasnym
@@ -226,6 +242,21 @@ executors:
     machine:
       image: ubuntu-2404:2026.05.1
     resource_class: arm.large
+
+  # Runner Apple silicon; wylacznie CircleCI Cloud (na Serverze go nie ma).
+  #
+  # Obraz `xcode: 27.0.0` to Xcode 27.0 na macOS 26.6.2 - a wiec NIE ta sama
+  # wersja systemu, na ktorej powstal port (macOS 27.0), ale ten sam kompilator
+  # i ten sam SDK. Podloga CMAKE_OSX_DEPLOYMENT_TARGET z CMakeLists.txt (14.4)
+  # obejmuje obie, wiec roznica nie zmienia wyniku budowy; gdyby kiedys zmienila,
+  # zobaczymy to tutaj wczesniej niz na maszynie developera.
+  #
+  # m4pro.medium to 6 vCPU / 28 GiB. m4pro.large (12 vCPU) skraca kompilacje, ale
+  # kosztuje wiecej za minute i nie skraca testow, ktore w tym jobie dominuja.
+  macos-m4:
+    macos:
+      xcode: 27.0.0
+    resource_class: m4pro.medium
 
 commands:
   check-skipci:
@@ -708,3 +739,68 @@ jobs:
       - run-test:
           build_type: << parameters.build_type >>
           build_tool: << parameters.build_tool >>
+
+  # Buda Debug i pelny zestaw testow na macOS/arm64.
+  #
+  # Caly przebieg robi scripts/macos-build.sh - ten sam skrypt, ktorym port
+  # powstawal i ktorym sprawdza sie go recznie. To jest cala wartosc tego
+  # ukladu: CI nie dostaje wlasnej, rownoleglej sciezki budowania, ktora mogla by
+  # rozjechac sie z ta, ktorej uzywa czlowiek. Skrypt sam robi preflight,
+  # doinstalowuje brakujace narzedzia przez brew, laduje profil conana, buduje,
+  # instaluje, uruchamia ctest i na koniec `ninja test-api` (testy klienta C++,
+  # ktore poza tym wejsciem w ogole nie biegna - patrz EXCLUDE_FROM_ALL w api/cpp).
+  #
+  # Dlatego job NIE uzywa `prep-env` / `conan-install` / `conan-build` /
+  # `run-test`: tamte wolaja `scripts/buildrdb.sh toolchain conan` (apt) i czytaja
+  # /proc/version oraz /etc/issue, czego na Darwinie nie ma.
+  build-debug-macos:
+    working_directory: ~/retractordb
+    executor: macos-m4
+    steps:
+      - checkout:
+          method: blobless
+      # Workflow reczny, wiec [skipci] nie ma czego pomijac - tak samo jak build-ARM.
+      - check-skipci:
+          enabled: false
+      # Cache conana wazy tu wiecej niz w jobach linuksowych: obraz CircleCI nie
+      # jest naszym obrazem, wiec nie ma prebuiltow z docker/ci/Dockerfile i
+      # pierwszy przebieg buduje Boost oraz ANTLR ze zrodel. Klucz sklada sie z
+      # conanfile.py (lista zaleznosci) i z wersji Xcode - zmiana kompilatora
+      # uniewaznia ABI, wiec musi uniewaznic i cache.
+      - restore_cache:
+          keys:
+            - conan-macos-xcode27.0-{{ checksum "conanfile.py" }}
+            - conan-macos-xcode27.0-
+      - run:
+          name: Build and test (scripts/macos-build.sh)
+          # Pierwszy przebieg z zimnym cache buduje Boost ze zrodel i potrafi
+          # milczec dluzej niz domyslne 10 minut CircleCI.
+          no_output_timeout: 45m
+          command: scripts/macos-build.sh debug
+      - save_cache:
+          key: conan-macos-xcode27.0-{{ checksum "conanfile.py" }}
+          paths:
+            - ~/.conan2
+      # Junit trafia do osobnego katalogu, a nie prosto z build/Debug: CircleCI
+      # skanuje wskazana sciezke po *.xml, a CTest zostawia obok wlasne pliki w
+      # Testing/ - nie sa w formacie junit i kolektor by sie o nie potykal.
+      - run:
+          name: Collect test results
+          when: always
+          command: |
+            mkdir -p /tmp/macos-test-results
+            cp build/Debug/test_results.xml /tmp/macos-test-results/ 2>/dev/null || true
+      - store_test_results:
+          path: /tmp/macos-test-results
+      # `when: always`, bo dziennik jest potrzebny WLASNIE wtedy, gdy krok wyzej
+      # padl: skrypt dopisuje do niego preflight, wynik kazdego etapu i powtorke
+      # nieudanych testow pojedynczo z -V. Bez tego z czerwonego joba zostaje samo
+      # "exit 1".
+      - store_artifacts:
+          when: always
+          path: build/macos-build.log
+          destination: macos-build.log
+      - store_artifacts:
+          when: always
+          path: /tmp/macos-test-results/test_results.xml
+          destination: test_results.xml

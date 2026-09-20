@@ -27,6 +27,19 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_THREAD_LIBS_INIT})
 
+# Na Apple SDK deklaruje takze funkcje NOWSZE niz cel wdrozenia
+# (CMAKE_OSX_DEPLOYMENT_TARGET; bez jawnego ustawienia clang bierze wersje
+# systemu budujacego). Taka funkcja jest dla kompilatora WIDOCZNA, wiec probe
+# wychodzi falszywie dodatni, a konsolidator dowiazuje ja SLABO: pod starszym
+# systemem symbol rozwiazuje sie na NULL i wywolanie konczy sie SIGSEGV, a nie
+# bledem. Tak wlasnie padalo pipe2 (macOS 27) zbudowane SDK 27 pod macOS 26.
+# -Werror=unguarded-availability-new zamienia to ostrzezenie w blad kompilacji
+# proby, dzieki czemu probe odpowiada na pytanie "czy WOLNO to wywolac", a nie
+# "czy naglowek o tym wie".
+if(APPLE)
+  set(CMAKE_REQUIRED_FLAGS "-Werror=unguarded-availability-new")
+endif()
+
 # --- czas ---------------------------------------------------------------
 check_cxx_symbol_exists(clock_nanosleep "ctime" RDB_HAS_CLOCK_NANOSLEEP)
 check_include_file_cxx("mach/mach_time.h" RDB_HAS_MACH_TIME_H)
@@ -87,11 +100,28 @@ check_cxx_source_compiles(
 unset(CMAKE_REQUIRED_LINK_OPTIONS)
 
 # --- rozne --------------------------------------------------------------
-check_cxx_symbol_exists(pipe2 "unistd.h" RDB_HAS_PIPE2)
+# Prawdziwe WYWOLANIE, a nie sam adres symbolu: diagnostyka dostepnosci Apple
+# odpala sie pewnie dopiero na uzyciu.
+check_cxx_source_compiles(
+  "#include <fcntl.h>
+   #include <unistd.h>
+   int main() {
+     int fd[2];
+     return pipe2(fd, O_CLOEXEC);
+   }"
+  RDB_HAS_PIPE2_CALLABLE)
+# Osobna nazwa w pamieci podrecznej: wpis RDB_HAS_PIPE2=1 zapisany przez
+# konfiguracje sprzed tej poprawki nie ma jak przeslonic nowej proby.
+if(RDB_HAS_PIPE2_CALLABLE)
+  set(RDB_HAS_PIPE2 1)
+else()
+  set(RDB_HAS_PIPE2 0)
+endif()
 check_cxx_symbol_exists(statvfs "sys/statvfs.h" RDB_HAS_STATVFS)
 
 unset(CMAKE_REQUIRED_DEFINITIONS)
 unset(CMAKE_REQUIRED_LIBRARIES)
+unset(CMAKE_REQUIRED_FLAGS)
 
 # --- narzedzia zewnetrzne wolane w czasie dzialania ---------------------
 # boost::stacktrace z zapleczem ADDR2LINE uruchamia ten program przy kazdym

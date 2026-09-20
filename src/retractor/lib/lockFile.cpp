@@ -17,7 +17,15 @@ namespace {
 /// Jak dlugo czekac, az blokade zwolni wlasciciel przejsciowy. Sprzatacz i proces kasujacy plik
 /// trzymaja ja przez kilka wywolan jadra; zywa instancja trzyma ja do konca, wiec po tym czasie
 /// odpowiedz "zajete" jest prawdziwa.
-constexpr std::chrono::milliseconds kTransientHolderGrace{50};
+///
+/// Ten czas NIE mierzy pracy wlasciciela przejsciowego, tylko czas, w jakim planista zdazy go
+/// obudzic. Kilka wywolan jadra to mikrosekundy, ale watek, ktory na nie czeka, wraca na procesor
+/// dopiero wtedy, gdy maszyna ma go gdzie postawic. Pomiar na tym samym protokole: przy 64-krotnym
+/// przeciazeniu procesora przekazanie trwalo do 168 ms, wiec z budzetem 50 ms padalo 118 prob na
+/// 120, a z 500 ms - zadna. Na rdzeniach asymetrycznych (Apple silicon: P i E) jest o to jeszcze
+/// latwiej, bo obudzony watek moze trafic na rdzen oszczedny. Falszywe "juz dziala" zatrzymuje
+/// start instancji, a nadmiar czekania kosztuje tylko tyle opoznienia na sciezce NAPRAWDE zajetej.
+constexpr std::chrono::milliseconds kTransientHolderGrace{500};
 constexpr std::chrono::milliseconds kRetryInterval{1};
 
 /// Ile razy zaczynac od nowa po trafieniu na skasowany i-wezel. Kazde trafienie znaczy, ze

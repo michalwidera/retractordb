@@ -12,10 +12,36 @@ if(NOT TARGET boost::boost AND NOT TARGET Boost::headers)
 endif()
 
 # Sondy lokalne: API musi dzialac takze bez konfiguracji silnika.
+include(CheckCXXSourceCompiles)
 include(CheckCXXSymbolExists)
-check_cxx_symbol_exists(pipe2 "fcntl.h;unistd.h" RDB_API_HAS_PIPE2)
+
+# Patrz cmake/PlatformChecks.cmake: na Apple SDK deklaruje takze funkcje nowsze
+# niz cel wdrozenia, a konsolidator dowiazuje je SLABO. Bez tego probe pipe2
+# wychodzi dodatni pod SDK 27, a binarium uruchomione pod macOS 26 skacze pod
+# NULL i ginie na SIGSEGV - tak padaly st_api_fake i st_api_real.
+if(APPLE)
+  set(CMAKE_REQUIRED_FLAGS "-Werror=unguarded-availability-new")
+endif()
+# Prawdziwe WYWOLANIE, a nie sam adres symbolu: diagnostyka dostepnosci Apple
+# odpala sie pewnie dopiero na uzyciu.
+check_cxx_source_compiles(
+  "#include <fcntl.h>
+   #include <unistd.h>
+   int main() {
+     int fd[2];
+     return pipe2(fd, O_CLOEXEC);
+   }"
+  RDB_API_HAS_PIPE2_CALLABLE)
 check_cxx_symbol_exists(POSIX_SPAWN_CLOEXEC_DEFAULT "spawn.h"
                         RDB_API_HAS_SPAWN_CLOEXEC_DEFAULT)
+unset(CMAKE_REQUIRED_FLAGS)
+# Osobna nazwa w pamieci podrecznej: wpis RDB_API_HAS_PIPE2=1 zapisany przez
+# konfiguracje sprzed tej poprawki nie ma jak przeslonic nowej proby.
+if(RDB_API_HAS_PIPE2_CALLABLE)
+  set(RDB_API_HAS_PIPE2 1)
+else()
+  set(RDB_API_HAS_PIPE2 0)
+endif()
 if(NOT RDB_API_HAS_PIPE2 AND NOT RDB_API_HAS_SPAWN_CLOEXEC_DEFAULT)
   message(
     FATAL_ERROR
