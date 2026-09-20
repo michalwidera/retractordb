@@ -170,11 +170,21 @@ rm -rf "$probe_dir"
 
 # --- brakujace narzedzia -------------------------------------------------
 banner "NARZEDZIA BUDOWY"
-# Conan i Ninja sa wymagane; ccache tylko przyspiesza. Instalujemy przez Homebrew,
-# bo python z Homebrew odmawia `pip install` poza srodowiskiem wirtualnym (PEP 668),
-# wiec sciezka pipowa i tak konczylaby sie tutaj.
+# Conan, Ninja i CMake sa wymagane; ccache tylko przyspiesza. Instalujemy przez
+# Homebrew, bo python z Homebrew odmawia `pip install` poza srodowiskiem wirtualnym
+# (PEP 668), wiec sciezka pipowa i tak konczylaby sie tutaj.
+#
+# CMake jest na tej liscie, chociaz conanfile.py przypina wlasny (tool_requires
+# cmake/[>=4.4.2]) i to ON liczy sie przy budowie: `conanbuild.sh` nizej stawia go
+# na poczatku PATH. Ale `conan install --build missing` na ZIMNYM cache buduje
+# recepty zaleznosci, a receptura, ktora nie deklaruje wlasnego tool_requires,
+# siega po cmake z PATH - wiec jakis cmake musi tu byc WCZESNIEJ. Na maszynie
+# developera zwykle juz jest i dlatego ta sciezka nie byla przebiegnieta do
+# 2026-09-20, kiedy oblal pierwszy job macOS na CircleCI: lista instalacyjna miala
+# `conan ninja`, a lista kontrolna ponizej `conan ninja cmake`. Obie MUSZA byc te
+# same - inaczej skrypt sprawdza cos, czego nie zainstalowal.
 missing=""
-for tool in conan ninja; do
+for tool in conan ninja cmake; do
   command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
 done
 if [ -n "$missing" ]; then
