@@ -255,12 +255,17 @@ tool_specs_for_option() {
                 "mold:required" "valgrind:required"
                 "hexdump:required" "conan:required"
                 # graphviz OPCJONALNY na tej liscie (minimalny toolchain CI), a nie
-                # wymagany: jedynym jego konsumentem jest render SVG w tescie
-                # it_issue31_doc, ktory bez `dot` sam sie nie rejestruje. Na obrazie
-                # projektu graphviz jest, wiec x86 nie traci nic. Joby uzywajace tej
-                # listy (ARM, czysta Ubuntu) przestaja przez to ciagnac zaleznosci
-                # graphviza z apt - a to wlasnie na nich lustro ports.ubuntu.com
-                # oddawalo okresowo 503 na fonts-liberation.
+                # wymagany. Konsumenci `dot`: render SVG w it_issue31_doc oraz testy
+                # -dot w it_dot_labels i it_lang_showcase. Kazdy z nich pyta o
+                # narzedzie przez find_program i bez niego albo sie nie rejestruje,
+                # albo sprawdza sam tekst DOT - warunek w tych testach musi zostac,
+                # bo bezwarunkowy render na Linuksie wywrocil 2026-09-20 joby
+                # `build-release` i `build-ARM` na `dot: command not found`. Joby z
+                # obrazu projektu (graphviz w docker/ci/Dockerfile) nie traca nic,
+                # joby uzywajace tej listy (ARM, czysta Ubuntu) traca sam render i
+                # przestaja przez to ciagnac zaleznosci graphviza z apt - a to
+                # wlasnie na nich lustro ports.ubuntu.com oddawalo okresowo 503 na
+                # fonts-liberation.
                 #
                 # POZIOM TRZYMAC SPOJNIE Z LISTA `validate`: ona ma wlasny zestaw
                 # i sprawdza go NIEZALEZNIE od tego, co ktorykolwiek `toolchain`
