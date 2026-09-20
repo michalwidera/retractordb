@@ -11,6 +11,10 @@
 # wybrany job - zeby czerwony CI dalo sie zbadac bez pushowania kolejnych
 # commitow "a moze teraz".
 #
+# Nie kazdy profil biegnie na obrazie projektu: `make-build` odwzorowuje job na
+# czystej Ubuntu, ktory toolchain stawia sam. Obraz, uzytkownik, katalog roboczy
+# i narzedzie budowy sa wiec wlasnosciami profilu - patrz sekcja nizej.
+#
 # ZRODLEM PRAWDY POZOSTAJE .circleci/config.yml. Kazdy profil nizej jest recznym
 # odwzorowaniem jednego joba i przy zmianie tamtego pliku trzeba go poprawic -
 # nie ma mechanizmu, ktory by to zrobil sam.
@@ -35,12 +39,13 @@ fi
 # `gate` jest w tej liscie, ale poza domyslnym uzyciem: to najdrozszy job
 # przebiegu nocnego (budowa czterech profili ablacji H9 + kampania 2 x 10010
 # planow), liczony w dziesiatkach minut.
-profile_names=(commit release ablation-all-off ablation-probe-on gate)
+profile_names=(commit release make-build ablation-all-off ablation-probe-on gate)
 
 profile_job() {
     case "$1" in
         commit)            echo "build-debug-ninja-mydocker (workflow: commit)" ;;
         release)           echo "build-release-ninja-mydocker (L1 manual-nightly-full)" ;;
+        make-build)        echo "build-release (workflow: manual-make-build)" ;;
         ablation-all-off)  echo "build-release-ablation / ablation-all-off (L2)" ;;
         ablation-probe-on) echo "build-release-ablation / ablation-probe-on (L2)" ;;
         gate)              echo "research-gate (L2 manual-nightly-full)" ;;
@@ -58,9 +63,51 @@ profile_desc() {
     case "$1" in
         commit)            echo "Debug + pelny zestaw testow - to, co idzie po commicie" ;;
         release)           echo "Release + pelny zestaw testow" ;;
+        make-build)        echo "Release na czystej Ubuntu: stockowy toolchain, make, pakietowanie" ;;
         ablation-all-off)  echo "Release z piecioma RDB_OPT_* = OFF + pelny zestaw testow" ;;
         ablation-probe-on) echo "Release z RDB_BENCH_PROBE=ON + pelny zestaw testow" ;;
         gate)              echo "bramka badawcza H9/H10 w trybie strict (dlugi przebieg)" ;;
+    esac
+}
+
+# Obraz, uzytkownik, katalog roboczy i narzedzie budowy ida za executorem joba, a
+# nie za skryptem: `make-build` odwzorowuje jedyny job z tej listy, ktory NIE
+# biegnie na obrazie projektu. Tam toolchainu nie ma wcale - stawia go dopiero
+# krok `prep-env-ci` - i wlasnie ta roznica ma byc sprawdzana, bo to na niej
+# 2026-09-20 wyszedl brak graphviza, ktorego zaden profil na obrazie projektu
+# zobaczyc nie mogl.
+#
+# Joba `build-ARM` z tego samego workflow NIE odwzorowujemy. Biegnie na
+# executorze `machine` arm64, a uruchomienie go tutaj znaczyloby emulacje qemu
+# na x86: wolna i niewierna akurat w tym, co ten job sprawdza (zachowanie na
+# innej architekturze). Luka jest swiadoma - po zmianie w `manual-make-build`
+# job ARM nadal trzeba sprawdzic przebiegiem CI.
+profile_image() {
+    case "$1" in
+        make-build) echo "$stock_image" ;;
+        *)          echo "$default_image" ;;
+    esac
+}
+
+profile_user() {
+    case "$1" in
+        make-build) echo "circleci" ;;
+        *)          echo "developer" ;;
+    esac
+}
+
+# Sciezki doslownie takie jak `working_directory` w config.yml.
+profile_work_dir() {
+    case "$1" in
+        make-build) echo "/home/circleci/retractordb" ;;
+        *)          echo "/home/developer/workspace/retractordb" ;;
+    esac
+}
+
+profile_build_tool() {
+    case "$1" in
+        make-build) echo "make" ;;
+        *)          echo "ninja" ;;
     esac
 }
 
@@ -81,7 +128,8 @@ show_help() {
     echo "  --profile <nazwa>  Profil do uruchomienia (domyslnie: commit)"
     echo "  --list             Wypisz profile i zakoncz"
     echo "  --out-dir <kat>    Katalog na wyniki testow (domyslnie: build/test-ci)"
-    echo "  --image <obraz>    Obraz dockerowy (domyslnie: $default_image)"
+    echo "  --image <obraz>    Obraz dockerowy (domyslnie: zalezny od profilu -"
+    echo "                     $default_image, a dla make-build $stock_image)"
     echo "  --cpus <n>         Limit CPU kontenera (domyslnie: $default_cpus - jak resource_class: large)"
     echo "  --memory <rozmiar> Limit RAM kontenera (domyslnie: $default_memory - jak resource_class: large)"
     echo "  --shm-size <r>     Rozmiar /dev/shm (domyslnie: $default_shm_size - domyslna wartosc dockera)"
@@ -98,6 +146,9 @@ show_help() {
 # kontenerowi tyle samo swapu co RAM-u, wiec przekroczenie budzetu objawia sie
 # spowolnieniem zamiast zabiciem procesu - a w CI zabija.
 default_image="micwide/buildenv-retractordb:latest"
+# Executor `ubuntu-docker` z config.yml. Tag `current` jak tam: obraz ma dostawac
+# te same aktualizacje bezpieczenstwa, co w CI.
+stock_image="cimg/base:current"
 default_cpus="4"
 default_memory="8g"
 # /dev/shm: 64 MiB to domyslna wartosc dockera i tyle samo ma executor
@@ -107,7 +158,7 @@ default_memory="8g"
 default_shm_size="64m"
 
 profile="commit"
-image="$default_image"
+image=""
 cpus="$default_cpus"
 memory="$default_memory"
 shm_size="$default_shm_size"
@@ -148,6 +199,11 @@ if ! printf '%s\n' "${profile_names[@]}" | grep -qx -- "$profile"; then
 fi
 
 build_type="$(profile_build_type "$profile")"
+build_tool="$(profile_build_tool "$profile")"
+container_user="$(profile_user "$profile")"
+work_dir="$(profile_work_dir "$profile")"
+# Pusty `image` znaczy "bez --image", wiec obraz bierze sie z profilu.
+image="${image:-$(profile_image "$profile")}"
 
 # ── Wykrycie dzialajacego dockera ────────────────────────────────────────────
 #
@@ -180,7 +236,6 @@ fi
 
 # ── Kontener ─────────────────────────────────────────────────────────────────
 container="rdb-test-ci-${profile}-$$"
-work_dir="/home/developer/workspace/retractordb"
 
 # BEZ nazwanego wolumenu na ccache: profil odwzorowuje job CI, a ten startuje
 # z pustym cache, bo config.yml nie przenosi go miedzy jobami (uzasadnienie w
@@ -227,14 +282,14 @@ if [ "$reuse_build" -eq 1 ]; then
 fi
 
 docker run --detach --name "$container" "${run_opts[@]}" \
-    --workdir /home/developer/workspace \
+    --workdir "$(dirname "$work_dir")" \
     "$image" sleep infinity > /dev/null
 
 # Punkt montowania wolumenu docker tworzy jako katalog roota, razem z brakujacym
 # katalogiem nadrzednym - bez tego rozpakowanie drzewa przez uzytkownika
-# `developer` konczy sie odmowa dostepu.
+# kontenera konczy sie odmowa dostepu.
 if [ "$reuse_build" -eq 1 ]; then
-    docker exec --user root "$container" chown developer:developer "$work_dir" "$work_dir/build"
+    docker exec --user root "$container" chown "$container_user:$container_user" "$work_dir" "$work_dir/build"
 fi
 
 # Testowana tresc: pliki sledzone + niesledzone nieignorowane, czyli drzewo
@@ -254,7 +309,8 @@ docker exec "$container" mkdir -p "$work_dir"
 # argumenty pozycyjne. Kroki odpowiadaja komendom conan-install / conan-build /
 # run-test z config.yml.
 rc=0
-docker exec --interactive "$container" bash -s -- "$profile" "$build_type" "$work_dir" << 'INSIDE' || rc=$?
+docker exec --interactive "$container" bash -s -- \
+    "$profile" "$build_type" "$work_dir" "$build_tool" << 'INSIDE' || rc=$?
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -262,15 +318,36 @@ set -o pipefail
 profile="$1"
 build_type="$2"
 work_dir="$3"
+build_tool="$4"
 
 cd "$work_dir"
 
-# Obraz trzyma conana i cmake w ~/.venv (docker/ci/Dockerfile), a ~/.bashrc nie
-# jest czytany przez powloke nieinteraktywna.
-# shellcheck disable=SC1091
-. "$HOME/.venv/bin/activate"
+# Obraz projektu trzyma conana i cmake w ~/.venv (docker/ci/Dockerfile), a
+# ~/.bashrc nie jest czytany przez powloke nieinteraktywna. Na czystym obrazie
+# tego venva jeszcze nie ma - powstaje dopiero w kroku toolchain, dokladnie jak
+# w CI, gdzie `prep-env-ci` dopisuje aktywacje do $BASH_ENV. Stad aktywacja
+# warunkowa i powtarzana po tamtym kroku, zamiast jednego wolania na starcie.
+activate_venv() {
+    if [ -f "$HOME/.venv/bin/activate" ]; then
+        # shellcheck disable=SC1091
+        . "$HOME/.venv/bin/activate"
+    fi
+}
+activate_venv
 export PATH="$HOME/.local/bin:$PATH"
 step() { echo; echo "== $*"; }
+
+# Odpowiednik `prep-env-ci`: minimalny toolchain, w ktorym graphviz jest
+# OPCJONALNY (scripts/buildrdb/toolmatrix.sh). Tego kroku nie ma zaden profil na
+# obrazie projektu i to on odroznia ten profil od `release`.
+prep_env_ci() {
+    step "Install build toolchain (minimal, CI only)"
+    scripts/buildrdb.sh toolchain_required conan
+    activate_venv
+
+    step "Validate installed toolchain"
+    scripts/buildrdb.sh validate
+}
 
 conan_install() {
     step "Conan install ($build_type)"
@@ -279,17 +356,24 @@ conan_install() {
 }
 
 conan_build() {
-    step "Conan build ($build_type, ninja)"
+    step "Conan build ($build_type, $build_tool)"
     conan build . -s build_type="$build_type" --build missing
-    (cd "build/$build_type" && ninja install)
+    (cd "build/$build_type" && "$build_tool" install)
 }
 
 smoke_test() {
     step "Smoke test"
-    (cd "build/$build_type" && ninja showelf)
+    (cd "build/$build_type" && "$build_tool" showelf)
     xretractor -h
     xqry -h
     xtrdb -h
+}
+
+# Odpowiednik `run-package`. Jedyny odwzorowany job, ktory pakietuje - stad krok
+# tylko w tym profilu.
+package() {
+    step "Package"
+    (cd "build/$build_type" && "$build_tool" packages)
 }
 
 # ctest z `-j $(nproc)` doslownie jak w config.yml. W kontenerze `nproc` podaje
@@ -352,6 +436,19 @@ case "$profile" in
         conan_build
         smoke_test
         run_tests || status=$?
+        ;;
+    make-build)
+        prep_env_ci
+        conan_install
+        conan_build
+        smoke_test
+        run_tests || status=$?
+        # Po czerwonych testach `run-package` w CI sie nie wykona - krok pada i
+        # job konczy sie na nim. Tutaj tak samo, inaczej profil pakietowalby
+        # drzewo, ktorego CI by nie spakowal.
+        if [ "$status" -eq 0 ]; then
+            package
+        fi
         ;;
     ablation-all-off)
         conan_install

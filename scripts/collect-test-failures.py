@@ -137,8 +137,30 @@ def failedInThisRun(lastTestLog: str, name: str) -> bool:
     return "Test Passed." not in section
 
 
+def comparePairs(command: str, workDir: Path) -> list[tuple[Path, Path]]:
+    """Pary wzorzec/wynik wyczytane z samego polecenia testu.
+
+    Testy integracyjne porownuja przez `bash ../compare.sh [--opcje] <wzorzec> <wynik>`,
+    wiec para jest w poleceniu zapisana wprost i nie trzeba jej zgadywac z nazw plikow.
+    Zgadywanie myli sie tam, gdzie katalog ma kilka wynikow: raport z 2026-09-20 parowal
+    `pattern-dot.txt` z `out.txt` testu `-run`, a `pattern.txt` z `out.dot`, i obie
+    roznice byly diffem dwoch niezwiazanych plikow.
+    """
+    pairs = []
+    for args in re.findall(r"compare\.sh((?:\s+[^\s&|;<>]+)+)", command):
+        operands = [arg for arg in args.split() if not arg.startswith("-")]
+        if len(operands) < 2:
+            continue
+        pattern, actual = workDir / operands[0], workDir / operands[1]
+        if pattern.is_file() and actual.is_file():
+            pairs.append((pattern, actual))
+    return pairs
+
+
 def patternPairs(workDir: Path) -> list[tuple[Path, Path]]:
     """Pary wzorzec/wynik, ktore da sie sparowac po nazwie.
+
+    Zapas dla testow, ktore nie wolaja `compare.sh` - tam para moze wyjsc tylko z nazw.
 
     Konwencja drzewa jest regularna: pattern.txt -> out.txt, pattern-run.txt -> out-run.txt
     albo out.txt, pattern-dot.txt -> out.dot, count.pattern -> count.txt. Parujemy po
@@ -151,7 +173,14 @@ def patternPairs(workDir: Path) -> list[tuple[Path, Path]]:
         candidates = []
         if stem.startswith("pattern"):
             suffix = stem[len("pattern"):].removesuffix(".txt")  # "", "-run", "-dot", "_compile"
-            candidates = [f"out{suffix}.txt", f"out{suffix}.dot", "out.txt", "out.dot"]
+            candidates = [f"out{suffix}.txt", f"out{suffix}.dot"]
+            # Sufiks nazywajacy rozszerzenie wyniku (`pattern-dot.txt` -> `out.dot`) idzie
+            # PRZED ogolnym `out.txt`. Inaczej w katalogu, ktory ma oba pliki, wzorzec DOT
+            # parowal sie z wyjsciem testu `-run`: raport lang_showcase z 2026-09-20 podawal
+            # roznice dwoch niezwiazanych plikow, a prawdziwy `out.dot` zgadzal sie ze wzorcem.
+            if suffix.startswith("-"):
+                candidates.append(f"out.{suffix[1:]}")
+            candidates += ["out.txt", "out.dot"]
         else:  # <cos>.pattern
             candidates = [stem.removesuffix(".pattern") + ".txt"]
         for candidate in candidates:
@@ -230,7 +259,7 @@ def collectOne(name: str, info: dict, lastTestLog: str, reportDir: Path) -> list
     elif tmpRaw:
         lines.append(f"  katalog przestrzeni nazw {tmpRaw} nie istnieje")
 
-    for pattern, actual in patternPairs(workDir):
+    for pattern, actual in comparePairs(command, workDir) or patternPairs(workDir):
         diff = subprocess.run(
             ["diff", "--strip-trailing-cr", "-u", str(pattern), str(actual)],
             capture_output=True, text=True).stdout
