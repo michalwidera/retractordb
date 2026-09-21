@@ -12,6 +12,7 @@
 
 #include "CRSMath.hpp"
 #include "executorsmState.hpp"
+#include "rdb/exceptions.hpp"
 
 // https://ref.pencilcode.net/turtle/colors.html
 
@@ -608,6 +609,15 @@ int presenter::run(const boost::program_options::variables_map &vm) {
     } else {
       onlyCompileShowProgram();
     }
+  } catch (const rdb::Error &error) {
+    // MUSI stac przed catch(std::exception) - rdb::Error z niego dziedziczy. Bez tego blad
+    // silnika wychodzil z presentera jako EINTR (4), czyli kodem "przerwano", podczas gdy
+    // nikt niczego nie przerywal. Ta sama pomylka co w executorsm::run() i z tego samego
+    // powodu: catch napisano, zanim cokolwiek w silniku zaczelo rzucac.
+    // Bez SPDLOG: presenter nie wciaga spdloga i nie ma po co. To sciezka narzedziowa
+    // (-c, --dot), uruchamiana z terminala, gdzie stderr JEST kanalem diagnostycznym.
+    std::cerr << "\nFATAL: " << error.what() << '\n';
+    return system::errc::operation_not_permitted;  // EPERM == 1 == EXIT_FAILURE
   } catch (std::exception &e) {
     std::cerr << e.what() << '\n';
     return system::errc::interrupted;

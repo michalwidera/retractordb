@@ -1,15 +1,14 @@
 # Core phase 1: FatalError becomes an exception
 
-**Status:** slice 1 (§2) and both halves of §3 item 1 - sub-slice 2a, the storage
-construction path, and sub-slice 2b, the read and write path - are **done**.
-`src/rdb` no longer contains a single `FatalError` call site. §3 items 2 and 3 are not
-started.
+**Status:** slice 1 (§2) and all of §3 item 1 are **done** - `src/rdb` no longer
+contains a single `FatalError` call site. §3 item 2 is under way: it was surveyed first
+(§3.2) and its slice A1, `compiler.cpp`, is **done** (§3.3). §3 item 3 is not started.
 Stage 1a (`9a1e72eb`) is this phase's test harness. **Prerequisite for:** everything
 above the storage layer, in all three embedding targets - see
 [`embedded-roadmap.md`](embedded-roadmap.md).
 
-After 2b: **142 `FatalError` call sites** in `src/`, **all of them in
-`src/retractor/lib`**. The storage layer is at zero. (At `f22cffe0` it was 221 total -
+After A1: **102 `FatalError` call sites** in `src/`, all in `src/retractor/lib`.
+(After 2b it was 142; `compiler.cpp`'s 40 are gone.) The storage layer is at zero. (At `f22cffe0` it was 221 total -
 79 in `src/rdb/lib`, 142 in `src/retractor/lib`.) No bare `exit()` anywhere in the tree.
 
 `FatalError` ends with `std::exit(EXIT_FAILURE)` (`src/include/fatalError.hpp:51`).
@@ -151,9 +150,11 @@ Ordered by how much each unblocks, not by size:
 1. ~~**`src/rdb/lib`, remaining 77 sites.**~~ **Done**, in two sub-slices at the seam
    described in §3.1a: 2a, the construction path, and 2b, the read and write path.
    Stage 1a's guards are now redundant rather than load-bearing, which was the point.
-2. **`src/retractor/lib`, 142 sites.** The hard half. `executorsm.cpp:70-77` and
-   `ipcServer.cpp:54-69` already carry comments about `FatalError` running `atexit`
-   handlers on the calling thread; those two are where unwinding will surprise you.
+2. **`src/retractor/lib`, 142 sites.** The hard half. Surveyed before converting
+   anything - see §3.2, which proposes an order and names what each slice has to
+   prove. The short version: the sites split into three execution contexts, and the
+   *correct* outcome differs per context, which is why they cannot be converted as
+   one batch.
 3. **Phase 2, de-globalization.** `statusDesc` is dealt with by slice 1; the other
    two are `fatalErrorRaised` (`fatalError.hpp:16`) and the MEMORY maps
    (`faccmemory.cc:13-16`). `api/python/tests/test_reentry.py` is the acceptance test
@@ -274,6 +275,196 @@ does not match the declared NULL field (`facctxtsrc.cc`). These are bad *data*, 
 types - calling them `LogicError` would accuse RetractorDB of a bug over the user's
 input. **Phase 5 should give data errors their own type**; these five sites are its
 first call sites.
+
+### 3.2 Survey of `src/retractor/lib` before converting anything
+
+Written after 2b, because every slice so far produced exactly one instance of the same
+question - *what did the code downstream of `std::exit` rely on?* - and in this layer
+that question meets two mutexes, a communication thread and an `atexit` handler. This
+section is the answer to it, gathered before any conversion.
+
+#### 3.2.1 The sites, grouped by the thread that runs them
+
+| Context | Files | Sites |
+|---|---|---|
+| **A. Plan build** - startup and, separately, the comms thread | `compiler.cpp` 40, `RQLParser.cpp` 6, `qTree.cpp` 3, `query.cpp` 3, `field.cpp` 1 | **53** |
+| **B. Tick path** - under `core_mutex`, inside `plan_epoch_mutex` | `dataModel.cpp` 25, `streamInstance.cpp` 22, `expressionEvaluator.cpp` 10, `CRSMath.cpp` 2 | **59** |
+| **C. Communication thread** - under `plan_epoch_mutex` | `dumpManager.cpp` 17, `executorsmCommands.cpp` 5, `executorsmAdHoc.cpp` 5, `executorsmPlanReload.cpp` 2, `executorsm.cpp` 1 | **30** |
+
+The grouping is the whole point: **a failure in context A at startup should end the
+process, and the same failure in context A on the comms thread must not.**
+`compiler::compile()` is called from both - `launcher.cpp:523` on the main thread and
+`executorsmAdHoc.cpp:60,150` / `executorsmPlanReload.cpp:84,284` on the communication
+thread. Today `FatalError` makes both end the process, which means **a malformed ad-hoc
+query kills the server**. That is the same defect the RQL parser conversion fixed one
+level up on 2026-09-05, still present one level down.
+
+#### 3.2.2 Lifetime hazards: better than expected
+
+Five raw pointers to automatic objects are published globally, each justified in
+`executorsmState.hpp` by "`std::exit` does not run destructors of automatic objects".
+Every one is a potential `pProc`. Their status:
+
+| Pointer | Points at | Exception-safe? |
+|---|---|---|
+| `pProc` | `dataModel` in the epoch loop | **Was not** - fixed by `EpochPublication` (§3.1b) |
+| `serviceGuardPtr` | `FlockServiceGuard` in `run()` | **Yes** - `LockGuardScope`, `executorsm.cpp:189-194` |
+| `busPtr` | `bus::Bus` in `run()` | **Yes** - `BusScope`, `executorsm.cpp:196-198` |
+| `executorsm::coreInstancePtr` | `qTree` in `main` | Yes by lifetime - outlives `run()` |
+| `executorsm::cmPtr` | `compiler` in `main` | Yes by lifetime - outlives `run()` |
+
+The RAII pattern `EpochPublication` introduces already existed twice in the same file;
+`pProc` was the one that had been left as bare statements. `fatal_exit_path`'s
+lock-hygiene gate passing on the new throw paths is the empirical confirmation that
+`serviceGuardPtr` unwinds correctly.
+
+Both mutexes are taken with `std::scoped_lock`, so unwinding releases them - which
+`std::exit` never did. The `try_to_lock` workaround in `cleanup()` exists because of
+exactly that. **Converting this layer removes the condition that workaround was written
+for.**
+
+#### 3.2.3 Who catches it on the way out
+
+| Catch | Effect on a converted site | Verdict |
+|---|---|---|
+| `executorsmCommands.cpp:225` | Reports to the client, server lives | **Correct, and the point** - this is what makes context A and C survivable |
+| `exprSimplify.cpp:94` | `foldConstants` swallows it and returns `nullopt` | **Deliberate, but changes behaviour** - see below |
+| `presenter.cpp:611` | Compile-path error returns `EINTR` (4), not `EXIT_FAILURE` (1) | **Needs the same treatment `executorsm::run()` got** |
+| `launcher.cpp:523` | A *returned* "Fail compile" gives `protocol_error` (71); a *throw* gives 1 | Exit code changes - decide and pin it |
+| `.antlr/RQLParser.cpp`, 47 sites | Catches `RecognitionException` only | Harmless for `rdb::Error` - but see §3.2.4 |
+
+**`exprSimplify.cpp:94` is the interesting one.** `foldConstants` evaluates a constant
+subexpression and returns `nullopt` if it cannot, deliberately leaving the error for run
+time. Today `expressionEvaluator.cpp`'s 10 sites `std::exit`, so that catch never sees
+them. After conversion it will: expressions that currently kill the process at compile
+time will instead be silently left unfolded. That is arguably the *better* behaviour,
+but it is a **semantic change to the optimizer**, and it is why `expressionEvaluator.cpp`
+must not be converted casually alongside the rest of context B. `it_optimizer_ablation-*`
+and `ut_exprSimplify` are the tests that would show it.
+
+#### 3.2.4 The ANTLR listener discipline applies again
+
+The sites in `RQLParser.cpp`, `qTree.cpp`, `query.cpp` and `field.cpp` reachable from
+inside a `ParserListener` callback must follow `abortParse()`: **`removeParseListeners()`
+before the throw**. Unwinding otherwise runs `antlrcpp::FinalAction` → `exitRule()` →
+`exitDeclare()` on a half-built context. This is trap 2 from §1, and it has already cost
+one segfault on the RQL side and been avoided once on the DESC side. It is not new
+knowledge - it just has to be applied a third time.
+
+#### 3.2.5 Proposed order
+
+**1. Context A, the compiler (53 sites).** First, not last. Highest user-visible value -
+it stops a malformed ad-hoc query from killing the server - and the receiving catch
+(`executorsmCommands.cpp:225`) is already correct. No locks are held at startup. The
+work is the A-startup / A-comms split: `compile()` must return a status where it returns
+one today and throw where the process should end. Fix `presenter.cpp:611` with it.
+
+**2. Context C, the communication thread (30 sites).** `dumpManager` is 17 of them and
+is a member of `streamInstance` reached through `pProc` from the comms thread, so it
+depends on `EpochPublication` already being in place - which it is.
+
+**3. Context B, the tick path (59 sites), minus `expressionEvaluator`.** Both locks
+unwind cleanly and `EpochPublication` covers the model, so the mechanical risk is lower
+than it looks. `RDB_FAULT_THROW_IN_SLOT` already exercises this exact path.
+
+**4. `expressionEvaluator.cpp` (10 sites), on its own.** Because of §3.2.3 - it is the
+only group whose conversion changes what the optimizer *produces*, rather than only what
+happens when something fails.
+
+#### 3.2.6 What each slice must prove
+
+- Exit code **1**, not 4 and not 71, wherever the process is still meant to die.
+- `fatalErrorRaised` latched on every path that ends the process, or a systemd unit
+  restarts into the plan that killed it.
+- A bad ad-hoc query leaves the server running and answers the client (the whole point
+  of slice 1 above).
+- No published pointer outlives its object - the `pProc` question, asked once per slice.
+- `ninja test_gate` unchanged: the research gate is the guard on optimizer output.
+
+### 3.3 Slice A1: `compiler.cpp` - DONE
+
+**40 sites.** Not a mechanical conversion: the work was deciding, per site, between
+*returning a message* and *throwing*, because `compile()` already reports plan errors by
+return value and only used `FatalError` for what its author considered impossible.
+
+#### The bug this fixes
+
+`compiler::compile()` runs on **two threads**: the main thread at startup
+(`launcher.cpp:523`) and the communication thread for ad-hoc queries and plan reloads
+(`executorsmAdHoc.cpp:60,150`, `executorsmPlanReload.cpp:84,284`). `FatalError` ended the
+process in both, so **a malformed ad-hoc query killed the server** - every stream, for
+every client, because one person mistyped a step. `xqry -a 'select * stream b from
+s@(0,4)'` was enough. This is the same defect the RQL parser conversion fixed one level
+up on 2026-09-05, still present one level down.
+
+#### 6 of 40 are reachable by a user
+
+Classified by reading what guards each site and where its value comes from - whether the
+condition derives from user-written RQL tokens or from state an earlier pass established.
+
+| Line | Reachable by | Now |
+|---|---|---|
+| 226 | `FROM x & 0` | plan error |
+| 247 | `FROM x % 0` | plan error |
+| 273 | `FROM x - 0` | plan error |
+| 315 | `FROM x@(0,4)` | plan error |
+| 1013 | `SELECT x[_] ... FROM x@(1,0)` - a zero-length AGSE window gives an empty descriptor, so `[_]` has nothing to expand | plan error |
+| 1805 | an interval ratio extreme enough that the origin search passes `1<<24` before converging | plan error |
+
+The other 34 are compiler invariants - pipeline state an earlier pass guarantees, regexes
+the compiler wrote itself, program sizes fixed by the grammar - and became
+`rdb::LogicError`, which is deliberately **not** caught at the boundary. A broken
+invariant is a bug in this code, not in the user's plan, and must not come back to a
+client as "your query is wrong".
+
+Two of the six were not signposted by their message text (1013 and 1805 read like
+invariants), and two that read like user errors are not: 1589 (`AGSE step` again) and
+1706 (`dump range invalid`) are pre-gated upstream - by site 315 and by
+`RQLParser::buildRule` respectively, the latter with a comment naming this very
+`FatalError` as its reason. **Both stay BUG only because of that gate; if either gate is
+reordered or removed, they must be reclassified.**
+
+#### The mechanism
+
+`PlanError`, a file-local type carrying a message, thrown by the six and caught by a
+function-try-block on `compile()`, which returns it as the status string. The same
+pattern `RQLSyntaxError` uses in `RQLParser.cpp`, for the same reason: the errors are
+detected a dozen frames below a function whose contract is to return a status, and
+threading returns through every pass would change the signature of each one.
+
+#### What else had to move
+
+- **`presenter.cpp:611`** got the `catch (const rdb::Error &)` that `executorsm::run()`
+  got in 2a - without it a compile-path engine error left the presenter as `EINTR` (4),
+  the code for "interrupted", when nothing interrupted anything.
+- **`fatal_exit_path` path 2 was rewritten, because this slice removes its premise.** It
+  asserted that an ad-hoc `@(0,4)` kills the server cleanly with exit 1. That assertion
+  was a correct test of a *defect*: it verified the tidiness of the crash rather than
+  questioning the crash. It now asserts that the client gets the error and the server
+  keeps serving. The exit-path mechanism it originally guarded is still covered, by the
+  `RDB_FAULT_*_IN_SLOT` hooks, which do not depend on any RQL still reaching a fatal error.
+- **Two `EXPECT_DEATH` tests in `test_compiler.cpp` flipped to `EXPECT_THROW`.**
+
+#### A separate defect found while classifying, not fixed here
+
+Site 2294 (`substrate name denotes two different programs`) looked user-reachable via a
+readable-name collision - `FROM a # b_c` and `FROM a_b # c` both composing
+`STREAM_HASH_a_b_c`. It is not, and the reason is worse than if it were:
+`qTree::topologicalSort()` (`qTree.cpp:25`) rebuilds the vector from name-keyed maps and
+therefore **silently drops one of two same-id queries**, and `expandSchemaWildcards`
+calls it before this check can run. So that collision does not reach a diagnostic - it
+produces a quietly wrong plan, with one substrate gone and its consumer reading the
+other's data. Worth its own issue; it is not a phase-1 problem and converting it would
+not have surfaced it.
+
+#### Still to do in §3 item 2
+
+`RQLParser.cpp` (6), `qTree.cpp` (3), `query.cpp` (3), `field.cpp` (1) are **slice A2**,
+split off because they need a different mechanism: all six `RQLParser.cpp` sites sit
+inside `class ParserListener`, so they need the `removeParseListeners()` discipline from
+§1 trap 2 before throwing. At least one is plainly user-reachable -
+`exitFraction: denominator is zero`, written as `x & 1/0`. Then contexts B and C, per
+§3.2.5.
 
 ## 4. Where stage 1a left things
 

@@ -13,6 +13,7 @@
 #include <boost/rational.hpp>
 #include <boost/system/error_code.hpp>
 
+#include "rdb/exceptions.hpp"
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/exprSimplify.hpp"
 #include "retractor/lib/planSource.hpp"
@@ -836,8 +837,17 @@ TEST(xcompiler, unresolved_node_is_a_compilation_error) {
   // wersja przepisywala konsumentowi ciche zero.
   const std::map<std::string, int> partial{{"src", 0}};
 
-  EXPECT_DEATH(
-      { requireResolvedForEveryNode(plan, partial, "test", "startup latency"); }, "unresolved startup latency for 'consumer'");
+  // Rzut, nie smierc procesu: plaster A1 fazy 1. Bramka pilnuje NIEZMIENNIKA kompilatora,
+  // wiec zglasza go rdb::LogicError - nie wraca statusem, bo nie jest bledem planu
+  // uzytkownika, tylko bledem w tym kodzie.
+  EXPECT_THROW({ requireResolvedForEveryNode(plan, partial, "test", "startup latency"); }, rdb::LogicError);
+
+  try {
+    requireResolvedForEveryNode(plan, partial, "test", "startup latency");
+    FAIL() << "expected LogicError";
+  } catch (const rdb::LogicError &error) {
+    EXPECT_NE(std::string(error.what()).find("unresolved startup latency for 'consumer'"), std::string::npos) << error.what();
+  }
 }
 
 // Kontrola aparatury do testu wyzej: przy komplecie wynikow bramka musi milczec.
@@ -1266,12 +1276,11 @@ TEST(xcompiler, malformed_intermediate_operator_is_rejected_before_iterator_unde
   malformed.lProgram.emplace_back(STREAM_TIMEMOVE);
   instance.push_back(malformed);
 
-  EXPECT_DEATH(
-      {
-        compiler compilerInstance(instance);
-        (void)compilerInstance.compile();
-      },
-      "operator 'STREAM_HASH' in query 'malformed' has 0 preceding tokens, needs 2");
+  // Niezmiennik kompilatora wychodzi Z compile() rzutem: catch na granicy lapie wylacznie
+  // PlanError, czyli bledy PLANU. Blad w samym kompilatorze ma dolecie tam, gdzie konczy
+  // sie proces, a nie wrocic do klienta jako "twoje zapytanie jest zle".
+  compiler compilerInstance(instance);
+  EXPECT_THROW((void)compilerInstance.compile(), rdb::LogicError);
 }
 
 // --- Issue 236: reduktor w postaci funkcyjnej SUMC()/MIN()/MAX()/AVG() ------------
@@ -3801,4 +3810,73 @@ TEST(xparser, rejects_misplaced_duplicate_or_conflicting_persistence) {
     testing::internal::GetCapturedStderr();
     EXPECT_NE(result, "OK") << source;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Faza 1, plaster A1: blad PLANU wraca statusem, nie zabija procesu.
+//
+// Szesc miejsc w kompilatorze jest osiagalnych zwyklym RQL-em. Do A1 kazde z nich wolalo
+// FatalError, czyli std::exit - a `compile()` biegnie takze w WATKU KOMUNIKACYJNYM
+// (executorsmAdHoc, executorsmPlanReload), wiec bledne zapytanie klienta zabijalo serwer.
+// Teraz kazde wraca zdaniem dla autora zapytania, ta sama droga co pozostale bledy planu.
+//
+// Testy nie moglyby istniec wczesniej: kazdy z nich zakonczylby binarke testow.
+// ---------------------------------------------------------------------------
+TEST(xcompiler, zero_dehash_divisor_is_a_plan_error) {
+  const auto result = compileRql(
+      "DECLARE v INTEGER STREAM src, 1 FILE 'a.txt'\n"
+      "SELECT * STREAM y FROM src & 0");
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("must not be zero"), std::string::npos) << result;
+}
+
+TEST(xcompiler, zero_dehash_modulo_is_a_plan_error) {
+  const auto result = compileRql(
+      "DECLARE v INTEGER STREAM src, 1 FILE 'a.txt'\n"
+      "SELECT * STREAM y FROM src % 0");
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("must not be zero"), std::string::npos) << result;
+}
+
+TEST(xcompiler, zero_subtract_interval_is_a_plan_error) {
+  const auto result = compileRql(
+      "DECLARE v INTEGER STREAM src, 1 FILE 'a.txt'\n"
+      "SELECT * STREAM y FROM src - 0");
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("must be > 0"), std::string::npos) << result;
+}
+
+/// Ten przypadek pinuje rowniez sciezke 2 testu integracyjnego fatal_exit_path: to jest
+/// zapytanie, ktorym klient zabijal serwer.
+TEST(xcompiler, zero_agse_step_is_a_plan_error) {
+  const auto result = compileRql(
+      "DECLARE v INTEGER STREAM src, 1 FILE 'a.txt'\n"
+      "SELECT * STREAM y FROM src@(0,4)");
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("AGSE step"), std::string::npos) << result;
+}
+
+/// Okno AGSE o dlugosci zero daje PUSTY deskryptor zrodla (query::descriptorFrom iteruje
+/// `for (i=0; i<abs(length); i++)`), wiec `[_]` nie ma czego rozwinac. Komunikat mowi o
+/// oknie, bo to okno napisal uzytkownik - dawny tekst mowil o "flat size".
+TEST(xcompiler, zero_width_agse_window_under_wildcard_is_a_plan_error) {
+  const auto result = compileRql(
+      "DECLARE v INTEGER STREAM src, 1 FILE 'a.txt'\n"
+      "SELECT src[_] STREAM y FROM src@(1,0)");
+  EXPECT_NE(result, "OK");
+}
+
+/// Po bledzie planu kompilator musi dac sie uzyc ponownie w tym samym procesie - inaczej
+/// serwer, ktory przezyl bledne zapytanie ad-hoc, nie obsluzylby juz poprawnego. To jest
+/// odpowiednik TEST(xparser, parse_failure_does_not_poison_the_next_parse) o pietro wyzej.
+TEST(xcompiler, a_rejected_plan_does_not_poison_the_next_compile) {
+  const auto rejected = compileRql(
+      "DECLARE v INTEGER STREAM src, 1 FILE 'a.txt'\n"
+      "SELECT * STREAM y FROM src@(0,4)");
+  ASSERT_NE(rejected, "OK");
+
+  const auto accepted = compileRql(
+      "DECLARE v INTEGER STREAM src, 1 FILE 'a.txt'\n"
+      "SELECT * STREAM y FROM src");
+  EXPECT_EQ(accepted, "OK") << accepted;
 }

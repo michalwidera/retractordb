@@ -11,9 +11,10 @@
 #      pusty, wiec makro wolalo should_log() na wskazniku zerowym: SIGSEGV, kod 139.
 #
 #   2. cleanup() robil bt.join() takze wtedy, gdy sam biegl w watku komunikacyjnym -
-#      a biegnie tam, bo getAdHoc() wola compile(), a kompilator ma wiele wywolan
+#      a biegl tam, bo getAdHoc() wola compile(), a kompilator mial wtedy wiele wywolan
 #      FatalError. join() na watku biezacym rzuca std::system_error, wyjatek z handlera
 #      atexit to std::terminate: SIGABRT, kod 134.
+#      (Plaster A1 fazy 1 usunal te droge u zrodla - patrz sciezka 2 nizej.)
 #
 # Test sprawdza te sciezki po kodzie wyjscia, bo to jedyna wielkosc, ktora odroznia
 # zakonczenie czyste (1) od segfaultu (139) i od abortu (134).
@@ -35,21 +36,54 @@ if [ "$status" -ne 1 ]; then
   exit 1
 fi
 
-# --- Sciezka 2: blad krytyczny w WATKU KOMUNIKACYJNYM, przy zapytaniu ad hoc. ---
-# `@(0,4)` ma krok zerowy, co kompilator odrzuca przez FatalError.
+# --- Sciezka 2: bledne zapytanie ad hoc NIE konczy serwera. ---
+#
+# Ta sciezka badala kiedys cos odwrotnego. Do plastra A1 fazy 1 `@(0,4)` - krok zerowy -
+# konczylo sie w kompilatorze wywolaniem FatalError, czyli std::exit W WATKU KOMUNIKACYJNYM,
+# i test sprawdzal, ze proces ginie CZYSTO (kodem 1, a nie SIGABRT-em z join() na watku
+# biezacym). Bylo to sprawdzenie sensowne - ale sprawdzalo porzadne wykonanie USTERKI:
+# klient, ktory wpisal bledne zapytanie, zabijal cudzy serwer razem ze wszystkimi
+# strumieniami. Dokladnie ta sama usterka, ktora na sciezce RQL naprawiono 2026-09-05.
+#
+# Po A1 kompilator zglasza bledy planu statusem (PlanError -> compiler::compile()), wiec
+# test sprawdza to, co ma sie dziac: serwer odpowiada bledem i ZYJE DALEJ. Kod wyjscia
+# ogladamy dopiero po zatrzymaniu go regularnie.
+#
+# Sam mechanizm wyjscia z watku komunikacyjnego nie przestal byc wart pilnowania - pilnuja
+# go sciezki 3-6 przez haki RDB_FAULT_*_IN_SLOT, ktore nie zaleza od tego, czy jakikolwiek
+# RQL nadal prowadzi do bledu krytycznego.
 rm -rf ./temp && mkdir -p ./temp
-rm -f ./*.desc ./*.meta ./*.shadow
+rm -f ./*.desc ./*.meta ./*.shadow ./adhoc.out
 xretractor query.rql -c >/dev/null
 server_start query.rql -m 400 -k -r
 
-xqry -a 'select * stream bad from src@(0,4)' >/dev/null 2>&1 || true
+xqry -a 'select * stream bad from src@(0,4)' >adhoc.out 2>&1 || true
 
-status=$(server_wait_status)
-if [ "$status" -ne 1 ]; then
-  echo "blad krytyczny w watku komunikacyjnym: kod wyjscia $status, oczekiwano 1"
-  echo "  (134 = SIGABRT z join() na watku biezacym albo z destruktora std::thread)"
+if ! kill -0 "$_server_pid" 2>/dev/null; then
+  echo "bledne zapytanie ad hoc zabilo serwer - regresja plastra A1"
   exit 1
 fi
+
+# Komunikat ma dojsc DO KLIENTA, a nie zostac w logu serwera: o bledzie w swoim zapytaniu
+# dowiaduje sie ten, kto je napisal.
+if ! grep -qi "step" adhoc.out; then
+  echo "serwer przezyl, ale klient nie dostal komunikatu o kroku AGSE:"
+  cat adhoc.out
+  exit 1
+fi
+
+# Serwer jest zdrowy: kolejne, poprawne zapytanie ad hoc nadal dziala.
+if ! xqry -a 'select * stream good from src' >/dev/null 2>&1; then
+  echo "serwer przezyl bledne zapytanie, ale nie obsluguje juz poprawnych"
+  exit 1
+fi
+
+# Zatrzymanie i kontrola kodu wyjscia ta sama droga co w adhoc_parse_error, ktory bada
+# blizniaczy przypadek o pietro wyzej (bledna SKLADNIA ad-hoc, naprawiona 2026-09-05).
+# server_wait_exit zna umowe: 0 albo 143, cokolwiek innego wypisuje i oblewa. Wlasna
+# kontrola dublowala te wiedze i rozjechala sie z nia.
+xqry -k
+server_wait_exit
 
 # --- Sciezki 3 i 4: blad krytyczny w SLOCIE przetwarzania. ---
 # Do 2026-09-14 proces w ogole sie nie konczyl. dataModel::processRows() trzyma core_mutex,
