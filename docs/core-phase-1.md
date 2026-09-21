@@ -2,15 +2,17 @@
 
 **Status:** slice 1 (§2) and all of §3 item 1 are **done** - `src/rdb` no longer
 contains a single `FatalError` call site. §3 item 2 is under way: it was surveyed first
-(§3.2), and slices A1 (`compiler.cpp`, §3.3) and A2 (the parser and plan model, §3.4) are
-**done**. §3 item 3 is not started.
+(§3.2), and slices A1 (`compiler.cpp`, §3.3), A2 (the parser and plan model, §3.4) and C
+(the communication thread, §3.5) are **done**. §3 item 3 is not started.
 Stage 1a (`9a1e72eb`) is this phase's test harness. **Prerequisite for:** everything
 above the storage layer, in all three embedding targets - see
 [`embedded-roadmap.md`](embedded-roadmap.md).
 
-After A2: **89 `FatalError` call sites** in `src/`, all in `src/retractor/lib` and all in
-contexts B and C. (221 at `f22cffe0`; 142 after 2b; 102 after A1.) The storage layer is at zero. (At `f22cffe0` it was 221 total -
-79 in `src/rdb/lib`, 142 in `src/retractor/lib`.) No bare `exit()` anywhere in the tree.
+After C: **80 `FatalError` call sites** in `src/`, all in `src/retractor/lib` and all in
+context B, the tick path. (221 at `f22cffe0`; 142 after 2b; 102 after A1; 89 after A2.)
+Contexts A and C are at zero, and so is the storage layer. (At `f22cffe0` it was 221
+total - 79 in `src/rdb/lib`, 142 in `src/retractor/lib`.) No bare `exit()` anywhere in
+the tree.
 
 `FatalError` ends with `std::exit(EXIT_FAILURE)` (`src/include/fatalError.hpp:51`).
 At `f22cffe0` there are **221 call sites** in `src/` - 79 in `src/rdb/lib`, 142 in
@@ -289,8 +291,28 @@ section is the answer to it, gathered before any conversion.
 | Context | Files | Sites |
 |---|---|---|
 | **A. Plan build** - startup and, separately, the comms thread | `compiler.cpp` 40, `RQLParser.cpp` 6, `qTree.cpp` 3, `query.cpp` 3, `field.cpp` 1 | **53** |
-| **B. Tick path** - under `core_mutex`, inside `plan_epoch_mutex` | `dataModel.cpp` 25, `streamInstance.cpp` 22, `expressionEvaluator.cpp` 10, `CRSMath.cpp` 2 | **59** |
-| **C. Communication thread** - under `plan_epoch_mutex` | `dumpManager.cpp` 17, `executorsmCommands.cpp` 5, `executorsmAdHoc.cpp` 5, `executorsmPlanReload.cpp` 2, `executorsm.cpp` 1 | **30** |
+| **B. Tick path** - under `core_mutex`, inside `plan_epoch_mutex` | `dataModel.cpp` 25, `streamInstance.cpp` 22, `dumpManager.cpp` 17, `expressionEvaluator.cpp` 10, `CRSMath.cpp` 2, `executorsmCommands.cpp` 2, `executorsm.cpp` 1, `executorsmPlanReload.cpp` 1 | **80** |
+| **C. Communication thread** - under `plan_epoch_mutex` | `executorsmAdHoc.cpp` 5, `executorsmCommands.cpp` 3, `executorsmPlanReload.cpp` 1 | **9** |
+
+**Corrected 2026-09-21, when slice C started.** The first version of this table put 30
+sites in context C, all of `dumpManager.cpp`, `executorsmCommands.cpp`,
+`executorsmAdHoc.cpp`, `executorsmPlanReload.cpp` and one in `executorsm.cpp`. That
+grouping was made **by filename**, and the table's own heading says thread - the two do
+not agree. Tracing the callers moved 21 of the 30 into context B:
+
+| Sites | Reached from | Thread |
+|---|---|---|
+| `dumpManager.cpp` 17 | `streamInstance.cpp:560,578,597` | tick path |
+| `executorsmCommands.cpp` 239,241 (`printRowValue`) | `IpcServer::broadcast` <- `executorsm.cpp:431,534` | tick path |
+| `executorsm.cpp` 161 (`getAwaitedStreamsSet`) | `executorsm.cpp:520` | tick path |
+| `executorsmPlanReload.cpp` 317 (`applyPendingPlan`) | `executorsm.cpp:579` | tick path |
+
+`dumpManager` is the instructive one: it is a member of `streamInstance`, so the
+assumption that it is reached "through `pProc` from the comms thread" reads plausibly
+and is wrong - the comms thread never calls it. Nothing was lost by the error, because
+all 21 already sit under `executorsm::run()`'s `catch (const rdb::Error&)` from 2a. What
+the correction changes is **which slice owns the decision**: these are tick-path
+semantics, and they get decided in B.
 
 The grouping is the whole point: **a failure in context A at startup should end the
 process, and the same failure in context A on the comms thread must not.**
@@ -360,11 +382,10 @@ it stops a malformed ad-hoc query from killing the server - and the receiving ca
 work is the A-startup / A-comms split: `compile()` must return a status where it returns
 one today and throw where the process should end. Fix `presenter.cpp:611` with it.
 
-**2. Context C, the communication thread (30 sites).** `dumpManager` is 17 of them and
-is a member of `streamInstance` reached through `pProc` from the comms thread, so it
-depends on `EpochPublication` already being in place - which it is.
+**2. Context C, the communication thread (9 sites, after the correction above).** Small,
+but it needs a transport boundary built first - see §3.5.
 
-**3. Context B, the tick path (59 sites), minus `expressionEvaluator`.** Both locks
+**3. Context B, the tick path (80 sites), minus `expressionEvaluator`.** Both locks
 unwind cleanly and `EpochPublication` covers the model, so the mechanical risk is lower
 than it looks. `RDB_FAULT_THROW_IN_SLOT` already exercises this exact path.
 
@@ -527,6 +548,78 @@ The per-line string-literal balance check added after A1 reported 206 failures i
 which a line legitimately carries an odd number of quotes. The checker now strips raw
 strings before reasoning per line. A verification tool that cries wolf is worse than none,
 because the next real failure is read as noise.
+
+### 3.5 Slice C: the communication thread - DONE
+
+Nine sites, all of them "unreachable" invariants: three null-pointer checks
+(`collectStreamsParameters` 2, `commandProcessor` 1), five in `getAdHoc` (an exhausted
+keyword filter, two bus statuses the ad-hoc path cannot produce, two null pointers) and
+one bus status in `validatePlanText`. All nine became `rdb::LogicError`. None is a user
+error, so none needed `ConfigError`: a client typo is answered on the normal path long
+before any of these.
+
+#### The prerequisite: the comms thread had no boundary at all
+
+`IpcServer::commandLoop()` had exactly one handler, `catch (IPC::interprocess_exception&)`,
+written for **failed construction** of the IPC resources. Anything else leaving the loop
+body also leaves the thread lambda in `IpcServer::start()` - which is `std::terminate`.
+
+That is a *worse* exit than the one being replaced. `std::exit` runs `atexit`, so
+`executorsm::cleanup()` removes the segment, the command queue and the named mutex;
+`std::terminate` runs none of it, and the next start finds those objects still in shared
+memory. Converting even one comms-thread site without a boundary would therefore have
+been a regression, not an improvement.
+
+Two roads to `std::terminate` were already open there, independent of this refactor:
+`read_info()` on a malformed message, and `lexical_cast<int>` on a missing `db.id`. Both
+are now logged drops.
+
+The per-message body is wrapped, and `clientProcessId` is extracted **before** the
+dispatch, because on the error path it is what decides whether there is anyone to answer.
+A consequence worth recording: a message with no `db.id` is now dropped before handling,
+which makes the `'show'` handler's own `db.id` check unreachable from this loop. The
+check stays as a guard for any other caller, with a comment saying so.
+
+`IPC::interprocess_exception` is rethrown to the outer handler, deliberately, so that
+this change does not quietly re-decide IPC failure policy. That handler labels a failure
+from `mymap->insert()` as "IPC resources could not be created", which is wrong - it is
+noted here rather than fixed, because fixing it is a decision about failure policy and
+not about exception plumbing.
+
+#### The catch that was about to mislabel them
+
+`commandProcessor` already ends in `catch (std::exception&)` returning
+`error.response: "command processor failure: ..."`. `rdb::Error` derives from it, so the
+moment these nine throw, an engine invariant would be reported to the client under a
+label written for a failure of the **dispatcher**. This is the third instance of the same
+trap in this refactor - `executorsm::run()`'s IPC catch in 2a, `presenter.cpp`'s in A1 -
+and the fix is the same: `catch (const rdb::Error&)` placed ahead of it.
+
+The `coreInstancePtr` check in `commandProcessor` also had to move *inside* the try. It
+sat above it, where a throw would bypass the function's own error boundary and land in
+the transport backstop - which is a last resort, not a reporting channel. Under
+`std::exit` the placement made no difference, which is why it was there.
+
+#### What the test asserts
+
+`it_fatal_exit_path` path 7, driven by `RDB_FAULT_THROW_IN_COMMAND`. The hook lives in
+the `.onCommand` lambda in `executorsm.cpp`, not in `ipcServer.cpp`: that keeps the
+transport free of protocol knowledge, and it throws from exactly the place the backstop
+exists for - past `commandProcessor`'s own catch. It is keyed on the command **name** so
+that `kill` stays reachable while the hook is armed.
+
+The path asserts the whole contract: the server lives, the client's log carries the
+reason over IPC rather than the silence it would otherwise wait out, `hello` still works
+afterwards, and shutdown is regular. It is the deliberate counterpart to
+`it_show_handler_failure`, which exercises the same client-visible outcome one floor up,
+inside the handler.
+
+#### One difference from every slice before it
+
+In contexts A and B the answer to "what should happen when the invariant breaks" is
+*end the epoch* or *end the process*. Here it is neither: the service keeps running and
+one client gets an error. That is the first place in this refactor where an engine
+invariant violation is **not** fatal to anything except the request that triggered it.
 
 ## 4. Where stage 1a left things
 

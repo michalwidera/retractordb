@@ -1,6 +1,6 @@
 # Blad krytyczny konczy proces czysto (EXIT_FAILURE), a nie SIGSEGV-em ani
-# SIGABRT-em ani zawieszeniem. Uzasadnienie czterech sprawdzanych sciezek stoi w
-# run.sh.
+# SIGABRT-em ani zawieszeniem, a wyjatek, ktorego nikt nie lapie, nie konczy go przez
+# std::terminate. Uzasadnienie siedmiu sprawdzanych sciezek stoi w run.sh.
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
@@ -10,4 +10,4 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash run.sh)
 
-set_tests_properties(${TestID}-run PROPERTIES TIMEOUT 90)
+set_tests_properties(${TestID}-run PROPERTIES TIMEOUT 120)

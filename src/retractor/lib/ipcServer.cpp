@@ -297,30 +297,75 @@ void IpcServer::commandLoop() const {
         std::stringstream strstream;
         strstream << message.data();
         memset(message.data(), 0, ipc::kQueryQueueMaxMessageSize);
-        ptree pt;
-        read_info(strstream, pt);
-        ptree pt_retval = callbacks_.onCommand(pt);
-        // Sygnal idzie PO obsludze komendy, nie po jej odebraniu. Jedynym jego odbiorca jest
-        // bramka --xqrywait, a bramka zdjeta w chwili ODEBRANIA komendy wpuszczala watek
-        // przetwarzania jeszcze przed rejestracja subskrybenta: dla 'show' znaczylo to slot
-        // wyemitowany do klienta, ktorego kolejki odpowiedzi jeszcze nie ma, a takiego wiersza
-        // nikt juz nie odzyska. Samo subscribe() jest oslonione blokada epoki -- tej samej,
-        // ktora bierze slot -- wiec wyscig rozstrzygal sie na ZAJECIU tej blokady: wygrywal
-        // ten, kto siegnal po nia pierwszy. Przesuniecie sygnalu zamienia ten wyscig na
-        // porzadek: gdy bramka opada, subskrypcja jest juz w mapach IpcServer.
-        // Kontrakt bramki jest nietkniety -- podnosi ja nadal KAZDA komenda, takze 'hello'
-        // (patrz it_xqrywait_gate).
-        callbacks_.onCommandHandled();
-        int clientProcessId = boost::lexical_cast<int>(pt.get("db.id", ""));
-        // Sending answer
-        std::stringstream response_stream;
-        write_info(response_stream, pt_retval);
-        IPCString ipcResponse(allocatorShmemMapInstance);
-        ipcResponse = response_stream.str().c_str();
-        // cppcheck-suppress danglingTemporaryLifetime
-        {
-          IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
-          mymap->insert(std::pair<int, IPCString>(clientProcessId, ipcResponse));
+        // ZAPORA WATKU KOMUNIKACYJNEGO. Jedynym catch-em tej funkcji byl dotad ten na dole,
+        // na IPC::interprocess_exception, postawiony dla NIEUDANEJ BUDOWY zasobow. Cokolwiek
+        // innego wyleci z tresci petli, opuszcza commandLoop(), a za nim lambde watku ze
+        // start() -- czyli std::terminate. To jest GORSZE niz std::exit, ktory tu zastepujemy:
+        // terminate nie uruchamia handlerow atexit, wiec segment, kolejka komend i muteks
+        // nazwany zostaja w pamieci dzielonej, a nastepny start trafia na nie.
+        //
+        // Zapora musi wiec stanac PRZED pierwsza zamiana FatalError na wyjatek po tej stronie.
+        // Dwie drogi do std::terminate byly tu zreszta juz wczesniej, niezaleznie od refaktoru:
+        // read_info() na znieksztalconej wiadomosci i lexical_cast na braku db.id.
+        try {
+          ptree pt;
+          read_info(strstream, pt);
+          // Numer klienta zdejmowany PRZED obsluga komendy: na sciezce bledu to on rozstrzyga,
+          // czy jest komu odeslac odpowiedz. Wiadomosc bez niego zostaje odrzucona, bo wpis do
+          // mapy nie mialby klucza, pod ktorym ktokolwiek go szuka. Kontrola 'db.id' w handlerze
+          // 'show' staje sie przez to nieosiagalna z tej petli; zostaje jako oslona handlera,
+          // gdyby kiedys wywolal go ktos inny.
+          const std::string clientId = pt.get("db.id", "");
+          if (clientId.empty()) {
+            SPDLOG_ERROR("Command without db.id dropped: there is no response queue to answer on.");
+            continue;
+          }
+          const int clientProcessId = boost::lexical_cast<int>(clientId);
+          ptree pt_retval;
+          try {
+            pt_retval = callbacks_.onCommand(pt);
+          } catch (const std::exception &ex) {
+            // Handler komendy ma wlasny catch(std::exception) i sam opisuje awarie klientowi;
+            // tutaj trafia tylko to, co wyleci POZA nim. Odpowiedz jest obowiazkowa: klient czeka
+            // na wpis w mapie i bez niego melduje brak kolejki odpowiedzi, czyli wskazuje winnego
+            // po niewlasciwej stronie IPC. Usluga biegnie dalej -- jedno wadliwe zadanie nie jest
+            // powodem, zeby przestac obslugiwac pozostale.
+            SPDLOG_CRITICAL("Command handler escaped its own boundary: {}", ex.what());
+            pt_retval.clear();
+            pt_retval.put("error.response", std::string("command handler failure: ") + ex.what());
+          }
+          // Sygnal idzie PO obsludze komendy, nie po jej odebraniu. Jedynym jego odbiorca jest
+          // bramka --xqrywait, a bramka zdjeta w chwili ODEBRANIA komendy wpuszczala watek
+          // przetwarzania jeszcze przed rejestracja subskrybenta: dla 'show' znaczylo to slot
+          // wyemitowany do klienta, ktorego kolejki odpowiedzi jeszcze nie ma, a takiego wiersza
+          // nikt juz nie odzyska. Samo subscribe() jest oslonione blokada epoki -- tej samej,
+          // ktora bierze slot -- wiec wyscig rozstrzygal sie na ZAJECIU tej blokady: wygrywal
+          // ten, kto siegnal po nia pierwszy. Przesuniecie sygnalu zamienia ten wyscig na
+          // porzadek: gdy bramka opada, subskrypcja jest juz w mapach IpcServer.
+          // Kontrakt bramki jest nietkniety -- podnosi ja nadal KAZDA komenda, takze 'hello'
+          // (patrz it_xqrywait_gate), a od tej zmiany takze komenda, ktora sie wywrocila.
+          callbacks_.onCommandHandled();
+          // Sending answer
+          std::stringstream response_stream;
+          write_info(response_stream, pt_retval);
+          IPCString ipcResponse(allocatorShmemMapInstance);
+          ipcResponse = response_stream.str().c_str();
+          // cppcheck-suppress danglingTemporaryLifetime
+          {
+            IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
+            mymap->insert(std::pair<int, IPCString>(clientProcessId, ipcResponse));
+          }
+        } catch (const IPC::interprocess_exception &) {
+          // Bez zmiany zachowania: obsluga zasobow IPC nalezy do catch-a ponizej, ktory melduje
+          // awarie i wola onFailure(). Etykieta "could not be created" jest dla wyjatku z insert()
+          // mylaca, ale rozstrzyganie polityki awarii IPC nie nalezy do tej zmiany.
+          throw;
+        } catch (const std::exception &ex) {
+          // Wiadomosc, ktorej nie da sie ani rozebrac, ani odeslac. Nie ma komu odpowiedziec,
+          // wiec zostaje w dzienniku, a petla odbiera nastepna.
+          SPDLOG_ERROR("Malformed command dropped: {}", ex.what());
+        } catch (...) {
+          SPDLOG_ERROR("Command dropped after a non-standard exception.");
         }
       }
       std::this_thread::sleep_for(ipc::kQueuePollInterval);

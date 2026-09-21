@@ -19,8 +19,10 @@
 # Test sprawdza te sciezki po kodzie wyjscia, bo to jedyna wielkosc, ktora odroznia
 # zakonczenie czyste (1) od segfaultu (139) i od abortu (134).
 #
-# Sciezki 5 i 6 (na koncu pliku) robia to samo dla WYJATKU zamiast std::exit - droga, ktora
-# faza 1 refaktoru czyni normalna dla bledow warstwy magazynu.
+# Sciezki 5 i 6 robia to samo dla WYJATKU zamiast std::exit - droga, ktora faza 1 refaktoru
+# czyni normalna dla bledow warstwy magazynu. Sciezka 7 bada granice watku komunikacyjnego,
+# gdzie niezatrzymany wyjatek nie konczy procesu przez std::exit, tylko przez std::terminate -
+# czyli Z POMINIECIEM handlerow atexit, wiec jeszcze brudniej.
 set -e
 . "$(dirname "$0")/../portable.sh"
 . "$(dirname "$0")/../serverlib.sh"
@@ -207,6 +209,57 @@ throw_in_slot() {
 
 throw_in_slot "wyjatek w slocie bez klienta" ""
 throw_in_slot "wyjatek w slocie z komenda klienta na blokadzie epoki" client
+
+# --- Sciezka 7: WYJATEK POZA granica bledu handlera komendy. ---
+#
+# commandProcessor() ma wlasny catch(std::exception) i sam opisuje awarie klientowi -- pilnuje
+# tego it_show_handler_failure przez hak RDB_FAULT_SHOW. Ta sciezka bada pietro NIZEJ: wyjatek,
+# ktory przechodzi OBOK tego catch-a. Jedynym catch-em w IpcServer::commandLoop() byl do tej
+# zmiany ten na IPC::interprocess_exception, postawiony dla nieudanej budowy zasobow, wiec
+# cokolwiek innego wychodzilo z petli, wychodzilo tez z lambdy watku ze start() -- czyli
+# std::terminate. Jest to wyjscie GORSZE od std::exit, ktory refaktor tu zastepuje: terminate
+# nie uruchamia handlerow atexit, wiec executorsm::cleanup() sie nie wykonuje i segment, kolejka
+# komend oraz muteks nazwany zostaja w pamieci dzielonej dla nastepnego startu.
+#
+# Hak RDB_FAULT_THROW_IN_COMMAND rzuca z lambdy .onCommand, czyli dokladnie tam: za granica
+# handlera, przed transportem. Jest zawezony do NAZWY komendy, zeby 'kill' pozostalo osiagalne.
+# Sprawdzamy caly kontrakt zapory: usluga zyje, klient dostaje POWOD (a nie cisze, na ktora
+# czekalby do limitu), kolejne komendy nadal dzialaja, a zatrzymanie jest regularne.
+rm -rf ./temp && mkdir -p ./temp
+rm -f ./*.desc ./*.meta ./*.shadow
+xretractor query.rql -c >/dev/null
+
+# Log klienta jest wspolny dla przestrzeni nazw i DOPISYWANY -- bez oproznienia sprawdzenie
+# ponizej lapaloby zdanie sasiada z tego samego slotu puli (patrz it_show_handler_failure).
+QRY_LOG="${TMPDIR:-/tmp}/xqry.log"
+: > "$QRY_LOG"
+
+export RDB_FAULT_THROW_IN_COMMAND=show
+server_start query.rql -m 400 -k -r
+unset RDB_FAULT_THROW_IN_COMMAND
+
+xqry -s w -m 2 >/dev/null 2>&1 || true
+
+if ! kill -0 "$_server_pid" 2>/dev/null; then
+  echo "wyjatek poza granica handlera zabil serwer - brak zapory w IpcServer::commandLoop()"
+  exit 1
+fi
+
+# Powod ma przyjsc linia IPC, a nie ze zmiennej srodowiskowej: klient jej nie widzi.
+if ! grep -F "RDB_FAULT_THROW_IN_COMMAND" "$QRY_LOG"; then
+  echo "zapora zatrzymala wyjatek, ale klient nie dostal powodu; tresc $QRY_LOG:"
+  cat "$QRY_LOG"
+  exit 1
+fi
+
+# Jedno wadliwe zadanie nie jest powodem, zeby przestac obslugiwac pozostale.
+if ! xqry -l >/dev/null 2>&1; then
+  echo "serwer przezyl wyjatek, ale nie obsluguje juz kolejnych komend"
+  exit 1
+fi
+
+xqry -k
+server_wait_exit
 
 # Blokada uslugi ma znikac SAMA. std::exit nie uruchamia destruktorow obiektow
 # automatycznych, wiec FlockServiceGuard::~FlockServiceGuard() przy bledzie krytycznym

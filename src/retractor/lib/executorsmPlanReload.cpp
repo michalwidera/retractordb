@@ -16,6 +16,7 @@
 #include "fatalError.hpp"
 #include "persistentCounter.hpp"
 #include "planSource.hpp"
+#include "rdb/exceptions.hpp"
 #include "serviceControl.hpp"
 
 // Przeladowanie calego planu (`xqry --reset`): trzyczesciowy transfer tekstu, jego walidacja
@@ -111,7 +112,7 @@ std::string executorsm::validatePlanText(const std::string &planText) {
       }
       case bus::ClaimStatus::ServiceConflict:
         // Nieosiagalne z tego samego powodu co w getAdHoc: reservePlan nie dotyka maski trybow.
-        FatalError("executorsm::validatePlanText: bus reported a service mode conflict");
+        throw rdb::LogicError("executorsm::validatePlanText: bus reported a service mode conflict");
         break;
       case bus::ClaimStatus::TooLarge:
       case bus::ClaimStatus::NoFreeSlot:

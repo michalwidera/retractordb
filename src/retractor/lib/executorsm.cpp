@@ -12,6 +12,7 @@
 #include <memory>
 #include <mutex>
 #include <print>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <utility>
@@ -233,7 +234,21 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   // Sending service in thread. Warstwa protokolu wchodzi do transportu przez te
   // cztery wywolania zwrotne -- IpcServer nie zna qTree, dataModel ani compilera.
   ipcServer.start({
-      .onCommand = [](const ptree &pt) { return executorsm::commandProcessor(pt); },
+      .onCommand =
+          [](const ptree &pt) {
+            // Hak diagnostyczny testu regresyjnego it_fatal_exit_path, sciezka 'throw_in_command'.
+            // Rzuca POZA wlasna granica bledu handlera: commandProcessor() ma swoj catch(std::exception)
+            // i wyjatku wypuszczonego STAD nie zlapie nikt po stronie silnika. Zatrzymac go ma zapora
+            // w IpcServer::commandLoop(); bez niej wychodzi z watku komunikacyjnego i konczy proces
+            // przez std::terminate -- Z POMINIECIEM handlerow atexit, wiec segment i kolejki zostaja
+            // w pamieci dzielonej. Warunkiem jest NAZWA komendy, zeby zatrzymanie serwera ('kill')
+            // pozostalo osiagalne mimo wlaczonego haka.
+            if (const char *faultyCommand = std::getenv("RDB_FAULT_THROW_IN_COMMAND");
+                faultyCommand != nullptr && pt.get("db.message", "") == faultyCommand)
+              throw std::runtime_error(std::string("RDB_FAULT_THROW_IN_COMMAND: wstrzyknieta awaria komendy '") +
+                                       faultyCommand + "'");
+            return executorsm::commandProcessor(pt);
+          },
       // Stan predykatu musi zmienic sie POD core_mutex. Watek glowny czeka na ipcReady
       // pod tym samym muteksem (ponizej), a cv.wait zwalnia go dopiero w chwili
       // zablokowania. Ustawienie flagi bez muteksu pozwalalo trafic w okno miedzy

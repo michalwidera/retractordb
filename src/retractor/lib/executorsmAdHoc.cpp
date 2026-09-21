@@ -1,5 +1,6 @@
 #include "executorsm.hpp"
 
+#include <format>
 #include <mutex>
 #include <string>
 #include <utility>
@@ -10,8 +11,8 @@
 #include "bus.hpp"
 #include "dataModel.hpp"
 #include "executorsmState.hpp"
-#include "fatalError.hpp"
 #include "planSource.hpp"
+#include "rdb/exceptions.hpp"
 #include "RQLParser.hpp"
 
 // Kanal ad-hoc: dolaczenie pojedynczej instrukcji SELECT/DECLARE albo reguly do planu, ktory
@@ -97,10 +98,11 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   auto [parseOut, first_keyword, stream_name] = parserRQLString(coreInstanceCopy, adHocQuery, statementKeywords);
 
   // Blad skladni rozstrzygamy PRZED first_keyword. Po bledzie parser zwraca "UNRECOGNIZED",
-  // a kontrole slowa kluczowego koncza sie ponizej FatalError-em, czyli smiercia serwera -
-  // tego samego, przed ktora broni usuniecie exit(EPERM) z listenerow (patrz RQLParser.cpp).
-  // Zalozenie "slowo kluczowe zawsze rozpoznane" bylo prawdziwe wylacznie dlatego, ze blad
-  // parsowania konczyl proces, zanim ta kontrola zdazyla je sprawdzic.
+  // a kontrola slowa kluczowego nizej traktuje kazde nieoczekiwane slowo jako USTERKE SILNIKA.
+  // Kolejnosc jest wiec tresciowa, nie porzadkowa: odwrocona, kazalaby literowke uzytkownika
+  // zglosic jako blad wewnetrzny. Do fazy 1 refaktoru ta kontrola konczyla proces (FatalError),
+  // wiec zalozenie "slowo kluczowe zawsze rozpoznane" bylo prawdziwe tylko dlatego, ze blad
+  // parsowania zabijal serwer, zanim zdazyla je sprawdzic (patrz exit(EPERM) w RQLParser.cpp).
   if (parseOut != "OK") {
     ptRetval.put(std::string("db"), "Fail parse:" + parseOut);
     SPDLOG_ERROR("Parse adhoc query failed: {}", parseOut);
@@ -139,7 +141,11 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   }
 
   if (first_keyword != "SELECT" && first_keyword != "DECLARE") {
-    FatalError("executorsm::getAdHoc: unexpected first_keyword '{}' after filtering - parser logic error", first_keyword);
+    // Filtr powyzej jest WYCZERPUJACY: kazde inne slowo kluczowe zostalo juz odeslane klientowi
+    // jako odmowa. Dotarcie tutaj znaczy, ze filtr i parser rozjechaly sie ze soba.
+    throw rdb::LogicError(
+        std::format("executorsm::getAdHoc: unexpected first_keyword '{}' after filtering - parser logic error",
+                    first_keyword));
   }
 
   // --until-eof jest trybem calego przebiegu. Deklaracja dolaczona pozniej musi
@@ -197,12 +203,12 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
       case bus::ClaimStatus::CounterConflict:
         // Nieosiagalne: ad-hoc nie przyjmuje :ROTATION (getAdHoc odrzuca dyrektywy wyzej),
         // wiec claimAdditional nigdy nie porownuje sciezki licznika.
-        FatalError("executorsm::getAdHoc: bus reported a rotation counter conflict for an adhoc query");
+        throw rdb::LogicError("executorsm::getAdHoc: bus reported a rotation counter conflict for an adhoc query");
         break;
       case bus::ClaimStatus::ServiceConflict:
         // Nieosiagalne: tryb pracy jest wlasnoscia URUCHOMIENIA i trafia do slotu wylacznie
         // w claim(); claimAdditional dopisuje nazwy strumieni i maski trybow nie oglada.
-        FatalError("executorsm::getAdHoc: bus reported a service mode conflict for an adhoc query");
+        throw rdb::LogicError("executorsm::getAdHoc: bus reported a service mode conflict for an adhoc query");
         break;
       case bus::ClaimStatus::TooLarge:
       case bus::ClaimStatus::NoFreeSlot: {
@@ -222,8 +228,8 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   std::vector<std::string> mergedIds;
   std::string compileChainResult;
   std::string addFailedId;
-  if (cmPtr == nullptr) FatalError("executorsm::getAdHoc: cmPtr is null");
-  if (pProc == nullptr) FatalError("executorsm::getAdHoc: pProc is null");
+  if (cmPtr == nullptr) throw rdb::LogicError("executorsm::getAdHoc: cmPtr is null");
+  if (pProc == nullptr) throw rdb::LogicError("executorsm::getAdHoc: pProc is null");
 
   // Publish the compiled tree and its runtime stream instances atomically with respect
   // to the execution loop.

@@ -18,6 +18,7 @@
 #include "executorsmState.hpp"
 #include "fatalError.hpp"
 #include "ipcServer.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/convertTypes.hpp"
 #include "shmBudget.hpp"
 
@@ -26,9 +27,9 @@
 using namespace esm;
 
 ptree executorsm::collectStreamsParameters() {
-  if (coreInstancePtr == nullptr) FatalError("executorsm::collectStreamsParameters: coreInstancePtr is null");
+  if (coreInstancePtr == nullptr) throw rdb::LogicError("executorsm::collectStreamsParameters: coreInstancePtr is null");
   ptree ptRetval;
-  if (pProc == nullptr) FatalError("executorsm::collectStreamsParameters: pProc is null");
+  if (pProc == nullptr) throw rdb::LogicError("executorsm::collectStreamsParameters: pProc is null");
   // Hak diagnostyczny testu regresyjnego it_service_reset_race, ta sama droga co RDB_FAULT_SHOW.
   //
   // Zwykle opoznienie tu nie wystarcza i zostalo odrzucone po probie: okno, w ktorym pProc jest
@@ -70,10 +71,13 @@ ptree executorsm::collectStreamsParameters() {
 }
 
 ptree executorsm::commandProcessor(const ptree &ptInval) {
-  if (coreInstancePtr == nullptr) FatalError("executorsm::commandProcessor: coreInstancePtr is null");
   ptree ptRetval;
   std::string command = ptInval.get("db.message", "");
   try {
+    // Kontrola stoi WEWNATRZ try, nie przed nim. Poza nim jej rzut omijalby wlasna granice bledu
+    // tej funkcji i ladowal w zaporze IpcServer::commandLoop() -- a zapora jest ostatnia deska
+    // ratunku transportu, nie kanalem raportowania silnika. Pod std::exit roznicy nie bylo.
+    if (coreInstancePtr == nullptr) throw rdb::LogicError("executorsm::commandProcessor: coreInstancePtr is null");
     // Hak diagnostyczny testu regresyjnego it_xqrywait_first_row, ta sama droga co
     // RDB_FAULT_PLAN_SWAP_DELAY. Rozciaga okno miedzy ODEBRANIEM komendy 'show' a jej
     // obsluga -- jedyne okno, w ktorym bramka --xqrywait zdejmowana na odbiorze wpuszczala
@@ -222,6 +226,18 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
   } catch (const boost::property_tree::ptree_error &e) {
     SPDLOG_ERROR("ptree fail: {}", e.what());
     ptRetval.put("error.response", std::string("ptree fail: ") + e.what());
+  } catch (const rdb::Error &error) {
+    // MUSI stac przed catch(std::exception) -- rdb::Error z niego dziedziczy. Bez tego blad
+    // silnika wracalby do klienta jako "command processor failure", czyli pod etykieta napisana
+    // dla awarii SAMEGO handlera. Ta sama pomylka wyszla na jaw w executorsm::run(), gdzie blad
+    // silnika raportowal catch napisany dla awarii IPC (faza 2a). Rozroznienie nie jest ozdoba:
+    // "command processor failure" kaze szukac usterki w dyspozytorze komend, a rdb::Error
+    // nazywa naruszony niezmiennik silnika.
+    //
+    // Sam proces ZYJE DALEJ. Bledny stan pojedynczej komendy nie jest powodem, zeby zatrzymac
+    // usluge -- inaczej niz w petli przetwarzania, gdzie ten sam wyjatek konczy epoke.
+    SPDLOG_CRITICAL("Engine invariant violated while handling command '{}': {}", command, error.what());
+    ptRetval.put("error.response", std::string("engine error: ") + error.what());
   } catch (std::exception &e) {
     // Bez tego wpisu awaria handlera jest dla klienta NIEODROZNIALNA od powodzenia:
     // 'show' nie wypelnia ptRetval nawet po udanej subskrypcji, wiec pusta odpowiedz
@@ -233,6 +249,12 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
   return ptRetval;  // sub for a while
 }
 
+/// Formatowanie wiersza do emisji. Mimo sasiedztwa z dyspozytorem komend ta funkcja NIE biegnie
+/// w watku komunikacyjnym: transport dostaje ja jako RowFormatter i wola z IpcServer::broadcast(),
+/// czyli z petli przetwarzania, pod clientMapsMutex_ i w srodku obiegu po subskrybentach. Oba
+/// bledy krytyczne ponizej naleza wiec do sciezki taktu (etap B), nie do tego pliku tematycznie --
+/// zamiana ich na rzut przerywa obieg w polowie i zostawia czesc subskrybentow bez wiersza, co
+/// jest decyzja o semantyce taktu, a nie o granicy komendy.
 std::string executorsm::printRowValue(const std::string &query_name) {
   using boost::property_tree::ptree;
   if (pProc == nullptr) return "";
