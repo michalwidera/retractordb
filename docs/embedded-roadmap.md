@@ -83,10 +83,14 @@ XCFramework needs Xcode and can only be produced on macOS, and the Android NDK
 toolchain is driven from Linux in this project's CI. `build-options.md` states how
 each flag behaves and what happens when it is requested on the wrong host.
 
-The **core phases** referenced above are the shared refactor, specified in the iOS
-roadmap: (1) `FatalError` becomes an exception, (2) de-globalize and inject a log
-sink, (3) `step()` and the removal of `_kbhit`, (4) push ingest, (5) the error
-taxonomy. Nothing above stage 1a can begin before phase 3.
+The **core phases** referenced above are the shared refactor: (1) `FatalError`
+becomes an exception, (2) de-globalize and inject a log sink, (3) `step()` and the
+removal of `_kbhit`, (4) push ingest, (5) the error taxonomy. Nothing above stage 1a
+can begin before phase 3.
+
+Phase 1 is specified in [`core-phase-1.md`](core-phase-1.md), down to the first
+slice and the file it starts in. The remaining phases are still only in the iOS
+roadmap draft.
 
 ## 5. Where the tree is now
 
