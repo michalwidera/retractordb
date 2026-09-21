@@ -1,5 +1,13 @@
 # Python API
 
+This package carries two independent halves. The **client** below talks to a running
+`xretractor` daemon and is pure Python. The **embedded engine**
+(`retractordb._core`) runs the engine in-process, needs no daemon, and is built
+only on request - see [`docs/build-options.md`](../../docs/build-options.md) and
+[`docs/jupyter-integration.md`](../../docs/jupyter-integration.md).
+
+## Client (xqry)
+
 Requires Linux, Python 3.10+, and matching `xqry` / `xretractor` binaries. There are no runtime dependencies outside the Python standard library.
 
 ```sh
@@ -38,3 +46,41 @@ with Client("laboratory") as db:
 For a GUI, use timed reads from its worker or timer and handle `ReadTimeout`. Serialize calls on each handle. The package does not impose an event loop or invoke callbacks on the GUI thread. The example handles Ctrl+C; applications using other termination signals must arrange context cleanup themselves.
 
 See [the shared contract](../README.md) for delivery and lifecycle limits.
+
+## Embedded engine
+
+Built only with `-DRDB_PYTHON=ON`. Stage 1a covers the storage layer, read-only:
+reading `.desc` files and records without a running server. Everything above the
+storage layer needs the shared refactor and is not bound yet.
+
+```sh
+scripts/python-venv.sh              # venv with nanobind + pytest; prints the next line
+cd build/Debug                      # cmake must re-run INSIDE the build directory
+cmake -DRDB_PYTHON=ON -DPython_EXECUTABLE="$OLDPWD/.venv-python/bin/python3" .
+ninja
+cd "$OLDPWD" && .venv-python/bin/python3 -m pytest api/python/tests
+```
+
+The script exists because Homebrew and distribution Pythons refuse `pip install`
+under PEP 668. It is idempotent; `scripts/python-venv.sh --help` lists the options.
+
+```python
+import retractordb as rdb
+
+desc = rdb.load_descriptor("test_db.desc")
+print(desc.size_bytes, [f.name for f in desc])
+
+with rdb.Storage("test_db", "test_db", storage_param="/path/to/dir") as st:
+    print(len(st), st[0], st[-1])       # a negative index reads from the end
+```
+
+Values come back as `int`, `float`, `str`, `Fraction` for RATIONAL, a tuple for
+the pair types, and `None` for NULL. A `Record` holds its own copy of the
+payload, so it stays valid after the next read.
+
+**One limitation to know before you rely on it.** A `.desc` file that exists but
+is malformed ends the process rather than raising - `FatalError` calls
+`std::exit`, which no binding can catch. Missing files, bad directories,
+out-of-range indices and reads from declared sources are all checked here and
+raise normally; an invalid descriptor is not, and cannot be until phase 1 of the
+shared refactor converts those sites to exceptions.

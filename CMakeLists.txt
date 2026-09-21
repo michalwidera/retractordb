@@ -89,6 +89,18 @@ option(ENABLE_COVERAGE "Enable code coverage" OFF)
 # przed włączeniem. Użycie: scripts/buildrdb.sh debug -DENABLE_UNITY_BUILD=ON
 option(ENABLE_UNITY_BUILD "Enable unity build for faster compilation" OFF)
 
+# Konsumenci osadzeni (docs/build-options.md). Kazdy jest opt-in i domyslnie
+# OFF: przy wylaczonej fladze konfiguracja nie tworzy zadnego celu ani nie szuka
+# zaleznosci, wiec build kogos, kto nie osadza silnika, nie placi za to niczym.
+# Rodzina jest wspolna - RDB_IOS (host: macOS) i RDB_ANDROID (host: Linux) wejda
+# tak samo, gdy powstana.
+#
+# Platforma hosta jest KONSEKWENCJA celu, nie jego wyborem, i flaga zadana na
+# niewlasciwym hoscie zatrzymuje konfiguracje zamiast zostac po cichu pominieta
+# - inaczej dostaje sie zielony build bez artefaktu. Sprawdzenie siedzi w
+# src/python/CMakeLists.txt, przy celu, ktorego dotyczy.
+option(RDB_PYTHON "Build the retractordb._core Python extension (nanobind)" OFF)
+
 # Przełączniki optymalizatora planu używane w kontrolowanych badaniach
 # ablacyjnych. Domyślna konfiguracja zachowuje dotychczasowe działanie.
 option(RDB_OPT_DEDUP_SUBSTRATES

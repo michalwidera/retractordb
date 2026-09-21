@@ -5,8 +5,24 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "retractordb"
 version = "0.1.0"
-description = "Local stream monitoring through xqry"
+description = "Local stream monitoring through xqry, plus the embedded storage engine"
 requires-python = ">=3.10"
+
+# Bez zaleznosci uruchomieniowych. Klient stoi na samej bibliotece standardowej,
+# a modul osadzony nie jest instalowany przez ten backend - buduje go CMake pod
+# flaga RDB_PYTHON (docs/build-options.md). Kola binarne to dopiero faza J4;
+# do tego czasu `pip install ./api/python` daje wylacznie polowe kliencka.
+dependencies = []
+
+[project.optional-dependencies]
+# Wymagane do zbudowania i przetestowania modulu osadzonego, nie do uzywania klienta.
+embedded-build = ["nanobind>=2.0", "pytest>=7.0"]
 
 [tool.setuptools]
 packages = ["retractordb"]
+
+[tool.setuptools.package-data]
+retractordb = ["*.pyi"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
