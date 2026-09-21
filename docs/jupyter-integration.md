@@ -107,11 +107,15 @@ longer the only thing standing between a notebook and `std::exit`; they translat
 engine's `ConfigError` / `InternalError` into the types a Python caller expects
 (`ValueError`, `KeyError`, `IndexError`).
 
-**What is left:** 80 sites in `src/retractor/lib`, all on the tick path - the plan layer
-above the storage is now converted too (slices A1, A2 and C). They become reachable at
-J1, when `Engine` binds L2. Slice C is the one that matters most to a host process even
-before J1: a bad command no longer ends the service, it answers the client and the
-engine keeps running.
+**What is left, in phase 1: nothing.** Phase 1 is done - the engine no longer contains a
+single `FatalError` call site, only the `RDB_FAULT_FATAL_IN_SLOT` diagnostic hook that the
+exit-path test uses. `std::exit` is no longer reachable from any engine failure, which is the
+whole precondition J1 was waiting on.
+
+Two consequences matter to a notebook even before `Engine` exists. A bad command no longer
+ends the service: it answers the client and the engine keeps running (slice C). And every
+failure now arrives as an `rdb::Error` subclass, so the binding maps it to a Python
+exception instead of guarding a path that would otherwise take the interpreter down with it.
 
 `api/python/tests/test_fatal_paths.py` tracks the boundary in executable form. The two
 descriptor cases now assert `pytest.raises` in the test interpreter;
@@ -152,7 +156,7 @@ Phase numbering follows the roadmap in `design/`.
 
 | Phase | Adds | Blocked by |
 |---|---|---|
-| **J1** | `Engine`: `compile()`, `step()`, `rows()`, real exception mapping | core phases 1-3 (phase 1 done for the storage layer, the plan layer and the comms thread; 80 tick-path sites left in `src/retractor/lib`) |
+| **J1** | `Engine`: `compile()`, `step()`, `rows()`, real exception mapping | core phases 1-3 (phase 1 **done**; phases 2-3 remain) |
 | **J2** | `Window`, DLPack zero-copy export, `torch.utils.data.IterableDataset` | J1 |
 | **J3** | `KeyboardInterrupt` during `run()`, logging bridge to the `logging` module | J1 |
 | **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | J2 |

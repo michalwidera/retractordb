@@ -1,18 +1,18 @@
 # Core phase 1: FatalError becomes an exception
 
-**Status:** slice 1 (§2) and all of §3 item 1 are **done** - `src/rdb` no longer
-contains a single `FatalError` call site. §3 item 2 is under way: it was surveyed first
-(§3.2), and slices A1 (`compiler.cpp`, §3.3), A2 (the parser and plan model, §3.4) and C
-(the communication thread, §3.5) are **done**. §3 item 3 is not started.
+**Status:** §3 items 1 and 2 are **done**. Every `FatalError` CALL SITE in the tree is
+gone - slice 1 and sub-slices 2a/2b for `src/rdb` (§2, §3.1a, §3.1b), then A1
+(`compiler.cpp`, §3.3), A2 (the parser and plan model, §3.4), C (the communication thread,
+§3.5) and B (the tick path, §3.6) for `src/retractor/lib`. §3 item 3, phase 2
+de-globalization, is not started.
 Stage 1a (`9a1e72eb`) is this phase's test harness. **Prerequisite for:** everything
 above the storage layer, in all three embedding targets - see
 [`embedded-roadmap.md`](embedded-roadmap.md).
 
-After C: **80 `FatalError` call sites** in `src/`, all in `src/retractor/lib` and all in
-context B, the tick path. (221 at `f22cffe0`; 142 after 2b; 102 after A1; 89 after A2.)
-Contexts A and C are at zero, and so is the storage layer. (At `f22cffe0` it was 221
-total - 79 in `src/rdb/lib`, 142 in `src/retractor/lib`.) No bare `exit()` anywhere in
-the tree.
+After B: **one** `FatalError` call in `src/`, and it is the `RDB_FAULT_FATAL_IN_SLOT`
+diagnostic hook in `dataModel.cpp`, kept on purpose (§3.6). Every real call site is
+converted. (221 at `f22cffe0`; 142 after 2b; 102 after A1; 89 after A2; 80 after C.) No bare
+`exit()` anywhere in the tree, and no `EXPECT_DEATH` left in the test suite.
 
 `FatalError` ends with `std::exit(EXIT_FAILURE)` (`src/include/fatalError.hpp:51`).
 At `f22cffe0` there are **221 call sites** in `src/` - 79 in `src/rdb/lib`, 142 in
@@ -153,7 +153,8 @@ Ordered by how much each unblocks, not by size:
 1. ~~**`src/rdb/lib`, remaining 77 sites.**~~ **Done**, in two sub-slices at the seam
    described in §3.1a: 2a, the construction path, and 2b, the read and write path.
    Stage 1a's guards are now redundant rather than load-bearing, which was the point.
-2. **`src/retractor/lib`, 142 sites.** The hard half. Surveyed before converting
+2. ~~**`src/retractor/lib`, 142 sites.**~~ **Done**, in four slices - A1, A2, C and B -
+   after the survey in §3.2. The hard half. Surveyed before converting
    anything - see §3.2, which proposes an order and names what each slice has to
    prove. The short version: the sites split into three execution contexts, and the
    *correct* outcome differs per context, which is why they cannot be converted as
@@ -620,6 +621,96 @@ In contexts A and B the answer to "what should happen when the invariant breaks"
 *end the epoch* or *end the process*. Here it is neither: the service keeps running and
 one client gets an error. That is the first place in this refactor where an engine
 invariant violation is **not** fatal to anything except the request that triggered it.
+
+### 3.6 Slice B: the tick path - DONE
+
+80 sites in four passes. The pattern is uniform - unwinding reaches
+`catch (const rdb::Error&)` in `executorsm::run()` and the process ends with 1, exactly as
+`std::exit` did - so the work was not in deciding *what happens*, but in classifying each
+site and in noticing the two places where a conversion would have changed behaviour silently.
+
+| Pass | Files | Sites |
+|---|---|---|
+| **B1** | `dataModel.cpp` 24, `CRSMath.cpp` 2 | 26 |
+| **B2** | `streamInstance.cpp` 22 | 22 |
+| **B3** | `dumpManager.cpp` 17, `printRowValue` 2, `getAwaitedStreamsSet` 1, `applyPendingPlan` 1 | 21 |
+| **B'** | `expressionEvaluator.cpp` 10 | 10 |
+
+B1 and B2 landed in one commit (`9dac8cc4`, named for B1).
+
+#### The classification rule, finally stated
+
+`test_qTree.cpp:58` recorded A2's rule - *if no RQL text can produce it, `LogicError`; if it
+can, `ConfigError`* - but the AGSE-step family had already split against itself in committed
+code: `compiler.cpp:1630` is `LogicError`, `query.cpp:189` is `ConfigError`, for the same
+condition. Slice B needed a rule that reconciles them, because the same condition appears
+three more times on the tick path. The rule used throughout B:
+
+> A runtime check of a quantity **the user wrote in the query** is `ConfigError`. The same
+> condition inside the compiler is `LogicError`, because that is where the gate itself lives.
+
+Under it: the AGSE step (`dataModel`, `streamInstance`), the window width
+(`streamInstance`), the DEHASH rational argument and an empty compiler directive are
+`ConfigError` - five sites in all. Everything else is `LogicError`: unsupported enum cases,
+type mismatches the compiler rejects at `:2671`, uninitialised-after-switch, null pointers,
+an empty query id.
+
+The rule also answers questions that looked like exceptions and were not. The dump range in
+`dumpManager::registerTask` is gated **twice** - `RQLParser.cpp:220` with a user-facing
+message and `compiler::computeRequiredCapacities` after it - so no RQL text reaches it, and
+it is `LogicError`. The DEHASH argument has no gate anywhere, so it stays `ConfigError`.
+
+Five sites in `dumpManager` are `IOError` - two `lseek`, two `write`, one `open`. They are
+the first outside the storage layer, and four of them reported a bare `"write failed"` with
+no `errno`; as a `FatalError` the text went to a dying process's stderr, as an exception it
+travels, so it now carries `strerror(errno)` and the return value. Same gap 2b closed in
+`posixBinaryFileWithShadow`.
+
+#### The one conversion that needed a second change: B'
+
+All ten `expressionEvaluator` sites are the same `typeid(a) != typeid(b)` check after
+normalization. Converting them alone would have been a silent regression, because
+`exprSimplify.cpp`'s `foldConstants` ends in `catch (const std::exception &)` returning
+`nullopt`, and **`rdb::Error` derives from `std::runtime_error`**. A broken type
+normalization would have become "this expression cannot be folded": no crash, no failing
+test, and a *different program* that still runs and still returns numbers.
+
+The fix is not caution, it is honouring what that catch already says it is for. Its own
+comment names the cases - `'a'-'b'`, an unknown function - and every one of them throws
+`std::runtime_error`, never `rdb::Error`. So `catch (const rdb::Error &) { throw; }` goes
+ahead of it. An engine invariant stays loud and still ends the process where it did before;
+an uncomputable expression is still left alone.
+
+One behaviour improves rather than staying level: a fold failure during an **ad-hoc** compile
+used to kill the server, because `FatalError` ran on the communication thread. It now unwinds
+to `commandProcessor`'s `rdb::Error` catch from slice C - the client gets an engine error and
+the service lives. A1's point, reaching the last corner that still had the old behaviour.
+
+#### Two decisions deliberately not taken
+
+Both are recorded in comments at the site rather than settled by the conversion:
+
+- `printRowValue` throwing aborts `IpcServer::broadcast`'s subscriber loop partway, so some
+  subscribers get that slot's row and the rest do not. That is **preserved** behaviour -
+  `std::exit` truncated the emission identically, without unwinding. "Report and keep
+  emitting" would change what a tick means.
+- A failed dump still ends the epoch and the process. Whether a failed dump - a side effect
+  of a rule, not a stream's output - should kill a running server is a fair question, but
+  answering it inside a mechanical conversion would smuggle a behaviour change past the
+  tests that exist.
+
+#### Where the process still dies on purpose
+
+`RDB_FAULT_FATAL_IN_SLOT` in `dataModel.cpp` is now the **only** `FatalError` call in the
+tree. Paths 3 and 4 of `it_fatal_exit_path` use it to test the `std::exit` machinery -
+`atexit`, the `try_to_lock` in `cleanup()`, not joining the current thread - and that
+machinery has to keep working while any `FatalError` remains. The hook and those two paths
+retire together.
+
+`EXPECT_DEATH` now appears nowhere in the suite. Three tests in `test_dumpManager.cpp` were
+the last, and they kept their message assertions rather than dropping to a bare
+`EXPECT_THROW`: the regex in `EXPECT_DEATH`'s second argument *was* an assertion, and
+dropping it would have quietly weakened three tests while making them pass.
 
 ## 4. Where stage 1a left things
 

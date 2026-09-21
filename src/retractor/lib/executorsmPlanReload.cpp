@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
+#include <format>
 #include <map>
 #include <mutex>
 #include <string>
@@ -13,7 +14,6 @@
 
 #include "bus.hpp"
 #include "executorsmState.hpp"
-#include "fatalError.hpp"
 #include "persistentCounter.hpp"
 #include "planSource.hpp"
 #include "rdb/exceptions.hpp"
@@ -315,7 +315,7 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
 
   const bus::ClaimResult activated = xrdbbus.activateReservedPlan();
   if (activated.status != bus::ClaimStatus::Claimed && xrdbbus.attached())
-    FatalError("Cannot activate the reserved bus resources: {}", activated.detail);
+    throw rdb::LogicError(std::format("Cannot activate the reserved bus resources: {}", activated.detail));
 
   // Rezerwacja jest zuzyta, wiec od tej chwili wolno przyjac nastepny reset. Ani chwili
   // wczesniej: az dotad kolejne reservePlan() nadpisywaloby rezerwacje wlasnie aktywowana.

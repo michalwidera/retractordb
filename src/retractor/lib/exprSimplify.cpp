@@ -12,6 +12,7 @@
 
 #include "expressionEvaluator.hpp"
 #include "expressionShape.hpp"  // functionResultType, isExactType, normalizedOperandType
+#include "rdb/exceptions.hpp"
 
 namespace {
 
@@ -84,6 +85,13 @@ std::optional<rdb::descFld> arithmeticResultType(std::optional<rdb::descFld> lef
 /// nullopt oznacza „zostaw program w spokoju": albo ewaluator rzucił (np. `'a'-'b'`, nieznana
 /// funkcja) i błąd ma polecieć w wykonaniu jak dotąd, albo wynik jest wartością, której nie da
 /// się z powrotem wstawić do programu jako literał.
+///
+/// rdb::Error NIE jest jednym z tych przypadków i dlatego leci dalej. Ten catch napisano dla
+/// wyrażeń, KTORYCH NIE DA SIĘ POLICZYĆ - nie dla naruszonego niezmiennika silnika. Po zamianie
+/// FatalError na wyjątek w expressionEvaluator (etap B-prim fazy 1) catch(std::exception)
+/// połykałby oba naraz: złamana normalizacja typów zamieniłaby się w ciche „nie zwijaj", czyli
+/// w INNY PROGRAM - taki, ktory nadal się liczy i nadal zwraca liczby. Przedtem konczyla proces.
+/// Przepuszczenie rdb::Error zachowuje tamto zachowanie i zostawia usterkę głośną.
 std::optional<rdb::descFldVT> foldConstants(const std::list<token> &program) {
   expressionEvaluator evaluator;
   try {
@@ -91,6 +99,8 @@ std::optional<rdb::descFldVT> foldConstants(const std::list<token> &program) {
     const auto type = typeOfConstant(value);
     if (type == rdb::NULLTYPE || type == rdb::INTPAIR || type == rdb::IDXPAIR) return std::nullopt;
     return value;
+  } catch (const rdb::Error &) {
+    throw;
   } catch (const std::exception &) {
     return std::nullopt;
   }

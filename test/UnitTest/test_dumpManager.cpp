@@ -14,6 +14,7 @@
 #undef private
 
 #include "rdb/descriptor.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/payload.hpp"
 #include "syscallWrap.hpp"
 
@@ -88,7 +89,14 @@ TEST(dumpManager, buildDumpChunk_rejects_negative_fd) {
   task.delayDumpRecordsToGo = 0;
   task.fd                   = -1;
 
-  EXPECT_DEATH({ (void)manager.buildDumpChunk(task, payload.get()); }, "file descriptor is not set");
+  // Plaster B3 fazy 1: rzut, nie smierc procesu. Niezmiennik silnika, wiec LogicError;
+  // komunikat sprawdzamy tak samo jak przedtem regexem EXPECT_DEATH.
+  try {
+    (void)manager.buildDumpChunk(task, payload.get());
+    FAIL() << "expected rdb::LogicError";
+  } catch (const rdb::LogicError &error) {
+    EXPECT_NE(std::string(error.what()).find("file descriptor is not set"), std::string::npos) << error.what();
+  }
 }
 
 // ============================================================
@@ -184,7 +192,7 @@ TEST(dumpManager, buildDumpChunk_multiple_records_not_done_until_last) {
 // buildDumpChunk - FatalError dla ujemnych wartości
 // ============================================================
 
-TEST(dumpManager, buildDumpChunk_negative_dumpedRecordsToGo_fatals) {
+TEST(dumpManager, buildDumpChunk_negative_dumpedRecordsToGo_throws) {
   dumpManager manager;
 
   auto descriptor = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
@@ -195,10 +203,17 @@ TEST(dumpManager, buildDumpChunk_negative_dumpedRecordsToGo_fatals) {
   task.delayDumpRecordsToGo = 0;
   task.fd                   = 0;
 
-  EXPECT_DEATH({ (void)manager.buildDumpChunk(task, payload.get()); }, "dumpedRecordsToGo is negative");
+  // Plaster B3 fazy 1: rzut, nie smierc procesu. Niezmiennik silnika, wiec LogicError;
+  // komunikat sprawdzamy tak samo jak przedtem regexem EXPECT_DEATH.
+  try {
+    (void)manager.buildDumpChunk(task, payload.get());
+    FAIL() << "expected rdb::LogicError";
+  } catch (const rdb::LogicError &error) {
+    EXPECT_NE(std::string(error.what()).find("dumpedRecordsToGo is negative"), std::string::npos) << error.what();
+  }
 }
 
-TEST(dumpManager, buildDumpChunk_negative_delayDumpRecordsToGo_fatals) {
+TEST(dumpManager, buildDumpChunk_negative_delayDumpRecordsToGo_throws) {
   dumpManager manager;
 
   auto descriptor = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
@@ -209,7 +224,14 @@ TEST(dumpManager, buildDumpChunk_negative_delayDumpRecordsToGo_fatals) {
   task.delayDumpRecordsToGo = -1;
   task.fd                   = 0;
 
-  EXPECT_DEATH({ (void)manager.buildDumpChunk(task, payload.get()); }, "delayDumpRecordsToGo is negative");
+  // Plaster B3 fazy 1: rzut, nie smierc procesu. Niezmiennik silnika, wiec LogicError;
+  // komunikat sprawdzamy tak samo jak przedtem regexem EXPECT_DEATH.
+  try {
+    (void)manager.buildDumpChunk(task, payload.get());
+    FAIL() << "expected rdb::LogicError";
+  } catch (const rdb::LogicError &error) {
+    EXPECT_NE(std::string(error.what()).find("delayDumpRecordsToGo is negative"), std::string::npos) << error.what();
+  }
 }
 
 // ============================================================

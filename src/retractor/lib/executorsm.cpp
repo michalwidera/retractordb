@@ -159,7 +159,7 @@ void cleanup() {
 }
 
 std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl, qTree *coreInstancePtr) {
-  if (coreInstancePtr == nullptr) FatalError("executorsm::getAwaitedStreamsSet: coreInstancePtr is null");
+  if (coreInstancePtr == nullptr) throw rdb::LogicError("executorsm::getAwaitedStreamsSet: coreInstancePtr is null");
   std::set<std::string> retVal;
   for (const auto &it : *coreInstancePtr)
     if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) retVal.insert(it.id);

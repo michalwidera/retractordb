@@ -16,7 +16,6 @@
 #include "constants.hpp"
 #include "dataModel.hpp"
 #include "executorsmState.hpp"
-#include "fatalError.hpp"
 #include "ipcServer.hpp"
 #include "rdb/exceptions.hpp"
 #include "rdb/convertTypes.hpp"
@@ -252,15 +251,20 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
 /// Formatowanie wiersza do emisji. Mimo sasiedztwa z dyspozytorem komend ta funkcja NIE biegnie
 /// w watku komunikacyjnym: transport dostaje ja jako RowFormatter i wola z IpcServer::broadcast(),
 /// czyli z petli przetwarzania, pod clientMapsMutex_ i w srodku obiegu po subskrybentach. Oba
-/// bledy krytyczne ponizej naleza wiec do sciezki taktu (etap B), nie do tego pliku tematycznie --
-/// zamiana ich na rzut przerywa obieg w polowie i zostawia czesc subskrybentow bez wiersza, co
-/// jest decyzja o semantyce taktu, a nie o granicy komendy.
+/// niezmienniki ponizej naleza wiec do sciezki taktu (etap B), nie do granicy komendy.
+///
+/// Rzut przerywa obieg po subskrybentach w polowie: czesc dostanie wiersz tego slotu, reszta nie.
+/// Jest to ZACHOWANE zachowanie, nie nowe -- std::exit w tym samym miejscu urywal emisje tak samo,
+/// tyle ze bez odwijania stosu. Rzut wychodzi z broadcast() (scoped_lock oddaje clientMapsMutex_)
+/// do catch(const rdb::Error&) w executorsm::run(), czyli konczy epoke i proces kodem 1 -- tak jak
+/// przedtem. Wybor "zglosic i emitowac dalej" byloby zmiana semantyki taktu i nalezy do osobnej
+/// decyzji, nie do zamiany mechanizmu bledu.
 std::string executorsm::printRowValue(const std::string &query_name) {
   using boost::property_tree::ptree;
   if (pProc == nullptr) return "";
-  if (coreInstancePtr == nullptr) FatalError("executorsm::printRowValue: coreInstancePtr is null");
+  if (coreInstancePtr == nullptr) throw rdb::LogicError("executorsm::printRowValue: coreInstancePtr is null");
   auto *payload = pProc->getPayload(query_name, 0);
-  if (payload == nullptr) FatalError("executorsm::printRowValue: getPayload returned null");
+  if (payload == nullptr) throw rdb::LogicError("executorsm::printRowValue: getPayload returned null");
 
   ptree pt;
   pt.put("stream", query_name);
