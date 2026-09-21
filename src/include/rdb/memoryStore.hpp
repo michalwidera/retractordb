@@ -36,6 +36,10 @@ class MemoryStore {
   /// Liczba zapisow append - logiczna dlugosc strumienia, niezalezna od bufora kolowego.
   std::size_t &writeCount(const std::string &stream) { return writeCount_[stream]; }
 
+  /// Czy sklep nie widzial jeszcze zadnego strumienia. Istnieje dla testu izolacji: pozwala
+  /// stwierdzic, ze zapis trafil do TEGO sklepu, bez zgadywania klucza (sciezki pliku).
+  [[nodiscard]] bool empty() const { return records_.empty(); }
+
   /// Kasuje pamiec strumienia; odpowiednik write(nullptr, ...).
   void clear(const std::string &stream) {
     records_[stream].clear();

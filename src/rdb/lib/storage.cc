@@ -31,12 +31,14 @@ storage::storage(const std::string_view qryID,         //
                  const std::string_view storageType,   //
                  bool oneShot,                         //
                  bool isHold,                          //
-                 int percounter)
+                 int percounter,                       //
+                 MemoryStore *memory)
     : isOneShot_(oneShot),
       isHold_(isHold),
       paths_(qryID, fileName, storageParam),
       storageType_(storageType),
-      percounter_(percounter) {}
+      percounter_(percounter),
+      memory_(memory) {}
 
 void storage::attachDescriptor(const Descriptor *descriptorParam) {
   if (descriptorFileExist()) {
@@ -98,7 +100,7 @@ storage::~storage() {
 bool storage::isDeclared() const { return isDeclaredType(storageType_); }
 
 void storage::initializeAccessor() {
-  accessor_ = makeAccessor(storageType_, paths_.storageFile(), descriptor, isOneShot_, percounter_);
+  accessor_ = makeAccessor(storageType_, paths_.storageFile(), descriptor, isOneShot_, percounter_, memory_);
 }
 
 void storage::resetForUnitTest() {

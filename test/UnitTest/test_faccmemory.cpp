@@ -4,6 +4,7 @@
 
 #include "rdb/descriptor.hpp"
 #include "rdb/faccmemory.hpp"
+#include "rdb/storage.hpp"
 
 static rdb::Descriptor makeDesc(size_t size) { return {"f", static_cast<int>(size), 1, rdb::BYTE}; }
 
@@ -386,4 +387,27 @@ TEST(MemoryStoreTest, default_is_the_process_store) {
   GTEST_ASSERT_EQ(explicitStore.count(), 1);
   GTEST_ASSERT_EQ(explicitStore.read(&record, 0), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 0x5A);
+}
+
+// Sklep podany do rdb::storage ma dojechac az do akcesora. Bez tego cala reszta fazy 2.1
+// jest martwa: memoryFile umie przyjac sklep, ale nikt mu go nie podaje.
+TEST(MemoryStoreTest, storage_passes_its_store_down_to_the_accessor) {
+  // Pole TYPE nie jest danymi - attachStorage() czyta z niego nazwe typu magazynu,
+  // wiec "MEMORY" wybiera backend pamieciowy (patrz test_probeLogicalGate.cpp).
+  auto descriptor = rdb::Descriptor{{"a", 4, 1, rdb::INTEGER}, {"MEMORY", 0, 0, rdb::TYPE}};
+
+  rdb::MemoryStore given;
+  rdb::MemoryStore untouched;
+
+  rdb::storage stream("memstore_iso", "memstore_iso", "", "DEFAULT", false, false, -1, &given);
+  stream.attachDescriptor(&descriptor);
+  stream.setDisposable(true);
+
+  auto *payload = stream.getPayload();
+  payload->setNullBitset(std::vector<bool>(descriptor.size(), false));
+  payload->setItem(0, 7);
+  stream.write();
+
+  EXPECT_FALSE(given.empty()) << "zapis nie trafil do sklepu podanego magazynowi";
+  EXPECT_TRUE(untouched.empty()) << "zapis trafil do cudzego sklepu";
 }
