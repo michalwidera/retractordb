@@ -5,9 +5,10 @@
 #include <stdexcept>
 #include <utility>
 
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
-#include "fatalError.hpp"
+#include "rdb/exceptions.hpp"
 #include "qTree.hpp"
 
 bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.rInterval; }
@@ -180,7 +181,12 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
 
       auto [step, length] = std::get<std::pair<int, int>>(cmd.getVT());
       if (step <= 0) {
-        FatalError("query::descriptorFrom: AGSE step must be > 0, got: {}", step);
+        // ConfigError, choc kompilator ma wlasna kontrole tego samego kroku (compiler.cpp,
+        // plaster A1) i normalnie nie przepuszcza tu zera. Wybor jest swiadomy: gdyby ta
+        // kontrola kiedys wypadla z kolejnosci przebiegow, LogicError oskarzalby silnik o
+        // usterke, ktora w rzeczywistosci jest literowka w zapytaniu. Z dwoch mozliwych
+        // pomylek ta jest tansza.
+        throw rdb::ConfigError(fmt::format("query::descriptorFrom: AGSE step must be > 0, got {}", step));
       }
       auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().widestFieldType();
       for (int i = 0; i < abs(length); i++) {
@@ -188,7 +194,8 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
       }
     } break;
     default:
-      FatalError("query::descriptorFrom: undefined cmd {} str:{}", cmd.getStrCommandID(), cmd.getStr_());
+      throw rdb::LogicError(
+          fmt::format("query::descriptorFrom: undefined cmd {} str:{}", cmd.getStrCommandID(), cmd.getStr_()));
   }
 
   if (!retention.noRetention()) {
@@ -202,7 +209,7 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   std::string sArg1;
   std::string sArg2;
   if (prog.size() >= 4) {
-    FatalError("query::GetArgs: program too large - {} tokens, expected at most 3", prog.size());
+    throw rdb::LogicError(fmt::format("query::GetArgs: program too large - {} tokens, expected at most 3", prog.size()));
   }
   if (prog.size() == 1) sArg1 = (*eIt).getStr_();   // 1
   if (prog.size() > 1) sArg1 = (*eIt++).getStr_();  // 2,3

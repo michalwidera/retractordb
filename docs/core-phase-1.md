@@ -2,13 +2,14 @@
 
 **Status:** slice 1 (§2) and all of §3 item 1 are **done** - `src/rdb` no longer
 contains a single `FatalError` call site. §3 item 2 is under way: it was surveyed first
-(§3.2) and its slice A1, `compiler.cpp`, is **done** (§3.3). §3 item 3 is not started.
+(§3.2), and slices A1 (`compiler.cpp`, §3.3) and A2 (the parser and plan model, §3.4) are
+**done**. §3 item 3 is not started.
 Stage 1a (`9a1e72eb`) is this phase's test harness. **Prerequisite for:** everything
 above the storage layer, in all three embedding targets - see
 [`embedded-roadmap.md`](embedded-roadmap.md).
 
-After A1: **102 `FatalError` call sites** in `src/`, all in `src/retractor/lib`.
-(After 2b it was 142; `compiler.cpp`'s 40 are gone.) The storage layer is at zero. (At `f22cffe0` it was 221 total -
+After A2: **89 `FatalError` call sites** in `src/`, all in `src/retractor/lib` and all in
+contexts B and C. (221 at `f22cffe0`; 142 after 2b; 102 after A1.) The storage layer is at zero. (At `f22cffe0` it was 221 total -
 79 in `src/rdb/lib`, 142 in `src/retractor/lib`.) No bare `exit()` anywhere in the tree.
 
 `FatalError` ends with `std::exit(EXIT_FAILURE)` (`src/include/fatalError.hpp:51`).
@@ -459,12 +460,73 @@ not have surfaced it.
 
 #### Still to do in §3 item 2
 
-`RQLParser.cpp` (6), `qTree.cpp` (3), `query.cpp` (3), `field.cpp` (1) are **slice A2**,
-split off because they need a different mechanism: all six `RQLParser.cpp` sites sit
-inside `class ParserListener`, so they need the `removeParseListeners()` discipline from
-§1 trap 2 before throwing. At least one is plainly user-reachable -
-`exitFraction: denominator is zero`, written as `x & 1/0`. Then contexts B and C, per
-§3.2.5.
+Contexts B and C, per §3.2.5. Slice A2 is §3.4.
+
+### 3.4 Slice A2: the parser and plan model - DONE
+
+**13 sites**: `RQLParser.cpp` 6, `qTree.cpp` 3, `query.cpp` 3, `field.cpp` 1.
+
+#### Trap 2 turned out not to apply where it mattered
+
+A2 was split from A1 on the expectation that all six parser sites, sitting inside
+`class ParserListener`, would need the `removeParseListeners()` dance before throwing.
+**Three of them did not need to throw at all.** The listener already has a gentle error
+channel - `reportSemanticError()`, which records the first message, and which
+`parserRQLString` returns as the parse status. `buildRule` has used it since the DUMP
+range check, and `exitDeclare` uses it for two policy conflicts.
+
+So the three user-reachable sites just report and return:
+
+| Site | Reachable by |
+|---|---|
+| `exitFraction` | `x & 1/0` - the grammar's `fraction_rule: DECIMAL DIVIDE DECIMAL` has no zero guard |
+| `exitSelect`, FILE name | `SELECT ... FILE ''` - `STRING` is `'\'' (~'\'' | '\'\'')* '\''`, and the `*` admits the empty string |
+| `exitCoption`, directive value | `:STORAGE ''`, same reason |
+
+One asymmetry found by getting a test wrong: the empty-name check lives in `exitSelect`,
+where `FILE` is optional, and there has never been one in `exitDeclare`, where it is
+mandatory. So `DECLARE ... FILE ''` is not a parse error - it reaches the `StoragePaths`
+constructor and comes back as sub-slice 2a's `ConfigError`. A worse message, but not a
+dead process, so it is not a phase-1 site. Worth a nicer parse-time message some day.
+
+`exitFraction` also sets a substitute denominator of 1 before returning, because the tree
+walk continues to the end of the statement and `boost::rational<int>(n, 0)` would throw
+`bad_rational` before the status could get back.
+
+**A stale comment is worth recording.** `exitWindow_agg` carried: *"szerokosc NIE jest tu
+sprawdzana: listener parsera nie ma lagodnego kanalu bledu (zostaje FatalError)"* - the
+listener has no gentle error channel, so window width is validated in the compiler
+instead. That was true when written and false by the time A2 arrived; the channel was
+added later for `buildRule` and nobody revisited the comment. The deferral it justified
+is still fine, but the reason it gave had expired.
+
+#### The three that do throw
+
+`exitWindow_agg`'s missing argument mark and the two unknown-name branches are
+unreachable while the grammar restricts names to `MIN|MAX|AVG|SUMC` (`RQL.g4`
+`window_agg`, `stream_fn_call`), so they are `rdb::LogicError`. These *are* thrown from
+inside the walk, so trap 2 applies in full: a new `abortInternal()` helper removes the
+parse listeners first, mirroring `abortParse()`. `ParserListener` gained the parser
+reference the two error listeners already held.
+
+#### The plan model
+
+| Site | Type | Why |
+|---|---|---|
+| `qTree::getAvailableTimeIntervals`, zero interval | `ConfigError` | The value comes straight from the DECLARE interval, and the grammar admits `0`. Called from `executorsm::run` **after** compilation, so there is no status channel to return through - it must throw, but it names the right culprit. |
+| `query::descriptorFrom`, AGSE step | `ConfigError` | Pre-gated by A1's site 315, so arguably an invariant. `ConfigError` chosen deliberately: if that gate is ever reordered out of the way, `LogicError` would accuse the engine of a defect that is really a typo in a query. Of the two possible wrong answers, this is the cheaper one. |
+| `qTree::dumpCore`, `qTree::getQuery` empty name, `query::descriptorFrom` undefined cmd, `GetArgs` oversized program, `field::getFirstFieldToken` | `LogicError` | No RQL text produces any of them. |
+
+Two more `EXPECT_DEATH` tests flipped (`test_qTree.cpp`), bringing phase 1's running total
+to four.
+
+#### A checker mistake worth not repeating
+
+The per-line string-literal balance check added after A1 reported 206 failures in
+`test_compiler.cpp`. All were false: the file holds 103 raw strings (`R"(...)"`), inside
+which a line legitimately carries an odd number of quotes. The checker now strips raw
+strings before reasoning per line. A verification tool that cries wolf is worse than none,
+because the next real failure is read as noise.
 
 ## 4. Where stage 1a left things
 

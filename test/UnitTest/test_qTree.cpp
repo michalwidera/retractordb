@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "rdb/exceptions.hpp"
 #include "retractor/lib/qTree.hpp"
 #include "retractor/lib/token.hpp"
 
@@ -53,9 +54,11 @@ TEST(qTree, getQuery_throws_logic_error_when_not_found) {
   EXPECT_THROW(qt.getQuery("missing"), std::logic_error);
 }
 
-TEST(qTree, getQuery_fatals_on_empty_name) {
+// Plaster A2 fazy 1: rzut, nie smierc procesu. Pusta nazwa nie jest bledem PLANU - zaden
+// tekst RQL jej nie wytwarza - wiec zglasza ja LogicError, a nie ConfigError.
+TEST(qTree, getQuery_throws_on_empty_name) {
   qTree qt;
-  EXPECT_DEATH({ qt.getQuery(""); }, "query name is empty");
+  EXPECT_THROW({ (void)qt.getQuery(""); }, rdb::LogicError);
 }
 
 // ============================================================
@@ -191,8 +194,18 @@ TEST(qTree, getAvailableTimeIntervals_skips_compiler_directives) {
   EXPECT_EQ(intervals.size(), 1u);
 }
 
-TEST(qTree, getAvailableTimeIntervals_fatals_when_rInterval_is_zero) {
+/// ConfigError, nie LogicError: interwal zero pisze uzytkownik w DECLARE, a gramatyka mu na
+/// to pozwala. Miejsce jest wolane przez executorsm JUZ PO kompilacji, wiec nie ma kanalu
+/// statusu - zostaje rzut, ale rzut nazywajacy wlasciwego winowajce.
+TEST(qTree, getAvailableTimeIntervals_throws_when_rInterval_is_zero) {
   qTree qt;
   qt.push_back(makeQuery("bad", 0, 1));
-  EXPECT_DEATH({ qt.getAvailableTimeIntervals(); }, "rInterval is zero");
+  EXPECT_THROW({ (void)qt.getAvailableTimeIntervals(); }, rdb::ConfigError);
+
+  try {
+    (void)qt.getAvailableTimeIntervals();
+    FAIL() << "expected ConfigError";
+  } catch (const rdb::ConfigError &error) {
+    EXPECT_NE(std::string(error.what()).find("bad"), std::string::npos) << error.what();
+  }
 }

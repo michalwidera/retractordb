@@ -3880,3 +3880,52 @@ TEST(xcompiler, a_rejected_plan_does_not_poison_the_next_compile) {
       "SELECT * STREAM y FROM src");
   EXPECT_EQ(accepted, "OK") << accepted;
 }
+
+// ---------------------------------------------------------------------------
+// Faza 1, plaster A2: bledy planu wykryte JUZ W LISTENERZE parsera.
+//
+// Trzy miejsca w RQLParser sa osiagalne zwyklym tekstem RQL. Do A2 kazde konczylo proces.
+// Kanalem nie jest tu rzut, tylko reportSemanticError - ten sam, ktorym od dawna wraca
+// odmowa z buildRule. parserRQLString oddaje go statusem, wiec caly plan jest odrzucany
+// bez sladu, a serwer zyje. Komentarz przy exitWindow_agg, mowiacy ze listener "nie ma
+// lagodnego kanalu bledu", byl juz wtedy nieaktualny.
+// ---------------------------------------------------------------------------
+TEST(xparser, zero_fraction_denominator_is_a_semantic_error) {
+  qTree instance;
+  auto [result, keyword, name] = parserRQLString(instance, "SELECT * STREAM y FROM src & 1/0");
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("denominator"), std::string::npos) << result;
+}
+
+/// Token STRING gramatyki to `'\'' (~'\'' | '\'\'')* '\''` - gwiazdka, wiec `''` jest
+/// poprawnym napisem pustym, a nie bledem skladni.
+///
+/// SELECT, nie DECLARE: kontrola pustej nazwy stoi w exitSelect, gdzie FILE jest
+/// OPCJONALNE (RQL.g4 select_statement). W declare_statement FILE jest obowiazkowe i osobna
+/// kontroli tam nigdy nie bylo - pusta nazwa z DECLARE dojezdza do konstruktora StoragePaths
+/// i wraca ConfigError-em z plastra 2a. Inny komunikat, ale nie smierc procesu.
+TEST(xparser, empty_file_name_in_select_is_a_semantic_error) {
+  qTree instance;
+  auto [result, keyword, name] = parserRQLString(instance, "SELECT * STREAM y FROM src FILE ''");
+  EXPECT_NE(result, "OK");
+  EXPECT_NE(result.find("FILE"), std::string::npos) << result;
+}
+
+TEST(xparser, empty_directive_value_is_a_semantic_error) {
+  qTree instance;
+  auto [result, keyword, name] = parserRQLString(instance, "STORAGE ''");
+  EXPECT_NE(result, "OK");
+}
+
+/// Ta sama wlasnosc co dla bledu skladni i dla bledu planu: po odmowie parser musi dac sie
+/// uzyc ponownie w tym samym procesie.
+TEST(xparser, a_semantic_error_does_not_poison_the_next_parse) {
+  qTree rejected;
+  auto [failed, k1, n1] = parserRQLString(rejected, "SELECT * STREAM y FROM src & 1/0");
+  ASSERT_NE(failed, "OK");
+
+  qTree instance;
+  auto [ok, k2, n2] = parserRQLString(instance, "DECLARE v INTEGER STREAM src, 1/500 FILE 'a.txt'");
+  EXPECT_EQ(ok, "OK") << ok;
+  EXPECT_TRUE(instance.exists("src"));
+}

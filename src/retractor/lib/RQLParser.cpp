@@ -8,6 +8,7 @@
 #include <vector>
 
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
 
@@ -19,8 +20,8 @@
 #include "antlr4-runtime/antlr4-runtime.h"
 #include "constants.hpp"
 #include "exprSimplify.hpp"
-#include "fatalError.hpp"
 #include "qTree.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/convertTypes.hpp"
 #include "rqlFunctions.hpp"
 
@@ -134,6 +135,10 @@ int fieldCount = 0;
 class ParserListener : public RQLBaseListener {
   qTree &coreInstance;
 
+  /// Parser, wylacznie po to, zeby abortInternal() mogl zdjac listenery przed rzutem.
+  /// Listenery bledow trzymaja go z tego samego powodu - patrz abortParse().
+  antlr4::Parser &parser_;
+
   /* Helper variable required for rational numbers processing */
   boost::rational<int> rationalResult;
 
@@ -231,9 +236,25 @@ class ParserListener : public RQLBaseListener {
   }
 
  public:
-  ParserListener(qTree &coreInstance) : coreInstance(coreInstance) {};
+  ParserListener(qTree &coreInstance, antlr4::Parser &parser) : coreInstance(coreInstance), parser_(parser) {};
 
   [[nodiscard]] const std::string &semanticError() const { return semanticError_; }
+
+  /// Zlamany niezmiennik listenera: rzuca, zamiast konczyc proces.
+  ///
+  /// Odpowiednik abortParse() dla drogi NIE-skladniowej. Zdjecie listenerow jest tak samo
+  /// konieczne: rozwijanie stosu przechodzi przez `finally` generowanego kodu
+  /// (antlrcpp::FinalAction), ktore wola exitRule(), a to wola kolejne exitXxx() na
+  /// kontekscie zatrzymanym w polowie budowy. Pierwsza wersja tej naprawy po stronie RQL
+  /// padala tam segfaultem - patrz pulapka 2 w docs/core-phase-1.md §1.
+  ///
+  /// NIE jest to kanal dla bledow uzytkownika; te ida przez reportSemanticError(), ktore
+  /// wraca statusem i nie wymaga zadnego z tych zabiegow.
+  [[noreturn]] void abortInternal(const std::string &message) {
+    SPDLOG_CRITICAL("Parser: {}", message);
+    parser_.removeParseListeners();
+    throw rdb::LogicError(message);
+  }
 
   void enterProg(RQLParser::ProgContext *ctx) override {}
 
@@ -298,7 +319,8 @@ class ParserListener : public RQLBaseListener {
   /// raportuje przez `Check result:` razem z pozostalymi kontrolami.
   void exitWindow_agg(RQLParser::Window_aggContext *ctx) override {
     const int width = std::stoi(ctx->width->getText());
-    if (windowArgMarks.empty()) FatalError("RQLParser::exitWindow_agg: no argument mark for '{}'", ctx->getText());
+    if (windowArgMarks.empty())
+      abortInternal(fmt::format("RQLParser::exitWindow_agg: no argument mark for '{}'", ctx->getText()));
     const auto argStart = static_cast<int>(windowArgMarks.back());
     windowArgMarks.pop_back();
     const auto shape = std::make_pair(width, argStart);
@@ -313,7 +335,9 @@ class ParserListener : public RQLBaseListener {
     else if (name == "sumc")
       recpToken(WINDOW_SUM, shape);
     else
-      FatalError("RQLParser::exitWindow_agg: unknown aggregate '{}'", ctx->children[0]->getText());
+      // Gramatyka ogranicza nazwe do MIN|MAX|AVG|SUMC (RQL.g4 window_agg), wiec inna nazwa
+      // znaczy rozjazd listenera z gramatyka - blad w tym kodzie, nie w zapytaniu.
+      abortInternal(fmt::format("RQLParser::exitWindow_agg: unknown aggregate '{}'", ctx->children[0]->getText()));
   }
 
   void exitExpFloat(RQLParser::ExpFloatContext *ctx) override { recpToken(PUSH_VAL, std::stof(ctx->getText())); }
@@ -384,7 +408,8 @@ class ParserListener : public RQLBaseListener {
     else if (ctx->SUMC() != nullptr)
       recpToken(STREAM_SUM);
     else
-      FatalError("RQLParser::exitStream_fn_call: unknown stream function '{}'", ctx->getText());
+      // Jak wyzej: RQL.g4 stream_fn_call wylicza dokladnie te cztery nazwy.
+      abortInternal(fmt::format("RQLParser::exitStream_fn_call: unknown stream function '{}'", ctx->getText()));
   }
   void exitSExpPlus(RQLParser::SExpPlusContext *ctx) override { recpToken(STREAM_ADD); }
   void exitSExpMinus(RQLParser::SExpMinusContext *ctx) override { recpToken(STREAM_SUBTRACT, rationalResult); }
@@ -450,7 +475,17 @@ class ParserListener : public RQLBaseListener {
   void exitFraction(RQLParser::FractionContext *ctx) override {
     const int nom = std::stoi(ctx->children[0]->getText());
     const int den = std::stoi(ctx->children[2]->getText());
-    if (den == 0) FatalError("RQLParser::exitFraction: denominator is zero");
+    if (den == 0) {
+      // Gramatyka dopuszcza `DECIMAL / DECIMAL` bez zadnego ograniczenia mianownika, wiec
+      // `x & 1/0` jest tekstem, ktory uzytkownik POTRAFI napisac - a do fazy 1 konczyl
+      // proces. Kanalem jest reportSemanticError, ten sam co dla buildRule: parserRQLString
+      // odda go statusem, a wolajacy odrzuci caly plan.
+      reportSemanticError("fraction denominator must not be zero");
+      // Wartosc zastepcza, bo obchod drzewa trwa dalej az do konca instrukcji, a
+      // boost::rational<int>(n, 0) rzuciloby bad_rational, zanim status zdazy wrocic.
+      rationalResult = boost::rational<int>(nom, 1);
+      return;
+    }
     rationalResult = boost::rational<int>(nom, den);
   }
 
@@ -491,7 +526,13 @@ class ParserListener : public RQLBaseListener {
       qry.filename.erase(qry.filename.size() - 1);
       qry.filename.erase(0, 1);
 
-      if (qry.filename.empty()) FatalError("RQLParser: directive filename must not be empty");
+      // Token STRING gramatyki to '\'' (~'\'' | '\'\'')* '\'' - gwiazdka, czyli ZERO lub
+      // wiecej znakow. `FILE ''` jest wiec poprawne skladniowo i po zdjeciu apostrofow daje
+      // nazwe pusta. Blad uzytkownika, nie silnika.
+      if (qry.filename.empty()) {
+        reportSemanticError("FILE name must not be empty");
+        return;
+      }
     }
 
     if (ctx->STORAGE() != nullptr) {
@@ -599,7 +640,10 @@ class ParserListener : public RQLBaseListener {
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
 
-    if (qry.filename.empty()) FatalError("RQLParser: directive filename must not be empty");
+    if (qry.filename.empty()) {
+      reportSemanticError("directive '" + qry.id + "' value must not be empty");
+      return;
+    }
 
     // Add / at the end of path, if not present in case of STORAGE
     if (qry.id == ":STORAGE" && qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');
@@ -728,7 +772,7 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   lexer.removeErrorListeners();
   lexer.addErrorListener(&lexerErrorListener);
   ParserErrorListener parserErrorListener(parser, firstLine);
-  ParserListener parserListener(coreInstance);
+  ParserListener parserListener(coreInstance, parser);
   parser.removeParseListeners();
   parser.removeErrorListeners();
   parser.addErrorListener(&parserErrorListener);

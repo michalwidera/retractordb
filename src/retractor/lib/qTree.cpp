@@ -1,13 +1,14 @@
 #include "qTree.hpp"
 
 #include <fmt/core.h>
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <sstream>
 #include <stdexcept>
 
-#include "fatalError.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/rationalFormat.hpp"
 
 using namespace boost;
@@ -72,7 +73,7 @@ void qTree::dumpCore() {
       else if (nName == vcols[3])
         size = static_cast<int>(it.id.length());
       else {
-        FatalError("qTree::dumpCore: unknown column name");
+        throw rdb::LogicError("qTree::dumpCore: unknown column name");
       }
       maxSize = std::max(maxSize, size);
     }
@@ -103,7 +104,15 @@ std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
   std::set<boost::rational<int>> lstTimeIntervals;
   for (const auto &it : *this) {
     if (it.rInterval == 0) {
-      FatalError("qTree: query '{}' rInterval is zero - check :STORAGE directive", it.id);
+      // ConfigError, nie LogicError: rInterval bierze sie wprost z interwalu w DECLARE
+      // (RQLParser.cpp, `qry.rInterval = rationalResult`), a gramatyka dopuszcza tam zero -
+      // `DECLARE v INTEGER STREAM src, 0 FILE 'a.txt'`. Wartosc jest uzytkownika, wiec blad
+      // tez jest jego, i tak brzmial komunikat na dlugo przed faza 1.
+      //
+      // Bez kanalu statusu: to miejsce wola executorsm::run() JUZ PO kompilacji, a nie
+      // compile(), wiec nie ma dokad wrocic wartoscia - zostaje rzut.
+      throw rdb::ConfigError(fmt::format("qTree: query '{}' has a zero interval - check its DECLARE or the :STORAGE directive",
+                                         it.id));
     }
     if (it.isCompilerDirective()) continue;
     lstTimeIntervals.insert(it.rInterval);
@@ -112,7 +121,7 @@ std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
 }
 
 query &qTree::getQuery(const std::string &query_name) {
-  if (query_name.empty()) FatalError("qTree::getQuery: query name is empty");
+  if (query_name.empty()) throw rdb::LogicError("qTree::getQuery: query name is empty");
 
   auto it = std::ranges::find_if(*this, [query_name](const auto &node) { return node.id == query_name; });
   if (it == std::end(*this)) {
