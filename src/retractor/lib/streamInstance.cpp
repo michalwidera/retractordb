@@ -4,26 +4,28 @@
 
 #include <cstdint>
 #include <cstdlib>  // std::div
+#include <format>
 #include <memory>   // unique_ptr
 #include <optional>
+#include <string>
 #include <utility>
 #include <variant>  // std::get, std::holds_alternative (P1-E3b)
 
 #include <spdlog/spdlog.h>
 
-#include "fatalError.hpp"
 
 #include "checkedArith.hpp"
 #include "executorsmState.hpp"
 #include "expressionEvaluator.hpp"
 #include "persistentCounter.hpp"
 #include "rdb/convertTypes.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/probe.hpp"
 
 streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam)
     : coreInstance(coreInstance) {
   // only objects with REF has storageNameParam filled.
-  if (qry.id.empty()) FatalError("streamInstance: query id must not be empty");
+  if (qry.id.empty()) throw rdb::LogicError("streamInstance: query id must not be empty");
 
   const auto storageName{qry.filename.empty() ? qry.id : qry.filename};
 
@@ -77,7 +79,10 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
                                                   const int windowIndex,        //
                                                   const int sourceIndexBase) const {
   if (step <= 0) {
-    FatalError("streamInstance::constructAgsePayload: step must be > 0, got {}", step);
+    // Ta sama rodzina co query::descriptorFrom (A2) i dataModel::constructInputPayload:
+    // krok AGSE jest wielkoscia z zapytania, wiec w WYKONANIU odpowiada za niego uzytkownik.
+    // W samym kompilatorze ten sam warunek jest LogicError-em, bo tam stoi juz bramka planu.
+    throw rdb::ConfigError(std::format("streamInstance::constructAgsePayload: step must be > 0, got {}", step));
   }
 
   // temporary alias for variable - for better understand what is happening here.
@@ -228,13 +233,17 @@ void fnOp(opType op, const rdb::descFldVT &value, rdb::descFldVT &valueRet) {
       storeQuotient(val1, val2, valueRet);
       break;
     default:
-      FatalError("streamInstance::fnOp: unsupported opType");
+      throw rdb::LogicError("streamInstance::fnOp: unsupported opType");
   }
 }
 
 windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const int lastLogicalIndex,
                                                const int sourceIndexBase) const {
-  if (group.width <= 0) FatalError("streamInstance::reduceRecordWindow: window width must be > 0, got {}", group.width);
+  // ConfigError, nie LogicError: szerokosc okna pisze uzytkownik w zapytaniu. Bramka stoi w
+  // kompilatorze (compiler.cpp:152), wiec w wykonaniu jest to niezmiennik -- ale za wielkosc
+  // WZIETA Z ZAPYTANIA wini sie uzytkownika, tak samo jak za krok AGSE (A2, query.cpp).
+  if (group.width <= 0)
+    throw rdb::ConfigError(std::format("streamInstance::reduceRecordWindow: window width must be > 0, got {}", group.width));
 
   const auto &source = outputPayload;
 
@@ -243,7 +252,8 @@ windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const i
   // siega. Deskryptor zrodla nie odpowie na to drugie pytanie, bo wyrazenie nie jest polem.
   const auto resultType = group.valueType;
   if (resultType != rdb::RATIONAL && resultType != rdb::FLOAT && resultType != rdb::DOUBLE) {
-    FatalError("streamInstance::reduceRecordWindow: unsupported field type for window aggregation on '{}'", group.source);
+    throw rdb::LogicError(
+        std::format("streamInstance::reduceRecordWindow: unsupported field type for window aggregation on '{}'", group.source));
   }
 
   cast<rdb::descFldVT> castVT;
@@ -323,7 +333,8 @@ windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const i
 
 rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::string &instance) const {
   if (cmd != STREAM_MAX && cmd != STREAM_MIN && cmd != STREAM_SUM && cmd != STREAM_AVG) {
-    FatalError("streamInstance::reduceFieldsToPayload: cmd must be STREAM_MAX/MIN/SUM/AVG, got {}", static_cast<int>(cmd));
+    throw rdb::LogicError(std::format("streamInstance::reduceFieldsToPayload: cmd must be STREAM_MAX/MIN/SUM/AVG, got {}",
+        static_cast<int>(cmd)));
   }
 
   // First construct descriptor
@@ -347,7 +358,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   rdb::payload localPayload(descriptor);
 
   if (maxType > rdb::DOUBLE) {  // fldlist.h -  rdb types are in sequence
-    FatalError("streamInstance: aggregation not supported for this field type");
+    throw rdb::LogicError("streamInstance: aggregation not supported for this field type");
   }
 
   // choose aggregate operation
@@ -372,7 +383,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         valueRet = std::numeric_limits<double>::max();
         break;
       default:
-        FatalError("streamInstance: unsupported aggregation type");
+        throw rdb::LogicError("streamInstance: unsupported aggregation type");
     }
   }
   if (cmd == STREAM_MAX) {
@@ -392,7 +403,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         valueRet = std::numeric_limits<double>::lowest();  // min() to najmniejsza DODATNIA
         break;
       default:
-        FatalError("streamInstance: unsupported aggregation type");
+        throw rdb::LogicError("streamInstance: unsupported aggregation type");
     }
   }
   if (cmd == STREAM_SUM || cmd == STREAM_AVG) {
@@ -412,12 +423,12 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         valueRet = double(0);
         break;
       default:
-        FatalError("streamInstance: unsupported aggregation type");
+        throw rdb::LogicError("streamInstance: unsupported aggregation type");
     }
   }
 
   if (std::holds_alternative<std::monostate>(valueRet))
-    FatalError("streamInstance::reduceFieldsToPayload: valueRet not initialized after switch");
+    throw rdb::LogicError("streamInstance::reduceFieldsToPayload: valueRet not initialized after switch");
 
   auto validItemCount{0};
   // Petla idzie po SLOTACH PLASKICH, nie po wpisach deskryptora: getItemVT() przyjmuje
@@ -437,7 +448,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
       case rdb::BYTE:
       case rdb::INTEGER:
       case rdb::UINT:
-        FatalError("streamInstance: BYTE/INT/UINT should have been cast to RATIONAL before aggregation");
+        throw rdb::LogicError("streamInstance: BYTE/INT/UINT should have been cast to RATIONAL before aggregation");
       case rdb::RATIONAL:
         fnOp<boost::rational<int>>(op, value, valueRet);
         break;
@@ -448,7 +459,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         fnOp<double>(op, value, valueRet);
         break;
       default:
-        FatalError("streamInstance: unsupported aggregation type");
+        throw rdb::LogicError("streamInstance: unsupported aggregation type");
     }
   }
 
@@ -464,7 +475,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
       case rdb::BYTE:
       case rdb::INTEGER:
       case rdb::UINT:
-        FatalError("streamInstance: BYTE/INT/UINT should have been cast to RATIONAL before aggregation");
+        throw rdb::LogicError("streamInstance: BYTE/INT/UINT should have been cast to RATIONAL before aggregation");
       case rdb::RATIONAL:
         fnOp<boost::rational<int>>(avgop, value, valueRet);
         break;
@@ -475,7 +486,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
         fnOp<double>(avgop, value, valueRet);
         break;
       default:
-        FatalError("streamInstance: unsupported aggregation type");
+        throw rdb::LogicError("streamInstance: unsupported aggregation type");
     }
   }
 
@@ -486,7 +497,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   // czyli sam defekt. Pole wyjściowe jest typu RATIONAL i nie ma do czego
   // nasycać: wynik zostaje dokładny.
   if (maxType != rdb::RATIONAL && maxType != rdb::FLOAT && maxType != rdb::DOUBLE) {
-    FatalError("streamInstance: unsupported type in aggregation finalization");
+    throw rdb::LogicError("streamInstance: unsupported type in aggregation finalization");
   }
 
   auto postion{0};
@@ -517,7 +528,8 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) cons
     // (najciezszej) sciezce. Parytet z wariantem any-owym potwierdzony round-trip
     // (test_payload) + integracja bit-identyczna (ctest).
     if (program.field_.rtype != (outputPayload->descriptor[i]).rtype) {
-      FatalError("streamInstance::constructOutputPayload: program field type does not match descriptor type at index {}", i);
+      throw rdb::LogicError(std::format(
+          "streamInstance::constructOutputPayload: program field type does not match descriptor type at index {}", i));
     }
 
     cast<rdb::descFldVT> castVT;
@@ -534,6 +546,12 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) cons
   }
 }
 
+/// Jedno miejsce na trzy warianty, ktorych boolCast nie obsluguje. Wpisane w kazda lambde
+/// z osobna rozpychaly linie ponad limit kolumn i rozbijaly wyrownanie zestawu przeciazen.
+[[noreturn]] static void boolCastUnsupported(const char *what) {
+  throw rdb::LogicError(std::string("boolCast: ") + what + " not supported");
+}
+
 bool boolCast(const rdb::descFldVT &inVar) {
   bool retVal(false);
 
@@ -545,9 +563,9 @@ bool boolCast(const rdb::descFldVT &inVar) {
                  [&retVal](boost::rational<int> a) { retVal = (a != 0); },                                                    //
                  [&retVal](float a) { retVal = (a != 0); },                                                                   //
                  [&retVal](double a) { retVal = (a != 0); },                                                                  //
-                 [&retVal](std::pair<int, int>) { FatalError("boolCast: pair<int,int> not supported"); },                     //
-                 [&retVal](const std::pair<std::string, int> &) { FatalError("boolCast: pair<string,int> not supported"); },  //
-                 [&retVal](const std::string &) { FatalError("boolCast: string type not supported"); }                        //
+                 [](std::pair<int, int>) { boolCastUnsupported("pair<int,int>"); },                                           //
+                 [](const std::pair<std::string, int> &) { boolCastUnsupported("pair<string,int>"); },                        //
+                 [](const std::string &) { boolCastUnsupported("string type"); }                                              //
              },
              inVar);
 
@@ -564,9 +582,9 @@ void streamInstance::constructRulesAndUpdate(const query &qry) {
   rdb::payload payload(*outputPayload->getPayload());
 
   for (const auto &r : qry.lRules) {
-    if (r.condition.empty()) FatalError("streamInstance::constructRulesAndUpdate: rule condition is empty");
+    if (r.condition.empty()) throw rdb::LogicError("streamInstance::constructRulesAndUpdate: rule condition is empty");
     if (r.action != rule::DUMP && r.action != rule::SYSTEM)
-      FatalError("streamInstance::constructRulesAndUpdate: unsupported rule action");
+      throw rdb::LogicError("streamInstance::constructRulesAndUpdate: unsupported rule action");
     // Regula dolaczona ad-hoc jest nieuzbrojona, dopoki nie zbierze wlasnej historii -
     // patrz rule::armAtCount. Reguly z planu maja tam zero i wchodza od razu.
     if (outputPayload->getRecordsCount() < r.armAtCount) continue;

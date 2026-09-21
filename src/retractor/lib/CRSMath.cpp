@@ -1,6 +1,6 @@
 #include "CRSMath.hpp"
 
-#include "fatalError.hpp"
+#include "rdb/exceptions.hpp"
 
 using namespace CRationalStreamMath;
 
@@ -9,7 +9,7 @@ TimeLine::TimeLine(set<boost::rational<int>> const &inSet) : ctSlot_(0) { rebuil
 void TimeLine::updateTimeIntervals(const set<boost::rational<int>> &inSet) { rebuild(inSet); }
 
 void TimeLine::rebuild(const set<boost::rational<int>> &inSet) {
-  if (inSet.empty()) FatalError("TimeLine: input interval set must not be empty");
+  if (inSet.empty()) throw rdb::LogicError("TimeLine: input interval set must not be empty");
   set<rational<int>> newRates;
   map<rational<int>, long> newCounters;
   for (auto val : inSet) {
@@ -49,7 +49,7 @@ bool TimeLine::isThisDeltaAwaitCurrentTimeSlot(const boost::rational<int> &inDel
 // MAGIC Warning
 
 const boost::rational<int> &TimeLine::getNextTimeSlot() {
-  if (sr_.empty()) FatalError("TimeLine::getNextTimeSlot: internal stream rate set is empty");
+  if (sr_.empty()) throw rdb::LogicError("TimeLine::getNextTimeSlot: internal stream rate set is empty");
   // In constructor we were set deltas and indexes
   // Take first value from tje edge
   // even good we can take max rational here.
