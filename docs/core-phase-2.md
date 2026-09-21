@@ -76,9 +76,8 @@ still means the process default, which is what `test_faccmemory_persistence_acro
 has always relied on.
 
 **Since then:** `rdb::storage` takes a store (2.4) and `rdb::embed::Engine` owns one (2.5) -
-see §3d. The Python binding still does not expose either, so
-`test_reentry.py::test_two_storages_open_at_once` continues to pass by luck rather than by
-isolation; that is now a wiring job with no design question left in it (§4).
+see §3d. The proof of isolation is `ut_embedEngine`, in C++, and §4 explains why it cannot
+be in Python yet.
 
 ## 3. The fatal-exit machinery leaves the shared headers (2.2)
 
@@ -183,19 +182,41 @@ the test was hard, but because there was nothing to call an engine.
 
 ## 4. What phase 2 still owes
 
-**The probe counters.** `probe.hpp` holds three `inline` counter objects, so two engines in
-one process share their measurements. They are in the header deliberately: the increment must
-inline, because a jump to another translation unit would be visible in the measurement itself.
-Moving them into an engine object costs a pointer chase in the tick loop, so this is a
-measurement-versus-isolation trade-off rather than a mechanical move. Listed in the gate's
-`KNOWN_DEBT`.
+**The probe counters - smaller than first recorded.** `probe.hpp` holds three `inline`
+counter objects, and the first pass through this document called them a measurement-versus-
+isolation trade-off awaiting a decision. Looking properly at when they are live makes the
+decision instead of posing it.
+
+Every access sits inside `if constexpr (rdb_probe_*)`, and `RDB_BENCH_PROBE` defaults to
+**OFF**. In every build that is not a measurement campaign the counters are dead bytes in
+`.bss`: nothing reads or writes them, so two engines in one process have no way to interfere
+through them. They come alive only in a probe build, and a probe build runs **one** engine by
+construction - the H9/H10 campaign on a pinned pi400.
+
+Moving them into the engine object would therefore buy isolation for a case the measurement
+never runs, and pay for it with a pointer chase in exactly the loop the probe exists to
+measure. That is the wrong trade, so it is not taken.
+
+They stay listed in the gate's `KNOWN_DEBT` rather than being waved through, because
+"the campaign is single-engine" is an assumption about how the build is used, not a property
+the code enforces. The gate prints them on every run; the entry now states the condition.
 
 **`executorsmState.hpp`.** Roughly twenty globals - `pProc`, `core_mutex`,
 `plan_epoch_mutex`, the `esm::` group. They are genuinely the server's, and no notebook links
 them today. They also stop being globals naturally when phase 3 restructures the run loop
 around `step()`, so converting them now would be work done twice.
 
-**The binding.** `rdb::embed::Engine` exists but `module.cpp` does not expose it, so a
-notebook still cannot build two isolated engines. This is the last step that makes
-`test_reentry.py::test_two_storages_open_at_once` assert isolation instead of coincidence -
-and it is now plumbing, since §3d settled who owns what.
+**The binding - and a correction.** It is tempting to say the last step is exposing
+`Engine` in `module.cpp` so that `test_reentry.py::test_two_storages_open_at_once` finally
+asserts isolation. That is wrong, and the reason is worth writing down rather than
+discovering twice.
+
+MEMORY-store state only diverges on a **write**. The stage 1a binding is deliberately
+read-only (`module.cpp:31`, `jupyter-integration.md` §1), so two Python `Storage` objects
+over the same stream cannot make the old global misbehave no matter how they are scoped.
+Exposing `Engine` today would add a public Python type that no test could exercise - API
+ahead of the requirement that shapes it.
+
+So the Python half of the isolation claim is blocked on **writes from Python**, which is J1
+and J6 work, not plumbing. `test_reentry.py` now says this in its own docstrings rather than
+implying a coverage it does not have; the claim itself is carried by `ut_embedEngine`.

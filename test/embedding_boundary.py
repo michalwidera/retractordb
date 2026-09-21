@@ -50,15 +50,24 @@ ALLOWED = {
 # nie mylic "wiemy i mamy plan" z "przeoczylismy".
 KNOWN_DEBT = {
     "src/include/rdb/probe.hpp": [
-        ("inline workCounters work{};", "liczniki sond sciezki goracej"),
-        ("inline materializationCounters materialization{};", "liczniki sond sciezki goracej"),
-        ("inline logicalWriteCounters logicalWrite{};", "liczniki sond sciezki goracej"),
+        ("inline workCounters work{};", "licznik sondy, ZYWY tylko przy RDB_BENCH_PROBE=ON"),
+        ("inline materializationCounters materialization{};", "licznik sondy, ZYWY tylko przy RDB_BENCH_PROBE=ON"),
+        ("inline logicalWriteCounters logicalWrite{};", "licznik sondy, ZYWY tylko przy RDB_BENCH_PROBE=ON"),
     ],
 }
-# Wspolny powod dla calej grupy powyzej: liczniki leza w naglowku, bo inkrementacja musi sie
-# inline'owac - skok do innej jednostki kompilacji bylby widoczny w samym pomiarze. Przeniesienie
-# ich do obiektu silnika kosztuje pogon za wskaznikiem w petli taktu, wiec jest to decyzja
-# o kompromisie pomiar/izolacja, a nie prosta zamiana. Patrz docs/core-phase-2.md sekcja 4.
+# Wspolny powod dla calej grupy powyzej, i jest wezszy, niz wyglada na pierwszy rzut oka.
+#
+# Liczniki leza w naglowku, bo inkrementacja musi sie inline'owac - skok do innej jednostki
+# kompilacji bylby widoczny w samym pomiarze. Ale KAZDE ich dotkniecie stoi wewnatrz
+# `if constexpr (rdb_probe_*)`, a RDB_BENCH_PROBE jest domyslnie OFF. W buildzie, ktory
+# ktokolwiek uruchamia poza kampania pomiarowa, sa to martwe bajty w .bss - nikt ich nie
+# czyta ani nie pisze, wiec dwa silniki w jednym procesie nie maja przez co na siebie wplynac.
+#
+# Zywe staja sie wylacznie w buildzie pomiarowym, a ten z zalozenia prowadzi JEDEN silnik
+# (kampania H9/H10 na przypietym pi400). Przeniesienie ich do obiektu silnika kosztowaloby
+# pogon za wskaznikiem dokladnie w petli, ktora sonda mierzy - czyli psuloby pomiar, zeby
+# odseparowac przypadek, ktorego pomiar nie wykonuje. Wpis zostaje widoczny, bo zalozenie
+# "kampania jest jednosilnikowa" jest zalozeniem, a nie gwarancja. Patrz core-phase-2.md sekcja 4.
 
 LOGGER_CONFIG = re.compile(
     r"\bspdlog::(set_default_logger|register_logger|set_pattern|set_level|shutdown|drop\w*)\b"

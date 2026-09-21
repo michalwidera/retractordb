@@ -7,10 +7,14 @@ run, which is what makes the three process-wide globals visible:
 * ``fatalErrorRaised`` - src/include/fatalError.hpp:16
 * the MEMORY maps      - src/rdb/lib/faccmemory.cc:13-16
 
-Stage 1a does not remove them; phase 2 of the shared refactor does. These tests
-assert that the sequential case is clean today, so that the phase-2 work has a
-baseline it must not regress, and so the first overlapping-instance failure is
-caught here rather than in someone's notebook.
+Stage 1a does not remove them; phase 2 of the shared refactor does, and by now has:
+``statusDesc`` is gone, ``fatalErrorRaised`` left the shared headers, and the MEMORY
+maps became ``rdb::MemoryStore`` owned by ``rdb::embed::Engine``.
+
+These tests remain the baseline that work must not regress. They are NOT the proof of
+instance isolation, and it is worth being exact about why: isolation shows up on a
+write, and this binding is read-only by design. The proof lives in ``ut_embedEngine``
+until the binding grows writes at J1.
 """
 
 from __future__ import annotations
@@ -40,7 +44,19 @@ def test_descriptor_parsing_is_repeatable(rdb, plain_storage: Path) -> None:
 
 
 def test_two_storages_open_at_once(rdb, plain_storage: Path) -> None:
-    """Overlapping instances - the case the globals will break first."""
+    """Overlapping instances, as far as a read-only binding can reach.
+
+    What this DOES check: two live ``Storage`` objects over the same stream do not
+    disturb each other's reads, in either order.
+
+    What it CANNOT check, and did not when it was written: MEMORY-store isolation.
+    That state only diverges on a *write*, and this binding is deliberately read-only
+    (``module.cpp:31``). Phase 2 gave the MEMORY store an owner and
+    ``rdb::embed::Engine`` to hold it, and ``ut_embedEngine`` asserts two engines do
+    not share a stream - but in C++, because that is where writes exist. This test
+    becomes the Python half of that claim only once the binding can write, which is
+    J1's push/ingest work, not a wiring job.
+    """
     with rdb.Storage("plain_file", "plain_file", storage_param=str(plain_storage)) as first:
         with rdb.Storage("plain_file", "plain_file", storage_param=str(plain_storage)) as second:
             assert tuple(first.read(0)) == (1, 10)
