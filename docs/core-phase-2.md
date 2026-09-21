@@ -1,8 +1,10 @@
 # Core phase 2: de-globalize, and inject the log sink
 
 **Status:** started. 2.1 (the MEMORY store), 2.2 (the fatal-exit machinery leaves the shared
-headers) and 2.3 (the descriptor format flag, plus the gate that enforces all of it) are
-**done**. `executorsmState.hpp` is deliberately out of scope - see §4.
+headers), 2.3 (the descriptor format flag, plus the gate that enforces all of it) and 2.4/2.5
+(the owner: `rdb::storage` takes a store, and L2 exists to hold one) are **done**. What
+remains is the binding and the probe counters - see §4. `executorsmState.hpp` is deliberately
+out of scope.
 
 **Prerequisite for:** stage 1b (`Engine` binding the full engine) and everything above it -
 see [`embedded-roadmap.md`](embedded-roadmap.md), where phase 2 is "de-globalize and inject a
@@ -73,10 +75,10 @@ same stream name stay independent; one store still shares between instances; no 
 still means the process default, which is what `test_faccmemory_persistence_across_instances`
 has always relied on.
 
-**Not done yet:** `rdb::storage` and the Python binding cannot pass a store, so
-`test_reentry.py::test_two_storages_open_at_once` still passes by luck rather than by
-isolation. Giving them one needs an object that means "one engine", which stage 1a does not
-have - see §4.
+**Since then:** `rdb::storage` takes a store (2.4) and `rdb::embed::Engine` owns one (2.5) -
+see §3d. The Python binding still does not expose either, so
+`test_reentry.py::test_two_storages_open_at_once` continues to pass by luck rather than by
+isolation; that is now a wiring job with no design question left in it (§4).
 
 ## 3. The fatal-exit machinery leaves the shared headers (2.2)
 
@@ -148,6 +150,37 @@ allocated once, not state). `KNOWN_DEBT` is for real defects with a plan - print
 run, not fatal, and meant to shrink. The distinction exists because an allowlist that hides
 a defect is worse than no gate at all.
 
+## 3d. The owner: L2 arrives early (2.4, 2.5)
+
+De-globalizing needs somewhere for the state to go, and phase 2 kept running into the same
+wall from three directions: `rdb::storage` had no way to accept a store, the probe counters
+had nowhere to live, and phase 3's `step()` will need the same thing. All three want an object
+that means **one engine**.
+
+That object was never in doubt - `embedded-roadmap.md` §2 already names the layer
+(**L2 `librdbembed`**, shared by nanobind, the C ABI and JNI) and `jupyter-integration.md`
+names the class (`Engine`, at J1). What was open was *timing*: `Engine` as specified needs
+`compile()`, `step()` and `rows()`, and those are phase 3.
+
+The decision taken: **create L2 now, in minimal form.** `rdb::embed::Engine` exists, owns a
+`MemoryStore`, and builds storages bound to it through `openStorage()`. Nothing else. J1 adds
+its methods to an object that already exists rather than inventing one under the pressure of
+a different problem, and phase 2 gets to *assert* its central claim instead of asserting it in
+prose.
+
+Two properties of the class are load-bearing rather than stylistic:
+
+- It is **non-movable and non-copyable**. `storage` holds a raw `MemoryStore*` into the
+  engine; moving the engine would relocate the store and leave every storage built from it
+  pointing at nothing.
+- It is **optional**. `rdb::storage` still defaults to `MemoryStore::processDefault()`, so the
+  server and the existing binding are untouched and know nothing about `Engine`. A test
+  asserts exactly that, because "the new object breaks nobody" is a claim worth checking.
+
+`test_embedEngine.cpp` is where the phase-2 thesis becomes an assertion: two engines, the same
+MEMORY stream name, no shared state. Before this it could not have been written - not because
+the test was hard, but because there was nothing to call an engine.
+
 ## 4. What phase 2 still owes
 
 **The probe counters.** `probe.hpp` holds three `inline` counter objects, so two engines in
@@ -162,7 +195,7 @@ measurement-versus-isolation trade-off rather than a mechanical move. Listed in 
 them today. They also stop being globals naturally when phase 3 restructures the run loop
 around `step()`, so converting them now would be work done twice.
 
-**The object that means "one engine".** 2.1 stops at the injection point because stage 1a has
-no such object: it binds loose `Storage` handles, not a session. Creating one is what lets the
-binding hand each engine its own MEMORY store, and it is the same object phase 3 needs for
-`step()` and phase 2.3 for the sink. It is the natural next decision, not a loose end.
+**The binding.** `rdb::embed::Engine` exists but `module.cpp` does not expose it, so a
+notebook still cannot build two isolated engines. This is the last step that makes
+`test_reentry.py::test_two_storages_open_at_once` assert isolation instead of coincidence -
+and it is now plumbing, since §3d settled who owns what.

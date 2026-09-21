@@ -5,6 +5,7 @@ cmake_minimum_required(VERSION 3.20...4.4 FATAL_ERROR)
 
 add_subdirectory(common)
 add_subdirectory(rdb)
+add_subdirectory(embed)
 add_subdirectory(qry)
 add_subdirectory(retractor)
 
