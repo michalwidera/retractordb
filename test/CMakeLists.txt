@@ -87,6 +87,14 @@ endif()
 # tablicach z proofOracle.hpp; ten test pilnuje, ze kazde twierdzenie z Profs ma
 # wiersz w proof_manifest.tsv i ze tablice nie sa starsze od dowodow. Czyta
 # tylko pliki .lean, wiec nie wymaga Lean i biegnie takze w CI.
+# Bramka fazy 2: warstwa osadzalna (biblioteka rdb + jej naglowki publiczne) nie trzyma
+# stanu procesu, nie konfiguruje logera i nie konczy procesu. Uzasadnienie i lista swiadomych
+# wyjatkow stoja w samym skrypcie; znany dlug jest wypisywany, ale nie oblewa.
+add_test(
+  NAME embedding_boundary
+  COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/embedding_boundary.py
+          ${CMAKE_CURRENT_SOURCE_DIR}/..)
+
 add_test(
   NAME proof_drift
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

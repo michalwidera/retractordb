@@ -620,7 +620,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
         (r.rtype == rdb::RETENTION) ||  //
         (r.rtype == rdb::RETMEMORY))    // skip these types
       continue;
-    if (!Descriptor::isSingleLineOutput())
+    if (!isSingleLineOutput(os))
       os << "\t";
     else
       os << " ";
@@ -645,16 +645,16 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       }
       flatIndex += flatCountForField;
     }
-    if (!Descriptor::isSingleLineOutput()) os << '\n';
+    if (!isSingleLineOutput(os)) os << '\n';
   }
   if (rhs.descriptor.empty()) {
     os << "Empty";
     SPDLOG_ERROR("Empty descriptor on payload.");
   }
-  if (Descriptor::isSingleLineOutput()) os << " ";
+  if (isSingleLineOutput(os)) os << " ";
   os << "}";
-  if (!Descriptor::isSingleLineOutput()) os << '\n';
-  Descriptor::setSingleLineOutput(false);
+  if (!isSingleLineOutput(os)) os << '\n';
+  setSingleLineOutput(os, false);
   return os;
 }
 

@@ -1,8 +1,8 @@
 # Core phase 2: de-globalize, and inject the log sink
 
-**Status:** started. 2.1 (the MEMORY store) and 2.2 (the fatal-exit machinery leaves the
-shared headers) are **done**. 2.3, the log sink, is not started. `executorsmState.hpp` is
-deliberately out of scope - see §4.
+**Status:** started. 2.1 (the MEMORY store), 2.2 (the fatal-exit machinery leaves the shared
+headers) and 2.3 (the descriptor format flag, plus the gate that enforces all of it) are
+**done**. `executorsmState.hpp` is deliberately out of scope - see §4.
 
 **Prerequisite for:** stage 1b (`Engine` binding the full engine) and everything above it -
 see [`embedded-roadmap.md`](embedded-roadmap.md), where phase 2 is "de-globalize and inject a
@@ -28,12 +28,21 @@ divides cleanly by *whose* state it is:
 | MEMORY records, NULL maps, write counter | `faccmemory.cc` 3 statics | the engine's - **fixed, §2** |
 | `fatalErrorRaised` | `fatalError.hpp` | the server process's - **relocated, §3** |
 | `statusDesc` | `DESCParser.cc` | gone - deleted by phase 1 slice 1 |
-| spdlog default logger | `uxSysTermTools.cpp` | the process's - **§4** |
+| `Descriptor::singleLineOutput_` | `descriptor.hpp` class static | the engine's - **fixed, §3a** |
+| spdlog default logger | `uxSysTermTools.cpp` | the binaries' - **not an issue, §3b** |
+| probe counters | `probe.hpp` 3 inline vars | the engine's - **known debt, §4** |
 | executor state (`pProc`, `core_mutex`, `esm::*`) | `executorsmState.hpp` | the server's - **§4** |
 | `castFldVT` | `expressionEvaluator.cpp` | stateless functor, not state |
 
 That list is the reason phase 2 is small. The engine does not, in general, keep process
-state; it kept three maps and one flag.
+state; it kept three maps, two flags and three counters.
+
+**The list is not the product of one sweep, and that matters.** The first pass looked for
+namespace-scope statics and found only the MEMORY maps. `Descriptor::singleLineOutput_` is a
+*class* static, so that sweep never saw it; the probe counters are `inline` variables in a
+header, so a grep for `static` missed them too. All three turned up only when the sweep was
+written as an executable gate (§3c) rather than run once by hand. An inventory that is not
+enforced is a snapshot of one afternoon's greps.
 
 ## 2. The MEMORY store (2.1)
 
@@ -92,11 +101,61 @@ This does not de-globalize the flag. Its correct scope genuinely *is* "the xretr
 exit path", because that is what it describes. What changes is that the shared include
 directory no longer advertises it.
 
+## 3a. The descriptor format flag (2.3)
+
+`Descriptor::singleLineOutput_` was a static class member: a process-wide flag, in the layer a
+notebook loads, and in the worst shape such a flag comes in. It was raised by the
+`rdb::singleLineFormat` manipulator and **cleared by `operator<<` itself** after one use, so two
+threads printing descriptors raced over the format of a third's output. `module.cpp` already
+carried a save-and-restore workaround around every `repr()`, with a comment naming phase 2 as
+the fix.
+
+It now lives in a `std::ios_base::xalloc()` slot of the stream being written to. Every call
+site is unchanged - `os << rdb::singleLineFormat << desc` reads the same, and the one-shot
+semantics are the same - but "single line" now means *this output* rather than *this process*.
+The binding's workaround is gone; a local `ostringstream` cannot affect anyone.
+
+A word on how nearly this went wrong: `grep singleLineOutput` finds no callers, because the
+manipulator that sets it is named `singleLineFormat` and has about 35 call sites across
+`xtrdb`, the tests and the binding. Read as dead code, it would have been deleted.
+
+## 3b. The log sink: already where it belongs (2.3)
+
+The roadmap pairs de-globalization with "inject a log sink", and the expectation was a slice.
+The sweep says otherwise: **no logger configuration exists in the library at all.** Every
+`set_default_logger`, sink construction, pattern and level lives in `src/common/uxSysTermTools.cpp`
+and the three launchers - that is, in the binaries. The library only ever *uses* whatever
+default logger it finds, which is exactly the behaviour a host process wants: it configures
+spdlog, and the engine writes there.
+
+So 2.3 needed no injection mechanism, only a guarantee that this stays true. That is what
+§3c checks.
+
+## 3c. The gate (2.3)
+
+`test/embedding_boundary.py`, registered as the `embedding_boundary` test, asserts four
+properties of `src/rdb/lib` and `src/include/rdb` - the library and its public headers, not
+the `xtrdb` tool that shares the directory:
+
+1. no file-scope mutable state (`static` / `inline` variables);
+2. no mutable static class members - the category the first sweep missed;
+3. no logger *configuration*, only use;
+4. no `std::exit` and no `FatalError` - phase 1's result, now held in place.
+
+Two lists keep it honest. `ALLOWED` is for deliberate, permanent exceptions, each with its
+reason: the `MemoryStore::processDefault()` instance, and the `xalloc` index (an index
+allocated once, not state). `KNOWN_DEBT` is for real defects with a plan - printed on every
+run, not fatal, and meant to shrink. The distinction exists because an allowlist that hides
+a defect is worse than no gate at all.
+
 ## 4. What phase 2 still owes
 
-**2.3, the log sink.** spdlog's default logger is process-global, and a host process has its
-own logging. The engine should take a sink rather than reach for the global registry. Not
-started.
+**The probe counters.** `probe.hpp` holds three `inline` counter objects, so two engines in
+one process share their measurements. They are in the header deliberately: the increment must
+inline, because a jump to another translation unit would be visible in the measurement itself.
+Moving them into an engine object costs a pointer chase in the tick loop, so this is a
+measurement-versus-isolation trade-off rather than a mechanical move. Listed in the gate's
+`KNOWN_DEBT`.
 
 **`executorsmState.hpp`.** Roughly twenty globals - `pProc`, `core_mutex`,
 `plan_epoch_mutex`, the `esm::` group. They are genuinely the server's, and no notebook links

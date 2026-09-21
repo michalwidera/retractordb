@@ -118,18 +118,15 @@ struct Record {
 
 /// Sformatuj obiekt przez jego operator<< - deskryptor i payload maja wlasne.
 ///
-/// Tryb jednoliniowy trzeba PRZYWROCIC. Manipulator singleLineFormat ustawia
-/// statyczna flage calego procesu (descriptor.cc:282-285) i nigdy jej nie cofa,
-/// wiec pojedyncze repr() w notatniku zmienialoby format kazdego pozniejszego
-/// wypisu deskryptora. Dokladnie ta klasa stanu globalnego jest przedmiotem
-/// fazy 2 wspolnego refaktoru - nie dokladamy do niej kolejnego przypadku.
+/// Zapamietywanie i przywracanie trybu jednoliniowego bylo tu OBEJSCIEM stanu globalnego:
+/// manipulator ustawial statyczna flage calego procesu, wiec jedno repr() w notatniku
+/// zmienialoby format kazdego pozniejszego wypisu deskryptora - takze w kodzie uzytkownika,
+/// ktory o istnieniu tej flagi nie wie. Faza 2 przeniosla flage do strumienia (xalloc), a
+/// strumien jest tu lokalny, wiec nie ma juz czego przywracac ani co zepsuc.
 template <typename T>
 std::string streamToString(const T &value) {
-  const bool previous = rdb::Descriptor::isSingleLineOutput();
-  rdb::Descriptor::setSingleLineOutput(true);
   std::ostringstream out;
-  out << value;
-  rdb::Descriptor::setSingleLineOutput(previous);
+  out << rdb::singleLineFormat << value;
   return out.str();
 }
 

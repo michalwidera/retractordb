@@ -17,7 +17,6 @@ extern std::string parserDESCString(rdb::Descriptor &desc, std::string_view inle
 
 namespace rdb {
 
-bool Descriptor::singleLineOutput_ = false;
 
 constexpr auto GetFieldType(const std::string_view name) {
   if (name == "NULL") return std::optional<rdb::descFld>(rdb::NULLTYPE);
@@ -281,8 +280,21 @@ std::pair<rdb::descFld, int> Descriptor::widestFieldType() {
   return std::make_pair(retVal, size);
 }
 
+namespace {
+/// Slot xalloc jest przydzielany RAZ na proces i jest niezmienny - to indeks, nie stan. Sama
+/// wartosc flagi zyje w iword() konkretnego strumienia.
+int singleLineSlot() {
+  static const int slot = std::ios_base::xalloc();
+  return slot;
+}
+}  // namespace
+
+bool isSingleLineOutput(std::ostream &os) { return os.iword(singleLineSlot()) != 0; }
+
+void setSingleLineOutput(std::ostream &os, const bool enabled) { os.iword(singleLineSlot()) = enabled ? 1 : 0; }
+
 std::ostream &singleLineFormat(std::ostream &os) {
-  Descriptor::setSingleLineOutput(true);
+  setSingleLineOutput(os, true);
   return os;
 }
 
@@ -293,7 +305,7 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
       if (r.rlen == 0 && r.rarray == 0) continue;  // skip retention 0,0
     if (r.rtype == rdb::RETMEMORY)
       if (r.rlen == 0) continue;  // skip retention memory 0
-    if (!Descriptor::singleLineOutput_)
+    if (!isSingleLineOutput(os))
       os << "\t";
     else
       os << " ";
@@ -322,14 +334,14 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
       os << "[" << r.rarray << "]";
     else if (r.rtype == rdb::STRING)
       os << "[" << r.rlen << "]";
-    if (!Descriptor::singleLineOutput_) os << '\n';
+    if (!isSingleLineOutput(os)) os << '\n';
   }
   if (rhs.empty())
     os << "Empty";
-  else if (Descriptor::singleLineOutput_)
+  else if (isSingleLineOutput(os))
     os << " ";
   os << "}";
-  Descriptor::singleLineOutput_ = false;
+  setSingleLineOutput(os, false);
 
   return os;
 }

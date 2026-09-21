@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <initializer_list>
+#include <iosfwd>
 #include <optional>
 #include <string>
 #include <vector>
@@ -49,12 +50,7 @@ class Descriptor : public std::vector<rField> {
   // fmt do tego szeroko-includowanego naglowka). Hot-path jest inline nizej.
   [[noreturn]] void flatIndexOutOfRange(int flatIndex) const;
 
-  static bool singleLineOutput_;
-
  public:
-  static bool isSingleLineOutput() { return singleLineOutput_; }
-  static void setSingleLineOutput(bool enabled) { singleLineOutput_ = enabled; }
-
   Descriptor(std::initializer_list<rField> fields);
   Descriptor(const std::string &fieldName, int length, int elementCount, rdb::descFld type);
 
@@ -105,5 +101,20 @@ class Descriptor : public std::vector<rField> {
 
 // http://www.gotw.ca/gotw/004.htm
 Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs);
+
+/// Format jednowierszowy deskryptora i payloadu. Stan NALEZY DO STRUMIENIA, nie do procesu:
+/// siedzi w slocie std::ios_base::xalloc() tego konkretnego ostream-a.
+///
+/// Do fazy 2 byla to statyczna skladowa Descriptor::singleLineOutput_ - flaga calego procesu w
+/// warstwie, ktora laduje notatnik, i to w najgorszej odmianie: ustawiana manipulatorem, a
+/// KASOWANA przez sam operator<< po pierwszym uzyciu. Dwa watki wypisujace rownolegle scigaly
+/// sie o format wyjscia trzeciego, a wiazanie Pythona musialo zapamietywac i przywracac jej
+/// wartosc wokol kazdego repr() (module.cpp, streamToString) - obejscie, ktore ta zmiana usuwa.
+///
+/// Semantyka JEDNORAZOWOSCI zostaje bez zmian: operator<< zdejmuje flage po wypisaniu, wiec
+/// `os << rdb::singleLineFormat << x` dotyczy dokladnie tego jednego wypisu. Nowe jest tylko
+/// to, ze "gdzie" oznacza teraz ten strumien, a nie caly proces.
 std::ostream &singleLineFormat(std::ostream &os);
+[[nodiscard]] bool isSingleLineOutput(std::ostream &os);
+void setSingleLineOutput(std::ostream &os, bool enabled);
 }  // namespace rdb
