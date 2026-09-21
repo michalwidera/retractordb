@@ -312,3 +312,78 @@ TEST(MemoryTest, test_faccmemory_persistence_across_instances) {
 
   mfa2->write(nullptr);
 }
+
+// ============================================================
+// MemoryStore - wlascicielstwo pamieci MEMORY (faza 2 refaktoru)
+// ============================================================
+
+// Sedno fazy 2: dwa sklepy to dwie pamieci. Ta sama nazwa strumienia, te same zapisy,
+// zadnego wspolnego stanu. Przed faza 2 nie bylo jak tego napisac - pamiec byla trzema
+// `static` w faccmemory.cc, wiec kazdy notatnik, ktory zbudowal dwa silniki w jednym
+// procesie, dostawal jeden strumien sklejony z dwoch.
+TEST(MemoryStoreTest, separate_stores_do_not_share_a_stream) {
+  BYTE record;
+  const std::string filename = "shared_name_two_stores";
+  auto recsize               = sizeof(BYTE);
+  auto retention             = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
+
+  rdb::MemoryStore storeA;
+  rdb::MemoryStore storeB;
+
+  rdb::memoryFile fileA(filename, makeDesc(recsize), retention, storeA);
+  rdb::memoryFile fileB(filename, makeDesc(recsize), retention, storeB);
+
+  record = 0x11;
+  fileA.write(&record);
+  GTEST_ASSERT_EQ(fileA.count(), 1);
+  GTEST_ASSERT_EQ(fileB.count(), 0) << "sklep B zobaczyl zapis do sklepu A";
+
+  record = 0x22;
+  fileB.write(&record);
+  GTEST_ASSERT_EQ(fileA.count(), 1);
+  GTEST_ASSERT_EQ(fileB.count(), 1);
+
+  GTEST_ASSERT_EQ(fileA.read(&record, 0), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(record, 0x11);
+  GTEST_ASSERT_EQ(fileB.read(&record, 0), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(record, 0x22);
+}
+
+// Druga polowa kontraktu: W GRANICACH jednego sklepu wspoldzielenie po nazwie zostaje.
+// Na tym stoi plan - piszacy i czytajacy ten sam strumien MEMORY to rozne obiekty.
+TEST(MemoryStoreTest, one_store_still_shares_by_stream_name) {
+  BYTE record;
+  const std::string filename = "shared_name_one_store";
+  auto recsize               = sizeof(BYTE);
+  auto retention             = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
+
+  rdb::MemoryStore store;
+  rdb::memoryFile writer(filename, makeDesc(recsize), retention, store);
+  rdb::memoryFile reader(filename, makeDesc(recsize), retention, store);
+
+  record = 0x37;
+  writer.write(&record);
+
+  GTEST_ASSERT_EQ(reader.count(), 1);
+  GTEST_ASSERT_EQ(reader.read(&record, 0), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(record, 0x37);
+}
+
+// Bez podanego sklepu obowiazuje instancja domyslna procesu - to jest zachowanie sprzed
+// fazy 2 i testy powyzej (test_faccmemory_persistence_across_instances) na nim stoja.
+TEST(MemoryStoreTest, default_is_the_process_store) {
+  BYTE record;
+  const std::string filename = "default_store_stream";
+  auto recsize               = sizeof(BYTE);
+  auto retention             = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
+
+  rdb::memoryFile implicitStore(filename, makeDesc(recsize), retention);
+  rdb::memoryFile explicitStore(filename, makeDesc(recsize), retention, rdb::MemoryStore::processDefault());
+
+  record = 0x5A;
+  implicitStore.write(&record);
+
+  GTEST_ASSERT_EQ(explicitStore.count(), 1);
+  GTEST_ASSERT_EQ(explicitStore.read(&record, 0), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(record, 0x5A);
+}

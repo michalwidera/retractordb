@@ -18,7 +18,6 @@
 #include <boost/system/system_error.hpp>
 
 #include "constants.hpp"
-#include "fatalError.hpp"
 #include "formatters.hpp"
 #include "ipcClient.hpp"
 #include "uxSysTermTools.hpp"

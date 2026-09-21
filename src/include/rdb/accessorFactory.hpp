@@ -6,6 +6,7 @@
 
 #include "descriptor.hpp"
 #include "fainterface.hpp"
+#include "memoryStore.hpp"
 #include "metaData.hpp"
 
 namespace rdb {
@@ -33,11 +34,16 @@ namespace rdb {
 ///         only reachable failure here and the one no binding-level guard can stand in front of - the
 ///         list of accepted types lives in this function and nowhere else.
 /// @note Descriptor jest nie-const, bo retention()/storagePolicy() nie są metodami const.
+/// @param memory Sklep magazynu MEMORY dla typu "MEMORY"; nullptr wybiera
+///        MemoryStore::processDefault(), czyli zachowanie sprzed fazy 2. Dla pozostalych
+///        typow bez znaczenia. To jest miejsce, w ktorym wolajacy nadaje pamieci MEMORY
+///        wlasciciela wezszego niz proces - patrz memoryStore.hpp.
 [[nodiscard]] std::unique_ptr<FileInterface> makeAccessor(std::string_view storageType,    //
                                                           const std::string &storageFile,  //
                                                           Descriptor &descriptor,          //
                                                           bool oneShot,                    //
-                                                          int percounter);
+                                                          int percounter,                  //
+                                                          MemoryStore *memory = nullptr);
 
 /// @brief Create the metaData variant matching the storage: inert for declared sources,
 ///        storageShadow when the accessor keeps a data shadow file, base metaData otherwise.

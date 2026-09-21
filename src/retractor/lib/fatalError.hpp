@@ -1,5 +1,16 @@
 #pragma once
 
+// Faza 2 refaktoru przeniosla ten naglowek z src/include (katalogu DZIELONEGO) tutaj, do
+// prywatnych naglowkow serwera. Powod jest jeden i jest to caly sens fazy 2: plik definiuje
+// `inline std::atomic<bool> fatalErrorRaised`, czyli stan CALEGO PROCESU, a stal w katalogu,
+// z ktorego bierze naglowki takze warstwa magazynu - ta sama, ktora laduje notatnik. Po fazie 1
+// `src/rdb` nie siega juz po FatalError ani razu, wiec nic tam tego nie potrzebowalo; zostawala
+// tylko mozliwosc, ze ktos siegnie. Teraz nie ma jej z czego wziac.
+//
+// Zostaje wylacznie jako mechanizm WYJSCIA PROCESU xretractor: jedyne zywe wywolanie FatalError
+// to hak RDB_FAULT_FATAL_IN_SLOT (dataModel.cpp), a sam zatrzask czytaja executorsm::cleanup()
+// i launcher.cpp. Jego wlasciwy zasieg to proces serwera i tam wlasnie teraz mieszka.
+
 #include <spdlog/spdlog.h>
 
 #include <atomic>
