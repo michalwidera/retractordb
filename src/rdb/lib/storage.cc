@@ -8,8 +8,11 @@
 #include <cstring>  //std::memset
 #include <filesystem>
 #include <ranges>
+#include <fmt/format.h>
+
 #include "fatalError.hpp"
 #include "rdb/accessorFactory.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/descriptorIO.hpp"
 #include "rdb/probe.hpp"  // sonda K6: objętość materializacji
 
@@ -42,7 +45,9 @@ void storage::attachDescriptor(const Descriptor *descriptorParam) {
     if (descriptorParam != nullptr) verifyDescriptorMatch(*descriptorParam, descriptor, paths_.descriptorFile());
   } else {
     if (descriptorParam == nullptr) {
-      FatalError("storage: no descriptor file and no descriptor provided");
+      // Blad wolajacego, nie silnika: nie ma pliku .desc i nie podano deskryptora, wiec
+      // nie ma z czego zbudowac magazynu. Osadzajacy proces chce to zlapac i zapytac.
+      throw ConfigError("storage: no descriptor file and no descriptor provided: " + paths_.descriptorFile());
     }
     descriptor = *descriptorParam;
     saveDescriptorFile(paths_.descriptorFile(), descriptor);
@@ -56,7 +61,10 @@ void storage::attachDescriptor(const Descriptor *descriptorParam) {
 }
 
 void storage::attachStorage() {
-  if (paths_.storageFile().empty()) FatalError("storage: storage file path is empty - storage not properly configured");
+  // Niezmiennik, nie kontrola wejscia: relocateFromRef() tuz wyzej odmawia juz przy pustej
+  // sciezce (ConfigError), wiec pusta tutaj znaczy, ze ktos wywolal attachStorage() z
+  // pominieciem attachDescriptor().
+  if (paths_.storageFile().empty()) throw LogicError("storage: storage file path is empty - attachDescriptor() not called");
 
   auto it1 = std::ranges::find_if(descriptor,  //
                                   [](const auto &item) { return item.rtype == rdb::TYPE; });
@@ -95,7 +103,7 @@ void storage::initializeAccessor() {
 }
 
 void storage::resetForUnitTest() {
-  if (paths_.storageFile().empty()) FatalError("storage: storage file path is empty - storage not properly configured");
+  if (paths_.storageFile().empty()) throw LogicError("storage: storage file path is empty - storage not properly configured");
 
   if (!accessor_) return;  // no accessor initialized - no need to reset.
 
@@ -111,8 +119,8 @@ void storage::resetForUnitTest() {
   if (metaData_) (*metaData_).reset();
 
   if (recordsCount_ != accessor_->count()) {
-    FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(),
-               paths_.storageFile());
+    throw LogicError(fmt::format("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_,
+                                 accessor_->count(), paths_.storageFile()));
   }
 }
 
@@ -126,7 +134,7 @@ void storage::cleanPayload(uint8_t *destination) {
 
 std::unique_ptr<rdb::payload>::pointer storage::getPayload() {
   if (!storagePayload_) {
-    FatalError("storage::getPayload: payload not attached");
+    throw LogicError("storage::getPayload: payload not attached");
   }
   return storagePayload_.get();
 }
@@ -139,18 +147,22 @@ void storage::releaseOnHold() { isHold_ = false; }
 
 size_t storage::getRecordsCount() const { return recordsCount_; }
 
+/// Cztery niezmienniki, ktorych zlamanie znaczy uzycie magazynu przed attachDescriptor().
+///
+/// LogicError, a nie ConfigError: zadnego z nich nie da sie wywolac poprawna sekwencja
+/// wywolan, wiec nie sa czescia umowy z wolajacym - sa czescia umowy magazynu z samym soba.
 void storage::abortIfStorageNotPrepared() {
   if (descriptor.empty()) {
-    FatalError("storage: descriptor is empty - storage not initialized");
+    throw LogicError("storage: descriptor is empty - storage not initialized");
   }
   if (!accessor_) {
-    FatalError("storage: data file not opened - accessor not initialized");
+    throw LogicError("storage: data file not opened - accessor not initialized");
   }
   if (!storagePayload_) {
-    FatalError("storage: payload not attached");
+    throw LogicError("storage: payload not attached");
   }
   if (!metaData_) {
-    FatalError("storage: meta index not attached - attachDescriptor() not called");
+    throw LogicError("storage: meta index not attached - attachDescriptor() not called");
   }
 }
 

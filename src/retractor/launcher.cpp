@@ -25,6 +25,7 @@
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "constants.hpp"
+#include "fatalError.hpp"  // fatalErrorRaised - zatrzask czytany przez executorsm::cleanup()
 #include "lib/appConfig.hpp"
 #include "lib/bus.hpp"
 #include "lib/compiler.hpp"
@@ -810,6 +811,12 @@ int main(int argc, char *argv[]) try {
   executorsm exec;
   return exec.run(coreInstance, guard, xrdbbus, cm, vm, appCfg, earlyServerName, systemd.unit.value_or(std::string{}));
 } catch (const std::exception &error) {
+  // Zatrzask MUSI zapasc takze tutaj. Do fazy 1 kazdy blad krytyczny szedl przez
+  // FatalError, ktory ustawial fatalErrorRaised przed std::exit; od fazy 1 czesc tych
+  // miejsc rzuca i dolatuje az tu. Bez zatrzasku executorsm::cleanup() (atexit, odpalany
+  // przy powrocie z main) uznaje takie zakonczenie za zwykle i NIE czysci pliku zapytan -
+  // czyli jednostka systemd z Restart=on-failure wstaje w kolko na planie, ktory ja zabil.
+  fatalErrorRaised.store(true, std::memory_order_release);
   const char *const executable = argc > 0 && argv[0] != nullptr ? argv[0] : "xretractor";
   std::fputs(executable, stderr);
   std::fputs(": unexpected error: ", stderr);
@@ -817,6 +824,7 @@ int main(int argc, char *argv[]) try {
   std::fputc('\n', stderr);
   return EXIT_FAILURE;
 } catch (...) {
+  fatalErrorRaised.store(true, std::memory_order_release);
   const char *const executable = argc > 0 && argv[0] != nullptr ? argv[0] : "xretractor";
   std::fputs(executable, stderr);
   std::fputs(": unexpected non-standard error\n", stderr);

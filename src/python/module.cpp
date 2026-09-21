@@ -21,6 +21,7 @@
 #include "fldType.hpp"
 #include "rdb/descriptor.hpp"
 #include "rdb/descriptorIO.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/storage.hpp"
 
@@ -32,25 +33,34 @@
 /// przy bledzie i trzyma stan globalny - wiec zwiazane dzis daloby API dzialajace
 /// raz na interpreter. Uzasadnienie i granice etapu: docs/jupyter-integration.md.
 ///
-/// OGRANICZENIE, ktorego to wiazanie nie usuwa: FatalError konczy sie
-/// std::exit(EXIT_FAILURE) (fatalError.hpp:51), a w samej warstwie magazynu jest
-/// 79 takich miejsc. std::exit nie odwija stosu, wiec zaden catch tutaj go nie
-/// przechwyci - zabija interpreter razem z sesja notatnika. Zamiana tych miejsc
-/// na wyjatki to faza 1 wspolnego refaktoru.
+/// OGRANICZENIE, ktore faza 1 usuwa PLASTRAMI. Plaster 1 (sciezka odczytu
+/// deskryptora) juz wszedl: loadDescriptorFile rzuca rdb::CorruptDescriptor
+/// zamiast konczyc proces, wiec uszkodzony albo pusty .desc jest tu zwyklym
+/// wyjatkiem Pythona. Pozostale miejsca w warstwie magazynu - okolo 77 -
+/// nadal wolaja FatalError, ktory konczy sie std::exit(EXIT_FAILURE)
+/// (fatalError.hpp:51). std::exit nie odwija stosu, wiec zaden catch tutaj go
+/// nie przechwyci; zabija interpreter razem z sesja notatnika.
 ///
-/// Co WOLNO zrobic juz teraz i co robimy nizej: sprawdzic w wiazaniu te warunki,
-/// ktore inaczej trafilyby prosto w FatalError - brak pliku deskryptora, brak
-/// katalogu magazynu, indeks poza zakresem, odczyt ze zrodla deklarowanego.
-/// Kazda taka straz zamienia smierc procesu na zwyklego Pythonowego wyjatka i
-/// jest jedyna ochrona, jaka warstwa wiazania moze dac przed faza 1.
+/// Plaster 2a domknal sciezke BUDOWY magazynu: storagePaths, accessorFactory i
+/// attachDescriptor rzucaja ConfigError albo InternalError, wiec zly katalog,
+/// nieznany typ magazynu czy deskryptor bez REF sa tu wyjatkami. Zostaja
+/// miejsca na sciezce ODCZYTU i ZAPISU (storage::read/revRead/write, payload,
+/// fagrp, facc*) - te nadal koncza proces.
+///
+/// Co WOLNO zrobic do czasu ich konwersji i co robimy nizej: sprawdzic w
+/// wiazaniu te warunki, ktore inaczej trafilyby prosto w FatalError - indeks
+/// poza zakresem i odczyt ze zrodla deklarowanego. Straze przy konstruktorze
+/// sa juz nadmiarowe; trzymamy je dla lepszych typow i komunikatow, nie dlatego,
+/// ze silnik bez nich zabija jadro.
 
 namespace nb = nanobind;
 
 namespace {
 
-/// Hierarchia bledow. Trzy typy, nie piec: pozostale z docelowej taksonomii
-/// (blad skladni RQL, blad kompilacji) nie maja dzis czego zglaszac - wejda
-/// razem z faza 1, ktora da im zrodlo.
+/// Hierarchia bledow. Dwa typy wlasne wiazania plus CorruptDescriptor, ktory
+/// przychodzi juz z silnika (rdb/exceptions.hpp) - pozostale z docelowej
+/// taksonomii (blad skladni RQL, blad kompilacji) nie maja dzis czego zglaszac
+/// i wejda razem z kolejnymi plastrami fazy 1.
 struct RdbError : std::runtime_error {
   using std::runtime_error::runtime_error;
 };
@@ -163,6 +173,22 @@ NB_MODULE(_core, m) {
   const nb::object baseError = nb::exception<RdbError>(m, "RetractorDBError");
   nb::exception<RdbNoSuchStream>(m, "NoSuchStream", baseError);
   nb::exception<RdbStorageError>(m, "StorageError", baseError);
+  // Typy przychodzace z SILNIKA, a nie zbudowane w wiazaniu. Rejestrowane na koncu, bo
+  // tlumacze probowane sa w kolejnosci odwrotnej do rejestracji, a wszystkie dziedzicza
+  // po std::runtime_error - domyslny tlumacz nanobinda zamienilby je na RuntimeError,
+  // gdyby dostal je pierwszy.
+  //
+  // Wspolna baza jest po stronie PYTHONA, nie C++: rdb::Error i RdbError to dwa rozne
+  // typy C++, wiec `except RetractorDBError` dziala dlatego, ze klasy ponizej dostaja ja
+  // jako baze Pythonowa. rdb::Error nie jest rejestrowany, bo nic go nie rzuca wprost -
+  // jest baza taksonomii. Gdyby kiedys zaczal byc rzucany goly, wyszedlby jako
+  // RuntimeError i ten komentarz jest miejscem, w ktorym to widac.
+  nb::exception<rdb::CorruptDescriptor>(m, "CorruptDescriptor", baseError);
+  nb::exception<rdb::ConfigError>(m, "ConfigError", baseError);
+  // LogicError w C++ nazywa sie po tym, czym jest; po stronie Pythona - po tym, co z nim
+  // zrobic. To zlamany niezmiennik silnika, czyli blad w NASZYM kodzie: nadaje sie do
+  // zgloszenia, nie do obsluzenia i kontynuowania.
+  nb::exception<rdb::LogicError>(m, "InternalError", baseError);
 
   // Nazwy pozycji wyliczenia biora sie z magic_enum, zeby nie rozjechac sie z
   // fldType.hpp przy dodaniu typu. reserve() jest WYMAGANE, nie kosmetyczne:
@@ -222,20 +248,26 @@ NB_MODULE(_core, m) {
   m.def(
       "load_descriptor",
       [](const std::string &path) {
-        // Straz przed FatalError w loadDescriptorFile: brak pliku to najczestsza
-        // pomylka w notatniku, a bez tego konczy sie zabiciem jadra.
+        // Straz ZOSTAJE mimo plastra 1. loadDescriptorFile zglasza brak pliku tym
+        // samym CorruptDescriptor co plik uszkodzony (rozdzielenie nalezy do
+        // taksonomii z fazy 5), a "nie ma takiego pliku" to najczestsza pomylka w
+        // notatniku i zasluguje na wlasny typ. Pinuje to
+        // test_guarded_paths_do_not_end_the_process.
         if (!std::filesystem::exists(path)) throw RdbNoSuchStream("no descriptor file: " + path);
         return rdb::loadDescriptorFile(path);
       },
       nb::arg("path"),
-      "Read a .desc file. A file that exists but holds an invalid descriptor still ends the process - see the module "
-      "docstring.");
+      "Read a .desc file. Raises CorruptDescriptor when the file is empty or does not parse, and NoSuchStream when it "
+      "is absent.");
 
   nb::class_<rdb::storage>(m, "Storage")
       .def(nb::new_([](const std::string &qry_id, const std::string &file_name, const std::string &storage_param,
                        const std::string &storage_type) {
-             // Trzy straze przed konstruktorem StoragePaths i attachDescriptor -
-             // kazdy z tych warunkow trafia inaczej prosto w FatalError.
+             // Po plastrze 2a te trzy warunki NIE sa juz jedyna ochrona - StoragePaths
+             // odmawia sam, przez ConfigError. Straze zostaja, bo daja Pythonowi typ,
+             // ktorego oczekuje dla zlego argumentu (ValueError), i komunikat nazywajacy
+             // parametr, a nie pole wewnetrzne. Pilnuje ich
+             // test_guarded_paths_do_not_end_the_process.
              if (qry_id.empty()) throw nb::value_error("qry_id must not be empty");
              if (file_name.empty()) throw nb::value_error("file_name must not be empty");
              if (!storage_param.empty() && !std::filesystem::is_directory(storage_param)) {

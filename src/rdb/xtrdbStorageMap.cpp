@@ -452,6 +452,13 @@ void showStorageMap(const std::string &baseName) {
   {
     std::ifstream df(descFile);
     df >> desc;
+    // Do fazy 1 bledny deskryptor konczyl tu proces przez FatalError. W narzedziu, ktorego
+    // calym zadaniem jest OGLADANIE plikow magazynu - takze uszkodzonych - to nigdy nie
+    // bylo wlasciwe zachowanie: teraz ekstraktor zapala failbit, a xtrdb wraca do promptu.
+    if (df.fail()) {
+      std::println(stderr, "Descriptor does not parse: {}", descFile);
+      return;
+    }
   }
 
   const size_t recordSize = desc.getSizeInBytes();

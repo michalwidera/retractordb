@@ -271,6 +271,50 @@ TEST(descriptor, parser) {
   EXPECT_TRUE(parserDESCString(out, "{ INTEGER a RETMEMORY 10 TYPE MEMORY }") == "OK");
 }
 
+/// Plaster 1 fazy 1: status parsera jest stanem JEDNEGO wywolania, nie procesu.
+///
+/// Blizniak TEST(xparser, parse_failure_does_not_poison_the_next_parse) po stronie RQL.
+/// Do fazy 1 DESCParser.cc trzymal status w zmiennej `statusDesc` o zasiegu zewnetrznym,
+/// ktorej nikt nie zerowal przy wejsciu. Bylo to nieszkodliwe WYLACZNIE dlatego, ze
+/// listener bledu konczyl proces przez exit(EPERM), wiec drugiego parsowania nigdy nie
+/// bylo. Bez tego testu defekt jest niewidoczny: zaden inny test nie parsuje zlego
+/// deskryptora, bo do tej pory zabilby binarke testow.
+TEST(descriptor, parse_failure_does_not_poison_the_next_parse) {
+  rdb::Descriptor rejected;
+  testing::internal::CaptureStderr();
+  const auto failed = parserDESCString(rejected, "this is not a descriptor at all");
+  (void)testing::internal::GetCapturedStderr();
+  ASSERT_NE(failed, "OK") << "a malformed descriptor must not parse";
+
+  rdb::Descriptor accepted;
+  EXPECT_EQ(parserDESCString(accepted, "{ BYTE a INTEGER b[10] INTEGER c }"), "OK");
+  EXPECT_TRUE(accepted.hasField("a"));
+  EXPECT_TRUE(accepted.hasField("c"));
+}
+
+/// operator>> zglasza niepowodzenie stanem strumienia, a nie smiercia procesu.
+///
+/// Dwie rzeczy sa tu pinowane osobno, bo obie sa latwe do zepsucia przy kolejnej zmianie:
+/// failbit po odczycie UDANYM musi byc zgaszony (petla `while (is >> str)` konczy sie na
+/// koncu strumienia, wiec zapala go rowniez wtedy), a deskryptor wolajacego nie moze
+/// zostac naruszony przez parse, ktory sie nie udal.
+TEST(descriptor, stream_extraction_reports_failure_through_failbit) {
+  std::stringstream good("{ BYTE a INTEGER b }");
+  rdb::Descriptor parsed;
+  good >> parsed;
+  EXPECT_FALSE(good.fail()) << "a complete descriptor must leave failbit clear";
+  EXPECT_EQ(parsed.size(), 2U);
+
+  std::stringstream bad("not a descriptor");
+  rdb::Descriptor untouched{rdb::rField("keep", 1, 1, rdb::BYTE)};
+  testing::internal::CaptureStderr();
+  bad >> untouched;
+  (void)testing::internal::GetCapturedStderr();
+  EXPECT_TRUE(bad.fail());
+  EXPECT_EQ(untouched.size(), 1U) << "a failed parse must not overwrite the caller's descriptor";
+  EXPECT_TRUE(untouched.hasField("keep"));
+}
+
 TEST(descriptor, assign_operator) {
   auto data1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
              rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //

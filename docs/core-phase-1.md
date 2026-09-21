@@ -1,8 +1,14 @@
 # Core phase 1: FatalError becomes an exception
 
-**Status:** not started. Stage 1a (`9a1e72eb`) is complete and is this phase's test
-harness. **Prerequisite for:** everything above the storage layer, in all three
-embedding targets - see [`embedded-roadmap.md`](embedded-roadmap.md).
+**Status:** slice 1 (the descriptor read path, §2) and sub-slice 2a (the storage
+construction path, §3.1a) are **done**; the rest of §3 is not started.
+Stage 1a (`9a1e72eb`) is this phase's test harness. **Prerequisite for:** everything
+above the storage layer, in all three embedding targets - see
+[`embedded-roadmap.md`](embedded-roadmap.md).
+
+After sub-slice 2a: **202 `FatalError` call sites** in `src/` - 60 in `src/rdb/lib`,
+142 in `src/retractor/lib` - and no bare `exit()` anywhere in the tree. (At `f22cffe0`
+it was 221 / 79 / 142.)
 
 `FatalError` ends with `std::exit(EXIT_FAILURE)` (`src/include/fatalError.hpp:51`).
 At `f22cffe0` there are **221 call sites** in `src/` - 79 in `src/rdb/lib`, 142 in
@@ -34,7 +40,10 @@ was harmless *only* because `exit(EPERM)` came first. `test_compiler.cpp` pins t
 fix as `TEST(xparser, parse_failure_does_not_poison_the_next_parse)`, whose comment
 states the rule: parse status is the state of one call, not of the process.
 
-## 2. Slice 1: the descriptor read path
+## 2. Slice 1: the descriptor read path - DONE
+
+Landed as described below. What the implementation added beyond the specification
+is recorded in §2.5.
 
 Do this first. It is self-contained, it has the precedent above to copy, and stage 1a
 already ships the test that flips.
@@ -88,14 +97,43 @@ and only one belongs to this slice.**
 
 | Test | Path | This slice? |
 |---|---|---|
-| `test_malformed_descriptor_file_ends_the_process` | DESCParser listeners, `exit(EPERM)` | **Yes** - flips to `pytest.raises` |
-| `test_empty_descriptor_file_ends_the_process` | `descriptorIO.cc:21-25`, `FatalError` | Yes, if `loadDescriptorFile` is converted as specified above |
-| `test_guarded_paths_do_not_end_the_process` | binding-level guards | No - must keep passing unchanged |
+| `test_malformed_descriptor_file_ends_the_process` | DESCParser listeners, `exit(EPERM)` | **Flipped** - now `test_malformed_descriptor_file_raises` |
+| `test_empty_descriptor_file_ends_the_process` | `descriptorIO.cc:21-25`, `FatalError` | **Flipped** - now `test_empty_descriptor_file_raises` |
+| `test_guarded_paths_do_not_end_the_process` | binding-level guards | No - passes unchanged, still in a subprocess |
 
-Each flipping test carries the `pytest.raises` form to replace its body with, in its
-own docstring.
+Both flipped cases run in the test interpreter rather than a subprocess: the suite
+finishing at all is the assertion that the process survived. Three cases were added
+alongside them - that `CorruptDescriptor` is caught by `except RetractorDBError`
+(nanobind's fallback translator would otherwise make it a plain `RuntimeError`), that
+a rejected descriptor does not poison the next read, and that the throw unwinds
+cleanly through a half-built `storage`.
 
-### 2.4 Acceptance
+### 2.4 What the implementation added beyond this specification
+
+Three things the spec did not call out, each because converting an exit into a throw
+moves a decision that used to belong to nobody:
+
+**`operator>>` parses into a temporary.** The listener fills the descriptor as it
+walks the tree, so an aborted parse used to leave the caller's descriptor half
+built. A caller that checks `failbit` only after the call would already have had its
+own object overwritten. `TEST(descriptor, stream_extraction_reports_failure_through_failbit)`
+pins both that and the next point.
+
+**`failbit` has to be cleared on the success path.** `while (is >> str)` ends only by
+failing at end of stream, so failbit was set after a *complete* read too. Without
+clearing it, "failbit means the descriptor did not parse" would have been false for
+every caller. eofbit and badbit are left alone, and a stream that was already bad on
+entry is returned untouched - clearing there would have masked a failed `open()`.
+
+**`launcher.cpp` latches `fatalErrorRaised` in its top-level handlers.** `FatalError`
+set that flag before `std::exit`; a throw that escapes to `main` sets nothing, and
+`executorsm::cleanup()` (registered with `atexit`, and run when `main` returns) reads
+it to decide whether to clear the service query file. Without the latch a systemd unit
+killed by a poisoned plan restarts straight back into that plan. This is the first
+instance of a question every later slice raises: **what did the code downstream of
+`std::exit` rely on, that unwinding does not provide?**
+
+### 2.5 Acceptance
 
 - `ctest` fully green, including the 263 existing tests.
 - The two flipped Python tests pass in their new form; the guard test unchanged.
@@ -109,7 +147,8 @@ own docstring.
 Ordered by how much each unblocks, not by size:
 
 1. **`src/rdb/lib`, remaining 77 sites.** Finishes the storage layer and makes stage
-   1a's guards redundant rather than load-bearing.
+   1a's guards redundant rather than load-bearing. Split in two at the seam described
+   in §3.1a: **2a, the construction path - done**; 2b, the read and write path.
 2. **`src/retractor/lib`, 142 sites.** The hard half. `executorsm.cpp:70-77` and
    `ipcServer.cpp:54-69` already carry comments about `FatalError` running `atexit`
    handlers on the calling thread; those two are where unwinding will surprise you.
@@ -117,6 +156,63 @@ Ordered by how much each unblocks, not by size:
    two are `fatalErrorRaised` (`fatalError.hpp:16`) and the MEMORY maps
    (`faccmemory.cc:13-16`). `api/python/tests/test_reentry.py` is the acceptance test
    and passes today, so it is a regression guard from the start.
+
+### 3.1a Sub-slice 2a: the storage construction path - DONE
+
+**18 sites**, chosen as everything reachable while *building* a storage:
+`storagePaths.cc` (5), `accessorFactory.cc` (3), the construction half of `storage.cc`
+(9) and `verifyDescriptorMatch` in `descriptorIO.cc` (1). The remaining 11 sites in
+`storage.cc` are read and write, and go with 2b.
+
+Two things on the construction path were left behind **on purpose**, and both for the
+same reason: `saveDescriptorFile`'s two sites are I/O failures. Every I/O-failure site
+in this layer - those two, `storage::read`/`write`, the `facc*` accessors - converts
+together in 2b, so the `IOError` type arrives once with all of its call sites instead
+of being half-introduced here against two of them. `descriptor.cc`, `payload.cc` and
+`convertTypes.cc` are data-shape helpers used from both paths, so they go with 2b too.
+
+**Why that seam.** The read path runs inside `dataModel::processRows()` while
+`core_mutex` is held, which is the same condition that hung the process until
+2026-09-14 (`executorsm::cleanup()`, `executorsm.cpp:70-77`). Unwinding through it is
+a materially different risk from unwinding through plan setup, and it deserves its
+own slice rather than being smuggled in with the easy half.
+
+**Two exception types, because this slice raises two kinds of error:**
+
+| Type | Python | Meaning |
+|---|---|---|
+| `rdb::ConfigError` | `ConfigError` | The caller asked for something that cannot work: unknown storage type, missing `:STORAGE` directory, empty identifier, descriptor with no REF. Input is wrong, engine is intact. **Worth catching.** |
+| `rdb::LogicError` | `InternalError` | An engine invariant broke - payload never attached, record count out of step with the accessor. Not reachable by any correct call sequence. **Not worth catching to continue**; it says the state is already wrong. |
+
+**The hole this closed.** `makeAccessor` is the only place the list of accepted
+storage types exists, so no binding-level guard could stand in front of it without
+duplicating that list and drifting from it. `rdb.Storage(..., storage_type="NONSENSE")`
+took the kernel down, and nothing in `module.cpp` could have prevented it.
+
+**What this slice taught, which §3.2 should expect more of.** Converting an exit into
+a throw does not merely change how a failure is reported - it hands the failure to
+whatever `catch` happens to be on the stack. Three places had to be corrected because
+they were written when nothing in the engine threw for a fatal condition:
+
+- **`executorsm::run()` (`executorsm.cpp`)** had `catch (std::exception &e)` written
+  for IPC failures. It would have reported a missing `:STORAGE` directory as
+  `IPC Fail.`, returned `EINTR` instead of `EXIT_FAILURE`, and - worst - left
+  `fatalErrorRaised` clear, so a systemd unit would restart into the same broken plan
+  forever. A `catch (const rdb::Error &)` now sits in front of it. `it_fatal_exit_path`
+  is what would have caught the exit code, and nothing would have caught the flag.
+- **`launcher.cpp`** latches the same flag in its top-level handlers (added in slice 1,
+  same reason).
+- **`xtrdbLauncher.cpp`** had no top-level `catch` at all, so any throw from a command
+  would have been `std::terminate` - SIGABRT in place of a message, in a shell whose
+  whole job is to survive a bad command.
+
+One broad catch was deliberately **left alone**: `executorsmCommands.cpp:225` handles
+an ad-hoc query in the communication thread, where reporting a bad configuration back
+to the client and keeping the server alive is exactly right. That one gets *better*
+with this slice - it used to be a server-wide `std::exit`.
+
+The question to ask for every later site is therefore not "will this unwind safely",
+but **"who catches it on the way out, and what will they think it was?"**
 
 ## 4. Where stage 1a left things
 

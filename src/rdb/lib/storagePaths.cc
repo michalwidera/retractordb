@@ -1,19 +1,24 @@
 #include "rdb/storagePaths.hpp"
 
+#include <fmt/format.h>
+
 #include <cstdio>  // ::remove
 #include <filesystem>
 #include <ranges>
 #include <string>
 #include <system_error>  // std::error_code
 
-#include "fatalError.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/storageShadow.hpp"
 
 namespace rdb {
 
 StoragePaths::StoragePaths(const std::string_view qryID, const std::string_view fileName, const std::string_view storageParam) {
-  if (qryID.empty()) FatalError("storage: qryID must not be empty");
-  if (fileName.empty()) FatalError("storage: fileName must not be empty");
+  // Rzut z LISTY INICJALIZACYJNEJ storage: obiekt storage nigdy nie powstaje, wiec jego
+  // destruktor sie nie wykona - a to on kasuje pliki magazynu disposable. Zla konfiguracja
+  // nie moze niczego usunac, i nie usuwa.
+  if (qryID.empty()) throw ConfigError("storage: qryID must not be empty");
+  if (fileName.empty()) throw ConfigError("storage: fileName must not be empty");
 
   descriptorFile_ = std::string(qryID) + ".desc";
   setStorageFile(std::string(fileName));
@@ -37,14 +42,14 @@ StoragePaths::StoragePaths(const std::string_view qryID, const std::string_view 
   if (!std::filesystem::exists(dirName)) {
     std::error_code absError;
     const auto full = std::filesystem::absolute(dirName, absError);
-    FatalError(
+    throw ConfigError(fmt::format(
         "storage: directory '{}' from the STORAGE directive does not exist ({}); "
         "RetractorDB does not create it - run 'mkdir -p {}' first",
-        dirName, absError ? std::string("path could not be resolved") : full.string(), dirName);
+        dirName, absError ? std::string("path could not be resolved") : full.string(), dirName));
   }
 
   if (!std::filesystem::is_directory(dirName)) {
-    FatalError("storage: path '{}' from the STORAGE directive exists but is not a directory", dirName);
+    throw ConfigError(fmt::format("storage: path '{}' from the STORAGE directive exists but is not a directory", dirName));
   }
 
   descriptorFile_ = std::filesystem::path(storageParam) / std::filesystem::path(descriptorFile_);
@@ -69,7 +74,7 @@ void StoragePaths::relocateFromRef(const Descriptor &descriptor) {
   // and there is no specified storage as REF in descriptor - we should
   // stop immediately.
   if (storageFile_.empty()) {
-    FatalError("storage: storage file not set in descriptor (missing REF field or :STORAGE directive)");
+    throw ConfigError("storage: storage file not set in descriptor (missing REF field or :STORAGE directive)");
   }
 }
 

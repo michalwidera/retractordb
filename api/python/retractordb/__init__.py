@@ -30,8 +30,11 @@ __all__ = [
     "Stream",
     "Record",
     # Zbudowane rozszerzenie (RDB_PYTHON=ON) - rozwiazywane leniwie w __getattr__.
+    "ConfigError",
+    "CorruptDescriptor",
     "Descriptor",
     "FieldType",
+    "InternalError",
     "NoSuchStream",
     "RetractorDBError",
     "Storage",
@@ -43,8 +46,11 @@ __all__ = [
 # __getattr__ nie probowal importowac rozszerzenia dla nazwy, ktorej ono nie ma.
 _CORE_NAMES = frozenset(
     {
+        "ConfigError",
+        "CorruptDescriptor",
         "Descriptor",
         "FieldType",
+        "InternalError",
         "NoSuchStream",
         "RetractorDBError",
         "Storage",

@@ -1,6 +1,8 @@
 #include "rdb/accessorFactory.hpp"
 
-#include "fatalError.hpp"
+#include <fmt/format.h>
+
+#include "rdb/exceptions.hpp"
 #include "rdb/faccbindev.hpp"
 #include "rdb/faccfs.hpp"
 #include "rdb/faccmemory.hpp"
@@ -19,8 +21,8 @@ std::unique_ptr<FileInterface> makeAccessor(const std::string_view storageType, 
                                             Descriptor &descriptor,              //
                                             const bool oneShot,                  //
                                             const int percounter) {
-  if (storageFile.empty()) FatalError("storage: storage file path is empty - storage not properly configured");
-  if (storageType.empty()) FatalError("storage: storage type is empty - storage type not set");
+  if (storageFile.empty()) throw ConfigError("storage: storage file path is empty - storage not properly configured");
+  if (storageType.empty()) throw ConfigError("storage: storage type is empty - storage type not set");
 
   if (storageType == "DEFAULT") {
     return std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile, descriptor, descriptor.retention(),
@@ -47,7 +49,13 @@ std::unique_ptr<FileInterface> makeAccessor(const std::string_view storageType, 
   if (storageType == "TEXTSOURCE") {
     return std::make_unique<rdb::textSourceRO>(storageFile, descriptor, !oneShot);
   }
-  FatalError("storage: unsupported storage type '{}'", storageType);
+  // Jedyna sciezka w tej fabryce osiagalna DOWOLNYM poprawnym wywolaniem API: typ magazynu
+  // bierze sie z pola TYPE deskryptora albo wprost od wolajacego (argument storage_type
+  // wiazania Pythona), wiec literowka w nim trafiala tu prosto w std::exit. Zadna straz w
+  // wiazaniu tego nie zatrzymywala - nie zna listy typow, ktora jest wlasnie tutaj.
+  throw ConfigError(fmt::format("storage: unsupported storage type '{}' - expected one of DEFAULT, DIRECT, MEMORY, POSIX, "
+                                "POSIXSHD, GENERIC, DEVICE, TEXTSOURCE",
+                                storageType));
 }
 
 std::unique_ptr<metaData> makeMetaIndex(const bool declared,           //

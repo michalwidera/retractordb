@@ -31,7 +31,10 @@ with rdb.Storage("test_db", "test_db", storage_param="/path/to/dir") as st:
 | `load_descriptor(path)` | `rdb::loadDescriptorFile` |
 | `Storage` | `rdb::storage` |
 | `Record` | `rdb::payload`, read through `getItemVT` |
-| `RetractorDBError` and subclasses | registered, mostly unreachable - see §3 |
+| `RetractorDBError`, `NoSuchStream`, `StorageError` | raised by the binding's guards |
+| `CorruptDescriptor` | `rdb::CorruptDescriptor` - `loadDescriptorFile` |
+| `ConfigError` | `rdb::ConfigError` - `storagePaths`, `accessorFactory`, `attachDescriptor` |
+| `InternalError` | `rdb::LogicError` - a broken engine invariant; report it, do not handle it |
 
 Reads release the GIL. That is not premature: without it a single blocking read
 freezes the whole kernel including its UI, and retrofitting the guard after callers
@@ -51,26 +54,57 @@ so this stage is a genuine capability that also answers the two questions the la
 stages would otherwise have to guess at: whether nanobind is the right tool, and how
 the C++ types actually cross into Python.
 
-## 3. The limitation you will hit first
+## 3. The limitation you will hit first - now mostly gone
 
-**A malformed descriptor kills the interpreter.** `loadDescriptorFile` on an empty or
-invalid `.desc` reaches `FatalError`, which calls `std::exit(EXIT_FAILURE)`. There
-are 79 such sites inside the storage layer. Nothing at the binding level can catch
-this; `std::exit` is not an exception and does not unwind.
+**A malformed descriptor used to kill the interpreter.** It no longer does:
+[core phase 1](core-phase-1.md) slice 1 converted the descriptor read path, so
+`load_descriptor` on an empty or unparsable `.desc` raises `CorruptDescriptor` and
+the kernel lives.
 
-The `RetractorDBError` hierarchy is registered anyway, because it costs nothing now
-and because phase 1 of the shared refactor has somewhere to land when it converts
-those sites to throws.
+```python
+try:
+    desc = rdb.load_descriptor("broken.desc")
+except rdb.CorruptDescriptor as err:
+    print(err)          # invalid descriptor in file: broken.desc
+```
 
-`api/python/tests/test_fatal_paths.py` documents this in executable form. Each case
-runs in a subprocess and asserts that the child dies with a non-zero status - the
-behaviour today - and carries the assertion it becomes once phase 1 lands. Those
-tests are the acceptance criteria for phase 1, not a description of a defect that
-this stage introduced.
+`CorruptDescriptor` is the first type in the hierarchy raised by the **engine**
+rather than by a guard in the binding, and it is where the rest of the taxonomy will
+attach.
+
+**Sub-slice 2a then closed the path that builds a storage.** An unknown
+`storage_type`, a `storage_param` that is not a directory, a descriptor with no REF
+field - all `ConfigError` now:
+
+```python
+rdb.Storage("s", "s", storage_param=".", storage_type="NONSENSE")
+# ConfigError: storage: unsupported storage type 'NONSENSE' - expected one of
+#              DEFAULT, DIRECT, MEMORY, POSIX, POSIXSHD, GENERIC, DEVICE, TEXTSOURCE
+```
+
+That one is worth singling out: `makeAccessor` is the only place the list of accepted
+types exists, so no guard in `module.cpp` could have stood in front of it without
+duplicating the list and drifting from it. It killed the kernel and nothing in the
+binding could have stopped it.
+
+**What still kills the interpreter:** the 60 remaining `FatalError` sites, all on the
+**read and write** path - `storage::read`/`revRead`/`write`, `payload`, `fagrp`,
+`facc*`, `convertTypes`. `std::exit` is not an exception and does not unwind, so no
+`catch` in the binding and no `except` in Python can see them. The binding's guards
+for index range and declared sources are still the only protection in front of those.
+The guards at the `Storage` constructor are now belt-and-braces: they give Python a
+`ValueError` where a `ValueError` is idiomatic, but the engine refuses on its own.
+
+`api/python/tests/test_fatal_paths.py` tracks the boundary in executable form. The two
+descriptor cases now assert `pytest.raises` in the test interpreter;
+`test_guarded_paths_do_not_end_the_process` still runs in a subprocess and is what
+notices a guard being dropped while the site behind it is still there.
 
 `test_reentry.py` does the same for phase 2: it constructs and destroys a `Storage`
-100 times in one process, which is the shape that `statusDesc`, `fatalErrorRaised`
-and the `faccmemory.cc` maps will fail under once instances start to overlap.
+100 times in one process, which is the shape that `fatalErrorRaised` and the
+`faccmemory.cc` maps will fail under once instances start to overlap. `statusDesc` is
+off that list - slice 1 deleted it, and the parser's status is now the state of one
+call rather than of the process.
 
 ## 3a. nanobind: the measurement stage 1a was for
 
@@ -100,7 +134,7 @@ Phase numbering follows the roadmap in `design/`.
 
 | Phase | Adds | Blocked by |
 |---|---|---|
-| **J1** | `Engine`: `compile()`, `step()`, `rows()`, real exception mapping | core phases 1-3 |
+| **J1** | `Engine`: `compile()`, `step()`, `rows()`, real exception mapping | core phases 1-3 (phase 1 slice 1 done) |
 | **J2** | `Window`, DLPack zero-copy export, `torch.utils.data.IterableDataset` | J1 |
 | **J3** | `KeyboardInterrupt` during `run()`, logging bridge to the `logging` module | J1 |
 | **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | J2 |

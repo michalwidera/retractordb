@@ -29,6 +29,7 @@
 #include "ipcServer.hpp"
 #include "persistentCounter.hpp"
 #include "planSource.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/probe.hpp"  // sondy E1/E2E, K6, E4
 #include "serviceControl.hpp"
 #include "shmBudget.hpp"
@@ -166,6 +167,11 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   if (percounterFilename != "{notinitialized}") pCounterPtr = std::make_unique<PersistentCounter>(percounterFilename);
 
   auto retVal = system::errc::success;
+
+  // Blad krytyczny silnika nie miesci sie w system::errc - musi wyjsc dokladnie kodem
+  // EXIT_FAILURE, bo tego pilnuje test/IntegrationTest/fatal_exit_path i po tym kodzie
+  // jednostka systemd odroznia awarie od zwyklego zatrzymania. Patrz catch nizej.
+  bool fatalExitRequested = false;
 
   // Sending service in thread. Warstwa protokolu wchodzi do transportu przez te
   // cztery wywolania zwrotne -- IpcServer nie zna qTree, dataModel ani compilera.
@@ -523,6 +529,25 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
     // Klawisz, ktory zakonczyl OSTATNIA epoke, zdejmujemy raz - epoka przerwana
     // przeladowaniem planu nie konczy sie klawiszem, wiec nie ma tam czego pobierac.
     if (iLoopLimitCnt != executorsm::stop_now) _getch();  // no wait ... feed key from kbhit
+  } catch (const rdb::Error &error) {
+    // MUSI stac przed catch(std::exception) - rdb::Error z niego dziedziczy, wiec bez tego
+    // kazdy blad silnika wychodzil stad jako "IPC Fail." z kodem EINTR.
+    //
+    // Ten catch istnieje od fazy 1 refaktoru i jest jej najbardziej pouczajacym skutkiem.
+    // Do fazy 1 blad krytyczny w budowie modelu (np. katalog z dyrektywy :STORAGE, ktorego
+    // nie ma) konczyl proces przez FatalError: std::exit(EXIT_FAILURE) z zatrzasnietym
+    // fatalErrorRaised, wiec handler atexit czyscil plik zapytan i jednostka wstawala BEZ
+    // planu. Zamiana tych miejsc na rzuty przeniosla je prosto w rece obejmujacego
+    // catch(std::exception), ktory napisano dla awarii IPC - a ten raportowal cudzy blad
+    // cudzym komunikatem, oddawal EINTR zamiast EXIT_FAILURE i NIE zatrzaskiwal flagi,
+    // czyli zapetlal restart uslugi na planie, ktory ja zabil.
+    //
+    // Pytanie, ktore trzeba zadac przy kazdym kolejnym plastrze fazy 1, brzmi wiec nie
+    // "czy to sie odwinie", tylko "kto to zlapie po drodze i za co uzna".
+    fatalErrorRaised.store(true, std::memory_order_release);
+    std::cerr << "\nFATAL: " << error.what() << '\n';
+    SPDLOG_CRITICAL("Engine error: {}", error.what());
+    fatalExitRequested = true;
   } catch (IPC::interprocess_exception &ex) {
     std::cerr << ex.what() << '\n' << "IPC::interprocess exception" << '\n';
     retVal = system::errc::no_child_process;
@@ -540,5 +565,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   ipcServer.broadcastOutOfBusiness();
   ipcServer.stop();
   ipcServer.removeAllObjects();
-  return retVal;
+  // Sprzatanie powyzej wykonuje sie TAKZE na sciezce krytycznej - to jedyna roznica wobec
+  // dawnego std::exit, ktory wychodzil stad natychmiast i zostawial je handlerowi atexit.
+  return fatalExitRequested ? EXIT_FAILURE : static_cast<int>(retVal);
 }

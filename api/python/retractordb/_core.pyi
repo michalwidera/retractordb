@@ -19,6 +19,32 @@ class NoSuchStream(RetractorDBError):
 class StorageError(RetractorDBError):
     """The storage exists but cannot serve the request."""
 
+class CorruptDescriptor(RetractorDBError):
+    """A .desc file is empty or does not parse.
+
+    The first error raised by the engine itself rather than by a guard in the
+    binding: core phase 1, slice 1 turned ``loadDescriptorFile`` from a process
+    exit into a throw.
+    """
+
+class ConfigError(RetractorDBError):
+    """The storage cannot be configured as asked.
+
+    An unknown ``storage_type``, a ``storage_param`` directory that is missing or
+    is not a directory, an empty identifier, or a descriptor with no REF field and
+    no storage directory. The input is wrong and the engine is intact, so this is
+    the one worth catching and reporting to whoever typed it.
+    """
+
+class InternalError(RetractorDBError):
+    """An engine invariant broke - a bug in RetractorDB, not in your input.
+
+    ``rdb::LogicError`` on the C++ side. Raised where the engine used to assert by
+    ending the process: a payload that was never attached, a record count that no
+    longer matches the accessor. Catching this to carry on is a mistake; the state
+    is already wrong. Report it.
+    """
+
 class FieldType(Enum):
     BYTE: int
     INTEGER: int
@@ -113,7 +139,6 @@ class Storage:
 def load_descriptor(path: str | PathLike[str]) -> Descriptor:
     """Read a .desc file.
 
-    A missing file raises NoSuchStream. A file that exists but holds an invalid
-    descriptor still ends the process - that is FatalError, not an exception,
-    and phase 1 of the shared refactor is what fixes it.
+    A missing file raises NoSuchStream; an empty or unparsable one raises
+    CorruptDescriptor. Neither ends the process.
     """

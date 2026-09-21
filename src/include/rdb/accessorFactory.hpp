@@ -15,7 +15,7 @@ namespace rdb {
 /// Funkcje fabryki powinny:
 /// - odwzorowywać nazwę typu magazynu (DEFAULT/DIRECT/MEMORY/POSIX/POSIXSHD/GENERIC/DEVICE/TEXTSOURCE)
 ///   na konkretną implementację FileInterface (makeAccessor()); nieznany typ, pusta ścieżka danych lub
-///   pusty typ kończą się przez FatalError,
+///   pusty typ kończą się rzutem ConfigError (faza 1, plaster 2a),
 /// - rozstrzygać, czy typ magazynu jest źródłem deklarowanym tylko do odczytu (isDeclaredType()),
 /// - dobierać wariant indeksu metadanych null (makeMetaIndex()): wariant inertny (pusta ścieżka pliku)
 ///   dla źródeł deklarowanych, storageShadow gdy accessor utrzymuje plik cienia danych, bazowy metaData
@@ -28,7 +28,10 @@ namespace rdb {
 /// @brief Whether the storage type is a read-only declared source (DEVICE/TEXTSOURCE).
 [[nodiscard]] bool isDeclaredType(std::string_view storageType);
 
-/// @brief Create the FileInterface implementation for the given storage type; FatalError on unknown type.
+/// @brief Create the FileInterface implementation for the given storage type.
+/// @throws ConfigError on an unknown or empty storage type, or an empty storage file path. This is the
+///         only reachable failure here and the one no binding-level guard can stand in front of - the
+///         list of accepted types lives in this function and nowhere else.
 /// @note Descriptor jest nie-const, bo retention()/storagePolicy() nie są metodami const.
 [[nodiscard]] std::unique_ptr<FileInterface> makeAccessor(std::string_view storageType,    //
                                                           const std::string &storageFile,  //

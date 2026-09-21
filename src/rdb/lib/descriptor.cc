@@ -6,6 +6,7 @@
 #include <iostream>
 #include <ranges>
 #include <sstream>
+#include <utility>
 
 #include "fatalError.hpp"
 
@@ -332,17 +333,41 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   return os;
 }
 
+/// Wczytaj deskryptor ze strumienia. Bledny tekst zapala failbit; NIE konczy procesu.
+///
+/// Do fazy 1 bledny deskryptor konczyl sie przez FatalError, czyli std::exit. Ekstraktor
+/// strumieniowy nie jest jednak miejscem, w ktorym zapada decyzja o przerwaniu programu -
+/// zglasza niepowodzenie stanem strumienia, a co z nim zrobic, wie wolajacy:
+/// loadDescriptorFile rzuca CorruptDescriptor, xtrdb wypisuje komunikat i czyta dalej.
 std::istream &operator>>(std::istream &is, Descriptor &rhs) {
+  // Strumien juz uszkodzony: nie ma czego czytac i nie wolno zmieniac jego stanu -
+  // w szczegolnosci nie wolno zgasic failbita ustawionego przez nieudane otwarcie pliku.
+  if (!is.good()) return is;
+
   std::stringstream strstream;
   std::string str;
   while (is >> str)
     strstream << " " << str;
 
-  auto result = parserDESCString(rhs, strstream.str());
+  // Petla powyzej konczy sie WYLACZNIE niepowodzeniem ekstrakcji, wiec po odczytaniu
+  // calego (poprawnego) tekstu failbit jest zapalony tak samo jak po bledzie. Gasimy go,
+  // zeby po powrocie znaczyl dokladnie jedno: deskryptor sie nie sparsowal. eofbit i
+  // badbit zostaja nietkniete.
+  is.clear(is.rdstate() & ~std::ios::failbit);
+
+  // Parsujemy do obiektu tymczasowego, a nie wprost do rhs. Listener uzupelnia deskryptor
+  // polami w miare schodzenia po drzewie, wiec przerwany parse zostawilby rhs w stanie
+  // czesciowym - a wolajacy, ktory sprawdzi failbit dopiero po powrocie, mialby juz wtedy
+  // podmieniony wlasny deskryptor.
+  Descriptor parsed;
+  const auto result = parserDESCString(parsed, strstream.str());
   if (result != "OK") {
-    FatalError("descriptor parse failed: {}", result);
+    SPDLOG_ERROR("Descriptor parse failed: {}", result);
+    is.setstate(std::ios::failbit);
+    return is;
   }
 
+  rhs = std::move(parsed);
   return is;
 }
 

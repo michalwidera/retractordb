@@ -11,6 +11,7 @@
 #include <fstream>
 
 #include "rdb/descriptor.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/storagePaths.hpp"
 
 // ---------------------------------------------------------------------------
@@ -90,4 +91,63 @@ TEST(StoragePathsTest, remove_all_files_deletes_whole_set) {
   EXPECT_FALSE(std::filesystem::exists("qry_rm.desc"));
   EXPECT_FALSE(std::filesystem::exists("data_rm.meta"));
   EXPECT_FALSE(std::filesystem::exists("data_rm.meta.shadow"));
+}
+
+// ---------------------------------------------------------------------------
+// Faza 1, plaster 2a: zla konfiguracja jest wyjatkiem, nie koncem procesu.
+//
+// Zadnego z tych przypadkow nie dalo sie wczesniej przetestowac - kazdy konczyl
+// binarke testow przez std::exit, wiec caly zestaw szedl z nim. To jest dokladnie
+// ten powod, dla ktorego sciezki bledow w tej warstwie byly nieprzetestowane.
+// ---------------------------------------------------------------------------
+TEST(StoragePathsTest, empty_identifiers_are_rejected) {
+  EXPECT_THROW((void)rdb::StoragePaths("", "data", ""), rdb::ConfigError);
+  EXPECT_THROW((void)rdb::StoragePaths("qry", "", ""), rdb::ConfigError);
+}
+
+TEST(StoragePathsTest, missing_storage_directory_is_rejected) {
+  const std::filesystem::path absent{"storage_paths_absent_dir"};
+  std::filesystem::remove_all(absent);
+
+  EXPECT_THROW((void)rdb::StoragePaths("qry", "data", absent.string()), rdb::ConfigError);
+}
+
+// Sciezka z koncowym ukosnikiem trafia w GALAZ KOLIZJI NAZW, nie w "nie istnieje":
+// konstruktor scina ukosnik przed sprawdzeniem, bo exists("plik/") jest falszem dla
+// zwyklego pliku i bez sciecia ta galaz bylaby nieosiagalna.
+TEST(StoragePathsTest, storage_param_pointing_at_a_file_is_rejected) {
+  const std::filesystem::path file{"storage_paths_not_a_dir"};
+  std::filesystem::remove_all(file);
+  { std::ofstream(file) << "x"; }
+
+  EXPECT_THROW((void)rdb::StoragePaths("qry", "data", file.string()), rdb::ConfigError);
+  EXPECT_THROW((void)rdb::StoragePaths("qry", "data", file.string() + "/"), rdb::ConfigError);
+
+  std::filesystem::remove(file);
+}
+
+// Pusta sciezka po relokacji jest osiagalna DOKLADNIE jedna droga: pole REF o pustej
+// nazwie. Konstruktor odrzuca puste fileName, wiec storageFile_ nie moze byc puste
+// wczesniej - dopiero relocateFromRef() przepisuje je z deskryptora i dopiero wtedy
+// moze zniknac. Bez tej obserwacji sciezki nie da sie przetestowac inaczej niz przez
+// prywatny setStorageFile().
+TEST(StoragePathsTest, relocate_to_an_empty_ref_is_rejected) {
+  rdb::StoragePaths paths("qry", "data", "");
+  ASSERT_EQ(paths.storageFile(), "data");
+
+  const rdb::Descriptor emptyRef{rdb::Descriptor("", 0, 0, rdb::REF)};
+  EXPECT_THROW(paths.relocateFromRef(emptyRef), rdb::ConfigError);
+}
+
+// Wyjatek z konstruktora znaczy, ze obiekt NIE POWSTAL - wiec nie ma destruktora,
+// ktory mialby cokolwiek posprzatac. Dla StoragePaths to istotne, bo removeAllFiles()
+// kasuje komplet plikow magazynu: zla konfiguracja nie moze skasowac cudzych danych.
+TEST(StoragePathsTest, a_rejected_construction_removes_nothing) {
+  const std::filesystem::path victim{"storage_paths_victim.desc"};
+  { std::ofstream(victim) << "keep me"; }
+
+  EXPECT_THROW((void)rdb::StoragePaths("", "storage_paths_victim", ""), rdb::ConfigError);
+  EXPECT_TRUE(std::filesystem::exists(victim));
+
+  std::filesystem::remove(victim);
 }

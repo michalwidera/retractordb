@@ -8,9 +8,11 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <string>
 
 #include "rdb/accessorFactory.hpp"
 #include "rdb/descriptor.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/faccbindev.hpp"
 #include "rdb/faccfs.hpp"
 #include "rdb/faccposix.hpp"
@@ -87,4 +89,41 @@ TEST(AccessorFactoryTest, meta_index_variant_selection) {
 
   auto plain = rdb::makeMetaIndex(false, false, desc, "af_plain.meta");
   EXPECT_EQ(dynamic_cast<rdb::storageShadow *>(plain.get()), nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// Faza 1, plaster 2a: nieznany typ magazynu jest wyjatkiem, nie koncem procesu.
+//
+// To byla jedyna sciezka w tej fabryce osiagalna poprawnym wywolaniem API i JEDYNA
+// nieoslonieta przez straz w wiazaniu Pythona - wiazanie nie zna listy typow, bo lista
+// jest wlasnie tutaj. rdb.Storage(storage_type="NONSENSE") zabijal jadro notatnika.
+// ---------------------------------------------------------------------------
+TEST(AccessorFactoryTest, unsupported_storage_type_is_rejected) {
+  auto desc = testDescriptor();
+
+  EXPECT_THROW((void)rdb::makeAccessor("NONSENSE", "af_unsupported.bin", desc, false, -1), rdb::ConfigError);
+  // Malymi literami tez nie - porownanie jest dokladne, a nie bez wzgledu na wielkosc.
+  EXPECT_THROW((void)rdb::makeAccessor("default", "af_unsupported.bin", desc, false, -1), rdb::ConfigError);
+}
+
+TEST(AccessorFactoryTest, empty_arguments_are_rejected) {
+  auto desc = testDescriptor();
+
+  EXPECT_THROW((void)rdb::makeAccessor("DEFAULT", "", desc, false, -1), rdb::ConfigError);
+  EXPECT_THROW((void)rdb::makeAccessor("", "af_empty_type.bin", desc, false, -1), rdb::ConfigError);
+}
+
+// Komunikat ma nazywac to, co wolno bylo podac. Bez tego jedyna droga do listy typow
+// prowadzi przez czytanie zrodla fabryki.
+TEST(AccessorFactoryTest, unsupported_type_message_names_the_accepted_values) {
+  auto desc = testDescriptor();
+
+  try {
+    (void)rdb::makeAccessor("NONSENSE", "af_unsupported.bin", desc, false, -1);
+    FAIL() << "expected ConfigError";
+  } catch (const rdb::ConfigError &error) {
+    const std::string message = error.what();
+    EXPECT_NE(message.find("NONSENSE"), std::string::npos) << message;
+    EXPECT_NE(message.find("TEXTSOURCE"), std::string::npos) << message;
+  }
 }
