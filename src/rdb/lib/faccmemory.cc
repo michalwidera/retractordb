@@ -8,7 +8,7 @@
 #include <ranges>
 #include <utility>
 #include <vector>
-#include "fatalError.hpp"
+#include "rdb/exceptions.hpp"
 
 static std::map<std::string, std::vector<std::vector<uint8_t>>> memoryStorage;
 static std::map<std::string, std::vector<std::vector<bool>>> memoryNullStorage;
@@ -20,7 +20,7 @@ namespace rdb {
 auto memoryFile::name() -> std::string & { return filename_; }
 
 ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) {
-  if (recordSize_ == 0) FatalError("memoryFile::write: recordSize_ is zero");
+  if (recordSize_ == 0) throw LogicError("memoryFile::write: recordSize_ is zero - accessor built on a zero-width descriptor");
   auto location = position / recordSize_;
   if (ptrData == nullptr) {
     memoryStorage[filename_].clear();
@@ -62,7 +62,7 @@ ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullB
 }
 
 ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
-  if (recordSize_ == 0) FatalError("memoryFile::read: recordSize_ is zero");
+  if (recordSize_ == 0) throw LogicError("memoryFile::read: recordSize_ is zero - accessor built on a zero-width descriptor");
   const auto location = position / recordSize_;
   const size_t slot   = (retentionSize_ != no_retention) ? (location % retentionSize_) : location;
 

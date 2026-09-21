@@ -9,7 +9,9 @@
 #include <cstring>
 #include <filesystem>
 
-#include "fatalError.hpp"
+#include <fmt/format.h>
+
+#include "rdb/exceptions.hpp"
 
 namespace rdb {
 
@@ -50,7 +52,7 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
     : filename_(std::string(fileName)),
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       percounter_(percounter) {
-  if (recordSize_ == 0) FatalError("posixBinaryFileWithShadow: record size must be > 0");
+  if (recordSize_ == 0) throw LogicError("posixBinaryFileWithShadow: record size must be > 0");
 
   std::error_code fs_ec;
   const bool mainFileExisted = std::filesystem::exists(filename_, fs_ec);
@@ -66,12 +68,20 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
 
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
   if (fd < 0) {
-    FatalError("posixBinaryFileWithShadow: failed to open '{}' (fd={})", filename_, fd);
+    throw IOError(fmt::format("posixBinaryFileWithShadow: failed to open '{}': {}", filename_, std::strerror(errno)));
   }
 
   fd_shadow = ::open(shadowName().c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
   if (fd_shadow < 0) {
-    FatalError("posixBinaryFileWithShadow: failed to open shadow '{}' (fd={})", shadowName(), fd_shadow);
+    // Rzut z konstruktora oznacza, ze destruktor sie NIE wykona - a fd otwarty wyzej juz
+    // istnieje. Do fazy 1 nie mialo to znaczenia, bo FatalError konczyl proces i jadro
+    // zamykalo deskryptory za nas; teraz wyjatek wraca do wolajacego, ktory probuje dalej, i
+    // niezamkniety deskryptor wycieka na kazda nieudana probe otwarcia cienia.
+    const int shadowErrno = errno;
+    ::close(fd);
+    fd = -1;
+    throw IOError(
+        fmt::format("posixBinaryFileWithShadow: failed to open shadow '{}': {}", shadowName(), std::strerror(shadowErrno)));
   }
 
   if (mainFileExisted) {

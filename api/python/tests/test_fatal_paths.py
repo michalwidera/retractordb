@@ -8,16 +8,18 @@ below run **in this interpreter** and assert an exception. That the rest of the
 suite still runs afterwards is the assertion that matters: before the slice, each
 of these took the interpreter down with ``std::exit``, which no ``except`` can see.
 
-**Sub-slice 2a has landed too**, closing the path that *builds* a storage:
-``storagePaths``, ``accessorFactory`` and ``storage::attachDescriptor`` now raise
-``ConfigError`` (bad input) or ``InternalError`` (broken engine invariant).
+**Sub-slices 2a and 2b have landed too.** ``src/rdb/lib`` now contains **no
+``FatalError`` call sites at all** - the whole storage layer reports failure by
+throwing. Nothing reachable from this binding can end the interpreter any more, which
+is the outcome core phase 1 exists for.
 
-What has *not* changed: the ~60 remaining ``FatalError`` sites on the **read and
-write** path - ``storage::read``/``revRead``/``write``, ``payload``, ``fagrp``,
-``facc*`` - still end the process. ``test_guarded_paths_do_not_end_the_process`` is
-what keeps the binding-level guards in front of them from being removed early; it
-still runs in a subprocess, because the thing it guards against would otherwise kill
-this one.
+The guards in ``module.cpp`` are therefore no longer load-bearing. They stay as
+*translation*: an empty argument is a ``ValueError``, an unknown field a ``KeyError``,
+an out-of-range index an ``IndexError`` - the types a Python caller expects, where the
+engine would give ``ConfigError`` or ``InternalError``.
+``test_guarded_paths_do_not_end_the_process`` still pins them, and still runs in a
+subprocess: it is cheap, and it is the test that notices if one is dropped and the
+engine's own refusal turns out not to cover the same case.
 """
 
 from __future__ import annotations
@@ -156,6 +158,54 @@ def test_storage_survives_a_rejected_type_and_opens_afterwards(rdb, plain_storag
 
     with rdb.Storage("plain_file", "plain_file", storage_param=str(plain_storage)) as storage:
         assert len(storage) == 4
+
+
+def test_unknown_field_raises_key_error(rdb, plain_storage: Path) -> None:
+    """A typo in a field name is a normal event in a notebook, not a fatal one.
+
+    ``Descriptor::fieldIndex`` is bound straight through, so the name arrives from
+    whoever typed it. Before 2b this killed the kernel; the engine now throws, and the
+    binding translates to the type Python expects for a failed lookup.
+    """
+    desc = rdb.load_descriptor(str(plain_storage / "plain_file.desc"))
+
+    for call in (desc.field_index, desc.byte_offset, desc.field_type_name):
+        with pytest.raises(KeyError):
+            call("no_such_field")
+
+    assert desc.field_index("a") == 0
+    assert desc.has_field("b")
+
+
+def test_the_storage_layer_has_no_remaining_fatal_paths(rdb, plain_storage: Path) -> None:
+    """Sweep the failure modes 2b converted, in one interpreter that has to survive them all.
+
+    Each of these reached a different ``FatalError`` before this slice - the accessor
+    factory, the descriptor lookup, the declared-source read guard, the storage
+    constructor. The assertion is not any single exception type; it is that the loop
+    finishes and the process is still here to report it.
+    """
+    desc_path = str(plain_storage / "plain_file.desc")
+    survived = 0
+
+    cases = (
+        lambda: rdb.Storage("plain_file", "plain_file", storage_param=str(plain_storage), storage_type="NONSENSE"),
+        lambda: rdb.load_descriptor(str(plain_storage / "nope.desc")),
+        lambda: rdb.load_descriptor(desc_path).field_index("absent"),
+        lambda: rdb.Storage("", "x", storage_param=str(plain_storage)),
+    )
+    for case in cases:
+        try:
+            case()
+        except (rdb.RetractorDBError, KeyError, ValueError):
+            survived += 1
+
+    assert survived == len(cases)
+
+    # ...and the engine is still usable afterwards, which a poisoned global would break.
+    with rdb.Storage("plain_file", "plain_file", storage_param=str(plain_storage)) as storage:
+        assert len(storage) == 4
+        assert storage[0][0] == 1
 
 
 def test_guarded_paths_do_not_end_the_process(module_root: Path, tmp_path: Path) -> None:

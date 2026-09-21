@@ -6,6 +6,7 @@
 #include <string>
 
 #include "rdb/descriptor.hpp"
+#include "rdb/exceptions.hpp"
 
 // Tests intentionally validate legacy textual/binary layouts with C-style arrays.
 // NOLINTBEGIN(modernize-avoid-c-arrays)
@@ -375,4 +376,34 @@ TEST(descriptor, string_array_stays_one_flat_slot) {
 
   EXPECT_EQ(text.flatElementCount(), 1);
   EXPECT_FALSE(text == eightBytes);
+}
+
+// ---------------------------------------------------------------------------
+// Faza 1, plaster 2b: wyszukiwanie po nazwie zglasza blad rzutem.
+//
+// Te trzy funkcje sa zwiazane wprost do Pythona (Descriptor.field_index i pokrewne),
+// wiec nazwa pola przychodzi do nich od uzytkownika. Do plastra 2b literowka w niej
+// konczyla proces - w notatniku razem z cala sesja.
+// ---------------------------------------------------------------------------
+TEST(descriptor, lookup_by_unknown_name_throws_and_names_the_field) {
+  const rdb::Descriptor desc{rdb::Descriptor("value", sizeof(int), 1, rdb::INTEGER)};
+
+  auto mutableDesc = desc;
+  EXPECT_THROW((void)mutableDesc.fieldIndex("absent"), rdb::LogicError);
+  EXPECT_THROW((void)mutableDesc.fieldByteOffset("absent"), rdb::LogicError);
+
+  try {
+    (void)mutableDesc.fieldIndex("absent");
+    FAIL() << "expected LogicError";
+  } catch (const rdb::LogicError &error) {
+    EXPECT_NE(std::string(error.what()).find("absent"), std::string::npos) << error.what();
+  }
+
+  // Pole, ktore istnieje, nadal odpowiada - rzut nie zatruwa deskryptora.
+  EXPECT_EQ(mutableDesc.fieldIndex("value"), 0U);
+}
+
+TEST(descriptor, merging_a_descriptor_with_itself_throws) {
+  rdb::Descriptor desc{rdb::Descriptor("value", sizeof(int), 1, rdb::INTEGER)};
+  EXPECT_THROW(desc += desc, rdb::LogicError);
 }

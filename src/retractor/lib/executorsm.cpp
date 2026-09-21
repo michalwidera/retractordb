@@ -52,6 +52,63 @@ constexpr std::chrono::milliseconds kIdleLoopSleep{100};
 /// serviceGuardPtr: po normalnym powrocie z run() straznika juz nie ma, a sprzatac trzeba
 /// takze wtedy. Obiekt statyczny zbudowany przed rejestracja cleanup() niszczy sie po niej.
 std::string exitSweepLockDir;
+
+/// Publikacja modelu epoki dla watku komunikacyjnego, zdejmowana przy KAZDYM wyjsciu z zakresu.
+///
+/// Watek komunikacyjny siega po globalny pProc bez wlasnej wiedzy o epokach (dumpManager,
+/// executorsm::getAdHoc), wiec wskaznik musi zgasnac POD BLOKADA EPOKI, zanim model zostanie
+/// rozebrany. Samo core_mutex nie wystarcza: zatrzymuje wylacznie komendy jeszcze
+/// nieprzebudzone, a ta, ktora jest juz w srodku handlera, czyta pProc na nowo.
+///
+/// Dlaczego RAII, a nie blok na koncu petli - jak bylo do tej pory. Poprzednia wersja gasila
+/// pProc instrukcjami na normalnej drodze wyjscia, co bylo poprawne dokladnie tak dlugo, jak
+/// dlugo TA DROGA BYLA JEDYNA. Pilnowal tego komentarz zakazujacy `break` w srodku petli
+/// slotow - zakaz, ktorego nie egzekwuje nic poza uwaga czytajacego. Faza 1 refaktoru zamienia
+/// bledy krytyczne warstwy magazynu na wyjatki, a wyjatek jest wlasnie takim `break`: wychodzi
+/// z petli z pominieciem tego bloku, niszczy `proc` przy odwijaniu stosu i zostawia watkowi
+/// komunikacyjnemu wskaznik na rozebrany model. Straznik zamienia zakaz na niezmiennik.
+///
+/// @note Obiekt MUSI byc zadeklarowany PO `proc`: destruktory biegna w odwrotnej kolejnosci
+/// deklaracji, wiec dopiero wtedy zgaszenie wskaznika wypada przed rozbiorka modelu.
+class EpochPublication {
+ public:
+  explicit EpochPublication(dataModel &model) {
+    {
+      // Publikacja pod obiema blokadami: blokada epoki wpuszcza handlery dopiero do modelu
+      // gotowego, core_mutex niesie powiadomienie do czekajacych na cv.
+      std::scoped_lock lock(plan_epoch_mutex, core_mutex);
+      pProc = &model;
+    }
+    cv.notify_all();
+  }
+
+  /// Zgas publikacje teraz. Idempotentne - wolane wprost na drodze normalnej, zeby ustalic
+  /// kolejnosc wobec broadcastOutOfBusiness(), i przez destruktor na kazdej innej.
+  void retire() {
+    {
+      std::scoped_lock lock(plan_epoch_mutex, core_mutex);
+      if (pProc == nullptr) return;  // juz zgaszone - drugie wywolanie nic nie zmienia
+      pProc             = nullptr;
+      dataModelExpected = false;
+    }
+    cv.notify_all();
+  }
+
+  /// Destruktor nie rzuca: scoped_lock na std::mutex moze teoretycznie rzucic system_error,
+  /// a wyjatek z destruktora w trakcie odwijania stosu to std::terminate. Zgaszenie wskaznika
+  /// jest wazniejsze niz zgloszenie, ze nie dalo sie wziac muteksu.
+  ~EpochPublication() {
+    try {
+      retire();
+    } catch (...) {  // NOLINT(bugprone-empty-catch)
+    }
+  }
+
+  EpochPublication(const EpochPublication &)            = delete;
+  EpochPublication &operator=(const EpochPublication &) = delete;
+  EpochPublication(EpochPublication &&)                 = delete;
+  EpochPublication &operator=(EpochPublication &&)      = delete;
+};
 }  // namespace
 
 void cleanup() {
@@ -305,13 +362,9 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
             if (q.isDeclaration()) q.isOneShot = true;
 
         dataModel proc(*coreInstancePtr);
-        {
-          // Publikacja pod obiema blokadami: blokada epoki wpuszcza handlery dopiero do
-          // modelu gotowego, core_mutex niesie powiadomienie do czekajacych na cv.
-          std::scoped_lock lock(plan_epoch_mutex, core_mutex);
-          pProc = &proc;
-        }
-        cv.notify_all();
+        // PO `proc`, nie przed - patrz EpochPublication. Ta kolejnosc deklaracji jest cala
+        // gwarancja, ze wskaznik gasnie zanim model zostanie rozebrany.
+        EpochPublication epochPublication(proc);
 
         // Czy bramke --xqrywait zdjelo zatrzymanie procesu, a nie komenda klienta. Osobna
         // zmienna, a nie odczyt iLoopLimitCnt nizej: `stop_now` to wartosc 1, czyli dokladnie
@@ -368,9 +421,11 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
           if (it.isDeclaration()) inSet.insert(it.id);
         // Zatrzymanie, ktore zdjelo bramke --xqrywait, nie ma prawa policzyc ani jednego kroku:
         // proces konczony sygnalem zapisalby wtedy rekord zerowy do magazynu, choc nikt o niego
-        // nie prosil. Sama petla ponizej i tak nie wykona obrotu (warunek stop_now), a wyjscia
-        // `break` w tym miejscu byc nie moze -- ominieloby zgaszenie pProc na koncu epoki i
-        // zostawiloby watkowi komunikacyjnemu wskaznik na rozbierany dataModel.
+        // nie prosil. Sama petla ponizej i tak nie wykona obrotu (warunek stop_now).
+        //
+        // Do wprowadzenia EpochPublication staloby tu rowniez ostrzezenie, ze `break` w tym
+        // miejscu ominalby zgaszenie pProc. Straznik czyni ten zakaz bezprzedmiotowym: pProc
+        // gasnie na kazdej drodze wyjscia z epoki, takze przez wyjatek.
         if (!gateStoppedProcess) {
           proc.processZeroStep();
           ipcServer.broadcast(inSet, formatRow);
@@ -507,19 +562,16 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         // End of data processing loop
         //
 
-        // Koniec epoki: model znika, zanim `proc` wyjdzie z zakresu. Kolejnosc jest wymogiem
-        // poprawnosci - watek komunikacyjny siega po pProc bez wlasnej wiedzy o epokach, wiec
-        // wskaznik musi zgasnac POD BLOKADA EPOKI, a nie tylko pod core_mutex. Sam core_mutex
-        // zatrzymywal wylacznie komendy jeszcze nieprzebudzone; ta, ktora byla juz w srodku
-        // handlera, czytala pProc na nowo i dostawala nulla albo zniszczony model.
-        // plan_epoch_mutex czeka tu na handler w locie, a po jego zwolnieniu pProc jest juz
-        // nullem, wiec destrukcja `proc` ponizej nie ma komu wyrwac obiektu spod rak.
-        {
-          std::scoped_lock lock(plan_epoch_mutex, core_mutex);
-          pProc             = nullptr;
-          dataModelExpected = false;
-        }
-        cv.notify_all();
+        // Koniec epoki na drodze NORMALNEJ. Zgaszenie zostaje tutaj, mimo ze umie je zrobic
+        // destruktor epochPublication, bo destruktor wypada dopiero za klamra ponizej - czyli
+        // PO broadcastOutOfBusiness(). Kolejnosc "najpierw zgas, potem oglos koniec" jest
+        // obserwowalna przez klienta, ktory na to ogloszenie odpowiada komenda, i nie ma
+        // powodu jej zmieniac przy okazji uodparniania na wyjatki.
+        //
+        // Podzial pracy jest wiec taki: ten blok ustala KOLEJNOSC, straznik gwarantuje
+        // ZAJSCIE. Powtorzenie jest zamierzone i nieszkodliwe - zgaszenie jest idempotentne,
+        // a na drodze wyjatkowej ten blok po prostu sie nie wykonuje.
+        epochPublication.retire();
         ipcServer.broadcastOutOfBusiness();
       }
 

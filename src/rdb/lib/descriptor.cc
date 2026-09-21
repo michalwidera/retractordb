@@ -1,5 +1,6 @@
 #include "rdb/descriptor.hpp"
 
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -8,7 +9,7 @@
 #include <sstream>
 #include <utility>
 
-#include "fatalError.hpp"
+#include "rdb/exceptions.hpp"
 
 #include <magic_enum/magic_enum.hpp>
 
@@ -83,7 +84,7 @@ void Descriptor::rebuildFieldMappings() const {
 // cross-TU. Tu zostaje tylko zimna sciezka bledu byteOffsetAtFlatIndex.
 void Descriptor::flatIndexOutOfRange(const int flatIndex) const {
   rebuildFieldMappings();
-  FatalError("descriptor: flatIndex {} out of range [0,{})", flatIndex, flattenedFieldCount_);
+  throw LogicError(fmt::format("descriptor: flatIndex {} out of range [0,{})", flatIndex, flattenedFieldCount_));
 }
 
 std::vector<rField> Descriptor::dataFields() {
@@ -112,7 +113,7 @@ Descriptor &Descriptor::operator+=(const Descriptor &rhs) {
   if (this != &rhs) {
     insert(end(), rhs.begin(), rhs.end());  // TODO: add rename of duplicates here.
   } else {
-    FatalError("descriptor: cannot merge descriptor with itself");
+    throw LogicError("descriptor: cannot merge descriptor with itself");
     // can't do safe: data | data
     // due one name policy
   }
@@ -171,8 +172,8 @@ void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, D
   // rekordzie wezszym niz plaski uklad zrodla. Ten sam warunek ta sama miara sprawdza
   // compiler::buildOutputSchema().
   if (lhs.flatElementCount() != rhs.flatElementCount()) {
-    FatalError("descriptor: hash composition requires equal-width descriptors: lhs={} rhs={}", lhs.flatElementCount(),
-               rhs.flatElementCount());
+    throw LogicError(fmt::format("descriptor: hash composition requires equal-width descriptors: lhs={} rhs={}",
+                                 lhs.flatElementCount(), rhs.flatElementCount()));
   }
 
   clear();
@@ -180,7 +181,7 @@ void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, D
   for (int i = 0; i < width; ++i) {
     const auto lhsPosition = lhs.flatIndexToDescriptorPosition(i);
     const auto rhsPosition = rhs.flatIndexToDescriptorPosition(i);
-    if (!lhsPosition || !rhsPosition) FatalError("descriptor: invalid flat field position");
+    if (!lhsPosition || !rhsPosition) throw LogicError("descriptor: invalid flat field position");
     const auto &lhsField = lhs[lhsPosition->first];
     const auto &rhsField = rhs[rhsPosition->first];
     auto maxRtype        = std::max(lhsField.rtype, rhsField.rtype);
@@ -240,9 +241,10 @@ size_t Descriptor::fieldIndex(const std::string_view fieldName) {
                                  [fieldName](const auto &item) { return item.rname == fieldName; });  //
 
   if (it != end()) return std::distance(begin(), it);
-  FatalError("descriptor: field ID not found");
-
-  return 0;  // ProForma Error
+  // Nazwa pola W KOMUNIKACIE, bo ta funkcja jest wystawiona wprost do Pythona
+  // (Descriptor.field_index) i wolana z tekstem od uzytkownika. "field not found" bez
+  // podania, ktorego, zmusza do zgadywania przy kazdej literowce.
+  throw LogicError(fmt::format("descriptor: no field named '{}'", fieldName));
 }
 
 int Descriptor::fieldSize(const std::string_view fieldName) { return fieldSize((*this)[fieldIndex(fieldName)]); }
@@ -253,8 +255,7 @@ size_t Descriptor::fieldByteOffset(const std::string_view fieldName) {
     if (fieldName == field.rname) return offset;
     offset += fieldSize(field);
   }
-  FatalError("descriptor: field not found by name");
-  return 0;  // ProForma Error
+  throw LogicError(fmt::format("descriptor: no field named '{}' (byte offset lookup)", fieldName));
 }
 
 std::string_view Descriptor::fieldTypeName(const std::string_view fieldName) {  //

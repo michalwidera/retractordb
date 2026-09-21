@@ -4,7 +4,7 @@
 #include <fstream>
 #include <limits>
 #include <memory>
-#include "fatalError.hpp"
+#include "rdb/exceptions.hpp"
 namespace rdb {
 // https://courses.cs.vt.edu/~cs2604/fall02/binio.html
 // https://stackoverflow.com/questions/1658476/c-fopen-vs-open
@@ -39,7 +39,8 @@ size_t genericBinaryFile::count() {
 }
 
 ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/, const size_t position) {
-  if (recordSize_ == 0) FatalError("genericBinaryFile::write: recordSize_ is zero");
+  if (recordSize_ == 0)
+    throw LogicError("genericBinaryFile::write: recordSize_ is zero - accessor built on a zero-width descriptor");
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   if (ptrData == nullptr && recordSize_ == 0 && position == 0) {
@@ -66,7 +67,8 @@ ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool>
 
 ssize_t genericBinaryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   nullBitset.clear();
-  if (recordSize_ == 0) FatalError("genericBinaryFile::read: recordSize_ is zero");
+  if (recordSize_ == 0)
+    throw LogicError("genericBinaryFile::read: recordSize_ is zero - accessor built on a zero-width descriptor");
   std::ifstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(filename_, std::ios::in | std::ios::binary);

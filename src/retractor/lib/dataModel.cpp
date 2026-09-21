@@ -16,6 +16,7 @@
 #include "executorsmState.hpp"
 #include "fatalError.hpp"
 #include "rdb/convertTypes.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/probe.hpp"
 #include "rdb/rationalFormat.hpp"
 #include "SOperations.hpp"
@@ -287,6 +288,20 @@ void dataModel::processRows(const std::set<std::string> &inSet, const boost::rat
     std::cerr << "RDB_FAULT_FATAL_IN_SLOT: slot locked" << '\n';
     std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
     FatalError("fault hook RDB_FAULT_FATAL_IN_SLOT: fatal error inside a processing slot");
+  }
+
+  // Blizniak powyzszego haka dla drogi WYJATKOWEJ - to, czym faza 1 zastepuje std::exit w
+  // warstwie magazynu (storage::read i reszta plastra 2b). Rzut stad przechodzi dokladnie ta
+  // droga co przyszly blad odczytu: spod core_mutex tej funkcji, spod plan_epoch_mutex
+  // wzietego przez executorsm::run na czas slotu, przez destruktor EpochPublication.
+  //
+  // Hak istnieje, bo inaczej tej drogi nie da sie zobaczyc: po W3 z 2026-09-14 zadne znane RQL
+  // nie doprowadza do bledu krytycznego w slocie, a plaster 2b jeszcze nie wszedl. Bez niego
+  // straznik epoki byl testowany wylacznie na drodze, ktora dziala od zawsze.
+  if (const char *delayMs = std::getenv("RDB_FAULT_THROW_IN_SLOT"); delayMs != nullptr) {
+    std::cerr << "RDB_FAULT_THROW_IN_SLOT: slot locked" << '\n';
+    std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
+    throw rdb::LogicError("fault hook RDB_FAULT_THROW_IN_SLOT: engine error inside a processing slot");
   }
 
   // Zrodlo dolaczone ad-hoc nie uczestniczylo w kroku zerowym. Uzbrajamy je

@@ -41,17 +41,20 @@
 /// (fatalError.hpp:51). std::exit nie odwija stosu, wiec zaden catch tutaj go
 /// nie przechwyci; zabija interpreter razem z sesja notatnika.
 ///
-/// Plaster 2a domknal sciezke BUDOWY magazynu: storagePaths, accessorFactory i
-/// attachDescriptor rzucaja ConfigError albo InternalError, wiec zly katalog,
-/// nieznany typ magazynu czy deskryptor bez REF sa tu wyjatkami. Zostaja
-/// miejsca na sciezce ODCZYTU i ZAPISU (storage::read/revRead/write, payload,
-/// fagrp, facc*) - te nadal koncza proces.
+/// OGRANICZENIE ZNIESIONE. Po plastrze 2b w src/rdb/lib nie ma juz ANI JEDNEGO
+/// wywolania FatalError: cala warstwa magazynu zglasza bledy rzutem. Zadne
+/// wywolanie z tego wiazania nie jest juz w stanie zabic interpretera, i to jest
+/// cel, dla ktorego faza 1 powstala.
 ///
-/// Co WOLNO zrobic do czasu ich konwersji i co robimy nizej: sprawdzic w
-/// wiazaniu te warunki, ktore inaczej trafilyby prosto w FatalError - indeks
-/// poza zakresem i odczyt ze zrodla deklarowanego. Straze przy konstruktorze
-/// sa juz nadmiarowe; trzymamy je dla lepszych typow i komunikatow, nie dlatego,
-/// ze silnik bez nich zabija jadro.
+/// Straze ponizej ZOSTAJA, ale zmienily role. Nie sa juz jedyna ochrona przed
+/// smiercia procesu - sa tlumaczeniem na typy, ktorych oczekuje Python: pusty
+/// argument daje ValueError, nieznane pole KeyError, indeks poza zakresem
+/// IndexError. Silnik zglasza te same przypadki jako ConfigError albo
+/// InternalError, co jest poprawne, ale w notatniku czyta sie gorzej.
+/// Pilnuje ich test_guarded_paths_do_not_end_the_process.
+///
+/// Zostaje 142 wywolania w src/retractor/lib - warstwie planu i wykonania,
+/// ktorej to wiazanie nie dotyka (patrz docs/core-phase-1.md §3.2).
 
 namespace nb = nanobind;
 
@@ -138,6 +141,9 @@ std::string streamToString(const T &value) {
 /// (DEVICE, TEXTSOURCE) trafia z kolei prosto w FatalError, wiec tez zatrzymujemy
 /// go przed wywolaniem.
 Record readRecord(rdb::storage &self, Py_ssize_t index) {
+  // Silnik zglasza to samo jako ConfigError (storage.cc). Straz zostaje, zeby typ byl
+  // stabilny dla kodu, ktory lapie StorageError od etapu 1a - zmiana typu wyjatku jest
+  // zmiana API, a plaster 2b nie ma powodu jej robic.
   if (self.isDeclared()) {
     throw RdbStorageError("cannot read directly from a declared (DEVICE/TEXTSOURCE) storage");
   }
@@ -189,6 +195,7 @@ NB_MODULE(_core, m) {
   // zrobic. To zlamany niezmiennik silnika, czyli blad w NASZYM kodzie: nadaje sie do
   // zgloszenia, nie do obsluzenia i kontynuowania.
   nb::exception<rdb::LogicError>(m, "InternalError", baseError);
+  nb::exception<rdb::IOError>(m, "IOError", baseError);
 
   // Nazwy pozycji wyliczenia biora sie z magic_enum, zeby nie rozjechac sie z
   // fldType.hpp przy dodaniu typu. reserve() jest WYMAGANE, nie kosmetyczne:
@@ -216,9 +223,34 @@ NB_MODULE(_core, m) {
       .def_prop_ro("size_bytes", [](const rdb::Descriptor &self) { return self.getSizeInBytes(); })
       .def_prop_ro("flat_element_count", [](const rdb::Descriptor &self) { return self.flatElementCount(); })
       .def("has_field", &rdb::Descriptor::hasField, nb::arg("name"))
-      .def("field_index", &rdb::Descriptor::fieldIndex, nb::arg("name"))
-      .def("byte_offset", &rdb::Descriptor::fieldByteOffset, nb::arg("name"))
-      .def("field_type_name", &rdb::Descriptor::fieldTypeName, nb::arg("name"))
+      // Trzy wyszukiwania po nazwie pod wspolna straza. Silnik rzuca dla nich
+      // InternalError (zlamany niezmiennik - i sluszne, bo wolajacy z C++ ma
+      // pytac o pole, ktore zadeklarowal), ale tutaj nazwa pola przychodzi
+      // wprost od uzytkownika notatnika, gdzie literowka jest przypadkiem
+      // NORMALNYM. Pythonowa odpowiedzia na "nie ma takiego klucza" jest
+      // KeyError, wiec straz tlumaczy typ - nie chroni juz przed smiercia
+      // procesu, bo po plastrze 2b nie ma przed czym.
+      .def(
+          "field_index",
+          [](rdb::Descriptor &self, const std::string &name) {
+            if (!self.hasField(name)) throw nb::key_error(name.c_str());
+            return self.fieldIndex(name);
+          },
+          nb::arg("name"))
+      .def(
+          "byte_offset",
+          [](rdb::Descriptor &self, const std::string &name) {
+            if (!self.hasField(name)) throw nb::key_error(name.c_str());
+            return self.fieldByteOffset(name);
+          },
+          nb::arg("name"))
+      .def(
+          "field_type_name",
+          [](rdb::Descriptor &self, const std::string &name) {
+            if (!self.hasField(name)) throw nb::key_error(name.c_str());
+            return self.fieldTypeName(name);
+          },
+          nb::arg("name"))
       .def("storage_policy", &rdb::Descriptor::storagePolicy)
       .def("__len__", [](const rdb::Descriptor &self) { return self.size(); })
       .def("__getitem__",

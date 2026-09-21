@@ -35,6 +35,7 @@ with rdb.Storage("test_db", "test_db", storage_param="/path/to/dir") as st:
 | `CorruptDescriptor` | `rdb::CorruptDescriptor` - `loadDescriptorFile` |
 | `ConfigError` | `rdb::ConfigError` - `storagePaths`, `accessorFactory`, `attachDescriptor` |
 | `InternalError` | `rdb::LogicError` - a broken engine invariant; report it, do not handle it |
+| `IOError` | `rdb::IOError` - a file operation failed; message carries `strerror(errno)` |
 
 Reads release the GIL. That is not premature: without it a single blocking read
 freezes the whole kernel including its UI, and retrofitting the guard after callers
@@ -54,7 +55,7 @@ so this stage is a genuine capability that also answers the two questions the la
 stages would otherwise have to guess at: whether nanobind is the right tool, and how
 the C++ types actually cross into Python.
 
-## 3. The limitation you will hit first - now mostly gone
+## 3. The limitation you will hit first - gone
 
 **A malformed descriptor used to kill the interpreter.** It no longer does:
 [core phase 1](core-phase-1.md) slice 1 converted the descriptor read path, so
@@ -87,13 +88,27 @@ types exists, so no guard in `module.cpp` could have stood in front of it withou
 duplicating the list and drifting from it. It killed the kernel and nothing in the
 binding could have stopped it.
 
-**What still kills the interpreter:** the 60 remaining `FatalError` sites, all on the
-**read and write** path - `storage::read`/`revRead`/`write`, `payload`, `fagrp`,
-`facc*`, `convertTypes`. `std::exit` is not an exception and does not unwind, so no
-`catch` in the binding and no `except` in Python can see them. The binding's guards
-for index range and declared sources are still the only protection in front of those.
-The guards at the `Storage` constructor are now belt-and-braces: they give Python a
-`ValueError` where a `ValueError` is idiomatic, but the engine refuses on its own.
+**Sub-slice 2b finished the job.** `src/rdb` - the whole storage layer plus the `xtrdb`
+tool - now contains **zero** `FatalError` call sites. Every failure below the binding is
+a throw, so nothing this module can reach will end the interpreter:
+
+```python
+desc.field_index("typo")        # KeyError, not a dead kernel
+storage[9999]                   # IndexError
+rdb.Storage("s", "s", storage_type="NONSENSE")   # ConfigError
+```
+
+A new `IOError` covers failures that are neither bad input nor engine bugs - a failed
+open, a rejected read - and carries `strerror(errno)` rather than a return code that
+was always -1.
+
+The guards in `module.cpp` have changed role rather than disappeared. They are no
+longer the only thing standing between a notebook and `std::exit`; they translate the
+engine's `ConfigError` / `InternalError` into the types a Python caller expects
+(`ValueError`, `KeyError`, `IndexError`).
+
+**What is left:** 142 sites in `src/retractor/lib` - the plan and execution layer, which
+this binding does not touch. They become reachable at J1, when `Engine` binds L2.
 
 `api/python/tests/test_fatal_paths.py` tracks the boundary in executable form. The two
 descriptor cases now assert `pytest.raises` in the test interpreter;
@@ -134,7 +149,7 @@ Phase numbering follows the roadmap in `design/`.
 
 | Phase | Adds | Blocked by |
 |---|---|---|
-| **J1** | `Engine`: `compile()`, `step()`, `rows()`, real exception mapping | core phases 1-3 (phase 1 slice 1 done) |
+| **J1** | `Engine`: `compile()`, `step()`, `rows()`, real exception mapping | core phases 1-3 (phase 1 done for the storage layer; 142 sites left in `src/retractor/lib`) |
 | **J2** | `Window`, DLPack zero-copy export, `torch.utils.data.IterableDataset` | J1 |
 | **J3** | `KeyboardInterrupt` during `run()`, logging bridge to the `logging` module | J1 |
 | **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | J2 |

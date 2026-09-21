@@ -1,14 +1,16 @@
 # Core phase 1: FatalError becomes an exception
 
-**Status:** slice 1 (the descriptor read path, §2) and sub-slice 2a (the storage
-construction path, §3.1a) are **done**; the rest of §3 is not started.
+**Status:** slice 1 (§2) and both halves of §3 item 1 - sub-slice 2a, the storage
+construction path, and sub-slice 2b, the read and write path - are **done**.
+`src/rdb` no longer contains a single `FatalError` call site. §3 items 2 and 3 are not
+started.
 Stage 1a (`9a1e72eb`) is this phase's test harness. **Prerequisite for:** everything
 above the storage layer, in all three embedding targets - see
 [`embedded-roadmap.md`](embedded-roadmap.md).
 
-After sub-slice 2a: **202 `FatalError` call sites** in `src/` - 60 in `src/rdb/lib`,
-142 in `src/retractor/lib` - and no bare `exit()` anywhere in the tree. (At `f22cffe0`
-it was 221 / 79 / 142.)
+After 2b: **142 `FatalError` call sites** in `src/`, **all of them in
+`src/retractor/lib`**. The storage layer is at zero. (At `f22cffe0` it was 221 total -
+79 in `src/rdb/lib`, 142 in `src/retractor/lib`.) No bare `exit()` anywhere in the tree.
 
 `FatalError` ends with `std::exit(EXIT_FAILURE)` (`src/include/fatalError.hpp:51`).
 At `f22cffe0` there are **221 call sites** in `src/` - 79 in `src/rdb/lib`, 142 in
@@ -146,9 +148,9 @@ instance of a question every later slice raises: **what did the code downstream 
 
 Ordered by how much each unblocks, not by size:
 
-1. **`src/rdb/lib`, remaining 77 sites.** Finishes the storage layer and makes stage
-   1a's guards redundant rather than load-bearing. Split in two at the seam described
-   in §3.1a: **2a, the construction path - done**; 2b, the read and write path.
+1. ~~**`src/rdb/lib`, remaining 77 sites.**~~ **Done**, in two sub-slices at the seam
+   described in §3.1a: 2a, the construction path, and 2b, the read and write path.
+   Stage 1a's guards are now redundant rather than load-bearing, which was the point.
 2. **`src/retractor/lib`, 142 sites.** The hard half. `executorsm.cpp:70-77` and
    `ipcServer.cpp:54-69` already carry comments about `FatalError` running `atexit`
    handlers on the calling thread; those two are where unwinding will surprise you.
@@ -213,6 +215,65 @@ with this slice - it used to be a server-wide `std::exit`.
 
 The question to ask for every later site is therefore not "will this unwind safely",
 but **"who catches it on the way out, and what will they think it was?"**
+
+### 3.1b Sub-slice 2b: the read and write path - DONE
+
+**60 sites** across `storage.cc` (11), `payload.cc` (16), `fagrp.cc` (7),
+`descriptor.cc` (6), `convertTypes.cc` (5), the five `facc*` accessors (11),
+`descriptorIO.cc` (2) and `sourceBuffer.cc` (1).
+
+**One new type, `rdb::IOError`** (Python `IOError`), for failures that are neither bad
+input nor engine bugs: a failed `open`, a read the accessor rejected, a descriptor that
+would not write. Everything else split into the existing `ConfigError` and `LogicError`.
+
+#### The prerequisite that had to land first
+
+2b could not be done safely until `executorsm::run()` stopped publishing the epoch's
+`dataModel` as a bare pointer cleared only on the normal exit path. `processRows()`
+runs while holding `plan_epoch_mutex`; an exception out of `storage::read` unwinds past
+that clear, destroys the model, and leaves the communication thread dereferencing a
+dangling `pProc` (`dumpManager.cpp:61,93,115,120,123`, `executorsmAdHoc.cpp:83,236`).
+The code already carried a comment forbidding `break` in that loop for exactly this
+reason - **a throw is a `break` the compiler does not warn about.** `EpochPublication`
+turns that prohibition into an invariant. `fatal_exit_path` paths 5 and 6 pin it, the
+second with a client command parked on the epoch lock.
+
+The reassuring half of the same question: unwinding *releases* `core_mutex` and
+`plan_epoch_mutex` on the way out, which `std::exit` never did - it ran `cleanup()` on
+the same thread with those locks held, the deadlock that forced `try_to_lock` into
+`cleanup()` on 2026-09-14. Throwing removes that condition rather than adding to it.
+
+#### Two latent bugs the conversion exposed
+
+Neither was caused by this refactor; both were invisible while the process died.
+
+- **`posixBinaryFileWithShadow` leaked a file descriptor.** The constructor opens the
+  data file, then the shadow. Throwing on the second means no destructor runs and the
+  first `fd` leaks - once per failed attempt, where `std::exit` had made it moot. Now
+  closed explicitly before the throw.
+- **Failed `open` reported `fd` instead of `errno`.** After a failed `::open`, `fd` is
+  always -1, so the message said only that it failed. `IOError` carries
+  `strerror(errno)`, which is the difference between "no such directory" and
+  "permission denied".
+
+#### The second hole in the binding
+
+`Descriptor::fieldIndex`, `fieldByteOffset` and `fieldTypeName` are bound straight
+through, so the field name arrives from whoever typed it - and a typo killed the
+kernel. The engine now throws and names the field; the binding translates to `KeyError`,
+which is what a Python caller expects from a failed lookup. This is the same shape as
+2a's `storage_type` hole: **a value that crosses from user input into a lookup table
+that only the engine knows.**
+
+#### Where the taxonomy is still lying, and to whom
+
+`ConfigError` carries two data-dependent cases it does not really describe: a rational
+with a zero denominator (`convertTypes.cc`, four sites) and a text source whose token
+does not match the declared NULL field (`facctxtsrc.cc`). These are bad *data*, not bad
+*configuration*. `ConfigError` was chosen as the least-wrong of the three available
+types - calling them `LogicError` would accuse RetractorDB of a bug over the user's
+input. **Phase 5 should give data errors their own type**; these five sites are its
+first call sites.
 
 ## 4. Where stage 1a left things
 

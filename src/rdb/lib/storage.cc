@@ -10,7 +10,6 @@
 #include <ranges>
 #include <fmt/format.h>
 
-#include "fatalError.hpp"
 #include "rdb/accessorFactory.hpp"
 #include "rdb/exceptions.hpp"
 #include "rdb/descriptorIO.hpp"
@@ -191,20 +190,23 @@ bool storage::isMetaIndexEmpty() const {
 }
 
 bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
-  if (isDeclared()) FatalError("storage::read: cannot read directly from declared (device/textsource) storage");
+  // ConfigError, nie LogicError: zrodla deklarowane czyta sie przez revRead(), a proba
+  // czytania ich wprost jest bledem WOLAJACEGO, nie zlamanym niezmiennikiem silnika. To samo
+  // rozroznienie widzi uzytkownik Pythona - straz w module.cpp zglasza tu StorageError.
+  if (isDeclared()) throw ConfigError("storage::read: cannot read directly from a declared (DEVICE/TEXTSOURCE) storage");
   abortIfStorageNotPrepared();
 
   if (destination == nullptr) {
     destination = storagePayload_->span().data();
   }
 
-  if (destination == nullptr) FatalError("storage::read: destination pointer is null (payload span is empty)");
+  if (destination == nullptr) throw LogicError("storage::read: destination pointer is null (payload span is empty)");
   auto size      = descriptor.getSizeInBytes();
   ssize_t result = 0;
 
   if (recordsCount_ != accessor_->count()) {
-    FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(),
-               paths_.storageFile());
+    throw LogicError(fmt::format("storage::read: internal record count mismatch: recordsCount_={} count()={} in {}",
+                                 recordsCount_, accessor_->count(), paths_.storageFile()));
   }
 
   if (isHold_) {
@@ -215,7 +217,8 @@ bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
   if (recordsCount_ > 0 && recordIndexFromFront < recordsCount_) {
     result = accessor_->read(destination, recordIndexFromFront * size);
     if (result != 0) {
-      FatalError("storage::read: read from '{}' at pos {} failed (result={})", accessor_->name(), recordIndexFromFront, result);
+      throw IOError(fmt::format("storage::read: read from '{}' at pos {} failed (result={})", accessor_->name(),
+                                recordIndexFromFront, result));
     }
     storagePayload_->setNullBitset(metaData_->nullBitsetFor(recordIndexFromFront));
   } else {
@@ -233,7 +236,7 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
                       ? storagePayload_->span().data()  //
                       : destination;
 
-    if (destination == nullptr) FatalError("storage::revRead: destination pointer is null in hold path");
+    if (destination == nullptr) throw LogicError("storage::revRead: destination pointer is null in hold path");
     auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
     bufferState = sourceState::armed;  // fake armed on hold position
@@ -254,7 +257,8 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   // In order to maintain the consistency of declared data sources,
   // it is necessary to maintain a buffer of at least 1
 
-  if (buffer_.capacity() == 0) FatalError("storage::revRead: circular buffer capacity is zero for declared source");
+  if (buffer_.capacity() == 0)
+    throw LogicError("storage::revRead: circular buffer capacity is zero for a declared source");
 
   if (recordIndexFromBack == 0 && bufferState == sourceState::flux) {
     buffer_.readCurrent(*accessor_, *storagePayload_);
@@ -270,8 +274,8 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   // - also for recordIndex == 0
 
   if (recordIndexFromBack >= buffer_.capacity()) {
-    FatalError("storage::revRead: recordIndexFromBack {} >= circularBuffer_.capacity() {} in '{}'", recordIndexFromBack,
-               buffer_.capacity(), accessor_->name());
+    throw LogicError(fmt::format("storage::revRead: recordIndexFromBack {} >= circularBuffer_.capacity() {} in '{}'",
+                                 recordIndexFromBack, buffer_.capacity(), accessor_->name()));
   }
 
   // in case of accessing buffer that has no data yet - zeros are returned
@@ -281,7 +285,7 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
                       ? storagePayload_->span().data()  //
                       : destination;
 
-    if (destination == nullptr) FatalError("storage::revRead: destination pointer is null in buffer fallback path");
+    if (destination == nullptr) throw LogicError("storage::revRead: destination pointer is null in buffer fallback path");
     auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
     SPDLOG_ERROR("read buffer fn {} - non existing data from [pos:{} cap:{} size:{}]", accessor_->name(), recordIndexFromBack,
@@ -309,15 +313,15 @@ bool storage::write(const size_t recordIndex) {
   if (recordIndex >= recordsCount_ && metaData_->absorbAppend(nullInfo)) return true;
 
   if (recordsCount_ != accessor_->count()) {
-    FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(),
-               paths_.storageFile());
+    throw LogicError(fmt::format("storage::write: internal record count mismatch: recordsCount_={} count()={} in {}",
+                                 recordsCount_, accessor_->count(), paths_.storageFile()));
   }
 
   ssize_t result = 0;
   if (recordIndex >= recordsCount_) {
     result = accessor_->write(storagePayload_->span().data());  // <- Call to append Function
     if (result != 0) {
-      FatalError("storage::write: append to '{}' failed (result={})", paths_.storageFile(), result);
+      throw IOError(fmt::format("storage::write: append to '{}' failed (result={})", paths_.storageFile(), result));
     }
     recordsCount_++;
     // `if constexpr` obejmuje całe wywołanie, nie tylko treść sondy: przy wyłączonej
@@ -336,7 +340,8 @@ bool storage::write(const size_t recordIndex) {
   } else {
     result = accessor_->write(storagePayload_->span().data(), recordIndex * descriptor.getSizeInBytes());
     if (result != 0) {
-      FatalError("storage::write: overwrite to '{}' at index {} failed (result={})", paths_.storageFile(), recordIndex, result);
+      throw IOError(fmt::format("storage::write: overwrite to '{}' at index {} failed (result={})", paths_.storageFile(),
+                                recordIndex, result));
     }
     // Nadpisanie nie zwiększa objętości magazynu, więc nie wchodzi do `bytes`. Do metryki
     // K23 wchodzi, bo tam jednostką jest zapis rekordu, nie przyrost objętości - inaczej

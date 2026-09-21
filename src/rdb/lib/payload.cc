@@ -24,6 +24,7 @@
 #define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
 #endif
 
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>  // std::min, std::copy, std::fill
@@ -36,7 +37,7 @@
 #include <ranges>
 #include <sstream>
 #include <utility>
-#include "fatalError.hpp"
+#include "rdb/exceptions.hpp"
 
 #include "rdb/convertTypes.hpp"
 
@@ -62,18 +63,18 @@ int resolveFieldIndexOrAbort(const Descriptor &descriptor, const int positionFla
       SPDLOG_ERROR("Stack: {}", message.str());
       std::cerr << message.str() << '\n';
     }
-    FatalError("payload: flat position out of range");
+    throw LogicError("payload: flat position out of range");
   }
 
   auto positionOpt = descriptor.flatIndexToDescriptorPosition(positionFlat);
   if (positionOpt.has_value()) {
     const auto position = positionOpt->first;
     if (position < 0 || std::cmp_greater_equal(position, descriptor.size())) {
-      FatalError("payload: {} converted index {} out of descriptor bounds", context, position);
+      throw LogicError(fmt::format("payload: {} converted index {} out of descriptor bounds", context, position));
     }
     return position;
   }
-  FatalError("payload: {} conversion failed for flat position {}", context, positionFlat);
+  throw LogicError(fmt::format("payload: {} conversion failed for flat position {}", context, positionFlat));
 }
 
 void writeValue(std::ostream &os, const std::any &value, const descFld type, const bool hexFormat) {
@@ -118,7 +119,7 @@ void writeValue(std::ostream &os, const std::any &value, const descFld type, con
     case rdb::TYPE:
     case rdb::RETENTION:
     case rdb::RETMEMORY:
-      FatalError("payload: configuration fields (REF/TYPE/RETENTION) cannot be formatted");
+      throw LogicError("payload: configuration fields (REF/TYPE/RETENTION) cannot be formatted");
       break;
   }
 }
@@ -188,7 +189,7 @@ void payload::retargetNullBitsetFrom(const payload &other) {
     const auto targetPosition = descriptor.flatIndexToDescriptorPosition(slot);
     const auto sourcePosition = other.descriptor.flatIndexToDescriptorPosition(slot);
     if (!targetPosition.has_value() || !sourcePosition.has_value()) {
-      FatalError("payload: flat slot {} missing while retargeting NULL flags", slot);
+      throw LogicError(fmt::format("payload: flat slot {} missing while retargeting NULL flags", slot));
     }
     if (other.nullBitset_[sourcePosition->first]) nullBitset_[targetPosition->first] = true;
   }
@@ -211,7 +212,7 @@ payload &payload::operator=(const Descriptor &other) {
       // descriptor = other; <- Just change field names - descriptor remains the same, payload remains the same
       // pass
     } else
-      FatalError("payload: descriptor not empty before assign - schema mismatch");
+      throw LogicError("payload: descriptor not empty before assign - schema mismatch");
   }
   return *this;
 }
@@ -251,7 +252,8 @@ const std::vector<bool> &payload::getNullBitset() const { return nullBitset_; }
 
 void payload::setNullBitset(const std::vector<bool> &nullBitset) {
   if (nullBitset.size() != descriptor.size()) {
-    FatalError("payload::setNullBitset: size mismatch: nullBitset={} descriptor={}", nullBitset.size(), descriptor.size());
+    throw LogicError(fmt::format("payload::setNullBitset: size mismatch: nullBitset={} descriptor={}",
+                                 nullBitset.size(), descriptor.size()));
   }
   nullBitset_ = nullBitset;
 }
@@ -297,8 +299,8 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
     auto destOffset = descriptor.byteOffsetAtFlatIndex(positionFlat);
     auto dest       = span().subspan(destOffset, len);
     if (destOffset + len > descriptor.getSizeInBytes()) {
-      FatalError("payload::writeStringField: destOffset {} + len {} exceeds descriptor size {}", destOffset, len,
-                 descriptor.getSizeInBytes());
+      throw LogicError(fmt::format("payload::writeStringField: destOffset {} + len {} exceeds descriptor size {}",
+                                   destOffset, len, descriptor.getSizeInBytes()));
     }
     std::ranges::fill(dest, 0);
     std::copy_n(data.c_str(), lenr, dest.begin());
@@ -335,7 +337,7 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
       case rdb::RETMEMORY:
         break;
       default:
-        FatalError("payload::setItem: unsupported field type: {}", (int)requestedType);
+        throw LogicError(fmt::format("payload::setItem: unsupported field type: {}", (int)requestedType));
     }
   } catch (const std::bad_any_cast &) {
     SPDLOG_ERROR("Error on payload::setItem");
@@ -365,7 +367,8 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
     auto fieldSpan = memory.subspan(offsetFlat, len);
     auto descLen   = descriptor.getSizeInBytes();
     if (offsetFlat + static_cast<size_t>(len) > descLen) {
-      FatalError("payload::readStringField: field offset {} + len {} exceeds descriptor size {}", offsetFlat, len, descLen);
+      throw LogicError(fmt::format("payload::readStringField: field offset {} + len {} exceeds descriptor size {}",
+                                   offsetFlat, len, descLen));
     }
 
     for (auto i = 0; i < len; i++) {
@@ -402,7 +405,7 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
       return std::nullopt;
   }
 
-  FatalError("payload::getItem: unsupported field type: {}", int(requestedType));
+  throw LogicError(fmt::format("payload::getItem: unsupported field type: {}", int(requestedType)));
 }
 
 // getItemVT / setItemVT (P1, speed_improvement): rownolegly interfejs wariantowy.
@@ -425,7 +428,8 @@ std::optional<rdb::descFldVT> payload::getItemVT(const int positionFlat) const {
     auto fieldSpan = memory.subspan(offsetFlat, len);
     auto descLen   = descriptor.getSizeInBytes();
     if (offsetFlat + static_cast<size_t>(len) > descLen) {
-      FatalError("payload::getItemVT string: field offset {} + len {} exceeds descriptor size {}", offsetFlat, len, descLen);
+      throw LogicError(fmt::format("payload::getItemVT string: field offset {} + len {} exceeds descriptor size {}",
+                                   offsetFlat, len, descLen));
     }
     for (auto i = 0; i < len; i++) {
       if (fieldSpan[i] == 0) {
@@ -461,7 +465,7 @@ std::optional<rdb::descFldVT> payload::getItemVT(const int positionFlat) const {
       return std::nullopt;
   }
 
-  FatalError("payload::getItemVT: unsupported field type: {}", int(requestedType));
+  throw LogicError(fmt::format("payload::getItemVT: unsupported field type: {}", int(requestedType)));
 }
 
 void payload::setItemVT(const int positionFlat, std::optional<rdb::descFldVT> valueParam) {
@@ -501,8 +505,8 @@ void payload::setItemVT(const int positionFlat, std::optional<rdb::descFldVT> va
       auto lenr       = std::min(len, static_cast<int>(data.length()));
       auto dest       = span().subspan(offsetFlat, len);
       if (offsetFlat + len > descriptor.getSizeInBytes()) {
-        FatalError("payload::setItemVT string: destOffset {} + len {} exceeds descriptor size {}", offsetFlat, len,
-                   descriptor.getSizeInBytes());
+        throw LogicError(fmt::format("payload::setItemVT string: destOffset {} + len {} exceeds descriptor size {}",
+                                     offsetFlat, len, descriptor.getSizeInBytes()));
       }
       std::ranges::fill(dest, 0);
       std::copy_n(data.c_str(), lenr, dest.begin());
@@ -531,7 +535,7 @@ void payload::setItemVT(const int positionFlat, std::optional<rdb::descFldVT> va
     case rdb::RETMEMORY:
       break;
     default:
-      FatalError("payload::setItemVT: unsupported field type: {}", (int)requestedType);
+      throw LogicError(fmt::format("payload::setItemVT: unsupported field type: {}", (int)requestedType));
   }
 }
 
@@ -636,7 +640,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
         if (value.has_value())
           writeValue(os, *value, r.rtype, rhs.hexFormat_);
         else
-          FatalError("payload: non-null array field returned no value for flat element");
+          throw LogicError("payload: non-null array field returned no value for flat element");
         if (i < flatCountForField - 1) os << " ";
       }
       flatIndex += flatCountForField;

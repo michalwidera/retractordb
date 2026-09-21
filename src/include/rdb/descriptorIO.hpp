@@ -23,10 +23,8 @@ namespace rdb {
 ///         (the Python extension, an iOS app) survives a bad file.
 [[nodiscard]] Descriptor loadDescriptorFile(const std::string &descriptorFile);
 
-/// @brief Write the descriptor to a .desc file; still FatalError on open or write failure.
-/// @note Deliberately left for sub-slice 2b: every I/O-failure site in this layer (here,
-///       storage::read/write, facc*) gets converted together, so the IOError type arrives once
-///       with all of its call sites rather than half-introduced here.
+/// @brief Write the descriptor to a .desc file.
+/// @throws IOError when the file cannot be opened for writing or the write fails.
 void saveDescriptorFile(const std::string &descriptorFile, const Descriptor &descriptor);
 
 /// @brief Check the provided descriptor against the one already on disk.

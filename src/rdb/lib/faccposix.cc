@@ -9,7 +9,9 @@
 #include <cstring>
 #include <filesystem>
 
-#include "fatalError.hpp"
+#include <fmt/format.h>
+
+#include "rdb/exceptions.hpp"
 
 namespace rdb {
 
@@ -23,7 +25,7 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
     : filename_(std::string(fileName)),
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       percounter_(percounter) {
-  if (recordSize_ == 0) FatalError("posixBinaryFile: record size must be > 0");
+  if (recordSize_ == 0) throw LogicError("posixBinaryFile: record size must be > 0");
 
   std::error_code fs_ec;
   const bool fileExisted = std::filesystem::exists(filename_, fs_ec);
@@ -33,7 +35,10 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
 
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
   if (fd < 0) {
-    FatalError("posixBinaryFile: failed to open '{}' (fd={})", filename_, fd);
+    // errno, nie fd. Po nieudanym ::open fd jest zawsze -1, wiec dawny komunikat mowil
+    // tylko tyle, ze sie nie udalo - a rozroznienie "brak uprawnien" od "brak katalogu"
+    // jest tu cala diagnostyka, jaka dostanie uzytkownik.
+    throw IOError(fmt::format("posixBinaryFile: failed to open '{}': {}", filename_, std::strerror(errno)));
   }
 
   if (fileExisted) {

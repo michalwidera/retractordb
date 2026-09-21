@@ -2,6 +2,7 @@
 
 #include <sys/stat.h>  // stat, S_ISREG - rozpoznanie pliku zwykłego przy doborze buforowania
 
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -12,7 +13,8 @@
 #include <ranges>
 #include <sstream>
 #include <type_traits>  // is_integral_v
-#include "fatalError.hpp"
+
+#include "rdb/exceptions.hpp"
 
 namespace rdb {
 
@@ -71,7 +73,7 @@ void parseAndSetNumericItem(rdb::payload &payload, int index, rdb::descFld rtype
       payload.setItem(index, static_cast<uint8_t>(parseAs<unsigned>(token)));
       break;
     default:
-      FatalError("facctxtsrc: unsupported field type: {}", static_cast<int>(rtype));
+      throw LogicError(fmt::format("facctxtsrc: unsupported field type: {}", static_cast<int>(rtype)));
   }
 }
 
@@ -138,7 +140,11 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
     if (item.rtype == rdb::NULLTYPE) {
       auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
       if (token.has_value() && !isNullToken(*token)) {
-        FatalError("facctxtsrc: expected NULL token for NULL field, got: {}", *token);
+        // ConfigError, nie LogicError: silnik jest caly, to PLIK ZRODLOWY nie zgadza sie z
+        // deklaracja strumienia. Mowienie tu o bledzie wewnetrznym oskarzaloby RetractorDB o
+        // cudzy literowke w danych. Docelowa taksonomia (faza 5) zapewne chce dla tego
+        // osobnego typu danych wejsciowych - patrz docs/core-phase-1.md.
+        throw ConfigError(fmt::format("facctxtsrc: expected a NULL token for a NULL field, got '{}' in {}", *token, filename_));
       }
       payload_->setItem(i, std::nullopt);
       i++;

@@ -7,7 +7,6 @@
 
 #include <cerrno>
 #include <cstring>
-#include "fatalError.hpp"
 
 namespace rdb {
 

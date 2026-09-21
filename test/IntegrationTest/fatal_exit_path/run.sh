@@ -15,8 +15,11 @@
 #      FatalError. join() na watku biezacym rzuca std::system_error, wyjatek z handlera
 #      atexit to std::terminate: SIGABRT, kod 134.
 #
-# Test sprawdza OBIE sciezki po kodzie wyjscia, bo to jedyna wielkosc, ktora odroznia
+# Test sprawdza te sciezki po kodzie wyjscia, bo to jedyna wielkosc, ktora odroznia
 # zakonczenie czyste (1) od segfaultu (139) i od abortu (134).
+#
+# Sciezki 5 i 6 (na koncu pliku) robia to samo dla WYJATKU zamiast std::exit - droga, ktora
+# faza 1 refaktoru czyni normalna dla bledow warstwy magazynu.
 set -e
 . "$(dirname "$0")/../portable.sh"
 . "$(dirname "$0")/../serverlib.sh"
@@ -110,6 +113,66 @@ fatal_in_slot() {
 
 fatal_in_slot "blad krytyczny w slocie bez klienta" ""
 fatal_in_slot "blad krytyczny w slocie z komenda klienta na blokadzie epoki" client
+
+# --- Sciezki 5 i 6: WYJATEK w slocie przetwarzania (faza 1 refaktoru). ---
+# Faza 1 zamienia bledy krytyczne warstwy magazynu na rzuty, wiec slot moze teraz zakonczyc
+# sie wyjatkiem zamiast std::exit. Dwie rzeczy musza wyjsc tak samo jak wyzej, i jedna
+# inaczej:
+#
+#   * kod wyjscia nadal 1 - rzut lapie catch(const rdb::Error&) w executorsm::run(), dodany
+#     PRZED catch(std::exception) napisanym dla awarii IPC. Bez niego blad silnika wychodzil
+#     jako "IPC Fail." z kodem EINTR (4);
+#   * proces nadal konczy sie SAM, bez wiszenia - odwijanie stosu zwalnia core_mutex i
+#     plan_epoch_mutex po drodze, czego std::exit nie robil (stad try_to_lock w cleanup());
+#   * wariant "client" pilnuje straznika epoki (EpochPublication). Komenda klienta stoi w
+#     handlerze na plan_epoch_mutex i siega po globalny pProc; gdyby zgaszenie tego wskaznika
+#     zostalo - jak bylo do tej pory - wylacznie instrukcjami na normalnej drodze wyjscia,
+#     wyjatek ominalby je i zniszczyl dataModel spod rak watku komunikacyjnego. Objawem jest
+#     SIGSEGV (139) albo SIGABRT (134) zamiast 1, wiec asercja na kodzie wyjscia jest tu
+#     asercja o braku uzycia po zwolnieniu.
+throw_in_slot() {
+  local label="$1" withClient="$2" i=0 clientPid=""
+  rm -rf ./temp && mkdir -p ./temp
+  rm -f ./*.desc ./*.meta ./*.shadow ./slot.err
+  export RDB_FAULT_THROW_IN_SLOT=3000
+  server_start query.rql -k -r 2>slot.err
+  unset RDB_FAULT_THROW_IN_SLOT
+
+  while ! grep -q "RDB_FAULT_THROW_IN_SLOT: slot locked" slot.err 2>/dev/null; do
+    i=$((i + 1))
+    if [ "$i" -gt 300 ]; then
+      echo "$label: hak nie zglosil wejscia w slot w ciagu 30 s"
+      exit 1
+    fi
+    sleep 0.1
+  done
+
+  if [ "$withClient" = "client" ]; then
+    run_timeout 30 xqry -t w >/dev/null 2>&1 &
+    clientPid=$!
+  fi
+
+  if ! wait_for_exit "$_server_pid"; then
+    echo "$label: serwer zyje 30 s po wyjatku w slocie (zawieszone wyjscie)"
+    exit 1
+  fi
+  status=$(server_wait_status)
+  [ -n "$clientPid" ] && { wait "$clientPid" 2>/dev/null || true; }
+  if [ "$status" -ne 1 ]; then
+    echo "$label: kod wyjscia $status, oczekiwano 1"
+    echo "  (4 = EINTR z catch(std::exception) dla awarii IPC - brak catch(rdb::Error);"
+    echo "   139 = SIGSEGV, 134 = SIGABRT - uzycie pProc po zniszczeniu dataModel)"
+    exit 1
+  fi
+  if ! grep -q "FATAL: fault hook RDB_FAULT_THROW_IN_SLOT" slot.err; then
+    echo "$label: brak komunikatu bledu silnika na stderr:"
+    cat slot.err
+    exit 1
+  fi
+}
+
+throw_in_slot "wyjatek w slocie bez klienta" ""
+throw_in_slot "wyjatek w slocie z komenda klienta na blokadzie epoki" client
 
 # Blokada uslugi ma znikac SAMA. std::exit nie uruchamia destruktorow obiektow
 # automatycznych, wiec FlockServiceGuard::~FlockServiceGuard() przy bledzie krytycznym

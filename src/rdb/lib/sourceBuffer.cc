@@ -5,7 +5,7 @@
 #include <cstdlib>  // EXIT_SUCCESS
 #include <vector>
 
-#include "fatalError.hpp"
+#include "rdb/exceptions.hpp"
 
 namespace rdb {
 
@@ -30,7 +30,8 @@ void SourceBuffer::readCurrent(FileInterface &source, payload &out) {
 }
 
 void SourceBuffer::fire(payload &out) {
-  if (circularBuffer_.capacity() == 0) FatalError("storage::fire: circular buffer capacity is zero");
+  if (circularBuffer_.capacity() == 0)
+    throw LogicError("SourceBuffer::fire: circular buffer capacity is zero - attach() not called");
   out = *chamber_;
   circularBuffer_.push_front(out);  // only one place when buffer is feed.
 }

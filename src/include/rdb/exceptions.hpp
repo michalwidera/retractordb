@@ -64,4 +64,18 @@ class LogicError : public Error {
   using Error::Error;
 };
 
+/// @brief Operacja wejscia-wyjscia nie powiodla sie.
+///
+/// Nieudane otwarcie pliku magazynu albo cienia, odczyt spod pozycji, ktora accessor
+/// odrzucil, nieudany zapis deskryptora. Wspolna cecha: i wejscie, i silnik sa w porzadku
+/// - zawiodl system plikow, uprawnienia albo miejsce na dysku.
+///
+/// @note Komunikat ma niesc strerror(errno), a nie sam kod powrotu. Poprzednie wersje tych
+/// miejsc wypisywaly wartosc `fd`, ktora po nieudanym ::open jest zawsze -1 i nie mowi nic
+/// poza tym, ze sie nie udalo.
+class IOError : public Error {
+ public:
+  using Error::Error;
+};
+
 }  // namespace rdb

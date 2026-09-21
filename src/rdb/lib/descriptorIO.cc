@@ -5,7 +5,8 @@
 #include <fstream>
 #include <iostream>
 
-#include "fatalError.hpp"
+#include <fmt/format.h>
+
 #include "rdb/exceptions.hpp"
 
 namespace rdb {
@@ -28,7 +29,7 @@ Descriptor loadDescriptorFile(const std::string &descriptorFile) {
   }
   myFile.close();
 
-  // Rzut, nie FatalError: ta funkcja jest granica biblioteki i jedynym wejsciem, przez
+  // Rzut, nie koniec procesu: ta funkcja jest granica biblioteki i jedynym wejsciem, przez
   // ktore wiazanie Pythona wczytuje deskryptor. std::exit nie odwija stosu, wiec zaden
   // catch po stronie osadzajacego procesu go nie widzi - konczyl sie smiercia jadra
   // notatnika na jednym uszkodzonym pliku.
@@ -52,11 +53,11 @@ void saveDescriptorFile(const std::string &descriptorFile, const Descriptor &des
   descFile.rdbuf()->pubsetbuf(nullptr, 0);
   descFile.open(descriptorFile, std::ios::out);
   if ((descFile.rdstate() & std::ofstream::failbit) != 0) {
-    FatalError("storage: failed to open descriptor file for writing: {}", descriptorFile);
+    throw IOError(fmt::format("storage: failed to open descriptor file for writing: {}", descriptorFile));
   }
   descFile << descriptor;
   if ((descFile.rdstate() & std::ofstream::failbit) != 0) {
-    FatalError("storage: failed to write descriptor file: {}", descriptorFile);
+    throw IOError(fmt::format("storage: failed to write descriptor file: {}", descriptorFile));
   }
   descFile.close();
 }

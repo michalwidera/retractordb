@@ -36,6 +36,15 @@ class ConfigError(RetractorDBError):
     the one worth catching and reporting to whoever typed it.
     """
 
+class IOError(RetractorDBError):  # noqa: A001 - shadows the builtin on purpose, see below
+    """A file operation failed: open, read, append, overwrite, descriptor write.
+
+    ``rdb::IOError`` on the C++ side. The name deliberately mirrors the C++ type and
+    is reached as ``rdb.IOError``, never as a bare name, so it does not shadow the
+    builtin in practice. Messages carry ``strerror(errno)`` rather than the return
+    code, which for a failed ``open`` was always -1 and said nothing.
+    """
+
 class InternalError(RetractorDBError):
     """An engine invariant broke - a bug in RetractorDB, not in your input.
 
@@ -79,9 +88,12 @@ class Descriptor(Sequence[Field]):
     def flat_element_count(self) -> int:
         """Number of value slots in a record. A STRING[N] field is one slot, not N."""
     def has_field(self, name: str) -> bool: ...
-    def field_index(self, name: str) -> int: ...
-    def byte_offset(self, name: str) -> int: ...
-    def field_type_name(self, name: str) -> str: ...
+    def field_index(self, name: str) -> int:
+        """Raises KeyError for an unknown field."""
+    def byte_offset(self, name: str) -> int:
+        """Raises KeyError for an unknown field."""
+    def field_type_name(self, name: str) -> str:
+        """Raises KeyError for an unknown field."""
     def storage_policy(self) -> tuple[str, int]: ...
     def __len__(self) -> int: ...
     def __getitem__(self, index: int) -> Field: ...  # type: ignore[override]
