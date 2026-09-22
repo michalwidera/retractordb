@@ -17,7 +17,7 @@ bool ReadCmd::execute(CommandContext &ctx) {
   if (ctx.dacc->isDeclared()) ctx.dacc->bufferState = rdb::sourceState::flux;
   auto returnStatus = reverse_ ? ctx.dacc->revRead(record) : ctx.dacc->read(record);
   if (ctx.dacc->isDeclared()) ctx.dacc->fire();
-  ctx.payloadStatus = returnStatus ? fetched : error;
+  ctx.payloadStatus = (returnStatus == rdb::ReadStatus::Ok) ? fetched : error;
   return true;
 }
 
@@ -30,7 +30,7 @@ bool ListCmd::execute(CommandContext &ctx) {
       continue;
     }
     auto returnStatus = reverse_ ? ctx.dacc->revRead(i) : ctx.dacc->read(i);
-    ctx.payloadStatus = returnStatus ? fetched : error;
+    ctx.payloadStatus = (returnStatus == rdb::ReadStatus::Ok) ? fetched : error;
     if (ctx.payloadStatus == error) {
       std::print("{}fetch error\n{}", ctx.colors.RED, ctx.colors.RESET);
       continue;

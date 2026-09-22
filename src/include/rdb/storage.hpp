@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>  // std::unique_ptr
 #include <string>
 
@@ -13,6 +14,23 @@
 #include "storagePaths.hpp"
 
 namespace rdb {
+
+/// @brief Wynik odczytu rekordu.
+///
+/// Do 2026-09-23 read() i revRead() zwracaly `bool` o JEDNEJ mozliwej wartosci: kazda prawdziwa
+/// awaria konczy sie FatalError i nie wraca, a jedyna awaria odwracalna - brak rekordu - wracala
+/// jako `true` z pamiecia wyzerowana i jawnie oznaczona jako NIE-null. Trzy miejsca obslugi bledu
+/// u wolajacych byly przez to martwe, a najgorzej konczylo sie to w reduktorze: zamiast pominac
+/// brakujacy rekord, skladal do MIN/MAX/SUM/AVG sfalszowane zero.
+///
+/// Rekord nieistniejacy jest wartoscia NIEOKRESLONA, nie zerem - dlatego towarzyszy mu payload
+/// all-null, tak samo jak w dataModel::fetchBack i fetchForward, ktore te konwencje stosuja od
+/// dawna. Dzieki temu wlacza sie pochlanianie NULL-i i wolajacy, ktory statusu nie sprawdzi,
+/// dostaje wartosc nieokreslona zamiast zera udajacego dane.
+enum class ReadStatus : std::uint8_t {
+  Ok,           ///< rekord odczytany ze zrodla, bufora albo wydany w stanie HOLD
+  NoSuchRecord  ///< rekordu nie ma; payload jest all-null, a wolajacy ma go POMINAC
+};
 
 /// @brief Warstwa koordynująca Descriptor, payload i FileInterface dla odczytu oraz zapisu rekordów.
 ///
@@ -115,8 +133,8 @@ class storage {
 
   bool write(size_t recordIndex = std::numeric_limits<size_t>::max());
 
-  bool revRead(size_t recordIndexFromBack, uint8_t *destination = nullptr);
-  bool read(size_t recordIndexFromFront, uint8_t *destination = nullptr);
+  [[nodiscard]] ReadStatus revRead(size_t recordIndexFromBack, uint8_t *destination = nullptr);
+  [[nodiscard]] ReadStatus read(size_t recordIndexFromFront, uint8_t *destination = nullptr);
   void fire();
   void purge();
 

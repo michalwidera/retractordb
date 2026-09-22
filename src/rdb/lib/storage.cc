@@ -178,7 +178,7 @@ bool storage::isMetaIndexEmpty() const {
   return metaData_->isEmpty();
 }
 
-bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
+rdb::ReadStatus storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
   if (isDeclared()) FatalError("storage::read: cannot read directly from declared (device/textsource) storage");
   abortIfStorageNotPrepared();
 
@@ -208,8 +208,10 @@ bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
 #endif
 
   if (isHold_) {
+    // HOLD to stan LEGALNY, nie brak rekordu: strumien celowo wydaje wartosc zatrzymana, wiec
+    // status jest Ok, a bitset zostaje taki, jaki byl przy ostatnim odczycie.
     std::memset(destination, 0, size);
-    return true;
+    return ReadStatus::Ok;
   }
 
   if (recordsCount_ > 0 && recordIndexFromFront < recordsCount_) {
@@ -219,15 +221,21 @@ bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
     }
     storagePayload_->setNullBitset(metaData_->nullBitsetFor(recordIndexFromFront));
   } else {
+    // Rekordu NIE MA. Pamiec zerujemy, bo wolajacy moze na nia patrzec, ale bitset mowi all-null:
+    // wartosc nieokreslona, nie zero. Poprzednio stalo tu `false` na kazdym polu, czyli jawne
+    // "to nie jest NULL" - przez co semantyka pochlaniania NULL-i sie NIE wlaczala i reduktor
+    // skladal to zero do MIN/MAX/SUM/AVG. Konwencja jest ta sama, ktora dataModel::fetchBack
+    // i fetchForward stosuja dla rekordu poza zgromadzona historia.
     std::memset(destination, 0, size);
-    storagePayload_->setNullBitset(std::vector<bool>(descriptor.size(), false));
+    storagePayload_->setNullBitset(std::vector<bool>(descriptor.size(), true));
     SPDLOG_ERROR("read fake {} - non existing data from pos:{} rec-count:{}", accessor_->name(), recordIndexFromFront,
                  recordsCount_);
+    return ReadStatus::NoSuchRecord;
   }
-  return result == 0;
+  return ReadStatus::Ok;
 }
 
-bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
+rdb::ReadStatus storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   if (isHold_) {
     destination = (destination == nullptr)              //
                       ? storagePayload_->span().data()  //
@@ -237,7 +245,7 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
     auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
     bufferState = sourceState::armed;  // fake armed on hold position
-    return true;
+    return ReadStatus::Ok;
   }
 
   if (!isDeclared()) {
@@ -260,7 +268,7 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   if (recordIndexFromBack == 0 && bufferState == sourceState::flux) {
     buffer_.readCurrent(*accessor_, *storagePayload_);
     bufferState = sourceState::armed;
-    return true;
+    return ReadStatus::Ok;
   }
   // recordIndexFromBack is size_t (unsigned), always >= 0
 
@@ -285,16 +293,21 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
     if (destination == nullptr) FatalError("storage::revRead: destination pointer is null in buffer fallback path");
     auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
+    // Ten sam brak rekordu co w read(), tylko dla zrodla DEKLAROWANEGO: bufor historii nie siega
+    // tak gleboko. Poprzednio bitset zostawal tu NIETKNIETY, wiec rekord dziedziczyl znaczniki po
+    // poprzednim odczycie - jeszcze gorzej niz zera oznaczone jako nie-null, bo wynik zalezal od
+    // tego, co akurat lezalo w payloadzie.
+    storagePayload_->setNullBitset(std::vector<bool>(descriptor.size(), true));
     SPDLOG_ERROR("read buffer fn {} - non existing data from [pos:{} cap:{} size:{}]", accessor_->name(), recordIndexFromBack,
                  buffer_.capacity(), buffer_.size());
-    return true;
+    return ReadStatus::NoSuchRecord;
   }
 
   // Note: the previous if-block handles the case where recordIndexFromBack >= buffer_.size()
   // so here recordIndexFromBack < buffer_.size() is guaranteed
 
   *(storagePayload_) = buffer_.history(recordIndexFromBack);
-  return true;
+  return ReadStatus::Ok;
 }
 
 void storage::setCapacity(const int capacity) {
