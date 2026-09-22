@@ -53,6 +53,11 @@ namespace detail {
 /// wartosc NAPRAWDE nie miesci sie w rational<int> - skrocona postac jest jedyna, wiec nie ma
 /// falszywych alarmow (`1/65536 + 1/65536` przechodzi przez mianownik 2^32 i daje 1/32768).
 inline std::optional<boost::rational<int>> narrowed(std::int64_t numerator, std::int64_t denominator) {
+  // Zerowy mianownik nie ma postaci skroconej i nie moze dojsc do gcd: gcd(0, 0) to zero, a dzielenie
+  // ponizej dzieli wtedy przez zero - SIGFPE na x86-64, cichy 0 na arm64, czyli to samo wejscie i dwa
+  // rozne konce procesu. Powstawalo z ulamka 0/0 wczytanego z surowych bajtow; payload takiego juz nie
+  // wypuszcza, wiec to straz drugiego rzedu - i jedyna, ktora obowiazuje tez wolajacego `div`.
+  if (denominator == 0) return std::nullopt;
   const auto divisor = std::gcd(numerator, denominator);
   numerator /= divisor;
   denominator /= divisor;

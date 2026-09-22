@@ -6,6 +6,7 @@
 #include <bit>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -444,6 +445,50 @@ TEST(payload, rational_field_is_stored_in_normalized_form) {
   EXPECT_EQ(stored(boost::rational<int>(0, 5)), std::make_pair(0, 1));    // zero jako 0/1
   EXPECT_EQ(stored(boost::rational<int>(1, -3)), std::make_pair(-1, 3));  // znak w liczniku
   EXPECT_EQ(stored(boost::rational<int>(7)), std::make_pair(7, 1));       // calkowita jako n/1
+}
+
+// Rekord wyzerowany, ale oznaczony jako NIE-NULL - dokladnie to, co zostawia fake-read w
+// storage::read i co zostaje po uszkodzonym pliku na dysku. Do 2026-09-23 odczyt wypuszczal stad
+// ulamek 0/0: stan, ktorego boost::rational zabrania, bo bajty trafialy do gotowego obiektu przez
+// memcpy, z pominieciem konstruktora. Dalej dzielil przez zerowy gcd w checkedArith - SIGFPE na
+// x86-64, wyjatek na arm64. Granica bajty -> obiekt jest jedynym miejscem, gdzie ten niezmiennik
+// da sie ustanowic, wiec tutaj stoi test.
+TEST(payload, rational_field_from_zeroed_record_reads_as_null) {
+  auto desc = rdb::Descriptor("ratio", static_cast<int>(sizeof(boost::rational<int>)), 1, rdb::RATIONAL);
+  rdb::payload p(desc);
+
+  p.setItem(0, boost::rational<int>(3, 4));
+  ASSERT_TRUE(p.getItem(0).has_value());  // znacznik NULL mowi "wartosc jest"...
+
+  std::ranges::fill(p.span(), 0);  // ...a bajty sa wyzerowane
+
+  EXPECT_FALSE(p.getItem(0).has_value());
+  EXPECT_FALSE(p.getItemVT(0).has_value());
+}
+
+// Mianownik niedodatni nie jest w formacie zapisu (patrz test wyzej: zapis normalizuje), wiec
+// oznacza rekord uszkodzony. Dwie z tych par zalamuja sam konstruktor boost::rational, a nie tylko
+// niezmiennik klasy - dlatego strazy nie da sie zawezic do samego zera.
+TEST(payload, rational_field_with_non_positive_denominator_reads_as_null) {
+  auto desc = rdb::Descriptor("ratio", static_cast<int>(sizeof(boost::rational<int>)), 1, rdb::RATIONAL);
+  rdb::payload p(desc);
+
+  const auto readBack = [&p](int32_t numerator, int32_t denominator) {
+    p.setItem(0, boost::rational<int>(1, 2));  // znacznik NULL na "wartosc jest"
+    std::memcpy(p.span().data(), &numerator, sizeof(numerator));
+    std::memcpy(p.span().data() + sizeof(numerator), &denominator, sizeof(denominator));
+    return p.getItemVT(0);
+  };
+
+  EXPECT_FALSE(readBack(0, 0).has_value());                                     // wyzerowany rekord
+  EXPECT_FALSE(readBack(1, 0).has_value());                                     // bad_rational: zerowy mianownik
+  EXPECT_FALSE(readBack(1, std::numeric_limits<int32_t>::min()).has_value());   // bad_rational: singularny mianownik
+  EXPECT_FALSE(readBack(std::numeric_limits<int32_t>::min(), -1).has_value());  // INT_MIN / -1 w gcd Boosta
+  EXPECT_FALSE(readBack(1, -2).has_value());                                    // znak poza liczbikiem - poza formatem
+
+  const auto valid = readBack(-8, 3);  // postac zgodna z formatem czyta sie bez zmian
+  ASSERT_TRUE(valid.has_value());
+  EXPECT_EQ(std::get<boost::rational<int>>(*valid), boost::rational<int>(-8, 3));
 }
 
 // NOLINTEND(bugprone-unchecked-optional-access,modernize-avoid-c-arrays)

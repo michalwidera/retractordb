@@ -27,14 +27,18 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>  // std::min, std::copy, std::fill
+#include <array>
+#include <bit>
 #include <boost/rational.hpp>
 #include <boost/stacktrace.hpp>
 
+#include <cstdint>
 #include <cstring>  // std::memcpy (for C-interop)
 #include <iomanip>
 #include <iostream>
 #include <ranges>
 #include <sstream>
+#include <type_traits>
 #include <utility>
 #include "fatalError.hpp"
 
@@ -394,6 +398,33 @@ T getVal(std::span<const uint8_t> s, int offset) {
   return val;
 }
 
+// Uklad pola RATIONAL w rekordzie to para int32 (licznik, mianownik) - format ZEWNETRZNY, opisany w
+// dokumentacji i przypiety testem rational_field_layout_is_two_int32_numerator_first. Zapis idzie
+// przez setItemBy<boost::rational<int>>, czyli przez memcpy calego obiektu, wiec uklad skladowych
+// Boosta JEST tym formatem. Aktualizacja Boosta, ktora go zmieni, ma byc bledem BUDOWY, a nie cicha
+// zmiana tego, co lezy na dysku. Sam rozmiar tego nie zlapie: zamiana licznika z mianownikiem
+// miejscami rozmiaru nie rusza, wiec druga asercja czyta bajty gotowej wartosci.
+static_assert(sizeof(boost::rational<int>) == 8 && std::is_trivially_copyable_v<boost::rational<int>>,
+              "boost::rational<int> nie jest juz trywialnie kopiowalna para int32 - format pola RATIONAL sie zmienil");
+static_assert(std::bit_cast<std::array<std::int32_t, 2>>(boost::rational<int>(3, 4)) == std::array<std::int32_t, 2>{3, 4},
+              "boost::rational<int> trzyma skladowe w innej kolejnosci - format pola RATIONAL sie zmienil");
+
+/// Bajty pola RATIONAL jako obiekt. Para int32 idzie przez KONSTRUKTOR, czyli przez normalize():
+/// memcpy do gotowego obiektu nadpisuje jego reprezentacje z pominieciem niezmiennika klasy, wiec
+/// rekord wyzerowany albo uszkodzony dawal 0/0 - stan, ktorego klasa zabrania. Taki ulamek dzielil
+/// potem przez zerowy gcd w checkedArith: SIGFPE na x86-64, wyjatek na arm64.
+///
+/// Poprawny zapis ma zawsze mianownik DODATNI - to niezmiennik boost::rational i zarazem niezmiennik
+/// formatu (test rational_field_is_stored_in_normalized_form) - wiec mianownik niedodatni oznacza
+/// rekord uszkodzony i czytamy go jako NULL. Warunek obejmuje tez dwa wejscia, na ktorych zalamuje
+/// sie sam konstruktor: den == INT_MIN rzuca bad_rational, a para (INT_MIN, -1) dzieli INT_MIN przez
+/// -1 w gcd Boosta.
+std::optional<boost::rational<int>> readRational(std::span<const uint8_t> s, int offset) {
+  const auto raw = getVal<std::array<std::int32_t, 2>>(s, offset);
+  if (raw[1] <= 0) return std::nullopt;
+  return boost::rational<int>(raw[0], raw[1]);
+}
+
 std::optional<std::any> payload::getItem(const int positionFlat) const {
   // Goraca sciezka: zadnej kopii deskryptora -- metody mapowan sa const
   // (leniwy cache w Descriptor jest mutable), wiec czytamy wprost z pola.
@@ -437,8 +468,11 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
       return getVal<double>(memory, offsetFlat);
     case rdb::FLOAT:
       return getVal<float>(memory, offsetFlat);
-    case rdb::RATIONAL:
-      return getVal<boost::rational<int>>(memory, offsetFlat);
+    case rdb::RATIONAL: {
+      const auto value = readRational(memory, offsetFlat);
+      if (!value.has_value()) return std::nullopt;
+      return *value;
+    }
     case rdb::REF:
     case rdb::TYPE:
     case rdb::RETENTION:
@@ -496,8 +530,11 @@ std::optional<rdb::descFldVT> payload::getItemVT(const int positionFlat) const {
       return rdb::descFldVT{getVal<double>(memory, offsetFlat)};
     case rdb::FLOAT:
       return rdb::descFldVT{getVal<float>(memory, offsetFlat)};
-    case rdb::RATIONAL:
-      return rdb::descFldVT{getVal<boost::rational<int>>(memory, offsetFlat)};
+    case rdb::RATIONAL: {
+      const auto value = readRational(memory, offsetFlat);
+      if (!value.has_value()) return std::nullopt;
+      return rdb::descFldVT{*value};
+    }
     case rdb::REF:
     case rdb::TYPE:
     case rdb::RETENTION:
