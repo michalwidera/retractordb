@@ -17,6 +17,56 @@ TEST(Rationalize, third) { EXPECT_EQ(Rationalize(1.0 / 3.0), boost::rational<int
 TEST(Rationalize, threequarters) { EXPECT_EQ(Rationalize(0.75), boost::rational<int>(3, 4)); }
 TEST(Rationalize, whole_number) { EXPECT_EQ(Rationalize(3.0), boost::rational<int>(3, 1)); }
 
+// --- wartosci UJEMNE ---
+//
+// Petla ulamka lancuchowego konwertowala `startx` na `unsigned int`. Dla ujemnego wejscia
+// jest to zachowanie nieokreslone i architektury rozstrzygaly je roznie: x86-64 (cvttsd2si)
+// bral mlodsze 32 bity i oddawal 4294967294 dla -2.0, arm64 (fcvtzu) nasycal do 0. Ta sama
+// baza dawala wiec -2/1 na jednej maszynie i 0/1 na drugiej. Na obu bylo to zreszta zle,
+// bo `diff = startx - val` liczylo sie na wartosci bez znaku: petla urywala sie po pierwszej
+// cyfrze i ulamek nigdy nie powstawal - -2.5 dawalo -2/1, nie -5/2.
+//
+// Testy sa architektonicznie neutralne - ta sama oczekiwana wartosc na kazdej maszynie -
+// wiec ich zadaniem jest padac na tej, ktora by sie wylamala.
+
+TEST(Rationalize, negative_half) { EXPECT_EQ(Rationalize(-2.5), boost::rational<int>(-5, 2)); }
+TEST(Rationalize, negative_whole_number) { EXPECT_EQ(Rationalize(-2.0), boost::rational<int>(-2, 1)); }
+TEST(Rationalize, negative_third) { EXPECT_NEAR(boost::rational_cast<double>(Rationalize(-10.0 / 3.0)), -10.0 / 3.0, 1E-6); }
+// Symetria znaku: rozwiniecie |x| daje p/q, a -|x| ma dac dokladnie -p/q.
+TEST(Rationalize, sign_is_symmetric) {
+  EXPECT_EQ(Rationalize(-1.0 / 3.0), -Rationalize(1.0 / 3.0));
+  EXPECT_EQ(Rationalize(-0.75), -Rationalize(0.75));
+  EXPECT_EQ(Rationalize(-1.5), -Rationalize(1.5));
+}
+TEST(Rationalize, negative_zero_is_zero) { EXPECT_EQ(Rationalize(-0.0), boost::rational<int>(0, 1)); }
+
+// --- wejscie bez przyblizenia wymiernego ---
+//
+// Rationalize zwraca boost::rational<int> przez wartosc, wiec NULL-a nie ma czym wyrazic:
+// NaN, nieskonczonosc i wartosc poza zakresem `int` oddaja {0,1}. NULL stoi o poziom wyzej,
+// na sciezce konwersji (ponizej: cast_variant / cast_any do RATIONAL i INTPAIR).
+
+TEST(Rationalize, nan_is_zero) { EXPECT_EQ(Rationalize(std::numeric_limits<double>::quiet_NaN()), boost::rational<int>(0, 1)); }
+TEST(Rationalize, infinity_is_zero) {
+  EXPECT_EQ(Rationalize(std::numeric_limits<double>::infinity()), boost::rational<int>(0, 1));
+  EXPECT_EQ(Rationalize(-std::numeric_limits<double>::infinity()), boost::rational<int>(0, 1));
+}
+TEST(Rationalize, above_integer_range_is_zero) {
+  EXPECT_EQ(Rationalize(1e30), boost::rational<int>(0, 1));
+  EXPECT_EQ(Rationalize(-1e30), boost::rational<int>(0, 1));
+}
+// Granica jest ta sama co w narrowFloatTo - 2^31 wylacznie, sprawdzana na wartosci obcietej.
+TEST(Rationalize, at_integer_bound_is_exact) {
+  EXPECT_EQ(Rationalize(2147483647.0), boost::rational<int>(2147483647, 1));
+  EXPECT_EQ(Rationalize(-2147483647.0), boost::rational<int>(-2147483647, 1));
+}
+// Jedyna wartosc, ktora na wyniesieniu znaku traci: -2^31. |INT_MIN| to 2^31, wiec wypada za
+// gorna granice i wychodzi {0,1}, choc sam INT_MIN da sie w `int` zapisac. Cena jest swiadoma:
+// droga przez wartosc bezwzgledna wymagalaby tu negacji INT_MIN, czyli nowego przepelnienia w
+// miejsce usunietego zachowania nieokreslonego. `boost::rational<int>` z licznikiem INT_MIN
+// jest zreszta nie do uzycia dalej - kazda negacja takiego ulamka przepelnia sie tak samo.
+TEST(Rationalize, at_negative_integer_bound_is_zero) { EXPECT_EQ(Rationalize(-2147483648.0), boost::rational<int>(0, 1)); }
+
 // ── nullFallbackValue ─────────────────────────────────────────────────────────
 
 TEST(nullFallbackValue, byte) { EXPECT_EQ(std::get<uint8_t>(nullFallbackValue(rdb::BYTE)), 0); }
@@ -457,4 +507,56 @@ TEST(cast_any, double_above_integer_range_is_null) {
   cast<std::any> c;
   std::any in = 1e30;
   EXPECT_EQ(c(in, rdb::INTEGER).type(), typeid(std::monostate));
+}
+
+// --- zwezenie float/double -> RATIONAL / INTPAIR bez reprezentacji ---
+//
+// Ta sama regula co dla typow calkowitych wyzej: wartosc, ktorej typ docelowy nie pomiesci,
+// daje NULL. NaN i nieskonczonosc nie maja przyblizenia wymiernego, wiec ida jako monostate
+// zamiast jako {0,1} - zero w polu bylo liczba, ktorej nikt nie policzyl.
+
+TEST(cast_variant, double_nan_to_rational_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::RATIONAL)));
+}
+TEST(cast_variant, double_infinity_to_rational_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT plus  = std::numeric_limits<double>::infinity();
+  rdb::descFldVT minus = -std::numeric_limits<double>::infinity();
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(plus, rdb::RATIONAL)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(minus, rdb::RATIONAL)));
+}
+TEST(cast_variant, float_nan_to_rational_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = std::numeric_limits<float>::quiet_NaN();
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::RATIONAL)));
+}
+TEST(cast_variant, double_nan_to_intpair_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::INTPAIR)));
+}
+TEST(cast_any, double_infinity_to_rational_is_null) {
+  cast<std::any> c;
+  std::any in = std::numeric_limits<double>::infinity();
+  EXPECT_EQ(c(in, rdb::RATIONAL).type(), typeid(std::monostate));
+}
+TEST(cast_any, double_nan_to_intpair_is_null) {
+  cast<std::any> c;
+  std::any in = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_EQ(c(in, rdb::INTPAIR).type(), typeid(std::monostate));
+}
+// Wartosc skonczona ma przejsc ta sama droga bez zmiany - takze ujemna.
+TEST(cast_variant, negative_double_to_rational) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = -2.5;
+  EXPECT_EQ(std::get<boost::rational<int>>(c(in, rdb::RATIONAL)), boost::rational<int>(-5, 2));
+}
+TEST(cast_variant, negative_double_to_intpair) {
+  using P = std::pair<int, int>;
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = -2.5;
+  P expected{-5, 2};
+  EXPECT_EQ(std::get<P>(c(in, rdb::INTPAIR)), expected);
 }
