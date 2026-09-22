@@ -45,6 +45,15 @@ class Descriptor : public std::vector<rField> {
   mutable size_t dataSizeBytes_    = 0;
   mutable bool fieldMappingsDirty_{true};
   void rebuildFieldMappings() const;
+  /// Cache po oddaniu zawartosci (zrodlo przeniesienia) - wraca do stanu z konstruktora
+  /// domyslnego, zeby liczniki nie opisywaly ukladu, ktorego juz tu nie ma.
+  void dropFieldMappings() noexcept {
+    flatToDescriptorIndexMap_.clear();
+    fieldByteOffsets_.clear();
+    flattenedFieldCount_ = 0;
+    dataSizeBytes_       = 0;
+    fieldMappingsDirty_  = true;
+  }
   // Zimna sciezka byteOffsetAtFlatIndex (poza TU, uzywa FatalError -> nie wciaga
   // fmt do tego szeroko-includowanego naglowka). Hot-path jest inline nizej.
   [[noreturn]] void flatIndexOutOfRange(int flatIndex) const;
@@ -60,6 +69,44 @@ class Descriptor : public std::vector<rField> {
 
   Descriptor()                         = default;
   Descriptor(const Descriptor &source) = default;
+
+  // Przenoszenie musi byc zadeklarowane JAWNIE i nie moze byc `= default`.
+  //
+  // Jawnie, bo deklaracja konstruktora kopiujacego wyzej blokuje niejawne operacje
+  // przenoszenia: bez tych dwoch std::move(Descriptor) jest gleboka kopia wektora pol
+  // i obu wektorow cache.
+  //
+  // Nie `= default`, bo wersja domyslna wektory cache PRZENOSI, a liczniki i flage
+  // fieldMappingsDirty_ KOPIUJE. Zrodlo zostawaloby z pustym wektorem pol i cache'em
+  // udajacym aktualny, wiec byteOffsetAtFlatIndex przechodzilby kontrole zakresu
+  // (flattenedFieldCount_ z poprzedniego ukladu) i indeksowal pusty fieldByteOffsets_.
+  // Dlatego cel bierze cache razem z polami, a zrodlo wraca do stanu poczatkowego
+  // przez dropFieldMappings().
+  //
+  // Cache jest przenoszony, a nie porzucany, bo to on jest wiekszoscia kosztu kopii:
+  // porzucony wymusza odbudowe przy pierwszym dostepie do celu (dwie alokacje plus
+  // przejscie po polach), czyli zabiera przenoszeniu prawie caly zysk - zmierzone na
+  // 25 polach: 101 ns z odbudowa wobec 113 ns pelnej kopii.
+  Descriptor(Descriptor &&other) noexcept
+      : std::vector<rField>(std::move(other)),
+        flatToDescriptorIndexMap_(std::move(other.flatToDescriptorIndexMap_)),
+        fieldByteOffsets_(std::move(other.fieldByteOffsets_)),
+        flattenedFieldCount_(other.flattenedFieldCount_),
+        dataSizeBytes_(other.dataSizeBytes_),
+        fieldMappingsDirty_(other.fieldMappingsDirty_) {
+    other.dropFieldMappings();
+  }
+  Descriptor &operator=(Descriptor &&other) noexcept {
+    if (this == &other) return *this;
+    std::vector<rField>::operator=(std::move(other));
+    flatToDescriptorIndexMap_ = std::move(other.flatToDescriptorIndexMap_);
+    fieldByteOffsets_         = std::move(other.fieldByteOffsets_);
+    flattenedFieldCount_      = other.flattenedFieldCount_;
+    dataSizeBytes_            = other.dataSizeBytes_;
+    fieldMappingsDirty_       = other.fieldMappingsDirty_;
+    other.dropFieldMappings();
+    return *this;
+  }
 
   void append(std::initializer_list<rField> fields);
   Descriptor &operator+=(const Descriptor &rhs);

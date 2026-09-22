@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <utility>
 
 #include "rdb/descriptor.hpp"
 
@@ -331,4 +332,35 @@ TEST(descriptor, string_array_stays_one_flat_slot) {
 
   EXPECT_EQ(text.flatElementCount(), 1);
   EXPECT_FALSE(text == eightBytes);
+}
+
+// Przeniesiony deskryptor musi zostac SPOJNY: wektor pol jest pusty, wiec cache mapowan
+// nie moze udawac poprzedniego ukladu. Wersja `= default` tej wlasnosci nie ma - przenosi
+// wektory cache, ale kopiuje liczniki i flage brudnosci, wiec zrodlo raportowaloby sloty,
+// ktorych juz nie ma, i indeksowalo puste fieldByteOffsets_.
+TEST(descriptor, moved_from_descriptor_reports_an_empty_layout) {
+  auto source{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
+              rdb::Descriptor("c1", 4, 1, rdb::INTEGER)};
+
+  EXPECT_EQ(source.flatElementCount(), 2);  // cache zbudowany PRZED przeniesieniem
+  EXPECT_EQ(source.getSizeInBytes(), 8U);
+
+  const rdb::Descriptor target(std::move(source));
+
+  EXPECT_EQ(target.flatElementCount(), 2);
+  EXPECT_EQ(target.getSizeInBytes(), 8U);
+  EXPECT_EQ(source.flatElementCount(), 0);
+  EXPECT_EQ(source.getSizeInBytes(), 0U);
+
+  // To samo dla przypisania przenoszacego.
+  auto secondSource{rdb::Descriptor("cells", 4, 3, rdb::INTEGER)};
+  EXPECT_EQ(secondSource.flatElementCount(), 3);
+
+  rdb::Descriptor assigned;
+  assigned = std::move(secondSource);
+
+  EXPECT_EQ(assigned.flatElementCount(), 3);
+  EXPECT_EQ(assigned.getSizeInBytes(), 12U);
+  EXPECT_EQ(secondSource.flatElementCount(), 0);
+  EXPECT_EQ(secondSource.getSizeInBytes(), 0U);
 }
