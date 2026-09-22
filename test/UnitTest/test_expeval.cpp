@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "rdb/payload.hpp"
+#include "retractor/lib/checkedArith.hpp"
 #include "retractor/lib/expressionEvaluator.hpp"
 
 // ctest -R '^ut-expeval' -V
@@ -1944,6 +1945,18 @@ TEST(xExpressionEval, int_overflow_returns_null) {
 
   // BYTE promuje sie do int, wiec 255*255 nie jest przepelnieniem.
   EXPECT_EQ(evalBinary(uint8_t(255), uint8_t(255), MULTIPLY), rdb::descFldVT{65025});
+}
+
+// Zerowy mianownik nie dochodzi do gcd. gcd(0, 0) to zero, a dzielenie przez nie konczy sie inaczej na
+// kazdej architekturze: SIGFPE na x86-64, cichy 0 na arm64 i dopiero potem wyjatek z konstruktora.
+// Wejscie takie powstawalo z ulamka 0/0 wczytanego z surowych bajtow (payload::getItemVT), ale `div`
+// dochodzi tu tez wprost, gdy licznik dzielnika jest zerem.
+TEST(xExpressionEval, narrowed_rejects_zero_denominator) {
+  EXPECT_FALSE(checkedArith::detail::narrowed(0, 0).has_value());
+  EXPECT_FALSE(checkedArith::detail::narrowed(7, 0).has_value());
+
+  // Mianownik niezerowy liczy sie jak dotad - straz nie zabiera poprawnej drogi.
+  EXPECT_EQ(checkedArith::detail::narrowed(6, 4), boost::rational<int>(3, 2));
 }
 
 TEST(xExpressionEval, rational_overflow_returns_null) {

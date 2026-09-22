@@ -146,10 +146,10 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
       const auto reversePosition = recordsCountSrc - static_cast<size_t>(recordIndex) - 1;
       if (lastReadPosition != reversePosition) {
         rdb::probe::onAgseRead();
-        if (source->revRead(reversePosition))
+        if (source->revRead(reversePosition) == rdb::ReadStatus::Ok)
           lastReadPosition = reversePosition;
         else
-          fp.rem = -1;
+          fp.rem = -1;  // rekordu nie ma - element okna zostaje nieokreslony
       }
     } else
       fp.rem = -1;  // skip to undefined(-1) as value
@@ -170,7 +170,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   }
 
   // 3. Cleanup source after processing
-  source->revRead(0);  // Reset source
+  static_cast<void>(source->revRead(0));  // Reset source - status bez znaczenia, czytamy dla efektu
 
   // 4. Return constructed object.
   return result;
@@ -259,7 +259,7 @@ windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const i
     if (recordIndex < 0 || !std::cmp_less(recordIndex, recordsCountSrc)) continue;
 
     const auto reversePosition = recordsCountSrc - static_cast<size_t>(recordIndex) - 1;
-    if (!source->revRead(reversePosition)) continue;
+    if (source->revRead(reversePosition) != rdb::ReadStatus::Ok) continue;  // brak rekordu POMIJAMY, nie zerujemy
 
     // JEDNA wartosc z rekordu: okno idzie po czasie, nie po slotach rekordu (patrz windowGroup).
     // Wyrazenie liczy sie na payloadzie TEGO rekordu - ewaluator dostaje program grupy
@@ -300,7 +300,7 @@ windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const i
     ++stats.count;
   }
 
-  source->revRead(0);  // Reset source - ten sam porzadek co w constructAgsePayload
+  static_cast<void>(source->revRead(0));  // Reset source - ten sam porzadek co w constructAgsePayload
 
   // Okno bez ani jednej wartosci nie ma sredniej ani sumy: zostaja NULL-e z konstrukcji.
   if (stats.count == 0) return stats;
@@ -327,7 +327,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   }
 
   // First construct descriptor
-  outputPayload->revRead(0);
+  static_cast<void>(outputPayload->revRead(0));  // czytamy dla ksztaltu deskryptora, nie dla wartosci
 
   auto [sourceType, sourceLen] = outputPayload->descriptor.widestFieldType();
 

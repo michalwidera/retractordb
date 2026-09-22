@@ -155,7 +155,7 @@ TEST(xrdb, test_storage) {
 
   dAcc2.write(1);
 
-  dAcc2.revRead(dAcc2.getRecordsCount() - 1 - 1);
+  static_cast<void>(dAcc2.revRead(dAcc2.getRecordsCount() - 1 - 1));
 
   EXPECT_EQ(std::any_cast<std::string>(pl->getItem(0).value()), "xxxx xxxx");
   EXPECT_EQ(std::any_cast<int>(pl->getItem(2).value()), 0x67);
@@ -230,12 +230,80 @@ TEST(xrdb, storage_persists_null_flags_via_metadata_stream) {
     pl->setItem(0, 77);
     ASSERT_TRUE(s.write());
 
-    ASSERT_TRUE(s.read(0));
+    ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
     EXPECT_FALSE(pl->getItem(0).has_value());
 
-    ASSERT_TRUE(s.read(1));
+    ASSERT_EQ(s.read(1), rdb::ReadStatus::Ok);
     ASSERT_TRUE(pl->getItem(0).has_value());
     EXPECT_EQ(std::any_cast<int>(pl->getItem(0).value()), 77);
+  }
+
+  std::filesystem::remove(metaFile);
+}
+
+// Rekord, ktorego nie ma, jest wartoscia NIEOKRESLONA - nie zerem.
+//
+// Do 2026-09-23 read() zwracalo `bool`, ktory nie mial jak tego powiedziec: kazda prawdziwa awaria
+// konczyla sie FatalError, a brak rekordu wracal jako `true` z pamiecia wyzerowana i JAWNIE
+// oznaczona jako nie-null. Przez to semantyka pochlaniania NULL-i sie nie wlaczala, a obsluga bledu
+// u trzech wolajacych byla martwa. Ten test pilnuje obu polowek kontraktu naraz: statusu i bitsetu.
+TEST(xrdb, storage_read_beyond_last_record_reports_no_such_record) {
+  const std::string streamName = "ut-no-such-record";
+  const std::string dataFile   = "ut-no-such-record.bin";
+  const std::string metaFile   = "./" + dataFile + ".meta";
+
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER) + rdb::Descriptor("b", 4, 1, rdb::INTEGER);
+
+  {
+    rdb::storage s(streamName, dataFile, ".");
+    s.attachDescriptor(&desc);
+    s.setDisposable(true);
+
+    auto *pl = s.getPayload();
+    pl->setItem(0, 11);
+    pl->setItem(1, 22);
+    ASSERT_TRUE(s.write());
+
+    // Rekord istniejacy: status Ok i wartosci nietkniete.
+    ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
+    ASSERT_TRUE(pl->getItem(0).has_value());
+    EXPECT_EQ(std::any_cast<int>(pl->getItem(0).value()), 11);
+
+    // Rekord tuz za koncem magazynu: status NoSuchRecord, a KAZDE pole jest NULL - nie zerem.
+    // Gdyby bitset mowil "nie-null", reduktor zlozylby to zero do MIN/MAX/SUM/AVG zamiast pominac,
+    // a porownanie z zerem nie odroznilo by braku danych od danych rownych zeru.
+    EXPECT_EQ(s.read(1), rdb::ReadStatus::NoSuchRecord);
+    EXPECT_FALSE(pl->getItem(0).has_value());
+    EXPECT_FALSE(pl->getItem(1).has_value());
+
+    // Pozycja daleko za koncem - ten sam kontrakt, bez wzgledu na to, jak daleko.
+    EXPECT_EQ(s.read(99), rdb::ReadStatus::NoSuchRecord);
+    EXPECT_FALSE(pl->getItem(0).has_value());
+  }
+
+  std::filesystem::remove(metaFile);
+}
+
+// Magazyn pusty: pierwszy odczyt nie ma czego zwrocic. Ta sciezka jest zywa w silniku, bo
+// revRead(0) nad strumieniem bez rekordow liczy `0 - 0 - 1` i wchodzi tu z pozycja SIZE_MAX.
+TEST(xrdb, storage_read_from_empty_storage_reports_no_such_record) {
+  const std::string streamName = "ut-empty-storage";
+  const std::string dataFile   = "ut-empty-storage.bin";
+  const std::string metaFile   = "./" + dataFile + ".meta";
+
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
+
+  {
+    rdb::storage s(streamName, dataFile, ".");
+    s.attachDescriptor(&desc);
+    s.setDisposable(true);
+
+    ASSERT_EQ(s.getRecordsCount(), 0U);
+    EXPECT_EQ(s.read(0), rdb::ReadStatus::NoSuchRecord);
+    EXPECT_FALSE(s.getPayload()->getItem(0).has_value());
+
+    EXPECT_EQ(s.revRead(0), rdb::ReadStatus::NoSuchRecord);
+    EXPECT_FALSE(s.getPayload()->getItem(0).has_value());
   }
 
   std::filesystem::remove(metaFile);
@@ -261,7 +329,7 @@ TEST(xrdb, storage_updates_null_flags_on_record_modify) {
     pl->setItem(0, std::nullopt);
     ASSERT_TRUE(s.write(0));
 
-    ASSERT_TRUE(s.read(0));
+    ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
     EXPECT_FALSE(pl->getItem(0).has_value());
   }
 
@@ -299,7 +367,7 @@ TEST(xrdb, storage_purge_resets_metadata_stream_state) {
     ASSERT_TRUE(s.write());
     ASSERT_EQ(s.getRecordsCount(), 1U);
 
-    ASSERT_TRUE(s.read(0));
+    ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
     ASSERT_TRUE(pl->getItem(0).has_value());
     EXPECT_EQ(std::any_cast<int>(pl->getItem(0).value()), 1234);
   }

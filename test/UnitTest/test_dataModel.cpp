@@ -239,11 +239,11 @@ TEST_F(xschema, probe_e4_agse_elements_scale_with_window_length) {
 TEST_F(xschema, check_sum) {
   streamInstance dataStr1{coreInstance, coreInstance["str1"]};
   dataStr1.outputPayload->setDisposable(false);
-  dataStr1.outputPayload->revRead(0);
+  static_cast<void>(dataStr1.outputPayload->revRead(0));
 
   streamInstance dataStr2{coreInstance, coreInstance["str2"]};
   dataStr2.outputPayload->setDisposable(false);
-  dataStr2.outputPayload->revRead(0);
+  static_cast<void>(dataStr2.outputPayload->revRead(0));
 
   // str1
   // [0] [1]

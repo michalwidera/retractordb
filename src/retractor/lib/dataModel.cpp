@@ -94,7 +94,7 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &
   qSet[instance]->outputPayload->releaseOnHold();
 
   if (!qSet[instance]->outputPayload->isDeclared()) {
-    qSet[instance]->outputPayload->revRead(revOffset);
+    static_cast<void>(qSet[instance]->outputPayload->revRead(revOffset));
   }
   return qSet[instance]->outputPayload->getPayload();
 }
@@ -128,7 +128,8 @@ rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffs
     return nullRecord;
   }
   if (!out.isDeclared()) {
-    out.revRead(static_cast<size_t>(revOffset));
+    // Zakres sprawdzony wyzej, wiec rekord istnieje - status nie wnosi tu nic ponad to.
+    static_cast<void>(out.revRead(static_cast<size_t>(revOffset)));
     return *out.getPayload();
   }
   return out.history(static_cast<size_t>(revOffset));
@@ -169,7 +170,8 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
 
   if (out.isDeclared()) return out.history(static_cast<size_t>(rev));
 
-  out.revRead(static_cast<size_t>(rev));
+  // Zakres sprawdzony wyzej (outOfRange), wiec rekord istnieje.
+  static_cast<void>(out.revRead(static_cast<size_t>(rev)));
   return *out.getPayload();
 }
 
@@ -179,7 +181,7 @@ void dataModel::bootstrapDeclaration(const query &qry) {
     FatalError("dataModel::bootstrapDeclaration: stream '{}' not in empty state", qry.id);
   }
   output.bufferState = rdb::sourceState::flux;
-  output.revRead(0);
+  static_cast<void>(output.revRead(0));
   output.fire();
   if (output.bufferState != rdb::sourceState::armed) {
     FatalError("dataModel::bootstrapDeclaration: stream '{}' not armed after fire()", qry.id);
@@ -357,7 +359,7 @@ void dataModel::processRows(const std::set<std::string> &inSet, const boost::rat
 
     if (qSet[q.id]->outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
     qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
-    qSet[q.id]->outputPayload->revRead(0);                            // Declarations need to process in separate&first
+    static_cast<void>(qSet[q.id]->outputPayload->revRead(0));         // Declarations need to process in separate&first
     qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
     if (qSet.at(q.id)->outputPayload->bufferState != rdb::sourceState::armed) {
       FatalError("dataModel::processRows: stream '{}' not armed after processing", q.id);
@@ -596,9 +598,16 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
   auto payload = std::make_unique<rdb::payload>(qSet[instance]->outputPayload->descriptor);
 
   if (!qSet[instance]->outputPayload->isDeclared()) {
-    auto success = qSet[instance]->outputPayload->revRead(timeOffset, payload->span().data());
-    if (!success) {
-      FatalError("dataModel::getRow: revRead failed for stream '{}' at timeOffset {}", instance, timeOffset);
+    if (qSet[instance]->outputPayload->revRead(timeOffset, payload->span().data()) == rdb::ReadStatus::NoSuchRecord) {
+      // Rekordu o tym offsecie nie ma - wiersz jest nieokreslony, czyli all-null; petla nizej zamieni
+      // kazde pole na wartosc zastepcza jego typu. Bitset trzeba ustawic TUTAJ, bo revRead z wlasnym
+      // buforem docelowym zapisuje znaczniki do payloadu magazynu, a nie do tego bufora.
+      //
+      // Poprzednio stal tu FatalError - nieosiagalny, bo revRead nie potrafil zglosic braku rekordu.
+      // Uzbrojony zabijalby proces za offset siegajacy poza zgromadzona historie, czyli za pytanie,
+      // na ktore poprawna odpowiedzia jest "nie wiem".
+      SPDLOG_ERROR("getRow {}: record {} back not available (timeOffset beyond history)", instance, timeOffset);
+      payload->setNullBitset(std::vector<bool>(payload->descriptor.size(), true));
     }
   } else {
     *payload = *(qSet[instance]->outputPayload->getPayload());
