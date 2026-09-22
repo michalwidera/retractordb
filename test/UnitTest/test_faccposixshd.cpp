@@ -1,9 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <sys/stat.h>
+
 #include <cerrno>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <map>
 #include <string>
 #include <vector>
@@ -64,6 +67,28 @@ ssize_t __wrap_write(int fd, const void *buf, size_t count) {
 RDB_WRAP_SYSCALL(ssize_t, pread, (int fd, void *buf, size_t count, off_t offset), (fd, buf, count, offset));
 RDB_WRAP_SYSCALL(ssize_t, write, (int fd, const void *buf, size_t count), (fd, buf, count));
 
+// Wstrzykniecie awarii stat() - uzywane przez test kontraktu count(). Licznik jest
+// jednorazowy i uzbrajany tuz przed badanym wywolaniem: --wrap dziala na CALY plik
+// wykonywalny, wiec uzbrojony na dluzej przechwycilby takze cudze stat().
+
+static thread_local int g_stat_fail_count = 0;
+static thread_local int g_stat_fail_errno = 0;
+
+extern "C" {
+int __real_stat(const char *path, struct stat *buf);
+
+int __wrap_stat(const char *path, struct stat *buf) {
+  if (g_stat_fail_count > 0) {
+    --g_stat_fail_count;
+    errno = g_stat_fail_errno;
+    return -1;
+  }
+  return __real_stat(path, buf);
+}
+}
+
+RDB_WRAP_SYSCALL(int, stat, (const char *path, struct stat *buf), (path, buf));
+
 // --- Helpers ---
 
 std::ifstream::pos_type filesize(const std::string &filename) {
@@ -89,6 +114,8 @@ class ShadowFileTest : public ::testing::Test {
   void SetUp() override {
     g_pread_eintr_count = 0;
     g_write_eintr_count = 0;
+    g_stat_fail_count   = 0;
+    g_stat_fail_errno   = 0;
     if (std::filesystem::is_directory(sandBoxFolder)) {
       std::filesystem::remove_all(sandBoxFolder);
     }
@@ -104,6 +131,8 @@ class ShadowFileTest : public ::testing::Test {
   void TearDown() override {
     g_pread_eintr_count = 0;
     g_write_eintr_count = 0;
+    g_stat_fail_count   = 0;
+    g_stat_fail_errno   = 0;
     if (std::filesystem::is_directory(sandBoxFolder)) {
       std::filesystem::remove_all(sandBoxFolder);
     }
@@ -659,6 +688,33 @@ TEST_F(ShadowFileTest, test_faccposixshd_update_write_eintr_exceeds_limit_fails)
   g_write_eintr_count = 10;
   data                = 0xEE;
   ASSERT_NE(pfa->write(&data, 0), EXIT_SUCCESS);
+}
+
+// count(): awaria stat() inna niz ENOENT zatrzymuje proces, zamiast oddac blad jako liczbe.
+// Pilnowana regresja: `return -1` z count() dociera do storage::recordsCount_ jako SIZE_MAX
+// (uzasadnienie kontraktu przy FileInterface::count). Dlatego sprawdzamy nie tylko to, ZE
+// proces ginie, ale i to, ze ginie wewnatrz count() - po komunikacie tej wlasnie funkcji.
+TEST_F(ShadowFileTest, test_faccposixshd_count_stat_failure_is_fatal) {
+  const std::string path = sandboxPath("shd_count_stat_fail");
+  {
+    auto pfa    = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
+    BYTE record = 0xAA;
+    GTEST_ASSERT_EQ(pfa->write(&record), EXIT_SUCCESS);
+    // Kontrola dodatnia: z rozbrojonym licznikiem stat() dziala i count() liczy normalnie.
+    GTEST_ASSERT_EQ(pfa->count(), 1);
+  }
+
+  EXPECT_DEATH(
+      {
+        rdb::posixBinaryFileWithShadow pfa(path, desc);
+        g_stat_fail_count = 1;
+        g_stat_fail_errno = EACCES;
+        // Nieosiagalne przy poprawnym kontrakcie. Gdyby count() wrocilo do oddawania bledu
+        // jako liczby, instrukcja dobiegnie konca, gtest zglosi "did not die", a wypisana
+        // wartosc pokaze, co zwrocila.
+        std::cerr << "count() zwrocilo " << pfa.count() << "\n";
+      },
+      "posixBinaryFileWithShadow::count: ::stat");
 }
 
 // NOLINTEND(modernize-avoid-c-arrays)

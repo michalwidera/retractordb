@@ -71,7 +71,7 @@ foreach(item ${V_GLOB})
     if(OUTPUT_FILE_NOEXT STREQUAL "test_faccposix"
        OR OUTPUT_FILE_NOEXT STREQUAL "test_faccposixshd")
       target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=pread
-                          -Wl,--wrap=write)
+                          -Wl,--wrap=write -Wl,--wrap=stat)
     endif()
     if(OUTPUT_FILE_NOEXT STREQUAL "test_dumpManager")
       target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=lseek
