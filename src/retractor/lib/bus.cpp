@@ -130,9 +130,16 @@ struct Segment {
 };
 
 /// Kopiuje napis do tablicy o stalym rozmiarze, zawsze zostawiajac terminator.
+///
+/// Pusty `string_view` ma `data() == nullptr`, a `memcpy` deklaruje oba wskazniki jako
+/// `nonnull`: NULL jest tam zachowaniem NIEOKRESLONYM takze przy zerowej dlugosci, kiedy
+/// zaden bajt sie nie czyta. Pusto jest tu stanem NORMALNYM, nie bledem wolajacego --
+/// ClaimRequest opisuje puste `name`, `unit` i `counterPath` jako instancje bez --name,
+/// zwykly proces i brak rotacji -- wiec straz stoi na dlugosci. `memset` ponizej zadnej
+/// nie potrzebuje: `dst` jest tablica w slocie i nigdy nie jest NULL-em.
 void storeString(char *dst, std::size_t capacity, std::string_view src) {
   const std::size_t len = std::min(src.size(), capacity - 1);
-  std::memcpy(dst, src.data(), len);
+  if (len != 0) std::memcpy(dst, src.data(), len);
   std::memset(dst + len, 0, capacity - len);
 }
 

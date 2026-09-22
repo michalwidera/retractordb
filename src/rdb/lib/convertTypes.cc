@@ -54,6 +54,32 @@ static void narrowFloatTo(F value, K &retVal) {
   }
 }
 
+/// Zwezenie ZMIENNOPRZECINKOWE -> WYMIERNE, ta sama regula zakresu co w narrowFloatTo wyzej.
+///
+/// Rationalize jest funkcja totalna i dla wejscia bez przyblizenia wymiernego oddaje {0,1}.
+/// Zero, ktorego nikt nie policzyl, jest jednak dokladnie tym, co komentarz wyzej odrzuca
+/// przy nasyceniu, dlatego NULL stoi na sciezce konwersji: NaN i nieskonczonosc nie maja
+/// reprezentacji w `boost::rational<int>` i ida jako std::monostate, tak samo jak wartosc
+/// zmiennoprzecinkowa poza zakresem typu calkowitego idzie nim z narrowFloatTo.
+template <typename K>
+static void rationalizeTo(double value, K &retVal) {
+  if (std::isfinite(value))
+    retVal = Rationalize(value);
+  else
+    retVal = std::monostate{};
+}
+
+/// Jak rationalizeTo, tylko wynik rozklada sie na pare licznik/mianownik (INTPAIR).
+template <typename K>
+static void rationalizePairTo(double value, K &retVal) {
+  if (std::isfinite(value)) {
+    const auto r = Rationalize(value);
+    retVal       = std::make_pair(r.numerator(), r.denominator());
+  } else {
+    retVal = std::monostate{};
+  }
+}
+
 template <typename T, typename K>
 static void parse_string(const std::string &a, K &retVal) {
   using P = std::conditional_t<std::is_floating_point_v<T>, double, int>;
@@ -182,15 +208,9 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
                             [&retVal](int a) { retVal = std::make_pair(0, a); },                                             //
                             [&retVal](unsigned a) { retVal = std::make_pair(0, static_cast<int>(a)); },                      //
                             [&retVal](boost::rational<int> a) { retVal = std::make_pair(a.numerator(), a.denominator()); },  //
-                            [&retVal](float a) {
-                              auto r = Rationalize(static_cast<double>(a));
-                              retVal = std::make_pair(r.numerator(), r.denominator());
-                            },
-                            [&retVal](double a) {
-                              auto r = Rationalize(a);
-                              retVal = std::make_pair(r.numerator(), r.denominator());
-                            },                                                 //
-                            [&retVal](std::pair<int, int> a) { retVal = a; },  //
+                            [&retVal](float a) { rationalizePairTo(static_cast<double>(a), retVal); },                       //
+                            [&retVal](double a) { rationalizePairTo(a, retVal); },                                           //
+                            [&retVal](std::pair<int, int> a) { retVal = a; },                                                //
                             [&retVal](const std::pair<std::string, int> &a) {
                               retVal = std::make_pair(atoi(a.first.c_str()), a.second);
                             },  //
@@ -213,11 +233,9 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
           auto r = std::any_cast<boost::rational<int>>(inVar);
           retVal = std::make_pair(r.numerator(), r.denominator());
         } else if (inVar.type() == typeid(float)) {
-          auto r = Rationalize(std::any_cast<float>(inVar));
-          retVal = std::make_pair(r.numerator(), r.denominator());
+          rationalizePairTo(std::any_cast<float>(inVar), retVal);
         } else if (inVar.type() == typeid(double)) {
-          auto r = Rationalize(std::any_cast<double>(inVar));
-          retVal = std::make_pair(r.numerator(), r.denominator());
+          rationalizePairTo(std::any_cast<double>(inVar), retVal);
         } else if (inVar.type() == typeid(std::pair<int, int>)) {
           retVal = std::any_cast<std::pair<int, int>>(inVar);
         } else if (inVar.type() == typeid(std::string)) {
@@ -238,8 +256,8 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
                             [&retVal](int a) { retVal = boost::rational<int>(a); },                         //
                             [&retVal](unsigned a) { retVal = boost::rational<int>(static_cast<int>(a)); },  //
                             [&retVal](boost::rational<int> a) { retVal = a; },                              //
-                            [&retVal](float a) { retVal = Rationalize(static_cast<double>(a)); },           //
-                            [&retVal](double a) { retVal = Rationalize(a); },                               //
+                            [&retVal](float a) { rationalizeTo(static_cast<double>(a), retVal); },          //
+                            [&retVal](double a) { rationalizeTo(a, retVal); },                              //
                             [&retVal](std::pair<int, int> a) {
                               if (a.second == 0) FatalError("convertTypes: rational denominator is zero (pair<int,int>)");
                               retVal = boost::rational<int>(a.first, a.second);
@@ -266,9 +284,9 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
         } else if (inVar.type() == typeid(boost::rational<int>)) {
           retVal = std::any_cast<boost::rational<int>>(inVar);
         } else if (inVar.type() == typeid(float)) {
-          retVal = Rationalize(std::any_cast<float>(inVar));
+          rationalizeTo(std::any_cast<float>(inVar), retVal);
         } else if (inVar.type() == typeid(double)) {
-          retVal = Rationalize(std::any_cast<double>(inVar));
+          rationalizeTo(std::any_cast<double>(inVar), retVal);
         } else if (inVar.type() == typeid(std::pair<int, int>)) {
           auto pairVar = std::any_cast<std::pair<int, int>>(inVar);
           if (pairVar.second == 0) FatalError("convertTypes: rational denominator is zero (any pair<int,int>)");
@@ -338,17 +356,40 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
   return retVal;
 }
 
+/// Znak wynosi sie PRZED petle ulamka lancuchowego, a konwersje w petli oslania ten sam
+/// sprawdzony zakres co narrowFloatTo wyzej.
+///
+/// `static_cast<unsigned int>(-2.5)` jest zachowaniem NIEOKRESLONYM i procesory rozstrzygaja
+/// je ROZNIE: x86-64 (cvttsd2si) bierze mlodsze 32 bity i oddaje 4294967294, arm64 (fcvtzu)
+/// NASYCA do 0. Ta sama baza dawala wiec `-2/1` na jednej maszynie i `0/1` na drugiej, po cichu
+/// i bez bledu. Na obu bylo to zreszta zle: `diff = startx - val` liczylo sie na wartosci BEZ
+/// ZNAKU, wiec dla ujemnego wejscia petla urywala sie po pierwszej cyfrze i ulamek nigdy nie
+/// powstawal - `-2.5` dawalo `-2/1`, nie `-5/2`.
+///
+/// Ulamek lancuchowy jest symetryczny wzgledem znaku: rozwiniecie |x| daje p/q, a -|x| daje
+/// -p/q. Liczymy wiec na wartosci bezwzglednej i negujemy wynik. `startx` jest wtedy zawsze
+/// nieujemne, wiec z zakresu zostaje sama GORNA granica - sprawdzana na wartosci OBCIETEJ,
+/// dokladnie jak w narrowFloatTo, i z ta sama potega dwojki jako granica.
+///
+/// NaN nie spelnia zadnego porownania i wypada z petli tak samo jak nieskonczonosc i jak
+/// wartosc za duza na `int`: nic nie trafia na stos, a pusty stos oddaje {0,1}. Funkcja jest
+/// totalna, bo zwraca `boost::rational<int>` przez wartosc i NULL-a nie ma czym wyrazic;
+/// niefinitywne wejscie odsiewa rationalizeTo/rationalizePairTo, jeszcze przed wywolaniem.
 boost::rational<int> Rationalize(const double inValue, const double DIFF /*=1E-6*/, const int ttl_const /*=11*/) {
   std::stack<int> st;
-  double startx = inValue;
+  const double upperExclusive = std::ldexp(1.0, std::numeric_limits<int>::digits);
+  const double absValue       = std::fabs(inValue);
+  double startx               = absValue;
   double diff;
   double err1;
   double err2;
   int ttl = ttl_const;
-  unsigned int val;
+  int val;
   for (;;) {
-    val = static_cast<unsigned int>(startx);
-    st.push(static_cast<int>(val));
+    const double truncated = std::trunc(startx);
+    if (!(truncated < upperExclusive)) break;
+    val = static_cast<int>(truncated);
+    st.push(val);
     if ((ttl--) == 0) break;
     diff = startx - val;
     if (diff < DIFF) break;
@@ -366,9 +407,10 @@ boost::rational<int> Rationalize(const double inValue, const double DIFF /*=1E-6
     st.pop();
     result1 = result2;
   }
-  err1 = std::abs(rational_cast<double>(result1) - inValue);
-  err2 = std::abs(rational_cast<double>(result2) - inValue);
-  return err1 > err2 ? result2 : result1;
+  err1                              = std::abs(rational_cast<double>(result1) - absValue);
+  err2                              = std::abs(rational_cast<double>(result2) - absValue);
+  const boost::rational<int> result = err1 > err2 ? result2 : result1;
+  return std::signbit(inValue) ? -result : result;
 }
 
 rdb::descFldVT nullFallbackValue(rdb::descFld type) {
