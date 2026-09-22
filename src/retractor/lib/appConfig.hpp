@@ -91,6 +91,16 @@ struct AppConfig {
   /// Musi być zgodny z argumentem ExecStart jednostki systemd (config nie zmienia ExecStart).
   std::string serviceQueryFile{appcfg::kDefaultServiceQueryFile};
 
+  /// Dopuszcza regułę `DO SYSTEM` w planie przyjmowanym kanałem `--reset`. Wartość `false`
+  /// (domyślna) odrzuca taki plan w całości - patrz executorsm::validatePlanText, gdzie stoi
+  /// pełne uzasadnienie granicy.
+  ///
+  /// Klucz czytany jest przy starcie procesu, więc ustawia go ten sam autorytet, który pisze
+  /// plik planu usługi: dla jednostki systemd jest to /etc/retractor/retractor.toml (usługa
+  /// biegnie jako `retractor` z HOME=/nonexistent, więc warstwa użytkownika jej nie dotyczy),
+  /// a dla serwera uruchomionego z terminala - konfiguracja tego, kto go uruchomił.
+  bool serviceUnrestricted{false};
+
   // === diagnostyka ===
 
   /// Ścieżki plików konfiguracyjnych faktycznie wczytanych (w kolejności nakładania warstw).

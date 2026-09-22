@@ -116,6 +116,14 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   executorsm::cfgMinQueueElements   = cfg.ipcMinQueueElements;
   executorsm::cfgRtPriority         = cfg.schedulingRtPriority;
   executorsm::cfgStorageDir         = cfg.storageDir;
+  executorsm::cfgUnrestricted       = cfg.serviceUnrestricted;
+  // Tryb nieograniczony zostawia slad w dzienniku ZAWSZE, nie tylko przy pierwszej regule:
+  // po incydencie pytanie brzmi "czy ta instancja przyjmowala polecenia powloki", a odpowiedz
+  // ma byc w logu startu, a nie do odtworzenia z pliku konfiguracyjnego, ktory mogl sie zmienic.
+  if (executorsm::cfgUnrestricted)
+    SPDLOG_WARN(
+        "service.unrestricted = true: a plan accepted over the reset channel MAY carry DO SYSTEM rules, "
+        "so anyone able to open this instance's IPC objects can run shell commands as this user.");
   // Dyrektywy sa jeszcze w drzewie: dataModel usunie je dopiero przy budowie modelu.
   executorsm::activeStorageDir = planStorageDir(coreInstance, cfg.storageDir);
   dataModelExpected            = !coreInstance.empty();

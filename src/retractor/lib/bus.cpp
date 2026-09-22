@@ -17,6 +17,7 @@
 
 #include <spdlog/spdlog.h>
 #include <boost/interprocess/mapped_region.hpp>
+#include <boost/interprocess/permissions.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
 
 #include "constants.hpp"
@@ -544,7 +545,11 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
   bool creator = false;
   if (createIfMissing) {
     try {
-      impl->shm = std::make_unique<IPC::shared_memory_object>(IPC::create_only, name.c_str(), IPC::read_write);
+      // Uprawnienia jawne tylko u TWORCY - kto segment otwiera, tego tryb juz nie dotyczy.
+      // Magistrala laczy instancje, wiec 0600 zamyka ja w obrebie jednego konta; praktycznie
+      // nic to nie zmienia, bo podlaczenie wymaga read_write, a umask 022 i tak dawal 0644.
+      impl->shm = std::make_unique<IPC::shared_memory_object>(IPC::create_only, name.c_str(), IPC::read_write,
+                                                              IPC::permissions(ipc::kObjectPermissions));
       creator   = true;
     } catch (const IPC::interprocess_exception &) {
       impl->shm.reset();

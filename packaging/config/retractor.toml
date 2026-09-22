@@ -12,3 +12,12 @@ client_response_max_fails = 300
 # write access. The built-in default leaves storage.dir unset.
 # [storage]
 # dir = "/var/lib/retractor"
+
+[service]
+# Allow a DO SYSTEM rule in a plan accepted over the `xqry --reset` channel.
+# false (the default) refuses such a plan as a whole: the reset channel carries no
+# authorship, so a rule that runs an arbitrary shell command may only be asked for in
+# the plan file the service starts from. Set true only if you deliberately hand this
+# channel over - anyone able to open this instance's IPC objects then runs shell
+# commands under the service account.
+unrestricted = false

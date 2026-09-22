@@ -1,0 +1,11 @@
+# Plan poprawny pod kazdym innym wzgledem niz regula: parsuje sie, kompiluje i nie koliduje
+# nazwami, wiec odmowa jest przypisywalna WYLACZNIE do akcji DO SYSTEM. Gdyby zawieral takze
+# blad skladni, krok 3b nie odroznialby jednego powodu odmowy od drugiego.
+#
+# Uzywany w reset.sh dwa razy: w kroku 3b (tryb domyslny - odmowa) i w kroku 8
+# (service.unrestricted = true - przyjecie i wykonanie).
+STORAGE 'temp'
+SUBSTRAT 'memory'
+DECLARE a INTEGER STREAM src, 0.2 FILE 'data.txt'
+SELECT a+1 STREAM alpha FROM src
+RULE evil ON alpha WHEN alpha[0] > 0 DO SYSTEM 'touch evidence.txt'

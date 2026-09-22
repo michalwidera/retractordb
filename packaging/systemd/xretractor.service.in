@@ -29,6 +29,11 @@ Group=retractor
 #
 #   xqry --reset /ścieżka/plan.rql --server service
 #
+# Plan podany tą drogą NIE może zawierać reguły `DO SYSTEM` - jest wtedy odrzucany w całości.
+# Kanał reset nie niesie autorstwa, więc regułę uruchamiającą polecenie powłoki wolno zamówić
+# tylko w pliku zapytań, na który wskazuje ExecStart. Operator, który świadomie oddaje ten
+# kanał, ustawia `unrestricted = true` w sekcji [service] pliku /etc/retractor/retractor.toml.
+#
 # Instancja usługowa nazywa się na magistrali "service" (chyba że jednostka poda --name), więc
 # adres jest ten sam na każdej maszynie. Usługa jest dokładnie jedna: druga instancja w trybie
 # usługowym jest odrzucana przy starcie. Przyjęty plan trafia też do tego pliku, żeby restart

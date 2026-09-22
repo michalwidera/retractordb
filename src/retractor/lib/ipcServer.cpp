@@ -17,6 +17,7 @@
 
 #include <spdlog/spdlog.h>
 #include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/interprocess/permissions.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/interprocess/sync/named_mutex.hpp>
 #include <boost/interprocess/sync/scoped_lock.hpp>
@@ -146,10 +147,11 @@ void IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
   // klienta bez gotowego uchwytu (przy okazji znika dotychczasowy wyscig
   // rejestracja-przed-utworzeniem-kolejki). Nadpisanie uchwytu przy
   // re-rejestracji zamyka stare mapowanie w tym watku.
-  auto queueHandle = std::make_unique<IPC::message_queue>(IPC::open_or_create,               // open or create
-                                                          queueName.c_str(),                 // name
-                                                          maxElements,                       // max message number
-                                                          ipc::kResponseQueueMaxMessageSize  // max message size
+  auto queueHandle = std::make_unique<IPC::message_queue>(IPC::open_or_create,                       // open or create
+                                                          queueName.c_str(),                         // name
+                                                          maxElements,                               // max message number
+                                                          ipc::kResponseQueueMaxMessageSize,         // max message size
+                                                          IPC::permissions(ipc::kObjectPermissions)  // tylko konto serwera
   );
   {
     std::scoped_lock lock(clientMapsMutex_);
@@ -271,14 +273,18 @@ void IpcServer::commandLoop() const {
     IPC::shared_memory_object::remove(names_.shmemSegment.c_str());
     IPC::named_mutex::remove(names_.mapMutex.c_str());
     // Segment and allocator for map purposes
-    IPC::managed_shared_memory mapSegment(IPC::open_or_create, names_.shmemSegment.c_str(), ipc::kShmemSegmentSize);
+    // `nullptr` to argument adresu odwzorowania - stoi przed uprawnieniami w sygnaturze Boosta
+    // i jego pominiecie jest jedynym powodem, dla ktorego ten wiersz wyglada inaczej niz reszta.
+    IPC::managed_shared_memory mapSegment(IPC::open_or_create, names_.shmemSegment.c_str(), ipc::kShmemSegmentSize, nullptr,
+                                          IPC::permissions(ipc::kObjectPermissions));
     const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
-    IPC::named_mutex mapMutex(IPC::open_or_create, names_.mapMutex.c_str());
+    IPC::named_mutex mapMutex(IPC::open_or_create, names_.mapMutex.c_str(), IPC::permissions(ipc::kObjectPermissions));
     // Create a message_queue.
-    IPC::message_queue mq(IPC::open_or_create,            // open or crate
-                          names_.queryQueue.c_str(),      // name
-                          ipc::kQueryQueueMaxMessages,    // max message number
-                          ipc::kQueryQueueMaxMessageSize  // max message size
+    IPC::message_queue mq(IPC::open_or_create,                       // open or crate
+                          names_.queryQueue.c_str(),                 // name
+                          ipc::kQueryQueueMaxMessages,               // max message number
+                          ipc::kQueryQueueMaxMessageSize,            // max message size
+                          IPC::permissions(ipc::kObjectPermissions)  // tylko konto serwera
     );
     IPCMap *mymap = mapSegment.construct<IPCMap>(std::string(ipc::kMapObject).c_str())  // object name
                     (std::less<>(), allocatorShmemMapInstance);
