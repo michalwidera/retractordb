@@ -243,11 +243,11 @@ ssize_t posixBinaryFileWithShadow::read(uint8_t *ptrData, std::vector<bool> &nul
 }
 
 size_t posixBinaryFileWithShadow::count() {
-  // Wolane na goracej sciezce odczytu - pojedynczy stat(), ENOENT to zwykly brak pliku.
+  // Kontrakt identyczny jak w posixBinaryFile::count() - uzasadnienie tam.
   struct stat stat_buf;
   if (stat(filename_.c_str(), &stat_buf) != 0) {
-    if (errno != ENOENT) SPDLOG_ERROR("::stat {} failed: {}", filename_, strerror(errno));
-    return 0;
+    if (errno == ENOENT) return 0;
+    FatalError("posixBinaryFileWithShadow::count: ::stat '{}' failed: {}", filename_, strerror(errno));
   }
   return stat_buf.st_size / recordSize_;
 }

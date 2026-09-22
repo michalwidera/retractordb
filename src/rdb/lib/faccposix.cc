@@ -77,12 +77,14 @@ posixBinaryFile::~posixBinaryFile() {
 auto posixBinaryFile::name() -> std::string & { return filename_; }
 
 size_t posixBinaryFile::count() {
-  // Wolane na goracej sciezce odczytu - pojedynczy stat(), ENOENT to zwykly brak pliku.
+  // Pojedynczy stat(). ENOENT to zwykly brak pliku - magazyn jeszcze nie zapisany albo
+  // po purge, ktory plik kasuje; stad 0 rekordow. Kazdy inny blad zatrzymuje, bo cicha
+  // wartosc jest tu grozniejsza od zatrzymania: 0 znaczy "magazyn pusty", wiec
+  // storage::write zaczyna dopisywac od indeksu 0 po istniejacych danych.
   struct stat stat_buf;
   if (stat(filename_.c_str(), &stat_buf) != 0) {
     if (errno == ENOENT) return 0;
-    SPDLOG_ERROR("::stat {} failed: {}", filename_, strerror(errno));
-    return -1;
+    FatalError("posixBinaryFile::count: ::stat '{}' failed: {}", filename_, strerror(errno));
   }
   return stat_buf.st_size / recordSize_;
 }
