@@ -4,6 +4,7 @@
 #include <fstream>
 #include <limits>
 #include <memory>
+#include <system_error>
 #include "fatalError.hpp"
 namespace rdb {
 // https://courses.cs.vt.edu/~cs2604/fall02/binio.html
@@ -34,8 +35,19 @@ genericBinaryFile::~genericBinaryFile() {
 auto genericBinaryFile::name() -> std::string & { return filename_; }
 
 size_t genericBinaryFile::count() {
-  std::ifstream in(filename_, std::ifstream::ate | std::ifstream::binary);
-  return in.tellg() / recordSize_;
+  if (recordSize_ == 0) FatalError("genericBinaryFile::count: recordSize_ is zero");
+  // Rozmiar pliku zamiast otwierania strumienia: ten sam kontrakt co w blizniakach
+  // posixowych (ENOENT = magazyn pusty, kazdy inny blad zatrzymuje) i bez open/seek/close
+  // na kazde wywolanie. Poprzednia postac nie sprawdzala, czy strumien sie otworzyl -
+  // tellg() zwracalo wtedy -1, co dla recordSize_ > 1 obcinalo sie do zera przypadkiem,
+  // a dla recordSize_ == 1 dawalo SIZE_MAX.
+  std::error_code ec;
+  const auto sizeInBytes = std::filesystem::file_size(filename_, ec);
+  if (ec) {
+    if (ec == std::errc::no_such_file_or_directory) return 0;
+    FatalError("genericBinaryFile::count: file_size('{}') failed: {}", filename_, ec.message());
+  }
+  return static_cast<size_t>(sizeInBytes / static_cast<uintmax_t>(recordSize_));
 }
 
 ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/, const size_t position) {

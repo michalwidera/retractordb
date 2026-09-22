@@ -190,10 +190,22 @@ bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
   auto size      = descriptor.getSizeInBytes();
   ssize_t result = 0;
 
+  // Asercja spójności TYLKO w Debug. accessor_->count() nie jest odczytem pola: dla magazynu
+  // DEFAULT (groupFile) to jeden stat() na KAŻDY żywy segment retencji, a read() stoi w pętli
+  // okna - streamInstance woła revRead() raz na element (FIR mwi_long = 180 elementów), więc
+  // przy interwale 1/360 s samo to okno wnosi kilkadziesiąt tysięcy wejść do jądra na sekundę.
+  // Pod SCHED_FIFO każde z nich obciąża budżet slotu, a ten budżet jest wielkością mierzoną -
+  // asercja płatna per rekord zmienia więc wynik pomiaru, dla którego silnik istnieje.
+  //
+  // W Release nie zostaje ślepa plama: jeśli plik został skrócony poniżej czytanej pozycji,
+  // poniższe accessor_->read() zwraca błąd (krótki pread) i kończy FatalError z nazwą pliku
+  // oraz pozycją. Tracimy wcześniejsze ostrzeżenie, nie samo wykrycie rozjazdu.
+#ifndef NDEBUG
   if (recordsCount_ != accessor_->count()) {
     FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(),
                paths_.storageFile());
   }
+#endif
 
   if (isHold_) {
     std::memset(destination, 0, size);
@@ -229,8 +241,9 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   }
 
   if (!isDeclared()) {
-    // Spójność recordsCount_ vs accessor_->count() weryfikuje read() - dla magazynów
-    // plikowych count() to syscall (stat), więc nie powtarzamy tego sprawdzenia tutaj.
+    // Spójność recordsCount_ vs accessor_->count() weryfikuje read(), i to tylko w Debug -
+    // dla magazynów plikowych count() to syscall (stat), więc nie powtarzamy go tutaj ani nie
+    // zostawiamy w Release (uzasadnienie przy asercji w read()).
     const auto recordPositionFromBack = recordsCount_ - recordIndexFromBack - 1;
     return read(recordPositionFromBack, destination);
   }
@@ -296,10 +309,15 @@ bool storage::write(const size_t recordIndex) {
   // (nie trafia do fizycznego magazynu), a jego brak zostanie oznaczony wpisem gap.
   if (recordIndex >= recordsCount_ && metaData_->absorbAppend(nullInfo)) return true;
 
+  // Asercja spójności TYLKO w Debug, z tego samego powodu co w read(): accessor_->count() to
+  // syscall (stat() na każdy segment), a write() wykonuje się raz na strumień na takt, wewnątrz
+  // tego samego mierzonego budżetu slotu. Różnica wobec read() jest wyłącznie w krotności.
+#ifndef NDEBUG
   if (recordsCount_ != accessor_->count()) {
     FatalError("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_, accessor_->count(),
                paths_.storageFile());
   }
+#endif
 
   ssize_t result = 0;
   if (recordIndex >= recordsCount_) {
