@@ -76,6 +76,61 @@ std::string executorsm::validatePlanText(const std::string &planText) {
   const PlanSource loaded = parsePlanText(candidate, planText);
   if (loaded.status != "OK") return "Fail parse:" + loaded.status;
 
+  // --- DO SYSTEM nie przechodzi kanalem `reset` ---
+  //
+  // DO SYSTEM jest wykonaniem dowolnego polecenia powloki na koncie, na ktorym biegnie ta
+  // instancja. Wolno je zamowic WYLACZNIE w pliku planu, ktorego autorem jest operator
+  // uruchamiajacy usluge - kanal IPC autorstwa nie niesie, wiec nadawcy resetu nie czyni
+  // operatorem. Ta sama granica odcina SYSTEM od kanalu ad-hoc: patrz attachAdHocRule.
+  //
+  // JAK: petla po zestawie SWIEZO SPARSOWANYM. Reguly wypelnia parser, a nie kompilacja, wiec
+  // tutaj sa juz wszystkie. Miejsce jest wymuszone z dwoch stron - PO parsowaniu, bo wczesniej
+  // nie ma czego ogladac, i PRZED reservePlan(), bo odmowa nie moze zostawic rezerwacji
+  // w gniezdzie magistrali: rezerwacja jest tam pojedyncza i blokowalaby kazdy nastepny reset.
+  //
+  // DLACZEGO CALY ZESTAW, A NIE SAMA REGULA: pominiecie reguly nie usuwa jej z planu, tylko
+  // ODKLADA. applyPendingPlan zapisuje przyjety TEKST do pliku zapytan uslugi, a start z pliku
+  // planu zadnego sprawdzenia nie przechodzi - wiec regula wycieta w locie wrocilaby uzbrojona
+  // przy najblizszym restarcie, juz po "dozwolonej" stronie granicy. Czesciowe przyjecie
+  // zamienia odmowe w przyjecie opoznione. Protokol i tak nie ma jak go przekazac:
+  // `reset-commit` zwraca jedno OK albo jedno Rejected, bez miejsca na "przyjeto, ale bez r1".
+  //
+  // DLACZEGO ISTNIEJE service.unrestricted: bez niego DO SYSTEM byloby w spakowanej usludze
+  // funkcja praktycznie martwa, a nie tylko trudniej dostepna. postinst tworzy
+  // /etc/retractor/startup.rql PUSTY i na niego wskazuje ExecStart jednostki, wiec instancja
+  // wstaje bezczynna, a JEDYNA bezprzywilejowa droga podania jej planu to wlasnie `--reset`.
+  // Obie pozostale drogi wymagaja roota i obie sa gorsze:
+  //   - `xretractor plan.rql` wykrywa zywy serwis, nadpisuje plik planu i zleca RESTART
+  //     jednostki (launcher.cpp: deliverQueryFile + restartService) - czyli zrywa ciaglosc
+  //     liczenia, ktorej ta usluga ma strzec;
+  //   - reczna edycja startup.rql jest NIETRWALA, bo ten sam plik nadpisuje applyPendingPlan
+  //     przy kazdym udanym `--reset`; regula dopisana recznie znika po cichu.
+  // Przelacznik oddaje wiec te funkcje temu, kto ma prawo o niej decydowac, zamiast kasowac ja
+  // przy okazji zamykania kanalu.
+  //
+  // DLACZEGO W TOML, A NIE FLAGA W ARGV: flaga jednorazowa bylaby zaworem jednokierunkowym.
+  // Tekst przyjety w trybie nieograniczonym trafia do pliku zapytan, ktorego start nie
+  // sprawdza, wiec JEDNO uruchomienie z flaga instalowaloby regule powlokowa na stale - takze
+  // dla instancji startujacych juz bez niej. Konfiguracja nie jest jednorazowa: usluga wstaje
+  // z tym samym kluczem, wiec tryb i jego skutek nie rozjezdzaja sie w czasie. Powod drugi,
+  // wezszy: flaga w argv dotyczylaby takze zwyklego `xretractor plan.rql`, gdzie jest
+  // bezprzedmiotowa - tam autorem planu jest ten, kto go uruchomil.
+  //
+  // CZEGO PRZELACZNIK NIE OTWIERA: kanalu ad-hoc. Tam nie ma ani planu, ani zadnego artefaktu
+  // operatora - jest pojedyncza regula od dowolnego klienta - wiec attachAdHocRule odmawia
+  // bezwarunkowo i tego klucza nie czyta.
+  //
+  // NA CZYM TEN TRYB STOI: z kluczem ON kanal reset jest kanalem zdalnego wykonania kodu,
+  // bramkowanym juz wylacznie uprawnieniami obiektow IPC. Dlatego sa one pinowane jawnie -
+  // patrz ipc::kObjectPermissions; inaczej tryb zalezalby od umaska jednostki systemd.
+  if (!cfgUnrestricted)
+    for (const auto &q : candidate)
+      for (const auto &r : q.lRules)
+        if (r.action == rule::SYSTEM)
+          return "Rejected: rule '" + r.name + "' on stream '" + q.id +
+                 "' uses DO SYSTEM; a plan sent over the reset channel may not carry shell actions (put the rule in the plan "
+                 "file the service starts from, or set service.unrestricted in the service config)";
+
   // Zestaw bez ani jednej instrukcji jest LEGALNY: tak sprowadza sie usluge do stanu
   // zerowego, w ktorym czeka na nastepny plan. To ta sama droga, ktora idzie start
   // z pustym plikiem zapytan.

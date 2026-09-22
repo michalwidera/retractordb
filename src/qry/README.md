@@ -122,6 +122,13 @@ $ xqry --reset broken.rql --server service
 xqry: plan reload refused at reset-commit: Fail compile:...
 ```
 
+A plan carrying a `DO SYSTEM` rule is refused as a **whole**, naming the rule and the reason. The reset channel carries no authorship - it is the same unauthenticated queue the ad-hoc channel refuses `DO SYSTEM` on - so a rule that runs an arbitrary shell command may only be asked for in the plan file the service starts from. The refusal covers the whole set rather than the single rule because an accepted plan is persisted to the service's query file, where a rule skipped in flight would come back armed after the next restart. An operator who deliberately hands this channel over sets `unrestricted = true` under `[service]` in the service configuration; the instance then logs a warning at every start, and the ad-hoc channel stays closed regardless.
+
+```
+$ xqry --reset with-system-rule.rql --server service
+xqry: plan reload refused at reset-commit: Rejected: rule 'evil' on stream 'alpha' uses DO SYSTEM; ...
+```
+
 An accepted plan replaces the running one at the end of the current slot: stream artifacts of the old plan are dropped exactly as at start-up (unless the plan carries `:ROTATION`), subscribed clients are told the show is over, and the new names are claimed on the bus. A file with no statements at all is a legal request - it returns the instance to the **idle** state, serving nothing and waiting for the next plan.
 
 An instance started as a service (`--service`, `XRETRACTOR_SERVICE=1`, or a systemd unit) is named `service` on the bus unless `--name` says otherwise, so the target is the same on every machine: `--server service`. With exactly one live instance `--server` may be omitted.

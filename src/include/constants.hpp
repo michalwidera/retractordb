@@ -174,6 +174,22 @@ constexpr int kResponseQueueMaxMessageSize = 1024;
 // wszystkie równoległe odpowiedzi przy typowej liczbie klientów.
 constexpr std::size_t kShmemSegmentSize = 65536;
 
+// === Uprawnienia obiektów IPC ===
+
+// Tryb nadawany KAŻDEMU obiektowi IPC, który tworzy serwer: segmentowi mapy, muteksowi mapy,
+// kolejce komend, kolejkom odpowiedzi i segmentowi magistrali.
+//
+// Jawny, bo domyślny `permissions()` Boosta deklaruje 0666, a tryb realny wychodzi dopiero
+// spod umaska procesu: przy umask 022 jest to 0644 (obcy użytkownik czyta segment, choć do
+// kolejki pisać nie może), a przy umask 002 już 0664 - czyli cała grupa może wysyłać komendy,
+// w tym `--reset`, który wymienia cały plan. Ochrona zależna od umaska jednostki systemd nie
+// jest ochroną, a od niej zależy sensowność trybu `service.unrestricted`.
+//
+// 0600 nie zabiera niczego klientowi: wszystkie te obiekty tworzy serwer, a xqry otwiera je
+// wyłącznie przez open_only (ipcClient.cpp, qryLauncher.cpp), więc klient i tak musi działać
+// na koncie serwera. Bity właściciela przeżywają każdy sensowny umask.
+constexpr int kObjectPermissions = 0600;
+
 // === Interwały czasowe ===
 
 // Interwał odpytywania kolejek IPC/SPSC - kompromis między latencją a obciążeniem CPU.

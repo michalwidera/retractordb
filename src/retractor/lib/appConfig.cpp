@@ -114,6 +114,7 @@ void applyTable(const toml::table &tbl, AppConfig &cfg) {
   if (auto v = tbl.at_path("server.autoname").value<bool>(); v) cfg.serverAutoName = *v;
 
   if (auto v = tbl.at_path("service.query_file").value<std::string>(); v) cfg.serviceQueryFile = *v;
+  if (auto v = tbl.at_path("service.unrestricted").value<bool>(); v) cfg.serviceUnrestricted = *v;
 }
 
 // Ścieżka pliku konfiguracyjnego użytkownika wg XDG ($XDG_CONFIG_HOME lub ~/.config).

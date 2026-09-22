@@ -22,3 +22,16 @@ dir = "/var/lib/retractor"
 # jako fallback - w normalnym przebiegu serwis sam raportuje swój plik zapytań. MUSI być
 # zgodny z argumentem ExecStart jednostki systemd (zmiana tutaj nie zmienia ExecStart).
 # query_file = "/etc/retractor/startup.rql"
+#
+# Dopuszczenie reguły `DO SYSTEM` w planie przyjmowanym kanałem `xqry --reset`.
+#
+# Domyślnie (false) taki plan jest odrzucany w CAŁOŚCI, bo kanał reset nie niesie autorstwa:
+# regułę uruchamiającą dowolne polecenie powłoki wolno zamówić tylko w pliku planu, którego
+# autorem jest operator usługi. Kanał ad-hoc odmawia jej bezwarunkowo i tego klucza nie czyta.
+#
+# Ustaw `true` WYŁĄCZNIE wtedy, gdy świadomie oddajesz ten kanał: usługa instalowana z pakietu
+# wstaje z pustym planem, więc `--reset` jest jej jedyną bezprzywilejową drogą podania zestawu,
+# a przy `true` każdy, kto potrafi otworzyć obiekty IPC tej instancji, wykona polecenie powłoki
+# na jej koncie. Obiekty IPC są tworzone z trybem 0600, więc granicą jest konto usługi.
+# Włączenie zostawia ostrzeżenie w dzienniku przy każdym starcie.
+# unrestricted = false

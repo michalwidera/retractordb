@@ -46,4 +46,5 @@ int executorsm::cfgQueueBufferSeconds = appcfg::kDefaultIpcQueueBufferSeconds;
 int executorsm::cfgMinQueueElements   = appcfg::kDefaultIpcMinQueueElements;
 int executorsm::cfgRtPriority         = appcfg::kDefaultSchedulingRtPriority;
 std::string executorsm::cfgStorageDir;
+bool executorsm::cfgUnrestricted = false;
 std::string executorsm::activeStorageDir;
