@@ -151,6 +151,15 @@ payload::payload(const payload &other) {
   nullBitset_ = other.nullBitset_;
 }
 
+// Move constructor
+
+// Kolejnosc listy inicjalizacyjnej idzie po kolejnosci deklaracji skladnikow.
+// hexFormat_ zostaje domyslny, dokladnie jak w konstruktorze kopiujacym.
+payload::payload(payload &&other) noexcept
+    : payloadData_(std::move(other.payloadData_)),
+      nullBitset_(std::move(other.nullBitset_)),
+      descriptor(std::move(other.descriptor)) {}
+
 // Copy & assignment operator
 
 payload &payload::operator=(const payload &other) {
@@ -171,6 +180,42 @@ payload &payload::operator=(const payload &other) {
   } else {
     retargetNullBitsetFrom(other);
   }
+  return *this;
+}
+
+// Move assignment operator
+
+/// Przenoszenie trzyma TE SAMA regule zgodnosci deskryptorow co przypisanie kopiujace wyzej -
+/// domyslna semantyka przenoszenia (kradziez calego stanu zrodla) zmienilaby zachowanie silnika.
+/// Kradzione jest wylacznie przypisanie do celu o PUSTYM deskryptorze; cel, ktory ma juz
+/// ksztalt, idzie dokladnie droga kopii, bo w tym przypadku nie ma czego ukrasc:
+///
+/// - Descriptor::operator== nie jest rownoscia, tylko warunkiem "cel miesci zrodlo" (odrzuca
+///   wylacznie slot wezszy albo typ nizszy, patrz descriptor.cc). Zgodny cel moze byc wiec
+///   SZERSZY od zrodla. span() liczy dlugosc z deskryptora CELU, nie z rozmiaru wektora, wiec
+///   ukradziony (krotszy) bufor dawalby odczyt za koncem alokacji przy pierwszym getItemVT.
+///   Do tego bajty celu poza span() zrodla zachowuja przy kopiowaniu swoja dotychczasowa tresc,
+///   a kradziez podmienilaby je na tresc zrodla, czyli zmienilaby wartosci pol.
+/// - Kradziez warunkowa (tylko przy rownych rozmiarach) jest bezpieczna, ale wymienia memcpy
+///   rekordu na zwolnienie bufora celu i przejecie cudzego w kazdym slocie - to nie jest
+///   szybsze. Ten sam rachunek dotyczy bitsetu NULL o rownej dlugosci.
+/// - Zrodlo zostaje w calosci nietkniete, wiec nie powstaje obiekt czesciowo przeniesiony
+///   (deskryptor z wpisami, a bitset pusty), po ktorym getItemVT czytalby poza zakresem.
+///
+/// noexcept mimo alokacji: FatalError konczy przez std::exit, wiec nie rzuca, a alokowac moga
+/// tu tylko leniwa przebudowa cache w operator== i przecelowanie bitsetu. bad_alloc bylby w tych
+/// miejscach std::terminate zamiast wyjatku - silnik nigdzie bad_alloc nie obsluguje.
+payload &payload::operator=(payload &&other) noexcept {
+  if (this == &other) return *this;
+
+  // Reguly zgodnosci nie ma tu drugiego raza: cel z ksztaltem obsluguje przypisanie kopiujace,
+  // razem z warunkiem zgodnosci i z FatalError na niezgodnym deskryptorze.
+  if (!descriptor.empty()) return *this = static_cast<const payload &>(other);
+
+  // Cel pusty - ta sama sciezka co operator=(const Descriptor&), tylko bez kopiowania czegokolwiek.
+  descriptor   = std::move(other.descriptor);
+  payloadData_ = std::move(other.payloadData_);
+  nullBitset_  = std::move(other.nullBitset_);
   return *this;
 }
 

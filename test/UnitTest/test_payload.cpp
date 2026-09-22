@@ -502,3 +502,90 @@ TEST(payload, null_flags_survive_the_change_of_record_form) {
   EXPECT_TRUE(expanded.getItemVT(0).has_value());
   EXPECT_TRUE(expanded.getItemVT(2).has_value());
 }
+
+// Przenoszenie do celu o PUSTYM deskryptorze przejmuje caly stan - to ta sama sciezka, ktora
+// przypisanie kopiujace realizuje przez operator=(const Descriptor&), tylko bez kopii. Zrodlo
+// zostaje odpowiednikiem obiektu z konstruktora domyslnego, wiec nadaje sie do ponownego uzycia.
+TEST(payload, move_assignment_into_empty_target_takes_over_the_record) {
+  const auto form{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
+                  rdb::Descriptor("c1", 4, 1, rdb::INTEGER)};
+
+  rdb::payload source(form);
+  source.setItemVT(0, rdb::descFldVT{11});
+  source.setItemVT(1, std::nullopt);
+
+  rdb::payload target;  // konstruktor domyslny: deskryptor pusty, gotowy do przypisania
+  target = std::move(source);
+
+  ASSERT_EQ(target.descriptor.size(), 2U);
+  EXPECT_EQ(std::get<int>(target.getItemVT(0).value()), 11);
+  EXPECT_FALSE(target.getItemVT(1).has_value());
+
+  EXPECT_TRUE(source.descriptor.empty());
+  EXPECT_TRUE(source.span().empty());
+
+  source = target;  // pusty deskryptor przejmuje ksztalt, jak po konstruktorze domyslnym
+  EXPECT_EQ(std::get<int>(source.getItemVT(0).value()), 11);
+}
+
+// Przenoszenie miedzy ZGODNYMI zapisami tego samego rekordu (`INTEGER[3]` i trzy `INTEGER`)
+// zachowuje deskryptor CELU razem z nazwami pol - inaczej niz domyslna semantyka przenoszenia.
+// Znaczniki NULL ida przez przecelowanie, bo sa per WPIS deskryptora.
+TEST(payload, move_assignment_between_compatible_record_forms_keeps_target_shape) {
+  const rdb::Descriptor arrayForm("cells", 4, 3, rdb::INTEGER);
+  const auto scalarForm{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
+                        rdb::Descriptor("c1", 4, 1, rdb::INTEGER) +  //
+                        rdb::Descriptor("c2", 4, 1, rdb::INTEGER)};
+
+  rdb::payload source(scalarForm);
+  source.setItemVT(0, rdb::descFldVT{11});
+  source.setItemVT(1, rdb::descFldVT{12});
+  source.setItemVT(2, rdb::descFldVT{13});
+
+  rdb::payload target(arrayForm);
+  target = std::move(source);
+
+  ASSERT_EQ(target.descriptor.size(), 1U);
+  EXPECT_EQ(target.descriptor[0].rname, "cells");
+  EXPECT_EQ(std::get<int>(target.getItemVT(0).value()), 11);
+  EXPECT_EQ(std::get<int>(target.getItemVT(2).value()), 13);
+
+  // Cel z ksztaltem nie kradnie NICZEGO - zrodlo zostaje nietkniete i czytelne. Kradziez
+  // bufora byla by tu bledem (cel moze byc szerszy), a czesciowa - bitsetu bez bufora -
+  // zostawilaby obiekt, w ktorym deskryptor obiecuje wpisy, a bitset ich nie ma.
+  EXPECT_EQ(source.descriptor.size(), 3U);
+  EXPECT_EQ(std::get<int>(source.getItemVT(1).value()), 12);
+
+  // Pole tablicowe niesie JEDEN bit NULL na wszystkie elementy, wiec zwiniecie trzech
+  // wpisow skalarnych musi je scalic - tak samo jak przy przypisaniu kopiujacym.
+  rdb::payload partiallyNull(scalarForm);
+  partiallyNull.setItemVT(0, rdb::descFldVT{11});
+  partiallyNull.setItemVT(1, std::nullopt);
+  partiallyNull.setItemVT(2, rdb::descFldVT{13});
+
+  rdb::payload collapsed(arrayForm);
+  collapsed = std::move(partiallyNull);
+  EXPECT_FALSE(collapsed.getItemVT(0).has_value());
+  EXPECT_FALSE(collapsed.getItemVT(2).has_value());
+}
+
+// Konstruktor przenoszacy: stan idzie do nowego obiektu, zrodlo zostaje puste i uzywalne.
+TEST(payload, move_construction_leaves_a_reusable_source) {
+  const auto form{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
+                  rdb::Descriptor("c1", 4, 1, rdb::INTEGER)};
+
+  rdb::payload source(form);
+  source.setItemVT(0, rdb::descFldVT{7});
+  source.setItemVT(1, rdb::descFldVT{8});
+
+  const rdb::payload moved(std::move(source));
+  ASSERT_EQ(moved.descriptor.size(), 2U);
+  EXPECT_EQ(std::get<int>(moved.getItemVT(0).value()), 7);
+  EXPECT_EQ(std::get<int>(moved.getItemVT(1).value()), 8);
+
+  EXPECT_TRUE(source.descriptor.empty());
+  EXPECT_TRUE(source.span().empty());
+
+  source = moved;
+  EXPECT_EQ(std::get<int>(source.getItemVT(1).value()), 8);
+}

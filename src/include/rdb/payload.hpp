@@ -17,6 +17,7 @@
 /// - udostępniać tekstową reprezentację danych przez operator<< oraz wczytywanie wartości przez operator>>,
 /// - umożliwiać formatowanie tekstowej reprezentacji wartości numerycznych w trybie dziesiętnym lub szesnastkowym,
 /// - wspierać kopiowanie stanu obiektu przez konstruktor kopiujący i operator=,
+/// - wspierać przenoszenie stanu obiektu przez konstruktor przenoszący i operator=(payload&&), zachowując regułę zgodności deskryptorów obowiązującą przy przypisaniu,
 /// - wspierać łączenie danych dwóch obiektów payload przez operator+,
 /// - uwzględniać obsługę wartości null na poziomie pola; getItem() zwraca std::nullopt, a operator<< wypisuje "null".
 
@@ -56,6 +57,14 @@ class payload {
   /// @param from destructor
   payload(const payload &other);
 
+  /// @brief Konstruktor przenoszący - przejmuje deskryptor, bufor i znaczniki NULL źródła.
+  ///
+  /// Źródło zostaje odpowiednikiem obiektu z konstruktora domyślnego (deskryptor pusty,
+  /// span() pusty), więc nadaje się do zniszczenia i do ponownego przypisania.
+  /// Formatu hex NIE przejmuje - tak samo jak konstruktor kopiujący, który zostawia
+  /// wartość domyślną; przenoszenie ma być obserwacyjnie równe kopiowaniu.
+  payload(payload &&other) noexcept;
+
   /// @brief Default constructor is allowed - creates uninitialized object, ready to assign
   payload() = default;
 
@@ -94,6 +103,17 @@ class payload {
   friend std::ostream &operator<<(std::ostream &os, const payload &rhs);
 
   payload &operator=(const payload &other);
+
+  /// @brief Przypisanie przenoszące - ta sama reguła zgodności deskryptorów co przy przypisaniu kopiującym.
+  ///
+  /// To NIE jest domyślna semantyka przenoszenia: kradzież całego stanu źródła zmieniłaby
+  /// zachowanie silnika. Reguła jest ta sama co przy operator=(const Descriptor&):
+  /// deskryptor pusty - cel przejmuje cudzy wraz z buforem i znacznikami NULL; deskryptor
+  /// zgodny - cel zachowuje WŁASNY deskryptor, a stan idzie dokładnie drogą kopii, bez
+  /// przejmowania czegokolwiek; deskryptor niezgodny - FatalError. Dlaczego zgodny cel nie
+  /// może niczego ukraść - przy definicji w payload.cc.
+  payload &operator=(payload &&other) noexcept;
+
   payload operator+(const payload &other);
 };
 }  // namespace rdb
