@@ -65,8 +65,20 @@ struct FileInterface {
   // following: https://stackoverflow.com/questions/51615363/how-to-write-c-getters-and-setters
   virtual auto name() -> std::string & = 0;
 
-  /// @brief data count in storage
-  /// @return number of records in storage
+  /// @brief Liczba rekordów w magazynie.
+  ///
+  /// Kontrakt awarii należy do interfejsu, nie do implementacji: count() nie ma wartości
+  /// oznaczającej błąd. Magazyn, którego nośnika jeszcze nie ma - plik nieutworzony albo
+  /// usunięty przez purge - jest magazynem pustym i zwraca 0. Każda inna awaria odczytu
+  /// rozmiaru zatrzymuje proces przez FatalError.
+  ///
+  /// Trzeciej odpowiedzi nie ma, bo wywołujący czyta tę liczbę wyłącznie jako rozmiar.
+  /// `return -1` z wariantu posixowego docierało do storage::recordsCount_ jako SIZE_MAX,
+  /// a `return 0` po błędzie innym niż ENOENT znaczyło "magazyn pusty", więc storage::write
+  /// dopisywał od indeksu 0 po istniejących danych. Obie odpowiedzi są gorsze od zatrzymania.
+  ///
+  /// @return liczba rekordów, albo inna miara postępu właściwa implementacji (patrz opis klasy);
+  ///         nigdy wartość sygnalizująca błąd
   virtual size_t count() = 0;
 
   /// @brief Whether this storage keeps a data shadow file (.shadow) for update operations.
