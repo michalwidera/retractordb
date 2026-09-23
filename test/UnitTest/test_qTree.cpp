@@ -59,6 +59,65 @@ TEST(qTree, getQuery_fatals_on_empty_name) {
 }
 
 // ============================================================
+// getQuery() - blizniacze nazwy
+// ============================================================
+
+// Dwa wezly o TEJ SAMEJ nazwie sa stanem DOZWOLONYM planu, nie defektem:
+// validateSubstratNameUniqueness pyta o rownosc programu, nie o unikalnosc nazwy, a przy
+// RDB_OPT_DEDUP_SUBSTRATES=OFF oba dochodza do wykonania. Kompilator stoi na tym, ze
+// wyszukanie po nazwie wskazuje PIERWSZE wystapienie - i to jest jedyne miejsce, ktore
+// tej semantyki pilnuje. Kazda proba zastapienia skanu czyms szybszym (indeks, zapamietana
+// pozycja) musi ja odtworzyc, inaczej wyszukanie zwraca inny wezel niz kompilator zalozyl.
+
+TEST(qTree, getQuery_returns_first_of_twin_names) {
+  qTree qt;
+  qt.push_back(makeQuery("x", 1, 2));  // pierwszy
+  qt.push_back(makeQuery("x", 1, 3));  // blizniak o rownej nazwie
+
+  // Zdanie "pierwsze wystapienie" jest twierdzeniem, a nie tautologia, dopiero gdy oba
+  // wezly sa rozroznialne. Bez tych dwoch asercji test przeszedlby takze wtedy, gdyby
+  // wyszukanie zwracalo drugi wezel.
+  ASSERT_NE(&qt[0], &qt[1]);
+  ASSERT_NE(qt[0].rInterval, qt[1].rInterval);
+
+  EXPECT_EQ(&qt.getQuery("x"), &qt[0]);
+  EXPECT_EQ(qt.getQuery("x").rInterval, rational(1, 2));
+
+  // operator[](nazwa) i getDelta() przechodza przez getQuery - ta sama semantyka.
+  EXPECT_EQ(&qt["x"], &qt[0]);
+  EXPECT_EQ(qt.getDelta("x"), rational(1, 2));
+}
+
+// Kontrprzyklad z #272. Podpowiedz pozycyjna uzbrojona na ukladzie [a, x, x'] potwierdza sie
+// na sprawdzeniu "czy [1].id == x", a mimo to po skasowaniu 'a' pozycja 1 trzyma juz blizniaka.
+// Uklad powstaje w factorMatchedHashTimeMoves (compiler.cpp:2185 push_back, :2211 erase), a
+// compile() biegnie na ZYWYM drzewie przy imporcie ad-hoc (executorsmAdHoc.cpp:234), wiec nie
+// jest hipotetyczny.
+TEST(qTree, getQuery_keeps_first_occurrence_after_plan_shift) {
+  qTree qt;
+  qt.push_back(makeQuery("a", 1, 1));
+  qt.push_back(makeQuery("x", 1, 2));  // pierwszy
+  qt.push_back(makeQuery("x", 1, 3));  // blizniak
+
+  static_cast<void>(qt.getQuery("x"));  // uzbrojenie ewentualnej podpowiedzi
+  qt.erase(qt.begin());                 // [x, x'] - pozycje przesuniete o jeden
+
+  ASSERT_EQ(qt.size(), 2u);
+  ASSERT_NE(qt[0].rInterval, qt[1].rInterval);
+
+  EXPECT_EQ(&qt.getQuery("x"), &qt[0]);
+  EXPECT_EQ(qt.getQuery("x").rInterval, rational(1, 2));
+}
+
+// exists() nie rozstrzyga, ktory wezel - ale ma odpowiadac TAK na nazwe blizniacza.
+TEST(qTree, exists_true_for_twin_names) {
+  qTree qt;
+  qt.push_back(makeQuery("x", 1, 2));
+  qt.push_back(makeQuery("x", 1, 3));
+  EXPECT_TRUE(qt.exists("x"));
+}
+
+// ============================================================
 // operator[]
 // ============================================================
 
