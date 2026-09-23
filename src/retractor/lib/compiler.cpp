@@ -3308,7 +3308,7 @@ std::string compiler::expandStreamGenerators() {
           return "Stream '" + q.id + "' uses '$' in '" + t.getStr_() + "' outside a stream generator";
       }
 
-  static_cast<std::vector<query> &>(coreInstance) = std::move(plan);
+  coreInstance.replaceAll(std::move(plan));
   return {"OK"};
 }
 

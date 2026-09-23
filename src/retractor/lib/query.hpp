@@ -201,5 +201,3 @@ class query {
 bool operator<(const query &lhs, const query &rhs);
 
 std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog);
-
-bool isThere(const std::vector<query> &v, const std::string &query_name);
