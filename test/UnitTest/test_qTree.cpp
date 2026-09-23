@@ -270,3 +270,156 @@ TEST(qTree, getAvailableTimeIntervals_fatals_when_rInterval_is_zero) {
   qt.push_back(makeQuery("bad", 0, 1));
   EXPECT_DEATH({ qt.getAvailableTimeIntervals(); }, "rInterval is zero");
 }
+
+// ============================================================
+// planRevision()
+// ============================================================
+//
+// Rewizja opisuje KSZTAŁT planu: długość, kolejność węzłów i nazwę na każdej pozycji. Trzyma
+// ją ten, kto buduje strukturę równoległą do planu (dataModel::handles_) i musi wiedzieć,
+// kiedy ją przebudować. Testy poniżej pilnują trzech rzeczy: że numer bierze KAŻDA operacja
+// zmieniająca kształt, że NIE bierze go zmiana treści węzła, i że dwie drogi kopiowania
+// całego drzewa nie potrafią podstawić numeru, który obserwator uzna za swój.
+
+TEST(qTree, planRevision_changes_on_push_back_copy) {
+  qTree qt;
+  const auto before = qt.planRevision();
+  const query node  = makeQuery("alpha");
+  qt.push_back(node);
+  EXPECT_NE(qt.planRevision(), before);
+}
+
+TEST(qTree, planRevision_changes_on_push_back_move) {
+  qTree qt;
+  const auto before = qt.planRevision();
+  qt.push_back(makeQuery("alpha"));
+  EXPECT_NE(qt.planRevision(), before);
+}
+
+TEST(qTree, planRevision_changes_on_pop_back) {
+  qTree qt;
+  qt.push_back(makeQuery("alpha"));
+  const auto before = qt.planRevision();
+  qt.pop_back();
+  EXPECT_NE(qt.planRevision(), before);
+}
+
+TEST(qTree, planRevision_changes_on_erase_single) {
+  qTree qt;
+  qt.push_back(makeQuery("alpha"));
+  qt.push_back(makeQuery("beta"));
+  const auto before = qt.planRevision();
+  qt.erase(qt.begin());
+  EXPECT_NE(qt.planRevision(), before);
+  EXPECT_EQ(qt.at(0).id, "beta");
+}
+
+TEST(qTree, planRevision_changes_on_erase_range) {
+  qTree qt;
+  qt.push_back(makeQuery("alpha"));
+  qt.push_back(makeQuery("beta"));
+  const auto before = qt.planRevision();
+  qt.erase(qt.begin(), qt.end());
+  EXPECT_NE(qt.planRevision(), before);
+  EXPECT_TRUE(qt.empty());
+}
+
+TEST(qTree, planRevision_changes_on_clear) {
+  qTree qt;
+  qt.push_back(makeQuery("alpha"));
+  const auto before = qt.planRevision();
+  qt.clear();
+  EXPECT_NE(qt.planRevision(), before);
+}
+
+TEST(qTree, planRevision_changes_on_replaceAll) {
+  qTree qt;
+  qt.push_back(makeQuery("alpha"));
+  const auto before = qt.planRevision();
+  std::vector<query> nodes{makeQuery("beta")};
+  qt.replaceAll(std::move(nodes));
+  EXPECT_NE(qt.planRevision(), before);
+}
+
+TEST(qTree, planRevision_changes_on_sort_even_when_order_already_correct) {
+  // sort() jest operacją na kształcie z definicji, a nie z wyniku: kolejność po niej jest
+  // nowym stanem także wtedy, gdy wyszła taka sama. Numer bierze zawsze - inaczej trzeba by
+  // porównywać plan przed i po, czyli robić dokładnie tę pracę, której numer ma oszczędzić.
+  qTree qt;
+  qt.push_back(makeQuery("fast", 1, 2));
+  qt.sort();
+  const auto before = qt.planRevision();
+  qt.sort();
+  EXPECT_NE(qt.planRevision(), before);
+}
+
+TEST(qTree, planRevision_changes_on_topologicalSort) {
+  qTree qt;
+  query a = makeQuery("A");
+  a.lProgram.push_back(token(PUSH_STREAM, std::string("B")));
+  qt.push_back(a);
+  qt.push_back(makeQuery("B"));
+
+  const auto before = qt.planRevision();
+  qt.topologicalSort();
+  EXPECT_NE(qt.planRevision(), before);
+}
+
+TEST(qTree, planRevision_unchanged_by_node_content) {
+  // Granica niezmiennika: at() i operator[] wydają query&, a zmiana pola w miejscu kształtu
+  // nie rusza. Dla isOneShot tak ma być - tak właśnie robi executorsm::run w trybie --until-eof.
+  qTree qt;
+  qt.push_back(makeQuery("alpha"));
+  const auto before = qt.planRevision();
+
+  qt.at(0).isOneShot      = true;
+  qt["alpha"].rInterval   = rational(1, 4);
+  qt.maxCapacity["alpha"] = 7;
+
+  EXPECT_EQ(qt.planRevision(), before);
+}
+
+TEST(qTree, planRevision_differs_between_freshly_built_trees) {
+  // Numery wydaje jeden dozownik na proces, więc puste drzewo powstałe przy przeładowaniu
+  // planu nie może trafić w numer, który ktoś zapamiętał dla innego drzewa.
+  qTree first;
+  qTree second;
+  EXPECT_NE(first.planRevision(), second.planRevision());
+}
+
+TEST(qTree, planRevision_copy_carries_source_number_until_first_mutation) {
+  // Kopia planu w kanale ad-hoc (executorsm::getAdHoc) niesie numer źródła, bo w tej chwili
+  // ma dokładnie jego kształt. Pierwsza mutacja kopii bierze własny numer.
+  qTree live;
+  live.push_back(makeQuery("alpha"));
+
+  qTree copy = live;
+  EXPECT_EQ(copy.planRevision(), live.planRevision());
+
+  copy.push_back(makeQuery("beta"));
+  EXPECT_NE(copy.planRevision(), live.planRevision());
+  EXPECT_EQ(live.size(), 1u);
+}
+
+TEST(qTree, planRevision_assignment_cannot_restore_an_observed_number) {
+  // Przeładowanie planu: `*coreInstancePtr = qTree{}`. Obserwator pamięta numer sprzed
+  // przypisania, a po nim MUSI zobaczyć inny - inaczej jego struktura równoległa do planu
+  // opisywałaby plan, którego już nie ma.
+  qTree live;
+  live.push_back(makeQuery("alpha"));
+  const auto observed = live.planRevision();
+
+  live = qTree{};
+
+  EXPECT_NE(live.planRevision(), observed);
+  EXPECT_TRUE(live.empty());
+}
+
+TEST(qTree, planRevision_never_matches_the_value_reserved_for_no_observation) {
+  // Zero znaczy "jeszcze nic nie obserwowane" u tego, kto numer zapamiętuje, więc żadne
+  // żywe drzewo nie ma prawa go nosić.
+  qTree qt;
+  EXPECT_NE(qt.planRevision(), 0u);
+  qt.push_back(makeQuery("alpha"));
+  EXPECT_NE(qt.planRevision(), 0u);
+}

@@ -4,6 +4,8 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <atomic>
+#include <cstdint>
 #include <sstream>
 #include <stdexcept>
 
@@ -11,6 +13,47 @@
 #include "rdb/rationalFormat.hpp"
 
 using namespace boost;
+
+std::uint64_t qTree::nextPlanRevision() {
+  // Zaczyna od 1, zeby zero zostalo wolne dla tego, kto numer zapamietuje: u niego oznacza
+  // "jeszcze nic nie obserwowane" i nie moze trafic w zadne zywe drzewo.
+  static std::atomic<std::uint64_t> dispenser{1};
+  // relaxed wystarcza: numer nie porzadkuje niczego, ma byc wylacznie niepowtarzalny.
+  // Sama zawartosc planu jedzie miedzy watkami pod core_mutex, razem z tym polem.
+  return dispenser.fetch_add(1, std::memory_order_relaxed);
+}
+
+void qTree::push_back(const query &node) {
+  std::vector<query>::push_back(node);
+  planRevision_ = nextPlanRevision();
+}
+
+void qTree::push_back(query &&node) {
+  std::vector<query>::push_back(std::move(node));
+  planRevision_ = nextPlanRevision();
+}
+
+void qTree::pop_back() {
+  std::vector<query>::pop_back();
+  planRevision_ = nextPlanRevision();
+}
+
+std::vector<query>::iterator qTree::erase(std::vector<query>::const_iterator position) {
+  auto next     = std::vector<query>::erase(position);
+  planRevision_ = nextPlanRevision();
+  return next;
+}
+
+std::vector<query>::iterator qTree::erase(std::vector<query>::const_iterator first, std::vector<query>::const_iterator last) {
+  auto next     = std::vector<query>::erase(first, last);
+  planRevision_ = nextPlanRevision();
+  return next;
+}
+
+void qTree::clear() {
+  std::vector<query>::clear();
+  planRevision_ = nextPlanRevision();
+}
 
 void qTree::dfs(const std::string &v) {
   visited_[v] = true;
@@ -41,10 +84,15 @@ void qTree::topologicalSort() {
   std::ranges::for_each(ans_, [&reordered, &coreInstance](const std::string &qname)  //
                         { reordered.push_back(coreInstance[qname]); });
 
+  // Nowy numer rewizji wnosi replaceAll ponizej - to przez nia przechodzi cala zmiana
+  // kolejnosci, wiec drugiego numeru tutaj nie ma po co brac.
   coreInstance.replaceAll(std::move(reordered));
 }
 
-void qTree::replaceAll(std::vector<query> &&nodes) { static_cast<std::vector<query> &>(*this) = std::move(nodes); }
+void qTree::replaceAll(std::vector<query> &&nodes) {
+  static_cast<std::vector<query> &>(*this) = std::move(nodes);
+  planRevision_                            = nextPlanRevision();
+}
 
 bool qTree::exists(const std::string &query_name) {
   return std::ranges::any_of(*this, [&query_name](const auto &q) { return q.id == query_name; });
