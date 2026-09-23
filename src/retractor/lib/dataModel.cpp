@@ -285,6 +285,10 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
   if (dueMask.size() != coreInstance_.size())
     FatalError("dataModel::processRows: due mask has {} entries, plan has {}", dueMask.size(), coreInstance_.size());
 
+  // Tablica uchwytow rownolegla do planu. Odswiezenie to porownanie dwoch liczb, dopoki plan
+  // stoi w miejscu; przebudowa kosztuje tyle, ile kosztowal JEDEN takt przed ta zmiana.
+  refreshStreamHandles();
+
   // Hak testu it_fatal_exit_path, ta sama droga co RDB_FAULT_PLAN_SWAP_DELAY. FatalError
   // w srodku slotu pada pod core_mutex i pod plan_epoch_mutex (bierze go executorsm::run),
   // a po W3 z 2026-09-14 zadne znane RQL nie prowadzi juz do niego w wykonaniu. Uspienie
@@ -303,7 +307,7 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
     if (dueMask[position] == 0) continue;
     const query &q = coreInstance_.at(position);
     if (!q.isDeclaration()) continue;
-    auto &runtime = streamRuntime(q.id);
+    auto &runtime = handleAt(position, q);
     if (runtime.outputPayload->bufferState != rdb::sourceState::empty) continue;
 
     const auto slotNumber = currentTimeSlot / q.rInterval;
@@ -331,13 +335,11 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
     // równy origin, więc slotów milczenia jest origin + ogon.
     const auto silentSlots = static_cast<size_t>(std::max(q.startupLatency, 0) + std::max(q.logicalOrigin, 0));
 
-    // Jedno wyszukanie po nazwie na strumien i na takt. Wczesniej bylo tu `*qSet[q.id]` plus
-    // trzy takie same wyszukania nizej; mapa jest kluczowana napisem, wiec kazde to porownania
-    // napisow po drodze przez drzewo. Do tego `qSet[]` na nazwie spoza modelu WSTAWIA pusty
-    // unique_ptr i zaraz go luska - dokladnie ta droga do SIGSEGV, ktora opisuje komentarz przy
-    // streamRuntime() w dataModel.hpp. Plan i model potrafia sie rozjechac (getAdHoc wnosi wezel
-    // do drzewa, a addQueryToModel moze zawiesc), wiec to nie jest przypadek niemozliwy.
-    auto &runtime = streamRuntime(q.id);
+    // Uchwyt po POZYCJI, bez ani jednego wyszukania po nazwie w takcie. Referencja idzie dalej
+    // do constructInputPayload i computeWindowAggregates, zeby nie szukaly tej samej instancji
+    // po raz drugi i trzeci. Kontrola, ze uchwyt opisuje wlasnie ten wezel, siedzi w handleAt()
+    // i w Debug czerwieni sie na przeterminowanej tablicy.
+    auto &runtime = handleAt(position, q);
     if (!runtime.logicalIndexBase.has_value()) {
       // Instancja ad hoc dołącza do już biegnącej osi. W jej pierwszym należnym slocie T
       // indeks rekordu wynika z definicji chwili emisji:
@@ -359,8 +361,8 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
     }
     if (runtime.elapsedSlots++ < silentSlots) continue;
 
-    constructInputPayload(q.id);                // That will create 'from' clause data set
-    computeWindowAggregates(q);                 // That will reduce record windows read from the source history
+    constructInputPayload(q, runtime);          // That will create 'from' clause data set
+    computeWindowAggregates(q, runtime);        // That will reduce record windows read from the source history
     runtime.constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
     runtime.outputPayload->write();             // That will store data from 'select' clause/list
     runtime.constructRulesAndUpdate(q);         // That will process all rules for this query
@@ -372,10 +374,10 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
     const query &q = coreInstance_.at(position);
     if (!q.isDeclaration()) continue;  // first declarations need to be processed
 
-    // Jedno wyszukanie na strumien, tak jak w petli wyzej. Referencja wskazuje INSTANCJE, wiec
-    // koncowy warunek czyta bufferState PO fire(), a nie wartosc sprzed: fire() przepisuje komore
+    // Uchwyt po pozycji, tak jak w petli wyzej. Referencja wskazuje INSTANCJE, wiec koncowy
+    // warunek czyta bufferState PO fire(), a nie wartosc sprzed: fire() przepisuje komore
     // do magazynu w miejscu (storage::fire -> sourceBuffer::fire), zmieniajac ten wlasnie stan.
-    auto &runtime = streamRuntime(q.id);
+    auto &runtime = handleAt(position, q);
     if (runtime.outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
     runtime.outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
     static_cast<void>(runtime.outputPayload->revRead(0));         // Declarations need to process in separate&first
@@ -393,16 +395,17 @@ std::string dataModel::exhaustedInputStream() const {
   return {};
 }
 
-void dataModel::computeWindowAggregates(const query &qry) {
+void dataModel::computeWindowAggregates(const query &qry, streamInstance &runtime) {
   if (!qry.hasWindowAggregates()) return;
 
-  auto &runtime = *qSet[qry.id];
   // Wektor odwzorowuje tabele grup TEGO zapytania jeden do jednego. Czyszczony w kazdym
   // takcie, zeby zadna pozycja nie niosla wyniku sprzed taktu.
   runtime.windowValues.assign(qry.windowGroups.size(), windowStats{});
 
-  const auto baseOf = [&](const std::string &id) {
-    const auto &logicalBase = qSet[id]->logicalIndexBase;
+  // Baza bierze sie z INSTANCJI, nie z jej nazwy: kazde zrodlo grupy jest i tak wyszukiwane
+  // nizej przez qSet.find(), wiec drugie wyszukanie tej samej nazwy nie mialo co wniesc.
+  const auto baseOf = [](const streamInstance &target, const std::string &id) {
+    const auto &logicalBase = target.logicalIndexBase;
     if (!logicalBase.has_value()) {
       FatalError("dataModel::computeWindowAggregates: logical index base not initialized for '{}'", id);
     }
@@ -412,7 +415,7 @@ void dataModel::computeWindowAggregates(const query &qry) {
   // Indeks logiczny rekordu, ktory wlasnie powstaje - ta sama definicja co w
   // constructInputPayload(). Rekord n obejmuje rekordy zrodla n-(width-1) ... n, czyli konczy
   // sie na rekordzie zrodla o TYM SAMYM indeksie logicznym.
-  const int n = static_cast<int>(runtime.outputPayload->getRecordsCount()) + baseOf(qry.id);
+  const int n = static_cast<int>(runtime.outputPayload->getRecordsCount()) + baseOf(runtime, qry.id);
 
   for (size_t groupIndex = 0; groupIndex < qry.windowGroups.size(); ++groupIndex) {
     const auto &group = qry.windowGroups[groupIndex];
@@ -420,26 +423,24 @@ void dataModel::computeWindowAggregates(const query &qry) {
     if (sourceIt == qSet.end()) {
       FatalError("dataModel::computeWindowAggregates: source '{}' of window group not in model", group.source);
     }
-    runtime.windowValues[groupIndex] = sourceIt->second->reduceRecordWindow(group, n, baseOf(group.source));
+    streamInstance &source           = *sourceIt->second;
+    runtime.windowValues[groupIndex] = source.reduceRecordWindow(group, n, baseOf(source, group.source));
   }
 }
 
-void dataModel::constructInputPayload(const std::string &instance) {
-  const query &qry = coreInstance_[instance];
-
+void dataModel::constructInputPayload(const query &qry, streamInstance &runtime) {
   if (qry.lProgram.size() >= 4) {
     FatalError("dataModel::constructInputPayload: program not optimized - {} tokens for query '{}', expected < 4",
-               qry.lProgram.size(), instance);
+               qry.lProgram.size(), qry.id);
   }
 
   std::vector<token> arg;
   std::ranges::copy(qry.lProgram, std::back_inserter(arg));
   // same: for (auto tk : qry.lProgram) arg.push_back(tk);
 
-  // Indeks LOGICZNY rekordu, który właśnie powstaje. Liczba rekordów w buforze jest indeksem
-  // fizycznym; strumień o niezerowym origin nie ma rekordów przed origin, więc jego rekord
-  // fizyczny 0 nosi indeks logiczny origin. Wszystkie odwzorowania z SOperations.hpp są
-  // zdefiniowane na indeksach logicznych, więc karmimy je tą wartością.
+  // Baza ZRODLA - jedyne miejsce, w ktorym ta funkcja adresuje instancje nazwa. Zrodla musza
+  // tak zostac: ich wezly jezdza przez kopie planu i przezywaja do innego drzewa, wiec
+  // zapamietany uchwyt zrodla wskazywalby strukture, ktorej juz nie ma.
   const auto logicalIndexBase = [&](const std::string &id) {
     const auto &logicalBase = qSet[id]->logicalIndexBase;
     if (!logicalBase.has_value()) {
@@ -447,8 +448,19 @@ void dataModel::constructInputPayload(const std::string &instance) {
     }
     return *logicalBase;
   };
-  const auto logicalIndex = [&](const std::string &id) {
-    return static_cast<int>(qSet[id]->outputPayload->getRecordsCount()) + logicalIndexBase(id);
+
+  // Indeks LOGICZNY rekordu, który właśnie powstaje. Liczba rekordów w buforze jest indeksem
+  // fizycznym; strumień o niezerowym origin nie ma rekordów przed origin, więc jego rekord
+  // fizyczny 0 nosi indeks logiczny origin. Wszystkie odwzorowania z SOperations.hpp są
+  // zdefiniowane na indeksach logicznych, więc karmimy je tą wartością. Bierze się z
+  // PRZEKAZANEJ instancji - ten strumień wołający już ma, więc nie ma go po co szukać w qSet
+  // po nazwie.
+  const auto logicalIndex = [&] {
+    const auto &logicalBase = runtime.logicalIndexBase;
+    if (!logicalBase.has_value()) {
+      FatalError("dataModel::constructInputPayload: logical index base not initialized for '{}'", qry.id);
+    }
+    return static_cast<int>(runtime.outputPayload->getRecordsCount()) + *logicalBase;
   };
 
   auto operation = qry.lProgram.back();  // Operation is always last element on stack
@@ -462,7 +474,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       const auto nameSrc = operation.getStr_();
 
-      *(qSet[instance]->inputPayload) = *getPayload(nameSrc);
+      *runtime.inputPayload = *getPayload(nameSrc);
     } break;
     case STREAM_TIMEMOVE: {
       // 	:- PUSH_STREAM(core0)
@@ -480,9 +492,9 @@ void dataModel::constructInputPayload(const std::string &instance) {
       // jest stały i równy W_src - N, więc dokładnym ogonem jest max(0, W_src - N) (K24p §2.2).
       // Adresowanie bezwzględne uwalnia ogon od tego związku; origin nadal gwarantuje, że
       // indeks n-N nie schodzi poniżej początku logicznego producenta.
-      const auto n = logicalIndex(instance);
+      const auto n = logicalIndex();
 
-      *(qSet[instance]->inputPayload) = fetchForward(nameSrc, n - timeOffset);
+      *runtime.inputPayload = fetchForward(nameSrc, n - timeOffset);
     } break;
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV: {
@@ -501,7 +513,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       // n - 0-bazowy indeks rekordu wyjściowego; Div/Mod (SOperations.hpp)
       // zwracają indeks POSTĘPUJĄCY elementu w strumieniu przeplecionym.
-      const auto n = logicalIndex(instance);
+      const auto n = logicalIndex();
 
       int fwdPos = -1;
       if (cmd == STREAM_DEHASH_DIV) {
@@ -515,7 +527,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
         // ~Θ: b_n = c_{n+⌊n·Δb/Δa⌋} - dostępny w swoim slocie.
         fwdPos = Mod(rationalArgument, qry.rInterval, n);
       }
-      *(qSet[instance]->inputPayload) = fetchForward(nameSrc, fwdPos);
+      *runtime.inputPayload = fetchForward(nameSrc, fwdPos);
     } break;
     case STREAM_SUM:
     case STREAM_AVG:
@@ -523,7 +535,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
     case STREAM_MAX: {
       const auto nameSrc = arg[0].getStr_();
 
-      *(qSet[instance]->inputPayload) = qSet[nameSrc]->reduceFieldsToPayload(cmd, instance + "_0");
+      *runtime.inputPayload = qSet[nameSrc]->reduceFieldsToPayload(cmd, qry.id + "_0");
     } break;
     case STREAM_SUBTRACT: {
       //  :- PUSH_STREAM(core0)
@@ -533,10 +545,10 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       const auto nameSrc          = arg[0].getStr_();
       const auto rationalArgument = arg[1].getRI();
-      const auto n                = logicalIndex(instance);
+      const auto n                = logicalIndex();
       const auto forwardIndex     = Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, n);
 
-      *(qSet[instance]->inputPayload) = fetchForward(nameSrc, forwardIndex);
+      *runtime.inputPayload = fetchForward(nameSrc, forwardIndex);
     } break;
     case STREAM_ADD: {
       // 	:- PUSH_STREAM(core0)
@@ -554,7 +566,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       // dopiero na koniec slotu, czyli w slocie n jeszcze nieokreślony.
       //
       // n - 0-bazowy indeks rekordu wyjściowego (indeks c_n z definicji).
-      const auto n = logicalIndex(instance);
+      const auto n = logicalIndex();
 
       const auto fwdPos1 = Add(qry.rInterval, coreInstance_.getQuery(nameSrc1).rInterval, n);
       const auto fwdPos2 = Add(qry.rInterval, coreInstance_.getQuery(nameSrc2).rInterval, n);
@@ -563,7 +575,7 @@ void dataModel::constructInputPayload(const std::string &instance) {
       // TODO support renaming of double-same fields after merge?
 
       rdb::probe::onAddMerge();
-      *(qSet[instance]->inputPayload) = fetchForward(nameSrc1, fwdPos1) + fetchForward(nameSrc2, fwdPos2);
+      *runtime.inputPayload = fetchForward(nameSrc1, fwdPos1) + fetchForward(nameSrc2, fwdPos2);
     } break;
     case STREAM_AGSE: {
       // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
@@ -574,15 +586,15 @@ void dataModel::constructInputPayload(const std::string &instance) {
       const auto nameSrc  = arg[0].getStr_();  // * INFO Sync with query.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       if (step <= 0) {
-        FatalError("dataModel::constructInputPayload: AGSE step must be > 0, got {} for '{}'", step, instance);
+        FatalError("dataModel::constructInputPayload: AGSE step must be > 0, got {} for '{}'", step, qry.id);
       }
       // Okno jest stemplowane końcem przedziału, więc rekord o indeksie logicznym n sięga
       // wstecz od pozycji n*step. Runtime'owa baza źródła przesuwa jego pozycje
       // spłaszczone o base*F. Dla planu startowego jest równa origin kompilatora,
       // ale zapytanie dodane ad hoc dostaje ją z bieżącej osi logicznej.
-      const int windowIndex           = logicalIndex(instance);
-      const int sourceIndexBase       = logicalIndexBase(nameSrc);
-      *(qSet[instance]->inputPayload) = qSet[nameSrc]->constructAgsePayload(length, step, nameSrc, windowIndex, sourceIndexBase);
+      const int windowIndex     = logicalIndex();
+      const int sourceIndexBase = logicalIndexBase(nameSrc);
+      *runtime.inputPayload     = qSet[nameSrc]->constructAgsePayload(length, step, nameSrc, windowIndex, sourceIndexBase);
     } break;
     case STREAM_HASH: {
       // 	:- PUSH_STREAM(core0)
@@ -598,12 +610,12 @@ void dataModel::constructInputPayload(const std::string &instance) {
 
       // n - 0-bazowy indeks rekordu wyjściowego (indeks c_n z definicji
       // przeplotu); Hash zwraca indeks POSTĘPUJĄCY elementu składowej.
-      const auto n = logicalIndex(instance);
+      const auto n = logicalIndex();
 
       rdb::probe::onHashPick();
-      int fwdPos                      = 0;
-      const bool takeSecond           = Hash(intervalSrc1, intervalSrc2, n, fwdPos);
-      *(qSet[instance]->inputPayload) = fetchForward(takeSecond ? nameSrc2 : nameSrc1, fwdPos);
+      int fwdPos            = 0;
+      const bool takeSecond = Hash(intervalSrc1, intervalSrc2, n, fwdPos);
+      *runtime.inputPayload = fetchForward(takeSecond ? nameSrc2 : nameSrc1, fwdPos);
 
     } break;
     default:
@@ -643,6 +655,24 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
   }
   return retVal;
 }
+
+void dataModel::refreshStreamHandles() {
+  // Szybka sciezka kazdego taktu: jedno porownanie liczb. Przebudowa idzie wylacznie po zmianie
+  // KSZTALTU planu, czyli po imporcie ad-hoc albo po przeladowaniu - patrz qTree::planRevision().
+  if (handlesRevision_ == coreInstance_.planRevision()) return;
+
+  handles_.clear();
+  handles_.reserve(coreInstance_.size());
+  // streamRuntime(), a nie qSet[]: wezel planu bez wpisu w modelu ma sie skonczyc zgloszonym
+  // bledem. Rewizje zapisujemy PO petli, wiec wyjatek zostawia tablice jawnie niegotowa i
+  // nastepne wejscie sprobuje jeszcze raz, zamiast wziac polowiczna za aktualna.
+  for (const auto &q : coreInstance_)
+    handles_.push_back(&streamRuntime(q.id));
+
+  handlesRevision_ = coreInstance_.planRevision();
+}
+
+void dataModel::markHandlesFreshForUnitTest() { handlesRevision_ = coreInstance_.planRevision(); }
 
 streamInstance &dataModel::streamRuntime(const std::string &instance) {
   const auto found = qSet.find(instance);

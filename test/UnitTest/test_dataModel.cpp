@@ -93,7 +93,7 @@ class xschema : public ::testing::Test {
     dataArea->qSet["str2"]->outputPayload->write();
 
     for (const auto &i : coreInstance)
-      if (!i.isDeclaration()) dataArea->constructInputPayload(i.id);
+      if (!i.isDeclaration()) dataArea->constructInputPayload(i, *dataArea->qSet[i.id]);
 
     pProc = dataArea.get();
   }
@@ -323,6 +323,78 @@ TEST_F(xschema, getRow_1) {
 
   dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
 }
+
+// ============================================================
+// Tablica uchwytow streamInstance (akcelerator processRows)
+// ============================================================
+//
+// processRows siega po instancje wykonawcza po POZYCJI w planie, a nie po nazwie. Tablica jest
+// przebudowywana przy rozjezdzie rewizji planu (qTree::planRevision()), wiec musi byc odporna
+// na kazda zmiane ukladu planu - a jej kontrola krzyzowa w Debug musi umiec sie CZERWIENIC,
+// inaczej nie jest kontrola, tylko ozdoba. Para testow ponizej pokazuje oba wyniki na tym samym
+// ukladzie: rozni je wylacznie to, czy tablica zostala oznaczona jako aktualna wbrew prawdzie.
+
+namespace {
+
+/// Odwraca kolejnosc wezlow planu. Dlugosc bez zmian, wiec sama dlugosc tablicy niczego nie
+/// wykryje - rozjazd widac dopiero po tozsamosci instancji na pozycji.
+void reversePlanOrder() {
+  std::vector<query> reordered(coreInstance.begin(), coreInstance.end());
+  std::ranges::reverse(reordered);
+  coreInstance.replaceAll(std::move(reordered));
+}
+
+std::vector<char> dueMaskFor(const std::string &id) {
+  std::vector<char> mask(coreInstance.size(), 0);
+  for (std::size_t position = 0; position < coreInstance.size(); ++position)
+    if (coreInstance.at(position).id == id) mask[position] = 1;
+  return mask;
+}
+
+}  // namespace
+
+TEST_F(xschema, handleTable_survives_plan_reorder) {
+  // Kontrola NEGATYWNA: po przestawieniu planu tablica przebudowuje sie sama i takt liczy sie
+  // poprawnie. Sprawdzany jest wynik, nie samo "nie zginelo" - ta sama para rekordow co
+  // w getRow_1, tyle ze policzona na odwroconym planie.
+  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+
+  // Uzbrojenie tablicy dla UKLADU SPRZED zmiany: maska pusta, wiec zaden strumien nie liczy.
+  dataArea->processRows(std::vector<char>(coreInstance.size(), 0));
+
+  reversePlanOrder();
+
+  dataArea->processZeroStep();
+  auto row1 = dataArea->getRow("core0", 0);
+  dataArea->processRows(dueMaskFor("core0"));
+  auto row2 = dataArea->getRow("core0", 1);
+
+  EXPECT_TRUE("{ 20 31 }" == print(row1));
+  EXPECT_TRUE("{ 21 32 }" == print(row2));
+
+  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+}
+
+TEST_F(xschema, handleTable_stale_entry_is_caught) {
+  // Kontrola DODATNIA. Ten sam uklad co wyzej, jedna roznica: tablica zostaje oznaczona jako
+  // zbudowana dla biezacej rewizji, choc jej zawartosc opisuje plan sprzed przestawienia.
+  // Niezmiennik zabrania takiego stanu, wiec wytworzyc go moze tylko hak testowy - i wlasnie
+  // dlatego ten test jest dowodem, ze kontrola w handleAt() ma jak zawiesc.
+#ifdef NDEBUG
+  GTEST_SKIP() << "kontrola krzyzowa uchwytow zyje tylko w Debug - w Release nie ma czego czerwienic";
+#else
+  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+  dataArea->processRows(std::vector<char>(coreInstance.size(), 0));  // uzbrojenie tablicy
+
+  EXPECT_DEATH(
+      {
+        reversePlanOrder();
+        dataArea->markHandlesFreshForUnitTest();
+        dataArea->processRows(dueMaskFor("core0"));
+      },
+      "does not match plan node");
+#endif
+}
 TEST_F(xschema, reduceFieldsToPayload_max) {
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setDisposable(false);
@@ -369,7 +441,7 @@ TEST_F(xschema, reduceFieldsToPayload_avg) {
 TEST_F(xschema, constructOutputPayload_expression) {
   // str2: SELECT str2[0]+5 FROM core0 → core0.a=20, result=25
   dataArea->processZeroStep();
-  dataArea->constructInputPayload("str2");
+  dataArea->constructInputPayload(coreInstance["str2"], *dataArea->qSet["str2"]);
   dataArea->qSet["str2"]->constructOutputPayload(coreInstance["str2"].lSchema);
   std::stringstream ss;
   ss << rdb::singleLineFormat << *(dataArea->qSet["str2"]->outputPayload->getPayload());

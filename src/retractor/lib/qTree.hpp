@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdint>
 #include <map>
 #include <set>
 #include <string>
@@ -32,6 +33,13 @@ class qTree : private std::vector<query> {
   void dfs(const std::string &v);  // Depth First Traversal
   int getSeqNr(const std::string &query_name);
 
+  /// Kolejny numer z dozownika procesu - patrz planRevision() nizej. Atomowy, bo kompilacja
+  /// kopii planu w kanale ad-hoc biegnie na watku komunikacyjnym rownolegle ze slotem:
+  /// obiekty sa wtedy rozne, ale dozownik jeden.
+  static std::uint64_t nextPlanRevision();
+
+  std::uint64_t planRevision_{nextPlanRevision()};
+
  public:
   // Powierzchnia wektora wystawiona jawnie - lista uzywana przez drzewo, nic ponadto.
   // Odczyt:
@@ -41,11 +49,15 @@ class qTree : private std::vector<query> {
   using std::vector<query>::begin;
   using std::vector<query>::end;
   // Mutacje - komplet punktow, w ktorych zmienia sie KSZTALT planu (obok replaceAll,
-  // sort i topologicalSort nizej):
-  using std::vector<query>::push_back;
-  using std::vector<query>::pop_back;
-  using std::vector<query>::erase;
-  using std::vector<query>::clear;
+  // sort i topologicalSort nizej). Kazda bierze nowy numer rewizji, wiec zadna nie moze
+  // zostac `using`-iem: deklaracja using wpuszcza metode bazy nietknieta i niczego by nie
+  // podbila.
+  void push_back(const query &node);
+  void push_back(query &&node);
+  void pop_back();
+  std::vector<query>::iterator erase(std::vector<query>::const_iterator position);
+  std::vector<query>::iterator erase(std::vector<query>::const_iterator first, std::vector<query>::const_iterator last);
+  void clear();
 
   // Wlasne operator[](nazwa) UKRYWA komplet przeciazen bazy, wiec bez tej deklaracji dostep po
   // pozycji - plan[i] - nie kompiluje sie wcale, a komunikat wskazuje na std::string zamiast na
@@ -73,6 +85,7 @@ class qTree : private std::vector<query> {
   // Keep explicit comparator: std::ranges::less is not invocable for query on newer GCC.
   void sort() {
     std::ranges::sort(*this, [](const query &lhs, const query &rhs) { return lhs < rhs; });
+    planRevision_ = nextPlanRevision();
   };
   void topologicalSort();
   bool exists(const std::string &query_name);
@@ -82,4 +95,28 @@ class qTree : private std::vector<query> {
   std::set<boost::rational<int>> getAvailableTimeIntervals();
 
   std::map<std::string, int> maxCapacity;
+
+  /// Numer KSZTALTU planu: jego dlugosci, kolejnosci wezlow i nazwy na kazdej pozycji. Sluzy
+  /// temu, kto trzyma strukture rownolegla do planu (dataModel::handles_) i musi wiedziec,
+  /// kiedy ja przebudowac. Porownuje sie go przez `!=`, nie przez `<`.
+  ///
+  /// Numery wydaje JEDEN dozownik na proces, a nie licznik na obiekt, i stad plynie wlasnosc,
+  /// ktora tu obowiazuje: ROWNY NUMER ZNACZY ROWNY KSZTALT, takze miedzy roznymi drzewami.
+  /// Dwie drogi, ktore przy liczniku na obiekt trzeba by obsluzyc z reki, zalatwia sama:
+  ///  * kopia planu (`qTree coreInstanceCopy = *coreInstancePtr` w executorsm::getAdHoc)
+  ///    niesie numer zrodla, bo w tej chwili ma dokladnie jego ksztalt; pierwsza mutacja
+  ///    kopii bierze nowy numer, wiec dwa drzewa o roznym ksztalcie nigdy go nie dziela;
+  ///  * przypisanie calego drzewa (`*coreInstancePtr = qTree{}` przy przeladowaniu planu)
+  ///    wnosi numer przypisywanego drzewa, a ten dopiero co wyszedl z dozownika - jest wiec
+  ///    rozny od wszystkiego, co obserwator mogl zapamietac. Licznik na obiekt wniosilby tu
+  ///    wartosc NIZSZA i przeterminowana struktura wygladalaby na aktualna.
+  ///
+  /// GRANICA. Numer opisuje ksztalt, a nie tresc wezla: at(), operator[] i getQuery() wydaja
+  /// query&, wiec zmiana pola w miejscu numeru nie rusza. Dla `isOneShot` czy `lRules` tak ma
+  /// byc; dla `id` byloby to cicha pomylka adresu. Dzis zadne miejsce nie przypisuje do `id`
+  /// wezla JUZ stojacego w drzewie - kazde `.id =` w src/ pisze do lokalnego `query` przed
+  /// wniesieniem go tutaj, takze rozwiniecie generatora strumieni w compiler.cpp, ktore
+  /// publikuje gotowy plan przez replaceAll(). To jest WARUNEK, nie obserwacja: gdyby takie
+  /// przypisanie kiedykolwiek powstalo, musi wziac nowy numer.
+  [[nodiscard]] std::uint64_t planRevision() const { return planRevision_; }
 };
