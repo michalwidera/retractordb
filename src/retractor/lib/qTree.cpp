@@ -114,7 +114,7 @@ std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
 query &qTree::getQuery(const std::string &query_name) {
   if (query_name.empty()) FatalError("qTree::getQuery: query name is empty");
 
-  auto it = std::ranges::find_if(*this, [query_name](const auto &node) { return node.id == query_name; });
+  auto it = std::ranges::find_if(*this, [&query_name](const auto &node) { return node.id == query_name; });
   if (it == std::end(*this)) {
     SPDLOG_ERROR("Missing - {}", query_name);
     throw std::logic_error("Referenced Stream in QUERY _not found_ in CORE TREE. (check log)");
