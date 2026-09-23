@@ -303,7 +303,7 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
     if (dueMask[position] == 0) continue;
     const query &q = coreInstance_.at(position);
     if (!q.isDeclaration()) continue;
-    auto &runtime = *qSet.at(q.id);
+    auto &runtime = streamRuntime(q.id);
     if (runtime.outputPayload->bufferState != rdb::sourceState::empty) continue;
 
     const auto slotNumber = currentTimeSlot / q.rInterval;
@@ -331,7 +331,13 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
     // równy origin, więc slotów milczenia jest origin + ogon.
     const auto silentSlots = static_cast<size_t>(std::max(q.startupLatency, 0) + std::max(q.logicalOrigin, 0));
 
-    auto &runtime = *qSet[q.id];
+    // Jedno wyszukanie po nazwie na strumien i na takt. Wczesniej bylo tu `*qSet[q.id]` plus
+    // trzy takie same wyszukania nizej; mapa jest kluczowana napisem, wiec kazde to porownania
+    // napisow po drodze przez drzewo. Do tego `qSet[]` na nazwie spoza modelu WSTAWIA pusty
+    // unique_ptr i zaraz go luska - dokladnie ta droga do SIGSEGV, ktora opisuje komentarz przy
+    // streamRuntime() w dataModel.hpp. Plan i model potrafia sie rozjechac (getAdHoc wnosi wezel
+    // do drzewa, a addQueryToModel moze zawiesc), wiec to nie jest przypadek niemozliwy.
+    auto &runtime = streamRuntime(q.id);
     if (!runtime.logicalIndexBase.has_value()) {
       // Instancja ad hoc dołącza do już biegnącej osi. W jej pierwszym należnym slocie T
       // indeks rekordu wynika z definicji chwili emisji:
@@ -353,11 +359,11 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
     }
     if (runtime.elapsedSlots++ < silentSlots) continue;
 
-    constructInputPayload(q.id);                    // That will create 'from' clause data set
-    computeWindowAggregates(q);                     // That will reduce record windows read from the source history
-    qSet[q.id]->constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
-    qSet[q.id]->outputPayload->write();             // That will store data from 'select' clause/list
-    qSet[q.id]->constructRulesAndUpdate(q);         // That will process all rules for this query
+    constructInputPayload(q.id);                // That will create 'from' clause data set
+    computeWindowAggregates(q);                 // That will reduce record windows read from the source history
+    runtime.constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
+    runtime.outputPayload->write();             // That will store data from 'select' clause/list
+    runtime.constructRulesAndUpdate(q);         // That will process all rules for this query
   }
 
   // Then - process all declarations to unlock them for next step
@@ -366,11 +372,15 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
     const query &q = coreInstance_.at(position);
     if (!q.isDeclaration()) continue;  // first declarations need to be processed
 
-    if (qSet[q.id]->outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
-    qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
-    static_cast<void>(qSet[q.id]->outputPayload->revRead(0));         // Declarations need to process in separate&first
-    qSet[q.id]->outputPayload->fire();                                // chamber_ -> outputPayload
-    if (qSet.at(q.id)->outputPayload->bufferState != rdb::sourceState::armed) {
+    // Jedno wyszukanie na strumien, tak jak w petli wyzej. Referencja wskazuje INSTANCJE, wiec
+    // koncowy warunek czyta bufferState PO fire(), a nie wartosc sprzed: fire() przepisuje komore
+    // do magazynu w miejscu (storage::fire -> sourceBuffer::fire), zmieniajac ten wlasnie stan.
+    auto &runtime = streamRuntime(q.id);
+    if (runtime.outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
+    runtime.outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
+    static_cast<void>(runtime.outputPayload->revRead(0));         // Declarations need to process in separate&first
+    runtime.outputPayload->fire();                                // chamber_ -> outputPayload
+    if (runtime.outputPayload->bufferState != rdb::sourceState::armed) {
       FatalError("dataModel::processRows: stream '{}' not armed after processing", q.id);
     }
   }
