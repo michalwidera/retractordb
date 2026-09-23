@@ -2,7 +2,7 @@
 
 #include <map>
 #include <memory>  // unique_ptr
-#include <set>
+#include <span>
 #include <vector>
 
 #include <boost/rational.hpp>
@@ -64,7 +64,14 @@ class dataModel {
    */
   void computeWindowAggregates(const query &qry);
 
-  void processRows(const std::set<std::string> &inSet, const boost::rational<int> &currentTimeSlot = boost::rational<int>(0));
+  /// Liczy jeden takt planu. Nalezne strumienie opisuje MASKA POZYCYJNA rownolegla do planu:
+  /// dueMask[i] != 0 znaczy "element i planu jest nalezny w tym takcie". Dlugosc maski musi byc
+  /// rowna dlugosci planu - pytanie brzmi zawsze "czy element i jest nalezny?", a nie "czy jest
+  /// w zbiorze ta nazwa", wiec zbior napisow byl tu tylko kosztem: wezel drzewa i std::string na
+  /// nalezny strumien w KAZDYM takcie, plus porownywanie napisow w trzech przebiegach ponizej.
+  /// Maske trzyma i wypelnia executorsm::collectAwaitedStreams; uklad planu nie ma prawa zmienic
+  /// sie miedzy jej wypelnieniem a tym wywolaniem.
+  void processRows(std::span<const char> dueMask, const boost::rational<int> &currentTimeSlot = boost::rational<int>(0));
   void processZeroStep();
 
   std::vector<rdb::descFldVT> getRow(const std::string &instance, int timeOffset);

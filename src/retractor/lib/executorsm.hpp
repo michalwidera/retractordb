@@ -5,6 +5,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -75,6 +76,22 @@ struct executorsm {
   /// nigdy smiercia procesu.
   void applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, const AppConfig &cfg);
 
-  std::set<std::string> getAwaitedStreamsSet(CRationalStreamMath::TimeLine &tl, qTree *coreInstancePtr);
+  /// Wyznacza strumienie nalezne w biezacym takcie: wypelnia dueMask_ i dueNames_.
+  /// Wolajacy MUSI trzymac core_mutex, a maska jest wazna tylko dopoki uklad planu sie
+  /// nie zmieni - patrz komentarz przy dueMask_.
+  void collectAwaitedStreams(CRationalStreamMath::TimeLine &tl, qTree *coreInstancePtr);
   std::string printRowValue(const std::string &query_name);
+
+  /// Strumienie nalezne w takcie, w DWOCH postaciach, bo konsumenci chca czego innego:
+  /// dataModel::processRows pyta o przynaleznosc POZYCJI w planie, a IpcServer::broadcast
+  /// ITERUJE po nazwach. Obie struktury sa skladowymi i uzywane ponownie miedzy taktami:
+  /// assign/clear zachowuja pojemnosc, wiec po pierwszym takcie nie ma tu alokacji.
+  ///
+  /// Maska jest POZYCYJNA, wiec wolno jej uzyc tylko wobec tego ukladu planu, z ktorego
+  /// powstala. Uklad zmienia import ad hoc (compiler::importFrom + compile, ktore dopisuja
+  /// wezly i sortuja topologicznie); import idzie pod plan_epoch_mutex, wiec wypelnienie i
+  /// konsumpcja maski musza wypasc pod TA SAMA blokada epoki. Z tego samego powodu widoki
+  /// w dueNames_ wskazuja na query::id zywego planu i zyja tylko tak dlugo.
+  std::vector<char> dueMask_;
+  std::vector<std::string_view> dueNames_;
 };

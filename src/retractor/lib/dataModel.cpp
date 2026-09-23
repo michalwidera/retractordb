@@ -277,8 +277,13 @@ void dataModel::processZeroStep() {
     if (q.isDeclaration()) bootstrapDeclaration(q);
 }
 
-void dataModel::processRows(const std::set<std::string> &inSet, const boost::rational<int> &currentTimeSlot) {
+void dataModel::processRows(std::span<const char> dueMask, const boost::rational<int> &currentTimeSlot) {
   std::scoped_lock scoped_lock(core_mutex);
+
+  // Maska jest pozycyjna, wiec rozjazd dlugosci znaczy, ze opisuje INNY uklad planu niz ten,
+  // ktory zaraz policzymy - i policzylaby sie wtedy cicho czesc planu przesunieta o rozne wezly.
+  if (dueMask.size() != coreInstance_.size())
+    FatalError("dataModel::processRows: due mask has {} entries, plan has {}", dueMask.size(), coreInstance_.size());
 
   // Hak testu it_fatal_exit_path, ta sama droga co RDB_FAULT_PLAN_SWAP_DELAY. FatalError
   // w srodku slotu pada pod core_mutex i pod plan_epoch_mutex (bierze go executorsm::run),
@@ -294,8 +299,10 @@ void dataModel::processRows(const std::set<std::string> &inSet, const boost::rat
   // Zrodlo dolaczone ad-hoc nie uczestniczylo w kroku zerowym. Uzbrajamy je
   // przed konsumentami pierwszego naleznego slotu. Koncowa faza deklaracji
   // pobierze wtedy rekord dla nastepnego slotu, tak jak po zwyklym kroku zerowym.
-  for (const auto &q : coreInstance_) {
-    if (!inSet.contains(q.id) || !q.isDeclaration()) continue;
+  for (std::size_t position = 0; position < dueMask.size(); ++position) {
+    if (dueMask[position] == 0) continue;
+    const query &q = coreInstance_.at(position);
+    if (!q.isDeclaration()) continue;
     auto &runtime = *qSet.at(q.id);
     if (runtime.outputPayload->bufferState != rdb::sourceState::empty) continue;
 
@@ -309,9 +316,10 @@ void dataModel::processRows(const std::set<std::string> &inSet, const boost::rat
   }
 
   // first - process all non-declaration queries
-  for (const auto &q : coreInstance_) {
-    if (!inSet.contains(q.id)) continue;  // Drop off rows that not computed now
-    if (q.isDeclaration()) continue;      // Declarations already processed
+  for (std::size_t position = 0; position < dueMask.size(); ++position) {
+    if (dueMask[position] == 0) continue;  // Drop off rows that not computed now
+    const query &q = coreInstance_.at(position);
+    if (q.isDeclaration()) continue;  // Declarations already processed
 
     // Ogon strumienia: w tych slotach wynik nie jest jeszcze zdefiniowany, więc strumień NIE emituje
     // rekordu - ani zerowego, ani all-null. NULL jest wartością pochłaniającą (dane oczekiwane a
@@ -353,9 +361,10 @@ void dataModel::processRows(const std::set<std::string> &inSet, const boost::rat
   }
 
   // Then - process all declarations to unlock them for next step
-  for (const auto &q : coreInstance_) {
-    if (!inSet.contains(q.id)) continue;  // Drop off rows that not computed now
-    if (!q.isDeclaration()) continue;     // first declarations need to be processed
+  for (std::size_t position = 0; position < dueMask.size(); ++position) {
+    if (dueMask[position] == 0) continue;  // Drop off rows that not computed now
+    const query &q = coreInstance_.at(position);
+    if (!q.isDeclaration()) continue;  // first declarations need to be processed
 
     if (qSet[q.id]->outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
     qSet[q.id]->outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source

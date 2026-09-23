@@ -7,6 +7,7 @@
 #include <locale>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "config.h"
 #include "rdb/fainterface.hpp"
@@ -304,10 +305,14 @@ TEST_F(xschema, getRow_1) {
   */
   dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
 
-  std::set<std::string> rowSet = {"core0"};
+  // processRows bierze maske pozycyjna rownolegla do planu, nie zbior nazw.
+  std::vector<char> rowMask(coreInstance.size(), 0);
+  for (std::size_t position = 0; position < coreInstance.size(); ++position)
+    if (coreInstance.at(position).id == "core0") rowMask[position] = 1;
+
   dataArea->processZeroStep();
   auto row1 = dataArea->getRow("core0", 0);
-  dataArea->processRows(rowSet);
+  dataArea->processRows(rowMask);
   auto row2 = dataArea->getRow("core0", 1);
 
   std::string res1 = print(row1);
@@ -408,8 +413,12 @@ class xschema_rules : public ::testing::Test {
 
 TEST_F(xschema_rules, constructRulesAndUpdate_system_rule_fires) {
   // core0 first row: a=20 → str_rule[0]=20 > 0 → rule1 fires, rule2 does not
+  std::vector<char> ruleMask(coreInstance.size(), 0);
+  for (std::size_t position = 0; position < coreInstance.size(); ++position)
+    if (coreInstance.at(position).id == "str_rule") ruleMask[position] = 1;
+
   dataArea_rules->processZeroStep();
-  dataArea_rules->processRows({"str_rule"});
+  dataArea_rules->processRows(ruleMask);
   EXPECT_TRUE(std::filesystem::exists("rule_marker1.txt")) << "rule1 (>0) should fire for positive data";
   EXPECT_FALSE(std::filesystem::exists("rule_marker2.txt")) << "rule2 (<0) should not fire for positive data";
 }

@@ -20,6 +20,14 @@ class qTree : public std::vector<query> {
   int getSeqNr(const std::string &query_name);
 
  public:
+  // Wlasne operator[](nazwa) UKRYWA komplet przeciazen bazy, wiec bez tej deklaracji dostep po
+  // pozycji - plan[i] - nie kompiluje sie wcale, a komunikat wskazuje na std::string zamiast na
+  // przyczyne (w C++17 gorzej: plan[0] szlo przez 0 -> const char* -> std::string i wywracalo
+  // sie w locie; dzis basic_string(nullptr_t) jest = delete). Rozstrzyganie jest jednoznaczne:
+  // z typu calkowitego nie ma niejawnej konwersji do std::string, wiec indeks zawsze wybiera
+  // wersje pozycyjna, a napis - wersje po nazwie.
+  using std::vector<query>::operator[];
+
   query &operator[](const std::string &query_name) { return getQuery(query_name); };
 
   query &getQuery(const std::string &query_name);

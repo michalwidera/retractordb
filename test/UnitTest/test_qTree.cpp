@@ -68,6 +68,21 @@ TEST(qTree, bracket_operator_returns_correct_query) {
   EXPECT_EQ(qt["x"].id, "x");
 }
 
+// Obie postacie indeksu MUSZA byc osiagalne naraz. Bez `using std::vector<query>::operator[]`
+// w qTree.hpp wersja pozycyjna jest ukryta przez wersje po nazwie i ten test nie kompiluje sie -
+// to jest cala jego tresc, wiec nie wolno go usunac jako "oczywistego".
+TEST(qTree, bracket_operator_takes_position_and_name) {
+  qTree qt;
+  qt.push_back(makeQuery("pierwszy"));
+  qt.push_back(makeQuery("drugi"));
+
+  const std::size_t second = 1;
+  EXPECT_EQ(qt[0].id, "pierwszy");     // literal calkowity -> pozycja
+  EXPECT_EQ(qt[second].id, "drugi");   // zmienna calkowita -> pozycja
+  EXPECT_EQ(qt["drugi"].id, "drugi");  // literal napisowy  -> nazwa
+  EXPECT_EQ(qt[std::string("pierwszy")].id, "pierwszy");
+}
+
 // ============================================================
 // getDelta()
 // ============================================================

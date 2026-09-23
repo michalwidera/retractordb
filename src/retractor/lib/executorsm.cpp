@@ -99,13 +99,21 @@ void cleanup() {
   if (!exitSweepLockDir.empty()) sweepAbandonedResources(exitSweepLockDir);
 }
 
-std::set<std::string> executorsm::getAwaitedStreamsSet(TimeLine &tl, qTree *coreInstancePtr) {
-  if (coreInstancePtr == nullptr) FatalError("executorsm::getAwaitedStreamsSet: coreInstancePtr is null");
-  std::set<std::string> retVal;
-  for (const auto &it : *coreInstancePtr)
-    if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) retVal.insert(it.id);
-
-  return retVal;
+void executorsm::collectAwaitedStreams(TimeLine &tl, qTree *coreInstancePtr) {
+  if (coreInstancePtr == nullptr) FatalError("executorsm::collectAwaitedStreams: coreInstancePtr is null");
+  // assign/clear zamiast konstrukcji: pojemnosc obu wektorow zostaje z poprzedniego taktu,
+  // wiec przy niezmienionym planie ten przebieg nie alokuje NICZEGO. Poprzednio powstawal tu
+  // wezel drzewa czerwono-czarnego plus std::string na kazdy nalezny strumien - w kazdym takcie.
+  dueMask_.assign(coreInstancePtr->size(), 0);
+  dueNames_.clear();
+  std::size_t position = 0;
+  for (const auto &it : *coreInstancePtr) {
+    if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) {
+      dueMask_[position] = 1;
+      dueNames_.emplace_back(it.id);
+    }
+    ++position;
+  }
 }
 
 int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrdbbus, compiler &cm, vm_map &vm,
@@ -365,9 +373,9 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         const IpcServer::RowFormatter formatRow = [this](const std::string &name) { return printRowValue(name); };
 
         // ZERO-step
-        std::set<std::string> inSet;
+        dueNames_.clear();
         for (const auto &it : *coreInstancePtr)
-          if (it.isDeclaration()) inSet.insert(it.id);
+          if (it.isDeclaration()) dueNames_.emplace_back(it.id);
         // Zatrzymanie, ktore zdjelo bramke --xqrywait, nie ma prawa policzyc ani jednego kroku:
         // proces konczony sygnalem zapisalby wtedy rekord zerowy do magazynu, choc nikt o niego
         // nie prosil. Sama petla ponizej i tak nie wykona obrotu (warunek stop_now), a wyjscia
@@ -375,7 +383,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         // zostawiloby watkowi komunikacyjnemu wskaznik na rozbierany dataModel.
         if (!gateStoppedProcess) {
           proc.processZeroStep();
-          ipcServer.broadcast(inSet, formatRow);
+          ipcServer.broadcast(dueNames_, formatRow);
         }
         // End of ZERO-step
 
@@ -461,12 +469,6 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
 
           slotBench.beginSlot(rational_cast<long>(interval));
           {
-            // Kompilator ad hoc modyfikuje qTree pod tym samym muteksem. Bez blokady
-            // iteracja getAwaitedStreamsSet mogłaby ścigać się z importem nowych węzłów.
-            std::scoped_lock lock(core_mutex);
-            inSet = getAwaitedStreamsSet(tl, coreInstancePtr);
-          }
-          {
             // Slot liczy sie pod blokada epoki, bo MUTUJE model: processRows przepisuje payloady,
             // a broadcast siega po nie przez getPayload (releaseOnHold/revRead). Handler komendy
             // czyta te same liczniki i te sama mape qSet, wiec bez tego wykluczenia `xqry -d`
@@ -475,10 +477,21 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
             // nieobciazonego muteksu to kilkadziesiat nanosekund. endSlot zostaje w srodku, zeby
             // zwolnienie blokady wypadlo poza pomiarem.
             std::scoped_lock epoch(plan_epoch_mutex);
+            {
+              // Zbior naleznych powstaje POD BLOKADA EPOKI, nie przed nia: maska jest pozycyjna,
+              // wiec musi opisywac ten sam uklad planu, ktory zaraz policzy processRows. Import
+              // ad hoc dopisuje wezly i przestawia kolejnosc (importFrom + compile), a idzie pod
+              // ta sama blokade epoki - przed nia maska rozjechalaby sie z planem o jeden import.
+              // Kolejnosc plan_epoch_mutex -> core_mutex jest ta sama co w handlerze komendy.
+              // Wyznaczenie zostaje PRZED beginCompute, tak jak dotad: mierzony rdzen E1 to
+              // nadal samo processRows.
+              std::scoped_lock lock(core_mutex);
+              collectAwaitedStreams(tl, coreInstancePtr);
+            }
             slotBench.beginCompute();
-            proc.processRows(inSet, currentTimeSlot);  // mierzony rdzeń obliczeń jednego interwału (E1)
+            proc.processRows(dueMask_, currentTimeSlot);  // mierzony rdzeń obliczeń jednego interwału (E1)
             slotBench.endCompute();
-            ipcServer.broadcast(inSet, formatRow);
+            ipcServer.broadcast(dueNames_, formatRow);
             slotBench.endSlot();
           }
 

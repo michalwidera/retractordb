@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -80,7 +81,12 @@ class IpcServer {
   void subscribe(int clientId, const std::string &streamName, int maxElements);
 
   /// Rozsyla biezacy wiersz kazdego z podanych strumieni do jego subskrybentow.
-  void broadcast(const std::set<std::string> &streams, const RowFormatter &formatRow);
+  ///
+  /// Nazwy przychodza jako WIDOKI na napisy wolajacego (u serwera: identyfikatory zywego planu)
+  /// i musza zyc przez cale wywolanie. Serwer nie zapamietuje zadnego z nich; jedyny, ktory tu
+  /// zostaje - nazwa strumienia o zbyt dlugim wierszu - trafia do oversizedRowStreams_ jako
+  /// kopia. Emisja bierze zbior taki, jaki wyznaczyl takt: bez odtwarzania go z napisow.
+  void broadcast(std::span<const std::string_view> streams, const RowFormatter &formatRow);
 
   /// Zawiadamia klientow o koncu pracy serwera i czysci rejestr subskrypcji.
   void broadcastOutOfBusiness();
@@ -102,7 +108,7 @@ class IpcServer {
   /// Czy wiersz miesci sie w slocie kolejki odpowiedzi. Falsz melduje przyczyne raz na
   /// strumien i jest rownoznaczny z pominieciem emisji -- nigdy z wyjatkiem, bo wyjatek
   /// z try_send konczyl cala usluge. Wolajacy MUSI trzymac clientMapsMutex_.
-  bool rowFitsSlot(const std::string &row, const std::string &streamName);
+  bool rowFitsSlot(const std::string &row, std::string_view streamName);
 
   Callbacks callbacks_;
   std::thread commsThread_;

@@ -161,9 +161,9 @@ void IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
 }
 
 // Wolajacy MUSI trzymac clientMapsMutex_ (dostep do oversizedRowStreams_).
-bool IpcServer::rowFitsSlot(const std::string &row, const std::string &streamName) {
+bool IpcServer::rowFitsSlot(const std::string &row, std::string_view streamName) {
   if (row.length() <= static_cast<std::size_t>(ipc::kResponseQueueMaxMessageSize)) return true;
-  if (oversizedRowStreams_.insert(streamName).second)
+  if (oversizedRowStreams_.emplace(streamName).second)
     SPDLOG_ERROR(
         "stream '{}': serialized row is {} B and does not fit the {} B response queue slot; "
         "subscribers of this stream receive no data",
@@ -171,7 +171,7 @@ bool IpcServer::rowFitsSlot(const std::string &row, const std::string &streamNam
   return false;
 }
 
-void IpcServer::broadcast(const std::set<std::string> &streams, const RowFormatter &formatRow) {
+void IpcServer::broadcast(std::span<const std::string_view> streams, const RowFormatter &formatRow) {
   // Muteks na caly przebieg emisji: kontencja tylko z krotkim wstawieniem do map
   // przy rejestracji klienta (watek komunikacyjny trzyma go nanosekundy), a koszt
   // niekontendowanego lock/unlock raz na slot jest pomijalny wobec ~ms compute.
@@ -188,7 +188,10 @@ void IpcServer::broadcast(const std::set<std::string> &streams, const RowFormatt
     for (const auto &element : id2StreamNameRelation_) {
       if (element.second == queryName) {
         if (!rowFormatted) {
-          row          = formatRow(queryName);
+          // RowFormatter bierze std::string, bo printRowValue szuka strumienia w mapie modelu po
+          // nazwie. Konwersja wypada WYLACZNIE tutaj, czyli tylko dla strumienia, ktory ma
+          // subskrybenta - obok budowanego w niej ptree jest niewidoczna.
+          row          = formatRow(std::string(queryName));
           rowFormatted = true;
           rowFits      = rowFitsSlot(row, queryName);
         }
