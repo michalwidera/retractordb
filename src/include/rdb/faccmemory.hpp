@@ -7,13 +7,16 @@
 
 namespace rdb {
 
+/// Stan jednego strumienia w pamięci procesu. Definicja stoi w faccmemory.cc - poza tą
+/// jednostką nikt nie ma do niej dostępu i nie ma powodu mieć.
+struct memoryBucket;
+
 /// @brief Implementacja magazynu rekordów przechowywanych wyłącznie w pamięci procesu.
 ///
 /// Obiekt memoryFile powinien:
 /// - implementować interfejs FileInterface dla danych przechowywanych w pamięci,
 /// - umożliwiać zapis, odczyt i nadpisywanie rekordów binarnych o rozmiarze wyznaczonym przez Descriptor,
-/// - przechowywać dane rekordów w globalnej strukturze indeksowanej nazwą strumienia, współdzielonej między instancjami o tej samej nazwie,
-/// - przechowywać nullBitset dla rekordów w osobnej globalnej strukturze współdzielonej między instancjami o tej samej nazwie,
+/// - przechowywać rekordy, ich nullBitset i licznik zapisów w globalnej strukturze indeksowanej nazwą strumienia, współdzielonej między instancjami o tej samej nazwie,
 /// - obsługiwać append przez position == std::numeric_limits<size_t>::max() oraz update przez wskazaną pozycję,
 /// - traktować write(nullptr, ...) jako polecenie wyczyszczenia pamięci dla danego strumienia,
 /// - zwracać przez count() logiczną liczbę rekordów (łączną liczbę zapisów append),
@@ -28,11 +31,13 @@ struct memoryFile : public FileInterface {
   const ssize_t recordSize_;
   const size_t retentionSize_;               // Retention size for the records, if set to no_retention, no limit is applied
   enum : std::uint8_t { no_retention = 0 };  // Default retention size if not specified
+
+  /// Węzeł TEGO strumienia w magazynie, wyszukany raz w konstruktorze i ważny do końca życia
+  /// instancji. Powód i warunki ważności - patrz konstruktor w faccmemory.cc.
+  memoryBucket *bucket_;
+
  public:
-  memoryFile(const std::string_view fileName, const Descriptor &descriptor, const std::pair<std::string, size_t> &retentionSize)
-      : filename_(std::string(fileName)),                                //
-        recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),  //
-        retentionSize_(retentionSize.second) {};
+  memoryFile(std::string_view fileName, const Descriptor &descriptor, const std::pair<std::string, size_t> &retentionSize);
 
   using FileInterface::read;
   using FileInterface::write;
