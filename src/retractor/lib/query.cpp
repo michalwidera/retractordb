@@ -27,10 +27,6 @@ void query::reset() {
   retention     = rdb::retention_t{.segments = 0, .capacity = 0};
 }
 
-bool isThere(const std::vector<query> &v, const std::string &query_name) {
-  return std::ranges::any_of(v, [&query_name](const auto &q) { return !q.id.empty() && q.id == query_name; });
-}
-
 /** Construktor set */
 
 query::query(boost::rational<int> rInterval, std::string id) : rInterval(rInterval), id(std::move(id)) {}
