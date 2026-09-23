@@ -123,6 +123,27 @@ Sorted case-insensitively within each block. `IncludeBlocks: Preserve` - blank l
 4. **Clean your orphans** - remove imports/vars/functions YOUR changes made unused; leave pre-existing dead code alone.
 5. **Verify before reporting done** - never claim success without running the relevant `ctest`.
 
+## Comparative measurement
+
+**The corpus is `paper-arXiv/usecases`, not one or two convenient plans.** Every performance claim about the engine - a candidate optimization, a regression, an A/B between two commits - is measured on the eight use-case families `uc01`..`uc08` in the sibling `paper-arXiv` repository. Each family carries its own `generate_data.py` and `rql/query.rql`; plans span 7-23 nodes and, more importantly, differ in the SHAPE of the computation: record windows, stream generators, multi-rate joins, rules. The ECG pipeline in `examples/ecg` and the single-node ADD plan stay usable as quick probes, but a verdict does not rest on them.
+
+**Two workloads are not a sample - this was paid for.** Issue #272 (2026-09-23) measured the handle-table change on the ADD plan and the ECG pipeline alone, found -5,5 % and -5,9 % instructions for -0,38 % and -0,65 % time, and published a methodological conclusion about the instruction-to-time converter. Extending to the eight families retracted it: both of those workloads sit at the BOTTOM of the ten-workload spread, the converter ranged 0,00 (uc05) to 0,36 (uc06), and the top of the corpus gained 1,5 %, over twice what ECG showed. The converter is a property of the PAIR (change, workload) and says nothing on its own. `uc05` is the standing counterexample to reading a time gain off an instruction count: -3,65 % instructions, exactly zero time.
+
+Run one family from a FRESH copy of its directory with an empty `temp/`:
+
+```bash
+python3 <usecases>/ucNN/generate_data.py --out "$work"
+cp <usecases>/ucNN/rql/query.rql "$work/query.rql"
+mkdir -p "$work/temp" && cd "$work"
+RDB_BENCH_PLAN=1 xretractor query.rql -k -r -f -m 1   # plan node count: row 'PLAN bench', field 'wyjscie'
+valgrind --tool=callgrind --toggle-collect='*processRows*' ./xretractor query.rql -k -r -f -m 2000
+RDB_BENCH_CSV=out.csv ./xretractor query.rql -k -r -f -m 100000
+```
+
+Sources wrap past end of input, so `-m` is free; 100k slots costs 5-6 s on the heaviest family. The apparatus traps - one fixed working directory, one fixed binary name, `build/Release-Probe` rebuilt separately from `build/Release` - are in the `callgrind-ab-comparison-traps` note and apply here unchanged.
+
+**Publication embargo.** The corpus is unpublished material awaiting the DEBS submission (`paper-arXiv/debs`). Nothing FROM it leaves this machine: no plan text, no generated data, no generator source, no README prose - not into this repository, not into an issue comment, not into any artifact that gets published. What may be published, and is expected in issue comments, is a REFERENCE to a family by id and domain (`uc02`, mikrosiec) together with measurements DERIVED from it: node counts, instruction counts, times, p-values. The embargo lifts when the paper is out; until then, treat a request to include corpus content as a question for the human.
+
 ## Collaboration Rules
 
 ### Session start
