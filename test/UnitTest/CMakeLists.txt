@@ -8,27 +8,17 @@ file(
   LIST_DIRECTORIES false
   "*.cpp")
 
-# Opakowanie kazdego testu jednostkowego. Na Linuksie jest to valgrind - taka
-# jest tam definicja "test przeszedl": bez wycieku i bez odczytu
-# niezainicjowanej pamieci. Gdzie valgrinda nie ma (Apple Silicon nie ma go i
-# miec nie bedzie), lista jest PUSTA i ctest uruchamia binarium wprost;
-# rownowaznikiem strazy pamieci jest wtedy konfiguracja z
-# -DRDB_SANITIZE=address,undefined, ktora wkompilowuje kontrole w same binaria.
+# Kazdy test jednostkowy biegnie bezposrednio w zwyklym zestawie. Osobna kopia
+# pod Valgrindem sprawdza wycieki i odczyty niezainicjowanej pamieci lokalnie.
+# Na platformie bez Valgrinda kopia nie jest rejestrowana; straz pamieci
+# zapewnia konfiguracja z -DRDB_SANITIZE=address,undefined.
 if(PROG_VALGRIND)
-  set(RDB_UT_LAUNCHER ${PROG_VALGRIND} --vgdb=no --error-exitcode=1
+  set(RDB_UT_VALGRIND ${PROG_VALGRIND} --vgdb=no --error-exitcode=1
                       --leak-check=full)
-else()
-  set(RDB_UT_LAUNCHER "")
 endif()
 
-# Limit czasu POZA valgrindem. Bez opakowania test jednostkowy konczy sie w
-# ulamku sekundy (najdluzszy w drzewie: ~2 s), wiec dwie minuty nie sa progiem
-# wydajnosci - sa granica miedzy "wolno" a "zawieszony". Rozroznienie jest
-# praktyczne: zawieszony test bez limitu zatrzymuje CALA suite i nie wiadomo
-# nawet, ktory to byl. Tak wlasnie stanelo pierwsze uruchomienie na macOS, gdzie
-# rtAbsoluteSleep liczylo termin na niewlasciwej osi zegara i spalo bez konca.
-# Pod valgrindem limitu nie ustawiamy: tam czasy sa o rzad wielkosci wieksze i
-# zalezne od obciazenia maszyny, wiec kazda liczba bylaby zgadywaniem.
+# Limit chroni zwykly zestaw przed zawieszeniem. Pod Valgrindem czasy sa o rzad
+# wielkosci wieksze i zalezne od obciazenia, wiec tam limitu nie ustawiamy.
 set(RDB_UT_TIMEOUT 120)
 
 list(FILTER V_GLOB EXCLUDE REGEX ".*test_qry\\.cpp$")
@@ -93,12 +83,22 @@ foreach(item ${V_GLOB})
     NAME ut_${TEST_SHORT}
     WORKING_DIRECTORY
       ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
-    COMMAND ${RDB_UT_LAUNCHER}
-            ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
-  set_tests_properties(ut_${TEST_SHORT} PROPERTIES FIXTURES_REQUIRED
-                                                   ut_${TEST_SHORT}-fixture)
-  if(NOT PROG_VALGRIND)
-    set_tests_properties(ut_${TEST_SHORT} PROPERTIES TIMEOUT ${RDB_UT_TIMEOUT})
+    COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
+  set_tests_properties(
+    ut_${TEST_SHORT}
+    PROPERTIES FIXTURES_REQUIRED ut_${TEST_SHORT}-fixture RESOURCE_LOCK
+               ut_${TEST_SHORT} TIMEOUT ${RDB_UT_TIMEOUT})
+  if(PROG_VALGRIND)
+    add_test(
+      NAME ut_${TEST_SHORT}-valgrind
+      WORKING_DIRECTORY
+        ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT}
+      COMMAND ${RDB_UT_VALGRIND}
+              ${CMAKE_BINARY_DIR}/test/UnitTest/${OUTPUT_FILE_NOEXT})
+    set_tests_properties(
+      ut_${TEST_SHORT}-valgrind
+      PROPERTIES LABELS valgrind FIXTURES_REQUIRED ut_${TEST_SHORT}-fixture
+                 RESOURCE_LOCK ut_${TEST_SHORT})
   endif()
 endforeach()
 
@@ -108,9 +108,16 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry)
 add_test(
   NAME ut_xqry
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry
-  COMMAND ${RDB_UT_LAUNCHER} ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
-if(NOT PROG_VALGRIND)
-  set_tests_properties(ut_xqry PROPERTIES TIMEOUT ${RDB_UT_TIMEOUT})
+  COMMAND ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
+set_tests_properties(ut_xqry PROPERTIES TIMEOUT ${RDB_UT_TIMEOUT} RESOURCE_LOCK
+                                        ut_xqry)
+if(PROG_VALGRIND)
+  add_test(
+    NAME ut_xqry-valgrind
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_qry
+    COMMAND ${RDB_UT_VALGRIND} ${CMAKE_BINARY_DIR}/test/UnitTest/test_xqry)
+  set_tests_properties(ut_xqry-valgrind PROPERTIES LABELS valgrind
+                                                   RESOURCE_LOCK ut_xqry)
 endif()
 
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/test/UnitTest/Data/test_dataModel)
@@ -138,21 +145,29 @@ set_tests_properties(ut_dataModel-compare
 # (nightly 2026-09-19: licznik sprzatacza 0 zamiast 1). Ponadto okno wlasciciela
 # przejsciowego (50 ms, lockFile.cpp) nie wytrzymuje kwoty CPU kontenera CI:
 # przy `ctest -j` kwota zamraza caly cgroup na dluzej niz 50 ms.
-set_tests_properties(
-  ut_rdb
-  ut_xqry
-  ut_dataModel
-  ut_dataModel-compile
-  ut_dataModel-compare
-  ut_soperations
-  ut_ipcServer
-  ut_ipcClient
-  ut_bus
-  ut_lockManager
-  PROPERTIES RUN_SERIAL TRUE)
+set(RDB_SERIAL_UNIT_TESTS
+    ut_rdb
+    ut_xqry
+    ut_dataModel
+    ut_dataModel-compile
+    ut_dataModel-compare
+    ut_soperations
+    ut_ipcServer
+    ut_ipcClient
+    ut_bus
+    ut_lockManager)
+foreach(_ut_serial IN LISTS RDB_SERIAL_UNIT_TESTS)
+  set_tests_properties(${_ut_serial} PROPERTIES RUN_SERIAL TRUE)
+  if(PROG_VALGRIND AND NOT _ut_serial MATCHES "-compile$|-compare$")
+    set_tests_properties(${_ut_serial}-valgrind PROPERTIES RUN_SERIAL TRUE)
+  endif()
+endforeach()
 
 # Takze z valgrindem musi byc ograniczenie dla regresji zakleszczenia.
 set_tests_properties(ut_busFallback PROPERTIES TIMEOUT 60)
+if(PROG_VALGRIND)
+  set_tests_properties(ut_busFallback-valgrind PROPERTIES TIMEOUT 60)
+endif()
 # test_busFallback dolacza bus.cpp jako zrodlo; GCC ostrzega wtedy o typach z
 # przestrzeni anonimowej uzytych w polach Bus::Impl, choc w tej jednostce
 # kompilacji sa jedyne.

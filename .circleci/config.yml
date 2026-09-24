@@ -46,7 +46,7 @@ parameters:
     default: false
 
 workflows:
-  # Warstwa commitowa. Jeden job: kompilacja Debug i pelny zestaw testow.
+  # Warstwa commitowa. Jeden job: kompilacja Debug i testy bez Valgrinda.
   commit:
     # Pipeline uruchomiony przez trigger cronowy albo recznie z parametrem ma
     # galaz master, wiec bez tego warunku `commit` dokladalby drugi, zbedny
@@ -84,7 +84,7 @@ workflows:
   # nie byl zapisany w dwoch miejscach.
   #
   # Dwie warstwy, pierwsza odcina druga:
-  #   L1  pelny zestaw testow (189) w Debug i Release na obrazie projektu;
+  #   L1  zwykle testy w Debug i Release oraz Valgrind tylko w Debug;
   #   L2  bramka badawcza H9/H10 (najdrozszy job przebiegu) i podloga ablacyjna.
   #
   # Do 2026-09-19 przed nimi stal smoke - sama kompilacja Debug, ktora miala
@@ -108,6 +108,7 @@ workflows:
       - build-release-ninja-mydocker
       - build-debug-ninja-mydocker:
           check_skipci: false
+          run_valgrind: true
       # -- L2 ---------------------------------------------------------------
       - research-gate:
           requires:
@@ -340,7 +341,7 @@ commands:
   # projektu (CMakeLists.txt podpina go sam, obraz go ma), ale job kompiluje
   # drzewo raz, wiec bez cache przenoszonego miedzy jobami nic nie zyskuje.
   # Czy przenoszenie sie oplaci - ile joba commitowego zajmuje kompilacja, a ile
-  # testy pod valgrindem, i ile kosztuje przeslanie cache - to osobna decyzja,
+  # zwykle testy, i ile kosztuje przeslanie cache - to osobna decyzja,
   # do podjecia po pomiarze na CircleCI.
 
   conan-install:
@@ -410,7 +411,7 @@ commands:
           command: |
             export PATH="$HOME/.local/bin:$PATH"
             ( cd build/<< parameters.build_type >>/test \
-              && ctest -j "$(nproc)" -V --output-junit test_results.xml ) && rc=0 || rc=$?
+              && ctest -j "$(nproc)" -V -LE valgrind --output-junit test_results.xml ) && rc=0 || rc=$?
             python3 scripts/collect-test-failures.py build/<< parameters.build_type >> --ctest-status "$rc"
             exit "$rc"
       - store_test_results:
@@ -426,6 +427,26 @@ commands:
           when: always
           path: build/<< parameters.build_type >>/test-failure-report
           destination: test-failure-report
+  run-valgrind:
+    steps:
+      - run:
+          name: Valgrind (manual-nightly-full, Debug)
+          command: |
+            export PATH="$HOME/.local/bin:$PATH"
+            mkdir -p build/Debug/test/valgrind-results
+            ( cd build/Debug/test \
+              && ctest -j 4 -V -L valgrind --output-junit valgrind-results/test_results.xml ) && rc=0 || rc=$?
+            python3 scripts/collect-test-failures.py build/Debug --ctest-status "$rc"
+            exit "$rc"
+      - store_test_results:
+          path: build/Debug/test/valgrind-results
+      - store_artifacts:
+          path: build/Debug/test/valgrind-results/test_results.xml
+          destination: valgrind_results.xml
+      - store_artifacts:
+          when: always
+          path: build/Debug/test-failure-report
+          destination: valgrind-failure-report
   run-cppcheck:
     parameters:
       build_type:
@@ -478,6 +499,9 @@ jobs:
       check_skipci:
         type: boolean
         default: true
+      run_valgrind:
+        type: boolean
+        default: false
     working_directory: ~/retractordb
     executor: debian-mydocker
     steps:
@@ -498,6 +522,10 @@ jobs:
       - run-test:
           build_type: Debug
           build_tool: ninja
+      - when:
+          condition: << parameters.run_valgrind >>
+          steps:
+            - run-valgrind
 
   # Bramka badawcza H9/H10 - ochrona osiagnietych wynikow przed regresja silnika
   # (test/research_gate/README.md). Celowo poza `ninja` i poza `ninja test`, wiec
