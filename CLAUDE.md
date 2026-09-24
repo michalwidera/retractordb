@@ -60,7 +60,7 @@ ctest -R '^ut_payload$'     # plain test by exact name
 ctest -R '^ut_payload$' -V  # verbose
 ```
 
-Unit tests run directly in `ninja test`. `ninja test-valgrind` repeats them under Valgrind with leak checking and includes the nine integration memory checks. The commit workflow skips Valgrind; `run_manual_nightly_full` runs it once in Debug. Plain `ctest` runs all registered groups; use `ctest -LE valgrind` to match the ordinary CI step.
+Unit tests run directly in `ninja test`. `ninja test-valgrind` repeats them under Valgrind with leak checking and includes the nine integration memory checks. The commit workflow skips Valgrind; `run_manual_nightly_full` runs it once in Debug - so `ninja test-valgrind` is run locally before every push and session end (see Session end). Plain `ctest` runs all registered groups; use `ctest -LE valgrind` to match the ordinary CI step.
 
 CI: CircleCI, branches `master` or `issue_*`.
 
@@ -218,6 +218,16 @@ ninja test_gate          # from build/Debug or build/Release
 It is deliberately outside `ninja` and `ninja test` (see `test/research_gate/README.md`), so nothing runs it implicitly. It is directional: a result worse than the reference is an **error** and stops the work; equal passes; better passes and is recorded. A skipped level (missing or stale H9 ablation profiles) counts as *not run*, never as passed - report it as such. No commit and no handoff goes out with an unreported or failing gate; a red gate is handed to the human, not worked around.
 
 Sessions that touched only tests, scripts or documentation do not need the gate - say explicitly that it was skipped and why.
+
+**Valgrind check - mandatory before every push and before closing.** The commit workflow on CircleCI no longer runs Valgrind (executor resource limits); only the periodic `run_manual_nightly_full` does, so a memory defect can sit unnoticed in the history for up to two weeks. The local run is therefore the only check between a change and the nightly one. Before every push and before the commit or the handoff at session end, run all three from `build/Debug` and report each result:
+
+```bash
+ninja test           # unit + integration
+ninja test_gate      # research gate (see above for when it applies)
+ninja test-valgrind  # unit tests under Valgrind with leak checking + integration memory checks
+```
+
+A Valgrind error or leak is a failure like a red test: it stops the push and the handoff and goes to the human, never suppressed or worked around. On macOS, where Valgrind does not exist, the equivalent is a full `ctest` in a `-DRDB_SANITIZE=address,undefined` build.
 
 **Ablation floor - mandatory when the session touched an optimizer pass.** The `RDB_OPT_*` switches must not change what the engine computes, only how fast it gets there. That invariant rots silently: the matrix broke with the `>N` tail rule change of 2026-08-07 and nobody noticed for twelve days, because `manual-ablation` runs only by hand. Whenever the session touched `src/retractor/lib/compiler.cpp`, the startup-latency or tail rules (`SOperations.hpp`, `computeStartupLatency`), or any code behind an `RDB_OPT_*` switch, build the all-off configuration and run the full suite before the commit or the handoff:
 
