@@ -404,7 +404,7 @@ T getVal(std::span<const uint8_t> s, int offset) {
 // Boosta JEST tym formatem. Aktualizacja Boosta, ktora go zmieni, ma byc bledem BUDOWY, a nie cicha
 // zmiana tego, co lezy na dysku. Sam rozmiar tego nie zlapie: zamiana licznika z mianownikiem
 // miejscami rozmiaru nie rusza, wiec druga asercja czyta bajty gotowej wartosci.
-static_assert(sizeof(boost::rational<int>) == 8 && std::is_trivially_copyable_v<boost::rational<int>>,
+static_assert(sizeof(boost::rational<int>) == 2 * sizeof(std::int32_t) && std::is_trivially_copyable_v<boost::rational<int>>,
               "boost::rational<int> nie jest juz trywialnie kopiowalna para int32 - format pola RATIONAL sie zmienil");
 static_assert(std::bit_cast<std::array<std::int32_t, 2>>(boost::rational<int>(3, 4)) == std::array<std::int32_t, 2>{3, 4},
               "boost::rational<int> trzyma skladowe w innej kolejnosci - format pola RATIONAL sie zmienil");
