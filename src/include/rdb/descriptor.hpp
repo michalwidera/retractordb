@@ -88,23 +88,25 @@ class Descriptor : public std::vector<rField> {
   // przejscie po polach), czyli zabiera przenoszeniu prawie caly zysk - zmierzone na
   // 25 polach: 101 ns z odbudowa wobec 113 ns pelnej kopii.
   Descriptor(Descriptor &&other) noexcept
-      : std::vector<rField>(std::move(other)),
-        flatToDescriptorIndexMap_(std::move(other.flatToDescriptorIndexMap_)),
+      : flatToDescriptorIndexMap_(std::move(other.flatToDescriptorIndexMap_)),
         fieldByteOffsets_(std::move(other.fieldByteOffsets_)),
         flattenedFieldCount_(other.flattenedFieldCount_),
         dataSizeBytes_(other.dataSizeBytes_),
         fieldMappingsDirty_(other.fieldMappingsDirty_) {
     other.dropFieldMappings();
+    // Ruch calego `other` na samym koncu: przeniesienie bazy przed skladowymi
+    // wlaczalo bugprone-use-after-move na kazdym dostepie do `other` powyzej.
+    std::vector<rField>::operator=(std::move(other));
   }
   Descriptor &operator=(Descriptor &&other) noexcept {
     if (this == &other) return *this;
-    std::vector<rField>::operator=(std::move(other));
     flatToDescriptorIndexMap_ = std::move(other.flatToDescriptorIndexMap_);
     fieldByteOffsets_         = std::move(other.fieldByteOffsets_);
     flattenedFieldCount_      = other.flattenedFieldCount_;
     dataSizeBytes_            = other.dataSizeBytes_;
     fieldMappingsDirty_       = other.fieldMappingsDirty_;
     other.dropFieldMappings();
+    std::vector<rField>::operator=(std::move(other));
     return *this;
   }
 
