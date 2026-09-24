@@ -15,8 +15,14 @@ add_custom_target(
 # Profile odwzorowuja joby z .circleci/config.yml; ich lista i opisy siedza w
 # scripts/test-ci.sh (`--list`) i tam tez nalezy je poprawiac razem z
 # config.yml.
-set(RDB_TEST_CI_PROFILES commit release make-build ablation-all-off
-                         ablation-probe-on gate)
+set(RDB_TEST_CI_PROFILES
+    commit
+    nightly-debug
+    release
+    make-build
+    ablation-all-off
+    ablation-probe-on
+    gate)
 
 foreach(rdb_ci_profile IN LISTS RDB_TEST_CI_PROFILES)
   add_custom_target(

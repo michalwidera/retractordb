@@ -23,7 +23,8 @@ Options chain: `scripts/buildrdb.sh conan ninja debug`
 ```bash
 ninja               # build
 ninja install       # install to ~/.local/bin (prefix auto-defaults to ~/.local - no sudo)
-ninja test          # all tests (unit + integration, via valgrind)
+ninja test          # unit + integration, bez valgrinda
+ninja test-valgrind # kontrola pamieci lokalnie (Linux)
 ninja cformat       # format C++/CMake sources
 ninja descgrammar   # regenerate ANTLR4 grammar from DESC.g4
 ninja rqlgrammar    # regenerate ANTLR4 grammar from RQL.g4
@@ -36,7 +37,7 @@ scripts/macos-build.sh release
 scripts/macos-build.sh --sanitize   # -DRDB_SANITIZE=address,undefined
 ```
 `scripts/buildrdb.sh` dziala tam tak samo, tylko `toolchain` instaluje przez Homebrew. Roznice, o ktorych trzeba wiedziec czytajac wynik:
-- **Valgrinda nie ma** na Apple silicon i nie bedzie. `ninja test` uruchamia wtedy binaria wprost; rownowaznikiem strazy pamieci jest konfiguracja `-DRDB_SANITIZE=address,undefined`.
+- **Valgrinda nie ma** na Apple silicon i nie bedzie. `ninja test` uruchamia binaria wprost na kazdej platformie; rownowaznikiem lokalnego `test-valgrind` jest konfiguracja `-DRDB_SANITIZE=address,undefined`.
 - **Czas rzeczywisty jest slabszy z zasady**: SCHED_FIFO obejmuje WATEK, nie proces (`sched_setscheduler` nie istnieje), masek powinowactwa nie ma wcale, `mlockall` zglasza ENOSYS, a odpowiednika PREEMPT_RT nie ma. macOS jest platforma rozwojowa i testowa, nie pomiarowa - bramka badawcza (`ninja test_gate`) tego nie zmienia.
 - **Usluga to launchd, nie systemd**: `restartCommand` sklada `launchctl kickstart -k`, tozsamosc jednostki bierze sie z `XPC_SERVICE_NAME`, a pakiet nie niesie zadnej jednostki `.service`.
 - **Wybor galezi platformowej** nie zapada po nazwie systemu, tylko przez `RDB_HAS_*` z `generated/platformConfig.h` (probe kompilacyjne w `cmake/PlatformChecks.cmake`). Nowy kod platformowy pisze sie tak samo: `#if RDB_HAS_X`, nigdy `#ifdef __APPLE__`.
@@ -45,6 +46,7 @@ scripts/macos-build.sh --sanitize   # -DRDB_SANITIZE=address,undefined
 **CI locally, before pushing** (`scripts/test-ci.sh`, needs a running Docker):
 ```bash
 ninja test-ci        # = test-ci-commit: the only job CircleCI runs after a push
+ninja test-ci-nightly-debug # Debug job from run_manual_nightly_full, including Valgrind
 ninja test-ci-fast   # same job, build/ kept between runs - quick, NOT a faithful CI run
 scripts/test-ci.sh --list   # every profile with the CircleCI job it mirrors
 ```
@@ -54,11 +56,11 @@ Every `test-ci-*` profile builds from scratch, like the CI checkout - tens of mi
 
 **Single test:**
 ```bash
-ctest -R ut_payload     # by name
-ctest -R ut_payload -V  # verbose
+ctest -R '^ut_payload$'     # plain test by exact name
+ctest -R '^ut_payload$' -V  # verbose
 ```
 
-Unit tests: valgrind + leak check. Integration tests: output matched against `test/IntegrationTest/*/Pattern*/`.
+Unit tests run directly in `ninja test`. `ninja test-valgrind` repeats them under Valgrind with leak checking and includes the nine integration memory checks. The commit workflow skips Valgrind; `run_manual_nightly_full` runs it once in Debug. Plain `ctest` runs all registered groups; use `ctest -LE valgrind` to match the ordinary CI step.
 
 CI: CircleCI, branches `master` or `issue_*`.
 

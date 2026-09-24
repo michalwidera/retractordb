@@ -344,13 +344,8 @@ foreach(_target ${_imported_targets})
   endif()
 endforeach()
 
-# Valgrind opakowuje KAZDY test jednostkowy (test/UnitTest/CMakeLists.txt), wiec
-# na Linuksie jego brak ma zatrzymac konfiguracje, a nie ujawnic sie dopiero
-# przy `ninja test` jako 51 razy "command not found". Poza Linuksem narzedzia
-# nie ma: dla Apple Silicon port valgrinda nie istnieje. REQUIRED zatrzymywaloby
-# tam konfiguracje, zanim cokolwiek zdazyloby sie skompilowac, wiec rola strazy
-# pamieci przechodzi na sanitizery (RDB_SANITIZE), a ctest uruchamia binaria
-# wprost.
+# Na Linuksie osobny cel test-valgrind wymaga narzedzia. Na Apple Silicon straz
+# pamieci przechodzi na sanitizery (RDB_SANITIZE).
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   find_program(PROG_VALGRIND valgrind REQUIRED)
 else()
@@ -359,10 +354,7 @@ endif()
 if(PROG_VALGRIND)
   message(STATUS "Memory checker: ${PROG_VALGRIND}")
 else()
-  message(
-    STATUS
-      "Memory checker: brak - testy jednostkowe biegna bez opakowania (rownowaznik: -DRDB_SANITIZE=address,undefined)"
-  )
+  message(STATUS "Memory checker: brak - uzyj -DRDB_SANITIZE=address,undefined")
 endif()
 
 if(DEFINED antlr4_PACKAGE_FOLDER_DEBUG)
@@ -443,12 +435,30 @@ add_subdirectory(test)
 
 option(RDB_WITH_API "Dolacz API klienckie (api/) do pakietow cpack" OFF)
 
-# Testy API sa oznaczone etykieta `api` i domyslnie wypadaja z `ninja test`.
-# CMAKE_CTEST_ARGUMENTS steruje wywolaniem ctest w celu `test`; -LE api to
-# jedyny sposob, by je pominac bez usuwania ich z rejestru (DISABLED czynilby je
-# nieuruchamialnymi takze przez `ninja test-api`).
+# Etykiety pozostaja w rejestrze CTest, ale wypadaja z domyslnego `ninja test`.
+# Osobne cele uruchamiaja je przez -L; DISABLED uniemozliwiloby taki wybor.
+set(RDB_DEFAULT_EXCLUDED_LABELS "valgrind")
 if(NOT RDB_WITH_API)
-  list(APPEND CMAKE_CTEST_ARGUMENTS -LE api)
+  string(APPEND RDB_DEFAULT_EXCLUDED_LABELS "|api")
+endif()
+# Wbudowany cel Ninja sklada komende powloki bez cytowania argumentow ctest.
+# Cytaty musza byc czescia wartosci, inaczej `|` staje sie potokiem powloki.
+list(APPEND CMAKE_CTEST_ARGUMENTS -LE "'${RDB_DEFAULT_EXCLUDED_LABELS}'")
+
+if(PROG_VALGRIND)
+  add_custom_target(
+    test-valgrind
+    COMMAND ${CMAKE_CTEST_COMMAND} --test-dir ${CMAKE_BINARY_DIR}/test -L
+            valgrind --output-on-failure --parallel 4
+    COMMENT "Testy pamieci pod Valgrindem (lokalnie)"
+    USES_TERMINAL)
+  # Rekonfiguracja test/CMakeLists.txt usuwa binaria UnitTest z drzewa budowy.
+  # Ninja odbuduje brakujace lub nieaktualne cele przed wywolaniem CTest.
+  get_property(
+    _rdb_unit_test_targets
+    DIRECTORY ${CMAKE_SOURCE_DIR}/test/UnitTest
+    PROPERTY BUILDSYSTEM_TARGETS)
+  add_dependencies(test-valgrind ${_rdb_unit_test_targets})
 endif()
 
 # `ninja install-withapi` - jedyne wejscie, ktore instaluje API. Zaleznosci
