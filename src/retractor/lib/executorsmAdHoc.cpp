@@ -1,6 +1,8 @@
 #include "executorsm.hpp"
 
+#include <cstdlib>
 #include <mutex>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -229,28 +231,49 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   // to the execution loop.
   {
     std::scoped_lock scoped_lock(core_mutex);
-    mergedIds = cmPtr->importFrom(coreInstanceCopy);
-    if (!mergedIds.empty()) adHocPlanRevision.fetch_add(1, std::memory_order_release);
-    compileChainResult = cmPtr->compile();
-    if (compileChainResult == "OK") {
-      pProc->syncDeclaredCapacities();
-      for (const auto &id : mergedIds)
-        if (!pProc->addQueryToModel(id)) {
-          addFailedId = id;
-          break;
+    // Migawka planu sprzed importu. importFrom() i compile() pisza po ZYWYM planie, a porazka
+    // kompilacji albo rejestracji w modelu zostawiala w nim wezly bez instancji: nastepny slot
+    // konczyl wtedy proces na refreshStreamHandles(). Kazda porazka ponizej przywraca plan
+    // w calosci, razem z numerem rewizji - ksztalt wraca ten sam, wiec tablica uchwytow modelu
+    // pozostaje zgodna. Modelu nie trzeba wycofywac, bo addQueriesToModel() wpisuje wszystko
+    // albo nic. Nie wraca jedynie pojemnosc deklaracji powiekszona przez
+    // syncDeclaredCapacities(): wieksza historia niczego w wyniku nie zmienia.
+    qTree planBefore = *coreInstancePtr;
+    try {
+      mergedIds          = cmPtr->importFrom(coreInstanceCopy);
+      compileChainResult = cmPtr->compile();
+      if (compileChainResult == "OK") {
+        pProc->syncDeclaredCapacities();
+        // Hak testu it_adhoc_register_rollback, ta sama droga co RDB_FAULT_SHOW. Zadne znane RQL
+        // nie prowadzi do porazki PO imporcie do zywego planu, a wlasnie ta porazka ma sie konczyc
+        // wycofaniem planu. Hak rzuca raz na proces, zeby test mogl po nim powtorzyc to samo
+        // zapytanie i sprawdzic, ze plan je przyjmuje.
+        static bool registerFaultFired = false;
+        if (!registerFaultFired && std::getenv("RDB_FAULT_ADHOC_REGISTER") != nullptr) {
+          registerFaultFired = true;
+          throw std::runtime_error("RDB_FAULT_ADHOC_REGISTER: wstrzyknieta awaria rejestracji ad-hoc w modelu");
         }
+        addFailedId = pProc->addQueriesToModel(mergedIds);
+      }
+    } catch (...) {
+      *coreInstancePtr = std::move(planBefore);
+      throw;
     }
+    if (compileChainResult != "OK" || !addFailedId.empty())
+      *coreInstancePtr = std::move(planBefore);
+    else if (!mergedIds.empty())
+      adHocPlanRevision.fetch_add(1, std::memory_order_release);
   }
 
   if (compileChainResult != "OK") {
-    ptRetval.put(std::string("db"), "Compile chain failed:" + response);
+    ptRetval.put(std::string("db"), "Compile chain failed:" + compileChainResult);
     SPDLOG_ERROR("Compile chain failed: {}", compileChainResult);
     return ptRetval;
   }
 
   if (!addFailedId.empty()) {
-    ptRetval.put(std::string("db"), "dataModel::addQueryToModel FAILED:" + addFailedId);
-    SPDLOG_ERROR("dataModel::addQueryToModel FAILED, stream {}", addFailedId);
+    ptRetval.put(std::string("db"), "dataModel::addQueriesToModel FAILED:" + addFailedId);
+    SPDLOG_ERROR("dataModel::addQueriesToModel FAILED, stream {}", addFailedId);
     return ptRetval;
   }
 

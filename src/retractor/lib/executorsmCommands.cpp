@@ -237,8 +237,9 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   using boost::property_tree::ptree;
   if (pProc == nullptr) return "";
   if (coreInstancePtr == nullptr) FatalError("executorsm::printRowValue: coreInstancePtr is null");
+  // Null stad nie wraca: brak strumienia w modelu getPayload zglasza wyjatkiem (streamRuntime),
+  // a pusty payload magazynu konczy sie wczesniej FatalError w storage::getPayload().
   auto *payload = pProc->getPayload(query_name, 0);
-  if (payload == nullptr) FatalError("executorsm::printRowValue: getPayload returned null");
 
   ptree pt;
   pt.put("stream", query_name);

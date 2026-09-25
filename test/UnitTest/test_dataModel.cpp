@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <locale>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -395,6 +396,48 @@ TEST_F(xschema, handleTable_stale_entry_is_caught) {
       "does not match plan node");
 #endif
 }
+
+// ============================================================
+// Strumien nieobecny w modelu (issue #252)
+// ============================================================
+//
+// Dostep po nazwie ma zglaszac brak strumienia wyjatkiem, tak jak streamRuntime(). `qSet[nazwa]`
+// na nieobecnym kluczu WSTAWIAL pusty unique_ptr i zaraz go dereferencjonowal - SIGSEGV zamiast
+// bledu. Sprawdzane sa trzy rzeczy: wyjatek, mapa bez wstawionego wpisu i model, ktory po bledzie
+// dalej odpowiada dla strumienia, ktory w nim jest.
+
+TEST_F(xschema, missingStream_is_reported_not_inserted) {
+  const std::string ghost = "no_such_stream";
+  const auto sizeBefore   = dataArea->qSet.size();
+
+  EXPECT_THROW(static_cast<void>(dataArea->getPayload(ghost)), std::logic_error);
+  EXPECT_THROW(static_cast<void>(dataArea->fetchForward(ghost, 0)), std::logic_error);
+  EXPECT_THROW(static_cast<void>(dataArea->getRow(ghost, 0)), std::logic_error);
+
+  EXPECT_FALSE(dataArea->qSet.contains(ghost));
+  EXPECT_EQ(dataArea->qSet.size(), sizeBefore);
+
+  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+  dataArea->processZeroStep();
+  EXPECT_TRUE("{ 20 31 }" == print(dataArea->getRow("core0", 0)));
+  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+}
+
+// Dolaczenie ad-hoc wpisuje instancje do modelu wszystkie albo zadnej. getAdHoc() przy porazce
+// wycofuje PLAN i polega na tym, ze model zostal nietkniety - z qSet nic sie nie usuwa, bo
+// tablica uchwytow trzyma surowe wskazniki. Poprawna nazwa przed bledna nie moze wiec zostac
+// w modelu sama.
+TEST_F(xschema, addQueriesToModel_is_all_or_nothing) {
+  query extra = coreInstance["str2"];
+  extra.id    = "str2_extra";
+  coreInstance.push_back(extra);
+  const auto sizeBefore = dataArea->qSet.size();
+
+  EXPECT_EQ(dataArea->addQueriesToModel({"str2_extra", "no_such_stream"}), "no_such_stream");
+  EXPECT_FALSE(dataArea->qSet.contains("str2_extra"));
+  EXPECT_EQ(dataArea->qSet.size(), sizeBefore);
+}
+
 TEST_F(xschema, reduceFieldsToPayload_max) {
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setDisposable(false);

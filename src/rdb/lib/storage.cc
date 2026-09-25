@@ -224,8 +224,8 @@ rdb::ReadStatus storage::read(const size_t recordIndexFromFront, uint8_t *destin
     // Rekordu NIE MA. Pamiec zerujemy, bo wolajacy moze na nia patrzec, ale bitset mowi all-null:
     // wartosc nieokreslona, nie zero. Poprzednio stalo tu `false` na kazdym polu, czyli jawne
     // "to nie jest NULL" - przez co semantyka pochlaniania NULL-i sie NIE wlaczala i reduktor
-    // skladal to zero do MIN/MAX/SUM/AVG. Konwencja jest ta sama, ktora dataModel::fetchBack
-    // i fetchForward stosuja dla rekordu poza zgromadzona historia.
+    // skladal to zero do MIN/MAX/SUM/AVG. Konwencja jest ta sama, ktora dataModel::fetchForward
+    // stosuje dla rekordu poza zgromadzona historia.
     std::memset(destination, 0, size);
     storagePayload_->setNullBitset(std::vector<bool>(descriptor.size(), true));
     SPDLOG_ERROR("read fake {} - non existing data from pos:{} rec-count:{}", accessor_->name(), recordIndexFromFront,
