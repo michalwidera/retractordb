@@ -6,7 +6,9 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -411,4 +413,20 @@ TEST(LockManagerSweep, RemovesOnlyAbandonedLocksAndTheirIpcObjects) {
   liveGuard.releaseLock();
   IPC::shared_memory_object::remove(liveNames.shmemSegment.c_str());
   std::filesystem::remove_all(dir);
+}
+
+// To, co sklada ipc::serviceName, musi rozpoznac ipc::serviceLockInstance: pierwsza strone wola
+// silnik, druga sprzatacz i straznik xtrdb. Oczekiwane nazwy plikow sa wpisane recznie, zeby test
+// nie porownywal funkcji z nia sama.
+TEST(ServiceLockFamily, NamesRoundTripAndForeignFilesAreRejected) {
+  EXPECT_EQ(ipc::serviceLockFile(ipc::serviceName("")), "xretractor_service.lock");
+  EXPECT_EQ(ipc::serviceLockFile(ipc::serviceName("alfa")), "xretractor_service.alfa.lock");
+
+  EXPECT_EQ(ipc::serviceLockInstance("xretractor_service.lock"), std::optional<std::string_view>(""));
+  EXPECT_EQ(ipc::serviceLockInstance("xretractor_service.alfa.lock"), std::optional<std::string_view>("alfa"));
+
+  EXPECT_FALSE(ipc::serviceLockInstance("xretractor_service..lock").has_value());  // pusty czlon po kropce
+  EXPECT_FALSE(ipc::serviceLockInstance("xretractor_servicealfa.lock").has_value());
+  EXPECT_FALSE(ipc::serviceLockInstance("xretractor_service.alfa.lock.bak").has_value());
+  EXPECT_FALSE(ipc::serviceLockInstance("xretractor_ipc.RetractorQueryQueue.alfa.lock").has_value());
 }

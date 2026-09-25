@@ -27,8 +27,7 @@ namespace IPC = boost::interprocess;
 
 namespace {
 
-constexpr std::string_view kServiceLockFamily = "xretractor_service";
-constexpr std::string_view kLockSuffix        = ".lock";
+constexpr std::string_view kLockSuffix = ".lock";
 
 /// Czy napis jest czlonem instancji z nazw IPC: sama nazwa serwera albo jej skrot ("0" i osiem
 /// malych cyfr szesnastkowych, patrz ipc::shortServerTag).
@@ -55,14 +54,9 @@ std::optional<std::string_view> ipcTokenOf(std::string_view file) {
 }
 
 /// Czy plik jest blokada instancji: xretractor_service.lock albo xretractor_service.<nazwa>.lock.
-/// Binarka o innej nazwie zaklada blokady z inna rodzina i tych sprzatacz nie rusza.
 bool isServiceLockName(std::string_view file) {
-  if (file.size() < kServiceLockFamily.size() + kLockSuffix.size() || !file.starts_with(kServiceLockFamily) ||
-      !file.ends_with(kLockSuffix))
-    return false;
-  const std::string_view middle =
-      file.substr(kServiceLockFamily.size(), file.size() - kServiceLockFamily.size() - kLockSuffix.size());
-  return middle.empty() || (middle.front() == '.' && servername::isValid(middle.substr(1)));
+  const std::optional<std::string_view> name = ipc::serviceLockInstance(file);
+  return name && (name->empty() || servername::isValid(*name));
 }
 
 }  // namespace
@@ -81,15 +75,14 @@ SystemdIdentity detectSystemdIdentity() {
 FlockServiceGuard::FlockServiceGuard(const std::string &serviceName)
 
 {
-  lockFilePath = std::filesystem::temp_directory_path() / (serviceName + ".lock");
+  lockFilePath = ipc::serviceLockDir({}) / ipc::serviceLockFile(serviceName);
 }
 
 FlockServiceGuard::~FlockServiceGuard() { releaseLock(); }
 
 void FlockServiceGuard::setLockDir(const std::string &dir) {
-  if (dir.empty()) return;
   const std::filesystem::path lockName = std::filesystem::path(lockFilePath).filename();
-  lockFilePath                         = (std::filesystem::path(dir) / lockName).string();
+  lockFilePath                         = (ipc::serviceLockDir(dir) / lockName).string();
 }
 
 void FlockServiceGuard::setServiceQueryFile(const std::string &queryFile) { serviceQueryFile = queryFile; }

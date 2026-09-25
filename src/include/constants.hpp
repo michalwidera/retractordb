@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -152,6 +154,42 @@ inline std::string identityLockPath(std::string_view queryQueue) {
 /// Czlon instancji liczony RAZ i uzyty we wszystkich czterech nazwach - patrz serverNameToken.
 /// Na Linuksie jest to zawsze sama nazwa serwera.
 inline ServerNames names(std::string_view serverName = {}) { return namesForToken(serverNameToken(serverName)); }
+
+/// Rodzina plikow blokady instancji: xretractor_service.lock dla instancji bezimiennej,
+/// xretractor_service.<nazwa serwera>.lock dla nazwanej. Przypieta na stale, a nie brana z argv[0]:
+/// te sama rodzine przegladaja sprzatacz pozostalosci i straznik xtrdb, a zaden z nich nie zna
+/// nazwy, pod jaka uruchomiono silnik.
+inline constexpr std::string_view kServiceLockFamily = "xretractor_service";
+inline constexpr std::string_view kServiceLockSuffix = ".lock";
+
+/// Nazwa uslugi instancji: rdzen nazwy pliku jej blokady i etykieta w `xretractor --status`.
+/// Czlonem jest sama nazwa serwera, nie skrot z serverNameToken.
+inline std::string serviceName(std::string_view serverName) { return withServerSuffix(kServiceLockFamily, serverName); }
+
+/// Plik blokady instancji (bez katalogu).
+inline std::string serviceLockFile(std::string_view serviceName) {
+  return std::string(serviceName) + std::string(kServiceLockSuffix);
+}
+
+/// Katalog blokad instancji: paths.lock_dir, a gdy nie ustawiony - katalog tymczasowy procesu
+/// (TMPDIR). Inaczej niz kMachineLockDir: ta blokada rozdziela instancje w obrebie jednego katalogu.
+inline std::filesystem::path serviceLockDir(std::string_view configuredDir) {
+  if (configuredDir.empty()) return std::filesystem::temp_directory_path();
+  return std::filesystem::path(configuredDir);
+}
+
+/// Czlon serwera odczytany z nazwy pliku blokady instancji: pusty dla instancji bezimiennej,
+/// nullopt dla pliku spoza rodziny. Poprawnosci samej nazwy nie ocenia - to nalezy do wolajacego.
+inline std::optional<std::string_view> serviceLockInstance(std::string_view file) {
+  if (file.size() < kServiceLockFamily.size() + kServiceLockSuffix.size() || !file.starts_with(kServiceLockFamily) ||
+      !file.ends_with(kServiceLockSuffix))
+    return std::nullopt;
+  const std::string_view middle =
+      file.substr(kServiceLockFamily.size(), file.size() - kServiceLockFamily.size() - kServiceLockSuffix.size());
+  if (middle.empty()) return middle;
+  if (middle.size() < 2 || middle.front() != '.') return std::nullopt;
+  return middle.substr(1);
+}
 
 // === Rozmiary buforów i kolejek ===
 
