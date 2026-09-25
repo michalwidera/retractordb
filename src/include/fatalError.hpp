@@ -40,7 +40,7 @@ struct FatalError {
         // makro SPDLOG_* wolalo should_log() na wskazniku zerowym: KAZDY blad krytyczny
         // konczyl sie SIGSEGV w atexit, tuz po wypisaniu wlasciwego komunikatu. Proces
         // zwracal 139 zamiast EXIT_FAILURE, komunikat ginal za sladem crashu, a IPC
-        // (RetractorShmemMap, RetractorQueryQueue) zostawal nieposprzatany, bo cleanup()
+        // (segment odpowiedzi, RetractorQueryQueue) zostawal nieposprzatany, bo cleanup()
         // ginal przed swoimi wywolaniami remove().
         //
         // Flush wystarcza do trwalosci: wszystkie sinki tego projektu sa SYNCHRONICZNE

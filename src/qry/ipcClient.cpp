@@ -4,8 +4,10 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <memory>
 #include <sstream>
@@ -14,17 +16,30 @@
 
 #include <spdlog/spdlog.h>
 #include <boost/interprocess/ipc/message_queue.hpp>
-#include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/interprocess/sync/named_mutex.hpp>
-#include <boost/interprocess/sync/scoped_lock.hpp>
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/system/system_error.hpp>
 
 #include "constants.hpp"
-#include "ipcTypes.hpp"
+#include "ipcResponses.hpp"
+#include "osPlatform.hpp"
 
 using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
+
+namespace {
+
+/// Numer zadania, liczony na PROCES, nie na obiekt IpcClient: dwa obiekty w jednym procesie
+/// maja ten sam pid, wiec liczniki per obiekt dawalyby im te same numery i jeden odbieralby
+/// odpowiedz drugiego.
+std::atomic<std::uint64_t> requestSeq{0};
+
+/// Znacznik startu tego procesu. Nie zmienia sie przez cale jego zycie, a odczyt to wywolanie jadra.
+std::uint64_t selfStartTime() {
+  static const std::uint64_t retVal = osplat::inspectProcess(static_cast<std::int32_t>(getpid())).startTime;
+  return retVal;
+}
+
+}  // namespace
 
 IpcClient::IpcClient(int clientResponseMaxFails, int responseQueueOpenMaxFails, std::string_view serverName)
     : clientResponseMaxFails_(std::max(1, clientResponseMaxFails)),
@@ -104,59 +119,45 @@ ptree IpcClient::netClient(const std::string &netCommand, const std::string &net
   ptree pt_response;
   ptree pt_request;
   try {
-    IPC::managed_shared_memory mapSegment(IPC::open_only, names_.shmemSegment.c_str());
-    IPC::named_mutex mapMutex(IPC::open_only, names_.mapMutex.c_str());
+    const ipc::responses::Mapping responses(IPC::open_only, names_.shmemSegment);
+    if (!responses.valid()) {
+      SPDLOG_ERROR("ipcClient: response segment '{}' has an incompatible layout", names_.shmemSegment);
+      done = true;
+      pt_response.put("error.response", "server not found");
+      return pt_response;
+    }
+    const ipc::responses::Owner self{
+        .pid = static_cast<std::int32_t>(getpid()), .startTime = selfStartTime(), .seq = ++requestSeq};
     pt_request.put("db.message", netCommand);
-    pt_request.put("db.id", getpid());
+    pt_request.put("db.id", self.pid);
+    pt_request.put("db.seq", self.seq);
     if (!netArgument.empty()) pt_request.put("db.argument", netArgument);
+
+    // Budżet liczony ZEGAREM, a nie liczbą obrotów pętli: na obciążonej maszynie obrót trwa
+    // dłużej niż sam interwał, a wtedy liczenie prób skracało faktyczne czekanie dokładnie
+    // w sytuacji, w której potrzebne było najdłuższe (issue_217). Jeden termin obejmuje oba
+    // czekania - na miejsce w kolejce komend i na odpowiedź - więc żadne nie trwa bez końca.
+    const auto deadline = std::chrono::steady_clock::now() + clientResponseMaxFails_ * ipc::kClientResponsePollInterval;
 
     IPC::message_queue mq(IPC::open_only, names_.queryQueue.c_str());
     std::stringstream request_stream;
     write_info(request_stream, pt_request);
-    mq.send(request_stream.str().c_str(), request_stream.str().length(), 0);
-
-    std::pair<ipc::IPCMap *, std::size_t> ret = mapSegment.find<ipc::IPCMap>(std::string(ipc::kMapObject).c_str());
-    ipc::IPCMap *mymap                        = ret.first;
-    if (mymap == nullptr) {
-      SPDLOG_ERROR("ipcClient: shared memory map '{}' not found", ipc::kMapObject);
+    const std::string request = request_stream.str();
+    if (!mq.timed_send(request.c_str(), request.length(), 0, deadline)) {
+      SPDLOG_ERROR("ipcClient: command queue '{}' stayed full until the deadline", names_.queryQueue);
       done = true;
       pt_response.put("error.response", "server not found");
       return pt_response;
     }
 
-    std::size_t processId = getpid();
-    auto it               = mymap->end();
-    {
-      IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
-      it = mymap->find(processId);
-    }
-
-    // Budżet liczony ZEGAREM, a nie liczbą obrotów pętli. Obrót to sen plus
-    // `lock` na muteksie współdzielonym z wątkiem emisji serwera, więc na
-    // obciążonej maszynie trwa dłużej niż sam interwał - a wtedy liczenie prób
-    // skracało faktyczne czekanie dokładnie w sytuacji, w której potrzebne było
-    // najdłuższe (issue_217).
-    const auto deadline = std::chrono::steady_clock::now() + clientResponseMaxFails_ * ipc::kClientResponsePollInterval;
-    while (it == mymap->end() && std::chrono::steady_clock::now() < deadline) {
-      std::this_thread::sleep_for(ipc::kClientResponsePollInterval);
-      IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
-      it = mymap->find(processId);
-    }
-    if (it == mymap->end()) {
+    const auto response = ipc::responses::take(responses.segment(), self, deadline, ipc::kClientResponsePollInterval);
+    if (!response) {
       SPDLOG_ERROR("server not found");
       done = true;
       pt_response.put("error.response", "server not found");
       return pt_response;
     }
-    std::stringstream strstream;
-    {
-      IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
-      it = mymap->find(processId);
-      if (it != mymap->end()) {
-        strstream << it->second;
-        mymap->erase(it);
-      }
-    }
+    std::stringstream strstream(*response);
     read_info(strstream, pt_response);
   } catch (IPC::interprocess_exception &e) {
     done = true;

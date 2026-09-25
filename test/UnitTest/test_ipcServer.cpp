@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <sys/wait.h>
+#include <unistd.h>
+
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstddef>
@@ -11,13 +15,12 @@
 #include <thread>
 
 #include <boost/interprocess/ipc/message_queue.hpp>
-#include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/interprocess/sync/named_mutex.hpp>
-#include <boost/interprocess/sync/scoped_lock.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/property_tree/info_parser.hpp>
 
 #include "constants.hpp"
-#include "ipcTypes.hpp"
+#include "ipcResponses.hpp"
 #include "retractor/lib/ipcServer.hpp"
 
 namespace {
@@ -46,9 +49,42 @@ bool queueExists(int clientId, std::string_view serverName = {}) {
   }
 }
 
-bool namedMutexExists(const std::string &name) {
+/// Stan, ktory zostawia proces zabity w srodku send/receive: wewnetrzny muteks kolejki zajety
+/// przez proces, ktory juz nie zyje. Potomek bierze go wprost z segmentu kolejki i konczy sie
+/// bez zwolnienia - bez wyscigu, ktorego nie dalo by sie zamowic kill -9 z zewnatrz.
+/// Uklad naglowka (mq_hdr_t za ManagedOpenOrCreateUserOffset) to szczegol Boosta; gdyby sie
+/// zmienil, testy ponizej oblewaja na kontroli dodatniej, a nie przechodza falszywie.
+void abandonQueueLock(const std::string &queueName) {
+  const pid_t child = fork();
+  if (child == 0) {
+    using Impl   = IPC::ipcdetail::managed_open_or_create_impl<IPC::shared_memory_object, 0, true, false>;
+    using Header = IPC::ipcdetail::mq_hdr_t<IPC::offset_ptr<void>>;
+    IPC::shared_memory_object shm(IPC::open_only, queueName.c_str(), IPC::read_write);
+    IPC::mapped_region region(shm, IPC::read_write);
+    auto *header = reinterpret_cast<Header *>(static_cast<char *>(region.get_address()) + Impl::ManagedOpenOrCreateUserOffset);
+    header->m_mutex.lock();
+    _exit(0);
+  }
+  waitpid(child, nullptr, 0);
+}
+
+/// Kontrola dodatnia dla abandonQueueLock: kolejka po niej rzuca not_recoverable. Uchwyt
+/// otwarty PRZED porzuceniem - serwer moze juz odtworzyc kolejke pod ta sama nazwa.
+bool queueLockIsAbandoned(IPC::message_queue &mq) {
   try {
-    IPC::named_mutex m(IPC::open_only, name.c_str());
+    std::array<char, ipc::kResponseQueueMaxMessageSize> buffer{};
+    IPC::message_queue::size_type received = 0;
+    unsigned int priority                  = 0;
+    (void)mq.try_receive(buffer.data(), buffer.size(), received, priority);
+    return false;
+  } catch (const IPC::interprocess_exception &ex) {
+    return ex.get_error_code() == IPC::not_recoverable;
+  }
+}
+
+bool segmentExists(const std::string &name) {
+  try {
+    IPC::shared_memory_object shm(IPC::open_only, name.c_str(), IPC::read_only);
     return true;
   } catch (const IPC::interprocess_exception &) {
     return false;
@@ -66,7 +102,7 @@ class IpcServerQueues : public ::testing::Test {
     for (const std::string_view server : {std::string_view{}, kServerA, kServerB}) {
       IPC::message_queue::remove(queueNameFor(kClientA, server).c_str());
       IPC::message_queue::remove(queueNameFor(kClientB, server).c_str());
-      IPC::named_mutex::remove(ipc::names(server).mapMutex.c_str());
+      IPC::shared_memory_object::remove(ipc::names(server).shmemSegment.c_str());
     }
   }
 };
@@ -110,17 +146,16 @@ TEST_F(IpcServerQueues, exit_handler_removes_client_queues_too) {
   EXPECT_FALSE(queueExists(kClientB)) << "kolejka klienta przetrwala sciezke atexit";
 }
 
-// Obie drogi wyjscia kasuja ten sam zestaw obiektow globalnych. Muteks nazwany
-// leczyl sie sam dopiero na starcie nastepnej instancji.
-TEST_F(IpcServerQueues, exit_handler_removes_named_mutex) {
-  const std::string mutexName = ipc::names().mapMutex;
-  IPC::named_mutex created(IPC::open_or_create, mutexName.c_str());
-  ASSERT_TRUE(namedMutexExists(mutexName));
+// Obie drogi wyjscia kasuja ten sam zestaw obiektow globalnych, takze segment odpowiedzi.
+TEST_F(IpcServerQueues, exit_handler_removes_response_segment) {
+  const std::string segmentName = ipc::names().shmemSegment;
+  { const ipc::responses::Mapping created(IPC::create_only, segmentName); }
+  ASSERT_TRUE(segmentExists(segmentName));
 
   IpcServer server;
   server.shutdownFromExitHandler();
 
-  EXPECT_FALSE(namedMutexExists(mutexName));
+  EXPECT_FALSE(segmentExists(segmentName));
 }
 
 // Pusta nazwa serwera musi dawac DOKLADNIE nazwy historyczne. To jest kontrakt
@@ -128,7 +163,6 @@ TEST_F(IpcServerQueues, exit_handler_removes_named_mutex) {
 TEST_F(IpcServerQueues, empty_server_name_yields_historical_names) {
   const ipc::ServerNames n = ipc::names();
   EXPECT_EQ(n.shmemSegment, std::string(ipc::kShmemSegment));
-  EXPECT_EQ(n.mapMutex, std::string(ipc::kMapMutex));
   EXPECT_EQ(n.queryQueue, std::string(ipc::kQueryQueue));
   EXPECT_EQ(n.responseQueue(kClientA), std::string(ipc::kResponseQueuePrefix) + std::to_string(kClientA));
 }
@@ -160,24 +194,43 @@ TEST_F(IpcServerQueues, servers_with_distinct_names_have_disjoint_queues) {
   EXPECT_FALSE(queueExists(kClientA, kServerB));
 }
 
-// Ta sama rozlacznosc dla muteksu nazwanego: sciezka atexit serwera A nie moze
-// zdjac muteksu serwera B (przed rozdzieleniem obie strony uzywaly jednej nazwy).
-TEST_F(IpcServerQueues, exit_handler_does_not_touch_other_servers_mutex) {
-  const std::string mutexB = ipc::names(kServerB).mapMutex;
-  IPC::named_mutex createdB(IPC::open_or_create, mutexB.c_str());
-  ASSERT_TRUE(namedMutexExists(mutexB));
+// Ta sama rozlacznosc dla segmentu odpowiedzi: sciezka atexit serwera A nie moze
+// zdjac segmentu serwera B.
+TEST_F(IpcServerQueues, exit_handler_does_not_touch_other_servers_segment) {
+  const std::string segmentB = ipc::names(kServerB).shmemSegment;
+  { const ipc::responses::Mapping createdB(IPC::create_only, segmentB); }
+  ASSERT_TRUE(segmentExists(segmentB));
 
   IpcServer serverA;
   serverA.setServerName(kServerA);
   serverA.shutdownFromExitHandler();
 
-  EXPECT_TRUE(namedMutexExists(mutexB)) << "sciezka atexit serwera A skasowala muteks serwera B";
-  IPC::named_mutex::remove(mutexB.c_str());
+  EXPECT_TRUE(segmentExists(segmentB)) << "sciezka atexit serwera A skasowala segment odpowiedzi serwera B";
 }
 
 // Po skasowaniu kolejek rejestr subskrypcji nie moze zostac z wpisami wskazujacymi
 // na nieistniejace kolejki: drugie wywolanie ma nie miec czego kasowac i nie moze
 // rzucic ani zawiesic.
+// Klient zabity w srodku try_receive na swojej kolejce odpowiedzi. try_send rzucal wtedy
+// lock_exception(not_recoverable) poza broadcast() - az za petle przetwarzania, czyli jeden
+// klient konczyl serwer wszystkim. Kolejka martwego ma zniknac jak przepelniona, emisja trwac.
+TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
+  IpcServer server;
+  server.subscribe(kClientA, "strumien", 16);
+  server.subscribe(kClientB, "strumien", 16);
+  IPC::message_queue probe(IPC::open_only, queueNameFor(kClientA).c_str());
+  abandonQueueLock(queueNameFor(kClientA));
+  ASSERT_TRUE(queueLockIsAbandoned(probe)) << "symulacja martwego wlasciciela nie zadzialala";
+
+  const std::array<std::string_view, 1> streams{"strumien"};
+  EXPECT_NO_THROW(server.broadcast(streams, [](const std::string &) { return std::string("wiersz"); }));
+
+  EXPECT_FALSE(queueExists(kClientA)) << "kolejka martwego klienta zostala";
+  EXPECT_TRUE(queueExists(kClientB)) << "zdrowy klient stracil kolejke";
+  EXPECT_NO_THROW(server.broadcast(streams, [](const std::string &) { return std::string("wiersz"); }));
+  server.removeAllObjects();
+}
+
 TEST_F(IpcServerQueues, removal_is_idempotent) {
   IpcServer server;
   server.subscribe(kClientA, "strumien", 16);
@@ -190,7 +243,7 @@ TEST_F(IpcServerQueues, removal_is_idempotent) {
 
 namespace {
 
-// Wlasny obszar nazw: watek komunikacyjny kasuje na wejsciu segment, kolejke komend i muteks
+// Wlasny obszar nazw: watek komunikacyjny kasuje na wejsciu segment i kolejke komend
 // SWOJEGO serwera, wiec obszar historyczny i obszary kServerA/kServerB zostaja nietkniete.
 constexpr std::string_view kServerLoop = "srvloop";
 constexpr int kClientFull              = 990003;
@@ -239,28 +292,36 @@ class RunningServer {
     mq.send(bytes.data(), bytes.size(), 0);
   }
 
-  /// Odpowiedz dla `clientId` z mapy odpowiedzi, zdjeta tak, jak zdejmuje ja IpcClient::netClient.
-  [[nodiscard]] std::optional<ptree> response(int clientId) const {
-    IPC::managed_shared_memory segment(IPC::open_only, names_.shmemSegment.c_str());
-    IPC::named_mutex mutex(IPC::open_only, names_.mapMutex.c_str());
-    ipc::IPCMap *map = segment.find<ipc::IPCMap>(std::string(ipc::kMapObject).c_str()).first;
-    if (map == nullptr) return std::nullopt;
+  /// send ponawiany, dopoki kolejka pod ta nazwa nie przyjmie wiadomosci. Po odtworzeniu kolejki
+  /// przez serwer pierwsze proby moga jeszcze trafic w stara, porzucona.
+  [[nodiscard]] bool sendWithin(const std::string &bytes) const {
     const auto deadline = std::chrono::steady_clock::now() + kResponseBudget;
     while (std::chrono::steady_clock::now() < deadline) {
-      {
-        IPC::scoped_lock<IPC::named_mutex> lock(mutex);
-        if (auto it = map->find(clientId); it != map->end()) {
-          std::stringstream text;
-          text << it->second;
-          map->erase(it);
-          ptree retVal;
-          read_info(text, retVal);
-          return retVal;
-        }
+      try {
+        send(bytes);
+        return true;
+      } catch (const IPC::interprocess_exception &) {
+        std::this_thread::sleep_for(ipc::kClientResponsePollInterval);
       }
-      std::this_thread::sleep_for(ipc::kClientResponsePollInterval);
     }
-    return std::nullopt;
+    return false;
+  }
+
+  [[nodiscard]] const std::string &commandQueue() const { return names_.queryQueue; }
+
+  /// Odpowiedz dla `clientId` ze slotow odpowiedzi, zdjeta tak, jak zdejmuje ja IpcClient::netClient.
+  /// Komendy testu nie niosa db.seq, a `clientId` nie jest zywym procesem, wiec serwer zapisuje
+  /// seq 0 i startTime 0 (znacznika startu nie ma czego odczytac).
+  [[nodiscard]] std::optional<ptree> response(int clientId) const {
+    const ipc::responses::Mapping responses(IPC::open_only, names_.shmemSegment);
+    if (!responses.valid()) return std::nullopt;
+    const auto text = ipc::responses::take(responses.segment(), {.pid = clientId, .startTime = 0, .seq = 0},
+                                           std::chrono::steady_clock::now() + kResponseBudget, ipc::kClientResponsePollInterval);
+    if (!text) return std::nullopt;
+    std::stringstream stream(*text);
+    ptree retVal;
+    read_info(stream, retVal);
+    return retVal;
   }
 
  private:
@@ -340,4 +401,21 @@ TEST(IpcServerLoop, command_without_client_id_is_rejected_and_server_keeps_servi
   const auto next = server.response(kClientNext);
   ASSERT_TRUE(next.has_value()) << "watek komunikacyjny przestal obslugiwac komendy";
   EXPECT_EQ(server.handled(), 1) << "komenda bez db.id zostala wykonana";
+}
+
+// Klient zabity w srodku send z muteksem kolejki komend w reku. try_receive rzucal potem
+// not_recoverable przy kazdym obrocie, a wyjatek konczyl watek komunikacyjny: serwer liczyl
+// dalej, ale nie przyjmowal juz zadnej komendy. Ma odtworzyc kolejke i obsluzyc nastepna.
+TEST(IpcServerLoop, command_queue_abandoned_by_dead_client_is_recreated) {
+  RunningServer server;
+  ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
+
+  IPC::message_queue probe(IPC::open_only, server.commandQueue().c_str());
+  abandonQueueLock(server.commandQueue());
+  ASSERT_TRUE(queueLockIsAbandoned(probe)) << "symulacja martwego wlasciciela nie zadzialala";
+
+  ASSERT_TRUE(server.sendWithin(command(kClientNext, "po"))) << "kolejka komend nie zostala odtworzona";
+  const auto next = server.response(kClientNext);
+  ASSERT_TRUE(next.has_value()) << "watek komunikacyjny przestal obslugiwac komendy";
+  EXPECT_EQ(server.handled(), 1);
 }

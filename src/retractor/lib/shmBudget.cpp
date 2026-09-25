@@ -147,7 +147,7 @@ std::string report(const qTree &plan, int bufferSeconds, int minElements) {
   else
     retVal += "  capacity                     unknown (statvfs failed)\n";
 
-  retVal += std::format("  fixed reservation        {:>12}   bus segment {} + command queue {} + map segment {}\n",  //
+  retVal += std::format("  fixed reservation        {:>12}   bus segment {} + command queue {} + response segment {}\n",  //
                         humanBytes(fixed), humanBytes(bus::segmentBytes()),
                         humanBytes(messageQueueBytes(ipc::kQueryQueueMaxMessages, ipc::kQueryQueueMaxMessageSize)),
                         humanBytes(ipc::kShmemSegmentSize));

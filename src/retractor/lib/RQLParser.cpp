@@ -44,10 +44,10 @@ struct RQLSyntaxError {
 
 /// Gorne ograniczenie dlugosci komunikatu wracajacego do klienta.
 ///
-/// Komunikat idzie do odpowiedzi serwera jako IPCString we WSPOLNYM segmencie 64 kB
-/// (ipc::kShmemSegmentSize). Lista `expecting {...}` przy blednym poczatku instrukcji
-/// wylicza kilkadziesiat tokenow; wyczerpanie segmentu konczy sie bad_alloc-iem lapanym
-/// POZA petla odbioru, czyli smiercia watku komunikacyjnego z dala od przyczyny.
+/// Komunikat idzie do odpowiedzi serwera, a ta do slotu o stalym rozmiarze
+/// (ipc::kResponseSlotDataSize). Lista `expecting {...}` przy blednym poczatku instrukcji
+/// wylicza kilkadziesiat tokenow; odpowiedz dluzsza od slotu klient dostaje jako blad
+/// "response too large" zamiast diagnostyki.
 constexpr size_t kMaxSyntaxErrorMessage = 300;
 
 /// Nazwa agregatu zlozona do malych liter. Lekser dopuszcza dwie pisownie ('MIN'|'min'),

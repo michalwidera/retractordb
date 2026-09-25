@@ -13,7 +13,6 @@
 #include <gtest/gtest.h>
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
-#include <boost/interprocess/sync/named_mutex.hpp>
 
 #include "constants.hpp"
 #include "platformConfig.h"
@@ -300,7 +299,7 @@ TEST(IpcIdentity, HashedNamesCannotAliasLiteralNames) {
   EXPECT_EQ(ipc::shortServerTag("review_long_name_10"), "0cb235fc4");
   EXPECT_NE(ipc::serverNameToken("review_long_name_10"), ipc::serverNameToken("cb235fc4"));
   const auto names = ipc::names("review_long_name_10");
-  EXPECT_LE(names.mapMutex.size() + 1, ipc::kMaxObjectNameLength);
+  EXPECT_LE(names.shmemSegment.size() + 1, ipc::kMaxObjectNameLength);
   EXPECT_LE(names.queryQueue.size() + 1, ipc::kMaxObjectNameLength);
   EXPECT_LE(names.responseQueue(2147483647).size() + 1, ipc::kMaxObjectNameLength);
 }
@@ -388,7 +387,6 @@ TEST(LockManagerSweep, RemovesOnlyAbandonedLocksAndTheirIpcObjects) {
   { std::ofstream touch(ipc::identityLockPath(deadNames.queryQueue)); }
   IPC::shared_memory_object(IPC::create_only, deadNames.shmemSegment.c_str(), IPC::read_write);
   IPC::message_queue(IPC::create_only, deadNames.queryQueue.c_str(), 1, 16);
-  IPC::named_mutex(IPC::create_only, deadNames.mapMutex.c_str());
 
   // Instancja zywa: te same rodzaje zasobow, ale blokady trzyma jej straznik.
   FlockServiceGuard liveGuard("xretractor_service." + live);
@@ -405,7 +403,6 @@ TEST(LockManagerSweep, RemovesOnlyAbandonedLocksAndTheirIpcObjects) {
   EXPECT_FALSE(std::filesystem::exists(ipc::identityLockPath(deadNames.queryQueue)));
   EXPECT_FALSE(shmExists(deadNames.shmemSegment));
   EXPECT_FALSE(IPC::message_queue::remove(deadNames.queryQueue.c_str())) << "kolejka komend przetrwala sprzatanie";
-  EXPECT_FALSE(IPC::named_mutex::remove(deadNames.mapMutex.c_str())) << "muteks mapy przetrwal sprzatanie";
 
   EXPECT_TRUE(std::filesystem::exists(dir / ("xretractor_service." + live + ".lock")));
   EXPECT_TRUE(std::filesystem::exists(ipc::identityLockPath(liveNames.queryQueue)));

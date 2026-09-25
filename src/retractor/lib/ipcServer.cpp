@@ -16,23 +16,17 @@
 #include <utility>
 
 #include <spdlog/spdlog.h>
-#include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/permissions.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
-#include <boost/interprocess/sync/named_mutex.hpp>
-#include <boost/interprocess/sync/scoped_lock.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/property_tree/info_parser.hpp>
 
 #include "constants.hpp"
-#include "ipcTypes.hpp"
+#include "ipcResponses.hpp"
+#include "osPlatform.hpp"
 #include "shmBudget.hpp"
 
 namespace IPC = boost::interprocess;
-
-using ipc::IPCMap;
-using ipc::IPCString;
-using ipc::ShmemAllocator;
 
 void IpcServer::setServerName(std::string_view serverName) { names_ = ipc::names(serverName); }
 
@@ -103,7 +97,6 @@ void IpcServer::removeAllObjects() {
 void IpcServer::removeGlobalObjects() const {
   IPC::shared_memory_object::remove(names_.shmemSegment.c_str());
   IPC::message_queue::remove(names_.queryQueue.c_str());
-  IPC::named_mutex::remove(names_.mapMutex.c_str());
 }
 
 /// Kolejka odpowiedzi, ktora przetrwa smierc serwera, nie jest tylko smieciem w
@@ -157,6 +150,22 @@ void IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
     std::scoped_lock lock(clientMapsMutex_);
     id2StreamNameRelation_[clientId] = streamName;
     id2QueueCache_[clientId]         = std::move(queueHandle);
+  }
+}
+
+/// Kolejka boosta trzyma w segmencie wlasny muteks, na Linuksie robust. Proces zabity z tym
+/// muteksem w reku - klient w srodku try_receive - zostawia go NIENAPRAWIALNYM: kazde nastepne
+/// zajecie rzuca lock_exception(not_recoverable), na zawsze. Wyjatek z try_send wychodzil poza
+/// broadcast() az za petle przetwarzania, czyli jeden klient zabity w zlej chwili konczyl caly
+/// serwer. Taka kolejka nalezy do martwego klienta, wiec traktujemy ja jak kolejke przepelniona:
+/// falsz, a wolajacy ja kasuje i wypisuje klienta.
+bool IpcServer::trySendOrAbandoned(IPC::message_queue &queue, const std::string &row, int clientId) {
+  try {
+    return queue.try_send(row.c_str(), row.length(), 0);
+  } catch (const IPC::interprocess_exception &ex) {
+    if (ex.get_error_code() != IPC::not_recoverable) throw;
+    SPDLOG_ERROR("response queue of client {} abandoned by a process that died holding its lock", clientId);
+    return false;
   }
 }
 
@@ -215,7 +224,7 @@ void IpcServer::broadcast(std::span<const std::string_view> streams, const RowFo
         // If send queue is full - means no one is listening and queue is
         // going to remove
         //
-        if (!mqPtr->try_send(row.c_str(), row.length(), 0)) {
+        if (!trySendOrAbandoned(*mqPtr, row, element.first)) {
           mqPtr.reset();  // zamknij mapowanie przed unlink
           IPC::message_queue::remove(queueName.c_str());
           eraseList.push_back(element.first);
@@ -267,31 +276,24 @@ void IpcServer::broadcastOutOfBusiness() {
 void IpcServer::commandLoop() const {
   bool readyAnnounced = false;
   try {
-    // Kasowanie na wejsciu sprzata po poprzedniku, ktory PADL: po SIGKILL segment, kolejka
-    // i muteks zostaja w /dev/shm, a open_or_create trafiloby na nie i probowalo skonstruowac
-    // mape w segmencie, w ktorym ona juz jest. Jest to bezpieczne wylacznie dlatego, ze
+    // Kasowanie na wejsciu sprzata po poprzedniku, ktory PADL: po SIGKILL segment i kolejka
+    // zostaja w /dev/shm, a segment odpowiedzi moze nosic sloty w stanie posrednim. Jest to
+    // bezpieczne wylacznie dlatego, ze
     // executorsm::run() przejmuje blokade instancji PRZED start() -- flock dowodzi, ze zaden
     // inny ZYWY serwer tych obiektow nie uzywa. Nazwy pochodza z names_, wiec kasowanie nigdy
     // nie siega poza obszar tego serwera.
     IPC::message_queue::remove(names_.queryQueue.c_str());
     IPC::shared_memory_object::remove(names_.shmemSegment.c_str());
-    IPC::named_mutex::remove(names_.mapMutex.c_str());
-    // Segment and allocator for map purposes
-    // `nullptr` to argument adresu odwzorowania - stoi przed uprawnieniami w sygnaturze Boosta
-    // i jego pominiecie jest jedynym powodem, dla ktorego ten wiersz wyglada inaczej niz reszta.
-    IPC::managed_shared_memory mapSegment(IPC::open_or_create, names_.shmemSegment.c_str(), ipc::kShmemSegmentSize, nullptr,
-                                          IPC::permissions(ipc::kObjectPermissions));
-    const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
-    IPC::named_mutex mapMutex(IPC::open_or_create, names_.mapMutex.c_str(), IPC::permissions(ipc::kObjectPermissions));
-    // Create a message_queue.
-    IPC::message_queue mq(IPC::open_or_create,                       // open or crate
-                          names_.queryQueue.c_str(),                 // name
-                          ipc::kQueryQueueMaxMessages,               // max message number
-                          ipc::kQueryQueueMaxMessageSize,            // max message size
-                          IPC::permissions(ipc::kObjectPermissions)  // tylko konto serwera
-    );
-    IPCMap *mymap = mapSegment.construct<IPCMap>(std::string(ipc::kMapObject).c_str())  // object name
-                    (std::less<>(), allocatorShmemMapInstance);
+    const ipc::responses::Mapping responses(IPC::create_only, names_.shmemSegment);
+    const auto createCommandQueue = [this] {
+      return std::make_unique<IPC::message_queue>(IPC::open_or_create,                       // open or crate
+                                                  names_.queryQueue.c_str(),                 // name
+                                                  ipc::kQueryQueueMaxMessages,               // max message number
+                                                  ipc::kQueryQueueMaxMessageSize,            // max message size
+                                                  IPC::permissions(ipc::kObjectPermissions)  // tylko konto serwera
+      );
+    };
+    auto mq = createCommandQueue();
     callbacks_.onReady();
     readyAnnounced = true;
     //
@@ -305,9 +307,28 @@ void IpcServer::commandLoop() const {
     unsigned int priority;
     IPC::message_queue::size_type recvd_size;
 
+    // Klient zabity w srodku send z wewnetrznym muteksem kolejki w reku zostawia go
+    // nienaprawialnym (patrz trySendOrAbandoned): kazde nastepne try_receive rzucaloby
+    // lock_exception(not_recoverable), a wyjatek konczyl watek komunikacyjny - serwer liczyl
+    // dalej, ale nie przyjmowal juz zadnej komendy, takze 'kill'. Kolejke zakladamy wtedy od
+    // nowa pod ta sama nazwa. Komendy, ktore w niej czekaly, przepadaja: ich klienci koncza sie
+    // limitem czasu, a kazdy nastepny otwiera juz nowa kolejke.
+    const auto tryReceive = [&] {
+      try {
+        return mq->try_receive(message.data(), ipc::kQueryQueueMaxMessageSize, recvd_size, priority);
+      } catch (const IPC::interprocess_exception &ex) {
+        if (ex.get_error_code() != IPC::not_recoverable) throw;
+        SPDLOG_ERROR("command queue '{}' abandoned by a process that died holding its lock; recreating it", names_.queryQueue);
+        mq.reset();
+        IPC::message_queue::remove(names_.queryQueue.c_str());
+        mq = createCommandQueue();
+        return false;
+      }
+    };
+
     bool loopRunning = true;
     while (loopRunning) {
-      while (mq.try_receive(message.data(), ipc::kQueryQueueMaxMessageSize, recvd_size, priority)) {
+      while (tryReceive()) {
         message[recvd_size] = 0;
         std::stringstream strstream;
         strstream << message.data();
@@ -317,7 +338,7 @@ void IpcServer::commandLoop() const {
         // tego nie zauwaza (ipcFailed czyta sie tylko przy starcie), wiec serwer liczy dalej,
         // ale nie przyjmuje juz zadnej komendy, takze 'kill' i '--reset'. onCommand jest
         // oslonione w commandProcessor; ten blok obejmuje to, co wokol niego: parser INFO,
-        // db.id oraz budowe odpowiedzi w segmencie 64 KiB, ktorego wyczerpanie daje bad_alloc.
+        // db.id oraz serializacje odpowiedzi.
         try {
           ptree pt;
           read_info(strstream, pt);
@@ -328,6 +349,10 @@ void IpcServer::commandLoop() const {
             SPDLOG_ERROR("IPC command '{}' rejected: missing or invalid db.id, no client to answer", pt.get("db.message", ""));
             continue;
           }
+          // db.seq odroznia kolejne zadania jednego procesu. Klient bez niego (starsza binarka)
+          // dostaje seq 0 i nadal odbiera swoja odpowiedz, bo sam tez czeka na 0.
+          std::uint64_t clientSeq = 0;
+          boost::conversion::try_lexical_convert(pt.get("db.seq", "0"), clientSeq);
           ptree pt_retval = callbacks_.onCommand(pt);
           // Sygnal idzie PO obsludze komendy, nie po jej odebraniu. Jedynym jego odbiorca jest
           // bramka --xqrywait, a bramka zdjeta w chwili ODEBRANIA komendy wpuszczala watek
@@ -343,13 +368,11 @@ void IpcServer::commandLoop() const {
           // Sending answer
           std::stringstream response_stream;
           write_info(response_stream, pt_retval);
-          IPCString ipcResponse(allocatorShmemMapInstance);
-          ipcResponse = response_stream.str().c_str();
-          // cppcheck-suppress danglingTemporaryLifetime
-          {
-            IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
-            mymap->insert(std::pair<int, IPCString>(clientProcessId, ipcResponse));
-          }
+          // Znacznik startu klienta czytany TERAZ, w chwili zapisu: po nim serwer rozpozna, ze
+          // wlasciciel slotu umarl, nawet jesli jego PID dostal juz inny proces.
+          const ipc::responses::Owner owner{
+              .pid = clientProcessId, .startTime = osplat::inspectProcess(clientProcessId).startTime, .seq = clientSeq};
+          ipc::responses::publish(responses.segment(), owner, response_stream.str());
         } catch (const std::exception &ex) {
           SPDLOG_ERROR("IPC message dropped: {}", ex.what());
         }

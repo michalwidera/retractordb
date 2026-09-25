@@ -36,7 +36,7 @@ add_test(
 #     constants.hpp), a nie 100 ms; zaglodzenie watku komunikacyjnego na 3 s pod `-j 4` na
 #     24 rdzeniach nie jest wiarygodne;
 #   * odtworzenie obiektow przez klienta - kazda sciezka xqry otwiera je przez `open_only`
-#     (ipcClient.cpp:111,112,117; qryLauncher.cpp:65,66), wiec klient nie moze zalozyc obiektu
+#     (ipcClient.cpp:122,142; qryLauncher.cpp:65,66), wiec klient nie moze zalozyc obiektu
 #     globalnego na nowo i zmienic i-wezla;
 #   * segment magistrali w porownywanym zbiorze - nazywa sie `xrdbbus_v6_<przestrzen>`
 #     z PODKRESLENIEM, a wzorzec verify.py wymaga kropki;
