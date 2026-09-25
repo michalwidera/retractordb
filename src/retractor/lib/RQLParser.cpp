@@ -3,7 +3,10 @@
 #include <algorithm>
 #include <cctype>
 #include <iostream>
+#include <optional>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -98,6 +101,32 @@ std::string lowercased(std::string text) {
   parser.removeParseListeners();
   throw RQLSyntaxError{std::move(message)};
 }
+
+/// Wartosc literalu liczbowego albo nullopt, gdy nie miesci sie w typie T.
+///
+/// Wyjatek NIE MOZE wyjsc z metody exit* listenera: te biegna z destruktora
+/// antlrcpp::FinalAction w generowanym parserze, ktory jest noexcept, wiec kazdy rzut konczy
+/// sie tam std::terminate. Do 2026-09-25 `xqry -a` z literalem 99999999999 konczyl tak
+/// dzialajacy serwer (#306). Tokeny DECIMAL i FLOAT nie maja ograniczenia dlugosci, wiec
+/// std::out_of_range jest osiagalny z tekstu RQL; std::invalid_argument - nie, lekser
+/// przepuszcza tu wylacznie cyfry i kropke.
+///
+/// std::sto*, a nie std::from_chars: wariant zmiennoprzecinkowy from_chars pojawil sie w libc++
+/// dopiero w LLVM 20 i jest objety adnotacja dostepnosci biblioteki systemowej, a port macOS
+/// celuje w 14.4. Przy okazji kazdy literal w zakresie jest przyjmowany dokladnie jak dotad.
+template <typename T>
+std::optional<T> parseLiteral(const std::string &text) {
+  try {
+    if constexpr (std::is_same_v<T, float>)
+      return std::stof(text);
+    else if constexpr (std::is_same_v<T, double>)
+      return std::stod(text);
+    else
+      return std::stoi(text);
+  } catch (const std::out_of_range &) {
+    return std::nullopt;
+  }
+}
 }  // namespace
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
@@ -179,6 +208,20 @@ class ParserListener : public RQLBaseListener {
     std::cerr << "Error: " << message << '\n';
     SPDLOG_ERROR("Parser: {}", message);
     if (semanticError_.empty()) semanticError_ = message;
+  }
+
+  void reportOutOfRange(const std::string &text) { reportSemanticError("numeric literal " + text + " is out of range"); }
+
+  /// Literal liczbowy; spoza zakresu - blad planu i wartosc zastepcza 0.
+  ///
+  /// Zero jest wypelnieniem, nie wynikiem: plan z bledem semantycznym jest odrzucany w calosci,
+  /// ale listener idzie dalej przez kolejne reguly, wiec `program` i reszta stanu musza
+  /// zachowac taki ksztalt, jaki mialyby przy poprawnej liczbie.
+  template <typename T>
+  T literal(const std::string &text) {
+    if (const auto value = parseLiteral<T>(text)) return *value;
+    reportOutOfRange(text);
+    return T{};
   }
 
   /// Dopina regule do strumienia wskazanego przez ON. Zwraca pusty napis albo powod odmowy;
@@ -297,7 +340,7 @@ class ParserListener : public RQLBaseListener {
   /// (zostaje FatalError), a szerokosc niedodatnia jest bledem PLANU, ktory kompilator
   /// raportuje przez `Check result:` razem z pozostalymi kontrolami.
   void exitWindow_agg(RQLParser::Window_aggContext *ctx) override {
-    const int width = std::stoi(ctx->width->getText());
+    const int width = literal<int>(ctx->width->getText());
     if (windowArgMarks.empty()) FatalError("RQLParser::exitWindow_agg: no argument mark for '{}'", ctx->getText());
     const auto argStart = static_cast<int>(windowArgMarks.back());
     windowArgMarks.pop_back();
@@ -316,8 +359,8 @@ class ParserListener : public RQLBaseListener {
       FatalError("RQLParser::exitWindow_agg: unknown aggregate '{}'", ctx->children[0]->getText());
   }
 
-  void exitExpFloat(RQLParser::ExpFloatContext *ctx) override { recpToken(PUSH_VAL, std::stof(ctx->getText())); }
-  void exitExpDec(RQLParser::ExpDecContext *ctx) override { recpToken(PUSH_VAL, std::stoi(ctx->getText())); }
+  void exitExpFloat(RQLParser::ExpFloatContext *ctx) override { recpToken(PUSH_VAL, literal<float>(ctx->getText())); }
+  void exitExpDec(RQLParser::ExpDecContext *ctx) override { recpToken(PUSH_VAL, literal<int>(ctx->getText())); }
   void exitExpString(RQLParser::ExpStringContext *ctx) override {
     auto text = ctx->getText();
     // Strip surrounding single quotes
@@ -393,10 +436,10 @@ class ParserListener : public RQLBaseListener {
     int window{0};
     int step{0};
     if (ctx->children[kAgseWindowSignChildIndex]->getText() == "-")
-      window = -std::stoi(ctx->window->getText());
+      window = -literal<int>(ctx->window->getText());
     else
-      window = std::stoi(ctx->window->getText());
-    step = std::stoi(ctx->step->getText());
+      window = literal<int>(ctx->window->getText());
+    step = literal<int>(ctx->step->getText());
 
     program.emplace_back(STREAM_AGSE, std::make_pair(step, window));
   }
@@ -415,7 +458,7 @@ class ParserListener : public RQLBaseListener {
     const std::string name    = known ? std::string(known->canonical) : written;
 
     if (ctx->DECIMAL() != nullptr)
-      recpToken(CALL2, std::make_pair(name, std::stoi(ctx->DECIMAL()->getText())));
+      recpToken(CALL2, std::make_pair(name, literal<int>(ctx->DECIMAL()->getText())));
     else
       recpToken(CALL, name);
   }
@@ -443,29 +486,49 @@ class ParserListener : public RQLBaseListener {
   // https://www.programiz.com/cpp-programming/string-float-conversion
   // https://www.geeksforgeeks.org/converting-strings-numbers-cc/
 
+  /// Zakres liczy sie tu wzgledem `rational<int>`, nie `double`. Rationalize() nie odmawia:
+  /// wartosc od 2^31 w gore i niezerowa ponizej jej rozdzielczosci (1e-6) oddaje jako 0/1,
+  /// wiec `3000000000.0` i `0.00000001` dawaly interwal zerowy, a plan padal dopiero
+  /// w kompilatorze na mylacym "Circular dependency in stream definitions". Jawne `0.0` zostaje
+  /// poza ta kontrola - to zerowy interwal, a nie literal spoza zakresu.
   void exitRationalAsFloat(RQLParser::RationalAsFloatContext *ctx) override {
-    rationalResult = Rationalize(std::stod(ctx->FLOAT()->getText()));
+    const std::string text = ctx->FLOAT()->getText();
+    const auto value       = parseLiteral<double>(text);
+    const auto rational    = value ? Rationalize(*value) : boost::rational<int>{};
+    if (!value || (rational == 0 && *value != 0)) {
+      reportOutOfRange(text);
+      return;
+    }
+    rationalResult = rational;
   }
 
   void exitRationalAsDecimal(RQLParser::RationalAsDecimalContext *ctx) override {
-    rationalResult = std::stoi(ctx->DECIMAL()->getText());
+    rationalResult = literal<int>(ctx->DECIMAL()->getText());
   }
 
   void exitFraction(RQLParser::FractionContext *ctx) override {
-    const int nom = std::stoi(ctx->children[0]->getText());
-    const int den = std::stoi(ctx->children[2]->getText());
+    const std::string nomText = ctx->children[0]->getText();
+    const std::string denText = ctx->children[2]->getText();
+    const auto nom            = parseLiteral<int>(nomText);
+    const auto den            = parseLiteral<int>(denText);
+    // Bez wartosci zastepczej z literal(): zastepcze 0 w mianowniku dolozyloby na stderr drugi,
+    // falszywy komunikat o zerowym mianowniku.
+    if (!nom || !den) {
+      reportOutOfRange(nom ? denText : nomText);
+      return;
+    }
     // Blad planu, nie FatalError: `xqry -a` z `1/0` konczyl dzialajacy serwer. rationalResult
     // zostaje bez zmian - plan z bledem semantycznym jest odrzucany w calosci, a konstruktor
     // boost::rational z zerowym mianownikiem rzuca.
-    if (den == 0) {
+    if (*den == 0) {
       reportSemanticError("fraction " + ctx->getText() + " has a zero denominator");
       return;
     }
-    rationalResult = boost::rational<int>(nom, den);
+    rationalResult = boost::rational<int>(*nom, *den);
   }
 
   void exitSelect(RQLParser::SelectContext *ctx) override {
-    qry.generatorSize = (ctx->gen_size != nullptr) ? std::stoi(ctx->gen_size->getText()) : query::notAGenerator;
+    qry.generatorSize = (ctx->gen_size != nullptr) ? literal<int>(ctx->gen_size->getText()) : query::notAGenerator;
 
     // this loop creates field names in streamName + "_" + counter++
     //
@@ -521,12 +584,12 @@ class ParserListener : public RQLBaseListener {
   void exitRetention(RQLParser::RetentionContext *ctx) override {
     if (ctx->segments != nullptr) {
       // retention {capacity} !{segments}
-      qry.retention = std::pair<int, int>(      //
-          std::stoi(ctx->segments->getText()),  //
-          std::stoi(ctx->capacity->getText()));
+      qry.retention = std::pair<int, int>(         //
+          literal<int>(ctx->segments->getText()),  //
+          literal<int>(ctx->capacity->getText()));
     } else {
       // retention {capacity} - note: segments is optional but capacity is required
-      qry.policy.second = std::stoi(ctx->capacity->getText());
+      qry.policy.second = literal<int>(ctx->capacity->getText());
     }
   }
 
@@ -566,13 +629,13 @@ class ParserListener : public RQLBaseListener {
 
   void exitDumppart(RQLParser::DumppartContext *ctx) override {
     actionType = rule::DUMP;
-    dump_left  = std::stoi(ctx->step_back->getText());
+    dump_left  = literal<int>(ctx->step_back->getText());
     if (negatedBefore(ctx, ctx->step_back)) dump_left = -dump_left;
-    dump_right = std::stoi(ctx->step_forward->getText());
+    dump_right = literal<int>(ctx->step_forward->getText());
     if (negatedBefore(ctx, ctx->step_forward)) dump_right = -dump_right;
 
     if (ctx->rule_retnetion != nullptr)
-      dump_retention = std::stoi(ctx->rule_retnetion->getText());
+      dump_retention = literal<int>(ctx->rule_retnetion->getText());
     else
       dump_retention = 0;  // Default: no retention
   }
@@ -627,7 +690,7 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitSExpTimeMove(RQLParser::SExpTimeMoveContext *ctx) override {
-    recpToken(STREAM_TIMEMOVE, std::stoi(ctx->DECIMAL()->getText()));
+    recpToken(STREAM_TIMEMOVE, literal<int>(ctx->DECIMAL()->getText()));
   }
 
   /// Nazwa strumienia. Pozostale alternatywy `stream_factor` - `( e )` i wywolanie
@@ -719,7 +782,7 @@ class ParserListener : public RQLBaseListener {
 
   void exitSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) override {
     auto fTypeSizeArray = 1;  // Default:1
-    if (ctx->type_size != nullptr) fTypeSizeArray = std::stoi(ctx->type_size->getText());
+    if (ctx->type_size != nullptr) fTypeSizeArray = literal<int>(ctx->type_size->getText());
     std::list<token> emptyProgram;
     qry.lSchema.emplace_back(rdb::rField(ctx->ID()->getText(), fTypeSize, fTypeSizeArray, fType), emptyProgram);
     fType = rdb::BYTE;

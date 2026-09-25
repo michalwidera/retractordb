@@ -18,6 +18,27 @@ set -e
 . "$(dirname "$0")/../serverlib.sh"
 
 xretractor plan.rql -c
+
+# (0) Start z pliku planu: literal spoza zakresu typu jest bledem parsowania jak kazdy inny -
+# kod 71 i powod w "Parse result:". Do 2026-09-25 std::out_of_range z listenera parsera
+# konczyl proces przez std::terminate (SIGABRT, kod 134), bez slowa o przyczynie (#306).
+echo "DECLARE a INTEGER STREAM core0, 99999999999 FILE 'source.dat'" >out_of_range.rql
+set +e
+file_out=$(xretractor out_of_range.rql -c 2>&1)
+file_rc=$?
+set -e
+if [ "$file_rc" -ne 71 ]; then
+  echo "start z pliku z literalem spoza zakresu: kod $file_rc zamiast 71: $file_out"
+  exit 1
+fi
+case "$file_out" in
+  *"Parse result:numeric literal 99999999999 is out of range"*) ;;
+  *)
+    echo "start z pliku nie podal powodu w 'Parse result:'; dostal: $file_out"
+    exit 1
+    ;;
+esac
+
 server_start plan.rql
 
 # (1) Bledne zapytanie: klient MUSI wyjsc niezerowo i powiedziec, ze to blad parsowania.
@@ -86,7 +107,9 @@ fi
 #   - pusty FILE w DECLARE - przechodzil parser i ginal dopiero na FatalError w rdb::StoragePaths
 #     przy rejestracji w modelu, czyli juz po imporcie do zywego planu,
 #   - zarezerwowana nazwa strumienia - abort(), czyli SIGABRT,
-#   - ulamek z zerowym mianownikiem - FatalError w listenerze parsera.
+#   - ulamek z zerowym mianownikiem - FatalError w listenerze parsera,
+#   - literal liczbowy spoza zakresu typu - std::out_of_range z listenera, ktory biegnie
+#     z noexcept-owego destruktora w generowanym parserze, czyli std::terminate (#306).
 # Parser biegnie w procesie DZIALAJACEGO serwera, wiec kazdy z nich byl bledem calej instancji.
 expect_parse_rejected() {
   local query="$1" reason="$2" out rc
@@ -120,6 +143,11 @@ expect_parse_rejected "SELECT a[0] STREAM emptyfile FROM core0 FILE ''" "FILE of
 expect_parse_rejected "DECLARE a INTEGER STREAM emptydecl, 1 FILE ''" "FILE of stream emptydecl requires a non-empty file name"
 expect_parse_rejected "SELECT a[0] STREAM OUT_OF_BUSSINESS FROM core0" "OUT_OF_BUSSINESS is reserved stream name"
 expect_parse_rejected "DECLARE a INTEGER STREAM zerorate, 1/0 FILE 'source.dat'" "fraction 1/0 has a zero denominator"
+expect_parse_rejected "DECLARE a INTEGER STREAM bigrate, 99999999999 FILE 'source.dat'" \
+  "numeric literal 99999999999 is out of range"
+expect_parse_rejected "SELECT core0[0]+10000000000000000000000000000000000000000.0 STREAM bigfloat FROM core0" \
+  "numeric literal 10000000000000000000000000000000000000000.0 is out of range"
+expect_parse_rejected "SELECT core0[0] STREAM bigshift FROM core0>99999999999" "numeric literal 99999999999 is out of range"
 
 # (3) Kolejne poprawne zapytanie nadal dziala.
 ok_out=$(xqry -a 'select a[0] stream adhocok from core0' 2>&1) || {
