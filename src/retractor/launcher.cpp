@@ -344,8 +344,7 @@ int main(int argc, char *argv[]) try {
   // Bez --name zostaje tozsamosc historyczna (jeden serwer na maszyne, ta sama nazwa blokady
   // i te same obiekty IPC co dotad). Nazwa wlacza rezim wieloserwerowy i jest opcjonalna
   // wlasnie po to, zeby dotychczasowe uzycie nie zmienilo sie ani o jeden plik.
-  const std::string executableName = std::filesystem::path(argv[0]).filename().string();
-  const std::string serviceName    = executableName + "_service" + (earlyServerName.empty() ? "" : "." + earlyServerName);
+  const std::string serviceName = ipc::serviceName(earlyServerName);
   FlockServiceGuard guard(serviceName);
   guard.setLockDir(earlyAppCfg.lockDir);
 
@@ -588,7 +587,7 @@ int main(int argc, char *argv[]) try {
         } else {
           for (const auto &live : instances) {
             if ((live.modes & bus::mode::kService) == 0U) continue;
-            FlockServiceGuard peerGuard(executableName + "_service" + (live.name.empty() ? "" : "." + live.name));
+            FlockServiceGuard peerGuard(ipc::serviceName(live.name));
             peerGuard.setLockDir(earlyAppCfg.lockDir);
             const FlockServiceGuard::PeerInfo found = peerGuard.readPeerInfo();
             if (isServicePeer(found)) {

@@ -26,7 +26,7 @@ The `xtrdb` tool serves several key functions:
 - **Artifact File Set**: Manage the data file, `.desc` schema, `.meta` null/gap index, and optional shadow files
 - **Deterministic Testing**: Create reproducible test scenarios
 
-> `xtrdb` detects a running default `xretractor` instance and refuses to enter interactive mode. It does not coordinate with named instances, so stop any engine that owns the target files before inspecting or modifying them offline.
+> `xtrdb` refuses to enter interactive mode while any `xretractor` instance is running - unnamed, named (`--name`) or under `RDB_NAMESPACE`. It looks for held `xretractor_service*.lock` files in the lock directory of the same configuration the engine reads (`paths.lock_dir`, otherwise `TMPDIR`). An engine started with `--config` pointing at another `lock_dir`, or with a different `TMPDIR`, stays invisible, so stop any engine that owns the target files before inspecting or modifying them offline.
 
 ## Supported Data Types
 
