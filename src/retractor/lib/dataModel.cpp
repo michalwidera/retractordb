@@ -68,10 +68,10 @@ bool dataModel::addQueryToModel(const std::string &id) {
   }
 
   qSet.emplace(id, std::make_unique<streamInstance>(coreInstance_, *it, directive_[":STORAGE"]));
-  qSet[id]->outputPayload->setDisposable(coreInstance_[id].isDisposable);
+  streamRuntime(id).outputPayload->setDisposable(coreInstance_[id].isDisposable);
   // SELECT dodany do działającego planu nie zaczyna w historycznym origin całego systemu.
   // Jego bazę wyznaczy dokładny pierwszy slot, w którym runtime zobaczy tę instancję.
-  if (!it->isDeclaration()) qSet[id]->logicalIndexBase.reset();
+  if (!it->isDeclaration()) streamRuntime(id).logicalIndexBase.reset();
 
   return true;
 }
@@ -91,12 +91,13 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &
   // This gePayload is called by constructInputPayload algebraic functions
   // that need to access different streams from qSet
   // this also need to release HOLD state if set for each stream before read
-  qSet[instance]->outputPayload->releaseOnHold();
+  auto &out = *(streamRuntime(instance).outputPayload);
+  out.releaseOnHold();
 
-  if (!qSet[instance]->outputPayload->isDeclared()) {
-    static_cast<void>(qSet[instance]->outputPayload->revRead(revOffset));
+  if (!out.isDeclared()) {
+    static_cast<void>(out.revRead(revOffset));
   }
-  return qSet[instance]->outputPayload->getPayload();
+  return out.getPayload();
 }
 
 rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffset) {
@@ -110,7 +111,7 @@ rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffs
   // deklarowanych operator przesunięcia był operacją pustą (dwie różne konwencje w jednym
   // silniku). Historia deklaracji leży w buforze kołowym, a jego pojemność zapewnia
   // compiler::computeRequiredCapacities() (capMap[src] >= offset + 1).
-  auto &out = *(qSet[instance]->outputPayload);
+  auto &out = *(streamRuntime(instance).outputPayload);
   out.releaseOnHold();
 
   const auto available              = static_cast<int>(out.getRecordsCount());
@@ -136,7 +137,8 @@ rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffs
 }
 
 rdb::payload dataModel::fetchForward(const std::string &instance, const int forwardIndex) {
-  auto &out = *(qSet[instance]->outputPayload);
+  auto &runtime = streamRuntime(instance);
+  auto &out     = *(runtime.outputPayload);
   out.releaseOnHold();
 
   // Konwersja indeksu postępującego na offset wsteczny względem bieżącej
@@ -149,7 +151,7 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
   // w którym ta różnica jest przeliczana - dzięki temu ADD, SUBTRACT, HASH i rozplot dostają
   // poprawkę raz, a nie każdy z osobna.
   const auto count        = static_cast<int>(out.getRecordsCount());
-  const auto &logicalBase = qSet[instance]->logicalIndexBase;
+  const auto &logicalBase = runtime.logicalIndexBase;
   if (!logicalBase.has_value()) {
     FatalError("dataModel::fetchForward: logical index base not initialized for '{}'", instance);
   }
@@ -176,7 +178,7 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
 }
 
 void dataModel::bootstrapDeclaration(const query &qry) {
-  auto &output = *qSet.at(qry.id)->outputPayload;
+  auto &output = *streamRuntime(qry.id).outputPayload;
   if (output.bufferState != rdb::sourceState::empty) {
     FatalError("dataModel::bootstrapDeclaration: stream '{}' not in empty state", qry.id);
   }
@@ -189,6 +191,10 @@ void dataModel::bootstrapDeclaration(const query &qry) {
 }
 
 bool dataModel::forwardRecordAvailable(const std::string &instance, const int forwardIndex) const {
+  // Jedyne wyszukanie w qSet omijajace streamRuntime(): predykat jest const, a streamRuntime()
+  // nie. Galaz `false` dla nazwy spoza modelu jest przy tym nieosiagalna. Pytanie pada wylacznie
+  // z processRows, ktory na wejsciu przepuszcza kazdy wezel planu przez refreshStreamHandles(),
+  // czyli przez streamRuntime(), a brak wpisu zglasza tam wyjatkiem.
   const auto found = qSet.find(instance);
   if (found == qSet.end()) return false;
 
@@ -403,7 +409,7 @@ void dataModel::computeWindowAggregates(const query &qry, streamInstance &runtim
   runtime.windowValues.assign(qry.windowGroups.size(), windowStats{});
 
   // Baza bierze sie z INSTANCJI, nie z jej nazwy: kazde zrodlo grupy jest i tak wyszukiwane
-  // nizej przez qSet.find(), wiec drugie wyszukanie tej samej nazwy nie mialo co wniesc.
+  // nizej przez streamRuntime(), wiec drugie wyszukanie tej samej nazwy nie mialo co wniesc.
   const auto baseOf = [](const streamInstance &target, const std::string &id) {
     const auto &logicalBase = target.logicalIndexBase;
     if (!logicalBase.has_value()) {
@@ -418,12 +424,8 @@ void dataModel::computeWindowAggregates(const query &qry, streamInstance &runtim
   const int n = static_cast<int>(runtime.outputPayload->getRecordsCount()) + baseOf(runtime, qry.id);
 
   for (size_t groupIndex = 0; groupIndex < qry.windowGroups.size(); ++groupIndex) {
-    const auto &group = qry.windowGroups[groupIndex];
-    auto sourceIt     = qSet.find(group.source);
-    if (sourceIt == qSet.end()) {
-      FatalError("dataModel::computeWindowAggregates: source '{}' of window group not in model", group.source);
-    }
-    streamInstance &source           = *sourceIt->second;
+    const auto &group                = qry.windowGroups[groupIndex];
+    streamInstance &source           = streamRuntime(group.source);
     runtime.windowValues[groupIndex] = source.reduceRecordWindow(group, n, baseOf(source, group.source));
   }
 }
@@ -442,7 +444,7 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
   // tak zostac: ich wezly jezdza przez kopie planu i przezywaja do innego drzewa, wiec
   // zapamietany uchwyt zrodla wskazywalby strukture, ktorej juz nie ma.
   const auto logicalIndexBase = [&](const std::string &id) {
-    const auto &logicalBase = qSet[id]->logicalIndexBase;
+    const auto &logicalBase = streamRuntime(id).logicalIndexBase;
     if (!logicalBase.has_value()) {
       FatalError("dataModel::constructInputPayload: logical index base not initialized for '{}'", id);
     }
@@ -535,7 +537,7 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
     case STREAM_MAX: {
       const auto nameSrc = arg[0].getStr_();
 
-      *runtime.inputPayload = qSet[nameSrc]->reduceFieldsToPayload(cmd, qry.id + "_0");
+      *runtime.inputPayload = streamRuntime(nameSrc).reduceFieldsToPayload(cmd, qry.id + "_0");
     } break;
     case STREAM_SUBTRACT: {
       //  :- PUSH_STREAM(core0)
@@ -594,7 +596,7 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       // ale zapytanie dodane ad hoc dostaje ją z bieżącej osi logicznej.
       const int windowIndex     = logicalIndex();
       const int sourceIndexBase = logicalIndexBase(nameSrc);
-      *runtime.inputPayload     = qSet[nameSrc]->constructAgsePayload(length, step, nameSrc, windowIndex, sourceIndexBase);
+      *runtime.inputPayload = streamRuntime(nameSrc).constructAgsePayload(length, step, nameSrc, windowIndex, sourceIndexBase);
     } break;
     case STREAM_HASH: {
       // 	:- PUSH_STREAM(core0)
@@ -626,10 +628,11 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
 std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const int timeOffset) {
   std::vector<rdb::descFldVT> retVal;
 
-  auto payload = std::make_unique<rdb::payload>(qSet[instance]->outputPayload->descriptor);
+  auto &out    = *(streamRuntime(instance).outputPayload);
+  auto payload = std::make_unique<rdb::payload>(out.descriptor);
 
-  if (!qSet[instance]->outputPayload->isDeclared()) {
-    if (qSet[instance]->outputPayload->revRead(timeOffset, payload->span().data()) == rdb::ReadStatus::NoSuchRecord) {
+  if (!out.isDeclared()) {
+    if (out.revRead(timeOffset, payload->span().data()) == rdb::ReadStatus::NoSuchRecord) {
       // Rekordu o tym offsecie nie ma - wiersz jest nieokreslony, czyli all-null; petla nizej zamieni
       // kazde pole na wartosc zastepcza jego typu. Bitset trzeba ustawic TUTAJ, bo revRead z wlasnym
       // buforem docelowym zapisuje znaczniki do payloadu magazynu, a nie do tego bufora.
@@ -641,7 +644,7 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
       payload->setNullBitset(std::vector<bool>(payload->descriptor.size(), true));
     }
   } else {
-    *payload = *(qSet[instance]->outputPayload->getPayload());
+    *payload = *(out.getPayload());
   }
   auto i{0};
   for (const auto &f : payload->descriptor.dataFields()) {
