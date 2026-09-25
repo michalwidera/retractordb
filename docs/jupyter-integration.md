@@ -160,7 +160,7 @@ Phase numbering follows the roadmap in `design/`.
 | **J1** | `Engine`: `compile()`, `step()`, `rows()`, real exception mapping | core phases 1-3 - **done**, see §7 |
 | **J2** | `Window`, DLPack export, `torch.utils.data.IterableDataset` | J1 - **done** (copy, not zero-copy: §4) |
 | **J3** | `KeyboardInterrupt` during `run()`, logging bridge to the `logging` module | J1 - **done** |
-| **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | J2 - not started |
+| **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | J2 - build environment only (`docker/wheel/`, §8); no `pyproject.toml`, no wheels |
 | **J5** | Colab notebook, CI smoke test against the built wheel | J4 - a local notebook exists (`api/python/notebooks/j1_engine.ipynb`); the CI smoke test waits for J4 |
 | **J6** | Push ingest from Python, which turns a notebook into the engine's test harness | core phase 4 - not started |
 
@@ -261,5 +261,60 @@ has the reasons and §4 what remains owed.
 shares *that* array; the engine's own memory is never handed out. That is the v1 decision from
 §4, taken deliberately, and it is what makes a tensor safe to keep across `step()`.
 
-**J4-J6 are not started.** No `scikit-build-core` `pyproject.toml`, no wheels, no CI smoke
-test, no ingest. `api/python/pyproject.toml` still installs the client half only.
+**J4 has its build environment (§8) and nothing else; J5 and J6 are not started.** No
+`scikit-build-core` `pyproject.toml`, no wheels, no CI smoke test, no ingest.
+`api/python/pyproject.toml` still installs the client half only.
+
+## 8. J4 build environment
+
+`docker/wheel/Dockerfile` is the image the wheels will be built in. It is
+`quay.io/pypa/manylinux_2_28_<arch>` - AlmaLinux 8, glibc 2.28, gcc-toolset-14, CPython
+3.10-3.15 and auditwheel - pinned to the digest cibuildwheel 4.x pins, plus what this
+tree needs on top: valgrind (the Linux configure requires it), `RDB_USE_MOLD=OFF` (the
+Linux default is mold, which the image does not have), a tools venv with conan,
+cmake >= 4.4.2 and ninja, and a Release Conan cache for `conanfile.py` under
+`CONAN_HOME=/opt/conan`. One file serves x86_64 (Colab) and aarch64; the header has the
+build, verification and publishing commands, and the image is published as
+`micwide/buildenv-retractordb-wheel:manylinux_2_28_<arch>`.
+
+Why manylinux_2_28: Colab (runtime 2026.07) is Ubuntu 22.04 with glibc 2.35 and Python
+3.12, so a 2_28 wheel loads there, and on RHEL 8 and Debian 10/11 as well. manylinux_2_34
+has the same GCC 14 but is still marked alpha and excludes those systems.
+
+The image checks two things itself, and a third on demand:
+
+| Check | Where | What a failure means |
+|---|---|---|
+| C++23 of the engine fits the manylinux_2_28 policy | `toolchain-probe.cpp` + `audit-so.py`, before the Conan step | GCC 14 code using `std::println`, `std::format`, `from_chars(double)` and `std::filesystem` needs libstdc++ symbols up to GLIBCXX_3.4.32; the policy allows 3.4.24. gcc-toolset links the difference statically - if it stops doing so, the build fails in its first minutes, not after Boost |
+| The Conan cache is complete | `smoke.sh`: `conan install --build never` | `conanfile.py` changed since the image was built - rebuild it |
+| `_core` from this tree is a valid wheel payload | `smoke.sh`: build `_core`, `audit-so.py`, `pytest api/python/tests` | a real portability defect in the engine or the binding |
+
+`audit-so.py` packs the given `.so` files into a throwaway wheel and asks
+`auditwheel show` for its tag, which is the same judgement `auditwheel repair` will pass
+on the real wheel.
+
+**Both architectures pass end to end** (2026-09-25, Apple silicon, Docker Desktop; x86_64
+under emulation). The probe passes on the real base, so gcc-toolset-14 does keep the
+engine's C++23 inside the policy; `smoke.sh` finds every Conan package in the cache,
+builds `_core` and runs `api/python/tests`:
+
+| | Image build (Conan step) | auditwheel grants | `api/python/tests` |
+|---|---|---|---|
+| aarch64, native | about 3.5 min (2.3 min) | `manylinux_2_26_aarch64` | 55 passed, 1 skipped |
+| x86_64, emulated | about 6 min (5.9 min) | `manylinux_2_27_x86_64` | 55 passed, 1 skipped |
+
+Both tags are at or below the image's `manylinux_2_28`, so a wheel from this image loads
+on Colab (glibc 2.35) with room to spare.
+
+Three things the first runs taught, all now handled: the Linux default of mold broke
+every configure probe after `PlatformChecks` (hence `RDB_USE_MOLD=OFF` in the image);
+ninja's default job count on a 14-core host got `compiler.cpp` at `-O3` killed for lack
+of memory, so `smoke.sh` sizes its job count at 2 GiB per job; and the first x86_64 build
+failed because Conan Center's prebuilt `b2` for x86_64 needs glibc 2.34, so the image
+builds every Conan package from source (`--build "*"`) and takes no binary from Conan
+Center at all.
+
+What J4 still has to add on top: the scikit-build-core `pyproject.toml`, the cibuildwheel
+configuration that runs `conan install` before the build and points CMake at its
+toolchain, the same memory-based cap on build jobs there (`CMAKE_BUILD_PARALLEL_LEVEL`),
+a way to configure without valgrind for wheel builds, pushing the image, and the CI job.
