@@ -175,10 +175,17 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   // Sciezki magazynow bierzemy z CALEGO planu po scaleniu, a nie z samych nowych wezlow:
   // claimAdditional pomija to, co juz stoi we wlasnym slocie, wiec zbior jest ten sam, a regula
   // "co jest magazynem" zostaje w jednym miejscu (planStorePaths).
+  //
+  // Zapamietane jest to, co roszczenie FAKTYCZNIE dopisalo: tylko to wolno zdjac z magistrali,
+  // gdy import sie nie powiedzie. Nazwy i sciezki, ktore plan juz obsluguje, musza zostac.
+  std::vector<std::string> claimedStreams;
+  std::vector<std::string> claimedStores;
   if (busPtr != nullptr && !adHocStreams.empty()) {
-    const bus::ClaimResult claimed = busPtr->claimAdditional(adHocStreams, planStorePaths(coreInstanceCopy, activeStorageDir));
+    bus::ClaimResult claimed = busPtr->claimAdditional(adHocStreams, planStorePaths(coreInstanceCopy, activeStorageDir));
     switch (claimed.status) {
       case bus::ClaimStatus::Claimed:
+        claimedStreams = std::move(claimed.addedStreams);
+        claimedStores  = std::move(claimed.addedStores);
         break;
       case bus::ClaimStatus::Conflict: {
         const std::string owner   = claimed.ownerName.empty() ? "the unnamed instance" : "instance '" + claimed.ownerName + "'";
@@ -238,6 +245,9 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     // pozostaje zgodna. Modelu nie trzeba wycofywac, bo addQueriesToModel() wpisuje wszystko
     // albo nic. Nie wraca jedynie pojemnosc deklaracji powiekszona przez
     // syncDeclaredCapacities(): wieksza historia niczego w wyniku nie zmienia.
+    //
+    // Razem z planem wraca roszczenie na magistrali: nazwa, ktorej plan nie zawiera, bylaby
+    // inaczej ogloszona jako strumien tej instancji az do jej konca.
     qTree planBefore = *coreInstancePtr;
     try {
       mergedIds          = cmPtr->importFrom(coreInstanceCopy);
@@ -257,11 +267,13 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
       }
     } catch (...) {
       *coreInstancePtr = std::move(planBefore);
+      if (busPtr != nullptr) busPtr->releaseAdditional(claimedStreams, claimedStores);
       throw;
     }
-    if (compileChainResult != "OK" || !addFailedId.empty())
+    if (compileChainResult != "OK" || !addFailedId.empty()) {
       *coreInstancePtr = std::move(planBefore);
-    else if (!mergedIds.empty())
+      if (busPtr != nullptr) busPtr->releaseAdditional(claimedStreams, claimedStores);
+    } else if (!mergedIds.empty())
       adHocPlanRevision.fetch_add(1, std::memory_order_release);
   }
 

@@ -7,10 +7,11 @@
 # Klient dostawal blad, a chwile pozniej serwera juz nie bylo.
 #
 # Zadne znane RQL nie prowadzi do takiej porazki, wiec wymusza ja jednorazowy hak
-# RDB_FAULT_ADHOC_REGISTER. Test sprawdza cztery rzeczy: odmowe z powodem w logu serwera,
-# zycie serwera przez kolejne sloty, brak nowej nazwy w planie i - wada lustrzana - to, ze
-# to samo zapytanie powtorzone bez awarii przechodzi i daje dane. Bez ostatniej kontroli
-# naprawa "odmawiaj zawsze" tez bylaby zielona.
+# RDB_FAULT_ADHOC_REGISTER. Test sprawdza piec rzeczy: odmowe z powodem w logu serwera,
+# zycie serwera przez kolejne sloty, brak nowej nazwy w planie, brak jej na magistrali (#303)
+# i - wada lustrzana - to, ze to samo zapytanie powtorzone bez awarii przechodzi, jest
+# ogloszone na magistrali i daje dane. Bez ostatniej kontroli naprawa "odmawiaj zawsze" tez
+# bylaby zielona.
 set -e
 . "$(dirname "$0")/../serverlib.sh"
 mkdir -p temp
@@ -59,12 +60,30 @@ if grep -qw extra dir_after_fail.txt; then
   exit 1
 fi
 
+# Magistrala tez wrocila do stanu sprzed komendy (#303). Roszczenie nazwy idzie PRZED importem,
+# wiec bez zwolnienia `extra` zostawalo ogloszone jako strumien tej instancji: `xqry -s extra`
+# trafial tu i dostawal "stream unknown", a inna instancja nie mogla tej nazwy zajac.
+xqry --bus > bus_after_fail.txt
+if grep -qE '\|[[:space:]]+extra$' bus_after_fail.txt; then
+  echo "magistrala po nieudanym imporcie nadal oglasza 'extra':"
+  cat bus_after_fail.txt
+  exit 1
+fi
+
 # Wada lustrzana: to samo zapytanie, juz bez awarii, przechodzi i liczy.
 rc=0
 xqry -a "$ADHOC" > out_ok.txt 2> err_ok.txt || rc=$?
 if [ "$rc" -ne 0 ]; then
   echo "powtorzone ad-hoc odrzucone (kod $rc) - wycofanie zostawilo plan, ktory go nie przyjmuje"
   cat out_ok.txt err_ok.txt
+  exit 1
+fi
+# Lustro kontroli magistrali: udany import ma nazwe oglosic. Bez tego zwolnienie "zawsze"
+# przeszloby kontrole po porazce.
+xqry --bus > bus_after_ok.txt
+if ! grep -qE '\|[[:space:]]+extra$' bus_after_ok.txt; then
+  echo "magistrala po udanym imporcie nie oglasza 'extra':"
+  cat bus_after_ok.txt
   exit 1
 fi
 rc=0

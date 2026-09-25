@@ -228,6 +228,10 @@ struct ClaimResult {
   std::string ownerName;  ///< wlasciciel kolidujacego zasobu; pusty => bezimienny
   std::int32_t ownerPid{0};
   std::string detail;  ///< sciezka licznika (CounterConflict) albo magazynu (StoreConflict), powod niedostepnosci albo limit
+  /// Wylacznie claimAdditional() przy Claimed: nazwy i sciezki faktycznie dopisane do slotu, bez tych,
+  /// ktore juz w nim staly. To one, i tylko one, wracaja do releaseAdditional() przy wycofaniu.
+  std::vector<std::string> addedStreams;
+  std::vector<std::string> addedStores;
 };
 
 /// Komplet danych, ktore instancja publikuje w swoim slocie.
@@ -320,9 +324,19 @@ class Bus {
   /// zostawialaby dzialajacy serwer bez slotu, czyli takze bez roszczenia nazw, ktore
   /// juz obsluguje. Tutaj odmowa nie ma zadnego skutku ubocznego -- slot zostaje
   /// nietkniety. Nazwy i sciezki juz obecne w slocie sa pomijane, wiec operacja jest idempotentna.
+  /// Co faktycznie dopisano, wraca w ClaimResult::addedStreams i ClaimResult::addedStores.
   ///
   /// Wymaga posiadanego slotu (po udanym claim()); bez niego zwraca Unavailable.
   ClaimResult claimAdditional(const std::vector<std::string> &streams, const std::vector<std::string> &stores);
+
+  /// Zdejmuje z WLASNEGO slotu podane nazwy strumieni i sciezki magazynow -- odwrotnosc udanego
+  /// claimAdditional() dla zapytania ad-hoc, ktorego import do planu sie nie powiodl. Bez tego
+  /// nazwa, ktorej plan nie zawiera, bylaby ogloszona jako strumien tej instancji az do jej konca.
+  ///
+  /// Wolajacy podaje WYLACZNIE to, co wrocilo w addedStreams/addedStores: zdjecie calej listy
+  /// z zapytania zabraloby nazwy, ktore plan juz obsluguje. Reszta slotu -- pozostale nazwy,
+  /// rezerwacja planu, licznik i tryby -- zostaje nietknieta. Bez slotu operacja nic nie robi.
+  void releaseAdditional(const std::vector<std::string> &streams, const std::vector<std::string> &stores);
 
   /// Zwalnia slot tej instancji. Idempotentne; wolane takze z handlera atexit.
   void release();
