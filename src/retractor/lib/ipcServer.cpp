@@ -265,6 +265,7 @@ void IpcServer::broadcastOutOfBusiness() {
 
 // Procedura watku komunikacyjnego.
 void IpcServer::commandLoop() const {
+  bool readyAnnounced = false;
   try {
     // Kasowanie na wejsciu sprzata po poprzedniku, ktory PADL: po SIGKILL segment, kolejka
     // i muteks zostaja w /dev/shm, a open_or_create trafiloby na nie i probowalo skonstruowac
@@ -292,6 +293,7 @@ void IpcServer::commandLoop() const {
     IPCMap *mymap = mapSegment.construct<IPCMap>(std::string(ipc::kMapObject).c_str())  // object name
                     (std::less<>(), allocatorShmemMapInstance);
     callbacks_.onReady();
+    readyAnnounced = true;
     //
     // This need to be clean up - There are some mess.
     //
@@ -310,37 +312,60 @@ void IpcServer::commandLoop() const {
         std::stringstream strstream;
         strstream << message.data();
         memset(message.data(), 0, message.size());
-        ptree pt;
-        read_info(strstream, pt);
-        ptree pt_retval = callbacks_.onCommand(pt);
-        // Sygnal idzie PO obsludze komendy, nie po jej odebraniu. Jedynym jego odbiorca jest
-        // bramka --xqrywait, a bramka zdjeta w chwili ODEBRANIA komendy wpuszczala watek
-        // przetwarzania jeszcze przed rejestracja subskrybenta: dla 'show' znaczylo to slot
-        // wyemitowany do klienta, ktorego kolejki odpowiedzi jeszcze nie ma, a takiego wiersza
-        // nikt juz nie odzyska. Samo subscribe() jest oslonione blokada epoki -- tej samej,
-        // ktora bierze slot -- wiec wyscig rozstrzygal sie na ZAJECIU tej blokady: wygrywal
-        // ten, kto siegnal po nia pierwszy. Przesuniecie sygnalu zamienia ten wyscig na
-        // porzadek: gdy bramka opada, subskrypcja jest juz w mapach IpcServer.
-        // Kontrakt bramki jest nietkniety -- podnosi ja nadal KAZDA komenda, takze 'hello'
-        // (patrz it_xqrywait_gate).
-        callbacks_.onCommandHandled();
-        int clientProcessId = boost::lexical_cast<int>(pt.get("db.id", ""));
-        // Sending answer
-        std::stringstream response_stream;
-        write_info(response_stream, pt_retval);
-        IPCString ipcResponse(allocatorShmemMapInstance);
-        ipcResponse = response_stream.str().c_str();
-        // cppcheck-suppress danglingTemporaryLifetime
-        {
-          IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
-          mymap->insert(std::pair<int, IPCString>(clientProcessId, ipcResponse));
+        // Blad jednej wiadomosci to ODMOWA tej wiadomosci, nie koniec watku. Tresc pisze dowolny
+        // lokalny proces, a wyjatek poza tym blokiem konczy watek komunikacyjny: po onReady nikt
+        // tego nie zauwaza (ipcFailed czyta sie tylko przy starcie), wiec serwer liczy dalej,
+        // ale nie przyjmuje juz zadnej komendy, takze 'kill' i '--reset'. onCommand jest
+        // oslonione w commandProcessor; ten blok obejmuje to, co wokol niego: parser INFO,
+        // db.id oraz budowe odpowiedzi w segmencie 64 KiB, ktorego wyczerpanie daje bad_alloc.
+        try {
+          ptree pt;
+          read_info(strstream, pt);
+          // db.id sprawdzane PRZED wykonaniem: komenda bez adresu zwrotnego jest odrzucana bez
+          // skutkow ubocznych, zamiast wykonac sie (np. 'kill') i zgubic odpowiedz.
+          int clientProcessId = 0;
+          if (!boost::conversion::try_lexical_convert(pt.get("db.id", ""), clientProcessId)) {
+            SPDLOG_ERROR("IPC command '{}' rejected: missing or invalid db.id, no client to answer", pt.get("db.message", ""));
+            continue;
+          }
+          ptree pt_retval = callbacks_.onCommand(pt);
+          // Sygnal idzie PO obsludze komendy, nie po jej odebraniu. Jedynym jego odbiorca jest
+          // bramka --xqrywait, a bramka zdjeta w chwili ODEBRANIA komendy wpuszczala watek
+          // przetwarzania jeszcze przed rejestracja subskrybenta: dla 'show' znaczylo to slot
+          // wyemitowany do klienta, ktorego kolejki odpowiedzi jeszcze nie ma, a takiego wiersza
+          // nikt juz nie odzyska. Samo subscribe() jest oslonione blokada epoki -- tej samej,
+          // ktora bierze slot -- wiec wyscig rozstrzygal sie na ZAJECIU tej blokady: wygrywal
+          // ten, kto siegnal po nia pierwszy. Przesuniecie sygnalu zamienia ten wyscig na
+          // porzadek: gdy bramka opada, subskrypcja jest juz w mapach IpcServer.
+          // Kontrakt bramki jest nietkniety -- podnosi ja nadal KAZDA komenda, takze 'hello'
+          // (patrz it_xqrywait_gate). Wiadomosc odrzucona wyzej komenda nie jest i jej nie podnosi.
+          callbacks_.onCommandHandled();
+          // Sending answer
+          std::stringstream response_stream;
+          write_info(response_stream, pt_retval);
+          IPCString ipcResponse(allocatorShmemMapInstance);
+          ipcResponse = response_stream.str().c_str();
+          // cppcheck-suppress danglingTemporaryLifetime
+          {
+            IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
+            mymap->insert(std::pair<int, IPCString>(clientProcessId, ipcResponse));
+          }
+        } catch (const std::exception &ex) {
+          SPDLOG_ERROR("IPC message dropped: {}", ex.what());
         }
       }
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
 
       if (callbacks_.shouldStop()) loopRunning = false;
     }
-  } catch (IPC::interprocess_exception &ex) {
+  } catch (const std::exception &ex) {
+    // Kazda ucieczka z funkcji watku to std::terminate, stad std::exception, a nie tylko wyjatki
+    // Boost IPC. onReady i onFailure wykluczaja sie (ipcServer.hpp), wiec po gotowosci zostaje
+    // wylacznie glosny wpis: watek konczy prace, a serwer przestaje przyjmowac komendy.
+    if (readyAnnounced) {
+      SPDLOG_ERROR("IPC communication thread stopped, server no longer accepts commands: {}", ex.what());
+      return;
+    }
     // Najczestsza przyczyna to brak miejsca w /dev/shm: sama kolejka komend zajmuje 1000 KiB,
     // a w kontenerze caly tmpfs ma domyslnie 64 MiB. Zawiadomienie jest tu obowiazkowe --
     // wolajacy czeka na gotowosc IPC i bez niego stanie na zawsze.

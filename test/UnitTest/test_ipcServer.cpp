@@ -200,14 +200,16 @@ constexpr auto kResponseBudget         = std::chrono::seconds(5);
 using ptree = IpcServer::ptree;
 
 /// Serwer z prawdziwym watkiem komunikacyjnym i zaslepkami zamiast executorsm. Odpowiedz niesie
-/// dlugosc otrzymanego db.argument - po niej widac, czy komenda doszla w calosci.
+/// dlugosc otrzymanego db.argument - po niej widac, czy komenda doszla w calosci. Licznik wywolan
+/// handlera odroznia komende odrzucona od wykonanej, ktorej odpowiedz tylko przepadla.
 class RunningServer {
  public:
   RunningServer() : names_(ipc::names(kServerLoop)) {
     server_.setServerName(kServerLoop);
     auto readyFuture = ready_.get_future();
     server_.start({.onCommand =
-                       [](const ptree &request) {
+                       [this](const ptree &request) {
+                         ++handled_;
                          ptree response;
                          response.put("argumentLength", request.get("db.argument", std::string{}).size());
                          return response;
@@ -229,6 +231,7 @@ class RunningServer {
   RunningServer &operator=(const RunningServer &) = delete;
 
   [[nodiscard]] bool ready() const { return readyOk_; }
+  [[nodiscard]] int handled() const { return handled_.load(); }
 
   /// Surowe bajty wprost do kolejki komend - z pominieciem IpcClient, ktory takiej komendy nie zbuduje.
   void send(const std::string &bytes) const {
@@ -266,13 +269,14 @@ class RunningServer {
   std::promise<bool> ready_;
   bool readyOk_{false};
   std::atomic<bool> stop_{false};
+  std::atomic<int> handled_{0};
 };
 
-/// Komenda w formacie IpcClient::netClient.
-std::string command(int clientId, const std::string &argument) {
+/// Komenda w formacie IpcClient::netClient; brak `clientId` daje komende bez db.id.
+std::string command(std::optional<int> clientId, const std::string &argument) {
   ptree request;
   request.put("db.message", "hello");
-  request.put("db.id", clientId);
+  if (clientId) request.put("db.id", *clientId);
   request.put("db.argument", argument);
   std::stringstream text;
   write_info(text, request);
@@ -306,4 +310,34 @@ TEST(IpcServerLoop, full_size_command_is_received_whole_and_server_keeps_serving
   const auto next = server.response(kClientNext);
   ASSERT_TRUE(next.has_value()) << "watek komunikacyjny przestal obslugiwac komendy";
   EXPECT_EQ(next->get<std::size_t>("argumentLength"), 2U);
+}
+
+// Regresja S-03: tresc, ktorej parser INFO nie przyjmuje, rzucala info_parser_error poza
+// jakimkolwiek catch watku komunikacyjnego - std::terminate calego serwera jedna wiadomoscia
+// od dowolnego lokalnego procesu. Ma byc odmowa: nic nie wykonane, nastepna komenda obsluzona.
+TEST(IpcServerLoop, garbage_command_is_rejected_and_server_keeps_serving) {
+  RunningServer server;
+  ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
+
+  server.send("}");
+
+  server.send(command(kClientNext, "po"));
+  const auto next = server.response(kClientNext);
+  ASSERT_TRUE(next.has_value()) << "watek komunikacyjny przestal obslugiwac komendy";
+  EXPECT_EQ(server.handled(), 1) << "znieksztalcona wiadomosc dotarla do handlera";
+}
+
+// Regresja S-03, druga droga: poprawne INFO bez db.id rzucalo bad_lexical_cast - i to dopiero
+// PO wykonaniu komendy. Komenda bez adresu zwrotnego ma byc odrzucona PRZED handlerem, zeby
+// odmowa nie miala skutkow ubocznych (kill, reset-commit bez nadawcy).
+TEST(IpcServerLoop, command_without_client_id_is_rejected_and_server_keeps_serving) {
+  RunningServer server;
+  ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
+
+  server.send(command(std::nullopt, "bez adresu"));
+
+  server.send(command(kClientNext, "po"));
+  const auto next = server.response(kClientNext);
+  ASSERT_TRUE(next.has_value()) << "watek komunikacyjny przestal obslugiwac komendy";
+  EXPECT_EQ(server.handled(), 1) << "komenda bez db.id zostala wykonana";
 }
