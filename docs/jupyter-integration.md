@@ -160,7 +160,7 @@ Phase numbering follows the roadmap in `design/`.
 | **J1** | `Engine`: `compile()`, `step()`, `rows()`, real exception mapping | core phases 1-3 - **done**, see §7 |
 | **J2** | `Window`, DLPack export, `torch.utils.data.IterableDataset` | J1 - **done** (copy, not zero-copy: §4) |
 | **J3** | `KeyboardInterrupt` during `run()`, logging bridge to the `logging` module | J1 - **done** |
-| **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | J2 - build environment only (`docker/wheel/`, §8); no `pyproject.toml`, no wheels |
+| **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | J2 - build environment (§8) and local wheel build (§9) in place; no CI job, nothing on PyPI |
 | **J5** | Colab notebook, CI smoke test against the built wheel | J4 - a local notebook exists (`api/python/notebooks/j1_engine.ipynb`); the CI smoke test waits for J4 |
 | **J6** | Push ingest from Python, which turns a notebook into the engine's test harness | core phase 4 - not started |
 
@@ -261,9 +261,10 @@ has the reasons and §4 what remains owed.
 shares *that* array; the engine's own memory is never handed out. That is the v1 decision from
 §4, taken deliberately, and it is what makes a tensor safe to keep across `step()`.
 
-**J4 has its build environment (§8) and nothing else; J5 and J6 are not started.** No
-`scikit-build-core` `pyproject.toml`, no wheels, no CI smoke test, no ingest.
-`api/python/pyproject.toml` still installs the client half only.
+**J4 builds wheels locally (§8, §9); J5 and J6 are not started.** No CI job builds the
+wheels yet, nothing is on PyPI, there is no CI smoke test and no ingest.
+`api/python/pyproject.toml` still installs the client half only; the wheel comes from
+the root `pyproject.toml`.
 
 ## 8. J4 build environment
 
@@ -314,7 +315,69 @@ failed because Conan Center's prebuilt `b2` for x86_64 needs glibc 2.34, so the 
 builds every Conan package from source (`--build "*"`) and takes no binary from Conan
 Center at all.
 
-What J4 still has to add on top: the scikit-build-core `pyproject.toml`, the cibuildwheel
-configuration that runs `conan install` before the build and points CMake at its
-toolchain, the same memory-based cap on build jobs there (`CMAKE_BUILD_PARALLEL_LEVEL`),
-a way to configure without valgrind for wheel builds, pushing the image, and the CI job.
+## 9. Building the wheels
+
+The wheel is described by the root `pyproject.toml` (scikit-build-core + nanobind) and
+built for Linux by cibuildwheel in the §8 image:
+
+```bash
+pipx install cibuildwheel                 # once, on the host; Docker must be running
+docker/wheel/build-wheels.sh aarch64      # or x86_64, or all -> wheelhouse/
+```
+
+The images are taken as `micwide/buildenv-retractordb-wheel:manylinux_2_28_<arch>`. A
+locally built image is used as it is once tagged under that name (`docker tag`, see the
+Dockerfile header); pushing it is only needed for other machines.
+
+What one run does, per architecture:
+
+| Step | Where it is set | What it checks |
+|---|---|---|
+| Copy tracked and new files to a temporary directory | `build-wheels.sh` | cibuildwheel copies its whole working directory into the container; a checkout's `build/` (hundreds of MB, plus a macOS `_core`) would go along |
+| `conan install --build never`, once per container | `tool.cibuildwheel.linux.before-all` | the image's Conan cache still matches `conanfile.py` |
+| scikit-build-core configures the whole tree with `RDB_PYTHON=ON`, builds only `_core` | `tool.scikit-build` | Conan's toolchain reaches CMake through `CMAKE_TOOLCHAIN_FILE`; job count from `docker/wheel/jobs.sh` |
+| `auditwheel repair`, and `abi3audit` for the abi3 wheel | cibuildwheel defaults | the wheel is manylinux and, for 3.12+, uses only the stable ABI |
+| `pytest api/python/tests` against the installed wheel | `tool.cibuildwheel.test-command` | the engine works from the wheel, not from a build tree |
+
+Three wheels per architecture come out: one abi3 wheel tagged `cp312-abi3` that serves
+Python 3.12 and later (Colab included), and version-specific wheels for 3.10 and 3.11.
+The abi3 build relies on nanobind's `STABLE_ABI`, which switches on only when
+scikit-build-core asks for `Development.SABIModule` (`src/python/CMakeLists.txt`); a
+developer build configured by hand is unchanged.
+
+Checked in a mock project with the same `pyproject.toml` and `src/python/CMakeLists.txt`
+(2026-09-25): the 3.12 build produces `retractordb/_core.abi3.so`, which imports and
+returns a NumPy array under Python 3.13 and passes `abi3audit --strict`; 3.10 and 3.11
+fall back to ordinary wheels; `ninja install` does not install `_core`.
+
+**First real runs** (2026-09-25, Apple silicon, Docker Desktop): `build-wheels.sh
+aarch64` produced three wheels in 7 minutes (about 2 minutes each, 1.8 MB each), and
+`build-wheels.sh x86_64`, emulated, three wheels in 12 minutes (about 4 minutes each,
+2.0 MB each). Tags after `auditwheel repair`:
+
+| Wheel | aarch64 | x86_64 |
+|---|---|---|
+| cp310 | `cp310-cp310-manylinux_2_26_aarch64.manylinux_2_28_aarch64` | `cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64` |
+| cp311 | `cp311-cp311-manylinux_2_26_aarch64.manylinux_2_28_aarch64` | `cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64` |
+| cp312 | `cp312-abi3-manylinux_2_26_aarch64.manylinux_2_28_aarch64` | `cp312-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64` |
+
+All six wheels pass `api/python/tests` installed from the wheel (54 passed, 2 skipped),
+and both `cp312-abi3` wheels pass `abi3audit --strict` with no non-abi3 symbols. One
+more skip than in `smoke.sh` is expected: the subprocess test needs a build tree
+(`module_root`), and an installed wheel has none. The Colab check below is still to do.
+
+**Acceptance on Colab.** Upload the x86_64 `cp312-abi3` wheel to a fresh notebook, then:
+
+```python
+!pip install retractordb-*-cp312-abi3-*x86_64.whl
+import retractordb as rdb
+print(rdb.Engine)
+```
+
+The install plus import should take under about 20 seconds and must not ask for a
+runtime restart (§4).
+
+What J4 still lacks: a CI job that runs `build-wheels.sh` and keeps the wheels (it
+needs the images on Docker Hub), reserving and publishing the `retractordb` name on
+PyPI, macOS wheels, and a way to configure without valgrind for wheel builds outside
+the image.

@@ -28,7 +28,13 @@ endif()
 # pelne Development zatrzymaloby konfiguracje bez powodu.
 #
 # Prog 3.10 jest wspolny dla nas i dla nanobinda od wersji 3.0.
-find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
+#
+# SKBUILD_SABI_COMPONENT ustawia wylacznie scikit-build-core, i to tylko przy
+# budowie kola abi3 (wheel.py-api w pyproject.toml, interpreter >= 3.12) - wtedy
+# rowna sie Development.SABIModule, bez ktorego STABLE_ABI nizej nic nie robi. W
+# zwyklym buildzie jest pusta i lista komponentow zostaje ta sama co dotad.
+find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module
+                                             ${SKBUILD_SABI_COMPONENT})
 
 # Katalog CMake nanobinda bierzemy z samego interpretera, nie z find_package po
 # nazwie: nanobind instaluje sie przez pip do site-packages TEGO interpretera, a
@@ -66,7 +72,11 @@ endforeach()
 # NB_STATIC: czesc wspolna nanobinda linkuje sie w modul zamiast do osobnej
 # biblioteki wspoldzielonej. Przy jednym module w drzewie to mniej plikow do
 # wydania i brak pytania o rpath.
-nanobind_add_module(_core NB_STATIC module.cpp)
+#
+# STABLE_ABI: jedno kolo dla Pythona 3.12 i nowszych (abi3). nanobind wlacza je
+# tylko przy Pythonie >= 3.12 i obecnym celu Python::SABIModule (komponent
+# wyzej), wiec buildy deweloperskie i kola dla 3.10/3.11 powstaja jak dotad.
+nanobind_add_module(_core NB_STATIC STABLE_ABI module.cpp)
 
 # rdbembed (L2) wnosi za soba retractor, rqlparser i antlr4_static - plan,
 # kompilator i model danych, ktore od fazy 3 stoja za Engine.
@@ -106,5 +116,16 @@ set(RDB_PYTHON_MODULE_DIR
     "${RDB_PYTHON_PACKAGE_ROOT}"
     CACHE PATH "Importable package root holding the built retractordb._core"
           FORCE)
+
+# Instalacja dla kola (pyproject.toml: install.components = python). Cel
+# wzgledny wobec prefiksu, ktory scikit-build-core ustawia na katalog pakietow
+# kola, wiec _core laduje obok plikow .py z api/python/retractordb.
+# EXCLUDE_FROM_ALL: zwykly `ninja install` go pomija, a cpack bierze tylko
+# komponenty z CPACK_COMPONENTS_ALL, wiec zadne z nich modulu nie instaluje.
+install(
+  TARGETS _core
+  LIBRARY DESTINATION retractordb
+          COMPONENT python
+          EXCLUDE_FROM_ALL)
 
 message(STATUS "RDB_PYTHON: ${Python_EXECUTABLE} -> ${RDB_PYTHON_MODULE_DIR}")

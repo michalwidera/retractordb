@@ -47,22 +47,10 @@ cmake -S . -B build/Release -G Ninja \
   -DRDB_PYTHON=ON \
   -DPython_EXECUTABLE="$venv_dir/bin/python3"
 
-# Rownoleglosc wedlug pamieci, nie rdzeni: ninja bierze domyslnie nproc+2
-# zadania, a pod Docker Desktop na Apple silicon (kilkanascie rdzeni, kilka GiB
-# pamieci maszyny wirtualnej) kompilacja compiler.cpp z -O3 ginela od OOM
-# killera. 2 GiB na zadanie to proporcja executora CI (4 vCPU / 8 GiB,
-# scripts/test-ci.sh). Limit cgroup (docker run --memory; v2 albo v1) wygrywa z
-# MemTotal, bo /proc/meminfo pokazuje pamiec calej maszyny wirtualnej.
-mem_kib=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
-cgroup_max=$(cat /sys/fs/cgroup/memory.max 2> /dev/null ||
-  cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2> /dev/null || echo max)
-if [[ $cgroup_max =~ ^[0-9]+$ ]] && ((cgroup_max / 1024 < mem_kib)); then
-  mem_kib=$((cgroup_max / 1024))
-fi
-jobs=$((mem_kib / (2 * 1024 * 1024)))
-jobs=$((jobs < 1 ? 1 : jobs))
-jobs=$((jobs > $(nproc) ? $(nproc) : jobs))
-echo "smoke: building _core with $jobs jobs ($((mem_kib / 1024 / 1024)) GiB, $(nproc) CPUs)"
+# Rownoleglosc wedlug pamieci, nie rdzeni - uzasadnienie w jobs.sh (ta sama
+# liczba trafia do cibuildwheel przez pyproject.toml).
+jobs=$(bash docker/wheel/jobs.sh)
+echo "smoke: building _core with $jobs jobs ($(nproc) CPUs)"
 cmake --build build/Release --target _core --parallel "$jobs"
 
 /opt/rdb-tools/venv/bin/python3 /opt/rdb-tools/audit-so.py build/Release/python/retractordb/_core*.so

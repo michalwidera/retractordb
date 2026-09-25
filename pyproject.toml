@@ -1,0 +1,83 @@
+# Kolo (wheel) pakietu retractordb z silnikiem osadzonym retractordb._core - faza J4
+# (docs/jupyter-integration.md). scikit-build-core konfiguruje CMake calego drzewa
+# z RDB_PYTHON=ON, ale kompiluje i instaluje wylacznie _core; pliki .py pakietu
+# pochodza z api/python/retractordb.
+#
+# api/python/pyproject.toml zostaje bez zmian: to deweloperska instalacja samej
+# polowy klienckiej, bez kompilacji. To, co trafi do PyPI, powstaje stad.
+#
+# Kola Linux: docker/wheel/build-wheels.sh (cibuildwheel w obrazie z
+# docker/wheel/Dockerfile). Budowa lokalna poza obrazem potrzebuje zaleznosci
+# z Conana i toolchaina w CMAKE_TOOLCHAIN_FILE - patrz sekcja cibuildwheel nizej.
+
+[build-system]
+requires = ["scikit-build-core>=0.11", "nanobind>=2.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "retractordb"
+dynamic = ["version"]
+description = "RetractorDB stream engine embedded in Python, with stream windows exported to NumPy and PyTorch"
+readme = "api/python/README.md"
+# Prog 3.10 jest wspolny dla calego repo (scripts/python-venv.sh,
+# api/python/pyproject.toml, src/python/CMakeLists.txt).
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Michal Widera" }]
+# numpy jest jedyna zaleznoscia uruchomieniowa (Engine.to_numpy/window). torch
+# celowo nie: w Colab wymuszona reinstalacja torcha to minuty i czasem zepsute
+# srodowisko (docs/jupyter-integration.md, sekcja 4).
+dependencies = ["numpy>=1.23"]
+
+[project.optional-dependencies]
+torch = ["torch>=2.0"]
+
+[project.urls]
+Homepage = "https://retractordb.com"
+Source = "https://github.com/michalwidera/retractordb"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+# Podloga projektu - to samo miejsce z ta sama wersja co w docker/ci/Dockerfile;
+# podnosi sie je razem.
+cmake.version = ">=4.4.2"
+cmake.build-type = "Release"
+cmake.define.RDB_PYTHON = "ON"
+# Z calego drzewa tylko modul i jego zaleznosci; install(... COMPONENT python)
+# w src/python/CMakeLists.txt kladzie _core obok plikow pakietu.
+build.targets = ["_core"]
+install.components = ["python"]
+wheel.packages = ["api/python/retractordb"]
+# Jedno kolo abi3 dla Pythona 3.12 i nowszych. Na 3.10 i 3.11 scikit-build-core
+# i nanobind same wracaja do kola dla konkretnej wersji - te buduje cibuildwheel
+# osobno (tool.cibuildwheel.build).
+wheel.py-api = "cp312"
+
+# Jedyne zrodlo wersji to plik VERSION w korzeniu repo (jak w conanfile.py,
+# CMakeLists.txt i obrazach Dockera).
+[tool.scikit-build.metadata.version]
+provider = "scikit_build_core.metadata.regex"
+input = "VERSION"
+regex = '^(?P<value>\d+\.\d+\.\d+)\s*$'
+
+[tool.cibuildwheel]
+# cp312 daje kolo abi3 (patrz wheel.py-api); cp310 i cp311 - kola wersyjne.
+build = ["cp310-*", "cp311-*", "cp312-*"]
+skip = ["*-musllinux_*"]
+test-requires = ["pytest>=7.0"]
+# Testy ida przeciw zainstalowanemu kolu: katalog tests/ nie jest pakietem, wiec
+# pytest dopisuje do sys.path tylko jego samego, a nie api/python ze zrodlami.
+test-command = "pytest -q {project}/api/python/tests"
+
+[tool.cibuildwheel.linux]
+# Obraz z docker/wheel/Dockerfile: manylinux_2_28 z gotowym cache Conana.
+manylinux-x86_64-image = "micwide/buildenv-retractordb-wheel:manylinux_2_28_x86_64"
+manylinux-aarch64-image = "micwide/buildenv-retractordb-wheel:manylinux_2_28_aarch64"
+# --build never: brak pakietu w cache obrazu ma zatrzymac budowe (obraz nie
+# nadaza za conanfile.py), a nie budowac zaleznosci w kazdym kontenerze.
+before-all = "conan install {project} -s build_type=Release --build never"
+# CMake od 3.21 bierze toolchain ze zmiennej srodowiska, gdy nie ma go w cache -
+# tak dociera do niego toolchain Conana przez scikit-build-core. Rownoleglosc
+# wedlug pamieci kontenera, jak w smoke.sh.
+environment = { CMAKE_TOOLCHAIN_FILE = "/project/build/Release/generators/conan_toolchain.cmake", CMAKE_BUILD_PARALLEL_LEVEL = "$(bash /project/docker/wheel/jobs.sh)" }
