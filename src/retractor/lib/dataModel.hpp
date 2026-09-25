@@ -18,12 +18,13 @@ class dataModel {
 
   /// Instancja wykonawcza strumienia po nazwie, ktora MOZE nie istniec w modelu.
   ///
-  /// Sciezka IPC (`xqry -d`, `xqry -t`) pyta o strumienie wypisane z planu, a plan i model
-  /// potrafia sie rozjechac: getAdHoc() wnosi wezly do zywego drzewa przez importFrom(), po
-  /// czym addQueryToModel() moze zawiesc, a wycofania nie ma. `qSet[id]` na takiej nazwie nie
-  /// zglaszalo bledu, tylko WSTAWIALO pusty unique_ptr i zaraz go luskalo -- czyli SIGSEGV
-  /// w odpowiedzi na komende. Brak nazwy jest tu bledem zgloszonym tak samo jak w
-  /// qTree::getQuery: wyjatkiem, ktory handler zamienia w `error.response` dla klienta.
+  /// Sciezka IPC (`xqry -d`, `xqry -t`) pyta o strumienie wypisane z planu. Do 2026-09-25 plan
+  /// i model potrafily sie rozjechac: getAdHoc() wnosil wezly do zywego drzewa przez
+  /// importFrom(), a porazka rejestracji w modelu nie miala wycofania; dzis getAdHoc() przywraca
+  /// plan przy kazdej porazce po imporcie. `qSet[id]` na nazwie spoza modelu nie zglaszalo
+  /// bledu, tylko WSTAWIALO pusty unique_ptr i zaraz go luskalo -- czyli SIGSEGV. Brak nazwy
+  /// jest tu bledem zgloszonym tak samo jak w qTree::getQuery: wyjatkiem, ktory handler
+  /// zamienia w `error.response` dla klienta.
   [[nodiscard]] streamInstance &streamRuntime(const std::string &instance);
 
   [[nodiscard]] bool forwardRecordAvailable(const std::string &instance, int forwardIndex) const;
@@ -75,7 +76,11 @@ class dataModel {
 
   dataModel() = delete;
 
-  bool addQueryToModel(const std::string &id);
+  /// Dolacza instancje wezlow planu o podanych nazwach - wszystkie albo zadnej. Zwraca nazwe,
+  /// ktorej nie da sie dolaczyc (pusty napis = sukces); wyjatek z budowy instancji wychodzi
+  /// przy nietknietym qSet. Wolajacy moze wiec wycofac plan, nie wyjmujac niczego z qSet - a
+  /// z qSet nic sie nie usuwa (patrz handles_).
+  [[nodiscard]] std::string addQueriesToModel(const std::vector<std::string> &ids);
   void syncDeclaredCapacities();
 
   std::unique_ptr<rdb::payload>::pointer getPayload(const std::string &instance,  //

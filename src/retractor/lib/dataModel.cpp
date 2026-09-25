@@ -55,25 +55,39 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
 
 dataModel::~dataModel() = default;
 
-bool dataModel::addQueryToModel(const std::string &id) {
-  if (qSet.contains(id)) {
-    SPDLOG_ERROR("dataModel::addQuery: Query with id '{}' already exists in dataModel", id);
-    return false;
+std::string dataModel::addQueriesToModel(const std::vector<std::string> &ids) {
+  // Trzy przebiegi, zeby porazka nie zostawila modelu w polowie: sprawdzenie kazdej nazwy,
+  // budowa kazdej instancji i dopiero na koncu wpis do qSet. Wyjatek z konstruktora
+  // streamInstance wychodzi wiec przy nietknietym qSet i nie trzeba z niego niczego wyjmowac.
+  std::vector<query *> nodes;
+  nodes.reserve(ids.size());
+  for (const auto &id : ids) {
+    if (qSet.contains(id)) {
+      SPDLOG_ERROR("dataModel::addQueriesToModel: Query with id '{}' already exists in dataModel", id);
+      return id;
+    }
+    auto it = std::ranges::find_if(coreInstance_, [&](const auto &qry) { return qry.id == id; });
+    if (it == coreInstance_.end()) {
+      SPDLOG_ERROR("dataModel::addQueriesToModel: Query with id '{}' not found in coreInstance", id);
+      return id;
+    }
+    nodes.push_back(&*it);
   }
 
-  auto it = std::ranges::find_if(coreInstance_, [&](const auto &qry) { return qry.id == id; });
-  if (it == coreInstance_.end()) {
-    SPDLOG_ERROR("dataModel::addQuery: Query with id '{}' not found in coreInstance", id);
-    return false;
+  std::vector<std::unique_ptr<streamInstance>> built;
+  built.reserve(nodes.size());
+  for (query *node : nodes) {
+    auto runtime = std::make_unique<streamInstance>(coreInstance_, *node, directive_[":STORAGE"]);
+    runtime->outputPayload->setDisposable(node->isDisposable);
+    // SELECT dodany do działającego planu nie zaczyna w historycznym origin całego systemu.
+    // Jego bazę wyznaczy dokładny pierwszy slot, w którym runtime zobaczy tę instancję.
+    if (!node->isDeclaration()) runtime->logicalIndexBase.reset();
+    built.push_back(std::move(runtime));
   }
 
-  qSet.emplace(id, std::make_unique<streamInstance>(coreInstance_, *it, directive_[":STORAGE"]));
-  streamRuntime(id).outputPayload->setDisposable(coreInstance_[id].isDisposable);
-  // SELECT dodany do działającego planu nie zaczyna w historycznym origin całego systemu.
-  // Jego bazę wyznaczy dokładny pierwszy slot, w którym runtime zobaczy tę instancję.
-  if (!it->isDeclaration()) streamRuntime(id).logicalIndexBase.reset();
-
-  return true;
+  for (std::size_t i = 0; i < nodes.size(); ++i)
+    qSet.emplace(nodes[i]->id, std::move(built[i]));
+  return {};
 }
 
 void dataModel::syncDeclaredCapacities() {
