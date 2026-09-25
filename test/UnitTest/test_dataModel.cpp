@@ -412,7 +412,6 @@ TEST_F(xschema, missingStream_is_reported_not_inserted) {
 
   EXPECT_THROW(static_cast<void>(dataArea->getPayload(ghost)), std::logic_error);
   EXPECT_THROW(static_cast<void>(dataArea->fetchForward(ghost, 0)), std::logic_error);
-  EXPECT_THROW(static_cast<void>(dataArea->fetchBack(ghost, 0)), std::logic_error);
   EXPECT_THROW(static_cast<void>(dataArea->getRow(ghost, 0)), std::logic_error);
 
   EXPECT_FALSE(dataArea->qSet.contains(ghost));

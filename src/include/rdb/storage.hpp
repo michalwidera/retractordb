@@ -24,9 +24,9 @@ namespace rdb {
 /// brakujacy rekord, skladal do MIN/MAX/SUM/AVG sfalszowane zero.
 ///
 /// Rekord nieistniejacy jest wartoscia NIEOKRESLONA, nie zerem - dlatego towarzyszy mu payload
-/// all-null, tak samo jak w dataModel::fetchBack i fetchForward, ktore te konwencje stosuja od
-/// dawna. Dzieki temu wlacza sie pochlanianie NULL-i i wolajacy, ktory statusu nie sprawdzi,
-/// dostaje wartosc nieokreslona zamiast zera udajacego dane.
+/// all-null, tak samo jak w dataModel::fetchForward, ktory te konwencje stosuje od dawna. Dzieki
+/// temu wlacza sie pochlanianie NULL-i i wolajacy, ktory statusu nie sprawdzi, dostaje wartosc
+/// nieokreslona zamiast zera udajacego dane.
 enum class ReadStatus : std::uint8_t {
   Ok,           ///< rekord odczytany ze zrodla, bufora albo wydany w stanie HOLD
   NoSuchRecord  ///< rekordu nie ma; payload jest all-null, a wolajacy ma go POMINAC

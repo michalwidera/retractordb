@@ -100,42 +100,6 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &
   return out.getPayload();
 }
 
-rdb::payload dataModel::fetchBack(const std::string &instance, const int revOffset) {
-  // Odczyt wsteczny o revOffset rekordów - nośnik konwencji operatora przesunięcia.
-  //
-  // tau_N jest OPÓŹNIENIEM: wynik ma tę samą treść co źródło i pojawia się N slotów później.
-  // Konwencja wybrana świadomie, bo odczyt w przód (s_{n+m}) jest nieprzyczynowy dla źródła
-  // pracującego na żywo - nie da się wydać próbki, która jeszcze nie powstała.
-  //
-  // Wcześniej offset był honorowany wyłącznie dla strumieni obliczanych, więc dla źródeł
-  // deklarowanych operator przesunięcia był operacją pustą (dwie różne konwencje w jednym
-  // silniku). Historia deklaracji leży w buforze kołowym, a jego pojemność zapewnia
-  // compiler::computeRequiredCapacities() (capMap[src] >= offset + 1).
-  auto &out = *(streamRuntime(instance).outputPayload);
-  out.releaseOnHold();
-
-  const auto available              = static_cast<int>(out.getRecordsCount());
-  const bool outsideRetainedHistory = out.isDeclared() && std::cmp_greater_equal(revOffset, out.historySize());
-  if (revOffset < 0 || revOffset >= available || outsideRetainedHistory) {
-    // Rekord poza zgromadzoną historią - wartość nieokreślona, czyli all-null (pochłaniająca).
-    // Ogon strumienia (query::startupLatency) jest tak dobrany, żeby ta ścieżka nie była
-    // wykorzystywana na starcie; pozostaje zabezpieczeniem, nie normalną drogą.
-    //
-    // Poziom ERROR, choć proces nie ginie: defekt D1 (K24) przeżył niezauważony właśnie
-    // dlatego, że ten komunikat był na WARN, a Release kompiluje WARN na wylot.
-    SPDLOG_ERROR("fetchBack {}: record {} back not available (count={})", instance, revOffset, available);
-    rdb::payload nullRecord(out.descriptor);
-    nullRecord.setNullBitset(std::vector<bool>(out.descriptor.size(), true));
-    return nullRecord;
-  }
-  if (!out.isDeclared()) {
-    // Zakres sprawdzony wyzej, wiec rekord istnieje - status nie wnosi tu nic ponad to.
-    static_cast<void>(out.revRead(static_cast<size_t>(revOffset)));
-    return *out.getPayload();
-  }
-  return out.history(static_cast<size_t>(revOffset));
-}
-
 rdb::payload dataModel::fetchForward(const std::string &instance, const int forwardIndex) {
   auto &runtime = streamRuntime(instance);
   auto &out     = *(runtime.outputPayload);
@@ -163,7 +127,9 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
   if (outOfRange) {
     // Rekord niedostępny (przyszłość na osi czasu źródła, przed początkiem logicznym
     // albo poza historią bufora) - rekord all-null; o jego losie decyduje ścieżka zapisu.
-    // Poziom ERROR z tego samego powodu co w fetchBack powyżej.
+    // Poziom ERROR, choć proces nie ginie: defekt D1 (K24) przeżył niezauważony właśnie
+    // dlatego, że komunikat o rekordzie niedostępnym szedł na WARN, a Release kompiluje WARN
+    // na wylot.
     SPDLOG_ERROR("fetchForward {}: record {} not available (count={}, base={})", instance, forwardIndex, count, *logicalBase);
     rdb::payload nullRecord(out.descriptor);
     nullRecord.setNullBitset(std::vector<bool>(out.descriptor.size(), true));
@@ -440,9 +406,10 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
   std::ranges::copy(qry.lProgram, std::back_inserter(arg));
   // same: for (auto tk : qry.lProgram) arg.push_back(tk);
 
-  // Baza ZRODLA - jedyne miejsce, w ktorym ta funkcja adresuje instancje nazwa. Zrodla musza
-  // tak zostac: ich wezly jezdza przez kopie planu i przezywaja do innego drzewa, wiec
-  // zapamietany uchwyt zrodla wskazywalby strukture, ktorej juz nie ma.
+  // Baza ZRODLA. Zrodla ta funkcja adresuje nazwa - tu, w REDUCE i AGSE ponizej oraz przez
+  // getPayload() i fetchForward() - i tak musi zostac: ich wezly jezdza przez kopie planu
+  // i przezywaja do innego drzewa, wiec zapamietany uchwyt zrodla wskazywalby strukture,
+  // ktorej juz nie ma.
   const auto logicalIndexBase = [&](const std::string &id) {
     const auto &logicalBase = streamRuntime(id).logicalIndexBase;
     if (!logicalBase.has_value()) {
@@ -487,6 +454,10 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       const auto nameSrc    = arg[0].getStr_();
       const auto timeOffset = std::get<int>(operation.getVT());
 
+      // tau_N jest OPÓŹNIENIEM: wynik ma tę samą treść co źródło i pojawia się N slotów później.
+      // Konwencja wybrana świadomie, bo odczyt w przód (s_{n+m}) jest nieprzyczynowy dla źródła
+      // pracującego na żywo - nie da się wydać próbki, która jeszcze nie powstała.
+      //
       // tau_N adresowane INDEKSEM LOGICZNYM: rekord n niesie treść rekordu n-N producenta.
       // Poprzednio szło to przez fetchBack z offsetem WZGLĘDNYM wobec czoła źródła, co wiązało
       // ogon przesunięcia z ogonem producenta (W = W_src) - bo tylko przy tej równości offset
