@@ -126,11 +126,15 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
 
   if (first_keyword == "RULE") return attachAdHocRule(coreInstanceCopy, stream_name);
 
-  if (first_keyword == "STORAGE" ||   //
-      first_keyword == "SUBSTRAT" ||  //
-      first_keyword == "PERCOUTNER") {
-    ptRetval.put(std::string("db"), "Fail parse: AdHoc STORAGE, SUBSTRAT or PERCOUTNER not supported");
-    SPDLOG_ERROR("Parse adhoc query failed: AdHoc STORAGE, SUBSTRAT or PERCOUTNER not supported");
+  // Lista DOZWOLONYCH, a nie zakazanych. Do 2026-09-25 stala tu lista zakazanych dyrektyw, w ktorej
+  // zamiast ROTATION widnial literal "PERCOUTNER" - pozostalosc zmiany nazwy tokenu COPTION
+  // w 7f939c09. Gramatyka takiego slowa nie zna, wiec `xqry -a "ROTATION 'plik'"` przechodzil
+  // filtr i konczyl serwer FatalError-em "parser logic error". Kazda inna instrukcja - dyrektywa
+  // kompilatora, DEFAULT VOLATILE, a takze przyszla instrukcja gramatyki - jest odmowa.
+  if (first_keyword != "SELECT" && first_keyword != "DECLARE") {
+    ptRetval.put(std::string("db"),
+                 "Fail parse: AdHoc accepts only SELECT, DECLARE or RULE; '" + first_keyword + "' is not supported");
+    SPDLOG_ERROR("Parse adhoc query failed: '{}' is not supported by AdHoc", first_keyword);
     return ptRetval;
   }
 
@@ -138,10 +142,6 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     ptRetval.put(std::string("db"), "Rejected: stream '" + stream_name + "' already exists in this instance");
     SPDLOG_ERROR("AdHoc DECLARE rejected: stream '{}' already exists", stream_name);
     return ptRetval;
-  }
-
-  if (first_keyword != "SELECT" && first_keyword != "DECLARE") {
-    FatalError("executorsm::getAdHoc: unexpected first_keyword '{}' after filtering - parser logic error", first_keyword);
   }
 
   // --until-eof jest trybem calego przebiegu. Deklaracja dolaczona pozniej musi
@@ -175,10 +175,17 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   // Sciezki magazynow bierzemy z CALEGO planu po scaleniu, a nie z samych nowych wezlow:
   // claimAdditional pomija to, co juz stoi we wlasnym slocie, wiec zbior jest ten sam, a regula
   // "co jest magazynem" zostaje w jednym miejscu (planStorePaths).
+  //
+  // Zapamietane jest to, co roszczenie FAKTYCZNIE dopisalo: tylko to wolno zdjac z magistrali,
+  // gdy import sie nie powiedzie. Nazwy i sciezki, ktore plan juz obsluguje, musza zostac.
+  std::vector<std::string> claimedStreams;
+  std::vector<std::string> claimedStores;
   if (busPtr != nullptr && !adHocStreams.empty()) {
-    const bus::ClaimResult claimed = busPtr->claimAdditional(adHocStreams, planStorePaths(coreInstanceCopy, activeStorageDir));
+    bus::ClaimResult claimed = busPtr->claimAdditional(adHocStreams, planStorePaths(coreInstanceCopy, activeStorageDir));
     switch (claimed.status) {
       case bus::ClaimStatus::Claimed:
+        claimedStreams = std::move(claimed.addedStreams);
+        claimedStores  = std::move(claimed.addedStores);
         break;
       case bus::ClaimStatus::Conflict: {
         const std::string owner   = claimed.ownerName.empty() ? "the unnamed instance" : "instance '" + claimed.ownerName + "'";
@@ -238,6 +245,9 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     // pozostaje zgodna. Modelu nie trzeba wycofywac, bo addQueriesToModel() wpisuje wszystko
     // albo nic. Nie wraca jedynie pojemnosc deklaracji powiekszona przez
     // syncDeclaredCapacities(): wieksza historia niczego w wyniku nie zmienia.
+    //
+    // Razem z planem wraca roszczenie na magistrali: nazwa, ktorej plan nie zawiera, bylaby
+    // inaczej ogloszona jako strumien tej instancji az do jej konca.
     qTree planBefore = *coreInstancePtr;
     try {
       mergedIds          = cmPtr->importFrom(coreInstanceCopy);
@@ -257,11 +267,13 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
       }
     } catch (...) {
       *coreInstancePtr = std::move(planBefore);
+      if (busPtr != nullptr) busPtr->releaseAdditional(claimedStreams, claimedStores);
       throw;
     }
-    if (compileChainResult != "OK" || !addFailedId.empty())
+    if (compileChainResult != "OK" || !addFailedId.empty()) {
       *coreInstancePtr = std::move(planBefore);
-    else if (!mergedIds.empty())
+      if (busPtr != nullptr) busPtr->releaseAdditional(claimedStreams, claimedStores);
+    } else if (!mergedIds.empty())
       adHocPlanRevision.fetch_add(1, std::memory_order_release);
   }
 

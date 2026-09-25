@@ -426,6 +426,10 @@ class ParserListener : public RQLBaseListener {
     // This removes ''
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
+    // Blad planu juz tutaj. Bez tego pusta nazwa przechodzila parser i kompilacje, a zatrzymywal
+    // ja dopiero FatalError w rdb::StoragePaths przy rejestracji w modelu - w sciezce ad-hoc juz
+    // po imporcie do zywego planu, czyli smierc dzialajacego serwera.
+    if (qry.filename.empty()) reportSemanticError("FILE of stream " + ctx->ID()->getText() + " requires a non-empty file name");
     qry.id           = ctx->ID()->getText();
     qry.rInterval    = rationalResult;
     qry.isDisposable = (ctx->DISPOSABLE() != nullptr);
@@ -450,7 +454,13 @@ class ParserListener : public RQLBaseListener {
   void exitFraction(RQLParser::FractionContext *ctx) override {
     const int nom = std::stoi(ctx->children[0]->getText());
     const int den = std::stoi(ctx->children[2]->getText());
-    if (den == 0) FatalError("RQLParser::exitFraction: denominator is zero");
+    // Blad planu, nie FatalError: `xqry -a` z `1/0` konczyl dzialajacy serwer. rationalResult
+    // zostaje bez zmian - plan z bledem semantycznym jest odrzucany w calosci, a konstruktor
+    // boost::rational z zerowym mianownikiem rzuca.
+    if (den == 0) {
+      reportSemanticError("fraction " + ctx->getText() + " has a zero denominator");
+      return;
+    }
     rationalResult = boost::rational<int>(nom, den);
   }
 
@@ -470,11 +480,9 @@ class ParserListener : public RQLBaseListener {
 
     qry.id = ctx->ID()->getText();
 
-    if (qry.id == constants::Reserved_id_oob) {
-      std::cerr << "Error: " << constants::Reserved_id_oob << " is reserved stream name." << '\n';
-      SPDLOG_ERROR("{} is reserved stream name.", constants::Reserved_id_oob);
-      abort();
-    }
+    // Blad planu, nie abort(): `xqry -a` z ta nazwa konczyl dzialajacy serwer SIGABRT-em.
+    if (qry.id == constants::Reserved_id_oob)
+      reportSemanticError(std::string(constants::Reserved_id_oob) + " is reserved stream name");
 
     qry.lProgram = program;
     // Domyslnosc jest w planie, bo plik moze byc parsowany po jednej instrukcji.
@@ -491,7 +499,9 @@ class ParserListener : public RQLBaseListener {
       qry.filename.erase(qry.filename.size() - 1);
       qry.filename.erase(0, 1);
 
-      if (qry.filename.empty()) FatalError("RQLParser: directive filename must not be empty");
+      // Blad planu, nie FatalError - ta sama przyczyna co w exitCoption.
+      if (qry.filename.empty())
+        reportSemanticError("FILE of stream " + ctx->ID()->getText() + " requires a non-empty file name");
     }
 
     if (ctx->STORAGE() != nullptr) {
@@ -599,12 +609,18 @@ class ParserListener : public RQLBaseListener {
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
 
-    if (qry.filename.empty()) FatalError("RQLParser: directive filename must not be empty");
+    // Blad semantyczny, nie FatalError: tym samym parserem idzie kanal ad-hoc i `xqry --reset`,
+    // czyli tekst obcy wykonywany w procesie DZIALAJACEGO serwera. FatalError konczyl tam cala
+    // instancje - `xqry -a "STORAGE ''"` wystarczalo. Stan listenera sprzatamy tak samo w obu
+    // galeziach, bo parser po bledzie semantycznym idzie dalej przez kolejne instrukcje.
+    if (qry.filename.empty()) {
+      reportSemanticError("directive " + qry.id.substr(1) + " requires a non-empty value");
+    } else {
+      // Add / at the end of path, if not present in case of STORAGE
+      if (qry.id == ":STORAGE" && qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');
 
-    // Add / at the end of path, if not present in case of STORAGE
-    if (qry.id == ":STORAGE" && qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');
-
-    coreInstance.push_back(qry);
+      coreInstance.push_back(qry);
+    }
     program.clear();
     qry.reset();
     fieldCount = 0;

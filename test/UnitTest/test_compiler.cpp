@@ -1583,6 +1583,48 @@ TEST(xparser, parse_failure_does_not_poison_the_next_parse) {
   EXPECT_TRUE(instance.exists("src"));
 }
 
+// Wartosc, ktorej plan nie moze przyjac, jest bledem PLANU zwracanym statusem parsowania, a nie
+// FatalError-em ani abort(). Parser biegnie takze w procesie DZIALAJACEGO serwera - kanal ad-hoc
+// i `xqry --reset` - wiec do 2026-09-25 kazdy z tych przypadkow konczyl cala instancje. Tutaj
+// wywracal caly proces testu, zanim ktorakolwiek asercja zdazyla sie wykonac. Odpowiednik
+// integracyjny: it_adhoc_parse_error (ad-hoc) i krok 3a it_service_reset (reset).
+TEST(xparser, invalid_values_are_refused_without_killing_the_process) {
+  struct Case {
+    std::string rql;
+    std::string reason;
+  };
+  const std::string source = "DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'\n";
+  const std::vector<Case> cases{
+      {"STORAGE ''", "directive STORAGE requires a non-empty value"},
+      {"SUBSTRAT ''", "directive SUBSTRAT requires a non-empty value"},
+      {"ROTATION ''", "directive ROTATION requires a non-empty value"},
+      {"DECLARE a INTEGER STREAM core0, 1 FILE ''", "FILE of stream core0 requires a non-empty file name"},
+      {source + "SELECT core0[0] STREAM dst FROM core0 FILE ''", "FILE of stream dst requires a non-empty file name"},
+      {source + "SELECT core0[0] STREAM OUT_OF_BUSSINESS FROM core0", "OUT_OF_BUSSINESS is reserved stream name"},
+      {"DECLARE a INTEGER STREAM core0, 1/0 FILE 'a.txt'", "fraction 1/0 has a zero denominator"},
+      // Druga droga do tego samego ulamka: rational_se w wyrazeniu strumieniowym.
+      {source + "SELECT * STREAM dst FROM core0 - 1/0", "fraction 1/0 has a zero denominator"},
+  };
+  for (const auto &[rql, reason] : cases) {
+    const auto [parseResult, diagnostics] = parseCapturingStderr(rql);
+    EXPECT_NE(parseResult, "OK") << rql;
+    EXPECT_TRUE(parseResult.contains(reason)) << rql << '\n' << parseResult;
+  }
+
+  // Odrzucona dyrektywa nie trafia do planu. Lustro: poprawna trafia, a magazyn dostaje koncowy '/'.
+  qTree refused;
+  testing::internal::CaptureStderr();
+  (void)parserRQLString(refused, "STORAGE ''");
+  (void)testing::internal::GetCapturedStderr();
+  EXPECT_FALSE(refused.exists(":STORAGE"));
+
+  qTree accepted;
+  auto [acceptedResult, acceptedKeyword, acceptedName] = parserRQLString(accepted, "STORAGE 'temp'");
+  EXPECT_EQ(acceptedResult, "OK");
+  ASSERT_TRUE(accepted.exists(":STORAGE"));
+  EXPECT_EQ(accepted[":STORAGE"].filename, "temp/");
+}
+
 namespace {
 
 /// Sparsuj i skompiluj `rql`, zwracajac wynik compiler::compile().

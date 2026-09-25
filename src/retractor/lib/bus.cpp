@@ -1076,8 +1076,51 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams, const 
 
   impl->unlock();
 
-  retVal.status = ClaimStatus::Claimed;
+  retVal.status       = ClaimStatus::Claimed;
+  retVal.addedStreams = std::move(toAdd);
+  retVal.addedStores  = std::move(toAddStores);
   return retVal;
+}
+
+void Bus::releaseAdditional(const std::vector<std::string> &streams, const std::vector<std::string> &stores) {
+  if (streams.empty() && stores.empty()) return;
+  if (!attached() || impl->slotIndex < 0) return;
+
+  // Skroty liczone przed muteksem: trzymamy go wtedy tylko na czas samego zapisu slotu.
+  std::vector<StoreDigest> digests;
+  digests.reserve(stores.size());
+  for (const auto &store : stores)
+    digests.push_back(storeDigest(store));
+
+  // Muteks z tego samego powodu co w release(): nieparzysty seq przy trzymanym muteksie ma
+  // znaczyc wylacznie "pisarz zginal".
+  if (!impl->lock()) return;
+
+  Slot &mine                     = impl->segment->slots[impl->slotIndex];
+  const std::uint32_t owned      = std::min(mine.streamCount, static_cast<std::uint32_t>(kMaxStreams));
+  const std::uint32_t ownedStore = std::min(mine.storeCount, static_cast<std::uint32_t>(kMaxStores));
+
+  // Zageszczenie tablic w miejscu, z zachowaniem kolejnosci pozostalych wpisow. Calosc miesci
+  // sie w jednym zapisie seqlocka, wiec czytelnik bez muteksu widzi slot sprzed albo po, nigdy
+  // tablice przesunieta w polowie.
+  beginWrite(mine);
+  std::uint32_t keptStreams = 0;
+  for (std::uint32_t s = 0; s < owned; ++s) {
+    if (std::ranges::find(streams, loadString(mine.streams[s], kStreamNameSize)) != streams.end()) continue;
+    if (keptStreams != s) std::memcpy(mine.streams[keptStreams], mine.streams[s], kStreamNameSize);
+    ++keptStreams;
+  }
+  mine.streamCount         = keptStreams;
+  std::uint32_t keptStores = 0;
+  for (std::uint32_t s = 0; s < ownedStore; ++s) {
+    if (std::ranges::find(digests, mine.stores[s]) != digests.end()) continue;
+    mine.stores[keptStores] = mine.stores[s];
+    ++keptStores;
+  }
+  mine.storeCount = keptStores;
+  endWrite(mine);
+
+  impl->unlock();
 }
 
 void Bus::release() {
