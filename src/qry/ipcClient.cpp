@@ -26,10 +26,6 @@
 using boost::property_tree::ptree;
 namespace IPC = boost::interprocess;
 
-namespace {
-constexpr std::size_t kNullTerminatorBytes{1};
-}
-
 IpcClient::IpcClient(int clientResponseMaxFails, int responseQueueOpenMaxFails, std::string_view serverName)
     : clientResponseMaxFails_(std::max(1, clientResponseMaxFails)),
       responseQueueOpenMaxFails_(std::max(1, responseQueueOpenMaxFails)),
@@ -74,7 +70,7 @@ void IpcClient::producer() {
   }
 
   try {
-    std::array<char, ipc::kResponseQueueMaxMessageSize + kNullTerminatorBytes> message;
+    std::array<char, ipc::kResponseQueueMaxMessageSize + ipc::kNullTerminatorBytes> message;
     unsigned int priority{0};
     IPC::message_queue::size_type recvd_size = ipc::kResponseQueueMaxMessageSize;
     while (!done) {

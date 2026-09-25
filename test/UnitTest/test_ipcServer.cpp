@@ -1,12 +1,23 @@
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <chrono>
+#include <cstddef>
+#include <future>
+#include <optional>
+#include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
 
 #include <boost/interprocess/ipc/message_queue.hpp>
+#include <boost/interprocess/managed_shared_memory.hpp>
 #include <boost/interprocess/sync/named_mutex.hpp>
+#include <boost/interprocess/sync/scoped_lock.hpp>
+#include <boost/property_tree/info_parser.hpp>
 
 #include "constants.hpp"
+#include "ipcTypes.hpp"
 #include "retractor/lib/ipcServer.hpp"
 
 namespace {
@@ -175,4 +186,124 @@ TEST_F(IpcServerQueues, removal_is_idempotent) {
   EXPECT_NO_THROW(server.removeAllObjects());
   EXPECT_NO_THROW(server.shutdownFromExitHandler());
   EXPECT_FALSE(queueExists(kClientA));
+}
+
+namespace {
+
+// Wlasny obszar nazw: watek komunikacyjny kasuje na wejsciu segment, kolejke komend i muteks
+// SWOJEGO serwera, wiec obszar historyczny i obszary kServerA/kServerB zostaja nietkniete.
+constexpr std::string_view kServerLoop = "srvloop";
+constexpr int kClientFull              = 990003;
+constexpr int kClientNext              = 990004;
+constexpr auto kResponseBudget         = std::chrono::seconds(5);
+
+using ptree = IpcServer::ptree;
+
+/// Serwer z prawdziwym watkiem komunikacyjnym i zaslepkami zamiast executorsm. Odpowiedz niesie
+/// dlugosc otrzymanego db.argument - po niej widac, czy komenda doszla w calosci.
+class RunningServer {
+ public:
+  RunningServer() : names_(ipc::names(kServerLoop)) {
+    server_.setServerName(kServerLoop);
+    auto readyFuture = ready_.get_future();
+    server_.start({.onCommand =
+                       [](const ptree &request) {
+                         ptree response;
+                         response.put("argumentLength", request.get("db.argument", std::string{}).size());
+                         return response;
+                       },
+                   .onReady          = [this] { ready_.set_value(true); },
+                   .onFailure        = [this] { ready_.set_value(false); },
+                   .onCommandHandled = [] {},
+                   .shouldStop       = [this] { return stop_.load(); }});
+    readyOk_ = readyFuture.wait_for(kResponseBudget) == std::future_status::ready && readyFuture.get();
+  }
+
+  ~RunningServer() {
+    stop_ = true;
+    server_.stop();
+    server_.removeAllObjects();
+  }
+
+  RunningServer(const RunningServer &)            = delete;
+  RunningServer &operator=(const RunningServer &) = delete;
+
+  [[nodiscard]] bool ready() const { return readyOk_; }
+
+  /// Surowe bajty wprost do kolejki komend - z pominieciem IpcClient, ktory takiej komendy nie zbuduje.
+  void send(const std::string &bytes) const {
+    IPC::message_queue mq(IPC::open_only, names_.queryQueue.c_str());
+    mq.send(bytes.data(), bytes.size(), 0);
+  }
+
+  /// Odpowiedz dla `clientId` z mapy odpowiedzi, zdjeta tak, jak zdejmuje ja IpcClient::netClient.
+  [[nodiscard]] std::optional<ptree> response(int clientId) const {
+    IPC::managed_shared_memory segment(IPC::open_only, names_.shmemSegment.c_str());
+    IPC::named_mutex mutex(IPC::open_only, names_.mapMutex.c_str());
+    ipc::IPCMap *map = segment.find<ipc::IPCMap>(std::string(ipc::kMapObject).c_str()).first;
+    if (map == nullptr) return std::nullopt;
+    const auto deadline = std::chrono::steady_clock::now() + kResponseBudget;
+    while (std::chrono::steady_clock::now() < deadline) {
+      {
+        IPC::scoped_lock<IPC::named_mutex> lock(mutex);
+        if (auto it = map->find(clientId); it != map->end()) {
+          std::stringstream text;
+          text << it->second;
+          map->erase(it);
+          ptree retVal;
+          read_info(text, retVal);
+          return retVal;
+        }
+      }
+      std::this_thread::sleep_for(ipc::kClientResponsePollInterval);
+    }
+    return std::nullopt;
+  }
+
+ private:
+  IpcServer server_;
+  ipc::ServerNames names_;
+  std::promise<bool> ready_;
+  bool readyOk_{false};
+  std::atomic<bool> stop_{false};
+};
+
+/// Komenda w formacie IpcClient::netClient.
+std::string command(int clientId, const std::string &argument) {
+  ptree request;
+  request.put("db.message", "hello");
+  request.put("db.id", clientId);
+  request.put("db.argument", argument);
+  std::stringstream text;
+  write_info(text, request);
+  return text.str();
+}
+
+}  // namespace
+
+// Regresja S-02: bufor odbiorczy mial rozmiar kQueryQueueMaxMessageSize, a kolejka przyjmuje
+// komende DOKLADNIE tej dlugosci - terminator ladowal jeden bajt za tablica. W zwyklym buildzie
+// zapis bywa niewidoczny (trafia w zerowy bajt kanarka stosu), wiec czerwien daje dopiero
+// -DRDB_SANITIZE=address; niezmiennik w kazdym buildzie pilnuje static_assert w commandLoop.
+// Test pilnuje zachowania na granicy: komenda o pelnej dlugosci dochodzi w calosci,
+// a watek komunikacyjny obsluguje nastepna.
+TEST(IpcServerLoop, full_size_command_is_received_whole_and_server_keeps_serving) {
+  RunningServer server;
+  ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
+
+  // Dlugosc serializacji rosnie o bajt na znak argumentu, wiec dopelnienie liczy sie z jednej proby.
+  const std::size_t overhead       = command(kClientFull, "x").size() - 1;
+  const std::size_t argumentLength = ipc::kQueryQueueMaxMessageSize - overhead;
+  const std::string full           = command(kClientFull, std::string(argumentLength, 'x'));
+  ASSERT_EQ(full.size(), static_cast<std::size_t>(ipc::kQueryQueueMaxMessageSize));
+
+  server.send(full);
+  const auto first = server.response(kClientFull);
+  ASSERT_TRUE(first.has_value()) << "brak odpowiedzi na komende o pelnej dlugosci";
+  EXPECT_EQ(first->get<std::size_t>("argumentLength"), argumentLength) << "komenda dotarla obcieta";
+
+  server.send(command(kClientNext, "po"));
+  const auto next = server.response(kClientNext);
+  ASSERT_TRUE(next.has_value()) << "watek komunikacyjny przestal obslugiwac komendy";
+  EXPECT_EQ(next->get<std::size_t>("argumentLength"), 2U);
 }

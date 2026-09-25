@@ -170,6 +170,11 @@ constexpr int kQueryQueueMaxMessageSize = 1000;
 // Odpowiedzi mogą być dłuższe niż komendy (pełne dane strumieniowe).
 constexpr int kResponseQueueMaxMessageSize = 1024;
 
+// Miejsce na terminator w buforze odbiorczym kazdej z dwoch kolejek. try_receive moze oddac
+// DOKLADNIE max_message_size bajtow, a odbiorca pisze '\0' pod indeksem recvd_size, czyli
+// zaraz za nimi. Bufor o rozmiarze samego max_message_size konczy sie zapisem poza tablica.
+constexpr std::size_t kNullTerminatorBytes = 1;
+
 // Rozmiar segmentu shared memory (bajty). 64 KiB wystarcza na
 // wszystkie równoległe odpowiedzi przy typowej liczbie klientów.
 constexpr std::size_t kShmemSegmentSize = 65536;

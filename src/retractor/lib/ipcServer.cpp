@@ -295,7 +295,11 @@ void IpcServer::commandLoop() const {
     //
     // This need to be clean up - There are some mess.
     //
-    std::array<char, ipc::kQueryQueueMaxMessageSize> message;
+    // try_receive moze oddac DOKLADNIE kQueryQueueMaxMessageSize bajtow (to max_message_size
+    // kolejki), a message[recvd_size] = 0 pisze zaraz za nimi. Bez miejsca na terminator
+    // komenda o pelnej dlugosci pisala jeden bajt poza tablica, w ramke stosu tego watku.
+    std::array<char, ipc::kQueryQueueMaxMessageSize + ipc::kNullTerminatorBytes> message;
+    static_assert(sizeof(message) > ipc::kQueryQueueMaxMessageSize, "bufor odbiorczy bez miejsca na terminator");
     unsigned int priority;
     IPC::message_queue::size_type recvd_size;
 
@@ -305,7 +309,7 @@ void IpcServer::commandLoop() const {
         message[recvd_size] = 0;
         std::stringstream strstream;
         strstream << message.data();
-        memset(message.data(), 0, ipc::kQueryQueueMaxMessageSize);
+        memset(message.data(), 0, message.size());
         ptree pt;
         read_info(strstream, pt);
         ptree pt_retval = callbacks_.onCommand(pt);
