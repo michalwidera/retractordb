@@ -26,7 +26,7 @@
 
 std::mutex core_mutex;
 
-dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
+dataModel::dataModel(qTree &coreInstance, rdb::MemoryStore *memory) : coreInstance_(coreInstance), memory_(memory) {
   //
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
@@ -50,7 +50,7 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   coreInstance_.erase(removed.begin(), removed.end());
 
   for (auto &qry : coreInstance_) {
-    auto runtime              = std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]);
+    auto runtime              = std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"], memory_);
     runtime->logicalIndexBase = qry.logicalOrigin;
     qSet.emplace(qry.id, std::move(runtime));
   }
@@ -72,7 +72,7 @@ bool dataModel::addQueryToModel(const std::string &id) {
     return false;
   }
 
-  qSet.emplace(id, std::make_unique<streamInstance>(coreInstance_, *it, directive_[":STORAGE"]));
+  qSet.emplace(id, std::make_unique<streamInstance>(coreInstance_, *it, directive_[":STORAGE"], memory_));
   qSet[id]->outputPayload->setDisposable(coreInstance_[id].isDisposable);
   // SELECT dodany do działającego planu nie zaczyna w historycznym origin całego systemu.
   // Jego bazę wyznaczy dokładny pierwszy slot, w którym runtime zobaczy tę instancję.
@@ -356,7 +356,7 @@ void dataModel::processRows(const std::set<std::string> &inSet, const boost::rat
       const auto slotNumber = currentTimeSlot / q.rInterval;
       if (slotNumber.denominator() != 1) {
         throw rdb::LogicError(std::format("dataModel::processRows: current slot {} is not aligned with interval {} for '{}'",
-            currentTimeSlot, q.rInterval, q.id));
+                                          currentTimeSlot, q.rInterval, q.id));
       }
       const int firstLogicalIndex = slotNumber.numerator() - 1 - q.startupLatency;
       if (firstLogicalIndex < q.logicalOrigin || !queryInputsAvailable(q, firstLogicalIndex)) continue;
@@ -422,8 +422,8 @@ void dataModel::computeWindowAggregates(const query &qry) {
     const auto &group = qry.windowGroups[groupIndex];
     auto sourceIt     = qSet.find(group.source);
     if (sourceIt == qSet.end()) {
-      throw rdb::LogicError(std::format("dataModel::computeWindowAggregates: source '{}' of window group not in model",
-          group.source));
+      throw rdb::LogicError(
+          std::format("dataModel::computeWindowAggregates: source '{}' of window group not in model", group.source));
     }
     runtime.windowValues[groupIndex] = sourceIt->second->reduceRecordWindow(group, n, baseOf(group.source));
   }
@@ -631,8 +631,8 @@ std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const
   if (!qSet[instance]->outputPayload->isDeclared()) {
     auto success = qSet[instance]->outputPayload->revRead(timeOffset, payload->span().data());
     if (!success) {
-      throw rdb::LogicError(std::format("dataModel::getRow: revRead failed for stream '{}' at timeOffset {}", instance,
-          timeOffset));
+      throw rdb::LogicError(
+          std::format("dataModel::getRow: revRead failed for stream '{}' at timeOffset {}", instance, timeOffset));
     }
   } else {
     *payload = *(qSet[instance]->outputPayload->getPayload());

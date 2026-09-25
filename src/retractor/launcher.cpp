@@ -25,13 +25,13 @@
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "constants.hpp"
-#include "lib/fatalError.hpp"  // fatalErrorRaised - zatrzask czytany przez executorsm::cleanup()
 #include "lib/appConfig.hpp"
 #include "lib/bus.hpp"
 #include "lib/compiler.hpp"
 #include "lib/executor_rt.hpp"
 #include "lib/executorsm.hpp"
 #include "lib/executorsmState.hpp"
+#include "lib/fatalError.hpp"  // fatalErrorRaised - zatrzask czytany przez executorsm::cleanup()
 #include "lib/lockManager.hpp"
 #include "lib/persistentCounter.hpp"
 #include "lib/planSource.hpp"

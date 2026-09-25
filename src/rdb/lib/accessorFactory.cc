@@ -55,9 +55,10 @@ std::unique_ptr<FileInterface> makeAccessor(const std::string_view storageType, 
   // bierze sie z pola TYPE deskryptora albo wprost od wolajacego (argument storage_type
   // wiazania Pythona), wiec literowka w nim trafiala tu prosto w std::exit. Zadna straz w
   // wiazaniu tego nie zatrzymywala - nie zna listy typow, ktora jest wlasnie tutaj.
-  throw ConfigError(fmt::format("storage: unsupported storage type '{}' - expected one of DEFAULT, DIRECT, MEMORY, POSIX, "
-                                "POSIXSHD, GENERIC, DEVICE, TEXTSOURCE",
-                                storageType));
+  throw ConfigError(
+      fmt::format("storage: unsupported storage type '{}' - expected one of DEFAULT, DIRECT, MEMORY, POSIX, "
+                  "POSIXSHD, GENERIC, DEVICE, TEXTSOURCE",
+                  storageType));
 }
 
 std::unique_ptr<metaData> makeMetaIndex(const bool declared,           //

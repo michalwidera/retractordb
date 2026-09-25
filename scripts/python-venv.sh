@@ -28,15 +28,19 @@ source_dir=$(cd "$script_dir/.." && pwd)
 # Prog 3.10 jest wspolny dla nas, dla nanobinda od 3.0 i dla requires-python
 # w api/python/pyproject.toml. Nie rozjezdzac go w jednym miejscu.
 readonly python_minimum="3.10"
-# nanobind i pytest sluza modulowi osadzonemu; clang-format i cmakelang obsluguja
+# nanobind, numpy i pytest sluza modulowi osadzonemu; clang-format i cmakelang obsluguja
 # `ninja cformat`, ktory src/CMakeLists.txt kaze instalowac przez pipa - a tej drogi
 # PEP 668 juz nie przepuszcza. Jeden venv zalatwia oba przypadki.
 #
 # clang-format PRZYPIETY do wersji z CLAUDE.md. Nie jest to ostroznosc na wyrost:
 # kolejne wydania formatuja inaczej, wiec niepinowana wersja znaczy, ze `ninja
 # cformat` u dwoch osob daje dwa rozne drzewa i roznica ta wchodzi do commitow.
+# numpy: jedyna zaleznosc uruchomieniowa modulu osadzonego (Engine.to_numpy/window,
+# docs/jupyter-integration.md sekcja 4); torch CELOWO nie - retractordb.torch importuje
+# go dopiero na zyczenie, a test, ktory go potrzebuje, pomija sie bez niego.
 readonly package_list=(
   "nanobind>=2.0"
+  "numpy>=1.23"
   "pytest>=7.0"
   "clang-format==21.1.7"
   "cmakelang"

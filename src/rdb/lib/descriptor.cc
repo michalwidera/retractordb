@@ -17,7 +17,6 @@ extern std::string parserDESCString(rdb::Descriptor &desc, std::string_view inle
 
 namespace rdb {
 
-
 constexpr auto GetFieldType(const std::string_view name) {
   if (name == "NULL") return std::optional<rdb::descFld>(rdb::NULLTYPE);
   return magic_enum::enum_cast<rdb::descFld>(name);

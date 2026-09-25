@@ -36,8 +36,13 @@ target_include_directories(
           ${spdlog_INCLUDE_DIR} #
           ${fmt_INCLUDE_DIR})
 
-# uxSysTermTools (używane przez executorsm.cpp) pochodzi z biblioteki common
-target_link_libraries(${PROJECT_NAME} PUBLIC common)
+# uxSysTermTools (używane przez executorsm.cpp) pochodzi z biblioteki common.
+# rdb i rqlparser (z antlr4_static) sa zaleznosciami tej biblioteki od zawsze;
+# deklaracja pojawila sie wraz z rdbembed (faza 3), ktore linkuje retractor jako
+# biblioteke, a nie przez reczna kolejnosc na linii konsolidacji - bez niej
+# CMake nie wie, ze librdb.a musi stac ZA kazdym wystapieniem libretractor.a, i
+# test jednostkowy nie linkuje sie wcale.
+target_link_libraries(${PROJECT_NAME} PUBLIC common rdb rqlparser antlr4_static)
 
 if(ENABLE_UNITY_BUILD)
   set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD ON)

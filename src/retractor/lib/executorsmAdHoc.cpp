@@ -144,8 +144,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     // Filtr powyzej jest WYCZERPUJACY: kazde inne slowo kluczowe zostalo juz odeslane klientowi
     // jako odmowa. Dotarcie tutaj znaczy, ze filtr i parser rozjechaly sie ze soba.
     throw rdb::LogicError(
-        std::format("executorsm::getAdHoc: unexpected first_keyword '{}' after filtering - parser logic error",
-                    first_keyword));
+        std::format("executorsm::getAdHoc: unexpected first_keyword '{}' after filtering - parser logic error", first_keyword));
   }
 
   // --until-eof jest trybem calego przebiegu. Deklaracja dolaczona pozniej musi

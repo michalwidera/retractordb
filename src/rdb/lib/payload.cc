@@ -252,8 +252,8 @@ const std::vector<bool> &payload::getNullBitset() const { return nullBitset_; }
 
 void payload::setNullBitset(const std::vector<bool> &nullBitset) {
   if (nullBitset.size() != descriptor.size()) {
-    throw LogicError(fmt::format("payload::setNullBitset: size mismatch: nullBitset={} descriptor={}",
-                                 nullBitset.size(), descriptor.size()));
+    throw LogicError(
+        fmt::format("payload::setNullBitset: size mismatch: nullBitset={} descriptor={}", nullBitset.size(), descriptor.size()));
   }
   nullBitset_ = nullBitset;
 }
@@ -299,8 +299,8 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
     auto destOffset = descriptor.byteOffsetAtFlatIndex(positionFlat);
     auto dest       = span().subspan(destOffset, len);
     if (destOffset + len > descriptor.getSizeInBytes()) {
-      throw LogicError(fmt::format("payload::writeStringField: destOffset {} + len {} exceeds descriptor size {}",
-                                   destOffset, len, descriptor.getSizeInBytes()));
+      throw LogicError(fmt::format("payload::writeStringField: destOffset {} + len {} exceeds descriptor size {}", destOffset,
+                                   len, descriptor.getSizeInBytes()));
     }
     std::ranges::fill(dest, 0);
     std::copy_n(data.c_str(), lenr, dest.begin());
@@ -367,8 +367,8 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
     auto fieldSpan = memory.subspan(offsetFlat, len);
     auto descLen   = descriptor.getSizeInBytes();
     if (offsetFlat + static_cast<size_t>(len) > descLen) {
-      throw LogicError(fmt::format("payload::readStringField: field offset {} + len {} exceeds descriptor size {}",
-                                   offsetFlat, len, descLen));
+      throw LogicError(fmt::format("payload::readStringField: field offset {} + len {} exceeds descriptor size {}", offsetFlat,
+                                   len, descLen));
     }
 
     for (auto i = 0; i < len; i++) {
@@ -428,8 +428,8 @@ std::optional<rdb::descFldVT> payload::getItemVT(const int positionFlat) const {
     auto fieldSpan = memory.subspan(offsetFlat, len);
     auto descLen   = descriptor.getSizeInBytes();
     if (offsetFlat + static_cast<size_t>(len) > descLen) {
-      throw LogicError(fmt::format("payload::getItemVT string: field offset {} + len {} exceeds descriptor size {}",
-                                   offsetFlat, len, descLen));
+      throw LogicError(fmt::format("payload::getItemVT string: field offset {} + len {} exceeds descriptor size {}", offsetFlat,
+                                   len, descLen));
     }
     for (auto i = 0; i < len; i++) {
       if (fieldSpan[i] == 0) {
@@ -505,8 +505,8 @@ void payload::setItemVT(const int positionFlat, std::optional<rdb::descFldVT> va
       auto lenr       = std::min(len, static_cast<int>(data.length()));
       auto dest       = span().subspan(offsetFlat, len);
       if (offsetFlat + len > descriptor.getSizeInBytes()) {
-        throw LogicError(fmt::format("payload::setItemVT string: destOffset {} + len {} exceeds descriptor size {}",
-                                     offsetFlat, len, descriptor.getSizeInBytes()));
+        throw LogicError(fmt::format("payload::setItemVT string: destOffset {} + len {} exceeds descriptor size {}", offsetFlat,
+                                     len, descriptor.getSizeInBytes()));
       }
       std::ranges::fill(dest, 0);
       std::copy_n(data.c_str(), lenr, dest.begin());

@@ -7,8 +7,8 @@
 #include <utility>
 #include <vector>
 
-#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <fmt/format.h>
+#include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
 
@@ -21,8 +21,8 @@
 #include "constants.hpp"
 #include "exprSimplify.hpp"
 #include "qTree.hpp"
-#include "rdb/exceptions.hpp"
 #include "rdb/convertTypes.hpp"
+#include "rdb/exceptions.hpp"
 #include "rqlFunctions.hpp"
 
 using namespace antlrcpp;

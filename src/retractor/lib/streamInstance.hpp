@@ -44,7 +44,13 @@ struct streamInstance {
   std::optional<int> logicalIndexBase;
 
   // This constructor will create data based on query
-  explicit streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam = "");
+  //
+  // `memory` to sklep magazynu MEMORY, ktory dostaje outputPayload; nullptr wybiera instancje
+  // domyslna procesu (rdb::MemoryStore::processDefault), czyli dotychczasowe zachowanie demona.
+  // Silnik osadzony (rdb::embed::Engine) podaje tu sklep wlasny - to jest miejsce, w ktorym
+  // izolacja dwoch silnikow w jednym procesie dociera do planu, a nie tylko do magazynu.
+  explicit streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam = "",
+                          rdb::MemoryStore *memory = nullptr);
 
   [[nodiscard]] rdb::payload constructAgsePayload(int length,                   //  _@(_,length)
                                                   int step,                     //  _@(step,_)

@@ -42,10 +42,10 @@ StoragePaths::StoragePaths(const std::string_view qryID, const std::string_view 
   if (!std::filesystem::exists(dirName)) {
     std::error_code absError;
     const auto full = std::filesystem::absolute(dirName, absError);
-    throw ConfigError(fmt::format(
-        "storage: directory '{}' from the STORAGE directive does not exist ({}); "
-        "RetractorDB does not create it - run 'mkdir -p {}' first",
-        dirName, absError ? std::string("path could not be resolved") : full.string(), dirName));
+    throw ConfigError(
+        fmt::format("storage: directory '{}' from the STORAGE directive does not exist ({}); "
+                    "RetractorDB does not create it - run 'mkdir -p {}' first",
+                    dirName, absError ? std::string("path could not be resolved") : full.string(), dirName));
   }
 
   if (!std::filesystem::is_directory(dirName)) {

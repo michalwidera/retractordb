@@ -5,14 +5,14 @@
 #include <algorithm>
 #include <chrono>
 
+#include <fmt/format.h>
 #include <cstring>  //std::memset
 #include <filesystem>
 #include <ranges>
-#include <fmt/format.h>
 
 #include "rdb/accessorFactory.hpp"
-#include "rdb/exceptions.hpp"
 #include "rdb/descriptorIO.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/probe.hpp"  // sonda K6: objętość materializacji
 
 namespace rdb {
@@ -259,8 +259,7 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   // In order to maintain the consistency of declared data sources,
   // it is necessary to maintain a buffer of at least 1
 
-  if (buffer_.capacity() == 0)
-    throw LogicError("storage::revRead: circular buffer capacity is zero for a declared source");
+  if (buffer_.capacity() == 0) throw LogicError("storage::revRead: circular buffer capacity is zero for a declared source");
 
   if (recordIndexFromBack == 0 && bufferState == sourceState::flux) {
     buffer_.readCurrent(*accessor_, *storagePayload_);

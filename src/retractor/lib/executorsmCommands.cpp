@@ -17,8 +17,8 @@
 #include "dataModel.hpp"
 #include "executorsmState.hpp"
 #include "ipcServer.hpp"
-#include "rdb/exceptions.hpp"
 #include "rdb/convertTypes.hpp"
+#include "rdb/exceptions.hpp"
 #include "shmBudget.hpp"
 
 // Dyspozytor komend kanalu IPC i formatowanie odpowiedzi. Stan wspolny opisuje

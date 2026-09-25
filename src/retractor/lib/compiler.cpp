@@ -216,8 +216,8 @@ std::string compiler::resolveStreamIntervals() {
         continue;  // Just one stream
       }
       if (q.lProgram.size() != 3 && q.lProgram.size() != 2) {
-        throw rdb::LogicError(fmt::format("compiler::prepareFields: unexpected program size {} for query '{}'",
-                                          q.lProgram.size(), q.id));
+        throw rdb::LogicError(
+            fmt::format("compiler::prepareFields: unexpected program size {} for query '{}'", q.lProgram.size(), q.id));
       }
       // This is shit coded (these size2 i size3) and fast fixed
       bool size3           = (q.lProgram.size() == 3);
@@ -335,8 +335,8 @@ std::string compiler::resolveStreamIntervals() {
           const int coreWindow    = coreInstance.getQuery(t1.getStr_()).descriptorStorage().flatElementCount();
           auto [step, windowSize] = std::get<std::pair<int, int>>(op.getVT());
           if (step <= 0) {
-            throw PlanError{fmt::format("Stream '{}' has an AGSE step of {}; the step in @(step,window) must be > 0", q.id,
-                step)};
+            throw PlanError{
+                fmt::format("Stream '{}' has an AGSE step of {}; the step in @(step,window) must be > 0", q.id, step)};
           }
           windowSize = abs(windowSize);
           // if (windowSize < 0) {  // windowSize < 0  (need to double-check and UT cover)
@@ -666,10 +666,10 @@ std::string compiler::extractIntermediateStreams() {
           // i `++` wracało na begin(). Ta sama konstrukcja o jeden krok dalej (sięgnięcie po
           // nieistniejący drugi argument `@`) kasowała wartownika i psuła stertę.
           if (std::distance(currentQuery.lProgram.begin(), it2) < argCount) {
-            throw rdb::LogicError(fmt::format("compiler::extractIntermediateStreams: operator '{}' in query '{}' has {} "
-                                              "preceding tokens, needs {}",
-                                              GetStringcommand_id(cmd), currentQuery.id,
-                                              std::distance(currentQuery.lProgram.begin(), it2), argCount));
+            throw rdb::LogicError(fmt::format(
+                "compiler::extractIntermediateStreams: operator '{}' in query '{}' has {} "
+                "preceding tokens, needs {}",
+                GetStringcommand_id(cmd), currentQuery.id, std::distance(currentQuery.lProgram.begin(), it2), argCount));
           }
           auto firstArg = it2;
           std::advance(firstArg, -argCount);
@@ -704,9 +704,10 @@ std::string compiler::extractIntermediateStreams() {
         }  // Endif PUSH_STREAM, PUSH_VAL
       }  // Endfor
       if (!extracted) {
-        throw rdb::LogicError(fmt::format("compiler::extractIntermediateStreams: query '{}' requires reduction but no operator "
-                                          "was extracted",
-                                          coreInstance.at(queryIndex).id));
+        throw rdb::LogicError(
+            fmt::format("compiler::extractIntermediateStreams: query '{}' requires reduction but no operator "
+                        "was extracted",
+                        coreInstance.at(queryIndex).id));
       }
     }  // Endwhile
   }  // Endfor
@@ -810,9 +811,10 @@ std::string compiler::expandSchemaWildcards() {
   for (auto &q : coreInstance) {
     for (auto &t : q.lProgram) {
       if (q.lProgram.size() >= 4) {
-        throw rdb::LogicError(fmt::format("compiler::expandSchemaWildcards: program not optimized - {} tokens for "
-                                          "query '{}', expected < 4",
-                                          q.lProgram.size(), q.id));
+        throw rdb::LogicError(
+            fmt::format("compiler::expandSchemaWildcards: program not optimized - {} tokens for "
+                        "query '{}', expected < 4",
+                        q.lProgram.size(), q.id));
       }
       // fail of above check means that all streams are
       // after optimization already
@@ -824,9 +826,10 @@ std::string compiler::expandSchemaWildcards() {
           if (q.lProgram.size() == 1) {
             // we assure that on and only token is push_stream
             if ((*q.lProgram.begin()).getCommandID() != PUSH_STREAM) {
-              throw rdb::LogicError(fmt::format("compiler::expandSchemaWildcards: first token must be PUSH_STREAM for "
-                                                "single-token program, got cmd={} for query '{}'",
-                                                (*q.lProgram.begin()).getStrCommandID(), q.id));
+              throw rdb::LogicError(
+                  fmt::format("compiler::expandSchemaWildcards: first token must be PUSH_STREAM for "
+                              "single-token program, got cmd={} for query '{}'",
+                              (*q.lProgram.begin()).getStrCommandID(), q.id));
             }
             auto nameOfscanningTable = (*q.lProgram.begin()).getStr_();
             // Strumien czytajacy SIEBIE odrzucamy TUTAJ, przed rozwinieciem schematu.
@@ -1041,9 +1044,10 @@ std::string compiler::expandIndexWildcards(query &q) {
       // okno AGSE o dlugosci zero: query::descriptorFrom iteruje `for (i=0; i<abs(length); i++)`,
       // wiec @(k,0) nie wytwarza ani jednego pola. Komunikat mowi o oknie, a nie o "flat size",
       // bo to okno uzytkownik napisal.
-      throw PlanError{fmt::format("Stream '{}' expands '[_]' over a source with no fields; an AGSE window of length 0 "
-                                  "produces nothing to expand",
-                                  q.id)};
+      throw PlanError{
+          fmt::format("Stream '{}' expands '[_]' over a source with no fields; an AGSE window of length 0 "
+                      "produces nothing to expand",
+                      q.id)};
     }
 
     for (int i = 0; i < minSizeFlat; i++) {
@@ -1274,8 +1278,8 @@ push_idXXX is searched in all stream program after reduction */
 std::string compiler::resolveFieldReferences() {
   for (auto &q : coreInstance) {  // for each query
     if (q.isReductionRequired()) {
-      throw rdb::LogicError(fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated",
-                                        q.id));
+      throw rdb::LogicError(
+          fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id));
     }
     for (auto &f : q.lSchema) {  // for each field in query
       std::string result{resolveTokenReferences(f.lProgram, q, "")};
@@ -1411,8 +1415,8 @@ std::string compiler::localizeFieldOffsets() {
   // This loop fill&create OffsetMap structure.
   for (auto &q : coreInstance) {  // for each query
     if (q.isReductionRequired()) {
-      throw rdb::LogicError(fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated",
-                                        q.id));
+      throw rdb::LogicError(
+          fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id));
     }  // that has at least two arguments
     std::set<std::string> viaInterleave;  // składowe, których tożsamość zniosło `#`
     offsetMap[q.id]          = sourceOffsetsInFrom(q, viaInterleave);
@@ -1451,8 +1455,8 @@ std::string compiler::localizeFieldOffsets() {
   // This loop converts with help of offsetMap
   for (auto &q : coreInstance) {  // for each query
     if (q.isReductionRequired()) {
-      throw rdb::LogicError(fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated",
-                                        q.id));
+      throw rdb::LogicError(
+          fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id));
     }  // that has at least two arguments and
     for (auto &f : q.lSchema) {             // for each field in query and
       for (auto &t : f.lProgram) {          // for each token in query field - do:
@@ -1468,9 +1472,10 @@ std::string compiler::localizeFieldOffsets() {
           if (base == offsets.end()) {
             const auto refs = namedSourceRefs_.find(q.id);
             if (refs == namedSourceRefs_.end() || !refs->second.contains(schema))
-              throw rdb::LogicError(fmt::format("compiler: stream '{}' holds a compiler-generated reference to '{}' outside its "
-                                                "FROM clause",
-                                                q.id, schema));
+              throw rdb::LogicError(
+                  fmt::format("compiler: stream '{}' holds a compiler-generated reference to '{}' outside its "
+                              "FROM clause",
+                              q.id, schema));
             return std::format(
                 "Stream '{}' refers to '{}', which is not in its FROM clause. A field list reads only the streams "
                 "named in FROM: refer to the field by its position in the record of a stream in FROM, or move the "
@@ -1489,8 +1494,8 @@ std::string compiler::validateConstraints() {
   for (auto &q : coreInstance) {      // for each query
     if (q.isDeclaration()) continue;  // do not check declaration in constraints.
     if (q.isReductionRequired()) {
-      throw rdb::LogicError(fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated",
-                                        q.id));
+      throw rdb::LogicError(
+          fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id));
     }  // process data only with two or less arguments
     auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
     switch (cmd.getCommandID()) {
@@ -1559,8 +1564,8 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
   for (auto &q : coreInstance) {      // for each query
     if (q.isDeclaration()) continue;  // that is not declaration
     if (q.isReductionRequired()) {
-      throw rdb::LogicError(fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated",
-                                        q.id));
+      throw rdb::LogicError(
+          fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id));
     }  // process data only with two or less arguments
     auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
     switch (cmd.getCommandID()) {
@@ -1570,9 +1575,10 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         //  :- STREAM_TIMEMOVE(1)
         //
         if (cmd.getCommandID() == STREAM_TIMEMOVE && q.lProgram.size() != 2) {
-          throw rdb::LogicError(fmt::format("compiler: unexpected program size in computeRequiredCapacities: {} tokens for "
-                                            "query '{}', expected 2",
-                                            q.lProgram.size(), q.id));
+          throw rdb::LogicError(
+              fmt::format("compiler: unexpected program size in computeRequiredCapacities: {} tokens for "
+                          "query '{}', expected 2",
+                          q.lProgram.size(), q.id));
         }
 
         if (cmd.getCommandID() == PUSH_STREAM) {
@@ -1619,17 +1625,19 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
         //
         if (q.lProgram.size() != 2) {
-          throw rdb::LogicError(fmt::format("compiler: unexpected program size in computeRequiredCapacities: {} tokens for "
-                                            "query '{}', expected 2",
-                                            q.lProgram.size(), q.id));
+          throw rdb::LogicError(
+              fmt::format("compiler: unexpected program size in computeRequiredCapacities: {} tokens for "
+                          "query '{}', expected 2",
+                          q.lProgram.size(), q.id));
         }
 
         const auto nameSrc = arg1;
         const auto step    = get<std::pair<int, int>>(cmd.getVT()).first;
         if (step <= 0) {
-          throw rdb::LogicError(fmt::format("compiler: AGSE step must be > 0, got {} for query '{}' in "
-                                            "computeRequiredCapacities",
-                                            step, q.id));
+          throw rdb::LogicError(
+              fmt::format("compiler: AGSE step must be > 0, got {} for query '{}' in "
+                          "computeRequiredCapacities",
+                          step, q.id));
         }
         auto &source          = coreInstance[nameSrc];
         const int sourceWidth = source.descriptorStorage().flatElementCount();
@@ -1850,9 +1858,10 @@ int firstIndexReaching(const Mapping &mapping, const int threshold, const std::s
       // 10^6) poszukiwanie przekracza limit, zanim mapping() dosiegnie progu. Kontrola
       // deltaTarget < deltaSource, ktora zwrocilaby czytelny komunikat, mieszka w
       // validateConstraints() - a ten przebieg biegnie PO tym miejscu.
-      throw PlanError{fmt::format("Stream '{}' has an interval ratio too extreme to resolve its logical origin "
-                                  "(origin search passed {} steps looking for {})",
-                                  nodeId, kOriginSearchLimit, threshold)};
+      throw PlanError{
+          fmt::format("Stream '{}' has an interval ratio too extreme to resolve its logical origin "
+                      "(origin search passed {} steps looking for {})",
+                      nodeId, kOriginSearchLimit, threshold)};
     }
     hi *= 2;
   }
@@ -2341,9 +2350,10 @@ std::string compiler::validateSubstratNameUniqueness() {
           return a.getCommandID() == b.getCommandID() && a.getVT() == b.getVT();
         });
     if (!progMatch)
-      throw rdb::LogicError(fmt::format("compiler::validateSubstratNameUniqueness: substrate name '{}' denotes two different "
-                                        "programs",
-                                        candidate.id));
+      throw rdb::LogicError(
+          fmt::format("compiler::validateSubstratNameUniqueness: substrate name '{}' denotes two different "
+                      "programs",
+                      candidate.id));
   }
   return {"OK"};
 }
@@ -3029,8 +3039,8 @@ class genIndexFolder {
   int fold() {
     const int value = sum();
     if (pos_ != text_.size())
-      throw rdb::LogicError(fmt::format("compiler::expandStreamGenerators: trailing '{}' in generator index '{}'",
-                                        text_.substr(pos_), text_));
+      throw rdb::LogicError(
+          fmt::format("compiler::expandStreamGenerators: trailing '{}' in generator index '{}'", text_.substr(pos_), text_));
     return value;
   }
 
@@ -3055,9 +3065,11 @@ class genIndexFolder {
   }
 
   int atom() {
-    if (pos_ >= text_.size()) throw rdb::LogicError(fmt::format("compiler::expandStreamGenerators: truncated generator index "
-                                                                "'{}'",
-                                                                text_));
+    if (pos_ >= text_.size())
+      throw rdb::LogicError(
+          fmt::format("compiler::expandStreamGenerators: truncated generator index "
+                      "'{}'",
+                      text_));
     if (text_[pos_] == '(') {
       ++pos_;
       const int value = sum();
@@ -3071,8 +3083,8 @@ class genIndexFolder {
       return ordinal_;
     }
     if (text_[pos_] < '0' || text_[pos_] > '9')
-      throw rdb::LogicError(fmt::format("compiler::expandStreamGenerators: unexpected '{}' in generator index '{}'",
-                                        text_[pos_], text_));
+      throw rdb::LogicError(
+          fmt::format("compiler::expandStreamGenerators: unexpected '{}' in generator index '{}'", text_[pos_], text_));
     int value = 0;
     while (pos_ < text_.size() && text_[pos_] >= '0' && text_[pos_] <= '9')
       value = (value * kDecimalBase) + (text_[pos_++] - '0');
@@ -3123,9 +3135,11 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
   for (auto &t : instance.lProgram) {
     if (t.getCommandID() != PUSH_STREAM || !dependsOnOrdinal(t.getStr_())) continue;
     const auto parts = splitIndexedRef(t.getStr_());
-    if (!parts.has_value()) throw rdb::LogicError(fmt::format("compiler::substituteOrdinal: malformed indexed stream reference "
-                                                              "'{}'",
-                                                              t.getStr_()));
+    if (!parts.has_value())
+      throw rdb::LogicError(
+          fmt::format("compiler::substituteOrdinal: malformed indexed stream reference "
+                      "'{}'",
+                      t.getStr_()));
     const int index = genIndexFolder(parts->second, ordinal).fold();
     t               = token(PUSH_STREAM, parts->first + "[" + std::to_string(index) + "]");
   }
@@ -3138,9 +3152,11 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
       }
       if (t.getCommandID() != PUSH_ID2 || !dependsOnOrdinal(t.getStr_())) continue;
       const auto parts = splitIndexedRef(t.getStr_());
-      if (!parts.has_value()) throw rdb::LogicError(fmt::format("compiler::substituteOrdinal: malformed indexed field reference "
-                                                                "'{}'",
-                                                                t.getStr_()));
+      if (!parts.has_value())
+        throw rdb::LogicError(
+            fmt::format("compiler::substituteOrdinal: malformed indexed field reference "
+                        "'{}'",
+                        t.getStr_()));
       const int index = genIndexFolder(parts->second, ordinal).fold();
       if (index < 0)
         return "Stream '" + instance.id + "' references '" + parts->first + "[" + std::to_string(index) +

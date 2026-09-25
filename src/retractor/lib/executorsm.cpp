@@ -245,8 +245,8 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
             // pozostalo osiagalne mimo wlaczonego haka.
             if (const char *faultyCommand = std::getenv("RDB_FAULT_THROW_IN_COMMAND");
                 faultyCommand != nullptr && pt.get("db.message", "") == faultyCommand)
-              throw std::runtime_error(std::string("RDB_FAULT_THROW_IN_COMMAND: wstrzyknieta awaria komendy '") +
-                                       faultyCommand + "'");
+              throw std::runtime_error(std::string("RDB_FAULT_THROW_IN_COMMAND: wstrzyknieta awaria komendy '") + faultyCommand +
+                                       "'");
             return executorsm::commandProcessor(pt);
           },
       // Stan predykatu musi zmienic sie POD core_mutex. Watek glowny czeka na ipcReady

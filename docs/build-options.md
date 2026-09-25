@@ -57,8 +57,12 @@ and prints the configure line to paste.
 | Package | For |
 |---|---|
 | `nanobind>=2.0` | building `retractordb._core` |
+| `numpy>=1.23` | `Engine.to_numpy()` / `window()` - the embedded half's only runtime dependency |
 | `pytest>=7.0` | `api/python/tests` |
 | `clang-format==21.1.7`, `cmakelang` | `ninja cformat` |
+
+torch is deliberately absent: `retractordb.torch` imports it on demand and the one test
+that needs it skips without it (`jupyter-integration.md` §4).
 
 The formatters are here for the same reason as the rest: `src/CMakeLists.txt` tells
 you to `pip install clang-format cmakelang`, and PEP 668 no longer allows that into a

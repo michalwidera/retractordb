@@ -1,7 +1,8 @@
 # Python, Jupyter and PyTorch integration
 
-**Stage 1a, implemented.** The rest of this document states what is not implemented
-and what each remaining phase needs, so the boundary is unambiguous.
+**Stage 1a implemented; J1, J2 and J3 implemented on top of core phase 3** (see
+[`core-phase-3.md`](core-phase-3.md) and §7 below). The rest of this document states what
+each stage delivers and what is still not implemented, so the boundary is unambiguous.
 
 The full design, including the PyTorch and Colab reasoning this summarises, is in
 `design/Jupyter-retractorDB-roadmap.md` (untracked working notes).
@@ -156,12 +157,12 @@ Phase numbering follows the roadmap in `design/`.
 
 | Phase | Adds | Blocked by |
 |---|---|---|
-| **J1** | `Engine`: `compile()`, `step()`, `rows()`, real exception mapping | core phases 1-3 (phase 1 **done**; phases 2-3 remain) |
-| **J2** | `Window`, DLPack zero-copy export, `torch.utils.data.IterableDataset` | J1 |
-| **J3** | `KeyboardInterrupt` during `run()`, logging bridge to the `logging` module | J1 |
-| **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | J2 |
-| **J5** | Colab notebook, CI smoke test against the built wheel | J4 |
-| **J6** | Push ingest from Python, which turns a notebook into the engine's test harness | core phase 4 |
+| **J1** | `Engine`: `compile()`, `step()`, `rows()`, real exception mapping | core phases 1-3 - **done**, see §7 |
+| **J2** | `Window`, DLPack export, `torch.utils.data.IterableDataset` | J1 - **done** (copy, not zero-copy: §4) |
+| **J3** | `KeyboardInterrupt` during `run()`, logging bridge to the `logging` module | J1 - **done** |
+| **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | J2 - not started |
+| **J5** | Colab notebook, CI smoke test against the built wheel | J4 - a local notebook exists (`api/python/notebooks/j1_engine.ipynb`); the CI smoke test waits for J4 |
+| **J6** | Push ingest from Python, which turns a notebook into the engine's test harness | core phase 4 - not started |
 
 Three decisions from that document are worth restating because they constrain the
 implementation rather than merely describing it:
@@ -193,6 +194,10 @@ retractordb._core    the embedded engine - compiled, needs no daemon
 a machine where the extension was never built. Ask for the embedded API on such a
 machine and you get an `ImportError` naming the build flag, not an obscure failure.
 
+`retractordb.engine` holds the Python half of `Engine` (`rows()`, `to_numpy()`,
+`window()`, `Window`) and needs numpy on first use of the array views; `retractordb.torch`
+is the only module that imports torch, and nothing imports it for you.
+
 ## 6. Building and testing
 
 See [`build-options.md`](build-options.md). In short:
@@ -208,3 +213,53 @@ cd "$OLDPWD" && .venv-python/bin/python3 -m pytest api/python/tests
 The suite locates the built module in the build tree by itself and skips cleanly
 when there is none, so no installation step is needed and a build without
 `RDB_PYTHON` sees no failures.
+
+## 7. What J1-J3 deliver
+
+`rdb::embed::Engine` (L2) compiles a plan and steps it, using the same slot body as the
+daemon's loop - `TimeLine` -> the set of streams due in that slot -> `dataModel::processRows`
+- without the clock, the IPC thread and the terminal. The plan's storages are built with
+the engine's `MemoryStore`, so two engines in one interpreter computing a `VOLATILE` stream
+of the same name do not share it; the C++ and Python tests both assert this.
+
+```python
+import retractordb as rdb
+
+with rdb.Engine("/tmp/plan") as eng:                     # storage dir for plans without STORAGE
+    eng.compile("""
+        DECLARE a INTEGER STREAM src, 1/2 FILE '/tmp/plan/data.txt'
+        SELECT a*2 STREAM dst FROM src
+    """)
+    eng.run()                                            # to end of input; Ctrl-C stops it
+    print(eng.streams(), eng.slots_done, eng.time)       # ['src', 'dst'] 9 9/2
+    print([row[0] for row in eng.rows("dst")])           # [20, 40, ..., 160]
+
+    w = eng.window("dst", fields=["dst_0"], size=4, stride=2, dtype="float32")
+    print(w.shape)                                       # (3, 4, 1)
+    t = torch.from_dlpack(w)                             # shares the window's memory
+```
+
+| Binding | C++ |
+|---|---|
+| `Engine(storage_dir="")` | `rdb::embed::Engine` |
+| `compile(rql, until_eof=True)` | `Engine::compile` - `parsePlanText` + `compiler::compile` + `dataModel` + `TimeLine` |
+| `step()` -> `int | None` | `Engine::step`; `None` after the slot in which a declared source ran dry |
+| `run(slots=None)` -> `int` | a loop over `step()` in `module.cpp`, GIL released, `PyErr_CheckSignals` every 50 ms |
+| `streams()`, `schema()`, `is_declared()`, `record_count()` | the model's `qSet` |
+| `record(stream, i)`, `rows(stream)` | `Engine::record` - a copy, oldest first |
+| `to_numpy(stream, fields=, dtype=)`, `window(stream, fields=, size=, stride=, dtype=)` | `Engine::project` - `double` per value, `NaN` for null, then one NumPy array per call |
+| `Window.__dlpack__` / `__dlpack_device__` / `__array__` | numpy's, on the array the window owns |
+| `retractordb.torch.StreamDataset`, `as_tensor` | `torch.from_dlpack` over `window()`; `num_workers=0` |
+| `RQLSyntaxError`, `CompileError` | `rdb::embed::SyntaxError`, `rdb::embed::CompileError` - both `ConfigError` |
+| engine log records | `logging.getLogger("retractordb")`, through a spdlog sink installed by the module |
+
+**Refused at `compile()`**, as `CompileError`, because the state they need is the daemon's and
+not the engine's: `DUMP` and `SYSTEM` rule actions, and `:ROTATION`. `core-phase-3.md` §2.3
+has the reasons and §4 what remains owed.
+
+**Not zero-copy.** `window()` materialises `(n_windows, size, n_values)` and `torch.from_dlpack`
+shares *that* array; the engine's own memory is never handed out. That is the v1 decision from
+§4, taken deliberately, and it is what makes a tensor safe to keep across `step()`.
+
+**J4-J6 are not started.** No `scikit-build-core` `pyproject.toml`, no wheels, no CI smoke
+test, no ingest. `api/python/pyproject.toml` still installs the client half only.

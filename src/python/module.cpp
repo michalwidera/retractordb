@@ -1,26 +1,38 @@
+#include <algorithm>
+#include <chrono>
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
 
 #include <nanobind/nanobind.h>
+#include <nanobind/ndarray.h>
+#include <nanobind/stl/optional.h>
 #include <nanobind/stl/pair.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/string_view.h>
 #include <nanobind/stl/unique_ptr.h>
+#include <nanobind/stl/vector.h>
+#include <spdlog/sinks/base_sink.h>
+#include <spdlog/spdlog.h>
 #include <boost/rational.hpp>
 #include <magic_enum/magic_enum.hpp>
 
 #include "fldType.hpp"
 #include "rdb/descriptor.hpp"
 #include "rdb/descriptorIO.hpp"
+#include "rdb/embed/engine.hpp"
 #include "rdb/exceptions.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/storage.hpp"
@@ -55,6 +67,18 @@
 ///
 /// Zostaje 142 wywolania w src/retractor/lib - warstwie planu i wykonania,
 /// ktorej to wiazanie nie dotyka (patrz docs/core-phase-1.md §3.2).
+///
+/// ETAP J1-J3 (faza 3 rdzenia, docs/core-phase-3.md). Warstwa planu i wykonania
+/// weszla do wiazania przez L2: rdb::embed::Engine przyjmuje plan (compile), liczy
+/// go slot po slocie (step/run) i oddaje rekordy (record) oraz gesta projekcje
+/// pol (_block) - z niej Python sklada okna DLPack. Trzy rzeczy sa tu decyzja,
+/// nie implementacja:
+///  - GIL jest zwalniany na czas compile/step/run/_block, a run() sprawdza
+///    sygnaly co kSignalCheckInterval - dlugie run(), ktorego nie da sie
+///    przerwac, to martwe jadro notatnika;
+///  - logi silnika ida do modulu `logging` (PythonLoggingSink), nie na stdout;
+///  - bledy planu przychodza z silnika jako typy (SyntaxError, CompileError w
+///    rdb::embed), wiec tlumaczenie jest rejestracja, a nie parsowaniem napisu.
 
 namespace nb = nanobind;
 
@@ -165,6 +189,127 @@ Record readRecord(rdb::storage &self, Py_ssize_t index) {
   return Record{*target, static_cast<std::size_t>(index)};
 }
 
+/// Most logow: spdlog -> logging.getLogger("retractordb").
+///
+/// Silnik pisze przez domyslny logger spdloga i NICZEGO w nim nie konfiguruje (bramka
+/// embedding_boundary, core-phase-2.md sekcja 3b) - konfiguracja nalezy do hosta, a hostem
+/// jest ten modul. Domyslny sink spdloga pisze na stdout, czyli w notatniku do wyjscia
+/// kazdej komorki; zamiast tego kazdy rekord trafia do modulu `logging`, gdzie uzytkownik
+/// filtruje go tak, jak reszte swoich logow.
+///
+/// Dlaczego wolno tu dotknac domyslnego loggera, skoro roadmapa zakazuje
+/// set_default_logger: spdlog jest tu header-only i wlinkowany w modul z ukryta
+/// widocznoscia symboli (NB_STATIC), wiec jego rejestr jest PRYWATNY dla _core. Inne
+/// rozszerzenia w tym samym interpreterze maja wlasny, choc uzywaja tej samej biblioteki.
+/// Zmieniamy wiec loggera, ktorego nikt poza tym modulem nie widzi.
+///
+/// GIL: sink bywa wolany z wnetrza step()/run(), gdzie GIL jest zwolniony, wiec bierze
+/// go sam. Po Py_Finalize interpretera nie ma, a destruktory statykow C++ (np. magistrala
+/// IPC z executorsmState.cpp) potrafia jeszcze logowac - stad straz na poczatku.
+class PythonLoggingSink final : public spdlog::sinks::base_sink<std::mutex> {
+ protected:
+  void sink_it_(const spdlog::details::log_msg &msg) override {
+    if (Py_IsInitialized() == 0) return;
+    const int level = pythonLevel(msg.level);
+    const std::string text(msg.payload.data(), msg.payload.size());
+    const nb::gil_scoped_acquire acquire;
+    try {
+      nb::module_::import_("logging").attr("getLogger")("retractordb").attr("log")(level, "%s", text);
+    } catch (nb::python_error &error) {
+      // Log, ktorego nie da sie dostarczyc, nie ma prawa przerwac slotu silnika.
+      error.discard_as_unraisable("retractordb logging bridge");
+    }
+  }
+
+  void flush_() override {}
+
+ private:
+  /// Poziomy modulu logging: DEBUG=10, INFO=20, WARNING=30, ERROR=40, CRITICAL=50.
+  static int pythonLevel(const spdlog::level::level_enum level) {
+    switch (level) {
+      case spdlog::level::trace:
+      case spdlog::level::debug:
+        return 10;
+      case spdlog::level::info:
+        return 20;
+      case spdlog::level::warn:
+        return 30;
+      case spdlog::level::err:
+        return 40;
+      case spdlog::level::critical:
+        return 50;
+      default:
+        return 0;
+    }
+  }
+};
+
+/// Co ile run() zaglada do sygnalow Pythona. Rzadziej niz co slot, bo wziecie GIL-a to
+/// koszt w petli, ktora ma byc szybka; czesciej niz reakcja czlowieka na przycisk stop.
+constexpr std::chrono::milliseconds kSignalCheckInterval{50};
+
+/// Petla run(): wiele slotow z ZWOLNIONYM GIL-em i z okresowym PyErr_CheckSignals.
+///
+/// To jest najwazniejszy szczegol uzytecznosci calego wiazania (roadmapa, sekcja 6):
+/// uzytkownik notatnika nacisnie "stop", a KeyboardInterrupt dociera do Pythona wylacznie
+/// przez PyErr_CheckSignals wolane z GIL-em. Bez tego run() bez budzetu slotow byloby
+/// martwym jadrem az do SIGKILL.
+std::uint64_t runEngine(rdb::embed::Engine &self, const std::optional<std::uint64_t> slots) {
+  std::uint64_t done = 0;
+  const nb::gil_scoped_release release;
+  auto lastCheck = std::chrono::steady_clock::now();
+  while (!slots.has_value() || done < *slots) {
+    if (!self.step().has_value()) break;
+    ++done;
+    if (const auto now = std::chrono::steady_clock::now(); now - lastCheck >= kSignalCheckInterval) {
+      lastCheck = now;
+      const nb::gil_scoped_acquire acquire;
+      if (PyErr_CheckSignals() != 0) throw nb::python_error();
+    }
+  }
+  return done;
+}
+
+/// Splaszczony blok double z silnika -> tablica numpy (rows x cols) w zadanym typie,
+/// z WLASNA pamiecia (kapsula zwalnia ja, gdy tablica ginie). Kopia jest zamierzona:
+/// "kopiuj, nie przypinaj" z docs/jupyter-integration.md sekcja 4.
+template <typename T>
+nb::object makeBlock(const std::vector<double> &values, const std::size_t rows, const std::size_t cols) {
+  auto data = std::make_unique<T[]>(values.size());
+  for (std::size_t i = 0; i < values.size(); ++i) {
+    if constexpr (std::is_integral_v<T>) {
+      // Null nie ma reprezentacji w typie calkowitym; zero byloby cicha wartoscia.
+      if (std::isnan(values[i])) throw nb::value_error("stream holds null values; use dtype float32 or float64");
+    }
+    data[i] = static_cast<T>(values[i]);
+  }
+  T *raw = data.release();
+  const nb::capsule owner(raw, [](void *p) noexcept { delete[] static_cast<T *>(p); });
+  return nb::cast(nb::ndarray<nb::numpy, T, nb::ndim<2>>(raw, {rows, cols}, owner));
+}
+
+nb::object engineBlock(rdb::embed::Engine &self, const std::string &stream, const std::vector<int> &flatFields,
+                       const std::size_t first, const std::size_t count, const std::string &dtype) {
+  std::vector<double> values;
+  {
+    const nb::gil_scoped_release release;
+    values = self.project(stream, flatFields, first, count);
+  }
+  const std::size_t cols = flatFields.size();
+  if (dtype == "float32") return makeBlock<float>(values, count, cols);
+  if (dtype == "float64") return makeBlock<double>(values, count, cols);
+  if (dtype == "int32") return makeBlock<std::int32_t>(values, count, cols);
+  if (dtype == "int64") return makeBlock<std::int64_t>(values, count, cols);
+  throw nb::value_error("dtype must be one of: float32, float64, int32, int64");
+}
+
+/// Nazwa strumienia przychodzi wprost od uzytkownika notatnika, wiec literowka jest
+/// przypadkiem NORMALNYM i dostaje KeyError - ta sama regula co field_index() wyzej.
+void requireStream(const rdb::embed::Engine &self, const std::string &stream) {
+  const auto names = self.streams();
+  if (std::ranges::find(names, stream) == names.end()) throw nb::key_error(stream.c_str());
+}
+
 }  // namespace
 
 NB_MODULE(_core, m) {
@@ -187,12 +332,24 @@ NB_MODULE(_core, m) {
   // jest baza taksonomii. Gdyby kiedys zaczal byc rzucany goly, wyszedlby jako
   // RuntimeError i ten komentarz jest miejscem, w ktorym to widac.
   nb::exception<rdb::CorruptDescriptor>(m, "CorruptDescriptor", baseError);
-  nb::exception<rdb::ConfigError>(m, "ConfigError", baseError);
+  const nb::object configError = nb::exception<rdb::ConfigError>(m, "ConfigError", baseError);
   // LogicError w C++ nazywa sie po tym, czym jest; po stronie Pythona - po tym, co z nim
   // zrobic. To zlamany niezmiennik silnika, czyli blad w NASZYM kodzie: nadaje sie do
   // zgloszenia, nie do obsluzenia i kontynuowania.
   nb::exception<rdb::LogicError>(m, "InternalError", baseError);
   nb::exception<rdb::IOError>(m, "IOError", baseError);
+  // Bledy planu z Engine::compile(): pochodne ConfigError po obu stronach. Rejestrowane PO
+  // ConfigError, zeby ich tlumacze byly probowane wczesniej. RQLSyntaxError, nie
+  // SyntaxError - ta nazwa jest w Pythonie wbudowana i znaczy co innego.
+  nb::exception<rdb::embed::SyntaxError>(m, "RQLSyntaxError", configError);
+  nb::exception<rdb::embed::CompileError>(m, "CompileError", configError);
+
+  // Most logow instalowany raz, przy imporcie: od tej chwili kazdy zapis silnika przez
+  // spdlog trafia do logging.getLogger("retractordb"). Poziom loggera spdloga zdejmujemy do
+  // trace, bo filtrowanie ma nalezec do `logging`; to, co kompilacja wyciela przez
+  // SPDLOG_ACTIVE_LEVEL, i tak tu nie dociera.
+  spdlog::default_logger()->sinks() = {std::make_shared<PythonLoggingSink>()};
+  spdlog::default_logger()->set_level(spdlog::level::trace);
 
   // Nazwy pozycji wyliczenia biora sie z magic_enum, zeby nie rozjechac sie z
   // fldType.hpp przy dodaniu typu. reserve() jest WYMAGANE, nie kosmetyczne:
@@ -328,4 +485,108 @@ NB_MODULE(_core, m) {
           nb::arg("exc").none(), nb::arg("traceback").none())
       .def("__repr__",
            [](const rdb::storage &self) { return "<Storage records=" + std::to_string(self.getRecordsCount()) + ">"; });
+
+  // Silnik osadzony (L2). Metody z okienkami i iteracja po rekordach sa dopisane po stronie
+  // Pythona (retractordb/engine.py), ktory dziedziczy po tej klasie: numpy i logika okien
+  // nie maja powodu byc w C++.
+  nb::class_<rdb::embed::Engine>(m, "Engine",
+                                 "One embedded engine: a compiled plan, driven one time slot at a time. See "
+                                 "docs/jupyter-integration.md.")
+      .def(nb::init<std::string>(), nb::arg("storage_dir") = "",
+           "storage_dir is used by plans that carry no STORAGE directive; the directive wins when present.")
+      // string_view wskazuje bufor UTF-8 obiektu str, ktory zyje przez cale wywolanie, wiec
+      // zwolnienie GIL-a na czas parsowania i kompilacji jest bezpieczne.
+      .def("compile", &rdb::embed::Engine::compile, nb::arg("rql"), nb::arg("until_eof") = true,
+           nb::call_guard<nb::gil_scoped_release>(),
+           "Parse, compile and build the plan. Raises RQLSyntaxError or CompileError. With until_eof=True (the "
+           "default) declared sources are read once, without wrapping, and step() reports end of input.")
+      .def("step", &rdb::embed::Engine::step, nb::call_guard<nb::gil_scoped_release>(),
+           "Advance one time slot. Returns the slot index, or None at end of input.")
+      .def("run", &runEngine, nb::arg("slots") = nb::none(),
+           "Advance up to `slots` slots (all, until end of input, when None). Returns the number of slots "
+           "processed. Releases the GIL and honours KeyboardInterrupt.")
+      .def_prop_ro("has_plan", &rdb::embed::Engine::hasPlan)
+      .def_prop_ro("slots_done", &rdb::embed::Engine::slotsDone)
+      .def_prop_ro("end_of_input", &rdb::embed::Engine::endOfInput)
+      .def_prop_ro(
+          "time",
+          [](const rdb::embed::Engine &self) {
+            const auto now = self.time();
+            return fractionType()(now.numerator(), now.denominator());
+          },
+          "Plan time of the last slot, in seconds, as a fractions.Fraction.")
+      .def("streams", &rdb::embed::Engine::streams, "Stream ids of the plan, in execution order.")
+      .def(
+          "schema",
+          [](const rdb::embed::Engine &self, const std::string &stream) {
+            requireStream(self, stream);
+            return self.schema(stream);
+          },
+          nb::arg("stream"), nb::rv_policy::copy)
+      .def(
+          "is_declared",
+          [](const rdb::embed::Engine &self, const std::string &stream) {
+            requireStream(self, stream);
+            return self.isDeclared(stream);
+          },
+          nb::arg("stream"))
+      .def(
+          "record_count",
+          [](const rdb::embed::Engine &self, const std::string &stream) {
+            requireStream(self, stream);
+            return self.recordCount(stream);
+          },
+          nb::arg("stream"))
+      .def(
+          "retained_from",
+          [](const rdb::embed::Engine &self, const std::string &stream) {
+            requireStream(self, stream);
+            return self.retainedFrom(stream);
+          },
+          nb::arg("stream"),
+          "Index of the oldest record still readable: 0 for a stream on disk, higher for a declared source or a "
+          "VOLATILE stream, which keep only a tail.")
+      .def(
+          "record",
+          [](rdb::embed::Engine &self, const std::string &stream, Py_ssize_t index) {
+            requireStream(self, stream);
+            const auto count = static_cast<Py_ssize_t>(self.recordCount(stream));
+            if (index < 0) index += count;
+            if (index < 0 || index >= count) throw nb::index_error("record index out of range");
+            if (std::cmp_less(index, self.retainedFrom(stream))) {
+              throw nb::index_error("record is no longer retained; see retained_from()");
+            }
+            rdb::payload data;
+            {
+              const nb::gil_scoped_release release;
+              data = self.record(stream, static_cast<std::size_t>(index));
+            }
+            return Record{std::move(data), static_cast<std::size_t>(index)};
+          },
+          nb::arg("stream"), nb::arg("index"),
+          "One record of a stream, oldest first; a negative index counts from the end. A copy.")
+      .def(
+          "_block",
+          [](rdb::embed::Engine &self, const std::string &stream, const std::vector<int> &flatFields, const std::size_t first,
+             const std::size_t count, const std::string &dtype) {
+            requireStream(self, stream);
+            return engineBlock(self, stream, flatFields, first, count, dtype);
+          },
+          nb::arg("stream"), nb::arg("flat_fields"), nb::arg("first"), nb::arg("count"), nb::arg("dtype"),
+          "Dense (count x len(flat_fields)) numpy block of records [first, first+count); null -> NaN.")
+      .def("close", &rdb::embed::Engine::close, "Drop the plan and close its storages. Idempotent.")
+      .def(
+          "__enter__", [](rdb::embed::Engine &self) { return &self; }, nb::rv_policy::reference_internal)
+      .def(
+          "__exit__",
+          [](rdb::embed::Engine &self, nb::handle, nb::handle, nb::handle) {
+            self.close();
+            return false;
+          },
+          nb::arg("exc_type").none(), nb::arg("exc").none(), nb::arg("traceback").none())
+      .def("__repr__", [](const rdb::embed::Engine &self) {
+        return self.hasPlan() ? "<Engine streams=" + std::to_string(self.streams().size()) +
+                                    " slots_done=" + std::to_string(self.slotsDone()) + ">"
+                              : std::string("<Engine (no plan)>");
+      });
 }

@@ -6,8 +6,8 @@
 #include <boost/rational.hpp>
 
 #include "descriptor.hpp"
-#include "memoryStore.hpp"
 #include "fainterface.hpp"
+#include "memoryStore.hpp"
 #include "metaData.hpp"
 #include "payload.hpp"
 #include "sourceBuffer.hpp"

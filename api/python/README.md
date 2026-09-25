@@ -50,8 +50,9 @@ See [the shared contract](../README.md) for delivery and lifecycle limits.
 ## Embedded engine
 
 Built only with `-DRDB_PYTHON=ON`. Stage 1a covers the storage layer, read-only:
-reading `.desc` files and records without a running server. Everything above the
-storage layer needs the shared refactor and is not bound yet.
+reading `.desc` files and records without a running server. J1-J3 add `Engine`:
+a plan compiled and stepped in-process, with NumPy and DLPack views of its streams
+(see below).
 
 ```sh
 scripts/python-venv.sh              # venv with nanobind + pytest; prints the next line
@@ -78,9 +79,44 @@ Values come back as `int`, `float`, `str`, `Fraction` for RATIONAL, a tuple for
 the pair types, and `None` for NULL. A `Record` holds its own copy of the
 payload, so it stays valid after the next read.
 
-**One limitation to know before you rely on it.** A `.desc` file that exists but
-is malformed ends the process rather than raising - `FatalError` calls
-`std::exit`, which no binding can catch. Missing files, bad directories,
-out-of-range indices and reads from declared sources are all checked here and
-raise normally; an invalid descriptor is not, and cannot be until phase 1 of the
-shared refactor converts those sites to exceptions.
+Every failure raises: missing files, bad directories, out-of-range indices, reads
+from declared sources, and - since core phase 1 - a malformed `.desc` too
+(`CorruptDescriptor`). Nothing reachable from this module ends the interpreter.
+
+### Running a plan
+
+```python
+import retractordb as rdb
+
+with rdb.Engine("/tmp/plan") as eng:            # storage dir for plans without STORAGE
+    eng.compile("""
+        DECLARE a INTEGER STREAM src, 1/2 FILE '/tmp/plan/data.txt'
+        SELECT a*2 STREAM dst FROM src
+    """)
+    eng.run()                                   # every slot until the source runs dry
+    print(eng.streams(), eng.slots_done, eng.time)
+    print([row[0] for row in eng.rows("dst")])
+
+    w = eng.window("dst", fields=["dst_0"], size=4, stride=2, dtype="float32")
+    print(w.shape)                              # (n_windows, 4, 1)
+    import torch
+    t = torch.from_dlpack(w)                    # shares the window's memory, no torch dependency
+```
+
+`step()` advances one time slot and returns its index, or `None` once a declared
+source has run dry (`compile(..., until_eof=False)` gives the daemon's wrapping
+behaviour instead). `run(slots=None)` loops `step()` with the GIL released and
+honours Ctrl-C. `rows()`, `record()`, `to_numpy()` and `window()` all return copies;
+nothing aliases engine memory. Engine diagnostics go to
+`logging.getLogger("retractordb")`, not to the cell's output.
+
+`RQLSyntaxError` and `CompileError` (both `ConfigError`) carry the parser's and the
+compiler's messages. `DUMP` and `SYSTEM` rule actions and `:ROTATION` are refused at
+`compile()`: they need daemon state the embedded engine does not have
+([`docs/core-phase-3.md`](../../docs/core-phase-3.md)).
+
+`retractordb.torch` (`StreamDataset`, `as_tensor`) is the only module that imports
+torch, and only when you import it. `DataLoader(..., num_workers=0)`: the engine
+does not survive `fork`.
+
+`notebooks/j1_engine.ipynb` walks through the same flow against a build tree.

@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.20...4.4 FATAL_ERROR)
 
 project(rdbpython LANGUAGES CXX)
 
-# Modul rozszerzenia CPythona wiazacy warstwe magazynu (etap 1a, docs/
-# jupyter-integration.md). Katalog wchodzi do konfiguracji wylacznie przy
-# RDB_PYTHON=ON - patrz src/CMakeLists.txt.
+# Modul rozszerzenia CPythona: warstwa magazynu (etap 1a) i silnik osadzony
+# rdb::embed::Engine (J1-J3, docs/jupyter-integration.md). Katalog wchodzi do
+# konfiguracji wylacznie przy RDB_PYTHON=ON - patrz src/CMakeLists.txt.
 
 # Platforma hosta jest konsekwencja celu, nie jego wyborem: rozszerzenia dla
 # Windows nikt jeszcze nie budowal. Flaga zadana na niewspieranym hoscie ma
@@ -59,7 +59,7 @@ find_package(nanobind CONFIG REQUIRED)
 # nie musza byc pozycyjnie niezalezne. Modul wspoldzielony, ktory je wciaga, juz
 # musi - na Linuksie inaczej nie linkuje sie wcale. Wlaczamy to TU, a nie w ich
 # wlasnych plikach CMake, zeby build bez RDB_PYTHON zachowal sie bez zmian.
-foreach(RDB_PIC_TARGET rdb descparser common)
+foreach(RDB_PIC_TARGET rdb descparser common retractor rqlparser rdbembed)
   set_property(TARGET ${RDB_PIC_TARGET} PROPERTY POSITION_INDEPENDENT_CODE ON)
 endforeach()
 
@@ -68,11 +68,18 @@ endforeach()
 # wydania i brak pytania o rpath.
 nanobind_add_module(_core NB_STATIC module.cpp)
 
+# rdbembed (L2) wnosi za soba retractor, rqlparser i antlr4_static - plan,
+# kompilator i model danych, ktore od fazy 3 stoja za Engine.
 target_link_libraries(
   _core
   PRIVATE #
-          boost::boost spdlog::spdlog_header_only magic_enum::magic_enum rdb
-          descparser common)
+          boost::boost
+          spdlog::spdlog_header_only
+          magic_enum::magic_enum
+          rdbembed
+          rdb
+          descparser
+          common)
 
 # Modul ladowany bez instalacji: build/<config>/python jest kompletnym korzeniem
 # importu, a pliki .py pakietu sa do niego kopiowane obok skompilowanego

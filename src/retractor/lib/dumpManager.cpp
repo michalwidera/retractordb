@@ -4,8 +4,8 @@
 #include <sys/stat.h>
 
 #include <algorithm>  // std::min
-#include <cstdlib>    // std::abs
 #include <cerrno>     // errno
+#include <cstdlib>    // std::abs
 #include <cstring>    // strerror
 #include <filesystem>
 #include <format>
@@ -119,11 +119,15 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
 void dumpManager::setDumpStorage(std::string storagePathParam) { storagePath = std::move(storagePathParam); }
 
 void dumpManager::processStreamChunk(const std::string &streamName) {
+  // Brak zadan PRZED siegnieciem po pProc: streamInstance wola te funkcje w kazdym slocie dla
+  // kazdego strumienia, a globalny pProc publikuje wylacznie petla demona. Silnik osadzony
+  // (rdb::embed::Engine) go nie publikuje i odrzuca reguly DUMP przy compile(), wiec dla
+  // niego ta ksiega jest zawsze pusta - i wtedy wskaznik nie jest do niczego potrzebny.
+  if (!bookOfTasks.contains(streamName)) return;
   if (pProc == nullptr) throw rdb::LogicError("dumpManager::processStreamChunk: dataModel pointer is null");
   if (!pProc->qSet.contains(streamName)) {
     throw rdb::LogicError(std::format("dumpManager::processStreamChunk: stream '{}' not found in dataModel", streamName));
   }
-  if (!bookOfTasks.contains(streamName)) return;
 
   auto currentStreamCount = pProc->getStreamCount(streamName);
   if (currentStreamCount == 0) return;  // nothing to dump

@@ -5,14 +5,13 @@
 #include <cstdint>
 #include <cstdlib>  // std::div
 #include <format>
-#include <memory>   // unique_ptr
+#include <memory>  // unique_ptr
 #include <optional>
 #include <string>
 #include <utility>
 #include <variant>  // std::get, std::holds_alternative (P1-E3b)
 
 #include <spdlog/spdlog.h>
-
 
 #include "checkedArith.hpp"
 #include "executorsmState.hpp"
@@ -22,7 +21,7 @@
 #include "rdb/exceptions.hpp"
 #include "rdb/probe.hpp"
 
-streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam)
+streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam, rdb::MemoryStore *memory)
     : coreInstance(coreInstance) {
   // only objects with REF has storageNameParam filled.
   if (qry.id.empty()) throw rdb::LogicError("streamInstance: query id must not be empty");
@@ -34,7 +33,7 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::strin
 
   inputPayload  = std::make_unique<rdb::payload>(qry.descriptorFrom(coreInstance));
   outputPayload = std::make_unique<rdb::storage>(qry.id, storageName, storagePathParam, qry.storage_policy, qry.isOneShot,
-                                                 qry.isHold, percounter);
+                                                 qry.isHold, percounter, memory);
 
   auto desc = qry.descriptorStorage();
   outputPayload->attachDescriptor(&desc);
@@ -333,8 +332,8 @@ windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const i
 
 rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::string &instance) const {
   if (cmd != STREAM_MAX && cmd != STREAM_MIN && cmd != STREAM_SUM && cmd != STREAM_AVG) {
-    throw rdb::LogicError(std::format("streamInstance::reduceFieldsToPayload: cmd must be STREAM_MAX/MIN/SUM/AVG, got {}",
-        static_cast<int>(cmd)));
+    throw rdb::LogicError(
+        std::format("streamInstance::reduceFieldsToPayload: cmd must be STREAM_MAX/MIN/SUM/AVG, got {}", static_cast<int>(cmd)));
   }
 
   // First construct descriptor
@@ -556,16 +555,16 @@ bool boolCast(const rdb::descFldVT &inVar) {
   bool retVal(false);
 
   std::visit(Overload{
-                 [&retVal](std::monostate) { retVal = false; },                                                               //
-                 [&retVal](uint8_t a) { retVal = (a != 0); },                                                                 //
-                 [&retVal](int a) { retVal = (a != 0); },                                                                     //
-                 [&retVal](unsigned a) { retVal = (a != 0); },                                                                //
-                 [&retVal](boost::rational<int> a) { retVal = (a != 0); },                                                    //
-                 [&retVal](float a) { retVal = (a != 0); },                                                                   //
-                 [&retVal](double a) { retVal = (a != 0); },                                                                  //
-                 [](std::pair<int, int>) { boolCastUnsupported("pair<int,int>"); },                                           //
-                 [](const std::pair<std::string, int> &) { boolCastUnsupported("pair<string,int>"); },                        //
-                 [](const std::string &) { boolCastUnsupported("string type"); }                                              //
+                 [&retVal](std::monostate) { retVal = false; },                                         //
+                 [&retVal](uint8_t a) { retVal = (a != 0); },                                           //
+                 [&retVal](int a) { retVal = (a != 0); },                                               //
+                 [&retVal](unsigned a) { retVal = (a != 0); },                                          //
+                 [&retVal](boost::rational<int> a) { retVal = (a != 0); },                              //
+                 [&retVal](float a) { retVal = (a != 0); },                                             //
+                 [&retVal](double a) { retVal = (a != 0); },                                            //
+                 [](std::pair<int, int>) { boolCastUnsupported("pair<int,int>"); },                     //
+                 [](const std::pair<std::string, int> &) { boolCastUnsupported("pair<string,int>"); },  //
+                 [](const std::string &) { boolCastUnsupported("string type"); }                        //
              },
              inVar);
 

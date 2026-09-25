@@ -111,8 +111,8 @@ std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
       //
       // Bez kanalu statusu: to miejsce wola executorsm::run() JUZ PO kompilacji, a nie
       // compile(), wiec nie ma dokad wrocic wartoscia - zostaje rzut.
-      throw rdb::ConfigError(fmt::format("qTree: query '{}' has a zero interval - check its DECLARE or the :STORAGE directive",
-                                         it.id));
+      throw rdb::ConfigError(
+          fmt::format("qTree: query '{}' has a zero interval - check its DECLARE or the :STORAGE directive", it.id));
     }
     if (it.isCompilerDirective()) continue;
     lstTimeIntervals.insert(it.rInterval);

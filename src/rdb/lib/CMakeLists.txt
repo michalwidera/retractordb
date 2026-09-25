@@ -28,6 +28,12 @@ target_include_directories(
           ${fmt_INCLUDE_DIR} #
           ${magic_enum_INCLUDE_DIR})
 
+# Parser deskryptora (.antlr) jest zaleznoscia tej biblioteki od zawsze
+# (DESCParser.cc); zadeklarowana wraz z rdbembed (faza 3), bo od kiedy retractor
+# deklaruje rdb, CMake powtarza librdb.a na linii konsolidacji i musi wiedziec,
+# ze libdescparser.a stoi ZA nim.
+target_link_libraries(${PROJECT_NAME} PUBLIC descparser antlr4_static)
+
 if(ENABLE_UNITY_BUILD)
   set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD ON)
 endif()

@@ -8,8 +8,8 @@
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
-#include "rdb/exceptions.hpp"
 #include "qTree.hpp"
+#include "rdb/exceptions.hpp"
 
 bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.rInterval; }
 
@@ -194,8 +194,7 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
       }
     } break;
     default:
-      throw rdb::LogicError(
-          fmt::format("query::descriptorFrom: undefined cmd {} str:{}", cmd.getStrCommandID(), cmd.getStr_()));
+      throw rdb::LogicError(fmt::format("query::descriptorFrom: undefined cmd {} str:{}", cmd.getStrCommandID(), cmd.getStr_()));
   }
 
   if (!retention.noRetention()) {

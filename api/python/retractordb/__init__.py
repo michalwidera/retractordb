@@ -9,7 +9,8 @@ Two independent halves live under this one name:
 ``retractordb._core``
     The embedded engine - a compiled extension module that needs no daemon.
     Built only when the tree is configured with ``-DRDB_PYTHON=ON``; see
-    ``docs/build-options.md``.
+    ``docs/build-options.md``. ``Engine`` and ``Window`` (``retractordb.engine``)
+    sit on top of it and are resolved the same lazy way.
 
 The embedded half is imported lazily, so a machine that never built the
 extension still gets a working client. Reaching for an embedded name without the
@@ -30,16 +31,20 @@ __all__ = [
     "Stream",
     "Record",
     # Zbudowane rozszerzenie (RDB_PYTHON=ON) - rozwiazywane leniwie w __getattr__.
+    "CompileError",
     "ConfigError",
     "CorruptDescriptor",
     "Descriptor",
+    "Engine",
     "FieldType",
     "IOError",
     "InternalError",
     "NoSuchStream",
+    "RQLSyntaxError",
     "RetractorDBError",
     "Storage",
     "StorageError",
+    "Window",
     "load_descriptor",
 ]
 
@@ -47,6 +52,7 @@ __all__ = [
 # __getattr__ nie probowal importowac rozszerzenia dla nazwy, ktorej ono nie ma.
 _CORE_NAMES = frozenset(
     {
+        "CompileError",
         "ConfigError",
         "CorruptDescriptor",
         "Descriptor",
@@ -54,12 +60,17 @@ _CORE_NAMES = frozenset(
         "IOError",
         "InternalError",
         "NoSuchStream",
+        "RQLSyntaxError",
         "RetractorDBError",
         "Storage",
         "StorageError",
         "load_descriptor",
     }
 )
+
+# Nazwy z retractordb.engine - warstwa Pythona nad _core.Engine (okna, numpy, iteracja).
+# Ten sam leniwy import, ten sam powod: modul importuje _core przy pierwszym uzyciu.
+_ENGINE_NAMES = frozenset({"Engine", "Window"})
 
 _BUILD_HINT = (
     "retractordb._core is not built in this installation. Configure the tree with "
@@ -77,15 +88,18 @@ def __getattr__(name):
     ``retractordb._core.Record``. Nazwy z modeli sa zaimportowane wprost powyzej,
     wiec __getattr__ nigdy dla nich nie wstanie i nie moze ich przeslonic.
     """
-    if name not in _CORE_NAMES:
+    if name not in _CORE_NAMES and name not in _ENGINE_NAMES:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
     try:
-        from . import _core
+        if name in _ENGINE_NAMES:
+            from . import engine as source
+        else:
+            from . import _core as source
     except ImportError as exc:  # pragma: no cover - zalezy od konfiguracji builda
         raise ImportError(_BUILD_HINT) from exc
 
-    value = getattr(_core, name)
+    value = getattr(source, name)
     globals()[name] = value  # kolejne odwolania ida juz zwykla sciezka
     return value
 
