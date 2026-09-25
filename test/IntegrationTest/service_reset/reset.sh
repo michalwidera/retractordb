@@ -133,6 +133,36 @@ if [ "$(wc -l < out_alpha_after_bad.txt)" -lt 2 ]; then
   exit 1
 fi
 
+# --- 3a. Pusta wartosc dyrektywy: odmowa z powodem, usluga liczy dalej. ---
+#
+# Tekst planu parsuje proces USLUGI. Do 2026-09-25 pusta wartosc dyrektywy konczyla go
+# FatalError-em w listenerze parsera, a FatalError w instancji bedacej jednostka systemd czysci
+# dodatkowo plik zapytan, wiec usluga wracala po restarcie BEZ planu. Parser zglasza ja teraz
+# jako blad planu, tym samym kanalem co blad skladni w kroku 3.
+status=0
+xqry --reset emptyvalue.rql --server service > empty_value_out.txt 2> empty_value_err.txt || status=$?
+if [ "$status" -eq 0 ]; then
+  echo "plan z pusta wartoscia dyrektywy zostal przyjety"
+  cat empty_value_out.txt empty_value_err.txt
+  exit 1
+fi
+if ! kill -0 "$_server_pid" 2>/dev/null; then
+  echo "usluga zginela na planie z pusta wartoscia dyrektywy"
+  cat empty_value_err.txt
+  exit 1
+fi
+grep -q 'directive STORAGE requires a non-empty value' empty_value_err.txt || {
+  echo "odmowa nie nazwala pustej wartosci dyrektywy"
+  cat empty_value_err.txt
+  exit 1
+}
+xqry -s alpha -m 2 --server service > out_alpha_after_empty_value.txt
+if [ "$(wc -l < out_alpha_after_empty_value.txt)" -lt 2 ]; then
+  echo "po odrzuconym planie z pusta dyrektywa strumien alpha przestal liczyc"
+  cat out_alpha_after_empty_value.txt
+  exit 1
+fi
+
 # --- 3b. Plan z regula DO SYSTEM: odmowa w trybie domyslnym (restricted). ---
 #
 # Kanal reset przyjmuje CALY tekst planu przez te sama nieuwierzytelniona kolejke, ktorej

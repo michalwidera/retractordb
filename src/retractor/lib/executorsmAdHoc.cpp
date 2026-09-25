@@ -126,11 +126,15 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
 
   if (first_keyword == "RULE") return attachAdHocRule(coreInstanceCopy, stream_name);
 
-  if (first_keyword == "STORAGE" ||   //
-      first_keyword == "SUBSTRAT" ||  //
-      first_keyword == "PERCOUTNER") {
-    ptRetval.put(std::string("db"), "Fail parse: AdHoc STORAGE, SUBSTRAT or PERCOUTNER not supported");
-    SPDLOG_ERROR("Parse adhoc query failed: AdHoc STORAGE, SUBSTRAT or PERCOUTNER not supported");
+  // Lista DOZWOLONYCH, a nie zakazanych. Do 2026-09-25 stala tu lista zakazanych dyrektyw, w ktorej
+  // zamiast ROTATION widnial literal "PERCOUTNER" - pozostalosc zmiany nazwy tokenu COPTION
+  // w 7f939c09. Gramatyka takiego slowa nie zna, wiec `xqry -a "ROTATION 'plik'"` przechodzil
+  // filtr i konczyl serwer FatalError-em "parser logic error". Kazda inna instrukcja - dyrektywa
+  // kompilatora, DEFAULT VOLATILE, a takze przyszla instrukcja gramatyki - jest odmowa.
+  if (first_keyword != "SELECT" && first_keyword != "DECLARE") {
+    ptRetval.put(std::string("db"),
+                 "Fail parse: AdHoc accepts only SELECT, DECLARE or RULE; '" + first_keyword + "' is not supported");
+    SPDLOG_ERROR("Parse adhoc query failed: '{}' is not supported by AdHoc", first_keyword);
     return ptRetval;
   }
 
@@ -138,10 +142,6 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     ptRetval.put(std::string("db"), "Rejected: stream '" + stream_name + "' already exists in this instance");
     SPDLOG_ERROR("AdHoc DECLARE rejected: stream '{}' already exists", stream_name);
     return ptRetval;
-  }
-
-  if (first_keyword != "SELECT" && first_keyword != "DECLARE") {
-    FatalError("executorsm::getAdHoc: unexpected first_keyword '{}' after filtering - parser logic error", first_keyword);
   }
 
   // --until-eof jest trybem calego przebiegu. Deklaracja dolaczona pozniej musi

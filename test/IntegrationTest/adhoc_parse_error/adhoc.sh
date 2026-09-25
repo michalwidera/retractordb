@@ -8,7 +8,7 @@
 #
 # Test sprawdza trzy rzeczy, bo dopiero razem znacza "serwer przezyl":
 #   1. bledne zapytanie konczy sie porazka KLIENTA, z komunikatem o bledzie parsowania,
-#   2. proces serwera nadal zyje,
+#   2. proces serwera nadal zyje - takze po tekstach, ktore parser albo filtr kanalu odrzucaja,
 #   3. nastepne POPRAWNE zapytanie ad-hoc dziala i dokłada strumien do planu.
 #
 # Punkt (3) nie jest ozdoba: status parsowania byl przed ta zmiana zmienna plikowa, ktorej
@@ -77,6 +77,49 @@ if xqry -d | grep -Eq 'hidden_select|hidden_source'; then
   xqry -d
   exit 1
 fi
+
+# Tekst odrzucany przez parser albo przez filtr kanalu to odmowa z powodem, a nie smierc serwera.
+# Do 2026-09-25 kazdy z ponizszych przypadkow konczyl proces:
+#   - ROTATION przechodzil filtr, ktory porownywal slowo kluczowe z literalem "PERCOUTNER"
+#     (gramatyka takiego slowa nie zna), i trafial na FatalError "parser logic error",
+#   - pusta wartosc dyrektywy i pusty FILE w SELECT - FatalError w listenerze parsera,
+#   - pusty FILE w DECLARE - przechodzil parser i ginal dopiero na FatalError w rdb::StoragePaths
+#     przy rejestracji w modelu, czyli juz po imporcie do zywego planu,
+#   - zarezerwowana nazwa strumienia - abort(), czyli SIGABRT,
+#   - ulamek z zerowym mianownikiem - FatalError w listenerze parsera.
+# Parser biegnie w procesie DZIALAJACEGO serwera, wiec kazdy z nich byl bledem calej instancji.
+expect_parse_rejected() {
+  local query="$1" reason="$2" out rc
+  set +e
+  out=$(xqry -a "$query" 2>&1)
+  rc=$?
+  set -e
+  if [ "$rc" -eq 0 ]; then
+    echo "ad-hoc zostal przyjety: $query"
+    exit 1
+  fi
+  case "$out" in
+    *"Fail parse"*"$reason"*) ;;
+    *)
+      echo "nieoczekiwana odpowiedz na ad-hoc '$query': $out"
+      exit 1
+      ;;
+  esac
+  if ! kill -0 "$_server_pid" 2>/dev/null; then
+    echo "serwer zginal po ad-hoc: $query"
+    exit 1
+  fi
+}
+expect_parse_rejected "ROTATION 'adhoc.cnt'" "'ROTATION' is not supported"
+# Lista dozwolonych obejmuje KAZDA dyrektywe z poprawna wartoscia, nie tylko te, ktora wczesniej
+# przeciekala - STORAGE i SUBSTRAT odrzucala dawna lista zakazanych i nie moga teraz przejsc.
+expect_parse_rejected "STORAGE 'x'" "'STORAGE' is not supported"
+expect_parse_rejected "SUBSTRAT 'memory'" "'SUBSTRAT' is not supported"
+expect_parse_rejected "STORAGE ''" "directive STORAGE requires a non-empty value"
+expect_parse_rejected "SELECT a[0] STREAM emptyfile FROM core0 FILE ''" "FILE of stream emptyfile requires a non-empty file name"
+expect_parse_rejected "DECLARE a INTEGER STREAM emptydecl, 1 FILE ''" "FILE of stream emptydecl requires a non-empty file name"
+expect_parse_rejected "SELECT a[0] STREAM OUT_OF_BUSSINESS FROM core0" "OUT_OF_BUSSINESS is reserved stream name"
+expect_parse_rejected "DECLARE a INTEGER STREAM zerorate, 1/0 FILE 'source.dat'" "fraction 1/0 has a zero denominator"
 
 # (3) Kolejne poprawne zapytanie nadal dziala.
 ok_out=$(xqry -a 'select a[0] stream adhocok from core0' 2>&1) || {
