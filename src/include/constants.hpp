@@ -27,20 +27,19 @@ constexpr std::string_view kServerStoppingReply = "server stopping";
 
 namespace ipc {
 
-// === Shared memory / mutex / queue names ===
+// === Shared memory / queue names ===
 // Muszą być spójne między serwerem (executorsm) a klientem (ipcClient, qryLauncher).
 
-// Segment shared memory przechowujący mapę odpowiedzi per-PID.
-constexpr std::string_view kShmemSegment = "RetractorShmemMap";
-
-// Named mutex chroniący dostęp do mapy w shared memory.
-constexpr std::string_view kMapMutex = "RetractorMapMutex";
+// Segment pamieci dzielonej ze slotami odpowiedzi na komendy (uklad w ipcResponses.hpp).
+// Nazwa niesie wersje ukladu z tego samego powodu co segment magistrali (bus.hpp): segment
+// starego ukladu zostaje w /dev/shm po podmianie binarki i nie moze byc czytany nowym.
+// Podkreslenie, nie kropka - kropka oddziela nazwe instancji. Nie dluzsza niz 17 znakow:
+// z kropka, skrotem nazwy instancji (9) i ukosnikiem Boosta ma sie zmiescic w 31 znakach
+// Darwina (kMaxObjectNameLength); "RetractorResponses_v1" juz sie nie miescila.
+constexpr std::string_view kShmemSegment = "RetractorReply_v1";
 
 // Główna kolejka komend: klient wysyła, serwer odbiera.
 constexpr std::string_view kQueryQueue = "RetractorQueryQueue";
-
-// Nazwa obiektu mapy wewnątrz segmentu shared memory.
-constexpr std::string_view kMapObject = "MyMap";
 
 // Prefiks nazwy kolejki odpowiedzi per-proces; pełna nazwa = prefiks + PID.
 constexpr std::string_view kResponseQueuePrefix = "brcdbr";
@@ -56,7 +55,6 @@ constexpr std::string_view kResponseQueuePrefix = "brcdbr";
 // dopiero wtedy, gdy ktoś poda nazwę niepustą.
 struct ServerNames {
   std::string shmemSegment;
-  std::string mapMutex;
   std::string queryQueue;
   std::string responseQueuePrefix;
 
@@ -68,10 +66,8 @@ struct ServerNames {
 ///
 /// Na jadrach BSD-owych nazwy POSIX-owych semaforow i obiektow pamieci dzielonej
 /// sa ograniczone do PSEMNAMLEN / PSHMNAMLEN, czyli 31 znakow, a dluzsza konczy
-/// sie ENAMETOOLONG ("File name too long") juz przy TWORZENIU obiektu. Dotyczy to
-/// takze obiektow, ktorych sami nie zakladamy: Boost.Interprocess realizuje tam
-/// named_mutex przez sem_open, bo Darwin nie ma muteksow wspoldzielonych miedzy
-/// procesami. Na Linuksie limitem jest NAME_MAX (255) i zapas jest tak duzy, ze
+/// sie ENAMETOOLONG ("File name too long") juz przy TWORZENIU obiektu. Na Linuksie
+/// limitem jest NAME_MAX (255) i zapas jest tak duzy, ze
 /// warunek ponizej nigdy nie zadziala - nazwy zostaja doslownie takie jak dotad.
 inline constexpr std::size_t kMaxObjectNameLength = RDB_OS_DARWIN ? 31 : 200;
 
@@ -131,7 +127,6 @@ inline std::string withServerSuffix(std::string_view base, std::string_view serv
 inline ServerNames namesForToken(std::string_view token) {
   ServerNames retVal;
   retVal.shmemSegment = withServerSuffix(kShmemSegment, token);
-  retVal.mapMutex     = withServerSuffix(kMapMutex, token);
   retVal.queryQueue   = withServerSuffix(kQueryQueue, token);
   // Prefiks kolejki odpowiedzi domyka się kropką, bo doklejany jest do niego identyfikator
   // klienta: bez separatora "brcdbr.srv" + "12" i "brcdbr.srv1" + "2" dałyby tę samą nazwę.
@@ -170,13 +165,30 @@ constexpr int kQueryQueueMaxMessageSize = 1000;
 // Odpowiedzi mogą być dłuższe niż komendy (pełne dane strumieniowe).
 constexpr int kResponseQueueMaxMessageSize = 1024;
 
-// Rozmiar segmentu shared memory (bajty). 64 KiB wystarcza na
-// wszystkie równoległe odpowiedzi przy typowej liczbie klientów.
-constexpr std::size_t kShmemSegmentSize = 65536;
+// Miejsce na terminator w buforze odbiorczym kazdej z dwoch kolejek. try_receive moze oddac
+// DOKLADNIE max_message_size bajtow, a odbiorca pisze '\0' pod indeksem recvd_size, czyli
+// zaraz za nimi. Bufor o rozmiarze samego max_message_size konczy sie zapisem poza tablica.
+constexpr std::size_t kNullTerminatorBytes = 1;
+
+// Liczba slotow odpowiedzi w segmencie kShmemSegment, czyli liczba odpowiedzi, ktore moga
+// czekac na odbior jednoczesnie. Slot zajety przez martwego klienta serwer odzyskuje.
+constexpr std::size_t kResponseSlotCount = 16;
+
+// Najwieksza odpowiedz miesczaca sie w slocie (bajty). Dluzsza jest zastepowana bledem.
+constexpr std::size_t kResponseSlotDataSize = 32 * 1024;
+
+// Naglowek segmentu i naglowek slotu (bajty); sizeof obu struktur pilnuje static_assert
+// w ipcResponses.hpp.
+constexpr std::size_t kResponseSegmentHeaderBytes = 32;
+constexpr std::size_t kResponseSlotHeaderBytes    = 32;
+
+// Rozmiar segmentu odpowiedzi (bajty): naglowek plus kResponseSlotCount pelnych slotow.
+constexpr std::size_t kShmemSegmentSize =
+    kResponseSegmentHeaderBytes + kResponseSlotCount * (kResponseSlotHeaderBytes + kResponseSlotDataSize);
 
 // === Uprawnienia obiektów IPC ===
 
-// Tryb nadawany KAŻDEMU obiektowi IPC, który tworzy serwer: segmentowi mapy, muteksowi mapy,
+// Tryb nadawany KAŻDEMU obiektowi IPC, który tworzy serwer: segmentowi odpowiedzi,
 // kolejce komend, kolejkom odpowiedzi i segmentowi magistrali.
 //
 // Jawny, bo domyślny `permissions()` Boosta deklaruje 0666, a tryb realny wychodzi dopiero

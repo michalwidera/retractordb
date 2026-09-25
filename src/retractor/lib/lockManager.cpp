@@ -16,7 +16,6 @@
 #include <spdlog/spdlog.h>
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
-#include <boost/interprocess/sync/named_mutex.hpp>
 
 #include "bus.hpp"
 #include "constants.hpp"
@@ -279,7 +278,6 @@ SweepReport sweepAbandonedResources(const std::string &serviceLockDir) {
         const ipc::ServerNames names = ipc::namesForToken(*ipcTokenOf(file));
         IPC::shared_memory_object::remove(names.shmemSegment.c_str());
         IPC::message_queue::remove(names.queryQueue.c_str());
-        IPC::named_mutex::remove(names.mapMutex.c_str());
       });
   retVal.busSegments = bus::sweepAbandonedSegments();
   return retVal;

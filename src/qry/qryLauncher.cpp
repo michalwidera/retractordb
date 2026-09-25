@@ -14,7 +14,7 @@
 
 #include <spdlog/spdlog.h>
 #include <boost/interprocess/ipc/message_queue.hpp>
-#include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/system/error_code.hpp>
@@ -62,7 +62,7 @@ static int exitCodeFor(selectResult result) {
 static bool serverReachable(std::string_view serverName) {
   const ipc::ServerNames names = ipc::names(serverName);
   try {
-    IPC::managed_shared_memory seg(IPC::open_only, names.shmemSegment.c_str());
+    IPC::shared_memory_object seg(IPC::open_only, names.shmemSegment.c_str(), IPC::read_only);
     IPC::message_queue mq(IPC::open_only, names.queryQueue.c_str());
   } catch (...) {
     return false;

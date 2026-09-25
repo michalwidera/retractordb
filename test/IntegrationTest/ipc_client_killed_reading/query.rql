@@ -1,0 +1,8 @@
+# Plan tla: serwer ma tylko zyc i odpowiadac na komendy. Zrodlo zawija sie po koncu danych,
+# wiec serwer liczy do chwili, w ktorej test zatrzyma go komenda `xqry -k`.
+
+STORAGE 'temp'
+
+DECLARE d INTEGER STREAM src, 1/8 FILE 'data.txt'
+
+SELECT src[0] STREAM dst FROM src

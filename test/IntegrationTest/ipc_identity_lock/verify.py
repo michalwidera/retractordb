@@ -389,8 +389,10 @@ def scenario():
 
         CONTEXT["phase"] = "2:migawka-before"
         before = ipc_objects(name)
-        check("krok2:obiekty-istnieja", before is None or len(before) >= 3,
-              f"pierwszy serwer nie ma kompletu obiektow IPC (oczekiwane >=3): {before}")
+        # Segment odpowiedzi i kolejka komend. Trzeciego obiektu - semafora muteksu mapy - nie ma
+        # od X-01 (#254): sloty odpowiedzi nie maja zamka.
+        check("krok2:obiekty-istnieja", before is None or len(before) >= 2,
+              f"pierwszy serwer nie ma kompletu obiektow IPC (oczekiwane >=2): {before}")
 
         CONTEXT["phase"] = "2:proba-drugiego-serwera"
         assert_refused("krok2", second, env_second)
