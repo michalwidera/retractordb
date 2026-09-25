@@ -336,9 +336,9 @@ class ParserListener : public RQLBaseListener {
   /// token z indeksem grupy okna.
   ///
   /// Okno jest zawsze PRZESUWNE co rekord - powod przy regule `window_agg` w RQL.g4.
-  /// Szerokosc NIE jest tu sprawdzana: listener parsera nie ma lagodnego kanalu bledu
-  /// (zostaje FatalError), a szerokosc niedodatnia jest bledem PLANU, ktory kompilator
-  /// raportuje przez `Check result:` razem z pozostalymi kontrolami.
+  /// Szerokosci niedodatniej NIE odrzucamy tutaj: to blad PLANU, ktory kompilator raportuje
+  /// przez `Check result:` razem z pozostalymi kontrolami. Parser odrzuca wylacznie literal
+  /// spoza zakresu `int` (literal<int>).
   void exitWindow_agg(RQLParser::Window_aggContext *ctx) override {
     const int width = literal<int>(ctx->width->getText());
     if (windowArgMarks.empty()) FatalError("RQLParser::exitWindow_agg: no argument mark for '{}'", ctx->getText());
@@ -448,10 +448,9 @@ class ParserListener : public RQLBaseListener {
   /// wielkoscia liter. Do tokena idzie postac KANONICZNA z rqlFunctions.hpp, a nie ta
   /// napisana w zapytaniu - uzasadnienie przy definicji tabeli.
   ///
-  /// Nazwy NIEZNANEJ nie odrzucamy tutaj. Listener parsera nie ma kanalu na lagodny
-  /// blad (zostaje FatalError), a `compiler::checkFunctionCalls()` raportuje ja przez
-  /// `Check result:` razem z pozostalymi kontrolami planu. Nieznana nazwa jedzie wiec
-  /// dalej w postaci doslownej, zeby komunikat pokazal to, co napisal autor.
+  /// Nazwy NIEZNANEJ nie odrzucamy tutaj: `compiler::checkFunctionCalls()` raportuje ja przez
+  /// `Check result:` razem z pozostalymi kontrolami planu. Nieznana nazwa jedzie wiec dalej
+  /// w postaci doslownej, zeby komunikat pokazal to, co napisal autor.
   void exitFunction_call(RQLParser::Function_callContext *ctx) override {
     const std::string written = ctx->fn->getText();
     const auto known          = rdb::findRqlFunction(written);
