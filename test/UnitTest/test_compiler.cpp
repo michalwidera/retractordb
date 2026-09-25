@@ -163,6 +163,82 @@ TEST(xparser, dump_range_signs_are_read_from_the_neighbouring_child) {
   }
 }
 
+// --- literal spoza zakresu typu: blad planu, nie std::terminate (#306) --------------------
+
+// Metody exit* listenera biegna z noexcept-owego destruktora antlrcpp::FinalAction, wiec
+// std::out_of_range z std::stoi konczyl proces - w kanale ad-hoc proces SERWERA. Po jednym
+// przypadku na kazde miejsce konwersji w RQLParser.cpp. Tabela jest parametryzowana, a nie
+// petla, bo przed poprawka pierwszy przypadek zabijal cala binarke: kazdy z nich musi dac sie
+// uruchomic osobno (--gtest_filter='*out_of_range*/<nazwa>').
+struct OutOfRangeLiteral {
+  std::string name;       // nazwa przypadku w --gtest_filter
+  std::string statement;  // instrukcja dopisana do planu tla
+  std::string literal;    // tekst literalu, ktory ma wrocic w komunikacie
+};
+
+// Bez tej funkcji gtest drukuje parametr jako surowe bajty obiektu, razem z niezainicjowana
+// czescia buforow std::string - ut_compiler-valgrind zglasza to jako blad.
+void PrintTo(const OutOfRangeLiteral &testCase, std::ostream *os) { *os << testCase.name; }
+
+class xparser_out_of_range : public testing::TestWithParam<OutOfRangeLiteral> {};
+
+TEST_P(xparser_out_of_range, literal_is_a_plan_error) {
+  qTree instance;
+  testing::internal::CaptureStderr();
+  auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'
+        SELECT src[0] STREAM dst FROM src
+      )" + GetParam().statement + "\n");
+  testing::internal::GetCapturedStderr();
+  EXPECT_NE(result.find("numeric literal " + GetParam().literal + " is out of range"), std::string::npos) << result;
+}
+
+const std::string kHugeInt   = "99999999999";
+const std::string kHugeFloat = "1" + std::string(40, '0') + ".0";  // ponad FLT_MAX: std::stof
+const std::string kHugeReal  = std::string(400, '9') + ".0";       // ponad DBL_MAX: std::stod
+
+INSTANTIATE_TEST_SUITE_P(
+    xparser, xparser_out_of_range,
+    testing::Values(
+        OutOfRangeLiteral{"declare_decimal", "DECLARE b INTEGER STREAM big, " + kHugeInt + " FILE 'b.txt'", kHugeInt},
+        OutOfRangeLiteral{"declare_fraction_nom", "DECLARE b INTEGER STREAM big, " + kHugeInt + "/1 FILE 'b.txt'", kHugeInt},
+        OutOfRangeLiteral{"declare_fraction_den", "DECLARE b INTEGER STREAM big, 1/" + kHugeInt + " FILE 'b.txt'", kHugeInt},
+        OutOfRangeLiteral{"declare_float", "DECLARE b INTEGER STREAM big, " + kHugeReal + " FILE 'b.txt'", kHugeReal},
+        // W zakresie double, ale nie rational<int>: Rationalize() oddawal 0/1 bez slowa.
+        OutOfRangeLiteral{"declare_float_above_rational", "DECLARE b INTEGER STREAM big, 3000000000.0 FILE 'b.txt'",
+                          "3000000000.0"},
+        OutOfRangeLiteral{"declare_float_below_rational", "DECLARE b INTEGER STREAM big, 0.00000001 FILE 'b.txt'", "0.00000001"},
+        OutOfRangeLiteral{"field_array_size", "DECLARE b INTEGER[" + kHugeInt + "] STREAM big, 1 FILE 'b.txt'", kHugeInt},
+        OutOfRangeLiteral{"expression_decimal", "SELECT src[0]+" + kHugeInt + " STREAM big FROM src", kHugeInt},
+        OutOfRangeLiteral{"expression_float", "SELECT src[0]+" + kHugeFloat + " STREAM big FROM src", kHugeFloat},
+        OutOfRangeLiteral{"time_move", "SELECT src[0] STREAM big FROM src>" + kHugeInt, kHugeInt},
+        OutOfRangeLiteral{"agse_step", "SELECT * STREAM big FROM src@(" + kHugeInt + ",1)", kHugeInt},
+        OutOfRangeLiteral{"agse_window", "SELECT * STREAM big FROM src@(1," + kHugeInt + ")", kHugeInt},
+        OutOfRangeLiteral{"agse_negative_window", "SELECT * STREAM big FROM src@(1,-" + kHugeInt + ")", kHugeInt},
+        OutOfRangeLiteral{"record_window_width", "SELECT MIN(src[0]:" + kHugeInt + ") STREAM big FROM src", kHugeInt},
+        OutOfRangeLiteral{"retention_capacity", "SELECT src[0] STREAM big FROM src RETENTION " + kHugeInt, kHugeInt},
+        OutOfRangeLiteral{"retention_segments", "SELECT src[0] STREAM big FROM src RETENTION 10 " + kHugeInt, kHugeInt},
+        OutOfRangeLiteral{"generator_size", "SELECT src[0] STREAM cells[" + kHugeInt + "] FROM src", kHugeInt},
+        OutOfRangeLiteral{"to_string_width", "SELECT to_string(src[0]:" + kHugeInt + ") STREAM big FROM src", kHugeInt},
+        OutOfRangeLiteral{"dump_left", "RULE r ON dst WHEN dst[0] > 0 DO DUMP -" + kHugeInt + " TO 1", kHugeInt},
+        OutOfRangeLiteral{"dump_right", "RULE r ON dst WHEN dst[0] > 0 DO DUMP -1 TO " + kHugeInt, kHugeInt},
+        OutOfRangeLiteral{"dump_retention", "RULE r ON dst WHEN dst[0] > 0 DO DUMP -1 TO 1 RETENTION " + kHugeInt, kHugeInt}),
+    [](const testing::TestParamInfo<OutOfRangeLiteral> &info) { return info.param.name; });
+
+TEST(xparser, literals_at_the_edge_of_their_type_are_still_accepted) {
+  // Kontrola w druga strone: odmowa ma dotyczyc wylacznie literalu SPOZA zakresu. Gorna granica
+  // `int` w wyrazeniu oraz obie granice, w ktorych Rationalize() oddaje interwal dokladnie.
+  for (const std::string statement :
+       {"SELECT src[0]+2147483647 STREAM edge FROM src", "DECLARE b INTEGER STREAM edge, 2147483647.0 FILE 'b.txt'",
+        "DECLARE b INTEGER STREAM edge, 0.000001 FILE 'b.txt'"}) {
+    qTree instance;
+    auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'
+      )" + statement + "\n");
+    EXPECT_EQ(result, "OK") << statement;
+  }
+}
+
 TEST(xcompiler, rule_condition_reaching_another_stream_is_refused) {
   // Warunek reguly ewaluator liczy na payloadzie WYJSCIOWYM celu i bierze z tokenu wylacznie
   // indeks - nazwa schematu jest ignorowana. Odwolanie do cudzego strumienia czytaloby wiec
