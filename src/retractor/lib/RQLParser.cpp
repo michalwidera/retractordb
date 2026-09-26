@@ -212,6 +212,20 @@ class ParserListener : public RQLBaseListener {
 
   void reportOutOfRange(const std::string &text) { reportSemanticError("numeric literal " + text + " is out of range"); }
 
+  /// Jedyne wejscie do rationalResult z trzech postaci `rational_se`. Wszyscy czterej odbiorcy
+  /// - interwal DECLARE, argument `&` i `%`, cel `-` - wymagaja liczby dodatniej, a gramatyka
+  /// dopuszcza zero (`0`, `0.0`, `0/5`). Do 2026-09-26 zero przechodzilo parser: DECLARE padal
+  /// na "Circular dependency" albo FatalError w qTree::getAvailableTimeIntervals, `&`/`%`/`-`
+  /// na FatalError w kompilatorze - w kanale ad-hoc smierc dzialajacego serwera (#308).
+  /// Przy odmowie rationalResult zostaje bez zmian, jak po bledzie z #306.
+  void acceptInterval(const boost::rational<int> &value, const std::string &text) {
+    if (value == 0) {
+      reportSemanticError("interval " + text + " must be greater than zero");
+      return;
+    }
+    rationalResult = value;
+  }
+
   /// Literal liczbowy; spoza zakresu - blad planu i wartosc zastepcza 0.
   ///
   /// Zero jest wypelnieniem, nie wynikiem: plan z bledem semantycznym jest odrzucany w calosci,
@@ -489,7 +503,7 @@ class ParserListener : public RQLBaseListener {
   /// wartosc od 2^31 w gore i niezerowa ponizej jej rozdzielczosci (1e-6) oddaje jako 0/1,
   /// wiec `3000000000.0` i `0.00000001` dawaly interwal zerowy, a plan padal dopiero
   /// w kompilatorze na mylacym "Circular dependency in stream definitions". Jawne `0.0` zostaje
-  /// poza ta kontrola - to zerowy interwal, a nie literal spoza zakresu.
+  /// poza ta kontrola - to zerowy interwal, a nie literal spoza zakresu; odrzuca je acceptInterval().
   void exitRationalAsFloat(RQLParser::RationalAsFloatContext *ctx) override {
     const std::string text = ctx->FLOAT()->getText();
     const auto value       = parseLiteral<double>(text);
@@ -498,11 +512,19 @@ class ParserListener : public RQLBaseListener {
       reportOutOfRange(text);
       return;
     }
-    rationalResult = rational;
+    acceptInterval(rational, text);
   }
 
   void exitRationalAsDecimal(RQLParser::RationalAsDecimalContext *ctx) override {
-    rationalResult = literal<int>(ctx->DECIMAL()->getText());
+    const std::string text = ctx->DECIMAL()->getText();
+    const auto value       = parseLiteral<int>(text);
+    // Bez wartosci zastepczej z literal(): zastepcze 0 dolozyloby na stderr drugi, falszywy
+    // komunikat o zerowym interwale.
+    if (!value) {
+      reportOutOfRange(text);
+      return;
+    }
+    acceptInterval(*value, text);
   }
 
   void exitFraction(RQLParser::FractionContext *ctx) override {
@@ -523,7 +545,7 @@ class ParserListener : public RQLBaseListener {
       reportSemanticError("fraction " + ctx->getText() + " has a zero denominator");
       return;
     }
-    rationalResult = boost::rational<int>(*nom, *den);
+    acceptInterval(boost::rational<int>(*nom, *den), ctx->getText());
   }
 
   void exitSelect(RQLParser::SelectContext *ctx) override {

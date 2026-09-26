@@ -189,8 +189,11 @@ TEST_P(xparser_out_of_range, literal_is_a_plan_error) {
         DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'
         SELECT src[0] STREAM dst FROM src
       )" + GetParam().statement + "\n");
-  testing::internal::GetCapturedStderr();
+  const std::string diagnostics      = testing::internal::GetCapturedStderr();
   EXPECT_NE(result.find("numeric literal " + GetParam().literal + " is out of range"), std::string::npos) << result;
+  // Literal spoza zakresu nie jest przy okazji zerowym interwalem (#308): wartosc zastepcza
+  // nie moze dolozyc drugiego komunikatu.
+  EXPECT_FALSE(diagnostics.contains("greater than zero")) << diagnostics;
 }
 
 const std::string kHugeInt   = "99999999999";
@@ -1680,6 +1683,14 @@ TEST(xparser, invalid_values_are_refused_without_killing_the_process) {
       {"DECLARE a INTEGER STREAM core0, 1/0 FILE 'a.txt'", "fraction 1/0 has a zero denominator"},
       // Druga droga do tego samego ulamka: rational_se w wyrazeniu strumieniowym.
       {source + "SELECT * STREAM dst FROM core0 - 1/0", "fraction 1/0 has a zero denominator"},
+      // Zerowy interwal w kazdej postaci rational_se i u kazdego odbiorcy (#308). DECLARE
+      // przechodzil parser, `&`/`%`/`-` konczyly proces FatalError-em w kompilatorze.
+      {"DECLARE a INTEGER STREAM core0, 0 FILE 'a.txt'", "interval 0 must be greater than zero"},
+      {"DECLARE a INTEGER STREAM core0, 0.0 FILE 'a.txt'", "interval 0.0 must be greater than zero"},
+      {"DECLARE a INTEGER STREAM core0, 0/5 FILE 'a.txt'", "interval 0/5 must be greater than zero"},
+      {source + "SELECT core0[0] STREAM dst FROM core0 & 0", "interval 0 must be greater than zero"},
+      {source + "SELECT core0[0] STREAM dst FROM core0 % 0", "interval 0 must be greater than zero"},
+      {source + "SELECT core0[0] STREAM dst FROM core0 - 0", "interval 0 must be greater than zero"},
   };
   for (const auto &[rql, reason] : cases) {
     const auto [parseResult, diagnostics] = parseCapturingStderr(rql);
