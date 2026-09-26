@@ -7,7 +7,7 @@
 
 #include <boost/rational.hpp>
 
-/// Arytmetyka WARTOSCI pol z wykrywaniem przepelnienia: INTEGER (int32) i RATIONAL
+/// Arytmetyka WARTOSCI pol z wykrywaniem przepelnienia: INTEGER (int32), UINT (uint32) i RATIONAL
 /// (boost::rational<int>). nullopt oznacza, ze wyniku nie da sie zapisac w typie, a wolajacy
 /// zamienia go na NULL - tak jak dzielenie przez zero w expressionEvaluator.
 ///
@@ -45,6 +45,28 @@ inline std::optional<int> div(int a, int b) {
 inline std::optional<int> neg(int a) {
   if (a == std::numeric_limits<int>::min()) return std::nullopt;
   return -a;
+}
+
+// UINT: wynik spoza [0, 2^32) - za duza suma albo iloczyn, ujemna roznica - nie ma reprezentacji
+// w typie. Do 2026-09-26 zawijal sie po cichu (`3 - 5` dawalo 4294967294). Iloraz UINT miesci sie
+// zawsze, wiec `div` dla niego nie ma.
+
+inline std::optional<unsigned> add(unsigned a, unsigned b) {
+  unsigned result = 0;
+  if (__builtin_add_overflow(a, b, &result)) return std::nullopt;
+  return result;
+}
+
+inline std::optional<unsigned> sub(unsigned a, unsigned b) {
+  unsigned result = 0;
+  if (__builtin_sub_overflow(a, b, &result)) return std::nullopt;
+  return result;
+}
+
+inline std::optional<unsigned> mul(unsigned a, unsigned b) {
+  unsigned result = 0;
+  if (__builtin_mul_overflow(a, b, &result)) return std::nullopt;
+  return result;
 }
 
 namespace detail {

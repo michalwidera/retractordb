@@ -617,6 +617,71 @@ TEST(cast_variant, double_at_byte_bound_is_exact) {
   rdb::descFldVT in = 255.9;
   EXPECT_EQ(std::get<uint8_t>(c(in, rdb::BYTE)), 255);
 }
+// Zwezenie CALKOWITE: ta sama regula co dla liczb zmiennoprzecinkowych - wartosc, ktorej typ
+// docelowy nie pomiesci, jest NULL. Do 2026-09-26 static_cast zawijal ja po cichu.
+TEST(cast_variant, negative_int_to_uint_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = -998;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::UINT)));
+}
+TEST(cast_variant, zero_int_to_uint_is_exact) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 0;
+  EXPECT_EQ(std::get<unsigned>(c(in, rdb::UINT)), 0U);
+}
+TEST(cast_variant, uint_above_int_max_to_integer_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 3000000000U;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::INTEGER)));
+}
+TEST(cast_variant, uint_at_int_max_to_integer_is_exact) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 2147483647U;
+  EXPECT_EQ(std::get<int>(c(in, rdb::INTEGER)), 2147483647);
+}
+TEST(cast_variant, int_outside_byte_range_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT above = 256;
+  rdb::descFldVT below = -1;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(above, rdb::BYTE)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(below, rdb::BYTE)));
+}
+TEST(cast_variant, int_at_byte_bound_is_exact) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 255;
+  EXPECT_EQ(std::get<uint8_t>(c(in, rdb::BYTE)), 255);
+}
+// rational_cast<T> rzutowal licznik i mianownik osobno: 600/3 w BYTE dawalo 88 / 3 = 29.
+TEST(cast_variant, rational_to_byte_uses_the_integer_part) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = boost::rational<int>(600, 3);
+  EXPECT_EQ(std::get<uint8_t>(c(in, rdb::BYTE)), 200);
+}
+TEST(cast_variant, negative_rational_to_uint_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = boost::rational<int>(-7, 2);
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::UINT)));
+}
+TEST(cast_variant, uint_above_int_max_to_rational_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 3000000000U;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::RATIONAL)));
+}
+TEST(cast_variant, negative_string_to_uint_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = std::string("-5");
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::UINT)));
+}
+TEST(cast_any, negative_int_to_uint_is_null) {
+  cast<std::any> c;
+  std::any in = -998;
+  EXPECT_EQ(c(in, rdb::UINT).type(), typeid(std::monostate));
+}
+TEST(cast_any, uint_above_int_max_to_rational_is_null) {
+  cast<std::any> c;
+  std::any in = 3000000000U;
+  EXPECT_EQ(c(in, rdb::RATIONAL).type(), typeid(std::monostate));
+}
 TEST(cast_any, double_above_integer_range_is_null) {
   cast<std::any> c;
   std::any in = 1e30;

@@ -1303,6 +1303,57 @@ TEST(xExpressionEval, add_uint_uint) {
   EXPECT_EQ(std::get<unsigned>(result), 7U);
 }
 
+// Arytmetyka UINT poza [0, 2^32) daje NULL, tak jak przepelnienie INTEGER. Do 2026-09-26
+// zawijala sie po cichu: `3 - 5` dawalo 4294967294.
+TEST(xExpressionEval, uint_sub_below_zero_is_null) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, 3U);
+  program.emplace_back(PUSH_VAL, 5U);
+  program.emplace_back(SUBTRACT);
+
+  expressionEvaluator test;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+}
+
+TEST(xExpressionEval, uint_add_and_mul_overflow_is_null) {
+  for (const auto op : {ADD, MULTIPLY}) {
+    std::list<token> program;
+    program.emplace_back(PUSH_VAL, 4000000000U);
+    program.emplace_back(PUSH_VAL, 400000000U);
+    program.emplace_back(op);
+
+    expressionEvaluator test;
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program))) << GetStringcommand_id(op);
+  }
+}
+
+TEST(xExpressionEval, uint_arithmetic_at_the_bound_is_exact) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, 65535U);
+  program.emplace_back(PUSH_VAL, 65537U);
+  program.emplace_back(MULTIPLY);
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<unsigned>(result));
+  EXPECT_EQ(std::get<unsigned>(result), 4294967295U);
+}
+
+// Ujemny INTEGER promowany do UINT nie ma reprezentacji: operacja daje NULL, a nie iloczyn
+// liczby 4294966298. Dotyczy tez porownania, ktore przechodzi przez te sama normalizacje.
+TEST(xExpressionEval, negative_int_promoted_to_uint_is_null) {
+  for (const auto op : {MULTIPLY, ADD, CMP_LT}) {
+    std::list<token> program;
+    program.emplace_back(PUSH_VAL, -998);
+    program.emplace_back(PUSH_VAL, 165U);
+    program.emplace_back(op);
+
+    expressionEvaluator test;
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program))) << GetStringcommand_id(op);
+  }
+}
+
 TEST(xExpressionEval, isnull_returns_1_for_null) {
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));

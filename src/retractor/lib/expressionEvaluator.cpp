@@ -85,6 +85,11 @@ rdb::descFldVT logicResultTypeRef(const rdb::descFldVT &a, const rdb::descFldVT 
 /// Operandy sprowadzone do wspolnego typu: wygrywa wyzszy indeks wariantu. Zgodne typy wracaja
 /// jako referencje do oryginalow, bez kopii. Przy roznych promowana strona laduje w `promoted`,
 /// ktore daje wolajacy i ktore musi zyc tak dlugo jak wynik (#289).
+///
+/// NULL wychodzi z normalizacji po stronie, ktora byla NULL albo nie ma reprezentacji w typie
+/// docelowym (ujemny INTEGER promowany do UINT - castFldVT daje wtedy NULL). Monostate ma
+/// najwyzszy indeks, wiec NULL na wejsciu promuje druga strone do NULL. Wolajacy sprawdza
+/// operandy PO normalizacji i jednym warunkiem obsluguje oba przypadki.
 pairRef normalize(const rdb::descFldVT &a, const rdb::descFldVT &b, rdb::descFldVT &promoted) {
   if (a.index() == b.index()) return {a, b};
 
@@ -106,10 +111,9 @@ rdb::descFldVT orNull(const std::optional<T> &value) {
 
 rdb::descFldVT operator+(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
-  if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
-
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
+  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -117,7 +121,7 @@ rdb::descFldVT operator+(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                                 //
                  [&retVal](uint8_t a, uint8_t b) { retVal = a + b; },                                                      //
                  [&retVal](int a, int b) { retVal = orNull(checkedArith::add(a, b)); },                                    //
-                 [&retVal](unsigned a, unsigned b) { retVal = a + b; },                                                    //
+                 [&retVal](unsigned a, unsigned b) { retVal = orNull(checkedArith::add(a, b)); },                          //
                  [&retVal](const std::string &a, const std::string &b) { retVal = a + b; },                                //
                  [&retVal](double a, double b) { retVal = a + b; },                                                        //
                  [&retVal](float a, float b) { retVal = a + b; },                                                          //
@@ -137,18 +141,17 @@ rdb::descFldVT operator+(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
 
 rdb::descFldVT operator-(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
-  if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
-
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
+  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },  //
-                 [&retVal](uint8_t a, uint8_t b) { retVal = a - b; },                       //
-                 [&retVal](int a, int b) { retVal = orNull(checkedArith::sub(a, b)); },     //
-                 [&retVal](unsigned a, unsigned b) { retVal = a - b; },                     //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },         //
+                 [&retVal](uint8_t a, uint8_t b) { retVal = a - b; },                              //
+                 [&retVal](int a, int b) { retVal = orNull(checkedArith::sub(a, b)); },            //
+                 [&retVal](unsigned a, unsigned b) { retVal = orNull(checkedArith::sub(a, b)); },  //
                  [](const std::string &, const std::string &) {
                    throw std::runtime_error("Operator '-' not defined for string operands");
                  },                                                                                                        //
@@ -170,18 +173,17 @@ rdb::descFldVT operator-(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
 
 rdb::descFldVT operator*(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
-  if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
-
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
+  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },  //
-                 [&retVal](uint8_t a, uint8_t b) { retVal = a * b; },                       //
-                 [&retVal](int a, int b) { retVal = orNull(checkedArith::mul(a, b)); },     //
-                 [&retVal](unsigned a, unsigned b) { retVal = a * b; },                     //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },         //
+                 [&retVal](uint8_t a, uint8_t b) { retVal = a * b; },                              //
+                 [&retVal](int a, int b) { retVal = orNull(checkedArith::mul(a, b)); },            //
+                 [&retVal](unsigned a, unsigned b) { retVal = orNull(checkedArith::mul(a, b)); },  //
                  [](const std::string &, const std::string &) {
                    throw std::runtime_error("Operator '*' not defined for string operands");
                  },                                                                                                        //
@@ -203,10 +205,9 @@ rdb::descFldVT operator*(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
 
 rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
-  if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
-
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
+  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
 
   const bool divisorIsZero =
       std::visit(Overload{[](uint8_t v) { return v == 0; }, [](int v) { return v == 0; }, [](unsigned v) { return v == 0U; },
@@ -323,10 +324,9 @@ rdb::descFldVT exactPower(const rdb::descFldVT &base, int exponent) {
 /// strone do STRING, wiec wystarczy sprawdzic typ znormalizowany. To samo zdanie zalatwia
 /// INTPAIR i IDXPAIR, ktore nie sa wartosciami wyrazen.
 rdb::descFldVT power(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
-  if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
-
   rdb::descFldVT promoted;
   auto [base, exponent] = normalize(aParam, bParam, promoted);
+  if (isNullValue(base) || isNullValue(exponent)) return std::monostate{};
 
   const auto resultType = static_cast<rdb::descFld>(base.index());
   if (resultType > rdb::DOUBLE) throw std::runtime_error("Operator '^' not defined for non-numeric operands");
@@ -345,10 +345,9 @@ rdb::descFldVT power(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
 
 rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
-  if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
-
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
+  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -376,10 +375,9 @@ rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
 
 rdb::descFldVT is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
-  if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
-
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
+  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -407,10 +405,9 @@ rdb::descFldVT is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam
 
 rdb::descFldVT is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
-  if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
-
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
+  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -438,10 +435,9 @@ rdb::descFldVT is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
 
 rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
-  if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
-
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
+  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -469,10 +465,9 @@ rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
 
 rdb::descFldVT is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
-  if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
-
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
+  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -500,10 +495,9 @@ rdb::descFldVT is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
 
 rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
-  if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
-
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
+  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
