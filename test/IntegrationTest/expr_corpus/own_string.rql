@@ -1,0 +1,10 @@
+# STRING + STRING i napis + liczba - wartosci dluzsze niz SSO.
+STORAGE 'temp'
+
+DECLARE s STRING[32], t STRING[32], k INTEGER STREAM w, 1 FILE 'own_string.txt'
+
+SELECT w[0]+w[1], w[0]+'_suffix_beyond_sso', to_string(w[2]:16)+w[0], w[1]+to_string(w[2]:8)+w[0] STREAM cat FROM w
+
+SELECT w[0], w[1], w[2] STREAM cpy FROM w
+
+RULE cmp ON cpy WHEN cpy[0] = 'no_such_word_in_data' OR cpy[1] < 'AAAA' OR cpy[0] = cpy[1] AND cpy[2] > 100000 DO DUMP -1 TO 0

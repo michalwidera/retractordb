@@ -1,0 +1,11 @@
+# Typy mieszane: promocja nizszego indeksu wariantu, w obu kierunkach. `m[4]*m[0]` promuje
+# INTEGER do UINT - ujemny INTEGER nie ma tam reprezentacji i daje NULL.
+STORAGE 'temp'
+
+DECLARE i INTEGER, d DOUBLE, f FLOAT, y BYTE, u UINT STREAM m, 1 FILE 'own_mixed.txt'
+
+SELECT m[0]+m[1], m[1]+m[0], m[0]*m[2], m[2]*m[0], m[1]-m[2], m[2]-m[1], m[3]+m[0], m[0]+m[3], m[4]*m[0], m[0]*m[4], m[0]/m[1], m[1]/m[4], (m[0]+m[1])*(m[2]-m[3]), m[0]*2.5, 0.5*m[0], m[3]^2, m[0]^0.5 STREAM mix FROM m
+
+SELECT m[0], m[1], m[2], m[3], m[4] STREAM cpy FROM m
+
+RULE cmp ON cpy WHEN cpy[0] > cpy[1]*cpy[1]+1000000 OR cpy[2] < cpy[0]-100000 OR cpy[3] >= cpy[4]*1000 OR cpy[1] != cpy[1] DO DUMP -1 TO 0
