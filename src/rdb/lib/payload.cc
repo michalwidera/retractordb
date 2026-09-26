@@ -546,6 +546,22 @@ std::optional<rdb::descFldVT> payload::getItemVT(const int positionFlat) const {
   FatalError("payload::getItemVT: unsupported field type: {}", int(requestedType));
 }
 
+std::optional<int> payload::getIntegralItem(const int positionFlat) const {
+  const auto position = resolveFieldIndexOrAbort(descriptor, positionFlat, "Read");
+
+  if (nullBitset_[position]) return std::nullopt;
+
+  const auto offsetFlat = descriptor.byteOffsetAtFlatIndex(positionFlat);
+  switch (descriptor[position].rtype) {
+    case rdb::BYTE:
+      return getVal<uint8_t>(span(), offsetFlat);
+    case rdb::INTEGER:
+      return getVal<int>(span(), offsetFlat);
+    default:
+      FatalError("payload::getIntegralItem: field type {} is not BYTE/INTEGER", int(descriptor[position].rtype));
+  }
+}
+
 void payload::setItemVT(const int positionFlat, std::optional<rdb::descFldVT> valueParam) {
   auto position = resolveFieldIndexOrAbort(descriptor, positionFlat, "Write");
 

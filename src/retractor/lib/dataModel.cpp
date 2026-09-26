@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
+#include <iterator>
 #include <memory>  // unique_ptr
 #include <mutex>
 #include <stdexcept>
@@ -194,43 +195,45 @@ bool dataModel::forwardRecordAvailable(const std::string &instance, const int fo
 bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
   if (qry.lProgram.empty()) return true;
 
-  std::vector<token> arg;
-  std::ranges::copy(qry.lProgram, std::back_inserter(arg));
-  const auto &operation = arg.back();
+  // Te same akcesory co w constructInputPayload(): tokeny i nazwy zrodel przez referencje, bez kopii.
+  const auto arg = [&qry](const int i) -> const token & { return *std::next(qry.lProgram.begin(), i); };
+
+  const auto nameArg = [&arg](const int i) -> const std::string & { return std::get<std::string>(arg(i).getVT()); };
+
+  const auto &operation = qry.lProgram.back();
   const auto cmd        = operation.getCommandID();
 
   bool available = false;
   switch (cmd) {
     case PUSH_STREAM:
-      available = forwardRecordAvailable(operation.getStr_(), logicalIndex);
+      available = forwardRecordAvailable(std::get<std::string>(operation.getVT()), logicalIndex);
       break;
     case STREAM_TIMEMOVE:
-      available = forwardRecordAvailable(arg[0].getStr_(), logicalIndex - std::get<int>(operation.getVT()));
+      available = forwardRecordAvailable(nameArg(0), logicalIndex - std::get<int>(operation.getVT()));
       break;
     case STREAM_DEHASH_MOD:
-      available = forwardRecordAvailable(arg[0].getStr_(), Mod(arg[1].getRI(), qry.rInterval, logicalIndex));
+      available = forwardRecordAvailable(nameArg(0), Mod(arg(1).getRI(), qry.rInterval, logicalIndex));
       break;
     case STREAM_DEHASH_DIV:
-      available = forwardRecordAvailable(arg[0].getStr_(), Div(qry.rInterval, arg[1].getRI(), logicalIndex));
+      available = forwardRecordAvailable(nameArg(0), Div(qry.rInterval, arg(1).getRI(), logicalIndex));
       break;
     case STREAM_SUM:
     case STREAM_AVG:
     case STREAM_MIN:
     case STREAM_MAX:
-      available = forwardRecordAvailable(arg[0].getStr_(), logicalIndex);
+      available = forwardRecordAvailable(nameArg(0), logicalIndex);
       break;
     case STREAM_SUBTRACT:
       available = forwardRecordAvailable(
-          arg[0].getStr_(), Subtract(coreInstance_.getQuery(arg[0].getStr_()).rInterval, operation.getRI(), logicalIndex));
+          nameArg(0), Subtract(coreInstance_.getQuery(nameArg(0)).rInterval, operation.getRI(), logicalIndex));
       break;
     case STREAM_ADD:
-      available = forwardRecordAvailable(arg[0].getStr_(),
-                                         Add(qry.rInterval, coreInstance_.getQuery(arg[0].getStr_()).rInterval, logicalIndex)) &&
-                  forwardRecordAvailable(arg[1].getStr_(),
-                                         Add(qry.rInterval, coreInstance_.getQuery(arg[1].getStr_()).rInterval, logicalIndex));
+      available =
+          forwardRecordAvailable(nameArg(0), Add(qry.rInterval, coreInstance_.getQuery(nameArg(0)).rInterval, logicalIndex)) &&
+          forwardRecordAvailable(nameArg(1), Add(qry.rInterval, coreInstance_.getQuery(nameArg(1)).rInterval, logicalIndex));
       break;
     case STREAM_AGSE: {
-      const auto source         = arg[0].getStr_();
+      const auto &source        = nameArg(0);
       const auto [step, length] = std::get<std::pair<int, int>>(operation.getVT());
       const int sourceWidth     = coreInstance_.getQuery(source).descriptorStorage().flatElementCount();
       const int lengthAbs       = length < 0 ? -length : length;
@@ -239,9 +242,9 @@ bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
       available                 = forwardRecordAvailable(source, firstRecord) && forwardRecordAvailable(source, lastRecord);
     } break;
     case STREAM_HASH: {
-      int forwardIndex  = 0;
-      const auto first  = arg[0].getStr_();
-      const auto second = arg[1].getStr_();
+      int forwardIndex   = 0;
+      const auto &first  = nameArg(0);
+      const auto &second = nameArg(1);
       const bool takeSecond =
           Hash(coreInstance_.getQuery(first).rInterval, coreInstance_.getQuery(second).rInterval, logicalIndex, forwardIndex);
       available = forwardRecordAvailable(takeSecond ? second : first, forwardIndex);
@@ -416,9 +419,12 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
                qry.lProgram.size(), qry.id);
   }
 
-  std::vector<token> arg;
-  std::ranges::copy(qry.lProgram, std::back_inserter(arg));
-  // same: for (auto tk : qry.lProgram) arg.push_back(tk);
+  // Tokeny programu czytane w miejscu - bez kopii listy do wektora w kazdym takcie.
+  const auto arg = [&qry](const int i) -> const token & { return *std::next(qry.lProgram.begin(), i); };
+
+  // Nazwa zrodla przez referencje do napisu w tokenie, a nie przez getStr_(), ktore zwraca kopie:
+  // nazwy substratow (STREAM_AGSE_1_25_mlii) nie mieszcza sie w SSO, wiec kazde uzycie bylo alokacja.
+  const auto nameArg = [&arg](const int i) -> const std::string & { return std::get<std::string>(arg(i).getVT()); };
 
   // Baza ZRODLA. Zrodla ta funkcja adresuje nazwa - tu, w REDUCE i AGSE ponizej oraz przez
   // getPayload() i fetchForward() - i tak musi zostac: ich wezly jezdza przez kopie planu
@@ -446,16 +452,16 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
     return static_cast<int>(runtime.outputPayload->getRecordsCount()) + *logicalBase;
   };
 
-  auto operation = qry.lProgram.back();  // Operation is always last element on stack
+  const auto &operation = qry.lProgram.back();  // Operation is always last element on stack
 
   const command_id cmd = operation.getCommandID();
   switch (cmd) {
     case PUSH_STREAM: {
       // 	:- PUSH_STREAM(core0)
       //
-      if (arg.size() != 1) FatalError("dataModel::constructInputPayload: PUSH_STREAM expects 1 token");
+      if (qry.lProgram.size() != 1) FatalError("dataModel::constructInputPayload: PUSH_STREAM expects 1 token");
 
-      const auto nameSrc = operation.getStr_();
+      const auto &nameSrc = nameArg(0);
 
       *runtime.inputPayload = *getPayload(nameSrc);
     } break;
@@ -463,9 +469,9 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       // 	:- PUSH_STREAM(core0)
       //  :- STREAM_TIMEMOVE(1)
       //
-      if (arg.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_TIMEMOVE expects 2 tokens");
+      if (qry.lProgram.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_TIMEMOVE expects 2 tokens");
 
-      const auto nameSrc    = arg[0].getStr_();
+      const auto &nameSrc   = nameArg(0);
       const auto timeOffset = std::get<int>(operation.getVT());
 
       // tau_N jest OPÓŹNIENIEM: wynik ma tę samą treść co źródło i pojawia się N slotów później.
@@ -489,10 +495,10 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       //  :- PUSH_VAL(2/1)
       //  :- STREAM_DEHASH_MOD
       //
-      if (arg.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_DEHASH expects 3 tokens");
+      if (qry.lProgram.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_DEHASH expects 3 tokens");
 
-      const auto nameSrc          = arg[0].getStr_();
-      const auto rationalArgument = arg[1].getRI();
+      const auto &nameSrc         = nameArg(0);
+      const auto rationalArgument = arg(1).getRI();
 
       if (rationalArgument <= 0) {
         FatalError("dataModel::constructInputPayload: DEHASH rational argument must be positive");
@@ -520,18 +526,20 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
     case STREAM_AVG:
     case STREAM_MIN:
     case STREAM_MAX: {
-      const auto nameSrc = arg[0].getStr_();
+      const auto &nameSrc = nameArg(0);
 
-      *runtime.inputPayload = streamRuntime(nameSrc).reduceFieldsToPayload(cmd, qry.id + "_0");
+      // Wynik idzie wprost do payloadu wejsciowego - ma on juz pole wyniku (query::descriptorFrom, ta sama
+      // regula reductionResultField), wiec nie budujemy co takt deskryptora i payloadu tylko po to, zeby je tu skopiowac.
+      streamRuntime(nameSrc).reduceFieldsInto(cmd, *runtime.inputPayload);
     } break;
     case STREAM_SUBTRACT: {
       //  :- PUSH_STREAM(core0)
       //  :- STREAM_SUBTRACT(1/2)
       //
-      if (arg.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_SUBTRACT expects 2 tokens");
+      if (qry.lProgram.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_SUBTRACT expects 2 tokens");
 
-      const auto nameSrc          = arg[0].getStr_();
-      const auto rationalArgument = arg[1].getRI();
+      const auto &nameSrc         = nameArg(0);
+      const auto rationalArgument = arg(1).getRI();
       const auto n                = logicalIndex();
       const auto forwardIndex     = Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, n);
 
@@ -542,10 +550,10 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       //  :- PUSH_STREAM(core1)
       //  :- STREAM_ADD
       //
-      if (arg.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_ADD expects 3 tokens");
+      if (qry.lProgram.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_ADD expects 3 tokens");
 
-      const auto nameSrc1 = arg[0].getStr_();
-      const auto nameSrc2 = arg[1].getStr_();
+      const auto &nameSrc1 = nameArg(0);
+      const auto &nameSrc2 = nameArg(1);
 
       // K24/P2 wariant A: składowe są czytane po indeksie POSTĘPUJĄCYM z Definicji sumy
       // strumieni (c_n = (a_n, b_{⌊nΔa/Δb⌋})), a nie jako bieżący payload obu składowych.
@@ -568,9 +576,9 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
       //  :- STREAM_AGSE 2,3 -> window_step, window_length  (arg[1])
       //
-      if (arg.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_AGSE expects 2 tokens");
+      if (qry.lProgram.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_AGSE expects 2 tokens");
 
-      const auto nameSrc  = arg[0].getStr_();  // * INFO Sync with query.cpp
+      const auto &nameSrc = nameArg(0);  // * INFO Sync with query.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
       if (step <= 0) {
         FatalError("dataModel::constructInputPayload: AGSE step must be > 0, got {} for '{}'", step, qry.id);
@@ -588,10 +596,10 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       //  :- PUSH_STREAM(core1)
       //  :- STREAM_HASH
       //
-      if (arg.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_HASH expects 3 tokens");
+      if (qry.lProgram.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_HASH expects 3 tokens");
 
-      const auto nameSrc1     = arg[0].getStr_();
-      const auto nameSrc2     = arg[1].getStr_();
+      const auto &nameSrc1    = nameArg(0);
+      const auto &nameSrc2    = nameArg(1);
       const auto intervalSrc1 = coreInstance_.getQuery(nameSrc1).rInterval;
       const auto intervalSrc2 = coreInstance_.getQuery(nameSrc2).rInterval;
 

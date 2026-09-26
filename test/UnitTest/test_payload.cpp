@@ -362,6 +362,32 @@ TEST(payload, vt_interface_null_matches_any_interface) {
   EXPECT_TRUE(std::equal(a.span().begin(), a.span().end(), v.span().begin()));
 }
 
+// getIntegralItem czyta pola BYTE/INTEGER tak samo jak getItemVT, tylko bez wariantu - takze
+// element tablicy (indeks plaski), skraje zakresu int i NULL, ktory jest per WPIS deskryptora.
+TEST(payload, integral_item_matches_vt_interface) {
+  const auto desc{rdb::Descriptor("b", 1, 1, rdb::BYTE) +       //
+                  rdb::Descriptor("i", 4, 1, rdb::INTEGER) +    //
+                  rdb::Descriptor("arr", 4, 3, rdb::INTEGER) +  //
+                  rdb::Descriptor("n", 4, 1, rdb::INTEGER)};
+
+  rdb::payload p(desc);
+  p.setItemVT(0, rdb::descFldVT{uint8_t{250}});
+  p.setItemVT(1, rdb::descFldVT{std::numeric_limits<int>::min()});
+  p.setItemVT(2, rdb::descFldVT{-7});
+  p.setItemVT(3, rdb::descFldVT{0});
+  p.setItemVT(4, rdb::descFldVT{std::numeric_limits<int>::max()});
+  p.setItemVT(5, std::nullopt);
+
+  ASSERT_TRUE(p.getIntegralItem(0).has_value());
+  EXPECT_EQ(*p.getIntegralItem(0), int{std::get<uint8_t>(p.getItemVT(0).value())});
+  for (int i = 1; i <= 4; ++i) {
+    ASSERT_TRUE(p.getIntegralItem(i).has_value()) << "slot " << i;
+    EXPECT_EQ(*p.getIntegralItem(i), std::get<int>(p.getItemVT(i).value())) << "slot " << i;
+  }
+  EXPECT_FALSE(p.getItemVT(5).has_value());
+  EXPECT_FALSE(p.getIntegralItem(5).has_value());
+}
+
 // Wartosc bez odpowiednika w typie pola (1e30 do INTEGER, 300.0 do BYTE) zapisuje sie jako
 // NULL - bit w nullBitset i bajty zastepcze, dokladnie jak nullopt - a nie jako liczba
 // nasycona albo przycieta (narrowFloatTo w convertTypes.cc). Obie drogi zapisu naraz.
