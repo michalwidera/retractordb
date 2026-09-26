@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
 #include "rdb/faccfs.hpp"
 
@@ -222,6 +223,44 @@ TEST_F(FaccfsTest, destructor_rotates_file_percounter_zero) {
   }
   EXPECT_FALSE(std::filesystem::exists(path));
   EXPECT_TRUE(std::filesystem::exists(path + ".old0"));
+}
+
+// Rotacja pod numerem, ktory ma juz archiwum, zostawia slad w logu (#281) - jak w faccposix.
+// Pierwsza rotacja pod tym numerem jest kontrola: nie nadpisuje niczego i komunikatu nie ma.
+TEST_F(FaccfsTest, destructor_rotation_overwrite_is_logged) {
+  auto desc                 = makeDesc(AREA_SIZE);
+  auto path                 = sandboxPath("rotate_twice");
+  const std::string archive = path + ".old3";
+  for (int session = 0; session < 2; ++session) {
+    LogCapture log;
+    {
+      rdb::genericBinaryFile gf(path, desc, 3);
+      uint8_t data[10];
+      std::memcpy(data, "rotate dat", AREA_SIZE);
+      gf.write(data);
+    }
+    EXPECT_TRUE(std::filesystem::exists(archive));
+    const bool logged = log.text().find("overwrote existing archive " + archive) != std::string::npos;
+    EXPECT_EQ(logged, session == 1) << "session " << session << ", log: " << log.text();
+  }
+}
+
+// Purge przez write(nullptr, 0) oproznia plik. Warunek galezi purge wymagal dawniej takze
+// recordSize_ == 0 - nieosiagalne, bo write() konczy sie przy zerze FatalError - wiec purge
+// wpadal w zwykly zapis spod nullptr (UB).
+TEST_F(FaccfsTest, purge_empties_file) {
+  auto desc = makeDesc(AREA_SIZE);
+  auto path = sandboxPath("purge_file");
+  rdb::genericBinaryFile gf(path, desc);
+  uint8_t data[10];
+  std::memcpy(data, "purge data", AREA_SIZE);
+  gf.write(data);
+  gf.write(data);
+  ASSERT_EQ(gf.count(), 2U);
+
+  EXPECT_EQ(gf.write(nullptr, 0), EXIT_SUCCESS);
+  EXPECT_EQ(gf.count(), 0U);
+  EXPECT_TRUE(std::filesystem::exists(path));
 }
 
 TEST_F(FaccfsTest, destructor_no_rotation_when_percounter_negative) {

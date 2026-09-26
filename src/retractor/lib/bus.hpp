@@ -286,9 +286,9 @@ class Bus {
   /// magazynu ze wszystkimi zywymi instancjami i -- gdy sa rozlaczne -- zatwierdza wlasny slot.
   /// Roszczenia, rezerwacje, aktywacje i zwolnienia sa serializowane jednym muteksem magistrali.
   ///
-  /// Licznik jest chroniony osobno, bo nie jest nazwa strumienia: PersistentCounter wczytuje
-  /// wartosc przy starcie, a zapisuje ja dopiero w destruktorze, wiec dwie instancje na jednym
-  /// pliku zapisuja te sama wartosc i gubia rotacje. Sciezke normalizuje WOLAJACY -- magistrala
+  /// Licznik jest chroniony osobno, bo nie jest nazwa strumienia: PersistentCounter czyta
+  /// wartosc i zapisuje nastepna bez blokady pliku, wiec dwie instancje na jednym pliku moga
+  /// dostac ten sam numer i nadpisac sobie archiwa. Sciezke normalizuje WOLAJACY -- magistrala
   /// porownuje napisy, a nie pliki.
   ///
   /// Magazyn jest chroniony osobno z tego samego powodu, choc wyglada na pochodna nazwy: klauzula

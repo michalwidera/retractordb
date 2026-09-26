@@ -67,11 +67,27 @@ posixBinaryFile::~posixBinaryFile() {
   if (percounter_ >= 0) {
     std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);
     std::error_code ec;
+    // rename() nadpisuje cel bez pytania. Archiwum juz lezace pod tym numerem znaczy, ze numer
+    // rotacji zostal uzyty drugi raz (np. po recznym usunieciu pliku licznika) - poprzednia
+    // tresc ginie, wiec zostaje przynajmniej slad w logu. Poziom ERROR, a nie WARN, bo Release
+    // wycina WARN juz przy kompilacji (SPDLOG_ACTIVE_LEVEL). Ta sama kontrola stoi przy
+    // pozostalych rotacjach: faccposixshd, faccfs, metaData::rotate.
+    const bool overwrites = std::filesystem::exists(rotated_filename, ec);
     std::filesystem::rename(filename_, rotated_filename, ec);
     if (ec) {
       SPDLOG_ERROR("Failed to rotate file {} to {}: {}", filename_, rotated_filename, ec.message());
+    } else if (overwrites) {
+      SPDLOG_ERROR("Rotation of {} overwrote existing archive {}; its previous content is lost", filename_, rotated_filename);
     }
   }
+}
+
+// Plik usuniety celowo nie jest archiwum. Bez wylaczenia rotacji destruktor probowal
+// przemianowac nieistniejacy plik i logowal falszywe "Failed to rotate" - przy kazdym
+// segmencie groupFile usunietym przez retencje albo purge.
+void posixBinaryFile::discard() {
+  std::filesystem::remove(filename_);
+  percounter_ = -1;
 }
 
 auto posixBinaryFile::name() -> std::string & { return filename_; }
@@ -93,8 +109,11 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> &
   if (fd < 0) return errno;  // Error status
 
   if (ptrData == nullptr && position == 0) {
-    // nullptr, position 0,0 - truncate file.
-    std::filesystem::remove(name());
+    // Purge oproznia plik W MIEJSCU. Dawniej kasowal go po nazwie, a deskryptor zostawal
+    // otwarty: kolejne zapisy szly do skasowanego i-wezla, count() (stat po nazwie) zwracal 0,
+    // odczyt oddawal dane sprzed purge, a przy zamknieciu wszystko ginelo. Porzucenie pliku
+    // razem z obiektem to discard().
+    if (::ftruncate(fd, 0) != 0) return errno;
     return EXIT_SUCCESS;
   }
   if (position == std::numeric_limits<size_t>::max()) {

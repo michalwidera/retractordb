@@ -201,8 +201,13 @@ void metaData::rotate(int percounter) {
   if (percounter >= 0 && !store_.empty() && store_.fileExists()) {
     std::string rotatedPath = std::format("{}.old{}", store_.path(), percounter);
     std::error_code ec;
+    // Nadpisanie istniejacego archiwum zostawia slad w logu - uzasadnienie w faccposix.cc.
+    const bool overwrites = std::filesystem::exists(rotatedPath, ec);
     std::filesystem::rename(store_.path(), rotatedPath, ec);
-    if (ec) SPDLOG_WARN("metaData::rotate: failed to rename '{}' to '{}': {}", store_.path(), rotatedPath, ec.message());
+    if (ec)
+      SPDLOG_WARN("metaData::rotate: failed to rename '{}' to '{}': {}", store_.path(), rotatedPath, ec.message());
+    else if (overwrites)
+      SPDLOG_ERROR("Rotation of {} overwrote existing archive {}; its previous content is lost", store_.path(), rotatedPath);
   }
   reset();
 }

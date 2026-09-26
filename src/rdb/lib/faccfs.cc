@@ -5,6 +5,9 @@
 #include <limits>
 #include <memory>
 #include <system_error>
+
+#include <spdlog/spdlog.h>
+
 #include "fatalError.hpp"
 namespace rdb {
 // https://courses.cs.vt.edu/~cs2604/fall02/binio.html
@@ -28,7 +31,11 @@ genericBinaryFile::~genericBinaryFile() {
   if (percounter_ >= 0) {
     std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);
     std::error_code ec;
+    // Nadpisanie istniejacego archiwum zostawia slad w logu - uzasadnienie w faccposix.cc.
+    const bool overwrites = std::filesystem::exists(rotated_filename, ec);
     std::filesystem::rename(filename_, rotated_filename, ec);
+    if (!ec && overwrites)
+      SPDLOG_ERROR("Rotation of {} overwrote existing archive {}; its previous content is lost", filename_, rotated_filename);
   }
 }
 
@@ -54,7 +61,9 @@ ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool>
   if (recordSize_ == 0) FatalError("genericBinaryFile::write: recordSize_ is zero");
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
-  if (ptrData == nullptr && recordSize_ == 0 && position == 0) {
+  // Purge. Warunek wymagal dawniej takze recordSize_ == 0, czego nie da sie tu spelnic (FatalError
+  // wyzej), wiec purge wpadal w zwykly zapis spod nullptr i po cichu nie robil nic.
+  if (ptrData == nullptr && position == 0) {
     myFile.open(filename_, std::ofstream::out | std::ofstream::trunc);
     if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
     myFile.close();

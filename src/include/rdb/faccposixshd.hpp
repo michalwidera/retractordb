@@ -19,7 +19,8 @@ namespace rdb {
 /// - ignorować parametr nullBitset przy zapisie i czyścić go przy odczycie; obsługa wartości null jest realizowana poza tą klasą,
 /// - implementować interfejs FileInterface,
 /// - udostępniać operację merge(), która scala zmiany z pliku cienia do pliku głównego i zeruje plik cienia,
-/// - w operacji purge wywołanej przez write(nullptr, ..., 0) usuwać zarówno plik główny, jak i plik cienia,
+/// - w operacji purge wywołanej przez write(nullptr, ..., 0) opróżniać w miejscu zarówno plik główny, jak i plik cienia,
+/// - przez discard() usuwać oba pliki i rezygnować z rotacji - dla właściciela, który porzuca plik celowo,
 /// - zwracać przez count() liczbę rekordów wynikającą wyłącznie z rozmiaru pliku głównego,
 /// - raportować przez hasShadow() posiadanie pliku cienia danych, aby storage dobrał wariant indeksu metadanych,
 /// - przy tworzeniu obiektu odtwarzać stan z istniejącego pliku głównego i istniejącego pliku cienia, przycinając niepełne końcówki wpisów,
@@ -61,5 +62,9 @@ class posixBinaryFileWithShadow : public FileInterface {
 
   /// @brief Scala plik cienia z głównym plikiem i usuwa plik cienia
   ssize_t merge();
+
+  /// @brief Usuwa oba pliki i wylacza rotacje w destruktorze (groupFile: retencja i purge).
+  ///        Obiekt nie nadaje sie potem do zapisu.
+  void discard();
 };
 }  // namespace rdb
