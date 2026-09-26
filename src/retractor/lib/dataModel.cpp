@@ -195,43 +195,45 @@ bool dataModel::forwardRecordAvailable(const std::string &instance, const int fo
 bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
   if (qry.lProgram.empty()) return true;
 
-  std::vector<token> arg;
-  std::ranges::copy(qry.lProgram, std::back_inserter(arg));
-  const auto &operation = arg.back();
+  // Te same akcesory co w constructInputPayload(): tokeny i nazwy zrodel przez referencje, bez kopii.
+  const auto arg = [&qry](const int i) -> const token & { return *std::next(qry.lProgram.begin(), i); };
+
+  const auto nameArg = [&arg](const int i) -> const std::string & { return std::get<std::string>(arg(i).getVT()); };
+
+  const auto &operation = qry.lProgram.back();
   const auto cmd        = operation.getCommandID();
 
   bool available = false;
   switch (cmd) {
     case PUSH_STREAM:
-      available = forwardRecordAvailable(operation.getStr_(), logicalIndex);
+      available = forwardRecordAvailable(std::get<std::string>(operation.getVT()), logicalIndex);
       break;
     case STREAM_TIMEMOVE:
-      available = forwardRecordAvailable(arg[0].getStr_(), logicalIndex - std::get<int>(operation.getVT()));
+      available = forwardRecordAvailable(nameArg(0), logicalIndex - std::get<int>(operation.getVT()));
       break;
     case STREAM_DEHASH_MOD:
-      available = forwardRecordAvailable(arg[0].getStr_(), Mod(arg[1].getRI(), qry.rInterval, logicalIndex));
+      available = forwardRecordAvailable(nameArg(0), Mod(arg(1).getRI(), qry.rInterval, logicalIndex));
       break;
     case STREAM_DEHASH_DIV:
-      available = forwardRecordAvailable(arg[0].getStr_(), Div(qry.rInterval, arg[1].getRI(), logicalIndex));
+      available = forwardRecordAvailable(nameArg(0), Div(qry.rInterval, arg(1).getRI(), logicalIndex));
       break;
     case STREAM_SUM:
     case STREAM_AVG:
     case STREAM_MIN:
     case STREAM_MAX:
-      available = forwardRecordAvailable(arg[0].getStr_(), logicalIndex);
+      available = forwardRecordAvailable(nameArg(0), logicalIndex);
       break;
     case STREAM_SUBTRACT:
       available = forwardRecordAvailable(
-          arg[0].getStr_(), Subtract(coreInstance_.getQuery(arg[0].getStr_()).rInterval, operation.getRI(), logicalIndex));
+          nameArg(0), Subtract(coreInstance_.getQuery(nameArg(0)).rInterval, operation.getRI(), logicalIndex));
       break;
     case STREAM_ADD:
-      available = forwardRecordAvailable(arg[0].getStr_(),
-                                         Add(qry.rInterval, coreInstance_.getQuery(arg[0].getStr_()).rInterval, logicalIndex)) &&
-                  forwardRecordAvailable(arg[1].getStr_(),
-                                         Add(qry.rInterval, coreInstance_.getQuery(arg[1].getStr_()).rInterval, logicalIndex));
+      available =
+          forwardRecordAvailable(nameArg(0), Add(qry.rInterval, coreInstance_.getQuery(nameArg(0)).rInterval, logicalIndex)) &&
+          forwardRecordAvailable(nameArg(1), Add(qry.rInterval, coreInstance_.getQuery(nameArg(1)).rInterval, logicalIndex));
       break;
     case STREAM_AGSE: {
-      const auto source         = arg[0].getStr_();
+      const auto &source        = nameArg(0);
       const auto [step, length] = std::get<std::pair<int, int>>(operation.getVT());
       const int sourceWidth     = coreInstance_.getQuery(source).descriptorStorage().flatElementCount();
       const int lengthAbs       = length < 0 ? -length : length;
@@ -240,9 +242,9 @@ bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
       available                 = forwardRecordAvailable(source, firstRecord) && forwardRecordAvailable(source, lastRecord);
     } break;
     case STREAM_HASH: {
-      int forwardIndex  = 0;
-      const auto first  = arg[0].getStr_();
-      const auto second = arg[1].getStr_();
+      int forwardIndex   = 0;
+      const auto &first  = nameArg(0);
+      const auto &second = nameArg(1);
       const bool takeSecond =
           Hash(coreInstance_.getQuery(first).rInterval, coreInstance_.getQuery(second).rInterval, logicalIndex, forwardIndex);
       available = forwardRecordAvailable(takeSecond ? second : first, forwardIndex);
@@ -526,7 +528,9 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
     case STREAM_MAX: {
       const auto &nameSrc = nameArg(0);
 
-      *runtime.inputPayload = streamRuntime(nameSrc).reduceFieldsToPayload(cmd, qry.id + "_0");
+      // Nazwa pola wyniku to qry.id + "_0" - payload wejsciowy juz ja niesie (query::descriptorFrom
+      // buduje dla reduktora jedno pole o tej nazwie), wiec nie sklejamy jej od nowa w kazdym takcie.
+      *runtime.inputPayload = streamRuntime(nameSrc).reduceFieldsToPayload(cmd, runtime.inputPayload->descriptor[0].rname);
     } break;
     case STREAM_SUBTRACT: {
       //  :- PUSH_STREAM(core0)
