@@ -161,7 +161,7 @@ Phase numbering follows the roadmap in `design/`.
 | **J2** | `Window`, DLPack export, `torch.utils.data.IterableDataset` | J1 - **done** (copy, not zero-copy: §4) |
 | **J3** | `KeyboardInterrupt` during `run()`, logging bridge to the `logging` module | J1 - **done** |
 | **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | J2 - build environment (§8) and local wheel build (§9) in place; no CI job, nothing on PyPI |
-| **J5** | Colab notebook, CI smoke test against the built wheel | J4 - a local notebook exists (`api/python/notebooks/j1_engine.ipynb`); the CI smoke test waits for J4 |
+| **J5** | Colab notebook, CI smoke test against the built wheel | J4 - notebook and smoke test in place (§10); no CI job, not yet run on Colab itself |
 | **J6** | Push ingest from Python, which turns a notebook into the engine's test harness | core phase 4 - not started |
 
 Three decisions from that document are worth restating because they constrain the
@@ -261,8 +261,9 @@ has the reasons and §4 what remains owed.
 shares *that* array; the engine's own memory is never handed out. That is the v1 decision from
 §4, taken deliberately, and it is what makes a tensor safe to keep across `step()`.
 
-**J4 builds wheels locally (§8, §9); J5 and J6 are not started.** No CI job builds the
-wheels yet, nothing is on PyPI, there is no CI smoke test and no ingest.
+**J4 builds wheels locally (§8, §9), J5 has its notebook and smoke test (§10); J6 is not
+started.** No CI job builds the wheels or runs the smoke test yet, nothing is on PyPI, and
+there is no ingest.
 `api/python/pyproject.toml` still installs the client half only; the wheel comes from
 the root `pyproject.toml`.
 
@@ -375,9 +376,69 @@ print(rdb.Engine)
 ```
 
 The install plus import should take under about 20 seconds and must not ask for a
-runtime restart (§4).
+runtime restart (§4). `api/python/notebooks/colab_quickstart.ipynb` (§10) makes the same
+check in its first cell and then runs the J1-J3 flow; uploading it together with the
+wheel is the fuller version of this test.
 
 What J4 still lacks: a CI job that runs `build-wheels.sh` and keeps the wheels (it
 needs the images on Docker Hub), reserving and publishing the `retractordb` name on
-PyPI, macOS wheels, and a way to configure without valgrind for wheel builds outside
-the image.
+PyPI (still free on 2026-09-25), macOS wheels, and a way to configure without valgrind
+for wheel builds outside the image.
+
+## 10. J5: the Colab notebook and its smoke test
+
+`api/python/notebooks/colab_quickstart.ipynb` is the notebook a Colab user opens. Unlike
+`j0_storage.ipynb` and `j1_engine.ipynb` it does not look for a build tree: its first cell
+installs the package with `%pip` and times the install plus import, which is the §4
+acceptance criterion. Until the package is on PyPI the cell takes a wheel instead of the
+name - `WHEEL = '/content/retractordb-*-cp312-abi3-*_x86_64.whl'` after an upload, or the
+`RDB_WHEEL` environment variable. The rest is the roadmap's §5.5 flow: a noisy sine
+written with numpy as the plan's `FILE` source, `AVG(v:100)` over it, `window()` into
+`torch.from_dlpack`, and a `StreamDataset` feeding a `DataLoader` while the engine keeps
+advancing between epochs. One cell asserts the engine's moving average against numpy's
+over the same input, so the notebook is a test and not only a demonstration.
+
+`docker/wheel/notebook-smoke.sh` executes that notebook against a built wheel, the way
+Colab would:
+
+```bash
+docker run --rm -v "$PWD:/src:ro" python:3.12-slim bash /src/docker/wheel/notebook-smoke.sh
+docker/wheel/notebook-smoke.sh [wheel]    # or on any Linux host with python3.12
+```
+
+It builds a clean venv holding what Colab runtime 2026.07 ships - Python 3.12, numpy
+2.0.2, torch 2.11.0, a Jupyter kernel - runs every cell with `nbclient`, and fails on any
+of three things:
+
+| Check | What a failure means |
+|---|---|
+| A cell raises | the wheel does not load, or the J1-J3 flow broke on the installed package |
+| `pip freeze --all` after the run differs from before by anything but an added `retractordb` | the wheel's requirements force an upgrade or reinstall - in Colab, a runtime restart |
+| The install cell takes over 20 s | the §4 budget |
+
+`nbclient` rather than papermill: the wheel reaches the notebook through `RDB_WHEEL`, so
+nothing is injected and the file executed is exactly the one a user opens. torch comes
+from the PyTorch CPU index by default (about 200 MB instead of the CUDA stack);
+`RDB_TORCH_INDEX=` takes it from PyPI instead.
+
+**First runs** (2026-09-25 and 26):
+
+| Wheel | Where | Result |
+|---|---|---|
+| x86_64 `cp312-abi3` | Ubuntu 24.04 container, Python 3.12.3, torch 2.11.0 from PyPI (`+cu130`, CPU only at run time) | all cells pass; install plus import 1.0 s; pip added only `retractordb`; five epochs over 5801 to 9801 windows, MSE 0.0026 down to 0.00006 |
+| aarch64 `cp312-abi3` | the `docker run python:3.12-slim` line above on Apple silicon (linux/arm64), Python 3.12.14, torch 2.11.0 from the default CPU index | all cells pass; install plus import 0.4 s; pip added only `retractordb`; the same five epochs and MSE as on x86_64 |
+| aarch64 `cp310` | Ubuntu 22.04 VM, Python 3.10.12, no torch | the install, signal and plan cells pass; in place of the torch cells, the same window and moving-average checks through `numpy.from_dlpack` pass too |
+
+The checks were also run against deliberately broken wheels, and each one fails as it
+should: a wheel requiring `numpy>=2.1` is rejected, the freeze diff showing numpy 2.0.2
+replaced by 2.5.3; a wheel without `_core` stops at the install cell with the package's
+`ImportError`; and the budget lowered to 0.5 s trips the time check.
+
+Not yet verified: the default torch source for x86_64 (the x86_64 run above used
+`RDB_TORCH_INDEX=`, because download.pytorch.org was unreachable from that machine), and a
+run on Colab.
+
+What J5 still lacks: a CI job that runs `notebook-smoke.sh` on the x86_64 wheel from J4's
+CI job, and one run on Colab by a human - upload the notebook and the wheel, run all.
+Once the notebook is on `master` of the public repository it also opens directly at
+`https://colab.research.google.com/github/michalwidera/retractordb/blob/master/api/python/notebooks/colab_quickstart.ipynb`.

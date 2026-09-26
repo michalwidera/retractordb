@@ -120,3 +120,4 @@ torch, and only when you import it. `DataLoader(..., num_workers=0)`: the engine
 does not survive `fork`.
 
 `notebooks/j1_engine.ipynb` walks through the same flow against a build tree.
+`notebooks/colab_quickstart.ipynb` does it from an installed wheel, the way Google Colab runs it.
