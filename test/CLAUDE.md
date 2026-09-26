@@ -89,3 +89,7 @@ ninja && ninja install && cmake . && ninja && ctest
 
 One directory is deliberately exempt: `service_idle` gets `$<TARGET_FILE:xretractor>` as its first script argument and never calls `xretractor` from `PATH`. Its three tests assert service-mode INFO markers, which `SPDLOG_ACTIVE_LEVEL` strips in Release - so a Release copy left in `~/.local/bin` (a build of ablation profiles is enough) made them fail with an empty `stderr.txt`, and the symptom read as an engine regression. Everything else in the tree still uses the installed binary.
 
+### Ablation: shape and value in separate tests
+
+Under the all-off ablation build (*Ablation floor* in the root `CLAUDE.md`) only an assertion that a pass **fired** may be disabled. A ctest entry that also asserts the computed result has to be split, because a single `DISABLED` takes the result assertion down together with the shape assertion. `it_issue202_hash_shift_e2e` is the worked example, split on 2026-09-06 into `-shape` and `-value`: its one `cmp matched CC` pinned `Val` and `Lat` at the same time, so it could never be green under ablation, and disabling it removed the only end-to-end place where the tail divergence between `(A>2)#(B>1)` and `(A#B)>3` was visible at all.
+

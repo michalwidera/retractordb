@@ -4,7 +4,7 @@ These instructions apply to the whole RetractorDB repository. They assume the re
 
 ## Required context
 
-1. Read `CLAUDE.md` in full before working with code, tests, build files, or documentation. It is the single source for build commands, testing, code style, integration-test sync traps, ANTLR4 grammar pitfalls, collaboration rules, commit/push/CI policy, and the AI-watermark hygiene procedure - all mandatory.
+1. Read `CLAUDE.md` in full before working with code, tests, build files, or documentation. It is the single source for build commands, testing, code style, collaboration rules, commit/push/CI policy, and the AI-watermark hygiene procedure - all mandatory. Area-specific pitfalls live next to the code and are not loaded automatically outside Claude Code: read `src/retractor/lib/CLAUDE.md` before touching the RQL grammar or parser, and `test/CLAUDE.md` before touching the test tree.
 
 2. Use the `retractordb-system` skill from the sibling `knowledge-index` repository for every RetractorDB task. The `.agents/skills/retractordb-system` path in this repository is only a relative symbolic link to that checkout.
 3. Run the skill's `scripts/check_freshness.sh` before relying on its indexed notes.
