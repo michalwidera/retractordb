@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file is the binding source for build, testing, style, collaboration, and commit/push/CI rules. `AGENTS.md` adds the agent-facing entry points it does not duplicate: the indexed system knowledge in the sibling `knowledge-index` repository (referenced here through `.agents/skills/retractordb-system`), and `scripts/install-codex-skill.sh`, which installs that external skill for other workspaces.
+This file is the binding source for build, testing, style, collaboration, and commit/push/CI rules. Area-specific pitfalls live next to the code (see the last section). `AGENTS.md` adds only the entry point to the external `retractordb-system` skill in the sibling `knowledge-index` repository.
 
 ## Build
 
@@ -23,25 +23,25 @@ Options chain: `scripts/buildrdb.sh conan ninja debug`
 ```bash
 ninja               # build
 ninja install       # install to ~/.local/bin (prefix auto-defaults to ~/.local - no sudo)
-ninja test          # unit + integration, bez valgrinda
-ninja test-valgrind # kontrola pamieci lokalnie (Linux)
+ninja test          # unit + integration, without Valgrind
+ninja test-valgrind # unit tests + `-vg-` integration checks under Valgrind (Linux)
 ninja cformat       # format C++/CMake sources
 ninja descgrammar   # regenerate ANTLR4 grammar from DESC.g4
 ninja rqlgrammar    # regenerate ANTLR4 grammar from RQL.g4
 ```
 
-**macOS** (sprawdzone tylko na Apple silicon z macOS 27 i Apple clang 21; Intel i starsze wydania nietestowane. Xcode 16.3+ CLT i deployment target 14.4+ to minimum wymuszone przez `std::print`, nie konfiguracja sprawdzona):
+**macOS** (verified only on Apple silicon with macOS 27 and Apple clang 21; Intel and older releases untested. Xcode 16.3+ CLT and deployment target 14.4+ are the minimum forced by `std::print`, not a verified configuration):
 ```bash
-scripts/macos-build.sh          # jeden przebieg: konfiguracja + budowa + install + ctest, log w build/macos-build.log
+scripts/macos-build.sh          # one pass: configure + build + install + ctest, log in build/macos-build.log
 scripts/macos-build.sh release
 scripts/macos-build.sh --sanitize   # -DRDB_SANITIZE=address,undefined
 ```
-`scripts/buildrdb.sh` dziala tam tak samo, tylko `toolchain` instaluje przez Homebrew. Roznice, o ktorych trzeba wiedziec czytajac wynik:
-- **Valgrinda nie ma** na Apple silicon i nie bedzie. `ninja test` uruchamia binaria wprost na kazdej platformie; rownowaznikiem lokalnego `test-valgrind` jest konfiguracja `-DRDB_SANITIZE=address,undefined`.
-- **Czas rzeczywisty jest slabszy z zasady**: SCHED_FIFO obejmuje WATEK, nie proces (`sched_setscheduler` nie istnieje), masek powinowactwa nie ma wcale, `mlockall` zglasza ENOSYS, a odpowiednika PREEMPT_RT nie ma. macOS jest platforma rozwojowa i testowa, nie pomiarowa - bramka badawcza (`ninja test_gate`) tego nie zmienia.
-- **Usluga to launchd, nie systemd**: `restartCommand` sklada `launchctl kickstart -k`, tozsamosc jednostki bierze sie z `XPC_SERVICE_NAME`, a pakiet nie niesie zadnej jednostki `.service`.
-- **Wybor galezi platformowej** nie zapada po nazwie systemu, tylko przez `RDB_HAS_*` z `generated/platformConfig.h` (probe kompilacyjne w `cmake/PlatformChecks.cmake`). Nowy kod platformowy pisze sie tak samo: `#if RDB_HAS_X`, nigdy `#ifdef __APPLE__`.
-- **Galaz zapasowa tylko z deklaracji**: proba, ktorej 0 wybiera slabsza galaz, musi to 0 miec zadeklarowane w `RDB_PLATFORM_FALLBACKS` (na Linuksie lista jest pusta, na Darwinie zawiera zera zmierzone na Apple silicon); kazde niezadeklarowane 0 zatrzymuje konfiguracje. Nowa galaz zapasowa oznacza nowa pozycje na liscie kontrolowanych prob w `cmake/PlatformChecks.cmake`.
+`scripts/buildrdb.sh` works the same there, except that `toolchain` installs through Homebrew. Differences to keep in mind when reading results:
+- **No Valgrind** on Apple silicon, and there will not be one. `ninja test` runs the binaries directly on every platform; the equivalent of a local `test-valgrind` is a `-DRDB_SANITIZE=address,undefined` build.
+- **Real time is weaker by design**: SCHED_FIFO applies to a THREAD, not the process (`sched_setscheduler` does not exist), there are no affinity masks at all, `mlockall` reports ENOSYS, and there is no PREEMPT_RT counterpart. macOS is a development and test platform, not a measurement one - the research gate (`ninja test_gate`) does not change that.
+- **The service is launchd, not systemd**: `restartCommand` builds `launchctl kickstart -k`, the unit identity comes from `XPC_SERVICE_NAME`, and the package ships no `.service` unit.
+- **The platform branch is chosen** not by OS name but through `RDB_HAS_*` from `generated/platformConfig.h` (compile probes in `cmake/PlatformChecks.cmake`). New platform code follows the same rule: `#if RDB_HAS_X`, never `#ifdef __APPLE__`.
+- **A fallback branch only by declaration**: a probe whose 0 selects the weaker branch must have that 0 declared in `RDB_PLATFORM_FALLBACKS` (empty on Linux; on Darwin it holds the zeros measured on Apple silicon); any undeclared 0 stops the configuration. A new fallback branch means a new entry in the list of controlled probes in `cmake/PlatformChecks.cmake`.
 
 **CI locally, before pushing** (`scripts/test-ci.sh`, needs a running Docker):
 ```bash
@@ -60,9 +60,9 @@ ctest -R '^ut_payload$'     # plain test by exact name
 ctest -R '^ut_payload$' -V  # verbose
 ```
 
-Unit tests run directly in `ninja test`. `ninja test-valgrind` repeats them under Valgrind with leak checking and includes the nine integration memory checks. The commit workflow skips Valgrind; `run_manual_nightly_full` runs it once in Debug - so `ninja test-valgrind` is run locally before every push and session end (see Session end). Plain `ctest` runs all registered groups; use `ctest -LE valgrind` to match the ordinary CI step.
+Unit tests run directly in `ninja test`. `ninja test-valgrind` repeats them under Valgrind with leak checking and adds the `-vg-` integration memory checks (ctest label `valgrind`). When each must be run is in *Session end*. Plain `ctest` runs all registered groups; use `ctest -LE valgrind` to match the ordinary CI step.
 
-CI: CircleCI, branches `master` or `issue_*`.
+CI: CircleCI. A push runs only the `commit` workflow, and only on branches `master`, `issue_*` / `Issue_*` and `<number>-*` (`.circleci/config.yml`); other branches (`dev/*`, `fix/*`, ...) trigger nothing.
 
 ## Architecture
 
@@ -82,7 +82,7 @@ CI: CircleCI, branches `master` or `issue_*`.
 **`retractor` library** (`src/retractor/lib/`):
 - `qTree` - topologically sorted `std::vector<query>`. Central structure for compile + execution.
 - `query` / `token` / `field` - query representations parsed from `.rql`.
-- `compiler` - passes: simplify → prepare fields → replicate indexes → convert refs → apply constraints → fill buffer sizes.
+- `compiler` - a chain of about twenty passes: name and interval resolution, stream expansion, optimizer rewrites behind `RDB_OPT_*`, field shape inference, startup latency, constraints. The authoritative order is `compiler::compile()` in `compiler.cpp`.
 - `dataModel` - owns all `streamInstance` objects; drives per-interval processing.
 - `streamInstance` - per stream: `outputPayload` (stored) + `inputPayload` (computed from FROM).
 - `executorsm` - dual-threaded: processing loop + comms thread (shared memory / boost IPC).
@@ -119,7 +119,7 @@ Sorted case-insensitively within each block. `IncludeBlocks: Preserve` - blank l
 
 ## Code Guidelines
 
-1. **Ask before implementing** - state assumptions, surface ambiguities, push back on overcomplicated requests.
+1. **State assumptions first** - surface ambiguities, push back on overcomplicated requests. Whether to wait for approval before writing code is decided by the *Planning threshold* (Session start).
 2. **Minimum code** - no speculative features, no single-use abstractions, no impossible-scenario error handling.
 3. **Surgical edits** - touch only what the task requires; don't improve adjacent code even if it looks wrong; match existing style. Report what looks wrong at the end of the task, with file and line and one sentence on why. Whether it gets fixed is the human's decision; fixing it is a separate task and needs a separate go-ahead.
 4. **Clean your orphans** - remove imports/vars/functions YOUR changes made unused; leave pre-existing dead code alone.
@@ -129,20 +129,22 @@ Sorted case-insensitively within each block. `IncludeBlocks: Preserve` - blank l
 
 **The corpus is `paper-arXiv/usecases`, not one or two convenient plans.** Every performance claim about the engine - a candidate optimization, a regression, an A/B between two commits - is measured on the eight use-case families `uc01`..`uc08` in the sibling `paper-arXiv` repository. Each family carries its own `generate_data.py` and `rql/query.rql`; plans span 7-23 nodes and, more importantly, differ in the SHAPE of the computation: record windows, stream generators, multi-rate joins, rules. The ECG pipeline in `examples/ecg` and the single-node ADD plan stay usable as quick probes, but a verdict does not rest on them.
 
-**Two workloads are not a sample - this was paid for.** Issue #272 (2026-09-23) measured the handle-table change on the ADD plan and the ECG pipeline alone, found -5,5 % and -5,9 % instructions for -0,38 % and -0,65 % time, and published a methodological conclusion about the instruction-to-time converter. Extending to the eight families retracted it: both of those workloads sit at the BOTTOM of the ten-workload spread, the converter ranged 0,00 (uc05) to 0,36 (uc06), and the top of the corpus gained 1,5 %, over twice what ECG showed. The converter is a property of the PAIR (change, workload) and says nothing on its own. `uc05` is the standing counterexample to reading a time gain off an instruction count: -3,65 % instructions, exactly zero time.
+**Two workloads are not a sample.** Issue #272 drew a conclusion about the instruction-to-time converter from the ADD plan and ECG alone; the eight families retracted it - both sat at the bottom of the spread, and the converter ranged 0,00 (uc05) to 0,36 (uc06). The converter is a property of the PAIR (change, workload) and says nothing on its own; `uc05` is the standing counterexample: -3,65 % instructions, exactly zero time.
 
 Run one family from a FRESH copy of its directory with an empty `temp/`:
 
 ```bash
+cmake --build build/Release-Probe   # `ninja` in build/Release does NOT rebuild it
 python3 <usecases>/ucNN/generate_data.py --out "$work"
 cp <usecases>/ucNN/rql/query.rql "$work/query.rql"
+cp build/Release-Probe/src/retractor/xretractor "$work/xretractor"   # RDB_BENCH_* need the probe build
 mkdir -p "$work/temp" && cd "$work"
-RDB_BENCH_PLAN=1 xretractor query.rql -k -r -f -m 1   # plan node count: row 'PLAN bench', field 'wyjscie'
+RDB_BENCH_PLAN=1 ./xretractor query.rql -k -r -f -m 1   # plan node count: row 'PLAN bench', field 'wyjscie'
 valgrind --tool=callgrind --toggle-collect='*processRows*' ./xretractor query.rql -k -r -f -m 2000
 RDB_BENCH_CSV=out.csv ./xretractor query.rql -k -r -f -m 100000
 ```
 
-Sources wrap past end of input, so `-m` is free; 100k slots costs 5-6 s on the heaviest family. The apparatus traps - one fixed working directory, one fixed binary name, `build/Release-Probe` rebuilt separately from `build/Release` - are in the `callgrind-ab-comparison-traps` note and apply here unchanged.
+Sources wrap past end of input, so `-m` is free; 100k slots costs 5-6 s on the heaviest family. In an A/B both sides run from the same `$work` path under the same binary name: path length and `argv[0]` alone shift the callgrind count by about 1 %.
 
 **Publication embargo.** The corpus is unpublished material awaiting the DEBS submission (`paper-arXiv/debs`). Nothing FROM it leaves this machine: no plan text, no generated data, no generator source, no README prose - not into this repository, not into an issue comment, not into any artifact that gets published. What may be published, and is expected in issue comments, is a REFERENCE to a family by id and domain (`uc02`, mikrosiec) together with measurements DERIVED from it: node counts, instruction counts, times, p-values. The embargo lifts when the paper is out; until then, treat a request to include corpus content as a question for the human.
 
@@ -161,7 +163,7 @@ ninja cformat     # format the tree as found, so later reformatting does not pol
 ctest -R ...      # relevant tests must pass
 ```
 
-Never start a new topic on top of unrelated uncommitted work.
+Never start a new topic on top of unrelated uncommitted work. That includes whatever the initial `ninja cformat` changed: hand it over as a separate formatting diff before starting the topic.
 
 **Planning threshold** - one rule for the whole session:
 - **3 or more files** - present a plan with success criteria and wait for approval before writing any code.
@@ -175,7 +177,7 @@ Tool: `watermarks-remover` (default `~/github/watermarks-remover`), used through
 
 **Mandatory sequence before every commit and before every push.** No commit or push goes out - and no diff is handed over for human review - while the check reports a hit.
 
-The command sequence - staged-file scan, per-file report, cleaning, re-check and re-stage, plus the whole-tree variant for a push and the commit-message check - is in the `watermark-check` skill. Invoke it before committing and before pushing.
+The command sequence - staged-file scan, per-file report, cleaning, re-check and re-stage, plus the whole-tree variant for a push and the commit-message check - is in the `watermark-check` skill (`.claude/skills/watermark-check/SKILL.md`). Invoke it before committing and before pushing.
 
 **Markdown exception:** The warning icon in `README.md` immediately before `**This is work in progress:**` contains `U+FE0F VARIATION SELECTOR-16`. This exact icon is intentional and must remain unchanged. If a strict scan reports it, verify its location and codepoint; every other reported hit still needs investigation. The default staged-file scan does not flag this emoji.
 
@@ -199,48 +201,39 @@ python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
 
 ### Commits, push and CI
 
-- **No commit is created without human review - on any branch, `master` and side branches alike.** After verification the assistant shows the diff and stops. The human reads it and gives the go-ahead; only then does `git commit` run. Verification passing is not the go-ahead: green tests say the change works, not that it is the change the human wants in the history.
-- **`master` in the code repository** - commits and pushes are performed by the human only.
-- **Side branches** - the assistant may run `git commit` locally, but only on an explicit go-ahead for that specific diff, and provided no CI process is triggered. Approval is per diff and does not carry over to the next change.
-- Permission to commit on a side branch does not include permission to push, open a pull request, or invoke CI manually. Those actions require an explicit human request.
-- If an action would trigger CI, stop and hand it over to the human.
+- **No commit without human review, on any branch.** After verification the assistant shows the diff and stops; `git commit` runs only after an explicit go-ahead for that specific diff, and the go-ahead does not carry over to the next change. Green tests are not the go-ahead: they say the change works, not that it is the change the human wants in the history.
+- **`master`** - commits and pushes are performed by the human only.
+- **Side branches** - the assistant may commit locally on that go-ahead. Pushing, opening a pull request or invoking CI needs a separate explicit request; anything that would trigger CI is handed over to the human.
 
 ### Session end
 
 Every session ends with either a local commit on a side branch made on an explicit go-ahead, a handoff of the uncommitted diff for human review/commit/push, or an explicit note why no commit was created. No unexplained uncommitted progress is left behind.
 
-**Research gate - mandatory before closing.** Whenever the session touched engine sources (`src/`), run the gate and report its verdict before the commit or the handoff:
+**Checks before the commit, the handoff and every push.** Run from `build/Debug` and report each result:
+
+| Check | When |
+|-------|------|
+| `ninja test` | always |
+| `ninja test-valgrind` | always; on macOS a full `ctest` in a `-DRDB_SANITIZE=address,undefined` build instead |
+| `ninja test_gate` | the session touched engine sources (`src/`); otherwise say explicitly that it was skipped and why |
+| ablation floor (below) | the session touched an optimizer pass |
+
+A red result, a Valgrind error or leak, or an unreported check stops the commit, the handoff and the push, and goes to the human - never suppressed or worked around.
+
+**Why Valgrind runs locally.** The commit workflow on CircleCI does not run Valgrind (executor resource limits); only `run_manual_nightly_full` does, so without the local run a memory defect can sit in the history for up to two weeks.
+
+**Research gate.** Deliberately outside `ninja` and `ninja test` (see `test/research_gate/README.md`), so nothing runs it implicitly. It is directional: a result worse than the reference is an **error**; equal passes; better passes and is recorded. A skipped level (missing or stale H9 ablation profiles) counts as *not run*, never as passed - report it as such.
+
+**Ablation floor.** The `RDB_OPT_*` switches must not change what the engine computes, only how fast it gets there, and that invariant rots silently (the `>N` tail rule change of 2026-08-07 broke it unnoticed for twelve days). Whenever the session touched `src/retractor/lib/compiler.cpp`, the startup-latency or tail rules (`SOperations.hpp`, `computeStartupLatency`), or any code behind an `RDB_OPT_*` switch, build the all-off configuration and run the full suite:
 
 ```bash
-ninja test_gate          # from build/Debug or build/Release
+scripts/buildrdb.sh release-ablation     # interactive: set every RDB_OPT_* switch OFF, probe OFF
+ctest --test-dir <directory printed by the script>/test -j 4
 ```
 
-It is deliberately outside `ninja` and `ninja test` (see `test/research_gate/README.md`), so nothing runs it implicitly. It is directional: a result worse than the reference is an **error** and stops the work; equal passes; better passes and is recorded. A skipped level (missing or stale H9 ablation profiles) counts as *not run*, never as passed - report it as such. No commit and no handoff goes out with an unreported or failing gate; a red gate is handed to the human, not worked around.
+Success is **the whole suite green** - no failure, and no `DISABLED` beyond the ones the tree already carries. Any difference the switches do show belongs in `def:observable`: `Val` must be equal, `Lat` only non-increasing (`paper-arXiv/debs/research_plan.md` §14.20). CI runs the same floor as `ablation-all-off` in `manual-nightly-full` on the 5th and 20th of every month - up to two weeks too late to replace the local run.
 
-Sessions that touched only tests, scripts or documentation do not need the gate - say explicitly that it was skipped and why.
-
-**Valgrind check - mandatory before every push and before closing.** The commit workflow on CircleCI no longer runs Valgrind (executor resource limits); only the periodic `run_manual_nightly_full` does, so a memory defect can sit unnoticed in the history for up to two weeks. The local run is therefore the only check between a change and the nightly one. Before every push and before the commit or the handoff at session end, run all three from `build/Debug` and report each result:
-
-```bash
-ninja test           # unit + integration
-ninja test_gate      # research gate (see above for when it applies)
-ninja test-valgrind  # unit tests under Valgrind with leak checking + integration memory checks
-```
-
-A Valgrind error or leak is a failure like a red test: it stops the push and the handoff and goes to the human, never suppressed or worked around. On macOS, where Valgrind does not exist, the equivalent is a full `ctest` in a `-DRDB_SANITIZE=address,undefined` build.
-
-**Ablation floor - mandatory when the session touched an optimizer pass.** The `RDB_OPT_*` switches must not change what the engine computes, only how fast it gets there. That invariant rots silently: the matrix broke with the `>N` tail rule change of 2026-08-07 and nobody noticed for twelve days, because `manual-ablation` runs only by hand. Whenever the session touched `src/retractor/lib/compiler.cpp`, the startup-latency or tail rules (`SOperations.hpp`, `computeStartupLatency`), or any code behind an `RDB_OPT_*` switch, build the all-off configuration and run the full suite before the commit or the handoff:
-
-```bash
-scripts/buildrdb.sh release-ablation     # interactive: set all five switches OFF, probe OFF
-ctest --test-dir <katalog wypisany przez skrypt>/test -j 4
-```
-
-Success is **the whole suite green** - no failure, and no `DISABLED` beyond the ones the tree already carries. The switches are an efficiency knob, not a semantics knob, and any difference they do show belongs in `def:observable`: `Val` must be equal, `Lat` only non-increasing (see `research_plan.md` §14.20).
-
-One kind of assertion cannot hold without the pass: the one saying that the pass **fired** - a substrate name, a `PUSH_STREAM` target, the absence of a substrate the pass was supposed to absorb. With the switch off that assertion is tautologically false, not red, and it may carry `DISABLED TRUE` guarded by `if(NOT RDB_OPT_...)` and labelled `expected_ablation_failure;requires_<switch>`. **Nothing else may.** An assertion about the computed result - payload bytes, metadata, a value against an oracle - is never disabled: a red `Val` under ablation is a semantics regression or an open finding, and it goes to the human. Never paper one over with `WILL_FAIL` or `DISABLED` - the matrix already carries a note from 2026-07-26 explaining why those annotations were removed.
-
-A test mixing both kinds in one ctest entry has to be split, because a single `DISABLED` then takes the result assertion down together with the shape assertion. `issue202_hash_shift_e2e` is the worked example, split on 2026-09-06 into `-shape` and `-value`: its one `cmp matched CC` pinned `Val` and `Lat` at the same time, so it could never be green under ablation, and disabling it removed the only end-to-end place where the tail divergence between `(A>2)#(B>1)` and `(A#B)>3` was visible at all. CI runs this same floor as `ablation-all-off` in layer L2 of `manual-nightly-full`, which the `cron-shedule` trigger starts on the 5th and 20th of every month, so a skipped local run gets caught at the next of those runs - up to about two weeks later, which is why the local run is not optional.
+Only one kind of assertion may be disabled under ablation: the one saying that the pass **fired** - a substrate name, a `PUSH_STREAM` target, the absence of a substrate the pass was supposed to absorb. With the switch off it is tautologically false, not red, and it may carry `DISABLED TRUE` guarded by `if(NOT RDB_OPT_...)` and labelled `expected_ablation_failure;requires_<switch>`. **Nothing else may.** An assertion about the computed result - payload bytes, metadata, a value against an oracle - is never disabled: a red `Val` under ablation is a semantics regression or an open finding, and it goes to the human. Never paper one over with `WILL_FAIL` or `DISABLED` - the matrix carries a note from 2026-07-26 explaining why those annotations were removed. A ctest entry mixing both kinds must be split; see *Ablation: shape and value in separate tests* in `test/CLAUDE.md`.
 
 ### Context hygiene
 
@@ -254,9 +247,9 @@ When any of these occur, say explicitly:
 
 Then suggest either: (a) commit current state and end the session, or (b) defer remaining work to a new session with a fresh context.
 
-## ANTLR4 Grammar - Known Pitfalls
+## Area-specific pitfalls
 
-Moved next to the code they govern, so they load when those files are in play:
+Kept next to the code they govern. Claude Code loads them when files in that directory are in play; other agents read them before touching the area:
 
-- `src/retractor/lib/CLAUDE.md` - COMMA ambiguity in `select_list`, adding a scalar function, Descriptor field sizes for STRING expressions in SELECT.
-- `test/CLAUDE.md` - integration test file sync: cmake copy timing, reconfigure wiping unit-test binaries, installed-binary vs build-copied script.
+- `src/retractor/lib/CLAUDE.md` - RQL grammar and parser: COMMA ambiguity in `select_list`, adding a scalar function, Descriptor field sizes for STRING expressions in SELECT.
+- `test/CLAUDE.md` - test tree: integration test file sync and reconfigure wiping unit-test binaries, the `add_test` semicolon trap, `compare.sh`, CI failure reports, fault hooks for races, namespaces, installed binary vs build-copied script, splitting shape and value assertions for ablation.
