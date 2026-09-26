@@ -846,7 +846,7 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
       } break;
       case PUSH_ID: {
         if (payload == nullptr) throw std::runtime_error("PUSH_ID: payload is null");
-        auto instancePosition = get<std::pair<std::string, int>>(tk.getVT());
+        const auto &instancePosition = get<std::pair<std::string, int>>(tk.getVT());
         // P1-E1: odczyt wprost do wariantu (getItemVT) - bez posrednika std::any
         // i any_to_variant_cast. Parytet z getItem potwierdzony w test_payload.
         auto valueOpt = payload->getItemVT(instancePosition.second);

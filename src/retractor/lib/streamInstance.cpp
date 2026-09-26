@@ -570,9 +570,8 @@ void streamInstance::constructRulesAndUpdate(const query &qry) {
     // Regula dolaczona ad-hoc jest nieuzbrojona, dopoki nie zbierze wlasnej historii -
     // patrz rule::armAtCount. Reguly z planu maja tam zero i wchodza od razu.
     if (outputPayload->getRecordsCount() < r.armAtCount) continue;
-    auto condition = r.condition;
     expressionEvaluator expression;
-    auto result = expression.eval(condition, &payload);
+    auto result = expression.eval(r.condition, &payload);
     if (boolCast(result)) {
       if (r.action == rule::DUMP) {
         dumpMgr.registerTask(qry.id, dumpTask(r.name, r.dumpRange, r.dump_retention));
