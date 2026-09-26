@@ -144,6 +144,13 @@ posixBinaryFileWithShadow::~posixBinaryFileWithShadow() {
   }
 }
 
+// Plik porzucony celowo nie jest archiwum - uzasadnienie przy posixBinaryFile::discard.
+void posixBinaryFileWithShadow::discard() {
+  std::filesystem::remove(filename_);
+  std::filesystem::remove(shadowName());
+  percounter_ = -1;
+}
+
 auto posixBinaryFileWithShadow::name() -> std::string & { return filename_; }
 
 ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/,
@@ -151,9 +158,10 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
   if (fd < 0) return errno;
 
   if (ptrData == nullptr && position == 0) {
-    // Truncate - czyści oba pliki
-    std::filesystem::remove(name());
-    std::filesystem::remove(name() + ".shadow");
+    // Purge oproznia oba pliki W MIEJSCU - uzasadnienie przy posixBinaryFile::write. Tu
+    // dodatkowo stary wpis cienia przeslanial po purge nowy rekord na tej samej pozycji.
+    if (::ftruncate(fd, 0) != 0) return errno;
+    if (::ftruncate(fd_shadow, 0) != 0) return errno;
     return EXIT_SUCCESS;
   }
 

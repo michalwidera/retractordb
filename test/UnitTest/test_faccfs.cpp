@@ -245,6 +245,24 @@ TEST_F(FaccfsTest, destructor_rotation_overwrite_is_logged) {
   }
 }
 
+// Purge przez write(nullptr, 0) oproznia plik. Warunek galezi purge wymagal dawniej takze
+// recordSize_ == 0 - nieosiagalne, bo write() konczy sie przy zerze FatalError - wiec purge
+// wpadal w zwykly zapis spod nullptr (UB).
+TEST_F(FaccfsTest, purge_empties_file) {
+  auto desc = makeDesc(AREA_SIZE);
+  auto path = sandboxPath("purge_file");
+  rdb::genericBinaryFile gf(path, desc);
+  uint8_t data[10];
+  std::memcpy(data, "purge data", AREA_SIZE);
+  gf.write(data);
+  gf.write(data);
+  ASSERT_EQ(gf.count(), 2U);
+
+  EXPECT_EQ(gf.write(nullptr, 0), EXIT_SUCCESS);
+  EXPECT_EQ(gf.count(), 0U);
+  EXPECT_TRUE(std::filesystem::exists(path));
+}
+
 TEST_F(FaccfsTest, destructor_no_rotation_when_percounter_negative) {
   auto desc = makeDesc(AREA_SIZE);
   auto path = sandboxPath("no_rotate");

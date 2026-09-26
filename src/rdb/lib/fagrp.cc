@@ -113,8 +113,10 @@ auto groupFile<T>::name() -> std::string & {
 
 template <typename T>
 ssize_t groupFile<T>::purge() {
+  // discard(), a nie purge segmentu: pliki grupy znikaja razem z segmentami i nie sa archiwum
+  // do rotacji. Purge segmentu tylko oproznia plik, wiec destruktor zrobilby z niego .old<N>.
   for (auto &v : vec_) {
-    v->write(nullptr, 0);  // purge files using special write command - this deltes the files
+    v->discard();
   }
   vec_.clear();
 
@@ -152,10 +154,8 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
       vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
       writeCount_ = 0;
       if (retention_.segments != 0 && vec_.size() > retention_.segments) {
-        auto segmentToRemove = vec_.front()->name();
-        SPDLOG_DEBUG("Removing oldest segment: {}", segmentToRemove);
-        std::filesystem::remove(segmentToRemove);
-        if (std::filesystem::exists(segmentToRemove + ".shadow")) std::filesystem::remove(segmentToRemove + ".shadow");
+        SPDLOG_DEBUG("Removing oldest segment: {}", vec_.front()->name());
+        vec_.front()->discard();  // usuwa takze cien; bez rotacji - uzasadnienie przy discard()
         vec_.erase(vec_.begin());
         removedSegments_++;
         if (vec_.empty()) FatalError("groupFile::write: no segments remain after removing oldest");

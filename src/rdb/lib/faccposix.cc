@@ -82,6 +82,14 @@ posixBinaryFile::~posixBinaryFile() {
   }
 }
 
+// Plik usuniety celowo nie jest archiwum. Bez wylaczenia rotacji destruktor probowal
+// przemianowac nieistniejacy plik i logowal falszywe "Failed to rotate" - przy kazdym
+// segmencie groupFile usunietym przez retencje albo purge.
+void posixBinaryFile::discard() {
+  std::filesystem::remove(filename_);
+  percounter_ = -1;
+}
+
 auto posixBinaryFile::name() -> std::string & { return filename_; }
 
 size_t posixBinaryFile::count() {
@@ -101,8 +109,11 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> &
   if (fd < 0) return errno;  // Error status
 
   if (ptrData == nullptr && position == 0) {
-    // nullptr, position 0,0 - truncate file.
-    std::filesystem::remove(name());
+    // Purge oproznia plik W MIEJSCU. Dawniej kasowal go po nazwie, a deskryptor zostawal
+    // otwarty: kolejne zapisy szly do skasowanego i-wezla, count() (stat po nazwie) zwracal 0,
+    // odczyt oddawal dane sprzed purge, a przy zamknieciu wszystko ginelo. Porzucenie pliku
+    // razem z obiektem to discard().
+    if (::ftruncate(fd, 0) != 0) return errno;
     return EXIT_SUCCESS;
   }
   if (position == std::numeric_limits<size_t>::max()) {

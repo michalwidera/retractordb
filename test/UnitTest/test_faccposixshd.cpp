@@ -296,6 +296,23 @@ TEST_F(ShadowFileTest, test_faccposixshd_truncate) {
   GTEST_ASSERT_EQ(shd->count(), 0);
 }
 
+// Purge oproznia oba pliki W MIEJSCU - uzasadnienie przy tescie purge w test_faccposix.cpp.
+// Tu dochodzi cien: wpis sprzed purge nie moze przeslonic nowego rekordu na tej samej pozycji.
+TEST_F(ShadowFileTest, test_faccposixshd_purge_keeps_files_usable) {
+  rdb::posixBinaryFileWithShadow shd(sandboxPath("shd_purge"), desc);
+  BYTE record = 10;
+  GTEST_ASSERT_EQ(shd.write(&record), EXIT_SUCCESS);
+  record = 99;
+  GTEST_ASSERT_EQ(shd.write(&record, 0), EXIT_SUCCESS);  // update -> cien
+  GTEST_ASSERT_EQ(shd.write(nullptr, 0), EXIT_SUCCESS);
+  record = 42;
+  GTEST_ASSERT_EQ(shd.write(&record), EXIT_SUCCESS);
+  EXPECT_EQ(shd.count(), 1U);
+  record = 0;
+  EXPECT_EQ(shd.read(&record, 0), EXIT_SUCCESS);
+  EXPECT_EQ(record, 42);
+}
+
 // Verify count returns only main file record count (shadow doesn't affect count)
 TEST_F(ShadowFileTest, test_faccposixshd_count_ignores_shadow) {
   BYTE record;

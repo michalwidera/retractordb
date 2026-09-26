@@ -20,7 +20,7 @@ namespace rdb {
  * - pełnić rolę wewnętrznej implementacji dostępu do danych binarnych, a nie publicznego typu wysokiego poziomu.
  *
  * @note Klasa nie utrzymuje osobnych metadanych null ani dodatkowego mechanizmu trwałości poza samym zapisem do pliku.
- * @note Obsługa purge przez `write(nullptr, ..., 0)` nie stanowi tu pełnego, ogólnego kontraktu i zależy od bieżącej implementacji.
+ * @note Purge przez `write(nullptr, ..., 0)` opróżnia plik (plik pozostaje, ma 0 bajtów).
  */
 struct genericBinaryFile : public FileInterface {
   std::string filename_;

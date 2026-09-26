@@ -212,7 +212,31 @@ TEST_F(PosixFileTest, test_faccposix_truncate) {
   GTEST_ASSERT_EQ(pfa->count(), 0);
 
   // Read after truncate should fail
-  GTEST_ASSERT_EQ(pfa->read(&record, 0), 0);
+  GTEST_ASSERT_NE(pfa->read(&record, 0), 0);
+}
+
+// Purge oproznia plik W MIEJSCU: deskryptor zostaje wazny, a zapis po purge trafia do
+// widocznego pliku. Dawniej purge kasowal plik po nazwie przy otwartym deskryptorze - zapisy
+// szly do skasowanego i-wezla, count() (stat po nazwie) zwracal 0, odczyt oddawal dane sprzed
+// purge, a wszystko ginelo przy zamknieciu.
+TEST_F(PosixFileTest, test_faccposix_purge_keeps_file_usable) {
+  const std::string path = sandboxPath("posix_purge");
+  {
+    rdb::posixBinaryFile pfa(path, desc);
+    BYTE record = 0x01;
+    GTEST_ASSERT_EQ(pfa.write(&record), EXIT_SUCCESS);
+    record = 0x02;
+    GTEST_ASSERT_EQ(pfa.write(&record), EXIT_SUCCESS);
+    GTEST_ASSERT_EQ(pfa.write(nullptr, 0), EXIT_SUCCESS);
+    record = 0x42;
+    GTEST_ASSERT_EQ(pfa.write(&record), EXIT_SUCCESS);
+    EXPECT_EQ(pfa.count(), 1U);
+    record = 0;
+    EXPECT_EQ(pfa.read(&record, 0), EXIT_SUCCESS);
+    EXPECT_EQ(record, 0x42);
+  }
+  std::ifstream in(path, std::ios::binary);
+  EXPECT_EQ(std::vector<char>(std::istreambuf_iterator<char>(in), {}), std::vector<char>({0x42}));
 }
 
 // Verify update-in-place overwrites record at given byte position

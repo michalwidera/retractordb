@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
 #include "rdb/fagrp.hpp"
 
@@ -240,6 +241,39 @@ TEST_F(GroupFileTest, test_fagrp_purge_no_retention) {
   auto mapOfFiles = collectFiles();
   GTEST_ASSERT_EQ(mapOfFiles.size(), 1);
   GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file")].sizeFromSystem, 0);
+}
+
+// Segment usuniety przez retencje nie jest archiwum: jego akcesor nie moze przy zniszczeniu
+// probowac rotacji skasowanego pliku (falszywy "Failed to rotate" w logu). Segmenty, ktore
+// retencje przetrwaly, dostaja przy koncu sesji zwykla rotacje do .old<N>.
+TEST_F(GroupFileTest, test_fagrp_retention_drop_is_not_a_rotation_failure) {
+  LogCapture log;
+  {
+    auto gfa = std::make_unique<rdb::groupFile<>>(filename, makeDesc(recsize), rdb::retention_t{2, 2}, 3);
+    for (BYTE record = 1; record <= 6; record++)
+      gfa->write(&record);
+  }
+  EXPECT_EQ(log.text().find("Failed to rotate"), std::string::npos) << log.text();
+  EXPECT_FALSE(std::filesystem::exists(sandboxPath("test_file_segment_0.old3")));
+  EXPECT_EQ(readFile(sandboxPath("test_file_segment_1.old3")), std::vector<BYTE>({3, 4}));
+  EXPECT_EQ(readFile(sandboxPath("test_file_segment_2.old3")), std::vector<BYTE>({5, 6}));
+}
+
+// To samo dla purge: pliki usuniete celowo nie sa archiwum. Tu segmenty typu posixBinaryFile
+// (STORAGE DIRECT), a wyzej posixBinaryFileWithShadow - kazdy typ ma test tej sciezki. Plik
+// zapisany PO purge jest zwyklym magazynem i przy koncu sesji trafia do .old<N>.
+TEST_F(GroupFileTest, test_fagrp_purge_is_not_a_rotation_failure) {
+  LogCapture log;
+  {
+    auto gfa    = std::make_unique<rdb::groupFile<rdb::posixBinaryFile>>(filename, makeDesc(recsize), rdb::retention_t{0, 0}, 3);
+    BYTE record = 11;
+    gfa->write(&record);
+    gfa->purge();
+    record = 42;
+    gfa->write(&record);
+  }
+  EXPECT_EQ(log.text().find("Failed to rotate"), std::string::npos) << log.text();
+  EXPECT_EQ(readFile(sandboxPath("test_file.old3")), std::vector<BYTE>({42}));
 }
 
 // Verify name() returns base filename in no-retention mode
