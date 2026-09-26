@@ -26,7 +26,7 @@ static cast<rdb::descFldVT> castFldVT;
 
 expressionEvaluator::expressionEvaluator(/* args */) = default;
 
-using pairVar = std::pair<rdb::descFldVT, rdb::descFldVT>;
+using pairRef = std::pair<const rdb::descFldVT &, const rdb::descFldVT &>;
 
 /// Nazwa funkcji złożona do małych liter. Nazwy pochodzą z gramatyki, więc ASCII wystarcza,
 /// a wynik mieści się w SSO - dopasowanie nazwy nie alokuje.
@@ -81,14 +81,18 @@ rdb::descFldVT logicResultTypeRef(const rdb::descFldVT &a, const rdb::descFldVT 
   return a;
 }
 
-pairVar normalize(const rdb::descFldVT &a, const rdb::descFldVT &b) {
+/// Operandy sprowadzone do wspolnego typu: wygrywa wyzszy indeks wariantu. Zgodne typy wracaja
+/// jako referencje do oryginalow, bez kopii. Przy roznych promowana strona laduje w `promoted`,
+/// ktore daje wolajacy i ktore musi zyc tak dlugo jak wynik (#289).
+pairRef normalize(const rdb::descFldVT &a, const rdb::descFldVT &b, rdb::descFldVT &promoted) {
   if (a.index() == b.index()) return {a, b};
 
-  pairVar retVal;
   if (a.index() > b.index()) {
-    return {a, castFldVT(b, static_cast<rdb::descFld>(a.index()))};
+    promoted = castFldVT(b, static_cast<rdb::descFld>(a.index()));
+    return {a, promoted};
   }
-  return {castFldVT(a, static_cast<rdb::descFld>(b.index())), b};
+  promoted = castFldVT(a, static_cast<rdb::descFld>(b.index()));
+  return {promoted, b};
 }
 
 /// Wynik z checkedArith jako wartosc wyrazenia. Przepelnienie INTEGER albo RATIONAL nie ma wyniku
@@ -103,7 +107,8 @@ rdb::descFldVT operator+(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   rdb::descFldVT retVal{0};
   if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
 
-  auto [a, b] = normalize(aParam, bParam);
+  rdb::descFldVT promoted;
+  auto [a, b] = normalize(aParam, bParam, promoted);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -133,7 +138,8 @@ rdb::descFldVT operator-(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   rdb::descFldVT retVal{0};
   if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
 
-  auto [a, b] = normalize(aParam, bParam);
+  rdb::descFldVT promoted;
+  auto [a, b] = normalize(aParam, bParam, promoted);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -165,7 +171,8 @@ rdb::descFldVT operator*(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   rdb::descFldVT retVal{0};
   if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
 
-  auto [a, b] = normalize(aParam, bParam);
+  rdb::descFldVT promoted;
+  auto [a, b] = normalize(aParam, bParam, promoted);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -197,7 +204,8 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   rdb::descFldVT retVal{0};
   if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
 
-  auto [a, b] = normalize(aParam, bParam);
+  rdb::descFldVT promoted;
+  auto [a, b] = normalize(aParam, bParam, promoted);
 
   const bool divisorIsZero =
       std::visit(Overload{[](uint8_t v) { return v == 0; }, [](int v) { return v == 0; }, [](unsigned v) { return v == 0U; },
@@ -316,7 +324,8 @@ rdb::descFldVT exactPower(const rdb::descFldVT &base, int exponent) {
 rdb::descFldVT power(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
 
-  auto [base, exponent] = normalize(aParam, bParam);
+  rdb::descFldVT promoted;
+  auto [base, exponent] = normalize(aParam, bParam, promoted);
 
   const auto resultType = static_cast<rdb::descFld>(base.index());
   if (resultType > rdb::DOUBLE) throw std::runtime_error("Operator '^' not defined for non-numeric operands");
@@ -337,7 +346,8 @@ rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   rdb::descFldVT retVal{0};
   if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
 
-  auto [a, b] = normalize(aParam, bParam);
+  rdb::descFldVT promoted;
+  auto [a, b] = normalize(aParam, bParam, promoted);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -367,7 +377,8 @@ rdb::descFldVT is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam
   rdb::descFldVT retVal{0};
   if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
 
-  auto [a, b] = normalize(aParam, bParam);
+  rdb::descFldVT promoted;
+  auto [a, b] = normalize(aParam, bParam, promoted);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -397,7 +408,8 @@ rdb::descFldVT is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   rdb::descFldVT retVal{0};
   if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
 
-  auto [a, b] = normalize(aParam, bParam);
+  rdb::descFldVT promoted;
+  auto [a, b] = normalize(aParam, bParam, promoted);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -427,7 +439,8 @@ rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   rdb::descFldVT retVal{0};
   if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
 
-  auto [a, b] = normalize(aParam, bParam);
+  rdb::descFldVT promoted;
+  auto [a, b] = normalize(aParam, bParam, promoted);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -457,7 +470,8 @@ rdb::descFldVT is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   rdb::descFldVT retVal{0};
   if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
 
-  auto [a, b] = normalize(aParam, bParam);
+  rdb::descFldVT promoted;
+  auto [a, b] = normalize(aParam, bParam, promoted);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -487,7 +501,8 @@ rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   rdb::descFldVT retVal{0};
   if (isNullValue(aParam) || isNullValue(bParam)) return std::monostate{};
 
-  auto [a, b] = normalize(aParam, bParam);
+  rdb::descFldVT promoted;
+  auto [a, b] = normalize(aParam, bParam, promoted);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -690,7 +705,7 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
     if (rStack.empty()) {
       throw std::runtime_error(std::string("Invalid expression: missing operand for ") + opName);
     }
-    auto v = rStack.top();
+    auto v = std::move(rStack.top());
     rStack.pop();
     return v;
   };
@@ -920,5 +935,5 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
     throw std::runtime_error("Invalid expression: too many values on evaluation stack");
   }
 
-  return rStack.top();
+  return std::move(rStack.top());
 }  // end fn
