@@ -599,7 +599,11 @@ bool boolCast(const rdb::descFldVT &inVar) {
                  [&retVal](double a) { retVal = (a != 0); },                                                                  //
                  [&retVal](std::pair<int, int>) { FatalError("boolCast: pair<int,int> not supported"); },                     //
                  [&retVal](const std::pair<std::string, int> &) { FatalError("boolCast: pair<string,int> not supported"); },  //
-                 [&retVal](const std::string &) { FatalError("boolCast: string type not supported"); }                        //
+                 // Ta sama regula co toLogicValue() w ewaluatorze: napis niepusty jest prawda. Wyniki
+                 // porownan i operatorow logicznych nad napisami sa INTEGER, wiec tu dochodzi tylko goly
+                 // napis (`WHEN s[0]`). Do 2026-09-26 bylo tu FatalError, a porownanie napisow dawalo
+                 // napis `"1"`/`"0"` - kazda regula z takim porownaniem konczyla proces.
+                 [&retVal](const std::string &a) { retVal = !a.empty(); }  //
              },
              inVar);
 
