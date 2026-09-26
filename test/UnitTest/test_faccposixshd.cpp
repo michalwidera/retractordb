@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
 #include "rdb/faccposixshd.hpp"
 #include "syscallWrap.hpp"
@@ -715,6 +716,24 @@ TEST_F(ShadowFileTest, test_faccposixshd_count_stat_failure_is_fatal) {
         std::cerr << "count() zwrocilo " << pfa.count() << "\n";
       },
       "posixBinaryFileWithShadow::count: ::stat");
+}
+
+// Rotacja pod numerem, ktory ma juz archiwum, zostawia slad w logu (#281) - jak w faccposix.
+// Pierwsza rotacja pod tym numerem jest kontrola: nie nadpisuje niczego i komunikatu nie ma.
+TEST_F(ShadowFileTest, test_faccposixshd_rotation_overwrite_is_logged) {
+  const std::string path    = sandboxPath("shd_rotate");
+  const std::string archive = path + ".old7";
+  BYTE record               = 0xAA;
+  for (int session = 0; session < 2; ++session) {
+    LogCapture log;
+    {
+      rdb::posixBinaryFileWithShadow shd(path, desc, 7);
+      GTEST_ASSERT_EQ(shd.write(&record), EXIT_SUCCESS);
+    }
+    EXPECT_TRUE(std::filesystem::exists(archive));
+    const bool logged = log.text().find("overwrote existing archive " + archive) != std::string::npos;
+    EXPECT_EQ(logged, session == 1) << "session " << session << ", log: " << log.text();
+  }
 }
 
 // NOLINTEND(modernize-avoid-c-arrays)

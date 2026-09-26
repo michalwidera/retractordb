@@ -5,6 +5,9 @@
 #include <limits>
 #include <memory>
 #include <system_error>
+
+#include <spdlog/spdlog.h>
+
 #include "fatalError.hpp"
 namespace rdb {
 // https://courses.cs.vt.edu/~cs2604/fall02/binio.html
@@ -28,7 +31,11 @@ genericBinaryFile::~genericBinaryFile() {
   if (percounter_ >= 0) {
     std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);
     std::error_code ec;
+    // Nadpisanie istniejacego archiwum zostawia slad w logu - uzasadnienie w faccposix.cc.
+    const bool overwrites = std::filesystem::exists(rotated_filename, ec);
     std::filesystem::rename(filename_, rotated_filename, ec);
+    if (!ec && overwrites)
+      SPDLOG_ERROR("Rotation of {} overwrote existing archive {}; its previous content is lost", filename_, rotated_filename);
   }
 }
 

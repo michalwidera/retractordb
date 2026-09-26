@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
 #include "rdb/faccposix.hpp"
 #include "syscallWrap.hpp"
@@ -377,4 +378,23 @@ TEST_F(PosixFileTest, test_faccposix_count_stat_failure_is_fatal) {
         std::cerr << "count() zwrocilo " << pfa.count() << "\n";
       },
       "posixBinaryFile::count: ::stat");
+}
+
+// Rotacja pod numerem, ktory ma juz archiwum: rename() nadpisuje je bez pytania, wiec jedynym
+// sladem jest log (#281). Pierwsza rotacja pod tym numerem jest kontrola - nie nadpisuje
+// niczego i komunikatu nie ma.
+TEST_F(PosixFileTest, test_faccposix_rotation_overwrite_is_logged) {
+  const std::string path    = sandboxPath("posix_rotate");
+  const std::string archive = path + ".old7";
+  BYTE record               = 0xAA;
+  for (int session = 0; session < 2; ++session) {
+    LogCapture log;
+    {
+      rdb::posixBinaryFile pfa(path, desc, 7);
+      GTEST_ASSERT_EQ(pfa.write(&record), EXIT_SUCCESS);
+    }
+    EXPECT_TRUE(std::filesystem::exists(archive));
+    const bool logged = log.text().find("overwrote existing archive " + archive) != std::string::npos;
+    EXPECT_EQ(logged, session == 1) << "session " << session << ", log: " << log.text();
+  }
 }

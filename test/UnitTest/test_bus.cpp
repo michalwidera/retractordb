@@ -429,9 +429,9 @@ TEST(BusForeignCounterOwner, OwnDistinctAndEmptyCountersPass) {
 }
 
 // Licznik rotacji nie jest nazwa strumienia, wiec rozlacznosc nazw go nie chroni. Dwie
-// instancje na jednym pliku wczytuja te sama wartosc i zapisuja te sama wartosc+1 (licznik
-// aktualizuje sie dopiero w destruktorze PersistentCounter), czyli gubia rotacje i nadpisuja
-// sobie archiwa. Nazwy strumieni sa tu ROZLACZNE -- kolizja dotyczy wylacznie licznika.
+// instancje na jednym pliku moga wczytac te sama wartosc i zapisac te sama wartosc+1 (odczyt
+// i zapis licznika nie sa objete blokada pliku), czyli dostac ten sam numer i nadpisac sobie
+// archiwa. Nazwy strumieni sa tu ROZLACZNE -- kolizja dotyczy wylacznie licznika.
 TEST_F(BusFixture, SharedRotationCounterIsRefused) {
   bus::Bus first(kTestSegment);
   bus::Bus second(kTestSegment);
