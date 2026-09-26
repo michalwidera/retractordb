@@ -1,3 +1,4 @@
+#include <cmath>
 #include <list>
 #include <map>
 #include <optional>
@@ -6,6 +7,7 @@
 #include <utility>
 
 #include <gtest/gtest.h>
+#include <boost/rational.hpp>
 
 #include "rdb/payload.hpp"
 #include "retractor/lib/expressionEvaluator.hpp"
@@ -295,6 +297,21 @@ TEST(exprSimplify, constant_square_folds_to_value_not_to_power) {
   EXPECT_EQ(simplifyExpression(program, testFieldType), 1u);
   ASSERT_EQ(program.size(), 1u);
   EXPECT_EQ(std::get<int>(program.front().getVT()), 4);
+}
+
+// Potęga o niecałkowitym wykładniku nad RATIONAL liczy się w double i wraca na RATIONAL przez
+// Rationalize. Konwergent ponad `int` przepełniał tam `boost::rational<int>`: `3^(3/2)` dawało
+// -685059943/143682433, czyli -4.768 zamiast 5.196 (#309).
+TEST(exprSimplify, folds_rational_power_without_overflow) {
+  std::list<token> program{token(PUSH_VAL, rdb::descFldVT(boost::rational<int>(3, 1))),
+                           token(PUSH_VAL, rdb::descFldVT(boost::rational<int>(3, 2))), token(POWER)};
+
+  EXPECT_EQ(simplifyExpression(program, testFieldType), 1u);
+  ASSERT_EQ(program.size(), 1u);
+  const double folded = boost::rational_cast<double>(std::get<boost::rational<int>>(program.front().getVT()));
+  const double exact  = std::pow(3.0, 1.5);
+  EXPECT_GT(folded, 0.0);
+  EXPECT_LE(std::abs(folded - exact) / exact, 1e-9) << folded;
 }
 
 //
