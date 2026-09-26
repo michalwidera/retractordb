@@ -383,21 +383,14 @@ TEST(cast_variant, string_to_rational) {
 
 // ── cast<descFldVT> - INTPAIR ────────────────────────────────────────────────
 
-TEST(cast_variant, int_to_intpair) {
-  using P = std::pair<int, int>;
+// Para to dwie niezalezne liczby, nie ulamek: skalar nie ma w niej reprezentacji i daje NULL.
+// Do 2026-09-26 calkowite dawaly (0, n), a RATIONAL/FLOAT/DOUBLE (licznik, mianownik).
+TEST(cast_variant, scalar_to_intpair_is_null) {
   cast<rdb::descFldVT> c;
-  rdb::descFldVT in = 7;
-  P result          = std::get<P>(c(in, rdb::INTPAIR));
-  P expected{0, 7};
-  EXPECT_EQ(result, expected);
-}
-TEST(cast_variant, double_to_intpair) {
-  using P = std::pair<int, int>;
-  cast<rdb::descFldVT> c;
-  rdb::descFldVT in = 0.5;
-  P result          = std::get<P>(c(in, rdb::INTPAIR));
-  P expected{1, 2};
-  EXPECT_EQ(result, expected);
+  const rdb::descFldVT scalars[] = {rdb::descFldVT{static_cast<uint8_t>(7)},    rdb::descFldVT{7},    rdb::descFldVT{7U},
+                                    rdb::descFldVT{boost::rational<int>(3, 5)}, rdb::descFldVT{0.5F}, rdb::descFldVT{0.5}};
+  for (const auto &in : scalars)
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::INTPAIR))) << "variant index " << in.index();
 }
 TEST(cast_variant, intpair_to_intpair) {
   using P = std::pair<int, int>;
@@ -465,13 +458,14 @@ TEST(cast_any, string_to_rational) {
   std::any in = std::string("2/5");
   EXPECT_EQ(std::any_cast<boost::rational<int>>(c(in, rdb::RATIONAL)), boost::rational<int>(2, 5));
 }
-TEST(cast_any, int_to_intpair) {
-  using P = std::pair<int, int>;
+// Ta sama regula w sciezce std::any. BYTE i UINT wkladaly tu wczesniej do std::any
+// pair<int, uint8_t> / pair<int, unsigned> zamiast pair<int, int>.
+TEST(cast_any, scalar_to_intpair_is_null) {
   cast<std::any> c;
-  std::any in = 8;
-  P result    = std::any_cast<P>(c(in, rdb::INTPAIR));
-  P expected{0, 8};
-  EXPECT_EQ(result, expected);
+  const std::any scalars[] = {std::any(static_cast<uint8_t>(7)),    std::any(7),    std::any(7U),
+                              std::any(boost::rational<int>(3, 5)), std::any(0.5F), std::any(0.5)};
+  for (const auto &in : scalars)
+    EXPECT_EQ(c(in, rdb::INTPAIR).type(), typeid(std::monostate)) << in.type().name();
 }
 TEST(cast_any, string_to_intpair) {
   using P = std::pair<int, int>;
@@ -487,22 +481,6 @@ TEST(cast_any, intpair_to_intpair) {
   std::any in = P{3, 9};
   P result    = std::any_cast<P>(c(in, rdb::INTPAIR));
   P expected{3, 9};
-  EXPECT_EQ(result, expected);
-}
-TEST(cast_any, double_to_intpair) {
-  using P = std::pair<int, int>;
-  cast<std::any> c;
-  std::any in = 0.5;
-  P result    = std::any_cast<P>(c(in, rdb::INTPAIR));
-  P expected{1, 2};
-  EXPECT_EQ(result, expected);
-}
-TEST(cast_any, rational_to_intpair) {
-  using P = std::pair<int, int>;
-  cast<std::any> c;
-  std::any in = boost::rational<int>(3, 5);
-  P result    = std::any_cast<P>(c(in, rdb::INTPAIR));
-  P expected{3, 5};
   EXPECT_EQ(result, expected);
 }
 TEST(cast_any, intpair_to_string) {
@@ -731,11 +709,4 @@ TEST(cast_variant, negative_double_to_rational) {
   cast<rdb::descFldVT> c;
   rdb::descFldVT in = -2.5;
   EXPECT_EQ(std::get<boost::rational<int>>(c(in, rdb::RATIONAL)), boost::rational<int>(-5, 2));
-}
-TEST(cast_variant, negative_double_to_intpair) {
-  using P = std::pair<int, int>;
-  cast<rdb::descFldVT> c;
-  rdb::descFldVT in = -2.5;
-  P expected{-5, 2};
-  EXPECT_EQ(std::get<P>(c(in, rdb::INTPAIR)), expected);
 }

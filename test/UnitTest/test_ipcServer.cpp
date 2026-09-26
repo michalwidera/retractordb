@@ -6,6 +6,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <csignal>
 #include <cstddef>
 #include <future>
 #include <optional>
@@ -50,22 +51,45 @@ bool queueExists(int clientId, std::string_view serverName = {}) {
 }
 
 /// Stan, ktory zostawia proces zabity w srodku send/receive: wewnetrzny muteks kolejki zajety
-/// przez proces, ktory juz nie zyje. Potomek bierze go wprost z segmentu kolejki i konczy sie
-/// bez zwolnienia - bez wyscigu, ktorego nie dalo by sie zamowic kill -9 z zewnatrz.
+/// przez proces, ktory juz nie zyje. Potomek bierze go wprost z segmentu kolejki, zglasza to
+/// przez potok i czeka, a rodzic zabija go kill -9 - dopiero po zgloszeniu, wiec bez wyscigu.
 /// Uklad naglowka (mq_hdr_t za ManagedOpenOrCreateUserOffset) to szczegol Boosta; gdyby sie
 /// zmienil, testy ponizej oblewaja na kontroli dodatniej, a nie przechodza falszywie.
+///
+/// SIGKILL z zewnatrz, a nie _exit ani raise(SIGKILL): w obu tych przypadkach valgrind przed
+/// koncem potomka robil kontrole wyciekow na stercie skopiowanej od rodzica, gdzie TLS jego
+/// watku komunikacyjnego wychodzil jako "possibly lost". Nikt tego nie widzial, bo waitpid
+/// gubil status - teraz status jest sprawdzany. Wyjatek w potomku konczy go od razu: inaczej
+/// wrocilby do gtest i puscil reszte zestawu obok rodzica.
 void abandonQueueLock(const std::string &queueName) {
+  int locked[2];
+  ASSERT_EQ(pipe(locked), 0);
   const pid_t child = fork();
   if (child == 0) {
-    using Impl   = IPC::ipcdetail::managed_open_or_create_impl<IPC::shared_memory_object, 0, true, false>;
-    using Header = IPC::ipcdetail::mq_hdr_t<IPC::offset_ptr<void>>;
-    IPC::shared_memory_object shm(IPC::open_only, queueName.c_str(), IPC::read_write);
-    IPC::mapped_region region(shm, IPC::read_write);
-    auto *header = reinterpret_cast<Header *>(static_cast<char *>(region.get_address()) + Impl::ManagedOpenOrCreateUserOffset);
-    header->m_mutex.lock();
-    _exit(0);
+    try {
+      using Impl   = IPC::ipcdetail::managed_open_or_create_impl<IPC::shared_memory_object, 0, true, false>;
+      using Header = IPC::ipcdetail::mq_hdr_t<IPC::offset_ptr<void>>;
+      IPC::shared_memory_object shm(IPC::open_only, queueName.c_str(), IPC::read_write);
+      IPC::mapped_region region(shm, IPC::read_write);
+      auto *header = reinterpret_cast<Header *>(static_cast<char *>(region.get_address()) + Impl::ManagedOpenOrCreateUserOffset);
+      header->m_mutex.lock();
+      const char byte = 1;
+      if (write(locked[1], &byte, 1) != 1) _exit(1);
+      for (;;)
+        pause();
+    } catch (...) {
+      _exit(1);
+    }
   }
-  waitpid(child, nullptr, 0);
+  close(locked[1]);
+  char byte           = 0;
+  const bool acquired = read(locked[0], &byte, 1) == 1;
+  close(locked[0]);
+  kill(child, SIGKILL);
+  int status = 0;
+  waitpid(child, &status, 0);
+  EXPECT_TRUE(acquired) << "potomek nie wzial muteksu kolejki";
+  EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL) << "potomek: status " << status;
 }
 
 /// Kontrola dodatnia dla abandonQueueLock: kolejka po niej rzuca not_recoverable. Uchwyt

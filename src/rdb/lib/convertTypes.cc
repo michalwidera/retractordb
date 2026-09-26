@@ -70,17 +70,6 @@ static void rationalizeTo(double value, K &retVal) {
     retVal = std::monostate{};
 }
 
-/// Jak rationalizeTo, tylko wynik rozklada sie na pare licznik/mianownik (INTPAIR).
-template <typename K>
-static void rationalizePairTo(double value, K &retVal) {
-  if (std::isfinite(value)) {
-    const auto r = Rationalize(value);
-    retVal       = std::make_pair(r.numerator(), r.denominator());
-  } else {
-    retVal = std::monostate{};
-  }
-}
-
 /// Zwezenie CALKOWITE -> typ pola, ta sama regula co narrowFloatTo wyzej: wartosc, ktorej typ
 /// docelowy nie pomiesci, daje NULL. Chodzi o liczbe ujemna do UINT, UINT powyzej INT_MAX do
 /// INTEGER i wartosc spoza 0..255 do BYTE. Do 2026-09-26 `static_cast` zawijal je po cichu:
@@ -244,16 +233,21 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
       break;
     case rdb::INTPAIR:
       // Requested type is INT PAIR
+      //
+      // Para to dwie niezalezne liczby, nie ulamek, wiec skalar nie ma w niej reprezentacji i daje
+      // NULL - ta sama regula co zwezenie bez reprezentacji wyzej. Do 2026-09-26 calkowite dawaly
+      // (0, n), a RATIONAL/FLOAT/DOUBLE (licznik, mianownik), czyli odczyt ilorazowy; w sciezce
+      // std::any BYTE i UINT trafialy tam jako pair<int, uint8_t>/pair<int, unsigned>.
       if constexpr (std::is_same_v<T, rdb::descFldVT>) {
-        std::visit(Overload{                                                                                                 //
-                            [&retVal](std::monostate) { retVal = std::make_pair(0, 0); },                                    //
-                            [&retVal](uint8_t a) { retVal = std::make_pair(0, a); },                                         //
-                            [&retVal](int a) { retVal = std::make_pair(0, a); },                                             //
-                            [&retVal](unsigned a) { retVal = std::make_pair(0, static_cast<int>(a)); },                      //
-                            [&retVal](boost::rational<int> a) { retVal = std::make_pair(a.numerator(), a.denominator()); },  //
-                            [&retVal](float a) { rationalizePairTo(static_cast<double>(a), retVal); },                       //
-                            [&retVal](double a) { rationalizePairTo(a, retVal); },                                           //
-                            [&retVal](std::pair<int, int> a) { retVal = a; },                                                //
+        std::visit(Overload{                                                                 //
+                            [&retVal](std::monostate) { retVal = std::make_pair(0, 0); },    //
+                            [&retVal](uint8_t) { retVal = std::monostate{}; },               //
+                            [&retVal](int) { retVal = std::monostate{}; },                   //
+                            [&retVal](unsigned) { retVal = std::monostate{}; },              //
+                            [&retVal](boost::rational<int>) { retVal = std::monostate{}; },  //
+                            [&retVal](float) { retVal = std::monostate{}; },                 //
+                            [&retVal](double) { retVal = std::monostate{}; },                //
+                            [&retVal](std::pair<int, int> a) { retVal = a; },                //
                             [&retVal](const std::pair<std::string, int> &a) {
                               retVal = std::make_pair(atoi(a.first.c_str()), a.second);
                             },  //
@@ -266,19 +260,9 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
                             }},
                    inVar);
       } else {
-        if (inVar.type() == typeid(uint8_t)) {
-          retVal = std::make_pair(0, std::any_cast<uint8_t>(inVar));
-        } else if (inVar.type() == typeid(int)) {
-          retVal = std::make_pair(0, std::any_cast<int>(inVar));
-        } else if (inVar.type() == typeid(unsigned)) {
-          retVal = std::make_pair(0, std::any_cast<unsigned>(inVar));
-        } else if (inVar.type() == typeid(boost::rational<int>)) {
-          auto r = std::any_cast<boost::rational<int>>(inVar);
-          retVal = std::make_pair(r.numerator(), r.denominator());
-        } else if (inVar.type() == typeid(float)) {
-          rationalizePairTo(std::any_cast<float>(inVar), retVal);
-        } else if (inVar.type() == typeid(double)) {
-          rationalizePairTo(std::any_cast<double>(inVar), retVal);
+        if (inVar.type() == typeid(uint8_t) || inVar.type() == typeid(int) || inVar.type() == typeid(unsigned) ||
+            inVar.type() == typeid(boost::rational<int>) || inVar.type() == typeid(float) || inVar.type() == typeid(double)) {
+          retVal = std::monostate{};
         } else if (inVar.type() == typeid(std::pair<int, int>)) {
           retVal = std::any_cast<std::pair<int, int>>(inVar);
         } else if (inVar.type() == typeid(std::string)) {
@@ -417,7 +401,7 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
 /// NaN nie spelnia zadnego porownania i wypada z petli tak samo jak nieskonczonosc i jak
 /// wartosc za duza na `int`: zaden wyraz nie wchodzi do ulamka, a pusty ulamek oddaje {0,1}.
 /// Funkcja jest totalna, bo zwraca `boost::rational<int>` przez wartosc i NULL-a nie ma czym
-/// wyrazic; niefinitywne wejscie odsiewa rationalizeTo/rationalizePairTo, jeszcze przed wywolaniem.
+/// wyrazic; niefinitywne wejscie odsiewa rationalizeTo, jeszcze przed wywolaniem.
 ///
 /// Wynik to konwergent h/k liczony rekurencja h = a*h1 + h2, k = a*k1 + k2 w `int64_t`.
 /// Wczesniej wyrazy szly na stos i skladaly sie od tylu na `boost::rational<int>`, ktory zakresu

@@ -17,7 +17,8 @@ struct cast {
   ///         no representation in the requested type: a floating-point value outside an integer
   ///         type's range (NaN and infinity included), an integer or rational value outside the
   ///         range of a narrower integer type (a negative value to UINT, UINT above INT_MAX to
-  ///         INTEGER or RATIONAL, a value outside 0..255 to BYTE), or a string that does not parse
+  ///         INTEGER or RATIONAL, a value outside 0..255 to BYTE), any scalar to INTPAIR (a pair is
+  ///         two independent numbers, not a fraction), or a string that does not parse
   T operator()(const T &inVar, rdb::descFld reqType);
 };
 
