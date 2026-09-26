@@ -56,23 +56,24 @@ std::optional<bool> toLogicValue(const rdb::descFldVT &value) {
 }
 
 rdb::descFldVT logicResultAsType(bool value, const rdb::descFldVT &typeRef) {
-  return std::visit(
-      Overload{[value](uint8_t) -> rdb::descFldVT { return static_cast<uint8_t>(value ? 1 : 0); },
-               [value](int) -> rdb::descFldVT { return value ? 1 : 0; },
-               [value](unsigned) -> rdb::descFldVT { return value ? 1U : 0U; },
-               [value](double) -> rdb::descFldVT { return value ? 1.0 : 0.0; },
-               [value](float) -> rdb::descFldVT { return value ? 1.0F : 0.0F; },
-               [value](boost::rational<int>) -> rdb::descFldVT { return boost::rational<int>(value ? 1 : 0); },
-               [](std::monostate) -> rdb::descFldVT { return std::monostate{}; },
-               [value](const std::string &) -> rdb::descFldVT { return value ? std::string("1") : std::string("0"); },
-               [](std::pair<int, int>) -> rdb::descFldVT {
-                 throw std::runtime_error("logicResultAsType: INTPAIR type not supported");
-               },
-               [](const std::pair<std::string, int> &) -> rdb::descFldVT {
-                 throw std::runtime_error("logicResultAsType: IDXPAIR type not supported");
-               }},
+  return std::visit(Overload{[value](uint8_t) -> rdb::descFldVT { return static_cast<uint8_t>(value ? 1 : 0); },
+                             [value](int) -> rdb::descFldVT { return value ? 1 : 0; },
+                             [value](unsigned) -> rdb::descFldVT { return value ? 1U : 0U; },
+                             [value](double) -> rdb::descFldVT { return value ? 1.0 : 0.0; },
+                             [value](float) -> rdb::descFldVT { return value ? 1.0F : 0.0F; },
+                             [value](boost::rational<int>) -> rdb::descFldVT { return boost::rational<int>(value ? 1 : 0); },
+                             [](std::monostate) -> rdb::descFldVT { return std::monostate{}; },
+                             // Wynik logiczny nad napisem jest INTEGER, nie napisem `"1"`/`"0"`: `"0"` jest niepusty,
+                             // wiec toLogicValue() czytal go jako PRAWDE i `NOT ('a' = 'b')` dawalo falsz.
+                             [value](const std::string &) -> rdb::descFldVT { return value ? 1 : 0; },
+                             [](std::pair<int, int>) -> rdb::descFldVT {
+                               throw std::runtime_error("logicResultAsType: INTPAIR type not supported");
+                             },
+                             [](const std::pair<std::string, int> &) -> rdb::descFldVT {
+                               throw std::runtime_error("logicResultAsType: IDXPAIR type not supported");
+                             }},
 
-      typeRef);
+                    typeRef);
 }
 
 rdb::descFldVT logicResultTypeRef(const rdb::descFldVT &a, const rdb::descFldVT &b) {
@@ -352,13 +353,13 @@ rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //
-                 [&retVal](uint8_t a, uint8_t b) { retVal = (a == b) ? uint8_t(1) : uint8_t(0); },          //
-                 [&retVal](int a, int b) { retVal = (a == b) ? 1 : 0; },                                    //
-                 [&retVal](unsigned a, unsigned b) { retVal = (a == b) ? unsigned(1) : unsigned(0); },      //
-                 [&retVal](const std::string &a, const std::string &b) { retVal = (a == b) ? "1" : "0"; },  //
-                 [&retVal](double a, double b) { retVal = (a == b) ? double(1) : double(0); },              //
-                 [&retVal](float a, float b) { retVal = (a == b) ? float(1) : float(0); },                  //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },              //
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a == b) ? uint8_t(1) : uint8_t(0); },      //
+                 [&retVal](int a, int b) { retVal = (a == b) ? 1 : 0; },                                //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a == b) ? unsigned(1) : unsigned(0); },  //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = (a == b) ? 1 : 0; },  //
+                 [&retVal](double a, double b) { retVal = (a == b) ? double(1) : double(0); },          //
+                 [&retVal](float a, float b) { retVal = (a == b) ? float(1) : float(0); },              //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a == b) ? boost::rational<int>(1) : boost::rational<int>(0);
                  },                                                                                                           //
@@ -383,13 +384,13 @@ rdb::descFldVT is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //
-                 [&retVal](uint8_t a, uint8_t b) { retVal = (a != b) ? uint8_t(1) : uint8_t(0); },          //
-                 [&retVal](int a, int b) { retVal = (a != b) ? 1 : 0; },                                    //
-                 [&retVal](unsigned a, unsigned b) { retVal = (a != b) ? unsigned(1) : unsigned(0); },      //
-                 [&retVal](const std::string &a, const std::string &b) { retVal = (a != b) ? "1" : "0"; },  //
-                 [&retVal](double a, double b) { retVal = (a != b) ? double(1) : double(0); },              //
-                 [&retVal](float a, float b) { retVal = (a != b) ? float(1) : float(0); },                  //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },              //
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a != b) ? uint8_t(1) : uint8_t(0); },      //
+                 [&retVal](int a, int b) { retVal = (a != b) ? 1 : 0; },                                //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a != b) ? unsigned(1) : unsigned(0); },  //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = (a != b) ? 1 : 0; },  //
+                 [&retVal](double a, double b) { retVal = (a != b) ? double(1) : double(0); },          //
+                 [&retVal](float a, float b) { retVal = (a != b) ? float(1) : float(0); },              //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a != b) ? boost::rational<int>(1) : boost::rational<int>(0);
                  },                                                                                                            //
@@ -414,13 +415,13 @@ rdb::descFldVT is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                 //
-                 [&retVal](uint8_t a, uint8_t b) { retVal = (a < b) ? uint8_t(1) : uint8_t(0); },          //
-                 [&retVal](int a, int b) { retVal = (a < b) ? 1 : 0; },                                    //
-                 [&retVal](unsigned a, unsigned b) { retVal = (a < b) ? unsigned(1) : unsigned(0); },      //
-                 [&retVal](const std::string &a, const std::string &b) { retVal = (a < b) ? "1" : "0"; },  //
-                 [&retVal](double a, double b) { retVal = (a < b) ? double(1) : double(0); },              //
-                 [&retVal](float a, float b) { retVal = (a < b) ? float(1) : float(0); },                  //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },             //
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a < b) ? uint8_t(1) : uint8_t(0); },      //
+                 [&retVal](int a, int b) { retVal = (a < b) ? 1 : 0; },                                //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a < b) ? unsigned(1) : unsigned(0); },  //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = (a < b) ? 1 : 0; },  //
+                 [&retVal](double a, double b) { retVal = (a < b) ? double(1) : double(0); },          //
+                 [&retVal](float a, float b) { retVal = (a < b) ? float(1) : float(0); },              //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a < b) ? boost::rational<int>(1) : boost::rational<int>(0);
                  },                                                                                                           //
@@ -445,13 +446,13 @@ rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                 //
-                 [&retVal](uint8_t a, uint8_t b) { retVal = (a > b) ? uint8_t(1) : uint8_t(0); },          //
-                 [&retVal](int a, int b) { retVal = (a > b) ? 1 : 0; },                                    //
-                 [&retVal](unsigned a, unsigned b) { retVal = (a > b) ? unsigned(1) : unsigned(0); },      //
-                 [&retVal](const std::string &a, const std::string &b) { retVal = (a > b) ? "1" : "0"; },  //
-                 [&retVal](double a, double b) { retVal = (a > b) ? double(1) : double(0); },              //
-                 [&retVal](float a, float b) { retVal = (a > b) ? float(1) : float(0); },                  //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },             //
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a > b) ? uint8_t(1) : uint8_t(0); },      //
+                 [&retVal](int a, int b) { retVal = (a > b) ? 1 : 0; },                                //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a > b) ? unsigned(1) : unsigned(0); },  //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = (a > b) ? 1 : 0; },  //
+                 [&retVal](double a, double b) { retVal = (a > b) ? double(1) : double(0); },          //
+                 [&retVal](float a, float b) { retVal = (a > b) ? float(1) : float(0); },              //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a > b) ? boost::rational<int>(1) : boost::rational<int>(0);
                  },                                                                                                           //
@@ -476,13 +477,13 @@ rdb::descFldVT is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //
-                 [&retVal](uint8_t a, uint8_t b) { retVal = (a <= b) ? uint8_t(1) : uint8_t(0); },          //
-                 [&retVal](int a, int b) { retVal = (a <= b) ? 1 : 0; },                                    //
-                 [&retVal](unsigned a, unsigned b) { retVal = (a <= b) ? unsigned(1) : unsigned(0); },      //
-                 [&retVal](const std::string &a, const std::string &b) { retVal = (a <= b) ? "1" : "0"; },  //
-                 [&retVal](double a, double b) { retVal = (a <= b) ? double(1) : double(0); },              //
-                 [&retVal](float a, float b) { retVal = (a <= b) ? float(1) : float(0); },                  //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },              //
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a <= b) ? uint8_t(1) : uint8_t(0); },      //
+                 [&retVal](int a, int b) { retVal = (a <= b) ? 1 : 0; },                                //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a <= b) ? unsigned(1) : unsigned(0); },  //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = (a <= b) ? 1 : 0; },  //
+                 [&retVal](double a, double b) { retVal = (a <= b) ? double(1) : double(0); },          //
+                 [&retVal](float a, float b) { retVal = (a <= b) ? float(1) : float(0); },              //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a <= b) ? boost::rational<int>(1) : boost::rational<int>(0);
                  },                                                                                                           //
@@ -507,13 +508,13 @@ rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
   std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                  //
-                 [&retVal](uint8_t a, uint8_t b) { retVal = (a >= b) ? uint8_t(1) : uint8_t(0); },          //
-                 [&retVal](int a, int b) { retVal = (a >= b) ? 1 : 0; },                                    //
-                 [&retVal](unsigned a, unsigned b) { retVal = (a >= b) ? unsigned(1) : unsigned(0); },      //
-                 [&retVal](const std::string &a, const std::string &b) { retVal = (a >= b) ? "1" : "0"; },  //
-                 [&retVal](double a, double b) { retVal = (a >= b) ? double(1) : double(0); },              //
-                 [&retVal](float a, float b) { retVal = (a >= b) ? float(1) : float(0); },                  //
+                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },              //
+                 [&retVal](uint8_t a, uint8_t b) { retVal = (a >= b) ? uint8_t(1) : uint8_t(0); },      //
+                 [&retVal](int a, int b) { retVal = (a >= b) ? 1 : 0; },                                //
+                 [&retVal](unsigned a, unsigned b) { retVal = (a >= b) ? unsigned(1) : unsigned(0); },  //
+                 [&retVal](const std::string &a, const std::string &b) { retVal = (a >= b) ? 1 : 0; },  //
+                 [&retVal](double a, double b) { retVal = (a >= b) ? double(1) : double(0); },          //
+                 [&retVal](float a, float b) { retVal = (a >= b) ? float(1) : float(0); },              //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a >= b) ? boost::rational<int>(1) : boost::rational<int>(0);
                  },                                                                                                           //

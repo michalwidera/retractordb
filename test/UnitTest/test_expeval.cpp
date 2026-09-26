@@ -743,8 +743,8 @@ TEST(xExpressionEval, not_nonempty_string_is_false) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "0");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 0);
 }
 
 TEST(xExpressionEval, not_empty_string_is_true) {
@@ -755,8 +755,8 @@ TEST(xExpressionEval, not_empty_string_is_true) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "1");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 1);
 }
 
 TEST(xExpressionEval, and_string_int_uses_string_truthiness) {
@@ -768,9 +768,9 @@ TEST(xExpressionEval, and_string_int_uses_string_truthiness) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  // "text" is truthy, 1 is truthy → true; result type matches first operand (string)
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "1");
+  // "text" is truthy, 1 is truthy → true; logic result over a string is INTEGER
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 1);
 }
 
 TEST(xExpressionEval, not_intpair_throws) {
@@ -1256,8 +1256,8 @@ TEST(xExpressionEval, cmp_equal_string_equal) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "1");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 1);
 }
 
 TEST(xExpressionEval, cmp_equal_string_not_equal) {
@@ -1269,8 +1269,8 @@ TEST(xExpressionEval, cmp_equal_string_not_equal) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "0");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 0);
 }
 
 // --- float arithmetic ---
@@ -1357,7 +1357,7 @@ TEST(xExpressionEval, null2zero_passes_a_value_through_unchanged) {
 }
 
 // --- string comparison operators (CMP_NOT_EQUAL, CMP_LT, CMP_GT, CMP_LE, CMP_GE) ---
-// Wynik porównania stringów jest zawsze typu std::string ("1" lub "0"),
+// Wynik porównania stringów jest INTEGER 1/0 (do 2026-09-26 napis "1"/"0"),
 // porównanie leksykograficzne zgodnie z std::string::operator<.
 
 TEST(xExpressionEval, cmp_not_equal_string_not_equal) {
@@ -1369,8 +1369,8 @@ TEST(xExpressionEval, cmp_not_equal_string_not_equal) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" != "xyz"
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "1");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 1);
 }
 
 TEST(xExpressionEval, cmp_not_equal_string_equal) {
@@ -1382,8 +1382,8 @@ TEST(xExpressionEval, cmp_not_equal_string_equal) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" != "abc"
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "0");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 0);
 }
 
 TEST(xExpressionEval, cmp_lt_string_true) {
@@ -1395,8 +1395,8 @@ TEST(xExpressionEval, cmp_lt_string_true) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" < "xyz"
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "1");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 1);
 }
 
 TEST(xExpressionEval, cmp_lt_string_false) {
@@ -1408,8 +1408,8 @@ TEST(xExpressionEval, cmp_lt_string_false) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "xyz" < "abc"
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "0");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 0);
 }
 
 TEST(xExpressionEval, cmp_gt_string_true) {
@@ -1421,8 +1421,8 @@ TEST(xExpressionEval, cmp_gt_string_true) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "xyz" > "abc"
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "1");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 1);
 }
 
 TEST(xExpressionEval, cmp_gt_string_false) {
@@ -1434,8 +1434,8 @@ TEST(xExpressionEval, cmp_gt_string_false) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" > "xyz"
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "0");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 0);
 }
 
 TEST(xExpressionEval, cmp_le_string_true_less) {
@@ -1447,8 +1447,8 @@ TEST(xExpressionEval, cmp_le_string_true_less) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" <= "xyz"
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "1");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 1);
 }
 
 TEST(xExpressionEval, cmp_le_string_true_equal) {
@@ -1460,8 +1460,8 @@ TEST(xExpressionEval, cmp_le_string_true_equal) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" <= "abc"
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "1");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 1);
 }
 
 TEST(xExpressionEval, cmp_le_string_false) {
@@ -1473,8 +1473,8 @@ TEST(xExpressionEval, cmp_le_string_false) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "xyz" <= "abc"
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "0");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 0);
 }
 
 TEST(xExpressionEval, cmp_ge_string_true_greater) {
@@ -1486,8 +1486,8 @@ TEST(xExpressionEval, cmp_ge_string_true_greater) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "xyz" >= "abc"
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "1");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 1);
 }
 
 TEST(xExpressionEval, cmp_ge_string_true_equal) {
@@ -1499,8 +1499,8 @@ TEST(xExpressionEval, cmp_ge_string_true_equal) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" >= "abc"
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "1");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 1);
 }
 
 TEST(xExpressionEval, cmp_ge_string_false) {
@@ -1512,12 +1512,12 @@ TEST(xExpressionEval, cmp_ge_string_false) {
   expressionEvaluator test;
   rdb::descFldVT result = test.eval(program);  // "abc" >= "xyz"
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "0");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 0);
 }
 
 // --- OR z operandem string ---
-// toLogicValue(string) = !string.empty(); typ wyniku pochodzi od pierwszego niezerowego operandu.
+// toLogicValue(string) = !string.empty(); wynik logiczny nad napisem jest INTEGER 1/0.
 
 TEST(xExpressionEval, or_nonempty_string_false_is_true) {
   std::list<token> program;
@@ -1526,10 +1526,10 @@ TEST(xExpressionEval, or_nonempty_string_false_is_true) {
   program.emplace_back(OR);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "text" OR 0 → true, typ string
+  rdb::descFldVT result = test.eval(program);  // "text" OR 0 → true, typ INTEGER
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "1");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 1);
 }
 
 TEST(xExpressionEval, or_empty_string_false_is_false) {
@@ -1539,10 +1539,41 @@ TEST(xExpressionEval, or_empty_string_false_is_false) {
   program.emplace_back(OR);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "" OR 0 → false, typ string
+  rdb::descFldVT result = test.eval(program);  // "" OR 0 → false, typ INTEGER
 
-  ASSERT_TRUE(std::holds_alternative<std::string>(result));
-  EXPECT_EQ(std::get<std::string>(result), "0");
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 0);
+}
+
+// Porownanie napisow jako operand logiki. Dopoki porownanie oddawalo napis "0", toLogicValue()
+// czytalo go jako prawde (napis niepusty): NOT ('a' = 'b') dawalo falsz, a ('a' = 'b') OR 0 - prawde.
+TEST(xExpressionEval, not_of_false_string_comparison_is_true) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("a")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("b")));
+  program.emplace_back(CMP_EQUAL);
+  program.emplace_back(NOT);
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 1);
+}
+
+TEST(xExpressionEval, or_of_false_string_comparison_is_false) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("a")));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("b")));
+  program.emplace_back(CMP_EQUAL);
+  program.emplace_back(PUSH_VAL, 0);
+  program.emplace_back(OR);
+
+  expressionEvaluator test;
+  rdb::descFldVT result = test.eval(program);
+
+  ASSERT_TRUE(std::holds_alternative<int>(result));
+  EXPECT_EQ(std::get<int>(result), 0);
 }
 
 // --- ADD: string + float i string + double przez normalize/castFldVT ---
