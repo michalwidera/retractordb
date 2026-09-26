@@ -6,9 +6,9 @@
 
 #include <charconv>
 #include <cmath>
+#include <cstdint>
 #include <istream>
 #include <limits>
-#include <stack>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
@@ -372,44 +372,48 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
 /// dokladnie jak w narrowFloatTo, i z ta sama potega dwojki jako granica.
 ///
 /// NaN nie spelnia zadnego porownania i wypada z petli tak samo jak nieskonczonosc i jak
-/// wartosc za duza na `int`: nic nie trafia na stos, a pusty stos oddaje {0,1}. Funkcja jest
-/// totalna, bo zwraca `boost::rational<int>` przez wartosc i NULL-a nie ma czym wyrazic;
-/// niefinitywne wejscie odsiewa rationalizeTo/rationalizePairTo, jeszcze przed wywolaniem.
+/// wartosc za duza na `int`: zaden wyraz nie wchodzi do ulamka, a pusty ulamek oddaje {0,1}.
+/// Funkcja jest totalna, bo zwraca `boost::rational<int>` przez wartosc i NULL-a nie ma czym
+/// wyrazic; niefinitywne wejscie odsiewa rationalizeTo/rationalizePairTo, jeszcze przed wywolaniem.
+///
+/// Wynik to konwergent h/k liczony rekurencja h = a*h1 + h2, k = a*k1 + k2 w `int64_t`.
+/// Wczesniej wyrazy szly na stos i skladaly sie od tylu na `boost::rational<int>`, ktory zakresu
+/// nie pilnuje: konwergent ponad `int` to przepelnienie liczby ze znakiem, czyli zachowanie
+/// nieokreslone, a w praktyce ulamek o zlej wartosci, czesto ujemny - interwal `0.333333` dawal
+/// 2064120233/1923156540, a `3^(3/2)` nad RATIONAL -4.768 (#309). Konwergenty rosna monotonicznie,
+/// wiec petla konczy sie na pierwszym, ktory nie miesci sie w `int`, i oddaje poprzedni - najlepsze
+/// przyblizenie, jakie `boost::rational<int>` zapisze. Tam, gdzie skladanie sie nie przepelnialo,
+/// wynik jest identyczny: to ten sam ulamek, a konwergent jest juz nieskracalny. Sama rekurencja
+/// nie przepelnia sie: a < 2^31 i h1, k1 <= INT_MAX, wiec a*h1 + h2 < 2^63.
 boost::rational<int> Rationalize(const double inValue, const double DIFF /*=1E-6*/, const int ttl_const /*=11*/) {
-  std::stack<int> st;
   const double upperExclusive = std::ldexp(1.0, std::numeric_limits<int>::digits);
-  const double absValue       = std::fabs(inValue);
-  double startx               = absValue;
-  double diff;
-  double err1;
-  double err2;
-  int ttl = ttl_const;
-  int val;
+  const std::int64_t limit    = std::numeric_limits<int>::max();
+  // Start rekurencji: h_{-1}/k_{-1} = 1/0, h_{-2}/k_{-2} = 0/1.
+  std::int64_t h1 = 1;
+  std::int64_t h2 = 0;
+  std::int64_t k1 = 0;
+  std::int64_t k2 = 1;
+  double startx   = std::fabs(inValue);
+  int ttl         = ttl_const;
   for (;;) {
     const double truncated = std::trunc(startx);
     if (!(truncated < upperExclusive)) break;
-    val = static_cast<int>(truncated);
-    st.push(val);
+    const auto a         = static_cast<std::int64_t>(truncated);
+    const std::int64_t h = a * h1 + h2;
+    const std::int64_t k = a * k1 + k2;
+    if (h > limit || k > limit) break;
+    h2 = h1;
+    h1 = h;
+    k2 = k1;
+    k1 = k;
     if ((ttl--) == 0) break;
-    diff = startx - val;
+    const double diff = startx - truncated;
     if (diff < DIFF) break;
     startx = 1 / diff;
     if (startx > (1 / DIFF)) break;
   }
-  if (st.empty()) return {0, 1};
-  boost::rational<int> result1(0, 1);
-  boost::rational<int> result2(0, 1);
-  while (!st.empty()) {
-    if (result1.numerator() != 0)
-      result2 = st.top() + (1 / result1);
-    else
-      result2 = st.top();
-    st.pop();
-    result1 = result2;
-  }
-  err1                              = std::abs(rational_cast<double>(result1) - absValue);
-  err2                              = std::abs(rational_cast<double>(result2) - absValue);
-  const boost::rational<int> result = err1 > err2 ? result2 : result1;
+  if (k1 == 0) return {0, 1};  // zaden wyraz nie wszedl - k1 zostalo przy k_{-1}
+  const boost::rational<int> result(static_cast<int>(h1), static_cast<int>(k1));
   return std::signbit(inValue) ? -result : result;
 }
 

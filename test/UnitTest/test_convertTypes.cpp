@@ -1,8 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <any>
+#include <boost/multiprecision/cpp_int.hpp>
 #include <boost/rational.hpp>
+#include <cmath>
+#include <cstdint>
+#include <format>
 #include <limits>
+#include <random>
+#include <stack>
 #include <string>
 #include <utility>
 
@@ -66,6 +72,114 @@ TEST(Rationalize, at_integer_bound_is_exact) {
 // miejsce usunietego zachowania nieokreslonego. `boost::rational<int>` z licznikiem INT_MIN
 // jest zreszta nie do uzycia dalej - kazda negacja takiego ulamka przepelnia sie tak samo.
 TEST(Rationalize, at_negative_integer_bound_is_zero) { EXPECT_EQ(Rationalize(-2147483648.0), boost::rational<int>(0, 1)); }
+
+// --- konwergent ponad `int` (#309) ---
+//
+// Skladanie ulamka od tylu na `boost::rational<int>` przepelnialo sie, gdy konwergent wychodzil
+// poza `int` - zachowanie nieokreslone, w praktyce ulamek o zlej wartosci i czesto zlym znaku
+// (`0.333333` dawalo 2064120233/1923156540). Wynikiem jest teraz ostatni konwergent, ktory sie
+// miesci. Kazda z tych wartosci przepelniala stara wersje; sprawdzamy znak i blad wzgledny.
+
+namespace {
+void expectCloseWithSign(double x) {
+  for (const double v : {x, -x}) {
+    const double r = boost::rational_cast<double>(Rationalize(v));
+    EXPECT_EQ(std::signbit(r), std::signbit(v)) << std::format("{}", v);
+    EXPECT_LE(std::abs(r - v) / std::abs(v), 1e-9) << std::format("{}", v);
+  }
+}
+}  // namespace
+
+TEST(Rationalize, overflow_decimal_interval) { expectCloseWithSign(0.333333); }
+TEST(Rationalize, overflow_large_with_fraction) { expectCloseWithSign(1500000000.7); }
+TEST(Rationalize, overflow_at_integer_bound) { expectCloseWithSign(2147483647.5); }
+TEST(Rationalize, overflow_power_result) { expectCloseWithSign(std::pow(3.0, 1.5)); }
+
+// --- zgodnosc ze stara wersja tam, gdzie ta sie nie przepelniala ---
+//
+// Kopia Rationalize sprzed #309 jako szablon po typie, w ktorym sklada sie ulamek. Dla `int` to
+// dokladnie stary kod. Dla `cpp_int` ten sam ulamek bez granicy zakresu - on rozstrzyga, czy
+// wersja `int` sie przepelnia. Licznik i mianownik kazdego ogona [a_i; ..., a_n] sa ograniczone
+// przez licznik i mianownik wyniku (a_i >= 1 dla i >= 1), wiec jesli wynik miesci sie w `int`,
+// miesci sie kazdy krok skladania i stara wersja liczy bez zachowania nieokreslonego.
+template <typename I>
+boost::rational<I> legacyRationalize(const double inValue, const double DIFF = kDefaultRationalizeDiff,
+                                     const int ttl_const = kDefaultRationalizeIterations) {
+  std::stack<int> st;
+  const double upperExclusive = std::ldexp(1.0, std::numeric_limits<int>::digits);
+  const double absValue       = std::fabs(inValue);
+  double startx               = absValue;
+  double diff;
+  double err1;
+  double err2;
+  int ttl = ttl_const;
+  int val;
+  for (;;) {
+    const double truncated = std::trunc(startx);
+    if (!(truncated < upperExclusive)) break;
+    val = static_cast<int>(truncated);
+    st.push(val);
+    if ((ttl--) == 0) break;
+    diff = startx - val;
+    if (diff < DIFF) break;
+    startx = 1 / diff;
+    if (startx > (1 / DIFF)) break;
+  }
+  if (st.empty()) return {0, 1};
+  boost::rational<I> result1(0, 1);
+  boost::rational<I> result2(0, 1);
+  while (!st.empty()) {
+    if (result1.numerator() != 0)
+      result2 = I(st.top()) + (I(1) / result1);
+    else
+      result2 = I(st.top());
+    st.pop();
+    result1 = result2;
+  }
+  err1                            = std::abs(boost::rational_cast<double>(result1) - absValue);
+  err2                            = std::abs(boost::rational_cast<double>(result2) - absValue);
+  const boost::rational<I> result = err1 > err2 ? result2 : result1;
+  return std::signbit(inValue) ? -result : result;
+}
+
+// Trzy rodziny wejsc: jednostajnie z [0,1), log-rownomiernie 1e-9..1e10 i liczby dziesietne
+// o 1-9 cyfrach po przecinku, z losowym znakiem i stalym ziarnem.
+TEST(Rationalize, matches_legacy_where_legacy_did_not_overflow) {
+  using big               = boost::multiprecision::cpp_int;
+  const big intMax        = std::numeric_limits<int>::max();
+  constexpr int perFamily = 5000;
+
+  std::mt19937_64 gen(309);
+  std::uniform_real_distribution<double> unit(0.0, 1.0);
+  std::uniform_real_distribution<double> decade(-9.0, 10.0);
+  std::uniform_int_distribution<std::int64_t> mantissa(0, 9999999999);
+  std::uniform_int_distribution<int> fractionDigits(1, 9);
+  std::bernoulli_distribution negative(0.5);
+  const auto draw = [&](int family) {
+    switch (family) {
+      case 0:
+        return unit(gen);
+      case 1:
+        return std::pow(10.0, decade(gen));
+      default:
+        return static_cast<double>(mantissa(gen)) / std::pow(10.0, fractionDigits(gen));
+    }
+  };
+
+  for (int family = 0; family < 3; ++family) {
+    int compared = 0;
+    for (int i = 0; i < perFamily; ++i) {
+      const double magnitude = draw(family);
+      const double x         = negative(gen) ? -magnitude : magnitude;
+      const auto exact       = legacyRationalize<big>(x);
+      if (abs(exact.numerator()) > intMax || exact.denominator() > intMax) continue;
+      ++compared;
+      EXPECT_EQ(Rationalize(x), legacyRationalize<int>(x)) << std::format("{}", x);
+    }
+    // Filtr nie moze zrobic z testu pustego. Zmierzone: 99 %, 61 % i 52 % wejsc bez przepelnienia.
+    EXPECT_GE(compared, perFamily / 4) << "rodzina " << family;
+  }
+}
 
 // ── nullFallbackValue ─────────────────────────────────────────────────────────
 
