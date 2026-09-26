@@ -528,9 +528,9 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
     case STREAM_MAX: {
       const auto &nameSrc = nameArg(0);
 
-      // Nazwa pola wyniku to qry.id + "_0" - payload wejsciowy juz ja niesie (query::descriptorFrom
-      // buduje dla reduktora jedno pole o tej nazwie), wiec nie sklejamy jej od nowa w kazdym takcie.
-      *runtime.inputPayload = streamRuntime(nameSrc).reduceFieldsToPayload(cmd, runtime.inputPayload->descriptor[0].rname);
+      // Wynik idzie wprost do payloadu wejsciowego - ma on juz pole wyniku (query::descriptorFrom, ta sama
+      // regula reductionResultField), wiec nie budujemy co takt deskryptora i payloadu tylko po to, zeby je tu skopiowac.
+      streamRuntime(nameSrc).reduceFieldsInto(cmd, *runtime.inputPayload);
     } break;
     case STREAM_SUBTRACT: {
       //  :- PUSH_STREAM(core0)

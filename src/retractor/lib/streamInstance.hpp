@@ -56,6 +56,11 @@ struct streamInstance {
    */
   [[nodiscard]] rdb::payload reduceFieldsToPayload(command_id cmd, const std::string &instance) const;
 
+  /// Ta sama redukcja, zapisana wprost do pola 0 payloadu `target`. Cel musi miec dokladnie jedno pole
+  /// o typie i szerokosci z reductionResultField() - tak buduje go query::descriptorFrom() dla reduktora.
+  /// Goraca petla pisze tak do payloadu wejsciowego wezla, bez budowy wyniku i jego kopii w kazdym takcie.
+  void reduceFieldsInto(command_id cmd, rdb::payload &target) const;
+
   /// Redukcja okna REKORDOWEGO nad polem TEGO strumienia - jedno przejście, cztery agregaty.
   ///
   /// Okno obejmuje rekordy logiczne `lastLogicalIndex-(group.width-1) ... lastLogicalIndex`.

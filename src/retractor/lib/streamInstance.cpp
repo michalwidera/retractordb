@@ -232,6 +232,43 @@ void fnOp(opType op, const rdb::descFldVT &value, rdb::descFldVT &valueRet) {
   }
 }
 
+// Redukcja pol BYTE/INTEGER bez wariantu na element. Liczy dokladnie to co petla ogolna nad
+// castVT + fnOp<rational>: wartosc to rational<int>(v) o mianowniku 1, wiec suma idzie przez
+// checkedArith::add(int, int) - te sama galaz, ktora wybiera add(rational, rational) - a ekstremum
+// przez zwykle porownanie. Przepelnienie daje NULL i pochlania reszte, ale elementy dalej sa liczone.
+// valueRet wchodzi z wartoscia startowa operacji (INT_MAX / INT_MIN / 0).
+void reduceIntegralFields(opType op, const rdb::payload &source, int flatCount, int &validItemCount, rdb::descFldVT &valueRet) {
+  int acc       = std::get<boost::rational<int>>(valueRet).numerator();
+  bool overflow = false;
+  for (int item = 0; item < flatCount; ++item) {
+    const auto value = source.getIntegralItem(item);
+    if (!value.has_value()) continue;
+    validItemCount++;
+    if (overflow) continue;
+    switch (op) {
+      case maxop:
+        if (acc < *value) acc = *value;
+        break;
+      case minop:
+        if (acc > *value) acc = *value;
+        break;
+      case sumop: {
+        const auto sum = checkedArith::add(acc, *value);
+        if (sum.has_value())
+          acc = *sum;
+        else
+          overflow = true;
+      } break;
+      default:
+        FatalError("streamInstance::reduceIntegralFields: unsupported opType");
+    }
+  }
+  if (overflow)
+    valueRet = std::monostate{};
+  else
+    valueRet = boost::rational<int>(acc);
+}
+
 windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const int lastLogicalIndex,
                                                const int sourceIndexBase) const {
   if (group.width <= 0) FatalError("streamInstance::reduceRecordWindow: window width must be > 0, got {}", group.width);
@@ -322,29 +359,39 @@ windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const i
 }
 
 rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::string &instance) const {
-  if (cmd != STREAM_MAX && cmd != STREAM_MIN && cmd != STREAM_SUM && cmd != STREAM_AVG) {
-    FatalError("streamInstance::reduceFieldsToPayload: cmd must be STREAM_MAX/MIN/SUM/AVG, got {}", static_cast<int>(cmd));
-  }
-
-  // First construct descriptor
-  static_cast<void>(outputPayload->revRead(0));  // czytamy dla ksztaltu deskryptora, nie dla wartosci
-
-  auto [sourceType, sourceLen] = outputPayload->descriptor.widestFieldType();
-
   // K24/D4: typ wyniku redukcji wyprowadzany jest jedną regułą, wspólną
   // z query::descriptorFrom - patrz reductionResultField() w query.hpp.
-  auto [maxType, maxLen] = reductionResultField(sourceType, sourceLen);
-  auto maxType_          = maxType;
+  auto [sourceType, sourceLen] = outputPayload->descriptor.widestFieldType();
+  auto [maxType, maxLen]       = reductionResultField(sourceType, sourceLen);
 
-  rdb::rField x{instance, maxLen, 1, maxType};  // TODO - Check 1
-  rdb::Descriptor descriptor{x};
-  // same as core[instance].descriptorFrom()
-
-  // Second construct payload
   // S2: obiekt lokalny zamiast make_unique - wczesniej payload powstawal na stercie,
   // a 'return *(localPayload)' KOPIOWAL go w calosci do wyniku. Lokalna zmienna +
   // NRVO usuwa i alokacje, i kopie (ten sam wzorzec co w constructAgsePayload).
-  rdb::payload localPayload(descriptor);
+  rdb::payload localPayload(rdb::Descriptor{rdb::rField{instance, maxLen, 1, maxType}});
+  reduceFieldsInto(cmd, localPayload);
+  return localPayload;
+}
+
+void streamInstance::reduceFieldsInto(command_id cmd, rdb::payload &target) const {
+  if (cmd != STREAM_MAX && cmd != STREAM_MIN && cmd != STREAM_SUM && cmd != STREAM_AVG) {
+    FatalError("streamInstance::reduceFieldsInto: cmd must be STREAM_MAX/MIN/SUM/AVG, got {}", static_cast<int>(cmd));
+  }
+
+  // Przywraca wspolny bufor zrodla na najswiezszy rekord - petla nizej czyta z niego WARTOSCI.
+  // Inni konsumenci tego zrodla (getPayload z offsetem, fetchForward) zostawiaja w nim starszy rekord.
+  static_cast<void>(outputPayload->revRead(0));
+
+  auto [sourceType, sourceLen] = outputPayload->descriptor.widestFieldType();
+  auto [maxType, maxLen]       = reductionResultField(sourceType, sourceLen);
+  auto maxType_                = maxType;
+
+  // Cel ma pole wyniku z tej samej reguly, ale policzonej nad deskryptorem PLANU, a magazyn zrodla moze
+  // niesc deskryptor z dysku (verifyDescriptorMatch przepuszcza plan szerszy od pliku). Rozjazd wychodzil
+  // dotad dopiero w payload::operator= przy przypisaniu wyniku - tu jest sprawdzany jawnie.
+  if (target.descriptor.size() != 1 || target.descriptor[0].rtype != maxType || target.descriptor[0].rlen != maxLen) {
+    FatalError("streamInstance::reduceFieldsInto: target does not match reduction result type {} for '{}'",
+               static_cast<int>(maxType), target.descriptor.empty() ? std::string{} : target.descriptor[0].rname);
+  }
 
   if (maxType > rdb::DOUBLE) {  // fldlist.h -  rdb types are in sequence
     FatalError("streamInstance: aggregation not supported for this field type");
@@ -417,7 +464,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   }
 
   if (std::holds_alternative<std::monostate>(valueRet))
-    FatalError("streamInstance::reduceFieldsToPayload: valueRet not initialized after switch");
+    FatalError("streamInstance::reduceFieldsInto: valueRet not initialized after switch");
 
   auto validItemCount{0};
   // Petla idzie po SLOTACH PLASKICH, nie po wpisach deskryptora: getItemVT() przyjmuje
@@ -427,35 +474,42 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   // Pola konfiguracyjne (REF, TYPE, RETENTION, RETMEMORY) nie maja slotow plaskich,
   // wiec ich pominiecie zapewnia sam Descriptor::rebuildFieldMappings().
   const int flatCount = outputPayload->descriptor.flatElementCount();
-  for (int item = 0; item < flatCount; ++item) {
-    auto valueOpt = outputPayload->getPayload()->getItemVT(item);
-    if (!valueOpt.has_value()) continue;
-    validItemCount++;
+  const auto *source  = outputPayload->getPayload();
+  // Najszerszy typ zrodla BYTE albo INTEGER znaczy: WSZYSTKIE pola danych sa BYTE/INTEGER - kazdy inny
+  // typ (UINT, RATIONAL, zmiennoprzecinkowe, STRING, NULLTYPE) jest w descFld szerszy od INTEGER.
+  if (maxType_ == rdb::RATIONAL && (sourceType == rdb::BYTE || sourceType == rdb::INTEGER)) {
+    reduceIntegralFields(op, *source, flatCount, validItemCount, valueRet);
+  } else {
+    for (int item = 0; item < flatCount; ++item) {
+      auto valueOpt = source->getItemVT(item);
+      if (!valueOpt.has_value()) continue;
+      validItemCount++;
 
-    rdb::descFldVT value = castVT(valueOpt.value(), maxType_);
-    switch (maxType_) {
-      case rdb::BYTE:
-      case rdb::INTEGER:
-      case rdb::UINT:
-        FatalError("streamInstance: BYTE/INT/UINT should have been cast to RATIONAL before aggregation");
-      case rdb::RATIONAL:
-        fnOp<boost::rational<int>>(op, value, valueRet);
-        break;
-      case rdb::FLOAT:
-        fnOp<float>(op, value, valueRet);
-        break;
-      case rdb::DOUBLE:
-        fnOp<double>(op, value, valueRet);
-        break;
-      default:
-        FatalError("streamInstance: unsupported aggregation type");
+      rdb::descFldVT value = castVT(valueOpt.value(), maxType_);
+      switch (maxType_) {
+        case rdb::BYTE:
+        case rdb::INTEGER:
+        case rdb::UINT:
+          FatalError("streamInstance: BYTE/INT/UINT should have been cast to RATIONAL before aggregation");
+        case rdb::RATIONAL:
+          fnOp<boost::rational<int>>(op, value, valueRet);
+          break;
+        case rdb::FLOAT:
+          fnOp<float>(op, value, valueRet);
+          break;
+        case rdb::DOUBLE:
+          fnOp<double>(op, value, valueRet);
+          break;
+        default:
+          FatalError("streamInstance: unsupported aggregation type");
+      }
     }
   }
 
   if (validItemCount == 0) {
     auto postion{0};
-    localPayload.setItemVT(postion, std::nullopt);
-    return localPayload;
+    target.setItemVT(postion, std::nullopt);
+    return;
   }
 
   if (cmd == STREAM_AVG) {
@@ -492,11 +546,9 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   auto postion{0};
   // monostate w std::optional nie jest NULL-em dla setItemVT - przepelnienie trzeba zapisac jawnie.
   if (std::holds_alternative<std::monostate>(valueRet))
-    localPayload.setItemVT(postion, std::nullopt);
+    target.setItemVT(postion, std::nullopt);
   else
-    localPayload.setItemVT(postion, valueRet);
-
-  return localPayload;
+    target.setItemVT(postion, valueRet);
 }
 
 void streamInstance::constructOutputPayload(const std::list<field> &fields) const {

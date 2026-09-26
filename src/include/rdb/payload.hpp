@@ -89,6 +89,11 @@ class payload {
   /// Semantyka identyczna z getItem (nullopt => null).
   [[nodiscard]] std::optional<descFldVT> getItemVT(int position) const;
 
+  /// @brief Odczyt pola BYTE/INTEGER wprost do int - bez wariantu, dla goracych petli, ktore znaja
+  /// typ z gory (redukcja pol rekordu). Semantyka NULL identyczna z getItemVT (nullopt => null).
+  /// Pole innego typu to blad wolajacego (FatalError).
+  [[nodiscard]] std::optional<int> getIntegralItem(int position) const;
+
   /// @brief Set format input/output formater - default false
   /// @param hexFormat true if out/in in hex
   void setHex(bool hexFormat);
