@@ -390,6 +390,32 @@ TEST(xExpressionEval, divide_by_zero_yields_null_for_every_numeric_type) {
   }
 }
 
+// Para dzieli sie po skladowych, wiec zero w KTOREJKOLWIEK skladowej dzielnika robi NULL z calej
+// pary - tak jak dla int i rational. Do #267 straznik polykal pary catch-allem, a zero w skladowej
+// konczylo proces sygnalem SIGFPE na x86-64. Asercja wykonuje sie tylko wtedy, gdy proces zyje.
+TEST(xExpressionEval, divide_intpair_by_zero_component_yields_null) {
+  for (const auto &divisor : {std::pair<int, int>(3, 0), std::pair<int, int>(0, 2)}) {
+    std::list<token> program;
+    program.emplace_back(PUSH_VAL, rdb::descFldVT(std::pair<int, int>(6, 4)));
+    program.emplace_back(PUSH_VAL, rdb::descFldVT(divisor));
+    program.emplace_back(DIVIDE);
+
+    expressionEvaluator test;
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program))) << divisor.first << "," << divisor.second;
+  }
+}
+
+// IDXPAIR dzieli tylko skladowa liczbowa - napisu nikt nie dzieli, wiec o NULL decyduje zero w `second`.
+TEST(xExpressionEval, divide_idxpair_by_zero_index_yields_null) {
+  std::list<token> program;
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::pair<std::string, int>("a", 6)));
+  program.emplace_back(PUSH_VAL, rdb::descFldVT(std::pair<std::string, int>("b", 0)));
+  program.emplace_back(DIVIDE);
+
+  expressionEvaluator test;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+}
+
 TEST(xExpressionEval, malformed_stack_throws) {
   std::list<token> program;
   program.emplace_back(ADD);

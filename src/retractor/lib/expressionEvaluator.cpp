@@ -209,11 +209,16 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   auto [a, b] = normalize(aParam, bParam, promoted);
   if (isNullValue(a) || isNullValue(b)) return std::monostate{};
 
+  // Para to dwie niezalezne liczby, nie ulamek - dzieli sie po skladowych, wiec zero w ktorejkolwiek
+  // dzielonej skladowej nie ma ilorazu. Napis IDXPAIR nie jest dzielony. Bez catch-allu: nowa
+  // alternatywa wariantu ma byc tu bledem kompilacji, nie cichym `false` (#267).
   const bool divisorIsZero =
       std::visit(Overload{[](uint8_t v) { return v == 0; }, [](int v) { return v == 0; }, [](unsigned v) { return v == 0U; },
                           [](double v) { return v == 0.0; }, [](float v) { return v == 0.0F; },
                           [](boost::rational<int> v) { return v == boost::rational<int>(0); },
-                          [](std::monostate) { return false; }, [](const auto &) { return false; }},
+                          [](std::pair<int, int> v) { return v.first == 0 || v.second == 0; },
+                          [](const std::pair<std::string, int> &v) { return v.second == 0; },
+                          [](const std::string &) { return false; }, [](std::monostate) { return false; }},
                  b);
 
   if (divisorIsZero) {
@@ -242,10 +247,19 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
                  [&retVal](float a, float b) { retVal = a / b; },                                                          //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::div(a, b)); },  //
                  [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
-                   retVal = std::make_pair(a.first / b.first, a.second / b.second);
+                   const auto first  = checkedArith::div(a.first, b.first);
+                   const auto second = checkedArith::div(a.second, b.second);
+                   if (first && second)
+                     retVal = std::make_pair(*first, *second);
+                   else
+                     retVal = std::monostate{};
                  },  //
                  [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
-                   retVal = std::make_pair(/* TODO? define str/str */ "?? /", a.second / b.second);
+                   const auto second = checkedArith::div(a.second, b.second);
+                   if (second)
+                     retVal = std::make_pair(/* TODO? define str/str */ "?? /", *second);
+                   else
+                     retVal = std::monostate{};
                  },                                             //
                  [&retVal](auto a, auto b) { retVal = a / b; }  //
              },
