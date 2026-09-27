@@ -429,6 +429,7 @@ int main(int argc, char *argv[]) try {
     // Ten sam budzet dla planu startowego i dla `-c`, ktore jest bramka: plan przyjety tutaj musi
     // przejsc takze kompilacje w kanale ad-hoc i `--reset` (executorsm::cfgHistoryMemoryMib).
     cm.setHistoryMemoryBudget(appCfg.historyMemoryMib);
+    cm.setDefaultRetention(appCfg.defaultRetention);
 
     iLoopLimitCnt = loopLimitVar;  // std::atomic assignment
 
@@ -528,6 +529,20 @@ int main(int argc, char *argv[]) try {
         std::cerr << "Input file:" << sInputFile << '\n'  //
                   << "Check result:" << response << '\n';
         return system::errc::protocol_error;
+      }
+
+      // Wzrost na dysku jest dozwolony, ale jawny (D8): wykaz przy starcie i w `-c`, takze z --quiet.
+      // Na stderr, bo log silnika lezy w $TMPDIR, a stdout `-c` bywa plikiem dot. Niczego nie kasuje -
+      // granice stawia RETENTION, magazyn MEMORY albo `[storage] default_retention`.
+      if (const auto unbounded = cm.unboundedDiskStreams(); !unbounded.empty()) {
+        for (const auto &[stream, reason] : unbounded) {
+          std::println(std::cerr, "{}: warning: stream {} grows without bound on disk ({})", argv[0], stream, reason);
+          SPDLOG_WARN("Stream {} grows without bound on disk ({})", stream, reason);
+        }
+        std::println(std::cerr,
+                     "{}: note: bound them with RETENTION <capacity> <segments>, STORAGE MEMORY, SUBSTRAT 'memory' "
+                     "or [storage] default_retention in the config",
+                     argv[0]);
       }
 
       if (onlyCompile) {
@@ -703,6 +718,14 @@ int main(int argc, char *argv[]) try {
     return system::errc::interrupted;
   }
 
+  // Pliki, ktore :ROTATION zachowa, musza pasowac do planu - przed pierwsza czynnoscia startu.
+  // Nie w `-c`: kompilacja nie musi biec na maszynie z danymi.
+  if (const std::string kept = checkKeptStores(coreInstance, {}); kept != "OK") {
+    std::cerr << "xretractor: " << kept << '\n';
+    SPDLOG_ERROR("Plan refused: {}", kept);
+    return system::errc::protocol_error;
+  }
+
   // Od tego miejsca zaczyna sie transakcja startowa zwyklej instancji. Najpierw blokada
   // tozsamosci, potem atomowe roszczenie magistrali, dopiero potem kasowanie artefaktow.
   // Przegrany rownolegly start nie dochodzi dzieki temu do zadnej czynnosci destrukcyjnej.
@@ -808,7 +831,7 @@ int main(int argc, char *argv[]) try {
 
   // Artefakty poprzedniego przebiegu znikaja ta sama droga co przy przeladowaniu planu
   // w locie (`xqry --reset`) - patrz dropStalePlanArtifacts w planSource.cpp.
-  dropStalePlanArtifacts(coreInstance, cm, processedLines);
+  dropStalePlanArtifacts(coreInstance);
 
   executorsm exec;
   return exec.run(coreInstance, guard, xrdbbus, cm, vm, appCfg, earlyServerName, systemd.unit.value_or(std::string{}));

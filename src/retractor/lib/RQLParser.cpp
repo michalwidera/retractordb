@@ -607,8 +607,10 @@ class ParserListener : public RQLBaseListener {
     // Domyslnosc jest w planie, bo plik moze byc parsowany po jednej instrukcji.
     // Jawna polityka SELECT wygrywa; DECLARE nie dziedziczy tego ustawienia.
     const bool inheritVolatile = coreInstance.exists(":DEFAULT") && ctx->PERSISTENT() == nullptr && ctx->STORAGE() == nullptr;
+    // Samo `RETENTION n` (juz w policy.second) jest rozmiarem pierscienia, jak przy `STORAGE MEMORY`.
+    // Do 2026-09-27 VOLATILE nadpisywal je jedynka, wiec RETENTION ginelo bez slowa (decyzja P4).
     if (ctx->VOLATILE() != nullptr || inheritVolatile) {
-      qry.policy = std::make_pair("MEMORY", 1);
+      qry.policy = std::make_pair("MEMORY", std::max<size_t>(qry.policy.second, 1));
     }
 
     if (ctx->FILE() != nullptr) {
@@ -629,12 +631,39 @@ class ParserListener : public RQLBaseListener {
     }
     if (ctx->PERSISTENT() != nullptr && qry.storage_policy == "MEMORY")
       reportSemanticError("PERSISTENT conflicts with STORAGE MEMORY");
-    // `STORAGE MEMORY` to pierscien w RAM, jak VOLATILE, tylko z RETENTION. Do 2026-09-27 polityka zostawala
+    // `STORAGE MEMORY` to pierscien w RAM, jak VOLATILE. Do 2026-09-27 polityka zostawala
     // ("DEFAULT", n): bez RETENTION deskryptor nie dostawal RETMEMORY, wiec memoryFile nie mial granicy
     // i rosl o rekord na takt do wyczerpania pamieci; z `RETENTION n` dostawal TYPE DEFAULT i dane szly
     // na DYSK. Pojemnosc to co najmniej 1 - reszte, jak dla VOLATILE, dobiera kompilator.
     if (qry.storage_policy == "MEMORY" && qry.policy.first != "MEMORY")
       qry.policy = std::make_pair("MEMORY", std::max<size_t>(qry.policy.second, 1));
+    // Samo `RETENTION n` to rozmiar pierscienia MEMORY. Magazyn plikowy liczy retencje w segmentach,
+    // a do 2026-09-27 zostawala tu polityka ("DEFAULT", n): deskryptor dostawal TYPE DEFAULT zamiast
+    // STORAGE z planu i zadnej retencji - plik rosl bez granicy, `STORAGE DIRECT` konczyl jako DEFAULT
+    // z .shadow (decyzja D7).
+    if (qry.policy.first != "MEMORY" && qry.policy.second != 0) {
+      const std::string capacity = std::to_string(qry.policy.second);
+      const std::string hint =
+          (qry.storage_policy == "DEFAULT" || qry.storage_policy == "DIRECT")
+              ? qry.storage_policy + " storage on disk keeps segments: write RETENTION " + capacity + " <segments>"
+              : qry.storage_policy + " storage has no retention: use STORAGE DEFAULT or DIRECT with RETENTION " + capacity +
+                    " <segments>";
+      reportSemanticError("RETENTION " + capacity + " on stream " + qry.id + " sets only the size of a MEMORY ring; " + hint);
+    }
+    // Lustro powyzszego: segmenty na dysku przy magazynie w pamieci. memoryFile czyta tylko RETMEMORY,
+    // wiec `RETENTION c s` bylo tu ignorowane bez slowa (decyzja P4).
+    if (qry.policy.first == "MEMORY" && !qry.retention.noRetention()) {
+      const std::string capacity = std::to_string(qry.retention.capacity);
+      const std::string owner    = (ctx->VOLATILE() != nullptr) ? "VOLATILE"
+                                   : inheritVolatile            ? "DEFAULT VOLATILE"
+                                                                : "STORAGE MEMORY";
+      const std::string onDisk   = (ctx->VOLATILE() != nullptr) ? "drop VOLATILE"
+                                   : inheritVolatile            ? "add PERSISTENT"
+                                                                : "use STORAGE DEFAULT or DIRECT";
+      reportSemanticError("RETENTION " + capacity + " " + std::to_string(qry.retention.segments) + " on stream " + qry.id +
+                          " sets segments on disk, but " + owner + " keeps the stream in memory: write RETENTION " + capacity +
+                          " for a MEMORY ring, or " + onDisk + " to keep segments on disk");
+    }
 
     coreInstance.push_back(qry);
     program.clear();

@@ -4307,6 +4307,215 @@ TEST(xcompiler, storage_memory_is_a_bounded_ring_in_memory) {
   EXPECT_EQ(ring("wide"), std::make_pair(std::string("MEMORY"), size_t{20}));
 }
 
+// D7: samo `RETENTION n` to rozmiar pierscienia MEMORY. Na magazynie plikowym zostawialo polityke
+// ("DEFAULT", n), a z niej TYPE DEFAULT w .desc - bez retencji i wbrew STORAGE z planu. Teraz blad planu
+// z podpowiedzia postaci dwuargumentowej; MEMORY, VOLATILE i odziedziczone DEFAULT VOLATILE bez zmian.
+TEST(xparser, retention_without_segments_on_disk_storage_is_a_plan_error) {
+  const std::string source = "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n";
+  for (const auto *select : {"SELECT src[0] STREAM out FROM src RETENTION 5",  //
+                             "SELECT src[0] STREAM out FROM src RETENTION 5 STORAGE DIRECT",
+                             "SELECT src[0] STREAM out FROM src RETENTION 5 STORAGE DEFAULT",
+                             "SELECT src[0] STREAM out FROM src RETENTION 5 STORAGE POSIX",
+                             "SELECT src[0] STREAM out FROM src RETENTION 5 STORAGE GENERIC"}) {
+    const auto [parseResult, diagnostics] = parseCapturingStderr(source + select);
+    EXPECT_TRUE(parseResult.contains("RETENTION 5 on stream out")) << select << '\n' << parseResult;
+    EXPECT_TRUE(parseResult.contains("RETENTION 5 <segments>")) << select << '\n' << parseResult;
+  }
+  // PERSISTENT wylacza odziedziczona ulotnosc, wiec magazyn jest plikowy.
+  const auto [persistent, persistentDiagnostics] =
+      parseCapturingStderr("DEFAULT VOLATILE\n" + source + "SELECT src[0] STREAM out FROM src RETENTION 5 PERSISTENT");
+  EXPECT_TRUE(persistent.contains("RETENTION 5 <segments>")) << persistent;
+
+  for (const auto *memory :
+       {"SELECT src[0] STREAM out FROM src RETENTION 5 STORAGE MEMORY", "SELECT src[0] STREAM out FROM src RETENTION 5 VOLATILE",
+        "SELECT src[0] STREAM out FROM src RETENTION 5 2 STORAGE DIRECT"}) {
+    qTree plan;
+    EXPECT_EQ(std::get<0>(parserRQLString(plan, source + memory)), "OK") << memory;
+  }
+  qTree inherited;
+  EXPECT_EQ(
+      std::get<0>(parserRQLString(inherited, "DEFAULT VOLATILE\n" + source + "SELECT src[0] STREAM out FROM src RETENTION 5")),
+      "OK");
+}
+
+// P4: segmenty na dysku przy magazynie w pamieci. memoryFile czyta tylko RETMEMORY, wiec `RETENTION c s`
+// przy STORAGE MEMORY i przy VOLATILE (jawnym i odziedziczonym) bylo ignorowane bez slowa. Teraz blad
+// planu z dwiema drogami wyjscia: pierscien albo dysk - ta druga zalezy od tego, co trzyma strumien w RAM.
+TEST(xparser, retention_segments_on_memory_storage_are_a_plan_error) {
+  const std::string source = "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n";
+  const std::vector<std::pair<std::string, std::string>> cases{
+      {source + "SELECT src[0] STREAM out FROM src RETENTION 5 2 STORAGE MEMORY",
+       "but STORAGE MEMORY keeps the stream in memory: write RETENTION 5 for a MEMORY ring, or use STORAGE DEFAULT or DIRECT"},
+      {source + "SELECT src[0] STREAM out FROM src RETENTION 5 2 VOLATILE",
+       "but VOLATILE keeps the stream in memory: write RETENTION 5 for a MEMORY ring, or drop VOLATILE"},
+      {"DEFAULT VOLATILE\n" + source + "SELECT src[0] STREAM out FROM src RETENTION 5 2",
+       "but DEFAULT VOLATILE keeps the stream in memory: write RETENTION 5 for a MEMORY ring, or add PERSISTENT"},
+  };
+  for (const auto &[rql, reason] : cases) {
+    const auto [parseResult, diagnostics] = parseCapturingStderr(rql);
+    EXPECT_TRUE(parseResult.contains("RETENTION 5 2 on stream out sets segments on disk, " + reason)) << rql << '\n'
+                                                                                                      << parseResult;
+  }
+  qTree persistent;
+  EXPECT_EQ(std::get<0>(parserRQLString(
+                persistent, "DEFAULT VOLATILE\n" + source + "SELECT src[0] STREAM out FROM src RETENTION 5 2 PERSISTENT")),
+            "OK");
+}
+
+// P4, lustro: samo `RETENTION n` przy VOLATILE jest rozmiarem pierscienia, jak przy STORAGE MEMORY -
+// do 2026-09-27 VOLATILE nadpisywal je jedynka. Wieksza potrzeba planu nadal wygrywa.
+TEST(xcompiler, volatile_retention_sets_the_ring_size) {
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan,
+                          "DEFAULT VOLATILE\n"
+                          "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n"
+                          "SELECT src[0] STREAM kept FROM src RETENTION 7 VOLATILE\n"
+                          "SELECT src[0] STREAM inherited FROM src RETENTION 7\n"
+                          "SELECT src[0] STREAM needed FROM src RETENTION 3 VOLATILE\n"
+                          "SELECT needed[0] STREAM late FROM needed>9\n"
+                          "SELECT src[0] STREAM bare FROM src VOLATILE\n")
+                .status,
+            "OK");
+  ASSERT_EQ(compiler(plan).compile(), "OK");
+  auto ring = [&plan](const std::string &id) { return plan.getQuery(id).descriptorStorage().storagePolicy(); };
+  EXPECT_EQ(ring("kept"), std::make_pair(std::string("MEMORY"), size_t{7}));
+  EXPECT_EQ(ring("inherited"), std::make_pair(std::string("MEMORY"), size_t{7}));
+  EXPECT_EQ(ring("needed").second, static_cast<size_t>(plan.maxCapacity.at("needed")));
+  EXPECT_GT(ring("needed").second, size_t{3});
+  EXPECT_EQ(ring("bare"), std::make_pair(std::string("MEMORY"), size_t{1}));
+}
+
+// D7, czesc druga: polityka "DEFAULT" typu nie wybiera, wiec TYPE w .desc bierze STORAGE z planu,
+// niezaleznie od tego, czy parser taka polityke jeszcze przepusci. Typ wybrany przez polityke -
+// VOLATILE (udokumentowane pierwszenstwo nad STORAGE) i profil SUBSTRAT - zostaje.
+TEST(xcompiler, default_policy_does_not_override_explicit_storage) {
+  query direct;
+  direct.lProgram       = {token(PUSH_STREAM, std::string("src"))};
+  direct.policy         = std::make_pair("DEFAULT", 5);
+  direct.storage_policy = "DIRECT";
+  EXPECT_EQ(direct.storageType(), "DIRECT");
+  EXPECT_EQ(direct.descriptorStorage().storagePolicy().first, "DIRECT");
+
+  qTree plan;
+  ASSERT_EQ(std::get<0>(parserRQLString(plan, R"(
+    SUBSTRAT 'direct'
+    DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'
+    SELECT src[0] STREAM segmented FROM src RETENTION 5 2 STORAGE DIRECT
+    SELECT src[0] STREAM tmp FROM src VOLATILE STORAGE DIRECT
+    SELECT src[0] STREAM out FROM SUMC(src@(1,3))
+  )")),
+            "OK");
+  ASSERT_EQ(compiler(plan).compile(), "OK");
+  EXPECT_EQ(plan.getQuery("segmented").storageType(), "DIRECT");
+  EXPECT_EQ(plan.getQuery("segmented").descriptorStorage().retention().segments, 2U);
+  EXPECT_EQ(plan.getQuery("segmented").descriptorStorage().retention().capacity, 5U);
+  EXPECT_EQ(plan.getQuery("tmp").storageType(), "MEMORY");
+  bool found = false;
+  for (auto &q : plan) {
+    if (!q.isSubstrat) continue;
+    found = true;
+    EXPECT_EQ(q.storageType(), "DIRECT") << q.id;
+    EXPECT_EQ(q.descriptorStorage().storagePolicy().first, "DIRECT") << q.id;
+  }
+  EXPECT_TRUE(found);
+}
+
+// groupFile tuz po rotacji trzyma (segments-1) * capacity + 1 rekordow. Konsument siegajacy glebiej
+// czytal skasowany segment i konczyl dzialajacy serwer FatalError-em w storage::read. `mid>6` czyta
+// 7 rekordow: granica jest ostra, sprawdzona biegiem silnika po obu stronach.
+TEST(xcompiler, disk_retention_must_cover_the_history_the_plan_reads) {
+  const auto compileWith = [](const std::string &retention) {
+    qTree plan;
+    EXPECT_EQ(std::get<0>(parserRQLString(plan,
+                                          "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n"
+                                          "SELECT src[0] STREAM mid FROM src RETENTION " +
+                                              retention +
+                                              " STORAGE DIRECT\n"
+                                              "SELECT mid[0] STREAM late FROM mid>6 VOLATILE\n")),
+              "OK");
+    return compiler(plan).compile();
+  };
+  for (const auto *enough : {"3 3", "1 7", "7 2", "4 0"})
+    EXPECT_EQ(compileWith(enough), "OK") << enough;
+  EXPECT_EQ(compileWith("2 3"),
+            "Stream 'mid' keeps only 5 record(s) on disk under RETENTION 2 3, but the plan reads 7 record(s) back from it");
+  EXPECT_EQ(compileWith("1 6"),
+            "Stream 'mid' keeps only 6 record(s) on disk under RETENTION 1 6, but the plan reads 7 record(s) back from it");
+  EXPECT_EQ(compileWith("7 1"),
+            "Stream 'mid' keeps only 1 record(s) on disk under RETENTION 7 1, but the plan reads 7 record(s) back from it");
+}
+
+// D8: `[storage] default_retention` dostaja strumienie DEFAULT/DIRECT bez RETENTION, takze posrednie.
+// Jawne RETENTION, MEMORY i magazyny bez retencji (POSIX...) zostaja jak byly; te ostatnie, razem ze
+// wszystkim, co nadal nie ma granicy, wymienia unboundedDiskStreams().
+TEST(xcompiler, default_retention_bounds_disk_streams_without_retention) {
+  const std::string rql  = R"(
+    DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'
+    SELECT src[0] STREAM plain FROM src
+    SELECT src[0] STREAM straight FROM src STORAGE DIRECT
+    SELECT src[0] STREAM own FROM src RETENTION 7 3
+    SELECT src[0] STREAM every FROM src RETENTION 7 0
+    SELECT src[0] STREAM mem FROM src STORAGE MEMORY
+    SELECT src[0] STREAM raw FROM src STORAGE POSIX
+    SELECT src[0] STREAM out FROM SUMC(src@(1,3)) VOLATILE
+  )";
+  const auto retentionOf = [](qTree &plan, const std::string &id) {
+    const auto r = plan.getQuery(id).descriptorStorage().retention();
+    return std::make_pair(r.capacity, r.segments);
+  };
+  using list = std::vector<std::pair<std::string, std::string>>;
+
+  qTree bare;
+  ASSERT_EQ(std::get<0>(parserRQLString(bare, rql)), "OK");
+  compiler bareCompiler(bare);
+  ASSERT_EQ(bareCompiler.compile(), "OK");
+  list expected{{"plain", "no RETENTION"},
+                {"straight", "no RETENTION"},
+                {"every", "RETENTION 7 0 keeps every segment"},
+                {"raw", "STORAGE POSIX has no retention"}};
+  for (const auto &q : bare)
+    if (q.isSubstrat) expected.emplace_back(q.id, "intermediate stream, no RETENTION");
+  ASSERT_GT(expected.size(), 4U);  // SUMC(src@(1,3)) daje wezel posredni na dysku
+  auto unbounded = bareCompiler.unboundedDiskStreams();
+  std::ranges::sort(unbounded);
+  std::ranges::sort(expected);
+  EXPECT_EQ(unbounded, expected);
+
+  qTree bounded;
+  ASSERT_EQ(std::get<0>(parserRQLString(bounded, rql)), "OK");
+  compiler boundedCompiler(bounded);
+  boundedCompiler.setDefaultRetention({.segments = 4, .capacity = 100});
+  ASSERT_EQ(boundedCompiler.compile(), "OK");
+  const auto fromConfig = std::make_pair(std::size_t{100}, std::size_t{4});
+  EXPECT_EQ(retentionOf(bounded, "plain"), fromConfig);
+  EXPECT_EQ(retentionOf(bounded, "straight"), fromConfig);
+  EXPECT_EQ(retentionOf(bounded, "own"), std::make_pair(std::size_t{7}, std::size_t{3}));
+  EXPECT_EQ(retentionOf(bounded, "every"), std::make_pair(std::size_t{7}, std::size_t{0}));
+  EXPECT_TRUE(bounded.getQuery("mem").descriptorStorage().retention().noRetention());
+  EXPECT_TRUE(bounded.getQuery("raw").descriptorStorage().retention().noRetention());
+  for (const auto &q : bounded)
+    if (q.isSubstrat) EXPECT_EQ(retentionOf(bounded, q.id), fromConfig) << q.id;
+  auto stillUnbounded = boundedCompiler.unboundedDiskStreams();
+  std::ranges::sort(stillUnbounded);
+  EXPECT_EQ(stillUnbounded, (list{{"every", "RETENTION 7 0 keeps every segment"}, {"raw", "STORAGE POSIX has no retention"}}));
+}
+
+// Retencja z konfiguracji przechodzi te sama kontrole glebokosci co jawna - klucz TOML nie moze
+// zamienic poprawnego planu w FatalError dzialajacego serwera.
+TEST(xcompiler, default_retention_too_small_for_the_plan_is_a_compilation_error) {
+  qTree plan;
+  ASSERT_EQ(std::get<0>(parserRQLString(plan,
+                                        "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n"
+                                        "SELECT src[0] STREAM mid FROM src\n"
+                                        "SELECT mid[0] STREAM late FROM mid>6 VOLATILE\n")),
+            "OK");
+  compiler cm(plan);
+  cm.setDefaultRetention({.segments = 3, .capacity = 2});
+  EXPECT_EQ(cm.compile(),
+            "Stream 'mid' keeps only 5 record(s) on disk under [storage] default_retention = [2, 3], but the plan reads 7 "
+            "record(s) back from it");
+}
+
 TEST(xcompiler, explicit_substrate_profile_overrides_default_in_either_header_order) {
   for (const auto *header : {"DEFAULT VOLATILE\nSUBSTRAT 'default'\n", "SUBSTRAT 'DEFAULT'\nDEFAULT VOLATILE\n"}) {
     qTree plan;

@@ -1,7 +1,9 @@
 #include "appConfig.hpp"
 
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <limits>
 #include <optional>
 #include <string>
 #include <system_error>
@@ -100,10 +102,28 @@ void sanitizeConfig(AppConfig &cfg) {
   }
 }
 
+// `[capacity, segments]` - kolejnosc jak w `RETENTION capacity segments`. Wartosc niepoprawna daje
+// brak retencji, jak pozostale klucze w sanitizeConfig: klucz, ktory kasuje dane, nie zgaduje.
+// Segmenty 0 znacza w RQL "bez limitu segmentow", czyli przeczylyby celowi klucza.
+rdb::retention_t parseDefaultRetention(const toml::node_view<const toml::node> node) {
+  if (const auto *arr = node.as_array(); arr != nullptr && arr->size() == 2) {
+    const auto capacity = (*arr)[0].value_exact<std::int64_t>();
+    const auto segments = (*arr)[1].value_exact<std::int64_t>();
+    constexpr std::int64_t kMax{std::numeric_limits<int>::max()};
+    if (capacity && segments && *capacity >= 1 && *segments >= 1 && *capacity <= kMax && *segments <= kMax)
+      return {.segments = static_cast<rdb::segments_t>(*segments), .capacity = static_cast<rdb::capacity_t>(*capacity)};
+  }
+  SPDLOG_WARN(
+      "Invalid config storage.default_retention (expected [capacity, segments], both integers > 0). "
+      "Streams without RETENTION keep growing on disk.");
+  return {.segments = 0, .capacity = 0};
+}
+
 // Nakłada ustawienia z jednej tabeli TOML na akumulowaną konfigurację.
 // Klucze nieobecne w tabeli pozostawiają dotychczasową wartość (warstwowość).
 void applyTable(const toml::table &tbl, AppConfig &cfg) {
   if (auto v = tbl.at_path("storage.dir").value<std::string>(); v) cfg.storageDir = *v;
+  if (auto v = tbl.at_path("storage.default_retention"); v) cfg.defaultRetention = parseDefaultRetention(v);
 
   if (auto v = tbl.at_path("ipc.queue_buffer_seconds").value<int>(); v) cfg.ipcQueueBufferSeconds = *v;
   if (auto v = tbl.at_path("ipc.min_queue_elements").value<int>(); v) cfg.ipcMinQueueElements = *v;

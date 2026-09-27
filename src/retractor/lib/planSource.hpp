@@ -5,7 +5,6 @@
 #include <utility>
 #include <vector>
 
-#include "compiler.hpp"
 #include "qTree.hpp"
 
 /// @brief Wczytanie zestawu RQL z TEKSTU i sprzatanie artefaktow poprzedniego planu.
@@ -32,12 +31,22 @@ struct PlanSource {
 /// stan poprawny, dla `--onlycompile` blad.
 [[nodiscard]] PlanSource parsePlanText(qTree &plan, const std::string &text);
 
-/// Kasuje artefakty (`<id>`, `<id>.desc`, `<id>.meta`) strumieni powolanych przez @p lines.
+/// Kasuje pelne rodziny plikow (dane z cieniem, `.desc`, `.meta` z cieniem, segmenty retencji)
+/// wszystkich wezlow skompilowanego planu, takze posrednich.
 ///
-/// Nic nie robi, gdy plan niesie `:ROTATION` - tam poprzednie przebiegi sa danymi, nie
-/// smieciem. Rodziny rozwiniete przez generator bierze z @p cm, bo nazwa z zapisu nie
-/// musi byc nazwa w planie (patrz compiler::generatedStreams()).
-void dropStalePlanArtifacts(qTree &plan, const compiler &cm, const std::vector<std::pair<std::string, std::string>> &lines);
+/// Przy `:ROTATION` wezly plikowe zostaja - tam poprzednie przebiegi sa danymi, nie smieciem -
+/// a znika tylko konfiguracja strumieni MEMORY. Katalog to `:STORAGE` planu (z domyslnym
+/// katalogiem konfiguracji juz dopisanym przez wolajacego).
+void dropStalePlanArtifacts(const qTree &plan);
+
+/// Zgodnosc plikow, ktore `:ROTATION` zachowa, z planem: TYPE i RETENTION z zachowanego `.desc`
+/// wygrywaja w magazynie z planem, a zmiana pojemnosci przy zachowanych segmentach przestawilaby
+/// adresowanie rekordow (groupFile liczy segment jako indeks / capacity). Dlatego rozjazd jest
+/// odmowa planu, zanim cokolwiek zostanie zmienione (decyzja P5), a nie cicha wygrana jednej strony.
+///
+/// @return "OK" albo powod odmowy z nazwa strumienia i obiema konfiguracjami. Bez `:ROTATION`
+///         zawsze "OK" - wtedy start i tak kasuje rodziny plikow (dropStalePlanArtifacts).
+[[nodiscard]] std::string checkKeptStores(qTree &plan, std::string_view defaultStorageDir);
 
 /// Nazwy strumieni, ktore plan ROSCI na magistrali: wszystkie wezly poza dyrektywami.
 [[nodiscard]] std::vector<std::string> planStreamNames(const qTree &plan);

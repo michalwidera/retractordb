@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "rdb/retention.hpp"
 #include "serviceDefaults.h"  // kBuildDefaultServiceQueryFile (generowane z CMake)
 
 namespace appcfg {
@@ -44,6 +45,12 @@ struct AppConfig {
   /// dziś - bieżący katalog procesu). Jeśli niepusty, gwarantuje końcowy '/'. Stosowany
   /// tylko gdy zestaw RQL nie zdefiniował własnej dyrektywy :STORAGE (RQL ma pierwszeństwo).
   std::string storageDir;
+
+  /// Retencja strumieni plikowych (DEFAULT, DIRECT, takze posrednich) bez klauzuli RETENTION:
+  /// `default_retention = [capacity, segments]`, obie liczby > 0. Pusta (domyslnie) = brak retencji,
+  /// czyli historia rosnie na dysku - dane kasuje dopiero jawna decyzja operatora (D8). Stosuje ja
+  /// kompilator (compiler::setDefaultRetention) na tych samych drogach co history_memory_mib.
+  rdb::retention_t defaultRetention{.segments = 0, .capacity = 0};
 
   // === [ipc] ===
 

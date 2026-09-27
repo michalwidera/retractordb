@@ -1,5 +1,6 @@
 #include "executorsm.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <mutex>
 #include <stdexcept>
@@ -60,6 +61,7 @@ ptree executorsm::attachAdHocRule(qTree &coreInstanceCopy, const std::string &st
 
   compiler localCompiler(coreInstanceCopy);
   localCompiler.setHistoryMemoryBudget(cfgHistoryMemoryMib);
+  localCompiler.setDefaultRetention(cfgDefaultRetention);
   const auto response = localCompiler.compile();
   if (response != "OK") {
     ptRetval.put(std::string("db"), "Fail local chain compiler:" + response);
@@ -158,6 +160,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
 
   compiler localCompiler(coreInstanceCopy);
   localCompiler.setHistoryMemoryBudget(cfgHistoryMemoryMib);
+  localCompiler.setDefaultRetention(cfgDefaultRetention);
   auto response = localCompiler.compile();
 
   if (response != "OK") {
@@ -300,6 +303,14 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
 
   for (const auto &id : mergedIds)
     processedLines.emplace_back(id, adHocQuery);
+
+  // Wykaz D8 dla strumieni, ktore wlasnie doszly - tylko do dziennika, jak przy `--reset`. Z kopii
+  // planu (localCompiler), a nie z zywego: ten po zwolnieniu core_mutex nalezy do petli przetwarzania.
+  // Poziom ERROR, bo Release wycina z dziennika wszystko ponizej (CMakeLists.txt), a ten raport ma byc
+  // widoczny w produkcji; to jedna linia na zmiane planu, wiec polityki oszczedzania karty nie narusza.
+  for (const auto &[stream, reason] : localCompiler.unboundedDiskStreams())
+    if (std::ranges::contains(mergedIds, stream))
+      SPDLOG_ERROR("AdHoc stream {} grows without bound on disk ({})", stream, reason);
 
   ptRetval.put(std::string("db"), "OK");
   return ptRetval;

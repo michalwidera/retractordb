@@ -1662,6 +1662,60 @@ std::string compiler::checkHistoryMemory() {
       total, historyMemoryMib_, budget, largestId, largestRecords, largestBytes);
 }
 
+namespace {
+/// Magazyny plikowe z retencja (groupFile). POSIX, POSIXSHD i GENERIC retencji nie maja wcale.
+bool isSegmentedDiskStorage(const std::string &type) { return type == "DEFAULT" || type == "DIRECT"; }
+}  // namespace
+
+/// Retencja magazynow plikowych: `[storage] default_retention` dla strumieni bez RETENTION (D8)
+/// i kontrola, czy retencja - z planu albo z konfiguracji - miesci historie, ktora plan czyta.
+///
+/// groupFile trzyma `segments` segmentow po `capacity` rekordow, a nowy segment powstaje przy
+/// zapisie, ktory nie miesci sie w biezacym - tuz po rotacji zostaje wiec tylko (segments-1) *
+/// capacity + 1 rekordow. Konsument siegajacy glebiej czytal skasowany segment: do 2026-09-27
+/// konczylo sie to FatalError w storage::read w dzialajacym serwerze (`RETENTION 2 2` pod `>6`).
+/// Segmenty 0 znacza brak limitu, wiec kontroli nie podlegaja.
+std::string compiler::applyDiskRetention() {
+  for (auto &q : coreInstance) {
+    if (q.isDeclaration() || q.isCompilerDirective() || !isSegmentedDiskStorage(q.storageType())) continue;
+    const bool fromConfig = q.retention.noRetention() && !defaultRetention_.noRetention();
+    if (fromConfig) q.retention = defaultRetention_;
+    if (q.retention.segments == 0) continue;
+
+    const auto need = coreInstance.maxCapacity.find(q.id);
+    if (need == coreInstance.maxCapacity.end()) continue;
+    const std::size_t kept = ((q.retention.segments - 1) * q.retention.capacity) + 1;
+    if (std::cmp_greater_equal(kept, need->second)) continue;
+    const std::string origin =
+        fromConfig ? std::format("[storage] default_retention = [{}, {}]", q.retention.capacity, q.retention.segments)
+                   : std::format("RETENTION {} {}", q.retention.capacity, q.retention.segments);
+    return std::format("Stream '{}' keeps only {} record(s) on disk under {}, but the plan reads {} record(s) back from it",
+                       q.id, kept, origin, need->second);
+  }
+  return {"OK"};
+}
+
+std::vector<std::pair<std::string, std::string>> compiler::unboundedDiskStreams() const {
+  std::vector<std::pair<std::string, std::string>> retVal;
+  for (const auto &q : coreInstance) {
+    if (q.isDeclaration() || q.isCompilerDirective()) continue;
+    const std::string type = q.storageType();
+    std::string reason;
+    if (isSegmentedDiskStorage(type)) {
+      if (q.retention.noRetention())
+        reason = "no RETENTION";
+      else if (q.retention.segments == 0)
+        reason = std::format("RETENTION {} 0 keeps every segment", q.retention.capacity);
+    } else if (type == "POSIX" || type == "POSIXSHD" || type == "GENERIC") {
+      reason = std::format("STORAGE {} has no retention", type);
+    }
+    if (reason.empty()) continue;
+    if (q.isSubstrat) reason = "intermediate stream, " + reason;
+    retVal.emplace_back(q.id, reason);
+  }
+  return retVal;
+}
+
 std::map<std::string, int> compiler::computeRequiredCapacities() {
   // Głębokość historii dla źródeł przeplotu (#) i rozplotu (&, %) - stała
   // w jednostkach rekordów, patrz komentarz przy STREAM_HASH poniżej.
@@ -3492,7 +3546,6 @@ std::string compiler::expandStreamGenerators() {
         if (f.field_.rname.starts_with("_")) f.field_.rname = instance.id + f.field_.rname;
 
       if (const std::string status = substituteOrdinal(instance, ordinal); status != "OK") return status;
-      generatedStreams_[q.id].push_back(instance.id);
       plan.push_back(std::move(instance));
     }
   }
@@ -3533,7 +3586,6 @@ void compiler::reset() {
   restrictSelectSharing_ = false;
   selectSharingScope_.clear();
   namedSourceRefs_.clear();
-  generatedStreams_.clear();
 }
 
 std::string compiler::compile() {
@@ -3672,6 +3724,10 @@ std::string compiler::compile() {
   // Po ustaleniu pojemnosci, przed jakimkolwiek SourceBuffer::setCapacity() - te wola dopiero
   // streamInstance przy budowie modelu.
   result = checkHistoryMemory();
+  if (result != "OK") return result;
+
+  // Po computeRequiredCapacities - kontrola retencji potrzebuje glebokosci historii konsumentow.
+  result = applyDiskRetention();
   if (result != "OK") return result;
 
   // Kolejność elementów qTree jest kolejnością przetwarzania w takcie

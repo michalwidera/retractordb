@@ -137,7 +137,13 @@ std::string executorsm::validatePlanText(const std::string &planText) {
   if (!candidate.empty()) {
     compiler localCompiler(candidate);
     localCompiler.setHistoryMemoryBudget(cfgHistoryMemoryMib);
+    localCompiler.setDefaultRetention(cfgDefaultRetention);
     if (const std::string response = localCompiler.compile(); response != "OK") return "Fail compile:" + response;
+    if (const std::string kept = checkKeptStores(candidate, cfgStorageDir); kept != "OK") return "Rejected: " + kept;
+    // Ten sam wykaz co przy starcie (launcher), tylko do dziennika - kanal reset nie ma stderr operatora.
+    // Poziom ERROR z tego samego powodu co raport ad-hoc (executorsmAdHoc.cpp): Release wycina nizsze.
+    for (const auto &[stream, reason] : localCompiler.unboundedDiskStreams())
+      SPDLOG_ERROR("Reset plan: stream {} grows without bound on disk ({})", stream, reason);
   }
 
   // Limity i rozlacznosc nazw sa rozstrzygane atomowo w magistrali, ZANIM resetCommit()
@@ -376,7 +382,7 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
   // wczesniej: az dotad kolejne reservePlan() nadpisywaloby rezerwacje wlasnie aktywowana.
   planSwapInFlight.store(false, std::memory_order_release);
 
-  dropStalePlanArtifacts(*coreInstancePtr, *cmPtr, processedLines);
+  dropStalePlanArtifacts(*coreInstancePtr);
 
   for (const auto &it : *coreInstancePtr)
     if (it.id == ":ROTATION") pCounterPtr = std::make_unique<PersistentCounter>(it.filename);

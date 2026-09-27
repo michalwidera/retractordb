@@ -187,3 +187,32 @@ TEST_F(AppConfigTest, history_memory_budget_of_wrong_type_is_ignored) {
 
   EXPECT_EQ(cfg.historyMemoryMib, 1024);
 }
+
+// [storage] default_retention - retencja strumieni plikowych bez RETENTION (D8). Brak klucza =
+// brak retencji: danych nie kasuje nic poza jawna decyzja operatora.
+TEST_F(AppConfigTest, default_retention_defaults_to_none) {
+  const AppConfig cfg = loadAppConfig();
+  EXPECT_TRUE(cfg.defaultRetention.noRetention());
+}
+
+TEST_F(AppConfigTest, user_layer_sets_default_retention) {
+  writeFile(userConfigFile(), "[storage]\ndefault_retention = [100, 4]\n");
+
+  const AppConfig cfg = loadAppConfig();
+
+  EXPECT_EQ(cfg.defaultRetention.capacity, 100U);
+  EXPECT_EQ(cfg.defaultRetention.segments, 4U);
+}
+
+// Segmenty 0 to w RQL "bez limitu", wiec jako granica nic by nie ograniczaly.
+TEST_F(AppConfigTest, invalid_default_retention_means_none) {
+  for (const std::string value : {"[0, 4]", "[100, 0]", "[-1, 2]", "[100]", "[100, 4, 1]", "\"100 4\"", "[1.5, 2]",
+                                  "[100, 3000000000]", "[\"a\", 2]", "100"}) {
+    const fs::path explicitFile = tmpDir / "custom.toml";
+    writeFile(explicitFile, "[storage]\ndefault_retention = " + value + "\n");
+
+    const AppConfig cfg = loadAppConfig(explicitFile.string());
+
+    EXPECT_TRUE(cfg.defaultRetention.noRetention()) << value;
+  }
+}

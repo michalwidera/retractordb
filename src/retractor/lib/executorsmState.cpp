@@ -48,4 +48,5 @@ int executorsm::cfgRtPriority         = appcfg::kDefaultSchedulingRtPriority;
 std::string executorsm::cfgStorageDir;
 bool executorsm::cfgUnrestricted    = false;
 int executorsm::cfgHistoryMemoryMib = appcfg::kDefaultHistoryMemoryMib;
+rdb::retention_t executorsm::cfgDefaultRetention{.segments = 0, .capacity = 0};
 std::string executorsm::activeStorageDir;

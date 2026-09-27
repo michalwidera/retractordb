@@ -91,6 +91,13 @@ std::vector<std::string> query::getDepStream() {
   return lRetVal;
 }
 
+// Typ niesie polityka tylko wtedy, gdy go wybiera: MEMORY (VOLATILE, STORAGE MEMORY) albo profil
+// dyrektywy :SUBSTRAT. Polityka "DEFAULT" typu nie wybiera i nie moze przykryc STORAGE z planu -
+// do 2026-09-27 TYPE DEFAULT z niej zamienial `STORAGE DIRECT` w magazyn DEFAULT z .shadow (D7).
+std::string query::storageType() const {
+  return (policy.second != 0 && policy.first != "DEFAULT") ? policy.first : storage_policy;
+}
+
 rdb::Descriptor query::descriptorStorage() {
   rdb::Descriptor retVal{};
   for (auto &f : lSchema)
@@ -105,7 +112,7 @@ rdb::Descriptor query::descriptorStorage() {
     }
     if (policy.second != 0) {
       retVal += rdb::Descriptor("", static_cast<int>(policy.second), 0, rdb::RETMEMORY);
-      retVal += rdb::Descriptor(policy.first, 0, 0, rdb::TYPE);
+      retVal += rdb::Descriptor(storageType(), 0, 0, rdb::TYPE);
     }
     return retVal;
   }
