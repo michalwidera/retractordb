@@ -6,6 +6,7 @@
 #include <algorithm>   // std::ranges::transform
 #include <cctype>      // std::tolower
 #include <cmath>       // sqrt, std::fabs
+#include <cstdint>     // std::int64_t
 #include <cstdlib>     // atoi
 #include <functional>  // std::function
 #include <limits>      // std::numeric_limits
@@ -90,7 +91,8 @@ rdb::descFldVT logicResultTypeRef(const rdb::descFldVT &a, const rdb::descFldVT 
 /// NULL wychodzi z normalizacji po stronie, ktora byla NULL albo nie ma reprezentacji w typie
 /// docelowym (ujemny INTEGER promowany do UINT - castFldVT daje wtedy NULL). Monostate ma
 /// najwyzszy indeks, wiec NULL na wejsciu promuje druga strone do NULL. Wolajacy sprawdza
-/// operandy PO normalizacji i jednym warunkiem obsluguje oba przypadki.
+/// operandy PO normalizacji i jednym warunkiem obsluguje oba przypadki - z jednym wyjatkiem:
+/// para INTEGER/UINT idzie wtedy do signedUnsignedOrNull(), ktory liczy ja dokladnie.
 pairRef normalize(const rdb::descFldVT &a, const rdb::descFldVT &b, rdb::descFldVT &promoted) {
   if (a.index() == b.index()) return {a, b};
 
@@ -110,6 +112,94 @@ rdb::descFldVT orNull(const std::optional<T> &value) {
   return value.has_value() ? rdb::descFldVT{*value} : rdb::descFldVT{std::monostate{}};
 }
 
+namespace {
+
+/// Para INTEGER z UINT, w kolejnosci operandow, jako liczby dokladne - int64 miesci obie.
+std::optional<std::pair<std::int64_t, std::int64_t>> signedUnsignedPair(const rdb::descFldVT &a, const rdb::descFldVT &b) {
+  if (const auto *x = std::get_if<int>(&a))
+    if (const auto *y = std::get_if<unsigned>(&b)) return std::pair<std::int64_t, std::int64_t>{*x, *y};
+  if (const auto *x = std::get_if<unsigned>(&a))
+    if (const auto *y = std::get_if<int>(&b)) return std::pair<std::int64_t, std::int64_t>{*x, *y};
+  return std::nullopt;
+}
+
+/// Wynik pary INTEGER/UINT w typie UINT - tym samym, ktory dalby normalize(). NULL, gdy wynik
+/// nie ma w nim reprezentacji.
+rdb::descFldVT asUintOrNull(std::int64_t value) {
+  if (!std::in_range<unsigned>(value)) return std::monostate{};
+  return static_cast<unsigned>(value);
+}
+
+/// Galaz NULL po normalize() w + - * / i szesciu porownaniach.
+///
+/// Dla pary INTEGER/UINT NULL z promocji znaczy ujemny INTEGER, ktory nie ma reprezentacji w UINT
+/// (od da67e5a3). Nie znaczy jednak, ze nie ma jej WYNIK: `u + i` dla u = 10, i = -2 to 8. Wynik
+/// liczy sie wiec na wartosciach dokladnych - kazde + - * / z int i unsigned miesci sie w int64 -
+/// i dopiero on jest zawezany do UINT; porownanie jest dokladne i daje UINT 1/0, jak porownanie
+/// dwoch UINT. Nieujemny INTEGER tu nie trafia: promocja sie udaje, a arytmetyka UINT z kontrola
+/// zakresu daje ten sam wynik. Kazdy inny NULL, w tym NULL na wejsciu, zostaje NULL.
+rdb::descFldVT signedUnsignedOrNull(const rdb::descFldVT &a, const rdb::descFldVT &b, command_id op) {
+  const auto pair = signedUnsignedPair(a, b);
+  if (!pair.has_value()) return std::monostate{};
+  const auto [x, y] = *pair;
+
+  switch (op) {
+    case ADD:
+      return asUintOrNull(x + y);
+    case SUBTRACT:
+      return asUintOrNull(x - y);
+    case MULTIPLY:
+      return asUintOrNull(x * y);
+    case DIVIDE:
+      if (y == 0) return std::monostate{};
+      return asUintOrNull(x / y);
+    case CMP_EQUAL:
+      return x == y ? 1U : 0U;
+    case CMP_NOT_EQUAL:
+      return x != y ? 1U : 0U;
+    case CMP_LT:
+      return x < y ? 1U : 0U;
+    case CMP_GT:
+      return x > y ? 1U : 0U;
+    case CMP_LE:
+      return x <= y ? 1U : 0U;
+    case CMP_GE:
+      return x >= y ? 1U : 0U;
+    default:
+      FatalError("signedUnsignedOrNull: operator {} is not a binary arithmetic or comparison", GetStringcommand_id(op));
+  }
+}
+
+/// `^` dla pary INTEGER/UINT, ktorej normalize() nie sprowadzil do UINT: ujemna podstawa albo
+/// ujemny wykladnik. Reguly te same co w power() dla typow dokladnych - wykladnik calkowity
+/// nieujemny liczy sie iloczynem, ujemny przez std::pow z obcieciem - tyle ze do UINT zawezany
+/// jest dopiero wynik: `(-2) ^ 2` daje 4, `(-2) ^ 3` NULL.
+rdb::descFldVT signedUnsignedPower(const rdb::descFldVT &a, const rdb::descFldVT &b) {
+  const auto pair = signedUnsignedPair(a, b);
+  if (!pair.has_value()) return std::monostate{};
+  const auto [base, exponent] = *pair;
+
+  if (exponent < 0) {  // podstawa jest wtedy UINT
+    const double result = std::pow(static_cast<double>(base), static_cast<double>(exponent));
+    if (!std::isfinite(result)) return std::monostate{};
+    return castFldVT(rdb::descFldVT{result}, rdb::UINT);
+  }
+
+  // Podstawa ujemna, wykladnik nieujemny. -1 zmienia tylko znak, a |podstawa| >= 2 wychodzi poza
+  // zakres UINT najpozniej po 32 mnozeniach - petla jest krotka takze dla wykladnika 4e9. Iloczyn
+  // |wynik| <= UINT_MAX razy |podstawa| <= 2^31 miesci sie w int64.
+  if (base == -1) return asUintOrNull(exponent % 2 == 0 ? 1 : -1);
+  constexpr std::int64_t uintMax = std::numeric_limits<unsigned>::max();
+  std::int64_t result            = 1;
+  for (std::int64_t step = 0; step < exponent; ++step) {
+    result *= base;
+    if (result > uintMax || result < -uintMax) return std::monostate{};
+  }
+  return asUintOrNull(result);
+}
+
+}  // namespace
+
 /// Operatory dwuargumentowe ponizej (+ - * / i szesc porownan) wypisuja kazda pare (T,T) jawnie.
 /// Przypadek ogolny na koncu kazdego Overload bierze TYLKO pary mieszane (T != U): std::visit na
 /// dwoch wariantach wymaga wszystkich kombinacji, a mieszane odcina wczesniej FatalError na indeksie.
@@ -119,7 +209,7 @@ rdb::descFldVT operator+(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
-  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
+  if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, ADD);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -149,7 +239,7 @@ rdb::descFldVT operator-(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
-  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
+  if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, SUBTRACT);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -181,7 +271,7 @@ rdb::descFldVT operator*(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
-  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
+  if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, MULTIPLY);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -213,7 +303,7 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
-  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
+  if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, DIVIDE);
 
   // Para to dwie niezalezne liczby, nie ulamek - dzieli sie po skladowych, wiec zero w ktorejkolwiek
   // dzielonej skladowej nie ma ilorazu. Napis IDXPAIR nie jest dzielony. Bez catch-allu: nowa
@@ -346,7 +436,7 @@ rdb::descFldVT exactPower(const rdb::descFldVT &base, int exponent) {
 rdb::descFldVT power(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT promoted;
   auto [base, exponent] = normalize(aParam, bParam, promoted);
-  if (isNullValue(base) || isNullValue(exponent)) return std::monostate{};
+  if (isNullValue(base) || isNullValue(exponent)) return signedUnsignedPower(aParam, bParam);
 
   const auto resultType = static_cast<rdb::descFld>(base.index());
   if (resultType > rdb::DOUBLE) throw std::runtime_error("Operator '^' not defined for non-numeric operands");
@@ -367,7 +457,7 @@ rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
-  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
+  if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, CMP_EQUAL);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -398,7 +488,7 @@ rdb::descFldVT is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
-  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
+  if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, CMP_NOT_EQUAL);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -429,7 +519,7 @@ rdb::descFldVT is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
-  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
+  if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, CMP_LT);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -460,7 +550,7 @@ rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
-  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
+  if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, CMP_GT);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -491,7 +581,7 @@ rdb::descFldVT is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
-  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
+  if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, CMP_LE);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 
@@ -522,7 +612,7 @@ rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
-  if (isNullValue(a) || isNullValue(b)) return std::monostate{};
+  if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, CMP_GE);
 
   if (a.index() != b.index()) FatalError("expressionEvaluator: operand types do not match after normalization");
 

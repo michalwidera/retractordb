@@ -1366,20 +1366,6 @@ TEST(xExpressionEval, uint_arithmetic_at_the_bound_is_exact) {
   EXPECT_EQ(std::get<unsigned>(result), 4294967295U);
 }
 
-// Ujemny INTEGER promowany do UINT nie ma reprezentacji: operacja daje NULL, a nie iloczyn
-// liczby 4294966298. Dotyczy tez porownania, ktore przechodzi przez te sama normalizacje.
-TEST(xExpressionEval, negative_int_promoted_to_uint_is_null) {
-  for (const auto op : {MULTIPLY, ADD, CMP_LT}) {
-    std::list<token> program;
-    program.emplace_back(PUSH_VAL, -998);
-    program.emplace_back(PUSH_VAL, 165U);
-    program.emplace_back(op);
-
-    expressionEvaluator test;
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program))) << GetStringcommand_id(op);
-  }
-}
-
 TEST(xExpressionEval, isnull_returns_1_for_null) {
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
@@ -2206,4 +2192,78 @@ TEST(xExpressionEval, double_chain_at_2p24_is_exact_and_narrows_to_16777220) {
   ASSERT_TRUE(std::holds_alternative<double>(result));
   EXPECT_EQ(std::get<double>(result), 16777219.0);
   EXPECT_EQ(static_cast<float>(std::get<double>(result)), 16777220.0F);
+}
+
+// INTEGER z UINT (2026-09-27). Ujemny INTEGER nie ma reprezentacji w UINT, ale WYNIK operacji
+// moze ja miec: para liczy sie dokladnie, a do UINT zawezany jest dopiero wynik. NULL zostaje
+// tylko dla wyniku spoza zakresu. Od da67e5a3 do tej zmiany kazda operacja z ujemnym INTEGER
+// dawala NULL, takze `10 + (-2)` i porownanie `-998 < 165`.
+TEST(xExpressionEval, uint_with_negative_int_is_exact_when_result_fits) {
+  struct testCase {
+    rdb::descFldVT a;
+    rdb::descFldVT b;
+    command_id op;
+    unsigned expected;
+  };
+  for (const auto &item :
+       {testCase{10U, -2, ADD, 8U}, testCase{-2, 10U, ADD, 8U}, testCase{10U, -2, SUBTRACT, 12U}, testCase{-2, 0U, MULTIPLY, 0U},
+        testCase{1U, -2, DIVIDE, 0U}, testCase{3000000000U, -1, ADD, 2999999999U}}) {
+    const auto result = evalBinary(item.a, item.b, item.op);
+    ASSERT_TRUE(std::holds_alternative<unsigned>(result)) << GetStringcommand_id(item.op);
+    EXPECT_EQ(std::get<unsigned>(result), item.expected) << GetStringcommand_id(item.op);
+  }
+}
+
+// Wynik ujemny nie ma reprezentacji w UINT - NULL, a nie iloczyn liczby 4294966298, jak przed
+// da67e5a3. NULL na wejsciu i dzielenie przez zero zostaja NULL.
+TEST(xExpressionEval, uint_with_negative_int_is_null_when_result_does_not_fit) {
+  struct testCase {
+    rdb::descFldVT a;
+    rdb::descFldVT b;
+    command_id op;
+  };
+  for (const auto &item :
+       {testCase{-998, 165U, MULTIPLY}, testCase{-998, 165U, ADD}, testCase{1U, -2, ADD}, testCase{-2, 1U, SUBTRACT},
+        testCase{10U, -2, DIVIDE}, testCase{-5, 0U, DIVIDE}, testCase{rdb::descFldVT{std::monostate{}}, -2, ADD}})
+    EXPECT_TRUE(isNull(evalBinary(item.a, item.b, item.op))) << GetStringcommand_id(item.op);
+}
+
+// Porownanie jest dokladne i daje UINT 1/0, jak porownanie dwoch UINT. Porownania zyja tylko
+// w RULE WHEN, wiec zaden zapisany artefakt nie zmienia typu.
+TEST(xExpressionEval, comparison_of_uint_with_negative_int_is_exact) {
+  struct testCase {
+    command_id op;
+    unsigned expected;
+  };
+  for (const auto &item : {testCase{CMP_LT, 1U}, testCase{CMP_LE, 1U}, testCase{CMP_GT, 0U}, testCase{CMP_GE, 0U},
+                           testCase{CMP_EQUAL, 0U}, testCase{CMP_NOT_EQUAL, 1U}}) {
+    const auto result = evalBinary(-998, 165U, item.op);
+    ASSERT_TRUE(std::holds_alternative<unsigned>(result)) << GetStringcommand_id(item.op);
+    EXPECT_EQ(std::get<unsigned>(result), item.expected) << GetStringcommand_id(item.op);
+  }
+  const auto reversed = evalBinary(165U, -998, CMP_GT);
+  ASSERT_TRUE(std::holds_alternative<unsigned>(reversed));
+  EXPECT_EQ(std::get<unsigned>(reversed), 1U);
+}
+
+// `^` wedlug regul typow dokladnych: wykladnik nieujemny - iloczyn, ujemny - std::pow z obcieciem.
+TEST(xExpressionEval, power_of_uint_with_negative_int_is_exact_when_result_fits) {
+  struct testCase {
+    rdb::descFldVT base;
+    rdb::descFldVT exponent;
+    std::optional<unsigned> expected;
+  };
+  for (const auto &item : {testCase{-2, 2U, 4U}, testCase{-2, 3U, std::nullopt}, testCase{-2, 30U, 1073741824U},
+                           testCase{-2, 32U, std::nullopt},  // 2^32 - poza zakresem UINT
+                           testCase{-1, 4000000000U, 1U},    // bez petli na 4e9 krokow
+                           testCase{-1, 4000000001U, std::nullopt}, testCase{2U, -1, 0U}, testCase{1U, -5, 1U},
+                           testCase{0U, -1, std::nullopt}}) {  // nieskonczonosc
+    const auto result = evalBinary(item.base, item.exponent, POWER);
+    if (!item.expected.has_value()) {
+      EXPECT_TRUE(isNull(result));
+      continue;
+    }
+    ASSERT_TRUE(std::holds_alternative<unsigned>(result));
+    EXPECT_EQ(std::get<unsigned>(result), *item.expected);
+  }
 }

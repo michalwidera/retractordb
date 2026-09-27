@@ -12,6 +12,9 @@ Model typow (kontrakt, nie implementacja):
   DOUBLE < STRING; operator dwuargumentowy podnosi operand o nizszym indeksie do wyzszego;
 * rzut bez reprezentacji w typie docelowym jest NULL (ujemna liczba do UINT, spoza int32
   do INTEGER, NaN do typu calkowitego);
+* wyjatek od promocji: para INTEGER/UINT (w dowolnej kolejnosci) liczy sie na wartosciach
+  dokladnych, a do UINT zawezany jest dopiero wynik - NULL tylko wtedy, gdy wynik sie nie
+  miesci; porownanie takiej pary jest dokladne i daje UINT 1/0;
 * INTEGER, UINT i RATIONAL (licznik i mianownik int32) poza zakresem daja NULL; BYTE op BYTE
   liczy sie w int (promocja C++), FLOAT w float32, dzielenie przez zero daje NULL;
 * porownanie i wynik logiczny nad napisem to INTEGER 1/0.
@@ -154,9 +157,22 @@ def is_zero(v):
     return v.type in (BYTE, INTEGER, UINT, RATIONAL, FLOAT, DOUBLE) and v.val == 0
 
 
+def signed_unsigned(a, b):
+    return {a.type, b.type} == {INTEGER, UINT}
+
+
+def as_uint(r):
+    return V(UINT, r) if fits(UINT, r) else NULLV
+
+
 def arith(op, a, b):
     if a.type == NULL or b.type == NULL:
         return NULLV
+    if signed_unsigned(a, b):
+        x, y = a.val, b.val
+        if op == "/":
+            return NULLV if y == 0 else as_uint(trunc_div(x, y))
+        return as_uint({"+": x + y, "-": x - y, "*": x * y}[op])
     a, b = normalize(a, b)
     if a.type == NULL or b.type == NULL:
         return NULLV
@@ -194,6 +210,16 @@ def integral_exponent(e):
 def power(a, b):
     if a.type == NULL or b.type == NULL:
         return NULLV
+    if signed_unsigned(a, b):
+        x, k = a.val, b.val
+        if k >= 0:
+            # |x| >= 2 do potegi > 32 i tak nie miesci sie w UINT - bez liczenia olbrzymiej liczby.
+            return NULLV if abs(x) >= 2 and k > 32 else as_uint(x**k)
+        try:
+            r = math.pow(x, k)
+        except (ValueError, OverflowError, ZeroDivisionError):
+            return NULLV
+        return cast(V(DOUBLE, r), UINT) if math.isfinite(r) else NULLV
     base, exponent = normalize(a, b)
     if base.type == NULL or exponent.type == NULL:
         return NULLV
@@ -221,6 +247,9 @@ def power(a, b):
 def compare(op, a, b):
     if a.type == NULL or b.type == NULL:
         return NULLV
+    if signed_unsigned(a, b):
+        x, y = a.val, b.val
+        return V(UINT, int({"=": x == y, "!=": x != y, "<": x < y, ">": x > y, "<=": x <= y, ">=": x >= y}[op]))
     a, b = normalize(a, b)
     if a.type == NULL or b.type == NULL:
         return NULLV

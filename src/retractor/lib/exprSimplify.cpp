@@ -156,8 +156,8 @@ std::optional<command_id> foldOperator(command_id tailOp, command_id op, bool co
 /// formy przepisanej jest wynik końcowy, który forma krokowa i tak musiała osiągnąć. Przy
 /// RDB_OPT_SIMPLIFY_EXPRESSIONS=ON wynik jest zatem co najwyżej BARDZIEJ określony: NULL (OFF)
 /// wobec dokładnej wartości (ON), nigdy inna liczba. Decyzja z 2026-09-14: przyjęte i opisane,
-/// reguła bez zmian. Z tej samej przyczyny `u*-2*-3` nad UINT daje przy OFF NULL (-2 nie ma
-/// reprezentacji w UINT), a przy ON `u*6`.
+/// reguła bez zmian. Z tej samej przyczyny `u*-2*-3` nad UINT daje przy OFF NULL (wynik pośredni
+/// `-2u` nie ma reprezentacji w UINT), a przy ON `u*6`.
 ///
 /// Rozumowanie zakłada stałe INTEGER albo RATIONAL - innych RQL nie wytwarza (literał, funkcja
 /// nad literałem, iloraz). Stała UINT przesuwałaby promocję E w formie przepisanej przed pierwszą
@@ -188,6 +188,10 @@ std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant
   // operacji. Tam c1 i c2 promowane są osobno, tu ich wynik. Ujemna INTEGER nie ma reprezentacji
   // w UINT (castFldVT daje NULL od da67e5a3), więc `(u+3)-5` przepisane na `u+(-2)` dawało NULL
   // dla każdego u, a forma krokowa u-2. Promocję liczy ta sama funkcja co w normalize().
+  //
+  // Od 2026-09-27 ewaluator liczy parę INTEGER/UINT dokładnie (signedUnsignedOrNull), więc
+  // `u+(-2)` daje już u-2 i strażnik jest dla tej pary ostrożniejszy, niż trzeba. Zostaje:
+  // odmowa nie zmienia wyniku, a zdjęcie go byłoby nowym przepisaniem podnoszącym licznik R3.
   const auto operationType = arithmeticResultType(tail.baseType, typeOfConstant(*value));
   if (typeOfConstant(*value) != *operationType &&
       std::holds_alternative<std::monostate>(cast<rdb::descFldVT>{}(*value, *operationType)))

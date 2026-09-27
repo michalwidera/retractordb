@@ -64,6 +64,10 @@ TAIL = [
     "{0}*2*3",
 ]
 
+# Tylko w planie UINT: ogon stalych ze zgloszenia regresji po da67e5a3, zeby `own_uint` sam pilnowal
+# typu, w ktorym zwinieta stala -2 nie ma reprezentacji. Pelny zestaw ksztaltow ma `own_tail`.
+UINT_ONLY = ["{0}+3-5"]
+
 
 def rows_int(rng, lo, hi, nonzero_col=None):
     out = []
@@ -79,9 +83,9 @@ def rows_real(rng):
     return [" ".join(f"{rng.uniform(-1000, 1000):.4f}" for _ in range(3)) for _ in range(ROWS)]
 
 
-def plan_same(plan, ftype, big, neg=None):
+def plan_same(plan, ftype, big, neg=None, extra=()):
     refs = ["src[0]", "src[1]", "src[2]"]
-    exprs = ", ".join(e.format(*refs) for e in SAME_TYPE)
+    exprs = ", ".join(e.format(*refs) for e in SAME_TYPE + list(extra))
     rule = SAME_TYPE_RULE.format("cpy[0]", "cpy[1]", "cpy[2]", big=big, neg=f"-{big}" if neg is None else neg)
     return f"""# {ftype} op {ftype} - droga normalize() bez promocji.
 STORAGE 'temp'
@@ -180,7 +184,7 @@ def main():
         ("own_double", "DOUBLE", 100000000, None, lambda: rows_real(rng)),
         ("own_float", "FLOAT", 100000000, None, lambda: rows_real(rng)),
     ):
-        write(f"{plan}.rql", plan_same(plan, ftype, big, neg))
+        write(f"{plan}.rql", plan_same(plan, ftype, big, neg, UINT_ONLY if ftype == "UINT" else ()))
         write(f"{plan}.txt", "\n".join(data()))
 
     # RATIONAL: DECLARE go nie zna, wiec powstaje z reduktora - srednia trzech INTEGER-ow ma
@@ -204,13 +208,14 @@ RULE cmp ON ra WHEN ra[0] > ra[0]*ra[0]+1000 OR ra[0]*ra[0] < ra[0]-ra[0] OR ra[
     # Typy mieszane - droga promocji w obu kierunkach (nizszy indeks z lewej i z prawej).
     mixed = [f"{rng.randint(-1000, 1000)} {rng.uniform(-100, 100):.4f} {rng.uniform(-100, 100):.3f} "
              f"{rng.randint(1, 200)} {rng.randint(1, 100000)}" for _ in range(ROWS)]
-    write("own_mixed.rql", """# Typy mieszane: promocja nizszego indeksu wariantu, w obu kierunkach. `m[4]*m[0]` promuje
-# INTEGER do UINT - ujemny INTEGER nie ma tam reprezentacji i daje NULL.
+    write("own_mixed.rql", """# Typy mieszane: promocja nizszego indeksu wariantu, w obu kierunkach. Para INTEGER/UINT liczy sie
+# dokladnie i dopiero wynik trafia do UINT: `m[4]*m[0]` dla ujemnego m[0] daje NULL, `m[4]+m[0]` wartosc,
+# gdy suma sie miesci.
 STORAGE 'temp'
 
 DECLARE i INTEGER, d DOUBLE, f FLOAT, y BYTE, u UINT STREAM m, 1 FILE 'own_mixed.txt'
 
-SELECT m[0]+m[1], m[1]+m[0], m[0]*m[2], m[2]*m[0], m[1]-m[2], m[2]-m[1], m[3]+m[0], m[0]+m[3], m[4]*m[0], m[0]*m[4], m[0]/m[1], m[1]/m[4], (m[0]+m[1])*(m[2]-m[3]), m[0]*2.5, 0.5*m[0], m[3]^2, m[0]^0.5 STREAM mix FROM m
+SELECT m[0]+m[1], m[1]+m[0], m[0]*m[2], m[2]*m[0], m[1]-m[2], m[2]-m[1], m[3]+m[0], m[0]+m[3], m[4]*m[0], m[0]*m[4], m[0]/m[1], m[1]/m[4], (m[0]+m[1])*(m[2]-m[3]), m[0]*2.5, 0.5*m[0], m[3]^2, m[0]^0.5, m[4]+m[0] STREAM mix FROM m
 
 SELECT m[0], m[1], m[2], m[3], m[4] STREAM cpy FROM m
 
