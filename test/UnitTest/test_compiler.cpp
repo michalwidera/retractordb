@@ -1,8 +1,12 @@
+#include <unistd.h>
+
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
 #include <format>
 #include <fstream>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <tuple>
@@ -13,6 +17,7 @@
 #include <boost/rational.hpp>
 #include <boost/system/error_code.hpp>
 
+#include "retractor/lib/appConfig.hpp"
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/exprSimplify.hpp"
 #include "retractor/lib/planSource.hpp"
@@ -222,6 +227,10 @@ INSTANTIATE_TEST_SUITE_P(
         OutOfRangeLiteral{"retention_capacity", "SELECT src[0] STREAM big FROM src RETENTION " + kHugeInt, kHugeInt},
         OutOfRangeLiteral{"retention_segments", "SELECT src[0] STREAM big FROM src RETENTION 10 " + kHugeInt, kHugeInt},
         OutOfRangeLiteral{"generator_size", "SELECT src[0] STREAM cells[" + kHugeInt + "] FROM src", kHugeInt},
+        // Indeks pola kompilator czytal przez atoi: 2^32 dawalo po cichu `src[0]`, a 2^32-1 - indeks -1,
+        // ktory ad-hoc przechodzil z "OK" i konczyl serwer przy pierwszym rekordzie (A2 M10).
+        OutOfRangeLiteral{"field_index_wraps_to_zero", "SELECT src[4294967296] STREAM big FROM src", "4294967296"},
+        OutOfRangeLiteral{"field_index_wraps_to_minus_one", "SELECT src[4294967295] STREAM big FROM src", "4294967295"},
         OutOfRangeLiteral{"to_string_width", "SELECT to_string(src[0]:" + kHugeInt + ") STREAM big FROM src", kHugeInt},
         OutOfRangeLiteral{"dump_left", "RULE r ON dst WHEN dst[0] > 0 DO DUMP -" + kHugeInt + " TO 1", kHugeInt},
         OutOfRangeLiteral{"dump_right", "RULE r ON dst WHEN dst[0] > 0 DO DUMP -1 TO " + kHugeInt, kHugeInt},
@@ -241,6 +250,70 @@ TEST(xparser, literals_at_the_edge_of_their_type_are_still_accepted) {
     EXPECT_EQ(result, "OK") << statement;
   }
 }
+
+// --- literal w zakresie int, ale absurdalny jako wymiar: blad planu (A2 M11) ------------------
+
+// `STREAM x[N]`, `TYP[N]`, `@(step, window)`, `>N` i reszta tych pozycji przyjmowaly kazdy int.
+// Wartosc absurdalna jako rozmiar konczyla sie std::bad_alloc, OOM killerem albo przepelnieniem int
+// w procesie DZIALAJACEGO serwera - kanal ad-hoc i `--reset` biegna przez ten sam parser. Po dwa
+// przypadki na pozycje: granica przechodzi, granica+1 odpada komunikatem z literalem i granica.
+struct DimensionLimit {
+  std::string name;       // nazwa przypadku w --gtest_filter
+  std::string statement;  // szablon instrukcji dopisanej do planu tla; `{}` zastepuje literal
+  std::string what;       // nazwa wymiaru w komunikacie odmowy
+  int limit;
+};
+
+void PrintTo(const DimensionLimit &testCase, std::ostream *os) { *os << testCase.name; }
+
+class xparser_dimension_limit : public testing::TestWithParam<DimensionLimit> {
+ protected:
+  static std::string parseWithLiteral(const DimensionLimit &testCase, int literal) {
+    std::string statement  = testCase.statement;
+    const auto placeholder = statement.find("{}");
+    statement.replace(placeholder, 2, std::to_string(literal));
+    qTree instance;
+    testing::internal::CaptureStderr();
+    auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'
+        SELECT src[0] STREAM dst FROM src
+      )" + statement + "\n");
+    testing::internal::GetCapturedStderr();
+    return result;
+  }
+};
+
+TEST_P(xparser_dimension_limit, value_at_the_limit_is_accepted) {
+  EXPECT_EQ(parseWithLiteral(GetParam(), GetParam().limit), "OK");
+}
+
+TEST_P(xparser_dimension_limit, value_above_the_limit_is_a_plan_error) {
+  const auto &testCase     = GetParam();
+  const std::string result = parseWithLiteral(testCase, testCase.limit + 1);
+  const std::string reason =
+      testCase.what + " " + std::to_string(testCase.limit + 1) + " exceeds the limit " + std::to_string(testCase.limit);
+  EXPECT_TRUE(result.contains(reason)) << result;
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    xparser, xparser_dimension_limit,
+    testing::Values(
+        DimensionLimit{"generator_size", "SELECT src[$] STREAM cells[{}] FROM src", "stream generator size", 128},
+        DimensionLimit{"field_array_size", "DECLARE b INTEGER[{}] STREAM big, 1 FILE 'b.txt'", "field size", 65536},
+        DimensionLimit{"string_length", "DECLARE b STRING[{}] STREAM big, 1 FILE 'b.txt'", "field size", 65536},
+        DimensionLimit{"to_string_width", "SELECT to_string(src[0]:{}) STREAM big FROM src", "to_string width", 65536},
+        DimensionLimit{"agse_step", "SELECT * STREAM big FROM src@({},1)", "AGSE step", 65536},
+        DimensionLimit{"agse_window", "SELECT * STREAM big FROM src@(1,{})", "AGSE window", 65536},
+        DimensionLimit{"agse_negative_window", "SELECT * STREAM big FROM src@(1,-{})", "AGSE window", 65536},
+        DimensionLimit{"time_move", "SELECT src[0] STREAM big FROM src>{}", "time shift", 65536},
+        DimensionLimit{"record_window_min", "SELECT MIN(src[0]:{}) STREAM big FROM src", "record window width", 65536},
+        DimensionLimit{"record_window_max", "SELECT MAX(src[0]:{}) STREAM big FROM src", "record window width", 65536},
+        DimensionLimit{"record_window_avg", "SELECT AVG(src[0]:{}) STREAM big FROM src", "record window width", 65536},
+        DimensionLimit{"record_window_sumc", "SELECT SUMC(src[0]:{}) STREAM big FROM src", "record window width", 65536},
+        DimensionLimit{"dump_left", "RULE r ON dst WHEN dst[0] > 0 DO DUMP -{} TO 1", "DUMP range bound", 65536},
+        DimensionLimit{"dump_right", "RULE r ON dst WHEN dst[0] > 0 DO DUMP -1 TO {}", "DUMP range bound", 65536},
+        DimensionLimit{"dump_retention", "RULE r ON dst WHEN dst[0] > 0 DO DUMP -1 TO 1 RETENTION {}", "DUMP RETENTION", 256}),
+    [](const testing::TestParamInfo<DimensionLimit> &info) { return info.param.name; });
 
 TEST(xcompiler, rule_condition_reaching_another_stream_is_refused) {
   // Warunek reguly ewaluator liczy na payloadzie WYJSCIOWYM celu i bierze z tokenu wylacznie
@@ -1700,6 +1773,14 @@ TEST(xparser, invalid_values_are_refused_without_killing_the_process) {
       {source + "SELECT core0[0] STREAM dst FROM core0 RETENTION 0 3", "RETENTION capacity 0 must be greater than zero"},
       {source + "SELECT core0[0] STREAM dst FROM core0 RETENTION 0 0", "RETENTION capacity 0 must be greater than zero"},
       {source + "SELECT core0[0] STREAM dst FROM core0 RETENTION 0", "RETENTION capacity 0 must be greater than zero"},
+      // Dolna granica wymiarow z A2 M11. Generator, szerokosc okna rekordowego i `to_string(x:0)`
+      // odrzucal dotad dopiero kompilator albo nie odrzucal nikt: `to_string(x:0)` dawalo po cichu
+      // szerokosc domyslna, a `INTEGER[0]` - pole o zerowej dlugosci.
+      {source + "SELECT core0[$] STREAM cell[0] FROM core0", "stream generator size 0 must be greater than zero"},
+      {"DECLARE a INTEGER[0] STREAM core0, 1 FILE 'a.txt'", "field size 0 must be greater than zero"},
+      {"DECLARE a STRING[0] STREAM core0, 1 FILE 'a.txt'", "field size 0 must be greater than zero"},
+      {source + "SELECT to_string(core0[0]:0) STREAM dst FROM core0", "to_string width 0 must be greater than zero"},
+      {source + "SELECT MIN(core0[0]:0) STREAM dst FROM core0", "record window width 0 must be greater than zero"},
   };
   for (const auto &[rql, reason] : cases) {
     const auto [parseResult, diagnostics] = parseCapturingStderr(rql);
@@ -2374,7 +2455,242 @@ TEST(xcompiler, rejects_zero_sized_generator) {
         SELECT cells[$] STREAM cell[0] FROM cells
       )");
   EXPECT_NE(verdict, "OK");
-  EXPECT_NE(verdict.find("positive size"), std::string::npos) << verdict;
+  EXPECT_NE(verdict.find("stream generator size 0 must be greater than zero"), std::string::npos) << verdict;
+}
+
+// --- wymiary zlozone, znane dopiero po przebiegach kompilatora (A2 M11) -----------------------
+
+// Generator to jedyny zapis, w ktorym jedna linia RQL daje wiele strumieni - kopie zapytania na
+// kazda instancje. Planu wiekszego niz slot magistrali serwer i tak nie uruchomi, wiec odmowa zapada
+// PRZED kopiowaniem. Plan bez generatora zostaje magistrali (it_service_reset_race).
+TEST(xcompiler, stream_count_after_generator_expansion_is_limited) {
+  const std::string source = "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n";
+  EXPECT_EQ(compileRql(source + "SELECT src[0]+$ STREAM cell[127] FROM src\n"), "OK");
+
+  const std::string verdict = compileRql(source + "SELECT src[0]+$ STREAM cell[128] FROM src\n");
+  EXPECT_TRUE(verdict.contains("Plan has 129 streams after expanding stream generators; the limit is 128")) << verdict;
+  EXPECT_TRUE(verdict.contains("stream generator 'cell' adds 128")) << verdict;
+}
+
+namespace {
+/// `SELECT to_string(src[0]:65536), ... STREAM wide FROM src` z `count` polami - kazde po 64 KiB.
+std::string wideStringSelect(int count) {
+  std::string list;
+  for (int i = 0; i < count; ++i)
+    list += std::string(i == 0 ? "" : ", ") + "to_string(src[0]:65536)";
+  return "SELECT " + list + " STREAM wide FROM src\n";
+}
+}  // namespace
+
+// Rekord do 1 MiB, pole do 65536 elementow. Kontrola liczy z lSchema w int64, zanim ktorykolwiek
+// przebieg zbuduje rdb::Descriptor - to jego budowa (offsety w int, mapowanie na element) i payload
+// sa tym, przed czym ma zdazyc.
+TEST(xcompiler, record_size_is_limited) {
+  const std::string source = "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n";
+  // Ksztalt znany juz z parsera: 16 x 64 KiB to dokladnie 1 MiB.
+  EXPECT_EQ(compileRql(source + wideStringSelect(16)), "OK");
+  std::string verdict = compileRql(source + wideStringSelect(17));
+  EXPECT_TRUE(verdict.contains("Stream 'wide' needs a record of 1114112 bytes; the limit is 1048576")) << verdict;
+
+  // Okno AGSE ma |window| slotow o szerokosci NAJSZERSZEGO elementu zrodla, wiec nad napisem rosnie
+  // z iloczynem. Pierwszy odpowiada rekord WEJSCIOWY (payload, ktory streamInstance alokuje z
+  // descriptorFrom), bo sprawdzany jest, zanim ktorykolwiek przebieg go zbuduje.
+  const std::string text = "DECLARE s STRING[65536] STREAM txt, 1 FILE 't.txt'\n";
+  EXPECT_EQ(compileRql(text + "SELECT * STREAM w FROM txt@(1,16)\n"), "OK");
+  verdict = compileRql(text + "SELECT * STREAM w FROM txt@(1,17)\n");
+  EXPECT_TRUE(verdict.contains("Stream 'w' reads an input record of 1114112 bytes; the limit is 1048576")) << verdict;
+  // Jedno pole wyjscia, 4 GiB wejscia - dawniej przepelnienie int w offsetach deskryptora wejsciowego.
+  verdict = compileRql(text + "SELECT txt[0] STREAM w FROM txt@(1,65536)\n");
+  EXPECT_TRUE(verdict.contains("Stream 'w' reads an input record of 4294967296 bytes; the limit is 1048576")) << verdict;
+
+  // Wejscie rosnie dopiero w inferFieldShapes(): pole `a` staje sie napisem 60000 znakow, gdy przebieg
+  // pozna typ zrodla, a okno nad nim bylo wczesniej oknem nad INTEGER.
+  verdict = compileRql(
+      "DECLARE s STRING[30000] STREAM txt, 1 FILE 't.txt'\n"
+      "SELECT txt[0]+txt[0] STREAM a FROM txt\n"
+      "SELECT a[0] STREAM w FROM a@(1,65536)\n");
+  EXPECT_TRUE(verdict.contains("Stream 'w' reads an input record of 3932160000 bytes; the limit is 1048576")) << verdict;
+
+  // Suma strumieni skleja rekordy obu skladnikow - kazdy z nich miesci sie w granicy.
+  std::string nine;
+  for (int i = 0; i < 9; ++i)
+    nine += std::string(i == 0 ? "" : ", ") + "s" + std::to_string(i) + " STRING[65536]";
+  verdict = compileRql("DECLARE " + nine + " STREAM a, 1 FILE 'a.txt'\nDECLARE " + nine +
+                       " STREAM b, 1 FILE 'b.txt'\nSELECT * STREAM w FROM a+b\n");
+  EXPECT_TRUE(verdict.contains("Stream 'w' reads an input record of 1179648 bytes; the limit is 1048576")) << verdict;
+}
+
+// Przeplot czyta w takcie rekord JEDNEGO skladnika, ale slot wejscia ma na kazdej pozycji dluzszy
+// z dwoch elementow. Uklady lustrzane - 10 napisow po 64 KiB i 10 bajtow wobec 10 bajtow i 10 napisow -
+// mieszcza sie w granicy kazdy z osobna (655370 B), a rekord wejsciowy ma same napisy (1310720 B).
+// Do 2026-09-27 checkInputRecord pomijal `#`.
+TEST(xcompiler, hash_input_record_is_limited) {
+  std::string strings;
+  std::string bytes;
+  for (int i = 0; i < 10; ++i) {
+    strings += ", s" + std::to_string(i) + " STRING[65536]";
+    bytes += ", b" + std::to_string(i) + " BYTE";
+  }
+  auto declare = [](const std::string &fields, const std::string &name) {
+    return "DECLARE " + fields.substr(2) + " STREAM " + name + ", 1 FILE '" + name + ".txt'\n";
+  };
+  const std::string verdict =
+      compileRql(declare(strings + bytes, "a") + declare(bytes + strings, "b") + "SELECT * STREAM w FROM a#b\n");
+  EXPECT_TRUE(verdict.contains("Stream 'w' reads an input record of 1310720 bytes; the limit is 1048576")) << verdict;
+
+  // Ten sam uklad po obu stronach: slot wejscia rowny slotowi zrodla.
+  EXPECT_EQ(compileRql(declare(strings + bytes, "a") + declare(strings + bytes, "b") + "SELECT * STREAM w FROM a#b\n"), "OK");
+}
+
+// Schemat wyjscia przeplotu ma ten sam ksztalt co slot wejscia - dluzszy element na kazdej pozycji,
+// niezaleznie od kolejnosci skladnikow. Do 2026-09-27 szedl za lewym skladnikiem, a slot napisowy
+// z DECLARE mial 1 B, wiec `.desc` wyjscia mowil `STRING s[1]`.
+TEST(xcompiler, hash_output_schema_takes_the_longer_side) {
+  auto plan = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE s STRING[8], k INTEGER STREAM ta, 1 FILE 'a.txt'
+        DECLARE s STRING[16], k DOUBLE STREAM tb, 1 FILE 'b.txt'
+        SELECT * STREAM h FROM ta#tb
+        SELECT * STREAM g FROM tb#ta
+      )");
+  for (const std::string id : {"h", "g"}) {
+    for (auto desc : {plan.getQuery(id).descriptorStorage(), plan.getQuery(id).descriptorFrom(plan)}) {
+      desc.removeConfigurationFields();
+      ASSERT_EQ(desc.size(), 2U) << id;
+      EXPECT_EQ(desc[0].rtype, rdb::STRING) << id;
+      EXPECT_EQ(desc.fieldSize(desc[0]), 16) << id;
+      EXPECT_EQ(desc[1].rtype, rdb::DOUBLE) << id;
+      EXPECT_EQ(desc.fieldSize(desc[1]), 8) << id;
+    }
+  }
+}
+
+// Napis ma w calym planie JEDEN zapis: `rlen = 1`, `rarray = N`, ten sam co DECLARE i `.desc`. Do
+// 2026-09-27 okno AGSE (rekord wejsciowy i schemat wyjscia) zapisywalo go odwrotnie, `rlen = N`, a
+// porownania ksztaltu w optymalizatorze, ktore biora rlen i rarray osobno, braly wtedy ten sam napis
+// za dwa rozne pola.
+TEST(xcompiler, string_fields_use_one_notation_across_the_plan) {
+  auto plan   = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE s STRING[8], k INTEGER STREAM txt, 1 FILE 't.txt'
+        DECLARE s STRING[16], k INTEGER STREAM wide, 1 FILE 'w.txt'
+        SELECT * STREAM win FROM txt@(1,3)
+        SELECT win[_] STREAM idx FROM win
+        SELECT * STREAM h FROM txt#wide
+        SELECT * STREAM total FROM txt+wide
+      )");
+  int strings = 0;
+  for (auto &q : plan) {
+    if (q.isCompilerDirective()) continue;
+    for (const auto &f : q.lSchema) {
+      if (f.field_.rtype != rdb::STRING) continue;
+      ++strings;
+      EXPECT_EQ(f.field_.rlen, 1) << q.id << " " << f.field_.rname;
+    }
+    if (q.isDeclaration()) continue;
+    for (const auto &f : q.descriptorFrom(plan)) {
+      if (f.rtype != rdb::STRING) continue;
+      ++strings;
+      EXPECT_EQ(f.rlen, 1) << q.id << " input " << f.rname;
+    }
+  }
+  EXPECT_GT(strings, 0);  // kontrola, ktora niczego nie objela, nie jest kontrola
+}
+
+// Pole pochodne dluzsze niz 65536 odpada, choc rekord miesci sie w 1 MiB: serwer zapisuje je do
+// .desc (`STRING wide_0[80000]`) i czyta przy nastepnym starcie, a gramatyka DESC ma te sama granice
+// co RQL. Bez tej kontroli plan przechodzilby pierwszy start i konczyl drugi FatalError-em.
+TEST(xcompiler, derived_field_length_is_limited) {
+  // Szerokosc znana z parsera.
+  std::string verdict = compileRql(
+      "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n"
+      "SELECT to_string(src[0]:40000)+to_string(src[0]:40000) STREAM wide FROM src\n");
+  EXPECT_TRUE(verdict.contains("Stream 'wide' field 'wide_0' has length 80000; the limit is 65536")) << verdict;
+
+  // Szerokosc znana dopiero z inferFieldShapes(): parser nie zna typu pola zrodla.
+  verdict = compileRql("DECLARE s STRING[40000] STREAM txt, 1 FILE 't.txt'\nSELECT txt[0]+txt[0] STREAM wide FROM txt\n");
+  EXPECT_TRUE(verdict.contains("Stream 'wide' field 'wide_0' has length 80000; the limit is 65536")) << verdict;
+}
+
+// Koszt kompilacji i pracy rosnie z liczba elementow plaskich, nie z bajtami: rekord 1 MiB z BYTE
+// to milion elementow i ~400 MB RSS juz w `-c` na jeden wezel `SELECT *` (zmierzone 2026-09-27).
+TEST(xcompiler, plan_wide_element_count_is_limited) {
+  std::string declarations;
+  for (const auto *name : {"a", "b", "c"})
+    declarations += std::string("DECLARE x BYTE[65536] STREAM ") + name + ", 1 FILE '" + name + ".txt'\n";
+  declarations += "DECLARE x BYTE[65535] STREAM d, 1 FILE 'd.txt'\n";
+
+  // 3 x 65536 + 65535 + 1 = 262144 - dokladnie granica.
+  EXPECT_EQ(compileRql(declarations + "SELECT d[0] STREAM w FROM d\n"), "OK");
+  // `SELECT *` materializuje 65535 pol. Wezel, na ktorym suma przekracza granice, zalezy od porzadku
+  // topologicznego (niezalezne deklaracje moga stanac za w), wiec nazwy tu nie przypinamy.
+  std::string verdict = compileRql(declarations + "SELECT * STREAM w FROM d\n");
+  EXPECT_TRUE(verdict.contains("Plan needs 327678 record elements; the limit is 262144 (reached at stream '")) << verdict;
+
+  // Jedna deklaracja o rekordzie 1 MiB (w granicy bajtow) to milion elementow.
+  std::string sixteen;
+  for (int i = 0; i < 16; ++i)
+    sixteen += std::string(i == 0 ? "" : ", ") + "f" + std::to_string(i) + " BYTE[65536]";
+  verdict = compileRql("DECLARE " + sixteen + " STREAM src, 1 FILE 'a.txt'\nSELECT * STREAM w FROM src\n");
+  EXPECT_TRUE(verdict.contains("Plan needs 1048576 record elements; the limit is 262144 (reached at stream 'src')")) << verdict;
+}
+
+// Okno nad oknem: origin rosnie jak O_src*F, wiec dwa okna `@(1,65536)` w lancuchu daja pierwszy rekord
+// po 2^32 slotach. Do 2026-09-27 int sie przepelnial i plan przechodzil; teraz to blad planu. Ten sam
+// iloczyn z duzym krokiem daje origin w zakresie - odmowa dotyczy wyniku, nie rachunku posredniego.
+TEST(xcompiler, agse_logical_origin_beyond_int_is_a_plan_error) {
+  const std::string source  = "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\nSELECT * STREAM w1 FROM src@(1,65536)\n";
+  const std::string verdict = compileRql(source + "SELECT * STREAM w2 FROM w1@(1,65536)\n");
+  EXPECT_TRUE(verdict.contains("Stream 'w2' has a logical origin of 4294967295 slots; the limit is 2147483647")) << verdict;
+  EXPECT_EQ(compileRql(source + "SELECT * STREAM w2 FROM w1@(65536,1)\n"), "OK");
+}
+
+// Petla okresu AGSE w computeRequiredCapacities liczyla (n+1+Wout)*step w int: przy F = 65536 i kroku
+// 65535 to ok. 2^32 (A2 M11). Wartosc oczekiwana policzona niezaleznie, liczbami calkowitymi Pythona.
+TEST(xcompiler, agse_capacity_period_is_computed_without_int_overflow) {
+  qTree plan;
+  ASSERT_EQ(std::get<0>(parserRQLString(plan,
+                                        "DECLARE x BYTE[65536] STREAM src, 1 FILE 'a.txt'\n"
+                                        "SELECT * STREAM w FROM src@(65535,1)\n")),
+            "OK");
+  ASSERT_EQ(compiler(plan).compile(), "OK");
+  EXPECT_EQ(plan.maxCapacity.at("src"), 3);
+}
+
+// Pamiec historii planu: pierscienie zrodel deklarowanych (SourceBuffer) i magazynow MEMORY, wycenione
+// capacity x (sizeof(rdb::payload) + bajty rekordu). Budzet przychodzi z `[limits] history_memory_mib`.
+TEST(xcompiler, stream_history_in_memory_is_limited_by_the_config_budget) {
+  const std::filesystem::path config =
+      std::filesystem::temp_directory_path() / ("ut_compiler_budget_" + std::to_string(::getpid()) + ".toml");
+  std::ofstream(config) << "[limits]\nhistory_memory_mib = 1\n";
+  const AppConfig small = loadAppConfig(config.string());
+  std::filesystem::remove(config);
+  ASSERT_EQ(small.historyMemoryMib, 1);
+
+  auto compileWithBudget = [](const std::string &rql, const std::optional<int> &budgetMib) {
+    qTree plan;
+    auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, rql);
+    if (parseResult != "OK") return parseResult;
+    compiler compilerInstance(plan);
+    if (budgetMib) compilerInstance.setHistoryMemoryBudget(*budgetMib);
+    return compilerInstance.compile();
+  };
+
+  // Zrodlo deklarowane: 512 KiB na rekord, przesuniecie o 100 wymaga ~100 rekordow historii (~53 MB).
+  const std::string declared = "DECLARE x DOUBLE[65536] STREAM src, 1 FILE 'a.txt'\nSELECT src[0] STREAM w FROM src>100\n";
+  EXPECT_EQ(compileWithBudget(declared, std::nullopt), "OK");
+  std::string verdict = compileWithBudget(declared, small.historyMemoryMib);
+  EXPECT_TRUE(verdict.contains("history_memory_mib = 1")) << verdict;
+  EXPECT_TRUE(verdict.contains("largest share: stream 'src'")) << verdict;
+
+  // Magazyn MEMORY: pierscien strumienia VOLATILE, czytanego z przesunieciem.
+  const std::string ring =
+      "DECLARE x INTEGER STREAM src, 1 FILE 'a.txt'\n"
+      "SELECT to_string(src[0]:65536) STREAM m FROM src VOLATILE\n"
+      "SELECT m[0] STREAM w FROM m>100\n";
+  EXPECT_EQ(compileWithBudget(ring, std::nullopt), "OK");
+  verdict = compileWithBudget(ring, small.historyMemoryMib);
+  EXPECT_TRUE(verdict.contains("largest share: stream 'm'")) << verdict;
 }
 
 /// Zwiniety indeks musi miescic sie w zrodle.
@@ -2386,6 +2702,43 @@ TEST(xcompiler, rejects_generated_field_index_beyond_source) {
   EXPECT_NE(verdict, "OK");
   EXPECT_NE(verdict.find("'cells' has 4 element(s) in its FROM clause, so 'cells[4]' is out of range"), std::string::npos)
       << verdict;
+}
+
+/// Arytmetyka indeksu generatora liczona w golym int zawijala sie po cichu (A2 M10): `$+4294967296`
+/// i `65536*65536+$` dawaly `cells[$]`, a `2147483647+$` w instancji 1 - indeks ujemny.
+TEST(xcompiler, rejects_generated_field_index_that_does_not_fit_in_int) {
+  for (const auto &[index, instance] :
+       {std::pair{"$+4294967296", "cell$0"}, std::pair{"2147483647+$", "cell$1"}, std::pair{"65536*65536+$", "cell$0"}}) {
+    const std::string verdict = compileRql(R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[)" + std::string(index) +
+                                           R"(] STREAM cell[2] FROM cells
+      )");
+    EXPECT_EQ(verdict, std::format("Stream '{}' references 'cells[{}]' - the index does not fit in int", instance, index));
+  }
+}
+
+const std::string kCellFamily = R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[$] STREAM cell[4] FROM cells
+      )";
+
+/// Indeks rodziny w FROM: przepelnienie wskazywalo po cichu inna instancje - `cell[4294967297]`
+/// dawalo `cell$1` (A2 M10).
+TEST(xcompiler, rejects_family_index_that_does_not_fit_in_int) {
+  EXPECT_EQ(compileRql(kCellFamily + "SELECT * STREAM w FROM cell[4294967297]\n"),
+            "Stream 'w' references 'cell[4294967297]' outside the range 0..3");
+  EXPECT_EQ(compileRql(kCellFamily + "SELECT * STREAM w FROM cell[65536*65536+2]\n"),
+            "Stream 'w' references 'cell[65536*65536+2]' outside the range 0..3");
+  EXPECT_EQ(compileRql(kCellFamily + "SELECT * STREAM w[2] FROM cell[$*65536*65536]\n"),
+            "Stream 'w$1' references 'cell[$*65536*65536]' - the index does not fit in int");
+}
+
+/// Ujemny numer instancji w FROM szablonu. Osobny test, bo przed poprawka konczyl FatalError-em
+/// caly proces - tu binarke testow, w kanale `--reset` serwer.
+TEST(xcompiler, rejects_negative_family_index_in_generator_template) {
+  EXPECT_EQ(compileRql(kCellFamily + "SELECT * STREAM w[2] FROM cell[$-1]\n"),
+            "Stream 'w$0' references 'cell[-1]' - stream generator index must not be negative");
 }
 
 /// Szerokosc zrodla powstaje dopiero w rozwinieciu: `[_]` daje dwa pola z jednej pozycji listy,
@@ -3925,6 +4278,242 @@ TEST(xparser, explicit_storage_overrides_default_without_leaking_to_next_select)
   }
   EXPECT_EQ(plan.getQuery("tmp").policy.first, "MEMORY");
   EXPECT_EQ(plan.getQuery("explicit_tmp").policy.first, "MEMORY");
+}
+
+// `STORAGE MEMORY` to pierscien w RAM o pojemnosci max(RETENTION, potrzeba planu). Do 2026-09-27 bez
+// RETENTION magazyn nie mial granicy (memoryFile z no_retention rosl o rekord na takt), a z `RETENTION n`
+// deskryptor dostawal TYPE DEFAULT i dane szly na dysk.
+TEST(xcompiler, storage_memory_is_a_bounded_ring_in_memory) {
+  qTree plan;
+  ASSERT_EQ(std::get<0>(parserRQLString(plan, R"(
+    DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'
+    SELECT src[0] STREAM bare FROM src STORAGE MEMORY
+    SELECT src[0] STREAM kept FROM src RETENTION 5 STORAGE MEMORY
+    SELECT src[0] STREAM needed FROM src RETENTION 5 STORAGE MEMORY
+    SELECT needed[0] STREAM late FROM needed>9
+    SELECT src[0] STREAM wide FROM src RETENTION 20 STORAGE MEMORY
+    SELECT wide[0] STREAM near FROM wide>2
+  )")),
+            "OK");
+  ASSERT_EQ(compiler(plan).compile(), "OK");
+  auto ring = [&plan](const std::string &id) { return plan.getQuery(id).descriptorStorage().storagePolicy(); };
+
+  EXPECT_EQ(ring("bare"), std::make_pair(std::string("MEMORY"), size_t{1}));
+  EXPECT_EQ(ring("kept"), std::make_pair(std::string("MEMORY"), size_t{5}));
+  // Potrzeba planu wieksza od RETENTION wygrywa, mniejsza nie skraca RETENTION.
+  EXPECT_EQ(ring("needed").first, "MEMORY");
+  EXPECT_EQ(ring("needed").second, static_cast<size_t>(plan.maxCapacity.at("needed")));
+  EXPECT_GT(ring("needed").second, size_t{5});
+  EXPECT_EQ(ring("wide"), std::make_pair(std::string("MEMORY"), size_t{20}));
+}
+
+// D7: samo `RETENTION n` to rozmiar pierscienia MEMORY. Na magazynie plikowym zostawialo polityke
+// ("DEFAULT", n), a z niej TYPE DEFAULT w .desc - bez retencji i wbrew STORAGE z planu. Teraz blad planu
+// z podpowiedzia postaci dwuargumentowej; MEMORY, VOLATILE i odziedziczone DEFAULT VOLATILE bez zmian.
+TEST(xparser, retention_without_segments_on_disk_storage_is_a_plan_error) {
+  const std::string source = "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n";
+  for (const auto *select : {"SELECT src[0] STREAM out FROM src RETENTION 5",  //
+                             "SELECT src[0] STREAM out FROM src RETENTION 5 STORAGE DIRECT",
+                             "SELECT src[0] STREAM out FROM src RETENTION 5 STORAGE DEFAULT",
+                             "SELECT src[0] STREAM out FROM src RETENTION 5 STORAGE POSIX",
+                             "SELECT src[0] STREAM out FROM src RETENTION 5 STORAGE GENERIC"}) {
+    const auto [parseResult, diagnostics] = parseCapturingStderr(source + select);
+    EXPECT_TRUE(parseResult.contains("RETENTION 5 on stream out")) << select << '\n' << parseResult;
+    EXPECT_TRUE(parseResult.contains("RETENTION 5 <segments>")) << select << '\n' << parseResult;
+  }
+  // PERSISTENT wylacza odziedziczona ulotnosc, wiec magazyn jest plikowy.
+  const auto [persistent, persistentDiagnostics] =
+      parseCapturingStderr("DEFAULT VOLATILE\n" + source + "SELECT src[0] STREAM out FROM src RETENTION 5 PERSISTENT");
+  EXPECT_TRUE(persistent.contains("RETENTION 5 <segments>")) << persistent;
+
+  for (const auto *memory :
+       {"SELECT src[0] STREAM out FROM src RETENTION 5 STORAGE MEMORY", "SELECT src[0] STREAM out FROM src RETENTION 5 VOLATILE",
+        "SELECT src[0] STREAM out FROM src RETENTION 5 2 STORAGE DIRECT"}) {
+    qTree plan;
+    EXPECT_EQ(std::get<0>(parserRQLString(plan, source + memory)), "OK") << memory;
+  }
+  qTree inherited;
+  EXPECT_EQ(
+      std::get<0>(parserRQLString(inherited, "DEFAULT VOLATILE\n" + source + "SELECT src[0] STREAM out FROM src RETENTION 5")),
+      "OK");
+}
+
+// P4: segmenty na dysku przy magazynie w pamieci. memoryFile czyta tylko RETMEMORY, wiec `RETENTION c s`
+// przy STORAGE MEMORY i przy VOLATILE (jawnym i odziedziczonym) bylo ignorowane bez slowa. Teraz blad
+// planu z dwiema drogami wyjscia: pierscien albo dysk - ta druga zalezy od tego, co trzyma strumien w RAM.
+TEST(xparser, retention_segments_on_memory_storage_are_a_plan_error) {
+  const std::string source = "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n";
+  const std::vector<std::pair<std::string, std::string>> cases{
+      {source + "SELECT src[0] STREAM out FROM src RETENTION 5 2 STORAGE MEMORY",
+       "but STORAGE MEMORY keeps the stream in memory: write RETENTION 5 for a MEMORY ring, or use STORAGE DEFAULT or DIRECT"},
+      {source + "SELECT src[0] STREAM out FROM src RETENTION 5 2 VOLATILE",
+       "but VOLATILE keeps the stream in memory: write RETENTION 5 for a MEMORY ring, or drop VOLATILE"},
+      {"DEFAULT VOLATILE\n" + source + "SELECT src[0] STREAM out FROM src RETENTION 5 2",
+       "but DEFAULT VOLATILE keeps the stream in memory: write RETENTION 5 for a MEMORY ring, or add PERSISTENT"},
+  };
+  for (const auto &[rql, reason] : cases) {
+    const auto [parseResult, diagnostics] = parseCapturingStderr(rql);
+    EXPECT_TRUE(parseResult.contains("RETENTION 5 2 on stream out sets segments on disk, " + reason)) << rql << '\n'
+                                                                                                      << parseResult;
+  }
+  qTree persistent;
+  EXPECT_EQ(std::get<0>(parserRQLString(
+                persistent, "DEFAULT VOLATILE\n" + source + "SELECT src[0] STREAM out FROM src RETENTION 5 2 PERSISTENT")),
+            "OK");
+}
+
+// P4, lustro: samo `RETENTION n` przy VOLATILE jest rozmiarem pierscienia, jak przy STORAGE MEMORY -
+// do 2026-09-27 VOLATILE nadpisywal je jedynka. Wieksza potrzeba planu nadal wygrywa.
+TEST(xcompiler, volatile_retention_sets_the_ring_size) {
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan,
+                          "DEFAULT VOLATILE\n"
+                          "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n"
+                          "SELECT src[0] STREAM kept FROM src RETENTION 7 VOLATILE\n"
+                          "SELECT src[0] STREAM inherited FROM src RETENTION 7\n"
+                          "SELECT src[0] STREAM needed FROM src RETENTION 3 VOLATILE\n"
+                          "SELECT needed[0] STREAM late FROM needed>9\n"
+                          "SELECT src[0] STREAM bare FROM src VOLATILE\n")
+                .status,
+            "OK");
+  ASSERT_EQ(compiler(plan).compile(), "OK");
+  auto ring = [&plan](const std::string &id) { return plan.getQuery(id).descriptorStorage().storagePolicy(); };
+  EXPECT_EQ(ring("kept"), std::make_pair(std::string("MEMORY"), size_t{7}));
+  EXPECT_EQ(ring("inherited"), std::make_pair(std::string("MEMORY"), size_t{7}));
+  EXPECT_EQ(ring("needed").second, static_cast<size_t>(plan.maxCapacity.at("needed")));
+  EXPECT_GT(ring("needed").second, size_t{3});
+  EXPECT_EQ(ring("bare"), std::make_pair(std::string("MEMORY"), size_t{1}));
+}
+
+// D7, czesc druga: polityka "DEFAULT" typu nie wybiera, wiec TYPE w .desc bierze STORAGE z planu,
+// niezaleznie od tego, czy parser taka polityke jeszcze przepusci. Typ wybrany przez polityke -
+// VOLATILE (udokumentowane pierwszenstwo nad STORAGE) i profil SUBSTRAT - zostaje.
+TEST(xcompiler, default_policy_does_not_override_explicit_storage) {
+  query direct;
+  direct.lProgram       = {token(PUSH_STREAM, std::string("src"))};
+  direct.policy         = std::make_pair("DEFAULT", 5);
+  direct.storage_policy = "DIRECT";
+  EXPECT_EQ(direct.storageType(), "DIRECT");
+  EXPECT_EQ(direct.descriptorStorage().storagePolicy().first, "DIRECT");
+
+  qTree plan;
+  ASSERT_EQ(std::get<0>(parserRQLString(plan, R"(
+    SUBSTRAT 'direct'
+    DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'
+    SELECT src[0] STREAM segmented FROM src RETENTION 5 2 STORAGE DIRECT
+    SELECT src[0] STREAM tmp FROM src VOLATILE STORAGE DIRECT
+    SELECT src[0] STREAM out FROM SUMC(src@(1,3))
+  )")),
+            "OK");
+  ASSERT_EQ(compiler(plan).compile(), "OK");
+  EXPECT_EQ(plan.getQuery("segmented").storageType(), "DIRECT");
+  EXPECT_EQ(plan.getQuery("segmented").descriptorStorage().retention().segments, 2U);
+  EXPECT_EQ(plan.getQuery("segmented").descriptorStorage().retention().capacity, 5U);
+  EXPECT_EQ(plan.getQuery("tmp").storageType(), "MEMORY");
+  bool found = false;
+  for (auto &q : plan) {
+    if (!q.isSubstrat) continue;
+    found = true;
+    EXPECT_EQ(q.storageType(), "DIRECT") << q.id;
+    EXPECT_EQ(q.descriptorStorage().storagePolicy().first, "DIRECT") << q.id;
+  }
+  EXPECT_TRUE(found);
+}
+
+// groupFile tuz po rotacji trzyma (segments-1) * capacity + 1 rekordow. Konsument siegajacy glebiej
+// czytal skasowany segment i konczyl dzialajacy serwer FatalError-em w storage::read. `mid>6` czyta
+// 7 rekordow: granica jest ostra, sprawdzona biegiem silnika po obu stronach.
+TEST(xcompiler, disk_retention_must_cover_the_history_the_plan_reads) {
+  const auto compileWith = [](const std::string &retention) {
+    qTree plan;
+    EXPECT_EQ(std::get<0>(parserRQLString(plan,
+                                          "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n"
+                                          "SELECT src[0] STREAM mid FROM src RETENTION " +
+                                              retention +
+                                              " STORAGE DIRECT\n"
+                                              "SELECT mid[0] STREAM late FROM mid>6 VOLATILE\n")),
+              "OK");
+    return compiler(plan).compile();
+  };
+  for (const auto *enough : {"3 3", "1 7", "7 2", "4 0"})
+    EXPECT_EQ(compileWith(enough), "OK") << enough;
+  EXPECT_EQ(compileWith("2 3"),
+            "Stream 'mid' keeps only 5 record(s) on disk under RETENTION 2 3, but the plan reads 7 record(s) back from it");
+  EXPECT_EQ(compileWith("1 6"),
+            "Stream 'mid' keeps only 6 record(s) on disk under RETENTION 1 6, but the plan reads 7 record(s) back from it");
+  EXPECT_EQ(compileWith("7 1"),
+            "Stream 'mid' keeps only 1 record(s) on disk under RETENTION 7 1, but the plan reads 7 record(s) back from it");
+}
+
+// D8: `[storage] default_retention` dostaja strumienie DEFAULT/DIRECT bez RETENTION, takze posrednie.
+// Jawne RETENTION, MEMORY i magazyny bez retencji (POSIX...) zostaja jak byly; te ostatnie, razem ze
+// wszystkim, co nadal nie ma granicy, wymienia unboundedDiskStreams().
+TEST(xcompiler, default_retention_bounds_disk_streams_without_retention) {
+  const std::string rql  = R"(
+    DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'
+    SELECT src[0] STREAM plain FROM src
+    SELECT src[0] STREAM straight FROM src STORAGE DIRECT
+    SELECT src[0] STREAM own FROM src RETENTION 7 3
+    SELECT src[0] STREAM every FROM src RETENTION 7 0
+    SELECT src[0] STREAM mem FROM src STORAGE MEMORY
+    SELECT src[0] STREAM raw FROM src STORAGE POSIX
+    SELECT src[0] STREAM out FROM SUMC(src@(1,3)) VOLATILE
+  )";
+  const auto retentionOf = [](qTree &plan, const std::string &id) {
+    const auto r = plan.getQuery(id).descriptorStorage().retention();
+    return std::make_pair(r.capacity, r.segments);
+  };
+  using list = std::vector<std::pair<std::string, std::string>>;
+
+  qTree bare;
+  ASSERT_EQ(std::get<0>(parserRQLString(bare, rql)), "OK");
+  compiler bareCompiler(bare);
+  ASSERT_EQ(bareCompiler.compile(), "OK");
+  list expected{{"plain", "no RETENTION"},
+                {"straight", "no RETENTION"},
+                {"every", "RETENTION 7 0 keeps every segment"},
+                {"raw", "STORAGE POSIX has no retention"}};
+  for (const auto &q : bare)
+    if (q.isSubstrat) expected.emplace_back(q.id, "intermediate stream, no RETENTION");
+  ASSERT_GT(expected.size(), 4U);  // SUMC(src@(1,3)) daje wezel posredni na dysku
+  auto unbounded = bareCompiler.unboundedDiskStreams();
+  std::ranges::sort(unbounded);
+  std::ranges::sort(expected);
+  EXPECT_EQ(unbounded, expected);
+
+  qTree bounded;
+  ASSERT_EQ(std::get<0>(parserRQLString(bounded, rql)), "OK");
+  compiler boundedCompiler(bounded);
+  boundedCompiler.setDefaultRetention({.segments = 4, .capacity = 100});
+  ASSERT_EQ(boundedCompiler.compile(), "OK");
+  const auto fromConfig = std::make_pair(std::size_t{100}, std::size_t{4});
+  EXPECT_EQ(retentionOf(bounded, "plain"), fromConfig);
+  EXPECT_EQ(retentionOf(bounded, "straight"), fromConfig);
+  EXPECT_EQ(retentionOf(bounded, "own"), std::make_pair(std::size_t{7}, std::size_t{3}));
+  EXPECT_EQ(retentionOf(bounded, "every"), std::make_pair(std::size_t{7}, std::size_t{0}));
+  EXPECT_TRUE(bounded.getQuery("mem").descriptorStorage().retention().noRetention());
+  EXPECT_TRUE(bounded.getQuery("raw").descriptorStorage().retention().noRetention());
+  for (const auto &q : bounded)
+    if (q.isSubstrat) EXPECT_EQ(retentionOf(bounded, q.id), fromConfig) << q.id;
+  auto stillUnbounded = boundedCompiler.unboundedDiskStreams();
+  std::ranges::sort(stillUnbounded);
+  EXPECT_EQ(stillUnbounded, (list{{"every", "RETENTION 7 0 keeps every segment"}, {"raw", "STORAGE POSIX has no retention"}}));
+}
+
+// Retencja z konfiguracji przechodzi te sama kontrole glebokosci co jawna - klucz TOML nie moze
+// zamienic poprawnego planu w FatalError dzialajacego serwera.
+TEST(xcompiler, default_retention_too_small_for_the_plan_is_a_compilation_error) {
+  qTree plan;
+  ASSERT_EQ(std::get<0>(parserRQLString(plan,
+                                        "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n"
+                                        "SELECT src[0] STREAM mid FROM src\n"
+                                        "SELECT mid[0] STREAM late FROM mid>6 VOLATILE\n")),
+            "OK");
+  compiler cm(plan);
+  cm.setDefaultRetention({.segments = 3, .capacity = 2});
+  EXPECT_EQ(cm.compile(),
+            "Stream 'mid' keeps only 5 record(s) on disk under [storage] default_retention = [2, 3], but the plan reads 7 "
+            "record(s) back from it");
 }
 
 TEST(xcompiler, explicit_substrate_profile_overrides_default_in_either_header_order) {

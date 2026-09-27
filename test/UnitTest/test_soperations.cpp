@@ -231,6 +231,16 @@ TEST(xSOperations, agse_logical_origin_skips_incomplete_windows) {
   EXPECT_EQ(5, AgseLogicalOrigin(3, 2, 4, 2));
 }
 
+// Dwa okna `@(1,65536)` w lancuchu: O_src = 65535 i F = 65536, wiec O_src*F przekracza int. Do
+// 2026-09-27 obie postaci liczyly w int i przepelnienie bylo UB; teraz wynik jest dokladny w int64,
+// a wartosc spoza int odrzuca kompilator jako blad planu (A2 M11).
+TEST(xSOperations, agse_origin_and_latency_do_not_overflow_int) {
+  EXPECT_EQ(std::int64_t{4294967295}, AgseLogicalOrigin(65536, 1, 65536, 65535));
+  EXPECT_EQ(std::int64_t{4294967295}, AgseStartupLatency(65536, 1, 65535));
+  // Duzy krok sprowadza ten sam iloczyn posredni z powrotem do int.
+  EXPECT_EQ(std::int64_t{65535}, AgseLogicalOrigin(65536, 65536, 1, 65535));
+}
+
 // Ogon sumy strumieni musi objąć dostępność rekordu KAŻDEJ składowej pod
 // indeksem floor(n*D_out/D_src), a nie tylko przeliczyć ogon składowej.
 TEST(xSOperations, add_startup_latency_covers_slower_component) {

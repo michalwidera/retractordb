@@ -1,13 +1,16 @@
 #pragma once
 
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
-#include "qTree.hpp"  // for qTree, query, token
+#include "appConfig.hpp"  // appcfg::kDefaultHistoryMemoryMib
+#include "qTree.hpp"      // for qTree, query, token
 
 /// Zatrzymuje kompilację, jeżeli którykolwiek węzeł planu nie ma wyliczonej wielkości.
 ///
@@ -33,24 +36,32 @@ struct compiler {
   ///
   /// Potrzebne przy przeladowaniu planu w locie (`xqry --reset`): referencja `coreInstance`
   /// jest nierebindowalna, wiec plan wymienia sie PRZEZ ZAWARTOSC tego samego obiektu.
-  /// Bez wyczyszczenia rodzin generatora i zapamietanych odwolan kompilacja nowego planu
-  /// widzialaby strumienie poprzedniego - a stawka jest kasowanie plikow artefaktow,
-  /// ktore idzie wlasnie po generatedStreams_.
+  /// Bez wyczyszczenia zapamietanych odwolan kompilacja nowego planu widzialaby strumienie
+  /// poprzedniego.
   void reset();
 
-  /// Rodziny rozwiniete przez expandStreamGenerators(): nazwa szablonu -> nazwy instancji.
+  /// Budzet pamieci historii planu w MiB, `[limits] history_memory_mib` (A2 M11).
   ///
-  /// Potrzebne POZA kompilatorem, bo generator lamie zalozenie „jedna linia RQL = jeden
-  /// strumien”, na ktorym opiera sie sprzatanie nieaktualnych artefaktow w launcherze.
-  /// Mapa jest jedynym zrodlem tej wiedzy: rozpoznawanie instancji po ksztalcie nazwy
-  /// (`szablon$n`) myliloby sie z recznie zadeklarowanym strumieniem o takiej nazwie,
-  /// a stawka jest kasowanie plikow.
-  [[nodiscard]] const std::map<std::string, std::vector<std::string>> &generatedStreams() const { return generatedStreams_; }
+  /// Setter, a nie argument konstruktora, bo kompilator launchera powstaje, zanim wczyta sie
+  /// konfiguracja. Wartosc domyslna jest wartoscia domyslna KLUCZA, a nie konfiguracja operatora,
+  /// wiec kazde miejsce kompilujace plan w procesie serwera musi ja ustawic: start i `-c`
+  /// (launcher), getAdHoc, attachAdHocRule i validatePlanText.
+  void setHistoryMemoryBudget(int mib) { historyMemoryMib_ = mib; }
+
+  /// Retencja strumieni plikowych bez RETENTION, `[storage] default_retention` (D8). Pusta = brak
+  /// retencji. Ustawiana w tych samych miejscach co setHistoryMemoryBudget - inaczej .desc tego
+  /// samego strumienia zalezalby od kanalu, ktorym przyszedl plan.
+  void setDefaultRetention(rdb::retention_t retention) { defaultRetention_ = retention; }
+
+  /// Strumienie skompilowanego planu rosnace na dysku bez granicy: nazwa i powod (D8).
+  [[nodiscard]] std::vector<std::pair<std::string, std::string>> unboundedDiskStreams() const;
 
  private:
   qTree &coreInstance;
+  int historyMemoryMib_       = appcfg::kDefaultHistoryMemoryMib;
   bool restrictSelectSharing_ = false;
   std::set<std::string> selectSharingScope_;
+  rdb::retention_t defaultRetention_{.segments = 0, .capacity = 0};
   /// Nazwy strumieni, po których sięgnął UŻYTKOWNIK, per zapytanie - sprawdzane przez bramkę
   /// przeplotu w localizeFieldOffsets(). Zbierane z dwóch miejsc, bo formy zapisu różnią się
   /// momentem, w którym znana jest nazwa strumienia:
@@ -60,7 +71,14 @@ struct compiler {
   ///  * goła nazwa pola - resolveTokenReferences(), bo nazwa strumienia powstaje dopiero
   ///    z wyszukania pola w schematach argumentów. PUSH_ID3 wystawia wyłącznie parser.
   std::map<std::string, std::set<std::string>> namedSourceRefs_;
-  std::map<std::string, std::vector<std::string>> generatedStreams_;
+  /// Szerokosc rekordu FROM i rozpietosci nazw w nim, zapamietane na czas resolveFieldReferences().
+  /// Przebieg przepisuje wylacznie tokeny programow pol, wiec schematy i programy FROM sie w nim nie
+  /// zmieniaja. Bez pamieci descriptorFrom() budowal sie od nowa dla kazdego odwolania, czyli
+  /// kwadratowo wzgledem szerokosci wezla: `SELECT * FROM src@(1,65536)` kompilowal sie ok. 2 minut.
+  std::map<std::string, int> fromWidthMemo_;
+  std::map<std::pair<std::string, std::string>, std::optional<int>> fromSpanMemo_;
+  [[nodiscard]] std::string checkRecordShape(const query &q, std::int64_t *planElements) const;
+  std::string checkInputRecord(query &q);
   std::list<field> buildOutputSchema(const std::string &sName1, const std::string &sName2, token &cmd_token);
   [[nodiscard]] std::optional<rdb::rField> sourceFieldAt(const std::string &streamId, int flatIndex) const;
   std::string composeStreamName(const std::string &sName1, const std::string &sName2, const token &cmd);
@@ -91,6 +109,8 @@ struct compiler {
   std::string validateConstraints();
   std::map<std::string, int> computeRequiredCapacities();
   std::string applyCapacitiesToStreams(const std::map<std::string, int> &capMap);
+  std::string checkHistoryMemory();
+  std::string applyDiskRetention();
   [[nodiscard]] std::map<std::string, std::vector<std::string>> snapshotUserFieldNames() const;
   [[nodiscard]] std::string verifyUserFieldNamesPreserved(const std::map<std::string, std::vector<std::string>> &before) const;
   std::string computeLogicalOrigin();

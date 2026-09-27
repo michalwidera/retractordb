@@ -1,0 +1,21 @@
+echo PASS_A
+open pa
+descc
+list 3
+
+echo PASS_B
+open pb
+descc
+list 3
+
+echo HASH_AB
+open h
+descc
+list 6
+
+echo HASH_BA
+open g
+descc
+list 6
+
+quit

@@ -23,7 +23,9 @@ namespace rdb {
 struct memoryBucket {
   std::vector<std::vector<uint8_t>> data;
   std::vector<std::vector<bool>> nulls;
-  size_t writeCount{0};  // Licznik zapisów - logiczna pozycja niezależna od instancji.
+  size_t writeCount{0};   // Licznik zapisów - logiczna pozycja niezależna od instancji.
+  ssize_t recordSize{0};  // Rozmiar rekordów w `data` - read() kopiuje rekord w całości.
+  size_t users{0};        // Żywe instancje memoryFile; ostatnia kasuje kubełek.
 };
 
 }  // namespace rdb
@@ -58,11 +60,30 @@ memoryFile::memoryFile(const std::string_view fileName, const Descriptor &descri
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),  //
       retentionSize_(retentionSize.second),                            //
       // Jedyne wyszukanie po nazwie w całym cyklu życia tej instancji. Węzły std::map są
-      // stabilne - unieważnia je wyłącznie skasowanie tego elementu, a z memoryStore nic nigdy
-      // nie kasuje (write(nullptr, ...) czyści wektory POD kluczem, nie klucz). Strumień
-      // dołączony ad-hoc buduje własne memoryFile z własnym wyszukaniem i istniejących
-      // instancji nie dotyka.
-      bucket_(&memoryStore[filename_]) {}
+      // stabilne - unieważnia je wyłącznie skasowanie tego elementu, a kasuje go dopiero
+      // destruktor OSTATNIEJ instancji, która go używa (write(nullptr, ...) czyści wektory POD
+      // kluczem, nie klucz). Póki ta instancja żyje, węzeł jest więc ważny. Strumień dołączony
+      // ad-hoc buduje własne memoryFile z własnym wyszukaniem i istniejących instancji nie dotyka.
+      bucket_(&memoryStore[filename_]) {
+  // Kubełek z rekordami innego rozmiaru nie ma czego przekazać tej instancji: read() kopiuje rekord
+  // w całości, więc szerszy wyszedłby poza bufor wołającego. Nowy plan i tak dostaje świeży kubełek
+  // (poprzedni ginie z ostatnią instancją) - to jest obrona, nie droga główna.
+  if (bucket_->recordSize != recordSize_) {
+    bucket_->data.clear();
+    bucket_->nulls.clear();
+    bucket_->writeCount = 0;
+    bucket_->recordSize = recordSize_;
+  }
+  ++bucket_->users;
+}
+
+/// Kubełek znika razem z ostatnią instancją, która go używa. Do 2026-09-27 wpisy memoryStore żyły do
+/// końca procesu: po `xqry --reset` strumień o tej samej nazwie dziedziczył rekordy i writeCount
+/// poprzedniego planu (przesunięty pierścień, zapis poza bufor przy węższym rekordzie, FatalError
+/// przy odczycie poza rozmiarem kubełka), a nazwy nieobecne w nowym planie zostawały w pamięci.
+memoryFile::~memoryFile() {
+  if (--bucket_->users == 0) memoryStore.erase(filename_);
+}
 
 auto memoryFile::name() -> std::string & { return filename_; }
 
@@ -122,6 +143,14 @@ ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const 
     return EXIT_FAILURE;
   }
 
+  // Rekord kopiujemy w całości, więc rekord innego rozmiaru niż ta instancja wyszedłby poza bufor
+  // wołającego (albo zostawił w nim śmieci). Konstruktor czyści kubełek o innym rozmiarze, ale nie
+  // pomoże, gdy obie instancje żyją naraz - dlatego straż stoi tutaj.
+  if (std::cmp_not_equal(bucket.data[slot].size(), recordSize_)) {
+    SPDLOG_ERROR("Read failed: record in slot {} has {} bytes, '{}' reads {}", slot, bucket.data[slot].size(), filename_,
+                 recordSize_);
+    return EXIT_FAILURE;
+  }
   std::ranges::copy(bucket.data[slot], ptrData);
 
   if (slot < bucket.nulls.size()) {
@@ -136,5 +165,7 @@ size_t memoryFile::count() {
   assertBucketMatches(bucket_, filename_);
   return bucket_->writeCount;
 }
+
+size_t memoryFile::bucketCountForUnitTest() { return memoryStore.size(); }
 
 }  // namespace rdb

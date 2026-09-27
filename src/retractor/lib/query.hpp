@@ -180,6 +180,10 @@ class query {
   std::pair<std::string, size_t> policy = std::make_pair("DEFAULT", rdb::memoryFile::no_retention);
   std::string storage_policy            = "DEFAULT";
 
+  /// Typ magazynu wyniku SELECT, ktory wybierze rdb::storage: TYPE z descriptorStorage, a bez niego
+  /// STORAGE z planu.
+  [[nodiscard]] std::string storageType() const;
+
   [[nodiscard]] bool isDeclaration() const { return lProgram.empty(); }
   bool isReductionRequired();
   [[nodiscard]] bool isGenerated() const { return id.compare(0, kGeneratedPrefixLength, "STREAM_") == 0; }

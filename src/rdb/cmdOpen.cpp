@@ -12,8 +12,7 @@ std::pair<std::string, std::vector<std::string>> OpenCmd::usage() const {
 }
 
 bool OpenCmd::execute(CommandContext &ctx) {
-  std::cin >> ctx.file;
-  if (ctx.file.contains('{')) {
+  if (!(std::cin >> ctx.file) || ctx.file.contains('{')) {
     std::print("{}unrecognized or missing file:{}\n{}", ctx.colors.RED, ctx.file, ctx.colors.RESET);
     return false;
   }
@@ -24,13 +23,28 @@ bool OpenCmd::execute(CommandContext &ctx) {
   if (ctx.dacc->descriptorFileExist()) {
     ctx.dacc->attachDescriptor();
   } else {
+    // Bez `.desc` schemat jest obowiazkowy i stoi w klamrach. Pierwszy znak sprawdzamy podgladem, bez
+    // konsumowania, wiec nastepne polecenie skryptu zostaje poleceniem. Do 2026-09-27 petla brala
+    // tokeny az do `}` bez kontroli strumienia: polecenia szly do schematu, a na koncu wejscia `>>`
+    // nie zmienialo `token` i ostatni token doklejal sie bez konca (#334, 8 GB w 2 min).
+    std::cin >> std::ws;
+    if (std::cin.peek() != '{') {
+      std::print("{}open: no descriptor file for '{}' and no schema - use: open {} {{ <schema> }}\n{}", ctx.colors.RED, ctx.file,
+                 ctx.file, ctx.colors.RESET);
+      ctx.dacc.reset();
+      return false;
+    }
     std::string schema;
     std::string token;
-    do {
-      std::cin >> token;
+    while (!token.contains('}')) {
+      if (!(std::cin >> token)) {
+        std::print("{}open: schema for '{}' is not closed with '}}'\n{}", ctx.colors.RED, ctx.file, ctx.colors.RESET);
+        ctx.dacc.reset();
+        return false;
+      }
       schema += token;
       schema += ' ';
-    } while (!token.contains('}'));
+    }
     std::stringstream schemaStream(schema);
     rdb::Descriptor desc;
     schemaStream >> desc;

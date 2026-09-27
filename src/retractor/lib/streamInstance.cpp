@@ -97,11 +97,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
     rdb::Descriptor descriptor;
     auto [maxType, maxLen] = source->descriptor.widestFieldType();
     for (auto i = 0; i < lengthAbs; ++i) {
-      rdb::rField x(instance + "_" + std::to_string(i),  //
-                    maxLen,                              //
-                    1,                                   //
-                    maxType);
-      descriptor += rdb::Descriptor{x};
+      descriptor += rdb::Descriptor{rdb::flatSlotField(instance + "_" + std::to_string(i), maxType, maxLen)};
     }
     cacheIt = agseDescriptorCache_.emplace(lengthAbs, std::move(descriptor)).first;
   }
@@ -122,7 +118,10 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   // przed początek źródła, a ogon (compiler::computeStartupLatency) - że górny koniec już
   // istnieje. Kontrola zakresu poniżej pozostaje ochroną przed uszkodzonym planem albo
   // bezpośrednim wywołaniem jednostkowym.
-  const auto windowStart = (windowIndex * step) - (lengthAbs - 1);
+  //
+  // Pozycja w int64: n*step rośnie jak liczba rekordów źródła razy jego szerokość i w int pękała
+  // po ok. 2^31/F rekordach źródła - przy F = 65536 po 32768, niezależnie od kroku.
+  const std::int64_t windowStart = (static_cast<std::int64_t>(windowIndex) * step) - (lengthAbs - 1);
 
   rdb::probe::onAgseWindow(lengthAbs);
 
@@ -133,7 +132,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
     // przed początek strumienia) ma trafiać do rekordu -1, a nie do rekordu 0. W silniku
     // ten przypadek nie występuje - origin go wyklucza - ale wywołanie jednostkowe może
     // podać dowolny indeks i cicha pomyłka o jeden rekord byłaby tu trudna do zauważenia.
-    auto fp = std::div(flatPosition, descriptorSrcSize);
+    auto fp = std::div(flatPosition, std::int64_t{descriptorSrcSize});
     if (fp.rem < 0) {
       --fp.quot;
       fp.rem += descriptorSrcSize;
@@ -154,7 +153,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
     } else
       fp.rem = -1;  // skip to undefined(-1) as value
 
-    auto locSrc = fp.rem;
+    auto locSrc = static_cast<int>(fp.rem);  // reszta < F, miesci sie w int
     if (locSrc >= 0) {
       // P1-E3: przepisanie elementu okna wprost przez wariant (getItemVT/setItemVT).
       // Poprzednio kazdy element szedl bajty->std::any->cast<std::any>->bajty; przy

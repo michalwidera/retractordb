@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -25,6 +26,7 @@
 #include "fatalError.hpp"
 #include "qTree.hpp"
 #include "rdb/convertTypes.hpp"
+#include "rdb/sizeLimits.hpp"
 #include "rqlFunctions.hpp"
 
 using namespace antlrcpp;
@@ -238,18 +240,25 @@ class ParserListener : public RQLBaseListener {
     return T{};
   }
 
-  /// Literal wymiaru, ktory nie moze byc zerem: krok i szerokosc okna AGSE, pojemnosc RETENTION.
-  /// Gramatyka bierze tu DECIMAL, wiec wartosc ujemna nie istnieje, a zero przechodzilo parser:
-  /// krok 0 konczyl proces FatalError-em w kompilatorze, okno 0 przy tworzeniu magazynu,
-  /// pojemnosc 0 przy pierwszym zapisie - w kanale ad-hoc i `--reset` smierc serwera (#308).
-  /// Literal spoza zakresu ma juz swoj komunikat; zastepcze 0 nie dostaje drugiego.
-  int nonZeroLiteral(const std::string &what, const std::string &text) {
+  /// Literal wymiaru z przedzialu [min, max]; min to 0 albo 1.
+  ///
+  /// Gramatyka bierze tu DECIMAL, wiec wartosc ujemna nie istnieje. Zero przechodzilo parser tam,
+  /// gdzie nic nie znaczy: krok 0 konczyl proces FatalError-em w kompilatorze, okno 0 przy tworzeniu
+  /// magazynu, pojemnosc 0 przy pierwszym zapisie - w kanale ad-hoc i `--reset` smierc serwera (#308).
+  /// Gorna granica (rdb/sizeLimits.hpp) zamyka te sama droge od drugiej strony: wartosc, ktora miesci
+  /// sie w int, a jest absurdalna jako rozmiar, konczyla sie std::bad_alloc, OOM killerem albo
+  /// przepelnieniem int dalej w silniku (A2 M11).
+  /// Literal spoza zakresu int ma juz swoj komunikat; zastepcze 0 nie dostaje drugiego.
+  int boundedLiteral(const std::string &what, const std::string &text, int min, int max = std::numeric_limits<int>::max()) {
     const auto value = parseLiteral<int>(text);
     if (!value) {
       reportOutOfRange(text);
       return 0;
     }
-    if (*value == 0) reportSemanticError(what + " " + text + " must be greater than zero");
+    if (*value < min)
+      reportSemanticError(what + " " + text + " must be greater than zero");
+    else if (*value > max)
+      reportSemanticError(what + " " + text + " exceeds the limit " + std::to_string(max));
     return *value;
   }
 
@@ -312,7 +321,15 @@ class ParserListener : public RQLBaseListener {
   void exitFieldID(RQLParser::FieldIDContext *ctx) override { recpToken(PUSH_ID3, ctx->getText()); }
   void exitFieldIDUnderline(RQLParser::FieldIDUnderlineContext *ctx) override { recpToken(PUSH_IDX, ctx->getText()); }
   void exitFieldIDColumnName(RQLParser::FieldIDColumnNameContext *ctx) override { recpToken(PUSH_ID1, ctx->getText()); }
-  void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) override { recpToken(PUSH_ID2, ctx->getText()); }
+
+  /// `strumien[k]` - indeks jest literalem DECIMAL, rownie nieograniczonym jak kazdy inny.
+  /// Do 2026-09-27 kompilator czytal go przez atoi: `core0[4294967296]` liczylo sie po cichu
+  /// jako `core0[0]`, a `core0[4294967295]` dawalo PUSH_ID z indeksem -1, ktory ad-hoc
+  /// przechodzil z "OK" i konczyl serwer przy pierwszym rekordzie (#306, A2 M10).
+  void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) override {
+    if (!parseLiteral<int>(ctx->column_index->getText())) reportOutOfRange(ctx->column_index->getText());
+    recpToken(PUSH_ID2, ctx->getText());
+  }
 
   /// `cells[$]`, `cells[23-$]` - indeks z numerem instancji generatora.
   ///
@@ -365,11 +382,10 @@ class ParserListener : public RQLBaseListener {
   /// token z indeksem grupy okna.
   ///
   /// Okno jest zawsze PRZESUWNE co rekord - powod przy regule `window_agg` w RQL.g4.
-  /// Szerokosci niedodatniej NIE odrzucamy tutaj: to blad PLANU, ktory kompilator raportuje
-  /// przez `Check result:` razem z pozostalymi kontrolami. Parser odrzuca wylacznie literal
-  /// spoza zakresu `int` (literal<int>).
+  /// Szerokosc spoza 1..kMaxHistoryReach odrzucamy tutaj (A2 M11): kazdy rekord okna to rekord
+  /// historii zrodla, wiec literal w zakresie int, ale absurdalny, stawal sie pojemnoscia bufora.
   void exitWindow_agg(RQLParser::Window_aggContext *ctx) override {
-    const int width = literal<int>(ctx->width->getText());
+    const int width = boundedLiteral("record window width", ctx->width->getText(), 1, rdb::limits::kMaxHistoryReach);
     if (windowArgMarks.empty()) FatalError("RQLParser::exitWindow_agg: no argument mark for '{}'", ctx->getText());
     const auto argStart = static_cast<int>(windowArgMarks.back());
     windowArgMarks.pop_back();
@@ -465,11 +481,9 @@ class ParserListener : public RQLBaseListener {
     int window{0};
     int step{0};
     // Minus przed szerokoscia jest legalny (kompilator bierze abs), wiec zerem jest tez `-0`.
-    if (ctx->children[kAgseWindowSignChildIndex]->getText() == "-")
-      window = -nonZeroLiteral("AGSE window", ctx->window->getText());
-    else
-      window = nonZeroLiteral("AGSE window", ctx->window->getText());
-    step = nonZeroLiteral("AGSE step", ctx->step->getText());
+    const int windowAbs = boundedLiteral("AGSE window", ctx->window->getText(), 1, rdb::limits::kMaxHistoryReach);
+    window              = (ctx->children[kAgseWindowSignChildIndex]->getText() == "-") ? -windowAbs : windowAbs;
+    step                = boundedLiteral("AGSE step", ctx->step->getText(), 1, rdb::limits::kMaxHistoryReach);
 
     program.emplace_back(STREAM_AGSE, std::make_pair(step, window));
   }
@@ -486,8 +500,10 @@ class ParserListener : public RQLBaseListener {
     const auto known          = rdb::findRqlFunction(written);
     const std::string name    = known ? std::string(known->canonical) : written;
 
+    // Szerokosc `to_string(x : N)` to dlugosc pola STRING, wiec ma granice pola (A2 M11).
     if (ctx->DECIMAL() != nullptr)
-      recpToken(CALL2, std::make_pair(name, literal<int>(ctx->DECIMAL()->getText())));
+      recpToken(CALL2, std::make_pair(
+                           name, boundedLiteral(name + " width", ctx->DECIMAL()->getText(), 1, rdb::limits::kMaxFieldLength)));
     else
       recpToken(CALL, name);
   }
@@ -565,7 +581,10 @@ class ParserListener : public RQLBaseListener {
   }
 
   void exitSelect(RQLParser::SelectContext *ctx) override {
-    qry.generatorSize = (ctx->gen_size != nullptr) ? literal<int>(ctx->gen_size->getText()) : query::notAGenerator;
+    // Kazda instancja generatora to kopia zapytania i wlasny strumien, wiec rozmiar ma granice planu (A2 M11).
+    qry.generatorSize = (ctx->gen_size != nullptr) ? boundedLiteral("stream generator size", ctx->gen_size->getText(), 1,
+                                                                    static_cast<int>(rdb::limits::kMaxPlanStreams))
+                                                   : query::notAGenerator;
 
     // this loop creates field names in streamName + "_" + counter++
     //
@@ -588,8 +607,10 @@ class ParserListener : public RQLBaseListener {
     // Domyslnosc jest w planie, bo plik moze byc parsowany po jednej instrukcji.
     // Jawna polityka SELECT wygrywa; DECLARE nie dziedziczy tego ustawienia.
     const bool inheritVolatile = coreInstance.exists(":DEFAULT") && ctx->PERSISTENT() == nullptr && ctx->STORAGE() == nullptr;
+    // Samo `RETENTION n` (juz w policy.second) jest rozmiarem pierscienia, jak przy `STORAGE MEMORY`.
+    // Do 2026-09-27 VOLATILE nadpisywal je jedynka, wiec RETENTION ginelo bez slowa (decyzja P4).
     if (ctx->VOLATILE() != nullptr || inheritVolatile) {
-      qry.policy = std::make_pair("MEMORY", 1);
+      qry.policy = std::make_pair("MEMORY", std::max<size_t>(qry.policy.second, 1));
     }
 
     if (ctx->FILE() != nullptr) {
@@ -610,6 +631,39 @@ class ParserListener : public RQLBaseListener {
     }
     if (ctx->PERSISTENT() != nullptr && qry.storage_policy == "MEMORY")
       reportSemanticError("PERSISTENT conflicts with STORAGE MEMORY");
+    // `STORAGE MEMORY` to pierscien w RAM, jak VOLATILE. Do 2026-09-27 polityka zostawala
+    // ("DEFAULT", n): bez RETENTION deskryptor nie dostawal RETMEMORY, wiec memoryFile nie mial granicy
+    // i rosl o rekord na takt do wyczerpania pamieci; z `RETENTION n` dostawal TYPE DEFAULT i dane szly
+    // na DYSK. Pojemnosc to co najmniej 1 - reszte, jak dla VOLATILE, dobiera kompilator.
+    if (qry.storage_policy == "MEMORY" && qry.policy.first != "MEMORY")
+      qry.policy = std::make_pair("MEMORY", std::max<size_t>(qry.policy.second, 1));
+    // Samo `RETENTION n` to rozmiar pierscienia MEMORY. Magazyn plikowy liczy retencje w segmentach,
+    // a do 2026-09-27 zostawala tu polityka ("DEFAULT", n): deskryptor dostawal TYPE DEFAULT zamiast
+    // STORAGE z planu i zadnej retencji - plik rosl bez granicy, `STORAGE DIRECT` konczyl jako DEFAULT
+    // z .shadow (decyzja D7).
+    if (qry.policy.first != "MEMORY" && qry.policy.second != 0) {
+      const std::string capacity = std::to_string(qry.policy.second);
+      const std::string hint =
+          (qry.storage_policy == "DEFAULT" || qry.storage_policy == "DIRECT")
+              ? qry.storage_policy + " storage on disk keeps segments: write RETENTION " + capacity + " <segments>"
+              : qry.storage_policy + " storage has no retention: use STORAGE DEFAULT or DIRECT with RETENTION " + capacity +
+                    " <segments>";
+      reportSemanticError("RETENTION " + capacity + " on stream " + qry.id + " sets only the size of a MEMORY ring; " + hint);
+    }
+    // Lustro powyzszego: segmenty na dysku przy magazynie w pamieci. memoryFile czyta tylko RETMEMORY,
+    // wiec `RETENTION c s` bylo tu ignorowane bez slowa (decyzja P4).
+    if (qry.policy.first == "MEMORY" && !qry.retention.noRetention()) {
+      const std::string capacity = std::to_string(qry.retention.capacity);
+      const std::string owner    = (ctx->VOLATILE() != nullptr) ? "VOLATILE"
+                                   : inheritVolatile            ? "DEFAULT VOLATILE"
+                                                                : "STORAGE MEMORY";
+      const std::string onDisk   = (ctx->VOLATILE() != nullptr) ? "drop VOLATILE"
+                                   : inheritVolatile            ? "add PERSISTENT"
+                                                                : "use STORAGE DEFAULT or DIRECT";
+      reportSemanticError("RETENTION " + capacity + " " + std::to_string(qry.retention.segments) + " on stream " + qry.id +
+                          " sets segments on disk, but " + owner + " keeps the stream in memory: write RETENTION " + capacity +
+                          " for a MEMORY ring, or " + onDisk + " to keep segments on disk");
+    }
 
     coreInstance.push_back(qry);
     program.clear();
@@ -626,10 +680,10 @@ class ParserListener : public RQLBaseListener {
       // retention {capacity} !{segments}
       qry.retention = std::pair<int, int>(         //
           literal<int>(ctx->segments->getText()),  //
-          nonZeroLiteral("RETENTION capacity", ctx->capacity->getText()));
+          boundedLiteral("RETENTION capacity", ctx->capacity->getText(), 1));
     } else {
       // retention {capacity} - note: segments is optional but capacity is required
-      qry.policy.second = nonZeroLiteral("RETENTION capacity", ctx->capacity->getText());
+      qry.policy.second = boundedLiteral("RETENTION capacity", ctx->capacity->getText(), 1);
     }
   }
 
@@ -667,15 +721,17 @@ class ParserListener : public RQLBaseListener {
     return false;
   }
 
+  /// Granice zakresu siegaja historii strumienia, a RETENTION to liczba jednoczesnych zadan zrzutu,
+  /// z ktorych kazde trzyma otwarty deskryptor pliku - stad granice z rdb/sizeLimits.hpp (A2 M11).
   void exitDumppart(RQLParser::DumppartContext *ctx) override {
     actionType = rule::DUMP;
-    dump_left  = literal<int>(ctx->step_back->getText());
+    dump_left  = boundedLiteral("DUMP range bound", ctx->step_back->getText(), 0, rdb::limits::kMaxHistoryReach);
     if (negatedBefore(ctx, ctx->step_back)) dump_left = -dump_left;
-    dump_right = literal<int>(ctx->step_forward->getText());
+    dump_right = boundedLiteral("DUMP range bound", ctx->step_forward->getText(), 0, rdb::limits::kMaxHistoryReach);
     if (negatedBefore(ctx, ctx->step_forward)) dump_right = -dump_right;
 
     if (ctx->rule_retnetion != nullptr)
-      dump_retention = literal<int>(ctx->rule_retnetion->getText());
+      dump_retention = boundedLiteral("DUMP RETENTION", ctx->rule_retnetion->getText(), 0, rdb::limits::kMaxDumpRetention);
     else
       dump_retention = 0;  // Default: no retention
   }
@@ -729,8 +785,9 @@ class ParserListener : public RQLBaseListener {
     fieldCount = 0;
   }
 
+  /// Przesuniecie o N rekordow to N rekordow historii zrodla (A2 M11).
   void exitSExpTimeMove(RQLParser::SExpTimeMoveContext *ctx) override {
-    recpToken(STREAM_TIMEMOVE, literal<int>(ctx->DECIMAL()->getText()));
+    recpToken(STREAM_TIMEMOVE, boundedLiteral("time shift", ctx->DECIMAL()->getText(), 0, rdb::limits::kMaxHistoryReach));
   }
 
   /// Nazwa strumienia. Pozostale alternatywy `stream_factor` - `( e )` i wywolanie
@@ -822,7 +879,9 @@ class ParserListener : public RQLBaseListener {
 
   void exitSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) override {
     auto fTypeSizeArray = 1;  // Default:1
-    if (ctx->type_size != nullptr) fTypeSizeArray = literal<int>(ctx->type_size->getText());
+    // Ta sama granica obowiazuje w gramatyce DESC - .desc czyta takze serwer (A2 M11).
+    if (ctx->type_size != nullptr)
+      fTypeSizeArray = boundedLiteral("field size", ctx->type_size->getText(), 1, rdb::limits::kMaxFieldLength);
     std::list<token> emptyProgram;
     qry.lSchema.emplace_back(rdb::rField(ctx->ID()->getText(), fTypeSize, fTypeSizeArray, fType), emptyProgram);
     fType = rdb::BYTE;

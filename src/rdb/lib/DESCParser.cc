@@ -1,16 +1,39 @@
 #include ".antlr/DESCParser.h"
 
+#include <charconv>
+#include <cstdint>
 #include <iostream>
+#include <limits>
+#include <optional>
+#include <string>
+#include <system_error>
 
 #include ".antlr/DESCBaseListener.h"
 #include ".antlr/DESCLexer.h"
 #include "antlr4-runtime/antlr4-runtime.h"
 #include "rdb/descriptor.hpp"
+#include "rdb/sizeLimits.hpp"
 
 using namespace antlrcpp;
 using namespace antlr4;
 
 std::string statusDesc = "OK";
+
+namespace {
+/// Wartosc tokenu DECIMAL albo nullopt, gdy nie miesci sie w int.
+///
+/// std::from_chars, a nie std::stoi: metody exit* listenera biegna z noexcept-owego destruktora
+/// antlrcpp::FinalAction, wiec std::out_of_range ze std::stoi konczyl proces przez std::terminate -
+/// takze proces serwera, ktory czyta .desc z katalogu magazynu (A2 M11; to samo w RQL: #306).
+/// Wariant calkowity from_chars nie ma ograniczen dostepnosci libc++, ktore opisuje parseLiteral
+/// w RQLParser.cpp - te dotycza wylacznie zmiennoprzecinkowego.
+std::optional<int> decimalLiteral(const std::string &text) {
+  int value{0};
+  const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
+  if (ec != std::errc{} || end != text.data() + text.size()) return std::nullopt;
+  return value;
+}
+}  // namespace
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
 
@@ -41,8 +64,62 @@ class ParserErrorListenerDesc : public BaseErrorListener {
 class ParserDESCListener : public DESCBaseListener {
   rdb::Descriptor &desc;
 
+  /// Suma bajtow pol danych. Limit rozmiaru pola nie ogranicza ich liczby, a Descriptor liczy offsety
+  /// w int - kilka tysiecy pol `DOUBLE a[65536]` przepelnialo go po cichu.
+  std::int64_t recordBytes_{0};
+
+  /// Pierwszy blad wartosci w deskryptorze. Pole listenera, a nie globalny statusDesc: ten nie jest
+  /// nigdzie zerowany, wiec raz zapisany blad zwracalby kazde nastepne parsowanie w procesie.
+  std::string error_;
+
+  void reportError(const std::string &message) {
+    std::cerr << "Error @Descriptor: " << message << '\n';
+    if (error_.empty()) error_ = message;
+  }
+
+  /// Liczba spoza int - blad deskryptora i wartosc zastepcza 1.
+  int number(const antlr4::Token *token) {
+    const std::string text = token->getText();
+    if (const auto value = decimalLiteral(text)) return *value;
+    reportError("numeric literal " + text + " is out of range");
+    return 1;
+  }
+
+  /// Rozmiar pola `TYP a[N]` / `STRING a[N]` - ta sama granica co w RQL (rdb/sizeLimits.hpp).
+  /// Przy bledzie wartosc zastepcza 1: deskryptor i tak jest odrzucany w calosci, a pole z absurdalnym
+  /// rozmiarem nie powinno powstac nawet na chwile.
+  int fieldSize(const antlr4::Token *token) {
+    if (token == nullptr) return 1;
+    const std::string text = token->getText();
+    const auto value       = decimalLiteral(text);
+    if (!value) {
+      reportError("numeric literal " + text + " is out of range");
+      return 1;
+    }
+    if (*value < 1) {
+      reportError("field size " + text + " must be greater than zero");
+      return 1;
+    }
+    if (*value > rdb::limits::kMaxFieldLength) {
+      reportError("field size " + text + " exceeds the limit " + std::to_string(rdb::limits::kMaxFieldLength));
+      return 1;
+    }
+    return *value;
+  }
+
+  void appendField(const std::string &name, int length, int count, rdb::descFld type) {
+    const bool fitted = recordBytes_ <= std::numeric_limits<int>::max();
+    recordBytes_ += std::int64_t{length} * count;
+    if (fitted && recordBytes_ > std::numeric_limits<int>::max())
+      reportError("record of " + std::to_string(recordBytes_) + " bytes exceeds the descriptor limit " +
+                  std::to_string(std::numeric_limits<int>::max()));
+    desc.append({rdb::rField(name, length, count, type)});
+  }
+
  public:
   ParserDESCListener(rdb::Descriptor &desc) : desc(desc) {};
+
+  [[nodiscard]] const std::string &error() const { return error_; }
 
   void enterDesc(DESCParser::DescContext *ctx) override {
     // std::cerr << "enterDesc" << std::endl;
@@ -53,63 +130,65 @@ class ParserDESCListener : public DESCBaseListener {
   }
 
   void exitByteID(DESCParser::ByteIDContext *ctx) override {
-    int count = 1;
-    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
+    const int count = fieldSize(ctx->arr);
 
-    desc.append({rdb::rField(ctx->name->getText(), sizeof(uint8_t), count, rdb::BYTE)});
+    appendField(ctx->name->getText(), sizeof(uint8_t), count, rdb::BYTE);
   }
 
   void exitIntegerID(DESCParser::IntegerIDContext *ctx) override {
-    int count = 1;
-    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
+    const int count = fieldSize(ctx->arr);
 
-    desc.append({rdb::rField(ctx->name->getText(), sizeof(int), count, rdb::INTEGER)});
+    appendField(ctx->name->getText(), sizeof(int), count, rdb::INTEGER);
   }
 
   void exitUnsignedID(DESCParser::UnsignedIDContext *ctx) override {
-    int count = 1;
-    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
+    const int count = fieldSize(ctx->arr);
 
-    desc.append({rdb::rField(ctx->name->getText(), sizeof(unsigned), count, rdb::UINT)});
+    appendField(ctx->name->getText(), sizeof(unsigned), count, rdb::UINT);
   }
 
   void exitFloatID(DESCParser::FloatIDContext *ctx) override {
-    int count = 1;
-    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
+    const int count = fieldSize(ctx->arr);
 
-    desc.append({rdb::rField(ctx->name->getText(), sizeof(float), count, rdb::FLOAT)});
+    appendField(ctx->name->getText(), sizeof(float), count, rdb::FLOAT);
   }
 
   void exitDoubleID(DESCParser::DoubleIDContext *ctx) override {
-    int count = 1;
-    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
+    const int count = fieldSize(ctx->arr);
 
-    desc.append({rdb::rField(ctx->name->getText(), sizeof(double), count, rdb::DOUBLE)});
+    appendField(ctx->name->getText(), sizeof(double), count, rdb::DOUBLE);
   }
 
   void exitRationalID(DESCParser::RationalIDContext *ctx) override {
-    int count = 1;
-    if (ctx->arr != nullptr) count = std::stoi(ctx->arr->getText());
+    const int count = fieldSize(ctx->arr);
 
-    desc.append({rdb::rField(ctx->name->getText(), sizeof(boost::rational<int>), count, rdb::RATIONAL)});
+    appendField(ctx->name->getText(), sizeof(boost::rational<int>), count, rdb::RATIONAL);
   }
 
   void exitStringID(DESCParser::StringIDContext *ctx) override {
-    int count = std::stoi(ctx->strsize->getText());
-    desc.append({rdb::rField(ctx->name->getText(), sizeof(char), count, rdb::STRING)});
+    const int count = fieldSize(ctx->strsize);
+    appendField(ctx->name->getText(), sizeof(char), count, rdb::STRING);
   }
 
   void exitRefID(DESCParser::RefIDContext *ctx) override { desc.append({rdb::rField(ctx->file->getText(), 0, 0, rdb::REF)}); }
 
   void exitTypeID(DESCParser::TypeIDContext *ctx) override { desc.append({rdb::rField(ctx->type->getText(), 0, 0, rdb::TYPE)}); }
 
+  /// Pojemnosc 0 odrzucamy jak w RQL (#308): groupFile konczyl na niej proces przy pierwszym zapisie.
+  /// Segmenty 0 zostaja legalne - znacza "bez limitu segmentow".
   void exitRetentionID(DESCParser::RetentionIDContext *ctx) override {
     // retention {capacity} !{segments} <- in grammar.
-    desc.append({rdb::rField("", std::stoi(ctx->segment->getText()), std::stoi(ctx->capacity->getText()), rdb::RETENTION)});
+    const int capacity = number(ctx->capacity);
+    if (capacity == 0) reportError("RETENTION capacity 0 must be greater than zero");
+    desc.append({rdb::rField("", number(ctx->segment), capacity, rdb::RETENTION)});
   }
 
+  /// RETMEMORY 0 to pierscien memoryFile bez granicy: kazdy zapis dokladal rekord. Zapis deskryptora
+  /// pomija wartosc 0, wiec w pliku moze sie ona znalezc tylko recznie.
   void exitRetentionMemoryID(DESCParser::RetentionMemoryIDContext *ctx) override {
-    desc.append({rdb::rField("", std::stoi(ctx->capacity->getText()), 0, rdb::RETMEMORY)});
+    const int capacity = number(ctx->capacity);
+    if (capacity == 0) reportError("RETMEMORY capacity 0 must be greater than zero");
+    desc.append({rdb::rField("", capacity, 0, rdb::RETMEMORY)});
   }
 };
 
@@ -132,5 +211,7 @@ std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet
   parser.addErrorListener(&parserErrorListener);
   parser.addParseListener(&parserDescListener);
   (void)parser.desc();
+  // Blad wartosci idzie tym samym kanalem co wynik - operator>> konczy na nim FatalError-em.
+  if (!parserDescListener.error().empty()) return parserDescListener.error();
   return statusDesc;
 }

@@ -1,0 +1,3 @@
+# Limit ciszy klienta: 1 s zamiast domyslnych 10 s, zeby test nie czekal na prozno.
+[timing]
+query_no_data_timeout_ms = 1000

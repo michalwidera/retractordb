@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "rdb/retention.hpp"
 #include "serviceDefaults.h"  // kBuildDefaultServiceQueryFile (generowane z CMake)
 
 namespace appcfg {
@@ -16,6 +17,8 @@ inline constexpr int kDefaultTimingServerStartupWaitSeconds{30};
 inline constexpr int kDefaultTimingServerStartupPollIntervalMs{100};
 inline constexpr int kDefaultTimingQueryNoDataTimeoutMs{10'000};
 inline constexpr int kDefaultSchedulingRtPriority{50};
+// Budzet pamieci historii planu. Uzasadnienie wartosci przy AppConfig::historyMemoryMib.
+inline constexpr int kDefaultHistoryMemoryMib{1024};
 
 inline constexpr int kRtPriorityMin{1};
 inline constexpr int kRtPriorityMax{99};
@@ -42,6 +45,12 @@ struct AppConfig {
   /// dziś - bieżący katalog procesu). Jeśli niepusty, gwarantuje końcowy '/'. Stosowany
   /// tylko gdy zestaw RQL nie zdefiniował własnej dyrektywy :STORAGE (RQL ma pierwszeństwo).
   std::string storageDir;
+
+  /// Retencja strumieni plikowych (DEFAULT, DIRECT, takze posrednich) bez klauzuli RETENTION:
+  /// `default_retention = [capacity, segments]`, obie liczby > 0. Pusta (domyslnie) = brak retencji,
+  /// czyli historia rosnie na dysku - dane kasuje dopiero jawna decyzja operatora (D8). Stosuje ja
+  /// kompilator (compiler::setDefaultRetention) na tych samych drogach co history_memory_mib.
+  rdb::retention_t defaultRetention{.segments = 0, .capacity = 0};
 
   // === [ipc] ===
 
@@ -100,6 +109,17 @@ struct AppConfig {
   /// biegnie jako `retractor` z HOME=/nonexistent, więc warstwa użytkownika jej nie dotyczy),
   /// a dla serwera uruchomionego z terminala - konfiguracja tego, kto go uruchomił.
   bool serviceUnrestricted{false};
+
+  // === [limits] ===
+
+  /// Budzet pamieci historii planu w MiB: suma po magazynach trzymajacych historie w RAM - pierscienie
+  /// zrodel deklarowanych (SourceBuffer) i magazynow MEMORY - z capacity x (sizeof(rdb::payload) +
+  /// bajty rekordu). Plan, ktory go przekracza, jest bledem kompilacji: przy starcie, w `-c`, w kanale
+  /// ad-hoc i przy `--reset` (compiler::setHistoryMemoryBudget). Bez budzetu wartosc w zakresie int
+  /// (`>65536` nad rekordem 1 MiB) konczyla sie std::bad_alloc albo OOM killerem w dzialajacym
+  /// serwerze (A2 M11). 1024 MiB to ponad trzy rzedy wielkosci zapasu: najwiecej w repozytorium
+  /// (examples/ecg/rec205) trzyma ok. 200 KiB historii.
+  int historyMemoryMib{appcfg::kDefaultHistoryMemoryMib};
 
   // === diagnostyka ===
 

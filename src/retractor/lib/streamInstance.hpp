@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <memory>  // unique_ptr
 #include <optional>
 #include <string>
@@ -42,6 +43,14 @@ struct streamInstance {
   /// dostaje bazę dopiero w pierwszym należnym jej slocie bieżącej osi czasu; do tego
   /// momentu std::nullopt odróżnia ją od strumienia startowego oczekującego na origin/ogon.
   std::optional<int> logicalIndexBase;
+
+  /// @brief Czy rekord skladnika przeplotu ma uklad slotu wejscia tej instancji: [0] lewy, [1] prawy.
+  ///
+  /// Wypelniane w pierwszym takcie, w ktorym przeplot bierze dana strone (dataModel::constructInputPayload).
+  /// Odpowiedz zalezy tylko od deskryptora wyjscia skladnika i deskryptora wejscia tego wezla, a oba sa
+  /// stale przez zycie instancji: qSet tylko przybywa i zadnej instancji nie podmienia. Poza wezlem
+  /// przeplotu zostaje puste.
+  std::array<std::optional<bool>, 2> hashSideMatchesInput;
 
   // This constructor will create data based on query
   explicit streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam = "");

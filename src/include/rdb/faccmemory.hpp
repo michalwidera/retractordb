@@ -16,7 +16,8 @@ struct memoryBucket;
 /// Obiekt memoryFile powinien:
 /// - implementować interfejs FileInterface dla danych przechowywanych w pamięci,
 /// - umożliwiać zapis, odczyt i nadpisywanie rekordów binarnych o rozmiarze wyznaczonym przez Descriptor,
-/// - przechowywać rekordy, ich nullBitset i licznik zapisów w globalnej strukturze indeksowanej nazwą strumienia, współdzielonej między instancjami o tej samej nazwie,
+/// - przechowywać rekordy, ich nullBitset i licznik zapisów w globalnej strukturze indeksowanej nazwą strumienia, współdzielonej między ŻYWYMI instancjami o tej samej nazwie,
+/// - kasować ten stan razem z ostatnią instancją, która go używa - strumień o tej samej nazwie w następnym planie zaczyna od zera,
 /// - obsługiwać append przez position == std::numeric_limits<size_t>::max() oraz update przez wskazaną pozycję,
 /// - traktować write(nullptr, ...) jako polecenie wyczyszczenia pamięci dla danego strumienia,
 /// - zwracać przez count() logiczną liczbę rekordów (łączną liczbę zapisów append),
@@ -24,7 +25,7 @@ struct memoryBucket;
 ///   zapis nadpisuje najstarszy slot, odczyt używa location % retentionSize jako indeksu w buforze.
 ///
 /// @note Trwałość danych dotyczy wyłącznie czasu życia procesu; klasa nie zapisuje stanu na dysk.
-/// @note Stan rekordów, nullBitset i licznik zapisów są współdzielone globalnie po nazwie strumienia między instancjami.
+/// @note Stan rekordów, nullBitset i licznik zapisów są współdzielone globalnie po nazwie strumienia między żywymi instancjami.
 
 struct memoryFile : public FileInterface {
   std::string filename_;
@@ -38,6 +39,7 @@ struct memoryFile : public FileInterface {
 
  public:
   memoryFile(std::string_view fileName, const Descriptor &descriptor, const std::pair<std::string, size_t> &retentionSize);
+  ~memoryFile() override;
 
   using FileInterface::read;
   using FileInterface::write;
@@ -46,6 +48,10 @@ struct memoryFile : public FileInterface {
 
   auto name() -> std::string & override;
   size_t count() override;
+
+  /// Liczba kubełków w magazynie procesu. Tylko do testów jednostkowych - z zewnątrz nie ma innej drogi,
+  /// żeby sprawdzić, że wymiana planu nie zostawia kubełków po strumieniach, których już nie ma.
+  static size_t bucketCountForUnitTest();
 
   memoryFile()                                    = delete;
   memoryFile(const memoryFile &)                  = delete;

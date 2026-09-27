@@ -1,0 +1,10 @@
+# Plan przed wymiana: `x` ma szesnascie pol INTEGER (64 B), a okno `wa` trzyma kilka jego rekordow
+# w pierscieniu. Pola sa rozpoznawalne (a+1000 ... a+16000), zeby rekord tego planu nie udawal
+# rekordu planu B.
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM src, 0.05 FILE 'data.txt'
+
+SELECT a+1000, a+2000, a+3000, a+4000, a+5000, a+6000, a+7000, a+8000, a+9000, a+10000, a+11000, a+12000, a+13000, a+14000, a+15000, a+16000 STREAM x FROM src VOLATILE
+SELECT * STREAM wa FROM x@(1,5)

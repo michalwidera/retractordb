@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <iterator>
@@ -237,9 +238,12 @@ bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
       const auto [step, length] = std::get<std::pair<int, int>>(operation.getVT());
       const int sourceWidth     = coreInstance_.getQuery(source).descriptorStorage().flatElementCount();
       const int lengthAbs       = length < 0 ? -length : length;
-      const int firstRecord     = floorDiv((logicalIndex * step) - (lengthAbs - 1), sourceWidth);
-      const int lastRecord      = floorDiv(logicalIndex * step, sourceWidth);
-      available                 = forwardRecordAvailable(source, firstRecord) && forwardRecordAvailable(source, lastRecord);
+      // Pozycja splaszczona w int64 - patrz floorDiv. Iloraz jest indeksem rekordu zrodla, a ten
+      // zyje na osi logicznej int, wiec wraca do int bez straty.
+      const std::int64_t newestPosition = static_cast<std::int64_t>(logicalIndex) * step;
+      const int firstRecord             = static_cast<int>(floorDiv(newestPosition - (lengthAbs - 1), sourceWidth));
+      const int lastRecord              = static_cast<int>(floorDiv(newestPosition, sourceWidth));
+      available = forwardRecordAvailable(source, firstRecord) && forwardRecordAvailable(source, lastRecord);
     } break;
     case STREAM_HASH: {
       int forwardIndex   = 0;
@@ -610,7 +614,28 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       rdb::probe::onHashPick();
       int fwdPos            = 0;
       const bool takeSecond = Hash(intervalSrc1, intervalSrc2, n, fwdPos);
-      *runtime.inputPayload = fetchForward(takeSecond ? nameSrc2 : nameSrc1, fwdPos);
+      auto component        = fetchForward(takeSecond ? nameSrc2 : nameSrc1, fwdPos);
+
+      // Slot wejscia ma na kazdej pozycji dluzszy z dwoch elementow skladnikow
+      // (Descriptor::composeHashDescriptorFrom). Skladnik o tym samym ukladzie przechodzi w calosci,
+      // jak dotad. Inny - slot po slocie, bo kopia bajtow rekordu przesunelaby offsety za pierwszym
+      // szerszym slotem, zostawila w nim bajty poprzedniego rekordu, a liczbe innego typu (INTEGER
+      // w slocie DOUBLE) podalaby jako bajty inta na bajtach poprzedniego double'a. setItemVT rzutuje
+      // na typ slotu i przenosi NULL.
+      //
+      // Descriptor::operator== to warunek "lewy miesci prawy": slot nie wezszy i typ nie nizszy. Typ
+      // slotu wejscia jest wyzszym z dwoch, a przy rownym typie slot jest dluzszy z dwoch - wiec
+      // skladnik, ktory miesci slot wejscia, ma dokladnie jego uklad. Wynik zalezy tylko od strony
+      // przeplotu, wiec liczymy go raz, w pierwszym takcie tej strony (streamInstance::hashSideMatchesInput).
+      auto &sameLayout = runtime.hashSideMatchesInput[takeSecond ? 1 : 0];
+      if (!sameLayout.has_value()) sameLayout = component.descriptor == runtime.inputPayload->descriptor;
+      if (*sameLayout) {
+        *runtime.inputPayload = std::move(component);
+      } else {
+        const int slots = runtime.inputPayload->descriptor.flatElementCount();
+        for (int slot = 0; slot < slots; ++slot)
+          runtime.inputPayload->setItemVT(slot, component.getItemVT(slot));
+      }
 
     } break;
     default:

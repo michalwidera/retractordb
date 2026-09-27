@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <utility>
 
 #include "rdb/descriptor.hpp"
@@ -201,6 +202,42 @@ TEST(descriptor, create_hash_uses_max_len_and_type) {
   EXPECT_EQ(out[1].rtype, rdb::UINT);
 }
 
+// Slot przeplotu nad napisem ma CALA dlugosc dluzszego napisu, w obu kolejnosciach skladnikow.
+// `STRING[N]` z DECLARE niesie dlugosc w rarray (rlen = 1), wpis z okna AGSE - w rlen (rarray = 1).
+// Do 2026-09-27 przeplot bral samo rlen, wiec slot zadeklarowanego `STRING[8]` mial 1 B i pierwsze
+// przypisanie rekordu zrodla konczylo proces FatalError-em "schema mismatch".
+TEST(descriptor, create_hash_string_slot_takes_the_full_length_of_the_longer_side) {
+  const rdb::Descriptor declared8("s", 1, 8, rdb::STRING);
+  const rdb::Descriptor declared16("s", 1, 16, rdb::STRING);
+  const rdb::Descriptor window12("w", 12, 1, rdb::STRING);
+
+  for (const auto &[lhs, rhs, bytes] : {std::tuple{declared8, declared16, 16}, std::tuple{declared16, declared8, 16},
+                                        std::tuple{window12, declared8, 12}, std::tuple{declared8, window12, 12}}) {
+    rdb::Descriptor out;
+    out.composeHashDescriptorFrom("h", lhs, rhs);
+    ASSERT_EQ(out.size(), 1U);
+    EXPECT_EQ(out[0].rtype, rdb::STRING);
+    EXPECT_EQ(out[0].rlen, 1);
+    EXPECT_EQ(out[0].rarray, bytes);
+    EXPECT_EQ(out.getSizeInBytes(), static_cast<size_t>(bytes));
+  }
+}
+
+// Pozycja liczbowa bierze dlugosc pola, ktorego TYP wygrywa. Wsrod typow BYTE..DOUBLE jest to zarazem
+// dluzsze pole z jednym wyjatkiem: FLOAT (4 B) nad RATIONAL (8 B). Slot FLOAT o 8 B kazalby zapisowi
+// wartosci kopiowac 8 B z czterobajtowej zmiennej.
+TEST(descriptor, create_hash_numeric_slot_takes_the_length_of_the_winning_type) {
+  for (const auto &[lhs, rhs] : {std::pair{rdb::Descriptor("a", 8, 1, rdb::RATIONAL), rdb::Descriptor("a", 4, 1, rdb::FLOAT)},
+                                 std::pair{rdb::Descriptor("a", 4, 1, rdb::FLOAT), rdb::Descriptor("a", 8, 1, rdb::RATIONAL)}}) {
+    rdb::Descriptor out;
+    out.composeHashDescriptorFrom("h", lhs, rhs);
+    ASSERT_EQ(out.size(), 1U);
+    EXPECT_EQ(out[0].rtype, rdb::FLOAT);
+    EXPECT_EQ(out[0].rlen, 4);
+    EXPECT_EQ(out[0].rarray, 1);
+  }
+}
+
 TEST(descriptor, flat_output_resets_after_stream) {
   auto desc = rdb::Descriptor("x", 1, 1, rdb::BYTE);
 
@@ -270,6 +307,56 @@ TEST(descriptor, parser) {
   EXPECT_TRUE(parserDESCString(out, "{ INTEGER a INTEGER b INTEGER c REF \"datafile.txt\" TYPE TEXTSOURCE }") == "OK");
   EXPECT_TRUE(parserDESCString(out, "{ INTEGER a RETENTION 10 5 }") == "OK");
   EXPECT_TRUE(parserDESCString(out, "{ INTEGER a RETMEMORY 10 TYPE MEMORY }") == "OK");
+}
+
+// Plik .desc czyta takze serwer (storage::attachDescriptor -> loadDescriptorFile), wiec rozmiar pola
+// ma w gramatyce DESC te sama granice co `TYP[N]` i `STRING[N]` w RQL (A2 M11). Literal spoza int
+// konczyl proces przez std::terminate: std::stoi rzucal z metody exit* listenera, a ta biegnie
+// z noexcept-owego destruktora antlrcpp::FinalAction.
+TEST(descriptor, parser_limits_field_size) {
+  for (const std::string type : {"BYTE", "INTEGER", "UINT", "FLOAT", "DOUBLE", "RATIONAL", "STRING"}) {
+    rdb::Descriptor atLimit;
+    EXPECT_EQ(parserDESCString(atLimit, "{ " + type + " a[65536] }"), "OK") << type;
+    rdb::Descriptor aboveLimit;
+    EXPECT_TRUE(parserDESCString(aboveLimit, "{ " + type + " a[65537] }").contains("field size 65537 exceeds the limit 65536"))
+        << type;
+    rdb::Descriptor zero;
+    EXPECT_TRUE(parserDESCString(zero, "{ " + type + " a[0] }").contains("field size 0 must be greater than zero")) << type;
+  }
+
+  for (const std::string text :
+       {"{ INTEGER a[99999999999] }", "{ STRING a[99999999999] }", "{ INTEGER a RETENTION 99999999999 5 }",
+        "{ INTEGER a RETENTION 5 99999999999 }", "{ INTEGER a RETMEMORY 99999999999 TYPE MEMORY }"}) {
+    rdb::Descriptor out;
+    EXPECT_TRUE(parserDESCString(out, text).contains("numeric literal 99999999999 is out of range")) << text;
+  }
+
+  // Retencja nic nie alokuje - trzyma pliki na dysku - wiec gornej granicy nie ma.
+  rdb::Descriptor retention;
+  EXPECT_EQ(parserDESCString(retention, "{ INTEGER a RETENTION 1000000 1000000 }"), "OK");
+
+  // Pojemnosc 0 nie opisuje zadnego magazynu: RETENTION konczyl proces przy pierwszym zapisie,
+  // a RETMEMORY dawal pierscien bez granicy. Segmenty 0 znacza "bez limitu segmentow".
+  rdb::Descriptor zeroCapacity;
+  EXPECT_TRUE(
+      parserDESCString(zeroCapacity, "{ INTEGER a RETENTION 0 5 }").contains("RETENTION capacity 0 must be greater than zero"));
+  rdb::Descriptor zeroSegments;
+  EXPECT_EQ(parserDESCString(zeroSegments, "{ INTEGER a RETENTION 5 0 }"), "OK");
+  rdb::Descriptor zeroRing;
+  EXPECT_TRUE(parserDESCString(zeroRing, "{ INTEGER a RETMEMORY 0 TYPE MEMORY }")
+                  .contains("RETMEMORY capacity 0 must be greater than zero"));
+
+  // Granica pola nie ogranicza liczby pol: 4096 pol po 512 KiB to 2^31 bajtow, o jeden wiecej niz int.
+  std::string wide = "{";
+  for (int i = 0; i < 4096; ++i)
+    wide += " DOUBLE f" + std::to_string(i) + "[65536]";
+  rdb::Descriptor tooWide;
+  EXPECT_TRUE(
+      parserDESCString(tooWide, wide + " }").contains("record of 2147483648 bytes exceeds the descriptor limit 2147483647"));
+
+  // Odmowa nie zostaje w stanie globalnym: nastepne parsowanie w tym samym procesie przechodzi.
+  rdb::Descriptor next;
+  EXPECT_EQ(parserDESCString(next, "{ INTEGER a }"), "OK");
 }
 
 TEST(descriptor, assign_operator) {

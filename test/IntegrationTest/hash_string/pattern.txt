@@ -1,0 +1,26 @@
+ PASS_A
+{ STRING ta_0[8] INTEGER ta_1 }
+{ ta_0:ab ta_1:1 }
+{ ta_0:alphabet ta_1:2 }
+{ ta_0:x ta_1:3 }
+ PASS_B
+{ STRING tb_2[16] DOUBLE tb_3 }
+{ tb_2:CCCCCCCCCCCCCCCC tb_3:1.5 }
+{ tb_2:delta tb_3:2.5 }
+{ tb_2:sixteencharslong tb_3:3.5 }
+ HASH_AB
+{ STRING s[16] DOUBLE k }
+{ s:CCCCCCCCCCCCCCCC k:1.5 }
+{ s:ab k:1 }
+{ s:delta k:2.5 }
+{ s:alphabet k:2 }
+{ s:sixteencharslong k:3.5 }
+{ s:x k:3 }
+ HASH_BA
+{ STRING s[16] DOUBLE k }
+{ s:ab k:1 }
+{ s:CCCCCCCCCCCCCCCC k:1.5 }
+{ s:alphabet k:2 }
+{ s:delta k:2.5 }
+{ s:x k:3 }
+{ s:sixteencharslong k:3.5 }

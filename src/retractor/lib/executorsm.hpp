@@ -40,6 +40,12 @@ struct executorsm {
   /// Czy plan przyjmowany kanalem `--reset` moze niesc regule `DO SYSTEM`. Domyslnie nie -
   /// uzasadnienie granicy stoi przy sprawdzeniu w validatePlanText.
   static bool cfgUnrestricted;
+  /// Budzet pamieci historii planu (`[limits] history_memory_mib`) dla kompilacji w watku
+  /// komunikacyjnym: ad-hoc i `--reset`. Plan startowy kompiluje launcher tym samym budzetem.
+  static int cfgHistoryMemoryMib;
+  /// `[storage] default_retention` dla tych samych kompilacji - .desc strumienia nie moze zalezec
+  /// od kanalu, ktorym przyszedl plan.
+  static rdb::retention_t cfgDefaultRetention;
   /// Katalog magazynu, w ktorym pisze plan DZIALAJACY. Trzymany osobno, bo dataModel usuwa
   /// dyrektywy z drzewa planu - w czasie pracy `:STORAGE` nie da sie juz z niego odczytac,
   /// a zapytanie ad-hoc musi roscic dokladnie te sciezki, ktore powstana na dysku.

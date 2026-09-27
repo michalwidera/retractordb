@@ -1,0 +1,11 @@
+# Plan po wymianie: `x` o tej samej nazwie ma JEDNO pole INTEGER (4 B), a okno `y` czyta jego
+# historie od pierwszego pelnego okna. `z` nie jest przedmiotem badania - jego okno wymusza pierscien
+# `x` na 200 rekordow, dzieki czemu stare sloty nie zdaza sie nadpisac przed pierwszym odczytem `y`.
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM src, 0.05 FILE 'data.txt'
+
+SELECT a STREAM x FROM src VOLATILE
+SELECT * STREAM y FROM x@(1,3)
+SELECT * STREAM z FROM x@(1,200)

@@ -13,7 +13,8 @@
 ///
 /// boost::rational 1.91 niczego tu nie sprawdza: `9/1 * 1000000000/1` daje po cichu 410065408/1.
 /// Ta sama klasa liczy tez os czasu (CRSMath, SOperations.hpp), ale tamtej sciezki ten plik nie
-/// dotyczy - sluzy wylacznie ewaluatorowi wyrazen i reduktorom w streamInstance.
+/// dotyczy - sluzy ewaluatorowi wyrazen i reduktorom w streamInstance, a wariant int takze
+/// zwijaniu indeksu generatora w kompilatorze, gdzie nullopt oznacza blad planu, nie NULL.
 ///
 /// Dzielnik rozny od zera jest warunkiem wstepnym `div`; zero obsluguje wolajacy.
 namespace checkedArith {

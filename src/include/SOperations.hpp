@@ -17,8 +17,10 @@ constexpr int floorR(boost::rational<int> const &num) { return static_cast<int>(
 // Dzielenie całkowite z zaokrągleniem W DÓŁ. Wbudowane `/` zaokrągla w stronę zera, co dla
 // ujemnych liczników daje inny rekord niż model zdarzeniowy - a ujemne pozycje spłaszczone
 // pojawiają się naturalnie w oknie stemplowanym końcem przedziału (n*step-(|L|-1)).
-constexpr int floorDiv(const int numerator, const int denominator) {
-  const int quotient = numerator / denominator;
+// Argumenty w int64: pozycja n*step rośnie jak liczba rekordów źródła razy jego szerokość
+// i w int pękała po ok. 2^31/F rekordach źródła.
+constexpr std::int64_t floorDiv(const std::int64_t numerator, const std::int64_t denominator) {
+  const std::int64_t quotient = numerator / denominator;
   return (numerator % denominator != 0 && ((numerator < 0) != (denominator < 0))) ? quotient - 1 : quotient;
 }
 
@@ -113,8 +115,18 @@ constexpr int agse(int offset, int step) { return floorR(boost::rational<int>(of
 //   P = floor((abs(length)-1)/gcd(step,F))*gcd(step,F),
 // bo rozpiętość okna nie jest już czekaniem - przeszła do origin. Ogon zatem
 // maleje, ale nie zaniża: to samo czekanie liczy teraz origin + ogon.
-constexpr int AgseStartupLatency(const int sourceWidth, const int step, const int sourceLatency) {
-  return ceilR(boost::rational<int>((1 + sourceLatency) * sourceWidth, step)) - 1;
+//
+// Rachunek w int64, bo (1+W_src)*F przekracza int juz dla trzech okien `@(1,65536)` w lancuchu
+// (A2 M11). Zaokraglenie jest to samo co w ceilR() - od zera - wiec w zakresie int wynik sie nie
+// zmienia; wynik spoza int odrzuca kompilator jako blad planu.
+constexpr std::int64_t roundedAwayFromZero(const std::int64_t numerator, const std::int64_t denominator) {
+  const std::int64_t quotient = numerator / denominator;
+  if (numerator % denominator == 0) return quotient;
+  return ((numerator < 0) == (denominator < 0)) ? quotient + 1 : quotient - 1;
+}
+
+constexpr std::int64_t AgseStartupLatency(const int sourceWidth, const int step, const int sourceLatency) {
+  return roundedAwayFromZero((std::int64_t{1} + sourceLatency) * sourceWidth, step) - 1;
 }
 
 // Początek logiczny strumienia okna: najmniejsze n, dla którego całe okno
@@ -122,9 +134,12 @@ constexpr int AgseStartupLatency(const int sourceWidth, const int step, const in
 // Źródło zaczyna się od pozycji spłaszczonej sourceOrigin*F, więc
 //   n*step - (abs(length)-1) >= sourceOrigin*F
 //   =>  O = ceil( (sourceOrigin*F + abs(length) - 1) / step ).
-constexpr int AgseLogicalOrigin(const int sourceWidth, const int step, const int length, const int sourceOrigin) {
-  const int lengthAbs = length < 0 ? -length : length;
-  return ceilR(boost::rational<int>((sourceOrigin * sourceWidth) + lengthAbs - 1, step));
+//
+// Rachunek w int64 z tego samego powodu co w AgseStartupLatency(): sourceOrigin*F dla dwoch okien
+// `@(1,65536)` w lancuchu to ok. 2^32.
+constexpr std::int64_t AgseLogicalOrigin(const int sourceWidth, const int step, const int length, const int sourceOrigin) {
+  const std::int64_t lengthAbs = length < 0 ? -std::int64_t{length} : length;
+  return roundedAwayFromZero((std::int64_t{sourceOrigin} * sourceWidth) + lengthAbs - 1, step);
 }
 
 // Suma strumieni czyta składową o interwale deltaSource po indeksie
