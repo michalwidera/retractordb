@@ -372,6 +372,7 @@ int main(int argc, char *argv[]) try {
           ("transparent,p", "make dot background transparent")                       //
           ("diagram,w", po::value<std::string>(&sDiagram), "create diagram output")  //
           ("shmbudget,z", "show shared memory budget of the compiled plan")          //
+          ("config,g", po::value<std::string>(&sConfig), "config file (TOML); overrides search")  //
           ;
     } else {
       desc.add_options()                                                          //
@@ -425,6 +426,9 @@ int main(int argc, char *argv[]) try {
     else
       SPDLOG_INFO("Configuration loaded from: {}", fmt::join(appCfg.loadedFrom, ", "));
     validateConfiguredStorageDir(appCfg);
+    // Ten sam budzet dla planu startowego i dla `-c`, ktore jest bramka: plan przyjety tutaj musi
+    // przejsc takze kompilacje w kanale ad-hoc i `--reset` (executorsm::cfgHistoryMemoryMib).
+    cm.setHistoryMemoryBudget(appCfg.historyMemoryMib);
 
     iLoopLimitCnt = loopLimitVar;  // std::atomic assignment
 

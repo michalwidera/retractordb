@@ -21,11 +21,15 @@ xretractor plan.rql -c
 
 # (0) Start z pliku planu: wartosc, ktorej plan nie moze przyjac, jest bledem parsowania jak
 # kazdy inny - kod 71 i powod w "Parse result:". Trzeci argument zmienia kanal powodu na
-# "Check result:", gdy odmowa zapada dopiero w kompilatorze.
+# "Check result:", gdy odmowa zapada dopiero w kompilatorze; czwarty to plik --config.
 expect_file_rejected() {
-  local plan="$1" reason="$2" channel="${3:-Parse result:}" out rc
+  local plan="$1" reason="$2" channel="${3:-Parse result:}" config="${4:-}" out rc
   set +e
-  out=$(xretractor "$plan" -c 2>&1)
+  if [ -n "$config" ]; then
+    out=$(xretractor "$plan" -c --config "$config" 2>&1)
+  else
+    out=$(xretractor "$plan" -c 2>&1)
+  fi
   rc=$?
   set -e
   if [ "$rc" -ne 71 ]; then
@@ -63,6 +67,21 @@ printf '%s\n' "DECLARE a INTEGER[2] STREAM core0, 1 FILE 'source.dat'" "SELECT c
   "SELECT * STREAM w[2] FROM cell[\$-1]" >negative_family_index.rql
 expect_file_rejected negative_family_index.rql "Stream 'w\$0' references 'cell[-1]' - stream generator index must not be negative" \
   "Check result:"
+# Do 2026-09-27 wymiar byl ograniczony tylko zakresem int: `>65537` przechodzil -c, a absurdalny
+# rozmiar konczyl sie std::bad_alloc albo OOM killerem dopiero w dzialajacym serwerze (A2 M11).
+printf '%s\n' "DECLARE a INTEGER STREAM core0, 1 FILE 'source.dat'" "SELECT core0[0] STREAM dst FROM core0>65537" >big_shift.rql
+expect_file_rejected big_shift.rql "time shift 65537 exceeds the limit 65536"
+# Budzet pamieci historii z pliku --config: rekord 512 KiB i przesuniecie o 2 to ok. 2,5 MiB historii
+# zrodla. Ten sam plan przechodzi przy budzecie 64 MiB, wiec odmowe daje wylacznie klucz z pliku.
+printf '%s\n' "DECLARE a DOUBLE[65536] STREAM core0, 1 FILE 'source.dat'" "SELECT core0[0] STREAM dst FROM core0>2" >history.rql
+printf '[limits]\nhistory_memory_mib = 1\n' >small_budget.toml
+printf '[limits]\nhistory_memory_mib = 64\n' >large_budget.toml
+if ! out=$(xretractor history.rql -c --config large_budget.toml 2>&1); then
+  echo "plan history.rql odrzucony przy budzecie 64 MiB: $out"
+  exit 1
+fi
+# Liczby bajtow nie przypinamy - zalezy od sizeof(rdb::payload), czyli od biblioteki standardowej.
+expect_file_rejected history.rql "Plan keeps " "Check result:" small_budget.toml
 
 server_start plan.rql
 
@@ -142,6 +161,8 @@ fi
 #     albo dopiero przy pierwszym zapisie (#308, A2 C4 i M12).
 #   - indeks pola 2^32-1 (do 2026-09-27) - atoi w kompilatorze dawal indeks -1, ad-hoc odpowiadal
 #     "OK", a proces konczyl FatalError przy pierwszym rekordzie (A2 M10).
+#   - wymiar w zakresie int, ale absurdalny (do 2026-09-27) - przesuniecie, okno czy szerokosc pola
+#     byly PRZYJMOWANE, a proces konczyl std::bad_alloc albo OOM killerem przy budowie magazynu (A2 M11).
 # Parser biegnie w procesie DZIALAJACEGO serwera, wiec kazdy z nich byl bledem calej instancji.
 # Trzeci argument zmienia prefiks odmowy, gdy zapada ona dopiero w kompilatorze kopii planu.
 expect_parse_rejected() {
@@ -193,6 +214,13 @@ expect_parse_rejected "SELECT core0[4294967295] STREAM minusindex FROM core0" "n
 # zapada w kompilatorze. Do 2026-09-27 instancja 1 dostawala po cichu `core0[0]`.
 expect_parse_rejected "SELECT core0[\$*65536*65536] STREAM genwrap[2] FROM core0" \
   "Stream 'genwrap\$1' references 'core0[\$*65536*65536]' - the index does not fit in int" "Fail local chain compiler"
+# A2 M11: granica pojedynczego literalu odpada w parserze, granica rekordu (17 pol po 64 KiB) dopiero
+# w kompilatorze kopii planu - kazdy wymiar z osobna miesci sie w swojej granicy.
+expect_parse_rejected "SELECT core0[0] STREAM bigshift2 FROM core0>65537" "time shift 65537 exceeds the limit 65536"
+wide_list="to_string(core0[0]:65536)"
+for _ in $(seq 2 17); do wide_list="$wide_list, to_string(core0[0]:65536)"; done
+expect_parse_rejected "SELECT $wide_list STREAM wide FROM core0" \
+  "Stream 'wide' needs a record of 1114112 bytes; the limit is 1048576" "Fail local chain compiler"
 
 # `kill -0` zaraz po odpowiedzi nie widzi smierci odroczonej: pojemnosc 0 konczyla proces dopiero
 # przy pierwszym zapisie, ok. 2 s po "OK". Po odmowach plan serwera ma wiec jeszcze liczyc.

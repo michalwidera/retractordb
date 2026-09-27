@@ -2,8 +2,10 @@
 
 #include <algorithm>  // std::max, std::ranges::transform
 #include <cctype>     // std::tolower
+#include <cstdint>
 #include <exception>
 #include <iterator>
+#include <limits>
 #include <utility>  // std::move, std::pair
 #include <variant>
 #include <vector>
@@ -545,8 +547,12 @@ std::optional<int> inferStringWidth(const std::list<token> &program, const field
         auto right = pop();
         auto left  = pop();
         if (!right.has_value() || !left.has_value()) return std::nullopt;
+        // Suma w int64, nasycona na INT_MAX. Liczby skladnikow nie ogranicza nic poza dlugoscia tekstu
+        // planu, a przepelnienie int bylo UB, zanim kontrola dlugosci pola w kompilatorze (A2 M11)
+        // zobaczyla wynik. Nasycona szerokosc i tak tam odpada.
         if (left->isString || right->isString)
-          stack.push_back({true, left->width + right->width});
+          stack.push_back({true, static_cast<int>(std::min<std::int64_t>(std::int64_t{left->width} + right->width,
+                                                                         std::numeric_limits<int>::max()))});
         else
           stack.push_back({false, 0});
       } break;

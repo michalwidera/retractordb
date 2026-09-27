@@ -35,3 +35,12 @@ dir = "/var/lib/retractor"
 # na jej koncie. Obiekty IPC są tworzone z trybem 0600, więc granicą jest konto usługi.
 # Włączenie zostawia ostrzeżenie w dzienniku przy każdym starcie.
 # unrestricted = false
+
+# [limits]
+# Budżet pamięci historii planu w MiB. Historię w RAM trzymają źródła deklarowane (DECLARE)
+# i strumienie w magazynie MEMORY (VOLATILE, SUBSTRAT 'memory'): każdy slot kosztuje rozmiar
+# rekordu plus ok. 170 B narzutu, a liczba slotów wynika z planu - okna `@`, przesunięcia `>N`,
+# okna rekordowe, zakres DUMP. Plan, który go przekracza, jest odrzucany jako błąd kompilacji:
+# przy starcie, w `xretractor -c`, w kanale ad-hoc i przy `xqry --reset`. Wartość musi być > 0;
+# niepoprawna zostaje zastąpiona domyślną z ostrzeżeniem w dzienniku.
+# history_memory_mib = 1024

@@ -89,6 +89,12 @@ void sanitizeConfig(AppConfig &cfg) {
     SPDLOG_WARN("High scheduling.rt_priority={} (may starve lower-priority tasks).", cfg.schedulingRtPriority);
   }
 
+  if (cfg.historyMemoryMib <= 0) {
+    SPDLOG_WARN("Invalid config limits.history_memory_mib={} (must be > 0). Using default {}.", cfg.historyMemoryMib,
+                defaults.historyMemoryMib);
+    cfg.historyMemoryMib = defaults.historyMemoryMib;
+  }
+
   if (!cfg.lockDir.empty() && !std::filesystem::path(cfg.lockDir).is_absolute()) {
     SPDLOG_WARN("paths.lock_dir='{}' is not an absolute path.", cfg.lockDir);
   }
@@ -115,6 +121,8 @@ void applyTable(const toml::table &tbl, AppConfig &cfg) {
 
   if (auto v = tbl.at_path("service.query_file").value<std::string>(); v) cfg.serviceQueryFile = *v;
   if (auto v = tbl.at_path("service.unrestricted").value<bool>(); v) cfg.serviceUnrestricted = *v;
+
+  if (auto v = tbl.at_path("limits.history_memory_mib").value<int>(); v) cfg.historyMemoryMib = *v;
 }
 
 // Ścieżka pliku konfiguracyjnego użytkownika wg XDG ($XDG_CONFIG_HOME lub ~/.config).

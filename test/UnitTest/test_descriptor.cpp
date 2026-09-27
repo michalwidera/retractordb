@@ -272,6 +272,56 @@ TEST(descriptor, parser) {
   EXPECT_TRUE(parserDESCString(out, "{ INTEGER a RETMEMORY 10 TYPE MEMORY }") == "OK");
 }
 
+// Plik .desc czyta takze serwer (storage::attachDescriptor -> loadDescriptorFile), wiec rozmiar pola
+// ma w gramatyce DESC te sama granice co `TYP[N]` i `STRING[N]` w RQL (A2 M11). Literal spoza int
+// konczyl proces przez std::terminate: std::stoi rzucal z metody exit* listenera, a ta biegnie
+// z noexcept-owego destruktora antlrcpp::FinalAction.
+TEST(descriptor, parser_limits_field_size) {
+  for (const std::string type : {"BYTE", "INTEGER", "UINT", "FLOAT", "DOUBLE", "RATIONAL", "STRING"}) {
+    rdb::Descriptor atLimit;
+    EXPECT_EQ(parserDESCString(atLimit, "{ " + type + " a[65536] }"), "OK") << type;
+    rdb::Descriptor aboveLimit;
+    EXPECT_TRUE(parserDESCString(aboveLimit, "{ " + type + " a[65537] }").contains("field size 65537 exceeds the limit 65536"))
+        << type;
+    rdb::Descriptor zero;
+    EXPECT_TRUE(parserDESCString(zero, "{ " + type + " a[0] }").contains("field size 0 must be greater than zero")) << type;
+  }
+
+  for (const std::string text :
+       {"{ INTEGER a[99999999999] }", "{ STRING a[99999999999] }", "{ INTEGER a RETENTION 99999999999 5 }",
+        "{ INTEGER a RETENTION 5 99999999999 }", "{ INTEGER a RETMEMORY 99999999999 TYPE MEMORY }"}) {
+    rdb::Descriptor out;
+    EXPECT_TRUE(parserDESCString(out, text).contains("numeric literal 99999999999 is out of range")) << text;
+  }
+
+  // Retencja nic nie alokuje - trzyma pliki na dysku - wiec gornej granicy nie ma.
+  rdb::Descriptor retention;
+  EXPECT_EQ(parserDESCString(retention, "{ INTEGER a RETENTION 1000000 1000000 }"), "OK");
+
+  // Pojemnosc 0 nie opisuje zadnego magazynu: RETENTION konczyl proces przy pierwszym zapisie,
+  // a RETMEMORY dawal pierscien bez granicy. Segmenty 0 znacza "bez limitu segmentow".
+  rdb::Descriptor zeroCapacity;
+  EXPECT_TRUE(
+      parserDESCString(zeroCapacity, "{ INTEGER a RETENTION 0 5 }").contains("RETENTION capacity 0 must be greater than zero"));
+  rdb::Descriptor zeroSegments;
+  EXPECT_EQ(parserDESCString(zeroSegments, "{ INTEGER a RETENTION 5 0 }"), "OK");
+  rdb::Descriptor zeroRing;
+  EXPECT_TRUE(parserDESCString(zeroRing, "{ INTEGER a RETMEMORY 0 TYPE MEMORY }")
+                  .contains("RETMEMORY capacity 0 must be greater than zero"));
+
+  // Granica pola nie ogranicza liczby pol: 4096 pol po 512 KiB to 2^31 bajtow, o jeden wiecej niz int.
+  std::string wide = "{";
+  for (int i = 0; i < 4096; ++i)
+    wide += " DOUBLE f" + std::to_string(i) + "[65536]";
+  rdb::Descriptor tooWide;
+  EXPECT_TRUE(
+      parserDESCString(tooWide, wide + " }").contains("record of 2147483648 bytes exceeds the descriptor limit 2147483647"));
+
+  // Odmowa nie zostaje w stanie globalnym: nastepne parsowanie w tym samym procesie przechodzi.
+  rdb::Descriptor next;
+  EXPECT_EQ(parserDESCString(next, "{ INTEGER a }"), "OK");
+}
+
 TEST(descriptor, assign_operator) {
   auto data1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
              rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //

@@ -59,6 +59,7 @@ ptree executorsm::attachAdHocRule(qTree &coreInstanceCopy, const std::string &st
                   " record(s) back cannot be served");
 
   compiler localCompiler(coreInstanceCopy);
+  localCompiler.setHistoryMemoryBudget(cfgHistoryMemoryMib);
   const auto response = localCompiler.compile();
   if (response != "OK") {
     ptRetval.put(std::string("db"), "Fail local chain compiler:" + response);
@@ -156,6 +157,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     FatalError("fault hook RDB_FAULT_FATAL_IN_ADHOC: fatal error in the communication thread");
 
   compiler localCompiler(coreInstanceCopy);
+  localCompiler.setHistoryMemoryBudget(cfgHistoryMemoryMib);
   auto response = localCompiler.compile();
 
   if (response != "OK") {

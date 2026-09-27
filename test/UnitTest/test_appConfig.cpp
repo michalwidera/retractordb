@@ -153,3 +153,37 @@ TEST_F(AppConfigTest, loaded_from_records_explicit_path) {
   ASSERT_EQ(cfg.loadedFrom.size(), 1u);
   EXPECT_EQ(cfg.loadedFrom.front(), explicitFile.string());
 }
+
+// [limits] history_memory_mib - budzet pamieci historii planu, sprawdzany przy kazdej kompilacji
+// (compiler::setHistoryMemoryBudget). Brak klucza = 1024 MiB.
+TEST_F(AppConfigTest, history_memory_budget_defaults_to_1024_mib) {
+  const AppConfig cfg = loadAppConfig();
+  EXPECT_EQ(cfg.historyMemoryMib, 1024);
+}
+
+TEST_F(AppConfigTest, user_layer_sets_history_memory_budget) {
+  writeFile(userConfigFile(), "[limits]\nhistory_memory_mib = 64\n");
+
+  const AppConfig cfg = loadAppConfig();
+
+  EXPECT_EQ(cfg.historyMemoryMib, 64);
+}
+
+TEST_F(AppConfigTest, non_positive_history_memory_budget_falls_back_to_default) {
+  for (const std::string value : {"0", "-5"}) {
+    const fs::path explicitFile = tmpDir / "custom.toml";
+    writeFile(explicitFile, "[limits]\nhistory_memory_mib = " + value + "\n");
+
+    const AppConfig cfg = loadAppConfig(explicitFile.string());
+
+    EXPECT_EQ(cfg.historyMemoryMib, 1024) << value;
+  }
+}
+
+TEST_F(AppConfigTest, history_memory_budget_of_wrong_type_is_ignored) {
+  writeFile(userConfigFile(), "[limits]\nhistory_memory_mib = \"lots\"\n");
+
+  const AppConfig cfg = loadAppConfig();
+
+  EXPECT_EQ(cfg.historyMemoryMib, 1024);
+}

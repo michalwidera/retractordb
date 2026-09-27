@@ -27,8 +27,10 @@
 #include "expressionShape.hpp"  // inferExpressionShape, exprShape
 #include "exprSimplify.hpp"     // simplifyExpression
 #include "fatalError.hpp"
-#include "rdb/probe.hpp"  // sonda E3: rozmiar planu, czas kompilacji
+#include "rdb/payload.hpp"  // sizeof(rdb::payload) w wycenie pamieci historii
+#include "rdb/probe.hpp"    // sonda E3: rozmiar planu, czas kompilacji
 #include "rdb/rationalFormat.hpp"
+#include "rdb/sizeLimits.hpp"
 #include "rqlFunctions.hpp"  // jedyna lista funkcji skalarnych
 #include "SOperations.hpp"   // ceilR
 
@@ -786,14 +788,87 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
   return lRetVal;
 }
 
+/// Wymiary rekordu WYJSCIOWEGO jednego wezla (A2 M11): dlugosc kazdego pola, rozmiar rekordu i -
+/// gdy `planElements` nie jest nullptr - narastajaca suma elementow plaskich planu.
+///
+/// Liczy z lSchema w int64, bez rdb::Descriptor: budowa deskryptora (offsety w int, mapowanie 12 B na
+/// element) i payloadu jest wlasnie tym, przed czym kontrola ma zdazyc. Dlatego wezel sprawdza sie,
+/// ZANIM ktorykolwiek konsument zbuduje z niego deskryptor.
+std::string compiler::checkRecordShape(const query &q, std::int64_t *planElements) const {
+  std::int64_t bytes{0};
+  std::int64_t elements{0};
+  for (const auto &f : q.lSchema) {
+    const rdb::rField &fld = f.field_;
+    // Iloczyn dwoch int miesci sie w int64. Dlugosc w rozumieniu `TYP[N]` i `STRING[N]` z .desc:
+    // napis to jeden element o dlugosci rlen * rarray (jedno z nich jest 1), liczba - rarray elementow.
+    const std::int64_t fieldBytes = std::int64_t{fld.rlen} * fld.rarray;
+    const std::int64_t length     = (fld.rtype == rdb::STRING) ? fieldBytes : fld.rarray;
+    if (length > rdb::limits::kMaxFieldLength)
+      return std::format("Stream '{}' field '{}' has length {}; the limit is {}", q.id, fld.rname, length,
+                         rdb::limits::kMaxFieldLength);
+    if (__builtin_add_overflow(bytes, fieldBytes, &bytes)) bytes = std::numeric_limits<std::int64_t>::max();
+    elements += flatSlotCount(fld);
+  }
+  if (bytes > rdb::limits::kMaxRecordBytes)
+    return std::format("Stream '{}' needs a record of {} bytes; the limit is {}", q.id, bytes, rdb::limits::kMaxRecordBytes);
+  if (planElements == nullptr) return {"OK"};
+  *planElements += elements;
+  if (*planElements > rdb::limits::kMaxPlanElements)
+    // Wezel, na ktorym suma przekracza granice, zalezy od porzadku topologicznego - nie musi byc
+    // najwiekszy, stad "reached at", a nie "caused by".
+    return std::format("Plan needs {} record elements; the limit is {} (reached at stream '{}')", *planElements,
+                       rdb::limits::kMaxPlanElements, q.id);
+  return {"OK"};
+}
+
+/// Rekord WEJSCIOWY wezla (query::descriptorFrom), ktory streamInstance alokuje obok wyjsciowego.
+///
+/// Bywa wiekszy od wyjscia: `SELECT txt[0] STREAM w FROM txt@(1,65536)` nad `STRING[65536]` ma jedno
+/// pole wyjscia i 4 GiB wejscia (A2 M11). Wolane PRZED kazdym descriptorFrom() w przebiegach, ktore go
+/// buduja, bo juz sam deskryptor takiego rekordu przepelnia int w offsetach.
+///
+/// Wejscie przerasta sprawdzone juz zrodla tylko przy dwoch operatorach: oknie AGSE (|window| slotow
+/// NAJSZERSZEGO elementu zrodla) i sumie strumieni (oba rekordy). Pozostale czytaja rekord zrodla bez
+/// zmian, jeden slot reduktora albo - przeplot - sloty najwyzej 8-bajtowe na szerokosci zrodla.
+/// Zrodla nieznanego nie oceniamy: nazwe raportuje dalszy przebieg, tak jak dotad.
+std::string compiler::checkInputRecord(query &q) {
+  if (q.isDeclaration() || q.isCompilerDirective()) return {"OK"};
+  auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
+  std::int64_t bytes{0};
+  switch (cmd.getCommandID()) {
+    case STREAM_AGSE: {
+      if (!coreInstance.exists(arg1)) return {"OK"};
+      const int window         = std::get<std::pair<int, int>>(cmd.getVT()).second;
+      const auto widestElement = coreInstance.getQuery(arg1).descriptorStorage().widestFieldType().second;
+      bytes                    = std::int64_t{std::abs(window)} * widestElement;
+    } break;
+    case STREAM_ADD:
+      if (!coreInstance.exists(arg1) || !coreInstance.exists(arg2)) return {"OK"};
+      bytes = static_cast<std::int64_t>(coreInstance.getQuery(arg1).descriptorStorage().getSizeInBytes()) +
+              static_cast<std::int64_t>(coreInstance.getQuery(arg2).descriptorStorage().getSizeInBytes());
+      break;
+    default:
+      return {"OK"};
+  }
+  if (bytes > rdb::limits::kMaxRecordBytes)
+    return std::format("Stream '{}' reads an input record of {} bytes; the limit is {}", q.id, bytes,
+                       rdb::limits::kMaxRecordBytes);
+  return {"OK"};
+}
+
 // goal of this procedure is setup of all possible fields name and unroll *
 // unfortunately algorithm if broken - because does not search backward but next
 // by next and some * can be process which have arguments appear as two asterisk
 // In such case unroll does not appear and algorithm gets shitin-shitout
 std::string compiler::expandSchemaWildcards() {
   int fieldCountSh = 0;
+  // Suma elementow plaskich wezlow juz rozwinietych. Wezly ida w porzadku topologicznym, wiec kazdy
+  // producent jest sprawdzony, zanim konsument zbuduje z niego deskryptor albo skopiuje schemat.
+  std::int64_t planElements{0};
   coreInstance.topologicalSort();
   for (auto &q : coreInstance) {
+    // PRZED rozwinieciem: [_] siega po descriptorFrom() tego wezla (sourceSpanInFrom).
+    if (const std::string input = checkInputRecord(q); input != "OK") return input;
     for (auto &t : q.lProgram) {
       if (q.lProgram.size() >= 4) {
         FatalError("compiler::expandSchemaWildcards: program not optimized - {} tokens for query '{}', expected < 4",
@@ -884,6 +959,9 @@ std::string compiler::expandSchemaWildcards() {
     // jako jednopolowy i schemat rozjechałby się z układem rekordu.
     const std::string resultIdx{expandIndexWildcards(q)};
     if (resultIdx != "OK") return resultIdx;
+
+    // A2 M11: wymiary wezla PO rozwinieciu `*` i [_], ktore skopiowaly lub zlozyly schemat.
+    if (const std::string shape = checkRecordShape(q, &planElements); shape != "OK") return shape;
   }
   coreInstance.sort();
   return {"OK"};
@@ -1129,11 +1207,21 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
                     "Stream '{}': rule '{}' reads the record of '{}', which has {} element(s), so '{}' is out of range", q.id,
                     ruleName, q.id, width, text);
             } else if (name == q.id) {
-              const int width = q.descriptorFrom(coreInstance).flatElementCount();
+              auto memo = fromWidthMemo_.find(q.id);
+              if (memo == fromWidthMemo_.end())
+                memo = fromWidthMemo_.emplace(q.id, q.descriptorFrom(coreInstance).flatElementCount()).first;
+              const int width = memo->second;
               if (offset1 >= width)
                 return std::format("Stream '{}': the FROM record of '{}' has {} element(s), so '{}' is out of range", q.id, q.id,
                                    width, text);
-            } else if (const auto span = sourceSpanInFrom(q, name); span && offset1 >= *span) {
+            } else if (const auto span =
+                           [&] {
+                             const auto key = std::make_pair(q.id, name);
+                             auto memo      = fromSpanMemo_.find(key);
+                             if (memo == fromSpanMemo_.end()) memo = fromSpanMemo_.emplace(key, sourceSpanInFrom(q, name)).first;
+                             return memo->second;
+                           }();
+                       span && offset1 >= *span) {
               return std::format("Stream '{}': stream '{}' has {} element(s) in its FROM clause, so '{}' is out of range", q.id,
                                  name, *span, text);
             }
@@ -1233,6 +1321,9 @@ Aim of this procedure is change all of push_idXXX to push_id
 note that push_id is closest to push_id4
 push_idXXX is searched in all stream program after reduction */
 std::string compiler::resolveFieldReferences() {
+  // Pamiec wazna wylacznie w tym przebiegu - patrz fromWidthMemo_. Poza nim nikt jej nie czyta.
+  fromWidthMemo_.clear();
+  fromSpanMemo_.clear();
   for (auto &q : coreInstance) {  // for each query
     if (q.isReductionRequired()) {
       FatalError("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id);
@@ -1492,9 +1583,56 @@ std::string compiler::applyCapacitiesToStreams(const std::map<std::string, int> 
     if (coreInstance[q.first].isReductionRequired()) {
       FatalError("compiler: query '{}' requires reduction at applyCapacities stage", q.first);
     }
-    coreInstance[q.first].policy.second = q.second;  // set memory size
+    // Pierscien MEMORY bierze wieksza z dwoch liczb: RETENTION zapisane przy `STORAGE MEMORY` i potrzebe
+    // planu. VOLATILE startuje od 1, wiec dla niego wynik jest taki jak dotad - sama potrzeba planu.
+    auto &policy  = coreInstance[q.first].policy;
+    policy.second = (policy.first == "MEMORY") ? std::max(policy.second, static_cast<size_t>(q.second)) : q.second;
   }
   return {"OK"};
+}
+
+/// Pamiec historii planu wobec budzetu `[limits] history_memory_mib` (A2 M11).
+///
+/// Historie w RAM trzymaja dwa magazyny: pierscien zrodla deklarowanego (SourceBuffer - set_capacity
+/// alokuje sloty z gory, pojemnosc 0 staje sie 1) i magazyn MEMORY (memoryFile, pierscien o rozmiarze
+/// policy.second po applyCapacitiesToStreams). Magazyn plikowy trzyma historie na dysku.
+/// Slot kosztuje sizeof(rdb::payload) plus bajty rekordu; dla memoryFile narzut jest mniejszy, wiec
+/// wycena jest zachowawcza. Pojemnosc, ktorej budzet nie miesci, byla dotad std::bad_alloc albo
+/// OOM killerem w dzialajacym serwerze: `>65536` nad rekordem 1 MiB to 64 GiB.
+std::string compiler::checkHistoryMemory() {
+  const std::int64_t budget = std::int64_t{historyMemoryMib_} * 1024 * 1024;
+  std::int64_t total{0};
+  std::int64_t largestShare{0};
+  std::int64_t largestRecords{0};
+  std::int64_t largestBytes{0};
+  std::string largestId;
+  for (auto &q : coreInstance) {
+    if (q.isCompilerDirective()) continue;
+    std::int64_t records{0};
+    if (q.isDeclaration()) {
+      const auto capacity = coreInstance.maxCapacity.find(q.id);
+      records             = std::max(1, capacity == coreInstance.maxCapacity.end() ? 1 : capacity->second);
+    } else if (q.policy.first == "MEMORY" && q.policy.second != 0) {
+      records = static_cast<std::int64_t>(q.policy.second);
+    }
+    if (records == 0) continue;
+    // Rekord kazdego wezla jest juz sprawdzony (<= 1 MiB), a pojemnosc to int: iloczyn i suma
+    // po co najwyzej kilkuset wezlach mieszcza sie w int64 z duzym zapasem.
+    const auto bytes         = static_cast<std::int64_t>(q.descriptorStorage().getSizeInBytes());
+    const std::int64_t share = records * (static_cast<std::int64_t>(sizeof(rdb::payload)) + bytes);
+    total += share;
+    if (share > largestShare) {
+      largestShare   = share;
+      largestRecords = records;
+      largestBytes   = bytes;
+      largestId      = q.id;
+    }
+  }
+  if (total <= budget) return {"OK"};
+  return std::format(
+      "Plan keeps {} bytes of stream history in memory; the budget [limits] history_memory_mib = {} allows {} "
+      "(largest share: stream '{}', {} records of {} bytes)",
+      total, historyMemoryMib_, budget, largestId, largestRecords, largestBytes);
 }
 
 std::map<std::string, int> compiler::computeRequiredCapacities() {
@@ -1596,18 +1734,27 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         // dystans jest okresowy i maksimum liczymy DOKŁADNIE, przeglądając jeden pełny okres
         // od origin. Postać zamknięta byłaby tu domysłem - a to jest wzór, którego zaniżenie
         // oznacza odczyt poza historią (defekt D1 z K24), nie tylko slot opóźnienia.
-        const int period     = sourceWidth / std::gcd(sourceWidth, step);
-        int maxDistance      = 0;
-        const int firstIndex = q.logicalOrigin;
-        for (int n = firstIndex; n < firstIndex + period; ++n) {
-          const int newest = floorDiv((n + 1 + q.startupLatency) * step, sourceWidth) - source.startupLatency - 1;
-          const int oldest = floorDiv((n * step) - std::abs(length) + 1, sourceWidth);
-          maxDistance      = std::max(maxDistance, newest - oldest);
+        //
+        // Rachunek w int64: n*step przekraczal int juz przy okresie 2^16 i kroku 2^16, czyli
+        // w granicach wymiarow planu (A2 M11). Sama odleglosc to ok. (1+Wsrc) + |L|/F, wiec
+        // wraca do int; przyciecie jest tylko straza - taka pojemnosc odrzuci budzet historii.
+        const auto floorDiv64 = [](const std::int64_t numerator, const std::int64_t denominator) {
+          const std::int64_t quotient = numerator / denominator;
+          return (numerator % denominator != 0 && ((numerator < 0) != (denominator < 0))) ? quotient - 1 : quotient;
+        };
+        const std::int64_t period     = sourceWidth / std::gcd(sourceWidth, step);
+        std::int64_t maxDistance      = 0;
+        const std::int64_t firstIndex = q.logicalOrigin;
+        for (std::int64_t n = firstIndex; n < firstIndex + period; ++n) {
+          const std::int64_t newest = floorDiv64((n + 1 + q.startupLatency) * step, sourceWidth) - source.startupLatency - 1;
+          const std::int64_t oldest = floorDiv64((n * step) - std::abs(length) + 1, sourceWidth);
+          maxDistance               = std::max(maxDistance, newest - oldest);
         }
         // Bufor musi pomieścić oba końce zakresu, więc pojemność to odległość + 1.
         // Deklaracja ma dodatkowo dwa rekordy przed pierwszym wykonaniem konsumenta:
         // rekord uzbrojony przy otwarciu storage oraz zerowy prefetch.
-        const int required = maxDistance + (source.isDeclaration() ? kDeclarationPrefetch : 1);
+        const int distance = static_cast<int>(std::min<std::int64_t>(maxDistance, std::numeric_limits<int>::max() - 2));
+        const int required = distance + (source.isDeclaration() ? kDeclarationPrefetch : 1);
         capMap[nameSrc]    = std::max({capMap[nameSrc], required, 1});
       } break;
       case STREAM_HASH:
@@ -1877,7 +2024,13 @@ std::string compiler::computeLogicalOrigin() {
       } else if (op == STREAM_AGSE) {
         const auto [step, length] = std::get<std::pair<int, int>>(q.lProgram.back().getVT());
         const int sourceWidth     = coreInstance[src1].descriptorStorage().flatElementCount();
-        result                    = AgseLogicalOrigin(sourceWidth, step, length, o1);
+        // Dwa okna `@(1,65536)` w lancuchu daja origin ok. 2^32, czyli pierwszy rekord po czterech
+        // miliardach slotow - blad planu, a nie przypadek brzegowy (A2 M11). Do tej pory int sie przepelnial.
+        const std::int64_t origin = AgseLogicalOrigin(sourceWidth, step, length, o1);
+        if (origin > std::numeric_limits<int>::max())
+          return std::format("Stream '{}' has a logical origin of {} slots; the limit is {}", q.id, origin,
+                             std::numeric_limits<int>::max());
+        result = static_cast<int>(origin);
       } else if (op == STREAM_SUBTRACT) {
         const auto delta = q.rInterval;
         result           = firstIndexReaching([&](int n) { return Subtract(delta1, delta, n); }, o1, q.id);
@@ -2022,7 +2175,12 @@ std::string compiler::computeStartupLatency() {
       } else if (op == STREAM_AGSE) {
         const auto step       = std::get<std::pair<int, int>>(q.lProgram.back().getVT()).first;
         const int sourceWidth = coreInstance[src1].descriptorStorage().flatElementCount();
-        result                = AgseStartupLatency(sourceWidth, step, w1);
+        // Ta sama straz co przy origin (A2 M11).
+        const std::int64_t tail = AgseStartupLatency(sourceWidth, step, w1);
+        if (tail > std::numeric_limits<int>::max())
+          return std::format("Stream '{}' has a startup latency of {} slots; the limit is {}", q.id, tail,
+                             std::numeric_limits<int>::max());
+        result = static_cast<int>(tail);
       } else if (op == STREAM_AVG || op == STREAM_MIN || op == STREAM_MAX || op == STREAM_SUM) {
         // Redukcje działają wyłącznie na bieżącej krotce producenta.
       }
@@ -2789,7 +2947,10 @@ std::string compiler::inferFieldShapes() {
     for (auto &q : coreInstance) {
       if (q.isCompilerDirective() || q.isDeclaration()) continue;
       if (!copiesOperandSchema(q) && !synthesizesOperandSchema(q)) continue;
-      current     = &q;
+      current = &q;
+      // Ksztalt zrodel mogl sie zmienic w poprzedniej rundzie - wejscie sprawdzamy przed KAZDYM
+      // descriptorFrom() (A2 M11).
+      if (const std::string input = checkInputRecord(q); input != "OK") return input;
       inputRecord = q.descriptorFrom(coreInstance);
       std::set<std::string> viaInterleave;
       fromOffsets = sourceOffsetsInFrom(q, viaInterleave);
@@ -2839,6 +3000,9 @@ std::string compiler::inferFieldShapes() {
         f.field_.rarray = inferred.shape.rarray;
         changed         = true;
       }
+      // Konkatenacja napisow poszerza pole dopiero tutaj (`txt[0]+txt[0]`). Kazda zmiana ksztaltu
+      // jest sprawdzana, zanim nastepny wezel zbuduje z niej swoj rekord wejsciowy (A2 M11).
+      if (const std::string shape = checkRecordShape(q, nullptr); shape != "OK") return shape;
     }
     if (!changed) break;
   }
@@ -3243,15 +3407,28 @@ std::string compiler::checkStreamReducerFieldRefs() {
 std::string compiler::expandStreamGenerators() {
   std::map<std::string, int> families;
   std::set<std::string> plainNames;
+  // Liczba strumieni planu po rozwinieciu - sprawdzana PRZED kopiowaniem zapytan, bo kazda instancja
+  // to pelna kopia szablonu (A2 M11). Tylko przy generatorze: plan bez niego ma tyle zapytan, ile
+  // linii tekstu, a jego rozmiar rozstrzyga - razem z wezlami posrednimi, ktore kompilator doklada
+  // pozniej - magistrala przy starcie i przy `--reset` (it_service_reset_race przypina jej komunikat).
+  // Plany wieksze od slotu magistrali kompiluje takze wyrocznia dowodow (ut_proofOracle).
+  std::size_t streamCount{0};
+  const query *largestFamily = nullptr;
   for (const auto &q : coreInstance) {
     if (q.generatorSize == query::notAGenerator) {
       plainNames.insert(q.id);
+      if (!q.isCompilerDirective()) ++streamCount;
       continue;
     }
     if (q.generatorSize <= 0)
       return "Stream generator '" + q.id + "' must declare a positive size, got " + std::to_string(q.generatorSize);
     if (!families.emplace(q.id, q.generatorSize).second) return "Stream generator '" + q.id + "' is declared more than once";
+    streamCount += static_cast<std::size_t>(q.generatorSize);
+    if (largestFamily == nullptr || q.generatorSize > largestFamily->generatorSize) largestFamily = &q;
   }
+  if (largestFamily != nullptr && streamCount > rdb::limits::kMaxPlanStreams)
+    return std::format("Plan has {} streams after expanding stream generators; the limit is {} (stream generator '{}' adds {})",
+                       streamCount, rdb::limits::kMaxPlanStreams, largestFamily->id, largestFamily->generatorSize);
 
   std::vector<query> plan;
   plan.reserve(coreInstance.size());
@@ -3463,6 +3640,11 @@ std::string compiler::compile() {
   if (result != "OK") return result;
 
   result = applyCapacitiesToStreams(coreInstance.maxCapacity);
+  if (result != "OK") return result;
+
+  // Po ustaleniu pojemnosci, przed jakimkolwiek SourceBuffer::setCapacity() - te wola dopiero
+  // streamInstance przy budowie modelu.
+  result = checkHistoryMemory();
   if (result != "OK") return result;
 
   // Kolejność elementów qTree jest kolejnością przetwarzania w takcie

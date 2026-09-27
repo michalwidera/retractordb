@@ -136,6 +136,7 @@ std::string executorsm::validatePlanText(const std::string &planText) {
   // z pustym plikiem zapytan.
   if (!candidate.empty()) {
     compiler localCompiler(candidate);
+    localCompiler.setHistoryMemoryBudget(cfgHistoryMemoryMib);
     if (const std::string response = localCompiler.compile(); response != "OK") return "Fail compile:" + response;
   }
 

@@ -8,6 +8,8 @@
 #include <string_view>
 #include <vector>
 
+#include "rdb/sizeLimits.hpp"
+
 /// @brief Magistrala xrdbbus: wspolny obszar wykrywania instancji xretractor i egzekwowania
 ///        rozlacznosci zasobow -- nazw strumieni i plikow magazynu -- miedzy serwerami
 ///        na jednej maszynie.
@@ -84,9 +86,10 @@ std::size_t sweepAbandonedSegments();
 /// STREAM_ADD_STREAM_ADD_..._str01_..._str12 z it_wide_from_names ma ponad 130 znakow.
 ///
 /// Liczba strumieni ma zapas rzedu 2,5x: najwiekszy skompilowany plan w repozytorium
-/// (test/IntegrationTest/optimizer_ablation) ma 53 wezly.
+/// (test/IntegrationTest/optimizer_ablation) ma 53 wezly. Wartosc stoi w rdb/sizeLimits.hpp, bo te
+/// sama granice sprawdzaja parser (rozmiar generatora) i kompilator (plan po rozwinieciu generatorow).
 inline constexpr std::size_t kMaxSlots         = 32;
-inline constexpr std::size_t kMaxStreams       = 128;
+inline constexpr std::size_t kMaxStreams       = rdb::limits::kMaxPlanStreams;
 inline constexpr std::size_t kStreamNameSize   = 208;  ///< z terminatorem => nazwa do 207 znakow
 inline constexpr std::size_t kInstanceNameSize = 40;   ///< servername::kMaxLength (32) + zapas
 inline constexpr std::size_t kQueryFileSize    = 256;  ///< z terminatorem => sciezka do 255 znakow

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <set>
@@ -7,7 +8,8 @@
 #include <string_view>
 #include <vector>
 
-#include "qTree.hpp"  // for qTree, query, token
+#include "appConfig.hpp"  // appcfg::kDefaultHistoryMemoryMib
+#include "qTree.hpp"      // for qTree, query, token
 
 /// Zatrzymuje kompilację, jeżeli którykolwiek węzeł planu nie ma wyliczonej wielkości.
 ///
@@ -47,8 +49,17 @@ struct compiler {
   /// a stawka jest kasowanie plikow.
   [[nodiscard]] const std::map<std::string, std::vector<std::string>> &generatedStreams() const { return generatedStreams_; }
 
+  /// Budzet pamieci historii planu w MiB, `[limits] history_memory_mib` (A2 M11).
+  ///
+  /// Setter, a nie argument konstruktora, bo kompilator launchera powstaje, zanim wczyta sie
+  /// konfiguracja. Wartosc domyslna jest wartoscia domyslna KLUCZA, a nie konfiguracja operatora,
+  /// wiec kazde miejsce kompilujace plan w procesie serwera musi ja ustawic: start i `-c`
+  /// (launcher), getAdHoc, attachAdHocRule i validatePlanText.
+  void setHistoryMemoryBudget(int mib) { historyMemoryMib_ = mib; }
+
  private:
   qTree &coreInstance;
+  int historyMemoryMib_       = appcfg::kDefaultHistoryMemoryMib;
   bool restrictSelectSharing_ = false;
   std::set<std::string> selectSharingScope_;
   /// Nazwy strumieni, po których sięgnął UŻYTKOWNIK, per zapytanie - sprawdzane przez bramkę
@@ -61,6 +72,14 @@ struct compiler {
   ///    z wyszukania pola w schematach argumentów. PUSH_ID3 wystawia wyłącznie parser.
   std::map<std::string, std::set<std::string>> namedSourceRefs_;
   std::map<std::string, std::vector<std::string>> generatedStreams_;
+  /// Szerokosc rekordu FROM i rozpietosci nazw w nim, zapamietane na czas resolveFieldReferences().
+  /// Przebieg przepisuje wylacznie tokeny programow pol, wiec schematy i programy FROM sie w nim nie
+  /// zmieniaja. Bez pamieci descriptorFrom() budowal sie od nowa dla kazdego odwolania, czyli
+  /// kwadratowo wzgledem szerokosci wezla: `SELECT * FROM src@(1,65536)` kompilowal sie ok. 2 minut.
+  std::map<std::string, int> fromWidthMemo_;
+  std::map<std::pair<std::string, std::string>, std::optional<int>> fromSpanMemo_;
+  [[nodiscard]] std::string checkRecordShape(const query &q, std::int64_t *planElements) const;
+  std::string checkInputRecord(query &q);
   std::list<field> buildOutputSchema(const std::string &sName1, const std::string &sName2, token &cmd_token);
   [[nodiscard]] std::optional<rdb::rField> sourceFieldAt(const std::string &streamId, int flatIndex) const;
   std::string composeStreamName(const std::string &sName1, const std::string &sName2, const token &cmd);
@@ -91,6 +110,7 @@ struct compiler {
   std::string validateConstraints();
   std::map<std::string, int> computeRequiredCapacities();
   std::string applyCapacitiesToStreams(const std::map<std::string, int> &capMap);
+  std::string checkHistoryMemory();
   [[nodiscard]] std::map<std::string, std::vector<std::string>> snapshotUserFieldNames() const;
   [[nodiscard]] std::string verifyUserFieldNamesPreserved(const std::map<std::string, std::vector<std::string>> &before) const;
   std::string computeLogicalOrigin();
