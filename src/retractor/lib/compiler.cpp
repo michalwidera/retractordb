@@ -1,6 +1,7 @@
 #include "compiler.hpp"
 
 #include <algorithm>
+#include <charconv>  // std::from_chars
 #include <cmath>
 #include <cstdint>
 #include <format>
@@ -22,6 +23,7 @@
 #include <boost/rational.hpp>
 #include <boost/regex.hpp>
 
+#include "checkedArith.hpp"     // arytmetyka indeksu generatora
 #include "expressionShape.hpp"  // inferExpressionShape, exprShape
 #include "exprSimplify.hpp"     // simplifyExpression
 #include "fatalError.hpp"
@@ -134,6 +136,19 @@ std::optional<int> windowWidthOf(const query &q, std::string &error) {
     }
   return widest;
 }
+
+/// Indeks z nawiasu `strumien[k]` albo nullopt, gdy tekst nie jest liczba mieszczaca sie w int.
+///
+/// Literal odrzuca juz parser, a indeks generatora - genIndexFolder, wiec z tekstu RQL tu nie
+/// dochodzi nic spoza zakresu. Do 2026-09-27 stal tu jednak atoi, ktory przepelnienie zamienia po
+/// cichu na inny indeks (`4294967296` na 0, `4294967295` na -1), a tekst tokenu PUSH_ID2 przepisuje
+/// takze sam kompilator. Kontrola zostaje wiec przy kazdym odczycie, nie tylko przy pierwszym.
+std::optional<int> parseIndex(const std::string &text) {
+  int value            = 0;
+  const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
+  if (ec != std::errc{} || end != text.data() + text.size()) return std::nullopt;
+  return value;
+}
 }  // namespace
 
 namespace localContext {
@@ -142,12 +157,10 @@ namespace localContext {
 // wyciagal nazwe strumienia "0". Do 2026-08-31 nie bylo tego widac, bo nieznana nazwa
 // degradowala sie po cichu do offsetu 0 bufora wejsciowego - czyli akurat do wartosci
 // poprawnej dla jednozrodlowego konsumenta.
-boost::regex xprFieldId5(R"(([\w$]*)\[(\d*)\]\[(\d*)\])");  // something[1][1]
-boost::regex xprFieldId4(R"(([\w$]*)\[(\d*)\,(\d*)\])");    // something[1,1]
-boost::regex xprFieldId2(R"(([\w$]*)\[(\d*)\])");           // something[1]
-boost::regex xprFieldIdX("([\\w$]*)\\[_]");                 // something[_]
-boost::regex xprFieldId1("(\\w*).(\\w*)");                  // something.in_schema
-boost::regex xprFieldId3("(\\w*)");                         // field_of_corn
+boost::regex xprFieldId2(R"(([\w$]*)\[(\d*)\])");  // something[1]
+boost::regex xprFieldIdX("([\\w$]*)\\[_]");        // something[_]
+boost::regex xprFieldId1("(\\w*).(\\w*)");         // something.in_schema
+boost::regex xprFieldId3("(\\w*)");                // field_of_corn
 }  // namespace localContext
 
 using namespace localContext;
@@ -1084,8 +1097,9 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
         if (regex_search(text.c_str(), what, xprFieldId2)) {
           if (what.size() != 3) FatalError("compiler: PUSH_ID2 regex match has unexpected capture count");
           const std::string name(what[1]);
-          const std::string sOffset1(what[2]);
-          const int offset1(atoi(sOffset1.c_str()));
+          const auto parsedOffset = parseIndex(what[2]);
+          if (!parsedOffset) return "Stream '" + q.id + "' has a malformed field reference '" + text + "'";
+          const int offset1 = *parsedOffset;
 
           // `strumien[k]` - pozycja PŁASKA w rekordzie źródła. W tej postaci buildOutputSchema()
           // wystawia też schematy substratów i rozwinięcie `SELECT *`.
@@ -1206,26 +1220,6 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
         } else
           return "Stream '" + q.id + "' has a malformed field reference '" + text + "'";
         break;
-      case PUSH_ID4:
-      case PUSH_ID5: {
-        if (regex_search(text.c_str(), what, xprFieldId4) || regex_search(text.c_str(), what, xprFieldId5)) {
-          if (what.size() != 4) FatalError("compiler: PUSH_ID4/5 regex match has unexpected capture count");
-          const std::string schema(what[1]);
-          const std::string sOffset1(what[2]);
-          const std::string sOffset2(what[3]);
-          const int offset1(atoi(sOffset1.c_str()));
-          const int offset2(atoi(sOffset2.c_str()));
-
-          namespace ranges = std::ranges;
-          const bool foundSchema =
-              ranges::find_if(coreInstance, [schema](const auto &qry) { return qry.id == schema; }) != coreInstance.end();
-
-          if (!foundSchema) return std::format("Stream '{}' refers to '{}', but there is no stream '{}'", q.id, text, schema);
-          t = token(PUSH_ID, std::make_pair(schema, offset1 + (offset2 * static_cast<int>(q.lSchema.size()))));
-        } else
-          return "Stream '" + q.id + "' has a malformed field reference '" + text + "'";
-        break;
-      }
       default:
         break;
     }
@@ -2970,42 +2964,52 @@ namespace {
 /// bialych znakow, a jego ksztalt gwarantuje gramatyka. Kazde odstepstwo od niej jest wiec
 /// bledem WEWNETRZNYM - rozjechala sie gramatyka z ewaluatorem - a nie bledem uzytkownika,
 /// i stad FatalError zamiast komunikatu zwracanego do wolajacego.
+///
+/// Przepelnienie int jest natomiast bledem UZYTKOWNIKA: gramatyka nie ogranicza ani dlugosci
+/// literalu, ani wyniku dzialan. fold() oddaje wtedy nullopt, a komunikat sklada wolajacy.
+/// Do 2026-09-27 wszystko liczylo sie w golym int (UB): `cells[$+4294967296]` zwijalo sie po
+/// cichu do `cells[$]`, a `cell[4294967297]` w FROM wskazywalo `cell$1` (#306, A2 M10).
 class genIndexFolder {
  public:
   genIndexFolder(const std::string &text, int ordinal) : text_(text), ordinal_(ordinal) {}
 
-  int fold() {
-    const int value = sum();
+  std::optional<int> fold() {
+    const auto value = sum();
+    if (!value) return std::nullopt;
     if (pos_ != text_.size())
       FatalError("compiler::expandStreamGenerators: trailing '{}' in generator index '{}'", text_.substr(pos_), text_);
     return value;
   }
 
  private:
-  int sum() {
-    int value = product();
-    while (pos_ < text_.size() && (text_[pos_] == '+' || text_[pos_] == '-')) {
-      const char op = text_[pos_++];
-      const int rhs = product();
-      value         = (op == '+') ? value + rhs : value - rhs;
+  std::optional<int> sum() {
+    auto value = product();
+    while (value && pos_ < text_.size() && (text_[pos_] == '+' || text_[pos_] == '-')) {
+      const char op  = text_[pos_++];
+      const auto rhs = product();
+      if (!rhs) return std::nullopt;
+      value = (op == '+') ? checkedArith::add(*value, *rhs) : checkedArith::sub(*value, *rhs);
     }
     return value;
   }
 
-  int product() {
-    int value = atom();
-    while (pos_ < text_.size() && text_[pos_] == '*') {
+  std::optional<int> product() {
+    auto value = atom();
+    while (value && pos_ < text_.size() && text_[pos_] == '*') {
       ++pos_;
-      value *= atom();
+      const auto rhs = atom();
+      if (!rhs) return std::nullopt;
+      value = checkedArith::mul(*value, *rhs);
     }
     return value;
   }
 
-  int atom() {
+  std::optional<int> atom() {
     if (pos_ >= text_.size()) FatalError("compiler::expandStreamGenerators: truncated generator index '{}'", text_);
     if (text_[pos_] == '(') {
       ++pos_;
-      const int value = sum();
+      const auto value = sum();
+      if (!value) return std::nullopt;
       if (pos_ >= text_.size() || text_[pos_] != ')')
         FatalError("compiler::expandStreamGenerators: unbalanced '(' in generator index '{}'", text_);
       ++pos_;
@@ -3017,9 +3021,11 @@ class genIndexFolder {
     }
     if (text_[pos_] < '0' || text_[pos_] > '9')
       FatalError("compiler::expandStreamGenerators: unexpected '{}' in generator index '{}'", text_[pos_], text_);
-    int value = 0;
-    while (pos_ < text_.size() && text_[pos_] >= '0' && text_[pos_] <= '9')
-      value = (value * kDecimalBase) + (text_[pos_++] - '0');
+    std::optional<int> value = 0;
+    while (value && pos_ < text_.size() && text_[pos_] >= '0' && text_[pos_] <= '9') {
+      const auto shifted = checkedArith::mul(*value, kDecimalBase);
+      value              = shifted ? checkedArith::add(*shifted, text_[pos_++] - '0') : std::nullopt;
+    }
     return value;
   }
 
@@ -3068,8 +3074,14 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
     if (t.getCommandID() != PUSH_STREAM || !dependsOnOrdinal(t.getStr_())) continue;
     const auto parts = splitIndexedRef(t.getStr_());
     if (!parts.has_value()) FatalError("compiler::substituteOrdinal: malformed indexed stream reference '{}'", t.getStr_());
-    const int index = genIndexFolder(parts->second, ordinal).fold();
-    t               = token(PUSH_STREAM, parts->first + "[" + std::to_string(index) + "]");
+    const auto index = genIndexFolder(parts->second, ordinal).fold();
+    if (!index) return "Stream '" + instance.id + "' references '" + t.getStr_() + "' - the index does not fit in int";
+    // Ujemny numer instancji nie zwinalby sie juz w expandStreamGenerators(): `-` na poczatku
+    // indeksu gramatyka wyklucza, wiec do 2026-09-27 `FROM cell[$-1]` konczylo proces FatalError-em.
+    if (*index < 0)
+      return "Stream '" + instance.id + "' references '" + parts->first + "[" + std::to_string(*index) +
+             "]' - stream generator index must not be negative";
+    t = token(PUSH_STREAM, parts->first + "[" + std::to_string(*index) + "]");
   }
 
   for (auto &f : instance.lSchema)
@@ -3081,11 +3093,12 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
       if (t.getCommandID() != PUSH_ID2 || !dependsOnOrdinal(t.getStr_())) continue;
       const auto parts = splitIndexedRef(t.getStr_());
       if (!parts.has_value()) FatalError("compiler::substituteOrdinal: malformed indexed field reference '{}'", t.getStr_());
-      const int index = genIndexFolder(parts->second, ordinal).fold();
-      if (index < 0)
-        return "Stream '" + instance.id + "' references '" + parts->first + "[" + std::to_string(index) +
+      const auto index = genIndexFolder(parts->second, ordinal).fold();
+      if (!index) return "Stream '" + instance.id + "' references '" + t.getStr_() + "' - the index does not fit in int";
+      if (*index < 0)
+        return "Stream '" + instance.id + "' references '" + parts->first + "[" + std::to_string(*index) +
                "]' - field index must not be negative";
-      t = token(PUSH_ID2, parts->first + "[" + std::to_string(index) + "]");
+      t = token(PUSH_ID2, parts->first + "[" + std::to_string(*index) + "]");
     }
   return {"OK"};
 }
@@ -3291,11 +3304,11 @@ std::string compiler::expandStreamGenerators() {
       const auto family = families.find(parts->first);
       if (family == families.end())
         return "Stream '" + q.id + "' references '" + t.getStr_() + "' but '" + parts->first + "' is not a stream generator";
-      const int index = genIndexFolder(parts->second, 0).fold();
-      if (index < 0 || index >= family->second)
+      const auto index = genIndexFolder(parts->second, 0).fold();
+      if (!index || *index < 0 || *index >= family->second)
         return "Stream '" + q.id + "' references '" + t.getStr_() + "' outside the range 0.." +
                std::to_string(family->second - 1);
-      t = token(PUSH_STREAM, instanceName(parts->first, index));
+      t = token(PUSH_STREAM, instanceName(parts->first, *index));
     }
 
   // Slad po `$` poza generatorem. Gramatyka na taki zapis pozwala, bo `$` jest zwyklym

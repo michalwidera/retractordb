@@ -20,9 +20,10 @@ set -e
 xretractor plan.rql -c
 
 # (0) Start z pliku planu: wartosc, ktorej plan nie moze przyjac, jest bledem parsowania jak
-# kazdy inny - kod 71 i powod w "Parse result:".
+# kazdy inny - kod 71 i powod w "Parse result:". Trzeci argument zmienia kanal powodu na
+# "Check result:", gdy odmowa zapada dopiero w kompilatorze.
 expect_file_rejected() {
-  local plan="$1" reason="$2" out rc
+  local plan="$1" reason="$2" channel="${3:-Parse result:}" out rc
   set +e
   out=$(xretractor "$plan" -c 2>&1)
   rc=$?
@@ -32,9 +33,9 @@ expect_file_rejected() {
     exit 1
   fi
   case "$out" in
-    *"Parse result:$reason"*) ;;
+    *"$channel$reason"*) ;;
     *)
-      echo "start z pliku $plan nie podal powodu w 'Parse result:'; dostal: $out"
+      echo "start z pliku $plan nie podal powodu w '$channel'; dostal: $out"
       exit 1
       ;;
   esac
@@ -53,6 +54,15 @@ printf '%s\n' "DECLARE a INTEGER STREAM core0, 1 FILE 'source.dat'" "SELECT * ST
 expect_file_rejected zero_step.rql "AGSE step 0 must be greater than zero"
 printf '%s\n' "DECLARE a INTEGER STREAM core0, 1 FILE 'source.dat'" "SELECT a[0] STREAM dst FROM core0 RETENTION 0 3" >zero_retention.rql
 expect_file_rejected zero_retention.rql "RETENTION capacity 0 must be greater than zero"
+# Do 2026-09-27 indeks pola szedl w kompilatorze przez atoi: `core0[4294967296]` przechodzil -c
+# i liczyl po cichu `core0[0]` (A2 M10). Ujemny numer instancji w FROM szablonu generatora
+# konczyl start FatalError-em (kod 1) - ta sama kompilacja biegnie w kanale `--reset`.
+printf '%s\n' "DECLARE a INTEGER STREAM core0, 1 FILE 'source.dat'" "SELECT core0[4294967296] STREAM dst FROM core0" >wrapped_index.rql
+expect_file_rejected wrapped_index.rql "numeric literal 4294967296 is out of range"
+printf '%s\n' "DECLARE a INTEGER[2] STREAM core0, 1 FILE 'source.dat'" "SELECT core0[\$] STREAM cell[2] FROM core0" \
+  "SELECT * STREAM w[2] FROM cell[\$-1]" >negative_family_index.rql
+expect_file_rejected negative_family_index.rql "Stream 'w\$0' references 'cell[-1]' - stream generator index must not be negative" \
+  "Check result:"
 
 server_start plan.rql
 
@@ -130,9 +140,12 @@ fi
 #   - zerowy krok AGSE (do 2026-09-27) - FatalError w kompilatorze; zerowe okno AGSE i zerowa
 #     pojemnosc RETENTION byly PRZYJMOWANE, a proces konczyl FatalError przy rejestracji
 #     albo dopiero przy pierwszym zapisie (#308, A2 C4 i M12).
+#   - indeks pola 2^32-1 (do 2026-09-27) - atoi w kompilatorze dawal indeks -1, ad-hoc odpowiadal
+#     "OK", a proces konczyl FatalError przy pierwszym rekordzie (A2 M10).
 # Parser biegnie w procesie DZIALAJACEGO serwera, wiec kazdy z nich byl bledem calej instancji.
+# Trzeci argument zmienia prefiks odmowy, gdy zapada ona dopiero w kompilatorze kopii planu.
 expect_parse_rejected() {
-  local query="$1" reason="$2" out rc
+  local query="$1" reason="$2" prefix="${3:-Fail parse}" out rc
   set +e
   out=$(xqry -a "$query" 2>&1)
   rc=$?
@@ -142,7 +155,7 @@ expect_parse_rejected() {
     exit 1
   fi
   case "$out" in
-    *"Fail parse"*"$reason"*) ;;
+    *"$prefix"*"$reason"*) ;;
     *)
       echo "nieoczekiwana odpowiedz na ad-hoc '$query': $out"
       exit 1
@@ -174,6 +187,12 @@ expect_parse_rejected "SELECT * STREAM zerostep FROM core0@(0,4)" "AGSE step 0 m
 expect_parse_rejected "SELECT * STREAM zerowindow FROM core0@(1,0)" "AGSE window 0 must be greater than zero"
 expect_parse_rejected "SELECT a[0] STREAM zeroretention FROM core0 RETENTION 0 3" \
   "RETENTION capacity 0 must be greater than zero"
+expect_parse_rejected "SELECT core0[4294967296] STREAM wrapindex FROM core0" "numeric literal 4294967296 is out of range"
+expect_parse_rejected "SELECT core0[4294967295] STREAM minusindex FROM core0" "numeric literal 4294967295 is out of range"
+# Indeks generatora nie ma literalu spoza zakresu - przepelnia go dopiero arytmetyka, wiec odmowa
+# zapada w kompilatorze. Do 2026-09-27 instancja 1 dostawala po cichu `core0[0]`.
+expect_parse_rejected "SELECT core0[\$*65536*65536] STREAM genwrap[2] FROM core0" \
+  "Stream 'genwrap\$1' references 'core0[\$*65536*65536]' - the index does not fit in int" "Fail local chain compiler"
 
 # `kill -0` zaraz po odpowiedzi nie widzi smierci odroczonej: pojemnosc 0 konczyla proces dopiero
 # przy pierwszym zapisie, ok. 2 s po "OK". Po odmowach plan serwera ma wiec jeszcze liczyc.

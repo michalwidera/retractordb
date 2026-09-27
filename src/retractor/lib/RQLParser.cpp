@@ -312,7 +312,15 @@ class ParserListener : public RQLBaseListener {
   void exitFieldID(RQLParser::FieldIDContext *ctx) override { recpToken(PUSH_ID3, ctx->getText()); }
   void exitFieldIDUnderline(RQLParser::FieldIDUnderlineContext *ctx) override { recpToken(PUSH_IDX, ctx->getText()); }
   void exitFieldIDColumnName(RQLParser::FieldIDColumnNameContext *ctx) override { recpToken(PUSH_ID1, ctx->getText()); }
-  void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) override { recpToken(PUSH_ID2, ctx->getText()); }
+
+  /// `strumien[k]` - indeks jest literalem DECIMAL, rownie nieograniczonym jak kazdy inny.
+  /// Do 2026-09-27 kompilator czytal go przez atoi: `core0[4294967296]` liczylo sie po cichu
+  /// jako `core0[0]`, a `core0[4294967295]` dawalo PUSH_ID z indeksem -1, ktory ad-hoc
+  /// przechodzil z "OK" i konczyl serwer przy pierwszym rekordzie (#306, A2 M10).
+  void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) override {
+    if (!parseLiteral<int>(ctx->column_index->getText())) reportOutOfRange(ctx->column_index->getText());
+    recpToken(PUSH_ID2, ctx->getText());
+  }
 
   /// `cells[$]`, `cells[23-$]` - indeks z numerem instancji generatora.
   ///

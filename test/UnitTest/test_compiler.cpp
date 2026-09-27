@@ -222,6 +222,10 @@ INSTANTIATE_TEST_SUITE_P(
         OutOfRangeLiteral{"retention_capacity", "SELECT src[0] STREAM big FROM src RETENTION " + kHugeInt, kHugeInt},
         OutOfRangeLiteral{"retention_segments", "SELECT src[0] STREAM big FROM src RETENTION 10 " + kHugeInt, kHugeInt},
         OutOfRangeLiteral{"generator_size", "SELECT src[0] STREAM cells[" + kHugeInt + "] FROM src", kHugeInt},
+        // Indeks pola kompilator czytal przez atoi: 2^32 dawalo po cichu `src[0]`, a 2^32-1 - indeks -1,
+        // ktory ad-hoc przechodzil z "OK" i konczyl serwer przy pierwszym rekordzie (A2 M10).
+        OutOfRangeLiteral{"field_index_wraps_to_zero", "SELECT src[4294967296] STREAM big FROM src", "4294967296"},
+        OutOfRangeLiteral{"field_index_wraps_to_minus_one", "SELECT src[4294967295] STREAM big FROM src", "4294967295"},
         OutOfRangeLiteral{"to_string_width", "SELECT to_string(src[0]:" + kHugeInt + ") STREAM big FROM src", kHugeInt},
         OutOfRangeLiteral{"dump_left", "RULE r ON dst WHEN dst[0] > 0 DO DUMP -" + kHugeInt + " TO 1", kHugeInt},
         OutOfRangeLiteral{"dump_right", "RULE r ON dst WHEN dst[0] > 0 DO DUMP -1 TO " + kHugeInt, kHugeInt},
@@ -2386,6 +2390,43 @@ TEST(xcompiler, rejects_generated_field_index_beyond_source) {
   EXPECT_NE(verdict, "OK");
   EXPECT_NE(verdict.find("'cells' has 4 element(s) in its FROM clause, so 'cells[4]' is out of range"), std::string::npos)
       << verdict;
+}
+
+/// Arytmetyka indeksu generatora liczona w golym int zawijala sie po cichu (A2 M10): `$+4294967296`
+/// i `65536*65536+$` dawaly `cells[$]`, a `2147483647+$` w instancji 1 - indeks ujemny.
+TEST(xcompiler, rejects_generated_field_index_that_does_not_fit_in_int) {
+  for (const auto &[index, instance] :
+       {std::pair{"$+4294967296", "cell$0"}, std::pair{"2147483647+$", "cell$1"}, std::pair{"65536*65536+$", "cell$0"}}) {
+    const std::string verdict = compileRql(R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[)" + std::string(index) +
+                                           R"(] STREAM cell[2] FROM cells
+      )");
+    EXPECT_EQ(verdict, std::format("Stream '{}' references 'cells[{}]' - the index does not fit in int", instance, index));
+  }
+}
+
+const std::string kCellFamily = R"(
+        DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
+        SELECT cells[$] STREAM cell[4] FROM cells
+      )";
+
+/// Indeks rodziny w FROM: przepelnienie wskazywalo po cichu inna instancje - `cell[4294967297]`
+/// dawalo `cell$1` (A2 M10).
+TEST(xcompiler, rejects_family_index_that_does_not_fit_in_int) {
+  EXPECT_EQ(compileRql(kCellFamily + "SELECT * STREAM w FROM cell[4294967297]\n"),
+            "Stream 'w' references 'cell[4294967297]' outside the range 0..3");
+  EXPECT_EQ(compileRql(kCellFamily + "SELECT * STREAM w FROM cell[65536*65536+2]\n"),
+            "Stream 'w' references 'cell[65536*65536+2]' outside the range 0..3");
+  EXPECT_EQ(compileRql(kCellFamily + "SELECT * STREAM w[2] FROM cell[$*65536*65536]\n"),
+            "Stream 'w$1' references 'cell[$*65536*65536]' - the index does not fit in int");
+}
+
+/// Ujemny numer instancji w FROM szablonu. Osobny test, bo przed poprawka konczyl FatalError-em
+/// caly proces - tu binarke testow, w kanale `--reset` serwer.
+TEST(xcompiler, rejects_negative_family_index_in_generator_template) {
+  EXPECT_EQ(compileRql(kCellFamily + "SELECT * STREAM w[2] FROM cell[$-1]\n"),
+            "Stream 'w$0' references 'cell[-1]' - stream generator index must not be negative");
 }
 
 /// Szerokosc zrodla powstaje dopiero w rozwinieciu: `[_]` daje dwa pola z jednej pozycji listy,
