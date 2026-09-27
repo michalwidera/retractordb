@@ -208,13 +208,14 @@ RULE cmp ON ra WHEN ra[0] > ra[0]*ra[0]+1000 OR ra[0]*ra[0] < ra[0]-ra[0] OR ra[
     # Typy mieszane - droga promocji w obu kierunkach (nizszy indeks z lewej i z prawej).
     mixed = [f"{rng.randint(-1000, 1000)} {rng.uniform(-100, 100):.4f} {rng.uniform(-100, 100):.3f} "
              f"{rng.randint(1, 200)} {rng.randint(1, 100000)}" for _ in range(ROWS)]
-    write("own_mixed.rql", """# Typy mieszane: promocja nizszego indeksu wariantu, w obu kierunkach. `m[4]*m[0]` promuje
-# INTEGER do UINT - ujemny INTEGER nie ma tam reprezentacji i daje NULL.
+    write("own_mixed.rql", """# Typy mieszane: promocja nizszego indeksu wariantu, w obu kierunkach. Para INTEGER/UINT liczy sie
+# dokladnie i dopiero wynik trafia do UINT: `m[4]*m[0]` dla ujemnego m[0] daje NULL, `m[4]+m[0]` wartosc,
+# gdy suma sie miesci.
 STORAGE 'temp'
 
 DECLARE i INTEGER, d DOUBLE, f FLOAT, y BYTE, u UINT STREAM m, 1 FILE 'own_mixed.txt'
 
-SELECT m[0]+m[1], m[1]+m[0], m[0]*m[2], m[2]*m[0], m[1]-m[2], m[2]-m[1], m[3]+m[0], m[0]+m[3], m[4]*m[0], m[0]*m[4], m[0]/m[1], m[1]/m[4], (m[0]+m[1])*(m[2]-m[3]), m[0]*2.5, 0.5*m[0], m[3]^2, m[0]^0.5 STREAM mix FROM m
+SELECT m[0]+m[1], m[1]+m[0], m[0]*m[2], m[2]*m[0], m[1]-m[2], m[2]-m[1], m[3]+m[0], m[0]+m[3], m[4]*m[0], m[0]*m[4], m[0]/m[1], m[1]/m[4], (m[0]+m[1])*(m[2]-m[3]), m[0]*2.5, 0.5*m[0], m[3]^2, m[0]^0.5, m[4]+m[0] STREAM mix FROM m
 
 SELECT m[0], m[1], m[2], m[3], m[4] STREAM cpy FROM m
 

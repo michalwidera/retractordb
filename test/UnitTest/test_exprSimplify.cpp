@@ -228,8 +228,8 @@ TEST(exprSimplify, keeps_expression_of_unknown_type_untouched) {
 }
 
 TEST(exprSimplify, keeps_uint_tail_whose_folded_constant_is_negative) {
-  // Zwinięta stała -2 nie ma reprezentacji w UINT: `u+(-2)` daje NULL dla każdego u, a forma
-  // krokowa u-2. Do poprawki `u+3-5` dawało NULL przy ON i wartość przy ablacji.
+  // Zwinięta stała -2 nie ma reprezentacji w UINT. Do 7471948b `u+3-5` zwijało się do `u+(-2)`,
+  // które do 2026-09-27 dawało NULL dla każdego u - przy ON NULL, przy ablacji u-2.
   const std::list<std::list<token>> originals{
       {pushId(0), token(PUSH_VAL, 3), token(ADD), token(PUSH_VAL, 5), token(SUBTRACT)},  // u+3-5
       {token(PUSH_VAL, 3), pushId(0), token(ADD), token(PUSH_VAL, 5), token(SUBTRACT)},  // 3+u-5
