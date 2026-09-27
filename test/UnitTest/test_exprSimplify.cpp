@@ -50,6 +50,24 @@ void expectSameResult(const std::list<token> &original, const std::list<token> &
       << dump(original) << " != " << dump(simplified) << " dla x=" << fieldValue;
 }
 
+/// Schemat z jednym polem UINT pod indeksem 0 - payload expectSameUintResult ma to samo pole.
+std::optional<rdb::descFld> uintFieldType(const std::string &, int index) {
+  if (index == 0) return rdb::UINT;
+  return std::nullopt;
+}
+
+/// expectSameResult nad polem UINT: jedyny typ dokładny wyżej niż literał INTEGER, w którym
+/// ujemna stała nie ma reprezentacji.
+void expectSameUintResult(const std::list<token> &original, const std::list<token> &simplified, unsigned fieldValue) {
+  auto descriptor = rdb::Descriptor("u", static_cast<int>(sizeof(unsigned)), 1, rdb::UINT);
+  rdb::payload data(descriptor);
+  data.setItem(0, fieldValue);
+
+  expressionEvaluator evaluator;
+  EXPECT_TRUE(evaluator.eval(original, &data) == evaluator.eval(simplified, &data))
+      << dump(original) << " != " << dump(simplified) << " dla u=" << fieldValue;
+}
+
 }  // namespace
 
 //
@@ -207,6 +225,36 @@ TEST(exprSimplify, keeps_expression_of_unknown_type_untouched) {
 
   EXPECT_EQ(simplifyExpression(program, testFieldType), 0u);
   EXPECT_EQ(dump(program), dump(original));
+}
+
+TEST(exprSimplify, keeps_uint_tail_whose_folded_constant_is_negative) {
+  // Zwinięta stała -2 nie ma reprezentacji w UINT: `u+(-2)` daje NULL dla każdego u, a forma
+  // krokowa u-2. Do poprawki `u+3-5` dawało NULL przy ON i wartość przy ablacji.
+  const std::list<std::list<token>> originals{
+      {pushId(0), token(PUSH_VAL, 3), token(ADD), token(PUSH_VAL, 5), token(SUBTRACT)},  // u+3-5
+      {token(PUSH_VAL, 3), pushId(0), token(ADD), token(PUSH_VAL, 5), token(SUBTRACT)},  // 3+u-5
+      {pushId(0), token(PUSH_VAL, 3), token(SUBTRACT), token(PUSH_VAL, 5), token(ADD)},  // (u-3)+5
+      {pushId(0), token(PUSH_VAL, 3), token(ADD), token(PUSH_VAL, 5), token(SUBTRACT),   //
+       token(PUSH_VAL, 7), token(ADD)}};                                                 // (u+3-5)+7
+  for (const auto &original : originals) {
+    std::list<token> program = original;
+
+    EXPECT_EQ(simplifyExpression(program, uintFieldType), 0u) << dump(original);
+    EXPECT_EQ(dump(program), dump(original));
+  }
+}
+
+TEST(exprSimplify, reassociates_uint_tail_whose_folded_constant_is_nonnegative) {
+  // u + 5 - 3 == u + 2 - strażnik odmawia tylko stałej bez reprezentacji w typie operacji.
+  const std::list<token> original{pushId(0), token(PUSH_VAL, 5), token(ADD), token(PUSH_VAL, 3), token(SUBTRACT)};
+  std::list<token> program = original;
+
+  EXPECT_EQ(simplifyExpression(program, uintFieldType), 1u);
+  ASSERT_EQ(program.size(), 3u);
+  EXPECT_EQ(std::get<int>(std::next(program.begin())->getVT()), 2);
+  EXPECT_EQ(program.back().getCommandID(), ADD);
+  for (const unsigned u : {0U, 1U, 2U, 10U})
+    expectSameUintResult(original, program, u);
 }
 
 //

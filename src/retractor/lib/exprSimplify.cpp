@@ -11,7 +11,8 @@
 #include <boost/rational.hpp>
 
 #include "expressionEvaluator.hpp"
-#include "expressionShape.hpp"  // functionResultType, isExactType, normalizedOperandType
+#include "expressionShape.hpp"   // functionResultType, isExactType, normalizedOperandType
+#include "rdb/convertTypes.hpp"  // cast - ta sama promocja co w normalize()
 
 namespace {
 
@@ -150,10 +151,17 @@ std::optional<command_id> foldOperator(command_id tailOp, command_id op, bool co
 /// Przepisanie może więc usunąć przepełnienie pośrednie: `(E+1)-1` dla E = INT_MAX bez reguły
 /// daje NULL, bo przepełnia się `E+1`, a po przepisaniu na `E+0` daje dokładnie INT_MAX.
 /// Odwrotnie być nie może: stała zwija się tylko wtedy, gdy `c1 ? c2` się mieści (foldConstants
-/// oddaje nullopt dla NULL), a jedynym wynikiem pośrednim formy przepisanej jest wynik końcowy,
-/// który forma krokowa i tak musiała osiągnąć. Przy RDB_OPT_SIMPLIFY_EXPRESSIONS=ON wynik jest
-/// zatem co najwyżej BARDZIEJ określony: NULL (OFF) wobec dokładnej wartości (ON), nigdy inna
-/// liczba. Decyzja z 2026-09-14: przyjęte i opisane, reguła bez zmian.
+/// oddaje nullopt dla NULL), i tylko wtedy, gdy ma reprezentację w typie operacji, do którego
+/// normalize() ją promuje (strażnik niżej). Poza tymi dwoma krokami jedynym wynikiem pośrednim
+/// formy przepisanej jest wynik końcowy, który forma krokowa i tak musiała osiągnąć. Przy
+/// RDB_OPT_SIMPLIFY_EXPRESSIONS=ON wynik jest zatem co najwyżej BARDZIEJ określony: NULL (OFF)
+/// wobec dokładnej wartości (ON), nigdy inna liczba. Decyzja z 2026-09-14: przyjęte i opisane,
+/// reguła bez zmian. Z tej samej przyczyny `u*-2*-3` nad UINT daje przy OFF NULL (-2 nie ma
+/// reprezentacji w UINT), a przy ON `u*6`.
+///
+/// Rozumowanie zakłada stałe INTEGER albo RATIONAL - innych RQL nie wytwarza (literał, funkcja
+/// nad literałem, iloraz). Stała UINT przesuwałaby promocję E w formie przepisanej przed pierwszą
+/// operację i wymagałaby osobnego strażnika.
 std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant, command_id op) {
   if (!left.tail.has_value()) return std::nullopt;
   const auto &tail = *left.tail;
@@ -176,6 +184,15 @@ std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant
   auto value = foldConstants(foldProgram);
   if (!value.has_value()) return std::nullopt;
 
+  // Forma przepisana ma krok, którego forma krokowa nie ma: promocję zwiniętej stałej do typu
+  // operacji. Tam c1 i c2 promowane są osobno, tu ich wynik. Ujemna INTEGER nie ma reprezentacji
+  // w UINT (castFldVT daje NULL od da67e5a3), więc `(u+3)-5` przepisane na `u+(-2)` dawało NULL
+  // dla każdego u, a forma krokowa u-2. Promocję liczy ta sama funkcja co w normalize().
+  const auto operationType = arithmeticResultType(tail.baseType, typeOfConstant(*value));
+  if (typeOfConstant(*value) != *operationType &&
+      std::holds_alternative<std::monostate>(cast<rdb::descFldVT>{}(*value, *operationType)))
+    return std::nullopt;
+
   node result;
   if (tail.constantOnLeft) {
     result.program.emplace_back(PUSH_VAL, *value);
@@ -185,7 +202,7 @@ std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant
     result.program.emplace_back(PUSH_VAL, *value);
   }
   result.program.emplace_back(tail.op);
-  result.type = arithmeticResultType(tail.baseType, typeOfConstant(*value));
+  result.type = operationType;
   // Wynik znów ma kształt ogona, więc łańcuch `E+1+1+1` zwija się w jednym przebiegu.
   result.tail = constantTail{
       .op = tail.op, .constant = *value, .constantOnLeft = tail.constantOnLeft, .base = tail.base, .baseType = tail.baseType};
