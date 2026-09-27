@@ -57,7 +57,11 @@ class xschema : public ::testing::Test {
         "file_A",       //
         "file_A.desc",  //
         "file_B",       //
-        "file_B.desc"   //
+        "file_B.desc",  //
+        "agse1",        //
+        "agse1.desc",   //
+        "agse1.meta",   //
+        "agse1.shadow"  //
     };
 
     for (auto i : cleanFilesSet)
@@ -436,6 +440,64 @@ TEST_F(xschema, addQueriesToModel_is_all_or_nothing) {
   EXPECT_EQ(dataArea->addQueriesToModel({"str2_extra", "no_such_stream"}), "no_such_stream");
   EXPECT_FALSE(dataArea->qSet.contains("str2_extra"));
   EXPECT_EQ(dataArea->qSet.size(), sizeBefore);
+}
+
+// ============================================================
+// Pozycja splaszczona okna AGSE poza zakresem int
+// ============================================================
+//
+// Rekord okna o indeksie logicznym n siega do pozycji splaszczonej n*step, a ta rosnie jak liczba
+// rekordow zrodla razy F (szerokosc zrodla w elementach plaskich). W int pekala po ok. 2^31/F
+// rekordach zrodla, niezaleznie od kroku - przy F = 65536 (legalne po M11) juz po 32768.
+// Tu F = 2 i krok 2, wiec te sama granice przekracza indeks n = 2^30+10: n*step = 2^31+20.
+// Sam indeks logiczny miesci sie w int - przepelnic mogl sie wylacznie iloczyn.
+//
+// Zawartosc okna zalezy tylko od odleglosci n od bazy zrodla, wiec okno daleko na osi ma byc
+// identyczne z ta sama geometria blisko poczatku:
+// pozycje 2n-3 .. 2n -> rekordy n-2, n-1, n-1, n -> pola 12, 13, 14, 15.
+
+TEST_F(xschema, agse_window_flat_position_beyond_int) {
+  constexpr int n = (1 << 30) + 10;
+
+  streamInstance data{coreInstance, coreInstance["str1"]};
+  data.outputPayload->setDisposable(false);
+
+  const auto nearWindow = data.constructAgsePayload(4, 2, "str1", 2, 0);
+  const auto farWindow  = data.constructAgsePayload(4, 2, "str1", n, n - 2);
+
+  std::stringstream nearText;
+  nearText << rdb::singleLineFormat << nearWindow;
+  std::stringstream farText;
+  farText << rdb::singleLineFormat << farWindow;
+
+  EXPECT_EQ(nearText.str(), "{ str1_0:15 str1_1:14 str1_2:13 str1_3:12 }");
+  EXPECT_EQ(farText.str(), nearText.str());
+}
+
+// Druga strona tego samego rachunku: queryInputsAvailable decyduje, czy wezel dolaczany ad hoc
+// ma juz komplet rekordow zrodla. Przy zawinietej pozycji odpowiadal "nie" na zawsze - okno
+// nigdy nie dostawalo bazy, wiec milczalo bez bledu.
+TEST_F(xschema, agse_adhoc_join_flat_position_beyond_int) {
+  constexpr int n = (1 << 30) + 10;
+
+  const auto [status, keyword, name] = parserRQLString(coreInstance, "SELECT agse1[0] STREAM agse1 FROM str1@(2,4)");
+  ASSERT_EQ(status, "OK");
+  // Fikstura nie uruchamia kompilatora, wiec interwal ustawiamy recznie. Przy interwale 1 pierwszy
+  // nalezny slot n+1 daje indeks n (T = (n + 1 + W) * Delta, W = 0).
+  coreInstance["agse1"].rInterval = 1;
+  ASSERT_EQ(dataArea->addQueriesToModel({"agse1"}), "");
+
+  // Rekord fizyczny 0 zrodla nosi indeks logiczny n-2, wiec okno n ma komplet rekordow n-2..n.
+  dataArea->qSet["str1"]->logicalIndexBase = n - 2;
+
+  dataArea->processRows(dueMaskFor("agse1"), boost::rational<int>(n + 1));
+
+  // Baze dostaje tylko wezel, dla ktorego queryInputsAvailable odpowiedzialo "tak".
+  EXPECT_EQ(dataArea->qSet["agse1"]->logicalIndexBase, std::optional<int>(n));
+
+  std::stringstream window;
+  window << rdb::singleLineFormat << *dataArea->qSet["agse1"]->inputPayload;
+  EXPECT_EQ(window.str(), "{ agse1_0:15 agse1_1:14 agse1_2:13 agse1_3:12 }");
 }
 
 TEST_F(xschema, reduceFieldsToPayload_max) {

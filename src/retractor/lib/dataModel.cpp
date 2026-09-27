@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <iterator>
@@ -237,9 +238,12 @@ bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
       const auto [step, length] = std::get<std::pair<int, int>>(operation.getVT());
       const int sourceWidth     = coreInstance_.getQuery(source).descriptorStorage().flatElementCount();
       const int lengthAbs       = length < 0 ? -length : length;
-      const int firstRecord     = floorDiv((logicalIndex * step) - (lengthAbs - 1), sourceWidth);
-      const int lastRecord      = floorDiv(logicalIndex * step, sourceWidth);
-      available                 = forwardRecordAvailable(source, firstRecord) && forwardRecordAvailable(source, lastRecord);
+      // Pozycja splaszczona w int64 - patrz floorDiv. Iloraz jest indeksem rekordu zrodla, a ten
+      // zyje na osi logicznej int, wiec wraca do int bez straty.
+      const std::int64_t newestPosition = static_cast<std::int64_t>(logicalIndex) * step;
+      const int firstRecord             = static_cast<int>(floorDiv(newestPosition - (lengthAbs - 1), sourceWidth));
+      const int lastRecord              = static_cast<int>(floorDiv(newestPosition, sourceWidth));
+      available = forwardRecordAvailable(source, firstRecord) && forwardRecordAvailable(source, lastRecord);
     } break;
     case STREAM_HASH: {
       int forwardIndex   = 0;

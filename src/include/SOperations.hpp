@@ -17,8 +17,10 @@ constexpr int floorR(boost::rational<int> const &num) { return static_cast<int>(
 // Dzielenie całkowite z zaokrągleniem W DÓŁ. Wbudowane `/` zaokrągla w stronę zera, co dla
 // ujemnych liczników daje inny rekord niż model zdarzeniowy - a ujemne pozycje spłaszczone
 // pojawiają się naturalnie w oknie stemplowanym końcem przedziału (n*step-(|L|-1)).
-constexpr int floorDiv(const int numerator, const int denominator) {
-  const int quotient = numerator / denominator;
+// Argumenty w int64: pozycja n*step rośnie jak liczba rekordów źródła razy jego szerokość
+// i w int pękała po ok. 2^31/F rekordach źródła.
+constexpr std::int64_t floorDiv(const std::int64_t numerator, const std::int64_t denominator) {
+  const std::int64_t quotient = numerator / denominator;
   return (numerator % denominator != 0 && ((numerator < 0) != (denominator < 0))) ? quotient - 1 : quotient;
 }
 
