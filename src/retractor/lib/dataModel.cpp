@@ -621,8 +621,11 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       //
       // Descriptor::operator== to warunek "lewy miesci prawy": slot nie wezszy i typ nie nizszy. Typ
       // slotu wejscia jest wyzszym z dwoch, a przy rownym typie slot jest dluzszy z dwoch - wiec
-      // skladnik, ktory miesci slot wejscia, ma dokladnie jego uklad.
-      if (component.descriptor == runtime.inputPayload->descriptor) {
+      // skladnik, ktory miesci slot wejscia, ma dokladnie jego uklad. Wynik zalezy tylko od strony
+      // przeplotu, wiec liczymy go raz, w pierwszym takcie tej strony (streamInstance::hashSideMatchesInput).
+      auto &sameLayout = runtime.hashSideMatchesInput[takeSecond ? 1 : 0];
+      if (!sameLayout.has_value()) sameLayout = component.descriptor == runtime.inputPayload->descriptor;
+      if (*sameLayout) {
         *runtime.inputPayload = std::move(component);
       } else {
         const int slots = runtime.inputPayload->descriptor.flatElementCount();
