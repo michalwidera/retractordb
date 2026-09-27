@@ -185,21 +185,21 @@ void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, D
     const auto maxRtype  = std::max(lhsField.rtype, rhsField.rtype);
     const auto name      = fieldNamePrefix + "_" + std::to_string(i);
     // Slot przeplotu to dluzszy z dwoch elementow tej pozycji plaskiej, liczony jak slot plaski:
-    // napis ma cala dlugosc rlen * rarray. `STRING[N]` z DECLARE niesie ja w rarray, wpis z okna
-    // AGSE - w rlen. Do 2026-09-27 stalo tu samo rlen, wiec slot zadeklarowanego napisu mial 1 B,
-    // a pierwsze przypisanie rekordu zrodla konczylo proces bledem "schema mismatch". Wpis idzie
-    // w zapisie deskryptora dla napisu: `rlen = 1`, `rarray = N`.
+    // napis ma cala dlugosc rlen * rarray (flatSlotSize), a `STRING[N]` niesie ja w rarray. Do
+    // 2026-09-27 stalo tu samo rlen, wiec slot zadeklarowanego napisu mial 1 B, a pierwsze
+    // przypisanie rekordu zrodla konczylo proces bledem "schema mismatch".
     //
     // Pozycja liczbowa bierze dlugosc pola, ktorego typ wygrywa. Wsrod typow BYTE..DOUBLE jest to
     // zarazem dluzsze pole z jednym wyjatkiem: FLOAT (4 B) nad RATIONAL (8 B) - slot FLOAT o 8 B
     // kazalby payload::setItemVT kopiowac 8 B z czterobajtowej zmiennej.
-    if (maxRtype == rdb::STRING) {
-      push_back(rField(name, 1, std::max(flatSlotSize(lhsField), flatSlotSize(rhsField)), rdb::STRING));
-    } else {
-      const int len = (lhsField.rtype == rhsField.rtype) ? std::max(lhsField.rlen, rhsField.rlen)
-                                                         : (lhsField.rtype > rhsField.rtype ? lhsField : rhsField).rlen;
-      push_back(rField(name, len, 1, maxRtype));
-    }
+    int bytes = 0;
+    if (maxRtype == rdb::STRING)
+      bytes = std::max(flatSlotSize(lhsField), flatSlotSize(rhsField));
+    else if (lhsField.rtype == rhsField.rtype)
+      bytes = std::max(lhsField.rlen, rhsField.rlen);
+    else
+      bytes = (lhsField.rtype > rhsField.rtype ? lhsField : rhsField).rlen;
+    push_back(flatSlotField(name, maxRtype, bytes));
   }
 
   fieldMappingsDirty_ = true;

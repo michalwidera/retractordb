@@ -97,11 +97,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
     rdb::Descriptor descriptor;
     auto [maxType, maxLen] = source->descriptor.widestFieldType();
     for (auto i = 0; i < lengthAbs; ++i) {
-      rdb::rField x(instance + "_" + std::to_string(i),  //
-                    maxLen,                              //
-                    1,                                   //
-                    maxType);
-      descriptor += rdb::Descriptor{x};
+      descriptor += rdb::Descriptor{rdb::flatSlotField(instance + "_" + std::to_string(i), maxType, maxLen)};
     }
     cacheIt = agseDescriptorCache_.emplace(lengthAbs, std::move(descriptor)).first;
   }

@@ -2565,6 +2565,38 @@ TEST(xcompiler, hash_output_schema_takes_the_longer_side) {
   }
 }
 
+// Napis ma w calym planie JEDEN zapis: `rlen = 1`, `rarray = N`, ten sam co DECLARE i `.desc`. Do
+// 2026-09-27 okno AGSE (rekord wejsciowy i schemat wyjscia) zapisywalo go odwrotnie, `rlen = N`, a
+// porownania ksztaltu w optymalizatorze, ktore biora rlen i rarray osobno, braly wtedy ten sam napis
+// za dwa rozne pola.
+TEST(xcompiler, string_fields_use_one_notation_across_the_plan) {
+  auto plan   = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE s STRING[8], k INTEGER STREAM txt, 1 FILE 't.txt'
+        DECLARE s STRING[16], k INTEGER STREAM wide, 1 FILE 'w.txt'
+        SELECT * STREAM win FROM txt@(1,3)
+        SELECT win[_] STREAM idx FROM win
+        SELECT * STREAM h FROM txt#wide
+        SELECT * STREAM total FROM txt+wide
+      )");
+  int strings = 0;
+  for (auto &q : plan) {
+    if (q.isCompilerDirective()) continue;
+    for (const auto &f : q.lSchema) {
+      if (f.field_.rtype != rdb::STRING) continue;
+      ++strings;
+      EXPECT_EQ(f.field_.rlen, 1) << q.id << " " << f.field_.rname;
+    }
+    if (q.isDeclaration()) continue;
+    for (const auto &f : q.descriptorFrom(plan)) {
+      if (f.rtype != rdb::STRING) continue;
+      ++strings;
+      EXPECT_EQ(f.rlen, 1) << q.id << " input " << f.rname;
+    }
+  }
+  EXPECT_GT(strings, 0);  // kontrola, ktora niczego nie objela, nie jest kontrola
+}
+
 // Pole pochodne dluzsze niz 65536 odpada, choc rekord miesci sie w 1 MiB: serwer zapisuje je do
 // .desc (`STRING wide_0[80000]`) i czyta przy nastepnym starcie, a gramatyka DESC ma te sama granice
 // co RQL. Bez tej kontroli plan przechodzilby pierwszy start i konczyl drugi FatalError-em.

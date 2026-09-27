@@ -762,7 +762,7 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
     auto [maxType, maxLen]  = coreInstance[sName1].descriptorStorage().widestFieldType();
     std::list<field> schema;
     for (int i = 0; i < abs(windowSize); i++) {
-      field intf(rdb::rField(sName1 + "_" + lexical_cast<std::string>(i), maxLen, 1, maxType),
+      field intf(rdb::flatSlotField(sName1 + "_" + lexical_cast<std::string>(i), maxType, maxLen),
                  token(PUSH_ID, std::make_pair(sName1, 0)));
       schema.push_back(intf);
     }
@@ -1136,10 +1136,13 @@ std::string compiler::expandIndexWildcards(query &q) {
         else
           lTempProgram.emplace_back(t.getCommandID(), t.getVT());
       }
-      expanded.emplace_back(rdb::rField("",               // nazwa po przenumerowaniu, nizej
-                                        f.field_.rlen,    //
-                                        1,                // (expanded)
-                                        f.field_.rtype),  //
+      // Krotnosc spada do jednego - ta sama regula co we flattenArrayFields(). `STRING[N]` jest
+      // jednym slotem i zachowuje `rarray = N`; do 2026-09-27 dostawal tu 1, czyli napis 1 B, a
+      // pelna dlugosc przywracal dopiero inferFieldShapes().
+      expanded.emplace_back(rdb::rField("",                                                    // nazwa po przenumerowaniu, nizej
+                                        f.field_.rlen,                                         //
+                                        (flatSlotCount(f.field_) == 1) ? f.field_.rarray : 1,  // (expanded)
+                                        f.field_.rtype),                                       //
                             lTempProgram);
     }
   }

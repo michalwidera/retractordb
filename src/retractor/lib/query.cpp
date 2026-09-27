@@ -180,7 +180,7 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
       }
       auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().widestFieldType();
       for (int i = 0; i < abs(length); i++) {
-        retVal += rdb::Descriptor(id + "_" + std::to_string(i), maxLen, 1, maxType);
+        retVal += rdb::Descriptor{rdb::flatSlotField(id + "_" + std::to_string(i), maxType, maxLen)};
       }
     } break;
     default:
