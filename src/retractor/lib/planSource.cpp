@@ -21,6 +21,11 @@ void dropArtifactFile(const std::filesystem::path &artifact_filename) {
   }
 }
 
+/// Typ magazynu rozstrzygamy DOKLADNIE tak, jak zrobi to wykonanie: `VOLATILE` wpisuje `TYPE` do
+/// deskryptora (query::descriptorStorage), a ten w rdb::storage::attachStorage wygrywa z polityka
+/// z klauzuli `STORAGE`.
+bool isMemoryStream(const query &q) { return ((q.policy.second != 0) ? q.policy.first : q.storage_policy) == "MEMORY"; }
+
 }  // namespace
 
 PlanSource parsePlanText(qTree &plan, const std::string &text) {
@@ -41,7 +46,11 @@ PlanSource parsePlanText(qTree &plan, const std::string &text) {
 }
 
 void dropStalePlanArtifacts(qTree &plan, const compiler &cm, const std::vector<std::pair<std::string, std::string>> &lines) {
-  if (std::ranges::any_of(plan, [](const auto &it) { return it.id == ":ROTATION"; })) return;
+  // :ROTATION zachowuje historie strumieni plikowych, wiec ich artefakty zostaja. Strumien MEMORY danych
+  // na dysku nie ma, a jego .desc i .meta to konfiguracja POPRZEDNIEGO przebiegu: magazyn bierze TYPE
+  // i RETMEMORY z wczytanego .desc, nie z planu. Do 2026-09-27 rotacja nie kasowala niczego, wiec .desc
+  // zapisany przed 108a5e94 (bez RETMEMORY) przywracal pierscien bez granicy.
+  const bool rotation = std::ranges::any_of(plan, [](const auto &it) { return it.id == ":ROTATION"; });
 
   std::string storage_location;
   for (const auto &it : plan)
@@ -64,7 +73,8 @@ void dropStalePlanArtifacts(qTree &plan, const compiler &cm, const std::vector<s
     for (const auto &defined_id : definedStreams) {
       if (plan[defined_id].isDeclaration()) continue;
       if (plan[defined_id].isCompilerDirective()) continue;
-      dropArtifactFile(std::filesystem::path(storage_location) / defined_id);
+      if (rotation && !isMemoryStream(plan[defined_id])) continue;
+      if (!rotation) dropArtifactFile(std::filesystem::path(storage_location) / defined_id);
       dropArtifactFile(std::filesystem::path(storage_location) / (defined_id + ".desc"));
       dropArtifactFile(std::filesystem::path(storage_location) / (defined_id + ".meta"));
     }
@@ -102,11 +112,7 @@ std::vector<std::string> planStorePaths(const qTree &plan, const std::string_vie
     if (q.isCompilerDirective()) continue;
     if (q.isDeclaration()) continue;
 
-    // Typ magazynu rozstrzygamy DOKLADNIE tak, jak zrobi to wykonanie: `VOLATILE` wpisuje
-    // `TYPE` do deskryptora (query::descriptorStorage), a ten w rdb::storage::attachStorage
-    // wygrywa z polityka z klauzuli `STORAGE`.
-    const std::string storageType = (q.policy.second != 0) ? q.policy.first : q.storage_policy;
-    if (storageType == "MEMORY") continue;
+    if (isMemoryStream(q)) continue;
 
     // Ta sama regula, co w streamInstance: `FILE` zastepuje nazwe zapytania nazwa pliku.
     const std::string storageName = q.filename.empty() ? q.id : q.filename;

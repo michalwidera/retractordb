@@ -1,3 +1,5 @@
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -154,4 +156,39 @@ TEST(PlanSource, aliased_streams_claim_one_store_once) {
   ASSERT_EQ(loaded.status, "OK");
 
   EXPECT_EQ(planStorePaths(plan, {}), (std::vector<std::string>{absolutePathOf("shared")}));
+}
+
+/// :ROTATION zachowuje historie strumieni plikowych, wiec ich artefakty zostaja. Strumien MEMORY
+/// danych na dysku nie ma, a jego .desc i .meta to konfiguracja POPRZEDNIEGO przebiegu: magazyn bierze
+/// TYPE i RETMEMORY z wczytanego .desc, nie z planu, wiec .desc sprzed 108a5e94 przywracal przy
+/// rotacji pierscien bez granicy. Obie drogi do MEMORY (VOLATILE i STORAGE memory) musza dac to samo.
+TEST(PlanSource, rotation_drops_only_the_configuration_of_memory_streams) {
+  namespace fs       = std::filesystem;
+  const fs::path dir = "rotation_store";
+  fs::remove_all(dir);
+  fs::create_directory(dir);
+
+  qTree plan;
+  const PlanSource loaded = parsePlanText(plan,
+                                          "ROTATION 'rotation_counter.txt'\n"
+                                          "STORAGE 'rotation_store'\n"
+                                          "DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'\n"
+                                          "SELECT a+1 STREAM vol FROM src VOLATILE\n"
+                                          "SELECT a+2 STREAM mem FROM src STORAGE memory\n"
+                                          "SELECT a+3 STREAM disk FROM src\n");
+  ASSERT_EQ(loaded.status, "OK");
+  compiler cm(plan);
+  ASSERT_EQ(cm.compile(), "OK");
+
+  for (const std::string file : {"vol.desc", "vol.meta", "mem.desc", "mem.meta", "disk", "disk.desc", "disk.meta"})
+    std::ofstream(dir / file) << "stale";
+
+  dropStalePlanArtifacts(plan, cm, loaded.lines);
+
+  for (const std::string file : {"vol.desc", "vol.meta", "mem.desc", "mem.meta"})
+    EXPECT_FALSE(fs::exists(dir / file)) << file;
+  for (const std::string file : {"disk", "disk.desc", "disk.meta"})
+    EXPECT_TRUE(fs::exists(dir / file)) << file;
+
+  fs::remove_all(dir);
 }

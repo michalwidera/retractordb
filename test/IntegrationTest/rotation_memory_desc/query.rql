@@ -1,0 +1,10 @@
+# `m` zyje w pamieci procesu (STORAGE MEMORY), `f` jest zwyklym strumieniem plikowym. Plan niesie
+# :ROTATION, wiec artefakty poprzedniego przebiegu nie sa kasowane w calosci.
+
+ROTATION 'rotation_counter.txt'
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM src, 0.05 FILE 'data.txt'
+
+SELECT a STREAM m FROM src STORAGE MEMORY
+SELECT m[0] STREAM f FROM m
