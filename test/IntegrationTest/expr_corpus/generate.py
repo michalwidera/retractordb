@@ -8,8 +8,9 @@ i rozbudowac: stale ziarno, wiec ponowne uruchomienie daje te same bajty.
 Dwie czesci:
 
 * plany wlasne `own_*` - po jednym na typ (INTEGER, UINT, BYTE, FLOAT, DOUBLE, RATIONAL z
-  reduktora), typy mieszane w obu kierunkach promocji, napisy dluzsze niz SSO i gleboki
-  program. Porownania zyja tylko w RULE WHEN, wiec kazdy plan ma regule na strumieniu-kopii
+  reduktora), typy mieszane w obu kierunkach promocji, napisy dluzsze niz SSO, gleboki
+  program i ogon stalych (`own_tail`, regula B w exprSimplify). Porownania zyja tylko
+  w RULE WHEN, wiec kazdy plan poza `own_deep` i `own_tail` ma regule na strumieniu-kopii
   z warunkiem, ktory nie jest prawdziwy dla zadnego wiersza - liczy sie w kazdym slocie, a
   akcja nie odpala;
 * plany `rehost_*` - wyrazenia z list SELECT planow testow systemowych (pliki `.rql` sledzone
@@ -46,6 +47,22 @@ SAME_TYPE = [
 ]
 
 SAME_TYPE_RULE = "{0} > {big} OR {1} < {neg} OR {0} >= {1} AND {2} = {big} OR {1} != {1}"
+
+# Ogon stalych `(E op c1) op c2` - ksztalt, ktory regula B w exprSimplify zwija do `E op (c1 ? c2)`.
+# Stala zwinieta bywa ujemna (`3-5`), a ujemna nie ma reprezentacji w UINT: do poprawki `u+3-5`
+# dawalo przy RDB_OPT_SIMPLIFY_EXPRESSIONS=ON NULL w kazdym wierszu, a przy ablacji u-2. Ostatnie
+# trzy zwijaja sie do stalej nieujemnej i maja zostac przepisane. Zadne nie zalezy od drabiny RQL.g4.
+TAIL = [
+    "{0}+3-5",
+    "3+{0}-5",
+    "({0}-3)+5",
+    "({0}+3-5)+7",
+    "{0}+1-5",
+    "{0}+1/2-3",
+    "{0}+5-3",
+    "{0}-1-1",
+    "{0}*2*3",
+]
 
 
 def rows_int(rng, lo, hi, nonzero_col=None):
@@ -232,6 +249,20 @@ SELECT {deep_dbl}, ({deep_dbl})/(dbl[1]*dbl[1]+1.0) STREAM ddbl FROM dbl
 """)
     write("own_deep_int.txt", "\n".join(rows_int(rng, -100, 100)))
     write("own_deep_dbl.txt", "\n".join(rows_real(rng)))
+
+    # Wlasne ziarno: dopisanie planu nie przesuwa danych planow wygenerowanych wyzej. Male u na
+    # poczatku trafiaja w granice NULL formy krokowej (`u+1-5` dla u < 4).
+    rng_tail = random.Random(20260927)
+    tail = ", ".join([e.format("src[0]") for e in TAIL] + [e.format("src[1]") for e in TAIL])
+    write("own_tail.rql", f"""# Ogon stalych nad UINT, INTEGER jako kontrola - wynik ten sam przy RDB_OPT_SIMPLIFY_EXPRESSIONS=ON i OFF.
+STORAGE 'temp'
+
+DECLARE u UINT, i INTEGER STREAM src, 1 FILE 'own_tail.txt'
+
+SELECT {tail} STREAM tail FROM src
+""")
+    write("own_tail.txt", "\n".join(f"{u if u < 8 else rng_tail.randint(0, 1000)} {rng_tail.randint(-1000, 1000)}"
+                                     for u in range(ROWS)))
 
     exprs = system_expressions()
     rng_sys = random.Random(289)
