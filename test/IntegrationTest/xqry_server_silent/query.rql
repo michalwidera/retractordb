@@ -1,0 +1,7 @@
+# Strumien z nowym wierszem co 0,1 s - klient ma co czytac az do chwili zamrozenia serwera.
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM src, 0.1 FILE 'data.txt'
+
+SELECT a+1 STREAM dst FROM src

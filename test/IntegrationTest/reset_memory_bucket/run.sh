@@ -53,8 +53,8 @@ until xqry --bus 2>/dev/null | grep -qE '\| y *$'; do
   sleep 0.1
   i=$((i + 1))
 done
-# Kod wyjscia `xqry -s` nie rozstrzyga: klient, ktory uznal serwer za martwy, konczy sie zerem.
-# Dowodem sa wiersze, a przy ich braku log serwera niesie przyczyne (FatalError).
+# Kod wyjscia `xqry -s` mowi tylko, ze serwer zamilkl - przyczyne (FatalError) niesie log serwera,
+# wiec o wyniku rozstrzygaja wiersze, a przy ich braku wypisujemy log.
 xqry -s y -m 8 >out_y.txt || true
 rows=$(wc -l <out_y.txt)
 if [ "$rows" -lt 8 ]; then
