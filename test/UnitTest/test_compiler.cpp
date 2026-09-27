@@ -2520,6 +2520,51 @@ TEST(xcompiler, record_size_is_limited) {
   EXPECT_TRUE(verdict.contains("Stream 'w' reads an input record of 1179648 bytes; the limit is 1048576")) << verdict;
 }
 
+// Przeplot czyta w takcie rekord JEDNEGO skladnika, ale slot wejscia ma na kazdej pozycji dluzszy
+// z dwoch elementow. Uklady lustrzane - 10 napisow po 64 KiB i 10 bajtow wobec 10 bajtow i 10 napisow -
+// mieszcza sie w granicy kazdy z osobna (655370 B), a rekord wejsciowy ma same napisy (1310720 B).
+// Do 2026-09-27 checkInputRecord pomijal `#`.
+TEST(xcompiler, hash_input_record_is_limited) {
+  std::string strings;
+  std::string bytes;
+  for (int i = 0; i < 10; ++i) {
+    strings += ", s" + std::to_string(i) + " STRING[65536]";
+    bytes += ", b" + std::to_string(i) + " BYTE";
+  }
+  auto declare = [](const std::string &fields, const std::string &name) {
+    return "DECLARE " + fields.substr(2) + " STREAM " + name + ", 1 FILE '" + name + ".txt'\n";
+  };
+  const std::string verdict =
+      compileRql(declare(strings + bytes, "a") + declare(bytes + strings, "b") + "SELECT * STREAM w FROM a#b\n");
+  EXPECT_TRUE(verdict.contains("Stream 'w' reads an input record of 1310720 bytes; the limit is 1048576")) << verdict;
+
+  // Ten sam uklad po obu stronach: slot wejscia rowny slotowi zrodla.
+  EXPECT_EQ(compileRql(declare(strings + bytes, "a") + declare(strings + bytes, "b") + "SELECT * STREAM w FROM a#b\n"), "OK");
+}
+
+// Schemat wyjscia przeplotu ma ten sam ksztalt co slot wejscia - dluzszy element na kazdej pozycji,
+// niezaleznie od kolejnosci skladnikow. Do 2026-09-27 szedl za lewym skladnikiem, a slot napisowy
+// z DECLARE mial 1 B, wiec `.desc` wyjscia mowil `STRING s[1]`.
+TEST(xcompiler, hash_output_schema_takes_the_longer_side) {
+  auto plan = compilePlan(R"(
+        SUBSTRAT 'memory'
+        DECLARE s STRING[8], k INTEGER STREAM ta, 1 FILE 'a.txt'
+        DECLARE s STRING[16], k DOUBLE STREAM tb, 1 FILE 'b.txt'
+        SELECT * STREAM h FROM ta#tb
+        SELECT * STREAM g FROM tb#ta
+      )");
+  for (const std::string id : {"h", "g"}) {
+    for (auto desc : {plan.getQuery(id).descriptorStorage(), plan.getQuery(id).descriptorFrom(plan)}) {
+      desc.removeConfigurationFields();
+      ASSERT_EQ(desc.size(), 2U) << id;
+      EXPECT_EQ(desc[0].rtype, rdb::STRING) << id;
+      EXPECT_EQ(desc.fieldSize(desc[0]), 16) << id;
+      EXPECT_EQ(desc[1].rtype, rdb::DOUBLE) << id;
+      EXPECT_EQ(desc.fieldSize(desc[1]), 8) << id;
+    }
+  }
+}
+
 // Pole pochodne dluzsze niz 65536 odpada, choc rekord miesci sie w 1 MiB: serwer zapisuje je do
 // .desc (`STRING wide_0[80000]`) i czyta przy nastepnym starcie, a gramatyka DESC ma te sama granice
 // co RQL. Bez tej kontroli plan przechodzilby pierwszy start i konczyl drugi FatalError-em.

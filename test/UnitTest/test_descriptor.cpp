@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <utility>
 
 #include "rdb/descriptor.hpp"
@@ -199,6 +200,42 @@ TEST(descriptor, create_hash_uses_max_len_and_type) {
   EXPECT_EQ(out[1].rlen, 4);
   EXPECT_EQ(out[1].rarray, 1);
   EXPECT_EQ(out[1].rtype, rdb::UINT);
+}
+
+// Slot przeplotu nad napisem ma CALA dlugosc dluzszego napisu, w obu kolejnosciach skladnikow.
+// `STRING[N]` z DECLARE niesie dlugosc w rarray (rlen = 1), wpis z okna AGSE - w rlen (rarray = 1).
+// Do 2026-09-27 przeplot bral samo rlen, wiec slot zadeklarowanego `STRING[8]` mial 1 B i pierwsze
+// przypisanie rekordu zrodla konczylo proces FatalError-em "schema mismatch".
+TEST(descriptor, create_hash_string_slot_takes_the_full_length_of_the_longer_side) {
+  const rdb::Descriptor declared8("s", 1, 8, rdb::STRING);
+  const rdb::Descriptor declared16("s", 1, 16, rdb::STRING);
+  const rdb::Descriptor window12("w", 12, 1, rdb::STRING);
+
+  for (const auto &[lhs, rhs, bytes] : {std::tuple{declared8, declared16, 16}, std::tuple{declared16, declared8, 16},
+                                        std::tuple{window12, declared8, 12}, std::tuple{declared8, window12, 12}}) {
+    rdb::Descriptor out;
+    out.composeHashDescriptorFrom("h", lhs, rhs);
+    ASSERT_EQ(out.size(), 1U);
+    EXPECT_EQ(out[0].rtype, rdb::STRING);
+    EXPECT_EQ(out[0].rlen, 1);
+    EXPECT_EQ(out[0].rarray, bytes);
+    EXPECT_EQ(out.getSizeInBytes(), static_cast<size_t>(bytes));
+  }
+}
+
+// Pozycja liczbowa bierze dlugosc pola, ktorego TYP wygrywa. Wsrod typow BYTE..DOUBLE jest to zarazem
+// dluzsze pole z jednym wyjatkiem: FLOAT (4 B) nad RATIONAL (8 B). Slot FLOAT o 8 B kazalby zapisowi
+// wartosci kopiowac 8 B z czterobajtowej zmiennej.
+TEST(descriptor, create_hash_numeric_slot_takes_the_length_of_the_winning_type) {
+  for (const auto &[lhs, rhs] : {std::pair{rdb::Descriptor("a", 8, 1, rdb::RATIONAL), rdb::Descriptor("a", 4, 1, rdb::FLOAT)},
+                                 std::pair{rdb::Descriptor("a", 4, 1, rdb::FLOAT), rdb::Descriptor("a", 8, 1, rdb::RATIONAL)}}) {
+    rdb::Descriptor out;
+    out.composeHashDescriptorFrom("h", lhs, rhs);
+    ASSERT_EQ(out.size(), 1U);
+    EXPECT_EQ(out[0].rtype, rdb::FLOAT);
+    EXPECT_EQ(out[0].rlen, 4);
+    EXPECT_EQ(out[0].rarray, 1);
+  }
 }
 
 TEST(descriptor, flat_output_resets_after_stream) {

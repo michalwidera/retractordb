@@ -707,10 +707,21 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
   const command_id cmd = cmd_token.getCommandID();
   // Merge of schemas for junction of hash type
   if (cmd == STREAM_HASH) {
-    if (coreInstance.getQuery(sName1).descriptorStorage().flatElementCount() !=
-        coreInstance.getQuery(sName2).descriptorStorage().flatElementCount())
+    const auto lhs = coreInstance.getQuery(sName1).descriptorStorage();
+    const auto rhs = coreInstance.getQuery(sName2).descriptorStorage();
+    if (lhs.flatElementCount() != rhs.flatElementCount())
       throw std::invalid_argument("Hash operation needs same schemas on arguments stream");
+    // Nazwy i programy pol z lewego skladnika, ksztalt ze slotu wejscia (query::descriptorFrom):
+    // na kazdej pozycji dluzszy z dwoch elementow, w obu kolejnosciach skladnikow. Do 2026-09-27
+    // ksztalt tez szedl za lewym skladnikiem.
+    rdb::Descriptor slots;
+    slots.composeHashDescriptorFrom(sName1, lhs, rhs);
     lRetVal = flattenArrayFields(coreInstance.getQuery(sName1).lSchema);
+    for (auto &&[f, slot] : std::views::zip(lRetVal, slots)) {
+      f.field_.rtype  = slot.rtype;
+      f.field_.rlen   = slot.rlen;
+      f.field_.rarray = slot.rarray;
+    }
   } else if (cmd == STREAM_DEHASH_DIV || cmd == STREAM_DEHASH_MOD)
     lRetVal = flattenArrayFields(coreInstance.getQuery(sName1).lSchema);  // NOLINT(bugprone-branch-clone)
   else if (cmd == STREAM_ADD) {
@@ -827,9 +838,10 @@ std::string compiler::checkRecordShape(const query &q, std::int64_t *planElement
 /// pole wyjscia i 4 GiB wejscia (A2 M11). Wolane PRZED kazdym descriptorFrom() w przebiegach, ktore go
 /// buduja, bo juz sam deskryptor takiego rekordu przepelnia int w offsetach.
 ///
-/// Wejscie przerasta sprawdzone juz zrodla tylko przy dwoch operatorach: oknie AGSE (|window| slotow
-/// NAJSZERSZEGO elementu zrodla) i sumie strumieni (oba rekordy). Pozostale czytaja rekord zrodla bez
-/// zmian, jeden slot reduktora albo - przeplot - sloty najwyzej 8-bajtowe na szerokosci zrodla.
+/// Wejscie przerasta sprawdzone juz zrodla tylko przy trzech operatorach: oknie AGSE (|window| slotow
+/// NAJSZERSZEGO elementu zrodla), sumie strumieni (oba rekordy) i przeplocie (na kazdej pozycji
+/// dluzszy z dwoch elementow, wiec skladniki o ukladach lustrzanych daja rekord wiekszy od kazdego
+/// z nich). Pozostale czytaja rekord zrodla bez zmian albo jeden slot reduktora.
 /// Zrodla nieznanego nie oceniamy: nazwe raportuje dalszy przebieg, tak jak dotad.
 std::string compiler::checkInputRecord(query &q) {
   if (q.isDeclaration() || q.isCompilerDirective()) return {"OK"};
@@ -847,6 +859,18 @@ std::string compiler::checkInputRecord(query &q) {
       bytes = static_cast<std::int64_t>(coreInstance.getQuery(arg1).descriptorStorage().getSizeInBytes()) +
               static_cast<std::int64_t>(coreInstance.getQuery(arg2).descriptorStorage().getSizeInBytes());
       break;
+    case STREAM_HASH: {
+      if (!coreInstance.exists(arg1) || !coreInstance.exists(arg2)) return {"OK"};
+      const auto lhs = coreInstance.getQuery(arg1).descriptorStorage();
+      const auto rhs = coreInstance.getQuery(arg2).descriptorStorage();
+      // Rozna szerokosc plaska jest bledem planu, ktory zglasza dalsza kompilacja; slotow wtedy nie ma.
+      if (lhs.flatElementCount() != rhs.flatElementCount()) return {"OK"};
+      // Deskryptor mozna tu zbudowac: kazdy skladnik jest juz sprawdzony, wiec slotow jest tyle, ile
+      // elementow plaskich ma kazdy z nich, a rekord ma najwyzej sume obu - 2 MiB.
+      rdb::Descriptor slots;
+      slots.composeHashDescriptorFrom(q.id, lhs, rhs);
+      bytes = static_cast<std::int64_t>(slots.getSizeInBytes());
+    } break;
     default:
       return {"OK"};
   }

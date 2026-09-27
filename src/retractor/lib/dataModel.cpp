@@ -610,7 +610,25 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       rdb::probe::onHashPick();
       int fwdPos            = 0;
       const bool takeSecond = Hash(intervalSrc1, intervalSrc2, n, fwdPos);
-      *runtime.inputPayload = fetchForward(takeSecond ? nameSrc2 : nameSrc1, fwdPos);
+      auto component        = fetchForward(takeSecond ? nameSrc2 : nameSrc1, fwdPos);
+
+      // Slot wejscia ma na kazdej pozycji dluzszy z dwoch elementow skladnikow
+      // (Descriptor::composeHashDescriptorFrom). Skladnik o tym samym ukladzie przechodzi w calosci,
+      // jak dotad. Inny - slot po slocie, bo kopia bajtow rekordu przesunelaby offsety za pierwszym
+      // szerszym slotem, zostawila w nim bajty poprzedniego rekordu, a liczbe innego typu (INTEGER
+      // w slocie DOUBLE) podalaby jako bajty inta na bajtach poprzedniego double'a. setItemVT rzutuje
+      // na typ slotu i przenosi NULL.
+      //
+      // Descriptor::operator== to warunek "lewy miesci prawy": slot nie wezszy i typ nie nizszy. Typ
+      // slotu wejscia jest wyzszym z dwoch, a przy rownym typie slot jest dluzszy z dwoch - wiec
+      // skladnik, ktory miesci slot wejscia, ma dokladnie jego uklad.
+      if (component.descriptor == runtime.inputPayload->descriptor) {
+        *runtime.inputPayload = std::move(component);
+      } else {
+        const int slots = runtime.inputPayload->descriptor.flatElementCount();
+        for (int slot = 0; slot < slots; ++slot)
+          runtime.inputPayload->setItemVT(slot, component.getItemVT(slot));
+      }
 
     } break;
     default:
