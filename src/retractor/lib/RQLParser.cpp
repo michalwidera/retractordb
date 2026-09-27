@@ -238,6 +238,21 @@ class ParserListener : public RQLBaseListener {
     return T{};
   }
 
+  /// Literal wymiaru, ktory nie moze byc zerem: krok i szerokosc okna AGSE, pojemnosc RETENTION.
+  /// Gramatyka bierze tu DECIMAL, wiec wartosc ujemna nie istnieje, a zero przechodzilo parser:
+  /// krok 0 konczyl proces FatalError-em w kompilatorze, okno 0 przy tworzeniu magazynu,
+  /// pojemnosc 0 przy pierwszym zapisie - w kanale ad-hoc i `--reset` smierc serwera (#308).
+  /// Literal spoza zakresu ma juz swoj komunikat; zastepcze 0 nie dostaje drugiego.
+  int nonZeroLiteral(const std::string &what, const std::string &text) {
+    const auto value = parseLiteral<int>(text);
+    if (!value) {
+      reportOutOfRange(text);
+      return 0;
+    }
+    if (*value == 0) reportSemanticError(what + " " + text + " must be greater than zero");
+    return *value;
+  }
+
   /// Dopina regule do strumienia wskazanego przez ON. Zwraca pusty napis albo powod odmowy;
   /// przy odmowie plan pozostaje nietkniety, wiec wolajacy odrzuca calosc bez sladu po regule.
   std::string buildRule(const std::string &stream_name, const std::string &rule_name) {
@@ -449,11 +464,12 @@ class ParserListener : public RQLBaseListener {
   void exitSExpAgse(RQLParser::SExpAgseContext *ctx) override {
     int window{0};
     int step{0};
+    // Minus przed szerokoscia jest legalny (kompilator bierze abs), wiec zerem jest tez `-0`.
     if (ctx->children[kAgseWindowSignChildIndex]->getText() == "-")
-      window = -literal<int>(ctx->window->getText());
+      window = -nonZeroLiteral("AGSE window", ctx->window->getText());
     else
-      window = literal<int>(ctx->window->getText());
-    step = literal<int>(ctx->step->getText());
+      window = nonZeroLiteral("AGSE window", ctx->window->getText());
+    step = nonZeroLiteral("AGSE step", ctx->step->getText());
 
     program.emplace_back(STREAM_AGSE, std::make_pair(step, window));
   }
@@ -602,15 +618,18 @@ class ParserListener : public RQLBaseListener {
     fieldCount         = 0;
   }
 
+  /// Pojemnosc 0 odrzucamy w obu postaciach. Z segmentami padala przy pierwszym zapisie
+  /// (groupFile::write), a `RETENTION 0` i `RETENTION 0 0` nie robily nic, bez slowa (#308).
+  /// Segmenty 0 zostaja legalne - znacza "bez limitu segmentow".
   void exitRetention(RQLParser::RetentionContext *ctx) override {
     if (ctx->segments != nullptr) {
       // retention {capacity} !{segments}
       qry.retention = std::pair<int, int>(         //
           literal<int>(ctx->segments->getText()),  //
-          literal<int>(ctx->capacity->getText()));
+          nonZeroLiteral("RETENTION capacity", ctx->capacity->getText()));
     } else {
       // retention {capacity} - note: segments is optional but capacity is required
-      qry.policy.second = literal<int>(ctx->capacity->getText());
+      qry.policy.second = nonZeroLiteral("RETENTION capacity", ctx->capacity->getText());
     }
   }
 

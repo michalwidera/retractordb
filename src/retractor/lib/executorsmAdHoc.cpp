@@ -148,6 +148,13 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   // odziedziczyc ONESHOT tak samo jak deklaracje planu startowego.
   if (first_keyword == "DECLARE" && untilEofMode) coreInstanceCopy[stream_name].isOneShot = true;
 
+  // Hak testu it_fatal_exit_path, ta sama droga co RDB_FAULT_FATAL_IN_SLOT. FatalError w watku
+  // komunikacyjnym, w miejscu lokalnej kompilacji kopii planu. Do 2026-09-27 wywolywal go tekst
+  // `@(0,4)` (krok zerowy AGSE); od #308 odrzuca go parser, a test sciezki wyjscia nie moze zalezec
+  // od tego, ktory wadliwy tekst jeszcze tu dochodzi - kazdy taki tekst jest bledem do naprawy.
+  if (std::getenv("RDB_FAULT_FATAL_IN_ADHOC") != nullptr)
+    FatalError("fault hook RDB_FAULT_FATAL_IN_ADHOC: fatal error in the communication thread");
+
   compiler localCompiler(coreInstanceCopy);
   auto response = localCompiler.compile();
 

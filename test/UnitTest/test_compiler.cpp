@@ -1691,6 +1691,15 @@ TEST(xparser, invalid_values_are_refused_without_killing_the_process) {
       {source + "SELECT core0[0] STREAM dst FROM core0 & 0", "interval 0 must be greater than zero"},
       {source + "SELECT core0[0] STREAM dst FROM core0 % 0", "interval 0 must be greater than zero"},
       {source + "SELECT core0[0] STREAM dst FROM core0 - 0", "interval 0 must be greater than zero"},
+      // Wymiary spoza rational_se (#308, A2 C4 i M12). Krok 0 konczyl proces w kompilatorze,
+      // okno 0 przy tworzeniu magazynu, pojemnosc 0 przy pierwszym zapisie; `RETENTION 0` i
+      // `RETENTION 0 0` przechodzily bez zadnego skutku.
+      {source + "SELECT * STREAM dst FROM core0@(0,2)", "AGSE step 0 must be greater than zero"},
+      {source + "SELECT * STREAM dst FROM core0@(1,0)", "AGSE window 0 must be greater than zero"},
+      {source + "SELECT * STREAM dst FROM core0@(1,-0)", "AGSE window 0 must be greater than zero"},
+      {source + "SELECT core0[0] STREAM dst FROM core0 RETENTION 0 3", "RETENTION capacity 0 must be greater than zero"},
+      {source + "SELECT core0[0] STREAM dst FROM core0 RETENTION 0 0", "RETENTION capacity 0 must be greater than zero"},
+      {source + "SELECT core0[0] STREAM dst FROM core0 RETENTION 0", "RETENTION capacity 0 must be greater than zero"},
   };
   for (const auto &[rql, reason] : cases) {
     const auto [parseResult, diagnostics] = parseCapturingStderr(rql);
@@ -1710,6 +1719,24 @@ TEST(xparser, invalid_values_are_refused_without_killing_the_process) {
   EXPECT_EQ(acceptedResult, "OK");
   ASSERT_TRUE(accepted.exists(":STORAGE"));
   EXPECT_EQ(accepted[":STORAGE"].filename, "temp/");
+}
+
+// Lustro kontroli zera z #308: zero i minus przechodza tam, gdzie cos znacza. Ujemna szerokosc
+// okna jest legalna (kompilator bierze abs), segmenty 0 to "bez limitu segmentow", a
+// `DUMP ... RETENTION 0` to jawnie zapisana wartosc domyslna "bez retencji".
+TEST(xparser, zero_where_it_has_a_meaning_is_accepted) {
+  qTree instance;
+  auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'
+        SELECT * STREAM mirrored FROM core0@(1,-3)
+        SELECT core0[0] STREAM unlimited FROM core0 RETENTION 3 0
+        RULE r ON unlimited WHEN unlimited[0] > 0 DO DUMP -1 TO 1 RETENTION 0
+      )");
+  ASSERT_EQ(result, "OK");
+  EXPECT_EQ(instance.getQuery("unlimited").retention.segments, 0U);
+  EXPECT_EQ(instance.getQuery("unlimited").retention.capacity, 3U);
+  ASSERT_EQ(instance.getQuery("unlimited").lRules.size(), 1U);
+  EXPECT_EQ(instance.getQuery("unlimited").lRules.front().dump_retention, 0U);
 }
 
 namespace {
