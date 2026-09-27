@@ -47,6 +47,12 @@ expect_file_rejected out_of_range.rql "numeric literal 99999999999 is out of ran
 # "Circular dependency in stream definitions" - strumien zalezny nie rozwiazywal sie nigdy (#308).
 printf '%s\n' "DECLARE a INTEGER STREAM core0, 0 FILE 'source.dat'" "SELECT a[0] STREAM dst FROM core0" >zero_interval.rql
 expect_file_rejected zero_interval.rql "interval 0 must be greater than zero"
+# Do 2026-09-27 krok 0 konczyl start FatalError-em w kompilatorze (kod 1), a pojemnosc 0 przechodzila
+# -c i konczyla proces dopiero przy pierwszym zapisie (#308, A2 C4 i M12).
+printf '%s\n' "DECLARE a INTEGER STREAM core0, 1 FILE 'source.dat'" "SELECT * STREAM dst FROM core0@(0,4)" >zero_step.rql
+expect_file_rejected zero_step.rql "AGSE step 0 must be greater than zero"
+printf '%s\n' "DECLARE a INTEGER STREAM core0, 1 FILE 'source.dat'" "SELECT a[0] STREAM dst FROM core0 RETENTION 0 3" >zero_retention.rql
+expect_file_rejected zero_retention.rql "RETENTION capacity 0 must be greater than zero"
 
 server_start plan.rql
 
@@ -120,7 +126,10 @@ fi
 #   - literal liczbowy spoza zakresu typu - std::out_of_range z listenera, ktory biegnie
 #     z noexcept-owego destruktora w generowanym parserze, czyli std::terminate (#306),
 #   - zerowy interwal (do 2026-09-26) - DECLARE byl PRZYJMOWANY, a proces konczyl FatalError
-#     w qTree::getAvailableTimeIntervals; `&` - FatalError w kompilatorze (#308).
+#     w qTree::getAvailableTimeIntervals; `&` - FatalError w kompilatorze (#308),
+#   - zerowy krok AGSE (do 2026-09-27) - FatalError w kompilatorze; zerowe okno AGSE i zerowa
+#     pojemnosc RETENTION byly PRZYJMOWANE, a proces konczyl FatalError przy rejestracji
+#     albo dopiero przy pierwszym zapisie (#308, A2 C4 i M12).
 # Parser biegnie w procesie DZIALAJACEGO serwera, wiec kazdy z nich byl bledem calej instancji.
 expect_parse_rejected() {
   local query="$1" reason="$2" out rc
@@ -161,6 +170,18 @@ expect_parse_rejected "SELECT core0[0]+10000000000000000000000000000000000000000
 expect_parse_rejected "SELECT core0[0] STREAM bigshift FROM core0>99999999999" "numeric literal 99999999999 is out of range"
 expect_parse_rejected "DECLARE a INTEGER STREAM zerorate0, 0 FILE 'source.dat'" "interval 0 must be greater than zero"
 expect_parse_rejected "SELECT core0[0] STREAM zerodehash FROM core0 & 0" "interval 0 must be greater than zero"
+expect_parse_rejected "SELECT * STREAM zerostep FROM core0@(0,4)" "AGSE step 0 must be greater than zero"
+expect_parse_rejected "SELECT * STREAM zerowindow FROM core0@(1,0)" "AGSE window 0 must be greater than zero"
+expect_parse_rejected "SELECT a[0] STREAM zeroretention FROM core0 RETENTION 0 3" \
+  "RETENTION capacity 0 must be greater than zero"
+
+# `kill -0` zaraz po odpowiedzi nie widzi smierci odroczonej: pojemnosc 0 konczyla proces dopiero
+# przy pierwszym zapisie, ok. 2 s po "OK". Po odmowach plan serwera ma wiec jeszcze liczyc.
+dst_rows=$(xqry -s dst -m 10 2>/dev/null | wc -l)
+if [ "$dst_rows" -lt 10 ]; then
+  echo "po odmowach strumien dst oddal $dst_rows z 10 rekordow"
+  exit 1
+fi
 
 # (3) Kolejne poprawne zapytanie nadal dziala.
 ok_out=$(xqry -a 'select a[0] stream adhocok from core0' 2>&1) || {

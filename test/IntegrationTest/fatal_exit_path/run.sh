@@ -33,18 +33,27 @@ if [ "$status" -ne 1 ]; then
 fi
 
 # --- Sciezka 2: blad krytyczny w WATKU KOMUNIKACYJNYM, przy zapytaniu ad hoc. ---
-# `@(0,4)` ma krok zerowy, co kompilator odrzuca przez FatalError.
+# Do 2026-09-27 wywolywal go tekst `@(0,4)` - krok zerowy, odrzucany przez kompilator
+# FatalError-em. Od #308 parser odmawia go wczesniej, wiec sciezke otwiera hak
+# RDB_FAULT_FATAL_IN_ADHOC w miejscu lokalnej kompilacji; zapytanie jest poprawne.
 rm -rf ./temp && mkdir -p ./temp
 rm -f ./*.desc ./*.meta ./*.shadow
 xretractor query.rql -c >/dev/null
-server_start query.rql -m 400 -k -r
+export RDB_FAULT_FATAL_IN_ADHOC=1
+server_start query.rql -m 400 -k -r 2>adhoc.err
+unset RDB_FAULT_FATAL_IN_ADHOC
 
-xqry -a 'select * stream bad from src@(0,4)' >/dev/null 2>&1 || true
+xqry -a 'select * stream fine from src@(1,4)' >/dev/null 2>&1 || true
 
 status=$(server_wait_status)
 if [ "$status" -ne 1 ]; then
   echo "blad krytyczny w watku komunikacyjnym: kod wyjscia $status, oczekiwano 1"
   echo "  (134 = SIGABRT z join() na watku biezacym albo z destruktora std::thread)"
+  exit 1
+fi
+if ! grep -q "FATAL: fault hook RDB_FAULT_FATAL_IN_ADHOC" adhoc.err; then
+  echo "blad krytyczny w watku komunikacyjnym: brak komunikatu haka na stderr:"
+  cat adhoc.err
   exit 1
 fi
 

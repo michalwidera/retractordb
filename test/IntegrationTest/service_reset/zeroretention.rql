@@ -1,0 +1,6 @@
+# Zerowa pojemnosc RETENTION: parser uslugi ma odmowic planu jako bledu planu (krok 3c w reset.sh).
+# Do 2026-09-27 plan byl PRZYJMOWANY, a proces konczyl FatalError przy pierwszym zapisie do gamma,
+# czyli juz po odpowiedzi klientowi. Reszta planu jest poprawna, zeby odmowa miala jedna przyczyne.
+STORAGE 'temp'
+DECLARE a INTEGER STREAM src, 0.2 FILE 'data.txt'
+SELECT a+1 STREAM gamma FROM src RETENTION 0 3

@@ -163,6 +163,34 @@ if [ "$(wc -l < out_alpha_after_empty_value.txt)" -lt 2 ]; then
   exit 1
 fi
 
+# --- 3c. Zerowy krok AGSE i zerowa pojemnosc RETENTION: odmowa z powodem, usluga liczy dalej. ---
+#
+# Do 2026-09-27 oba plany przechodzily parser uslugi (#308, A2 C4 i M12). Krok 0 konczyl proces
+# FatalError-em w kompilatorze, pojemnosc 0 dopiero przy pierwszym zapisie po wymianie epoki -
+# po odpowiedzi "przyjety". Stad kontrola, ze alpha liczy dalej, a nie samo `kill -0`.
+expect_reset_refused() {
+  local plan="$1" reason="$2" status=0
+  xqry --reset "$plan" --server service > zero_out.txt 2> zero_err.txt || status=$?
+  if [ "$status" -eq 0 ]; then
+    echo "plan $plan zostal przyjety"
+    cat zero_out.txt zero_err.txt
+    exit 1
+  fi
+  grep -q "$reason" zero_err.txt || {
+    echo "odmowa planu $plan nie nazwala powodu"
+    cat zero_err.txt
+    exit 1
+  }
+  xqry -s alpha -m 2 --server service > out_alpha_after_zero.txt
+  if [ "$(wc -l < out_alpha_after_zero.txt)" -lt 2 ]; then
+    echo "po odrzuconym planie $plan strumien alpha przestal liczyc"
+    cat out_alpha_after_zero.txt
+    exit 1
+  fi
+}
+expect_reset_refused zerostep.rql "AGSE step 0 must be greater than zero"
+expect_reset_refused zeroretention.rql "RETENTION capacity 0 must be greater than zero"
+
 # --- 3b. Plan z regula DO SYSTEM: odmowa w trybie domyslnym (restricted). ---
 #
 # Kanal reset przyjmuje CALY tekst planu przez te sama nieuwierzytelniona kolejke, ktorej
