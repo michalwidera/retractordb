@@ -169,7 +169,9 @@ int main(int argc, char *argv[]) {
   std::string cmd;
   while (true) {
     if (cmd != "#") std::cout << prompt;  // std::cout (powiązany z std::cin) gwarantuje flush przed odczytem - std::print nie
-    std::cin >> cmd;
+    // Koniec wejscia konczy sesje jak `quit`. Nieudane `>>` nie zmienia `cmd`, wiec do 2026-09-27
+    // skrypt bez `quit` powtarzal ostatnie polecenie w nieskonczonosc.
+    if (!(std::cin >> cmd)) break;
     if (cmd == "exit" || cmd == "quit" || cmd == "q") break;
     if (cmd == "#" || cmd == "rem") {
       // Two comment styles: # suppresses output entirely (used in test scripts),
