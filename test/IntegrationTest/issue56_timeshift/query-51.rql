@@ -3,7 +3,7 @@
 
 STORAGE 'temp'
 
-DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile2.dat'
-DECLARE b INTEGER STREAM core1, 0.2 FILE 'datafile3.dat'
+DECLARE a INTEGER STREAM shift_core0, 0.1 FILE 'datafile2.dat'
+DECLARE b INTEGER STREAM shift_core1, 0.2 FILE 'datafile3.dat'
 
-SELECT str1[0]*10,str1[1]*10,str1[1]*str1[0]+20 STREAM str1 FROM (core0+core1)>5
+SELECT shift_str1[0]*10,shift_str1[1]*10,shift_str1[1]*shift_str1[0]+20 STREAM shift_str1 FROM (shift_core0+shift_core1)>5

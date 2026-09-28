@@ -1,8 +1,8 @@
 # make install && ctest -R issue56_timeshift -V
 
 # Weryfikuje operator filtra (> 5) na połączonych strumieniach (issue #57).
-# core0 + core1 z filtrem > 5 - tylko rekordy spełniające warunek trafiają do
-# str1. Wynik porównywany z pattern-run.txt via xtrdb.
+# shift_core0 + shift_core1 z filtrem > 5 - tylko rekordy spełniające warunek
+# trafiają do shift_str1. Wynik porównywany z pattern-run.txt via xtrdb.
 
 # K24/H10a: przebieg wydluzony z 10 na 11 taktow. Ogon `+` wzrosl o jeden slot
 # (rekord wolniejszej skladowej jest okreslony dopiero na koncu jej wlasnego

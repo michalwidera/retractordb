@@ -1,5 +1,5 @@
 storage temp
-open str1
+open max_str1
 size
 desc
 list 9

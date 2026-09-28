@@ -17,8 +17,9 @@ add_custom_target(
 
 add_custom_target(
   simple-max
-  COMMAND ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
-          "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh str2
+  COMMAND
+    ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
+    "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh max_str2
   WORKING_DIRECTORY
     ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple_max
   DEPENDS xretractor xqry)
@@ -27,7 +28,7 @@ add_custom_target(
   simple-timeshift
   COMMAND
     ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
-    "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh str1
+    "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh shift_str1
     query-51.rql
   WORKING_DIRECTORY
     ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/issue56_timeshift
@@ -78,27 +79,30 @@ add_custom_target(
 add_custom_target(
   ecg
   COMMAND
-    ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
-    "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh s205out
-    rec205-replay.rql 720,560,1360 --gnuplot-rtl
+    ${CMAKE_COMMAND} -E env "RDB_NAMESPACE=ecg_replay"
+    "XRETRACTOR=$<TARGET_FILE:xretractor>" "XQRY=$<TARGET_FILE:xqry>"
+    ${CMAKE_SOURCE_DIR}/scripts/xplot.sh s205out rec205-replay.rql 720,560,1360
+    --gnuplot-rtl ecg_replay
   DEPENDS ecg-clean xretractor xqry
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 
 add_custom_target(
   ecg-qrs
   COMMAND
-    ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
-    "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh qrs_out
-    rec205-qrs.rql 1440,-50,350 "--gnuplot-rtl"
+    ${CMAKE_COMMAND} -E env "RDB_NAMESPACE=ecg_qrs"
+    "XRETRACTOR=$<TARGET_FILE:xretractor>" "XQRY=$<TARGET_FILE:xqry>"
+    ${CMAKE_SOURCE_DIR}/scripts/xplot.sh qrs_out rec205-qrs.rql 1440,-50,350
+    "--gnuplot-rtl" ecg_qrs
   DEPENDS ecg-clean xretractor xqry
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 
 add_custom_target(
   ecg-detect-qrs
   COMMAND
-    ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
-    "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh detect_out
-    rec205-detect.rql 720,-50,400 "--gnuplot-rtl"
+    ${CMAKE_COMMAND} -E env "RDB_NAMESPACE=ecg_detect_qrs"
+    "XRETRACTOR=$<TARGET_FILE:xretractor>" "XQRY=$<TARGET_FILE:xqry>"
+    ${CMAKE_SOURCE_DIR}/scripts/xplot.sh detect_out rec205-detect.rql
+    720,-50,400 "--gnuplot-rtl" ecg_detect_qrs
   DEPENDS ecg-clean xretractor xqry
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 
