@@ -8,6 +8,7 @@
 #include <ctime>  // kotwica osi czasu pętli: clock_gettime, timespec
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -375,15 +376,25 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         const IpcServer::RowFormatter formatRow = [this](const std::string &name) { return printRowValue(name); };
 
         // ZERO-step
-        dueNames_.clear();
-        for (const auto &it : *coreInstancePtr)
-          if (it.isDeclaration()) dueNames_.emplace_back(it.id);
         // Zatrzymanie, ktore zdjelo bramke --xqrywait, nie ma prawa policzyc ani jednego kroku:
         // proces konczony sygnalem zapisalby wtedy rekord zerowy do magazynu, choc nikt o niego
         // nie prosil. Sama petla ponizej i tak nie wykona obrotu (warunek stop_now), a wyjscia
         // `break` w tym miejscu byc nie moze -- ominieloby zgaszenie pProc na koncu epoki i
         // zostawiloby watkowi komunikacyjnemu wskaznik na rozbierany dataModel.
         if (!gateStoppedProcess) {
+          std::scoped_lock epoch(plan_epoch_mutex);
+          dueNames_.clear();
+          for (const auto &it : *coreInstancePtr)
+            if (it.isDeclaration()) dueNames_.emplace_back(it.id);
+          // Hak it_zero_step_adhoc: klient ad-hoc musi dotrzec do handlera, gdy widoki
+          // nazw sa juz zebrane. Plik .release zwalnia krok; limit chroni test przed zwisem.
+          if (const char *gatePath = std::getenv("RDB_FAULT_ZERO_STEP_GATE"); gatePath != nullptr) {
+            std::ofstream(gatePath).put('1');
+            const auto releasePath = std::string(gatePath) + ".release";
+            const auto deadline    = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+            while (!std::filesystem::exists(releasePath) && std::chrono::steady_clock::now() < deadline)
+              std::this_thread::sleep_for(std::chrono::milliseconds(1));
+          }
           proc.processZeroStep();
           ipcServer.broadcast(dueNames_, formatRow);
         }

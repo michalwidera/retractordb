@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
+#include <fstream>
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
@@ -74,6 +75,10 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
   ptree ptRetval;
   std::string command = ptInval.get("db.message", "");
   try {
+    // Hak it_zero_step_adhoc: znacznik powstaje przed proba zajecia blokady epoki.
+    if (command == "adhoc")
+      if (const char *gatePath = std::getenv("RDB_FAULT_ZERO_STEP_GATE"); gatePath != nullptr)
+        std::ofstream(std::string(gatePath) + ".adhoc").put('1');
     // Hak diagnostyczny testu regresyjnego it_xqrywait_first_row, ta sama droga co
     // RDB_FAULT_PLAN_SWAP_DELAY. Rozciaga okno miedzy ODEBRANIEM komendy 'show' a jej
     // obsluga -- jedyne okno, w ktorym bramka --xqrywait zdejmowana na odbiorze wpuszczala
