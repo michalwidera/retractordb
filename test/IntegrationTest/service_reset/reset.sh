@@ -31,15 +31,15 @@ SERVER_LOCK="${TMPDIR:-/tmp}/xretractor_service.service.lock"
 rm -rf ./temp && mkdir -p ./temp
 
 # Wiersz magistrali dla instancji `service` -- ten, ktory niesie PID i tryb.
-service_row() { xqry --bus 2>/dev/null | grep -E '^service +\|' || true; }
+service_row() { bus_own | grep -E '^service +\|' || true; }
 
 # Strumienie instancji `service`, po jednym na linie. `--bus` daje kazda nazwe we wlasnym
 # wierszu: pierwsza stoi w wierszu instancji, kazda nastepna w linii kontynuacji o pustych
-# kolumnach po lewej -- czyli `service_row` widzi tylko pierwsza z nich. Segment magistrali
-# nalezy do przestrzeni nazw tego testu, wiec jedyna instancja w tabeli jest nasza i ostatnia
-# kolumna kazdego wiersza danych to jej strumien. Plan pusty daje jedna linie ze znakiem '-'.
+# kolumnach po lewej -- czyli `service_row` widzi tylko pierwsza z nich. `bus_own` zostawia
+# sekcje magistrali przestrzeni nazw tego testu, wiec jedyna instancja w tabeli jest nasza
+# i ostatnia kolumna kazdego wiersza danych to jej strumien. Plan pusty daje jedna linie ze znakiem '-'.
 service_streams() {
-  xqry --bus 2>/dev/null | sed -nE 's/^(service|[[:space:]]+) *\|.*\| (.+)$/\2/p' || true
+  bus_own | sed -nE 's/^(service|[[:space:]]+) *\|.*\| (.+)$/\2/p' || true
 }
 
 # Czeka, az plan uslugi zacznie roscic dany strumien. Przeladowanie jest asynchroniczne:

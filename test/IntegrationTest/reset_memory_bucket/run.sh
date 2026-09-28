@@ -43,7 +43,7 @@ xqry -s x -m 6 >out_x.txt
 xqry --reset planB.rql
 # Wymiana jest asynchroniczna: `--reset` konczy sie na PRZYJECIU planu.
 i=0
-until xqry --bus 2>/dev/null | grep -qE '\| y *$'; do
+until bus_own | grep -qE '\| y *$'; do
   if [ "$i" -ge 300 ]; then
     echo "strumien y nie pojawil sie w planie w ciagu 30 s"
     xqry --bus || true
