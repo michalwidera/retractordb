@@ -200,7 +200,7 @@ int main(int argc, char *argv[]) {
         ("influxdb,f", "influxDB output mode")                                                                        //
         ("gnuplot,p", po::value<std::string>(&sGnuplotDim), "x,y - gnuplot output mode")                              //
         ("gnuplot-rtl,z", "gnuplot output: newest samples on the right (right-to-left scroll)")                       //
-        ("gnuplot-ohlc", "gnuplot output: row = open, high, low, close, then the samples of that candle")             //
+        ("gnuplot-ohlc,o", "gnuplot output: row = open, high, low, close, then the samples of that candle")           //
         ("config,e", po::value<std::string>(&sConfig), "config file (TOML); overrides search")                        //
         ("help,h", "produce help message")                                                                            //
         ("needctrlc,c", "force ctl+c for stop this tool")                                                             //
