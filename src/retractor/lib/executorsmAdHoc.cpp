@@ -184,6 +184,15 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     adHocStreams.push_back(q.id);
   }
 
+  if (!adHocStreams.empty()) {
+    if (const std::string openError = checkOutputFilesOpenable(coreInstanceCopy, activeStorageDir, adHocStreams);
+        openError != "OK") {
+      ptRetval.put("db", "Rejected: " + openError);
+      SPDLOG_ERROR("AdHoc rejected: {}", openError);
+      return ptRetval;
+    }
+  }
+
   // Sciezki magazynow bierzemy z CALEGO planu po scaleniu, a nie z samych nowych wezlow:
   // claimAdditional pomija to, co juz stoi we wlasnym slocie, wiec zbior jest ten sam, a regula
   // "co jest magazynem" zostaje w jednym miejscu (planStorePaths).

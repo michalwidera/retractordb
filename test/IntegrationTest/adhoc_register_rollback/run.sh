@@ -25,6 +25,27 @@ unset RDB_FAULT_ADHOC_REGISTER
 SERVER_LOG="${TMPDIR:-/tmp}/xretractor.log"
 log_mark=$(wc -l < "$SERVER_LOG" 2> /dev/null || echo 0)
 
+# Otworzenie pliku SELECT w nieistniejacym katalogu nie moze ominac wycofania przez
+# FatalError. Odmowa wypada przed roszczeniem nazw; plan, magistrala i serwer zostaja.
+rc=0
+xqry -a "SELECT src[0] STREAM blocked FROM src FILE 'missing/out'" > out_open.txt 2> err_open.txt || rc=$?
+if [ "$rc" -eq 0 ] || ! grep -q "cannot open output file" err_open.txt; then
+  echo "ad-hoc z nieotwieralnym FILE nie zwrocil odmowy z powodem"
+  cat out_open.txt err_open.txt
+  exit 1
+fi
+if ! kill -0 "$_server_pid" 2>/dev/null; then
+  echo "serwer zginal po odmowie otwarcia FILE"
+  exit 1
+fi
+xqry -d > dir_after_open.txt
+xqry --bus > bus_after_open.txt
+if grep -qw blocked dir_after_open.txt || grep -qE '\|[[:space:]]+blocked$' bus_after_open.txt; then
+  echo "nieudany import FILE zostawil strumien blocked w planie lub magistrali"
+  cat dir_after_open.txt bus_after_open.txt
+  exit 1
+fi
+
 ADHOC='SELECT src[0]+1 STREAM extra FROM src'
 
 rc=0

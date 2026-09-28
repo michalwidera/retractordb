@@ -191,6 +191,17 @@ expect_reset_refused() {
 expect_reset_refused zerostep.rql "AGSE step 0 must be greater than zero"
 expect_reset_refused zeroretention.rql "RETENTION capacity 0 must be greater than zero"
 
+# Plik wyjsciowy SELECT w nieistniejacym katalogu musi zostac odrzucony przed
+# zaplanowaniem wymiany epoki. Po odmowie alpha nadal liczy i rosczenie zostaje stare.
+printf '%s\n' "STORAGE 'temp'" "DECLARE a INTEGER STREAM src2, 0.2 FILE 'data.txt'" \
+  "SELECT a[0] STREAM blocked FROM src2 FILE 'missing/out'" > blocked.rql
+expect_reset_refused blocked.rql "cannot open output file"
+if service_streams | grep -qx blocked; then
+  echo "odrzucony reset zostawil blocked na magistrali"
+  xqry --bus
+  exit 1
+fi
+
 # --- 3b. Plan z regula DO SYSTEM: odmowa w trybie domyslnym (restricted). ---
 #
 # Kanal reset przyjmuje CALY tekst planu przez te sama nieuwierzytelniona kolejke, ktorej
