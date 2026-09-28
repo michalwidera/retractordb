@@ -20,7 +20,11 @@ for rql in *.rql; do
     for stream in $(sed -n 's/^SELECT .* STREAM \([A-Za-z_0-9]*\) FROM .*/\1/p' "$rql"); do
       echo "== $stream"
       # `xtrdb` otwiera artefakt z katalogu biezacego; spoza `temp` czeka na wejscie.
-      (cd temp && printf 'open %s\nlist 1000\nquit\n' "$stream" | run_timeout 10 xtrdb -n 2>&1 | grep -F '{' || true)
+      # Znak NaN zalezy od platformy, nie od jezyka (#320): `sqrt(-x)` na x86-64 daje bity
+      # fff8... i glibc pisze `-nan`, aarch64 daje 7ff8... i `nan`, libc macOS pisze `nan`
+      # zawsze. Wyrocznia znak pomija; wzorzec trzyma postac bez znaku.
+      (cd temp && printf 'open %s\nlist 1000\nquit\n' "$stream" | run_timeout 10 xtrdb -n 2>&1 | grep -F '{' |
+        sed 's/:-nan /:nan /g' || true)
       echo "== desc $stream"
       cat "temp/$stream.desc"
       echo  # .desc nie konczy sie znakiem nowej linii
