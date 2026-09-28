@@ -32,11 +32,13 @@ Available options:
   -m [ --llimitqry ] arg (=0) loop iteration limit, 0 - no limit
 Branch: <branch>:<commit>, Code compiler: <compiler>, Build time: <timestamp>, Type: <build type>
 Log: <system temporary directory>/xretractor.log
+Config: Defaults
 This software is licensed under the MIT License and is provided ‘as is’,
 without warranty of any kind. For more information, see the LICENSE file.
 ```
 
 The query file is optional in execution mode, where omitting it starts an idle instance. Compile-only mode requires a query file.
+When configuration files are loaded, `Config:` lists their paths in load order instead of `Defaults`.
 
 ## Running as a systemd service
 
@@ -251,6 +253,7 @@ Available options:
   -z [ --shmbudget ]     show shared memory budget of the compiled plan
 Branch: <branch>:<commit>, Code compiler: <compiler>, Build time: <timestamp>, Type: <build type>
 Log: <system temporary directory>/xretractor.log
+Config: Defaults
 This software is licensed under the MIT License and is provided ‘as is’,
 without warranty of any kind. For more information, see the LICENSE file.
 ```

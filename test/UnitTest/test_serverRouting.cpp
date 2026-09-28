@@ -267,4 +267,17 @@ TEST(serverRouting, describeYamlDescribesEmptyBusAndEmptyFields) {
   EXPECT_EQ(lines[6], "    streams: []");
 }
 
+TEST(serverRouting, describeNamespacesYamlDistinguishesDefaultFromNamedNull) {
+  const std::vector<routing::NamespaceGroup> groups{
+      {.name = "", .instances = {makeInstance("shared", 101, "default.rql", {})}},
+      {.name = "null", .instances = {makeInstance("shared", 202, "named.rql", {})}}};
+  const std::vector<std::string> lines = routing::describeNamespacesYaml(groups);
+  ASSERT_EQ(lines.size(), 15U);
+  EXPECT_EQ(lines[3], "  - name: shared");
+  EXPECT_EQ(lines[4], "    namespace: null");
+  EXPECT_EQ(lines[9], "  - name: shared");
+  EXPECT_EQ(lines[10], "    namespace: \"null\"");
+  EXPECT_EQ(routing::describeNamespacesYaml({})[2], "servers: []");
+}
+
 }  // namespace

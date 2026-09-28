@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <iosfwd>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -19,11 +20,13 @@ class qTree;
 /// Parsuje JEDNA porcje tekstu RQL. `firstLine` to numer wiersza, na ktorym ta porcja stoi
 /// w pliku zrodlowym - wolajacy, ktory tnie plik na instrukcje (parsePlanText,
 /// parserRQLFile_4Test), podaje tu pozycje instrukcji, reszta zostawia 1.
+/// `sourceFile` podaje nazwe pliku do logu bledow skladni; pusty dla zapytan bez pliku.
 ///
 /// Zwraca {status, pierwsze slowo kluczowe, nazwa strumienia}. Status "OK" albo tresc bledu;
 /// `statementKeywords` dostaje slowa kluczowe wszystkich instrukcji porcji.
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
-                                                                  std::vector<std::string> &statementKeywords, size_t firstLine);
+                                                                  std::vector<std::string> &statementKeywords, size_t firstLine,
+                                                                  std::string_view sourceFile = {});
 
 /// Jak wyzej, z `firstLine` rownym 1.
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,

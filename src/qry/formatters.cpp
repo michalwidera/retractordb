@@ -128,34 +128,46 @@ void Formatter::renderGnuplotOhlc(const ptree &row, int count, const std::string
   // Najnowsza probka stoi w x = 0, jak w renderGnuplot(), wiec --gnuplot-rtl dziala bez zmian.
   // Wiersz k (0 = najnowszy) zajmuje x z [k*samples, (k+1)*samples), a swieca stoi nad srodkiem
   // tego przedzialu. Kolor liczy gnuplot: close >= open to swieca wzrostowa.
+  const auto n           = static_cast<size_t>(samples);
+  const auto rows        = gnuplot_lines_[0].size();
+  const auto validCandle = [this](size_t k) {
+    for (int i = 0; i < 4; ++i)
+      if (gnuplot_lines_[i][k] == "NaN") return false;
+    return true;
+  };
+  bool hasCandle = false;
+  bool hasSample = false;
+  for (size_t k = 0; k < rows; ++k) {
+    hasCandle |= validCandle(k);
+    for (size_t x = 0; x < n; ++x)
+      if (gnuplot_lines_[kOhlc + x][k] != "NaN") hasSample = true;
+  }
+  if (!hasCandle && !hasSample) return;
+
   std::string title = input;
   std::ranges::replace(title, '_', '-');
-  std::print(
-      "plot '-' u 1:2:3:4:5:6:($5>=$2?0x00a000:0xd00000) t '[{}-ohlc]' w candlesticks lc rgb variable,"
-      " '-' u 1:2 t '[{}]' w lines lc rgb 'blue'\r\n",
-      title, title);
+  std::print("plot");
+  if (hasCandle) std::print(" '-' u 1:2:3:4:5:6:($5>=$2?0x00a000:0xd00000) t '[{}-ohlc]' w candlesticks lc rgb variable", title);
+  if (hasSample) std::print("{} '-' u 1:2 t '[{}]' w lines lc rgb 'blue'", hasCandle ? "," : "", title);
+  std::print("\r\n");
 
-  const auto n                  = static_cast<size_t>(samples);
-  const auto rows               = gnuplot_lines_[0].size();
   constexpr double bodyFraction = 0.8;  // czesc przedzialu wiersza zajeta przez korpus swiecy
-  for (size_t k = 0; k < rows; k++) {
-    const auto &open  = gnuplot_lines_[0][k];
-    const auto &high  = gnuplot_lines_[1][k];
-    const auto &low   = gnuplot_lines_[2][k];
-    const auto &close = gnuplot_lines_[3][k];
-    // Swieca z NULL-em nie ma ksztaltu: gnuplot pomija cala tylko wtedy, gdy NaN stoi
-    // wszedzie, a z jednym NaN rysuje knot do krawedzi wykresu.
-    if (open == "NaN" || high == "NaN" || low == "NaN" || close == "NaN") continue;
-    const auto first = static_cast<double>(k * n);
-    std::print("{} {} {} {} {} {}\r\n", std::midpoint(first, first + static_cast<double>(n - 1)), open, low, high, close,
-               static_cast<double>(n) * bodyFraction);
+  if (hasCandle) {
+    for (size_t k = 0; k < rows; k++) {
+      if (!validCandle(k)) continue;
+      const auto first = static_cast<double>(k * n);
+      std::print("{} {} {} {} {} {}\r\n", std::midpoint(first, first + static_cast<double>(n - 1)), gnuplot_lines_[0][k],
+                 gnuplot_lines_[2][k], gnuplot_lines_[1][k], gnuplot_lines_[3][k], static_cast<double>(n) * bodyFraction);
+    }
+    std::print("e\r\n");
   }
-  std::print("e\r\n");
   // Probki w porzadku rosnacego x - `w lines` laczy punkty w kolejnosci danych.
-  for (size_t k = 0; k < rows; k++)
-    for (size_t x = 0; x < n; x++)
-      std::print("{} {}\r\n", (k * n) + x, gnuplot_lines_[kOhlc + n - 1 - x][k]);
-  std::print("e\r\n");
+  if (hasSample) {
+    for (size_t k = 0; k < rows; k++)
+      for (size_t x = 0; x < n; x++)
+        std::print("{} {}\r\n", (k * n) + x, gnuplot_lines_[kOhlc + n - 1 - x][k]);
+    std::print("e\r\n");
+  }
 }
 
 void Formatter::renderGraphite(const ptree &row, const std::string &nullmap, const std::string &input, const ptree &schema) {

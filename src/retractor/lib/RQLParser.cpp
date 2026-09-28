@@ -74,7 +74,7 @@ std::string lowercased(std::string text) {
 /// Listener bledow leksera dostaje ten sam parser, bo blad leksera rozwija stos przez
 /// dokladnie te same `finally` - token pobiera sie w srodku reguly parsera.
 [[noreturn]] void abortParse(antlr4::Parser &parser, size_t firstLine, size_t line, size_t charPositionInLine,
-                             const std::string &msg, Token *offendingSymbol) {
+                             const std::string &msg, Token *offendingSymbol, std::string_view sourceFile) {
   // Lekser i parser licza wiersze wewnatrz PRZEKAZANEGO tekstu, a ten bywa pojedyncza
   // instrukcja wyjeta z pliku planu przez readLogicalLines. firstLine przesuwa numer z
   // powrotem na wiersz pliku - bez tego kazda odmowa wskazywala wiersz 1, niezaleznie od
@@ -98,7 +98,10 @@ std::string lowercased(std::string text) {
   std::cerr << "Syntax error @Rql" << '\n';
   std::cerr << "line:" << sourceLine << ":" << charPositionInLine << " at " << offendingText << '\n';
   std::cerr << "msg:" << msg << '\n';
-  SPDLOG_ERROR("Parser: {}", message);
+  if (sourceFile.empty())
+    SPDLOG_ERROR("Parser: {}", message);
+  else
+    SPDLOG_ERROR("Parser: {}: {}", sourceFile, message);
 
   parser.removeParseListeners();
   throw RQLSyntaxError{std::move(message)};
@@ -135,28 +138,36 @@ std::optional<T> parseLiteral(const std::string &text) {
 
 class LexerErrorListener : public BaseErrorListener {
  public:
-  LexerErrorListener(antlr4::Parser &parser, size_t firstLine) : parser_(parser), firstLine_(firstLine) {}
+  LexerErrorListener(antlr4::Parser &parser, size_t firstLine, std::string_view sourceFile)
+      : parser_(parser),
+        firstLine_(firstLine),
+        sourceFile_(sourceFile) {}
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    abortParse(parser_, firstLine_, line, charPositionInLine, msg, offendingSymbol);
+    abortParse(parser_, firstLine_, line, charPositionInLine, msg, offendingSymbol, sourceFile_);
   }
 
  private:
   antlr4::Parser &parser_;
   size_t firstLine_;
+  std::string_view sourceFile_;
 };
 
 class ParserErrorListener : public BaseErrorListener {
  public:
-  ParserErrorListener(antlr4::Parser &parser, size_t firstLine) : parser_(parser), firstLine_(firstLine) {}
+  ParserErrorListener(antlr4::Parser &parser, size_t firstLine, std::string_view sourceFile)
+      : parser_(parser),
+        firstLine_(firstLine),
+        sourceFile_(sourceFile) {}
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    abortParse(parser_, firstLine_, line, charPositionInLine, msg, offendingSymbol);
+    abortParse(parser_, firstLine_, line, charPositionInLine, msg, offendingSymbol, sourceFile_);
   }
 
  private:
   antlr4::Parser &parser_;
   size_t firstLine_;
+  std::string_view sourceFile_;
 };
 
 /* Iterator - each new field gets new fieldCount number */
@@ -889,8 +900,8 @@ class ParserListener : public RQLBaseListener {
 };
 
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
-                                                                  std::vector<std::string> &statementKeywords,
-                                                                  size_t firstLine) {
+                                                                  std::vector<std::string> &statementKeywords, size_t firstLine,
+                                                                  std::string_view sourceFile) {
   statementKeywords.clear();
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
@@ -902,10 +913,10 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   RQLParser parser(&tokens);
   // Oba listenery bledow potrzebuja parsera (abortParse), wiec powstaja po nim - i przed nim
   // sa niszczone, czyli w chwili, gdy nikt juz do nich nie siega.
-  LexerErrorListener lexerErrorListener(parser, firstLine);
+  LexerErrorListener lexerErrorListener(parser, firstLine, sourceFile);
   lexer.removeErrorListeners();
   lexer.addErrorListener(&lexerErrorListener);
-  ParserErrorListener parserErrorListener(parser, firstLine);
+  ParserErrorListener parserErrorListener(parser, firstLine, sourceFile);
   ParserListener parserListener(coreInstance);
   parser.removeParseListeners();
   parser.removeErrorListeners();
@@ -1011,7 +1022,7 @@ std::string parserRQLFile_4Test(qTree &coreInstance, const std::string &sInputFi
   std::string status = "Empty file.";
   std::vector<std::string> statementKeywords;
   for (const auto &[stmt, firstLine] : readLogicalLines(file)) {
-    auto [result, first_keyword, stream_name] = parserRQLString(coreInstance, stmt, statementKeywords, firstLine);
+    auto [result, first_keyword, stream_name] = parserRQLString(coreInstance, stmt, statementKeywords, firstLine, sInputFile);
     status                                    = result;
     if (status != "OK") {
       SPDLOG_ERROR("Error: Parsing failed on {}.\n{}", first_keyword, stmt);

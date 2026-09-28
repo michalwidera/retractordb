@@ -66,14 +66,14 @@ std::string describeStore(const std::string &type, const rdb::retention_t &reten
 
 }  // namespace
 
-PlanSource parsePlanText(qTree &plan, const std::string &text) {
+PlanSource parsePlanText(qTree &plan, const std::string &text, std::string_view sourceFile) {
   PlanSource retVal;
   std::istringstream source(text);
   // Numer wiersza idzie do parsera, bo tylko tutaj wiadomo, w ktorym miejscu pliku stoi
   // instrukcja: parser dostaje ja wyjeta z kontekstu i sam liczylby od jedynki.
   std::vector<std::string> statementKeywords;
   for (const auto &[stmt, firstLine] : readLogicalLines(source)) {
-    auto [status, first_keyword, stream_name] = parserRQLString(plan, stmt, statementKeywords, firstLine);
+    auto [status, first_keyword, stream_name] = parserRQLString(plan, stmt, statementKeywords, firstLine, sourceFile);
     if (status != "OK") {
       retVal.status = status;
       return retVal;

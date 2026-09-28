@@ -26,10 +26,12 @@ LOCK_A="$LOCK_DIR/xretractor_service.alfa.lock"
 LOCK_B="$LOCK_DIR/xretractor_service.beta.lock"
 # Instancja punktu (8): ginie od SIGKILL, wiec plik blokady zostaje po niej na dysku.
 LOCK_G="$LOCK_DIR/xretractor_service.gamma.lock"
+LOCK_N="$LOCK_DIR/xretractor_service.probe.lock"
 
 pid_a=""
 pid_b=""
 pid_g=""
+pid_n=""
 
 cleanup() {
   local status=$?
@@ -37,7 +39,8 @@ cleanup() {
   xqry --server alfa -k >/dev/null 2>&1 || true
   xqry --server beta -k >/dev/null 2>&1 || true
   xqry --server gamma -k >/dev/null 2>&1 || true
-  for pid in "$pid_a" "$pid_b" "$pid_g"; do
+  RDB_NAMESPACE=bus_probe xqry --server probe -k >/dev/null 2>&1 || true
+  for pid in "$pid_a" "$pid_b" "$pid_g" "$pid_n"; do
     [ -n "$pid" ] || continue
     local waited=0
     while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt 50 ]; do
@@ -48,7 +51,7 @@ cleanup() {
     wait "$pid" 2>/dev/null || true
   done
   # Stabilne pliki flock sa czescia protokolu; usuwamy pliki testowe dopiero po procesach.
-  rm -f "$LOCK_A" "$LOCK_B" "$LOCK_G"
+  rm -f "$LOCK_A" "$LOCK_B" "$LOCK_G" "$LOCK_N"
   # Bramka higieny: zaden obiekt IPC ani testowy plik blokady tych instancji nie ma prawa zostac.
   # Instancja gamma ginie od SIGKILL, wiec jej obiekty kasuje sam scenariusz (punkt 8) --
   # tutaj sprawdzamy juz tylko, czy naprawde po sobie posprzatal.
@@ -56,7 +59,7 @@ cleanup() {
   # i brak katalogu Boost.Interprocess). Cicho zdana kontrola higieny bylaby gorsza niz
   # jej brak, wiec taki przypadek jest jawnym pominieciem, a nie sukcesem.
   local leftovers shm_status=0
-  leftovers=$(shm_list 'alfa|beta|gamma') || shm_status=$?
+  leftovers=$(shm_list 'alfa|beta|gamma|probe|bus_probe') || shm_status=$?
   if [ "$shm_status" -ne 0 ]; then
     echo "POMINIETO: higiena IPC niesprawdzalna na tej platformie"
   elif [ -n "$leftovers" ]; then
@@ -64,7 +67,7 @@ cleanup() {
     echo "$leftovers"
     status=1
   fi
-  if [ -f "$LOCK_A" ] || [ -f "$LOCK_B" ] || [ -f "$LOCK_G" ]; then
+  if [ -f "$LOCK_A" ] || [ -f "$LOCK_B" ] || [ -f "$LOCK_G" ] || [ -f "$LOCK_N" ]; then
     echo "higiena: zostal plik blokady instancji"
     status=1
   fi
@@ -128,10 +131,29 @@ for stream in srca dsta srcb dstb; do
 done
 grep -qE "^MODE: N=normal, R=realtime, .*S=service$" servers.txt || {
   echo "--bus nie wypisal legendy trybow:"; cat servers.txt; exit 1; }
-# Naglowek, separator, po dwie linie na instancje (srca+dsta, srcb+dstb) i legenda.
-[ "$(wc -l < servers.txt)" -eq 7 ] || {
-  echo "--bus wypisal tabele o nieoczekiwanej liczbie wierszy:"; cat servers.txt; exit 1; }
 
+# Druga magistrala ma osobna sekcje, nawet gdy klient nie ma RDB_NAMESPACE.
+RDB_NAMESPACE=bus_probe xretractor --noanykey --name probe </dev/null >probe.log 2>&1 &
+pid_n=$!
+wait_for_lock "$LOCK_N" "$pid_n"
+xqry --bus > namespaces.txt
+grep -qx 'NAMESPACE: (default)' namespaces.txt || {
+  echo "--bus pominal sekcje domyslna:"; cat namespaces.txt; exit 1; }
+grep -qx 'NAMESPACE: bus_probe' namespaces.txt || {
+  echo "--bus pominal sekcje bus_probe:"; cat namespaces.txt; exit 1; }
+awk '/^NAMESPACE: bus_probe$/ { in_section = 1; next } /^NAMESPACE: / { in_section = 0 } in_section && /^probe[[:space:]]*\|/ { found = 1 } END { exit !found }' namespaces.txt || {
+  echo "--bus pominal instancje w bus_probe:"; cat namespaces.txt; exit 1; }
+xqry --bus -y > namespaces.yaml
+grep -q '^    namespace: null$' namespaces.yaml &&
+  grep -A1 '^  - name: probe$' namespaces.yaml | grep -q '^    namespace: "bus_probe"$' || {
+  echo "--bus -y pominal nazwy magistral:"; cat namespaces.yaml; exit 1; }
+RDB_NAMESPACE=bus_probe xqry --server probe -k
+wait "$pid_n" 2>/dev/null || true
+pid_n=""
+xqry --bus > namespaces_after.txt
+if grep -q '^NAMESPACE: bus_probe$' namespaces_after.txt; then
+  echo "--bus wypisal zamknieta magistrale:"; cat namespaces_after.txt; exit 1
+fi
 # (2) -s bez --server trafia do wlasciciela.
 #
 # Sprawdzamy PRZYNALEZNOSC do zbioru, a nie konkretna trojke wartosci: zrodla sa czytane

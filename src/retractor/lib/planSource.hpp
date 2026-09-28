@@ -29,7 +29,8 @@ struct PlanSource {
 /// status zostaje "OK", a lista instrukcji pusta. Rozstrzygniecie, czy pusty plan znaczy
 /// "tryb bezczynny", czy "nie ma czego kompilowac", nalezy do wolajacego - dla uslugi to
 /// stan poprawny, dla `--onlycompile` blad.
-[[nodiscard]] PlanSource parsePlanText(qTree &plan, const std::string &text);
+/// `sourceFile` jest opcjonalna nazwa pliku dla logu bledow skladni.
+[[nodiscard]] PlanSource parsePlanText(qTree &plan, const std::string &text, std::string_view sourceFile = {});
 
 /// Kasuje pelne rodziny plikow (dane z cieniem, `.desc`, `.meta` z cieniem, segmenty retencji)
 /// wszystkich wezlow skompilowanego planu, takze posrednich.

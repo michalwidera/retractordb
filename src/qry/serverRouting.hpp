@@ -32,6 +32,11 @@ struct Resolution {
   std::string detail;      ///< gotowa treść komunikatu dla operatora
 };
 
+struct NamespaceGroup {
+  std::string name;  ///< pusta => magistrala domyslna
+  std::vector<bus::InstanceInfo> instances;
+};
+
 /// Nazwa instancji w komunikacie; instancja bez `--name` jako "(unnamed)" - jedno pole,
 /// bez spacji, więc wyjście `--bus` zostaje kolumnowo rozbieralne.
 [[nodiscard]] std::string instanceLabel(std::string_view name);
@@ -70,5 +75,8 @@ struct Resolution {
 /// w dokumencie do maszynowego odczytu bylaby szumem, a znaczenie liter niesie dokumentacja.
 /// Pusta magistrala daje `servers: []`, bo konsument formatu ma dostac dokument, nie nic.
 [[nodiscard]] std::vector<std::string> describeYaml(const std::vector<bus::InstanceInfo> &instances);
+
+/// Lista wszystkich magistral dla `xqry --bus -y`; kazdy serwer ma jawne pole namespace.
+[[nodiscard]] std::vector<std::string> describeNamespacesYaml(const std::vector<NamespaceGroup> &groups);
 
 }  // namespace routing

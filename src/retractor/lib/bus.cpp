@@ -9,6 +9,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cstring>
+#include <filesystem>
 #include <optional>
 #include <span>
 #include <thread>
@@ -271,6 +272,16 @@ std::string presencePath(std::string_view segment) {
   return std::string(ipc::kMachineLockDir) + "/" + std::string(segment) + ".lock";
 }
 
+std::optional<std::string> segmentFromPresence(std::string_view file) {
+  if (!file.ends_with(".lock")) return std::nullopt;
+  const std::string_view segment = file.substr(0, file.size() - 5);
+  if (segment == kSegmentName) return std::string(segment);
+  if (segment.size() <= kSegmentName.size() + 1 || !segment.starts_with(kSegmentName) || segment[kSegmentName.size()] != '_' ||
+      !servername::isValid(segment.substr(kSegmentName.size() + 1)))
+    return std::nullopt;
+  return std::string(segment);
+}
+
 }  // namespace
 
 StoreDigest storeDigest(const std::string_view path) {
@@ -307,18 +318,23 @@ std::string segmentName() {
   return std::string(kSegmentName) + '_' + runNamespace;
 }
 
+std::vector<std::string> segmentNames() {
+  std::vector<std::string> names;
+  std::error_code ec;
+  for (std::filesystem::directory_iterator it(ipc::kMachineLockDir, ec), end; !ec && it != end; it.increment(ec)) {
+    const std::string file = it->path().filename().string();
+    if (auto name = segmentFromPresence(file)) names.push_back(std::move(*name));
+  }
+  std::ranges::sort(names);
+  return names;
+}
+
 std::size_t segmentBytes() { return sizeof(Segment); }
 
 std::size_t sweepAbandonedSegments() {
   // Wylacznie segmenty tej wersji ukladu: starsze nazwy mapuja binarki sprzed protokolu
   // obecnosci, ktore blokady nie biora, wiec jej brak niczego o nich nie mowi.
-  const auto isSegmentPresence = [](std::string_view file) {
-    if (!file.ends_with(".lock")) return false;
-    const std::string_view segment = file.substr(0, file.size() - 5);
-    if (segment == kSegmentName) return true;
-    return segment.size() > kSegmentName.size() + 1 && segment.starts_with(kSegmentName) &&
-           segment[kSegmentName.size()] == '_' && servername::isValid(segment.substr(kSegmentName.size() + 1));
-  };
+  const auto isSegmentPresence = [](std::string_view file) { return segmentFromPresence(file).has_value(); };
   return lockfile::sweep(std::string(ipc::kMachineLockDir), isSegmentPresence, [](std::string_view file) {
     const std::string segment(file.substr(0, file.size() - 5));
     IPC::shared_memory_object::remove(segment.c_str());

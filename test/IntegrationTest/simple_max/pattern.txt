@@ -1,34 +1,34 @@
 :STORAGE	temp/
-core0(1/10)	datafile2.dat
+max_core0(1/10)	datafile2.dat
 	a: INTEGER
-core1(1/5)	datafile3.dat
+max_core1(1/5)	datafile3.dat
 	b: INTEGER
-str0(1/10)	tail=1
-	:- PUSH_STREAM(core0)
-	:- PUSH_STREAM(core1)
+max_str0(1/10)	tail=1
+	:- PUSH_STREAM(max_core0)
+	:- PUSH_STREAM(max_core1)
 	:- STREAM_ADD
-	str0_0: INTEGER
-		PUSH_ID(str0[0])
+	max_str0_0: INTEGER
+		PUSH_ID(max_str0[0])
 		PUSH_VAL(10)
 		MULTIPLY
-	str0_1: INTEGER
-		PUSH_ID(str0[1])
+	max_str0_1: INTEGER
+		PUSH_ID(max_str0[1])
 		PUSH_VAL(10)
 		ADD
 		PUSH_VAL(10)
 		MULTIPLY
-str1(1/10)	tail=1
-	:- PUSH_STREAM(str0)
+max_str1(1/10)	tail=1
+	:- PUSH_STREAM(max_str0)
 	:- STREAM_MAX
-	str1_0: RATIONAL
-		PUSH_ID(str1[0])
-str2(1/10)	tail=1
-	:- PUSH_STREAM(str0)
-	:- PUSH_STREAM(str1)
+	max_str1_0: RATIONAL
+		PUSH_ID(max_str1[0])
+max_str2(1/10)	tail=1
+	:- PUSH_STREAM(max_str0)
+	:- PUSH_STREAM(max_str1)
 	:- STREAM_ADD
-	str0_0: INTEGER
-		PUSH_ID(str2[0])
-	str0_1: INTEGER
-		PUSH_ID(str2[1])
-	str1_2: RATIONAL
-		PUSH_ID(str2[2])
+	max_str0_0: INTEGER
+		PUSH_ID(max_str2[0])
+	max_str0_1: INTEGER
+		PUSH_ID(max_str2[1])
+	max_str1_2: RATIONAL
+		PUSH_ID(max_str2[2])
