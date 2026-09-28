@@ -47,7 +47,8 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   coreInstance_.erase(removed.begin(), removed.end());
 
   for (auto &qry : coreInstance_) {
-    auto runtime              = std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]);
+    auto runtime = std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]);
+    if (!runtime->initializationError.empty()) FatalError("dataModel: {}", runtime->initializationError);
     runtime->logicalIndexBase = qry.logicalOrigin;
     qSet.emplace(qry.id, std::move(runtime));
   }
@@ -59,8 +60,8 @@ dataModel::~dataModel() = default;
 
 std::string dataModel::addQueriesToModel(const std::vector<std::string> &ids) {
   // Trzy przebiegi, zeby porazka nie zostawila modelu w polowie: sprawdzenie kazdej nazwy,
-  // budowa kazdej instancji i dopiero na koncu wpis do qSet. Wyjatek z konstruktora
-  // streamInstance wychodzi wiec przy nietknietym qSet i nie trzeba z niego niczego wyjmowac.
+  // budowa kazdej instancji i dopiero na koncu wpis do qSet. Blad otwarcia magazynu
+  // wraca jako status, zanim cokolwiek zostanie wpisane do qSet.
   std::vector<query *> nodes;
   nodes.reserve(ids.size());
   for (const auto &id : ids) {
@@ -80,6 +81,7 @@ std::string dataModel::addQueriesToModel(const std::vector<std::string> &ids) {
   built.reserve(nodes.size());
   for (query *node : nodes) {
     auto runtime = std::make_unique<streamInstance>(coreInstance_, *node, directive_[":STORAGE"]);
+    if (!runtime->initializationError.empty()) return "stream '" + node->id + "': " + runtime->initializationError;
     runtime->outputPayload->setDisposable(node->isDisposable);
     // SELECT dodany do działającego planu nie zaczyna w historycznym origin całego systemu.
     // Jego bazę wyznaczy dokładny pierwszy slot, w którym runtime zobaczy tę instancję.

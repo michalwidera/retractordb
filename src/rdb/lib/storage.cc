@@ -36,8 +36,9 @@ storage::storage(const std::string_view qryID,         //
       storageType_(storageType),
       percounter_(percounter) {}
 
-void storage::attachDescriptor(const Descriptor *descriptorParam) {
-  if (descriptorFileExist()) {
+std::string storage::attachDescriptor(const Descriptor *descriptorParam) {
+  const bool descriptorExisted = descriptorFileExist();
+  if (descriptorExisted) {
     descriptor = loadDescriptorFile(paths_.descriptorFile());
     if (descriptorParam != nullptr) verifyDescriptorMatch(*descriptorParam, descriptor, paths_.descriptorFile());
   } else {
@@ -52,10 +53,15 @@ void storage::attachDescriptor(const Descriptor *descriptorParam) {
   storagePayload_ = std::make_unique<rdb::payload>(descriptor);
   buffer_.attach(descriptor);
 
-  attachStorage();
+  const std::string error = attachStorage();
+  if (!error.empty() && !descriptorExisted) {
+    std::error_code ec;
+    std::filesystem::remove(paths_.descriptorFile(), ec);
+  }
+  return error;
 }
 
-void storage::attachStorage() {
+std::string storage::attachStorage() {
   if (paths_.storageFile().empty()) FatalError("storage: storage file path is empty - storage not properly configured");
 
   auto it1 = std::ranges::find_if(descriptor,  //
@@ -66,14 +72,16 @@ void storage::attachStorage() {
   }
 
   initializeAccessor();
+  if (!accessor_->initializationError().empty()) return accessor_->initializationError();
 
   // Wstrzyknięcie wariantu metadanych - dobór wariantu (inertny/cień indeksu/bazowy) realizuje fabryka.
   metaData_ = makeMetaIndex(isDeclared(), accessor_->hasShadow(), descriptor, paths_.metaIndexFile());
 
-  if (isDeclared()) return;
+  if (isDeclared()) return {};
 
   recordsCount_ = accessor_->count();
   detectStartupState();
+  return {};
 }
 
 storage::~storage() {
@@ -104,6 +112,7 @@ void storage::resetForUnitTest() {
     if (!isDeclared()) remove(paths_.storageFile().c_str());
 
   initializeAccessor();
+  if (!accessor_->initializationError().empty()) FatalError("storage::resetForUnitTest: {}", accessor_->initializationError());
 
   accessor_->write(nullptr, 0);
   recordsCount_ = 0;

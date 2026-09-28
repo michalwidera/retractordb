@@ -80,7 +80,7 @@ class storage {
   boost::rational<int> rInterval_{1};  ///< sampling interval for time calculations
 
   void detectStartupState();  ///< detect rotation or startup gap after meta index is ready
-  void attachStorage();
+  [[nodiscard]] std::string attachStorage();
 
   void abortIfStorageNotPrepared();
   void initializeAccessor();
@@ -122,7 +122,8 @@ class storage {
 
   sourceState bufferState{sourceState::empty};  // ? test lock
 
-  void attachDescriptor(const Descriptor *descriptor = nullptr);
+  /// @return pusty napis albo powod, dla ktorego nie dalo sie otworzyc magazynu (patrz FileInterface::initializationError)
+  [[nodiscard]] std::string attachDescriptor(const Descriptor *descriptor = nullptr);
 
   /// @brief Oznacz magazyn jako materializowany podplan (substrat) dla sondy K23.
   ///

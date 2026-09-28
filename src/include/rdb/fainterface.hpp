@@ -81,6 +81,15 @@ struct FileInterface {
   ///         nigdy wartość sygnalizująca błąd
   virtual size_t count() = 0;
 
+  /// @brief Powod, dla ktorego konstruktor nie otworzyl magazynu; pusty napis = akcesor gotowy.
+  ///
+  /// Import planu odczytuje go przed pierwszym count(), read() albo write() i odmawia statusem
+  /// zamiast FatalError. Akcesor z niepustym bledem nie nadaje sie do niczego poza zniszczeniem.
+  [[nodiscard]] virtual const std::string &initializationError() const {
+    static const std::string none;
+    return none;
+  }
+
   /// @brief Whether this storage keeps a data shadow file (.shadow) for update operations.
   /// @return true when updates go to a shadow file (see posixBinaryFileWithShadow)
   [[nodiscard]] virtual bool hasShadow() const { return false; }

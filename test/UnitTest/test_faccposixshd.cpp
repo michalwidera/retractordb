@@ -146,6 +146,16 @@ class ShadowFileTest : public ::testing::Test {
 // posixBinaryFileWithShadow tests
 // ============================================================
 
+TEST_F(ShadowFileTest, shadow_open_failure_returns_status_and_removes_new_main_file) {
+  std::filesystem::create_directory(filename + ".shadow");
+  {
+    rdb::posixBinaryFileWithShadow file(filename, desc);
+    EXPECT_NE(file.initializationError().find(filename + ".shadow"), std::string::npos);
+    EXPECT_FALSE(std::filesystem::exists(filename));
+  }
+  EXPECT_TRUE(std::filesystem::is_directory(filename + ".shadow"));
+}
+
 // Verify append writes go to main file, not shadow
 TEST_F(ShadowFileTest, test_faccposixshd_append_to_main) {
   BYTE record;

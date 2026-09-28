@@ -33,7 +33,10 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
 
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
   if (fd < 0) {
-    FatalError("posixBinaryFile: failed to open '{}' (fd={})", filename_, fd);
+    const int openErrno  = errno;  // przed skladaniem napisu - alokacja moze ruszyc errno
+    initializationError_ = "cannot open output file '" + filename_ + "': " + strerror(openErrno);
+    percounter_          = -1;
+    return;
   }
 
   if (fileExisted) {

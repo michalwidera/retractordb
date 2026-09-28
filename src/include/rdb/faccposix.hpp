@@ -30,8 +30,9 @@ class posixBinaryFile : public FileInterface {
   /**
    * @brief Posix File Descriptor
    */
-  int fd;
+  int fd{-1};
   int percounter_;
+  std::string initializationError_;
 
  public:
   posixBinaryFile(std::string_view fileName, const Descriptor &descriptor, int percounter = -1);
@@ -44,9 +45,11 @@ class posixBinaryFile : public FileInterface {
 
   auto name() -> std::string & override;
   size_t count() override;
+  [[nodiscard]] const std::string &initializationError() const override { return initializationError_; }
 
   /// @brief Usuwa plik i wylacza rotacje w destruktorze (groupFile: retencja i purge).
   ///        Obiekt nie nadaje sie potem do zapisu.
   void discard();
+  void suppressRotation() { percounter_ = -1; }
 };
 }  // namespace rdb

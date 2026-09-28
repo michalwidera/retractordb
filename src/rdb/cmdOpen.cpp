@@ -19,9 +19,10 @@ bool OpenCmd::execute(CommandContext &ctx) {
   const auto oldPos = ctx.file.find(".old");
   const auto base   = (oldPos != std::string::npos) ? ctx.file.substr(0, oldPos) : ctx.file;
   ctx.dacc          = std::make_unique<rdb::storage>(base, ctx.file, ctx.storageParam, ctx.storagePolicy);
+  std::string openError;
 
   if (ctx.dacc->descriptorFileExist()) {
-    ctx.dacc->attachDescriptor();
+    openError = ctx.dacc->attachDescriptor();
   } else {
     // Bez `.desc` schemat jest obowiazkowy i stoi w klamrach. Pierwszy znak sprawdzamy podgladem, bez
     // konsumowania, wiec nastepne polecenie skryptu zostaje poleceniem. Do 2026-09-27 petla brala
@@ -48,7 +49,12 @@ bool OpenCmd::execute(CommandContext &ctx) {
     std::stringstream schemaStream(schema);
     rdb::Descriptor desc;
     schemaStream >> desc;
-    ctx.dacc->attachDescriptor(&desc);
+    openError = ctx.dacc->attachDescriptor(&desc);
+  }
+  if (!openError.empty()) {
+    std::print("{}open: {}\n{}", ctx.colors.RED, openError, ctx.colors.RESET);
+    ctx.dacc.reset();
+    return false;
   }
   ctx.payloadStatus = clean;
   ctx.dacc->setDisposable(false);
