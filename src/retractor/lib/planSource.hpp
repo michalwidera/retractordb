@@ -83,6 +83,12 @@ void dropStalePlanArtifacts(const qTree &plan);
 /// atomowa i krotka. Sciezki po `REF` pozostaja wiec niechronione.
 [[nodiscard]] std::vector<std::string> planStorePaths(const qTree &plan, std::string_view defaultStorageDir);
 
+/// Sprawdza otwarcie plikow wyjsciowych SELECT przed publikacja planu. Pusta lista nazw
+/// oznacza caly plan; ad-hoc przekazuje tylko nowo dodawane strumienie.
+/// Zwraca "OK" albo powod odmowy z nazwa strumienia i pliku.
+[[nodiscard]] std::string checkOutputFilesOpenable(const qTree &plan, std::string_view defaultStorageDir,
+                                                   const std::vector<std::string> &streamNames = {});
+
 /// Normalizacja sciezki publikowanej w slocie magistrali. absolute() PRZED weakly_canonical():
 /// plik licznika przy pierwszym starcie jeszcze nie istnieje, a weakly_canonical nad
 /// nieistniejaca sciezka wzgledna zwraca ja bez zmiany - czyli bez katalogu roboczego,

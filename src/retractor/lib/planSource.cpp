@@ -1,7 +1,13 @@
 #include "planSource.hpp"
 
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
+#include <cstring>
 #include <filesystem>
 #include <format>
 #include <sstream>
@@ -167,6 +173,47 @@ std::vector<std::string> planStorePaths(const qTree &plan, const std::string_vie
     if (std::ranges::find(retVal, path) == retVal.end()) retVal.push_back(std::move(path));
   }
   return retVal;
+}
+
+std::string checkOutputFilesOpenable(const qTree &plan, const std::string_view defaultStorageDir,
+                                     const std::vector<std::string> &streamNames) {
+  const std::filesystem::path dir = planStorageDir(plan, defaultStorageDir);
+  for (const auto &q : plan) {
+    if (q.isCompilerDirective() || q.isDeclaration() || isMemoryStream(q)) continue;
+    if (!streamNames.empty() && std::ranges::find(streamNames, q.id) == streamNames.end()) continue;
+
+    std::string path       = (dir / (q.filename.empty() ? q.id : q.filename)).string();
+    const std::string type = q.storageType();
+    if ((type == "DEFAULT" || type == "DIRECT") && !q.retention.noRetention()) path += "_segment_0";
+
+    const auto check = [&](const std::string &file) -> std::string {
+      // Walidacja nie tworzy pliku: na nosniku embedded bylby to zapis przy
+      // kazdym resecie. Istniejacy plik otwieramy tak jak akcesor, a przy nowym
+      // sprawdzamy katalog, w ktorym akcesor dopiero go utworzy.
+      const int fd = ::open(file.c_str(), O_RDWR | O_CLOEXEC);
+      if (fd >= 0) {
+        if (::close(fd) != 0)
+          return std::format("cannot close output file '{}' for stream '{}': {}", file, q.id, std::strerror(errno));
+        return {};
+      }
+      if (errno != ENOENT)
+        return std::format("cannot open output file '{}' for stream '{}': {}", file, q.id, std::strerror(errno));
+
+      const std::filesystem::path parent = std::filesystem::path(file).parent_path().empty()
+                                               ? std::filesystem::path(".")
+                                               : std::filesystem::path(file).parent_path();
+      struct stat parentInfo{};
+      if (::stat(parent.c_str(), &parentInfo) != 0 || !S_ISDIR(parentInfo.st_mode) || ::access(parent.c_str(), W_OK | X_OK) != 0)
+        return std::format("cannot open output file '{}' for stream '{}': parent directory '{}' is unavailable", file, q.id,
+                           parent.string());
+      return {};
+    };
+
+    if (const auto error = check(path); !error.empty()) return error;
+    if (type == "DEFAULT" || type == "POSIXSHD")
+      if (const auto error = check(path + ".shadow"); !error.empty()) return error;
+  }
+  return "OK";
 }
 
 std::string planCounterPath(const qTree &plan) {
