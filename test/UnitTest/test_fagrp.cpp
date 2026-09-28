@@ -86,6 +86,33 @@ class GroupFileTest : public ::testing::Test {
 // groupFile tests
 // ============================================================
 
+TEST_F(GroupFileTest, failed_later_segment_keeps_earlier_segment_without_rotation) {
+  std::ofstream(filename + "_segment_0", std::ios::binary).put(static_cast<char>(42));
+  std::filesystem::create_directory(filename + "_segment_1");
+  {
+    rdb::groupFile<> file(filename, makeDesc(recsize), rdb::retention_t{2, 1}, 7);
+    EXPECT_FALSE(file.initializationError().empty());
+  }
+  EXPECT_EQ(readFile(filename + "_segment_0"), std::vector<BYTE>({42}));
+  EXPECT_FALSE(std::filesystem::exists(filename + "_segment_0.old7"));
+}
+
+// Status z konstruktora segmentu obsluguje tylko import planu. Nowy segment przy rotacji w pracy
+// ciaglej, ktorego nie da sie otworzyc, zatrzymuje proces z nazwa pliku - bez tego segment z
+// fd=-1 oddawalby z write() samo errno, a przy errno==0 cichy sukces bez zapisu.
+TEST_F(GroupFileTest, failed_rotation_segment_is_fatal) {
+  EXPECT_DEATH(
+      {
+        rdb::groupFile<> gfa(filename, makeDesc(recsize), rdb::retention_t{2, 1}, -1);
+        BYTE record = 1;
+        // Pierwszy zapis miesci sie w segmencie 0; dopiero drugi otwiera segment 1.
+        if (gfa.write(&record) != EXIT_SUCCESS) std::cerr << "pierwszy zapis nieudany\n";
+        std::filesystem::create_directory(filename + "_segment_1");
+        std::cerr << "write() zwrocilo " << gfa.write(&record) << "\n";
+      },
+      "groupFile::write: cannot open output file '" + filename + "_segment_1'");
+}
+
 // Verify no-retention mode writes all records into a single file
 TEST_F(GroupFileTest, test_fagrp_no_retention) {
   BYTE record;

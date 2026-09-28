@@ -53,6 +53,7 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
 
   if (retention.noRetention()) {
     vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
+    initializationError_ = vec_.back()->initializationError();
   } else {
     std::vector<size_t> existingSegments;
     existingSegments.reserve(retention_.segments == 0 ? kDefaultSegmentReserve : retention_.segments);
@@ -95,6 +96,12 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
       currentSegment_  = i;
       currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
       vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
+      if (!vec_.back()->initializationError().empty()) {
+        initializationError_ = vec_.back()->initializationError();
+        for (auto &segment : vec_)
+          segment->suppressRotation();
+        break;
+      }
       writeCount_ = vec_.back()->count();
     }
   }
@@ -126,6 +133,9 @@ ssize_t groupFile<T>::purge() {
   removedSegments_ = 0;
   currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
   vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
+  // Status z konstruktora obsluguje tylko import planu. Tu, w pracy ciaglej, segment bez pliku
+  // zapisywalby w ciemno, wiec zostaje dawne zatrzymanie z nazwa pliku.
+  if (const auto &err = vec_.back()->initializationError(); !err.empty()) FatalError("groupFile::purge: {}", err);
 
   SPDLOG_DEBUG("Purged all segments and reset group state.");
   if (vec_.size() != 1) FatalError("fagrp::purge: expected exactly one segment after purge");
@@ -152,6 +162,8 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
       currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
       SPDLOG_DEBUG("Rotating segments: currentSegment={}", currentSegment_);
       vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
+      // Uzasadnienie przy purge().
+      if (const auto &err = vec_.back()->initializationError(); !err.empty()) FatalError("groupFile::write: {}", err);
       writeCount_ = 0;
       if (retention_.segments != 0 && vec_.size() > retention_.segments) {
         SPDLOG_DEBUG("Removing oldest segment: {}", vec_.front()->name());

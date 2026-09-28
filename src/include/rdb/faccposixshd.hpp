@@ -35,14 +35,15 @@ class posixBinaryFileWithShadow : public FileInterface {
   /**
    * @brief Posix File Descriptor for main file
    */
-  int fd;
+  int fd{-1};
   /**
    * @brief Posix File Descriptor for shadow file
    * Shadow file stores (position, data) pairs for update operations.
    * Each shadow entry has size: sizeof(size_t) + recordSize_
    */
-  int fd_shadow;
+  int fd_shadow{-1};
   int percounter_;
+  std::string initializationError_;
 
   [[nodiscard]] std::string shadowName() const;
   ssize_t shadowFind(uint8_t *ptrData, size_t position) const;
@@ -58,6 +59,7 @@ class posixBinaryFileWithShadow : public FileInterface {
 
   auto name() -> std::string & override;
   size_t count() override;
+  [[nodiscard]] const std::string &initializationError() const override { return initializationError_; }
   [[nodiscard]] bool hasShadow() const override { return true; }
 
   /// @brief Scala plik cienia z głównym plikiem i usuwa plik cienia
@@ -66,5 +68,6 @@ class posixBinaryFileWithShadow : public FileInterface {
   /// @brief Usuwa oba pliki i wylacza rotacje w destruktorze (groupFile: retencja i purge).
   ///        Obiekt nie nadaje sie potem do zapisu.
   void discard();
+  void suppressRotation() { percounter_ = -1; }
 };
 }  // namespace rdb

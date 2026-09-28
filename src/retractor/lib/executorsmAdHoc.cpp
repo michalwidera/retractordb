@@ -1,10 +1,14 @@
 #include "executorsm.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -193,6 +197,22 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     }
   }
 
+  // Test zmienia katalog po kontroli wstepnej, lecz przed rzeczywistym open() w
+  // akcesorze. Bramka dziala raz na proces; limit zapobiega zawieszeniu serwera,
+  // gdy klient testowy zostanie przerwany przed utworzeniem pliku .release.
+  static bool openGateFired = false;
+  if (!openGateFired && !adHocStreams.empty()) {
+    const char *gate   = std::getenv("RDB_FAULT_ADHOC_OPEN_GATE");
+    const char *stream = std::getenv("RDB_FAULT_ADHOC_OPEN_STREAM");
+    if (gate != nullptr && stream != nullptr && std::ranges::contains(adHocStreams, std::string(stream))) {
+      openGateFired = true;
+      std::ofstream(std::string(gate) + ".ready").put('\n');
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+      while (!std::filesystem::exists(std::string(gate) + ".release") && std::chrono::steady_clock::now() < deadline)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+  }
+
   // Sciezki magazynow bierzemy z CALEGO planu po scaleniu, a nie z samych nowych wezlow:
   // claimAdditional pomija to, co juz stoi we wlasnym slocie, wiec zbior jest ten sam, a regula
   // "co jest magazynem" zostaje w jednym miejscu (planStorePaths).
@@ -275,10 +295,11 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
       compileChainResult = cmPtr->compile();
       if (compileChainResult == "OK") {
         pProc->syncDeclaredCapacities();
-        // Hak testu it_adhoc_register_rollback, ta sama droga co RDB_FAULT_SHOW. Zadne znane RQL
-        // nie prowadzi do porazki PO imporcie do zywego planu, a wlasnie ta porazka ma sie konczyc
-        // wycofaniem planu. Hak rzuca raz na proces, zeby test mogl po nim powtorzyc to samo
-        // zapytanie i sprawdzic, ze plan je przyjmuje.
+        // Hak testu it_adhoc_register_rollback, ta sama droga co RDB_FAULT_SHOW. Porazka PO
+        // imporcie do zywego planu ma dwie drogi wycofania: status z addQueriesToModel (pozny
+        // blad open() magazynu, wymuszany bramka RDB_FAULT_ADHOC_OPEN_GATE) i wyjatek, ktory
+        // lapie catch ponizej. Hak rzuca, bo drugiej drogi zadne znane RQL nie wywoluje. Raz na
+        // proces, zeby test mogl po nim powtorzyc to samo zapytanie i sprawdzic, ze plan je przyjmuje.
         static bool registerFaultFired = false;
         if (!registerFaultFired && std::getenv("RDB_FAULT_ADHOC_REGISTER") != nullptr) {
           registerFaultFired = true;
@@ -305,8 +326,8 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   }
 
   if (!addFailedId.empty()) {
-    ptRetval.put(std::string("db"), "dataModel::addQueriesToModel FAILED:" + addFailedId);
-    SPDLOG_ERROR("dataModel::addQueriesToModel FAILED, stream {}", addFailedId);
+    ptRetval.put(std::string("db"), "Rejected: " + addFailedId);
+    SPDLOG_ERROR("AdHoc rejected after import: {}", addFailedId);
     return ptRetval;
   }
 

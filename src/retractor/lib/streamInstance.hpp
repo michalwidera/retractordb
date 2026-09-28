@@ -28,6 +28,7 @@ struct streamInstance {
   std::unique_ptr<rdb::storage> outputPayload;  // here is payload that will be stored - select clause
   std::unique_ptr<rdb::payload> inputPayload;   // payload used for computation in select
                                                 // clause - created by from clause.
+  std::string initializationError;
 
   /// @brief Liczba slotów własnego interwału, które upłynęły od startu strumienia.
   ///

@@ -66,12 +66,19 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
 
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
   if (fd < 0) {
-    FatalError("posixBinaryFileWithShadow: failed to open '{}' (fd={})", filename_, fd);
+    const int openErrno  = errno;  // przed skladaniem napisu - uzasadnienie w faccposix.cc
+    initializationError_ = "cannot open output file '" + filename_ + "': " + strerror(openErrno);
+    percounter_          = -1;
+    return;
   }
 
   fd_shadow = ::open(shadowName().c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
   if (fd_shadow < 0) {
-    FatalError("posixBinaryFileWithShadow: failed to open shadow '{}' (fd={})", shadowName(), fd_shadow);
+    const int openErrno  = errno;
+    initializationError_ = "cannot open output file '" + shadowName() + "': " + strerror(openErrno);
+    percounter_          = -1;
+    if (!mainFileExisted) std::filesystem::remove(filename_, fs_ec);
+    return;
   }
 
   if (mainFileExisted) {
