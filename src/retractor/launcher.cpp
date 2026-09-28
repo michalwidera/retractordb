@@ -362,6 +362,7 @@ int main(int argc, char *argv[]) try {
           ("onlycompile,c", "compile only mode")                                     // linking inheritance from launcher
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")     //
           ("quiet,r", "no output on screen, skip presenter")                         //
+          ("verbose,v", "verbose mode (show stream params)")                         //
           ("dot,d", "create dot output")                                             //
           ("csv,m", "create csv output")                                             //
           ("fields,f", "show fields in dot file")                                    //
@@ -382,7 +383,7 @@ int main(int argc, char *argv[]) try {
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
           ("quiet,r", "no output on screen, skip presenter")                      //
           ("status,s", "check service status")                                    //
-          ("cleanup", "remove leftovers of dead instances and exit")              //
+          ("cleanup,o", "remove leftovers of dead instances and exit")            //
           ("verbose,v", "verbose mode (show stream params)")                      //
           ("xqrywait,x", "wait with processing for first query")                  //
           ("name,n", po::value<std::string>(&sServerName),                        //
@@ -458,6 +459,7 @@ int main(int argc, char *argv[]) try {
       std::cout << desc;
       std::println("{}", config_line);
       std::println("Log: {}", tempLocation);
+      std::println("Config: {}", appCfg.loadedFrom.empty() ? "Defaults" : fmt::format("{}", fmt::join(appCfg.loadedFrom, ", ")));
       if (vm.contains("realtime")) rtCheckAndPrint();
       std::println("{}", warranty);
       return system::errc::success;
@@ -499,7 +501,7 @@ int main(int argc, char *argv[]) try {
       planText << file.rdbuf();
       file.close();
 
-      const PlanSource loaded = parsePlanText(coreInstance, planText.str());
+      const PlanSource loaded = parsePlanText(coreInstance, planText.str(), std::filesystem::absolute(sInputFile).string());
       if (loaded.status != "OK") {
         std::cerr << "Input file:" << sInputFile << '\n'  //
                   << "Parse result:" << loaded.status << '\n';
@@ -536,13 +538,15 @@ int main(int argc, char *argv[]) try {
       // granice stawia RETENTION, magazyn MEMORY albo `[storage] default_retention`.
       if (const auto unbounded = cm.unboundedDiskStreams(); !unbounded.empty()) {
         for (const auto &[stream, reason] : unbounded) {
-          std::println(std::cerr, "{}: warning: stream {} grows without bound on disk ({})", argv[0], stream, reason);
+          if (vm.contains("verbose"))
+            std::println(std::cerr, "{}: warning: stream {} grows without bound on disk ({})", argv[0], stream, reason);
           SPDLOG_WARN("Stream {} grows without bound on disk ({})", stream, reason);
         }
-        std::println(std::cerr,
-                     "{}: note: bound them with RETENTION <capacity> <segments>, STORAGE MEMORY, SUBSTRAT 'memory' "
-                     "or [storage] default_retention in the config",
-                     argv[0]);
+        if (vm.contains("verbose"))
+          std::println(std::cerr,
+                       "{}: note: bound them with RETENTION <capacity> <segments>, STORAGE MEMORY, SUBSTRAT 'memory' "
+                       "or [storage] default_retention in the config",
+                       argv[0]);
       }
 
       if (onlyCompile) {

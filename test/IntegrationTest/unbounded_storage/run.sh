@@ -5,7 +5,7 @@
 # z `RETMEMORY 5` i `TYPE DEFAULT`: magazyn DEFAULT z .shadow zamiast DIRECT i bez retencji, jeden plik
 # rosnacy o rekord na takt. Teraz to blad planu z podpowiedzia `RETENTION 5 <segments>`, a postac
 # dwuargumentowa daje DIRECT z segmentami.
-# D8. Wzrost na dysku zostaje dozwolony, ale jawny: ostrzezenie na stderr przy starcie i w `-c`,
+# D8. Wzrost na dysku zostaje dozwolony, ale jawny: ostrzezenie na stderr przy starcie i w `-c` z `--verbose`,
 # a `[storage] default_retention` daje retencje strumieniom bez RETENTION.
 # Za mala retencja (ponizej historii czytanej przez plan) konczyla dzialajacy serwer FatalError-em
 # w storage::read; teraz jest bledem kompilacji.
@@ -47,16 +47,16 @@ segments=$(ls temp | grep -c -E '^str2_segment_[0-9]+$' || true)
 if ls temp | grep -q 'shadow'; then fail "DIRECT storage left a .shadow file: $(ls temp)"; fi
 grep -q "grows without bound" segmented_run.txt && fail "bounded stream reported as unbounded" segmented_run.txt
 
-# --- D8: ostrzezenie wymienia strumien bez granicy, w -c i przy starcie; ograniczonego nie ---
+# --- D8: ostrzezenie wymienia strumien bez granicy, w -c i przy starcie z --verbose; ograniczonego nie ---
 printf '%s\nSELECT src[0] STREAM plain FROM src\nSELECT src[0] STREAM bounded FROM src RETENTION 5 2\n' "$header" >warn.rql
 fresh
-xretractor warn.rql -c >warn_c.out 2>warn_c.err || fail "-c rejected a valid plan" warn_c.err
+xretractor warn.rql -c --verbose >warn_c.out 2>warn_c.err || fail "-c rejected a valid plan" warn_c.err
 grep -q "warning: stream plain grows without bound on disk (no RETENTION)" warn_c.err || fail "-c did not name plain" warn_c.err
 grep -q "stream bounded" warn_c.err && fail "-c named a bounded stream" warn_c.err
 grep -q "grows without bound" warn_c.out && fail "-c warning leaked to stdout" warn_c.out
-xretractor warn.rql -c --quiet >/dev/null 2>warn_q.err || fail "-c --quiet rejected a valid plan" warn_q.err
+xretractor warn.rql -c --quiet --verbose >/dev/null 2>warn_q.err || fail "-c --quiet rejected a valid plan" warn_q.err
 grep -q "stream plain grows without bound" warn_q.err || fail "-c --quiet dropped the warning" warn_q.err
-xretractor warn.rql -m 3 -f </dev/null >warn_run.out 2>warn_run.err || fail "start rejected a valid plan" warn_run.err
+xretractor warn.rql -m 3 -f --verbose </dev/null >warn_run.out 2>warn_run.err || fail "start rejected a valid plan" warn_run.err
 grep -q "warning: stream plain grows without bound on disk (no RETENTION)" warn_run.err || fail "start did not name plain" warn_run.err
 
 # --- D8: [storage] default_retention trafia do .desc i ogranicza liczbe segmentow ---

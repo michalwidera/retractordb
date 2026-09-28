@@ -4,6 +4,8 @@ STREAM=${1:-str1}
 QUERY=${2:-query.rql}
 SIZE=${3:-50,200}
 XQRY_EXTRA_FLAGS=${4:-}
+XRETRACTOR=${XRETRACTOR:-xretractor}
+XQRY=${XQRY:-xqry}
 
 # Kazde uruchomienie dostaje wlasna nazwe instancji, domyslnie z katalogu roboczego celu.
 # Bez nazwy dwa cele uruchomione rownolegle (np. `ninja dsp` i `ninja simple`) walcza o ta sama
@@ -14,14 +16,14 @@ NAME=${5:-$(basename "$PWD")}
 NAME=$(printf '%s' "$NAME" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9_-' '_' | cut -c1-32)
 case "$NAME" in [a-z]*) ;; *) NAME=$(printf 'x%s' "$NAME" | cut -c1-32) ;; esac
 
-if ! xretractor $QUERY -c -r ; then exit 1 ; fi
+if ! "$XRETRACTOR" $QUERY -c -r ; then exit 1 ; fi
 
 if ! which gnuplot > /dev/null ; then echo "install gnuplot!" ; exit 1 ; fi
 
 # Odsiew PRZED czynnoscia niszczaca. `rm -rf temp` kasuje magazyn celu, wiec nie moze wykonac
 # sie w sytuacji, w ktorej i tak nie wystartujemy: drugie uruchomienie tego samego celu zabralo by
 # dane dzialajacej instancji, zanim xretractor zdazylby odmowic startu na blokadzie.
-if xqry --server "$NAME" -l > /dev/null 2>&1 ; then
+if "$XQRY" --server "$NAME" -l > /dev/null 2>&1 ; then
     echo "xplot: instance '$NAME' is already running; stop it (xqry --server $NAME -k) or pass a different name as the fifth argument" >&2
     exit 1
 fi
@@ -55,7 +57,7 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-nohup xretractor $QUERY --name "$NAME" -k -r &
+nohup "$XRETRACTOR" $QUERY --name "$NAME" -k -r &
 XRETRACTOR_PID=$!
 
 # Czekamy na gotowosc WLASNEJ instancji zamiast na staly `sleep 1`. Petla pilnuje takze, czy
@@ -64,7 +66,7 @@ XRETRACTOR_PID=$!
 READY=
 for _ in $(seq 100); do
     if ! kill -0 "$XRETRACTOR_PID" 2>/dev/null ; then break ; fi
-    if xqry --server "$NAME" -l > /dev/null 2>&1 ; then READY=1 ; break ; fi
+    if "$XQRY" --server "$NAME" -l > /dev/null 2>&1 ; then READY=1 ; break ; fi
     sleep 0.1
 done
 if [ -z "$READY" ]; then
@@ -95,7 +97,7 @@ exec 3<&0
 exec 4<> "$PLOT_DIR/data"
 gnuplot < "$PLOT_DIR/data" 3<&- 4>&- &
 GNUPLOT_PID=$!
-{ printf 'bind "Close" "exit gnuplot"\n'; exec xqry --server "$NAME" -s "$STREAM" -p "$SIZE" $XQRY_EXTRA_FLAGS; } \
+{ printf 'bind "Close" "exit gnuplot"\n'; exec "$XQRY" --server "$NAME" -s "$STREAM" -p "$SIZE" $XQRY_EXTRA_FLAGS; } \
     <&3 3<&- > "$PLOT_DIR/data" 4>&- &
 XQRY_PID=$!
 exec 3<&- 4>&-

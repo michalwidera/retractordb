@@ -10,31 +10,46 @@ add_subdirectory(retractor)
 
 add_custom_target(
   simple
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple)
+  COMMAND ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
+          "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple
+  DEPENDS xretractor xqry)
 
 add_custom_target(
   simple-max
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh str2
+  COMMAND ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
+          "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh str2
   WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple_max)
+    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/simple_max
+  DEPENDS xretractor xqry)
 
 add_custom_target(
   simple-timeshift
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh str1 query-51.rql
+  COMMAND
+    ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
+    "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh str1
+    query-51.rql
   WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/issue56_timeshift)
+    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/issue56_timeshift
+  DEPENDS xretractor xqry)
 
 add_custom_target(
   dsp
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh outputAll query.rql 50:256
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/dsp)
+  COMMAND
+    ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
+    "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh outputAll
+    query.rql 50:256
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/dsp
+  DEPENDS xretractor xqry)
 
 add_custom_target(
   candlestick
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh chart candlestick.rql 250,64,192
-          "--gnuplot-ohlc --gnuplot-rtl"
-  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/candlestick)
+  COMMAND
+    ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
+    "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh chart
+    candlestick.rql 250,64,192 "--gnuplot-ohlc --gnuplot-rtl"
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/candlestick
+  DEPENDS xretractor xqry)
 
 add_custom_target(
   ecg-clean
@@ -62,23 +77,29 @@ add_custom_target(
 
 add_custom_target(
   ecg
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh s205out rec205-replay.rql
-          720,560,1360 --gnuplot-rtl
-  DEPENDS ecg-clean
+  COMMAND
+    ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
+    "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh s205out
+    rec205-replay.rql 720,560,1360 --gnuplot-rtl
+  DEPENDS ecg-clean xretractor xqry
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 
 add_custom_target(
   ecg-qrs
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh qrs_out rec205-qrs.rql
-          1440,-50,350 "--gnuplot-rtl"
-  DEPENDS ecg-clean
+  COMMAND
+    ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
+    "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh qrs_out
+    rec205-qrs.rql 1440,-50,350 "--gnuplot-rtl"
+  DEPENDS ecg-clean xretractor xqry
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 
 add_custom_target(
   ecg-detect-qrs
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh detect_out rec205-detect.rql
-          720,-50,400 "--gnuplot-rtl"
-  DEPENDS ecg-clean
+  COMMAND
+    ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
+    "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh detect_out
+    rec205-detect.rql 720,-50,400 "--gnuplot-rtl"
+  DEPENDS ecg-clean xretractor xqry
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/ecg/rec205)
 
 add_custom_target(
@@ -101,9 +122,11 @@ add_custom_target(
 
 add_custom_target(
   lang-showcase
-  COMMAND ${CMAKE_SOURCE_DIR}/scripts/xplot.sh win
+  COMMAND ${CMAKE_COMMAND} -E env "XRETRACTOR=$<TARGET_FILE:xretractor>"
+          "XQRY=$<TARGET_FILE:xqry>" ${CMAKE_SOURCE_DIR}/scripts/xplot.sh win
   WORKING_DIRECTORY
-    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/lang_showcase)
+    ${CMAKE_CURRENT_BINARY_DIR}/../test/IntegrationTest/lang_showcase
+  DEPENDS xretractor xqry)
 
 add_custom_target(
   lang-showcase-view
