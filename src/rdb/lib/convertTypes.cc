@@ -61,10 +61,12 @@ static void narrowFloatTo(F value, K &retVal) {
 /// Zero, ktorego nikt nie policzyl, jest jednak dokladnie tym, co komentarz wyzej odrzuca
 /// przy nasyceniu, dlatego NULL stoi na sciezce konwersji: NaN i nieskonczonosc nie maja
 /// reprezentacji w `boost::rational<int>` i ida jako std::monostate, tak samo jak wartosc
-/// zmiennoprzecinkowa poza zakresem typu calkowitego idzie nim z narrowFloatTo.
+/// zmiennoprzecinkowa poza zakresem typu calkowitego idzie nim z narrowFloatTo. Zakres
+/// sprawdzamy na obcietej wartosci bezwzglednej, zgodnie z granica uzywana w Rationalize.
 template <typename K>
 static void rationalizeTo(double value, K &retVal) {
-  if (std::isfinite(value))
+  const double upperExclusive = std::ldexp(1.0, std::numeric_limits<int>::digits);
+  if (std::isfinite(value) && std::trunc(std::fabs(value)) < upperExclusive)
     retVal = Rationalize(value);
   else
     retVal = std::monostate{};
