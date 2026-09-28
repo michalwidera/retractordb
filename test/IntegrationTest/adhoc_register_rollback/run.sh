@@ -63,7 +63,7 @@ fi
 # Magistrala tez wrocila do stanu sprzed komendy (#303). Roszczenie nazwy idzie PRZED importem,
 # wiec bez zwolnienia `extra` zostawalo ogloszone jako strumien tej instancji: `xqry -s extra`
 # trafial tu i dostawal "stream unknown", a inna instancja nie mogla tej nazwy zajac.
-xqry --bus > bus_after_fail.txt
+bus_own > bus_after_fail.txt
 if grep -qE '\|[[:space:]]+extra$' bus_after_fail.txt; then
   echo "magistrala po nieudanym imporcie nadal oglasza 'extra':"
   cat bus_after_fail.txt
@@ -80,7 +80,7 @@ if [ "$rc" -ne 0 ]; then
 fi
 # Lustro kontroli magistrali: udany import ma nazwe oglosic. Bez tego zwolnienie "zawsze"
 # przeszloby kontrole po porazce.
-xqry --bus > bus_after_ok.txt
+bus_own > bus_after_ok.txt
 if ! grep -qE '\|[[:space:]]+extra$' bus_after_ok.txt; then
   echo "magistrala po udanym imporcie nie oglasza 'extra':"
   cat bus_after_ok.txt

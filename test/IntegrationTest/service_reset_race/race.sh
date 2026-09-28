@@ -57,12 +57,12 @@ export RDB_FAULT_GET_AWAIT_EPOCH_SWAP=1200
 server_start plan1.rql --service --noanykey
 unset RDB_FAULT_GET_AWAIT_EPOCH_SWAP
 
-# Segment magistrali nalezy do przestrzeni nazw tego testu, wiec jedyne wiersze, jakie
-# w nim sa, pochodza od naszej instancji.
+# `bus_own` zostawia sekcje magistrali przestrzeni nazw tego testu, wiec jedyne wiersze,
+# jakie widzimy, pochodza od naszej instancji.
 wait_for_stream() {
   local name="$1" i=0
   while [ "$i" -lt 100 ]; do
-    if xqry --bus 2>/dev/null | grep -qE "[ |,]${name}(,| |\||$)"; then return 0; fi
+    if bus_own | grep -qE "[ |,]${name}(,| |\||$)"; then return 0; fi
     sleep 0.1
     i=$((i + 1))
   done
