@@ -710,3 +710,25 @@ TEST(cast_variant, negative_double_to_rational) {
   rdb::descFldVT in = -2.5;
   EXPECT_EQ(std::get<boost::rational<int>>(c(in, rdb::RATIONAL)), boost::rational<int>(-5, 2));
 }
+
+TEST(cast_variant, finite_double_outside_rational_range_is_null) {
+  cast<rdb::descFldVT> c;
+  for (const double value : {2147483648.0, -2147483648.0, 1e30, -1e30}) {
+    rdb::descFldVT in = value;
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::RATIONAL))) << value;
+  }
+}
+
+TEST(cast_variant, finite_double_inside_rational_range_is_not_null) {
+  cast<rdb::descFldVT> c;
+  for (const double value : {2147483647.5, -2147483647.5}) {
+    rdb::descFldVT in = value;
+    EXPECT_TRUE(std::holds_alternative<boost::rational<int>>(c(in, rdb::RATIONAL))) << value;
+  }
+}
+
+TEST(cast_any, finite_float_outside_rational_range_is_null) {
+  cast<std::any> c;
+  EXPECT_EQ(c(std::any(2147483648.0F), rdb::RATIONAL).type(), typeid(std::monostate));
+  EXPECT_EQ(c(std::any(2147483520.0F), rdb::RATIONAL).type(), typeid(boost::rational<int>));
+}
