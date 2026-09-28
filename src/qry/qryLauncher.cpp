@@ -347,18 +347,31 @@ int main(int argc, char *argv[]) {
       return system::errc::success;
     }
 
-    const std::vector<bus::InstanceInfo> liveInstances = busSnapshot();
-
     if (vm.contains("bus")) {
-      const std::vector<std::string> lines =
-          vm.contains("yaml") ? routing::describeYaml(liveInstances) : routing::describe(liveInstances);
-      for (const auto &line : lines)
-        std::println("{}", line);
-      // Komunikat o pustej magistrali wynika z samej magistrali, a nie z liczby wypisanych
-      // wierszy: forma YAML wypisuje dokument `servers: []` takze wtedy, gdy nie ma czego opisac.
-      if (liveInstances.empty()) std::println(std::cerr, "xqry: no live xretractor instance");
+      std::vector<routing::NamespaceGroup> groups;
+      for (const auto &segment : bus::segmentNames()) {
+        const bus::Bus xrdbbus(segment, /*createIfMissing=*/false);
+        std::vector<bus::InstanceInfo> instances = xrdbbus.instances();
+        if (instances.empty()) continue;
+        const std::string name = segment == bus::kSegmentName ? std::string{} : segment.substr(bus::kSegmentName.size() + 1);
+        groups.push_back({.name = name, .instances = std::move(instances)});
+      }
+      if (vm.contains("yaml")) {
+        for (const auto &line : routing::describeNamespacesYaml(groups))
+          std::println("{}", line);
+      } else {
+        for (const auto &group : groups) {
+          if (&group != &groups.front()) std::println();
+          std::println("NAMESPACE: {}", group.name.empty() ? "(default)" : group.name);
+          for (const auto &line : routing::describe(group.instances))
+            std::println("{}", line);
+        }
+      }
+      if (groups.empty()) std::println(std::cerr, "xqry: no live xretractor instance");
       return system::errc::success;
     }
+
+    const std::vector<bus::InstanceInfo> liveInstances = busSnapshot();
 
     // Jawny `--server` wygrywa zawsze i pomija magistralę: operator, który wskazał instancję
     // palcem, ma dostać dokładnie ją, także wtedy gdy magistrala jest niedostępna. Tak samo

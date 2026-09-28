@@ -67,6 +67,10 @@ inline constexpr std::string_view kSegmentName = "xrdbbus_v6";
 /// instancji ("<obiekt>.<nazwa instancji>") i wpadalaby pod wzorce sprzatajace.
 [[nodiscard]] std::string segmentName();
 
+/// Nazwy segmentow biezacej wersji znalezione przez pliki obecnosci. Samo znalezienie pliku
+/// nie dowodzi, ze segment lub zywa instancja nadal istnieje; czytelnik sprawdza to przez Bus.
+[[nodiscard]] std::vector<std::string> segmentNames();
+
 /// Kasuje segmenty tej wersji ukladu, ktorych nikt nie mapuje - pozostalosci po procesach zabitych,
 /// ktore nie zdazyly posprzatac jako ostatni wychodzacy. Zwraca liczbe usunietych.
 std::size_t sweepAbandonedSegments();
