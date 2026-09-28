@@ -174,7 +174,26 @@ TEST(Formatter, renderGnuplotOhlc_null_candle_is_skipped) {
   Formatter fmt;
   auto out = feedOhlc(fmt, {{"", "40", "5", "30", "7"}}, "10000", 5);
 
-  EXPECT_NE(out.find("\r\ne\r\n0 7\r\ne\r\n"), std::string::npos) << out;
+  EXPECT_NE(out.find("plot '-' u 1:2 t '[chart]' w lines lc rgb 'blue'\r\n0 7\r\ne\r\n"), std::string::npos) << out;
+  EXPECT_EQ(out.find("candlesticks"), std::string::npos) << out;
+}
+
+TEST(Formatter, renderGnuplotOhlc_all_null_waits_for_valid_points) {
+  Formatter fmt;
+  auto empty = feedOhlc(fmt, {{"", "", "", "", ""}}, "11111", 5);
+  EXPECT_TRUE(empty.empty()) << empty;
+
+  auto out = feedOhlc(fmt, {{"10", "40", "5", "30", "7"}}, "00000", 5);
+  EXPECT_NE(out.find("candlesticks"), std::string::npos) << out;
+  EXPECT_NE(out.find("0 7\r\n"), std::string::npos) << out;
+}
+
+TEST(Formatter, renderGnuplotOhlc_null_samples_draws_only_candle) {
+  Formatter fmt;
+  auto out = feedOhlc(fmt, {{"10", "40", "5", "30", ""}}, "00001", 5);
+
+  EXPECT_NE(out.find("plot '-' u 1:2:3:4:5:6:"), std::string::npos) << out;
+  EXPECT_EQ(out.find("w lines"), std::string::npos) << out;
 }
 
 TEST(Formatter, renderGnuplotOhlc_row_without_samples_plots_nothing) {
