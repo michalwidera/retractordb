@@ -720,14 +720,14 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       os << " ";
     os << r.rname;
     os << ":";
-    const int flatCountForField = (r.rtype == rdb::STRING || r.rtype == rdb::NULLTYPE) ? 1 : r.rarray;
+    const int flatCountForField = rdb::flatElementCount(r);
     const auto firstValue       = rhs.getItem(flatIndex);
     if (!firstValue.has_value()) {
       os << "null";
       flatIndex += flatCountForField;
     } else if (r.rtype == rdb::STRING || r.rtype == rdb::NULLTYPE) {
       writeValue(os, *firstValue, r.rtype, rhs.hexFormat_);
-      ++flatIndex;
+      flatIndex += flatCountForField;
     } else {
       for (int i = 0; i < flatCountForField; ++i) {
         const auto value = rhs.getItem(flatIndex + i);

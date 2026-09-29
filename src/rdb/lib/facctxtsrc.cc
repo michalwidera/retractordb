@@ -136,12 +136,15 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
   auto i = 0;
   for (const auto &item : descriptor_) {
     if (item.rtype == rdb::NULLTYPE) {
-      auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
-      if (token.has_value() && !isNullToken(*token)) {
-        FatalError("facctxtsrc: expected NULL token for NULL field, got: {}", *token);
+      // NULLTYPE[N] to N slotow, wiec - jak tablica liczbowa - N tokenow wiersza.
+      for (auto j = 0; j < rdb::flatElementCount(item); j++) {
+        auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
+        if (token.has_value() && !isNullToken(*token)) {
+          FatalError("facctxtsrc: expected NULL token for NULL field, got: {}", *token);
+        }
+        payload_->setItem(i + j, std::nullopt);
       }
-      payload_->setItem(i, std::nullopt);
-      i++;
+      i += rdb::flatElementCount(item);
       continue;
     }
 
@@ -221,7 +224,7 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
       // STRING zajmuje jedną pozycję płaską, a tablica liczbowa po jednej pozycji na element. Stałe
       // i++ ustawiało kolejne pole na pozycji wewnątrz poprzedniej tablicy: przy DECLARE a INTEGER[3],
       // b INTEGER wartość b lądowała w a[1], a własne pole b zostawało niezapisane.
-      i += (item.rtype == rdb::STRING) ? 1 : item.rarray;
+      i += rdb::flatElementCount(item);
     }
   }
 

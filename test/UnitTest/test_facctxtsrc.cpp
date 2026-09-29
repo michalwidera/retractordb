@@ -366,6 +366,27 @@ TEST_F(TextSourceROTest, test_read_integer_array) {
   GTEST_ASSERT_EQ(values[2], 3);
 }
 
+// Verify NULLTYPE[N] consumes N NULL tokens, so the next field reads its own token
+TEST_F(TextSourceROTest, test_read_nulltype_array_keeps_next_field_aligned) {
+  auto filename = createTestFile("test_nulltype_arr.txt", "NULL NULL NULL 7\n");
+
+  rdb::Descriptor desc{{"n", 0, 3, rdb::NULLTYPE}, {"b", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
+
+  auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
+
+  int value = 0;
+  std::memcpy(&value, buffer.get(), sizeof(int));
+  GTEST_ASSERT_EQ(value, 7);
+
+  auto nulls = src->lastNullBitset();
+  ASSERT_EQ(nulls.size(), 2U);
+  EXPECT_TRUE(nulls[0]);
+  EXPECT_FALSE(nulls[1]);
+}
+
 // ============================================================
 // textSourceRO - loop to beginning (EOF wrapping) tests
 // ============================================================

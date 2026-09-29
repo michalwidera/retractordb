@@ -538,13 +538,6 @@ bool consumesTwoPrecedingTokens(command_id cmd) {
   }
 }
 
-/// Ile slotów PŁASKICH zajmuje pole w rekordzie.
-///
-/// Reguła jest jedna dla całego systemu i pochodzi z Descriptor::rebuildFieldMappings():
-/// pole liczbowe `T[N]` to N slotów, `STRING[N]` to JEDEN slot o długości N bajtów.
-/// compiler::sourceFieldAt() chodzi po schemacie źródła dokładnie tak samo.
-int flatSlotCount(const rdb::rField &f) { return (f.rtype == rdb::STRING) ? 1 : f.rarray; }
-
 /// Wpis schematu o zadanej nazwie: (indeks PLASKI pierwszego slotu, liczba slotow).
 /// nullopt = w tym schemacie nie ma wpisu o tej nazwie.
 ///
@@ -561,7 +554,7 @@ std::optional<std::pair<int, int>> namedEntrySlots(const query &q, const std::st
   for (const auto &f : q.lSchema) {
     const auto type = f.field_.rtype;
     if (type == rdb::TYPE || type == rdb::REF || type == rdb::RETENTION || type == rdb::RETMEMORY) continue;
-    const int slots = flatSlotCount(f.field_);
+    const int slots = rdb::flatElementCount(f.field_);
     if (f.field_.rname == name) return std::make_pair(flatIndex, slots);
     flatIndex += slots;
   }
@@ -604,7 +597,7 @@ std::optional<int> singleFieldSlot(const query &q, const std::string &name, cons
 std::list<field> flattenArrayFields(const std::list<field> &schema) {
   std::list<field> result;
   for (const auto &f : schema) {
-    const int slots = flatSlotCount(f.field_);
+    const int slots = rdb::flatElementCount(f.field_);
     if (slots == 1) {
       result.push_back(f);
       continue;
@@ -818,7 +811,7 @@ std::string compiler::checkRecordShape(const query &q, std::int64_t *planElement
       return std::format("Stream '{}' field '{}' has length {}; the limit is {}", q.id, fld.rname, length,
                          rdb::limits::kMaxFieldLength);
     if (__builtin_add_overflow(bytes, fieldBytes, &bytes)) bytes = std::numeric_limits<std::int64_t>::max();
-    elements += flatSlotCount(fld);
+    elements += rdb::flatElementCount(fld);
   }
   if (bytes > rdb::limits::kMaxRecordBytes)
     return std::format("Stream '{}' needs a record of {} bytes; the limit is {}", q.id, bytes, rdb::limits::kMaxRecordBytes);
@@ -954,7 +947,7 @@ std::string compiler::expandSchemaWildcards() {
             // jednym slotem i zachowuje `rarray = N`.
             int filedPosition = 0;
             for (const auto &s : coreInstance.getQuery(t.getStr_()).lSchema) {
-              const int slots = flatSlotCount(s.field_);
+              const int slots = rdb::flatElementCount(s.field_);
               const int arity = (slots == 1) ? s.field_.rarray : 1;
               for (int slot = 0; slot < slots; ++slot) {
                 std::list<token> lTempProgram;
@@ -1139,10 +1132,10 @@ std::string compiler::expandIndexWildcards(query &q) {
       // Krotnosc spada do jednego - ta sama regula co we flattenArrayFields(). `STRING[N]` jest
       // jednym slotem i zachowuje `rarray = N`; do 2026-09-27 dostawal tu 1, czyli napis 1 B, a
       // pelna dlugosc przywracal dopiero inferFieldShapes().
-      expanded.emplace_back(rdb::rField("",                                                    // nazwa po przenumerowaniu, nizej
-                                        f.field_.rlen,                                         //
-                                        (flatSlotCount(f.field_) == 1) ? f.field_.rarray : 1,  // (expanded)
-                                        f.field_.rtype),                                       //
+      expanded.emplace_back(rdb::rField("",             // nazwa po przenumerowaniu, nizej
+                                        f.field_.rlen,  //
+                                        (rdb::flatElementCount(f.field_) == 1) ? f.field_.rarray : 1,  // (expanded)
+                                        f.field_.rtype),                                               //
                             lTempProgram);
     }
   }
@@ -2708,7 +2701,7 @@ std::optional<rdb::rField> compiler::sourceFieldAt(const std::string &streamId, 
     // Pola konfiguracyjne deskryptora (TYPE, REF, RETENTION, RETMEMORY) nie są wartościami
     // wyrażeń i nie zajmują indeksów płaskich - Descriptor pomija je tak samo.
     if (type == rdb::TYPE || type == rdb::REF || type == rdb::RETENTION || type == rdb::RETMEMORY) continue;
-    const int flatCount = (type == rdb::STRING) ? 1 : item.field_.rarray;
+    const int flatCount = rdb::flatElementCount(item.field_);
     if (remaining < flatCount) return item.field_;
     remaining -= flatCount;
   }
@@ -3008,7 +3001,7 @@ std::string compiler::inferFieldShapes() {
     // Wpis zrodla o wielu slotach plaskich wchodzi do odczytu SLOTEM, wiec zostaje typ
     // i dlugosc, a krotnosc spada do jednego - ta sama regula co we flattenArrayFields().
     // `STRING[N]` jest jednym slotem i zachowuje `rarray = N`.
-    const int arity = (flatSlotCount(*sourceField) == 1) ? sourceField->rarray : 1;
+    const int arity = (rdb::flatElementCount(*sourceField) == 1) ? sourceField->rarray : 1;
     return exprShape{.rtype = sourceField->rtype, .rlen = sourceField->rlen, .rarray = arity};
   };
   // Program grupy okna czyta HISTORIE zrodla, wiec zawsze pole zrodla.
@@ -3105,7 +3098,7 @@ std::string compiler::checkRuleConditionShapes() {
     const auto sourceField = sourceFieldAt(streamId, flatIndex);
     if (!sourceField.has_value()) return std::nullopt;
     if (sourceField->rtype > rdb::STRING) return std::nullopt;
-    const int arity = (flatSlotCount(*sourceField) == 1) ? sourceField->rarray : 1;
+    const int arity = (rdb::flatElementCount(*sourceField) == 1) ? sourceField->rarray : 1;
     return exprShape{.rtype = sourceField->rtype, .rlen = sourceField->rlen, .rarray = arity};
   };
 
