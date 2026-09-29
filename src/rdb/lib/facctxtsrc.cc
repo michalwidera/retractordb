@@ -5,6 +5,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <charconv>  // from_chars
 #include <cstring>   // memcpy
 #include <memory>    // make_unique
@@ -116,11 +117,11 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
     return status;
   };
 
-  if (position != 0) return markAllNullAndZero(EXIT_FAILURE);
+  if (position != 0) return markAllNullAndZero(EINVAL);
 
-  if (recordSize_ == 0) return markAllNullAndZero(EXIT_FAILURE);
+  if (recordSize_ == 0) return markAllNullAndZero(EINVAL);
 
-  if (!myFile_.is_open()) return markAllNullAndZero(EXIT_FAILURE);
+  if (!myFile_.is_open()) return markAllNullAndZero(EBADF);
 
   if (!loopToBeginningIfEOF_) {
     if (myFile_.eof()) {
@@ -131,7 +132,7 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
     }
   }
 
-  if (myFile_.fail()) return markAllNullAndZero(EXIT_FAILURE);
+  if (myFile_.fail()) return markAllNullAndZero(EIO);
 
   auto i = 0;
   for (const auto &item : descriptor_) {

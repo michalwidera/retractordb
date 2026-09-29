@@ -1,5 +1,6 @@
 #include "rdb/faccfs.hpp"
 
+#include <cerrno>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -65,22 +66,22 @@ ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool>
   // wyzej), wiec purge wpadal w zwykly zapis spod nullptr i po cichu nie robil nic.
   if (ptrData == nullptr && position == 0) {
     myFile.open(filename_, std::ofstream::out | std::ofstream::trunc);
-    if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
+    if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EIO;
     myFile.close();
     return EXIT_SUCCESS;
   }
   if (position == std::numeric_limits<size_t>::max()) {
     myFile.open(filename_, std::ios::in | std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
-    if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
+    if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EIO;
     // Note: no seekp here!
   } else {
     myFile.open(filename_, std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
-    if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
+    if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EIO;
     myFile.seekp(static_cast<std::streamoff>(position));
-    if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
+    if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EIO;
   }
   myFile.write(reinterpret_cast<const char *>(ptrData), recordSize_);
-  if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
+  if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EIO;
   myFile.close();
   return EXIT_SUCCESS;
 }
@@ -91,11 +92,12 @@ ssize_t genericBinaryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset,
   std::ifstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(filename_, std::ios::in | std::ios::binary);
-  if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
+  if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EIO;
   myFile.seekg(static_cast<std::streamoff>(position));
-  if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
+  if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EIO;
   myFile.read(reinterpret_cast<char *>(ptrData), recordSize_);
-  if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EXIT_FAILURE;
+  // Zero bajtow = pod ta pozycja nie ma rekordu; mniej niz rekord = rekord urwany w polowie.
+  if ((myFile.rdstate() & std::ofstream::failbit) != 0) return myFile.gcount() == 0 ? ERANGE : EIO;
   myFile.close();
   return EXIT_SUCCESS;
 }

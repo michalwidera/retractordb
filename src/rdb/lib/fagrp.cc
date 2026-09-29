@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -186,10 +187,10 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
   auto segmentIndex      = recordIndex / retention_.capacity;
   auto positionInSegment = (recordIndex % retention_.capacity) * recordSize_;
 
-  if (segmentIndex < removedSegments_) return EXIT_FAILURE;
+  if (segmentIndex < removedSegments_) return ERANGE;
 
   const auto localSegmentIndex = segmentIndex - removedSegments_;
-  if (localSegmentIndex >= vec_.size()) return EXIT_FAILURE;
+  if (localSegmentIndex >= vec_.size()) return ERANGE;
 
   return static_cast<FileInterface *>(vec_[localSegmentIndex].get())->write(ptrData, nullBitset, positionInSegment);
 }
@@ -206,10 +207,10 @@ ssize_t groupFile<T>::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
   auto segmentIndex      = recordIndex / retention_.capacity;
   auto positionInSegment = (recordIndex % retention_.capacity) * recordSize_;
 
-  if (segmentIndex < removedSegments_) return EXIT_FAILURE;
+  if (segmentIndex < removedSegments_) return ERANGE;
 
   const auto localSegmentIndex = segmentIndex - removedSegments_;
-  if (localSegmentIndex >= vec_.size()) return EXIT_FAILURE;
+  if (localSegmentIndex >= vec_.size()) return ERANGE;
 
   return static_cast<FileInterface *>(vec_[localSegmentIndex].get())->read(ptrData, nullBitset, positionInSegment);
 }

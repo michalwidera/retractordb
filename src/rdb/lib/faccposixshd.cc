@@ -162,7 +162,7 @@ auto posixBinaryFileWithShadow::name() -> std::string & { return filename_; }
 
 ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/,
                                          const size_t position) {
-  if (fd < 0) return errno;
+  if (fd < 0 || fd_shadow < 0) return EBADF;
 
   if (ptrData == nullptr && position == 0) {
     // Purge oproznia oba pliki W MIEJSCU - uzasadnienie przy posixBinaryFile::write. Tu
@@ -183,19 +183,24 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
     int retries              = 0;
     while (sizesh > 0) {
       ssize_t write_result = ::write(fd, ptr, sizesh);
-      if (write_result >= 0) {
+      if (write_result == 0) {
+        SPDLOG_ERROR("::write {} made no progress", filename_);
+        return EIO;
+      }
+      if (write_result > 0) {
         retries = 0;
         ptr += write_result;
         sizesh -= write_result;
         continue;
       }
       if (errno != EINTR) {
-        SPDLOG_ERROR("::write {} failed: {}", filename_, strerror(errno));
-        return EXIT_FAILURE;
+        const int error = errno;
+        SPDLOG_ERROR("::write {} failed: {}", filename_, strerror(error));
+        return error;
       }
       if (++retries > maxRetries) {
         SPDLOG_ERROR("::write {} failed after {} EINTR retries", filename_, maxRetries);
-        return errno;
+        return EINTR;
       }
     }
     return EXIT_SUCCESS;
@@ -208,8 +213,9 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
   // Zapisz pozycję
   ssize_t wr = ::write(fd_shadow, &position, sizeof(size_t));
   if (wr != sizeof(size_t)) {
-    SPDLOG_ERROR("::write shadow position {} failed: {}", shadowName(), strerror(errno));
-    return EXIT_FAILURE;
+    const int error = wr < 0 ? errno : EIO;
+    SPDLOG_ERROR("::write shadow position {} failed: {}", shadowName(), strerror(error));
+    return error;
   }
 
   // Zapisz dane
@@ -219,19 +225,24 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
   int retries              = 0;
   while (sizesh > 0) {
     ssize_t write_result = ::write(fd_shadow, ptr, sizesh);
-    if (write_result >= 0) {
+    if (write_result == 0) {
+      SPDLOG_ERROR("::write shadow {} made no progress", shadowName());
+      return EIO;
+    }
+    if (write_result > 0) {
       retries = 0;
       ptr += write_result;
       sizesh -= write_result;
       continue;
     }
     if (errno != EINTR) {
-      SPDLOG_ERROR("::write shadow {} failed: {}", shadowName(), strerror(errno));
-      return EXIT_FAILURE;
+      const int error = errno;
+      SPDLOG_ERROR("::write shadow {} failed: {}", shadowName(), strerror(error));
+      return error;
     }
     if (++retries > maxRetries) {
       SPDLOG_ERROR("::write shadow {} failed after {} EINTR retries", shadowName(), maxRetries);
-      return errno;
+      return EINTR;
     }
   }
   return EXIT_SUCCESS;
@@ -239,7 +250,7 @@ ssize_t posixBinaryFileWithShadow::write(const uint8_t *ptrData, const std::vect
 
 ssize_t posixBinaryFileWithShadow::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   nullBitset.clear();
-  if (fd < 0) return fd;
+  if (fd < 0 || fd_shadow < 0) return EBADF;
 
   // Najpierw szukaj w pliku cienia
   if (shadowFind(ptrData, position) == EXIT_SUCCESS) return EXIT_SUCCESS;
@@ -251,14 +262,15 @@ ssize_t posixBinaryFileWithShadow::read(uint8_t *ptrData, std::vector<bool> &nul
     if (read_size == recordSize_) return EXIT_SUCCESS;
     if (read_size < 0) {
       if (errno == EINTR) continue;  // Retry
-      SPDLOG_ERROR("::pread {} failed: {}", filename_, strerror(errno));
-      return EXIT_FAILURE;
+      const int error = errno;
+      SPDLOG_ERROR("::pread {} failed: {}", filename_, strerror(error));
+      return error;
     }
     SPDLOG_WARN("::pread {} partial read: {} of {} bytes at pos {}", filename_, read_size, recordSize_, position);
-    return EXIT_FAILURE;
+    return read_size == 0 ? ERANGE : EIO;  // uzasadnienie w posixBinaryFile::read
   }
   SPDLOG_ERROR("::pread {} failed after {} EINTR retries", filename_, maxRetries);
-  return EXIT_FAILURE;
+  return EINTR;
 }
 
 size_t posixBinaryFileWithShadow::count() {
@@ -274,8 +286,9 @@ size_t posixBinaryFileWithShadow::count() {
 ssize_t posixBinaryFileWithShadow::merge() {
   struct stat shadow_stat;
   if (fstat(fd_shadow, &shadow_stat) != 0) {
-    SPDLOG_ERROR("::fstat shadow {} failed: {}", shadowName(), strerror(errno));
-    return EXIT_FAILURE;
+    const int error = errno;
+    SPDLOG_ERROR("::fstat shadow {} failed: {}", shadowName(), strerror(error));
+    return error;
   }
 
   const ssize_t entrySize  = static_cast<ssize_t>(sizeof(size_t)) + recordSize_;
@@ -295,16 +308,18 @@ ssize_t posixBinaryFileWithShadow::merge() {
     // Nadpisz rekord w głównym pliku
     ssize_t wr = ::pwrite(fd, buffer.data(), recordSize_, static_cast<off_t>(storedPos));
     if (wr != recordSize_) {
-      SPDLOG_ERROR("::pwrite {} failed at pos {}: {}", filename_, storedPos, strerror(errno));
-      return EXIT_FAILURE;
+      const int error = wr < 0 ? errno : EIO;
+      SPDLOG_ERROR("::pwrite {} failed at pos {}: {}", filename_, storedPos, strerror(error));
+      return error;
     }
   }
 
   // Wyczyść plik cienia po udanym scaleniu
   auto result = ::ftruncate(fd_shadow, 0);
   if (result != 0) {
-    SPDLOG_ERROR("::ftruncate shadow {} failed: {}", shadowName(), strerror(errno));
-    return EXIT_FAILURE;
+    const int error = errno;
+    SPDLOG_ERROR("::ftruncate shadow {} failed: {}", shadowName(), strerror(error));
+    return error;
   }
   return EXIT_SUCCESS;
 }

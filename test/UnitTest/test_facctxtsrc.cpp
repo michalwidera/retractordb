@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cerrno>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -186,7 +187,7 @@ TEST_F(TextSourceROTest, test_read_missing_file_returns_null_row) {
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   std::memset(buffer.get(), 0xFF, desc.getSizeInBytes());
-  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_FAILURE);
+  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EBADF);
 
   int value = -1;
   std::memcpy(&value, buffer.get(), sizeof(int));
@@ -513,7 +514,7 @@ TEST_F(TextSourceROTest, test_name) {
 // textSourceRO - write is read-only
 // ============================================================
 
-// Verify write always returns EXIT_FAILURE (read-only source)
+// Verify write always returns ENOTSUP (read-only source)
 TEST_F(TextSourceROTest, test_write_returns_failure) {
   auto filename = createTestFile("test_ro.txt", "1\n");
 
@@ -522,8 +523,8 @@ TEST_F(TextSourceROTest, test_write_returns_failure) {
   auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   uint8_t data[] = {0};
-  GTEST_ASSERT_EQ(src->write(data, 0), EXIT_FAILURE);
-  GTEST_ASSERT_EQ(src->write(data), EXIT_FAILURE);
+  GTEST_ASSERT_EQ(src->write(data, 0), ENOTSUP);
+  GTEST_ASSERT_EQ(src->write(data), ENOTSUP);
 }
 
 // ============================================================

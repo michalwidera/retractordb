@@ -31,23 +31,45 @@ namespace rdb {
 
 struct FileInterface {
   /// @brief Null-aware write: stores data and associated null bitset in the storage.
+  ///
+  /// Kontrakt statusu read() i write() należy do interfejsu, nie do implementacji: 0 to
+  /// powodzenie, każda inna wartość to dodatni kod z rodziny errno, który opisuje przyczynę.
+  /// Kody o ustalonym znaczeniu:
+  /// - EBADF   - akcesor bez otwartego nośnika (niepusty initializationError()),
+  /// - ERANGE  - pod tą pozycją nie ma rekordu: poza końcem magazynu albo usunięty przez retencję,
+  /// - EINVAL  - pozycja albo rozmiar rekordu poza kontraktem implementacji (np. pozycja różna
+  ///             od 0 w źródle sekwencyjnym),
+  /// - ENOTSUP - zapis do źródła tylko do odczytu,
+  /// - EINTR   - wyczerpany limit ponowień wywołania systemowego przerwanego sygnałem,
+  /// - EIO     - rekord urwany w połowie albo awaria strumienia bez dokładniejszej przyczyny.
+  /// Każdy inny kod to errno nieudanego wywołania systemowego, przekazane bez zmian.
+  ///
+  /// Kod errno, a nie nazwany stan, bo ścieżki posixowe i tak niosą errno, a wołający sprawdzają
+  /// wyłącznie różność od zera i wstawiają kod do komunikatu. Nazwany stan wymagałby mapowania
+  /// przy każdym wywołaniu systemowym i gubiłby szczegół (ENOSPC, EROFS). Z tego wyboru wynikają
+  /// dwie reguły:
+  /// - nigdy EXIT_FAILURE: to 1, czyli także EPERM, więc komunikat `result=1` był niejednoznaczny,
+  /// - `return errno` tylko bezpośrednio po nieudanym wywołaniu systemowym, a errno zapamiętane
+  ///   przed zapisem do logu. Inaczej wraca wartość po cudzym wywołaniu - dla zamkniętego
+  ///   deskryptora bywało to 0, czyli meldunek powodzenia (E-03, #270).
+  ///
   /// @param ptrData    pointer to data bytes; nullptr with position=0 triggers purge
   /// @param nullBitset one bool per descriptor field, true = null
   /// @param position   byte position (std::numeric_limits<size_t>::max() = append)
-  /// @return status of operation - 0/EXIT_SUCCESS success
+  /// @return 0 przy powodzeniu, w przeciwnym razie dodatni kod z rodziny errno (patrz wyżej)
   virtual ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, size_t position) = 0;
 
   /// @brief Null-aware read: retrieves data and fills nullBitset for the record.
   /// @param ptrData    pointer to destination buffer
   /// @param nullBitset output: one bool per descriptor field, true = null
   /// @param position   byte position
-  /// @return status of operation - 0/EXIT_SUCCESS success
+  /// @return 0 przy powodzeniu, w przeciwnym razie dodatni kod z rodziny errno, jak w write().
   virtual ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) = 0;
 
   /// @brief Convenience wrapper: Updates or appends data without null tracking.
   /// @param ptrData  pointer to data bytes; nullptr with position=0 triggers purge
   /// @param position byte position (max = append)
-  /// @return status of operation - 0/EXIT_SUCCESS success
+  /// @return 0 przy powodzeniu, w przeciwnym razie dodatni kod z rodziny errno.
   ssize_t write(const uint8_t *ptrData, const size_t position = std::numeric_limits<size_t>::max()) {
     std::vector<bool> ignored;
     return write(ptrData, ignored, position);
@@ -56,7 +78,7 @@ struct FileInterface {
   /// @brief Convenience wrapper: Reads data without null tracking.
   /// @param ptrData  pointer to destination buffer
   /// @param position byte position
-  /// @return status of operation - 0/EXIT_SUCCESS success
+  /// @return 0 przy powodzeniu, w przeciwnym razie dodatni kod z rodziny errno.
   ssize_t read(uint8_t *ptrData, const size_t position) {
     std::vector<bool> ignored;
     return read(ptrData, ignored, position);

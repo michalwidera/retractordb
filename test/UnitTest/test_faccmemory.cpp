@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cerrno>
 #include <string>
 
 #include "rdb/descriptor.hpp"
@@ -275,12 +276,12 @@ TEST(MemoryTest, test_faccmemory_read_beyond_bounds) {
   GTEST_ASSERT_EQ(mfa->read(&record, 2), EXIT_SUCCESS);
 
   // Beyond upper bound should fail
-  GTEST_ASSERT_EQ(mfa->read(&record, 3), EXIT_FAILURE);
-  GTEST_ASSERT_EQ(mfa->read(&record, 99), EXIT_FAILURE);
+  GTEST_ASSERT_EQ(mfa->read(&record, 3), ERANGE);
+  GTEST_ASSERT_EQ(mfa->read(&record, 99), ERANGE);
 
   // Empty storage should fail
   mfa->write(nullptr);
-  GTEST_ASSERT_EQ(mfa->read(&record, 0), EXIT_FAILURE);
+  GTEST_ASSERT_EQ(mfa->read(&record, 0), ERANGE);
 }
 
 // Verify two LIVE instances with the same filename share one bucket
@@ -328,7 +329,7 @@ TEST(MemoryTest, test_faccmemory_bucket_dies_with_last_instance) {
 
   auto mfa2 = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
   GTEST_ASSERT_EQ(mfa2->count(), 0);
-  GTEST_ASSERT_EQ(mfa2->read(&record, 0), EXIT_FAILURE);
+  GTEST_ASSERT_EQ(mfa2->read(&record, 0), ERANGE);
 }
 
 // Verify an instance with a different record size never sees records of the old size: read()
@@ -363,7 +364,7 @@ TEST(MemoryTest, test_faccmemory_read_refuses_record_of_other_size) {
 
   // On the heap, so that an overrun is visible to valgrind (ut_faccmemory-valgrind).
   auto narrowBuffer = std::make_unique<BYTE[]>(1);
-  GTEST_ASSERT_EQ(narrow->read(narrowBuffer.get(), 0), EXIT_FAILURE);
+  GTEST_ASSERT_EQ(narrow->read(narrowBuffer.get(), 0), EINVAL);
 }
 
 // Verify the number of buckets stays constant over plan swaps that bring new stream names:

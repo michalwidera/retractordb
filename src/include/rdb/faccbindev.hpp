@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cerrno>
 #include <cstdint>
 #include <vector>
 
@@ -14,7 +15,7 @@ namespace rdb {
 /// - odczytywać kolejne porcje surowych danych binarnych o długości wyznaczonej przez Descriptor,
 /// - używać Descriptor wyłącznie do określenia długości rekordu i rozmiaru wektora nullBitset,
 /// - składać rekord z krótkich odczytów i ponawiać wywołanie systemowe przerwane przez EINTR,
-/// - implementować interfejs FileInterface, pozostając źródłem tylko do odczytu; metoda write(...) zawsze zwraca EXIT_FAILURE,
+/// - implementować interfejs FileInterface, pozostając źródłem tylko do odczytu; metoda write(...) zawsze zwraca ENOTSUP,
 /// - obsługiwać wyłącznie sekwencyjny odczyt, w którym jedyną poprawną pozycją jest 0,
 /// - przy poprawnym odczycie ustawiać nullBitset na same wartości false,
 /// - w przypadku błędu, niepoprawnej pozycji lub braku danych zwracać dane wyzerowane i nullBitset ustawiony na same wartości true,
@@ -57,9 +58,7 @@ class binaryDeviceRO : public FileInterface {
   using FileInterface::read;
   using FileInterface::write;
   ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) override;
-  ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override {
-    return EXIT_FAILURE;
-  };
+  ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override { return ENOTSUP; };
 
   auto name() -> std::string & override;
   size_t count() override;

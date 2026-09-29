@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cerrno>
 #include <fstream>
 #include <memory>
 
@@ -14,7 +15,7 @@ namespace rdb {
 /// Obiekt textSourceRO powinien:
 /// - odczytywać kolejne rekordy z pliku tekstowego i interpretować je zgodnie z dostarczonym Descriptor,
 /// - wspierać pola liczbowe, tekstowe oraz pola NULL zgodnie z zakresem obsługiwanym przez implementację,
-/// - implementować interfejs FileInterface, pozostając źródłem tylko do odczytu; metoda write(...) zawsze zwraca EXIT_FAILURE,
+/// - implementować interfejs FileInterface, pozostając źródłem tylko do odczytu; metoda write(...) zawsze zwraca ENOTSUP,
 /// - obsługiwać informację o wartościach null przez nullBitset powiązany z wewnętrznym obiektem payload,
 /// - traktować brak tokenu lub token `null`/`NULL`/`Null` jako wartość null dla odpowiedniego pola,
 /// - działać sekwencyjnie; jedyną poprawną pozycją odczytu jest 0, a inna pozycja skutkuje zwróceniem danych wyzerowanych i nullBitset ustawionego na same wartości true,
@@ -54,9 +55,7 @@ class textSourceRO : public FileInterface {
   using FileInterface::read;
   using FileInterface::write;
   ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) override;
-  ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override {
-    return EXIT_FAILURE;
-  }
+  ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override { return ENOTSUP; }
 
   auto name() -> std::string & override;
   size_t count() override;
