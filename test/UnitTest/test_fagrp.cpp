@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cerrno>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -384,7 +385,8 @@ TEST_F(GroupFileTest, test_fagrp_count_after_rotation) {
   GTEST_ASSERT_EQ(gfa->count(), 8);
 }
 
-// Verify reads and updates into already removed global positions fail safely.
+// Verify reads and updates into already removed global positions fail safely with ERANGE:
+// a record removed by retention is a record that is not there (contract at FileInterface::write).
 TEST_F(GroupFileTest, test_fagrp_access_removed_segment_fails) {
   BYTE record;
 
@@ -399,8 +401,8 @@ TEST_F(GroupFileTest, test_fagrp_access_removed_segment_fails) {
   }
 
   record = 99;
-  GTEST_ASSERT_NE(gfa->read(&record, 0), 0);
-  GTEST_ASSERT_NE(gfa->write(&record, 0), 0);
+  GTEST_ASSERT_EQ(gfa->read(&record, 0), ERANGE);
+  GTEST_ASSERT_EQ(gfa->write(&record, 0), ERANGE);
 }
 
 // Verify segment mapping for multi-byte records: position is a byte offset, capacity is in records.

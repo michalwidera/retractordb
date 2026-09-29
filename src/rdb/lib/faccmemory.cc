@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>  // for std::copy
+#include <cerrno>
 #include <limits>
 #include <map>
 #include <ranges>
@@ -123,7 +124,7 @@ ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullB
     const size_t slot = (retentionSize_ != no_retention) ? (location % retentionSize_) : location;
     if (slot >= bucket.data.size()) {
       SPDLOG_ERROR("Write failed: slot {} out of range, storage size {}", slot, bucket.data.size());
-      return EXIT_FAILURE;
+      return ERANGE;
     }
     bucket.data[slot] = std::move(vec);
     if (slot < bucket.nulls.size()) bucket.nulls[slot] = nullBitset;
@@ -140,7 +141,7 @@ ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const 
 
   if (slot >= bucket.data.size()) {
     SPDLOG_ERROR("Read failed: slot {} out of range, storage size {}", slot, bucket.data.size());
-    return EXIT_FAILURE;
+    return ERANGE;
   }
 
   // Rekord kopiujemy w całości, więc rekord innego rozmiaru niż ta instancja wyszedłby poza bufor
@@ -149,7 +150,7 @@ ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const 
   if (std::cmp_not_equal(bucket.data[slot].size(), recordSize_)) {
     SPDLOG_ERROR("Read failed: record in slot {} has {} bytes, '{}' reads {}", slot, bucket.data[slot].size(), filename_,
                  recordSize_);
-    return EXIT_FAILURE;
+    return EINVAL;
   }
   std::ranges::copy(bucket.data[slot], ptrData);
 

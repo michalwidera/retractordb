@@ -114,7 +114,13 @@ void storage::resetForUnitTest() {
   initializeAccessor();
   if (!accessor_->initializationError().empty()) FatalError("storage::resetForUnitTest: {}", accessor_->initializationError());
 
-  accessor_->write(nullptr, 0);
+  // Zrodlo deklarowane jest tylko do odczytu (purge zwraca ENOTSUP) - wystarcza mu ponowne otwarcie wyzej.
+  if (!isDeclared()) {
+    if (const auto result = accessor_->write(nullptr, 0); result != 0) {
+      FatalError("storage::resetForUnitTest: purge of '{}' failed (result={}: {})", paths_.storageFile(), result,
+                 strerror(static_cast<int>(result)));
+    }
+  }
   recordsCount_ = 0;
 
   if (metaData_) (*metaData_).reset();
@@ -171,7 +177,11 @@ void storage::fire() {
 void storage::purge() {
   abortIfStorageNotPrepared();
 
-  accessor_->write(nullptr, 0);
+  // Nieudany purge zostawia dane na nosniku; bez zatrzymania recordsCount_ = 0 rozjechalby sie z count().
+  if (const auto result = accessor_->write(nullptr, 0); result != 0) {
+    FatalError("storage::purge: purge of '{}' failed (result={}: {})", paths_.storageFile(), result,
+               strerror(static_cast<int>(result)));
+  }
   recordsCount_ = 0;
 
   (*metaData_).reset();  // czyści indeks oraz liczniki maszyny gap
@@ -226,7 +236,8 @@ rdb::ReadStatus storage::read(const size_t recordIndexFromFront, uint8_t *destin
   if (recordsCount_ > 0 && recordIndexFromFront < recordsCount_) {
     result = accessor_->read(destination, recordIndexFromFront * size);
     if (result != 0) {
-      FatalError("storage::read: read from '{}' at pos {} failed (result={})", accessor_->name(), recordIndexFromFront, result);
+      FatalError("storage::read: read from '{}' at pos {} failed (result={}: {})", accessor_->name(), recordIndexFromFront,
+                 result, strerror(static_cast<int>(result)));
     }
     storagePayload_->setNullBitset(metaData_->nullBitsetFor(recordIndexFromFront));
   } else {
@@ -345,7 +356,8 @@ bool storage::write(const size_t recordIndex) {
   if (recordIndex >= recordsCount_) {
     result = accessor_->write(storagePayload_->span().data());  // <- Call to append Function
     if (result != 0) {
-      FatalError("storage::write: append to '{}' failed (result={})", paths_.storageFile(), result);
+      FatalError("storage::write: append to '{}' failed (result={}: {})", paths_.storageFile(), result,
+                 strerror(static_cast<int>(result)));
     }
     recordsCount_++;
     // `if constexpr` obejmuje całe wywołanie, nie tylko treść sondy: przy wyłączonej
@@ -364,7 +376,8 @@ bool storage::write(const size_t recordIndex) {
   } else {
     result = accessor_->write(storagePayload_->span().data(), recordIndex * descriptor.getSizeInBytes());
     if (result != 0) {
-      FatalError("storage::write: overwrite to '{}' at index {} failed (result={})", paths_.storageFile(), recordIndex, result);
+      FatalError("storage::write: overwrite to '{}' at index {} failed (result={}: {})", paths_.storageFile(), recordIndex,
+                 result, strerror(static_cast<int>(result)));
     }
     // Nadpisanie nie zwiększa objętości magazynu, więc nie wchodzi do `bytes`. Do metryki
     // K23 wchodzi, bo tam jednostką jest zapis rekordu, nie przyrost objętości - inaczej

@@ -109,7 +109,7 @@ size_t posixBinaryFile::count() {
 }
 
 ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/, const size_t position) {
-  if (fd < 0) return errno;  // Error status
+  if (fd < 0) return EBADF;
 
   if (ptrData == nullptr && position == 0) {
     // Purge oproznia plik W MIEJSCU. Dawniej kasowal go po nazwie, a deskryptor zostawal
@@ -131,16 +131,24 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> &
   int retries              = 0;
   while (sizesh > 0) {
     ssize_t write_result = ::write(fd, ptrData, sizesh);
-    if (write_result >= 0) {
+    if (write_result == 0) {
+      SPDLOG_ERROR("::write {} made no progress", filename_);
+      return EIO;
+    }
+    if (write_result > 0) {
       retries = 0;
       ptrData += write_result;
       sizesh -= write_result;
       continue;
     }
-    if (errno != EINTR) return errno;
+    if (errno != EINTR) {
+      const int error = errno;
+      SPDLOG_ERROR("::write {} failed: {}", filename_, strerror(error));
+      return error;
+    }
     if (++retries > maxRetries) {
       SPDLOG_ERROR("::write {} failed after {} EINTR retries", filename_, maxRetries);
-      return errno;
+      return EINTR;
     }
   }
   return EXIT_SUCCESS;
@@ -148,7 +156,7 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> &
 
 ssize_t posixBinaryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   nullBitset.clear();
-  if (fd < 0) return fd;
+  if (fd < 0) return EBADF;
 
   constexpr int maxRetries = 5;
   for (int attempt = 0; attempt < maxRetries; ++attempt) {
@@ -156,14 +164,16 @@ ssize_t posixBinaryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, c
     if (read_size == recordSize_) return EXIT_SUCCESS;
     if (read_size < 0) {
       if (errno == EINTR) continue;  // Retry
-      SPDLOG_ERROR("::pread {} failed: {}", filename_, strerror(errno));
-      return EXIT_FAILURE;
+      const int error = errno;
+      SPDLOG_ERROR("::pread {} failed: {}", filename_, strerror(error));
+      return error;
     }
     SPDLOG_WARN("::pread {} partial read: {} of {} bytes at pos {}", filename_, read_size, recordSize_, position);
-    return EXIT_FAILURE;
+    // Zero bajtow = pod ta pozycja nie ma rekordu; mniej niz rekord = rekord urwany w polowie.
+    return read_size == 0 ? ERANGE : EIO;
   }
   SPDLOG_ERROR("::pread {} failed after {} EINTR retries", filename_, maxRetries);
-  return EXIT_FAILURE;
+  return EINTR;
 }
 
 }  // namespace rdb

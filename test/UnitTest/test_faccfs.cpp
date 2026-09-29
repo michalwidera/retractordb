@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cerrno>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -9,6 +11,7 @@
 #include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
 #include "rdb/faccfs.hpp"
+#include "rdb/storage.hpp"
 
 // Tests intentionally use raw byte buffers for low-level I/O API verification.
 // NOLINTBEGIN(modernize-avoid-c-arrays)
@@ -145,6 +148,20 @@ TEST_F(FaccfsTest, append_multiple_and_read_back) {
     ASSERT_EQ(gf.read(rData, i * AREA_SIZE), EXIT_SUCCESS);
     EXPECT_EQ(std::memcmp(rData, records[i], AREA_SIZE), 0);
   }
+}
+
+// Odczyt poza koncem: 0 bajtow to brak rekordu pod pozycja (ERANGE), rekord urwany w polowie
+// to EIO - kontrakt przy FileInterface::write, wspolny z wariantami posixowymi.
+TEST_F(FaccfsTest, read_beyond_end_returns_erange_and_torn_record_eio) {
+  auto desc = makeDesc(AREA_SIZE);
+  rdb::genericBinaryFile gf(sandboxPath(filename), desc);
+
+  uint8_t data[10] = {};
+  ASSERT_EQ(gf.write(data), EXIT_SUCCESS);
+
+  uint8_t rData[10] = {};
+  EXPECT_EQ(gf.read(rData, AREA_SIZE), ERANGE);
+  EXPECT_EQ(gf.read(rData, AREA_SIZE / 2), EIO);
 }
 
 // ============================================================
@@ -433,6 +450,29 @@ TEST_F(FaccfsTest, append_and_update_first_record) {
 
   gf.read(rData, AREA_SIZE);
   EXPECT_EQ(std::memcmp(rData, "second rec", AREA_SIZE), 0);
+}
+
+// ============================================================
+// storage::purge() over an accessor that cannot empty its medium
+// ============================================================
+
+// Nieudany purge konczy proces, zamiast wyzerowac recordsCount_ nad danymi, ktore zostaly na
+// nosniku - dawniej storage::purge() pomijal status akcesora. Plik danych podmieniony na katalog:
+// faccfs otwiera plik przy kazdej operacji, wiec otwarcie z obcieciem zawodzi dopiero w purge.
+TEST_F(FaccfsTest, storage_purge_failure_is_fatal) {
+  EXPECT_EXIT(
+      {
+        rdb::storage s("purge_fail", "purge_fail_data", ".", "GENERIC");
+        const auto descriptor = makeDesc(sizeof(BYTE));
+        if (!s.attachDescriptor(&descriptor).empty()) std::_Exit(3);
+        s.getPayload()->setItem(0, static_cast<BYTE>(0xAA));
+        if (!s.write()) std::_Exit(4);
+        if (!std::filesystem::remove("purge_fail_data")) std::_Exit(5);
+        std::filesystem::create_directory("purge_fail_data");
+        s.purge();
+        std::_Exit(6);
+      },
+      ::testing::ExitedWithCode(EXIT_FAILURE), "storage::purge: purge of .*purge_fail_data.* failed");
 }
 
 // NOLINTEND(modernize-avoid-c-arrays)
