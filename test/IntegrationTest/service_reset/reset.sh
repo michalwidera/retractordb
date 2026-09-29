@@ -190,6 +190,10 @@ expect_reset_refused() {
 }
 expect_reset_refused zerostep.rql "AGSE step 0 must be greater than zero"
 expect_reset_refused zeroretention.rql "RETENTION capacity 0 must be greater than zero"
+# Ta sama nazwa odrzucona podczas resetu nie moze zatrzymac dzialajacej uslugi.
+printf '%s\n' "STORAGE 'temp'" "DECLARE a INTEGER STREAM core0, 0.2 FILE 'data.txt'" \
+  "SELECT core0[0] STREAM OUT_OF_BUSSINESS FROM core0" >reserved_name.rql
+expect_reset_refused reserved_name.rql "OUT_OF_BUSSINESS is reserved stream name"
 
 # Plik wyjsciowy SELECT w nieistniejacym katalogu musi zostac odrzucony przed
 # zaplanowaniem wymiany epoki. Po odmowie alpha nadal liczy i rosczenie zostaje stare.

@@ -534,6 +534,10 @@ class ParserListener : public RQLBaseListener {
     qry.isDisposable = (ctx->DISPOSABLE() != nullptr);
     qry.isOneShot    = (ctx->ONESHOT() != nullptr);
     qry.isHold       = (ctx->HOLD() != nullptr);
+    // Ta sama odmowa co w exitSelect: klient bral kazdy rekord deklaracji o tej nazwie
+    // za sygnal zamkniecia serwera i konczyl sie "no data in stream".
+    if (qry.id == constants::Reserved_id_oob)
+      reportSemanticError(std::string(constants::Reserved_id_oob) + " is reserved stream name");
     coreInstance.push_back(qry);
     qry.reset();
     fieldCount = 0;

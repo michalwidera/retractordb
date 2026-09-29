@@ -134,6 +134,20 @@ install_cmake_format_if_missing() {
     command_exists cmake-format
 }
 
+install_lean_if_missing() {
+    local toolchain
+    export PATH="${ELAN_HOME:-$HOME/.elan}/bin:$PATH"
+    if ! command_exists elan; then
+        echo "-- Installing elan..."
+        curl -sSfL https://elan.lean-lang.org/elan-init.sh | sh -s -- -y --default-toolchain none
+        command_exists elan || return 1
+    fi
+    toolchain=$(tr -d '[:space:]' < "$rdb_source_dir/math_proofs/lean-toolchain") || return 1
+    echo "-- Installing Lean toolchain $toolchain..."
+    elan toolchain install "$toolchain" || return 1
+    tool_installed lean
+}
+
 install_missing_special_tool() {
     local cmd="$1"
     case "$cmd" in
@@ -151,6 +165,9 @@ install_missing_special_tool() {
             ;;
         cmake-pinned)
             install_pinned_cmake_if_needed
+            ;;
+        lean)
+            install_lean_if_missing
             ;;
         gcc|g++|cc|c++)
             # Na macOS kompilator nie jest pakietem menedzera (cmd_to_brew_package

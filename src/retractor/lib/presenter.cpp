@@ -12,6 +12,7 @@
 
 #include "CRSMath.hpp"
 #include "executorsmState.hpp"
+#include "fatalError.hpp"
 
 // https://ref.pencilcode.net/turtle/colors.html
 
@@ -438,7 +439,7 @@ void presenter::onlyCompileShowProgram() {
           break;
         default:
           std::cout << "\t\t" << "UNKNOWN_ACTION";
-          abort();
+          FatalError("presenter::onlyCompileShowProgram: unknown rule action");
       }
 
       std::cout << '\n';
