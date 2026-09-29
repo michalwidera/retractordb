@@ -62,6 +62,8 @@ ctest -R '^ut_payload$' -V  # verbose
 
 Unit tests run directly in `ninja test`. `ninja test-valgrind` repeats them under Valgrind with leak checking and adds the `-vg-` integration memory checks (ctest label `valgrind`). When each must be run is in *Session end*. Plain `ctest` runs all registered groups; use `ctest -LE valgrind` to match the ordinary CI step.
 
+**Before every test run, verify what was built and what will run.** `ctest`, `ninja test`, and `ninja test-valgrind` can execute stale binaries or a different installation without rebuilding them. Check that the build tree's `CMAKE_HOME_DIRECTORY` names the current source checkout, rebuild the tested targets from that tree, and inspect the registered test command plus its effective `PATH`. For every project program used by the test, resolve the executable in that environment and compare it byte-for-byte with the just-built target; for copied test scripts and fixtures, compare the build copy with the source file. Do not run or report a test until these checks agree. The concrete integration-test procedure is in `test/CLAUDE.md`.
+
 CI: CircleCI. A push runs only the `commit` workflow, and only on branches `master`, `issue_*` / `Issue_*` and `<number>-*` (`.circleci/config.yml`); other branches (`dev/*`, `fix/*`, ...) trigger nothing.
 
 ## Architecture

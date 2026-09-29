@@ -1753,6 +1753,7 @@ TEST(xparser, invalid_values_are_refused_without_killing_the_process) {
       {"DECLARE a INTEGER STREAM core0, 1 FILE ''", "FILE of stream core0 requires a non-empty file name"},
       {source + "SELECT core0[0] STREAM dst FROM core0 FILE ''", "FILE of stream dst requires a non-empty file name"},
       {source + "SELECT core0[0] STREAM OUT_OF_BUSSINESS FROM core0", "OUT_OF_BUSSINESS is reserved stream name"},
+      {"DECLARE a INTEGER STREAM OUT_OF_BUSSINESS, 1 FILE 'a.txt'", "OUT_OF_BUSSINESS is reserved stream name"},
       {"DECLARE a INTEGER STREAM core0, 1/0 FILE 'a.txt'", "fraction 1/0 has a zero denominator"},
       // Druga droga do tego samego ulamka: rational_se w wyrazeniu strumieniowym.
       {source + "SELECT * STREAM dst FROM core0 - 1/0", "fraction 1/0 has a zero denominator"},

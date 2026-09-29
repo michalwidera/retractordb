@@ -48,6 +48,19 @@ expect_file_rejected() {
 # (SIGABRT, kod 134), bez slowa o przyczynie (#306).
 echo "DECLARE a INTEGER STREAM core0, 99999999999 FILE 'source.dat'" >out_of_range.rql
 expect_file_rejected out_of_range.rql "numeric literal 99999999999 is out of range"
+# Zastrzezona nazwa to blad parsera zwracany z kodem 71, nie SIGABRT. W pliku z dwoma
+# bledami klient dostaje powod pierwszej niepoprawnej instrukcji.
+printf '%s\n' "DECLARE a INTEGER STREAM core0, 1 FILE 'source.dat'" \
+  "SELECT core0[0] STREAM OUT_OF_BUSSINESS FROM core0" >reserved_name.rql
+expect_file_rejected reserved_name.rql "OUT_OF_BUSSINESS is reserved stream name"
+printf '%s\n' "DECLARE a INTEGER STREAM core0, 1 FILE 'source.dat'" \
+  "SELECT core0[0] STREAM OUT_OF_BUSSINESS FROM core0" \
+  "RULE r ON missing WHEN missing[0] > 0 DO DUMP -1 TO 1" >reserved_first.rql
+expect_file_rejected reserved_first.rql "OUT_OF_BUSSINESS is reserved stream name"
+printf '%s\n' "DECLARE a INTEGER STREAM core0, 1 FILE 'source.dat'" \
+  "RULE r ON missing WHEN missing[0] > 0 DO DUMP -1 TO 1" \
+  "SELECT core0[0] STREAM OUT_OF_BUSSINESS FROM core0" >rule_first.rql
+expect_file_rejected rule_first.rql "Rule 'r' refers to stream 'missing', but no such stream is defined"
 # Do 2026-09-26 zerowy interwal przechodzil parser, a plan padal w kompilatorze na mylacym
 # "Circular dependency in stream definitions" - strumien zalezny nie rozwiazywal sie nigdy (#308).
 printf '%s\n' "DECLARE a INTEGER STREAM core0, 0 FILE 'source.dat'" "SELECT a[0] STREAM dst FROM core0" >zero_interval.rql
@@ -195,7 +208,7 @@ expect_parse_rejected "SUBSTRAT 'memory'" "'SUBSTRAT' is not supported"
 expect_parse_rejected "STORAGE ''" "directive STORAGE requires a non-empty value"
 expect_parse_rejected "SELECT a[0] STREAM emptyfile FROM core0 FILE ''" "FILE of stream emptyfile requires a non-empty file name"
 expect_parse_rejected "DECLARE a INTEGER STREAM emptydecl, 1 FILE ''" "FILE of stream emptydecl requires a non-empty file name"
-expect_parse_rejected "SELECT a[0] STREAM OUT_OF_BUSSINESS FROM core0" "OUT_OF_BUSSINESS is reserved stream name"
+expect_parse_rejected "SELECT core0[0] STREAM OUT_OF_BUSSINESS FROM core0" "OUT_OF_BUSSINESS is reserved stream name"
 expect_parse_rejected "DECLARE a INTEGER STREAM zerorate, 1/0 FILE 'source.dat'" "fraction 1/0 has a zero denominator"
 expect_parse_rejected "DECLARE a INTEGER STREAM bigrate, 99999999999 FILE 'source.dat'" \
   "numeric literal 99999999999 is out of range"
