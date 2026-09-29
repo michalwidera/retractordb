@@ -366,6 +366,31 @@ TEST_F(TextSourceROTest, test_read_integer_array) {
   GTEST_ASSERT_EQ(values[2], 3);
 }
 
+// Verify NULL on any element of a numeric array makes the whole field NULL, wherever the element stands
+TEST_F(TextSourceROTest, test_read_integer_array_null_element_nulls_whole_field) {
+  auto filename = createTestFile("test_arr_null.txt", "NULL 2 3\n2 NULL 3\n2 3 NULL\n1 2 3\n");
+
+  rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 3, rdb::INTEGER}};
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
+
+  auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  for (int row = 0; row < 3; ++row) {
+    GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS) << "row " << row;
+    ASSERT_EQ(src->lastNullBitset().size(), 1U);
+    EXPECT_TRUE(src->lastNullBitset()[0]) << "row " << row;
+  }
+
+  // A row without NULL after rows with NULL - the field is defined again
+  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
+  EXPECT_FALSE(src->lastNullBitset()[0]);
+  int values[3];
+  std::memcpy(values, buffer.get(), 3 * sizeof(int));
+  GTEST_ASSERT_EQ(values[0], 1);
+  GTEST_ASSERT_EQ(values[1], 2);
+  GTEST_ASSERT_EQ(values[2], 3);
+}
+
 // Verify NULLTYPE[N] consumes N NULL tokens, so the next field reads its own token
 TEST_F(TextSourceROTest, test_read_nulltype_array_keeps_next_field_aligned) {
   auto filename = createTestFile("test_nulltype_arr.txt", "NULL NULL NULL 7\n");

@@ -210,14 +210,22 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
         var.resize(strLen);
         payload_->setItem(i, var);
       } else {
+        bool anyNull = false;
         for (auto j = 0; j < item.rarray; j++) {
           auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
           if (!token.has_value() || isNullToken(*token)) {
-            payload_->setItem(i + j, std::nullopt);
+            anyNull = true;
             continue;
           }
           parseAndSetNumericItem(*payload_, i + j, item.rtype, *token);
         }
+        // Bit NULL jest jeden na wpis deskryptora, a zapis wartosci elementu go kasuje. Dopoki element
+        // NULL byl zapisywany w petli, `NULL 2 3` dawalo pole okreslone z zerem w a[0], a `2 3 NULL` -
+        // pole NULL. NULL na dowolnym elemencie oznacza NULL calego pola (payload::retargetNullBitsetFrom),
+        // wiec pole NULL zapisujemy dopiero po wszystkich elementach.
+        if (anyNull)
+          for (auto j = 0; j < item.rarray; j++)
+            payload_->setItem(i + j, std::nullopt);
       }
 
       // rdb::RATIONAL - deprecate ?
