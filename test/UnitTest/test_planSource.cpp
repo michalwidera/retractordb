@@ -325,8 +325,59 @@ TEST(PlanSource, rotation_refuses_kept_files_written_with_another_configuration)
   EXPECT_TRUE(
       check("{ INTEGER seg_0 RETMEMORY 5 TYPE DEFAULT }", true).contains("written with STORAGE DEFAULT without RETENTION"))
       << ".desc sprzed D7";
+  EXPECT_TRUE(check("{\n INTEGER }\n", true).contains("Fail: line 2:9"));
   // Bez rotacji pliki i tak znikaja przy starcie, wiec nie ma czego porownywac.
   EXPECT_EQ(check("{ INTEGER seg_0 RETENTION 5 3 }", false), "OK");
+
+  fs::remove_all(dir);
+}
+
+TEST(PlanSource, invalid_declared_descriptor_is_rejected_before_plan_activation) {
+  namespace fs       = std::filesystem;
+  const fs::path dir = "bad_declared_descriptor";
+  fs::remove_all(dir);
+  fs::create_directory(dir);
+
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan,
+                          "STORAGE 'bad_declared_descriptor'\n"
+                          "DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'\n")
+                .status,
+            "OK");
+  compiler cm(plan);
+  ASSERT_EQ(cm.compile(), "OK");
+
+  std::ofstream(dir / "src.desc") << "{\n INTEGER }\n";
+  const std::string error = checkDescriptorFiles(plan, {});
+  EXPECT_TRUE(error.contains("src.desc")) << error;
+  EXPECT_TRUE(error.contains("Fail: line 2:9")) << error;
+
+  fs::remove_all(dir);
+}
+
+// Wstepne sprawdzenie ma dawac ten sam werdykt co storage::attachDescriptor -> verifyDescriptorMatch
+// (plan == plik). Descriptor::operator== jest asymetryczny: odwrocony kierunek odrzucal plan, ktory
+// silnik przyjmuje, i przepuszczal taki, na ktorym silnik konczyl sie FatalError-em.
+TEST(PlanSource, declared_descriptor_check_uses_the_runtime_direction) {
+  namespace fs       = std::filesystem;
+  const fs::path dir = "declared_descriptor_direction";
+  fs::remove_all(dir);
+  fs::create_directory(dir);
+
+  const auto check = [&](const std::string &plannedType, const std::string &keptType) {
+    qTree plan;
+    EXPECT_EQ(parsePlanText(
+                  plan, "STORAGE 'declared_descriptor_direction'\nDECLARE a " + plannedType + " STREAM src, 1 FILE 'data.txt'\n")
+                  .status,
+              "OK");
+    compiler cm(plan);
+    EXPECT_EQ(cm.compile(), "OK");
+    std::ofstream(dir / "src.desc") << "{ " + keptType + " a REF \"data.txt\" TYPE TEXTSOURCE }\n";
+    return checkDescriptorFiles(plan, {});
+  };
+
+  EXPECT_TRUE(check("INTEGER", "DOUBLE").contains("descriptor schema mismatch")) << "silnik konczy sie FatalError-em";
+  EXPECT_EQ(check("DOUBLE", "INTEGER"), "OK") << "silnik przyjmuje ten plan";
 
   fs::remove_all(dir);
 }

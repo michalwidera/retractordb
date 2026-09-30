@@ -122,7 +122,7 @@ class storage {
 
   sourceState bufferState{sourceState::empty};  // ? test lock
 
-  /// @return pusty napis albo powod, dla ktorego nie dalo sie otworzyc magazynu (patrz FileInterface::initializationError)
+  /// @return pusty napis albo powod odmowy odczytu deskryptora lub otwarcia magazynu
   [[nodiscard]] std::string attachDescriptor(const Descriptor *descriptor = nullptr);
 
   /// @brief Oznacz magazyn jako materializowany podplan (substrat) dla sondy K23.

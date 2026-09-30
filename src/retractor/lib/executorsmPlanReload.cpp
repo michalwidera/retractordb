@@ -140,6 +140,8 @@ std::string executorsm::validatePlanText(const std::string &planText) {
     localCompiler.setDefaultRetention(cfgDefaultRetention);
     if (const std::string response = localCompiler.compile(); response != "OK") return "Fail compile:" + response;
     if (const std::string kept = checkKeptStores(candidate, cfgStorageDir); kept != "OK") return "Rejected: " + kept;
+    if (const std::string descriptorError = checkDescriptorFiles(candidate, cfgStorageDir); descriptorError != "OK")
+      return "Rejected: " + descriptorError;
     if (const std::string openError = checkOutputFilesOpenable(candidate, cfgStorageDir); openError != "OK")
       return "Rejected: " + openError;
     // Ten sam wykaz co przy starcie (launcher), tylko do dziennika - kanal reset nie ma stderr operatora.
