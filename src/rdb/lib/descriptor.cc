@@ -349,9 +349,7 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
 
 std::istream &operator>>(std::istream &is, Descriptor &rhs) {
   std::stringstream strstream;
-  std::string str;
-  while (is >> str)
-    strstream << " " << str;
+  strstream << is.rdbuf();
 
   auto result = parserDESCString(rhs, strstream.str());
   if (result != "OK") {

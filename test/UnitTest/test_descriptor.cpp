@@ -309,7 +309,22 @@ TEST(descriptor, parser) {
   EXPECT_TRUE(parserDESCString(out, "{ INTEGER a RETMEMORY 10 TYPE MEMORY }") == "OK");
 }
 
-// Plik .desc czyta takze serwer (storage::attachDescriptor -> loadDescriptorFile), wiec rozmiar pola
+TEST(descriptor, syntax_error_returns_location_and_allows_next_parse) {
+  rdb::Descriptor bad;
+  const std::string parserError = parserDESCString(bad, "{\n INTEGER }\n");
+  EXPECT_TRUE(parserError.starts_with("Fail: line 2:9 ")) << parserError;
+  EXPECT_TRUE(parserError.contains("missing ID")) << parserError;
+
+  rdb::Descriptor badToken;
+  const std::string lexerError = parserDESCString(badToken, "{\n INTEGER @bad\n}");
+  EXPECT_TRUE(lexerError.starts_with("Fail: line 2:9 ")) << lexerError;
+  EXPECT_TRUE(lexerError.contains("token recognition error")) << lexerError;
+
+  rdb::Descriptor valid;
+  EXPECT_EQ(parserDESCString(valid, "{ INTEGER a }"), "OK");
+}
+
+// Plik .desc czyta takze serwer (storage::attachDescriptor -> tryLoadDescriptorFile), wiec rozmiar pola
 // ma w gramatyce DESC te sama granice co `TYP[N]` i `STRING[N]` w RQL (A2 M11). Literal spoza int
 // konczyl proces przez std::terminate: std::stoi rzucal z metody exit* listenera, a ta biegnie
 // z noexcept-owego destruktora antlrcpp::FinalAction.

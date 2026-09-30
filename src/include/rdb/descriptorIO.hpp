@@ -9,15 +9,15 @@ namespace rdb {
 /// @brief Persystencja pliku deskryptora (.desc) - wydzielona z klasy storage.
 ///
 /// Funkcje descriptorIO powinny:
-/// - wczytywać Descriptor z istniejącego pliku .desc (loadDescriptorFile()) z pominięciem buforowania
-///   strumienia; pusty deskryptor w pliku kończy się przez FatalError,
+/// - wczytywać Descriptor z istniejącego pliku .desc (tryLoadDescriptorFile()) bez kończenia procesu;
+///   błąd otwarcia, składni, wartości i pusty deskryptor wracają jako komunikat,
 /// - zapisywać Descriptor do pliku .desc (saveDescriptorFile()) z kontrolą błędów otwarcia i zapisu,
 /// - weryfikować zgodność deskryptora dostarczonego z już zapisanym (verifyDescriptorMatch());
 ///   niezgodność schematów wypisuje oba deskryptory i kończy się przez FatalError,
 /// - nie znać pozostałych plików magazynu - operują wyłącznie na wskazanej ścieżce .desc.
 
-/// @brief Load a Descriptor from an existing .desc file; FatalError when the file holds an empty descriptor.
-[[nodiscard]] Descriptor loadDescriptorFile(const std::string &descriptorFile);
+/// @brief Read a descriptor without ending the process; return an empty string on success.
+[[nodiscard]] std::string tryLoadDescriptorFile(const std::string &descriptorFile, Descriptor &descriptor);
 
 /// @brief Write the descriptor to a .desc file; FatalError on open or write failure.
 void saveDescriptorFile(const std::string &descriptorFile, const Descriptor &descriptor);

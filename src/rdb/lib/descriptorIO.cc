@@ -1,29 +1,32 @@
 #include "rdb/descriptorIO.hpp"
 
-#include <spdlog/spdlog.h>
-
 #include <fstream>
 #include <iostream>
+#include <sstream>
+#include <utility>
+
+#include <spdlog/spdlog.h>
 
 #include "fatalError.hpp"
 
+extern std::string parserDESCString(rdb::Descriptor &desc, std::string_view inlet);
+
 namespace rdb {
 
-Descriptor loadDescriptorFile(const std::string &descriptorFile) {
-  Descriptor descriptor;
+std::string tryLoadDescriptorFile(const std::string &descriptorFile, Descriptor &descriptor) {
+  std::ifstream file(descriptorFile);
+  if (!file) return "cannot open descriptor file: " + descriptorFile;
 
-  std::fstream myFile;
-  myFile.rdbuf()->pubsetbuf(nullptr, 0);
-  myFile.open(descriptorFile, std::ios::in);  // Open existing descriptor
-  if (myFile.good()) myFile >> descriptor;
-  myFile.close();
+  std::ostringstream content;
+  content << file.rdbuf();
+  if (file.bad()) return "cannot read descriptor file: " + descriptorFile;
 
-  if (descriptor.getSizeInBytes() == 0) {
-    SPDLOG_ERROR("Empty descriptor in file.");
-    std::cerr << "Error, empty descriptor file:" << descriptorFile << '\n';
-    FatalError("storage: empty descriptor file");
-  }
-  return descriptor;
+  Descriptor parsed;
+  if (const std::string result = parserDESCString(parsed, content.str()); result != "OK")
+    return "descriptor parse failed in '" + descriptorFile + "': " + result;
+  if (parsed.getSizeInBytes() == 0) return "storage: empty descriptor file: " + descriptorFile;
+  descriptor = std::move(parsed);
+  return {};
 }
 
 void saveDescriptorFile(const std::string &descriptorFile, const Descriptor &descriptor) {

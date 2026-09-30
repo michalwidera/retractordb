@@ -108,4 +108,15 @@ bool writeQueryFile(const std::string &content, const std::string &target) {
   return true;
 }
 
+bool dropRefusedPlan(const std::string &unit, const std::string &queryFile) {
+  if (unit.empty() || queryFile.empty()) return false;
+  if (!writeQueryFile("", queryFile)) {
+    SPDLOG_CRITICAL("Plan refused: could NOT clear query file '{}'; the service unit may restart into the same plan.",
+                    queryFile);
+    return false;
+  }
+  SPDLOG_CRITICAL("Plan refused: query file '{}' cleared; the service unit will restart with no plan.", queryFile);
+  return true;
+}
+
 }  // namespace servicecontrol

@@ -49,6 +49,9 @@ void dropStalePlanArtifacts(const qTree &plan);
 ///         zawsze "OK" - wtedy start i tak kasuje rodziny plikow (dropStalePlanArtifacts).
 [[nodiscard]] std::string checkKeptStores(qTree &plan, std::string_view defaultStorageDir);
 
+/// Sprawdza zachowane pliki .desc przed zmiana planu: deklaracje zawsze, wyniki tylko przy ROTATION.
+[[nodiscard]] std::string checkDescriptorFiles(qTree &plan, std::string_view defaultStorageDir);
+
 /// Nazwy strumieni, ktore plan ROSCI na magistrali: wszystkie wezly poza dyrektywami.
 [[nodiscard]] std::vector<std::string> planStreamNames(const qTree &plan);
 

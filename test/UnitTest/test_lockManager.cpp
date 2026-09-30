@@ -261,6 +261,23 @@ TEST(ServiceControlWrite, fails_when_the_target_directory_does_not_exist) {
   EXPECT_FALSE(servicecontrol::writeQueryFile("x\n", (dir / "startup.rql").string()));
 }
 
+// Odmowa planu przed startem czysci plik zapytan WYLACZNIE w jednostce uslugowej: zwykly proces
+// z terminala dostaje plik .rql operatora, a tego ruszac nie wolno.
+TEST(ServiceControlDropRefused, clears_the_query_file_only_inside_a_service_unit) {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_drop_refused";
+  std::filesystem::create_directories(dir);
+  const std::filesystem::path plan = dir / "startup.rql";
+  std::ofstream(plan) << "SELECT a STREAM d FROM b\n";
+
+  EXPECT_FALSE(servicecontrol::dropRefusedPlan("", plan.string()));
+  EXPECT_EQ(std::filesystem::file_size(plan), 25U) << "plik operatora poza jednostka";
+
+  EXPECT_TRUE(servicecontrol::dropRefusedPlan("xretractor.service", plan.string()));
+  EXPECT_EQ(std::filesystem::file_size(plan), 0U);
+
+  std::filesystem::remove_all(dir);
+}
+
 TEST(ServiceControlDeliver, fails_on_missing_source) {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_deliver_missing";
   std::filesystem::create_directories(dir);

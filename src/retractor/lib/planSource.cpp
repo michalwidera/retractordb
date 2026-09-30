@@ -117,7 +117,8 @@ std::string checkKeptStores(qTree &plan, const std::string_view defaultStorageDi
 
     // Ta sama regula co rdb::storage::attachStorage: TYPE z wczytanego .desc wygrywa, bez niego
     // obowiazuje STORAGE z planu.
-    rdb::Descriptor kept    = rdb::loadDescriptorFile(descFile.string());
+    rdb::Descriptor kept;
+    if (const std::string error = rdb::tryLoadDescriptorFile(descFile.string(), kept); !error.empty()) return error;
     const auto keptType     = kept.storagePolicy().first.empty() ? q.storage_policy : kept.storagePolicy().first;
     const auto keptStore    = describeStore(keptType, kept.retention());
     const auto plannedStore = describeStore(q.storageType(), q.descriptorStorage().retention());
@@ -128,6 +129,22 @@ std::string checkKeptStores(qTree &plan, const std::string_view defaultStorageDi
         q.id, descFile.string(), keptStore, plannedStore, keptStore);
   }
   return {"OK"};
+}
+
+std::string checkDescriptorFiles(qTree &plan, const std::string_view defaultStorageDir) {
+  const bool rotation             = std::ranges::any_of(plan, [](const auto &q) { return q.id == ":ROTATION"; });
+  const std::filesystem::path dir = planStorageDir(plan, defaultStorageDir);
+  for (auto &q : plan) {
+    if (q.isCompilerDirective() || (!q.isDeclaration() && (!rotation || isMemoryStream(q)))) continue;
+    const std::filesystem::path descFile = dir / (q.id + ".desc");
+    if (!std::filesystem::exists(descFile)) continue;
+
+    rdb::Descriptor kept;
+    if (const std::string error = rdb::tryLoadDescriptorFile(descFile.string(), kept); !error.empty()) return error;
+    // Kierunek jak w rdb::verifyDescriptorMatch (plan == plik): Descriptor::operator== jest asymetryczny.
+    if (q.descriptorStorage() != kept) return "storage: descriptor schema mismatch in '" + descFile.string() + "'";
+  }
+  return "OK";
 }
 
 std::vector<std::string> planStreamNames(const qTree &plan) {

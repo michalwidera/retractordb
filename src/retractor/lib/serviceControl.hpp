@@ -34,4 +34,10 @@ bool deliverQueryFile(const std::string &source, const std::string &target);
 // czyli plan zerowy - tą drogą usługa sprowadzana jest do trybu bezczynnego.
 bool writeQueryFile(const std::string &content, const std::string &target);
 
+// Plan odrzucony przed startem jednostki usługowej: ta sama reguła co po błędzie krytycznym
+// (executorsm::cleanup) - plik zapytań jednostki zostaje opróżniony, żeby Restart=on-failure nie
+// wracał co RestartSec na ten sam plan. Poza jednostką (unit pusty) nic nie robi: plik .rql
+// operatora jest jego własnością. Zwraca true, gdy plik opróżniono.
+bool dropRefusedPlan(const std::string &unit, const std::string &queryFile);
+
 }  // namespace servicecontrol

@@ -39,7 +39,7 @@ storage::storage(const std::string_view qryID,         //
 std::string storage::attachDescriptor(const Descriptor *descriptorParam) {
   const bool descriptorExisted = descriptorFileExist();
   if (descriptorExisted) {
-    descriptor = loadDescriptorFile(paths_.descriptorFile());
+    if (const std::string error = tryLoadDescriptorFile(paths_.descriptorFile(), descriptor); !error.empty()) return error;
     if (descriptorParam != nullptr) verifyDescriptorMatch(*descriptorParam, descriptor, paths_.descriptorFile());
   } else {
     if (descriptorParam == nullptr) {

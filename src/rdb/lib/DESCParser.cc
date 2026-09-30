@@ -17,9 +17,33 @@
 using namespace antlrcpp;
 using namespace antlr4;
 
-std::string statusDesc = "OK";
-
 namespace {
+/// Blad skladni .desc: przerywa parsowanie, zamiast konczyc proces.
+///
+/// Wczesniej oba listenery bledow wolaly exit(EPERM). Plik .desc czyta takze serwer
+/// (storage::attachDescriptor), wiec uszkodzony deskryptor artefaktu konczyl xretractora (#265).
+///
+/// Rzut, a nie powrot z listenera - z tego samego powodu co RQLSyntaxError w RQLParser.cpp: po
+/// powrocie ANTLR wchodzi w odzyskiwanie i wola dalej metody exit* ParserDESCListener na kalekich
+/// kontekstach, gdzie etykieta tokenu (np. ctx->name) bywa nullem. Rzut wychodzi z desc() przez
+/// generowany kod, bo ten lapie wylacznie RecognitionException.
+struct DESCSyntaxError {
+  std::string message;
+};
+
+[[noreturn]] void abortParse(antlr4::Parser &parser, size_t line, size_t column, const std::string &msg,
+                             Token *offendingSymbol) {
+  const std::string message = "line " + std::to_string(line) + ":" + std::to_string(column) + " " + msg;
+  std::cerr << "Syntax error @Descriptor" << '\n';
+  std::cerr << "line:" << line << ":" << column << " at "
+            << (offendingSymbol != nullptr ? offendingSymbol->getText() : "<unknown>") << '\n';
+  std::cerr << "msg:" << msg << '\n';
+  // FinalAction wywoluje exitRule() podczas zwijania stosu. Bez odpiecia listenera
+  // exit* moze dereferencjonowac niekompletny kontekst po bledzie skladni.
+  parser.removeParseListeners();
+  throw DESCSyntaxError{message};
+}
+
 /// Wartosc tokenu DECIMAL albo nullopt, gdy nie miesci sie w int.
 ///
 /// std::from_chars, a nie std::stoi: metody exit* listenera biegna z noexcept-owego destruktora
@@ -39,26 +63,28 @@ std::optional<int> decimalLiteral(const std::string &text) {
 
 class LexerErrorListenerDesc : public BaseErrorListener {
  public:
+  explicit LexerErrorListenerDesc(antlr4::Parser &parser) : parser_(parser) {}
+
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    std::cerr << "Syntax error @Descriptor" << '\n';
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << '\n';
-    std::cerr << "msg:" << msg << '\n';
-    statusDesc = "Fail";
-    exit(EPERM);
+    abortParse(parser_, line, charPositionInLine, msg, offendingSymbol);
   }
+
+ private:
+  antlr4::Parser &parser_;
 };
 
 class ParserErrorListenerDesc : public BaseErrorListener {
  public:
+  explicit ParserErrorListenerDesc(antlr4::Parser &parser) : parser_(parser) {}
+
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    std::cerr << "Syntax error @Descriptor" << '\n';
-    std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingSymbol << '\n';
-    std::cerr << "msg:" << msg << '\n';
-    statusDesc = "Fail";
-    exit(EPERM);
+    abortParse(parser_, line, charPositionInLine, msg, offendingSymbol);
   }
+
+ private:
+  antlr4::Parser &parser_;
 };
 
 class ParserDESCListener : public DESCBaseListener {
@@ -68,8 +94,7 @@ class ParserDESCListener : public DESCBaseListener {
   /// w int - kilka tysiecy pol `DOUBLE a[65536]` przepelnialo go po cichu.
   std::int64_t recordBytes_{0};
 
-  /// Pierwszy blad wartosci w deskryptorze. Pole listenera, a nie globalny statusDesc: ten nie jest
-  /// nigdzie zerowany, wiec raz zapisany blad zwracalby kazde nastepne parsowanie w procesie.
+  /// Pierwszy blad wartosci w deskryptorze, lokalny dla jednego parsowania.
   std::string error_;
 
   void reportError(const std::string &message) {
@@ -198,20 +223,24 @@ std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet
   // to create a token stream.
   DESCLexer lexer(&input);
   CommonTokenStream tokens(&lexer);
-  LexerErrorListenerDesc lexerErrorListener;
-  lexer.removeErrorListeners();
-  lexer.addErrorListener(&lexerErrorListener);
   // Create a parser which parses the token stream
   // to create a parse tree.
   DESCParser parser(&tokens);
-  ParserErrorListenerDesc parserErrorListener;
+  LexerErrorListenerDesc lexerErrorListener(parser);
+  lexer.removeErrorListeners();
+  lexer.addErrorListener(&lexerErrorListener);
+  ParserErrorListenerDesc parserErrorListener(parser);
   ParserDESCListener parserDescListener(desc);
   parser.removeParseListeners();
   parser.removeErrorListeners();
   parser.addErrorListener(&parserErrorListener);
   parser.addParseListener(&parserDescListener);
-  (void)parser.desc();
+  try {
+    (void)parser.desc();
+  } catch (const DESCSyntaxError &e) {
+    return "Fail: " + e.message;
+  }
   // Blad wartosci idzie tym samym kanalem co wynik - operator>> konczy na nim FatalError-em.
   if (!parserDescListener.error().empty()) return parserDescListener.error();
-  return statusDesc;
+  return "OK";
 }

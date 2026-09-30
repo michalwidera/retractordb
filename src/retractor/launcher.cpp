@@ -104,9 +104,10 @@
 /// - Nadawać instancji usługowej stałą nazwę ("service"), o ile operator nie wskazał innej, i
 ///   dopuszczać w systemie dokładnie jedną instancję w trybie usługowym; serwerów zwykłych może
 ///   pracować wiele.
-/// - Po błędzie krytycznym (FatalError) sprowadzać jednostkę systemd do stanu bez planu: plik
+/// - Po błędzie krytycznym (FatalError) i po odmowie planu przed startem (parsowanie, kompilacja,
+///   zachowane pliki magazynu i .desc) sprowadzać jednostkę systemd do stanu bez planu: plik
 ///   zapytań usługi jest opróżniany, więc restart podnosi ją w trybie bezczynnym zamiast wracać
-///   w kółko na plan, który ją zabił.
+///   w kółko na plan, który ją zabił albo nie może wystartować.
 /// - Udostępniać dane wynikowe strumieni klientom (xqry) przez współdzieloną pamięć / IPC (Boost.Interprocess)
 ///   obsługiwane w osobnym wątku komunikacyjnym, niezależnym od wątku przetwarzania danych.
 /// - Umożliwiać sterowanie startem przetwarzania z poziomu klienta (opcja --xqrywait: wstrzymanie pętli do
@@ -350,6 +351,15 @@ int main(int argc, char *argv[]) try {
 
   int loopLimitVar{executorsm::inifitie_loop};
   AppConfig appCfg = earlyAppCfg;
+
+  // Odmowa planu przed startem. W jednostce systemd plan, ktory nie moze wystartowac, znika z pliku
+  // zapytan - ta sama regula co po FatalError (executorsm::cleanup), bo inaczej Restart=on-failure
+  // wraca co RestartSec na ten sam plan (#265). `-c` jest sprawdzeniem, a nie usluga.
+  const auto refusePlan = [&] {
+    if (!onlyCompile) servicecontrol::dropRefusedPlan(systemd.unit.value_or(std::string{}), guard.getServiceQueryFile());
+    return system::errc::protocol_error;
+  };
+
   try {
     std::string sInputFile;
     std::string sDiagram;
@@ -505,7 +515,7 @@ int main(int argc, char *argv[]) try {
       if (loaded.status != "OK") {
         std::cerr << "Input file:" << sInputFile << '\n'  //
                   << "Parse result:" << loaded.status << '\n';
-        return system::errc::protocol_error;
+        return refusePlan();
       }
       processedLines = loaded.lines;
     }
@@ -530,7 +540,7 @@ int main(int argc, char *argv[]) try {
       if (response != "OK") {
         std::cerr << "Input file:" << sInputFile << '\n'  //
                   << "Check result:" << response << '\n';
-        return system::errc::protocol_error;
+        return refusePlan();
       }
 
       // Wzrost na dysku jest dozwolony, ale jawny (D8): wykaz przy starcie i w `-c`, takze z --quiet.
@@ -682,6 +692,16 @@ int main(int argc, char *argv[]) try {
         }
 
         if (deliverToService) {
+          // Te same sprawdzenia plikow magazynu co przy starcie ponizej - PRZED nadpisaniem pliku
+          // uslugi. Bez nich plan odrzucany przy starcie wychodzil stad z kodem 0, a usluga tracila
+          // dzialajacy plan na rzecz takiego, ktory nie wstaje (#265).
+          for (const std::string &refusal :
+               {checkKeptStores(coreInstance, appCfg.storageDir), checkDescriptorFiles(coreInstance, appCfg.storageDir)}) {
+            if (refusal == "OK") continue;
+            std::cerr << "xretractor: " << refusal << "; nothing was changed\n";
+            SPDLOG_ERROR("Refused before delivery: {}", refusal);
+            return system::errc::protocol_error;
+          }
           const std::string target = peer.queryFile.empty() ? appCfg.serviceQueryFile : peer.queryFile;
           SPDLOG_INFO("Detected running service unit '{}'; delivering compiled query set to {}.", peer.unit, target);
           if (!servicecontrol::deliverQueryFile(sInputFile, target)) {
@@ -727,7 +747,12 @@ int main(int argc, char *argv[]) try {
   if (const std::string kept = checkKeptStores(coreInstance, {}); kept != "OK") {
     std::cerr << "xretractor: " << kept << '\n';
     SPDLOG_ERROR("Plan refused: {}", kept);
-    return system::errc::protocol_error;
+    return refusePlan();
+  }
+  if (const std::string descriptorError = checkDescriptorFiles(coreInstance, {}); descriptorError != "OK") {
+    std::cerr << "xretractor: " << descriptorError << '\n';
+    SPDLOG_ERROR("Plan refused: {}", descriptorError);
+    return refusePlan();
   }
 
   // Od tego miejsca zaczyna sie transakcja startowa zwyklej instancji. Najpierw blokada

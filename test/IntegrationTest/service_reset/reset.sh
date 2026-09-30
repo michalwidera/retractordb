@@ -97,6 +97,25 @@ if [ "$(wc -l < out_alpha.txt)" -lt 3 ]; then
   exit 1
 fi
 
+# Bledny zapisany .desc nie moze zabic serwera ani przyjac planu przed walidacja artefaktu.
+cp temp/src.desc src.desc.saved
+printf '{\n INTEGER }\n' > temp/src.desc
+status=0
+xqry --reset plan2.rql --server service > bad_desc_out.txt 2> bad_desc_err.txt || status=$?
+if [ "$status" -eq 0 ] || ! grep -q 'src.desc.*Fail: line 2:9' bad_desc_err.txt; then
+  echo "reset nie odrzucil blednego deskryptora z diagnostyka"
+  cat bad_desc_out.txt bad_desc_err.txt
+  exit 1
+fi
+mv src.desc.saved temp/src.desc
+wait_for_stream alpha
+xqry -s alpha -m 2 --server service > out_alpha_after_bad_desc.txt
+if [ "$(wc -l < out_alpha_after_bad_desc.txt)" -lt 2 ]; then
+  echo "po odrzuconym deskryptorze strumien alpha przestal liczyc"
+  cat out_alpha_after_bad_desc.txt
+  exit 1
+fi
+
 # --- 3. Plan wadliwy: odmowa, a dzialajacy plan zostaje nietkniety. ---
 status=0
 xqry --reset bad.rql --server service > bad_out.txt 2> bad_err.txt || status=$?
