@@ -204,7 +204,8 @@ python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
 ### Commits, push and CI
 
 - **No commit without human review, on any branch.** After verification the assistant shows the diff and stops; `git commit` runs only after an explicit go-ahead for that specific diff, and the go-ahead does not carry over to the next change. Green tests are not the go-ahead: they say the change works, not that it is the change the human wants in the history.
-- **`master`** - commits and pushes are performed by the human only.
+- **`master`** - protected: nobody commits or pushes to it directly, the human included; changes reach it only through a merged pull request.
+- **`dev/muro`** - takes over the role of `master` locally: side branches start from it, and commits and pushes on it are performed by the human only.
 - **Side branches** - the assistant may commit locally on that go-ahead. Pushing, opening a pull request or invoking CI needs a separate explicit request; anything that would trigger CI is handed over to the human.
 
 ### Session end
