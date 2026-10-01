@@ -18,6 +18,8 @@
 #define RDB_HAS_ROBUST_MUTEX 0
 #include "retractor/lib/bus.cpp"
 
+#include "busSlotCountTests.hpp"
+
 namespace {
 using namespace std::chrono_literals;
 

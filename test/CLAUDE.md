@@ -14,7 +14,7 @@ Before every focused or full `ctest`, `ninja test`, or `ninja test-valgrind` run
 
 1. Check `CMAKE_HOME_DIRECTORY` in `build/Debug/CMakeCache.txt` against `git rev-parse --show-toplevel`, and check the build configuration. A build directory from another checkout or configuration is not evidence for the current sources.
 2. Rebuild the targets the test uses from that build directory (`ninja` for the full suite). After a CMake reconfigure, rebuild the unit-test binaries that were removed with the copied test tree.
-3. Inspect the registered command with `ctest -N -V -R '<test name>'`. Unit tests should execute the rebuilt `build/Debug/test/UnitTest/` binary. For integration tests that call `xretractor`, `xqry`, or `xtrdb` by name, resolve each program through the **same effective `PATH` as CTest** (including its appended install directory), then use `cmp -s` to verify that executable equals the rebuilt target under `build/Debug/src/`. Tests such as `service_idle` that receive a target-file path need that path checked instead. Do not infer the chosen binary from `ninja install` or from a shell with a different `PATH`.
+3. Inspect the registered command with `ctest -N -V -R '<test name>'`. Unit tests should execute the rebuilt `build/Debug/test/UnitTest/` binary. For integration tests that call `xretractor`, `xqry`, or `xtrdb` by name, resolve each program through the **same effective `PATH` as CTest** (including its appended install directory), then use `cmp -s` to verify that executable equals the rebuilt target under `build/Debug/src/`. Tests that receive a target-file path (the four exempt directories under *Namespaces*) need that path checked instead. Do not infer the chosen binary from `ninja install` or from a shell with a different `PATH`.
 4. For every changed `.sh`, `.rql`, data file, or pattern used by the test, use `cmp -s` to verify the copy under `build/Debug/test/` equals the source file. Reconfigure or copy the fixture again if it differs.
 
 If any path or comparison cannot be established, fix the build/install/copy first and repeat the provenance check before testing. Report the build directory and actual executable path with the test result.
@@ -99,7 +99,13 @@ cmake . && ninja && ninja install && ctest
 ```
 Before `ctest`, confirm with `cmp -s` that each installed project binary selected by the test matches its final build target, as required above.
 
-One directory is deliberately exempt: `service_idle` gets `$<TARGET_FILE:xretractor>` as its first script argument and never calls `xretractor` from `PATH`. Its three tests assert service-mode INFO markers, which `SPDLOG_ACTIVE_LEVEL` strips in Release - so a Release copy left in `~/.local/bin` (a build of ablation profiles is enough) made them fail with an empty `stderr.txt`, and the symptom read as an engine regression. Everything else in the tree still uses the installed binary.
+Four directories are exempt: they receive the build-tree target as a script argument and never call `xretractor` from `PATH`. For them the provenance check compares the passed path, not the `PATH` lookup.
+
+- `service_idle` passes `$<TARGET_FILE:xretractor>` to `service-idle.sh`, deliberately. Its three tests assert service-mode INFO markers, which `SPDLOG_ACTIVE_LEVEL` strips in Release - so a Release copy left in `~/.local/bin` (a build of ablation profiles is enough) made them fail with an empty `stderr.txt`, and the symptom read as an engine regression.
+- `ipc_identity_lock` and `leftover_sweep` (both since `5853a83e`, #241) pass `$<TARGET_FILE:xretractor>` and `$<TARGET_FILE:xqry>` to `verify.py`. The tree records no reason for that choice.
+- `bus_slot_count` (#266) reuses the launch pattern of `ipc_identity_lock` and passes the same two paths to its `verify.py`.
+
+Everything else in the tree still uses the installed binary.
 
 ### Ablation: shape and value in separate tests
 

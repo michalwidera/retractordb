@@ -168,8 +168,10 @@ set_tests_properties(ut_busFallback PROPERTIES TIMEOUT 60)
 if(PROG_VALGRIND)
   set_tests_properties(ut_busFallback-valgrind PROPERTIES TIMEOUT 60)
 endif()
-# test_busFallback dolacza bus.cpp jako zrodlo; GCC ostrzega wtedy o typach z
-# przestrzeni anonimowej uzytych w polach Bus::Impl, choc w tej jednostce
+# test_busFallback i test_busSlotCount dolaczaja bus.cpp; GCC ostrzega o typach
+# z przestrzeni anonimowej uzytych w polach Bus::Impl, choc w tej jednostce
 # kompilacji sa jedyne.
-target_compile_options(test_busFallback
-                       PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-subobject-linkage>)
+foreach(_bus_impl_test test_busFallback test_busSlotCount)
+  target_compile_options(
+    ${_bus_impl_test} PRIVATE $<$<CXX_COMPILER_ID:GNU>:-Wno-subobject-linkage>)
+endforeach()
