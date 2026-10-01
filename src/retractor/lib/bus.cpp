@@ -120,6 +120,8 @@ struct BusMutex {
 struct Segment {
   std::uint64_t magic;
   std::uint32_t layoutVersion;
+  // Znacznik zgodnosci ukladu, sprawdzany przy podlaczeniu, NIE granica petli.
+  // Naglowek moze zostac podmieniony pozniej; tablica zawsze ma kMaxSlots elementow.
   std::uint32_t slotCount;
   // Rozmiar slotu w naglowku, obok numeru wersji: numer wersji chroni przed zmiana ZNACZENIA
   // pol, a ten rozmiar przed zmiana POJEMNOSCI (kMaxStreams, kStreamNameSize), ktora latwo
@@ -429,7 +431,7 @@ struct Bus::Impl {
       // Poprzedni wlasciciel zginal trzymajac zamek. Trzymanie zamka jest tu dowodem,
       // ze zadna ZYWA instancja nie jest w trakcie zapisu slotu, wiec slot o nieparzystym
       // seq to slot przerwany w polowie -- jego tresc jest smieciem i musi zniknac.
-      for (std::uint32_t i = 0; i < segment->slotCount; ++i) {
+      for (std::uint32_t i = 0; i < kMaxSlots; ++i) {
         Slot &slot = segment->slots[i];
         std::atomic_ref<std::uint32_t> seq(slot.seq);
         if ((seq.load(std::memory_order_relaxed) & 1U) == 0U) continue;
@@ -747,7 +749,7 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
   auto scratch     = std::make_unique<Slot>();  // ~57 KiB -- na stercie, nie na stosie
   int freeSlot     = -1;
 
-  for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
+  for (std::uint32_t i = 0; i < kMaxSlots; ++i) {
     Slot &slot = segment.slots[i];
     if (!snapshot(slot, *scratch)) continue;
 
@@ -811,7 +813,7 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
 
   if (freeSlot < 0) {
     retVal.status = ClaimStatus::NoFreeSlot;
-    retVal.detail = "all " + std::to_string(segment.slotCount) + " bus slots are held by live instances";
+    retVal.detail = "all " + std::to_string(kMaxSlots) + " bus slots are held by live instances";
     impl->unlock();
     return retVal;
   }
@@ -883,7 +885,7 @@ ClaimResult Bus::reservePlan(const std::vector<std::string> &streams, std::strin
   Segment &segment = *impl->segment;
   auto scratch     = std::make_unique<Slot>();  // ~57 KiB -- na stercie, nie na stosie
 
-  for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
+  for (std::uint32_t i = 0; i < kMaxSlots; ++i) {
     if (std::cmp_equal(i, slotIndex)) continue;
     Slot &slot = segment.slots[i];
     if (!snapshot(slot, *scratch)) continue;
@@ -1050,7 +1052,7 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams, const 
 
   auto scratch = std::make_unique<Slot>();  // ~57 KiB -- na stercie, nie na stosie
 
-  for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
+  for (std::uint32_t i = 0; i < kMaxSlots; ++i) {
     if (std::cmp_equal(i, impl->slotIndex)) continue;  // wlasnych nazw nie sprawdzamy przeciw sobie
     Slot &slot = segment.slots[i];
     if (!snapshot(slot, *scratch)) continue;
@@ -1158,7 +1160,7 @@ std::vector<InstanceInfo> Bus::instances() const {
   Segment &segment = *impl->segment;
   auto scratch     = std::make_unique<Slot>();
 
-  for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
+  for (std::uint32_t i = 0; i < kMaxSlots; ++i) {
     if (!snapshot(segment.slots[i], *scratch)) continue;
     if (!isProcessAlive(scratch->pid, scratch->startTime)) continue;
 
