@@ -247,11 +247,11 @@ A query set is a `.rql` file with stream `DECLARE`s and continuous `SELECT`s. Th
 DECLARE a BYTE , b BYTE STREAM core0, 1 DEVICE '/dev/urandom'
 DECLARE c BYTE , d BYTE STREAM core1, 0.5 DEVICE '/dev/urandom'
 
-SELECT core0[0],b STREAM str1 FROM core0#core1
+SELECT str1[0],str1[1] STREAM str1 FROM core0#core1
 SELECT core1[0]/2+1,a,a+1,b STREAM str2 FROM core1+core0
 ```
 
-Note: the interlace operator `#` requires both input streams to have the same number of fields.
+Note: the interlace operator `#` requires both input streams to have the same number of fields. After `#` the constituents share one schema, so the result is read by its own name (`str1[0]`, `str1[1]`), not through `core0` or `core1`.
 
 (More ready-made examples live under [examples/](examples/), e.g. [examples/session-record-1/query.rql](examples/session-record-1/query.rql).)
 

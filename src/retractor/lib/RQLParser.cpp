@@ -656,11 +656,11 @@ class ParserListener : public RQLBaseListener {
     // wtedy plan z generatora jest nie do odroznienia od recznie rozpisanych SELECT-ow.
     if (qry.generatorSize == query::notAGenerator) {
       for (auto &i : qry.lSchema) {
-        if ((i.field_.rname).starts_with("_")) (i.field_.rname) = ctx->ID()->getText() + i.field_.rname;
+        if ((i.field_.rname).starts_with("_")) (i.field_.rname) = ctx->stream_name->getText() + i.field_.rname;
       }
     }
 
-    qry.id = ctx->ID()->getText();
+    qry.id = ctx->stream_name->getText();
 
     // Blad planu, nie abort(): `xqry -a` z ta nazwa konczyl dzialajacy serwer SIGABRT-em.
     if (qry.id == constants::Reserved_id_oob)
@@ -685,12 +685,24 @@ class ParserListener : public RQLBaseListener {
 
       // Blad planu, nie FatalError - ta sama przyczyna co w exitCoption.
       if (qry.filename.empty())
-        reportSemanticError("FILE of stream " + ctx->ID()->getText() + " requires a non-empty file name");
+        reportSemanticError("FILE of stream " + ctx->stream_name->getText() + " requires a non-empty file name");
     }
 
     if (ctx->STORAGE() != nullptr) {
       qry.storage_policy = ctx->type_name->getText();
       std::ranges::transform(qry.storage_policy, qry.storage_policy.begin(), ::toupper);  // to upper case
+      // Gramatyka przyjmuje tu takze slowa, ktore profilem nie sa (patrz select_statement w RQL.g4) -
+      // po to, zeby odmowa nazwala strumien i profile, zamiast bledu skladni o dyrektywie STORAGE.
+      // Rozstrzyga typ tokenu, nie tekst: `Direct` jako ID nie moze stac sie profilem przez toupper,
+      // bo profile maja tylko dwie pisownie, jak kazde slowo kluczowe.
+      const auto tokenType = ctx->type_name->getType();
+      if (tokenType != RQLParser::TYPE_PROFILE && tokenType != RQLParser::DEFAULT) {
+        const bool sourceKind = tokenType == RQLParser::DEVICE || tokenType == RQLParser::BINFILE ||
+                                tokenType == RQLParser::TEXTFILE || qry.storage_policy == "TEXTSOURCE";
+        reportSemanticError("STORAGE " + ctx->type_name->getText() + " of stream " + ctx->stream_name->getText() +
+                            " is not a storage profile" + (sourceKind ? " but a source kind of DECLARE" : "") +
+                            "; use DEFAULT, MEMORY, DIRECT, POSIX, POSIXSHD or GENERIC");
+      }
     }
     if (ctx->PERSISTENT() != nullptr && qry.storage_policy == "MEMORY")
       reportSemanticError("PERSISTENT conflicts with STORAGE MEMORY");
@@ -1011,7 +1023,7 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   std::string streamName;  // tree->children[1]->children[0]->getText();
   if (!tree->children.empty()) {
     if (auto *selectCtx = dynamic_cast<RQLParser::SelectContext *>(tree->children[0])) {
-      streamName = selectCtx->ID()->getText();
+      streamName = selectCtx->stream_name->getText();
     } else if (auto *declareCtx = dynamic_cast<RQLParser::DeclareContext *>(tree->children[0])) {
       streamName = declareCtx->stream_name->getText();
     } else if (auto *ruleCtx = dynamic_cast<RQLParser::RulezContext *>(tree->children[0])) {

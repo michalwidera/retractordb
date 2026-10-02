@@ -15,13 +15,17 @@ compiler_option     : directive=( ROTATION | STORAGE | SUBSTRAT ) value=( STRING
                     # Coption
                     ;
 
+// Po STORAGE gramatyka przyjmuje takze slowa, ktore profilem NIE sa: rodzaje zrodel DECLARE
+// i dowolny identyfikator (np. dawne TEXTSOURCE). Odrzuca je exitSelect bledem z nazwa strumienia
+// i lista profili. Bez tych alternatyw parser konczyl SELECT przed STORAGE, bral reszte za
+// dyrektywe `STORAGE 'katalog'` i zglaszal "expecting {STRING_PROFILE, STRING}" (#346).
 select_statement    : SELECT select_list
                       STREAM stream_name=ID ('[' gen_size=DECIMAL ']')?
                       FROM stream_expression
                       (FILE file_name=STRING)?
                       (retention_from)?
                       (VOLATILE | PERSISTENT)?
-                      (STORAGE type_name=(TYPE_PROFILE | DEFAULT))?
+                      (STORAGE type_name=(TYPE_PROFILE | DEFAULT | DEVICE | BINFILE | TEXTFILE | ID))?
                     # Select
                     ;
 

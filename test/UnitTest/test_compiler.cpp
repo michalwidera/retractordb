@@ -4651,12 +4651,34 @@ TEST(xparser, source_keywords_are_reserved_stream_names) {
 // `-c` i padaly w wykonaniu. Wartosc `:STORAGE` jest katalogiem, wiec katalog `device` zostaje legalny.
 TEST(xparser, storage_profiles_are_only_writable_profiles) {
   const std::string source = "DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'\n";
-  for (const auto *profile : {"DEVICE", "device", "TEXTSOURCE", "textsource"}) {
+  // Odmowa nazywa strumien i profile. Do poprawki parser konczyl SELECT przed STORAGE i zglaszal
+  // "expecting {STRING_PROFILE, STRING}", bo reszte bral za dyrektywe `STORAGE 'katalog'`.
+  for (const auto *profile : {"DEVICE", "device", "TEXTSOURCE", "textsource", "BINFILE", "TEXTFILE"}) {
     qTree plan;
     testing::internal::CaptureStderr();
-    EXPECT_NE(parsePlanText(plan, source + "SELECT core0[0] STREAM dst FROM core0 STORAGE " + profile + "\n").status, "OK")
-        << profile;
+    const std::string status =
+        parsePlanText(plan, source + "SELECT core0[0] STREAM dst FROM core0 STORAGE " + profile + "\n").status;
     testing::internal::GetCapturedStderr();
+    EXPECT_TRUE(status.contains(std::string("STORAGE ") + profile +
+                                " of stream dst is not a storage profile but a source kind of DECLARE"))
+        << status;
+  }
+  // `Direct` nie jest pisownia profilu - slowa kluczowe maja dwie pisownie, a ID nie staje sie profilem przez toupper.
+  for (const auto *profile : {"foo", "Direct"}) {
+    qTree plan;
+    testing::internal::CaptureStderr();
+    const std::string status =
+        parsePlanText(plan, source + "SELECT core0[0] STREAM dst FROM core0 STORAGE " + profile + "\n").status;
+    testing::internal::GetCapturedStderr();
+    EXPECT_TRUE(
+        status.contains(std::string("STORAGE ") + profile +
+                        " of stream dst is not a storage profile; use DEFAULT, MEMORY, DIRECT, POSIX, POSIXSHD or GENERIC"))
+        << status;
+  }
+  for (const auto *profile : {"memory", "DEFAULT", "direct", "POSIX", "posixshd", "GENERIC"}) {
+    qTree plan;
+    EXPECT_EQ(parsePlanText(plan, source + "SELECT core0[0] STREAM dst FROM core0 STORAGE " + profile + "\n").status, "OK")
+        << profile;
   }
   for (const auto *profile : {"device", "TEXTSOURCE", "foo"}) {
     const auto [parseResult, diagnostics] = parseCapturingStderr(std::string("SUBSTRAT '") + profile + "'");

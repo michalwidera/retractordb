@@ -192,7 +192,8 @@ public:
     antlr4::tree::TerminalNode *STREAM();
     antlr4::tree::TerminalNode *FROM();
     Stream_expressionContext *stream_expression();
-    antlr4::tree::TerminalNode *ID();
+    std::vector<antlr4::tree::TerminalNode *> ID();
+    antlr4::tree::TerminalNode* ID(size_t i);
     antlr4::tree::TerminalNode *FILE();
     Retention_fromContext *retention_from();
     antlr4::tree::TerminalNode *STORAGE();
@@ -202,6 +203,9 @@ public:
     antlr4::tree::TerminalNode *PERSISTENT();
     antlr4::tree::TerminalNode *TYPE_PROFILE();
     antlr4::tree::TerminalNode *DEFAULT();
+    antlr4::tree::TerminalNode *DEVICE();
+    antlr4::tree::TerminalNode *BINFILE();
+    antlr4::tree::TerminalNode *TEXTFILE();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
