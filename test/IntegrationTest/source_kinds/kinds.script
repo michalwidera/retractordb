@@ -1,0 +1,8 @@
+storage temp
+open obin
+list 3
+open otxt
+list 3
+open ozero
+list 3
+quit

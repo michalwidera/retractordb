@@ -18,13 +18,16 @@ void query::reset() {
   rInterval = 0;
   lSchema.clear();
   lProgram.clear();
-  isDisposable  = false;
-  isOneShot     = false;
-  isHold        = false;
-  isSubstrat    = false;
-  generatorSize = notAGenerator;
-  policy        = std::make_pair("DEFAULT", 0);
-  retention     = rdb::retention_t{.segments = 0, .capacity = 0};
+  isDisposable     = false;
+  isOneShot        = false;
+  isHold           = false;
+  isSubstrat       = false;
+  kind             = sourceKind::none;
+  isDeprecatedFile = false;
+  declarationLine  = 0;
+  generatorSize    = notAGenerator;
+  policy           = std::make_pair("DEFAULT", 0);
+  retention        = rdb::retention_t{.segments = 0, .capacity = 0};
 }
 
 /** Construktor set */
@@ -118,12 +121,22 @@ rdb::Descriptor query::descriptorStorage() {
   }
   retVal += rdb::Descriptor(filename, 0, 0, rdb::REF);
 
-  auto filenameShdw{filename};
-  std::ranges::transform(filenameShdw, filenameShdw.begin(), ::tolower);
-  if (filenameShdw.find(".txt") != std::string::npos)
-    retVal += rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE);
-  else
-    retVal += rdb::Descriptor("DEVICE", 0, 0, rdb::TYPE);
+  // TYPE wynika z rodzaju ze slowa kluczowego (#346). Heurystyka `.txt` zyje juz tylko
+  // w tlumaczeniu przestarzalego `FILE` w parserze. TEXTFILE zachowuje dawna nazwe typu
+  // magazynu TEXTSOURCE, wiec jego `.desc` sprzed zmiany nadal pasuje.
+  switch (kind) {
+    case sourceKind::binFile:
+      retVal += rdb::Descriptor("BINFILE", 0, 0, rdb::TYPE);
+      break;
+    case sourceKind::textFile:
+      retVal += rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE);
+      break;
+    case sourceKind::device:
+      retVal += rdb::Descriptor("DEVICE", 0, 0, rdb::TYPE);
+      break;
+    case sourceKind::none:
+      FatalError("query::descriptorStorage: declaration '{}' has no source kind", id);
+  }
 
   return retVal;
 }

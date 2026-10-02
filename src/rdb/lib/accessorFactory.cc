@@ -1,5 +1,9 @@
 #include "rdb/accessorFactory.hpp"
 
+#include <sys/stat.h>
+
+#include <format>
+
 #include "fatalError.hpp"
 #include "rdb/faccbindev.hpp"
 #include "rdb/faccfs.hpp"
@@ -12,7 +16,42 @@
 
 namespace rdb {
 
-bool isDeclaredType(const std::string_view storageType) { return (storageType == "DEVICE") || (storageType == "TEXTSOURCE"); }
+bool isDeclaredType(const std::string_view storageType) {
+  return (storageType == "BINFILE") || (storageType == "DEVICE") || (storageType == "TEXTSOURCE");
+}
+
+bool isWritableType(const std::string_view storageType) {
+  return (storageType == "DEFAULT") || (storageType == "DIRECT") || (storageType == "MEMORY") || (storageType == "POSIX") ||
+         (storageType == "POSIXSHD") || (storageType == "GENERIC");
+}
+
+namespace {
+std::string_view fileKindName(const mode_t mode) {
+  if (S_ISREG(mode)) return "a regular file";
+  if (S_ISDIR(mode)) return "a directory";
+  if (S_ISCHR(mode)) return "a character device";
+  if (S_ISBLK(mode)) return "a block device";
+  if (S_ISFIFO(mode)) return "a FIFO";
+  if (S_ISSOCK(mode)) return "a socket";
+  return "an unknown file type";
+}
+}  // namespace
+
+std::string sourceKindMismatch(const std::string_view storageType, const std::string &path, const mode_t mode) {
+  if (storageType == "DEVICE") {
+    if (S_ISCHR(mode) || S_ISFIFO(mode)) return {};
+    return std::format("DEVICE '{}' is {}, not a character device or FIFO", path, fileKindName(mode));
+  }
+  if (S_ISREG(mode)) return {};
+  const std::string_view keyword = (storageType == "TEXTSOURCE") ? "TEXTFILE" : storageType;
+  return std::format("{} '{}' is {}, not a regular file", keyword, path, fileKindName(mode));
+}
+
+std::string sourceKindMismatch(const std::string_view storageType, const std::string &path) {
+  struct stat sourceStat{};
+  if (::stat(path.c_str(), &sourceStat) != 0) return {};
+  return sourceKindMismatch(storageType, path, sourceStat.st_mode);
+}
 
 std::unique_ptr<FileInterface> makeAccessor(const std::string_view storageType,  //
                                             const std::string &storageFile,      //
@@ -41,8 +80,8 @@ std::unique_ptr<FileInterface> makeAccessor(const std::string_view storageType, 
   if (storageType == "GENERIC") {
     return std::make_unique<rdb::genericBinaryFile>(storageFile, descriptor, percounter);
   }
-  if (storageType == "DEVICE") {
-    return std::make_unique<rdb::binaryDeviceRO>(storageFile, descriptor, !oneShot);
+  if (storageType == "BINFILE" || storageType == "DEVICE") {
+    return std::make_unique<rdb::binaryDeviceRO>(storageFile, descriptor, !oneShot, storageType);
   }
   if (storageType == "TEXTSOURCE") {
     return std::make_unique<rdb::textSourceRO>(storageFile, descriptor, !oneShot);

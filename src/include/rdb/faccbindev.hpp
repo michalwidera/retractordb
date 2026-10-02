@@ -2,6 +2,8 @@
 
 #include <cerrno>
 #include <cstdint>
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include "descriptor.hpp"
@@ -22,7 +24,10 @@ namespace rdb {
 /// - po osiągnięciu końca strumienia próbować wrócić do początku, jeśli włączono loopToBeginningIfEOF,
 /// - po osiągnięciu końca strumienia przy wyłączonym loopToBeginningIfEOF zwracać rekord oznaczony jako null,
 /// - w tym samym przypadku zgłaszać wyczerpanie wejścia przez exhausted(), bo rekord all-null jest nieodróżnialny od danych,
-/// - zliczać wykonane odczyty i zwracać ich liczbę przez count().
+/// - zliczać wykonane odczyty i zwracać ich liczbę przez count(),
+/// - obsługiwać dwa typy źródła deklarowanego (#346): BINFILE (plik zwykły) i DEVICE (urządzenie znakowe
+///   albo FIFO); ścieżkę złego rodzaju odrzucać przez initializationError() - BINFILE sprawdza stat()
+///   przed otwarciem, więc FIFO bez pisarza nie blokuje open(), a oba typy dodatkowo fstat() po otwarciu.
 ///
 /// @note Klasa nie interpretuje semantyki pól opisanych w Descriptor; przekazuje jedynie surowe bajty do bufora wyjściowego.
 /// @note Mechanizm powrotu do początku zakłada źródło wspierające lseek; dla urządzeń nieseekowalnych zachowanie zależy od systemowego deskryptora.
@@ -30,6 +35,8 @@ class binaryDeviceRO : public FileInterface {
   enum class readOutcome : std::uint8_t { complete, endOfFile, error };
 
   std::string filename_;
+  std::string storageType_;
+  std::string initializationError_;
   const ssize_t recordSize_;
   Descriptor descriptor_;
   /**
@@ -52,7 +59,8 @@ class binaryDeviceRO : public FileInterface {
  public:
   explicit binaryDeviceRO(std::string_view fileName,          //
                           const rdb::Descriptor &descriptor,  //
-                          bool loopToBeginningIfEOF);
+                          bool loopToBeginningIfEOF,          //
+                          std::string_view storageType);
   ~binaryDeviceRO() override;
 
   using FileInterface::read;
@@ -63,6 +71,7 @@ class binaryDeviceRO : public FileInterface {
   auto name() -> std::string & override;
   size_t count() override;
   [[nodiscard]] bool exhausted() const override { return exhausted_; }
+  [[nodiscard]] const std::string &initializationError() const override { return initializationError_; }
 
   [[nodiscard]] const std::vector<bool> &lastNullBitset() const;
 };

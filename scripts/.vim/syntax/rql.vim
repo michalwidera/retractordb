@@ -9,6 +9,7 @@ endif
 " RQL statement keywords (SELECT, DECLARE, RULE, etc.)
 syn keyword rqlKey          SELECT select STREAM stream FROM from DECLARE declare
 syn keyword rqlKey          FILE file VOLATILE volatile RULE rule ON on
+syn keyword rqlKey          BINFILE binfile TEXTFILE textfile DEVICE device
 syn keyword rqlKey          WHEN when DO do DUMP dump TO to SYSTEM system
 syn keyword rqlKey          DISPOSABLE disposable ONESHOT oneshot HOLD hold
 syn keyword rqlKey          RETENTION retention PERSISTENT persistent
@@ -22,7 +23,6 @@ syn keyword rqlLogic        AND and OR or NOT not
 " Storage profile values (TYPE_PROFILE)
 syn keyword rqlProfile      MEMORY memory DEFAULT default DIRECT direct
 syn keyword rqlProfile      POSIX posix POSIXSHD posixshd GENERIC generic
-syn keyword rqlProfile      DEVICE device TEXTSOURCE textsource
 
 " Comments: '# ' (space required), // and /* */
 syn match  rqlComment       "# .*$"

@@ -8,6 +8,7 @@
 #include <cerrno>
 #include <cstring>
 #include "fatalError.hpp"
+#include "rdb/accessorFactory.hpp"
 
 namespace rdb {
 
@@ -17,15 +18,31 @@ constexpr mode_t kDefaultFileMode = 0644;
 
 binaryDeviceRO::binaryDeviceRO(const std::string_view fileName,  //
                                const rdb::Descriptor &descriptor,
-                               bool loopToBeginningIfEOF)  //
+                               bool loopToBeginningIfEOF,  //
+                               const std::string_view storageType)
     : filename_(std::string(fileName)),
+      storageType_(std::string(storageType)),
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       descriptor_(descriptor),
+      fd_(-1),
       loopToBeginningIfEOF_(loopToBeginningIfEOF),
       lastNullBitset_(descriptor.size(), false) {
+  // BINFILE PRZED otwarciem: open(O_RDONLY) na FIFO bez pisarza wisi w samym wywolaniu, wiec
+  // fstat po nim nie zdazylby niczego odrzucic. Otwarcie DEVICE zostaje blokujace - #347.
+  if (storageType_ == "BINFILE") initializationError_ = sourceKindMismatch(storageType_, filename_);
+  if (!initializationError_.empty()) return;
+
   fd_ = ::open(filename_.c_str(), O_RDONLY | O_CLOEXEC, kDefaultFileMode);
   if (fd_ < 0) {
     SPDLOG_WARN("Unable to open binary device source: {}", filename_);
+    return;
+  }
+  // Rodzaj tego, co faktycznie otwarto - sciezka mogla zmienic sie po stat().
+  struct stat openedStat{};
+  if (::fstat(fd_, &openedStat) == 0) initializationError_ = sourceKindMismatch(storageType_, filename_, openedStat.st_mode);
+  if (!initializationError_.empty()) {
+    ::close(fd_);
+    fd_ = -1;
   }
 }
 

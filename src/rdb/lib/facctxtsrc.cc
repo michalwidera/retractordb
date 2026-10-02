@@ -1,7 +1,5 @@
 #include "rdb/facctxtsrc.hpp"
 
-#include <sys/stat.h>  // stat, S_ISREG - rozpoznanie pliku zwykłego przy doborze buforowania
-
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -14,6 +12,7 @@
 #include <sstream>
 #include <type_traits>  // is_integral_v
 #include "fatalError.hpp"
+#include "rdb/accessorFactory.hpp"
 
 namespace rdb {
 
@@ -84,18 +83,16 @@ textSourceRO::textSourceRO(const std::string_view fileName,    //
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
 
       loopToBeginningIfEOF_(loopToBeginningIfEOF) {
-  // Buforowanie wyłączamy wyłącznie dla źródeł nieregularnych (urządzenia, FIFO): tam bufor czytałby w przód
-  // poza bieżącą krotkę i konsumowałby bajty należące do kolejnych odczytów. Dla pliku zwykłego jesteśmy
-  // jedynym czytelnikiem deskryptora, więc bufor jest bezpieczny i zdejmuje koszt I/O ponoszony przez
-  // operator>> na każdy znak. Nierozpoznany stat traktujemy jak źródło nieregularne (wariant zachowawczy).
-  struct stat sourceStat{};
-  if (::stat(filename_.c_str(), &sourceStat) != 0 || !S_ISREG(sourceStat.st_mode)) {
-    myFile_.rdbuf()->pubsetbuf(nullptr, 0);
-  }
-  myFile_.open(filename_, std::ios::in);
-  if ((myFile_.rdstate() & std::ifstream::failbit) != 0) {
-    SPDLOG_WARN("Unable to open text source file: {}", filename_);
-    myFile_.clear();
+  // TEXTFILE czyta wyłącznie plik zwykły (#346), sprawdzany przez stat() PRZED otwarciem - otwarcie FIFO
+  // bez pisarza wisi w samym open(). Plik zwykły ma jednego czytelnika deskryptora, więc strumień jest
+  // zawsze buforowany; do #346 bufor wyłączano tu dla urządzeń i FIFO, bo czytałby w przód poza krotkę.
+  initializationError_ = sourceKindMismatch("TEXTSOURCE", filename_);
+  if (initializationError_.empty()) {
+    myFile_.open(filename_, std::ios::in);
+    if ((myFile_.rdstate() & std::ifstream::failbit) != 0) {
+      SPDLOG_WARN("Unable to open text source file: {}", filename_);
+      myFile_.clear();
+    }
   }
 
   payload_ = std::make_unique<rdb::payload>(descriptor_);

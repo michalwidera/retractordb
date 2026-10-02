@@ -50,7 +50,26 @@ void dropStalePlanArtifacts(const qTree &plan);
 [[nodiscard]] std::string checkKeptStores(qTree &plan, std::string_view defaultStorageDir);
 
 /// Sprawdza zachowane pliki .desc przed zmiana planu: deklaracje zawsze, wyniki tylko przy ROTATION.
+/// Deklaracja musi sie zgadzac takze w TYPE i REF, bo te magazyn bierze z pliku, nie z planu (#346).
+/// Jedyny przepuszczany rozjazd to dawny TYPE DEVICE zwyklego pliku binarnego, ktory zastepuje
+/// dropStalePlanArtifacts().
 [[nodiscard]] std::string checkDescriptorFiles(qTree &plan, std::string_view defaultStorageDir);
+
+/// Rodzaj pliku pod sciezka kazdej deklaracji (#346): BINFILE i TEXTFILE - plik zwykly, DEVICE -
+/// urzadzenie znakowe albo FIFO. Tylko stat(), bez otwarcia, wiec FIFO bez pisarza niczego nie
+/// wiesza. Pusta lista nazw oznacza caly plan; ad-hoc przekazuje tylko nowo dodawane strumienie.
+/// Nie w `-c` - kompilacja nie musi biec na maszynie z danymi.
+/// Zwraca "OK" albo powod odmowy z nazwa strumienia i sciezka; przy formie przestarzalej `FILE`
+/// takze z podpowiedzia jawnego slowa.
+[[nodiscard]] std::string checkDeclaredSources(const qTree &plan, const std::vector<std::string> &streamNames = {});
+
+/// Ostrzezenia o deklaracjach w przestarzalej formie `DECLARE ... FILE` (#346), po jednym na
+/// deklaracje, w kolejnosci wierszy planu - kompilator sortuje wezly po interwale. Kazde nazywa
+/// wiersz, strumien i slowo wybrane przez zamrozona regule. Wypisuje je tylko wolajacy z --verbose:
+/// bez niego stare plany, testy i narzedzia pomiarowe nie zmieniaja wyjscia. Pusta lista nazw
+/// oznacza caly plan; ad-hoc przekazuje tylko nowo dodawane strumienie.
+[[nodiscard]] std::vector<std::string> deprecatedFileWarnings(const qTree &plan,
+                                                              const std::vector<std::string> &streamNames = {});
 
 /// Nazwy strumieni, ktore plan ROSCI na magistrali: wszystkie wezly poza dyrektywami.
 [[nodiscard]] std::vector<std::string> planStreamNames(const qTree &plan);
@@ -70,7 +89,7 @@ void dropStalePlanArtifacts(const qTree &plan);
 /// jeden magazyn.
 ///
 /// Ze zbioru wypadaja dwa rodzaje wezlow, i oba wypadaja z powodu, nie dla wygody:
-///   - DEKLARACJE: `query::descriptorStorage()` nadaje kazdej `TYPE TEXTSOURCE` albo `DEVICE`,
+///   - DEKLARACJE: `query::descriptorStorage()` nadaje kazdej `TYPE BINFILE`, `TEXTSOURCE` albo `DEVICE`,
 ///     czyli zrodlo TYLKO DO ODCZYTU. Wiele serwerow czytajacych jeden plik jest poprawne
 ///     (na tym stoi caly it_multiserver_uniqueness, gdzie kilka planow czyta `data.txt`).
 ///   - MEMORY (`VOLATILE` albo `STORAGE memory`): `rdb::memoryFile` zyje w pamieci procesu

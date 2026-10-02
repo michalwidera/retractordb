@@ -546,6 +546,12 @@ int main(int argc, char *argv[]) try {
       // Wzrost na dysku jest dozwolony, ale jawny (D8): wykaz przy starcie i w `-c`, takze z --quiet.
       // Na stderr, bo log silnika lezy w $TMPDIR, a stdout `-c` bywa plikiem dot. Niczego nie kasuje -
       // granice stawia RETENTION, magazyn MEMORY albo `[storage] default_retention`.
+      // Przestarzale `DECLARE ... FILE` (#346): tylko z --verbose, takze przy --quiet. Domyslnie cisza,
+      // zeby stare plany, testy i narzedzia pomiarowe nie zmienialy wyjscia - ani na stdout, ani na stderr.
+      if (vm.contains("verbose"))
+        for (const std::string &warning : deprecatedFileWarnings(coreInstance))
+          std::println(std::cerr, "{}: warning: {}", argv[0], warning);
+
       if (const auto unbounded = cm.unboundedDiskStreams(); !unbounded.empty()) {
         for (const auto &[stream, reason] : unbounded) {
           if (vm.contains("verbose"))
@@ -696,7 +702,8 @@ int main(int argc, char *argv[]) try {
           // uslugi. Bez nich plan odrzucany przy starcie wychodzil stad z kodem 0, a usluga tracila
           // dzialajacy plan na rzecz takiego, ktory nie wstaje (#265).
           for (const std::string &refusal :
-               {checkKeptStores(coreInstance, appCfg.storageDir), checkDescriptorFiles(coreInstance, appCfg.storageDir)}) {
+               {checkKeptStores(coreInstance, appCfg.storageDir), checkDescriptorFiles(coreInstance, appCfg.storageDir),
+                checkDeclaredSources(coreInstance)}) {
             if (refusal == "OK") continue;
             std::cerr << "xretractor: " << refusal << "; nothing was changed\n";
             SPDLOG_ERROR("Refused before delivery: {}", refusal);
@@ -752,6 +759,13 @@ int main(int argc, char *argv[]) try {
   if (const std::string descriptorError = checkDescriptorFiles(coreInstance, {}); descriptorError != "OK") {
     std::cerr << "xretractor: " << descriptorError << '\n';
     SPDLOG_ERROR("Plan refused: {}", descriptorError);
+    return refusePlan();
+  }
+  // Rodzaj pliku zrodel przed startem (#346). Akcesor odrzuca sciezke zlego rodzaju i sam, ale
+  // przy starcie konczy sie to FatalError-em budowy modelu - tu jest odmowa planu jak wyzej.
+  if (const std::string sourceError = checkDeclaredSources(coreInstance); sourceError != "OK") {
+    std::cerr << "xretractor: " << sourceError << '\n';
+    SPDLOG_ERROR("Plan refused: {}", sourceError);
     return refusePlan();
   }
 

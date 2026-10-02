@@ -14,17 +14,18 @@ public:
   enum {
     T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, BYTE_T = 5, STRING_T = 6, UNSIGNED_T = 7, 
     INTEGER_T = 8, FLOAT_T = 9, DOUBLE_T = 10, SELECT = 11, STREAM = 12, 
-    FROM = 13, DECLARE = 14, RETENTION = 15, FILE = 16, STORAGE = 17, ROTATION = 18, 
-    SUBSTRAT = 19, RULE = 20, DISPOSABLE = 21, ONESHOT = 22, HOLD = 23, 
-    VOLATILE = 24, PERSISTENT = 25, DEFAULT = 26, ON = 27, WHEN = 28, DUMP = 29, 
-    SYSTEM = 30, DO = 31, TO = 32, AND_C = 33, OR_C = 34, NOT_C = 35, MIN = 36, 
-    MAX = 37, AVG = 38, SUMC = 39, TYPE_PROFILE = 40, STRING_PROFILE = 41, 
-    ID = 42, STRING = 43, FLOAT = 44, DECIMAL = 45, REAL = 46, IS_EQ = 47, 
-    IS_NQ = 48, IS_GR = 49, IS_LS = 50, IS_GE = 51, IS_LE = 52, EXCLAMATION = 53, 
-    DOUBLE_BAR = 54, DOT = 55, UNDERLINE = 56, AT = 57, SHARP = 58, AND = 59, 
-    MOD = 60, DOLLAR = 61, COMMA = 62, SEMI = 63, COLON = 64, DOUBLE_COLON = 65, 
-    STAR = 66, DIVIDE = 67, PLUS = 68, MINUS = 69, BIT_NOT = 70, BIT_OR = 71, 
-    BIT_XOR = 72, SPACE = 73, COMMENT = 74, LINE_COMMENT2 = 75
+    FROM = 13, DECLARE = 14, RETENTION = 15, FILE = 16, BINFILE = 17, TEXTFILE = 18, 
+    DEVICE = 19, STORAGE = 20, ROTATION = 21, SUBSTRAT = 22, RULE = 23, 
+    DISPOSABLE = 24, ONESHOT = 25, HOLD = 26, VOLATILE = 27, PERSISTENT = 28, 
+    DEFAULT = 29, ON = 30, WHEN = 31, DUMP = 32, SYSTEM = 33, DO = 34, TO = 35, 
+    AND_C = 36, OR_C = 37, NOT_C = 38, MIN = 39, MAX = 40, AVG = 41, SUMC = 42, 
+    TYPE_PROFILE = 43, STRING_PROFILE = 44, ID = 45, STRING = 46, FLOAT = 47, 
+    DECIMAL = 48, REAL = 49, IS_EQ = 50, IS_NQ = 51, IS_GR = 52, IS_LS = 53, 
+    IS_GE = 54, IS_LE = 55, EXCLAMATION = 56, DOUBLE_BAR = 57, DOT = 58, 
+    UNDERLINE = 59, AT = 60, SHARP = 61, AND = 62, MOD = 63, DOLLAR = 64, 
+    COMMA = 65, SEMI = 66, COLON = 67, DOUBLE_COLON = 68, STAR = 69, DIVIDE = 70, 
+    PLUS = 71, MINUS = 72, BIT_NOT = 73, BIT_OR = 74, BIT_XOR = 75, SPACE = 76, 
+    COMMENT = 77, LINE_COMMENT2 = 78
   };
 
   enum {
@@ -191,7 +192,8 @@ public:
     antlr4::tree::TerminalNode *STREAM();
     antlr4::tree::TerminalNode *FROM();
     Stream_expressionContext *stream_expression();
-    antlr4::tree::TerminalNode *ID();
+    std::vector<antlr4::tree::TerminalNode *> ID();
+    antlr4::tree::TerminalNode* ID(size_t i);
     antlr4::tree::TerminalNode *FILE();
     Retention_fromContext *retention_from();
     antlr4::tree::TerminalNode *STORAGE();
@@ -201,6 +203,9 @@ public:
     antlr4::tree::TerminalNode *PERSISTENT();
     antlr4::tree::TerminalNode *TYPE_PROFILE();
     antlr4::tree::TerminalNode *DEFAULT();
+    antlr4::tree::TerminalNode *DEVICE();
+    antlr4::tree::TerminalNode *BINFILE();
+    antlr4::tree::TerminalNode *TEXTFILE();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
@@ -225,6 +230,7 @@ public:
     DeclareContext(Declare_statementContext *ctx);
 
     antlr4::Token *stream_name = nullptr;
+    antlr4::Token *kind = nullptr;
     antlr4::Token *file_name = nullptr;
     antlr4::tree::TerminalNode *DECLARE();
     std::vector<Field_declarationContext *> field_declaration();
@@ -233,9 +239,12 @@ public:
     std::vector<antlr4::tree::TerminalNode *> COMMA();
     antlr4::tree::TerminalNode* COMMA(size_t i);
     Rational_seContext *rational_se();
-    antlr4::tree::TerminalNode *FILE();
     antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *STRING();
+    antlr4::tree::TerminalNode *BINFILE();
+    antlr4::tree::TerminalNode *TEXTFILE();
+    antlr4::tree::TerminalNode *DEVICE();
+    antlr4::tree::TerminalNode *FILE();
     antlr4::tree::TerminalNode *DISPOSABLE();
     antlr4::tree::TerminalNode *ONESHOT();
     antlr4::tree::TerminalNode *HOLD();

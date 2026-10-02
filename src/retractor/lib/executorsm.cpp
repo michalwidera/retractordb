@@ -139,6 +139,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   executorsm::activeStorageDir = planStorageDir(coreInstance, cfg.storageDir);
   dataModelExpected            = !coreInstance.empty();
   untilEofMode                 = vm.contains("until-eof");
+  verboseMode                  = vm.contains("verbose");
   // Plik zapytan uslugi. Nadpisuje go przyjety plan i oprozniaja skutki bledu krytycznego,
   // wiec wskazuje go WYLACZNIE instancja bedaca jednostka systemd: plik `.rql` operatora,
   // ktory uruchomil xretractor z terminala, jest jego wlasnoscia, a nie stanem uslugi.

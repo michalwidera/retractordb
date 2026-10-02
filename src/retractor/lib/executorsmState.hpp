@@ -88,6 +88,10 @@ extern std::atomic<std::uint64_t> adHocPlanRevision;
 /// Tryb --until-eof calego przebiegu.
 extern bool untilEofMode;
 
+/// --verbose serwera. Rozstrzyga o ostrzezeniach o przestarzalym `DECLARE ... FILE` (#346)
+/// w planach przyjetych kanalem ad-hoc i `reset` - tam nie ma juz linii polecen launchera.
+extern bool verboseMode;
+
 /// Zadanie przeladowania planu przyjete przez kanal IPC. Podnosi je resetCommit() po pelnej
 /// walidacji, zdejmuje applyPendingPlan(). Petla epok traktuje je jak warunek konca epoki -
 /// dokladnie tak samo jak `stop_now`, tyle ze po niej zaczyna sie epoka nastepna, nie koniec

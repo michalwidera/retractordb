@@ -1,4 +1,4 @@
-DECLARE a INTEGER STREAM core0, 0.5 FILE datafile3.dat
+DECLARE a INTEGER STREAM core0, 0.5 BINFILE 'datafile3.dat'
 
 SELECT * STREAM str1 FROM core0@(2,3)
 SELECT * STREAM str2 FROM core0@(2,-3)

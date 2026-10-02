@@ -141,7 +141,7 @@ help|h                           Show help
 
 Supply a schema to `open` only when the corresponding `.desc` file does not exist. When it already exists, use `open file` and let `xtrdb` load that descriptor.
 
-`policy` accepts `DEFAULT`, `DIRECT`, `MEMORY`, `POSIX`, `POSIXSHD`, `GENERIC`, `DEVICE`, and `TEXTSOURCE` (case-insensitive). `DEVICE` and `TEXTSOURCE` are read-only source accessors. A `TYPE` entry loaded from an existing descriptor overrides the policy selected at the prompt.
+`policy` accepts `DEFAULT`, `DIRECT`, `MEMORY`, `POSIX`, `POSIXSHD`, `GENERIC`, `BINFILE`, `DEVICE`, and `TEXTSOURCE` (case-insensitive). `BINFILE`, `DEVICE` and `TEXTSOURCE` are read-only source accessors. A `TYPE` entry loaded from an existing descriptor overrides the policy selected at the prompt.
 
 `quitdrop` removes the base data file, `.desc`, `.meta`, and `.meta.shadow`. It is not a complete artifact-family cleanup: a data `.shadow` file and retention segments can remain. Use `dropfile { file1 file2 ... }` to remove explicitly named leftovers after verifying that no running `xretractor` instance owns them.
 
@@ -591,7 +591,7 @@ ok
 
 **Use case:** Creating a deterministic binary fixture whose contents can be compared with expected records.
 
-> An `.desc` file created by `xtrdb` describes writable storage. It is not a `DECLARE` source descriptor, which additionally contains `REF` and `TYPE DEVICE` or `TYPE TEXTSOURCE`; do not reuse it unchanged as a query input descriptor.
+> An `.desc` file created by `xtrdb` describes writable storage. It is not a `DECLARE` source descriptor, which additionally contains `REF` and `TYPE BINFILE`, `TYPE TEXTSOURCE` or `TYPE DEVICE`; do not reuse it unchanged as a query input descriptor.
 
 ## Practical Use Cases
 

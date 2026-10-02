@@ -5,9 +5,9 @@
 #   cd examples/ecg/rec205
 #   xretractor rec205-replay.rql -m <liczba_cykli>
 #
-# Zrodlo danych czyta plik binarny w petli (TYPE DEVICE bez ONESHOT).
+# Zrodlo danych czyta plik binarny w petli (BINFILE bez ONESHOT).
 # Kazdy cykl xretractor odpowiada jednej probce EKG (0.002778 s).
 
-DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 FILE 'rec205'
+DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 BINFILE 'rec205'
 
 SELECT ecg.MLII, ecg.V1 STREAM s205out FROM ecg VOLATILE

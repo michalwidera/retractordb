@@ -25,6 +25,7 @@
 #include "exprSimplify.hpp"
 #include "fatalError.hpp"
 #include "qTree.hpp"
+#include "rdb/accessorFactory.hpp"
 #include "rdb/convertTypes.hpp"
 #include "rdb/sizeLimits.hpp"
 #include "rqlFunctions.hpp"
@@ -60,6 +61,20 @@ constexpr size_t kMaxSyntaxErrorMessage = 300;
 std::string lowercased(std::string text) {
   std::ranges::transform(text, text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
   return text;
+}
+
+/// Zamrozona regula przestarzalego `DECLARE ... FILE` (#346). To ta sama regula, ktora do tej
+/// zmiany wybierala akcesor w query::descriptorStorage(), rozszerzona wylacznie o rozdzial
+/// pliku binarnego i urzadzenia. Wiersze po kolei: `.txt` w DOWOLNYM miejscu sciezki i bez
+/// wzgledu na wielkosc liter - TEXTFILE; poczatek `/dev/` - DEVICE; kazda inna - BINFILE.
+///
+/// NIE ZMIENIAC. Seria pomiarowa artykulu i korpus H9 uruchamiaja te same teksty planow po obu
+/// stronach tej granicy, a regula daje dla nich dokladnie dawne zachowanie. Nowe plany pisza
+/// jawne slowo; usuniecie tej formy to #349.
+sourceKind resolveDeprecatedFile(const std::string &path) {
+  if (lowercased(path).find(".txt") != std::string::npos) return sourceKind::textFile;
+  if (path.starts_with("/dev/")) return sourceKind::device;
+  return sourceKind::binFile;
 }
 
 /// Zdejmuje ParserListenera i rzuca RQLSyntaxError.
@@ -175,6 +190,9 @@ int fieldCount = 0;
 
 class ParserListener : public RQLBaseListener {
   qTree &coreInstance;
+
+  /* Wiersz pliku planu, na ktorym stoi parsowana porcja - jak w ParserErrorListener */
+  size_t firstLine_;
 
   /* Helper variable required for rational numbers processing */
   boost::rational<int> rationalResult;
@@ -323,7 +341,7 @@ class ParserListener : public RQLBaseListener {
   }
 
  public:
-  ParserListener(qTree &coreInstance) : coreInstance(coreInstance) {};
+  ParserListener(qTree &coreInstance, size_t firstLine) : coreInstance(coreInstance), firstLine_(firstLine) {};
 
   [[nodiscard]] const std::string &semanticError() const { return semanticError_; }
 
@@ -525,15 +543,45 @@ class ParserListener : public RQLBaseListener {
     // This removes ''
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
+    qry.isDeprecatedFile = (ctx->kind->getType() == RQLParser::FILE);
+    switch (ctx->kind->getType()) {
+      case RQLParser::BINFILE:
+        qry.kind = sourceKind::binFile;
+        break;
+      case RQLParser::TEXTFILE:
+        qry.kind = sourceKind::textFile;
+        break;
+      case RQLParser::DEVICE:
+        qry.kind = sourceKind::device;
+        break;
+      default:
+        qry.kind = resolveDeprecatedFile(qry.filename);
+    }
+    const std::string keyword(qry.isDeprecatedFile ? "FILE" : sourceKindKeyword(qry.kind));
+    qry.declarationLine = firstLine_ + ctx->getStart()->getLine() - 1;
     // Blad planu juz tutaj. Bez tego pusta nazwa przechodzila parser i kompilacje, a zatrzymywal
     // ja dopiero FatalError w rdb::StoragePaths przy rejestracji w modelu - w sciezce ad-hoc juz
     // po imporcie do zywego planu, czyli smierc dzialajacego serwera.
-    if (qry.filename.empty()) reportSemanticError("FILE of stream " + ctx->ID()->getText() + " requires a non-empty file name");
+    if (qry.filename.empty())
+      reportSemanticError(keyword + " of stream " + ctx->ID()->getText() + " requires a non-empty file name");
     qry.id           = ctx->ID()->getText();
     qry.rInterval    = rationalResult;
     qry.isDisposable = (ctx->DISPOSABLE() != nullptr);
     qry.isOneShot    = (ctx->ONESHOT() != nullptr);
     qry.isHold       = (ctx->HOLD() != nullptr);
+    // DEVICE to zrodlo zywe (#346): HOLD nie zatrzymuje producenta, tylko gromadzi zaleglosc,
+    // a DISPOSABLE kasowalby sciezke urzadzenia albo FIFO. ONESHOT odpada przy jawnym DEVICE,
+    // bo polityke EOF urzadzenia ustala #347; forma przestarzala zachowuje go bez zmian.
+    if (qry.kind == sourceKind::device) {
+      const std::string what =
+          qry.isDeprecatedFile ? "FILE '" + qry.filename + "' resolves as DEVICE, which" : std::string("DEVICE");
+      for (const auto &[present, option] :
+           {std::pair{qry.isDisposable, "DISPOSABLE"}, std::pair{qry.isOneShot && !qry.isDeprecatedFile, "ONESHOT"},
+            std::pair{qry.isHold, "HOLD"}})
+        if (present)
+          reportSemanticError("DECLARE " + qry.id + ": " + what + " does not take " + option +
+                              "; DISPOSABLE, ONESHOT and HOLD apply to BINFILE and TEXTFILE");
+    }
     // Ta sama odmowa co w exitSelect: klient bral kazdy rekord deklaracji o tej nazwie
     // za sygnal zamkniecia serwera i konczyl sie "no data in stream".
     if (qry.id == constants::Reserved_id_oob)
@@ -608,11 +656,11 @@ class ParserListener : public RQLBaseListener {
     // wtedy plan z generatora jest nie do odroznienia od recznie rozpisanych SELECT-ow.
     if (qry.generatorSize == query::notAGenerator) {
       for (auto &i : qry.lSchema) {
-        if ((i.field_.rname).starts_with("_")) (i.field_.rname) = ctx->ID()->getText() + i.field_.rname;
+        if ((i.field_.rname).starts_with("_")) (i.field_.rname) = ctx->stream_name->getText() + i.field_.rname;
       }
     }
 
-    qry.id = ctx->ID()->getText();
+    qry.id = ctx->stream_name->getText();
 
     // Blad planu, nie abort(): `xqry -a` z ta nazwa konczyl dzialajacy serwer SIGABRT-em.
     if (qry.id == constants::Reserved_id_oob)
@@ -637,12 +685,24 @@ class ParserListener : public RQLBaseListener {
 
       // Blad planu, nie FatalError - ta sama przyczyna co w exitCoption.
       if (qry.filename.empty())
-        reportSemanticError("FILE of stream " + ctx->ID()->getText() + " requires a non-empty file name");
+        reportSemanticError("FILE of stream " + ctx->stream_name->getText() + " requires a non-empty file name");
     }
 
     if (ctx->STORAGE() != nullptr) {
       qry.storage_policy = ctx->type_name->getText();
       std::ranges::transform(qry.storage_policy, qry.storage_policy.begin(), ::toupper);  // to upper case
+      // Gramatyka przyjmuje tu takze slowa, ktore profilem nie sa (patrz select_statement w RQL.g4) -
+      // po to, zeby odmowa nazwala strumien i profile, zamiast bledu skladni o dyrektywie STORAGE.
+      // Rozstrzyga typ tokenu, nie tekst: `Direct` jako ID nie moze stac sie profilem przez toupper,
+      // bo profile maja tylko dwie pisownie, jak kazde slowo kluczowe.
+      const auto tokenType = ctx->type_name->getType();
+      if (tokenType != RQLParser::TYPE_PROFILE && tokenType != RQLParser::DEFAULT) {
+        const bool sourceKind = tokenType == RQLParser::DEVICE || tokenType == RQLParser::BINFILE ||
+                                tokenType == RQLParser::TEXTFILE || qry.storage_policy == "TEXTSOURCE";
+        reportSemanticError("STORAGE " + ctx->type_name->getText() + " of stream " + ctx->stream_name->getText() +
+                            " is not a storage profile" + (sourceKind ? " but a source kind of DECLARE" : "") +
+                            "; use DEFAULT, MEMORY, DIRECT, POSIX, POSIXSHD or GENERIC");
+      }
     }
     if (ctx->PERSISTENT() != nullptr && qry.storage_policy == "MEMORY")
       reportSemanticError("PERSISTENT conflicts with STORAGE MEMORY");
@@ -787,8 +847,17 @@ class ParserListener : public RQLBaseListener {
     // czyli tekst obcy wykonywany w procesie DZIALAJACEGO serwera. FatalError konczyl tam cala
     // instancje - `xqry -a "STORAGE ''"` wystarczalo. Stan listenera sprzatamy tak samo w obu
     // galeziach, bo parser po bledzie semantycznym idzie dalej przez kolejne instrukcje.
+    std::string upperValue(qry.filename);
+    std::ranges::transform(upperValue, upperValue.begin(), ::toupper);
     if (qry.filename.empty()) {
       reportSemanticError("directive " + qry.id.substr(1) + " requires a non-empty value");
+    } else if (qry.id == ":SUBSTRAT" && !rdb::isWritableType(upperValue)) {
+      // Do #346 wartosc szla bez kontroli: `SUBSTRAT 'device'` dawal posrednim wezlom akcesor
+      // tylko do odczytu i FatalError przy pierwszym zapisie, `SUBSTRAT 'foo'` - FatalError
+      // nieznanego typu przy budowie modelu. `-c` przepuszczal oba. Wielkosc liter jak
+      // w compiler::extractIntermediateStreams(), ktory sklada wartosc do wielkich liter.
+      reportSemanticError("SUBSTRAT '" + qry.filename +
+                          "' is not a storage profile; use DEFAULT, MEMORY, DIRECT, POSIX, POSIXSHD or GENERIC");
     } else {
       // Add / at the end of path, if not present in case of STORAGE
       if (qry.id == ":STORAGE" && qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');
@@ -921,7 +990,7 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   lexer.removeErrorListeners();
   lexer.addErrorListener(&lexerErrorListener);
   ParserErrorListener parserErrorListener(parser, firstLine, sourceFile);
-  ParserListener parserListener(coreInstance);
+  ParserListener parserListener(coreInstance, firstLine);
   parser.removeParseListeners();
   parser.removeErrorListeners();
   parser.addErrorListener(&parserErrorListener);
@@ -954,7 +1023,7 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   std::string streamName;  // tree->children[1]->children[0]->getText();
   if (!tree->children.empty()) {
     if (auto *selectCtx = dynamic_cast<RQLParser::SelectContext *>(tree->children[0])) {
-      streamName = selectCtx->ID()->getText();
+      streamName = selectCtx->stream_name->getText();
     } else if (auto *declareCtx = dynamic_cast<RQLParser::DeclareContext *>(tree->children[0])) {
       streamName = declareCtx->stream_name->getText();
     } else if (auto *ruleCtx = dynamic_cast<RQLParser::RulezContext *>(tree->children[0])) {

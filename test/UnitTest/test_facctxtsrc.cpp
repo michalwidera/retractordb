@@ -1,9 +1,15 @@
 #include <gtest/gtest.h>
 
+#include <sys/stat.h>  // mkfifo
+
 #include <cerrno>
+#include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <future>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -654,6 +660,42 @@ TEST_F(TextSourceROTest, test_read_integer_array_followed_by_scalar) {
   EXPECT_EQ(values[0], 5);
   EXPECT_EQ(values[1], 6);
   EXPECT_EQ(values[2], 7);
+}
+
+// TEXTFILE czyta wylacznie plik zwykly (#346), sprawdzany przez stat() PRZED otwarciem - std::ifstream
+// na FIFO bez pisarza wisi w samym open(). Do #346 tekst przez FIFO czytano bez bufora.
+TEST_F(TextSourceROTest, textfile_refuses_a_fifo_without_blocking) {
+  const std::string path = "text_source_kind.fifo";
+  fs::remove(path);
+  ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
+  createdFiles_.push_back(path);
+  rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+
+  auto pending = std::async(std::launch::async, [&] {
+    rdb::textSourceRO src(path, desc, true);
+    int value = -1;
+    return std::make_pair(src.initializationError(), src.read(reinterpret_cast<uint8_t *>(&value), 0));
+  });
+  if (pending.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
+    std::cerr << "textSourceRO blocked on a FIFO without a writer\n";
+    std::_Exit(EXIT_FAILURE);
+  }
+  const auto [error, readResult] = pending.get();
+  EXPECT_EQ(error, "TEXTFILE '" + path + "' is a FIFO, not a regular file");
+  EXPECT_EQ(readResult, EBADF);
+}
+
+TEST_F(TextSourceROTest, textfile_refuses_a_character_device) {
+  rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+  rdb::textSourceRO src(std::string("/dev/null"), desc, true);
+  EXPECT_EQ(src.initializationError(), "TEXTFILE '/dev/null' is a character device, not a regular file");
+}
+
+// Brak pliku nie jest odmowa (#346): ostrzezenie i rekordy NULL jak dotad.
+TEST_F(TextSourceROTest, missing_file_is_not_a_kind_refusal) {
+  rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+  rdb::textSourceRO src(std::string("does_not_exist_kind.txt"), desc, true);
+  EXPECT_EQ(src.initializationError(), "");
 }
 
 // NOLINTEND(modernize-avoid-c-arrays)

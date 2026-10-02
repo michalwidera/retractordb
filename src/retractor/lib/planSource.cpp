@@ -15,6 +15,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include "rdb/accessorFactory.hpp"
 #include "rdb/descriptorIO.hpp"
 #include "rdb/storageShadow.hpp"
 #include "RQLParser.hpp"
@@ -64,6 +65,21 @@ void dropArtifactFamily(const std::filesystem::path &dir, const query &q) {
   }
 }
 
+/// Wartosc pierwszego pola konfiguracyjnego danego rodzaju (TYPE, REF); pusta, gdy go nie ma.
+std::string configField(const rdb::Descriptor &descriptor, const rdb::descFld kind) {
+  const auto it = std::ranges::find_if(descriptor, [kind](const auto &item) { return item.rtype == kind; });
+  return (it == descriptor.end()) ? std::string{} : it->rname;
+}
+
+/// `.desc` deklaracji zapisany przed #346 dla zwyklego pliku binarnego: wtedy kazde zrodlo
+/// nietekstowe dostawalo TYPE DEVICE, teraz taki plik ma TYPE BINFILE. Poza typem plik musi
+/// sie zgadzac z planem we wszystkim - REF i slotach - bo tylko wtedy jest to ten sam
+/// strumien zapisany starsza nazwa typu, a nie inne zrodlo.
+bool isLegacyBinaryDescriptor(const rdb::Descriptor &planned, const rdb::Descriptor &kept) {
+  return configField(kept, rdb::TYPE) == "DEVICE" && configField(planned, rdb::TYPE) == "BINFILE" &&
+         configField(kept, rdb::REF) == configField(planned, rdb::REF) && planned == kept;
+}
+
 /// Konfiguracja magazynu w postaci, w jakiej operator zapisalby ja w planie.
 std::string describeStore(const std::string &type, const rdb::retention_t &retention) {
   if (retention.noRetention()) return std::format("STORAGE {} without RETENTION", type);
@@ -101,7 +117,21 @@ void dropStalePlanArtifacts(const qTree &plan) {
   const bool rotation             = std::ranges::any_of(plan, [](const auto &it) { return it.id == ":ROTATION"; });
   const std::filesystem::path dir = planStorageDir(plan, {});
   for (const auto &q : plan) {
-    if (q.isDeclaration() || q.isCompilerDirective()) continue;
+    if (q.isCompilerDirective()) continue;
+    if (q.isDeclaration()) {
+      // Magazyn bierze TYPE z wczytanego `.desc`, nie z planu, wiec dawny TYPE DEVICE zwyklego
+      // pliku binarnego (sprzed #346) musi zniknac, zanim magazyn go przeczyta. Deklaracja nie
+      // ma w katalogu magazynu zadnych danych - `.desc` zapisze sie od nowa z planu.
+      // checkDescriptorFiles() przepuszcza wylacznie ten przypadek.
+      const std::filesystem::path descFile = dir / (q.id + ".desc");
+      rdb::Descriptor kept;
+      if (std::filesystem::exists(descFile) && rdb::tryLoadDescriptorFile(descFile.string(), kept).empty() &&
+          isLegacyBinaryDescriptor(query(q).descriptorStorage(), kept)) {
+        SPDLOG_INFO("Stream {}: replacing pre-#346 TYPE DEVICE in {} with TYPE BINFILE", q.id, descFile.string());
+        dropArtifactFile(descFile);
+      }
+      continue;
+    }
     if (rotation && !isMemoryStream(q)) continue;
     dropArtifactFamily(dir, q);
   }
@@ -142,9 +172,69 @@ std::string checkDescriptorFiles(qTree &plan, const std::string_view defaultStor
     rdb::Descriptor kept;
     if (const std::string error = rdb::tryLoadDescriptorFile(descFile.string(), kept); !error.empty()) return error;
     // Kierunek jak w rdb::verifyDescriptorMatch (plan == plik): Descriptor::operator== jest asymetryczny.
-    if (q.descriptorStorage() != kept) return "storage: descriptor schema mismatch in '" + descFile.string() + "'";
+    const rdb::Descriptor planned = q.descriptorStorage();
+    if (planned != kept) return "storage: descriptor schema mismatch in '" + descFile.string() + "'";
+    if (!q.isDeclaration() || isLegacyBinaryDescriptor(planned, kept)) continue;
+
+    // operator== porownuje tylko sloty danych, a magazyn bierze TYPE i REF z wczytanego `.desc`.
+    // Do #346 zmiana sciezki albo rodzaju zrodla w planie przechodzila wiec po cichu: plan wskazywal
+    // `w.txt`, a silnik czytal `v.txt` sprzed zmiany. Teraz to odmowa przed startem.
+    const std::string keptType    = configField(kept, rdb::TYPE);
+    const std::string plannedType = configField(planned, rdb::TYPE);
+    if (keptType != plannedType)
+      return std::format(
+          "stream '{}': {} was written for TYPE {} and the plan declares TYPE {}; remove {} to start the "
+          "stream afresh",
+          q.id, descFile.string(), keptType, plannedType, descFile.string());
+    const std::string keptRef    = configField(kept, rdb::REF);
+    const std::string plannedRef = configField(planned, rdb::REF);
+    if (keptRef != plannedRef)
+      return std::format(
+          "stream '{}': {} was written for source '{}' and the plan reads '{}'; remove {} to start the "
+          "stream afresh",
+          q.id, descFile.string(), keptRef, plannedRef, descFile.string());
   }
   return "OK";
+}
+
+std::string checkDeclaredSources(const qTree &plan, const std::vector<std::string> &streamNames) {
+  for (const auto &q : plan) {
+    if (q.isCompilerDirective() || !q.isDeclaration()) continue;
+    if (!streamNames.empty() && std::ranges::find(streamNames, q.id) == streamNames.end()) continue;
+
+    const std::string type     = configField(query(q).descriptorStorage(), rdb::TYPE);
+    const std::string mismatch = rdb::sourceKindMismatch(type, q.filename);
+    if (mismatch.empty()) continue;
+    if (!q.isDeprecatedFile) return std::format("stream '{}': {}", q.id, mismatch);
+
+    // Forma przestarzala: autor napisal FILE, wiec komunikat mowi, jakie slowo wybrala regula
+    // i jakie pasuje do tego, co lezy pod sciezka. Inaczej FIFO spoza /dev konczylo sie
+    // odmowa nazywajaca BINFILE, ktorego w planie nie ma.
+    std::error_code ec;
+    const auto fileType   = std::filesystem::status(q.filename, ec).type();
+    const std::string fit = (fileType == std::filesystem::file_type::character || fileType == std::filesystem::file_type::fifo)
+                                ? "DEVICE"
+                            : (fileType == std::filesystem::file_type::regular) ? "BINFILE or TEXTFILE"
+                                                                                : "";
+    std::string hint      = std::format("deprecated FILE resolved this path as {}", sourceKindKeyword(q.kind));
+    if (!fit.empty()) hint += std::format("; declare it with {}", fit);
+    return std::format("stream '{}': {} ({})", q.id, mismatch, hint);
+  }
+  return "OK";
+}
+
+std::vector<std::string> deprecatedFileWarnings(const qTree &plan, const std::vector<std::string> &streamNames) {
+  std::vector<const query *> deprecated;
+  for (const auto &q : plan)
+    if (q.isDeprecatedFile && (streamNames.empty() || std::ranges::find(streamNames, q.id) != streamNames.end()))
+      deprecated.push_back(&q);
+  std::ranges::sort(deprecated, {}, &query::declarationLine);
+
+  std::vector<std::string> retVal;
+  for (const query *q : deprecated)
+    retVal.push_back(std::format("line {}: DECLARE {}: FILE '{}' is deprecated, resolved as {}", q->declarationLine, q->id,
+                                 q->filename, sourceKindKeyword(q->kind)));
+  return retVal;
 }
 
 std::vector<std::string> planStreamNames(const qTree &plan) {

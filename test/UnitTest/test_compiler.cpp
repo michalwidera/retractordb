@@ -4548,3 +4548,158 @@ TEST(xparser, rejects_misplaced_duplicate_or_conflicting_persistence) {
     EXPECT_NE(result, "OK") << source;
   }
 }
+
+// Rodzaj zrodla deklarowanego wynika ze slowa kluczowego, nigdy ze sciezki (#346). Nazwy dobrane
+// tak, zeby dawna heurystyka `.txt` dala odwrotny wynik: `bytes.txt` jest binarny, `values.dat`
+// tekstowy, a DEVICE z nazwa `.txt` dalej jest urzadzeniem.
+TEST(xparser, declare_source_kind_comes_from_the_keyword) {
+  struct Case {
+    std::string declaration;
+    sourceKind kind;
+    std::string storageType;
+  };
+  for (const auto &[declaration, kind, storageType] : std::vector<Case>{
+           {"BINFILE 'bytes.txt'", sourceKind::binFile, "BINFILE"},
+           {"binfile 'bytes.txt'", sourceKind::binFile, "BINFILE"},
+           {"TEXTFILE 'values.dat'", sourceKind::textFile, "TEXTSOURCE"},
+           {"textfile 'values.dat'", sourceKind::textFile, "TEXTSOURCE"},
+           {"DEVICE '/tmp/feed.txt'", sourceKind::device, "DEVICE"},
+           {"device 'sensor'", sourceKind::device, "DEVICE"},
+       }) {
+    qTree plan;
+    ASSERT_EQ(std::get<0>(parserRQLString(plan, "DECLARE a INTEGER STREAM src, 1 " + declaration)), "OK") << declaration;
+    auto &src = plan.getQuery("src");
+    EXPECT_EQ(src.kind, kind) << declaration;
+    EXPECT_FALSE(src.isDeprecatedFile) << declaration;
+    EXPECT_EQ(src.descriptorStorage().storagePolicy().first, storageType) << declaration;
+  }
+}
+
+// Zamrozona regula przestarzalego `FILE` (#346). Wiersze tabeli ze zgloszenia, w tym te, ktore
+// dawna heurystyka rozstrzygala nieoczywiscie: `.txt` w srodku sciezki i wielkie litery.
+TEST(xparser, deprecated_file_resolves_by_the_frozen_rule) {
+  for (const auto &[path, kind] : std::vector<std::pair<std::string, sourceKind>>{
+           {"x.txt", sourceKind::textFile},
+           {"X.TXT", sourceKind::textFile},
+           {"/x.txt.d/rec", sourceKind::textFile},
+           {"/dev/x.txt", sourceKind::textFile},
+           {"data.dat", sourceKind::binFile},
+           {"rec205", sourceKind::binFile},
+           {"/tmp/feed.fifo", sourceKind::binFile},
+           {"dev/urandom", sourceKind::binFile},
+           {"/dev/urandom", sourceKind::device},
+           {"/dev/serial/by-id/usb", sourceKind::device},
+       }) {
+    qTree plan;
+    ASSERT_EQ(std::get<0>(parserRQLString(plan, "DECLARE a INTEGER STREAM src, 1 FILE '" + path + "'")), "OK") << path;
+    EXPECT_EQ(plan.getQuery("src").kind, kind) << path;
+    EXPECT_TRUE(plan.getQuery("src").isDeprecatedFile) << path;
+  }
+}
+
+// DEVICE to zrodlo zywe: HOLD gromadzilby zaleglosc, DISPOSABLE kasowalby sciezke urzadzenia,
+// a polityke EOF ustala #347 (#346, R6). Forma przestarzala rozstrzygnieta na DEVICE odrzuca
+// HOLD i DISPOSABLE, ale ONESHOT przyjmuje bez zmian. Pliki biora wszystkie trzy, w dowolnym
+// polaczeniu.
+TEST(xparser, device_refuses_the_options_of_recorded_files) {
+  for (const auto &[rql, reason] : std::vector<std::pair<std::string, std::string>>{
+           {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/urandom' DISPOSABLE", "DECLARE s: DEVICE does not take DISPOSABLE"},
+           {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/urandom' ONESHOT", "DECLARE s: DEVICE does not take ONESHOT"},
+           {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/urandom' HOLD", "DECLARE s: DEVICE does not take HOLD"},
+           {"DECLARE a BYTE STREAM s, 1 FILE '/dev/urandom' HOLD",
+            "DECLARE s: FILE '/dev/urandom' resolves as DEVICE, which does not take HOLD"},
+           {"DECLARE a BYTE STREAM s, 1 FILE '/dev/urandom' DISPOSABLE",
+            "DECLARE s: FILE '/dev/urandom' resolves as DEVICE, which does not take DISPOSABLE"},
+           {"DECLARE a BYTE STREAM s, 1 BINFILE ''", "BINFILE of stream s requires a non-empty file name"},
+       }) {
+    const auto [parseResult, diagnostics] = parseCapturingStderr(rql);
+    EXPECT_TRUE(parseResult.contains(reason)) << rql << '\n' << parseResult;
+    EXPECT_TRUE(diagnostics.contains(reason)) << rql << '\n' << diagnostics;
+  }
+
+  qTree plan;
+  ASSERT_EQ(std::get<0>(parserRQLString(plan, "DECLARE a BYTE STREAM legacy, 1 FILE '/dev/urandom' ONESHOT")), "OK");
+  EXPECT_TRUE(plan.getQuery("legacy").isOneShot);
+  for (const auto *keyword : {"BINFILE 'a.bin'", "TEXTFILE 'a.txt'"}) {
+    qTree files;
+    ASSERT_EQ(
+        std::get<0>(parserRQLString(files, std::string("DECLARE a BYTE STREAM f, 1 ") + keyword + " DISPOSABLE ONESHOT HOLD")),
+        "OK")
+        << keyword;
+    const auto &f = files.getQuery("f");
+    EXPECT_TRUE(f.isDisposable && f.isOneShot && f.isHold) << keyword;
+  }
+}
+
+// BINFILE, TEXTFILE i DEVICE sa tokenami leksera przed ID, wiec - jak MIN i MAX - zaden strumien
+// nie moze sie tak nazywac. TEXTSOURCE wypadl z TYPE_PROFILE i jest znow zwykla nazwa.
+TEST(xparser, source_keywords_are_reserved_stream_names) {
+  for (const char *rql : {
+           "DECLARE v INTEGER STREAM binfile, 1 FILE 'a.txt'",
+           "DECLARE v INTEGER STREAM TEXTFILE, 1 FILE 'a.txt'",
+           "DECLARE v INTEGER STREAM device, 1 FILE 'a.txt'",
+       }) {
+    const auto [parseResult, diagnostics] = parseCapturingStderr(rql);
+    EXPECT_TRUE(parseResult.contains("expecting ID")) << rql << '\n' << parseResult;
+  }
+  qTree plan;
+  EXPECT_EQ(std::get<0>(parserRQLString(plan, "DECLARE v INTEGER STREAM textsource, 1 FILE 'a.txt'")), "OK");
+}
+
+// Profile wyjscia SELECT to tylko profile zapisywalne (#346, R1). `STORAGE DEVICE` kompilowal sie
+// i konczyl proces przy pierwszym zapisie, `SUBSTRAT 'device'` i `SUBSTRAT 'foo'` przechodzily
+// `-c` i padaly w wykonaniu. Wartosc `:STORAGE` jest katalogiem, wiec katalog `device` zostaje legalny.
+TEST(xparser, storage_profiles_are_only_writable_profiles) {
+  const std::string source = "DECLARE a INTEGER STREAM core0, 1 FILE 'a.txt'\n";
+  // Odmowa nazywa strumien i profile. Do poprawki parser konczyl SELECT przed STORAGE i zglaszal
+  // "expecting {STRING_PROFILE, STRING}", bo reszte bral za dyrektywe `STORAGE 'katalog'`.
+  for (const auto *profile : {"DEVICE", "device", "TEXTSOURCE", "textsource", "BINFILE", "TEXTFILE"}) {
+    qTree plan;
+    testing::internal::CaptureStderr();
+    const std::string status =
+        parsePlanText(plan, source + "SELECT core0[0] STREAM dst FROM core0 STORAGE " + profile + "\n").status;
+    testing::internal::GetCapturedStderr();
+    EXPECT_TRUE(status.contains(std::string("STORAGE ") + profile +
+                                " of stream dst is not a storage profile but a source kind of DECLARE"))
+        << status;
+  }
+  // `Direct` nie jest pisownia profilu - slowa kluczowe maja dwie pisownie, a ID nie staje sie profilem przez toupper.
+  for (const auto *profile : {"foo", "Direct"}) {
+    qTree plan;
+    testing::internal::CaptureStderr();
+    const std::string status =
+        parsePlanText(plan, source + "SELECT core0[0] STREAM dst FROM core0 STORAGE " + profile + "\n").status;
+    testing::internal::GetCapturedStderr();
+    EXPECT_TRUE(
+        status.contains(std::string("STORAGE ") + profile +
+                        " of stream dst is not a storage profile; use DEFAULT, MEMORY, DIRECT, POSIX, POSIXSHD or GENERIC"))
+        << status;
+  }
+  for (const auto *profile : {"memory", "DEFAULT", "direct", "POSIX", "posixshd", "GENERIC"}) {
+    qTree plan;
+    EXPECT_EQ(parsePlanText(plan, source + "SELECT core0[0] STREAM dst FROM core0 STORAGE " + profile + "\n").status, "OK")
+        << profile;
+  }
+  for (const auto *profile : {"device", "TEXTSOURCE", "foo"}) {
+    const auto [parseResult, diagnostics] = parseCapturingStderr(std::string("SUBSTRAT '") + profile + "'");
+    EXPECT_TRUE(parseResult.contains(std::string("SUBSTRAT '") + profile + "' is not a storage profile")) << parseResult;
+  }
+  for (const auto *profile : {"memory", "DEFAULT", "direct", "POSIX", "posixshd", "Generic"}) {
+    qTree plan;
+    EXPECT_EQ(std::get<0>(parserRQLString(plan, std::string("SUBSTRAT '") + profile + "'")), "OK") << profile;
+  }
+  qTree plan;
+  EXPECT_EQ(std::get<0>(parserRQLString(plan, "STORAGE 'device'")), "OK");
+}
+
+TEST(xparser, query_reset_clears_the_source_kind) {
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan, "\nDECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n").status, "OK");
+  query q = plan.getQuery("src");
+  ASSERT_TRUE(q.isDeprecatedFile);
+  ASSERT_EQ(q.declarationLine, 2U);
+  q.reset();
+  EXPECT_EQ(q.kind, sourceKind::none);
+  EXPECT_FALSE(q.isDeprecatedFile);
+  EXPECT_EQ(q.declarationLine, 0U);
+}

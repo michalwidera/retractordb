@@ -198,7 +198,7 @@ bool storage::isMetaIndexEmpty() const {
 }
 
 rdb::ReadStatus storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
-  if (isDeclared()) FatalError("storage::read: cannot read directly from declared (device/textsource) storage");
+  if (isDeclared()) FatalError("storage::read: cannot read directly from declared (binfile/device/textsource) storage");
   abortIfStorageNotPrepared();
 
   if (destination == nullptr) {

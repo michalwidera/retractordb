@@ -10,6 +10,6 @@
 # 3 - you should know what are you doing.
 # ... for now 3 looks reasonable.
 
-DECLARE data1 BYTE, data2 BYTE STREAM source, 0.02 FILE '/dev/urandom'
+DECLARE data1 BYTE, data2 BYTE STREAM source, 0.02 DEVICE '/dev/urandom'
 
 SELECT source[0]/25/100 STREAM output FROM source 

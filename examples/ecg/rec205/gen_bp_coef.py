@@ -16,7 +16,7 @@
 #
 # Wyjscie: bp_coef.txt - jeden wspolczynnik INTEGER na linie, 25 linii.
 # Uzycie w RQL:
-#   DECLARE bp_coef INTEGER[25] STREAM bpf, 1 FILE 'bp_coef.txt'
+#   DECLARE bp_coef INTEGER[25] STREAM bpf, 1 TEXTFILE 'bp_coef.txt'
 #   SELECT mlii_win[_]*bpf[_] STREAM bp_acc FROM mlii_win+bpf
 #   SELECT bp_acc[0]/1000 STREAM bp_out FROM bp_acc.sumc
 
