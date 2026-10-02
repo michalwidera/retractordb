@@ -158,4 +158,55 @@ theorem causalInterleave_tail_exact (a b : ℕ) (ha : 0 < a) (hb : 0 < b)
   exactInterleaveTail_exact a b A.tail B.tail W _ ha hb tick htick
 -- ANCHOR_END: causal_tail_exact
 
+/- Zrodla deklarowane maja ogon 0. Faza 0 przeplotu wybiera b_0 (interleave_starts_with_right),
+   a jej wymaganie ceil((a+b)/a) - 1 jest dodatnie, wiec ogon przeplotu dwoch zrodel
+   deklarowanych wynosi co najmniej 1. -/
+-- ANCHOR: declared_tail_pos
+theorem exactInterleaveTail_declared_pos (a b : ℕ) (ha : 0 < a) (hb : 0 < b) :
+    1 ≤ exactInterleaveTail a b 0 0 := by
+  have hs : 0 < a + b := by omega
+  have h1 : b / (a + b) = 0 := Nat.div_eq_of_lt (by omega)
+  have hsel : selectsA a b 0 = false := by simp [selectsA, progress, h1]
+  have hidx : selectedIndex a b 0 = 0 := by simp [selectedIndex, hsel]
+  have hratio : (1 : ℚ) < ratioB a b := by
+    have haq : (0 : ℚ) < a := by exact_mod_cast ha
+    have hbq : (0 : ℚ) < b := by exact_mod_cast hb
+    unfold ratioB
+    rw [one_lt_div haq]
+    push_cast
+    linarith
+  have hceil : 1 < ⌈ratioB a b⌉ := Int.lt_ceil.mpr (by exact_mod_cast hratio)
+  have hreq : 1 ≤ selectedRequirement a b 0 0 (selectsA a b) (selectedIndex a b) 0 := by
+    simp only [selectedRequirement, hsel, hidx, Bool.false_eq_true, ↓reduceIte, phaseRequirement]
+    norm_num
+    omega
+  by_contra hlt
+  have hle : exactInterleaveTail a b 0 0 ≤ 0 := by omega
+  unfold exactInterleaveTail at hle
+  obtain ⟨_, hall⟩ := (phaseMax_le_iff _ _ _).mp hle
+  have h0 := hall 0 (List.mem_range.mpr hs)
+  omega
+-- ANCHOR_END: declared_tail_pos
+
+/- Nad zrodlami deklarowanymi strona zablokowana niesie caly ogon przeplotu W, a sfaktoryzowana
+   tylko nadwyzke max(0, W - L). Przy rownym poczatku cisza (origin + ogon) rozni sie wiec
+   dokladnie o min(W, L), a przy kazdym niezerowym przesunieciu przepisanie jest ostro wczesniejsze. -/
+-- ANCHOR: causal_r1_declared
+theorem causal_shift_matching_declared (a b i k : ℕ) (ha : 0 < a) (hb : 0 < b)
+    (hmatch : i * a = k * b) {α β : Type*} {tick : ℚ}
+    (A : CausalStream α ((a : ℚ) * tick)) (B : CausalStream β ((b : ℚ) * tick))
+    (hA : A.tail = 0) (hB : B.tail = 0) :
+    let W := (exactInterleaveTail a b 0 0).toNat
+    let lhs := causalInterleave a b ha hb (causalShift i A) (causalShift k B)
+    let rhs := causalShift (i + k) (causalInterleave a b ha hb A B)
+    lhs.tail = W ∧ rhs.tail = W - (i + k) ∧
+      lhs.origin + lhs.tail = rhs.origin + rhs.tail + min W (i + k) ∧
+      (0 < i + k → rhs.origin + rhs.tail < lhs.origin + lhs.tail) := by
+  have ho := interleaveOrigin_shift a b i k A.origin B.origin ha hb hmatch
+  have hW := exactInterleaveTail_declared_pos a b ha hb
+  dsimp only [causalInterleave, causalShift]
+  rw [hA, hB, Nat.zero_sub, Nat.zero_sub, ho]
+  omega
+-- ANCHOR_END: causal_r1_declared
+
 end Profs

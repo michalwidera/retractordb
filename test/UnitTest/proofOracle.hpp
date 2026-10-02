@@ -16,7 +16,7 @@ inline constexpr ProofSource kProofSources[] = {
     {"Profs/EventOrder.lean", "16ded3dba9b137e89fa0829596180465ac982aa0545542518e1fc7c2a74bfd31"},
     {"Profs/ExactInvertibility.lean", "80c320bd5c23419c94340783e88bba48ebeeed2bbd289e7a4f16fd951d450bfa"},
     {"Profs/InterleaveCovering.lean", "2d29413acc3f4bceb40aa94870a4d49c3075adcfa123f22aabfaf87691a2979d"},
-    {"Profs/InterleaveTailExact.lean", "ff4d691923100f9cc251e9506e0ea197465756bd3c9d99c850bf1efb22cb7749"},
+    {"Profs/InterleaveTailExact.lean", "27b04c4a7c57d68acc0a9dc47b76f037f49a5859e57adeab5ca670c3fc609dfd"},
     {"Profs/ShiftMatching.lean", "d74a5a242e5d5dc879ee2708ed607c6ee0ae74eb03bd01f8b47782b74457ba7a"},
     {"Profs/SumCommutativity.lean", "502c21dc6b6413b1c707c51de9bff8341e1f1c03879b91130f0d0376401c29ed"},
     {"OracleMain.lean", "4165f610ca923a07b11357d458b964d92ab8dcb123303b6fe4fda529c97afd66"},
