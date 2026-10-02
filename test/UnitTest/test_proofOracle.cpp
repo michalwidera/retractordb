@@ -318,6 +318,14 @@ TEST(ProofOracle, exactInterleaveTail_exact) {
         }
 }
 
+// Ogon przeplotu dwoch zrodel deklarowanych (ogon 0) wynosi co najmniej 1, w kazdej skali.
+TEST(ProofOracle, exactInterleaveTail_declared_pos) {
+  for (int a = 1; a <= 40; ++a)
+    for (int b = 1; b <= 40; ++b)
+      for (int d : kScales)
+        ASSERT_GE(hashTail(a, b, 0, 0, d), 1) << "a=" << a << " b=" << b << " d=" << d;
+}
+
 // Przesuniecie dopasowane do tempa (i*a = k*b): slot n przeplotu przesunietych skladowych czyta
 // ten sam rekord co slot n+i+k przeplotu nieprzesunietego.
 TEST(ProofOracle, shift_matching_values) {
@@ -646,5 +654,29 @@ TEST(ProofOracle, causal_shift_matching) {
       ASSERT_EQ(record.value, rhs.at(n).value) << run.describe() << " n=" << n;
       ASSERT_LE(rhs.at(n).time, record.time) << run.describe() << " n=" << n;
     }
+  }
+}
+
+// Nad zrodlami deklarowanymi lhs niesie caly ogon przeplotu W, a rhs max(0, W - L). Cisza rozni sie
+// o min(W, L) i o tyle slotow wyjscia wczesniej pojawia sie pierwszy rekord rhs (most G3, #353).
+TEST(ProofOracle, causal_shift_matching_declared) {
+  for (const auto [a, b, m] : kShiftMatchingCases) {
+    ShiftMatchingRun run(a, b, m);
+    ASSERT_FALSE(HasFatalFailure());
+    const auto &lhsQry = run.instance.getQuery("lhs");
+    const auto &rhsQry = run.instance.getQuery("rhs");
+    const int w        = run.instance.getQuery("plain").startupLatency;
+    const int shift    = run.i + run.k;
+    ASSERT_GE(w, 1) << run.describe();
+    ASSERT_EQ(lhsQry.startupLatency, w) << run.describe();
+    ASSERT_EQ(rhsQry.startupLatency, std::max(0, w - shift)) << run.describe();
+    ASSERT_EQ(lhsQry.logicalOrigin + lhsQry.startupLatency, rhsQry.logicalOrigin + rhsQry.startupLatency + std::min(w, shift))
+        << run.describe();
+
+    const auto &lhs = run.trace.at("lhs");
+    const auto &rhs = run.trace.at("rhs");
+    ASSERT_FALSE(lhs.empty()) << run.describe();
+    ASSERT_FALSE(rhs.empty()) << run.describe();
+    ASSERT_EQ(lhs.begin()->second.time - rhs.begin()->second.time, std::min(w, shift) * lhsQry.rInterval) << run.describe();
   }
 }
