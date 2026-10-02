@@ -9,6 +9,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cstring>
+#include <filesystem>
 #include <optional>
 #include <span>
 #include <thread>
@@ -17,6 +18,7 @@
 
 #include <spdlog/spdlog.h>
 #include <boost/interprocess/mapped_region.hpp>
+#include <boost/interprocess/permissions.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
 
 #include "constants.hpp"
@@ -118,6 +120,8 @@ struct BusMutex {
 struct Segment {
   std::uint64_t magic;
   std::uint32_t layoutVersion;
+  // Znacznik zgodnosci ukladu, sprawdzany przy podlaczeniu, NIE granica petli.
+  // Naglowek moze zostac podmieniony pozniej; tablica zawsze ma kMaxSlots elementow.
   std::uint32_t slotCount;
   // Rozmiar slotu w naglowku, obok numeru wersji: numer wersji chroni przed zmiana ZNACZENIA
   // pol, a ten rozmiar przed zmiana POJEMNOSCI (kMaxStreams, kStreamNameSize), ktora latwo
@@ -130,9 +134,16 @@ struct Segment {
 };
 
 /// Kopiuje napis do tablicy o stalym rozmiarze, zawsze zostawiajac terminator.
+///
+/// Pusty `string_view` ma `data() == nullptr`, a `memcpy` deklaruje oba wskazniki jako
+/// `nonnull`: NULL jest tam zachowaniem NIEOKRESLONYM takze przy zerowej dlugosci, kiedy
+/// zaden bajt sie nie czyta. Pusto jest tu stanem NORMALNYM, nie bledem wolajacego --
+/// ClaimRequest opisuje puste `name`, `unit` i `counterPath` jako instancje bez --name,
+/// zwykly proces i brak rotacji -- wiec straz stoi na dlugosci. `memset` ponizej zadnej
+/// nie potrzebuje: `dst` jest tablica w slocie i nigdy nie jest NULL-em.
 void storeString(char *dst, std::size_t capacity, std::string_view src) {
   const std::size_t len = std::min(src.size(), capacity - 1);
-  std::memcpy(dst, src.data(), len);
+  if (len != 0) std::memcpy(dst, src.data(), len);
   std::memset(dst + len, 0, capacity - len);
 }
 
@@ -263,6 +274,16 @@ std::string presencePath(std::string_view segment) {
   return std::string(ipc::kMachineLockDir) + "/" + std::string(segment) + ".lock";
 }
 
+std::optional<std::string> segmentFromPresence(std::string_view file) {
+  if (!file.ends_with(".lock")) return std::nullopt;
+  const std::string_view segment = file.substr(0, file.size() - 5);
+  if (segment == kSegmentName) return std::string(segment);
+  if (segment.size() <= kSegmentName.size() + 1 || !segment.starts_with(kSegmentName) || segment[kSegmentName.size()] != '_' ||
+      !servername::isValid(segment.substr(kSegmentName.size() + 1)))
+    return std::nullopt;
+  return std::string(segment);
+}
+
 }  // namespace
 
 StoreDigest storeDigest(const std::string_view path) {
@@ -299,18 +320,23 @@ std::string segmentName() {
   return std::string(kSegmentName) + '_' + runNamespace;
 }
 
+std::vector<std::string> segmentNames() {
+  std::vector<std::string> names;
+  std::error_code ec;
+  for (std::filesystem::directory_iterator it(ipc::kMachineLockDir, ec), end; !ec && it != end; it.increment(ec)) {
+    const std::string file = it->path().filename().string();
+    if (auto name = segmentFromPresence(file)) names.push_back(std::move(*name));
+  }
+  std::ranges::sort(names);
+  return names;
+}
+
 std::size_t segmentBytes() { return sizeof(Segment); }
 
 std::size_t sweepAbandonedSegments() {
   // Wylacznie segmenty tej wersji ukladu: starsze nazwy mapuja binarki sprzed protokolu
   // obecnosci, ktore blokady nie biora, wiec jej brak niczego o nich nie mowi.
-  const auto isSegmentPresence = [](std::string_view file) {
-    if (!file.ends_with(".lock")) return false;
-    const std::string_view segment = file.substr(0, file.size() - 5);
-    if (segment == kSegmentName) return true;
-    return segment.size() > kSegmentName.size() + 1 && segment.starts_with(kSegmentName) &&
-           segment[kSegmentName.size()] == '_' && servername::isValid(segment.substr(kSegmentName.size() + 1));
-  };
+  const auto isSegmentPresence = [](std::string_view file) { return segmentFromPresence(file).has_value(); };
   return lockfile::sweep(std::string(ipc::kMachineLockDir), isSegmentPresence, [](std::string_view file) {
     const std::string segment(file.substr(0, file.size() - 5));
     IPC::shared_memory_object::remove(segment.c_str());
@@ -405,7 +431,7 @@ struct Bus::Impl {
       // Poprzedni wlasciciel zginal trzymajac zamek. Trzymanie zamka jest tu dowodem,
       // ze zadna ZYWA instancja nie jest w trakcie zapisu slotu, wiec slot o nieparzystym
       // seq to slot przerwany w polowie -- jego tresc jest smieciem i musi zniknac.
-      for (std::uint32_t i = 0; i < segment->slotCount; ++i) {
+      for (std::uint32_t i = 0; i < kMaxSlots; ++i) {
         Slot &slot = segment->slots[i];
         std::atomic_ref<std::uint32_t> seq(slot.seq);
         if ((seq.load(std::memory_order_relaxed) & 1U) == 0U) continue;
@@ -537,7 +563,11 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
   bool creator = false;
   if (createIfMissing) {
     try {
-      impl->shm = std::make_unique<IPC::shared_memory_object>(IPC::create_only, name.c_str(), IPC::read_write);
+      // Uprawnienia jawne tylko u TWORCY - kto segment otwiera, tego tryb juz nie dotyczy.
+      // Magistrala laczy instancje, wiec 0600 zamyka ja w obrebie jednego konta; praktycznie
+      // nic to nie zmienia, bo podlaczenie wymaga read_write, a umask 022 i tak dawal 0644.
+      impl->shm = std::make_unique<IPC::shared_memory_object>(IPC::create_only, name.c_str(), IPC::read_write,
+                                                              IPC::permissions(ipc::kObjectPermissions));
       creator   = true;
     } catch (const IPC::interprocess_exception &) {
       impl->shm.reset();
@@ -719,7 +749,7 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
   auto scratch     = std::make_unique<Slot>();  // ~57 KiB -- na stercie, nie na stosie
   int freeSlot     = -1;
 
-  for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
+  for (std::uint32_t i = 0; i < kMaxSlots; ++i) {
     Slot &slot = segment.slots[i];
     if (!snapshot(slot, *scratch)) continue;
 
@@ -783,7 +813,7 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
 
   if (freeSlot < 0) {
     retVal.status = ClaimStatus::NoFreeSlot;
-    retVal.detail = "all " + std::to_string(segment.slotCount) + " bus slots are held by live instances";
+    retVal.detail = "all " + std::to_string(kMaxSlots) + " bus slots are held by live instances";
     impl->unlock();
     return retVal;
   }
@@ -855,7 +885,7 @@ ClaimResult Bus::reservePlan(const std::vector<std::string> &streams, std::strin
   Segment &segment = *impl->segment;
   auto scratch     = std::make_unique<Slot>();  // ~57 KiB -- na stercie, nie na stosie
 
-  for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
+  for (std::uint32_t i = 0; i < kMaxSlots; ++i) {
     if (std::cmp_equal(i, slotIndex)) continue;
     Slot &slot = segment.slots[i];
     if (!snapshot(slot, *scratch)) continue;
@@ -1022,7 +1052,7 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams, const 
 
   auto scratch = std::make_unique<Slot>();  // ~57 KiB -- na stercie, nie na stosie
 
-  for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
+  for (std::uint32_t i = 0; i < kMaxSlots; ++i) {
     if (std::cmp_equal(i, impl->slotIndex)) continue;  // wlasnych nazw nie sprawdzamy przeciw sobie
     Slot &slot = segment.slots[i];
     if (!snapshot(slot, *scratch)) continue;
@@ -1064,8 +1094,51 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams, const 
 
   impl->unlock();
 
-  retVal.status = ClaimStatus::Claimed;
+  retVal.status       = ClaimStatus::Claimed;
+  retVal.addedStreams = std::move(toAdd);
+  retVal.addedStores  = std::move(toAddStores);
   return retVal;
+}
+
+void Bus::releaseAdditional(const std::vector<std::string> &streams, const std::vector<std::string> &stores) {
+  if (streams.empty() && stores.empty()) return;
+  if (!attached() || impl->slotIndex < 0) return;
+
+  // Skroty liczone przed muteksem: trzymamy go wtedy tylko na czas samego zapisu slotu.
+  std::vector<StoreDigest> digests;
+  digests.reserve(stores.size());
+  for (const auto &store : stores)
+    digests.push_back(storeDigest(store));
+
+  // Muteks z tego samego powodu co w release(): nieparzysty seq przy trzymanym muteksie ma
+  // znaczyc wylacznie "pisarz zginal".
+  if (!impl->lock()) return;
+
+  Slot &mine                     = impl->segment->slots[impl->slotIndex];
+  const std::uint32_t owned      = std::min(mine.streamCount, static_cast<std::uint32_t>(kMaxStreams));
+  const std::uint32_t ownedStore = std::min(mine.storeCount, static_cast<std::uint32_t>(kMaxStores));
+
+  // Zageszczenie tablic w miejscu, z zachowaniem kolejnosci pozostalych wpisow. Calosc miesci
+  // sie w jednym zapisie seqlocka, wiec czytelnik bez muteksu widzi slot sprzed albo po, nigdy
+  // tablice przesunieta w polowie.
+  beginWrite(mine);
+  std::uint32_t keptStreams = 0;
+  for (std::uint32_t s = 0; s < owned; ++s) {
+    if (std::ranges::find(streams, loadString(mine.streams[s], kStreamNameSize)) != streams.end()) continue;
+    if (keptStreams != s) std::memcpy(mine.streams[keptStreams], mine.streams[s], kStreamNameSize);
+    ++keptStreams;
+  }
+  mine.streamCount         = keptStreams;
+  std::uint32_t keptStores = 0;
+  for (std::uint32_t s = 0; s < ownedStore; ++s) {
+    if (std::ranges::find(digests, mine.stores[s]) != digests.end()) continue;
+    mine.stores[keptStores] = mine.stores[s];
+    ++keptStores;
+  }
+  mine.storeCount = keptStores;
+  endWrite(mine);
+
+  impl->unlock();
 }
 
 void Bus::release() {
@@ -1087,7 +1160,7 @@ std::vector<InstanceInfo> Bus::instances() const {
   Segment &segment = *impl->segment;
   auto scratch     = std::make_unique<Slot>();
 
-  for (std::uint32_t i = 0; i < segment.slotCount; ++i) {
+  for (std::uint32_t i = 0; i < kMaxSlots; ++i) {
     if (!snapshot(segment.slots[i], *scratch)) continue;
     if (!isProcessAlive(scratch->pid, scratch->startTime)) continue;
 

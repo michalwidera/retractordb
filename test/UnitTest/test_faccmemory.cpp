@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <array>
+#include <cerrno>
 #include <string>
 
 #include "rdb/descriptor.hpp"
@@ -275,33 +277,29 @@ TEST(MemoryTest, test_faccmemory_read_beyond_bounds) {
   GTEST_ASSERT_EQ(mfa->read(&record, 2), EXIT_SUCCESS);
 
   // Beyond upper bound should fail
-  GTEST_ASSERT_EQ(mfa->read(&record, 3), EXIT_FAILURE);
-  GTEST_ASSERT_EQ(mfa->read(&record, 99), EXIT_FAILURE);
+  GTEST_ASSERT_EQ(mfa->read(&record, 3), ERANGE);
+  GTEST_ASSERT_EQ(mfa->read(&record, 99), ERANGE);
 
   // Empty storage should fail
   mfa->write(nullptr);
-  GTEST_ASSERT_EQ(mfa->read(&record, 0), EXIT_FAILURE);
+  GTEST_ASSERT_EQ(mfa->read(&record, 0), ERANGE);
 }
 
-// Verify data persists in static storage across instances with the same filename
-TEST(MemoryTest, test_faccmemory_persistence_across_instances) {
+// Verify two LIVE instances with the same filename share one bucket
+TEST(MemoryTest, test_faccmemory_shared_between_live_instances) {
   BYTE record;
 
-  std::string filename = "test_file_memory_persist";
+  std::string filename = "test_file_memory_shared";
 
   auto recsize   = sizeof(BYTE);
   auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
 
-  {
-    auto mfa = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
-    record   = 0x42;
-    mfa->write(&record);
-    record = 0x43;
-    mfa->write(&record);
-    GTEST_ASSERT_EQ(mfa->count(), 2);
-  }  // mfa destroyed
+  auto mfa = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
+  record   = 0x42;
+  mfa->write(&record);
+  record = 0x43;
+  mfa->write(&record);
 
-  // New instance with same filename should see persisted data
   auto mfa2 = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
   GTEST_ASSERT_EQ(mfa2->count(), 2);
 
@@ -310,8 +308,87 @@ TEST(MemoryTest, test_faccmemory_persistence_across_instances) {
 
   GTEST_ASSERT_EQ(mfa2->read(&record, 1), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 0x43);
+}
 
-  mfa2->write(nullptr);
+// Verify the bucket dies with the last instance using it: a stream of the same name in the next
+// plan starts empty. Until 2026-09-27 it inherited the records and writeCount of the previous plan,
+// which after `xqry --reset` shifted its ring and ended the server with FatalError.
+TEST(MemoryTest, test_faccmemory_bucket_dies_with_last_instance) {
+  BYTE record = 0x42;
+
+  std::string filename = "test_file_memory_last_instance";
+
+  auto recsize   = sizeof(BYTE);
+  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
+
+  {
+    auto mfa = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
+    mfa->write(&record);
+    mfa->write(&record);
+    GTEST_ASSERT_EQ(mfa->count(), 2);
+  }  // mfa destroyed - the last user of the bucket
+
+  auto mfa2 = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
+  GTEST_ASSERT_EQ(mfa2->count(), 0);
+  GTEST_ASSERT_EQ(mfa2->read(&record, 0), ERANGE);
+}
+
+// Verify an instance with a different record size never sees records of the old size: read()
+// copies a whole stored record, so a wider one would overrun the narrower caller's buffer.
+TEST(MemoryTest, test_faccmemory_other_record_size_starts_empty) {
+  std::string filename = "test_file_memory_other_size";
+
+  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
+
+  auto wide = std::make_unique<rdb::memoryFile>(filename, makeDesc(8), retention);
+  std::array<BYTE, 8> wideRecord{};
+  wide->write(wideRecord.data());
+  GTEST_ASSERT_EQ(wide->count(), 1);
+
+  auto narrow = std::make_unique<rdb::memoryFile>(filename, makeDesc(1), retention);
+  GTEST_ASSERT_EQ(narrow->count(), 0);
+}
+
+// Verify read() refuses a stored record of another size instead of copying it past the caller's
+// buffer. Two LIVE instances of one name with different record sizes do not occur in the engine
+// (one storage per stream), and the constructor's clearing cannot help once both are alive.
+TEST(MemoryTest, test_faccmemory_read_refuses_record_of_other_size) {
+  std::string filename = "test_file_memory_read_other_size";
+
+  auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
+
+  auto wide   = std::make_unique<rdb::memoryFile>(filename, makeDesc(8), retention);
+  auto narrow = std::make_unique<rdb::memoryFile>(filename, makeDesc(1), retention);
+
+  std::array<BYTE, 8> wideRecord{};
+  GTEST_ASSERT_EQ(wide->write(wideRecord.data()), EXIT_SUCCESS);
+
+  // On the heap, so that an overrun is visible to valgrind (ut_faccmemory-valgrind).
+  auto narrowBuffer = std::make_unique<BYTE[]>(1);
+  GTEST_ASSERT_EQ(narrow->read(narrowBuffer.get(), 0), EINVAL);
+}
+
+// Verify the number of buckets stays constant over plan swaps that bring new stream names:
+// each round builds the instances of one plan and drops them, as dataModel does at the end
+// of an epoch. Until 2026-09-27 every name ever used kept its bucket until process exit.
+TEST(MemoryTest, test_faccmemory_bucket_count_constant_across_plan_swaps) {
+  BYTE record = 0x42;
+
+  auto recsize   = sizeof(BYTE);
+  auto retention = std::pair<std::string, size_t>("MEMORY", 2);
+
+  const auto baseline = rdb::memoryFile::bucketCountForUnitTest();
+
+  for (int plan = 0; plan < 50; ++plan) {
+    {
+      auto a = std::make_unique<rdb::memoryFile>("plan_" + std::to_string(plan) + "/a", makeDesc(recsize), retention);
+      auto b = std::make_unique<rdb::memoryFile>("plan_" + std::to_string(plan) + "/b", makeDesc(recsize), retention);
+      a->write(&record);
+      b->write(&record);
+      GTEST_ASSERT_EQ(rdb::memoryFile::bucketCountForUnitTest(), baseline + 2);
+    }
+    GTEST_ASSERT_EQ(rdb::memoryFile::bucketCountForUnitTest(), baseline);
+  }
 }
 
 // ============================================================
@@ -400,7 +477,7 @@ TEST(MemoryStoreTest, storage_passes_its_store_down_to_the_accessor) {
   rdb::MemoryStore untouched;
 
   rdb::storage stream("memstore_iso", "memstore_iso", "", "DEFAULT", false, false, -1, &given);
-  stream.attachDescriptor(&descriptor);
+  ASSERT_TRUE(stream.attachDescriptor(&descriptor).empty());
   stream.setDisposable(true);
 
   auto *payload = stream.getPayload();

@@ -1,0 +1,8 @@
+# Plan tla dla it_hash_string-adhoc: zrodla i przeplot przychodza dopiero przez `xqry -a`.
+# ctest -R hash_string -V
+
+STORAGE 'temp'
+
+DECLARE s STRING[8], k INTEGER STREAM base, 1 FILE 'a.txt'
+
+SELECT * STREAM dst FROM base

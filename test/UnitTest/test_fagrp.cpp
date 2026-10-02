@@ -1,5 +1,7 @@
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <cerrno>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -7,7 +9,9 @@
 #include <string>
 #include <vector>
 
+#include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/fagrp.hpp"
 
 static rdb::Descriptor makeDesc(size_t size) { return {"f", static_cast<int>(size), 1, rdb::BYTE}; }
@@ -84,6 +88,31 @@ class GroupFileTest : public ::testing::Test {
 // ============================================================
 // groupFile tests
 // ============================================================
+
+TEST_F(GroupFileTest, failed_later_segment_keeps_earlier_segment_without_rotation) {
+  std::ofstream(filename + "_segment_0", std::ios::binary).put(static_cast<char>(42));
+  std::filesystem::create_directory(filename + "_segment_1");
+  {
+    rdb::groupFile<> file(filename, makeDesc(recsize), rdb::retention_t{2, 1}, 7);
+    EXPECT_FALSE(file.initializationError().empty());
+  }
+  EXPECT_EQ(readFile(filename + "_segment_0"), std::vector<BYTE>({42}));
+  EXPECT_FALSE(std::filesystem::exists(filename + "_segment_0.old7"));
+}
+
+// Status z konstruktora segmentu obsluguje tylko import planu. Nowy segment przy rotacji w pracy
+// ciaglej, ktorego nie da sie otworzyc, rzuca IOError z nazwa pliku - bez tego segment z
+// fd=-1 oddawalby z write() samo errno, a przy errno==0 cichy sukces bez zapisu.
+TEST_F(GroupFileTest, failed_rotation_segment_is_fatal) {
+  rdb::groupFile<> gfa(filename, makeDesc(recsize), rdb::retention_t{2, 1}, -1);
+  BYTE record = 1;
+  // Pierwszy zapis miesci sie w segmencie 0; dopiero drugi otwiera segment 1.
+  ASSERT_EQ(gfa.write(&record), EXIT_SUCCESS);
+  std::filesystem::create_directory(filename + "_segment_1");
+  EXPECT_THAT([&] { static_cast<void>(gfa.write(&record)); },
+              ::testing::ThrowsMessage<rdb::IOError>(
+                  ::testing::HasSubstr("groupFile::write: cannot open output file '" + filename + "_segment_1'")));
+}
 
 // Verify no-retention mode writes all records into a single file
 TEST_F(GroupFileTest, test_fagrp_no_retention) {
@@ -242,6 +271,39 @@ TEST_F(GroupFileTest, test_fagrp_purge_no_retention) {
   GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file")].sizeFromSystem, 0);
 }
 
+// Segment usuniety przez retencje nie jest archiwum: jego akcesor nie moze przy zniszczeniu
+// probowac rotacji skasowanego pliku (falszywy "Failed to rotate" w logu). Segmenty, ktore
+// retencje przetrwaly, dostaja przy koncu sesji zwykla rotacje do .old<N>.
+TEST_F(GroupFileTest, test_fagrp_retention_drop_is_not_a_rotation_failure) {
+  LogCapture log;
+  {
+    auto gfa = std::make_unique<rdb::groupFile<>>(filename, makeDesc(recsize), rdb::retention_t{2, 2}, 3);
+    for (BYTE record = 1; record <= 6; record++)
+      gfa->write(&record);
+  }
+  EXPECT_EQ(log.text().find("Failed to rotate"), std::string::npos) << log.text();
+  EXPECT_FALSE(std::filesystem::exists(sandboxPath("test_file_segment_0.old3")));
+  EXPECT_EQ(readFile(sandboxPath("test_file_segment_1.old3")), std::vector<BYTE>({3, 4}));
+  EXPECT_EQ(readFile(sandboxPath("test_file_segment_2.old3")), std::vector<BYTE>({5, 6}));
+}
+
+// To samo dla purge: pliki usuniete celowo nie sa archiwum. Tu segmenty typu posixBinaryFile
+// (STORAGE DIRECT), a wyzej posixBinaryFileWithShadow - kazdy typ ma test tej sciezki. Plik
+// zapisany PO purge jest zwyklym magazynem i przy koncu sesji trafia do .old<N>.
+TEST_F(GroupFileTest, test_fagrp_purge_is_not_a_rotation_failure) {
+  LogCapture log;
+  {
+    auto gfa    = std::make_unique<rdb::groupFile<rdb::posixBinaryFile>>(filename, makeDesc(recsize), rdb::retention_t{0, 0}, 3);
+    BYTE record = 11;
+    gfa->write(&record);
+    gfa->purge();
+    record = 42;
+    gfa->write(&record);
+  }
+  EXPECT_EQ(log.text().find("Failed to rotate"), std::string::npos) << log.text();
+  EXPECT_EQ(readFile(sandboxPath("test_file.old3")), std::vector<BYTE>({42}));
+}
+
 // Verify name() returns base filename in no-retention mode
 TEST_F(GroupFileTest, test_fagrp_name_no_retention) {
   auto retention = rdb::retention_t{0, 0};
@@ -323,7 +385,8 @@ TEST_F(GroupFileTest, test_fagrp_count_after_rotation) {
   GTEST_ASSERT_EQ(gfa->count(), 8);
 }
 
-// Verify reads and updates into already removed global positions fail safely.
+// Verify reads and updates into already removed global positions fail safely with ERANGE:
+// a record removed by retention is a record that is not there (contract at FileInterface::write).
 TEST_F(GroupFileTest, test_fagrp_access_removed_segment_fails) {
   BYTE record;
 
@@ -338,8 +401,8 @@ TEST_F(GroupFileTest, test_fagrp_access_removed_segment_fails) {
   }
 
   record = 99;
-  GTEST_ASSERT_NE(gfa->read(&record, 0), 0);
-  GTEST_ASSERT_NE(gfa->write(&record, 0), 0);
+  GTEST_ASSERT_EQ(gfa->read(&record, 0), ERANGE);
+  GTEST_ASSERT_EQ(gfa->write(&record, 0), ERANGE);
 }
 
 // Verify segment mapping for multi-byte records: position is a byte offset, capacity is in records.

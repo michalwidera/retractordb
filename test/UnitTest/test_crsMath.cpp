@@ -4,7 +4,9 @@
 #include <filesystem>
 #include <iomanip>
 #include <map>
+#include <set>
 #include <variant>
+#include <vector>
 
 #include "config.h"
 #include "rdb/fainterface.hpp"
@@ -206,16 +208,24 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
 
     strstream << std::setw(colSize) << period << " ";
 
+    // Zbior nazw sluzy WYLACZNIE wydrukowi ponizej; processRows bierze maske pozycyjna.
     std::set<std::string> procSet;
-    for (const auto &it : coreInstance)
-      if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) procSet.insert(it.id);
+    std::vector<char> procMask(coreInstance.size(), 0);
+    std::size_t position = 0;
+    for (const auto &it : coreInstance) {
+      if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) {
+        procSet.insert(it.id);
+        procMask[position] = 1;
+      }
+      ++position;
+    }
 
     for (const auto &x : allStreams)
       strstream << "{" << std::setw(colSize) << (procSet.contains(x) ? x : "") << "}";
 
     strstream << '\n';
 
-    proc.processRows(procSet);
+    proc.processRows(procMask);
   }
 
   if (strstream.str() != expectedResult) {
@@ -378,15 +388,23 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
 
     strstream << std::setw(4) << period << " ";
 
+    // Zbior nazw sluzy licznikom i wydrukowi ponizej; processRows bierze maske pozycyjna.
     std::set<std::string> procSet;
-    for (const auto &it : coreInstance)
-      if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) procSet.insert(it.id);
+    std::vector<char> procMask(coreInstance.size(), 0);
+    std::size_t position = 0;
+    for (const auto &it : coreInstance) {
+      if (tl.isThisDeltaAwaitCurrentTimeSlot(it.rInterval)) {
+        procSet.insert(it.id);
+        procMask[position] = 1;
+      }
+      ++position;
+    }
 
     std::map<std::string, size_t> recordsBefore;
     for (const auto &x : procSet)
       recordsBefore.emplace(x, proc.qSet.at(x)->outputPayload->getRecordsCount());
 
-    proc.processRows(procSet);
+    proc.processRows(procMask);
 
     for (const auto &x : allStreams)
       strstream << "|" << std::setw(colSize)

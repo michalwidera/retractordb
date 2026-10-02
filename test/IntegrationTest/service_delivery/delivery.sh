@@ -278,3 +278,30 @@ grep -q "stream 'src' is already served by instance 'service' (pid $pid_service)
 }
 grep -qx 'STARY PLAN' service_target.rql || { echo "odrzucony start 'foo' nadpisal plik zapytan uslugi"; exit 1; }
 [ ! -f systemctl_called ] || { echo "odrzucony start 'foo' zlecil restart uslugi"; exit 1; }
+
+# --- 5. Plan, ktorego usluga nie uruchomi, nie jest dostarczany ------------------------------
+
+# Uszkodzony .desc deklaracji: start uslugi odmowilby tego planu, wiec dostarczenie ma odmowic
+# PRZED nadpisaniem pliku uslugi. Do #265 ta droga konczyla sie kodem 0, a usluga tracila
+# dzialajacy plan na rzecz takiego, ktory nie wstaje.
+printf 'STARY PLAN\n' >service_target.rql
+rm -f systemctl_called
+cp temp/src.desc src.desc.saved
+printf '{\n INTEGER }\n' >temp/src.desc
+
+status=0
+PATH="$PWD/fakebin:$PATH" SYSTEMCTL_MARKER="$PWD/systemctl_called" \
+  xretractor plan.rql --noanykey </dev/null >bad_desc_delivery.log 2>&1 || status=$?
+mv src.desc.saved temp/src.desc
+if [ "$status" -eq 0 ]; then
+  echo "plan z uszkodzonym .desc zostal dostarczony do uslugi"
+  cat bad_desc_delivery.log
+  exit 1
+fi
+grep -q "src.desc.*Fail: line 2:9.*nothing was changed" bad_desc_delivery.log || {
+  echo "odmowa dostarczenia nie wskazuje uszkodzonego deskryptora:"
+  cat bad_desc_delivery.log
+  exit 1
+}
+grep -qx 'STARY PLAN' service_target.rql || { echo "odrzucony plan nadpisal plik zapytan uslugi"; exit 1; }
+[ ! -f systemctl_called ] || { echo "odrzucony plan zlecil restart uslugi"; exit 1; }

@@ -150,3 +150,15 @@ server_wait_exit() {
   fi
   return 0
 }
+
+# bus_own - wypisuje z `xqry --bus` wylacznie sekcje przestrzeni nazw TEGO testu.
+#
+# `--bus` pokazuje magistrale wszystkich przestrzeni nazw, kazda pod naglowkiem
+# "NAMESPACE: <nazwa>" (bez RDB_NAMESPACE: "(default)"), a nie tylko wlasna. Testy biegna
+# rownolegle w osobnych przestrzeniach i ich plany nosza te same nazwy strumieni, wiec
+# warunek oparty na calym wydruku trafial w instancje sasiada: it_service_reset_double
+# widzial `beta1` z it_service_reset_race i wysylal reset w trakcie wlasnej wymiany planu.
+bus_own() {
+  local section="NAMESPACE: ${RDB_NAMESPACE:-(default)}"
+  xqry --bus 2>/dev/null | awk -v section="$section" '$0 == section { own = 1; next } /^NAMESPACE: / { own = 0 } own'
+}

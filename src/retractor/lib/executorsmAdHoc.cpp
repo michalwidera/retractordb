@@ -1,8 +1,15 @@
 #include "executorsm.hpp"
 
+#include <algorithm>
+#include <chrono>
+#include <cstdlib>
+#include <filesystem>
 #include <format>
+#include <fstream>
 #include <mutex>
+#include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -11,6 +18,7 @@
 #include "bus.hpp"
 #include "dataModel.hpp"
 #include "executorsmState.hpp"
+#include "fatalError.hpp"  // wylacznie hak RDB_FAULT_FATAL_IN_ADHOC
 #include "planSource.hpp"
 #include "rdb/exceptions.hpp"
 #include "RQLParser.hpp"
@@ -58,6 +66,8 @@ ptree executorsm::attachAdHocRule(qTree &coreInstanceCopy, const std::string &st
                   " record(s) back cannot be served");
 
   compiler localCompiler(coreInstanceCopy);
+  localCompiler.setHistoryMemoryBudget(cfgHistoryMemoryMib);
+  localCompiler.setDefaultRetention(cfgDefaultRetention);
   const auto response = localCompiler.compile();
   if (response != "OK") {
     ptRetval.put(std::string("db"), "Fail local chain compiler:" + response);
@@ -126,11 +136,15 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
 
   if (first_keyword == "RULE") return attachAdHocRule(coreInstanceCopy, stream_name);
 
-  if (first_keyword == "STORAGE" ||   //
-      first_keyword == "SUBSTRAT" ||  //
-      first_keyword == "PERCOUTNER") {
-    ptRetval.put(std::string("db"), "Fail parse: AdHoc STORAGE, SUBSTRAT or PERCOUTNER not supported");
-    SPDLOG_ERROR("Parse adhoc query failed: AdHoc STORAGE, SUBSTRAT or PERCOUTNER not supported");
+  // Lista DOZWOLONYCH, a nie zakazanych. Do 2026-09-25 stala tu lista zakazanych dyrektyw, w ktorej
+  // zamiast ROTATION widnial literal "PERCOUTNER" - pozostalosc zmiany nazwy tokenu COPTION
+  // w 7f939c09. Gramatyka takiego slowa nie zna, wiec `xqry -a "ROTATION 'plik'"` przechodzil
+  // filtr i konczyl serwer FatalError-em "parser logic error". Kazda inna instrukcja - dyrektywa
+  // kompilatora, DEFAULT VOLATILE, a takze przyszla instrukcja gramatyki - jest odmowa.
+  if (first_keyword != "SELECT" && first_keyword != "DECLARE") {
+    ptRetval.put(std::string("db"),
+                 "Fail parse: AdHoc accepts only SELECT, DECLARE or RULE; '" + first_keyword + "' is not supported");
+    SPDLOG_ERROR("Parse adhoc query failed: '{}' is not supported by AdHoc", first_keyword);
     return ptRetval;
   }
 
@@ -140,18 +154,20 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     return ptRetval;
   }
 
-  if (first_keyword != "SELECT" && first_keyword != "DECLARE") {
-    // Filtr powyzej jest WYCZERPUJACY: kazde inne slowo kluczowe zostalo juz odeslane klientowi
-    // jako odmowa. Dotarcie tutaj znaczy, ze filtr i parser rozjechaly sie ze soba.
-    throw rdb::LogicError(
-        std::format("executorsm::getAdHoc: unexpected first_keyword '{}' after filtering - parser logic error", first_keyword));
-  }
-
   // --until-eof jest trybem calego przebiegu. Deklaracja dolaczona pozniej musi
   // odziedziczyc ONESHOT tak samo jak deklaracje planu startowego.
   if (first_keyword == "DECLARE" && untilEofMode) coreInstanceCopy[stream_name].isOneShot = true;
 
+  // Hak testu it_fatal_exit_path, ta sama droga co RDB_FAULT_FATAL_IN_SLOT. FatalError w watku
+  // komunikacyjnym, w miejscu lokalnej kompilacji kopii planu. Do 2026-09-27 wywolywal go tekst
+  // `@(0,4)` (krok zerowy AGSE); od #308 odrzuca go parser, a test sciezki wyjscia nie moze zalezec
+  // od tego, ktory wadliwy tekst jeszcze tu dochodzi - kazdy taki tekst jest bledem do naprawy.
+  if (std::getenv("RDB_FAULT_FATAL_IN_ADHOC") != nullptr)
+    FatalError("fault hook RDB_FAULT_FATAL_IN_ADHOC: fatal error in the communication thread");
+
   compiler localCompiler(coreInstanceCopy);
+  localCompiler.setHistoryMemoryBudget(cfgHistoryMemoryMib);
+  localCompiler.setDefaultRetention(cfgDefaultRetention);
   auto response = localCompiler.compile();
 
   if (response != "OK") {
@@ -175,13 +191,45 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     adHocStreams.push_back(q.id);
   }
 
+  if (!adHocStreams.empty()) {
+    if (const std::string openError = checkOutputFilesOpenable(coreInstanceCopy, activeStorageDir, adHocStreams);
+        openError != "OK") {
+      ptRetval.put("db", "Rejected: " + openError);
+      SPDLOG_ERROR("AdHoc rejected: {}", openError);
+      return ptRetval;
+    }
+  }
+
+  // Test zmienia katalog po kontroli wstepnej, lecz przed rzeczywistym open() w
+  // akcesorze. Bramka dziala raz na proces; limit zapobiega zawieszeniu serwera,
+  // gdy klient testowy zostanie przerwany przed utworzeniem pliku .release.
+  static bool openGateFired = false;
+  if (!openGateFired && !adHocStreams.empty()) {
+    const char *gate   = std::getenv("RDB_FAULT_ADHOC_OPEN_GATE");
+    const char *stream = std::getenv("RDB_FAULT_ADHOC_OPEN_STREAM");
+    if (gate != nullptr && stream != nullptr && std::ranges::contains(adHocStreams, std::string(stream))) {
+      openGateFired = true;
+      std::ofstream(std::string(gate) + ".ready").put('\n');
+      const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+      while (!std::filesystem::exists(std::string(gate) + ".release") && std::chrono::steady_clock::now() < deadline)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+  }
+
   // Sciezki magazynow bierzemy z CALEGO planu po scaleniu, a nie z samych nowych wezlow:
   // claimAdditional pomija to, co juz stoi we wlasnym slocie, wiec zbior jest ten sam, a regula
   // "co jest magazynem" zostaje w jednym miejscu (planStorePaths).
+  //
+  // Zapamietane jest to, co roszczenie FAKTYCZNIE dopisalo: tylko to wolno zdjac z magistrali,
+  // gdy import sie nie powiedzie. Nazwy i sciezki, ktore plan juz obsluguje, musza zostac.
+  std::vector<std::string> claimedStreams;
+  std::vector<std::string> claimedStores;
   if (busPtr != nullptr && !adHocStreams.empty()) {
-    const bus::ClaimResult claimed = busPtr->claimAdditional(adHocStreams, planStorePaths(coreInstanceCopy, activeStorageDir));
+    bus::ClaimResult claimed = busPtr->claimAdditional(adHocStreams, planStorePaths(coreInstanceCopy, activeStorageDir));
     switch (claimed.status) {
       case bus::ClaimStatus::Claimed:
+        claimedStreams = std::move(claimed.addedStreams);
+        claimedStores  = std::move(claimed.addedStores);
         break;
       case bus::ClaimStatus::Conflict: {
         const std::string owner   = claimed.ownerName.empty() ? "the unnamed instance" : "instance '" + claimed.ownerName + "'";
@@ -234,33 +282,68 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   // to the execution loop.
   {
     std::scoped_lock scoped_lock(core_mutex);
-    mergedIds = cmPtr->importFrom(coreInstanceCopy);
-    if (!mergedIds.empty()) adHocPlanRevision.fetch_add(1, std::memory_order_release);
-    compileChainResult = cmPtr->compile();
-    if (compileChainResult == "OK") {
-      pProc->syncDeclaredCapacities();
-      for (const auto &id : mergedIds)
-        if (!pProc->addQueryToModel(id)) {
-          addFailedId = id;
-          break;
+    // Migawka planu sprzed importu. importFrom() i compile() pisza po ZYWYM planie, a porazka
+    // kompilacji albo rejestracji w modelu zostawiala w nim wezly bez instancji: nastepny slot
+    // konczyl wtedy proces na refreshStreamHandles(). Kazda porazka ponizej przywraca plan
+    // w calosci, razem z numerem rewizji - ksztalt wraca ten sam, wiec tablica uchwytow modelu
+    // pozostaje zgodna. Modelu nie trzeba wycofywac, bo addQueriesToModel() wpisuje wszystko
+    // albo nic. Nie wraca jedynie pojemnosc deklaracji powiekszona przez
+    // syncDeclaredCapacities(): wieksza historia niczego w wyniku nie zmienia.
+    //
+    // Razem z planem wraca roszczenie na magistrali: nazwa, ktorej plan nie zawiera, bylaby
+    // inaczej ogloszona jako strumien tej instancji az do jej konca.
+    qTree planBefore = *coreInstancePtr;
+    try {
+      mergedIds          = cmPtr->importFrom(coreInstanceCopy);
+      compileChainResult = cmPtr->compile();
+      if (compileChainResult == "OK") {
+        pProc->syncDeclaredCapacities();
+        // Hak testu it_adhoc_register_rollback, ta sama droga co RDB_FAULT_SHOW. Porazka PO
+        // imporcie do zywego planu ma dwie drogi wycofania: status z addQueriesToModel (pozny
+        // blad open() magazynu, wymuszany bramka RDB_FAULT_ADHOC_OPEN_GATE) i wyjatek, ktory
+        // lapie catch ponizej. Hak rzuca, bo drugiej drogi zadne znane RQL nie wywoluje. Raz na
+        // proces, zeby test mogl po nim powtorzyc to samo zapytanie i sprawdzic, ze plan je przyjmuje.
+        static bool registerFaultFired = false;
+        if (!registerFaultFired && std::getenv("RDB_FAULT_ADHOC_REGISTER") != nullptr) {
+          registerFaultFired = true;
+          throw std::runtime_error("RDB_FAULT_ADHOC_REGISTER: wstrzyknieta awaria rejestracji ad-hoc w modelu");
         }
+        addFailedId = pProc->addQueriesToModel(mergedIds);
+      }
+    } catch (...) {
+      *coreInstancePtr = std::move(planBefore);
+      if (busPtr != nullptr) busPtr->releaseAdditional(claimedStreams, claimedStores);
+      throw;
     }
+    if (compileChainResult != "OK" || !addFailedId.empty()) {
+      *coreInstancePtr = std::move(planBefore);
+      if (busPtr != nullptr) busPtr->releaseAdditional(claimedStreams, claimedStores);
+    } else if (!mergedIds.empty())
+      adHocPlanRevision.fetch_add(1, std::memory_order_release);
   }
 
   if (compileChainResult != "OK") {
-    ptRetval.put(std::string("db"), "Compile chain failed:" + response);
+    ptRetval.put(std::string("db"), "Compile chain failed:" + compileChainResult);
     SPDLOG_ERROR("Compile chain failed: {}", compileChainResult);
     return ptRetval;
   }
 
   if (!addFailedId.empty()) {
-    ptRetval.put(std::string("db"), "dataModel::addQueryToModel FAILED:" + addFailedId);
-    SPDLOG_ERROR("dataModel::addQueryToModel FAILED, stream {}", addFailedId);
+    ptRetval.put(std::string("db"), "Rejected: " + addFailedId);
+    SPDLOG_ERROR("AdHoc rejected after import: {}", addFailedId);
     return ptRetval;
   }
 
   for (const auto &id : mergedIds)
     processedLines.emplace_back(id, adHocQuery);
+
+  // Wykaz D8 dla strumieni, ktore wlasnie doszly - tylko do dziennika, jak przy `--reset`. Z kopii
+  // planu (localCompiler), a nie z zywego: ten po zwolnieniu core_mutex nalezy do petli przetwarzania.
+  // Poziom ERROR, bo Release wycina z dziennika wszystko ponizej (CMakeLists.txt), a ten raport ma byc
+  // widoczny w produkcji; to jedna linia na zmiane planu, wiec polityki oszczedzania karty nie narusza.
+  for (const auto &[stream, reason] : localCompiler.unboundedDiskStreams())
+    if (std::ranges::contains(mergedIds, stream))
+      SPDLOG_ERROR("AdHoc stream {} grows without bound on disk ({})", stream, reason);
 
   ptRetval.put(std::string("db"), "OK");
   return ptRetval;

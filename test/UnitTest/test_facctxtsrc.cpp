@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cerrno>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -186,7 +187,7 @@ TEST_F(TextSourceROTest, test_read_missing_file_returns_null_row) {
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   std::memset(buffer.get(), 0xFF, desc.getSizeInBytes());
-  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_FAILURE);
+  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EBADF);
 
   int value = -1;
   std::memcpy(&value, buffer.get(), sizeof(int));
@@ -366,6 +367,52 @@ TEST_F(TextSourceROTest, test_read_integer_array) {
   GTEST_ASSERT_EQ(values[2], 3);
 }
 
+// Verify NULL on any element of a numeric array makes the whole field NULL, wherever the element stands
+TEST_F(TextSourceROTest, test_read_integer_array_null_element_nulls_whole_field) {
+  auto filename = createTestFile("test_arr_null.txt", "NULL 2 3\n2 NULL 3\n2 3 NULL\n1 2 3\n");
+
+  rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 3, rdb::INTEGER}};
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
+
+  auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  for (int row = 0; row < 3; ++row) {
+    GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS) << "row " << row;
+    ASSERT_EQ(src->lastNullBitset().size(), 1U);
+    EXPECT_TRUE(src->lastNullBitset()[0]) << "row " << row;
+  }
+
+  // A row without NULL after rows with NULL - the field is defined again
+  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
+  EXPECT_FALSE(src->lastNullBitset()[0]);
+  int values[3];
+  std::memcpy(values, buffer.get(), 3 * sizeof(int));
+  GTEST_ASSERT_EQ(values[0], 1);
+  GTEST_ASSERT_EQ(values[1], 2);
+  GTEST_ASSERT_EQ(values[2], 3);
+}
+
+// Verify NULLTYPE[N] consumes N NULL tokens, so the next field reads its own token
+TEST_F(TextSourceROTest, test_read_nulltype_array_keeps_next_field_aligned) {
+  auto filename = createTestFile("test_nulltype_arr.txt", "NULL NULL NULL 7\n");
+
+  rdb::Descriptor desc{{"n", 0, 3, rdb::NULLTYPE}, {"b", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+
+  auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
+
+  auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  GTEST_ASSERT_EQ(src->read(buffer.get(), 0), EXIT_SUCCESS);
+
+  int value = 0;
+  std::memcpy(&value, buffer.get(), sizeof(int));
+  GTEST_ASSERT_EQ(value, 7);
+
+  auto nulls = src->lastNullBitset();
+  ASSERT_EQ(nulls.size(), 2U);
+  EXPECT_TRUE(nulls[0]);
+  EXPECT_FALSE(nulls[1]);
+}
+
 // ============================================================
 // textSourceRO - loop to beginning (EOF wrapping) tests
 // ============================================================
@@ -467,7 +514,7 @@ TEST_F(TextSourceROTest, test_name) {
 // textSourceRO - write is read-only
 // ============================================================
 
-// Verify write always returns EXIT_FAILURE (read-only source)
+// Verify write always returns ENOTSUP (read-only source)
 TEST_F(TextSourceROTest, test_write_returns_failure) {
   auto filename = createTestFile("test_ro.txt", "1\n");
 
@@ -476,8 +523,8 @@ TEST_F(TextSourceROTest, test_write_returns_failure) {
   auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
   uint8_t data[] = {0};
-  GTEST_ASSERT_EQ(src->write(data, 0), EXIT_FAILURE);
-  GTEST_ASSERT_EQ(src->write(data), EXIT_FAILURE);
+  GTEST_ASSERT_EQ(src->write(data, 0), ENOTSUP);
+  GTEST_ASSERT_EQ(src->write(data), ENOTSUP);
 }
 
 // ============================================================

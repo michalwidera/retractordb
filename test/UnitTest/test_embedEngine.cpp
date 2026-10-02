@@ -72,14 +72,23 @@ TEST(embedEngine, two_engines_do_not_share_a_memory_stream) {
 
   auto firstStream  = first.openStorage("engine_iso", "engine_iso", "", "DEFAULT", false, false, -1);
   auto secondStream = second.openStorage("engine_iso", "engine_iso", "", "DEFAULT", false, false, -1);
-  firstStream->attachDescriptor(&descriptor);
-  secondStream->attachDescriptor(&descriptor);
+  ASSERT_TRUE(firstStream->attachDescriptor(&descriptor).empty());
+  ASSERT_TRUE(secondStream->attachDescriptor(&descriptor).empty());
   firstStream->setDisposable(true);
 
   writeOneRecord(*firstStream, descriptor, 11);
 
   EXPECT_FALSE(first.memory().empty()) << "zapis nie trafil do sklepu wlasnego silnika";
-  EXPECT_TRUE(second.memory().empty()) << "drugi silnik zobaczyl zapis pierwszego";
+
+  // Pustosc sklepu drugiego silnika nic tu nie mowi: kubelek strumienia powstaje razem z
+  // otwartym magazynem (#306, D3), wiec secondStream ma w nim wlasny, pusty. O izolacji mowi
+  // to, co widzi swiezy magazyn tej samej nazwy w kazdym ze sklepow.
+  auto firstReader  = first.openStorage("engine_iso", "engine_iso", "", "DEFAULT", false, false, -1);
+  auto secondReader = second.openStorage("engine_iso", "engine_iso", "", "DEFAULT", false, false, -1);
+  ASSERT_TRUE(firstReader->attachDescriptor(&descriptor).empty());
+  ASSERT_TRUE(secondReader->attachDescriptor(&descriptor).empty());
+  EXPECT_EQ(firstReader->getRecordsCount(), 1U) << "zapis nie trafil do sklepu wlasnego silnika";
+  EXPECT_EQ(secondReader->getRecordsCount(), 0U) << "drugi silnik zobaczyl zapis pierwszego";
 }
 
 // Engine jest OPCJONALNY: magazyn zbudowany bez niego nadal uzywa instancji domyslnej
@@ -95,7 +104,7 @@ TEST(embedEngine, storage_built_without_an_engine_uses_the_process_default) {
 
   rdb::embed::Engine engine;
   rdb::storage loose("engine_default", "engine_default", "", "DEFAULT", false, false, -1);
-  loose.attachDescriptor(&descriptor);
+  ASSERT_TRUE(loose.attachDescriptor(&descriptor).empty());
   loose.setDisposable(true);
 
   writeOneRecord(loose, descriptor, 37);

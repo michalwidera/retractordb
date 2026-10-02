@@ -37,7 +37,7 @@ class writableStorage {
   writableStorage(const std::string &name, rdb::Descriptor descriptor, bool substrate)
       : descriptor_(std::move(descriptor)),
         storage_(name, name, "") {
-    storage_.attachDescriptor(&descriptor_);
+    EXPECT_EQ(storage_.attachDescriptor(&descriptor_), "");
     storage_.setDisposable(true);
     storage_.markAsSubstrate(substrate);
   }

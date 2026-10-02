@@ -91,7 +91,8 @@ remained was only the *possibility* that something would reach for it. The heade
 
 - `executorsm.cpp` - `cleanup()` reads the latch, `run()`'s `rdb::Error` catch sets it;
 - `launcher.cpp` - sets it on two startup failure paths;
-- `dataModel.cpp` - the `RDB_FAULT_FATAL_IN_SLOT` hook, the last `FatalError` call in the tree.
+- `dataModel.cpp` and `executorsmAdHoc.cpp` - the `RDB_FAULT_FATAL_IN_SLOT` and
+  `RDB_FAULT_FATAL_IN_ADHOC` test hooks, the only `FatalError` calls left in the tree.
 
 Two includes in `qry.cpp` and `uxSysTermTools.cpp` turned out to be stale - zero uses of
 either the macro or the flag - and went with it. Headers are not installed

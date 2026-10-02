@@ -1,7 +1,7 @@
 #!/bin/bash
 # Przeladowanie calego planu dzialajacej uslugi jedna komenda: `xqry --reset plan.rql`.
 #
-# Scenariusz sprawdza cztery wlasciwosci, ktorych zaden istniejacy test nie obejmowal:
+# Scenariusz sprawdza szesc wlasciwosci, ktorych zaden istniejacy test nie obejmowal:
 #
 #  1. Instancja BEZCZYNNA (start bez pliku planu) potrafi przyjac plan. Do 2026-09-05 byla
 #     slepym zaulkiem: pProc pozostawal nullem, wiec kazda komenda wymagajaca modelu
@@ -13,6 +13,11 @@
 #  4. Usluga jest DOKLADNIE JEDNA. Serwerow zwyklych moze pracowac wiele, ale druga instancja
 #     w trybie uslugowym odpowiadalaby na te same komendy i pisala do tego samego pliku
 #     zapytan.
+#  5. Plan z regula DO SYSTEM jest odrzucany w CALOSCI (krok 3b). Kanal reset niesie tekst
+#     planu przez te sama nieuwierzytelniona kolejke co kanal ad-hoc, ktory akcji SYSTEM
+#     odmawia od poczatku; do 2026-09-22 reset nie ogladal regul ani razu.
+#  6. service.unrestricted = true znosi to ograniczenie (krok 8) - bez tego kroku odmowa
+#     bylaby nieodroznialna od trwalego usuniecia akcji SYSTEM z tego kanalu.
 #
 # Katalog dziala na tozsamosci globalnej maszyny (nazwa instancji `service`), stad
 # IT_NO_NAMESPACE w CMakeLists.txt i RUN_SERIAL.
@@ -26,15 +31,15 @@ SERVER_LOCK="${TMPDIR:-/tmp}/xretractor_service.service.lock"
 rm -rf ./temp && mkdir -p ./temp
 
 # Wiersz magistrali dla instancji `service` -- ten, ktory niesie PID i tryb.
-service_row() { xqry --bus 2>/dev/null | grep -E '^service +\|' || true; }
+service_row() { bus_own | grep -E '^service +\|' || true; }
 
 # Strumienie instancji `service`, po jednym na linie. `--bus` daje kazda nazwe we wlasnym
 # wierszu: pierwsza stoi w wierszu instancji, kazda nastepna w linii kontynuacji o pustych
-# kolumnach po lewej -- czyli `service_row` widzi tylko pierwsza z nich. Segment magistrali
-# nalezy do przestrzeni nazw tego testu, wiec jedyna instancja w tabeli jest nasza i ostatnia
-# kolumna kazdego wiersza danych to jej strumien. Plan pusty daje jedna linie ze znakiem '-'.
+# kolumnach po lewej -- czyli `service_row` widzi tylko pierwsza z nich. `bus_own` zostawia
+# sekcje magistrali przestrzeni nazw tego testu, wiec jedyna instancja w tabeli jest nasza
+# i ostatnia kolumna kazdego wiersza danych to jej strumien. Plan pusty daje jedna linie ze znakiem '-'.
 service_streams() {
-  xqry --bus 2>/dev/null | sed -nE 's/^(service|[[:space:]]+) *\|.*\| (.+)$/\2/p' || true
+  bus_own | sed -nE 's/^(service|[[:space:]]+) *\|.*\| (.+)$/\2/p' || true
 }
 
 # Czeka, az plan uslugi zacznie roscic dany strumien. Przeladowanie jest asynchroniczne:
@@ -92,6 +97,25 @@ if [ "$(wc -l < out_alpha.txt)" -lt 3 ]; then
   exit 1
 fi
 
+# Bledny zapisany .desc nie moze zabic serwera ani przyjac planu przed walidacja artefaktu.
+cp temp/src.desc src.desc.saved
+printf '{\n INTEGER }\n' > temp/src.desc
+status=0
+xqry --reset plan2.rql --server service > bad_desc_out.txt 2> bad_desc_err.txt || status=$?
+if [ "$status" -eq 0 ] || ! grep -q 'src.desc.*Fail: line 2:9' bad_desc_err.txt; then
+  echo "reset nie odrzucil blednego deskryptora z diagnostyka"
+  cat bad_desc_out.txt bad_desc_err.txt
+  exit 1
+fi
+mv src.desc.saved temp/src.desc
+wait_for_stream alpha
+xqry -s alpha -m 2 --server service > out_alpha_after_bad_desc.txt
+if [ "$(wc -l < out_alpha_after_bad_desc.txt)" -lt 2 ]; then
+  echo "po odrzuconym deskryptorze strumien alpha przestal liczyc"
+  cat out_alpha_after_bad_desc.txt
+  exit 1
+fi
+
 # --- 3. Plan wadliwy: odmowa, a dzialajacy plan zostaje nietkniety. ---
 status=0
 xqry --reset bad.rql --server service > bad_out.txt 2> bad_err.txt || status=$?
@@ -125,6 +149,117 @@ xqry -s alpha -m 2 --server service > out_alpha_after_bad.txt
 if [ "$(wc -l < out_alpha_after_bad.txt)" -lt 2 ]; then
   echo "po odrzuconym planie strumien alpha przestal liczyc"
   cat out_alpha_after_bad.txt
+  exit 1
+fi
+
+# --- 3a. Pusta wartosc dyrektywy: odmowa z powodem, usluga liczy dalej. ---
+#
+# Tekst planu parsuje proces USLUGI. Do 2026-09-25 pusta wartosc dyrektywy konczyla go
+# FatalError-em w listenerze parsera, a FatalError w instancji bedacej jednostka systemd czysci
+# dodatkowo plik zapytan, wiec usluga wracala po restarcie BEZ planu. Parser zglasza ja teraz
+# jako blad planu, tym samym kanalem co blad skladni w kroku 3.
+status=0
+xqry --reset emptyvalue.rql --server service > empty_value_out.txt 2> empty_value_err.txt || status=$?
+if [ "$status" -eq 0 ]; then
+  echo "plan z pusta wartoscia dyrektywy zostal przyjety"
+  cat empty_value_out.txt empty_value_err.txt
+  exit 1
+fi
+if ! kill -0 "$_server_pid" 2>/dev/null; then
+  echo "usluga zginela na planie z pusta wartoscia dyrektywy"
+  cat empty_value_err.txt
+  exit 1
+fi
+grep -q 'directive STORAGE requires a non-empty value' empty_value_err.txt || {
+  echo "odmowa nie nazwala pustej wartosci dyrektywy"
+  cat empty_value_err.txt
+  exit 1
+}
+xqry -s alpha -m 2 --server service > out_alpha_after_empty_value.txt
+if [ "$(wc -l < out_alpha_after_empty_value.txt)" -lt 2 ]; then
+  echo "po odrzuconym planie z pusta dyrektywa strumien alpha przestal liczyc"
+  cat out_alpha_after_empty_value.txt
+  exit 1
+fi
+
+# --- 3c. Zerowy krok AGSE i zerowa pojemnosc RETENTION: odmowa z powodem, usluga liczy dalej. ---
+#
+# Do 2026-09-27 oba plany przechodzily parser uslugi (#308, A2 C4 i M12). Krok 0 konczyl proces
+# FatalError-em w kompilatorze, pojemnosc 0 dopiero przy pierwszym zapisie po wymianie epoki -
+# po odpowiedzi "przyjety". Stad kontrola, ze alpha liczy dalej, a nie samo `kill -0`.
+expect_reset_refused() {
+  local plan="$1" reason="$2" status=0
+  xqry --reset "$plan" --server service > zero_out.txt 2> zero_err.txt || status=$?
+  if [ "$status" -eq 0 ]; then
+    echo "plan $plan zostal przyjety"
+    cat zero_out.txt zero_err.txt
+    exit 1
+  fi
+  grep -q "$reason" zero_err.txt || {
+    echo "odmowa planu $plan nie nazwala powodu"
+    cat zero_err.txt
+    exit 1
+  }
+  xqry -s alpha -m 2 --server service > out_alpha_after_zero.txt
+  if [ "$(wc -l < out_alpha_after_zero.txt)" -lt 2 ]; then
+    echo "po odrzuconym planie $plan strumien alpha przestal liczyc"
+    cat out_alpha_after_zero.txt
+    exit 1
+  fi
+}
+expect_reset_refused zerostep.rql "AGSE step 0 must be greater than zero"
+expect_reset_refused zeroretention.rql "RETENTION capacity 0 must be greater than zero"
+# Ta sama nazwa odrzucona podczas resetu nie moze zatrzymac dzialajacej uslugi.
+printf '%s\n' "STORAGE 'temp'" "DECLARE a INTEGER STREAM core0, 0.2 FILE 'data.txt'" \
+  "SELECT core0[0] STREAM OUT_OF_BUSSINESS FROM core0" >reserved_name.rql
+expect_reset_refused reserved_name.rql "OUT_OF_BUSSINESS is reserved stream name"
+
+# Plik wyjsciowy SELECT w nieistniejacym katalogu musi zostac odrzucony przed
+# zaplanowaniem wymiany epoki. Po odmowie alpha nadal liczy i rosczenie zostaje stare.
+printf '%s\n' "STORAGE 'temp'" "DECLARE a INTEGER STREAM src2, 0.2 FILE 'data.txt'" \
+  "SELECT a[0] STREAM blocked FROM src2 FILE 'missing/out'" > blocked.rql
+expect_reset_refused blocked.rql "cannot open output file"
+if service_streams | grep -qx blocked; then
+  echo "odrzucony reset zostawil blocked na magistrali"
+  xqry --bus
+  exit 1
+fi
+
+# --- 3b. Plan z regula DO SYSTEM: odmowa w trybie domyslnym (restricted). ---
+#
+# Kanal reset przyjmuje CALY tekst planu przez te sama nieuwierzytelniona kolejke, ktorej
+# kanal ad-hoc odmawia od poczatku (attachAdHocRule). Sprawdzenie stoi w validatePlanText,
+# tuz po parsowaniu, wiec odmowa wypada PRZED wymiana epoki i plan dzialajacy zostaje.
+#
+# Dowodem, ze nic sie nie wykonalo, jest BRAK pliku: sam komunikat na stderr nie wyklucza
+# tego, ze regula zdazyla wystartowac, zanim zestaw zostal odrzucony.
+rm -f evidence.txt
+status=0
+xqry --reset system.rql --server service > sys_out.txt 2> sys_err.txt || status=$?
+if [ "$status" -eq 0 ]; then
+  echo "plan z regula DO SYSTEM zostal przyjety w trybie domyslnym"
+  cat sys_out.txt sys_err.txt
+  exit 1
+fi
+grep -q 'DO SYSTEM' sys_err.txt || {
+  echo "odmowa nie nazwala powodu (DO SYSTEM)"
+  cat sys_err.txt
+  exit 1
+}
+grep -q 'evil' sys_err.txt || {
+  echo "odmowa nie nazwala reguly, ktora ja wywolala"
+  cat sys_err.txt
+  exit 1
+}
+if [ -f evidence.txt ]; then
+  echo "regula DO SYSTEM wykonala sie mimo odmowy planu"
+  exit 1
+fi
+wait_for_stream alpha
+xqry -s alpha -m 2 --server service > out_alpha_after_sys.txt
+if [ "$(wc -l < out_alpha_after_sys.txt)" -lt 2 ]; then
+  echo "po odrzuconym planie z DO SYSTEM strumien alpha przestal liczyc"
+  cat out_alpha_after_sys.txt
   exit 1
 fi
 
@@ -178,5 +313,30 @@ xretractor plan2.rql --noanykey --name plain -m 6 </dev/null > plain.txt 2>&1 ||
 }
 
 # --- 7. Zatrzymanie uslugi. ---
+xqry -k --server service
+server_wait_exit
+
+# --- 8. service.unrestricted = true: ten sam plan wchodzi, a regula naprawde dziala. ---
+#
+# Bez tego kroku odmowa z 3b bylaby nieodroznialna od trwalego usuniecia akcji SYSTEM
+# z kanalu reset, a przelacznik nie mialby dowodu w druga strone. Klucz czytany jest przy
+# starcie procesu, wiec wymaga WLASNEJ instancji - usluga jest jedna na maszyne, stad
+# miejsce dopiero po zatrzymaniu poprzedniej.
+rm -f evidence.txt
+server_start --service --noanykey --config unrestricted.toml
+xqry --reset system.rql --server service
+wait_for_stream alpha
+i=0
+while [ "$i" -lt 100 ]; do
+  if [ -f evidence.txt ]; then break; fi
+  sleep 0.1
+  i=$((i + 1))
+done
+if [ ! -f evidence.txt ]; then
+  echo "przy service.unrestricted = true regula DO SYSTEM nie wykonala sie w ciagu 10 s"
+  xqry -d --server service || true
+  exit 1
+fi
+
 xqry -k --server service
 server_wait_exit

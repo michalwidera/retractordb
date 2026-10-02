@@ -86,6 +86,18 @@ tool_installed() {
         conan)
             command_exists conan || [ -x "$HOME/.venv/bin/conan" ]
             ;;
+        lean)
+            local toolchain version
+            toolchain=$(tr -d '[:space:]' < "$rdb_source_dir/math_proofs/lean-toolchain") || return 1
+            version=${toolchain##*:v}
+            (
+                export PATH="${ELAN_HOME:-$HOME/.elan}/bin:$PATH"
+                command_exists elan || exit 1
+                elan toolchain list | awk -v expected="$toolchain" '$1 == expected { found = 1 } END { exit !found }' || exit 1
+                cd "$rdb_source_dir/math_proofs" || exit 1
+                [[ "$(lean --version 2>/dev/null)" == "Lean (version $version,"* ]]
+            )
+            ;;
         *)
             command_exists "$tool"
             ;;
@@ -122,7 +134,7 @@ cmd_to_apt_package() {
         apt-get) echo "apt" ;;
         sudo) echo "sudo" ;;
         batcat) echo "bat" ;;
-        conan|gcovr|cmake-format|cmake-pinned) echo "" ;;
+        conan|gcovr|cmake-format|cmake-pinned|lean) echo "" ;;
         *) echo "$cmd" ;;
     esac
 }
@@ -159,7 +171,7 @@ cmd_to_brew_package() {
         bat|batcat) echo "bat" ;;
         # hexdump jest czescia bazowego macOS - nie ma czego instalowac.
         hexdump) echo "" ;;
-        conan|gcovr|cmake-format|cmake-pinned) echo "" ;;
+        conan|gcovr|cmake-format|cmake-pinned|lean) echo "" ;;
         *) echo "$cmd" ;;
     esac
 }
@@ -285,6 +297,7 @@ tool_specs_for_option() {
                 "valgrind:required" "hexdump:required" "graphviz:required"
                 "cppcheck:required" "gdb:required" "mold:required" "ccache:required" "cmake-format:required" "clang-format:required" "clang-tidy:required" "shellcheck:required" "rg:required"
                 "tmux:required" "feh:required" "gnuplot:required"
+                "curl:optional" "lean:optional"
             )
             ;;
         "validate")
@@ -295,7 +308,7 @@ tool_specs_for_option() {
                 "hexdump:required"
                 "graphviz:recommended"
                 "cppcheck:recommended" "mold:recommended" "ccache:recommended" "rg:recommended"
-                "cmake-format:optional" "clang-format:optional" "clang-tidy:optional" "shellcheck:optional" "gdb:optional" "tmux:optional" "feh:optional" "gnuplot:optional"
+                "cmake-format:optional" "clang-format:optional" "clang-tidy:optional" "shellcheck:optional" "gdb:optional" "tmux:optional" "feh:optional" "gnuplot:optional" "lean:optional"
             )
             validate_only=1
             ;;

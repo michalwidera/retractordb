@@ -2,6 +2,7 @@
 
 #include <pthread.h>
 #include <sched.h>
+#include <sys/mman.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -154,7 +155,12 @@ TEST(ExecutorRtActivateTest, WithoutRootReturnsFalse) {
   if (geteuid() == 0) {
     GTEST_SKIP() << "Running as root; cannot test unprivileged path";
   }
-  bool result = rtActivate();
+  const bool result = rtActivate();
+#if RDB_HAS_MLOCKALL
+  // rtActivate moze wlaczyc MCL_FUTURE przed odmowa SCHED_FIFO. Zwolnij te
+  // blokade, aby limit memlock nie uniemozliwil nastepnym testom tworzenia watkow.
+  EXPECT_EQ(munlockall(), 0);
+#endif
   EXPECT_FALSE(result);
 }
 

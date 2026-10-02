@@ -6,6 +6,7 @@
 #include <bit>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -361,6 +362,32 @@ TEST(payload, vt_interface_null_matches_any_interface) {
   EXPECT_TRUE(std::equal(a.span().begin(), a.span().end(), v.span().begin()));
 }
 
+// getIntegralItem czyta pola BYTE/INTEGER tak samo jak getItemVT, tylko bez wariantu - takze
+// element tablicy (indeks plaski), skraje zakresu int i NULL, ktory jest per WPIS deskryptora.
+TEST(payload, integral_item_matches_vt_interface) {
+  const auto desc{rdb::Descriptor("b", 1, 1, rdb::BYTE) +       //
+                  rdb::Descriptor("i", 4, 1, rdb::INTEGER) +    //
+                  rdb::Descriptor("arr", 4, 3, rdb::INTEGER) +  //
+                  rdb::Descriptor("n", 4, 1, rdb::INTEGER)};
+
+  rdb::payload p(desc);
+  p.setItemVT(0, rdb::descFldVT{uint8_t{250}});
+  p.setItemVT(1, rdb::descFldVT{std::numeric_limits<int>::min()});
+  p.setItemVT(2, rdb::descFldVT{-7});
+  p.setItemVT(3, rdb::descFldVT{0});
+  p.setItemVT(4, rdb::descFldVT{std::numeric_limits<int>::max()});
+  p.setItemVT(5, std::nullopt);
+
+  ASSERT_TRUE(p.getIntegralItem(0).has_value());
+  EXPECT_EQ(*p.getIntegralItem(0), int{std::get<uint8_t>(p.getItemVT(0).value())});
+  for (int i = 1; i <= 4; ++i) {
+    ASSERT_TRUE(p.getIntegralItem(i).has_value()) << "slot " << i;
+    EXPECT_EQ(*p.getIntegralItem(i), std::get<int>(p.getItemVT(i).value())) << "slot " << i;
+  }
+  EXPECT_FALSE(p.getItemVT(5).has_value());
+  EXPECT_FALSE(p.getIntegralItem(5).has_value());
+}
+
 // Wartosc bez odpowiednika w typie pola (1e30 do INTEGER, 300.0 do BYTE) zapisuje sie jako
 // NULL - bit w nullBitset i bajty zastepcze, dokladnie jak nullopt - a nie jako liczba
 // nasycona albo przycieta (narrowFloatTo w convertTypes.cc). Obie drogi zapisu naraz.
@@ -446,6 +473,50 @@ TEST(payload, rational_field_is_stored_in_normalized_form) {
   EXPECT_EQ(stored(boost::rational<int>(7)), std::make_pair(7, 1));       // calkowita jako n/1
 }
 
+// Rekord wyzerowany, ale oznaczony jako NIE-NULL - dokladnie to, co zostawia fake-read w
+// storage::read i co zostaje po uszkodzonym pliku na dysku. Do 2026-09-23 odczyt wypuszczal stad
+// ulamek 0/0: stan, ktorego boost::rational zabrania, bo bajty trafialy do gotowego obiektu przez
+// memcpy, z pominieciem konstruktora. Dalej dzielil przez zerowy gcd w checkedArith - SIGFPE na
+// x86-64, wyjatek na arm64. Granica bajty -> obiekt jest jedynym miejscem, gdzie ten niezmiennik
+// da sie ustanowic, wiec tutaj stoi test.
+TEST(payload, rational_field_from_zeroed_record_reads_as_null) {
+  auto desc = rdb::Descriptor("ratio", static_cast<int>(sizeof(boost::rational<int>)), 1, rdb::RATIONAL);
+  rdb::payload p(desc);
+
+  p.setItem(0, boost::rational<int>(3, 4));
+  ASSERT_TRUE(p.getItem(0).has_value());  // znacznik NULL mowi "wartosc jest"...
+
+  std::ranges::fill(p.span(), 0);  // ...a bajty sa wyzerowane
+
+  EXPECT_FALSE(p.getItem(0).has_value());
+  EXPECT_FALSE(p.getItemVT(0).has_value());
+}
+
+// Mianownik niedodatni nie jest w formacie zapisu (patrz test wyzej: zapis normalizuje), wiec
+// oznacza rekord uszkodzony. Dwie z tych par zalamuja sam konstruktor boost::rational, a nie tylko
+// niezmiennik klasy - dlatego strazy nie da sie zawezic do samego zera.
+TEST(payload, rational_field_with_non_positive_denominator_reads_as_null) {
+  auto desc = rdb::Descriptor("ratio", static_cast<int>(sizeof(boost::rational<int>)), 1, rdb::RATIONAL);
+  rdb::payload p(desc);
+
+  const auto readBack = [&p](int32_t numerator, int32_t denominator) {
+    p.setItem(0, boost::rational<int>(1, 2));  // znacznik NULL na "wartosc jest"
+    std::memcpy(p.span().data(), &numerator, sizeof(numerator));
+    std::memcpy(p.span().data() + sizeof(numerator), &denominator, sizeof(denominator));
+    return p.getItemVT(0);
+  };
+
+  EXPECT_FALSE(readBack(0, 0).has_value());                                     // wyzerowany rekord
+  EXPECT_FALSE(readBack(1, 0).has_value());                                     // bad_rational: zerowy mianownik
+  EXPECT_FALSE(readBack(1, std::numeric_limits<int32_t>::min()).has_value());   // bad_rational: singularny mianownik
+  EXPECT_FALSE(readBack(std::numeric_limits<int32_t>::min(), -1).has_value());  // INT_MIN / -1 w gcd Boosta
+  EXPECT_FALSE(readBack(1, -2).has_value());                                    // znak poza liczbikiem - poza formatem
+
+  const auto valid = readBack(-8, 3);  // postac zgodna z formatem czyta sie bez zmian
+  ASSERT_TRUE(valid.has_value());
+  EXPECT_EQ(std::get<boost::rational<int>>(*valid), boost::rational<int>(-8, 3));
+}
+
 // NOLINTEND(bugprone-unchecked-optional-access,modernize-avoid-c-arrays)
 
 // Przypisanie miedzy dwoma ZGODNYMI zapisami tego samego rekordu: `INTEGER[3]` i trzy pola
@@ -501,4 +572,91 @@ TEST(payload, null_flags_survive_the_change_of_record_form) {
   expanded = allSet;
   EXPECT_TRUE(expanded.getItemVT(0).has_value());
   EXPECT_TRUE(expanded.getItemVT(2).has_value());
+}
+
+// Przenoszenie do celu o PUSTYM deskryptorze przejmuje caly stan - to ta sama sciezka, ktora
+// przypisanie kopiujace realizuje przez operator=(const Descriptor&), tylko bez kopii. Zrodlo
+// zostaje odpowiednikiem obiektu z konstruktora domyslnego, wiec nadaje sie do ponownego uzycia.
+TEST(payload, move_assignment_into_empty_target_takes_over_the_record) {
+  const auto form{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
+                  rdb::Descriptor("c1", 4, 1, rdb::INTEGER)};
+
+  rdb::payload source(form);
+  source.setItemVT(0, rdb::descFldVT{11});
+  source.setItemVT(1, std::nullopt);
+
+  rdb::payload target;  // konstruktor domyslny: deskryptor pusty, gotowy do przypisania
+  target = std::move(source);
+
+  ASSERT_EQ(target.descriptor.size(), 2U);
+  EXPECT_EQ(std::get<int>(target.getItemVT(0).value()), 11);
+  EXPECT_FALSE(target.getItemVT(1).has_value());
+
+  EXPECT_TRUE(source.descriptor.empty());
+  EXPECT_TRUE(source.span().empty());
+
+  source = target;  // pusty deskryptor przejmuje ksztalt, jak po konstruktorze domyslnym
+  EXPECT_EQ(std::get<int>(source.getItemVT(0).value()), 11);
+}
+
+// Przenoszenie miedzy ZGODNYMI zapisami tego samego rekordu (`INTEGER[3]` i trzy `INTEGER`)
+// zachowuje deskryptor CELU razem z nazwami pol - inaczej niz domyslna semantyka przenoszenia.
+// Znaczniki NULL ida przez przecelowanie, bo sa per WPIS deskryptora.
+TEST(payload, move_assignment_between_compatible_record_forms_keeps_target_shape) {
+  const rdb::Descriptor arrayForm("cells", 4, 3, rdb::INTEGER);
+  const auto scalarForm{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
+                        rdb::Descriptor("c1", 4, 1, rdb::INTEGER) +  //
+                        rdb::Descriptor("c2", 4, 1, rdb::INTEGER)};
+
+  rdb::payload source(scalarForm);
+  source.setItemVT(0, rdb::descFldVT{11});
+  source.setItemVT(1, rdb::descFldVT{12});
+  source.setItemVT(2, rdb::descFldVT{13});
+
+  rdb::payload target(arrayForm);
+  target = std::move(source);
+
+  ASSERT_EQ(target.descriptor.size(), 1U);
+  EXPECT_EQ(target.descriptor[0].rname, "cells");
+  EXPECT_EQ(std::get<int>(target.getItemVT(0).value()), 11);
+  EXPECT_EQ(std::get<int>(target.getItemVT(2).value()), 13);
+
+  // Cel z ksztaltem nie kradnie NICZEGO - zrodlo zostaje nietkniete i czytelne. Kradziez
+  // bufora byla by tu bledem (cel moze byc szerszy), a czesciowa - bitsetu bez bufora -
+  // zostawilaby obiekt, w ktorym deskryptor obiecuje wpisy, a bitset ich nie ma.
+  EXPECT_EQ(source.descriptor.size(), 3U);
+  EXPECT_EQ(std::get<int>(source.getItemVT(1).value()), 12);
+
+  // Pole tablicowe niesie JEDEN bit NULL na wszystkie elementy, wiec zwiniecie trzech
+  // wpisow skalarnych musi je scalic - tak samo jak przy przypisaniu kopiujacym.
+  rdb::payload partiallyNull(scalarForm);
+  partiallyNull.setItemVT(0, rdb::descFldVT{11});
+  partiallyNull.setItemVT(1, std::nullopt);
+  partiallyNull.setItemVT(2, rdb::descFldVT{13});
+
+  rdb::payload collapsed(arrayForm);
+  collapsed = std::move(partiallyNull);
+  EXPECT_FALSE(collapsed.getItemVT(0).has_value());
+  EXPECT_FALSE(collapsed.getItemVT(2).has_value());
+}
+
+// Konstruktor przenoszacy: stan idzie do nowego obiektu, zrodlo zostaje puste i uzywalne.
+TEST(payload, move_construction_leaves_a_reusable_source) {
+  const auto form{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
+                  rdb::Descriptor("c1", 4, 1, rdb::INTEGER)};
+
+  rdb::payload source(form);
+  source.setItemVT(0, rdb::descFldVT{7});
+  source.setItemVT(1, rdb::descFldVT{8});
+
+  const rdb::payload moved(std::move(source));
+  ASSERT_EQ(moved.descriptor.size(), 2U);
+  EXPECT_EQ(std::get<int>(moved.getItemVT(0).value()), 7);
+  EXPECT_EQ(std::get<int>(moved.getItemVT(1).value()), 8);
+
+  EXPECT_TRUE(source.descriptor.empty());
+  EXPECT_TRUE(source.span().empty());
+
+  source = moved;
+  EXPECT_EQ(std::get<int>(source.getItemVT(1).value()), 8);
 }

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
 #include "rdb/metaData.hpp"
 
@@ -334,6 +335,20 @@ TEST_F(RotateFixture, rotate_preserves_data_in_renamed_file) {
   EXPECT_EQ(old.totalRecords(), 2U);
   EXPECT_EQ(old.getNullBitset(0), (std::vector<bool>{false}));
   EXPECT_EQ(old.getNullBitset(1), (std::vector<bool>{true}));
+}
+
+// Rotacja pod numerem, ktory ma juz archiwum, zostawia slad w logu (#281) - jak w faccposix.
+// Pierwsza rotacja pod tym numerem jest kontrola: nie nadpisuje niczego i komunikatu nie ma.
+TEST_F(RotateFixture, rotate_overwrite_is_logged) {
+  rdb::metaData m(descriptor, meta);
+  for (int session = 0; session < 2; ++session) {
+    LogCapture log;
+    m.onRecordAppended({false});
+    m.rotate(0);
+    EXPECT_TRUE(std::filesystem::exists(metaOld0));
+    const bool logged = log.text().find("overwrote existing archive " + metaOld0) != std::string::npos;
+    EXPECT_EQ(logged, session == 1) << "session " << session << ", log: " << log.text();
+  }
 }
 
 // After rotation, new records can be appended and queried correctly.

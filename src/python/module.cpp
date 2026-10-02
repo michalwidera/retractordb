@@ -181,7 +181,8 @@ Record readRecord(rdb::storage &self, Py_ssize_t index) {
     // zamraza cale jadro razem z jego interfejsem, a dolozenie tej straznicy
     // pozniej oznacza przeglad wszystkich wywolan, ktore do tego czasu powstana.
     const nb::gil_scoped_release release;
-    self.read(static_cast<std::size_t>(index));
+    // Status bez znaczenia: indeks sprawdzony wyzej wzgledem liczby rekordow.
+    static_cast<void>(self.read(static_cast<std::size_t>(index)));
   }
 
   // Kopia payloadu powstaje juz z GIL-em: to samo przepisanie pamieci, a Record
@@ -463,7 +464,13 @@ NB_MODULE(_core, m) {
              auto created = std::make_unique<rdb::storage>(qry_id, file_name, storage_param, storage_type);
              if (!created->descriptorFileExist()) throw RdbNoSuchStream("no descriptor file for stream: " + qry_id);
 
-             created->attachDescriptor(nullptr);
+             // attachDescriptor() oddaje odmowe NAPISEM (#265, #303): .desc, ktorego nie da sie
+             // wczytac, albo nosnik, ktorego nie da sie otworzyc - pozostale bledy rzuca. Napis
+             // nie niesie typu, a Python rozroznia te dwie przyczyny, wiec .desc czytamy najpierw
+             // ta sama droga co load_descriptor(): zly konczy sie tu CorruptDescriptor. Odmowa,
+             // ktora przyjdzie potem, moze juz pochodzic tylko z otwarcia nosnika.
+             static_cast<void>(rdb::loadDescriptorFile(rdb::StoragePaths(qry_id, file_name, storage_param).descriptorFile()));
+             if (const std::string error = created->attachDescriptor(nullptr); !error.empty()) throw rdb::IOError(error);
              return created;
            }),
            nb::arg("qry_id"), nb::arg("file_name"), nb::arg("storage_param") = "", nb::arg("storage_type") = "DEFAULT")

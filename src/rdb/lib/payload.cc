@@ -28,14 +28,18 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>  // std::min, std::copy, std::fill
+#include <array>
+#include <bit>
 #include <boost/rational.hpp>
 #include <boost/stacktrace.hpp>
 
+#include <cstdint>
 #include <cstring>  // std::memcpy (for C-interop)
 #include <iomanip>
 #include <iostream>
 #include <ranges>
 #include <sstream>
+#include <type_traits>
 #include <utility>
 #include "rdb/exceptions.hpp"
 
@@ -152,6 +156,15 @@ payload::payload(const payload &other) {
   nullBitset_ = other.nullBitset_;
 }
 
+// Move constructor
+
+// Kolejnosc listy inicjalizacyjnej idzie po kolejnosci deklaracji skladnikow.
+// hexFormat_ zostaje domyslny, dokladnie jak w konstruktorze kopiujacym.
+payload::payload(payload &&other) noexcept
+    : payloadData_(std::move(other.payloadData_)),
+      nullBitset_(std::move(other.nullBitset_)),
+      descriptor(std::move(other.descriptor)) {}
+
 // Copy & assignment operator
 
 payload &payload::operator=(const payload &other) {
@@ -172,6 +185,43 @@ payload &payload::operator=(const payload &other) {
   } else {
     retargetNullBitsetFrom(other);
   }
+  return *this;
+}
+
+// Move assignment operator
+
+/// Przenoszenie trzyma TE SAMA regule zgodnosci deskryptorow co przypisanie kopiujace wyzej -
+/// domyslna semantyka przenoszenia (kradziez calego stanu zrodla) zmienilaby zachowanie silnika.
+/// Kradzione jest wylacznie przypisanie do celu o PUSTYM deskryptorze; cel, ktory ma juz
+/// ksztalt, idzie dokladnie droga kopii, bo w tym przypadku nie ma czego ukrasc:
+///
+/// - Descriptor::operator== nie jest rownoscia, tylko warunkiem "cel miesci zrodlo" (odrzuca
+///   wylacznie slot wezszy albo typ nizszy, patrz descriptor.cc). Zgodny cel moze byc wiec
+///   SZERSZY od zrodla. span() liczy dlugosc z deskryptora CELU, nie z rozmiaru wektora, wiec
+///   ukradziony (krotszy) bufor dawalby odczyt za koncem alokacji przy pierwszym getItemVT.
+///   Do tego bajty celu poza span() zrodla zachowuja przy kopiowaniu swoja dotychczasowa tresc,
+///   a kradziez podmienilaby je na tresc zrodla, czyli zmienilaby wartosci pol.
+/// - Kradziez warunkowa (tylko przy rownych rozmiarach) jest bezpieczna, ale wymienia memcpy
+///   rekordu na zwolnienie bufora celu i przejecie cudzego w kazdym slocie - to nie jest
+///   szybsze. Ten sam rachunek dotyczy bitsetu NULL o rownej dlugosci.
+/// - Zrodlo zostaje w calosci nietkniete, wiec nie powstaje obiekt czesciowo przeniesiony
+///   (deskryptor z wpisami, a bitset pusty), po ktorym getItemVT czytalby poza zakresem.
+///
+/// BEZ noexcept: niezgodny deskryptor celu rzuca LogicError (faza 1, dawniej FatalError, ktory
+/// konczyl przez std::exit i dlatego nie rzucal). Rzut z funkcji noexcept to std::terminate - w
+/// procesie osadzajacym smierc jadra notatnika bez zadnego catch po drodze. Realokacja
+/// std::vector bierze konstruktor przenoszacy, a ten noexcept zostaje.
+payload &payload::operator=(payload &&other) {
+  if (this == &other) return *this;
+
+  // Reguly zgodnosci nie ma tu drugiego raza: cel z ksztaltem obsluguje przypisanie kopiujace,
+  // razem z warunkiem zgodnosci i z LogicError na niezgodnym deskryptorze.
+  if (!descriptor.empty()) return *this = static_cast<const payload &>(other);
+
+  // Cel pusty - ta sama sciezka co operator=(const Descriptor&), tylko bez kopiowania czegokolwiek.
+  descriptor   = std::move(other.descriptor);
+  payloadData_ = std::move(other.payloadData_);
+  nullBitset_  = std::move(other.nullBitset_);
   return *this;
 }
 
@@ -351,6 +401,33 @@ T getVal(std::span<const uint8_t> s, int offset) {
   return val;
 }
 
+// Uklad pola RATIONAL w rekordzie to para int32 (licznik, mianownik) - format ZEWNETRZNY, opisany w
+// dokumentacji i przypiety testem rational_field_layout_is_two_int32_numerator_first. Zapis idzie
+// przez setItemBy<boost::rational<int>>, czyli przez memcpy calego obiektu, wiec uklad skladowych
+// Boosta JEST tym formatem. Aktualizacja Boosta, ktora go zmieni, ma byc bledem BUDOWY, a nie cicha
+// zmiana tego, co lezy na dysku. Sam rozmiar tego nie zlapie: zamiana licznika z mianownikiem
+// miejscami rozmiaru nie rusza, wiec druga asercja czyta bajty gotowej wartosci.
+static_assert(sizeof(boost::rational<int>) == 2 * sizeof(std::int32_t) && std::is_trivially_copyable_v<boost::rational<int>>,
+              "boost::rational<int> nie jest juz trywialnie kopiowalna para int32 - format pola RATIONAL sie zmienil");
+static_assert(std::bit_cast<std::array<std::int32_t, 2>>(boost::rational<int>(3, 4)) == std::array<std::int32_t, 2>{3, 4},
+              "boost::rational<int> trzyma skladowe w innej kolejnosci - format pola RATIONAL sie zmienil");
+
+/// Bajty pola RATIONAL jako obiekt. Para int32 idzie przez KONSTRUKTOR, czyli przez normalize():
+/// memcpy do gotowego obiektu nadpisuje jego reprezentacje z pominieciem niezmiennika klasy, wiec
+/// rekord wyzerowany albo uszkodzony dawal 0/0 - stan, ktorego klasa zabrania. Taki ulamek dzielil
+/// potem przez zerowy gcd w checkedArith: SIGFPE na x86-64, wyjatek na arm64.
+///
+/// Poprawny zapis ma zawsze mianownik DODATNI - to niezmiennik boost::rational i zarazem niezmiennik
+/// formatu (test rational_field_is_stored_in_normalized_form) - wiec mianownik niedodatni oznacza
+/// rekord uszkodzony i czytamy go jako NULL. Warunek obejmuje tez dwa wejscia, na ktorych zalamuje
+/// sie sam konstruktor: den == INT_MIN rzuca bad_rational, a para (INT_MIN, -1) dzieli INT_MIN przez
+/// -1 w gcd Boosta.
+std::optional<boost::rational<int>> readRational(std::span<const uint8_t> s, int offset) {
+  const auto raw = getVal<std::array<std::int32_t, 2>>(s, offset);
+  if (raw[1] <= 0) return std::nullopt;
+  return boost::rational<int>(raw[0], raw[1]);
+}
+
 std::optional<std::any> payload::getItem(const int positionFlat) const {
   // Goraca sciezka: zadnej kopii deskryptora -- metody mapowan sa const
   // (leniwy cache w Descriptor jest mutable), wiec czytamy wprost z pola.
@@ -395,8 +472,11 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
       return getVal<double>(memory, offsetFlat);
     case rdb::FLOAT:
       return getVal<float>(memory, offsetFlat);
-    case rdb::RATIONAL:
-      return getVal<boost::rational<int>>(memory, offsetFlat);
+    case rdb::RATIONAL: {
+      const auto value = readRational(memory, offsetFlat);
+      if (!value.has_value()) return std::nullopt;
+      return *value;
+    }
     case rdb::REF:
     case rdb::TYPE:
     case rdb::RETENTION:
@@ -455,8 +535,11 @@ std::optional<rdb::descFldVT> payload::getItemVT(const int positionFlat) const {
       return rdb::descFldVT{getVal<double>(memory, offsetFlat)};
     case rdb::FLOAT:
       return rdb::descFldVT{getVal<float>(memory, offsetFlat)};
-    case rdb::RATIONAL:
-      return rdb::descFldVT{getVal<boost::rational<int>>(memory, offsetFlat)};
+    case rdb::RATIONAL: {
+      const auto value = readRational(memory, offsetFlat);
+      if (!value.has_value()) return std::nullopt;
+      return rdb::descFldVT{*value};
+    }
     case rdb::REF:
     case rdb::TYPE:
     case rdb::RETENTION:
@@ -466,6 +549,23 @@ std::optional<rdb::descFldVT> payload::getItemVT(const int positionFlat) const {
   }
 
   throw LogicError(fmt::format("payload::getItemVT: unsupported field type: {}", int(requestedType)));
+}
+
+std::optional<int> payload::getIntegralItem(const int positionFlat) const {
+  const auto position = resolveFieldIndexOrAbort(descriptor, positionFlat, "Read");
+
+  if (nullBitset_[position]) return std::nullopt;
+
+  const auto offsetFlat = descriptor.byteOffsetAtFlatIndex(positionFlat);
+  switch (descriptor[position].rtype) {
+    case rdb::BYTE:
+      return getVal<uint8_t>(span(), offsetFlat);
+    case rdb::INTEGER:
+      return getVal<int>(span(), offsetFlat);
+    default:
+      throw LogicError(
+          fmt::format("payload::getIntegralItem: field type {} is not BYTE/INTEGER", int(descriptor[position].rtype)));
+  }
 }
 
 void payload::setItemVT(const int positionFlat, std::optional<rdb::descFldVT> valueParam) {
@@ -626,14 +726,14 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       os << " ";
     os << r.rname;
     os << ":";
-    const int flatCountForField = (r.rtype == rdb::STRING || r.rtype == rdb::NULLTYPE) ? 1 : r.rarray;
+    const int flatCountForField = rdb::flatElementCount(r);
     const auto firstValue       = rhs.getItem(flatIndex);
     if (!firstValue.has_value()) {
       os << "null";
       flatIndex += flatCountForField;
     } else if (r.rtype == rdb::STRING || r.rtype == rdb::NULLTYPE) {
       writeValue(os, *firstValue, r.rtype, rhs.hexFormat_);
-      ++flatIndex;
+      flatIndex += flatCountForField;
     } else {
       for (int i = 0; i < flatCountForField; ++i) {
         const auto value = rhs.getItem(flatIndex + i);

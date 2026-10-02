@@ -6,14 +6,15 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
 #include <gtest/gtest.h>
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
-#include <boost/interprocess/sync/named_mutex.hpp>
 
 #include "constants.hpp"
 #include "platformConfig.h"
@@ -260,6 +261,23 @@ TEST(ServiceControlWrite, fails_when_the_target_directory_does_not_exist) {
   EXPECT_FALSE(servicecontrol::writeQueryFile("x\n", (dir / "startup.rql").string()));
 }
 
+// Odmowa planu przed startem czysci plik zapytan WYLACZNIE w jednostce uslugowej: zwykly proces
+// z terminala dostaje plik .rql operatora, a tego ruszac nie wolno.
+TEST(ServiceControlDropRefused, clears_the_query_file_only_inside_a_service_unit) {
+  const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_drop_refused";
+  std::filesystem::create_directories(dir);
+  const std::filesystem::path plan = dir / "startup.rql";
+  std::ofstream(plan) << "SELECT a STREAM d FROM b\n";
+
+  EXPECT_FALSE(servicecontrol::dropRefusedPlan("", plan.string()));
+  EXPECT_EQ(std::filesystem::file_size(plan), 25U) << "plik operatora poza jednostka";
+
+  EXPECT_TRUE(servicecontrol::dropRefusedPlan("xretractor.service", plan.string()));
+  EXPECT_EQ(std::filesystem::file_size(plan), 0U);
+
+  std::filesystem::remove_all(dir);
+}
+
 TEST(ServiceControlDeliver, fails_on_missing_source) {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_deliver_missing";
   std::filesystem::create_directories(dir);
@@ -300,7 +318,7 @@ TEST(IpcIdentity, HashedNamesCannotAliasLiteralNames) {
   EXPECT_EQ(ipc::shortServerTag("review_long_name_10"), "0cb235fc4");
   EXPECT_NE(ipc::serverNameToken("review_long_name_10"), ipc::serverNameToken("cb235fc4"));
   const auto names = ipc::names("review_long_name_10");
-  EXPECT_LE(names.mapMutex.size() + 1, ipc::kMaxObjectNameLength);
+  EXPECT_LE(names.shmemSegment.size() + 1, ipc::kMaxObjectNameLength);
   EXPECT_LE(names.queryQueue.size() + 1, ipc::kMaxObjectNameLength);
   EXPECT_LE(names.responseQueue(2147483647).size() + 1, ipc::kMaxObjectNameLength);
 }
@@ -388,7 +406,6 @@ TEST(LockManagerSweep, RemovesOnlyAbandonedLocksAndTheirIpcObjects) {
   { std::ofstream touch(ipc::identityLockPath(deadNames.queryQueue)); }
   IPC::shared_memory_object(IPC::create_only, deadNames.shmemSegment.c_str(), IPC::read_write);
   IPC::message_queue(IPC::create_only, deadNames.queryQueue.c_str(), 1, 16);
-  IPC::named_mutex(IPC::create_only, deadNames.mapMutex.c_str());
 
   // Instancja zywa: te same rodzaje zasobow, ale blokady trzyma jej straznik.
   FlockServiceGuard liveGuard("xretractor_service." + live);
@@ -405,7 +422,6 @@ TEST(LockManagerSweep, RemovesOnlyAbandonedLocksAndTheirIpcObjects) {
   EXPECT_FALSE(std::filesystem::exists(ipc::identityLockPath(deadNames.queryQueue)));
   EXPECT_FALSE(shmExists(deadNames.shmemSegment));
   EXPECT_FALSE(IPC::message_queue::remove(deadNames.queryQueue.c_str())) << "kolejka komend przetrwala sprzatanie";
-  EXPECT_FALSE(IPC::named_mutex::remove(deadNames.mapMutex.c_str())) << "muteks mapy przetrwal sprzatanie";
 
   EXPECT_TRUE(std::filesystem::exists(dir / ("xretractor_service." + live + ".lock")));
   EXPECT_TRUE(std::filesystem::exists(ipc::identityLockPath(liveNames.queryQueue)));
@@ -414,4 +430,20 @@ TEST(LockManagerSweep, RemovesOnlyAbandonedLocksAndTheirIpcObjects) {
   liveGuard.releaseLock();
   IPC::shared_memory_object::remove(liveNames.shmemSegment.c_str());
   std::filesystem::remove_all(dir);
+}
+
+// To, co sklada ipc::serviceName, musi rozpoznac ipc::serviceLockInstance: pierwsza strone wola
+// silnik, druga sprzatacz i straznik xtrdb. Oczekiwane nazwy plikow sa wpisane recznie, zeby test
+// nie porownywal funkcji z nia sama.
+TEST(ServiceLockFamily, NamesRoundTripAndForeignFilesAreRejected) {
+  EXPECT_EQ(ipc::serviceLockFile(ipc::serviceName("")), "xretractor_service.lock");
+  EXPECT_EQ(ipc::serviceLockFile(ipc::serviceName("alfa")), "xretractor_service.alfa.lock");
+
+  EXPECT_EQ(ipc::serviceLockInstance("xretractor_service.lock"), std::optional<std::string_view>(""));
+  EXPECT_EQ(ipc::serviceLockInstance("xretractor_service.alfa.lock"), std::optional<std::string_view>("alfa"));
+
+  EXPECT_FALSE(ipc::serviceLockInstance("xretractor_service..lock").has_value());  // pusty czlon po kropce
+  EXPECT_FALSE(ipc::serviceLockInstance("xretractor_servicealfa.lock").has_value());
+  EXPECT_FALSE(ipc::serviceLockInstance("xretractor_service.alfa.lock.bak").has_value());
+  EXPECT_FALSE(ipc::serviceLockInstance("xretractor_ipc.RetractorQueryQueue.alfa.lock").has_value());
 }

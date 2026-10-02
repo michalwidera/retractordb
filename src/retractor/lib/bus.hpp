@@ -8,6 +8,8 @@
 #include <string_view>
 #include <vector>
 
+#include "rdb/sizeLimits.hpp"
+
 /// @brief Magistrala xrdbbus: wspolny obszar wykrywania instancji xretractor i egzekwowania
 ///        rozlacznosci zasobow -- nazw strumieni i plikow magazynu -- miedzy serwerami
 ///        na jednej maszynie.
@@ -65,6 +67,10 @@ inline constexpr std::string_view kSegmentName = "xrdbbus_v6";
 /// instancji ("<obiekt>.<nazwa instancji>") i wpadalaby pod wzorce sprzatajace.
 [[nodiscard]] std::string segmentName();
 
+/// Nazwy segmentow biezacej wersji znalezione przez pliki obecnosci. Samo znalezienie pliku
+/// nie dowodzi, ze segment lub zywa instancja nadal istnieje; czytelnik sprawdza to przez Bus.
+[[nodiscard]] std::vector<std::string> segmentNames();
+
 /// Kasuje segmenty tej wersji ukladu, ktorych nikt nie mapuje - pozostalosci po procesach zabitych,
 /// ktore nie zdazyly posprzatac jako ostatni wychodzacy. Zwraca liczbe usunietych.
 std::size_t sweepAbandonedSegments();
@@ -84,9 +90,10 @@ std::size_t sweepAbandonedSegments();
 /// STREAM_ADD_STREAM_ADD_..._str01_..._str12 z it_wide_from_names ma ponad 130 znakow.
 ///
 /// Liczba strumieni ma zapas rzedu 2,5x: najwiekszy skompilowany plan w repozytorium
-/// (test/IntegrationTest/optimizer_ablation) ma 53 wezly.
+/// (test/IntegrationTest/optimizer_ablation) ma 53 wezly. Wartosc stoi w rdb/sizeLimits.hpp, bo te
+/// sama granice sprawdzaja parser (rozmiar generatora) i kompilator (plan po rozwinieciu generatorow).
 inline constexpr std::size_t kMaxSlots         = 32;
-inline constexpr std::size_t kMaxStreams       = 128;
+inline constexpr std::size_t kMaxStreams       = rdb::limits::kMaxPlanStreams;
 inline constexpr std::size_t kStreamNameSize   = 208;  ///< z terminatorem => nazwa do 207 znakow
 inline constexpr std::size_t kInstanceNameSize = 40;   ///< servername::kMaxLength (32) + zapas
 inline constexpr std::size_t kQueryFileSize    = 256;  ///< z terminatorem => sciezka do 255 znakow
@@ -228,6 +235,10 @@ struct ClaimResult {
   std::string ownerName;  ///< wlasciciel kolidujacego zasobu; pusty => bezimienny
   std::int32_t ownerPid{0};
   std::string detail;  ///< sciezka licznika (CounterConflict) albo magazynu (StoreConflict), powod niedostepnosci albo limit
+  /// Wylacznie claimAdditional() przy Claimed: nazwy i sciezki faktycznie dopisane do slotu, bez tych,
+  /// ktore juz w nim staly. To one, i tylko one, wracaja do releaseAdditional() przy wycofaniu.
+  std::vector<std::string> addedStreams;
+  std::vector<std::string> addedStores;
 };
 
 /// Komplet danych, ktore instancja publikuje w swoim slocie.
@@ -282,9 +293,9 @@ class Bus {
   /// magazynu ze wszystkimi zywymi instancjami i -- gdy sa rozlaczne -- zatwierdza wlasny slot.
   /// Roszczenia, rezerwacje, aktywacje i zwolnienia sa serializowane jednym muteksem magistrali.
   ///
-  /// Licznik jest chroniony osobno, bo nie jest nazwa strumienia: PersistentCounter wczytuje
-  /// wartosc przy starcie, a zapisuje ja dopiero w destruktorze, wiec dwie instancje na jednym
-  /// pliku zapisuja te sama wartosc i gubia rotacje. Sciezke normalizuje WOLAJACY -- magistrala
+  /// Licznik jest chroniony osobno, bo nie jest nazwa strumienia: PersistentCounter czyta
+  /// wartosc i zapisuje nastepna bez blokady pliku, wiec dwie instancje na jednym pliku moga
+  /// dostac ten sam numer i nadpisac sobie archiwa. Sciezke normalizuje WOLAJACY -- magistrala
   /// porownuje napisy, a nie pliki.
   ///
   /// Magazyn jest chroniony osobno z tego samego powodu, choc wyglada na pochodna nazwy: klauzula
@@ -320,9 +331,19 @@ class Bus {
   /// zostawialaby dzialajacy serwer bez slotu, czyli takze bez roszczenia nazw, ktore
   /// juz obsluguje. Tutaj odmowa nie ma zadnego skutku ubocznego -- slot zostaje
   /// nietkniety. Nazwy i sciezki juz obecne w slocie sa pomijane, wiec operacja jest idempotentna.
+  /// Co faktycznie dopisano, wraca w ClaimResult::addedStreams i ClaimResult::addedStores.
   ///
   /// Wymaga posiadanego slotu (po udanym claim()); bez niego zwraca Unavailable.
   ClaimResult claimAdditional(const std::vector<std::string> &streams, const std::vector<std::string> &stores);
+
+  /// Zdejmuje z WLASNEGO slotu podane nazwy strumieni i sciezki magazynow -- odwrotnosc udanego
+  /// claimAdditional() dla zapytania ad-hoc, ktorego import do planu sie nie powiodl. Bez tego
+  /// nazwa, ktorej plan nie zawiera, bylaby ogloszona jako strumien tej instancji az do jej konca.
+  ///
+  /// Wolajacy podaje WYLACZNIE to, co wrocilo w addedStreams/addedStores: zdjecie calej listy
+  /// z zapytania zabraloby nazwy, ktore plan juz obsluguje. Reszta slotu -- pozostale nazwy,
+  /// rezerwacja planu, licznik i tryby -- zostaje nietknieta. Bez slotu operacja nic nie robi.
+  void releaseAdditional(const std::vector<std::string> &streams, const std::vector<std::string> &stores);
 
   /// Zwalnia slot tej instancji. Idempotentne; wolane takze z handlera atexit.
   void release();

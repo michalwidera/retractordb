@@ -1,0 +1,10 @@
+# make install && ctest -R hash_string -V
+
+DECLARE s STRING[8], k INTEGER STREAM ta, 1 FILE 'a.txt'
+DECLARE s STRING[16], k DOUBLE STREAM tb, 1 FILE 'b.txt'
+
+SELECT * STREAM pa FROM ta
+SELECT * STREAM pb FROM tb
+
+SELECT * STREAM h FROM ta#tb
+SELECT * STREAM g FROM tb#ta

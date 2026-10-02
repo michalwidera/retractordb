@@ -3,7 +3,11 @@
 #include <algorithm>
 #include <cctype>
 #include <iostream>
+#include <limits>
+#include <optional>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -23,6 +27,7 @@
 #include "qTree.hpp"
 #include "rdb/convertTypes.hpp"
 #include "rdb/exceptions.hpp"
+#include "rdb/sizeLimits.hpp"
 #include "rqlFunctions.hpp"
 
 using namespace antlrcpp;
@@ -45,10 +50,10 @@ struct RQLSyntaxError {
 
 /// Gorne ograniczenie dlugosci komunikatu wracajacego do klienta.
 ///
-/// Komunikat idzie do odpowiedzi serwera jako IPCString we WSPOLNYM segmencie 64 kB
-/// (ipc::kShmemSegmentSize). Lista `expecting {...}` przy blednym poczatku instrukcji
-/// wylicza kilkadziesiat tokenow; wyczerpanie segmentu konczy sie bad_alloc-iem lapanym
-/// POZA petla odbioru, czyli smiercia watku komunikacyjnego z dala od przyczyny.
+/// Komunikat idzie do odpowiedzi serwera, a ta do slotu o stalym rozmiarze
+/// (ipc::kResponseSlotDataSize). Lista `expecting {...}` przy blednym poczatku instrukcji
+/// wylicza kilkadziesiat tokenow; odpowiedz dluzsza od slotu klient dostaje jako blad
+/// "response too large" zamiast diagnostyki.
 constexpr size_t kMaxSyntaxErrorMessage = 300;
 
 /// Nazwa agregatu zlozona do malych liter. Lekser dopuszcza dwie pisownie ('MIN'|'min'),
@@ -70,7 +75,7 @@ std::string lowercased(std::string text) {
 /// Listener bledow leksera dostaje ten sam parser, bo blad leksera rozwija stos przez
 /// dokladnie te same `finally` - token pobiera sie w srodku reguly parsera.
 [[noreturn]] void abortParse(antlr4::Parser &parser, size_t firstLine, size_t line, size_t charPositionInLine,
-                             const std::string &msg, Token *offendingSymbol) {
+                             const std::string &msg, Token *offendingSymbol, std::string_view sourceFile) {
   // Lekser i parser licza wiersze wewnatrz PRZEKAZANEGO tekstu, a ten bywa pojedyncza
   // instrukcja wyjeta z pliku planu przez readLogicalLines. firstLine przesuwa numer z
   // powrotem na wiersz pliku - bez tego kazda odmowa wskazywala wiersz 1, niezaleznie od
@@ -94,10 +99,39 @@ std::string lowercased(std::string text) {
   std::cerr << "Syntax error @Rql" << '\n';
   std::cerr << "line:" << sourceLine << ":" << charPositionInLine << " at " << offendingText << '\n';
   std::cerr << "msg:" << msg << '\n';
-  SPDLOG_ERROR("Parser: {}", message);
+  if (sourceFile.empty())
+    SPDLOG_ERROR("Parser: {}", message);
+  else
+    SPDLOG_ERROR("Parser: {}: {}", sourceFile, message);
 
   parser.removeParseListeners();
   throw RQLSyntaxError{std::move(message)};
+}
+
+/// Wartosc literalu liczbowego albo nullopt, gdy nie miesci sie w typie T.
+///
+/// Wyjatek NIE MOZE wyjsc z metody exit* listenera: te biegna z destruktora
+/// antlrcpp::FinalAction w generowanym parserze, ktory jest noexcept, wiec kazdy rzut konczy
+/// sie tam std::terminate. Do 2026-09-25 `xqry -a` z literalem 99999999999 konczyl tak
+/// dzialajacy serwer (#306). Tokeny DECIMAL i FLOAT nie maja ograniczenia dlugosci, wiec
+/// std::out_of_range jest osiagalny z tekstu RQL; std::invalid_argument - nie, lekser
+/// przepuszcza tu wylacznie cyfry i kropke.
+///
+/// std::sto*, a nie std::from_chars: wariant zmiennoprzecinkowy from_chars pojawil sie w libc++
+/// dopiero w LLVM 20 i jest objety adnotacja dostepnosci biblioteki systemowej, a port macOS
+/// celuje w 14.4. Przy okazji kazdy literal w zakresie jest przyjmowany dokladnie jak dotad.
+template <typename T>
+std::optional<T> parseLiteral(const std::string &text) {
+  try {
+    if constexpr (std::is_same_v<T, float>)
+      return std::stof(text);
+    else if constexpr (std::is_same_v<T, double>)
+      return std::stod(text);
+    else
+      return std::stoi(text);
+  } catch (const std::out_of_range &) {
+    return std::nullopt;
+  }
 }
 }  // namespace
 
@@ -105,28 +139,36 @@ std::string lowercased(std::string text) {
 
 class LexerErrorListener : public BaseErrorListener {
  public:
-  LexerErrorListener(antlr4::Parser &parser, size_t firstLine) : parser_(parser), firstLine_(firstLine) {}
+  LexerErrorListener(antlr4::Parser &parser, size_t firstLine, std::string_view sourceFile)
+      : parser_(parser),
+        firstLine_(firstLine),
+        sourceFile_(sourceFile) {}
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    abortParse(parser_, firstLine_, line, charPositionInLine, msg, offendingSymbol);
+    abortParse(parser_, firstLine_, line, charPositionInLine, msg, offendingSymbol, sourceFile_);
   }
 
  private:
   antlr4::Parser &parser_;
   size_t firstLine_;
+  std::string_view sourceFile_;
 };
 
 class ParserErrorListener : public BaseErrorListener {
  public:
-  ParserErrorListener(antlr4::Parser &parser, size_t firstLine) : parser_(parser), firstLine_(firstLine) {}
+  ParserErrorListener(antlr4::Parser &parser, size_t firstLine, std::string_view sourceFile)
+      : parser_(parser),
+        firstLine_(firstLine),
+        sourceFile_(sourceFile) {}
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
-    abortParse(parser_, firstLine_, line, charPositionInLine, msg, offendingSymbol);
+    abortParse(parser_, firstLine_, line, charPositionInLine, msg, offendingSymbol, sourceFile_);
   }
 
  private:
   antlr4::Parser &parser_;
   size_t firstLine_;
+  std::string_view sourceFile_;
 };
 
 /* Iterator - each new field gets new fieldCount number */
@@ -184,6 +226,56 @@ class ParserListener : public RQLBaseListener {
     std::cerr << "Error: " << message << '\n';
     SPDLOG_ERROR("Parser: {}", message);
     if (semanticError_.empty()) semanticError_ = message;
+  }
+
+  void reportOutOfRange(const std::string &text) { reportSemanticError("numeric literal " + text + " is out of range"); }
+
+  /// Jedyne wejscie do rationalResult z trzech postaci `rational_se`. Wszyscy czterej odbiorcy
+  /// - interwal DECLARE, argument `&` i `%`, cel `-` - wymagaja liczby dodatniej, a gramatyka
+  /// dopuszcza zero (`0`, `0.0`, `0/5`). Do 2026-09-26 zero przechodzilo parser: DECLARE padal
+  /// na "Circular dependency" albo FatalError w qTree::getAvailableTimeIntervals, `&`/`%`/`-`
+  /// na FatalError w kompilatorze - w kanale ad-hoc smierc dzialajacego serwera (#308).
+  /// Przy odmowie rationalResult zostaje bez zmian, jak po bledzie z #306.
+  void acceptInterval(const boost::rational<int> &value, const std::string &text) {
+    if (value == 0) {
+      reportSemanticError("interval " + text + " must be greater than zero");
+      return;
+    }
+    rationalResult = value;
+  }
+
+  /// Literal liczbowy; spoza zakresu - blad planu i wartosc zastepcza 0.
+  ///
+  /// Zero jest wypelnieniem, nie wynikiem: plan z bledem semantycznym jest odrzucany w calosci,
+  /// ale listener idzie dalej przez kolejne reguly, wiec `program` i reszta stanu musza
+  /// zachowac taki ksztalt, jaki mialyby przy poprawnej liczbie.
+  template <typename T>
+  T literal(const std::string &text) {
+    if (const auto value = parseLiteral<T>(text)) return *value;
+    reportOutOfRange(text);
+    return T{};
+  }
+
+  /// Literal wymiaru z przedzialu [min, max]; min to 0 albo 1.
+  ///
+  /// Gramatyka bierze tu DECIMAL, wiec wartosc ujemna nie istnieje. Zero przechodzilo parser tam,
+  /// gdzie nic nie znaczy: krok 0 konczyl proces FatalError-em w kompilatorze, okno 0 przy tworzeniu
+  /// magazynu, pojemnosc 0 przy pierwszym zapisie - w kanale ad-hoc i `--reset` smierc serwera (#308).
+  /// Gorna granica (rdb/sizeLimits.hpp) zamyka te sama droge od drugiej strony: wartosc, ktora miesci
+  /// sie w int, a jest absurdalna jako rozmiar, konczyla sie std::bad_alloc, OOM killerem albo
+  /// przepelnieniem int dalej w silniku (A2 M11).
+  /// Literal spoza zakresu int ma juz swoj komunikat; zastepcze 0 nie dostaje drugiego.
+  int boundedLiteral(const std::string &what, const std::string &text, int min, int max = std::numeric_limits<int>::max()) {
+    const auto value = parseLiteral<int>(text);
+    if (!value) {
+      reportOutOfRange(text);
+      return 0;
+    }
+    if (*value < min)
+      reportSemanticError(what + " " + text + " must be greater than zero");
+    else if (*value > max)
+      reportSemanticError(what + " " + text + " exceeds the limit " + std::to_string(max));
+    return *value;
   }
 
   /// Dopina regule do strumienia wskazanego przez ON. Zwraca pusty napis albo powod odmowy;
@@ -261,7 +353,15 @@ class ParserListener : public RQLBaseListener {
   void exitFieldID(RQLParser::FieldIDContext *ctx) override { recpToken(PUSH_ID3, ctx->getText()); }
   void exitFieldIDUnderline(RQLParser::FieldIDUnderlineContext *ctx) override { recpToken(PUSH_IDX, ctx->getText()); }
   void exitFieldIDColumnName(RQLParser::FieldIDColumnNameContext *ctx) override { recpToken(PUSH_ID1, ctx->getText()); }
-  void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) override { recpToken(PUSH_ID2, ctx->getText()); }
+
+  /// `strumien[k]` - indeks jest literalem DECIMAL, rownie nieograniczonym jak kazdy inny.
+  /// Do 2026-09-27 kompilator czytal go przez atoi: `core0[4294967296]` liczylo sie po cichu
+  /// jako `core0[0]`, a `core0[4294967295]` dawalo PUSH_ID z indeksem -1, ktory ad-hoc
+  /// przechodzil z "OK" i konczyl serwer przy pierwszym rekordzie (#306, A2 M10).
+  void exitFieldIDTable(RQLParser::FieldIDTableContext *ctx) override {
+    if (!parseLiteral<int>(ctx->column_index->getText())) reportOutOfRange(ctx->column_index->getText());
+    recpToken(PUSH_ID2, ctx->getText());
+  }
 
   /// `cells[$]`, `cells[23-$]` - indeks z numerem instancji generatora.
   ///
@@ -314,11 +414,10 @@ class ParserListener : public RQLBaseListener {
   /// token z indeksem grupy okna.
   ///
   /// Okno jest zawsze PRZESUWNE co rekord - powod przy regule `window_agg` w RQL.g4.
-  /// Szerokosc NIE jest tu sprawdzana: listener parsera nie ma lagodnego kanalu bledu
-  /// (zostaje FatalError), a szerokosc niedodatnia jest bledem PLANU, ktory kompilator
-  /// raportuje przez `Check result:` razem z pozostalymi kontrolami.
+  /// Szerokosc spoza 1..kMaxHistoryReach odrzucamy tutaj (A2 M11): kazdy rekord okna to rekord
+  /// historii zrodla, wiec literal w zakresie int, ale absurdalny, stawal sie pojemnoscia bufora.
   void exitWindow_agg(RQLParser::Window_aggContext *ctx) override {
-    const int width = std::stoi(ctx->width->getText());
+    const int width = boundedLiteral("record window width", ctx->width->getText(), 1, rdb::limits::kMaxHistoryReach);
     if (windowArgMarks.empty())
       abortInternal(fmt::format("RQLParser::exitWindow_agg: no argument mark for '{}'", ctx->getText()));
     const auto argStart = static_cast<int>(windowArgMarks.back());
@@ -340,8 +439,8 @@ class ParserListener : public RQLBaseListener {
       abortInternal(fmt::format("RQLParser::exitWindow_agg: unknown aggregate '{}'", ctx->children[0]->getText()));
   }
 
-  void exitExpFloat(RQLParser::ExpFloatContext *ctx) override { recpToken(PUSH_VAL, std::stof(ctx->getText())); }
-  void exitExpDec(RQLParser::ExpDecContext *ctx) override { recpToken(PUSH_VAL, std::stoi(ctx->getText())); }
+  void exitExpFloat(RQLParser::ExpFloatContext *ctx) override { recpToken(PUSH_VAL, literal<float>(ctx->getText())); }
+  void exitExpDec(RQLParser::ExpDecContext *ctx) override { recpToken(PUSH_VAL, literal<int>(ctx->getText())); }
   void exitExpString(RQLParser::ExpStringContext *ctx) override {
     auto text = ctx->getText();
     // Strip surrounding single quotes
@@ -417,11 +516,10 @@ class ParserListener : public RQLBaseListener {
   void exitSExpAgse(RQLParser::SExpAgseContext *ctx) override {
     int window{0};
     int step{0};
-    if (ctx->children[kAgseWindowSignChildIndex]->getText() == "-")
-      window = -std::stoi(ctx->window->getText());
-    else
-      window = std::stoi(ctx->window->getText());
-    step = std::stoi(ctx->step->getText());
+    // Minus przed szerokoscia jest legalny (kompilator bierze abs), wiec zerem jest tez `-0`.
+    const int windowAbs = boundedLiteral("AGSE window", ctx->window->getText(), 1, rdb::limits::kMaxHistoryReach);
+    window              = (ctx->children[kAgseWindowSignChildIndex]->getText() == "-") ? -windowAbs : windowAbs;
+    step                = boundedLiteral("AGSE step", ctx->step->getText(), 1, rdb::limits::kMaxHistoryReach);
 
     program.emplace_back(STREAM_AGSE, std::make_pair(step, window));
   }
@@ -430,17 +528,18 @@ class ParserListener : public RQLBaseListener {
   /// wielkoscia liter. Do tokena idzie postac KANONICZNA z rqlFunctions.hpp, a nie ta
   /// napisana w zapytaniu - uzasadnienie przy definicji tabeli.
   ///
-  /// Nazwy NIEZNANEJ nie odrzucamy tutaj. Listener parsera nie ma kanalu na lagodny
-  /// blad (zostaje FatalError), a `compiler::checkFunctionCalls()` raportuje ja przez
-  /// `Check result:` razem z pozostalymi kontrolami planu. Nieznana nazwa jedzie wiec
-  /// dalej w postaci doslownej, zeby komunikat pokazal to, co napisal autor.
+  /// Nazwy NIEZNANEJ nie odrzucamy tutaj: `compiler::checkFunctionCalls()` raportuje ja przez
+  /// `Check result:` razem z pozostalymi kontrolami planu. Nieznana nazwa jedzie wiec dalej
+  /// w postaci doslownej, zeby komunikat pokazal to, co napisal autor.
   void exitFunction_call(RQLParser::Function_callContext *ctx) override {
     const std::string written = ctx->fn->getText();
     const auto known          = rdb::findRqlFunction(written);
     const std::string name    = known ? std::string(known->canonical) : written;
 
+    // Szerokosc `to_string(x : N)` to dlugosc pola STRING, wiec ma granice pola (A2 M11).
     if (ctx->DECIMAL() != nullptr)
-      recpToken(CALL2, std::make_pair(name, std::stoi(ctx->DECIMAL()->getText())));
+      recpToken(CALL2, std::make_pair(
+                           name, boundedLiteral(name + " width", ctx->DECIMAL()->getText(), 1, rdb::limits::kMaxFieldLength)));
     else
       recpToken(CALL, name);
   }
@@ -451,11 +550,19 @@ class ParserListener : public RQLBaseListener {
     // This removes ''
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
+    // Blad planu juz tutaj. Bez tego pusta nazwa przechodzila parser i kompilacje, a zatrzymywal
+    // ja dopiero FatalError w rdb::StoragePaths przy rejestracji w modelu - w sciezce ad-hoc juz
+    // po imporcie do zywego planu, czyli smierc dzialajacego serwera.
+    if (qry.filename.empty()) reportSemanticError("FILE of stream " + ctx->ID()->getText() + " requires a non-empty file name");
     qry.id           = ctx->ID()->getText();
     qry.rInterval    = rationalResult;
     qry.isDisposable = (ctx->DISPOSABLE() != nullptr);
     qry.isOneShot    = (ctx->ONESHOT() != nullptr);
     qry.isHold       = (ctx->HOLD() != nullptr);
+    // Ta sama odmowa co w exitSelect: klient bral kazdy rekord deklaracji o tej nazwie
+    // za sygnal zamkniecia serwera i konczyl sie "no data in stream".
+    if (qry.id == constants::Reserved_id_oob)
+      reportSemanticError(std::string(constants::Reserved_id_oob) + " is reserved stream name");
     coreInstance.push_back(qry);
     qry.reset();
     fieldCount = 0;
@@ -464,33 +571,60 @@ class ParserListener : public RQLBaseListener {
   // https://www.programiz.com/cpp-programming/string-float-conversion
   // https://www.geeksforgeeks.org/converting-strings-numbers-cc/
 
+  /// Zakres liczy sie tu wzgledem `rational<int>`, nie `double`. Rationalize() nie odmawia:
+  /// wartosc od 2^31 w gore i niezerowa ponizej jej rozdzielczosci (1e-6) oddaje jako 0/1,
+  /// wiec `3000000000.0` i `0.00000001` dawaly interwal zerowy, a plan padal dopiero
+  /// w kompilatorze na mylacym "Circular dependency in stream definitions". Jawne `0.0` zostaje
+  /// poza ta kontrola - to zerowy interwal, a nie literal spoza zakresu; odrzuca je acceptInterval().
   void exitRationalAsFloat(RQLParser::RationalAsFloatContext *ctx) override {
-    rationalResult = Rationalize(std::stod(ctx->FLOAT()->getText()));
+    const std::string text = ctx->FLOAT()->getText();
+    const auto value       = parseLiteral<double>(text);
+    const auto rational    = value ? Rationalize(*value) : boost::rational<int>{};
+    if (!value || (rational == 0 && *value != 0)) {
+      reportOutOfRange(text);
+      return;
+    }
+    acceptInterval(rational, text);
   }
 
   void exitRationalAsDecimal(RQLParser::RationalAsDecimalContext *ctx) override {
-    rationalResult = std::stoi(ctx->DECIMAL()->getText());
+    const std::string text = ctx->DECIMAL()->getText();
+    const auto value       = parseLiteral<int>(text);
+    // Bez wartosci zastepczej z literal(): zastepcze 0 dolozyloby na stderr drugi, falszywy
+    // komunikat o zerowym interwale.
+    if (!value) {
+      reportOutOfRange(text);
+      return;
+    }
+    acceptInterval(*value, text);
   }
 
   void exitFraction(RQLParser::FractionContext *ctx) override {
-    const int nom = std::stoi(ctx->children[0]->getText());
-    const int den = std::stoi(ctx->children[2]->getText());
-    if (den == 0) {
-      // Gramatyka dopuszcza `DECIMAL / DECIMAL` bez zadnego ograniczenia mianownika, wiec
-      // `x & 1/0` jest tekstem, ktory uzytkownik POTRAFI napisac - a do fazy 1 konczyl
-      // proces. Kanalem jest reportSemanticError, ten sam co dla buildRule: parserRQLString
-      // odda go statusem, a wolajacy odrzuci caly plan.
-      reportSemanticError("fraction denominator must not be zero");
-      // Wartosc zastepcza, bo obchod drzewa trwa dalej az do konca instrukcji, a
-      // boost::rational<int>(n, 0) rzuciloby bad_rational, zanim status zdazy wrocic.
-      rationalResult = boost::rational<int>(nom, 1);
+    const std::string nomText = ctx->children[0]->getText();
+    const std::string denText = ctx->children[2]->getText();
+    const auto nom            = parseLiteral<int>(nomText);
+    const auto den            = parseLiteral<int>(denText);
+    // Bez wartosci zastepczej z literal(): zastepcze 0 w mianowniku dolozyloby na stderr drugi,
+    // falszywy komunikat o zerowym mianowniku.
+    if (!nom || !den) {
+      reportOutOfRange(nom ? denText : nomText);
       return;
     }
-    rationalResult = boost::rational<int>(nom, den);
+    // Blad planu, nie FatalError: `xqry -a` z `1/0` konczyl dzialajacy serwer. rationalResult
+    // zostaje bez zmian - plan z bledem semantycznym jest odrzucany w calosci, a konstruktor
+    // boost::rational z zerowym mianownikiem rzuca.
+    if (*den == 0) {
+      reportSemanticError("fraction " + ctx->getText() + " has a zero denominator");
+      return;
+    }
+    acceptInterval(boost::rational<int>(*nom, *den), ctx->getText());
   }
 
   void exitSelect(RQLParser::SelectContext *ctx) override {
-    qry.generatorSize = (ctx->gen_size != nullptr) ? std::stoi(ctx->gen_size->getText()) : query::notAGenerator;
+    // Kazda instancja generatora to kopia zapytania i wlasny strumien, wiec rozmiar ma granice planu (A2 M11).
+    qry.generatorSize = (ctx->gen_size != nullptr) ? boundedLiteral("stream generator size", ctx->gen_size->getText(), 1,
+                                                                    static_cast<int>(rdb::limits::kMaxPlanStreams))
+                                                   : query::notAGenerator;
 
     // this loop creates field names in streamName + "_" + counter++
     //
@@ -505,18 +639,18 @@ class ParserListener : public RQLBaseListener {
 
     qry.id = ctx->ID()->getText();
 
-    if (qry.id == constants::Reserved_id_oob) {
-      std::cerr << "Error: " << constants::Reserved_id_oob << " is reserved stream name." << '\n';
-      SPDLOG_ERROR("{} is reserved stream name.", constants::Reserved_id_oob);
-      abort();
-    }
+    // Blad planu, nie abort(): `xqry -a` z ta nazwa konczyl dzialajacy serwer SIGABRT-em.
+    if (qry.id == constants::Reserved_id_oob)
+      reportSemanticError(std::string(constants::Reserved_id_oob) + " is reserved stream name");
 
     qry.lProgram = program;
     // Domyslnosc jest w planie, bo plik moze byc parsowany po jednej instrukcji.
     // Jawna polityka SELECT wygrywa; DECLARE nie dziedziczy tego ustawienia.
     const bool inheritVolatile = coreInstance.exists(":DEFAULT") && ctx->PERSISTENT() == nullptr && ctx->STORAGE() == nullptr;
+    // Samo `RETENTION n` (juz w policy.second) jest rozmiarem pierscienia, jak przy `STORAGE MEMORY`.
+    // Do 2026-09-27 VOLATILE nadpisywal je jedynka, wiec RETENTION ginelo bez slowa (decyzja P4).
     if (ctx->VOLATILE() != nullptr || inheritVolatile) {
-      qry.policy = std::make_pair("MEMORY", 1);
+      qry.policy = std::make_pair("MEMORY", std::max<size_t>(qry.policy.second, 1));
     }
 
     if (ctx->FILE() != nullptr) {
@@ -526,13 +660,9 @@ class ParserListener : public RQLBaseListener {
       qry.filename.erase(qry.filename.size() - 1);
       qry.filename.erase(0, 1);
 
-      // Token STRING gramatyki to '\'' (~'\'' | '\'\'')* '\'' - gwiazdka, czyli ZERO lub
-      // wiecej znakow. `FILE ''` jest wiec poprawne skladniowo i po zdjeciu apostrofow daje
-      // nazwe pusta. Blad uzytkownika, nie silnika.
-      if (qry.filename.empty()) {
-        reportSemanticError("FILE name must not be empty");
-        return;
-      }
+      // Blad planu, nie FatalError - ta sama przyczyna co w exitCoption.
+      if (qry.filename.empty())
+        reportSemanticError("FILE of stream " + ctx->ID()->getText() + " requires a non-empty file name");
     }
 
     if (ctx->STORAGE() != nullptr) {
@@ -541,6 +671,39 @@ class ParserListener : public RQLBaseListener {
     }
     if (ctx->PERSISTENT() != nullptr && qry.storage_policy == "MEMORY")
       reportSemanticError("PERSISTENT conflicts with STORAGE MEMORY");
+    // `STORAGE MEMORY` to pierscien w RAM, jak VOLATILE. Do 2026-09-27 polityka zostawala
+    // ("DEFAULT", n): bez RETENTION deskryptor nie dostawal RETMEMORY, wiec memoryFile nie mial granicy
+    // i rosl o rekord na takt do wyczerpania pamieci; z `RETENTION n` dostawal TYPE DEFAULT i dane szly
+    // na DYSK. Pojemnosc to co najmniej 1 - reszte, jak dla VOLATILE, dobiera kompilator.
+    if (qry.storage_policy == "MEMORY" && qry.policy.first != "MEMORY")
+      qry.policy = std::make_pair("MEMORY", std::max<size_t>(qry.policy.second, 1));
+    // Samo `RETENTION n` to rozmiar pierscienia MEMORY. Magazyn plikowy liczy retencje w segmentach,
+    // a do 2026-09-27 zostawala tu polityka ("DEFAULT", n): deskryptor dostawal TYPE DEFAULT zamiast
+    // STORAGE z planu i zadnej retencji - plik rosl bez granicy, `STORAGE DIRECT` konczyl jako DEFAULT
+    // z .shadow (decyzja D7).
+    if (qry.policy.first != "MEMORY" && qry.policy.second != 0) {
+      const std::string capacity = std::to_string(qry.policy.second);
+      const std::string hint =
+          (qry.storage_policy == "DEFAULT" || qry.storage_policy == "DIRECT")
+              ? qry.storage_policy + " storage on disk keeps segments: write RETENTION " + capacity + " <segments>"
+              : qry.storage_policy + " storage has no retention: use STORAGE DEFAULT or DIRECT with RETENTION " + capacity +
+                    " <segments>";
+      reportSemanticError("RETENTION " + capacity + " on stream " + qry.id + " sets only the size of a MEMORY ring; " + hint);
+    }
+    // Lustro powyzszego: segmenty na dysku przy magazynie w pamieci. memoryFile czyta tylko RETMEMORY,
+    // wiec `RETENTION c s` bylo tu ignorowane bez slowa (decyzja P4).
+    if (qry.policy.first == "MEMORY" && !qry.retention.noRetention()) {
+      const std::string capacity = std::to_string(qry.retention.capacity);
+      const std::string owner    = (ctx->VOLATILE() != nullptr) ? "VOLATILE"
+                                   : inheritVolatile            ? "DEFAULT VOLATILE"
+                                                                : "STORAGE MEMORY";
+      const std::string onDisk   = (ctx->VOLATILE() != nullptr) ? "drop VOLATILE"
+                                   : inheritVolatile            ? "add PERSISTENT"
+                                                                : "use STORAGE DEFAULT or DIRECT";
+      reportSemanticError("RETENTION " + capacity + " " + std::to_string(qry.retention.segments) + " on stream " + qry.id +
+                          " sets segments on disk, but " + owner + " keeps the stream in memory: write RETENTION " + capacity +
+                          " for a MEMORY ring, or " + onDisk + " to keep segments on disk");
+    }
 
     coreInstance.push_back(qry);
     program.clear();
@@ -549,15 +712,18 @@ class ParserListener : public RQLBaseListener {
     fieldCount         = 0;
   }
 
+  /// Pojemnosc 0 odrzucamy w obu postaciach. Z segmentami padala przy pierwszym zapisie
+  /// (groupFile::write), a `RETENTION 0` i `RETENTION 0 0` nie robily nic, bez slowa (#308).
+  /// Segmenty 0 zostaja legalne - znacza "bez limitu segmentow".
   void exitRetention(RQLParser::RetentionContext *ctx) override {
     if (ctx->segments != nullptr) {
       // retention {capacity} !{segments}
-      qry.retention = std::pair<int, int>(      //
-          std::stoi(ctx->segments->getText()),  //
-          std::stoi(ctx->capacity->getText()));
+      qry.retention = std::pair<int, int>(         //
+          literal<int>(ctx->segments->getText()),  //
+          boundedLiteral("RETENTION capacity", ctx->capacity->getText(), 1));
     } else {
       // retention {capacity} - note: segments is optional but capacity is required
-      qry.policy.second = std::stoi(ctx->capacity->getText());
+      qry.policy.second = boundedLiteral("RETENTION capacity", ctx->capacity->getText(), 1);
     }
   }
 
@@ -595,15 +761,17 @@ class ParserListener : public RQLBaseListener {
     return false;
   }
 
+  /// Granice zakresu siegaja historii strumienia, a RETENTION to liczba jednoczesnych zadan zrzutu,
+  /// z ktorych kazde trzyma otwarty deskryptor pliku - stad granice z rdb/sizeLimits.hpp (A2 M11).
   void exitDumppart(RQLParser::DumppartContext *ctx) override {
     actionType = rule::DUMP;
-    dump_left  = std::stoi(ctx->step_back->getText());
+    dump_left  = boundedLiteral("DUMP range bound", ctx->step_back->getText(), 0, rdb::limits::kMaxHistoryReach);
     if (negatedBefore(ctx, ctx->step_back)) dump_left = -dump_left;
-    dump_right = std::stoi(ctx->step_forward->getText());
+    dump_right = boundedLiteral("DUMP range bound", ctx->step_forward->getText(), 0, rdb::limits::kMaxHistoryReach);
     if (negatedBefore(ctx, ctx->step_forward)) dump_right = -dump_right;
 
     if (ctx->rule_retnetion != nullptr)
-      dump_retention = std::stoi(ctx->rule_retnetion->getText());
+      dump_retention = boundedLiteral("DUMP RETENTION", ctx->rule_retnetion->getText(), 0, rdb::limits::kMaxDumpRetention);
     else
       dump_retention = 0;  // Default: no retention
   }
@@ -640,22 +808,26 @@ class ParserListener : public RQLBaseListener {
     qry.filename.erase(qry.filename.size() - 1);
     qry.filename.erase(0, 1);
 
+    // Blad semantyczny, nie FatalError: tym samym parserem idzie kanal ad-hoc i `xqry --reset`,
+    // czyli tekst obcy wykonywany w procesie DZIALAJACEGO serwera. FatalError konczyl tam cala
+    // instancje - `xqry -a "STORAGE ''"` wystarczalo. Stan listenera sprzatamy tak samo w obu
+    // galeziach, bo parser po bledzie semantycznym idzie dalej przez kolejne instrukcje.
     if (qry.filename.empty()) {
-      reportSemanticError("directive '" + qry.id + "' value must not be empty");
-      return;
+      reportSemanticError("directive " + qry.id.substr(1) + " requires a non-empty value");
+    } else {
+      // Add / at the end of path, if not present in case of STORAGE
+      if (qry.id == ":STORAGE" && qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');
+
+      coreInstance.push_back(qry);
     }
-
-    // Add / at the end of path, if not present in case of STORAGE
-    if (qry.id == ":STORAGE" && qry.filename[qry.filename.size() - 1] != '/') qry.filename.push_back('/');
-
-    coreInstance.push_back(qry);
     program.clear();
     qry.reset();
     fieldCount = 0;
   }
 
+  /// Przesuniecie o N rekordow to N rekordow historii zrodla (A2 M11).
   void exitSExpTimeMove(RQLParser::SExpTimeMoveContext *ctx) override {
-    recpToken(STREAM_TIMEMOVE, std::stoi(ctx->DECIMAL()->getText()));
+    recpToken(STREAM_TIMEMOVE, boundedLiteral("time shift", ctx->DECIMAL()->getText(), 0, rdb::limits::kMaxHistoryReach));
   }
 
   /// Nazwa strumienia. Pozostale alternatywy `stream_factor` - `( e )` i wywolanie
@@ -747,7 +919,9 @@ class ParserListener : public RQLBaseListener {
 
   void exitSingleDeclaration(RQLParser::SingleDeclarationContext *ctx) override {
     auto fTypeSizeArray = 1;  // Default:1
-    if (ctx->type_size != nullptr) fTypeSizeArray = std::stoi(ctx->type_size->getText());
+    // Ta sama granica obowiazuje w gramatyce DESC - .desc czyta takze serwer (A2 M11).
+    if (ctx->type_size != nullptr)
+      fTypeSizeArray = boundedLiteral("field size", ctx->type_size->getText(), 1, rdb::limits::kMaxFieldLength);
     std::list<token> emptyProgram;
     qry.lSchema.emplace_back(rdb::rField(ctx->ID()->getText(), fTypeSize, fTypeSizeArray, fType), emptyProgram);
     fType = rdb::BYTE;
@@ -755,8 +929,8 @@ class ParserListener : public RQLBaseListener {
 };
 
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
-                                                                  std::vector<std::string> &statementKeywords,
-                                                                  size_t firstLine) {
+                                                                  std::vector<std::string> &statementKeywords, size_t firstLine,
+                                                                  std::string_view sourceFile) {
   statementKeywords.clear();
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
@@ -768,10 +942,10 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   RQLParser parser(&tokens);
   // Oba listenery bledow potrzebuja parsera (abortParse), wiec powstaja po nim - i przed nim
   // sa niszczone, czyli w chwili, gdy nikt juz do nich nie siega.
-  LexerErrorListener lexerErrorListener(parser, firstLine);
+  LexerErrorListener lexerErrorListener(parser, firstLine, sourceFile);
   lexer.removeErrorListeners();
   lexer.addErrorListener(&lexerErrorListener);
-  ParserErrorListener parserErrorListener(parser, firstLine);
+  ParserErrorListener parserErrorListener(parser, firstLine, sourceFile);
   ParserListener parserListener(coreInstance, parser);
   parser.removeParseListeners();
   parser.removeErrorListeners();
@@ -877,7 +1051,7 @@ std::string parserRQLFile_4Test(qTree &coreInstance, const std::string &sInputFi
   std::string status = "Empty file.";
   std::vector<std::string> statementKeywords;
   for (const auto &[stmt, firstLine] : readLogicalLines(file)) {
-    auto [result, first_keyword, stream_name] = parserRQLString(coreInstance, stmt, statementKeywords, firstLine);
+    auto [result, first_keyword, stream_name] = parserRQLString(coreInstance, stmt, statementKeywords, firstLine, sInputFile);
     status                                    = result;
     if (status != "OK") {
       SPDLOG_ERROR("Error: Parsing failed on {}.\n{}", first_keyword, stmt);

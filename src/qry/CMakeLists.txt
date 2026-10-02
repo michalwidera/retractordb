@@ -36,11 +36,13 @@ target_link_libraries(
 # standardowej. lockFile.cpp tak samo: bus.cpp bierze przez nia blokade
 # obecnosci na segmencie. W bibliotece `qry` zadnej z nich NIE ma celowo - testy
 # jednostkowe linkuja jednoczesnie `qry` i `retractor`, a dwie kopie bus.o
-# daloby duplikaty symboli.
+# daloby duplikaty symboli. ipcResponses.cpp (sloty odpowiedzi, ktore czyta
+# ipcClient.cpp) dochodzi na tej samej zasadzie i z tego samego powodu.
 add_executable(
   ${PROJECT_NAME}
   qryLauncher.cpp ../retractor/lib/appConfig.cpp ../retractor/lib/bus.cpp
-  ../retractor/lib/lockFile.cpp ../retractor/lib/serverName.cpp)
+  ../retractor/lib/ipcResponses.cpp ../retractor/lib/lockFile.cpp
+  ../retractor/lib/serverName.cpp)
 
 target_include_directories(${PROJECT_NAME}
                            PRIVATE ${CMAKE_SOURCE_DIR}/src/retractor/lib)

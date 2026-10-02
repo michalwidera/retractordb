@@ -9,7 +9,6 @@
 #include <limits>
 #include <memory>
 #include <optional>
-#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -45,6 +44,10 @@ struct Engine::Plan {
   bool endOfInput{false};
   std::uint64_t slotsDone{0};
   boost::rational<int> time{0};
+  /// Maska strumieni naleznych w slocie, pozycyjna wzgledem drzewa - ta sama, ktora buduje
+  /// executorsm::collectAwaitedStreams. Pole planu, a nie zmienna slotu: pojemnosc zostaje
+  /// miedzy taktami, wiec krok nie alokuje.
+  std::vector<char> dueMask;
 };
 
 Engine::Engine(std::string storageDir) : storageDir_(std::move(storageDir)) {}
@@ -122,7 +125,7 @@ void Engine::compile(const std::string_view rql, const bool untilEof) {
 
   // Artefakty poprzedniego przebiegu, jak przed startem demona i przed `xqry --reset`:
   // magazyn SELECT-a zastany na dysku liczylby dalej od starych rekordow.
-  dropStalePlanArtifacts(plan->tree, plan->cm, loaded.lines);
+  dropStalePlanArtifacts(plan->tree);
   // Deklaracje demon pomija, a tu ich .desc MUSI zejsc: storage::attachDescriptor bierze
   // istniejacy plik .desc przed deskryptorem z planu i sprawdza tylko pola danych, wiec
   // zastane `REF "stary.txt"` kazaloby czytac poprzedni plik zrodlowy mimo nowego FILE w
@@ -162,13 +165,16 @@ std::optional<std::uint64_t> Engine::step() {
   }
 
   // Cialo slotu z executorsm::run(), bez czekania na zegar i bez rozglaszania IPC:
-  // os czasu -> zbior strumieni oczekujacych w tym slocie -> przeliczenie.
+  // os czasu -> maska strumieni oczekujacych w tym slocie -> przeliczenie.
   const boost::rational<int> slot = plan.timeline->getNextTimeSlot();
-  std::set<std::string> awaited;
-  for (const auto &qry : plan.tree)
-    if (plan.timeline->isThisDeltaAwaitCurrentTimeSlot(qry.rInterval)) awaited.insert(qry.id);
+  plan.dueMask.assign(plan.tree.size(), 0);
+  std::size_t position = 0;
+  for (const auto &qry : plan.tree) {
+    if (plan.timeline->isThisDeltaAwaitCurrentTimeSlot(qry.rInterval)) plan.dueMask[position] = 1;
+    ++position;
+  }
 
-  plan.model->processRows(awaited, slot);
+  plan.model->processRows(plan.dueMask, slot);
   plan.time                 = slot;
   const std::uint64_t index = plan.slotsDone++;
 
@@ -239,7 +245,8 @@ payload Engine::record(const std::string &stream, const std::size_t index) {
   // Do WLASNEGO bufora: wewnetrzny payload magazynu jest stanem modelu, a jedyne, co read()
   // w nim zmienia przy podanym celu, to mapa NULL - i wlasnie ja stad przepisujemy.
   payload out(store.descriptor);
-  store.read(index, out.span().data());
+  // Status bez znaczenia: zakres [retainedFrom, count) sprawdzony wyzej, wiec NoSuchRecord nie zapada.
+  static_cast<void>(store.read(index, out.span().data()));
   out.setNullBitset(store.getPayload()->getNullBitset());
   return out;
 }

@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -15,7 +16,7 @@
 
 #include "constants.hpp"
 
-/// Transport IPC strony serwerowej: segment pamieci dzielonej z mapa odpowiedzi,
+/// Transport IPC strony serwerowej: segment pamieci dzielonej ze slotami odpowiedzi,
 /// kolejka komend, kolejki rozgloszeniowe per klient oraz watek komunikacyjny.
 ///
 /// Klasa nie zna qTree, dataModel ani compilera. Warstwa protokolu (rozpoznanie
@@ -61,8 +62,8 @@ class IpcServer {
   /// kasowania. Nazwa pusta (domyslna) daje nazwy historyczne, jednoserwerowe.
   void setServerName(std::string_view serverName);
 
-  /// Startuje watek komunikacyjny. onReady wola sie z tego watku, gdy segment,
-  /// muteks nazwany i kolejka komend juz istnieja.
+  /// Startuje watek komunikacyjny. onReady wola sie z tego watku, gdy segment
+  /// odpowiedzi i kolejka komend juz istnieja.
   void start(Callbacks callbacks);
 
   /// Normalne zamkniecie: dolacza watek komunikacyjny.
@@ -70,7 +71,7 @@ class IpcServer {
 
   /// Sciezka atexit/FatalError: odpina lub dolacza watek i kasuje obiekty IPC.
   /// Kasuje ten sam zestaw co removeAllObjects(), z jednym zastrzezeniem: kolejki
-  /// klientow tylko wtedy, gdy uda sie wziac muteks map bez czekania (patrz .cpp).
+  /// klientow tylko wtedy, gdy uda sie wziac clientMapsMutex_ bez czekania (patrz .cpp).
   void shutdownFromExitHandler();
 
   /// Uchwyt watku komunikacyjnego dla rtKeepThreadOffRtCpus. Wolac po start().
@@ -80,19 +81,24 @@ class IpcServer {
   void subscribe(int clientId, const std::string &streamName, int maxElements);
 
   /// Rozsyla biezacy wiersz kazdego z podanych strumieni do jego subskrybentow.
-  void broadcast(const std::set<std::string> &streams, const RowFormatter &formatRow);
+  ///
+  /// Nazwy przychodza jako WIDOKI na napisy wolajacego (u serwera: identyfikatory zywego planu)
+  /// i musza zyc przez cale wywolanie. Serwer nie zapamietuje zadnego z nich; jedyny, ktory tu
+  /// zostaje - nazwa strumienia o zbyt dlugim wierszu - trafia do oversizedRowStreams_ jako
+  /// kopia. Emisja bierze zbior taki, jaki wyznaczyl takt: bez odtwarzania go z napisow.
+  void broadcast(std::span<const std::string_view> streams, const RowFormatter &formatRow);
 
   /// Zawiadamia klientow o koncu pracy serwera i czysci rejestr subskrypcji.
   void broadcastOutOfBusiness();
 
-  /// Kasuje wszystkie obiekty IPC serwera: segment, kolejke komend, muteks
-  /// nazwany i kolejki odpowiedzi pozostalych klientow. Wolac po stop().
+  /// Kasuje wszystkie obiekty IPC serwera: segment odpowiedzi, kolejke komend
+  /// i kolejki odpowiedzi pozostalych klientow. Wolac po stop().
   void removeAllObjects();
 
  private:
   void commandLoop() const;
 
-  /// Segment, kolejka komend, muteks nazwany. Nie dotyka stanu klientow.
+  /// Segment odpowiedzi i kolejka komend. Nie dotyka stanu klientow.
   void removeGlobalObjects() const;
 
   /// Kolejki odpowiedzi klientow plus wyczyszczenie rejestru subskrypcji.
@@ -102,7 +108,11 @@ class IpcServer {
   /// Czy wiersz miesci sie w slocie kolejki odpowiedzi. Falsz melduje przyczyne raz na
   /// strumien i jest rownoznaczny z pominieciem emisji -- nigdy z wyjatkiem, bo wyjatek
   /// z try_send konczyl cala usluge. Wolajacy MUSI trzymac clientMapsMutex_.
-  bool rowFitsSlot(const std::string &row, const std::string &streamName);
+  bool rowFitsSlot(const std::string &row, std::string_view streamName);
+
+  /// try_send, ktore kolejke z muteksem porzuconym przez martwy proces traktuje jak przepelniona
+  /// (falsz) zamiast rzucac. Pozostale bledy IPC przechodza dalej bez zmian.
+  static bool trySendOrAbandoned(boost::interprocess::message_queue &queue, const std::string &row, int clientId);
 
   Callbacks callbacks_;
   std::thread commsThread_;

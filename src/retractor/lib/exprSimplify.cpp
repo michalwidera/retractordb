@@ -2,8 +2,10 @@
 
 #include <algorithm>  // std::max, std::ranges::transform
 #include <cctype>     // std::tolower
+#include <cstdint>
 #include <exception>
 #include <iterator>
+#include <limits>
 #include <utility>  // std::move, std::pair
 #include <variant>
 #include <vector>
@@ -11,7 +13,8 @@
 #include <boost/rational.hpp>
 
 #include "expressionEvaluator.hpp"
-#include "expressionShape.hpp"  // functionResultType, isExactType, normalizedOperandType
+#include "expressionShape.hpp"   // functionResultType, isExactType, normalizedOperandType
+#include "rdb/convertTypes.hpp"  // cast - ta sama promocja co w normalize()
 #include "rdb/exceptions.hpp"
 
 namespace {
@@ -160,10 +163,17 @@ std::optional<command_id> foldOperator(command_id tailOp, command_id op, bool co
 /// Przepisanie może więc usunąć przepełnienie pośrednie: `(E+1)-1` dla E = INT_MAX bez reguły
 /// daje NULL, bo przepełnia się `E+1`, a po przepisaniu na `E+0` daje dokładnie INT_MAX.
 /// Odwrotnie być nie może: stała zwija się tylko wtedy, gdy `c1 ? c2` się mieści (foldConstants
-/// oddaje nullopt dla NULL), a jedynym wynikiem pośrednim formy przepisanej jest wynik końcowy,
-/// który forma krokowa i tak musiała osiągnąć. Przy RDB_OPT_SIMPLIFY_EXPRESSIONS=ON wynik jest
-/// zatem co najwyżej BARDZIEJ określony: NULL (OFF) wobec dokładnej wartości (ON), nigdy inna
-/// liczba. Decyzja z 2026-09-14: przyjęte i opisane, reguła bez zmian.
+/// oddaje nullopt dla NULL), i tylko wtedy, gdy ma reprezentację w typie operacji, do którego
+/// normalize() ją promuje (strażnik niżej). Poza tymi dwoma krokami jedynym wynikiem pośrednim
+/// formy przepisanej jest wynik końcowy, który forma krokowa i tak musiała osiągnąć. Przy
+/// RDB_OPT_SIMPLIFY_EXPRESSIONS=ON wynik jest zatem co najwyżej BARDZIEJ określony: NULL (OFF)
+/// wobec dokładnej wartości (ON), nigdy inna liczba. Decyzja z 2026-09-14: przyjęte i opisane,
+/// reguła bez zmian. Z tej samej przyczyny `u*-2*-3` nad UINT daje przy OFF NULL (wynik pośredni
+/// `-2u` nie ma reprezentacji w UINT), a przy ON `u*6`.
+///
+/// Rozumowanie zakłada stałe INTEGER albo RATIONAL - innych RQL nie wytwarza (literał, funkcja
+/// nad literałem, iloraz). Stała UINT przesuwałaby promocję E w formie przepisanej przed pierwszą
+/// operację i wymagałaby osobnego strażnika.
 std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant, command_id op) {
   if (!left.tail.has_value()) return std::nullopt;
   const auto &tail = *left.tail;
@@ -186,6 +196,19 @@ std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant
   auto value = foldConstants(foldProgram);
   if (!value.has_value()) return std::nullopt;
 
+  // Forma przepisana ma krok, którego forma krokowa nie ma: promocję zwiniętej stałej do typu
+  // operacji. Tam c1 i c2 promowane są osobno, tu ich wynik. Ujemna INTEGER nie ma reprezentacji
+  // w UINT (castFldVT daje NULL od da67e5a3), więc `(u+3)-5` przepisane na `u+(-2)` dawało NULL
+  // dla każdego u, a forma krokowa u-2. Promocję liczy ta sama funkcja co w normalize().
+  //
+  // Od 2026-09-27 ewaluator liczy parę INTEGER/UINT dokładnie (signedUnsignedOrNull), więc
+  // `u+(-2)` daje już u-2 i strażnik jest dla tej pary ostrożniejszy, niż trzeba. Zostaje:
+  // odmowa nie zmienia wyniku, a zdjęcie go byłoby nowym przepisaniem podnoszącym licznik R3.
+  const auto operationType = arithmeticResultType(tail.baseType, typeOfConstant(*value));
+  if (typeOfConstant(*value) != *operationType &&
+      std::holds_alternative<std::monostate>(cast<rdb::descFldVT>{}(*value, *operationType)))
+    return std::nullopt;
+
   node result;
   if (tail.constantOnLeft) {
     result.program.emplace_back(PUSH_VAL, *value);
@@ -195,7 +218,7 @@ std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant
     result.program.emplace_back(PUSH_VAL, *value);
   }
   result.program.emplace_back(tail.op);
-  result.type = arithmeticResultType(tail.baseType, typeOfConstant(*value));
+  result.type = operationType;
   // Wynik znów ma kształt ogona, więc łańcuch `E+1+1+1` zwija się w jednym przebiegu.
   result.tail = constantTail{
       .op = tail.op, .constant = *value, .constantOnLeft = tail.constantOnLeft, .base = tail.base, .baseType = tail.baseType};
@@ -534,8 +557,12 @@ std::optional<int> inferStringWidth(const std::list<token> &program, const field
         auto right = pop();
         auto left  = pop();
         if (!right.has_value() || !left.has_value()) return std::nullopt;
+        // Suma w int64, nasycona na INT_MAX. Liczby skladnikow nie ogranicza nic poza dlugoscia tekstu
+        // planu, a przepelnienie int bylo UB, zanim kontrola dlugosci pola w kompilatorze (A2 M11)
+        // zobaczyla wynik. Nasycona szerokosc i tak tam odpada.
         if (left->isString || right->isString)
-          stack.push_back({true, left->width + right->width});
+          stack.push_back({true, static_cast<int>(std::min<std::int64_t>(std::int64_t{left->width} + right->width,
+                                                                         std::numeric_limits<int>::max()))});
         else
           stack.push_back({false, 0});
       } break;

@@ -33,6 +33,23 @@ bash ../compare.sh --ignore-eol pattern-run.txt out-run.txt
 # rownoczesnie; te testy i tak pracowaly na danych stad, tylko z drugiego
 # CMakeLists.
 
+# Zawartosc zrzutow DO DUMP. Osobny wpis ctest, bo -run pilnuje strumienia str1,
+# a to jest asercja o INNYM artefakcie: plikach temp/str1_*_dump*.tmp, ktorych
+# do 2026-09-23 nie ogladal zaden wzorzec. Wzorzec przypina stan FAKTYCZNY -
+# wiodace zera w str1_testrule2_dump*.tmp to sfabrykowana historia z DO DUMP -5
+# nad strumieniem mlodszym niz szesc rekordow. Zostaja tam swiadomie: dopoki
+# nikt ich nie widzi, ich naprawa jest cicha zmiana pliku, ktorego nikt nie
+# czyta.
+add_test(
+  NAME ${TestID}-dump
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash -c "set -e && \
+    bash dump-content.sh > out-dump.txt && \
+    bash ../compare.sh --ignore-eol pattern-dump.txt out-dump.txt")
+
+# Zrzuty powstaja dopiero w przebiegu silnika, wiec ten test czeka na -run.
+set_tests_properties(${TestID}-dump PROPERTIES DEPENDS ${TestID}-run)
+
 add_test(
   NAME ${TestID}-compile
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

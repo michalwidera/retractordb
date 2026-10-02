@@ -63,23 +63,23 @@ ssize_t binaryDeviceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, co
     return status;
   };
 
-  if (fd_ < 0) return markAllNullAndZero(EXIT_FAILURE);
-  if (recordSize_ == 0) return markAllNullAndZero(EXIT_FAILURE);
+  if (fd_ < 0) return markAllNullAndZero(EBADF);
+  if (recordSize_ == 0) return markAllNullAndZero(EINVAL);
 
   if (position != 0) {
-    return markAllNullAndZero(EXIT_FAILURE);
+    return markAllNullAndZero(EINVAL);
   }
 
   auto outcome = readExact(ptrData);  // /dev/random no seek supported
-  if (outcome == readOutcome::error) return markAllNullAndZero(EXIT_FAILURE);
+  if (outcome == readOutcome::error) return markAllNullAndZero(EIO);
   if (outcome == readOutcome::endOfFile) {  // dev/random has no seek - but binary files should loop?
     if (!loopToBeginningIfEOF_) {
       // Koniec strumienia bez zawijania to koniec danych - przebieg z --until-eof ma sie tu zatrzymac.
       exhausted_ = true;
       return markAllNullAndZero(EXIT_SUCCESS);
     }
-    if (::lseek(fd_, 0, SEEK_SET) < 0) return markAllNullAndZero(EXIT_FAILURE);
-    if (readExact(ptrData) != readOutcome::complete) return markAllNullAndZero(EXIT_FAILURE);
+    if (::lseek(fd_, 0, SEEK_SET) < 0) return markAllNullAndZero(errno);
+    if (readExact(ptrData) != readOutcome::complete) return markAllNullAndZero(EIO);
   }
   lastNullBitset_.assign(descriptor_.size(), false);
   nullBitset = lastNullBitset_;

@@ -4,7 +4,7 @@ These instructions apply to the whole RetractorDB repository. They assume the re
 
 ## Required context
 
-1. Read `CLAUDE.md` in full before working with code, tests, build files, or documentation. It is the single source for build commands, testing, code style, integration-test sync traps, ANTLR4 grammar pitfalls, collaboration rules, commit/push/CI policy, and the AI-watermark hygiene procedure - all mandatory.
+1. Read `CLAUDE.md` in full before working with code, tests, build files, or documentation. It is the single source for build commands, testing, code style, collaboration rules, commit/push/CI policy, and the AI-watermark hygiene procedure - all mandatory. Area-specific pitfalls live next to the code and are not loaded automatically outside Claude Code: read `src/retractor/lib/CLAUDE.md` before touching the RQL grammar or parser, and `test/CLAUDE.md` before touching the test tree.
 
 2. Use the `retractordb-system` skill from the sibling `knowledge-index` repository for every RetractorDB task. The `.agents/skills/retractordb-system` path in this repository is only a relative symbolic link to that checkout.
 3. Run the skill's `scripts/check_freshness.sh` before relying on its indexed notes.
@@ -22,4 +22,4 @@ The installer delegates to `../knowledge-index/scripts/install-skill.sh` and cre
 
 ## Commits, push and CI
 
-Follow *Commits, push and CI* and *AI watermark hygiene (text)* in `CLAUDE.md`. Both are binding here and hold the full text: the mandatory watermark check before every commit, the human-only rule for `master`, the limits on side-branch commits, the prohibition on pushing, opening pull requests, or invoking CI without an explicit human request, and the session-end handoff requirement. The `retractordb-system` skill restates none of it - it only adds the deltas that apply to the documentation and paper repositories.
+Follow *Commits, push and CI* and *AI watermark hygiene (text)* in `CLAUDE.md`. Both are binding here and hold the full text: the mandatory watermark check before every commit, the pull-request-only rule for `master` and the human-only rule for `dev/muro`, the limits on side-branch commits, the prohibition on pushing, opening pull requests, or invoking CI without an explicit human request, and the session-end handoff requirement. The `retractordb-system` skill restates none of it - it only adds the deltas that apply to the documentation and paper repositories.

@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "rdb/retention.hpp"
 #include "serviceDefaults.h"  // kBuildDefaultServiceQueryFile (generowane z CMake)
 
 namespace appcfg {
@@ -16,6 +17,8 @@ inline constexpr int kDefaultTimingServerStartupWaitSeconds{30};
 inline constexpr int kDefaultTimingServerStartupPollIntervalMs{100};
 inline constexpr int kDefaultTimingQueryNoDataTimeoutMs{10'000};
 inline constexpr int kDefaultSchedulingRtPriority{50};
+// Budzet pamieci historii planu. Uzasadnienie wartosci przy AppConfig::historyMemoryMib.
+inline constexpr int kDefaultHistoryMemoryMib{1024};
 
 inline constexpr int kRtPriorityMin{1};
 inline constexpr int kRtPriorityMax{99};
@@ -42,6 +45,12 @@ struct AppConfig {
   /// dziś - bieżący katalog procesu). Jeśli niepusty, gwarantuje końcowy '/'. Stosowany
   /// tylko gdy zestaw RQL nie zdefiniował własnej dyrektywy :STORAGE (RQL ma pierwszeństwo).
   std::string storageDir;
+
+  /// Retencja strumieni plikowych (DEFAULT, DIRECT, takze posrednich) bez klauzuli RETENTION:
+  /// `default_retention = [capacity, segments]`, obie liczby > 0. Pusta (domyslnie) = brak retencji,
+  /// czyli historia rosnie na dysku - dane kasuje dopiero jawna decyzja operatora (D8). Stosuje ja
+  /// kompilator (compiler::setDefaultRetention) na tych samych drogach co history_memory_mib.
+  rdb::retention_t defaultRetention{.segments = 0, .capacity = 0};
 
   // === [ipc] ===
 
@@ -90,6 +99,27 @@ struct AppConfig {
   /// Używany tylko jako fallback, gdy serwis nie zaraportował własnego QUERYFILE w blokadzie.
   /// Musi być zgodny z argumentem ExecStart jednostki systemd (config nie zmienia ExecStart).
   std::string serviceQueryFile{appcfg::kDefaultServiceQueryFile};
+
+  /// Dopuszcza regułę `DO SYSTEM` w planie przyjmowanym kanałem `--reset`. Wartość `false`
+  /// (domyślna) odrzuca taki plan w całości - patrz executorsm::validatePlanText, gdzie stoi
+  /// pełne uzasadnienie granicy.
+  ///
+  /// Klucz czytany jest przy starcie procesu, więc ustawia go ten sam autorytet, który pisze
+  /// plik planu usługi: dla jednostki systemd jest to /etc/retractor/retractor.toml (usługa
+  /// biegnie jako `retractor` z HOME=/nonexistent, więc warstwa użytkownika jej nie dotyczy),
+  /// a dla serwera uruchomionego z terminala - konfiguracja tego, kto go uruchomił.
+  bool serviceUnrestricted{false};
+
+  // === [limits] ===
+
+  /// Budzet pamieci historii planu w MiB: suma po magazynach trzymajacych historie w RAM - pierscienie
+  /// zrodel deklarowanych (SourceBuffer) i magazynow MEMORY - z capacity x (sizeof(rdb::payload) +
+  /// bajty rekordu). Plan, ktory go przekracza, jest bledem kompilacji: przy starcie, w `-c`, w kanale
+  /// ad-hoc i przy `--reset` (compiler::setHistoryMemoryBudget). Bez budzetu wartosc w zakresie int
+  /// (`>65536` nad rekordem 1 MiB) konczyla sie std::bad_alloc albo OOM killerem w dzialajacym
+  /// serwerze (A2 M11). 1024 MiB to ponad trzy rzedy wielkosci zapasu: najwiecej w repozytorium
+  /// (examples/ecg/rec205) trzyma ok. 200 KiB historii.
+  int historyMemoryMib{appcfg::kDefaultHistoryMemoryMib};
 
   // === diagnostyka ===
 

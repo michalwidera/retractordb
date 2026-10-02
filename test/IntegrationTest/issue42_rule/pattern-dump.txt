@@ -1,0 +1,14 @@
+str1_testrule1_dump.tmp 7 rekord(ow)
+13 14 15 16 17 10 10
+str1_testrule2_dump.tmp 10 rekord(ow)
+0 0 0 10 11 12 13 14 15 16
+str1_testrule2_dump_0.tmp 10 rekord(ow)
+0 0 10 11 12 13 14 15 16 17
+str1_testrule2_dump_1.tmp 10 rekord(ow)
+0 10 11 12 13 14 15 16 17 10
+str1_testrule2_dump_2.tmp 9 rekord(ow)
+10 11 12 13 14 15 16 17 10
+str1_testrule2_dump_3.tmp 8 rekord(ow)
+11 12 13 14 15 16 17 10
+str1_testrule2_dump_4.tmp 7 rekord(ow)
+12 13 14 15 16 17 10

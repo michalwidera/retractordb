@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -130,7 +131,7 @@ TEST_F(BinaryDeviceROTest, read_fails_on_empty_file_when_loop_enabled) {
   rdb::binaryDeviceRO dev(path, desc, true);
   uint8_t out[4] = {0xFF, 0xFF, 0xFF, 0xFF};
 
-  EXPECT_EQ(dev.read(out, 0), EXIT_FAILURE);
+  EXPECT_EQ(dev.read(out, 0), EIO);
   EXPECT_EQ(out[0], 0x00);
   EXPECT_EQ(out[1], 0x00);
   EXPECT_EQ(out[2], 0x00);
@@ -147,7 +148,7 @@ TEST_F(BinaryDeviceROTest, read_fails_on_missing_file_with_null_metadata) {
   rdb::binaryDeviceRO dev(sandboxPath("missing.bin"), desc, true);
   uint8_t out[4] = {0xFF, 0xFF, 0xFF, 0xFF};
 
-  EXPECT_EQ(dev.read(out, 0), EXIT_FAILURE);
+  EXPECT_EQ(dev.read(out, 0), EBADF);
   EXPECT_EQ(out[0], 0x00);
   EXPECT_EQ(out[1], 0x00);
   EXPECT_EQ(out[2], 0x00);
@@ -168,7 +169,7 @@ TEST_F(BinaryDeviceROTest, name_and_write_contract) {
   uint8_t out[4] = {0x10, 0x20, 0x30, 0x40};
 
   EXPECT_EQ(dev.name(), path);
-  EXPECT_EQ(dev.write(out, 0), EXIT_FAILURE);
+  EXPECT_EQ(dev.write(out, 0), ENOTSUP);
 }
 
 // Regression: ::read on a FIFO may return fewer bytes than requested. The old code treated any

@@ -439,7 +439,7 @@ void presenter::onlyCompileShowProgram() {
           break;
         default:
           std::cout << "\t\t" << "UNKNOWN_ACTION";
-          abort();
+          throw rdb::LogicError("presenter::onlyCompileShowProgram: unknown rule action");
       }
 
       std::cout << '\n';

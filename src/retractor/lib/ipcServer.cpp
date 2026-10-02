@@ -16,22 +16,17 @@
 #include <utility>
 
 #include <spdlog/spdlog.h>
-#include <boost/interprocess/managed_shared_memory.hpp>
+#include <boost/interprocess/permissions.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
-#include <boost/interprocess/sync/named_mutex.hpp>
-#include <boost/interprocess/sync/scoped_lock.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/property_tree/info_parser.hpp>
 
 #include "constants.hpp"
-#include "ipcTypes.hpp"
+#include "ipcResponses.hpp"
+#include "osPlatform.hpp"
 #include "shmBudget.hpp"
 
 namespace IPC = boost::interprocess;
-
-using ipc::IPCMap;
-using ipc::IPCString;
-using ipc::ShmemAllocator;
 
 void IpcServer::setServerName(std::string_view serverName) { names_ = ipc::names(serverName); }
 
@@ -102,7 +97,6 @@ void IpcServer::removeAllObjects() {
 void IpcServer::removeGlobalObjects() const {
   IPC::shared_memory_object::remove(names_.shmemSegment.c_str());
   IPC::message_queue::remove(names_.queryQueue.c_str());
-  IPC::named_mutex::remove(names_.mapMutex.c_str());
 }
 
 /// Kolejka odpowiedzi, ktora przetrwa smierc serwera, nie jest tylko smieciem w
@@ -146,10 +140,11 @@ void IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
   // klienta bez gotowego uchwytu (przy okazji znika dotychczasowy wyscig
   // rejestracja-przed-utworzeniem-kolejki). Nadpisanie uchwytu przy
   // re-rejestracji zamyka stare mapowanie w tym watku.
-  auto queueHandle = std::make_unique<IPC::message_queue>(IPC::open_or_create,               // open or create
-                                                          queueName.c_str(),                 // name
-                                                          maxElements,                       // max message number
-                                                          ipc::kResponseQueueMaxMessageSize  // max message size
+  auto queueHandle = std::make_unique<IPC::message_queue>(IPC::open_or_create,                       // open or create
+                                                          queueName.c_str(),                         // name
+                                                          maxElements,                               // max message number
+                                                          ipc::kResponseQueueMaxMessageSize,         // max message size
+                                                          IPC::permissions(ipc::kObjectPermissions)  // tylko konto serwera
   );
   {
     std::scoped_lock lock(clientMapsMutex_);
@@ -158,10 +153,26 @@ void IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
   }
 }
 
+/// Kolejka boosta trzyma w segmencie wlasny muteks, na Linuksie robust. Proces zabity z tym
+/// muteksem w reku - klient w srodku try_receive - zostawia go NIENAPRAWIALNYM: kazde nastepne
+/// zajecie rzuca lock_exception(not_recoverable), na zawsze. Wyjatek z try_send wychodzil poza
+/// broadcast() az za petle przetwarzania, czyli jeden klient zabity w zlej chwili konczyl caly
+/// serwer. Taka kolejka nalezy do martwego klienta, wiec traktujemy ja jak kolejke przepelniona:
+/// falsz, a wolajacy ja kasuje i wypisuje klienta.
+bool IpcServer::trySendOrAbandoned(IPC::message_queue &queue, const std::string &row, int clientId) {
+  try {
+    return queue.try_send(row.c_str(), row.length(), 0);
+  } catch (const IPC::interprocess_exception &ex) {
+    if (ex.get_error_code() != IPC::not_recoverable) throw;
+    SPDLOG_ERROR("response queue of client {} abandoned by a process that died holding its lock", clientId);
+    return false;
+  }
+}
+
 // Wolajacy MUSI trzymac clientMapsMutex_ (dostep do oversizedRowStreams_).
-bool IpcServer::rowFitsSlot(const std::string &row, const std::string &streamName) {
+bool IpcServer::rowFitsSlot(const std::string &row, std::string_view streamName) {
   if (row.length() <= static_cast<std::size_t>(ipc::kResponseQueueMaxMessageSize)) return true;
-  if (oversizedRowStreams_.insert(streamName).second)
+  if (oversizedRowStreams_.emplace(streamName).second)
     SPDLOG_ERROR(
         "stream '{}': serialized row is {} B and does not fit the {} B response queue slot; "
         "subscribers of this stream receive no data",
@@ -169,7 +180,7 @@ bool IpcServer::rowFitsSlot(const std::string &row, const std::string &streamNam
   return false;
 }
 
-void IpcServer::broadcast(const std::set<std::string> &streams, const RowFormatter &formatRow) {
+void IpcServer::broadcast(std::span<const std::string_view> streams, const RowFormatter &formatRow) {
   // Muteks na caly przebieg emisji: kontencja tylko z krotkim wstawieniem do map
   // przy rejestracji klienta (watek komunikacyjny trzyma go nanosekundy), a koszt
   // niekontendowanego lock/unlock raz na slot jest pomijalny wobec ~ms compute.
@@ -186,7 +197,10 @@ void IpcServer::broadcast(const std::set<std::string> &streams, const RowFormatt
     for (const auto &element : id2StreamNameRelation_) {
       if (element.second == queryName) {
         if (!rowFormatted) {
-          row          = formatRow(queryName);
+          // RowFormatter bierze std::string, bo printRowValue szuka strumienia w mapie modelu po
+          // nazwie. Konwersja wypada WYLACZNIE tutaj, czyli tylko dla strumienia, ktory ma
+          // subskrybenta - obok budowanego w niej ptree jest niewidoczna.
+          row          = formatRow(std::string(queryName));
           rowFormatted = true;
           rowFits      = rowFitsSlot(row, queryName);
         }
@@ -210,7 +224,7 @@ void IpcServer::broadcast(const std::set<std::string> &streams, const RowFormatt
         // If send queue is full - means no one is listening and queue is
         // going to remove
         //
-        if (!mqPtr->try_send(row.c_str(), row.length(), 0)) {
+        if (!trySendOrAbandoned(*mqPtr, row, element.first)) {
           mqPtr.reset();  // zamknij mapowanie przed unlink
           IPC::message_queue::remove(queueName.c_str());
           eraseList.push_back(element.first);
@@ -260,76 +274,94 @@ void IpcServer::broadcastOutOfBusiness() {
 
 // Procedura watku komunikacyjnego.
 void IpcServer::commandLoop() const {
+  bool readyAnnounced = false;
   try {
-    // Kasowanie na wejsciu sprzata po poprzedniku, ktory PADL: po SIGKILL segment, kolejka
-    // i muteks zostaja w /dev/shm, a open_or_create trafiloby na nie i probowalo skonstruowac
-    // mape w segmencie, w ktorym ona juz jest. Jest to bezpieczne wylacznie dlatego, ze
+    // Kasowanie na wejsciu sprzata po poprzedniku, ktory PADL: po SIGKILL segment i kolejka
+    // zostaja w /dev/shm, a segment odpowiedzi moze nosic sloty w stanie posrednim. Jest to
+    // bezpieczne wylacznie dlatego, ze
     // executorsm::run() przejmuje blokade instancji PRZED start() -- flock dowodzi, ze zaden
     // inny ZYWY serwer tych obiektow nie uzywa. Nazwy pochodza z names_, wiec kasowanie nigdy
     // nie siega poza obszar tego serwera.
     IPC::message_queue::remove(names_.queryQueue.c_str());
     IPC::shared_memory_object::remove(names_.shmemSegment.c_str());
-    IPC::named_mutex::remove(names_.mapMutex.c_str());
-    // Segment and allocator for map purposes
-    IPC::managed_shared_memory mapSegment(IPC::open_or_create, names_.shmemSegment.c_str(), ipc::kShmemSegmentSize);
-    const ShmemAllocator allocatorShmemMapInstance(mapSegment.get_segment_manager());
-    IPC::named_mutex mapMutex(IPC::open_or_create, names_.mapMutex.c_str());
-    // Create a message_queue.
-    IPC::message_queue mq(IPC::open_or_create,            // open or crate
-                          names_.queryQueue.c_str(),      // name
-                          ipc::kQueryQueueMaxMessages,    // max message number
-                          ipc::kQueryQueueMaxMessageSize  // max message size
-    );
-    IPCMap *mymap = mapSegment.construct<IPCMap>(std::string(ipc::kMapObject).c_str())  // object name
-                    (std::less<>(), allocatorShmemMapInstance);
+    const ipc::responses::Mapping responses(IPC::create_only, names_.shmemSegment);
+    const auto createCommandQueue = [this] {
+      return std::make_unique<IPC::message_queue>(IPC::open_or_create,                       // open or crate
+                                                  names_.queryQueue.c_str(),                 // name
+                                                  ipc::kQueryQueueMaxMessages,               // max message number
+                                                  ipc::kQueryQueueMaxMessageSize,            // max message size
+                                                  IPC::permissions(ipc::kObjectPermissions)  // tylko konto serwera
+      );
+    };
+    auto mq = createCommandQueue();
     callbacks_.onReady();
+    readyAnnounced = true;
     //
     // This need to be clean up - There are some mess.
     //
-    std::array<char, ipc::kQueryQueueMaxMessageSize> message;
+    // try_receive moze oddac DOKLADNIE kQueryQueueMaxMessageSize bajtow (to max_message_size
+    // kolejki), a message[recvd_size] = 0 pisze zaraz za nimi. Bez miejsca na terminator
+    // komenda o pelnej dlugosci pisala jeden bajt poza tablica, w ramke stosu tego watku.
+    std::array<char, ipc::kQueryQueueMaxMessageSize + ipc::kNullTerminatorBytes> message;
+    static_assert(sizeof(message) > ipc::kQueryQueueMaxMessageSize, "bufor odbiorczy bez miejsca na terminator");
     unsigned int priority;
     IPC::message_queue::size_type recvd_size;
 
+    // Klient zabity w srodku send z wewnetrznym muteksem kolejki w reku zostawia go
+    // nienaprawialnym (patrz trySendOrAbandoned): kazde nastepne try_receive rzucaloby
+    // lock_exception(not_recoverable), a wyjatek konczyl watek komunikacyjny - serwer liczyl
+    // dalej, ale nie przyjmowal juz zadnej komendy, takze 'kill'. Kolejke zakladamy wtedy od
+    // nowa pod ta sama nazwa. Komendy, ktore w niej czekaly, przepadaja: ich klienci koncza sie
+    // limitem czasu, a kazdy nastepny otwiera juz nowa kolejke.
+    const auto tryReceive = [&] {
+      try {
+        return mq->try_receive(message.data(), ipc::kQueryQueueMaxMessageSize, recvd_size, priority);
+      } catch (const IPC::interprocess_exception &ex) {
+        if (ex.get_error_code() != IPC::not_recoverable) throw;
+        SPDLOG_ERROR("command queue '{}' abandoned by a process that died holding its lock; recreating it", names_.queryQueue);
+        mq.reset();
+        IPC::message_queue::remove(names_.queryQueue.c_str());
+        mq = createCommandQueue();
+        return false;
+      }
+    };
+
     bool loopRunning = true;
     while (loopRunning) {
-      while (mq.try_receive(message.data(), ipc::kQueryQueueMaxMessageSize, recvd_size, priority)) {
+      while (tryReceive()) {
         message[recvd_size] = 0;
         std::stringstream strstream;
         strstream << message.data();
-        memset(message.data(), 0, ipc::kQueryQueueMaxMessageSize);
-        // ZAPORA WATKU KOMUNIKACYJNEGO. Jedynym catch-em tej funkcji byl dotad ten na dole,
-        // na IPC::interprocess_exception, postawiony dla NIEUDANEJ BUDOWY zasobow. Cokolwiek
-        // innego wyleci z tresci petli, opuszcza commandLoop(), a za nim lambde watku ze
-        // start() -- czyli std::terminate. To jest GORSZE niz std::exit, ktory tu zastepujemy:
-        // terminate nie uruchamia handlerow atexit, wiec segment, kolejka komend i muteks
-        // nazwany zostaja w pamieci dzielonej, a nastepny start trafia na nie.
-        //
-        // Zapora musi wiec stanac PRZED pierwsza zamiana FatalError na wyjatek po tej stronie.
-        // Dwie drogi do std::terminate byly tu zreszta juz wczesniej, niezaleznie od refaktoru:
-        // read_info() na znieksztalconej wiadomosci i lexical_cast na braku db.id.
+        memset(message.data(), 0, message.size());
+        // Blad jednej wiadomosci to ODMOWA tej wiadomosci, nie koniec watku. Tresc pisze dowolny
+        // lokalny proces, a wyjatek poza tym blokiem konczy watek komunikacyjny: po onReady nikt
+        // tego nie zauwaza (ipcFailed czyta sie tylko przy starcie), wiec serwer liczy dalej,
+        // ale nie przyjmuje juz zadnej komendy, takze 'kill' i '--reset'. onCommand jest
+        // oslonione w commandProcessor; ten blok obejmuje to, co wokol niego: parser INFO,
+        // db.id oraz serializacje odpowiedzi.
         try {
           ptree pt;
           read_info(strstream, pt);
-          // Numer klienta zdejmowany PRZED obsluga komendy: na sciezce bledu to on rozstrzyga,
-          // czy jest komu odeslac odpowiedz. Wiadomosc bez niego zostaje odrzucona, bo wpis do
-          // mapy nie mialby klucza, pod ktorym ktokolwiek go szuka. Kontrola 'db.id' w handlerze
-          // 'show' staje sie przez to nieosiagalna z tej petli; zostaje jako oslona handlera,
-          // gdyby kiedys wywolal go ktos inny.
-          const std::string clientId = pt.get("db.id", "");
-          if (clientId.empty()) {
-            SPDLOG_ERROR("Command without db.id dropped: there is no response queue to answer on.");
+          // db.id sprawdzane PRZED wykonaniem: komenda bez adresu zwrotnego jest odrzucana bez
+          // skutkow ubocznych, zamiast wykonac sie (np. 'kill') i zgubic odpowiedz.
+          int clientProcessId = 0;
+          if (!boost::conversion::try_lexical_convert(pt.get("db.id", ""), clientProcessId)) {
+            SPDLOG_ERROR("IPC command '{}' rejected: missing or invalid db.id, no client to answer", pt.get("db.message", ""));
             continue;
           }
-          const int clientProcessId = boost::lexical_cast<int>(clientId);
+          // db.seq odroznia kolejne zadania jednego procesu. Klient bez niego (starsza binarka)
+          // dostaje seq 0 i nadal odbiera swoja odpowiedz, bo sam tez czeka na 0.
+          std::uint64_t clientSeq = 0;
+          boost::conversion::try_lexical_convert(pt.get("db.seq", "0"), clientSeq);
           ptree pt_retval;
           try {
             pt_retval = callbacks_.onCommand(pt);
           } catch (const std::exception &ex) {
             // Handler komendy ma wlasny catch(std::exception) i sam opisuje awarie klientowi;
             // tutaj trafia tylko to, co wyleci POZA nim. Odpowiedz jest obowiazkowa: klient czeka
-            // na wpis w mapie i bez niego melduje brak kolejki odpowiedzi, czyli wskazuje winnego
-            // po niewlasciwej stronie IPC. Usluga biegnie dalej -- jedno wadliwe zadanie nie jest
-            // powodem, zeby przestac obslugiwac pozostale.
+            // na nia i bez niej melduje brak odpowiedzi, czyli wskazuje winnego po niewlasciwej
+            // stronie IPC. Usluga biegnie dalej -- jedno wadliwe zadanie nie jest powodem, zeby
+            // przestac obslugiwac pozostale.
             SPDLOG_CRITICAL("Command handler escaped its own boundary: {}", ex.what());
             pt_retval.clear();
             pt_retval.put("error.response", std::string("command handler failure: ") + ex.what());
@@ -343,36 +375,33 @@ void IpcServer::commandLoop() const {
           // ten, kto siegnal po nia pierwszy. Przesuniecie sygnalu zamienia ten wyscig na
           // porzadek: gdy bramka opada, subskrypcja jest juz w mapach IpcServer.
           // Kontrakt bramki jest nietkniety -- podnosi ja nadal KAZDA komenda, takze 'hello'
-          // (patrz it_xqrywait_gate), a od tej zmiany takze komenda, ktora sie wywrocila.
+          // (patrz it_xqrywait_gate), takze komenda, ktora sie wywrocila. Wiadomosc odrzucona wyzej
+          // komenda nie jest i jej nie podnosi.
           callbacks_.onCommandHandled();
           // Sending answer
           std::stringstream response_stream;
           write_info(response_stream, pt_retval);
-          IPCString ipcResponse(allocatorShmemMapInstance);
-          ipcResponse = response_stream.str().c_str();
-          // cppcheck-suppress danglingTemporaryLifetime
-          {
-            IPC::scoped_lock<IPC::named_mutex> lock(mapMutex);
-            mymap->insert(std::pair<int, IPCString>(clientProcessId, ipcResponse));
-          }
-        } catch (const IPC::interprocess_exception &) {
-          // Bez zmiany zachowania: obsluga zasobow IPC nalezy do catch-a ponizej, ktory melduje
-          // awarie i wola onFailure(). Etykieta "could not be created" jest dla wyjatku z insert()
-          // mylaca, ale rozstrzyganie polityki awarii IPC nie nalezy do tej zmiany.
-          throw;
+          // Znacznik startu klienta czytany TERAZ, w chwili zapisu: po nim serwer rozpozna, ze
+          // wlasciciel slotu umarl, nawet jesli jego PID dostal juz inny proces.
+          const ipc::responses::Owner owner{
+              .pid = clientProcessId, .startTime = osplat::inspectProcess(clientProcessId).startTime, .seq = clientSeq};
+          ipc::responses::publish(responses.segment(), owner, response_stream.str());
         } catch (const std::exception &ex) {
-          // Wiadomosc, ktorej nie da sie ani rozebrac, ani odeslac. Nie ma komu odpowiedziec,
-          // wiec zostaje w dzienniku, a petla odbiera nastepna.
-          SPDLOG_ERROR("Malformed command dropped: {}", ex.what());
-        } catch (...) {
-          SPDLOG_ERROR("Command dropped after a non-standard exception.");
+          SPDLOG_ERROR("IPC message dropped: {}", ex.what());
         }
       }
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
 
       if (callbacks_.shouldStop()) loopRunning = false;
     }
-  } catch (IPC::interprocess_exception &ex) {
+  } catch (const std::exception &ex) {
+    // Kazda ucieczka z funkcji watku to std::terminate, stad std::exception, a nie tylko wyjatki
+    // Boost IPC. onReady i onFailure wykluczaja sie (ipcServer.hpp), wiec po gotowosci zostaje
+    // wylacznie glosny wpis: watek konczy prace, a serwer przestaje przyjmowac komendy.
+    if (readyAnnounced) {
+      SPDLOG_ERROR("IPC communication thread stopped, server no longer accepts commands: {}", ex.what());
+      return;
+    }
     // Najczestsza przyczyna to brak miejsca w /dev/shm: sama kolejka komend zajmuje 1000 KiB,
     // a w kontenerze caly tmpfs ma domyslnie 64 MiB. Zawiadomienie jest tu obowiazkowe --
     // wolajacy czeka na gotowosc IPC i bez niego stanie na zawsze.

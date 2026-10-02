@@ -248,6 +248,9 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
   // Liczba faktycznie wyrenderowanych elementów. Bez niej „koniec pętli" i „nic
   // nie przyszło" były nieodróżnialne, a klient meldował sukces po zerze danych.
   long long rendered = 0;
+  // Czy petla skonczyla sie na ciszy serwera. Samo `rendered` tego nie mowi: klient, ktory dostal
+  // czesc zamowionych elementow i stracil serwer, konczyl sie do 2026-09-27 sukcesem.
+  bool serverWentSilent = false;
 
   ptree e_value;
   try {
@@ -296,6 +299,7 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
       if (++noDataCounter > serverNoDataTimeoutMs_) {
         SPDLOG_WARN("No data received for {} ms, assuming server is dead.", serverNoDataTimeoutMs_);
         transport_->done = true;
+        serverWentSilent = true;
         break;
       }
     }
@@ -330,6 +334,10 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
     }
     SPDLOG_ERROR("stream '{}' delivered no elements", input);
     return selectResult::noData;
+  }
+  if (serverWentSilent) {
+    SPDLOG_ERROR("stream '{}' went silent for {} ms after {} element(s)", input, serverNoDataTimeoutMs_, rendered);
+    return selectResult::serverNoResponse;
   }
   return selectResult::ok;
 }

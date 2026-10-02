@@ -1,3 +1,4 @@
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <spdlog/spdlog.h>
 
@@ -6,9 +7,12 @@
 #include <filesystem>
 #include <locale>
 #include <sstream>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "config.h"
+#include "rdb/exceptions.hpp"
 #include "rdb/fainterface.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/probe.hpp"  // sonda E4 (liczy tylko w buildzie RDB_BENCH_PROBE)
@@ -55,7 +59,11 @@ class xschema : public ::testing::Test {
         "file_A",       //
         "file_A.desc",  //
         "file_B",       //
-        "file_B.desc"   //
+        "file_B.desc",  //
+        "agse1",        //
+        "agse1.desc",   //
+        "agse1.meta",   //
+        "agse1.shadow"  //
     };
 
     for (auto i : cleanFilesSet)
@@ -92,7 +100,7 @@ class xschema : public ::testing::Test {
     dataArea->qSet["str2"]->outputPayload->write();
 
     for (const auto &i : coreInstance)
-      if (!i.isDeclaration()) dataArea->constructInputPayload(i.id);
+      if (!i.isDeclaration()) dataArea->constructInputPayload(i, *dataArea->qSet[i.id]);
 
     pProc = dataArea.get();
   }
@@ -239,11 +247,11 @@ TEST_F(xschema, probe_e4_agse_elements_scale_with_window_length) {
 TEST_F(xschema, check_sum) {
   streamInstance dataStr1{coreInstance, coreInstance["str1"]};
   dataStr1.outputPayload->setDisposable(false);
-  dataStr1.outputPayload->revRead(0);
+  static_cast<void>(dataStr1.outputPayload->revRead(0));
 
   streamInstance dataStr2{coreInstance, coreInstance["str2"]};
   dataStr2.outputPayload->setDisposable(false);
-  dataStr2.outputPayload->revRead(0);
+  static_cast<void>(dataStr2.outputPayload->revRead(0));
 
   // str1
   // [0] [1]
@@ -304,10 +312,14 @@ TEST_F(xschema, getRow_1) {
   */
   dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
 
-  std::set<std::string> rowSet = {"core0"};
+  // processRows bierze maske pozycyjna rownolegla do planu, nie zbior nazw.
+  std::vector<char> rowMask(coreInstance.size(), 0);
+  for (std::size_t position = 0; position < coreInstance.size(); ++position)
+    if (coreInstance.at(position).id == "core0") rowMask[position] = 1;
+
   dataArea->processZeroStep();
   auto row1 = dataArea->getRow("core0", 0);
-  dataArea->processRows(rowSet);
+  dataArea->processRows(rowMask);
   auto row2 = dataArea->getRow("core0", 1);
 
   std::string res1 = print(row1);
@@ -318,6 +330,181 @@ TEST_F(xschema, getRow_1) {
 
   dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
 }
+
+// ============================================================
+// Tablica uchwytow streamInstance (akcelerator processRows)
+// ============================================================
+//
+// processRows siega po instancje wykonawcza po POZYCJI w planie, a nie po nazwie. Tablica jest
+// przebudowywana przy rozjezdzie rewizji planu (qTree::planRevision()), wiec musi byc odporna
+// na kazda zmiane ukladu planu - a jej kontrola krzyzowa w Debug musi umiec sie CZERWIENIC,
+// inaczej nie jest kontrola, tylko ozdoba. Para testow ponizej pokazuje oba wyniki na tym samym
+// ukladzie: rozni je wylacznie to, czy tablica zostala oznaczona jako aktualna wbrew prawdzie.
+
+namespace {
+
+/// Odwraca kolejnosc wezlow planu. Dlugosc bez zmian, wiec sama dlugosc tablicy niczego nie
+/// wykryje - rozjazd widac dopiero po tozsamosci instancji na pozycji.
+void reversePlanOrder() {
+  std::vector<query> reordered(coreInstance.begin(), coreInstance.end());
+  std::ranges::reverse(reordered);
+  coreInstance.replaceAll(std::move(reordered));
+}
+
+std::vector<char> dueMaskFor(const std::string &id) {
+  std::vector<char> mask(coreInstance.size(), 0);
+  for (std::size_t position = 0; position < coreInstance.size(); ++position)
+    if (coreInstance.at(position).id == id) mask[position] = 1;
+  return mask;
+}
+
+}  // namespace
+
+TEST_F(xschema, handleTable_survives_plan_reorder) {
+  // Kontrola NEGATYWNA: po przestawieniu planu tablica przebudowuje sie sama i takt liczy sie
+  // poprawnie. Sprawdzany jest wynik, nie samo "nie zginelo" - ta sama para rekordow co
+  // w getRow_1, tyle ze policzona na odwroconym planie.
+  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+
+  // Uzbrojenie tablicy dla UKLADU SPRZED zmiany: maska pusta, wiec zaden strumien nie liczy.
+  dataArea->processRows(std::vector<char>(coreInstance.size(), 0));
+
+  reversePlanOrder();
+
+  dataArea->processZeroStep();
+  auto row1 = dataArea->getRow("core0", 0);
+  dataArea->processRows(dueMaskFor("core0"));
+  auto row2 = dataArea->getRow("core0", 1);
+
+  EXPECT_TRUE("{ 20 31 }" == print(row1));
+  EXPECT_TRUE("{ 21 32 }" == print(row2));
+
+  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+}
+
+TEST_F(xschema, handleTable_stale_entry_is_caught) {
+  // Kontrola DODATNIA. Ten sam uklad co wyzej, jedna roznica: tablica zostaje oznaczona jako
+  // zbudowana dla biezacej rewizji, choc jej zawartosc opisuje plan sprzed przestawienia.
+  // Niezmiennik zabrania takiego stanu, wiec wytworzyc go moze tylko hak testowy - i wlasnie
+  // dlatego ten test jest dowodem, ze kontrola w handleAt() ma jak zawiesc.
+#ifdef NDEBUG
+  GTEST_SKIP() << "kontrola krzyzowa uchwytow zyje tylko w Debug - w Release nie ma czego czerwienic";
+#else
+  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+  dataArea->processRows(std::vector<char>(coreInstance.size(), 0));  // uzbrojenie tablicy
+
+  EXPECT_THAT(
+      [&] {
+        reversePlanOrder();
+        dataArea->markHandlesFreshForUnitTest();
+        dataArea->processRows(dueMaskFor("core0"));
+      },
+      ::testing::ThrowsMessage<rdb::LogicError>(::testing::HasSubstr("does not match plan node")));
+  // Kontrola rzuca, a nie zabija procesu potomnego, wiec przestawienie zostalo w TYM procesie.
+  // Nastepne testy dziela plan i model z tym, wiec dostaja z powrotem uklad sprzed testu.
+  reversePlanOrder();
+#endif
+}
+
+// ============================================================
+// Strumien nieobecny w modelu (issue #252)
+// ============================================================
+//
+// Dostep po nazwie ma zglaszac brak strumienia wyjatkiem, tak jak streamRuntime(). `qSet[nazwa]`
+// na nieobecnym kluczu WSTAWIAL pusty unique_ptr i zaraz go dereferencjonowal - SIGSEGV zamiast
+// bledu. Sprawdzane sa trzy rzeczy: wyjatek, mapa bez wstawionego wpisu i model, ktory po bledzie
+// dalej odpowiada dla strumienia, ktory w nim jest.
+
+TEST_F(xschema, missingStream_is_reported_not_inserted) {
+  const std::string ghost = "no_such_stream";
+  const auto sizeBefore   = dataArea->qSet.size();
+
+  EXPECT_THROW(static_cast<void>(dataArea->getPayload(ghost)), std::logic_error);
+  EXPECT_THROW(static_cast<void>(dataArea->fetchForward(ghost, 0)), std::logic_error);
+  EXPECT_THROW(static_cast<void>(dataArea->getRow(ghost, 0)), std::logic_error);
+
+  EXPECT_FALSE(dataArea->qSet.contains(ghost));
+  EXPECT_EQ(dataArea->qSet.size(), sizeBefore);
+
+  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+  dataArea->processZeroStep();
+  EXPECT_TRUE("{ 20 31 }" == print(dataArea->getRow("core0", 0)));
+  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+}
+
+// Dolaczenie ad-hoc wpisuje instancje do modelu wszystkie albo zadnej. getAdHoc() przy porazce
+// wycofuje PLAN i polega na tym, ze model zostal nietkniety - z qSet nic sie nie usuwa, bo
+// tablica uchwytow trzyma surowe wskazniki. Poprawna nazwa przed bledna nie moze wiec zostac
+// w modelu sama.
+TEST_F(xschema, addQueriesToModel_is_all_or_nothing) {
+  query extra = coreInstance["str2"];
+  extra.id    = "str2_extra";
+  coreInstance.push_back(extra);
+  const auto sizeBefore = dataArea->qSet.size();
+
+  EXPECT_EQ(dataArea->addQueriesToModel({"str2_extra", "no_such_stream"}), "no_such_stream");
+  EXPECT_FALSE(dataArea->qSet.contains("str2_extra"));
+  EXPECT_EQ(dataArea->qSet.size(), sizeBefore);
+}
+
+// ============================================================
+// Pozycja splaszczona okna AGSE poza zakresem int
+// ============================================================
+//
+// Rekord okna o indeksie logicznym n siega do pozycji splaszczonej n*step, a ta rosnie jak liczba
+// rekordow zrodla razy F (szerokosc zrodla w elementach plaskich). W int pekala po ok. 2^31/F
+// rekordach zrodla, niezaleznie od kroku - przy F = 65536 (legalne po M11) juz po 32768.
+// Tu F = 2 i krok 2, wiec te sama granice przekracza indeks n = 2^30+10: n*step = 2^31+20.
+// Sam indeks logiczny miesci sie w int - przepelnic mogl sie wylacznie iloczyn.
+//
+// Zawartosc okna zalezy tylko od odleglosci n od bazy zrodla, wiec okno daleko na osi ma byc
+// identyczne z ta sama geometria blisko poczatku:
+// pozycje 2n-3 .. 2n -> rekordy n-2, n-1, n-1, n -> pola 12, 13, 14, 15.
+
+TEST_F(xschema, agse_window_flat_position_beyond_int) {
+  constexpr int n = (1 << 30) + 10;
+
+  streamInstance data{coreInstance, coreInstance["str1"]};
+  data.outputPayload->setDisposable(false);
+
+  const auto nearWindow = data.constructAgsePayload(4, 2, "str1", 2, 0);
+  const auto farWindow  = data.constructAgsePayload(4, 2, "str1", n, n - 2);
+
+  std::stringstream nearText;
+  nearText << rdb::singleLineFormat << nearWindow;
+  std::stringstream farText;
+  farText << rdb::singleLineFormat << farWindow;
+
+  EXPECT_EQ(nearText.str(), "{ str1_0:15 str1_1:14 str1_2:13 str1_3:12 }");
+  EXPECT_EQ(farText.str(), nearText.str());
+}
+
+// Druga strona tego samego rachunku: queryInputsAvailable decyduje, czy wezel dolaczany ad hoc
+// ma juz komplet rekordow zrodla. Przy zawinietej pozycji odpowiadal "nie" na zawsze - okno
+// nigdy nie dostawalo bazy, wiec milczalo bez bledu.
+TEST_F(xschema, agse_adhoc_join_flat_position_beyond_int) {
+  constexpr int n = (1 << 30) + 10;
+
+  const auto [status, keyword, name] = parserRQLString(coreInstance, "SELECT agse1[0] STREAM agse1 FROM str1@(2,4)");
+  ASSERT_EQ(status, "OK");
+  // Fikstura nie uruchamia kompilatora, wiec interwal ustawiamy recznie. Przy interwale 1 pierwszy
+  // nalezny slot n+1 daje indeks n (T = (n + 1 + W) * Delta, W = 0).
+  coreInstance["agse1"].rInterval = 1;
+  ASSERT_EQ(dataArea->addQueriesToModel({"agse1"}), "");
+
+  // Rekord fizyczny 0 zrodla nosi indeks logiczny n-2, wiec okno n ma komplet rekordow n-2..n.
+  dataArea->qSet["str1"]->logicalIndexBase = n - 2;
+
+  dataArea->processRows(dueMaskFor("agse1"), boost::rational<int>(n + 1));
+
+  // Baze dostaje tylko wezel, dla ktorego queryInputsAvailable odpowiedzialo "tak".
+  EXPECT_EQ(dataArea->qSet["agse1"]->logicalIndexBase, std::optional<int>(n));
+
+  std::stringstream window;
+  window << rdb::singleLineFormat << *dataArea->qSet["agse1"]->inputPayload;
+  EXPECT_EQ(window.str(), "{ agse1_0:15 agse1_1:14 agse1_2:13 agse1_3:12 }");
+}
+
 TEST_F(xschema, reduceFieldsToPayload_max) {
   streamInstance data{coreInstance, coreInstance["str1"]};
   data.outputPayload->setDisposable(false);
@@ -364,7 +551,7 @@ TEST_F(xschema, reduceFieldsToPayload_avg) {
 TEST_F(xschema, constructOutputPayload_expression) {
   // str2: SELECT str2[0]+5 FROM core0 → core0.a=20, result=25
   dataArea->processZeroStep();
-  dataArea->constructInputPayload("str2");
+  dataArea->constructInputPayload(coreInstance["str2"], *dataArea->qSet["str2"]);
   dataArea->qSet["str2"]->constructOutputPayload(coreInstance["str2"].lSchema);
   std::stringstream ss;
   ss << rdb::singleLineFormat << *(dataArea->qSet["str2"]->outputPayload->getPayload());
@@ -408,8 +595,12 @@ class xschema_rules : public ::testing::Test {
 
 TEST_F(xschema_rules, constructRulesAndUpdate_system_rule_fires) {
   // core0 first row: a=20 → str_rule[0]=20 > 0 → rule1 fires, rule2 does not
+  std::vector<char> ruleMask(coreInstance.size(), 0);
+  for (std::size_t position = 0; position < coreInstance.size(); ++position)
+    if (coreInstance.at(position).id == "str_rule") ruleMask[position] = 1;
+
   dataArea_rules->processZeroStep();
-  dataArea_rules->processRows({"str_rule"});
+  dataArea_rules->processRows(ruleMask);
   EXPECT_TRUE(std::filesystem::exists("rule_marker1.txt")) << "rule1 (>0) should fire for positive data";
   EXPECT_FALSE(std::filesystem::exists("rule_marker2.txt")) << "rule2 (<0) should not fire for positive data";
 }

@@ -49,13 +49,24 @@ struct rField {
 };
 
 // Liczba SLOTOW PLASKICH zajmowanych przez pole w rekordzie. Jedna definicja dla calego
-// drzewa: mapowan deskryptora (Descriptor::rebuildFieldMappings), serializacji wiersza do
-// klienta (executorsm::printRowValue) i krotnosci pola w odpowiedzi 'detail'. Regula byla
-// przepisana recznie w kazdym z tych miejsc, a rozjazd miedzy nimi przesuwa indeksy plaskie
-// wzgledem wartosci - czyli po cichu podmienia wartosci pod nazwami pol.
+// drzewa: wolaja ja deskryptor, kompilator, parser zrodla tekstowego, wypisywanie payloadu
+// i odpowiedzi executorsm. Regula byla przepisana recznie w kazdym z tych miejsc, a rozjazd
+// miedzy nimi przesuwa indeksy plaskie wzgledem wartosci - czyli po cichu podmienia wartosci
+// pod nazwami pol.
 //
 // STRING[N] to JEDNA wartosc: N jest dlugoscia tekstu, nie krotnoscia pola.
+// NULLTYPE[N] zajmuje N slotow jak pole liczbowe, choc nie zajmuje bajtow rekordu. Dzis nic
+// w drzewie nie buduje NULLTYPE o rarray != 1 (typu NULL nie ma ani w DESC.g4, ani w DECLARE);
+// regula mowi, jak liczyc, gdyby takie pole powstalo.
 constexpr int flatElementCount(const rField &field) { return field.rtype == STRING ? 1 : field.rarray; }
+
+// Pole JEDNEGO slotu plaskiego o szerokosci `bytes`. Napis ma zapis `rlen = 1`, `rarray = N` - ten
+// sam, ktory daja DECLARE i parser `.desc`; liczba - `rlen = bytes`, `rarray = 1`. Porownania
+// ksztaltu biora rlen i rarray osobno, wiec drugi zapis tego samego napisu (`rlen = N`), ktory
+// do 2026-09-27 dawalo okno AGSE, bylby dla nich innym polem.
+inline rField flatSlotField(std::string name, descFld type, int bytes) {
+  return type == STRING ? rField(std::move(name), 1, bytes, type) : rField(std::move(name), bytes, 1, type);
+}
 
 }  // namespace rdb
 // Support for std::visit over std::variant

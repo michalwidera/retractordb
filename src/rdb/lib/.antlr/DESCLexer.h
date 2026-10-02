@@ -14,9 +14,9 @@ public:
   enum {
     T__0 = 1, T__1 = 2, T__2 = 3, T__3 = 4, T__4 = 5, BYTE_T = 6, STRING_T = 7, 
     UNSIGNED_T = 8, INTEGER_T = 9, FLOAT_T = 10, DOUBLE_T = 11, RATIONAL_T = 12, 
-    INTPAIR_T = 13, IDXPAIR_T = 14, TYPE_T = 15, REF_T = 16, RETENTION_T = 17, 
-    RETMEMORY_T = 18, DOT = 19, MINUS = 20, ID = 21, STRING = 22, DECIMAL = 23, 
-    FILENAME = 24, SPACE = 25, COMMENT = 26, LINE_COMMENT1 = 27, LINE_COMMENT2 = 28
+    TYPE_T = 13, REF_T = 14, RETENTION_T = 15, RETMEMORY_T = 16, DOT = 17, 
+    MINUS = 18, ID = 19, STRING = 20, DECIMAL = 21, FILENAME = 22, SPACE = 23, 
+    COMMENT = 24, LINE_COMMENT1 = 25, LINE_COMMENT2 = 26
   };
 
   explicit DESCLexer(antlr4::CharStream *input);

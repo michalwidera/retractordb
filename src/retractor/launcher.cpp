@@ -105,9 +105,10 @@
 /// - Nadawać instancji usługowej stałą nazwę ("service"), o ile operator nie wskazał innej, i
 ///   dopuszczać w systemie dokładnie jedną instancję w trybie usługowym; serwerów zwykłych może
 ///   pracować wiele.
-/// - Po błędzie krytycznym (FatalError) sprowadzać jednostkę systemd do stanu bez planu: plik
+/// - Po błędzie krytycznym (rdb::Error na szczycie executorsm::run albo FatalError) i po odmowie planu przed startem (parsowanie, kompilacja,
+///   zachowane pliki magazynu i .desc) sprowadzać jednostkę systemd do stanu bez planu: plik
 ///   zapytań usługi jest opróżniany, więc restart podnosi ją w trybie bezczynnym zamiast wracać
-///   w kółko na plan, który ją zabił.
+///   w kółko na plan, który ją zabił albo nie może wystartować.
 /// - Udostępniać dane wynikowe strumieni klientom (xqry) przez współdzieloną pamięć / IPC (Boost.Interprocess)
 ///   obsługiwane w osobnym wątku komunikacyjnym, niezależnym od wątku przetwarzania danych.
 /// - Umożliwiać sterowanie startem przetwarzania z poziomu klienta (opcja --xqrywait: wstrzymanie pętli do
@@ -345,13 +346,21 @@ int main(int argc, char *argv[]) try {
   // Bez --name zostaje tozsamosc historyczna (jeden serwer na maszyne, ta sama nazwa blokady
   // i te same obiekty IPC co dotad). Nazwa wlacza rezim wieloserwerowy i jest opcjonalna
   // wlasnie po to, zeby dotychczasowe uzycie nie zmienilo sie ani o jeden plik.
-  const std::string executableName = std::filesystem::path(argv[0]).filename().string();
-  const std::string serviceName    = executableName + "_service" + (earlyServerName.empty() ? "" : "." + earlyServerName);
+  const std::string serviceName = ipc::serviceName(earlyServerName);
   FlockServiceGuard guard(serviceName);
   guard.setLockDir(earlyAppCfg.lockDir);
 
   int loopLimitVar{executorsm::inifitie_loop};
   AppConfig appCfg = earlyAppCfg;
+
+  // Odmowa planu przed startem. W jednostce systemd plan, ktory nie moze wystartowac, znika z pliku
+  // zapytan - ta sama regula co po FatalError (executorsm::cleanup), bo inaczej Restart=on-failure
+  // wraca co RestartSec na ten sam plan (#265). `-c` jest sprawdzeniem, a nie usluga.
+  const auto refusePlan = [&] {
+    if (!onlyCompile) servicecontrol::dropRefusedPlan(systemd.unit.value_or(std::string{}), guard.getServiceQueryFile());
+    return system::errc::protocol_error;
+  };
+
   try {
     std::string sInputFile;
     std::string sDiagram;
@@ -364,6 +373,7 @@ int main(int argc, char *argv[]) try {
           ("onlycompile,c", "compile only mode")                                     // linking inheritance from launcher
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")     //
           ("quiet,r", "no output on screen, skip presenter")                         //
+          ("verbose,v", "verbose mode (show stream params)")                         //
           ("dot,d", "create dot output")                                             //
           ("csv,m", "create csv output")                                             //
           ("fields,f", "show fields in dot file")                                    //
@@ -374,6 +384,7 @@ int main(int argc, char *argv[]) try {
           ("transparent,p", "make dot background transparent")                       //
           ("diagram,w", po::value<std::string>(&sDiagram), "create diagram output")  //
           ("shmbudget,z", "show shared memory budget of the compiled plan")          //
+          ("config,g", po::value<std::string>(&sConfig), "config file (TOML); overrides search")  //
           ;
     } else {
       desc.add_options()                                                          //
@@ -383,7 +394,7 @@ int main(int argc, char *argv[]) try {
           ("queryfile,q", po::value<std::string>(&sInputFile), "query set file")  //
           ("quiet,r", "no output on screen, skip presenter")                      //
           ("status,s", "check service status")                                    //
-          ("cleanup", "remove leftovers of dead instances and exit")              //
+          ("cleanup,o", "remove leftovers of dead instances and exit")            //
           ("verbose,v", "verbose mode (show stream params)")                      //
           ("xqrywait,x", "wait with processing for first query")                  //
           ("name,n", po::value<std::string>(&sServerName),                        //
@@ -427,6 +438,10 @@ int main(int argc, char *argv[]) try {
     else
       SPDLOG_INFO("Configuration loaded from: {}", fmt::join(appCfg.loadedFrom, ", "));
     validateConfiguredStorageDir(appCfg);
+    // Ten sam budzet dla planu startowego i dla `-c`, ktore jest bramka: plan przyjety tutaj musi
+    // przejsc takze kompilacje w kanale ad-hoc i `--reset` (executorsm::cfgHistoryMemoryMib).
+    cm.setHistoryMemoryBudget(appCfg.historyMemoryMib);
+    cm.setDefaultRetention(appCfg.defaultRetention);
 
     iLoopLimitCnt = loopLimitVar;  // std::atomic assignment
 
@@ -455,6 +470,7 @@ int main(int argc, char *argv[]) try {
       std::cout << desc;
       std::println("{}", config_line);
       std::println("Log: {}", tempLocation);
+      std::println("Config: {}", appCfg.loadedFrom.empty() ? "Defaults" : fmt::format("{}", fmt::join(appCfg.loadedFrom, ", ")));
       if (vm.contains("realtime")) rtCheckAndPrint();
       std::println("{}", warranty);
       return system::errc::success;
@@ -496,11 +512,11 @@ int main(int argc, char *argv[]) try {
       planText << file.rdbuf();
       file.close();
 
-      const PlanSource loaded = parsePlanText(coreInstance, planText.str());
+      const PlanSource loaded = parsePlanText(coreInstance, planText.str(), std::filesystem::absolute(sInputFile).string());
       if (loaded.status != "OK") {
         std::cerr << "Input file:" << sInputFile << '\n'  //
                   << "Parse result:" << loaded.status << '\n';
-        return system::errc::protocol_error;
+        return refusePlan();
       }
       processedLines = loaded.lines;
     }
@@ -525,7 +541,23 @@ int main(int argc, char *argv[]) try {
       if (response != "OK") {
         std::cerr << "Input file:" << sInputFile << '\n'  //
                   << "Check result:" << response << '\n';
-        return system::errc::protocol_error;
+        return refusePlan();
+      }
+
+      // Wzrost na dysku jest dozwolony, ale jawny (D8): wykaz przy starcie i w `-c`, takze z --quiet.
+      // Na stderr, bo log silnika lezy w $TMPDIR, a stdout `-c` bywa plikiem dot. Niczego nie kasuje -
+      // granice stawia RETENTION, magazyn MEMORY albo `[storage] default_retention`.
+      if (const auto unbounded = cm.unboundedDiskStreams(); !unbounded.empty()) {
+        for (const auto &[stream, reason] : unbounded) {
+          if (vm.contains("verbose"))
+            std::println(std::cerr, "{}: warning: stream {} grows without bound on disk ({})", argv[0], stream, reason);
+          SPDLOG_WARN("Stream {} grows without bound on disk ({})", stream, reason);
+        }
+        if (vm.contains("verbose"))
+          std::println(std::cerr,
+                       "{}: note: bound them with RETENTION <capacity> <segments>, STORAGE MEMORY, SUBSTRAT 'memory' "
+                       "or [storage] default_retention in the config",
+                       argv[0]);
       }
 
       if (onlyCompile) {
@@ -589,7 +621,7 @@ int main(int argc, char *argv[]) try {
         } else {
           for (const auto &live : instances) {
             if ((live.modes & bus::mode::kService) == 0U) continue;
-            FlockServiceGuard peerGuard(executableName + "_service" + (live.name.empty() ? "" : "." + live.name));
+            FlockServiceGuard peerGuard(ipc::serviceName(live.name));
             peerGuard.setLockDir(earlyAppCfg.lockDir);
             const FlockServiceGuard::PeerInfo found = peerGuard.readPeerInfo();
             if (isServicePeer(found)) {
@@ -661,6 +693,16 @@ int main(int argc, char *argv[]) try {
         }
 
         if (deliverToService) {
+          // Te same sprawdzenia plikow magazynu co przy starcie ponizej - PRZED nadpisaniem pliku
+          // uslugi. Bez nich plan odrzucany przy starcie wychodzil stad z kodem 0, a usluga tracila
+          // dzialajacy plan na rzecz takiego, ktory nie wstaje (#265).
+          for (const std::string &refusal :
+               {checkKeptStores(coreInstance, appCfg.storageDir), checkDescriptorFiles(coreInstance, appCfg.storageDir)}) {
+            if (refusal == "OK") continue;
+            std::cerr << "xretractor: " << refusal << "; nothing was changed\n";
+            SPDLOG_ERROR("Refused before delivery: {}", refusal);
+            return system::errc::protocol_error;
+          }
           const std::string target = peer.queryFile.empty() ? appCfg.serviceQueryFile : peer.queryFile;
           SPDLOG_INFO("Detected running service unit '{}'; delivering compiled query set to {}.", peer.unit, target);
           if (!servicecontrol::deliverQueryFile(sInputFile, target)) {
@@ -699,6 +741,19 @@ int main(int argc, char *argv[]) try {
   } catch (std::exception &e) {
     std::cerr << e.what() << "\n";
     return system::errc::interrupted;
+  }
+
+  // Pliki, ktore :ROTATION zachowa, musza pasowac do planu - przed pierwsza czynnoscia startu.
+  // Nie w `-c`: kompilacja nie musi biec na maszynie z danymi.
+  if (const std::string kept = checkKeptStores(coreInstance, {}); kept != "OK") {
+    std::cerr << "xretractor: " << kept << '\n';
+    SPDLOG_ERROR("Plan refused: {}", kept);
+    return refusePlan();
+  }
+  if (const std::string descriptorError = checkDescriptorFiles(coreInstance, {}); descriptorError != "OK") {
+    std::cerr << "xretractor: " << descriptorError << '\n';
+    SPDLOG_ERROR("Plan refused: {}", descriptorError);
+    return refusePlan();
   }
 
   // Od tego miejsca zaczyna sie transakcja startowa zwyklej instancji. Najpierw blokada
@@ -806,7 +861,7 @@ int main(int argc, char *argv[]) try {
 
   // Artefakty poprzedniego przebiegu znikaja ta sama droga co przy przeladowaniu planu
   // w locie (`xqry --reset`) - patrz dropStalePlanArtifacts w planSource.cpp.
-  dropStalePlanArtifacts(coreInstance, cm, processedLines);
+  dropStalePlanArtifacts(coreInstance);
 
   executorsm exec;
   return exec.run(coreInstance, guard, xrdbbus, cm, vm, appCfg, earlyServerName, systemd.unit.value_or(std::string{}));

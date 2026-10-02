@@ -1,0 +1,2 @@
+DECLARE v INTEGER STREAM guardsrc, 1 FILE 'data.txt'
+SELECT guardsrc[0]+1 STREAM guarddst FROM guardsrc

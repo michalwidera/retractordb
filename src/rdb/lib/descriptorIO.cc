@@ -1,49 +1,47 @@
 #include "rdb/descriptorIO.hpp"
 
-#include <spdlog/spdlog.h>
-
 #include <fstream>
 #include <iostream>
+#include <sstream>
+#include <utility>
+
+#include <spdlog/spdlog.h>
 
 #include <fmt/format.h>
 
 #include "rdb/exceptions.hpp"
 
+extern std::string parserDESCString(rdb::Descriptor &desc, std::string_view inlet);
+
 namespace rdb {
 
+std::string tryLoadDescriptorFile(const std::string &descriptorFile, Descriptor &descriptor) {
+  std::ifstream file(descriptorFile);
+  if (!file) return "cannot open descriptor file: " + descriptorFile;
+
+  std::ostringstream content;
+  content << file.rdbuf();
+  if (file.bad()) return "cannot read descriptor file: " + descriptorFile;
+
+  Descriptor parsed;
+  if (const std::string result = parserDESCString(parsed, content.str()); result != "OK")
+    return "descriptor parse failed in '" + descriptorFile + "': " + result;
+  if (parsed.getSizeInBytes() == 0) return "storage: empty descriptor file: " + descriptorFile;
+  descriptor = std::move(parsed);
+  return {};
+}
+
 Descriptor loadDescriptorFile(const std::string &descriptorFile) {
-  Descriptor descriptor;
-
-  std::fstream myFile;
-  myFile.rdbuf()->pubsetbuf(nullptr, 0);
-  myFile.open(descriptorFile, std::ios::in);  // Open existing descriptor
-
-  // failbit po operator>> znaczy teraz dokladnie "tekst sie nie sparsowal" - ekstraktor
-  // gasi ten ustawiony przez koniec strumienia (descriptor.cc). Stan trzeba odczytac
-  // PRZED close(), bo close() na strumieniu, ktorego nie udalo sie otworzyc, sam zapala
-  // failbit i zatarlby rozroznienie.
-  bool parseFailed = false;
-  if (myFile.good()) {
-    myFile >> descriptor;
-    parseFailed = myFile.fail();
-  }
-  myFile.close();
-
   // Rzut, nie koniec procesu: ta funkcja jest granica biblioteki i jedynym wejsciem, przez
   // ktore wiazanie Pythona wczytuje deskryptor. std::exit nie odwija stosu, wiec zaden
   // catch po stronie osadzajacego procesu go nie widzi - konczyl sie smiercia jadra
-  // notatnika na jednym uszkodzonym pliku.
-  if (parseFailed) {
-    SPDLOG_ERROR("Invalid descriptor in file: {}", descriptorFile);
-    throw CorruptDescriptor("invalid descriptor in file: " + descriptorFile);
-  }
-
-  // Deskryptor pusty rowniez wtedy, gdy pliku po prostu nie ma - myFile.good() jest
-  // wowczas falszem i nic sie nie czytalo. Komunikat zostaje wspolny, bo taki byl przed
-  // faza 1, a rozdzielenie brakujacego pliku od pustego nalezy do taksonomii z fazy 5.
-  if (descriptor.getSizeInBytes() == 0) {
-    SPDLOG_ERROR("Empty descriptor in file.");
-    throw CorruptDescriptor("empty descriptor file: " + descriptorFile);
+  // notatnika na jednym uszkodzonym pliku. Powod odmowy jest ten sam, ktory serwer dostaje
+  // z tryLoadDescriptorFile() - brak pliku, blad odczytu, skladni albo wartosci, pusty
+  // deskryptor - i jeden typ dla wszystkich, jak przed rozdzieleniem.
+  Descriptor descriptor;
+  if (const std::string error = tryLoadDescriptorFile(descriptorFile, descriptor); !error.empty()) {
+    SPDLOG_ERROR("Invalid descriptor: {}", error);
+    throw CorruptDescriptor(error);
   }
   return descriptor;
 }

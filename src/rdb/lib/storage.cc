@@ -40,9 +40,10 @@ storage::storage(const std::string_view qryID,         //
       percounter_(percounter),
       memory_(memory) {}
 
-void storage::attachDescriptor(const Descriptor *descriptorParam) {
-  if (descriptorFileExist()) {
-    descriptor = loadDescriptorFile(paths_.descriptorFile());
+std::string storage::attachDescriptor(const Descriptor *descriptorParam) {
+  const bool descriptorExisted = descriptorFileExist();
+  if (descriptorExisted) {
+    if (const std::string error = tryLoadDescriptorFile(paths_.descriptorFile(), descriptor); !error.empty()) return error;
     if (descriptorParam != nullptr) verifyDescriptorMatch(*descriptorParam, descriptor, paths_.descriptorFile());
   } else {
     if (descriptorParam == nullptr) {
@@ -58,10 +59,15 @@ void storage::attachDescriptor(const Descriptor *descriptorParam) {
   storagePayload_ = std::make_unique<rdb::payload>(descriptor);
   buffer_.attach(descriptor);
 
-  attachStorage();
+  const std::string error = attachStorage();
+  if (!error.empty() && !descriptorExisted) {
+    std::error_code ec;
+    std::filesystem::remove(paths_.descriptorFile(), ec);
+  }
+  return error;
 }
 
-void storage::attachStorage() {
+std::string storage::attachStorage() {
   // Niezmiennik, nie kontrola wejscia: relocateFromRef() tuz wyzej odmawia juz przy pustej
   // sciezce (ConfigError), wiec pusta tutaj znaczy, ze ktos wywolal attachStorage() z
   // pominieciem attachDescriptor().
@@ -75,14 +81,16 @@ void storage::attachStorage() {
   }
 
   initializeAccessor();
+  if (!accessor_->initializationError().empty()) return accessor_->initializationError();
 
   // Wstrzyknięcie wariantu metadanych - dobór wariantu (inertny/cień indeksu/bazowy) realizuje fabryka.
   metaData_ = makeMetaIndex(isDeclared(), accessor_->hasShadow(), descriptor, paths_.metaIndexFile());
 
-  if (isDeclared()) return;
+  if (isDeclared()) return {};
 
   recordsCount_ = accessor_->count();
   detectStartupState();
+  return {};
 }
 
 storage::~storage() {
@@ -113,8 +121,16 @@ void storage::resetForUnitTest() {
     if (!isDeclared()) remove(paths_.storageFile().c_str());
 
   initializeAccessor();
+  if (!accessor_->initializationError().empty())
+    throw IOError(fmt::format("storage::resetForUnitTest: {}", accessor_->initializationError()));
 
-  accessor_->write(nullptr, 0);
+  // Zrodlo deklarowane jest tylko do odczytu (purge zwraca ENOTSUP) - wystarcza mu ponowne otwarcie wyzej.
+  if (!isDeclared()) {
+    if (const auto result = accessor_->write(nullptr, 0); result != 0) {
+      throw IOError(fmt::format("storage::resetForUnitTest: purge of '{}' failed (result={}: {})", paths_.storageFile(), result,
+                                strerror(static_cast<int>(result))));
+    }
+  }
   recordsCount_ = 0;
 
   if (metaData_) (*metaData_).reset();
@@ -175,7 +191,11 @@ void storage::fire() {
 void storage::purge() {
   abortIfStorageNotPrepared();
 
-  accessor_->write(nullptr, 0);
+  // Nieudany purge zostawia dane na nosniku; bez zatrzymania recordsCount_ = 0 rozjechalby sie z count().
+  if (const auto result = accessor_->write(nullptr, 0); result != 0) {
+    throw IOError(fmt::format("storage::purge: purge of '{}' failed (result={}: {})", paths_.storageFile(), result,
+                              strerror(static_cast<int>(result))));
+  }
   recordsCount_ = 0;
 
   (*metaData_).reset();  // czyści indeks oraz liczniki maszyny gap
@@ -191,7 +211,7 @@ bool storage::isMetaIndexEmpty() const {
   return metaData_->isEmpty();
 }
 
-bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
+rdb::ReadStatus storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
   // ConfigError, nie LogicError: zrodla deklarowane czyta sie przez revRead(), a proba
   // czytania ich wprost jest bledem WOLAJACEGO, nie zlamanym niezmiennikiem silnika. To samo
   // rozroznienie widzi uzytkownik Pythona - straz w module.cpp zglasza tu StorageError.
@@ -206,33 +226,53 @@ bool storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
   auto size      = descriptor.getSizeInBytes();
   ssize_t result = 0;
 
+  // Asercja spójności TYLKO w Debug. accessor_->count() nie jest odczytem pola: dla magazynu
+  // DEFAULT (groupFile) to jeden stat() na KAŻDY żywy segment retencji, a read() stoi w pętli
+  // okna - streamInstance woła revRead() raz na element (FIR mwi_long = 180 elementów), więc
+  // przy interwale 1/360 s samo to okno wnosi kilkadziesiąt tysięcy wejść do jądra na sekundę.
+  // Pod SCHED_FIFO każde z nich obciąża budżet slotu, a ten budżet jest wielkością mierzoną -
+  // asercja płatna per rekord zmienia więc wynik pomiaru, dla którego silnik istnieje.
+  //
+  // W Release nie zostaje ślepa plama: jeśli plik został skrócony poniżej czytanej pozycji,
+  // poniższe accessor_->read() zwraca błąd (krótki pread) i rzuca IOError z nazwą pliku
+  // oraz pozycją. Tracimy wcześniejsze ostrzeżenie, nie samo wykrycie rozjazdu.
+#ifndef NDEBUG
   if (recordsCount_ != accessor_->count()) {
     throw LogicError(fmt::format("storage::read: internal record count mismatch: recordsCount_={} count()={} in {}",
                                  recordsCount_, accessor_->count(), paths_.storageFile()));
   }
+#endif
 
   if (isHold_) {
+    // HOLD to stan LEGALNY, nie brak rekordu: strumien celowo wydaje wartosc zatrzymana, wiec
+    // status jest Ok, a bitset zostaje taki, jaki byl przy ostatnim odczycie.
     std::memset(destination, 0, size);
-    return true;
+    return ReadStatus::Ok;
   }
 
   if (recordsCount_ > 0 && recordIndexFromFront < recordsCount_) {
     result = accessor_->read(destination, recordIndexFromFront * size);
     if (result != 0) {
-      throw IOError(fmt::format("storage::read: read from '{}' at pos {} failed (result={})", accessor_->name(),
-                                recordIndexFromFront, result));
+      throw IOError(fmt::format("storage::read: read from '{}' at pos {} failed (result={}: {})", accessor_->name(),
+                                recordIndexFromFront, result, strerror(static_cast<int>(result))));
     }
     storagePayload_->setNullBitset(metaData_->nullBitsetFor(recordIndexFromFront));
   } else {
+    // Rekordu NIE MA. Pamiec zerujemy, bo wolajacy moze na nia patrzec, ale bitset mowi all-null:
+    // wartosc nieokreslona, nie zero. Poprzednio stalo tu `false` na kazdym polu, czyli jawne
+    // "to nie jest NULL" - przez co semantyka pochlaniania NULL-i sie NIE wlaczala i reduktor
+    // skladal to zero do MIN/MAX/SUM/AVG. Konwencja jest ta sama, ktora dataModel::fetchForward
+    // stosuje dla rekordu poza zgromadzona historia.
     std::memset(destination, 0, size);
-    storagePayload_->setNullBitset(std::vector<bool>(descriptor.size(), false));
+    storagePayload_->setNullBitset(std::vector<bool>(descriptor.size(), true));
     SPDLOG_ERROR("read fake {} - non existing data from pos:{} rec-count:{}", accessor_->name(), recordIndexFromFront,
                  recordsCount_);
+    return ReadStatus::NoSuchRecord;
   }
-  return result == 0;
+  return ReadStatus::Ok;
 }
 
-bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
+rdb::ReadStatus storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   if (isHold_) {
     destination = (destination == nullptr)              //
                       ? storagePayload_->span().data()  //
@@ -242,12 +282,13 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
     auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
     bufferState = sourceState::armed;  // fake armed on hold position
-    return true;
+    return ReadStatus::Ok;
   }
 
   if (!isDeclared()) {
-    // Spójność recordsCount_ vs accessor_->count() weryfikuje read() - dla magazynów
-    // plikowych count() to syscall (stat), więc nie powtarzamy tego sprawdzenia tutaj.
+    // Spójność recordsCount_ vs accessor_->count() weryfikuje read(), i to tylko w Debug -
+    // dla magazynów plikowych count() to syscall (stat), więc nie powtarzamy go tutaj ani nie
+    // zostawiamy w Release (uzasadnienie przy asercji w read()).
     const auto recordPositionFromBack = recordsCount_ - recordIndexFromBack - 1;
     return read(recordPositionFromBack, destination);
   }
@@ -264,7 +305,7 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   if (recordIndexFromBack == 0 && bufferState == sourceState::flux) {
     buffer_.readCurrent(*accessor_, *storagePayload_);
     bufferState = sourceState::armed;
-    return true;
+    return ReadStatus::Ok;
   }
   // recordIndexFromBack is size_t (unsigned), always >= 0
 
@@ -289,16 +330,21 @@ bool storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
     if (destination == nullptr) throw LogicError("storage::revRead: destination pointer is null in buffer fallback path");
     auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
+    // Ten sam brak rekordu co w read(), tylko dla zrodla DEKLAROWANEGO: bufor historii nie siega
+    // tak gleboko. Poprzednio bitset zostawal tu NIETKNIETY, wiec rekord dziedziczyl znaczniki po
+    // poprzednim odczycie - jeszcze gorzej niz zera oznaczone jako nie-null, bo wynik zalezal od
+    // tego, co akurat lezalo w payloadzie.
+    storagePayload_->setNullBitset(std::vector<bool>(descriptor.size(), true));
     SPDLOG_ERROR("read buffer fn {} - non existing data from [pos:{} cap:{} size:{}]", accessor_->name(), recordIndexFromBack,
                  buffer_.capacity(), buffer_.size());
-    return true;
+    return ReadStatus::NoSuchRecord;
   }
 
   // Note: the previous if-block handles the case where recordIndexFromBack >= buffer_.size()
   // so here recordIndexFromBack < buffer_.size() is guaranteed
 
   *(storagePayload_) = buffer_.history(recordIndexFromBack);
-  return true;
+  return ReadStatus::Ok;
 }
 
 void storage::setCapacity(const int capacity) {
@@ -313,16 +359,22 @@ bool storage::write(const size_t recordIndex) {
   // (nie trafia do fizycznego magazynu), a jego brak zostanie oznaczony wpisem gap.
   if (recordIndex >= recordsCount_ && metaData_->absorbAppend(nullInfo)) return true;
 
+  // Asercja spójności TYLKO w Debug, z tego samego powodu co w read(): accessor_->count() to
+  // syscall (stat() na każdy segment), a write() wykonuje się raz na strumień na takt, wewnątrz
+  // tego samego mierzonego budżetu slotu. Różnica wobec read() jest wyłącznie w krotności.
+#ifndef NDEBUG
   if (recordsCount_ != accessor_->count()) {
     throw LogicError(fmt::format("storage::write: internal record count mismatch: recordsCount_={} count()={} in {}",
                                  recordsCount_, accessor_->count(), paths_.storageFile()));
   }
+#endif
 
   ssize_t result = 0;
   if (recordIndex >= recordsCount_) {
     result = accessor_->write(storagePayload_->span().data());  // <- Call to append Function
     if (result != 0) {
-      throw IOError(fmt::format("storage::write: append to '{}' failed (result={})", paths_.storageFile(), result));
+      throw IOError(fmt::format("storage::write: append to '{}' failed (result={}: {})", paths_.storageFile(), result,
+                                strerror(static_cast<int>(result))));
     }
     recordsCount_++;
     // `if constexpr` obejmuje całe wywołanie, nie tylko treść sondy: przy wyłączonej
@@ -341,8 +393,8 @@ bool storage::write(const size_t recordIndex) {
   } else {
     result = accessor_->write(storagePayload_->span().data(), recordIndex * descriptor.getSizeInBytes());
     if (result != 0) {
-      throw IOError(fmt::format("storage::write: overwrite to '{}' at index {} failed (result={})", paths_.storageFile(),
-                                recordIndex, result));
+      throw IOError(fmt::format("storage::write: overwrite to '{}' at index {} failed (result={}: {})", paths_.storageFile(),
+                                recordIndex, result, strerror(static_cast<int>(result))));
     }
     // Nadpisanie nie zwiększa objętości magazynu, więc nie wchodzi do `bytes`. Do metryki
     // K23 wchodzi, bo tam jednostką jest zapis rekordu, nie przyrost objętości - inaczej

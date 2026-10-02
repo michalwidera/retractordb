@@ -1,14 +1,20 @@
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
+
+#include <sys/stat.h>
 
 #include <cerrno>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <map>
 #include <string>
 #include <vector>
 
+#include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/faccposixshd.hpp"
 #include "syscallWrap.hpp"
 
@@ -31,9 +37,14 @@ static rdb::Descriptor makeDescInt(size_t size) { return {"f", static_cast<int>(
 // g_pread_eintr_count / g_write_eintr_count control how many
 // consecutive EINTR errors the wrapped syscall will produce
 // before delegating to the real implementation.
+// g_write_zero_on_call / g_write_error_on_call = N: N-te wywolanie write() od ustawienia
+// zwraca 0 bajtow albo -1 z errno = g_write_error_errno; pozostale ida do jadra.
 
-static thread_local int g_pread_eintr_count = 0;
-static thread_local int g_write_eintr_count = 0;
+static thread_local int g_pread_eintr_count   = 0;
+static thread_local int g_write_eintr_count   = 0;
+static thread_local int g_write_error_on_call = 0;
+static thread_local int g_write_error_errno   = 0;
+static thread_local int g_write_zero_on_call  = 0;
 
 extern "C" {
 ssize_t __real_pread(int fd, void *buf, size_t count, off_t offset);
@@ -49,6 +60,11 @@ ssize_t __wrap_pread(int fd, void *buf, size_t count, off_t offset) {
 }
 
 ssize_t __wrap_write(int fd, const void *buf, size_t count) {
+  if (g_write_zero_on_call > 0 && --g_write_zero_on_call == 0) return 0;
+  if (g_write_error_on_call > 0 && --g_write_error_on_call == 0) {
+    errno = g_write_error_errno;
+    return -1;
+  }
   if (g_write_eintr_count > 0) {
     --g_write_eintr_count;
     errno = EINTR;
@@ -63,6 +79,28 @@ ssize_t __wrap_write(int fd, const void *buf, size_t count) {
 // o nazwie systemowej - patrz syscallWrap.hpp.
 RDB_WRAP_SYSCALL(ssize_t, pread, (int fd, void *buf, size_t count, off_t offset), (fd, buf, count, offset));
 RDB_WRAP_SYSCALL(ssize_t, write, (int fd, const void *buf, size_t count), (fd, buf, count));
+
+// Wstrzykniecie awarii stat() - uzywane przez test kontraktu count(). Licznik jest
+// jednorazowy i uzbrajany tuz przed badanym wywolaniem: --wrap dziala na CALY plik
+// wykonywalny, wiec uzbrojony na dluzej przechwycilby takze cudze stat().
+
+static thread_local int g_stat_fail_count = 0;
+static thread_local int g_stat_fail_errno = 0;
+
+extern "C" {
+int __real_stat(const char *path, struct stat *buf);
+
+int __wrap_stat(const char *path, struct stat *buf) {
+  if (g_stat_fail_count > 0) {
+    --g_stat_fail_count;
+    errno = g_stat_fail_errno;
+    return -1;
+  }
+  return __real_stat(path, buf);
+}
+}
+
+RDB_WRAP_SYSCALL(int, stat, (const char *path, struct stat *buf), (path, buf));
 
 // --- Helpers ---
 
@@ -87,8 +125,13 @@ class ShadowFileTest : public ::testing::Test {
   const rdb::Descriptor desc                = makeDesc(sizeof(BYTE));
 
   void SetUp() override {
-    g_pread_eintr_count = 0;
-    g_write_eintr_count = 0;
+    g_pread_eintr_count   = 0;
+    g_write_eintr_count   = 0;
+    g_write_error_on_call = 0;
+    g_write_error_errno   = 0;
+    g_write_zero_on_call  = 0;
+    g_stat_fail_count     = 0;
+    g_stat_fail_errno     = 0;
     if (std::filesystem::is_directory(sandBoxFolder)) {
       std::filesystem::remove_all(sandBoxFolder);
     }
@@ -102,8 +145,13 @@ class ShadowFileTest : public ::testing::Test {
   }
 
   void TearDown() override {
-    g_pread_eintr_count = 0;
-    g_write_eintr_count = 0;
+    g_pread_eintr_count   = 0;
+    g_write_eintr_count   = 0;
+    g_write_error_on_call = 0;
+    g_write_error_errno   = 0;
+    g_write_zero_on_call  = 0;
+    g_stat_fail_count     = 0;
+    g_stat_fail_errno     = 0;
     if (std::filesystem::is_directory(sandBoxFolder)) {
       std::filesystem::remove_all(sandBoxFolder);
     }
@@ -115,6 +163,43 @@ class ShadowFileTest : public ::testing::Test {
 // ============================================================
 // posixBinaryFileWithShadow tests
 // ============================================================
+
+TEST_F(ShadowFileTest, shadow_open_failure_returns_status_and_removes_new_main_file) {
+  std::filesystem::create_directory(filename + ".shadow");
+  {
+    rdb::posixBinaryFileWithShadow file(filename, desc);
+    EXPECT_NE(file.initializationError().find(filename + ".shadow"), std::string::npos);
+    EXPECT_FALSE(std::filesystem::exists(filename));
+  }
+  EXPECT_TRUE(std::filesystem::is_directory(filename + ".shadow"));
+}
+
+// Regresja E-03 (#270) - uzasadnienie przy tym samym tescie w test_faccposix.cpp.
+TEST_F(ShadowFileTest, write_without_descriptor_returns_ebadf_even_when_errno_is_zero) {
+  std::filesystem::create_directory(filename);
+  rdb::posixBinaryFileWithShadow file(filename, desc);
+  ASSERT_FALSE(file.initializationError().empty());
+
+  BYTE data = 0xAA;
+  errno     = 0;
+  EXPECT_EQ(file.write(&data), EBADF);
+  errno = 0;
+  EXPECT_EQ(file.read(&data, 0), EBADF);
+}
+
+// Brak samego cienia tez jest akcesorem bez nosnika. Dawniej straz patrzyla tylko na fd, wiec
+// dopisanie do glownego pliku przechodzilo mimo niepustego initializationError().
+TEST_F(ShadowFileTest, write_without_shadow_descriptor_returns_ebadf) {
+  std::filesystem::create_directory(filename + ".shadow");
+  rdb::posixBinaryFileWithShadow file(filename, desc);
+  ASSERT_FALSE(file.initializationError().empty());
+
+  BYTE data = 0xAA;
+  errno     = 0;
+  EXPECT_EQ(file.write(&data), EBADF);
+  errno = 0;
+  EXPECT_EQ(file.read(&data, 0), EBADF);
+}
 
 // Verify append writes go to main file, not shadow
 TEST_F(ShadowFileTest, test_faccposixshd_append_to_main) {
@@ -266,6 +351,23 @@ TEST_F(ShadowFileTest, test_faccposixshd_truncate) {
   GTEST_ASSERT_EQ(shd->count(), 0);
 }
 
+// Purge oproznia oba pliki W MIEJSCU - uzasadnienie przy tescie purge w test_faccposix.cpp.
+// Tu dochodzi cien: wpis sprzed purge nie moze przeslonic nowego rekordu na tej samej pozycji.
+TEST_F(ShadowFileTest, test_faccposixshd_purge_keeps_files_usable) {
+  rdb::posixBinaryFileWithShadow shd(sandboxPath("shd_purge"), desc);
+  BYTE record = 10;
+  GTEST_ASSERT_EQ(shd.write(&record), EXIT_SUCCESS);
+  record = 99;
+  GTEST_ASSERT_EQ(shd.write(&record, 0), EXIT_SUCCESS);  // update -> cien
+  GTEST_ASSERT_EQ(shd.write(nullptr, 0), EXIT_SUCCESS);
+  record = 42;
+  GTEST_ASSERT_EQ(shd.write(&record), EXIT_SUCCESS);
+  EXPECT_EQ(shd.count(), 1U);
+  record = 0;
+  EXPECT_EQ(shd.read(&record, 0), EXIT_SUCCESS);
+  EXPECT_EQ(record, 42);
+}
+
 // Verify count returns only main file record count (shadow doesn't affect count)
 TEST_F(ShadowFileTest, test_faccposixshd_count_ignores_shadow) {
   BYTE record;
@@ -298,7 +400,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_read_empty_file) {
   GTEST_ASSERT_NE(std::filesystem::exists(path), 0);
 }
 
-// Verify reading beyond EOF returns failure
+// Verify reading beyond EOF returns ERANGE: no record at that position (contract at FileInterface::write)
 TEST_F(ShadowFileTest, test_faccposixshd_read_beyond_eof) {
   BYTE record;
   auto path = sandboxPath("shd_beyond");
@@ -309,7 +411,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_read_beyond_eof) {
   shd->write(&record);
 
   GTEST_ASSERT_EQ(shd->count(), 1);
-  GTEST_ASSERT_NE(shd->read(&record, 5), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(shd->read(&record, 5), ERANGE);
 }
 
 // Verify shadow entry binary format: (size_t position, data[recordSize])
@@ -659,6 +761,105 @@ TEST_F(ShadowFileTest, test_faccposixshd_update_write_eintr_exceeds_limit_fails)
   g_write_eintr_count = 10;
   data                = 0xEE;
   ASSERT_NE(pfa->write(&data, 0), EXIT_SUCCESS);
+}
+
+// Awaria write() inna niz EINTR oddaje wlasne errno, jak w posixBinaryFile (#270, kryterium 3).
+// Dawniej wariant z cieniem zwracal tu EXIT_FAILURE. Drugi zapis trafia w pozycje wpisu cienia.
+TEST_F(ShadowFileTest, non_eintr_write_failure_returns_its_errno) {
+  rdb::posixBinaryFileWithShadow file(sandboxPath("shd_write_error"), desc);
+  BYTE data = 0xAA;
+
+  g_write_error_on_call = 1;
+  g_write_error_errno   = EACCES;
+  EXPECT_EQ(file.write(&data), EACCES);
+
+  ASSERT_EQ(file.write(&data), EXIT_SUCCESS);
+  g_write_error_on_call = 1;
+  g_write_error_errno   = EACCES;
+  EXPECT_EQ(file.write(&data, 0), EACCES);
+}
+
+// To samo dla petli zapisu danych wpisu cienia: pozycja zapisana, awaria dopiero na danych.
+TEST_F(ShadowFileTest, non_eintr_shadow_data_write_failure_returns_its_errno) {
+  rdb::posixBinaryFileWithShadow file(sandboxPath("shd_data_write_error"), desc);
+  BYTE data = 0xAA;
+  ASSERT_EQ(file.write(&data), EXIT_SUCCESS);
+
+  g_write_error_on_call = 2;  // zapis pozycji, potem zapis danych
+  g_write_error_errno   = ENOSPC;
+  EXPECT_EQ(file.write(&data, 0), ENOSPC);
+}
+
+// merge() podlega tej samej rodzinie kodow co read()/write(); dawniej zwracal EXIT_FAILURE,
+// czyli takze EPERM. Bez deskryptora cienia fstat() odpowiada EBADF.
+TEST_F(ShadowFileTest, merge_without_shadow_descriptor_returns_ebadf) {
+  std::filesystem::create_directory(filename + ".shadow");
+  rdb::posixBinaryFileWithShadow file(filename, desc);
+  ASSERT_FALSE(file.initializationError().empty());
+
+  errno = 0;
+  EXPECT_EQ(file.merge(), EBADF);
+}
+
+// write() zwracajace 0 bajtow - uzasadnienie przy tym samym tescie w test_faccposix.cpp.
+TEST_F(ShadowFileTest, zero_byte_append_returns_eio_without_writing_record) {
+  rdb::posixBinaryFileWithShadow file(sandboxPath("shd_zero_append"), desc);
+  BYTE data            = 0xAA;
+  g_write_zero_on_call = 1;
+  EXPECT_EQ(file.write(&data), EIO);
+  EXPECT_EQ(file.count(), 0);
+}
+
+// To samo dla petli zapisu danych wpisu cienia (aktualizacja rekordu).
+TEST_F(ShadowFileTest, zero_byte_shadow_data_write_returns_eio) {
+  rdb::posixBinaryFileWithShadow file(sandboxPath("shd_zero_update"), desc);
+  BYTE data = 0xAA;
+  ASSERT_EQ(file.write(&data), EXIT_SUCCESS);
+
+  data                 = 0xBB;
+  g_write_zero_on_call = 2;  // zapis pozycji, potem zapis danych
+  EXPECT_EQ(file.write(&data, 0), EIO);
+  EXPECT_EQ(file.count(), 1);
+}
+
+// count(): awaria stat() inna niz ENOENT rzuca IOError, zamiast oddac blad jako liczbe.
+// Pilnowana regresja: `return -1` z count() dociera do storage::recordsCount_ jako SIZE_MAX
+// (uzasadnienie kontraktu przy FileInterface::count). Dlatego sprawdzamy nie tylko to, ZE
+// count() odmawia, ale i to, ze odmawia samo - komunikatem tej wlasnie funkcji.
+TEST_F(ShadowFileTest, test_faccposixshd_count_stat_failure_is_fatal) {
+  const std::string path = sandboxPath("shd_count_stat_fail");
+  {
+    auto pfa    = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
+    BYTE record = 0xAA;
+    GTEST_ASSERT_EQ(pfa->write(&record), EXIT_SUCCESS);
+    // Kontrola dodatnia: z rozbrojonym licznikiem stat() dziala i count() liczy normalnie.
+    GTEST_ASSERT_EQ(pfa->count(), 1);
+  }
+
+  rdb::posixBinaryFileWithShadow pfa(path, desc);
+  g_stat_fail_count = 1;
+  g_stat_fail_errno = EACCES;
+  // Gdyby count() wrocilo do oddawania bledu jako liczby, gtest zglosi brak wyjatku.
+  EXPECT_THAT([&] { static_cast<void>(pfa.count()); },
+              ::testing::ThrowsMessage<rdb::IOError>(::testing::HasSubstr("posixBinaryFileWithShadow::count: ::stat")));
+}
+
+// Rotacja pod numerem, ktory ma juz archiwum, zostawia slad w logu (#281) - jak w faccposix.
+// Pierwsza rotacja pod tym numerem jest kontrola: nie nadpisuje niczego i komunikatu nie ma.
+TEST_F(ShadowFileTest, test_faccposixshd_rotation_overwrite_is_logged) {
+  const std::string path    = sandboxPath("shd_rotate");
+  const std::string archive = path + ".old7";
+  BYTE record               = 0xAA;
+  for (int session = 0; session < 2; ++session) {
+    LogCapture log;
+    {
+      rdb::posixBinaryFileWithShadow shd(path, desc, 7);
+      GTEST_ASSERT_EQ(shd.write(&record), EXIT_SUCCESS);
+    }
+    EXPECT_TRUE(std::filesystem::exists(archive));
+    const bool logged = log.text().find("overwrote existing archive " + archive) != std::string::npos;
+    EXPECT_EQ(logged, session == 1) << "session " << session << ", log: " << log.text();
+  }
 }
 
 // NOLINTEND(modernize-avoid-c-arrays)

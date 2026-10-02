@@ -34,7 +34,7 @@ Allowed options:
   -p [ --gnuplot ] arg           x,y - gnuplot output mode
   -z [ --gnuplot-rtl ]           gnuplot output: newest samples on the right
                                  (right-to-left scroll)
-  --gnuplot-ohlc                 gnuplot output: row = open, high, low, close,
+  -o [ --gnuplot-ohlc ]          gnuplot output: row = open, high, low, close,
                                  then the samples of that candle
   -e [ --config ] arg            config file (TOML); overrides search
   -h [ --help ]                  produce help message
@@ -122,6 +122,13 @@ $ xqry --reset broken.rql --server service
 xqry: plan reload refused at reset-commit: Fail compile:...
 ```
 
+A plan carrying a `DO SYSTEM` rule is refused as a **whole**, naming the rule and the reason. The reset channel carries no authorship - it is the same unauthenticated queue the ad-hoc channel refuses `DO SYSTEM` on - so a rule that runs an arbitrary shell command may only be asked for in the plan file the service starts from. The refusal covers the whole set rather than the single rule because an accepted plan is persisted to the service's query file, where a rule skipped in flight would come back armed after the next restart. An operator who deliberately hands this channel over sets `unrestricted = true` under `[service]` in the service configuration; the instance then logs a warning at every start, and the ad-hoc channel stays closed regardless.
+
+```
+$ xqry --reset with-system-rule.rql --server service
+xqry: plan reload refused at reset-commit: Rejected: rule 'evil' on stream 'alpha' uses DO SYSTEM; ...
+```
+
 An accepted plan replaces the running one at the end of the current slot: stream artifacts of the old plan are dropped exactly as at start-up (unless the plan carries `:ROTATION`), subscribed clients are told the show is over, and the new names are claimed on the bus. A file with no statements at all is a legal request - it returns the instance to the **idle** state, serving nothing and waiting for the next plan.
 
 An instance started as a service (`--service`, `XRETRACTOR_SERVICE=1`, or a systemd unit) is named `service` on the bus unless `--name` says otherwise, so the target is the same on every machine: `--server service`. With exactly one live instance `--server` may be omitted.
@@ -181,7 +188,9 @@ An unknown stream name prints nothing and exits with code `2`, in both forms.
 
 ## Live instances - `xqry --bus`
 
-`--bus` lists the live xretractor instances read from the bus segment, without contacting any server. `--bus -y` reports the same list in YAML. Two differences follow from the format: the query path is given **in full** (the table shortens it to `.../<dir>/<file>` for readability, which a consumer cannot open), and the MODE letter legend is not printed - its meaning belongs in this documentation, not in a machine-readable document. An empty bus still yields a document: `servers: []` on stdout, with the `no live xretractor instance` note on stderr.
+`--bus` discovers accessible bus namespaces with live registered instances without requiring `RDB_NAMESPACE`, and prints a separate `NAMESPACE:` table for each one. `(default)` names the unscoped bus. It reads the shared-memory registries without contacting any server; stale segments with no live instances are omitted. Shared-memory permissions limit discovery to buses accessible to the current account. This discovery applies only to `--bus`: other commands still route within the current `RDB_NAMESPACE`.
+
+`--bus -y` reports all the same instances in one `servers` list. Each server has a `namespace` field (`null` for the default bus), so servers with the same name in different namespaces remain distinguishable. The query path is given **in full** (the table shortens it to `.../<dir>/<file>` for readability), and the MODE letter legend is omitted. When no instance is live, YAML still yields `servers: []` on stdout, with the `no live xretractor instance` note on stderr.
 
 ```
 $ xqry --bus -y
@@ -189,6 +198,7 @@ $ xqry --bus -y
 apiVersion: xqry/v1
 servers:
   - name: smokea
+    namespace: null
     pid: 116472
     modes: N
     query: "/srv/retractor/plans/alfa.rql"

@@ -1,13 +1,19 @@
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <cerrno>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
 
+#include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
+#include "rdb/exceptions.hpp"
 #include "rdb/faccfs.hpp"
+#include "rdb/storage.hpp"
 
 // Tests intentionally use raw byte buffers for low-level I/O API verification.
 // NOLINTBEGIN(modernize-avoid-c-arrays)
@@ -146,6 +152,20 @@ TEST_F(FaccfsTest, append_multiple_and_read_back) {
   }
 }
 
+// Odczyt poza koncem: 0 bajtow to brak rekordu pod pozycja (ERANGE), rekord urwany w polowie
+// to EIO - kontrakt przy FileInterface::write, wspolny z wariantami posixowymi.
+TEST_F(FaccfsTest, read_beyond_end_returns_erange_and_torn_record_eio) {
+  auto desc = makeDesc(AREA_SIZE);
+  rdb::genericBinaryFile gf(sandboxPath(filename), desc);
+
+  uint8_t data[10] = {};
+  ASSERT_EQ(gf.write(data), EXIT_SUCCESS);
+
+  uint8_t rData[10] = {};
+  EXPECT_EQ(gf.read(rData, AREA_SIZE), ERANGE);
+  EXPECT_EQ(gf.read(rData, AREA_SIZE / 2), EIO);
+}
+
 // ============================================================
 // Update in-place
 // ============================================================
@@ -222,6 +242,44 @@ TEST_F(FaccfsTest, destructor_rotates_file_percounter_zero) {
   }
   EXPECT_FALSE(std::filesystem::exists(path));
   EXPECT_TRUE(std::filesystem::exists(path + ".old0"));
+}
+
+// Rotacja pod numerem, ktory ma juz archiwum, zostawia slad w logu (#281) - jak w faccposix.
+// Pierwsza rotacja pod tym numerem jest kontrola: nie nadpisuje niczego i komunikatu nie ma.
+TEST_F(FaccfsTest, destructor_rotation_overwrite_is_logged) {
+  auto desc                 = makeDesc(AREA_SIZE);
+  auto path                 = sandboxPath("rotate_twice");
+  const std::string archive = path + ".old3";
+  for (int session = 0; session < 2; ++session) {
+    LogCapture log;
+    {
+      rdb::genericBinaryFile gf(path, desc, 3);
+      uint8_t data[10];
+      std::memcpy(data, "rotate dat", AREA_SIZE);
+      gf.write(data);
+    }
+    EXPECT_TRUE(std::filesystem::exists(archive));
+    const bool logged = log.text().find("overwrote existing archive " + archive) != std::string::npos;
+    EXPECT_EQ(logged, session == 1) << "session " << session << ", log: " << log.text();
+  }
+}
+
+// Purge przez write(nullptr, 0) oproznia plik. Warunek galezi purge wymagal dawniej takze
+// recordSize_ == 0 - nieosiagalne, bo write() konczy sie przy zerze FatalError - wiec purge
+// wpadal w zwykly zapis spod nullptr (UB).
+TEST_F(FaccfsTest, purge_empties_file) {
+  auto desc = makeDesc(AREA_SIZE);
+  auto path = sandboxPath("purge_file");
+  rdb::genericBinaryFile gf(path, desc);
+  uint8_t data[10];
+  std::memcpy(data, "purge data", AREA_SIZE);
+  gf.write(data);
+  gf.write(data);
+  ASSERT_EQ(gf.count(), 2U);
+
+  EXPECT_EQ(gf.write(nullptr, 0), EXIT_SUCCESS);
+  EXPECT_EQ(gf.count(), 0U);
+  EXPECT_TRUE(std::filesystem::exists(path));
 }
 
 TEST_F(FaccfsTest, destructor_no_rotation_when_percounter_negative) {
@@ -394,6 +452,26 @@ TEST_F(FaccfsTest, append_and_update_first_record) {
 
   gf.read(rData, AREA_SIZE);
   EXPECT_EQ(std::memcmp(rData, "second rec", AREA_SIZE), 0);
+}
+
+// ============================================================
+// storage::purge() over an accessor that cannot empty its medium
+// ============================================================
+
+// Nieudany purge rzuca IOError, zamiast wyzerowac recordsCount_ nad danymi, ktore zostaly na
+// nosniku - dawniej storage::purge() pomijal status akcesora. Plik danych podmieniony na katalog:
+// faccfs otwiera plik przy kazdej operacji, wiec otwarcie z obcieciem zawodzi dopiero w purge.
+TEST_F(FaccfsTest, storage_purge_failure_is_fatal) {
+  rdb::storage s("purge_fail", "purge_fail_data", ".", "GENERIC");
+  const auto descriptor = makeDesc(sizeof(BYTE));
+  ASSERT_TRUE(s.attachDescriptor(&descriptor).empty());
+  s.getPayload()->setItem(0, static_cast<BYTE>(0xAA));
+  ASSERT_TRUE(s.write());
+  ASSERT_TRUE(std::filesystem::remove("purge_fail_data"));
+  std::filesystem::create_directory("purge_fail_data");
+  EXPECT_THAT([&] { s.purge(); }, ::testing::ThrowsMessage<rdb::IOError>(
+                                      ::testing::ContainsRegex("storage::purge: purge of .*purge_fail_data.* failed")));
+  EXPECT_EQ(s.getRecordsCount(), 1U) << "nieudany purge nie moze wyzerowac licznika nad danymi";
 }
 
 // NOLINTEND(modernize-avoid-c-arrays)

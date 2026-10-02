@@ -18,7 +18,14 @@ set(SOURCES_RDB
     cmdStatus.cpp
     cmdStorage.cpp)
 
-add_executable(${PROJECT_NAME} ${SOURCES_RDB})
+# appConfig.cpp dokladana zrodlowo, tak samo jak w xqry: straznik "silnik
+# dziala" czyta katalog blokad (paths.lock_dir) z tej samej konfiguracji co
+# silnik. Plik zalezy wylacznie od toml++ i spdlog, wiec biblioteka `rdb` nie
+# dostaje zaleznosci od biblioteki `retractor`.
+add_executable(${PROJECT_NAME} ${SOURCES_RDB} ../retractor/lib/appConfig.cpp)
+
+target_include_directories(${PROJECT_NAME}
+                           PRIVATE ${CMAKE_SOURCE_DIR}/src/retractor/lib)
 
 target_link_libraries(
   ${PROJECT_NAME}

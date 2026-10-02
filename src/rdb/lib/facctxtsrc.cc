@@ -6,6 +6,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <charconv>  // from_chars
 #include <cstring>   // memcpy
 #include <memory>    // make_unique
@@ -118,11 +119,11 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
     return status;
   };
 
-  if (position != 0) return markAllNullAndZero(EXIT_FAILURE);
+  if (position != 0) return markAllNullAndZero(EINVAL);
 
-  if (recordSize_ == 0) return markAllNullAndZero(EXIT_FAILURE);
+  if (recordSize_ == 0) return markAllNullAndZero(EINVAL);
 
-  if (!myFile_.is_open()) return markAllNullAndZero(EXIT_FAILURE);
+  if (!myFile_.is_open()) return markAllNullAndZero(EBADF);
 
   if (!loopToBeginningIfEOF_) {
     if (myFile_.eof()) {
@@ -133,21 +134,25 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
     }
   }
 
-  if (myFile_.fail()) return markAllNullAndZero(EXIT_FAILURE);
+  if (myFile_.fail()) return markAllNullAndZero(EIO);
 
   auto i = 0;
   for (const auto &item : descriptor_) {
     if (item.rtype == rdb::NULLTYPE) {
-      auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
-      if (token.has_value() && !isNullToken(*token)) {
-        // ConfigError, nie LogicError: silnik jest caly, to PLIK ZRODLOWY nie zgadza sie z
-        // deklaracja strumienia. Mowienie tu o bledzie wewnetrznym oskarzaloby RetractorDB o
-        // cudzy literowke w danych. Docelowa taksonomia (faza 5) zapewne chce dla tego
-        // osobnego typu danych wejsciowych - patrz docs/core-phase-1.md.
-        throw ConfigError(fmt::format("facctxtsrc: expected a NULL token for a NULL field, got '{}' in {}", *token, filename_));
+      // NULLTYPE[N] to N slotow, wiec - jak tablica liczbowa - N tokenow wiersza.
+      for (auto j = 0; j < rdb::flatElementCount(item); j++) {
+        auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
+        if (token.has_value() && !isNullToken(*token)) {
+          // ConfigError, nie LogicError: silnik jest caly, to PLIK ZRODLOWY nie zgadza sie z
+          // deklaracja strumienia. Mowienie tu o bledzie wewnetrznym oskarzaloby RetractorDB o
+          // cudzy literowke w danych. Docelowa taksonomia (faza 5) zapewne chce dla tego
+          // osobnego typu danych wejsciowych - patrz docs/core-phase-1.md.
+          throw ConfigError(
+              fmt::format("facctxtsrc: expected a NULL token for a NULL field, got '{}' in {}", *token, filename_));
+        }
+        payload_->setItem(i + j, std::nullopt);
       }
-      payload_->setItem(i, std::nullopt);
-      i++;
+      i += rdb::flatElementCount(item);
       continue;
     }
 
@@ -213,21 +218,29 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
         var.resize(strLen);
         payload_->setItem(i, var);
       } else {
+        bool anyNull = false;
         for (auto j = 0; j < item.rarray; j++) {
           auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
           if (!token.has_value() || isNullToken(*token)) {
-            payload_->setItem(i + j, std::nullopt);
+            anyNull = true;
             continue;
           }
           parseAndSetNumericItem(*payload_, i + j, item.rtype, *token);
         }
+        // Bit NULL jest jeden na wpis deskryptora, a zapis wartosci elementu go kasuje. Dopoki element
+        // NULL byl zapisywany w petli, `NULL 2 3` dawalo pole okreslone z zerem w a[0], a `2 3 NULL` -
+        // pole NULL. NULL na dowolnym elemencie oznacza NULL calego pola (payload::retargetNullBitsetFrom),
+        // wiec pole NULL zapisujemy dopiero po wszystkich elementach.
+        if (anyNull)
+          for (auto j = 0; j < item.rarray; j++)
+            payload_->setItem(i + j, std::nullopt);
       }
 
       // rdb::RATIONAL - deprecate ?
       // STRING zajmuje jedną pozycję płaską, a tablica liczbowa po jednej pozycji na element. Stałe
       // i++ ustawiało kolejne pole na pozycji wewnątrz poprzedniej tablicy: przy DECLARE a INTEGER[3],
       // b INTEGER wartość b lądowała w a[1], a własne pole b zostawało niezapisane.
-      i += (item.rtype == rdb::STRING) ? 1 : item.rarray;
+      i += rdb::flatElementCount(item);
     }
   }
 

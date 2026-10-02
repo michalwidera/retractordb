@@ -350,7 +350,7 @@ if [ "$run_tests" = "1" ]; then
   # .circleci/config.yml), zeby CircleCI pokazywal wyniki macOS w tej samej
   # zakladce, a nie tylko jako dziennik. Lokalnie to jeden plik wiecej w katalogu
   # budowy i nic poza tym. Powtorka nieudanych nizej junita NIE nadpisuje.
-  ( cd "$build_dir" && ctest --output-on-failure -j "$jobs" --output-junit test_results.xml ) 2>&1 |
+  ( cd "$build_dir" && ctest --output-on-failure -j "$jobs" -LE valgrind --output-junit test_results.xml ) 2>&1 |
     tee -a "$log_file"
   ctest_status=${PIPESTATUS[0]}
   if [ "$ctest_status" -ne 0 ]; then

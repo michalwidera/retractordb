@@ -35,10 +35,10 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
 
   fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
   if (fd < 0) {
-    // errno, nie fd. Po nieudanym ::open fd jest zawsze -1, wiec dawny komunikat mowil
-    // tylko tyle, ze sie nie udalo - a rozroznienie "brak uprawnien" od "brak katalogu"
-    // jest tu cala diagnostyka, jaka dostanie uzytkownik.
-    throw IOError(fmt::format("posixBinaryFile: failed to open '{}': {}", filename_, std::strerror(errno)));
+    const int openErrno  = errno;  // przed skladaniem napisu - alokacja moze ruszyc errno
+    initializationError_ = "cannot open output file '" + filename_ + "': " + strerror(openErrno);
+    percounter_          = -1;
+    return;
   }
 
   if (fileExisted) {
@@ -72,32 +72,54 @@ posixBinaryFile::~posixBinaryFile() {
   if (percounter_ >= 0) {
     std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);
     std::error_code ec;
+    // rename() nadpisuje cel bez pytania. Archiwum juz lezace pod tym numerem znaczy, ze numer
+    // rotacji zostal uzyty drugi raz (np. po recznym usunieciu pliku licznika) - poprzednia
+    // tresc ginie, wiec zostaje przynajmniej slad w logu. Poziom ERROR, a nie WARN, bo Release
+    // wycina WARN juz przy kompilacji (SPDLOG_ACTIVE_LEVEL). Ta sama kontrola stoi przy
+    // pozostalych rotacjach: faccposixshd, faccfs, metaData::rotate.
+    const bool overwrites = std::filesystem::exists(rotated_filename, ec);
     std::filesystem::rename(filename_, rotated_filename, ec);
     if (ec) {
       SPDLOG_ERROR("Failed to rotate file {} to {}: {}", filename_, rotated_filename, ec.message());
+    } else if (overwrites) {
+      SPDLOG_ERROR("Rotation of {} overwrote existing archive {}; its previous content is lost", filename_, rotated_filename);
     }
   }
+}
+
+// Plik usuniety celowo nie jest archiwum. Bez wylaczenia rotacji destruktor probowal
+// przemianowac nieistniejacy plik i logowal falszywe "Failed to rotate" - przy kazdym
+// segmencie groupFile usunietym przez retencje albo purge.
+void posixBinaryFile::discard() {
+  std::filesystem::remove(filename_);
+  percounter_ = -1;
 }
 
 auto posixBinaryFile::name() -> std::string & { return filename_; }
 
 size_t posixBinaryFile::count() {
-  // Wolane na goracej sciezce odczytu - pojedynczy stat(), ENOENT to zwykly brak pliku.
+  // Pojedynczy stat(). ENOENT to zwykly brak pliku - magazyn jeszcze nie zapisany albo
+  // po purge, ktory plik kasuje; stad 0 rekordow. Kazdy inny blad rzuca IOError, bo cicha
+  // wartosc jest tu grozniejsza od zatrzymania: 0 znaczy "magazyn pusty", wiec
+  // storage::write zaczyna dopisywac od indeksu 0 po istniejacych danych.
   struct stat stat_buf;
   if (stat(filename_.c_str(), &stat_buf) != 0) {
     if (errno == ENOENT) return 0;
-    SPDLOG_ERROR("::stat {} failed: {}", filename_, strerror(errno));
-    return -1;
+    const int statErrno = errno;  // przed skladaniem komunikatu - alokacja moze ruszyc errno
+    throw IOError(fmt::format("posixBinaryFile::count: ::stat '{}' failed: {}", filename_, strerror(statErrno)));
   }
   return stat_buf.st_size / recordSize_;
 }
 
 ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/, const size_t position) {
-  if (fd < 0) return errno;  // Error status
+  if (fd < 0) return EBADF;
 
   if (ptrData == nullptr && position == 0) {
-    // nullptr, position 0,0 - truncate file.
-    std::filesystem::remove(name());
+    // Purge oproznia plik W MIEJSCU. Dawniej kasowal go po nazwie, a deskryptor zostawal
+    // otwarty: kolejne zapisy szly do skasowanego i-wezla, count() (stat po nazwie) zwracal 0,
+    // odczyt oddawal dane sprzed purge, a przy zamknieciu wszystko ginelo. Porzucenie pliku
+    // razem z obiektem to discard().
+    if (::ftruncate(fd, 0) != 0) return errno;
     return EXIT_SUCCESS;
   }
   if (position == std::numeric_limits<size_t>::max()) {
@@ -112,16 +134,24 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> &
   int retries              = 0;
   while (sizesh > 0) {
     ssize_t write_result = ::write(fd, ptrData, sizesh);
-    if (write_result >= 0) {
+    if (write_result == 0) {
+      SPDLOG_ERROR("::write {} made no progress", filename_);
+      return EIO;
+    }
+    if (write_result > 0) {
       retries = 0;
       ptrData += write_result;
       sizesh -= write_result;
       continue;
     }
-    if (errno != EINTR) return errno;
+    if (errno != EINTR) {
+      const int error = errno;
+      SPDLOG_ERROR("::write {} failed: {}", filename_, strerror(error));
+      return error;
+    }
     if (++retries > maxRetries) {
       SPDLOG_ERROR("::write {} failed after {} EINTR retries", filename_, maxRetries);
-      return errno;
+      return EINTR;
     }
   }
   return EXIT_SUCCESS;
@@ -129,7 +159,7 @@ ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> &
 
 ssize_t posixBinaryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   nullBitset.clear();
-  if (fd < 0) return fd;
+  if (fd < 0) return EBADF;
 
   constexpr int maxRetries = 5;
   for (int attempt = 0; attempt < maxRetries; ++attempt) {
@@ -137,14 +167,16 @@ ssize_t posixBinaryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, c
     if (read_size == recordSize_) return EXIT_SUCCESS;
     if (read_size < 0) {
       if (errno == EINTR) continue;  // Retry
-      SPDLOG_ERROR("::pread {} failed: {}", filename_, strerror(errno));
-      return EXIT_FAILURE;
+      const int error = errno;
+      SPDLOG_ERROR("::pread {} failed: {}", filename_, strerror(error));
+      return error;
     }
     SPDLOG_WARN("::pread {} partial read: {} of {} bytes at pos {}", filename_, read_size, recordSize_, position);
-    return EXIT_FAILURE;
+    // Zero bajtow = pod ta pozycja nie ma rekordu; mniej niz rekord = rekord urwany w polowie.
+    return read_size == 0 ? ERANGE : EIO;
   }
   SPDLOG_ERROR("::pread {} failed after {} EINTR retries", filename_, maxRetries);
-  return EXIT_FAILURE;
+  return EINTR;
 }
 
 }  // namespace rdb

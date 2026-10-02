@@ -1,3 +1,4 @@
+#include <cmath>
 #include <list>
 #include <map>
 #include <optional>
@@ -6,6 +7,7 @@
 #include <utility>
 
 #include <gtest/gtest.h>
+#include <boost/rational.hpp>
 
 #include "rdb/payload.hpp"
 #include "retractor/lib/expressionEvaluator.hpp"
@@ -46,6 +48,24 @@ void expectSameResult(const std::list<token> &original, const std::list<token> &
   expressionEvaluator evaluator;
   EXPECT_TRUE(evaluator.eval(original, &data) == evaluator.eval(simplified, &data))
       << dump(original) << " != " << dump(simplified) << " dla x=" << fieldValue;
+}
+
+/// Schemat z jednym polem UINT pod indeksem 0 - payload expectSameUintResult ma to samo pole.
+std::optional<rdb::descFld> uintFieldType(const std::string &, int index) {
+  if (index == 0) return rdb::UINT;
+  return std::nullopt;
+}
+
+/// expectSameResult nad polem UINT: jedyny typ dokładny wyżej niż literał INTEGER, w którym
+/// ujemna stała nie ma reprezentacji.
+void expectSameUintResult(const std::list<token> &original, const std::list<token> &simplified, unsigned fieldValue) {
+  auto descriptor = rdb::Descriptor("u", static_cast<int>(sizeof(unsigned)), 1, rdb::UINT);
+  rdb::payload data(descriptor);
+  data.setItem(0, fieldValue);
+
+  expressionEvaluator evaluator;
+  EXPECT_TRUE(evaluator.eval(original, &data) == evaluator.eval(simplified, &data))
+      << dump(original) << " != " << dump(simplified) << " dla u=" << fieldValue;
 }
 
 }  // namespace
@@ -207,6 +227,36 @@ TEST(exprSimplify, keeps_expression_of_unknown_type_untouched) {
   EXPECT_EQ(dump(program), dump(original));
 }
 
+TEST(exprSimplify, keeps_uint_tail_whose_folded_constant_is_negative) {
+  // Zwinięta stała -2 nie ma reprezentacji w UINT. Do 7471948b `u+3-5` zwijało się do `u+(-2)`,
+  // które do 2026-09-27 dawało NULL dla każdego u - przy ON NULL, przy ablacji u-2.
+  const std::list<std::list<token>> originals{
+      {pushId(0), token(PUSH_VAL, 3), token(ADD), token(PUSH_VAL, 5), token(SUBTRACT)},  // u+3-5
+      {token(PUSH_VAL, 3), pushId(0), token(ADD), token(PUSH_VAL, 5), token(SUBTRACT)},  // 3+u-5
+      {pushId(0), token(PUSH_VAL, 3), token(SUBTRACT), token(PUSH_VAL, 5), token(ADD)},  // (u-3)+5
+      {pushId(0), token(PUSH_VAL, 3), token(ADD), token(PUSH_VAL, 5), token(SUBTRACT),   //
+       token(PUSH_VAL, 7), token(ADD)}};                                                 // (u+3-5)+7
+  for (const auto &original : originals) {
+    std::list<token> program = original;
+
+    EXPECT_EQ(simplifyExpression(program, uintFieldType), 0u) << dump(original);
+    EXPECT_EQ(dump(program), dump(original));
+  }
+}
+
+TEST(exprSimplify, reassociates_uint_tail_whose_folded_constant_is_nonnegative) {
+  // u + 5 - 3 == u + 2 - strażnik odmawia tylko stałej bez reprezentacji w typie operacji.
+  const std::list<token> original{pushId(0), token(PUSH_VAL, 5), token(ADD), token(PUSH_VAL, 3), token(SUBTRACT)};
+  std::list<token> program = original;
+
+  EXPECT_EQ(simplifyExpression(program, uintFieldType), 1u);
+  ASSERT_EQ(program.size(), 3u);
+  EXPECT_EQ(std::get<int>(std::next(program.begin())->getVT()), 2);
+  EXPECT_EQ(program.back().getCommandID(), ADD);
+  for (const unsigned u : {0U, 1U, 2U, 10U})
+    expectSameUintResult(original, program, u);
+}
+
 //
 // ─── C: elementy neutralne ──────────────────────────────────────────────────────
 //
@@ -295,6 +345,21 @@ TEST(exprSimplify, constant_square_folds_to_value_not_to_power) {
   EXPECT_EQ(simplifyExpression(program, testFieldType), 1u);
   ASSERT_EQ(program.size(), 1u);
   EXPECT_EQ(std::get<int>(program.front().getVT()), 4);
+}
+
+// Potęga o niecałkowitym wykładniku nad RATIONAL liczy się w double i wraca na RATIONAL przez
+// Rationalize. Konwergent ponad `int` przepełniał tam `boost::rational<int>`: `3^(3/2)` dawało
+// -685059943/143682433, czyli -4.768 zamiast 5.196 (#309).
+TEST(exprSimplify, folds_rational_power_without_overflow) {
+  std::list<token> program{token(PUSH_VAL, rdb::descFldVT(boost::rational<int>(3, 1))),
+                           token(PUSH_VAL, rdb::descFldVT(boost::rational<int>(3, 2))), token(POWER)};
+
+  EXPECT_EQ(simplifyExpression(program, testFieldType), 1u);
+  ASSERT_EQ(program.size(), 1u);
+  const double folded = boost::rational_cast<double>(std::get<boost::rational<int>>(program.front().getVT()));
+  const double exact  = std::pow(3.0, 1.5);
+  EXPECT_GT(folded, 0.0);
+  EXPECT_LE(std::abs(folded - exact) / exact, 1e-9) << folded;
 }
 
 //

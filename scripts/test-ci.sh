@@ -39,11 +39,12 @@ fi
 # `gate` jest w tej liscie, ale poza domyslnym uzyciem: to najdrozszy job
 # przebiegu nocnego (budowa czterech profili ablacji H9 + kampania 2 x 10010
 # planow), liczony w dziesiatkach minut.
-profile_names=(commit release make-build ablation-all-off ablation-probe-on gate)
+profile_names=(commit nightly-debug release make-build ablation-all-off ablation-probe-on gate)
 
 profile_job() {
     case "$1" in
         commit)            echo "build-debug-ninja-mydocker (workflow: commit)" ;;
+        nightly-debug)     echo "build-debug-ninja-mydocker (L1 manual-nightly-full, Valgrind)" ;;
         release)           echo "build-release-ninja-mydocker (L1 manual-nightly-full)" ;;
         make-build)        echo "build-release (workflow: manual-make-build)" ;;
         ablation-all-off)  echo "build-release-ablation / ablation-all-off (L2)" ;;
@@ -54,18 +55,19 @@ profile_job() {
 
 profile_build_type() {
     case "$1" in
-        commit) echo "Debug" ;;
+        commit|nightly-debug) echo "Debug" ;;
         *)      echo "Release" ;;
     esac
 }
 
 profile_desc() {
     case "$1" in
-        commit)            echo "Debug + pelny zestaw testow - to, co idzie po commicie" ;;
-        release)           echo "Release + pelny zestaw testow" ;;
+        commit)            echo "Debug + testy bez Valgrinda - to, co idzie po commicie" ;;
+        nightly-debug)     echo "Debug + zwykle testy i Valgrind w manual-nightly-full" ;;
+        release)           echo "Release + zwykle testy bez Valgrinda" ;;
         make-build)        echo "Release na czystej Ubuntu: stockowy toolchain, make, pakietowanie" ;;
-        ablation-all-off)  echo "Release z piecioma RDB_OPT_* = OFF + pelny zestaw testow" ;;
-        ablation-probe-on) echo "Release z RDB_BENCH_PROBE=ON + pelny zestaw testow" ;;
+        ablation-all-off)  echo "Release z piecioma RDB_OPT_* = OFF + zwykle testy" ;;
+        ablation-probe-on) echo "Release z RDB_BENCH_PROBE=ON + zwykle testy" ;;
         gate)              echo "bramka badawcza H9/H10 w trybie strict (dlugi przebieg)" ;;
     esac
 }
@@ -382,8 +384,18 @@ package() {
 run_tests() {
     step "Integration & Unit test"
     local rc=0
-    (cd "build/$build_type/test" && ctest -j "$(nproc)" -V --output-junit test_results.xml) || rc=$?
+    (cd "build/$build_type/test" && ctest -j "$(nproc)" -V -LE valgrind --output-junit test_results.xml) || rc=$?
     python3 scripts/collect-test-failures.py "build/$build_type" --ctest-status "$rc"
+    return "$rc"
+}
+
+# Osobny przebieg pamieciowy tylko dla Debug w manual-nightly-full.
+run_valgrind() {
+    step "Valgrind (manual-nightly-full, Debug)"
+    local rc=0
+    mkdir -p build/Debug/test/valgrind-results
+    (cd build/Debug/test && ctest -j 4 -V -L valgrind --output-junit valgrind-results/test_results.xml) || rc=$?
+    python3 scripts/collect-test-failures.py build/Debug --ctest-status "$rc"
     return "$rc"
 }
 
@@ -431,11 +443,14 @@ ablation_build() {
 
 status=0
 case "$profile" in
-    commit|release)
+    commit|nightly-debug|release)
         conan_install
         conan_build
         smoke_test
         run_tests || status=$?
+        if [ "$status" -eq 0 ] && [ "$profile" = "nightly-debug" ]; then
+            run_valgrind || status=$?
+        fi
         ;;
     make-build)
         prep_env_ci
@@ -492,6 +507,10 @@ copy_out() {
 }
 
 copy_out "$work_dir/build/$build_type/test/test_results.xml"
+if [ "$profile" = "nightly-debug" ]; then
+    docker cp "$container:$work_dir/build/Debug/test/valgrind-results/test_results.xml" \
+        "$profile_out/valgrind_results.xml" > /dev/null 2>&1 || true
+fi
 copy_out "$work_dir/build/$build_type/test-failure-report"
 if [ "$profile" = "gate" ]; then
     copy_out "$work_dir/build/research-gate-work"

@@ -7,13 +7,14 @@
 
 #include <boost/rational.hpp>
 
-/// Arytmetyka WARTOSCI pol z wykrywaniem przepelnienia: INTEGER (int32) i RATIONAL
+/// Arytmetyka WARTOSCI pol z wykrywaniem przepelnienia: INTEGER (int32), UINT (uint32) i RATIONAL
 /// (boost::rational<int>). nullopt oznacza, ze wyniku nie da sie zapisac w typie, a wolajacy
 /// zamienia go na NULL - tak jak dzielenie przez zero w expressionEvaluator.
 ///
 /// boost::rational 1.91 niczego tu nie sprawdza: `9/1 * 1000000000/1` daje po cichu 410065408/1.
 /// Ta sama klasa liczy tez os czasu (CRSMath, SOperations.hpp), ale tamtej sciezki ten plik nie
-/// dotyczy - sluzy wylacznie ewaluatorowi wyrazen i reduktorom w streamInstance.
+/// dotyczy - sluzy ewaluatorowi wyrazen i reduktorom w streamInstance, a wariant int takze
+/// zwijaniu indeksu generatora w kompilatorze, gdzie nullopt oznacza blad planu, nie NULL.
 ///
 /// Dzielnik rozny od zera jest warunkiem wstepnym `div`; zero obsluguje wolajacy.
 namespace checkedArith {
@@ -47,12 +48,39 @@ inline std::optional<int> neg(int a) {
   return -a;
 }
 
+// UINT: wynik spoza [0, 2^32) - za duza suma albo iloczyn, ujemna roznica - nie ma reprezentacji
+// w typie. Do 2026-09-26 zawijal sie po cichu (`3 - 5` dawalo 4294967294). Iloraz UINT miesci sie
+// zawsze, wiec `div` dla niego nie ma.
+
+inline std::optional<unsigned> add(unsigned a, unsigned b) {
+  unsigned result = 0;
+  if (__builtin_add_overflow(a, b, &result)) return std::nullopt;
+  return result;
+}
+
+inline std::optional<unsigned> sub(unsigned a, unsigned b) {
+  unsigned result = 0;
+  if (__builtin_sub_overflow(a, b, &result)) return std::nullopt;
+  return result;
+}
+
+inline std::optional<unsigned> mul(unsigned a, unsigned b) {
+  unsigned result = 0;
+  if (__builtin_mul_overflow(a, b, &result)) return std::nullopt;
+  return result;
+}
+
 namespace detail {
 
 /// Ulamek policzony na int64 sprowadzony do najnizszych terminow. Dopiero wtedy wiadomo, czy
 /// wartosc NAPRAWDE nie miesci sie w rational<int> - skrocona postac jest jedyna, wiec nie ma
 /// falszywych alarmow (`1/65536 + 1/65536` przechodzi przez mianownik 2^32 i daje 1/32768).
 inline std::optional<boost::rational<int>> narrowed(std::int64_t numerator, std::int64_t denominator) {
+  // Zerowy mianownik nie ma postaci skroconej i nie moze dojsc do gcd: gcd(0, 0) to zero, a dzielenie
+  // ponizej dzieli wtedy przez zero - SIGFPE na x86-64, cichy 0 na arm64, czyli to samo wejscie i dwa
+  // rozne konce procesu. Powstawalo z ulamka 0/0 wczytanego z surowych bajtow; payload takiego juz nie
+  // wypuszcza, wiec to straz drugiego rzedu - i jedyna, ktora obowiazuje tez wolajacego `div`.
+  if (denominator == 0) return std::nullopt;
   const auto divisor = std::gcd(numerator, denominator);
   numerator /= divisor;
   denominator /= divisor;

@@ -13,12 +13,14 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <vector>
 
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/spdlog.h>
 #include <boost/program_options.hpp>
 
+#include "appConfig.hpp"
 #include "cmdDropFile.hpp"
 #include "cmdFieldAccess.hpp"
 #include "cmdMeta.hpp"
@@ -27,6 +29,7 @@
 #include "cmdStatus.hpp"
 #include "cmdStorage.hpp"
 #include "config.h"
+#include "constants.hpp"
 #include "ICommand.hpp"
 #include "rdb/exceptions.hpp"
 #include "rdb/storage.hpp"
@@ -101,13 +104,20 @@ int main(int argc, char *argv[]) {
   if (cliNoPrompt) colors = {};
 
   {
-    const auto lockPath = std::filesystem::temp_directory_path() / "xretractor_service.lock";
-    const int fd        = open(lockPath.c_str(), O_RDONLY);
-    if (fd != -1) {
+    // Kazda instancja - bezimienna, nazwana, w przestrzeni RDB_NAMESPACE - trzyma przez caly czas
+    // pracy wlasny plik z jednej rodziny w katalogu blokad, wiec przegladamy cala rodzine, a katalog
+    // bierzemy z tej samej konfiguracji (paths.lock_dir) co silnik.
+    const std::filesystem::path lockDir = ipc::serviceLockDir(loadAppConfig().lockDir);
+    std::error_code ec;
+    for (const auto &entry : std::filesystem::directory_iterator(lockDir, ec)) {
+      const std::string name = entry.path().filename().string();
+      if (!ipc::serviceLockInstance(name)) continue;
+      const int fd = open(entry.path().c_str(), O_RDONLY);
+      if (fd == -1) continue;
       const bool running = (flock(fd, LOCK_SH | LOCK_NB) == -1 && (errno == EWOULDBLOCK || errno == EAGAIN));
       close(fd);
       if (running) {
-        std::cerr << "xretractor is running - stop it before using xtrdb.\n";
+        std::println(std::cerr, "xretractor is running (lock {}) - stop it before using xtrdb.", entry.path().string());
         spdlog::shutdown();
         return 1;
       }
@@ -160,7 +170,9 @@ int main(int argc, char *argv[]) {
   std::string cmd;
   while (true) {
     if (cmd != "#") std::cout << prompt;  // std::cout (powiązany z std::cin) gwarantuje flush przed odczytem - std::print nie
-    std::cin >> cmd;
+    // Koniec wejscia konczy sesje jak `quit`. Nieudane `>>` nie zmienia `cmd`, wiec do 2026-09-27
+    // skrypt bez `quit` powtarzal ostatnie polecenie w nieskonczonosc.
+    if (!(std::cin >> cmd)) break;
     if (cmd == "exit" || cmd == "quit" || cmd == "q") break;
     if (cmd == "#" || cmd == "rem") {
       // Two comment styles: # suppresses output entirely (used in test scripts),

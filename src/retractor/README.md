@@ -32,11 +32,13 @@ Available options:
   -m [ --llimitqry ] arg (=0) loop iteration limit, 0 - no limit
 Branch: <branch>:<commit>, Code compiler: <compiler>, Build time: <timestamp>, Type: <build type>
 Log: <system temporary directory>/xretractor.log
+Config: Defaults
 This software is licensed under the MIT License and is provided ‘as is’,
 without warranty of any kind. For more information, see the LICENSE file.
 ```
 
 The query file is optional in execution mode, where omitting it starts an idle instance. Compile-only mode requires a query file.
+When configuration files are loaded, `Config:` lists their paths in load order instead of `Defaults`.
 
 ## Running as a systemd service
 
@@ -93,7 +95,7 @@ xretractor my-new-queries.rql      # validated, delivered, service restarted
 
 Notes:
 - Since `xqry --reset` exists, this is no longer the only way to hand a full query set to a running service. Use it when you want the service **restarted** on the new set; use `xqry --reset` when you want the plan swapped in place, without a restart and without `systemctl` privileges.
-- Both are paths for a **full** query set (rules, `:STORAGE`, `:SUBSTRAT`, rotation) - unlike the lightweight, transient ad-hoc injection over IPC (`xqry --adhoc`), which only accepts a single `SELECT`, `DECLARE` or `RULE`. An ad-hoc `RULE` may use `DO DUMP`; `DO SYSTEM` is rejected over IPC.
+- Both are paths for a **full** query set (rules, `:STORAGE`, `:SUBSTRAT`, rotation) - unlike the lightweight, transient ad-hoc injection over IPC (`xqry --adhoc`), which only accepts a single `SELECT`, `DECLARE` or `RULE`. An ad-hoc `RULE` may use `DO DUMP`; `DO SYSTEM` is rejected over IPC. The same boundary applies to `xqry --reset`, which carries a full plan but no authorship either: a plan holding a `DO SYSTEM` rule is refused as a whole, so such a rule may only be asked for in the plan file this process starts from. An operator who deliberately hands that channel over sets `unrestricted = true` under `[service]` in the service configuration; the ad-hoc channel stays closed regardless.
 - The running service is found on the **bus**, not by the lock file name: a service is named `service`, so a new invocation almost never shares its lock file.
 - **An explicitly requested identity wins over delivery.** `xretractor plan.rql --name foo` (likewise `--autoname` or `[server] autoname = true`) starts a **separate instance** next to the service; the service's query file is not touched and its unit is not restarted. `--name service` - the name the service itself carries - still means "target that service" and delivers. Such a separate instance may not claim a stream name or rotation counter the live service holds: that is a normal conflict (`device_or_resource_busy`), because the two are meant to run side by side. Starting a second instance in **service mode** stays refused regardless of its name (see *One service, one name*).
 - Restarting a **system** unit needs privileges - run with `sudo` if `systemctl restart` is denied; a `--user` unit restarts without root.
@@ -251,6 +253,7 @@ Available options:
   -z [ --shmbudget ]     show shared memory budget of the compiled plan
 Branch: <branch>:<commit>, Code compiler: <compiler>, Build time: <timestamp>, Type: <build type>
 Log: <system temporary directory>/xretractor.log
+Config: Defaults
 This software is licensed under the MIT License and is provided ‘as is’,
 without warranty of any kind. For more information, see the LICENSE file.
 ```

@@ -1,0 +1,5 @@
+# Zerowy krok okna AGSE: parser uslugi ma odmowic planu jako bledu planu (krok 3c w reset.sh),
+# a nie konczyc procesu FatalError-em w kompilatorze. Reszta planu jest poprawna, zeby odmowa miala jedna przyczyne.
+STORAGE 'temp'
+DECLARE a INTEGER STREAM src, 0.2 FILE 'data.txt'
+SELECT * STREAM gamma FROM src@(0,4)

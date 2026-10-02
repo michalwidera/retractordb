@@ -118,14 +118,20 @@ Trace runPlan(qTree &instance, const rational<int> &horizon) {
 
   Trace trace;
   for (auto now = timeline.getNextTimeSlot(); now <= horizon; now = timeline.getNextTimeSlot()) {
+    // Zbior nazw sluzy filtrowaniu sladu ponizej; processRows bierze maske pozycyjna.
     std::set<std::string> due;
+    std::vector<char> dueMask(instance.size(), 0);
     std::map<std::string, size_t> before;
-    for (const auto &q : instance)
+    std::size_t position = 0;
+    for (const auto &q : instance) {
       if (timeline.isThisDeltaAwaitCurrentTimeSlot(q.rInterval)) {
         due.insert(q.id);
-        before[q.id] = proc.qSet.at(q.id)->outputPayload->getRecordsCount();
+        dueMask[position] = 1;
+        before[q.id]      = proc.qSet.at(q.id)->outputPayload->getRecordsCount();
       }
-    proc.processRows(due, now);
+      ++position;
+    }
+    proc.processRows(dueMask, now);
     for (const auto &q : instance) {
       if (q.isDeclaration() || !due.contains(q.id)) continue;
       const auto count = proc.qSet.at(q.id)->outputPayload->getRecordsCount();

@@ -85,6 +85,10 @@ macro(add_test)
   # makro.
   string(FIND "${CMAKE_CURRENT_SOURCE_DIR}" "${IT_TREE_ROOT}" _it_in_tree)
   if(_it_in_tree EQUAL 0)
+    # Jawne proby pamieci maja osobny cel; nazwy -vg-* sa ich konwencja.
+    if(_it_test_name MATCHES "-vg-")
+      set_tests_properties(${_it_test_name} PROPERTIES LABELS valgrind)
+    endif()
     if(IT_NO_NAMESPACE)
       # Katalog badajacy tozsamosc globalna maszyny: instancja bezimienna albo
       # nazwy nadawane przez sam scenariusz (alfa, beta, ...). Przestrzen nazw
@@ -151,9 +155,12 @@ foreach(item ${V_GLOB})
   endif()
 endforeach()
 
-# Zwrot pamieci dzielonej zajetej przez pule. Rejestracja przez _add_test, bo
-# makro powyzej doklada FIXTURES_REQUIRED -- test sprzatajacy wlasna oprawe
-# czekalby sam na siebie.
+# Zwrot pamieci dzielonej zajetej przez pule po zwyklych testach integracyjnych.
+# Ten test pozostaje w normalnym zestawie: po przebiegu serwerow segmenty
+# magistrali zajmowalyby pamiec /dev/shm takze po zakonczeniu CTest. CTest
+# dolacza go automatycznie rowniez do filtrowanych testow uzywajacych oprawy.
+# Rejestracja przez _add_test, bo makro powyzej doklada FIXTURES_REQUIRED --
+# test sprzatajacy wlasna oprawe czekalby sam na siebie.
 _add_test(
   NAME
   it_namespace_pool-cleanup

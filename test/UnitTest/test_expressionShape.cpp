@@ -233,6 +233,25 @@ TEST(xExpressionShape, comparison_result_is_the_normalized_operand_type) {
   }
 }
 
+// Porownanie napisow i logika nad napisem daja INTEGER 1/0. Do 2026-09-26 dawaly napis
+// `"1"`/`"0"`, ktory toLogicValue() czytal jako prawde, bo jest niepusty.
+TEST(xExpressionShape, string_comparison_and_logic_are_integer) {
+  auto record = testPayload(6);
+  for (const auto op : {CMP_EQUAL, CMP_NOT_EQUAL, CMP_LT, CMP_GT, CMP_LE, CMP_GE, AND, OR}) {
+    std::list<token> program{readField(sText), readField(sText), token(op)};
+    const auto inferred = analyse(program);
+    const auto label    = std::string(GetStringcommand_id(op));
+    ASSERT_TRUE(inferred.resolved()) << label;
+    EXPECT_EQ(inferred.shape.rtype, rdb::INTEGER) << label;
+    EXPECT_EQ(inferred.shape.rtype, evaluatedType(program, record)) << label << " (ewaluator)";
+  }
+  std::list<token> negation{readField(sText), token(NOT)};
+  const auto inferred = analyse(negation);
+  ASSERT_TRUE(inferred.resolved());
+  EXPECT_EQ(inferred.shape.rtype, rdb::INTEGER);
+  EXPECT_EQ(inferred.shape.rtype, evaluatedType(negation, record));
+}
+
 // --- funkcje ---------------------------------------------------------------------------
 
 // Kazda funkcja z kRqlFunctions ma tu swoj wiersz. Tabela jest zamknieta: test pilnuje, ze

@@ -16,7 +16,8 @@ namespace rdb {
 /// - traktować Descriptor jako źródło rozmiaru pojedynczego rekordu,
 /// - ignorować parametr nullBitset przy zapisie i czyścić go przy odczycie; klasa nie przechowuje metadanych null,
 /// - zwracać przez count() liczbę rekordów wynikającą z rozmiaru pliku danych,
-/// - obsługiwać purge przez write(nullptr, ..., 0), usuwając plik danych,
+/// - obsługiwać purge przez write(nullptr, ..., 0), opróżniając plik danych w miejscu (deskryptor pozostaje ważny),
+/// - przez discard() usuwać plik i rezygnować z rotacji - dla właściciela, który porzuca plik celowo,
 /// - przy tworzeniu obiektu odtwarzać spójny stan istniejącego pliku przez przycięcie niepełnego końca do wielokrotności rozmiaru rekordu,
 /// - przy niszczeniu obiektu zamykać deskryptor pliku i podejmować próbę utrwalenia danych przez fsync,
 /// - jeśli parametr percounter jest nieujemny, próbować po zamknięciu przemianować plik do postaci `<nazwa>.old<percounter>`.
@@ -29,8 +30,9 @@ class posixBinaryFile : public FileInterface {
   /**
    * @brief Posix File Descriptor
    */
-  int fd;
+  int fd{-1};
   int percounter_;
+  std::string initializationError_;
 
  public:
   posixBinaryFile(std::string_view fileName, const Descriptor &descriptor, int percounter = -1);
@@ -43,5 +45,11 @@ class posixBinaryFile : public FileInterface {
 
   auto name() -> std::string & override;
   size_t count() override;
+  [[nodiscard]] const std::string &initializationError() const override { return initializationError_; }
+
+  /// @brief Usuwa plik i wylacza rotacje w destruktorze (groupFile: retencja i purge).
+  ///        Obiekt nie nadaje sie potem do zapisu.
+  void discard();
+  void suppressRotation() { percounter_ = -1; }
 };
 }  // namespace rdb

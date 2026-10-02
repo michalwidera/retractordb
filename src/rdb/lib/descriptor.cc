@@ -182,9 +182,24 @@ void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, D
     if (!lhsPosition || !rhsPosition) throw LogicError("descriptor: invalid flat field position");
     const auto &lhsField = lhs[lhsPosition->first];
     const auto &rhsField = rhs[rhsPosition->first];
-    auto maxRtype        = std::max(lhsField.rtype, rhsField.rtype);
-    auto maxRlen         = std::max(lhsField.rlen, rhsField.rlen);
-    push_back(rField(fieldNamePrefix + "_" + std::to_string(i), maxRlen, 1, maxRtype));
+    const auto maxRtype  = std::max(lhsField.rtype, rhsField.rtype);
+    const auto name      = fieldNamePrefix + "_" + std::to_string(i);
+    // Slot przeplotu to dluzszy z dwoch elementow tej pozycji plaskiej, liczony jak slot plaski:
+    // napis ma cala dlugosc rlen * rarray (flatSlotSize), a `STRING[N]` niesie ja w rarray. Do
+    // 2026-09-27 stalo tu samo rlen, wiec slot zadeklarowanego napisu mial 1 B, a pierwsze
+    // przypisanie rekordu zrodla konczylo proces bledem "schema mismatch".
+    //
+    // Pozycja liczbowa bierze dlugosc pola, ktorego typ wygrywa. Wsrod typow BYTE..DOUBLE jest to
+    // zarazem dluzsze pole z jednym wyjatkiem: FLOAT (4 B) nad RATIONAL (8 B) - slot FLOAT o 8 B
+    // kazalby payload::setItemVT kopiowac 8 B z czterobajtowej zmiennej.
+    int bytes = 0;
+    if (maxRtype == rdb::STRING)
+      bytes = std::max(flatSlotSize(lhsField), flatSlotSize(rhsField));
+    else if (lhsField.rtype == rhsField.rtype)
+      bytes = std::max(lhsField.rlen, rhsField.rlen);
+    else
+      bytes = (lhsField.rtype > rhsField.rtype ? lhsField : rhsField).rlen;
+    push_back(flatSlotField(name, maxRtype, bytes));
   }
 
   fieldMappingsDirty_ = true;
@@ -357,9 +372,7 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
   if (!is.good()) return is;
 
   std::stringstream strstream;
-  std::string str;
-  while (is >> str)
-    strstream << " " << str;
+  strstream << is.rdbuf();
 
   // Petla powyzej konczy sie WYLACZNIE niepowodzeniem ekstrakcji, wiec po odczytaniu
   // calego (poprawnego) tekstu failbit jest zapalony tak samo jak po bledzie. Gasimy go,

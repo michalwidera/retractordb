@@ -7,12 +7,13 @@
 
 #include <charconv>
 #include <cmath>
+#include <cstdint>
 #include <istream>
 #include <limits>
-#include <stack>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
+#include <utility>
 
 /// Zwezenie ZMIENNOPRZECINKOWE -> CALKOWITE bez zachowania nieokreslonego.
 ///
@@ -55,13 +56,72 @@ static void narrowFloatTo(F value, K &retVal) {
   }
 }
 
+/// Zwezenie ZMIENNOPRZECINKOWE -> WYMIERNE, ta sama regula zakresu co w narrowFloatTo wyzej.
+///
+/// Rationalize jest funkcja totalna i dla wejscia bez przyblizenia wymiernego oddaje {0,1}.
+/// Zero, ktorego nikt nie policzyl, jest jednak dokladnie tym, co komentarz wyzej odrzuca
+/// przy nasyceniu, dlatego NULL stoi na sciezce konwersji: NaN i nieskonczonosc nie maja
+/// reprezentacji w `boost::rational<int>` i ida jako std::monostate, tak samo jak wartosc
+/// zmiennoprzecinkowa poza zakresem typu calkowitego idzie nim z narrowFloatTo. Zakres
+/// sprawdzamy na obcietej wartosci bezwzglednej, zgodnie z granica uzywana w Rationalize.
+template <typename K>
+static void rationalizeTo(double value, K &retVal) {
+  const double upperExclusive = std::ldexp(1.0, std::numeric_limits<int>::digits);
+  if (std::isfinite(value) && std::trunc(std::fabs(value)) < upperExclusive)
+    retVal = Rationalize(value);
+  else
+    retVal = std::monostate{};
+}
+
+/// Zwezenie CALKOWITE -> typ pola, ta sama regula co narrowFloatTo wyzej: wartosc, ktorej typ
+/// docelowy nie pomiesci, daje NULL. Chodzi o liczbe ujemna do UINT, UINT powyzej INT_MAX do
+/// INTEGER i wartosc spoza 0..255 do BYTE. Do 2026-09-26 `static_cast` zawijal je po cichu:
+/// `-998` jako UINT to 4294966298, a promocja INTEGER do UINT w `u * k` mnozyla dalej te liczbe.
+/// Do typu zmiennoprzecinkowego zwezenia nie ma.
+template <typename T, typename I, typename K>
+static void narrowIntegralTo(I value, K &retVal) {
+  static_assert(std::is_integral_v<I>);
+  if constexpr (std::is_integral_v<T>) {
+    if (std::in_range<T>(value))
+      retVal = static_cast<T>(value);
+    else
+      retVal = std::monostate{};
+  } else {
+    retVal = static_cast<T>(value);
+  }
+}
+
+/// Wymierne -> typ pola. Czesc calkowita (obciecie ku zeru, jak `rational_cast<int>`) liczy sie
+/// w int, gdzie miesci sie zawsze, a zakres typu docelowego sprawdza narrowIntegralTo.
+/// `rational_cast<T>` rzutowal licznik i mianownik osobno: -7/2 do UINT i 600/3 do BYTE (29)
+/// wychodzily zmyslone.
+template <typename T, typename K>
+static void narrowRationalTo(boost::rational<int> value, K &retVal) {
+  if constexpr (std::is_integral_v<T>)
+    narrowIntegralTo<T>(value.numerator() / value.denominator(), retVal);
+  else
+    retVal = boost::rational_cast<T>(value);
+}
+
+/// UINT -> RATIONAL: licznik jest int, wiec UINT powyzej INT_MAX nie ma reprezentacji.
+template <typename K>
+static void rationalFromUnsignedTo(unsigned value, K &retVal) {
+  if (std::in_range<int>(value))
+    retVal = boost::rational<int>(static_cast<int>(value));
+  else
+    retVal = std::monostate{};
+}
+
 template <typename T, typename K>
 static void parse_string(const std::string &a, K &retVal) {
   using P = std::conditional_t<std::is_floating_point_v<T>, double, int>;
   P val{};
-  if (auto [p, e] = std::from_chars(a.data(), a.data() + a.size(), val); e == std::errc{})
-    retVal = static_cast<T>(val);
-  else {
+  if (auto [p, e] = std::from_chars(a.data(), a.data() + a.size(), val); e == std::errc{}) {
+    if constexpr (std::is_integral_v<T>)
+      narrowIntegralTo<T>(val, retVal);
+    else
+      retVal = static_cast<T>(val);
+  } else {
     SPDLOG_ERROR("Cant conv string to numeric type.");
     retVal = std::monostate{};
   }
@@ -77,10 +137,10 @@ void visit_descFld(const K &inVar, K &retVal) {
   if constexpr (std::is_same_v<K, rdb::descFldVT>) {
     std::visit(Overload{
                    [&retVal](std::monostate) { retVal = T{}; },                                                 //
-                   [&retVal](uint8_t a) { retVal = static_cast<T>(a); },                                        //
-                   [&retVal](int a) { retVal = static_cast<T>(a); },                                            //
-                   [&retVal](unsigned a) { retVal = static_cast<T>(a); },                                       //
-                   [&retVal](boost::rational<int> a) { retVal = boost::rational_cast<T>(a); },                  //
+                   [&retVal](uint8_t a) { narrowIntegralTo<T>(a, retVal); },                                    //
+                   [&retVal](int a) { narrowIntegralTo<T>(a, retVal); },                                        //
+                   [&retVal](unsigned a) { narrowIntegralTo<T>(a, retVal); },                                   //
+                   [&retVal](boost::rational<int> a) { narrowRationalTo<T>(a, retVal); },                       //
                    [&retVal](float a) { narrowFloatTo<T>(a, retVal); },                                         //
                    [&retVal](double a) { narrowFloatTo<T>(a, retVal); },                                        //
                    [&retVal](std::pair<int, int> a) { SPDLOG_ERROR("TODO - pair-int->T"); },                    //
@@ -92,13 +152,13 @@ void visit_descFld(const K &inVar, K &retVal) {
     if (inVar.type() == typeid(std::monostate)) {
       retVal = T{};
     } else if (inVar.type() == typeid(uint8_t)) {
-      retVal = static_cast<T>(std::any_cast<uint8_t>(inVar));
+      narrowIntegralTo<T>(std::any_cast<uint8_t>(inVar), retVal);
     } else if (inVar.type() == typeid(int)) {
-      retVal = static_cast<T>(std::any_cast<int>(inVar));
+      narrowIntegralTo<T>(std::any_cast<int>(inVar), retVal);
     } else if (inVar.type() == typeid(unsigned)) {
-      retVal = static_cast<T>(std::any_cast<unsigned>(inVar));
+      narrowIntegralTo<T>(std::any_cast<unsigned>(inVar), retVal);
     } else if (inVar.type() == typeid(boost::rational<int>)) {
-      retVal = boost::rational_cast<T>(std::any_cast<boost::rational<int>>(inVar));
+      narrowRationalTo<T>(std::any_cast<boost::rational<int>>(inVar), retVal);
     } else if (inVar.type() == typeid(float)) {
       narrowFloatTo<T>(std::any_cast<float>(inVar), retVal);
     } else if (inVar.type() == typeid(double)) {
@@ -176,22 +236,21 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
       break;
     case rdb::INTPAIR:
       // Requested type is INT PAIR
+      //
+      // Para to dwie niezalezne liczby, nie ulamek, wiec skalar nie ma w niej reprezentacji i daje
+      // NULL - ta sama regula co zwezenie bez reprezentacji wyzej. Do 2026-09-26 calkowite dawaly
+      // (0, n), a RATIONAL/FLOAT/DOUBLE (licznik, mianownik), czyli odczyt ilorazowy; w sciezce
+      // std::any BYTE i UINT trafialy tam jako pair<int, uint8_t>/pair<int, unsigned>.
       if constexpr (std::is_same_v<T, rdb::descFldVT>) {
-        std::visit(Overload{                                                                                                 //
-                            [&retVal](std::monostate) { retVal = std::make_pair(0, 0); },                                    //
-                            [&retVal](uint8_t a) { retVal = std::make_pair(0, a); },                                         //
-                            [&retVal](int a) { retVal = std::make_pair(0, a); },                                             //
-                            [&retVal](unsigned a) { retVal = std::make_pair(0, static_cast<int>(a)); },                      //
-                            [&retVal](boost::rational<int> a) { retVal = std::make_pair(a.numerator(), a.denominator()); },  //
-                            [&retVal](float a) {
-                              auto r = Rationalize(static_cast<double>(a));
-                              retVal = std::make_pair(r.numerator(), r.denominator());
-                            },
-                            [&retVal](double a) {
-                              auto r = Rationalize(a);
-                              retVal = std::make_pair(r.numerator(), r.denominator());
-                            },                                                 //
-                            [&retVal](std::pair<int, int> a) { retVal = a; },  //
+        std::visit(Overload{                                                                 //
+                            [&retVal](std::monostate) { retVal = std::make_pair(0, 0); },    //
+                            [&retVal](uint8_t) { retVal = std::monostate{}; },               //
+                            [&retVal](int) { retVal = std::monostate{}; },                   //
+                            [&retVal](unsigned) { retVal = std::monostate{}; },              //
+                            [&retVal](boost::rational<int>) { retVal = std::monostate{}; },  //
+                            [&retVal](float) { retVal = std::monostate{}; },                 //
+                            [&retVal](double) { retVal = std::monostate{}; },                //
+                            [&retVal](std::pair<int, int> a) { retVal = a; },                //
                             [&retVal](const std::pair<std::string, int> &a) {
                               retVal = std::make_pair(atoi(a.first.c_str()), a.second);
                             },  //
@@ -204,21 +263,9 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
                             }},
                    inVar);
       } else {
-        if (inVar.type() == typeid(uint8_t)) {
-          retVal = std::make_pair(0, std::any_cast<uint8_t>(inVar));
-        } else if (inVar.type() == typeid(int)) {
-          retVal = std::make_pair(0, std::any_cast<int>(inVar));
-        } else if (inVar.type() == typeid(unsigned)) {
-          retVal = std::make_pair(0, std::any_cast<unsigned>(inVar));
-        } else if (inVar.type() == typeid(boost::rational<int>)) {
-          auto r = std::any_cast<boost::rational<int>>(inVar);
-          retVal = std::make_pair(r.numerator(), r.denominator());
-        } else if (inVar.type() == typeid(float)) {
-          auto r = Rationalize(std::any_cast<float>(inVar));
-          retVal = std::make_pair(r.numerator(), r.denominator());
-        } else if (inVar.type() == typeid(double)) {
-          auto r = Rationalize(std::any_cast<double>(inVar));
-          retVal = std::make_pair(r.numerator(), r.denominator());
+        if (inVar.type() == typeid(uint8_t) || inVar.type() == typeid(int) || inVar.type() == typeid(unsigned) ||
+            inVar.type() == typeid(boost::rational<int>) || inVar.type() == typeid(float) || inVar.type() == typeid(double)) {
+          retVal = std::monostate{};
         } else if (inVar.type() == typeid(std::pair<int, int>)) {
           retVal = std::any_cast<std::pair<int, int>>(inVar);
         } else if (inVar.type() == typeid(std::string)) {
@@ -233,14 +280,14 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
     case rdb::RATIONAL:
       // Requested type is RATIONAL
       if constexpr (std::is_same_v<T, rdb::descFldVT>) {
-        std::visit(Overload{                                                                                //
-                            [&retVal](std::monostate) { retVal = boost::rational<int>(0, 1); },             //
-                            [&retVal](uint8_t a) { retVal = boost::rational<int>(a); },                     //
-                            [&retVal](int a) { retVal = boost::rational<int>(a); },                         //
-                            [&retVal](unsigned a) { retVal = boost::rational<int>(static_cast<int>(a)); },  //
-                            [&retVal](boost::rational<int> a) { retVal = a; },                              //
-                            [&retVal](float a) { retVal = Rationalize(static_cast<double>(a)); },           //
-                            [&retVal](double a) { retVal = Rationalize(a); },                               //
+        std::visit(Overload{                                                                        //
+                            [&retVal](std::monostate) { retVal = boost::rational<int>(0, 1); },     //
+                            [&retVal](uint8_t a) { retVal = boost::rational<int>(a); },             //
+                            [&retVal](int a) { retVal = boost::rational<int>(a); },                 //
+                            [&retVal](unsigned a) { rationalFromUnsignedTo(a, retVal); },           //
+                            [&retVal](boost::rational<int> a) { retVal = a; },                      //
+                            [&retVal](float a) { rationalizeTo(static_cast<double>(a), retVal); },  //
+                            [&retVal](double a) { rationalizeTo(a, retVal); },                      //
                             [&retVal](std::pair<int, int> a) {
                               if (a.second == 0)
                                 throw rdb::ConfigError("convertTypes: rational denominator is zero (pair<int,int>)");
@@ -264,13 +311,13 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
         } else if (inVar.type() == typeid(int)) {
           retVal = boost::rational<int>(std::any_cast<int>(inVar));
         } else if (inVar.type() == typeid(unsigned)) {
-          retVal = boost::rational<int>(std::any_cast<unsigned>(inVar));
+          rationalFromUnsignedTo(std::any_cast<unsigned>(inVar), retVal);
         } else if (inVar.type() == typeid(boost::rational<int>)) {
           retVal = std::any_cast<boost::rational<int>>(inVar);
         } else if (inVar.type() == typeid(float)) {
-          retVal = Rationalize(std::any_cast<float>(inVar));
+          rationalizeTo(std::any_cast<float>(inVar), retVal);
         } else if (inVar.type() == typeid(double)) {
-          retVal = Rationalize(std::any_cast<double>(inVar));
+          rationalizeTo(std::any_cast<double>(inVar), retVal);
         } else if (inVar.type() == typeid(std::pair<int, int>)) {
           auto pairVar = std::any_cast<std::pair<int, int>>(inVar);
           if (pairVar.second == 0) throw rdb::ConfigError("convertTypes: rational denominator is zero (any pair<int,int>)");
@@ -340,37 +387,65 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
   return retVal;
 }
 
+/// Znak wynosi sie PRZED petle ulamka lancuchowego, a konwersje w petli oslania ten sam
+/// sprawdzony zakres co narrowFloatTo wyzej.
+///
+/// `static_cast<unsigned int>(-2.5)` jest zachowaniem NIEOKRESLONYM i procesory rozstrzygaja
+/// je ROZNIE: x86-64 (cvttsd2si) bierze mlodsze 32 bity i oddaje 4294967294, arm64 (fcvtzu)
+/// NASYCA do 0. Ta sama baza dawala wiec `-2/1` na jednej maszynie i `0/1` na drugiej, po cichu
+/// i bez bledu. Na obu bylo to zreszta zle: `diff = startx - val` liczylo sie na wartosci BEZ
+/// ZNAKU, wiec dla ujemnego wejscia petla urywala sie po pierwszej cyfrze i ulamek nigdy nie
+/// powstawal - `-2.5` dawalo `-2/1`, nie `-5/2`.
+///
+/// Ulamek lancuchowy jest symetryczny wzgledem znaku: rozwiniecie |x| daje p/q, a -|x| daje
+/// -p/q. Liczymy wiec na wartosci bezwzglednej i negujemy wynik. `startx` jest wtedy zawsze
+/// nieujemne, wiec z zakresu zostaje sama GORNA granica - sprawdzana na wartosci OBCIETEJ,
+/// dokladnie jak w narrowFloatTo, i z ta sama potega dwojki jako granica.
+///
+/// NaN nie spelnia zadnego porownania i wypada z petli tak samo jak nieskonczonosc i jak
+/// wartosc za duza na `int`: zaden wyraz nie wchodzi do ulamka, a pusty ulamek oddaje {0,1}.
+/// Funkcja jest totalna, bo zwraca `boost::rational<int>` przez wartosc i NULL-a nie ma czym
+/// wyrazic; niefinitywne wejscie odsiewa rationalizeTo, jeszcze przed wywolaniem.
+///
+/// Wynik to konwergent h/k liczony rekurencja h = a*h1 + h2, k = a*k1 + k2 w `int64_t`.
+/// Wczesniej wyrazy szly na stos i skladaly sie od tylu na `boost::rational<int>`, ktory zakresu
+/// nie pilnuje: konwergent ponad `int` to przepelnienie liczby ze znakiem, czyli zachowanie
+/// nieokreslone, a w praktyce ulamek o zlej wartosci, czesto ujemny - interwal `0.333333` dawal
+/// 2064120233/1923156540, a `3^(3/2)` nad RATIONAL -4.768 (#309). Konwergenty rosna monotonicznie,
+/// wiec petla konczy sie na pierwszym, ktory nie miesci sie w `int`, i oddaje poprzedni - najlepsze
+/// przyblizenie, jakie `boost::rational<int>` zapisze. Tam, gdzie skladanie sie nie przepelnialo,
+/// wynik jest identyczny: to ten sam ulamek, a konwergent jest juz nieskracalny. Sama rekurencja
+/// nie przepelnia sie: a < 2^31 i h1, k1 <= INT_MAX, wiec a*h1 + h2 < 2^63.
 boost::rational<int> Rationalize(const double inValue, const double DIFF /*=1E-6*/, const int ttl_const /*=11*/) {
-  std::stack<int> st;
-  double startx = inValue;
-  double diff;
-  double err1;
-  double err2;
-  int ttl = ttl_const;
-  unsigned int val;
+  const double upperExclusive = std::ldexp(1.0, std::numeric_limits<int>::digits);
+  const std::int64_t limit    = std::numeric_limits<int>::max();
+  // Start rekurencji: h_{-1}/k_{-1} = 1/0, h_{-2}/k_{-2} = 0/1.
+  std::int64_t h1 = 1;
+  std::int64_t h2 = 0;
+  std::int64_t k1 = 0;
+  std::int64_t k2 = 1;
+  double startx   = std::fabs(inValue);
+  int ttl         = ttl_const;
   for (;;) {
-    val = static_cast<unsigned int>(startx);
-    st.push(static_cast<int>(val));
+    const double truncated = std::trunc(startx);
+    if (!(truncated < upperExclusive)) break;
+    const auto a         = static_cast<std::int64_t>(truncated);
+    const std::int64_t h = a * h1 + h2;
+    const std::int64_t k = a * k1 + k2;
+    if (h > limit || k > limit) break;
+    h2 = h1;
+    h1 = h;
+    k2 = k1;
+    k1 = k;
     if ((ttl--) == 0) break;
-    diff = startx - val;
+    const double diff = startx - truncated;
     if (diff < DIFF) break;
     startx = 1 / diff;
     if (startx > (1 / DIFF)) break;
   }
-  if (st.empty()) return {0, 1};
-  boost::rational<int> result1(0, 1);
-  boost::rational<int> result2(0, 1);
-  while (!st.empty()) {
-    if (result1.numerator() != 0)
-      result2 = st.top() + (1 / result1);
-    else
-      result2 = st.top();
-    st.pop();
-    result1 = result2;
-  }
-  err1 = std::abs(rational_cast<double>(result1) - inValue);
-  err2 = std::abs(rational_cast<double>(result2) - inValue);
-  return err1 > err2 ? result2 : result1;
+  if (k1 == 0) return {0, 1};  // zaden wyraz nie wszedl - k1 zostalo przy k_{-1}
+  const boost::rational<int> result(static_cast<int>(h1), static_cast<int>(k1));
+  return std::signbit(inValue) ? -result : result;
 }
 
 rdb::descFldVT nullFallbackValue(rdb::descFld type) {

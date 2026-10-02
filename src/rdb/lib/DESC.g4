@@ -17,6 +17,7 @@ command               : BYTE_T name=ID     ('[' arr=DECIMAL ']')?       # ByteID
                       ;
 
 // sync types with: src/include/rdb/fldType.hpp
+// INTPAIR i IDXPAIR celowo pominiete: to operandy tokenow planu, nie typy pol rekordu (#267).
 
 BYTE_T:             'BYTE';
 STRING_T:           'STRING';
@@ -25,8 +26,6 @@ INTEGER_T:          'INTEGER';
 FLOAT_T:            'FLOAT';
 DOUBLE_T:           'DOUBLE';
 RATIONAL_T:         'RATIONAL';
-INTPAIR_T:          'INTPAIR';
-IDXPAIR_T:          'IDXPAIR';
 
 fragment DEC_DIGIT: [0-9];
 

@@ -3,20 +3,15 @@
 #include <unistd.h>
 
 #include <chrono>
-#include <functional>
 #include <string>
 #include <thread>
-#include <utility>
 
-#include <boost/container/map.hpp>
-#include <boost/container/string.hpp>
-#include <boost/interprocess/allocators/allocator.hpp>
 #include <boost/interprocess/ipc/message_queue.hpp>
-#include <boost/interprocess/managed_shared_memory.hpp>
-#include <boost/interprocess/sync/named_mutex.hpp>
+#include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/property_tree/ptree.hpp>
 
 #include "constants.hpp"
+#include "ipcResponses.hpp"
 #include "qry/ipcClient.hpp"
 
 // ---- Lifecycle ----
@@ -171,33 +166,26 @@ TEST(IpcClient, full_consumer_queue_does_not_prevent_shutdown) {
 namespace {
 
 // Atrapa serwera: tworzy dokładnie te obiekty IPC, których szuka `netClient`,
-// ale NIGDY nie wstawia odpowiedzi do mapy. Odwzorowuje serwer, którego wątek
+// ale NIGDY nie odkłada odpowiedzi w slocie. Odwzorowuje serwer, którego wątek
 // komunikacyjny jest zagłodzony przez wątek czasu rzeczywistego.
 class SilentServer {
-  using segment_manager_t = boost::interprocess::managed_shared_memory::segment_manager;
-  using CharAllocator     = boost::interprocess::allocator<char, segment_manager_t>;
-  using IPCString         = boost::container::basic_string<char, std::char_traits<char>, CharAllocator>;
-  using ValueType         = std::pair<const int, IPCString>;
-  using ShmemAllocator    = boost::interprocess::allocator<ValueType, segment_manager_t>;
-  using IPCMap            = boost::container::map<int, IPCString, std::less<>, ShmemAllocator>;
+  // Pozostalosc po przerwanym przebiegu testu zablokowalaby create_only.
+  static std::string freshSegmentName() {
+    boost::interprocess::shared_memory_object::remove(ipc::names().shmemSegment.c_str());
+    return ipc::names().shmemSegment;
+  }
 
-  boost::interprocess::managed_shared_memory segment_;
-  boost::interprocess::named_mutex mutex_;
+  ipc::responses::Mapping responses_;
   boost::interprocess::message_queue queue_;
 
  public:
   SilentServer()
-      : segment_(boost::interprocess::open_or_create, ipc::names().shmemSegment.c_str(), ipc::kShmemSegmentSize),
-        mutex_(boost::interprocess::open_or_create, ipc::names().mapMutex.c_str()),
+      : responses_(boost::interprocess::create_only, freshSegmentName()),
         queue_(boost::interprocess::open_or_create, ipc::names().queryQueue.c_str(), ipc::kQueryQueueMaxMessages,
-               ipc::kQueryQueueMaxMessageSize) {
-    segment_.construct<IPCMap>(std::string(ipc::kMapObject).c_str())(std::less<>(),
-                                                                     ShmemAllocator(segment_.get_segment_manager()));
-  }
+               ipc::kQueryQueueMaxMessageSize) {}
 
   ~SilentServer() {
     boost::interprocess::shared_memory_object::remove(ipc::names().shmemSegment.c_str());
-    boost::interprocess::named_mutex::remove(ipc::names().mapMutex.c_str());
     boost::interprocess::message_queue::remove(ipc::names().queryQueue.c_str());
   }
 };

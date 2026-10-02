@@ -13,34 +13,48 @@ std::pair<std::string, std::vector<std::string>> OpenCmd::usage() const {
 }
 
 bool OpenCmd::execute(CommandContext &ctx) {
-  std::cin >> ctx.file;
-  if (ctx.file.contains('{')) {
+  if (!(std::cin >> ctx.file) || ctx.file.contains('{')) {
     std::print("{}unrecognized or missing file:{}\n{}", ctx.colors.RED, ctx.file, ctx.colors.RESET);
     return false;
   }
   const auto oldPos = ctx.file.find(".old");
   const auto base   = (oldPos != std::string::npos) ? ctx.file.substr(0, oldPos) : ctx.file;
   ctx.dacc          = std::make_unique<rdb::storage>(base, ctx.file, ctx.storageParam, ctx.storagePolicy);
+  std::string openError;
 
   if (ctx.dacc->descriptorFileExist()) {
-    // loadDescriptorFile rzuca od fazy 1 zamiast konczyc proces. xtrdb jest powloka
-    // interaktywna: uszkodzony plik ma zostac zgloszony i zostawic operatora przy
+    // Od fazy 1 attachDescriptor() nie konczy procesu: odmowe zwraca napisem (brak albo
+    // uszkodzenie .desc, nieudane otwarcie magazynu), a pozostale bledy rzuca. xtrdb jest
+    // powloka interaktywna: jedno i drugie ma zostac zgloszone i zostawic operatora przy
     // prompcie, a nie wyrzucic go z narzedzia w srodku sesji.
     try {
-      ctx.dacc->attachDescriptor();
+      openError = ctx.dacc->attachDescriptor();
     } catch (const rdb::Error &error) {
-      std::print("{}{}{}\n", ctx.colors.RED, error.what(), ctx.colors.RESET);
+      openError = error.what();
+    }
+  } else {
+    // Bez `.desc` schemat jest obowiazkowy i stoi w klamrach. Pierwszy znak sprawdzamy podgladem, bez
+    // konsumowania, wiec nastepne polecenie skryptu zostaje poleceniem. Do 2026-09-27 petla brala
+    // tokeny az do `}` bez kontroli strumienia: polecenia szly do schematu, a na koncu wejscia `>>`
+    // nie zmienialo `token` i ostatni token doklejal sie bez konca (#334, 8 GB w 2 min).
+    std::cin >> std::ws;
+    if (std::cin.peek() != '{') {
+      std::print("{}open: no descriptor file for '{}' and no schema - use: open {} {{ <schema> }}\n{}", ctx.colors.RED, ctx.file,
+                 ctx.file, ctx.colors.RESET);
       ctx.dacc.reset();
       return false;
     }
-  } else {
     std::string schema;
     std::string token;
-    do {
-      std::cin >> token;
+    while (!token.contains('}')) {
+      if (!(std::cin >> token)) {
+        std::print("{}open: schema for '{}' is not closed with '}}'\n{}", ctx.colors.RED, ctx.file, ctx.colors.RESET);
+        ctx.dacc.reset();
+        return false;
+      }
       schema += token;
       schema += ' ';
-    } while (!token.contains('}'));
+    }
     std::stringstream schemaStream(schema);
     rdb::Descriptor desc;
     schemaStream >> desc;
@@ -54,7 +68,16 @@ bool OpenCmd::execute(CommandContext &ctx) {
       ctx.dacc.reset();
       return false;
     }
-    ctx.dacc->attachDescriptor(&desc);
+    try {
+      openError = ctx.dacc->attachDescriptor(&desc);
+    } catch (const rdb::Error &error) {
+      openError = error.what();
+    }
+  }
+  if (!openError.empty()) {
+    std::print("{}open: {}\n{}", ctx.colors.RED, openError, ctx.colors.RESET);
+    ctx.dacc.reset();
+    return false;
   }
   ctx.payloadStatus = clean;
   ctx.dacc->setDisposable(false);

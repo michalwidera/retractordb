@@ -1,0 +1,6 @@
+# Ogon stalych nad UINT, INTEGER jako kontrola - wynik ten sam przy RDB_OPT_SIMPLIFY_EXPRESSIONS=ON i OFF.
+STORAGE 'temp'
+
+DECLARE u UINT, i INTEGER STREAM src, 1 FILE 'own_tail.txt'
+
+SELECT src[0]+3-5, 3+src[0]-5, (src[0]-3)+5, (src[0]+3-5)+7, src[0]+1-5, src[0]+1/2-3, src[0]+5-3, src[0]-1-1, src[0]*2*3, src[1]+3-5, 3+src[1]-5, (src[1]-3)+5, (src[1]+3-5)+7, src[1]+1-5, src[1]+1/2-3, src[1]+5-3, src[1]-1-1, src[1]*2*3 STREAM tail FROM src

@@ -321,11 +321,11 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
       case CMP_LE:
       case CMP_GE: {
         // Porownanie NIE promuje BYTE: `is_eq` zapisuje wprost `uint8_t(1)`/`uint8_t(0)`,
-        // wiec wynikiem jest typ znormalizowany. Porownanie napisow daje `"1"`/`"0"`,
-        // czyli napis o szerokosci jednego bajtu.
+        // wiec wynikiem jest typ znormalizowany. Porownanie napisow daje INTEGER 1/0
+        // (do 2026-09-26 napis `"1"`/`"0"`, ktory toLogicValue() czytal jako prawde).
         const auto normalized = normalizedOperandType(left.rtype, right.rtype);
         if (normalized == rdb::STRING) {
-          stack.push_back(stringShape(1));
+          stack.push_back(numericShape(rdb::INTEGER));
           break;
         }
         if (normalized > rdb::DOUBLE) return illTyped;
@@ -341,8 +341,9 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
         // opisuja i ta niejednoznacznosc nie dociera do artefaktu. Analizator podaje typ
         // lewego operandu i zaznacza to komentarzem, zamiast udawac, ze pytanie jest
         // rozstrzygniete.
+        // Wynik nad napisem jest INTEGER - logicResultAsType() nie oddaje juz `"1"`/`"0"`.
         if (left.rtype > rdb::STRING || right.rtype > rdb::STRING) return illTyped;
-        stack.push_back(left.rtype == rdb::STRING ? stringShape(1) : left);
+        stack.push_back(left.rtype == rdb::STRING ? numericShape(rdb::INTEGER) : left);
         break;
 
       case NEGATE:
@@ -355,9 +356,9 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
 
       case NOT:
         // `logic_not()` oddaje wynik przez logicResultAsType() w typie ARGUMENTU; dla napisu
-        // jest to `"1"` albo `"0"`, czyli jeden bajt.
+        // jest to INTEGER 1/0.
         if (right.rtype > rdb::STRING) return illTyped;
-        stack.push_back(right.rtype == rdb::STRING ? stringShape(1) : right);
+        stack.push_back(right.rtype == rdb::STRING ? numericShape(rdb::INTEGER) : right);
         break;
 
       case CALL:

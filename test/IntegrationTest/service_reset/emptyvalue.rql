@@ -1,0 +1,5 @@
+# Pusta wartosc dyrektywy: parser uslugi ma odmowic planu jako bledu planu (krok 3a w reset.sh),
+# a nie konczyc procesu FatalError-em. Reszta planu jest poprawna, zeby odmowa miala jedna przyczyne.
+STORAGE ''
+DECLARE a INTEGER STREAM src, 0.2 FILE 'data.txt'
+SELECT a+1 STREAM gamma FROM src

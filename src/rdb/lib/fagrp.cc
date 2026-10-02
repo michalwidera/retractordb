@@ -1,9 +1,11 @@
 #include "rdb/fagrp.hpp"
 
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -53,6 +55,7 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
 
   if (retention.noRetention()) {
     vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
+    initializationError_ = vec_.back()->initializationError();
   } else {
     std::vector<size_t> existingSegments;
     existingSegments.reserve(retention_.segments == 0 ? kDefaultSegmentReserve : retention_.segments);
@@ -95,6 +98,12 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
       currentSegment_  = i;
       currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
       vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
+      if (!vec_.back()->initializationError().empty()) {
+        initializationError_ = vec_.back()->initializationError();
+        for (auto &segment : vec_)
+          segment->suppressRotation();
+        break;
+      }
       writeCount_ = vec_.back()->count();
     }
   }
@@ -113,8 +122,10 @@ auto groupFile<T>::name() -> std::string & {
 
 template <typename T>
 ssize_t groupFile<T>::purge() {
+  // discard(), a nie purge segmentu: pliki grupy znikaja razem z segmentami i nie sa archiwum
+  // do rotacji. Purge segmentu tylko oproznia plik, wiec destruktor zrobilby z niego .old<N>.
   for (auto &v : vec_) {
-    v->write(nullptr, 0);  // purge files using special write command - this deltes the files
+    v->discard();
   }
   vec_.clear();
 
@@ -124,6 +135,11 @@ ssize_t groupFile<T>::purge() {
   removedSegments_ = 0;
   currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
   vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
+  // Status z konstruktora obsluguje tylko import planu. Tu, w pracy ciaglej, segment bez pliku
+  // zapisywalby w ciemno, wiec zostaje twarda awaria z nazwa pliku - IOError zamiast dawnego
+  // FatalError: demon i tak sie na nim zatrzymuje (executorsm::run), a gospodarz przezywa.
+  if (const auto &err = vec_.back()->initializationError(); !err.empty())
+    throw IOError(fmt::format("groupFile::purge: {}", err));
 
   SPDLOG_DEBUG("Purged all segments and reset group state.");
   if (vec_.size() != 1) throw LogicError("fagrp::purge: expected exactly one segment after purge");
@@ -150,12 +166,13 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
       currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
       SPDLOG_DEBUG("Rotating segments: currentSegment={}", currentSegment_);
       vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
+      // Uzasadnienie przy purge().
+      if (const auto &err = vec_.back()->initializationError(); !err.empty())
+        throw IOError(fmt::format("groupFile::write: {}", err));
       writeCount_ = 0;
       if (retention_.segments != 0 && vec_.size() > retention_.segments) {
-        auto segmentToRemove = vec_.front()->name();
-        SPDLOG_DEBUG("Removing oldest segment: {}", segmentToRemove);
-        std::filesystem::remove(segmentToRemove);
-        if (std::filesystem::exists(segmentToRemove + ".shadow")) std::filesystem::remove(segmentToRemove + ".shadow");
+        SPDLOG_DEBUG("Removing oldest segment: {}", vec_.front()->name());
+        vec_.front()->discard();  // usuwa takze cien; bez rotacji - uzasadnienie przy discard()
         vec_.erase(vec_.begin());
         removedSegments_++;
         if (vec_.empty()) throw LogicError("groupFile::write: no segments remain after removing oldest");
@@ -174,10 +191,10 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
   auto segmentIndex      = recordIndex / retention_.capacity;
   auto positionInSegment = (recordIndex % retention_.capacity) * recordSize_;
 
-  if (segmentIndex < removedSegments_) return EXIT_FAILURE;
+  if (segmentIndex < removedSegments_) return ERANGE;
 
   const auto localSegmentIndex = segmentIndex - removedSegments_;
-  if (localSegmentIndex >= vec_.size()) return EXIT_FAILURE;
+  if (localSegmentIndex >= vec_.size()) return ERANGE;
 
   return static_cast<FileInterface *>(vec_[localSegmentIndex].get())->write(ptrData, nullBitset, positionInSegment);
 }
@@ -194,10 +211,10 @@ ssize_t groupFile<T>::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
   auto segmentIndex      = recordIndex / retention_.capacity;
   auto positionInSegment = (recordIndex % retention_.capacity) * recordSize_;
 
-  if (segmentIndex < removedSegments_) return EXIT_FAILURE;
+  if (segmentIndex < removedSegments_) return ERANGE;
 
   const auto localSegmentIndex = segmentIndex - removedSegments_;
-  if (localSegmentIndex >= vec_.size()) return EXIT_FAILURE;
+  if (localSegmentIndex >= vec_.size()) return ERANGE;
 
   return static_cast<FileInterface *>(vec_[localSegmentIndex].get())->read(ptrData, nullBitset, positionInSegment);
 }

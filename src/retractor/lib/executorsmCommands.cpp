@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
+#include <fstream>
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
@@ -77,6 +78,10 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
     // tej funkcji i ladowal w zaporze IpcServer::commandLoop() -- a zapora jest ostatnia deska
     // ratunku transportu, nie kanalem raportowania silnika. Pod std::exit roznicy nie bylo.
     if (coreInstancePtr == nullptr) throw rdb::LogicError("executorsm::commandProcessor: coreInstancePtr is null");
+    // Hak it_zero_step_adhoc: znacznik powstaje przed proba zajecia blokady epoki.
+    if (command == "adhoc")
+      if (const char *gatePath = std::getenv("RDB_FAULT_ZERO_STEP_GATE"); gatePath != nullptr)
+        std::ofstream(std::string(gatePath) + ".adhoc").put('1');
     // Hak diagnostyczny testu regresyjnego it_xqrywait_first_row, ta sama droga co
     // RDB_FAULT_PLAN_SWAP_DELAY. Rozciaga okno miedzy ODEBRANIEM komendy 'show' a jej
     // obsluga -- jedyne okno, w ktorym bramka --xqrywait zdejmowana na odbiorze wpuszczala
@@ -263,8 +268,9 @@ std::string executorsm::printRowValue(const std::string &query_name) {
   using boost::property_tree::ptree;
   if (pProc == nullptr) return "";
   if (coreInstancePtr == nullptr) throw rdb::LogicError("executorsm::printRowValue: coreInstancePtr is null");
+  // Null stad nie wraca: brak strumienia w modelu getPayload zglasza wyjatkiem (streamRuntime),
+  // a pusty payload magazynu konczy sie wczesniej rzutem LogicError w storage::getPayload().
   auto *payload = pProc->getPayload(query_name, 0);
-  if (payload == nullptr) throw rdb::LogicError("executorsm::printRowValue: getPayload returned null");
 
   ptree pt;
   pt.put("stream", query_name);

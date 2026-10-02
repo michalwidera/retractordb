@@ -1,0 +1,10 @@
+# FLOAT op FLOAT - droga normalize() bez promocji.
+STORAGE 'temp'
+
+DECLARE x FLOAT, y FLOAT, z FLOAT STREAM src, 1 FILE 'own_float.txt'
+
+SELECT src[0]+src[1], src[0]-src[1], src[0]*src[2], src[0]/src[1], (src[0]+src[1])*(src[1]-src[2]), src[0]*src[0]+src[1]*src[1], (src[0]-src[1])/(src[2]+src[2]+src[1]), src[0]+src[1]+src[2]-src[0]*src[1], src[0]^2 STREAM ari FROM src
+
+SELECT src[0], src[1], src[2] STREAM cpy FROM src
+
+RULE cmp ON cpy WHEN cpy[0] > 100000000 OR cpy[1] < -100000000 OR cpy[0] >= cpy[1] AND cpy[2] = 100000000 OR cpy[1] != cpy[1] DO DUMP -1 TO 0

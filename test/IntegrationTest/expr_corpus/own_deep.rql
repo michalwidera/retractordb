@@ -1,0 +1,8 @@
+# Gleboki program ONP: kilkadziesiat operatorow na pole, INTEGER i DOUBLE.
+STORAGE 'temp'
+
+DECLARE x INTEGER, y INTEGER, z INTEGER STREAM src, 1 FILE 'own_deep_int.txt'
+DECLARE x DOUBLE, y DOUBLE, z DOUBLE STREAM dbl, 1 FILE 'own_deep_dbl.txt'
+
+SELECT (src[0]*src[1]-src[2])+(src[1]*src[2]-src[0])+(src[2]*src[0]-src[1])+(src[0]*src[1]-src[2])+(src[1]*src[2]-src[0])+(src[2]*src[0]-src[1])+(src[0]*src[1]-src[2])+(src[1]*src[2]-src[0])+(src[2]*src[0]-src[1])+(src[0]*src[1]-src[2])+(src[1]*src[2]-src[0])+(src[2]*src[0]-src[1]), ((src[0]*src[1]-src[2])+(src[1]*src[2]-src[0])+(src[2]*src[0]-src[1])+(src[0]*src[1]-src[2])+(src[1]*src[2]-src[0])+(src[2]*src[0]-src[1])+(src[0]*src[1]-src[2])+(src[1]*src[2]-src[0])+(src[2]*src[0]-src[1])+(src[0]*src[1]-src[2])+(src[1]*src[2]-src[0])+(src[2]*src[0]-src[1]))/(src[1]*src[1]+1) STREAM dint FROM src
+SELECT (dbl[0]*dbl[1]-dbl[2])+(dbl[1]*dbl[2]-dbl[0])+(dbl[2]*dbl[0]-dbl[1])+(dbl[0]*dbl[1]-dbl[2])+(dbl[1]*dbl[2]-dbl[0])+(dbl[2]*dbl[0]-dbl[1])+(dbl[0]*dbl[1]-dbl[2])+(dbl[1]*dbl[2]-dbl[0])+(dbl[2]*dbl[0]-dbl[1])+(dbl[0]*dbl[1]-dbl[2])+(dbl[1]*dbl[2]-dbl[0])+(dbl[2]*dbl[0]-dbl[1]), ((dbl[0]*dbl[1]-dbl[2])+(dbl[1]*dbl[2]-dbl[0])+(dbl[2]*dbl[0]-dbl[1])+(dbl[0]*dbl[1]-dbl[2])+(dbl[1]*dbl[2]-dbl[0])+(dbl[2]*dbl[0]-dbl[1])+(dbl[0]*dbl[1]-dbl[2])+(dbl[1]*dbl[2]-dbl[0])+(dbl[2]*dbl[0]-dbl[1])+(dbl[0]*dbl[1]-dbl[2])+(dbl[1]*dbl[2]-dbl[0])+(dbl[2]*dbl[0]-dbl[1]))/(dbl[1]*dbl[1]+1.0) STREAM ddbl FROM dbl

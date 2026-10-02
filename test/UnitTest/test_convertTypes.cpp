@@ -1,8 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <any>
+#include <boost/multiprecision/cpp_int.hpp>
 #include <boost/rational.hpp>
+#include <cmath>
+#include <cstdint>
+#include <format>
 #include <limits>
+#include <random>
+#include <stack>
 #include <string>
 #include <utility>
 
@@ -16,6 +22,164 @@ TEST(Rationalize, half) { EXPECT_EQ(Rationalize(0.5), boost::rational<int>(1, 2)
 TEST(Rationalize, third) { EXPECT_EQ(Rationalize(1.0 / 3.0), boost::rational<int>(1, 3)); }
 TEST(Rationalize, threequarters) { EXPECT_EQ(Rationalize(0.75), boost::rational<int>(3, 4)); }
 TEST(Rationalize, whole_number) { EXPECT_EQ(Rationalize(3.0), boost::rational<int>(3, 1)); }
+
+// --- wartosci UJEMNE ---
+//
+// Petla ulamka lancuchowego konwertowala `startx` na `unsigned int`. Dla ujemnego wejscia
+// jest to zachowanie nieokreslone i architektury rozstrzygaly je roznie: x86-64 (cvttsd2si)
+// bral mlodsze 32 bity i oddawal 4294967294 dla -2.0, arm64 (fcvtzu) nasycal do 0. Ta sama
+// baza dawala wiec -2/1 na jednej maszynie i 0/1 na drugiej. Na obu bylo to zreszta zle,
+// bo `diff = startx - val` liczylo sie na wartosci bez znaku: petla urywala sie po pierwszej
+// cyfrze i ulamek nigdy nie powstawal - -2.5 dawalo -2/1, nie -5/2.
+//
+// Testy sa architektonicznie neutralne - ta sama oczekiwana wartosc na kazdej maszynie -
+// wiec ich zadaniem jest padac na tej, ktora by sie wylamala.
+
+TEST(Rationalize, negative_half) { EXPECT_EQ(Rationalize(-2.5), boost::rational<int>(-5, 2)); }
+TEST(Rationalize, negative_whole_number) { EXPECT_EQ(Rationalize(-2.0), boost::rational<int>(-2, 1)); }
+TEST(Rationalize, negative_third) { EXPECT_NEAR(boost::rational_cast<double>(Rationalize(-10.0 / 3.0)), -10.0 / 3.0, 1E-6); }
+// Symetria znaku: rozwiniecie |x| daje p/q, a -|x| ma dac dokladnie -p/q.
+TEST(Rationalize, sign_is_symmetric) {
+  EXPECT_EQ(Rationalize(-1.0 / 3.0), -Rationalize(1.0 / 3.0));
+  EXPECT_EQ(Rationalize(-0.75), -Rationalize(0.75));
+  EXPECT_EQ(Rationalize(-1.5), -Rationalize(1.5));
+}
+TEST(Rationalize, negative_zero_is_zero) { EXPECT_EQ(Rationalize(-0.0), boost::rational<int>(0, 1)); }
+
+// --- wejscie bez przyblizenia wymiernego ---
+//
+// Rationalize zwraca boost::rational<int> przez wartosc, wiec NULL-a nie ma czym wyrazic:
+// NaN, nieskonczonosc i wartosc poza zakresem `int` oddaja {0,1}. NULL stoi o poziom wyzej,
+// na sciezce konwersji (ponizej: cast_variant / cast_any do RATIONAL i INTPAIR).
+
+TEST(Rationalize, nan_is_zero) { EXPECT_EQ(Rationalize(std::numeric_limits<double>::quiet_NaN()), boost::rational<int>(0, 1)); }
+TEST(Rationalize, infinity_is_zero) {
+  EXPECT_EQ(Rationalize(std::numeric_limits<double>::infinity()), boost::rational<int>(0, 1));
+  EXPECT_EQ(Rationalize(-std::numeric_limits<double>::infinity()), boost::rational<int>(0, 1));
+}
+TEST(Rationalize, above_integer_range_is_zero) {
+  EXPECT_EQ(Rationalize(1e30), boost::rational<int>(0, 1));
+  EXPECT_EQ(Rationalize(-1e30), boost::rational<int>(0, 1));
+}
+// Granica jest ta sama co w narrowFloatTo - 2^31 wylacznie, sprawdzana na wartosci obcietej.
+TEST(Rationalize, at_integer_bound_is_exact) {
+  EXPECT_EQ(Rationalize(2147483647.0), boost::rational<int>(2147483647, 1));
+  EXPECT_EQ(Rationalize(-2147483647.0), boost::rational<int>(-2147483647, 1));
+}
+// Jedyna wartosc, ktora na wyniesieniu znaku traci: -2^31. |INT_MIN| to 2^31, wiec wypada za
+// gorna granice i wychodzi {0,1}, choc sam INT_MIN da sie w `int` zapisac. Cena jest swiadoma:
+// droga przez wartosc bezwzgledna wymagalaby tu negacji INT_MIN, czyli nowego przepelnienia w
+// miejsce usunietego zachowania nieokreslonego. `boost::rational<int>` z licznikiem INT_MIN
+// jest zreszta nie do uzycia dalej - kazda negacja takiego ulamka przepelnia sie tak samo.
+TEST(Rationalize, at_negative_integer_bound_is_zero) { EXPECT_EQ(Rationalize(-2147483648.0), boost::rational<int>(0, 1)); }
+
+// --- konwergent ponad `int` (#309) ---
+//
+// Skladanie ulamka od tylu na `boost::rational<int>` przepelnialo sie, gdy konwergent wychodzil
+// poza `int` - zachowanie nieokreslone, w praktyce ulamek o zlej wartosci i czesto zlym znaku
+// (`0.333333` dawalo 2064120233/1923156540). Wynikiem jest teraz ostatni konwergent, ktory sie
+// miesci. Kazda z tych wartosci przepelniala stara wersje; sprawdzamy znak i blad wzgledny.
+
+namespace {
+void expectCloseWithSign(double x) {
+  for (const double v : {x, -x}) {
+    const double r = boost::rational_cast<double>(Rationalize(v));
+    EXPECT_EQ(std::signbit(r), std::signbit(v)) << std::format("{}", v);
+    EXPECT_LE(std::abs(r - v) / std::abs(v), 1e-9) << std::format("{}", v);
+  }
+}
+}  // namespace
+
+TEST(Rationalize, overflow_decimal_interval) { expectCloseWithSign(0.333333); }
+TEST(Rationalize, overflow_large_with_fraction) { expectCloseWithSign(1500000000.7); }
+TEST(Rationalize, overflow_at_integer_bound) { expectCloseWithSign(2147483647.5); }
+TEST(Rationalize, overflow_power_result) { expectCloseWithSign(std::pow(3.0, 1.5)); }
+
+// --- zgodnosc ze stara wersja tam, gdzie ta sie nie przepelniala ---
+//
+// Kopia Rationalize sprzed #309 jako szablon po typie, w ktorym sklada sie ulamek. Dla `int` to
+// dokladnie stary kod. Dla `cpp_int` ten sam ulamek bez granicy zakresu - on rozstrzyga, czy
+// wersja `int` sie przepelnia. Licznik i mianownik kazdego ogona [a_i; ..., a_n] sa ograniczone
+// przez licznik i mianownik wyniku (a_i >= 1 dla i >= 1), wiec jesli wynik miesci sie w `int`,
+// miesci sie kazdy krok skladania i stara wersja liczy bez zachowania nieokreslonego.
+template <typename I>
+boost::rational<I> legacyRationalize(const double inValue, const double DIFF = kDefaultRationalizeDiff,
+                                     const int ttl_const = kDefaultRationalizeIterations) {
+  std::stack<int> st;
+  const double upperExclusive = std::ldexp(1.0, std::numeric_limits<int>::digits);
+  const double absValue       = std::fabs(inValue);
+  double startx               = absValue;
+  double diff;
+  double err1;
+  double err2;
+  int ttl = ttl_const;
+  int val;
+  for (;;) {
+    const double truncated = std::trunc(startx);
+    if (!(truncated < upperExclusive)) break;
+    val = static_cast<int>(truncated);
+    st.push(val);
+    if ((ttl--) == 0) break;
+    diff = startx - val;
+    if (diff < DIFF) break;
+    startx = 1 / diff;
+    if (startx > (1 / DIFF)) break;
+  }
+  if (st.empty()) return {0, 1};
+  boost::rational<I> result1(0, 1);
+  boost::rational<I> result2(0, 1);
+  while (!st.empty()) {
+    if (result1.numerator() != 0)
+      result2 = I(st.top()) + (I(1) / result1);
+    else
+      result2 = I(st.top());
+    st.pop();
+    result1 = result2;
+  }
+  err1                            = std::abs(boost::rational_cast<double>(result1) - absValue);
+  err2                            = std::abs(boost::rational_cast<double>(result2) - absValue);
+  const boost::rational<I> result = err1 > err2 ? result2 : result1;
+  return std::signbit(inValue) ? -result : result;
+}
+
+// Trzy rodziny wejsc: jednostajnie z [0,1), log-rownomiernie 1e-9..1e10 i liczby dziesietne
+// o 1-9 cyfrach po przecinku, z losowym znakiem i stalym ziarnem.
+TEST(Rationalize, matches_legacy_where_legacy_did_not_overflow) {
+  using big               = boost::multiprecision::cpp_int;
+  const big intMax        = std::numeric_limits<int>::max();
+  constexpr int perFamily = 5000;
+
+  std::mt19937_64 gen(309);
+  std::uniform_real_distribution<double> unit(0.0, 1.0);
+  std::uniform_real_distribution<double> decade(-9.0, 10.0);
+  std::uniform_int_distribution<std::int64_t> mantissa(0, 9999999999);
+  std::uniform_int_distribution<int> fractionDigits(1, 9);
+  std::bernoulli_distribution negative(0.5);
+  const auto draw = [&](int family) {
+    switch (family) {
+      case 0:
+        return unit(gen);
+      case 1:
+        return std::pow(10.0, decade(gen));
+      default:
+        return static_cast<double>(mantissa(gen)) / std::pow(10.0, fractionDigits(gen));
+    }
+  };
+
+  for (int family = 0; family < 3; ++family) {
+    int compared = 0;
+    for (int i = 0; i < perFamily; ++i) {
+      const double magnitude = draw(family);
+      const double x         = negative(gen) ? -magnitude : magnitude;
+      const auto exact       = legacyRationalize<big>(x);
+      if (abs(exact.numerator()) > intMax || exact.denominator() > intMax) continue;
+      ++compared;
+      EXPECT_EQ(Rationalize(x), legacyRationalize<int>(x)) << std::format("{}", x);
+    }
+    // Filtr nie moze zrobic z testu pustego. Zmierzone: 99 %, 61 % i 52 % wejsc bez przepelnienia.
+    EXPECT_GE(compared, perFamily / 4) << "rodzina " << family;
+  }
+}
 
 // ── nullFallbackValue ─────────────────────────────────────────────────────────
 
@@ -219,21 +383,14 @@ TEST(cast_variant, string_to_rational) {
 
 // ── cast<descFldVT> - INTPAIR ────────────────────────────────────────────────
 
-TEST(cast_variant, int_to_intpair) {
-  using P = std::pair<int, int>;
+// Para to dwie niezalezne liczby, nie ulamek: skalar nie ma w niej reprezentacji i daje NULL.
+// Do 2026-09-26 calkowite dawaly (0, n), a RATIONAL/FLOAT/DOUBLE (licznik, mianownik).
+TEST(cast_variant, scalar_to_intpair_is_null) {
   cast<rdb::descFldVT> c;
-  rdb::descFldVT in = 7;
-  P result          = std::get<P>(c(in, rdb::INTPAIR));
-  P expected{0, 7};
-  EXPECT_EQ(result, expected);
-}
-TEST(cast_variant, double_to_intpair) {
-  using P = std::pair<int, int>;
-  cast<rdb::descFldVT> c;
-  rdb::descFldVT in = 0.5;
-  P result          = std::get<P>(c(in, rdb::INTPAIR));
-  P expected{1, 2};
-  EXPECT_EQ(result, expected);
+  const rdb::descFldVT scalars[] = {rdb::descFldVT{static_cast<uint8_t>(7)},    rdb::descFldVT{7},    rdb::descFldVT{7U},
+                                    rdb::descFldVT{boost::rational<int>(3, 5)}, rdb::descFldVT{0.5F}, rdb::descFldVT{0.5}};
+  for (const auto &in : scalars)
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::INTPAIR))) << "variant index " << in.index();
 }
 TEST(cast_variant, intpair_to_intpair) {
   using P = std::pair<int, int>;
@@ -301,13 +458,14 @@ TEST(cast_any, string_to_rational) {
   std::any in = std::string("2/5");
   EXPECT_EQ(std::any_cast<boost::rational<int>>(c(in, rdb::RATIONAL)), boost::rational<int>(2, 5));
 }
-TEST(cast_any, int_to_intpair) {
-  using P = std::pair<int, int>;
+// Ta sama regula w sciezce std::any. BYTE i UINT wkladaly tu wczesniej do std::any
+// pair<int, uint8_t> / pair<int, unsigned> zamiast pair<int, int>.
+TEST(cast_any, scalar_to_intpair_is_null) {
   cast<std::any> c;
-  std::any in = 8;
-  P result    = std::any_cast<P>(c(in, rdb::INTPAIR));
-  P expected{0, 8};
-  EXPECT_EQ(result, expected);
+  const std::any scalars[] = {std::any(static_cast<uint8_t>(7)),    std::any(7),    std::any(7U),
+                              std::any(boost::rational<int>(3, 5)), std::any(0.5F), std::any(0.5)};
+  for (const auto &in : scalars)
+    EXPECT_EQ(c(in, rdb::INTPAIR).type(), typeid(std::monostate)) << in.type().name();
 }
 TEST(cast_any, string_to_intpair) {
   using P = std::pair<int, int>;
@@ -323,22 +481,6 @@ TEST(cast_any, intpair_to_intpair) {
   std::any in = P{3, 9};
   P result    = std::any_cast<P>(c(in, rdb::INTPAIR));
   P expected{3, 9};
-  EXPECT_EQ(result, expected);
-}
-TEST(cast_any, double_to_intpair) {
-  using P = std::pair<int, int>;
-  cast<std::any> c;
-  std::any in = 0.5;
-  P result    = std::any_cast<P>(c(in, rdb::INTPAIR));
-  P expected{1, 2};
-  EXPECT_EQ(result, expected);
-}
-TEST(cast_any, rational_to_intpair) {
-  using P = std::pair<int, int>;
-  cast<std::any> c;
-  std::any in = boost::rational<int>(3, 5);
-  P result    = std::any_cast<P>(c(in, rdb::INTPAIR));
-  P expected{3, 5};
   EXPECT_EQ(result, expected);
 }
 TEST(cast_any, intpair_to_string) {
@@ -453,8 +595,140 @@ TEST(cast_variant, double_at_byte_bound_is_exact) {
   rdb::descFldVT in = 255.9;
   EXPECT_EQ(std::get<uint8_t>(c(in, rdb::BYTE)), 255);
 }
+// Zwezenie CALKOWITE: ta sama regula co dla liczb zmiennoprzecinkowych - wartosc, ktorej typ
+// docelowy nie pomiesci, jest NULL. Do 2026-09-26 static_cast zawijal ja po cichu.
+TEST(cast_variant, negative_int_to_uint_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = -998;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::UINT)));
+}
+TEST(cast_variant, zero_int_to_uint_is_exact) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 0;
+  EXPECT_EQ(std::get<unsigned>(c(in, rdb::UINT)), 0U);
+}
+TEST(cast_variant, uint_above_int_max_to_integer_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 3000000000U;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::INTEGER)));
+}
+TEST(cast_variant, uint_at_int_max_to_integer_is_exact) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 2147483647U;
+  EXPECT_EQ(std::get<int>(c(in, rdb::INTEGER)), 2147483647);
+}
+TEST(cast_variant, int_outside_byte_range_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT above = 256;
+  rdb::descFldVT below = -1;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(above, rdb::BYTE)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(below, rdb::BYTE)));
+}
+TEST(cast_variant, int_at_byte_bound_is_exact) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 255;
+  EXPECT_EQ(std::get<uint8_t>(c(in, rdb::BYTE)), 255);
+}
+// rational_cast<T> rzutowal licznik i mianownik osobno: 600/3 w BYTE dawalo 88 / 3 = 29.
+TEST(cast_variant, rational_to_byte_uses_the_integer_part) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = boost::rational<int>(600, 3);
+  EXPECT_EQ(std::get<uint8_t>(c(in, rdb::BYTE)), 200);
+}
+TEST(cast_variant, negative_rational_to_uint_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = boost::rational<int>(-7, 2);
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::UINT)));
+}
+TEST(cast_variant, uint_above_int_max_to_rational_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = 3000000000U;
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::RATIONAL)));
+}
+TEST(cast_variant, negative_string_to_uint_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = std::string("-5");
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::UINT)));
+}
+TEST(cast_any, negative_int_to_uint_is_null) {
+  cast<std::any> c;
+  std::any in = -998;
+  EXPECT_EQ(c(in, rdb::UINT).type(), typeid(std::monostate));
+}
+TEST(cast_any, uint_above_int_max_to_rational_is_null) {
+  cast<std::any> c;
+  std::any in = 3000000000U;
+  EXPECT_EQ(c(in, rdb::RATIONAL).type(), typeid(std::monostate));
+}
 TEST(cast_any, double_above_integer_range_is_null) {
   cast<std::any> c;
   std::any in = 1e30;
   EXPECT_EQ(c(in, rdb::INTEGER).type(), typeid(std::monostate));
+}
+
+// --- zwezenie float/double -> RATIONAL / INTPAIR bez reprezentacji ---
+//
+// Ta sama regula co dla typow calkowitych wyzej: wartosc, ktorej typ docelowy nie pomiesci,
+// daje NULL. NaN i nieskonczonosc nie maja przyblizenia wymiernego, wiec ida jako monostate
+// zamiast jako {0,1} - zero w polu bylo liczba, ktorej nikt nie policzyl.
+
+TEST(cast_variant, double_nan_to_rational_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::RATIONAL)));
+}
+TEST(cast_variant, double_infinity_to_rational_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT plus  = std::numeric_limits<double>::infinity();
+  rdb::descFldVT minus = -std::numeric_limits<double>::infinity();
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(plus, rdb::RATIONAL)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(minus, rdb::RATIONAL)));
+}
+TEST(cast_variant, float_nan_to_rational_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = std::numeric_limits<float>::quiet_NaN();
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::RATIONAL)));
+}
+TEST(cast_variant, double_nan_to_intpair_is_null) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::INTPAIR)));
+}
+TEST(cast_any, double_infinity_to_rational_is_null) {
+  cast<std::any> c;
+  std::any in = std::numeric_limits<double>::infinity();
+  EXPECT_EQ(c(in, rdb::RATIONAL).type(), typeid(std::monostate));
+}
+TEST(cast_any, double_nan_to_intpair_is_null) {
+  cast<std::any> c;
+  std::any in = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_EQ(c(in, rdb::INTPAIR).type(), typeid(std::monostate));
+}
+// Wartosc skonczona ma przejsc ta sama droga bez zmiany - takze ujemna.
+TEST(cast_variant, negative_double_to_rational) {
+  cast<rdb::descFldVT> c;
+  rdb::descFldVT in = -2.5;
+  EXPECT_EQ(std::get<boost::rational<int>>(c(in, rdb::RATIONAL)), boost::rational<int>(-5, 2));
+}
+
+TEST(cast_variant, finite_double_outside_rational_range_is_null) {
+  cast<rdb::descFldVT> c;
+  for (const double value : {2147483648.0, -2147483648.0, 1e30, -1e30}) {
+    rdb::descFldVT in = value;
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::RATIONAL))) << value;
+  }
+}
+
+TEST(cast_variant, finite_double_inside_rational_range_is_not_null) {
+  cast<rdb::descFldVT> c;
+  for (const double value : {2147483647.5, -2147483647.5}) {
+    rdb::descFldVT in = value;
+    EXPECT_TRUE(std::holds_alternative<boost::rational<int>>(c(in, rdb::RATIONAL))) << value;
+  }
+}
+
+TEST(cast_any, finite_float_outside_rational_range_is_null) {
+  cast<std::any> c;
+  EXPECT_EQ(c(std::any(2147483648.0F), rdb::RATIONAL).type(), typeid(std::monostate));
+  EXPECT_EQ(c(std::any(2147483520.0F), rdb::RATIONAL).type(), typeid(boost::rational<int>));
 }

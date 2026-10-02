@@ -1,0 +1,10 @@
+# BYTE op BYTE - droga normalize() bez promocji.
+STORAGE 'temp'
+
+DECLARE x BYTE, y BYTE, z BYTE STREAM src, 1 FILE 'own_byte.txt'
+
+SELECT src[0]+src[1], src[0]-src[1], src[0]*src[2], src[0]/src[1], (src[0]+src[1])*(src[1]-src[2]), src[0]*src[0]+src[1]*src[1], (src[0]-src[1])/(src[2]+src[2]+src[1]), src[0]+src[1]+src[2]-src[0]*src[1], src[0]^2 STREAM ari FROM src
+
+SELECT src[0], src[1], src[2] STREAM cpy FROM src
+
+RULE cmp ON cpy WHEN cpy[0] > 250 OR cpy[1] < 0 OR cpy[0] >= cpy[1] AND cpy[2] = 250 OR cpy[1] != cpy[1] DO DUMP -1 TO 0

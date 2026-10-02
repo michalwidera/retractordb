@@ -1,9 +1,9 @@
 # make install && ctest -R simple_max -V
 
-# Weryfikuje operator .max na strumieniu: str0 zawiera dane z core0+core1, str1
-# = str0.max (wartość maksymalna), str2 = str0 + str1 (złączenie). Wynik
-# porównywany z pattern-run.txt via xtrdb. Test -vg-2 uruchamia valgrind z
-# wykrywaniem wycieków pamięci.
+# Weryfikuje operator .max na strumieniu: max_str0 zawiera dane z
+# max_core0+max_core1, max_str1 = max_str0.max (wartość maksymalna), max_str2 =
+# max_str0 + max_str1 (złączenie). Wynik porównywany z pattern-run.txt via
+# xtrdb. Test -vg-2 uruchamia valgrind z wykrywaniem wycieków pamięci.
 
 # K24/H10a: przebieg wydluzony z 10 na 11 taktow. Ogon `+` wzrosl o jeden slot
 # (rekord wolniejszej skladowej jest okreslony dopiero na koncu jej wlasnego

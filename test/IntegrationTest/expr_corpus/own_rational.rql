@@ -1,0 +1,12 @@
+# RATIONAL op RATIONAL - srednia z reduktora, mianownik 3.
+STORAGE 'temp'
+
+DECLARE x INTEGER, y INTEGER, z INTEGER STREAM p, 1 FILE 'own_rational_p.txt'
+DECLARE x INTEGER, y INTEGER, z INTEGER STREAM q, 1 FILE 'own_rational_q.txt'
+
+SELECT p[0] STREAM ra FROM p.avg
+SELECT q[0] STREAM rb FROM q.avg
+
+SELECT ra[0]+ra[0], ra[0]*ra[0], ra[0]-ra[0]*ra[0], (ra[0]+ra[0])*(ra[0]-ra[0]*ra[0]), ra[0]^2, ra[0]*ra[0]+ra[0] STREAM rself FROM ra
+
+RULE cmp ON ra WHEN ra[0] > ra[0]*ra[0]+1000 OR ra[0]*ra[0] < ra[0]-ra[0] OR ra[0] != ra[0] DO DUMP -1 TO 0

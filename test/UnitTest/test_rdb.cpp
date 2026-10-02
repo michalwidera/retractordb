@@ -129,7 +129,7 @@ TEST(xrdb, test_storage) {
 
   rdb::storage dAcc2("datafile-fstream2", "datafile-fstream2", "");
 
-  dAcc2.attachDescriptor(&dataDescriptor);
+  EXPECT_EQ(dAcc2.attachDescriptor(&dataDescriptor), "");
   dAcc2.setDisposable(true);
 
   auto *pl = dAcc2.getPayload();
@@ -155,7 +155,7 @@ TEST(xrdb, test_storage) {
 
   dAcc2.write(1);
 
-  dAcc2.revRead(dAcc2.getRecordsCount() - 1 - 1);
+  static_cast<void>(dAcc2.revRead(dAcc2.getRecordsCount() - 1 - 1));
 
   EXPECT_EQ(std::any_cast<std::string>(pl->getItem(0).value()), "xxxx xxxx");
   EXPECT_EQ(std::any_cast<int>(pl->getItem(2).value()), 0x67);
@@ -176,7 +176,7 @@ TEST(xrdb, test_storage_disposal_removes_all_files) {
 
   {
     rdb::storage s(qryId, qryId, "");
-    s.attachDescriptor(&desc);
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
     s.setDisposable(true);
 
     auto *pl = s.getPayload();
@@ -219,7 +219,7 @@ TEST(xrdb, storage_persists_null_flags_via_metadata_stream) {
 
   {
     rdb::storage s(streamName, dataFile, ".");
-    s.attachDescriptor(&desc);
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
     s.setDisposable(true);
 
     auto *pl = s.getPayload();
@@ -230,12 +230,80 @@ TEST(xrdb, storage_persists_null_flags_via_metadata_stream) {
     pl->setItem(0, 77);
     ASSERT_TRUE(s.write());
 
-    ASSERT_TRUE(s.read(0));
+    ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
     EXPECT_FALSE(pl->getItem(0).has_value());
 
-    ASSERT_TRUE(s.read(1));
+    ASSERT_EQ(s.read(1), rdb::ReadStatus::Ok);
     ASSERT_TRUE(pl->getItem(0).has_value());
     EXPECT_EQ(std::any_cast<int>(pl->getItem(0).value()), 77);
+  }
+
+  std::filesystem::remove(metaFile);
+}
+
+// Rekord, ktorego nie ma, jest wartoscia NIEOKRESLONA - nie zerem.
+//
+// Do 2026-09-23 read() zwracalo `bool`, ktory nie mial jak tego powiedziec: kazda prawdziwa awaria
+// konczyla sie FatalError, a brak rekordu wracal jako `true` z pamiecia wyzerowana i JAWNIE
+// oznaczona jako nie-null. Przez to semantyka pochlaniania NULL-i sie nie wlaczala, a obsluga bledu
+// u trzech wolajacych byla martwa. Ten test pilnuje obu polowek kontraktu naraz: statusu i bitsetu.
+TEST(xrdb, storage_read_beyond_last_record_reports_no_such_record) {
+  const std::string streamName = "ut-no-such-record";
+  const std::string dataFile   = "ut-no-such-record.bin";
+  const std::string metaFile   = "./" + dataFile + ".meta";
+
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER) + rdb::Descriptor("b", 4, 1, rdb::INTEGER);
+
+  {
+    rdb::storage s(streamName, dataFile, ".");
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    s.setDisposable(true);
+
+    auto *pl = s.getPayload();
+    pl->setItem(0, 11);
+    pl->setItem(1, 22);
+    ASSERT_TRUE(s.write());
+
+    // Rekord istniejacy: status Ok i wartosci nietkniete.
+    ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
+    ASSERT_TRUE(pl->getItem(0).has_value());
+    EXPECT_EQ(std::any_cast<int>(pl->getItem(0).value()), 11);
+
+    // Rekord tuz za koncem magazynu: status NoSuchRecord, a KAZDE pole jest NULL - nie zerem.
+    // Gdyby bitset mowil "nie-null", reduktor zlozylby to zero do MIN/MAX/SUM/AVG zamiast pominac,
+    // a porownanie z zerem nie odroznilo by braku danych od danych rownych zeru.
+    EXPECT_EQ(s.read(1), rdb::ReadStatus::NoSuchRecord);
+    EXPECT_FALSE(pl->getItem(0).has_value());
+    EXPECT_FALSE(pl->getItem(1).has_value());
+
+    // Pozycja daleko za koncem - ten sam kontrakt, bez wzgledu na to, jak daleko.
+    EXPECT_EQ(s.read(99), rdb::ReadStatus::NoSuchRecord);
+    EXPECT_FALSE(pl->getItem(0).has_value());
+  }
+
+  std::filesystem::remove(metaFile);
+}
+
+// Magazyn pusty: pierwszy odczyt nie ma czego zwrocic. Ta sciezka jest zywa w silniku, bo
+// revRead(0) nad strumieniem bez rekordow liczy `0 - 0 - 1` i wchodzi tu z pozycja SIZE_MAX.
+TEST(xrdb, storage_read_from_empty_storage_reports_no_such_record) {
+  const std::string streamName = "ut-empty-storage";
+  const std::string dataFile   = "ut-empty-storage.bin";
+  const std::string metaFile   = "./" + dataFile + ".meta";
+
+  auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
+
+  {
+    rdb::storage s(streamName, dataFile, ".");
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    s.setDisposable(true);
+
+    ASSERT_EQ(s.getRecordsCount(), 0U);
+    EXPECT_EQ(s.read(0), rdb::ReadStatus::NoSuchRecord);
+    EXPECT_FALSE(s.getPayload()->getItem(0).has_value());
+
+    EXPECT_EQ(s.revRead(0), rdb::ReadStatus::NoSuchRecord);
+    EXPECT_FALSE(s.getPayload()->getItem(0).has_value());
   }
 
   std::filesystem::remove(metaFile);
@@ -250,7 +318,7 @@ TEST(xrdb, storage_updates_null_flags_on_record_modify) {
 
   {
     rdb::storage s(streamName, dataFile, ".");
-    s.attachDescriptor(&desc);
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
     s.setDisposable(true);
 
     auto *pl = s.getPayload();
@@ -261,7 +329,7 @@ TEST(xrdb, storage_updates_null_flags_on_record_modify) {
     pl->setItem(0, std::nullopt);
     ASSERT_TRUE(s.write(0));
 
-    ASSERT_TRUE(s.read(0));
+    ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
     EXPECT_FALSE(pl->getItem(0).has_value());
   }
 
@@ -284,7 +352,7 @@ TEST(xrdb, storage_purge_resets_metadata_stream_state) {
 
   {
     rdb::storage s(streamName, dataFile, ".");
-    s.attachDescriptor(&desc);
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
 
     auto *pl = s.getPayload();
 
@@ -299,7 +367,7 @@ TEST(xrdb, storage_purge_resets_metadata_stream_state) {
     ASSERT_TRUE(s.write());
     ASSERT_EQ(s.getRecordsCount(), 1U);
 
-    ASSERT_TRUE(s.read(0));
+    ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
     ASSERT_TRUE(pl->getItem(0).has_value());
     EXPECT_EQ(std::any_cast<int>(pl->getItem(0).value()), 1234);
   }
@@ -320,7 +388,7 @@ TEST(xrdb, storage_first_write_persists_first_meta_record) {
 
   {
     rdb::storage s(streamName, dataFile, ".");
-    s.attachDescriptor(&desc);
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
 
     auto *pl = s.getPayload();
     pl->setItem(0, std::nullopt);
@@ -349,7 +417,7 @@ TEST(xrdb, storage_auto_gap_detection_marks_gap_after_null_records) {
 
   {
     rdb::storage s(streamName, dataFile, ".");
-    s.attachDescriptor(&desc);
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
 
     // nullFillCount=2: first 2 consecutive all-null appends go to storage (nullfill phase)
     // gap phase starts when consecutiveNullCount_ > nullFillCount_
@@ -391,7 +459,7 @@ TEST(xrdb, storage_gap_flushed_on_destructor) {
 
   {
     rdb::storage s(streamName, dataFile, ".");
-    s.attachDescriptor(&desc);
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
     s.configureGapDetection(boost::rational<int>(1, 100), 1);
 
     auto *pl = s.getPayload();
@@ -410,7 +478,7 @@ TEST(xrdb, storage_gap_flushed_on_destructor) {
   // Reopen and verify gap was saved
   {
     rdb::storage s2(streamName, dataFile, ".");
-    s2.attachDescriptor(&desc);
+    EXPECT_EQ(s2.attachDescriptor(&desc), "");
 
     // Record 0 was written; gap marker should be before record 1 (which doesn't exist yet,
     // but isGapBefore is based on meta entries, not record count)
@@ -432,7 +500,7 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_fast_writes) {
 
   {
     rdb::storage s(streamName, dataFile, ".");
-    s.attachDescriptor(&desc);
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
 
     // rInterval=1 (1 second), nullFillCount=2
     // All writes happen within milliseconds so no gap should be detected
@@ -463,7 +531,7 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_modify) {
 
   {
     rdb::storage s(streamName, dataFile, ".");
-    s.attachDescriptor(&desc);
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
 
     // rInterval=1/100 (10ms), nullFillCount=2
     s.configureGapDetection(boost::rational<int>(1, 100), 2);
@@ -498,7 +566,7 @@ TEST(xrdb, storage_setSamplingInterval_propagates_to_meta) {
 
   {
     rdb::storage s(streamName, dataFile, ".");
-    s.attachDescriptor(&desc);
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
 
     s.configureGapDetection(boost::rational<int>(1, 10));
 
@@ -539,7 +607,7 @@ TEST(xrdb, storage_detects_rotation_and_rotates_meta) {
   // posixBinaryFile destructor renames dataFile → dataFile.old0.
   {
     rdb::storage s(qryID, dataFile, ".", "POSIX", false, false, 0);
-    s.attachDescriptor(&desc);
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
     auto *pl = s.getPayload();
     for (int i = 0; i < 3; ++i) {
       pl->setItem(0, i);
@@ -556,8 +624,8 @@ TEST(xrdb, storage_detects_rotation_and_rotates_meta) {
   // Second lifecycle: new empty data file, old meta still has 3 records.
   {
     rdb::storage s(qryID, dataFile, ".", "POSIX", false, false, 0);
-    s.attachDescriptor(&desc);         // creates new empty data file
-    s.configureGapDetection({1, 10});  // detectStartupState: rotation! → rotate(0)
+    EXPECT_EQ(s.attachDescriptor(&desc), "");  // creates new empty data file
+    s.configureGapDetection({1, 10});          // detectStartupState: rotation! → rotate(0)
 
     EXPECT_TRUE(s.isMetaIndexEmpty());              // meta rotated to initial state
     EXPECT_TRUE(std::filesystem::exists(metaOld));  // old meta preserved
@@ -580,7 +648,7 @@ TEST(xrdb, storage_no_rotation_when_counts_match) {
   // First lifecycle: percounter=-1 so data file is NOT renamed.
   {
     rdb::storage s(qryID2, dataFile2, ".", "POSIX", false, false, -1);
-    s.attachDescriptor(&desc);
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
     auto *pl = s.getPayload();
     for (int i = 0; i < 3; ++i) {
       pl->setItem(0, i);
@@ -594,7 +662,7 @@ TEST(xrdb, storage_no_rotation_when_counts_match) {
   // Second lifecycle: counts match → no rotation.
   {
     rdb::storage s(qryID2, dataFile2, ".", "POSIX", false, false, -1);
-    s.attachDescriptor(&desc);
+    EXPECT_EQ(s.attachDescriptor(&desc), "");
     s.configureGapDetection({1, 10});
 
     // Meta still has the original 3 records (not rotated).

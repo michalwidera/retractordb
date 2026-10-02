@@ -113,6 +113,7 @@ Install the binaries (no sudo - prefix defaults to `~/.local`) and run the test 
 cd build/Debug
 ninja install     # installs xretractor, xqry, xtrdb to ~/.local/bin
 ninja test        # optional: unit + integration tests
+ninja test-valgrind  # Linux: local memory checks
 ```
 
 #### macOS
@@ -127,7 +128,7 @@ scripts/macos-build.sh --sanitize   # -fsanitize=address,undefined
 
 Two differences are worth knowing before you read the results:
 
-- **Memory checking.** Unit tests run under Valgrind on Linux; there is no Valgrind for Apple silicon, so on macOS they run directly and the equivalent check is a sanitizer build (`-DRDB_SANITIZE=address,undefined`, which `--sanitize` passes for you).
+- **Memory checking.** Unit tests run directly in the default suite. On Linux, `ninja test-valgrind` repeats them and runs the integration memory checks locally. There is no Valgrind for Apple silicon; the equivalent check is a sanitizer build (`-DRDB_SANITIZE=address,undefined`, which `--sanitize` passes for you).
 - **Real time and the service.** `SCHED_FIFO` is set per thread rather than per process, CPU affinity has no macOS equivalent (`--realtime` reports this instead of silently doing nothing), and there is no `PREEMPT_RT` counterpart, so macOS is a development and test target rather than a measurement platform. Service mode talks to launchd rather than systemd, and no unit file is packaged.
 
 To produce your own `.deb` / `.tar.gz` packages locally:

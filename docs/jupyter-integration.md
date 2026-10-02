@@ -109,9 +109,12 @@ engine's `ConfigError` / `InternalError` into the types a Python caller expects
 (`ValueError`, `KeyError`, `IndexError`).
 
 **What is left, in phase 1: nothing.** Phase 1 is done - the engine no longer contains a
-single `FatalError` call site, only the `RDB_FAULT_FATAL_IN_SLOT` diagnostic hook that the
-exit-path test uses. `std::exit` is no longer reachable from any engine failure, which is the
-whole precondition J1 was waiting on.
+single `FatalError` call site, only two diagnostic hooks that the exit-path test uses:
+`RDB_FAULT_FATAL_IN_SLOT` (processing slot) and `RDB_FAULT_FATAL_IN_ADHOC` (communication
+thread). Both fire only when their environment variable is set. The `FatalError` sites that
+later master fixes added were converted to `rdb::Error` throws when master was merged in.
+`std::exit` is no longer reachable from any engine failure, which is the whole precondition J1
+was waiting on.
 
 Two consequences matter to a notebook even before `Engine` exists. A bad command no longer
 ends the service: it answers the client and the engine keeps running (slice C). And every

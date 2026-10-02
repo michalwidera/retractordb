@@ -28,10 +28,6 @@ void query::reset() {
   retention     = rdb::retention_t{.segments = 0, .capacity = 0};
 }
 
-bool isThere(const std::vector<query> &v, const std::string &query_name) {
-  return std::ranges::any_of(v, [&query_name](const auto &q) { return !q.id.empty() && q.id == query_name; });
-}
-
 /** Construktor set */
 
 query::query(boost::rational<int> rInterval, std::string id) : rInterval(rInterval), id(std::move(id)) {}
@@ -96,6 +92,13 @@ std::vector<std::string> query::getDepStream() {
   return lRetVal;
 }
 
+// Typ niesie polityka tylko wtedy, gdy go wybiera: MEMORY (VOLATILE, STORAGE MEMORY) albo profil
+// dyrektywy :SUBSTRAT. Polityka "DEFAULT" typu nie wybiera i nie moze przykryc STORAGE z planu -
+// do 2026-09-27 TYPE DEFAULT z niej zamienial `STORAGE DIRECT` w magazyn DEFAULT z .shadow (D7).
+std::string query::storageType() const {
+  return (policy.second != 0 && policy.first != "DEFAULT") ? policy.first : storage_policy;
+}
+
 rdb::Descriptor query::descriptorStorage() {
   rdb::Descriptor retVal{};
   for (auto &f : lSchema)
@@ -110,7 +113,7 @@ rdb::Descriptor query::descriptorStorage() {
     }
     if (policy.second != 0) {
       retVal += rdb::Descriptor("", static_cast<int>(policy.second), 0, rdb::RETMEMORY);
-      retVal += rdb::Descriptor(policy.first, 0, 0, rdb::TYPE);
+      retVal += rdb::Descriptor(storageType(), 0, 0, rdb::TYPE);
     }
     return retVal;
   }
@@ -190,7 +193,7 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
       }
       auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().widestFieldType();
       for (int i = 0; i < abs(length); i++) {
-        retVal += rdb::Descriptor(id + "_" + std::to_string(i), maxLen, 1, maxType);
+        retVal += rdb::Descriptor{rdb::flatSlotField(id + "_" + std::to_string(i), maxType, maxLen)};
       }
     } break;
     default:

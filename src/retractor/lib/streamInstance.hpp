@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <memory>  // unique_ptr
 #include <optional>
 #include <string>
@@ -27,6 +28,7 @@ struct streamInstance {
   std::unique_ptr<rdb::storage> outputPayload;  // here is payload that will be stored - select clause
   std::unique_ptr<rdb::payload> inputPayload;   // payload used for computation in select
                                                 // clause - created by from clause.
+  std::string initializationError;
 
   /// @brief Liczba slotów własnego interwału, które upłynęły od startu strumienia.
   ///
@@ -42,6 +44,14 @@ struct streamInstance {
   /// dostaje bazę dopiero w pierwszym należnym jej slocie bieżącej osi czasu; do tego
   /// momentu std::nullopt odróżnia ją od strumienia startowego oczekującego na origin/ogon.
   std::optional<int> logicalIndexBase;
+
+  /// @brief Czy rekord skladnika przeplotu ma uklad slotu wejscia tej instancji: [0] lewy, [1] prawy.
+  ///
+  /// Wypelniane w pierwszym takcie, w ktorym przeplot bierze dana strone (dataModel::constructInputPayload).
+  /// Odpowiedz zalezy tylko od deskryptora wyjscia skladnika i deskryptora wejscia tego wezla, a oba sa
+  /// stale przez zycie instancji: qSet tylko przybywa i zadnej instancji nie podmienia. Poza wezlem
+  /// przeplotu zostaje puste.
+  std::array<std::optional<bool>, 2> hashSideMatchesInput;
 
   // This constructor will create data based on query
   //
@@ -61,6 +71,11 @@ struct streamInstance {
    * This function will create aggregate payload based on the command and instance
    */
   [[nodiscard]] rdb::payload reduceFieldsToPayload(command_id cmd, const std::string &instance) const;
+
+  /// Ta sama redukcja, zapisana wprost do pola 0 payloadu `target`. Cel musi miec dokladnie jedno pole
+  /// o typie i szerokosci z reductionResultField() - tak buduje go query::descriptorFrom() dla reduktora.
+  /// Goraca petla pisze tak do payloadu wejsciowego wezla, bez budowy wyniku i jego kopii w kazdym takcie.
+  void reduceFieldsInto(command_id cmd, rdb::payload &target) const;
 
   /// Redukcja okna REKORDOWEGO nad polem TEGO strumienia - jedno przejście, cztery agregaty.
   ///

@@ -1,0 +1,5 @@
+eq 2
+lt 1
+ne 1
+never 0
+bare 4

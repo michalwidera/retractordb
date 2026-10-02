@@ -1,0 +1,22 @@
+# Porownanie napisow w warunku RULE.
+#
+# Do 2026-09-26 kazda z tych regul konczyla proces: porownanie napisow oddawalo napis "1"/"0",
+# a boolCast() w streamInstance.cpp odrzucal napis przez FatalError. Nawet bez tej awarii wynik
+# byl zly - "0" jest napisem niepustym, wiec AND/OR/NOT czytaly falszywe porownanie jako prawde.
+
+STORAGE 'temp'
+
+DECLARE s STRING[8], k INTEGER STREAM src, 1 FILE 'data.txt' ONESHOT
+
+SELECT src[0], src[1] STREAM cpy FROM src
+
+# wiersze 2 i 4
+RULE eq ON cpy WHEN cpy[0] = 'bb' DO SYSTEM 'echo eq >> fired.txt'
+# wiersz 1
+RULE lt ON cpy WHEN cpy[0] < 'bb' DO SYSTEM 'echo lt >> fired.txt'
+# wiersz 3 - porownanie napisow jako operand AND
+RULE ne ON cpy WHEN cpy[0] != 'bb' AND cpy[1] > 2 DO SYSTEM 'echo ne >> fired.txt'
+# nigdy - falszywe porownanie napisow jako operand OR nie moze byc prawda
+RULE never ON cpy WHEN cpy[0] = 'zz' OR cpy[1] > 100 DO SYSTEM 'echo never >> fired.txt'
+# kazdy wiersz - goly napis niepusty jest prawda, ta sama regula co toLogicValue()
+RULE bare ON cpy WHEN cpy[0] DO SYSTEM 'echo bare >> fired.txt'

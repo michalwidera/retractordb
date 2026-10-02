@@ -47,13 +47,13 @@ fi
 # klient, ktory wpisal bledne zapytanie, zabijal cudzy serwer razem ze wszystkimi
 # strumieniami. Dokladnie ta sama usterka, ktora na sciezce RQL naprawiono 2026-09-05.
 #
-# Po A1 kompilator zglasza bledy planu statusem (PlanError -> compiler::compile()), wiec
-# test sprawdza to, co ma sie dziac: serwer odpowiada bledem i ZYJE DALEJ. Kod wyjscia
-# ogladamy dopiero po zatrzymaniu go regularnie.
+# Po A1 kompilator zglasza bledy planu statusem (PlanError -> compiler::compile()), a od #308
+# krok zerowy odrzuca juz parser, wiec test sprawdza to, co ma sie dziac: serwer odpowiada
+# bledem i ZYJE DALEJ. Kod wyjscia ogladamy dopiero po zatrzymaniu go regularnie.
 #
-# Sam mechanizm wyjscia z watku komunikacyjnego nie przestal byc wart pilnowania - pilnuja
-# go sciezki 3-6 przez haki RDB_FAULT_*_IN_SLOT, ktore nie zaleza od tego, czy jakikolwiek
-# RQL nadal prowadzi do bledu krytycznego.
+# Sam mechanizm wyjscia z watku komunikacyjnego nie przestal byc wart pilnowania - pilnuje
+# go sciezka 2a przez hak RDB_FAULT_FATAL_IN_ADHOC i sciezki 3-6 przez haki RDB_FAULT_*_IN_SLOT,
+# ktore nie zaleza od tego, czy jakikolwiek RQL nadal prowadzi do bledu krytycznego.
 rm -rf ./temp && mkdir -p ./temp
 rm -f ./*.desc ./*.meta ./*.shadow ./adhoc.out
 xretractor query.rql -c >/dev/null
@@ -86,6 +86,31 @@ fi
 # kontrola dublowala te wiedze i rozjechala sie z nia.
 xqry -k
 server_wait_exit
+
+# --- Sciezka 2a: blad krytyczny w WATKU KOMUNIKACYJNYM, przy zapytaniu ad hoc. ---
+# Do 2026-09-27 wywolywal go tekst `@(0,4)` - krok zerowy, odrzucany przez kompilator
+# FatalError-em. Od #308 parser odmawia go wczesniej (sciezka 2), wiec sciezke otwiera hak
+# RDB_FAULT_FATAL_IN_ADHOC w miejscu lokalnej kompilacji; zapytanie jest poprawne.
+rm -rf ./temp && mkdir -p ./temp
+rm -f ./*.desc ./*.meta ./*.shadow
+xretractor query.rql -c >/dev/null
+export RDB_FAULT_FATAL_IN_ADHOC=1
+server_start query.rql -m 400 -k -r 2>adhoc.err
+unset RDB_FAULT_FATAL_IN_ADHOC
+
+xqry -a 'select * stream fine from src@(1,4)' >/dev/null 2>&1 || true
+
+status=$(server_wait_status)
+if [ "$status" -ne 1 ]; then
+  echo "blad krytyczny w watku komunikacyjnym: kod wyjscia $status, oczekiwano 1"
+  echo "  (134 = SIGABRT z join() na watku biezacym albo z destruktora std::thread)"
+  exit 1
+fi
+if ! grep -q "FATAL: fault hook RDB_FAULT_FATAL_IN_ADHOC" adhoc.err; then
+  echo "blad krytyczny w watku komunikacyjnym: brak komunikatu haka na stderr:"
+  cat adhoc.err
+  exit 1
+fi
 
 # --- Sciezki 3 i 4: blad krytyczny w SLOCIE przetwarzania. ---
 # Do 2026-09-14 proces w ogole sie nie konczyl. dataModel::processRows() trzyma core_mutex,

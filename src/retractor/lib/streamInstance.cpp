@@ -4,13 +4,12 @@
 
 #include <cstdint>
 #include <cstdlib>  // std::div
-#include <format>
-#include <memory>  // unique_ptr
+#include <memory>   // unique_ptr
 #include <optional>
-#include <string>
 #include <utility>
 #include <variant>  // std::get, std::holds_alternative (P1-E3b)
 
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include "checkedArith.hpp"
@@ -35,8 +34,9 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::strin
   outputPayload = std::make_unique<rdb::storage>(qry.id, storageName, storagePathParam, qry.storage_policy, qry.isOneShot,
                                                  qry.isHold, percounter, memory);
 
-  auto desc = qry.descriptorStorage();
-  outputPayload->attachDescriptor(&desc);
+  auto desc           = qry.descriptorStorage();
+  initializationError = outputPayload->attachDescriptor(&desc);
+  if (!initializationError.empty()) return;
 
   // Jedyne miejsce, w którym rola z planu (`isSubstrat`) spotyka się z magazynem - sonda
   // logicznych zapisów (K23) rozdziela materializowany podplan od publicznego wyniku.
@@ -81,7 +81,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
     // Ta sama rodzina co query::descriptorFrom (A2) i dataModel::constructInputPayload:
     // krok AGSE jest wielkoscia z zapytania, wiec w WYKONANIU odpowiada za niego uzytkownik.
     // W samym kompilatorze ten sam warunek jest LogicError-em, bo tam stoi juz bramka planu.
-    throw rdb::ConfigError(std::format("streamInstance::constructAgsePayload: step must be > 0, got {}", step));
+    throw rdb::ConfigError(fmt::format("streamInstance::constructAgsePayload: step must be > 0, got {}", step));
   }
 
   // temporary alias for variable - for better understand what is happening here.
@@ -101,11 +101,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
     rdb::Descriptor descriptor;
     auto [maxType, maxLen] = source->descriptor.widestFieldType();
     for (auto i = 0; i < lengthAbs; ++i) {
-      rdb::rField x(instance + "_" + std::to_string(i),  //
-                    maxLen,                              //
-                    1,                                   //
-                    maxType);
-      descriptor += rdb::Descriptor{x};
+      descriptor += rdb::Descriptor{rdb::flatSlotField(instance + "_" + std::to_string(i), maxType, maxLen)};
     }
     cacheIt = agseDescriptorCache_.emplace(lengthAbs, std::move(descriptor)).first;
   }
@@ -126,7 +122,10 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   // przed początek źródła, a ogon (compiler::computeStartupLatency) - że górny koniec już
   // istnieje. Kontrola zakresu poniżej pozostaje ochroną przed uszkodzonym planem albo
   // bezpośrednim wywołaniem jednostkowym.
-  const auto windowStart = (windowIndex * step) - (lengthAbs - 1);
+  //
+  // Pozycja w int64: n*step rośnie jak liczba rekordów źródła razy jego szerokość i w int pękała
+  // po ok. 2^31/F rekordach źródła - przy F = 65536 po 32768, niezależnie od kroku.
+  const std::int64_t windowStart = (static_cast<std::int64_t>(windowIndex) * step) - (lengthAbs - 1);
 
   rdb::probe::onAgseWindow(lengthAbs);
 
@@ -137,7 +136,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
     // przed początek strumienia) ma trafiać do rekordu -1, a nie do rekordu 0. W silniku
     // ten przypadek nie występuje - origin go wyklucza - ale wywołanie jednostkowe może
     // podać dowolny indeks i cicha pomyłka o jeden rekord byłaby tu trudna do zauważenia.
-    auto fp = std::div(flatPosition, descriptorSrcSize);
+    auto fp = std::div(flatPosition, std::int64_t{descriptorSrcSize});
     if (fp.rem < 0) {
       --fp.quot;
       fp.rem += descriptorSrcSize;
@@ -150,15 +149,15 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
       const auto reversePosition = recordsCountSrc - static_cast<size_t>(recordIndex) - 1;
       if (lastReadPosition != reversePosition) {
         rdb::probe::onAgseRead();
-        if (source->revRead(reversePosition))
+        if (source->revRead(reversePosition) == rdb::ReadStatus::Ok)
           lastReadPosition = reversePosition;
         else
-          fp.rem = -1;
+          fp.rem = -1;  // rekordu nie ma - element okna zostaje nieokreslony
       }
     } else
       fp.rem = -1;  // skip to undefined(-1) as value
 
-    auto locSrc = fp.rem;
+    auto locSrc = static_cast<int>(fp.rem);  // reszta < F, miesci sie w int
     if (locSrc >= 0) {
       // P1-E3: przepisanie elementu okna wprost przez wariant (getItemVT/setItemVT).
       // Poprzednio kazdy element szedl bajty->std::any->cast<std::any>->bajty; przy
@@ -174,7 +173,7 @@ rdb::payload streamInstance::constructAgsePayload(const int length,             
   }
 
   // 3. Cleanup source after processing
-  source->revRead(0);  // Reset source
+  static_cast<void>(source->revRead(0));  // Reset source - status bez znaczenia, czytamy dla efektu
 
   // 4. Return constructed object.
   return result;
@@ -236,13 +235,50 @@ void fnOp(opType op, const rdb::descFldVT &value, rdb::descFldVT &valueRet) {
   }
 }
 
+// Redukcja pol BYTE/INTEGER bez wariantu na element. Liczy dokladnie to co petla ogolna nad
+// castVT + fnOp<rational>: wartosc to rational<int>(v) o mianowniku 1, wiec suma idzie przez
+// checkedArith::add(int, int) - te sama galaz, ktora wybiera add(rational, rational) - a ekstremum
+// przez zwykle porownanie. Przepelnienie daje NULL i pochlania reszte, ale elementy dalej sa liczone.
+// valueRet wchodzi z wartoscia startowa operacji (INT_MAX / INT_MIN / 0).
+void reduceIntegralFields(opType op, const rdb::payload &source, int flatCount, int &validItemCount, rdb::descFldVT &valueRet) {
+  int acc       = std::get<boost::rational<int>>(valueRet).numerator();
+  bool overflow = false;
+  for (int item = 0; item < flatCount; ++item) {
+    const auto value = source.getIntegralItem(item);
+    if (!value.has_value()) continue;
+    validItemCount++;
+    if (overflow) continue;
+    switch (op) {
+      case maxop:
+        if (acc < *value) acc = *value;
+        break;
+      case minop:
+        if (acc > *value) acc = *value;
+        break;
+      case sumop: {
+        const auto sum = checkedArith::add(acc, *value);
+        if (sum.has_value())
+          acc = *sum;
+        else
+          overflow = true;
+      } break;
+      default:
+        throw rdb::LogicError("streamInstance::reduceIntegralFields: unsupported opType");
+    }
+  }
+  if (overflow)
+    valueRet = std::monostate{};
+  else
+    valueRet = boost::rational<int>(acc);
+}
+
 windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const int lastLogicalIndex,
                                                const int sourceIndexBase) const {
   // ConfigError, nie LogicError: szerokosc okna pisze uzytkownik w zapytaniu. Bramka stoi w
-  // kompilatorze (compiler.cpp:152), wiec w wykonaniu jest to niezmiennik -- ale za wielkosc
-  // WZIETA Z ZAPYTANIA wini sie uzytkownika, tak samo jak za krok AGSE (A2, query.cpp).
+  // kompilatorze, wiec w wykonaniu jest to niezmiennik -- ale za wielkosc WZIETA Z ZAPYTANIA
+  // wini sie uzytkownika, tak samo jak za krok AGSE (A2, query.cpp).
   if (group.width <= 0)
-    throw rdb::ConfigError(std::format("streamInstance::reduceRecordWindow: window width must be > 0, got {}", group.width));
+    throw rdb::ConfigError(fmt::format("streamInstance::reduceRecordWindow: window width must be > 0, got {}", group.width));
 
   const auto &source = outputPayload;
 
@@ -252,7 +288,7 @@ windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const i
   const auto resultType = group.valueType;
   if (resultType != rdb::RATIONAL && resultType != rdb::FLOAT && resultType != rdb::DOUBLE) {
     throw rdb::LogicError(
-        std::format("streamInstance::reduceRecordWindow: unsupported field type for window aggregation on '{}'", group.source));
+        fmt::format("streamInstance::reduceRecordWindow: unsupported field type for window aggregation on '{}'", group.source));
   }
 
   cast<rdb::descFldVT> castVT;
@@ -268,7 +304,7 @@ windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const i
     if (recordIndex < 0 || !std::cmp_less(recordIndex, recordsCountSrc)) continue;
 
     const auto reversePosition = recordsCountSrc - static_cast<size_t>(recordIndex) - 1;
-    if (!source->revRead(reversePosition)) continue;
+    if (source->revRead(reversePosition) != rdb::ReadStatus::Ok) continue;  // brak rekordu POMIJAMY, nie zerujemy
 
     // JEDNA wartosc z rekordu: okno idzie po czasie, nie po slotach rekordu (patrz windowGroup).
     // Wyrazenie liczy sie na payloadzie TEGO rekordu - ewaluator dostaje program grupy
@@ -309,7 +345,7 @@ windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const i
     ++stats.count;
   }
 
-  source->revRead(0);  // Reset source - ten sam porzadek co w constructAgsePayload
+  static_cast<void>(source->revRead(0));  // Reset source - ten sam porzadek co w constructAgsePayload
 
   // Okno bez ani jednej wartosci nie ma sredniej ani sumy: zostaja NULL-e z konstrukcji.
   if (stats.count == 0) return stats;
@@ -331,30 +367,41 @@ windowStats streamInstance::reduceRecordWindow(const windowGroup &group, const i
 }
 
 rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::string &instance) const {
-  if (cmd != STREAM_MAX && cmd != STREAM_MIN && cmd != STREAM_SUM && cmd != STREAM_AVG) {
-    throw rdb::LogicError(
-        std::format("streamInstance::reduceFieldsToPayload: cmd must be STREAM_MAX/MIN/SUM/AVG, got {}", static_cast<int>(cmd)));
-  }
-
-  // First construct descriptor
-  outputPayload->revRead(0);
-
-  auto [sourceType, sourceLen] = outputPayload->descriptor.widestFieldType();
-
   // K24/D4: typ wyniku redukcji wyprowadzany jest jedną regułą, wspólną
   // z query::descriptorFrom - patrz reductionResultField() w query.hpp.
-  auto [maxType, maxLen] = reductionResultField(sourceType, sourceLen);
-  auto maxType_          = maxType;
+  auto [sourceType, sourceLen] = outputPayload->descriptor.widestFieldType();
+  auto [maxType, maxLen]       = reductionResultField(sourceType, sourceLen);
 
-  rdb::rField x{instance, maxLen, 1, maxType};  // TODO - Check 1
-  rdb::Descriptor descriptor{x};
-  // same as core[instance].descriptorFrom()
-
-  // Second construct payload
   // S2: obiekt lokalny zamiast make_unique - wczesniej payload powstawal na stercie,
   // a 'return *(localPayload)' KOPIOWAL go w calosci do wyniku. Lokalna zmienna +
   // NRVO usuwa i alokacje, i kopie (ten sam wzorzec co w constructAgsePayload).
-  rdb::payload localPayload(descriptor);
+  rdb::payload localPayload(rdb::Descriptor{rdb::rField{instance, maxLen, 1, maxType}});
+  reduceFieldsInto(cmd, localPayload);
+  return localPayload;
+}
+
+void streamInstance::reduceFieldsInto(command_id cmd, rdb::payload &target) const {
+  if (cmd != STREAM_MAX && cmd != STREAM_MIN && cmd != STREAM_SUM && cmd != STREAM_AVG) {
+    throw rdb::LogicError(
+        fmt::format("streamInstance::reduceFieldsInto: cmd must be STREAM_MAX/MIN/SUM/AVG, got {}", static_cast<int>(cmd)));
+  }
+
+  // Przywraca wspolny bufor zrodla na najswiezszy rekord - petla nizej czyta z niego WARTOSCI.
+  // Inni konsumenci tego zrodla (getPayload z offsetem, fetchForward) zostawiaja w nim starszy rekord.
+  static_cast<void>(outputPayload->revRead(0));
+
+  auto [sourceType, sourceLen] = outputPayload->descriptor.widestFieldType();
+  auto [maxType, maxLen]       = reductionResultField(sourceType, sourceLen);
+  auto maxType_                = maxType;
+
+  // Cel ma pole wyniku z tej samej reguly, ale policzonej nad deskryptorem PLANU, a magazyn zrodla moze
+  // niesc deskryptor z dysku (verifyDescriptorMatch przepuszcza plan szerszy od pliku). Rozjazd wychodzil
+  // dotad dopiero w payload::operator= przy przypisaniu wyniku - tu jest sprawdzany jawnie.
+  if (target.descriptor.size() != 1 || target.descriptor[0].rtype != maxType || target.descriptor[0].rlen != maxLen) {
+    throw rdb::LogicError(
+        fmt::format("streamInstance::reduceFieldsInto: target does not match reduction result type {} for '{}'",
+                    static_cast<int>(maxType), target.descriptor.empty() ? std::string{} : target.descriptor[0].rname));
+  }
 
   if (maxType > rdb::DOUBLE) {  // fldlist.h -  rdb types are in sequence
     throw rdb::LogicError("streamInstance: aggregation not supported for this field type");
@@ -427,7 +474,7 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   }
 
   if (std::holds_alternative<std::monostate>(valueRet))
-    throw rdb::LogicError("streamInstance::reduceFieldsToPayload: valueRet not initialized after switch");
+    throw rdb::LogicError("streamInstance::reduceFieldsInto: valueRet not initialized after switch");
 
   auto validItemCount{0};
   // Petla idzie po SLOTACH PLASKICH, nie po wpisach deskryptora: getItemVT() przyjmuje
@@ -437,35 +484,42 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   // Pola konfiguracyjne (REF, TYPE, RETENTION, RETMEMORY) nie maja slotow plaskich,
   // wiec ich pominiecie zapewnia sam Descriptor::rebuildFieldMappings().
   const int flatCount = outputPayload->descriptor.flatElementCount();
-  for (int item = 0; item < flatCount; ++item) {
-    auto valueOpt = outputPayload->getPayload()->getItemVT(item);
-    if (!valueOpt.has_value()) continue;
-    validItemCount++;
+  const auto *source  = outputPayload->getPayload();
+  // Najszerszy typ zrodla BYTE albo INTEGER znaczy: WSZYSTKIE pola danych sa BYTE/INTEGER - kazdy inny
+  // typ (UINT, RATIONAL, zmiennoprzecinkowe, STRING, NULLTYPE) jest w descFld szerszy od INTEGER.
+  if (maxType_ == rdb::RATIONAL && (sourceType == rdb::BYTE || sourceType == rdb::INTEGER)) {
+    reduceIntegralFields(op, *source, flatCount, validItemCount, valueRet);
+  } else {
+    for (int item = 0; item < flatCount; ++item) {
+      auto valueOpt = source->getItemVT(item);
+      if (!valueOpt.has_value()) continue;
+      validItemCount++;
 
-    rdb::descFldVT value = castVT(valueOpt.value(), maxType_);
-    switch (maxType_) {
-      case rdb::BYTE:
-      case rdb::INTEGER:
-      case rdb::UINT:
-        throw rdb::LogicError("streamInstance: BYTE/INT/UINT should have been cast to RATIONAL before aggregation");
-      case rdb::RATIONAL:
-        fnOp<boost::rational<int>>(op, value, valueRet);
-        break;
-      case rdb::FLOAT:
-        fnOp<float>(op, value, valueRet);
-        break;
-      case rdb::DOUBLE:
-        fnOp<double>(op, value, valueRet);
-        break;
-      default:
-        throw rdb::LogicError("streamInstance: unsupported aggregation type");
+      rdb::descFldVT value = castVT(valueOpt.value(), maxType_);
+      switch (maxType_) {
+        case rdb::BYTE:
+        case rdb::INTEGER:
+        case rdb::UINT:
+          throw rdb::LogicError("streamInstance: BYTE/INT/UINT should have been cast to RATIONAL before aggregation");
+        case rdb::RATIONAL:
+          fnOp<boost::rational<int>>(op, value, valueRet);
+          break;
+        case rdb::FLOAT:
+          fnOp<float>(op, value, valueRet);
+          break;
+        case rdb::DOUBLE:
+          fnOp<double>(op, value, valueRet);
+          break;
+        default:
+          throw rdb::LogicError("streamInstance: unsupported aggregation type");
+      }
     }
   }
 
   if (validItemCount == 0) {
     auto postion{0};
-    localPayload.setItemVT(postion, std::nullopt);
-    return localPayload;
+    target.setItemVT(postion, std::nullopt);
+    return;
   }
 
   if (cmd == STREAM_AVG) {
@@ -502,11 +556,9 @@ rdb::payload streamInstance::reduceFieldsToPayload(command_id cmd, const std::st
   auto postion{0};
   // monostate w std::optional nie jest NULL-em dla setItemVT - przepelnienie trzeba zapisac jawnie.
   if (std::holds_alternative<std::monostate>(valueRet))
-    localPayload.setItemVT(postion, std::nullopt);
+    target.setItemVT(postion, std::nullopt);
   else
-    localPayload.setItemVT(postion, valueRet);
-
-  return localPayload;
+    target.setItemVT(postion, valueRet);
 }
 
 void streamInstance::constructOutputPayload(const std::list<field> &fields) const {
@@ -527,7 +579,7 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) cons
     // (najciezszej) sciezce. Parytet z wariantem any-owym potwierdzony round-trip
     // (test_payload) + integracja bit-identyczna (ctest).
     if (program.field_.rtype != (outputPayload->descriptor[i]).rtype) {
-      throw rdb::LogicError(std::format(
+      throw rdb::LogicError(fmt::format(
           "streamInstance::constructOutputPayload: program field type does not match descriptor type at index {}", i));
     }
 
@@ -545,7 +597,7 @@ void streamInstance::constructOutputPayload(const std::list<field> &fields) cons
   }
 }
 
-/// Jedno miejsce na trzy warianty, ktorych boolCast nie obsluguje. Wpisane w kazda lambde
+/// Jedno miejsce na warianty, ktorych boolCast nie obsluguje. Wpisane w kazda lambde
 /// z osobna rozpychaly linie ponad limit kolumn i rozbijaly wyrownanie zestawu przeciazen.
 [[noreturn]] static void boolCastUnsupported(const char *what) {
   throw rdb::LogicError(std::string("boolCast: ") + what + " not supported");
@@ -564,7 +616,11 @@ bool boolCast(const rdb::descFldVT &inVar) {
                  [&retVal](double a) { retVal = (a != 0); },                                            //
                  [](std::pair<int, int>) { boolCastUnsupported("pair<int,int>"); },                     //
                  [](const std::pair<std::string, int> &) { boolCastUnsupported("pair<string,int>"); },  //
-                 [](const std::string &) { boolCastUnsupported("string type"); }                        //
+                 // Ta sama regula co toLogicValue() w ewaluatorze: napis niepusty jest prawda. Wyniki
+                 // porownan i operatorow logicznych nad napisami sa INTEGER, wiec tu dochodzi tylko goly
+                 // napis (`WHEN s[0]`). Do 2026-09-26 bylo tu FatalError, a porownanie napisow dawalo
+                 // napis `"1"`/`"0"` - kazda regula z takim porownaniem konczyla proces.
+                 [&retVal](const std::string &a) { retVal = !a.empty(); }  //
              },
              inVar);
 
@@ -587,9 +643,8 @@ void streamInstance::constructRulesAndUpdate(const query &qry) {
     // Regula dolaczona ad-hoc jest nieuzbrojona, dopoki nie zbierze wlasnej historii -
     // patrz rule::armAtCount. Reguly z planu maja tam zero i wchodza od razu.
     if (outputPayload->getRecordsCount() < r.armAtCount) continue;
-    auto condition = r.condition;
     expressionEvaluator expression;
-    auto result = expression.eval(condition, &payload);
+    auto result = expression.eval(r.condition, &payload);
     if (boolCast(result)) {
       if (r.action == rule::DUMP) {
         dumpMgr.registerTask(qry.id, dumpTask(r.name, r.dumpRange, r.dump_retention));

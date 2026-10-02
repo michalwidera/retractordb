@@ -1,0 +1,6 @@
+# Konfiguracja kroku 8 w reset.sh: instancja, ktorej wlasciciel swiadomie oddal kanal reset.
+#
+# Klucz czytany jest przy starcie procesu (--config wylacza wyszukiwanie warstwowe), wiec
+# wymaga wlasnej instancji - stad osobny start po zatrzymaniu uslugi z krokow 1-7.
+[service]
+unrestricted = true

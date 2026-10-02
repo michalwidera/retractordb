@@ -429,9 +429,9 @@ TEST(BusForeignCounterOwner, OwnDistinctAndEmptyCountersPass) {
 }
 
 // Licznik rotacji nie jest nazwa strumienia, wiec rozlacznosc nazw go nie chroni. Dwie
-// instancje na jednym pliku wczytuja te sama wartosc i zapisuja te sama wartosc+1 (licznik
-// aktualizuje sie dopiero w destruktorze PersistentCounter), czyli gubia rotacje i nadpisuja
-// sobie archiwa. Nazwy strumieni sa tu ROZLACZNE -- kolizja dotyczy wylacznie licznika.
+// instancje na jednym pliku moga wczytac te sama wartosc i zapisac te sama wartosc+1 (odczyt
+// i zapis licznika nie sa objete blokada pliku), czyli dostac ten sam numer i nadpisac sobie
+// archiwa. Nazwy strumieni sa tu ROZLACZNE -- kolizja dotyczy wylacznie licznika.
 TEST_F(BusFixture, SharedRotationCounterIsRefused) {
   bus::Bus first(kTestSegment);
   bus::Bus second(kTestSegment);
@@ -717,6 +717,54 @@ TEST_F(BusFixture, ClaimAdditionalStoreConflictLeavesOwnSlotIntact) {
   ASSERT_NE(own, instances.end());
   EXPECT_EQ(own->streams, (std::vector<std::string>{"srca"}));
   EXPECT_EQ(own->storeDigests, (std::vector<bus::StoreDigest>{bus::storeDigest("/tmp/srca")}));
+}
+
+// Wycofanie nieudanego ad-hoc (#303): z magistrali schodzi dokladnie to, co roszczenie dopisalo.
+// Nazwa i plik wracaja do puli dla innych instancji, a nazwy i magazyny planu -- takze te
+// powtorzone w zapytaniu ad-hoc -- zostaja przy wlascicielu.
+TEST_F(BusFixture, ReleaseAdditionalFreesOnlyWhatWasAdded) {
+  bus::Bus first(kTestSegment);
+  bus::Bus second(kTestSegment);
+  bus::Bus third(kTestSegment);
+
+  ASSERT_EQ(first.claim({.name = "alfa", .queryFile = "a.rql", .streams = {"srca", "dsta"}, .stores = {"/tmp/srca"}}).status,
+            bus::ClaimStatus::Claimed);
+
+  const auto added = first.claimAdditional({"dsta", "adhoc"}, {"/tmp/srca", "/tmp/adhoc"});
+  ASSERT_EQ(added.status, bus::ClaimStatus::Claimed);
+  EXPECT_EQ(added.addedStreams, (std::vector<std::string>{"adhoc"}));
+  EXPECT_EQ(added.addedStores, (std::vector<std::string>{"/tmp/adhoc"}));
+
+  first.releaseAdditional(added.addedStreams, added.addedStores);
+
+  const auto instances = first.instances();
+  const auto own       = std::ranges::find_if(instances, [](const auto &instance) { return instance.name == "alfa"; });
+  ASSERT_NE(own, instances.end());
+  EXPECT_EQ(own->streams, (std::vector<std::string>{"srca", "dsta"}));
+  EXPECT_EQ(own->storeDigests, (std::vector<bus::StoreDigest>{bus::storeDigest("/tmp/srca")}));
+
+  EXPECT_EQ(second.claim({.name = "beta", .queryFile = "b.rql", .streams = {"adhoc"}, .stores = {"/tmp/adhoc"}}).status,
+            bus::ClaimStatus::Claimed);
+  const auto refused = third.claim({.name = "gamma", .queryFile = "c.rql", .streams = {"dsta"}});
+  EXPECT_EQ(refused.status, bus::ClaimStatus::Conflict);
+  EXPECT_EQ(refused.ownerName, "alfa");
+}
+
+// Zwolnienie wpisu ze srodka tablicy zageszcza ja z zachowaniem kolejnosci pozostalych:
+// slot nie moze zostac z dziura ani z przestawionymi nazwami.
+TEST_F(BusFixture, ReleaseAdditionalKeepsOrderOfRemainingEntries) {
+  bus::Bus instance(kTestSegment);
+
+  ASSERT_EQ(instance.claim({.name = "alfa", .queryFile = "a.rql", .streams = {"srca"}}).status, bus::ClaimStatus::Claimed);
+  ASSERT_EQ(instance.claimAdditional({"adhoc1"}, {"/tmp/adhoc1"}).status, bus::ClaimStatus::Claimed);
+  ASSERT_EQ(instance.claimAdditional({"adhoc2"}, {"/tmp/adhoc2"}).status, bus::ClaimStatus::Claimed);
+
+  instance.releaseAdditional({"adhoc1"}, {"/tmp/adhoc1"});
+
+  const auto instances = instance.instances();
+  ASSERT_EQ(instances.size(), 1U);
+  EXPECT_EQ(instances[0].streams, (std::vector<std::string>{"srca", "adhoc2"}));
+  EXPECT_EQ(instances[0].storeDigests, (std::vector<bus::StoreDigest>{bus::storeDigest("/tmp/adhoc2")}));
 }
 
 // Magazynow ogranicza wylacznie LICZBA. Sciezka dowolnej dlugosci przechodzi w calosci, bo
