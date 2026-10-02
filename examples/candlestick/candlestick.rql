@@ -11,7 +11,7 @@
 STORAGE 'temp'
 DEFAULT VOLATILE
 
-DECLARE v BYTE STREAM candle_source, 0.02 FILE '/dev/random'
+DECLARE v BYTE STREAM candle_source, 0.02 DEVICE '/dev/random'
 
 SELECT int(AVG(candle_source[0] : 25)) STREAM price FROM candle_source
 SELECT * STREAM bar FROM price@(10,-10)

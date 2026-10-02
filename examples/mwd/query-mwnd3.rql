@@ -1,4 +1,4 @@
-DECLARE a INTEGER STREAM core, 1 FILE 'datafile.txt'
+DECLARE a INTEGER STREAM core, 1 TEXTFILE 'datafile.txt'
 
 SELECT * STREAM str1 FROM core@(2,-2)
 

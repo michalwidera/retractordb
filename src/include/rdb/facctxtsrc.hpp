@@ -3,6 +3,7 @@
 #include <cerrno>
 #include <fstream>
 #include <memory>
+#include <string>
 
 #include "descriptor.hpp"
 #include "fainterface.hpp"
@@ -23,12 +24,15 @@ namespace rdb {
 /// - po osiągnięciu końca pliku przy wyłączonym loopToBeginningIfEOF zwracać kolejne rekordy jako wyzerowane dane z nullBitset ustawionym na same wartości true,
 /// - w tym samym przypadku zgłaszać wyczerpanie wejścia przez exhausted(), bo rekord all-null jest nieodróżnialny od danych,
 /// - w przypadku błędu otwarcia pliku lub błędu odczytu zwracać dane wyzerowane z nullBitset ustawionym na same wartości true,
-/// - zliczać wykonane odczyty i zwracać ich liczbę przez count().
+/// - zliczać wykonane odczyty i zwracać ich liczbę przez count(),
+/// - czytać wyłącznie plik zwykły (#346): ścieżkę innego rodzaju odrzucać przez initializationError(),
+///   sprawdzając ją przez stat() przed otwarciem, żeby FIFO bez pisarza nie zablokowało open().
 ///
 /// @note Klasa nie obsługuje zapisu i nie zapewnia losowego dostępu do rekordów tekstowych.
 /// @note Interpretacja błędnych tokenów numerycznych zależy od bieżącej implementacji parsera i nie stanowi pełnej walidacji wejścia.
 class textSourceRO : public FileInterface {
   std::string filename_;
+  std::string initializationError_;
   const ssize_t recordSize_;
 
   Descriptor descriptor_;
@@ -60,6 +64,7 @@ class textSourceRO : public FileInterface {
   auto name() -> std::string & override;
   size_t count() override;
   [[nodiscard]] bool exhausted() const override { return exhausted_; }
+  [[nodiscard]] const std::string &initializationError() const override { return initializationError_; }
 
   const std::vector<bool> &lastNullBitset() const;
 };

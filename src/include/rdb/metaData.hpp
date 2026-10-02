@@ -58,7 +58,7 @@ namespace rdb {
 /// @note Wpisy gap są markerami przerw transmisji danych między rekordami i nie są wliczane do numeracji logicznych rekordów zwracanej przez totalRecords().
 /// @note Interfejs klasy jest ograniczony do operacji potrzebnych do dopisywania, modyfikacji, odczytu i trwałego utrzymania indeksu null.
 /// @note Instancja z pustą ścieżką pliku jest wariantem inertnym (bez persystencji) - storage wstrzykuje ją dla
-///       źródeł deklarowanych (DEVICE/TEXTSOURCE), które nie utrzymują indeksu null.
+///       źródeł deklarowanych (BINFILE/DEVICE/TEXTSOURCE), które nie utrzymują indeksu null.
 /// @note Klasa pełni rolę koordynatora spinającego wydzielone jednostki: format wpisu definiuje IndexRecord
 ///       (indexRecord.hpp), persystencję pliku .meta realizuje MetaIndexStore (metaIndexStore.hpp), stan detekcji
 ///       przerw GapDetector (gapDetector.hpp), a operacje na segmentach RLE - splitSegment()/sumNonGapRecords()

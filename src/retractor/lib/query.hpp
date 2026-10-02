@@ -1,9 +1,11 @@
 #pragma once
 
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <list>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <vector>
 
@@ -102,6 +104,25 @@ struct windowStats {
   int count = 0;
 };
 
+/// Rodzaj zrodla deklarowanego (#346). Wynika ze slowa kluczowego DECLARE, nigdy ze sciezki;
+/// przestarzale `FILE` parser tlumaczy na jeden z trzech rodzajow, wiec dalej silnik widzi tylko je.
+enum class sourceKind : std::uint8_t { none, binFile, textFile, device };
+
+/// Slowo kluczowe RQL rodzaju - do komunikatow i ostrzezen.
+inline std::string_view sourceKindKeyword(sourceKind kind) {
+  switch (kind) {
+    case sourceKind::binFile:
+      return "BINFILE";
+    case sourceKind::textFile:
+      return "TEXTFILE";
+    case sourceKind::device:
+      return "DEVICE";
+    case sourceKind::none:
+      break;
+  }
+  return "";
+}
+
 class query {
   void fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &val, const std::string &id);
 
@@ -154,6 +175,13 @@ class query {
   bool isOneShot    = false;
   bool isHold       = false;
   bool isSubstrat   = false;
+
+  /// Rodzaj zrodla deklaracji; `none` dla SELECT i dyrektyw.
+  sourceKind kind = sourceKind::none;
+  /// Deklaracja zapisana przestarzala forma `FILE` - `kind` wybrala zamrozona regula ze sciezki.
+  bool isDeprecatedFile = false;
+  /// Wiersz pliku planu, od ktorego zaczyna sie deklaracja - do ostrzezenia o formie przestarzalej.
+  size_t declarationLine = 0;
 
   std::list<field> lSchema;
   std::list<token> lProgram;

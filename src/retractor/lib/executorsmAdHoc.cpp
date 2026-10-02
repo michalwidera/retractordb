@@ -5,7 +5,9 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <mutex>
+#include <print>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -195,6 +197,15 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
       SPDLOG_ERROR("AdHoc rejected: {}", openError);
       return ptRetval;
     }
+    if (const std::string sourceError = checkDeclaredSources(coreInstanceCopy, adHocStreams); sourceError != "OK") {
+      ptRetval.put("db", "Rejected: " + sourceError);
+      SPDLOG_ERROR("AdHoc rejected: {}", sourceError);
+      return ptRetval;
+    }
+    // Jak przy starcie: przestarzale `DECLARE ... FILE` tylko z --verbose serwera, na jego stderr.
+    if (verboseMode)
+      for (const std::string &warning : deprecatedFileWarnings(coreInstanceCopy, adHocStreams))
+        std::println(std::cerr, "xretractor: warning: {}", warning);
   }
 
   // Test zmienia katalog po kontroli wstepnej, lecz przed rzeczywistym open() w

@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
+#include <iostream>
 #include <map>
 #include <mutex>
+#include <print>
 #include <string>
 #include <thread>
 #include <utility>
@@ -142,6 +144,10 @@ std::string executorsm::validatePlanText(const std::string &planText) {
     if (const std::string kept = checkKeptStores(candidate, cfgStorageDir); kept != "OK") return "Rejected: " + kept;
     if (const std::string descriptorError = checkDescriptorFiles(candidate, cfgStorageDir); descriptorError != "OK")
       return "Rejected: " + descriptorError;
+    if (const std::string sourceError = checkDeclaredSources(candidate); sourceError != "OK") return "Rejected: " + sourceError;
+    if (verboseMode)
+      for (const std::string &warning : deprecatedFileWarnings(candidate))
+        std::println(std::cerr, "xretractor: warning: {}", warning);
     if (const std::string openError = checkOutputFilesOpenable(candidate, cfgStorageDir); openError != "OK")
       return "Rejected: " + openError;
     // Ten sam wykaz co przy starcie (launcher), tylko do dziennika - kanal reset nie ma stderr operatora.

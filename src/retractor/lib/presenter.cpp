@@ -89,13 +89,16 @@ void presenter::graphiz(std::ostream &xout, const boost::program_options::variab
     xout << dotId(q.id) << "\t";
     xout << "[shape=record,";
     if (q.isDeclaration()) {
-      auto desc = q.descriptorStorage();
-      if (desc.hasField("DEVICE"))
+      // BINFILE zostaje przy kolorze, ktory przed #346 mialo kazde zrodlo nietekstowe - to byly
+      // niemal zawsze pliki binarne. Nowy kolor dostaje DEVICE.
+      if (q.kind == sourceKind::binFile)
         xout << "style=filled,fillcolor=Skyblue,color=Black,";
-      else if (desc.hasField("TEXTSOURCE"))
+      else if (q.kind == sourceKind::textFile)
         xout << "style=filled,fillcolor=\"#FFF2CC\",color=Black,";
+      else if (q.kind == sourceKind::device)
+        xout << "style=filled,fillcolor=PaleGreen,color=Black,";
       else
-        xout << "style=filled,fillcolor=Red,color=Black,";  // something wrong here - declaration without DEVICE or TEXTSOURCE
+        xout << "style=filled,fillcolor=Red,color=Black,";  // something wrong here - declaration without source kind
     } else if (q.isGenerated())
       xout << "style=filled,fillcolor=Sienna,color=Black,";
     else

@@ -244,8 +244,8 @@ A query set is a `.rql` file with stream `DECLARE`s and continuous `SELECT`s. Th
 
 ```sql
 # declaration of input time series
-DECLARE a BYTE , b BYTE STREAM core0, 1 FILE '/dev/urandom'
-DECLARE c BYTE , d BYTE STREAM core1, 0.5 FILE '/dev/urandom'
+DECLARE a BYTE , b BYTE STREAM core0, 1 DEVICE '/dev/urandom'
+DECLARE c BYTE , d BYTE STREAM core1, 0.5 DEVICE '/dev/urandom'
 
 SELECT core0[0],b STREAM str1 FROM core0#core1
 SELECT core1[0]/2+1,a,a+1,b STREAM str2 FROM core1+core0

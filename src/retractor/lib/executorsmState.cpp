@@ -29,6 +29,7 @@ std::atomic<bool> dataModelExpected{false};
 std::atomic<bool> firstQueryReceived{false};
 std::atomic<std::uint64_t> adHocPlanRevision{0};
 bool untilEofMode{false};
+bool verboseMode{false};
 std::atomic<bool> planResetRequested{false};
 std::string pendingPlanText;
 std::atomic<bool> planSwapInFlight{false};

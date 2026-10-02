@@ -23,9 +23,9 @@
 # ladowalyby na dysku substratem DEFAULT.
 SUBSTRAT 'memory'
 
-DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 FILE 'rec205'
-DECLARE bp_coef INTEGER[25] STREAM bpf, 1 FILE 'bp_coef.txt'
-DECLARE d_coef INTEGER[5] STREAM df, 1 FILE 'd_coef.txt'
+DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 BINFILE 'rec205'
+DECLARE bp_coef INTEGER[25] STREAM bpf, 1 TEXTFILE 'bp_coef.txt'
+DECLARE d_coef INTEGER[5] STREAM df, 1 TEXTFILE 'd_coef.txt'
 
 # Potok liczy w arytmetyce CALKOWITEJ: wynik SUMC/AVG nad polem INTEGER jest RATIONAL,
 # wiec kazdy wraca do INTEGER jawnym `int` (skrot `to_integer`). Bez rzutowan mianowniki

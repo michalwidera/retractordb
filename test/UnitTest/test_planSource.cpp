@@ -1,5 +1,11 @@
+#include <sys/stat.h>  // mkfifo
+
+#include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <future>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -380,4 +386,153 @@ TEST(PlanSource, declared_descriptor_check_uses_the_runtime_direction) {
   EXPECT_EQ(check("DOUBLE", "INTEGER"), "OK") << "silnik przyjmuje ten plan";
 
   fs::remove_all(dir);
+}
+
+namespace {
+
+/// Wynik `call` albo przerwanie procesu testu, gdy nie wroci w 5 s. Kontrola rodzaju pliku nie moze
+/// otwierac sciezki: open() na FIFO bez pisarza wisi, a wiszacego watku nie da sie zakonczyc inaczej.
+template <typename F>
+auto withinFiveSeconds(F call) {
+  auto pending = std::async(std::launch::async, std::move(call));
+  if (pending.wait_for(std::chrono::seconds(5)) != std::future_status::ready) {
+    std::cerr << "call blocked for 5 s - a FIFO without a writer was opened\n";
+    std::_Exit(EXIT_FAILURE);
+  }
+  return pending.get();
+}
+
+}  // namespace
+
+// Rodzaj pliku pod sciezka deklaracji (#346): BINFILE i TEXTFILE - plik zwykly, DEVICE - urzadzenie
+// znakowe albo FIFO. Brak pliku nie jest odmowa - akcesor ostrzega i daje NULL jak dotad.
+TEST(PlanSource, declared_source_kind_is_checked_without_opening_the_path) {
+  namespace fs       = std::filesystem;
+  const fs::path dir = "declared_source_kind";
+  fs::remove_all(dir);
+  fs::create_directory(dir);
+  const std::string fifo    = (dir / "feed.fifo").string();
+  const std::string regular = (dir / "values.dat").string();
+  ASSERT_EQ(::mkfifo(fifo.c_str(), 0600), 0);
+  std::ofstream(regular) << "1\n";
+
+  const auto check = [](const std::string &declaration) {
+    qTree plan;
+    EXPECT_EQ(parsePlanText(plan, "DECLARE a INTEGER STREAM src, 1 " + declaration + "\n").status, "OK") << declaration;
+    return withinFiveSeconds([&plan] { return checkDeclaredSources(plan); });
+  };
+
+  EXPECT_EQ(check("BINFILE '" + fifo + "'"), "stream 'src': BINFILE '" + fifo + "' is a FIFO, not a regular file");
+  EXPECT_EQ(check("TEXTFILE '" + fifo + "'"), "stream 'src': TEXTFILE '" + fifo + "' is a FIFO, not a regular file");
+  EXPECT_EQ(check("BINFILE '/dev/null'"), "stream 'src': BINFILE '/dev/null' is a character device, not a regular file");
+  EXPECT_EQ(check("TEXTFILE '/dev/null'"), "stream 'src': TEXTFILE '/dev/null' is a character device, not a regular file");
+  EXPECT_EQ(check("BINFILE '" + dir.string() + "'"),
+            "stream 'src': BINFILE '" + dir.string() + "' is a directory, not a regular file");
+  EXPECT_EQ(check("DEVICE '" + regular + "'"),
+            "stream 'src': DEVICE '" + regular + "' is a regular file, not a character device or FIFO");
+
+  EXPECT_EQ(check("DEVICE '" + fifo + "'"), "OK");
+  EXPECT_EQ(check("DEVICE '/dev/null'"), "OK");
+  EXPECT_EQ(check("BINFILE '" + regular + "'"), "OK");
+  EXPECT_EQ(check("TEXTFILE '" + regular + "'"), "OK");
+  EXPECT_EQ(check("BINFILE '" + (dir / "missing.bin").string() + "'"), "OK");
+
+  // Forma przestarzala: odmowa mowi, co wybrala regula i jakie slowo pasuje do pliku.
+  EXPECT_EQ(check("FILE '" + fifo + "'"), "stream 'src': BINFILE '" + fifo +
+                                              "' is a FIFO, not a regular file (deprecated FILE resolved this path as "
+                                              "BINFILE; declare it with DEVICE)");
+
+  // Ad-hoc sprawdza tylko nowo dodawane strumienie.
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan, "DECLARE a INTEGER STREAM bad, 1 BINFILE '" + fifo +
+                                    "'\nDECLARE a INTEGER STREAM good, 1 BINFILE '" + regular + "'\n")
+                .status,
+            "OK");
+  EXPECT_EQ(checkDeclaredSources(plan, {"good"}), "OK");
+  EXPECT_NE(checkDeclaredSources(plan), "OK");
+
+  fs::remove_all(dir);
+}
+
+// Magazyn bierze TYPE i REF deklaracji z wczytanego `.desc`, a Descriptor::operator== porownuje
+// tylko sloty danych. Do #346 plan wskazujacy `w.txt` czytal wiec po cichu `v.txt` sprzed zmiany.
+// Jedyny przepuszczany rozjazd to dawny TYPE DEVICE zwyklego pliku binarnego - ten `.desc`
+// zastepuje start.
+TEST(PlanSource, declared_descriptor_must_match_the_source_kind_and_path) {
+  namespace fs       = std::filesystem;
+  const fs::path dir = "declared_descriptor_kind";
+  fs::remove_all(dir);
+  fs::create_directory(dir);
+  const fs::path descFile = dir / "src.desc";
+
+  const auto plan = [](const std::string &declaration) {
+    qTree retVal;
+    EXPECT_EQ(parsePlanText(retVal, "STORAGE 'declared_descriptor_kind'\nDECLARE a INTEGER STREAM src, 1 " + declaration + "\n")
+                  .status,
+              "OK");
+    return retVal;
+  };
+  const auto keep = [&](const std::string &ref, const std::string &type) {
+    std::ofstream(descFile) << "{ INTEGER a REF \"" + ref + "\" TYPE " + type + " }\n";
+  };
+
+  // Dawny zapis: przepuszczony i zastapiony przy starcie.
+  keep("rec.bin", "DEVICE");
+  qTree legacy = plan("FILE 'rec.bin'");
+  EXPECT_EQ(checkDescriptorFiles(legacy, {}), "OK");
+  dropStalePlanArtifacts(legacy);
+  EXPECT_FALSE(fs::exists(descFile));
+
+  // Ten sam dawny zapis, ale plan czyta plik jako tekst - to juz inne zrodlo.
+  keep("rec.bin", "DEVICE");
+  qTree text = plan("TEXTFILE 'rec.bin'");
+  EXPECT_EQ(checkDescriptorFiles(text, {}), "stream 'src': " + descFile.string() +
+                                                " was written for TYPE DEVICE and the plan declares TYPE TEXTSOURCE; remove " +
+                                                descFile.string() + " to start the stream afresh");
+  dropStalePlanArtifacts(text);
+  EXPECT_TRUE(fs::exists(descFile)) << "start nie kasuje .desc, ktory nie jest dawnym zapisem BINFILE";
+
+  // Dawny TYPE DEVICE dla innej sciezki nie jest dawnym zapisem tego strumienia.
+  keep("old.bin", "DEVICE");
+  qTree moved = plan("FILE 'rec.bin'");
+  EXPECT_TRUE(checkDescriptorFiles(moved, {}).contains("was written for TYPE DEVICE and the plan declares TYPE BINFILE"));
+
+  // Zmiana sciezki przy tym samym rodzaju.
+  keep("v.txt", "TEXTSOURCE");
+  qTree path = plan("FILE 'w.txt'");
+  EXPECT_EQ(checkDescriptorFiles(path, {}), "stream 'src': " + descFile.string() +
+                                                " was written for source 'v.txt' and the plan reads 'w.txt'; remove " +
+                                                descFile.string() + " to start the stream afresh");
+
+  // Urzadzenie bylo DEVICE przed zmiana i zostaje nim - `.desc` pasuje i zostaje.
+  keep("/dev/urandom", "DEVICE");
+  qTree device = plan("FILE '/dev/urandom'");
+  EXPECT_EQ(checkDescriptorFiles(device, {}), "OK");
+  dropStalePlanArtifacts(device);
+  EXPECT_TRUE(fs::exists(descFile));
+
+  fs::remove_all(dir);
+}
+
+// Ostrzezenia o formie przestarzalej ida w kolejnosci wierszy planu, choc kompilator sortuje
+// wezly po interwale. Wiersz to pierwszy wiersz instrukcji takze przy kontynuacji `\`.
+TEST(PlanSource, deprecated_file_warnings_follow_the_plan_lines) {
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan,
+                          "DECLARE a INTEGER STREAM slow, 2 FILE 'a.txt'\n"
+                          "# komentarz\n"
+                          "DECLARE b BYTE STREAM fast, 1/10 \\\n"
+                          "  FILE '/dev/urandom'\n"
+                          "DECLARE c INTEGER STREAM fresh, 1 BINFILE 'c.bin'\n"
+                          "SELECT slow[0] STREAM out FROM slow\n")
+                .status,
+            "OK");
+  compiler cm(plan);
+  ASSERT_EQ(cm.compile(), "OK");
+
+  EXPECT_EQ(deprecatedFileWarnings(plan),
+            (std::vector<std::string>{"line 1: DECLARE slow: FILE 'a.txt' is deprecated, resolved as TEXTFILE",
+                                      "line 3: DECLARE fast: FILE '/dev/urandom' is deprecated, resolved as DEVICE"}));
+  EXPECT_EQ(deprecatedFileWarnings(plan, {"fast", "fresh"}),
+            (std::vector<std::string>{"line 3: DECLARE fast: FILE '/dev/urandom' is deprecated, resolved as DEVICE"}));
 }

@@ -1,0 +1,14 @@
+# it_source_kinds: rodzaj zrodla wynika ze slowa kluczowego, nigdy ze sciezki (#346).
+# `ascii.txt` jest czytany jako surowe rekordy mimo rozszerzenia, `values.dat` jako tekst
+# z tokenem NULL, a DEVICE na /dev/zero daje zera, nie NULL.
+# ctest -R source_kinds -V
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM bin, 1 BINFILE 'ascii.txt'
+DECLARE b INTEGER STREAM txt, 1 TEXTFILE 'values.dat'
+DECLARE c INTEGER STREAM zero, 1 DEVICE '/dev/zero'
+
+SELECT bin[0] STREAM obin FROM bin
+SELECT txt[0] STREAM otxt FROM txt
+SELECT zero[0] STREAM ozero FROM zero

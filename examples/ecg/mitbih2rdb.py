@@ -119,7 +119,7 @@ def interval_rql(fs: int) -> str:
 def write_rql(rql_path: str, record: str, bin_name: str, fs: int, signals: list[dict]) -> None:
     """Generuje plik RQL odtwarzający sygnał ECG w pętli.
 
-    DECLARE deklaruje strumień wejściowy z pliku binarnego (TYPE DEVICE = pętla).
+    DECLARE ... BINFILE deklaruje strumień wejściowy z pliku binarnego (TYPE BINFILE = pętla).
     SELECT przepisuje kanały do strumienia wyjściowego VOLATILE (brak zapisu na dysk).
     Plik należy uruchamiać z katalogu zawierającego pliki danych (rec205/).
     bin_name: nazwa pliku binarnego (zaczyna się od litery, zgodna z tokenem FILENAME w DESC.g4)
@@ -137,12 +137,12 @@ def write_rql(rql_path: str, record: str, bin_name: str, fs: int, signals: list[
         f.write(f'#   cd {os.path.dirname(rql_path)}\n')
         f.write(f'#   xretractor {os.path.basename(rql_path)} -m <liczba_cykli>\n')
         f.write('#\n')
-        f.write(f'# Zrodlo danych czyta plik binarny w petli (TYPE DEVICE bez ONESHOT).\n')
+        f.write(f'# Zrodlo danych czyta plik binarny w petli (BINFILE bez ONESHOT).\n')
         f.write(f'# Kazdy cykl xretractor odpowiada jednej probce EKG ({duration_s:.6f} s).\n')
         f.write('\n')
         # Nazwa strumienia musi zaczynać się od litery (gramatyka: ID: [A-Za-z][A-Za-z_$0-9]*)
         out_stream = ('s' + record if record[0].isdigit() else record) + 'out'
-        f.write(f"DECLARE {channel_list} STREAM ecg, {interval} FILE '{bin_name}'\n")
+        f.write(f"DECLARE {channel_list} STREAM ecg, {interval} BINFILE '{bin_name}'\n")
         f.write('\n')
         f.write(f'SELECT {select_list} STREAM {out_stream} FROM ecg VOLATILE\n')
 

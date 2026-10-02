@@ -122,7 +122,7 @@ sample_MLII = B0 | ((B1 & 0x0F) << 8)   sign-extended from 12 bits
 sample_V1   = B2 | ((B1 >>  4) << 8)    sign-extended from 12 bits
 ```
 
-### `rec205.desc` - descriptor (TYPE DEVICE)
+### `rec205.desc` - descriptor (TYPE BINFILE)
 
 Produced by `build.sh` to match the file that `xretractor` auto-creates on first run:
 
@@ -130,24 +130,24 @@ Produced by `build.sh` to match the file that `xretractor` auto-creates on first
 {	INTEGER MLII
 	INTEGER V1
 	REF "rec205"
-	TYPE DEVICE
+	TYPE BINFILE
 }
 ```
 
-`TYPE DEVICE` opens the data file through `binaryDeviceRO`, which reads sequentially and wraps back to the start after the last record (loop replay). `REF "rec205"` is the binary filename from the `DECLARE FILE 'rec205'` clause - xretractor stores it in the descriptor automatically.
+`TYPE BINFILE` opens the data file through `binaryDeviceRO`, which reads sequentially and wraps back to the start after the last record (loop replay). `REF "rec205"` is the binary filename from the `DECLARE ... BINFILE 'rec205'` clause - xretractor stores it in the descriptor automatically.
 
 ### `rec205-replay.rql` - RQL playback script
 
 Produced by `mitbih2rdb.py`.
 
 ```rql
-DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 FILE 'rec205'
+DECLARE MLII INTEGER, V1 INTEGER STREAM ecg, 1/360 BINFILE 'rec205'
 
 SELECT ecg.MLII, ecg.V1 STREAM s205out FROM ecg VOLATILE
 ```
 
 - `STREAM ecg, 1/360` - sampling interval 1/360 s (= 360 Hz), matching the original recording
-- `FILE 'rec205'` - references `rec205.desc` and the `rec205` binary data file
+- `BINFILE 'rec205'` - references `rec205.desc` and the `rec205` binary data file
 - `VOLATILE` - output stream is not written to disk
 
 Run from the `rec205/` directory so that relative paths resolve correctly:

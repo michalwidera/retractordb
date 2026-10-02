@@ -20,7 +20,7 @@ scope: source.rql
 contexts:
   main:
     # RQL statement keywords
-    - match: \b(SELECT|select|STREAM|stream|FROM|from|DECLARE|declare|FILE|file|VOLATILE|volatile|PERSISTENT|persistent|RULE|rule|ON|on|WHEN|when|DO|do|DUMP|dump|TO|to|SYSTEM|system|DISPOSABLE|disposable|ONESHOT|oneshot|HOLD|hold|RETENTION|retention)\b
+    - match: \b(SELECT|select|STREAM|stream|FROM|from|DECLARE|declare|FILE|file|BINFILE|binfile|TEXTFILE|textfile|DEVICE|device|VOLATILE|volatile|PERSISTENT|persistent|RULE|rule|ON|on|WHEN|when|DO|do|DUMP|dump|TO|to|SYSTEM|system|DISPOSABLE|disposable|ONESHOT|oneshot|HOLD|hold|RETENTION|retention)\b
       scope: keyword.control.rql
     # Compiler option directives
     - match: \b(STORAGE|storage|ROTATION|rotation|SUBSTRAT|substrat)\b
@@ -29,7 +29,7 @@ contexts:
     - match: \b(AND|and|OR|or|NOT|not)\b
       scope: keyword.operator.logical.rql
     # Storage profile values (TYPE_PROFILE)
-    - match: \b(MEMORY|memory|DEFAULT|default|DIRECT|direct|POSIX|posix|POSIXSHD|posixshd|GENERIC|generic|DEVICE|device|TEXTSOURCE|textsource)\b
+    - match: \b(MEMORY|memory|DEFAULT|default|DIRECT|direct|POSIX|posix|POSIXSHD|posixshd|GENERIC|generic)\b
       scope: support.constant.rql
     - match: "'"
       push: string

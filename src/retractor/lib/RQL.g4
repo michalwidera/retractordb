@@ -25,9 +25,14 @@ select_statement    : SELECT select_list
                     # Select
                     ;
 
+// Rodzaj zrodla wynika ze slowa kluczowego, nigdy ze sciezki (#346): BINFILE - surowe rekordy
+// z pliku zwyklego, TEXTFILE - plik tekstowy, DEVICE - urzadzenie znakowe albo FIFO. FILE to
+// forma przestarzala: exitDeclare tlumaczy ja na jeden z trzech rodzajow zamrozona regula
+// ze sciezki. Odmowy opcji (DEVICE nie bierze DISPOSABLE/ONESHOT/HOLD) sa bledami
+// semantycznymi w exitDeclare, nie skladni - komunikat ma nazwac strumien i opcje.
 declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
                       STREAM stream_name=ID COMMA rational_se
-                      FILE file_name=STRING
+                      kind=( BINFILE | TEXTFILE | DEVICE | FILE ) file_name=STRING
                       (DISPOSABLE)?
                       (ONESHOT)?
                       (HOLD)?
@@ -327,6 +332,9 @@ FROM:               'FROM'|'from';
 DECLARE:            'DECLARE'|'declare';
 RETENTION:          'RETENTION'|'retention';
 FILE:               'FILE'|'file';
+BINFILE:            'BINFILE'|'binfile';
+TEXTFILE:           'TEXTFILE'|'textfile';
+DEVICE:             'DEVICE'|'device';
 STORAGE:            'STORAGE'|'storage';
 ROTATION:           'ROTATION'|'rotation';
 SUBSTRAT:           'SUBSTRAT'|'substrat';
@@ -352,7 +360,10 @@ MAX:                'MAX'|'max';
 AVG:                'AVG'|'avg';
 SUMC:               'SUMC'|'sumc';
 
-TYPE_PROFILE:       'MEMORY'|'memory'|'DIRECT'|'direct'|'POSIX'|'posix'|'POSIXSHD'|'posixshd'|'GENERIC'|'generic'|'DEVICE'|'device'|'TEXTSOURCE'|'textsource';
+// Tylko profile ZAPISYWALNE wyjscia SELECT. DEVICE i TEXTSOURCE byly tu do #346: oba akcesory
+// sa tylko do odczytu, wiec `STORAGE DEVICE` kompilowal sie i padal przy pierwszym zapisie.
+// Rodzaje zrodel DECLARE to osobna przestrzen nazw - tokeny BINFILE, TEXTFILE i DEVICE wyzej.
+TYPE_PROFILE:       'MEMORY'|'memory'|'DIRECT'|'direct'|'POSIX'|'posix'|'POSIXSHD'|'posixshd'|'GENERIC'|'generic';
 STRING_PROFILE:    '\'' (TYPE_PROFILE | DEFAULT) '\'';
 
 // UWAGA: `to_integer`, `to_float`, `to_double` i `to_string` mialy tu do 2026-08-30 wlasne

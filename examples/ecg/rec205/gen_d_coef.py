@@ -15,7 +15,7 @@
 #     (pomijany w implementacji - nie wplywa na detekcje szczytow)
 #
 # Uzycie w RQL:
-#   DECLARE d_coef INTEGER[5] STREAM df, 1 FILE 'd_coef.txt'
+#   DECLARE d_coef INTEGER[5] STREAM df, 1 TEXTFILE 'd_coef.txt'
 #   SELECT bp_win[_]*df[_] STREAM d_acc FROM bp_win+df
 #   SELECT d_acc[0] STREAM d_out FROM d_acc.sumc
 

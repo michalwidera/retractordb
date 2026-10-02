@@ -14,7 +14,7 @@ namespace rdb {
 /// @brief Stan bufora źródła deklarowanego: empty → flux (odczyt fizyczny dozwolony) → armed (rekord pobrany).
 enum class sourceState : std::uint8_t { empty, flux, armed };
 
-/// @brief Bufor bieżącego rekordu i historii dla źródeł deklarowanych (DEVICE/TEXTSOURCE) - wydzielony z klasy storage.
+/// @brief Bufor bieżącego rekordu i historii dla źródeł deklarowanych (BINFILE/DEVICE/TEXTSOURCE) - wydzielony z klasy storage.
 ///
 /// Obiekt klasy SourceBuffer powinien:
 /// - po attach(descriptor) utrzymywać komorę (chamber) - payload bieżącego rekordu odczytanego ze źródła,

@@ -7,6 +7,8 @@
 
 #include <gtest/gtest.h>
 
+#include <sys/stat.h>  // S_IF*
+
 #include <filesystem>
 
 #include "rdb/accessorFactory.hpp"
@@ -23,10 +25,40 @@ rdb::Descriptor testDescriptor() { return {rdb::Descriptor("a", sizeof(int), 1, 
 }  // namespace
 
 TEST(AccessorFactoryTest, declared_types) {
+  EXPECT_TRUE(rdb::isDeclaredType("BINFILE"));
   EXPECT_TRUE(rdb::isDeclaredType("DEVICE"));
   EXPECT_TRUE(rdb::isDeclaredType("TEXTSOURCE"));
   EXPECT_FALSE(rdb::isDeclaredType("DEFAULT"));
   EXPECT_FALSE(rdb::isDeclaredType("POSIX"));
+}
+
+// Profile zapisywalne to dokladnie te, ktore przyjmuje `STORAGE` w SELECT i `:SUBSTRAT` (#346).
+TEST(AccessorFactoryTest, writable_types) {
+  for (const auto *type : {"DEFAULT", "DIRECT", "MEMORY", "POSIX", "POSIXSHD", "GENERIC"})
+    EXPECT_TRUE(rdb::isWritableType(type)) << type;
+  for (const auto *type : {"BINFILE", "DEVICE", "TEXTSOURCE", "memory", "FOO", ""})
+    EXPECT_FALSE(rdb::isWritableType(type)) << type;
+}
+
+// Rodzaj pliku zrodla deklarowanego (#346): plik zwykly dla BINFILE i TEXTSOURCE, urzadzenie
+// znakowe albo FIFO dla DEVICE. Komunikat mowi slowem RQL - TEXTFILE, nie nazwa typu magazynu.
+TEST(AccessorFactoryTest, source_kind_mismatch_by_file_type) {
+  EXPECT_EQ(rdb::sourceKindMismatch("BINFILE", "p", S_IFREG), "");
+  EXPECT_EQ(rdb::sourceKindMismatch("TEXTSOURCE", "p", S_IFREG), "");
+  EXPECT_EQ(rdb::sourceKindMismatch("DEVICE", "p", S_IFCHR), "");
+  EXPECT_EQ(rdb::sourceKindMismatch("DEVICE", "p", S_IFIFO), "");
+
+  EXPECT_EQ(rdb::sourceKindMismatch("BINFILE", "p", S_IFIFO), "BINFILE 'p' is a FIFO, not a regular file");
+  EXPECT_EQ(rdb::sourceKindMismatch("TEXTSOURCE", "p", S_IFCHR), "TEXTFILE 'p' is a character device, not a regular file");
+  EXPECT_EQ(rdb::sourceKindMismatch("BINFILE", "p", S_IFDIR), "BINFILE 'p' is a directory, not a regular file");
+  EXPECT_EQ(rdb::sourceKindMismatch("TEXTSOURCE", "p", S_IFSOCK), "TEXTFILE 'p' is a socket, not a regular file");
+  EXPECT_EQ(rdb::sourceKindMismatch("DEVICE", "p", S_IFREG), "DEVICE 'p' is a regular file, not a character device or FIFO");
+  EXPECT_EQ(rdb::sourceKindMismatch("DEVICE", "p", S_IFBLK), "DEVICE 'p' is a block device, not a character device or FIFO");
+  EXPECT_EQ(rdb::sourceKindMismatch("DEVICE", "p", S_IFDIR), "DEVICE 'p' is a directory, not a character device or FIFO");
+
+  // Brak sciezki nie jest odmowa - akcesor ostrzega i daje NULL jak przed #346.
+  EXPECT_EQ(rdb::sourceKindMismatch("BINFILE", "af_missing_kind.bin"), "");
+  EXPECT_EQ(rdb::sourceKindMismatch("DEVICE", "af_missing_kind.dev"), "");
 }
 
 // ---------------------------------------------------------------------------
@@ -56,10 +88,14 @@ TEST(AccessorFactoryTest, maps_type_to_accessor_class) {
 }
 
 // ---------------------------------------------------------------------------
-// Źródła deklarowane: DEVICE/TEXTSOURCE są tylko do odczytu, bez cienia danych.
+// Źródła deklarowane: BINFILE/DEVICE/TEXTSOURCE są tylko do odczytu, bez cienia danych.
 // ---------------------------------------------------------------------------
 TEST(AccessorFactoryTest, maps_declared_sources) {
   auto desc = testDescriptor();
+
+  auto binary = rdb::makeAccessor("BINFILE", "af_missing.bin", desc, true, -1);
+  EXPECT_NE(dynamic_cast<rdb::binaryDeviceRO *>(binary.get()), nullptr);
+  EXPECT_FALSE(binary->hasShadow());
 
   auto device = rdb::makeAccessor("DEVICE", "af_missing.dev", desc, true, -1);
   EXPECT_NE(dynamic_cast<rdb::binaryDeviceRO *>(device.get()), nullptr);

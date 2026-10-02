@@ -8,10 +8,10 @@
 # probably addiational layer of file management (ex. file.dat access)
 # should appear in system to cover such issue.
 
-DECLARE a INTEGER STREAM datacrc,1/5 FILE 'datacrc.dat'
-DECLARE e INTEGER STREAM datadat,1/4 FILE 'datanocrc.dat'
-DECLARE b INTEGER STREAM adata,0.2 FILE 'file.dat'
-DECLARE d INTEGER STREAM bdata,1 FILE 'file.dat'
+DECLARE a INTEGER STREAM datacrc,1/5 BINFILE 'datacrc.dat'
+DECLARE e INTEGER STREAM datadat,1/4 BINFILE 'datanocrc.dat'
+DECLARE b INTEGER STREAM adata,0.2 BINFILE 'file.dat'
+DECLARE d INTEGER STREAM bdata,1 BINFILE 'file.dat'
 
 SELECT 77 STREAM d0 FROM bdata 
 SELECT adata[0] STREAM d1 FROM adata#d0
