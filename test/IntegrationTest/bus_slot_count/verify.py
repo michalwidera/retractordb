@@ -12,7 +12,7 @@ import time
 
 xretractor, xqry = sys.argv[1:3]
 namespace = os.environ["RDB_NAMESPACE"]
-segment_path = Path("/dev/shm") / ("xrdbbus_v6_" + namespace)
+segment_path = Path("/dev/shm") / ("xrdbbus_v7_" + namespace)
 if not segment_path.parent.is_dir():
     print("SKIP: bez /dev/shm test podmiany naglowka nie jest dostepny")
     sys.exit(77)
@@ -66,10 +66,10 @@ try:
     assert (held.st_dev, held.st_ino) == (named.st_dev, named.st_ino)
     with segment_path.open("r+b") as segment:
         mapping = mmap.mmap(segment.fileno(), 0)
-    # Staly prefiks v6: magic, layoutVersion, slotCount, slotSize, reserved.
+    # Staly prefiks v7: magic, layoutVersion, slotCount, slotSize, reserved.
     # Nie kopiujemy ukladu Slot ani zaleznego od platformy pthread_mutex_t.
     magic, version, count, slot_size, _ = struct.unpack_from("=QIIII", mapping)
-    assert magic == 0x5852444242555300 and version == 6 and count == 32
+    assert magic == 0x5852444242555300 and version == 7 and count == 32
     assert slot_size > 0 and len(mapping) >= 24 + count * slot_size
     struct.pack_into("=I", mapping, 12, 4096)
 

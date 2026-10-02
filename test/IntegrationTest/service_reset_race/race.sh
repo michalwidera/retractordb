@@ -138,14 +138,14 @@ grep -qE "^${live} " dir_final.txt || {
 }
 
 # Plan przekraczajacy pojemnosc slotu magistrali ma odpasc przed zakonczeniem
-# biezacej epoki. Poprzednio walidacja sprawdzala tylko kolizje nazw, a limit 128
+# biezacej epoki. Poprzednio walidacja sprawdzala tylko kolizje nazw, a limit slotu
 # wychodzil dopiero po rozebraniu modelu; klient dostawal sukces, a usluga zostawala
 # bez aktywnego planu.
 {
   echo "STORAGE 'temp'"
   echo "DECLARE a INTEGER STREAM oversized_src, 1 FILE 'data.txt'"
   i=1
-  while [ "$i" -le 128 ]; do
+  while [ "$i" -le 148 ]; do
     echo "SELECT a+${i} STREAM oversized${i} FROM oversized_src"
     i=$((i + 1))
   done
@@ -154,7 +154,7 @@ grep -qE "^${live} " dir_final.txt || {
 status=0
 xqry --reset oversized.rql > oversized_out.txt 2> oversized_err.txt || status=$?
 if [ "$status" -eq 0 ]; then
-  echo "plan ze 129 strumieniami zostal przyjety"
+  echo "plan ze 149 strumieniami zostal przyjety"
   cat oversized_out.txt oversized_err.txt
   exit 1
 fi
@@ -163,7 +163,7 @@ grep -q 'plan reload refused' oversized_err.txt || {
   cat oversized_err.txt
   exit 1
 }
-grep -q 'plan has 129 streams' oversized_err.txt || {
+grep -q 'plan has 149 streams' oversized_err.txt || {
   echo "odmowa nie podala przekroczonego limitu magistrali"
   cat oversized_err.txt
   exit 1

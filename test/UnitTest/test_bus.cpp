@@ -831,7 +831,7 @@ TEST(BusForeignStoreOwner, OwnDistinctAndEmptyStoresPass) {
 // Podkreslenie zamiast kropki jest czescia kontraktu: obiekty IPC instancji nazywaja sie
 // "<obiekt>.<nazwa instancji>", wiec segment z kropka wpadlby pod wzorce sprzatajace /dev/shm/*.<nazwa>.
 TEST(BusSegmentName, CarriesLayoutVersionAndAvoidsInstanceNamespace) {
-  EXPECT_EQ(bus::kSegmentName, "xrdbbus_v6");
+  EXPECT_EQ(bus::kSegmentName, "xrdbbus_v7");
   EXPECT_EQ(bus::kSegmentName.find('.'), std::string_view::npos);
 }
 

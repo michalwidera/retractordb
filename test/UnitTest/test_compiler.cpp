@@ -298,7 +298,7 @@ TEST_P(xparser_dimension_limit, value_above_the_limit_is_a_plan_error) {
 INSTANTIATE_TEST_SUITE_P(
     xparser, xparser_dimension_limit,
     testing::Values(
-        DimensionLimit{"generator_size", "SELECT src[$] STREAM cells[{}] FROM src", "stream generator size", 128},
+        DimensionLimit{"generator_size", "SELECT src[$] STREAM cells[{}] FROM src", "stream generator size", 148},
         DimensionLimit{"field_array_size", "DECLARE b INTEGER[{}] STREAM big, 1 FILE 'b.txt'", "field size", 65536},
         DimensionLimit{"string_length", "DECLARE b STRING[{}] STREAM big, 1 FILE 'b.txt'", "field size", 65536},
         DimensionLimit{"to_string_width", "SELECT to_string(src[0]:{}) STREAM big FROM src", "to_string width", 65536},
@@ -2466,11 +2466,11 @@ TEST(xcompiler, rejects_zero_sized_generator) {
 // PRZED kopiowaniem. Plan bez generatora zostaje magistrali (it_service_reset_race).
 TEST(xcompiler, stream_count_after_generator_expansion_is_limited) {
   const std::string source = "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n";
-  EXPECT_EQ(compileRql(source + "SELECT src[0]+$ STREAM cell[127] FROM src\n"), "OK");
+  EXPECT_EQ(compileRql(source + "SELECT src[0]+$ STREAM cell[147] FROM src\n"), "OK");
 
-  const std::string verdict = compileRql(source + "SELECT src[0]+$ STREAM cell[128] FROM src\n");
-  EXPECT_TRUE(verdict.contains("Plan has 129 streams after expanding stream generators; the limit is 128")) << verdict;
-  EXPECT_TRUE(verdict.contains("stream generator 'cell' adds 128")) << verdict;
+  const std::string verdict = compileRql(source + "SELECT src[0]+$ STREAM cell[148] FROM src\n");
+  EXPECT_TRUE(verdict.contains("Plan has 149 streams after expanding stream generators; the limit is 148")) << verdict;
+  EXPECT_TRUE(verdict.contains("stream generator 'cell' adds 148")) << verdict;
 }
 
 namespace {

@@ -38,7 +38,7 @@ add_test(
 #   * odtworzenie obiektow przez klienta - kazda sciezka xqry otwiera je przez `open_only`
 #     (ipcClient.cpp:122,142; qryLauncher.cpp:65,66), wiec klient nie moze zalozyc obiektu
 #     globalnego na nowo i zmienic i-wezla;
-#   * segment magistrali w porownywanym zbiorze - nazywa sie `xrdbbus_v6_<przestrzen>`
+#   * segment magistrali w porownywanym zbiorze - nazywa sie `xrdbbus_v7_<przestrzen>`
 #     z PODKRESLENIEM, a wzorzec verify.py wymaga kropki;
 #   * sasiad z tego samego slotu puli (it12: issue167_dedup_positive, window_aggregate,
 #     self_ref_simplify_type, lang_showcase, agse_array) - sprawdzone ponownie: kazdy wola

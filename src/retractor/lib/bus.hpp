@@ -52,7 +52,7 @@ namespace bus {
 /// Podkreslenie, nie kropka: obiekty IPC instancji nazywaja sie "<obiekt>.<nazwa instancji>", wiec
 /// "xrdbbus.v2" wygladalby jak obiekt instancji o nazwie "v2" i wpadl pod wzorce sprzatajace
 /// postaci /dev/shm/*.<nazwa>.
-inline constexpr std::string_view kSegmentName = "xrdbbus_v6";
+inline constexpr std::string_view kSegmentName = "xrdbbus_v7";
 
 /// Nazwa segmentu dla BIEZACEGO uruchomienia: kSegmentName, a przy ustawionej przestrzeni
 /// nazw (servername::environmentNamespace) kSegmentName + "_" + przestrzen.
@@ -89,9 +89,10 @@ std::size_t sweepAbandonedSegments();
 /// skrotem. Pole krotsze niz ten budzet wywracalo start planow z szerokim FROM -- nazwa
 /// STREAM_ADD_STREAM_ADD_..._str01_..._str12 z it_wide_from_names ma ponad 130 znakow.
 ///
-/// Liczba strumieni ma zapas rzedu 2,5x: najwiekszy skompilowany plan w repozytorium
-/// (test/IntegrationTest/optimizer_ablation) ma 53 wezly. Wartosc stoi w rdb/sizeLimits.hpp, bo te
-/// sama granice sprawdzaja parser (rozmiar generatora) i kompilator (plan po rozwinieciu generatorow).
+/// Liczba strumieni ma zapas 17 nad najwiekszym planem korpusu artykulu (K6c W4_Q32, 131 wezlow);
+/// w repozytorium najwiekszy skompilowany plan (test/IntegrationTest/optimizer_ablation) ma 53 wezly.
+/// Wartosc stoi w rdb/sizeLimits.hpp, bo te sama granice sprawdzaja parser (rozmiar generatora)
+/// i kompilator (plan po rozwinieciu generatorow).
 inline constexpr std::size_t kMaxSlots         = 32;
 inline constexpr std::size_t kMaxStreams       = rdb::limits::kMaxPlanStreams;
 inline constexpr std::size_t kStreamNameSize   = 208;  ///< z terminatorem => nazwa do 207 znakow
