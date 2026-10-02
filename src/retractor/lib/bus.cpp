@@ -45,7 +45,7 @@ constexpr std::uint64_t kMagic = 0x5852'4442'4255'5300ULL;
 // ukladach nie spotykaja sie na jednym segmencie, wiec do tego sprawdzenia w ogole nie dochodzi.
 // Ten numer razem ze slotSize chroni przypadek, ktorego nazwa nie zlapie: zmiane znaczenia pol
 // przy zapomnianym bumpie nazwy oraz obcy obiekt o tej samej nazwie.
-constexpr std::uint32_t kLayoutVersion = 6;  // 6: obecnosc na segmencie przez flock (sprzatanie)
+constexpr std::uint32_t kLayoutVersion = 7;  // 7: pojemnosc slotu 148 strumieni i magazynow (kMaxPlanStreams)
 
 // Ile czasu instancja podlaczajaca sie czeka na dokonczenie inicjalizacji przez tworce.
 // Inicjalizacja to truncate + memset + pthread_mutex_init, czyli mikrosekundy; dwie sekundy

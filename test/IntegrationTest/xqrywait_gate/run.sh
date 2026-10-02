@@ -28,7 +28,7 @@ set -e
 mkdir -p temp
 
 # Plan szeroki: konstrukcja dataModel dla 120 strumieni to cale okno startowe. Limit
-# gniazda magistrali to 128 strumieni, wiec 120 + zrodlo miesci sie na styk.
+# gniazda magistrali to 148 strumieni, wiec 120 + zrodlo sie miesci.
 {
   echo "STORAGE 'temp'"
   echo

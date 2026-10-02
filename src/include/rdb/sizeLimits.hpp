@@ -32,7 +32,11 @@ inline constexpr int kMaxDumpRetention = 256;
 /// Liczba strumieni planu: rozmiar generatora `STREAM x[N]` (parser) i plan po rozwinieciu
 /// generatorow (kompilator). Te sama liczbe bierze uklad magistrali (bus::kMaxStreams), wiec zmiana
 /// tutaj zmienia uklad segmentu xrdbbus.
-inline constexpr std::size_t kMaxPlanStreams = 128;
+///
+/// 148 od 2026-10-02 (wczesniej 128): najwiekszy plan korpusu artykulu (480 planow: .rql z pinu
+/// rdb-experiment i K6c w 6 skalach) to K6c W4_Q32 - 131 strumieni w kazdej skali, przy 128 serwer
+/// odmawial startu. Nastepny w korpusie ma 96, wiec zapas wynosi 17.
+inline constexpr std::size_t kMaxPlanStreams = 148;
 
 // --- Warstwa 2: wielkosci zlozone, sprawdza kompilator; biblioteka rdb ich nie stosuje ---
 
