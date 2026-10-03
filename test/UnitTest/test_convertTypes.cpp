@@ -732,3 +732,29 @@ TEST(cast_any, finite_float_outside_rational_range_is_null) {
   EXPECT_EQ(c(std::any(2147483648.0F), rdb::RATIONAL).type(), typeid(std::monostate));
   EXPECT_EQ(c(std::any(2147483520.0F), rdb::RATIONAL).type(), typeid(boost::rational<int>));
 }
+
+// --- para -> typ skalarny (#286) ---
+//
+// Para nie ma reprezentacji w typie skalarnym, wiec obie galezie visit_descFld daja NULL.
+// Wczesniej galaz wariantowa niczego nie zapisywala i wychodzil BYTE 0 niezaleznie od typu
+// docelowego, a galaz std::any wpisywala zero typu docelowego.
+
+TEST(cast_variant, pair_to_scalar_is_null) {
+  cast<rdb::descFldVT> c;
+  const rdb::descFldVT pairs[] = {std::make_pair(3, 4), std::make_pair(std::string("key"), 7)};
+  for (const auto &in : pairs)
+    for (const auto type : {rdb::BYTE, rdb::INTEGER, rdb::UINT, rdb::FLOAT, rdb::DOUBLE})
+      EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, type))) << "variant index " << in.index() << " type " << type;
+}
+TEST(cast_any, pair_to_scalar_is_null) {
+  cast<std::any> c;
+  const std::any pairs[] = {std::any(std::make_pair(3, 4)), std::any(std::make_pair(std::string("key"), 7))};
+  for (const auto &in : pairs)
+    for (const auto type : {rdb::BYTE, rdb::INTEGER, rdb::UINT, rdb::FLOAT, rdb::DOUBLE})
+      EXPECT_EQ(c(in, type).type(), typeid(std::monostate)) << in.type().name() << " type " << type;
+}
+// Typ spoza descFldVT w std::any: wczesniej std::any wychodzilo puste (ani wartosc, ani NULL).
+TEST(cast_any, unknown_type_to_scalar_is_null) {
+  cast<std::any> c;
+  EXPECT_EQ(c(std::any(7L), rdb::INTEGER).type(), typeid(std::monostate));
+}
