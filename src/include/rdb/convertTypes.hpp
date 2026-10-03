@@ -18,7 +18,9 @@ struct cast {
   ///         type's range (NaN and infinity included), an integer or rational value outside the
   ///         range of a narrower integer type (a negative value to UINT, UINT above INT_MAX to
   ///         INTEGER or RATIONAL, a value outside 0..255 to BYTE), any scalar to INTPAIR (a pair is
-  ///         two independent numbers, not a fraction), or a string that does not parse
+  ///         two independent numbers, not a fraction), a pair (INTPAIR, IDXPAIR) to BYTE, INTEGER,
+  ///         UINT, FLOAT or DOUBLE, a std::any holding a type outside descFldVT, or a string that
+  ///         does not parse
   T operator()(const T &inVar, rdb::descFld reqType);
 };
 

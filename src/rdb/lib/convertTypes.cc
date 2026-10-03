@@ -281,6 +281,12 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
           int second{1};
           in >> first >> expect<','> >> second;
           retVal = std::make_pair(first, second);
+        } else if (inVar.type() == typeid(std::pair<std::string, int>)) {
+          auto pairVar = std::any_cast<std::pair<std::string, int>>(inVar);
+          retVal       = std::make_pair(atoi(pairVar.first.c_str()), pairVar.second);
+        } else {
+          SPDLOG_ERROR("{} to INTPAIR yields NULL", inVar.type().name());
+          retVal = std::monostate{};
         }
       }
       break;
@@ -335,6 +341,11 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
           in >> nom >> expect<'/'> >> den;
           if (den == 0) FatalError("convertTypes: rational denominator is zero (any string parse)");
           retVal = boost::rational<int>(nom, den);
+        } else if (inVar.type() == typeid(std::pair<std::string, int>)) {
+          retVal = boost::rational<int>(std::any_cast<std::pair<std::string, int>>(inVar).second, 1);  //  first is skipped
+        } else {
+          SPDLOG_ERROR("{} to RATIONAL yields NULL", inVar.type().name());
+          retVal = std::monostate{};
         }
       }
       break;
@@ -382,7 +393,8 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
           auto pairVar = std::any_cast<std::pair<std::string, int>>(inVar);
           retVal       = pairVar.first + "," + std::to_string(pairVar.second);
         } else {
-          SPDLOG_ERROR("TODO - std::any->T");
+          SPDLOG_ERROR("{} to STRING yields NULL", inVar.type().name());
+          retVal = std::monostate{};
         }
       }
       break;

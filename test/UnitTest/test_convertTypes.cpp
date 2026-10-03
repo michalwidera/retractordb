@@ -758,3 +758,25 @@ TEST(cast_any, unknown_type_to_scalar_is_null) {
   cast<std::any> c;
   EXPECT_EQ(c(std::any(7L), rdb::INTEGER).type(), typeid(std::monostate));
 }
+
+// --- sciezka std::any: kazda galaz cast::operator() cos zapisuje ---
+//
+// Typ spoza descFldVT konczyl sie w galeziach STRING, RATIONAL i INTPAIR pustym std::any (ani
+// wartosc, ani NULL), a IDXPAIR do RATIONAL i INTPAIR nie mial tu przypadku, choc galaz
+// wariantowa go ma. Teraz pierwszy daje NULL, a drugi to samo co galaz wariantowa.
+
+TEST(cast_any, unknown_type_is_null_for_every_target) {
+  cast<std::any> c;
+  for (const auto type : {rdb::BYTE, rdb::INTEGER, rdb::UINT, rdb::FLOAT, rdb::DOUBLE, rdb::RATIONAL, rdb::INTPAIR, rdb::STRING})
+    EXPECT_EQ(c(std::any(7L), type).type(), typeid(std::monostate)) << "type " << type;
+}
+TEST(cast_any, idxpair_matches_variant_branch) {
+  using P  = std::pair<std::string, int>;
+  using IP = std::pair<int, int>;
+  cast<std::any> ca;
+  cast<rdb::descFldVT> cv;
+  const P in{"12", 5};
+  EXPECT_EQ(std::any_cast<boost::rational<int>>(ca(std::any(in), rdb::RATIONAL)),
+            std::get<boost::rational<int>>(cv(rdb::descFldVT(in), rdb::RATIONAL)));
+  EXPECT_EQ(std::any_cast<IP>(ca(std::any(in), rdb::INTPAIR)), std::get<IP>(cv(rdb::descFldVT(in), rdb::INTPAIR)));
+}
