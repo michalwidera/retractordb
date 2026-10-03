@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <csignal>
 #include <ctime>
 #include <iostream>
 #include <sstream>
@@ -84,6 +85,52 @@ TEST(ExecutorRtSleepTest, LargeIntervalNoCarryPastAnchor) {
 
   long elapsed_ms = (after.tv_sec - before.tv_sec) * 1000 + (after.tv_nsec - before.tv_nsec) / 1'000'000;
   EXPECT_LT(elapsed_ms, 500);  // luźny próg: valgrind + obciążone CI dają jitter rzędu dziesiątek ms
+}
+
+void ignoreWakeSignal(int /*signum*/) {}
+
+// #43: przerwany sen jest zglaszany, a ponowienie czeka do TEGO SAMEGO terminu. Obsluga sygnalu
+// przez signal(), jak handleSignal w launcherze (SA_RESTART nie wznawia clock_nanosleep).
+// Sygnaly przychodza przez pierwsze 300 ms, wiec watek zdazy zasnac nawet pod valgrindem.
+// Ponowienie liczace nowy okres skonczyloby sie najwczesniej po 300 + 600 ms.
+TEST(ExecutorRtSleepTest, InterruptReportsEarlyWakeAndRetryKeepsDeadline) {
+  constexpr long kDeadlineMs = 600;
+  const auto previous        = std::signal(SIGUSR1, ignoreWakeSignal);
+  ASSERT_NE(previous, SIG_ERR);
+
+  struct timespec anchor{};
+  clock_gettime(CLOCK_MONOTONIC, &anchor);
+  const pthread_t sleeper = pthread_self();
+  std::thread interrupter([sleeper] {
+    for (int i = 0; i < 10; ++i) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(30));
+      pthread_kill(sleeper, SIGUSR1);
+    }
+  });
+
+  int earlyWakes = 0;
+  while (!rtAbsoluteSleep(anchor, kDeadlineMs))
+    ++earlyWakes;
+  struct timespec after{};
+  clock_gettime(CLOCK_MONOTONIC, &after);
+  interrupter.join();
+  std::signal(SIGUSR1, previous);
+
+  const long sinceAnchorMs = (after.tv_sec - anchor.tv_sec) * 1000 + (after.tv_nsec - anchor.tv_nsec) / 1'000'000;
+  EXPECT_GT(earlyWakes, 0);
+  EXPECT_GE(sinceAnchorMs, kDeadlineMs);
+  EXPECT_LT(sinceAnchorMs, kDeadlineMs + 200);
+}
+
+// #43: termin w ms liczony w 64 bitach. Dawne `rational<int> * 1000` przepelnialo licznik po cichu:
+// przy 100 Hz w slocie 214748365 (~24,9 dnia) termin wychodzil ujemny, przy 360 Hz juz po ~2,8 dnia,
+// a sen absolutny do terminu z przeszlosci nie spi wcale.
+TEST(ExecutorRtSleepTest, SlotDeadlineMsSurvivesLongAxis) {
+  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(1, 3)), 333);
+  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(2, 3)), 666);
+  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(214748365, 100)), 2147483650L);
+  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(85899346, 360)), 238609294L);
+  EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(2147483647, 1)), 2147483647000L);
 }
 
 // --- rtCheckAndPrint ---

@@ -29,11 +29,11 @@
 #   raportuje statystyki E2E i wake_lag (z p99,9 - ogon pochodzi z planisty).
 #
 # JAK URUCHOMIĆ POMIAR (z build/Release)
-#   # (a) tryb zwykły - uwaga: sleep względny, dryf kumuluje się w e2e;
-#   #     kolumny E2E miarodajne tylko dla trybu (b):
+#   # (a) tryb zwykły - budzenie do terminu od stałej kotwicy, jak w (b),
+#   #     ale z szeregowaniem SCHED_OTHER, więc z większym jitterem pobudki:
 #   RDB_BENCH_CSV=/tmp/e1_normal.csv \
 #       ./xretractor <ścieżka>/rec205-detect.rql -k -m 650000
-#   # (b) tryb real-time (SCHED_FIFO, absolutne budzenie; wymaga uprawnień):
+#   # (b) tryb real-time (SCHED_FIFO, mlockall; wymaga uprawnień):
 #   sudo RDB_BENCH_CSV=/tmp/e1_rt.csv \
 #       taskset -c 3 ./xretractor <ścieżka>/rec205-detect.rql -k -m 650000 -t
 #   # Pełny tor emisji: równolegle podpiąć jedno xqry nasłuchujące na

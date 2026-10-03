@@ -359,7 +359,12 @@ bool rtKeepThreadOffRtCpus([[maybe_unused]] pthread_t handle) {
 #endif
 }
 
-void rtAbsoluteSleep(const struct timespec &anchor, long interval_ms) {
+long rtSlotDeadlineMs(const boost::rational<int> &slotSeconds) {
+  constexpr long kMsPerSec = 1000;
+  return static_cast<long>(slotSeconds.numerator()) * kMsPerSec / slotSeconds.denominator();
+}
+
+bool rtAbsoluteSleep(const struct timespec &anchor, long interval_ms) {
   long ns           = interval_ms * kNsPerMs;
   struct timespec t = anchor;
   t.tv_sec += ns / kNsPerSec;
@@ -370,7 +375,9 @@ void rtAbsoluteSleep(const struct timespec &anchor, long interval_ms) {
   }
 
 #if RDB_HAS_CLOCK_NANOSLEEP
-  clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t, nullptr);
+  // EINTR przy kazdej obsludze sygnalu, takze z SA_RESTART (signal(7)). Inny kod bledu przy
+  // poprawnym timespec nie wystepuje, a ponawianie go zapetliloby wolajacego.
+  return clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &t, nullptr) != EINTR;
 #elif RDB_HAS_MACH_TIME_H
   // Sen ABSOLUTNY bez clock_nanosleep, na jadrach Macha.
   //
@@ -393,13 +400,13 @@ void rtAbsoluteSleep(const struct timespec &anchor, long interval_ms) {
     mach_timebase_info(&info);
     return info;
   }();
-  if (timebase.numer == 0 || timebase.denom == 0) return;
+  if (timebase.numer == 0 || timebase.denom == 0) return true;
 
   struct timespec now{};
   clock_gettime(CLOCK_MONOTONIC, &now);
   const std::int64_t remainingNs = (static_cast<std::int64_t>(t.tv_sec) - static_cast<std::int64_t>(now.tv_sec)) * kNsPerSec +
                                    (static_cast<std::int64_t>(t.tv_nsec) - static_cast<std::int64_t>(now.tv_nsec));
-  if (remainingNs <= 0) return;  // termin juz minal
+  if (remainingNs <= 0) return true;  // termin juz minal
 
   // Mnozenie rozbite na iloraz i reszte, zeby nie przepelnic 64 bitow; wynik jest
   // identyczny jak remainingNs * denom / numer.
@@ -407,7 +414,8 @@ void rtAbsoluteSleep(const struct timespec &anchor, long interval_ms) {
   const std::uint64_t numer = timebase.numer;
   const std::uint64_t denom = timebase.denom;
   const std::uint64_t ticks = (left / numer) * denom + ((left % numer) * denom) / numer;
-  mach_wait_until(mach_absolute_time() + ticks);
+  // KERN_ABORTED = sen przerwany. Ponowienie przeliczy pozostaly czas od tej samej kotwicy.
+  return mach_wait_until(mach_absolute_time() + ticks) != KERN_ABORTED;
 #else
   // Ostatnia droga: sen WZGLEDNY o pozostaly czas. Rozni sie od dwoch powyzszych
   // tym, ze miedzy odczytem zegara a zasnieciem moze wypasc wywlaszczenie i ten
@@ -420,7 +428,7 @@ void rtAbsoluteSleep(const struct timespec &anchor, long interval_ms) {
     delta.tv_sec -= 1;
     delta.tv_nsec += kNsPerSec;
   }
-  if (delta.tv_sec < 0) return;  // termin juz minal
-  nanosleep(&delta, nullptr);
+  if (delta.tv_sec < 0) return true;  // termin juz minal
+  return nanosleep(&delta, nullptr) == 0 || errno != EINTR;
 #endif
 }
