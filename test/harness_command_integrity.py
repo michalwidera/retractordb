@@ -18,15 +18,41 @@ awarii: zielony wynik w zerowym czasie.
 Regula domowa, ktorej pilnuje ten straznik: po `-c` stoi DOKLADNIE JEDEN
 argument. Skrypt z wieloma poleceniami idzie do wlasnego pliku `run.sh`
 wolanego jako `COMMAND bash run.sh`, tak jak robi to wiekszosc katalogow serii.
+
+Makro tnie tak samo kazdy zapis, wiec straznik szuka powloki na dowolnej
+pozycji (za `valgrind`, `env`, `timeout`), po nazwie bazowej (`dash`,
+`/opt/homebrew/bin/bash`), i przechodzi przez jej opcje do pierwszej krotkiej
+flagi z `c` (`-ec`, `-e -o pipefail -c`, `--rcfile plik -c`). Nazwa testu
+bywa zapisana jako `[=[t]=]` albo `"t"` (CMake 4) i nie moze udawac argumentu.
 """
 
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ARG = re.compile(r'"((?:[^"\\]|\\.)*)"')
-NAME = re.compile(r"^add_test\(\s*(?:\[=\[(?P<bracket>.*?)\]=\]|(?P<bare>[^\s\"()]+))")
-SHELLS = {"sh", "bash", "/bin/sh", "/bin/bash", "/usr/bin/sh", "/usr/bin/bash"}
+NAME = re.compile(r'^add_test\(\s*(?:\[=\[(?P<bracket>.*?)\]=\]|"(?P<quoted>(?:[^"\\]|\\.)*)"|(?P<bare>[^\s"()]+))')
+SHELLS = {"sh", "bash", "dash", "zsh", "ksh"}
+# Opcje powloki, ktore zabieraja nastepny argument.
+OPTS_WITH_VALUE = {"-o", "+o", "-O", "+O", "--rcfile", "--init-file"}
+C_FLAG = re.compile(r"-[A-Za-z]*c[A-Za-z]*")
+
+
+def command_args(args):
+    """Argumenty za flaga `-c` powloki wolanej w trybie -c, albo None."""
+    for start, arg in enumerate(args):
+        if PurePosixPath(arg).name not in SHELLS:
+            continue
+        i = start + 1
+        while i < len(args) and args[i].startswith(("-", "+")):
+            if args[i] in OPTS_WITH_VALUE:
+                i += 2
+                continue
+            if C_FLAG.fullmatch(args[i]):
+                return args[i + 1 :]
+            i += 1
+        # Pierwszy argument, ktory nie jest opcja, to skrypt: ta powloka nie jest w trybie -c.
+    return None
 
 
 def offenders(build_dir: Path):
@@ -35,12 +61,9 @@ def offenders(build_dir: Path):
             if not line.startswith("add_test("):
                 continue
             matched = NAME.match(line)
-            name = (matched.group("bracket") or matched.group("bare")) if matched else "?"
-            args = ARG.findall(line)
-            if len(args) < 2 or args[0] not in SHELLS or args[1] != "-c":
-                continue
-            rest = args[2:]
-            if len(rest) > 1:
+            name = matched.group(matched.lastgroup) if matched else "?"
+            rest = command_args(ARG.findall(line, matched.end() if matched else 0))
+            if rest is not None and len(rest) > 1:
                 yield name, testfile, rest
 
 
