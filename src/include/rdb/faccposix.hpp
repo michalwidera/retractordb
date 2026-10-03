@@ -38,6 +38,10 @@ class posixBinaryFile : public FileInterface {
   posixBinaryFile(std::string_view fileName, const Descriptor &descriptor, int percounter = -1);
   ~posixBinaryFile() override;
 
+  // Kopia zamknelaby ten sam deskryptor dwa razy; akcesor zyje wylacznie w unique_ptr (R-01, #274).
+  posixBinaryFile(const posixBinaryFile &)            = delete;
+  posixBinaryFile &operator=(const posixBinaryFile &) = delete;
+
   using FileInterface::read;
   using FileInterface::write;
   ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, size_t position) override;

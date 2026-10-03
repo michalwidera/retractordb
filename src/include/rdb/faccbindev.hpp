@@ -105,6 +105,10 @@ class binaryDeviceRO : public FileInterface {
                           std::string_view storageType);
   ~binaryDeviceRO() override;
 
+  // Kopia zamknelaby ten sam deskryptor dwa razy; akcesor zyje wylacznie w unique_ptr (R-01, #274).
+  binaryDeviceRO(const binaryDeviceRO &)            = delete;
+  binaryDeviceRO &operator=(const binaryDeviceRO &) = delete;
+
   using FileInterface::read;
   using FileInterface::write;
   ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) override;

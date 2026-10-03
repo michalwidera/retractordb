@@ -11,6 +11,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "logCapture.hpp"
@@ -20,6 +21,12 @@
 #include "syscallWrap.hpp"
 
 using BYTE = unsigned char;
+
+// Akcesor trzyma deskryptor, wiec nie wolno go ani kopiowac, ani przenosic - R-01, #274.
+static_assert(!std::is_copy_constructible_v<rdb::posixBinaryFile>);
+static_assert(!std::is_copy_assignable_v<rdb::posixBinaryFile>);
+static_assert(!std::is_move_constructible_v<rdb::posixBinaryFile>);
+static_assert(!std::is_move_assignable_v<rdb::posixBinaryFile>);
 
 // Helper: create a single-field Descriptor of given byte size (BYTE type)
 static rdb::Descriptor makeDesc(size_t size) { return {"f", static_cast<int>(size), 1, rdb::BYTE}; }
