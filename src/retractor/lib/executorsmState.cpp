@@ -30,6 +30,7 @@ std::atomic<bool> firstQueryReceived{false};
 std::atomic<std::uint64_t> adHocPlanRevision{0};
 bool untilEofMode{false};
 bool verboseMode{false};
+bool noClockMode{false};
 std::atomic<bool> planResetRequested{false};
 std::string pendingPlanText;
 std::atomic<bool> planSwapInFlight{false};

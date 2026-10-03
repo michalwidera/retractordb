@@ -257,6 +257,18 @@ std::vector<std::string> deviceTimeoutWarnings(const qTree &plan, const std::opt
   return retVal;
 }
 
+std::vector<std::string> deviceTimeoutReport(const qTree &plan, const std::optional<double> configured, const bool noClock,
+                                             const std::vector<std::string> &streamNames) {
+  std::vector<std::string> retVal;
+  for (const auto &q : plan) {
+    if (q.kind != sourceKind::device) continue;
+    if (!streamNames.empty() && std::ranges::find(streamNames, q.id) == streamNames.end()) continue;
+    const auto timeout = effectiveDeviceTimeout(q, configured, noClock);
+    retVal.push_back(std::format("DEVICE stream '{}': effective TIMEOUT {} s ({})", q.id, timeout.seconds, timeout.origin));
+  }
+  return retVal;
+}
+
 std::vector<std::string> planStreamNames(const qTree &plan) {
   std::vector<std::string> retVal;
   for (const auto &q : plan)

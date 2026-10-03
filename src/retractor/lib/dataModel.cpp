@@ -266,10 +266,21 @@ bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
   });
 }
 
+void dataModel::advanceDeclaration(const query &qry, rdb::storage &output) {
+  output.bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
+  static_cast<void>(output.revRead(0));         // Declarations need to process in separate&first
+  output.fire();                                // chamber_ -> outputPayload
+  if (output.bufferState != rdb::sourceState::armed) {
+    FatalError("dataModel::processRows: stream '{}' not armed after processing", qry.id);
+  }
+}
+
 void dataModel::processZeroStep() {
   std::scoped_lock scoped_lock(core_mutex);
+  // DEVICE nie ma kroku zerowego (#347): jego rekord jest czytany na poczatku slotu, ktory go
+  // konsumuje, a nie slot wczesniej. Pierwszy rekord wnosi pierwszy nalezny slot w processRows.
   for (const auto &q : coreInstance_)
-    if (q.isDeclaration()) bootstrapDeclaration(q);
+    if (q.isDeclaration() && q.kind != sourceKind::device) bootstrapDeclaration(q);
 }
 
 void dataModel::processRows(std::span<const char> dueMask, const boost::rational<int> &currentTimeSlot) {
@@ -298,12 +309,21 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
   // Zrodlo dolaczone ad-hoc nie uczestniczylo w kroku zerowym. Uzbrajamy je
   // przed konsumentami pierwszego naleznego slotu. Koncowa faza deklaracji
   // pobierze wtedy rekord dla nastepnego slotu, tak jak po zwyklym kroku zerowym.
+  //
+  // DEVICE (#347) przechodzi tedy w KAZDYM naleznym slocie, a koncowa faza go pomija: jego rekord
+  // zebrala faza DEVICE przed blokadami (rdb::awaitRecords), a tutaj trafia do modelu przed
+  // konsumentami slotu, ktory go konsumuje. Pierwszy nalezny slot ustawia baze ta sama droga co
+  // zrodlo ad-hoc, wiec rekord k ma ten sam indeks logiczny co rekord k BINFILE czytanego
+  // z wyprzedzeniem - model ogona i tak uznaje go za okreslony dopiero w chwili (k+1)*interwal.
   for (std::size_t position = 0; position < dueMask.size(); ++position) {
     if (dueMask[position] == 0) continue;
     const query &q = coreInstance_.at(position);
     if (!q.isDeclaration()) continue;
     auto &runtime = handleAt(position, q);
-    if (runtime.outputPayload->bufferState != rdb::sourceState::empty) continue;
+    if (runtime.outputPayload->bufferState != rdb::sourceState::empty) {
+      if (q.kind == sourceKind::device) advanceDeclaration(q, *runtime.outputPayload);
+      continue;
+    }
 
     const auto slotNumber = currentTimeSlot / q.rInterval;
     if (slotNumber.denominator() != 1) {
@@ -367,19 +387,15 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
   for (std::size_t position = 0; position < dueMask.size(); ++position) {
     if (dueMask[position] == 0) continue;  // Drop off rows that not computed now
     const query &q = coreInstance_.at(position);
-    if (!q.isDeclaration()) continue;  // first declarations need to be processed
+    if (!q.isDeclaration()) continue;            // first declarations need to be processed
+    if (q.kind == sourceKind::device) continue;  // DEVICE czytany na poczatku slotu (#347)
 
     // Uchwyt po pozycji, tak jak w petli wyzej. Referencja wskazuje INSTANCJE, wiec koncowy
     // warunek czyta bufferState PO fire(), a nie wartosc sprzed: fire() przepisuje komore
     // do magazynu w miejscu (storage::fire -> sourceBuffer::fire), zmieniajac ten wlasnie stan.
     auto &runtime = handleAt(position, q);
     if (runtime.outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
-    runtime.outputPayload->bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
-    static_cast<void>(runtime.outputPayload->revRead(0));         // Declarations need to process in separate&first
-    runtime.outputPayload->fire();                                // chamber_ -> outputPayload
-    if (runtime.outputPayload->bufferState != rdb::sourceState::armed) {
-      FatalError("dataModel::processRows: stream '{}' not armed after processing", q.id);
-    }
+    advanceDeclaration(q, *runtime.outputPayload);
   }
 }
 

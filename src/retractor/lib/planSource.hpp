@@ -78,6 +78,12 @@ void dropStalePlanArtifacts(const qTree &plan);
 [[nodiscard]] std::vector<std::string> deviceTimeoutWarnings(const qTree &plan, std::optional<double> configured,
                                                              const std::vector<std::string> &streamNames = {});
 
+/// Efektywny termin kazdego zrodla DEVICE wraz z jego pochodzeniem (#347): "RQL", "config",
+/// "default" albo "no-clock" (`-f`). Wpis do dziennika przy starcie epoki i przy imporcie ad-hoc -
+/// operator widzi, z jakim terminem naprawde czyta kazde zrodlo. Pusta lista nazw oznacza caly plan.
+[[nodiscard]] std::vector<std::string> deviceTimeoutReport(const qTree &plan, std::optional<double> configured, bool noClock,
+                                                           const std::vector<std::string> &streamNames = {});
+
 /// Nazwy strumieni, ktore plan ROSCI na magistrali: wszystkie wezly poza dyrektywami.
 [[nodiscard]] std::vector<std::string> planStreamNames(const qTree &plan);
 

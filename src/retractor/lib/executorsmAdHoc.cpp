@@ -189,6 +189,9 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     if (coreInstancePtr->exists(q.id)) continue;
     adHocStreams.push_back(q.id);
   }
+  // Liczony z kopii PRZED importem, wpisywany po udanym (jak wykaz D8 nizej): importFrom przenosi
+  // wezly z tej kopii do zywego planu.
+  const auto deviceReport = deviceTimeoutReport(coreInstanceCopy, cfgSourcesTimeout, noClockMode, adHocStreams);
 
   if (!adHocStreams.empty()) {
     if (const std::string openError = checkOutputFilesOpenable(coreInstanceCopy, activeStorageDir, adHocStreams);
@@ -354,6 +357,9 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   for (const auto &[stream, reason] : localCompiler.unboundedDiskStreams())
     if (std::ranges::contains(mergedIds, stream))
       SPDLOG_ERROR("AdHoc stream {} grows without bound on disk ({})", stream, reason);
+  // Termin DEVICE dolaczonego w locie (#347), ten sam poziom i ten sam powod co wyzej.
+  for (const std::string &line : deviceReport)
+    SPDLOG_ERROR("AdHoc {}", line);
 
   ptRetval.put(std::string("db"), "OK");
   return ptRetval;

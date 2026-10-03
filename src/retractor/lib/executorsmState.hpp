@@ -92,6 +92,10 @@ extern bool untilEofMode;
 /// w planach przyjetych kanalem ad-hoc i `reset` - tam nie ma juz linii polecen launchera.
 extern bool verboseMode;
 
+/// Tryb bez zegara (`-f`) calego przebiegu: termin kazdego DEVICE wynosi 0 (#347). Watek
+/// komunikacyjny czyta go przy wpisie efektywnego terminu zrodla dolaczonego ad-hoc.
+extern bool noClockMode;
+
 /// Zadanie przeladowania planu przyjete przez kanal IPC. Podnosi je resetCommit() po pelnej
 /// walidacji, zdejmuje applyPendingPlan(). Petla epok traktuje je jak warunek konca epoki -
 /// dokladnie tak samo jak `stop_now`, tyle ze po niej zaczyna sie epoka nastepna, nie koniec
