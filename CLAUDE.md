@@ -19,6 +19,8 @@ scripts/buildrdb.sh coverage    # build with coverage + gcovr report → coverag
 
 Options chain: `scripts/buildrdb.sh conan ninja debug`
 
+Plain `ctest ...` and `ninja test*` commands run through the `PreToolUse` hook `.claude/hooks/test-output-filter.py`: the full output goes to a log under the session scratchpad and the command returns its last 120 lines plus the log path. Read the log for anything the tail cut off instead of re-running the tests.
+
 **Incremental (from `build/Debug`):**
 ```bash
 ninja               # build
@@ -121,7 +123,7 @@ Never start a new topic on top of unrelated uncommitted work. That includes what
 
 ### Delegation to subagents
 
-This section is the standing request to delegate. The agents are defined in `.claude/agents/`, and the split below is binding. The reason is cost: a log or a search result read in the main session is read again on every later turn, so output-heavy work goes to a cheaper model that returns only the lines that matter.
+This section is the standing request to delegate. The agents are defined in `.claude/agents/`, and the split below is binding. The reason is cost and context: a log or a search result read in the main session is read again on every later turn and pushes the session toward compaction, so output-heavy work goes to a cheaper model that returns only the lines that matter.
 
 **The main session keeps** the goal, the plan, design decisions, root-cause analysis, every conclusion reported to the human, and the commit or handoff; it reads every diff an agent produced before the handoff. The model and effort of the main session are the human's choice (`/model`, `/effort`); `xhigh` is recommended for planning compiler or concurrency changes.
 
@@ -145,6 +147,7 @@ This section is the standing request to delegate. The agents are defined in `.cl
 - Agents never commit, push, open pull requests or touch CI, and the embargo in *Comparative measurement* binds them as it binds the main session.
 - Files changed by `implementer` count toward the *Planning threshold*, and the main session reads its diff before the handoff.
 - A failed agent run is retried at most once, with a corrected prompt; after that the main session does the work itself.
+- Build, test and read-only git commands are pre-approved in `.claude/settings.json`, so the agents run them without prompting; `git add` / `commit` / `push`, `ninja cformat` and the watermark scripts are not, on purpose. A permission prompt raised by an agent is a stop signal: read the command before approving it.
 
 ### AI watermark hygiene (text)
 
