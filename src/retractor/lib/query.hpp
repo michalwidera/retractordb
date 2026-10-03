@@ -183,10 +183,11 @@ class query {
   bool isDeprecatedFile = false;
   /// Wiersz pliku planu, od ktorego zaczyna sie deklaracja - do ostrzezenia o formie przestarzalej.
   size_t declarationLine = 0;
-  /// Jawna klauzula `TIMEOUT` deklaracji DEVICE w sekundach (#347). Brak klauzuli to cos innego niz
-  /// jawne 0: brak bierze `[sources] timeout_s` z retractor.toml, a jawne 0 wylacza dodatnia wartosc
-  /// z konfiguracji dla tego jednego zrodla. Pierwszenstwo rozstrzyga effectiveDeviceTimeout().
-  std::optional<double> timeoutSeconds;
+  /// Jawna klauzula `TIMEOUT` deklaracji DEVICE w sekundach (#347), wymierna jak interwal. Brak
+  /// klauzuli to cos innego niz jawne 0: brak bierze `[sources] timeout_s` z retractor.toml, a jawne 0
+  /// wylacza dodatnia wartosc z konfiguracji dla tego jednego zrodla. Pierwszenstwo rozstrzyga
+  /// effectiveDeviceTimeout().
+  std::optional<boost::rational<int>> timeoutSeconds;
 
   std::list<field> lSchema;
   std::list<token> lProgram;

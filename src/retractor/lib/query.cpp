@@ -14,7 +14,7 @@ bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.
 
 deviceTimeout effectiveDeviceTimeout(const query &qry, const std::optional<double> configured, const bool noClock) {
   if (noClock) return {.seconds = 0.0, .origin = "no-clock"};
-  if (qry.timeoutSeconds) return {.seconds = *qry.timeoutSeconds, .origin = "RQL"};
+  if (qry.timeoutSeconds) return {.seconds = boost::rational_cast<double>(*qry.timeoutSeconds), .origin = "RQL"};
   if (configured) return {.seconds = *configured, .origin = "config"};
   return {.seconds = 0.0, .origin = "default"};
 }

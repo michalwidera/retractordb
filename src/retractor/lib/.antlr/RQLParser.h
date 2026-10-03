@@ -233,14 +233,15 @@ public:
     antlr4::Token *kind = nullptr;
     antlr4::Token *file_name = nullptr;
     antlr4::Token *timeout_sign = nullptr;
-    antlr4::Token *timeout_value = nullptr;
+    RQLParser::Rational_seContext *timeout_value = nullptr;
     antlr4::tree::TerminalNode *DECLARE();
     std::vector<Field_declarationContext *> field_declaration();
     Field_declarationContext* field_declaration(size_t i);
     antlr4::tree::TerminalNode *STREAM();
     std::vector<antlr4::tree::TerminalNode *> COMMA();
     antlr4::tree::TerminalNode* COMMA(size_t i);
-    Rational_seContext *rational_se();
+    std::vector<Rational_seContext *> rational_se();
+    Rational_seContext* rational_se(size_t i);
     antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *STRING();
     antlr4::tree::TerminalNode *BINFILE();
@@ -251,8 +252,6 @@ public:
     antlr4::tree::TerminalNode *DISPOSABLE();
     antlr4::tree::TerminalNode *ONESHOT();
     antlr4::tree::TerminalNode *HOLD();
-    antlr4::tree::TerminalNode *FLOAT();
-    antlr4::tree::TerminalNode *DECIMAL();
     antlr4::tree::TerminalNode *MINUS();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;

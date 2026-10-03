@@ -55,7 +55,7 @@ write_ints() {
 # (1) -c
 printf '%s\n' "DECLARE a INTEGER STREAM fast, 1/10 DEVICE '/dev/zero' TIMEOUT 0.5" "SELECT fast[0] STREAM o FROM fast" >late.rql
 xretractor late.rql -c >late-c.out 2>late-c.err
-grep -q "timeout=0.5" late-c.out || { echo "-c bez timeout=0.5"; cat late-c.out; exit 1; }
+grep -q "timeout=1/2" late-c.out || { echo "-c bez timeout=1/2"; cat late-c.out; exit 1; }
 expect_contains "$(cat late-c.err)" "DECLARE fast: TIMEOUT 0.5 s (RQL) is longer than the interval 0.1 s; waiting overruns the slot"
 
 printf '%s\n' "DECLARE a INTEGER STREAM legacy, 1 FILE '/dev/urandom' TIMEOUT 0.1" "SELECT legacy[0] STREAM o FROM legacy" >legacy-timeout.rql

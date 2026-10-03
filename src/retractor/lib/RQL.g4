@@ -34,14 +34,15 @@ select_statement    : SELECT select_list
 // forma przestarzala: exitDeclare tlumaczy ja na jeden z trzech rodzajow zamrozona regula
 // ze sciezki. Odmowy opcji (DEVICE nie bierze DISPOSABLE/HOLD) sa bledami
 // semantycznymi w exitDeclare, nie skladni - komunikat ma nazwac strumien i opcje.
-// TIMEOUT (#347) ma wlasna liczbe, a nie rational_se: tamte przebiegi pisza do wspolnego
-// interwalu deklaracji i odrzucaja zero. Minus jest tu tylko po to, zeby wartosc ujemna dostala
-// komunikat z nazwa strumienia zamiast bledu skladni; odrzuca ja exitDeclare, tak jak TIMEOUT
-// przy rodzaju innym niz DEVICE.
+// TIMEOUT (#347) to czas w sekundach, wiec - jak interwal - ma postac rational_se: `TIMEOUT 1/100`,
+// `TIMEOUT 0.01`, `TIMEOUT 0`. Przebiegi rational_se rozpoznaja wartosc TIMEOUT po etykiecie
+// timeout_value i nie pisza jej do interwalu deklaracji (RQLParser.cpp, isTimeoutValue). Minus jest
+// tu tylko po to, zeby wartosc ujemna dostala komunikat z nazwa strumienia zamiast bledu skladni;
+// odrzuca ja exitDeclare, tak jak TIMEOUT przy rodzaju innym niz DEVICE.
 declare_statement   : DECLARE field_declaration (COMMA field_declaration)*
                       STREAM stream_name=ID COMMA rational_se
                       kind=( BINFILE | TEXTFILE | DEVICE | FILE ) file_name=STRING
-                      (TIMEOUT timeout_sign=MINUS? timeout_value=( FLOAT | DECIMAL ))?
+                      (TIMEOUT timeout_sign=MINUS? timeout_value=rational_se)?
                       (DISPOSABLE)?
                       (ONESHOT)?
                       (HOLD)?

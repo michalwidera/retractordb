@@ -4632,25 +4632,30 @@ TEST(xparser, device_refuses_the_options_of_recorded_files) {
   }
 }
 
-// Klauzula TIMEOUT (#347). Brak klauzuli i jawne 0 to dwa rozne stany - jawne 0 wylacza dodatnia
-// wartosc z retractor.toml. Wartosc TIMEOUT nie moze trafic do interwalu deklaracji: przebiegi
-// rational_se pisza do wspolnego rationalResult i odrzucaja zero, a TIMEOUT 0 jest legalne.
-// query::reset() kasuje klauzule, wiec nastepna deklaracja jej nie dziedziczy.
+// Klauzula TIMEOUT (#347) ma postac rational_se, jak interwal: ulamek, liczba z kropka albo calkowita.
+// Brak klauzuli i jawne 0 to dwa rozne stany - jawne 0 wylacza dodatnia wartosc z retractor.toml.
+// Wartosc TIMEOUT nie moze trafic do interwalu deklaracji: przebiegi rational_se pisza do wspolnego
+// rationalResult i odrzucaja zero, a TIMEOUT 0 jest legalne. query::reset() kasuje klauzule, wiec
+// nastepna deklaracja jej nie dziedziczy.
 TEST(xparser, device_timeout_clause) {
+  using rational = boost::rational<int>;
   qTree plan;
   ASSERT_EQ(parsePlanText(plan,
                           "DECLARE a BYTE STREAM fast, 1/50 DEVICE '/dev/zero' TIMEOUT 0.01\n"
+                          "DECLARE a BYTE STREAM frac, 1/50 DEVICE '/dev/zero' TIMEOUT 1/100\n"
                           "DECLARE a BYTE STREAM zeroed, 0.5 DEVICE '/dev/zero' TIMEOUT 0\n"
                           "DECLARE a BYTE STREAM whole, 2 device '/dev/zero' timeout 3\n"
                           "DECLARE a BYTE STREAM bare, 1 DEVICE '/dev/zero'\n")
                 .status,
             "OK");
-  EXPECT_EQ(plan.getQuery("fast").timeoutSeconds, std::optional<double>(0.01));
-  EXPECT_EQ(plan.getQuery("fast").rInterval, boost::rational<int>(1, 50));
-  EXPECT_EQ(plan.getQuery("zeroed").timeoutSeconds, std::optional<double>(0.0));
-  EXPECT_EQ(plan.getQuery("zeroed").rInterval, boost::rational<int>(1, 2));
-  EXPECT_EQ(plan.getQuery("whole").timeoutSeconds, std::optional<double>(3.0));
-  EXPECT_EQ(plan.getQuery("whole").rInterval, boost::rational<int>(2));
+  EXPECT_EQ(plan.getQuery("fast").timeoutSeconds, std::optional<rational>(rational(1, 100)));
+  EXPECT_EQ(plan.getQuery("fast").rInterval, rational(1, 50));
+  EXPECT_EQ(plan.getQuery("frac").timeoutSeconds, std::optional<rational>(rational(1, 100)));
+  EXPECT_EQ(plan.getQuery("frac").rInterval, rational(1, 50));
+  EXPECT_EQ(plan.getQuery("zeroed").timeoutSeconds, std::optional<rational>(rational(0)));
+  EXPECT_EQ(plan.getQuery("zeroed").rInterval, rational(1, 2));
+  EXPECT_EQ(plan.getQuery("whole").timeoutSeconds, std::optional<rational>(rational(3)));
+  EXPECT_EQ(plan.getQuery("whole").rInterval, rational(2));
   EXPECT_FALSE(plan.getQuery("bare").timeoutSeconds.has_value());
 }
 
@@ -4661,6 +4666,9 @@ TEST(xparser, device_timeout_refusals) {
   for (const auto &[rql, reason] : std::vector<std::pair<std::string, std::string>>{
            {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/zero' TIMEOUT -1", "DECLARE s: TIMEOUT -1 must not be negative"},
            {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/zero' TIMEOUT -0.5", "DECLARE s: TIMEOUT -0.5 must not be negative"},
+           {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/zero' TIMEOUT -1/2", "DECLARE s: TIMEOUT -1/2 must not be negative"},
+           {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/zero' TIMEOUT 1/0", "fraction 1/0 has a zero denominator"},
+           {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/zero' TIMEOUT 0.0000001", "numeric literal 0.0000001 is out of range"},
            {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/zero' TIMEOUT 86401", "DECLARE s: TIMEOUT 86401 exceeds the limit 86400 s"},
            {"DECLARE a BYTE STREAM s, 1 BINFILE 'a.bin' TIMEOUT 0.1",
             "DECLARE s: BINFILE does not take TIMEOUT; TIMEOUT applies to DEVICE"},
@@ -4686,9 +4694,9 @@ TEST(xparser, device_timeout_refusals) {
 // Pierwszenstwo terminu DEVICE: tryb bez zegara > jawna klauzula (takze 0) > `[sources] timeout_s` > 0.
 TEST(xparser, effective_device_timeout_precedence) {
   query explicitZero;
-  explicitZero.timeoutSeconds = 0.0;
+  explicitZero.timeoutSeconds = boost::rational<int>(0);
   query explicitHalf;
-  explicitHalf.timeoutSeconds = 0.5;
+  explicitHalf.timeoutSeconds = boost::rational<int>(1, 2);
   const query bare;
 
   const auto check = [](const deviceTimeout &timeout, double seconds, std::string_view origin) {

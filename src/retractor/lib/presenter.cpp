@@ -377,7 +377,8 @@ void presenter::onlyCompileShowProgram() {
     if (q.logicalOrigin > 0) std::cout << "\torigin=" << q.logicalOrigin;
     if (!q.filename.empty()) std::cout << "\t" << q.filename;
     // Tylko jawna klauzula TIMEOUT (#347), jak ogon: listing planow bez niej zostaje bez zmian.
-    // Wartosc z retractor.toml nie jest czescia planu, wiec jej tu nie ma.
+    // Wymierna, w tej samej postaci co interwal. Wartosc z retractor.toml nie jest czescia planu,
+    // wiec jej tu nie ma.
     if (q.timeoutSeconds) std::cout << "\ttimeout=" << *q.timeoutSeconds;
     std::cout << '\n';
     for (auto t : q.lProgram)
