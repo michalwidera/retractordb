@@ -346,6 +346,14 @@ TEST(descriptor, parser_limits_field_size) {
     EXPECT_TRUE(parserDESCString(out, text).contains("numeric literal 99999999999 is out of range")) << text;
   }
 
+  // Literaly z #279 (S-07): INT_MAX miesci sie w int, wiec odpada na granicy pola - wczesniej konstruktor
+  // payloadu zamawial na nim 2 GiB; drugi nie miesci sie w int - wczesniej std::stoi rzucal std::out_of_range.
+  rdb::Descriptor intMax;
+  EXPECT_TRUE(parserDESCString(intMax, "{ STRING s[2147483647] }").contains("field size 2147483647 exceeds the limit 65536"));
+  rdb::Descriptor aboveInt;
+  EXPECT_TRUE(
+      parserDESCString(aboveInt, "{ INTEGER a[999999999999] }").contains("numeric literal 999999999999 is out of range"));
+
   // Retencja nic nie alokuje - trzyma pliki na dysku - wiec gornej granicy nie ma.
   rdb::Descriptor retention;
   EXPECT_EQ(parserDESCString(retention, "{ INTEGER a RETENTION 1000000 1000000 }"), "OK");
