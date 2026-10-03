@@ -14,7 +14,13 @@ widziany z innej strony:
      przeoczyl pierwszy przeglad fazy 2 (Descriptor::singleLineOutput_),
   3. brak KONFIGUROWANIA globalnego logera - biblioteka uzywa domyslnego loggera
      hosta, nigdy go nie ustawia ani nie zamyka,
-  4. brak std::exit i FatalError - to dorobek fazy 1, tutaj tylko zabezpieczony.
+  4. brak std::exit i FatalError - to dorobek fazy 1, tutaj tylko zabezpieczony,
+  5. brak throw / try / catch w rdzeniu bez wyjatkow (rdb, retractorcore, rdbembed) poza
+     wyspami, ktore opakowuja kod cudzy zglaszajacy bledy rzutem: dwa parsery ANTLR i
+     Boost.Stacktrace (docs/embedded-realtime-gaps.md, sekcja 2).
+     Build z RDB_NO_EXCEPTIONS=ON (domyslny) pilnuje tego sam - kompilator odrzuca `throw`.
+     Bramka pilnuje tego TAKZE przy RDB_NO_EXCEPTIONS=OFF, zeby wylaczenie opcji nie
+     otwieralo drogi powrotnej.
 
 Wyjatki sa WYMIENIONE Z NAZWY razem z powodem. Lista, ktora rosnie bez uzasadnienia,
 jest gorsza niz brak bramki.
@@ -43,7 +49,24 @@ ALLOWED = {
          "INDEKS slotu xalloc, nie stan: przydzielany raz i niezmienny; wartosc flagi "
          "zyje w iword() konkretnego strumienia"),
     ],
+    "src/rdb/lib/error.cc": [
+        ("static std::atomic<FatalHandler> slot{nullptr};",
+         "handler rdb::fatal() jest z natury wlasnoscia PROCESU: zlamany niezmiennik konczy caly "
+         "proces, a nie jeden silnik, wiec dwa silniki w jednym procesie dziela go poprawnie; "
+         "ustawia go host (launcher demona), nigdy silnik"),
+    ],
 }
+
+# Rdzen bez wyjatkow poza ROOTS: fasada osadzenia i zrodla biblioteki retractorcore (lista
+# czytana z src/retractor/lib/CMakeLists.txt, zeby nie rozjechala sie z buildem).
+CORE_EXTRA_ROOTS = ("src/embed",)
+CORE_SOURCES_CMAKE = "src/retractor/lib/CMakeLists.txt"
+# Wyspy z wyjatkami: opakowuja kod cudzy, ktory zglasza bledy wylacznie rzutem (parser ANTLR,
+# Boost.Stacktrace), i lapia wszystko na wlasnej granicy (rdb_exception_island w korzeniu
+# CMakeLists.txt).
+EXCEPTION_ISLANDS = ("src/rdb/lib/DESCParser.cc", "src/rdb/lib/stackTrace.cc", "src/retractor/lib/RQLParser.cpp")
+EXCEPTION_SYNTAX = re.compile(r"\bthrow\b|\btry\s*\{|\bcatch\s*\(")
+STRING_LITERAL = re.compile(r'"(?:\\.|[^"\\])*"')
 
 # Stan, ktory JEST bledem i nie zostal jeszcze naprawiony. Bramka go wypisuje i przepuszcza,
 # ale nowy wpis tutaj wymaga swiadomej decyzji - lista ma malec, nie rosnac. Rzecz w tym, zeby
@@ -133,9 +156,44 @@ def scan(repo: Path) -> tuple[list[str], list[str]]:
     return problems, debt
 
 
+def core_files(repo: Path) -> list[Path]:
+    files: list[Path] = []
+    for root in ROOTS + CORE_EXTRA_ROOTS:
+        base = repo / root
+        if base.is_dir():
+            files += [p for p in sorted(base.rglob("*")) if p.suffix in (".cc", ".cpp", ".hpp", ".h")]
+    cmake = (repo / CORE_SOURCES_CMAKE).read_text(encoding="utf-8")
+    listing = re.search(r"set\(RETRACTOR_CORE_SOURCES([^)]*)\)", cmake)
+    if listing is None:
+        raise SystemExit(f"{CORE_SOURCES_CMAKE}: brak listy RETRACTOR_CORE_SOURCES - bramka mierzy nie to, co trzeba")
+    for name in listing.group(1).split():
+        files.append(repo / "src/retractor/lib" / name)
+        header = (repo / "src/retractor/lib" / name).with_suffix(".hpp")
+        if header.exists():
+            files.append(header)
+    return files
+
+
+def scan_exceptions(repo: Path) -> list[str]:
+    problems: list[str] = []
+    for path in core_files(repo):
+        rel = path.relative_to(repo).as_posix()
+        if ".antlr" in path.parts or rel in EXCEPTION_ISLANDS:
+            continue
+        for number, raw in enumerate(path.read_text(encoding="utf-8", errors="replace").split("\n"), 1):
+            stripped = raw.lstrip()
+            if stripped.startswith(("*", "/*")):
+                continue
+            code = STRING_LITERAL.sub('""', strip_comment(raw))
+            if EXCEPTION_SYNTAX.search(code):
+                problems.append(f"{rel}:{number}: wyjatek C++ w rdzeniu bez wyjatkow: {raw.strip()[:100]}")
+    return problems
+
+
 def main() -> int:
     repo = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent
     problems, debt = scan(repo)
+    problems += scan_exceptions(repo)
     if debt:
         print("Znany dlug fazy 2 (przepuszczony, patrz docs/core-phase-2.md sekcja 4):")
         for item in debt:
@@ -151,7 +209,8 @@ def main() -> int:
             "dopisz go do ALLOWED w tym pliku RAZEM Z POWODEM."
         )
         return 1
-    print(f"Bramka osadzalnosci: {', '.join(ROOTS)} bez stanu procesu, bez konfiguracji logera, bez exit().")
+    print(f"Bramka osadzalnosci: {', '.join(ROOTS)} bez stanu procesu, bez konfiguracji logera, bez exit();")
+    print("rdzen (rdb, retractorcore, rdbembed) bez throw/try/catch poza wyspami (ANTLR, Boost.Stacktrace).")
     return 0
 
 

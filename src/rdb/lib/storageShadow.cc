@@ -1,6 +1,6 @@
 #include "rdb/storageShadow.hpp"
 
-#include <stdexcept>
+#include <fmt/format.h>
 
 namespace rdb {
 
@@ -10,9 +10,12 @@ storageShadow::storageShadow(const Descriptor &descriptor, const std::string &me
   shadow_.load();
 }
 
-void storageShadow::onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitset) {
-  if (recordIndex >= totalRecords()) throw std::out_of_range("recordIndex out of range in storageShadow::onRecordModified");
+Result<> storageShadow::onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitset) {
+  if (recordIndex >= totalRecords())
+    return fail(Errc::Logic, fmt::format("recordIndex {} out of range in storageShadow::onRecordModified (records: {})",
+                                         recordIndex, totalRecords()));
   shadow_.appendOverride(recordIndex, nullBitset);
+  return {};
 }
 
 std::vector<bool> storageShadow::getNullBitset(size_t recordIndex) const {
@@ -25,10 +28,11 @@ void storageShadow::reset() {
   shadow_.discard();
 }
 
-void storageShadow::mergeShadow() {
+Result<> storageShadow::mergeShadow() {
   for (const auto &ov : shadow_.overrides())
-    metaData::onRecordModified(ov.recordIndex, ov.nullBitset);
+    RDB_TRY(metaData::onRecordModified(ov.recordIndex, ov.nullBitset));
   shadow_.discard();
+  return {};
 }
 
 void storageShadow::discardShadow() { shadow_.discard(); }

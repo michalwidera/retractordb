@@ -17,7 +17,6 @@
 #include <boost/rational.hpp>
 #include <boost/system/error_code.hpp>
 
-#include "rdb/exceptions.hpp"
 #include "retractor/lib/appConfig.hpp"
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/exprSimplify.hpp"
@@ -950,17 +949,12 @@ TEST(xcompiler, unrepresentable_interval_reports_range_error) {
       )");
   ASSERT_EQ(parseResult, "OK");
 
+  // Status planu, nie blad wewnetrzny: interwal wynika z tresci planu. Do 2026-10 zakres
+  // zglaszal rzut std::out_of_range, ktorego compile() nie lapal.
   compiler compilerInstance(instance);
-  EXPECT_THROW(
-      {
-        try {
-          compilerInstance.compile();
-        } catch (const std::out_of_range &error) {
-          EXPECT_NE(std::string(error.what()).find("out of representable range"), std::string::npos);
-          throw;
-        }
-      },
-      std::out_of_range);
+  const std::string status = compilerInstance.compile();
+  EXPECT_NE(status.find("out of representable range"), std::string::npos) << status;
+  EXPECT_FALSE(isInternalCompilerError(status)) << status;
 }
 
 // --- L5: nierozwiazany wezel planu nie moze degradowac po cichu ---------------------
@@ -989,17 +983,12 @@ TEST(xcompiler, unresolved_node_is_a_compilation_error) {
   // wersja przepisywala konsumentowi ciche zero.
   const std::map<std::string, int> partial{{"src", 0}};
 
-  // Rzut, nie smierc procesu: plaster A1 fazy 1. Bramka pilnuje NIEZMIENNIKA kompilatora,
-  // wiec zglasza go rdb::LogicError - nie wraca statusem, bo nie jest bledem planu
-  // uzytkownika, tylko bledem w tym kodzie.
-  EXPECT_THROW({ requireResolvedForEveryNode(plan, partial, "test", "startup latency"); }, rdb::LogicError);
-
-  try {
-    requireResolvedForEveryNode(plan, partial, "test", "startup latency");
-    FAIL() << "expected LogicError";
-  } catch (const rdb::LogicError &error) {
-    EXPECT_NE(std::string(error.what()).find("unresolved startup latency for 'consumer'"), std::string::npos) << error.what();
-  }
+  // Status, nie smierc procesu (plaster A1 fazy 1) i nie wyjatek. Bramka pilnuje NIEZMIENNIKA
+  // kompilatora, wiec status niesie przedrostek kInternalCompilerError - wolajacy odroznia blad
+  // w tym kodzie od bledu planu uzytkownika. Do 2026-10 byl to rzut rdb::LogicError.
+  const std::string status = requireResolvedForEveryNode(plan, partial, "test", "startup latency");
+  EXPECT_TRUE(isInternalCompilerError(status)) << status;
+  EXPECT_NE(status.find("unresolved startup latency for 'consumer'"), std::string::npos) << status;
 }
 
 // Kontrola aparatury do testu wyzej: przy komplecie wynikow bramka musi milczec.
@@ -1011,16 +1000,15 @@ TEST(xcompiler, complete_resolution_passes_the_gate) {
 
   const std::map<std::string, int> complete{{"src", 0}, {"consumer", 3}};
 
-  requireResolvedForEveryNode(plan, complete, "test", "startup latency");
-  SUCCEED();
+  EXPECT_EQ(requireResolvedForEveryNode(plan, complete, "test", "startup latency"), "OK");
 }
 
 // Kontrola pozytywna na korpusie planow poprawnych: plan obejmujacy wszystkie dziewiec
 // klas operatorow musi wyjsc z kompilatora bez ani jednego wezla nierozwiazanego.
 //
-// Trybem porazki tego testu jest SMIERC PROCESU: requireResolvedForEveryNode() konczy
-// kompilacje przez FatalError, wiec nierozwiazany wezel przerywa binarke testu, zamiast
-// zapisac ostrzezenie w logu. Kontrola mutacyjna (zaszczepienie deklaracji usuniete
+// Trybem porazki tego testu jest status bledu wewnetrznego z compile(): requireResolvedForEveryNode()
+// konczy kompilacje statusem z przedrostkiem kInternalCompilerError, zamiast zapisac ostrzezenie
+// w logu i przejsc dalej. Kontrola mutacyjna (zaszczepienie deklaracji usuniete
 // z computeStartupLatency) pokazuje, ze ten tryb porazki dziala.
 TEST(xcompiler, every_node_of_a_nine_class_plan_is_resolved) {
   qTree instance;
@@ -1428,11 +1416,12 @@ TEST(xcompiler, malformed_intermediate_operator_is_rejected_before_iterator_unde
   malformed.lProgram.emplace_back(STREAM_TIMEMOVE);
   instance.push_back(malformed);
 
-  // Niezmiennik kompilatora wychodzi Z compile() rzutem: catch na granicy lapie wylacznie
-  // PlanError, czyli bledy PLANU. Blad w samym kompilatorze ma dolecie tam, gdzie konczy
-  // sie proces, a nie wrocic do klienta jako "twoje zapytanie jest zle".
+  // Niezmiennik kompilatora wychodzi Z compile() statusem z przedrostkiem kInternalCompilerError.
+  // Blad w samym kompilatorze ma dolecie tam, gdzie wolajacy rozpozna go jako InternalError,
+  // a nie wrocic do klienta jako "twoje zapytanie jest zle". Do 2026-10 byl to rzut LogicError.
   compiler compilerInstance(instance);
-  EXPECT_THROW((void)compilerInstance.compile(), rdb::LogicError);
+  const std::string status = compilerInstance.compile();
+  EXPECT_TRUE(isInternalCompilerError(status)) << status;
 }
 
 // --- Issue 236: reduktor w postaci funkcyjnej SUMC()/MIN()/MAX()/AVG() ------------
@@ -4652,7 +4641,7 @@ TEST(xparser, zero_fraction_denominator_is_a_semantic_error) {
 /// SELECT, nie DECLARE: kontrola pustej nazwy stoi w exitSelect, gdzie FILE jest
 /// OPCJONALNE (RQL.g4 select_statement). W declare_statement FILE jest obowiazkowe i osobna
 /// kontroli tam nigdy nie bylo - pusta nazwa z DECLARE dojezdza do konstruktora StoragePaths
-/// i wraca ConfigError-em z plastra 2a. Inny komunikat, ale nie smierc procesu.
+/// i wraca bledem Errc::Config z plastra 2a. Inny komunikat, ale nie smierc procesu.
 TEST(xparser, empty_file_name_in_select_is_a_semantic_error) {
   qTree instance;
   auto [result, keyword, name] = parserRQLString(instance, "SELECT * STREAM y FROM src FILE ''");

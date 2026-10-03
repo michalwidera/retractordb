@@ -11,9 +11,9 @@
 
 #include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
-#include "rdb/exceptions.hpp"
 #include "rdb/faccfs.hpp"
 #include "rdb/storage.hpp"
+#include "rdbResult.hpp"
 
 // Tests intentionally use raw byte buffers for low-level I/O API verification.
 // NOLINTBEGIN(modernize-avoid-c-arrays)
@@ -76,7 +76,7 @@ TEST_F(FaccfsTest, count_returns_zero_for_new_file) {
   std::ofstream(sandboxPath(filename), std::ios::binary).close();
 
   rdb::genericBinaryFile gf(sandboxPath(filename), desc);
-  EXPECT_EQ(gf.count(), 0U);
+  EXPECT_EQ(rdbtest::ok(gf.count()), 0U);
 }
 
 TEST_F(FaccfsTest, count_returns_correct_number_of_records) {
@@ -93,7 +93,7 @@ TEST_F(FaccfsTest, count_returns_correct_number_of_records) {
   std::memcpy(data, "record ccc", AREA_SIZE);
   ASSERT_EQ(gf.write(data), EXIT_SUCCESS);
 
-  EXPECT_EQ(gf.count(), 3U);
+  EXPECT_EQ(rdbtest::ok(gf.count()), 3U);
 }
 
 TEST_F(FaccfsTest, count_after_update_does_not_change) {
@@ -106,13 +106,13 @@ TEST_F(FaccfsTest, count_after_update_does_not_change) {
   std::memcpy(data, "record bbb", AREA_SIZE);
   gf.write(data);
 
-  EXPECT_EQ(gf.count(), 2U);
+  EXPECT_EQ(rdbtest::ok(gf.count()), 2U);
 
   // Update record 0 (in-place) should not change count
   std::memcpy(data, "record xxx", AREA_SIZE);
   gf.write(data, 0);
 
-  EXPECT_EQ(gf.count(), 2U);
+  EXPECT_EQ(rdbtest::ok(gf.count()), 2U);
 }
 
 // ============================================================
@@ -143,7 +143,7 @@ TEST_F(FaccfsTest, append_multiple_and_read_back) {
     ASSERT_EQ(gf.write(data), EXIT_SUCCESS);
   }
 
-  EXPECT_EQ(gf.count(), 4U);
+  EXPECT_EQ(rdbtest::ok(gf.count()), 4U);
 
   for (size_t i = 0; i < 4; ++i) {
     uint8_t rData[10] = {};
@@ -275,10 +275,10 @@ TEST_F(FaccfsTest, purge_empties_file) {
   std::memcpy(data, "purge data", AREA_SIZE);
   gf.write(data);
   gf.write(data);
-  ASSERT_EQ(gf.count(), 2U);
+  ASSERT_EQ(rdbtest::ok(gf.count()), 2U);
 
   EXPECT_EQ(gf.write(nullptr, 0), EXIT_SUCCESS);
-  EXPECT_EQ(gf.count(), 0U);
+  EXPECT_EQ(rdbtest::ok(gf.count()), 0U);
   EXPECT_TRUE(std::filesystem::exists(path));
 }
 
@@ -370,7 +370,7 @@ TEST_F(FaccfsTest, single_byte_record_size) {
   w = 0xCD;
   ASSERT_EQ(gf.write(&w), EXIT_SUCCESS);
 
-  EXPECT_EQ(gf.count(), 2U);
+  EXPECT_EQ(rdbtest::ok(gf.count()), 2U);
 
   uint8_t r = 0;
   gf.read(&r, 0);
@@ -395,7 +395,7 @@ TEST_F(FaccfsTest, large_record_size) {
   std::memset(wData.data(), 0xBB, LARGE);
   ASSERT_EQ(gf.write(wData.data()), EXIT_SUCCESS);
 
-  EXPECT_EQ(gf.count(), 2U);
+  EXPECT_EQ(rdbtest::ok(gf.count()), 2U);
 
   std::vector<uint8_t> rData(LARGE, 0);
   gf.read(rData.data(), 0);
@@ -437,14 +437,14 @@ TEST_F(FaccfsTest, append_and_update_first_record) {
   std::memcpy(data, "second rec", AREA_SIZE);
   gf.write(data);
 
-  EXPECT_EQ(gf.count(), 2U);
+  EXPECT_EQ(rdbtest::ok(gf.count()), 2U);
 
   // Update first record at position 0
   std::memcpy(data, "MODIFIED!a", AREA_SIZE);
   gf.write(data, 0);
 
   // Count should remain the same
-  EXPECT_EQ(gf.count(), 2U);
+  EXPECT_EQ(rdbtest::ok(gf.count()), 2U);
 
   uint8_t rData[10] = {};
   gf.read(rData, 0);
@@ -458,19 +458,21 @@ TEST_F(FaccfsTest, append_and_update_first_record) {
 // storage::purge() over an accessor that cannot empty its medium
 // ============================================================
 
-// Nieudany purge rzuca IOError, zamiast wyzerowac recordsCount_ nad danymi, ktore zostaly na
+// Nieudany purge zwraca blad Errc::IO, zamiast wyzerowac recordsCount_ nad danymi, ktore zostaly na
 // nosniku - dawniej storage::purge() pomijal status akcesora. Plik danych podmieniony na katalog:
 // faccfs otwiera plik przy kazdej operacji, wiec otwarcie z obcieciem zawodzi dopiero w purge.
 TEST_F(FaccfsTest, storage_purge_failure_is_fatal) {
-  rdb::storage s("purge_fail", "purge_fail_data", ".", "GENERIC");
+  auto sOwner           = rdbtest::ok(rdb::storage::create("purge_fail", "purge_fail_data", ".", "GENERIC"));
+  rdb::storage &s       = *sOwner;
   const auto descriptor = makeDesc(sizeof(BYTE));
-  ASSERT_TRUE(s.attachDescriptor(&descriptor).empty());
+  ASSERT_RDB_OK(s.attachDescriptor(&descriptor));
   s.getPayload()->setItem(0, static_cast<BYTE>(0xAA));
-  ASSERT_TRUE(s.write());
+  ASSERT_RDB_OK(s.write());
   ASSERT_TRUE(std::filesystem::remove("purge_fail_data"));
   std::filesystem::create_directory("purge_fail_data");
-  EXPECT_THAT([&] { s.purge(); }, ::testing::ThrowsMessage<rdb::IOError>(
-                                      ::testing::ContainsRegex("storage::purge: purge of .*purge_fail_data.* failed")));
+  const auto purged = s.purge();
+  ASSERT_RDB_ERROR(purged, rdb::Errc::IO);
+  EXPECT_THAT(purged.error().message(), ::testing::ContainsRegex("storage::purge: purge of .*purge_fail_data.* failed"));
   EXPECT_EQ(s.getRecordsCount(), 1U) << "nieudany purge nie moze wyzerowac licznika nad danymi";
 }
 

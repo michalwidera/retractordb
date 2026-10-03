@@ -12,7 +12,6 @@
 
 #include "rdb/accessorFactory.hpp"
 #include "rdb/descriptorIO.hpp"
-#include "rdb/exceptions.hpp"
 #include "rdb/probe.hpp"  // sonda K6: objętość materializacji
 
 namespace rdb {
@@ -25,53 +24,77 @@ bool storage::isMemoryBackedStorage() const {
   return storageType_ == "MEMORY";
 }
 
-storage::storage(const std::string_view qryID,         //
-                 const std::string_view fileName,      //
-                 const std::string_view storageParam,  //
-                 const std::string_view storageType,   //
-                 bool oneShot,                         //
-                 bool isHold,                          //
-                 int percounter,                       //
+storage::storage(StoragePaths paths,                  //
+                 const std::string_view storageType,  //
+                 bool oneShot,                        //
+                 bool isHold,                         //
+                 int percounter,                      //
                  MemoryStore *memory)
     : isOneShot_(oneShot),
       isHold_(isHold),
-      paths_(qryID, fileName, storageParam),
+      paths_(std::move(paths)),
       storageType_(storageType),
       percounter_(percounter),
       memory_(memory) {}
 
-std::string storage::attachDescriptor(const Descriptor *descriptorParam) {
+Result<std::unique_ptr<storage>> storage::create(const std::string_view qryID,         //
+                                                 const std::string_view fileName,      //
+                                                 const std::string_view storageParam,  //
+                                                 const std::string_view storageType,   //
+                                                 bool oneShot,                         //
+                                                 bool isHold,                          //
+                                                 int percounter,                       //
+                                                 MemoryStore *memory) {
+  // Konfiguracja sprawdzana PRZED zbudowaniem obiektu: magazyn, ktory nie powstal, nie ma
+  // destruktora, wiec plikow disposable nikt nie kasuje na podstawie zlej sciezki.
+  RDB_TRY_ASSIGN(StoragePaths paths, StoragePaths::make(qryID, fileName, storageParam));
+  return std::unique_ptr<storage>(new storage(std::move(paths), storageType, oneShot, isHold, percounter, memory));
+}
+
+Result<> storage::attachDescriptor(const Descriptor *descriptorParam) {
   const bool descriptorExisted = descriptorFileExist();
   if (descriptorExisted) {
-    if (const std::string error = tryLoadDescriptorFile(paths_.descriptorFile(), descriptor); !error.empty()) return error;
-    if (descriptorParam != nullptr) verifyDescriptorMatch(*descriptorParam, descriptor, paths_.descriptorFile());
+    if (std::string error = tryLoadDescriptorFile(paths_.descriptorFile(), descriptor); !error.empty())
+      return fail(Errc::CorruptDescriptor, std::move(error));
+    if (descriptorParam != nullptr) RDB_TRY(verifyDescriptorMatch(*descriptorParam, descriptor, paths_.descriptorFile()));
   } else {
     if (descriptorParam == nullptr) {
       // Blad wolajacego, nie silnika: nie ma pliku .desc i nie podano deskryptora, wiec
-      // nie ma z czego zbudowac magazynu. Osadzajacy proces chce to zlapac i zapytac.
-      throw ConfigError("storage: no descriptor file and no descriptor provided: " + paths_.descriptorFile());
+      // nie ma z czego zbudowac magazynu. Osadzajacy proces chce to zobaczyc i zapytac.
+      return fail(Errc::Config, "storage: no descriptor file and no descriptor provided: " + paths_.descriptorFile());
     }
+    // Deskryptor zerowej szerokosci odrzucany NA GRANICY: kazdy akcesor dzieli przez rozmiar
+    // rekordu, wiec dalej bylby to zlamany niezmiennik, a tutaj jest zwyklym zlym wejsciem.
+    // Plik .desc tej kontroli nie potrzebuje - tryLoadDescriptorFile odrzuca pusty deskryptor.
+    if (descriptorParam->getSizeInBytes() == 0)
+      return fail(Errc::Config, "storage: descriptor has zero record size: " + paths_.descriptorFile());
     descriptor = *descriptorParam;
-    saveDescriptorFile(paths_.descriptorFile(), descriptor);
+    RDB_TRY(saveDescriptorFile(paths_.descriptorFile(), descriptor));
   }
 
-  paths_.relocateFromRef(descriptor);
+  // Sprzatanie po odmowie: .desc zapisany przed chwila przez TEN magazyn nie moze zostac, bo
+  // nastepna proba z innym planem przeczytalaby go jako istniejacy schemat.
+  auto discardFreshDescriptor = [&](Error error) -> Result<> {
+    if (!descriptorExisted) {
+      std::error_code ec;
+      std::filesystem::remove(paths_.descriptorFile(), ec);
+    }
+    return fail(std::move(error));
+  };
+
+  if (auto relocated = paths_.relocateFromRef(descriptor); !relocated)
+    return discardFreshDescriptor(std::move(relocated).error());
   storagePayload_ = std::make_unique<rdb::payload>(descriptor);
   buffer_.attach(descriptor);
 
-  const std::string error = attachStorage();
-  if (!error.empty() && !descriptorExisted) {
-    std::error_code ec;
-    std::filesystem::remove(paths_.descriptorFile(), ec);
-  }
-  return error;
+  if (auto attached = attachStorage(); !attached) return discardFreshDescriptor(std::move(attached).error());
+  return {};
 }
 
-std::string storage::attachStorage() {
+Result<> storage::attachStorage() {
   // Niezmiennik, nie kontrola wejscia: relocateFromRef() tuz wyzej odmawia juz przy pustej
-  // sciezce (ConfigError), wiec pusta tutaj znaczy, ze ktos wywolal attachStorage() z
-  // pominieciem attachDescriptor().
-  if (paths_.storageFile().empty()) throw LogicError("storage: storage file path is empty - attachDescriptor() not called");
+  // sciezce (Errc::Config), a attachStorage() jest prywatne i wola je tylko attachDescriptor().
+  RDB_ASSERT(!paths_.storageFile().empty(), "storage: storage file path is empty - attachDescriptor() not called");
 
   auto it1 = std::ranges::find_if(descriptor,  //
                                   [](const auto &item) { return item.rtype == rdb::TYPE; });
@@ -80,15 +103,15 @@ std::string storage::attachStorage() {
     storageType_ = (*it1).rname;
   }
 
-  initializeAccessor();
-  if (!accessor_->initializationError().empty()) return accessor_->initializationError();
+  RDB_TRY(initializeAccessor());
+  if (!accessor_->initializationError().empty()) return fail(Errc::IO, accessor_->initializationError());
 
   // Wstrzyknięcie wariantu metadanych - dobór wariantu (inertny/cień indeksu/bazowy) realizuje fabryka.
   metaData_ = makeMetaIndex(isDeclared(), accessor_->hasShadow(), descriptor, paths_.metaIndexFile());
 
   if (isDeclared()) return {};
 
-  recordsCount_ = accessor_->count();
+  RDB_TRY_ASSIGN(recordsCount_, accessor_->count());
   detectStartupState();
   return {};
 }
@@ -107,38 +130,43 @@ storage::~storage() {
 
 bool storage::isDeclared() const { return isDeclaredType(storageType_); }
 
-void storage::initializeAccessor() {
-  accessor_ = makeAccessor(storageType_, paths_.storageFile(), descriptor, isOneShot_, percounter_, memory_);
+Result<> storage::initializeAccessor() {
+  RDB_TRY_ASSIGN(accessor_, makeAccessor(storageType_, paths_.storageFile(), descriptor, isOneShot_, percounter_, memory_));
+  return {};
 }
 
-void storage::resetForUnitTest() {
-  if (paths_.storageFile().empty()) throw LogicError("storage: storage file path is empty - storage not properly configured");
+Result<> storage::resetForUnitTest() {
+  if (paths_.storageFile().empty())
+    return fail(Errc::Logic, "storage: storage file path is empty - storage not properly configured");
 
-  if (!accessor_) return;  // no accessor initialized - no need to reset.
+  if (!accessor_) return {};  // no accessor initialized - no need to reset.
 
-  auto resourceAlreadyExist = std::filesystem::exists(paths_.storageFile());
+  std::error_code ec;
+  auto resourceAlreadyExist = std::filesystem::exists(paths_.storageFile(), ec);
   if (resourceAlreadyExist)
     if (!isDeclared()) remove(paths_.storageFile().c_str());
 
-  initializeAccessor();
+  RDB_TRY(initializeAccessor());
   if (!accessor_->initializationError().empty())
-    throw IOError(fmt::format("storage::resetForUnitTest: {}", accessor_->initializationError()));
+    return fail(Errc::IO, fmt::format("storage::resetForUnitTest: {}", accessor_->initializationError()));
 
   // Zrodlo deklarowane jest tylko do odczytu (purge zwraca ENOTSUP) - wystarcza mu ponowne otwarcie wyzej.
   if (!isDeclared()) {
     if (const auto result = accessor_->write(nullptr, 0); result != 0) {
-      throw IOError(fmt::format("storage::resetForUnitTest: purge of '{}' failed (result={}: {})", paths_.storageFile(), result,
-                                strerror(static_cast<int>(result))));
+      return fail(Errc::IO, fmt::format("storage::resetForUnitTest: purge of '{}' failed (result={}: {})", paths_.storageFile(),
+                                        result, strerror(static_cast<int>(result))));
     }
   }
   recordsCount_ = 0;
 
   if (metaData_) (*metaData_).reset();
 
-  if (recordsCount_ != accessor_->count()) {
-    throw LogicError(fmt::format("storage: internal record count mismatch: recordsCount_={} count()={} in {}", recordsCount_,
-                                 accessor_->count(), paths_.storageFile()));
+  RDB_TRY_ASSIGN(const size_t onMedium, accessor_->count());
+  if (recordsCount_ != onMedium) {
+    return fail(Errc::Logic, fmt::format("storage: internal record count mismatch: recordsCount_={} count()={} in {}",
+                                         recordsCount_, onMedium, paths_.storageFile()));
   }
+  return {};
 }
 
 void storage::cleanPayload(uint8_t *destination) {
@@ -150,13 +178,16 @@ void storage::cleanPayload(uint8_t *destination) {
 }
 
 std::unique_ptr<rdb::payload>::pointer storage::getPayload() {
-  if (!storagePayload_) {
-    throw LogicError("storage::getPayload: payload not attached");
-  }
+  RDB_ASSERT(storagePayload_ != nullptr, "storage::getPayload: payload not attached");
   return storagePayload_.get();
 }
 
-bool storage::descriptorFileExist() { return std::filesystem::exists(paths_.descriptorFile()); }
+bool storage::descriptorFileExist() const {
+  // Blad stat() (np. brak prawa do katalogu) znaczy tu "pliku nie widac" - attachDescriptor
+  // sprobuje go wtedy zapisac i to zapis zglosi prawdziwy powod jako Errc::IO.
+  std::error_code ec;
+  return std::filesystem::exists(paths_.descriptorFile(), ec);
+}
 
 void storage::setDisposable(bool value) { isDisposable_ = value; }
 
@@ -166,21 +197,16 @@ size_t storage::getRecordsCount() const { return recordsCount_; }
 
 /// Cztery niezmienniki, ktorych zlamanie znaczy uzycie magazynu przed attachDescriptor().
 ///
-/// LogicError, a nie ConfigError: zadnego z nich nie da sie wywolac poprawna sekwencja
-/// wywolan, wiec nie sa czescia umowy z wolajacym - sa czescia umowy magazynu z samym soba.
-void storage::abortIfStorageNotPrepared() {
-  if (descriptor.empty()) {
-    throw LogicError("storage: descriptor is empty - storage not initialized");
-  }
-  if (!accessor_) {
-    throw LogicError("storage: data file not opened - accessor not initialized");
-  }
-  if (!storagePayload_) {
-    throw LogicError("storage: payload not attached");
-  }
-  if (!metaData_) {
-    throw LogicError("storage: meta index not attached - attachDescriptor() not called");
-  }
+/// Errc::Logic, a nie Config: zadnego z nich nie da sie wywolac poprawna sekwencja wywolan,
+/// wiec nie sa czescia umowy z wolajacym - sa czescia umowy magazynu z samym soba. Zwracane,
+/// a nie asercja, bo wszyscy wolajacy (read, write, purge) i tak zwracaja Result - host
+/// dostaje InternalError zamiast zakonczonego procesu.
+Result<> storage::requirePrepared() const {
+  if (descriptor.empty()) return fail(Errc::Logic, "storage: descriptor is empty - storage not initialized");
+  if (!accessor_) return fail(Errc::Logic, "storage: data file not opened - accessor not initialized");
+  if (!storagePayload_) return fail(Errc::Logic, "storage: payload not attached");
+  if (!metaData_) return fail(Errc::Logic, "storage: meta index not attached - attachDescriptor() not called");
+  return {};
 }
 
 void storage::fire() {
@@ -188,17 +214,18 @@ void storage::fire() {
   recordsCount_++;
 }
 
-void storage::purge() {
-  abortIfStorageNotPrepared();
+Result<> storage::purge() {
+  RDB_TRY(requirePrepared());
 
   // Nieudany purge zostawia dane na nosniku; bez zatrzymania recordsCount_ = 0 rozjechalby sie z count().
   if (const auto result = accessor_->write(nullptr, 0); result != 0) {
-    throw IOError(fmt::format("storage::purge: purge of '{}' failed (result={}: {})", paths_.storageFile(), result,
-                              strerror(static_cast<int>(result))));
+    return fail(Errc::IO, fmt::format("storage::purge: purge of '{}' failed (result={}: {})", paths_.storageFile(), result,
+                                      strerror(static_cast<int>(result))));
   }
   recordsCount_ = 0;
 
   (*metaData_).reset();  // czyści indeks oraz liczniki maszyny gap
+  return {};
 }
 
 void storage::markTransmissionGap(size_t gapDuration) { metaData_->onTransmissionGap(gapDuration); }
@@ -211,18 +238,18 @@ bool storage::isMetaIndexEmpty() const {
   return metaData_->isEmpty();
 }
 
-rdb::ReadStatus storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
-  // ConfigError, nie LogicError: zrodla deklarowane czyta sie przez revRead(), a proba
-  // czytania ich wprost jest bledem WOLAJACEGO, nie zlamanym niezmiennikiem silnika. To samo
-  // rozroznienie widzi uzytkownik Pythona - straz w module.cpp zglasza tu StorageError.
-  if (isDeclared()) throw ConfigError("storage::read: cannot read directly from a declared (DEVICE/TEXTSOURCE) storage");
-  abortIfStorageNotPrepared();
+Result<rdb::ReadStatus> storage::read(const size_t recordIndexFromFront, uint8_t *destination) {
+  // Config, nie Logic: zrodla deklarowane czyta sie przez revRead(), a proba czytania ich
+  // wprost jest bledem WOLAJACEGO, nie zlamanym niezmiennikiem silnika. To samo rozroznienie
+  // widzi uzytkownik Pythona - straz w module.cpp zglasza tu StorageError.
+  if (isDeclared()) return fail(Errc::Config, "storage::read: cannot read directly from a declared (DEVICE/TEXTSOURCE) storage");
+  RDB_TRY(requirePrepared());
 
   if (destination == nullptr) {
     destination = storagePayload_->span().data();
   }
 
-  if (destination == nullptr) throw LogicError("storage::read: destination pointer is null (payload span is empty)");
+  if (destination == nullptr) return fail(Errc::Logic, "storage::read: destination pointer is null (payload span is empty)");
   auto size      = descriptor.getSizeInBytes();
   ssize_t result = 0;
 
@@ -234,12 +261,15 @@ rdb::ReadStatus storage::read(const size_t recordIndexFromFront, uint8_t *destin
   // asercja płatna per rekord zmienia więc wynik pomiaru, dla którego silnik istnieje.
   //
   // W Release nie zostaje ślepa plama: jeśli plik został skrócony poniżej czytanej pozycji,
-  // poniższe accessor_->read() zwraca błąd (krótki pread) i rzuca IOError z nazwą pliku
+  // poniższe accessor_->read() zwraca błąd (krótki pread) i wraca Errc::IO z nazwą pliku
   // oraz pozycją. Tracimy wcześniejsze ostrzeżenie, nie samo wykrycie rozjazdu.
 #ifndef NDEBUG
-  if (recordsCount_ != accessor_->count()) {
-    throw LogicError(fmt::format("storage::read: internal record count mismatch: recordsCount_={} count()={} in {}",
-                                 recordsCount_, accessor_->count(), paths_.storageFile()));
+  {
+    RDB_TRY_ASSIGN(const size_t onMedium, accessor_->count());
+    if (recordsCount_ != onMedium) {
+      return fail(Errc::Logic, fmt::format("storage::read: internal record count mismatch: recordsCount_={} count()={} in {}",
+                                           recordsCount_, onMedium, paths_.storageFile()));
+    }
   }
 #endif
 
@@ -253,8 +283,8 @@ rdb::ReadStatus storage::read(const size_t recordIndexFromFront, uint8_t *destin
   if (recordsCount_ > 0 && recordIndexFromFront < recordsCount_) {
     result = accessor_->read(destination, recordIndexFromFront * size);
     if (result != 0) {
-      throw IOError(fmt::format("storage::read: read from '{}' at pos {} failed (result={}: {})", accessor_->name(),
-                                recordIndexFromFront, result, strerror(static_cast<int>(result))));
+      return fail(Errc::IO, fmt::format("storage::read: read from '{}' at pos {} failed (result={}: {})", accessor_->name(),
+                                        recordIndexFromFront, result, strerror(static_cast<int>(result))));
     }
     storagePayload_->setNullBitset(metaData_->nullBitsetFor(recordIndexFromFront));
   } else {
@@ -272,13 +302,13 @@ rdb::ReadStatus storage::read(const size_t recordIndexFromFront, uint8_t *destin
   return ReadStatus::Ok;
 }
 
-rdb::ReadStatus storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
+Result<rdb::ReadStatus> storage::revRead(const size_t recordIndexFromBack, uint8_t *destination) {
   if (isHold_) {
     destination = (destination == nullptr)              //
                       ? storagePayload_->span().data()  //
                       : destination;
 
-    if (destination == nullptr) throw LogicError("storage::revRead: destination pointer is null in hold path");
+    if (destination == nullptr) return fail(Errc::Logic, "storage::revRead: destination pointer is null in hold path");
     auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
     bufferState = sourceState::armed;  // fake armed on hold position
@@ -293,17 +323,20 @@ rdb::ReadStatus storage::revRead(const size_t recordIndexFromBack, uint8_t *dest
     return read(recordPositionFromBack, destination);
   }
 
-  if (recordsCount_ != accessor_->count())
-    SPDLOG_ERROR("revRead {}: recordsCount:{} ->count():{}", paths_.storageFile(), recordsCount_, accessor_->count());
+  // Zrodla deklarowane licza odczyty w pamieci (count() bez syscalli), wiec porownanie zostaje
+  // takze w Release - jako ostrzezenie, jak dotad.
+  if (const auto counted = accessor_->count(); counted && recordsCount_ != *counted)
+    SPDLOG_ERROR("revRead {}: recordsCount:{} ->count():{}", paths_.storageFile(), recordsCount_, *counted);
 
   // For all _DECLARED_ data sources buffer capacity at least _MUST_ be 1
   // In order to maintain the consistency of declared data sources,
   // it is necessary to maintain a buffer of at least 1
 
-  if (buffer_.capacity() == 0) throw LogicError("storage::revRead: circular buffer capacity is zero for a declared source");
+  if (buffer_.capacity() == 0)
+    return fail(Errc::Logic, "storage::revRead: circular buffer capacity is zero for a declared source");
 
   if (recordIndexFromBack == 0 && bufferState == sourceState::flux) {
-    buffer_.readCurrent(*accessor_, *storagePayload_);
+    RDB_TRY(buffer_.readCurrent(*accessor_, *storagePayload_));
     bufferState = sourceState::armed;
     return ReadStatus::Ok;
   }
@@ -316,8 +349,8 @@ rdb::ReadStatus storage::revRead(const size_t recordIndexFromBack, uint8_t *dest
   // - also for recordIndex == 0
 
   if (recordIndexFromBack >= buffer_.capacity()) {
-    throw LogicError(fmt::format("storage::revRead: recordIndexFromBack {} >= circularBuffer_.capacity() {} in '{}'",
-                                 recordIndexFromBack, buffer_.capacity(), accessor_->name()));
+    return fail(Errc::Logic, fmt::format("storage::revRead: recordIndexFromBack {} >= circularBuffer_.capacity() {} in '{}'",
+                                         recordIndexFromBack, buffer_.capacity(), accessor_->name()));
   }
 
   // in case of accessing buffer that has no data yet - zeros are returned
@@ -327,7 +360,8 @@ rdb::ReadStatus storage::revRead(const size_t recordIndexFromBack, uint8_t *dest
                       ? storagePayload_->span().data()  //
                       : destination;
 
-    if (destination == nullptr) throw LogicError("storage::revRead: destination pointer is null in buffer fallback path");
+    if (destination == nullptr)
+      return fail(Errc::Logic, "storage::revRead: destination pointer is null in buffer fallback path");
     auto size = descriptor.getSizeInBytes();
     std::memset(destination, 0, size);
     // Ten sam brak rekordu co w read(), tylko dla zrodla DEKLAROWANEGO: bufor historii nie siega
@@ -351,21 +385,24 @@ void storage::setCapacity(const int capacity) {
   if (isDeclared()) buffer_.setCapacity(capacity);
 }
 
-bool storage::write(const size_t recordIndex) {
-  abortIfStorageNotPrepared();
+Result<> storage::write(const size_t recordIndex) {
+  RDB_TRY(requirePrepared());
   const auto nullInfo = storagePayload_->getNullBitset();
 
   // Maszyna detekcji gap żyje w metaData: rekord all-null poza fazą nullfill jest pochłaniany
   // (nie trafia do fizycznego magazynu), a jego brak zostanie oznaczony wpisem gap.
-  if (recordIndex >= recordsCount_ && metaData_->absorbAppend(nullInfo)) return true;
+  if (recordIndex >= recordsCount_ && metaData_->absorbAppend(nullInfo)) return {};
 
   // Asercja spójności TYLKO w Debug, z tego samego powodu co w read(): accessor_->count() to
   // syscall (stat() na każdy segment), a write() wykonuje się raz na strumień na takt, wewnątrz
   // tego samego mierzonego budżetu slotu. Różnica wobec read() jest wyłącznie w krotności.
 #ifndef NDEBUG
-  if (recordsCount_ != accessor_->count()) {
-    throw LogicError(fmt::format("storage::write: internal record count mismatch: recordsCount_={} count()={} in {}",
-                                 recordsCount_, accessor_->count(), paths_.storageFile()));
+  {
+    RDB_TRY_ASSIGN(const size_t onMedium, accessor_->count());
+    if (recordsCount_ != onMedium) {
+      return fail(Errc::Logic, fmt::format("storage::write: internal record count mismatch: recordsCount_={} count()={} in {}",
+                                           recordsCount_, onMedium, paths_.storageFile()));
+    }
   }
 #endif
 
@@ -373,8 +410,8 @@ bool storage::write(const size_t recordIndex) {
   if (recordIndex >= recordsCount_) {
     result = accessor_->write(storagePayload_->span().data());  // <- Call to append Function
     if (result != 0) {
-      throw IOError(fmt::format("storage::write: append to '{}' failed (result={}: {})", paths_.storageFile(), result,
-                                strerror(static_cast<int>(result))));
+      return fail(Errc::IO, fmt::format("storage::write: append to '{}' failed (result={}: {})", paths_.storageFile(), result,
+                                        strerror(static_cast<int>(result))));
     }
     recordsCount_++;
     // `if constexpr` obejmuje całe wywołanie, nie tylko treść sondy: przy wyłączonej
@@ -393,8 +430,8 @@ bool storage::write(const size_t recordIndex) {
   } else {
     result = accessor_->write(storagePayload_->span().data(), recordIndex * descriptor.getSizeInBytes());
     if (result != 0) {
-      throw IOError(fmt::format("storage::write: overwrite to '{}' at index {} failed (result={}: {})", paths_.storageFile(),
-                                recordIndex, result, strerror(static_cast<int>(result))));
+      return fail(Errc::IO, fmt::format("storage::write: overwrite to '{}' at index {} failed (result={}: {})",
+                                        paths_.storageFile(), recordIndex, result, strerror(static_cast<int>(result))));
     }
     // Nadpisanie nie zwiększa objętości magazynu, więc nie wchodzi do `bytes`. Do metryki
     // K23 wchodzi, bo tam jednostką jest zapis rekordu, nie przyrost objętości - inaczej
@@ -405,10 +442,10 @@ bool storage::write(const size_t recordIndex) {
       probe::onLogicalWrite(isSubstrate_, false, canonicalRecordBytes_);
     }
 
-    metaData_->onRecordModified(recordIndex, nullInfo);  // polimorficznie: cień indeksu albo główny indeks
+    RDB_TRY(metaData_->onRecordModified(recordIndex, nullInfo));  // polimorficznie: cień indeksu albo główny indeks
   }
-  return result == 0;
-};
+  return {};
+}
 
 void storage::configureGapDetection(boost::rational<int> rInterval, int nullFillCount) {
   rInterval_ = rInterval;
@@ -430,9 +467,9 @@ void storage::detectStartupState() {
   if (metaData_->isEmpty()) return;
 
   // Existing data: compute gap since data file was last written
-  if (!std::filesystem::exists(paths_.storageFile()) || rInterval_.numerator() <= 0) return;
-
   std::error_code ec;
+  if (!std::filesystem::exists(paths_.storageFile(), ec) || rInterval_.numerator() <= 0) return;
+
   auto lastWriteFT = std::filesystem::last_write_time(paths_.storageFile(), ec);
   if (ec) return;
 

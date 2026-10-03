@@ -3,8 +3,10 @@
 # ma dalej liczyc i odpowiadac (issue #252).
 #
 # Granica tego, co test widzi. Nazwa spoza planu nie dochodzi do modelu danych: handler 'show'
-# odrzuca ja wczesniej, na wyszukaniu w planie (qTree::getQuery), i ta droga jest tu
-# pilnowana. Sama zmiana z #252 - dataModel siega po strumien przez streamRuntime() zamiast
+# odrzuca ja wczesniej, sprawdzeniem qTree::exists() na granicy komendy, i ta droga jest tu
+# pilnowana. Do 2026-10 odrzucal ja rzut std::logic_error z qTree::getQuery, ktory zamienial
+# catch(std::exception) handlera; dzis getQuery ma nazwe z planu za warunek wstepny (RDB_ASSERT),
+# wiec bez tej straznicy nazwa od klienta konczylaby serwer - i to wlasnie ten test by pokazal. Sama zmiana z #252 - dataModel siega po strumien przez streamRuntime() zamiast
 # qSet[] - jest przez IPC nieosiagalna: nazwa obecna w planie, a nieobecna w modelu powstaje
 # tylko po nieudanym imporcie ad-hoc, a wtedy nastepny slot konczy proces juz na
 # refreshStreamHandles(). Te zmiane pilnuje ut_dataModel
@@ -33,9 +35,9 @@ if [ "$rc" -ne "$expected_rc" ]; then
 fi
 
 # Werdykt klienta bierze sie z listy strumieni, wiec o tym, ze SERWER oddal blad na 'show',
-# mowi dopiero jego log: odmowa wyszukania w planie i wyjatek zamieniony w error.response.
+# mowi dopiero jego log: odmowa z nazwa strumienia i komenda, ktora o niego pytala.
 tail -n +"$((log_mark + 1))" "$SERVER_LOG" > server_log_tail.txt
-for expected in "Missing - no_such_stream" "Command processor failure"; do
+for expected in "Missing - no_such_stream" "command 'show' asks for a stream that is not in the plan"; do
   if ! grep -qF "$expected" server_log_tail.txt; then
     echo "w logu serwera brak '$expected'; dopisane linie:"
     cat server_log_tail.txt

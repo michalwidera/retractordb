@@ -28,8 +28,6 @@ struct streamInstance {
   std::unique_ptr<rdb::storage> outputPayload;  // here is payload that will be stored - select clause
   std::unique_ptr<rdb::payload> inputPayload;   // payload used for computation in select
                                                 // clause - created by from clause.
-  std::string initializationError;
-
   /// @brief Liczba slotów własnego interwału, które upłynęły od startu strumienia.
   ///
   /// Potrzebna, bo od czasu wprowadzenia ogona (query::startupLatency) liczba rekordów NIE jest już równa
@@ -59,23 +57,27 @@ struct streamInstance {
   // domyslna procesu (rdb::MemoryStore::processDefault), czyli dotychczasowe zachowanie demona.
   // Silnik osadzony (rdb::embed::Engine) podaje tu sklep wlasny - to jest miejsce, w ktorym
   // izolacja dwoch silnikow w jednym procesie dociera do planu, a nie tylko do magazynu.
-  explicit streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam = "",
-                          rdb::MemoryStore *memory = nullptr);
+  //
+  // Budowa przez create(): magazyn wyniku, ktory sie nie otworzyl (albo jego .desc nie da sie
+  // wczytac), wraca jako blad zamiast polowicznie zbudowanej instancji z napisem w polu.
+  [[nodiscard]] static rdb::Result<std::unique_ptr<streamInstance>> create(qTree &coreInstance, query &qry,
+                                                                           const std::string &storagePathParam = "",
+                                                                           rdb::MemoryStore *memory            = nullptr);
 
-  [[nodiscard]] rdb::payload constructAgsePayload(int length,                   //  _@(_,length)
-                                                  int step,                     //  _@(step,_)
-                                                  const std::string &instance,  //  instance@(_,_)
-                                                  int windowIndex,              //  indeks LOGICZNY okna
-                                                  int sourceIndexBase = 0) const;
+  [[nodiscard]] rdb::Result<rdb::payload> constructAgsePayload(int length,                   //  _@(_,length)
+                                                               int step,                     //  _@(step,_)
+                                                               const std::string &instance,  //  instance@(_,_)
+                                                               int windowIndex,              //  indeks LOGICZNY okna
+                                                               int sourceIndexBase = 0) const;
   /*
    * This function will create aggregate payload based on the command and instance
    */
-  [[nodiscard]] rdb::payload reduceFieldsToPayload(command_id cmd, const std::string &instance) const;
+  [[nodiscard]] rdb::Result<rdb::payload> reduceFieldsToPayload(command_id cmd, const std::string &instance) const;
 
   /// Ta sama redukcja, zapisana wprost do pola 0 payloadu `target`. Cel musi miec dokladnie jedno pole
   /// o typie i szerokosci z reductionResultField() - tak buduje go query::descriptorFrom() dla reduktora.
   /// Goraca petla pisze tak do payloadu wejsciowego wezla, bez budowy wyniku i jego kopii w kazdym takcie.
-  void reduceFieldsInto(command_id cmd, rdb::payload &target) const;
+  [[nodiscard]] rdb::Result<> reduceFieldsInto(command_id cmd, rdb::payload &target) const;
 
   /// Redukcja okna REKORDOWEGO nad polem TEGO strumienia - jedno przejście, cztery agregaty.
   ///
@@ -88,7 +90,8 @@ struct streamInstance {
   /// Rekordy spoza historii są pomijane (nie zerowane). Przy poprawnym planie ten przypadek
   /// nie występuje - origin gwarantuje, że całe okno leży w istniejącej części strumienia,
   /// a compiler::computeRequiredCapacities() zamawia dla niego pojemność.
-  [[nodiscard]] windowStats reduceRecordWindow(const windowGroup &group, int lastLogicalIndex, int sourceIndexBase) const;
+  [[nodiscard]] rdb::Result<windowStats> reduceRecordWindow(const windowGroup &group, int lastLogicalIndex,
+                                                            int sourceIndexBase) const;
 
   /// Wyniki okien tego taktu, indeksowane numerem grupy (query::windowGroups).
   ///
@@ -101,16 +104,17 @@ struct streamInstance {
    * constructOutputPayload uses only data from inputPayload
    * inputPayload need to be filled first before this constructOutputPayload will be called.
    */
-  void constructOutputPayload(const std::list<field> &fields) const;
+  [[nodiscard]] rdb::Result<> constructOutputPayload(const std::list<field> &fields) const;
 
   /*
    * This function will process all rules from query
    * constructRules uses data from outputPayload
    * outputPayload need to be filled first before this constructRules will be called
    */
-  void constructRulesAndUpdate(const query &qry);
+  [[nodiscard]] rdb::Result<> constructRulesAndUpdate(const query &qry);
 
  private:
+  streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam, rdb::MemoryStore *memory);
   dumpManager dumpMgr;
 
   // Ksztalt deskryptora okna @(step,N) zalezy tylko od (ten strumien, |N|) i jest

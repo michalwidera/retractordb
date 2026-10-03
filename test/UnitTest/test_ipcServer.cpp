@@ -28,6 +28,22 @@ namespace {
 
 namespace IPC = boost::interprocess;
 
+// Czy muteks wewnatrz kolejki Boosta w ogole widzi smierc wlasciciela. To wlasnosc Boosta na
+// danej platformie, nie serwera: interprocess_mutex jest robust mutexem POSIX tylko tam, gdzie
+// Boost bierze pthready wspoldzielone miedzy procesami (BOOST_INTERPROCESS_MUTEX_USE_POSIX) i zna
+// PTHREAD_MUTEX_ROBUST. Na macOS Boost uznaje wspoldzielenie pthreadow za wadliwe (workaround.hpp)
+// i uzywa muteksu wirujacego - porzucony zamek wiruje bez konca. Testy porzuconego zamka
+// wisialy tam do limitu ctest juz na kontroli dodatniej (queueLockIsAbandoned), zamiast cokolwiek
+// sprawdzic; na takiej platformie sa pomijane z powodem w wyniku testu.
+#if defined(BOOST_INTERPROCESS_MUTEX_USE_POSIX) && defined(BOOST_INTERPROCESS_POSIX_ROBUST_MUTEXES)
+constexpr bool kQueueLockSeesDeadOwner = true;
+#else
+constexpr bool kQueueLockSeesDeadOwner = false;
+#endif
+constexpr const char *kNoDeadOwnerDetection =
+    "Boost.Interprocess na tej platformie nie ma robust mutexa w kolejce - zamek porzucony przez "
+    "martwego klienta blokuje kolejke na zawsze, wiec scenariusza nie da sie odtworzyc";
+
 // Identyfikatory klientow poza zakresem realnych PID-ow, zeby test nie mogl
 // trafic w kolejke zywego procesu na tej maszynie.
 constexpr int kClientA = 990001;
@@ -239,6 +255,7 @@ TEST_F(IpcServerQueues, exit_handler_does_not_touch_other_servers_segment) {
 // lock_exception(not_recoverable) poza broadcast() - az za petle przetwarzania, czyli jeden
 // klient konczyl serwer wszystkim. Kolejka martwego ma zniknac jak przepelniona, emisja trwac.
 TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
+  if (!kQueueLockSeesDeadOwner) GTEST_SKIP() << kNoDeadOwnerDetection;
   IpcServer server;
   server.subscribe(kClientA, "strumien", 16);
   server.subscribe(kClientB, "strumien", 16);
@@ -431,6 +448,7 @@ TEST(IpcServerLoop, command_without_client_id_is_rejected_and_server_keeps_servi
 // not_recoverable przy kazdym obrocie, a wyjatek konczyl watek komunikacyjny: serwer liczyl
 // dalej, ale nie przyjmowal juz zadnej komendy. Ma odtworzyc kolejke i obsluzyc nastepna.
 TEST(IpcServerLoop, command_queue_abandoned_by_dead_client_is_recreated) {
+  if (!kQueueLockSeesDeadOwner) GTEST_SKIP() << kNoDeadOwnerDetection;
   RunningServer server;
   ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
 

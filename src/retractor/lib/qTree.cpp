@@ -10,7 +10,7 @@
 #include <sstream>
 #include <stdexcept>
 
-#include "rdb/exceptions.hpp"
+#include "rdb/error.hpp"
 #include "rdb/rationalFormat.hpp"
 
 using namespace boost;
@@ -119,7 +119,7 @@ void qTree::dumpCore() {
       else if (nName == vcols[3])
         size = static_cast<int>(it.id.length());
       else {
-        throw rdb::LogicError("qTree::dumpCore: unknown column name");
+        rdb::fatal("qTree::dumpCore: unknown column name");
       }
       maxSize = std::max(maxSize, size);
     }
@@ -146,18 +146,17 @@ void qTree::dumpCore() {
   }
 }
 
-std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
+rdb::Result<std::set<boost::rational<int>>> qTree::getAvailableTimeIntervals() {
   std::set<boost::rational<int>> lstTimeIntervals;
   for (const auto &it : *this) {
     if (it.rInterval == 0) {
-      // ConfigError, nie LogicError: rInterval bierze sie wprost z interwalu w DECLARE
-      // (RQLParser.cpp, `qry.rInterval = rationalResult`), a gramatyka dopuszcza tam zero -
+      // Config, nie Logic: rInterval bierze sie wprost z interwalu w DECLARE (RQLParser.cpp,
+      // `qry.rInterval = rationalResult`), a gramatyka dopuszcza tam zero -
       // `DECLARE v INTEGER STREAM src, 0 FILE 'a.txt'`. Wartosc jest uzytkownika, wiec blad
-      // tez jest jego, i tak brzmial komunikat na dlugo przed faza 1.
-      //
-      // Bez kanalu statusu: to miejsce wola executorsm::run() JUZ PO kompilacji, a nie
-      // compile(), wiec nie ma dokad wrocic wartoscia - zostaje rzut.
-      throw rdb::ConfigError(
+      // tez jest jego, i tak brzmial komunikat na dlugo przed faza 1. To miejsce wola
+      // executorsm::run() i Engine::compile() JUZ PO kompilacji - stad wlasny kanal bledu.
+      return rdb::fail(
+          rdb::Errc::Config,
           fmt::format("qTree: query '{}' has a zero interval - check its DECLARE or the :STORAGE directive", it.id));
     }
     if (it.isCompilerDirective()) continue;
@@ -167,13 +166,14 @@ std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
 }
 
 query &qTree::getQuery(const std::string &query_name) {
-  if (query_name.empty()) throw rdb::LogicError("qTree::getQuery: query name is empty");
+  // Warunek wstepny: nazwa istnieje w planie. Odwolania z tresci planu sprawdza kompilator
+  // (compiler::checkStreamReferences) zanim ktorykolwiek przebieg tu siegnie, a nazwy od klienta
+  // (Engine, polecenia demona) sprawdzaja exists() ich wolajacy. Do 2026-10 `FROM nosuch` dochodzilo
+  // tu i konczylo kompilacje std::logic_error, ktorego nie lapal nikt po drodze.
+  RDB_ASSERT(!query_name.empty(), "qTree::getQuery: query name is empty");
 
   auto it = std::ranges::find_if(*this, [&query_name](const auto &node) { return node.id == query_name; });
-  if (it == std::end(*this)) {
-    SPDLOG_ERROR("Missing - {}", query_name);
-    throw std::logic_error("Referenced Stream in QUERY _not found_ in CORE TREE. (check log)");
-  }
+  RDB_ASSERT(it != std::end(*this), "qTree::getQuery: stream '{}' not found in the plan", query_name);
   return (*it);
 }
 
@@ -183,7 +183,6 @@ int qTree::getSeqNr(const std::string &query_name) {
     if (query_name == q.id) return cnt;
     ++cnt;
   }
-  SPDLOG_ERROR("No such stream in set - {}", query_name);
-  throw std::logic_error("No such stream in set.");
-  return -1;  // INVALID QUERY_NR
+  // Warunek wstepny jak w getQuery(): nazwa pochodzi z samego drzewa albo zostala sprawdzona.
+  rdb::fatal(fmt::format("qTree::getSeqNr: no such stream in set - {}", query_name));
 }

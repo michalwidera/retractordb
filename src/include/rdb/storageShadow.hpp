@@ -41,8 +41,8 @@ class storageShadow : public metaData {
   storageShadow(const Descriptor &descriptor, const std::string &metaFilePath);
 
   /// @brief Record the modification as a shadow override instead of rewriting the main index.
-  /// @throws std::out_of_range if recordIndex >= totalRecords()
-  void onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitset) override;
+  /// @return Errc::Logic if recordIndex >= totalRecords()
+  [[nodiscard]] Result<> onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitset) override;
 
   /// @brief Shadow override wins; otherwise the main index is consulted.
   std::vector<bool> getNullBitset(size_t recordIndex) const override;
@@ -55,7 +55,7 @@ class storageShadow : public metaData {
   /// Applies each recorded override to the main index (in arrival order, so
   /// the last override for a record wins) and then discards the shadow index,
   /// mirroring the data store's merge() of .shadow into the main file.
-  void mergeShadow();
+  [[nodiscard]] Result<> mergeShadow();
 
   /// @brief Discard all shadow overrides and remove the shadow index file.
   ///

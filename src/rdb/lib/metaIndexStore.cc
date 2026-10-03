@@ -37,7 +37,10 @@ MetaIndexStore::MetaIndexStore(std::string metaFilePath, size_t entrySize)
     : metaFilePath_(std::move(metaFilePath)),
       entrySize_(entrySize) {}
 
-bool MetaIndexStore::fileExists() const { return !metaFilePath_.empty() && std::filesystem::exists(metaFilePath_); }
+bool MetaIndexStore::fileExists() const {
+  std::error_code ec;  // blad stat() = pliku nie widac; wersja rzucajaca zabralaby to decyzje wolajacemu
+  return !metaFilePath_.empty() && std::filesystem::exists(metaFilePath_, ec);
+}
 
 void MetaIndexStore::saveHeader() {
   if (metaFilePath_.empty()) return;
@@ -82,7 +85,15 @@ const std::vector<IndexRecord> &MetaIndexStore::readAll() const {
 
   std::span<const std::byte> remaining(fileData);
   while (remaining.size() >= entrySize_) {
-    entriesCache_.push_back(IndexRecord::deserialize(remaining.subspan(0, entrySize_)));
+    auto entry = IndexRecord::deserialize(remaining.subspan(0, entrySize_));
+    if (!entry) {
+      // Uszkodzony wpis konczy indeks: nastepne wpisy i tak nie maja wiarygodnego wyrownania.
+      // Liczba rekordow indeksu spada ponizej liczby rekordow danych, a wtedy storage traktuje
+      // rekordy bez wpisu tak jak rekordy nieindeksowane (nullBitsetFor) - zamiast konczyc proces.
+      SPDLOG_ERROR("MetaIndexStore: corrupt entry #{} in {} - index truncated there", entriesCache_.size(), metaFilePath_);
+      break;
+    }
+    entriesCache_.push_back(std::move(*entry));
     remaining = remaining.subspan(entrySize_);
   }
 
@@ -124,7 +135,16 @@ void MetaIndexStore::rewrite(const std::vector<IndexRecord> &entries) {
   for (const auto &rec : entries)
     writeEntry(out, rec);
   out.close();
-  std::filesystem::rename(tmpPath, metaFilePath_);
+  // Przeciazenie z error_code: wersja rzucajaca dawala filesystem_error ze srodka zapisu indeksu.
+  // Nieudana podmiana zostawia stary plik .meta nietkniety - ta sama polityka co nieudane
+  // otwarcie wyzej (plik nietkniety, cache odbudowany przy odczycie), tylko ze sladem w logu.
+  std::error_code renameError;
+  std::filesystem::rename(tmpPath, metaFilePath_, renameError);
+  if (renameError) {
+    SPDLOG_ERROR("MetaIndexStore: cannot replace {} with {}: {}", metaFilePath_, tmpPath, renameError.message());
+    cacheValid_ = false;
+    return;
+  }
   // write-through; guard na wypadek, gdyby caller podal sam cache (self-assign jest
   // bezpieczny dla std::vector, ale jawny warunek dokumentuje intencje)
   if (&entries != &entriesCache_) entriesCache_ = entries;

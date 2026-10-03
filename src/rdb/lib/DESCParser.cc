@@ -261,7 +261,9 @@ class ParserDESCListener : public DESCBaseListener {
 ///
 /// @param desc deskryptor zapisywany przez listenera. Przy bledzie moze zostac czesciowo
 ///        uzupelniony - wolajacy ma go wtedy odrzucic, i tak robi operator>>.
-std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet) {
+namespace {
+
+std::string parseDescriptorText(rdb::Descriptor &desc, const std::string_view inlet) {
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
   // to create a token stream.
@@ -291,4 +293,20 @@ std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet
   // Blad wartosci idzie tym samym kanalem co wynik - operator>> zglasza go failbitem.
   if (!parserDescListener.error().empty()) return parserDescListener.error();
   return "OK";
+}
+
+}  // namespace
+
+/// GRANICA WYSPY WYJATKOW (RDB_NO_EXCEPTIONS, korzen CMakeLists.txt): ten plik jedyny w bibliotece
+/// rdb ma wyjatki, bo steruje parserem ANTLR, ktory przerywa parsowanie rzutem. Zaden wyjatek nie
+/// moze go opuscic - wolajacy (descriptorIO, operator>>) sa skompilowani bez wyjatkow. Wszystko,
+/// czego nie zlapal parseDescriptorText (np. blad samego runtime ANTLR), wraca statusem "Fail: ...".
+std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet) {
+  try {
+    return parseDescriptorText(desc, inlet);
+  } catch (const std::exception &error) {
+    return std::string("Fail: internal descriptor parser error: ") + error.what();
+  } catch (...) {
+    return "Fail: internal descriptor parser error";
+  }
 }

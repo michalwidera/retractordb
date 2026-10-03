@@ -261,7 +261,8 @@ def test_engine_logs_reach_the_logging_module(rdb, plan_dir: Path, caplog: pytes
     """Engine diagnostics go to logging.getLogger('retractordb'), never to stdout.
 
     A clean run logs nothing, so the record comes from a deterministic error path:
-    qTree::getQuery logs "Missing - <name>" at ERROR before it throws.
+    compiler::checkStreamReferences logs the undefined stream at ERROR before it
+    returns the status that becomes CompileError.
     """
     caplog.set_level(logging.DEBUG, logger="retractordb")
     with rdb.Engine(str(plan_dir)) as engine:

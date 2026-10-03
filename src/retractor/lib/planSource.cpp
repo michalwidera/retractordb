@@ -22,8 +22,8 @@
 namespace {
 
 void dropArtifactFile(const std::filesystem::path &artifact_filename) {
-  if (std::filesystem::exists(artifact_filename)) {
-    std::error_code ec;
+  std::error_code ec;  // przeciazenia z error_code: blad stat() to "pliku nie widac", nie wyjatek
+  if (std::filesystem::exists(artifact_filename, ec)) {
     std::filesystem::remove(artifact_filename, ec);
     if (ec) {
       SPDLOG_WARN("Failed to remove file {}: {}", artifact_filename.string(), ec.message());
@@ -52,8 +52,11 @@ void dropArtifactFamily(const std::filesystem::path &dir, const query &q) {
 
   const std::string prefix           = data.filename().string() + "_segment_";
   const std::filesystem::path parent = data.parent_path().empty() ? std::filesystem::path(".") : data.parent_path();
+  // Petla z increment(ec), nie range-for: operator++ iteratora katalogu zglasza blad odczytu
+  // katalogu wyjatkiem, a tu ma on tylko zakonczyc sprzatanie.
   std::error_code ec;
-  for (const auto &entry : std::filesystem::directory_iterator(parent, ec)) {
+  for (std::filesystem::directory_iterator it(parent, ec), end; !ec && it != end; it.increment(ec)) {
+    const auto &entry      = *it;
     const std::string name = entry.path().filename().string();
     std::string_view rest  = name;
     if (!rest.starts_with(prefix)) continue;
@@ -113,7 +116,7 @@ std::string checkKeptStores(qTree &plan, const std::string_view defaultStorageDi
   for (auto &q : plan) {
     if (q.isDeclaration() || q.isCompilerDirective() || isMemoryStream(q)) continue;
     const std::filesystem::path descFile = dir / (q.id + ".desc");
-    if (!std::filesystem::exists(descFile)) continue;
+    if (std::error_code ec; !std::filesystem::exists(descFile, ec)) continue;
 
     // Ta sama regula co rdb::storage::attachStorage: TYPE z wczytanego .desc wygrywa, bez niego
     // obowiazuje STORAGE z planu.
@@ -137,7 +140,7 @@ std::string checkDescriptorFiles(qTree &plan, const std::string_view defaultStor
   for (auto &q : plan) {
     if (q.isCompilerDirective() || (!q.isDeclaration() && (!rotation || isMemoryStream(q)))) continue;
     const std::filesystem::path descFile = dir / (q.id + ".desc");
-    if (!std::filesystem::exists(descFile)) continue;
+    if (std::error_code ec; !std::filesystem::exists(descFile, ec)) continue;
 
     rdb::Descriptor kept;
     if (const std::string error = rdb::tryLoadDescriptorFile(descFile.string(), kept); !error.empty()) return error;

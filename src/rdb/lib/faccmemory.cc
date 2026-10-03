@@ -11,7 +11,7 @@
 
 #include <fmt/format.h>
 
-#include "rdb/exceptions.hpp"
+#include "rdb/error.hpp"
 
 namespace rdb {
 
@@ -32,9 +32,8 @@ namespace {
 void assertBucketMatches([[maybe_unused]] const memoryBucket *cached, [[maybe_unused]] MemoryStore &store,
                          [[maybe_unused]] const std::string &filename) {
 #ifndef NDEBUG
-  if (cached != &store.bucket(filename))
-    throw LogicError(
-        fmt::format("memoryFile: zapamietany kubelek nie odpowiada nazwie '{}' - nazwa zmieniona po konstrukcji?", filename));
+  RDB_ASSERT(cached == &store.bucket(filename),
+             "memoryFile: zapamietany kubelek nie odpowiada nazwie '{}' - nazwa zmieniona po konstrukcji?", filename);
 #endif
 }
 
@@ -75,7 +74,8 @@ memoryFile::~memoryFile() {
 auto memoryFile::name() -> std::string & { return filename_; }
 
 ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) {
-  if (recordSize_ == 0) throw LogicError("memoryFile::write: recordSize_ is zero - accessor built on a zero-width descriptor");
+  // Akcesor na deskryptorze zerowej szerokosci: rozmiar poza kontraktem (EINVAL), nie asercja.
+  if (recordSize_ == 0) return EINVAL;
   assertBucketMatches(bucket_, store_, filename_);
   auto &bucket  = *bucket_;
   auto location = position / recordSize_;
@@ -119,7 +119,7 @@ ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullB
 }
 
 ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
-  if (recordSize_ == 0) throw LogicError("memoryFile::read: recordSize_ is zero - accessor built on a zero-width descriptor");
+  if (recordSize_ == 0) return EINVAL;  // uzasadnienie w write()
   assertBucketMatches(bucket_, store_, filename_);
   auto &bucket        = *bucket_;
   const auto location = position / recordSize_;
@@ -148,7 +148,7 @@ ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const 
   return EXIT_SUCCESS;
 }
 
-size_t memoryFile::count() {
+Result<size_t> memoryFile::count() {
   assertBucketMatches(bucket_, store_, filename_);
   return bucket_->writeCount;
 }

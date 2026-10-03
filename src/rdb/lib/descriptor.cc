@@ -9,7 +9,7 @@
 #include <sstream>
 #include <utility>
 
-#include "rdb/exceptions.hpp"
+#include "rdb/error.hpp"
 
 #include <magic_enum/magic_enum.hpp>
 
@@ -82,7 +82,8 @@ void Descriptor::rebuildFieldMappings() const {
 // cross-TU. Tu zostaje tylko zimna sciezka bledu byteOffsetAtFlatIndex.
 void Descriptor::flatIndexOutOfRange(const int flatIndex) const {
   rebuildFieldMappings();
-  throw LogicError(fmt::format("descriptor: flatIndex {} out of range [0,{})", flatIndex, flattenedFieldCount_));
+  // Indeks plaski pochodzi z kompilatora albo ze strazy wiazania - spoza zakresu znaczy blad w kodzie.
+  rdb::fatal(fmt::format("descriptor: flatIndex {} out of range [0,{})", flatIndex, flattenedFieldCount_));
 }
 
 std::vector<rField> Descriptor::dataFields() {
@@ -108,13 +109,9 @@ Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs) {
 }
 
 Descriptor &Descriptor::operator+=(const Descriptor &rhs) {
-  if (this != &rhs) {
-    insert(end(), rhs.begin(), rhs.end());  // TODO: add rename of duplicates here.
-  } else {
-    throw LogicError("descriptor: cannot merge descriptor with itself");
-    // can't do safe: data | data
-    // due one name policy
-  }
+  // can't do safe: data | data - due one name policy
+  RDB_ASSERT(this != &rhs, "descriptor: cannot merge descriptor with itself");
+  insert(end(), rhs.begin(), rhs.end());  // TODO: add rename of duplicates here.
 
   fieldMappingsDirty_ = true;
   return *this;
@@ -169,17 +166,18 @@ void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, D
   // strona tablicowa dawala deskryptor o szerokosci 1 zamiast 3 i przeplot zawieszal sie na
   // rekordzie wezszym niz plaski uklad zrodla. Ten sam warunek ta sama miara sprawdza
   // compiler::buildOutputSchema().
-  if (lhs.flatElementCount() != rhs.flatElementCount()) {
-    throw LogicError(fmt::format("descriptor: hash composition requires equal-width descriptors: lhs={} rhs={}",
-                                 lhs.flatElementCount(), rhs.flatElementCount()));
-  }
+  // Wolajacy (compiler::buildOutputSchema, kontrola rozmiaru rekordu) sprawdzaja szerokosc i
+  // odrzucaja plan bledem kompilacji, zanim tu dojda.
+  RDB_ASSERT(lhs.flatElementCount() == rhs.flatElementCount(),
+             "descriptor: hash composition requires equal-width descriptors: lhs={} rhs={}", lhs.flatElementCount(),
+             rhs.flatElementCount());
 
   clear();
   const int width = lhs.flatElementCount();
   for (int i = 0; i < width; ++i) {
     const auto lhsPosition = lhs.flatIndexToDescriptorPosition(i);
     const auto rhsPosition = rhs.flatIndexToDescriptorPosition(i);
-    if (!lhsPosition || !rhsPosition) throw LogicError("descriptor: invalid flat field position");
+    RDB_ASSERT(lhsPosition && rhsPosition, "descriptor: invalid flat field position");
     const auto &lhsField = lhs[lhsPosition->first];
     const auto &rhsField = rhs[rhsPosition->first];
     const auto maxRtype  = std::max(lhsField.rtype, rhsField.rtype);
@@ -253,11 +251,11 @@ size_t Descriptor::fieldIndex(const std::string_view fieldName) {
   auto it = std::ranges::find_if(*this,                                                               //
                                  [fieldName](const auto &item) { return item.rname == fieldName; });  //
 
-  if (it != end()) return std::distance(begin(), it);
-  // Nazwa pola W KOMUNIKACIE, bo ta funkcja jest wystawiona wprost do Pythona
-  // (Descriptor.field_index) i wolana z tekstem od uzytkownika. "field not found" bez
-  // podania, ktorego, zmusza do zgadywania przy kazdej literowce.
-  throw LogicError(fmt::format("descriptor: no field named '{}'", fieldName));
+  // Warunek wstepny: hasField(). Wiazanie Pythona (Descriptor.field_index) sprawdza go i zglasza
+  // KeyError z nazwa pola, zanim tu dojdzie - tekst od uzytkownika nie dociera wiec do asercji.
+  // Nazwa pola zostaje w komunikacie, bo bez niej blad w kodzie trudno znalezc.
+  RDB_ASSERT(it != end(), "descriptor: no field named '{}'", fieldName);
+  return std::distance(begin(), it);
 }
 
 int Descriptor::fieldSize(const std::string_view fieldName) { return fieldSize((*this)[fieldIndex(fieldName)]); }
@@ -268,7 +266,8 @@ size_t Descriptor::fieldByteOffset(const std::string_view fieldName) {
     if (fieldName == field.rname) return offset;
     offset += fieldSize(field);
   }
-  throw LogicError(fmt::format("descriptor: no field named '{}' (byte offset lookup)", fieldName));
+  // Warunek wstepny jak w fieldIndex(): hasField() sprawdza wolajacy (straz wiazania, operator>>).
+  rdb::fatal(fmt::format("descriptor: no field named '{}' (byte offset lookup)", fieldName));
 }
 
 std::string_view Descriptor::fieldTypeName(const std::string_view fieldName) {  //
@@ -365,7 +364,7 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
 /// Do fazy 1 bledny deskryptor konczyl sie przez FatalError, czyli std::exit. Ekstraktor
 /// strumieniowy nie jest jednak miejscem, w ktorym zapada decyzja o przerwaniu programu -
 /// zglasza niepowodzenie stanem strumienia, a co z nim zrobic, wie wolajacy:
-/// loadDescriptorFile rzuca CorruptDescriptor, xtrdb wypisuje komunikat i czyta dalej.
+/// loadDescriptorFile zwraca blad Errc::CorruptDescriptor, xtrdb wypisuje komunikat i czyta dalej.
 std::istream &operator>>(std::istream &is, Descriptor &rhs) {
   // Strumien juz uszkodzony: nie ma czego czytac i nie wolno zmieniac jego stanu -
   // w szczegolnosci nie wolno zgasic failbita ustawionego przez nieudane otwarcie pliku.

@@ -101,6 +101,51 @@ option(ENABLE_UNITY_BUILD "Enable unity build for faster compilation" OFF)
 # src/python/CMakeLists.txt, przy celu, ktorego dotyczy.
 option(RDB_PYTHON "Build the retractordb._core Python extension (nanobind)" OFF)
 
+# Rdzen silnika bez wyjatkow C++ (docs/embedded-realtime-gaps.md). Biblioteki
+# rdb, retractorcore i rdbembed - to, co laduje osadzony Engine - zglaszaja
+# bledy wartoscia (rdb::Result, src/include/rdb/error.hpp), a zlamany
+# niezmiennik konczy sie rdb::fatal(). ON kompiluje je z -fno-exceptions, wiec
+# `throw`, `try` i `catch` w rdzeniu sa bledem KOMPILACJI. Wyjatki zostaja tylko
+# tam, gdzie wymaga ich kod cudzy: wygenerowany parser ANTLR razem z dwoma
+# opakowaniami (DESCParser.cc, RQLParser.cpp) i opakowanie Boost.Stacktrace
+# (stackTrace.cc) - "wyspy" z wlasnym catch na granicy - wiazanie nanobind oraz
+# uslugi demona na Boost.Interprocess i program_options. OFF tylko do diagnozy -
+# kod rdzenia jest ten sam w obu trybach. Celowo POZA `xretractor --build-info`:
+# zbior kluczy tego wypisu sprawdza korpus bramki H9.
+option(
+  RDB_NO_EXCEPTIONS
+  "Compile the engine core (rdb, retractorcore, rdbembed) with -fno-exceptions"
+  ON)
+
+# rdb_no_exceptions(<target>): rdzen bez wyjatkow. SPDLOG_NO_EXCEPTIONS jest
+# wymagane, bo naglowki spdlog maja `try` w funkcjach inline i nie wykrywaja
+# trybu same. Makro idzie WYLACZNIE do rdzenia: w tym trybie spdlog konczy
+# proces (abort) na bledzie zapisu sinka, a plikowy sink demona na karcie SD ma
+# dalej zglaszac taki blad i pracowac dalej - patrz
+# docs/embedded-realtime-gaps.md, luka o logowaniu.
+function(rdb_no_exceptions target)
+  if(RDB_NO_EXCEPTIONS)
+    target_compile_options(${target}
+                           PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>)
+    target_compile_definitions(${target} PRIVATE SPDLOG_NO_EXCEPTIONS)
+  endif()
+endfunction()
+
+# rdb_exception_island(<source>...): plik rdzenia, ktory MUSI miec wyjatki, bo
+# wola kod cudzy, ktory nimi steruje (parser ANTLR). Wyjatek nie moze opuscic
+# takiego pliku - kazda funkcja wystawiona reszcie rdzenia lapie wszystko na
+# granicy i zwraca status. Bez wspolnych PCH i bez unity build: oba laczylyby
+# jednostke z wyjatkami z jednostkami bez nich.
+function(rdb_exception_island)
+  if(RDB_NO_EXCEPTIONS)
+    set_source_files_properties(
+      ${ARGN}
+      PROPERTIES COMPILE_OPTIONS "-fexceptions;-USPDLOG_NO_EXCEPTIONS"
+                 SKIP_PRECOMPILE_HEADERS ON
+                 SKIP_UNITY_BUILD_INCLUSION ON)
+  endif()
+endfunction()
+
 # Przełączniki optymalizatora planu używane w kontrolowanych badaniach
 # ablacyjnych. Domyślna konfiguracja zachowuje dotychczasowe działanie.
 option(RDB_OPT_DEDUP_SUBSTRATES
@@ -242,6 +287,55 @@ if(RDB_SANITIZE)
     -fsanitize=${RDB_SANITIZE} -fno-sanitize-recover=undefined
     -fno-omit-frame-pointer -g)
   add_link_options(-fsanitize=${RDB_SANITIZE})
+
+  # Modul Pythona z ASan nie laduje sie w zwyklym interpreterze.
+  # retractordb._core linkuje runtime ASan, a python nie jest nim
+  # instrumentowany i dociaga modul przez dlopen - za pozno: na macOS runtime
+  # przerywa proces przy inicjalizacji ("Interceptors are not working"), na
+  # Linuksie konczy go ("ASan runtime does not come first"). Pod pytestem
+  # przyczyna ginie w przechwyconym wyjsciu i zostaje gole "Fatal Python error:
+  # Aborted" albo kod 1 bez slowa. Dlatego ostrzezenie juz przy konfiguracji, z
+  # gotowym poleceniem. Na Linuksie (GCC) obok libasan trzeba wstepnie zaladowac
+  # libstdc++: python jest programem w C, wiec bez tego przechwycenie
+  # __cxa_throw nie znajduje oryginalu i pierwszy wyjatek z nanobinda konczy sie
+  # "CHECK failed: real___cxa_throw". Sprawdzone 2026-10-02: 55 passed, 1
+  # skipped pod address,undefined.
+  if(RDB_PYTHON AND RDB_SANITIZE MATCHES "address")
+    if(APPLE)
+      execute_process(
+        COMMAND ${CMAKE_CXX_COMPILER} -print-resource-dir
+        OUTPUT_VARIABLE _rdb_asan_resource_dir
+        OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+      set(_rdb_asan_preload
+          "DYLD_INSERT_LIBRARIES=${_rdb_asan_resource_dir}/lib/darwin/libclang_rt.asan_osx_dynamic.dylib ASAN_OPTIONS=detect_container_overflow=0"
+      )
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+      execute_process(
+        COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libasan.so
+        OUTPUT_VARIABLE _rdb_asan_runtime
+        OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+      execute_process(
+        COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libstdc++.so
+        OUTPUT_VARIABLE _rdb_asan_libstdcxx
+        OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+      set(_rdb_asan_preload
+          "LD_PRELOAD=\"${_rdb_asan_runtime} ${_rdb_asan_libstdcxx}\" ASAN_OPTIONS=detect_leaks=0"
+      )
+    else()
+      set(_rdb_asan_preload
+          "LD_PRELOAD=<the ASan runtime of ${CMAKE_CXX_COMPILER}> ASAN_OPTIONS=detect_leaks=0"
+      )
+    endif()
+    message(
+      WARNING
+        "RDB_PYTHON=ON with RDB_SANITIZE=${RDB_SANITIZE}: retractordb._core links the "
+        "AddressSanitizer runtime, and a Python interpreter that was not started with that "
+        "runtime aborts while importing the module (under pytest the reason is swallowed and "
+        "you only see \"Fatal Python error: Aborted\"). Either build the module in a separate "
+        "build directory without RDB_SANITIZE, or start Python with the runtime preloaded:\n"
+        "  ${_rdb_asan_preload} <python> -m pytest api/python/tests\n"
+        "See docs/build-options.md.")
+  endif()
 endif()
 
 # ccache buforuje wyniki kompilacji, przyspieszając powtórne budowanie (np.

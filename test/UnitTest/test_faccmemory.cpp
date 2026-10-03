@@ -7,6 +7,7 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/faccmemory.hpp"
 #include "rdb/storage.hpp"
+#include "rdbResult.hpp"
 
 static rdb::Descriptor makeDesc(size_t size) { return {"f", static_cast<int>(size), 1, rdb::BYTE}; }
 
@@ -42,7 +43,7 @@ TEST(MemoryTest, test_faccmemory_infinite) {
   record.data = 4;
   GTEST_ASSERT_EQ(mfa->write(&record.data), EXIT_SUCCESS);
 
-  GTEST_ASSERT_EQ(mfa->count(), 4);
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 4);
 
   GTEST_ASSERT_EQ(mfa->read(&record.data, 0), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record.data, 1);
@@ -56,8 +57,8 @@ TEST(MemoryTest, test_faccmemory_infinite) {
   GTEST_ASSERT_EQ(mfa->read(&record.data, 3), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record.data, 4);
 
-  mfa->write(nullptr);               // Clear the storage
-  GTEST_ASSERT_EQ(mfa->count(), 0);  // After clearing, count should be 0
+  mfa->write(nullptr);                            // Clear the storage
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 0);  // After clearing, count should be 0
 }
 
 // Verify retention ring buffer: after 4 writes with size 2, ring holds last 2 records.
@@ -82,7 +83,7 @@ TEST(MemoryTest, test_faccmemory_retention) {
   record.data = 4;
   GTEST_ASSERT_EQ(mfa->write(&record.data), EXIT_SUCCESS);
 
-  GTEST_ASSERT_EQ(mfa->count(), 4);
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 4);
 
   // Positions 2 and 3 map to ring slots 0 and 1 - current values 3 and 4
   GTEST_ASSERT_EQ(mfa->read(&record.data, 2), EXIT_SUCCESS);
@@ -95,8 +96,8 @@ TEST(MemoryTest, test_faccmemory_retention) {
   GTEST_ASSERT_EQ(mfa->read(&record.data, 0), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record.data, 3);
 
-  mfa->write(nullptr);               // Clear the storage
-  GTEST_ASSERT_EQ(mfa->count(), 0);  // After clearing, count should be 0
+  mfa->write(nullptr);                            // Clear the storage
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 0);  // After clearing, count should be 0
 }
 
 // Verify write and read of multi-byte records (4-byte integers) without retention
@@ -116,7 +117,7 @@ TEST(MemoryTest, test_faccmemory_multibyte_record) {
   record = 3000;
   GTEST_ASSERT_EQ(mfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
 
-  GTEST_ASSERT_EQ(mfa->count(), 3);
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 3);
 
   // Read back using byte positions (position = index * recordSize)
   mfa->read(reinterpret_cast<uint8_t *>(&record), 0 * sizeof(int));
@@ -129,7 +130,7 @@ TEST(MemoryTest, test_faccmemory_multibyte_record) {
   GTEST_ASSERT_EQ(record, 3000);
 
   mfa->write(nullptr);
-  GTEST_ASSERT_EQ(mfa->count(), 0);
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 0);
 }
 
 // Verify update-in-place overwrites existing record at given position
@@ -149,14 +150,14 @@ TEST(MemoryTest, test_faccmemory_update_in_place) {
   record = 30;
   mfa->write(&record);
 
-  GTEST_ASSERT_EQ(mfa->count(), 3);
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 3);
 
   // Update record at position 1 (byte offset = 1 * recsize = 1)
   record = 99;
   GTEST_ASSERT_EQ(mfa->write(&record, 1), EXIT_SUCCESS);
 
   // Count should remain the same after update
-  GTEST_ASSERT_EQ(mfa->count(), 3);
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 3);
 
   // Verify updated record
   mfa->read(&record, 1);
@@ -193,7 +194,7 @@ TEST(MemoryTest, test_faccmemory_empty_count) {
   auto retention = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
   auto mfa       = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
 
-  GTEST_ASSERT_EQ(mfa->count(), 0);
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 0);
 
   mfa->write(nullptr);
 }
@@ -215,7 +216,7 @@ TEST(MemoryTest, test_faccmemory_retention_boundary) {
     mfa->write(&record);
   }
 
-  GTEST_ASSERT_EQ(mfa->count(), 3);
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 3);
 
   // Ring slots 0,1,2 hold values 1,2,3
   GTEST_ASSERT_EQ(mfa->read(&record, 0), EXIT_SUCCESS);
@@ -227,7 +228,7 @@ TEST(MemoryTest, test_faccmemory_retention_boundary) {
   record = 4;
   mfa->write(&record);
 
-  GTEST_ASSERT_EQ(mfa->count(), 4);
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 4);
 
   // Position 0 maps to slot 0 - now holds value 4 (overwritten)
   GTEST_ASSERT_EQ(mfa->read(&record, 0), EXIT_SUCCESS);
@@ -241,7 +242,7 @@ TEST(MemoryTest, test_faccmemory_retention_boundary) {
   record = 5;
   mfa->write(&record);
 
-  GTEST_ASSERT_EQ(mfa->count(), 5);
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 5);
 
   GTEST_ASSERT_EQ(mfa->read(&record, 4), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 5);
@@ -270,7 +271,7 @@ TEST(MemoryTest, test_faccmemory_read_beyond_bounds) {
   record = 30;
   mfa->write(&record);
 
-  GTEST_ASSERT_EQ(mfa->count(), 3);
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 3);
 
   // Valid reads
   GTEST_ASSERT_EQ(mfa->read(&record, 0), EXIT_SUCCESS);
@@ -301,7 +302,7 @@ TEST(MemoryTest, test_faccmemory_shared_between_live_instances) {
   mfa->write(&record);
 
   auto mfa2 = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
-  GTEST_ASSERT_EQ(mfa2->count(), 2);
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa2->count()), 2);
 
   GTEST_ASSERT_EQ(mfa2->read(&record, 0), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 0x42);
@@ -325,11 +326,11 @@ TEST(MemoryTest, test_faccmemory_bucket_dies_with_last_instance) {
     auto mfa = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
     mfa->write(&record);
     mfa->write(&record);
-    GTEST_ASSERT_EQ(mfa->count(), 2);
+    GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 2);
   }  // mfa destroyed - the last user of the bucket
 
   auto mfa2 = std::make_unique<rdb::memoryFile>(filename, makeDesc(recsize), retention);
-  GTEST_ASSERT_EQ(mfa2->count(), 0);
+  GTEST_ASSERT_EQ(rdbtest::ok(mfa2->count()), 0);
   GTEST_ASSERT_EQ(mfa2->read(&record, 0), ERANGE);
 }
 
@@ -343,10 +344,10 @@ TEST(MemoryTest, test_faccmemory_other_record_size_starts_empty) {
   auto wide = std::make_unique<rdb::memoryFile>(filename, makeDesc(8), retention);
   std::array<BYTE, 8> wideRecord{};
   wide->write(wideRecord.data());
-  GTEST_ASSERT_EQ(wide->count(), 1);
+  GTEST_ASSERT_EQ(rdbtest::ok(wide->count()), 1);
 
   auto narrow = std::make_unique<rdb::memoryFile>(filename, makeDesc(1), retention);
-  GTEST_ASSERT_EQ(narrow->count(), 0);
+  GTEST_ASSERT_EQ(rdbtest::ok(narrow->count()), 0);
 }
 
 // Verify read() refuses a stored record of another size instead of copying it past the caller's
@@ -413,13 +414,13 @@ TEST(MemoryStoreTest, separate_stores_do_not_share_a_stream) {
 
   record = 0x11;
   fileA.write(&record);
-  GTEST_ASSERT_EQ(fileA.count(), 1);
-  GTEST_ASSERT_EQ(fileB.count(), 0) << "sklep B zobaczyl zapis do sklepu A";
+  GTEST_ASSERT_EQ(rdbtest::ok(fileA.count()), 1);
+  GTEST_ASSERT_EQ(rdbtest::ok(fileB.count()), 0) << "sklep B zobaczyl zapis do sklepu A";
 
   record = 0x22;
   fileB.write(&record);
-  GTEST_ASSERT_EQ(fileA.count(), 1);
-  GTEST_ASSERT_EQ(fileB.count(), 1);
+  GTEST_ASSERT_EQ(rdbtest::ok(fileA.count()), 1);
+  GTEST_ASSERT_EQ(rdbtest::ok(fileB.count()), 1);
 
   GTEST_ASSERT_EQ(fileA.read(&record, 0), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 0x11);
@@ -442,7 +443,7 @@ TEST(MemoryStoreTest, one_store_still_shares_by_stream_name) {
   record = 0x37;
   writer.write(&record);
 
-  GTEST_ASSERT_EQ(reader.count(), 1);
+  GTEST_ASSERT_EQ(rdbtest::ok(reader.count()), 1);
   GTEST_ASSERT_EQ(reader.read(&record, 0), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 0x37);
 }
@@ -461,7 +462,7 @@ TEST(MemoryStoreTest, default_is_the_process_store) {
   record = 0x5A;
   implicitStore.write(&record);
 
-  GTEST_ASSERT_EQ(explicitStore.count(), 1);
+  GTEST_ASSERT_EQ(rdbtest::ok(explicitStore.count()), 1);
   GTEST_ASSERT_EQ(explicitStore.read(&record, 0), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 0x5A);
 }
@@ -476,14 +477,15 @@ TEST(MemoryStoreTest, storage_passes_its_store_down_to_the_accessor) {
   rdb::MemoryStore given;
   rdb::MemoryStore untouched;
 
-  rdb::storage stream("memstore_iso", "memstore_iso", "", "DEFAULT", false, false, -1, &given);
-  ASSERT_TRUE(stream.attachDescriptor(&descriptor).empty());
+  auto streamOwner = rdbtest::ok(rdb::storage::create("memstore_iso", "memstore_iso", "", "DEFAULT", false, false, -1, &given));
+  rdb::storage &stream = *streamOwner;
+  ASSERT_RDB_OK(stream.attachDescriptor(&descriptor));
   stream.setDisposable(true);
 
   auto *payload = stream.getPayload();
   payload->setNullBitset(std::vector<bool>(descriptor.size(), false));
   payload->setItem(0, 7);
-  stream.write();
+  rdbtest::ok(stream.write());
 
   EXPECT_FALSE(given.empty()) << "zapis nie trafil do sklepu podanego magazynowi";
   EXPECT_TRUE(untouched.empty()) << "zapis trafil do cudzego sklepu";

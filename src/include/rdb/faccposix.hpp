@@ -44,7 +44,7 @@ class posixBinaryFile : public FileInterface {
   ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) override;
 
   auto name() -> std::string & override;
-  size_t count() override;
+  [[nodiscard]] Result<size_t> count() override;
   [[nodiscard]] const std::string &initializationError() const override { return initializationError_; }
 
   /// @brief Usuwa plik i wylacza rotacje w destruktorze (groupFile: retencja i purge).

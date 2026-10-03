@@ -27,9 +27,8 @@
 #include "checkedArith.hpp"     // arytmetyka indeksu generatora
 #include "expressionShape.hpp"  // inferExpressionShape, exprShape
 #include "exprSimplify.hpp"     // simplifyExpression
-#include "rdb/exceptions.hpp"
-#include "rdb/payload.hpp"  // sizeof(rdb::payload) w wycenie pamieci historii
-#include "rdb/probe.hpp"    // sonda E3: rozmiar planu, czas kompilacji
+#include "rdb/payload.hpp"      // sizeof(rdb::payload) w wycenie pamieci historii
+#include "rdb/probe.hpp"        // sonda E3: rozmiar planu, czas kompilacji
 #include "rdb/rationalFormat.hpp"
 #include "rdb/sizeLimits.hpp"
 #include "rqlFunctions.hpp"  // jedyna lista funkcji skalarnych
@@ -37,29 +36,25 @@
 
 using boost::lexical_cast;
 
-namespace {
-/// Blad PLANU wykryty juz po sparsowaniu: wraca do wolajacego statusem, nie konczy procesu.
-///
-/// Wzorzec jest ten sam co RQLSyntaxError w RQLParser.cpp i z tego samego powodu. compile()
-/// zglasza bledy planu wartoscia zwracana ("OK" albo zdanie dla uzytkownika), ale wykrywa je
-/// kilkanascie ramek glebiej - w prepareFields, expandIndexWildcards, computeLogicalOrigin.
-/// Przewleczenie statusu przez te wszystkie funkcje oznaczaloby zmiane sygnatury kazdej z
-/// nich; rzut przechwycony na granicy compile() daje ten sam efekt jednym catch.
-///
-/// Dlaczego to NIE jest rdb::ConfigError: tamten opuszcza silnik i trafia do osadzajacego
-/// procesu. Ten ma zostac zamieniony na status ZANIM compile() wroci, wiec jest typem
-/// wewnetrznym tej jednostki i nie ma go w rdb/exceptions.hpp.
-///
-/// Do fazy 1 wszystkie te miejsca wolaly FatalError. W procesie serwera znaczylo to smierc
-/// xretractora przy KAZDYM blednym zapytaniu ad-hoc - `xqry -a 'select * stream b from s@(0,4)'`
-/// wystarczalo. Dokladnie ta sama usterka co na sciezce RQL, naprawiona 2026-09-05 o poziom wyzej.
-struct PlanError {
-  std::string message;
-};
-}  // namespace
+// Bledy planu wracaja z compile() STATUSEM ("OK" albo zdanie dla uzytkownika) przez kazdy
+// przebieg po kolei - bez wyjatkow. Do 2026-10 przebiegi gleboko w kompilatorze rzucaly
+// wewnetrzny PlanError (oraz std::out_of_range i std::invalid_argument, ktorych nie lapal nikt
+// po drodze), a compile() zamienial na status tylko pierwszy z nich. Dzis kazdy przebieg zwraca
+// status, a pomocnicze funkcje (narrowInterval, firstIndexReaching, buildOutputSchema,
+// computeRequiredCapacities) zwracaja wartosc albo powod odmowy.
+//
+// Zlamany niezmiennik kompilatora NIE jest bledem planu i nie moze wrocic do klienta jako "twoje
+// zapytanie jest zle" - dlatego ma wlasny przedrostek (kInternalCompilerError). Engine::compile
+// zglasza go jako Errc::Logic (w Pythonie InternalError), a demon traktuje jak blad krytyczny.
+std::string internalCompilerError(const std::string &message) {
+  SPDLOG_ERROR("{}{}", kInternalCompilerError, message);
+  return std::string(kInternalCompilerError) + message;
+}
 
-void requireResolvedForEveryNode(const qTree &plan, const std::map<std::string, int> &resolved, std::string_view pass,
-                                 std::string_view quantity) {
+bool isInternalCompilerError(std::string_view status) { return status.starts_with(kInternalCompilerError); }
+
+std::string requireResolvedForEveryNode(const qTree &plan, const std::map<std::string, int> &resolved, std::string_view pass,
+                                        std::string_view quantity) {
   // Reguła: kompilator nie wypuszcza planu z węzłem, dla którego nie policzył origin albo ogona.
   //
   // Do 2026-08-07 stało tu SPDLOG_WARN i `continue`. Ponieważ query::logicalOrigin
@@ -75,7 +70,8 @@ void requireResolvedForEveryNode(const qTree &plan, const std::map<std::string, 
   // zerem przed pętlą. Nie ma więc legalnego planu, który zostawia węzeł nierozwiązany;
   // jeżeli tak się stanie, jest to defekt kompilatora - awaria aparatury, nie wynik.
   for (const auto &q : plan)
-    if (!resolved.contains(q.id)) throw rdb::LogicError(fmt::format("{}: unresolved {} for '{}'", pass, quantity, q.id));
+    if (!resolved.contains(q.id)) return internalCompilerError(fmt::format("{}: unresolved {} for '{}'", pass, quantity, q.id));
+  return {"OK"};
 }
 
 namespace {
@@ -94,11 +90,16 @@ wideRational widen(const boost::rational<int> &value) { return wideRational{valu
 
 wideRational widen(int value) { return wideRational{value, 1}; }
 
-boost::rational<int> narrowInterval(const wideRational &value, const std::string &id, const char *formula) {
+constexpr const char *kIntervalOutOfRange =
+    "Stream interval out of representable range - simplify the plan or use coarser intervals";
+
+/// nullopt, gdy interwalu nie da sie zapisac w boost::rational<int> - wolajacy zwraca wtedy
+/// kIntervalOutOfRange jako status planu.
+std::optional<boost::rational<int>> narrowInterval(const wideRational &value, const std::string &id, const char *formula) {
   constexpr std::int64_t limit = std::numeric_limits<int>::max();
   if (value.numerator() > limit || value.numerator() < std::numeric_limits<int>::min() || value.denominator() > limit) {
     SPDLOG_ERROR("compiler: interval {} of stream '{}' ({}) is out of representable range", value, id, formula);
-    throw std::out_of_range("Stream interval out of representable range - simplify the plan or use coarser intervals");
+    return std::nullopt;
   }
   return boost::rational<int>{static_cast<int>(value.numerator()), static_cast<int>(value.denominator())};
 }
@@ -231,7 +232,7 @@ std::string compiler::resolveStreamIntervals() {
         continue;  // Just one stream
       }
       if (q.lProgram.size() != 3 && q.lProgram.size() != 2) {
-        throw rdb::LogicError(
+        return internalCompilerError(
             fmt::format("compiler::prepareFields: unexpected program size {} for query '{}'", q.lProgram.size(), q.id));
       }
       // This is shit coded (these size2 i size3) and fast fixed
@@ -253,15 +254,17 @@ std::string compiler::resolveStreamIntervals() {
             unresolvedCount++;
             continue;
           }
-          delta = narrowInterval((widen(delta1) * widen(delta2)) / (widen(delta1) + widen(delta2)), q.id,
-                                 "(D_a*D_b)/(D_a+D_b)");  // deltaHash(delta1, delta2);
+          const auto narrowed = narrowInterval((widen(delta1) * widen(delta2)) / (widen(delta1) + widen(delta2)), q.id,
+                                               "(D_a*D_b)/(D_a+D_b)");  // deltaHash(delta1, delta2);
+          if (!narrowed) return kIntervalOutOfRange;
+          delta = *narrowed;
         } break;
         case STREAM_DEHASH_DIV: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
           boost::rational<int> delta2 = t2.getRI();  // There is no second stream
           // - just fraction argument
           if (delta2 == 0) {
-            throw PlanError{fmt::format("Stream '{}' divides by a zero interval; the '&' argument must not be zero", q.id)};
+            return fmt::format("Stream '{}' divides by a zero interval; the '&' argument must not be zero", q.id);
           }
           if (delta1 == 0) {
             bOnceAgain = true;
@@ -270,19 +273,21 @@ std::string compiler::resolveStreamIntervals() {
           }  //           D_c * D_b
           //   D_a = --------------
           //         abs(D_c - D_b)
-          delta = narrowInterval((widen(delta1) * widen(delta2)) / abs(widen(delta1) - widen(delta2)), q.id,
-                                 "(D_c*D_b)/|D_c-D_b|");  // deltaDivMod(delta1, delta2);
+          const auto narrowed = narrowInterval((widen(delta1) * widen(delta2)) / abs(widen(delta1) - widen(delta2)), q.id,
+                                               "(D_c*D_b)/|D_c-D_b|");  // deltaDivMod(delta1, delta2);
+          if (!narrowed) return kIntervalOutOfRange;
+          delta = *narrowed;
 
           if (delta1 > delta) {
             SPDLOG_ERROR("Faster div from slower src q.id={}", q.id);
-            throw std::out_of_range("You cannot make faster div from slower source");
+            return std::string("You cannot make faster div from slower source");
           }
         } break;
         case STREAM_DEHASH_MOD: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
           boost::rational<int> delta2 = t2.getRI();
           if (delta2 == 0) {
-            throw PlanError{fmt::format("Stream '{}' divides by a zero interval; the '%' argument must not be zero", q.id)};
+            return fmt::format("Stream '{}' divides by a zero interval; the '%' argument must not be zero", q.id);
           }
           if (delta1 == 0) {
             bOnceAgain = true;
@@ -291,12 +296,14 @@ std::string compiler::resolveStreamIntervals() {
           }  //           D_c * D_a
           //   D_b = --------------
           //         abs(D_c - D_a)
-          delta = narrowInterval((widen(delta2) * widen(delta1)) / abs(widen(delta2) - widen(delta1)), q.id,
-                                 "(D_c*D_a)/|D_c-D_a|");  // deltaDivMod(delta2, delta1);  (NOTICE DIFF SEQ!)
+          const auto narrowed = narrowInterval((widen(delta2) * widen(delta1)) / abs(widen(delta2) - widen(delta1)), q.id,
+                                               "(D_c*D_a)/|D_c-D_a|");  // deltaDivMod(delta2, delta1);  (NOTICE DIFF SEQ!)
+          if (!narrowed) return kIntervalOutOfRange;
+          delta = *narrowed;
 
           if (delta1 > delta) {
             SPDLOG_ERROR("Faster div from slower src q.id={}", q.id);
-            throw std::out_of_range("You cannot make faster mod from slower source");
+            return std::string("You cannot make faster mod from slower source");
           }
         } break;
         case STREAM_SUBTRACT: {
@@ -308,7 +315,7 @@ std::string compiler::resolveStreamIntervals() {
             continue;
           }
           if (delta2 <= 0) {
-            throw PlanError{fmt::format("Stream '{}' subtracts to a zero target interval; the '-' argument must be > 0", q.id)};
+            return fmt::format("Stream '{}' subtracts to a zero target interval; the '-' argument must be > 0", q.id);
           }
           delta = delta2;
         } break;
@@ -350,8 +357,7 @@ std::string compiler::resolveStreamIntervals() {
           const int coreWindow    = coreInstance.getQuery(t1.getStr_()).descriptorStorage().flatElementCount();
           auto [step, windowSize] = std::get<std::pair<int, int>>(op.getVT());
           if (step <= 0) {
-            throw PlanError{
-                fmt::format("Stream '{}' has an AGSE step of {}; the step in @(step,window) must be > 0", q.id, step)};
+            return fmt::format("Stream '{}' has an AGSE step of {}; the step in @(step,window) must be > 0", q.id, step);
           }
           windowSize = abs(windowSize);
           // if (windowSize < 0) {  // windowSize < 0  (need to double-check and UT cover)
@@ -361,14 +367,17 @@ std::string compiler::resolveStreamIntervals() {
           // } else
           // delta = (deltaSrc / windowSizeSrc) * step;
 
-          delta = narrowInterval((widen(coreDelta) * widen(step)) / widen(coreWindow), q.id, "(D_src*k)/F");
+          const auto narrowed = narrowInterval((widen(coreDelta) * widen(step)) / widen(coreWindow), q.id, "(D_src*k)/F");
+          if (!narrowed) return kIntervalOutOfRange;
+          delta = *narrowed;
         } break;
         default:
           SPDLOG_ERROR("Undefined token: command={}", op.getStrCommandID());
-          throw std::out_of_range("Undefined token/command on list");
+          return std::string("Undefined token/command on list");
       }  // switch ( op.getCommandID() )
       if (delta == -1) {
-        throw rdb::LogicError(fmt::format("compiler::prepareFields: stream interval (delta) not resolved for query '{}'", q.id));
+        return internalCompilerError(
+            fmt::format("compiler::prepareFields: stream interval (delta) not resolved for query '{}'", q.id));
       }
       if (q.rInterval == 0) resolvedThisPass++;
       q.rInterval = delta;  // There is established delta value - return value
@@ -674,7 +683,7 @@ std::string compiler::extractIntermediateStreams() {
           // i `++` wracało na begin(). Ta sama konstrukcja o jeden krok dalej (sięgnięcie po
           // nieistniejący drugi argument `@`) kasowała wartownika i psuła stertę.
           if (std::distance(currentQuery.lProgram.begin(), it2) < argCount) {
-            throw rdb::LogicError(fmt::format(
+            return internalCompilerError(fmt::format(
                 "compiler::extractIntermediateStreams: operator '{}' in query '{}' has {} "
                 "preceding tokens, needs {}",
                 GetStringcommand_id(cmd), currentQuery.id, std::distance(currentQuery.lProgram.begin(), it2), argCount));
@@ -712,7 +721,7 @@ std::string compiler::extractIntermediateStreams() {
         }  // Endif PUSH_STREAM, PUSH_VAL
       }  // Endfor
       if (!extracted) {
-        throw rdb::LogicError(
+        return internalCompilerError(
             fmt::format("compiler::extractIntermediateStreams: query '{}' requires reduction but no operator "
                         "was extracted",
                         coreInstance.at(queryIndex).id));
@@ -723,15 +732,15 @@ std::string compiler::extractIntermediateStreams() {
 }
 
 // Goal of this procedure is to unroll schema based of given command
-std::list<field> compiler::buildOutputSchema(const std::string &sName1, const std::string &sName2, token &cmd_token) {
+std::string compiler::buildOutputSchema(const std::string &sName1, const std::string &sName2, token &cmd_token,
+                                        std::list<field> &schemaOut) {
   std::list<field> lRetVal;
   const command_id cmd = cmd_token.getCommandID();
   // Merge of schemas for junction of hash type
   if (cmd == STREAM_HASH) {
     const auto lhs = coreInstance.getQuery(sName1).descriptorStorage();
     const auto rhs = coreInstance.getQuery(sName2).descriptorStorage();
-    if (lhs.flatElementCount() != rhs.flatElementCount())
-      throw std::invalid_argument("Hash operation needs same schemas on arguments stream");
+    if (lhs.flatElementCount() != rhs.flatElementCount()) return "Hash operation needs same schemas on arguments stream";
     // Nazwy i programy pol z lewego skladnika, ksztalt ze slotu wejscia (query::descriptorFrom):
     // na kazdej pozycji dluzszy z dwoch elementow, w obu kolejnosciach skladnikow. Do 2026-09-27
     // ksztalt tez szedl za lewym skladnikiem.
@@ -756,7 +765,8 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
         lRetVal.push_back(intf);
       }
     }
-    return lRetVal;
+    schemaOut = std::move(lRetVal);
+    return "OK";
   } else if (cmd == STREAM_SUBTRACT)
     lRetVal = flattenArrayFields(coreInstance.getQuery(sName1).lSchema);
   else if (cmd == STREAM_TIMEMOVE)
@@ -776,7 +786,8 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
     auto [reducedType, reducedLen] = reductionResultField(sourceType, sourceLen);
     field intf(rdb::rField(name, reducedLen, 1, reducedType), token(PUSH_ID, std::make_pair(sName1, 0)));
     lRetVal.push_back(intf);
-    return lRetVal;
+    schemaOut = std::move(lRetVal);
+    return "OK";
   } else if (cmd == STREAM_AGSE) {
     // Unrolling schema for agse - discussion needed if we need do that this way
     auto [step, windowSize] = std::get<std::pair<int, int>>(cmd_token.getVT());
@@ -790,8 +801,8 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
 
     lRetVal = schema;
   } else {
-    throw rdb::LogicError(fmt::format("compiler: undefined stream token command in combine function: str={} cmd={}",
-                                      cmd_token.getStr_(), cmd_token.getStrCommandID()));
+    return internalCompilerError(fmt::format("compiler: undefined stream token command in combine function: str={} cmd={}",
+                                             cmd_token.getStr_(), cmd_token.getStrCommandID()));
   }
   // Pole wezla pochodnego jest ODWOLANIEM do slotu operandu, a nie kopia jego rachunku:
   // operand jest zmaterializowany, wiec wartosc juz policzyl i lezy ona w jego rekordzie.
@@ -817,7 +828,8 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
     f.lProgram.clear();
     f.lProgram.emplace_back(PUSH_ID2, std::make_pair(s.str(), 0));
   }
-  return lRetVal;
+  schemaOut = std::move(lRetVal);
+  return "OK";
 }
 
 /// Wymiary rekordu WYJSCIOWEGO jednego wezla (A2 M11): dlugosc kazdego pola, rozmiar rekordu i -
@@ -916,7 +928,7 @@ std::string compiler::expandSchemaWildcards() {
     if (const std::string input = checkInputRecord(q); input != "OK") return input;
     for (auto &t : q.lProgram) {
       if (q.lProgram.size() >= 4) {
-        throw rdb::LogicError(
+        return internalCompilerError(
             fmt::format("compiler::expandSchemaWildcards: program not optimized - {} tokens for "
                         "query '{}', expected < 4",
                         q.lProgram.size(), q.id));
@@ -931,7 +943,7 @@ std::string compiler::expandSchemaWildcards() {
           if (q.lProgram.size() == 1) {
             // we assure that on and only token is push_stream
             if ((*q.lProgram.begin()).getCommandID() != PUSH_STREAM) {
-              throw rdb::LogicError(
+              return internalCompilerError(
                   fmt::format("compiler::expandSchemaWildcards: first token must be PUSH_STREAM for "
                               "single-token program, got cmd={} for query '{}'",
                               (*q.lProgram.begin()).getStrCommandID(), q.id));
@@ -990,7 +1002,9 @@ std::string compiler::expandSchemaWildcards() {
           }
           if (q.lProgram.size() == 3 || q.lProgram.size() == 2) {
             auto [sName1, sName2, cmd]{GetArgs(q.lProgram)};
-            q.lSchema = buildOutputSchema(sName1, sName2, cmd);
+            std::list<field> schema;
+            if (auto status = buildOutputSchema(sName1, sName2, cmd, schema); status != "OK") return status;
+            q.lSchema = std::move(schema);
             break;
           }
         }
@@ -1113,8 +1127,8 @@ std::string compiler::expandIndexWildcards(query &q) {
       if (t.getCommandID() != PUSH_IDX) continue;
       boost::cmatch what;
       const std::string text(t.getStr_());
-      if (!regex_search(text.c_str(), what, xprFieldIdX)) throw std::out_of_range("No mach on type conversion IDX");
-      if (what.size() != 2) throw rdb::LogicError("compiler: PUSH_IDX regex match has unexpected capture count");
+      if (!regex_search(text.c_str(), what, xprFieldIdX)) return std::string("No mach on type conversion IDX");
+      if (what.size() != 2) return internalCompilerError("compiler: PUSH_IDX regex match has unexpected capture count");
       const std::string schema(what[1]);
       t = token(PUSH_IDX, std::make_pair(schema, 0));  // .second arg is always 0
       usedSchemaX.push_back(schema);
@@ -1145,17 +1159,17 @@ std::string compiler::expandIndexWildcards(query &q) {
     }
 
     if (minSizeFlat == std::numeric_limits<int>::max()) {
-      throw rdb::LogicError(fmt::format("compiler::expandIndexWildcards: flat size not resolved for query '{}'", q.id));
+      return internalCompilerError(fmt::format("compiler::expandIndexWildcards: flat size not resolved for query '{}'", q.id));
     }
     if (minSizeFlat <= 0) {
       // minSizeFlat == 0 znaczy, ze zrodlo ma PUSTY deskryptor, a jedyna droga do tego jest
       // okno AGSE o dlugosci zero: query::descriptorFrom iteruje `for (i=0; i<abs(length); i++)`,
       // wiec @(k,0) nie wytwarza ani jednego pola. Komunikat mowi o oknie, a nie o "flat size",
       // bo to okno uzytkownik napisal.
-      throw PlanError{
-          fmt::format("Stream '{}' expands '[_]' over a source with no fields; an AGSE window of length 0 "
-                      "produces nothing to expand",
-                      q.id)};
+      return fmt::format(
+          "Stream '{}' expands '[_]' over a source with no fields; an AGSE window of length 0 "
+          "produces nothing to expand",
+          q.id);
     }
 
     for (int i = 0; i < minSizeFlat; i++) {
@@ -1210,7 +1224,7 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
     switch (cmd) {
       case PUSH_ID1:
         if (regex_search(text.c_str(), what, xprFieldId1)) {
-          if (what.size() != 3) throw rdb::LogicError("compiler: PUSH_ID1 regex match has unexpected capture count");
+          if (what.size() != 3) return internalCompilerError("compiler: PUSH_ID1 regex match has unexpected capture count");
           const std::string schema(what[1]);
           const std::string field(what[2]);
           // aim of this procedure is found schema, next field in schema
@@ -1230,7 +1244,7 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
         break;
       case PUSH_ID2:
         if (regex_search(text.c_str(), what, xprFieldId2)) {
-          if (what.size() != 3) throw rdb::LogicError("compiler: PUSH_ID2 regex match has unexpected capture count");
+          if (what.size() != 3) return internalCompilerError("compiler: PUSH_ID2 regex match has unexpected capture count");
           const std::string name(what[1]);
           const auto parsedOffset = parseIndex(what[2]);
           if (!parsedOffset) return "Stream '" + q.id + "' has a malformed field reference '" + text + "'";
@@ -1331,7 +1345,7 @@ std::string compiler::resolveTokenReferences(std::list<token> &lProgram, query &
         break;
       case PUSH_ID3:
         if (regex_search(text.c_str(), what, xprFieldId3)) {
-          if (what.size() != 2) throw rdb::LogicError("compiler: PUSH_ID3 regex match has unexpected capture count");
+          if (what.size() != 2) return internalCompilerError("compiler: PUSH_ID3 regex match has unexpected capture count");
           const std::string field(what[1]);
           query *pQ1(nullptr);
           query *pQ2(nullptr);
@@ -1383,7 +1397,7 @@ std::string compiler::resolveFieldReferences() {
   fromSpanMemo_.clear();
   for (auto &q : coreInstance) {  // for each query
     if (q.isReductionRequired()) {
-      throw rdb::LogicError(
+      return internalCompilerError(
           fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id));
     }
     for (auto &f : q.lSchema) {  // for each field in query
@@ -1520,7 +1534,7 @@ std::string compiler::localizeFieldOffsets() {
   // This loop fill&create OffsetMap structure.
   for (auto &q : coreInstance) {  // for each query
     if (q.isReductionRequired()) {
-      throw rdb::LogicError(
+      return internalCompilerError(
           fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id));
     }  // that has at least two arguments
     std::set<std::string> viaInterleave;  // składowe, których tożsamość zniosło `#`
@@ -1560,7 +1574,7 @@ std::string compiler::localizeFieldOffsets() {
   // This loop converts with help of offsetMap
   for (auto &q : coreInstance) {  // for each query
     if (q.isReductionRequired()) {
-      throw rdb::LogicError(
+      return internalCompilerError(
           fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id));
     }  // that has at least two arguments and
     for (auto &f : q.lSchema) {             // for each field in query and
@@ -1577,7 +1591,7 @@ std::string compiler::localizeFieldOffsets() {
           if (base == offsets.end()) {
             const auto refs = namedSourceRefs_.find(q.id);
             if (refs == namedSourceRefs_.end() || !refs->second.contains(schema))
-              throw rdb::LogicError(
+              return internalCompilerError(
                   fmt::format("compiler: stream '{}' holds a compiler-generated reference to '{}' outside its "
                               "FROM clause",
                               q.id, schema));
@@ -1599,7 +1613,7 @@ std::string compiler::validateConstraints() {
   for (auto &q : coreInstance) {      // for each query
     if (q.isDeclaration()) continue;  // do not check declaration in constraints.
     if (q.isReductionRequired()) {
-      throw rdb::LogicError(
+      return internalCompilerError(
           fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id));
     }  // process data only with two or less arguments
     auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
@@ -1633,8 +1647,8 @@ std::string compiler::validateConstraints() {
         // No additional constraints for these commands in this phase.
         break;
       default:
-        throw rdb::LogicError(fmt::format("compiler::validateConstraints: unsupported command '{}' for query '{}'",
-                                          GetStringcommand_id(cmd.getCommandID()), q.id));
+        return internalCompilerError(fmt::format("compiler::validateConstraints: unsupported command '{}' for query '{}'",
+                                                 GetStringcommand_id(cmd.getCommandID()), q.id));
     }
   }
   return {"OK"};
@@ -1644,7 +1658,7 @@ std::string compiler::applyCapacitiesToStreams(const std::map<std::string, int> 
   for (const auto &q : capMap) {                             // for each query
     if (coreInstance[q.first].policy.second == 0) continue;  // do not check declaration in constraints.
     if (coreInstance[q.first].isReductionRequired()) {
-      throw rdb::LogicError(fmt::format("compiler: query '{}' requires reduction at applyCapacities stage", q.first));
+      return internalCompilerError(fmt::format("compiler: query '{}' requires reduction at applyCapacities stage", q.first));
     }
     // Pierscien MEMORY bierze wieksza z dwoch liczb: RETENTION zapisane przy `STORAGE MEMORY` i potrzebe
     // planu. VOLATILE startuje od 1, wiec dla niego wynik jest taki jak dotad - sama potrzeba planu.
@@ -1752,7 +1766,7 @@ std::vector<std::pair<std::string, std::string>> compiler::unboundedDiskStreams(
   return retVal;
 }
 
-std::map<std::string, int> compiler::computeRequiredCapacities() {
+std::expected<std::map<std::string, int>, std::string> compiler::computeRequiredCapacities() {
   // Głębokość historii dla źródeł przeplotu (#) i rozplotu (&, %) - stała
   // w jednostkach rekordów, patrz komentarz przy STREAM_HASH poniżej.
   constexpr int kJunctionHistory = 4;
@@ -1770,8 +1784,8 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
   for (auto &q : coreInstance) {      // for each query
     if (q.isDeclaration()) continue;  // that is not declaration
     if (q.isReductionRequired()) {
-      throw rdb::LogicError(
-          fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id));
+      return std::unexpected(internalCompilerError(
+          fmt::format("compiler: query '{}' requires reduction at this stage - pipeline invariant violated", q.id)));
     }  // process data only with two or less arguments
     auto [arg1, arg2, cmd]{GetArgs(q.lProgram)};
     switch (cmd.getCommandID()) {
@@ -1781,10 +1795,10 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         //  :- STREAM_TIMEMOVE(1)
         //
         if (cmd.getCommandID() == STREAM_TIMEMOVE && q.lProgram.size() != 2) {
-          throw rdb::LogicError(
-              fmt::format("compiler: unexpected program size in computeRequiredCapacities: {} tokens for "
-                          "query '{}', expected 2",
-                          q.lProgram.size(), q.id));
+          return std::unexpected(
+              internalCompilerError(fmt::format("compiler: unexpected program size in computeRequiredCapacities: {} tokens for "
+                                                "query '{}', expected 2",
+                                                q.lProgram.size(), q.id)));
         }
 
         if (cmd.getCommandID() == PUSH_STREAM) {
@@ -1831,19 +1845,19 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
         //
         if (q.lProgram.size() != 2) {
-          throw rdb::LogicError(
-              fmt::format("compiler: unexpected program size in computeRequiredCapacities: {} tokens for "
-                          "query '{}', expected 2",
-                          q.lProgram.size(), q.id));
+          return std::unexpected(
+              internalCompilerError(fmt::format("compiler: unexpected program size in computeRequiredCapacities: {} tokens for "
+                                                "query '{}', expected 2",
+                                                q.lProgram.size(), q.id)));
         }
 
         const auto nameSrc = arg1;
         const auto step    = get<std::pair<int, int>>(cmd.getVT()).first;
         if (step <= 0) {
-          throw rdb::LogicError(
-              fmt::format("compiler: AGSE step must be > 0, got {} for query '{}' in "
-                          "computeRequiredCapacities",
-                          step, q.id));
+          return std::unexpected(
+              internalCompilerError(fmt::format("compiler: AGSE step must be > 0, got {} for query '{}' in "
+                                                "computeRequiredCapacities",
+                                                step, q.id)));
         }
         auto &source          = coreInstance[nameSrc];
         const int sourceWidth = source.descriptorStorage().flatElementCount();
@@ -1955,8 +1969,9 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
         capMap[arg1] = std::max({capMap[arg1], required, 1});
       } break;
       default:
-        throw rdb::LogicError(fmt::format("compiler::computeRequiredCapacities: unsupported command '{}' for query '{}'",
-                                          GetStringcommand_id(cmd.getCommandID()), q.id));
+        return std::unexpected(
+            internalCompilerError(fmt::format("compiler::computeRequiredCapacities: unsupported command '{}' for query '{}'",
+                                              GetStringcommand_id(cmd.getCommandID()), q.id)));
     }
 
     // Ujemna czesc zakresu DUMP siega historii strumienia, NA KTORYM wisi regula: dumpManager
@@ -1969,7 +1984,8 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
       if (rule.action != rule::DUMP) continue;
       auto [l, r] = rule.dumpRange;
       if (l >= r) {
-        throw rdb::LogicError(fmt::format("compiler: dump range invalid [{}..{}] for query '{}'", l, r, q.id));
+        return std::unexpected(
+            internalCompilerError(fmt::format("compiler: dump range invalid [{}..{}] for query '{}'", l, r, q.id)));
       }
       if (l < 0) capMap[q.id] = std::max(capMap[q.id], static_cast<int>(abs(l)));
     }
@@ -2060,8 +2076,10 @@ constexpr int kOriginSearchLimit = 1 << 24;
 // Najmniejsze n >= 0, dla którego niemalejące odwzorowanie indeksu osiąga próg.
 // Wszystkie odwzorowania rekord->rekord w SOperations.hpp są niemalejące, więc
 // zbiór n spełniających warunek jest półprostą i wystarczy znaleźć jej początek.
+/// nullopt, gdy poszukiwanie przekroczy kOriginSearchLimit - wolajacy zwraca wtedy
+/// originSearchTooExtreme() jako status planu.
 template <typename Mapping>
-int firstIndexReaching(const Mapping &mapping, const int threshold, const std::string &nodeId) {
+std::optional<int> firstIndexReaching(const Mapping &mapping, const int threshold) {
   if (threshold <= 0) return 0;
   // Podwajanie w poszukiwaniu górnego ograniczenia, potem połowienie. Odwzorowania
   // rozplotu rosną szybciej niż liniowo, więc podwajanie kończy się po kilku krokach.
@@ -2073,10 +2091,7 @@ int firstIndexReaching(const Mapping &mapping, const int threshold, const std::s
       // 10^6) poszukiwanie przekracza limit, zanim mapping() dosiegnie progu. Kontrola
       // deltaTarget < deltaSource, ktora zwrocilaby czytelny komunikat, mieszka w
       // validateConstraints() - a ten przebieg biegnie PO tym miejscu.
-      throw PlanError{
-          fmt::format("Stream '{}' has an interval ratio too extreme to resolve its logical origin "
-                      "(origin search passed {} steps looking for {})",
-                      nodeId, kOriginSearchLimit, threshold)};
+      return std::nullopt;
     }
     hi *= 2;
   }
@@ -2089,6 +2104,13 @@ int firstIndexReaching(const Mapping &mapping, const int threshold, const std::s
       hi = mid;
   }
   return lo;
+}
+
+std::string originSearchTooExtreme(const std::string &nodeId, const int threshold) {
+  return fmt::format(
+      "Stream '{}' has an interval ratio too extreme to resolve its logical origin "
+      "(origin search passed {} steps looking for {})",
+      nodeId, kOriginSearchLimit, threshold);
 }
 
 }  // namespace
@@ -2165,16 +2187,22 @@ std::string compiler::computeLogicalOrigin() {
                              std::numeric_limits<int>::max());
         result = static_cast<int>(origin);
       } else if (op == STREAM_SUBTRACT) {
-        const auto delta = q.rInterval;
-        result           = firstIndexReaching([&](int n) { return Subtract(delta1, delta, n); }, o1, q.id);
+        const auto delta   = q.rInterval;
+        const auto reached = firstIndexReaching([&](int n) { return Subtract(delta1, delta, n); }, o1);
+        if (!reached) return originSearchTooExtreme(q.id, o1);
+        result = *reached;
       } else if (op == STREAM_DEHASH_DIV) {
-        const auto delta = q.rInterval;
-        const auto param = std::next(q.lProgram.begin())->getRI();
-        result           = firstIndexReaching([&](int n) { return Div(delta, param, n); }, o1, q.id);
+        const auto delta   = q.rInterval;
+        const auto param   = std::next(q.lProgram.begin())->getRI();
+        const auto reached = firstIndexReaching([&](int n) { return Div(delta, param, n); }, o1);
+        if (!reached) return originSearchTooExtreme(q.id, o1);
+        result = *reached;
       } else if (op == STREAM_DEHASH_MOD) {
-        const auto delta = q.rInterval;
-        const auto param = std::next(q.lProgram.begin())->getRI();
-        result           = firstIndexReaching([&](int n) { return Mod(param, delta, n); }, o1, q.id);
+        const auto delta   = q.rInterval;
+        const auto param   = std::next(q.lProgram.begin())->getRI();
+        const auto reached = firstIndexReaching([&](int n) { return Mod(param, delta, n); }, o1);
+        if (!reached) return originSearchTooExtreme(q.id, o1);
+        result = *reached;
       } else if (op == STREAM_ADD || op == STREAM_HASH) {
         auto second = std::next(q.lProgram.begin());
         int o2      = 0;
@@ -2183,15 +2211,21 @@ std::string compiler::computeLogicalOrigin() {
 
         if (op == STREAM_ADD) {
           const auto delta = q.rInterval;
-          result           = std::max(firstIndexReaching([&](int n) { return Add(delta, delta1, n); }, o1, q.id),
-                                      firstIndexReaching([&](int n) { return Add(delta, delta2, n); }, o2, q.id));
+          const auto first = firstIndexReaching([&](int n) { return Add(delta, delta1, n); }, o1);
+          if (!first) return originSearchTooExtreme(q.id, o1);
+          const auto second = firstIndexReaching([&](int n) { return Add(delta, delta2, n); }, o2);
+          if (!second) return originSearchTooExtreme(q.id, o2);
+          result = std::max(*first, *second);
         } else {
           // Przeplot czyta w slocie n tylko JEDNĄ składową, ale obie pozycje - floor(z*n) dla
           // pierwszej i n-floor(z*n) dla drugiej - są niemalejące. Najmniejsze n, od którego
           // KAŻDY dalszy slot trafia w istniejący rekord swojej składowej, to maksimum progów.
-          const auto zet = delta2 / (delta1 + delta2);
-          result         = std::max(firstIndexReaching([&](int n) { return floorR(zet * n); }, o1, q.id),
-                                    firstIndexReaching([&](int n) { return n - floorR(zet * n); }, o2, q.id));
+          const auto zet   = delta2 / (delta1 + delta2);
+          const auto first = firstIndexReaching([&](int n) { return floorR(zet * n); }, o1);
+          if (!first) return originSearchTooExtreme(q.id, o1);
+          const auto second = firstIndexReaching([&](int n) { return n - floorR(zet * n); }, o2);
+          if (!second) return originSearchTooExtreme(q.id, o2);
+          result = std::max(*first, *second);
         }
       }
 
@@ -2200,7 +2234,9 @@ std::string compiler::computeLogicalOrigin() {
     }
   }
 
-  requireResolvedForEveryNode(coreInstance, origin, "compiler::computeLogicalOrigin", "logical origin");
+  if (auto status = requireResolvedForEveryNode(coreInstance, origin, "compiler::computeLogicalOrigin", "logical origin");
+      status != "OK")
+    return status;
   for (auto &q : coreInstance)
     q.logicalOrigin = origin.at(q.id);
   return {"OK"};
@@ -2323,7 +2359,9 @@ std::string compiler::computeStartupLatency() {
     }
   }
 
-  requireResolvedForEveryNode(coreInstance, latency, "compiler::computeStartupLatency", "startup latency");
+  if (auto status = requireResolvedForEveryNode(coreInstance, latency, "compiler::computeStartupLatency", "startup latency");
+      status != "OK")
+    return status;
   for (auto &q : coreInstance)
     q.startupLatency = latency.at(q.id);
   return {"OK"};
@@ -2576,7 +2614,7 @@ std::string compiler::validateSubstratNameUniqueness() {
           return a.getCommandID() == b.getCommandID() && a.getVT() == b.getVT();
         });
     if (!progMatch)
-      throw rdb::LogicError(
+      return internalCompilerError(
           fmt::format("compiler::validateSubstratNameUniqueness: substrate name '{}' denotes two different "
                       "programs",
                       candidate.id));
@@ -3263,7 +3301,7 @@ namespace {
 /// `$` ma wartosc numeru instancji. Tekst pochodzi z ANTLR-owego getText(), wiec nie zawiera
 /// bialych znakow, a jego ksztalt gwarantuje gramatyka. Kazde odstepstwo od niej jest wiec
 /// bledem WEWNETRZNYM - rozjechala sie gramatyka z ewaluatorem - a nie bledem uzytkownika,
-/// i stad FatalError zamiast komunikatu zwracanego do wolajacego.
+/// i stad osobny kanal: internalError() niepusty, a wolajacy zwraca internalCompilerError().
 ///
 /// Przepelnienie int jest natomiast bledem UZYTKOWNIKA: gramatyka nie ogranicza ani dlugosci
 /// literalu, ani wyniku dzialan. fold() oddaje wtedy nullopt, a komunikat sklada wolajacy.
@@ -3277,10 +3315,14 @@ class genIndexFolder {
     const auto value = sum();
     if (!value) return std::nullopt;
     if (pos_ != text_.size())
-      throw rdb::LogicError(
+      return internal(
           fmt::format("compiler::expandStreamGenerators: trailing '{}' in generator index '{}'", text_.substr(pos_), text_));
     return value;
   }
+
+  /// Niepusty po odstepstwie od gramatyki - wtedy fold() zwrocil nullopt z tego powodu, a nie
+  /// z powodu przepelnienia.
+  [[nodiscard]] const std::string &internalError() const { return internalError_; }
 
  private:
   std::optional<int> sum() {
@@ -3305,15 +3347,20 @@ class genIndexFolder {
     return value;
   }
 
+  std::optional<int> internal(std::string message) {
+    if (internalError_.empty()) internalError_ = std::move(message);
+    return std::nullopt;
+  }
+
   std::optional<int> atom() {
     if (pos_ >= text_.size())
-      throw rdb::LogicError(fmt::format("compiler::expandStreamGenerators: truncated generator index '{}'", text_));
+      return internal(fmt::format("compiler::expandStreamGenerators: truncated generator index '{}'", text_));
     if (text_[pos_] == '(') {
       ++pos_;
       const auto value = sum();
       if (!value) return std::nullopt;
       if (pos_ >= text_.size() || text_[pos_] != ')')
-        throw rdb::LogicError(fmt::format("compiler::expandStreamGenerators: unbalanced '(' in generator index '{}'", text_));
+        return internal(fmt::format("compiler::expandStreamGenerators: unbalanced '(' in generator index '{}'", text_));
       ++pos_;
       return value;
     }
@@ -3322,7 +3369,7 @@ class genIndexFolder {
       return ordinal_;
     }
     if (text_[pos_] < '0' || text_[pos_] > '9')
-      throw rdb::LogicError(
+      return internal(
           fmt::format("compiler::expandStreamGenerators: unexpected '{}' in generator index '{}'", text_[pos_], text_));
     std::optional<int> value = 0;
     while (value && pos_ < text_.size() && text_[pos_] >= '0' && text_[pos_] <= '9') {
@@ -3336,6 +3383,7 @@ class genIndexFolder {
   static constexpr int kDecimalBase{10};
   int ordinal_;
   std::size_t pos_ = 0;
+  std::string internalError_;
 };
 
 /// Rozbija `cells[23-$]` na nazwe `cells` i tresc nawiasu `23-$`.
@@ -3377,8 +3425,11 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
     if (t.getCommandID() != PUSH_STREAM || !dependsOnOrdinal(t.getStr_())) continue;
     const auto parts = splitIndexedRef(t.getStr_());
     if (!parts.has_value())
-      throw rdb::LogicError(fmt::format("compiler::substituteOrdinal: malformed indexed stream reference '{}'", t.getStr_()));
-    const auto index = genIndexFolder(parts->second, ordinal).fold();
+      return internalCompilerError(
+          fmt::format("compiler::substituteOrdinal: malformed indexed stream reference '{}'", t.getStr_()));
+    genIndexFolder folder(parts->second, ordinal);
+    const auto index = folder.fold();
+    if (!folder.internalError().empty()) return internalCompilerError(folder.internalError());
     if (!index) return "Stream '" + instance.id + "' references '" + t.getStr_() + "' - the index does not fit in int";
     // Ujemny numer instancji nie zwinalby sie juz w expandStreamGenerators(): `-` na poczatku
     // indeksu gramatyka wyklucza, wiec do 2026-09-27 `FROM cell[$-1]` konczylo proces FatalError-em.
@@ -3397,8 +3448,11 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
       if (t.getCommandID() != PUSH_ID2 || !dependsOnOrdinal(t.getStr_())) continue;
       const auto parts = splitIndexedRef(t.getStr_());
       if (!parts.has_value())
-        throw rdb::LogicError(fmt::format("compiler::substituteOrdinal: malformed indexed field reference '{}'", t.getStr_()));
-      const auto index = genIndexFolder(parts->second, ordinal).fold();
+        return internalCompilerError(
+            fmt::format("compiler::substituteOrdinal: malformed indexed field reference '{}'", t.getStr_()));
+      genIndexFolder folder(parts->second, ordinal);
+      const auto index = folder.fold();
+      if (!folder.internalError().empty()) return internalCompilerError(folder.internalError());
       if (!index) return "Stream '" + instance.id + "' references '" + t.getStr_() + "' - the index does not fit in int";
       if (*index < 0)
         return "Stream '" + instance.id + "' references '" + parts->first + "[" + std::to_string(*index) +
@@ -3621,7 +3675,9 @@ std::string compiler::expandStreamGenerators() {
       const auto family = families.find(parts->first);
       if (family == families.end())
         return "Stream '" + q.id + "' references '" + t.getStr_() + "' but '" + parts->first + "' is not a stream generator";
-      const auto index = genIndexFolder(parts->second, 0).fold();
+      genIndexFolder folder(parts->second, 0);
+      const auto index = folder.fold();
+      if (!folder.internalError().empty()) return internalCompilerError(folder.internalError());
       if (!index || *index < 0 || *index >= family->second)
         return "Stream '" + q.id + "' references '" + t.getStr_() + "' outside the range 0.." +
                std::to_string(family->second - 1);
@@ -3642,20 +3698,47 @@ std::string compiler::expandStreamGenerators() {
   return {"OK"};
 }
 
+std::string compiler::checkStreamReferences() {
+  // Do 2026-10 nie bylo tego przebiegu: `SELECT * STREAM out FROM nosuch` dochodzilo do
+  // qTree::getQuery() glebiej w kompilatorze i konczylo kompilacje std::logic_error, ktorego nie
+  // lapal compile() - a krok `@(0,4)` przechodzil az do query::descriptorFrom(). Oba sa bledami
+  // PLANU i wracaja tu statusem, zanim ktorykolwiek przebieg zbuduje z nich wezel.
+  for (const auto &q : coreInstance) {
+    if (q.isCompilerDirective()) continue;
+    for (const auto &t : q.lProgram) {
+      if (t.getCommandID() == PUSH_STREAM && !coreInstance.exists(t.getStr_())) {
+        // Wpis w logu, jak dawny "Missing - <nazwa>" z qTree::getQuery: host osadzajacy (most logow
+        // Pythona, test_engine_logs_reach_the_logging_module) widzi przyczyne takze poza statusem.
+        auto message = fmt::format("Stream '{}' reads from '{}', which is not defined in the plan", q.id, t.getStr_());
+        SPDLOG_ERROR("compiler: {}", message);
+        return message;
+      }
+      if (t.getCommandID() == STREAM_AGSE) {
+        const auto *window = std::get_if<std::pair<int, int>>(&t.getVT());
+        if (window == nullptr)
+          return internalCompilerError(fmt::format("compiler: AGSE token without (step,window) in '{}'", q.id));
+        if (window->first <= 0)
+          return fmt::format("Stream '{}' has an AGSE step of {}; the step in @(step,window) must be > 0", q.id, window->first);
+      }
+    }
+  }
+  return {"OK"};
+}
+
 void compiler::reset() {
   restrictSelectSharing_ = false;
   selectSharingScope_.clear();
   namedSourceRefs_.clear();
 }
 
-/// @throws nic. Blad planu wraca STATUSEM - to jest cala umowa tej funkcji i powod, dla
-/// ktorego PlanError jest lapany tutaj, a nie wyzej. Wolajacych jest czterech i dwoch z nich
-/// biegnie w watku komunikacyjnym (executorsmAdHoc, executorsmPlanReload), gdzie rzut
-/// oznaczalby smierc serwera na bledne zapytanie klienta.
+/// Nie rzuca. Blad planu wraca STATUSEM - to jest cala umowa tej funkcji. Wolajacych jest
+/// czterech i dwoch z nich biegnie w watku komunikacyjnym (executorsmAdHoc,
+/// executorsmPlanReload), gdzie wyjatek oznaczalby smierc serwera na bledne zapytanie klienta.
 ///
-/// rdb::LogicError NIE jest tu lapany celowo: zlamany niezmiennik kompilatora to blad w tym
-/// kodzie, a nie w planie uzytkownika, i ma dolecie tam, gdzie konczy sie proces.
-std::string compiler::compile() try {
+/// Zlamany niezmiennik kompilatora wraca TA SAMA droga, ale z przedrostkiem
+/// kInternalCompilerError: to blad w tym kodzie, a nie w planie uzytkownika, wiec wolajacy
+/// odroznia go (isInternalCompilerError) i nie pokazuje klientowi jako bledu zapytania.
+std::string compiler::compile() {
   std::string result;
 
   // Sonda E3 (rdb/probe.hpp): rozmiar planu na czterech etapach, czas kompilacji i
@@ -3679,6 +3762,10 @@ std::string compiler::compile() try {
   // plan jest nie do odróżnienia od ręcznie rozpisanego, więc dalsza część kompilatora
   // o generatorach nie wie i wiedzieć nie musi.
   result = expandStreamGenerators();
+  if (result != "OK") return result;
+
+  // Granica walidacji odwolan: od tego miejsca nazwa strumienia w programie FROM zawsze istnieje.
+  result = checkStreamReferences();
   if (result != "OK") return result;
 
   // Musi być PRZED pierwszym przebiegiem - patrz uzasadnienie przy definicji.
@@ -3780,7 +3867,9 @@ std::string compiler::compile() try {
   result = computeStartupLatency();
   if (result != "OK") return result;
 
-  coreInstance.maxCapacity = computeRequiredCapacities();
+  auto capacities = computeRequiredCapacities();
+  if (!capacities) return capacities.error();
+  coreInstance.maxCapacity = std::move(*capacities);
 
   result = validateConstraints();
   if (result != "OK") return result;
@@ -3812,10 +3901,6 @@ std::string compiler::compile() try {
   planBench.report(coreInstance, coreInstance.maxCapacity, RDB_OPT_DEDUP_SUBSTRATES);
 
   return {"OK"};
-} catch (const PlanError &error) {
-  // Ta sama droga, ktora wraca kazdy inny blad planu - wolajacy ma JEDNO miejsce, w ktorym
-  // odrzuca plan, i nie musi wiedziec, ktory przebieg go odrzucil.
-  return error.message;
 }
 
 std::vector<std::string> compiler::importFrom(qTree &source) {

@@ -12,11 +12,11 @@
 #include <vector>
 
 #include "config.h"
-#include "rdb/exceptions.hpp"
 #include "rdb/fainterface.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/probe.hpp"  // sonda E4 (liczy tylko w buildzie RDB_BENCH_PROBE)
 #include "rdb/storage.hpp"
+#include "rdbResult.hpp"
 #include "retractor/lib/dataModel.hpp"
 #include "retractor/lib/executorsmState.hpp"
 #include "retractor/lib/qTree.hpp"  // coreInstance
@@ -76,31 +76,31 @@ class xschema : public ::testing::Test {
     // This simplified dataModel::load
     coreInstance.clear();
     parserRQLFile_4Test(coreInstance, "ut_example_schema.rql");
-    dataArea = std::make_unique<dataModel>(coreInstance);
+    dataArea = rdbtest::ok(dataModel::create(coreInstance));
 
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 11);
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 12);
-    dataArea->qSet["str1"]->outputPayload->write();
+    rdbtest::ok(dataArea->qSet["str1"]->outputPayload->write());
 
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 13);
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 14);
-    dataArea->qSet["str1"]->outputPayload->write();
+    rdbtest::ok(dataArea->qSet["str1"]->outputPayload->write());
 
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 15);
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 16);
-    dataArea->qSet["str1"]->outputPayload->write();
+    rdbtest::ok(dataArea->qSet["str1"]->outputPayload->write());
 
     dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 111);
-    dataArea->qSet["str2"]->outputPayload->write();
+    rdbtest::ok(dataArea->qSet["str2"]->outputPayload->write());
 
     dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 222);
-    dataArea->qSet["str2"]->outputPayload->write();
+    rdbtest::ok(dataArea->qSet["str2"]->outputPayload->write());
 
     dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 333);
-    dataArea->qSet["str2"]->outputPayload->write();
+    rdbtest::ok(dataArea->qSet["str2"]->outputPayload->write());
 
     for (const auto &i : coreInstance)
-      if (!i.isDeclaration()) dataArea->constructInputPayload(i, *dataArea->qSet[i.id]);
+      if (!i.isDeclaration()) rdbtest::ok(dataArea->constructInputPayload(i, *dataArea->qSet[i.id]));
 
     pProc = dataArea.get();
   }
@@ -113,7 +113,8 @@ class xschema : public ::testing::Test {
 };
 
 TEST_F(xschema, check_construct_payload) {
-  streamInstance data{coreInstance, coreInstance["str1"]};
+  auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
+  streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
 
   // str1
@@ -127,7 +128,8 @@ TEST_F(xschema, check_construct_payload) {
   // ta sama zawartosc siedzi pod indeksem 5, nie 2.
   // Dodatnia szerokosc uklada najnowsze pole jako pierwsze.
   {
-    std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(4, 1, "str1", 5));
+    std::unique_ptr<rdb::payload> payload =
+        std::make_unique<rdb::payload>(rdbtest::ok(data.constructAgsePayload(4, 1, "str1", 5)));
     std::stringstream coutstring1;
     coutstring1 << rdb::singleLineFormat << payload->descriptor;
     std::stringstream coutstring2;
@@ -139,7 +141,8 @@ TEST_F(xschema, check_construct_payload) {
 }
 
 TEST_F(xschema, check_construct_payload_mirror) {
-  streamInstance data{coreInstance, coreInstance["str1"]};
+  auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
+  streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
 
   // str1
@@ -150,7 +153,8 @@ TEST_F(xschema, check_construct_payload_mirror) {
 
   // Ujemna szerokosc jest odbiciem lustrzanym tego samego pelnego okna (pozycje 2..5).
   {
-    std::unique_ptr<rdb::payload> payload = std::make_unique<rdb::payload>(data.constructAgsePayload(-4, 1, "str1", 5));
+    std::unique_ptr<rdb::payload> payload =
+        std::make_unique<rdb::payload>(rdbtest::ok(data.constructAgsePayload(-4, 1, "str1", 5)));
     std::stringstream coutstring1;
     coutstring1 << rdb::singleLineFormat << payload->descriptor;
 
@@ -185,11 +189,12 @@ TEST_F(xschema, probe_e4_agse_window_work_counts) {
   // przejście przez to samo okno nie ma prawa ruszyć żadnego licznika.
   constexpr unsigned long long on = rdb_probe_work ? 1 : 0;
 
-  streamInstance data{coreInstance, coreInstance["str1"]};
+  auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
+  streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
 
   rdb::probe::workReset();
-  { auto payload = data.constructAgsePayload(4, 1, "str1", 5); }
+  { auto payload = rdbtest::ok(data.constructAgsePayload(4, 1, "str1", 5)); }
   const auto after = rdb::probe::workReport();
 
   EXPECT_EQ(after.agseWindows, 1 * on);
@@ -200,7 +205,7 @@ TEST_F(xschema, probe_e4_agse_window_work_counts) {
   // a analiza dzieli je przez liczbę slotów. Gdyby akumulacja gubiła wywołania, model
   // kosztu dostałby zaniżoną pracę i to jest dokładnie ta klasa błędu, przez którą
   // upadł model K20 etap 1.
-  { auto payload = data.constructAgsePayload(4, 1, "str1", 5); }
+  { auto payload = rdbtest::ok(data.constructAgsePayload(4, 1, "str1", 5)); }
   const auto twice = rdb::probe::workReport();
 
   EXPECT_EQ(twice.agseWindows, 2 * on);
@@ -210,7 +215,7 @@ TEST_F(xschema, probe_e4_agse_window_work_counts) {
   // Okno lustrzane ma tę samą geometrię, więc tę samą pracę - znak steruje kolejnością
   // pól w wyniku, nie liczbą odwiedzin.
   rdb::probe::workReset();
-  { auto payload = data.constructAgsePayload(-4, 1, "str1", 5); }
+  { auto payload = rdbtest::ok(data.constructAgsePayload(-4, 1, "str1", 5)); }
   const auto mirrored = rdb::probe::workReport();
 
   EXPECT_EQ(mirrored.agseElements, 4 * on);
@@ -228,15 +233,16 @@ TEST_F(xschema, probe_e4_agse_window_work_counts) {
 TEST_F(xschema, probe_e4_agse_elements_scale_with_window_length) {
   constexpr unsigned long long on = rdb_probe_work ? 1 : 0;
 
-  streamInstance data{coreInstance, coreInstance["str1"]};
+  auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
+  streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
 
   rdb::probe::workReset();
-  { auto payload = data.constructAgsePayload(2, 1, "str1", 2); }
+  { auto payload = rdbtest::ok(data.constructAgsePayload(2, 1, "str1", 2)); }
   const auto shortWindow = rdb::probe::workReport().agseElements;
 
   rdb::probe::workReset();
-  { auto payload = data.constructAgsePayload(6, 1, "str1", 2); }
+  { auto payload = rdbtest::ok(data.constructAgsePayload(6, 1, "str1", 2)); }
   const auto longWindow = rdb::probe::workReport().agseElements;
 
   EXPECT_EQ(shortWindow, 2 * on);
@@ -245,11 +251,13 @@ TEST_F(xschema, probe_e4_agse_elements_scale_with_window_length) {
 }
 
 TEST_F(xschema, check_sum) {
-  streamInstance dataStr1{coreInstance, coreInstance["str1"]};
+  auto dataStr1Owner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
+  streamInstance &dataStr1 = *dataStr1Owner;
   dataStr1.outputPayload->setDisposable(false);
   static_cast<void>(dataStr1.outputPayload->revRead(0));
 
-  streamInstance dataStr2{coreInstance, coreInstance["str2"]};
+  auto dataStr2Owner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str2"]));
+  streamInstance &dataStr2 = *dataStr2Owner;
   dataStr2.outputPayload->setDisposable(false);
   static_cast<void>(dataStr2.outputPayload->revRead(0));
 
@@ -310,17 +318,17 @@ TEST_F(xschema, getRow_1) {
   21 32
   22 33
   */
-  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+  rdbtest::ok(dataArea->qSet["core0"]->outputPayload->resetForUnitTest());
 
   // processRows bierze maske pozycyjna rownolegla do planu, nie zbior nazw.
   std::vector<char> rowMask(coreInstance.size(), 0);
   for (std::size_t position = 0; position < coreInstance.size(); ++position)
     if (coreInstance.at(position).id == "core0") rowMask[position] = 1;
 
-  dataArea->processZeroStep();
-  auto row1 = dataArea->getRow("core0", 0);
-  dataArea->processRows(rowMask);
-  auto row2 = dataArea->getRow("core0", 1);
+  rdbtest::ok(dataArea->processZeroStep());
+  auto row1 = rdbtest::ok(dataArea->getRow("core0", 0));
+  rdbtest::ok(dataArea->processRows(rowMask));
+  auto row2 = rdbtest::ok(dataArea->getRow("core0", 1));
 
   std::string res1 = print(row1);
   std::string res2 = print(row2);
@@ -328,7 +336,7 @@ TEST_F(xschema, getRow_1) {
   EXPECT_TRUE("{ 20 31 }" == res1);
   EXPECT_TRUE("{ 21 32 }" == res2);
 
-  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+  rdbtest::ok(dataArea->qSet["core0"]->outputPayload->resetForUnitTest());
 }
 
 // ============================================================
@@ -364,22 +372,22 @@ TEST_F(xschema, handleTable_survives_plan_reorder) {
   // Kontrola NEGATYWNA: po przestawieniu planu tablica przebudowuje sie sama i takt liczy sie
   // poprawnie. Sprawdzany jest wynik, nie samo "nie zginelo" - ta sama para rekordow co
   // w getRow_1, tyle ze policzona na odwroconym planie.
-  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+  rdbtest::ok(dataArea->qSet["core0"]->outputPayload->resetForUnitTest());
 
   // Uzbrojenie tablicy dla UKLADU SPRZED zmiany: maska pusta, wiec zaden strumien nie liczy.
-  dataArea->processRows(std::vector<char>(coreInstance.size(), 0));
+  rdbtest::ok(dataArea->processRows(std::vector<char>(coreInstance.size(), 0)));
 
   reversePlanOrder();
 
-  dataArea->processZeroStep();
-  auto row1 = dataArea->getRow("core0", 0);
-  dataArea->processRows(dueMaskFor("core0"));
-  auto row2 = dataArea->getRow("core0", 1);
+  rdbtest::ok(dataArea->processZeroStep());
+  auto row1 = rdbtest::ok(dataArea->getRow("core0", 0));
+  rdbtest::ok(dataArea->processRows(dueMaskFor("core0")));
+  auto row2 = rdbtest::ok(dataArea->getRow("core0", 1));
 
   EXPECT_TRUE("{ 20 31 }" == print(row1));
   EXPECT_TRUE("{ 21 32 }" == print(row2));
 
-  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+  rdbtest::ok(dataArea->qSet["core0"]->outputPayload->resetForUnitTest());
 }
 
 TEST_F(xschema, handleTable_stale_entry_is_caught) {
@@ -390,19 +398,19 @@ TEST_F(xschema, handleTable_stale_entry_is_caught) {
 #ifdef NDEBUG
   GTEST_SKIP() << "kontrola krzyzowa uchwytow zyje tylko w Debug - w Release nie ma czego czerwienic";
 #else
-  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
-  dataArea->processRows(std::vector<char>(coreInstance.size(), 0));  // uzbrojenie tablicy
+  rdbtest::ok(dataArea->qSet["core0"]->outputPayload->resetForUnitTest());
+  rdbtest::ok(dataArea->processRows(std::vector<char>(coreInstance.size(), 0)));  // uzbrojenie tablicy
 
-  EXPECT_THAT(
-      [&] {
+  // Kontrola to RDB_ASSERT: zlamany niezmiennik konczy proces (do 2026-10 rzucala LogicError).
+  // Przestawienie planu zachodzi wylacznie w procesie potomnym testu smierci, wiec ten proces -
+  // i nastepne testy, ktore dziela z nim plan i model - zostaje z ukladem sprzed testu.
+  EXPECT_DEATH(
+      {
         reversePlanOrder();
         dataArea->markHandlesFreshForUnitTest();
-        dataArea->processRows(dueMaskFor("core0"));
+        static_cast<void>(dataArea->processRows(dueMaskFor("core0")));
       },
-      ::testing::ThrowsMessage<rdb::LogicError>(::testing::HasSubstr("does not match plan node")));
-  // Kontrola rzuca, a nie zabija procesu potomnego, wiec przestawienie zostalo w TYM procesie.
-  // Nastepne testy dziela plan i model z tym, wiec dostaja z powrotem uklad sprzed testu.
-  reversePlanOrder();
+      "does not match plan node");
 #endif
 }
 
@@ -410,26 +418,27 @@ TEST_F(xschema, handleTable_stale_entry_is_caught) {
 // Strumien nieobecny w modelu (issue #252)
 // ============================================================
 //
-// Dostep po nazwie ma zglaszac brak strumienia wyjatkiem, tak jak streamRuntime(). `qSet[nazwa]`
-// na nieobecnym kluczu WSTAWIAL pusty unique_ptr i zaraz go dereferencjonowal - SIGSEGV zamiast
-// bledu. Sprawdzane sa trzy rzeczy: wyjatek, mapa bez wstawionego wpisu i model, ktory po bledzie
-// dalej odpowiada dla strumienia, ktory w nim jest.
+// Dostep po nazwie konczy proces z nazwa strumienia (RDB_ASSERT w streamRuntime()) - nazwy przychodza
+// z planu, wiec brak to blad w kodzie. `qSet[nazwa]` na nieobecnym kluczu WSTAWIAL pusty unique_ptr
+// i zaraz go dereferencjonowal - SIGSEGV zamiast bledu. Do 2026-10 byl tu rzut std::logic_error.
+// Sprawdzane sa: zatrzymanie z komunikatem, mapa bez wstawionego wpisu i model, ktory dalej
+// odpowiada dla strumienia, ktory w nim jest.
 
 TEST_F(xschema, missingStream_is_reported_not_inserted) {
   const std::string ghost = "no_such_stream";
   const auto sizeBefore   = dataArea->qSet.size();
 
-  EXPECT_THROW(static_cast<void>(dataArea->getPayload(ghost)), std::logic_error);
-  EXPECT_THROW(static_cast<void>(dataArea->fetchForward(ghost, 0)), std::logic_error);
-  EXPECT_THROW(static_cast<void>(dataArea->getRow(ghost, 0)), std::logic_error);
+  EXPECT_DEATH(static_cast<void>(dataArea->getPayload(ghost)), "FATAL: .*no_such_stream");
+  EXPECT_DEATH(static_cast<void>(dataArea->fetchForward(ghost, 0)), "FATAL: .*no_such_stream");
+  EXPECT_DEATH(static_cast<void>(dataArea->getRow(ghost, 0)), "FATAL: .*no_such_stream");
 
   EXPECT_FALSE(dataArea->qSet.contains(ghost));
   EXPECT_EQ(dataArea->qSet.size(), sizeBefore);
 
-  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
-  dataArea->processZeroStep();
-  EXPECT_TRUE("{ 20 31 }" == print(dataArea->getRow("core0", 0)));
-  dataArea->qSet["core0"]->outputPayload->resetForUnitTest();
+  rdbtest::ok(dataArea->qSet["core0"]->outputPayload->resetForUnitTest());
+  rdbtest::ok(dataArea->processZeroStep());
+  EXPECT_TRUE("{ 20 31 }" == print(rdbtest::ok(dataArea->getRow("core0", 0))));
+  rdbtest::ok(dataArea->qSet["core0"]->outputPayload->resetForUnitTest());
 }
 
 // Dolaczenie ad-hoc wpisuje instancje do modelu wszystkie albo zadnej. getAdHoc() przy porazce
@@ -464,11 +473,12 @@ TEST_F(xschema, addQueriesToModel_is_all_or_nothing) {
 TEST_F(xschema, agse_window_flat_position_beyond_int) {
   constexpr int n = (1 << 30) + 10;
 
-  streamInstance data{coreInstance, coreInstance["str1"]};
+  auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
+  streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
 
-  const auto nearWindow = data.constructAgsePayload(4, 2, "str1", 2, 0);
-  const auto farWindow  = data.constructAgsePayload(4, 2, "str1", n, n - 2);
+  const auto nearWindow = rdbtest::ok(data.constructAgsePayload(4, 2, "str1", 2, 0));
+  const auto farWindow  = rdbtest::ok(data.constructAgsePayload(4, 2, "str1", n, n - 2));
 
   std::stringstream nearText;
   nearText << rdb::singleLineFormat << nearWindow;
@@ -495,7 +505,7 @@ TEST_F(xschema, agse_adhoc_join_flat_position_beyond_int) {
   // Rekord fizyczny 0 zrodla nosi indeks logiczny n-2, wiec okno n ma komplet rekordow n-2..n.
   dataArea->qSet["str1"]->logicalIndexBase = n - 2;
 
-  dataArea->processRows(dueMaskFor("agse1"), boost::rational<int>(n + 1));
+  rdbtest::ok(dataArea->processRows(dueMaskFor("agse1"), boost::rational<int>(n + 1)));
 
   // Baze dostaje tylko wezel, dla ktorego queryInputsAvailable odpowiedzialo "tak".
   EXPECT_EQ(dataArea->qSet["agse1"]->logicalIndexBase, std::optional<int>(n));
@@ -506,43 +516,47 @@ TEST_F(xschema, agse_adhoc_join_flat_position_beyond_int) {
 }
 
 TEST_F(xschema, reduceFieldsToPayload_max) {
-  streamInstance data{coreInstance, coreInstance["str1"]};
+  auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
+  streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
   // str1 last record: {15, 16} → MAX = 16 (pole RATIONAL, patrz K24/D4)
-  auto result = data.reduceFieldsToPayload(STREAM_MAX, "str1");
+  auto result = rdbtest::ok(data.reduceFieldsToPayload(STREAM_MAX, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:16/1 }");
 }
 
 TEST_F(xschema, reduceFieldsToPayload_min) {
-  streamInstance data{coreInstance, coreInstance["str1"]};
+  auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
+  streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
   // str1 last record: {15, 16} → MIN = 15 (pole RATIONAL, patrz K24/D4)
-  auto result = data.reduceFieldsToPayload(STREAM_MIN, "str1");
+  auto result = rdbtest::ok(data.reduceFieldsToPayload(STREAM_MIN, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:15/1 }");
 }
 
 TEST_F(xschema, reduceFieldsToPayload_sum) {
-  streamInstance data{coreInstance, coreInstance["str1"]};
+  auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
+  streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
   // str1 last record: {15, 16} → SUM = 31 (pole RATIONAL, patrz K24/D4)
-  auto result = data.reduceFieldsToPayload(STREAM_SUM, "str1");
+  auto result = rdbtest::ok(data.reduceFieldsToPayload(STREAM_SUM, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:31/1 }");
 }
 
 TEST_F(xschema, reduceFieldsToPayload_avg) {
-  streamInstance data{coreInstance, coreInstance["str1"]};
+  auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
+  streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
   // str1 last record: {15, 16} → AVG = 31/2.
   // K24/D4: wynik redukcji jest polem RATIONAL i pozostaje dokladny. Wczesniej
   // przechodzil przez rational_cast<int> i dawal 15, mimo ze pole wyjsciowe
   // zadeklarowane przez kompilator bylo RATIONAL - stad mianownik zawsze 1.
-  auto result = data.reduceFieldsToPayload(STREAM_AVG, "str1");
+  auto result = rdbtest::ok(data.reduceFieldsToPayload(STREAM_AVG, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:31/2 }");
@@ -550,9 +564,9 @@ TEST_F(xschema, reduceFieldsToPayload_avg) {
 
 TEST_F(xschema, constructOutputPayload_expression) {
   // str2: SELECT str2[0]+5 FROM core0 → core0.a=20, result=25
-  dataArea->processZeroStep();
-  dataArea->constructInputPayload(coreInstance["str2"], *dataArea->qSet["str2"]);
-  dataArea->qSet["str2"]->constructOutputPayload(coreInstance["str2"].lSchema);
+  rdbtest::ok(dataArea->processZeroStep());
+  rdbtest::ok(dataArea->constructInputPayload(coreInstance["str2"], *dataArea->qSet["str2"]));
+  rdbtest::ok(dataArea->qSet["str2"]->constructOutputPayload(coreInstance["str2"].lSchema));
   std::stringstream ss;
   ss << rdb::singleLineFormat << *(dataArea->qSet["str2"]->outputPayload->getPayload());
   EXPECT_EQ(ss.str(), "{ str2_0:25 }");
@@ -560,15 +574,16 @@ TEST_F(xschema, constructOutputPayload_expression) {
 
 TEST_F(xschema, constructRulesAndUpdate_empty_rules) {
   // str2 has no RULE declarations → constructRulesAndUpdate is a no-op (no crash)
-  dataArea->qSet["str2"]->constructRulesAndUpdate(coreInstance["str2"]);
+  rdbtest::ok(dataArea->qSet["str2"]->constructRulesAndUpdate(coreInstance["str2"]));
   SUCCEED();
 }
 
 TEST_F(xschema, reduceFieldsToPayload_single_field) {
-  streamInstance data{coreInstance, coreInstance["str2"]};
+  auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str2"]));
+  streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
   // str2 last record: {333} → single-field aggregate
-  auto result = data.reduceFieldsToPayload(STREAM_MAX, "str2");
+  auto result = rdbtest::ok(data.reduceFieldsToPayload(STREAM_MAX, "str2"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str2:333/1 }");
@@ -585,7 +600,7 @@ class xschema_rules : public ::testing::Test {
 
     coreInstance.clear();
     parserRQLFile_4Test(coreInstance, "ut_rules_schema.rql");
-    dataArea_rules = std::make_unique<dataModel>(coreInstance);
+    dataArea_rules = rdbtest::ok(dataModel::create(coreInstance));
     pProc          = dataArea_rules.get();
   }
   ~xschema_rules() override { pProc = nullptr; }
@@ -599,8 +614,8 @@ TEST_F(xschema_rules, constructRulesAndUpdate_system_rule_fires) {
   for (std::size_t position = 0; position < coreInstance.size(); ++position)
     if (coreInstance.at(position).id == "str_rule") ruleMask[position] = 1;
 
-  dataArea_rules->processZeroStep();
-  dataArea_rules->processRows(ruleMask);
+  rdbtest::ok(dataArea_rules->processZeroStep());
+  rdbtest::ok(dataArea_rules->processRows(ruleMask));
   EXPECT_TRUE(std::filesystem::exists("rule_marker1.txt")) << "rule1 (>0) should fire for positive data";
   EXPECT_FALSE(std::filesystem::exists("rule_marker2.txt")) << "rule2 (<0) should not fire for positive data";
 }
@@ -616,10 +631,10 @@ class xschema_all_null : public ::testing::Test {
       if (std::filesystem::exists(f)) std::filesystem::remove(f);
     coreInstance.clear();
     parserRQLFile_4Test(coreInstance, "ut_example_schema.rql");
-    dataArea_null = std::make_unique<dataModel>(coreInstance);
+    dataArea_null = rdbtest::ok(dataModel::create(coreInstance));
     dataArea_null->qSet["str1"]->outputPayload->getPayload()->setItem(0, std::nullopt);
     dataArea_null->qSet["str1"]->outputPayload->getPayload()->setItem(1, std::nullopt);
-    dataArea_null->qSet["str1"]->outputPayload->write();
+    rdbtest::ok(dataArea_null->qSet["str1"]->outputPayload->write());
     pProc = dataArea_null.get();
   }
   ~xschema_all_null() override { pProc = nullptr; }
@@ -631,28 +646,28 @@ class xschema_all_null : public ::testing::Test {
 // Null bity są w currentEntry_ metaData tej samej instancji storage,
 // więc revRead(0) odczyta je poprawnie bez potrzeby flushu na dysk.
 TEST_F(xschema_all_null, reduceFieldsToPayload_all_null_sum) {
-  auto result = dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_SUM, "str1");
+  auto result = rdbtest::ok(dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_SUM, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:null }");
 }
 
 TEST_F(xschema_all_null, reduceFieldsToPayload_all_null_min) {
-  auto result = dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_MIN, "str1");
+  auto result = rdbtest::ok(dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_MIN, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:null }");
 }
 
 TEST_F(xschema_all_null, reduceFieldsToPayload_all_null_max) {
-  auto result = dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_MAX, "str1");
+  auto result = rdbtest::ok(dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_MAX, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:null }");
 }
 
 TEST_F(xschema_all_null, reduceFieldsToPayload_all_null_avg) {
-  auto result = dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_AVG, "str1");
+  auto result = rdbtest::ok(dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_AVG, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:null }");
@@ -666,11 +681,11 @@ class xschema_partial_null : public ::testing::Test {
       if (std::filesystem::exists(f)) std::filesystem::remove(f);
     coreInstance.clear();
     parserRQLFile_4Test(coreInstance, "ut_example_schema.rql");
-    dataArea_null = std::make_unique<dataModel>(coreInstance);
+    dataArea_null = rdbtest::ok(dataModel::create(coreInstance));
     // pole 0 = NULL, pole 1 = 10 (nie-NULL)
     dataArea_null->qSet["str1"]->outputPayload->getPayload()->setItem(0, std::nullopt);
     dataArea_null->qSet["str1"]->outputPayload->getPayload()->setItem(1, 10);
-    dataArea_null->qSet["str1"]->outputPayload->write();
+    rdbtest::ok(dataArea_null->qSet["str1"]->outputPayload->write());
     pProc = dataArea_null.get();
   }
   ~xschema_partial_null() override { pProc = nullptr; }
@@ -680,7 +695,7 @@ class xschema_partial_null : public ::testing::Test {
 
 // Logika trójwartościowa: NULL ignorowany, agregacja tylko na wartościach niezerowych
 TEST_F(xschema_partial_null, reduceFieldsToPayload_partial_null_sum) {
-  auto result = dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_SUM, "str1");
+  auto result = rdbtest::ok(dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_SUM, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:10/1 }");
@@ -688,21 +703,21 @@ TEST_F(xschema_partial_null, reduceFieldsToPayload_partial_null_sum) {
 
 TEST_F(xschema_partial_null, reduceFieldsToPayload_partial_null_avg) {
   // AVG: tylko 1 pole niezerowe (10), mianownik = 1, wynik = 10
-  auto result = dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_AVG, "str1");
+  auto result = rdbtest::ok(dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_AVG, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:10/1 }");
 }
 
 TEST_F(xschema_partial_null, reduceFieldsToPayload_partial_null_min) {
-  auto result = dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_MIN, "str1");
+  auto result = rdbtest::ok(dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_MIN, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:10/1 }");
 }
 
 TEST_F(xschema_partial_null, reduceFieldsToPayload_partial_null_max) {
-  auto result = dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_MAX, "str1");
+  auto result = rdbtest::ok(dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_MAX, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:10/1 }");
@@ -712,18 +727,20 @@ TEST_F(xschema_partial_null, reduceFieldsToPayload_partial_null_max) {
 // sees them correctly. Before fix: second reader saw totalRecords()==0 →
 // all-non-null fallback → SUM(null,null)=0 instead of null.
 TEST_F(xschema_all_null, null_bits_flushed_to_disk_second_reader_sum) {
-  streamInstance second{coreInstance, coreInstance["str1"]};
+  auto secondOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
+  streamInstance &second = *secondOwner;
   second.outputPayload->setDisposable(false);
-  auto result = second.reduceFieldsToPayload(STREAM_SUM, "str1");
+  auto result = rdbtest::ok(second.reduceFieldsToPayload(STREAM_SUM, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:null }");
 }
 
 TEST_F(xschema_partial_null, null_bits_flushed_to_disk_second_reader_ignores_null) {
-  streamInstance second{coreInstance, coreInstance["str1"]};
+  auto secondOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
+  streamInstance &second = *secondOwner;
   second.outputPayload->setDisposable(false);
-  auto result = second.reduceFieldsToPayload(STREAM_SUM, "str1");
+  auto result = rdbtest::ok(second.reduceFieldsToPayload(STREAM_SUM, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:10/1 }");
@@ -741,24 +758,24 @@ class xschema_compare_restore : public ::testing::Test {
       if (std::filesystem::exists(f)) std::filesystem::remove(f);
     coreInstance.clear();
     parserRQLFile_4Test(coreInstance, "ut_example_schema.rql");
-    dataArea = std::make_unique<dataModel>(coreInstance);
+    dataArea = rdbtest::ok(dataModel::create(coreInstance));
 
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 11);
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 12);
-    dataArea->qSet["str1"]->outputPayload->write();
+    rdbtest::ok(dataArea->qSet["str1"]->outputPayload->write());
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 13);
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 14);
-    dataArea->qSet["str1"]->outputPayload->write();
+    rdbtest::ok(dataArea->qSet["str1"]->outputPayload->write());
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 15);
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 16);
-    dataArea->qSet["str1"]->outputPayload->write();
+    rdbtest::ok(dataArea->qSet["str1"]->outputPayload->write());
 
     dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 111);
-    dataArea->qSet["str2"]->outputPayload->write();
+    rdbtest::ok(dataArea->qSet["str2"]->outputPayload->write());
     dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 222);
-    dataArea->qSet["str2"]->outputPayload->write();
+    rdbtest::ok(dataArea->qSet["str2"]->outputPayload->write());
     dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 333);
-    dataArea->qSet["str2"]->outputPayload->write();
+    rdbtest::ok(dataArea->qSet["str2"]->outputPayload->write());
 
     pProc = dataArea.get();
   }

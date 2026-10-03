@@ -31,8 +31,9 @@ class payload {
   /// @brief Type of dumped or read numeric formats
   bool hexFormat_ = false;
 
+  /// @return false, gdy @p value nie niesie typu T - wolajacy loguje i pomija zapis pola.
   template <typename T>
-  void setItemBy(int position, std::any value);
+  [[nodiscard]] bool setItemBy(int position, const std::any &value);
 
   payload &operator=(const Descriptor &other);
 
@@ -91,7 +92,7 @@ class payload {
 
   /// @brief Odczyt pola BYTE/INTEGER wprost do int - bez wariantu, dla goracych petli, ktore znaja
   /// typ z gory (redukcja pol rekordu). Semantyka NULL identyczna z getItemVT (nullopt => null).
-  /// Pole innego typu to blad wolajacego (LogicError).
+  /// Pole innego typu to blad wolajacego (rdb::fatal - kompilator sprawdzil typ wczesniej).
   [[nodiscard]] std::optional<int> getIntegralItem(int position) const;
 
   /// @brief Set format input/output formater - default false
@@ -115,9 +116,9 @@ class payload {
   /// zachowanie silnika. Reguła jest ta sama co przy operator=(const Descriptor&):
   /// deskryptor pusty - cel przejmuje cudzy wraz z buforem i znacznikami NULL; deskryptor
   /// zgodny - cel zachowuje WŁASNY deskryptor, a stan idzie dokładnie drogą kopii, bez
-  /// przejmowania czegokolwiek; deskryptor niezgodny - LogicError. Dlaczego zgodny cel nie
-  /// może niczego ukraść - przy definicji w payload.cc.
-  payload &operator=(payload &&other);
+  /// przejmowania czegokolwiek; deskryptor niezgodny - złamany niezmiennik (RDB_ASSERT). Dlaczego
+  /// zgodny cel nie może niczego ukraść - przy definicji w payload.cc.
+  payload &operator=(payload &&other) noexcept;
 
   payload operator+(const payload &other);
 };

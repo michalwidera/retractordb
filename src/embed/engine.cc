@@ -9,7 +9,6 @@
 #include <limits>
 #include <memory>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -43,6 +42,9 @@ struct Engine::Plan {
   bool bootstrapped{false};
   bool endOfInput{false};
   std::uint64_t slotsDone{0};
+  /// Slot zwrocil blad: model moze stac w polowie przeliczenia, wiec dalsze step() odmawia.
+  /// Trzyma tresc pierwszego bledu, zeby kolejna odmowa mowila, CO sie stalo, a nie tylko ze.
+  std::optional<Error> failure;
   boost::rational<int> time{0};
   /// Maska strumieni naleznych w slocie, pozycyjna wzgledem drzewa - ta sama, ktora buduje
   /// executorsm::collectAwaitedStreams. Pole planu, a nie zmienna slotu: pojemnosc zostaje
@@ -54,17 +56,17 @@ Engine::Engine(std::string storageDir) : storageDir_(std::move(storageDir)) {}
 
 Engine::~Engine() { close(); }
 
-std::unique_ptr<storage> Engine::openStorage(const std::string_view qryID,         //
-                                             const std::string_view fileName,      //
-                                             const std::string_view storageParam,  //
-                                             const std::string_view storageType,   //
-                                             const bool oneShot,                   //
-                                             const bool isHold,                    //
-                                             const int percounter) {
-  return std::make_unique<storage>(qryID, fileName, storageParam, storageType, oneShot, isHold, percounter, &memory_);
+Result<std::unique_ptr<storage>> Engine::openStorage(const std::string_view qryID,         //
+                                                     const std::string_view fileName,      //
+                                                     const std::string_view storageParam,  //
+                                                     const std::string_view storageType,   //
+                                                     const bool oneShot,                   //
+                                                     const bool isHold,                    //
+                                                     const int percounter) {
+  return storage::create(qryID, fileName, storageParam, storageType, oneShot, isHold, percounter, &memory_);
 }
 
-void Engine::compile(const std::string_view rql, const bool untilEof) {
+Result<> Engine::compile(const std::string_view rql, const bool untilEof) {
   // Poprzedni plan schodzi PRZED budowa nowego: oba pisalyby do tych samych plikow magazynu.
   close();
 
@@ -72,44 +74,43 @@ void Engine::compile(const std::string_view rql, const bool untilEof) {
   plan->untilEof = untilEof;
 
   // Ta sama droga, ktora idzie launcher (parsePlanText + compiler::compile) i przeladowanie
-  // planu w locie (`xqry --reset`); status "OK" albo tresc bledu - obie sa tu wyjatkiem.
+  // planu w locie (`xqry --reset`); status "OK" albo tresc bledu. Status z przedrostkiem
+  // kInternalCompilerError to nie blad planu, tylko blad w parserze/kompilatorze (dawny
+  // LogicError) - host ma go dostac jako InternalError, nie jako "popraw swoj RQL".
   const PlanSource loaded = parsePlanText(plan->tree, std::string(rql));
-  if (loaded.status != "OK") throw SyntaxError(loaded.status);
-  if (plan->tree.empty()) throw CompileError("plan holds no statements");
+  if (loaded.status != "OK") return fail(isInternalCompilerError(loaded.status) ? Errc::Logic : Errc::Syntax, loaded.status);
+  if (plan->tree.empty()) return fail(Errc::Compile, "plan holds no statements");
 
-  std::string response;
-  try {
-    response = plan->cm.compile();
-  } catch (const std::logic_error &error) {
-    // Odwolanie do strumienia, ktorego plan nie deklaruje, kompilator zglasza rzutem
-    // std::logic_error z qTree::getQuery (nie rdb::Error i nie statusem "Check result").
-    // Dla planu podanego przez hosta to blad WEJSCIA, wiec tu zostaje CompileError; rdb::Error
-    // (LogicError, ConfigError) nie dziedziczy po std::logic_error i przechodzi bez zmian.
-    throw CompileError(error.what());
+  // Odwolanie do strumienia, ktorego plan nie deklaruje (`FROM nosuch`), do 2026-10 konczylo
+  // kompilacje std::logic_error z qTree::getQuery, lapanym tu i zamienianym na CompileError.
+  // Teraz odrzuca je przebieg compiler::checkStreamReferences statusem - tym samym kanalem co
+  // kazdy inny blad planu.
+  if (const std::string response = plan->cm.compile(); response != "OK") {
+    return fail(isInternalCompilerError(response) ? Errc::Logic : Errc::Compile, response);
   }
-  if (response != "OK") throw CompileError(response);
 
   // Trzy rzeczy, ktorych silnik osadzony NIE MA, odrzucane tutaj, a nie w polowie slotu:
   //  - :ROTATION czyta licznik rotacji z globalnego pCounterPtr demona (streamInstance.cpp);
   //    bez niego dyrektywa bylaby po cichu ignorowana, a plan pisalby bez rotacji;
   //  - regula DUMP siega po model przez globalny pProc (dumpManager.cpp), ktorego tu nie ma -
-  //    zamiast LogicError o pustym wskazniku w srodku slotu uzytkownik dostaje odpowiedz
+  //    zamiast bledu o pustym wskazniku w srodku slotu uzytkownik dostaje odpowiedz
   //    przy compile();
   //  - regula SYSTEM wykonuje ::system() w procesie hosta; roadmapa (iOS faza 3, pkt 5)
   //    kaze ja bramkowac wywolaniem zwrotnym hosta, DOMYSLNIE WYLACZONYM. Bramki jeszcze nie
   //    ma, wiec obowiazuje "wylaczone".
   for (const auto &qry : plan->tree) {
     if (qry.id == ":ROTATION") {
-      throw CompileError(":ROTATION is not available in the embedded engine - the rotation counter belongs to the daemon");
+      return fail(Errc::Compile,
+                  ":ROTATION is not available in the embedded engine - the rotation counter belongs to the daemon");
     }
     for (const auto &item : qry.lRules) {
       if (item.action == rule::DUMP) {
-        throw CompileError(
-            std::format("stream '{}', rule '{}': DUMP actions are not available in the embedded engine", qry.id, item.name));
+        return fail(Errc::Compile, std::format("stream '{}', rule '{}': DUMP actions are not available in the embedded engine",
+                                               qry.id, item.name));
       }
       if (item.action == rule::SYSTEM) {
-        throw CompileError(
-            std::format("stream '{}', rule '{}': SYSTEM actions are not available in the embedded engine", qry.id, item.name));
+        return fail(Errc::Compile, std::format("stream '{}', rule '{}': SYSTEM actions are not available in the embedded engine",
+                                               qry.id, item.name));
       }
     }
   }
@@ -147,20 +148,38 @@ void Engine::compile(const std::string_view rql, const bool untilEof) {
 
   // Model dostaje sklep MEMORY TEGO silnika - to jest chwila, w ktorej izolacja z fazy 2
   // obejmuje plan, a nie tylko magazyn otwarty przez openStorage().
-  plan->model = std::make_unique<dataModel>(plan->tree, &memory_);
+  RDB_TRY_ASSIGN(plan->model, dataModel::create(plan->tree, &memory_));
   // Po budowie modelu, tak jak w petli demona: dataModel usuwa dyrektywy z drzewa, a os
   // czasu ma powstac z samych strumieni.
-  plan->timeline = std::make_unique<CRationalStreamMath::TimeLine>(plan->tree.getAvailableTimeIntervals());
+  RDB_TRY_ASSIGN(const auto intervals, plan->tree.getAvailableTimeIntervals());
+  // Os czasu bez ani jednego interwalu to niezmiennik TimeLine (RDB_ASSERT). Plan z samymi
+  // dyrektywami przechodzi kompilacje, wiec odmowa nalezy do granicy - tutaj.
+  if (intervals.empty()) return fail(Errc::Compile, "plan holds no streams - only directives");
+  plan->timeline = std::make_unique<CRationalStreamMath::TimeLine>(intervals);
 
   plan_ = std::move(plan);
+  return {};
 }
 
-std::optional<std::uint64_t> Engine::step() {
-  Plan &plan = requirePlan("step");
+Result<std::optional<std::uint64_t>> Engine::step() {
+  RDB_TRY_ASSIGN(Plan *const plan, requirePlan("step"));
+  if (plan->failure.has_value()) {
+    return fail(Errc::Logic, std::format("Engine::step: the plan stopped at slot {} with: {} - compile it again",
+                                         plan->slotsDone, plan->failure->message()));
+  }
+  auto done = stepPlan(*plan);
+  // Kopia bledu, nie przeniesienie: oryginal idzie do wolajacego, kopia zostaje w planie jako
+  // przyczyna kazdej nastepnej odmowy. Sciezka bez bledu niczego nie kopiuje.
+  if (!done) [[unlikely]]
+    plan->failure = done.error();
+  return done;
+}
+
+Result<std::optional<std::uint64_t>> Engine::stepPlan(Plan &plan) {
   if (plan.endOfInput) return std::nullopt;
 
   if (!plan.bootstrapped) {
-    plan.model->processZeroStep();
+    RDB_TRY(plan.model->processZeroStep());
     plan.bootstrapped = true;
   }
 
@@ -174,7 +193,7 @@ std::optional<std::uint64_t> Engine::step() {
     ++position;
   }
 
-  plan.model->processRows(plan.dueMask, slot);
+  RDB_TRY(plan.model->processRows(plan.dueMask, slot));
   plan.time                 = slot;
   const std::uint64_t index = plan.slotsDone++;
 
@@ -186,31 +205,41 @@ std::optional<std::uint64_t> Engine::step() {
   return index;
 }
 
+bool Engine::failed() const noexcept { return plan_ != nullptr && plan_->failure.has_value(); }
+
 std::uint64_t Engine::slotsDone() const noexcept { return plan_ ? plan_->slotsDone : 0; }
 
 boost::rational<int> Engine::time() const noexcept { return plan_ ? plan_->time : boost::rational<int>(0); }
 
 bool Engine::endOfInput() const noexcept { return plan_ != nullptr && plan_->endOfInput; }
 
-std::vector<std::string> Engine::streams() const {
-  const Plan &plan = requirePlan("streams");
+Result<std::vector<std::string>> Engine::streams() const {
+  RDB_TRY_ASSIGN(const Plan *const plan, requirePlan("streams"));
   std::vector<std::string> retVal;
-  retVal.reserve(plan.tree.size());
-  for (const auto &qry : plan.tree)
+  retVal.reserve(plan->tree.size());
+  for (const auto &qry : plan->tree)
     retVal.push_back(qry.id);
   return retVal;
 }
 
-const Descriptor &Engine::schema(const std::string &stream) const { return streamStorage(stream, "schema").descriptor; }
-
-bool Engine::isDeclared(const std::string &stream) const { return streamStorage(stream, "isDeclared").isDeclared(); }
-
-std::size_t Engine::recordCount(const std::string &stream) const {
-  return streamStorage(stream, "recordCount").getRecordsCount();
+Result<const Descriptor *> Engine::schema(const std::string &stream) const {
+  RDB_TRY_ASSIGN(const storage *const store, streamStorage(stream, "schema"));
+  return &store->descriptor;
 }
 
-std::size_t Engine::retainedFrom(const std::string &stream) const {
-  storage &store          = streamStorage(stream, "retainedFrom");
+Result<bool> Engine::isDeclared(const std::string &stream) const {
+  RDB_TRY_ASSIGN(const storage *const store, streamStorage(stream, "isDeclared"));
+  return store->isDeclared();
+}
+
+Result<std::size_t> Engine::recordCount(const std::string &stream) const {
+  RDB_TRY_ASSIGN(const storage *const store, streamStorage(stream, "recordCount"));
+  return store->getRecordsCount();
+}
+
+Result<std::size_t> Engine::retainedFrom(const std::string &stream) const {
+  RDB_TRY_ASSIGN(storage *const found, streamStorage(stream, "retainedFrom"));
+  storage &store          = *found;
   const std::size_t count = store.getRecordsCount();
   std::size_t retained    = count;
   if (store.isDeclared()) {
@@ -224,15 +253,18 @@ std::size_t Engine::retainedFrom(const std::string &stream) const {
   return count - retained;
 }
 
-payload Engine::record(const std::string &stream, const std::size_t index) {
-  storage &store          = streamStorage(stream, "record");
+Result<payload> Engine::record(const std::string &stream, const std::size_t index) {
+  RDB_TRY_ASSIGN(storage *const found, streamStorage(stream, "record"));
+  storage &store          = *found;
   const std::size_t count = store.getRecordsCount();
   if (index >= count) {
-    throw ConfigError(std::format("Engine::record: stream '{}' has {} records, index {} is out of range", stream, count, index));
+    return fail(Errc::Config,
+                std::format("Engine::record: stream '{}' has {} records, index {} is out of range", stream, count, index));
   }
-  if (const std::size_t oldest = retainedFrom(stream); index < oldest) {
-    throw ConfigError(std::format("Engine::record: stream '{}' retains only records {}..{} of its {}; record {} is gone", stream,
-                                  oldest, count - 1, count, index));
+  RDB_TRY_ASSIGN(const std::size_t oldest, retainedFrom(stream));
+  if (index < oldest) {
+    return fail(Errc::Config, std::format("Engine::record: stream '{}' retains only records {}..{} of its {}; record {} is gone",
+                                          stream, oldest, count - 1, count, index));
   }
 
   if (store.isDeclared()) {
@@ -245,86 +277,92 @@ payload Engine::record(const std::string &stream, const std::size_t index) {
   // Do WLASNEGO bufora: wewnetrzny payload magazynu jest stanem modelu, a jedyne, co read()
   // w nim zmienia przy podanym celu, to mapa NULL - i wlasnie ja stad przepisujemy.
   payload out(store.descriptor);
-  // Status bez znaczenia: zakres [retainedFrom, count) sprawdzony wyzej, wiec NoSuchRecord nie zapada.
-  static_cast<void>(store.read(index, out.span().data()));
+  // Status odczytu bez znaczenia: zakres [retainedFrom, count) sprawdzony wyzej, wiec NoSuchRecord
+  // nie zapada. Blad odczytu (nosnik, uprawnienia) wraca do hosta.
+  RDB_TRY(store.read(index, out.span().data()));
   out.setNullBitset(store.getPayload()->getNullBitset());
   return out;
 }
 
-std::vector<double> Engine::project(const std::string &stream, const std::vector<int> &flatFields, const std::size_t first,
-                                    const std::size_t count) {
-  const storage &store    = streamStorage(stream, "project");
-  const std::size_t total = store.getRecordsCount();
+Result<std::vector<double>> Engine::project(const std::string &stream, const std::vector<int> &flatFields,
+                                            const std::size_t first, const std::size_t count) {
+  RDB_TRY_ASSIGN(const storage *const store, streamStorage(stream, "project"));
+  const std::size_t total = store->getRecordsCount();
   if (first > total || count > total - first) {
-    throw ConfigError(std::format("Engine::project: stream '{}' has {} records, range [{}, {}) is out of range", stream, total,
-                                  first, first + count));
+    return fail(Errc::Config, std::format("Engine::project: stream '{}' has {} records, range [{}, {}) is out of range", stream,
+                                          total, first, first + count));
   }
-  const int flatCount = store.descriptor.flatElementCount();
+  const int flatCount = store->descriptor.flatElementCount();
   for (const int flat : flatFields) {
     if (flat < 0 || flat >= flatCount) {
-      throw ConfigError(
-          std::format("Engine::project: stream '{}' has {} flat elements, index {} is out of range", stream, flatCount, flat));
+      return fail(Errc::Config, std::format("Engine::project: stream '{}' has {} flat elements, index {} is out of range",
+                                            stream, flatCount, flat));
     }
   }
 
   std::vector<double> block;
   block.reserve(count * flatFields.size());
+  // Typ elementu, ktory nie jest liczba - zapamietany w wizytatorze, zgloszony po nim.
+  const char *notNumber = nullptr;
   for (std::size_t row = 0; row < count; ++row) {
-    const payload item = record(stream, first + row);
+    RDB_TRY_ASSIGN(const payload item, record(stream, first + row));
     for (const int flat : flatFields) {
       const auto value = item.getItemVT(flat);
       if (!value.has_value()) {
         block.push_back(std::numeric_limits<double>::quiet_NaN());
         continue;
       }
+      constexpr double kNaN = std::numeric_limits<double>::quiet_NaN();
       block.push_back(std::visit(Overload{
-                                     [](const std::monostate &) { return std::numeric_limits<double>::quiet_NaN(); },
+                                     [](const std::monostate &) { return kNaN; },
                                      [](const std::uint8_t arg) { return static_cast<double>(arg); },
                                      [](const int arg) { return static_cast<double>(arg); },
                                      [](const unsigned int arg) { return static_cast<double>(arg); },
                                      [](const float arg) { return static_cast<double>(arg); },
                                      [](const double arg) { return arg; },
                                      [](const boost::rational<int> &arg) { return boost::rational_cast<double>(arg); },
-                                     [&](const std::pair<int, int> &) -> double {
-                                       throw ConfigError(std::format(
-                                           "Engine::project: stream '{}' element {} is an INTPAIR, not a number", stream, flat));
+                                     [&notNumber](const std::pair<int, int> &) {
+                                       notNumber = "an INTPAIR";
+                                       return kNaN;
                                      },
-                                     [&](const std::pair<std::string, int> &) -> double {
-                                       throw ConfigError(std::format(
-                                           "Engine::project: stream '{}' element {} is an IDXPAIR, not a number", stream, flat));
+                                     [&notNumber](const std::pair<std::string, int> &) {
+                                       notNumber = "an IDXPAIR";
+                                       return kNaN;
                                      },
-                                     [&](const std::string &) -> double {
-                                       throw ConfigError(std::format(
-                                           "Engine::project: stream '{}' element {} is a STRING, not a number", stream, flat));
+                                     [&notNumber](const std::string &) {
+                                       notNumber = "a STRING";
+                                       return kNaN;
                                      },
                                  },
                                  value.value()));
+      if (notNumber != nullptr) [[unlikely]] {
+        return fail(Errc::Config,
+                    std::format("Engine::project: stream '{}' element {} is {}, not a number", stream, flat, notNumber));
+      }
     }
   }
   return block;
 }
 
 void Engine::close() noexcept {
-  // Destruktor magazynu potrafi zglosic blad (np. zapis deskryptora) - z close() i z ~Engine
-  // wyjatek nie ma prawa wyjsc, bo host wola je ze swojego __del__ / __exit__.
-  try {
-    plan_.reset();
-  } catch (...) {  // NOLINT(bugprone-empty-catch)
-  }
+  // Destruktory modelu i magazynow nie rzucaja (rdzen buduje sie z -fno-exceptions), wiec
+  // close() i ~Engine, wolane przez hosta z __del__ / __exit__, nie potrzebuja juz try/catch.
+  // Blad zapisu przy zamykaniu (np. .desc) magazyn loguje sam.
+  plan_.reset();
 }
 
-Engine::Plan &Engine::requirePlan(const char *operation) const {
-  if (!plan_) throw ConfigError(std::format("Engine::{}: no plan - call compile() first", operation));
-  return *plan_;
+Result<Engine::Plan *> Engine::requirePlan(const char *operation) const {
+  if (!plan_) return fail(Errc::Config, std::format("Engine::{}: no plan - call compile() first", operation));
+  return plan_.get();
 }
 
-storage &Engine::streamStorage(const std::string &stream, const char *operation) const {
-  Plan &plan       = requirePlan(operation);
-  const auto found = plan.model->qSet.find(stream);
-  if (found == plan.model->qSet.end()) {
-    throw ConfigError(std::format("Engine::{}: no stream '{}' in the plan", operation, stream));
+Result<storage *> Engine::streamStorage(const std::string &stream, const char *operation) const {
+  RDB_TRY_ASSIGN(Plan *const plan, requirePlan(operation));
+  const auto found = plan->model->qSet.find(stream);
+  if (found == plan->model->qSet.end()) {
+    return fail(Errc::Config, std::format("Engine::{}: no stream '{}' in the plan", operation, stream));
   }
-  return *found->second->outputPayload;
+  return found->second->outputPayload.get();
 }
 
 }  // namespace rdb::embed

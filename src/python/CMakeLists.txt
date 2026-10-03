@@ -65,7 +65,7 @@ find_package(nanobind CONFIG REQUIRED)
 # nie musza byc pozycyjnie niezalezne. Modul wspoldzielony, ktory je wciaga, juz
 # musi - na Linuksie inaczej nie linkuje sie wcale. Wlaczamy to TU, a nie w ich
 # wlasnych plikach CMake, zeby build bez RDB_PYTHON zachowal sie bez zmian.
-foreach(RDB_PIC_TARGET rdb descparser common retractor rqlparser rdbembed)
+foreach(RDB_PIC_TARGET rdb descparser common retractorcore rqlparser rdbembed)
   set_property(TARGET ${RDB_PIC_TARGET} PROPERTY POSITION_INDEPENDENT_CODE ON)
 endforeach()
 

@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "rdb/payload.hpp"
+#include "rdbResult.hpp"
 #include "retractor/lib/checkedArith.hpp"
 #include "retractor/lib/expressionEvaluator.hpp"
 
@@ -30,7 +31,7 @@ TEST(xExpressionEval, add_int_int) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::INTEGER);  // int in Token
 
@@ -49,7 +50,7 @@ TEST(xExpressionEval, add_int_int_new_token) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::INTEGER);  // int in Token
 
@@ -68,7 +69,7 @@ TEST(xExpressionEval, add_double_int) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::DOUBLE);
 
@@ -82,7 +83,7 @@ TEST(xExpressionEval, add_string_int) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::STRING);
 
@@ -96,7 +97,7 @@ TEST(xExpressionEval, add_rational_int) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::RATIONAL);
 
@@ -110,7 +111,7 @@ TEST(xExpressionEval, add_rational_string) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::STRING);
 
@@ -124,7 +125,7 @@ TEST(xExpressionEval, sub_int_int) {
   program.emplace_back(SUBTRACT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::INTEGER);
 
@@ -138,7 +139,7 @@ TEST(xExpressionEval, sub_int_dobule) {
   program.emplace_back(SUBTRACT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::DOUBLE);
 
@@ -152,7 +153,7 @@ TEST(xExpressionEval, mul_int_dobule) {
   program.emplace_back(MULTIPLY);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::DOUBLE);
   // std::cerr << std::get<double>(result) << std::endl;
@@ -166,7 +167,7 @@ TEST(xExpressionEval, div_int_dobule) {
   program.emplace_back(DIVIDE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::DOUBLE);
   // std::cerr << std::get<double>(result) << std::endl;
@@ -179,7 +180,7 @@ TEST(xExpressionEval, neg_dobule) {
   program.emplace_back(NEGATE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::DOUBLE);
   EXPECT_TRUE(std::get<double>(result) == -2.1);
@@ -191,7 +192,7 @@ TEST(xExpressionEval, neg_byte_as_xor_ff) {
   program.emplace_back(NEGATE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::BYTE);
   EXPECT_TRUE(std::get<uint8_t>(result) == 0xf0);
@@ -203,7 +204,7 @@ TEST(xExpressionEval, neg_rational_preserves_type) {
   program.emplace_back(NEGATE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::RATIONAL);
   EXPECT_EQ(std::get<boost::rational<int>>(result), boost::rational<int>(-3, 2));
@@ -215,7 +216,7 @@ TEST(xExpressionEval, call_floor_function_double) {
   program.emplace_back(CALL, std::string("floor"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::DOUBLE);
   EXPECT_TRUE(std::get<double>(result) == 1);
@@ -227,7 +228,7 @@ TEST(xExpressionEval, call_floor_function_rational) {
   program.emplace_back(CALL, std::string("floor"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::RATIONAL);
   EXPECT_TRUE(std::get<boost::rational<int>>(result) == 1);
@@ -239,7 +240,7 @@ TEST(xExpressionEval, call_ceil_function_double) {
   program.emplace_back(CALL, std::string("ceil"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::DOUBLE);
   EXPECT_TRUE(std::get<double>(result) == 2);
@@ -255,7 +256,7 @@ TEST(xExpressionEval, long_program) {
   program.emplace_back(CALL, std::string("ceil"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(result.index() == rdb::DOUBLE);
   EXPECT_TRUE(std::get<double>(result) == 4);  // ceil ( (1 + 2) * 1.25 ) == ceil( 3.75 ) == 4
@@ -268,7 +269,7 @@ TEST(xExpressionEval, add_null_int_propagates_null) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(std::holds_alternative<std::monostate>(result));
 }
@@ -280,7 +281,7 @@ TEST(xExpressionEval, and_false_null_is_false) {
   program.emplace_back(AND);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -293,7 +294,7 @@ TEST(xExpressionEval, or_true_null_is_true) {
   program.emplace_back(OR);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -306,7 +307,7 @@ TEST(xExpressionEval, and_true_null_is_null) {
   program.emplace_back(AND);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(std::holds_alternative<std::monostate>(result));
 }
@@ -317,7 +318,7 @@ TEST(xExpressionEval, not_true_is_false) {
   program.emplace_back(NOT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -329,7 +330,7 @@ TEST(xExpressionEval, not_null_is_null) {
   program.emplace_back(NOT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_TRUE(std::holds_alternative<std::monostate>(result));
 }
@@ -344,7 +345,7 @@ TEST(xExpressionEval, divide_by_zero_yields_null) {
   program.emplace_back(DIVIDE);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 // NULL jest pochlaniajacy takze wtedy, gdy pojawi sie po stronie dzielnej.
@@ -355,7 +356,7 @@ TEST(xExpressionEval, divide_null_by_zero_yields_null) {
   program.emplace_back(DIVIDE);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 // Zero w LICZNIKU to zwykla dana - wynik istnieje i musi pozostac wartoscia, nie NULL-em.
@@ -367,7 +368,7 @@ TEST(xExpressionEval, zero_divided_by_value_stays_a_value) {
   program.emplace_back(DIVIDE);
 
   expressionEvaluator test;
-  auto result = test.eval(program);
+  auto result = rdbtest::ok(test.eval(program));
   ASSERT_FALSE(std::holds_alternative<std::monostate>(result));
   EXPECT_EQ(std::get<int>(result), 0);
 }
@@ -386,7 +387,8 @@ TEST(xExpressionEval, divide_by_zero_yields_null_for_every_numeric_type) {
     program.emplace_back(DIVIDE);
 
     expressionEvaluator test;
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program))) << "divisor variant index " << zero.index();
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))))
+        << "divisor variant index " << zero.index();
   }
 }
 
@@ -401,7 +403,8 @@ TEST(xExpressionEval, divide_intpair_by_zero_component_yields_null) {
     program.emplace_back(DIVIDE);
 
     expressionEvaluator test;
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program))) << divisor.first << "," << divisor.second;
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))))
+        << divisor.first << "," << divisor.second;
   }
 }
 
@@ -413,7 +416,7 @@ TEST(xExpressionEval, divide_idxpair_by_zero_index_yields_null) {
   program.emplace_back(DIVIDE);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 TEST(xExpressionEval, malformed_stack_throws) {
@@ -421,7 +424,7 @@ TEST(xExpressionEval, malformed_stack_throws) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program), std::runtime_error);
+  EXPECT_RDB_ERROR(test.eval(program), rdb::Errc::Eval);
 }
 
 TEST(xExpressionEval, cmp_equal_true) {
@@ -431,7 +434,7 @@ TEST(xExpressionEval, cmp_equal_true) {
   program.emplace_back(CMP_EQUAL);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -444,7 +447,7 @@ TEST(xExpressionEval, cmp_equal_false) {
   program.emplace_back(CMP_EQUAL);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -457,7 +460,7 @@ TEST(xExpressionEval, cmp_not_equal_true) {
   program.emplace_back(CMP_NOT_EQUAL);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -470,7 +473,7 @@ TEST(xExpressionEval, cmp_lt_true) {
   program.emplace_back(CMP_LT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // 2 < 3
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // 2 < 3
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -483,7 +486,7 @@ TEST(xExpressionEval, cmp_lt_false) {
   program.emplace_back(CMP_LT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // 3 < 2
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // 3 < 2
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -496,7 +499,7 @@ TEST(xExpressionEval, cmp_gt_true) {
   program.emplace_back(CMP_GT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // 3 > 2
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // 3 > 2
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -509,7 +512,7 @@ TEST(xExpressionEval, cmp_gt_false) {
   program.emplace_back(CMP_GT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // 2 > 3
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // 2 > 3
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -522,7 +525,7 @@ TEST(xExpressionEval, cmp_le_true_less) {
   program.emplace_back(CMP_LE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // 2 <= 3
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // 2 <= 3
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -535,7 +538,7 @@ TEST(xExpressionEval, cmp_le_true_equal) {
   program.emplace_back(CMP_LE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // 3 <= 3
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // 3 <= 3
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -548,7 +551,7 @@ TEST(xExpressionEval, cmp_le_false) {
   program.emplace_back(CMP_LE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // 3 <= 2
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // 3 <= 2
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -561,7 +564,7 @@ TEST(xExpressionEval, cmp_ge_true_greater) {
   program.emplace_back(CMP_GE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // 3 >= 2
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // 3 >= 2
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -574,7 +577,7 @@ TEST(xExpressionEval, cmp_ge_true_equal) {
   program.emplace_back(CMP_GE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // 3 >= 3
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // 3 >= 3
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -587,7 +590,7 @@ TEST(xExpressionEval, cmp_ge_false) {
   program.emplace_back(CMP_GE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // 2 >= 3
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // 2 >= 3
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -602,7 +605,7 @@ TEST(xExpressionEval, sub_null_propagates_null) {
   program.emplace_back(SUBTRACT);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 TEST(xExpressionEval, mul_null_propagates_null) {
@@ -612,7 +615,7 @@ TEST(xExpressionEval, mul_null_propagates_null) {
   program.emplace_back(MULTIPLY);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 TEST(xExpressionEval, div_null_propagates_null) {
@@ -622,7 +625,7 @@ TEST(xExpressionEval, div_null_propagates_null) {
   program.emplace_back(DIVIDE);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 // --- neg ---
@@ -633,7 +636,7 @@ TEST(xExpressionEval, neg_int) {
   program.emplace_back(NEGATE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), -7);
@@ -645,7 +648,7 @@ TEST(xExpressionEval, neg_null_propagates_null) {
   program.emplace_back(NEGATE);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 // --- null propagation in comparisons ---
@@ -657,7 +660,7 @@ TEST(xExpressionEval, cmp_equal_null_propagates_null) {
   program.emplace_back(CMP_EQUAL);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 TEST(xExpressionEval, cmp_not_equal_false) {
@@ -667,7 +670,7 @@ TEST(xExpressionEval, cmp_not_equal_false) {
   program.emplace_back(CMP_NOT_EQUAL);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // 3 != 3
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // 3 != 3
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -682,7 +685,7 @@ TEST(xExpressionEval, or_false_null_is_null) {
   program.emplace_back(OR);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 TEST(xExpressionEval, or_false_false_is_false) {
@@ -692,7 +695,7 @@ TEST(xExpressionEval, or_false_false_is_false) {
   program.emplace_back(OR);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -705,7 +708,7 @@ TEST(xExpressionEval, and_true_true_is_true) {
   program.emplace_back(AND);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -719,14 +722,14 @@ TEST(xExpressionEval, call_unsupported_function_throws) {
   program.emplace_back(CALL, std::string("unsupported_fn"));
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program), std::runtime_error);
+  EXPECT_RDB_ERROR(test.eval(program), rdb::Errc::Eval);
 }
 
 TEST(xExpressionEval, empty_program_throws) {
   std::list<token> program;
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program), std::runtime_error);
+  EXPECT_RDB_ERROR(test.eval(program), rdb::Errc::Eval);
 }
 
 TEST(xExpressionEval, sub_string_string_throws) {
@@ -736,7 +739,7 @@ TEST(xExpressionEval, sub_string_string_throws) {
   program.emplace_back(SUBTRACT);
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program), std::runtime_error);
+  EXPECT_RDB_ERROR(test.eval(program), rdb::Errc::Eval);
 }
 
 TEST(xExpressionEval, mul_string_string_throws) {
@@ -746,7 +749,7 @@ TEST(xExpressionEval, mul_string_string_throws) {
   program.emplace_back(MULTIPLY);
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program), std::runtime_error);
+  EXPECT_RDB_ERROR(test.eval(program), rdb::Errc::Eval);
 }
 
 TEST(xExpressionEval, div_string_string_throws) {
@@ -756,7 +759,7 @@ TEST(xExpressionEval, div_string_string_throws) {
   program.emplace_back(DIVIDE);
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program), std::runtime_error);
+  EXPECT_RDB_ERROR(test.eval(program), rdb::Errc::Eval);
 }
 
 // --- toLogicValue: string and pair handling ---
@@ -767,7 +770,7 @@ TEST(xExpressionEval, not_nonempty_string_is_false) {
   program.emplace_back(NOT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -779,7 +782,7 @@ TEST(xExpressionEval, not_empty_string_is_true) {
   program.emplace_back(NOT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -792,7 +795,7 @@ TEST(xExpressionEval, and_string_int_uses_string_truthiness) {
   program.emplace_back(AND);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   // "text" is truthy, 1 is truthy → true; logic result over a string is INTEGER
   ASSERT_TRUE(std::holds_alternative<int>(result));
@@ -805,7 +808,7 @@ TEST(xExpressionEval, not_intpair_throws) {
   program.emplace_back(NOT);
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program), std::runtime_error);
+  EXPECT_RDB_ERROR(test.eval(program), rdb::Errc::Eval);
 }
 
 // --- PUSH_ID from payload ---
@@ -819,7 +822,7 @@ TEST(xExpressionEval, push_id_reads_value_from_payload) {
   program.emplace_back(PUSH_ID, rdb::descFldVT(std::pair<std::string, int>("x", 0)));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program, &p);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program, &p));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 42);
@@ -830,7 +833,7 @@ TEST(xExpressionEval, push_id_null_payload_throws) {
   program.emplace_back(PUSH_ID, rdb::descFldVT(std::pair<std::string, int>("x", 0)));
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program, nullptr), std::runtime_error);
+  EXPECT_RDB_ERROR(test.eval(program, nullptr), rdb::Errc::Eval);
 }
 
 // --- PUSH_ID2 ---
@@ -844,7 +847,7 @@ TEST(xExpressionEval, push_id2_reads_value_from_payload) {
   program.emplace_back(PUSH_ID2, rdb::descFldVT(std::string("x[0]")));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program, &p);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program, &p));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 99);
@@ -855,7 +858,7 @@ TEST(xExpressionEval, push_id2_null_payload_throws) {
   program.emplace_back(PUSH_ID2, rdb::descFldVT(std::string("x[0]")));
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program, nullptr), std::runtime_error);
+  EXPECT_RDB_ERROR(test.eval(program, nullptr), rdb::Errc::Eval);
 }
 
 TEST(xExpressionEval, push_id2_malformed_identifier_throws) {
@@ -867,7 +870,7 @@ TEST(xExpressionEval, push_id2_malformed_identifier_throws) {
   program.emplace_back(PUSH_ID2, rdb::descFldVT(std::string("fieldname")));
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program, &p), std::runtime_error);
+  EXPECT_RDB_ERROR(test.eval(program, &p), rdb::Errc::Eval);
 }
 
 // --- PUSH_IDX ---
@@ -877,7 +880,7 @@ TEST(xExpressionEval, push_idx_throws) {
   program.emplace_back(PUSH_IDX, 0);
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program), std::runtime_error);
+  EXPECT_RDB_ERROR(test.eval(program), rdb::Errc::Eval);
 }
 
 // --- stack errors ---
@@ -888,7 +891,7 @@ TEST(xExpressionEval, too_many_values_on_stack_throws) {
   program.emplace_back(PUSH_VAL, 2);
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program), std::runtime_error);
+  EXPECT_RDB_ERROR(test.eval(program), rdb::Errc::Eval);
 }
 
 // --- CALL functions ---
@@ -906,7 +909,7 @@ TEST(xExpressionEval, call_function_name_as_grammar_writes_it) {
     program.emplace_back(CALL, name);
 
     expressionEvaluator test;
-    rdb::descFldVT result = test.eval(program);
+    rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
     ASSERT_TRUE(std::holds_alternative<double>(result)) << name;
     EXPECT_EQ(std::get<double>(result), expected) << name;
@@ -917,25 +920,19 @@ TEST(xExpressionEval, call_function_name_as_grammar_writes_it) {
 // w komunikacie.
 //
 // Od 2026-08-30 ta ścieżka jest z RQL NIEOSIĄGALNA: `compiler::checkFunctionCalls()` odrzuca
-// nieznaną nazwę na kompilacji, więc plan z nią nie dochodzi do wykonania. Rzut zostaje jako
+// nieznaną nazwę na kompilacji, więc plan z nią nie dochodzi do wykonania. Odmowa zostaje jako
 // kontrola dla programów tokenów budowanych wprost, tak jak tutaj. `Crc` był w gramatyce do
-// tej daty i został usunięty razem z ośmioma innymi nazwami bez implementacji.
+// tej daty i został usunięty razem z ośmioma innymi nazwami bez implementacji. Błąd wraca
+// wartością Errc::Eval (do 2026-10 rzutem std::runtime_error).
 TEST(xExpressionEval, call_unknown_function_keeps_author_spelling) {
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 4.0);
   program.emplace_back(CALL, std::string("Crc"));
 
   expressionEvaluator test;
-  EXPECT_THROW(
-      {
-        try {
-          test.eval(program);
-        } catch (const std::runtime_error &error) {
-          EXPECT_STREQ(error.what(), "Unsupported function call: Crc");
-          throw;
-        }
-      },
-      std::runtime_error);
+  const auto result = test.eval(program);
+  ASSERT_RDB_ERROR(result, rdb::Errc::Eval);
+  EXPECT_EQ(result.error().message(), "Unsupported function call: Crc");
 }
 
 // Funkcje dopisane 2026-08-30. `Abs` liczy się wprost na wariancie, żeby nie tracić dokładności
@@ -950,7 +947,7 @@ TEST(xExpressionEval, call_abs_preserves_type) {
     program.emplace_back(CALL, std::string("Abs"));
 
     expressionEvaluator test;
-    rdb::descFldVT result = test.eval(program);
+    rdb::descFldVT result = rdbtest::ok(test.eval(program));
     ASSERT_TRUE(std::holds_alternative<int>(result)) << input;
     EXPECT_EQ(std::get<int>(result), expected) << input;
   }
@@ -961,7 +958,7 @@ TEST(xExpressionEval, call_abs_preserves_type) {
   program.emplace_back(CALL, std::string("Abs"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
   ASSERT_TRUE(std::holds_alternative<boost::rational<int>>(result));
   EXPECT_EQ(std::get<boost::rational<int>>(result), boost::rational<int>(22, 7));
 }
@@ -977,7 +974,7 @@ TEST(xExpressionEval, call_iszero_and_isnonzero_return_integer) {
       program.emplace_back(CALL, name);
 
       expressionEvaluator test;
-      rdb::descFldVT result = test.eval(program);
+      rdb::descFldVT result = rdbtest::ok(test.eval(program));
       ASSERT_TRUE(std::holds_alternative<int>(result)) << name << "(" << input << ")";
       EXPECT_EQ(std::get<int>(result), expected) << name << "(" << input << ")";
     }
@@ -996,7 +993,7 @@ TEST(xExpressionEval, call_length_counts_value_not_field_width) {
     program.emplace_back(CALL, std::string("Length"));
 
     expressionEvaluator test;
-    rdb::descFldVT result = test.eval(program);
+    rdb::descFldVT result = rdbtest::ok(test.eval(program));
     ASSERT_TRUE(std::holds_alternative<int>(result)) << "Length('" << input << "')";
     EXPECT_EQ(std::get<int>(result), expected) << "Length('" << input << "')";
   }
@@ -1012,7 +1009,7 @@ TEST(xExpressionEval, call_length_rejects_numeric_operand) {
     program.emplace_back(CALL, std::string("Length"));
 
     expressionEvaluator test;
-    EXPECT_THROW({ auto discarded = test.eval(program); }, std::runtime_error) << "indeks " << value.index();
+    EXPECT_RDB_ERROR(test.eval(program), rdb::Errc::Eval) << "indeks " << value.index();
   }
 }
 
@@ -1024,7 +1021,7 @@ TEST(xExpressionEval, new_functions_propagate_null) {
     program.emplace_back(CALL, std::string(name));
 
     expressionEvaluator test;
-    rdb::descFldVT result = test.eval(program);
+    rdb::descFldVT result = rdbtest::ok(test.eval(program));
     EXPECT_TRUE(std::holds_alternative<std::monostate>(result)) << name;
   }
 }
@@ -1035,7 +1032,7 @@ TEST(xExpressionEval, call_sqrt_function_double) {
   program.emplace_back(CALL, std::string("sqrt"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<double>(result));
   EXPECT_EQ(std::get<double>(result), 2.0);
@@ -1047,7 +1044,7 @@ TEST(xExpressionEval, call_round_function_double) {
   program.emplace_back(CALL, std::string("round"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<double>(result));
   EXPECT_EQ(std::get<double>(result), 2.0);
@@ -1059,7 +1056,7 @@ TEST(xExpressionEval, call_trunc_function_double) {
   program.emplace_back(CALL, std::string("trunc"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<double>(result));
   EXPECT_EQ(std::get<double>(result), 1.0);
@@ -1071,7 +1068,7 @@ TEST(xExpressionEval, call_sin_zero) {
   program.emplace_back(CALL, std::string("sin"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<double>(result));
   EXPECT_EQ(std::get<double>(result), 0.0);
@@ -1083,7 +1080,7 @@ TEST(xExpressionEval, call_cos_zero) {
   program.emplace_back(CALL, std::string("cos"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<double>(result));
   EXPECT_EQ(std::get<double>(result), 1.0);
@@ -1103,7 +1100,7 @@ TEST(xExpressionEval, real_functions_return_double_for_exact_arguments) {
       program.emplace_back(PUSH_VAL, argument);
       program.emplace_back(CALL, name);
       expressionEvaluator evaluator;
-      const auto result = evaluator.eval(program);
+      const auto result = rdbtest::ok(evaluator.eval(program));
       ASSERT_TRUE(std::holds_alternative<double>(result)) << name;
       EXPECT_NEAR(std::get<double>(result), expected, 1e-12) << name;
     }
@@ -1119,8 +1116,8 @@ TEST(xExpressionEval, real_functions_propagate_null_and_reject_text) {
     text.emplace_back(PUSH_VAL, std::string("text"));
     text.emplace_back(CALL, std::string(name));
     expressionEvaluator evaluator;
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(evaluator.eval(missing))) << name;
-    EXPECT_THROW(evaluator.eval(text), std::runtime_error) << name;
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(evaluator.eval(missing)))) << name;
+    EXPECT_RDB_ERROR(evaluator.eval(text), rdb::Errc::Eval) << name;
   }
 }
 
@@ -1129,7 +1126,7 @@ TEST(xExpressionEval, exp_overflow_returns_null) {
   program.emplace_back(PUSH_VAL, 1000.0);
   program.emplace_back(CALL, std::string("exp"));
   expressionEvaluator evaluator;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(evaluator.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(evaluator.eval(program))));
 }
 
 TEST(xExpressionEval, call_tan_zero) {
@@ -1138,7 +1135,7 @@ TEST(xExpressionEval, call_tan_zero) {
   program.emplace_back(CALL, std::string("tan"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<double>(result));
   EXPECT_EQ(std::get<double>(result), 0.0);
@@ -1150,7 +1147,7 @@ TEST(xExpressionEval, call_log_of_one) {
   program.emplace_back(CALL, std::string("log"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<double>(result));
   EXPECT_EQ(std::get<double>(result), 0.0);
@@ -1162,7 +1159,7 @@ TEST(xExpressionEval, call_log2_of_one) {
   program.emplace_back(CALL, std::string("log2"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<double>(result));
   EXPECT_EQ(std::get<double>(result), 0.0);
@@ -1174,7 +1171,7 @@ TEST(xExpressionEval, call_function_null_propagates_null) {
   program.emplace_back(CALL, std::string("sqrt"));
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 TEST(xExpressionEval, call_function_on_string_throws) {
@@ -1183,7 +1180,7 @@ TEST(xExpressionEval, call_function_on_string_throws) {
   program.emplace_back(CALL, std::string("floor"));
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program), std::runtime_error);
+  EXPECT_RDB_ERROR(test.eval(program), rdb::Errc::Eval);
 }
 
 // --- null propagation in remaining comparisons ---
@@ -1195,7 +1192,7 @@ TEST(xExpressionEval, cmp_lt_null_propagates_null) {
   program.emplace_back(CMP_LT);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 TEST(xExpressionEval, cmp_gt_null_propagates_null) {
@@ -1205,7 +1202,7 @@ TEST(xExpressionEval, cmp_gt_null_propagates_null) {
   program.emplace_back(CMP_GT);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 TEST(xExpressionEval, cmp_le_null_propagates_null) {
@@ -1215,7 +1212,7 @@ TEST(xExpressionEval, cmp_le_null_propagates_null) {
   program.emplace_back(CMP_LE);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 TEST(xExpressionEval, cmp_ge_null_propagates_null) {
@@ -1225,7 +1222,7 @@ TEST(xExpressionEval, cmp_ge_null_propagates_null) {
   program.emplace_back(CMP_GE);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 TEST(xExpressionEval, cmp_not_equal_null_propagates_null) {
@@ -1235,7 +1232,7 @@ TEST(xExpressionEval, cmp_not_equal_null_propagates_null) {
   program.emplace_back(CMP_NOT_EQUAL);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 // --- neg on string ---
@@ -1246,7 +1243,7 @@ TEST(xExpressionEval, neg_string_throws) {
   program.emplace_back(NEGATE);
 
   expressionEvaluator test;
-  EXPECT_THROW(test.eval(program), std::runtime_error);
+  EXPECT_RDB_ERROR(test.eval(program), rdb::Errc::Eval);
 }
 
 // --- 3VL: null AND null, null OR null ---
@@ -1258,7 +1255,7 @@ TEST(xExpressionEval, and_null_null_is_null) {
   program.emplace_back(AND);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 TEST(xExpressionEval, or_null_null_is_null) {
@@ -1268,7 +1265,7 @@ TEST(xExpressionEval, or_null_null_is_null) {
   program.emplace_back(OR);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 // --- string comparisons ---
@@ -1280,7 +1277,7 @@ TEST(xExpressionEval, cmp_equal_string_equal) {
   program.emplace_back(CMP_EQUAL);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -1293,7 +1290,7 @@ TEST(xExpressionEval, cmp_equal_string_not_equal) {
   program.emplace_back(CMP_EQUAL);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -1308,7 +1305,7 @@ TEST(xExpressionEval, add_float_float) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<float>(result));
   EXPECT_EQ(std::get<float>(result), 3.0F);
@@ -1323,7 +1320,7 @@ TEST(xExpressionEval, add_uint_uint) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<unsigned>(result));
   EXPECT_EQ(std::get<unsigned>(result), 7U);
@@ -1338,7 +1335,7 @@ TEST(xExpressionEval, uint_sub_below_zero_is_null) {
   program.emplace_back(SUBTRACT);
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 TEST(xExpressionEval, uint_add_and_mul_overflow_is_null) {
@@ -1349,7 +1346,7 @@ TEST(xExpressionEval, uint_add_and_mul_overflow_is_null) {
     program.emplace_back(op);
 
     expressionEvaluator test;
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program))) << GetStringcommand_id(op);
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program)))) << GetStringcommand_id(op);
   }
 }
 
@@ -1360,7 +1357,7 @@ TEST(xExpressionEval, uint_arithmetic_at_the_bound_is_exact) {
   program.emplace_back(MULTIPLY);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<unsigned>(result));
   EXPECT_EQ(std::get<unsigned>(result), 4294967295U);
@@ -1372,7 +1369,7 @@ TEST(xExpressionEval, isnull_returns_1_for_null) {
   program.emplace_back(CALL, std::string("isnull"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -1384,7 +1381,7 @@ TEST(xExpressionEval, isnull_returns_0_for_non_null) {
   program.emplace_back(CALL, std::string("isnull"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -1399,7 +1396,7 @@ TEST(xExpressionEval, null2zero_replaces_null_with_zero) {
   program.emplace_back(CALL, std::string("null2zero"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -1413,7 +1410,7 @@ TEST(xExpressionEval, null2zero_passes_a_value_through_unchanged) {
   program.emplace_back(CALL, std::string("null2zero"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<boost::rational<int>>(result));
   EXPECT_EQ(std::get<boost::rational<int>>(result), boost::rational<int>(7, 2));
@@ -1430,7 +1427,7 @@ TEST(xExpressionEval, cmp_not_equal_string_not_equal) {
   program.emplace_back(CMP_NOT_EQUAL);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "abc" != "xyz"
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "abc" != "xyz"
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -1443,7 +1440,7 @@ TEST(xExpressionEval, cmp_not_equal_string_equal) {
   program.emplace_back(CMP_NOT_EQUAL);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "abc" != "abc"
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "abc" != "abc"
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -1456,7 +1453,7 @@ TEST(xExpressionEval, cmp_lt_string_true) {
   program.emplace_back(CMP_LT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "abc" < "xyz"
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "abc" < "xyz"
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -1469,7 +1466,7 @@ TEST(xExpressionEval, cmp_lt_string_false) {
   program.emplace_back(CMP_LT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "xyz" < "abc"
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "xyz" < "abc"
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -1482,7 +1479,7 @@ TEST(xExpressionEval, cmp_gt_string_true) {
   program.emplace_back(CMP_GT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "xyz" > "abc"
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "xyz" > "abc"
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -1495,7 +1492,7 @@ TEST(xExpressionEval, cmp_gt_string_false) {
   program.emplace_back(CMP_GT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "abc" > "xyz"
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "abc" > "xyz"
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -1508,7 +1505,7 @@ TEST(xExpressionEval, cmp_le_string_true_less) {
   program.emplace_back(CMP_LE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "abc" <= "xyz"
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "abc" <= "xyz"
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -1521,7 +1518,7 @@ TEST(xExpressionEval, cmp_le_string_true_equal) {
   program.emplace_back(CMP_LE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "abc" <= "abc"
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "abc" <= "abc"
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -1534,7 +1531,7 @@ TEST(xExpressionEval, cmp_le_string_false) {
   program.emplace_back(CMP_LE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "xyz" <= "abc"
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "xyz" <= "abc"
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -1547,7 +1544,7 @@ TEST(xExpressionEval, cmp_ge_string_true_greater) {
   program.emplace_back(CMP_GE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "xyz" >= "abc"
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "xyz" >= "abc"
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -1560,7 +1557,7 @@ TEST(xExpressionEval, cmp_ge_string_true_equal) {
   program.emplace_back(CMP_GE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "abc" >= "abc"
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "abc" >= "abc"
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -1573,7 +1570,7 @@ TEST(xExpressionEval, cmp_ge_string_false) {
   program.emplace_back(CMP_GE);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "abc" >= "xyz"
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "abc" >= "xyz"
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -1589,7 +1586,7 @@ TEST(xExpressionEval, or_nonempty_string_false_is_true) {
   program.emplace_back(OR);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "text" OR 0 → true, typ INTEGER
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "text" OR 0 → true, typ INTEGER
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -1602,7 +1599,7 @@ TEST(xExpressionEval, or_empty_string_false_is_false) {
   program.emplace_back(OR);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "" OR 0 → false, typ INTEGER
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "" OR 0 → false, typ INTEGER
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -1618,7 +1615,7 @@ TEST(xExpressionEval, not_of_false_string_comparison_is_true) {
   program.emplace_back(NOT);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 1);
@@ -1633,7 +1630,7 @@ TEST(xExpressionEval, or_of_false_string_comparison_is_false) {
   program.emplace_back(OR);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -1651,7 +1648,7 @@ TEST(xExpressionEval, add_string_float_converts_via_to_string) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "unit" + std::to_string(1.0f)
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "unit" + std::to_string(1.0f)
 
   ASSERT_TRUE(std::holds_alternative<std::string>(result));
   EXPECT_EQ(std::get<std::string>(result), std::to_string(1.0F) + "unit");
@@ -1664,7 +1661,7 @@ TEST(xExpressionEval, add_string_double_converts_via_to_string) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);  // "val" + std::to_string(2.0)
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));  // "val" + std::to_string(2.0)
 
   ASSERT_TRUE(std::holds_alternative<std::string>(result));
   EXPECT_EQ(std::get<std::string>(result), std::to_string(2.0) + "val");
@@ -1678,7 +1675,7 @@ TEST(xExpressionEval, call_to_integer_from_string) {
   program.emplace_back(CALL, std::string("to_integer"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 42);
@@ -1690,7 +1687,7 @@ TEST(xExpressionEval, call_to_integer_from_double_truncates) {
   program.emplace_back(CALL, std::string("to_integer"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 3);
@@ -1702,7 +1699,7 @@ TEST(xExpressionEval, call_to_integer_null_propagates_null) {
   program.emplace_back(CALL, std::string("to_integer"));
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 // Wartosc, ktorej INTEGER nie pomiesci, nie ma wyniku: NULL, jak przepelnienie arytmetyki.
@@ -1716,7 +1713,7 @@ TEST(xExpressionEval, call_to_integer_out_of_range_is_null) {
     program.emplace_back(CALL, std::string("to_integer"));
 
     expressionEvaluator test;
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program))) << in;
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program)))) << in;
   }
 }
 
@@ -1731,7 +1728,7 @@ TEST(xExpressionEval, call_math_over_integer_without_integer_result_is_null) {
     program.emplace_back(CALL, name);
 
     expressionEvaluator test;
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program))) << name << "(" << arg << ")";
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program)))) << name << "(" << arg << ")";
   }
 }
 
@@ -1743,7 +1740,7 @@ TEST(xExpressionEval, call_to_float_from_string) {
   program.emplace_back(CALL, std::string("to_float"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<float>(result));
   EXPECT_EQ(std::get<float>(result), 2.5F);
@@ -1755,7 +1752,7 @@ TEST(xExpressionEval, call_to_float_from_int) {
   program.emplace_back(CALL, std::string("to_float"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<float>(result));
   EXPECT_EQ(std::get<float>(result), 5.0F);
@@ -1767,7 +1764,7 @@ TEST(xExpressionEval, call_to_float_null_propagates_null) {
   program.emplace_back(CALL, std::string("to_float"));
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 // --- to_double ---
@@ -1778,7 +1775,7 @@ TEST(xExpressionEval, call_to_double_from_string) {
   program.emplace_back(CALL, std::string("to_double"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<double>(result));
   EXPECT_EQ(std::get<double>(result), 1.5);
@@ -1790,7 +1787,7 @@ TEST(xExpressionEval, call_to_double_from_int) {
   program.emplace_back(CALL, std::string("to_double"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<double>(result));
   EXPECT_EQ(std::get<double>(result), 7.0);
@@ -1802,7 +1799,7 @@ TEST(xExpressionEval, call_to_double_null_propagates_null) {
   program.emplace_back(CALL, std::string("to_double"));
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 // --- to_string ---
@@ -1813,7 +1810,7 @@ TEST(xExpressionEval, call_to_string_from_int) {
   program.emplace_back(CALL, std::string("to_string"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<std::string>(result));
   EXPECT_EQ(std::get<std::string>(result), "42");
@@ -1825,7 +1822,7 @@ TEST(xExpressionEval, call_to_string_from_float) {
   program.emplace_back(CALL, std::string("to_string"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<std::string>(result));
   EXPECT_EQ(std::get<std::string>(result), std::to_string(1.0F));
@@ -1837,7 +1834,7 @@ TEST(xExpressionEval, call_to_string_identity) {
   program.emplace_back(CALL, std::string("to_string"));
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<std::string>(result));
   EXPECT_EQ(std::get<std::string>(result), "hello");
@@ -1849,7 +1846,7 @@ TEST(xExpressionEval, call_to_string_null_propagates_null) {
   program.emplace_back(CALL, std::string("to_string"));
 
   expressionEvaluator test;
-  EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
 }
 
 // --- POWER: operator `^` z RQL.g4 (ExpPow) ------------------------------------------------
@@ -1864,7 +1861,7 @@ TEST(xExpressionEval, pow_operand_order) {
   program.emplace_back(POWER);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 8);
@@ -1879,7 +1876,7 @@ TEST(xExpressionEval, pow_int_int_stays_integer) {
   program.emplace_back(POWER);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   EXPECT_EQ(result.index(), rdb::INTEGER);
   EXPECT_EQ(std::get<int>(result), 49);
@@ -1893,7 +1890,7 @@ TEST(xExpressionEval, pow_int_double_promotes_to_double) {
   program.emplace_back(POWER);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_EQ(result.index(), rdb::DOUBLE);
   EXPECT_NEAR(std::get<double>(result), 1.4142135623730951, 1E-12);
@@ -1907,7 +1904,7 @@ TEST(xExpressionEval, pow_negative_exponent_truncates_on_integer_base) {
   program.emplace_back(POWER);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<int>(result));
   EXPECT_EQ(std::get<int>(result), 0);
@@ -1924,7 +1921,7 @@ TEST(xExpressionEval, pow_non_finite_result_gives_null) {
     program.emplace_back(POWER);
 
     expressionEvaluator test;
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
   }
 }
 
@@ -1936,7 +1933,7 @@ TEST(xExpressionEval, pow_null_operand_propagates_null) {
     program.emplace_back(POWER);
 
     expressionEvaluator test;
-    EXPECT_TRUE(std::holds_alternative<std::monostate>(test.eval(program)));
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(rdbtest::ok(test.eval(program))));
   }
 }
 
@@ -1950,7 +1947,7 @@ TEST(xExpressionEval, pow_string_operand_throws) {
     program.emplace_back(POWER);
 
     expressionEvaluator test;
-    EXPECT_THROW(test.eval(program), std::runtime_error);
+    EXPECT_RDB_ERROR(test.eval(program), rdb::Errc::Eval);
   }
 }
 
@@ -1981,7 +1978,7 @@ TEST(xExpressionEval, pow_on_exact_types_matches_multiplication) {
     }
 
     expressionEvaluator test;
-    EXPECT_TRUE(test.eval(asPower) == test.eval(asProduct)) << "wykladnik " << item.exponent;
+    EXPECT_TRUE(rdbtest::ok(test.eval(asPower)) == rdbtest::ok(test.eval(asProduct))) << "wykladnik " << item.exponent;
   }
 }
 
@@ -1996,7 +1993,7 @@ rdb::descFldVT evalBinary(const rdb::descFldVT &a, const rdb::descFldVT &b, comm
   program.emplace_back(PUSH_VAL, b);
   program.emplace_back(op);
   expressionEvaluator test;
-  return test.eval(program);
+  return rdbtest::ok(test.eval(program));
 }
 
 rdb::descFldVT evalUnary(const rdb::descFldVT &a, const token &op) {
@@ -2004,7 +2001,7 @@ rdb::descFldVT evalUnary(const rdb::descFldVT &a, const token &op) {
   program.emplace_back(PUSH_VAL, a);
   program.push_back(op);
   expressionEvaluator test;
-  return test.eval(program);
+  return rdbtest::ok(test.eval(program));
 }
 
 bool isNull(const rdb::descFldVT &value) { return std::holds_alternative<std::monostate>(value); }
@@ -2089,7 +2086,7 @@ TEST(xExpressionEval, rational_overflow_returns_null) {
   program.emplace_back(PUSH_VAL, R(1000000000));
   program.emplace_back(DIVIDE);
   expressionEvaluator test;
-  EXPECT_TRUE(isNull(test.eval(program)));
+  EXPECT_TRUE(isNull(rdbtest::ok(test.eval(program))));
 }
 
 // --- FLOAT na granicy 2^24: gdzie dokladnie gubi sie zaokraglenie ---
@@ -2131,7 +2128,7 @@ TEST(xExpressionEval, float_add_int_stays_float_at_2p24) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<float>(result))
       << "normalize() podniosl FLOAT + INTEGER ponad FLOAT; indeks wyniku: " << result.index();
@@ -2148,7 +2145,7 @@ TEST(xExpressionEval, float_chain_rounds_at_every_step_at_2p24) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<float>(result)) << "indeks wyniku: " << result.index();
   EXPECT_EQ(std::get<float>(result), 16777218.0F) << "16777220 znaczy DOUBLE w posredniku albo przepisanie na x+3";
@@ -2169,7 +2166,7 @@ TEST(xExpressionEval, float_slot_chain_rounds_at_every_step_at_2p24) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program, &p);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program, &p));
 
   ASSERT_TRUE(std::holds_alternative<float>(result)) << "indeks wyniku: " << result.index();
   EXPECT_EQ(std::get<float>(result), 16777218.0F);
@@ -2187,7 +2184,7 @@ TEST(xExpressionEval, double_chain_at_2p24_is_exact_and_narrows_to_16777220) {
   program.emplace_back(ADD);
 
   expressionEvaluator test;
-  rdb::descFldVT result = test.eval(program);
+  rdb::descFldVT result = rdbtest::ok(test.eval(program));
 
   ASSERT_TRUE(std::holds_alternative<double>(result));
   EXPECT_EQ(std::get<double>(result), 16777219.0);

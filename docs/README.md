@@ -13,6 +13,7 @@ belongs here.
 | [`core-phase-1.md`](core-phase-1.md) | The refactor that gates every stage above the storage layer, the precedent to copy, and the first slice specified to the file. |
 | [`core-phase-2.md`](core-phase-2.md) | Where engine state lived, who owns it now (`MemoryStore`, `Engine`), and the gate that keeps the embeddable layer free of process state. |
 | [`core-phase-3.md`](core-phase-3.md) | `Engine::compile()` / `step()`: how a host drives the plan one slot at a time, what the binding built on it, and what the daemon side still owes. |
+| [`embedded-realtime-gaps.md`](embedded-realtime-gaps.md) | What four books on embedded, low-latency and concurrent C++ ask of the engine, where it falls short, and the error-handling change that replaced exceptions with values (`RDB_NO_EXCEPTIONS`). |
 
 Build commands, testing, code style and the commit/CI policy are not here - they are
 in `CLAUDE.md` at the repository root, which remains the binding source for all of it.

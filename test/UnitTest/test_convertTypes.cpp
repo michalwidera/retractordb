@@ -242,8 +242,10 @@ TEST(any_to_variant_cast, rational_input) {
   auto result = any_to_variant_cast(std::any(boost::rational<int>(1, 3)));
   EXPECT_EQ(std::get<boost::rational<int>>(result), boost::rational<int>(1, 3));
 }
-TEST(any_to_variant_cast, unsupported_type_throws) {
-  EXPECT_THROW(any_to_variant_cast(std::any(std::vector<int>{1, 2})), std::bad_any_cast);
+// Typ spoza wariantu to niezmiennik: wartosci std::any powstaja w silniku z typow deskryptora.
+// rdb::fatal z nazwa przyczyny - do 2026-10 byl to rzut std::bad_any_cast.
+TEST(any_to_variant_castDeathTest, unsupported_type_is_fatal) {
+  EXPECT_DEATH(static_cast<void>(any_to_variant_cast(std::any(std::vector<int>{1, 2}))), "FATAL: ");
 }
 
 // ── cast<descFldVT> - NULLTYPE ────────────────────────────────────────────────

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "rdb/facctxtsrc.hpp"
+#include "rdbResult.hpp"
 
 // Tests intentionally use raw byte buffers for parser and file-interface validation.
 // NOLINTBEGIN(modernize-avoid-c-arrays)
@@ -196,7 +197,7 @@ TEST_F(TextSourceROTest, test_read_missing_file_returns_null_row) {
   auto nulls = src->lastNullBitset();
   ASSERT_EQ(nulls.size(), 1U);
   EXPECT_TRUE(nulls[0]);
-  EXPECT_EQ(src->count(), 1U);
+  EXPECT_EQ(rdbtest::ok(src->count()), 1U);
 }
 
 // ============================================================
@@ -482,17 +483,17 @@ TEST_F(TextSourceROTest, test_count_increments) {
 
   auto src = std::make_unique<rdb::textSourceRO>(filename, desc, false);
 
-  GTEST_ASSERT_EQ(src->count(), 0U);
+  GTEST_ASSERT_EQ(rdbtest::ok(src->count()), 0U);
 
   auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
   src->read(buffer.get(), 0);
-  GTEST_ASSERT_EQ(src->count(), 1U);
+  GTEST_ASSERT_EQ(rdbtest::ok(src->count()), 1U);
 
   src->read(buffer.get(), 0);
-  GTEST_ASSERT_EQ(src->count(), 2U);
+  GTEST_ASSERT_EQ(rdbtest::ok(src->count()), 2U);
 
   src->read(buffer.get(), 0);
-  GTEST_ASSERT_EQ(src->count(), 3U);
+  GTEST_ASSERT_EQ(rdbtest::ok(src->count()), 3U);
 }
 
 // ============================================================

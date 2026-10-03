@@ -11,8 +11,6 @@
 
 #include <fmt/format.h>
 
-#include "rdb/exceptions.hpp"
-
 namespace rdb {
 
 namespace {
@@ -25,7 +23,13 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
     : filename_(std::string(fileName)),
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       percounter_(percounter) {
-  if (recordSize_ == 0) throw LogicError("posixBinaryFile: record size must be > 0");
+  // Deskryptor zerowej szerokosci odrzuca storage::attachDescriptor (Errc::Config) - akcesor
+  // zbudowany wprost dostaje ten sam status co przy nieudanym otwarciu, zamiast asercji.
+  if (recordSize_ == 0) {
+    initializationError_ = "posixBinaryFile: record size must be > 0 for '" + filename_ + "'";
+    percounter_          = -1;
+    return;
+  }
 
   std::error_code fs_ec;
   const bool fileExisted = std::filesystem::exists(filename_, fs_ec);
@@ -91,24 +95,26 @@ posixBinaryFile::~posixBinaryFile() {
 // przemianowac nieistniejacy plik i logowal falszywe "Failed to rotate" - przy kazdym
 // segmencie groupFile usunietym przez retencje albo purge.
 void posixBinaryFile::discard() {
-  std::filesystem::remove(filename_);
+  std::error_code ec;  // brak pliku nie jest bledem porzucenia - stad przeciazenie bez rzutu
+  std::filesystem::remove(filename_, ec);
   percounter_ = -1;
 }
 
 auto posixBinaryFile::name() -> std::string & { return filename_; }
 
-size_t posixBinaryFile::count() {
+Result<size_t> posixBinaryFile::count() {
+  if (recordSize_ == 0) return fail(Errc::IO, initializationError_);
   // Pojedynczy stat(). ENOENT to zwykly brak pliku - magazyn jeszcze nie zapisany albo
-  // po purge, ktory plik kasuje; stad 0 rekordow. Kazdy inny blad rzuca IOError, bo cicha
+  // po purge, ktory plik kasuje; stad 0 rekordow. Kazdy inny blad wraca jako Errc::IO, bo cicha
   // wartosc jest tu grozniejsza od zatrzymania: 0 znaczy "magazyn pusty", wiec
   // storage::write zaczyna dopisywac od indeksu 0 po istniejacych danych.
   struct stat stat_buf;
   if (stat(filename_.c_str(), &stat_buf) != 0) {
     if (errno == ENOENT) return 0;
     const int statErrno = errno;  // przed skladaniem komunikatu - alokacja moze ruszyc errno
-    throw IOError(fmt::format("posixBinaryFile::count: ::stat '{}' failed: {}", filename_, strerror(statErrno)));
+    return fail(Errc::IO, fmt::format("posixBinaryFile::count: ::stat '{}' failed: {}", filename_, strerror(statErrno)));
   }
-  return stat_buf.st_size / recordSize_;
+  return static_cast<size_t>(stat_buf.st_size / recordSize_);
 }
 
 ssize_t posixBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/, const size_t position) {

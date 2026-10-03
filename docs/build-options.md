@@ -27,9 +27,43 @@ Four rules hold for all of them:
 4. **Dependencies of an embedded target are looked up only when its flag is on.**
    `find_package(Python3)` must not run in a build that did not ask for Python.
 
+## `RDB_NO_EXCEPTIONS`
+
+Not an embedded target, but a property every embedded target relies on, so it is recorded
+here. Default **`ON`**.
+
+With it on, the engine core - the `rdb`, `retractorcore` and `rdbembed` libraries - compiles
+with `-fno-exceptions` (and `SPDLOG_NO_EXCEPTIONS`). Errors are `rdb::Result` values
+(`src/include/rdb/error.hpp`), and a `throw`, `try` or `catch` in the core is a compile error.
+Three files keep exceptions because they wrap third-party code that reports errors only by
+throwing: the two ANTLR parser wrappers, `src/rdb/lib/DESCParser.cc` and
+`src/retractor/lib/RQLParser.cpp`, and the Boost.Stacktrace wrapper, `src/rdb/lib/stackTrace.cc`
+(Boost's default stack-trace backend, which Conan's Boost uses on macOS, has `throw` in its
+headers). Each catches everything at its own boundary. The daemon service (`retractor`), the tools and the Python
+module keep exceptions, because Boost.Interprocess, `program_options` and nanobind need them.
+
+`OFF` builds the same sources with exceptions enabled. Nothing in the code depends on the flag,
+and `test/embedding_boundary.py` rejects `throw`/`try`/`catch` in the core either way. The flag
+is deliberately not printed by `xretractor --build-info`, because the H9 corpus checks that
+output's set of keys exactly.
+
+One side effect shows up only under `RDB_SANITIZE=address` with libc++ (the macOS
+`--sanitize` run). libc++ tags its inline functions with the exception mode, so a unit-test
+executable ends up with some `std::vector` code from the instrumented core and some from
+Conan's GoogleTest, which is built without sanitizers. AddressSanitizer's container-overflow
+check is only reliable when all code is instrumented, and here it reported a false
+heap-buffer-overflow while GoogleTest was registering tests. The unit-test `main`
+(`test/UnitTest/launch/main.cpp`) therefore sets `detect_container_overflow=0` as its ASan
+default. The other ASan checks stay on, and `ASAN_OPTIONS=detect_container_overflow=1` turns
+this one back on.
+
+The design, the residual risks and the remaining real-time gaps are in
+[`embedded-realtime-gaps.md`](embedded-realtime-gaps.md).
+
 ## `RDB_PYTHON`
 
-Builds `retractordb._core` from `src/python/` against the `rdb` static library.
+Builds `retractordb._core` from `src/python/` against the engine core (`rdbembed`, which links
+`retractorcore` and `rdb`).
 
 Requirements, all checked at configure time:
 
@@ -128,8 +162,9 @@ a developer who never asked for the Python extension should not see failures fro
 ### One side effect to know before measuring
 
 A shared module cannot link static libraries that are not position independent, so
-with `RDB_PYTHON=ON` the `rdb`, `descparser` and `common` targets are built with
-`POSITION_INDEPENDENT_CODE ON`. Those are the same targets the engine binaries link,
+with `RDB_PYTHON=ON` the `rdb`, `descparser`, `common`, `retractorcore`, `rqlparser` and
+`rdbembed` targets are built with `POSITION_INDEPENDENT_CODE ON`. Most of those are the same
+targets the engine binaries link,
 so the flag does not only add a module - it changes how the engine itself is
 compiled in that build directory.
 
@@ -144,6 +179,35 @@ The alternative - compiling a second, position-independent copy of those three
 libraries just for the module - doubles their build time and was not worth it while
 stage 1a is the only consumer. Revisit when stage 1b makes the module a shipped
 artifact.
+
+### Not in a sanitizer build directory, unless you preload the runtime
+
+With `RDB_SANITIZE=address` (for example the directory `scripts/macos-build.sh --sanitize`
+configures), `retractordb._core` links the AddressSanitizer runtime. A Python interpreter
+loads the module with `dlopen`, which is too late for that runtime: on macOS the process
+aborts during import, on Linux it exits with "ASan runtime does not come first". Under pytest
+the reason is captured, so all you see is `Fatal Python error: Aborted` or exit code 1. CMake
+warns about this at configure time and prints the exact command for the host.
+
+Use a separate build directory without `RDB_SANITIZE` for the Python module. Or, to run the
+Python suite under the sanitizer (which is worth doing - it is the only memory check the
+binding gets on macOS), preload the runtime:
+
+```sh
+# macOS (Apple clang)
+DYLD_INSERT_LIBRARIES="$(clang -print-resource-dir)/lib/darwin/libclang_rt.asan_osx_dynamic.dylib" \
+ASAN_OPTIONS=detect_container_overflow=0 \
+RDB_PYTHON_MODULE_DIR=build/Debug/python .venv-python/bin/python3 -m pytest api/python/tests
+
+# Linux (GCC): libstdc++ as well, because python itself is a C program
+LD_PRELOAD="$(g++ -print-file-name=libasan.so) $(g++ -print-file-name=libstdc++.so)" \
+ASAN_OPTIONS=detect_leaks=0 \
+RDB_PYTHON_MODULE_DIR=build/Debug/python .venv-python/bin/python3 -m pytest api/python/tests
+```
+
+`detect_leaks=0` because the interpreter does not free everything at exit, and LeakSanitizer
+would report that. `detect_container_overflow=0` for the reason given under
+`RDB_NO_EXCEPTIONS`: the Conan libraries the module links are not instrumented.
 
 ### What it does not do
 

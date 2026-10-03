@@ -17,6 +17,8 @@ bool ReadCmd::execute(CommandContext &ctx) {
   if (ctx.dacc->isDeclared()) ctx.dacc->bufferState = rdb::sourceState::flux;
   auto returnStatus = reverse_ ? ctx.dacc->revRead(record) : ctx.dacc->read(record);
   if (ctx.dacc->isDeclared()) ctx.dacc->fire();
+  if (!returnStatus) std::print("{}read: {}\n{}", ctx.colors.RED, returnStatus.error().message(), ctx.colors.RESET);
+  // expected == wartosc: falsz takze przy bledzie, wiec blad odczytu daje status `error`.
   ctx.payloadStatus = (returnStatus == rdb::ReadStatus::Ok) ? fetched : error;
   return true;
 }
@@ -32,7 +34,10 @@ bool ListCmd::execute(CommandContext &ctx) {
     auto returnStatus = reverse_ ? ctx.dacc->revRead(i) : ctx.dacc->read(i);
     ctx.payloadStatus = (returnStatus == rdb::ReadStatus::Ok) ? fetched : error;
     if (ctx.payloadStatus == error) {
-      std::print("{}fetch error\n{}", ctx.colors.RED, ctx.colors.RESET);
+      if (returnStatus)
+        std::print("{}fetch error\n{}", ctx.colors.RED, ctx.colors.RESET);
+      else
+        std::print("{}fetch error: {}\n{}", ctx.colors.RED, returnStatus.error().message(), ctx.colors.RESET);
       continue;
     }
     std::cout << ctx.colors.ORANGE << rdb::singleLineFormat << *(ctx.dacc->getPayload()) << ctx.colors.RESET << "\n";
@@ -51,8 +56,11 @@ bool WriteCmd::execute(CommandContext &ctx) {
     std::print("{}record out of range - Check append command.\n{}", ctx.colors.RED, ctx.colors.RESET);
     return false;
   }
+  // Do 2026-10 warunek brzmial `!writeStatus ? stored : error`, a write() oddawal true przy
+  // POWODZENIU - udany zapis konczyl sie statusem `error`, nieudany `stored`.
   auto writeStatus  = ctx.dacc->write(record);
-  ctx.payloadStatus = (!writeStatus) ? stored : error;
+  ctx.payloadStatus = writeStatus ? stored : error;
+  if (!writeStatus) std::print("{}write: {}\n{}", ctx.colors.RED, writeStatus.error().message(), ctx.colors.RESET);
   return true;
 }
 
@@ -70,7 +78,11 @@ bool DumpCmd::execute(CommandContext &ctx) {
 std::pair<std::string, std::vector<std::string>> AppendCmd::usage() const { return {"append", {"append payload to database"}}; }
 
 bool AppendCmd::execute(CommandContext &ctx) {
-  ctx.dacc->write();
+  if (auto written = ctx.dacc->write(); !written) {
+    std::print("{}append: {}\n{}", ctx.colors.RED, written.error().message(), ctx.colors.RESET);
+    ctx.payloadStatus = error;
+    return true;
+  }
   ctx.payloadStatus = stored;
   return true;
 }
@@ -80,7 +92,8 @@ std::pair<std::string, std::vector<std::string>> PurgeCmd::usage() const {
 }
 
 bool PurgeCmd::execute(CommandContext &ctx) {
-  ctx.dacc->purge();
+  if (auto purged = ctx.dacc->purge(); !purged)
+    std::print("{}purge: {}\n{}", ctx.colors.RED, purged.error().message(), ctx.colors.RESET);
   return true;
 }
 

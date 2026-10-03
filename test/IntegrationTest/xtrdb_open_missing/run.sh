@@ -1,11 +1,15 @@
 #!/bin/bash
 # `open` bez `.desc` przyjmuje schemat wylacznie w nawiasach klamrowych; bez niego odmawia (#334).
 #
-# Kazdy przebieg idzie pod `ulimit -v` i `timeout`: przed poprawka xtrdb dochodzil do 8 GB w 2 min,
-# wiec bez tych granic czerwony test zjadalby pamiec maszyny, zamiast pasc.
+# Kazdy przebieg idzie pod `ulimit -v` i limit czasu: przed poprawka xtrdb dochodzil do 8 GB w 2 min,
+# wiec bez tych granic czerwony test zjadalby pamiec maszyny, zamiast pasc. Limit czasu daje
+# run_timeout (portable.sh) - macOS nie ma `timeout` z GNU coreutils. `ulimit -v` macOS odrzuca
+# ("cannot modify limit: Invalid argument"); tam zostaje sam limit czasu, ktory przy tamtym
+# tempie wzrostu zatrzymuje proces przy okolo 1,3 GB.
 #
 # Uzycie: run.sh <xtrdb>
 set -e
+. "$(dirname "$0")/../portable.sh"
 xtrdb="$1"
 rm -f ./*.desc ./*.meta nosuch nosuch2 fresh fresh2 out.txt
 
@@ -14,8 +18,8 @@ run_xtrdb() {
   set +e
   # shellcheck disable=SC2059 # wejscie jest formatem printf z \n
   printf "$1" | (
-    ulimit -v 2000000
-    timeout 20 "$xtrdb" noprompt
+    ulimit -v 2000000 2>/dev/null || true
+    run_timeout 20 "$xtrdb" noprompt
   ) >out.txt 2>&1
   rc=$?
   set -e

@@ -35,25 +35,27 @@ std::vector<std::byte> metaShadow::ShadowOverride::serialize() const {
   return buf;
 }
 
-metaShadow::ShadowOverride metaShadow::ShadowOverride::deserialize(std::span<const std::byte> data) {
+std::optional<metaShadow::ShadowOverride> metaShadow::ShadowOverride::deserialize(std::span<const std::byte> data) {
   const std::byte *ptr = data.data();
   const std::byte *end = ptr + data.size();
 
-  auto read = [&]<typename T>(T &out) {
-    if (ptr + sizeof(T) > end) throw std::runtime_error("Buffer underrun while deserializing ShadowOverride");
+  // Uzasadnienie przy IndexRecord::deserialize: krotki wpis to uszkodzony plik, nie blad kodu.
+  auto read = [&]<typename T>(T &out) -> bool {
+    if (ptr + sizeof(T) > end) return false;
     std::memcpy(&out, ptr, sizeof(T));
     ptr += sizeof(T);
+    return true;
   };
 
   ShadowOverride ov;
   uint8_t flag = 0;
-  read(flag);
-  read(ov.recordIndex);
+  if (!read(flag)) return std::nullopt;
+  if (!read(ov.recordIndex)) return std::nullopt;
 
   size_t bitsetSize = 0;
-  read(bitsetSize);
+  if (!read(bitsetSize)) return std::nullopt;
   const size_t byteCount = packedByteCount(bitsetSize);
-  if (ptr + byteCount > end) throw std::runtime_error("Buffer underrun in ShadowOverride bitset data");
+  if (byteCount > static_cast<size_t>(end - ptr)) return std::nullopt;
 
   ov.nullBitset = unpackBits(std::span<const std::byte>(ptr, byteCount), bitsetSize);
 
@@ -93,7 +95,13 @@ void metaShadow::load() {
 
   std::span<const std::byte> remaining(fileData);
   while (remaining.size() >= entrySize_) {
-    overrides_.push_back(ShadowOverride::deserialize(remaining.subspan(0, entrySize_)));
+    auto entry = ShadowOverride::deserialize(remaining.subspan(0, entrySize_));
+    if (!entry) {
+      // Uszkodzony wpis konczy cien: nastepne wpisy i tak nie maja wiarygodnego wyrownania.
+      SPDLOG_ERROR("metaShadow: corrupt entry #{} in {} - shadow index truncated there", overrides_.size(), shadowFilePath_);
+      break;
+    }
+    overrides_.push_back(std::move(*entry));
     remaining = remaining.subspan(entrySize_);
   }
 }

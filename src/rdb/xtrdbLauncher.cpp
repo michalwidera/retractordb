@@ -31,7 +31,6 @@
 #include "config.h"
 #include "constants.hpp"
 #include "ICommand.hpp"
-#include "rdb/exceptions.hpp"
 #include "rdb/storage.hpp"
 #include "uxSysTermTools.hpp"
 #include "xtrdbStorageMap.hpp"
@@ -207,18 +206,13 @@ int main(int argc, char *argv[]) {
         std::print("{}unconnected\n{}", colors.RED, colors.RESET);
         continue;
       }
-      // Od fazy 1 warstwa magazynu zglasza bledy rzutem, a nie koncem procesu. xtrdb nie
-      // ma nadrzednego catch, wiec bez tego bloku KAZDY taki rzut konczylby sie
-      // std::terminate - czyli SIGABRT zamiast komunikatu, i to w powloce, ktora ma z
-      // zalozenia przezyc bledna komende. Straz przy dacc powyzej jest tego czescia:
-      // cmdOpen zeruje magazyn, ktorego nie udalo mu sie otworzyc, wiec kolejne komendy
-      // odbijaja sie o "unconnected" zamiast siegac po nullptr.
-      try {
-        if (!it->second->execute(ctx)) continue;
-      } catch (const rdb::Error &error) {
-        std::print("{}{}\n{}", colors.RED, error.what(), colors.RESET);
-        continue;
-      }
+      // Warstwa magazynu zglasza bledy wartoscia (rdb::Result) i kazda komenda wypisuje swoj
+      // blad sama, zostawiajac operatora przy prompcie. Do 2026-10 stal tu catch(rdb::Error),
+      // bo magazyn rzucal. Straz przy dacc powyzej zostaje: cmdOpen zeruje magazyn, ktorego nie
+      // udalo mu sie otworzyc, wiec kolejne komendy odbijaja sie o "unconnected" zamiast siegac
+      // po nullptr. Zlamany niezmiennik silnika (RDB_ASSERT) konczy proces - to blad w kodzie,
+      // nie w komendzie.
+      if (!it->second->execute(ctx)) continue;
     } else if (cmd == "help" || cmd == "h") {
       std::print("{}", colors.GREEN);
       for (auto [c, d] : std::initializer_list<std::pair<std::string_view, std::string_view>>{

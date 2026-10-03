@@ -16,12 +16,10 @@
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
-#include "rdb/exceptions.hpp"
-
 // Numer N+1 jest rezerwowany przy starcie, a nie zapisywany w destruktorze (#281). Dawny
 // destruktor zapisywal go na koniec sesji i przy porazce mogl ja jedynie przemilczec: nastepna
-// sesja dostawala znow N i nadpisywala .old<N>. Tu porazka zatrzymuje start (IOError - demon
-// konczy sie na nim kodem EXIT_FAILURE w main albo w executorsm::run), zanim powstanie
+// sesja dostawala znow N i nadpisywala .old<N>. Tu porazka zatrzymuje start (Errc::IO z create() -
+// demon konczy sie na nim kodem EXIT_FAILURE w main albo w executorsm::run), zanim powstanie
 // pierwsze archiwum. Przy okazji znika okno przy wyjsciu: pCounterPtr jest globalny, wiec jego
 // destruktor biegl dopiero po cleanup() z atexit - po zwolnieniu slotu magistrali i blokady,
 // kiedy druga instancja mogla juz wczytac stare N. Cena: sesja zabita w trakcie zuzywa swoj
@@ -29,19 +27,23 @@
 PersistentCounter::PersistentCounter(std::string initFilename)
     :                                                      //
       persistentCounterFilename_(std::move(initFilename))  //
-{
-  load();
-  if (!save(count_ + 1))
-    throw rdb::IOError(fmt::format(
-        "Cannot reserve rotation number {} in '{}'; refusing to start - otherwise the next session would reuse number {} "
-        "and overwrite the archives of this one.",
-        count_ + 1, persistentCounterFilename_, count_));
+{}
+
+rdb::Result<std::unique_ptr<PersistentCounter>> PersistentCounter::create(std::string initFilename) {
+  std::unique_ptr<PersistentCounter> counter(new PersistentCounter(std::move(initFilename)));
+  RDB_TRY(counter->load());
+  if (!counter->save(counter->count_ + 1))
+    return rdb::fail(rdb::Errc::IO,
+                     fmt::format("Cannot reserve rotation number {} in '{}'; refusing to start - otherwise the next session "
+                                 "would reuse number {} and overwrite the archives of this one.",
+                                 counter->count_ + 1, counter->persistentCounterFilename_, counter->count_));
+  return counter;
 }
 
 int PersistentCounter::getCount() const { return count_; }
 
 // Brak pliku to pierwsze uzycie planu z :ROTATION - rotacja 0. Kazdy INNY stan pliku, ktorego
-// nie da sie odczytac w calosci jako nieujemnej liczby, zatrzymuje silnik (ConfigError). Dawniej `infile >>
+// nie da sie odczytac w calosci jako nieujemnej liczby, zatrzymuje silnik (Errc::Config). Dawniej `infile >>
 // count_` na pustym pliku wpisywal 0 (od C++11 nieudany odczyt zeruje zmienna), wiec plik
 // uciety przez awarie udawal rotacje 0: plan zaczynal archiwizacje od nowa i nadpisywal
 // .old0, .old1, ... poprzednich sesji bez sladu w logu. Wartosc ujemna odpada z tego samego
@@ -50,11 +52,11 @@ int PersistentCounter::getCount() const { return count_; }
 // Odmowa zamiast wartosci zastepczej (decyzja operacyjna, #281): wlasciwego numeru nie da sie
 // tu odtworzyc, a kazdy zgadniety moze nadpisac archiwum. Operator naprawia plik albo
 // swiadomie go usuwa.
-void PersistentCounter::load() {
+rdb::Result<> PersistentCounter::load() {
   std::error_code ec;
   if (!std::filesystem::exists(persistentCounterFilename_, ec) && !ec) {
     count_ = 0;
-    return;
+    return {};
   }
 
   std::ifstream infile(persistentCounterFilename_, std::ios::binary);
@@ -69,12 +71,14 @@ void PersistentCounter::load() {
   int value{};
   const auto [ptr, err] = std::from_chars(first, last, value);
   if (!infile.is_open() || err != std::errc() || ptr != last || value < 0)
-    throw rdb::ConfigError(fmt::format(
-        "Rotation counter file '{}' is unreadable ({} bytes: '{}'); refusing to start. A guessed rotation number could "
-        "overwrite archives of previous sessions. Repair the file (a non-negative integer), or delete it to restart "
-        "rotation from 0 - existing .old<N> archives will then be overwritten.",
-        persistentCounterFilename_, text.size(), text.substr(0, 32)));
+    return rdb::fail(
+        rdb::Errc::Config,
+        fmt::format("Rotation counter file '{}' is unreadable ({} bytes: '{}'); refusing to start. A guessed rotation number "
+                    "could overwrite archives of previous sessions. Repair the file (a non-negative integer), or delete it "
+                    "to restart rotation from 0 - existing .old<N> archives will then be overwritten.",
+                    persistentCounterFilename_, text.size(), text.substr(0, 32)));
   count_ = value;
+  return {};
 }
 
 // Zapis przez plik tymczasowy, wzorem servicecontrol::writeQueryFile. Samo

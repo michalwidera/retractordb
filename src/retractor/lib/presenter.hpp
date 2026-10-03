@@ -3,6 +3,7 @@
 #include <boost/program_options.hpp>  // IWYU pragma: keep
 
 #include "qTree.hpp"  // for qTree, query, token
+#include "rdb/error.hpp"
 
 struct presenter {
   explicit presenter(qTree &coreInstance) : coreInstance(coreInstance) {};
@@ -20,5 +21,6 @@ struct presenter {
   void qSet();
   void qRules();
   void onlyCompileShowProgram();
-  void sequenceDiagram(int gridType, int cycleCount);
+  /// Errc::Config, gdy plan nie daje osi czasu (interwal zero, brak strumieni).
+  [[nodiscard]] rdb::Result<> sequenceDiagram(int gridType, int cycleCount);
 };

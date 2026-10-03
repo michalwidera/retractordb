@@ -14,7 +14,7 @@
 
 #include "dataModel.hpp"
 #include "executorsmState.hpp"
-#include "rdb/exceptions.hpp"
+#include "rdb/error.hpp"
 
 namespace {
 constexpr mode_t kDefaultDumpFileMode = 0644;
@@ -58,20 +58,18 @@ dumpTask::~dumpTask() {
   }
 }
 
-void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
-  if (pProc == nullptr) throw rdb::LogicError("dumpManager::registerTask: dataModel pointer is null");
-  if (!pProc->qSet.contains(streamName)) {
-    throw rdb::LogicError(std::format("dumpManager::registerTask: stream '{}' not found in dataModel", streamName));
-  }
-  if (task.range.first > task.range.second) {
-    // LogicError, nie ConfigError: zakres jest bramkowany DWUKROTNIE, w parserze
-    // (RQLParser.cpp:220, komunikat dla uzytkownika) i w compiler::computeRequiredCapacities.
-    // Zaden tekst RQL nie dociera tu z pustym zakresem.
-    throw rdb::LogicError(std::format("dumpManager::registerTask: range.first {} > range.second {} for stream '{}'",
-                                      task.range.first, task.range.second, streamName));
-  }
+rdb::Result<> dumpManager::registerTask(const std::string &streamName, dumpTask task) {
+  // Model publikuje petla demona; silnik osadzony odrzuca reguly DUMP przy compile() - oba to niezmienniki.
+  RDB_ASSERT(pProc != nullptr, "dumpManager::registerTask: dataModel pointer is null");
+  RDB_ASSERT(pProc->qSet.contains(streamName), "dumpManager::registerTask: stream '{}' not found in dataModel", streamName);
+  // Niezmiennik, nie wejscie: zakres jest bramkowany DWUKROTNIE, w parserze (RQLParser.cpp,
+  // komunikat dla uzytkownika) i w compiler::computeRequiredCapacities. Zaden tekst RQL nie
+  // dociera tu z pustym zakresem.
+  RDB_ASSERT(task.range.first <= task.range.second,
+             "dumpManager::registerTask: range.first {} > range.second {} for stream '{}'", task.range.first, task.range.second,
+             streamName);
 
-  std::tie(task.dumpFilename, task.fd)      = createDumpFile(streamName, task.taskName);
+  RDB_TRY_ASSIGN(std::tie(task.dumpFilename, task.fd), createDumpFile(streamName, task.taskName));
   task.dumpedRecordsToGo                    = static_cast<int>(abs(task.range.second - task.range.first));
   retentionSize[streamName + task.taskName] = static_cast<int>(task.retentionSize);
   // Pojemnosc ksiegi to liczba zadan JEDNOCZESNIE w locie na tym strumieniu, wiec musi
@@ -95,48 +93,48 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
     // CHECK SEQUENCE IF THIS IS IN REVERSE ORDER
     int dumpHistoryCount = static_cast<int>(abs(task.range.first));
     for (auto i = 0; i < dumpHistoryCount; ++i) {
-      auto *payLoadPtr = pProc->getPayload(streamName, dumpHistoryCount - i);
-      auto resultSeek  = ::lseek(task.fd, 0, SEEK_END);
+      RDB_TRY_ASSIGN(auto *payLoadPtr, pProc->getPayload(streamName, dumpHistoryCount - i));
+      auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
       if (resultSeek == -1)
-        throw rdb::IOError(std::format("dumpManager::registerTask: lseek failed during history dump: {}", strerror(errno)));
+        return rdb::fail(rdb::Errc::IO,
+                         std::format("dumpManager::registerTask: lseek failed during history dump: {}", strerror(errno)));
       ssize_t write_count_result = ::write(task.fd, payLoadPtr->span().data(), payLoadPtr->descriptor.getSizeInBytes());
       if (write_count_result <= 0)
-        throw rdb::IOError(std::format("dumpManager::registerTask: write failed during history dump (returned {}): {}",
-                                       write_count_result, strerror(errno)));
+        return rdb::fail(rdb::Errc::IO,
+                         std::format("dumpManager::registerTask: write failed during history dump (returned {}): {}",
+                                     write_count_result, strerror(errno)));
     }
-    if (task.dumpedRecordsToGo < dumpHistoryCount) {
-      throw rdb::LogicError(std::format("dumpManager::registerTask: dumpedRecordsToGo {} < dumpHistoryCount {}",
-                                        task.dumpedRecordsToGo, dumpHistoryCount));
-    }
+    RDB_ASSERT(task.dumpedRecordsToGo >= dumpHistoryCount,
+               "dumpManager::registerTask: dumpedRecordsToGo {} < dumpHistoryCount {}", task.dumpedRecordsToGo,
+               dumpHistoryCount);
     task.dumpedRecordsToGo -= dumpHistoryCount;
   } else {
     task.delayDumpRecordsToGo = static_cast<int>(task.range.first);
   }
 
   bookOfTasks[streamName].push_back(std::move(task));
+  return {};
 }
 
 void dumpManager::setDumpStorage(std::string storagePathParam) { storagePath = std::move(storagePathParam); }
 
-void dumpManager::processStreamChunk(const std::string &streamName) {
+rdb::Result<> dumpManager::processStreamChunk(const std::string &streamName) {
   // Brak zadan PRZED siegnieciem po pProc: streamInstance wola te funkcje w kazdym slocie dla
   // kazdego strumienia, a globalny pProc publikuje wylacznie petla demona. Silnik osadzony
   // (rdb::embed::Engine) go nie publikuje i odrzuca reguly DUMP przy compile(), wiec dla
   // niego ta ksiega jest zawsze pusta - i wtedy wskaznik nie jest do niczego potrzebny.
-  if (!bookOfTasks.contains(streamName)) return;
-  if (pProc == nullptr) throw rdb::LogicError("dumpManager::processStreamChunk: dataModel pointer is null");
-  if (!pProc->qSet.contains(streamName)) {
-    throw rdb::LogicError(std::format("dumpManager::processStreamChunk: stream '{}' not found in dataModel", streamName));
-  }
+  if (!bookOfTasks.contains(streamName)) return {};
+  RDB_ASSERT(pProc != nullptr, "dumpManager::processStreamChunk: dataModel pointer is null");
+  RDB_ASSERT(pProc->qSet.contains(streamName), "dumpManager::processStreamChunk: stream '{}' not found in dataModel",
+             streamName);
 
   auto currentStreamCount = pProc->getStreamCount(streamName);
-  if (currentStreamCount == 0) return;  // nothing to dump
+  if (currentStreamCount == 0) return {};  // nothing to dump
 
-  auto *payLoadPtr = pProc->getPayload(streamName);
+  RDB_TRY_ASSIGN(auto *payLoadPtr, pProc->getPayload(streamName));
 
-  if (payLoadPtr->descriptor.getSizeInBytes() == 0)
-    throw rdb::LogicError("dumpManager::processStreamChunk: payload descriptor size is zero");
-  if (payLoadPtr->span().empty()) throw rdb::LogicError("dumpManager::processStreamChunk: payload data span is empty");
+  RDB_ASSERT(payLoadPtr->descriptor.getSizeInBytes() != 0, "dumpManager::processStreamChunk: payload descriptor size is zero");
+  RDB_ASSERT(!payLoadPtr->span().empty(), "dumpManager::processStreamChunk: payload data span is empty");
 
   // enumerate all tasks for this stream
   for (auto &task : bookOfTasks[streamName]) {
@@ -146,7 +144,7 @@ void dumpManager::processStreamChunk(const std::string &streamName) {
       SPDLOG_ERROR("dumpManager::processStreamChunk file descriptor is not set for stream: {}", streamName);
       continue;
     }
-    auto dumpTaskCompleted = buildDumpChunk(task, payLoadPtr);
+    RDB_TRY_ASSIGN(const bool dumpTaskCompleted, buildDumpChunk(task, payLoadPtr));
 
     if (dumpTaskCompleted) {
       ::close(task.fd);
@@ -157,12 +155,13 @@ void dumpManager::processStreamChunk(const std::string &streamName) {
   auto new_end = std::remove_if(bookOfTasks[streamName].begin(), bookOfTasks[streamName].end(),
                                 [](dumpTask &n) { return n.dumpedRecordsToGo == 0; });
   bookOfTasks[streamName].erase(new_end, bookOfTasks[streamName].end());
+  return {};
 }
 
-bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::pointer payload) {
-  if (task.dumpedRecordsToGo < 0) throw rdb::LogicError("dumpManager::buildDumpChunk: dumpedRecordsToGo is negative");
-  if (task.delayDumpRecordsToGo < 0) throw rdb::LogicError("dumpManager::buildDumpChunk: delayDumpRecordsToGo is negative");
-  if (task.fd < 0) throw rdb::LogicError("dumpManager::buildDumpChunk: file descriptor is not set");
+rdb::Result<bool> dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::pointer payload) {
+  RDB_ASSERT(task.dumpedRecordsToGo >= 0, "dumpManager::buildDumpChunk: dumpedRecordsToGo is negative");
+  RDB_ASSERT(task.delayDumpRecordsToGo >= 0, "dumpManager::buildDumpChunk: delayDumpRecordsToGo is negative");
+  RDB_ASSERT(task.fd >= 0, "dumpManager::buildDumpChunk: file descriptor is not set");
 
   // tutaj trzeba będzie opóźnić zrzut danych do pliku jeśli range określa tylko zrzut w przyszłości np. range 2 to 4
   if (task.delayDumpRecordsToGo != 0) {
@@ -171,12 +170,13 @@ bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::
   }
 
   auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
-  if (resultSeek == -1) throw rdb::IOError(std::format("dumpManager::buildDumpChunk: lseek to end failed: {}", strerror(errno)));
+  if (resultSeek == -1)
+    return rdb::fail(rdb::Errc::IO, std::format("dumpManager::buildDumpChunk: lseek to end failed: {}", strerror(errno)));
 
   ssize_t write_count_result = ::write(task.fd, payload->span().data(), payload->descriptor.getSizeInBytes());
   if (write_count_result <= 0)
-    throw rdb::IOError(
-        std::format("dumpManager::buildDumpChunk: write failed (returned {}): {}", write_count_result, strerror(errno)));
+    return rdb::fail(rdb::Errc::IO, std::format("dumpManager::buildDumpChunk: write failed (returned {}): {}",
+                                                write_count_result, strerror(errno)));
 
   if (task.dumpedRecordsToGo > 0) {
     task.dumpedRecordsToGo--;
@@ -185,7 +185,8 @@ bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::
   return (task.dumpedRecordsToGo == 0);
 }
 
-std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view streamName, const std::string_view taskName) {
+rdb::Result<std::pair<std::string, int>> dumpManager::createDumpFile(const std::string_view streamName,
+                                                                     const std::string_view taskName) {
   std::string key = std::string(streamName) + std::string(taskName);
   auto filename =
       std::filesystem::path(storagePath) / std::filesystem::path(std::string(streamName) + "_" + std::string(taskName));
@@ -194,17 +195,16 @@ std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view s
   } else {
     auto ret = (retentionCounter[key]++) % retentionSize[key];
     filename += "_dump_" + std::to_string(ret) + ".tmp";
-    if (ret >= retentionSize[key]) {
-      // Warunek nie moze byc prawdziwy: 'ret' powstaje jako '% retentionSize[key]', wiec jest
-      // z definicji mniejsze od dzielnika. Zostaje jako asercja tego faktu - kosztuje jedno
-      // porownanie i nazywa zalozenie, na ktorym stoi nazwa pliku zrzutu.
-      throw rdb::LogicError(std::format("dumpManager::createDumpFile: retention counter out of bounds: {} >= {} for key '{}'",
-                                        ret, retentionSize[key], key));
-    }
+    // Warunek nie moze byc falszywy: 'ret' powstaje jako '% retentionSize[key]', wiec jest
+    // z definicji mniejsze od dzielnika. Zostaje jako asercja tego faktu - kosztuje jedno
+    // porownanie i nazywa zalozenie, na ktorym stoi nazwa pliku zrzutu.
+    RDB_ASSERT(ret < retentionSize[key], "dumpManager::createDumpFile: retention counter out of bounds: {} >= {} for key '{}'",
+               ret, retentionSize[key], key);
   }
   int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, kDefaultDumpFileMode);
   if (fd < 0) {
-    throw rdb::IOError(std::format("dumpManager::createDumpFile: failed to open '{}': {}", filename.string(), strerror(errno)));
+    return rdb::fail(rdb::Errc::IO,
+                     std::format("dumpManager::createDumpFile: failed to open '{}': {}", filename.string(), strerror(errno)));
   }
-  return std::make_pair(filename, fd);
+  return std::make_pair(filename.string(), fd);
 }

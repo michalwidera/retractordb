@@ -16,6 +16,7 @@
 #include "rdb/facctxtsrc.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/sourceBuffer.hpp"
+#include "rdbResult.hpp"
 
 namespace {
 
@@ -62,7 +63,7 @@ TEST(SourceBufferTest, read_current_fills_out_from_source) {
   buffer.attach(desc);
 
   rdb::payload out(desc);
-  buffer.readCurrent(source, out);
+  rdbtest::ok(buffer.readCurrent(source, out));
 
   EXPECT_EQ(valueOf(out), 42);
   EXPECT_EQ(out.getNullBitset(), std::vector<bool>(desc.size(), false));
@@ -83,8 +84,8 @@ TEST(SourceBufferTest, read_current_after_eof_returns_null_row) {
   buffer.attach(desc);
   rdb::payload out(desc);
 
-  buffer.readCurrent(source, out);  // 7
-  buffer.readCurrent(source, out);  // EOF
+  rdbtest::ok(buffer.readCurrent(source, out));  // 7
+  rdbtest::ok(buffer.readCurrent(source, out));  // EOF
 
   EXPECT_EQ(valueOf(out), 0);
   EXPECT_EQ(out.getNullBitset(), std::vector<bool>(desc.size(), true));
@@ -107,7 +108,7 @@ TEST(SourceBufferTest, fire_pushes_chamber_into_history) {
   rdb::payload out(desc);
 
   for (int expected : {1, 2, 3}) {
-    buffer.readCurrent(source, out);
+    rdbtest::ok(buffer.readCurrent(source, out));
     buffer.fire(out);
     EXPECT_EQ(valueOf(out), expected);
   }

@@ -14,7 +14,6 @@
 #include <optional>
 #include <regex>
 #include <stack>
-#include <stdexcept>
 #include <string>
 #include <type_traits>  // std::is_same_v
 #include <utility>      // std::cmp_greater_equal
@@ -22,12 +21,28 @@
 
 #include "checkedArith.hpp"
 #include "rdb/convertTypes.hpp"
-#include "rdb/exceptions.hpp"
+#include "rdb/error.hpp"
 #include "rdb/probe.hpp"
 
 static cast<rdb::descFldVT> castFldVT;
 
 expressionEvaluator::expressionEvaluator(/* args */) = default;
+
+// Ewaluator nie rzuca. Wartosc, ktorej nie da sie policzyc dla tych operandow (operator na
+// napisach, para w kontekscie logicznym, funkcja spoza listy), wraca jako Errc::Eval - ten sam
+// tekst, ktory dawniej niosl std::runtime_error. Brak wyniku w zbiorze wartosci (dzielenie przez
+// zero, przepelnienie) NIE jest bledem i zostaje NULL-em, jak dotad. Zlamany niezmiennik
+// ewaluatora (typy rozne PO normalizacji) to RDB_ASSERT.
+using EvalResult = rdb::Result<rdb::descFldVT>;
+
+static std::unexpected<rdb::Error> evalError(std::string message) { return rdb::fail(rdb::Errc::Eval, std::move(message)); }
+
+/// Wynik zwracany z ewaluatora dla operandow, ktorych operator nie obsluguje: `error` ustawia
+/// galaz std::visit zamiast rzutu, a funkcja zamienia go tu na blad.
+static EvalResult valueOrEvalError(rdb::descFldVT value, const char *error) {
+  if (error != nullptr) return evalError(error);
+  return value;
+}
 
 using pairRef = std::pair<const rdb::descFldVT &, const rdb::descFldVT &>;
 
@@ -40,43 +55,40 @@ static std::string lowercased(std::string text) {
 
 bool isNullValue(const rdb::descFldVT &value) { return std::holds_alternative<std::monostate>(value); }
 
-std::optional<bool> toLogicValue(const rdb::descFldVT &value) {
+rdb::Result<std::optional<bool>> toLogicValue(const rdb::descFldVT &value) {
+  using LogicResult = rdb::Result<std::optional<bool>>;
   return std::visit(
-      Overload{[](std::monostate) -> std::optional<bool> { return std::nullopt; },
-               [](uint8_t a) -> std::optional<bool> { return a != 0; }, [](int a) -> std::optional<bool> { return a != 0; },
-               [](unsigned a) -> std::optional<bool> { return a != 0; },
-               [](double a) -> std::optional<bool> { return a != 0.0; },
-               [](float a) -> std::optional<bool> { return a != 0.0F; },
-               [](boost::rational<int> a) -> std::optional<bool> { return a != boost::rational<int>(0); },
-               [](const std::string &a) -> std::optional<bool> { return !a.empty(); },
-               [](std::pair<int, int>) -> std::optional<bool> {
-                 throw std::runtime_error("toLogicValue: INTPAIR type not supported in logical context");
+      Overload{[](std::monostate) -> LogicResult { return std::nullopt; }, [](uint8_t a) -> LogicResult { return a != 0; },
+               [](int a) -> LogicResult { return a != 0; }, [](unsigned a) -> LogicResult { return a != 0; },
+               [](double a) -> LogicResult { return a != 0.0; }, [](float a) -> LogicResult { return a != 0.0F; },
+               [](boost::rational<int> a) -> LogicResult { return a != boost::rational<int>(0); },
+               [](const std::string &a) -> LogicResult { return !a.empty(); },
+               [](std::pair<int, int>) -> LogicResult {
+                 return evalError("toLogicValue: INTPAIR type not supported in logical context");
                },
-               [](const std::pair<std::string, int> &) -> std::optional<bool> {
-                 throw std::runtime_error("toLogicValue: IDXPAIR type not supported in logical context");
+               [](const std::pair<std::string, int> &) -> LogicResult {
+                 return evalError("toLogicValue: IDXPAIR type not supported in logical context");
                }},
       value);
 }
 
-rdb::descFldVT logicResultAsType(bool value, const rdb::descFldVT &typeRef) {
-  return std::visit(Overload{[value](uint8_t) -> rdb::descFldVT { return static_cast<uint8_t>(value ? 1 : 0); },
-                             [value](int) -> rdb::descFldVT { return value ? 1 : 0; },
-                             [value](unsigned) -> rdb::descFldVT { return value ? 1U : 0U; },
-                             [value](double) -> rdb::descFldVT { return value ? 1.0 : 0.0; },
-                             [value](float) -> rdb::descFldVT { return value ? 1.0F : 0.0F; },
-                             [value](boost::rational<int>) -> rdb::descFldVT { return boost::rational<int>(value ? 1 : 0); },
-                             [](std::monostate) -> rdb::descFldVT { return std::monostate{}; },
-                             // Wynik logiczny nad napisem jest INTEGER, nie napisem `"1"`/`"0"`: `"0"` jest niepusty,
-                             // wiec toLogicValue() czytal go jako PRAWDE i `NOT ('a' = 'b')` dawalo falsz.
-                             [value](const std::string &) -> rdb::descFldVT { return value ? 1 : 0; },
-                             [](std::pair<int, int>) -> rdb::descFldVT {
-                               throw std::runtime_error("logicResultAsType: INTPAIR type not supported");
-                             },
-                             [](const std::pair<std::string, int> &) -> rdb::descFldVT {
-                               throw std::runtime_error("logicResultAsType: IDXPAIR type not supported");
-                             }},
+EvalResult logicResultAsType(bool value, const rdb::descFldVT &typeRef) {
+  return std::visit(
+      Overload{[value](uint8_t) -> EvalResult { return static_cast<uint8_t>(value ? 1 : 0); },
+               [value](int) -> EvalResult { return value ? 1 : 0; }, [value](unsigned) -> EvalResult { return value ? 1U : 0U; },
+               [value](double) -> EvalResult { return value ? 1.0 : 0.0; },
+               [value](float) -> EvalResult { return value ? 1.0F : 0.0F; },
+               [value](boost::rational<int>) -> EvalResult { return boost::rational<int>(value ? 1 : 0); },
+               [](std::monostate) -> EvalResult { return std::monostate{}; },
+               // Wynik logiczny nad napisem jest INTEGER, nie napisem `"1"`/`"0"`: `"0"` jest niepusty,
+               // wiec toLogicValue() czytal go jako PRAWDE i `NOT ('a' = 'b')` dawalo falsz.
+               [value](const std::string &) -> EvalResult { return value ? 1 : 0; },
+               [](std::pair<int, int>) -> EvalResult { return evalError("logicResultAsType: INTPAIR type not supported"); },
+               [](const std::pair<std::string, int> &) -> EvalResult {
+                 return evalError("logicResultAsType: IDXPAIR type not supported");
+               }},
 
-                    typeRef);
+      typeRef);
 }
 
 rdb::descFldVT logicResultTypeRef(const rdb::descFldVT &a, const rdb::descFldVT &b) {
@@ -167,7 +179,7 @@ rdb::descFldVT signedUnsignedOrNull(const rdb::descFldVT &a, const rdb::descFldV
     case CMP_GE:
       return x >= y ? 1U : 0U;
     default:
-      throw rdb::LogicError(
+      rdb::fatal(
           fmt::format("signedUnsignedOrNull: operator {} is not a binary arithmetic or comparison", GetStringcommand_id(op)));
   }
 }
@@ -204,16 +216,21 @@ rdb::descFldVT signedUnsignedPower(const rdb::descFldVT &a, const rdb::descFldVT
 
 /// Operatory dwuargumentowe ponizej (+ - * / i szesc porownan) wypisuja kazda pare (T,T) jawnie.
 /// Przypadek ogolny na koncu kazdego Overload bierze TYLKO pary mieszane (T != U): std::visit na
-/// dwoch wariantach wymaga wszystkich kombinacji, a mieszane odcina wczesniej LogicError na indeksie.
+/// dwoch wariantach wymaga wszystkich kombinacji, a mieszane odcina wczesniej RDB_ASSERT na indeksie.
+/// Do 2026-10 cialo przypadku ogolnego brzmialo `retVal = a + b` i kompilowalo sie tylko dlatego, ze
+/// operator byl wtedy `operator+` na descFldVT: wyszukiwanie znajdowalo jego samego (obie strony
+/// konwertuja sie do wariantu), czyli martwa galaz byla rekurencja bez konca. Teraz jest jawnym
+/// rdb::fatal - galaz jest nieosiagalna i tak ma byc zapisana.
 /// Zawezenie jest istotne: dla nowej alternatywy wariantu para (T,T) nie ma tu kandydata, wiec
 /// jest bledem kompilacji, a nie cichym wynikiem w czasie pracy (#267).
-rdb::descFldVT operator+(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+EvalResult evalAdd(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
   if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, ADD);
 
-  if (a.index() != b.index()) throw rdb::LogicError("expressionEvaluator: operand types do not match after normalization");
+  RDB_ASSERT(a.index() == b.index(), "expressionEvaluator: operand types do not match after normalization");
+  const char *error = nullptr;
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                                 //
@@ -230,78 +247,84 @@ rdb::descFldVT operator+(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
                  [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
                    retVal = std::make_pair(a.first + b.first, a.second + b.second);
                  },
-                 [&retVal]<typename T, typename U>(T a, U b) requires(!std::is_same_v<T, U>) { retVal = a + b; }  //
+                 []<typename T, typename U>(T, U) requires(!std::is_same_v<T, U>) {
+                   rdb::fatal("expressionEvaluator: mixed operand types reached '+' after normalization");
+                 }  //
              },
              a, b);
 
-  return retVal;
+  return valueOrEvalError(std::move(retVal), error);
 }
 
-rdb::descFldVT operator-(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+EvalResult evalSubtract(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
   if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, SUBTRACT);
 
-  if (a.index() != b.index()) throw rdb::LogicError("expressionEvaluator: operand types do not match after normalization");
+  RDB_ASSERT(a.index() == b.index(), "expressionEvaluator: operand types do not match after normalization");
+  const char *error = nullptr;
 
-  std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },         //
-                 [&retVal](uint8_t a, uint8_t b) { retVal = a - b; },                              //
-                 [&retVal](int a, int b) { retVal = orNull(checkedArith::sub(a, b)); },            //
-                 [&retVal](unsigned a, unsigned b) { retVal = orNull(checkedArith::sub(a, b)); },  //
-                 [](const std::string &, const std::string &) {
-                   throw std::runtime_error("Operator '-' not defined for string operands");
-                 },                                                                                                        //
-                 [&retVal](double a, double b) { retVal = a - b; },                                                        //
-                 [&retVal](float a, float b) { retVal = a - b; },                                                          //
-                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::sub(a, b)); },  //
-                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
-                   retVal = std::make_pair(a.first - b.first, a.second - b.second);
-                 },
-                 [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
-                   retVal = std::make_pair(/* TODO? define str-str */ "?? -", a.second - b.second);
-                 },
-                 [&retVal]<typename T, typename U>(T a, U b) requires(!std::is_same_v<T, U>) { retVal = a - b; }  //
-             },
-             a, b);
+  std::visit(
+      Overload{
+          [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                                        //
+          [&retVal](uint8_t a, uint8_t b) { retVal = a - b; },                                                             //
+          [&retVal](int a, int b) { retVal = orNull(checkedArith::sub(a, b)); },                                           //
+          [&retVal](unsigned a, unsigned b) { retVal = orNull(checkedArith::sub(a, b)); },                                 //
+          [&error](const std::string &, const std::string &) { error = "Operator '-' not defined for string operands"; },  //
+          [&retVal](double a, double b) { retVal = a - b; },                                                               //
+          [&retVal](float a, float b) { retVal = a - b; },                                                                 //
+          [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::sub(a, b)); },         //
+          [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
+            retVal = std::make_pair(a.first - b.first, a.second - b.second);
+          },
+          [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
+            retVal = std::make_pair(/* TODO? define str-str */ "?? -", a.second - b.second);
+          },
+          []<typename T, typename U>(T, U) requires(!std::is_same_v<T, U>) {
+            rdb::fatal("expressionEvaluator: mixed operand types reached '-' after normalization");
+          }  //
+      },
+      a, b);
 
-  return retVal;
+  return valueOrEvalError(std::move(retVal), error);
 }
 
-rdb::descFldVT operator*(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+EvalResult evalMultiply(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
   if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, MULTIPLY);
 
-  if (a.index() != b.index()) throw rdb::LogicError("expressionEvaluator: operand types do not match after normalization");
+  RDB_ASSERT(a.index() == b.index(), "expressionEvaluator: operand types do not match after normalization");
+  const char *error = nullptr;
 
-  std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },         //
-                 [&retVal](uint8_t a, uint8_t b) { retVal = a * b; },                              //
-                 [&retVal](int a, int b) { retVal = orNull(checkedArith::mul(a, b)); },            //
-                 [&retVal](unsigned a, unsigned b) { retVal = orNull(checkedArith::mul(a, b)); },  //
-                 [](const std::string &, const std::string &) {
-                   throw std::runtime_error("Operator '*' not defined for string operands");
-                 },                                                                                                        //
-                 [&retVal](double a, double b) { retVal = a * b; },                                                        //
-                 [&retVal](float a, float b) { retVal = a * b; },                                                          //
-                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::mul(a, b)); },  //
-                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
-                   retVal = std::make_pair(a.first * b.first, a.second * b.second);
-                 },
-                 [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
-                   retVal = std::make_pair(/* TODO? define str*str */ "?? *", a.second * b.second);
-                 },
-                 [&retVal]<typename T, typename U>(T a, U b) requires(!std::is_same_v<T, U>) { retVal = a * b; }  //
-             },
-             a, b);
+  std::visit(
+      Overload{
+          [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                                        //
+          [&retVal](uint8_t a, uint8_t b) { retVal = a * b; },                                                             //
+          [&retVal](int a, int b) { retVal = orNull(checkedArith::mul(a, b)); },                                           //
+          [&retVal](unsigned a, unsigned b) { retVal = orNull(checkedArith::mul(a, b)); },                                 //
+          [&error](const std::string &, const std::string &) { error = "Operator '*' not defined for string operands"; },  //
+          [&retVal](double a, double b) { retVal = a * b; },                                                               //
+          [&retVal](float a, float b) { retVal = a * b; },                                                                 //
+          [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::mul(a, b)); },         //
+          [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
+            retVal = std::make_pair(a.first * b.first, a.second * b.second);
+          },
+          [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
+            retVal = std::make_pair(/* TODO? define str*str */ "?? *", a.second * b.second);
+          },
+          []<typename T, typename U>(T, U) requires(!std::is_same_v<T, U>) {
+            rdb::fatal("expressionEvaluator: mixed operand types reached '*' after normalization");
+          }  //
+      },
+      a, b);
 
-  return retVal;
+  return valueOrEvalError(std::move(retVal), error);
 }
 
-rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+EvalResult evalDivide(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
@@ -331,39 +354,41 @@ rdb::descFldVT operator/(const rdb::descFldVT &aParam, const rdb::descFldVT &bPa
     return std::monostate{};
   }
 
-  if (a.index() != b.index()) throw rdb::LogicError("expressionEvaluator: operand types do not match after normalization");
+  RDB_ASSERT(a.index() == b.index(), "expressionEvaluator: operand types do not match after normalization");
+  const char *error = nullptr;
 
-  std::visit(Overload{
-                 [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },  //
-                 [&retVal](uint8_t a, uint8_t b) { retVal = a / b; },                       //
-                 [&retVal](int a, int b) { retVal = orNull(checkedArith::div(a, b)); },     //
-                 [&retVal](unsigned a, unsigned b) { retVal = a / b; },                     //
-                 [](const std::string &, const std::string &) {
-                   throw std::runtime_error("Operator '/' not defined for string operands");
-                 },                                                                                                        //
-                 [&retVal](double a, double b) { retVal = a / b; },                                                        //
-                 [&retVal](float a, float b) { retVal = a / b; },                                                          //
-                 [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::div(a, b)); },  //
-                 [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
-                   const auto first  = checkedArith::div(a.first, b.first);
-                   const auto second = checkedArith::div(a.second, b.second);
-                   if (first && second)
-                     retVal = std::make_pair(*first, *second);
-                   else
-                     retVal = std::monostate{};
-                 },  //
-                 [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
-                   const auto second = checkedArith::div(a.second, b.second);
-                   if (second)
-                     retVal = std::make_pair(/* TODO? define str/str */ "?? /", *second);
-                   else
-                     retVal = std::monostate{};
-                 },                                                                                               //
-                 [&retVal]<typename T, typename U>(T a, U b) requires(!std::is_same_v<T, U>) { retVal = a / b; }  //
-             },
-             a, b);
+  std::visit(
+      Overload{
+          [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },                                        //
+          [&retVal](uint8_t a, uint8_t b) { retVal = a / b; },                                                             //
+          [&retVal](int a, int b) { retVal = orNull(checkedArith::div(a, b)); },                                           //
+          [&retVal](unsigned a, unsigned b) { retVal = a / b; },                                                           //
+          [&error](const std::string &, const std::string &) { error = "Operator '/' not defined for string operands"; },  //
+          [&retVal](double a, double b) { retVal = a / b; },                                                               //
+          [&retVal](float a, float b) { retVal = a / b; },                                                                 //
+          [&retVal](boost::rational<int> a, boost::rational<int> b) { retVal = orNull(checkedArith::div(a, b)); },         //
+          [&retVal](std::pair<int, int> a, std::pair<int, int> b) {
+            const auto first  = checkedArith::div(a.first, b.first);
+            const auto second = checkedArith::div(a.second, b.second);
+            if (first && second)
+              retVal = std::make_pair(*first, *second);
+            else
+              retVal = std::monostate{};
+          },  //
+          [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
+            const auto second = checkedArith::div(a.second, b.second);
+            if (second)
+              retVal = std::make_pair(/* TODO? define str/str */ "?? /", *second);
+            else
+              retVal = std::monostate{};
+          },  //
+          []<typename T, typename U>(T, U) requires(!std::is_same_v<T, U>) {
+            rdb::fatal("expressionEvaluator: mixed operand types reached '/' after normalization");
+          }  //
+      },
+      a, b);
 
-  return retVal;
+  return valueOrEvalError(std::move(retVal), error);
 }
 
 /// Potegowanie `b ^ a` - operator ExpPow z RQL.g4.
@@ -421,12 +446,16 @@ std::optional<int> integralExponent(const rdb::descFldVT &value) {
 /// Wynik NIE jest rzutowany z powrotem na typ podstawy - typ ma byc dokladnie ten, ktory
 /// dalby zapisany wprost iloczyn (dla BYTE jest to INTEGER, bo `uint8_t * uint8_t`
 /// promuje sie do int).
-rdb::descFldVT exactPower(const rdb::descFldVT &base, int exponent) {
+EvalResult exactPower(const rdb::descFldVT &base, int exponent) {
   rdb::descFldVT result = castFldVT(rdb::descFldVT{1}, static_cast<rdb::descFld>(base.index()));
   rdb::descFldVT factor = base;
   for (int rest = exponent; rest > 0; rest >>= 1) {
-    if ((rest & 1) != 0) result = result * factor;
-    if (rest > 1) factor = factor * factor;
+    if ((rest & 1) != 0) {
+      RDB_TRY_ASSIGN(result, evalMultiply(result, factor));
+    }
+    if (rest > 1) {
+      RDB_TRY_ASSIGN(factor, evalMultiply(factor, factor));
+    }
   }
   return result;
 }
@@ -435,13 +464,13 @@ rdb::descFldVT exactPower(const rdb::descFldVT &base, int exponent) {
 
 /// strone do STRING, wiec wystarczy sprawdzic typ znormalizowany. To samo zdanie zalatwia
 /// INTPAIR i IDXPAIR, ktore nie sa wartosciami wyrazen.
-rdb::descFldVT power(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+EvalResult power(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT promoted;
   auto [base, exponent] = normalize(aParam, bParam, promoted);
   if (isNullValue(base) || isNullValue(exponent)) return signedUnsignedPower(aParam, bParam);
 
   const auto resultType = static_cast<rdb::descFld>(base.index());
-  if (resultType > rdb::DOUBLE) throw std::runtime_error("Operator '^' not defined for non-numeric operands");
+  if (resultType > rdb::DOUBLE) return evalError("Operator '^' not defined for non-numeric operands");
 
   // Typ dokladny + calkowity nieujemny wykladnik: liczymy iloczynem, nie std::pow. Patrz
   // exactPower() - od tego zalezy, czy `a*a` wolno przepisac na `a^2`.
@@ -455,13 +484,14 @@ rdb::descFldVT power(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
   return castFldVT(rdb::descFldVT{result}, resultType);
 }
 
-rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+EvalResult is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
   if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, CMP_EQUAL);
 
-  if (a.index() != b.index()) throw rdb::LogicError("expressionEvaluator: operand types do not match after normalization");
+  RDB_ASSERT(a.index() == b.index(), "expressionEvaluator: operand types do not match after normalization");
+  const char *error = nullptr;
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },              //
@@ -473,26 +503,27 @@ rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
                  [&retVal](float a, float b) { retVal = (a == b) ? float(1) : float(0); },              //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a == b) ? boost::rational<int>(1) : boost::rational<int>(0);
-                 },                                                                                                           //
-                 [](std::pair<int, int>, std::pair<int, int>) { throw std::runtime_error("is_eq: INTPAIR not supported"); },  //
-                 [](const std::pair<std::string, int> &, const std::pair<std::string, int> &) {
-                   throw std::runtime_error("is_eq: IDXPAIR not supported");
+                 },                                                                                               //
+                 [&error](std::pair<int, int>, std::pair<int, int>) { error = "is_eq: INTPAIR not supported"; },  //
+                 [&error](const std::pair<std::string, int> &, const std::pair<std::string, int> &) {
+                   error = "is_eq: IDXPAIR not supported";
                  },  //
-                 []<typename T, typename U>(const T &, const U &)
-                     requires(!std::is_same_v<T, U>) { throw std::runtime_error("is_eq: unsupported operand types"); }  //
+                 [&error]<typename T, typename U>(const T &, const U &)
+                     requires(!std::is_same_v<T, U>) { error = "is_eq: unsupported operand types"; }  //
              },
              a, b);
 
-  return retVal;
+  return valueOrEvalError(std::move(retVal), error);
 }
 
-rdb::descFldVT is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+EvalResult is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
   if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, CMP_NOT_EQUAL);
 
-  if (a.index() != b.index()) throw rdb::LogicError("expressionEvaluator: operand types do not match after normalization");
+  RDB_ASSERT(a.index() == b.index(), "expressionEvaluator: operand types do not match after normalization");
+  const char *error = nullptr;
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },              //
@@ -504,26 +535,27 @@ rdb::descFldVT is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam
                  [&retVal](float a, float b) { retVal = (a != b) ? float(1) : float(0); },              //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a != b) ? boost::rational<int>(1) : boost::rational<int>(0);
-                 },                                                                                                            //
-                 [](std::pair<int, int>, std::pair<int, int>) { throw std::runtime_error("is_neq: INTPAIR not supported"); },  //
-                 [](const std::pair<std::string, int> &, const std::pair<std::string, int> &) {
-                   throw std::runtime_error("is_neq: IDXPAIR not supported");
+                 },                                                                                                //
+                 [&error](std::pair<int, int>, std::pair<int, int>) { error = "is_neq: INTPAIR not supported"; },  //
+                 [&error](const std::pair<std::string, int> &, const std::pair<std::string, int> &) {
+                   error = "is_neq: IDXPAIR not supported";
                  },  //
-                 []<typename T, typename U>(const T &, const U &)
-                     requires(!std::is_same_v<T, U>) { throw std::runtime_error("is_neq: unsupported operand types"); }  //
+                 [&error]<typename T, typename U>(const T &, const U &)
+                     requires(!std::is_same_v<T, U>) { error = "is_neq: unsupported operand types"; }  //
              },
              a, b);
 
-  return retVal;
+  return valueOrEvalError(std::move(retVal), error);
 }
 
-rdb::descFldVT is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+EvalResult is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
   if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, CMP_LT);
 
-  if (a.index() != b.index()) throw rdb::LogicError("expressionEvaluator: operand types do not match after normalization");
+  RDB_ASSERT(a.index() == b.index(), "expressionEvaluator: operand types do not match after normalization");
+  const char *error = nullptr;
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },             //
@@ -535,26 +567,27 @@ rdb::descFldVT is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
                  [&retVal](float a, float b) { retVal = (a < b) ? float(1) : float(0); },              //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a < b) ? boost::rational<int>(1) : boost::rational<int>(0);
-                 },                                                                                                           //
-                 [](std::pair<int, int>, std::pair<int, int>) { throw std::runtime_error("is_lt: INTPAIR not supported"); },  //
-                 [](const std::pair<std::string, int> &, const std::pair<std::string, int> &) {
-                   throw std::runtime_error("is_lt: IDXPAIR not supported");
+                 },                                                                                               //
+                 [&error](std::pair<int, int>, std::pair<int, int>) { error = "is_lt: INTPAIR not supported"; },  //
+                 [&error](const std::pair<std::string, int> &, const std::pair<std::string, int> &) {
+                   error = "is_lt: IDXPAIR not supported";
                  },  //
-                 []<typename T, typename U>(const T &, const U &)
-                     requires(!std::is_same_v<T, U>) { throw std::runtime_error("is_lt: unsupported operand types"); }  //
+                 [&error]<typename T, typename U>(const T &, const U &)
+                     requires(!std::is_same_v<T, U>) { error = "is_lt: unsupported operand types"; }  //
              },
              a, b);
 
-  return retVal;
+  return valueOrEvalError(std::move(retVal), error);
 }
 
-rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+EvalResult is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
   if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, CMP_GT);
 
-  if (a.index() != b.index()) throw rdb::LogicError("expressionEvaluator: operand types do not match after normalization");
+  RDB_ASSERT(a.index() == b.index(), "expressionEvaluator: operand types do not match after normalization");
+  const char *error = nullptr;
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },             //
@@ -566,26 +599,27 @@ rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
                  [&retVal](float a, float b) { retVal = (a > b) ? float(1) : float(0); },              //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a > b) ? boost::rational<int>(1) : boost::rational<int>(0);
-                 },                                                                                                           //
-                 [](std::pair<int, int>, std::pair<int, int>) { throw std::runtime_error("is_gt: INTPAIR not supported"); },  //
-                 [](const std::pair<std::string, int> &, const std::pair<std::string, int> &) {
-                   throw std::runtime_error("is_gt: IDXPAIR not supported");
+                 },                                                                                               //
+                 [&error](std::pair<int, int>, std::pair<int, int>) { error = "is_gt: INTPAIR not supported"; },  //
+                 [&error](const std::pair<std::string, int> &, const std::pair<std::string, int> &) {
+                   error = "is_gt: IDXPAIR not supported";
                  },  //
-                 []<typename T, typename U>(const T &, const U &)
-                     requires(!std::is_same_v<T, U>) { throw std::runtime_error("is_gt: unsupported operand types"); }  //
+                 [&error]<typename T, typename U>(const T &, const U &)
+                     requires(!std::is_same_v<T, U>) { error = "is_gt: unsupported operand types"; }  //
              },
              a, b);
 
-  return retVal;
+  return valueOrEvalError(std::move(retVal), error);
 }
 
-rdb::descFldVT is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+EvalResult is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
   if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, CMP_LE);
 
-  if (a.index() != b.index()) throw rdb::LogicError("expressionEvaluator: operand types do not match after normalization");
+  RDB_ASSERT(a.index() == b.index(), "expressionEvaluator: operand types do not match after normalization");
+  const char *error = nullptr;
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },              //
@@ -597,26 +631,27 @@ rdb::descFldVT is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
                  [&retVal](float a, float b) { retVal = (a <= b) ? float(1) : float(0); },              //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a <= b) ? boost::rational<int>(1) : boost::rational<int>(0);
-                 },                                                                                                           //
-                 [](std::pair<int, int>, std::pair<int, int>) { throw std::runtime_error("is_le: INTPAIR not supported"); },  //
-                 [](const std::pair<std::string, int> &, const std::pair<std::string, int> &) {
-                   throw std::runtime_error("is_le: IDXPAIR not supported");
+                 },                                                                                               //
+                 [&error](std::pair<int, int>, std::pair<int, int>) { error = "is_le: INTPAIR not supported"; },  //
+                 [&error](const std::pair<std::string, int> &, const std::pair<std::string, int> &) {
+                   error = "is_le: IDXPAIR not supported";
                  },  //
-                 []<typename T, typename U>(const T &, const U &)
-                     requires(!std::is_same_v<T, U>) { throw std::runtime_error("is_le: unsupported operand types"); }  //
+                 [&error]<typename T, typename U>(const T &, const U &)
+                     requires(!std::is_same_v<T, U>) { error = "is_le: unsupported operand types"; }  //
              },
              a, b);
 
-  return retVal;
+  return valueOrEvalError(std::move(retVal), error);
 }
 
-rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+EvalResult is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
   if (isNullValue(a) || isNullValue(b)) return signedUnsignedOrNull(aParam, bParam, CMP_GE);
 
-  if (a.index() != b.index()) throw rdb::LogicError("expressionEvaluator: operand types do not match after normalization");
+  RDB_ASSERT(a.index() == b.index(), "expressionEvaluator: operand types do not match after normalization");
+  const char *error = nullptr;
 
   std::visit(Overload{
                  [&retVal](std::monostate, std::monostate) { retVal = std::monostate{}; },              //
@@ -628,22 +663,22 @@ rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam)
                  [&retVal](float a, float b) { retVal = (a >= b) ? float(1) : float(0); },              //
                  [&retVal](boost::rational<int> a, boost::rational<int> b) {
                    retVal = (a >= b) ? boost::rational<int>(1) : boost::rational<int>(0);
-                 },                                                                                                           //
-                 [](std::pair<int, int>, std::pair<int, int>) { throw std::runtime_error("is_ge: INTPAIR not supported"); },  //
-                 [](const std::pair<std::string, int> &, const std::pair<std::string, int> &) {
-                   throw std::runtime_error("is_ge: IDXPAIR not supported");
+                 },                                                                                               //
+                 [&error](std::pair<int, int>, std::pair<int, int>) { error = "is_ge: INTPAIR not supported"; },  //
+                 [&error](const std::pair<std::string, int> &, const std::pair<std::string, int> &) {
+                   error = "is_ge: IDXPAIR not supported";
                  },  //
-                 []<typename T, typename U>(const T &, const U &)
-                     requires(!std::is_same_v<T, U>) { throw std::runtime_error("is_ge: unsupported operand types"); }  //
+                 [&error]<typename T, typename U>(const T &, const U &)
+                     requires(!std::is_same_v<T, U>) { error = "is_ge: unsupported operand types"; }  //
              },
              a, b);
 
-  return retVal;
+  return valueOrEvalError(std::move(retVal), error);
 }
 
-rdb::descFldVT is_logic_or(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
-  auto a = toLogicValue(aParam);
-  auto b = toLogicValue(bParam);
+EvalResult is_logic_or(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+  RDB_TRY_ASSIGN(const auto a, toLogicValue(aParam));
+  RDB_TRY_ASSIGN(const auto b, toLogicValue(bParam));
 
   if ((a.has_value() && *a) || (b.has_value() && *b)) {
     return logicResultAsType(true, logicResultTypeRef(aParam, bParam));
@@ -656,9 +691,9 @@ rdb::descFldVT is_logic_or(const rdb::descFldVT &aParam, const rdb::descFldVT &b
   return std::monostate{};
 }
 
-rdb::descFldVT is_logic_and(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
-  auto a = toLogicValue(aParam);
-  auto b = toLogicValue(bParam);
+EvalResult is_logic_and(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam) {
+  RDB_TRY_ASSIGN(const auto a, toLogicValue(aParam));
+  RDB_TRY_ASSIGN(const auto b, toLogicValue(bParam));
 
   if ((a.has_value() && !*a) || (b.has_value() && !*b)) {
     return logicResultAsType(false, logicResultTypeRef(aParam, bParam));
@@ -671,9 +706,10 @@ rdb::descFldVT is_logic_and(const rdb::descFldVT &aParam, const rdb::descFldVT &
   return std::monostate{};
 }
 
-rdb::descFldVT neg(const rdb::descFldVT &inVar) {
+EvalResult neg(const rdb::descFldVT &inVar) {
   rdb::descFldVT retVal;
   if (isNullValue(inVar)) return std::monostate{};
+  const char *error = nullptr;
 
   std::visit(Overload{
                  [&retVal](std::monostate) { retVal = std::monostate{}; },                            //
@@ -684,16 +720,16 @@ rdb::descFldVT neg(const rdb::descFldVT &inVar) {
                  [&retVal](float a) { retVal = -a; },                                                 //
                  [&retVal](double a) { retVal = -a; },                                                //
                  [&retVal](std::pair<int, int> a) { retVal = std::make_pair(-a.first, -a.second); },  //
-                 [&retVal](const std::pair<std::string, int> &a) { retVal = std::make_pair("-" + a.first, -a.second); },     //
-                 [](const std::string &) { throw std::runtime_error("Operator 'negate' not defined for string operands"); }  //
+                 [&retVal](const std::pair<std::string, int> &a) { retVal = std::make_pair("-" + a.first, -a.second); },  //
+                 [&error](const std::string &) { error = "Operator 'negate' not defined for string operands"; }           //
              },
              inVar);
 
-  return retVal;
+  return valueOrEvalError(std::move(retVal), error);
 }
 
-rdb::descFldVT logic_not(const rdb::descFldVT &inVar) {
-  auto value = toLogicValue(inVar);
+EvalResult logic_not(const rdb::descFldVT &inVar) {
+  RDB_TRY_ASSIGN(const auto value, toLogicValue(inVar));
   if (!value.has_value()) return std::monostate{};
   return logicResultAsType(!(*value), inVar);
 }
@@ -706,25 +742,25 @@ rdb::descFldVT isnull(const rdb::descFldVT &inVar) { return isNullValue(inVar) ?
 /// RATIONAL idzie przez Rationalize z tolerancja 1e-6 - czyli gubi dokladna wartosc wymierna.
 /// Dla `Abs` ta strata bylaby czysto zbedna: wartosc bezwzgledna nie zmienia ani typu, ani
 /// mianownika. Wzorzec wziety z neg() powyzej, ktore jest tym samym rodzajem operacji.
-rdb::descFldVT absolute(const rdb::descFldVT &inVar) {
+EvalResult absolute(const rdb::descFldVT &inVar) {
   if (isNullValue(inVar)) return std::monostate{};
 
   rdb::descFldVT retVal;
-  std::visit(Overload{[&retVal](std::monostate) { retVal = std::monostate{}; },                 //
-                      [&retVal](uint8_t a) { retVal = a; },                                     // bez znaku - tozsamosc
-                      [&retVal](int a) { retVal = a < 0 ? orNull(checkedArith::neg(a)) : a; },  //
-                      [&retVal](unsigned a) { retVal = a; },                                    // bez znaku - tozsamosc
-                      [&retVal](boost::rational<int> a) { retVal = a < 0 ? orNull(checkedArith::neg(a)) : a; },  //
-                      [&retVal](float a) { retVal = std::fabs(a); },                                             //
-                      [&retVal](double a) { retVal = std::fabs(a); },                                            //
-                      [](std::pair<int, int>) { throw std::runtime_error("Function 'Abs' not defined for INTPAIR operands"); },
-                      [](const std::pair<std::string, int> &) {
-                        throw std::runtime_error("Function 'Abs' not defined for IDXPAIR operands");
-                      },
-                      [](const std::string &) { throw std::runtime_error("Function 'Abs' not defined for string operands"); }},
-             inVar);
+  const char *error = nullptr;
+  std::visit(
+      Overload{[&retVal](std::monostate) { retVal = std::monostate{}; },                 //
+               [&retVal](uint8_t a) { retVal = a; },                                     // bez znaku - tozsamosc
+               [&retVal](int a) { retVal = a < 0 ? orNull(checkedArith::neg(a)) : a; },  //
+               [&retVal](unsigned a) { retVal = a; },                                    // bez znaku - tozsamosc
+               [&retVal](boost::rational<int> a) { retVal = a < 0 ? orNull(checkedArith::neg(a)) : a; },  //
+               [&retVal](float a) { retVal = std::fabs(a); },                                             //
+               [&retVal](double a) { retVal = std::fabs(a); },                                            //
+               [&error](std::pair<int, int>) { error = "Function 'Abs' not defined for INTPAIR operands"; },
+               [&error](const std::pair<std::string, int> &) { error = "Function 'Abs' not defined for IDXPAIR operands"; },
+               [&error](const std::string &) { error = "Function 'Abs' not defined for string operands"; }},
+      inVar);
 
-  return retVal;
+  return valueOrEvalError(std::move(retVal), error);
 }
 
 /// IsZero / IsNonZero - predykat liczbowy zwracajacy 0 albo 1 jako INTEGER.
@@ -736,12 +772,12 @@ rdb::descFldVT absolute(const rdb::descFldVT &inVar) {
 ///
 /// Dla stringa predykat nie ma sensu i jest bledem, a nie cicha konwersja: toLogicValue()
 /// uznaje kazdy niepusty napis za prawde, co dla nazwy `IsZero` byloby mylace.
-rdb::descFldVT isZeroValue(const rdb::descFldVT &inVar, bool wantZero) {
+EvalResult isZeroValue(const rdb::descFldVT &inVar, bool wantZero) {
   if (isNullValue(inVar)) return std::monostate{};
   if (std::holds_alternative<std::string>(inVar))
-    throw std::runtime_error("Functions 'IsZero'/'IsNonZero' are not defined for string operands");
+    return evalError("Functions 'IsZero'/'IsNonZero' are not defined for string operands");
 
-  const auto value = toLogicValue(inVar);
+  RDB_TRY_ASSIGN(const auto value, toLogicValue(inVar));
   if (!value.has_value()) return std::monostate{};
   const bool isZero = !(*value);
   return (isZero == wantZero) ? 1 : 0;
@@ -757,11 +793,11 @@ rdb::descFldVT isZeroValue(const rdb::descFldVT &inVar, bool wantZero) {
 /// Abs i IsZero, ktore odrzucaja napis. `Length(k)` nad polem INTEGER jest niemal na pewno
 /// literowka, a nie prosba o dlugosc zapisu dziesietnego; kto chce tej drugiej rzeczy, pisze
 /// `Length(to_string(k))` i mowi to wprost.
-rdb::descFldVT stringLength(const rdb::descFldVT &inVar) {
+EvalResult stringLength(const rdb::descFldVT &inVar) {
   if (isNullValue(inVar)) return std::monostate{};
 
   const auto *text = std::get_if<std::string>(&inVar);
-  if (text == nullptr) throw std::runtime_error("Function 'Length' is defined for string operands only");
+  if (text == nullptr) return evalError("Function 'Length' is defined for string operands only");
 
   return static_cast<int>(text->length());
 }
@@ -775,14 +811,14 @@ rdb::descFldVT stringLength(const rdb::descFldVT &inVar) {
 /// potrzebne, ale to byla wlasciwosc TAMTEJ biblioteki, a nie gwarancja jezyka.
 using mathFn = double (*)(double);
 
-rdb::descFldVT callFun(rdb::descFldVT &inVar, const std::function<double(double)> &fnName) {
+EvalResult callFun(rdb::descFldVT &inVar, const std::function<double(double)> &fnName) {
   if (isNullValue(inVar)) return std::monostate{};
   auto backResultType = inVar.index();
   if (backResultType >= rdb::BYTE && backResultType <= rdb::DOUBLE) {
     rdb::descFldVT floValue{fnName(std::get<double>(castFldVT(inVar, rdb::DOUBLE)))};
     return castFldVT(floValue, (rdb::descFld)backResultType);
   }
-  throw std::runtime_error("callFun: unsupported type - math functions require numeric operand");
+  return evalError("callFun: unsupported type - math functions require numeric operand");
 }
 
 /// Funkcje o niewymiernej przeciwdziedzinie (`sin`, `cos`, `exp`) oddaja DOUBLE, bez
@@ -794,16 +830,16 @@ rdb::descFldVT callFun(rdb::descFldVT &inVar, const std::function<double(double)
 /// i wykonuje takze programy skladane z pominieciem kompilatora, wiec nie powtarza jego
 /// decyzji o kontrakcie jezyka; rachunek przez double jest tu poprawny i nie ma czego
 /// zabraniac.
-rdb::descFldVT callRealFun(const rdb::descFldVT &inVar, const std::function<double(double)> &fnName) {
+EvalResult callRealFun(const rdb::descFldVT &inVar, const std::function<double(double)> &fnName) {
   if (isNullValue(inVar)) return std::monostate{};
   if (inVar.index() < rdb::BYTE || inVar.index() > rdb::DOUBLE)
-    throw std::runtime_error("callRealFun: math functions require numeric operand");
+    return evalError("callRealFun: math functions require numeric operand");
   const double result = fnName(std::get<double>(castFldVT(inVar, rdb::DOUBLE)));
   return std::isfinite(result) ? rdb::descFldVT{result} : rdb::descFldVT{std::monostate{}};
 }
 
-rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::payload *payload,
-                                         const std::vector<windowStats> *windowValues) {
+rdb::Result<rdb::descFldVT> expressionEvaluator::eval(const std::list<token> &program, rdb::payload *payload,
+                                                      const std::vector<windowStats> *windowValues) {
   // Kontener stosu: small_vector z inline-storage zamiast domyślnej std::deque.
   // std::deque alokuje mapę + blok już przy konstrukcji pustego stosu (~2 alok.),
   // a eval() jest wołane raz na pole/regułę co interwał (gorąca ścieżka K1 -
@@ -814,14 +850,22 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
   rdb::descFldVT a;
   rdb::descFldVT b;
 
-  auto popOrThrow = [&rStack](const char *opName) -> rdb::descFldVT {
-    if (rStack.empty()) {
-      throw std::runtime_error(std::string("Invalid expression: missing operand for ") + opName);
-    }
-    auto v = std::move(rStack.top());
+  // Zdjecie operandu; false = programu RPN zabraklo operandu (blad programu, Errc::Eval).
+  auto pop = [&rStack](rdb::descFldVT &out) -> bool {
+    if (rStack.empty()) return false;
+    out = std::move(rStack.top());
     rStack.pop();
-    return v;
+    return true;
   };
+
+  // Wynik operacji na stos albo powrot z jej bledem.
+#define RDB_EVAL_PUSH(...)                                 \
+  do {                                                     \
+    auto rdbEvalResult_ = (__VA_ARGS__);                   \
+    if (!rdbEvalResult_) [[unlikely]]                      \
+      return rdb::fail(std::move(rdbEvalResult_).error()); \
+    rStack.push(std::move(*rdbEvalResult_));               \
+  } while (false)
 
   rdb::probe::onEval(program.size());
 
@@ -844,12 +888,13 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
       case CMP_GE:
       case OR:
       case AND:
-        a = popOrThrow("binary operator");
+        if (!pop(a)) return evalError("Invalid expression: missing operand for binary operator");
+        [[fallthrough]];
       case CALL:
       case CALL2:
       case NEGATE:
       case NOT:
-        b = popOrThrow("unary operator");
+        if (!pop(b)) return evalError("Invalid expression: missing operand for unary operator");
         break;
       default:
         break;
@@ -859,49 +904,49 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         rStack.push(tk.getVT());
         break;
       case ADD:
-        rStack.push(b + a);
+        RDB_EVAL_PUSH(evalAdd(b, a));
         break;
       case SUBTRACT:
-        rStack.push(b - a);
+        RDB_EVAL_PUSH(evalSubtract(b, a));
         break;
       case MULTIPLY:
-        rStack.push(a * b);
+        RDB_EVAL_PUSH(evalMultiply(a, b));
         break;
       case DIVIDE:
-        rStack.push(b / a);
+        RDB_EVAL_PUSH(evalDivide(b, a));
         break;
       case POWER:
-        rStack.push(power(b, a));
+        RDB_EVAL_PUSH(power(b, a));
         break;
       case NEGATE:
-        rStack.push(neg(b));
+        RDB_EVAL_PUSH(neg(b));
         break;
       case NOT:
-        rStack.push(logic_not(b));
+        RDB_EVAL_PUSH(logic_not(b));
         break;
       case CMP_EQUAL: {
-        rStack.push(is_eq(b, a));
+        RDB_EVAL_PUSH(is_eq(b, a));
       }; break;
       case CMP_NOT_EQUAL:
-        rStack.push(is_neq(b, a));
+        RDB_EVAL_PUSH(is_neq(b, a));
         break;
       case CMP_LT:
-        rStack.push(is_lt(b, a));
+        RDB_EVAL_PUSH(is_lt(b, a));
         break;
       case CMP_GT:
-        rStack.push(is_gt(b, a));
+        RDB_EVAL_PUSH(is_gt(b, a));
         break;
       case CMP_LE:
-        rStack.push(is_le(b, a));
+        RDB_EVAL_PUSH(is_le(b, a));
         break;
       case CMP_GE:
-        rStack.push(is_ge(b, a));
+        RDB_EVAL_PUSH(is_ge(b, a));
         break;
       case OR:
-        rStack.push(is_logic_or(b, a));
+        RDB_EVAL_PUSH(is_logic_or(b, a));
         break;
       case AND:
-        rStack.push(is_logic_and(b, a));
+        RDB_EVAL_PUSH(is_logic_and(b, a));
         break;
       case CALL: {
         // Parser zapisuje do tokena postać KANONICZNĄ z rqlFunctions.hpp ('Sqrt', 'to_integer'),
@@ -912,27 +957,27 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         const auto tkStr    = lowercased(original);
         // https://learnmoderncpp.com/2020/06/01/strings-as-switch-case-labels/ (?)
         if (tkStr == "floor")
-          rStack.push(callFun(b, static_cast<mathFn>(std::floor)));
+          RDB_EVAL_PUSH(callFun(b, static_cast<mathFn>(std::floor)));
         else if (tkStr == "ceil")
-          rStack.push(callFun(b, static_cast<mathFn>(std::ceil)));
+          RDB_EVAL_PUSH(callFun(b, static_cast<mathFn>(std::ceil)));
         else if (tkStr == "sqrt")
-          rStack.push(callFun(b, static_cast<mathFn>(std::sqrt)));
+          RDB_EVAL_PUSH(callFun(b, static_cast<mathFn>(std::sqrt)));
         else if (tkStr == "round")
-          rStack.push(callFun(b, static_cast<mathFn>(std::round)));
+          RDB_EVAL_PUSH(callFun(b, static_cast<mathFn>(std::round)));
         else if (tkStr == "sin")
-          rStack.push(callRealFun(b, static_cast<mathFn>(std::sin)));
+          RDB_EVAL_PUSH(callRealFun(b, static_cast<mathFn>(std::sin)));
         else if (tkStr == "cos")
-          rStack.push(callRealFun(b, static_cast<mathFn>(std::cos)));
+          RDB_EVAL_PUSH(callRealFun(b, static_cast<mathFn>(std::cos)));
         else if (tkStr == "exp")
-          rStack.push(callRealFun(b, static_cast<mathFn>(std::exp)));
+          RDB_EVAL_PUSH(callRealFun(b, static_cast<mathFn>(std::exp)));
         else if (tkStr == "tan")
-          rStack.push(callFun(b, static_cast<mathFn>(std::tan)));
+          RDB_EVAL_PUSH(callFun(b, static_cast<mathFn>(std::tan)));
         else if (tkStr == "log")
-          rStack.push(callFun(b, static_cast<mathFn>(std::log)));
+          RDB_EVAL_PUSH(callFun(b, static_cast<mathFn>(std::log)));
         else if (tkStr == "log2")
-          rStack.push(callFun(b, static_cast<mathFn>(std::log2)));
+          RDB_EVAL_PUSH(callFun(b, static_cast<mathFn>(std::log2)));
         else if (tkStr == "trunc")
-          rStack.push(callFun(b, static_cast<mathFn>(std::trunc)));
+          RDB_EVAL_PUSH(callFun(b, static_cast<mathFn>(std::trunc)));
         else if (tkStr == "isnull")
           rStack.push(isnull(b));
         // NULL -> 0, reszta bez zmian. Zeruje wartosc POCHLANIAJACA (dziura w danych, dzielenie
@@ -941,13 +986,13 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         else if (tkStr == "null2zero")
           rStack.push(isNullValue(b) ? rdb::descFldVT{0} : b);
         else if (tkStr == "abs")
-          rStack.push(absolute(b));
+          RDB_EVAL_PUSH(absolute(b));
         else if (tkStr == "iszero")
-          rStack.push(isZeroValue(b, true));
+          RDB_EVAL_PUSH(isZeroValue(b, true));
         else if (tkStr == "isnonzero")
-          rStack.push(isZeroValue(b, false));
+          RDB_EVAL_PUSH(isZeroValue(b, false));
         else if (tkStr == "length")
-          rStack.push(stringLength(b));
+          RDB_EVAL_PUSH(stringLength(b));
         else if (tkStr == "to_integer")
           rStack.push(isNullValue(b) ? rdb::descFldVT{std::monostate{}} : castFldVT(b, rdb::INTEGER));
         else if (tkStr == "to_float")
@@ -959,20 +1004,19 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         else
           // Nieosiągalne z RQL od 2026-08-30: compiler::checkFunctionCalls() odrzuca nieznaną
           // nazwę przez `Check result:`, więc plan z taką nazwą nie dochodzi do wykonania.
-          // Rzut zostaje jako kontrola dla ścieżek omijających kompilator (testy jednostkowe
-          // budujące program tokenów wprost) - tak samo jak FatalError przy nierozwiązanym
-          // węźle planu.
-          throw std::runtime_error(std::string("Unsupported function call: ") + original);
+          // Blad zostaje jako kontrola dla ścieżek omijających kompilator (testy jednostkowe
+          // budujące program tokenów wprost).
+          return evalError(std::string("Unsupported function call: ") + original);
       } break;
       case CALL2: {
         const auto tkStr = tk.getStr_();
         if (tkStr == "to_string")
           rStack.push(isNullValue(b) ? rdb::descFldVT{std::monostate{}} : castFldVT(b, rdb::STRING));
         else
-          throw std::runtime_error(std::string("Unsupported 2-arg function call: ") + tkStr);
+          return evalError(std::string("Unsupported 2-arg function call: ") + tkStr);
       } break;
       case PUSH_ID: {
-        if (payload == nullptr) throw std::runtime_error("PUSH_ID: payload is null");
+        if (payload == nullptr) return evalError("PUSH_ID: payload is null");
         const auto &instancePosition = get<std::pair<std::string, int>>(tk.getVT());
         // P1-E1: odczyt wprost do wariantu (getItemVT) - bez posrednika std::any
         // i any_to_variant_cast. Parytet z getItem potwierdzony w test_payload.
@@ -991,10 +1035,10 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         // tylko kładzie gotowy wynik okna. Samo okno policzył wcześniej
         // dataModel::computeWindowAggregates(), bo sięga po historię źródła, której payload
         // wejściowy nie zawiera.
-        if (windowValues == nullptr) throw std::runtime_error("WINDOW aggregate: window values not supplied");
+        if (windowValues == nullptr) return evalError("WINDOW aggregate: window values not supplied");
         const auto groupIndex = std::get<int>(tk.getVT());
         if (groupIndex < 0 || std::cmp_greater_equal(groupIndex, windowValues->size()))
-          throw std::runtime_error("WINDOW aggregate: group index out of range");
+          return evalError("WINDOW aggregate: group index out of range");
         const auto &stats = (*windowValues)[static_cast<size_t>(groupIndex)];
         switch (tk.getCommandID()) {
           case WINDOW_MIN:
@@ -1013,16 +1057,14 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
       } break;
       case PUSH_IDX:
         SPDLOG_ERROR("There should not appear PUSH_IDX here.");
-        throw std::runtime_error("PUSH_IDX should be translated to other PUSH_ before eval");
-        break;
+        return evalError("PUSH_IDX should be translated to other PUSH_ before eval");
       case PUSH_ID2: {
-        if (payload == nullptr) throw std::runtime_error("PUSH_ID2: payload is null");
+        if (payload == nullptr) return evalError("PUSH_ID2: payload is null");
         const auto tkStr = tk.getStr_();
         std::regex r(R"((\w*)\[(\d*)\])");
         std::smatch what;
         std::regex_search(tkStr, what, r);  // something[1]
-        if (what.size() != 3)
-          throw std::runtime_error("PUSH_ID2: malformed identifier '" + tkStr + "', expected format: name[index]");
+        if (what.size() != 3) return evalError("PUSH_ID2: malformed identifier '" + tkStr + "', expected format: name[index]");
         // const std::string schema(what[1]);
         const std::string sOffset1(what[2]);
         const int offset1(atoi(sOffset1.c_str()));
@@ -1037,16 +1079,14 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         rStack.push(std::move(*valueOpt));
       } break;
       default:
-        throw std::runtime_error("Unsupported token in expressionEvaluator");
+        return evalError("Unsupported token in expressionEvaluator");
     }
   };
 
-  if (rStack.empty()) {
-    throw std::runtime_error("Invalid expression: empty evaluation stack");
-  }
-  if (rStack.size() != 1) {
-    throw std::runtime_error("Invalid expression: too many values on evaluation stack");
-  }
+#undef RDB_EVAL_PUSH
+
+  if (rStack.empty()) return evalError("Invalid expression: empty evaluation stack");
+  if (rStack.size() != 1) return evalError("Invalid expression: too many values on evaluation stack");
 
   return std::move(rStack.top());
 }  // end fn

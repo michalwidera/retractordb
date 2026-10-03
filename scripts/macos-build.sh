@@ -289,7 +289,10 @@ fi
 
 # --- etapy ---------------------------------------------------------------
 cmake_args=(-DCMAKE_BUILD_TYPE="$build_type")
-[ -n "$sanitize" ] && cmake_args+=(-DRDB_SANITIZE="$sanitize")
+# RDB_SANITIZE ZAWSZE, takze pusty. Wartosc siedzi w CMakeCache.txt, wiec przebieg bez
+# --sanitize po przebiegu z --sanitize budowal dalej z ASan - razem z binarkami instalowanymi
+# do ~/.local/bin i modulem Pythona, ktorego zwykly interpreter juz nie zaladuje.
+cmake_args+=(-DRDB_SANITIZE="$sanitize")
 
 stage "conan source" conan source "$source_dir"
 stage "conan install ($build_type)" conan install "$source_dir" -s build_type="$build_type" --build missing

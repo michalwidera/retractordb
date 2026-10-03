@@ -3,13 +3,14 @@
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
-#include "rdb/exceptions.hpp"
+#include "rdb/error.hpp"
 
 #include <charconv>
 #include <cmath>
 #include <cstdint>
 #include <istream>
 #include <limits>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
@@ -177,6 +178,34 @@ void visit_descFld(const K &inVar, K &retVal) {
   }
 }
 
+namespace {
+
+/// Ulamek z pary (licznik, mianownik), ktora go ma; nullopt dla pary bez reprezentacji.
+///
+/// Ta sama regula co zwezenie bez reprezentacji wyzej: wartosc, ktorej typ docelowy nie umie
+/// przedstawic, jest NULL-em, nie bledem. Trzy pary takiej reprezentacji nie maja: mianownik zero,
+/// mianownik INT_MIN (boost::rational nie umie odwrocic jego znaku i zglasza bad_rational) oraz
+/// licznik INT_MIN przy mianowniku ujemnym (normalize() neguje licznik - przepelnienie, a dla
+/// (INT_MIN, -1) dzielenie w gcd konczy sie SIGFPE, patrz readRational w payload.cc). Do zmiany
+/// pierwszy przypadek zglaszal ConfigError, a dwa pozostale wychodzily z Boosta wyjatkiem albo
+/// sygnalem - wszystkie trzy da sie dostac wprost z danych (napis "3/0" w polu RATIONAL).
+std::optional<boost::rational<int>> rationalOf(const int numerator, const int denominator) {
+  constexpr int intMin = std::numeric_limits<int>::min();
+  if (denominator == 0 || denominator == intMin) return std::nullopt;
+  if (denominator < 0 && numerator == intMin) return std::nullopt;
+  return boost::rational<int>(numerator, denominator);
+}
+
+template <typename T>
+void assignRationalOrNull(T &retVal, const int numerator, const int denominator) {
+  if (const auto value = rationalOf(numerator, denominator); value.has_value())
+    retVal = *value;
+  else
+    retVal = std::monostate{};
+}
+
+}  // namespace
+
 // https://stackoverflow.com/questions/23304177/c-alternative-for-parsing-input-with-sscanf
 template <char C>
 std::istream &expect(std::istream &in) {
@@ -232,7 +261,10 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
     case rdb::NULLTYPE:
       break;
     case rdb::IDXPAIR:
-      throw rdb::LogicError("convertTypes: IDXPAIR->T conversion not implemented");
+      // Konwersji na IDXPAIR nie ma - i jak kazda wartosc bez reprezentacji w typie docelowym
+      // daje NULL. Dawniej LogicError: typ pola IDXPAIR da sie zadeklarowac, wiec droga byla
+      // osiagalna trescia planu, a nie tylko bledem w kodzie.
+      retVal = std::monostate{};
       break;
     case rdb::INTPAIR:
       // Requested type is INT PAIR
@@ -280,19 +312,15 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
     case rdb::RATIONAL:
       // Requested type is RATIONAL
       if constexpr (std::is_same_v<T, rdb::descFldVT>) {
-        std::visit(Overload{                                                                        //
-                            [&retVal](std::monostate) { retVal = boost::rational<int>(0, 1); },     //
-                            [&retVal](uint8_t a) { retVal = boost::rational<int>(a); },             //
-                            [&retVal](int a) { retVal = boost::rational<int>(a); },                 //
-                            [&retVal](unsigned a) { rationalFromUnsignedTo(a, retVal); },           //
-                            [&retVal](boost::rational<int> a) { retVal = a; },                      //
-                            [&retVal](float a) { rationalizeTo(static_cast<double>(a), retVal); },  //
-                            [&retVal](double a) { rationalizeTo(a, retVal); },                      //
-                            [&retVal](std::pair<int, int> a) {
-                              if (a.second == 0)
-                                throw rdb::ConfigError("convertTypes: rational denominator is zero (pair<int,int>)");
-                              retVal = boost::rational<int>(a.first, a.second);
-                            },  //
+        std::visit(Overload{                                                                                        //
+                            [&retVal](std::monostate) { retVal = boost::rational<int>(0, 1); },                     //
+                            [&retVal](uint8_t a) { retVal = boost::rational<int>(a); },                             //
+                            [&retVal](int a) { retVal = boost::rational<int>(a); },                                 //
+                            [&retVal](unsigned a) { rationalFromUnsignedTo(a, retVal); },                           //
+                            [&retVal](boost::rational<int> a) { retVal = a; },                                      //
+                            [&retVal](float a) { rationalizeTo(static_cast<double>(a), retVal); },                  //
+                            [&retVal](double a) { rationalizeTo(a, retVal); },                                      //
+                            [&retVal](std::pair<int, int> a) { assignRationalOrNull(retVal, a.first, a.second); },  //
                             [&retVal](const std::pair<std::string, int> &a) {
                               retVal = boost::rational<int>(a.second, 1);
                             },  //  first is skipped
@@ -301,8 +329,7 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
                               int nom{0};
                               int den{1};
                               in >> nom >> expect<'/'> >> den;
-                              if (den == 0) throw rdb::ConfigError("convertTypes: rational denominator is zero (string parse)");
-                              retVal = boost::rational<int>(nom, den);
+                              assignRationalOrNull(retVal, nom, den);
                             }},
                    inVar);
       } else {
@@ -319,16 +346,14 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
         } else if (inVar.type() == typeid(double)) {
           rationalizeTo(std::any_cast<double>(inVar), retVal);
         } else if (inVar.type() == typeid(std::pair<int, int>)) {
-          auto pairVar = std::any_cast<std::pair<int, int>>(inVar);
-          if (pairVar.second == 0) throw rdb::ConfigError("convertTypes: rational denominator is zero (any pair<int,int>)");
-          retVal = boost::rational<int>(pairVar.first, pairVar.second);
+          const auto pairVar = std::any_cast<std::pair<int, int>>(inVar);
+          assignRationalOrNull(retVal, pairVar.first, pairVar.second);
         } else if (inVar.type() == typeid(std::string)) {
           std::istringstream in(std::any_cast<std::string>(inVar));
           int nom{0};
           int den{1};
           in >> nom >> expect<'/'> >> den;
-          if (den == 0) throw rdb::ConfigError("convertTypes: rational denominator is zero (any string parse)");
-          retVal = boost::rational<int>(nom, den);
+          assignRationalOrNull(retVal, nom, den);
         }
       }
       break;
@@ -487,8 +512,8 @@ rdb::descFldVT any_to_variant_cast(std::any a) {
   if (a.type() == typeid(double)) return castRI(std::any_cast<double>(a), rdb::DOUBLE);
   if (a.type() == typeid(float)) return castRI(std::any_cast<float>(a), rdb::FLOAT);
   if (a.type() == typeid(boost::rational<int>)) return castRI(std::any_cast<boost::rational<int>>(a), rdb::RATIONAL);
-  throw std::bad_any_cast();
-  return std::monostate{};  // Proforma
+  // std::any z typem spoza descFldVT buduje tylko kod silnika - to blad w kodzie, nie w danych.
+  rdb::fatal(fmt::format("any_to_variant_cast: unsupported type {}", a.type().name()));
 }
 
 template struct cast<rdb::descFldVT>;

@@ -12,6 +12,7 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <print>
 #include <stdexcept>
 #include <string>
@@ -31,7 +32,7 @@
 #include "ipcServer.hpp"
 #include "persistentCounter.hpp"
 #include "planSource.hpp"
-#include "rdb/exceptions.hpp"
+#include "rdb/error.hpp"
 #include "rdb/probe.hpp"  // sondy E1/E2E, K6, E4
 #include "serviceControl.hpp"
 #include "shmBudget.hpp"
@@ -49,6 +50,17 @@ using namespace esm;
 
 namespace {
 constexpr std::chrono::milliseconds kIdleLoopSleep{100};
+
+/// Raport bledu silnika, ktory konczy proces: zatrzask PRZED komunikatem (handler atexit ma
+/// poznac prawde takze wtedy, gdy wypis sie nie uda), potem "FATAL: <tresc>" na stderr - tego
+/// wiersza szuka test/IntegrationTest/fatal_exit_path - i log krytyczny. Kod wyjscia ustala
+/// wolajacy (EXIT_FAILURE). Ta sama tresc co w daemonFatalExit (fatalError.hpp), ale BEZ
+/// std::exit: run() ma jeszcze posprzatac IPC wlasnymi rekami.
+void reportEngineFailure(const rdb::Error &error) {
+  fatalErrorRaised.store(true, std::memory_order_release);
+  std::cerr << "\nFATAL: " << error.message() << '\n';
+  SPDLOG_CRITICAL("Engine error ({}): {}", rdb::errcName(error.code()), error.message());
+}
 
 /// Katalog blokad instancji dla sprzatania przy wyjsciu. Kopia, a nie odczyt przez
 /// serviceGuardPtr: po normalnym powrocie z run() straznika juz nie ma, a sprzatac trzeba
@@ -160,7 +172,7 @@ void cleanup() {
 }
 
 void executorsm::collectAwaitedStreams(TimeLine &tl, qTree *coreInstancePtr) {
-  if (coreInstancePtr == nullptr) throw rdb::LogicError("executorsm::collectAwaitedStreams: coreInstancePtr is null");
+  RDB_ASSERT(coreInstancePtr != nullptr, "executorsm::collectAwaitedStreams: coreInstancePtr is null");
   // assign/clear zamiast konstrukcji: pojemnosc obu wektorow zostaje z poprzedniego taktu,
   // wiec przy niezmienionym planie ten przebieg nie alokuje NICZEGO. Poprzednio powstawal tu
   // wezel drzewa czerwono-czarnego plus std::string na kazdy nalezny strumien - w kazdym takcie.
@@ -241,7 +253,17 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
       percounterFilename = it.filename;
     }
 
-  if (percounterFilename != "{notinitialized}") pCounterPtr = std::make_unique<PersistentCounter>(percounterFilename);
+  // Licznik rotacji, ktorego nie da sie wczytac, konczy start ta sama droga co blad silnika w
+  // epoce (patrz reportEngineFailure). Do 2026-10 konstruktor rzucal tu IOError/ConfigError PRZED
+  // blokiem try ponizej, wiec wyjatek nie mial kto zlapac: std::terminate, kod 134, bez FATAL.
+  if (percounterFilename != "{notinitialized}") {
+    auto counter = PersistentCounter::create(percounterFilename);
+    if (!counter) {
+      reportEngineFailure(counter.error());
+      return EXIT_FAILURE;
+    }
+    pCounterPtr = std::move(*counter);
+  }
 
   auto retVal = system::errc::success;
 
@@ -249,6 +271,11 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   // EXIT_FAILURE, bo tego pilnuje test/IntegrationTest/fatal_exit_path i po tym kodzie
   // jednostka systemd odroznia awarie od zwyklego zatrzymania. Patrz catch nizej.
   bool fatalExitRequested = false;
+  // Blad silnika z petli epok (rdb::Result). Petle przerywa `break`, a raport i kod wyjscia
+  // wypadaja ZA petla - patrz reportEngineFailure. Do 2026-10 te sama droge szedl rzut
+  // rdb::Error do catch na koncu tej funkcji; rdzen nie rzuca juz wyjatkow, wiec blad jest
+  // wartoscia, a sciezka slotu nie ma ani jednego landing pada.
+  std::optional<rdb::Error> engineError;
 
   // Sending service in thread. Warstwa protokolu wchodzi do transportu przez te
   // cztery wywolania zwrotne -- IpcServer nie zna qTree, dataModel ani compilera.
@@ -395,7 +422,12 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
           for (auto &q : *coreInstancePtr)
             if (q.isDeclaration()) q.isOneShot = true;
 
-        dataModel proc(*coreInstancePtr);
+        auto createdModel = dataModel::create(*coreInstancePtr);
+        if (!createdModel) {
+          engineError = std::move(createdModel).error();
+          break;
+        }
+        dataModel &proc = **createdModel;
         // PO `proc`, nie przed - patrz EpochPublication. Ta kolejnosc deklaracji jest cala
         // gwarancja, ze wskaznik gasnie zanim model zostanie rozebrany.
         EpochPublication epochPublication(proc);
@@ -435,8 +467,19 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         std::uint64_t observedAdHocPlanRevision;
         {
           std::scoped_lock lock(core_mutex);
-          timeIntervals             = coreInstancePtr->getAvailableTimeIntervals();
+          auto intervals = coreInstancePtr->getAvailableTimeIntervals();
+          if (!intervals) {
+            engineError = std::move(intervals).error();
+            break;
+          }
+          timeIntervals             = std::move(*intervals);
           observedAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_relaxed);
+        }
+        // Os czasu bez interwalu to niezmiennik TimeLine (RDB_ASSERT). Plan z samymi dyrektywami
+        // przechodzi kompilacje, wiec odmowa nalezy tutaj - do 2026-10 rzucal ja konstruktor TimeLine.
+        if (timeIntervals.empty()) {
+          engineError = rdb::Error(rdb::Errc::Config, "plan holds no streams - only directives");
+          break;
         }
         TimeLine tl(timeIntervals);
         //
@@ -456,7 +499,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         //
         // Do wprowadzenia EpochPublication staloby tu rowniez ostrzezenie, ze `break` w tym
         // miejscu ominalby zgaszenie pProc. Straznik czyni ten zakaz bezprzedmiotowym: pProc
-        // gasnie na kazdej drodze wyjscia z epoki, takze przez wyjatek.
+        // gasnie na kazdej drodze wyjscia z epoki, takze przez `break` po bledzie silnika.
         if (!gateStoppedProcess) {
           std::scoped_lock epoch(plan_epoch_mutex);
           dueNames_.clear();
@@ -471,7 +514,10 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
             while (!std::filesystem::exists(releasePath) && std::chrono::steady_clock::now() < deadline)
               std::this_thread::sleep_for(std::chrono::milliseconds(1));
           }
-          proc.processZeroStep();
+          if (auto zeroStep = proc.processZeroStep(); !zeroStep) {
+            engineError = std::move(zeroStep).error();
+            break;
+          }
           ipcServer.broadcast(dueNames_, formatRow);
         }
         // End of ZERO-step
@@ -528,7 +574,12 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
           const auto currentAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_acquire);
           if (currentAdHocPlanRevision != observedAdHocPlanRevision) {
             std::scoped_lock lock(core_mutex);
-            auto availableTimeIntervals = coreInstancePtr->getAvailableTimeIntervals();
+            auto importedIntervals = coreInstancePtr->getAvailableTimeIntervals();
+            if (!importedIntervals) {
+              engineError = std::move(importedIntervals).error();
+              break;
+            }
+            auto availableTimeIntervals = std::move(*importedIntervals);
             if (availableTimeIntervals != timeIntervals) {
               tl.updateTimeIntervals(availableTimeIntervals);
               timeIntervals = std::move(availableTimeIntervals);
@@ -578,8 +629,13 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
               collectAwaitedStreams(tl, coreInstancePtr);
             }
             slotBench.beginCompute();
-            proc.processRows(dueMask_, currentTimeSlot);  // mierzony rdzeń obliczeń jednego interwału (E1)
+            // mierzony rdzeń obliczeń jednego interwału (E1); sprawdzenie wyniku to jedna galaz
+            auto computed = proc.processRows(dueMask_, currentTimeSlot);
             slotBench.endCompute();
+            if (!computed) [[unlikely]] {
+              engineError = std::move(computed).error();
+              break;
+            }
             ipcServer.broadcast(dueNames_, formatRow);
             slotBench.endSlot();
           }
@@ -603,6 +659,9 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
           }
           // End of loop while( ! _kbhit(ignoreanykey) )
         }
+        // Blad silnika w slocie przerwal petle slotow; konczy tez petle epok. Licznikow nie
+        // raportujemy - opisywalyby przebieg urwany w polowie slotu.
+        if (engineError.has_value()) break;
 
         // Raport liczników runtime (K6 materializacja, E4 praca na slot) po zakończeniu
         // mierzonej pętli, żeby zliczanie nie obciążało budżetu slotu.
@@ -619,36 +678,33 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         //
         // Podzial pracy jest wiec taki: ten blok ustala KOLEJNOSC, straznik gwarantuje
         // ZAJSCIE. Powtorzenie jest zamierzone i nieszkodliwe - zgaszenie jest idempotentne,
-        // a na drodze wyjatkowej ten blok po prostu sie nie wykonuje.
+        // a na drodze bledu silnika (`break` wyzej) ten blok po prostu sie nie wykonuje.
         epochPublication.retire();
         ipcServer.broadcastOutOfBusiness();
       }
 
       if (!planResetRequested.load(std::memory_order_acquire)) break;
-      applyPendingPlan(guard, xrdbbus, cfg);
+      if (auto applied = applyPendingPlan(guard, xrdbbus, cfg); !applied) {
+        engineError = std::move(applied).error();
+        break;
+      }
     }
-    // Klawisz, ktory zakonczyl OSTATNIA epoke, zdejmujemy raz - epoka przerwana
-    // przeladowaniem planu nie konczy sie klawiszem, wiec nie ma tam czego pobierac.
-    if (iLoopLimitCnt != executorsm::stop_now) _getch();  // no wait ... feed key from kbhit
-  } catch (const rdb::Error &error) {
-    // MUSI stac przed catch(std::exception) - rdb::Error z niego dziedziczy, wiec bez tego
-    // kazdy blad silnika wychodzil stad jako "IPC Fail." z kodem EINTR.
-    //
-    // Ten catch istnieje od fazy 1 refaktoru i jest jej najbardziej pouczajacym skutkiem.
-    // Do fazy 1 blad krytyczny w budowie modelu (np. katalog z dyrektywy :STORAGE, ktorego
-    // nie ma) konczyl proces przez FatalError: std::exit(EXIT_FAILURE) z zatrzasnietym
-    // fatalErrorRaised, wiec handler atexit czyscil plik zapytan i jednostka wstawala BEZ
-    // planu. Zamiana tych miejsc na rzuty przeniosla je prosto w rece obejmujacego
-    // catch(std::exception), ktory napisano dla awarii IPC - a ten raportowal cudzy blad
-    // cudzym komunikatem, oddawal EINTR zamiast EXIT_FAILURE i NIE zatrzaskiwal flagi,
-    // czyli zapetlal restart uslugi na planie, ktory ja zabil.
-    //
-    // Pytanie, ktore trzeba zadac przy kazdym kolejnym plastrze fazy 1, brzmi wiec nie
-    // "czy to sie odwinie", tylko "kto to zlapie po drodze i za co uzna".
-    fatalErrorRaised.store(true, std::memory_order_release);
-    std::cerr << "\nFATAL: " << error.what() << '\n';
-    SPDLOG_CRITICAL("Engine error: {}", error.what());
-    fatalExitRequested = true;
+    if (engineError.has_value()) {
+      // Blad silnika konczy proces kodem EXIT_FAILURE z zatrzasnietym fatalErrorRaised - handler
+      // atexit czysci wtedy plik zapytan uslugi i jednostka wstaje BEZ planu, ktory ja zabil.
+      // Do 2026-10 ta sama polityka siedziala w catch(const rdb::Error&), ktory musial stac przed
+      // catch(std::exception) napisanym dla awarii IPC: inaczej blad silnika wychodzil jako
+      // "IPC Fail." z kodem EINTR i bez zatrzasku, a usluga wstawala w kolko na tym samym planie.
+      // Wartosc zamiast rzutu usuwa cale to pytanie "kto to zlapie po drodze i za co uzna":
+      // blad przechodzi przez petle jawnie, a ponizsze catch zostaja wylacznie dla bibliotek
+      // zewnetrznych (Boost.Interprocess, ptree), ktore zglaszaja bledy wyjatkami.
+      reportEngineFailure(*engineError);
+      fatalExitRequested = true;
+    } else if (iLoopLimitCnt != executorsm::stop_now) {
+      // Klawisz, ktory zakonczyl OSTATNIA epoke, zdejmujemy raz - epoka przerwana
+      // przeladowaniem planu nie konczy sie klawiszem, wiec nie ma tam czego pobierac.
+      _getch();  // no wait ... feed key from kbhit
+    }
   } catch (IPC::interprocess_exception &ex) {
     std::cerr << ex.what() << '\n' << "IPC::interprocess exception" << '\n';
     retVal = system::errc::no_child_process;

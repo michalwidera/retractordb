@@ -14,8 +14,8 @@
 
 #include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
-#include "rdb/exceptions.hpp"
 #include "rdb/faccposixshd.hpp"
+#include "rdbResult.hpp"
 #include "syscallWrap.hpp"
 
 // Tests intentionally use raw byte arrays for low-level shared-file behavior checks.
@@ -213,7 +213,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_append_to_main) {
   record = 0xBB;
   GTEST_ASSERT_EQ(shd->write(&record), EXIT_SUCCESS);
 
-  GTEST_ASSERT_EQ(shd->count(), 2);
+  GTEST_ASSERT_EQ(rdbtest::ok(shd->count()), 2);
 
   // Shadow file should be empty (no updates, only appends)
   GTEST_ASSERT_EQ(filesize(path + ".shadow"), 0);
@@ -348,7 +348,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_truncate) {
   // Truncate
   shd->write(nullptr, 0);
 
-  GTEST_ASSERT_EQ(shd->count(), 0);
+  GTEST_ASSERT_EQ(rdbtest::ok(shd->count()), 0);
 }
 
 // Purge oproznia oba pliki W MIEJSCU - uzasadnienie przy tescie purge w test_faccposix.cpp.
@@ -362,7 +362,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_purge_keeps_files_usable) {
   GTEST_ASSERT_EQ(shd.write(nullptr, 0), EXIT_SUCCESS);
   record = 42;
   GTEST_ASSERT_EQ(shd.write(&record), EXIT_SUCCESS);
-  EXPECT_EQ(shd.count(), 1U);
+  EXPECT_EQ(rdbtest::ok(shd.count()), 1U);
   record = 0;
   EXPECT_EQ(shd.read(&record, 0), EXIT_SUCCESS);
   EXPECT_EQ(record, 42);
@@ -380,13 +380,13 @@ TEST_F(ShadowFileTest, test_faccposixshd_count_ignores_shadow) {
   record = 2;
   shd->write(&record);
 
-  GTEST_ASSERT_EQ(shd->count(), 2);
+  GTEST_ASSERT_EQ(rdbtest::ok(shd->count()), 2);
 
   // Update should not change count
   record = 99;
   shd->write(&record, 0);
 
-  GTEST_ASSERT_EQ(shd->count(), 2);
+  GTEST_ASSERT_EQ(rdbtest::ok(shd->count()), 2);
 }
 
 // Verify reading from an empty file returns failure
@@ -396,7 +396,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_read_empty_file) {
 
   auto shd = std::make_unique<rdb::posixBinaryFileWithShadow>(path, desc);
 
-  GTEST_ASSERT_EQ(shd->count(), 0);
+  GTEST_ASSERT_EQ(rdbtest::ok(shd->count()), 0);
   GTEST_ASSERT_NE(std::filesystem::exists(path), 0);
 }
 
@@ -410,7 +410,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_read_beyond_eof) {
   record = 0xAA;
   shd->write(&record);
 
-  GTEST_ASSERT_EQ(shd->count(), 1);
+  GTEST_ASSERT_EQ(rdbtest::ok(shd->count()), 1);
   GTEST_ASSERT_EQ(shd->read(&record, 5), ERANGE);
 }
 
@@ -555,7 +555,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_write_after_merge) {
   // Continue using the accessor after merge
   record = 0x30;
   shd->write(&record);  // append
-  GTEST_ASSERT_EQ(shd->count(), 3);
+  GTEST_ASSERT_EQ(rdbtest::ok(shd->count()), 3);
 
   record = 0xEE;
   shd->write(&record, 1);  // new shadow update
@@ -590,7 +590,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_shadow_not_created_on_append_only) {
     shd->write(&record);
   }
 
-  GTEST_ASSERT_EQ(shd->count(), 10);
+  GTEST_ASSERT_EQ(rdbtest::ok(shd->count()), 10);
   GTEST_ASSERT_EQ(filesize(path + ".shadow"), 0);
 }
 
@@ -632,7 +632,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_main_file) 
 
   // Constructor should truncate the trailing byte and restore consistent record state
   GTEST_ASSERT_EQ(filesize(path), static_cast<std::ifstream::pos_type>(4));
-  GTEST_ASSERT_EQ(shd->count(), 2);
+  GTEST_ASSERT_EQ(rdbtest::ok(shd->count()), 2);
 
   uint8_t rec[2] = {};
   GTEST_ASSERT_EQ(shd->read(rec, 0), EXIT_SUCCESS);
@@ -807,7 +807,7 @@ TEST_F(ShadowFileTest, zero_byte_append_returns_eio_without_writing_record) {
   BYTE data            = 0xAA;
   g_write_zero_on_call = 1;
   EXPECT_EQ(file.write(&data), EIO);
-  EXPECT_EQ(file.count(), 0);
+  EXPECT_EQ(rdbtest::ok(file.count()), 0);
 }
 
 // To samo dla petli zapisu danych wpisu cienia (aktualizacja rekordu).
@@ -819,10 +819,10 @@ TEST_F(ShadowFileTest, zero_byte_shadow_data_write_returns_eio) {
   data                 = 0xBB;
   g_write_zero_on_call = 2;  // zapis pozycji, potem zapis danych
   EXPECT_EQ(file.write(&data, 0), EIO);
-  EXPECT_EQ(file.count(), 1);
+  EXPECT_EQ(rdbtest::ok(file.count()), 1);
 }
 
-// count(): awaria stat() inna niz ENOENT rzuca IOError, zamiast oddac blad jako liczbe.
+// count(): awaria stat() inna niz ENOENT zwraca blad Errc::IO, zamiast oddac blad jako liczbe.
 // Pilnowana regresja: `return -1` z count() dociera do storage::recordsCount_ jako SIZE_MAX
 // (uzasadnienie kontraktu przy FileInterface::count). Dlatego sprawdzamy nie tylko to, ZE
 // count() odmawia, ale i to, ze odmawia samo - komunikatem tej wlasnie funkcji.
@@ -833,15 +833,16 @@ TEST_F(ShadowFileTest, test_faccposixshd_count_stat_failure_is_fatal) {
     BYTE record = 0xAA;
     GTEST_ASSERT_EQ(pfa->write(&record), EXIT_SUCCESS);
     // Kontrola dodatnia: z rozbrojonym licznikiem stat() dziala i count() liczy normalnie.
-    GTEST_ASSERT_EQ(pfa->count(), 1);
+    GTEST_ASSERT_EQ(rdbtest::ok(pfa->count()), 1);
   }
 
   rdb::posixBinaryFileWithShadow pfa(path, desc);
   g_stat_fail_count = 1;
   g_stat_fail_errno = EACCES;
-  // Gdyby count() wrocilo do oddawania bledu jako liczby, gtest zglosi brak wyjatku.
-  EXPECT_THAT([&] { static_cast<void>(pfa.count()); },
-              ::testing::ThrowsMessage<rdb::IOError>(::testing::HasSubstr("posixBinaryFileWithShadow::count: ::stat")));
+  // Gdyby count() wrocilo do oddawania bledu jako liczby, test zobaczy wartosc zamiast bledu.
+  const auto counted = pfa.count();
+  ASSERT_RDB_ERROR(counted, rdb::Errc::IO);
+  EXPECT_THAT(counted.error().message(), ::testing::HasSubstr("posixBinaryFileWithShadow::count: ::stat"));
 }
 
 // Rotacja pod numerem, ktory ma juz archiwum, zostawia slad w logu (#281) - jak w faccposix.

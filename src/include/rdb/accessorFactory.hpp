@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "descriptor.hpp"
+#include "error.hpp"
 #include "fainterface.hpp"
 #include "memoryStore.hpp"
 #include "metaData.hpp"
@@ -16,7 +17,7 @@ namespace rdb {
 /// Funkcje fabryki powinny:
 /// - odwzorowywać nazwę typu magazynu (DEFAULT/DIRECT/MEMORY/POSIX/POSIXSHD/GENERIC/DEVICE/TEXTSOURCE)
 ///   na konkretną implementację FileInterface (makeAccessor()); nieznany typ, pusta ścieżka danych lub
-///   pusty typ kończą się rzutem ConfigError (faza 1, plaster 2a),
+///   pusty typ kończą się błędem Errc::Config (faza 1, plaster 2a; do 2026-10 rzutem ConfigError),
 /// - rozstrzygać, czy typ magazynu jest źródłem deklarowanym tylko do odczytu (isDeclaredType()),
 /// - dobierać wariant indeksu metadanych null (makeMetaIndex()): wariant inertny (pusta ścieżka pliku)
 ///   dla źródeł deklarowanych, storageShadow gdy accessor utrzymuje plik cienia danych, bazowy metaData
@@ -30,7 +31,7 @@ namespace rdb {
 [[nodiscard]] bool isDeclaredType(std::string_view storageType);
 
 /// @brief Create the FileInterface implementation for the given storage type.
-/// @throws ConfigError on an unknown or empty storage type, or an empty storage file path. This is the
+/// @return Errc::Config on an unknown or empty storage type, or an empty storage file path. This is the
 ///         only reachable failure here and the one no binding-level guard can stand in front of - the
 ///         list of accepted types lives in this function and nowhere else.
 /// @note Descriptor jest nie-const, bo retention()/storagePolicy() nie są metodami const.
@@ -38,12 +39,12 @@ namespace rdb {
 ///        MemoryStore::processDefault(), czyli zachowanie sprzed fazy 2. Dla pozostalych
 ///        typow bez znaczenia. To jest miejsce, w ktorym wolajacy nadaje pamieci MEMORY
 ///        wlasciciela wezszego niz proces - patrz memoryStore.hpp.
-[[nodiscard]] std::unique_ptr<FileInterface> makeAccessor(std::string_view storageType,    //
-                                                          const std::string &storageFile,  //
-                                                          Descriptor &descriptor,          //
-                                                          bool oneShot,                    //
-                                                          int percounter,                  //
-                                                          MemoryStore *memory = nullptr);
+[[nodiscard]] Result<std::unique_ptr<FileInterface>> makeAccessor(std::string_view storageType,    //
+                                                                  const std::string &storageFile,  //
+                                                                  Descriptor &descriptor,          //
+                                                                  bool oneShot,                    //
+                                                                  int percounter,                  //
+                                                                  MemoryStore *memory = nullptr);
 
 /// @brief Create the metaData variant matching the storage: inert for declared sources,
 ///        storageShadow when the accessor keeps a data shadow file, base metaData otherwise.

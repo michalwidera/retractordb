@@ -17,13 +17,13 @@
 // Definicje stanu opisanego w executorsmState.hpp. Komentarze - czym kazdy z tych obiektow
 // jest, kto go pisze i pod jakim muteksem - mieszkaja przy deklaracjach w naglowku.
 
-std::unique_ptr<PersistentCounter> pCounterPtr;
+// pCounterPtr, pProc i esm::plan_epoch_mutex sa definiowane w coreState.cpp: czyta je rdzen
+// (streamInstance, dumpManager, dataModel), ktory laduje takze silnik osadzony - a ten nie moze
+// ciagnac za soba tej jednostki, bo definiuje ona m.in. globalny IpcServer na Boost.Interprocess.
 std::vector<std::pair<std::string, std::string>> processedLines;
-dataModel *pProc = nullptr;
 std::atomic<int> iLoopLimitCnt{executorsm::inifitie_loop};
 
 namespace esm {
-std::mutex plan_epoch_mutex;
 std::condition_variable cv;
 std::atomic<bool> dataModelExpected{false};
 std::atomic<bool> firstQueryReceived{false};

@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "error.hpp"
+
 namespace rdb {
 
 /// @brief Abstrakcyjny interfejs operacji wejścia/wyjścia dla magazynów używanych przez storage.
@@ -89,10 +91,10 @@ struct FileInterface {
 
   /// @brief Liczba rekordów w magazynie.
   ///
-  /// Kontrakt awarii należy do interfejsu, nie do implementacji: count() nie ma wartości
+  /// Kontrakt awarii należy do interfejsu, nie do implementacji: liczba nie ma wartości
   /// oznaczającej błąd. Magazyn, którego nośnika jeszcze nie ma - plik nieutworzony albo
   /// usunięty przez purge - jest magazynem pustym i zwraca 0. Każda inna awaria odczytu
-  /// rozmiaru rzuca IOError.
+  /// rozmiaru wraca jako błąd Errc::IO - nigdy jako liczba.
   ///
   /// Trzeciej odpowiedzi nie ma, bo wywołujący czyta tę liczbę wyłącznie jako rozmiar.
   /// `return -1` z wariantu posixowego docierało do storage::recordsCount_ jako SIZE_MAX,
@@ -100,14 +102,24 @@ struct FileInterface {
   /// dopisywał od indeksu 0 po istniejących danych. Obie odpowiedzi są gorsze od zatrzymania.
   ///
   /// @return liczba rekordów, albo inna miara postępu właściwa implementacji (patrz opis klasy);
-  ///         nigdy wartość sygnalizująca błąd
-  virtual size_t count() = 0;
+  ///         błąd odczytu rozmiaru jako Errc::IO
+  [[nodiscard]] virtual Result<size_t> count() = 0;
 
   /// @brief Powod, dla ktorego konstruktor nie otworzyl magazynu; pusty napis = akcesor gotowy.
   ///
   /// Import planu odczytuje go przed pierwszym count(), read() albo write() i odmawia statusem
   /// zamiast FatalError. Akcesor z niepustym bledem nie nadaje sie do niczego poza zniszczeniem.
   [[nodiscard]] virtual const std::string &initializationError() const {
+    static const std::string none;
+    return none;
+  }
+
+  /// @brief Opis ostatniego bledu TRESCI wejscia - read() zwrocil EILSEQ.
+  ///
+  /// Zrodlo deklarowane, ktorego plik nie zgadza sie z deklaracja strumienia (token inny niz NULL
+  /// w polu NULL, typ pola, ktorego zrodlo tekstowe nie umie wczytac), nie jest awaria nosnika:
+  /// silnik jest caly, zle sa dane. SourceBuffer zamienia ten kod na Errc::Config z tym opisem.
+  [[nodiscard]] virtual const std::string &inputError() const {
     static const std::string none;
     return none;
   }

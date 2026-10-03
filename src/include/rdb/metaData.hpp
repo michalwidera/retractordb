@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "descriptor.hpp"
+#include "error.hpp"
 #include "gapDetector.hpp"
 #include "indexRecord.hpp"
 #include "metaIndexStore.hpp"
@@ -92,10 +93,11 @@ class metaData {
   /// containing the record is split accordingly.
   /// @param recordIndex position of the modified record in the stream
   /// @param nullBitset  new null bit-set pattern of the modified record
-  /// @throws std::out_of_range if recordIndex >= totalRecords()
+  /// @return Errc::Logic if recordIndex >= totalRecords() - the data file holds a record the index
+  ///         does not know (e.g. a .meta removed or truncated behind the engine's back)
   /// @note Virtual: the shadow-aware variant (storageShadow) records the change
   ///       as a shadow override instead of rewriting the main index.
-  virtual void onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitset);
+  [[nodiscard]] virtual Result<> onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitset);
 
   /// @brief Notify the meta index that a record has been appended.
   ///
@@ -110,7 +112,7 @@ class metaData {
   /// @brief Retrieve the null bit-set for the record at @p recordIndex.
   /// @param recordIndex global position of the record in the stream
   /// @return null bit-set (one bit per descriptor field, true = null)
-  /// @throws std::out_of_range if recordIndex >= totalRecords()
+  /// @pre recordIndex < totalRecords(); a violation is a broken invariant (RDB_ASSERT, rdb::fatal)
   /// @note Virtual: the shadow-aware variant (storageShadow) returns the shadow override when one exists.
   virtual std::vector<bool> getNullBitset(size_t recordIndex) const;
 

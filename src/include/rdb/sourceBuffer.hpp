@@ -39,9 +39,11 @@ class SourceBuffer {
   [[nodiscard]] size_t size() const { return circularBuffer_.size(); }
 
   /// @brief The only place where data is physically read from a declared source; fills @p out with the record.
-  void readCurrent(FileInterface &source, payload &out);
+  /// Errc::Config, gdy zrodlo zglosi blad tresci wejscia (EILSEQ, patrz FileInterface::inputError()).
+  /// Kazdy inny blad odczytu daje - jak dotad - wiersz all-null i ostrzezenie w logu.
+  [[nodiscard]] Result<> readCurrent(FileInterface &source, payload &out);
 
-  /// @brief Copy the chamber to @p out and push it into history; FatalError when capacity is zero.
+  /// @brief Copy the chamber to @p out and push it into history; capacity zero is a broken invariant (RDB_ASSERT).
   void fire(payload &out);
 
   /// @brief History record at @p index (0 = newest); requires index < size().

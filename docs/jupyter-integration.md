@@ -33,10 +33,20 @@ with rdb.Storage("test_db", "test_db", storage_param="/path/to/dir") as st:
 | `Storage` | `rdb::storage` |
 | `Record` | `rdb::payload`, read through `getItemVT` |
 | `RetractorDBError`, `NoSuchStream`, `StorageError` | raised by the binding's guards |
-| `CorruptDescriptor` | `rdb::CorruptDescriptor` - `loadDescriptorFile` |
-| `ConfigError` | `rdb::ConfigError` - `storagePaths`, `accessorFactory`, `attachDescriptor` |
-| `InternalError` | `rdb::LogicError` - a broken engine invariant; report it, do not handle it |
-| `IOError` | `rdb::IOError` - a file operation failed; message carries `strerror(errno)` |
+| `CorruptDescriptor` | `rdb::Errc::CorruptDescriptor` - `loadDescriptorFile`, `attachDescriptor` |
+| `ConfigError` | `rdb::Errc::Config` - `storagePaths`, `accessorFactory`, `attachDescriptor` |
+| `InternalError` | `rdb::Errc::Logic` - a broken engine invariant; report it, do not handle it. Also `rdb::Errc::Eval`, an expression the compiler should have rejected |
+| `IOError` | `rdb::Errc::IO` - a file operation failed; message carries `strerror(errno)` |
+
+Since 2026-10 the engine core returns errors as values (`rdb::Result`) and builds with
+`-fno-exceptions`; `module.cpp` is the only place where an engine error becomes an exception,
+and it raises the same Python classes as before. Two differences are visible from Python:
+
+- an evaluator error used to escape as a bare `RuntimeError`; it is now `InternalError`;
+- a broken invariant that the binding does not guard ends the process (`std::abort` after a
+  `FATAL:` line on stderr) instead of raising `InternalError`. Every path known to reach one
+  is guarded and pinned by `test_fatal_paths.py` and `test_engine.py`; see gap 8 in
+  [`embedded-realtime-gaps.md`](embedded-realtime-gaps.md).
 
 Reads release the GIL. That is not premature: without it a single blocking read
 freezes the whole kernel including its UI, and retrofitting the guard after callers
@@ -118,8 +128,9 @@ was waiting on.
 
 Two consequences matter to a notebook even before `Engine` exists. A bad command no longer
 ends the service: it answers the client and the engine keeps running (slice C). And every
-failure now arrives as an `rdb::Error` subclass, so the binding maps it to a Python
-exception instead of guarding a path that would otherwise take the interpreter down with it.
+failure now arrives as an `rdb::Error` (an exception subclass until 2026-10, a `Result` value
+since), so the binding maps it to a Python exception instead of guarding a path that would
+otherwise take the interpreter down with it.
 
 `api/python/tests/test_fatal_paths.py` tracks the boundary in executable form. The two
 descriptor cases now assert `pytest.raises` in the test interpreter;
@@ -253,7 +264,8 @@ with rdb.Engine("/tmp/plan") as eng:                     # storage dir for plans
 | `to_numpy(stream, fields=, dtype=)`, `window(stream, fields=, size=, stride=, dtype=)` | `Engine::project` - `double` per value, `NaN` for null, then one NumPy array per call |
 | `Window.__dlpack__` / `__dlpack_device__` / `__array__` | numpy's, on the array the window owns |
 | `retractordb.torch.StreamDataset`, `as_tensor` | `torch.from_dlpack` over `window()`; `num_workers=0` |
-| `RQLSyntaxError`, `CompileError` | `rdb::embed::SyntaxError`, `rdb::embed::CompileError` - both `ConfigError` |
+| `RQLSyntaxError`, `CompileError` | `rdb::Errc::Syntax`, `rdb::Errc::Compile` - both in the `ConfigError` family |
+| `failed` | `Engine::failed` - a slot returned an error; `step()` raises `InternalError` until the next `compile()` |
 | engine log records | `logging.getLogger("retractordb")`, through a spdlog sink installed by the module |
 
 **Refused at `compile()`**, as `CompileError`, because the state they need is the daemon's and

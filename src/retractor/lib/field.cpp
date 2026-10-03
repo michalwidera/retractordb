@@ -2,7 +2,7 @@
 
 #include <utility>
 
-#include "rdb/exceptions.hpp"
+#include "rdb/error.hpp"
 
 /** Construktor set */
 
@@ -18,8 +18,7 @@ field::field(rdb::rField field_, std::list<token> lProgram)
       field_(std::move(field_)) {}
 
 token field::getFirstFieldToken() {
-  if (lProgram.empty())
-    throw rdb::LogicError("field::getFirstFieldToken: no program tokens - should not be called on a declaration field");
+  RDB_ASSERT(!lProgram.empty(), "field::getFirstFieldToken: no program tokens - should not be called on a declaration field");
   return *lProgram.begin();
 }
 

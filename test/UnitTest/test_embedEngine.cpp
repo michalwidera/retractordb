@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -10,7 +11,7 @@
 
 #include "rdb/descriptor.hpp"
 #include "rdb/embed/engine.hpp"
-#include "rdb/exceptions.hpp"
+#include "rdbResult.hpp"
 
 // ctest -R '^ut_embedEngine' -V
 
@@ -36,7 +37,7 @@ void writeOneRecord(rdb::storage &stream, const rdb::Descriptor &descriptor, int
   auto *payload = stream.getPayload();
   payload->setNullBitset(std::vector<bool>(descriptor.size(), false));
   payload->setItem(0, value);
-  stream.write();
+  rdbtest::ok(stream.write());
 }
 
 /// Zrodlo tekstowe: jedna liczba na wiersz, jak data.txt w it_untileof_stop.
@@ -70,10 +71,10 @@ TEST(embedEngine, two_engines_do_not_share_a_memory_stream) {
   rdb::embed::Engine first;
   rdb::embed::Engine second;
 
-  auto firstStream  = first.openStorage("engine_iso", "engine_iso", "", "DEFAULT", false, false, -1);
-  auto secondStream = second.openStorage("engine_iso", "engine_iso", "", "DEFAULT", false, false, -1);
-  ASSERT_TRUE(firstStream->attachDescriptor(&descriptor).empty());
-  ASSERT_TRUE(secondStream->attachDescriptor(&descriptor).empty());
+  auto firstStream  = rdbtest::ok(first.openStorage("engine_iso", "engine_iso", "", "DEFAULT", false, false, -1));
+  auto secondStream = rdbtest::ok(second.openStorage("engine_iso", "engine_iso", "", "DEFAULT", false, false, -1));
+  ASSERT_RDB_OK(firstStream->attachDescriptor(&descriptor));
+  ASSERT_RDB_OK(secondStream->attachDescriptor(&descriptor));
   firstStream->setDisposable(true);
 
   writeOneRecord(*firstStream, descriptor, 11);
@@ -83,10 +84,10 @@ TEST(embedEngine, two_engines_do_not_share_a_memory_stream) {
   // Pustosc sklepu drugiego silnika nic tu nie mowi: kubelek strumienia powstaje razem z
   // otwartym magazynem (#306, D3), wiec secondStream ma w nim wlasny, pusty. O izolacji mowi
   // to, co widzi swiezy magazyn tej samej nazwy w kazdym ze sklepow.
-  auto firstReader  = first.openStorage("engine_iso", "engine_iso", "", "DEFAULT", false, false, -1);
-  auto secondReader = second.openStorage("engine_iso", "engine_iso", "", "DEFAULT", false, false, -1);
-  ASSERT_TRUE(firstReader->attachDescriptor(&descriptor).empty());
-  ASSERT_TRUE(secondReader->attachDescriptor(&descriptor).empty());
+  auto firstReader  = rdbtest::ok(first.openStorage("engine_iso", "engine_iso", "", "DEFAULT", false, false, -1));
+  auto secondReader = rdbtest::ok(second.openStorage("engine_iso", "engine_iso", "", "DEFAULT", false, false, -1));
+  ASSERT_RDB_OK(firstReader->attachDescriptor(&descriptor));
+  ASSERT_RDB_OK(secondReader->attachDescriptor(&descriptor));
   EXPECT_EQ(firstReader->getRecordsCount(), 1U) << "zapis nie trafil do sklepu wlasnego silnika";
   EXPECT_EQ(secondReader->getRecordsCount(), 0U) << "drugi silnik zobaczyl zapis pierwszego";
 }
@@ -103,8 +104,9 @@ TEST(embedEngine, storage_built_without_an_engine_uses_the_process_default) {
   ASSERT_TRUE(rdb::MemoryStore::processDefault().empty()) << "sklep domyslny nie byl pusty na starcie binarki";
 
   rdb::embed::Engine engine;
-  rdb::storage loose("engine_default", "engine_default", "", "DEFAULT", false, false, -1);
-  ASSERT_TRUE(loose.attachDescriptor(&descriptor).empty());
+  auto looseOwner     = rdbtest::ok(rdb::storage::create("engine_default", "engine_default", "", "DEFAULT", false, false, -1));
+  rdb::storage &loose = *looseOwner;
+  ASSERT_RDB_OK(loose.attachDescriptor(&descriptor));
   loose.setDisposable(true);
 
   writeOneRecord(loose, descriptor, 37);
@@ -123,14 +125,14 @@ TEST(embedEnginePlan, compile_step_and_read_the_result) {
 
   rdb::embed::Engine engine;
   ASSERT_FALSE(engine.hasPlan());
-  engine.compile(doublingPlan("plan_data.txt"));
+  ASSERT_RDB_OK(engine.compile(doublingPlan("plan_data.txt")));
   ASSERT_TRUE(engine.hasPlan());
-  EXPECT_EQ(engine.streams(), (std::vector<std::string>{"src", "dst"}));
-  EXPECT_TRUE(engine.isDeclared("src"));
-  EXPECT_FALSE(engine.isDeclared("dst"));
+  EXPECT_EQ(rdbtest::ok(engine.streams()), (std::vector<std::string>{"src", "dst"}));
+  EXPECT_TRUE(rdbtest::ok(engine.isDeclared("src")));
+  EXPECT_FALSE(rdbtest::ok(engine.isDeclared("dst")));
 
   std::uint64_t slots = 0;
-  while (const auto slot = engine.step()) {
+  while (const auto slot = rdbtest::ok(engine.step())) {
     EXPECT_EQ(*slot, slots);
     ++slots;
   }
@@ -138,27 +140,27 @@ TEST(embedEnginePlan, compile_step_and_read_the_result) {
   EXPECT_EQ(engine.slotsDone(), slots);
   EXPECT_EQ(engine.time(), boost::rational<int>(static_cast<int>(slots), 2));
   // Po koncu wejscia step() odpowiada nullopt i niczego nie liczy.
-  EXPECT_FALSE(engine.step().has_value());
+  EXPECT_FALSE(rdbtest::ok(engine.step()).has_value());
   EXPECT_EQ(engine.slotsDone(), slots);
 
-  ASSERT_EQ(engine.recordCount("dst"), input.size());
+  ASSERT_EQ(rdbtest::ok(engine.recordCount("dst")), input.size());
   for (std::size_t i = 0; i < input.size(); ++i)
-    EXPECT_EQ(firstValue(engine.record("dst", i)), input[i] * 2);
-  EXPECT_EQ(engine.schema("dst").front().rname, "dst_0");
+    EXPECT_EQ(firstValue(rdbtest::ok(engine.record("dst", i))), input[i] * 2);
+  EXPECT_EQ(rdbtest::ok(engine.schema("dst"))->front().rname, "dst_0");
 
   // Projekcja gesta: te same wartosci jako double, wierszami.
-  const auto block = engine.project("dst", {0}, 2, 3);
+  const auto block = rdbtest::ok(engine.project("dst", {0}, 2, 3));
   ASSERT_EQ(block.size(), 3U);
   EXPECT_DOUBLE_EQ(block[0], 60.0);
   EXPECT_DOUBLE_EQ(block[2], 100.0);
 
-  EXPECT_THROW((void)engine.record("dst", input.size()), rdb::ConfigError);
-  EXPECT_THROW((void)engine.record("nosuch", 0), rdb::ConfigError);
-  EXPECT_THROW((void)engine.project("dst", {7}, 0, 1), rdb::ConfigError);
+  EXPECT_RDB_ERROR(engine.record("dst", input.size()), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine.record("nosuch", 0), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine.project("dst", {7}, 0, 1), rdb::Errc::Config);
 
   engine.close();
   EXPECT_FALSE(engine.hasPlan());
-  EXPECT_THROW(engine.step(), rdb::ConfigError);
+  EXPECT_RDB_ERROR(engine.step(), rdb::Errc::Config, "no plan");
   engine.close();  // idempotentne
 }
 
@@ -174,22 +176,22 @@ TEST(embedEnginePlan, two_engines_with_the_same_volatile_stream_stay_isolated) {
 
   rdb::embed::Engine first;
   rdb::embed::Engine second;
-  first.compile(plan("low.txt"));
-  second.compile(plan("high.txt"));
-  while (first.step()) {}
-  while (second.step()) {}
+  ASSERT_RDB_OK(first.compile(plan("low.txt")));
+  ASSERT_RDB_OK(second.compile(plan("high.txt")));
+  while (rdbtest::ok(first.step())) {}
+  while (rdbtest::ok(second.step())) {}
 
-  ASSERT_EQ(first.recordCount("shared"), 4U);
-  ASSERT_EQ(second.recordCount("shared"), 4U);
-  EXPECT_EQ(firstValue(first.record("shared", 3)), 8);
-  EXPECT_EQ(firstValue(second.record("shared", 3)), 800);
+  ASSERT_EQ(rdbtest::ok(first.recordCount("shared")), 4U);
+  ASSERT_EQ(rdbtest::ok(second.recordCount("shared")), 4U);
+  EXPECT_EQ(firstValue(rdbtest::ok(first.record("shared", 3))), 8);
+  EXPECT_EQ(firstValue(rdbtest::ok(second.record("shared", 3))), 800);
   EXPECT_FALSE(first.memory().empty()) << "strumien VOLATILE nie trafil do sklepu pierwszego silnika";
   EXPECT_FALSE(second.memory().empty()) << "strumien VOLATILE nie trafil do sklepu drugiego silnika";
 
   // Strumien VOLATILE jest pierscieniem o rozmiarze z kompilatora (tu: 1). Starszy rekord
   // NIE istnieje i nie wolno go udawac cudzym slotem - retainedFrom() to mowi, record() odmawia.
-  EXPECT_EQ(first.retainedFrom("shared"), 3U);
-  EXPECT_THROW((void)first.record("shared", 0), rdb::ConfigError);
+  EXPECT_EQ(rdbtest::ok(first.retainedFrom("shared")), 3U);
+  EXPECT_RDB_ERROR(first.record("shared", 0), rdb::Errc::Config);
 }
 
 // Powtorne compile() w tym samym katalogu: artefakty poprzedniego planu schodza, TAKZE .desc
@@ -201,41 +203,71 @@ TEST(embedEnginePlan, recompile_in_the_same_directory_reads_the_new_source) {
   dropArtifacts("dst");
 
   rdb::embed::Engine engine;
-  engine.compile(doublingPlan("first_source.txt"));
-  while (engine.step()) {}
-  EXPECT_EQ(firstValue(engine.record("dst", 2)), 6);
+  ASSERT_RDB_OK(engine.compile(doublingPlan("first_source.txt")));
+  while (rdbtest::ok(engine.step())) {}
+  EXPECT_EQ(firstValue(rdbtest::ok(engine.record("dst", 2))), 6);
 
-  engine.compile(doublingPlan("second_source.txt"));
+  ASSERT_RDB_OK(engine.compile(doublingPlan("second_source.txt")));
   EXPECT_EQ(engine.slotsDone(), 0U);
-  while (engine.step()) {}
-  ASSERT_EQ(engine.recordCount("dst"), 3U) << "magazyn SELECT-a liczyl dalej od starych rekordow";
-  EXPECT_EQ(firstValue(engine.record("dst", 2)), 60) << "deklaracja czytala poprzedni plik zrodlowy";
+  while (rdbtest::ok(engine.step())) {}
+  ASSERT_EQ(rdbtest::ok(engine.recordCount("dst")), 3U) << "magazyn SELECT-a liczyl dalej od starych rekordow";
+  EXPECT_EQ(firstValue(rdbtest::ok(engine.record("dst", 2))), 60) << "deklaracja czytala poprzedni plik zrodlowy";
 }
 
-// Bledy planu przychodza jako TYPY, w kolejnosci, w jakiej plan przez nie przechodzi:
-// parser, kompilator, ograniczenia silnika osadzonego.
+// Bledy planu przychodza jako KATEGORIE (rdb::Errc), w kolejnosci, w jakiej plan przez nie
+// przechodzi: parser, kompilator, ograniczenia silnika osadzonego.
 TEST(embedEnginePlan, plan_errors_are_typed) {
   writeSource("plan_data.txt", {1, 2});
   rdb::embed::Engine engine;
 
-  EXPECT_THROW(engine.compile("SELEKT nonsense FROM nowhere\n"), rdb::embed::SyntaxError);
-  EXPECT_THROW(engine.compile("SELECT a*2 STREAM dst FROM nosuch\n"), rdb::embed::CompileError);
-  EXPECT_THROW(engine.compile("# nothing but a comment\n"), rdb::embed::CompileError);
-  EXPECT_THROW(engine.compile(doublingPlan("plan_data.txt") + "RULE r ON dst WHEN dst[0] > 100 DO DUMP -1 TO 1\n"),
-               rdb::embed::CompileError);
-  EXPECT_THROW(engine.compile(doublingPlan("plan_data.txt") + "RULE r ON dst WHEN dst[0] > 100 DO SYSTEM 'echo no'\n"),
-               rdb::embed::CompileError);
-  EXPECT_THROW(engine.compile(doublingPlan("plan_data.txt") + "ROTATION 'counter.txt'\n"), rdb::embed::CompileError);
+  EXPECT_RDB_ERROR(engine.compile("SELEKT nonsense FROM nowhere\n"), rdb::Errc::Syntax);
+  // Do 2026-10 ten przypadek konczyl kompilacje std::logic_error z qTree::getQuery, ktory Engine
+  // lapal i przepakowywal; teraz odrzuca go przebieg compiler::checkStreamReferences.
+  EXPECT_RDB_ERROR(engine.compile("SELECT a*2 STREAM dst FROM nosuch\n"), rdb::Errc::Compile, "nosuch");
+  EXPECT_RDB_ERROR(engine.compile("# nothing but a comment\n"), rdb::Errc::Compile);
+  EXPECT_RDB_ERROR(engine.compile(doublingPlan("plan_data.txt") + "RULE r ON dst WHEN dst[0] > 100 DO DUMP -1 TO 1\n"),
+                   rdb::Errc::Compile, "DUMP");
+  EXPECT_RDB_ERROR(engine.compile(doublingPlan("plan_data.txt") + "RULE r ON dst WHEN dst[0] > 100 DO SYSTEM 'echo no'\n"),
+                   rdb::Errc::Compile, "SYSTEM");
+  EXPECT_RDB_ERROR(engine.compile(doublingPlan("plan_data.txt") + "ROTATION 'counter.txt'\n"), rdb::Errc::Compile, ":ROTATION");
   EXPECT_FALSE(engine.hasPlan()) << "odrzucony plan nie ma prawa zostac planem silnika";
 
-  // Oba typy sa ConfigError: wejscie jest zle, silnik jest caly.
-  EXPECT_THROW(engine.compile("SELEKT\n"), rdb::ConfigError);
-  EXPECT_THROW(engine.step(), rdb::ConfigError);
-  EXPECT_THROW((void)engine.streams(), rdb::ConfigError);
+  // Obie kategorie naleza do rodziny Config: wejscie jest zle, silnik jest caly.
+  const auto refused = engine.compile("SELEKT\n");
+  ASSERT_FALSE(refused.has_value());
+  EXPECT_TRUE(rdb::isConfigFamily(refused.error().code())) << rdb::errcName(refused.error().code());
+  EXPECT_RDB_ERROR(engine.step(), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine.streams(), rdb::Errc::Config);
+}
+
+// Blad w slocie (tu: hak RDB_FAULT_ERROR_IN_SLOT, bo zadne znane RQL do niego nie prowadzi) wraca z
+// step() WARTOSCIA i zatrzymuje plan: kolejne step() odmawia z przyczyna, zamiast liczyc dalej na
+// modelu, ktorego slot nie dokonczyl. Odczyty dzialaja, a compile() zaczyna od czysta.
+TEST(embedEnginePlan, a_slot_error_stops_the_plan_until_it_is_compiled_again) {
+  writeSource("plan_data.txt", {1, 2, 3});
+  dropArtifacts("dst");
+  rdb::embed::Engine engine;
+  ASSERT_RDB_OK(engine.compile(doublingPlan("plan_data.txt")));
+  ASSERT_TRUE(rdbtest::ok(engine.step()).has_value());
+
+  ::setenv("RDB_FAULT_ERROR_IN_SLOT", "0", 1);
+  const auto failedStep = engine.step();
+  ::unsetenv("RDB_FAULT_ERROR_IN_SLOT");
+  EXPECT_RDB_ERROR(failedStep, rdb::Errc::Logic, "RDB_FAULT_ERROR_IN_SLOT");
+  EXPECT_TRUE(engine.failed());
+  EXPECT_EQ(engine.slotsDone(), 1U) << "slot, ktory sie nie udal, nie jest policzony";
+
+  EXPECT_RDB_ERROR(engine.step(), rdb::Errc::Logic, "compile it again");
+  EXPECT_RDB_OK(engine.recordCount("dst"));
+
+  ASSERT_RDB_OK(engine.compile(doublingPlan("plan_data.txt")));
+  EXPECT_FALSE(engine.failed());
+  while (rdbtest::ok(engine.step())) {}
+  EXPECT_EQ(rdbtest::ok(engine.recordCount("dst")), 3U);
 }
 
 // Katalog magazynu silnika obowiazuje tylko plan bez :STORAGE, jak `[storage] dir` demona;
-// a nieistniejacy katalog jest ConfigError z fazy 1, nie martwym procesem.
+// a nieistniejacy katalog jest bledem Errc::Config z fazy 1, nie martwym procesem.
 TEST(embedEnginePlan, storage_dir_is_a_default_and_the_directive_wins) {
   writeSource("plan_data.txt", {5, 6, 7});
   std::filesystem::create_directories("engine_default_dir");
@@ -245,20 +277,20 @@ TEST(embedEnginePlan, storage_dir_is_a_default_and_the_directive_wins) {
 
   {
     rdb::embed::Engine engine("engine_default_dir");
-    engine.compile(doublingPlan("plan_data.txt"));
-    while (engine.step()) {}
-    EXPECT_EQ(engine.recordCount("dst"), 3U);
+    ASSERT_RDB_OK(engine.compile(doublingPlan("plan_data.txt")));
+    while (rdbtest::ok(engine.step())) {}
+    EXPECT_EQ(rdbtest::ok(engine.recordCount("dst")), 3U);
   }
   EXPECT_TRUE(std::filesystem::exists("engine_default_dir/dst.desc"));
 
   {
     rdb::embed::Engine engine("engine_default_dir");
-    engine.compile("STORAGE 'engine_directive_dir'\n" + doublingPlan("plan_data.txt"));
-    while (engine.step()) {}
+    ASSERT_RDB_OK(engine.compile("STORAGE 'engine_directive_dir'\n" + doublingPlan("plan_data.txt")));
+    while (rdbtest::ok(engine.step())) {}
   }
   EXPECT_TRUE(std::filesystem::exists("engine_directive_dir/dst.desc"));
 
   rdb::embed::Engine missing("engine_missing_dir");
-  EXPECT_THROW(missing.compile(doublingPlan("plan_data.txt")), rdb::ConfigError);
+  EXPECT_RDB_ERROR(missing.compile(doublingPlan("plan_data.txt")), rdb::Errc::Config);
   EXPECT_FALSE(missing.hasPlan());
 }

@@ -147,6 +147,23 @@ make_temp_file() {
   mktemp "$(rdb_tmp_root)/rdbtest.XXXXXXXX"
 }
 
+# Migawka zawartosci katalogu: po linii na wpis - nazwa, tryb, rozmiar i czas modyfikacji
+# w nanosekundach - posortowana po nazwie. Zastepuje `ls -l --time-style=full-iso` (GNU),
+# ktorego BSD `ls` nie zna: konczy sie bledem uzycia, a porownanie "przed/po" zestawia dwa
+# puste napisy. Zwykle `ls -l` tez nie wystarcza, bo czas ma tam rozdzielczosc minuty i
+# zapis w tej samej minucie bylby niewidoczny.
+dir_snapshot() {
+  python3 - "$1" <<'RDB_PY'
+import os
+import sys
+
+root = sys.argv[1]
+for name in sorted(os.listdir(root)):
+    info = os.lstat(os.path.join(root, name))
+    print(name, oct(info.st_mode), info.st_size, info.st_mtime_ns)
+RDB_PY
+}
+
 # Porownanie pierwszych N bajtow dwoch plikow. Zastepuje `cmp -n N a b`
 # (rozszerzenie GNU; BSD `cmp` ma w tym miejscu zupelnie inna skladnie).
 # `head -c` jest w obu userlandach.

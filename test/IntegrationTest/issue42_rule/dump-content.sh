@@ -12,11 +12,13 @@
 # ich znikniecie bylo ruchem wzorca, a nie cicha zmiana pliku, ktorego nikt nie czyta.
 set -e
 export LC_ALL=C
+. "$(dirname "$0")/../portable.sh"
 
 for f in temp/str1_*_dump*.tmp; do
-  size=$(wc -c < "$f")
-  printf '%s %d rekord(ow)\n' "${f##*/}" "$((size / 4))"
-  # -v jest konieczne: bez niego od skraca powtorzenia do gwiazdki i wlasnie ciag zer,
-  # o ktory tu chodzi, przestaje byc widoczny.
-  od -An -td4 -w4 -v "$f" | tr -d ' ' | paste -sd' ' -
+  printf '%s %d rekord(ow)\n' "${f##*/}" "$(record_count "$f" 4)"
+  # read_binary_values, a nie `od -An -td4 -w4 -v`: `-w` jest rozszerzeniem GNU i BSD `od`
+  # (macOS) konczy sie na nim bledem uzycia, wiec linie wartosci znikaly z wyniku. Odczyt
+  # wypisuje KAZDY rekord - takze ciag zer, ktorego `od` bez `-v` skracal do gwiazdki, a o
+  # ktory tu wlasnie chodzi.
+  read_binary_values "$f" d4
 done

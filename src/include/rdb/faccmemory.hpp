@@ -49,7 +49,7 @@ struct memoryFile : public FileInterface {
   ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) override;
 
   auto name() -> std::string & override;
-  size_t count() override;
+  [[nodiscard]] Result<size_t> count() override;
 
   /// Liczba kubełków w sklepie domyślnym procesu (MemoryStore::processDefault()). Tylko do testów jednostkowych - z zewnątrz nie ma innej drogi,
   /// żeby sprawdzić, że wymiana planu nie zostawia kubełków po strumieniach, których już nie ma.

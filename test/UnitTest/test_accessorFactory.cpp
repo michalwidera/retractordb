@@ -12,13 +12,13 @@
 
 #include "rdb/accessorFactory.hpp"
 #include "rdb/descriptor.hpp"
-#include "rdb/exceptions.hpp"
 #include "rdb/faccbindev.hpp"
 #include "rdb/faccfs.hpp"
 #include "rdb/faccposix.hpp"
 #include "rdb/faccposixshd.hpp"
 #include "rdb/facctxtsrc.hpp"
 #include "rdb/storageShadow.hpp"
+#include "rdbResult.hpp"
 
 namespace {
 rdb::Descriptor testDescriptor() { return {rdb::Descriptor("a", sizeof(int), 1, rdb::INTEGER)}; }
@@ -38,22 +38,22 @@ TEST(AccessorFactoryTest, declared_types) {
 TEST(AccessorFactoryTest, maps_type_to_accessor_class) {
   auto desc = testDescriptor();
 
-  auto posix = rdb::makeAccessor("POSIX", "af_posix.bin", desc, false, -1);
+  auto posix = rdbtest::ok(rdb::makeAccessor("POSIX", "af_posix.bin", desc, false, -1));
   EXPECT_NE(dynamic_cast<rdb::posixBinaryFile *>(posix.get()), nullptr);
   EXPECT_FALSE(posix->hasShadow());
 
-  auto posixShd = rdb::makeAccessor("POSIXSHD", "af_posixshd.bin", desc, false, -1);
+  auto posixShd = rdbtest::ok(rdb::makeAccessor("POSIXSHD", "af_posixshd.bin", desc, false, -1));
   EXPECT_NE(dynamic_cast<rdb::posixBinaryFileWithShadow *>(posixShd.get()), nullptr);
   EXPECT_TRUE(posixShd->hasShadow());
 
-  auto generic = rdb::makeAccessor("GENERIC", "af_generic.bin", desc, false, -1);
+  auto generic = rdbtest::ok(rdb::makeAccessor("GENERIC", "af_generic.bin", desc, false, -1));
   EXPECT_NE(dynamic_cast<rdb::genericBinaryFile *>(generic.get()), nullptr);
   EXPECT_FALSE(generic->hasShadow());
 
-  auto byDefault = rdb::makeAccessor("DEFAULT", "af_default.bin", desc, false, -1);
+  auto byDefault = rdbtest::ok(rdb::makeAccessor("DEFAULT", "af_default.bin", desc, false, -1));
   EXPECT_TRUE(byDefault->hasShadow());
 
-  auto direct = rdb::makeAccessor("DIRECT", "af_direct.bin", desc, false, -1);
+  auto direct = rdbtest::ok(rdb::makeAccessor("DIRECT", "af_direct.bin", desc, false, -1));
   EXPECT_FALSE(direct->hasShadow());
 }
 
@@ -63,11 +63,11 @@ TEST(AccessorFactoryTest, maps_type_to_accessor_class) {
 TEST(AccessorFactoryTest, maps_declared_sources) {
   auto desc = testDescriptor();
 
-  auto device = rdb::makeAccessor("DEVICE", "af_missing.dev", desc, true, -1);
+  auto device = rdbtest::ok(rdb::makeAccessor("DEVICE", "af_missing.dev", desc, true, -1));
   EXPECT_NE(dynamic_cast<rdb::binaryDeviceRO *>(device.get()), nullptr);
   EXPECT_FALSE(device->hasShadow());
 
-  auto text = rdb::makeAccessor("TEXTSOURCE", "af_missing.txt", desc, true, -1);
+  auto text = rdbtest::ok(rdb::makeAccessor("TEXTSOURCE", "af_missing.txt", desc, true, -1));
   EXPECT_NE(dynamic_cast<rdb::textSourceRO *>(text.get()), nullptr);
   EXPECT_FALSE(text->hasShadow());
 }
@@ -92,7 +92,7 @@ TEST(AccessorFactoryTest, meta_index_variant_selection) {
 }
 
 // ---------------------------------------------------------------------------
-// Faza 1, plaster 2a: nieznany typ magazynu jest wyjatkiem, nie koncem procesu.
+// Faza 1, plaster 2a: nieznany typ magazynu jest bledem (dzis Errc::Config), nie koncem procesu.
 //
 // To byla jedyna sciezka w tej fabryce osiagalna poprawnym wywolaniem API i JEDYNA
 // nieoslonieta przez straz w wiazaniu Pythona - wiazanie nie zna listy typow, bo lista
@@ -101,16 +101,16 @@ TEST(AccessorFactoryTest, meta_index_variant_selection) {
 TEST(AccessorFactoryTest, unsupported_storage_type_is_rejected) {
   auto desc = testDescriptor();
 
-  EXPECT_THROW((void)rdb::makeAccessor("NONSENSE", "af_unsupported.bin", desc, false, -1), rdb::ConfigError);
+  EXPECT_RDB_ERROR(rdb::makeAccessor("NONSENSE", "af_unsupported.bin", desc, false, -1), rdb::Errc::Config);
   // Malymi literami tez nie - porownanie jest dokladne, a nie bez wzgledu na wielkosc.
-  EXPECT_THROW((void)rdb::makeAccessor("default", "af_unsupported.bin", desc, false, -1), rdb::ConfigError);
+  EXPECT_RDB_ERROR(rdb::makeAccessor("default", "af_unsupported.bin", desc, false, -1), rdb::Errc::Config);
 }
 
 TEST(AccessorFactoryTest, empty_arguments_are_rejected) {
   auto desc = testDescriptor();
 
-  EXPECT_THROW((void)rdb::makeAccessor("DEFAULT", "", desc, false, -1), rdb::ConfigError);
-  EXPECT_THROW((void)rdb::makeAccessor("", "af_empty_type.bin", desc, false, -1), rdb::ConfigError);
+  EXPECT_RDB_ERROR(rdb::makeAccessor("DEFAULT", "", desc, false, -1), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(rdb::makeAccessor("", "af_empty_type.bin", desc, false, -1), rdb::Errc::Config);
 }
 
 // Komunikat ma nazywac to, co wolno bylo podac. Bez tego jedyna droga do listy typow
@@ -118,12 +118,9 @@ TEST(AccessorFactoryTest, empty_arguments_are_rejected) {
 TEST(AccessorFactoryTest, unsupported_type_message_names_the_accepted_values) {
   auto desc = testDescriptor();
 
-  try {
-    (void)rdb::makeAccessor("NONSENSE", "af_unsupported.bin", desc, false, -1);
-    FAIL() << "expected ConfigError";
-  } catch (const rdb::ConfigError &error) {
-    const std::string message = error.what();
-    EXPECT_NE(message.find("NONSENSE"), std::string::npos) << message;
-    EXPECT_NE(message.find("TEXTSOURCE"), std::string::npos) << message;
-  }
+  const auto made = rdb::makeAccessor("NONSENSE", "af_unsupported.bin", desc, false, -1);
+  ASSERT_RDB_ERROR(made, rdb::Errc::Config);
+  const std::string &message = made.error().message();
+  EXPECT_NE(message.find("NONSENSE"), std::string::npos) << message;
+  EXPECT_NE(message.find("TEXTSOURCE"), std::string::npos) << message;
 }

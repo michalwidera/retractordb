@@ -9,7 +9,7 @@
 #include <spdlog/spdlog.h>
 
 #include "qTree.hpp"
-#include "rdb/exceptions.hpp"
+#include "rdb/error.hpp"
 
 bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.rInterval; }
 
@@ -41,9 +41,8 @@ int query::getFieldIndex(const field &f_arg) {
       return idx;
     ++idx;
   }
-  SPDLOG_ERROR("Field not found in query - {}", f_arg.field_.rname);
-  throw std::logic_error("Field not found in query");
-  return -1;  // not found
+  // Pole pochodzi ze schematu tego samego zapytania - brak znaczy blad w kodzie wolajacego.
+  rdb::fatal(fmt::format("query::getFieldIndex: field '{}' not found in query '{}'", f_arg.field_.rname, id));
 }
 
 /// Czy klauzula FROM ma wiecej niz jeden operator, czyli wymaga wydzielenia substratow.
@@ -183,21 +182,17 @@ rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
       //  :- STREAM_AGSE 2,3 -> window_length, window_step (arg[1])
 
       auto [step, length] = std::get<std::pair<int, int>>(cmd.getVT());
-      if (step <= 0) {
-        // ConfigError, choc kompilator ma wlasna kontrole tego samego kroku (compiler.cpp,
-        // plaster A1) i normalnie nie przepuszcza tu zera. Wybor jest swiadomy: gdyby ta
-        // kontrola kiedys wypadla z kolejnosci przebiegow, LogicError oskarzalby silnik o
-        // usterke, ktora w rzeczywistosci jest literowka w zapytaniu. Z dwoch mozliwych
-        // pomylek ta jest tansza.
-        throw rdb::ConfigError(fmt::format("query::descriptorFrom: AGSE step must be > 0, got {}", step));
-      }
+      // Krok niedodatni odrzuca kompilator jako pierwszy swoj przebieg po rozwinieciu generatorow
+      // (compiler::checkStreamReferences), zanim cokolwiek zbuduje stad deskryptor - wiec tutaj
+      // jest to juz niezmiennik, a nie literowka w zapytaniu.
+      RDB_ASSERT(step > 0, "query::descriptorFrom: AGSE step must be > 0, got {}", step);
       auto [maxType, maxLen] = coreInstance.getQuery(arg1).descriptorStorage().widestFieldType();
       for (int i = 0; i < abs(length); i++) {
         retVal += rdb::Descriptor{rdb::flatSlotField(id + "_" + std::to_string(i), maxType, maxLen)};
       }
     } break;
     default:
-      throw rdb::LogicError(fmt::format("query::descriptorFrom: undefined cmd {} str:{}", cmd.getStrCommandID(), cmd.getStr_()));
+      rdb::fatal(fmt::format("query::descriptorFrom: undefined cmd {} str:{}", cmd.getStrCommandID(), cmd.getStr_()));
   }
 
   if (!retention.noRetention()) {
@@ -210,9 +205,9 @@ std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog) {
   auto eIt = prog.begin();
   std::string sArg1;
   std::string sArg2;
-  if (prog.size() >= 4) {
-    throw rdb::LogicError(fmt::format("query::GetArgs: program too large - {} tokens, expected at most 3", prog.size()));
-  }
+  // Program klauzuli FROM po wydzieleniu substratow ma 1..3 tokeny; wolaja to wylacznie przebiegi
+  // kompilatora po extractIntermediateStreams() i kod wykonania planu skompilowanego.
+  RDB_ASSERT(prog.size() < 4, "query::GetArgs: program too large - {} tokens, expected at most 3", prog.size());
   if (prog.size() == 1) sArg1 = (*eIt).getStr_();   // 1
   if (prog.size() > 1) sArg1 = (*eIt++).getStr_();  // 2,3
   if (prog.size() > 2) sArg2 = (*eIt++).getStr_();  // 3

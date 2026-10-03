@@ -40,6 +40,7 @@
 #include "lib/serverName.hpp"
 #include "lib/serviceControl.hpp"
 #include "lib/shmBudget.hpp"
+#include "rdb/error.hpp"
 #include "rdb/probe.hpp"  // baner buildu z sondami pomiarowymi
 #include "uxSysTermTools.hpp"
 
@@ -222,6 +223,10 @@ static void printOptimizerBuildInfo() {
 }
 
 int main(int argc, char *argv[]) try {
+  // Pierwsza instrukcja: zlamany niezmiennik rdzenia (RDB_ASSERT -> rdb::fatal) ma od poczatku
+  // konczyc serwer droga FatalError - zatrzask, "FATAL: ...", std::exit(EXIT_FAILURE) z
+  // handlerami atexit - a nie domyslnym std::abort biblioteki.
+  rdb::setFatalHandler(&daemonFatalExit);
   qTree coreInstance;
   compiler cm(coreInstance);
 
@@ -537,6 +542,14 @@ int main(int argc, char *argv[]) try {
       std::string response;
 
       response = cm.compile();
+
+      // Blad wewnetrzny kompilatora (przedrostek kInternalCompilerError) nie jest wina planu, wiec
+      // plan nie jest odrzucany - refusePlan() skasowalby go jednostce systemd. Do 2026-10
+      // przychodzil rzutem LogicError do catch(std::exception) nizej i konczyl proces kodem EINTR.
+      if (isInternalCompilerError(response)) {
+        std::cerr << "Input file:" << sInputFile << '\n' << "\nFATAL: " << response << '\n';
+        return EXIT_FAILURE;
+      }
 
       if (response != "OK") {
         std::cerr << "Input file:" << sInputFile << '\n'  //

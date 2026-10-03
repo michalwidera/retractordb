@@ -25,7 +25,7 @@ struct cast {
 /// @brief Convert std::any holding supported scalar value to descriptor variant.
 /// @param a input value; must contain one of supported payload scalar types
 /// @return value converted to rdb::descFldVT
-/// @throws std::bad_any_cast when input type is unsupported or empty
+/// @pre the value holds a supported type; anything else is a broken invariant (rdb::fatal)
 rdb::descFldVT any_to_variant_cast(std::any a);
 
 /// @brief Build default fallback value for a given descriptor field type.

@@ -11,8 +11,6 @@
 
 #include <fmt/format.h>
 
-#include "rdb/exceptions.hpp"
-
 namespace rdb {
 
 namespace {
@@ -52,7 +50,12 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
     : filename_(std::string(fileName)),
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       percounter_(percounter) {
-  if (recordSize_ == 0) throw LogicError("posixBinaryFileWithShadow: record size must be > 0");
+  // Uzasadnienie jak w posixBinaryFile: status zamiast asercji.
+  if (recordSize_ == 0) {
+    initializationError_ = "posixBinaryFileWithShadow: record size must be > 0 for '" + filename_ + "'";
+    percounter_          = -1;
+    return;
+  }
 
   std::error_code fs_ec;
   const bool mainFileExisted = std::filesystem::exists(filename_, fs_ec);
@@ -155,8 +158,9 @@ posixBinaryFileWithShadow::~posixBinaryFileWithShadow() {
 
 // Plik porzucony celowo nie jest archiwum - uzasadnienie przy posixBinaryFile::discard.
 void posixBinaryFileWithShadow::discard() {
-  std::filesystem::remove(filename_);
-  std::filesystem::remove(shadowName());
+  std::error_code ec;  // uzasadnienie przy posixBinaryFile::discard
+  std::filesystem::remove(filename_, ec);
+  std::filesystem::remove(shadowName(), ec);
   percounter_ = -1;
 }
 
@@ -275,15 +279,17 @@ ssize_t posixBinaryFileWithShadow::read(uint8_t *ptrData, std::vector<bool> &nul
   return EINTR;
 }
 
-size_t posixBinaryFileWithShadow::count() {
+Result<size_t> posixBinaryFileWithShadow::count() {
   // Kontrakt identyczny jak w posixBinaryFile::count() - uzasadnienie tam.
+  if (recordSize_ == 0) return fail(Errc::IO, initializationError_);
   struct stat stat_buf;
   if (stat(filename_.c_str(), &stat_buf) != 0) {
     if (errno == ENOENT) return 0;
     const int statErrno = errno;  // przed skladaniem komunikatu - alokacja moze ruszyc errno
-    throw IOError(fmt::format("posixBinaryFileWithShadow::count: ::stat '{}' failed: {}", filename_, strerror(statErrno)));
+    return fail(Errc::IO,
+                fmt::format("posixBinaryFileWithShadow::count: ::stat '{}' failed: {}", filename_, strerror(statErrno)));
   }
-  return stat_buf.st_size / recordSize_;
+  return static_cast<size_t>(stat_buf.st_size / recordSize_);
 }
 
 ssize_t posixBinaryFileWithShadow::merge() {

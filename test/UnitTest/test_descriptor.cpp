@@ -8,7 +8,6 @@
 #include <utility>
 
 #include "rdb/descriptor.hpp"
-#include "rdb/exceptions.hpp"
 
 // Tests intentionally validate legacy textual/binary layouts with C-style arrays.
 // NOLINTBEGIN(modernize-avoid-c-arrays)
@@ -503,33 +502,29 @@ TEST(descriptor, string_array_stays_one_flat_slot) {
 }
 
 // ---------------------------------------------------------------------------
-// Faza 1, plaster 2b: wyszukiwanie po nazwie zglasza blad rzutem.
+// Wyszukiwanie po nazwie: nazwa spoza deskryptora jest zlamanym warunkiem wstepnym.
 //
-// Te trzy funkcje sa zwiazane wprost do Pythona (Descriptor.field_index i pokrewne),
-// wiec nazwa pola przychodzi do nich od uzytkownika. Do plastra 2b literowka w niej
-// konczyla proces - w notatniku razem z cala sesja.
+// Te trzy funkcje sa zwiazane wprost do Pythona (Descriptor.field_index i pokrewne), ale
+// wiazanie pyta najpierw hasField() i literowke uzytkownika zamienia na KeyError, zanim
+// dotrze tutaj (test_guarded_paths_do_not_end_the_process). Silnik pyta o pola, ktore
+// zadeklarowal. Stad rdb::fatal z nazwa pola - do 2026-10 byl to rzut LogicError.
 // ---------------------------------------------------------------------------
-TEST(descriptor, lookup_by_unknown_name_throws_and_names_the_field) {
+TEST(descriptorDeathTest, lookup_by_unknown_name_is_fatal_and_names_the_field) {
   const rdb::Descriptor desc{rdb::Descriptor("value", sizeof(int), 1, rdb::INTEGER)};
 
   auto mutableDesc = desc;
-  EXPECT_THROW((void)mutableDesc.fieldIndex("absent"), rdb::LogicError);
-  EXPECT_THROW((void)mutableDesc.fieldByteOffset("absent"), rdb::LogicError);
+  EXPECT_DEATH(static_cast<void>(mutableDesc.fieldIndex("absent")), "FATAL: .*absent");
+  EXPECT_DEATH(static_cast<void>(mutableDesc.fieldByteOffset("absent")), "FATAL: .*absent");
 
-  try {
-    (void)mutableDesc.fieldIndex("absent");
-    FAIL() << "expected LogicError";
-  } catch (const rdb::LogicError &error) {
-    EXPECT_NE(std::string(error.what()).find("absent"), std::string::npos) << error.what();
-  }
-
-  // Pole, ktore istnieje, nadal odpowiada - rzut nie zatruwa deskryptora.
+  // Pole, ktore istnieje, odpowiada - sprawdzenie nazwy obecnej nie konczy procesu.
+  EXPECT_TRUE(mutableDesc.hasField("value"));
+  EXPECT_FALSE(mutableDesc.hasField("absent"));
   EXPECT_EQ(mutableDesc.fieldIndex("value"), 0U);
 }
 
-TEST(descriptor, merging_a_descriptor_with_itself_throws) {
+TEST(descriptorDeathTest, merging_a_descriptor_with_itself_is_fatal) {
   rdb::Descriptor desc{rdb::Descriptor("value", sizeof(int), 1, rdb::INTEGER)};
-  EXPECT_THROW(desc += desc, rdb::LogicError);
+  EXPECT_DEATH(desc += desc, "FATAL: descriptor: cannot merge descriptor with itself");
 }
 
 // Przeniesiony deskryptor musi zostac SPOJNY: wektor pol jest pusty, wiec cache mapowan

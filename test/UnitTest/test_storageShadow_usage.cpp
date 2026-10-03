@@ -12,6 +12,7 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/fagrp.hpp"
 #include "rdb/storageShadow.hpp"
+#include "rdbResult.hpp"
 
 #include <cstdio>
 #include <filesystem>
@@ -78,7 +79,7 @@ TEST_F(StorageShadowFixture, scenariusz_nadpisanie_w_cieniu) {
     meta.onRecordAppended(allNull);
 
   // Korekta rekordu 2 → nadpisanie w .meta.shadow.
-  meta.onRecordModified(2, allPresent);
+  ASSERT_RDB_OK(meta.onRecordModified(2, allPresent));
 
   // Widok logiczny uwzględnia nadpisanie...
   EXPECT_EQ(meta.getNullBitset(2), allPresent);
@@ -92,8 +93,9 @@ TEST_F(StorageShadowFixture, scenariusz_nadpisanie_w_cieniu) {
   // Plik cienia indeksu powstał obok głównego.
   EXPECT_TRUE(std::filesystem::exists(shadowFile));
 
-  // Aktualizacja poza zakresem głównego indeksu jest odrzucana.
-  EXPECT_THROW(meta.onRecordModified(5, allPresent), std::out_of_range);
+  // Aktualizacja poza zakresem głównego indeksu jest odrzucana - błędem Errc::Logic (do 2026-10
+  // rzutem std::out_of_range).
+  EXPECT_RDB_ERROR(meta.onRecordModified(5, allPresent), rdb::Errc::Logic, "out of range");
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +110,7 @@ TEST_F(StorageShadowFixture, scenariusz_persystencja_i_merge) {
     rdb::storageShadow meta(descriptor, file);
     for (int i = 0; i < 5; ++i)
       meta.onRecordAppended(allNull);
-    meta.onRecordModified(2, allPresent);
+    ASSERT_RDB_OK(meta.onRecordModified(2, allPresent));
   }
 
   // Persystencja cienia po restarcie: nadpisanie nadal widoczne.
@@ -116,7 +118,7 @@ TEST_F(StorageShadowFixture, scenariusz_persystencja_i_merge) {
   EXPECT_EQ(meta.getNullBitset(2), allPresent);
 
   // Scalenie cienia do głównego indeksu - jak merge() pliku cienia danych.
-  meta.mergeShadow();
+  ASSERT_RDB_OK(meta.mergeShadow());
 
   // Teraz główny indeks jest rozbity na 3 segmenty, a cień usunięty.
   auto segs = meta.segments();
@@ -137,14 +139,14 @@ TEST_F(StorageShadowFixture, scenariusz_discard_i_reset) {
   rdb::storageShadow meta(descriptor, file);
   for (int i = 0; i < 3; ++i)
     meta.onRecordAppended(allNull);
-  meta.onRecordModified(1, allPresent);
+  ASSERT_RDB_OK(meta.onRecordModified(1, allPresent));
   ASSERT_TRUE(std::filesystem::exists(shadowFile));
 
   meta.discardShadow();
   EXPECT_EQ(meta.getNullBitset(1), allNull);  // nadpisanie odrzucone - widok z głównego indeksu
   EXPECT_FALSE(std::filesystem::exists(shadowFile));
 
-  meta.onRecordModified(1, allPresent);
+  ASSERT_RDB_OK(meta.onRecordModified(1, allPresent));
   meta.reset();
   EXPECT_TRUE(meta.isEmpty());
   EXPECT_FALSE(std::filesystem::exists(shadowFile));

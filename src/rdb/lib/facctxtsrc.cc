@@ -15,8 +15,6 @@
 #include <sstream>
 #include <type_traits>  // is_integral_v
 
-#include "rdb/exceptions.hpp"
-
 namespace rdb {
 
 std::optional<std::string> readTokenFromFstream(std::fstream &myFile, bool loopToBeginningIfEOF = true) {
@@ -56,7 +54,8 @@ T parseAs(const std::string &token) {
   return var;
 }
 
-void parseAndSetNumericItem(rdb::payload &payload, int index, rdb::descFld rtype, const std::string &token) {
+/// @return false dla typu pola, ktorego zrodlo tekstowe nie umie wczytac (np. RATIONAL, para).
+[[nodiscard]] bool parseAndSetNumericItem(rdb::payload &payload, int index, rdb::descFld rtype, const std::string &token) {
   switch (rtype) {
     case rdb::INTEGER:
       payload.setItem(index, parseAs<int>(token));
@@ -74,8 +73,9 @@ void parseAndSetNumericItem(rdb::payload &payload, int index, rdb::descFld rtype
       payload.setItem(index, static_cast<uint8_t>(parseAs<unsigned>(token)));
       break;
     default:
-      throw LogicError(fmt::format("facctxtsrc: unsupported field type: {}", static_cast<int>(rtype)));
+      return false;
   }
+  return true;
 }
 
 textSourceRO::textSourceRO(const std::string_view fileName,    //
@@ -143,12 +143,11 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
       for (auto j = 0; j < rdb::flatElementCount(item); j++) {
         auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
         if (token.has_value() && !isNullToken(*token)) {
-          // ConfigError, nie LogicError: silnik jest caly, to PLIK ZRODLOWY nie zgadza sie z
-          // deklaracja strumienia. Mowienie tu o bledzie wewnetrznym oskarzaloby RetractorDB o
-          // cudzy literowke w danych. Docelowa taksonomia (faza 5) zapewne chce dla tego
-          // osobnego typu danych wejsciowych - patrz docs/core-phase-1.md.
-          throw ConfigError(
-              fmt::format("facctxtsrc: expected a NULL token for a NULL field, got '{}' in {}", *token, filename_));
+          // Blad tresci wejscia (EILSEQ -> Errc::Config w SourceBuffer), nie niezmiennika: silnik
+          // jest caly, to PLIK ZRODLOWY nie zgadza sie z deklaracja strumienia. Mowienie tu o
+          // bledzie wewnetrznym oskarzaloby RetractorDB o cudza literowke w danych.
+          inputError_ = fmt::format("facctxtsrc: expected a NULL token for a NULL field, got '{}' in {}", *token, filename_);
+          return EILSEQ;
         }
         payload_->setItem(i + j, std::nullopt);
       }
@@ -225,7 +224,12 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
             anyNull = true;
             continue;
           }
-          parseAndSetNumericItem(*payload_, i + j, item.rtype, *token);
+          if (!parseAndSetNumericItem(*payload_, i + j, item.rtype, *token)) {
+            // Typ pola z deklaracji, ktorego zrodlo tekstowe nie wczytuje - to tez tresc
+            // deklaracji wobec zrodla, nie stan silnika.
+            inputError_ = fmt::format("facctxtsrc: unsupported field type: {}", static_cast<int>(item.rtype));
+            return EILSEQ;
+          }
         }
         // Bit NULL jest jeden na wpis deskryptora, a zapis wartosci elementu go kasuje. Dopoki element
         // NULL byl zapisywany w petli, `NULL 2 3` dawalo pole okreslone z zerem w a[0], a `2 3 NULL` -
@@ -258,7 +262,7 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
   return EXIT_SUCCESS;
 }
 
-size_t textSourceRO::count() { return readCount_; }
+Result<size_t> textSourceRO::count() { return readCount_; }
 
 const std::vector<bool> &textSourceRO::lastNullBitset() const { return payload_->getNullBitset(); }
 

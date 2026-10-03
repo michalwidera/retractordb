@@ -16,9 +16,9 @@
 
 #include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
-#include "rdb/exceptions.hpp"
 #include "rdb/faccposix.hpp"
 #include "rdb/storage.hpp"
+#include "rdbResult.hpp"
 #include "syscallWrap.hpp"
 
 using BYTE = unsigned char;
@@ -188,7 +188,7 @@ TEST_F(PosixFileTest, test_faccposix_write_and_read) {
   record = 0xCC;
   GTEST_ASSERT_EQ(pfa->write(&record), EXIT_SUCCESS);
 
-  GTEST_ASSERT_EQ(pfa->count(), 3);
+  GTEST_ASSERT_EQ(rdbtest::ok(pfa->count()), 3);
 
   GTEST_ASSERT_EQ(pfa->read(&record, 0), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 0xAA);
@@ -208,7 +208,7 @@ TEST_F(PosixFileTest, test_faccposix_read_beyond_eof) {
 
   record = 0x11;
   GTEST_ASSERT_EQ(pfa->write(&record), EXIT_SUCCESS);
-  GTEST_ASSERT_EQ(pfa->count(), 1);
+  GTEST_ASSERT_EQ(rdbtest::ok(pfa->count()), 1);
 
   // Reading at position beyond file size should fail
   GTEST_ASSERT_EQ(pfa->read(&record, 99), ERANGE);
@@ -220,7 +220,7 @@ TEST_F(PosixFileTest, test_faccposix_read_empty_file) {
 
   auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_empty"), desc);
 
-  GTEST_ASSERT_EQ(pfa->count(), 0);
+  GTEST_ASSERT_EQ(rdbtest::ok(pfa->count()), 0);
   GTEST_ASSERT_EQ(pfa->read(&record, 0), ERANGE);
 }
 
@@ -234,11 +234,11 @@ TEST_F(PosixFileTest, test_faccposix_truncate) {
   pfa->write(&record);
   record = 0x02;
   pfa->write(&record);
-  GTEST_ASSERT_EQ(pfa->count(), 2);
+  GTEST_ASSERT_EQ(rdbtest::ok(pfa->count()), 2);
 
   // Truncate
   pfa->write(nullptr, 0);
-  GTEST_ASSERT_EQ(pfa->count(), 0);
+  GTEST_ASSERT_EQ(rdbtest::ok(pfa->count()), 0);
 
   // Read after truncate should fail
   GTEST_ASSERT_NE(pfa->read(&record, 0), 0);
@@ -259,7 +259,7 @@ TEST_F(PosixFileTest, test_faccposix_purge_keeps_file_usable) {
     GTEST_ASSERT_EQ(pfa.write(nullptr, 0), EXIT_SUCCESS);
     record = 0x42;
     GTEST_ASSERT_EQ(pfa.write(&record), EXIT_SUCCESS);
-    EXPECT_EQ(pfa.count(), 1U);
+    EXPECT_EQ(rdbtest::ok(pfa.count()), 1U);
     record = 0;
     EXPECT_EQ(pfa.read(&record, 0), EXIT_SUCCESS);
     EXPECT_EQ(record, 0x42);
@@ -281,14 +281,14 @@ TEST_F(PosixFileTest, test_faccposix_update_in_place) {
   record = 30;
   pfa->write(&record);
 
-  GTEST_ASSERT_EQ(pfa->count(), 3);
+  GTEST_ASSERT_EQ(rdbtest::ok(pfa->count()), 3);
 
   // Update record at byte position 1
   record = 99;
   GTEST_ASSERT_EQ(pfa->write(&record, 1), EXIT_SUCCESS);
 
   // Count should remain unchanged
-  GTEST_ASSERT_EQ(pfa->count(), 3);
+  GTEST_ASSERT_EQ(rdbtest::ok(pfa->count()), 3);
 
   // Verify updated record
   GTEST_ASSERT_EQ(pfa->read(&record, 1), EXIT_SUCCESS);
@@ -323,7 +323,7 @@ TEST_F(PosixFileTest, test_faccposix_multibyte_record) {
   record = 2000;
   GTEST_ASSERT_EQ(pfa->write(reinterpret_cast<uint8_t *>(&record)), EXIT_SUCCESS);
 
-  GTEST_ASSERT_EQ(pfa->count(), 2);
+  GTEST_ASSERT_EQ(rdbtest::ok(pfa->count()), 2);
 
   GTEST_ASSERT_EQ(pfa->read(reinterpret_cast<uint8_t *>(&record), 0 * recsize_int), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 1000);
@@ -350,7 +350,7 @@ TEST_F(PosixFileTest, test_faccposix_persistence) {
 
   // Reopen and verify data persists
   auto pfa2 = std::make_unique<rdb::posixBinaryFile>(path, desc);
-  GTEST_ASSERT_EQ(pfa2->count(), 2);
+  GTEST_ASSERT_EQ(rdbtest::ok(pfa2->count()), 2);
 
   GTEST_ASSERT_EQ(pfa2->read(&record, 0), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 0x42);
@@ -436,25 +436,26 @@ TEST_F(PosixFileTest, zero_byte_write_returns_eio_without_writing_record) {
   BYTE data            = 0xAA;
   g_write_zero_on_call = 1;
   EXPECT_EQ(file.write(&data), EIO);
-  EXPECT_EQ(file.count(), 0);
+  EXPECT_EQ(rdbtest::ok(file.count()), 0);
 }
 
-// storage nie liczy nieudanego dopisania: IOError zapada przed recordsCount_++. Wlasnosc storage,
+// storage nie liczy nieudanego dopisania: blad Errc::IO zapada przed recordsCount_++. Wlasnosc storage,
 // nie akcesora - test przechodzi takze na kodzie sprzed #270. Galezi `fd < 0` z E-03 nie da sie
 // osiagnac przez storage, bo attachStorage() odrzuca akcesor z niepustym initializationError();
 // dlatego deskryptor zamyka tu nakladka na write(), a jadro odpowiada EBADF. Sam blad E-03
 // pilnuje write_without_descriptor_returns_ebadf_even_when_errno_is_zero.
 TEST_F(PosixFileTest, storage_append_failure_is_fatal_without_count_increment) {
-  rdb::storage s("closed_fd", "closed_fd_data", ".", "POSIX");
+  auto sOwner           = rdbtest::ok(rdb::storage::create("closed_fd", "closed_fd_data", ".", "POSIX"));
+  rdb::storage &s       = *sOwner;
   const auto descriptor = makeDesc(sizeof(BYTE));
-  ASSERT_TRUE(s.attachDescriptor(&descriptor).empty());
+  ASSERT_RDB_OK(s.attachDescriptor(&descriptor));
   s.getPayload()->setItem(0, static_cast<BYTE>(0xAA));
   g_write_close_fd_once = true;
-  EXPECT_THROW(static_cast<void>(s.write()), rdb::IOError);
+  EXPECT_RDB_ERROR(s.write(), rdb::Errc::IO);
   EXPECT_EQ(s.getRecordsCount(), 0U);
 }
 
-// count(): awaria stat() inna niz ENOENT rzuca IOError, zamiast oddac blad jako liczbe.
+// count(): awaria stat() inna niz ENOENT zwraca blad Errc::IO, zamiast oddac blad jako liczbe.
 // Pilnowana regresja: `return -1` z count() dociera do storage::recordsCount_ jako SIZE_MAX
 // (uzasadnienie kontraktu przy FileInterface::count). Dlatego sprawdzamy nie tylko to, ZE
 // count() odmawia, ale i to, ze odmawia samo - komunikatem tej wlasnie funkcji.
@@ -465,15 +466,16 @@ TEST_F(PosixFileTest, test_faccposix_count_stat_failure_is_fatal) {
     BYTE record = 0xAA;
     GTEST_ASSERT_EQ(pfa->write(&record), EXIT_SUCCESS);
     // Kontrola dodatnia: z rozbrojonym licznikiem stat() dziala i count() liczy normalnie.
-    GTEST_ASSERT_EQ(pfa->count(), 1);
+    GTEST_ASSERT_EQ(rdbtest::ok(pfa->count()), 1);
   }
 
   rdb::posixBinaryFile pfa(path, desc);
   g_stat_fail_count = 1;
   g_stat_fail_errno = EACCES;
-  // Gdyby count() wrocilo do oddawania bledu jako liczby, gtest zglosi brak wyjatku.
-  EXPECT_THAT([&] { static_cast<void>(pfa.count()); },
-              ::testing::ThrowsMessage<rdb::IOError>(::testing::HasSubstr("posixBinaryFile::count: ::stat")));
+  // Gdyby count() wrocilo do oddawania bledu jako liczby, test zobaczy wartosc zamiast bledu.
+  const auto counted = pfa.count();
+  ASSERT_RDB_ERROR(counted, rdb::Errc::IO);
+  EXPECT_THAT(counted.error().message(), ::testing::HasSubstr("posixBinaryFile::count: ::stat"));
 }
 
 // Rotacja pod numerem, ktory ma juz archiwum: rename() nadpisuje je bez pytania, wiec jedynym

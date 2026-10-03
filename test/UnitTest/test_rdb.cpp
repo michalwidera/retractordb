@@ -13,6 +13,7 @@
 #include "rdb/fainterface.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/storage.hpp"
+#include "rdbResult.hpp"
 
 // Tests intentionally use raw arrays and direct optional access to exercise binary storage semantics.
 // NOLINTBEGIN(modernize-avoid-c-arrays,bugprone-unchecked-optional-access)
@@ -127,9 +128,10 @@ TEST(xrdb, test_storage) {
   // This assert will fail is structure is not packed.
   EXPECT_TRUE(dataDescriptor.getSizeInBytes() == sizeof(dataPayload));
 
-  rdb::storage dAcc2("datafile-fstream2", "datafile-fstream2", "");
+  auto dAcc2Owner     = rdbtest::ok(rdb::storage::create("datafile-fstream2", "datafile-fstream2", ""));
+  rdb::storage &dAcc2 = *dAcc2Owner;
 
-  EXPECT_EQ(dAcc2.attachDescriptor(&dataDescriptor), "");
+  EXPECT_RDB_OK(dAcc2.attachDescriptor(&dataDescriptor));
   dAcc2.setDisposable(true);
 
   auto *pl = dAcc2.getPayload();
@@ -145,15 +147,15 @@ TEST(xrdb, test_storage) {
     EXPECT_EQ(std::any_cast<int>(pl->getItem(2).value()), tlenViaOffset);
   }
 
-  dAcc2.write();
-  dAcc2.write();
-  dAcc2.write();
+  ASSERT_RDB_OK(dAcc2.write());
+  ASSERT_RDB_OK(dAcc2.write());
+  ASSERT_RDB_OK(dAcc2.write());
 
   pl->setItem(0, std::string("xxxx xxxx"));
   pl->setItem(1, static_cast<uint8_t>(0x33));
   pl->setItem(2, 0x67);
 
-  dAcc2.write(1);
+  ASSERT_RDB_OK(dAcc2.write(1));
 
   static_cast<void>(dAcc2.revRead(dAcc2.getRecordsCount() - 1 - 1));
 
@@ -175,8 +177,9 @@ TEST(xrdb, test_storage_disposal_removes_all_files) {
   auto desc               = makeDesc(AREA_SIZE);
 
   {
-    rdb::storage s(qryId, qryId, "");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(qryId, qryId, ""));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     s.setDisposable(true);
 
     auto *pl = s.getPayload();
@@ -184,7 +187,7 @@ TEST(xrdb, test_storage_disposal_removes_all_files) {
     std::memcpy(xData, "test data", AREA_SIZE);
     std::memcpy(pl->span().data(), xData, AREA_SIZE);
 
-    ASSERT_TRUE(s.write());
+    ASSERT_RDB_OK(s.write());
   }  // ~storage(): isDisposable_ => usuwa plik danych, .desc i .meta
 
   EXPECT_FALSE(std::filesystem::exists(qryId));
@@ -218,17 +221,18 @@ TEST(xrdb, storage_persists_null_flags_via_metadata_stream) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     s.setDisposable(true);
 
     auto *pl = s.getPayload();
 
     pl->setItem(0, std::nullopt);
-    ASSERT_TRUE(s.write());
+    ASSERT_RDB_OK(s.write());
 
     pl->setItem(0, 77);
-    ASSERT_TRUE(s.write());
+    ASSERT_RDB_OK(s.write());
 
     ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
     EXPECT_FALSE(pl->getItem(0).has_value());
@@ -255,14 +259,15 @@ TEST(xrdb, storage_read_beyond_last_record_reports_no_such_record) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER) + rdb::Descriptor("b", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     s.setDisposable(true);
 
     auto *pl = s.getPayload();
     pl->setItem(0, 11);
     pl->setItem(1, 22);
-    ASSERT_TRUE(s.write());
+    ASSERT_RDB_OK(s.write());
 
     // Rekord istniejacy: status Ok i wartosci nietkniete.
     ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
@@ -294,8 +299,9 @@ TEST(xrdb, storage_read_from_empty_storage_reports_no_such_record) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     s.setDisposable(true);
 
     ASSERT_EQ(s.getRecordsCount(), 0U);
@@ -317,17 +323,18 @@ TEST(xrdb, storage_updates_null_flags_on_record_modify) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     s.setDisposable(true);
 
     auto *pl = s.getPayload();
 
     pl->setItem(0, 123);
-    ASSERT_TRUE(s.write());
+    ASSERT_RDB_OK(s.write());
 
     pl->setItem(0, std::nullopt);
-    ASSERT_TRUE(s.write(0));
+    ASSERT_RDB_OK(s.write(0));
 
     ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
     EXPECT_FALSE(pl->getItem(0).has_value());
@@ -351,20 +358,21 @@ TEST(xrdb, storage_purge_resets_metadata_stream_state) {
   std::filesystem::remove("./" + dataFile + ".shadow");
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
 
     auto *pl = s.getPayload();
 
     pl->setItem(0, std::nullopt);
-    ASSERT_TRUE(s.write());
+    ASSERT_RDB_OK(s.write());
     ASSERT_EQ(s.getRecordsCount(), 1U);
 
-    s.purge();
+    ASSERT_RDB_OK(s.purge());
     ASSERT_EQ(s.getRecordsCount(), 0U);
 
     pl->setItem(0, 1234);
-    ASSERT_TRUE(s.write());
+    ASSERT_RDB_OK(s.write());
     ASSERT_EQ(s.getRecordsCount(), 1U);
 
     ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
@@ -387,12 +395,13 @@ TEST(xrdb, storage_first_write_persists_first_meta_record) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
 
     auto *pl = s.getPayload();
     pl->setItem(0, std::nullopt);
-    ASSERT_TRUE(s.write());
+    ASSERT_RDB_OK(s.write());
     // Meta index is flushed to disk at destructor (lazy-write per spec):
     // "zapis pierwszego rekordu do pliku indeksu nie jest wymagany natychmiast"
   }
@@ -416,8 +425,9 @@ TEST(xrdb, storage_auto_gap_detection_marks_gap_after_null_records) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
 
     // nullFillCount=2: first 2 consecutive all-null appends go to storage (nullfill phase)
     // gap phase starts when consecutiveNullCount_ > nullFillCount_
@@ -429,17 +439,17 @@ TEST(xrdb, storage_auto_gap_detection_marks_gap_after_null_records) {
 
     // Nullfill phase: 2 all-null records written to storage as records 0 and 1
     pl->setNullBitset(allNull);
-    ASSERT_TRUE(s.write());
-    ASSERT_TRUE(s.write());
+    ASSERT_RDB_OK(s.write());
+    ASSERT_RDB_OK(s.write());
 
     // Gap phase: 2 more all-null records NOT written to storage (activeGapDuration_ = 2)
-    ASSERT_TRUE(s.write());
-    ASSERT_TRUE(s.write());
+    ASSERT_RDB_OK(s.write());
+    ASSERT_RDB_OK(s.write());
 
     // Non-null record: flushPendingGap(2) marks gap, then written as record 2
     pl->setNullBitset(nonNull);
     pl->setItem(0, 42);
-    ASSERT_TRUE(s.write());
+    ASSERT_RDB_OK(s.write());
 
     EXPECT_TRUE(s.hasGapBefore(2));
   }
@@ -458,8 +468,9 @@ TEST(xrdb, storage_gap_flushed_on_destructor) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     s.configureGapDetection(boost::rational<int>(1, 100), 1);
 
     auto *pl = s.getPayload();
@@ -467,18 +478,19 @@ TEST(xrdb, storage_gap_flushed_on_destructor) {
 
     // Nullfill phase: 1 all-null record written to storage as record 0
     pl->setNullBitset(allNull);
-    ASSERT_TRUE(s.write());
+    ASSERT_RDB_OK(s.write());
 
     // Gap phase: 1 more all-null record NOT written (activeGapDuration_ = 1)
-    ASSERT_TRUE(s.write());
+    ASSERT_RDB_OK(s.write());
 
     // Destructor fires here - flushPendingGap() must persist the gap to meta file
   }
 
   // Reopen and verify gap was saved
   {
-    rdb::storage s2(streamName, dataFile, ".");
-    EXPECT_EQ(s2.attachDescriptor(&desc), "");
+    auto s2Owner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s2 = *s2Owner;
+    EXPECT_RDB_OK(s2.attachDescriptor(&desc));
 
     // Record 0 was written; gap marker should be before record 1 (which doesn't exist yet,
     // but isGapBefore is based on meta entries, not record count)
@@ -499,8 +511,9 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_fast_writes) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
 
     // rInterval=1 (1 second), nullFillCount=2
     // All writes happen within milliseconds so no gap should be detected
@@ -510,7 +523,7 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_fast_writes) {
 
     for (int i = 0; i < 5; ++i) {
       pl->setItem(0, i);
-      ASSERT_TRUE(s.write());
+      ASSERT_RDB_OK(s.write());
     }
 
     EXPECT_FALSE(s.hasGapBefore(0));
@@ -530,8 +543,9 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_modify) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
 
     // rInterval=1/100 (10ms), nullFillCount=2
     s.configureGapDetection(boost::rational<int>(1, 100), 2);
@@ -539,14 +553,14 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_modify) {
     auto *pl = s.getPayload();
 
     pl->setItem(0, 10);
-    ASSERT_TRUE(s.write());
+    ASSERT_RDB_OK(s.write());
 
     // Wait longer than threshold
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // Modify existing record - auto-gap should NOT be triggered for modifications
     pl->setItem(0, 99);
-    ASSERT_TRUE(s.write(0));
+    ASSERT_RDB_OK(s.write(0));
 
     EXPECT_FALSE(s.hasGapBefore(0));
   }
@@ -565,8 +579,9 @@ TEST(xrdb, storage_setSamplingInterval_propagates_to_meta) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
 
     s.configureGapDetection(boost::rational<int>(1, 10));
 
@@ -575,7 +590,7 @@ TEST(xrdb, storage_setSamplingInterval_propagates_to_meta) {
     // Write 3 records and verify meta tracks them
     for (int i = 0; i < 3; ++i) {
       pl->setItem(0, i * 10);
-      ASSERT_TRUE(s.write());
+      ASSERT_RDB_OK(s.write());
     }
 
     EXPECT_FALSE(s.isMetaIndexEmpty());
@@ -606,12 +621,13 @@ TEST(xrdb, storage_detects_rotation_and_rotates_meta) {
   // First lifecycle: write 3 records; no configureGapDetection so meta is plain.
   // posixBinaryFile destructor renames dataFile → dataFile.old0.
   {
-    rdb::storage s(qryID, dataFile, ".", "POSIX", false, false, 0);
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(qryID, dataFile, ".", "POSIX", false, false, 0));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     auto *pl = s.getPayload();
     for (int i = 0; i < 3; ++i) {
       pl->setItem(0, i);
-      s.write();
+      ASSERT_RDB_OK(s.write());
     }
     EXPECT_EQ(s.getRecordsCount(), 3U);
     // ~storage → ~posixBinaryFile: renames dataFile → dataFile.old0
@@ -623,8 +639,9 @@ TEST(xrdb, storage_detects_rotation_and_rotates_meta) {
 
   // Second lifecycle: new empty data file, old meta still has 3 records.
   {
-    rdb::storage s(qryID, dataFile, ".", "POSIX", false, false, 0);
-    EXPECT_EQ(s.attachDescriptor(&desc), "");  // creates new empty data file
+    auto sOwner     = rdbtest::ok(rdb::storage::create(qryID, dataFile, ".", "POSIX", false, false, 0));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));  // creates new empty data file
     s.configureGapDetection({1, 10});          // detectStartupState: rotation! → rotate(0)
 
     EXPECT_TRUE(s.isMetaIndexEmpty());              // meta rotated to initial state
@@ -647,12 +664,13 @@ TEST(xrdb, storage_no_rotation_when_counts_match) {
 
   // First lifecycle: percounter=-1 so data file is NOT renamed.
   {
-    rdb::storage s(qryID2, dataFile2, ".", "POSIX", false, false, -1);
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(qryID2, dataFile2, ".", "POSIX", false, false, -1));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     auto *pl = s.getPayload();
     for (int i = 0; i < 3; ++i) {
       pl->setItem(0, i);
-      s.write();
+      ASSERT_RDB_OK(s.write());
     }
   }
 
@@ -661,8 +679,9 @@ TEST(xrdb, storage_no_rotation_when_counts_match) {
 
   // Second lifecycle: counts match → no rotation.
   {
-    rdb::storage s(qryID2, dataFile2, ".", "POSIX", false, false, -1);
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(qryID2, dataFile2, ".", "POSIX", false, false, -1));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     s.configureGapDetection({1, 10});
 
     // Meta still has the original 3 records (not rotated).

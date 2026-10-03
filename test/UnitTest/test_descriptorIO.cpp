@@ -12,6 +12,7 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/descriptorIO.hpp"
 #include "rdb/storage.hpp"
+#include "rdbResult.hpp"
 
 namespace {
 rdb::Descriptor sampleDescriptor() {
@@ -27,7 +28,7 @@ TEST(DescriptorIOTest, save_and_load_round_trip) {
   const std::string file{"dio_roundtrip.desc"};
   const auto saved = sampleDescriptor();
 
-  rdb::saveDescriptorFile(file, saved);
+  ASSERT_RDB_OK(rdb::saveDescriptorFile(file, saved));
   ASSERT_TRUE(std::filesystem::exists(file));
 
   rdb::Descriptor loaded;
@@ -55,20 +56,25 @@ TEST(DescriptorIOTest, storage_returns_a_bad_descriptor_error) {
   std::ofstream(file) << "{\n INTEGER }\n";
 
   const rdb::Descriptor planned = sampleDescriptor();
-  rdb::storage storage("dio_storage", "dio_storage", "", "DEFAULT", false, false, -1);
-  const std::string error = storage.attachDescriptor(&planned);
-  EXPECT_TRUE(error.contains("Fail: line 2:9")) << error;
+  auto storageOwner     = rdbtest::ok(rdb::storage::create("dio_storage", "dio_storage", "", "DEFAULT", false, false, -1));
+  rdb::storage &storage = *storageOwner;
+  EXPECT_RDB_ERROR(storage.attachDescriptor(&planned), rdb::Errc::CorruptDescriptor, "Fail: line 2:9");
 
   std::filesystem::remove(file);
 }
 
 // ---------------------------------------------------------------------------
-// Weryfikacja zgodności: identyczne deskryptory przechodzą bez efektów
-// ubocznych (niezgodność kończy proces przez FatalError - poza zasięgiem
-// testu jednostkowego, tak jak pozostałe ścieżki FatalError w repo).
+// Weryfikacja zgodności: identyczne deskryptory przechodzą, niezgodne zwracają
+// błąd Errc::Config z nazwą pliku - bez końca procesu i bez wyjątku.
 // ---------------------------------------------------------------------------
 TEST(DescriptorIOTest, verify_match_accepts_equal_descriptors) {
   const auto lhs = sampleDescriptor();
   const auto rhs = sampleDescriptor();
-  rdb::verifyDescriptorMatch(lhs, rhs, "dio_verify.desc");  // brak FatalError == sukces
+  EXPECT_RDB_OK(rdb::verifyDescriptorMatch(lhs, rhs, "dio_verify.desc"));
+}
+
+TEST(DescriptorIOTest, verify_match_rejects_different_descriptors) {
+  const auto lhs = sampleDescriptor();
+  const auto rhs = rdb::Descriptor("a", sizeof(int), 1, rdb::INTEGER);
+  EXPECT_RDB_ERROR(rdb::verifyDescriptorMatch(lhs, rhs, "dio_verify.desc"), rdb::Errc::Config, "dio_verify.desc");
 }

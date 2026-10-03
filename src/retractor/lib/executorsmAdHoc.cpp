@@ -7,7 +7,6 @@
 #include <format>
 #include <fstream>
 #include <mutex>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include <utility>
@@ -20,7 +19,7 @@
 #include "executorsmState.hpp"
 #include "fatalError.hpp"  // wylacznie hak RDB_FAULT_FATAL_IN_ADHOC
 #include "planSource.hpp"
-#include "rdb/exceptions.hpp"
+#include "rdb/error.hpp"
 #include "RQLParser.hpp"
 
 // Kanal ad-hoc: dolaczenie pojedynczej instrukcji SELECT/DECLARE albo reguly do planu, ktory
@@ -81,6 +80,10 @@ ptree executorsm::attachAdHocRule(qTree &coreInstanceCopy, const std::string &st
 
   {
     std::scoped_lock scoped_lock(core_mutex);
+    // Cel istnial w kopii, a kopia powstala z zywego planu pod ta sama blokada epoki - wiec jest
+    // i tu. Sprawdzenie zostaje jako odmowa, nie RDB_ASSERT w getQuery(): komenda klienta nie ma
+    // prawa konczyc serwera, nawet gdyby to rozumowanie kiedys przestalo byc prawdziwe.
+    if (!coreInstancePtr->exists(streamName)) return refuse("stream '" + streamName + "' is no longer in the plan");
     query &live = coreInstancePtr->getQuery(streamName);
     // Warunek reguly adresuje rekord wyjsciowy celu po indeksie plaskim, wiec wolno go dolaczyc
     // tylko wtedy, gdy rekord ma w obu planach ten sam ksztalt. Kompilacja kopii przebiega
@@ -170,6 +173,11 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   localCompiler.setDefaultRetention(cfgDefaultRetention);
   auto response = localCompiler.compile();
 
+  // Blad wewnetrzny kompilatora (przedrostek kInternalCompilerError) to nie blad zapytania. Do
+  // 2026-10 przychodzil rzutem LogicError, ktory lapal catch dyspozytora komend - klient dostawal
+  // "engine error", a usluga liczyla dalej. Ta sama odpowiedz, teraz z wartosci.
+  if (isInternalCompilerError(response)) return engineErrorResponse("adhoc", response);
+
   if (response != "OK") {
     ptRetval.put(std::string("db"), "Fail local chain compiler:" + response);
     SPDLOG_ERROR("Compile chain of adhoc failed: {}", response);
@@ -250,13 +258,11 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
       case bus::ClaimStatus::CounterConflict:
         // Nieosiagalne: ad-hoc nie przyjmuje :ROTATION (getAdHoc odrzuca dyrektywy wyzej),
         // wiec claimAdditional nigdy nie porownuje sciezki licznika.
-        throw rdb::LogicError("executorsm::getAdHoc: bus reported a rotation counter conflict for an adhoc query");
-        break;
+        return engineErrorResponse("adhoc", "executorsm::getAdHoc: bus reported a rotation counter conflict for an adhoc query");
       case bus::ClaimStatus::ServiceConflict:
         // Nieosiagalne: tryb pracy jest wlasnoscia URUCHOMIENIA i trafia do slotu wylacznie
         // w claim(); claimAdditional dopisuje nazwy strumieni i maski trybow nie oglada.
-        throw rdb::LogicError("executorsm::getAdHoc: bus reported a service mode conflict for an adhoc query");
-        break;
+        return engineErrorResponse("adhoc", "executorsm::getAdHoc: bus reported a service mode conflict for an adhoc query");
       case bus::ClaimStatus::TooLarge:
       case bus::ClaimStatus::NoFreeSlot: {
         const std::string message = "Rejected: cannot register adhoc streams on the xrdbbus bus: " + claimed.detail;
@@ -275,8 +281,8 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   std::vector<std::string> mergedIds;
   std::string compileChainResult;
   std::string addFailedId;
-  if (cmPtr == nullptr) throw rdb::LogicError("executorsm::getAdHoc: cmPtr is null");
-  if (pProc == nullptr) throw rdb::LogicError("executorsm::getAdHoc: pProc is null");
+  if (cmPtr == nullptr) return engineErrorResponse("adhoc", "executorsm::getAdHoc: cmPtr is null");
+  if (pProc == nullptr) return engineErrorResponse("adhoc", "executorsm::getAdHoc: pProc is null");
 
   // Publish the compiled tree and its runtime stream instances atomically with respect
   // to the execution loop.
@@ -293,27 +299,26 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     // Razem z planem wraca roszczenie na magistrali: nazwa, ktorej plan nie zawiera, bylaby
     // inaczej ogloszona jako strumien tej instancji az do jej konca.
     qTree planBefore = *coreInstancePtr;
-    try {
-      mergedIds          = cmPtr->importFrom(coreInstanceCopy);
-      compileChainResult = cmPtr->compile();
-      if (compileChainResult == "OK") {
-        pProc->syncDeclaredCapacities();
-        // Hak testu it_adhoc_register_rollback, ta sama droga co RDB_FAULT_SHOW. Porazka PO
-        // imporcie do zywego planu ma dwie drogi wycofania: status z addQueriesToModel (pozny
-        // blad open() magazynu, wymuszany bramka RDB_FAULT_ADHOC_OPEN_GATE) i wyjatek, ktory
-        // lapie catch ponizej. Hak rzuca, bo drugiej drogi zadne znane RQL nie wywoluje. Raz na
-        // proces, zeby test mogl po nim powtorzyc to samo zapytanie i sprawdzic, ze plan je przyjmuje.
-        static bool registerFaultFired = false;
-        if (!registerFaultFired && std::getenv("RDB_FAULT_ADHOC_REGISTER") != nullptr) {
-          registerFaultFired = true;
-          throw std::runtime_error("RDB_FAULT_ADHOC_REGISTER: wstrzyknieta awaria rejestracji ad-hoc w modelu");
-        }
+    // Bez try/catch: importFrom, compile i addQueriesToModel naleza do rdzenia, ktory nie rzuca
+    // (buduje sie z -fno-exceptions) - kazda porazka wraca statusem i idzie ta sama droga
+    // wycofania ponizej. Do 2026-10 stal tu catch(...) z wycofaniem i ponownym rzutem; jedynym,
+    // co go jeszcze wywolywalo, byl hak testu ponizej.
+    mergedIds          = cmPtr->importFrom(coreInstanceCopy);
+    compileChainResult = cmPtr->compile();
+    if (compileChainResult == "OK") {
+      pProc->syncDeclaredCapacities();
+      // Hak testu it_adhoc_register_rollback, ta sama droga co RDB_FAULT_SHOW. Porazka PO
+      // imporcie do zywego planu: status z addQueriesToModel (pozny blad open() magazynu,
+      // wymuszany bramka RDB_FAULT_ADHOC_OPEN_GATE) albo ten hak, ktory podaje status bez
+      // dotykania modelu. Raz na proces, zeby test mogl po nim powtorzyc to samo zapytanie i
+      // sprawdzic, ze plan je przyjmuje.
+      static bool registerFaultFired = false;
+      if (!registerFaultFired && std::getenv("RDB_FAULT_ADHOC_REGISTER") != nullptr) {
+        registerFaultFired = true;
+        addFailedId        = "RDB_FAULT_ADHOC_REGISTER: wstrzyknieta awaria rejestracji ad-hoc w modelu";
+      } else {
         addFailedId = pProc->addQueriesToModel(mergedIds);
       }
-    } catch (...) {
-      *coreInstancePtr = std::move(planBefore);
-      if (busPtr != nullptr) busPtr->releaseAdditional(claimedStreams, claimedStores);
-      throw;
     }
     if (compileChainResult != "OK" || !addFailedId.empty()) {
       *coreInstancePtr = std::move(planBefore);

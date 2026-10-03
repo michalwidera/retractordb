@@ -10,6 +10,7 @@
 #include <boost/rational.hpp>
 
 #include "rdb/payload.hpp"
+#include "rdbResult.hpp"
 #include "retractor/lib/expressionEvaluator.hpp"
 #include "retractor/lib/exprSimplify.hpp"
 
@@ -46,7 +47,7 @@ void expectSameResult(const std::list<token> &original, const std::list<token> &
   data.setItem(0, fieldValue);
 
   expressionEvaluator evaluator;
-  EXPECT_TRUE(evaluator.eval(original, &data) == evaluator.eval(simplified, &data))
+  EXPECT_TRUE(rdbtest::ok(evaluator.eval(original, &data)) == rdbtest::ok(evaluator.eval(simplified, &data)))
       << dump(original) << " != " << dump(simplified) << " dla x=" << fieldValue;
 }
 
@@ -64,7 +65,7 @@ void expectSameUintResult(const std::list<token> &original, const std::list<toke
   data.setItem(0, fieldValue);
 
   expressionEvaluator evaluator;
-  EXPECT_TRUE(evaluator.eval(original, &data) == evaluator.eval(simplified, &data))
+  EXPECT_TRUE(rdbtest::ok(evaluator.eval(original, &data)) == rdbtest::ok(evaluator.eval(simplified, &data)))
       << dump(original) << " != " << dump(simplified) << " dla u=" << fieldValue;
 }
 

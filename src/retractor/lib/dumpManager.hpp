@@ -9,6 +9,7 @@
 
 #include <boost/circular_buffer.hpp>
 
+#include "rdb/error.hpp"
 #include "rdb/payload.hpp"
 
 struct dumpTask {
@@ -40,9 +41,9 @@ class dumpManager {
   dumpManager()  = default;
   ~dumpManager() = default;
 
-  void registerTask(const std::string &streamName, dumpTask task);  // Register a dump function
-  void processStreamChunk(const std::string &streamName);           // Call all registered dump functions
-  void setDumpStorage(std::string storagePathParam);                // Set storage path for dump files
+  [[nodiscard]] rdb::Result<> registerTask(const std::string &streamName, dumpTask task);  // Register a dump function
+  [[nodiscard]] rdb::Result<> processStreamChunk(const std::string &streamName);           // Call all registered dump functions
+  void setDumpStorage(std::string storagePathParam);                                       // Set storage path for dump files
 
  private:
   std::map<std::string, int> retentionCounter;  // first - streamName+taskName, second - counter
@@ -51,7 +52,8 @@ class dumpManager {
   std::map<std::string, boost::circular_buffer<dumpTask>> bookOfTasks;  // streamName -> list of tasks
   // circular buffer to track retention - will set by .set_capacity(retentionSize)
 
-  bool buildDumpChunk(dumpTask &task,
-                      std::unique_ptr<rdb::payload>::pointer payload);  // Execute dump task - return true if task is completed
-  std::pair<std::string, int> createDumpFile(std::string_view streamName, std::string_view taskName);
+  rdb::Result<bool> buildDumpChunk(
+      dumpTask &task,
+      std::unique_ptr<rdb::payload>::pointer payload);  // Execute dump task - return true if task is completed
+  rdb::Result<std::pair<std::string, int>> createDumpFile(std::string_view streamName, std::string_view taskName);
 };

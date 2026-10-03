@@ -105,7 +105,12 @@ bool MetaRawCmd::execute(CommandContext &ctx) {
       std::print("{}truncated entry at index: {}\n{}", ctx.colors.RED, entryIdx, ctx.colors.RESET);
       break;
     }
-    auto rec = rdb::metaData::IndexRecord::deserialize(std::span<const std::byte>(raw));
+    const auto parsed = rdb::metaData::IndexRecord::deserialize(std::span<const std::byte>(raw));
+    if (!parsed.has_value()) {
+      std::print("{}corrupt entry at index: {}\n{}", ctx.colors.RED, entryIdx, ctx.colors.RESET);
+      break;
+    }
+    const auto &rec = *parsed;
     std::print("entry[{}] ", entryIdx);
     std::print("count:{} ", rec.recordCount);
     std::print("gap:{} ", (rec.isGap ? 1 : 0));

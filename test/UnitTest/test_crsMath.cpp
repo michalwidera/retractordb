@@ -12,6 +12,7 @@
 #include "rdb/fainterface.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/storage.hpp"
+#include "rdbResult.hpp"
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/CRSMath.hpp"
 #include "retractor/lib/dataModel.hpp"
@@ -169,10 +170,11 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
 
   std::stringstream strstream;
 
-  dataModel proc(coreInstance);
-  pProc = &proc;  // This need to be set for dumpManager
+  auto procOwner  = rdbtest::ok(dataModel::create(coreInstance));
+  dataModel &proc = *procOwner;
+  pProc           = &proc;  // This need to be set for dumpManager
 
-  TimeLine tl(coreInstance.getAvailableTimeIntervals());
+  TimeLine tl(rdbtest::ok(coreInstance.getAvailableTimeIntervals()));
   boost::rational<int> prev_interval(0);
 
   strstream << std::setw(colSize) << "Dlt: ";
@@ -189,7 +191,7 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
   for (const auto &it : coreInstance)
     if (it.isDeclaration()) initSet.insert(it.id);
 
-  proc.processZeroStep();
+  rdbtest::ok(proc.processZeroStep());
 
   strstream << std::setw(colSize) << " 000:";
   for (const auto &x : allStreams)
@@ -225,7 +227,7 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
 
     strstream << '\n';
 
-    proc.processRows(procMask);
+    rdbtest::ok(proc.processRows(procMask));
   }
 
   if (strstream.str() != expectedResult) {
@@ -239,8 +241,8 @@ TEST_F(crsMathTest, check_if_streams_sequence_are_correct) {
 
 std::string print(const std::string &query_name, dataModel &proc) {
   std::stringstream coutstring;
-  auto cnt = proc.getPayload(query_name)->descriptor.flatElementCount();
-  for (auto value : proc.getRow(query_name, 0)) {
+  auto cnt = rdbtest::ok(proc.getPayload(query_name))->descriptor.flatElementCount();
+  for (auto value : rdbtest::ok(proc.getRow(query_name, 0))) {
     std::visit(
         Overload{                                                                                                           //
                  [&coutstring](std::monostate) { coutstring << "null"; },                                                   //
@@ -345,10 +347,11 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
 
   std::stringstream strstream;
 
-  dataModel proc(coreInstance);
-  pProc = &proc;  // This need to be set for dumpManager
+  auto procOwner  = rdbtest::ok(dataModel::create(coreInstance));
+  dataModel &proc = *procOwner;
+  pProc           = &proc;  // This need to be set for dumpManager
 
-  TimeLine tl(coreInstance.getAvailableTimeIntervals());
+  TimeLine tl(rdbtest::ok(coreInstance.getAvailableTimeIntervals()));
   boost::rational<int> prev_interval(0);
 
   // Delta presentation
@@ -369,7 +372,7 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
   for (const auto &it : coreInstance)
     if (it.isDeclaration()) initSet.insert(it.id);
 
-  proc.processZeroStep();
+  rdbtest::ok(proc.processZeroStep());
 
   strstream << std::setw(4) << " 000 ";
   for (const auto &x : allStreams)
@@ -404,7 +407,7 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
     for (const auto &x : procSet)
       recordsBefore.emplace(x, proc.qSet.at(x)->outputPayload->getRecordsCount());
 
-    proc.processRows(procMask);
+    rdbtest::ok(proc.processRows(procMask));
 
     for (const auto &x : allStreams)
       strstream << "|" << std::setw(colSize)

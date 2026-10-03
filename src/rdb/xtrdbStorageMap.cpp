@@ -314,7 +314,10 @@ static std::vector<Segment> readMetaFile(const std::string &path, size_t fieldCo
   std::vector<Segment> result;
   std::span<const std::byte> rem(buf);
   while (rem.size() >= entrySize) {
-    result.push_back(Segment::deserialize(rem.subspan(0, entrySize)));
+    // Uszkodzony wpis konczy mape w tym miejscu - ta sama polityka co MetaIndexStore::readAll.
+    auto segment = Segment::deserialize(rem.subspan(0, entrySize));
+    if (!segment.has_value()) break;
+    result.push_back(std::move(*segment));
     rem = rem.subspan(entrySize);
   }
   return result;

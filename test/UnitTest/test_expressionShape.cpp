@@ -21,6 +21,7 @@
 #include <boost/rational.hpp>
 
 #include "rdb/payload.hpp"
+#include "rdbResult.hpp"
 #include "retractor/lib/expressionEvaluator.hpp"
 #include "retractor/lib/expressionShape.hpp"
 #include "retractor/lib/exprSimplify.hpp"  // kToStringDefaultWidth
@@ -104,7 +105,7 @@ exprShapeResult analyse(const std::list<token> &program) { return inferExpressio
 /// Typ, jaki NAPRAWDE oddaje ewaluator dla tego programu na tym rekordzie.
 rdb::descFld evaluatedType(const std::list<token> &program, rdb::payload &record) {
   expressionEvaluator evaluator;
-  return static_cast<rdb::descFld>(evaluator.eval(program, &record).index());
+  return static_cast<rdb::descFld>(rdbtest::ok(evaluator.eval(program, &record)).index());
 }
 
 const std::vector<rdb::descFld> &numericTypes() {
@@ -173,7 +174,7 @@ TEST(xExpressionShape, binary_arithmetic_matrix_matches_the_evaluator) {
         const std::list<token> literals{token(PUSH_VAL, *record.getItemVT(slotOf(leftType))),
                                         token(PUSH_VAL, *right.getItemVT(slotOf(rightType))), token(op)};
         expressionEvaluator evaluator;
-        const auto actual = static_cast<rdb::descFld>(evaluator.eval(literals).index());
+        const auto actual = static_cast<rdb::descFld>(rdbtest::ok(evaluator.eval(literals)).index());
 
         EXPECT_EQ(inferred.shape.rtype, actual) << label << " (ewaluator)";
       }
@@ -396,7 +397,7 @@ TEST(xExpressionShape, explicit_conversion_decides_inside_a_larger_expression) {
                            token(MULTIPLY)};
   EXPECT_EQ(analyse(toFloat).shape.rtype, rdb::FLOAT);
   expressionEvaluator evaluator;
-  EXPECT_EQ(static_cast<rdb::descFld>(evaluator.eval(toFloat).index()), rdb::FLOAT);
+  EXPECT_EQ(static_cast<rdb::descFld>(rdbtest::ok(evaluator.eval(toFloat)).index()), rdb::FLOAT);
 
   // to_integer(d) + 1 -> INTEGER, mimo ze argument byl DOUBLE
   std::list<token> toInteger{readField(sDouble), token(CALL, std::string("to_integer")), token(PUSH_VAL, 1), token(ADD)};
@@ -448,7 +449,7 @@ TEST(xExpressionShape, null2zero_static_type_is_the_argument_type) {
   // Zapis do pola o innym typie nie gubi wartosci: zero przechodzi przez rzut bez straty.
   rdb::payload target(rdb::Descriptor("out", static_cast<int>(sizeof(double)), 1, rdb::DOUBLE));
   expressionEvaluator evaluator;
-  target.setItemVT(0, evaluator.eval(overNull, &missing));
+  target.setItemVT(0, rdbtest::ok(evaluator.eval(overNull, &missing)));
   ASSERT_TRUE(target.getItemVT(0).has_value());
   EXPECT_DOUBLE_EQ(std::get<double>(*target.getItemVT(0)), 0.0);
 }
@@ -500,7 +501,7 @@ TEST(xExpressionShape, ill_typed_program_reports_ill_typed) {
   EXPECT_EQ(analyse(product).status, exprShapeStatus::illTyped);
   auto record = testPayload(2);
   expressionEvaluator evaluator;
-  EXPECT_THROW((void)evaluator.eval(product, &record), std::exception);
+  EXPECT_RDB_ERROR(evaluator.eval(product, &record), rdb::Errc::Eval);
 
   // Brakujacy operand i wartosc nadmiarowa.
   EXPECT_EQ(analyse({token(ADD)}).status, exprShapeStatus::illTyped);

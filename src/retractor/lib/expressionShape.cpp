@@ -307,7 +307,7 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
       case DIVIDE:
       case POWER:
         // Operand tekstowy pod operatorem liczbowym jest bledem WYKONANIA i tak ma zostac:
-        // ewaluator rzuca `Operator '<op>' not defined for string operands`. Analizator
+        // ewaluator zwraca blad `Operator '<op>' not defined for string operands`. Analizator
         // odmawia ksztaltu, wiec pole zostaje przy sentinelu i moment zgloszenia bledu
         // nie zmienia sie ani o krok.
         if (left.rtype > rdb::DOUBLE || right.rtype > rdb::DOUBLE) return illTyped;

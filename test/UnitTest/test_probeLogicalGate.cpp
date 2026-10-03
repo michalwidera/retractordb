@@ -10,6 +10,7 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/probe.hpp"
 #include "rdb/storage.hpp"
+#include "rdbResult.hpp"
 
 // ctest -R '^ut_probeLogicalGate' -V
 
@@ -36,8 +37,9 @@ class writableStorage {
  public:
   writableStorage(const std::string &name, rdb::Descriptor descriptor, bool substrate)
       : descriptor_(std::move(descriptor)),
-        storage_(name, name, "") {
-    EXPECT_EQ(storage_.attachDescriptor(&descriptor_), "");
+        owner_(rdbtest::ok(rdb::storage::create(name, name, ""))),
+        storage_(*owner_) {
+    EXPECT_RDB_OK(storage_.attachDescriptor(&descriptor_));
     storage_.setDisposable(true);
     storage_.markAsSubstrate(substrate);
   }
@@ -47,14 +49,14 @@ class writableStorage {
   void write(bool allNull = false) {
     auto *payload = storage_.getPayload();
     payload->setNullBitset(std::vector<bool>(descriptor_.size(), allNull));
-    storage_.write();
+    EXPECT_RDB_OK(storage_.write());
   }
 
   /// Nadpisanie rekordu o podanym indeksie - druga gałąź `storage::write()`.
   void overwrite(std::size_t recordIndex) {
     auto *payload = storage_.getPayload();
     payload->setNullBitset(std::vector<bool>(descriptor_.size(), false));
-    storage_.write(recordIndex);
+    EXPECT_RDB_OK(storage_.write(recordIndex));
   }
 
   void configureGapDetection(int nullFillCount) { storage_.configureGapDetection(boost::rational<int>(1, 1), nullFillCount); }
@@ -63,7 +65,8 @@ class writableStorage {
 
  private:
   rdb::Descriptor descriptor_;
-  rdb::storage storage_;
+  std::unique_ptr<rdb::storage> owner_;
+  rdb::storage &storage_;
 };
 
 rdb::Descriptor oneInteger() { return rdb::Descriptor{{"a", 4, 1, rdb::INTEGER}}; }

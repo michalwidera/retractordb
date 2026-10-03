@@ -37,7 +37,7 @@ struct genericBinaryFile : public FileInterface {
   ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) override;
 
   auto name() -> std::string & override;
-  size_t count() override;
+  [[nodiscard]] Result<size_t> count() override;
 
   genericBinaryFile()                                           = delete;
   genericBinaryFile(const genericBinaryFile &)                  = delete;

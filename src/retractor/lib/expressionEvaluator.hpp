@@ -4,6 +4,7 @@
 
 #include "fldType.hpp"
 #include "query.hpp"  // windowStats
+#include "rdb/error.hpp"
 #include "rdb/payload.hpp"
 #include "token.hpp"  // token, std::list
 
@@ -34,6 +35,9 @@ class expressionEvaluator {
   ///        (qTree::windowGroups). Wypełnia je dataModel::computeWindowAggregates() PRZED
   ///        wyliczeniem pól, bo okno czyta historię ŹRÓDŁA, a payload wejściowy niesie tylko
   ///        rekord bieżący. nullptr znaczy: plan bez okien.
-  rdb::descFldVT eval(const std::list<token> &program, rdb::payload *payload = nullptr,
-                      const std::vector<windowStats> *windowValues = nullptr);
+  /// Wartosc wyrazenia RPN albo Errc::Eval, gdy programu nie da sie policzyc dla tych operandow
+  /// (operator nieokreslony dla typu, brak operandu, nieznana funkcja). NULL - brak wyniku w zbiorze
+  /// wartosci (dzielenie przez zero, przepelnienie) - jest wynikiem, nie bledem.
+  [[nodiscard]] rdb::Result<rdb::descFldVT> eval(const std::list<token> &program, rdb::payload *payload = nullptr,
+                                                 const std::vector<windowStats> *windowValues = nullptr);
 };

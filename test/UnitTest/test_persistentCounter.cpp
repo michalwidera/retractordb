@@ -8,7 +8,7 @@
 #include <fstream>
 #include <string>
 
-#include "rdb/exceptions.hpp"
+#include "rdbResult.hpp"
 #include "retractor/lib/persistentCounter.hpp"
 
 // ctest -R '^ut_persistentCounter' -V
@@ -40,8 +40,8 @@ class PersistentCounterTest : public ::testing::Test {
 // ============================================================
 
 TEST_F(PersistentCounterTest, starts_at_zero_when_no_file) {
-  PersistentCounter pc(counterPath());
-  EXPECT_EQ(pc.getCount(), 0);
+  auto pc = rdbtest::ok(PersistentCounter::create(counterPath()));
+  EXPECT_EQ(pc->getCount(), 0);
 }
 
 // ============================================================
@@ -51,8 +51,8 @@ TEST_F(PersistentCounterTest, starts_at_zero_when_no_file) {
 // Numer nastepnej sesji jest w pliku, zanim ta sesja cokolwiek zarchiwizuje - nie dopiero
 // po destrukcji obiektu.
 TEST_F(PersistentCounterTest, construction_reserves_next_value) {
-  PersistentCounter pc(counterPath());
-  EXPECT_EQ(pc.getCount(), 0);
+  auto pc = rdbtest::ok(PersistentCounter::create(counterPath()));
+  EXPECT_EQ(pc->getCount(), 0);
 
   std::ifstream in(counterPath());
   int saved = -1;
@@ -65,10 +65,10 @@ TEST_F(PersistentCounterTest, construction_reserves_next_value) {
 // ============================================================
 
 TEST_F(PersistentCounterTest, second_instance_loads_saved_value) {
-  { PersistentCounter pc(counterPath()); }  // zapisuje 1
+  { auto pc = rdbtest::ok(PersistentCounter::create(counterPath())); }  // zapisuje 1
 
-  PersistentCounter pc2(counterPath());
-  EXPECT_EQ(pc2.getCount(), 1);
+  auto pc2 = rdbtest::ok(PersistentCounter::create(counterPath()));
+  EXPECT_EQ(pc2->getCount(), 1);
 }
 
 // ============================================================
@@ -76,12 +76,12 @@ TEST_F(PersistentCounterTest, second_instance_loads_saved_value) {
 // ============================================================
 
 TEST_F(PersistentCounterTest, count_accumulates_across_instances) {
-  { PersistentCounter pc(counterPath()); }  // 0 → zapisuje 1
-  { PersistentCounter pc(counterPath()); }  // wczytuje 1 → zapisuje 2
-  { PersistentCounter pc(counterPath()); }  // wczytuje 2 → zapisuje 3
+  { auto pc = rdbtest::ok(PersistentCounter::create(counterPath())); }  // 0 → zapisuje 1
+  { auto pc = rdbtest::ok(PersistentCounter::create(counterPath())); }  // wczytuje 1 → zapisuje 2
+  { auto pc = rdbtest::ok(PersistentCounter::create(counterPath())); }  // wczytuje 2 → zapisuje 3
 
-  PersistentCounter pc(counterPath());
-  EXPECT_EQ(pc.getCount(), 3);
+  auto pc = rdbtest::ok(PersistentCounter::create(counterPath()));
+  EXPECT_EQ(pc->getCount(), 3);
 }
 
 // ============================================================
@@ -89,11 +89,11 @@ TEST_F(PersistentCounterTest, count_accumulates_across_instances) {
 // ============================================================
 
 TEST_F(PersistentCounterTest, getCount_is_idempotent_before_destruction) {
-  { PersistentCounter pc(counterPath()); }  // zapisuje 1
+  { auto pc = rdbtest::ok(PersistentCounter::create(counterPath())); }  // zapisuje 1
 
-  PersistentCounter pc2(counterPath());
-  EXPECT_EQ(pc2.getCount(), 1);
-  EXPECT_EQ(pc2.getCount(), 1);
+  auto pc2 = rdbtest::ok(PersistentCounter::create(counterPath()));
+  EXPECT_EQ(pc2->getCount(), 1);
+  EXPECT_EQ(pc2->getCount(), 1);
 }
 
 // ============================================================
@@ -111,36 +111,47 @@ TEST_F(PersistentCounterTest, empty_file_is_not_rotation_zero) {
   ASSERT_TRUE(std::filesystem::exists(counterPath()));
   ASSERT_EQ(std::filesystem::file_size(counterPath()), 0U);
 
-  EXPECT_THAT(
-      [&] { PersistentCounter pc(counterPath()); },
-      ::testing::ThrowsMessage<rdb::ConfigError>(::testing::ContainsRegex("Rotation counter file .* is unreadable \\(0 bytes")));
+  {
+    const auto created = PersistentCounter::create(counterPath());
+    ASSERT_RDB_ERROR(created, rdb::Errc::Config);
+    EXPECT_THAT(created.error().message(), ::testing::ContainsRegex("Rotation counter file .* is unreadable \\(0 bytes"));
+  }
 }
 
 TEST_F(PersistentCounterTest, non_numeric_file_is_fatal) {
   std::ofstream(counterPath()) << "not_a_number";
-  EXPECT_THAT([&] { PersistentCounter pc(counterPath()); },
-              ::testing::ThrowsMessage<rdb::ConfigError>(::testing::HasSubstr("is unreadable")));
+  {
+    const auto created = PersistentCounter::create(counterPath());
+    ASSERT_RDB_ERROR(created, rdb::Errc::Config);
+    EXPECT_THAT(created.error().message(), ::testing::HasSubstr("is unreadable"));
+  }
 }
 
 // Dawny `>>` czytal z "12abc" liczbe 12 i ogon przemilczal.
 TEST_F(PersistentCounterTest, trailing_garbage_is_fatal) {
   std::ofstream(counterPath()) << "12abc";
-  EXPECT_THAT([&] { PersistentCounter pc(counterPath()); },
-              ::testing::ThrowsMessage<rdb::ConfigError>(::testing::HasSubstr("is unreadable")));
+  {
+    const auto created = PersistentCounter::create(counterPath());
+    ASSERT_RDB_ERROR(created, rdb::Errc::Config);
+    EXPECT_THAT(created.error().message(), ::testing::HasSubstr("is unreadable"));
+  }
 }
 
 // percounter < 0 wylacza w storage rotacje - plik z "-1" nie moze tego zrobic po cichu.
 TEST_F(PersistentCounterTest, negative_value_is_fatal) {
   std::ofstream(counterPath()) << "-1";
-  EXPECT_THAT([&] { PersistentCounter pc(counterPath()); },
-              ::testing::ThrowsMessage<rdb::ConfigError>(::testing::HasSubstr("is unreadable")));
+  {
+    const auto created = PersistentCounter::create(counterPath());
+    ASSERT_RDB_ERROR(created, rdb::Errc::Config);
+    EXPECT_THAT(created.error().message(), ::testing::HasSubstr("is unreadable"));
+  }
 }
 
 // Kontrola dodatnia: plik poprawiony recznie w edytorze konczy sie znakiem nowej linii.
 TEST_F(PersistentCounterTest, trailing_newline_is_accepted) {
   std::ofstream(counterPath()) << "7\n";
-  PersistentCounter pc(counterPath());
-  EXPECT_EQ(pc.getCount(), 7);
+  auto pc = rdbtest::ok(PersistentCounter::create(counterPath()));
+  EXPECT_EQ(pc->getCount(), 7);
 }
 
 // ============================================================
@@ -148,7 +159,7 @@ TEST_F(PersistentCounterTest, trailing_newline_is_accepted) {
 // ============================================================
 
 TEST_F(PersistentCounterTest, save_leaves_no_temp_file) {
-  { PersistentCounter pc(counterPath()); }
+  { auto pc = rdbtest::ok(PersistentCounter::create(counterPath())); }
   size_t entries = 0;
   for ([[maybe_unused]] const auto &entry : std::filesystem::directory_iterator(sandBoxFolder))
     ++entries;
@@ -164,8 +175,11 @@ TEST_F(PersistentCounterTest, failed_reservation_is_fatal_and_keeps_previous_val
   std::ofstream(counterPath()) << "5";
 
   std::filesystem::create_directory(counterPath() + ".tmp." + std::to_string(::getpid()));
-  EXPECT_THAT([&] { PersistentCounter pc(counterPath()); },
-              ::testing::ThrowsMessage<rdb::IOError>(::testing::HasSubstr("Cannot reserve rotation number 6")));
+  {
+    const auto created = PersistentCounter::create(counterPath());
+    ASSERT_RDB_ERROR(created, rdb::Errc::IO);
+    EXPECT_THAT(created.error().message(), ::testing::HasSubstr("Cannot reserve rotation number 6"));
+  }
 
   std::ifstream in(counterPath());
   std::string saved;
@@ -179,7 +193,7 @@ TEST_F(PersistentCounterTest, failed_reservation_is_fatal_and_keeps_previous_val
 
 TEST_F(PersistentCounterTest, custom_filename_creates_correct_file) {
   std::string custom = (sandBoxFolder / "my_custom_counter").string();
-  { PersistentCounter pc(custom); }
+  { auto pc = rdbtest::ok(PersistentCounter::create(custom)); }
   EXPECT_TRUE(std::filesystem::exists(custom));
   EXPECT_FALSE(std::filesystem::exists(counterPath()));
 }

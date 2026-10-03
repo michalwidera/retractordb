@@ -1,5 +1,11 @@
 # Core phase 1: FatalError becomes an exception
 
+> **2026-10:** the exceptions this phase introduced have since been replaced by error values
+> (`rdb::Result`), and the engine core builds with `-fno-exceptions`. The categories survive as
+> `rdb::Errc`, and the Python classes are unchanged. This page is kept as the record of how
+> `std::exit` left the engine. For the current design see
+> [`embedded-realtime-gaps.md`](embedded-realtime-gaps.md), section 2.
+
 **Status:** §3 items 1 and 2 are **done**. Every `FatalError` CALL SITE in the tree is
 gone - slice 1 and sub-slices 2a/2b for `src/rdb` (§2, §3.1a, §3.1b), then A1
 (`compiler.cpp`, §3.3), A2 (the parser and plan model, §3.4), C (the communication thread,

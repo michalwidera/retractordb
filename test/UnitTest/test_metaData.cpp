@@ -3,6 +3,7 @@
 #include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
 #include "rdb/metaData.hpp"
+#include "rdbResult.hpp"
 
 #include <chrono>
 #include <cstdio>
@@ -20,10 +21,15 @@ TEST(MetaDataIndexRecordTest, test_IndexRecord_serialization) {
   original.recordCount = 42;
   original.nullBitset  = {true, false, true, true, false};
 
-  std::vector<std::byte> serialized       = original.serialize();
-  rdb::metaData::IndexRecord deserialized = rdb::metaData::IndexRecord::deserialize(serialized);
-  EXPECT_EQ(deserialized.recordCount, original.recordCount);
-  EXPECT_EQ(deserialized.nullBitset, original.nullBitset);
+  std::vector<std::byte> serialized = original.serialize();
+  const auto deserialized           = rdb::metaData::IndexRecord::deserialize(serialized);
+  ASSERT_TRUE(deserialized.has_value());
+  EXPECT_EQ(deserialized->recordCount, original.recordCount);
+  EXPECT_EQ(deserialized->nullBitset, original.nullBitset);
+
+  // Wpis krotszy niz deklaruje (uszkodzony plik .meta) daje nullopt, a nie odczyt poza buforem.
+  serialized.pop_back();
+  EXPECT_FALSE(rdb::metaData::IndexRecord::deserialize(serialized).has_value());
 }
 
 TEST(MetaDataIndexRecordTest, test_IndexRecord_gap_serialization) {
@@ -34,9 +40,10 @@ TEST(MetaDataIndexRecordTest, test_IndexRecord_gap_serialization) {
 
   auto serialized   = gap.serialize();
   auto deserialized = rdb::metaData::IndexRecord::deserialize(serialized);
-  EXPECT_TRUE(deserialized.isGap);
-  EXPECT_EQ(deserialized.recordCount, 5U);
-  EXPECT_EQ(deserialized.nullBitset, gap.nullBitset);
+  ASSERT_TRUE(deserialized.has_value());
+  EXPECT_TRUE(deserialized->isGap);
+  EXPECT_EQ(deserialized->recordCount, 5U);
+  EXPECT_EQ(deserialized->nullBitset, gap.nullBitset);
 }
 
 // ── onRecordModified: committed-on-disk path (rewriteFile) ──────────
@@ -60,7 +67,7 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_on_disk) {
 
   EXPECT_EQ(meta.segments().size(), 2U);
 
-  meta.onRecordModified(1, noNull_);  // triggers rewriteFile
+  ASSERT_RDB_OK(meta.onRecordModified(1, noNull_));  // triggers rewriteFile
 
   EXPECT_EQ(meta.totalRecords(), 4U);
   EXPECT_EQ(meta.getNullBitset(0), null_);
@@ -160,8 +167,8 @@ TEST_F(MetaTestFixture, integration_gap_markers_with_operations) {
     EXPECT_EQ(gapCnt, 2U);
   }
 
-  meta.onRecordModified(2, normal);
-  meta.onRecordModified(3, normal);
+  ASSERT_RDB_OK(meta.onRecordModified(2, normal));
+  ASSERT_RDB_OK(meta.onRecordModified(3, normal));
 
   EXPECT_EQ(meta.getNullBitset(2), normal);
   EXPECT_EQ(meta.getNullBitset(3), normal);
@@ -426,7 +433,7 @@ TEST_F(MetaTestFixture, test_modify_non_last_in_current_entry_while_tail_dirty) 
   // Modify non-last record in currentEntry_ (rec 1, offset 1, two records follow).
   // The stale on-disk entry [{A,3}] must be overwritten with the prefix [{A,1}],
   // not left as-is with new entries appended after it.
-  meta.onRecordModified(1, B);
+  ASSERT_RDB_OK(meta.onRecordModified(1, B));
 
   meta.flushCurrentEntry();  // flush suffix {A,2}
 
@@ -477,7 +484,7 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_while_tail_dirty) {
   ASSERT_EQ(meta.totalRecords(), 5U);
 
   // Modify an earlier committed record (rec 1) while the on-disk tail is stale.
-  meta.onRecordModified(1, C);
+  ASSERT_RDB_OK(meta.onRecordModified(1, C));
 
   ASSERT_EQ(meta.totalRecords(), 5U);
   EXPECT_EQ(meta.getNullBitset(0), A);

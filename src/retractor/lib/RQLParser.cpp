@@ -22,11 +22,11 @@
 #include ".antlr/RQLLexer.h"
 #include ".antlr/RQLParser.h"
 #include "antlr4-runtime/antlr4-runtime.h"
+#include "compiler.hpp"  // kInternalCompilerError - status bledu wewnetrznego
 #include "constants.hpp"
 #include "exprSimplify.hpp"
 #include "qTree.hpp"
 #include "rdb/convertTypes.hpp"
-#include "rdb/exceptions.hpp"
 #include "rdb/sizeLimits.hpp"
 #include "rqlFunctions.hpp"
 
@@ -45,6 +45,13 @@ constexpr size_t kAgseWindowSignChildIndex = 5;
 /// dalej callbacki ParserListenera na kalekich kontekstach, gdzie np. ctx->ID() jest nullem.
 /// Rzut wychodzi z prog() przez generowany kod, bo ten lapie wylacznie RecognitionException.
 struct RQLSyntaxError {
+  std::string message;
+};
+
+/// Zlamany niezmiennik listenera (abortInternal). Rzucany tylko WEWNATRZ tego pliku i lapany w
+/// parserRQLString() - tak jak RQLSyntaxError NIE dziedziczy po antlr4::RecognitionException,
+/// bo wygenerowany kod parsera lapie ten typ i polknalby rzut w odzyskiwaniu po bledzie.
+struct RQLInternalError {
   std::string message;
 };
 
@@ -345,7 +352,7 @@ class ParserListener : public RQLBaseListener {
   [[noreturn]] void abortInternal(const std::string &message) {
     SPDLOG_CRITICAL("Parser: {}", message);
     parser_.removeParseListeners();
-    throw rdb::LogicError(message);
+    throw RQLInternalError{message};
   }
 
   void enterProg(RQLParser::ProgContext *ctx) override {}
@@ -928,9 +935,11 @@ class ParserListener : public RQLBaseListener {
   }
 };
 
-std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
-                                                                  std::vector<std::string> &statementKeywords, size_t firstLine,
-                                                                  std::string_view sourceFile) {
+namespace {
+
+std::tuple<std::string, std::string, std::string> parseRqlText(qTree &coreInstance, const std::string &inlet,
+                                                               std::vector<std::string> &statementKeywords, size_t firstLine,
+                                                               std::string_view sourceFile) {
   statementKeywords.clear();
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
@@ -992,6 +1001,29 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   if (!parserListener.semanticError().empty()) return {parserListener.semanticError(), firsttoken, streamName};
 
   return {"OK", firsttoken, streamName};
+}
+
+}  // namespace
+
+/// GRANICA WYSPY WYJATKOW (RDB_NO_EXCEPTIONS, korzen CMakeLists.txt). Ten plik jedyny w
+/// retractorcore ma wyjatki, bo steruje wygenerowanym parserem ANTLR, ktory przerywa parsowanie
+/// rzutem - i zaden wyjatek nie moze go opuscic: wolajacy (launcher, planSource, executorsmAdHoc,
+/// Engine) sa skompilowani bez wyjatkow, a rzut przez ich ramki to std::terminate. Bledy
+/// skladni i semantyki wracaja statusem jak dotad; zlamany niezmiennik listenera (abortInternal)
+/// i wszystko, co rzuci sam runtime ANTLR, wraca statusem z przedrostkiem kInternalCompilerError,
+/// ktory wolajacy odrozniaja od bledu planu.
+std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
+                                                                  std::vector<std::string> &statementKeywords, size_t firstLine,
+                                                                  std::string_view sourceFile) {
+  try {
+    return parseRqlText(coreInstance, inlet, statementKeywords, firstLine, sourceFile);
+  } catch (const RQLInternalError &error) {
+    return {std::string(kInternalCompilerError) + error.message, "UNRECOGNIZED", ""};
+  } catch (const std::exception &error) {
+    return {std::string(kInternalCompilerError) + "RQL parser: " + error.what(), "UNRECOGNIZED", ""};
+  } catch (...) {
+    return {std::string(kInternalCompilerError) + "RQL parser: unknown failure", "UNRECOGNIZED", ""};
+  }
 }
 
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,

@@ -12,9 +12,15 @@ add_library(${PROJECT_NAME} STATIC ${BUILDRDBEMBED_CC})
 
 # PUBLIC, bo konsument (modul Pythona, testy) potrzebuje tych samych bibliotek
 # na linii konsolidacji; kolejnosc dla bibliotek statycznych wyznacza CMake z
-# tego grafu (retractor deklaruje rdb, rqlparser i antlr4_static jako swoje
-# zaleznosci).
-target_link_libraries(${PROJECT_NAME} PUBLIC retractor rdb)
+# tego grafu (retractorcore deklaruje rdb, rqlparser i antlr4_static jako swoje
+# zaleznosci). Rdzen, nie `retractor`: silnik osadzony nie linkuje uslugi
+# demona.
+target_link_libraries(${PROJECT_NAME} PUBLIC retractorcore rdb)
+
+# Fasada osadzenia jest czescia rdzenia bez wyjatkow (RDB_NO_EXCEPTIONS): bledy
+# wychodza z niej jako rdb::Result, a na wyjatek Pythona zamienia je dopiero
+# modul nanobind.
+rdb_no_exceptions(${PROJECT_NAME})
 
 # Naglowki silnika sa wlaczane sciezka od korzenia src
 # ("retractor/lib/dataModel.hpp"), tak jak robia to testy jednostkowe; naglowek

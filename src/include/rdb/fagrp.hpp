@@ -63,7 +63,7 @@ class groupFile : public FileInterface {
   ssize_t purge();
 
   auto name() -> std::string & override;
-  size_t count() override;
+  [[nodiscard]] Result<size_t> count() override;
   [[nodiscard]] const std::string &initializationError() const override { return initializationError_; }
   [[nodiscard]] bool hasShadow() const override { return !vec_.empty() && vec_.front()->hasShadow(); }
   // NOLINTEND(portability-template-virtual-member-function)

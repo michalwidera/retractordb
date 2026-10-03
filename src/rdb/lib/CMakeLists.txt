@@ -34,6 +34,15 @@ target_include_directories(
 # ze libdescparser.a stoi ZA nim.
 target_link_libraries(${PROJECT_NAME} PUBLIC descparser antlr4_static)
 
+# Rdzen bez wyjatkow (RDB_NO_EXCEPTIONS, korzen CMakeLists.txt) z dwiema
+# wyspami. DESCParser.cc steruje parserem ANTLR, ktory przerywa parsowanie
+# wyjatkiem, i sam lapie go na granicy: parserDESCString() zwraca status.
+# stackTrace.cc opakowuje Boost.Stacktrace, ktorego naglowki maja `throw`/`try`
+# w funkcjach inline (zaplecze domyslne Boosta z Conana na macOS):
+# currentStackTrace() jest noexcept i zwraca napis.
+rdb_no_exceptions(${PROJECT_NAME})
+rdb_exception_island(DESCParser.cc stackTrace.cc)
+
 if(ENABLE_UNITY_BUILD)
   set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD ON)
 endif()

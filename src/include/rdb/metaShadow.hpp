@@ -37,7 +37,8 @@ class metaShadow {
     size_t recordIndex{0};         ///< absolute position of the overridden record in the main index
     std::vector<bool> nullBitset;  ///< new null bit-set pattern for that record
     [[nodiscard]] std::vector<std::byte> serialize() const;
-    static ShadowOverride deserialize(std::span<const std::byte> data);
+    /// nullopt dla wpisu krotszego niz deklaruje (uszkodzony plik cienia) - jak IndexRecord::deserialize.
+    [[nodiscard]] static std::optional<ShadowOverride> deserialize(std::span<const std::byte> data);
   };
 
   /// @param descriptor   descriptor of the indexed data stream (determines entry size on disk)

@@ -69,7 +69,7 @@ two engines, one `VOLATILE` stream name, different inputs, different outputs.
 ### 2.3 What `compile()` refuses
 
 Three things a plan can ask for reach state the embedded engine does not have. Each is refused at
-`compile()`, as `CompileError`, rather than discovered as a `LogicError` half-way through a slot:
+`compile()`, as `CompileError`, rather than discovered as an internal error half-way through a slot:
 
 - **`DUMP` rule actions** - `dumpManager` reaches the model through the daemon's global `pProc`
   (`executorsmState.hpp`), which the embedded engine does not publish. Publishing it per engine
@@ -112,9 +112,13 @@ Python half: `rows()`, `to_numpy()`, `window()` and `Window`.
   `logging.getLogger("retractordb")`. The engine itself configures nothing (that is phase 2's
   gate); the *host* does, and the module is the host. spdlog is header-only and linked into the
   module with hidden symbols, so the logger being replaced is visible to nothing but `_core`.
-- **Exceptions.** `RQLSyntaxError` and `CompileError` are C++ types (`rdb::embed::SyntaxError`,
-  `rdb::embed::CompileError`, both `ConfigError`), registered like the rest of the hierarchy. The
-  binding parses no message text to decide a type.
+- **Errors.** `Engine` returns `rdb::Result` values. `RQLSyntaxError` and `CompileError` are the
+  Python classes for `rdb::Errc::Syntax` and `rdb::Errc::Compile`, both in the `ConfigError`
+  family. Until 2026-10 they were C++ exception types (`rdb::embed::SyntaxError`,
+  `rdb::embed::CompileError`). The binding parses no message text to decide a type. After an
+  error inside a slot the plan stops (`Engine.failed`), and every later `step()` raises
+  `InternalError` until `compile()` - see
+  [`embedded-realtime-gaps.md`](embedded-realtime-gaps.md) section 2.5.
 - **Windows and DLPack.** `window(stream, fields=, size=, stride=, dtype=)` is a NumPy array of
   shape `(n_windows, size, n_values)` that the `Window` object owns; `__dlpack__` and
   `__dlpack_device__` delegate to it, so `torch.from_dlpack(window)` shares the memory without a
@@ -138,5 +142,6 @@ a throughput limit, not a correctness one, and it goes with the daemon restructu
 **The host callback for `SYSTEM`.** Refusing the rule is the "off" the roadmap asked for; the
 "on" - a callback the host installs - is unwritten.
 
-**Phase 4 (ingest) and phase 5 (the taxonomy).** Untouched. `SyntaxError` and `CompileError` live
-in `rdb/embed/engine.hpp` because only `Engine::compile()` raises them; phase 5 may move them.
+**Phase 4 (ingest) and phase 5 (the taxonomy).** Phase 4 is untouched. The taxonomy now exists as
+`rdb::Errc` in `rdb/error.hpp` (2026-10); phase 5 is left with whether `Errc` needs finer
+categories than the seven it has.

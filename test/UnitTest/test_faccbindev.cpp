@@ -14,6 +14,7 @@
 
 #include "rdb/descriptor.hpp"
 #include "rdb/faccbindev.hpp"
+#include "rdbResult.hpp"
 
 // Tests intentionally use raw byte buffers for binary device I/O coverage.
 // NOLINTBEGIN(modernize-avoid-c-arrays)
@@ -60,7 +61,7 @@ TEST_F(BinaryDeviceROTest, read_exact_record_and_count) {
   EXPECT_EQ(out[1], 0x22);
   EXPECT_EQ(out[2], 0x33);
   EXPECT_EQ(out[3], 0x44);
-  EXPECT_EQ(dev.count(), 1U);
+  EXPECT_EQ(rdbtest::ok(dev.count()), 1U);
 
   auto nulls = dev.lastNullBitset();
   ASSERT_EQ(nulls.size(), 1U);
@@ -73,11 +74,11 @@ TEST_F(BinaryDeviceROTest, count_starts_at_zero_before_any_read) {
 
   auto desc = fixedIntDescriptor();
   rdb::binaryDeviceRO dev(path, desc, true);
-  EXPECT_EQ(dev.count(), 0U);
+  EXPECT_EQ(rdbtest::ok(dev.count()), 0U);
 
   uint8_t out[4] = {0, 0, 0, 0};
   EXPECT_EQ(dev.read(out, 0), EXIT_SUCCESS);
-  EXPECT_EQ(dev.count(), 1U);
+  EXPECT_EQ(rdbtest::ok(dev.count()), 1U);
 }
 
 TEST_F(BinaryDeviceROTest, read_loops_to_beginning_on_eof_when_enabled) {
@@ -94,7 +95,7 @@ TEST_F(BinaryDeviceROTest, read_loops_to_beginning_on_eof_when_enabled) {
   EXPECT_EQ(out[1], 0x02);
   EXPECT_EQ(out[2], 0x03);
   EXPECT_EQ(out[3], 0x04);
-  EXPECT_EQ(dev.count(), 2U);
+  EXPECT_EQ(rdbtest::ok(dev.count()), 2U);
 }
 
 TEST_F(BinaryDeviceROTest, read_zero_fills_on_eof_when_loop_disabled) {
@@ -116,7 +117,7 @@ TEST_F(BinaryDeviceROTest, read_zero_fills_on_eof_when_loop_disabled) {
   EXPECT_EQ(out[1], 0x00);
   EXPECT_EQ(out[2], 0x00);
   EXPECT_EQ(out[3], 0x00);
-  EXPECT_EQ(dev.count(), 2U);
+  EXPECT_EQ(rdbtest::ok(dev.count()), 2U);
 
   auto nulls = dev.lastNullBitset();
   ASSERT_EQ(nulls.size(), 1U);
@@ -136,7 +137,7 @@ TEST_F(BinaryDeviceROTest, read_fails_on_empty_file_when_loop_enabled) {
   EXPECT_EQ(out[1], 0x00);
   EXPECT_EQ(out[2], 0x00);
   EXPECT_EQ(out[3], 0x00);
-  EXPECT_EQ(dev.count(), 1U);
+  EXPECT_EQ(rdbtest::ok(dev.count()), 1U);
 
   auto nulls = dev.lastNullBitset();
   ASSERT_EQ(nulls.size(), 1U);
@@ -153,7 +154,7 @@ TEST_F(BinaryDeviceROTest, read_fails_on_missing_file_with_null_metadata) {
   EXPECT_EQ(out[1], 0x00);
   EXPECT_EQ(out[2], 0x00);
   EXPECT_EQ(out[3], 0x00);
-  EXPECT_EQ(dev.count(), 1U);
+  EXPECT_EQ(rdbtest::ok(dev.count()), 1U);
 
   auto nulls = dev.lastNullBitset();
   ASSERT_EQ(nulls.size(), 1U);

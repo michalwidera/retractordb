@@ -14,8 +14,8 @@
 #undef private
 
 #include "rdb/descriptor.hpp"
-#include "rdb/exceptions.hpp"
 #include "rdb/payload.hpp"
+#include "rdbResult.hpp"
 #include "syscallWrap.hpp"
 
 extern "C" off_t __real_lseek(int fd, off_t offset, int whence);
@@ -66,7 +66,7 @@ TEST(dumpManager, buildDumpChunk_accepts_fd_zero_as_valid) {
   wrappedWriteCalls = 0;
   wrappedLastFd     = -1;
 
-  const bool completed = manager.buildDumpChunk(task, payload.get());
+  const bool completed = rdbtest::ok(manager.buildDumpChunk(task, payload.get()));
 
   wrapEnabled = false;
 
@@ -77,7 +77,7 @@ TEST(dumpManager, buildDumpChunk_accepts_fd_zero_as_valid) {
   EXPECT_EQ(wrappedLastFd, 0);
 }
 
-TEST(dumpManager, buildDumpChunk_rejects_negative_fd) {
+TEST(dumpManagerDeathTest, buildDumpChunk_rejects_negative_fd) {
   dumpManager manager;
 
   auto descriptor = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
@@ -89,14 +89,9 @@ TEST(dumpManager, buildDumpChunk_rejects_negative_fd) {
   task.delayDumpRecordsToGo = 0;
   task.fd                   = -1;
 
-  // Plaster B3 fazy 1: rzut, nie smierc procesu. Niezmiennik silnika, wiec LogicError;
-  // komunikat sprawdzamy tak samo jak przedtem regexem EXPECT_DEATH.
-  try {
-    (void)manager.buildDumpChunk(task, payload.get());
-    FAIL() << "expected rdb::LogicError";
-  } catch (const rdb::LogicError &error) {
-    EXPECT_NE(std::string(error.what()).find("file descriptor is not set"), std::string::npos) << error.what();
-  }
+  // Niezmiennik silnika: RDB_ASSERT -> rdb::fatal (FATAL i koniec procesu). Plaster B3 fazy 1
+  // zamienil tu smierc procesu na rzut LogicError; rdzen bez wyjatkow wraca do zatrzymania.
+  EXPECT_DEATH(static_cast<void>(manager.buildDumpChunk(task, payload.get())), "FATAL: .*file descriptor is not set");
 }
 
 // ============================================================
@@ -114,7 +109,7 @@ TEST(dumpManager, buildDumpChunk_delay_decrements_returns_false) {
   task.delayDumpRecordsToGo = 2;
   task.fd                   = 0;  // wrapping nie jest potrzebne - zapis nie nastąpi
 
-  const bool result = manager.buildDumpChunk(task, payload.get());
+  const bool result = rdbtest::ok(manager.buildDumpChunk(task, payload.get()));
 
   EXPECT_FALSE(result);
   EXPECT_EQ(task.delayDumpRecordsToGo, 1);
@@ -134,7 +129,7 @@ TEST(dumpManager, buildDumpChunk_delay_exhausted_then_writes) {
   task.fd                   = 0;
 
   // Pierwsze wywołanie: opóźnienie, brak zapisu
-  bool r1 = manager.buildDumpChunk(task, payload.get());
+  bool r1 = rdbtest::ok(manager.buildDumpChunk(task, payload.get()));
   EXPECT_FALSE(r1);
   EXPECT_EQ(task.delayDumpRecordsToGo, 0);
 
@@ -143,7 +138,7 @@ TEST(dumpManager, buildDumpChunk_delay_exhausted_then_writes) {
   wrappedLseekCalls = 0;
   wrappedWriteCalls = 0;
 
-  bool r2 = manager.buildDumpChunk(task, payload.get());
+  bool r2 = rdbtest::ok(manager.buildDumpChunk(task, payload.get()));
 
   wrapEnabled = false;
 
@@ -171,15 +166,15 @@ TEST(dumpManager, buildDumpChunk_multiple_records_not_done_until_last) {
   wrapEnabled       = true;
   wrappedWriteCalls = 0;
 
-  bool r1 = manager.buildDumpChunk(task, payload.get());
+  bool r1 = rdbtest::ok(manager.buildDumpChunk(task, payload.get()));
   EXPECT_FALSE(r1);
   EXPECT_EQ(task.dumpedRecordsToGo, 2);
 
-  bool r2 = manager.buildDumpChunk(task, payload.get());
+  bool r2 = rdbtest::ok(manager.buildDumpChunk(task, payload.get()));
   EXPECT_FALSE(r2);
   EXPECT_EQ(task.dumpedRecordsToGo, 1);
 
-  bool r3 = manager.buildDumpChunk(task, payload.get());
+  bool r3 = rdbtest::ok(manager.buildDumpChunk(task, payload.get()));
   EXPECT_TRUE(r3);
   EXPECT_EQ(task.dumpedRecordsToGo, 0);
 
@@ -192,7 +187,7 @@ TEST(dumpManager, buildDumpChunk_multiple_records_not_done_until_last) {
 // buildDumpChunk - FatalError dla ujemnych wartości
 // ============================================================
 
-TEST(dumpManager, buildDumpChunk_negative_dumpedRecordsToGo_throws) {
+TEST(dumpManagerDeathTest, buildDumpChunk_negative_dumpedRecordsToGo_is_fatal) {
   dumpManager manager;
 
   auto descriptor = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
@@ -203,17 +198,12 @@ TEST(dumpManager, buildDumpChunk_negative_dumpedRecordsToGo_throws) {
   task.delayDumpRecordsToGo = 0;
   task.fd                   = 0;
 
-  // Plaster B3 fazy 1: rzut, nie smierc procesu. Niezmiennik silnika, wiec LogicError;
-  // komunikat sprawdzamy tak samo jak przedtem regexem EXPECT_DEATH.
-  try {
-    (void)manager.buildDumpChunk(task, payload.get());
-    FAIL() << "expected rdb::LogicError";
-  } catch (const rdb::LogicError &error) {
-    EXPECT_NE(std::string(error.what()).find("dumpedRecordsToGo is negative"), std::string::npos) << error.what();
-  }
+  // Niezmiennik silnika: RDB_ASSERT -> rdb::fatal (FATAL i koniec procesu). Plaster B3 fazy 1
+  // zamienil tu smierc procesu na rzut LogicError; rdzen bez wyjatkow wraca do zatrzymania.
+  EXPECT_DEATH(static_cast<void>(manager.buildDumpChunk(task, payload.get())), "FATAL: .*dumpedRecordsToGo is negative");
 }
 
-TEST(dumpManager, buildDumpChunk_negative_delayDumpRecordsToGo_throws) {
+TEST(dumpManagerDeathTest, buildDumpChunk_negative_delayDumpRecordsToGo_is_fatal) {
   dumpManager manager;
 
   auto descriptor = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
@@ -224,14 +214,9 @@ TEST(dumpManager, buildDumpChunk_negative_delayDumpRecordsToGo_throws) {
   task.delayDumpRecordsToGo = -1;
   task.fd                   = 0;
 
-  // Plaster B3 fazy 1: rzut, nie smierc procesu. Niezmiennik silnika, wiec LogicError;
-  // komunikat sprawdzamy tak samo jak przedtem regexem EXPECT_DEATH.
-  try {
-    (void)manager.buildDumpChunk(task, payload.get());
-    FAIL() << "expected rdb::LogicError";
-  } catch (const rdb::LogicError &error) {
-    EXPECT_NE(std::string(error.what()).find("delayDumpRecordsToGo is negative"), std::string::npos) << error.what();
-  }
+  // Niezmiennik silnika: RDB_ASSERT -> rdb::fatal (FATAL i koniec procesu). Plaster B3 fazy 1
+  // zamienil tu smierc procesu na rzut LogicError; rdzen bez wyjatkow wraca do zatrzymania.
+  EXPECT_DEATH(static_cast<void>(manager.buildDumpChunk(task, payload.get())), "FATAL: .*delayDumpRecordsToGo is negative");
 }
 
 // ============================================================
@@ -319,7 +304,7 @@ TEST_F(DumpManagerFileTest, createDumpFile_without_retention_creates_tmp_suffix)
   manager.storagePath = sandBoxFolder.string();
   // retentionSize["streamt"] = 0 (domyślna wartość mapy)
 
-  auto [filename, fd] = manager.createDumpFile("stream", "t");
+  auto [filename, fd] = rdbtest::ok(manager.createDumpFile("stream", "t"));
   ASSERT_GE(fd, 0);
   ::close(fd);
 
@@ -332,11 +317,11 @@ TEST_F(DumpManagerFileTest, createDumpFile_with_retention_creates_numbered_files
   manager.storagePath                 = sandBoxFolder.string();
   manager.retentionSize["streamtask"] = 3;
 
-  auto [f0, fd0] = manager.createDumpFile("stream", "task");
+  auto [f0, fd0] = rdbtest::ok(manager.createDumpFile("stream", "task"));
   ASSERT_GE(fd0, 0);
   ::close(fd0);
 
-  auto [f1, fd1] = manager.createDumpFile("stream", "task");
+  auto [f1, fd1] = rdbtest::ok(manager.createDumpFile("stream", "task"));
   ASSERT_GE(fd1, 0);
   ::close(fd1);
 

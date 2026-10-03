@@ -1,28 +1,10 @@
 #include "rdb/payload.hpp"
 
-// Wybor zaplecza boost::stacktrace. addr2line rozwiazuje adresy najdokladniej
-// (nazwa pliku i numer linii), ale jest osobnym programem z binutils, ktorego na
-// czesci systemow nie ma w ogole - na macOS odpowiednikiem jest atos, o innym
-// interfejsie. Bez tego makra Boost bierze zaplecze domyslne (backtrace + dladdr):
-// slad jest krotszy o numery linii, ale POWSTAJE, zamiast czekac 60 s na program,
-// ktorego nie ma. Obecnosc addr2line sprawdza find_program w
-// cmake/PlatformChecks.cmake, wiec decyzja zapada raz, przy konfiguracji.
+// RDB_HAS_ADDR2LINE - wybor zaplecza sladu stosu i tresc komunikatu ponizej. Samo
+// Boost.Stacktrace mieszka w stackTrace.cc (wyspa z wyjatkami): jego naglowki maja `throw`
+// i `try` w funkcjach inline, wiec w tej jednostce, kompilowanej z -fno-exceptions, nie
+// skompilowalyby sie (zaplecze domyslne Boosta z Conana na macOS).
 #include "platformConfig.h"
-
-#if RDB_HAS_ADDR2LINE
-#define BOOST_STACKTRACE_USE_ADDR2LINE
-#endif
-
-// Zaplecze domyslne (rozwijanie stosu + dladdr) stoi na _Unwind_Backtrace, a Boost
-// odmawia jego uzycia, dopoki nie zobaczy _GNU_SOURCE. To jest warunek o GLIBC, nie
-// o dostepnosci samej funkcji: na Linuksie _GNU_SOURCE definiuje za nas libstdc++,
-// wiec byl spelniony przypadkiem i nikt go nie zauwazyl. Poza glibc
-// _Unwind_Backtrace pochodzi z libunwind i jest deklarowane bezwarunkowo, wiec nie
-// ma tu czego sprawdzac - i tyle Boostowi mowimy. Bez tego jedyny plik w drzewie
-// uzywajacy boost::stacktrace nie kompiluje sie wcale.
-#if !defined(_GNU_SOURCE) && !defined(BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED)
-#define BOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED
-#endif
 
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
@@ -31,19 +13,20 @@
 #include <array>
 #include <bit>
 #include <boost/rational.hpp>
-#include <boost/stacktrace.hpp>
 
 #include <cstdint>
 #include <cstring>  // std::memcpy (for C-interop)
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <ranges>
 #include <sstream>
 #include <type_traits>
 #include <utility>
-#include "rdb/exceptions.hpp"
+#include "rdb/error.hpp"
 
 #include "rdb/convertTypes.hpp"
+#include "rdb/stackTrace.hpp"
 
 namespace rdb {
 
@@ -62,23 +45,32 @@ int resolveFieldIndexOrAbort(const Descriptor &descriptor, const int positionFla
 #else
       std::cerr << "Collecting stack trace." << '\n';
 #endif
-      std::stringstream message;
-      message << boost::stacktrace::stacktrace();
-      SPDLOG_ERROR("Stack: {}", message.str());
-      std::cerr << message.str() << '\n';
+      const std::string trace = rdb::currentStackTrace();
+      SPDLOG_ERROR("Stack: {}", trace);
+      std::cerr << trace << '\n';
     }
-    throw LogicError("payload: flat position out of range");
+    // Pozycja plaska pochodzi z kompilatora planu albo ze strazy wiazania Pythona (IndexError
+    // przed wywolaniem) - spoza zakresu znaczy blad w kodzie, a zapis dalej bylby zapisem poza
+    // rekordem. Stad zatrzymanie, nie blad zwracany.
+    rdb::fatal(fmt::format("payload: {} flat position {} out of range [0,{})", context, positionFlat, flatCount));
   }
 
   auto positionOpt = descriptor.flatIndexToDescriptorPosition(positionFlat);
-  if (positionOpt.has_value()) {
-    const auto position = positionOpt->first;
-    if (position < 0 || std::cmp_greater_equal(position, descriptor.size())) {
-      throw LogicError(fmt::format("payload: {} converted index {} out of descriptor bounds", context, position));
-    }
-    return position;
-  }
-  throw LogicError(fmt::format("payload: {} conversion failed for flat position {}", context, positionFlat));
+  RDB_ASSERT(positionOpt.has_value(), "payload: {} conversion failed for flat position {}", context, positionFlat);
+  const auto position = positionOpt->first;
+  RDB_ASSERT(position >= 0 && std::cmp_less(position, descriptor.size()),
+             "payload: {} converted index {} out of descriptor bounds", context, position);
+  return position;
+}
+
+/// Wartosc std::any jako T. Typ niesiony przez any wynika z typu pola, ktory zna wolajacy, wiec
+/// niezgodnosc to blad w kodzie. Forma z wskaznikiem zamiast std::any_cast<T>(any): ta rzuca
+/// bad_any_cast, a w buildzie bez wyjatkow konczy proces bez slowa o przyczynie.
+template <typename T>
+const T &anyAs(const std::any &value) {
+  const T *typed = std::any_cast<T>(&value);
+  RDB_ASSERT(typed != nullptr, "payload: value of type {} where the field type expects another", value.type().name());
+  return *typed;
 }
 
 void writeValue(std::ostream &os, const std::any &value, const descFld type, const bool hexFormat) {
@@ -87,51 +79,83 @@ void writeValue(std::ostream &os, const std::any &value, const descFld type, con
       os << "null";
       break;
     case rdb::STRING:
-      os << std::any_cast<std::string>(value);
+      os << anyAs<std::string>(value);
       break;
     case rdb::BYTE: {
       if (hexFormat) {
         os << std::setfill('0') << std::setw(kHexByteWidth);
       }
-      os << static_cast<int>(std::any_cast<uint8_t>(value));
+      os << static_cast<int>(anyAs<uint8_t>(value));
       break;
     }
     case rdb::INTEGER: {
       if (hexFormat) {
         os << std::setfill('0') << std::setw(kHexWordWidth);
       }
-      os << std::any_cast<int>(value);
+      os << anyAs<int>(value);
       break;
     }
     case rdb::UINT: {
       if (hexFormat) {
         os << std::setfill('0') << std::setw(kHexWordWidth);
       }
-      os << std::any_cast<unsigned>(value);
+      os << anyAs<unsigned>(value);
       break;
     }
     case rdb::FLOAT:
-      os << std::any_cast<float>(value);
+      os << anyAs<float>(value);
       break;
     case rdb::DOUBLE:
-      os << std::any_cast<double>(value);
+      os << anyAs<double>(value);
       break;
     case rdb::RATIONAL:
-      os << std::any_cast<boost::rational<int>>(value);
+      os << anyAs<boost::rational<int>>(value);
       break;
+    case rdb::INTPAIR:
+    case rdb::IDXPAIR:
+      // Pary sa operandami tokenow planu, nie typami pol rekordu - gramatyka .desc ich nie zna (#267).
+      // Tu i tak nie dochodza: operator<< czyta wartosc przez getItem, a ten konczy proces na tym
+      // samym typie. Jawne przypadki zamiast milczacego pominiecia (-Wswitch).
+      rdb::fatal("payload: INTPAIR/IDXPAIR are plan token operands, not record field types");
     case rdb::REF:
     case rdb::TYPE:
     case rdb::RETENTION:
     case rdb::RETMEMORY:
-      throw LogicError("payload: configuration fields (REF/TYPE/RETENTION) cannot be formatted");
-      break;
+      // operator<< pomija pola konfiguracyjne, zanim zapyta o wartosc - tu nie dochodzi nic poza bledem w kodzie.
+      rdb::fatal("payload: configuration fields (REF/TYPE/RETENTION) cannot be formatted");
   }
+}
+
+/// Ulamek w postaci tekstowej "n/d" - zamiennik operator>> z boost/rational.hpp, ktory w srodku
+/// lapie bad_rational (try/catch) i dlatego nie kompiluje sie w rdzeniu bez wyjatkow. Semantyka ta
+/// sama: tekst, ktory nie jest ulamkiem z poprawnym mianownikiem, ustawia failbit i zostawia @p out.
+std::istream &readRationalText(std::istream &is, boost::rational<int> &out) {
+  int numerator   = 0;
+  int denominator = 1;
+  char slash      = 0;
+  if (!(is >> numerator)) return is;
+  if (!is.get(slash) || slash != '/' || !(is >> std::noskipws >> denominator >> std::skipws)) {
+    is.setstate(std::ios::failbit);
+    return is;
+  }
+  // Mianownik zero, INT_MIN albo ujemny przy liczniku INT_MIN nie da sie znormalizowac - patrz
+  // rationalOf w convertTypes.cc.
+  if (denominator == 0 || denominator == std::numeric_limits<int>::min() ||
+      (denominator < 0 && numerator == std::numeric_limits<int>::min())) {
+    is.setstate(std::ios::failbit);
+    return is;
+  }
+  out.assign(numerator, denominator);
+  return is;
 }
 
 template <typename T>
 void copyToMemory(std::istream &is, payload &rhs, const std::string_view fieldName, const int arrayOffset) {
-  T data;
-  is >> data;
+  T data{};
+  if constexpr (std::is_same_v<T, boost::rational<int>>)
+    readRationalText(is, data);
+  else
+    is >> data;
   Descriptor desc(rhs.descriptor);
   auto dest = rhs.span().subspan(desc.fieldByteOffset(fieldName) + arrayOffset, sizeof(T));
   std::memcpy(dest.data(), &data, sizeof(T));
@@ -207,15 +231,15 @@ payload &payload::operator=(const payload &other) {
 /// - Zrodlo zostaje w calosci nietkniete, wiec nie powstaje obiekt czesciowo przeniesiony
 ///   (deskryptor z wpisami, a bitset pusty), po ktorym getItemVT czytalby poza zakresem.
 ///
-/// BEZ noexcept: niezgodny deskryptor celu rzuca LogicError (faza 1, dawniej FatalError, ktory
-/// konczyl przez std::exit i dlatego nie rzucal). Rzut z funkcji noexcept to std::terminate - w
-/// procesie osadzajacym smierc jadra notatnika bez zadnego catch po drodze. Realokacja
-/// std::vector bierze konstruktor przenoszacy, a ten noexcept zostaje.
-payload &payload::operator=(payload &&other) {
+/// noexcept: niezgodny deskryptor celu to zlamany niezmiennik (rdb::fatal), a nie rzut - silnik
+/// nie zglasza bledow wyjatkami - wiec nic nie opuszcza tej funkcji inaczej niz powrotem.
+/// Przypisanie do celu z ksztaltem nie alokuje (rozmiar bufora i bitsetu juz jest), wiec i
+/// bad_alloc stad nie wychodzi. Kontenery biora przenoszenie tylko wtedy, gdy jest noexcept.
+payload &payload::operator=(payload &&other) noexcept {
   if (this == &other) return *this;
 
   // Reguly zgodnosci nie ma tu drugiego raza: cel z ksztaltem obsluguje przypisanie kopiujace,
-  // razem z warunkiem zgodnosci i z LogicError na niezgodnym deskryptorze.
+  // razem z warunkiem zgodnosci i z asercja na niezgodnym deskryptorze.
   if (!descriptor.empty()) return *this = static_cast<const payload &>(other);
 
   // Cel pusty - ta sama sciezka co operator=(const Descriptor&), tylko bez kopiowania czegokolwiek.
@@ -238,9 +262,8 @@ void payload::retargetNullBitsetFrom(const payload &other) {
   for (int slot = 0; slot < slots; ++slot) {
     const auto targetPosition = descriptor.flatIndexToDescriptorPosition(slot);
     const auto sourcePosition = other.descriptor.flatIndexToDescriptorPosition(slot);
-    if (!targetPosition.has_value() || !sourcePosition.has_value()) {
-      throw LogicError(fmt::format("payload: flat slot {} missing while retargeting NULL flags", slot));
-    }
+    RDB_ASSERT(targetPosition.has_value() && sourcePosition.has_value(),
+               "payload: flat slot {} missing while retargeting NULL flags", slot);
     if (other.nullBitset_[sourcePosition->first]) nullBitset_[targetPosition->first] = true;
   }
 }
@@ -258,11 +281,9 @@ payload &payload::operator=(const Descriptor &other) {
     payloadData_.assign(other.getSizeInBytes(), 0);
     nullBitset_.assign(descriptor.size(), false);
   } else {
-    if (descriptor == other) {  // compare rlen and rtype only here
-      // descriptor = other; <- Just change field names - descriptor remains the same, payload remains the same
-      // pass
-    } else
-      throw LogicError("payload: descriptor not empty before assign - schema mismatch");
+    // compare rlen and rtype only here; descriptor = other; <- would just change field names -
+    // descriptor remains the same, payload remains the same.
+    RDB_ASSERT(descriptor == other, "payload: descriptor not empty before assign - schema mismatch");
   }
   return *this;
 }
@@ -301,10 +322,8 @@ void payload::setHex(bool hexFormatVal) { hexFormat_ = hexFormatVal; }
 const std::vector<bool> &payload::getNullBitset() const { return nullBitset_; }
 
 void payload::setNullBitset(const std::vector<bool> &nullBitset) {
-  if (nullBitset.size() != descriptor.size()) {
-    throw LogicError(
-        fmt::format("payload::setNullBitset: size mismatch: nullBitset={} descriptor={}", nullBitset.size(), descriptor.size()));
-  }
+  RDB_ASSERT(nullBitset.size() == descriptor.size(), "payload::setNullBitset: size mismatch: nullBitset={} descriptor={}",
+             nullBitset.size(), descriptor.size());
   nullBitset_ = nullBitset;
 }
 
@@ -313,12 +332,14 @@ std::span<uint8_t> payload::span() { return {payloadData_.data(), descriptor.get
 std::span<const uint8_t> payload::span() const { return {payloadData_.data(), descriptor.getSizeInBytes()}; }
 
 template <typename T>
-void payload::setItemBy(const int positionFlat, std::any value) {
-  T data          = std::any_cast<T>(value);
+bool payload::setItemBy(const int positionFlat, const std::any &value) {
+  const T *data = std::any_cast<T>(&value);  // forma bez rzutu - niezgodny typ obsluguje wolajacy
+  if (data == nullptr) return false;
   auto position   = resolveFieldIndexOrAbort(descriptor, positionFlat, "Write");
   auto offsetFlat = descriptor.byteOffsetAtFlatIndex(positionFlat);
   auto dest       = span().subspan(offsetFlat, descriptor[position].rlen);
-  std::memcpy(dest.data(), &data, descriptor[position].rlen);
+  std::memcpy(dest.data(), data, descriptor[position].rlen);
+  return true;
 }
 
 void payload::setItem(const int positionFlat, std::optional<std::any> valueParam) {
@@ -342,56 +363,58 @@ void payload::setItem(const int positionFlat, std::optional<std::any> valueParam
     }
   }
 
-  auto writeStringField = [&]() {
-    const auto len  = descriptor[position].rlen * descriptor[position].rarray;
-    auto data       = std::any_cast<std::string>(value);
-    auto lenr       = std::min(len, static_cast<int>(data.length()));
+  auto writeStringField = [&]() -> bool {
+    const auto len          = descriptor[position].rlen * descriptor[position].rarray;
+    const std::string *data = std::any_cast<std::string>(&value);
+    if (data == nullptr) return false;
+    auto lenr       = std::min(len, static_cast<int>(data->length()));
     auto destOffset = descriptor.byteOffsetAtFlatIndex(positionFlat);
     auto dest       = span().subspan(destOffset, len);
-    if (destOffset + len > descriptor.getSizeInBytes()) {
-      throw LogicError(fmt::format("payload::writeStringField: destOffset {} + len {} exceeds descriptor size {}", destOffset,
-                                   len, descriptor.getSizeInBytes()));
-    }
+    RDB_ASSERT(destOffset + len <= descriptor.getSizeInBytes(),
+               "payload::writeStringField: destOffset {} + len {} exceeds descriptor size {}", destOffset, len,
+               descriptor.getSizeInBytes());
     std::ranges::fill(dest, 0);
-    std::copy_n(data.c_str(), lenr, dest.begin());
+    std::copy_n(data->c_str(), lenr, dest.begin());
+    return true;
   };
 
-  try {
-    switch (requestedType) {
-      case rdb::NULLTYPE:
-        break;
-      case rdb::STRING:
-        writeStringField();
-        break;
-      case rdb::BYTE:
-        setItemBy<uint8_t>(positionFlat, value);
-        break;
-      case rdb::INTEGER:
-        setItemBy<int>(positionFlat, value);
-        break;
-      case rdb::UINT:
-        setItemBy<unsigned>(positionFlat, value);
-        break;
-      case rdb::DOUBLE:
-        setItemBy<double>(positionFlat, value);
-        break;
-      case rdb::FLOAT:
-        setItemBy<float>(positionFlat, value);
-        break;
-      case rdb::RATIONAL:
-        setItemBy<boost::rational<int>>(positionFlat, value);
-        break;
-      case rdb::REF:
-      case rdb::TYPE:
-      case rdb::RETENTION:
-      case rdb::RETMEMORY:
-        break;
-      default:
-        throw LogicError(fmt::format("payload::setItem: unsupported field type: {}", (int)requestedType));
-    }
-  } catch (const std::bad_any_cast &) {
-    SPDLOG_ERROR("Error on payload::setItem");
+  // Wartosc innego typu niz pole (np. napis bez konwersji do pola liczbowego) jest logowana i
+  // pomijana - ta sama decyzja co dawny catch (std::bad_any_cast), tylko bez wyjatku: forma
+  // std::any_cast ze wskaznikiem zwraca nullptr zamiast rzucac.
+  bool written = true;
+  switch (requestedType) {
+    case rdb::NULLTYPE:
+      break;
+    case rdb::STRING:
+      written = writeStringField();
+      break;
+    case rdb::BYTE:
+      written = setItemBy<uint8_t>(positionFlat, value);
+      break;
+    case rdb::INTEGER:
+      written = setItemBy<int>(positionFlat, value);
+      break;
+    case rdb::UINT:
+      written = setItemBy<unsigned>(positionFlat, value);
+      break;
+    case rdb::DOUBLE:
+      written = setItemBy<double>(positionFlat, value);
+      break;
+    case rdb::FLOAT:
+      written = setItemBy<float>(positionFlat, value);
+      break;
+    case rdb::RATIONAL:
+      written = setItemBy<boost::rational<int>>(positionFlat, value);
+      break;
+    case rdb::REF:
+    case rdb::TYPE:
+    case rdb::RETENTION:
+    case rdb::RETMEMORY:
+      break;
+    default:
+      rdb::fatal(fmt::format("payload::setItem: unsupported field type: {}", static_cast<int>(requestedType)));
   }
+  if (!written) SPDLOG_ERROR("Error on payload::setItem");
 }
 
 template <typename T>
@@ -443,10 +466,8 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
     auto len       = descriptor[position].rlen * descriptor[position].rarray;
     auto fieldSpan = memory.subspan(offsetFlat, len);
     auto descLen   = descriptor.getSizeInBytes();
-    if (offsetFlat + static_cast<size_t>(len) > descLen) {
-      throw LogicError(fmt::format("payload::readStringField: field offset {} + len {} exceeds descriptor size {}", offsetFlat,
-                                   len, descLen));
-    }
+    RDB_ASSERT(offsetFlat + static_cast<size_t>(len) <= descLen,
+               "payload::readStringField: field offset {} + len {} exceeds descriptor size {}", offsetFlat, len, descLen);
 
     for (auto i = 0; i < len; i++) {
       if (fieldSpan[i] == 0) {
@@ -483,9 +504,12 @@ std::optional<std::any> payload::getItem(const int positionFlat) const {
     case rdb::RETMEMORY:
       SPDLOG_ERROR("Configuration field type not supported in getItem: {}", static_cast<int>(requestedType));
       return std::nullopt;
+    case rdb::INTPAIR:
+    case rdb::IDXPAIR:
+      break;  // nie typ pola rekordu (#267) - do rdb::fatal ponizej, jak kazdy typ spoza listy
   }
 
-  throw LogicError(fmt::format("payload::getItem: unsupported field type: {}", int(requestedType)));
+  rdb::fatal(fmt::format("payload::getItem: unsupported field type: {}", static_cast<int>(requestedType)));
 }
 
 // getItemVT / setItemVT (P1, speed_improvement): rownolegly interfejs wariantowy.
@@ -507,10 +531,8 @@ std::optional<rdb::descFldVT> payload::getItemVT(const int positionFlat) const {
     auto len       = descriptor[position].rlen * descriptor[position].rarray;
     auto fieldSpan = memory.subspan(offsetFlat, len);
     auto descLen   = descriptor.getSizeInBytes();
-    if (offsetFlat + static_cast<size_t>(len) > descLen) {
-      throw LogicError(fmt::format("payload::getItemVT string: field offset {} + len {} exceeds descriptor size {}", offsetFlat,
-                                   len, descLen));
-    }
+    RDB_ASSERT(offsetFlat + static_cast<size_t>(len) <= descLen,
+               "payload::getItemVT string: field offset {} + len {} exceeds descriptor size {}", offsetFlat, len, descLen);
     for (auto i = 0; i < len; i++) {
       if (fieldSpan[i] == 0) {
         len = i;
@@ -546,9 +568,12 @@ std::optional<rdb::descFldVT> payload::getItemVT(const int positionFlat) const {
     case rdb::RETMEMORY:
       SPDLOG_ERROR("Configuration field type not supported in getItemVT: {}", static_cast<int>(requestedType));
       return std::nullopt;
+    case rdb::INTPAIR:
+    case rdb::IDXPAIR:
+      break;  // nie typ pola rekordu (#267) - do rdb::fatal ponizej, jak kazdy typ spoza listy
   }
 
-  throw LogicError(fmt::format("payload::getItemVT: unsupported field type: {}", int(requestedType)));
+  rdb::fatal(fmt::format("payload::getItemVT: unsupported field type: {}", static_cast<int>(requestedType)));
 }
 
 std::optional<int> payload::getIntegralItem(const int positionFlat) const {
@@ -563,8 +588,10 @@ std::optional<int> payload::getIntegralItem(const int positionFlat) const {
     case rdb::INTEGER:
       return getVal<int>(span(), offsetFlat);
     default:
-      throw LogicError(
-          fmt::format("payload::getIntegralItem: field type {} is not BYTE/INTEGER", int(descriptor[position].rtype)));
+      // Wolajacy (indeksy tablic w ewaluatorze) prosi o pole calkowite tylko dla pola, ktore
+      // kompilator sprawdzil jako BYTE/INTEGER.
+      rdb::fatal(fmt::format("payload::getIntegralItem: field type {} is not BYTE/INTEGER",
+                             static_cast<int>(descriptor[position].rtype)));
   }
 }
 
@@ -604,10 +631,9 @@ void payload::setItemVT(const int positionFlat, std::optional<rdb::descFldVT> va
       const auto data = std::get<std::string>(value);
       auto lenr       = std::min(len, static_cast<int>(data.length()));
       auto dest       = span().subspan(offsetFlat, len);
-      if (offsetFlat + len > descriptor.getSizeInBytes()) {
-        throw LogicError(fmt::format("payload::setItemVT string: destOffset {} + len {} exceeds descriptor size {}", offsetFlat,
-                                     len, descriptor.getSizeInBytes()));
-      }
+      RDB_ASSERT(offsetFlat + len <= descriptor.getSizeInBytes(),
+                 "payload::setItemVT string: destOffset {} + len {} exceeds descriptor size {}", offsetFlat, len,
+                 descriptor.getSizeInBytes());
       std::ranges::fill(dest, 0);
       std::copy_n(data.c_str(), lenr, dest.begin());
     } break;
@@ -635,7 +661,7 @@ void payload::setItemVT(const int positionFlat, std::optional<rdb::descFldVT> va
     case rdb::RETMEMORY:
       break;
     default:
-      throw LogicError(fmt::format("payload::setItemVT: unsupported field type: {}", (int)requestedType));
+      rdb::fatal(fmt::format("payload::setItemVT: unsupported field type: {}", static_cast<int>(requestedType)));
   }
 }
 
@@ -737,10 +763,8 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     } else {
       for (int i = 0; i < flatCountForField; ++i) {
         const auto value = rhs.getItem(flatIndex + i);
-        if (value.has_value())
-          writeValue(os, *value, r.rtype, rhs.hexFormat_);
-        else
-          throw LogicError("payload: non-null array field returned no value for flat element");
+        RDB_ASSERT(value.has_value(), "payload: non-null array field returned no value for flat element");
+        writeValue(os, *value, r.rtype, rhs.hexFormat_);
         if (i < flatCountForField - 1) os << " ";
       }
       flatIndex += flatCountForField;

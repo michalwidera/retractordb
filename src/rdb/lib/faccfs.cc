@@ -10,8 +10,6 @@
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
-#include "rdb/exceptions.hpp"
-
 namespace rdb {
 // https://courses.cs.vt.edu/~cs2604/fall02/binio.html
 // https://stackoverflow.com/questions/1658476/c-fopen-vs-open
@@ -44,10 +42,10 @@ genericBinaryFile::~genericBinaryFile() {
 
 auto genericBinaryFile::name() -> std::string & { return filename_; }
 
-size_t genericBinaryFile::count() {
-  if (recordSize_ == 0) throw LogicError("genericBinaryFile::count: recordSize_ is zero");
+Result<size_t> genericBinaryFile::count() {
+  if (recordSize_ == 0) return fail(Errc::Logic, "genericBinaryFile::count: recordSize_ is zero");
   // Rozmiar pliku zamiast otwierania strumienia: ten sam kontrakt co w blizniakach
-  // posixowych (ENOENT = magazyn pusty, kazdy inny blad rzuca IOError) i bez open/seek/close
+  // posixowych (ENOENT = magazyn pusty, kazdy inny blad to Errc::IO) i bez open/seek/close
   // na kazde wywolanie. Poprzednia postac nie sprawdzala, czy strumien sie otworzyl -
   // tellg() zwracalo wtedy -1, co dla recordSize_ > 1 obcinalo sie do zera przypadkiem,
   // a dla recordSize_ == 1 dawalo SIZE_MAX.
@@ -55,17 +53,17 @@ size_t genericBinaryFile::count() {
   const auto sizeInBytes = std::filesystem::file_size(filename_, ec);
   if (ec) {
     if (ec == std::errc::no_such_file_or_directory) return 0;
-    throw IOError(fmt::format("genericBinaryFile::count: file_size('{}') failed: {}", filename_, ec.message()));
+    return fail(Errc::IO, fmt::format("genericBinaryFile::count: file_size('{}') failed: {}", filename_, ec.message()));
   }
   return static_cast<size_t>(sizeInBytes / static_cast<uintmax_t>(recordSize_));
 }
 
 ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/, const size_t position) {
-  if (recordSize_ == 0)
-    throw LogicError("genericBinaryFile::write: recordSize_ is zero - accessor built on a zero-width descriptor");
+  // Akcesor na deskryptorze zerowej szerokosci: pozycja i rozmiar poza kontraktem (EINVAL).
+  if (recordSize_ == 0) return EINVAL;
   std::fstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
-  // Purge. Warunek wymagal dawniej takze recordSize_ == 0, czego nie da sie tu spelnic (LogicError
+  // Purge. Warunek wymagal dawniej takze recordSize_ == 0, czego nie da sie tu spelnic (EINVAL
   // wyzej), wiec purge wpadal w zwykly zapis spod nullptr i po cichu nie robil nic.
   if (ptrData == nullptr && position == 0) {
     myFile.open(filename_, std::ofstream::out | std::ofstream::trunc);
@@ -91,8 +89,7 @@ ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool>
 
 ssize_t genericBinaryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   nullBitset.clear();
-  if (recordSize_ == 0)
-    throw LogicError("genericBinaryFile::read: recordSize_ is zero - accessor built on a zero-width descriptor");
+  if (recordSize_ == 0) return EINVAL;  // uzasadnienie w write()
   std::ifstream myFile;
   myFile.rdbuf()->pubsetbuf(nullptr, 0);
   myFile.open(filename_, std::ios::in | std::ios::binary);

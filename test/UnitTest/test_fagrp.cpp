@@ -11,8 +11,8 @@
 
 #include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
-#include "rdb/exceptions.hpp"
 #include "rdb/fagrp.hpp"
+#include "rdbResult.hpp"
 
 static rdb::Descriptor makeDesc(size_t size) { return {"f", static_cast<int>(size), 1, rdb::BYTE}; }
 
@@ -101,17 +101,18 @@ TEST_F(GroupFileTest, failed_later_segment_keeps_earlier_segment_without_rotatio
 }
 
 // Status z konstruktora segmentu obsluguje tylko import planu. Nowy segment przy rotacji w pracy
-// ciaglej, ktorego nie da sie otworzyc, rzuca IOError z nazwa pliku - bez tego segment z
-// fd=-1 oddawalby z write() samo errno, a przy errno==0 cichy sukces bez zapisu.
+// ciaglej, ktorego nie da sie otworzyc, konczy write() statusem EIO i wpisem w logu z nazwa
+// pliku (storage zamienia EIO na blad Errc::IO) - bez tego segment z fd=-1 oddawalby z write()
+// samo errno, a przy errno==0 cichy sukces bez zapisu. Do 2026-10 byl to rzut IOError.
 TEST_F(GroupFileTest, failed_rotation_segment_is_fatal) {
   rdb::groupFile<> gfa(filename, makeDesc(recsize), rdb::retention_t{2, 1}, -1);
   BYTE record = 1;
   // Pierwszy zapis miesci sie w segmencie 0; dopiero drugi otwiera segment 1.
   ASSERT_EQ(gfa.write(&record), EXIT_SUCCESS);
   std::filesystem::create_directory(filename + "_segment_1");
-  EXPECT_THAT([&] { static_cast<void>(gfa.write(&record)); },
-              ::testing::ThrowsMessage<rdb::IOError>(
-                  ::testing::HasSubstr("groupFile::write: cannot open output file '" + filename + "_segment_1'")));
+  LogCapture log;
+  EXPECT_EQ(gfa.write(&record), EIO);
+  EXPECT_THAT(log.text(), ::testing::HasSubstr("groupFile::write: cannot open output file '" + filename + "_segment_1'"));
 }
 
 // Verify no-retention mode writes all records into a single file
@@ -131,7 +132,7 @@ TEST_F(GroupFileTest, test_fagrp_no_retention) {
   GTEST_ASSERT_EQ(mapOfFiles.size(), 1);
   GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file")].sizeFromSystem, 2);
   GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file")].fileContents, std::vector<BYTE>({11, 12}));
-  GTEST_ASSERT_EQ(gfa->count(), 2);
+  GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 2);
 }
 
 // Verify retention mode splits records across segment files with correct contents
@@ -157,7 +158,7 @@ TEST_F(GroupFileTest, test_fagrp_segmented_write_and_read) {
   GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_1")].sizeFromSystem, 3);
   GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_0")].fileContents, std::vector<BYTE>({1, 2, 3}));
   GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_1")].fileContents, std::vector<BYTE>({4, 5, 6}));
-  GTEST_ASSERT_EQ(gfa->count(), 6);
+  GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 6);
 
   // Verify all records can be read back by global index
   for (BYTE i = 0; i < 6; i++) {
@@ -235,16 +236,16 @@ TEST_F(GroupFileTest, test_fagrp_purge) {
     gfa->write(&record);
   }
 
-  GTEST_ASSERT_EQ(gfa->count(), 6);
+  GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 6);
 
   // Purge all segments using explicit API
   gfa->purge();
-  GTEST_ASSERT_EQ(gfa->count(), 0);
+  GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 0);
 
   // Should be able to write new records after purge
   record = 42;
   gfa->write(&record);
-  GTEST_ASSERT_EQ(gfa->count(), 1);
+  GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 1);
 
   gfa->read(&record, 0);
   GTEST_ASSERT_EQ(record, 42);
@@ -261,10 +262,10 @@ TEST_F(GroupFileTest, test_fagrp_purge_no_retention) {
   gfa->write(&record);
   record = 12;
   gfa->write(&record);
-  GTEST_ASSERT_EQ(gfa->count(), 2);
+  GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 2);
 
   gfa->purge();
-  GTEST_ASSERT_EQ(gfa->count(), 0);
+  GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 0);
 
   auto mapOfFiles = collectFiles();
   GTEST_ASSERT_EQ(mapOfFiles.size(), 1);
@@ -325,7 +326,7 @@ TEST_F(GroupFileTest, test_fagrp_empty_count) {
   auto retention = rdb::retention_t{0, 0};
   auto gfa       = std::make_unique<rdb::groupFile<>>(filename, makeDesc(recsize), retention, -1);
 
-  GTEST_ASSERT_EQ(gfa->count(), 0);
+  GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 0);
 }
 
 // Verify update-in-place within a segment overwrites the correct record
@@ -342,14 +343,14 @@ TEST_F(GroupFileTest, test_fagrp_update_in_place) {
   record = 30;
   gfa->write(&record);
 
-  GTEST_ASSERT_EQ(gfa->count(), 3);
+  GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 3);
 
   // Update record 1 (position is a byte offset: index * recsize, here recsize = 1)
   record = 99;
   gfa->write(&record, 1);
 
   // Count should remain unchanged
-  GTEST_ASSERT_EQ(gfa->count(), 3);
+  GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 3);
 
   // Verify updated record
   gfa->read(&record, 1);
@@ -382,7 +383,7 @@ TEST_F(GroupFileTest, test_fagrp_count_after_rotation) {
   }
 
   // count() = remaining segment counts + removedSegments * capacity
-  GTEST_ASSERT_EQ(gfa->count(), 8);
+  GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 8);
 }
 
 // Verify reads and updates into already removed global positions fail safely with ERANGE:
@@ -418,7 +419,7 @@ TEST_F(GroupFileTest, test_fagrp_multibyte_record_segment_mapping) {
     record = i;
     GTEST_ASSERT_EQ(gfa->write(reinterpret_cast<uint8_t *>(&record)), 0);
   }
-  GTEST_ASSERT_EQ(gfa->count(), 5);
+  GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 5);
 
   for (uint32_t i = 0; i < 5; i++) {
     record = 0;
@@ -429,7 +430,7 @@ TEST_F(GroupFileTest, test_fagrp_multibyte_record_segment_mapping) {
   // Update record 4 (segment_1, second record)
   record = 99;
   GTEST_ASSERT_EQ(gfa->write(reinterpret_cast<uint8_t *>(&record), 4 * size), 0);
-  GTEST_ASSERT_EQ(gfa->count(), 5);
+  GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 5);
 
   for (uint32_t i = 0; i < 5; i++) {
     record = 0;
@@ -452,12 +453,12 @@ TEST_F(GroupFileTest, test_fagrp_restore_state_after_restart) {
       record = i;
       GTEST_ASSERT_EQ(gfa->write(&record), 0);
     }
-    GTEST_ASSERT_EQ(gfa->count(), 5);
+    GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 5);
   }
 
   {
     auto gfa = std::make_unique<rdb::groupFile<>>(filename, makeDesc(recsize), retention, -1);
-    GTEST_ASSERT_EQ(gfa->count(), 5);
+    GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 5);
 
     // Verify data persisted and is readable by global position after restart.
     for (BYTE i = 0; i < 5; i++) {
@@ -475,7 +476,7 @@ TEST_F(GroupFileTest, test_fagrp_restore_state_after_restart) {
     GTEST_ASSERT_EQ(mapOfFiles.count(sandboxPath("test_file_segment_0")), 0);
     GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_1")].fileContents, std::vector<BYTE>({4, 5, 6}));
     GTEST_ASSERT_EQ(mapOfFiles[sandboxPath("test_file_segment_2")].fileContents, std::vector<BYTE>({7}));
-    GTEST_ASSERT_EQ(gfa->count(), 7);
+    GTEST_ASSERT_EQ(rdbtest::ok(gfa->count()), 7);
   }
 }
 

@@ -16,6 +16,7 @@
 #include "lockManager.hpp"
 
 #include "appConfig.hpp"
+#include "rdb/error.hpp"
 
 using ptree  = boost::property_tree::ptree;
 using vm_map = boost::program_options::variables_map;
@@ -61,6 +62,10 @@ struct executorsm {
   static std::atomic<bool> ipcFailed;
 
   static ptree commandProcessor(const ptree &ptInval);
+  /// Odpowiedz komendy na zlamany niezmiennik silnika: `error.response` = "engine error: ...",
+  /// log krytyczny, proces liczy dalej. Ksztalt, ktory do 2026-10 skladal catch(const rdb::Error&)
+  /// w commandProcessor - teraz skladany z wartosci w miejscu wykrycia.
+  static ptree engineErrorResponse(std::string_view command, const std::string &message);
   static ptree collectStreamsParameters();
   static ptree getAdHoc(const std::string &adHocQuery);
   static ptree attachAdHocRule(qTree &coreInstanceCopy, const std::string &streamName);
@@ -79,8 +84,10 @@ struct executorsm {
   /// Wymienia plan na przyjety wczesniej `pendingPlanText` i przygotowuje kolejna epoke:
   /// aktywacja rezerwacji magistrali, skasowanie artefaktow, licznik rotacji, plik zapytan.
   /// Plan, ktorego nie da sie tu zbudowac, konczy sie epoka PUSTA (tryb bezczynny) -
-  /// nigdy smiercia procesu.
-  void applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, const AppConfig &cfg);
+  /// nigdy smiercia procesu. Blad zwracany stad to co innego: magistrala, ktora odmowila
+  /// aktywacji zarezerwowanych zasobow, albo licznik :ROTATION, ktorego nie da sie wczytac -
+  /// run() konczy wtedy proces jak po bledzie silnika w epoce (FATAL, EXIT_FAILURE).
+  [[nodiscard]] rdb::Result<> applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, const AppConfig &cfg);
 
   /// Wyznacza strumienie nalezne w biezacym takcie: wypelnia dueMask_ i dueNames_.
   /// Wolajacy MUSI trzymac core_mutex, a maska jest wazna tylko dopoki uklad planu sie

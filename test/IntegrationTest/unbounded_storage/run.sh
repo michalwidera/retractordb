@@ -103,11 +103,11 @@ printf "ROTATION 'rotation_counter.txt'\n%s\nSELECT src[0] STREAM rot FROM src R
 fresh
 rm -f rotation_counter.txt
 xretractor rot_a.rql -m 12 -f </dev/null >rot_a1.txt 2>&1 || fail "rotation plan did not run" rot_a1.txt
-before=$(ls -l --time-style=full-iso temp)
+before=$(dir_snapshot temp)
 if xretractor rot_b.rql -m 12 -f </dev/null >rot_b.txt 2>&1; then fail "start accepted kept files with another retention" rot_b.txt; fi
 grep -q "Stream 'rot' keeps its files under ROTATION, but temp/rot.desc was written with STORAGE DEFAULT RETENTION 5 2 and the plan asks for STORAGE DEFAULT RETENTION 5 3" rot_b.txt ||
   fail "refusal did not name both configurations" rot_b.txt
-[ "$(ls -l --time-style=full-iso temp)" = "$before" ] || fail "refused start changed the kept files"
+[ "$(dir_snapshot temp)" = "$before" ] || fail "refused start changed the kept files"
 xretractor rot_a.rql -m 12 -f </dev/null >rot_a2.txt 2>&1 || fail "rotation plan with the kept configuration did not run" rot_a2.txt
 rm -f rotation_counter.txt
 

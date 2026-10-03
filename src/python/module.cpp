@@ -33,7 +33,7 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/descriptorIO.hpp"
 #include "rdb/embed/engine.hpp"
-#include "rdb/exceptions.hpp"
+#include "rdb/error.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/storage.hpp"
 
@@ -77,17 +77,26 @@
 ///    sygnaly co kSignalCheckInterval - dlugie run(), ktorego nie da sie
 ///    przerwac, to martwe jadro notatnika;
 ///  - logi silnika ida do modulu `logging` (PythonLoggingSink), nie na stdout;
-///  - bledy planu przychodza z silnika jako typy (SyntaxError, CompileError w
-///    rdb::embed), wiec tlumaczenie jest rejestracja, a nie parsowaniem napisu.
+///  - bledy planu przychodza z silnika jako kategorie (Errc::Syntax, Errc::Compile),
+///    wiec tlumaczenie jest wyborem typu po kodzie, a nie parsowaniem napisu.
+///
+/// BLEDY JAKO WARTOSCI (2026-10, docs/embedded-realtime-gaps.md). Rdzen silnika - rdb,
+/// retractorcore, rdbembed - nie rzuca juz wyjatkow C++ i buduje sie z -fno-exceptions:
+/// kazda operacja, ktora moze sie nie udac, zwraca rdb::Result. To wiazanie jest JEDYNYM
+/// miejscem, w ktorym blad silnika staje sie wyjatkiem: unwrap() ponizej zamienia
+/// rdb::Error na wyjatek C++ zdefiniowany TUTAJ, a nanobind tlumaczy go na wyjatek Pythona
+/// tej samej klasy co przed zmiana. Wyjatek powstaje po powrocie z silnika, wiec nie
+/// przechodzi przez zadna ramke rdzenia - modul moze sie budowac z wyjatkami, rdzen nie.
 
 namespace nb = nanobind;
 
 namespace {
 
-/// Hierarchia bledow. Dwa typy wlasne wiazania plus CorruptDescriptor, ktory
-/// przychodzi juz z silnika (rdb/exceptions.hpp) - pozostale z docelowej
-/// taksonomii (blad skladni RQL, blad kompilacji) nie maja dzis czego zglaszac
-/// i wejda razem z kolejnymi plastrami fazy 1.
+/// Hierarchia bledow Pythona, po stronie C++ wylacznie w tym pliku. Dwa typy wlasne wiazania
+/// (NoSuchStream, StorageError - straze argumentow) i po jednym typie na kategorie rdb::Errc.
+/// Typy C++ dziedzicza tak samo jak klasy Pythona, ktore z nich powstaja: nanobind probuje
+/// tlumaczy w kolejnosci odwrotnej do rejestracji i lapie takze po klasie bazowej, wiec
+/// rejestracja idzie od bazy do pochodnych (patrz NB_MODULE).
 struct RdbError : std::runtime_error {
   using std::runtime_error::runtime_error;
 };
@@ -99,6 +108,68 @@ struct RdbNoSuchStream : RdbError {
 struct RdbStorageError : RdbError {
   using RdbError::RdbError;
 };
+
+struct RdbCorruptDescriptor : RdbError {
+  using RdbError::RdbError;
+};
+
+struct RdbConfigError : RdbError {
+  using RdbError::RdbError;
+};
+
+/// Python: InternalError. Zlamany niezmiennik wykryty w miejscu, ktore umie go zwrocic
+/// (Errc::Logic), i wyrazenie, ktorego nie da sie policzyc (Errc::Eval) - kompilator sprawdza
+/// typy, wiec dojscie do tego drugiego w slocie to tez luka w NASZYM kodzie, nie w planie.
+/// Do 2026-10 blad ewaluatora wychodzil jako goly RuntimeError, poza RetractorDBError.
+struct RdbInternalError : RdbError {
+  using RdbError::RdbError;
+};
+
+struct RdbIOError : RdbError {
+  using RdbError::RdbError;
+};
+
+struct RdbSyntaxError : RdbConfigError {
+  using RdbConfigError::RdbConfigError;
+};
+
+struct RdbCompileError : RdbConfigError {
+  using RdbConfigError::RdbConfigError;
+};
+
+/// Blad silnika -> wyjatek wiazania tej samej kategorii. Jedyne miejsce, w ktorym rdb::Error
+/// staje sie wyjatkiem; switch bez default, zeby nowa kategoria byla ostrzezeniem kompilatora.
+[[noreturn]] void raise(const rdb::Error &error) {
+  switch (error.code()) {
+    case rdb::Errc::Config:
+      throw RdbConfigError(error.message());
+    case rdb::Errc::CorruptDescriptor:
+      throw RdbCorruptDescriptor(error.message());
+    case rdb::Errc::Syntax:
+      throw RdbSyntaxError(error.message());
+    case rdb::Errc::Compile:
+      throw RdbCompileError(error.message());
+    case rdb::Errc::IO:
+      throw RdbIOError(error.message());
+    case rdb::Errc::Eval:
+    case rdb::Errc::Logic:
+      throw RdbInternalError(error.message());
+  }
+  throw RdbInternalError(error.message());
+}
+
+/// Wartosc wyniku albo wyjatek wiazania. Wolane PO powrocie z silnika - takze pod zwolnionym
+/// GIL-em: destruktor gil_scoped_release bierze GIL z powrotem przy zwijaniu, zanim nanobind
+/// przetlumaczy wyjatek.
+template <typename T>
+T unwrap(rdb::Result<T> &&result) {
+  if (!result) raise(result.error());
+  return std::move(*result);
+}
+
+void unwrap(rdb::Result<> &&result) {
+  if (!result) raise(result.error());
+}
 
 /// Typ fractions.Fraction, pobierany raz. boost::rational<int> nie ma w Pythonie
 /// odpowiednika wbudowanego, a krotka (licznik, mianownik) zlewalaby sie z
@@ -156,13 +227,11 @@ std::string streamToString(const T &value) {
 
 /// Odczyt rekordu pod straza.
 ///
-/// storage::read() NIE konczy sie bledem dla indeksu poza zakresem - loguje i
-/// oddaje wyzerowany rekord (storage.cc:181). Cicha bledna wartosc jest gorsza
-/// niz wyjatek, wiec zakres sprawdzamy tutaj. Odczyt ze zrodla deklarowanego
-/// (DEVICE, TEXTSOURCE) trafia z kolei prosto w FatalError, wiec tez zatrzymujemy
-/// go przed wywolaniem.
+/// storage::read() dla indeksu poza zakresem zwraca status NoSuchRecord, a nie
+/// blad - zakres sprawdzamy wiec tutaj, zeby Python dostal IndexError. Odczyt ze
+/// zrodla deklarowanego (DEVICE, TEXTSOURCE) zatrzymujemy przed wywolaniem.
 Record readRecord(rdb::storage &self, Py_ssize_t index) {
-  // Silnik zglasza to samo jako ConfigError (storage.cc). Straz zostaje, zeby typ byl
+  // Silnik zglasza to samo bledem Errc::Config (storage.cc). Straz zostaje, zeby typ byl
   // stabilny dla kodu, ktory lapie StorageError od etapu 1a - zmiana typu wyjatku jest
   // zmiana API, a plaster 2b nie ma powodu jej robic.
   if (self.isDeclared()) {
@@ -181,8 +250,9 @@ Record readRecord(rdb::storage &self, Py_ssize_t index) {
     // zamraza cale jadro razem z jego interfejsem, a dolozenie tej straznicy
     // pozniej oznacza przeglad wszystkich wywolan, ktore do tego czasu powstana.
     const nb::gil_scoped_release release;
-    // Status bez znaczenia: indeks sprawdzony wyzej wzgledem liczby rekordow.
-    static_cast<void>(self.read(static_cast<std::size_t>(index)));
+    // Status bez znaczenia: indeks sprawdzony wyzej wzgledem liczby rekordow. Blad
+    // odczytu (nosnik) wychodzi jako IOError.
+    static_cast<void>(unwrap(self.read(static_cast<std::size_t>(index))));
   }
 
   // Kopia payloadu powstaje juz z GIL-em: to samo przepisanie pamieci, a Record
@@ -260,7 +330,7 @@ std::uint64_t runEngine(rdb::embed::Engine &self, const std::optional<std::uint6
   const nb::gil_scoped_release release;
   auto lastCheck = std::chrono::steady_clock::now();
   while (!slots.has_value() || done < *slots) {
-    if (!self.step().has_value()) break;
+    if (!unwrap(self.step()).has_value()) break;
     ++done;
     if (const auto now = std::chrono::steady_clock::now(); now - lastCheck >= kSignalCheckInterval) {
       lastCheck = now;
@@ -294,7 +364,7 @@ nb::object engineBlock(rdb::embed::Engine &self, const std::string &stream, cons
   std::vector<double> values;
   {
     const nb::gil_scoped_release release;
-    values = self.project(stream, flatFields, first, count);
+    values = unwrap(self.project(stream, flatFields, first, count));
   }
   const std::size_t cols = flatFields.size();
   if (dtype == "float32") return makeBlock<float>(values, count, cols);
@@ -307,7 +377,7 @@ nb::object engineBlock(rdb::embed::Engine &self, const std::string &stream, cons
 /// Nazwa strumienia przychodzi wprost od uzytkownika notatnika, wiec literowka jest
 /// przypadkiem NORMALNYM i dostaje KeyError - ta sama regula co field_index() wyzej.
 void requireStream(const rdb::embed::Engine &self, const std::string &stream) {
-  const auto names = self.streams();
+  const auto names = unwrap(self.streams());
   if (std::ranges::find(names, stream) == names.end()) throw nb::key_error(stream.c_str());
 }
 
@@ -319,31 +389,24 @@ NB_MODULE(_core, m) {
   // Kolejnosc rejestracji ma znaczenie: nanobind probuje tlumaczy w kolejnosci
   // ODWROTNEJ do rejestracji, a typy pochodne lapia sie rowniez na catch po
   // klasie bazowej. Baza pierwsza => pochodne sprawdzane wczesniej.
+  //
+  // Nazwy i hierarchia Pythona sa te same co przed przejsciem rdzenia na Result: zmienilo
+  // sie tylko, SKAD wyjatek pochodzi (raise() w tym pliku zamiast throw w silniku).
   const nb::object baseError = nb::exception<RdbError>(m, "RetractorDBError");
   nb::exception<RdbNoSuchStream>(m, "NoSuchStream", baseError);
   nb::exception<RdbStorageError>(m, "StorageError", baseError);
-  // Typy przychodzace z SILNIKA, a nie zbudowane w wiazaniu. Rejestrowane na koncu, bo
-  // tlumacze probowane sa w kolejnosci odwrotnej do rejestracji, a wszystkie dziedzicza
-  // po std::runtime_error - domyslny tlumacz nanobinda zamienilby je na RuntimeError,
-  // gdyby dostal je pierwszy.
-  //
-  // Wspolna baza jest po stronie PYTHONA, nie C++: rdb::Error i RdbError to dwa rozne
-  // typy C++, wiec `except RetractorDBError` dziala dlatego, ze klasy ponizej dostaja ja
-  // jako baze Pythonowa. rdb::Error nie jest rejestrowany, bo nic go nie rzuca wprost -
-  // jest baza taksonomii. Gdyby kiedys zaczal byc rzucany goly, wyszedlby jako
-  // RuntimeError i ten komentarz jest miejscem, w ktorym to widac.
-  nb::exception<rdb::CorruptDescriptor>(m, "CorruptDescriptor", baseError);
-  const nb::object configError = nb::exception<rdb::ConfigError>(m, "ConfigError", baseError);
-  // LogicError w C++ nazywa sie po tym, czym jest; po stronie Pythona - po tym, co z nim
+  nb::exception<RdbCorruptDescriptor>(m, "CorruptDescriptor", baseError);
+  const nb::object configError = nb::exception<RdbConfigError>(m, "ConfigError", baseError);
+  // Errc::Logic nazywa sie po tym, czym jest; po stronie Pythona - po tym, co z nim
   // zrobic. To zlamany niezmiennik silnika, czyli blad w NASZYM kodzie: nadaje sie do
   // zgloszenia, nie do obsluzenia i kontynuowania.
-  nb::exception<rdb::LogicError>(m, "InternalError", baseError);
-  nb::exception<rdb::IOError>(m, "IOError", baseError);
+  nb::exception<RdbInternalError>(m, "InternalError", baseError);
+  nb::exception<RdbIOError>(m, "IOError", baseError);
   // Bledy planu z Engine::compile(): pochodne ConfigError po obu stronach. Rejestrowane PO
   // ConfigError, zeby ich tlumacze byly probowane wczesniej. RQLSyntaxError, nie
   // SyntaxError - ta nazwa jest w Pythonie wbudowana i znaczy co innego.
-  nb::exception<rdb::embed::SyntaxError>(m, "RQLSyntaxError", configError);
-  nb::exception<rdb::embed::CompileError>(m, "CompileError", configError);
+  nb::exception<RdbSyntaxError>(m, "RQLSyntaxError", configError);
+  nb::exception<RdbCompileError>(m, "CompileError", configError);
 
   // Most logow instalowany raz, przy imporcie: od tej chwili kazdy zapis silnika przez
   // spdlog trafia do logging.getLogger("retractordb"). Poziom loggera spdloga zdejmujemy do
@@ -435,13 +498,13 @@ NB_MODULE(_core, m) {
   m.def(
       "load_descriptor",
       [](const std::string &path) {
-        // Straz ZOSTAJE mimo plastra 1. loadDescriptorFile zglasza brak pliku tym
-        // samym CorruptDescriptor co plik uszkodzony (rozdzielenie nalezy do
+        // Straz ZOSTAJE mimo plastra 1. loadDescriptorFile zglasza brak pliku ta
+        // sama kategoria CorruptDescriptor co plik uszkodzony (rozdzielenie nalezy do
         // taksonomii z fazy 5), a "nie ma takiego pliku" to najczestsza pomylka w
         // notatniku i zasluguje na wlasny typ. Pinuje to
         // test_guarded_paths_do_not_end_the_process.
         if (!std::filesystem::exists(path)) throw RdbNoSuchStream("no descriptor file: " + path);
-        return rdb::loadDescriptorFile(path);
+        return unwrap(rdb::loadDescriptorFile(path));
       },
       nb::arg("path"),
       "Read a .desc file. Raises CorruptDescriptor when the file is empty or does not parse, and NoSuchStream when it "
@@ -451,7 +514,7 @@ NB_MODULE(_core, m) {
       .def(nb::new_([](const std::string &qry_id, const std::string &file_name, const std::string &storage_param,
                        const std::string &storage_type) {
              // Po plastrze 2a te trzy warunki NIE sa juz jedyna ochrona - StoragePaths
-             // odmawia sam, przez ConfigError. Straze zostaja, bo daja Pythonowi typ,
+             // odmawia sam, bledem Errc::Config. Straze zostaja, bo daja Pythonowi typ,
              // ktorego oczekuje dla zlego argumentu (ValueError), i komunikat nazywajacy
              // parametr, a nie pole wewnetrzne. Pilnuje ich
              // test_guarded_paths_do_not_end_the_process.
@@ -461,16 +524,14 @@ NB_MODULE(_core, m) {
                throw RdbNoSuchStream("storage_param is not a directory: " + storage_param);
              }
 
-             auto created = std::make_unique<rdb::storage>(qry_id, file_name, storage_param, storage_type);
+             auto created = unwrap(rdb::storage::create(qry_id, file_name, storage_param, storage_type));
              if (!created->descriptorFileExist()) throw RdbNoSuchStream("no descriptor file for stream: " + qry_id);
 
-             // attachDescriptor() oddaje odmowe NAPISEM (#265, #303): .desc, ktorego nie da sie
-             // wczytac, albo nosnik, ktorego nie da sie otworzyc - pozostale bledy rzuca. Napis
-             // nie niesie typu, a Python rozroznia te dwie przyczyny, wiec .desc czytamy najpierw
-             // ta sama droga co load_descriptor(): zly konczy sie tu CorruptDescriptor. Odmowa,
-             // ktora przyjdzie potem, moze juz pochodzic tylko z otwarcia nosnika.
-             static_cast<void>(rdb::loadDescriptorFile(rdb::StoragePaths(qry_id, file_name, storage_param).descriptorFile()));
-             if (const std::string error = created->attachDescriptor(nullptr); !error.empty()) throw rdb::IOError(error);
+             // attachDescriptor() oddaje odmowe kategoria (#265, #303): .desc, ktorego nie da sie
+             // wczytac, to Errc::CorruptDescriptor, nosnik, ktorego nie da sie otworzyc, to
+             // Errc::IO. Do 2026-10 odmowa byla NAPISEM bez typu i wiazanie czytalo .desc drugi raz,
+             // zeby te dwie przyczyny rozroznic - kategoria bledu robi to teraz sama.
+             unwrap(created->attachDescriptor(nullptr));
              return created;
            }),
            nb::arg("qry_id"), nb::arg("file_name"), nb::arg("storage_param") = "", nb::arg("storage_type") = "DEFAULT")
@@ -503,18 +564,23 @@ NB_MODULE(_core, m) {
            "storage_dir is used by plans that carry no STORAGE directive; the directive wins when present.")
       // string_view wskazuje bufor UTF-8 obiektu str, ktory zyje przez cale wywolanie, wiec
       // zwolnienie GIL-a na czas parsowania i kompilacji jest bezpieczne.
-      .def("compile", &rdb::embed::Engine::compile, nb::arg("rql"), nb::arg("until_eof") = true,
-           nb::call_guard<nb::gil_scoped_release>(),
-           "Parse, compile and build the plan. Raises RQLSyntaxError or CompileError. With until_eof=True (the "
-           "default) declared sources are read once, without wrapping, and step() reports end of input.")
-      .def("step", &rdb::embed::Engine::step, nb::call_guard<nb::gil_scoped_release>(),
-           "Advance one time slot. Returns the slot index, or None at end of input.")
+      .def(
+          "compile",
+          [](rdb::embed::Engine &self, const std::string_view rql, const bool untilEof) { unwrap(self.compile(rql, untilEof)); },
+          nb::arg("rql"), nb::arg("until_eof") = true, nb::call_guard<nb::gil_scoped_release>(),
+          "Parse, compile and build the plan. Raises RQLSyntaxError or CompileError. With until_eof=True (the "
+          "default) declared sources are read once, without wrapping, and step() reports end of input.")
+      .def(
+          "step", [](rdb::embed::Engine &self) { return unwrap(self.step()); }, nb::call_guard<nb::gil_scoped_release>(),
+          "Advance one time slot. Returns the slot index, or None at end of input. After an error inside a slot the "
+          "plan stops: further step() calls raise InternalError until compile() is called again.")
       .def("run", &runEngine, nb::arg("slots") = nb::none(),
            "Advance up to `slots` slots (all, until end of input, when None). Returns the number of slots "
            "processed. Releases the GIL and honours KeyboardInterrupt.")
       .def_prop_ro("has_plan", &rdb::embed::Engine::hasPlan)
       .def_prop_ro("slots_done", &rdb::embed::Engine::slotsDone)
       .def_prop_ro("end_of_input", &rdb::embed::Engine::endOfInput)
+      .def_prop_ro("failed", &rdb::embed::Engine::failed, "True after step() raised; the plan does not advance any more.")
       .def_prop_ro(
           "time",
           [](const rdb::embed::Engine &self) {
@@ -522,33 +588,35 @@ NB_MODULE(_core, m) {
             return fractionType()(now.numerator(), now.denominator());
           },
           "Plan time of the last slot, in seconds, as a fractions.Fraction.")
-      .def("streams", &rdb::embed::Engine::streams, "Stream ids of the plan, in execution order.")
+      .def(
+          "streams", [](const rdb::embed::Engine &self) { return unwrap(self.streams()); },
+          "Stream ids of the plan, in execution order.")
       .def(
           "schema",
           [](const rdb::embed::Engine &self, const std::string &stream) {
             requireStream(self, stream);
-            return self.schema(stream);
+            return *unwrap(self.schema(stream));
           },
           nb::arg("stream"), nb::rv_policy::copy)
       .def(
           "is_declared",
           [](const rdb::embed::Engine &self, const std::string &stream) {
             requireStream(self, stream);
-            return self.isDeclared(stream);
+            return unwrap(self.isDeclared(stream));
           },
           nb::arg("stream"))
       .def(
           "record_count",
           [](const rdb::embed::Engine &self, const std::string &stream) {
             requireStream(self, stream);
-            return self.recordCount(stream);
+            return unwrap(self.recordCount(stream));
           },
           nb::arg("stream"))
       .def(
           "retained_from",
           [](const rdb::embed::Engine &self, const std::string &stream) {
             requireStream(self, stream);
-            return self.retainedFrom(stream);
+            return unwrap(self.retainedFrom(stream));
           },
           nb::arg("stream"),
           "Index of the oldest record still readable: 0 for a stream on disk, higher for a declared source or a "
@@ -557,16 +625,16 @@ NB_MODULE(_core, m) {
           "record",
           [](rdb::embed::Engine &self, const std::string &stream, Py_ssize_t index) {
             requireStream(self, stream);
-            const auto count = static_cast<Py_ssize_t>(self.recordCount(stream));
+            const auto count = static_cast<Py_ssize_t>(unwrap(self.recordCount(stream)));
             if (index < 0) index += count;
             if (index < 0 || index >= count) throw nb::index_error("record index out of range");
-            if (std::cmp_less(index, self.retainedFrom(stream))) {
+            if (std::cmp_less(index, unwrap(self.retainedFrom(stream)))) {
               throw nb::index_error("record is no longer retained; see retained_from()");
             }
             rdb::payload data;
             {
               const nb::gil_scoped_release release;
-              data = self.record(stream, static_cast<std::size_t>(index));
+              data = unwrap(self.record(stream, static_cast<std::size_t>(index)));
             }
             return Record{std::move(data), static_cast<std::size_t>(index)};
           },
@@ -592,7 +660,7 @@ NB_MODULE(_core, m) {
           },
           nb::arg("exc_type").none(), nb::arg("exc").none(), nb::arg("traceback").none())
       .def("__repr__", [](const rdb::embed::Engine &self) {
-        return self.hasPlan() ? "<Engine streams=" + std::to_string(self.streams().size()) +
+        return self.hasPlan() ? "<Engine streams=" + std::to_string(unwrap(self.streams()).size()) +
                                     " slots_done=" + std::to_string(self.slotsDone()) + ">"
                               : std::string("<Engine (no plan)>");
       });

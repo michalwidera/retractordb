@@ -2,7 +2,6 @@
 
 #include <fmt/format.h>
 
-#include "rdb/exceptions.hpp"
 #include "rdb/faccbindev.hpp"
 #include "rdb/faccfs.hpp"
 #include "rdb/faccmemory.hpp"
@@ -16,14 +15,14 @@ namespace rdb {
 
 bool isDeclaredType(const std::string_view storageType) { return (storageType == "DEVICE") || (storageType == "TEXTSOURCE"); }
 
-std::unique_ptr<FileInterface> makeAccessor(const std::string_view storageType,  //
-                                            const std::string &storageFile,      //
-                                            Descriptor &descriptor,              //
-                                            const bool oneShot,                  //
-                                            const int percounter,                //
-                                            MemoryStore *memory) {
-  if (storageFile.empty()) throw ConfigError("storage: storage file path is empty - storage not properly configured");
-  if (storageType.empty()) throw ConfigError("storage: storage type is empty - storage type not set");
+Result<std::unique_ptr<FileInterface>> makeAccessor(const std::string_view storageType,  //
+                                                    const std::string &storageFile,      //
+                                                    Descriptor &descriptor,              //
+                                                    const bool oneShot,                  //
+                                                    const int percounter,                //
+                                                    MemoryStore *memory) {
+  if (storageFile.empty()) return fail(Errc::Config, "storage: storage file path is empty - storage not properly configured");
+  if (storageType.empty()) return fail(Errc::Config, "storage: storage type is empty - storage type not set");
 
   if (storageType == "DEFAULT") {
     return std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile, descriptor, descriptor.retention(),
@@ -55,10 +54,10 @@ std::unique_ptr<FileInterface> makeAccessor(const std::string_view storageType, 
   // bierze sie z pola TYPE deskryptora albo wprost od wolajacego (argument storage_type
   // wiazania Pythona), wiec literowka w nim trafiala tu prosto w std::exit. Zadna straz w
   // wiazaniu tego nie zatrzymywala - nie zna listy typow, ktora jest wlasnie tutaj.
-  throw ConfigError(
-      fmt::format("storage: unsupported storage type '{}' - expected one of DEFAULT, DIRECT, MEMORY, POSIX, "
-                  "POSIXSHD, GENERIC, DEVICE, TEXTSOURCE",
-                  storageType));
+  return fail(Errc::Config,
+              fmt::format("storage: unsupported storage type '{}' - expected one of DEFAULT, DIRECT, MEMORY, POSIX, "
+                          "POSIXSHD, GENERIC, DEVICE, TEXTSOURCE",
+                          storageType));
 }
 
 std::unique_ptr<metaData> makeMetaIndex(const bool declared,           //

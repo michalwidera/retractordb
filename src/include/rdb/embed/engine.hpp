@@ -11,7 +11,7 @@
 #include <boost/rational.hpp>
 
 #include "rdb/descriptor.hpp"
-#include "rdb/exceptions.hpp"
+#include "rdb/error.hpp"
 #include "rdb/memoryStore.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/storage.hpp"
@@ -26,24 +26,15 @@
 /// warstwy L3 nie kompiluje naglowkow silnika, ktorych nie uzywa.
 namespace rdb::embed {
 
-/// Tekst RQL nie parsuje sie. Komunikat jest DOKLADNIE tym, co parser zglasza statusem -
-/// z numerem wiersza, jesli parser go podal.
-///
-/// Oba typy ponizej dziedzicza po ConfigError, bo taka jest ich natura: wejscie jest zle,
-/// silnik jest caly. Pelna taksonomia (faza 5) moze je przeniesc do rdb/exceptions.hpp;
-/// dzis rzuca je wylacznie Engine::compile(), wiec mieszkaja przy nim.
-class SyntaxError : public ConfigError {
- public:
-  using ConfigError::ConfigError;
-};
-
-/// Plan parsuje sie, ale nie przechodzi kompilacji ("Check result:" launchera) albo
-/// uzywa czegos, czego silnik osadzony nie ma (akcje regul DUMP i SYSTEM, dyrektywa
-/// :ROTATION - patrz Engine::compile).
-class CompileError : public ConfigError {
- public:
-  using ConfigError::ConfigError;
-};
+/// Bledy silnika osadzonego sa WARTOSCIAMI (rdb/error.hpp), nie wyjatkami: kazda operacja, ktora
+/// moze sie nie udac, zwraca rdb::Result. Kategorie odpowiadaja dawnym typom wyjatkow 1:1:
+///  - Errc::Syntax  - tekst RQL nie parsuje sie (dawny embed::SyntaxError); komunikat jest
+///    DOKLADNIE tym, co parser zglasza statusem, z numerem wiersza, jesli parser go podal;
+///  - Errc::Compile - plan parsuje sie, ale nie przechodzi kompilacji ("Check result:" launchera)
+///    albo uzywa czegos, czego silnik osadzony nie ma (dawny embed::CompileError);
+///  - Errc::Config  - zly argument API albo zla konfiguracja planu (katalog :STORAGE);
+///  - Errc::Logic / Errc::Eval - blad wewnatrz silnika wykryty w miejscu, ktore umie go zwrocic.
+/// Wiazanie Pythona zamienia je na wyjatki Pythona tych samych nazw co przedtem.
 
 /// Jedna instancja silnika w procesie hosta.
 ///
@@ -57,6 +48,12 @@ class CompileError : public ConfigError {
 /// bez zegara sciennego, bez watku komunikacyjnego, bez terminala. Cialo slotu jest tym samym,
 /// ktore wykonuje executorsm::run() (os czasu -> zbior oczekujacych strumieni ->
 /// dataModel::processRows); rozni sie tylko to, KTO wola i KIEDY.
+///
+/// Zaden kod sciezki slotu nie rzuca i nie lapie wyjatkow C++ (rdzen buduje sie z -fno-exceptions,
+/// opcja RDB_NO_EXCEPTIONS). Blad w slocie wraca z step() jako wartosc, a plan zostaje oznaczony
+/// jako zepsuty: kolejne step() zwraca Errc::Logic zamiast liczyc dalej na stanie, ktorego slot
+/// nie dokonczyl. Odczyty (record, project, ...) dzialaja nadal - host moze obejrzec, co powstalo
+/// przed bledem. Wyjscie z tego stanu to compile() albo close().
 ///
 /// @note Obiekt jest NIEPRZENOSNY i NIEKOPIOWALNY celowo. storage trzyma surowy wskaznik na
 ///       MemoryStore tego silnika; przeniesienie Engine przesunieloby sklep i zostawiloby
@@ -82,13 +79,13 @@ class Engine {
   /// procesu. Poza tym argumenty i znaczenie jak w konstruktorze rdb::storage.
   ///
   /// Zwracany magazyn NIE MOZE przezyc silnika - trzyma wskaznik na jego sklep.
-  [[nodiscard]] std::unique_ptr<storage> openStorage(std::string_view qryID,                    //
-                                                     std::string_view fileName,                 //
-                                                     std::string_view storageParam,             //
-                                                     std::string_view storageType = "DEFAULT",  //
-                                                     bool oneShot                 = false,      //
-                                                     bool isHold                  = false,      //
-                                                     int percounter               = -1);
+  [[nodiscard]] Result<std::unique_ptr<storage>> openStorage(std::string_view qryID,                    //
+                                                             std::string_view fileName,                 //
+                                                             std::string_view storageParam,             //
+                                                             std::string_view storageType = "DEFAULT",  //
+                                                             bool oneShot                 = false,      //
+                                                             bool isHold                  = false,      //
+                                                             int percounter               = -1);
 
   /// Przyjmuje plan: parsowanie, kompilacja, budowa modelu danych i osi czasu. Poprzedni
   /// plan, jesli byl, jest zamykany PRZED budowa nowego.
@@ -99,8 +96,10 @@ class Engine {
   ///        danych, ktore juz raz przeszly. Domyslnie TAK, bo notatnik czyta plik jako
   ///        zbior danych, a nie jako zrodlo bez konca. Musi byc znane tutaj, nie przy
   ///        step(): ONESHOT wchodzi do fabryki akcesorow przy budowie modelu.
-  /// @throws SyntaxError, CompileError, ConfigError (np. katalog :STORAGE nie istnieje).
-  void compile(std::string_view rql, bool untilEof = true);
+  /// @return Errc::Syntax, Errc::Compile albo Errc::Config (np. katalog :STORAGE nie istnieje);
+  ///         Errc::Logic, gdy kompilator zglosil blad wewnetrzny (kInternalCompilerError).
+  ///         Po bledzie silnik jest bez planu (hasPlan() == false).
+  [[nodiscard]] Result<> compile(std::string_view rql, bool untilEof = true);
 
   /// Czy jest przyjety plan. false po zbudowaniu i po close().
   [[nodiscard]] bool hasPlan() const noexcept { return plan_ != nullptr; }
@@ -112,8 +111,9 @@ class Engine {
   ///         (patrz untilEof w compile). Rekordy policzone w slocie, ktory wykryl koniec
   ///         wejscia, sa poprawne: deklaracje czytane sa na koncu slotu, a ich rekord
   ///         konsumuje dopiero slot nastepny - ta sama regula co w executorsm::run().
-  /// @throws ConfigError bez planu; rdb::Error z wnetrza slotu.
-  std::optional<std::uint64_t> step();
+  /// @return blad Errc::Config bez planu; blad z wnetrza slotu (Errc::Eval, Errc::Logic, ...),
+  ///         po ktorym plan jest zepsuty i kazde nastepne step() zwraca Errc::Logic.
+  [[nodiscard]] Result<std::optional<std::uint64_t>> step();
 
   /// Liczba slotow wykonanych od compile().
   [[nodiscard]] std::uint64_t slotsDone() const noexcept;
@@ -124,36 +124,40 @@ class Engine {
   /// Czy step() zglosil juz koniec wejscia.
   [[nodiscard]] bool endOfInput() const noexcept;
 
-  /// Identyfikatory strumieni planu w kolejnosci wykonania (bez dyrektyw).
-  [[nodiscard]] std::vector<std::string> streams() const;
+  /// Czy step() zwrocil blad, po ktorym plan nie liczy dalej (patrz opis klasy).
+  [[nodiscard]] bool failed() const noexcept;
 
-  /// Deskryptor magazynu strumienia - uklad rekordu, ktory zwraca record().
-  /// @throws ConfigError dla nazwy spoza planu.
-  [[nodiscard]] const Descriptor &schema(const std::string &stream) const;
+  /// Identyfikatory strumieni planu w kolejnosci wykonania (bez dyrektyw). Errc::Config bez planu.
+  [[nodiscard]] Result<std::vector<std::string>> streams() const;
+
+  /// Deskryptor magazynu strumienia - uklad rekordu, ktory zwraca record(). Wskaznik nigdy nie
+  /// jest pusty przy sukcesie i jest wazny do nastepnego compile()/close().
+  /// @return Errc::Config dla nazwy spoza planu albo bez planu.
+  [[nodiscard]] Result<const Descriptor *> schema(const std::string &stream) const;
 
   /// Czy strumien jest deklaracja (zrodlo czytane z pliku), a nie zapytaniem SELECT.
-  [[nodiscard]] bool isDeclared(const std::string &stream) const;
+  [[nodiscard]] Result<bool> isDeclared(const std::string &stream) const;
 
   /// Liczba rekordow strumienia zapisanych od startu planu.
-  [[nodiscard]] std::size_t recordCount(const std::string &stream) const;
+  [[nodiscard]] Result<std::size_t> recordCount(const std::string &stream) const;
 
   /// Indeks najstarszego rekordu, ktory da sie jeszcze odczytac. Zero dla strumienia na
   /// dysku; dla deklaracji i strumieni VOLATILE (pierscien MEMORY) wiekszy, bo starsze
   /// rekordy juz nie istnieja - trzymany jest tylko ogon o pojemnosci z kompilatora.
-  [[nodiscard]] std::size_t retainedFrom(const std::string &stream) const;
+  [[nodiscard]] Result<std::size_t> retainedFrom(const std::string &stream) const;
 
   /// Rekord strumienia o indeksie POSTEPUJACYM (0 = najstarszy). KOPIA - nastepny slot nie ma
-  /// jak go uniewaznic. Indeks ponizej retainedFrom() zglaszany jest ConfigError, nigdy
+  /// jak go uniewaznic. Indeks ponizej retainedFrom() zglaszany jest bledem Errc::Config, nigdy
   /// oddawany jako cudzy rekord.
-  [[nodiscard]] payload record(const std::string &stream, std::size_t index);
+  [[nodiscard]] Result<payload> record(const std::string &stream, std::size_t index);
 
   /// Gesta projekcja: rekordy [first, first+count) x elementy splaszczone `flatFields`
   /// (kolejnosc jak w argumencie), wierszami. Wartosc null daje NaN. To jest kopia, o ktorej
   /// mowi decyzja "kopiuj, nie przypinaj" z docs/jupyter-integration.md sekcja 4; double miesci
   /// dokladnie kazdy typ liczbowy deskryptora poza UINT powyzej 2^53.
-  /// @throws ConfigError dla pola nieliczbowego (STRING, pary) albo zakresu poza strumieniem.
-  [[nodiscard]] std::vector<double> project(const std::string &stream, const std::vector<int> &flatFields, std::size_t first,
-                                            std::size_t count);
+  /// @return Errc::Config dla pola nieliczbowego (STRING, pary) albo zakresu poza strumieniem.
+  [[nodiscard]] Result<std::vector<double>> project(const std::string &stream, const std::vector<int> &flatFields,
+                                                    std::size_t first, std::size_t count);
 
   /// Zamyka plan: model danych i jego magazyny. Idempotentne; destruktor wola to samo.
   void close() noexcept;
@@ -161,9 +165,11 @@ class Engine {
  private:
   struct Plan;
 
-  /// Wylacznie plan, ktory jest; bez planu ConfigError z nazwa operacji.
-  [[nodiscard]] Plan &requirePlan(const char *operation) const;
-  [[nodiscard]] storage &streamStorage(const std::string &stream, const char *operation) const;
+  /// Wylacznie plan, ktory jest; bez planu Errc::Config z nazwa operacji.
+  [[nodiscard]] Result<Plan *> requirePlan(const char *operation) const;
+  [[nodiscard]] Result<storage *> streamStorage(const std::string &stream, const char *operation) const;
+  /// Cialo step() bez straznika zepsutego planu.
+  [[nodiscard]] Result<std::optional<std::uint64_t>> stepPlan(Plan &plan);
 
   std::string storageDir_;
   MemoryStore memory_;

@@ -25,16 +25,21 @@ list(FILTER V_GLOB EXCLUDE REGEX ".*test_qry\\.cpp$")
 
 # foreach(item ${V_GLOB}) message( ${item}) endforeach()
 
+# qry PRZED retractor: ipcClient.cpp (qry) siega po sloty odpowiedzi z
+# ipcResponses.cpp, ktore mieszkaja w bibliotece uslugi `retractor`. Do podzialu
+# na retractorcore/retractor kolejnosc nie miala znaczenia, bo rdbembed ciagnal
+# za soba `retractor` drugi raz, juz za qry; teraz linkuje wylacznie rdzen, wiec
+# biblioteka statyczna musi stac za swoim uzytkownikiem jawnie.
 set(LIBRARY_TEST_SET
     boost::boost
     gtest::gtest
     spdlog::spdlog_header_only
     magic_enum::magic_enum
     antlr4_static
+    qry
     retractor
     rdbembed
     rdb
-    qry
     rqlparser
     descparser)
 

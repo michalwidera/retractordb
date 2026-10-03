@@ -5,7 +5,7 @@
 #include <sstream>
 
 #include "rdb/descriptor.hpp"
-#include "rdb/exceptions.hpp"
+#include "rdb/error.hpp"
 
 std::pair<std::string, std::vector<std::string>> OpenCmd::usage() const {
   return {"open file [schema]",
@@ -19,19 +19,20 @@ bool OpenCmd::execute(CommandContext &ctx) {
   }
   const auto oldPos = ctx.file.find(".old");
   const auto base   = (oldPos != std::string::npos) ? ctx.file.substr(0, oldPos) : ctx.file;
-  ctx.dacc          = std::make_unique<rdb::storage>(base, ctx.file, ctx.storageParam, ctx.storagePolicy);
-  std::string openError;
+  auto created      = rdb::storage::create(base, ctx.file, ctx.storageParam, ctx.storagePolicy);
+  if (!created) {
+    std::print("{}open: {}\n{}", ctx.colors.RED, created.error().message(), ctx.colors.RESET);
+    ctx.dacc.reset();
+    return false;
+  }
+  ctx.dacc = std::move(*created);
+  rdb::Result<> opened;
 
   if (ctx.dacc->descriptorFileExist()) {
-    // Od fazy 1 attachDescriptor() nie konczy procesu: odmowe zwraca napisem (brak albo
-    // uszkodzenie .desc, nieudane otwarcie magazynu), a pozostale bledy rzuca. xtrdb jest
-    // powloka interaktywna: jedno i drugie ma zostac zgloszone i zostawic operatora przy
-    // prompcie, a nie wyrzucic go z narzedzia w srodku sesji.
-    try {
-      openError = ctx.dacc->attachDescriptor();
-    } catch (const rdb::Error &error) {
-      openError = error.what();
-    }
+    // attachDescriptor() nie konczy procesu i nie rzuca: odmowe (brak albo uszkodzenie .desc,
+    // nieudane otwarcie magazynu) zwraca bledem. xtrdb jest powloka interaktywna: odmowa ma
+    // zostac zgloszona i zostawic operatora przy prompcie, a nie wyrzucic go z narzedzia.
+    opened = ctx.dacc->attachDescriptor();
   } else {
     // Bez `.desc` schemat jest obowiazkowy i stoi w klamrach. Pierwszy znak sprawdzamy podgladem, bez
     // konsumowania, wiec nastepne polecenie skryptu zostaje poleceniem. Do 2026-09-27 petla brala
@@ -68,14 +69,10 @@ bool OpenCmd::execute(CommandContext &ctx) {
       ctx.dacc.reset();
       return false;
     }
-    try {
-      openError = ctx.dacc->attachDescriptor(&desc);
-    } catch (const rdb::Error &error) {
-      openError = error.what();
-    }
+    opened = ctx.dacc->attachDescriptor(&desc);
   }
-  if (!openError.empty()) {
-    std::print("{}open: {}\n{}", ctx.colors.RED, openError, ctx.colors.RESET);
+  if (!opened) {
+    std::print("{}open: {}\n{}", ctx.colors.RED, opened.error().message(), ctx.colors.RESET);
     ctx.dacc.reset();
     return false;
   }

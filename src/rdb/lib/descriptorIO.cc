@@ -9,8 +9,6 @@
 
 #include <fmt/format.h>
 
-#include "rdb/exceptions.hpp"
-
 extern std::string parserDESCString(rdb::Descriptor &desc, std::string_view inlet);
 
 namespace rdb {
@@ -31,48 +29,47 @@ std::string tryLoadDescriptorFile(const std::string &descriptorFile, Descriptor 
   return {};
 }
 
-Descriptor loadDescriptorFile(const std::string &descriptorFile) {
-  // Rzut, nie koniec procesu: ta funkcja jest granica biblioteki i jedynym wejsciem, przez
-  // ktore wiazanie Pythona wczytuje deskryptor. std::exit nie odwija stosu, wiec zaden
-  // catch po stronie osadzajacego procesu go nie widzi - konczyl sie smiercia jadra
-  // notatnika na jednym uszkodzonym pliku. Powod odmowy jest ten sam, ktory serwer dostaje
-  // z tryLoadDescriptorFile() - brak pliku, blad odczytu, skladni albo wartosci, pusty
-  // deskryptor - i jeden typ dla wszystkich, jak przed rozdzieleniem.
+Result<Descriptor> loadDescriptorFile(const std::string &descriptorFile) {
+  // Blad jako wartosc, nie koniec procesu: ta funkcja jest granica biblioteki i jedynym
+  // wejsciem, przez ktore wiazanie Pythona wczytuje deskryptor. Powod odmowy jest ten sam,
+  // ktory serwer dostaje z tryLoadDescriptorFile() - brak pliku, blad odczytu, skladni albo
+  // wartosci, pusty deskryptor - i jedna kategoria dla wszystkich, jak przed rozdzieleniem.
   Descriptor descriptor;
-  if (const std::string error = tryLoadDescriptorFile(descriptorFile, descriptor); !error.empty()) {
+  if (std::string error = tryLoadDescriptorFile(descriptorFile, descriptor); !error.empty()) {
     SPDLOG_ERROR("Invalid descriptor: {}", error);
-    throw CorruptDescriptor(error);
+    return fail(Errc::CorruptDescriptor, std::move(error));
   }
   return descriptor;
 }
 
-void saveDescriptorFile(const std::string &descriptorFile, const Descriptor &descriptor) {
+Result<> saveDescriptorFile(const std::string &descriptorFile, const Descriptor &descriptor) {
   std::fstream descFile;
   descFile.rdbuf()->pubsetbuf(nullptr, 0);
   descFile.open(descriptorFile, std::ios::out);
   if ((descFile.rdstate() & std::ofstream::failbit) != 0) {
-    throw IOError(fmt::format("storage: failed to open descriptor file for writing: {}", descriptorFile));
+    return fail(Errc::IO, fmt::format("storage: failed to open descriptor file for writing: {}", descriptorFile));
   }
   descFile << descriptor;
   if ((descFile.rdstate() & std::ofstream::failbit) != 0) {
-    throw IOError(fmt::format("storage: failed to write descriptor file: {}", descriptorFile));
+    return fail(Errc::IO, fmt::format("storage: failed to write descriptor file: {}", descriptorFile));
   }
   descFile.close();
+  return {};
 }
 
-void verifyDescriptorMatch(const Descriptor &provided, const Descriptor &existing, const std::string &descriptorFile) {
-  if (provided == existing) return;
+Result<> verifyDescriptorMatch(const Descriptor &provided, const Descriptor &existing, const std::string &descriptorFile) {
+  if (provided == existing) return {};
 
-  // ConfigError, nie blad wejscia-wyjscia: plik jest w porzadku, tylko opisuje inny
+  // Errc::Config, nie Errc::IO: plik jest w porzadku, tylko opisuje inny
   // ksztalt rekordu niz ten, o ktory prosi plan. Zwykle znaczy to zmieniona deklaracje
   // strumienia nad istniejacymi danymi - czyli cos, co autor planu ma poprawic.
   //
-  // Oba deskryptory ida na stderr, a nie do tekstu wyjatku: sa wielowierszowe, a komunikat
-  // wyjatku bywa przekazywany dalej jednym wierszem (patrz kMaxSyntaxErrorMessage).
+  // Oba deskryptory ida na stderr, a nie do tekstu bledu: sa wielowierszowe, a komunikat
+  // bledu bywa przekazywany dalej jednym wierszem (patrz kMaxSyntaxErrorMessage).
   SPDLOG_ERROR("Descriptors do not match in {}.", descriptorFile);
   std::cerr << "Error in data descriptor file: " << descriptorFile << '\n';
   std::cerr << "Provided Descriptor:\n" << provided << "\nExisting Descriptor:\n" << existing << '\n';
-  throw ConfigError("storage: descriptor schema mismatch in " + descriptorFile + " - remove data files and restart");
+  return fail(Errc::Config, "storage: descriptor schema mismatch in " + descriptorFile + " - remove data files and restart");
 }
 
 }  // namespace rdb

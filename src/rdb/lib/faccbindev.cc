@@ -87,7 +87,7 @@ ssize_t binaryDeviceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, co
   return EXIT_SUCCESS;
 }
 
-size_t binaryDeviceRO::count() { return cnt_; }
+Result<size_t> binaryDeviceRO::count() { return cnt_; }
 
 const std::vector<bool> &binaryDeviceRO::lastNullBitset() const { return lastNullBitset_; }
 

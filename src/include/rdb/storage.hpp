@@ -7,6 +7,7 @@
 #include <boost/rational.hpp>
 
 #include "descriptor.hpp"
+#include "error.hpp"
 #include "fainterface.hpp"
 #include "memoryStore.hpp"
 #include "metaData.hpp"
@@ -18,8 +19,10 @@ namespace rdb {
 
 /// @brief Wynik odczytu rekordu.
 ///
-/// Do 2026-09-23 read() i revRead() zwracaly `bool` o JEDNEJ mozliwej wartosci: kazda prawdziwa
-/// awaria konczy sie FatalError i nie wraca, a jedyna awaria odwracalna - brak rekordu - wracala
+/// Prawdziwa awaria odczytu (blad wejscia-wyjscia, zrodlo deklarowane czytane wprost) wraca jako
+/// blad Result; ReadStatus opisuje wylacznie odczyty UDANE. Historia: do 2026-09-23 read() i
+/// revRead() zwracaly `bool` o JEDNEJ mozliwej wartosci: kazda prawdziwa
+/// awaria konczyla sie FatalError i nie wracala, a jedyna awaria odwracalna - brak rekordu - wracala
 /// jako `true` z pamiecia wyzerowana i jawnie oznaczona jako NIE-null. Trzy miejsca obslugi bledu
 /// u wolajacych byly przez to martwe, a najgorzej konczylo sie to w reduktorze: zamiast pominac
 /// brakujacy rekord, skladal do MIN/MAX/SUM/AVG sfalszowane zero.
@@ -81,10 +84,11 @@ class storage {
   boost::rational<int> rInterval_{1};  ///< sampling interval for time calculations
 
   void detectStartupState();  ///< detect rotation or startup gap after meta index is ready
-  [[nodiscard]] std::string attachStorage();
+  [[nodiscard]] Result<> attachStorage();
 
-  void abortIfStorageNotPrepared();
-  void initializeAccessor();
+  /// Cztery niezmienniki, ktorych zlamanie znaczy uzycie magazynu przed attachDescriptor().
+  [[nodiscard]] Result<> requirePrepared() const;
+  [[nodiscard]] Result<> initializeAccessor();
 
   /// @brief Czy magazyn trzyma dane w pamięci, a nie na dysku (polityka TYPE deskryptora).
   ///
@@ -112,25 +116,35 @@ class storage {
   /// Dla pozostalych typow magazynu bez znaczenia.
   MemoryStore *memory_ = nullptr;
 
+  storage(StoragePaths paths, std::string_view storageType, bool oneShot, bool isHold, int percounter, MemoryStore *memory);
+
  public:
   storage() = delete;
-  explicit storage(std::string_view qryID,                    //
-                   std::string_view fileName,                 //
-                   std::string_view storageParam,             //
-                   std::string_view storageType = "DEFAULT",  //
-                   bool oneShot                 = false,      //
-                   bool isHold                  = false,      //
-                   int percounter               = -1,         //
-                   MemoryStore *memory          = nullptr     //
+
+  /// Jedyna droga do magazynu. Zla konfiguracja (pusty identyfikator, katalog :STORAGE, ktorego
+  /// nie ma) wraca jako Errc::Config, zanim obiekt powstanie - wiec destruktor magazynu
+  /// disposable nie ma czego kasowac. Dawny konstruktor rzucal ConfigError z listy inicjalizacyjnej.
+  [[nodiscard]] static Result<std::unique_ptr<storage>> create(std::string_view qryID,                    //
+                                                               std::string_view fileName,                 //
+                                                               std::string_view storageParam,             //
+                                                               std::string_view storageType = "DEFAULT",  //
+                                                               bool oneShot                 = false,      //
+                                                               bool isHold                  = false,      //
+                                                               int percounter               = -1,         //
+                                                               MemoryStore *memory          = nullptr     //
   );
+  storage(const storage &)            = delete;
+  storage &operator=(const storage &) = delete;
   virtual ~storage();
 
   Descriptor descriptor;
 
   sourceState bufferState{sourceState::empty};  // ? test lock
 
-  /// @return pusty napis albo powod odmowy odczytu deskryptora lub otwarcia magazynu
-  [[nodiscard]] std::string attachDescriptor(const Descriptor *descriptor = nullptr);
+  /// @return sukces albo powod odmowy: odczyt deskryptora (CorruptDescriptor tresc jak w
+  ///         tryLoadDescriptorFile), niezgodnosc schematu albo brak deskryptora (Config), zapis .desc
+  ///         lub otwarcie magazynu (IO).
+  [[nodiscard]] Result<> attachDescriptor(const Descriptor *descriptor = nullptr);
 
   /// @brief Oznacz magazyn jako materializowany podplan (substrat) dla sondy K23.
   ///
@@ -139,12 +153,13 @@ class storage {
   /// w nagłówku, żeby w buildzie bez sondy nie powstał osobny symbol w bibliotece.
   void markAsSubstrate(const bool value) { isSubstrate_ = value; }
 
-  bool write(size_t recordIndex = std::numeric_limits<size_t>::max());
+  [[nodiscard]] Result<> write(size_t recordIndex = std::numeric_limits<size_t>::max());
 
-  [[nodiscard]] ReadStatus revRead(size_t recordIndexFromBack, uint8_t *destination = nullptr);
-  [[nodiscard]] ReadStatus read(size_t recordIndexFromFront, uint8_t *destination = nullptr);
+  [[nodiscard]] Result<ReadStatus> revRead(size_t recordIndexFromBack, uint8_t *destination = nullptr);
+  /// Errc::Config dla zrodla deklarowanego (czyta sie je przez revRead), Errc::IO dla nieudanego odczytu.
+  [[nodiscard]] Result<ReadStatus> read(size_t recordIndexFromFront, uint8_t *destination = nullptr);
   void fire();
-  void purge();
+  [[nodiscard]] Result<> purge();
 
   /// @brief Mark a transmission gap at the current position.
   ///
@@ -162,12 +177,14 @@ class storage {
   /// @return true if neither storage nor meta index contain any records
   [[nodiscard]] bool isMetaIndexEmpty() const;
 
+  /// Payload magazynu. Istnieje po kazdym udanym attachDescriptor(); wolanie wczesniej to blad w
+  /// kodzie wolajacego (RDB_ASSERT), nie stan, ktory trzeba obslugiwac.
   std::unique_ptr<rdb::payload>::pointer getPayload();
 
   void setDisposable(bool value);
   void releaseOnHold();
   [[nodiscard]] size_t getRecordsCount() const;
-  bool descriptorFileExist();
+  [[nodiscard]] bool descriptorFileExist() const;
 
   /// @brief Rekord historii źródła deklarowanego (0 = najnowszy) bez mutacji bieżącego payloadu.
   [[nodiscard]] const payload &history(size_t recordIndexFromBack) const { return buffer_.history(recordIndexFromBack); }
@@ -201,6 +218,6 @@ class storage {
   [[nodiscard]] boost::rational<int> getSamplingInterval() const;
 
   // technical function - for unit tests
-  void resetForUnitTest();
+  [[nodiscard]] Result<> resetForUnitTest();
 };
 }  // namespace rdb
