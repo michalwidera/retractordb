@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -46,6 +47,9 @@ struct executorsm {
   /// `[storage] default_retention` dla tych samych kompilacji - .desc strumienia nie moze zalezec
   /// od kanalu, ktorym przyszedl plan.
   static rdb::retention_t cfgDefaultRetention;
+  /// `[sources] timeout_s` (#347): termin DEVICE bez klauzuli TIMEOUT - dla fazy DEVICE w petli
+  /// slotow i dla ostrzezen kompilacji w kanale ad-hoc i `--reset`.
+  static std::optional<double> cfgSourcesTimeout;
   /// Katalog magazynu, w ktorym pisze plan DZIALAJACY. Trzymany osobno, bo dataModel usuwa
   /// dyrektywy z drzewa planu - w czasie pracy `:STORAGE` nie da sie juz z niego odczytac,
   /// a zapytanie ad-hoc musi roscic dokladnie te sciezki, ktore powstana na dysku.

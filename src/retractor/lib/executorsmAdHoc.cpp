@@ -206,6 +206,8 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     if (verboseMode)
       for (const std::string &warning : deprecatedFileWarnings(coreInstanceCopy, adHocStreams))
         std::println(std::cerr, "xretractor: warning: {}", warning);
+    for (const std::string &warning : deviceTimeoutWarnings(coreInstanceCopy, cfgSourcesTimeout, adHocStreams))
+      SPDLOG_ERROR("AdHoc: {}", warning);
   }
 
   // Test zmienia katalog po kontroli wstepnej, lecz przed rzeczywistym open() w

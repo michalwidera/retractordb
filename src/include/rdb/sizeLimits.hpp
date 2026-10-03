@@ -38,6 +38,11 @@ inline constexpr int kMaxDumpRetention = 256;
 /// odmawial startu. Nastepny w korpusie ma 96, wiec zapas wynosi 17.
 inline constexpr std::size_t kMaxPlanStreams = 148;
 
+/// Termin odczytu zrodla DEVICE w sekundach: klauzula `TIMEOUT` (parser) i `[sources] timeout_s`
+/// (retractor.toml), #347. Doba to i tak wiecej niz najdluzszy interwal, przy ktorym czekanie ma sens;
+/// granica trzyma termin daleko od przepelnienia zegara monotonicznego w nanosekundach.
+inline constexpr double kMaxDeviceTimeoutSeconds = 86400.0;
+
 // --- Warstwa 2: wielkosci zlozone, sprawdza kompilator; biblioteka rdb ich nie stosuje ---
 
 /// Rozmiar jednego rekordu w bajtach.

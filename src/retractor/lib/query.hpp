@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <iostream>
 #include <list>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -182,6 +183,10 @@ class query {
   bool isDeprecatedFile = false;
   /// Wiersz pliku planu, od ktorego zaczyna sie deklaracja - do ostrzezenia o formie przestarzalej.
   size_t declarationLine = 0;
+  /// Jawna klauzula `TIMEOUT` deklaracji DEVICE w sekundach (#347). Brak klauzuli to cos innego niz
+  /// jawne 0: brak bierze `[sources] timeout_s` z retractor.toml, a jawne 0 wylacza dodatnia wartosc
+  /// z konfiguracji dla tego jednego zrodla. Pierwszenstwo rozstrzyga effectiveDeviceTimeout().
+  std::optional<double> timeoutSeconds;
 
   std::list<field> lSchema;
   std::list<token> lProgram;
@@ -231,5 +236,17 @@ class query {
 };
 
 bool operator<(const query &lhs, const query &rhs);
+
+/// Efektywny termin odczytu zrodla DEVICE i to, skad pochodzi (#347).
+struct deviceTimeout {
+  double seconds = 0.0;
+  /// "RQL", "config", "default" albo "no-clock" - do wpisu w logu przy starcie epoki.
+  std::string_view origin;
+};
+
+/// Pierwszenstwo: tryb bez zegara (`-f`) > jawna klauzula TIMEOUT > `[sources] timeout_s` > 0.
+/// W trybie bez zegara termin wynosi zawsze 0: sekundy rzeczywiste nie maja przelicznika na czas
+/// wirtualny, a proba nieblokujaca zostawia DEVICE uzytecznym w szybkich testach.
+deviceTimeout effectiveDeviceTimeout(const query &qry, std::optional<double> configured, bool noClock);
 
 std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog);

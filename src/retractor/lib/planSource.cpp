@@ -237,6 +237,26 @@ std::vector<std::string> deprecatedFileWarnings(const qTree &plan, const std::ve
   return retVal;
 }
 
+std::vector<std::string> deviceTimeoutWarnings(const qTree &plan, const std::optional<double> configured,
+                                               const std::vector<std::string> &streamNames) {
+  std::vector<const query *> late;
+  for (const auto &q : plan) {
+    if (q.kind != sourceKind::device) continue;
+    if (!streamNames.empty() && std::ranges::find(streamNames, q.id) == streamNames.end()) continue;
+    if (effectiveDeviceTimeout(q, configured, false).seconds > boost::rational_cast<double>(q.rInterval)) late.push_back(&q);
+  }
+  std::ranges::sort(late, {}, &query::declarationLine);
+
+  std::vector<std::string> retVal;
+  for (const query *q : late) {
+    const auto timeout = effectiveDeviceTimeout(*q, configured, false);
+    retVal.push_back(
+        std::format("line {}: DECLARE {}: TIMEOUT {} s ({}) is longer than the interval {} s; waiting overruns the slot",
+                    q->declarationLine, q->id, timeout.seconds, timeout.origin, boost::rational_cast<double>(q->rInterval)));
+  }
+  return retVal;
+}
+
 std::vector<std::string> planStreamNames(const qTree &plan) {
   std::vector<std::string> retVal;
   for (const auto &q : plan)

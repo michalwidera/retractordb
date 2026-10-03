@@ -570,17 +570,36 @@ class ParserListener : public RQLBaseListener {
     qry.isOneShot    = (ctx->ONESHOT() != nullptr);
     qry.isHold       = (ctx->HOLD() != nullptr);
     // DEVICE to zrodlo zywe (#346): HOLD nie zatrzymuje producenta, tylko gromadzi zaleglosc,
-    // a DISPOSABLE kasowalby sciezke urzadzenia albo FIFO. ONESHOT odpada przy jawnym DEVICE,
-    // bo polityke EOF urzadzenia ustala #347; forma przestarzala zachowuje go bez zmian.
+    // a DISPOSABLE kasowalby sciezke urzadzenia albo FIFO. ONESHOT jest dozwolony od #347:
+    // wyczerpaniem DEVICE jest pierwszy EOF po otrzymaniu danych (binaryDeviceRO::fill).
     if (qry.kind == sourceKind::device) {
       const std::string what =
           qry.isDeprecatedFile ? "FILE '" + qry.filename + "' resolves as DEVICE, which" : std::string("DEVICE");
-      for (const auto &[present, option] :
-           {std::pair{qry.isDisposable, "DISPOSABLE"}, std::pair{qry.isOneShot && !qry.isDeprecatedFile, "ONESHOT"},
-            std::pair{qry.isHold, "HOLD"}})
+      for (const auto &[present, option] : {std::pair{qry.isDisposable, "DISPOSABLE"}, std::pair{qry.isHold, "HOLD"}})
         if (present)
           reportSemanticError("DECLARE " + qry.id + ": " + what + " does not take " + option +
-                              "; DISPOSABLE, ONESHOT and HOLD apply to BINFILE and TEXTFILE");
+                              "; DISPOSABLE and HOLD apply to BINFILE and TEXTFILE");
+    }
+    // TIMEOUT (#347) ma sens tylko przy zrodle zywym. Forma przestarzala nie przyjmuje klauzul
+    // wcale - takze wtedy, gdy regula ze sciezki wybrala DEVICE - wiec komunikat podpowiada jawne
+    // slowo. Wartosc ujemna nie ma znaczenia "czekaj bez konca": takiego terminu nie ma.
+    if (ctx->TIMEOUT() != nullptr) {
+      const std::string text = ctx->timeout_value->getText();
+      const auto value       = parseLiteral<double>(text);
+      if (!value)
+        reportOutOfRange(text);
+      else if (ctx->timeout_sign != nullptr)
+        reportSemanticError("DECLARE " + qry.id + ": TIMEOUT -" + text + " must not be negative");
+      else if (*value > rdb::limits::kMaxDeviceTimeoutSeconds)
+        reportSemanticError("DECLARE " + qry.id + ": TIMEOUT " + text + " exceeds the limit " +
+                            std::to_string(static_cast<long long>(rdb::limits::kMaxDeviceTimeoutSeconds)) + " s");
+      else
+        qry.timeoutSeconds = *value;
+      if (qry.isDeprecatedFile)
+        reportSemanticError("DECLARE " + qry.id + ": deprecated FILE does not take TIMEOUT; declare the source with DEVICE '" +
+                            qry.filename + "'");
+      else if (qry.kind != sourceKind::device)
+        reportSemanticError("DECLARE " + qry.id + ": " + keyword + " does not take TIMEOUT; TIMEOUT applies to DEVICE");
     }
     // Ta sama odmowa co w exitSelect: klient bral kazdy rekord deklaracji o tej nazwie
     // za sygnal zamkniecia serwera i konczyl sie "no data in stream".

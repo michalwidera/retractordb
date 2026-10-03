@@ -4597,14 +4597,13 @@ TEST(xparser, deprecated_file_resolves_by_the_frozen_rule) {
   }
 }
 
-// DEVICE to zrodlo zywe: HOLD gromadzilby zaleglosc, DISPOSABLE kasowalby sciezke urzadzenia,
-// a polityke EOF ustala #347 (#346, R6). Forma przestarzala rozstrzygnieta na DEVICE odrzuca
-// HOLD i DISPOSABLE, ale ONESHOT przyjmuje bez zmian. Pliki biora wszystkie trzy, w dowolnym
-// polaczeniu.
+// DEVICE to zrodlo zywe: HOLD gromadzilby zaleglosc, a DISPOSABLE kasowalby sciezke urzadzenia
+// (#346, R6). ONESHOT jest dozwolony od #347 - wyczerpaniem jest pierwszy EOF po danych. Forma
+// przestarzala rozstrzygnieta na DEVICE odrzuca HOLD i DISPOSABLE. Pliki biora wszystkie trzy,
+// w dowolnym polaczeniu.
 TEST(xparser, device_refuses_the_options_of_recorded_files) {
   for (const auto &[rql, reason] : std::vector<std::pair<std::string, std::string>>{
            {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/urandom' DISPOSABLE", "DECLARE s: DEVICE does not take DISPOSABLE"},
-           {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/urandom' ONESHOT", "DECLARE s: DEVICE does not take ONESHOT"},
            {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/urandom' HOLD", "DECLARE s: DEVICE does not take HOLD"},
            {"DECLARE a BYTE STREAM s, 1 FILE '/dev/urandom' HOLD",
             "DECLARE s: FILE '/dev/urandom' resolves as DEVICE, which does not take HOLD"},
@@ -4620,6 +4619,8 @@ TEST(xparser, device_refuses_the_options_of_recorded_files) {
   qTree plan;
   ASSERT_EQ(std::get<0>(parserRQLString(plan, "DECLARE a BYTE STREAM legacy, 1 FILE '/dev/urandom' ONESHOT")), "OK");
   EXPECT_TRUE(plan.getQuery("legacy").isOneShot);
+  ASSERT_EQ(std::get<0>(parserRQLString(plan, "DECLARE a BYTE STREAM live, 1 DEVICE '/dev/urandom' TIMEOUT 0 ONESHOT")), "OK");
+  EXPECT_TRUE(plan.getQuery("live").isOneShot);
   for (const auto *keyword : {"BINFILE 'a.bin'", "TEXTFILE 'a.txt'"}) {
     qTree files;
     ASSERT_EQ(
@@ -4629,6 +4630,77 @@ TEST(xparser, device_refuses_the_options_of_recorded_files) {
     const auto &f = files.getQuery("f");
     EXPECT_TRUE(f.isDisposable && f.isOneShot && f.isHold) << keyword;
   }
+}
+
+// Klauzula TIMEOUT (#347). Brak klauzuli i jawne 0 to dwa rozne stany - jawne 0 wylacza dodatnia
+// wartosc z retractor.toml. Wartosc TIMEOUT nie moze trafic do interwalu deklaracji: przebiegi
+// rational_se pisza do wspolnego rationalResult i odrzucaja zero, a TIMEOUT 0 jest legalne.
+// query::reset() kasuje klauzule, wiec nastepna deklaracja jej nie dziedziczy.
+TEST(xparser, device_timeout_clause) {
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan,
+                          "DECLARE a BYTE STREAM fast, 1/50 DEVICE '/dev/zero' TIMEOUT 0.01\n"
+                          "DECLARE a BYTE STREAM zeroed, 0.5 DEVICE '/dev/zero' TIMEOUT 0\n"
+                          "DECLARE a BYTE STREAM whole, 2 device '/dev/zero' timeout 3\n"
+                          "DECLARE a BYTE STREAM bare, 1 DEVICE '/dev/zero'\n")
+                .status,
+            "OK");
+  EXPECT_EQ(plan.getQuery("fast").timeoutSeconds, std::optional<double>(0.01));
+  EXPECT_EQ(plan.getQuery("fast").rInterval, boost::rational<int>(1, 50));
+  EXPECT_EQ(plan.getQuery("zeroed").timeoutSeconds, std::optional<double>(0.0));
+  EXPECT_EQ(plan.getQuery("zeroed").rInterval, boost::rational<int>(1, 2));
+  EXPECT_EQ(plan.getQuery("whole").timeoutSeconds, std::optional<double>(3.0));
+  EXPECT_EQ(plan.getQuery("whole").rInterval, boost::rational<int>(2));
+  EXPECT_FALSE(plan.getQuery("bare").timeoutSeconds.has_value());
+}
+
+// Wartosc ujemna nie jest sentinelem "czekaj bez konca". TIMEOUT ma sens tylko przy DEVICE; forma
+// przestarzala nie bierze klauzul wcale, takze gdy jej sciezka wybiera DEVICE, wiec odmowa podpowiada
+// jawne slowo.
+TEST(xparser, device_timeout_refusals) {
+  for (const auto &[rql, reason] : std::vector<std::pair<std::string, std::string>>{
+           {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/zero' TIMEOUT -1", "DECLARE s: TIMEOUT -1 must not be negative"},
+           {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/zero' TIMEOUT -0.5", "DECLARE s: TIMEOUT -0.5 must not be negative"},
+           {"DECLARE a BYTE STREAM s, 1 DEVICE '/dev/zero' TIMEOUT 86401", "DECLARE s: TIMEOUT 86401 exceeds the limit 86400 s"},
+           {"DECLARE a BYTE STREAM s, 1 BINFILE 'a.bin' TIMEOUT 0.1",
+            "DECLARE s: BINFILE does not take TIMEOUT; TIMEOUT applies to DEVICE"},
+           {"DECLARE a BYTE STREAM s, 1 TEXTFILE 'a.txt' TIMEOUT 0",
+            "DECLARE s: TEXTFILE does not take TIMEOUT; TIMEOUT applies to DEVICE"},
+           {"DECLARE a BYTE STREAM s, 1 FILE '/dev/urandom' TIMEOUT 0.1",
+            "DECLARE s: deprecated FILE does not take TIMEOUT; declare the source with DEVICE '/dev/urandom'"},
+           {"DECLARE a BYTE STREAM s, 1 FILE 'a.bin' TIMEOUT 0.1",
+            "DECLARE s: deprecated FILE does not take TIMEOUT; declare the source with DEVICE 'a.bin'"},
+       }) {
+    const auto [parseResult, diagnostics] = parseCapturingStderr(rql);
+    EXPECT_TRUE(parseResult.contains(reason)) << rql << '\n' << parseResult;
+    EXPECT_TRUE(diagnostics.contains(reason)) << rql << '\n' << diagnostics;
+  }
+  // TIMEOUT stal sie slowem zastrzezonym - jak ONESHOT i HOLD.
+  for (const char *rql :
+       {"DECLARE v INTEGER STREAM timeout, 1 BINFILE 'a.bin'", "DECLARE TIMEOUT INTEGER STREAM s, 1 BINFILE 'a.bin'"}) {
+    const auto [parseResult, diagnostics] = parseCapturingStderr(rql);
+    EXPECT_TRUE(parseResult.contains("expecting ID")) << rql << '\n' << parseResult;
+  }
+}
+
+// Pierwszenstwo terminu DEVICE: tryb bez zegara > jawna klauzula (takze 0) > `[sources] timeout_s` > 0.
+TEST(xparser, effective_device_timeout_precedence) {
+  query explicitZero;
+  explicitZero.timeoutSeconds = 0.0;
+  query explicitHalf;
+  explicitHalf.timeoutSeconds = 0.5;
+  const query bare;
+
+  const auto check = [](const deviceTimeout &timeout, double seconds, std::string_view origin) {
+    EXPECT_EQ(timeout.seconds, seconds);
+    EXPECT_EQ(timeout.origin, origin);
+  };
+  check(effectiveDeviceTimeout(explicitZero, 0.3, false), 0.0, "RQL");
+  check(effectiveDeviceTimeout(explicitHalf, 0.3, false), 0.5, "RQL");
+  check(effectiveDeviceTimeout(bare, 0.3, false), 0.3, "config");
+  check(effectiveDeviceTimeout(bare, std::nullopt, false), 0.0, "default");
+  check(effectiveDeviceTimeout(explicitHalf, 0.3, true), 0.0, "no-clock");
+  check(effectiveDeviceTimeout(bare, 0.3, true), 0.0, "no-clock");
 }
 
 // BINFILE, TEXTFILE i DEVICE sa tokenami leksera przed ID, wiec - jak MIN i MAX - zaden strumien

@@ -52,6 +52,19 @@ struct AppConfig {
   /// kompilator (compiler::setDefaultRetention) na tych samych drogach co history_memory_mib.
   rdb::retention_t defaultRetention{.segments = 0, .capacity = 0};
 
+  // === [sources] ===
+
+  /// Termin odczytu zrodel DEVICE bez klauzuli TIMEOUT, w sekundach (#347). Brak klucza = nullopt,
+  /// czyli wbudowane 0. Jawna klauzula w RQL wygrywa - takze jawne `TIMEOUT 0`. Klucz nie zmienia
+  /// BINFILE, TEXTFILE ani timing.query_no_data_timeout_ms klienta xqry.
+  std::optional<double> sourcesTimeoutSeconds;
+
+  /// Powod odrzucenia `[sources] timeout_s` (pusty = wartosc poprawna albo brak klucza). Swiadome
+  /// odstepstwo od reguly "ostrzezenie + wartosc domyslna": cicha zamiana zmienilaby semantyke
+  /// czekania. loadAppConfig() tylko go zapisuje, bo czytaja go tez xqry i xtrdb, ktorych ten klucz
+  /// nie dotyczy; start xretractora konczy sie bledem w launcherze.
+  std::string sourcesTimeoutError;
+
   // === [ipc] ===
 
   /// Liczba sekund bufora kolejki IPC per strumień (elementy = 1/interwał × sekundy).

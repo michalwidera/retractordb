@@ -437,6 +437,9 @@ int main(int argc, char *argv[]) try {
     else
       SPDLOG_INFO("Configuration loaded from: {}", fmt::join(appCfg.loadedFrom, ", "));
     validateConfiguredStorageDir(appCfg);
+    // Termin DEVICE z konfiguracji (#347): wartosc niepoprawna zatrzymuje start, zamiast cicho
+    // zmienic semantyke czekania. Tutaj, a nie w loadAppConfig - ten klucz nie dotyczy xqry ani xtrdb.
+    if (!appCfg.sourcesTimeoutError.empty()) throw std::invalid_argument("Configuration error: " + appCfg.sourcesTimeoutError);
     // Ten sam budzet dla planu startowego i dla `-c`, ktore jest bramka: plan przyjety tutaj musi
     // przejsc takze kompilacje w kanale ad-hoc i `--reset` (executorsm::cfgHistoryMemoryMib).
     cm.setHistoryMemoryBudget(appCfg.historyMemoryMib);
@@ -551,6 +554,12 @@ int main(int argc, char *argv[]) try {
       if (vm.contains("verbose"))
         for (const std::string &warning : deprecatedFileWarnings(coreInstance))
           std::println(std::cerr, "{}: warning: {}", argv[0], warning);
+      // TIMEOUT dluzszy od interwalu (#347) zawsze: dotyczy tylko planow z DEVICE i z TIMEOUT
+      // albo `[sources] timeout_s`, wiec zadne wyjscie sprzed tej zmiany go nie dostanie.
+      for (const std::string &warning : deviceTimeoutWarnings(coreInstance, appCfg.sourcesTimeoutSeconds)) {
+        std::println(std::cerr, "{}: warning: {}", argv[0], warning);
+        SPDLOG_WARN("{}", warning);
+      }
 
       if (const auto unbounded = cm.unboundedDiskStreams(); !unbounded.empty()) {
         for (const auto &[stream, reason] : unbounded) {

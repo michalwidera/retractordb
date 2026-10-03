@@ -128,6 +128,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   executorsm::cfgUnrestricted       = cfg.serviceUnrestricted;
   executorsm::cfgHistoryMemoryMib   = cfg.historyMemoryMib;
   executorsm::cfgDefaultRetention   = cfg.defaultRetention;
+  executorsm::cfgSourcesTimeout     = cfg.sourcesTimeoutSeconds;
   // Tryb nieograniczony zostawia slad w dzienniku ZAWSZE, nie tylko przy pierwszej regule:
   // po incydencie pytanie brzmi "czy ta instancja przyjmowala polecenia powloki", a odpowiedz
   // ma byc w logu startu, a nie do odtworzenia z pliku konfiguracyjnego, ktory mogl sie zmienic.

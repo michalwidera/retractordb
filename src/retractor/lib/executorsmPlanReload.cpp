@@ -148,6 +148,8 @@ std::string executorsm::validatePlanText(const std::string &planText) {
     if (verboseMode)
       for (const std::string &warning : deprecatedFileWarnings(candidate))
         std::println(std::cerr, "xretractor: warning: {}", warning);
+    for (const std::string &warning : deviceTimeoutWarnings(candidate, cfgSourcesTimeout))
+      SPDLOG_ERROR("Reset plan: {}", warning);
     if (const std::string openError = checkOutputFilesOpenable(candidate, cfgStorageDir); openError != "OK")
       return "Rejected: " + openError;
     // Ten sam wykaz co przy starcie (launcher), tylko do dziennika - kanal reset nie ma stderr operatora.
