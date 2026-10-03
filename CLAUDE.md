@@ -19,7 +19,7 @@ scripts/buildrdb.sh coverage    # build with coverage + gcovr report → coverag
 
 Options chain: `scripts/buildrdb.sh conan ninja debug`
 
-Plain `ctest ...` and `ninja test*` commands run through the `PreToolUse` hook `.claude/hooks/test-output-filter.py`: the full output goes to a log under the session scratchpad and the command returns its last 120 lines plus the log path. Read the log for anything the tail cut off instead of re-running the tests.
+Plain `ctest ...` and `ninja [-C <dir>] test|test-valgrind|test_gate` commands, also after a leading `cd <dir> &&`, run through the `PreToolUse` hook `.claude/hooks/test-output-filter.py`: the full output goes to a log under the session scratchpad and the command returns its last 120 lines plus the log path. Any other operator outside quotes (a pipe, a redirection, `;`) or `$` outside single quotes leaves the command unfiltered. Read the log for anything the tail cut off instead of re-running the tests.
 
 **Incremental (from `build/Debug`):**
 ```bash
@@ -143,13 +143,13 @@ Everything else stays in the main session: a short build and `ninja test` (run t
 
 - The delegation prompt is short: goal, paths, exact commands or acceptance criteria, expected report. The agent's definition already carries its rules - do not repeat them.
 - Agents load only at session start. If `.claude/agents/` changed during the session, do the work in place - never emulate an agent by pasting its definition into a `general-purpose` prompt.
-- One run at a time per build directory: never let two agents, or an agent and the main session, use the same `build/<cfg>` concurrently. `investigator` copies are the exception, because they never touch a shared build directory.
+- One build or test run at a time on the machine: never let two agents, or an agent and the main session, build, install or test concurrently - not even in different `build/<cfg>` directories, because they share `~/.local/bin` and the `RDB_NAMESPACE` pool (in the #269 session a Debug run in parallel with a Release run tested the Release binaries). `investigator` copies are the exception, because they never touch a shared build directory or install.
 - While an agent runs in the background, wait for its notification: do not poll it (`ps`, `kill -0`, reading its output file), and do not run the same check in the main session. A check is either delegated or run in place - never both.
 - An agent's report is evidence, not a verdict. Before telling the human that a check passed, read the verbatim lines it returned (ctest summary, exit codes, `cmp` results); a missing line means the check was not run. Reading those lines is the verification - do not repeat the check.
 - Agents never commit, push, open pull requests or touch CI, and the embargo in *Comparative measurement* binds them as it binds the main session.
 - Files changed by `implementer` count toward the *Planning threshold*, and the main session reads its diff before the handoff.
 - A failed agent run is retried at most once, with a corrected prompt; after that the main session does the work itself.
-- Build, test, read-only git commands and `scripts/hygiene-check.sh` are pre-approved in `.claude/settings.json`, so neither the main session nor an agent prompts for them; `git add` / `commit` / `push` and `ninja cformat` are not, on purpose. A permission prompt raised by an agent is a stop signal: read the command before approving it.
+- Build, test, read-only git commands and `scripts/hygiene-check.sh` are pre-approved in `.claude/settings.json`, so neither the main session nor an agent prompts for them; `git add` / `commit` / `push`, `ninja cformat`, `cmake .` (a reconfigure deletes `build/<cfg>/test`) and `sed` (its `e` command runs a shell command, `w` and `-i` write files) are not, on purpose. The hook refuses `ctest` in script or dashboard mode (`-S`, `-D`, `--script`, `--build-and-test`), which `Bash(ctest *)` would otherwise let through. A permission prompt raised by an agent is a stop signal: read the command before approving it.
 
 ### AI watermark hygiene (text)
 
