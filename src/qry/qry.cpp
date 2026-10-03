@@ -6,10 +6,12 @@
 #include <array>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <expected>
 #include <iostream>
 #include <print>
 #include <sstream>
+#include <stdexcept>
 #include <stop_token>
 #include <thread>
 #include <vector>
@@ -252,6 +254,14 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
   // Czy petla skonczyla sie na ciszy serwera. Samo `rendered` tego nie mowi: klient, ktory dostal
   // czesc zamowionych elementow i stracil serwer, konczyl sie do 2026-09-27 sukcesem.
   bool serverWentSilent = false;
+  // Czy petle przerwal wyjatek. Do 2026-10-03 przechwycenie logowalo staly napis i szlo dalej
+  // zwyklym epilogiem, wiec awaria formatera konczyla sie jak pusty strumien (noData), a po
+  // czesci elementow -- sukcesem (#285).
+  bool loopFailed = false;
+
+  // Hak testu it_select_loop_failure, ta sama droga co RDB_FAULT_SHOW po stronie serwera.
+  // Wymusza wyjatek w petli renderowania przy pierwszym elemencie strumienia.
+  const bool faultRender = std::getenv("RDB_FAULT_RENDER") != nullptr;
 
   ptree e_value;
   try {
@@ -273,6 +283,7 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
         }
         for (auto &[w, k] : streamTable)
           if (w == streamN) {
+            if (faultRender) throw std::runtime_error("RDB_FAULT_RENDER: wstrzyknieta awaria petli renderowania");
             const int count = std::stoi(e_value.get("count", ""));
             if (outputFormatMode == formatMode::RAW)
               Formatter::renderRaw(e_value, count, nullmap, vm.contains("null"));
@@ -309,8 +320,12 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
 
     if (elemLimitCnt != 1 && !transport_->done) _getch();
 
+  } catch (const std::exception &e) {
+    SPDLOG_ERROR("select loop failed (stream: {}): {}", input, e.what());
+    loopFailed = true;
   } catch (...) {
-    SPDLOG_ERROR("General exception catched.");
+    SPDLOG_ERROR("select loop failed (stream: {}): non-standard exception", input);
+    loopFailed = true;
   }
 
   transport_->done = true;
@@ -324,6 +339,10 @@ selectResult qry::select(boost::program_options::variables_map &vm, const int iE
   // diagnozę tej samej awarii. `done` jest już ustawione, a każda pętla producenta
   // sprawdza tę flagę, więc oczekiwanie jest krótkie.
   producer_thread.join();
+
+  // Awaria petli ma pierwszenstwo przed bilansem elementow: liczba wyrenderowanych mowi
+  // wtedy tylko, gdzie petla padla, a nie co przyslal serwer.
+  if (loopFailed) return selectResult::renderFailed;
 
   // Reguła: klient, który nie przeczytał ani jednego elementu, nie kończy się
   // sukcesem. Rozróżniamy przy tym DLACZEGO nic nie przyszło, bo „serwer nie
@@ -359,6 +378,8 @@ const char *toString(selectResult result) {
       return "server has no plan loaded (idle); load one with --reset";
     case selectResult::serverStopping:
       return "server is shutting down";
+    case selectResult::renderFailed:
+      return "select loop failed in the client; reason in the client log";
   }
   return "unknown";
 }

@@ -39,7 +39,8 @@ enum class selectResult : std::uint8_t {
   clientQueueMissing,  ///< serwer nie utworzył kolejki odpowiedzi tego klienta
   noData,              ///< dołączono do strumienia, ale nie przyszedł ani jeden element
   noActivePlan,        ///< serwer odpowiedział, ale nie ma wczytanego planu (tryb bezczynny)
-  serverStopping       ///< serwer odpowiedział, ale właśnie się zamyka
+  serverStopping,      ///< serwer odpowiedział, ale właśnie się zamyka
+  renderFailed         ///< pętla odbioru i renderowania przerwana wyjątkiem po stronie klienta
 };
 
 /// Nazwa trybu do komunikatu dla operatora.
