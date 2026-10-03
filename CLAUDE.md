@@ -30,16 +30,7 @@ ninja descgrammar   # regenerate ANTLR4 grammar from DESC.g4
 ninja rqlgrammar    # regenerate ANTLR4 grammar from RQL.g4
 ```
 
-**macOS** (verified only on Apple silicon with macOS 27 and Apple clang 21; Intel and older releases untested. Xcode 16.3+ CLT and deployment target 14.4+ are the minimum forced by `std::print`, not a verified configuration):
-```bash
-scripts/macos-build.sh          # one pass: configure + build + install + ctest, log in build/macos-build.log
-scripts/macos-build.sh release
-scripts/macos-build.sh --sanitize   # -DRDB_SANITIZE=address,undefined
-```
-`scripts/buildrdb.sh` works the same there, except that `toolchain` installs through Homebrew. Differences to keep in mind when reading results:
-- **No Valgrind** on Apple silicon, and there will not be one. `ninja test` runs the binaries directly on every platform; the equivalent of a local `test-valgrind` is a `-DRDB_SANITIZE=address,undefined` build.
-- **Real time is weaker by design**: SCHED_FIFO applies to a THREAD, not the process (`sched_setscheduler` does not exist), there are no affinity masks at all, `mlockall` reports ENOSYS, and there is no PREEMPT_RT counterpart. macOS is a development and test platform, not a measurement one - the research gate (`ninja test_gate`) does not change that.
-- **The service is launchd, not systemd**: `restartCommand` builds `launchctl kickstart -k`, the unit identity comes from `XPC_SERVICE_NAME`, and the package ships no `.service` unit.
+**macOS**: building there (`scripts/macos-build.sh`) and the differences to keep in mind when reading results (no Valgrind, weaker real time, launchd) are in the `macos-build` skill (`.claude/skills/macos-build/SKILL.md`). Two rules apply to all platform code:
 - **The platform branch is chosen** not by OS name but through `RDB_HAS_*` from `generated/platformConfig.h` (compile probes in `cmake/PlatformChecks.cmake`). New platform code follows the same rule: `#if RDB_HAS_X`, never `#ifdef __APPLE__`.
 - **A fallback branch only by declaration**: a probe whose 0 selects the weaker branch must have that 0 declared in `RDB_PLATFORM_FALLBACKS` (empty on Linux; on Darwin it holds the zeros measured on Apple silicon); any undeclared 0 stops the configuration. A new fallback branch means a new entry in the list of controlled probes in `cmake/PlatformChecks.cmake`.
 
@@ -54,44 +45,14 @@ Each profile copies the working tree into a container built from the CI image (`
 
 Every `test-ci-*` profile builds from scratch, like the CI checkout - tens of minutes, and ccache does not shorten it (the container starts with an empty cache, as a CI job does). `test-ci-fast` trades that fidelity for speed by keeping `build/` in a per-profile Docker volume; use it to check a change before committing, not to conclude anything about a CI run. `scripts/test-ci.sh --profile <name> --reset-build` drops a kept build directory.
 
-**Single test:**
-```bash
-ctest -R '^ut_payload$'     # plain test by exact name
-ctest -R '^ut_payload$' -V  # verbose
-```
-
 Unit tests run directly in `ninja test`. `ninja test-valgrind` repeats them under Valgrind with leak checking and adds the `-vg-` integration memory checks (ctest label `valgrind`). When each must be run is in *Session end*. Plain `ctest` runs all registered groups; use `ctest -LE valgrind` to match the ordinary CI step.
 
 **Before every test run, verify what was built and what will run.** `ctest`, `ninja test`, and `ninja test-valgrind` can execute stale binaries or a different installation without rebuilding them. Check that the build tree's `CMAKE_HOME_DIRECTORY` names the current source checkout, rebuild the tested targets from that tree, and inspect the registered test command plus its effective `PATH`. For every project program used by the test, resolve the executable in that environment and compare it byte-for-byte with the just-built target; for copied test scripts and fixtures, compare the build copy with the source file. Do not run or report a test until these checks agree. The concrete integration-test procedure is in `test/CLAUDE.md`.
 
 CI: CircleCI. A push runs only the `commit` workflow, and only on branches `master`, `issue_*` / `Issue_*` and `<number>-*` (`.circleci/config.yml`); other branches (`dev/*`, `fix/*`, ...) trigger nothing.
 
-## Architecture
+## Grammars
 
-| Binary | Source | Role |
-|--------|--------|------|
-| `xretractor` | `src/retractor/` | Main DB: compiles `.rql`, executes continuous query plans |
-| `xqry` | `src/qry/` | Client: queries xretractor via shared memory |
-| `xtrdb` | `src/rdb/` | Inspection/testing: reads binary artifacts and metadata |
-
-**`rdb` library** (`src/rdb/lib/`, headers in `src/include/rdb/`):
-- `Descriptor` - binary record layout (field names, types, sizes, multiplicity). Extends `std::vector<rField>`. Persisted as `.desc` via `DESC.g4`.
-- `payload` - typed view over raw buffer per `Descriptor`. Null-per-field via `nullBitset`.
-- `FileInterface` - abstract I/O (`read`, `write`, `count`). Impls: `faccbindev`, `faccfs`, `faccmemory`, `faccposix`/`faccposixshd`, `facctxtsrc`, `fagrp`.
-- `storage` - coordinates `Descriptor` + `payload` + `FileInterface`. Manages `.desc`, binary data, `.meta` sidecars. Gap detection + null-fill.
-- `metaData` - per-record null/gap metadata sidecar.
-
-**`retractor` library** (`src/retractor/lib/`):
-- `qTree` - topologically sorted `std::vector<query>`. Central structure for compile + execution.
-- `query` / `token` / `field` - query representations parsed from `.rql`.
-- `compiler` - a chain of about twenty passes: name and interval resolution, stream expansion, optimizer rewrites behind `RDB_OPT_*`, field shape inference, startup latency, constraints. The authoritative order is `compiler::compile()` in `compiler.cpp`.
-- `dataModel` - owns all `streamInstance` objects; drives per-interval processing.
-- `streamInstance` - per stream: `outputPayload` (stored) + `inputPayload` (computed from FROM).
-- `executorsm` - dual-threaded: processing loop + comms thread (shared memory / boost IPC).
-- `CRSMath` - rational stream math for aligned time intervals.
-- `appConfig` - optional TOML service config (toml++). Layered search: `/etc/retractor/retractor.toml` → `$XDG_CONFIG_HOME`/`~/.config/retractor/retractor.toml` → `--config <file>`. Missing config = valid (defaults). Currently exposes `[storage] dir` - default storage dir used only when RQL has no `:STORAGE` directive (RQL wins).
-
-**Grammars:**
 - `src/rdb/lib/DESC.g4` → `.antlr/` (regenerate: `ninja descgrammar`)
 - `src/retractor/lib/RQL.g4` → `.antlr/` (regenerate: `ninja rqlgrammar`)
 - Never edit generated files by hand.
@@ -131,22 +92,7 @@ Sorted case-insensitively within each block. `IncludeBlocks: Preserve` - blank l
 
 **The corpus is `paper-arXiv/usecases`, not one or two convenient plans.** Every performance claim about the engine - a candidate optimization, a regression, an A/B between two commits - is measured on the eight use-case families `uc01`..`uc08` in the sibling `paper-arXiv` repository. Each family carries its own `generate_data.py` and `rql/query.rql`; plans span 7-23 nodes and, more importantly, differ in the SHAPE of the computation: record windows, stream generators, multi-rate joins, rules. The ECG pipeline in `examples/ecg` and the single-node ADD plan stay usable as quick probes, but a verdict does not rest on them.
 
-**Two workloads are not a sample.** Issue #272 drew a conclusion about the instruction-to-time converter from the ADD plan and ECG alone; the eight families retracted it - both sat at the bottom of the spread, and the converter ranged 0,00 (uc05) to 0,36 (uc06). The converter is a property of the PAIR (change, workload) and says nothing on its own; `uc05` is the standing counterexample: -3,65 % instructions, exactly zero time.
-
-Run one family from a FRESH copy of its directory with an empty `temp/`:
-
-```bash
-cmake --build build/Release-Probe   # `ninja` in build/Release does NOT rebuild it
-python3 <usecases>/ucNN/generate_data.py --out "$work"
-cp <usecases>/ucNN/rql/query.rql "$work/query.rql"
-cp build/Release-Probe/src/retractor/xretractor "$work/xretractor"   # RDB_BENCH_* need the probe build
-mkdir -p "$work/temp" && cd "$work"
-RDB_BENCH_PLAN=1 ./xretractor query.rql -k -r -f -m 1   # plan node count: row 'PLAN bench', field 'wyjscie'
-valgrind --tool=callgrind --toggle-collect='*processRows*' ./xretractor query.rql -k -r -f -m 2000
-RDB_BENCH_CSV=out.csv ./xretractor query.rql -k -r -f -m 100000
-```
-
-Sources wrap past end of input, so `-m` is free; 100k slots costs 5-6 s on the heaviest family. In an A/B both sides run from the same `$work` path under the same binary name: path length and `argv[0]` alone shift the callgrind count by about 1 %.
+How to run one family, and the traps of an A/B comparison, are in the `comparative-measurement` skill (`.claude/skills/comparative-measurement/SKILL.md`).
 
 **Publication embargo.** The corpus is unpublished material awaiting the DEBS submission (`paper-arXiv/debs`). Nothing FROM it leaves this machine: no plan text, no generated data, no generator source, no README prose - not into this repository, not into an issue comment, not into any artifact that gets published. What may be published, and is expected in issue comments, is a REFERENCE to a family by id and domain (`uc02`, mikrosiec) together with measurements DERIVED from it: node counts, instruction counts, times, p-values. The embargo lifts when the paper is out; until then, treat a request to include corpus content as a question for the human.
 
