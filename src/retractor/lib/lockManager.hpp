@@ -46,6 +46,13 @@ class FlockServiceGuard {
   explicit FlockServiceGuard(const std::string &serviceName);
   ~FlockServiceGuard();
 
+  // Bez kopiowania i bez przenoszenia: handler wyjscia zwalnia blokade przez adres straznika
+  // (serviceGuardPtr), wiec obiekt nie moze zmienic ani wlasciciela deskryptorow, ani miejsca.
+  FlockServiceGuard(const FlockServiceGuard &)            = delete;
+  FlockServiceGuard &operator=(const FlockServiceGuard &) = delete;
+  FlockServiceGuard(FlockServiceGuard &&)                 = delete;
+  FlockServiceGuard &operator=(FlockServiceGuard &&)      = delete;
+
   // Przejmuje wylaczna blokade i ZERUJE plik. Tresci (PID/MODE/UNIT/...) jeszcze nie zapisuje --
   // robi to publishLockInfo(). Rozdzielenie jest wymogiem poprawnosci startu: wylacznosc musi byc
   // ustalona ZANIM instancja dotknie obiektow IPC, ale pusty plik nie moze udawac gotowego serwera

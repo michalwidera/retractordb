@@ -10,6 +10,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -39,6 +40,12 @@ std::filesystem::path writeLockFile(const std::string &dir, const std::string &s
 }
 
 }  // namespace
+
+// Straznik nie zmienia ani wlasciciela deskryptorow, ani adresu (serviceGuardPtr) - R-01, #274.
+static_assert(!std::is_copy_constructible_v<FlockServiceGuard>);
+static_assert(!std::is_copy_assignable_v<FlockServiceGuard>);
+static_assert(!std::is_move_constructible_v<FlockServiceGuard>);
+static_assert(!std::is_move_assignable_v<FlockServiceGuard>);
 
 // --- readPeerInfo: parsowanie MODE/UNIT/SCOPE/QUERYFILE ---
 

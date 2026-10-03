@@ -21,6 +21,7 @@
 #include <string>
 #include <thread>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -29,6 +30,12 @@
 
 // Tests intentionally use raw byte buffers for binary device I/O coverage.
 // NOLINTBEGIN(modernize-avoid-c-arrays)
+
+// Akcesor trzyma deskryptor, wiec nie wolno go ani kopiowac, ani przenosic - R-01, #274.
+static_assert(!std::is_copy_constructible_v<rdb::binaryDeviceRO>);
+static_assert(!std::is_copy_assignable_v<rdb::binaryDeviceRO>);
+static_assert(!std::is_move_constructible_v<rdb::binaryDeviceRO>);
+static_assert(!std::is_move_assignable_v<rdb::binaryDeviceRO>);
 
 namespace {
 
