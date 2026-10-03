@@ -47,14 +47,14 @@ class writableStorage {
   void write(bool allNull = false) {
     auto *payload = storage_.getPayload();
     payload->setNullBitset(std::vector<bool>(descriptor_.size(), allNull));
-    storage_.write();
+    static_cast<void>(storage_.write());
   }
 
   /// Nadpisanie rekordu o podanym indeksie - druga gałąź `storage::write()`.
   void overwrite(std::size_t recordIndex) {
     auto *payload = storage_.getPayload();
     payload->setNullBitset(std::vector<bool>(descriptor_.size(), false));
-    storage_.write(recordIndex);
+    static_cast<void>(storage_.write(recordIndex));
   }
 
   void configureGapDetection(int nullFillCount) { storage_.configureGapDetection(boost::rational<int>(1, 1), nullFillCount); }

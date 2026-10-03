@@ -1,6 +1,6 @@
 ---
 name: scout
-description: Tanie przeszukanie repozytorium (Haiku, bez CLAUDE.md) - gdzie jest kod, test, wywołanie, definicja, wpis w historii git. Używaj proaktywnie zamiast przeszukiwania w głównej sesji, gdy miejsce jest nieznane albo wynik obejmuje więcej niż ~3 pliki. Tylko odczyt; zwraca ścieżki z liniami i krótkie wycinki, bez wniosków projektowych.
+description: Tanie przeszukanie repozytorium (Haiku) - gdzie jest kod, test, wywołanie, definicja, wpis w historii git. Tylko gdy przeszukanie obejmuje repozytoria siostrzane lub głęboką historię git i zajęłoby głównej sesji więcej niż ~5 wyszukiwań; zwykłe szukanie w tym repozytorium robi główna sesja. Tylko odczyt; zwraca ścieżki z liniami i krótkie wycinki, bez wniosków projektowych.
 model: haiku
 tools: Read, Bash
 omitClaudeMd: true

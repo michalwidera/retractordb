@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: Wykonawca zatwierdzonego planu (Sonnet, high) - implementacja kodu C++ i testów, podpięcie w CMake, skrypty, dokumentacja, według planu i specyfikacji z głównej sesji. Rdzeń silnika (semantyka obliczeń i współbieżność, wykaz w CLAUDE.md) tylko z parametrem model opus. Nie pisze planów ani nie podejmuje decyzji projektowych; przy niejednoznaczności przerywa i zwraca pytanie.
+description: Wykonawca dużej, mechanicznej zmiany z zatwierdzonego planu (Sonnet, high) - ta sama edycja w wielu plikach, seria podobnych testów, podpięcie w CMake, według specyfikacji z głównej sesji; zwykłe edycje robi główna sesja. Rdzeń silnika (semantyka obliczeń i współbieżność, wykaz w CLAUDE.md) tylko z parametrem model opus. Nie pisze planów ani nie podejmuje decyzji projektowych; przy niejednoznaczności przerywa i zwraca pytanie.
 model: sonnet
 effort: high
 tools: Read, Edit, Write, Bash
