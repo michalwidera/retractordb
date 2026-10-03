@@ -78,12 +78,15 @@ report formatting "${hits%$'\n'}"
 report leftovers "$(git ls-files --others --exclude-standard | grep -E '\.(bak|fixed|orig|rej)$')"
 
 # Typograficzne myslniki w dodanych liniach; czy to cytat, rozstrzyga wywolujacy.
+# Dopasowanie po bajtach UTF-8 (U+2013 = E2 80 93, U+2014 = E2 80 94) w locale C: grep -P
+# nie istnieje w BSD grep na macOS i tam zwracalby pusty wynik, czyli falszywe CLEAN.
+dash_re=$(printf '\342\200[\223\224]')
 added() { awk '/^\+\+\+ b\//{f=substr($0,7);next} /^\+/{print f": "substr($0,2)}'; }
 case "$scope" in
 working) dashes=$(git diff HEAD | added; git ls-files --others --exclude-standard -z | xargs -0 -r grep -HnI '') ;;
 staged) dashes=$(git diff --cached | added) ;;
 tree) dashes=$(git diff '@{upstream}...HEAD' 2>/dev/null | added) ;;
 esac
-report dashes "$(printf '%s\n' "$dashes" | LC_ALL=C.UTF-8 grep -P '[\x{2013}\x{2014}]')"
+report dashes "$(printf '%s\n' "$dashes" | LC_ALL=C grep -E "$dash_re")"
 
 exit $status

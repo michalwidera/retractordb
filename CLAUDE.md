@@ -226,7 +226,7 @@ Warn the user when the session shows signs of context degradation:
 - you catch yourself re-asking for information already given earlier in the session, or
 - the session has passed ~100 tool calls: every call re-reads the whole context, so the cost of a session grows roughly with the square of its length (on 2026-10-02/03 each of three sessions of 270-410 calls cost about as much as all eight sessions of 2026-09-29 to 10-01 together).
 
-A session left idle for more than an hour has lost its prompt cache, and the next turn re-writes the whole context at full price; to continue after such a break, start a new session from a handoff note rather than resuming a long one.
+A session left idle past the prompt-cache lifetime - an hour on a Claude subscription within plan usage, five minutes on usage credits or an API key - has lost its cache, and the next turn re-writes the whole context at full price; to continue after such a break, start a new session from a handoff note rather than resuming a long one.
 
 When any of these occur, say explicitly:
 > "Kontekst tej sesji jest długi - rozważ przerwę lub nową sesję od czystego stanu."
