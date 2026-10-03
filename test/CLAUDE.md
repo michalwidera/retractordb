@@ -14,7 +14,7 @@ Before every focused or full `ctest`, `ninja test`, or `ninja test-valgrind` run
 
 1. Check `CMAKE_HOME_DIRECTORY` in `build/Debug/CMakeCache.txt` against `git rev-parse --show-toplevel`, and check the build configuration. A build directory from another checkout or configuration is not evidence for the current sources.
 2. Rebuild the targets the test uses from that build directory (`ninja` for the full suite). After a CMake reconfigure, rebuild the unit-test binaries that were removed with the copied test tree.
-3. Inspect the registered command with `ctest -N -V -R '<test name>'`. Unit tests should execute the rebuilt `build/Debug/test/UnitTest/` binary. For integration tests that call `xretractor`, `xqry`, or `xtrdb` by name, resolve each program through the **same effective `PATH` as CTest** (including its appended install directory), then use `cmp -s` to verify that executable equals the rebuilt target under `build/Debug/src/`. Tests that receive a target-file path (the four exempt directories under *Namespaces*) need that path checked instead. Do not infer the chosen binary from `ninja install` or from a shell with a different `PATH`.
+3. Inspect the registered command with `ctest -N -V -R '<test name>'`. Unit tests should execute the rebuilt `build/Debug/test/UnitTest/` binary. For integration tests that call `xretractor`, `xqry`, or `xtrdb` by name, resolve each program through the **same effective `PATH` as CTest** (including its appended install directory), then use `cmp -s` to verify that executable equals the rebuilt target under `build/Debug/src/`. A program that the registered command or its script names by a build-tree path (see *Namespaces*) needs that path checked instead. Do not infer the chosen binary from `ninja install` or from a shell with a different `PATH`.
 4. For every changed `.sh`, `.rql`, data file, or pattern used by the test, use `cmp -s` to verify the copy under `build/Debug/test/` equals the source file. Reconfigure or copy the fixture again if it differs.
 
 If any path or comparison cannot be established, fix the build/install/copy first and repeat the provenance check before testing. Report the build directory and actual executable path with the test result.
@@ -93,19 +93,17 @@ Racing it by hand cost a stagger sweep (one hit in fourteen), so the window is o
 
 Each test directory gets `RDB_NAMESPACE`, its own `TMPDIR` and a `RESOURCE_LOCK`, assigned from a pool of 16 by that same macro. A directory that must run on the machine-global identity (unnamed instance, or names it picks itself) opts out with `set(IT_NO_NAMESPACE TRUE)` before its `add_test` calls, and gets `RUN_SERIAL` instead.
 
-**Integration tests run the *installed* binary + the *build-copied* script, not source.** Editing a `.sh` and the C++ it exercises requires syncing both. Install only after the final build: reconfiguration can relink the executable, leaving a previously installed copy stale. Full sequence after touching integration `.sh` + source:
+**A program called by name runs the *installed* binary, and the script runs from its *build copy*, not from source.** Editing a `.sh` and the C++ it exercises requires syncing both. Install only after the final build: reconfiguration can relink the executable, leaving a previously installed copy stale. Full sequence after touching integration `.sh` + source:
 ```bash
 cmake . && ninja && ninja install && ctest
 ```
 Before `ctest`, confirm with `cmp -s` that each installed project binary selected by the test matches its final build target, as required above.
 
-Four directories are exempt: they receive the build-tree target as a script argument and never call `xretractor` from `PATH`. For them the provenance check compares the passed path, not the `PATH` lookup.
+Not every call goes by name. As of 2026-10-03 the build-tree target is named directly - `${CMAKE_BINARY_DIR}/src/<dir>/<program>` in the command, or `$<TARGET_FILE:...>` passed to a script - for `xtrdb` in 29 directories, `xretractor` in 13 and `xqry` in 3, often next to a by-name call of another program in the same test. A list of such directories went stale within weeks (it named four), so the provenance check decides per program, from the registered command (`ctest -N -V -R '<test name>'`) and the scripts it runs: a build-tree path is checked as that path, a bare name through the CTest `PATH` lookup above. Cases with a known history:
 
 - `service_idle` passes `$<TARGET_FILE:xretractor>` to `service-idle.sh`, deliberately. Its three tests assert service-mode INFO markers, which `SPDLOG_ACTIVE_LEVEL` strips in Release - so a Release copy left in `~/.local/bin` (a build of ablation profiles is enough) made them fail with an empty `stderr.txt`, and the symptom read as an engine regression.
 - `ipc_identity_lock` and `leftover_sweep` (both since `5853a83e`, #241) pass `$<TARGET_FILE:xretractor>` and `$<TARGET_FILE:xqry>` to `verify.py`. The tree records no reason for that choice.
 - `bus_slot_count` (#266) reuses the launch pattern of `ipc_identity_lock` and passes the same two paths to its `verify.py`.
-
-Everything else in the tree still uses the installed binary.
 
 ### Ablation: shape and value in separate tests
 
