@@ -20,7 +20,9 @@ enum class sourceState : std::uint8_t { empty, flux, armed };
 /// - po attach(descriptor) utrzymywać komorę (chamber) - payload bieżącego rekordu odczytanego ze źródła,
 /// - realizować jedyne miejsce fizycznego odczytu ze źródła deklarowanego (readCurrent()): rekord i jego
 ///   wzorzec null pochodzą z null-aware read() akcesora - źródła deklarowane przy błędzie same zwracają
-///   dane wyzerowane z wzorcem all-null, co jest logowane jako ostrzeżenie,
+///   dane wyzerowane z wzorcem all-null, co jest logowane jako ostrzeżenie; wyjątkiem jest DEVICE (#347),
+///   którego bajty zbiera wcześniej faza DEVICE poza blokadami (rdb::awaitRecords), a read() akcesora
+///   tylko oddaje gotowy rekord albo all-null,
 /// - kopiować komorę do payloadu wyjściowego i do historii przez fire() - jedyne miejsce zasilania bufora
 ///   historii; pojemność zero kończy się przez FatalError,
 /// - utrzymywać bufor historii o pojemności co najmniej 1 (setCapacity()) - spójność źródeł deklarowanych

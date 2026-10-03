@@ -11,6 +11,7 @@
 #include "fatalError.hpp"
 #include "rdb/accessorFactory.hpp"
 #include "rdb/descriptorIO.hpp"
+#include "rdb/faccbindev.hpp"
 #include "rdb/probe.hpp"  // sonda K6: objętość materializacji
 
 namespace rdb {
@@ -97,6 +98,10 @@ storage::~storage() {
 }
 
 bool storage::isDeclared() const { return isDeclaredType(storageType_); }
+
+binaryDeviceRO *storage::deviceSource() const {
+  return storageType_ == "DEVICE" ? dynamic_cast<binaryDeviceRO *>(accessor_.get()) : nullptr;
+}
 
 void storage::initializeAccessor() {
   accessor_ = makeAccessor(storageType_, paths_.storageFile(), descriptor, isOneShot_, percounter_);

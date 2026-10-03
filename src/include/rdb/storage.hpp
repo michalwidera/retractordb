@@ -15,6 +15,8 @@
 
 namespace rdb {
 
+class binaryDeviceRO;
+
 /// @brief Wynik odczytu rekordu.
 ///
 /// Do 2026-09-23 read() i revRead() zwracaly `bool` o JEDNEJ mozliwej wartosci: kazda prawdziwa
@@ -176,6 +178,9 @@ class storage {
   /// Pytanie ma sens wyłącznie dla źródeł czytanych bez zawijania; magazyny zapisywalne
   /// i źródła zawijane zawsze odpowiadają false.
   [[nodiscard]] bool sourceExhausted() const { return accessor_ != nullptr && accessor_->exhausted(); }
+
+  /// @brief Akcesor źródła DEVICE dla fazy DEVICE (rdb::awaitRecords, #347); nullptr dla każdego innego magazynu.
+  [[nodiscard]] binaryDeviceRO *deviceSource() const;
 
   void setCapacity(int capacity);
   void cleanPayload(uint8_t *destination = nullptr);
