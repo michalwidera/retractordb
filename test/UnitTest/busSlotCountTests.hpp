@@ -138,7 +138,7 @@ TEST_P(BusSlotCount, DeadOwnerRecoveryClearsLastInterruptedSlotAndPreservesLiveS
     ASSERT_TRUE(WIFEXITED(status));
     ASSERT_EQ(WEXITSTATUS(status), 0);
     ASSERT_EQ(candidate.claim({.name = "candidate", .streams = {"fresh"}}).status, bus::ClaimStatus::Claimed);
-    EXPECT_EQ(segment->slots[bus::kMaxSlots - 1].seq, 0U);
+    EXPECT_EQ(segment->slots[bus::kMaxSlots - 1].seq, 2U);  // naprawa konczy przerwany zapis: 1 -> 2
     EXPECT_EQ(segment->slots[bus::kMaxSlots - 1].pid, 0);
     const auto instances = owner.instances();
     ASSERT_EQ(instances.size(), 3U);

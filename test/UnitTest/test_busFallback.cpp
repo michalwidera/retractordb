@@ -18,6 +18,7 @@
 #define RDB_HAS_ROBUST_MUTEX 0
 #include "retractor/lib/bus.cpp"
 
+#include "busRepairSeqlockTests.hpp"
 #include "busSlotCountTests.hpp"
 
 namespace {

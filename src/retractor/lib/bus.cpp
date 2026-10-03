@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cerrno>
 #include <chrono>
+#include <cstddef>
 #include <cstring>
 #include <filesystem>
 #include <optional>
@@ -91,6 +92,9 @@ struct Slot {
   StoreDigest reservedStores[kMaxStores];
   // NOLINTEND(modernize-avoid-c-arrays)
 };
+// Naprawa po smierci wlasciciela zamka zeruje tresc slotu Z POMINIECIEM seq, zakladajac,
+// ze seq lezy na poczatku slotu.
+static_assert(offsetof(Slot, seq) == 0, "repair after EOWNERDEAD zeroes everything past seq");
 
 #if RDB_HAS_ROBUST_MUTEX
 /// Zamek magistrali tam, gdzie jadro potrafi zglosic smierc wlasciciela:
@@ -431,12 +435,19 @@ struct Bus::Impl {
       // Poprzedni wlasciciel zginal trzymajac zamek. Trzymanie zamka jest tu dowodem,
       // ze zadna ZYWA instancja nie jest w trakcie zapisu slotu, wiec slot o nieparzystym
       // seq to slot przerwany w polowie -- jego tresc jest smieciem i musi zniknac.
+      //
+      // Muteks wyklucza PISARZY, nie czytelnikow: snapshot() czyta slot bez zamka. Stad ta sama
+      // dyscyplina co w endWrite(): tresc zerowana przy nadal nieparzystym seq, a seq podnoszone
+      // na koncu, za bariera zwalniajaca. Zerowanie slotu razem z seq dawaloby parzysty licznik
+      // nad trescia czesciowo stara, a cofniecie licznika do 0 przepuszczaloby czytelnika, ktory
+      // zapamietal 0 przed smiercia pisarza i skopiowal tresc w trakcie jego zapisu.
       for (std::uint32_t i = 0; i < kMaxSlots; ++i) {
         Slot &slot = segment->slots[i];
         std::atomic_ref<std::uint32_t> seq(slot.seq);
         if ((seq.load(std::memory_order_relaxed) & 1U) == 0U) continue;
         SPDLOG_WARN("xrdbbus: slot {} interrupted mid-write by a dead owner, invalidating.", i);
-        std::memset(&slot, 0, sizeof(Slot));
+        std::memset(reinterpret_cast<char *>(&slot) + sizeof(slot.seq), 0, sizeof(Slot) - sizeof(slot.seq));
+        endWrite(slot);
       }
       markConsistent();
     }
