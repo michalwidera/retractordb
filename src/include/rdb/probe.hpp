@@ -253,9 +253,9 @@ void logicalWriteReset();
 ///                 ten sam cel, do którego dąży rtAbsoluteSleep) - jitter planisty,
 ///   e2e_ns      - od deadline'u (nominalny moment pojawienia się krotki wejściowej
 ///                 w modelu czasowym) do końca emisji wyniku do kolejek IPC.
-/// Aktywna dopiero, gdy `RDB_BENCH_CSV` wskazuje plik wyjściowy. Uwaga: bez `-t` pętla
-/// śpi względnie, więc dryf kumuluje się w wake_lag/e2e - do CDF E2E miarodajny jest
-/// przebieg z `-t`.
+/// Aktywna dopiero, gdy `RDB_BENCH_CSV` wskazuje plik wyjściowy. Pętla śpi do tego samego
+/// deadline'u w każdym trybie taktowanym, więc wake_lag/e2e nie kumulują dryfu także bez `-t`;
+/// `-t` zmienia tylko szeregowanie (SCHED_FIFO, mlockall, powinowactwo CPU).
 class slotProbe {
  public:
   slotProbe() = default;

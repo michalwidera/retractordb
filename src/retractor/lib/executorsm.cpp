@@ -437,7 +437,6 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         // End of ZERO-step
 
         // Loop of data processing
-        boost::rational<int> prev_interval(0);
 
         // Sonda E1/E2E: czas obliczeń slotu i latencja end-to-end (rdb/probe.hpp).
         // Uzbrajana dopiero zmienną RDB_BENCH_CSV; bez wkompilowanej sondy znika w całości.
@@ -485,6 +484,9 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
             else
               break;
           }
+          // Ostatni slot budzetu -m ustawia stop_now juz tutaj. Zatrzymanie, ktore przerywa sen
+          // ponizej, musi byc od niego odroznialne, inaczej przerwanie zgubiloby ten slot.
+          const bool lastBudgetSlot = iLoopLimitCnt == executorsm::stop_now;
 
           // Check if system service lock is still active
           if (!guard.isLockActive()) {
@@ -512,21 +514,27 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
           // Inner time is counted in miliseconds
           // probably can be increased in faster machines
           //
-          const int msInSec                          = 1000;
           const boost::rational<int> currentTimeSlot = tl.getNextTimeSlot();
-          boost::rational<int> interval(currentTimeSlot * msInSec /* sec->ms */);
-          int period(rational_cast<int>(interval - prev_interval));  // miliseconds
-          prev_interval = interval;
+          const long deadlineMs                      = rtSlotDeadlineMs(currentTimeSlot);
 
-          //
-          // Waiting given miliseconds time that is computed
-          //
-          if (rt_mode)
-            rtAbsoluteSleep(loop_anchor, rational_cast<long>(interval));
-          else if (!no_clock_mode)
-            std::this_thread::sleep_for(std::chrono::milliseconds(period));
+          // Termin slotu = kotwica epoki + czas logiczny slotu, w kazdym trybie taktowanym. Czas
+          // pracy slotu (obliczenia, faza DEVICE) nie przesuwa wiec nastepnych terminow. Po
+          // chwilowym spoznieniu zalegle sloty ida kolejno bez snu, az wykonanie dogoni
+          // harmonogram; zaden slot nie jest pomijany. Kotwica nie przesuwa sie nigdy, takze przy
+          // trwalym przeciazeniu - zaleglosc wtedy rosnie, zamiast byc ukryta.
+          // Przerwany sen jest ponawiany do tego samego terminu. Zatrzymanie, ktore przyszlo w
+          // trakcie snu, konczy epoke przed slotem, ktorego termin jeszcze nie nadszedl.
+          if (!no_clock_mode) {
+            bool stopWhileAsleep = false;
+            while (!rtAbsoluteSleep(loop_anchor, deadlineMs))
+              if (!lastBudgetSlot && iLoopLimitCnt == executorsm::stop_now) {
+                stopWhileAsleep = true;
+                break;
+              }
+            if (stopWhileAsleep) break;
+          }
 
-          slotBench.beginSlot(rational_cast<long>(interval));
+          slotBench.beginSlot(deadlineMs);
 
           // Faza DEVICE (#347): przed blokadami modelu i przed beginCompute, wiec czekanie na zrodlo
           // zywe nie zatrzymuje watku komunikacyjnego i nie wchodzi do E1 (zostaje w e2e_ns sondy).

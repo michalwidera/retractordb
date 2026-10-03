@@ -115,8 +115,9 @@
 /// - Wspierać tryb wsadowej kompilacji bez uruchamiania przetwarzania (--onlycompile) z generowaniem artefaktów
 ///   diagnostycznych (dot/csv/diagram) jako odrębną, nieusługową ścieżką użycia.
 /// - Oferować ograniczenie liczby iteracji pętli (--llimitqry) na potrzeby testów i pracy deterministycznej.
-/// - Opcjonalnie wspierać szeregowanie czasu rzeczywistego (--realtime: SCHED_FIFO, mlockall, sen do bezwzględnego
-///   punktu czasu) dla deterministycznych interwałów przetwarzania.
+/// - Planować sloty względem stałej kotwicy czasu monotonicznego (sen do bezwzględnego punktu czasu w każdym
+///   trybie taktowanym) i opcjonalnie wspierać szeregowanie czasu rzeczywistego (--realtime: SCHED_FIFO, mlockall,
+///   powinowactwo CPU) dla deterministycznych interwałów przetwarzania.
 /// - Oferować tryb bez taktowania zegarem ściennym (--no-clock) dla przebiegów offline: pełna semantyka
 ///   interwałów planu, ale bez czekania na zegar. Wyklucza się z --realtime.
 /// - Oferować tryb liczenia do końca wejścia (--until-eof): źródła deklarowane czytane bez zawijania,
@@ -478,7 +479,7 @@ int main(int argc, char *argv[]) try {
       return system::errc::success;
     }
 
-    // --realtime zaostrza szeregowanie do bezwzględnych pobudek, --no-clock je usuwa. Żądania są
+    // --realtime zaostrza szeregowanie pobudek (SCHED_FIFO), --no-clock usuwa pobudki. Żądania są
     // sprzeczne i nie ma sensownego rozstrzygnięcia w żadną stronę, więc zamiast cichego pierwszeństwa
     // jednej z opcji zgłaszamy błąd argumentów.
     if (vm.contains("realtime") && vm.contains("no-clock")) {
