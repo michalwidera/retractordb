@@ -117,6 +117,29 @@ Never start a new topic on top of unrelated uncommitted work. That includes what
 - **3 or more files** - present a plan with success criteria and wait for approval before writing any code.
 - **1-2 files** - state the steps and success criteria, then proceed without waiting.
 
+### Delegation to subagents
+
+This section is the standing request to delegate. The agents are defined in `.claude/agents/`, and the split below is binding. The reason is cost: a log or a search result read in the main session is read again on every later turn, so output-heavy work goes to a cheaper model that returns only the lines that matter.
+
+**The main session keeps** the goal, the plan, design decisions, changes to what the engine computes (`src/`), root-cause analysis, every conclusion reported to the human, and the commit or handoff. The model and effort of the main session are the human's choice (`/model`, `/effort`); `xhigh` is recommended for planning compiler or concurrency changes.
+
+| Work | Agent | Model |
+|---|---|---|
+| A search whose location is unknown or that spans more than ~3 files; git history lookup | `scout` | Haiku |
+| A build and test run with long output; every check in the *Session end* table | `test-runner` | Haiku |
+| Watermark, formatting and leftover check before a handoff, commit or push | `hygiene-check` | Haiku |
+| A fully specified change outside engine semantics: tests, fixtures, CMake test wiring, scripts, docs, mechanical renames | `implementer` | Sonnet |
+| Rule-conformance review of a finished diff that touches more than one file, or the test tree or CMake | `reviewer` | Sonnet |
+
+**Do not delegate** a task of fewer than ~3 tool calls (a cold start costs more than it saves), a debug loop in which the main session needs the raw output to reason, or anything the main session keeps.
+
+- The delegation prompt is self-contained - goal, paths, exact commands or acceptance criteria, expected report - because an agent starts without the conversation.
+- An agent's report is evidence, not a verdict. Before telling the human that a check passed, read the verbatim lines it returned (ctest summary, exit codes, `cmp` results); a missing line means the check was not run.
+- Independent agents run in parallel, e.g. `scout` while `test-runner` takes the baseline.
+- Agents never commit, push, open pull requests or touch CI, and the embargo in *Comparative measurement* binds them as it binds the main session.
+- Files changed by `implementer` count toward the *Planning threshold*, and the main session reads its diff before the handoff.
+- A failed agent run is retried at most once, with a corrected prompt; after that the main session does the work itself.
+
 ### AI watermark hygiene (text)
 
 Every text artifact that enters the repository must be free of AI provenance marks - invisible Unicode (zero-width, bidi, tag chars, variation selectors, private use) and space homoglyphs. **Images are out of scope: marks in `.png` / `.jpg` / `.pdf` / figures may stay.** The requirement covers only text: sources, scripts, `.md`, `.rql`, `.g4`, CMake, TOML/YAML and commit messages.
