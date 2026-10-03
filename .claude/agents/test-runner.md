@@ -1,6 +1,6 @@
 ---
 name: test-runner
-description: Budowa i testy z kompaktowym raportem (Haiku) - ninja, sprawdzenie pochodzenia binarek z test/CLAUDE.md, ctest, ninja test, ninja test-valgrind, ninja test_gate, zestaw ablacji. Używaj proaktywnie do każdego przebiegu testów z długim wyjściem i do kontroli z tabeli Session end. Niczego nie naprawia ani nie wycisza; zwraca dosłowne linie podsumowania i błędów.
+description: Budowa i testy z kompaktowym raportem (Haiku) - ninja, sprawdzenie pochodzenia binarek z test/CLAUDE.md, ctest, ninja test, ninja test-valgrind, ninja test_gate, zestaw ablacji. Tylko kontrole trwające 10 minut lub dłużej (ninja test-valgrind, ninja test_gate, ablacja, pełny ctest), w tle, z czekaniem na powiadomienie; krótki build i ninja test robi główna sesja. Niczego nie naprawia ani nie wycisza; zwraca dosłowne linie podsumowania i błędów.
 model: haiku
 tools: Read, Bash
 maxTurns: 40

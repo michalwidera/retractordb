@@ -121,27 +121,29 @@ Never start a new topic on top of unrelated uncommitted work. That includes what
 
 ### Delegation to subagents
 
-This section is the standing request to delegate. The agents are defined in `.claude/agents/`, and the split below is binding. The reason is cost: a log or a search result read in the main session is read again on every later turn, so output-heavy work goes to a cheaper model that returns only the lines that matter.
+Delegation is the exception, not the default. Measured on 2026-10-03 (the #269 session): in the window in which agents worked, the main session cost about four times as much as the agents themselves - every agent report wakes the main session on its whole context, the self-contained prompt is written in the most expensive kind of token, and the main session re-checked what the agents had checked. Delegate only where that overhead is clearly smaller than doing the work in place. The agents are defined in `.claude/agents/`.
 
-**The main session keeps** the goal, the plan, design decisions, root-cause analysis, every conclusion reported to the human, and the commit or handoff; it reads every diff an agent produced before the handoff. The model and effort of the main session are the human's choice (`/model`, `/effort`); `xhigh` is recommended for planning compiler or concurrency changes.
+**The main session keeps** the goal, the plan, design decisions, root-cause analysis, every conclusion reported to the human, and the commit or handoff; it reads every diff an agent produced before the handoff. The model and effort of the main session are the human's choice (`/model`, `/effort`); `high` is the default, `xhigh` is for planning compiler or concurrency changes and goes back to `high` for the execution.
+
+Delegate only this:
 
 | Work | Agent | Model |
 |---|---|---|
-| A search whose location is unknown or that spans more than ~3 files; git history lookup | `scout` | Haiku |
-| A build and test run with long output; every check in the *Session end* table | `test-runner` | Haiku |
-| Watermark, formatting and leftover check before a handoff, commit or push | `hygiene-check` | Haiku |
-| Code, tests, CMake wiring, scripts and docs under an approved plan, outside the engine core | `implementer` | Sonnet |
-| Code in the engine core under an approved plan | `implementer` with `model: opus`, or the main session | Opus |
-| Rule-conformance review of a finished diff that touches more than one file, or the test tree or CMake | `reviewer` | Sonnet |
-| Settling one stated hypothesis about a hard defect (rare race, flaky test, divergent results); one copy per competing hypothesis, run in parallel | `investigator` | Opus |
+| A check that runs 10 minutes or longer (`ninja test-valgrind`, `ninja test_gate`, the ablation suite, a full `ctest`), in the background | `test-runner` | Haiku |
+| A large, mechanical change under an approved plan (the same edit across many files, a batch of similar tests), outside the engine core | `implementer` | Sonnet |
+| A search across the sibling repositories or deep in the git history that would take the main session more than ~5 searches | `scout` | Haiku |
+| A rule-conformance review of a finished diff, when the human asks for one | `reviewer` | Sonnet |
+| Settling one stated hypothesis about a hard defect (rare race, flaky test, divergent results), when the human asks for it; one copy per competing hypothesis, run in parallel | `investigator` | Opus |
 
-**The engine core** is the code that decides what the engine computes or when - `compiler.*`, `SOperations.hpp`, `query.*`, `expressionEvaluator.cpp`, `exprSimplify.*`, `expressionShape.*`, `RQLParser.cpp`, `dataModel.cpp`, `streamInstance.cpp`, `executor_rt.cpp` and anything behind an `RDB_OPT_*` switch - and the code that runs concurrently: `bus.*`, `executorsm*.cpp`, `ipcServer.cpp`, `lockManager.cpp` and signal handlers. The history of semantic and race fixes concentrates there, and an error in it passes compilation and most tests. The rest of `src/` (`qry/`, `rdb/`, `common/`, the launchers, `presenter.cpp`) goes to Sonnet.
+Everything else stays in the main session: a short build and `ninja test` (keep only the tail of the output, e.g. `ninja test 2>&1 | tail -n 30`), searches inside this repository, ordinary edits, debug loops that need the raw output, and the pre-handoff check, which is a script: `scripts/hygiene-check.sh [working|staged|tree]` (exit code 0 = clean, 1 = hits).
 
-**Do not delegate** a task of fewer than ~3 tool calls (a cold start costs more than it saves), a debug loop in which the main session needs the raw output to reason, or anything the main session keeps.
+**The engine core** is the code that decides what the engine computes or when - `compiler.*`, `SOperations.hpp`, `query.*`, `expressionEvaluator.cpp`, `exprSimplify.*`, `expressionShape.*`, `RQLParser.cpp`, `dataModel.cpp`, `streamInstance.cpp`, `executor_rt.cpp` and anything behind an `RDB_OPT_*` switch - and the code that runs concurrently: `bus.*`, `executorsm*.cpp`, `ipcServer.cpp`, `lockManager.cpp` and signal handlers. The history of semantic and race fixes concentrates there, and an error in it passes compilation and most tests. Core code is written by the main session on Opus; a large mechanical change in it may go to `implementer` with `model: opus`.
 
-- The delegation prompt is self-contained - goal, paths, exact commands or acceptance criteria, expected report - because an agent starts without the conversation.
-- An agent's report is evidence, not a verdict. Before telling the human that a check passed, read the verbatim lines it returned (ctest summary, exit codes, `cmp` results); a missing line means the check was not run.
-- Independent agents run in parallel, e.g. `scout` while `test-runner` takes the baseline. Parallel `investigator` copies each get a different hypothesis; weighing their evidence stays with the main session.
+- The delegation prompt is short: goal, paths, exact commands or acceptance criteria, expected report. The agent's definition already carries its rules - do not repeat them.
+- Agents load only at session start. If `.claude/agents/` changed during the session, do the work in place - never emulate an agent by pasting its definition into a `general-purpose` prompt.
+- One run at a time per build directory: never let two agents, or an agent and the main session, use the same `build/<cfg>` concurrently. `investigator` copies are the exception, because they never touch a shared build directory.
+- While an agent runs in the background, wait for its notification: do not poll it (`ps`, `kill -0`, reading its output file), and do not run the same check in the main session. A check is either delegated or run in place - never both.
+- An agent's report is evidence, not a verdict. Before telling the human that a check passed, read the verbatim lines it returned (ctest summary, exit codes, `cmp` results); a missing line means the check was not run. Reading those lines is the verification - do not repeat the check.
 - Agents never commit, push, open pull requests or touch CI, and the embargo in *Comparative measurement* binds them as it binds the main session.
 - Files changed by `implementer` count toward the *Planning threshold*, and the main session reads its diff before the handoff.
 - A failed agent run is retried at most once, with a corrected prompt; after that the main session does the work itself.
@@ -218,7 +220,10 @@ Only one kind of assertion may be disabled under ablation: the one saying that t
 Warn the user when the session shows signs of context degradation:
 - more than ~10 back-and-forth exchanges on a single task, or
 - the conversation has drifted across multiple unrelated topics, or
-- you catch yourself re-asking for information already given earlier in the session.
+- you catch yourself re-asking for information already given earlier in the session, or
+- the session has passed ~100 tool calls: every call re-reads the whole context, so the cost of a session grows roughly with the square of its length (on 2026-10-02/03 each of three sessions of 270-410 calls cost about as much as all eight sessions of 2026-09-29 to 10-01 together).
+
+A session left idle for more than an hour has lost its prompt cache, and the next turn re-writes the whole context at full price; to continue after such a break, start a new session from a handoff note rather than resuming a long one.
 
 When any of these occur, say explicitly:
 > "Kontekst tej sesji jest długi - rozważ przerwę lub nową sesję od czystego stanu."

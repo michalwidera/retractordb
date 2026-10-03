@@ -1,6 +1,6 @@
 ---
 name: investigator
-description: Rozstrzygnięcie jednej hipotezy w trudnym problemie (Opus, xhigh) - rzadki wyścig, migoczący test, rozbieżność wyników, zachowanie trudne do odtworzenia. Uruchamiaj kilka kopii równolegle, każdą z inną hipotezą, gdy główna sesja ma co najmniej dwa konkurencyjne wyjaśnienia. Nie zmienia drzewa ani wspólnych katalogów build; zwraca rozstrzygnięcie z dowodem i propozycję następnego kroku.
+description: Rozstrzygnięcie jednej hipotezy w trudnym problemie (Opus, xhigh) - rzadki wyścig, migoczący test, rozbieżność wyników, zachowanie trudne do odtworzenia. Tylko na prośbę człowieka; wtedy kilka kopii równolegle, każda z inną hipotezą. Nie zmienia drzewa ani wspólnych katalogów build; zwraca rozstrzygnięcie z dowodem i propozycję następnego kroku.
 model: opus
 effort: xhigh
 tools: Read, Bash
