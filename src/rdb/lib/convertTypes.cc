@@ -126,13 +126,22 @@ static void parse_string(const std::string &a, K &retVal) {
   }
 }
 
+/// Konwersja do typu skalarnego T (BYTE, INTEGER, UINT, FLOAT, DOUBLE). Nieudana konwersja daje
+/// NULL (std::monostate), tak jak zwezenie bez reprezentacji w narrowFloatTo i parse_string wyzej.
+///
+/// Wynik idzie przez wartosc, a nie przez parametr wyjsciowy, i startuje od NULL: galaz, ktora
+/// niczego nie zapisze, oddaje NULL, a nie zero. Do 2026-10-03 galaz wariantowa dla par tylko
+/// logowala, wiec wychodzil `T retVal{}` z cast::operator(), czyli BYTE 0 niezaleznie od T (pierwsza
+/// alternatywa descFldVT) - w setItemVT pola INTEGER to bad_variant_access. Galaz std::any dla tych
+/// samych par wpisywala zero typu T (#286).
 template <typename T, typename K>
-void visit_descFld(const K &inVar, K &retVal) {
+[[nodiscard]] K visit_descFld(const K &inVar) {
   // List of unsupported types by this function
   static_assert(!std::is_same_v<T, boost::rational<int>>);
   static_assert(!std::is_same_v<T, std::pair<int, int>>);
   static_assert(!std::is_same_v<T, std::pair<std::string, int>>);
 
+  K retVal = std::monostate{};
   if constexpr (std::is_same_v<K, rdb::descFldVT>) {
     std::visit(Overload{
                    [&retVal](std::monostate) { retVal = T{}; },                                                 //
@@ -142,8 +151,8 @@ void visit_descFld(const K &inVar, K &retVal) {
                    [&retVal](boost::rational<int> a) { narrowRationalTo<T>(a, retVal); },                       //
                    [&retVal](float a) { narrowFloatTo<T>(a, retVal); },                                         //
                    [&retVal](double a) { narrowFloatTo<T>(a, retVal); },                                        //
-                   [&retVal](std::pair<int, int> a) { SPDLOG_ERROR("TODO - pair-int->T"); },                    //
-                   [&retVal](const std::pair<std::string, int> &a) { SPDLOG_ERROR("TODO - idxpair-int->T"); },  //
+                   [](std::pair<int, int>) { SPDLOG_ERROR("INTPAIR to scalar yields NULL"); },                  //
+                   [](const std::pair<std::string, int> &) { SPDLOG_ERROR("IDXPAIR to scalar yields NULL"); },  //
                    [&retVal](const std::string &a) { parse_string<T>(a, retVal); }                              //
                },
                inVar);
@@ -163,17 +172,16 @@ void visit_descFld(const K &inVar, K &retVal) {
     } else if (inVar.type() == typeid(double)) {
       narrowFloatTo<T>(std::any_cast<double>(inVar), retVal);
     } else if (inVar.type() == typeid(std::pair<int, int>)) {
-      SPDLOG_ERROR("No cast INTPAIR to any type here");
-      retVal = static_cast<T>(0);
+      SPDLOG_ERROR("INTPAIR to scalar yields NULL");
     } else if (inVar.type() == typeid(std::pair<std::string, int>)) {
-      SPDLOG_ERROR("No cast IDXPAIR to any type here");
-      retVal = static_cast<T>(0);
+      SPDLOG_ERROR("IDXPAIR to scalar yields NULL");
     } else if (inVar.type() == typeid(std::string)) {
       parse_string<T>(std::any_cast<std::string>(inVar), retVal);
     } else {
-      SPDLOG_ERROR("TODO - std::any->T");
+      SPDLOG_ERROR("{} to scalar yields NULL", inVar.type().name());
     }
   }
+  return retVal;
 }
 
 // https://stackoverflow.com/questions/23304177/c-alternative-for-parsing-input-with-sscanf
@@ -214,19 +222,19 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
 
   switch (reqType) {
     case rdb::BYTE:
-      visit_descFld<uint8_t>(inVar, retVal);
+      retVal = visit_descFld<uint8_t>(inVar);
       break;
     case rdb::INTEGER:
-      visit_descFld<int>(inVar, retVal);
+      retVal = visit_descFld<int>(inVar);
       break;
     case rdb::UINT:
-      visit_descFld<unsigned>(inVar, retVal);
+      retVal = visit_descFld<unsigned>(inVar);
       break;
     case rdb::DOUBLE:
-      visit_descFld<double>(inVar, retVal);
+      retVal = visit_descFld<double>(inVar);
       break;
     case rdb::FLOAT:
-      visit_descFld<float>(inVar, retVal);
+      retVal = visit_descFld<float>(inVar);
       break;
     case rdb::NULLTYPE:
       break;
