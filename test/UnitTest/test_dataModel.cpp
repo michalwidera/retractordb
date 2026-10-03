@@ -78,24 +78,24 @@ class xschema : public ::testing::Test {
 
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 11);
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 12);
-    dataArea->qSet["str1"]->outputPayload->write();
+    static_cast<void>(dataArea->qSet["str1"]->outputPayload->write());
 
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 13);
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 14);
-    dataArea->qSet["str1"]->outputPayload->write();
+    static_cast<void>(dataArea->qSet["str1"]->outputPayload->write());
 
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 15);
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 16);
-    dataArea->qSet["str1"]->outputPayload->write();
+    static_cast<void>(dataArea->qSet["str1"]->outputPayload->write());
 
     dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 111);
-    dataArea->qSet["str2"]->outputPayload->write();
+    static_cast<void>(dataArea->qSet["str2"]->outputPayload->write());
 
     dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 222);
-    dataArea->qSet["str2"]->outputPayload->write();
+    static_cast<void>(dataArea->qSet["str2"]->outputPayload->write());
 
     dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 333);
-    dataArea->qSet["str2"]->outputPayload->write();
+    static_cast<void>(dataArea->qSet["str2"]->outputPayload->write());
 
     for (const auto &i : coreInstance)
       if (!i.isDeclaration()) dataArea->constructInputPayload(i, *dataArea->qSet[i.id]);
@@ -614,7 +614,7 @@ class xschema_all_null : public ::testing::Test {
     dataArea_null = std::make_unique<dataModel>(coreInstance);
     dataArea_null->qSet["str1"]->outputPayload->getPayload()->setItem(0, std::nullopt);
     dataArea_null->qSet["str1"]->outputPayload->getPayload()->setItem(1, std::nullopt);
-    dataArea_null->qSet["str1"]->outputPayload->write();
+    static_cast<void>(dataArea_null->qSet["str1"]->outputPayload->write());
     pProc = dataArea_null.get();
   }
   ~xschema_all_null() override { pProc = nullptr; }
@@ -665,7 +665,7 @@ class xschema_partial_null : public ::testing::Test {
     // pole 0 = NULL, pole 1 = 10 (nie-NULL)
     dataArea_null->qSet["str1"]->outputPayload->getPayload()->setItem(0, std::nullopt);
     dataArea_null->qSet["str1"]->outputPayload->getPayload()->setItem(1, 10);
-    dataArea_null->qSet["str1"]->outputPayload->write();
+    static_cast<void>(dataArea_null->qSet["str1"]->outputPayload->write());
     pProc = dataArea_null.get();
   }
   ~xschema_partial_null() override { pProc = nullptr; }
@@ -740,20 +740,20 @@ class xschema_compare_restore : public ::testing::Test {
 
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 11);
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 12);
-    dataArea->qSet["str1"]->outputPayload->write();
+    static_cast<void>(dataArea->qSet["str1"]->outputPayload->write());
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 13);
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 14);
-    dataArea->qSet["str1"]->outputPayload->write();
+    static_cast<void>(dataArea->qSet["str1"]->outputPayload->write());
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(0, 15);
     dataArea->qSet["str1"]->outputPayload->getPayload()->setItem(1, 16);
-    dataArea->qSet["str1"]->outputPayload->write();
+    static_cast<void>(dataArea->qSet["str1"]->outputPayload->write());
 
     dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 111);
-    dataArea->qSet["str2"]->outputPayload->write();
+    static_cast<void>(dataArea->qSet["str2"]->outputPayload->write());
     dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 222);
-    dataArea->qSet["str2"]->outputPayload->write();
+    static_cast<void>(dataArea->qSet["str2"]->outputPayload->write());
     dataArea->qSet["str2"]->outputPayload->getPayload()->setItem(0, 333);
-    dataArea->qSet["str2"]->outputPayload->write();
+    static_cast<void>(dataArea->qSet["str2"]->outputPayload->write());
 
     pProc = dataArea.get();
   }

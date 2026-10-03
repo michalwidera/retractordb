@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <chrono>
 
 #include <cstring>  //std::memset
@@ -339,13 +340,13 @@ void storage::setCapacity(const int capacity) {
   if (isDeclared()) buffer_.setCapacity(capacity);
 }
 
-bool storage::write(const size_t recordIndex) {
+rdb::WriteStatus storage::write(const size_t recordIndex) {
   abortIfStorageNotPrepared();
   const auto nullInfo = storagePayload_->getNullBitset();
 
   // Maszyna detekcji gap żyje w metaData: rekord all-null poza fazą nullfill jest pochłaniany
   // (nie trafia do fizycznego magazynu), a jego brak zostanie oznaczony wpisem gap.
-  if (recordIndex >= recordsCount_ && metaData_->absorbAppend(nullInfo)) return true;
+  if (recordIndex >= recordsCount_ && metaData_->absorbAppend(nullInfo)) return WriteStatus::Ok;
 
   // Asercja spójności TYLKO w Debug, z tego samego powodu co w read(): accessor_->count() to
   // syscall (stat() na każdy segment), a write() wykonuje się raz na strumień na takt, wewnątrz
@@ -361,6 +362,9 @@ bool storage::write(const size_t recordIndex) {
   if (recordIndex >= recordsCount_) {
     result = accessor_->write(storagePayload_->span().data());  // <- Call to append Function
     if (result != 0) {
+      // Zrodlo deklarowane odmawia zapisu, zanim cokolwiek zapisze - stan magazynu jest nietkniety,
+      // wiec to odmowa dla wolajacego, nie awaria. isDeclared() porownuje napisy: tylko w galezi bledu.
+      if (result == ENOTSUP && isDeclared()) return WriteStatus::ReadOnly;
       FatalError("storage::write: append to '{}' failed (result={}: {})", paths_.storageFile(), result,
                  strerror(static_cast<int>(result)));
     }
@@ -395,8 +399,8 @@ bool storage::write(const size_t recordIndex) {
 
     metaData_->onRecordModified(recordIndex, nullInfo);  // polimorficznie: cień indeksu albo główny indeks
   }
-  return result == 0;
-};
+  return WriteStatus::Ok;
+}
 
 void storage::configureGapDetection(boost::rational<int> rInterval, int nullFillCount) {
   rInterval_ = rInterval;

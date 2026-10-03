@@ -379,8 +379,11 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
     constructInputPayload(q, runtime);          // That will create 'from' clause data set
     computeWindowAggregates(q, runtime);        // That will reduce record windows read from the source history
     runtime.constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
-    runtime.outputPayload->write();             // That will store data from 'select' clause/list
-    runtime.constructRulesAndUpdate(q);         // That will process all rules for this query
+    // Odmowa zapisu (WriteStatus::ReadOnly) wraca od #269 do wolajacego, a dawniej konczyla proces w storage.
+    // Wyjscie zapytania nie jest zrodlem deklarowanym, wiec tu zostaje dawne zachowanie: koniec silnika.
+    if (runtime.outputPayload->write() != rdb::WriteStatus::Ok)  // That will store data from 'select' clause/list
+      FatalError("dataModel::processRows: stream '{}' refused the write of its output record", q.id);
+    runtime.constructRulesAndUpdate(q);  // That will process all rules for this query
   }
 
   // Then - process all declarations to unlock them for next step

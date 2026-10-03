@@ -466,7 +466,7 @@ TEST_F(FaccfsTest, storage_purge_failure_is_fatal) {
         const auto descriptor = makeDesc(sizeof(BYTE));
         if (!s.attachDescriptor(&descriptor).empty()) std::_Exit(3);
         s.getPayload()->setItem(0, static_cast<BYTE>(0xAA));
-        if (!s.write()) std::_Exit(4);
+        if (s.write() != rdb::WriteStatus::Ok) std::_Exit(4);
         if (!std::filesystem::remove("purge_fail_data")) std::_Exit(5);
         std::filesystem::create_directory("purge_fail_data");
         s.purge();

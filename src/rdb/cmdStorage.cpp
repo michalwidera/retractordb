@@ -52,7 +52,7 @@ bool WriteCmd::execute(CommandContext &ctx) {
     return false;
   }
   auto writeStatus  = ctx.dacc->write(record);
-  ctx.payloadStatus = (!writeStatus) ? stored : error;
+  ctx.payloadStatus = (writeStatus == rdb::WriteStatus::Ok) ? stored : error;
   return true;
 }
 
@@ -70,8 +70,8 @@ bool DumpCmd::execute(CommandContext &ctx) {
 std::pair<std::string, std::vector<std::string>> AppendCmd::usage() const { return {"append", {"append payload to database"}}; }
 
 bool AppendCmd::execute(CommandContext &ctx) {
-  ctx.dacc->write();
-  ctx.payloadStatus = stored;
+  auto writeStatus  = ctx.dacc->write();
+  ctx.payloadStatus = (writeStatus == rdb::WriteStatus::Ok) ? stored : error;
   return true;
 }
 

@@ -3,7 +3,9 @@
 #include <chrono>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <thread>
 
@@ -145,15 +147,15 @@ TEST(xrdb, test_storage) {
     EXPECT_EQ(std::any_cast<int>(pl->getItem(2).value()), tlenViaOffset);
   }
 
-  dAcc2.write();
-  dAcc2.write();
-  dAcc2.write();
+  static_cast<void>(dAcc2.write());
+  static_cast<void>(dAcc2.write());
+  static_cast<void>(dAcc2.write());
 
   pl->setItem(0, std::string("xxxx xxxx"));
   pl->setItem(1, static_cast<uint8_t>(0x33));
   pl->setItem(2, 0x67);
 
-  dAcc2.write(1);
+  static_cast<void>(dAcc2.write(1));
 
   static_cast<void>(dAcc2.revRead(dAcc2.getRecordsCount() - 1 - 1));
 
@@ -184,7 +186,7 @@ TEST(xrdb, test_storage_disposal_removes_all_files) {
     std::memcpy(xData, "test data", AREA_SIZE);
     std::memcpy(pl->span().data(), xData, AREA_SIZE);
 
-    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
   }  // ~storage(): isDisposable_ => usuwa plik danych, .desc i .meta
 
   EXPECT_FALSE(std::filesystem::exists(qryId));
@@ -225,10 +227,10 @@ TEST(xrdb, storage_persists_null_flags_via_metadata_stream) {
     auto *pl = s.getPayload();
 
     pl->setItem(0, std::nullopt);
-    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
 
     pl->setItem(0, 77);
-    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
 
     ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
     EXPECT_FALSE(pl->getItem(0).has_value());
@@ -262,7 +264,7 @@ TEST(xrdb, storage_read_beyond_last_record_reports_no_such_record) {
     auto *pl = s.getPayload();
     pl->setItem(0, 11);
     pl->setItem(1, 22);
-    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
 
     // Rekord istniejacy: status Ok i wartosci nietkniete.
     ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
@@ -282,6 +284,40 @@ TEST(xrdb, storage_read_beyond_last_record_reports_no_such_record) {
   }
 
   std::filesystem::remove(metaFile);
+}
+
+// Zapis do zrodla deklarowanego jest odmowa, nie awaria (#269).
+//
+// Do 2026-10-03 write() zwracalo `bool` o jednej mozliwej wartosci, a akcesor zrodla tylko do
+// odczytu odpowiadal ENOTSUP, co konczylo proces przez FatalError. Test pilnuje, ze odmowa wraca
+// jako WriteStatus::ReadOnly, a licznik rekordow i plik zrodla zostaja nietkniete.
+TEST(xrdb, storage_append_to_declared_source_reports_read_only) {
+  const std::string streamName = "ut-readonly-source";
+  const std::string dataFile   = "ut-readonly-source.txt";
+  const std::string descFile   = "./" + streamName + ".desc";
+  const std::string content    = "1 2\n";
+
+  {
+    std::ofstream(dataFile) << content;
+    std::ofstream(descFile) << "{\tINTEGER a\n\tINTEGER b\n\tREF \"" << dataFile << "\"\n\tTYPE TEXTSOURCE\n}\n";
+  }
+
+  {
+    rdb::storage s(streamName, streamName, ".");
+    ASSERT_EQ(s.attachDescriptor(), "");
+    ASSERT_TRUE(s.isDeclared());
+
+    EXPECT_EQ(s.write(), rdb::WriteStatus::ReadOnly);
+    EXPECT_EQ(s.getRecordsCount(), 0);
+  }
+
+  std::ifstream in(dataFile);
+  std::stringstream after;
+  after << in.rdbuf();
+  EXPECT_EQ(after.str(), content);
+
+  std::filesystem::remove(dataFile);
+  std::filesystem::remove(descFile);
 }
 
 // Magazyn pusty: pierwszy odczyt nie ma czego zwrocic. Ta sciezka jest zywa w silniku, bo
@@ -324,10 +360,10 @@ TEST(xrdb, storage_updates_null_flags_on_record_modify) {
     auto *pl = s.getPayload();
 
     pl->setItem(0, 123);
-    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
 
     pl->setItem(0, std::nullopt);
-    ASSERT_TRUE(s.write(0));
+    ASSERT_EQ(s.write(0), rdb::WriteStatus::Ok);
 
     ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
     EXPECT_FALSE(pl->getItem(0).has_value());
@@ -357,14 +393,14 @@ TEST(xrdb, storage_purge_resets_metadata_stream_state) {
     auto *pl = s.getPayload();
 
     pl->setItem(0, std::nullopt);
-    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
     ASSERT_EQ(s.getRecordsCount(), 1U);
 
     s.purge();
     ASSERT_EQ(s.getRecordsCount(), 0U);
 
     pl->setItem(0, 1234);
-    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
     ASSERT_EQ(s.getRecordsCount(), 1U);
 
     ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
@@ -392,7 +428,7 @@ TEST(xrdb, storage_first_write_persists_first_meta_record) {
 
     auto *pl = s.getPayload();
     pl->setItem(0, std::nullopt);
-    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
     // Meta index is flushed to disk at destructor (lazy-write per spec):
     // "zapis pierwszego rekordu do pliku indeksu nie jest wymagany natychmiast"
   }
@@ -429,17 +465,17 @@ TEST(xrdb, storage_auto_gap_detection_marks_gap_after_null_records) {
 
     // Nullfill phase: 2 all-null records written to storage as records 0 and 1
     pl->setNullBitset(allNull);
-    ASSERT_TRUE(s.write());
-    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
 
     // Gap phase: 2 more all-null records NOT written to storage (activeGapDuration_ = 2)
-    ASSERT_TRUE(s.write());
-    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
 
     // Non-null record: flushPendingGap(2) marks gap, then written as record 2
     pl->setNullBitset(nonNull);
     pl->setItem(0, 42);
-    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
 
     EXPECT_TRUE(s.hasGapBefore(2));
   }
@@ -467,10 +503,10 @@ TEST(xrdb, storage_gap_flushed_on_destructor) {
 
     // Nullfill phase: 1 all-null record written to storage as record 0
     pl->setNullBitset(allNull);
-    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
 
     // Gap phase: 1 more all-null record NOT written (activeGapDuration_ = 1)
-    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
 
     // Destructor fires here - flushPendingGap() must persist the gap to meta file
   }
@@ -510,7 +546,7 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_fast_writes) {
 
     for (int i = 0; i < 5; ++i) {
       pl->setItem(0, i);
-      ASSERT_TRUE(s.write());
+      ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
     }
 
     EXPECT_FALSE(s.hasGapBefore(0));
@@ -539,14 +575,14 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_modify) {
     auto *pl = s.getPayload();
 
     pl->setItem(0, 10);
-    ASSERT_TRUE(s.write());
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
 
     // Wait longer than threshold
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // Modify existing record - auto-gap should NOT be triggered for modifications
     pl->setItem(0, 99);
-    ASSERT_TRUE(s.write(0));
+    ASSERT_EQ(s.write(0), rdb::WriteStatus::Ok);
 
     EXPECT_FALSE(s.hasGapBefore(0));
   }
@@ -575,7 +611,7 @@ TEST(xrdb, storage_setSamplingInterval_propagates_to_meta) {
     // Write 3 records and verify meta tracks them
     for (int i = 0; i < 3; ++i) {
       pl->setItem(0, i * 10);
-      ASSERT_TRUE(s.write());
+      ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
     }
 
     EXPECT_FALSE(s.isMetaIndexEmpty());
@@ -611,7 +647,7 @@ TEST(xrdb, storage_detects_rotation_and_rotates_meta) {
     auto *pl = s.getPayload();
     for (int i = 0; i < 3; ++i) {
       pl->setItem(0, i);
-      s.write();
+      static_cast<void>(s.write());
     }
     EXPECT_EQ(s.getRecordsCount(), 3U);
     // ~storage → ~posixBinaryFile: renames dataFile → dataFile.old0
@@ -652,7 +688,7 @@ TEST(xrdb, storage_no_rotation_when_counts_match) {
     auto *pl = s.getPayload();
     for (int i = 0; i < 3; ++i) {
       pl->setItem(0, i);
-      s.write();
+      static_cast<void>(s.write());
     }
   }
 
