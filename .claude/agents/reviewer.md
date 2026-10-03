@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: Niezależny przegląd gotowego diffu pod kątem reguł repozytorium i zatwierdzonego planu (Sonnet) - edycje chirurgiczne, osierocony kod, kolejność includów, pułapka średnika w add_test, compare.sh, rozdział kształtu i wartości przy ablacji, embargo korpusu. Używaj przed oddaniem diffu dotykającego więcej niż jednego pliku albo testów lub CMake. Tylko odczyt.
+description: Niezależny przegląd gotowego diffu pod kątem reguł repozytorium i zatwierdzonego planu (Sonnet) - edycje chirurgiczne, osierocony kod, kolejność includów, pułapka średnika w add_test, compare.sh, rozdział kształtu i wartości przy ablacji, embargo korpusu. Tylko na prośbę człowieka. Tylko odczyt.
 model: sonnet
 effort: high
 tools: Read, Bash

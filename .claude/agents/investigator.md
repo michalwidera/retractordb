@@ -1,6 +1,6 @@
 ---
 name: investigator
-description: Rozstrzygnięcie jednej hipotezy w trudnym problemie (Opus, xhigh) - rzadki wyścig, migoczący test, rozbieżność wyników, zachowanie trudne do odtworzenia. Uruchamiaj kilka kopii równolegle, każdą z inną hipotezą, gdy główna sesja ma co najmniej dwa konkurencyjne wyjaśnienia. Nie zmienia drzewa ani wspólnych katalogów build; zwraca rozstrzygnięcie z dowodem i propozycję następnego kroku.
+description: Rozstrzygnięcie jednej hipotezy w trudnym problemie (Opus, xhigh) - rzadki wyścig, migoczący test, rozbieżność wyników, zachowanie trudne do odtworzenia. Tylko na prośbę człowieka; wtedy kilka kopii równolegle, każda z inną hipotezą. Nie zmienia drzewa ani wspólnych katalogów build; zwraca rozstrzygnięcie z dowodem i propozycję następnego kroku.
 model: opus
 effort: xhigh
 tools: Read, Bash
@@ -20,6 +20,7 @@ The caller gives you the symptom (with the verbatim failing output), the hypothe
 - Size the run count to the base rate, and report counts as hits/runs (e.g. 41/697), never as "sometimes" or "rarely".
 - The engine logs to `$TMPDIR/xretractor.log`, not to stderr. A Debug build can spend about a minute symbolizing a stack trace after a fatal error - that is not a hang.
 - When the evidence points away from your hypothesis, say so and stop; do not drift into a different investigation.
+- A long experiment starts with the Bash tool's `run_in_background` option and you wait for it inside your own turns (`sleep` with a long `timeout`, then check its log). Never give your final report while an experiment you started is still running: a subagent running in the foreground has its background commands killed at its final response.
 
 ## Isolation - other agents run beside you
 

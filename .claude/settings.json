@@ -1,4 +1,36 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(ninja)",
+      "Bash(ninja install)",
+      "Bash(ninja test)",
+      "Bash(ninja test-valgrind)",
+      "Bash(ninja test_gate)",
+      "Bash(ctest)",
+      "Bash(ctest *)",
+      "Bash(cmake .)",
+      "Bash(cmake --build *)",
+      "Bash(clang-format --dry-run *)",
+      "Bash(cmake-format --check *)",
+      "Bash(scripts/hygiene-check.sh)",
+      "Bash(scripts/hygiene-check.sh *)",
+      "Bash(cmp *)",
+      "Bash(sed -n *)",
+      "Bash(readlink *)",
+      "Bash(git grep *)",
+      "Bash(git ls-files)",
+      "Bash(git ls-files *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git blame *)",
+      "Bash(git diff)",
+      "Bash(git diff *)",
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(scripts/collect-test-failures.py *)",
+      "Bash(python3 scripts/collect-test-failures.py *)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -6,6 +38,18 @@
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/plan-guard.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/test-output-filter.py\"",
             "timeout": 10
           }
         ]
