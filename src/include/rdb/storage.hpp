@@ -34,6 +34,21 @@ enum class ReadStatus : std::uint8_t {
   NoSuchRecord  ///< rekordu nie ma; payload jest all-null, a wolajacy ma go POMINAC
 };
 
+/// @brief Wynik zapisu rekordu.
+///
+/// Do 2026-10-03 write() zwracalo `bool` o JEDNEJ mozliwej wartosci: od 7054eb5f kazda awaria
+/// akcesora konczy sie FatalError i nie wraca, wiec `result == 0` bylo zawsze prawda. xtrdb
+/// odwracal ten bool i po kazdym udanym `write n` meldowal `error` (E-02, #269).
+///
+/// Jedyna awaria odwracalna to zapis do zrodla deklarowanego, ktore jest tylko do odczytu: akcesor
+/// odmawia ENOTSUP, zanim cokolwiek zapisze, wiec licznik rekordow i indeks metadanych zostaja
+/// nietkniete. Kazda inna awaria nadal konczy sie FatalError - czesciowy zapis rozjechalby
+/// recordsCount_ z count().
+enum class WriteStatus : std::uint8_t {
+  Ok,       ///< rekord dopisany, nadpisany albo pochloniety przez detekcje gap (rozliczony jako przerwa)
+  ReadOnly  ///< magazyn jest zrodlem deklarowanym; nic nie zapisano
+};
+
 /// @brief Warstwa koordynująca Descriptor, payload i FileInterface dla odczytu oraz zapisu rekordów.
 ///
 /// Obiekt klasy storage powinien:
@@ -134,7 +149,7 @@ class storage {
   /// w nagłówku, żeby w buildzie bez sondy nie powstał osobny symbol w bibliotece.
   void markAsSubstrate(const bool value) { isSubstrate_ = value; }
 
-  bool write(size_t recordIndex = std::numeric_limits<size_t>::max());
+  [[nodiscard]] WriteStatus write(size_t recordIndex = std::numeric_limits<size_t>::max());
 
   [[nodiscard]] ReadStatus revRead(size_t recordIndexFromBack, uint8_t *destination = nullptr);
   [[nodiscard]] ReadStatus read(size_t recordIndexFromFront, uint8_t *destination = nullptr);
