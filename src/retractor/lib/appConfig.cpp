@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <format>
 #include <limits>
 #include <optional>
 #include <string>
@@ -13,6 +14,7 @@
 #include <toml++/toml.hpp>
 
 #include "platformConfig.h"
+#include "rdb/sizeLimits.hpp"
 
 namespace {
 
@@ -119,11 +121,28 @@ rdb::retention_t parseDefaultRetention(const toml::node_view<const toml::node> n
   return {.segments = 0, .capacity = 0};
 }
 
+// `[sources] timeout_s`: liczba z przedzialu [0, kMaxDeviceTimeoutSeconds]. Wartosc spoza niego nie
+// wraca do domyslnej - zostaje powod odmowy, ktory launcher xretractora zamienia w blad startu.
+void parseSourcesTimeout(const toml::node_view<const toml::node> node, AppConfig &cfg) {
+  const auto value = node.value<double>();
+  if (value && *value >= 0.0 && *value <= rdb::limits::kMaxDeviceTimeoutSeconds) {
+    cfg.sourcesTimeoutSeconds = *value;
+    cfg.sourcesTimeoutError.clear();
+    return;
+  }
+  cfg.sourcesTimeoutSeconds.reset();
+  cfg.sourcesTimeoutError =
+      std::format("sources.timeout_s must be a number of seconds from 0 to {}", rdb::limits::kMaxDeviceTimeoutSeconds);
+  if (value) cfg.sourcesTimeoutError += std::format(", got {}", *value);
+}
+
 // Nakłada ustawienia z jednej tabeli TOML na akumulowaną konfigurację.
 // Klucze nieobecne w tabeli pozostawiają dotychczasową wartość (warstwowość).
 void applyTable(const toml::table &tbl, AppConfig &cfg) {
   if (auto v = tbl.at_path("storage.dir").value<std::string>(); v) cfg.storageDir = *v;
   if (auto v = tbl.at_path("storage.default_retention"); v) cfg.defaultRetention = parseDefaultRetention(v);
+
+  if (auto v = tbl.at_path("sources.timeout_s"); v) parseSourcesTimeout(v, cfg);
 
   if (auto v = tbl.at_path("ipc.queue_buffer_seconds").value<int>(); v) cfg.ipcQueueBufferSeconds = *v;
   if (auto v = tbl.at_path("ipc.min_queue_elements").value<int>(); v) cfg.ipcMinQueueElements = *v;

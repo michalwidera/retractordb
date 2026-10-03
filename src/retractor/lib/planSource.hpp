@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -70,6 +71,18 @@ void dropStalePlanArtifacts(const qTree &plan);
 /// oznacza caly plan; ad-hoc przekazuje tylko nowo dodawane strumienie.
 [[nodiscard]] std::vector<std::string> deprecatedFileWarnings(const qTree &plan,
                                                               const std::vector<std::string> &streamNames = {});
+
+/// Ostrzezenia o zrodlach DEVICE, ktorych efektywny TIMEOUT (jawna klauzula albo @p configured
+/// z `[sources] timeout_s`) jest dluzszy od interwalu strumienia (#347): czekanie przekroczy wtedy
+/// slot. Po jednym na deklaracje, w kolejnosci wierszy planu. Pusta lista nazw oznacza caly plan.
+[[nodiscard]] std::vector<std::string> deviceTimeoutWarnings(const qTree &plan, std::optional<double> configured,
+                                                             const std::vector<std::string> &streamNames = {});
+
+/// Efektywny termin kazdego zrodla DEVICE wraz z jego pochodzeniem (#347): "RQL", "config",
+/// "default" albo "no-clock" (`-f`). Wpis do dziennika przy starcie epoki i przy imporcie ad-hoc -
+/// operator widzi, z jakim terminem naprawde czyta kazde zrodlo. Pusta lista nazw oznacza caly plan.
+[[nodiscard]] std::vector<std::string> deviceTimeoutReport(const qTree &plan, std::optional<double> configured, bool noClock,
+                                                           const std::vector<std::string> &streamNames = {});
 
 /// Nazwy strumieni, ktore plan ROSCI na magistrali: wszystkie wezly poza dyrektywami.
 [[nodiscard]] std::vector<std::string> planStreamNames(const qTree &plan);

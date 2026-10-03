@@ -1,7 +1,9 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -14,11 +16,13 @@
 #include "compiler.hpp"
 #include "CRSMath.hpp"
 #include "lockManager.hpp"
+#include "rdb/faccbindev.hpp"
 
 #include "appConfig.hpp"
 
 using ptree  = boost::property_tree::ptree;
 using vm_map = boost::program_options::variables_map;
+class dataModel;
 struct executorsm {
   /// serverName pusta => tozsamosc historyczna (jeden serwer na maszyne, dotychczasowe nazwy
   /// obiektow IPC). Niepusta => wlasny, rozlaczny obszar IPC tej instancji.
@@ -46,6 +50,9 @@ struct executorsm {
   /// `[storage] default_retention` dla tych samych kompilacji - .desc strumienia nie moze zalezec
   /// od kanalu, ktorym przyszedl plan.
   static rdb::retention_t cfgDefaultRetention;
+  /// `[sources] timeout_s` (#347): termin DEVICE bez klauzuli TIMEOUT - dla fazy DEVICE w petli
+  /// slotow i dla ostrzezen kompilacji w kanale ad-hoc i `--reset`.
+  static std::optional<double> cfgSourcesTimeout;
   /// Katalog magazynu, w ktorym pisze plan DZIALAJACY. Trzymany osobno, bo dataModel usuwa
   /// dyrektywy z drzewa planu - w czasie pracy `:STORAGE` nie da sie juz z niego odczytac,
   /// a zapytanie ad-hoc musi roscic dokladnie te sciezki, ktore powstana na dysku.
@@ -87,6 +94,14 @@ struct executorsm {
   /// nie zmieni - patrz komentarz przy dueMask_.
   void collectAwaitedStreams(CRationalStreamMath::TimeLine &tl, qTree *coreInstancePtr);
   std::string printRowValue(const std::string &query_name);
+
+  /// Migawka fazy DEVICE (#347): nalezne w biezacym takcie zrodla DEVICE z efektywnymi terminami
+  /// liczonymi od @p wake. Wolajacy MUSI trzymac plan_epoch_mutex - akcesory zyja w modelu, a plan
+  /// zmienia import ad-hoc. Kazde zrodlo dostaje markAwaited(); zdejmuje je rdb::awaitRecords().
+  void collectDueDevices(CRationalStreamMath::TimeLine &tl, dataModel &proc, std::chrono::steady_clock::time_point wake);
+
+  /// Wpisy fazy DEVICE, uzywane ponownie miedzy taktami jak dueMask_.
+  std::vector<rdb::deviceWait> deviceWaits_;
 
   /// Strumienie nalezne w takcie, w DWOCH postaciach, bo konsumenci chca czego innego:
   /// dataModel::processRows pyta o przynaleznosc POZYCJI w planie, a IpcServer::broadcast

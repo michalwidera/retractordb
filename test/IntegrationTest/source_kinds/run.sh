@@ -30,8 +30,8 @@ xtrdb noprompt <kinds.script >out-kinds.txt
 bash ../compare.sh --ignore-eol pattern-kinds.txt out-kinds.txt
 
 # (2) DEVICE na FIFO z nazwa `.txt`: surowe bajty, `NULL` to cztery litery, a zero to zero.
-# Pisarz trzyma FIFO otwarte, bo otwarcie DEVICE nadal blokuje (#347). Danych jest z zapasem,
-# zeby zaden odczyt nie czekal na brakujacy rekord.
+# Pisarz trzyma FIFO otwarte z danymi z gory: w -f odczyt DEVICE jest jedna proba nieblokujaca
+# (#347), wiec kazdy rekord musi juz czekac w rurze. Danych jest z zapasem.
 mkfifo feed.txt
 exec 3<>feed.txt
 printf 'NULL\000\000\000\000ABCDABCDABCDABCDABCD' >&3

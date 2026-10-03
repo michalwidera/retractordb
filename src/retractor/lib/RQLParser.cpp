@@ -197,6 +197,11 @@ class ParserListener : public RQLBaseListener {
   /* Helper variable required for rational numbers processing */
   boost::rational<int> rationalResult;
 
+  /// Wartosc klauzuli TIMEOUT biezacej deklaracji (#347), osobno od rationalResult: ta sama
+  /// deklaracja ma dwa rational_se, a exitDeclare czyta rationalResult jako interwal. Puste, gdy
+  /// klauzuli nie ma albo literal zostal odrzucony; exitDeclare zuzywa wartosc i ja kasuje.
+  std::optional<boost::rational<int>> timeoutResult;
+
   /* Helper variable required to build query or declaration */
   query qry;
 
@@ -255,6 +260,26 @@ class ParserListener : public RQLBaseListener {
       return;
     }
     rationalResult = value;
+  }
+
+  /// Czy ten rational_se jest wartoscia klauzuli TIMEOUT deklaracji, a nie interwalem (#347).
+  ///
+  /// Listener jest podpiety przez addParseListener, wiec biegnie W TRAKCIE parsowania: przy wyjsciu
+  /// z rational_se pole etykiety timeout_value rodzica nie jest jeszcze przypisane. Token TIMEOUT jest
+  /// juz natomiast dzieckiem deklaracji, bo gramatyka dopasowuje go przed liczba - a przy rational_se
+  /// interwalu, ktory stoi wczesniej, jeszcze go nie ma.
+  static bool isTimeoutValue(antlr4::tree::ParseTree *rational) {
+    auto *declare = dynamic_cast<RQLParser::DeclareContext *>(rational->parent);
+    return declare != nullptr && declare->TIMEOUT() != nullptr;
+  }
+
+  /// Rozdzial wartosci rational_se: TIMEOUT dopuszcza zero i idzie do timeoutResult, kazdy inny
+  /// odbiorca przez acceptInterval() do rationalResult.
+  void acceptRational(antlr4::tree::ParseTree *rational, const boost::rational<int> &value, const std::string &text) {
+    if (isTimeoutValue(rational))
+      timeoutResult = value;
+    else
+      acceptInterval(value, text);
   }
 
   /// Literal liczbowy; spoza zakresu - blad planu i wartosc zastepcza 0.
@@ -570,17 +595,36 @@ class ParserListener : public RQLBaseListener {
     qry.isOneShot    = (ctx->ONESHOT() != nullptr);
     qry.isHold       = (ctx->HOLD() != nullptr);
     // DEVICE to zrodlo zywe (#346): HOLD nie zatrzymuje producenta, tylko gromadzi zaleglosc,
-    // a DISPOSABLE kasowalby sciezke urzadzenia albo FIFO. ONESHOT odpada przy jawnym DEVICE,
-    // bo polityke EOF urzadzenia ustala #347; forma przestarzala zachowuje go bez zmian.
+    // a DISPOSABLE kasowalby sciezke urzadzenia albo FIFO. ONESHOT jest dozwolony od #347:
+    // wyczerpaniem DEVICE jest pierwszy EOF po otrzymaniu danych (binaryDeviceRO::fill).
     if (qry.kind == sourceKind::device) {
       const std::string what =
           qry.isDeprecatedFile ? "FILE '" + qry.filename + "' resolves as DEVICE, which" : std::string("DEVICE");
-      for (const auto &[present, option] :
-           {std::pair{qry.isDisposable, "DISPOSABLE"}, std::pair{qry.isOneShot && !qry.isDeprecatedFile, "ONESHOT"},
-            std::pair{qry.isHold, "HOLD"}})
+      for (const auto &[present, option] : {std::pair{qry.isDisposable, "DISPOSABLE"}, std::pair{qry.isHold, "HOLD"}})
         if (present)
           reportSemanticError("DECLARE " + qry.id + ": " + what + " does not take " + option +
-                              "; DISPOSABLE, ONESHOT and HOLD apply to BINFILE and TEXTFILE");
+                              "; DISPOSABLE and HOLD apply to BINFILE and TEXTFILE");
+    }
+    // TIMEOUT (#347) ma sens tylko przy zrodle zywym. Forma przestarzala nie przyjmuje klauzul
+    // wcale - takze wtedy, gdy regula ze sciezki wybrala DEVICE - wiec komunikat podpowiada jawne
+    // slowo. Wartosc ujemna nie ma znaczenia "czekaj bez konca": takiego terminu nie ma.
+    if (ctx->TIMEOUT() != nullptr) {
+      const std::string text = ctx->timeout_value->getText();
+      // Brak wartosci znaczy, ze przebieg rational_se juz zglosil literal (zakres, zerowy mianownik).
+      if (timeoutResult) {
+        if (ctx->timeout_sign != nullptr)
+          reportSemanticError("DECLARE " + qry.id + ": TIMEOUT -" + text + " must not be negative");
+        else if (boost::rational_cast<double>(*timeoutResult) > rdb::limits::kMaxDeviceTimeoutSeconds)
+          reportSemanticError("DECLARE " + qry.id + ": TIMEOUT " + text + " exceeds the limit " +
+                              std::to_string(static_cast<long long>(rdb::limits::kMaxDeviceTimeoutSeconds)) + " s");
+        else
+          qry.timeoutSeconds = *timeoutResult;
+      }
+      if (qry.isDeprecatedFile)
+        reportSemanticError("DECLARE " + qry.id + ": deprecated FILE does not take TIMEOUT; declare the source with DEVICE '" +
+                            qry.filename + "'");
+      else if (qry.kind != sourceKind::device)
+        reportSemanticError("DECLARE " + qry.id + ": " + keyword + " does not take TIMEOUT; TIMEOUT applies to DEVICE");
     }
     // Ta sama odmowa co w exitSelect: klient bral kazdy rekord deklaracji o tej nazwie
     // za sygnal zamkniecia serwera i konczyl sie "no data in stream".
@@ -588,6 +632,7 @@ class ParserListener : public RQLBaseListener {
       reportSemanticError(std::string(constants::Reserved_id_oob) + " is reserved stream name");
     coreInstance.push_back(qry);
     qry.reset();
+    timeoutResult.reset();
     fieldCount = 0;
   }
 
@@ -607,7 +652,7 @@ class ParserListener : public RQLBaseListener {
       reportOutOfRange(text);
       return;
     }
-    acceptInterval(rational, text);
+    acceptRational(ctx, rational, text);
   }
 
   void exitRationalAsDecimal(RQLParser::RationalAsDecimalContext *ctx) override {
@@ -619,7 +664,7 @@ class ParserListener : public RQLBaseListener {
       reportOutOfRange(text);
       return;
     }
-    acceptInterval(*value, text);
+    acceptRational(ctx, *value, text);
   }
 
   void exitFraction(RQLParser::FractionContext *ctx) override {
@@ -640,7 +685,8 @@ class ParserListener : public RQLBaseListener {
       reportSemanticError("fraction " + ctx->getText() + " has a zero denominator");
       return;
     }
-    acceptInterval(boost::rational<int>(*nom, *den), ctx->getText());
+    // Ulamek stoi pod alternatywa RationalAsFraction_proforma - to ona jest dzieckiem deklaracji.
+    acceptRational(ctx->parent, boost::rational<int>(*nom, *den), ctx->getText());
   }
 
   void exitSelect(RQLParser::SelectContext *ctx) override {

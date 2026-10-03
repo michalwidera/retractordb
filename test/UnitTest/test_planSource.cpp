@@ -536,3 +536,30 @@ TEST(PlanSource, deprecated_file_warnings_follow_the_plan_lines) {
   EXPECT_EQ(deprecatedFileWarnings(plan, {"fast", "fresh"}),
             (std::vector<std::string>{"line 3: DECLARE fast: FILE '/dev/urandom' is deprecated, resolved as DEVICE"}));
 }
+
+// TIMEOUT dluzszy od interwalu przekracza slot (#347). Liczy sie termin EFEKTYWNY: jawna klauzula,
+// a bez niej `[sources] timeout_s`; jawne `TIMEOUT 0` wylacza wartosc z konfiguracji. Termin rowny
+// interwalowi jeszcze miesci sie w slocie.
+TEST(PlanSource, device_timeout_warnings_use_the_effective_timeout) {
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan,
+                          "DECLARE a BYTE STREAM late, 1/10 DEVICE '/dev/zero' TIMEOUT 0.5\n"
+                          "DECLARE b BYTE STREAM ontime, 1 DEVICE '/dev/zero' TIMEOUT 1\n"
+                          "DECLARE c BYTE STREAM inherit, 1/10 DEVICE '/dev/zero'\n"
+                          "DECLARE d BYTE STREAM zeroed, 1/10 DEVICE '/dev/zero' TIMEOUT 0\n"
+                          "DECLARE e BYTE STREAM recorded, 1/10 BINFILE 'e.bin'\n"
+                          "SELECT late[0] STREAM out FROM late\n")
+                .status,
+            "OK");
+  compiler cm(plan);
+  ASSERT_EQ(cm.compile(), "OK");
+
+  const std::string late =
+      "line 1: DECLARE late: TIMEOUT 0.5 s (RQL) is longer than the interval 0.1 s; waiting overruns the slot";
+  const std::string inherit =
+      "line 3: DECLARE inherit: TIMEOUT 0.2 s (config) is longer than the interval 0.1 s; waiting overruns the slot";
+  EXPECT_EQ(deviceTimeoutWarnings(plan, std::nullopt), (std::vector<std::string>{late}));
+  EXPECT_EQ(deviceTimeoutWarnings(plan, 0.2), (std::vector<std::string>{late, inherit}));
+  EXPECT_EQ(deviceTimeoutWarnings(plan, 0.2, {"inherit", "zeroed"}), (std::vector<std::string>{inherit}));
+  EXPECT_EQ(deviceTimeoutWarnings(plan, 0.1, {"inherit"}), (std::vector<std::string>{}));
+}

@@ -12,6 +12,13 @@
 
 bool operator<(const query &lhs, const query &rhs) { return lhs.rInterval < rhs.rInterval; }
 
+deviceTimeout effectiveDeviceTimeout(const query &qry, const std::optional<double> configured, const bool noClock) {
+  if (noClock) return {.seconds = 0.0, .origin = "no-clock"};
+  if (qry.timeoutSeconds) return {.seconds = boost::rational_cast<double>(*qry.timeoutSeconds), .origin = "RQL"};
+  if (configured) return {.seconds = *configured, .origin = "config"};
+  return {.seconds = 0.0, .origin = "default"};
+}
+
 void query::reset() {
   id.clear();
   filename.clear();
@@ -28,6 +35,7 @@ void query::reset() {
   generatorSize    = notAGenerator;
   policy           = std::make_pair("DEFAULT", 0);
   retention        = rdb::retention_t{.segments = 0, .capacity = 0};
+  timeoutSeconds.reset();
 }
 
 /** Construktor set */

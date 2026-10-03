@@ -13,6 +13,13 @@ client_response_max_fails = 300
 # [storage]
 # dir = "/var/lib/retractor"
 
+# Read deadline in seconds for DEVICE sources (character devices, FIFOs) whose DECLARE has
+# no TIMEOUT clause. 0, the default, is one immediate attempt: no complete record in a due
+# slot gives an all-null record without waiting. An explicit TIMEOUT in RQL wins, including
+# TIMEOUT 0. A negative value stops xretractor at startup with a configuration error.
+# [sources]
+# timeout_s = 0.0
+
 [service]
 # Allow a DO SYSTEM rule in a plan accepted over the `xqry --reset` channel.
 # false (the default) refuses such a plan as a whole: the reset channel carries no

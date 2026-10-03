@@ -30,6 +30,8 @@ class dataModel {
   [[nodiscard]] bool forwardRecordAvailable(const std::string &instance, int forwardIndex) const;
   [[nodiscard]] bool queryInputsAvailable(const query &qry, int logicalIndex);
   void bootstrapDeclaration(const query &qry);
+  /// Kolejny rekord uzbrojonej deklaracji: odczyt z akcesora i fire() do historii.
+  void advanceDeclaration(const query &qry, rdb::storage &output);
 
   /// Instancje wykonawcze ULOZONE JAK PLAN: handles_[i] obsluguje coreInstance_.at(i). Tablica
   /// jest AKCELERATOREM, nie zmiana semantyki - powstaje z tych samych wywolan streamRuntime(),

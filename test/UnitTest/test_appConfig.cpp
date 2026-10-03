@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include <toml++/toml.hpp>
 
@@ -214,5 +216,42 @@ TEST_F(AppConfigTest, invalid_default_retention_means_none) {
     const AppConfig cfg = loadAppConfig(explicitFile.string());
 
     EXPECT_TRUE(cfg.defaultRetention.noRetention()) << value;
+  }
+}
+
+// `[sources] timeout_s` (#347): brak klucza to cos innego niz jawne 0 - w RQL wygrywa i tak klauzula,
+// ale log startu mowi, skad pochodzi termin.
+TEST_F(AppConfigTest, sources_timeout_defaults_to_none) {
+  const AppConfig cfg = loadAppConfig();
+  EXPECT_FALSE(cfg.sourcesTimeoutSeconds.has_value());
+  EXPECT_TRUE(cfg.sourcesTimeoutError.empty());
+}
+
+TEST_F(AppConfigTest, user_layer_sets_sources_timeout) {
+  for (const auto &[value, seconds] :
+       std::vector<std::pair<std::string, double>>{{"0.0", 0.0}, {"0", 0.0}, {"0.25", 0.25}, {"2", 2.0}}) {
+    writeFile(userConfigFile(), "[sources]\ntimeout_s = " + value + "\n");
+
+    const AppConfig cfg = loadAppConfig();
+
+    ASSERT_TRUE(cfg.sourcesTimeoutSeconds.has_value()) << value;
+    EXPECT_EQ(*cfg.sourcesTimeoutSeconds, seconds) << value;
+    EXPECT_TRUE(cfg.sourcesTimeoutError.empty()) << value;
+  }
+}
+
+// Wartosc niepoprawna nie wraca po cichu do 0: zostaje powod, a start xretractora konczy sie bledem.
+// loadAppConfig sam nie rzuca, bo ten sam plik czytaja xqry i xtrdb.
+TEST_F(AppConfigTest, invalid_sources_timeout_is_an_error_not_a_default) {
+  for (const std::string value : {"-1", "-0.5", "nan", "inf", "86401", "\"0.5\"", "true", "[0.5]"}) {
+    const fs::path explicitFile = tmpDir / "custom.toml";
+    writeFile(explicitFile, "[sources]\ntimeout_s = " + value + "\n");
+
+    AppConfig cfg;
+    ASSERT_NO_THROW(cfg = loadAppConfig(explicitFile.string())) << value;
+
+    EXPECT_FALSE(cfg.sourcesTimeoutSeconds.has_value()) << value;
+    EXPECT_TRUE(cfg.sourcesTimeoutError.starts_with("sources.timeout_s must be a number of seconds from 0 to 86400"))
+        << value << ": " << cfg.sourcesTimeoutError;
   }
 }

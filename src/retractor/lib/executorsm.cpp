@@ -117,6 +117,23 @@ void executorsm::collectAwaitedStreams(TimeLine &tl, qTree *coreInstancePtr) {
   }
 }
 
+void executorsm::collectDueDevices(TimeLine &tl, dataModel &proc, const std::chrono::steady_clock::time_point wake) {
+  deviceWaits_.clear();
+  for (const auto &q : *coreInstancePtr) {
+    if (q.kind != sourceKind::device || !tl.isThisDeltaAwaitCurrentTimeSlot(q.rInterval)) continue;
+    // Wezel planu bez instancji (nieudane otwarcie) nie ma czego czytac; read() zwroci all-null.
+    const auto found = proc.qSet.find(q.id);
+    if (found == proc.qSet.end()) continue;
+    auto *source = found->second->outputPayload->deviceSource();
+    if (source == nullptr) continue;
+    const auto timeout = effectiveDeviceTimeout(q, cfgSourcesTimeout, noClockMode);
+    source->markAwaited(true);
+    deviceWaits_.push_back({.source   = source,
+                            .deadline = wake + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                                   std::chrono::duration<double>(timeout.seconds))});
+  }
+}
+
 int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrdbbus, compiler &cm, vm_map &vm,
                     const AppConfig &cfg, std::string_view serverName, std::string_view systemdUnit) {
   executorsm::coreInstancePtr       = &coreInstance;
@@ -128,6 +145,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   executorsm::cfgUnrestricted       = cfg.serviceUnrestricted;
   executorsm::cfgHistoryMemoryMib   = cfg.historyMemoryMib;
   executorsm::cfgDefaultRetention   = cfg.defaultRetention;
+  executorsm::cfgSourcesTimeout     = cfg.sourcesTimeoutSeconds;
   // Tryb nieograniczony zostawia slad w dzienniku ZAWSZE, nie tylko przy pierwszej regule:
   // po incydencie pytanie brzmi "czy ta instancja przyjmowala polecenia powloki", a odpowiedz
   // ma byc w logu startu, a nie do odtworzenia z pliku konfiguracyjnego, ktory mogl sie zmienic.
@@ -140,6 +158,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   dataModelExpected            = !coreInstance.empty();
   untilEofMode                 = vm.contains("until-eof");
   verboseMode                  = vm.contains("verbose");
+  noClockMode                  = vm.contains("no-clock");
   // Plik zapytan uslugi. Nadpisuje go przyjety plan i oprozniaja skutki bledu krytycznego,
   // wiec wskazuje go WYLACZNIE instancja bedaca jednostka systemd: plik `.rql` operatora,
   // ktory uruchomil xretractor z terminala, jest jego wlasnoscia, a nie stanem uslugi.
@@ -358,12 +377,27 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
 
         if (vm.contains("verbose")) coreInstancePtr->dumpCore();
 
+        // Liczba zrodel DEVICE w planie (#347): plan bez nich nie placi w petli slotow nic - ani
+        // migawki, ani drugiego zajecia blokady epoki. Przeliczana przy kazdej zmianie rewizji planu.
+        // Zrodlo dolaczone importem w trakcie snu slotu nie jest jeszcze policzone; w pierwszym
+        // slocie dostaje jedna probe nieblokujaca pod blokada (efektywnie TIMEOUT 0), pelny termin
+        // od nastepnego naleznego slotu.
+        const auto countDevices = [](const qTree &plan) {
+          return std::ranges::count_if(plan, [](const query &q) { return q.kind == sourceKind::device; });
+        };
         std::set<boost::rational<int>> timeIntervals;
         std::uint64_t observedAdHocPlanRevision;
+        std::ptrdiff_t planDevices = 0;
         {
           std::scoped_lock lock(core_mutex);
           timeIntervals             = coreInstancePtr->getAvailableTimeIntervals();
           observedAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_relaxed);
+          planDevices               = countDevices(*coreInstancePtr);
+          // Efektywny termin kazdego DEVICE, takze `-f` (wtedy 0). Poziom ERROR z powodu opisanego
+          // przy wykazie D8 w executorsmAdHoc.cpp: Release wycina nizsze, a to jedna linia na
+          // zrodlo na epoke.
+          for (const std::string &line : deviceTimeoutReport(*coreInstancePtr, cfgSourcesTimeout, noClockMode))
+            SPDLOG_ERROR("{}", line);
         }
         TimeLine tl(timeIntervals);
         //
@@ -385,8 +419,9 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         if (!gateStoppedProcess) {
           std::scoped_lock epoch(plan_epoch_mutex);
           dueNames_.clear();
+          // DEVICE nie ma kroku zerowego (#347), wiec nie ma tu czego rozglaszac.
           for (const auto &it : *coreInstancePtr)
-            if (it.isDeclaration()) dueNames_.emplace_back(it.id);
+            if (it.isDeclaration() && it.kind != sourceKind::device) dueNames_.emplace_back(it.id);
           // Hak it_zero_step_adhoc: klient ad-hoc musi dotrzec do handlera, gdy widoki
           // nazw sa juz zebrane. Plik .release zwalnia krok; limit chroni test przed zwisem.
           if (const char *gatePath = std::getenv("RDB_FAULT_ZERO_STEP_GATE"); gatePath != nullptr) {
@@ -433,6 +468,15 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         clock_gettime(CLOCK_MONOTONIC, &loop_anchor);
         slotBench.anchor(loop_anchor);
 
+        // Wyjscie przy koncu wejscia (--until-eof) - ta sama droga co przy wyczerpaniu --llimitqry:
+        // stop_now zdejmuje czekanie na klawisz ponizej petli, wiec przebieg wsadowy konczy sie sam.
+        const auto stopAtEndOfInput = [&vm](const std::string &exhausted) {
+          SPDLOG_INFO("End of input on declared stream '{}' - stopping (--until-eof).", exhausted);
+          if (vm.contains("verbose")) std::cout << "End of input on stream '" << exhausted << "'. Stopping.\n";
+          std::scoped_lock lock(core_mutex);
+          iLoopLimitCnt = executorsm::stop_now;
+        };
+
         while (!_kbhit(ignoreanykey) && iLoopLimitCnt != executorsm::stop_now &&
                !planResetRequested.load(std::memory_order_acquire)) {
           if (iLoopLimitCnt != executorsm::inifitie_loop) {
@@ -458,6 +502,7 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
               tl.updateTimeIntervals(availableTimeIntervals);
               timeIntervals = std::move(availableTimeIntervals);
             }
+            planDevices = countDevices(*coreInstancePtr);
             // Import również publikuje rewizję pod core_mutex. Ponowny odczyt
             // pod blokadą obejmuje wszystkie importy zakończone przed tym skanem.
             observedAdHocPlanRevision = adHocPlanRevision.load(std::memory_order_relaxed);
@@ -482,6 +527,33 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
             std::this_thread::sleep_for(std::chrono::milliseconds(period));
 
           slotBench.beginSlot(rational_cast<long>(interval));
+
+          // Faza DEVICE (#347): przed blokadami modelu i przed beginCompute, wiec czekanie na zrodlo
+          // zywe nie zatrzymuje watku komunikacyjnego i nie wchodzi do E1 (zostaje w e2e_ns sondy).
+          // Pod blokada epoki tylko migawka naleznych zrodel; bajty trafiaja wylacznie do prywatnych
+          // buforow akcesorow, a do modelu wnosi je dopiero processRows (fire). Terminy licza sie od
+          // chwili przebudzenia, wiec laczne czekanie to maksimum, nie suma TIMEOUT.
+          if (planDevices > 0) {
+            const auto wake = std::chrono::steady_clock::now();
+            {
+              std::scoped_lock epoch(plan_epoch_mutex);
+              collectDueDevices(tl, proc, wake);
+            }
+            rdb::awaitRecords(deviceWaits_);
+            // Przy odczycie na poczatku slotu rekord all-null zza konca wejscia trafilby do
+            // konsumentow TEGO slotu, wiec wyczerpanie DEVICE zatrzymuje przebieg przed nim.
+            if (until_eof_mode &&
+                std::ranges::any_of(deviceWaits_, [](const rdb::deviceWait &wait) { return wait.source->exhausted(); })) {
+              std::string exhausted;
+              {
+                std::scoped_lock epoch(plan_epoch_mutex);
+                exhausted = proc.exhaustedInputStream();
+              }
+              stopAtEndOfInput(exhausted);
+              break;
+            }
+          }
+
           {
             // Slot liczy sie pod blokada epoki, bo MUTUJE model: processRows przepisuje payloady,
             // a broadcast siega po nie przez getPayload (releaseOnHold/revRead). Handler komendy
@@ -509,20 +581,13 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
             slotBench.endSlot();
           }
 
-          // Deklaracje sa czytane na koncu slotu, a ich rekord konsumuje dopiero slot nastepny.
+          // BINFILE i TEXTFILE sa czytane na koncu slotu, a ich rekord konsumuje dopiero slot nastepny.
           // Wyjscie z petli w tym miejscu wypada wiec dokladnie przed pierwszym rekordem, ktory
-          // powstalby z all-null wstawionego za koniec wejscia.
+          // powstalby z all-null wstawionego za koniec wejscia. DEVICE sprawdza faza DEVICE wyzej.
           if (until_eof_mode) {
             const auto exhausted = proc.exhaustedInputStream();
             if (!exhausted.empty()) {
-              SPDLOG_INFO("End of input on declared stream '{}' - stopping (--until-eof).", exhausted);
-              if (vm.contains("verbose")) std::cout << "End of input on stream '" << exhausted << "'. Stopping.\n";
-              // Ta sama droga wyjscia co przy wyczerpaniu --llimitqry: stop_now zdejmuje czekanie
-              // na klawisz ponizej petli, wiec przebieg wsadowy konczy sie sam.
-              {
-                std::scoped_lock lock(core_mutex);
-                iLoopLimitCnt = executorsm::stop_now;
-              }
+              stopAtEndOfInput(exhausted);
               break;
             }
           }

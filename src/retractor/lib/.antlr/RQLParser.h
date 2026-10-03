@@ -16,16 +16,16 @@ public:
     INTEGER_T = 8, FLOAT_T = 9, DOUBLE_T = 10, SELECT = 11, STREAM = 12, 
     FROM = 13, DECLARE = 14, RETENTION = 15, FILE = 16, BINFILE = 17, TEXTFILE = 18, 
     DEVICE = 19, STORAGE = 20, ROTATION = 21, SUBSTRAT = 22, RULE = 23, 
-    DISPOSABLE = 24, ONESHOT = 25, HOLD = 26, VOLATILE = 27, PERSISTENT = 28, 
-    DEFAULT = 29, ON = 30, WHEN = 31, DUMP = 32, SYSTEM = 33, DO = 34, TO = 35, 
-    AND_C = 36, OR_C = 37, NOT_C = 38, MIN = 39, MAX = 40, AVG = 41, SUMC = 42, 
-    TYPE_PROFILE = 43, STRING_PROFILE = 44, ID = 45, STRING = 46, FLOAT = 47, 
-    DECIMAL = 48, REAL = 49, IS_EQ = 50, IS_NQ = 51, IS_GR = 52, IS_LS = 53, 
-    IS_GE = 54, IS_LE = 55, EXCLAMATION = 56, DOUBLE_BAR = 57, DOT = 58, 
-    UNDERLINE = 59, AT = 60, SHARP = 61, AND = 62, MOD = 63, DOLLAR = 64, 
-    COMMA = 65, SEMI = 66, COLON = 67, DOUBLE_COLON = 68, STAR = 69, DIVIDE = 70, 
-    PLUS = 71, MINUS = 72, BIT_NOT = 73, BIT_OR = 74, BIT_XOR = 75, SPACE = 76, 
-    COMMENT = 77, LINE_COMMENT2 = 78
+    DISPOSABLE = 24, ONESHOT = 25, HOLD = 26, TIMEOUT = 27, VOLATILE = 28, 
+    PERSISTENT = 29, DEFAULT = 30, ON = 31, WHEN = 32, DUMP = 33, SYSTEM = 34, 
+    DO = 35, TO = 36, AND_C = 37, OR_C = 38, NOT_C = 39, MIN = 40, MAX = 41, 
+    AVG = 42, SUMC = 43, TYPE_PROFILE = 44, STRING_PROFILE = 45, ID = 46, 
+    STRING = 47, FLOAT = 48, DECIMAL = 49, REAL = 50, IS_EQ = 51, IS_NQ = 52, 
+    IS_GR = 53, IS_LS = 54, IS_GE = 55, IS_LE = 56, EXCLAMATION = 57, DOUBLE_BAR = 58, 
+    DOT = 59, UNDERLINE = 60, AT = 61, SHARP = 62, AND = 63, MOD = 64, DOLLAR = 65, 
+    COMMA = 66, SEMI = 67, COLON = 68, DOUBLE_COLON = 69, STAR = 70, DIVIDE = 71, 
+    PLUS = 72, MINUS = 73, BIT_NOT = 74, BIT_OR = 75, BIT_XOR = 76, SPACE = 77, 
+    COMMENT = 78, LINE_COMMENT2 = 79
   };
 
   enum {
@@ -232,22 +232,27 @@ public:
     antlr4::Token *stream_name = nullptr;
     antlr4::Token *kind = nullptr;
     antlr4::Token *file_name = nullptr;
+    antlr4::Token *timeout_sign = nullptr;
+    RQLParser::Rational_seContext *timeout_value = nullptr;
     antlr4::tree::TerminalNode *DECLARE();
     std::vector<Field_declarationContext *> field_declaration();
     Field_declarationContext* field_declaration(size_t i);
     antlr4::tree::TerminalNode *STREAM();
     std::vector<antlr4::tree::TerminalNode *> COMMA();
     antlr4::tree::TerminalNode* COMMA(size_t i);
-    Rational_seContext *rational_se();
+    std::vector<Rational_seContext *> rational_se();
+    Rational_seContext* rational_se(size_t i);
     antlr4::tree::TerminalNode *ID();
     antlr4::tree::TerminalNode *STRING();
     antlr4::tree::TerminalNode *BINFILE();
     antlr4::tree::TerminalNode *TEXTFILE();
     antlr4::tree::TerminalNode *DEVICE();
     antlr4::tree::TerminalNode *FILE();
+    antlr4::tree::TerminalNode *TIMEOUT();
     antlr4::tree::TerminalNode *DISPOSABLE();
     antlr4::tree::TerminalNode *ONESHOT();
     antlr4::tree::TerminalNode *HOLD();
+    antlr4::tree::TerminalNode *MINUS();
     virtual void enterRule(antlr4::tree::ParseTreeListener *listener) override;
     virtual void exitRule(antlr4::tree::ParseTreeListener *listener) override;
   };
