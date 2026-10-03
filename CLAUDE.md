@@ -117,25 +117,31 @@ Never start a new topic on top of unrelated uncommitted work. That includes what
 - **3 or more files** - present a plan with success criteria and wait for approval before writing any code.
 - **1-2 files** - state the steps and success criteria, then proceed without waiting.
 
+**Who plans.** The goal declaration, the plan and every design decision are written only by a session running on Opus or a more capable model (Fable); the model's name is in the session's environment details. A session running on Sonnet or Haiku stops before writing any of them and asks the human to switch (`/model opus`). The text alone did not stop Haiku, so the `SessionStart` hook `.claude/hooks/plan-guard.sh` (wired in `.claude/settings.json`) repeats the rule at the start of every session. Subagents never plan: they work from the plan they are given and return a question where it is silent.
+
 ### Delegation to subagents
 
 This section is the standing request to delegate. The agents are defined in `.claude/agents/`, and the split below is binding. The reason is cost: a log or a search result read in the main session is read again on every later turn, so output-heavy work goes to a cheaper model that returns only the lines that matter.
 
-**The main session keeps** the goal, the plan, design decisions, changes to what the engine computes (`src/`), root-cause analysis, every conclusion reported to the human, and the commit or handoff. The model and effort of the main session are the human's choice (`/model`, `/effort`); `xhigh` is recommended for planning compiler or concurrency changes.
+**The main session keeps** the goal, the plan, design decisions, root-cause analysis, every conclusion reported to the human, and the commit or handoff; it reads every diff an agent produced before the handoff. The model and effort of the main session are the human's choice (`/model`, `/effort`); `xhigh` is recommended for planning compiler or concurrency changes.
 
 | Work | Agent | Model |
 |---|---|---|
 | A search whose location is unknown or that spans more than ~3 files; git history lookup | `scout` | Haiku |
 | A build and test run with long output; every check in the *Session end* table | `test-runner` | Haiku |
 | Watermark, formatting and leftover check before a handoff, commit or push | `hygiene-check` | Haiku |
-| A fully specified change outside engine semantics: tests, fixtures, CMake test wiring, scripts, docs, mechanical renames | `implementer` | Sonnet |
+| Code, tests, CMake wiring, scripts and docs under an approved plan, outside the engine core | `implementer` | Sonnet |
+| Code in the engine core under an approved plan | `implementer` with `model: opus`, or the main session | Opus |
 | Rule-conformance review of a finished diff that touches more than one file, or the test tree or CMake | `reviewer` | Sonnet |
+| Settling one stated hypothesis about a hard defect (rare race, flaky test, divergent results); one copy per competing hypothesis, run in parallel | `investigator` | Opus |
+
+**The engine core** is the code that decides what the engine computes or when - `compiler.*`, `SOperations.hpp`, `query.*`, `expressionEvaluator.cpp`, `exprSimplify.*`, `expressionShape.*`, `RQLParser.cpp`, `dataModel.cpp`, `streamInstance.cpp`, `executor_rt.cpp` and anything behind an `RDB_OPT_*` switch - and the code that runs concurrently: `bus.*`, `executorsm*.cpp`, `ipcServer.cpp`, `lockManager.cpp` and signal handlers. The history of semantic and race fixes concentrates there, and an error in it passes compilation and most tests. The rest of `src/` (`qry/`, `rdb/`, `common/`, the launchers, `presenter.cpp`) goes to Sonnet.
 
 **Do not delegate** a task of fewer than ~3 tool calls (a cold start costs more than it saves), a debug loop in which the main session needs the raw output to reason, or anything the main session keeps.
 
 - The delegation prompt is self-contained - goal, paths, exact commands or acceptance criteria, expected report - because an agent starts without the conversation.
 - An agent's report is evidence, not a verdict. Before telling the human that a check passed, read the verbatim lines it returned (ctest summary, exit codes, `cmp` results); a missing line means the check was not run.
-- Independent agents run in parallel, e.g. `scout` while `test-runner` takes the baseline.
+- Independent agents run in parallel, e.g. `scout` while `test-runner` takes the baseline. Parallel `investigator` copies each get a different hypothesis; weighing their evidence stays with the main session.
 - Agents never commit, push, open pull requests or touch CI, and the embargo in *Comparative measurement* binds them as it binds the main session.
 - Files changed by `implementer` count toward the *Planning threshold*, and the main session reads its diff before the handoff.
 - A failed agent run is retried at most once, with a corrected prompt; after that the main session does the work itself.
