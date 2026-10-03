@@ -53,6 +53,10 @@ static int exitCodeFor(selectResult result) {
       return system::errc::no_such_file_or_directory;
     case selectResult::serverStopping:
       return system::errc::operation_canceled;
+    // Ten sam kod co wyjatek standardowy przechwycony na najwyzszym poziomie (`Std: ...`):
+    // awaria klienta, a nie stan serwera (#285).
+    case selectResult::renderFailed:
+      return system::errc::interrupted;
   }
   return system::errc::interrupted;
 }
