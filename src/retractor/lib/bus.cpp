@@ -337,11 +337,11 @@ std::vector<std::string> segmentNames() {
 
 std::size_t segmentBytes() { return sizeof(Segment); }
 
-std::size_t sweepAbandonedSegments() {
+std::size_t sweepAbandonedSegments(std::string_view machineLockDir) {
   // Wylacznie segmenty tej wersji ukladu: starsze nazwy mapuja binarki sprzed protokolu
   // obecnosci, ktore blokady nie biora, wiec jej brak niczego o nich nie mowi.
   const auto isSegmentPresence = [](std::string_view file) { return segmentFromPresence(file).has_value(); };
-  return lockfile::sweep(std::string(ipc::kMachineLockDir), isSegmentPresence, [](std::string_view file) {
+  return lockfile::sweep(std::string(machineLockDir), isSegmentPresence, [](std::string_view file) {
     const std::string segment(file.substr(0, file.size() - 5));
     IPC::shared_memory_object::remove(segment.c_str());
   });
