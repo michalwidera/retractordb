@@ -20,6 +20,7 @@
 
 #include "busRepairSeqlockTests.hpp"
 #include "busSlotCountTests.hpp"
+#include "unreadableProcess.hpp"
 
 namespace {
 using namespace std::chrono_literals;
@@ -73,6 +74,32 @@ TEST_F(FallbackLock, LiveStoppedOwnerKeepsLockBeyondDiagnosticDeadline) {
   waitpid(child, nullptr, 0);
   child = -1;
   EXPECT_EQ(claimant.get().status, bus::ClaimStatus::Claimed);
+}
+
+// Wlasciciel zamka, ktorego wpisu nie da sie odczytac (hidepid / ProtectProc), nie jest martwy:
+// przejecie jego zamka oznaczaloby dwa procesy zmieniajace segment naraz. Wlasciciel naprawde
+// zginal i zostal zebrany; podmieniona odpowiedz jadra udaje, ze zyje jako proces innego
+// uzytkownika. Po zdjeciu podmiany ten sam zamek jest odzyskiwany - kontrola dodatnia.
+TEST_F(FallbackLock, UnreadableOwnerKeepsLock) {
+  bus::Bus candidate(name);
+  ASSERT_TRUE(candidate.attached());
+  IPC::shared_memory_object object(IPC::open_only, name.c_str(), IPC::read_write);
+  IPC::mapped_region mapping(object, IPC::read_write);
+  auto *segment = static_cast<bus::Segment *>(mapping.get_address());
+  stopOwner(segment);
+  const pid_t owner = child;
+  kill(child, SIGKILL);
+  waitpid(child, nullptr, 0);
+  child = -1;
+
+  unreadablePid.store(owner);
+  auto claimant = std::async(std::launch::async, [&] { return candidate.claim({.name = "candidate", .streams = {"dst"}}); });
+  EXPECT_EQ(claimant.wait_for(2s), std::future_status::timeout);
+  EXPECT_EQ(std::atomic_ref<std::uint32_t>(segment->slots[0].seq).load(), 1U);
+
+  unreadablePid.store(0);
+  EXPECT_EQ(claimant.get().status, bus::ClaimStatus::Claimed);
+  EXPECT_EQ(segment->slots[0].seq % 2, 0U);
 }
 
 TEST_F(FallbackLock, DeadOwnerIsRecoveredAndInterruptedSlotInvalidated) {

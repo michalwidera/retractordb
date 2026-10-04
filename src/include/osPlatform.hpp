@@ -21,12 +21,19 @@ namespace osplat {
 
 /// Migawka wpisu procesu w tablicy procesow jadra.
 ///
-/// `found == false` znaczy "jadro nie zna tego PID-u" i jest stanem ROZNYM od
-/// `zombie`: pierwszy przypadek to proces, po ktorym nie ma juz sladu, drugi to
-/// proces zakonczony, ktorego rodzic jeszcze nie zebral przez wait().
+/// Trzy stany, ktorych nie wolno ze soba mieszac:
+///   - `found == true`: wpis odczytany; `zombie` i `startTime` sa wtedy wiarygodne.
+///     `zombie` to proces zakonczony, ktorego rodzic jeszcze nie zebral przez wait().
+///   - `found == false`, `unreadable == false`: jadro POTWIERDZILO, ze tego PID-u nie
+///     ma (Linux: kill(pid, 0) == ESRCH, Darwin: sysctl bez wpisu). Tylko to jest "martwy".
+///   - `unreadable == true`: wpisu nie dalo sie odczytac albo sparsowac, a jadro nie
+///     potwierdzilo braku procesu - typowo hidepid / ProtectProc na /proc albo EPERM
+///     z sysctl dla procesu innego uzytkownika. Znaczy "nie wiem", NIE "martwy";
+///     `found`, `zombie` i `startTime` sa wtedy puste.
 struct ProcessSnapshot {
   bool found{false};
   bool zombie{false};
+  bool unreadable{false};
   /// Znacznik uruchomienia TEJ inkarnacji PID-u. Wartosc jest nieprzezroczysta i
   /// porownywana wylacznie na rownosc - jednostka rozni sie miedzy systemami
   /// (Linux: takty od startu jadra, Darwin: mikrosekundy epoki). Zero znaczy

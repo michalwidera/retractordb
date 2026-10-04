@@ -351,6 +351,18 @@ bool isProcessAlive(std::int32_t pid, std::uint64_t startTime) {
   if (pid <= 0) return false;
 
   const osplat::ProcessSnapshot snapshot = osplat::inspectProcess(pid);
+
+  // Wpis nieczytelny to "nie wiem", nie "martwy": hidepid / ProtectProc ukrywaja wpis
+  // procesu innego uzytkownika, a segment w /dev/shm zostaje dla niego czytelny - to
+  // wlasnie ten kontakt miedzy kontami, dla ktorego magistrala istnieje. Pomylki nie sa
+  // symetryczne: falszywe "zyje" kosztuje zajety slot (i nazwy strumieni) az do zniku
+  // segmentu, falszywe "martwy" kosztuje clearSlot() na slocie zywego wlasciciela, czyli
+  // dwie instancje na jednym <qryID>.desc. Wybieramy pierwsza. Znacznika startu nie da
+  // sie wtedy porownac, wiec ponowne uzycie PID-u przez obcy proces tez trzyma slot.
+  if (snapshot.unreadable) {
+    SPDLOG_WARN("xrdbbus: process entry of pid {} is unreadable (hidepid or ProtectProc on /proc?) - treated as alive.", pid);
+    return true;
+  }
   if (!snapshot.found) return false;
 
   // Zombie to proces JUZ ZAKONCZONY: zwolnil pamiec, deskryptory i odwzorowania obiektow
@@ -515,8 +527,11 @@ struct Bus::Impl {
       // Znacznik rowny zeru znaczy "nie udalo sie go ustalic przy zajmowaniu zamka".
       // Rozstrzyga wtedy sama obecnosc procesu -- gorzej, bo nie odroznia inkarnacji
       // PID-u, ale nadal poprawnie odrzuca wlasciciela, po ktorym nie ma sladu.
+      // Wpis nieczytelny nie jest dowodem smierci (kontrakt ProcessSnapshot, isProcessAlive):
+      // przejecie zamka zywego wlasciciela oznaczaloby dwa procesy zmieniajace segment naraz.
       const bool holderDead =
-          !holder.found || holder.zombie || (holderStart != 0 && static_cast<std::uint32_t>(holder.startTime) != holderStart);
+          !holder.unreadable &&
+          (!holder.found || holder.zombie || (holderStart != 0 && static_cast<std::uint32_t>(holder.startTime) != holderStart));
       if (!holderDead && !warned && std::chrono::steady_clock::now() > deadline) {
         SPDLOG_WARN("xrdbbus: still waiting for bus lock held by live pid {} after {} s.", holderPid, kLongLockWait.count());
         warned = true;
