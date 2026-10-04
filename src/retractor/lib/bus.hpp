@@ -8,6 +8,7 @@
 #include <string_view>
 #include <vector>
 
+#include "constants.hpp"
 #include "rdb/sizeLimits.hpp"
 
 /// @brief Magistrala xrdbbus: wspolny obszar wykrywania instancji xretractor i egzekwowania
@@ -73,7 +74,8 @@ inline constexpr std::string_view kSegmentName = "xrdbbus_v7";
 
 /// Kasuje segmenty tej wersji ukladu, ktorych nikt nie mapuje - pozostalosci po procesach zabitych,
 /// ktore nie zdazyly posprzatac jako ostatni wychodzacy. Zwraca liczbe usunietych.
-std::size_t sweepAbandonedSegments();
+/// Pliki obecnosci przeglada w machineLockDir; inny katalog niz domyslny podaja tylko testy.
+std::size_t sweepAbandonedSegments(std::string_view machineLockDir = ipc::kMachineLockDir);
 
 /// Rozmiar segmentu magistrali w bajtach. Segment jest tworzony w calosci i od razu
 /// zerowany, wiec jest to miejsce ZAJETE w /dev/shm, a nie rezerwacja rosnaca z uzyciem.

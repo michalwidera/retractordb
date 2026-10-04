@@ -19,6 +19,7 @@
 
 #include "constants.hpp"
 #include "platformConfig.h"
+#include "retractor/lib/bus.hpp"
 #include "retractor/lib/lockFile.hpp"
 #include "retractor/lib/lockManager.hpp"
 #include "retractor/lib/serviceControl.hpp"
@@ -379,20 +380,21 @@ TEST(LockFile, LiveHolderMeansBusyAndIsVisible) {
 }
 
 TEST(LockManagerFlock, IpcIdentityLockNeedsNoWriteAccess) {
-  // Blokada tozsamosci lezy w /tmp i moze nalezec do innego uzytkownika: 0644, a przy
-  // fs.protected_regular jadro odrzuca nawet O_CREAT na takim pliku. Plik bez prawa zapisu
-  // odtwarza to bez drugiego konta (pod rootem test przechodzi trywialnie).
+  // Blokada tozsamosci lezy w katalogu wspolnym dla maszyny i moze nalezec do innego uzytkownika:
+  // 0644, a przy fs.protected_regular jadro odrzuca nawet O_CREAT na takim pliku. Plik bez prawa
+  // zapisu odtwarza to bez drugiego konta (pod rootem test przechodzi trywialnie). Katalog wlasny,
+  // nie /tmp: niezablokowany plik zabieral tam sprzatacz konczacego sie sasiedniego serwera.
   const std::string object = "ut_ipc_ro_" + std::to_string(getpid());
-  const std::string path   = ipc::identityLockPath(object);
+  const auto dir           = std::filesystem::temp_directory_path() / ("ut_ipc_ro_" + std::to_string(getpid()));
+  std::filesystem::create_directories(dir);
+  const std::string path = ipc::identityLockPath(object, dir.string());
   { std::ofstream touch(path); }
   ASSERT_EQ(chmod(path.c_str(), S_IRUSR | S_IRGRP | S_IROTH), 0);
-  const auto dir = std::filesystem::temp_directory_path() / ("ut_ipc_ro_" + std::to_string(getpid()));
-  std::filesystem::create_directories(dir);
   {
     FlockServiceGuard guard("ut_ipc_ro");
     guard.setLockDir(dir.string());
     ASSERT_TRUE(guard.acquireLock());
-    EXPECT_TRUE(guard.acquireIpcLock(object));
+    EXPECT_TRUE(guard.acquireIpcLock(object, dir.string()));
   }
   EXPECT_FALSE(std::filesystem::exists(path)) << "wlasciciel nie skasowal pliku przy zwolnieniu";
   std::filesystem::remove(path);
@@ -400,43 +402,58 @@ TEST(LockManagerFlock, IpcIdentityLockNeedsNoWriteAccess) {
 }
 
 TEST(LockManagerSweep, RemovesOnlyAbandonedLocksAndTheirIpcObjects) {
+  // Wlasne katalogi zamiast /tmp: tam porzucone blokady zabieral sprzatacz konczacego sie
+  // sasiedniego serwera i licznik wychodzil 0. Osobny katalog na kazdy rodzaj, zeby zamiana
+  // argumentow nie przeszla niezauwazona.
   const std::string pid            = std::to_string(getpid());
   const auto dir                   = std::filesystem::temp_directory_path() / ("ut_sweep_" + pid);
+  const auto machineDir            = std::filesystem::temp_directory_path() / ("ut_sweep_machine_" + pid);
   const std::string dead           = "utdead" + pid;
   const std::string live           = "utlive" + pid;
   const ipc::ServerNames deadNames = ipc::names(dead);
   const ipc::ServerNames liveNames = ipc::names(live);
+  const std::string deadSegment    = std::string(bus::kSegmentName) + "_utdead" + pid;
+  const auto identityLock          = [&](const std::string &queue) { return ipc::identityLockPath(queue, machineDir.string()); };
+  const std::string deadPresence   = (machineDir / (deadSegment + ".lock")).string();
   std::filesystem::create_directories(dir);
+  std::filesystem::create_directories(machineDir);
 
-  // Instancja zabita SIGKILL-em: pliki blokad bez wlasciciela i komplet globalnych obiektow IPC.
+  // Instancja zabita SIGKILL-em: pliki blokad bez wlasciciela, komplet globalnych obiektow IPC
+  // i segment magistrali, ktorego nikt nie mapuje.
   { std::ofstream touch(dir / ("xretractor_service." + dead + ".lock")); }
-  { std::ofstream touch(ipc::identityLockPath(deadNames.queryQueue)); }
+  { std::ofstream touch(identityLock(deadNames.queryQueue)); }
   IPC::shared_memory_object(IPC::create_only, deadNames.shmemSegment.c_str(), IPC::read_write);
   IPC::message_queue(IPC::create_only, deadNames.queryQueue.c_str(), 1, 16);
+  IPC::shared_memory_object(IPC::create_only, deadSegment.c_str(), IPC::read_write);
+  { std::ofstream touch(deadPresence); }
 
   // Instancja zywa: te same rodzaje zasobow, ale blokady trzyma jej straznik.
   FlockServiceGuard liveGuard("xretractor_service." + live);
   liveGuard.setLockDir(dir.string());
   ASSERT_TRUE(liveGuard.acquireLock());
-  ASSERT_TRUE(liveGuard.acquireIpcLock(liveNames.queryQueue));
+  ASSERT_TRUE(liveGuard.acquireIpcLock(liveNames.queryQueue, machineDir.string()));
   IPC::shared_memory_object(IPC::create_only, liveNames.shmemSegment.c_str(), IPC::read_write);
 
-  const SweepReport swept = sweepAbandonedResources(dir.string());
+  const SweepReport swept = sweepAbandonedResources(dir.string(), machineDir.string());
   EXPECT_EQ(swept.serviceLocks, 1U);
-  EXPECT_GE(swept.ipcIdentities, 1U);  // /tmp jest wspolny: moga trafic sie cudze porzucone
+  EXPECT_EQ(swept.ipcIdentities, 1U);
+  EXPECT_EQ(swept.busSegments, 1U) << "katalog nie dotarl do sprzatacza magistrali";
 
   EXPECT_FALSE(std::filesystem::exists(dir / ("xretractor_service." + dead + ".lock")));
-  EXPECT_FALSE(std::filesystem::exists(ipc::identityLockPath(deadNames.queryQueue)));
+  EXPECT_FALSE(std::filesystem::exists(identityLock(deadNames.queryQueue)));
   EXPECT_FALSE(shmExists(deadNames.shmemSegment));
   EXPECT_FALSE(IPC::message_queue::remove(deadNames.queryQueue.c_str())) << "kolejka komend przetrwala sprzatanie";
+  EXPECT_FALSE(shmExists(deadSegment));
+  EXPECT_FALSE(std::filesystem::exists(deadPresence));
 
   EXPECT_TRUE(std::filesystem::exists(dir / ("xretractor_service." + live + ".lock")));
-  EXPECT_TRUE(std::filesystem::exists(ipc::identityLockPath(liveNames.queryQueue)));
+  EXPECT_TRUE(std::filesystem::exists(identityLock(liveNames.queryQueue)));
   EXPECT_TRUE(shmExists(liveNames.shmemSegment)) << "sprzatacz skasowal obiekty zywej instancji";
 
   liveGuard.releaseLock();
   IPC::shared_memory_object::remove(liveNames.shmemSegment.c_str());
   std::filesystem::remove_all(dir);
+  std::filesystem::remove_all(machineDir);
 }
 
 // To, co sklada ipc::serviceName, musi rozpoznac ipc::serviceLockInstance: pierwsza strone wola

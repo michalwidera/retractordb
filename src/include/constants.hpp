@@ -139,6 +139,12 @@ inline ServerNames namesForToken(std::string_view token) {
 
 /// Katalog blokad wspolnych dla calej maszyny: tozsamosci IPC i obecnosci na magistrali.
 /// Nie TMPDIR: obiekty chronione tymi blokadami widac ze wszystkich katalogow tymczasowych.
+///
+/// To wartosc PRODUKCYJNA, nie jedyna dopuszczalna: sprzatacz (sweepAbandonedResources,
+/// bus::sweepAbandonedSegments) przyjmuje katalog jako argument z ta wartoscia domyslna, a testy
+/// podaja wlasny, do ktorego nie zaglada sprzatacz sasiedniego serwera. Produkt nie czyta jej ze
+/// srodowiska: dwa serwery z roznym katalogiem nie widzialyby swoich blokad, wiec zalozylyby
+/// obiekty IPC i segment magistrali o tej samej nazwie - blokada maszynowa musi byc jedna.
 inline constexpr std::string_view kMachineLockDir = "/tmp";
 
 /// Przedrostek pliku blokady tozsamosci IPC. Pelna nazwa: przedrostek + nazwa kolejki komend + ".lock".
@@ -146,9 +152,10 @@ inline constexpr std::string_view kIdentityLockPrefix = "xretractor_ipc.";
 
 /// Plik blokady tozsamosci IPC. Serwer trzyma ja wylacznie od chwili PRZED utworzeniem swoich
 /// obiektow IPC do chwili PO ich skasowaniu, a po jego smierci zwalnia ja jadro - dlatego jest
-/// zarazem najpewniejszym dowodem, ze serwer o tym czlonie zyje.
-inline std::string identityLockPath(std::string_view queryQueue) {
-  return std::string(kMachineLockDir) + "/" + std::string(kIdentityLockPrefix) + std::string(queryQueue) + ".lock";
+/// zarazem najpewniejszym dowodem, ze serwer o tym czlonie zyje. Katalog inny niz domyslny podaja
+/// tylko testy - patrz kMachineLockDir.
+inline std::string identityLockPath(std::string_view queryQueue, std::string_view dir = kMachineLockDir) {
+  return std::string(dir) + "/" + std::string(kIdentityLockPrefix) + std::string(queryQueue) + ".lock";
 }
 
 /// Czlon instancji liczony RAZ i uzyty we wszystkich czterech nazwach - patrz serverNameToken.

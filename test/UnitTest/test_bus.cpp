@@ -8,6 +8,7 @@
 #include <chrono>
 #include <csignal>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -17,6 +18,7 @@
 
 #include "osPlatform.hpp"
 #include "retractor/lib/bus.hpp"
+#include "retractor/lib/lockFile.hpp"
 #include "retractor/lib/serverName.hpp"
 #include "unreadableProcess.hpp"
 
@@ -967,29 +969,32 @@ TEST(BusPresence, LastMapperRemovesSegment) {
 }
 
 // Proces zabity nie posprzata jako ostatni wychodzacy: segment zostaje, ale jego LOCK_SH znika
-// razem z procesem. Sprzatacz usuwa taki segment i wylacznie taki.
+// razem z procesem. Sprzatacz usuwa taki segment i wylacznie taki. Pliki obecnosci leza we
+// wlasnym katalogu testu: w /tmp zabieral je sprzatacz konczacego sie sasiedniego serwera.
 TEST(BusPresence, SweepRemovesOnlyUnmappedSegments) {
   const std::string pid  = std::to_string(getpid());
+  const auto dir         = std::filesystem::temp_directory_path() / ("ut_bus_sweep_" + pid);
   const std::string dead = std::string(bus::kSegmentName) + "_utdead" + pid;
   const std::string live = std::string(bus::kSegmentName) + "_utlive" + pid;
+  const auto presence    = [&](const std::string &segment) { return (dir / (segment + ".lock")).string(); };
+  std::filesystem::create_directories(dir);
 
-  const pid_t child = fork();
-  ASSERT_NE(child, -1);
-  if (child == 0) {
-    bus::Bus orphan(dead);
-    _exit(orphan.attached() ? 0 : 1);  // _exit: bez destruktora, tak jak po SIGKILL
-  }
-  int status = 0;
-  ASSERT_EQ(waitpid(child, &status, 0), child);
-  ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0);
-  ASSERT_TRUE(segmentExists(dead));
+  // Segment po procesie zabitym: plik obecnosci bez blokady.
+  IPC::shared_memory_object(IPC::create_only, dead.c_str(), IPC::read_write);
+  { std::ofstream touch(presence(dead)); }
 
-  bus::Bus holder(live);
-  ASSERT_TRUE(holder.attached());
+  // Segment mapowany: LOCK_SH na pliku obecnosci, tak jak trzyma go Bus.
+  IPC::shared_memory_object(IPC::create_only, live.c_str(), IPC::read_write);
+  int holder = -1;
+  ASSERT_EQ(lockfile::acquire(presence(live), false, false, holder), lockfile::Result::Acquired);
 
-  EXPECT_GE(bus::sweepAbandonedSegments(), 1U);  // /tmp jest wspolny: moga trafic sie cudze porzucone
+  EXPECT_EQ(bus::sweepAbandonedSegments(dir.string()), 1U);
   EXPECT_FALSE(segmentExists(dead));
-  EXPECT_FALSE(std::filesystem::exists(presenceFile(dead)));
+  EXPECT_FALSE(std::filesystem::exists(presence(dead)));
   EXPECT_TRUE(segmentExists(live)) << "sprzatacz skasowal segment, ktory ktos mapuje";
-  EXPECT_TRUE(std::filesystem::exists(presenceFile(live)));
+  EXPECT_TRUE(std::filesystem::exists(presence(live)));
+
+  ::close(holder);
+  IPC::shared_memory_object::remove(live.c_str());
+  std::filesystem::remove_all(dir);
 }

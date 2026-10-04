@@ -116,11 +116,11 @@ bool FlockServiceGuard::acquireLock() {
   return true;
 }
 
-bool FlockServiceGuard::acquireIpcLock(std::string_view objectName) {
+bool FlockServiceGuard::acquireIpcLock(std::string_view objectName, std::string_view machineLockDir) {
   if (!isLockActive() || ipcLockDescriptor != -1) return false;
   // Nie uzywamy TMPDIR ani lock.dir: te same obiekty IPC moga byc osiagalne
   // z roznych katalogow blokad instancji.
-  const std::string path = ipc::identityLockPath(objectName);
+  const std::string path = ipc::identityLockPath(objectName, machineLockDir);
   int fd                 = -1;
   switch (lockfile::acquire(path, true, false, fd)) {
     case lockfile::Result::Acquired:
@@ -258,7 +258,7 @@ bool FlockServiceGuard::writeLockInfo() const {
   return true;
 }
 
-SweepReport sweepAbandonedResources(const std::string &serviceLockDir) {
+SweepReport sweepAbandonedResources(const std::string &serviceLockDir, std::string_view machineLockDir) {
   SweepReport retVal;
   retVal.serviceLocks = lockfile::sweep(serviceLockDir, isServiceLockName, [](std::string_view) {});
   // Porzucona blokada tozsamosci dowodzi, ze zaden zywy serwer nie uzywa obiektow tego czlonu:
@@ -266,12 +266,12 @@ SweepReport sweepAbandonedResources(const std::string &serviceLockDir) {
   // odpowiedzi klientow nie da sie tu wyliczyc bez listowania /dev/shm, wiec zostaja - usuwa je
   // serwer przy wyjsciu, a klient, ktory dostanie ten sam identyfikator, zaklada je od nowa.
   retVal.ipcIdentities = lockfile::sweep(
-      std::string(ipc::kMachineLockDir), [](std::string_view file) { return ipcTokenOf(file).has_value(); },
+      std::string(machineLockDir), [](std::string_view file) { return ipcTokenOf(file).has_value(); },
       [](std::string_view file) {
         const ipc::ServerNames names = ipc::namesForToken(*ipcTokenOf(file));
         IPC::shared_memory_object::remove(names.shmemSegment.c_str());
         IPC::message_queue::remove(names.queryQueue.c_str());
       });
-  retVal.busSegments = bus::sweepAbandonedSegments();
+  retVal.busSegments = bus::sweepAbandonedSegments(machineLockDir);
   return retVal;
 }

@@ -6,6 +6,8 @@
 #include <string>
 #include <string_view>
 
+#include "constants.hpp"
+
 /// Tozsamosc systemd biezacego procesu, ustalona z /proc/self/cgroup.
 struct SystemdIdentity {
   std::optional<std::string> unit;  // nazwa jednostki, gdy proces jest jednostka systemd
@@ -61,7 +63,8 @@ class FlockServiceGuard {
 
   // Druga blokada chroni faktyczna nazwe IPC, takze przy kolizji skrotow nazw.
   // Wspolna dla wszystkich TMPDIR i przestrzeni magistrali. Przed dotknieciem IPC.
-  bool acquireIpcLock(std::string_view objectName);
+  // machineLockDir inny niz domyslny podaja tylko testy.
+  bool acquireIpcLock(std::string_view objectName, std::string_view machineLockDir = ipc::kMachineLockDir);
 
   // Pliki obu blokad kasuje releaseLock(), zgodnie z protokolem z lockFile.hpp.
 
@@ -102,4 +105,6 @@ struct SweepReport {
 /// zabity (SIGKILL, OOM, awaria zasilania). Bezpieczne w kazdej chwili i przy dzialajacych
 /// instancjach: usuwa wylacznie to, czego blokade udalo sie zajac wylacznie (lockFile.hpp),
 /// a zywa instancja trzyma swoje blokady do konca.
-SweepReport sweepAbandonedResources(const std::string &serviceLockDir);
+/// machineLockDir: katalog blokad tozsamosci IPC i obecnosci na magistrali; inny niz domyslny
+/// podaja tylko testy.
+SweepReport sweepAbandonedResources(const std::string &serviceLockDir, std::string_view machineLockDir = ipc::kMachineLockDir);

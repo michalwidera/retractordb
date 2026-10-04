@@ -149,12 +149,14 @@ set_tests_properties(ut_dataModel-compare
 # rzucal boost::interprocess_exception::library_error (2026-09-14), a
 # samodzielnie przechodzil; przyczyny nie badano.
 #
-# ut_bus i ut_lockManager zakladaja w /tmp porzucone blokady i segmenty, zeby
-# sprawdzic sprzatacz. /tmp jest wspolny dla maszyny, a kazdy xretractor
-# konczacy test integracyjny sprzata to samo przy wyjsciu - zabieral je pierwszy
-# (nightly 2026-09-19: licznik sprzatacza 0 zamiast 1). Ponadto okno wlasciciela
-# przejsciowego (50 ms, lockFile.cpp) nie wytrzymuje kwoty CPU kontenera CI:
-# przy `ctest -j` kwota zamraza caly cgroup na dluzej niz 50 ms.
+# ut_bus i ut_lockManager: testy sprzatacza zakladaly w /tmp porzucone blokady i
+# segmenty, a kazdy xretractor konczacy test integracyjny sprzata /tmp przy
+# wyjsciu - zabieral je pierwszy (nightly 2026-09-19: licznik sprzatacza 0
+# zamiast 1). Od #276 pracuja na wlasnym katalogu. Ponadto okno wlasciciela
+# przejsciowego (kTransientHolderGrace, lockFile.cpp) mialo 50 ms i nie
+# wytrzymywalo kwoty CPU kontenera CI: przy `ctest -j` kwota zamrazala caly
+# cgroup na dluzej. Od f22cffe0 okno ma 500 ms; czy to pozwala zdjac RUN_SERIAL,
+# nie sprawdzono.
 set(RDB_SERIAL_UNIT_TESTS
     ut_rdb
     ut_xqry
