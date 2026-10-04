@@ -53,8 +53,10 @@ void dropStalePlanArtifacts(const qTree &plan);
 /// Sprawdza zachowane pliki .desc przed zmiana planu: deklaracje zawsze, wyniki tylko przy ROTATION.
 /// Deklaracja musi sie zgadzac takze w TYPE i REF, bo te magazyn bierze z pliku, nie z planu (#346).
 /// Jedyny przepuszczany rozjazd to dawny TYPE DEVICE zwyklego pliku binarnego, ktory zastepuje
-/// dropStalePlanArtifacts().
-[[nodiscard]] std::string checkDescriptorFiles(qTree &plan, std::string_view defaultStorageDir);
+/// dropStalePlanArtifacts(). Pusta lista nazw oznacza caly plan; ad-hoc przekazuje tylko nowo
+/// dodawane strumienie.
+[[nodiscard]] std::string checkDescriptorFiles(qTree &plan, std::string_view defaultStorageDir,
+                                               const std::vector<std::string> &streamNames = {});
 
 /// Rodzaj pliku pod sciezka kazdej deklaracji (#346): BINFILE i TEXTFILE - plik zwykly, DEVICE -
 /// urzadzenie znakowe albo FIFO. Tylko stat(), bez otwarcia, wiec FIFO bez pisarza niczego nie

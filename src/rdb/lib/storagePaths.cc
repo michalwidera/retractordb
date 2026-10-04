@@ -98,7 +98,7 @@ void StoragePaths::setStorageFile(std::string file) {
 // Ustalenie zapada przed pierwszym otwarciem pliku, ale nie chroni przed podmiana sciezki miedzy
 // sprawdzeniem a open() akcesora. Ta sama luka istnieje bez REF - plik danych w katalogu magazynu
 // tez moze byc dowiazaniem - i zamknie ja dopiero otwieranie wzgledem deskryptora katalogu
-// (openat2 z RESOLVE_BENEATH) we wszystkich akcesorach.
+// (openat2 z RESOLVE_BENEATH) we wszystkich akcesorach (#374).
 void StoragePaths::relocateFromRef(const Descriptor &descriptor) {
   auto it = std::ranges::find_if(descriptor,  //
                                  [](const auto &item) { return item.rtype == rdb::REF; });

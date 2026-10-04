@@ -161,11 +161,13 @@ std::string checkKeptStores(qTree &plan, const std::string_view defaultStorageDi
   return {"OK"};
 }
 
-std::string checkDescriptorFiles(qTree &plan, const std::string_view defaultStorageDir) {
+std::string checkDescriptorFiles(qTree &plan, const std::string_view defaultStorageDir,
+                                 const std::vector<std::string> &streamNames) {
   const bool rotation             = std::ranges::any_of(plan, [](const auto &q) { return q.id == ":ROTATION"; });
   const std::filesystem::path dir = planStorageDir(plan, defaultStorageDir);
   for (auto &q : plan) {
     if (q.isCompilerDirective() || (!q.isDeclaration() && (!rotation || isMemoryStream(q)))) continue;
+    if (!streamNames.empty() && std::ranges::find(streamNames, q.id) == streamNames.end()) continue;
     const std::filesystem::path descFile = dir / (q.id + ".desc");
     if (!std::filesystem::exists(descFile)) continue;
 
