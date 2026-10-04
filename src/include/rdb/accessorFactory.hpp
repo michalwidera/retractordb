@@ -48,11 +48,14 @@ namespace rdb {
 
 /// @brief Create the FileInterface implementation for the given storage type; FatalError on unknown type.
 /// @note Descriptor jest nie-const, bo retention()/storagePolicy() nie są metodami const.
+/// @param followFinalLink zapisywalny plik danych moze byc dowiazaniem - tylko dla REF podanego przez
+///        wolajacego (#374, storageFile.hpp); zrodla deklarowane czytaja sciezke jak dotad.
 [[nodiscard]] std::unique_ptr<FileInterface> makeAccessor(std::string_view storageType,    //
                                                           const std::string &storageFile,  //
                                                           Descriptor &descriptor,          //
                                                           bool oneShot,                    //
-                                                          int percounter);
+                                                          int percounter,                  //
+                                                          bool followFinalLink = false);
 
 /// @brief Create the metaData variant matching the storage: inert for declared sources,
 ///        storageShadow when the accessor keeps a data shadow file, base metaData otherwise.

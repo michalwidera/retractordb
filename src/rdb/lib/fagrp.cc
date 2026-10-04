@@ -43,17 +43,19 @@ template <typename T>
 groupFile<T>::groupFile(const std::string_view fileName,  //
                         const Descriptor &descriptor,     //
                         const retention_t &retention,     //
-                        int percounter)                   //
+                        int percounter,                   //
+                        const bool followFinalLink)       //
     : filename_(std::string(fileName)),
       descriptor_(descriptor),
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       retention_(retention),
-      percounter_(percounter) {
+      percounter_(percounter),
+      followFinalLink_(followFinalLink && retention.noRetention()) {
   writeCount_      = 0;
   currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
 
   if (retention.noRetention()) {
-    vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
+    vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_, followFinalLink_));
     initializationError_ = vec_.back()->initializationError();
   } else {
     std::vector<size_t> existingSegments;
@@ -96,7 +98,7 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
     for (const auto i : restoredSegments) {
       currentSegment_  = i;
       currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
-      vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
+      vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_, followFinalLink_));
       if (!vec_.back()->initializationError().empty()) {
         initializationError_ = vec_.back()->initializationError();
         for (auto &segment : vec_)
@@ -133,7 +135,7 @@ ssize_t groupFile<T>::purge() {
   currentSegment_  = 0;
   removedSegments_ = 0;
   currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
-  vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
+  vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_, followFinalLink_));
   // Status z konstruktora obsluguje tylko import planu. Tu, w pracy ciaglej, segment bez pliku
   // zapisywalby w ciemno, wiec zostaje dawne zatrzymanie z nazwa pliku.
   if (const auto &err = vec_.back()->initializationError(); !err.empty()) FatalError("groupFile::purge: {}", err);
@@ -162,7 +164,7 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
       currentSegment_++;
       currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
       SPDLOG_DEBUG("Rotating segments: currentSegment={}", currentSegment_);
-      vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_));
+      vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_, followFinalLink_));
       // Uzasadnienie przy purge().
       if (const auto &err = vec_.back()->initializationError(); !err.empty()) FatalError("groupFile::write: {}", err);
       writeCount_ = 0;

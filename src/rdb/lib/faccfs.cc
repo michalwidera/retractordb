@@ -1,32 +1,29 @@
 #include "rdb/faccfs.hpp"
 
+#include <fcntl.h>
+
 #include <cerrno>
 #include <filesystem>
-#include <fstream>
 #include <limits>
 #include <memory>
+#include <span>
 #include <system_error>
 
 #include <spdlog/spdlog.h>
 
 #include "fatalError.hpp"
+#include "rdb/storageFile.hpp"
 namespace rdb {
-// https://courses.cs.vt.edu/~cs2604/fall02/binio.html
-// https://stackoverflow.com/questions/1658476/c-fopen-vs-open
-
-// Turn off buffering (this must appear before open)
-// http://gcc.gnu.org/onlinedocs/libstdc++/manual/streambufs.html#io.streambuf.buffering
-
-// https://en.cppreference.com/w/cpp/io/ios_base/openmode
-// https://stackoverflow.com/questions/15063985/opening-a-binary-output-file-stream-without-truncation
 
 genericBinaryFile::genericBinaryFile(  //
     const std::string_view fileName,   //
     const Descriptor &descriptor,      //
-    int percounter)                    //
+    int percounter,                    //
+    const bool followFinalLink)        //
     : filename_(std::string(fileName)),
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
-      percounter_(percounter) {}
+      percounter_(percounter),
+      followFinalLink_(followFinalLink) {}
 
 genericBinaryFile::~genericBinaryFile() {
   if (percounter_ >= 0) {
@@ -60,45 +57,35 @@ size_t genericBinaryFile::count() {
 
 ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/, const size_t position) {
   if (recordSize_ == 0) FatalError("genericBinaryFile::write: recordSize_ is zero");
-  std::fstream myFile;
-  myFile.rdbuf()->pubsetbuf(nullptr, 0);
   // Purge. Warunek wymagal dawniej takze recordSize_ == 0, czego nie da sie tu spelnic (FatalError
   // wyzej), wiec purge wpadal w zwykly zapis spod nullptr i po cichu nie robil nic.
   if (ptrData == nullptr && position == 0) {
-    myFile.open(filename_, std::ofstream::out | std::ofstream::trunc);
-    if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EIO;
-    myFile.close();
-    return EXIT_SUCCESS;
+    const StorageFd purged(filename_, O_WRONLY | O_CREAT | O_TRUNC, kStreamFileMode, followFinalLink_);
+    return purged.isOpen() ? EXIT_SUCCESS : EIO;
   }
+  const auto record = std::as_bytes(std::span{ptrData, static_cast<size_t>(recordSize_)});
+  // Tryby jak dawniej w std::fstream: dopisanie tworzy plik ("a+"), zapis pod pozycje wymaga
+  // istniejacego pliku ("r+").
   if (position == std::numeric_limits<size_t>::max()) {
-    myFile.open(filename_, std::ios::in | std::ios::out | std::ios::binary | std::ios::app | std::ios::ate);
-    if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EIO;
-    // Note: no seekp here!
+    const StorageFd file(filename_, O_RDWR | O_CREAT | O_APPEND, kStreamFileMode, followFinalLink_);
+    if (!file.isOpen() || !file.write(record)) return EIO;
   } else {
-    myFile.open(filename_, std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
-    if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EIO;
-    myFile.seekp(static_cast<std::streamoff>(position));
-    if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EIO;
+    const StorageFd file(filename_, O_RDWR, kStreamFileMode, followFinalLink_);
+    if (!file.isOpen() || !file.writeAt(record, static_cast<off_t>(position))) return EIO;
   }
-  myFile.write(reinterpret_cast<const char *>(ptrData), recordSize_);
-  if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EIO;
-  myFile.close();
   return EXIT_SUCCESS;
 }
 
 ssize_t genericBinaryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   nullBitset.clear();
   if (recordSize_ == 0) FatalError("genericBinaryFile::read: recordSize_ is zero");
-  std::ifstream myFile;
-  myFile.rdbuf()->pubsetbuf(nullptr, 0);
-  myFile.open(filename_, std::ios::in | std::ios::binary);
-  if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EIO;
-  myFile.seekg(static_cast<std::streamoff>(position));
-  if ((myFile.rdstate() & std::ofstream::failbit) != 0) return EIO;
-  myFile.read(reinterpret_cast<char *>(ptrData), recordSize_);
+  const StorageFd file(filename_, O_RDONLY, kStreamFileMode, followFinalLink_);
+  if (!file.isOpen()) return EIO;
+  const ssize_t got =
+      file.readAt(std::as_writable_bytes(std::span{ptrData, static_cast<size_t>(recordSize_)}), static_cast<off_t>(position));
   // Zero bajtow = pod ta pozycja nie ma rekordu; mniej niz rekord = rekord urwany w polowie.
-  if ((myFile.rdstate() & std::ofstream::failbit) != 0) return myFile.gcount() == 0 ? ERANGE : EIO;
-  myFile.close();
+  if (got == 0) return ERANGE;
+  if (got != recordSize_) return EIO;
   return EXIT_SUCCESS;
 }
 

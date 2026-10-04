@@ -1,28 +1,39 @@
 #include "rdb/descriptorIO.hpp"
 
-#include <fstream>
+#include <fcntl.h>
+
+#include <cerrno>
+#include <cstring>
 #include <iostream>
+#include <span>
 #include <sstream>
 #include <utility>
 
 #include <spdlog/spdlog.h>
 
 #include "fatalError.hpp"
+#include "rdb/storageFile.hpp"
 
 extern std::string parserDESCString(rdb::Descriptor &desc, std::string_view inlet);
 
 namespace rdb {
 
 std::string tryLoadDescriptorFile(const std::string &descriptorFile, Descriptor &descriptor) {
-  std::ifstream file(descriptorFile);
-  if (!file) return "cannot open descriptor file: " + descriptorFile;
+  // `.desc` lezy w katalogu magazynu: dowiazanie pod jego nazwa jest odmowa (#374).
+  const StorageFd file(descriptorFile, O_RDONLY);
+  if (!file.isOpen()) {
+    const int openErrno = errno;  // przed skladaniem napisu - alokacja moze ruszyc errno
+    return "cannot open descriptor file: " + descriptorFile + ": " + std::strerror(openErrno);
+  }
 
-  std::ostringstream content;
-  content << file.rdbuf();
-  if (file.bad()) return "cannot read descriptor file: " + descriptorFile;
+  const off_t fileSize = file.size();
+  std::string content(fileSize > 0 ? static_cast<size_t>(fileSize) : 0, '\0');
+  const ssize_t got = fileSize < 0 ? -1 : file.readAt(std::as_writable_bytes(std::span{content}), 0);
+  if (got < 0) return "cannot read descriptor file: " + descriptorFile;
+  content.resize(static_cast<size_t>(got));
 
   Descriptor parsed;
-  if (const std::string result = parserDESCString(parsed, content.str()); result != "OK")
+  if (const std::string result = parserDESCString(parsed, content); result != "OK")
     return "descriptor parse failed in '" + descriptorFile + "': " + result;
   if (parsed.getSizeInBytes() == 0) return "storage: empty descriptor file: " + descriptorFile;
   descriptor = std::move(parsed);
@@ -30,17 +41,17 @@ std::string tryLoadDescriptorFile(const std::string &descriptorFile, Descriptor 
 }
 
 void saveDescriptorFile(const std::string &descriptorFile, const Descriptor &descriptor) {
-  std::fstream descFile;
-  descFile.rdbuf()->pubsetbuf(nullptr, 0);
-  descFile.open(descriptorFile, std::ios::out);
-  if ((descFile.rdstate() & std::ofstream::failbit) != 0) {
-    FatalError("storage: failed to open descriptor file for writing: {}", descriptorFile);
+  std::ostringstream content;
+  content << descriptor;
+  const std::string text = content.str();
+  // Bez podazania za dowiazaniem: O_TRUNC przez dowiazanie obcialby jego cel (#374).
+  const StorageFd descFile(descriptorFile, O_WRONLY | O_CREAT | O_TRUNC);
+  if (!descFile.isOpen()) {
+    FatalError("storage: failed to open descriptor file for writing: {}: {}", descriptorFile, std::strerror(errno));
   }
-  descFile << descriptor;
-  if ((descFile.rdstate() & std::ofstream::failbit) != 0) {
+  if (!descFile.write(std::as_bytes(std::span{text}))) {
     FatalError("storage: failed to write descriptor file: {}", descriptorFile);
   }
-  descFile.close();
 }
 
 void verifyDescriptorMatch(const Descriptor &provided, const Descriptor &existing, const std::string &descriptorFile) {

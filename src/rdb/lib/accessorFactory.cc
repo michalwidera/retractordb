@@ -57,28 +57,30 @@ std::unique_ptr<FileInterface> makeAccessor(const std::string_view storageType, 
                                             const std::string &storageFile,      //
                                             Descriptor &descriptor,              //
                                             const bool oneShot,                  //
-                                            const int percounter) {
+                                            const int percounter,                //
+                                            const bool followFinalLink) {
   if (storageFile.empty()) FatalError("storage: storage file path is empty - storage not properly configured");
   if (storageType.empty()) FatalError("storage: storage type is empty - storage type not set");
 
   if (storageType == "DEFAULT") {
     return std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile, descriptor, descriptor.retention(),
-                                                                       percounter);
+                                                                       percounter, followFinalLink);
   }
   if (storageType == "DIRECT") {
-    return std::make_unique<rdb::groupFile<posixBinaryFile>>(storageFile, descriptor, descriptor.retention(), percounter);
+    return std::make_unique<rdb::groupFile<posixBinaryFile>>(storageFile, descriptor, descriptor.retention(), percounter,
+                                                             followFinalLink);
   }
   if (storageType == "MEMORY") {
     return std::make_unique<rdb::memoryFile>(storageFile, descriptor, descriptor.storagePolicy());
   }
   if (storageType == "POSIX") {
-    return std::make_unique<rdb::posixBinaryFile>(storageFile, descriptor, percounter);
+    return std::make_unique<rdb::posixBinaryFile>(storageFile, descriptor, percounter, followFinalLink);
   }
   if (storageType == "POSIXSHD") {
-    return std::make_unique<rdb::posixBinaryFileWithShadow>(storageFile, descriptor, percounter);
+    return std::make_unique<rdb::posixBinaryFileWithShadow>(storageFile, descriptor, percounter, followFinalLink);
   }
   if (storageType == "GENERIC") {
-    return std::make_unique<rdb::genericBinaryFile>(storageFile, descriptor, percounter);
+    return std::make_unique<rdb::genericBinaryFile>(storageFile, descriptor, percounter, followFinalLink);
   }
   if (storageType == "BINFILE" || storageType == "DEVICE") {
     return std::make_unique<rdb::binaryDeviceRO>(storageFile, descriptor, !oneShot, storageType);

@@ -1,7 +1,7 @@
 ---
 name: scout
-description: Tanie przeszukanie repozytorium (Haiku) - gdzie jest kod, test, wywołanie, definicja, wpis w historii git. Tylko gdy przeszukanie obejmuje repozytoria siostrzane lub głęboką historię git i zajęłoby głównej sesji więcej niż ~5 wyszukiwań; zwykłe szukanie w tym repozytorium robi główna sesja. Tylko odczyt; zwraca ścieżki z liniami i krótkie wycinki, bez wniosków projektowych.
-model: haiku
+description: Przeszukanie repozytorium (Sonnet) - gdzie jest kod, test, wywołanie, definicja, wpis w historii git. Tylko gdy przeszukanie obejmuje repozytoria siostrzane lub głęboką historię git i zajęłoby głównej sesji więcej niż ~5 wyszukiwań; zwykłe szukanie w tym repozytorium robi główna sesja. Tylko odczyt; zwraca ścieżki z liniami i krótkie wycinki, bez wniosków projektowych.
+model: sonnet
 tools: Read, Bash
 omitClaudeMd: true
 maxTurns: 20

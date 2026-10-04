@@ -1,16 +1,18 @@
 #include "rdb/metaShadow.hpp"
 
-#include <spdlog/spdlog.h>
+#include <fcntl.h>
 
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
 #include <ranges>
 #include <span>
 #include <stdexcept>
 
+#include <spdlog/spdlog.h>
+
 #include "rdb/bitsetCodec.hpp"
+#include "rdb/storageFile.hpp"
 
 namespace rdb {
 
@@ -76,20 +78,19 @@ void metaShadow::load() {
   overrides_.clear();
   if (shadowFilePath_.empty()) return;
 
-  std::ifstream in(shadowFilePath_, std::ios::binary);
-  if (!in.is_open()) return;
+  // Bez podazania za dowiazaniem (#374), tak jak `.meta` obok.
+  const StorageFd in(shadowFilePath_, O_RDONLY);
+  if (!in.isOpen()) return;
 
-  in.seekg(0, std::ios::end);
-  const auto fileSize = static_cast<std::streamoff>(in.tellg());
+  const off_t fileSize = in.size();
   if (fileSize <= 0) return;
 
   const auto payloadSize = static_cast<size_t>(fileSize);
   if (payloadSize % entrySize_ != 0)
     SPDLOG_WARN("metaShadow: unexpected shadow alignment (size={}, entrySize={})", payloadSize, entrySize_);
 
-  in.seekg(0, std::ios::beg);
   std::vector<std::byte> fileData(payloadSize);
-  in.read(reinterpret_cast<char *>(fileData.data()), static_cast<std::streamsize>(payloadSize));
+  (void)in.readAt(fileData, 0);
 
   std::span<const std::byte> remaining(fileData);
   while (remaining.size() >= entrySize_) {
@@ -103,10 +104,9 @@ void metaShadow::appendOverride(size_t recordIndex, const std::vector<bool> &nul
   overrides_.push_back(ov);
 
   if (shadowFilePath_.empty()) return;
-  std::ofstream out(shadowFilePath_, std::ios::binary | std::ios::app);
-  if (!out.is_open()) return;
-  auto buf = ov.serialize();
-  out.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
+  const StorageFd out(shadowFilePath_, O_WRONLY | O_CREAT | O_APPEND);
+  if (!out.isOpen()) return;
+  (void)out.write(ov.serialize());
 }
 
 std::optional<std::vector<bool>> metaShadow::lookup(size_t recordIndex) const {
