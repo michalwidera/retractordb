@@ -479,6 +479,40 @@ TEST_F(GroupFileTest, test_fagrp_restore_state_after_restart) {
   }
 }
 
+// To samo, gdy plik grupy lezy w podkatalogu - tak jak pod :STORAGE ("temp/strumien"). Segmenty
+// szukano dawniej w katalogu roboczym i porownywano z pelna sciezka, wiec po restarcie grupa
+// zaczynala od pustego `_segment_0`, a pozniejsze segmenty zostawaly na dysku do nadpisania.
+TEST_F(GroupFileTest, test_fagrp_restore_state_after_restart_in_subdirectory) {
+  BYTE record;
+  const std::string stored = "store/" + filename;
+  std::filesystem::create_directory("store");
+  const auto retention = rdb::retention_t{2, 3};
+
+  {
+    auto gfa = std::make_unique<rdb::groupFile<>>(stored, makeDesc(recsize), retention, -1);
+    for (BYTE i = 1; i <= 5; i++) {
+      record = i;
+      GTEST_ASSERT_EQ(gfa->write(&record), 0);
+    }
+  }
+
+  auto gfa = std::make_unique<rdb::groupFile<>>(stored, makeDesc(recsize), retention, -1);
+  GTEST_ASSERT_EQ(gfa->count(), 5);
+  for (BYTE i = 0; i < 5; i++) {
+    GTEST_ASSERT_EQ(gfa->read(&record, i), 0);
+    GTEST_ASSERT_EQ(record, i + 1);
+  }
+
+  record = 6;
+  GTEST_ASSERT_EQ(gfa->write(&record), 0);
+  record = 7;
+  GTEST_ASSERT_EQ(gfa->write(&record), 0);
+  EXPECT_FALSE(std::filesystem::exists(stored + "_segment_0"));
+  EXPECT_EQ(readFile(stored + "_segment_1"), std::vector<BYTE>({4, 5, 6}));
+  EXPECT_EQ(readFile(stored + "_segment_2"), std::vector<BYTE>({7}));
+  GTEST_ASSERT_EQ(gfa->count(), 7);
+}
+
 // ============================================================
 // retention_t tests
 // ============================================================
