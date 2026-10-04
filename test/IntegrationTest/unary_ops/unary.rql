@@ -1,0 +1,10 @@
+# Operatory jednoargumentowe nad polami (#328, A2 C2). Do 2026-10-04 kazdy z tych programow
+# konczyl start FatalError-em albo serwer w pierwszym slocie.
+# ctest -R it_unary_ops -V
+STORAGE 'temp'
+
+DECLARE b BYTE, u UINT, i INTEGER, d DOUBLE STREAM src, 1 TEXTFILE 'unary.txt'
+
+SELECT -src[0], ~src[0], -src[1], ~src[1], -src[2], +src[2], -(src[2]+1), -src[2]+1, -src[3], src[2] * -src[2] STREAM uno FROM src
+
+RULE pos ON uno WHEN -uno[4] < 0 DO DUMP -1 TO 0

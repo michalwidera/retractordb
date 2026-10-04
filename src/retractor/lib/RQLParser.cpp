@@ -407,6 +407,16 @@ class ParserListener : public RQLBaseListener {
   void exitExpLe(RQLParser::ExpLeContext *ctx) override { recpToken(CMP_LE); }
   void exitExpNot(RQLParser::ExpNotContext *ctx) override { recpToken(NOT); }
 
+  /// `-a`, `+a`, `~a` nad dowolnym `term` - operand dolozyl juz swoje tokeny, tu dochodzi operator.
+  /// `+` jest tozsamoscia i tokenu nie ma. Literal ujemny (`-2`) tu nie trafia, bo jest
+  /// prymitywem `ExpDec`/`ExpFloat`.
+  void exitUnary_op_expression(RQLParser::Unary_op_expressionContext *ctx) override {
+    if (ctx->BIT_NOT() != nullptr)
+      recpToken(BIT_NOT);
+    else if (ctx->MINUS() != nullptr)
+      recpToken(NEGATE);
+  }
+
   /// `$` poza nawiasami kwadratowymi - numer instancji jako wartosc.
   ///
   /// Wartosci jeszcze nie znamy (jest nia numer instancji, ktory powstanie dopiero przy

@@ -2171,24 +2171,38 @@ TEST(xparser, binary_stream_operators_are_left_associative) {
 
 namespace {
 
-/// Program pola SELECT-a w postaci ONP - do porownan grupowania w wyrazeniu skalarnym.
+/// Programy pol SELECT-a w postaci ONP, kazde pole OSOBNO - do porownan grupowania
+/// w wyrazeniu skalarnym i do liczenia pol.
 ///
 /// Sam PARSER, bez kompilacji: uproszczenia algebraiczne (R3) zwinelyby stale i zatarly
 /// roznice, o ktore chodzi. Zrodlem jest jeden strumien o dwoch polach, wiec `v` i `w` sa
 /// zwyklymi odwolaniami FieldID.
-std::string selectFieldProgram(const std::string &expression) {
+///
+/// Do 2026-10-04 (#328) pomocnik sklejal tokeny WSZYSTKICH pol w jeden napis, wiec program
+/// rozbity na dwa pola porownywal sie rowno z poprawnym programem jednego pola.
+std::vector<std::string> selectFieldPrograms(const std::string &expression) {
   qTree instance;
   auto [parseResult, keyword, streamName] = parserRQLString(instance,
-                                                            "DECLARE v INTEGER, w INTEGER STREAM a, 1/500 FILE 'a.txt'\n"
+                                                            "DECLARE v INTEGER, w INTEGER STREAM a, 1/500 TEXTFILE 'a.txt'\n"
                                                             "SELECT " +
                                                                 expression + " STREAM t FROM a\n");
   EXPECT_EQ(parseResult, "OK") << expression;
 
-  std::ostringstream out;
-  for (auto &f : instance.getQuery("t").lSchema)
+  std::vector<std::string> fields;
+  for (auto &f : instance.getQuery("t").lSchema) {
+    std::ostringstream out;
     for (auto &tk : f.lProgram)
       out << tk << ";";
-  return out.str();
+    fields.push_back(out.str());
+  }
+  return fields;
+}
+
+/// Program JEDYNEGO pola - wyrazenie, ktore rozpadlo sie na kilka pol, jest bledem samo w sobie.
+std::string selectFieldProgram(const std::string &expression) {
+  const auto fields = selectFieldPrograms(expression);
+  EXPECT_EQ(fields.size(), 1U) << expression;
+  return fields.empty() ? std::string{} : fields.front();
 }
 
 }  // namespace
@@ -2212,12 +2226,124 @@ TEST(xparser, power_is_right_associative) {
   EXPECT_NE(selectFieldProgram("v^w^2"), selectFieldProgram("(v^w)^2"));
 }
 
-// Literal ujemny jest PRYMITYWEM tego samego pietra, a `unary_op_expression` siega po cale
-// `expression` - stad asymetria, ktorej dla `*` nie bylo widac, bo tam nie zmieniala wyniku.
-// Test utrwala stan faktyczny: dla `^` zamiar zapisuje sie nawiasem.
+// Literal ujemny jest PRYMITYWEM tego samego pietra, a `unary_op_expression` siega po caly
+// `term` - stad asymetria, ktorej dla `*` nie bylo widac, bo tam nie zmieniala wyniku.
+// Test utrwala stan faktyczny: dla `^` zamiar zapisuje sie nawiasem. Program jest przypiety
+// wprost, bo rownosc dwoch programow nie dowodzi, ze ktorykolwiek jest poprawny (#328).
 TEST(xparser, power_and_unary_minus_group_differently_for_literals_and_fields) {
   EXPECT_EQ(selectFieldProgram("-2^2"), selectFieldProgram("(-2)^2"));
   EXPECT_EQ(selectFieldProgram("-v^2"), selectFieldProgram("-(v^2)"));
+  EXPECT_EQ(selectFieldProgram("-v^2"), "PUSH_ID3(v);PUSH_VAL(2);POWER(0);NEGATE(0);");
+}
+
+// --- #328: operatory jednoargumentowe nad wyrazeniem ---------------------------------
+//
+// Do 2026-10-04 operand stal w `expression`, a kazde wyjscie z `expression` zamyka pole
+// SELECT. `-v` dawalo wiec pole `v` i drugie, puste pole, a operator ginal; nad warunkiem
+// RULE operand wypadal z warunku do schematu. Testy przypinaja ONP i liczbe pol osobno.
+
+TEST(xparser, unary_operators_emit_one_field_with_the_operator) {
+  EXPECT_EQ(selectFieldPrograms("-v"), std::vector<std::string>{"PUSH_ID3(v);NEGATE(0);"});
+  EXPECT_EQ(selectFieldPrograms("+v"), std::vector<std::string>{"PUSH_ID3(v);"});
+  EXPECT_EQ(selectFieldPrograms("~v"), std::vector<std::string>{"PUSH_ID3(v);BIT_NOT(0);"});
+  EXPECT_EQ(selectFieldPrograms("-(v+1)"), std::vector<std::string>{"PUSH_ID3(v);PUSH_VAL(1);ADD(0);NEGATE(0);"});
+  EXPECT_EQ(selectFieldPrograms("--v"), std::vector<std::string>{"PUSH_ID3(v);NEGATE(0);NEGATE(0);"});
+  EXPECT_EQ(selectFieldPrograms("-~v"), std::vector<std::string>{"PUSH_ID3(v);BIT_NOT(0);NEGATE(0);"});
+}
+
+TEST(xparser, unary_operators_in_a_multi_field_list) {
+  const std::vector<std::string> expected{"PUSH_ID3(v);PUSH_ID3(v);NEGATE(0);MULTIPLY(0);", "PUSH_ID3(w);BIT_NOT(0);",
+                                          "PUSH_ID3(w);"};
+  EXPECT_EQ(selectFieldPrograms("v * -v, ~w, +w"), expected);
+}
+
+// Operand wiaze jak literal ujemny wobec `+` i `-`: `-v+1` to `(-v)+1`, tak jak `-2+1` to
+// `(-2)+1`. Do 2026-10-04 operand siegal po cale `expression`, wiec `-v+1` znaczylo `-(v+1)`.
+TEST(xparser, unary_minus_binds_tighter_than_binary_plus_and_minus) {
+  EXPECT_EQ(selectFieldProgram("-v+1"), "PUSH_ID3(v);NEGATE(0);PUSH_VAL(1);ADD(0);");
+  EXPECT_EQ(selectFieldProgram("-v-w"), "PUSH_ID3(v);NEGATE(0);PUSH_ID3(w);SUBTRACT(0);");
+  EXPECT_EQ(selectFieldProgram("~v+w"), "PUSH_ID3(v);BIT_NOT(0);PUSH_ID3(w);ADD(0);");
+  EXPECT_EQ(selectFieldProgram("v+-w"), "PUSH_ID3(v);PUSH_ID3(w);NEGATE(0);ADD(0);");
+  EXPECT_NE(selectFieldProgram("-v+1"), selectFieldProgram("-(v+1)"));
+}
+
+TEST(xparser, unary_minus_in_a_rule_condition_stays_in_the_condition) {
+  qTree instance;
+  auto [parseResult, keyword, streamName] = parserRQLString(instance, R"(
+      DECLARE v INTEGER STREAM a, 1 TEXTFILE 'a.txt'
+      SELECT v STREAM t FROM a
+      RULE r ON t WHEN -t[0] < 0 DO DUMP -1 TO 1
+    )");
+  ASSERT_EQ(parseResult, "OK");
+
+  const auto &q = instance.getQuery("t");
+  EXPECT_EQ(q.lSchema.size(), 1U) << "operand warunku wyciekl do schematu";
+  ASSERT_EQ(q.lRules.size(), 1U);
+  std::ostringstream out;
+  for (const auto &tk : q.lRules.front().condition)
+    out << tk << ";";
+  EXPECT_EQ(out.str(), "PUSH_ID2(t[0]);NEGATE(0);PUSH_VAL(0);CMP_LT(0);");
+}
+
+namespace {
+
+/// Kompilacja planu z jednym zrodlem `src` typu `type` i jednym wyrazeniem `expression`
+/// w SELECT albo w warunku RULE. RATIONAL nie ma deklaracji - daje go dopiero reduktor AVG.
+std::string compileUnaryPlan(const std::string &type, const std::string &expression, bool inRule,
+                             rdb::descFld *fieldType = nullptr) {
+  const bool rational        = type == "RATIONAL";
+  const std::string declared = rational ? "INTEGER" : type;
+  const std::string from     = rational ? "AVG(src)" : "src";
+  const std::string text =
+      "DECLARE a " + declared + " STREAM src, 1 TEXTFILE 'src.txt'\n" + "SELECT * STREAM m FROM " + from + "\n" +
+      (inRule ? "RULE r ON m WHEN " + expression + " > 0 DO DUMP -1 TO 1\n" : "SELECT " + expression + " STREAM o FROM m\n");
+  qTree plan;
+  auto [parseResult, firstKeyword, streamName] = parserRQLString(plan, text);
+  if (parseResult != "OK") return "parse: " + parseResult;
+  compiler instance(plan);
+  const auto result = instance.compile();
+  if (result == "OK" && fieldType != nullptr) *fieldType = plan.getQuery("o").lSchema.front().field_.rtype;
+  return result;
+}
+
+}  // namespace
+
+// Decyzja wlasciciela (#328): `~` tylko dla BYTE i UINT, gdzie rowna sie `-a`; kazdy inny typ
+// to odmowa planu, w SELECT i w warunku RULE (osobny przebieg checkRuleConditionShapes).
+TEST(xcompiler, bitwise_not_is_refused_outside_byte_and_uint) {
+  for (const char *type : {"INTEGER", "RATIONAL", "FLOAT", "DOUBLE", "STRING[4]"}) {
+    for (const bool inRule : {false, true}) {
+      const auto result = compileUnaryPlan(type, "~m[0]", inRule);
+      EXPECT_NE(result.find("unary '~' is defined only for BYTE and UINT"), std::string::npos)
+          << type << (inRule ? " (RULE)" : " (SELECT)") << ": " << result;
+      if (inRule) EXPECT_NE(result.find("rule condition"), std::string::npos) << type << ": " << result;
+    }
+  }
+}
+
+// `-` nad napisem bylby wyjatkiem w slocie, a ten konczy serwer - stad odmowa juz w kompilacji.
+TEST(xcompiler, unary_minus_over_string_is_refused) {
+  for (const bool inRule : {false, true}) {
+    const auto result = compileUnaryPlan("STRING[4]", "-m[0]", inRule);
+    EXPECT_NE(result.find("unary '-' is not defined for STRING"), std::string::npos) << result;
+  }
+}
+
+// Kontrola pozytywna: dozwolone pary przechodza i zachowuja typ operandu - `neg()` i `~` nie
+// promuja. `+` jest tozsamoscia i przechodzi dla kazdego typu, takze napisu.
+TEST(xcompiler, unary_operators_keep_the_operand_type) {
+  const std::vector<std::tuple<std::string, std::string, rdb::descFld>> cases{
+      {"BYTE", "~m[0]", rdb::BYTE},           {"UINT", "~m[0]", rdb::UINT},       {"BYTE", "-m[0]", rdb::BYTE},
+      {"UINT", "-m[0]", rdb::UINT},           {"INTEGER", "-m[0]", rdb::INTEGER}, {"RATIONAL", "-m[0]", rdb::RATIONAL},
+      {"FLOAT", "-m[0]", rdb::FLOAT},         {"DOUBLE", "-m[0]", rdb::DOUBLE},   {"STRING[4]", "+m[0]", rdb::STRING},
+      {"INTEGER", "-(m[0]+1)", rdb::INTEGER},
+  };
+  for (const auto &[type, expression, expected] : cases) {
+    rdb::descFld fieldType = rdb::NULLTYPE;
+    ASSERT_EQ(compileUnaryPlan(type, expression, false, &fieldType), "OK") << type << " " << expression;
+    EXPECT_EQ(fieldType, expected) << type << " " << expression;
+    EXPECT_EQ(compileUnaryPlan(type, expression, true), "OK") << type << " " << expression << " (RULE)";
+  }
 }
 
 // Poziom 2 jest lancuchowalny. Do 2026-08-29 kazdy z tych zapisow byl bledem skladni,

@@ -222,8 +222,12 @@ A red result, a Valgrind error or leak, or an unreported check stops the commit,
 
 ```bash
 scripts/buildrdb.sh release-ablation     # interactive: set every RDB_OPT_* switch OFF, probe OFF
-ctest --test-dir <directory printed by the script>/test -j 4
+A=<directory printed by the script>
+PATH="$A/src/retractor:$A/src/qry:$A/src/rdb:$PATH" command -v xretractor xqry xtrdb   # each must print a path under $A/src/
+PATH="$A/src/retractor:$A/src/qry:$A/src/rdb:$PATH" ctest --test-dir "$A/test" -j 4
 ```
+
+**The floor tests the all-off binaries only with that `PATH` prefix.** Integration tests call `xretractor`, `xqry` and `xtrdb` by name, and the CTest file of every build directory only *appends* the install directory to the caller's `PATH`, so a plain `ctest --test-dir "$A/test"` runs whatever the caller's `PATH` finds first - normally the Debug install in `~/.local/bin`. On 2026-10-04 (#328) a 348/348 green ablation run turned out to have tested the Debug engine in every by-name integration test. Report the three resolved paths with the result. Never `ninja install` the ablation directory instead: it would overwrite `~/.local/bin` with a Release build and break the next Debug `ctest` (see *Namespaces* in `test/CLAUDE.md`).
 
 Success is **the whole suite green** - no failure, and no `DISABLED` beyond the ones the tree already carries. Any difference the switches do show belongs in `def:observable`: `Val` must be equal, `Lat` only non-increasing (`paper-arXiv/debs/research_plan.md` §14.20). CI runs the same floor as `ablation-all-off` in `manual-nightly-full` on the 5th and 20th of every month - up to two weeks too late to replace the local run.
 

@@ -232,7 +232,7 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
     int operands = 0;
     if (isBinaryShapeOperator(cmd))
       operands = 2;
-    else if (cmd == CALL || cmd == CALL2 || cmd == NEGATE || cmd == NOT)
+    else if (cmd == CALL || cmd == CALL2 || cmd == NEGATE || cmd == BIT_NOT || cmd == NOT)
       operands = 1;
     if (operands > 0) {
       if (std::cmp_less(stack.size(), operands)) return illTyped;
@@ -349,10 +349,27 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
       case NEGATE:
         // `neg()` ZACHOWUJE typ: dla `uint8_t` liczy `~a` i oddaje `uint8_t`, dla `unsigned`
         // takze `unsigned`. Promocji tu nie ma, inaczej niz przy operatorach dwuargumentowych.
-        // Operand tekstowy jest bledem wykonania (`Operator 'negate' not defined for string`).
+        // Operand tekstowy bylby bledem wykonania (`Operator 'negate' not defined for string`),
+        // a wyjatek w slocie konczy serwer - dlatego odmowa planu, a nie `illTyped` (#328).
+        if (right.rtype == rdb::STRING)
+          return {.status = exprShapeStatus::rejected, .shape = {}, .reason = "unary '-' is not defined for STRING"};
         if (right.rtype > rdb::DOUBLE) return illTyped;
         stack.push_back(right);
         break;
+
+      case BIT_NOT:
+        // Decyzja wlasciciela (#328): `~` tylko dla BYTE i UINT, gdzie rowna sie `-a`. Kazdy inny
+        // typ wartosci to odmowa planu - bitowa negacja liczby ze znakiem, wymiernej czy napisu
+        // nie jest w RQL zdefiniowana.
+        if (right.rtype == rdb::BYTE || right.rtype == rdb::UINT) {
+          stack.push_back(right);
+          break;
+        }
+        if (right.rtype > rdb::STRING || right.rtype == rdb::INTPAIR || right.rtype == rdb::IDXPAIR) return illTyped;
+        return {
+            .status = exprShapeStatus::rejected,
+            .shape  = {},
+            .reason = "unary '~' is defined only for BYTE and UINT, not for " + std::string(rdb::GetStringdescFld(right.rtype))};
 
       case NOT:
         // `logic_not()` oddaje wynik przez logicResultAsType() w typie ARGUMENTU; dla napisu

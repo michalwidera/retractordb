@@ -95,6 +95,16 @@ if ! out=$(xretractor history.rql -c --config large_budget.toml 2>&1); then
 fi
 # Liczby bajtow nie przypinamy - zalezy od sizeof(rdb::payload), czyli od biblioteki standardowej.
 expect_file_rejected history.rql "Plan keeps " "Check result:" small_budget.toml
+# Do 2026-10-04 operand operatora jednoargumentowego stawal sie osobnym polem, a `-a[0]` konczylo
+# start FatalError-em "no program tokens" (A2 C2, #328). `~` poza BYTE/UINT to odmowa kompilatora,
+# w SELECT i w warunku RULE.
+printf '%s\n' "DECLARE a INTEGER STREAM core0, 1 BINFILE 'source.dat'" "SELECT ~a[0] STREAM dst FROM core0" >bit_not.rql
+expect_file_rejected bit_not.rql "Stream 'dst': unary '~' is defined only for BYTE and UINT, not for INTEGER" \
+  "Check result:"
+printf '%s\n' "DECLARE a INTEGER STREAM core0, 1 BINFILE 'source.dat'" "SELECT a[0] STREAM dst FROM core0" \
+  "RULE r ON dst WHEN ~dst[0] > 0 DO DUMP -1 TO 1" >bit_not_rule.rql
+expect_file_rejected bit_not_rule.rql \
+  "Stream 'dst' rule condition: unary '~' is defined only for BYTE and UINT, not for INTEGER" "Check result:"
 
 server_start plan.rql
 
@@ -234,6 +244,22 @@ wide_list="to_string(core0[0]:65536)"
 for _ in $(seq 2 17); do wide_list="$wide_list, to_string(core0[0]:65536)"; done
 expect_parse_rejected "SELECT $wide_list STREAM wide FROM core0" \
   "Stream 'wide' needs a record of 1114112 bytes; the limit is 1048576" "Fail local chain compiler"
+
+# A2 C2 (#328): `-pole` ad hoc konczylo serwer (kod 1), a `pole * -pole` bylo przyjmowane i konczylo
+# go dopiero w pierwszym slocie (kod 4). `~` nad INTEGER i `-` nad napisem to odmowy kompilatora.
+expect_parse_rejected "SELECT ~core0[0] STREAM bitnot FROM core0" \
+  "unary '~' is defined only for BYTE and UINT, not for INTEGER" "Fail local chain compiler"
+expect_parse_rejected "SELECT -to_string(core0[0]) STREAM negtext FROM core0" \
+  "unary '-' is not defined for STRING" "Fail local chain compiler"
+neg_out=$(xqry -a 'SELECT core0[0] * -core0[0], -core0[0] + 1 STREAM adhocneg FROM core0' 2>&1) || {
+  echo "ad-hoc z jednoargumentowym minusem odrzucony: $neg_out"
+  exit 1
+}
+neg_rows=$(xqry -s adhocneg -m 5 2>/dev/null | wc -l)
+if [ "$neg_rows" -lt 5 ] || ! kill -0 "$_server_pid" 2>/dev/null; then
+  echo "strumien adhocneg oddal $neg_rows z 5 rekordow albo serwer zginal: $neg_out"
+  exit 1
+fi
 
 # `kill -0` zaraz po odpowiedzi nie widzi smierci odroczonej: pojemnosc 0 konczyla proces dopiero
 # przy pierwszym zapisie, ok. 2 s po "OK". Po odmowach plan serwera ma wiec jeszcze liczyc.

@@ -217,6 +217,35 @@ TEST(xExpressionShape, unary_operators_keep_the_argument_type) {
   }
 }
 
+// `~` (#328) przechodzi wylacznie nad BYTE i UINT i wtedy zachowuje typ, jak NEGATE. Kazdy
+// inny typ wartosci, takze napis, to `rejected` - kompilacja staje, zamiast liczyc.
+TEST(xExpressionShape, bitwise_not_resolves_only_for_byte_and_uint) {
+  auto record = testPayload(6);
+  for (const auto type : numericTypes()) {
+    std::list<token> program{readField(slotOf(type)), token(BIT_NOT)};
+    const auto inferred = analyse(program);
+    if (type == rdb::BYTE || type == rdb::UINT) {
+      ASSERT_TRUE(inferred.resolved()) << typeName(type);
+      EXPECT_EQ(inferred.shape.rtype, type) << typeName(type);
+      EXPECT_EQ(inferred.shape.rtype, evaluatedType(program, record)) << typeName(type) << " (ewaluator)";
+    } else {
+      EXPECT_EQ(inferred.status, exprShapeStatus::rejected) << typeName(type);
+      EXPECT_NE(inferred.reason.find(typeName(type)), std::string::npos) << inferred.reason;
+    }
+  }
+  const auto overText = analyse({readField(sText), token(BIT_NOT)});
+  EXPECT_EQ(overText.status, exprShapeStatus::rejected);
+  EXPECT_NE(overText.reason.find("STRING"), std::string::npos) << overText.reason;
+}
+
+// `-` nad napisem przed #328 bylo `illTyped`, czyli przepuszczeniem do bledu wykonania -
+// a wyjatek w slocie konczy serwer. Teraz odmowa.
+TEST(xExpressionShape, unary_minus_over_string_is_rejected) {
+  const auto inferred = analyse({readField(sText), token(NEGATE)});
+  EXPECT_EQ(inferred.status, exprShapeStatus::rejected);
+  EXPECT_NE(inferred.reason.find("unary '-'"), std::string::npos) << inferred.reason;
+}
+
 // --- porownania i logika ---------------------------------------------------------------
 
 // Porownanie NIE promuje BYTE: `is_eq` zapisuje wprost `uint8_t(1)`. Operatory te zyja
