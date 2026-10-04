@@ -44,6 +44,19 @@ using Milliseconds = std::chrono::milliseconds;
 
 std::string string(const json::value &value) { return std::string(value.as_string()); }
 
+// Parsowanie odpowiedzi xqry: Error przechodzi bez zmian, kazdy inny wyjatek
+// (boost::json, std::stoll) staje sie Error("protocol_error", ...).
+template <typename F>
+auto parsed(F action) {
+  try {
+    return action();
+  } catch (const Error &) {
+    throw;
+  } catch (const std::exception &error) {
+    throw Error("protocol_error", error.what());
+  }
+}
+
 std::int64_t integer(const std::string &text) {
   std::size_t end;
   const auto value = std::stoll(text, &end);
@@ -312,8 +325,10 @@ struct Subscription::Impl {
       : process(args, options.capacity),
         timeout(wait) {
     const auto event = process.read(timeout);
-    if (event.at("event") != "schema") throw Error("protocol_error", "Expected schema event");
-    description = retractordb::schema(event);
+    description      = parsed([&] {
+      if (event.at("event") != "schema") throw Error("protocol_error", "Expected schema event");
+      return retractordb::schema(event);
+    });
   }
   void close() noexcept {
     closed = true;
@@ -365,17 +380,13 @@ struct Client::Impl {
     return result;
   }
   json::object command(std::string_view expected, std::initializer_list<std::string> command) const {
-    try {
+    return parsed([&] {
       Process process(args(command), 16);
       auto result = process.read(options.timeout);
       if (string(result.at("event")) != expected) throw Error("protocol_error", "Unexpected command response");
       process.complete(options.timeout);
       return result;
-    } catch (const Error &) {
-      throw;
-    } catch (const std::exception &error) {
-      throw Error("protocol_error", error.what());
-    }
+    });
   }
 };
 
@@ -400,14 +411,19 @@ bool Client::ping() {
 }
 std::vector<Stream> Client::streams() {
   const auto result = impl_->command("streams", {"--dir"});
-  std::vector<Stream> streams;
-  for (const auto &item : result.at("streams").as_array()) {
-    const auto &stream = item.as_object();
-    streams.push_back({string(stream.at("name")), rational(string(stream.at("delta")))});
-  }
-  return streams;
+  return parsed([&] {
+    std::vector<Stream> streams;
+    for (const auto &item : result.at("streams").as_array()) {
+      const auto &stream = item.as_object();
+      streams.push_back({string(stream.at("name")), rational(string(stream.at("delta")))});
+    }
+    return streams;
+  });
 }
-Schema Client::describe(const std::string &stream) { return schema(impl_->command("schema", {"--detail", stream})); }
+Schema Client::describe(const std::string &stream) {
+  const auto result = impl_->command("schema", {"--detail", stream});
+  return parsed([&] { return schema(result); });
+}
 Subscription Client::subscribe(const std::string &stream, SubscribeOptions options) {
   if (options.limit < 0 || options.idleTimeout.count() < 0) throw std::invalid_argument("limits must be nonnegative");
   auto subscription =

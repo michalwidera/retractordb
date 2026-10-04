@@ -59,6 +59,12 @@ int main(int argc, char **argv) {
           samples.next(2s);
         });
       }
+      for (const std::string broken : {"nokey", "badtype", "baddelta", "hugedelta", "zerodelta"}) {
+        retractordb::Client client(broken, {.xqry = argv[2], .timeout = 2s});
+        expectError("protocol_error", [&] { client.streams(); });
+        expectError("protocol_error", [&] { db.describe(broken); });
+        expectError("protocol_error", [&] { db.subscribe(broken); });
+      }
       {
         auto samples = db.subscribe("wait");
         expectError("read_timeout", [&] { samples.next(20ms); });

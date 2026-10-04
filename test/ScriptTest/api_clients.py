@@ -39,17 +39,27 @@ import time
 Path(os.environ['API_TEST_STATE'], 'pid.' + str(os.getpid())).touch()
 args = sys.argv[1:]
 stream = args[args.index('--select') + 1] if '--select' in args else 'valid'
+if '--detail' in args:
+    stream = args[args.index('--detail') + 1]
 if stream == 'wait':
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
 def emit(kind, **values):
     print(json.dumps(dict(version=1, event=kind, **values)), flush=True)
-schema = dict(stream=stream, delta='1/20', query='test', fields=[
+# Zepsute delta: wariant wybiera nazwa serwera (--dir) albo strumienia (--detail, --select).
+broken = dict(nokey=None, badtype=[1, 20], baddelta='abc', hugedelta='99999999999999999999', zerodelta='1/0')
+def with_delta(item, case):
+    if case in broken:
+        item.pop('delta')
+        if broken[case] is not None:
+            item['delta'] = broken[case]
+    return item
+schema = with_delta(dict(stream=stream, delta='1/20', query='test', fields=[
     dict(name='a', type='INTEGER', count=2), dict(name='s', type='STRING', count=1),
-    dict(name='r', type='RATIONAL', count=1)])
+    dict(name='r', type='RATIONAL', count=1)]), stream)
 if '--hello' in args:
     emit('pong')
 elif '--dir' in args:
-    emit('streams', streams=[dict(name='valid', delta='1/20')])
+    emit('streams', streams=[with_delta(dict(name='valid', delta='1/20'), args[args.index('--server') + 1])])
 elif '--detail' in args:
     emit('schema', **schema)
 elif stream == 'badversion':
@@ -142,6 +152,15 @@ def python_fake(binary):
             with error(code):
                 with db.subscribe(name) as samples:
                     samples.next(timeout=2)
+        # hugedelta tylko w C++: int Pythona nie ma zakresu.
+        for case in ("nokey", "badtype", "baddelta", "zerodelta"):
+            with Client(case, xqry=binary, timeout=2) as broken:
+                with error("protocol_error"):
+                    broken.streams()
+            with error("protocol_error"):
+                db.describe(case)
+            with error("protocol_error"):
+                db.subscribe(case)
         with db.subscribe("wait") as samples:
             with error("read_timeout"):
                 samples.next(timeout=0.02)
@@ -165,7 +184,7 @@ def real(root):
     env = dict(os.environ, RDB_NAMESPACE=name, TMPDIR=str(root))
     (root / "data.txt").write_text("10 11 12\n", encoding="ascii")
     (root / "query.rql").write_text("""STORAGE 'storage'
-DECLARE v INTEGER[3] STREAM numbers, 1/20 FILE 'data.txt'
+DECLARE v INTEGER[3] STREAM numbers, 1/20 TEXTFILE 'data.txt'
 SELECT * STREAM copy FROM numbers
 SELECT AVG(numbers[0] : 1)/3, numbers[1]/0 STREAM ratios FROM numbers
 SELECT 'hello world', 'null' STREAM words FROM numbers
