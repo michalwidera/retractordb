@@ -110,13 +110,13 @@ class Client:
         result = self._command("streams", "--dir")
         try:
             return [Stream(s["name"], Fraction(s["delta"])) for s in result["streams"]]
-        except (KeyError, TypeError, ValueError) as exc:
+        except (KeyError, TypeError, ValueError, ZeroDivisionError) as exc:
             raise Error("protocol_error", str(exc)) from exc
 
     def describe(self, stream):
         try:
             return Schema.from_event(self._command("schema", "--detail", stream))
-        except (KeyError, TypeError, ValueError) as exc:
+        except (KeyError, TypeError, ValueError, ZeroDivisionError) as exc:
             raise Error("protocol_error", str(exc)) from exc
 
     def subscribe(self, stream, *, limit=0, idle_timeout=0.0, capacity=1024):
