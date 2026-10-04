@@ -32,6 +32,13 @@ dir = "/var/lib/retractor"
 # Niepoprawna wartość jest pomijana z ostrzeżeniem w dzienniku.
 # default_retention = [100000, 10]
 
+# Katalogi poza katalogiem magazynu, do których pole REF zachowanego pliku .desc może przenieść
+# zapisywalny plik danych (czyta xtrdb). Bez klucza REF wzięty z .desc zapisuje i usuwa tylko
+# w katalogu magazynu: `open` takiego magazynu jest odmową, a `quitdrop` usuwa sam .desc. Odczyt
+# źródeł BINFILE, TEXTFILE i DEVICE przez REF oraz REF z planu nie podlegają temu ograniczeniu.
+# Wpisy: bezwzględne ścieżki istniejących katalogów - inny wpis zatrzymuje start xtrdb.
+# ref_dirs = ["/srv/retractor/archive"]
+
 # [sources]
 # Termin odczytu źródeł DEVICE (urządzenie znakowe albo FIFO) w sekundach, gdy deklaracja w RQL
 # nie ma klauzuli TIMEOUT. 0 (domyślnie, także bez klucza) to jedna próba natychmiastowa: brak

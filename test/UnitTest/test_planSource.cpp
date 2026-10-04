@@ -514,6 +514,38 @@ TEST(PlanSource, declared_descriptor_must_match_the_source_kind_and_path) {
   fs::remove_all(dir);
 }
 
+// Plan nie daje SELECT-owi REF, a magazyn wzialby go z zachowanego `.desc` i przeniosl zapis wyniku
+// w dowolne miejsce (#278). Pod :ROTATION, gdy pliki zostaja, jest to odmowa przed startem. Bez
+// rotacji start i tak kasuje `.desc` wezla.
+TEST(PlanSource, kept_select_descriptor_must_not_move_the_data_file) {
+  namespace fs       = std::filesystem;
+  const fs::path dir = "kept_select_ref";
+  fs::remove_all(dir);
+  fs::create_directory(dir);
+
+  const auto check = [&dir](const std::string &keptDesc, bool rotation) {
+    qTree plan;
+    EXPECT_EQ(parsePlanText(plan, std::string(rotation ? "ROTATION 'kept_select_ref_counter.txt'\n" : "") +
+                                      "STORAGE 'kept_select_ref'\n"
+                                      "DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'\n"
+                                      "SELECT a+1 STREAM out FROM src\n")
+                  .status,
+              "OK");
+    compiler cm(plan);
+    EXPECT_EQ(cm.compile(), "OK");
+    std::ofstream(dir / "out.desc") << keptDesc;
+    return checkDescriptorFiles(plan, {});
+  };
+
+  EXPECT_EQ(check("{ INTEGER out_0 }", true), "OK");
+  EXPECT_EQ(check("{ INTEGER out_0 REF \"../../etc/rdb\" }", true),
+            "stream 'out': kept_select_ref/out.desc moves the stream's data file to '../../etc/rdb', which the plan does "
+            "not do; remove kept_select_ref/out.desc to start the stream afresh");
+  EXPECT_EQ(check("{ INTEGER out_0 REF \"../../etc/rdb\" }", false), "OK");
+
+  fs::remove_all(dir);
+}
+
 // Ostrzezenia o formie przestarzalej ida w kolejnosci wierszy planu, choc kompilator sortuje
 // wezly po interwale. Wiersz to pierwszy wiersz instrukcji takze przy kontynuacji `\`.
 TEST(PlanSource, deprecated_file_warnings_follow_the_plan_lines) {

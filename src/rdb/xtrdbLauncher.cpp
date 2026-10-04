@@ -102,11 +102,18 @@ int main(int argc, char *argv[]) {
 
   if (cliNoPrompt) colors = {};
 
+  const AppConfig appCfg = loadAppConfig();
+  if (!appCfg.storageRefDirsError.empty()) {
+    std::println(std::cerr, "Configuration error: {}", appCfg.storageRefDirsError);
+    spdlog::shutdown();
+    return 1;
+  }
+
   {
     // Kazda instancja - bezimienna, nazwana, w przestrzeni RDB_NAMESPACE - trzyma przez caly czas
     // pracy wlasny plik z jednej rodziny w katalogu blokad, wiec przegladamy cala rodzine, a katalog
     // bierzemy z tej samej konfiguracji (paths.lock_dir) co silnik.
-    const std::filesystem::path lockDir = ipc::serviceLockDir(loadAppConfig().lockDir);
+    const std::filesystem::path lockDir = ipc::serviceLockDir(appCfg.lockDir);
     std::error_code ec;
     for (const auto &entry : std::filesystem::directory_iterator(lockDir, ec)) {
       const std::string name = entry.path().filename().string();
@@ -136,7 +143,8 @@ int main(int argc, char *argv[]) {
                      .storageParam  = storageParam,
                      .storagePolicy = storagePolicy,
                      .colors        = colors,
-                     .rox           = rox};
+                     .rox           = rox,
+                     .refDirs       = appCfg.storageRefDirs};
 
   std::map<std::string, std::unique_ptr<ICommand>> commands;
   commands["append"]   = std::make_unique<AppendCmd>();

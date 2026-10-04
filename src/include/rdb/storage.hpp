@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <memory>  // std::unique_ptr
 #include <string>
+#include <utility>
+#include <vector>
 
 #include <boost/rational.hpp>
 
@@ -87,6 +89,7 @@ class storage {
   SourceBuffer buffer_;  ///< komora bieżącego rekordu i historia dla źródeł deklarowanych
 
   bool isDisposable_   = false;  // if true - storage and descriptor will be deleted after use
+  bool refFromCaller_  = false;  // REF pochodzi od wolajacego (plan, schemat), nie wylacznie z wczytanego .desc
   bool isOneShot_      = false;  // if false - storage will be looped when end is reached
   bool isHold_         = false;  // if true - no processing until first query appear
   size_t recordsCount_ = 0;
@@ -175,6 +178,11 @@ class storage {
   std::unique_ptr<rdb::payload>::pointer getPayload();
 
   void setDisposable(bool value);
+
+  /// @brief Katalogi spoza katalogu magazynu, do których REF z wczytanego `.desc` może przenieść
+  ///        zapisywalny plik danych (`storage.ref_dirs`, #278). Wołać przed attachDescriptor().
+  void allowRefDirs(std::vector<std::string> dirs) { paths_.allowRefDirs(std::move(dirs)); }
+
   void releaseOnHold();
   [[nodiscard]] size_t getRecordsCount() const;
   bool descriptorFileExist();

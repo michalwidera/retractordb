@@ -174,7 +174,17 @@ std::string checkDescriptorFiles(qTree &plan, const std::string_view defaultStor
     // Kierunek jak w rdb::verifyDescriptorMatch (plan == plik): Descriptor::operator== jest asymetryczny.
     const rdb::Descriptor planned = q.descriptorStorage();
     if (planned != kept) return "storage: descriptor schema mismatch in '" + descFile.string() + "'";
-    if (!q.isDeclaration() || isLegacyBinaryDescriptor(planned, kept)) continue;
+    if (!q.isDeclaration()) {
+      // Plan nie daje SELECT-owi REF, wiec REF w jego `.desc` przenioslby zapis wyniku w miejsce,
+      // ktorego plan nie zna (#278). rdb::storage odmowi tego samego, ale dopiero po starcie.
+      if (const std::string keptRef = configField(kept, rdb::REF); !keptRef.empty())
+        return std::format(
+            "stream '{}': {} moves the stream's data file to '{}', which the plan does not do; remove {} to start "
+            "the stream afresh",
+            q.id, descFile.string(), keptRef, descFile.string());
+      continue;
+    }
+    if (isLegacyBinaryDescriptor(planned, kept)) continue;
 
     // operator== porownuje tylko sloty danych, a magazyn bierze TYPE i REF z wczytanego `.desc`.
     // Do #346 zmiana sciezki albo rodzaju zrodla w planie przechodzila wiec po cichu: plan wskazywal

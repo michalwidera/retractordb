@@ -710,4 +710,128 @@ TEST(xrdb, storage_no_rotation_when_counts_match) {
     std::filesystem::remove(f);
 }
 
+// REF z wczytanego `.desc` a uprawnienia magazynu (#278). REF moze prowadzic poza katalog magazynu
+// - tak opisuje sie zewnetrzne zrodla DECLARE - ale wziety wylacznie z pliku nie kieruje zapisu
+// poza katalog magazynu i `storage.ref_dirs`, a porzadkowanie magazynu nie usuwa pliku spoza nich.
+// REF podany przez wolajacego (plan) jest decyzja operatora i musi zgadzac sie z zachowanym `.desc`.
+namespace {
+struct RefScene {
+  std::string store   = "ut-ref-store";
+  std::string outside = "ut-ref-outside";
+  std::string stream  = "ut-ref";
+  std::string desc    = "ut-ref-store/ut-ref.desc";
+
+  RefScene() {
+    std::filesystem::remove_all(store);
+    std::filesystem::remove_all(outside);
+    std::filesystem::create_directory(store);
+    std::filesystem::create_directory(outside);
+  }
+  ~RefScene() {
+    std::filesystem::remove_all(store);
+    std::filesystem::remove_all(outside);
+  }
+  RefScene(const RefScene &)            = delete;
+  RefScene &operator=(const RefScene &) = delete;
+
+  void keep(const std::string &ref, const std::string &type) const {
+    std::ofstream(desc) << "{ INTEGER a REF \"" << ref << "\" TYPE " << type << " }\n";
+  }
+};
+}  // namespace
+
+// Odczyt zewnetrznego zrodla dziala jak dotad, ale `rox` nie usuwa pliku, ktorego instancja nie posiada.
+TEST(xrdb, storage_ref_outside_store_reads_but_is_not_removed) {
+  RefScene scene;
+  const std::string source = scene.outside + "/source.txt";
+  std::ofstream(source) << "1\n2\n";
+  scene.keep(source, "TEXTSOURCE");
+
+  {
+    rdb::storage s(scene.stream, scene.stream, scene.store);
+    ASSERT_EQ(s.attachDescriptor(), "");
+    EXPECT_TRUE(s.isDeclared());
+    s.setDisposable(true);
+  }
+
+  EXPECT_TRUE(std::filesystem::exists(source));
+  EXPECT_FALSE(std::filesystem::exists(scene.desc));
+}
+
+// Zapisywalny magazyn przeniesiony przez REF poza katalog magazynu: odmowa przed pierwszym
+// dotknieciem sciezki - plik nie powstaje, a `.desc` zostaje do wgladu operatora.
+TEST(xrdb, storage_writable_ref_outside_store_is_refused) {
+  RefScene scene;
+  const std::string target = scene.outside + "/target.bin";
+  scene.keep(target, "POSIX");
+
+  {
+    rdb::storage s(scene.stream, scene.stream, scene.store);
+    const std::string error = s.attachDescriptor();
+    EXPECT_EQ(error, "storage: " + scene.desc + " moves the POSIX data file to '" + target +
+                         "', outside the storage directory; add its directory to storage.ref_dirs in retractor.toml to "
+                         "allow it");
+  }
+
+  EXPECT_FALSE(std::filesystem::exists(target));
+  EXPECT_FALSE(std::filesystem::exists(target + ".meta"));
+  EXPECT_TRUE(std::filesystem::exists(scene.desc));
+}
+
+// Katalog z `storage.ref_dirs` to jawnie dozwolona relokacja: zapis tam trafia, a porzadkowanie
+// magazynu usuwa plik jak kazdy inny plik instancji.
+TEST(xrdb, storage_writable_ref_into_allowed_dir_works) {
+  RefScene scene;
+  const std::string target = scene.outside + "/target.bin";
+  scene.keep(target, "POSIX");
+
+  {
+    rdb::storage s(scene.stream, scene.stream, scene.store);
+    s.allowRefDirs({std::filesystem::absolute(scene.outside).string()});
+    ASSERT_EQ(s.attachDescriptor(), "");
+    *reinterpret_cast<int *>(s.getPayload()->span().data()) = 7;
+    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    EXPECT_EQ(std::filesystem::file_size(target), sizeof(int));
+    s.setDisposable(true);
+  }
+
+  EXPECT_FALSE(std::filesystem::exists(target));
+  EXPECT_FALSE(std::filesystem::exists(scene.desc));
+}
+
+// REF z planu wygrywa: zachowany `.desc` o innym REF - albo z REF, ktorego plan nie daje (SELECT) -
+// jest odmowa, zanim cokolwiek zostanie otwarte. Ten sam REF przechodzi.
+TEST(xrdb, storage_kept_ref_must_match_the_plan) {
+  RefScene scene;
+  const std::string planned = scene.outside + "/planned.txt";
+  const std::string foreign = scene.outside + "/foreign.txt";
+  std::ofstream(planned) << "1\n";
+  std::ofstream(foreign) << "1\n";
+
+  const auto attach = [&](const rdb::Descriptor &plan) {
+    rdb::storage s(scene.stream, scene.stream, scene.store);
+    const std::string error = s.attachDescriptor(&plan);
+    if (error.empty()) s.setDisposable(true);  // jak dataModel: DISPOSABLE dopiero po udanym otwarciu
+    return error;
+  };
+  const rdb::Descriptor field("a", sizeof(int), 1, rdb::INTEGER);
+
+  scene.keep(foreign, "TEXTSOURCE");
+  EXPECT_EQ(attach(field + rdb::Descriptor(planned, 0, 0, rdb::REF) + rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE)),
+            "storage: " + scene.desc + " names data file '" + foreign + "', but the plan gives '" + planned + "'; remove " +
+                scene.desc + " to start the stream afresh");
+
+  scene.keep(foreign, "POSIX");
+  EXPECT_EQ(attach(field), "storage: " + scene.desc + " names data file '" + foreign + "', but the plan gives none; remove " +
+                               scene.desc + " to start the stream afresh");
+  EXPECT_TRUE(std::filesystem::exists(foreign));
+  EXPECT_TRUE(std::filesystem::exists(scene.desc)) << "odmowa nie usuwa zachowanego .desc";
+
+  // REF planu zgodny z plikiem: odczyt dziala, a DISPOSABLE z planu usuwa zrodlo jak dotad.
+  scene.keep(planned, "TEXTSOURCE");
+  EXPECT_EQ(attach(field + rdb::Descriptor(planned, 0, 0, rdb::REF) + rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE)), "");
+  EXPECT_FALSE(std::filesystem::exists(planned));
+  EXPECT_TRUE(std::filesystem::exists(foreign));
+}
+
 // NOLINTEND(modernize-avoid-c-arrays,bugprone-unchecked-optional-access)

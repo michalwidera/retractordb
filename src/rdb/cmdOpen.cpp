@@ -19,6 +19,7 @@ bool OpenCmd::execute(CommandContext &ctx) {
   const auto oldPos = ctx.file.find(".old");
   const auto base   = (oldPos != std::string::npos) ? ctx.file.substr(0, oldPos) : ctx.file;
   ctx.dacc          = std::make_unique<rdb::storage>(base, ctx.file, ctx.storageParam, ctx.storagePolicy);
+  ctx.dacc->allowRefDirs(ctx.refDirs);
   std::string openError;
 
   if (ctx.dacc->descriptorFileExist()) {

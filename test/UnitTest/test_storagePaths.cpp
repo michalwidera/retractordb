@@ -9,6 +9,8 @@
 
 #include <filesystem>
 #include <fstream>
+#include <string>
+#include <vector>
 
 #include "rdb/descriptor.hpp"
 #include "rdb/storagePaths.hpp"
@@ -90,4 +92,74 @@ TEST(StoragePathsTest, remove_all_files_deletes_whole_set) {
   EXPECT_FALSE(std::filesystem::exists("qry_rm.desc"));
   EXPECT_FALSE(std::filesystem::exists("data_rm.meta"));
   EXPECT_FALSE(std::filesystem::exists("data_rm.meta.shadow"));
+}
+
+// ---------------------------------------------------------------------------
+// removeAllFiles(true): plik danych spoza dozwolonych katalogów nie należy do
+// instancji - znika sam deskryptor, plik danych i jego indeksy zostają (#278).
+// ---------------------------------------------------------------------------
+TEST(StoragePathsTest, remove_all_files_can_keep_data_files) {
+  rdb::StoragePaths paths("qry_keep", "data_keep", "");
+
+  for (const auto &file : {std::string("data_keep"), std::string("qry_keep.desc"),  //
+                           std::string("data_keep.meta"), std::string("data_keep.meta.shadow")}) {
+    std::ofstream out(file);
+    out << "x";
+  }
+
+  paths.removeAllFiles(true);
+
+  EXPECT_FALSE(std::filesystem::exists("qry_keep.desc"));
+  EXPECT_TRUE(std::filesystem::exists("data_keep"));
+  EXPECT_TRUE(std::filesystem::exists("data_keep.meta"));
+  EXPECT_TRUE(std::filesystem::exists("data_keep.meta.shadow"));
+
+  for (const auto *file : {"data_keep", "data_keep.meta", "data_keep.meta.shadow"})
+    std::filesystem::remove(file);
+}
+
+// ---------------------------------------------------------------------------
+// Zawarcie REF w katalogu magazynu (#278): liczy się ścieżka po rozwiązaniu
+// `..` i dowiązań, porównywana po komponentach, a katalogi z allowRefDirs()
+// poszerzają zakres. Ścieżka względna REF rozwiązuje się względem katalogu
+// roboczego, tak jak w open() akcesora.
+// ---------------------------------------------------------------------------
+TEST(StoragePathsTest, ref_leaving_allowed_dirs_is_detected) {
+  namespace fs       = std::filesystem;
+  const fs::path dir = "storage_paths_ref";
+  fs::remove_all(dir);
+  fs::create_directories(dir / "store" / "sub");
+  fs::create_directories(dir / "store2");
+  fs::create_directories(dir / "archive");
+  fs::create_directory_symlink(fs::absolute(dir / "archive"), dir / "store" / "link");
+
+  const auto leaves = [&](const std::string &ref, const std::vector<std::string> &refDirs) {
+    rdb::StoragePaths paths("qry1", "data1", (dir / "store").string());
+    paths.allowRefDirs(refDirs);
+    paths.relocateFromRef(rdb::Descriptor(ref, 0, 0, rdb::REF) + rdb::Descriptor("a", sizeof(int), 1, rdb::INTEGER));
+    return paths.refLeavesAllowedDirs();
+  };
+  const std::string store = (dir / "store").string();
+
+  EXPECT_FALSE(leaves(store + "/sub/data.bin", {}));
+  EXPECT_FALSE(leaves(store + "/sub/../data.bin", {}));
+  EXPECT_TRUE(leaves(store + "/../outside.bin", {}));
+  EXPECT_TRUE(leaves(store + "/../../../../etc/rdb", {}));
+  EXPECT_TRUE(leaves((dir / "store2" / "data.bin").string(), {})) << "store2 nie lezy w store mimo wspolnego prefiksu";
+  EXPECT_TRUE(leaves(store + "/link/data.bin", {})) << "dowiazanie wyprowadza poza katalog magazynu";
+  EXPECT_TRUE(leaves(store, {})) << "sam katalog nie jest plikiem w katalogu";
+
+  const std::string archive = fs::absolute(dir / "archive").string();
+  EXPECT_FALSE(leaves((dir / "archive" / "data.bin").string(), {archive}));
+  EXPECT_FALSE(leaves(store + "/link/data.bin", {archive + "/"}));
+  EXPECT_TRUE(leaves((dir / "store2" / "data.bin").string(), {archive}));
+
+  fs::remove_all(dir);
+}
+
+// Bez pola REF ścieżka pochodzi od wołającego - nie ma czego ograniczać.
+TEST(StoragePathsTest, no_ref_never_leaves_allowed_dirs) {
+  rdb::StoragePaths paths("qry1", "../data1", "");
+  paths.relocateFromRef(rdb::Descriptor("a", sizeof(int), 1, rdb::INTEGER));
+  EXPECT_FALSE(paths.refLeavesAllowedDirs());
 }
