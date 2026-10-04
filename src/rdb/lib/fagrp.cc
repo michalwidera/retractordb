@@ -61,9 +61,14 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
     std::vector<size_t> existingSegments;
     existingSegments.reserve(retention_.segments == 0 ? kDefaultSegmentReserve : retention_.segments);
 
-    for (const auto &entry : std::filesystem::directory_iterator(std::filesystem::current_path())) {
+    // Segmenty leza obok pliku grupy - pod :STORAGE w katalogu magazynu, nie w katalogu roboczym.
+    // Nazwe wpisu porownujemy z sama nazwa pliku grupy, bez katalogu.
+    const std::filesystem::path groupPath(filename_);
+    const auto groupDir  = groupPath.has_parent_path() ? groupPath.parent_path() : std::filesystem::path(".");
+    const auto groupName = groupPath.filename().string();
+    for (const auto &entry : std::filesystem::directory_iterator(groupDir)) {
       const auto filenameEx = entry.path().filename().string();
-      if (const auto segIdx = parseSegmentIndex(filenameEx, filename_); segIdx.has_value()) {
+      if (const auto segIdx = parseSegmentIndex(filenameEx, groupName); segIdx.has_value()) {
         existingSegments.push_back(*segIdx);
       }
     }
