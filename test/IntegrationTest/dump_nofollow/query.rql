@@ -1,0 +1,11 @@
+# DO DUMP nie idzie za dowiazaniem podstawionym pod nazwe pliku zrzutu - issue #277
+# make install ; ctest -R dump_nofollow -V
+
+STORAGE 'temp'
+
+DECLARE a INTEGER STREAM core0, 0.1 BINFILE 'datafile.dat'
+
+SELECT str1[0] STREAM str1 FROM core0
+
+RULE viasymlink ON str1 WHEN str1[0] = 12 DO DUMP -2 TO 2
+RULE viahardlink ON str1 WHEN str1[0] = 14 DO DUMP -2 TO 2
