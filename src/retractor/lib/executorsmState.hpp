@@ -54,6 +54,10 @@ extern dataModel *pProc;
 // counts remaining loop iterations; 0 = stop, inifitie_loop = run forever
 extern std::atomic<int> iLoopLimitCnt;
 
+/// Numer sygnalu zatrzymania (0 = brak). Pisze go wylacznie handleSignal() w launcher.cpp,
+/// komunikat wypisuje run() po wyjsciu z petli epok - patrz komentarz przy handlerze.
+extern std::atomic<int> receivedSignal;
+
 //
 // Grupa druga: stan wewnetrzny wykonawcy.
 //

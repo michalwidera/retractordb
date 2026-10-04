@@ -32,7 +32,7 @@ mkdir -p temp
 {
   echo "STORAGE 'temp'"
   echo
-  echo "DECLARE a INTEGER STREAM src, 1/8 FILE 'data.txt'"
+  echo "DECLARE a INTEGER STREAM src, 1/8 TEXTFILE 'data.txt'"
   echo
   for i in $(seq 0 119); do echo "SELECT src[0] STREAM dst$i FROM src"; done
 } > wide.rql
@@ -40,7 +40,7 @@ mkdir -p temp
 {
   echo "STORAGE 'temp'"
   echo
-  echo "DECLARE a INTEGER STREAM src, 1/8 FILE 'data.txt'"
+  echo "DECLARE a INTEGER STREAM src, 1/8 TEXTFILE 'data.txt'"
   echo
   echo "SELECT src[0] STREAM dst FROM src"
 } > small.rql

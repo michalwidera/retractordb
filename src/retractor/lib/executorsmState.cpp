@@ -21,6 +21,7 @@ std::unique_ptr<PersistentCounter> pCounterPtr;
 std::vector<std::pair<std::string, std::string>> processedLines;
 dataModel *pProc = nullptr;
 std::atomic<int> iLoopLimitCnt{executorsm::inifitie_loop};
+std::atomic<int> receivedSignal{0};
 
 namespace esm {
 std::mutex plan_epoch_mutex;

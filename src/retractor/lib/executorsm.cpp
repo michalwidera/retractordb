@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <csignal>
 #include <cstdint>
 #include <cstdlib>
 #include <ctime>  // kotwica osi czasu pętli: clock_gettime, timespec
@@ -639,6 +640,24 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
     std::cerr << e.what() << '\n';
     SPDLOG_ERROR("catch exception: {}", e.what());
     retVal = system::errc::interrupted;
+  }
+  // Komunikat o sygnale zatrzymania wypisujemy tutaj, a nie w handleSignal(): to wspolne wyjscie
+  // trybu bezczynnego, bramki --xqrywait i petli slotow, a logowanie jest tu legalne.
+  if (const int signum = receivedSignal.load(); signum != 0) {
+    switch (signum) {
+      case SIGINT:
+        SPDLOG_WARN("Received SIGINT, initiating shutdown...");
+        break;
+      case SIGTERM:
+        SPDLOG_WARN("Received SIGTERM, initiating shutdown...");
+        break;
+      case SIGHUP:
+        SPDLOG_WARN("Received SIGHUP, initiating shutdown...");
+        break;
+      default:
+        SPDLOG_WARN("Received unknown signal: {}", signum);
+        break;
+    }
   }
   {
     std::scoped_lock lock(core_mutex);
