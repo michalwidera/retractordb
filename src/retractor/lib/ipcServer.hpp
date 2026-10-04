@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
@@ -77,8 +78,14 @@ class IpcServer {
   /// Uchwyt watku komunikacyjnego dla rtKeepThreadOffRtCpus. Wolac po start().
   std::thread::native_handle_type threadHandle();
 
-  /// Rejestruje klienta na strumieniu i tworzy jego kolejke odpowiedzi.
-  void subscribe(int clientId, const std::string &streamName, int maxElements);
+  /// Epoka rejestru subskrypcji: rosnie przy kazdym jego zamknieciu (broadcastOutOfBusiness,
+  /// removeClientQueues). Wolajacy odczytuje ja razem z parametrami subskrypcji, poki trzyma
+  /// model, i przekazuje do subscribe() -- patrz subscriptionEpoch_.
+  std::uint64_t subscriptionEpoch() const { return subscriptionEpoch_.load(std::memory_order_acquire); }
+
+  /// Tworzy kolejke odpowiedzi klienta i rejestruje go na strumieniu, jesli rejestr nie zostal
+  /// zamkniety od odczytu @p expectedEpoch. Falsz = odmowa: kolejka usunieta, rejestr nietkniety.
+  bool subscribe(int clientId, const std::string &streamName, int maxElements, std::uint64_t expectedEpoch);
 
   /// Rozsyla biezacy wiersz kazdego z podanych strumieni do jego subskrybentow.
   ///
@@ -148,4 +155,11 @@ class IpcServer {
   // na operacjach na mapach -- NIGDY podczas konstrukcji kolejki (mmap ~MB), aby
   // nie wnosic inwersji priorytetow do watku RT.
   std::mutex clientMapsMutex_;
+
+  // Licznik zamkniec rejestru subskrypcji. subscribe() buduje kolejke bez blokady epoki planu
+  // (#283), wiec miedzy odczytem parametrow strumienia a rejestracja epoka moze sie skonczyc:
+  // broadcastOutOfBusiness wysyla OOB i czysci mapy, a spozniona rejestracja przezylaby to bez
+  // OOB -- przy --reset na strumien nowego planu o tej samej nazwie. Pisany pod clientMapsMutex_,
+  // tam tez porownywany przy rejestracji; czytany bez muteksu przez subscriptionEpoch().
+  std::atomic<std::uint64_t> subscriptionEpoch_{0};
 };

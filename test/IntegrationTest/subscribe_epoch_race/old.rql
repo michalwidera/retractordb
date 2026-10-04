@@ -1,0 +1,8 @@
+# Plan odchodzacy. DEVICE na FIFO z pisarzem bez danych: kazdy slot czeka pelny TIMEOUT (3 s) poza
+# blokada epoki, wiec rozbiorka epoki po przyjetym --reset nastepuje dopiero po tym czekaniu.
+
+STORAGE 'old'
+
+DECLARE a INTEGER STREAM src, 1 DEVICE 'wait.fifo' TIMEOUT 3
+
+SELECT src[0] STREAM dst FROM src

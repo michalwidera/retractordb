@@ -1,0 +1,7 @@
+# Plan przychodzacy: strumien o TEJ SAMEJ nazwie `dst`, ktory od razu emituje wiersze.
+
+STORAGE 'new'
+
+DECLARE a INTEGER STREAM src, 1/8 TEXTFILE 'data.txt'
+
+SELECT src[0] STREAM dst FROM src
