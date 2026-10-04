@@ -8,6 +8,7 @@
 
 #include <cstring>  //std::memset
 #include <filesystem>
+#include <format>
 #include <ranges>
 #include "fatalError.hpp"
 #include "rdb/accessorFactory.hpp"
@@ -42,7 +43,19 @@ std::string storage::attachDescriptor(const Descriptor *descriptorParam) {
   const bool descriptorExisted = descriptorFileExist();
   if (descriptorExisted) {
     if (const std::string error = tryLoadDescriptorFile(paths_.descriptorFile(), descriptor); !error.empty()) return error;
-    if (descriptorParam != nullptr) verifyDescriptorMatch(*descriptorParam, descriptor, paths_.descriptorFile());
+    if (descriptorParam != nullptr) {
+      verifyDescriptorMatch(*descriptorParam, descriptor, paths_.descriptorFile());
+      // REF decyduje, ktory plik zostanie otwarty, zapisany i - przy DISPOSABLE - usuniety, a operator==
+      // porownuje tylko sloty danych. Bez tej kontroli REF z zachowanego `.desc` wygrywal z planem
+      // tam, gdzie launcher nie woluje checkDescriptorFiles(): w kanale ad-hoc i przy SELECT pod
+      // :ROTATION (#278). Odmowa przed relokacja - plik spod REF nie jest dotykany.
+      const std::string keptRef    = descriptorRef(descriptor);
+      const std::string plannedRef = descriptorRef(*descriptorParam);
+      if (keptRef != plannedRef)
+        return std::format("storage: {} names data file '{}', but the plan gives {}; remove {} to start the stream afresh",
+                           paths_.descriptorFile(), keptRef, plannedRef.empty() ? "none" : "'" + plannedRef + "'",
+                           paths_.descriptorFile());
+    }
   } else {
     if (descriptorParam == nullptr) {
       FatalError("storage: no descriptor file and no descriptor provided");
@@ -51,6 +64,7 @@ std::string storage::attachDescriptor(const Descriptor *descriptorParam) {
     saveDescriptorFile(paths_.descriptorFile(), descriptor);
   }
 
+  refFromCaller_ = (descriptorParam != nullptr);
   paths_.relocateFromRef(descriptor);
   storagePayload_ = std::make_unique<rdb::payload>(descriptor);
   buffer_.attach(descriptor);
@@ -73,6 +87,16 @@ std::string storage::attachStorage() {
     storageType_ = (*it1).rname;
   }
 
+  // REF wziety wylacznie z wczytanego `.desc` nie moze skierowac zapisu poza katalog magazynu
+  // i `storage.ref_dirs` (#278). Zrodlo deklarowane otwiera akcesor tylko do odczytu, wiec TYPE
+  // z tego samego pliku moze tu jedynie zawezic dostep, nigdy go poszerzyc. Odmowa zapada przed
+  // utworzeniem akcesora, czyli przed O_CREAT.
+  if (!refFromCaller_ && !isDeclared() && paths_.refLeavesAllowedDirs())
+    return std::format(
+        "storage: {} moves the {} data file to '{}', outside the storage directory; add its directory to "
+        "storage.ref_dirs in retractor.toml to allow it",
+        paths_.descriptorFile(), storageType_, paths_.storageFile());
+
   initializeAccessor();
   if (!accessor_->initializationError().empty()) return accessor_->initializationError();
 
@@ -94,7 +118,13 @@ storage::~storage() {
     // Odłączenie od pliku PRZED usunięciem: bez tego destruktor metaData_ (wywołany automatycznie
     // po zakończeniu tego ciała) odtworzyłby właśnie skasowany plik .meta przez flushCurrentEntry().
     if (metaData_) metaData_->abandonFile();
-    paths_.removeAllFiles();
+    // Plik spoza dozwolonych katalogow, wskazany wylacznie przez `.desc`, nie nalezy do tej
+    // instancji - porzadkowanie usuwa wtedy sam deskryptor (#278). DISPOSABLE z planu usuwa
+    // zrodlo jak dotad, bo REF planu jest decyzja operatora.
+    const bool keepDataFiles = !refFromCaller_ && paths_.refLeavesAllowedDirs();
+    if (keepDataFiles)
+      SPDLOG_WARN("storage: keeping {} - it lies outside the storage directory and storage.ref_dirs", paths_.storageFile());
+    paths_.removeAllFiles(keepDataFiles);
   }
 }
 

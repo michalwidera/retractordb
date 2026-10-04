@@ -255,3 +255,38 @@ TEST_F(AppConfigTest, invalid_sources_timeout_is_an_error_not_a_default) {
         << value << ": " << cfg.sourcesTimeoutError;
   }
 }
+
+TEST_F(AppConfigTest, storage_ref_dirs_default_to_none) {
+  const AppConfig cfg = loadAppConfig();
+  EXPECT_TRUE(cfg.storageRefDirs.empty());
+  EXPECT_TRUE(cfg.storageRefDirsError.empty());
+}
+
+TEST_F(AppConfigTest, user_layer_sets_storage_ref_dirs) {
+  fs::create_directories(tmpDir / "archive");
+  writeFile(userConfigFile(), "[storage]\nref_dirs = [\"" + (tmpDir / "archive").string() + "\"]\n");
+
+  const AppConfig cfg = loadAppConfig();
+
+  EXPECT_EQ(cfg.storageRefDirs, std::vector<std::string>{(tmpDir / "archive").string()});
+  EXPECT_TRUE(cfg.storageRefDirsError.empty());
+}
+
+// Lista uprawnien zapisu nie zgaduje: wpis wzgledny, nieistniejacy albo nie-napis to powod odmowy,
+// a nie pominiecie wpisu. loadAppConfig sam nie rzuca, bo ten sam plik czyta xretractor i xqry.
+TEST_F(AppConfigTest, invalid_storage_ref_dirs_is_an_error) {
+  std::ofstream(tmpDir / "file") << "x";
+  for (const std::string &value :
+       std::vector<std::string>{"\"" + tmpDir.string() + "\"", "[\"relative/dir\"]", "[\"" + (tmpDir / "none").string() + "\"]",
+                                "[\"" + (tmpDir / "file").string() + "\"]", "[1]"}) {
+    const fs::path explicitFile = tmpDir / "custom.toml";
+    writeFile(explicitFile, "[storage]\nref_dirs = " + value + "\n");
+
+    AppConfig cfg;
+    ASSERT_NO_THROW(cfg = loadAppConfig(explicitFile.string())) << value;
+
+    EXPECT_TRUE(cfg.storageRefDirs.empty()) << value;
+    EXPECT_TRUE(cfg.storageRefDirsError.starts_with("storage.ref_dirs must be an array of absolute directory paths"))
+        << value << ": " << cfg.storageRefDirsError;
+  }
+}

@@ -52,6 +52,18 @@ struct AppConfig {
   /// kompilator (compiler::setDefaultRetention) na tych samych drogach co history_memory_mib.
   rdb::retention_t defaultRetention{.segments = 0, .capacity = 0};
 
+  /// Katalogi spoza katalogu magazynu, do ktorych REF z wczytanego `.desc` moze przeniesc
+  /// zapisywalny plik danych (#278): `ref_dirs = ["/srv/rdb/archive"]`, sciezki bezwzgledne
+  /// istniejacych katalogow. Bez klucza REF z pliku pisze i usuwa tylko w katalogu magazynu.
+  /// Klucz nie zmienia odczytu zrodel deklarowanych ani REF z planu - te sa dozwolone zawsze.
+  /// Czyta go xtrdb: w xretractorze REF zachowanego `.desc` musi byc rowny REF planu.
+  std::vector<std::string> storageRefDirs;
+
+  /// Powod odrzucenia `storage.ref_dirs` (pusty = poprawny albo brak klucza). Jak przy
+  /// sourcesTimeoutError: loadAppConfig() go tylko zapisuje, a xtrdb konczy start bledem - lista
+  /// uprawnien zapisu nie zgaduje.
+  std::string storageRefDirsError;
+
   // === [sources] ===
 
   /// Termin odczytu zrodel DEVICE bez klauzuli TIMEOUT, w sekundach (#347). Brak klucza = nullopt,

@@ -15,6 +15,7 @@ struct CommandContext {
   std::string &storagePolicy;
   const Colors &colors;
   bool &rox;
+  const std::vector<std::string> &refDirs;  ///< storage.ref_dirs z retractor.toml (#278)
 };
 
 class ICommand {

@@ -146,6 +146,12 @@ If any of those checks fail, xretractor reports a configuration error and stops.
   - Used only if RQL input does not define its own `:STORAGE` directive.
   - If set, path must exist and be writable; otherwise startup fails with configuration error.
 
+- `storage.ref_dirs` (array of strings, default: empty) - read by `xtrdb`
+  - Extra directories into which a `REF` taken from a stored `.desc` may move a writable data file (#278).
+  - Without the key, a `REF` read from a `.desc` writes and deletes only inside the storage directory: `open` of a writable storage whose `REF` leads elsewhere is refused before the file is touched, and `quitdrop` / `rox` delete only the `.desc` of a data file outside the allowed directories.
+  - Reading a declared source (`TYPE BINFILE`, `TEXTSOURCE`, `DEVICE`) through `REF` is always allowed, and a `REF` given by the plan or by an `open` schema is the operator's decision and is not limited. In xretractor the `REF` of a stored `.desc` must equal the plan's, so the key does not change the engine.
+  - Each entry must be an absolute path to an existing directory; otherwise `xtrdb` stops with a configuration error.
+
 #### [ipc]
 
 - `ipc.queue_buffer_seconds` (int, default: `10`, must be `> 0`)

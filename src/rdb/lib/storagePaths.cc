@@ -1,5 +1,6 @@
 #include "rdb/storagePaths.hpp"
 
+#include <algorithm>
 #include <cstdio>  // ::remove
 #include <filesystem>
 #include <ranges>
@@ -10,6 +11,32 @@
 #include "rdb/storageShadow.hpp"
 
 namespace rdb {
+
+namespace {
+
+// Zawarcie sprawdzane po rozwiazaniu dowiazan (weakly_canonical) i po komponentach sciezki, nie po
+// prefiksie napisu: `/srv/rdb2` nie lezy w `/srv/rdb`. Dowiazanie w katalogu magazynu wskazujace na
+// zewnatrz wychodzi wiec poza katalog. Blad rozwiazania sciezki to "poza" - niepewnosc nie moze
+// poszerzac uprawnien. Sciezka wzgledna rozwiazuje sie wzgledem katalogu roboczego, tak jak
+// w open() akcesora.
+bool liesWithin(const std::filesystem::path &file, const std::string &dir) {
+  std::error_code ec;
+  const auto base = dir.empty() ? std::filesystem::current_path(ec) : std::filesystem::absolute(dir, ec);
+  if (ec) return false;
+  const auto resolvedDir = std::filesystem::weakly_canonical(base, ec);
+  if (ec) return false;
+  const auto resolvedFile = std::filesystem::weakly_canonical(std::filesystem::absolute(file, ec), ec);
+  if (ec) return false;
+  const auto [dirEnd, fileRest] = std::ranges::mismatch(resolvedDir, resolvedFile);
+  return dirEnd == resolvedDir.end() && fileRest != resolvedFile.end();
+}
+
+}  // namespace
+
+std::string descriptorRef(const Descriptor &descriptor) {
+  const auto it = std::ranges::find_if(descriptor, [](const auto &item) { return item.rtype == rdb::REF; });
+  return (it == descriptor.end()) ? std::string{} : it->rname;
+}
 
 StoragePaths::StoragePaths(const std::string_view qryID, const std::string_view fileName, const std::string_view storageParam) {
   if (qryID.empty()) FatalError("storage: qryID must not be empty");
@@ -47,6 +74,8 @@ StoragePaths::StoragePaths(const std::string_view qryID, const std::string_view 
     FatalError("storage: path '{}' from the STORAGE directive exists but is not a directory", dirName);
   }
 
+  storageDir_ = dirName;
+
   descriptorFile_ = std::filesystem::path(storageParam) / std::filesystem::path(descriptorFile_);
   setStorageFile(std::filesystem::path(storageParam) / std::filesystem::path(storageFile_));
 }
@@ -56,6 +85,20 @@ void StoragePaths::setStorageFile(std::string file) {
   metaIndexFile_ = storageFile_ + ".meta";
 }
 
+// Czym REF jest: sciezka pliku danych, rozwiazywana wzgledem katalogu roboczego procesu, nie
+// katalogu magazynu. Silnik zapisuje w nim sciezke z DECLARE ... BINFILE/TEXTFILE/DEVICE, czyli
+// polozenie zewnetrznego zrodla - `/dev/urandom`, `../rec205/...` - wiec REF legalnie wychodzi poza
+// katalog magazynu i tego tu nie zabraniamy.
+//
+// Czym REF nie jest: zgoda na zapis ani usuwanie w dowolnym miejscu (#278, S-06). Tu zapada tylko
+// ustalenie, czy plik danych wyszedl poza katalog magazynu i poza `storage.ref_dirs`. Odmowe zapisu
+// i ochrone przed usunieciem stosuje storage (attachStorage, ~storage) - wylacznie dla REF wzietego
+// z wczytanego `.desc`, bo REF podany przez wolajacego (plan, schemat w xtrdb) jest decyzja operatora.
+//
+// Ustalenie zapada przed pierwszym otwarciem pliku, ale nie chroni przed podmiana sciezki miedzy
+// sprawdzeniem a open() akcesora. Ta sama luka istnieje bez REF - plik danych w katalogu magazynu
+// tez moze byc dowiazaniem - i zamknie ja dopiero otwieranie wzgledem deskryptora katalogu
+// (openat2 z RESOLVE_BENEATH) we wszystkich akcesorach (#374).
 void StoragePaths::relocateFromRef(const Descriptor &descriptor) {
   auto it = std::ranges::find_if(descriptor,  //
                                  [](const auto &item) { return item.rtype == rdb::REF; });
@@ -63,6 +106,8 @@ void StoragePaths::relocateFromRef(const Descriptor &descriptor) {
   // Descriptor changes storageFile location
   if (it != descriptor.end()) {
     setStorageFile((*it).rname);
+    refLeavesAllowedDirs_ = !liesWithin(storageFile_, storageDir_) &&
+                            std::ranges::none_of(refDirs_, [&](const auto &dir) { return liesWithin(storageFile_, dir); });
   }
 
   // if storage object was created with default storage as ""
@@ -73,9 +118,10 @@ void StoragePaths::relocateFromRef(const Descriptor &descriptor) {
   }
 }
 
-void StoragePaths::removeAllFiles() const {
-  if (!storageFile_.empty()) (void)::remove(storageFile_.c_str());
+void StoragePaths::removeAllFiles(const bool keepDataFiles) const {
   if (std::filesystem::exists(descriptorFile_)) ::remove(descriptorFile_.c_str());
+  if (keepDataFiles) return;
+  if (!storageFile_.empty()) (void)::remove(storageFile_.c_str());
   if (!metaIndexFile_.empty() && std::filesystem::exists(metaIndexFile_)) ::remove(metaIndexFile_.c_str());
   const std::string metaShadowFile = storageShadow::metaShadowFilePath(metaIndexFile_);
   if (!metaIndexFile_.empty() && std::filesystem::exists(metaShadowFile)) ::remove(metaShadowFile.c_str());

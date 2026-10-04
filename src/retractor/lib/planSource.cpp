@@ -161,11 +161,13 @@ std::string checkKeptStores(qTree &plan, const std::string_view defaultStorageDi
   return {"OK"};
 }
 
-std::string checkDescriptorFiles(qTree &plan, const std::string_view defaultStorageDir) {
+std::string checkDescriptorFiles(qTree &plan, const std::string_view defaultStorageDir,
+                                 const std::vector<std::string> &streamNames) {
   const bool rotation             = std::ranges::any_of(plan, [](const auto &q) { return q.id == ":ROTATION"; });
   const std::filesystem::path dir = planStorageDir(plan, defaultStorageDir);
   for (auto &q : plan) {
     if (q.isCompilerDirective() || (!q.isDeclaration() && (!rotation || isMemoryStream(q)))) continue;
+    if (!streamNames.empty() && std::ranges::find(streamNames, q.id) == streamNames.end()) continue;
     const std::filesystem::path descFile = dir / (q.id + ".desc");
     if (!std::filesystem::exists(descFile)) continue;
 
@@ -174,7 +176,17 @@ std::string checkDescriptorFiles(qTree &plan, const std::string_view defaultStor
     // Kierunek jak w rdb::verifyDescriptorMatch (plan == plik): Descriptor::operator== jest asymetryczny.
     const rdb::Descriptor planned = q.descriptorStorage();
     if (planned != kept) return "storage: descriptor schema mismatch in '" + descFile.string() + "'";
-    if (!q.isDeclaration() || isLegacyBinaryDescriptor(planned, kept)) continue;
+    if (!q.isDeclaration()) {
+      // Plan nie daje SELECT-owi REF, wiec REF w jego `.desc` przenioslby zapis wyniku w miejsce,
+      // ktorego plan nie zna (#278). rdb::storage odmowi tego samego, ale dopiero po starcie.
+      if (const std::string keptRef = configField(kept, rdb::REF); !keptRef.empty())
+        return std::format(
+            "stream '{}': {} moves the stream's data file to '{}', which the plan does not do; remove {} to start "
+            "the stream afresh",
+            q.id, descFile.string(), keptRef, descFile.string());
+      continue;
+    }
+    if (isLegacyBinaryDescriptor(planned, kept)) continue;
 
     // operator== porownuje tylko sloty danych, a magazyn bierze TYPE i REF z wczytanego `.desc`.
     // Do #346 zmiana sciezki albo rodzaju zrodla w planie przechodzila wiec po cichu: plan wskazywal

@@ -136,11 +136,35 @@ void parseSourcesTimeout(const toml::node_view<const toml::node> node, AppConfig
   if (value) cfg.sourcesTimeoutError += std::format(", got {}", *value);
 }
 
+// `[storage] ref_dirs`: tablica bezwzglednych sciezek istniejacych katalogow. Wpis wzgledny
+// zmienialby zakres uprawnien z katalogiem roboczym procesu, wiec jest bledem, nie ostrzezeniem.
+void parseStorageRefDirs(const toml::node_view<const toml::node> node, AppConfig &cfg) {
+  cfg.storageRefDirs.clear();
+  cfg.storageRefDirsError.clear();
+  const auto *dirs = node.as_array();
+  if (dirs == nullptr) {
+    cfg.storageRefDirsError = "storage.ref_dirs must be an array of absolute directory paths";
+    return;
+  }
+  for (const auto &item : *dirs) {
+    const auto dir = item.value<std::string>();
+    std::error_code ec;
+    if (!dir || !std::filesystem::path(*dir).is_absolute() || !std::filesystem::is_directory(*dir, ec)) {
+      cfg.storageRefDirs.clear();
+      cfg.storageRefDirsError = "storage.ref_dirs must be an array of absolute directory paths";
+      if (dir) cfg.storageRefDirsError += std::format(", got '{}', which is not an absolute path to a directory", *dir);
+      return;
+    }
+    cfg.storageRefDirs.push_back(*dir);
+  }
+}
+
 // Nakłada ustawienia z jednej tabeli TOML na akumulowaną konfigurację.
 // Klucze nieobecne w tabeli pozostawiają dotychczasową wartość (warstwowość).
 void applyTable(const toml::table &tbl, AppConfig &cfg) {
   if (auto v = tbl.at_path("storage.dir").value<std::string>(); v) cfg.storageDir = *v;
   if (auto v = tbl.at_path("storage.default_retention"); v) cfg.defaultRetention = parseDefaultRetention(v);
+  if (auto v = tbl.at_path("storage.ref_dirs"); v) parseStorageRefDirs(v, cfg);
 
   if (auto v = tbl.at_path("sources.timeout_s"); v) parseSourcesTimeout(v, cfg);
 

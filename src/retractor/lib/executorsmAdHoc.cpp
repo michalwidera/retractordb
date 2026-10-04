@@ -205,6 +205,14 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
       SPDLOG_ERROR("AdHoc rejected: {}", sourceError);
       return ptRetval;
     }
+    // Zachowany `.desc` musi zgadzac sie z planem w TYPE i REF, jak przy starcie i przeladowaniu (#278).
+    // rdb::storage odmowilby tego samego, ale dopiero po imporcie i kompilacji pod core_mutex.
+    if (const std::string descriptorError = checkDescriptorFiles(coreInstanceCopy, activeStorageDir, adHocStreams);
+        descriptorError != "OK") {
+      ptRetval.put("db", "Rejected: " + descriptorError);
+      SPDLOG_ERROR("AdHoc rejected: {}", descriptorError);
+      return ptRetval;
+    }
     // Jak przy starcie: przestarzale `DECLARE ... FILE` tylko z --verbose serwera, na jego stderr.
     if (verboseMode)
       for (const std::string &warning : deprecatedFileWarnings(coreInstanceCopy, adHocStreams))
