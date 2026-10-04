@@ -2,6 +2,7 @@
 
 #include <unistd.h>
 
+#include <cerrno>
 #include <cstdlib>
 #include <string>
 #include <string_view>
@@ -9,6 +10,7 @@
 #include "platformConfig.h"
 
 #if RDB_HAS_PROCFS
+#include <csignal>
 #include <fstream>
 #include <sstream>
 #endif
@@ -34,28 +36,42 @@ namespace {
 /// starttime jest polem 22 - czyli dziewietnastym tokenem za stanem.
 constexpr int kProcStatStartTimeField = 22;
 
+/// Rozstrzygniecie, gdy /proc/<pid>/stat nie dal sie otworzyc albo sparsowac.
+///
+/// errno po nieudanym otwarciu nie wystarcza: przy hidepid=2 (ProtectProc=invisible)
+/// katalog /proc/<pid> procesu innego uzytkownika jest UKRYTY, wiec otwarcie konczy sie
+/// ENOENT - tym samym bledem co dla procesu, ktorego nie ma. kill(pid, 0) nie zalezy od
+/// opcji montowania /proc: ESRCH jest dowodem braku procesu, a 0 albo EPERM znacza, ze
+/// proces istnieje, tylko jego wpisu nie mozemy przeczytac.
+ProcessSnapshot unreadEntry(std::int32_t pid) {
+  ProcessSnapshot retVal;
+  if (kill(static_cast<pid_t>(pid), 0) != 0 && errno == ESRCH) return retVal;
+  retVal.unreadable = true;
+  return retVal;
+}
+
 ProcessSnapshot inspectViaProcFs(std::int32_t pid) {
   ProcessSnapshot retVal;
 
   std::ifstream stat("/proc/" + std::to_string(pid) + "/stat");
-  if (!stat.is_open()) return retVal;
+  if (!stat.is_open()) return unreadEntry(pid);
 
   std::string line;
-  if (!std::getline(stat, line)) return retVal;
+  if (!std::getline(stat, line)) return unreadEntry(pid);
 
   const auto lastParen = line.rfind(')');
-  if (lastParen == std::string::npos) return retVal;
+  if (lastParen == std::string::npos) return unreadEntry(pid);
 
   std::istringstream fields(line.substr(lastParen + 1));
   std::string token;
   char state = '\0';
   for (int index = 3; index < kProcStatStartTimeField; ++index) {
-    if (!(fields >> token)) return retVal;
+    if (!(fields >> token)) return unreadEntry(pid);
     if (index == 3 && !token.empty()) state = token.front();
   }
 
   std::uint64_t startTime{0};
-  if (!(fields >> startTime)) return retVal;
+  if (!(fields >> startTime)) return unreadEntry(pid);
 
   retVal.found     = true;
   retVal.zombie    = (state == 'Z');
@@ -85,7 +101,12 @@ ProcessSnapshot inspectViaSysctl(std::int32_t pid) {
   struct kinfo_proc entry{};
   std::size_t length = sizeof(entry);
 
-  if (sysctl(mib, 4, &entry, &length, nullptr, 0) != 0) return retVal;
+  // Brak procesu rozstrzyga wylacznie ESRCH albo pusty wynik; kazdy inny blad (EPERM dla
+  // procesu innego uzytkownika) znaczy "nie wiem" - patrz kontrakt ProcessSnapshot.
+  if (sysctl(mib, 4, &entry, &length, nullptr, 0) != 0) {
+    retVal.unreadable = (errno != ESRCH);
+    return retVal;
+  }
   if (length == 0) return retVal;  // PID nieznany jadru
 
   retVal.found     = true;
@@ -96,7 +117,8 @@ ProcessSnapshot inspectViaSysctl(std::int32_t pid) {
   // Znacznik rowny zeru znaczylby "nie ustalono" - patrz kontrakt ProcessSnapshot.
   // Proces uruchomiony dokladnie w epoce jest niemozliwy, ale gdyby jadro oddalo
   // same zera, lepiej zglosic brak pomiaru niz wartosc, ktora zawsze sie zgadza.
-  if (retVal.startTime == 0) retVal.found = false;
+  // Wpis jednak istnieje, wiec to jest "nie wiem", a nie "martwy".
+  if (retVal.startTime == 0) return ProcessSnapshot{.unreadable = true};
   return retVal;
 }
 

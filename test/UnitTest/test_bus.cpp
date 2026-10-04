@@ -15,8 +15,10 @@
 
 #include <boost/interprocess/shared_memory_object.hpp>
 
+#include "osPlatform.hpp"
 #include "retractor/lib/bus.hpp"
 #include "retractor/lib/serverName.hpp"
+#include "unreadableProcess.hpp"
 
 namespace {
 
@@ -354,6 +356,69 @@ TEST_F(BusFixture, ZombieSlotIsFreeAgain) {
   // Zombie zbieramy dopiero teraz: test nie ma prawa zostawic go po sobie.
   int childStatus = 0;
   ASSERT_EQ(waitpid(child, &childStatus, 0), child);
+}
+
+// Wpis procesu nieczytelny (hidepid=2 / ProtectProc=invisible na /proc, EPERM z sysctl) znaczy
+// "nie wiem", nie "martwy". Potomek roszczy nazwe i zostaje zebrany, wiec jego wpis naprawde znika;
+// podmieniona odpowiedz jadra (EPERM zamiast ESRCH) odtwarza obraz, jaki widzi instancja innego
+// uzytkownika przy ukrytym /proc. Slot takiego wlasciciela NIE moze zostac wyczyszczony - inaczej
+// druga instancja dostaje te same nazwy strumieni, czyli ten sam <qryID>.desc. Kontrola dodatnia
+// na koncu: bez podmiany ten sam slot jest wolny, inaczej test przechodzilby takze przy poprawce,
+// ktora blokuje kazdy martwy slot.
+TEST_F(BusFixture, UnreadableOwnerKeepsSlot) {
+  bus::Bus parent(kTestSegment);
+  ASSERT_TRUE(parent.attached());
+
+  const pid_t child = fork();
+  ASSERT_NE(child, -1);
+
+  if (child == 0) {
+    // Jak w ZombieSlotIsFreeAgain: potomek roszczy nazwe i czeka na SIGKILL od rodzica.
+    bus::Bus mine(kTestSegment);
+    mine.claim({.name = "hidden", .queryFile = "hidden.rql", .streams = {"dsth"}});
+    for (;;)
+      pause();
+    _exit(0);
+  }
+
+  const auto childVisible = [&] {
+    const auto instances = parent.instances();
+    return std::ranges::any_of(instances, [&](const auto &i) { return i.pid == child; });
+  };
+  for (int attempt = 0; attempt < 200 && !childVisible(); ++attempt)
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  ASSERT_TRUE(childVisible()) << "potomek nie zdazyl zaroscic slotu";
+
+  const std::uint64_t childStart = bus::processStartTime(child);
+  ASSERT_NE(childStart, 0U);
+
+  int childStatus = 0;
+  ASSERT_EQ(kill(child, SIGKILL), 0);
+  ASSERT_EQ(waitpid(child, &childStatus, 0), child);
+
+  // Bez podmiany jadro potwierdza brak procesu: to jest "martwy", nie "nie wiem".
+  const osplat::ProcessSnapshot gone = osplat::inspectProcess(child);
+  EXPECT_FALSE(gone.found);
+  EXPECT_FALSE(gone.unreadable);
+
+  unreadablePid.store(child);
+  const osplat::ProcessSnapshot hidden = osplat::inspectProcess(child);
+  EXPECT_FALSE(hidden.found);
+  EXPECT_TRUE(hidden.unreadable);
+  EXPECT_TRUE(bus::isProcessAlive(child, childStart));
+  // Znacznik zero zapisuje ipcServer dla klienta, ktorego wpisu nie dalo sie odczytac; odpowiedzi
+  // takiego klienta nie wolno uznac za porzucone (ipcResponses.cpp).
+  EXPECT_TRUE(bus::isProcessAlive(child, 0));
+
+  const auto refused = parent.claim({.name = "alfa", .queryFile = "alfa.rql", .streams = {"dsth"}});
+  EXPECT_EQ(refused.status, bus::ClaimStatus::Conflict);
+  EXPECT_EQ(refused.stream, "dsth");
+  EXPECT_EQ(refused.ownerName, "hidden");
+  EXPECT_EQ(refused.ownerPid, static_cast<std::int32_t>(child));
+
+  unreadablePid.store(0);
+  EXPECT_EQ(parent.claim({.name = "alfa", .queryFile = "alfa.rql", .streams = {"dsth"}}).status, bus::ClaimStatus::Claimed);
+  EXPECT_EQ(streamsOf(parent.instances(), "alfa"), (std::vector<std::string>{"dsth"}));
 }
 
 // Reguly wyboru wlasciciela przy dostarczaniu zestawu zapytan dzialajacemu serwisowi.
