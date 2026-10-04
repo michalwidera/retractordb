@@ -1,0 +1,19 @@
+== uno
+{ uno_0:255 uno_1:255 uno_2:4294967295 uno_3:4294967295 uno_4:-5 uno_5:5 uno_6:-6 uno_7:-4 uno_8:-1.5 uno_9:-25 }
+{ uno_0:254 uno_1:254 uno_2:4294967294 uno_3:4294967294 uno_4:null uno_5:-2147483648 uno_6:2147483647 uno_7:null uno_8:2.5 uno_9:null }
+{ uno_0:0 uno_1:0 uno_2:0 uno_3:0 uno_4:-2147483647 uno_5:2147483647 uno_6:null uno_7:-2147483646 uno_8:-0 uno_9:null }
+{ uno_0:240 uno_1:240 uno_2:4294963455 uno_3:4294963455 uno_4:7 uno_5:-7 uno_6:6 uno_7:8 uno_8:-2 uno_9:-49 }
+== desc uno
+{	BYTE uno_0
+	BYTE uno_1
+	UINT uno_2
+	UINT uno_3
+	INTEGER uno_4
+	INTEGER uno_5
+	INTEGER uno_6
+	INTEGER uno_7
+	DOUBLE uno_8
+	INTEGER uno_9
+}
+== dumps
+./uno_pos_dump.tmp

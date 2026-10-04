@@ -169,7 +169,7 @@ void rqlParserInitialize() {
   	219,5,2,0,0,213,214,5,46,0,0,214,215,5,1,0,0,215,216,3,50,25,0,216,217,
   	5,2,0,0,217,219,1,0,0,0,218,201,1,0,0,0,218,202,1,0,0,0,218,206,1,0,0,
   	0,218,209,1,0,0,0,218,213,1,0,0,0,219,29,1,0,0,0,220,221,5,74,0,0,221,
-  	225,3,34,17,0,222,223,7,5,0,0,223,225,3,34,17,0,224,220,1,0,0,0,224,222,
+  	225,3,44,22,0,222,223,7,5,0,0,223,225,3,44,22,0,224,220,1,0,0,0,224,222,
   	1,0,0,0,225,31,1,0,0,0,226,227,5,46,0,0,227,229,5,59,0,0,228,226,1,0,
   	0,0,228,229,1,0,0,0,229,230,1,0,0,0,230,231,5,70,0,0,231,33,1,0,0,0,232,
   	233,3,42,21,0,233,35,1,0,0,0,234,235,3,38,19,0,235,37,1,0,0,0,236,237,
@@ -2206,8 +2206,8 @@ tree::TerminalNode* RQLParser::Unary_op_expressionContext::BIT_NOT() {
   return getToken(RQLParser::BIT_NOT, 0);
 }
 
-RQLParser::ExpressionContext* RQLParser::Unary_op_expressionContext::expression() {
-  return getRuleContext<RQLParser::ExpressionContext>(0);
+RQLParser::TermContext* RQLParser::Unary_op_expressionContext::term() {
+  return getRuleContext<RQLParser::TermContext>(0);
 }
 
 tree::TerminalNode* RQLParser::Unary_op_expressionContext::PLUS() {
@@ -2256,7 +2256,7 @@ RQLParser::Unary_op_expressionContext* RQLParser::unary_op_expression() {
         setState(220);
         match(RQLParser::BIT_NOT);
         setState(221);
-        expression();
+        term(0);
         break;
       }
 
@@ -2276,7 +2276,7 @@ RQLParser::Unary_op_expressionContext* RQLParser::unary_op_expression() {
           consume();
         }
         setState(223);
-        expression();
+        term(0);
         break;
       }
 

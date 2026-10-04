@@ -2267,3 +2267,40 @@ TEST(xExpressionEval, power_of_uint_with_negative_int_is_exact_when_result_fits)
     EXPECT_EQ(std::get<unsigned>(result), *item.expected);
   }
 }
+
+// --- #328: `-a` i `~a` nad BYTE i UINT ---------------------------------------------------
+//
+// Decyzja wlasciciela: w typach bez liczb ujemnych `-a` jest negacja bitowa (neg()), a `~a`
+// daje ten sam wynik. Granice: 0, 1 i wartosc najwieksza typu. NULL przechodzi bez zmian.
+TEST(xExpressionEval, minus_and_bitwise_not_agree_on_byte_and_uint) {
+  for (const uint8_t a : {uint8_t{0}, uint8_t{1}, uint8_t{0x0f}, uint8_t{0xff}}) {
+    const rdb::descFldVT expected{static_cast<uint8_t>(~a)};
+    EXPECT_EQ(evalUnary(a, token(NEGATE)), expected) << int{a};
+    EXPECT_EQ(evalUnary(a, token(BIT_NOT)), expected) << int{a};
+  }
+  for (const unsigned a : {0U, 1U, 0x0f0f0f0fU, std::numeric_limits<unsigned>::max()}) {
+    const rdb::descFldVT expected{~a};
+    EXPECT_EQ(evalUnary(a, token(NEGATE)), expected) << a;
+    EXPECT_EQ(evalUnary(a, token(BIT_NOT)), expected) << a;
+  }
+  EXPECT_TRUE(isNull(evalUnary(std::monostate{}, token(NEGATE))));
+  EXPECT_TRUE(isNull(evalUnary(std::monostate{}, token(BIT_NOT))));
+}
+
+// `~` nad innym typem odrzuca kompilator; ewaluator, do ktorego taki program mimo to dotarl,
+// nie zgaduje wartosci, tylko zglasza blad - tak jak `negate` nad napisem.
+TEST(xExpressionEval, bitwise_not_outside_byte_and_uint_throws) {
+  for (const rdb::descFldVT &a : {rdb::descFldVT{5}, rdb::descFldVT{boost::rational<int>(3, 2)}, rdb::descFldVT{2.5F},
+                                  rdb::descFldVT{2.5}, rdb::descFldVT{std::string("ab")}})
+    EXPECT_THROW(evalUnary(a, token(BIT_NOT)), std::runtime_error) << a.index();
+}
+
+// Kontrola z drugiej strony: `-a` nad typami ze znakiem zostaje arytmetyczne, a przepelnienie
+// (`-INT_MIN`) daje NULL - neg() jest tym samym kodem, co przed #328.
+TEST(xExpressionEval, unary_minus_stays_arithmetic_for_signed_types) {
+  EXPECT_EQ(evalUnary(5, token(NEGATE)), rdb::descFldVT{-5});
+  EXPECT_EQ(evalUnary(2.5, token(NEGATE)), rdb::descFldVT{-2.5});
+  EXPECT_EQ(evalUnary(2.5F, token(NEGATE)), rdb::descFldVT{-2.5F});
+  EXPECT_TRUE(isNull(evalUnary(intMin, token(NEGATE))));
+  EXPECT_THROW(evalUnary(std::string("ab"), token(NEGATE)), std::runtime_error);
+}

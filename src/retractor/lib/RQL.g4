@@ -99,8 +99,14 @@ field_id            : column_name=ID                             # FieldID      
                     | tablename=ID '[' gen_index ']'             # FieldIDGenerated   // id[$] - ID2
                     ;
 
-unary_op_expression : BIT_NOT expression
-                    | op=(PLUS | MINUS) expression
+// Operand jest `term`, a nie `expression` (#328). Do 2026-10-04 stalo tu `expression`, co
+// dawalo dwa bledy naraz: kazde wyjscie z `expression` zamyka w RQLParser.cpp pole SELECT,
+// wiec operand stawal sie osobnym polem, a operator ginal; a `-a+b` znaczylo `-(a+b)`,
+// podczas gdy literal `-2+1` znaczy `(-2)+1`. Z `term` operand wiaze jak literal ujemny
+// wobec `+`/`-`, a `-x^2` i `-x*y` zostaja `-(x^2)` i `-(x*y)` - wartosc tej drugiej
+// grupy nie zalezy od nawiasu.
+unary_op_expression : BIT_NOT term
+                    | op=(PLUS | MINUS) term
                     ;
 
 asterisk            : (ID DOT)? STAR
@@ -140,7 +146,7 @@ expression_factor   : expression_factor PLUS expression_factor   # ExpPlus
 //
 // UWAGA na jednoargumentowy minus: `-2^2` daje 4, a `-x^2` daje -(x^2). Nie jest to
 // niedopatrzenie tylko skutek tego, ze literal ujemny (`'-'? DECIMAL`) jest PRYMITYWEM
-// tego samego pietra, a `unary_op_expression` siega po cale `expression`. Dla `*` ta sama
+// tego samego pietra, a `unary_op_expression` siega po caly `term`. Dla `*` ta sama
 // asymetria nie zmieniala wyniku, dla `^` zmienia - zamiar zapisuje sie nawiasem.
 //
 // Token to BIT_XOR, zdefiniowany w lekserze od poczatku i do 2026-08-29 nieuzywany w

@@ -64,7 +64,11 @@ enum command_id : std::uint8_t {
   WINDOW_MIN,  // 44
   WINDOW_MAX,  // 45
   WINDOW_AVG,  // 46
-  WINDOW_SUM   // 47
+  WINDOW_SUM,  // 47
+  // `~a` (#328). Osobny od NEGATE, bo parser nie zna typu operandu, a o tym, czy plan wolno
+  // przyjac, decyduje wlasnie typ: bitowa negacja ma sens tylko dla BYTE i UINT, gdzie jej
+  // wartosc jest rowna `-a` (neg()). Pozostale typy odrzuca inferExpressionShape().
+  BIT_NOT  // 48
 };
 
 constexpr auto GetStringcommand_id(enum command_id index) -> std::string_view { return magic_enum::enum_name(index); }

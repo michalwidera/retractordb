@@ -319,6 +319,7 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
       } break;
 
       case NEGATE:
+      case BIT_NOT:
       case NOT:
       case CALL:
       case CALL2: {
@@ -357,7 +358,7 @@ std::size_t simplifyExpression(std::list<token> &program, const fieldTypeLookup 
         }
         // NOT normalizuje wartość do 1/0 w typie operandu, ale przez logicResultAsType,
         // a nie przez normalize - nie wchodzi w rachunek typów reguł B i C.
-        if (cmd == NEGATE)
+        if (cmd == NEGATE || cmd == BIT_NOT)
           result.type = operand->type;
         else if (cmd == CALL || cmd == CALL2)
           result.type = typeOfCall(tk, operand->type);
@@ -536,6 +537,7 @@ std::optional<int> inferStringWidth(const std::list<token> &program, const field
       } break;
 
       case NEGATE:
+      case BIT_NOT:
       case NOT:
         if (!pop().has_value()) return std::nullopt;
         stack.push_back({false, 0});

@@ -690,6 +690,16 @@ rdb::descFldVT neg(const rdb::descFldVT &inVar) {
   return retVal;
 }
 
+/// `~a` (#328) - bitowa negacja, zdefiniowana tylko dla BYTE i UINT; tam rowna neg().
+/// Inne typy odrzuca juz kompilator (inferExpressionShape), wiec wyjatek ponizej jest
+/// tylko straza programu, ktory bramke ominal.
+rdb::descFldVT bit_not(const rdb::descFldVT &inVar) {
+  if (isNullValue(inVar)) return std::monostate{};
+  if (const auto *a = std::get_if<uint8_t>(&inVar)) return static_cast<uint8_t>(~*a);
+  if (const auto *a = std::get_if<unsigned>(&inVar)) return ~*a;
+  throw std::runtime_error("Operator '~' defined only for BYTE and UINT operands");
+}
+
 rdb::descFldVT logic_not(const rdb::descFldVT &inVar) {
   auto value = toLogicValue(inVar);
   if (!value.has_value()) return std::monostate{};
@@ -846,6 +856,7 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
       case CALL:
       case CALL2:
       case NEGATE:
+      case BIT_NOT:
       case NOT:
         b = popOrThrow("unary operator");
         break;
@@ -873,6 +884,9 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         break;
       case NEGATE:
         rStack.push(neg(b));
+        break;
+      case BIT_NOT:
+        rStack.push(bit_not(b));
         break;
       case NOT:
         rStack.push(logic_not(b));

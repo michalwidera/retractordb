@@ -636,7 +636,7 @@ public:
     Unary_op_expressionContext(antlr4::ParserRuleContext *parent, size_t invokingState);
     virtual size_t getRuleIndex() const override;
     antlr4::tree::TerminalNode *BIT_NOT();
-    ExpressionContext *expression();
+    TermContext *term();
     antlr4::tree::TerminalNode *PLUS();
     antlr4::tree::TerminalNode *MINUS();
 
