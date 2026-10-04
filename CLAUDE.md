@@ -194,11 +194,12 @@ python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
 
 Every session ends with either a local commit on a side branch made on an explicit go-ahead, a handoff of the uncommitted diff for human review/commit/push, or an explicit note why no commit was created. No unexplained uncommitted progress is left behind.
 
-**Closing signal.** When a piece of work is finished, the last message ends with exactly one of two marked lines - the human's cue that the next move is theirs:
-- `**Status: gotowe do zamknięcia**` - nothing is left for the assistant; the line names what the human does next (review the diff, commit, merge the pull request, close the issue) and which checks back it.
+**Closing signal.** When a piece of work is finished, the last message ends with exactly one of three marked lines - the human's cue that the next move is theirs:
+- `**Status: gotowe do zamknięcia**` - nothing is left for the assistant and the work does not belong to a continuous issue; the line names what the human does next (review the diff, commit, merge the pull request, close the issue) and which checks back it.
+- `**Status: gotowe do aktualizacji**` - the same, but the work belongs to a continuous issue (label `Continious`, or one the human declared continuous, e.g. Epic #177), which stays open until its goal is reached; the line names the update the human makes (review the diff or the issue comment, commit) and which checks back it, and never proposes closing the issue.
 - `**Status: wymagana decyzja**` - work cannot go on without the human; the line states the question and the options (continue, stop, which direction), with a recommendation.
 
-Neither marker appears in an intermediate update, nor while a check is still running: that state is reported as in progress, so a marker always means the assistant has stopped and is waiting.
+No marker appears in an intermediate update, nor while a check is still running: that state is reported as in progress, so a marker always means the assistant has stopped and is waiting.
 
 **Checks before the commit, the handoff and every push.** Run from `build/Debug` and report each result:
 
