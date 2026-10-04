@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <csignal>
 #include <cstdio>
@@ -8,13 +9,16 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <print>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include <fmt/ranges.h>                    // fmt::join - łączenie listy ścieżek konfiguracyjnych
+#include <spdlog/sinks/base_sink.h>        // hak RDB_FAULT_SIGNAL_IN_LOG
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 #include <boost/algorithm/string.hpp>
@@ -137,25 +141,36 @@ using namespace boost;
 
 using boost::lexical_cast;
 
-static void handleSignal(int signum) {
-  switch (signum) {
-    case SIGINT:
-      SPDLOG_WARN("Received SIGINT, initiating shutdown...");
-      break;
-    case SIGTERM:
-      SPDLOG_WARN("Received SIGTERM, initiating shutdown...");
-      break;
-    case SIGHUP:
-      SPDLOG_WARN("Received SIGHUP, initiating shutdown...");
-      break;
-    default:
-      SPDLOG_WARN("Received unknown signal: {}", signum);
-      break;
-  }
+// W handlerze wolno tylko zapisac bezblokadowe atomiki (#284). SPDLOG formatuje z alokacja na
+// kopcu i bierze muteks sinka: sygnal dostarczony watkowi, ktory sam byl w srodku logowania albo
+// malloc, zakleszczal handler na tym muteksie, stop_now nigdy nie zapadalo i proces schodzil
+// dopiero na SIGKILL. To samo rozumowanie co przy notify_all w executorsm.cpp (czekanie na bramce
+// --xqrywait). Komunikat o sygnale wypisuje run() po wyjsciu z petli epok. Numer sygnalu idzie
+// przez std::atomic, nie volatile sig_atomic_t: handler moze wykonac sie w dowolnym watku, a
+// odczyt w watku glownym bylby wtedy wyscigiem danych.
+static_assert(std::atomic<int>::is_always_lock_free, "handleSignal() wymaga bezblokadowego std::atomic<int>");
 
-  // This will cause the main loop to exit
-  iLoopLimitCnt = executorsm::stop_now;
+static void handleSignal(int signum) {
+  receivedSignal = signum;
+  iLoopLimitCnt  = executorsm::stop_now;
 }
+
+// Hak testu it_signal_stop. Sygnal zgloszony z wnetrza sink_it_, czyli w watku trzymajacym muteks
+// sinka dziennika - deterministycznie to okno, w ktore zewnetrzny `kill` trafia tylko losowo.
+// Handler, ktory loguje, zakleszcza sie tutaj przy kazdym uruchomieniu.
+class raiseUnderLogLock final : public spdlog::sinks::base_sink<std::mutex> {
+ public:
+  explicit raiseUnderLogLock(int signum) : signum_(signum) {}
+
+ protected:
+  void sink_it_(const spdlog::details::log_msg & /*msg*/) override {
+    if (const int signum = std::exchange(signum_, 0); signum != 0) std::raise(signum);
+  }
+  void flush_() override {}
+
+ private:
+  int signum_;
+};
 
 static std::string ownerLabel(std::string_view instance) {
   return instance.empty() ? "the unnamed instance" : "instance '" + std::string(instance) + "'";
@@ -881,6 +896,12 @@ int main(int argc, char *argv[]) try {
   signal(SIGINT, handleSignal);   // Ctrl+C
   signal(SIGTERM, handleSignal);  // Terminate
   signal(SIGHUP, handleSignal);   // Hangup
+
+  // Poziom ERROR, bo Release wycina nizsze, a wtedy sink nie dostalby zadnego komunikatu.
+  if (const char *faultSignal = std::getenv("RDB_FAULT_SIGNAL_IN_LOG"); faultSignal != nullptr) {
+    spdlog::default_logger()->sinks().push_back(std::make_shared<raiseUnderLogLock>(std::atoi(faultSignal)));
+    SPDLOG_ERROR("fault hook RDB_FAULT_SIGNAL_IN_LOG: raising signal {} under the log sink lock", faultSignal);
+  }
 
   // Artefakty poprzedniego przebiegu znikaja ta sama droga co przy przeladowaniu planu
   // w locie (`xqry --reset`) - patrz dropStalePlanArtifacts w planSource.cpp.

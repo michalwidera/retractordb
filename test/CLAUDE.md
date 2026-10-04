@@ -89,6 +89,12 @@ What this test does **not** cover: the gate is still lifted by *any* command, in
 
 Racing it by hand cost a stagger sweep (one hit in fourteen), so the window is opened by the `RDB_FAULT_PLAN_SWAP_DELAY` hook, the same route as `RDB_FAULT_GET_AWAIT_EPOCH_SWAP`. The test checks four things, because the fix has two sides that break separately: a reload sent before the swap starts is refused, one sent **inside** the window is refused (the regression proper), the server survives and the accepted plan really took over, and - the mirror defect - a reload sent **after** the swap is accepted again. Without that last check, a "refuse always" fix would pass.
 
+### The signal handler that logged
+
+`it_signal_stop` guards #284: `handleSignal` may only store two lock-free atomics - the signal number (`receivedSignal`) and `stop_now` - and `run()` logs `Received SIG..., initiating shutdown...` after the epoch loop. Until 2026-10-04 the handler logged through `SPDLOG_WARN`, which takes the sink mutex: a signal delivered to a thread already inside a log call deadlocked the handler, `stop_now` was never set, and the process survived until `SIGKILL`.
+
+Part A sends `SIGTERM`, `SIGINT` and `SIGHUP` from outside in each mode - idle, the `-x` gate, the slot loop - and requires a self-exit with code 0 (the unchanged contract) plus, outside Release, the log line. It proves stopping works, not that the deadlock is gone: an external `kill` lands in the logging window only by chance. Part B opens that window deterministically through the `RDB_FAULT_SIGNAL_IN_LOG=<signum>` hook, a sink that raises the signal from inside `sink_it_`, i.e. with the sink mutex held. Against the old handler in Debug it hangs every run. In Release `SPDLOG_WARN` is compiled out, so part B passes even without the fix - the defect is visible only in Debug and RelWithDebInfo.
+
 ### Namespaces
 
 Each test directory gets `RDB_NAMESPACE`, its own `TMPDIR` and a `RESOURCE_LOCK`, assigned from a pool of 16 by that same macro. A directory that must run on the machine-global identity (unnamed instance, or names it picks itself) opts out with `set(IT_NO_NAMESPACE TRUE)` before its `add_test` calls, and gets `RUN_SERIAL` instead.
@@ -103,6 +109,7 @@ Not every call goes by name. As of 2026-10-03 the build-tree target is named dir
 
 - `service_idle` passes `$<TARGET_FILE:xretractor>` to `service-idle.sh`, deliberately. Its three tests assert service-mode INFO markers, which `SPDLOG_ACTIVE_LEVEL` strips in Release - so a Release copy left in `~/.local/bin` (a build of ablation profiles is enough) made them fail with an empty `stderr.txt`, and the symptom read as an engine regression.
 - `ipc_identity_lock` and `leftover_sweep` (both since `5853a83e`, #241) pass `$<TARGET_FILE:xretractor>` and `$<TARGET_FILE:xqry>` to `verify.py`. The tree records no reason for that choice.
+- `signal_stop` (#284) passes `$<TARGET_FILE:xretractor>` and the build type to `run.sh`, for the same reason as `service_idle`: it asserts a `SPDLOG_WARN` line, which only a non-Release binary emits.
 - `bus_slot_count` (#266) reuses the launch pattern of `ipc_identity_lock` and passes the same two paths to its `verify.py`.
 
 ### Ablation: shape and value in separate tests
