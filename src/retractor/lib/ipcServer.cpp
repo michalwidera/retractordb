@@ -112,9 +112,10 @@ void IpcServer::removeClientQueues() {
     IPC::message_queue::remove(names_.responseQueue(element.first).c_str());
   }
   id2StreamNameRelation_.clear();
+  subscriptionEpoch_.fetch_add(1, std::memory_order_release);
 }
 
-void IpcServer::subscribe(int clientId, const std::string &streamName, int maxElements) {
+bool IpcServer::subscribe(int clientId, const std::string &streamName, int maxElements, std::uint64_t expectedEpoch) {
   const std::string queueName = names_.responseQueue(clientId);
 
   // Straz miejsca PRZED utworzeniem kolejki. Kolejka boosta powstaje w calosci od razu (segment
@@ -146,11 +147,21 @@ void IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
                                                           ipc::kResponseQueueMaxMessageSize,         // max message size
                                                           IPC::permissions(ipc::kObjectPermissions)  // tylko konto serwera
   );
+  // Sprawdzenie epoki i wpis do map pod JEDNYM zajeciem muteksu: broadcastOutOfBusiness bierze
+  // ten sam muteks, wiec albo rejestracja wypada przed nim i OOB ja obejmie, albo po nim i widzi
+  // nowa epoke. Rejestr zamkniety od odczytu expectedEpoch oznacza, ze strumien, ktorego
+  // parametry wolajacy odczytal, nalezy do epoki juz rozebranej.
   {
     std::scoped_lock lock(clientMapsMutex_);
-    id2StreamNameRelation_[clientId] = streamName;
-    id2QueueCache_[clientId]         = std::move(queueHandle);
+    if (subscriptionEpoch_.load(std::memory_order_relaxed) == expectedEpoch) {
+      id2StreamNameRelation_[clientId] = streamName;
+      id2QueueCache_[clientId]         = std::move(queueHandle);
+      return true;
+    }
   }
+  queueHandle.reset();  // zamknij mapowanie przed unlink -- ta sama kolejnosc co w broadcast()
+  IPC::message_queue::remove(queueName.c_str());
+  return false;
 }
 
 /// Kolejka boosta trzyma w segmencie wlasny muteks, na Linuksie robust. Proces zabity z tym
@@ -270,6 +281,7 @@ void IpcServer::broadcastOutOfBusiness() {
   }
   id2StreamNameRelation_.clear();
   id2QueueCache_.clear();
+  subscriptionEpoch_.fetch_add(1, std::memory_order_release);
 }
 
 // Procedura watku komunikacyjnego.
@@ -358,10 +370,12 @@ void IpcServer::commandLoop() const {
           // bramka --xqrywait, a bramka zdjeta w chwili ODEBRANIA komendy wpuszczala watek
           // przetwarzania jeszcze przed rejestracja subskrybenta: dla 'show' znaczylo to slot
           // wyemitowany do klienta, ktorego kolejki odpowiedzi jeszcze nie ma, a takiego wiersza
-          // nikt juz nie odzyska. Samo subscribe() jest oslonione blokada epoki -- tej samej,
-          // ktora bierze slot -- wiec wyscig rozstrzygal sie na ZAJECIU tej blokady: wygrywal
-          // ten, kto siegnal po nia pierwszy. Przesuniecie sygnalu zamienia ten wyscig na
-          // porzadek: gdy bramka opada, subskrypcja jest juz w mapach IpcServer.
+          // nikt juz nie odzyska. Rejestracja w subscribe() szla wtedy pod blokada epoki -- ta
+          // sama, ktora bierze slot -- wiec wyscig rozstrzygal sie na ZAJECIU tej blokady:
+          // wygrywal ten, kto siegnal po nia pierwszy. Przesuniecie sygnalu zamienia ten wyscig
+          // na porzadek: gdy bramka opada, subskrypcja jest juz w mapach IpcServer. Od #283
+          // subscribe() biegnie bez blokady epoki, a porzadek trzyma sie nadal, bo rejestracja
+          // konczy sie przed powrotem z onCommand.
           // Kontrakt bramki jest nietkniety -- podnosi ja nadal KAZDA komenda, takze 'hello'
           // (patrz it_xqrywait_gate). Wiadomosc odrzucona wyzej komenda nie jest i jej nie podnosi.
           callbacks_.onCommandHandled();

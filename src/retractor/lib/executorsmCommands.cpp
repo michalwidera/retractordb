@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
+#include <format>
 #include <fstream>
 #include <mutex>
 #include <sstream>
@@ -83,8 +85,9 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
     // RDB_FAULT_PLAN_SWAP_DELAY. Rozciaga okno miedzy ODEBRANIEM komendy 'show' a jej
     // obsluga -- jedyne okno, w ktorym bramka --xqrywait zdejmowana na odbiorze wpuszczala
     // petle przetwarzania przed rejestracja subskrybenta. Wyscigu nie da sie zamowic inaczej:
-    // rejestracja idzie pod plan_epoch_mutex, tym samym, ktory bierze slot, wiec rozstrzyga
-    // sie on na zajeciu muteksu i trwa nanosekundy. Uspienie musi wypasc PRZED zajeciem
+    // rejestracja szla wtedy pod plan_epoch_mutex, tym samym, ktory bierze slot, wiec
+    // rozstrzygal sie on na zajeciu muteksu i trwal nanosekundy (od #283 subscribe() biegnie
+    // poza ta blokada, ale nadal przed sygnalem obsluzenia komendy). Uspienie musi wypasc PRZED zajeciem
     // blokady epoki, inaczej wstrzymywaloby slot i samo zaslanialoby badane okno.
     if (const char *delayMs = std::getenv("RDB_FAULT_SHOW_DELAY"); delayMs != nullptr && command == "show")
       std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
@@ -193,11 +196,42 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
       // umiec wymusic wyjatek, zamiast czekac na warunki wyscigu.
       if (std::getenv("RDB_FAULT_SHOW") != nullptr)
         throw std::runtime_error("RDB_FAULT_SHOW: wstrzyknieta awaria handlera 'show'");
-      ipcServer.subscribe(streamId, streamName, maxElements);
-      // Odstep na ustanie kolejki nie potrzebuje juz ani modelu, ani planu, a blokada epoki
-      // wstrzymuje w tym czasie slot. Zdejmujemy ja przed czekaniem, zeby subskrypcja nie
-      // dokladala tego milisekunda do kazdego slotu, w ktory trafi komenda `show`.
+      // Epoka rejestru odczytana POD blokada epoki, razem z parametrami strumienia: dopoki
+      // pProc zyje, OOB tej epoki jeszcze nie wyszedl, wiec ta wartosc opisuje epoke, z ktorej
+      // pochodza streamName i maxElements.
+      const std::uint64_t subscriptionEpoch = ipcServer.subscriptionEpoch();
+      // Dalej nie potrzebujemy ani modelu, ani planu: streamName jest kopia, a maxElements
+      // policzone. Blokade zdejmujemy PRZED subscribe(), nie dopiero przed czekaniem ponizej.
+      // subscribe() robi shm_open + fstatvfs i buduje kolejke (mmap rzedu MiB, 42 ms przy
+      // pierwszej emisji pod mlockall -- ipcServer.cpp), a slot w SCHED_FIFO bierze
+      // plan_epoch_mutex w kazdym takcie i std::mutex nie dziedziczy priorytetu. To ta sama
+      // regula, ktora ipcServer.hpp stawia przy clientMapsMutex_: nigdy konstrukcja kolejki pod
+      // muteksem, na ktory czeka watek RT (#283).
+      //
+      // Cena: miedzy odczytem a rejestracja epoka planu moze sie skonczyc (--reset, --kill,
+      // sygnal, -m, --until-eof), a rejestracja po OOB przezylaby ja -- przy --reset klient
+      // dostawalby bez ostrzezenia wiersze strumienia nowego planu o tej samej nazwie.
+      // Pilnuje tego subscriptionEpoch: subscribe() odmawia, gdy rejestr zamknieto od jej
+      // odczytu, a klient dostaje powod w error.response (it_subscribe_epoch_race).
       epochLock.unlock();
+      // Hak testu it_subscribe_epoch_race, ta sama droga co RDB_FAULT_GET_AWAIT_EPOCH_SWAP:
+      // czeka na SAM FAKT (do wyczerpania budzetu w ms), nie na uplyw czasu -- az rejestr
+      // starej epoki zostanie zamkniety i nastepny plan ogloszony (dataModelExpected wraca
+      // dopiero w applyPendingPlan). To najgorszy przypadek: spozniona rejestracja wpadalaby
+      // do NOWEJ epoki, a nastepna komenda klienta zastaje juz nowy plan, nie stan posredni.
+      if (const char *budgetMs = std::getenv("RDB_FAULT_SUBSCRIBE_AWAIT_PLAN_SWAP"); budgetMs != nullptr) {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(std::atoi(budgetMs));
+        while ((ipcServer.subscriptionEpoch() == subscriptionEpoch || !dataModelExpected.load()) &&
+               std::chrono::steady_clock::now() < deadline)
+          std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
+      if (!ipcServer.subscribe(streamId, streamName, maxElements, subscriptionEpoch)) {
+        SPDLOG_WARN("commandProcessor: 'show' of stream '{}' for client {} refused: plan epoch ended during subscription",
+                    streamName, streamId);
+        ptRetval.put("error.response",
+                     std::format("plan epoch ended while subscribing to stream '{}'; repeat the command", streamName));
+        return ptRetval;
+      }
       std::this_thread::sleep_for(ipc::kQueuePollInterval);
     }
     //

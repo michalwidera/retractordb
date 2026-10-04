@@ -8,6 +8,7 @@
 #include <chrono>
 #include <csignal>
 #include <cstddef>
+#include <cstdint>
 #include <future>
 #include <optional>
 #include <sstream>
@@ -135,14 +136,14 @@ class IpcServerQueues : public ::testing::Test {
 
 TEST_F(IpcServerQueues, subscribe_creates_response_queue) {
   IpcServer server;
-  server.subscribe(kClientA, "strumien", 16);
+  ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
   EXPECT_TRUE(queueExists(kClientA));
 }
 
 TEST_F(IpcServerQueues, removeAllObjects_removes_every_client_queue) {
   IpcServer server;
-  server.subscribe(kClientA, "strumien", 16);
-  server.subscribe(kClientB, "strumien", 16);
+  ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
+  ASSERT_TRUE(server.subscribe(kClientB, "strumien", 16, server.subscriptionEpoch()));
   ASSERT_TRUE(queueExists(kClientA));
   ASSERT_TRUE(queueExists(kClientB));
 
@@ -159,8 +160,8 @@ TEST_F(IpcServerQueues, removeAllObjects_removes_every_client_queue) {
 // z poprzedniego przebiegu.
 TEST_F(IpcServerQueues, exit_handler_removes_client_queues_too) {
   IpcServer server;
-  server.subscribe(kClientA, "strumien", 16);
-  server.subscribe(kClientB, "strumien", 16);
+  ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
+  ASSERT_TRUE(server.subscribe(kClientB, "strumien", 16, server.subscriptionEpoch()));
   ASSERT_TRUE(queueExists(kClientA));
   ASSERT_TRUE(queueExists(kClientB));
 
@@ -200,8 +201,8 @@ TEST_F(IpcServerQueues, servers_with_distinct_names_have_disjoint_queues) {
   IpcServer serverB;
   serverB.setServerName(kServerB);
 
-  serverA.subscribe(kClientA, "strumien", 16);
-  serverB.subscribe(kClientA, "strumien", 16);
+  ASSERT_TRUE(serverA.subscribe(kClientA, "strumien", 16, serverA.subscriptionEpoch()));
+  ASSERT_TRUE(serverB.subscribe(kClientA, "strumien", 16, serverB.subscriptionEpoch()));
 
   // Ten sam identyfikator klienta, dwie rozne kolejki.
   ASSERT_NE(queueNameFor(kClientA, kServerA), queueNameFor(kClientA, kServerB));
@@ -240,8 +241,8 @@ TEST_F(IpcServerQueues, exit_handler_does_not_touch_other_servers_segment) {
 // klient konczyl serwer wszystkim. Kolejka martwego ma zniknac jak przepelniona, emisja trwac.
 TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
   IpcServer server;
-  server.subscribe(kClientA, "strumien", 16);
-  server.subscribe(kClientB, "strumien", 16);
+  ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
+  ASSERT_TRUE(server.subscribe(kClientB, "strumien", 16, server.subscriptionEpoch()));
   IPC::message_queue probe(IPC::open_only, queueNameFor(kClientA).c_str());
   abandonQueueLock(queueNameFor(kClientA));
   ASSERT_TRUE(queueLockIsAbandoned(probe)) << "symulacja martwego wlasciciela nie zadzialala";
@@ -255,9 +256,45 @@ TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
   server.removeAllObjects();
 }
 
+// #283: subscribe() buduje kolejke bez blokady epoki planu, wiec rejestr subskrypcji moze zostac
+// zamkniety (OOB na koncu epoki) miedzy odczytem parametrow strumienia a rejestracja. Spozniona
+// rejestracja przezylaby OOB i przy --reset trafila na strumien nowego planu o tej samej nazwie.
+TEST_F(IpcServerQueues, subscribe_after_out_of_business_is_refused_without_queue) {
+  IpcServer server;
+  const std::uint64_t epoch = server.subscriptionEpoch();
+  server.broadcastOutOfBusiness();
+
+  EXPECT_FALSE(server.subscribe(kClientA, "strumien", 16, epoch));
+  EXPECT_FALSE(queueExists(kClientA)) << "odmowa zostawila kolejke w /dev/shm";
+
+  // Odmowa nie wpisala klienta: emisja nie ma do kogo pisac i nie probuje otwierac kolejki.
+  const std::array<std::string_view, 1> streams{"strumien"};
+  bool formatted = false;
+  server.broadcast(streams, [&formatted](const std::string &) {
+    formatted = true;
+    return std::string("wiersz");
+  });
+  EXPECT_FALSE(formatted) << "odrzucony klient zostal w rejestrze";
+
+  // Kontrola dodatnia: z epoka biezaca ta sama subskrypcja przechodzi.
+  EXPECT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
+  EXPECT_TRUE(queueExists(kClientA));
+  server.removeAllObjects();
+}
+
+// Ta sama straz na drugiej drodze zamkniecia rejestru: kasowanie kolejek przy wyjsciu.
+TEST_F(IpcServerQueues, subscribe_after_queue_removal_is_refused_without_queue) {
+  IpcServer server;
+  const std::uint64_t epoch = server.subscriptionEpoch();
+  server.removeAllObjects();
+
+  EXPECT_FALSE(server.subscribe(kClientA, "strumien", 16, epoch));
+  EXPECT_FALSE(queueExists(kClientA)) << "odmowa zostawila kolejke w /dev/shm";
+}
+
 TEST_F(IpcServerQueues, removal_is_idempotent) {
   IpcServer server;
-  server.subscribe(kClientA, "strumien", 16);
+  ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
 
   server.removeAllObjects();
   EXPECT_NO_THROW(server.removeAllObjects());
