@@ -1,13 +1,19 @@
 #include "rdb/metaIndexStore.hpp"
 
-#include <spdlog/spdlog.h>
+#include <fcntl.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <format>
-#include <fstream>
+#include <iterator>
 #include <span>
 #include <utility>
+#include <vector>
+
+#include <spdlog/spdlog.h>
+
+#include "rdb/storageFile.hpp"
 
 namespace rdb {
 
@@ -20,16 +26,9 @@ namespace {
 constexpr size_t kHeaderSize      = sizeof(int64_t);
 constexpr int64_t kReservedHeader = 0;
 
-void writeHeader(std::ostream &out) {
-  int64_t reserved = kReservedHeader;
-  const auto bytes = std::as_bytes(std::span{&reserved, 1});
-  out.write(reinterpret_cast<const char *>(bytes.data()), static_cast<std::streamsize>(bytes.size_bytes()));
-}
-
-void writeEntry(std::ostream &out, const IndexRecord &entry) {
-  auto buf = entry.serialize();
-  out.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
-}
+// Pliki `.meta` otwiera StorageFd, czyli bez podazania za dowiazaniem (#374). Bledy zapisu sa
+// ignorowane jak wczesniej przy std::ofstream - indeks jest wtorny wobec pliku danych.
+std::span<const std::byte> headerBytes() { return std::as_bytes(std::span{&kReservedHeader, 1}); }
 
 }  // namespace
 
@@ -41,9 +40,9 @@ bool MetaIndexStore::fileExists() const { return !metaFilePath_.empty() && std::
 
 void MetaIndexStore::saveHeader() {
   if (metaFilePath_.empty()) return;
-  std::ofstream out(metaFilePath_, std::ios::binary | std::ios::trunc);
-  if (!out.is_open()) return;  // plik nietkniety -- cache pozostaje aktualny
-  writeHeader(out);
+  const StorageFd out(metaFilePath_, O_WRONLY | O_CREAT | O_TRUNC);
+  if (!out.isOpen()) return;  // plik nietkniety -- cache pozostaje aktualny
+  (void)out.write(headerBytes());
   // write-through: po truncate plik zawiera tylko naglowek -> zero wpisow
   entriesCache_.clear();
   cacheValid_ = true;
@@ -58,27 +57,24 @@ const std::vector<IndexRecord> &MetaIndexStore::readAll() const {
     return entriesCache_;
   }
 
-  std::ifstream in(metaFilePath_, std::ios::binary);
-  if (!in.is_open()) {
+  const StorageFd in(metaFilePath_, O_RDONLY);
+  if (!in.isOpen()) {
     cacheValid_ = true;
     return entriesCache_;
   }
 
-  in.seekg(0, std::ios::end);
-  // Compare stream positions as streamoff; cmp_less with streampos is ill-formed.
-  const auto fileSize = static_cast<std::streamoff>(in.tellg());
+  const off_t fileSize = in.size();
   if (fileSize <= 0 || std::cmp_less_equal(fileSize, kHeaderSize)) {
     cacheValid_ = true;
     return entriesCache_;
   }
 
-  const auto payloadSize = static_cast<size_t>(fileSize - static_cast<std::streamoff>(kHeaderSize));
+  const auto payloadSize = static_cast<size_t>(fileSize) - kHeaderSize;
   if (payloadSize % entrySize_ != 0)
     SPDLOG_WARN("MetaIndexStore: unexpected payload alignment (payloadSize={}, entrySize={})", payloadSize, entrySize_);
 
-  in.seekg(static_cast<std::streamoff>(kHeaderSize), std::ios::beg);
   std::vector<std::byte> fileData(payloadSize);
-  in.read(reinterpret_cast<char *>(fileData.data()), static_cast<std::streamsize>(payloadSize));
+  (void)in.readAt(fileData, static_cast<off_t>(kHeaderSize));
 
   std::span<const std::byte> remaining(fileData);
   while (remaining.size() >= entrySize_) {
@@ -92,23 +88,19 @@ const std::vector<IndexRecord> &MetaIndexStore::readAll() const {
 
 void MetaIndexStore::appendEntry(const IndexRecord &entry) {
   if (metaFilePath_.empty()) return;
-  std::ofstream out(metaFilePath_, std::ios::binary | std::ios::app);
-  if (!out.is_open()) return;  // plik nietkniety -- cache pozostaje aktualny
-  writeEntry(out, entry);
+  const StorageFd out(metaFilePath_, O_WRONLY | O_CREAT | O_APPEND);
+  if (!out.isOpen()) return;  // plik nietkniety -- cache pozostaje aktualny
+  (void)out.write(entry.serialize());
   if (cacheValid_) entriesCache_.push_back(entry);  // write-through
 }
 
 void MetaIndexStore::overwriteLast(const IndexRecord &entry) {
   if (metaFilePath_.empty()) return;
-  std::fstream f(metaFilePath_, std::ios::binary | std::ios::in | std::ios::out);
-  if (!f.is_open()) return;
-  f.seekp(0, std::ios::end);
-  // Compare stream positions as streamoff; cmp_less with streampos is ill-formed.
-  const auto fileSize = static_cast<std::streamoff>(f.tellp());
+  const StorageFd f(metaFilePath_, O_RDWR);
+  if (!f.isOpen()) return;
+  const off_t fileSize = f.size();
   if (std::cmp_less(fileSize, kHeaderSize + entrySize_)) return;
-  f.seekp(-static_cast<std::streamoff>(entrySize_), std::ios::end);
-  auto buf = entry.serialize();
-  f.write(reinterpret_cast<const char *>(buf.data()), static_cast<std::streamsize>(buf.size()));
+  (void)f.writeAt(entry.serialize(), fileSize - static_cast<off_t>(entrySize_));
   if (cacheValid_ && !entriesCache_.empty())
     entriesCache_.back() = entry;  // write-through
   else
@@ -118,12 +110,16 @@ void MetaIndexStore::overwriteLast(const IndexRecord &entry) {
 void MetaIndexStore::rewrite(const std::vector<IndexRecord> &entries) {
   if (metaFilePath_.empty()) return;
   const std::string tmpPath = std::format("{}.tmp", metaFilePath_);
-  std::ofstream out(tmpPath, std::ios::binary | std::ios::trunc);
-  if (!out.is_open()) return;  // plik nietkniety -- cache pozostaje aktualny
-  writeHeader(out);
-  for (const auto &rec : entries)
-    writeEntry(out, rec);
-  out.close();
+  {
+    const StorageFd out(tmpPath, O_WRONLY | O_CREAT | O_TRUNC);
+    if (!out.isOpen()) return;  // plik nietkniety -- cache pozostaje aktualny
+    std::vector<std::byte> content;
+    content.reserve(kHeaderSize + (entries.size() * entrySize_));
+    std::ranges::copy(headerBytes(), std::back_inserter(content));
+    for (const auto &rec : entries)
+      std::ranges::copy(rec.serialize(), std::back_inserter(content));
+    (void)out.write(content);
+  }
   std::filesystem::rename(tmpPath, metaFilePath_);
   // write-through; guard na wypadek, gdyby caller podal sam cache (self-assign jest
   // bezpieczny dla std::vector, ale jawny warunek dokumentuje intencje)

@@ -7,7 +7,7 @@
 
 namespace rdb {
 /**
- * @brief Implementacja prostego magazynu binarnego opartego na `std::fstream`.
+ * @brief Implementacja prostego magazynu binarnego otwierającego plik osobno przy każdej operacji.
  *
  * Obiekt `genericBinaryFile` powinien:
  * - realizować odczyt i zapis rekordów binarnych o długości wyznaczonej przez `Descriptor`,
@@ -21,14 +21,18 @@ namespace rdb {
  *
  * @note Klasa nie utrzymuje osobnych metadanych null ani dodatkowego mechanizmu trwałości poza samym zapisem do pliku.
  * @note Purge przez `write(nullptr, ..., 0)` opróżnia plik (plik pozostaje, ma 0 bajtów).
+ * @note Do #374 klasa używała `std::fstream`, który nie przyjmuje O_NOFOLLOW; plik otwiera teraz
+ *       openStorageFile() (storageFile.hpp), a dowiązanie pod nazwą pliku daje EIO.
  */
 struct genericBinaryFile : public FileInterface {
   std::string filename_;
   const ssize_t recordSize_;
   int percounter_;
+  bool followFinalLink_;
 
  public:
-  genericBinaryFile(std::string_view fileName, const Descriptor &descriptor, int percounter = -1);
+  /// @param followFinalLink plik danych spod REF wolajacego moze byc dowiazaniem (#374, storageFile.hpp)
+  genericBinaryFile(std::string_view fileName, const Descriptor &descriptor, int percounter = -1, bool followFinalLink = false);
   ~genericBinaryFile() override;
 
   using FileInterface::read;

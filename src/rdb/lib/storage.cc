@@ -135,7 +135,11 @@ binaryDeviceRO *storage::deviceSource() const {
 }
 
 void storage::initializeAccessor() {
-  accessor_ = makeAccessor(storageType_, paths_.storageFile(), descriptor, isOneShot_, percounter_);
+  // Dowiazanie jako plik danych przechodzi tylko pod REF podanym przez wolajacego (#374, #278).
+  // Samo refFromCaller_ to za malo: SELECT planu tez ma deskryptor od wolajacego, ale jego plik
+  // danych sklada silnik z katalogu magazynu i nazwy strumienia.
+  const bool followFinalLink = refFromCaller_ && !descriptorRef(descriptor).empty();
+  accessor_ = makeAccessor(storageType_, paths_.storageFile(), descriptor, isOneShot_, percounter_, followFinalLink);
 }
 
 void storage::resetForUnitTest() {

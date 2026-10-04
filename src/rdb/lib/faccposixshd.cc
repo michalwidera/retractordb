@@ -10,6 +10,7 @@
 #include <filesystem>
 
 #include "fatalError.hpp"
+#include "rdb/storageFile.hpp"
 
 namespace rdb {
 
@@ -46,7 +47,7 @@ ssize_t posixBinaryFileWithShadow::shadowFind(uint8_t *ptrData, size_t position)
 }
 
 posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view fileName, const Descriptor &descriptor,
-                                                     int percounter)
+                                                     int percounter, const bool followFinalLink)
     : filename_(std::string(fileName)),
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       percounter_(percounter) {
@@ -64,7 +65,7 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
     SPDLOG_WARN("Failed to check if {} exists: {}", shadowName(), fs_ec.message());
   }
 
-  fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
+  fd = openStorageFile(filename_, O_RDWR | O_CREAT, kDefaultFileMode, followFinalLink);
   if (fd < 0) {
     const int openErrno  = errno;  // przed skladaniem napisu - uzasadnienie w faccposix.cc
     initializationError_ = "cannot open output file '" + filename_ + "': " + strerror(openErrno);
@@ -72,7 +73,7 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
     return;
   }
 
-  fd_shadow = ::open(shadowName().c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
+  fd_shadow = openStorageFile(shadowName(), O_RDWR | O_CREAT, kDefaultFileMode);
   if (fd_shadow < 0) {
     const int openErrno  = errno;
     initializationError_ = "cannot open output file '" + shadowName() + "': " + strerror(openErrno);

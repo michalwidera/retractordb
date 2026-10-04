@@ -46,10 +46,13 @@ class groupFile : public FileInterface {
   size_t removedSegments_ = 0;
 
   int percounter_;
+  // Tylko bez retencji: segment `<nazwa>_segment_N` to nazwa zlozona przez silnik, nie REF wolajacego (#374).
+  bool followFinalLink_;
   std::string initializationError_;
 
  public:
-  groupFile(std::string_view fileName, const Descriptor &descriptor, const retention_t &retention, int percounter);
+  groupFile(std::string_view fileName, const Descriptor &descriptor, const retention_t &retention, int percounter,
+            bool followFinalLink = false);
   ~groupFile() override;
 
   using FileInterface::read;

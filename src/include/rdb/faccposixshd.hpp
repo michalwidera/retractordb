@@ -49,7 +49,9 @@ class posixBinaryFileWithShadow : public FileInterface {
   ssize_t shadowFind(uint8_t *ptrData, size_t position) const;
 
  public:
-  posixBinaryFileWithShadow(std::string_view fileName, const Descriptor &descriptor, int percounter = -1);
+  /// @param followFinalLink plik danych spod REF wolajacego moze byc dowiazaniem; cien `.shadow` nigdy (#374)
+  posixBinaryFileWithShadow(std::string_view fileName, const Descriptor &descriptor, int percounter = -1,
+                            bool followFinalLink = false);
   ~posixBinaryFileWithShadow() override;
 
   // Kopia zamknelaby te same deskryptory dwa razy; akcesor zyje wylacznie w unique_ptr (R-01, #274).

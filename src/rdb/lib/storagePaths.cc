@@ -95,10 +95,11 @@ void StoragePaths::setStorageFile(std::string file) {
 // i ochrone przed usunieciem stosuje storage (attachStorage, ~storage) - wylacznie dla REF wzietego
 // z wczytanego `.desc`, bo REF podany przez wolajacego (plan, schemat w xtrdb) jest decyzja operatora.
 //
-// Ustalenie zapada przed pierwszym otwarciem pliku, ale nie chroni przed podmiana sciezki miedzy
-// sprawdzeniem a open() akcesora. Ta sama luka istnieje bez REF - plik danych w katalogu magazynu
-// tez moze byc dowiazaniem - i zamknie ja dopiero otwieranie wzgledem deskryptora katalogu
-// (openat2 z RESOLVE_BENEATH) we wszystkich akcesorach (#374).
+// Ustalenie zapada przed pierwszym otwarciem pliku. Dowiazanie pod nazwa pliku magazynu - takze
+// bez REF - zatrzymuje dopiero O_NOFOLLOW przy samym otwarciu (openStorageFile(), #374), wiec
+// podmiana pliku na dowiazanie po tym sprawdzeniu tez nic nie daje. Zostaje podmiana katalogu
+// posredniego sciezki REF miedzy sprawdzeniem a open(): wymaga zapisu do katalogu nadrzednego,
+// a jej zamkniecie (deskryptor katalogu, przejscie po komponentach) jest odlozone.
 void StoragePaths::relocateFromRef(const Descriptor &descriptor) {
   auto it = std::ranges::find_if(descriptor,  //
                                  [](const auto &item) { return item.rtype == rdb::REF; });

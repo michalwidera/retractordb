@@ -10,6 +10,7 @@
 #include <filesystem>
 
 #include "fatalError.hpp"
+#include "rdb/storageFile.hpp"
 
 namespace rdb {
 
@@ -19,7 +20,8 @@ constexpr mode_t kDefaultFileMode = 0644;
 
 posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
                                  const Descriptor &descriptor,     //
-                                 int percounter)                   //
+                                 int percounter,                   //
+                                 const bool followFinalLink)       //
     : filename_(std::string(fileName)),
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       percounter_(percounter) {
@@ -31,7 +33,7 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
     SPDLOG_WARN("Failed to check if {} exists: {}", filename_, fs_ec.message());
   }
 
-  fd = ::open(filename_.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, kDefaultFileMode);
+  fd = openStorageFile(filename_, O_RDWR | O_CREAT, kDefaultFileMode, followFinalLink);
   if (fd < 0) {
     const int openErrno  = errno;  // przed skladaniem napisu - alokacja moze ruszyc errno
     initializationError_ = "cannot open output file '" + filename_ + "': " + strerror(openErrno);

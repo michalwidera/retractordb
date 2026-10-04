@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <cerrno>
 #include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -832,6 +834,146 @@ TEST(xrdb, storage_kept_ref_must_match_the_plan) {
   EXPECT_EQ(attach(field + rdb::Descriptor(planned, 0, 0, rdb::REF) + rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE)), "");
   EXPECT_FALSE(std::filesystem::exists(planned));
   EXPECT_TRUE(std::filesystem::exists(foreign));
+}
+
+// Dowiazanie pod nazwa pliku magazynu (#374). Kto ma prawo zapisu do katalogu magazynu, kladzie
+// tam dowiazanie do pliku dostepnego dla konta uslugi; pliki magazynu otwierane z O_NOFOLLOW nie
+// zapisuja ani nie obcinaja jego celu. Katalog magazynu bedacy dowiazaniem i REF podany przez
+// wolajacego (#278) dzialaja jak dotad.
+namespace {
+struct LinkScene : RefScene {
+  std::string sentinel           = outside + "/sentinel";
+  const std::string sentinelText = "wartownik\n";
+  const rdb::Descriptor plan     = rdb::Descriptor("a", sizeof(int), 1, rdb::INTEGER);
+  const std::string eloopMessage = std::strerror(ELOOP);
+
+  LinkScene() { std::ofstream(sentinel) << sentinelText; }
+
+  // Dowiazanie wzgledne, jakie zalozylby ktos z prawem zapisu do katalogu magazynu.
+  void link(const std::string &name, const std::string &target = "sentinel") const {
+    std::filesystem::create_symlink("../" + outside + "/" + target, store + "/" + name);
+  }
+  [[nodiscard]] bool sentinelIntact() const {
+    std::ifstream in(sentinel);
+    std::stringstream content;
+    content << in.rdbuf();
+    return content.str() == sentinelText;
+  }
+};
+
+void writeValue(rdb::storage &s, const int value, const size_t position = std::numeric_limits<size_t>::max()) {
+  *reinterpret_cast<int *>(s.getPayload()->span().data()) = value;
+  ASSERT_EQ(s.write(position), rdb::WriteStatus::Ok);
+}
+}  // namespace
+
+// Plik danych i cien danych: otwarcie konczy sie odmowa z ELOOP, a nie zapisem do celu.
+TEST(xrdb, storage_data_file_symlink_is_refused) {
+  for (const std::string type : {"POSIX", "POSIXSHD", "DEFAULT", "DIRECT"}) {
+    LinkScene scene;
+    scene.link(scene.stream);
+    {
+      rdb::storage s(scene.stream, scene.stream, scene.store, type, false, false, -1);
+      const std::string error = s.attachDescriptor(&scene.plan);
+      EXPECT_NE(error.find(scene.eloopMessage), std::string::npos) << type << ": " << error;
+    }
+    EXPECT_TRUE(scene.sentinelIntact()) << type;
+  }
+  for (const std::string type : {"POSIXSHD", "DEFAULT"}) {
+    LinkScene scene;
+    scene.link(scene.stream + ".shadow");
+    {
+      rdb::storage s(scene.stream, scene.stream, scene.store, type, false, false, -1);
+      const std::string error = s.attachDescriptor(&scene.plan);
+      EXPECT_NE(error.find(scene.eloopMessage), std::string::npos) << type << ": " << error;
+    }
+    EXPECT_TRUE(scene.sentinelIntact()) << type;
+  }
+}
+
+// GENERIC otwiera plik przy kazdej operacji: odmowa przychodzi z pierwszym zapisem.
+TEST(xrdb, storage_generic_symlink_is_not_written) {
+  LinkScene scene;
+  scene.link(scene.stream);
+  EXPECT_DEATH(
+      {
+        rdb::storage s(scene.stream, scene.stream, scene.store, "GENERIC", false, false, -1);
+        if (s.attachDescriptor(&scene.plan).empty()) writeValue(s, 7);
+      },
+      "failed");
+  EXPECT_TRUE(scene.sentinelIntact());
+}
+
+// Indeks `.meta` i jego cien: magazyn pracuje dalej (indeks jest wtorny), ale cel dowiazania
+// nie zostaje obciety ani dopisany. DISPOSABLE usuwa samo dowiazanie, cel zostaje.
+TEST(xrdb, storage_meta_symlink_is_not_written) {
+  for (const std::string suffix : {".meta", ".meta.shadow"}) {
+    LinkScene scene;
+    scene.link(scene.stream + suffix);
+    {
+      rdb::storage s(scene.stream, scene.stream, scene.store, "POSIXSHD", false, false, -1);
+      ASSERT_EQ(s.attachDescriptor(&scene.plan), "") << suffix;
+      writeValue(s, 7);
+      writeValue(s, 8, 0);  // aktualizacja rekordu dopisuje wpis do `.meta.shadow`
+      s.setDisposable(true);
+    }
+    EXPECT_TRUE(scene.sentinelIntact()) << suffix;
+    EXPECT_FALSE(std::filesystem::is_symlink(scene.store + "/" + scene.stream + suffix)) << suffix;
+  }
+}
+
+// `.desc` bedacy dowiazaniem: istniejacy cel nie jest czytany jako deskryptor, a nieistniejacy
+// nie powstaje przez dowiazanie.
+TEST(xrdb, storage_descriptor_symlink_is_refused) {
+  LinkScene scene;
+  scene.link(scene.stream + ".desc");
+  {
+    rdb::storage s(scene.stream, scene.stream, scene.store, "POSIX", false, false, -1);
+    const std::string error = s.attachDescriptor(&scene.plan);
+    EXPECT_NE(error.find(scene.eloopMessage), std::string::npos) << error;
+  }
+  EXPECT_TRUE(scene.sentinelIntact());
+
+  std::filesystem::remove(scene.desc);
+  scene.link(scene.stream + ".desc", "created");
+  EXPECT_DEATH(
+      {
+        rdb::storage s(scene.stream, scene.stream, scene.store, "POSIX", false, false, -1);
+        (void)s.attachDescriptor(&scene.plan);
+      },
+      "failed to open descriptor file for writing");
+  EXPECT_FALSE(std::filesystem::exists(scene.outside + "/created"));
+}
+
+// Katalog magazynu wskazany dowiazaniem dziala jak dotad - O_NOFOLLOW dotyczy ostatniego komponentu.
+TEST(xrdb, storage_directory_symlink_works) {
+  LinkScene scene;
+  const std::string storeLink = scene.store + "-link";
+  std::filesystem::remove(storeLink);
+  std::filesystem::create_directory_symlink(scene.store, storeLink);
+  {
+    rdb::storage s(scene.stream, scene.stream, storeLink, "POSIX", false, false, -1);
+    ASSERT_EQ(s.attachDescriptor(&scene.plan), "");
+    writeValue(s, 7);
+  }
+  EXPECT_EQ(std::filesystem::file_size(scene.store + "/" + scene.stream), sizeof(int));
+  std::filesystem::remove(storeLink);
+}
+
+// REF podany przez wolajacego jest decyzja operatora (#278): dowiazanie pod nim prowadzi zapis do celu.
+TEST(xrdb, storage_caller_ref_symlink_works) {
+  LinkScene scene;
+  const std::string link   = scene.outside + "/link";
+  const std::string target = scene.outside + "/target.bin";
+  std::filesystem::create_symlink("target.bin", link);
+  const rdb::Descriptor plan = scene.plan + rdb::Descriptor(link, 0, 0, rdb::REF) + rdb::Descriptor("POSIX", 0, 0, rdb::TYPE);
+  {
+    rdb::storage s(scene.stream, scene.stream, scene.store);
+    ASSERT_EQ(s.attachDescriptor(&plan), "");
+    writeValue(s, 7);
+  }
+  EXPECT_TRUE(std::filesystem::is_symlink(link));
+  EXPECT_EQ(std::filesystem::file_size(target), sizeof(int));
 }
 
 // NOLINTEND(modernize-avoid-c-arrays,bugprone-unchecked-optional-access)

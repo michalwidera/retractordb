@@ -35,7 +35,8 @@ class posixBinaryFile : public FileInterface {
   std::string initializationError_;
 
  public:
-  posixBinaryFile(std::string_view fileName, const Descriptor &descriptor, int percounter = -1);
+  /// @param followFinalLink plik danych spod REF wolajacego moze byc dowiazaniem (#374, storageFile.hpp)
+  posixBinaryFile(std::string_view fileName, const Descriptor &descriptor, int percounter = -1, bool followFinalLink = false);
   ~posixBinaryFile() override;
 
   // Kopia zamknelaby ten sam deskryptor dwa razy; akcesor zyje wylacznie w unique_ptr (R-01, #274).

@@ -133,11 +133,13 @@ Delegate only this:
 
 | Work | Agent | Model |
 |---|---|---|
-| A check that runs 10 minutes or longer (`ninja test-valgrind`, `ninja test_gate`, the ablation suite, a full `ctest`), in the background | `test-runner` | Haiku |
+| A check that runs 10 minutes or longer (`ninja test-valgrind`, `ninja test_gate`, the ablation suite, a full `ctest`), in the background | `test-runner` | Sonnet |
 | A large, mechanical change under an approved plan (the same edit across many files, a batch of similar tests), outside the engine core | `implementer` | Sonnet |
-| A search across the sibling repositories or deep in the git history that would take the main session more than ~5 searches | `scout` | Haiku |
+| A search across the sibling repositories or deep in the git history that would take the main session more than ~5 searches | `scout` | Sonnet |
 | A rule-conformance review of a finished diff, when the human asks for one | `reviewer` | Sonnet |
 | Settling one stated hypothesis about a hard defect (rare race, flaky test, divergent results), when the human asks for it; one copy per competing hypothesis, run in parallel | `investigator` | Opus |
+
+**No Haiku.** No agent and no session in this repository runs on Haiku (decision of 2026-10-04). Haiku wrote a plan despite *Who plans* (2026-10-03) and, as `test-runner` in the #374 session, ran its check in the foreground against its own definition, then started a full `ctest` beside the still running `ninja test-valgrind`; the overlapping runs collided on the namespace pool and the result had to be thrown away and repeated. A model that does not keep the rules disrupts the process and costs more than it saves. A new agent definition takes `sonnet` or a more capable model.
 
 Everything else stays in the main session: a short build and `ninja test` (run them plain - the `PreToolUse` hook described under *Build* keeps the full output in a log and returns only the tail; a hand-written `| tail` bypasses the hook and loses the log), searches inside this repository, ordinary edits, debug loops that need the raw output, and the pre-handoff check, which is a script: `scripts/hygiene-check.sh [working|staged|tree]` (exit code 0 = clean, 1 = hits).
 
@@ -195,7 +197,7 @@ python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
 Every session ends with either a local commit on a side branch made on an explicit go-ahead, a handoff of the uncommitted diff for human review/commit/push, or an explicit note why no commit was created. No unexplained uncommitted progress is left behind.
 
 **Closing signal.** When a piece of work is finished, the last message ends with exactly one of three marked lines - the human's cue that the next move is theirs:
-- `**Status: gotowe do zamknięcia**` - nothing is left for the assistant and the work does not belong to a continuous issue; the line names what the human does next (review the diff, commit, merge the pull request, close the issue) and which checks back it.
+- `**Status: zakończono pracę w tym wątku**` - nothing is left for the assistant in this thread and the work does not belong to a continuous issue; the marker does not by itself mean the issue can be closed; the line names what the human does next (review the diff, commit, merge the pull request, close the issue) and which checks back it.
 - `**Status: gotowe do aktualizacji**` - the same, but the work belongs to a continuous issue (label `Continious`, or one the human declared continuous, e.g. Epic #177), which stays open until its goal is reached; the line names the update the human makes (review the diff or the issue comment, commit) and which checks back it, and never proposes closing the issue.
 - `**Status: wymagana decyzja**` - work cannot go on without the human; the line states the question and the options (continue, stop, which direction), with a recommendation.
 
