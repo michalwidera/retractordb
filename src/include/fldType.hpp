@@ -4,6 +4,7 @@
 #include <cstdint>                    // uint8_t - C++20
 #include <magic_enum/magic_enum.hpp>  // magic_enum::enum_name
 #include <string>                     // std::string
+#include <type_traits>                // std::is_same_v
 #include <utility>                    // std::pair
 #include <variant>                    // std::variant
 
@@ -31,6 +32,26 @@ enum descFld : std::uint8_t {
   RETENTION,  //
   RETMEMORY   // Retention memory
 };
+
+// Indeks alternatywy descFldVT JEST wartoscia descFld: ewaluator i kompilator zamieniaja
+// `value.index()` wprost na descFld, a promocja typow (normalize(), normalizedOperandType)
+// i bramki typu liczbowego (`> DOUBLE`, `> STRING`) stoja na porzadku obu list. Przestawienie
+// albo dopisanie alternatywy bez zmiany wyliczenia przemapowaloby po cichu wszystkie wartosci.
+//
+// Zgodnosc obowiazuje tylko na prefiksie BYTE..NULLTYPE. TYPE, REF, RETENTION i RETMEMORY sa
+// polami metadeskryptora (.desc), nie typami wartosci - nie maja i nie moga miec alternatywy
+// w wariancie, wiec asercji rozmiaru nie "naprawia" sie dopisaniem ich do descFldVT.
+static_assert(std::variant_size_v<descFldVT> == NULLTYPE + 1);
+static_assert(std::is_same_v<std::variant_alternative_t<BYTE, descFldVT>, uint8_t>);
+static_assert(std::is_same_v<std::variant_alternative_t<INTEGER, descFldVT>, int>);
+static_assert(std::is_same_v<std::variant_alternative_t<UINT, descFldVT>, unsigned int>);
+static_assert(std::is_same_v<std::variant_alternative_t<RATIONAL, descFldVT>, boost::rational<int>>);
+static_assert(std::is_same_v<std::variant_alternative_t<FLOAT, descFldVT>, float>);
+static_assert(std::is_same_v<std::variant_alternative_t<DOUBLE, descFldVT>, double>);
+static_assert(std::is_same_v<std::variant_alternative_t<INTPAIR, descFldVT>, std::pair<int, int>>);
+static_assert(std::is_same_v<std::variant_alternative_t<IDXPAIR, descFldVT>, std::pair<std::string, int>>);
+static_assert(std::is_same_v<std::variant_alternative_t<STRING, descFldVT>, std::string>);
+static_assert(std::is_same_v<std::variant_alternative_t<NULLTYPE, descFldVT>, std::monostate>);
 
 constexpr auto GetStringdescFld(const enum descFld index) -> std::string_view {
   return index == NULLTYPE ? std::string_view("NULL") : magic_enum::enum_name(index);
