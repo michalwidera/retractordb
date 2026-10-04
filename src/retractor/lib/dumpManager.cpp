@@ -185,9 +185,24 @@ std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view s
                  key);
     }
   }
-  int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, kDefaultDumpFileMode);
-  if (fd < 0) {
-    FatalError("dumpManager::createDumpFile: failed to open '{}': {}", filename.string(), strerror(errno));
+  // Sciezka zrzutu jest w calosci przewidywalna z tekstu planu (STORAGE, strumien, regula), wiec
+  // ktos z prawem zapisu do katalogu moze ja zajac przed nami. O_TRUNC obcina to, na co nazwa
+  // WSKAZUJE: cel dowiazania symbolicznego albo i-wezel wspoldzielony przez dowiazanie twarde -
+  // takze z O_NOFOLLOW, ktore zatrzymuje tylko to pierwsze. Dlatego poprzedni plik kasujemy
+  // (unlink nie idzie za dowiazaniem) i tworzymy nowy przez O_EXCL: otwarcie udaje sie tylko na
+  // i-wezle, ktory sami wlasnie utworzylismy. Kontrola stillLinked (jak w lockFile.cpp) nie jest
+  // potrzebna: przez zrzut nikt sie nie synchronizuje, a podmiana nazwy po otwarciu kosztuje
+  // tylko nasz wlasny zrzut, nie cudzy plik. O_CLOEXEC - deskryptor nie trafia do polecen
+  // uruchamianych przez DO SYSTEM.
+  constexpr int kMaxRecreates = 100;
+  for (int attempt = 0; attempt < kMaxRecreates; ++attempt) {
+    if (::unlink(filename.c_str()) != 0 && errno != ENOENT) {
+      FatalError("dumpManager::createDumpFile: failed to remove '{}': {}", filename.string(), strerror(errno));
+    }
+    int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, kDefaultDumpFileMode);
+    if (fd >= 0) return std::make_pair(filename, fd);
+    if (errno != EEXIST) break;
+    // Ktos utworzyl plik miedzy naszym unlink() a open(); kasujemy go jeszcze raz.
   }
-  return std::make_pair(filename, fd);
+  FatalError("dumpManager::createDumpFile: failed to create '{}': {}", filename.string(), strerror(errno));
 }

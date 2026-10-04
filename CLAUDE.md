@@ -82,6 +82,8 @@ Sorted case-insensitively within each block. `IncludeBlocks: Preserve` - blank l
 
 **Use C++ headers, not C:** `<ctime>` not `<time.h>`, `<cstdlib>` not `<stdlib.h>`, etc.
 
+**RQL without deprecated forms.** RQL written or edited in a session (tests, examples, documentation) uses only the current syntax: `BINFILE` / `TEXTFILE` / `DEVICE` instead of `DECLARE ... FILE` (#346), and `MIN(s)` / `MAX(s)` / `AVG(s)` / `SUMC(s)` instead of the postfix `s.min` / `s.max` / `s.avg` / `s.sumc`. The engine marks both (`deprecatedFileWarnings` in `planSource.cpp`, `exitSExpAgregate_proforma` in `RQLParser.cpp`); a form deprecated later joins this list. Copying from an older file is no exception: migrate the copy, and the source too when the human asks for it. The only exception is a test whose subject is the deprecated form itself.
+
 ## Code Guidelines
 
 1. **State assumptions first** - surface ambiguities, push back on overcomplicated requests. Whether to wait for approval before writing code is decided by the *Planning threshold* (Session start).

@@ -3,7 +3,7 @@
 
 STORAGE 'temp'
 
-DECLARE a INTEGER STREAM core0, 0.1 FILE 'datafile2.dat'
+DECLARE a INTEGER STREAM core0, 0.1 BINFILE 'datafile2.dat'
 
 SELECT str1[0] STREAM str1 FROM core0
 
