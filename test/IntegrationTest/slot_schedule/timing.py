@@ -12,9 +12,11 @@ to chwila slotu z dokladnoscia do odpytywania (~0,5 ms). Zegar monotoniczny, wyl
                                    po jednym przestoju zalegle sloty ida bez snu, a wykonanie
                                    wraca na pierwotna siatke (przesuniecie < LIMIT)
   grid OUT PLIK OKRES LIMIT        caly ciag na jednej siatce: rozrzut przesuniec < LIMIT
-  phase OUT PLIK OKRES WZOR PIERWSZY LIMIT
+  phase OUT PLIK OKRES WZOR OKRES_WZORU LIMIT
                                    rekordy PLIKU leza na siatce OKRESU od kotwicy wyznaczonej
-                                   z pierwszego rekordu WZORU (pojawia sie PIERWSZY s po kotwicy)
+                                   z mediany rekordow WZORU (rekord k pojawia sie (k+1)*OKRES_WZORU
+                                   po kotwicy); mediana, bo jitter budzika jednego rekordu (macOS,
+                                   #408) przesuwalby cala os
 
 Kod wyjscia 1 i opis, gdy warunek nie zachodzi.
 """
@@ -100,8 +102,8 @@ def grid(out, path, period, limit):
     return 0
 
 
-def phase(out, path, period, reference, first, limit):
-    anchor = load(out, reference)[0] - first
+def phase(out, path, period, reference, reference_period, limit):
+    anchor = statistics.median(t - (k + 1) * reference_period for k, t in enumerate(load(out, reference)))
     times = load(out, path)
     residuals = [(t - anchor) - round((t - anchor) / period) * period for t in times]
     worst = max(residuals, key=abs)
