@@ -23,8 +23,11 @@ for rql in *.rql; do
       # Znak NaN zalezy od platformy, nie od jezyka (#320): `sqrt(-x)` na x86-64 daje bity
       # fff8... i glibc pisze `-nan`, aarch64 daje 7ff8... i `nan`, libc macOS pisze `nan`
       # zawsze. Wyrocznia znak pomija; wzorzec trzyma postac bez znaku.
+      # Zera konca mantysy tez zaleza od platformy (#408): przy dokladnym remisie zaokraglenia do
+      # 6 cyfr libc macOS pisze `5.30770e+11`, glibc `5.3077e+11` - ta sama wartosc. Wzorzec trzyma
+      # postac bez zer.
       (cd temp && printf 'open %s\nlist 1000\nquit\n' "$stream" | run_timeout 10 xtrdb -n 2>&1 | grep -F '{' |
-        sed 's/:-nan /:nan /g' || true)
+        sed -E 's/:-nan /:nan /g; s/(\.[0-9]*[1-9])0+e/\1e/g; s/\.0+e/e/g' || true)
       echo "== desc $stream"
       cat "temp/$stream.desc"
       echo  # .desc nie konczy sie znakiem nowej linii
