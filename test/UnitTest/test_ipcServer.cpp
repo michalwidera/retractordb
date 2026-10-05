@@ -107,6 +107,16 @@ bool queueLockIsAbandoned(IPC::message_queue &mq) {
   }
 }
 
+/// Czy martwy wlasciciel muteksu kolejki jest w ogole wykrywalny. Boost ustawia
+/// BOOST_INTERPROCESS_MUTEX_USE_POSIX, gdy interprocess_mutex jest robust pthread mutexem; w przeciwnym
+/// razie (Darwin, FORCE_GENERIC_EMULATION) to spin_mutex, na ktorym kazde zajecie po smierci wlasciciela
+/// kreci sie bez konca - takze sama kontrola dodatnia queueLockIsAbandoned. Issue #410.
+#if defined(BOOST_INTERPROCESS_MUTEX_USE_POSIX)
+constexpr bool kDeadQueueOwnerDetectable = true;
+#else
+constexpr bool kDeadQueueOwnerDetectable = false;
+#endif
+
 bool segmentExists(const std::string &name) {
   try {
     IPC::shared_memory_object shm(IPC::open_only, name.c_str(), IPC::read_only);
@@ -240,6 +250,7 @@ TEST_F(IpcServerQueues, exit_handler_does_not_touch_other_servers_segment) {
 // lock_exception(not_recoverable) poza broadcast() - az za petle przetwarzania, czyli jeden
 // klient konczyl serwer wszystkim. Kolejka martwego ma zniknac jak przepelniona, emisja trwac.
 TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
+  if (!kDeadQueueOwnerDetectable) GTEST_SKIP() << "#410: zamek kolejki to spin_mutex - martwy wlasciciel = wieczny spin";
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
   ASSERT_TRUE(server.subscribe(kClientB, "strumien", 16, server.subscriptionEpoch()));
@@ -468,6 +479,7 @@ TEST(IpcServerLoop, command_without_client_id_is_rejected_and_server_keeps_servi
 // not_recoverable przy kazdym obrocie, a wyjatek konczyl watek komunikacyjny: serwer liczyl
 // dalej, ale nie przyjmowal juz zadnej komendy. Ma odtworzyc kolejke i obsluzyc nastepna.
 TEST(IpcServerLoop, command_queue_abandoned_by_dead_client_is_recreated) {
+  if (!kDeadQueueOwnerDetectable) GTEST_SKIP() << "#410: zamek kolejki to spin_mutex - martwy wlasciciel = wieczny spin";
   RunningServer server;
   ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
 

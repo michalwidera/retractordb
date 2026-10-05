@@ -155,6 +155,22 @@ cmp_prefix() {
   cmp <(head -c "$bytes" "$left") <(head -c "$bytes" "$right")
 }
 
+# Migawka katalogu do porownania "przed/po": jedna linia na wpis - nazwa, rozmiar
+# i czas modyfikacji w nanosekundach, posortowane po nazwie. Zastepuje
+# `ls -l --time-style=full-iso` (rozszerzenie GNU; BSD `ls` go nie zna, a jego
+# domyslny czas ma rozdzielczosc minuty, wiec zapis w tej samej minucie bylby
+# niewidoczny).
+dir_snapshot() {
+  python3 - "$1" <<'RDB_PY'
+import os
+import sys
+
+for entry in sorted(os.scandir(sys.argv[1]), key=lambda e: e.name):
+    st = entry.stat(follow_symlinks=False)
+    print(entry.name, st.st_size, st.st_mtime_ns)
+RDB_PY
+}
+
 # Numeryczna wartosc stalej errno o podanej nazwie.
 #
 # Potrzebna, bo silnik zwraca kody bledow POSIX jako kod wyjscia procesu

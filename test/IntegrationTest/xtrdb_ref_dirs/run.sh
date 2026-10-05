@@ -11,6 +11,7 @@
 # Kazdy przypadek jest oceniany osobno, zeby czerwony przebieg pokazal wszystkie awarie.
 #
 # Uzycie: run.sh <xtrdb>
+. "$(dirname "$0")/../portable.sh"
 xtrdb="$1"
 status=0
 rm -rf store outside xdg out.txt
@@ -22,8 +23,9 @@ config="$XDG_CONFIG_HOME/retractor/retractor.toml"
 run_xtrdb() {
   # shellcheck disable=SC2059 # wejscie jest formatem printf z \n
   printf "$1" | (
-    ulimit -v 2000000
-    timeout 20 "$xtrdb" noprompt
+    # Darwin nie egzekwuje RLIMIT_AS i odrzuca `ulimit -v` bledem; tam straza zostaje sam limit czasu.
+    ulimit -v 2000000 2>/dev/null || true
+    run_timeout 20 "$xtrdb" noprompt
   ) >out.txt 2>&1
   rc=$?
 }

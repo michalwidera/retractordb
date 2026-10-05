@@ -20,8 +20,10 @@ set -e
 xretractor plan.rql -c
 
 # (0) Start z pliku planu: wartosc, ktorej plan nie moze przyjac, jest bledem parsowania jak
-# kazdy inny - kod 71 i powod w "Parse result:". Trzeci argument zmienia kanal powodu na
+# kazdy inny - kod EPROTO i powod w "Parse result:". Trzeci argument zmienia kanal powodu na
 # "Check result:", gdy odmowa zapada dopiero w kompilatorze; czwarty to plik --config.
+# Kod z nazwy stalej, nie z liczby: EPROTO to 71 na Linuksie i 100 na macOS.
+expected_rc=$(errno_value EPROTO)
 expect_file_rejected() {
   local plan="$1" reason="$2" channel="${3:-Parse result:}" config="${4:-}" out rc
   set +e
@@ -32,8 +34,8 @@ expect_file_rejected() {
   fi
   rc=$?
   set -e
-  if [ "$rc" -ne 71 ]; then
-    echo "start z pliku $plan: kod $rc zamiast 71: $out"
+  if [ "$rc" -ne "$expected_rc" ]; then
+    echo "start z pliku $plan: kod $rc zamiast $expected_rc: $out"
     exit 1
   fi
   case "$out" in
@@ -48,7 +50,7 @@ expect_file_rejected() {
 # (SIGABRT, kod 134), bez slowa o przyczynie (#306).
 echo "DECLARE a INTEGER STREAM core0, 99999999999 FILE 'source.dat'" >out_of_range.rql
 expect_file_rejected out_of_range.rql "numeric literal 99999999999 is out of range"
-# Zastrzezona nazwa to blad parsera zwracany z kodem 71, nie SIGABRT. W pliku z dwoma
+# Zastrzezona nazwa to blad parsera zwracany z kodem EPROTO, nie SIGABRT. W pliku z dwoma
 # bledami klient dostaje powod pierwszej niepoprawnej instrukcji.
 printf '%s\n' "DECLARE a INTEGER STREAM core0, 1 FILE 'source.dat'" \
   "SELECT core0[0] STREAM OUT_OF_BUSSINESS FROM core0" >reserved_name.rql

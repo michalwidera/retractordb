@@ -470,6 +470,8 @@ void countSignal(int /*signal*/) { signalsDelivered.fetch_add(1, std::memory_ord
 
 // EINTR z poll() nie odnawia terminu. Watek pomocniczy przerywa czekanie co 5 ms prawdziwym sygnalem
 // (handler bez SA_RESTART); przy odnawianym terminie faza trwalaby, dopoki leca sygnaly (2 s).
+// Odnowienie lapie gorna granica 700 ms; kontrola liczby sygnalow sprawdza tylko, ze przerwanie zaszlo
+// wiecej niz raz. Nie zalezy od ziarna budzika: na macOS 5 ms wychodzi pod obciazeniem ok. 37 ms (#408).
 TEST_F(BinaryDeviceROTest, await_deadline_survives_eintr) {
   auto path = sandboxPath("eintr.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
@@ -500,12 +502,14 @@ TEST_F(BinaryDeviceROTest, await_deadline_survives_eintr) {
 
   EXPECT_GE(elapsed, std::chrono::milliseconds(300));
   EXPECT_LT(elapsed, std::chrono::milliseconds(700));
-  EXPECT_GE(signalsDelivered.load(), 10) << "czekanie nie zostalo przerwane - test niczego nie sprawdzil";
+  EXPECT_GE(signalsDelivered.load(), 2) << "czekanie nie zostalo przerwane - test niczego nie sprawdzil";
   ::close(writer);
 }
 
 // EAGAIN po przebudzeniu nie odnawia terminu. Pisarz kapie po bajcie co 20 ms do rekordu 64 B, ktory
 // skompletowalby sie po ok. 1,3 s; kazdy bajt budzi poll(), a read() po nim konczy sie EAGAIN.
+// Jak wyzej: odnowienie lapie granica 700 ms, kontrola kropel nie zalezy od ziarna budzika (na macOS
+// 20 ms wychodzi ok. 100 ms, #408).
 TEST_F(BinaryDeviceROTest, await_deadline_survives_eagain) {
   auto path = sandboxPath("drip.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
@@ -528,7 +532,7 @@ TEST_F(BinaryDeviceROTest, await_deadline_survives_eagain) {
 
   EXPECT_GE(elapsed, std::chrono::milliseconds(300));
   EXPECT_LT(elapsed, std::chrono::milliseconds(700));
-  EXPECT_GE(dripped.load(), 5) << "pisarz nie budzil czekania - test niczego nie sprawdzil";
+  EXPECT_GE(dripped.load(), 2) << "pisarz nie budzil czekania - test niczego nie sprawdzil";
   ::close(writer);
 }
 

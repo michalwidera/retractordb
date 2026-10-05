@@ -12,11 +12,11 @@
 # ich znikniecie bylo ruchem wzorca, a nie cicha zmiana pliku, ktorego nikt nie czyta.
 set -e
 export LC_ALL=C
+. "$(dirname "$0")/../portable.sh"
 
 for f in temp/str1_*_dump*.tmp; do
   size=$(wc -c < "$f")
   printf '%s %d rekord(ow)\n' "${f##*/}" "$((size / 4))"
-  # -v jest konieczne: bez niego od skraca powtorzenia do gwiazdki i wlasnie ciag zer,
-  # o ktory tu chodzi, przestaje byc widoczny.
-  od -An -td4 -w4 -v "$f" | tr -d ' ' | paste -sd' ' -
+  # Kazda wartosc osobno - takze ciag zer, o ktory tu chodzi (`od` bez -v skracal go do gwiazdki).
+  read_binary_values "$f" d4
 done

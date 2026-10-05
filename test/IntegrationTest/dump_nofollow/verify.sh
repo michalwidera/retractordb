@@ -8,6 +8,7 @@
 # Na stdout: zawartosc obu zrzutow (4 B na rekord INTEGER), porownywana z pattern.txt.
 set -e
 export LC_ALL=C
+. "$(dirname "$0")/../portable.sh"
 
 rm -rf temp outside-*.txt
 mkdir temp
@@ -35,5 +36,5 @@ fi
 
 for f in temp/str1_viasymlink_dump.tmp temp/str1_viahardlink_dump.tmp; do
   printf '%s ' "${f##*/}"
-  od -An -td4 -w4 -v "$f" | tr -d ' ' | paste -sd' ' -
+  read_binary_values "$f" d4
 done
