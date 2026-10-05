@@ -73,15 +73,16 @@ wait_records() {
 write_ints seq.bin 1 400
 write_ints dev.bin 101 140
 
-# (1) Dryf. Okres 0,1 s; w kazdym slocie ~25 ms czekania na pusty DEVICE (pisarz trzymany na
+# (1) Dryf. Okres 0,2 s; w kazdym slocie ~25 ms czekania na pusty DEVICE (pisarz trzymany na
 # deskryptorze 3, danych brak) i ~25 ms reguly. Sen wzgledny przesuwa kazdy slot o te ~55 ms,
-# czyli o ~0,55 s miedzy tercjami 30 slotow; limit 0,2 s.
+# czyli o ~0,55 s miedzy tercjami 30 slotow niezaleznie od okresu; limit 0,2 s. Okres ma zapas wobec
+# pracy: na macOS CI ta sama praca trwala do ~140 ms (koalescencja budzikow, #408).
 mkfifo idle.fifo
 exec 3<>idle.fifo
 drift_plan() {
   printf '%s\n' "STORAGE '$1'" \
-    "DECLARE a INTEGER STREAM dev, 1/10 DEVICE 'idle.fifo' TIMEOUT 0.025" \
-    "DECLARE a INTEGER STREAM src, 1/10 BINFILE 'seq.bin'" \
+    "DECLARE a INTEGER STREAM dev, 1/5 DEVICE 'idle.fifo' TIMEOUT 0.025" \
+    "DECLARE a INTEGER STREAM src, 1/5 BINFILE 'seq.bin'" \
     "SELECT src[0] STREAM o FROM src" \
     "RULE work ON o WHEN o[0] > 0 DO SYSTEM 'sleep 0.025'"
 }
@@ -90,7 +91,7 @@ drift_plan dn >drift-n.rql
 watch_start dn/o
 run_timeout 60 xretractor drift-n.rql -k -r -m 31 >/dev/null
 watch_stop
-check drift times.txt dn/o 0.1 0.2
+check drift times.txt dn/o 0.2 0.2
 
 # (2) To samo z --realtime. Bez uprawnien RT opcja konczy sie na wypisie zgodnosci, a harmonogram
 # ma byc ten sam.
@@ -98,7 +99,7 @@ drift_plan dt >drift-t.rql
 watch_start dt/o
 run_timeout 60 xretractor drift-t.rql -k -r -t -m 31 >/dev/null
 watch_stop
-check drift times.txt dt/o 0.1 0.2
+check drift times.txt dt/o 0.2 0.2
 same_records dn/o dt/o
 exec 3>&-
 
@@ -150,22 +151,24 @@ server_wait_exit
 watch_stop
 check grid times.txt rb/r 0.1 0.3
 
-# (5) Import ad hoc szybkosci 1/10 do planu 1/4 po ~1,3 s. Os czasu nie jest przewijana: strumien o
-# zostaje na swojej siatce, a strumien g z importu lezy na siatce 0,1 s od tej samej kotwicy.
+# (5) Import ad hoc szybkosci 1/5 do planu 1/4 po ~1,3 s. Os czasu nie jest przewijana: strumien o
+# zostaje na swojej siatce, a strumien g z importu lezy na siatce 0,2 s od tej samej kotwicy. Okres
+# 0,2 s i limit fazy 0,08 s, bo odchylenie liczone modulo okres miesci sie w +-okres/2, a jitter
+# budzika na macOS CI siegal ~50 ms (#408).
 mkdir -p ah
 printf '%s\n' "STORAGE 'ah'" "DECLARE a INTEGER STREAM src, 1/4 BINFILE 'seq.bin'" "SELECT src[0] STREAM o FROM src" >adhoc.rql
 watch_start ah/o ah/g
 server_start adhoc.rql -k
 sleep 1.3
-xqry -a "DECLARE a INTEGER STREAM fast, 1/10 BINFILE 'seq.bin'"
+xqry -a "DECLARE a INTEGER STREAM fast, 1/5 BINFILE 'seq.bin'"
 xqry -a "SELECT fast[0]+1 STREAM g FROM fast"
-wait_records ah/o 14
+wait_records ah/o 18
 xqry -k >/dev/null
 server_wait_exit
 watch_stop
 check grid times.txt ah/o 0.25 0.1
-check grid times.txt ah/g 0.1 0.1
-check phase times.txt ah/g 0.1 ah/o 0.25 0.04
+check grid times.txt ah/g 0.2 0.1
+check phase times.txt ah/g 0.2 ah/o 0.25 0.08
 
 # (6) SIGTERM w trakcie snu przed pierwszym slotem okresu 4 s. Sen wzgledny dosypial do terminu
 # i liczyl ten slot; sen absolutny zglasza przerwanie, a petla konczy epoke przed slotem.
