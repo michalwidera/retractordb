@@ -28,7 +28,8 @@ namespace rdb {
 /// - udostępniać mergeShadow() scalające nadpisania (w kolejności zapisu - ostatnie nadpisanie pozycji wygrywa)
 ///   do głównego indeksu i usuwające cień, lustrzanie do merge() pliku cienia danych,
 /// - udostępniać discardShadow() odrzucające cień bez scalania, lustrzanie do usunięcia pliku .shadow danych,
-/// - przy reset() (purge/rotacja w storage) czyścić główny indeks i odrzucać cień,
+/// - przy reset() (purge) czyscic glowny indeks i odrzucac cien,
+/// - przy rotacji archiwizowac glowny indeks i jego cien pod tym samym numerem co dane,
 /// - udostępniać ścieżkę pliku cienia indeksu (metaShadowFilePath()) na potrzeby porządkowania zasobów przez storage.
 /// @note Walidacja zakresu recordIndex w onRecordModified() odbywa się względem totalRecords() głównego indeksu.
 /// @note Pozostałe wymagania (RLE, gap, persystencja głównego indeksu) dziedziczone z metaData.
@@ -49,6 +50,8 @@ class storageShadow : public metaData {
 
   /// @brief Clear the main index and discard the shadow index.
   void reset() override;
+
+  void rotate(int percounter, bool reopen = true) override;
 
   /// @brief Merge all shadow overrides into the main index and clear the shadow.
   ///

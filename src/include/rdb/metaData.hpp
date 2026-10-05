@@ -43,7 +43,7 @@ namespace rdb {
 ///   zarezerwowanym, zapisywanym jako zero (do 2026-09-02 niósł czas utworzenia indeksu - pole wycofane),
 /// - zarządzać własnymi zasobami w sposób bezpieczny i bez wycieków pamięci.
 /// - przyjąć od obiektu storage informację o przerwie w transmisji danych (wraz z jej długością w jednostkach próbkowania) i zapisać ją jako wpis gap w indeksie,
-/// - przyjąć od obiektu storage informację o rotacji pliku danych i wykonać rotację indeksu: skopiować obecny plik indeksu z rozszerzeniem .old/percounter, następnie stworzyć nowy, czysty plik indeksu (bez wpisu gap),
+/// - przyjąć od obiektu storage informację o rotacji pliku danych i wykonać rotację indeksu: przemianować obecny plik indeksu z rozszerzeniem .old/percounter, następnie stworzyć nowy, czysty plik indeksu (bez wpisu gap), a przy zamknięciu magazynu tylko odłączyć się od pliku,
 /// - jeśli plik danych nie zrotował, przyjąć od obiektu storage informację o brakujących danych i dopisać odpowiedni wpis gap przed pierwszym nowym rekordem.
 /// - gwarantować, że plik indeksu nigdy nie zawiera przestarzałych (nadpisanych logicznie) wpisów: jeśli bieżący segment RLE został wciągnięty do pamięci w celu rozszerzenia (mechanizm lazy overwrite), każda operacja dopisująca nowe wpisy do pliku musi najpierw zastąpić ten przestarzały wpis zamiast dopisywać za nim.
 /// - udostępniać metodę wymuszającą natychmiastowy zapis pending entry na dysk (flushCurrentEntry()), aby null metadata przeżyła awarię lub otwarcie pliku przez drugi obiekt storage.
@@ -180,12 +180,12 @@ class metaData {
 
   /// @brief Rotate the meta index file: rename current to .old<percounter>, reset to initial state.
   ///
-  /// Called by storage when it detects at startup that the data file was rotated
-  /// (empty data file but non-empty meta index). Renames the current meta file to
-  /// `<metaFilePath>.old<percounter>` and creates a fresh, empty meta file.
+  /// Przy zamknieciu storage przekazuje reopen=false: indeks jest zapisany i archiwizowany
+  /// bez odtwarzania aktywnego pliku. Wariant z cieniem archiwizuje tez .meta.shadow.
+  /// Domyslne reopen=true przygotowuje nowy pusty indeks do dalszego zapisu.
   /// If percounter < 0, the rename is skipped and the index is simply reset.
   /// @param percounter rotation counter (same suffix used for data file rotation)
-  void rotate(int percounter);
+  virtual void rotate(int percounter, bool reopen = true);
 
   /// @brief Clear all index data and reset to initial state.
   ///

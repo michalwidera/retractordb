@@ -25,6 +25,12 @@ void storageShadow::reset() {
   shadow_.discard();
 }
 
+void storageShadow::rotate(int percounter, const bool reopen) {
+  // Przed reset() glownego indeksu, ktory odrzucilby niezarchiwizowany cien.
+  shadow_.rotate(percounter);
+  metaData::rotate(percounter, reopen);
+}
+
 void storageShadow::mergeShadow() {
   for (const auto &ov : shadow_.overrides())
     metaData::onRecordModified(ov.recordIndex, ov.nullBitset);

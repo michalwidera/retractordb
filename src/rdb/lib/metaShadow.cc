@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <format>
 #include <ranges>
 #include <span>
 #include <stdexcept>
@@ -121,6 +122,20 @@ void metaShadow::discard() {
   if (shadowFilePath_.empty()) return;
   std::error_code ec;
   std::filesystem::remove(shadowFilePath_, ec);
+}
+
+void metaShadow::rotate(int percounter) {
+  if (percounter < 0 || shadowFilePath_.empty()) return;
+  std::error_code ec;
+  if (!std::filesystem::exists(shadowFilePath_, ec)) return;
+  const std::string rotatedPath = std::format("{}.old{}", shadowFilePath_, percounter);
+  const bool overwrites         = std::filesystem::exists(rotatedPath, ec);
+  std::filesystem::rename(shadowFilePath_, rotatedPath, ec);
+  if (ec)
+    SPDLOG_WARN("metaShadow::rotate: failed to rename '{}' to '{}': {}", shadowFilePath_, rotatedPath, ec.message());
+  else if (overwrites)
+    SPDLOG_ERROR("Rotation of {} overwrote existing archive {}; its previous content is lost", shadowFilePath_, rotatedPath);
+  overrides_.clear();
 }
 
 }  // namespace rdb

@@ -78,7 +78,8 @@ enum class WriteStatus : std::uint8_t {
 /// - umożliwiać konfigurację interwału próbkowania oraz liczby rekordów nullfill poprzedzających oznaczenie gap;
 ///   samą maszynę detekcji gap (nullfill/absorpcja/flush) realizuje metaData,
 /// - przy starcie wyznaczać przerwę w transmisji danych (wynikającą z niedziałania systemu) jako liczbę interwałów próbkowania, które upłynęły od ostatniego zapisu pliku danych do momentu startu, i przekazywać ją do obiektu indeksu metadanych w celu zarejestrowania jako wpis gap,
-/// - przy starcie wykrywać zaszłą rotację pliku danych (świeży/pusty magazyn przy niepustym indeksie metadanych) i informować obiekt indeksu, aby ten zrotował indeks tak jak storage (.old<percounter> dla percounter >= 0) i przygotował nowy ze stanem początkowym.
+/// - przy zamknieciu rotowac indeks metadanych pod tym samym numerem .old<percounter> co dane,
+///   a przy starcie pustego magazynu usuwac osierocony indeks pozostawiony przez starsza wersje.
 ///
 /// @note Klasa sama nie implementuje fizycznego formatu magazynu; deleguje operacje I/O do accessor_.
 /// @note Semantyka nullfill i gap dotyczy tylko ścieżki zapisu z włączonym mechanizmem gap detection (configureGapDetection()).
@@ -99,7 +100,7 @@ class storage {
 
   boost::rational<int> rInterval_{1};  ///< sampling interval for time calculations
 
-  void detectStartupState();  ///< detect rotation or startup gap after meta index is ready
+  void detectStartupState();  ///< resetuje osierocony indeks lub wykrywa przerwe po przygotowaniu metadanych
   [[nodiscard]] std::string attachStorage();
 
   void abortIfStorageNotPrepared();

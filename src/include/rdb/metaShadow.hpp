@@ -60,6 +60,9 @@ class metaShadow {
   /// @brief Discard all overrides and remove the shadow file.
   void discard();
 
+  /// @brief Archiwizuje cien pod tym samym numerem co plik danych i glowny indeks.
+  void rotate(int percounter);
+
   /// @brief Path of the shadow index file corresponding to @p metaFilePath, without instantiating a metaShadow.
   [[nodiscard]] static std::string shadowFilePathFor(std::string_view metaFilePath);
 
