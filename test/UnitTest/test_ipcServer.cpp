@@ -1,10 +1,13 @@
+#include <gtest/gtest-spi.h>
 #include <gtest/gtest.h>
 
+#include <poll.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <array>
 #include <atomic>
+#include <cerrno>
 #include <chrono>
 #include <csignal>
 #include <cstddef>
@@ -60,13 +63,21 @@ bool queueExists(int clientId, std::string_view serverName = {}) {
 /// SIGKILL z zewnatrz, a nie _exit ani raise(SIGKILL): w obu tych przypadkach valgrind przed
 /// koncem potomka robil kontrole wyciekow na stercie skopiowanej od rodzica, gdzie TLS jego
 /// watku komunikacyjnego wychodzil jako "possibly lost". Nikt tego nie widzial, bo waitpid
-/// gubil status - teraz status jest sprawdzany. Wyjatek w potomku konczy go od razu: inaczej
-/// wrocilby do gtest i puscil reszte zestawu obok rodzica.
+/// gubil status - teraz status jest sprawdzany. Wyjatek w potomku zamyka potok: rodzic dostaje
+/// EOF i tez zbiera go przez SIGKILL, bez kontroli odziedziczonej sterty. Potomek nigdy nie
+/// wraca do gtest, zeby nie puscic reszty zestawu obok rodzica.
 void abandonQueueLock(const std::string &queueName) {
   int locked[2];
   ASSERT_EQ(pipe(locked), 0);
   const pid_t child = fork();
+  if (child < 0) {
+    const int error = errno;
+    close(locked[0]);
+    close(locked[1]);
+    FAIL() << "fork: errno " << error;
+  }
   if (child == 0) {
+    close(locked[0]);
     try {
       using Impl   = IPC::ipcdetail::managed_open_or_create_impl<IPC::shared_memory_object, 0, true, false>;
       using Header = IPC::ipcdetail::mq_hdr_t<IPC::offset_ptr<void>>;
@@ -75,21 +86,64 @@ void abandonQueueLock(const std::string &queueName) {
       auto *header = reinterpret_cast<Header *>(static_cast<char *>(region.get_address()) + Impl::ManagedOpenOrCreateUserOffset);
       header->m_mutex.lock();
       const char byte = 1;
-      if (write(locked[1], &byte, 1) != 1) _exit(1);
+      ssize_t written;
+      do {
+        written = write(locked[1], &byte, 1);
+      } while (written < 0 && errno == EINTR);
+      close(locked[1]);
       for (;;)
         pause();
     } catch (...) {
-      _exit(1);
+      close(locked[1]);
+      for (;;)
+        pause();
     }
   }
   close(locked[1]);
-  char byte           = 0;
-  const bool acquired = read(locked[0], &byte, 1) == 1;
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  pollfd ready{locked[0], POLLIN, 0};
+  char byte        = 0;
+  ssize_t received = -1;
+  int pipeError    = 0;
+  bool timedOut    = false;
+  for (;;) {
+    const auto remaining = std::chrono::ceil<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
+    if (remaining.count() <= 0) {
+      timedOut = true;
+      break;
+    }
+    const int result = poll(&ready, 1, static_cast<int>(remaining.count()));
+    if (result < 0) {
+      if (errno == EINTR) continue;
+      pipeError = errno;
+      break;
+    }
+    if (result == 0) {
+      timedOut = true;
+      break;
+    }
+    if (ready.revents & (POLLIN | POLLHUP)) {
+      received = read(locked[0], &byte, 1);
+      if (received < 0 && errno == EINTR) continue;
+      if (received < 0) pipeError = errno;
+      break;
+    }
+    pipeError = (ready.revents & POLLNVAL) ? EBADF : EIO;
+    break;
+  }
   close(locked[0]);
-  kill(child, SIGKILL);
-  int status = 0;
-  waitpid(child, &status, 0);
-  EXPECT_TRUE(acquired) << "potomek nie wzial muteksu kolejki";
+  const int killed    = kill(child, SIGKILL);
+  const int killError = errno;
+  int status          = 0;
+  pid_t waited;
+  do {
+    waited = waitpid(child, &status, 0);
+  } while (waited < 0 && errno == EINTR);
+  ASSERT_EQ(waited, child) << "waitpid: errno " << errno;
+  ASSERT_EQ(killed, 0) << "kill: errno " << killError;
+  ASSERT_FALSE(timedOut) << "przekroczono czas oczekiwania na muteks kolejki";
+  ASSERT_EQ(pipeError, 0) << "potok: errno " << pipeError;
+  ASSERT_TRUE(received == 1 && byte == 1) << "potomek nie wzial muteksu kolejki (odczyt: " << received << ")";
   EXPECT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL) << "potomek: status " << status;
 }
 
@@ -143,6 +197,22 @@ class IpcServerQueues : public ::testing::Test {
 };
 
 }  // namespace
+
+TEST_F(IpcServerQueues, abandonQueueLock_reports_eof_from_child) {
+  EXPECT_FATAL_FAILURE(abandonQueueLock(queueNameFor(kClientA)), "potomek nie wzial muteksu kolejki");
+}
+
+TEST_F(IpcServerQueues, abandonQueueLock_times_out_when_mutex_is_busy) {
+  IPC::message_queue mq(IPC::create_only, queueNameFor(kClientA).c_str(), 1, 1);
+  using Impl   = IPC::ipcdetail::managed_open_or_create_impl<IPC::shared_memory_object, 0, true, false>;
+  using Header = IPC::ipcdetail::mq_hdr_t<IPC::offset_ptr<void>>;
+  IPC::shared_memory_object shm(IPC::open_only, queueNameFor(kClientA).c_str(), IPC::read_write);
+  IPC::mapped_region region(shm, IPC::read_write);
+  auto *header = reinterpret_cast<Header *>(static_cast<char *>(region.get_address()) + Impl::ManagedOpenOrCreateUserOffset);
+  header->m_mutex.lock();
+  EXPECT_FATAL_FAILURE(abandonQueueLock(queueNameFor(kClientA)), "przekroczono czas oczekiwania");
+  header->m_mutex.unlock();
+}
 
 TEST_F(IpcServerQueues, subscribe_creates_response_queue) {
   IpcServer server;
@@ -255,7 +325,7 @@ TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
   ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
   ASSERT_TRUE(server.subscribe(kClientB, "strumien", 16, server.subscriptionEpoch()));
   IPC::message_queue probe(IPC::open_only, queueNameFor(kClientA).c_str());
-  abandonQueueLock(queueNameFor(kClientA));
+  ASSERT_NO_FATAL_FAILURE(abandonQueueLock(queueNameFor(kClientA)));
   ASSERT_TRUE(queueLockIsAbandoned(probe)) << "symulacja martwego wlasciciela nie zadzialala";
 
   const std::array<std::string_view, 1> streams{"strumien"};
@@ -484,7 +554,7 @@ TEST(IpcServerLoop, command_queue_abandoned_by_dead_client_is_recreated) {
   ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
 
   IPC::message_queue probe(IPC::open_only, server.commandQueue().c_str());
-  abandonQueueLock(server.commandQueue());
+  ASSERT_NO_FATAL_FAILURE(abandonQueueLock(server.commandQueue()));
   ASSERT_TRUE(queueLockIsAbandoned(probe)) << "symulacja martwego wlasciciela nie zadzialala";
 
   ASSERT_TRUE(server.sendWithin(command(kClientNext, "po"))) << "kolejka komend nie zostala odtworzona";
