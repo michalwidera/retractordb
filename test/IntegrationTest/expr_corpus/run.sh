@@ -9,8 +9,16 @@ set -e
 . "$(dirname "$0")/../portable.sh"
 export LC_ALL=C
 
+shopt -s nullglob
+plans=(*.rql)
+if [ "${#plans[@]}" -eq 0 ]; then
+  echo "WYROCZNIA: brak planow w korpusie"
+  exit 1
+fi
+python3 test_oracle.py
+
 status=0
-for rql in *.rql; do
+for rql in "${plans[@]}"; do
   plan=${rql%.rql}
   rm -rf temp
   mkdir temp
