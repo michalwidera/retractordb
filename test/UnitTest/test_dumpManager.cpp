@@ -6,6 +6,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
+#include <map>
 #include <memory>
 #include <string>
 
@@ -15,6 +17,11 @@
 
 #include "rdb/descriptor.hpp"
 #include "rdb/payload.hpp"
+#include "retractor/lib/compiler.hpp"
+#include "retractor/lib/dataModel.hpp"
+#include "retractor/lib/executorsmState.hpp"
+#include "retractor/lib/qTree.hpp"
+#include "retractor/lib/RQLParser.hpp"
 #include "syscallWrap.hpp"
 
 extern "C" off_t __real_lseek(int fd, off_t offset, int whence);
@@ -323,3 +330,71 @@ TEST_F(DumpManagerFileTest, createDumpFile_with_retention_creates_numbered_files
   EXPECT_TRUE(std::filesystem::exists(f0));
   EXPECT_TRUE(std::filesystem::exists(f1));
 }
+
+class DumpManagerTaskTest : public DumpManagerFileTest, public ::testing::WithParamInterface<size_t> {
+ protected:
+  qTree plan;
+  std::unique_ptr<dataModel> model;
+
+  void SetUp() override {
+    DumpManagerFileTest::SetUp();
+    const auto inputFile = sandBoxFolder / "input.bin";
+    std::ofstream(inputFile, std::ios::binary).write("\0\0\0\0", 4);
+    const auto [status, keyword, streamName] = parserRQLString(
+        plan, "STORAGE '" + sandBoxFolder.string() + "'\nDECLARE value INTEGER STREAM src, 1 BINFILE '" + inputFile.string() +
+                  "'\nSELECT src[0] STREAM result FROM src RETENTION " + std::to_string(GetParam() + 1) + " STORAGE MEMORY\n");
+    ASSERT_EQ(status, "OK");
+    compiler compilePlan(plan);
+    ASSERT_EQ(compilePlan.compile(), "OK");
+    model = std::make_unique<dataModel>(plan);
+    pProc = model.get();
+  }
+
+  void TearDown() override {
+    pProc = nullptr;
+    model.reset();
+    DumpManagerFileTest::TearDown();
+  }
+};
+
+// Pierwsza nazwa, zawiniecie retencji i bajty kazdego pozostalego zrzutu.
+// Zadania koncza sie przed kolejnym wyzwoleniem - nakladanie zrzutow to osobny kontrakt (#380).
+TEST_P(DumpManagerTaskTest, registerTask_retains_completed_dump_files_and_contents) {
+  dumpManager manager;
+  manager.setDumpStorage(sandBoxFolder.string());
+  const auto retention = GetParam();
+  std::map<std::filesystem::path, std::int32_t> expectedDumps;
+  auto &output = *model->qSet.at("result")->outputPayload;
+
+  for (int trigger = 0; trigger < 5; ++trigger) {
+    const std::int32_t value = 10 + trigger;
+    output.getPayload()->setItem(0, value);
+    static_cast<void>(output.write());
+    manager.registerTask("result", dumpTask("task", {0, 1}, retention));
+
+    const auto suffix   = retention == 0 ? "_dump.tmp" : "_dump_" + std::to_string(trigger % retention) + ".tmp";
+    const auto filename = sandBoxFolder / ("result_task" + suffix);
+    EXPECT_EQ(manager.bookOfTasks.at("result").back().dumpFilename, filename.string());
+    manager.processStreamChunk("result");
+    EXPECT_TRUE(manager.bookOfTasks.at("result").empty());
+    expectedDumps[filename] = value;
+
+    size_t dumpCount = 0;
+    for (const auto &entry : std::filesystem::directory_iterator(sandBoxFolder))
+      if (entry.path().extension() == ".tmp") ++dumpCount;
+    EXPECT_EQ(dumpCount, expectedDumps.size());
+    if (retention > 0) EXPECT_FALSE(std::filesystem::exists(sandBoxFolder / "result_task_dump.tmp"));
+
+    for (const auto &[path, expectedValue] : expectedDumps) {
+      std::ifstream dump(path, std::ios::binary);
+      ASSERT_TRUE(dump.is_open()) << path;
+      std::int32_t actualValue = 0;
+      dump.read(reinterpret_cast<char *>(&actualValue), sizeof(actualValue));
+      ASSERT_EQ(dump.gcount(), sizeof(actualValue)) << path;
+      EXPECT_EQ(actualValue, expectedValue) << path;
+      EXPECT_EQ(dump.peek(), std::ifstream::traits_type::eof()) << path;
+    }
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(BoundarySizes, DumpManagerTaskTest, ::testing::Values(size_t{0}, size_t{1}, size_t{2}));

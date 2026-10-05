@@ -58,12 +58,12 @@ ptree executorsm::attachAdHocRule(qTree &coreInstanceCopy, const std::string &st
 
   // Pojemnosci nie da sie podniesc w locie: polityka trafia do deskryptora przy tworzeniu
   // streamInstance, a storage::setCapacity() dla strumienia niedeklarowanego nic nie robi.
-  // Magazyn MEMORY jest pierscieniem o rozmiarze policy.second - glebszej historii tam nie ma
-  // i nie bedzie, wiec odmawiamy zamiast uzbrajac regule, ktora czekalaby w nieskonczonosc.
-  if (historyDepth > 0 && targetPolicy.first == "MEMORY" && std::cmp_greater(historyDepth, targetPolicy.second))
+  // Magazyn MEMORY jest pierscieniem o rozmiarze policy.second; rekord biezacy zajmuje jeden
+  // slot, wiec na historie zostaje policy.second - 1. Glebszy zakres odmawiamy przed dolaczeniem.
+  if (historyDepth > 0 && targetPolicy.first == "MEMORY" && std::cmp_greater_equal(historyDepth, targetPolicy.second))
     return refuse("stream '" + streamName + "' keeps only " + std::to_string(targetPolicy.second) +
-                  " record(s) in memory, so a dump range reaching " + std::to_string(historyDepth) +
-                  " record(s) back cannot be served");
+                  " record(s) in memory, but a dump range reaching " + std::to_string(historyDepth) + " record(s) back needs " +
+                  std::to_string(historyDepth + 1) + " (history plus the current record)");
 
   compiler localCompiler(coreInstanceCopy);
   localCompiler.setHistoryMemoryBudget(cfgHistoryMemoryMib);
@@ -89,9 +89,10 @@ ptree executorsm::attachAdHocRule(qTree &coreInstanceCopy, const std::string &st
     if (!(compiledLayout == live.descriptorStorage()))
       return refuse("stream '" + streamName + "' has a different record layout in the recompiled plan");
 
-    // Granica historii: regula rusza dopiero, gdy PO dolaczeniu przybedzie tyle rekordow, ile
-    // siega jej zakres. Do tej chwili zostaje nieuzbrojona - patrz rule::armAtCount.
-    attached.armAtCount = pProc->getStreamCount(streamName) + static_cast<size_t>(historyDepth);
+    // Granica historii: PO dolaczeniu musi przybyc cala historia ORAZ rekord oceniany przez
+    // WHEN. Przy c + historyDepth najstarszy odczyt (offset historyDepth) trafial jeszcze
+    // w ostatni rekord sprzed dolaczenia. Bez historii regula rusza na pierwszym nowym rekordzie.
+    attached.armAtCount = pProc->getStreamCount(streamName) + static_cast<size_t>(historyDepth) + 1;
     live.lRules.push_back(std::move(attached));
   }
 
