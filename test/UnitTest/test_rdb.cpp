@@ -625,52 +625,66 @@ TEST(xrdb, storage_setSamplingInterval_propagates_to_meta) {
   std::filesystem::remove(metaFile);
 }
 
-// ── Storage startup: rotation detection via detectStartupState() ─────────────
-//
-// When the data file is renamed by posixBinaryFile destructor (percounter >= 0)
-// but the meta file survives, detectStartupState() must detect the mismatch
-// (recordsCount_==0 but meta has records) and rotate the meta index.
+// Rotacja zamyka dane, indeks i oba cienie w tej samej sesji, bez detekcji gap.
+// Korekta rekordu 0 sprawdza niepusty cien, a ponowny odczyt archiwum - jego NULL-e.
+TEST(xrdb, storage_rotates_data_and_null_indexes_on_shutdown) {
+  const auto desc = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
+  for (const std::string type : {"DIRECT", "DEFAULT", "POSIX", "POSIXSHD", "GENERIC"}) {
+    SCOPED_TRACE(type);
+    const std::filesystem::path root = "ut-rotation-" + type;
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root / "view");
+    const auto dataFile = root / "result";
+    const auto metaFile = root / "result.meta";
+    const bool shadow   = type == "DEFAULT" || type == "POSIXSHD";
+    for (int session = 0; session < 2; ++session) {
+      {
+        rdb::storage s("result", "result", root.string(), type, false, false, session);
+        ASSERT_EQ(s.attachDescriptor(&desc), "");
+        EXPECT_EQ(s.getRecordsCount(), 0U);
+        EXPECT_TRUE(s.isMetaIndexEmpty());
+        auto *pl = s.getPayload();
+        pl->setItem(0, session == 0 ? std::optional<std::any>{std::nullopt} : std::optional<std::any>{42});
+        EXPECT_EQ(s.write(), rdb::WriteStatus::Ok);
+        pl->setItem(0, 100 + session);
+        EXPECT_EQ(s.write(), rdb::WriteStatus::Ok);
+        pl->setItem(0, session == 0 ? std::optional<std::any>{77} : std::optional<std::any>{std::nullopt});
+        EXPECT_EQ(s.write(0), rdb::WriteStatus::Ok);
+        EXPECT_EQ(s.read(0), rdb::ReadStatus::Ok);
+        EXPECT_EQ(pl->getNullBitset(), std::vector<bool>{session == 1});
+        if (session == 0) EXPECT_EQ(std::any_cast<int>(pl->getItem(0).value()), 77);
+      }
 
-TEST(xrdb, storage_detects_rotation_and_rotates_meta) {
-  const std::string qryID    = "ut-rotation-detect";
-  const std::string dataFile = "ut-rotation-detect.bin";
-  const std::string descFile = qryID + ".desc";
-  const std::string metaFile = dataFile + ".meta";
-  const std::string metaOld  = metaFile + ".old0";
-  const std::string dataOld  = dataFile + ".old0";
+      const std::string suffix = ".old" + std::to_string(session);
+      ASSERT_TRUE(std::filesystem::exists(dataFile.string() + suffix));
+      ASSERT_TRUE(std::filesystem::exists(metaFile.string() + suffix));
+      EXPECT_FALSE(std::filesystem::exists(dataFile));
+      EXPECT_FALSE(std::filesystem::exists(metaFile));
+      for (const auto &name : {"result.shadow", "result.meta.shadow"}) {
+        EXPECT_FALSE(std::filesystem::exists(root / name));
+        EXPECT_EQ(std::filesystem::exists(root / (name + suffix)), shadow);
+      }
 
-  auto desc = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
-
-  // First lifecycle: write 3 records; no configureGapDetection so meta is plain.
-  // posixBinaryFile destructor renames dataFile → dataFile.old0.
-  {
-    rdb::storage s(qryID, dataFile, ".", "POSIX", false, false, 0);
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
-    auto *pl = s.getPayload();
-    for (int i = 0; i < 3; ++i) {
-      pl->setItem(0, i);
-      static_cast<void>(s.write());
+      // Archiwum odtwarzamy pod nazwami roboczymi, aby sprawdzic normalna sciezke storage::read.
+      for (const auto &name : {"result", "result.meta", "result.shadow", "result.meta.shadow"}) {
+        if (!shadow && std::string(name).ends_with("shadow")) continue;
+        std::filesystem::copy_file(root / (name + suffix), root / "view" / name,
+                                   std::filesystem::copy_options::overwrite_existing);
+      }
+      {
+        rdb::storage view("result", "result", (root / "view").string(), type, false, false, -1);
+        ASSERT_EQ(view.attachDescriptor(&desc), "");
+        EXPECT_EQ(view.getRecordsCount(), 2U);
+        EXPECT_EQ(view.read(0), rdb::ReadStatus::Ok);
+        EXPECT_EQ(view.getPayload()->getNullBitset(), std::vector<bool>{session == 1});
+        if (session == 0) EXPECT_EQ(std::any_cast<int>(view.getPayload()->getItem(0).value()), 77);
+        EXPECT_EQ(view.read(1), rdb::ReadStatus::Ok);
+        EXPECT_EQ(view.getPayload()->getNullBitset(), std::vector<bool>{false});
+        EXPECT_EQ(std::any_cast<int>(view.getPayload()->getItem(0).value()), 100 + session);
+      }
     }
-    EXPECT_EQ(s.getRecordsCount(), 3U);
-    // ~storage → ~posixBinaryFile: renames dataFile → dataFile.old0
+    std::filesystem::remove_all(root);
   }
-
-  EXPECT_FALSE(std::filesystem::exists(dataFile));  // renamed by destructor
-  EXPECT_TRUE(std::filesystem::exists(dataOld));
-  EXPECT_TRUE(std::filesystem::exists(metaFile));  // meta survives
-
-  // Second lifecycle: new empty data file, old meta still has 3 records.
-  {
-    rdb::storage s(qryID, dataFile, ".", "POSIX", false, false, 0);
-    EXPECT_EQ(s.attachDescriptor(&desc), "");  // creates new empty data file
-    s.configureGapDetection({1, 10});          // detectStartupState: rotation! → rotate(0)
-
-    EXPECT_TRUE(s.isMetaIndexEmpty());              // meta rotated to initial state
-    EXPECT_TRUE(std::filesystem::exists(metaOld));  // old meta preserved
-  }
-
-  for (const auto &f : {dataFile, dataOld, descFile, metaFile, metaOld})
-    std::filesystem::remove(f);
 }
 
 // When data and meta counts match (no rotation), configureGapDetection must NOT

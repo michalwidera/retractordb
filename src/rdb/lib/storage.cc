@@ -125,6 +125,10 @@ storage::~storage() {
     if (keepDataFiles)
       SPDLOG_WARN("storage: keeping {} - it lies outside the storage directory and storage.ref_dirs", paths_.storageFile());
     paths_.removeAllFiles(keepDataFiles);
+  } else if (metaData_ && percounter_ >= 0 && !isDeclared() && !isMemoryBackedStorage()) {
+    // Ten sam numer i ten sam koniec sesji co w destruktorze akcesora danych.
+    // Bez nowego pliku roboczego: destruktor indeksu nie moze odtworzyc starego .meta.
+    metaData_->rotate(percounter_, false);
   }
 }
 
@@ -444,13 +448,16 @@ void storage::configureGapDetection(boost::rational<int> rInterval, int nullFill
 }
 
 void storage::detectStartupState() {
-  if (!metaData_ || !metaData_->gapDetectionEnabled()) return;
+  if (!metaData_) return;
 
-  // Detect rotation: data file is fresh/empty but meta index has records from previous run
+  // Pusty magazyn nie moze czytac indeksu osieroconego przez starsza wersje silnika.
+  // Numeru tamtej sesji nie znamy; archiwizacja odbywa sie teraz przy zamknieciu.
   if (recordsCount_ == 0 && !metaData_->isEmpty()) {
-    metaData_->rotate(percounter_);
+    metaData_->reset();
     return;
   }
+
+  if (!metaData_->gapDetectionEnabled()) return;
 
   // Fresh start with no previous records - nothing to gap from
   if (metaData_->isEmpty()) return;

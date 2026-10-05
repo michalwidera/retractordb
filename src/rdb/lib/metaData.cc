@@ -196,7 +196,7 @@ bool metaData::isGapBefore(size_t recordIndex) const {
 
 bool metaData::isEmpty() const { return totalRecords() == 0; }
 
-void metaData::rotate(int percounter) {
+void metaData::rotate(int percounter, const bool reopen) {
   flushCurrentEntry();
   if (percounter >= 0 && !store_.empty() && store_.fileExists()) {
     std::string rotatedPath = std::format("{}.old{}", store_.path(), percounter);
@@ -209,7 +209,10 @@ void metaData::rotate(int percounter) {
     else if (overwrites)
       SPDLOG_ERROR("Rotation of {} overwrote existing archive {}; its previous content is lost", store_.path(), rotatedPath);
   }
-  reset();
+  if (reopen)
+    reset();
+  else
+    abandonFile();
 }
 
 void metaData::reset() {
