@@ -118,6 +118,13 @@ run_research_option() {
                 "$ablation_factor" \
                 "$ablation_probe" \
                 "$ablation_simplify"
+
+            # Prefiks obowiazuje w podpowloce testow, bez zmiany instalacji Debug.
+            echo "-- Run the full suite against this ablation build (CLAUDE.md: Ablation floor):"
+            printf '(\n  export PATH=%q:"$PATH"\n' \
+                "$ablation_build_dir/src/retractor:$ablation_build_dir/src/rdb:$ablation_build_dir/src/qry"
+            printf '  command -v xretractor xtrdb xqry &&\n  xretractor --build-info &&\n'
+            printf '  ctest --test-dir %q -j 4 --output-on-failure\n)\n' "$ablation_build_dir/test"
             ;;
         "probe")
             # Budowa Release z WŁĄCZONĄ sondą pomiarową (benchmark E1/E3). Release, bo
