@@ -58,7 +58,7 @@ std::string tooLargeResponse(std::size_t length) {
 void faultReadDelay(std::size_t slotIndex) {
   const char *delayMs = std::getenv("RDB_FAULT_CLIENT_READ_DELAY");
   if (delayMs == nullptr) return;
-  std::cerr << "RDB_FAULT_CLIENT_READ_DELAY: holding response slot " << slotIndex << " in READING" << std::endl;
+  std::cerr << "RDB_FAULT_CLIENT_READ_DELAY: holding response slot " << slotIndex << " in READING\n" << std::flush;
   std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
 }
 
@@ -171,7 +171,7 @@ std::optional<std::string> take(Segment &segment, const Owner &owner, std::chron
   }
 }
 
-Mapping::Mapping(IPC::create_only_t, const std::string &name)
+Mapping::Mapping(IPC::create_only_t /*tag*/, const std::string &name)
     : shm_(IPC::create_only, name.c_str(), IPC::read_write, IPC::permissions(kObjectPermissions)) {
   // truncate wypelnia segment zerami, a zero to SlotState::Free w kazdym slocie.
   shm_.truncate(static_cast<IPC::offset_t>(sizeof(Segment)));
@@ -179,7 +179,7 @@ Mapping::Mapping(IPC::create_only_t, const std::string &name)
   initialize(segment());
 }
 
-Mapping::Mapping(IPC::open_only_t, const std::string &name)
+Mapping::Mapping(IPC::open_only_t /*tag*/, const std::string &name)
     : shm_(IPC::open_only, name.c_str(), IPC::read_write),
       region_(shm_, IPC::read_write) {}
 

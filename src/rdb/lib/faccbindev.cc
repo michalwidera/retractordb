@@ -26,7 +26,6 @@ binaryDeviceRO::binaryDeviceRO(const std::string_view fileName,  //
       storageType_(std::string(storageType)),
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),
       descriptor_(descriptor),
-      fd_(-1),
       loopToBeginningIfEOF_(loopToBeginningIfEOF),
       lastNullBitset_(descriptor.size(), false),
       isDevice_(storageType == "DEVICE") {

@@ -974,7 +974,7 @@ std::string compiler::expandSchemaWildcards() {
     // buildOutputSchema() materializuje schemat węzła pochodnego kopiując listy pól
     // operandów, więc konsument złączenia zobaczyłby strumień z nierozwiniętym [_]
     // jako jednopolowy i schemat rozjechałby się z układem rekordu.
-    const std::string resultIdx{expandIndexWildcards(q)};
+    std::string resultIdx{expandIndexWildcards(q)};
     if (resultIdx != "OK") return resultIdx;
 
     // A2 M11: wymiary wezla PO rozwinieciu `*` i [_], ktore skopiowaly lub zlozyly schemat.
@@ -1703,7 +1703,7 @@ std::vector<std::pair<std::string, std::string>> compiler::unboundedDiskStreams(
       reason = std::format("STORAGE {} has no retention", type);
     }
     if (reason.empty()) continue;
-    if (q.isSubstrat) reason = "intermediate stream, " + reason;
+    if (q.isSubstrat) reason.insert(0, "intermediate stream, ");
     retVal.emplace_back(q.id, reason);
   }
   return retVal;

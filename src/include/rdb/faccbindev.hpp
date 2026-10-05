@@ -66,7 +66,7 @@ class binaryDeviceRO : public FileInterface {
   /**
    * @brief Posix File Descriptor
    */
-  int fd_;
+  int fd_ = -1;
 
   size_t cnt_ = 0;
 

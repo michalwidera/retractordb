@@ -2,6 +2,7 @@
 
 #include <sys/wait.h>  // WIFEXITED, WEXITSTATUS dla wyniku ::system()
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>  // std::div
 #include <memory>   // unique_ptr
@@ -247,10 +248,10 @@ void reduceIntegralFields(opType op, const rdb::payload &source, int flatCount, 
     if (overflow) continue;
     switch (op) {
       case maxop:
-        if (acc < *value) acc = *value;
+        acc = std::max(acc, *value);
         break;
       case minop:
-        if (acc > *value) acc = *value;
+        acc = std::min(acc, *value);
         break;
       case sumop: {
         const auto sum = checkedArith::add(acc, *value);

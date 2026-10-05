@@ -6,6 +6,7 @@
 #include <cctype>
 #include <cerrno>
 #include <charconv>
+#include <cstddef>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -49,6 +50,7 @@ int PersistentCounter::getCount() const { return count_; }
 // tu odtworzyc, a kazdy zgadniety moze nadpisac archiwum. Operator naprawia plik albo
 // swiadomie go usuwa.
 void PersistentCounter::load() {
+  constexpr std::size_t kErrorPreviewBytes = 32;
   std::error_code ec;
   if (!std::filesystem::exists(persistentCounterFilename_, ec) && !ec) {
     count_ = 0;
@@ -71,7 +73,7 @@ void PersistentCounter::load() {
         "Rotation counter file '{}' is unreadable ({} bytes: '{}'); refusing to start. A guessed rotation number could "
         "overwrite archives of previous sessions. Repair the file (a non-negative integer), or delete it to restart "
         "rotation from 0 - existing .old<N> archives will then be overwritten.",
-        persistentCounterFilename_, text.size(), text.substr(0, 32));
+        persistentCounterFilename_, text.size(), text.substr(0, kErrorPreviewBytes));
   count_ = value;
 }
 

@@ -81,7 +81,7 @@ class IpcServer {
   /// Epoka rejestru subskrypcji: rosnie przy kazdym jego zamknieciu (broadcastOutOfBusiness,
   /// removeClientQueues). Wolajacy odczytuje ja razem z parametrami subskrypcji, poki trzyma
   /// model, i przekazuje do subscribe() -- patrz subscriptionEpoch_.
-  std::uint64_t subscriptionEpoch() const { return subscriptionEpoch_.load(std::memory_order_acquire); }
+  [[nodiscard]] std::uint64_t subscriptionEpoch() const { return subscriptionEpoch_.load(std::memory_order_acquire); }
 
   /// Tworzy kolejke odpowiedzi klienta i rejestruje go na strumieniu, jesli rejestr nie zostal
   /// zamkniety od odczytu @p expectedEpoch. Falsz = odmowa: kolejka usunieta, rejestr nietkniety.

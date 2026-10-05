@@ -231,9 +231,10 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
     if (gate != nullptr && stream != nullptr && std::ranges::contains(adHocStreams, std::string(stream))) {
       openGateFired = true;
       std::ofstream(std::string(gate) + ".ready").put('\n');
-      const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+      const auto deadline                  = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+      constexpr auto kOpenGatePollInterval = std::chrono::milliseconds{10};
       while (!std::filesystem::exists(std::string(gate) + ".release") && std::chrono::steady_clock::now() < deadline)
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(kOpenGatePollInterval);
     }
   }
 

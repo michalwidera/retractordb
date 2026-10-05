@@ -36,6 +36,7 @@ namespace ipc::responses {
 inline constexpr std::uint64_t kMagic         = 0x5244'4252'4553'5031ULL;  // "RDBRESP1"
 inline constexpr std::uint32_t kLayoutVersion = 1;
 
+// NOLINTNEXTLINE(performance-enum-size): zgodny z 32-bitowym slowem atomowym stanu slotu IPC
 enum class SlotState : std::uint32_t { Free = 0, Writing = 1, Ready = 2, Reading = 3 };
 
 struct Header {
@@ -74,7 +75,7 @@ struct Owner {
   std::uint64_t seq{0};
 };
 
-enum class PublishStatus {
+enum class PublishStatus : std::uint8_t {
   Published,  ///< w wolnym slocie
   Reclaimed,  ///< w slocie odzyskanym po martwym kliencie
   Full        ///< wszystkie sloty zajete przez zywych - odpowiedz przepada
@@ -103,8 +104,8 @@ PublishStatus publish(Segment &segment, const Owner &owner, std::string_view tex
 /// z open_only otwiera istniejacy (klient). Bledy systemowe jako interprocess_exception.
 class Mapping {
  public:
-  Mapping(boost::interprocess::create_only_t, const std::string &name);
-  Mapping(boost::interprocess::open_only_t, const std::string &name);
+  Mapping(boost::interprocess::create_only_t /*tag*/, const std::string &name);
+  Mapping(boost::interprocess::open_only_t /*tag*/, const std::string &name);
 
   /// Falsz, gdy odwzorowanie jest krotsze od ukladu albo naglowek nie pasuje.
   [[nodiscard]] bool valid() const;

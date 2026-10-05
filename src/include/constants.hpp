@@ -182,7 +182,7 @@ inline std::string serviceLockFile(std::string_view serviceName) {
 /// (TMPDIR). Inaczej niz kMachineLockDir: ta blokada rozdziela instancje w obrebie jednego katalogu.
 inline std::filesystem::path serviceLockDir(std::string_view configuredDir) {
   if (configuredDir.empty()) return std::filesystem::temp_directory_path();
-  return std::filesystem::path(configuredDir);
+  return {configuredDir};
 }
 
 /// Czlon serwera odczytany z nazwy pliku blokady instancji: pusty dla instancji bezimiennej,
@@ -220,7 +220,7 @@ constexpr std::size_t kNullTerminatorBytes = 1;
 constexpr std::size_t kResponseSlotCount = 16;
 
 // Najwieksza odpowiedz miesczaca sie w slocie (bajty). Dluzsza jest zastepowana bledem.
-constexpr std::size_t kResponseSlotDataSize = 32 * 1024;
+constexpr std::size_t kResponseSlotDataSize = std::size_t{32} * 1024;
 
 // Naglowek segmentu i naglowek slotu (bajty); sizeof obu struktur pilnuje static_assert
 // w ipcResponses.hpp.
@@ -229,7 +229,7 @@ constexpr std::size_t kResponseSlotHeaderBytes    = 32;
 
 // Rozmiar segmentu odpowiedzi (bajty): naglowek plus kResponseSlotCount pelnych slotow.
 constexpr std::size_t kShmemSegmentSize =
-    kResponseSegmentHeaderBytes + kResponseSlotCount * (kResponseSlotHeaderBytes + kResponseSlotDataSize);
+    kResponseSegmentHeaderBytes + (kResponseSlotCount * (kResponseSlotHeaderBytes + kResponseSlotDataSize));
 
 // === Uprawnienia obiektów IPC ===
 
