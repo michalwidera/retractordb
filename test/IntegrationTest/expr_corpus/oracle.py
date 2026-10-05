@@ -477,11 +477,14 @@ def rule_truth(cond, row):
 
 def read_rows(path, types):
     rows = []
-    for line in Path(path).read_text().split("\n"):
+    for i, line in enumerate(Path(path).read_text().splitlines(), 1):
         if not line.strip():
             continue
+        tokens = line.split()
+        if len(tokens) != len(types):
+            raise ValueError(f"{path}:{i}: {len(tokens)} kolumn, oczekiwane {len(types)}")
         row = []
-        for t, tok in zip(types, line.split()):
+        for t, tok in zip(types, tokens):
             if tok == "NULL":
                 row.append(NULLV)
             elif t == STRING:
@@ -498,13 +501,18 @@ def load_plan(plan_path):
     text = "\n".join(line for line in Path(plan_path).read_text().splitlines() if not line.lstrip().startswith("#"))
     base = Path(plan_path).parent
     streams, selects, rules = {}, [], []
-    for m in re.finditer(r"^DECLARE\s+(.*?)\s+STREAM\s+(\w+)\s*,\s*\S+\s+FILE\s+'([^']+)'", text, re.M):
+    for m in re.finditer(r"^DECLARE\s+(.*?)\s+STREAM\s+(\w+)\s*,\s*\S+\s+(?:TEXTFILE|FILE)\s+'([^']+)'", text, re.M):
         types = [DECLARED[re.sub(r"\[.*", "", f.split()[1]).upper()] for f in m.group(1).split(",")]
         streams[m.group(2)] = read_rows(base / m.group(3), types)
-    for m in re.finditer(r"^SELECT\s+(.*?)\s+STREAM\s+(\w+)\s+FROM\s+(\S+)", text, re.M):
+    for m in re.finditer(r"^SELECT\s+(.*?)\s+STREAM\s+(\w+)\s+FROM\s+(AVG\s*\(\s*\w+\s*\)|\S+)\s*$", text, re.M):
         selects.append((m.group(2), split_top(m.group(1)), m.group(3)))
     for m in re.finditer(r"^RULE\s+(\w+)\s+ON\s+(\w+)\s+WHEN\s+(.*?)\s+DO\b", text, re.M):
         rules.append((m.group(1), m.group(2), m.group(3)))
+    for keyword, count in (("DECLARE", len(streams)), ("SELECT", len(selects)), ("RULE", len(rules))):
+        if len(re.findall(rf"^\s*{keyword}\b", text, re.M)) != count:
+            raise ValueError(f"{plan_path}: nierozpoznane lub powtorzone polecenie {keyword}")
+    if not streams or not selects:
+        raise ValueError(f"{plan_path}: plan wymaga zrodla i co najmniej jednego SELECT")
     return streams, selects, rules
 
 
@@ -521,23 +529,34 @@ def reduce_avg(row):
 
 
 def read_output(path):
-    records, types, dumps, current = {}, {}, [], None
+    records, descriptors, types, dumps, current = {}, {}, {}, [], None
     for line in Path(path).read_text().splitlines():
         if line.startswith("== dumps"):
             current = "__dumps__"
         elif line.startswith("== desc "):
             name = line.split()[2]
             current = ("desc", name)
-            types[name] = []
+            if name in descriptors:
+                raise ValueError(f"{name}: powtorzona sekcja .desc")
+            descriptors[name] = []
         elif line.startswith("== "):
             current = line.split()[1]
+            if current in records:
+                raise ValueError(f"{current}: powtorzony wypis strumienia")
             records[current] = []
         elif current == "__dumps__" and line.strip():
             dumps.append(line.strip())
         elif isinstance(current, tuple):
-            types[current[1]] += re.findall(r"\b(BYTE|INTEGER|UINT|RATIONAL|FLOAT|DOUBLE|STRING)\b", line)
+            descriptors[current[1]].append(line)
         elif current and line.startswith("{"):
             records[current].append([m.group(1) for m in re.finditer(r"\w+?_\d+:(\S*)", line)])
+    # Deskryptor musi byc kompletny; samo znalezienie nazw typow nie dowodzi poprawnego odczytu.
+    field = r"(BYTE|INTEGER|UINT|RATIONAL|FLOAT|DOUBLE|STRING)\s+[A-Za-z_]\w*(?:\[\d+\])?"
+    for name, lines in descriptors.items():
+        descriptor = "\n".join(lines).strip()
+        if not re.fullmatch(r"\{\s*(?:" + field + r"\s*)+\}", descriptor):
+            raise ValueError(f"{name}: niepoprawny lub pusty .desc")
+        types[name] = re.findall(field, descriptor)
     return records, types, dumps
 
 
@@ -557,13 +576,14 @@ def matches(expected, text):
     return text == expected.val
 
 
-def main(plan_path, out_path):
+def check_plan(plan_path, out_path):
     streams, selects, rules = load_plan(plan_path)
     records, types, dumps = read_output(out_path)
     errors, checked = [], 0
 
     for name, exprs, source in selects:
-        src_name, _, reducer = source.partition(".")
+        avg = re.fullmatch(r"AVG\s*\(\s*(\w+)\s*\)", source, re.I)
+        src_name, _, reducer = (avg.group(1), "", "avg") if avg else source.partition(".")
         rows = streams[src_name]
         if reducer:
             if reducer.lower() != "avg":
@@ -577,6 +597,14 @@ def main(plan_path, out_path):
             trees.append(tree)
         expected = [[evaluate(t, row) for t in trees] for row in rows]
         streams[name] = expected
+        if not expected:
+            errors.append(f"{name}: brak wartosci do sprawdzenia")
+
+        declared = types.get(name)
+        if declared is None:
+            errors.append(f"{name}: brak .desc")
+        elif len(declared) != len(exprs):
+            errors.append(f"{name}: {len(declared)} typow w .desc, oczekiwane {len(exprs)}")
 
         got = records.get(name)
         if got is None:
@@ -584,17 +612,23 @@ def main(plan_path, out_path):
             continue
         if len(got) != len(expected):
             errors.append(f"{name}: {len(got)} rekordow, wyrocznia oczekuje {len(expected)}")
+        for i, got_row in enumerate(got):
+            if len(got_row) != len(exprs):
+                errors.append(f"{name}[{i}]: {len(got_row)} kolumn wyniku, oczekiwane {len(exprs)}")
         for i, (exp_row, got_row) in enumerate(zip(expected, got)):
+            if len(exp_row) != len(exprs) or len(got_row) != len(exprs):
+                continue
             for k, (ev, gv) in enumerate(zip(exp_row, got_row)):
                 checked += 1
                 if not matches(ev, gv):
                     errors.append(f"{name}[{i}].{k} ({exprs[k]}): silnik {gv}, wyrocznia {ev}")
-        declared = types.get(name, [])
+        if declared is None or len(declared) != len(exprs):
+            continue
         for k, row_types in enumerate(zip(*[[v.type if v.typed else NULL for v in r] for r in expected])):
             concrete = {TYPE_NAMES[t] for t in row_types if t != NULL}
             if len(concrete) > 1:
                 errors.append(f"{name}.{k} ({exprs[k]}): wyrocznia daje rozne typy w roznych wierszach {sorted(concrete)}")
-            elif concrete and k < len(declared) and concrete != {declared[k]}:
+            elif concrete and concrete != {declared[k]}:
                 errors.append(f"{name}.{k} ({exprs[k]}): typ w .desc {declared[k]}, wyrocznia {concrete.pop()}")
 
     for rule, on, cond_text in rules:
@@ -605,6 +639,8 @@ def main(plan_path, out_path):
         if any(f"_{rule}_dump" in d for d in dumps):
             errors.append(f"regula {rule}: silnik ja odpalil ({[d for d in dumps if rule in d]})")
 
+    if checked == 0:
+        errors.append("brak sprawdzonych wartosci w planie")
     for e in errors[:40]:
         print(e)
     if errors:
@@ -612,6 +648,14 @@ def main(plan_path, out_path):
         return 1
     print(f"WYROCZNIA: {Path(plan_path).name} zgodny, {checked} wartosci")
     return 0
+
+
+def main(plan_path, out_path):
+    try:
+        return check_plan(plan_path, out_path)
+    except (OSError, ValueError, SyntaxError, KeyError, IndexError, EvalError) as error:
+        print(f"WYROCZNIA: blad w {Path(plan_path).name}: {error}")
+        return 1
 
 
 if __name__ == "__main__":
