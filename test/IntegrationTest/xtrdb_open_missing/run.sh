@@ -6,6 +6,7 @@
 #
 # Uzycie: run.sh <xtrdb>
 set -e
+. "$(dirname "$0")/../portable.sh"
 xtrdb="$1"
 rm -f ./*.desc ./*.meta nosuch nosuch2 fresh fresh2 out.txt
 
@@ -14,8 +15,9 @@ run_xtrdb() {
   set +e
   # shellcheck disable=SC2059 # wejscie jest formatem printf z \n
   printf "$1" | (
-    ulimit -v 2000000
-    timeout 20 "$xtrdb" noprompt
+    # Darwin nie egzekwuje RLIMIT_AS i odrzuca `ulimit -v` bledem; tam straza zostaje sam limit czasu.
+    ulimit -v 2000000 2>/dev/null || true
+    run_timeout 20 "$xtrdb" noprompt
   ) >out.txt 2>&1
   rc=$?
   set -e

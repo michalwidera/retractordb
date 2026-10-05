@@ -8,7 +8,7 @@
 # Test sprawdza po kolei:
 #  1. BINFILE, TEXTFILE i DEVICE czytaja wedlug slowa, takze wbrew nazwie pliku,
 #  2. DEVICE na FIFO o nazwie `.txt` czyta surowe bajty - ani tekst, ani token NULL,
-#  3. odmowy rodzaju pliku: kod 71, nazwa strumienia i sciezka, bez zawieszenia na FIFO,
+#  3. odmowy rodzaju pliku: kod EPROTO, nazwa strumienia i sciezka, bez zawieszenia na FIFO,
 #  4. forma przestarzala daje bez --verbose dokladnie to samo wyjscie co jawne slowa,
 #     a z --verbose jedno ostrzezenie na deklaracje - takze przy imporcie ad-hoc,
 #  5. `.desc` deklaracji: dawny TYPE DEVICE pliku binarnego jest zastepowany, inny rozjazd TYPE
@@ -51,15 +51,17 @@ fi
 
 # (3) Odmowy rodzaju pliku. FIFO bez pisarza: open() zawiesilby start, wiec kontrola idzie przez
 # stat() przed otwarciem. Limit czasu zamienia ewentualne zawieszenie w czytelna porazke (124).
+# Kod z nazwy stalej, nie z liczby: EPROTO to 71 na Linuksie i 100 na macOS.
 mkfifo nowriter.fifo
+expected_rc=$(errno_value EPROTO)
 expect_plan_refused() {
   local plan="$1" reason="$2" out rc
   set +e
   out=$(run_timeout 20 xretractor "$plan" -k -r -f -m 2 2>&1)
   rc=$?
   set -e
-  if [ "$rc" -ne 71 ]; then
-    echo "$plan: kod $rc zamiast 71 (124 = zawieszenie): $out"
+  if [ "$rc" -ne "$expected_rc" ]; then
+    echo "$plan: kod $rc zamiast $expected_rc (124 = zawieszenie): $out"
     exit 1
   fi
   case "$out" in
