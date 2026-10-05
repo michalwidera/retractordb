@@ -66,9 +66,11 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
                task.range.second, streamName);
   }
 
+  // createDumpFile wybiera nazwe po retentionSize, wiec wpis musi byc przed nim. Do #379 stal po
+  // nim i pierwsze wyzwolenie reguly z RETENTION trafialo do _dump.tmp zamiast _dump_0.tmp.
+  retentionSize[streamName + task.taskName] = static_cast<int>(task.retentionSize);
   std::tie(task.dumpFilename, task.fd)      = createDumpFile(streamName, task.taskName);
   task.dumpedRecordsToGo                    = static_cast<int>(abs(task.range.second - task.range.first));
-  retentionSize[streamName + task.taskName] = static_cast<int>(task.retentionSize);
   // Pojemnosc ksiegi to liczba zadan JEDNOCZESNIE w locie na tym strumieniu, wiec musi
   // wystarczyc najbardziej wymagajacej regule. Do 2026-09-05 ustawialo ja wylacznie zadanie
   // pierwsze ("capacity() == 0"), czyli ta regula, ktora akurat odpalila najwczesniej: przy
