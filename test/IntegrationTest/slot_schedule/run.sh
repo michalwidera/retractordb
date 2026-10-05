@@ -48,6 +48,15 @@ watch_stop() {
   watcher=""
 }
 check() { python3 ../timing.py "$@"; }
+# same_records <a> <b> - artefakty INTEGER bajtowo rowne; przy roznicy oba rozpisane na wartosci,
+# bo z CI (macOS, #408) zostaje tylko log, a samo `cmp` mowi jedynie, ze sie roznia.
+same_records() {
+  if ! cmp "$1" "$2"; then
+    echo "$1: $(read_binary_values "$1" d4)"
+    echo "$2: $(read_binary_values "$2" d4)"
+    return 1
+  fi
+}
 # wait_records <plik> <liczba> - czeka do 30 s, az w magazynie bedzie tyle rekordow INTEGER.
 wait_records() {
   local i=0
@@ -90,7 +99,7 @@ watch_start dt/o
 run_timeout 60 xretractor drift-t.rql -k -r -t -m 31 >/dev/null
 watch_stop
 check drift times.txt dt/o 0.1 0.2
-cmp dn/o dt/o
+same_records dn/o dt/o
 exec 3>&-
 
 # (3) Przestoj. Regula zatrzymuje slot rekordu 8 na 0,45 s, czyli na 4,5 okresu. Zrodlo DEVICE ma
@@ -119,8 +128,8 @@ exec 3<>feed.fifo
 cat dev.bin >&3
 run_timeout 60 xretractor catch-f.rql -k -r -f -m 25 >/dev/null
 exec 3>&-
-cmp cc/o cf/o
-cmp cc/d cf/d
+same_records cc/o cf/o
+same_records cc/d cf/d
 if [ "$(file_size cc/o)" -ne 96 ] || [ "$(file_size cc/d)" -ne 96 ]; then
   echo "przestoj: o=$(file_size cc/o) B, d=$(file_size cc/d) B zamiast po 96 B (24 sloty)"
   exit 1
