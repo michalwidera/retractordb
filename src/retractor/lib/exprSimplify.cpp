@@ -195,6 +195,7 @@ std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant
   // `u+(-2)` daje już u-2 i strażnik jest dla tej pary ostrożniejszy, niż trzeba. Zostaje:
   // odmowa nie zmienia wyniku, a zdjęcie go byłoby nowym przepisaniem podnoszącym licznik R3.
   const auto operationType = arithmeticResultType(tail.baseType, typeOfConstant(*value));
+  if (!operationType.has_value()) return std::nullopt;
   if (typeOfConstant(*value) != *operationType &&
       std::holds_alternative<std::monostate>(cast<rdb::descFldVT>{}(*value, *operationType)))
     return std::nullopt;

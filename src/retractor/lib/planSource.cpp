@@ -223,12 +223,13 @@ std::string checkDeclaredSources(const qTree &plan, const std::vector<std::strin
     // i jakie pasuje do tego, co lezy pod sciezka. Inaczej FIFO spoza /dev konczylo sie
     // odmowa nazywajaca BINFILE, ktorego w planie nie ma.
     std::error_code ec;
-    const auto fileType   = std::filesystem::status(q.filename, ec).type();
-    const std::string fit = (fileType == std::filesystem::file_type::character || fileType == std::filesystem::file_type::fifo)
-                                ? "DEVICE"
-                            : (fileType == std::filesystem::file_type::regular) ? "BINFILE or TEXTFILE"
-                                                                                : "";
-    std::string hint      = std::format("deprecated FILE resolved this path as {}", sourceKindKeyword(q.kind));
+    const auto fileType = std::filesystem::status(q.filename, ec).type();
+    std::string fit;
+    if (fileType == std::filesystem::file_type::character || fileType == std::filesystem::file_type::fifo)
+      fit = "DEVICE";
+    else if (fileType == std::filesystem::file_type::regular)
+      fit = "BINFILE or TEXTFILE";
+    std::string hint = std::format("deprecated FILE resolved this path as {}", sourceKindKeyword(q.kind));
     if (!fit.empty()) hint += std::format("; declare it with {}", fit);
     return std::format("stream '{}': {} ({})", q.id, mismatch, hint);
   }
@@ -243,6 +244,7 @@ std::vector<std::string> deprecatedFileWarnings(const qTree &plan, const std::ve
   std::ranges::sort(deprecated, {}, &query::declarationLine);
 
   std::vector<std::string> retVal;
+  retVal.reserve(deprecated.size());
   for (const query *q : deprecated)
     retVal.push_back(std::format("line {}: DECLARE {}: FILE '{}' is deprecated, resolved as {}", q->declarationLine, q->id,
                                  q->filename, sourceKindKeyword(q->kind)));

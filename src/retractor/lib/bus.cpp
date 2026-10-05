@@ -1186,8 +1186,8 @@ std::vector<InstanceInfo> Bus::instances() const {
   Segment &segment = *impl->segment;
   auto scratch     = std::make_unique<Slot>();
 
-  for (std::uint32_t i = 0; i < kMaxSlots; ++i) {
-    if (!snapshot(segment.slots[i], *scratch)) continue;
+  for (auto &slot : segment.slots) {
+    if (!snapshot(slot, *scratch)) continue;
     if (!isProcessAlive(scratch->pid, scratch->startTime)) continue;
 
     InstanceInfo info;

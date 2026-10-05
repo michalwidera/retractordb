@@ -448,8 +448,8 @@ boost::rational<int> Rationalize(const double inValue, const double DIFF /*=1E-6
     const double truncated = std::trunc(startx);
     if (!(truncated < upperExclusive)) break;
     const auto a         = static_cast<std::int64_t>(truncated);
-    const std::int64_t h = a * h1 + h2;
-    const std::int64_t k = a * k1 + k2;
+    const std::int64_t h = (a * h1) + h2;
+    const std::int64_t k = (a * k1) + k2;
     if (h > limit || k > limit) break;
     h2 = h1;
     h1 = h;

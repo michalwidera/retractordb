@@ -126,7 +126,7 @@ rdb::retention_t parseDefaultRetention(const toml::node_view<const toml::node> n
 void parseSourcesTimeout(const toml::node_view<const toml::node> node, AppConfig &cfg) {
   const auto value = node.value<double>();
   if (value && *value >= 0.0 && *value <= rdb::limits::kMaxDeviceTimeoutSeconds) {
-    cfg.sourcesTimeoutSeconds = *value;
+    cfg.sourcesTimeoutSeconds = value;
     cfg.sourcesTimeoutError.clear();
     return;
   }

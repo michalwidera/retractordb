@@ -785,12 +785,15 @@ class ParserListener : public RQLBaseListener {
     // wiec `RETENTION c s` bylo tu ignorowane bez slowa (decyzja P4).
     if (qry.policy.first == "MEMORY" && !qry.retention.noRetention()) {
       const std::string capacity = std::to_string(qry.retention.capacity);
-      const std::string owner    = (ctx->VOLATILE() != nullptr) ? "VOLATILE"
-                                   : inheritVolatile            ? "DEFAULT VOLATILE"
-                                                                : "STORAGE MEMORY";
-      const std::string onDisk   = (ctx->VOLATILE() != nullptr) ? "drop VOLATILE"
-                                   : inheritVolatile            ? "add PERSISTENT"
-                                                                : "use STORAGE DEFAULT or DIRECT";
+      std::string owner          = "STORAGE MEMORY";
+      std::string onDisk         = "use STORAGE DEFAULT or DIRECT";
+      if (ctx->VOLATILE() != nullptr) {
+        owner  = "VOLATILE";
+        onDisk = "drop VOLATILE";
+      } else if (inheritVolatile) {
+        owner  = "DEFAULT VOLATILE";
+        onDisk = "add PERSISTENT";
+      }
       reportSemanticError("RETENTION " + capacity + " " + std::to_string(qry.retention.segments) + " on stream " + qry.id +
                           " sets segments on disk, but " + owner + " keeps the stream in memory: write RETENTION " + capacity +
                           " for a MEMORY ring, or " + onDisk + " to keep segments on disk");

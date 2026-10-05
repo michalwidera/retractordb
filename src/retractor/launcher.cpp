@@ -158,6 +158,7 @@ static void handleSignal(int signum) {
 // Hak testu it_signal_stop. Sygnal zgloszony z wnetrza sink_it_, czyli w watku trzymajacym muteks
 // sinka dziennika - deterministycznie to okno, w ktore zewnetrzny `kill` trafia tylko losowo.
 // Handler, ktory loguje, zakleszcza sie tutaj przy kazdym uruchomieniu.
+// NOLINTNEXTLINE(portability-template-virtual-member-function): czysto wirtualne haki base_sink sa nadpisane ponizej
 class raiseUnderLogLock final : public spdlog::sinks::base_sink<std::mutex> {
  public:
   explicit raiseUnderLogLock(int signum) : signum_(signum) {}
