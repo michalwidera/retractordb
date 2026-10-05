@@ -109,9 +109,17 @@ run_timeout() {
   # skonczylo sie natychmiast, i kazde wywolanie kosztowalo pelny limit czasu.
   # (Widoczne na macOS jako it_issue95_loopInCompile trwajacy rowno 10,04 s przy
   # limicie 10 s, a w tescie z kilkoma wywolaniami - jako przekroczenie limitu ctest.)
+  # Z tego samego powodu `sleep` nie moze przezyc straznika: TERM zabija podpowloke, ale nie jej
+  # dziecko, a osierocony `sleep` trzyma kazdy odziedziczony deskryptor do konca limitu. FIFO
+  # otwarte przez wolajacego (`exec 3<>fifo`) nie bylo wtedy nigdy zamkniete przez wszystkich i
+  # zachowywalo nieprzeczytane dane - it_slot_schedule na macOS czytal w drugim przebiegu resztke
+  # pierwszego (#408). Pulapka TERM stoi przed uruchomieniem `sleep` i bierze `$!`, ktore powloka
+  # ustawia juz przy rozwidleniu - przypisanie do zmiennej zostawialo okno, w ktorym TERM trafial
+  # na pusta nazwe i `sleep` zostawal sierota.
   (
-    sleep "$seconds"
-    kill -TERM "$child" 2>/dev/null
+    trap 'kill "$!" 2>/dev/null; wait "$!" 2>/dev/null; exit 0' TERM
+    sleep "$seconds" &
+    wait "$!" && kill -TERM "$child" 2>/dev/null
   ) >/dev/null 2>&1 &
   local guard=$!
   local status=0
