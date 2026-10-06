@@ -68,21 +68,20 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
 
   // createDumpFile wybiera nazwe po retentionSize, wiec wpis musi byc przed nim. Do #379 stal po
   // nim i pierwsze wyzwolenie reguly z RETENTION trafialo do _dump.tmp zamiast _dump_0.tmp.
-  retentionSize[streamName + task.taskName] = static_cast<int>(task.retentionSize);
-  std::tie(task.dumpFilename, task.fd)      = createDumpFile(streamName, task.taskName);
-  task.dumpedRecordsToGo                    = static_cast<int>(abs(task.range.second - task.range.first));
-  // Pojemnosc ksiegi to liczba zadan JEDNOCZESNIE w locie na tym strumieniu, wiec musi
-  // wystarczyc najbardziej wymagajacej regule. Do 2026-09-05 ustawialo ja wylacznie zadanie
-  // pierwsze ("capacity() == 0"), czyli ta regula, ktora akurat odpalila najwczesniej: przy
-  // regule bez RETENTION ksiega miala pojemnosc 1 i kazde nastepne zadanie - takze cudze,
-  // z wlasnym RETENTION - wypychalo poprzednie, zamykajac mu deskryptor i ucinajac zrzut.
-  // Rosniemy, nigdy nie zwezamy: zwezenie skasowaloby zadania juz przyjete.
-  const size_t requiredBookSize = task.retentionSize > 0 ? task.retentionSize : 1;
-  if (bookOfTasks[streamName].capacity() < requiredBookSize) {
-    bookOfTasks[streamName].set_capacity(requiredBookSize);
-  }
-  // This push_back will overwrite oldest task if retentionSize is exceeded
-  // Task destructor will close file descriptor if still open
+  retentionSize[streamName + "_" + task.taskName] = static_cast<int>(task.retentionSize);
+  std::tie(task.dumpFilename, task.fd)            = createDumpFile(streamName, task.taskName);
+  // Nowy plik zastapil poprzedni pod ta sama nazwa: regula bez RETENTION odtwarza go przy kazdym
+  // wyzwoleniu, regula z RETENTION N przy zawinieciu licznika slotow. Zadania tego pliku pisalyby
+  // dalej do odlaczonego i-wezla, wiec je usuwamy; move/destruktor dumpTask zamyka ich deskryptory.
+  // Kazda regula ma wiec w ksiedze najwyzej tyle zadan, ile ma nazw plikow (1 albo N), i ksiega nie
+  // potrzebuje wlasnej pojemnosci. Do #380 byl nia circular_buffer o pojemnosci najwiekszego
+  // RETENTION na strumieniu, a jego pelnosc wypychala najstarsze zadanie dowolnej reguly - takze
+  // cudze, ucinajac jego widoczny zrzut (np. dwie reguly bez RETENTION przy pojemnosci 1).
+  auto &tasks = bookOfTasks[streamName];
+  auto newEnd = std::remove_if(tasks.begin(), tasks.end(),
+                               [&](const dumpTask &previous) { return previous.dumpFilename == task.dumpFilename; });
+  tasks.erase(newEnd, tasks.end());
+  task.dumpedRecordsToGo = static_cast<int>(abs(task.range.second - task.range.first));
 
   if (task.range.first < 0) {
     // Filling dump with data already in stream history
@@ -107,7 +106,7 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
     task.delayDumpRecordsToGo = static_cast<int>(task.range.first);
   }
 
-  bookOfTasks[streamName].push_back(std::move(task));
+  tasks.push_back(std::move(task));
 }
 
 void dumpManager::setDumpStorage(std::string storagePathParam) { storagePath = std::move(storagePathParam); }
@@ -174,7 +173,9 @@ bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::
 }
 
 std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view streamName, const std::string_view taskName) {
-  std::string key = std::string(streamName) + std::string(taskName);
+  // Klucz to rdzen nazwy pliku. Bez separatora pary a/bc i ab/c dzielily licznik slotow i RETENTION,
+  // choc ich pliki sa rozne; rowny rdzen dwoch roznych par odrzuca juz parser.
+  std::string key = std::string(streamName) + "_" + std::string(taskName);
   auto filename =
       std::filesystem::path(storagePath) / std::filesystem::path(std::string(streamName) + "_" + std::string(taskName));
   if (retentionSize[key] == 0) {

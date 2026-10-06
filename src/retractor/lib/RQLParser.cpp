@@ -316,6 +316,32 @@ class ParserListener : public RQLBaseListener {
     return *value;
   }
 
+  /// Plik zrzutu to <strumien>_<regula> z przyrostkiem _dump.tmp albo _dump_K.tmp
+  /// (dumpManager::createDumpFile), a przyrostki nie daja tej samej nazwy. Dwie rozne pary o rownym
+  /// rdzeniu (regula b_c na a i regula c na a_b) kasowalyby sobie nawzajem pliki zrzutu. Rdzen
+  /// porownujemy bez wielkosci liter: na systemie plikow nieczulym na nia (domyslnie macOS) Ab_r
+  /// i ab_R to ten sam plik, a poprawnosc planu nie moze zalezec od hosta. Rodziny generatora
+  /// pomijamy: ich instancje (rodzina$k) maja w nazwie '$', ktorego nie ma w identyfikatorach, wiec
+  /// nie zderzaja sie z niczym, a rdzen samej rodziny nie jest nazwa zadnego pliku.
+  std::string dumpFileCollision(const query &target, const std::string &rule_name) {
+    if (target.generatorSize != query::notAGenerator) return {};
+    const auto stem = [](const std::string &stream, const std::string &name) {
+      std::string text = stream + "_" + name;
+      std::ranges::transform(text, text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      return text;
+    };
+    const std::string wanted = stem(target.id, rule_name);
+    for (const auto &q : coreInstance) {
+      if (q.generatorSize != query::notAGenerator) continue;
+      for (const auto &existing : q.lRules)
+        if (existing.action == rule::DUMP && stem(q.id, existing.name) == wanted)
+          return "Rule '" + rule_name + "' on stream '" + target.id + "' would write the same dump file as rule '" +
+                 existing.name + "' on stream '" + q.id + "' (" + target.id + "_" + rule_name +
+                 "_dump*.tmp); rename the rule or the stream";
+    }
+    return {};
+  }
+
   /// Dopina regule do strumienia wskazanego przez ON. Zwraca pusty napis albo powod odmowy;
   /// przy odmowie plan pozostaje nietkniety, wiec wolajacy odrzuca calosc bez sladu po regule.
   std::string buildRule(const std::string &stream_name, const std::string &rule_name) {
@@ -349,6 +375,7 @@ class ParserListener : public RQLBaseListener {
         if (dump_left >= dump_right)
           return "Rule '" + rule_name + "': dump range [" + std::to_string(dump_left) + ".." + std::to_string(dump_right) +
                  "] is empty, left bound must be less than right bound";
+        if (std::string collision = dumpFileCollision(*target, rule_name); !collision.empty()) return collision;
         ruleConstruct.action         = rule::DUMP;
         ruleConstruct.dumpRange      = std::make_pair(dump_left, dump_right);
         ruleConstruct.dump_retention = dump_retention;
