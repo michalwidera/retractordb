@@ -46,10 +46,10 @@ constexpr int flatSlotSize(const rField &field) {
   return field.rlen * field.rarray;
 }
 
-Descriptor::Descriptor(std::initializer_list<rField> fields) : std::vector<rField>(fields) {}
+Descriptor::Descriptor(std::initializer_list<rField> fields) : fields_(fields) {}
 
 Descriptor::Descriptor(const std::string &fieldName, int length, int elementCount, rdb::descFld type) {  //
-  emplace_back(fieldName, length, elementCount, type);                                                   //
+  mutableFields().emplace_back(fieldName, length, elementCount, type);                                   //
 }
 
 void Descriptor::rebuildFieldMappings() const {
@@ -97,8 +97,8 @@ std::vector<rField> Descriptor::dataFields() {
 }
 
 void Descriptor::append(std::initializer_list<rField> fields) {
-  insert(end(), fields.begin(), fields.end());
-  fieldMappingsDirty_ = true;
+  auto &target = mutableFields();
+  target.insert(target.end(), fields.begin(), fields.end());
 }
 
 Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs) {
@@ -109,14 +109,14 @@ Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs) {
 
 Descriptor &Descriptor::operator+=(const Descriptor &rhs) {
   if (this != &rhs) {
-    insert(end(), rhs.begin(), rhs.end());  // TODO: add rename of duplicates here.
+    auto &target = mutableFields();
+    target.insert(target.end(), rhs.begin(), rhs.end());  // TODO: add rename of duplicates here.
   } else {
     FatalError("descriptor: cannot merge descriptor with itself");
     // can't do safe: data | data
     // due one name policy
   }
 
-  fieldMappingsDirty_ = true;
   return *this;
 }
 
@@ -150,15 +150,7 @@ bool Descriptor::operator==(const Descriptor &rhs) const {
 }
 
 void Descriptor::removeConfigurationFields() {
-  Descriptor rhs(*this);
-  clear();
-  std::ranges::copy_if(rhs,                        //
-                       std::back_inserter(*this),  //
-                       [](const rField &i) {       //
-                         return !isConfigurationField(i.rtype);
-                       });
-
-  fieldMappingsDirty_ = true;
+  std::erase_if(mutableFields(), [](const rField &i) { return isConfigurationField(i.rtype); });
 }
 
 void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, Descriptor lhs, Descriptor rhs) {
@@ -174,7 +166,8 @@ void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, D
                rhs.flatElementCount());
   }
 
-  clear();
+  auto &target = mutableFields();
+  target.clear();
   const int width = lhs.flatElementCount();
   for (int i = 0; i < width; ++i) {
     const auto lhsPosition = lhs.flatIndexToDescriptorPosition(i);
@@ -199,10 +192,8 @@ void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, D
       bytes = std::max(lhsField.rlen, rhsField.rlen);
     else
       bytes = (lhsField.rtype > rhsField.rtype ? lhsField : rhsField).rlen;
-    push_back(flatSlotField(name, maxRtype, bytes));
+    target.push_back(flatSlotField(name, maxRtype, bytes));
   }
-
-  fieldMappingsDirty_ = true;
 }
 
 int Descriptor::fieldSize(const rdb::rField &field) const {

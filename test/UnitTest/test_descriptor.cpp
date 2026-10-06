@@ -2,9 +2,11 @@
 
 #include <cstring>
 #include <iostream>
+#include <ranges>
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 
 #include "rdb/descriptor.hpp"
@@ -16,14 +18,59 @@ extern std::string parserDESCString(rdb::Descriptor &desc, std::string_view inle
 
 namespace {
 
+// Interfejs kontenera nie moze oddawac mutowalnego pola ani drogi do bazy vector.
+static_assert(!std::is_base_of_v<std::vector<rdb::rField>, rdb::Descriptor>);
+static_assert(!std::is_convertible_v<rdb::Descriptor *, std::vector<rdb::rField> *>);
+static_assert(std::is_same_v<decltype(std::declval<rdb::Descriptor &>()[0]), const rdb::rField &>);
+static_assert(std::is_same_v<std::ranges::range_reference_t<rdb::Descriptor>, const rdb::rField &>);
+static_assert(std::is_same_v<decltype(*std::declval<rdb::Descriptor &>().cbegin()), const rdb::rField &>);
+static_assert(std::is_nothrow_move_constructible_v<rdb::Descriptor>);
+static_assert(std::is_nothrow_move_assignable_v<rdb::Descriptor>);
+
+template <typename T>
+constexpr bool exposesVectorMutation = requires(T & d, rdb::rField f) {
+  d.push_back(f);
+}
+|| requires(T &d, rdb::rField f) { d.emplace_back(f); }
+|| requires(T &d, rdb::rField f) { d.insert(d.begin(), f); }
+|| requires(T &d) { d.erase(d.begin()); }
+|| requires(T &d) { d.clear(); }
+|| requires(T &d) { d.resize(1); }
+|| requires(T &d, rdb::rField f) { d.assign(1, f); }
+|| requires(T &d, rdb::rField f) { d.assign({f}); }
+|| requires(T &d) { d.assign(d.begin(), d.end()); }
+|| requires(T &d) { d.pop_back(); }
+|| requires(T &d) { d.swap(d); }
+|| requires(T &d, rdb::rField f) { d.at(0) = f; }
+|| requires(T &d, rdb::rField f) { d.front() = f; }
+|| requires(T &d, rdb::rField f) { d.back() = f; }
+|| requires(T &d, rdb::rField f) { *d.data() = f; };
+static_assert(!exposesVectorMutation<rdb::Descriptor>);
+
+void expectLayout(const rdb::Descriptor &desc, std::initializer_list<int> offsets,
+                  std::initializer_list<std::pair<int, int>> positions, size_t bytes) {
+  EXPECT_EQ(desc.getSizeInBytes(), bytes);
+  ASSERT_EQ(desc.flatElementCount(), static_cast<int>(offsets.size()));
+  ASSERT_EQ(offsets.size(), positions.size());
+  auto position = positions.begin();
+  int slot      = 0;
+  for (const int offset : offsets) {
+    EXPECT_EQ(desc.byteOffsetAtFlatIndex(slot), offset);
+    EXPECT_EQ(desc.flatIndexToDescriptorPosition(slot), *position);
+    ++position;
+    ++slot;
+  }
+  EXPECT_FALSE(desc.flatIndexToDescriptorPosition(slot).has_value());
+}
+
 bool test_descriptor() {
   rdb::Descriptor data1{rdb::rField("Name3", 1, 10, rdb::STRING), rdb::rField("Name4", 10, 1, rdb::STRING)};
 
   data1.append({rdb::rField("Name5z", 1, 10, rdb::STRING)});
   data1.append({rdb::rField("Name6z", 1, 10, rdb::STRING)});
 
-  data1.push_back(rdb::rField("Name", 1, 10, rdb::STRING));
-  data1.push_back(rdb::rField("TLen", sizeof(uint), 1, rdb::UINT));
+  data1.append({rdb::rField("Name", 1, 10, rdb::STRING)});
+  data1.append({rdb::rField("TLen", sizeof(uint), 1, rdb::UINT)});
 
   data1 += rdb::Descriptor("Name2", 1, 10, rdb::STRING);
   data1 += rdb::Descriptor("Control", 1, 1, rdb::BYTE);
@@ -87,10 +134,16 @@ bool test_descriptor_read() {
 
 }  // namespace
 
+// Sprawdza odczyt deskryptora przez operator>> i jego ponowny zapis tekstowy.
+// Pokrywa mieszany uklad napisow, pola BYTE i pol UINT w wejsciach z podzialem na wiersze.
 TEST(descriptor, read_from_stream) { EXPECT_TRUE(test_descriptor_read()); }
 
+// Sprawdza budowanie deskryptora przez append, += i + oraz formatowanie i dostep po nazwie.
+// Pokrywa napisy o dlugosci zapisanej w rlen lub rarray i pola liczbowe za nimi.
 TEST(descriptor, print_and_basic_accessors) { EXPECT_TRUE(test_descriptor()); }
 
+// Sprawdza typ i szerokosc pojedynczego slotu zwracane przez widestFieldType().
+// Pokrywa tablice INTEGER, jej polaczenie ze skalarem DOUBLE oraz jeden napis STRING[12].
 TEST(descriptor, widest_field_type_reports_flat_element_width) {
   rdb::Descriptor numericArray{{"samples", static_cast<int>(sizeof(int)), 3, rdb::INTEGER}};
   EXPECT_EQ(numericArray.widestFieldType(), std::make_pair(rdb::INTEGER, static_cast<int>(sizeof(int))));
@@ -103,6 +156,8 @@ TEST(descriptor, widest_field_type_reports_flat_element_width) {
   EXPECT_EQ(text.widestFieldType(), std::make_pair(rdb::STRING, 12));
 }
 
+// Sprawdza zgodnosc identycznych ukladow i odmowe dla zmienionej kolejnosci typow pol.
+// Pokrywa tez napis w prawym deskryptorze dluzszy niz pole dostepne w lewym.
 TEST(descriptor, compare) {
   rdb::Descriptor dataDescriptor1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
                                   rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
@@ -121,6 +176,8 @@ TEST(descriptor, compare) {
   EXPECT_FALSE(dataDescriptor1 == dataDescriptorDiff2);
 }
 
+// Sprawdza pomijanie REF i TYPE podczas porownania deskryptorow z rozna liczba wpisow.
+// Pokrywa zgodne pole INTEGER po konfiguracji oraz odmowe dla szerszego pola DOUBLE.
 TEST(descriptor, compare_ignores_configuration_fields_without_out_of_bounds_access) {
   auto withConfig = rdb::Descriptor("source.dat", 0, 0, rdb::REF) +   //
                     rdb::Descriptor("TEXTSOURCE", 0, 1, rdb::TYPE) +  //
@@ -132,6 +189,8 @@ TEST(descriptor, compare_ignores_configuration_fields_without_out_of_bounds_acce
   EXPECT_FALSE(withConfig == different);
 }
 
+// Sprawdza domyslne wyniki retention() i storagePolicy() bez pol konfiguracyjnych.
+// Pokrywa deskryptor z jednym polem danych: brak retencji, pusty typ magazynu i pojemnosc zero.
 TEST(descriptor, retention_and_policy_defaults) {
   auto desc = rdb::Descriptor("value", 4, 1, rdb::INTEGER);
 
@@ -143,6 +202,8 @@ TEST(descriptor, retention_and_policy_defaults) {
   EXPECT_EQ(policy.second, 0U);
 }
 
+// Sprawdza odczyt konfiguracji RETENTION, RETMEMORY i TYPE obok pola danych.
+// Pokrywa retencje 5 segmentow po 2 rekordy oraz magazyn MEMORY o pojemnosci 7.
 TEST(descriptor, retention_and_policy_values) {
   auto desc = rdb::Descriptor("value", 4, 1, rdb::INTEGER) +  //
               rdb::Descriptor("MEMORY", 0, 1, rdb::TYPE) +    //
@@ -157,6 +218,8 @@ TEST(descriptor, retention_and_policy_values) {
   EXPECT_EQ(policy.second, 7U);
 }
 
+// Sprawdza wybor pol danych, liczbe slotow plaskich i usuniecie konfiguracji REF oraz TYPE.
+// Pokrywa tablice BYTE[3] i jeden napis, ktore musza pozostac po usunieciu konfiguracji.
 TEST(descriptor, clean_ref_and_flat_fields) {
   auto desc = rdb::Descriptor("src.bin", 0, 0, rdb::REF) +      //
               rdb::Descriptor("TEXTSOURCE", 0, 1, rdb::TYPE) +  //
@@ -179,6 +242,8 @@ TEST(descriptor, clean_ref_and_flat_fields) {
   EXPECT_EQ(desc.size(), 2U);
 }
 
+// Sprawdza nazwy, typy i szerokosci slotow deskryptora przeplotu po pominieciu REF.
+// Pokrywa pary BYTE/INTEGER i UINT/BYTE, wybierajac szerszy typ dla kazdej pozycji.
 TEST(descriptor, create_hash_uses_max_len_and_type) {
   auto lhs = rdb::Descriptor("src-left", 0, 0, rdb::REF) +  //
              rdb::Descriptor("a", 1, 1, rdb::BYTE) +        //
@@ -238,6 +303,8 @@ TEST(descriptor, create_hash_numeric_slot_takes_the_length_of_the_winning_type) 
   }
 }
 
+// Sprawdza jednorazowe dzialanie singleLineFormat i reset flagi po zapisie deskryptora.
+// Pokrywa dwa kolejne zapisy: pierwszy w jednym wierszu, drugi w domyslnym formacie wielowierszowym.
 TEST(descriptor, flat_output_resets_after_stream) {
   auto desc = rdb::Descriptor("x", 1, 1, rdb::BYTE);
 
@@ -251,6 +318,8 @@ TEST(descriptor, flat_output_resets_after_stream) {
   EXPECT_EQ(multilineOut.str(), "{\tBYTE x\n}");
 }
 
+// Sprawdza mapowanie slotow na pola i elementy tablic oraz offsety bajtowe mieszanego rekordu.
+// Pokrywa dwa sloty BYTE, jeden napis o rozmiarze 5 * 9 bajtow i INTEGER pod offsetem 47.
 TEST(descriptor, offset_and_convert_for_string_and_arrays) {
   auto desc = rdb::Descriptor("a", 1, 2, rdb::BYTE) +    //
               rdb::Descriptor("s", 5, 9, rdb::STRING) +  //
@@ -269,6 +338,8 @@ TEST(descriptor, offset_and_convert_for_string_and_arrays) {
   EXPECT_EQ(desc.byteOffsetAtFlatIndex(3), 47);
 }
 
+// Sprawdza odczyt ukladu pustego deskryptora utworzonego konstruktorem domyslnym.
+// Pokrywa brak pol danych, zero slotow i odmowe mapowania indeksu zero.
 TEST(descriptor, empty_descriptor_has_empty_flat_mapping) {
   rdb::Descriptor empty;
 
@@ -277,6 +348,96 @@ TEST(descriptor, empty_descriptor_has_empty_flat_mapping) {
   EXPECT_FALSE(empty.flatIndexToDescriptorPosition(0).has_value());
 }
 
+// #424: sprawdza odswiezenie rozmiaru, offsetow i mapowan po append na juz zbudowanym cache.
+// Pokrywa dodanie napisu i INTEGER za tablica BYTE; stare dwa sloty musza rozszerzyc sie do czterech.
+TEST(descriptor, append_refreshes_cached_layout) {
+  rdb::Descriptor desc{{"a", 1, 2, rdb::BYTE}};
+  expectLayout(desc, {0, 1}, {{0, 0}, {0, 1}}, 2);
+
+  desc.append({{"s", 1, 5, rdb::STRING}, {"b", 4, 1, rdb::INTEGER}});
+  expectLayout(desc, {0, 1, 2, 7}, {{0, 0}, {0, 1}, {1, 0}, {2, 0}}, 11);
+}
+
+// #424: sprawdza aktualny uklad po laczeniu deskryptorow przez + i +=, gdy oba maja zbudowany cache.
+// Pokrywa zachowanie lewego argumentu przy + oraz dopisanie napisu i INTEGER za tablica BYTE.
+TEST(descriptor, concatenation_refreshes_cached_layout) {
+  rdb::Descriptor desc{{"a", 1, 2, rdb::BYTE}};
+  const rdb::Descriptor rhs{{"s", 1, 5, rdb::STRING}, {"b", 4, 1, rdb::INTEGER}};
+  expectLayout(desc, {0, 1}, {{0, 0}, {0, 1}}, 2);
+  expectLayout(rhs, {0, 5}, {{0, 0}, {1, 0}}, 9);
+
+  const auto sum = desc + rhs;
+  expectLayout(sum, {0, 1, 2, 7}, {{0, 0}, {0, 1}, {1, 0}, {2, 0}}, 11);
+  expectLayout(desc, {0, 1}, {{0, 0}, {0, 1}}, 2);
+  desc += rhs;
+  expectLayout(desc, {0, 1, 2, 7}, {{0, 0}, {0, 1}, {1, 0}, {2, 0}}, 11);
+}
+
+// #424: sprawdza odswiezenie indeksow pol po usunieciu konfiguracji z juz zmapowanego deskryptora.
+// Pokrywa REF przed danymi i TYPE miedzy polami: offsety i rozmiar zostaja te same, indeksy pol sie zmieniaja.
+TEST(descriptor, removing_configuration_refreshes_cached_positions) {
+  rdb::Descriptor desc{
+      {"src.bin", 0, 0, rdb::REF}, {"a", 1, 2, rdb::BYTE}, {"MEMORY", 0, 0, rdb::TYPE}, {"b", 4, 1, rdb::INTEGER}};
+  expectLayout(desc, {0, 1, 2}, {{1, 0}, {1, 1}, {3, 0}}, 6);
+
+  desc.removeConfigurationFields();
+  expectLayout(desc, {0, 1, 2}, {{0, 0}, {0, 1}, {1, 0}}, 6);
+  ASSERT_EQ(desc.size(), 2U);
+  EXPECT_EQ(desc[1].rname, "b");
+}
+
+// #424: sprawdza zastapienie pol i ich cache podczas composeHashDescriptorFrom na niepustym deskryptorze.
+// Pokrywa zmiane trzech slotow BYTE na dwa sloty INTEGER z nowymi offsetami i nazwami h_0 oraz h_1.
+TEST(descriptor, hash_composition_replaces_cached_layout) {
+  rdb::Descriptor desc{{"old", 1, 3, rdb::BYTE}};
+  expectLayout(desc, {0, 1, 2}, {{0, 0}, {0, 1}, {0, 2}}, 3);
+
+  desc.composeHashDescriptorFrom("h", rdb::Descriptor{{"a", 4, 2, rdb::INTEGER}}, rdb::Descriptor{{"b", 1, 2, rdb::BYTE}});
+  expectLayout(desc, {0, 4}, {{0, 0}, {1, 0}}, 8);
+  ASSERT_EQ(desc.size(), 2U);
+  EXPECT_EQ(desc[0].rname, "h_0");
+  EXPECT_EQ(desc[1].rname, "h_1");
+}
+
+// #424: sprawdza odswiezenie cache po dopisaniu pol przez parserDESCString i operator>>.
+// Pokrywa kolejne parsowania do niepustego deskryptora: napis po BYTE[2], a nastepnie INTEGER za napisem.
+TEST(descriptor, parsing_into_nonempty_descriptor_refreshes_cached_layout) {
+  rdb::Descriptor desc{{"a", 1, 2, rdb::BYTE}};
+  expectLayout(desc, {0, 1}, {{0, 0}, {0, 1}}, 2);
+  ASSERT_EQ(parserDESCString(desc, "{ STRING s[5] }"), "OK");
+  expectLayout(desc, {0, 1, 2}, {{0, 0}, {0, 1}, {1, 0}}, 7);
+
+  std::istringstream input("{ INTEGER b }");
+  input >> desc;
+  expectLayout(desc, {0, 1, 2, 7}, {{0, 0}, {0, 1}, {1, 0}, {2, 0}}, 11);
+}
+
+// #424: sprawdza zastapienie cache celu przy przypisaniu kopiujacym i przenoszacym.
+// Pokrywa zrodlo z cache zbudowanym lub wymagajacym odbudowy oraz ponowne append do oproznionego zrodla.
+TEST(descriptor, assignment_transfers_clean_and_dirty_layouts) {
+  // Cel i zrodlo maja rozne uklady. Kopia/przeniesienie musza zastapic takze cache celu.
+  for (const bool buildSourceCache : {false, true}) {
+    SCOPED_TRACE(buildSourceCache);
+    rdb::Descriptor source{{"s", 1, 5, rdb::STRING}, {"b", 4, 1, rdb::INTEGER}};
+    if (buildSourceCache) expectLayout(source, {0, 5}, {{0, 0}, {1, 0}}, 9);
+
+    rdb::Descriptor target{{"old", 1, 2, rdb::BYTE}};
+    expectLayout(target, {0, 1}, {{0, 0}, {0, 1}}, 2);
+    target = source;
+    expectLayout(target, {0, 5}, {{0, 0}, {1, 0}}, 9);
+
+    rdb::Descriptor moved{{"old", 1, 2, rdb::BYTE}};
+    expectLayout(moved, {0, 1}, {{0, 0}, {0, 1}}, 2);
+    moved = std::move(source);
+    expectLayout(moved, {0, 5}, {{0, 0}, {1, 0}}, 9);
+    expectLayout(source, {}, {}, 0);
+    source.append({{"new", 4, 1, rdb::INTEGER}});
+    expectLayout(source, {0}, {{0, 0}}, 4);
+  }
+}
+
+// Sprawdza przypisanie indeksu plaskiego do pola i elementu tablicy w rekordzie zaczynajacym sie od napisu.
+// Pokrywa STRING[10] jako jeden slot, BYTE[3] jako trzy sloty i koncowy skalar INTEGER.
 TEST(descriptor, position_conversion_case_1) {
   auto desc1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
              rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
@@ -289,6 +450,8 @@ TEST(descriptor, position_conversion_case_1) {
   EXPECT_TRUE(desc1.flatIndexToDescriptorPosition(4) == std::make_pair(2, 0));
 }
 
+// Sprawdza mapowanie indeksow plaskich, gdy pole przed tablica jest skalarem liczbowym.
+// Pokrywa BYTE, trzy elementy BYTE[3] i koncowy INTEGER, z zachowaniem indeksow elementow tablicy.
 TEST(descriptor, position_conversion_case_2) {
   auto desc1{rdb::Descriptor("Name", 1, 1, rdb::BYTE) +     //
              rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
@@ -301,6 +464,8 @@ TEST(descriptor, position_conversion_case_2) {
   EXPECT_TRUE(desc1.flatIndexToDescriptorPosition(4) == std::make_pair(2, 0));
 }
 
+// Sprawdza akceptacje poprawnej skladni deskryptorow przez parserDESCString.
+// Pokrywa pola skalarne i tablicowe oraz konfiguracje REF, TYPE TEXTSOURCE, RETENTION i RETMEMORY.
 TEST(descriptor, parser) {
   rdb::Descriptor out;
   EXPECT_TRUE(parserDESCString(out, "{ BYTE a INTEGER b[10] INTEGER c }") == "OK");
@@ -309,6 +474,8 @@ TEST(descriptor, parser) {
   EXPECT_TRUE(parserDESCString(out, "{ INTEGER a RETMEMORY 10 TYPE MEMORY }") == "OK");
 }
 
+// Sprawdza diagnostyke z numerem wiersza i kolumny oraz mozliwosc parsowania po bledzie.
+// Pokrywa brak nazwy pola, niedozwolony znak @ i nastepny poprawny deskryptor w tym samym procesie.
 TEST(descriptor, syntax_error_returns_location_and_allows_next_parse) {
   rdb::Descriptor bad;
   const std::string parserError = parserDESCString(bad, "{\n INTEGER }\n");
@@ -382,6 +549,8 @@ TEST(descriptor, parser_limits_field_size) {
   EXPECT_EQ(parserDESCString(next, "{ INTEGER a }"), "OK");
 }
 
+// Sprawdza zachowanie indeksow i rozmiaru pola po przypisaniu kopiujacym do pustego deskryptora.
+// Pokrywa mieszany uklad napisu, BYTE i INTEGER odczytywany po nazwach Control i TLen.
 TEST(descriptor, assign_operator) {
   auto data1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
              rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
@@ -395,6 +564,8 @@ TEST(descriptor, assign_operator) {
 
 // NOLINTEND(modernize-avoid-c-arrays)
 
+// Sprawdza zachowanie indeksow i rozmiaru pola podczas konstrukcji kopii deskryptora.
+// Pokrywa kopie mieszanego ukladu STRING/BYTE/INTEGER i odczyt pol Control oraz TLen po nazwie.
 TEST(descriptor, copy_constructor) {
   auto data1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
              rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
