@@ -6,8 +6,7 @@
 #include <memory>  // unique_ptr
 #include <string>
 #include <string_view>
-
-#include <boost/circular_buffer.hpp>
+#include <vector>
 
 #include "rdb/payload.hpp"
 
@@ -45,11 +44,10 @@ class dumpManager {
   void setDumpStorage(std::string storagePathParam);                // Set storage path for dump files
 
  private:
-  std::map<std::string, int> retentionCounter;  // first - streamName+taskName, second - counter
-  std::map<std::string, int> retentionSize;     // first - streamName+taskName, second - retention size
+  std::map<std::string, int> retentionCounter;  // first - streamName_taskName, second - counter
+  std::map<std::string, int> retentionSize;     // first - streamName_taskName, second - retention size
   std::string storagePath;
-  std::map<std::string, boost::circular_buffer<dumpTask>> bookOfTasks;  // streamName -> list of tasks
-  // circular buffer to track retention - will set by .set_capacity(retentionSize)
+  std::map<std::string, std::vector<dumpTask>> bookOfTasks;  // streamName -> list of tasks
 
   bool buildDumpChunk(dumpTask &task,
                       std::unique_ptr<rdb::payload>::pointer payload);  // Execute dump task - return true if task is completed

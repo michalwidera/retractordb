@@ -3,14 +3,19 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+#include <algorithm>
+#include <array>
+#include <cerrno>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <list>
 #include <map>
 #include <memory>
 #include <ostream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -305,7 +310,7 @@ TEST_F(DumpManagerFileTest, setDumpStorage_sets_path) {
 TEST_F(DumpManagerFileTest, createDumpFile_without_retention_creates_tmp_suffix) {
   dumpManager manager;
   manager.storagePath = sandBoxFolder.string();
-  // retentionSize["streamt"] = 0 (domyślna wartość mapy)
+  // retentionSize["stream_t"] = 0 (domyślna wartość mapy)
 
   auto [filename, fd] = manager.createDumpFile("stream", "t");
   ASSERT_GE(fd, 0);
@@ -317,8 +322,8 @@ TEST_F(DumpManagerFileTest, createDumpFile_without_retention_creates_tmp_suffix)
 
 TEST_F(DumpManagerFileTest, createDumpFile_with_retention_creates_numbered_files) {
   dumpManager manager;
-  manager.storagePath                 = sandBoxFolder.string();
-  manager.retentionSize["streamtask"] = 3;
+  manager.storagePath                  = sandBoxFolder.string();
+  manager.retentionSize["stream_task"] = 3;
 
   auto [f0, fd0] = manager.createDumpFile("stream", "task");
   ASSERT_GE(fd0, 0);
@@ -334,10 +339,73 @@ TEST_F(DumpManagerFileTest, createDumpFile_with_retention_creates_numbered_files
   EXPECT_TRUE(std::filesystem::exists(f1));
 }
 
+// Drugi deskryptor na pliku zrzutu. Po unlink i zamknieciu fd zadania tylko przez niego widac,
+// czy odlaczony i-wezel jeszcze rosnie.
+struct dumpObserver {
+  int fd{-1};
+  off_t sizeAtOpen{-1};
+  explicit dumpObserver(const std::string &path) : fd(::open(path.c_str(), O_RDONLY | O_CLOEXEC)) {
+    struct stat st{};
+    if (fd >= 0 && ::fstat(fd, &st) == 0) sizeAtOpen = st.st_size;
+  }
+  dumpObserver(const dumpObserver &)            = delete;
+  dumpObserver &operator=(const dumpObserver &) = delete;
+  ~dumpObserver() {
+    if (fd >= 0) ::close(fd);
+  }
+};
+
+// Plik odlaczony od katalogu i bez zapisow od otwarcia obserwatora.
+void expectDetachedAndFrozen(const dumpObserver &observer) {
+  ASSERT_GE(observer.sizeAtOpen, 0);
+  struct stat now{};
+  ASSERT_EQ(::fstat(observer.fd, &now), 0);
+  EXPECT_EQ(now.st_nlink, 0);
+  EXPECT_EQ(now.st_size, observer.sizeAtOpen);
+}
+
+// Gdyby numer zamknietego fd dostalo kolejne open(), F_GETFD by sie udalo i asercja padnie -
+// ponowny przydzial numeru nie ukryje wiec niezamknietego deskryptora.
+void expectClosed(int fd) {
+  errno = 0;
+  EXPECT_EQ(::fcntl(fd, F_GETFD), -1);
+  EXPECT_EQ(errno, EBADF);
+}
+
+const dumpTask &taskOf(const dumpManager &manager, const std::string &filename) {
+  const auto &tasks = manager.bookOfTasks.at("result");
+  const auto task   = std::find_if(tasks.begin(), tasks.end(), [&](const dumpTask &t) { return t.dumpFilename == filename; });
+  if (task == tasks.end()) throw std::runtime_error("no dump task for " + filename);
+  return *task;
+}
+
 class DumpManagerTaskTest : public DumpManagerFileTest, public ::testing::WithParamInterface<size_t> {
  protected:
   qTree plan;
   std::unique_ptr<dataModel> model;
+
+  // Poczatek zakresu DUMP dla parametru: zapis od razu, jeden rekord historii (strumien ma wtedy
+  // RETENTION 2) i start opozniony o dwa rekordy.
+  [[nodiscard]] long rangeStart() const { return std::array<long, 3>{0, -1, 2}.at(GetParam()); }
+
+  void writeRecord(std::int32_t value) {
+    auto &output = *model->qSet.at("result")->outputPayload;
+    output.getPayload()->setItem(0, value);
+    static_cast<void>(output.write());
+  }
+
+  [[nodiscard]] std::string dumpPath(const char *filename) const { return (sandBoxFolder / filename).string(); }
+
+  void expectDump(const char *filename, std::int32_t start, std::int32_t count) {
+    std::vector<std::int32_t> expected(count);
+    for (std::int32_t i = 0; i < count; ++i)
+      expected[i] = start + i;
+    std::ifstream dump(sandBoxFolder / filename, std::ios::binary);
+    ASSERT_TRUE(dump.is_open()) << filename;
+    const std::string actualBytes(std::istreambuf_iterator<char>{dump}, std::istreambuf_iterator<char>{});
+    const std::string expectedBytes(reinterpret_cast<const char *>(expected.data()), expected.size() * sizeof(expected[0]));
+    EXPECT_EQ(actualBytes, expectedBytes) << filename;
+  }
 
   void SetUp() override {
     DumpManagerFileTest::SetUp();
@@ -401,6 +469,142 @@ TEST_P(DumpManagerTaskTest, registerTask_retains_completed_dump_files_and_conten
 }
 
 INSTANTIATE_TEST_SUITE_P(BoundarySizes, DumpManagerTaskTest, ::testing::Values(size_t{0}, size_t{1}, size_t{2}));
+
+// #380: regula bez RETENTION odtwarza swoj plik przy kazdym wyzwoleniu. Zastapione zadanie
+// konczy sie od razu, choc obca regula z RETENTION 100 trzyma w ksiedze dluzsze okna.
+TEST_P(DumpManagerTaskTest, unretained_replacement_closes_only_same_rule_tasks) {
+  dumpManager manager;
+  manager.setDumpStorage(sandBoxFolder.string());
+  const long first = rangeStart();
+  writeRecord(1);
+  writeRecord(2);
+  writeRecord(3);
+  manager.registerTask("result", dumpTask("latest", {first, first + 3}, 0));
+  manager.registerTask("result", dumpTask("kept", {0, 7}, 100));
+  const int keptFd = taskOf(manager, dumpPath("result_kept_dump_0.tmp")).fd;
+  manager.processStreamChunk("result");
+
+  std::list<dumpObserver> observers;
+  for (int trigger = 4; trigger <= 5; ++trigger) {
+    const int oldFd = taskOf(manager, dumpPath("result_latest_dump.tmp")).fd;
+    ASSERT_GE(observers.emplace_back(dumpPath("result_latest_dump.tmp")).sizeAtOpen, 0);
+
+    writeRecord(trigger);
+    if (trigger == 4) manager.registerTask("result", dumpTask("kept", {0, 7}, 100));
+    manager.registerTask("result", dumpTask("latest", {first, first + 3}, 0));
+    expectClosed(oldFd);
+    EXPECT_NE(::fcntl(keptFd, F_GETFD), -1);
+    EXPECT_EQ(manager.bookOfTasks.at("result").size(), 3U);
+    manager.processStreamChunk("result");
+  }
+
+  for (int value = 6; value <= 10; ++value) {
+    writeRecord(value);
+    manager.processStreamChunk("result");
+  }
+  EXPECT_TRUE(manager.bookOfTasks.at("result").empty());
+  for (const auto &observer : observers)
+    expectDetachedAndFrozen(observer);
+
+  expectDump("result_latest_dump.tmp", static_cast<std::int32_t>(5 + first), 3);
+  expectDump("result_kept_dump_0.tmp", 3, 7);
+  expectDump("result_kept_dump_1.tmp", 4, 7);
+}
+
+// #380: regula z RETENTION 2 odtwarza plik slotu 0 przy trzecim wyzwoleniu. Zadanie pierwszego
+// wyzwolenia konczy sie wtedy, choc obca regula z RETENTION 100 zostawilaby mu miejsce w ksiedze.
+TEST_P(DumpManagerTaskTest, retention_wrap_closes_task_of_reused_slot) {
+  dumpManager manager;
+  manager.setDumpStorage(sandBoxFolder.string());
+  const long first = rangeStart();
+  writeRecord(1);
+  writeRecord(2);
+  writeRecord(3);
+  manager.registerTask("result", dumpTask("kept", {0, 9}, 100));
+  manager.registerTask("result", dumpTask("ring", {first, first + 5}, 2));
+  manager.processStreamChunk("result");
+  writeRecord(4);
+  manager.registerTask("result", dumpTask("ring", {first, first + 5}, 2));
+  manager.processStreamChunk("result");
+
+  const int wrappedFd = taskOf(manager, dumpPath("result_ring_dump_0.tmp")).fd;
+  const int slot1Fd   = taskOf(manager, dumpPath("result_ring_dump_1.tmp")).fd;
+  const int keptFd    = taskOf(manager, dumpPath("result_kept_dump_0.tmp")).fd;
+  const dumpObserver observer(dumpPath("result_ring_dump_0.tmp"));
+  ASSERT_GE(observer.sizeAtOpen, 0);
+  writeRecord(5);
+  manager.registerTask("result", dumpTask("ring", {first, first + 5}, 2));
+  expectClosed(wrappedFd);
+  EXPECT_NE(::fcntl(slot1Fd, F_GETFD), -1);
+  EXPECT_NE(::fcntl(keptFd, F_GETFD), -1);
+  EXPECT_EQ(manager.bookOfTasks.at("result").size(), 3U);
+  manager.processStreamChunk("result");
+
+  for (int value = 6; value <= 11; ++value) {
+    writeRecord(value);
+    manager.processStreamChunk("result");
+  }
+  EXPECT_TRUE(manager.bookOfTasks.at("result").empty());
+  expectDetachedAndFrozen(observer);
+
+  expectDump("result_ring_dump_0.tmp", static_cast<std::int32_t>(5 + first), 5);
+  expectDump("result_ring_dump_1.tmp", static_cast<std::int32_t>(4 + first), 5);
+  expectDump("result_kept_dump_0.tmp", 3, 9);
+}
+
+// #380: dwie reguly bez RETENTION na jednym strumieniu maja nakladajace sie okna. Do #380 ksiega
+// miala wtedy pojemnosc 1 i wyzwolenie drugiej ucinalo widoczny zrzut pierwszej.
+TEST_P(DumpManagerTaskTest, unretained_rules_do_not_evict_each_other) {
+  dumpManager manager;
+  manager.setDumpStorage(sandBoxFolder.string());
+  const long first = rangeStart();
+  writeRecord(1);
+  writeRecord(2);
+  writeRecord(3);
+  manager.registerTask("result", dumpTask("a", {first, first + 3}, 0));
+  const int aFd = taskOf(manager, dumpPath("result_a_dump.tmp")).fd;
+  manager.processStreamChunk("result");
+  writeRecord(4);
+  manager.registerTask("result", dumpTask("b", {first, first + 3}, 0));
+  EXPECT_NE(::fcntl(aFd, F_GETFD), -1);
+  EXPECT_EQ(manager.bookOfTasks.at("result").size(), 2U);
+  manager.processStreamChunk("result");
+
+  for (int value = 5; value <= 8; ++value) {
+    writeRecord(value);
+    manager.processStreamChunk("result");
+  }
+  EXPECT_TRUE(manager.bookOfTasks.at("result").empty());
+
+  expectDump("result_a_dump.tmp", static_cast<std::int32_t>(3 + first), 3);
+  expectDump("result_b_dump.tmp", static_cast<std::int32_t>(4 + first), 3);
+}
+
+// Licznik slotow i RETENTION naleza do pary strumien/regula. Klucz bez separatora sklejal a/bc
+// z ab/c (oba "abc"), choc ich pliki sa rozne: druga regula zaczynala od cudzego slotu 1.
+TEST_F(DumpManagerFileTest, retention_counters_are_kept_per_stream_and_rule) {
+  const auto inputFile = sandBoxFolder / "input.bin";
+  std::ofstream(inputFile, std::ios::binary).write("\0\0\0\0", 4);
+  qTree plan;
+  const auto [status, keyword, streamName] =
+      parserRQLString(plan, "STORAGE '" + sandBoxFolder.string() + "'\nDECLARE value INTEGER STREAM src, 1 BINFILE '" +
+                                inputFile.string() + "'\nSELECT src[0] STREAM a FROM src\nSELECT src[0] STREAM ab FROM src\n");
+  ASSERT_EQ(status, "OK");
+  compiler compilePlan(plan);
+  ASSERT_EQ(compilePlan.compile(), "OK");
+  dataModel model(plan);
+  pProc = &model;
+
+  dumpManager manager;
+  manager.setDumpStorage(sandBoxFolder.string());
+  manager.registerTask("a", dumpTask("bc", {0, 1}, 3));
+  manager.registerTask("ab", dumpTask("c", {0, 1}, 2));
+  manager.registerTask("a", dumpTask("bc", {0, 1}, 3));
+  EXPECT_EQ(manager.bookOfTasks.at("a").front().dumpFilename, (sandBoxFolder / "a_bc_dump_0.tmp").string());
+  EXPECT_EQ(manager.bookOfTasks.at("a").back().dumpFilename, (sandBoxFolder / "a_bc_dump_1.tmp").string());
+  EXPECT_EQ(manager.bookOfTasks.at("ab").back().dumpFilename, (sandBoxFolder / "ab_c_dump_0.tmp").string());
+  pProc = nullptr;
+}
 
 struct DumpHistoryCase {
   int historyDepth;

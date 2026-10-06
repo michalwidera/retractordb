@@ -130,6 +130,50 @@ TEST(xparser, duplicate_rule_name_on_one_stream_is_refused) {
   EXPECT_NE(result.find("already defined"), std::string::npos) << result;
 }
 
+// #380: plik zrzutu to <strumien>_<regula>_dump*.tmp, wiec rozne pary o rownym rdzeniu kasowalyby
+// sobie nawzajem pliki. Rdzen porownujemy bez wielkosci liter - na macOS Ab_r i ab_R to jeden plik.
+TEST(xparser, dump_rules_sharing_a_dump_file_are_refused) {
+  for (const char *rules :
+       {"RULE b_c ON a WHEN a[0] > 0 DO DUMP -1 TO 1\nRULE c ON a_b WHEN a_b[0] > 0 DO DUMP 0 TO 2 RETENTION 3",
+        "RULE R ON Ab WHEN Ab[0] > 0 DO DUMP 0 TO 1\nRULE r ON ab WHEN ab[0] > 0 DO DUMP 0 TO 1",
+        "RULE r ON ab WHEN ab[0] > 0 DO DUMP 0 TO 1\nRULE R ON ab WHEN ab[0] > 1 DO DUMP 0 TO 1"}) {
+    qTree instance;
+    testing::internal::CaptureStderr();
+    auto [result, keyword, streamName] = parserRQLString(instance, std::string(R"(
+        DECLARE x INTEGER STREAM core0, 1 BINFILE 'a.dat'
+        SELECT core0[0] STREAM a FROM core0
+        SELECT core0[0] STREAM a_b FROM core0
+        SELECT core0[0] STREAM Ab FROM core0
+        SELECT core0[0] STREAM ab FROM core0
+      )") + rules);
+    testing::internal::GetCapturedStderr();
+    EXPECT_NE(result, "OK") << rules;
+    EXPECT_NE(result.find("would write the same dump file"), std::string::npos) << result;
+  }
+}
+
+// Rozne rdzenie nie sa kolizja: a/bc i ab/c to pliki a_bc i ab_c. Instancje rodziny generatora
+// nazywaja sie gen$k, wiec ich pliki (gen$k_b_c) nie zderzaja sie z gen_b_c strumienia gen_b.
+// DO SYSTEM nie pisze pliku, wiec jego rdzen (a_b_c) nie zajmuje nazwy zrzutu c na a_b.
+TEST(xparser, dump_rules_with_distinct_dump_files_are_accepted) {
+  qTree instance;
+  auto [result, keyword, streamName] = parserRQLString(instance, R"(
+        DECLARE x INTEGER STREAM core0, 1 BINFILE 'a.dat'
+        SELECT core0[0] STREAM a FROM core0
+        SELECT core0[0] STREAM ab FROM core0
+        SELECT core0[0] STREAM a_b FROM core0
+        SELECT core0[$] STREAM gen[2] FROM core0
+        SELECT core0[0] STREAM gen_b FROM core0
+        RULE bc ON a WHEN a[0] > 0 DO DUMP 0 TO 1 RETENTION 3
+        RULE c ON ab WHEN ab[0] > 0 DO DUMP 0 TO 1 RETENTION 2
+        RULE b_c ON gen WHEN gen[0] > 0 DO DUMP 0 TO 1
+        RULE c ON gen_b WHEN gen_b[0] > 0 DO DUMP 0 TO 1
+        RULE b_c ON a WHEN a[0] > 1 DO SYSTEM 'true'
+        RULE c ON a_b WHEN a_b[0] > 0 DO DUMP 0 TO 1
+      )");
+  EXPECT_EQ(result, "OK");
+}
+
 TEST(xparser, empty_dump_range_is_refused_by_the_parser) {
   // Rownosc granic nie opisuje zadnego zrzutu, a nizej czekal na nia FatalError w
   // compiler::computeRequiredCapacities() - czyli w kanale ad-hoc smierc serwera.

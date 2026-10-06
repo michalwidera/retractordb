@@ -102,6 +102,19 @@ TEST_P(ExecutorsmAdHocRuleTest, attached_rule_first_dump_contains_only_records_a
   EXPECT_EQ(dump.peek(), std::ifstream::traits_type::eof());
 }
 
+// #380: regula ad-hoc, ktorej plik zrzutu pokrywa sie z plikiem reguly dolaczonej wczesniej -
+// tu Guard i guard na result, jeden plik na systemie nieczulym na wielkosc liter - dostaje odmowe
+// parsera, a zywy plan zostaje bez niej.
+TEST_P(ExecutorsmAdHocRuleTest, attached_rule_sharing_a_dump_file_is_refused) {
+  testing::internal::CaptureStderr();
+  ASSERT_EQ(executorsm::getAdHoc("RULE Guard ON result WHEN result[0] > 0 DO DUMP 0 TO 1").get<std::string>("db"), "OK");
+  const auto reply = executorsm::getAdHoc("RULE guard ON result WHEN result[0] > 1 DO DUMP 0 TO 1").get<std::string>("db");
+  testing::internal::GetCapturedStderr();
+  EXPECT_NE(reply.find("would write the same dump file"), std::string::npos) << reply;
+  ASSERT_EQ(plan.getQuery("result").lRules.size(), 1U);
+  EXPECT_EQ(plan.getQuery("result").lRules.front().name, "Guard");
+}
+
 TEST_P(ExecutorsmAdHocRuleTest, attached_rule_rejects_history_equal_to_memory_capacity) {
   const auto capacity                      = plan.getQuery("result").policy.second;
   qTree copy                               = plan;

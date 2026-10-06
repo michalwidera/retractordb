@@ -25,8 +25,8 @@ inline constexpr int kMaxFieldLength = 65536;
 /// na pojemnosc historii zrodla, a szerokosc okna AGSE - takze na szerokosc rekordu.
 inline constexpr int kMaxHistoryReach = 65536;
 
-/// `DUMP ... RETENTION n`: ksiega zadan zrzutu jest circular_buffer, a kazde otwarte zadanie trzyma
-/// deskryptor pliku. 256 to miekki RLIMIT_NOFILE na macOS.
+/// `DUMP ... RETENTION n`: regula ma w locie najwyzej n zadan zrzutu (po jednym na plik slotu), a kazde
+/// otwarte zadanie trzyma deskryptor pliku. 256 to miekki RLIMIT_NOFILE na macOS.
 inline constexpr int kMaxDumpRetention = 256;
 
 /// Liczba strumieni planu: rozmiar generatora `STREAM x[N]` (parser) i plan po rozwinieciu
