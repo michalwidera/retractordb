@@ -32,10 +32,11 @@ enum FieldColumn : std::uint8_t { rname = 0, rlen = 1, rarray = 2, rtype = 3 };
 /// - udostępniać metadane konfiguracyjne zapisane w polach specjalnych, takie jak REF, TYPE, RETENTION i RETMEMORY,
 /// - umożliwiać porównanie kompatybilności dwóch deskryptorów w zakresie pól danych przez operator==.
 ///
-/// @note Descriptor dziedziczy po std::vector<rField>, więc zachowuje się jak kontener pól z dodatkowymi metodami pomocniczymi.
+/// @note Pola są dostępne tylko do odczytu; zmiany układu przechodzą przez metody unieważniające cache.
 /// @note Operator== nie oznacza ścisłej równości wszystkich właściwości deskryptora; sprawdza zgodność pól danych z pominięciem pól konfiguracyjnych.
 
-class Descriptor : public std::vector<rField> {
+class Descriptor {
+  std::vector<rField> fields_;
   // Cache mapowan pol jest mutable: metody odczytu (getItem w payload dziala na
   // const Descriptorze) musza moc leniwie przebudowac mapowania bez kopiowania
   // calego deskryptora. Przebudowa jest idempotentna; obiekt jest logicznie const.
@@ -44,6 +45,12 @@ class Descriptor : public std::vector<rField> {
   mutable int flattenedFieldCount_ = 0;
   mutable size_t dataSizeBytes_    = 0;
   mutable bool fieldMappingsDirty_{true};
+  // Jedyna droga modyfikacji ukladu poza konstrukcja i przeniesieniem/kopia
+  // calego deskryptora wraz z jego cache. Uniewaznienie poprzedza mutacje.
+  std::vector<rField> &mutableFields() noexcept {
+    fieldMappingsDirty_ = true;
+    return fields_;
+  }
   void rebuildFieldMappings() const;
   /// Cache po oddaniu zawartosci (zrodlo przeniesienia) - wraca do stanu z konstruktora
   /// domyslnego, zeby liczniki nie opisywaly ukladu, ktorego juz tu nie ma.
@@ -61,6 +68,14 @@ class Descriptor : public std::vector<rField> {
   static bool singleLineOutput_;
 
  public:
+  [[nodiscard]] size_t size() const noexcept { return fields_.size(); }
+  [[nodiscard]] bool empty() const noexcept { return fields_.empty(); }
+  [[nodiscard]] const rField &operator[](size_t index) const noexcept { return fields_[index]; }
+  [[nodiscard]] std::vector<rField>::const_iterator begin() const noexcept { return fields_.cbegin(); }
+  [[nodiscard]] std::vector<rField>::const_iterator end() const noexcept { return fields_.cend(); }
+  [[nodiscard]] std::vector<rField>::const_iterator cbegin() const noexcept { return begin(); }
+  [[nodiscard]] std::vector<rField>::const_iterator cend() const noexcept { return end(); }
+
   static bool isSingleLineOutput() { return singleLineOutput_; }
   static void setSingleLineOutput(bool enabled) { singleLineOutput_ = enabled; }
 
@@ -88,15 +103,13 @@ class Descriptor : public std::vector<rField> {
   // przejscie po polach), czyli zabiera przenoszeniu prawie caly zysk - zmierzone na
   // 25 polach: 101 ns z odbudowa wobec 113 ns pelnej kopii.
   Descriptor(Descriptor &&other) noexcept
-      : flatToDescriptorIndexMap_(std::move(other.flatToDescriptorIndexMap_)),
+      : fields_(std::move(other.fields_)),
+        flatToDescriptorIndexMap_(std::move(other.flatToDescriptorIndexMap_)),
         fieldByteOffsets_(std::move(other.fieldByteOffsets_)),
         flattenedFieldCount_(other.flattenedFieldCount_),
         dataSizeBytes_(other.dataSizeBytes_),
         fieldMappingsDirty_(other.fieldMappingsDirty_) {
     other.dropFieldMappings();
-    // Ruch calego `other` na samym koncu: przeniesienie bazy przed skladowymi
-    // wlaczalo bugprone-use-after-move na kazdym dostepie do `other` powyzej.
-    std::vector<rField>::operator=(std::move(other));
   }
   Descriptor &operator=(Descriptor &&other) noexcept {
     if (this == &other) return *this;
@@ -106,7 +119,7 @@ class Descriptor : public std::vector<rField> {
     dataSizeBytes_            = other.dataSizeBytes_;
     fieldMappingsDirty_       = other.fieldMappingsDirty_;
     other.dropFieldMappings();
-    std::vector<rField>::operator=(std::move(other));
+    fields_ = std::move(other.fields_);
     return *this;
   }
 
