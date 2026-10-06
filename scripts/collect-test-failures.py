@@ -13,7 +13,8 @@ Dla kazdego testu z LastTestsFailed.log zbierane sa:
   * male pliki tekstowe z katalogu roboczego (wyniki, logi, wyjscia posrednie),
   * logi silnika i klienta z katalogu przestrzeni nazw (TMPDIR), ktore NIE leza
     w katalogu roboczym testu,
-  * gotowa roznica kazdej pary wzorzec/wynik, ktora da sie sparowac.
+  * gotowa roznica kazdej pary wzorzec/wynik zadeklarowanej przez `compare.sh`
+    w poleceniu testu, albo opis brakujacego pliku.
 
 Mapowanie nazwy testu na katalog roboczy pochodzi z `ctest --show-only=json-v1`
 (wlasnosc WORKING_DIRECTORY), a nie ze zgadywania z nazwy: nazwa testu i nazwa katalogu
@@ -152,42 +153,7 @@ def comparePairs(command: str, workDir: Path) -> list[tuple[Path, Path]]:
         if len(operands) < 2:
             continue
         pattern, actual = workDir / operands[0], workDir / operands[1]
-        if pattern.is_file() and actual.is_file():
-            pairs.append((pattern, actual))
-    return pairs
-
-
-def patternPairs(workDir: Path) -> list[tuple[Path, Path]]:
-    """Pary wzorzec/wynik, ktore da sie sparowac po nazwie.
-
-    Zapas dla testow, ktore nie wolaja `compare.sh` - tam para moze wyjsc tylko z nazw.
-
-    Konwencja drzewa jest regularna: pattern.txt -> out.txt, pattern-run.txt -> out-run.txt
-    albo out.txt, pattern-dot.txt -> out.dot, count.pattern -> count.txt. Parujemy po
-    przyrostku nazwy, a gdy to nie wychodzi - kazdy wzorzec z kazdym wynikiem byloby
-    myleniem, wiec zostaje sam pattern.txt/out.txt.
-    """
-    pairs = []
-    for pattern in sorted(workDir.glob("pattern*")) + sorted(workDir.glob("*.pattern")):
-        stem = pattern.name
-        candidates = []
-        if stem.startswith("pattern"):
-            suffix = stem[len("pattern"):].removesuffix(".txt")  # "", "-run", "-dot", "_compile"
-            candidates = [f"out{suffix}.txt", f"out{suffix}.dot"]
-            # Sufiks nazywajacy rozszerzenie wyniku (`pattern-dot.txt` -> `out.dot`) idzie
-            # PRZED ogolnym `out.txt`. Inaczej w katalogu, ktory ma oba pliki, wzorzec DOT
-            # parowal sie z wyjsciem testu `-run`: raport lang_showcase z 2026-09-20 podawal
-            # roznice dwoch niezwiazanych plikow, a prawdziwy `out.dot` zgadzal sie ze wzorcem.
-            if suffix.startswith("-"):
-                candidates.append(f"out.{suffix[1:]}")
-            candidates += ["out.txt", "out.dot"]
-        else:  # <cos>.pattern
-            candidates = [stem.removesuffix(".pattern") + ".txt"]
-        for candidate in candidates:
-            actual = workDir / candidate
-            if actual.is_file():
-                pairs.append((pattern, actual))
-                break
+        pairs.append((pattern, actual))
     return pairs
 
 
@@ -259,11 +225,22 @@ def collectOne(name: str, info: dict, lastTestLog: str, reportDir: Path) -> list
     elif tmpRaw:
         lines.append(f"  katalog przestrzeni nazw {tmpRaw} nie istnieje")
 
-    for pattern, actual in comparePairs(command, workDir) or patternPairs(workDir):
+    # Bez jawnej pary zostaja logi i pliki, ale nie zgadywany diff. Ten sam katalog
+    # moze zawierac wyniki kilku testow, w tym zwyklego i pamieciowego.
+    for pattern, actual in comparePairs(command, workDir):
+        name_ = f"diff-{pattern.name}-vs-{actual.name}.txt"
+        missing = []
+        if not pattern.is_file():
+            missing.append(f"wzorzec {pattern.name}: BRAK pliku")
+        if not actual.is_file():
+            missing.append(f"wynik {actual.name}: BRAK (nie zostal wytworzony)")
+        if missing:
+            (target / name_).write_text("\n".join(missing) + "\n", encoding="utf-8")
+            lines.extend(f"  {message}" for message in missing)
+            continue
         diff = subprocess.run(
             ["diff", "--strip-trailing-cr", "-u", str(pattern), str(actual)],
             capture_output=True, text=True).stdout
-        name_ = f"diff-{pattern.name}-vs-{actual.name}.txt"
         (target / name_).write_text(diff or "(brak roznic tekstowych)\n", encoding="utf-8")
         lines.append(f"  roznica {pattern.name} vs {actual.name}: "
                      f"{'zapisana' if diff else 'brak roznic tekstowych'}")
