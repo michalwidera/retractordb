@@ -7,9 +7,12 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <memory>
+#include <ostream>
 #include <string>
+#include <vector>
 
 #define private public
 #include "retractor/lib/dumpManager.hpp"
@@ -398,3 +401,72 @@ TEST_P(DumpManagerTaskTest, registerTask_retains_completed_dump_files_and_conten
 }
 
 INSTANTIATE_TEST_SUITE_P(BoundarySizes, DumpManagerTaskTest, ::testing::Values(size_t{0}, size_t{1}, size_t{2}));
+
+struct DumpHistoryCase {
+  int historyDepth;
+  const char *storageClause;
+};
+
+void PrintTo(const DumpHistoryCase &testCase, std::ostream *out) {
+  *out << "H=" << testCase.historyDepth << ", " << testCase.storageClause;
+}
+
+class DumpManagerHistoryTest : public DumpManagerFileTest, public ::testing::WithParamInterface<DumpHistoryCase> {
+ protected:
+  qTree plan;
+  std::unique_ptr<dataModel> model;
+
+  void SetUp() override {
+    DumpManagerFileTest::SetUp();
+    const auto inputFile = sandBoxFolder / "input.bin";
+    std::ofstream(inputFile, std::ios::binary).write("\0\0\0\0", 4);
+    const auto [status, keyword, streamName] =
+        parserRQLString(plan, "STORAGE '" + sandBoxFolder.string() + "'\nDECLARE value INTEGER STREAM src, 1 BINFILE '" +
+                                  inputFile.string() + "'\nSELECT src[0] STREAM result FROM src " + GetParam().storageClause +
+                                  "\nRULE capture ON result WHEN result[0] >= 10 DO DUMP -" +
+                                  std::to_string(GetParam().historyDepth) + " TO 1\n");
+    ASSERT_EQ(status, "OK");
+    ASSERT_EQ(compiler(plan).compile(), "OK");
+    model = std::make_unique<dataModel>(plan);
+    pProc = model.get();
+  }
+
+  void TearDown() override {
+    pProc = nullptr;
+    model.reset();
+    DumpManagerFileTest::TearDown();
+  }
+};
+
+// #419: prawdziwy magazyn i regula skompilowanego planu, bez recznego powiekszania
+// pierscienia. Zrzut porownujemy bajtowo po kilku obrotach pierscienia/segmentow.
+TEST_P(DumpManagerHistoryTest, compiled_rule_dumps_history_and_current_record_bytes) {
+  auto &runtime       = *model->qSet.at("result");
+  auto &output        = *runtime.outputPayload;
+  const auto dumpPath = sandBoxFolder / "result_capture_dump.tmp";
+
+  for (std::int32_t value = 1; value <= 12; ++value) {
+    output.getPayload()->setItem(0, value);
+    static_cast<void>(output.write());
+    ASSERT_EQ(output.getRecordsCount(), static_cast<size_t>(value));
+    runtime.constructRulesAndUpdate(plan.getQuery("result"));
+    if (value < 10) continue;
+
+    std::vector<std::int32_t> expected;
+    for (auto previous = value - GetParam().historyDepth; previous <= value; ++previous)
+      expected.push_back(previous);
+    const std::string expectedBytes(reinterpret_cast<const char *>(expected.data()), expected.size() * sizeof(expected[0]));
+    std::ifstream dump(dumpPath, std::ios::binary);
+    ASSERT_TRUE(dump.is_open());
+    const std::string actualBytes(std::istreambuf_iterator<char>{dump}, std::istreambuf_iterator<char>{});
+    EXPECT_EQ(actualBytes, expectedBytes) << "trigger=" << value << ", H=" << GetParam().historyDepth;
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(StorageBoundaries, DumpManagerHistoryTest,
+                         ::testing::Values(DumpHistoryCase{1, "STORAGE MEMORY"}, DumpHistoryCase{3, "STORAGE MEMORY"},
+                                           DumpHistoryCase{7, "STORAGE MEMORY"},
+                                           DumpHistoryCase{3, "RETENTION 3 STORAGE MEMORY"},
+                                           DumpHistoryCase{3, "RETENTION 4 STORAGE MEMORY"},
+                                           DumpHistoryCase{3, "RETENTION 1 4 STORAGE DEFAULT"},
+                                           DumpHistoryCase{3, "RETENTION 1 4 STORAGE DIRECT"}));

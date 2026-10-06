@@ -1912,15 +1912,16 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
     // czyta ja przez getPayload(q.id, k), a nie przez zrodlo z klauzuli FROM. Do 2026-09-05
     // podbicie trafialo w arg1 programu strumienia, czyli w zrodlo - glebokosc historii
     // dostawal ktos inny niz ten, kto z niej korzysta. Znaczenie ma to dla magazynu MEMORY,
-    // gdzie policy.second jest rozmiarem pierscienia i starszy rekord po prostu nie istnieje;
-    // magazyn plikowy trzyma cala historie niezaleznie od tej liczby.
+    // gdzie policy.second jest rozmiarem pierscienia. H rekordow historii i rekord biezacy
+    // potrzebuja H+1 slotow, inaczej najstarszy odczyt trafia w slot biezacy (#419).
+    // Tej samej potrzeby uzywa applyDiskRetention do kontroli retencji magazynu plikowego.
     for (const auto &rule : q.lRules) {
       if (rule.action != rule::DUMP) continue;
       auto [l, r] = rule.dumpRange;
       if (l >= r) {
         FatalError("compiler: dump range invalid [{}..{}] for query '{}'", l, r, q.id);
       }
-      if (l < 0) capMap[q.id] = std::max(capMap[q.id], static_cast<int>(abs(l)));
+      if (l < 0) capMap[q.id] = std::max(capMap[q.id], static_cast<int>(abs(l)) + 1);
     }
   }
   return capMap;
