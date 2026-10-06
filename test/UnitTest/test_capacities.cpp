@@ -212,8 +212,8 @@ TEST(capacities, rule_history_depth_lands_on_the_rule_owner) {
 
   qTree instance;
   auto [parseResult, keyword, name] = parserRQLString(instance, R"(
-        DECLARE a INTEGER STREAM src, 1 FILE 'src.dat'
-        SELECT src[0] STREAM dst FROM src
+        DECLARE a INTEGER STREAM src, 1 BINFILE 'src.dat'
+        SELECT src[0] STREAM dst FROM src STORAGE MEMORY
         RULE r ON dst WHEN dst[0] > 0 DO DUMP -7 TO 1
       )");
   ASSERT_EQ(parseResult, "OK");
@@ -221,6 +221,74 @@ TEST(capacities, rule_history_depth_lands_on_the_rule_owner) {
   compiler compilerInstance(instance);
   ASSERT_EQ(compilerInstance.compile(), "OK");
 
-  EXPECT_GE(instance.maxCapacity.at("dst"), historyDepth);
+  EXPECT_EQ(instance.maxCapacity.at("dst"), historyDepth + 1);
+  EXPECT_EQ(instance.getQuery("dst").policy.second, historyDepth + 1);
   EXPECT_LT(instance.maxCapacity.at("src"), historyDepth);
+}
+
+// #419: H rekordow historii i rekord biezacy musza miescic sie jednoczesnie.
+// Jawne RETENTION jest minimum pierscienia, nie ograniczeniem potrzeby planu.
+TEST(capacities, dump_history_and_current_record_fit_in_memory) {
+  for (const int historyDepth : {1, 3, 65536}) {
+    for (const int retention : {0, historyDepth, historyDepth + 1, historyDepth + 3}) {
+      SCOPED_TRACE("H=" + std::to_string(historyDepth) + ", RETENTION=" + std::to_string(retention));
+      const auto retentionClause = retention == 0 ? "" : " RETENTION " + std::to_string(retention);
+      qTree plan;
+      ASSERT_EQ(std::get<0>(parserRQLString(plan,
+                                            "DECLARE value INTEGER STREAM src, 1 BINFILE 'src.dat'\n"
+                                            "SELECT src[0] STREAM result FROM src" +
+                                                retentionClause +
+                                                " STORAGE MEMORY\n"
+                                                "RULE capture ON result WHEN result[0] = 10 DO DUMP -" +
+                                                std::to_string(historyDepth) + " TO 1\n")),
+                "OK");
+      ASSERT_EQ(compiler(plan).compile(), "OK");
+      EXPECT_EQ(plan.maxCapacity.at("result"), historyDepth + 1);
+      EXPECT_EQ(plan.getQuery("result").policy.second, std::max(retention, historyDepth + 1));
+    }
+  }
+}
+
+TEST(capacities, dump_without_history_keeps_the_single_record_memory_ring) {
+  for (const auto *range : {"0 TO 1", "2 TO 4"}) {
+    qTree plan;
+    ASSERT_EQ(std::get<0>(parserRQLString(plan, std::string("DECLARE value INTEGER STREAM src, 1 BINFILE 'src.dat'\n"
+                                                            "SELECT src[0] STREAM result FROM src STORAGE MEMORY\n"
+                                                            "RULE capture ON result WHEN result[0] = 10 DO DUMP ") +
+                                                    range + "\n")),
+              "OK");
+    ASSERT_EQ(compiler(plan).compile(), "OK");
+    EXPECT_EQ(plan.getQuery("result").policy.second, 1U) << range;
+  }
+}
+
+// Tuz po rotacji zostaje (segments-1)*capacity+1 rekordow. Przy H=3 trzy
+// rekordy sa za malo, cztery wystarczaja - takze dla retencji z konfiguracji.
+TEST(capacities, disk_retention_covers_dump_history_and_current_record) {
+  for (const auto *storage : {"DEFAULT", "DIRECT"}) {
+    for (const bool fromConfig : {false, true}) {
+      for (const int segments : {3, 4}) {
+        SCOPED_TRACE(std::string(storage) + ", config=" + std::to_string(fromConfig) + ", segments=" + std::to_string(segments));
+        const auto retentionClause = fromConfig ? "" : " RETENTION 1 " + std::to_string(segments);
+        qTree plan;
+        ASSERT_EQ(std::get<0>(parserRQLString(plan,
+                                              "DECLARE value INTEGER STREAM src, 1 BINFILE 'src.dat'\n"
+                                              "SELECT src[0] STREAM result FROM src" +
+                                                  retentionClause + " STORAGE " + storage +
+                                                  "\n"
+                                                  "RULE capture ON result WHEN result[0] = 10 DO DUMP -3 TO 1\n")),
+                  "OK");
+        compiler compilePlan(plan);
+        if (fromConfig) compilePlan.setDefaultRetention({.segments = static_cast<size_t>(segments), .capacity = 1});
+        const auto status = compilePlan.compile();
+        if (segments == 4) {
+          EXPECT_EQ(status, "OK");
+        } else {
+          const auto origin = fromConfig ? "[storage] default_retention = [1, 3]" : "RETENTION 1 3";
+          EXPECT_EQ(status, std::string("Stream 'result' keeps only 3 record(s) on disk under ") + origin +
+                                ", but the plan reads 4 record(s) back from it");
+        }
+      }
+    }
+  }
 }
