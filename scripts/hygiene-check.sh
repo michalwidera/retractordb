@@ -18,6 +18,8 @@ set -o pipefail
 scope=${1:-working}
 msg=${2:-}
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 2
+# Nazwy spoza ASCII bez cytowania - inaczej [ -f ] ich nie znajduje i plik nie jest skanowany.
+export GIT_CONFIG_PARAMETERS="'core.quotePath=false'"
 WM="${WATERMARKS_REMOVER:-$HOME/github/watermarks-remover}/service/scripts"
 [ -f "$WM/inspect_text.py" ] || { echo "ERROR: brak $WM/inspect_text.py"; exit 2; }
 
@@ -29,7 +31,7 @@ tree) files=$(git ls-files) ;;
 esac
 
 TEXT='\.(md|txt|tex|bib|rql|desc|cpp|hpp|h|c|g4|sh|py|ya?ml|toml|json|cmake|in)$|CMakeLists\.txt$'
-SRC='\.(cpp|hpp|h|c|g4|rql|desc|sh|py|cmake|toml|ya?ml|json)$|CMakeLists\.txt$'
+SRC='\.(cpp|hpp|h|c|g4|rql|desc|sh|py|cmake|toml|ya?ml|json|in)$|CMakeLists\.txt$'
 status=0
 
 report() { # nazwa, trafienia (jedno na linie)
