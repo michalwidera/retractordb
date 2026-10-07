@@ -78,9 +78,9 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
   // RETENTION na strumieniu, a jego pelnosc wypychala najstarsze zadanie dowolnej reguly - takze
   // cudze, ucinajac jego widoczny zrzut (np. dwie reguly bez RETENTION przy pojemnosci 1).
   auto &tasks = bookOfTasks[streamName];
-  auto newEnd = std::remove_if(tasks.begin(), tasks.end(),
-                               [&](const dumpTask &previous) { return previous.dumpFilename == task.dumpFilename; });
-  tasks.erase(newEnd, tasks.end());
+  auto removed =
+      std::ranges::remove_if(tasks, [&](const dumpTask &previous) { return previous.dumpFilename == task.dumpFilename; });
+  tasks.erase(removed.begin(), removed.end());
   task.dumpedRecordsToGo = static_cast<int>(abs(task.range.second - task.range.first));
 
   if (task.range.first < 0) {
