@@ -1,0 +1,40 @@
+== bounds
+{ bounds_0:2147483647 bounds_1:1 bounds_2:128 bounds_3:null bounds_4:null bounds_5:2147483647 bounds_6:3 bounds_7:null bounds_8:null }
+{ bounds_0:-2147483648 bounds_1:4294967291 bounds_2:0 bounds_3:null bounds_4:-2147483648 bounds_5:null bounds_6:null bounds_7:0 bounds_8:4294967289 }
+{ bounds_0:0 bounds_1:0 bounds_2:255 bounds_3:0 bounds_4:0 bounds_5:0 bounds_6:2 bounds_7:null bounds_8:null }
+{ bounds_0:1 bounds_1:10 bounds_2:127 bounds_3:null bounds_4:1 bounds_5:1 bounds_6:12 bounds_7:-2130706432 bounds_8:8 }
+{ bounds_0:7 bounds_1:4294967295 bounds_2:1 bounds_3:null bounds_4:7 bounds_5:7 bounds_6:null bounds_7:-16777216 bounds_8:null }
+{ bounds_0:null bounds_1:null bounds_2:null bounds_3:null bounds_4:null bounds_5:null bounds_6:null bounds_7:null bounds_8:null }
+== desc bounds
+{	INTEGER bounds_0
+	UINT bounds_1
+	BYTE bounds_2
+	UINT bounds_3
+	INTEGER bounds_4
+	INTEGER bounds_5
+	UINT bounds_6
+	INTEGER bounds_7
+	UINT bounds_8
+}
+== ratio
+{ ratio_0:1/2147483647 }
+{ ratio_0:-1/2147483647 }
+{ ratio_0:0/1 }
+{ ratio_0:1/1 }
+{ ratio_0:-2147483648/2147483647 }
+{ ratio_0:null }
+== desc ratio
+{	RATIONAL ratio_0
+}
+== rational_result
+{ rational_result_0:1/2147483647 rational_result_1:null }
+{ rational_result_0:-1/2147483647 rational_result_1:-1/2147483647 }
+{ rational_result_0:0/1 rational_result_1:0/1 }
+{ rational_result_0:1/1 rational_result_1:1/1 }
+{ rational_result_0:-2147483648/2147483647 rational_result_1:-2147483648/2147483647 }
+{ rational_result_0:null rational_result_1:null }
+== desc rational_result
+{	RATIONAL rational_result_0
+	RATIONAL rational_result_1
+}
+== dumps
