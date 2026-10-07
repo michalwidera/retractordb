@@ -163,8 +163,8 @@ integerRange definedDomain(std::int64_t a, std::int64_t b, integerRange base, in
   const auto lower = output.first - b;
   const auto upper = output.second - b;
   // C++ dzieli w stronę zera; dolna granica wymaga ceil, górna floor.
-  const auto lo = lower / a + (lower % a > 0 ? 1 : 0);
-  const auto hi = upper / a - (upper % a < 0 ? 1 : 0);
+  const auto lo = (lower / a) + (lower % a > 0 ? 1 : 0);
+  const auto hi = (upper / a) - (upper % a < 0 ? 1 : 0);
   return {std::max(base.first, lo), std::min(base.second, hi)};
 }
 
@@ -176,10 +176,11 @@ bool preservesIntermediateNull(const constantTail &tail, const rdb::descFldVT &c
   const auto *cf = std::get_if<int>(&folded);
   // RATIONAL może przepełnić licznik albo mianownik. Bez dowodu o promocjach i dziedzinie
   // określoności reguła B odmawia - również dla stałych innych typów.
-  if (!c1 || !c2 || !cf || (*tail.baseType != rdb::BYTE && *tail.baseType != rdb::INTEGER && *tail.baseType != rdb::UINT))
-    return false;
+  if (c1 == nullptr || c2 == nullptr || cf == nullptr || !tail.baseType.has_value()) return false;
+  const auto baseType = *tail.baseType;
+  if (baseType != rdb::BYTE && baseType != rdb::INTEGER && baseType != rdb::UINT) return false;
 
-  const integerRange output = *tail.baseType == rdb::UINT
+  const integerRange output = baseType == rdb::UINT
                                   ? integerRange{0, std::numeric_limits<unsigned>::max()}
                                   : integerRange{std::numeric_limits<int>::min(), std::numeric_limits<int>::max()};
   // Typowanie reguły B nie widzi promocji BYTE do INTEGER w podwyrażeniu `b+b`. Cały zakres

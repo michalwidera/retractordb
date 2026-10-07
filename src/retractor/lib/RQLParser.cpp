@@ -334,10 +334,23 @@ class ParserListener : public RQLBaseListener {
     for (const auto &q : coreInstance) {
       if (q.generatorSize != query::notAGenerator) continue;
       for (const auto &existing : q.lRules)
-        if (existing.action == rule::DUMP && stem(q.id, existing.name) == wanted)
-          return "Rule '" + rule_name + "' on stream '" + target.id + "' would write the same dump file as rule '" +
-                 existing.name + "' on stream '" + q.id + "' (" + target.id + "_" + rule_name +
-                 "_dump*.tmp); rename the rule or the stream";
+        if (existing.action == rule::DUMP && stem(q.id, existing.name) == wanted) {  //
+          std::string message = "Rule '";                                            //
+          message                                                                    //
+              .append(rule_name)                                                     //
+              .append("' on stream '")                                               //
+              .append(target.id)                                                     //
+              .append("' would write the same dump file as rule '")                  //
+              .append(existing.name)                                                 //
+              .append("' on stream '")                                               //
+              .append(q.id)                                                          //
+              .append("' (")                                                         //
+              .append(target.id)                                                     //
+              .append("_")                                                           //
+              .append(rule_name)                                                     //
+              .append("_dump*.tmp); rename the rule or the stream");                 //
+          return message;                                                            //
+        }  //
     }
     return {};
   }

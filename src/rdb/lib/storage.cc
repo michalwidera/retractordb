@@ -453,7 +453,7 @@ void storage::detectStartupState() {
   // Pusty magazyn nie moze czytac indeksu osieroconego przez starsza wersje silnika.
   // Numeru tamtej sesji nie znamy; archiwizacja odbywa sie teraz przy zamknieciu.
   if (recordsCount_ == 0 && !metaData_->isEmpty()) {
-    metaData_->reset();
+    (*metaData_).reset();
     return;
   }
 
