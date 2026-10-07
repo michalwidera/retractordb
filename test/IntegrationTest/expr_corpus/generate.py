@@ -51,7 +51,7 @@ SAME_TYPE_RULE = "{0} > {big} OR {1} < {neg} OR {0} >= {1} AND {2} = {big} OR {1
 # Ogon stalych `(E op c1) op c2` - ksztalt, ktory regula B w exprSimplify zwija do `E op (c1 ? c2)`.
 # Stala zwinieta bywa ujemna (`3-5`), a ujemna nie ma reprezentacji w UINT: do poprawki `u+3-5`
 # dawalo przy RDB_OPT_SIMPLIFY_EXPRESSIONS=ON NULL w kazdym wierszu, a przy ablacji u-2. Ostatnie
-# trzy zwijaja sie do stalej nieujemnej i maja zostac przepisane. Zadne nie zalezy od drabiny RQL.g4.
+# trzy daja stala nieujemna; straznik NULL nadal moze odmowic przepisania. Zadne nie zalezy od drabiny RQL.g4.
 TAIL = [
     "{0}+3-5",
     "3+{0}-5",
@@ -174,6 +174,20 @@ def write(name, text):
     (HERE / name).write_text(text if text.endswith("\n") else text + "\n")
 
 
+def issue327_boundaries():
+    # Osobny zestaw deterministyczny; nie przesuwa ziaren dotychczasowego korpusu.
+    write("own_overflow.rql", """# Regula B (#327): posredni NULL musi pozostac przy ON i all-off.
+STORAGE 'temp'
+DECLARE i INTEGER, u UINT, b BYTE STREAM src, 1 TEXTFILE 'own_overflow.txt'
+DECLARE r INTEGER STREAM rat, 1 TEXTFILE 'own_overflow_rat.txt'
+SELECT src[0], src[1], src[2], src[1]*-2*-3, (src[0]+1)-1, src[0]*-1*-1, src[1]+5-3, (src[2]+src[2])*8388608*-1, src[1]+3-5 STREAM bounds FROM src
+SELECT rat[0]/2147483647 STREAM ratio FROM AVG(rat)
+SELECT ratio[0], (ratio[0]+1)-1 STREAM rational_result FROM ratio
+""")
+    write("own_overflow.txt", "2147483647 1 128\n-2147483648 4294967291 0\n0 0 255\n1 10 127\n7 4294967295 1\nNULL NULL NULL")
+    write("own_overflow_rat.txt", "1\n-1\n0\n2147483647\n-2147483648\nNULL")
+
+
 def main():
     rng = random.Random(20260926)
 
@@ -268,6 +282,8 @@ SELECT {tail} STREAM tail FROM src
 """)
     write("own_tail.txt", "\n".join(f"{u if u < 8 else rng_tail.randint(0, 1000)} {rng_tail.randint(-1000, 1000)}"
                                      for u in range(ROWS)))
+
+    issue327_boundaries()
 
     exprs = system_expressions()
     rng_sys = random.Random(289)

@@ -147,23 +147,57 @@ std::optional<command_id> foldOperator(command_id tailOp, command_id op, bool co
   return op;
 }
 
-/// Reguła B - łączy dwie stałe rozdzielone podwyrażeniem.
-///
-/// Przepełnienie INTEGER i RATIONAL daje w ewaluatorze NULL (od 2026-09-14, checkedArith.hpp).
-/// Przepisanie może więc usunąć przepełnienie pośrednie: `(E+1)-1` dla E = INT_MAX bez reguły
-/// daje NULL, bo przepełnia się `E+1`, a po przepisaniu na `E+0` daje dokładnie INT_MAX.
-/// Odwrotnie być nie może: stała zwija się tylko wtedy, gdy `c1 ? c2` się mieści (foldConstants
-/// oddaje nullopt dla NULL), i tylko wtedy, gdy ma reprezentację w typie operacji, do którego
-/// normalize() ją promuje (strażnik niżej). Poza tymi dwoma krokami jedynym wynikiem pośrednim
-/// formy przepisanej jest wynik końcowy, który forma krokowa i tak musiała osiągnąć. Przy
-/// RDB_OPT_SIMPLIFY_EXPRESSIONS=ON wynik jest zatem co najwyżej BARDZIEJ określony: NULL (OFF)
-/// wobec dokładnej wartości (ON), nigdy inna liczba. Decyzja z 2026-09-14: przyjęte i opisane,
-/// reguła bez zmian. Z tej samej przyczyny `u*-2*-3` nad UINT daje przy OFF NULL (wynik pośredni
-/// `-2u` nie ma reprezentacji w UINT), a przy ON `u*6`.
-///
-/// Rozumowanie zakłada stałe INTEGER albo RATIONAL - innych RQL nie wytwarza (literał, funkcja
-/// nad literałem, iloraz). Stała UINT przesuwałaby promocję E w formie przepisanej przed pierwszą
-/// operację i wymagałaby osobnego strażnika.
+// Dziedzina a*E+b w reprezentacji wyniku. Wszystkie wspolczynniki pochodza
+// z INTEGER, a granice z int32/uint32; dzielenie i roznice mieszcza sie w int64.
+using integerRange = std::pair<std::int64_t, std::int64_t>;
+
+integerRange definedDomain(std::int64_t a, std::int64_t b, integerRange base, integerRange output) {
+  if (a == 0) return b >= output.first && b <= output.second ? base : integerRange{1, 0};
+  if (a < 0) {
+    a      = -a;
+    b      = -b;
+    output = {-output.second, -output.first};
+  }
+  const auto lower = output.first - b;
+  const auto upper = output.second - b;
+  // C++ dzieli w strone zera; dolna granica wymaga ceil, gorna floor.
+  const auto lo = lower / a + (lower % a > 0 ? 1 : 0);
+  const auto hi = upper / a - (upper % a < 0 ? 1 : 0);
+  return {std::max(base.first, lo), std::min(base.second, hi)};
+}
+
+bool preservesIntermediateNull(const constantTail &tail, const rdb::descFldVT &constant, const rdb::descFldVT &folded) {
+  const auto *c1 = std::get_if<int>(&tail.constant);
+  const auto *c2 = std::get_if<int>(&constant);
+  const auto *cf = std::get_if<int>(&folded);
+  // RATIONAL moze przepelnic licznik lub mianownik. Bez dowodu o promocjach
+  // i dziedzinie okreslonosci odmawiamy B, rowniez dla innych typow stalych.
+  if (!c1 || !c2 || !cf || (*tail.baseType != rdb::BYTE && *tail.baseType != rdb::INTEGER && *tail.baseType != rdb::UINT))
+    return false;
+
+  const integerRange output = *tail.baseType == rdb::UINT
+                                  ? integerRange{0, std::numeric_limits<unsigned>::max()}
+                                  : integerRange{std::numeric_limits<int>::min(), std::numeric_limits<int>::max()};
+  // Typowanie B nie uwzglednia promocji BYTE do INTEGER w podwyrazeniu b+b.
+  // Caly zakres INTEGER jest bezpiecznym nadzbiorem takze dla takiej bazy.
+  const auto affine = [&](int c) -> integerRange {
+    if (tail.op == MULTIPLY) return {c, 0};
+    if (tail.op == ADD) return {1, c};
+    return tail.constantOnLeft ? integerRange{-1, c} : integerRange{1, -std::int64_t{c}};
+  };
+  const auto [a1, b1] = affine(*c1);
+  const auto [af, bf] = affine(*cf);
+  const auto before   = definedDomain(a1, b1, output, output);
+  const auto after    = definedDomain(af, bf, output, output);
+  return after.first > after.second || (after.first >= before.first && after.second <= before.second);
+}
+
+/// Regula B - laczy stale tylko z zachowaniem dokladnego Val, wlacznie z NULL.
+/// Fold i kontrola reprezentacji chronia krok tworzacy nowa stala. Osobny
+/// straznik wymaga, by kazde E z okreslonym wynikiem po przepisaniu mialo tez
+/// okreslony wynik posredni przed przepisaniem. Wynik koncowy obu form jest
+/// wtedy ta sama liczba; NULL bazy propaguje sie w obu formach.
+/// Nie wystarcza c2 != 0 dla mnozenia: INT_MIN * -1 * -1 traci posredni NULL.
 std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant, command_id op) {
   if (!left.tail.has_value()) return std::nullopt;
   const auto &tail = *left.tail;
@@ -199,6 +233,8 @@ std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant
   if (typeOfConstant(*value) != *operationType &&
       std::holds_alternative<std::monostate>(cast<rdb::descFldVT>{}(*value, *operationType)))
     return std::nullopt;
+
+  if (!stringConcat && !preservesIntermediateNull(tail, constant, *value)) return std::nullopt;
 
   node result;
   if (tail.constantOnLeft) {

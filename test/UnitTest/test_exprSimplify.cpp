@@ -1,10 +1,12 @@
 #include <cmath>
+#include <limits>
 #include <list>
 #include <map>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <gtest/gtest.h>
 #include <boost/rational.hpp>
@@ -145,16 +147,14 @@ TEST(exprSimplify, reassociates_whole_chain_in_one_pass) {
   expectSameResult(original, program, 7);
 }
 
-TEST(exprSimplify, reassociates_mixed_plus_minus) {
-  // x + 5 - 2 == x + 3
+TEST(exprSimplify, keeps_mixed_plus_minus_with_intermediate_overflow) {
   const std::list<token> original{pushId(0), token(PUSH_VAL, 5), token(ADD), token(PUSH_VAL, 2), token(SUBTRACT)};
   std::list<token> program = original;
 
-  EXPECT_EQ(simplifyExpression(program, testFieldType), 1u);
-  ASSERT_EQ(program.size(), 3u);
-  EXPECT_EQ(std::get<int>(std::next(program.begin())->getVT()), 3);
-  EXPECT_EQ(program.back().getCommandID(), ADD);
-  expectSameResult(original, program, 7);
+  EXPECT_EQ(simplifyExpression(program, testFieldType), 0u);
+  EXPECT_EQ(dump(program), dump(original));
+  for (int x : {7, std::numeric_limits<int>::max() - 4, std::numeric_limits<int>::max()})
+    expectSameResult(original, program, x);
 }
 
 TEST(exprSimplify, reassociates_subtraction_chain) {
@@ -180,15 +180,16 @@ TEST(exprSimplify, reassociates_multiplication) {
 }
 
 TEST(exprSimplify, reassociates_with_constant_on_the_left) {
-  // 10 - x - 3 == 7 - x
-  const std::list<token> original{token(PUSH_VAL, 10), pushId(0), token(SUBTRACT), token(PUSH_VAL, 3), token(SUBTRACT)};
+  // 10 - x + 3 == 13 - x; okreslonosc wyniku gwarantuje okreslonosc 10-x.
+  const std::list<token> original{token(PUSH_VAL, 10), pushId(0), token(SUBTRACT), token(PUSH_VAL, 3), token(ADD)};
   std::list<token> program = original;
 
   EXPECT_EQ(simplifyExpression(program, testFieldType), 1u);
   ASSERT_EQ(program.size(), 3u);
-  EXPECT_EQ(std::get<int>(program.front().getVT()), 7);
+  EXPECT_EQ(std::get<int>(program.front().getVT()), 13);
   EXPECT_EQ(program.back().getCommandID(), SUBTRACT);
-  expectSameResult(original, program, 7);
+  for (int x : {7, std::numeric_limits<int>::min(), std::numeric_limits<int>::max()})
+    expectSameResult(original, program, x);
 }
 
 TEST(exprSimplify, concatenates_string_tail) {
@@ -244,17 +245,111 @@ TEST(exprSimplify, keeps_uint_tail_whose_folded_constant_is_negative) {
   }
 }
 
-TEST(exprSimplify, reassociates_uint_tail_whose_folded_constant_is_nonnegative) {
-  // u + 5 - 3 == u + 2 - strażnik odmawia tylko stałej bez reprezentacji w typie operacji.
+TEST(exprSimplify, keeps_uint_tail_with_intermediate_overflow_despite_nonnegative_fold) {
   const std::list<token> original{pushId(0), token(PUSH_VAL, 5), token(ADD), token(PUSH_VAL, 3), token(SUBTRACT)};
   std::list<token> program = original;
 
+  EXPECT_EQ(simplifyExpression(program, uintFieldType), 0u);
+  EXPECT_EQ(dump(program), dump(original));
+  for (unsigned u : {0U, 1U, 2U, 10U, std::numeric_limits<unsigned>::max() - 4, std::numeric_limits<unsigned>::max()})
+    expectSameUintResult(original, program, u);
+}
+
+TEST(exprSimplify, reassociates_safe_uint_addition_tail) {
+  const std::list<token> original{pushId(0), token(PUSH_VAL, 3), token(ADD), token(PUSH_VAL, 5), token(ADD)};
+  auto program = original;
   EXPECT_EQ(simplifyExpression(program, uintFieldType), 1u);
   ASSERT_EQ(program.size(), 3u);
-  EXPECT_EQ(std::get<int>(std::next(program.begin())->getVT()), 2);
-  EXPECT_EQ(program.back().getCommandID(), ADD);
-  for (const unsigned u : {0U, 1U, 2U, 10U})
+  EXPECT_EQ(std::get<int>(std::next(program.begin())->getVT()), 8);
+  for (unsigned u : {0U, 10U, std::numeric_limits<unsigned>::max() - 7, std::numeric_limits<unsigned>::max()})
     expectSameUintResult(original, program, u);
+}
+
+TEST(exprSimplify, preserves_null_in_issue327_counterexamples) {
+  struct example {
+    rdb::descFld type;
+    int width;
+    rdb::descFldVT value;
+    std::list<token> program;
+  };
+  const std::vector<example> examples{
+      {rdb::UINT, 4, 1U, {pushId(0), token(PUSH_VAL, -2), token(MULTIPLY), token(PUSH_VAL, -3), token(MULTIPLY)}},
+      {rdb::INTEGER,
+       4,
+       std::numeric_limits<int>::max(),
+       {pushId(0), token(PUSH_VAL, 1), token(ADD), token(PUSH_VAL, 1), token(SUBTRACT)}},
+      {rdb::INTEGER,
+       4,
+       std::numeric_limits<int>::min(),
+       {pushId(0), token(PUSH_VAL, -1), token(MULTIPLY), token(PUSH_VAL, -1), token(MULTIPLY)}},
+      {rdb::UINT,
+       4,
+       std::numeric_limits<unsigned>::max() - 4,
+       {pushId(0), token(PUSH_VAL, 5), token(ADD), token(PUSH_VAL, 3), token(SUBTRACT)}},
+      {rdb::RATIONAL,
+       8,
+       boost::rational<int>(1, std::numeric_limits<int>::max()),
+       {pushId(0), token(PUSH_VAL, 1), token(ADD), token(PUSH_VAL, 1), token(SUBTRACT)}},
+      {rdb::BYTE,
+       1,
+       uint8_t{128},
+       {pushId(0), pushId(0), token(ADD), token(PUSH_VAL, 8388608), token(MULTIPLY), token(PUSH_VAL, -1), token(MULTIPLY)}}};
+  expressionEvaluator evaluator;
+  for (const auto &example : examples) {
+    SCOPED_TRACE(dump(example.program));
+    auto descriptor = rdb::Descriptor("E", example.width, 1, example.type);
+    rdb::payload data(descriptor);
+    data.setItemVT(0, example.value);
+    ASSERT_EQ(data.getItemVT(0), std::optional{example.value});
+    auto simplified = example.program;
+    EXPECT_EQ(simplifyExpression(simplified, [&](const std::string &, int) { return std::optional{example.type}; }), 0u);
+    EXPECT_EQ(evaluator.eval(example.program, &data), rdb::descFldVT(std::monostate{}));
+    EXPECT_EQ(evaluator.eval(simplified, &data), rdb::descFldVT(std::monostate{}));
+  }
+}
+
+TEST(exprSimplify, constant_tail_matrix_preserves_values_and_null_at_boundaries) {
+  const std::vector<int> constants{std::numeric_limits<int>::min(), -65536, -3, -2, -1, 0, 1, 2, 3, 65536,
+                                   std::numeric_limits<int>::max()};
+  const std::vector<command_id> operators{ADD, SUBTRACT, MULTIPLY};
+  expressionEvaluator evaluator;
+  std::size_t rewritten = 0;
+  for (auto type : {rdb::BYTE, rdb::INTEGER, rdb::UINT}) {
+    auto descriptor = rdb::Descriptor("E", type == rdb::BYTE ? 1 : 4, 1, type);
+    rdb::payload data(descriptor);
+    std::vector<rdb::descFldVT> values{std::monostate{}};
+    if (type == rdb::BYTE) {
+      for (int x : {0, 1, 127, 128, 254, 255})
+        values.emplace_back(static_cast<uint8_t>(x));
+    } else if (type == rdb::INTEGER) {
+      for (int x : constants)
+        values.emplace_back(x);
+      values.emplace_back(std::numeric_limits<int>::min() + 1);
+      values.emplace_back(std::numeric_limits<int>::max() - 1);
+    } else {
+      for (unsigned x : {0U, 1U, 2U, 3U, 65536U, 2147483647U, 2147483648U, 4294967291U, 4294967294U, 4294967295U})
+        values.emplace_back(x);
+    }
+    for (int c1 : constants)
+      for (int c2 : constants)
+        for (auto op1 : operators)
+          for (auto op2 : operators)
+            for (bool left : {false, true}) {
+              const auto field = pushId(0);
+              const std::list<token> original{left ? token(PUSH_VAL, c1) : field, left ? field : token(PUSH_VAL, c1), token(op1),
+                                              token(PUSH_VAL, c2), token(op2)};
+              auto simplified = original;
+              rewritten += simplifyExpression(simplified, [type](const std::string &, int) { return std::optional{type}; }) > 0;
+              for (const auto &value : values) {
+                data.setItemVT(0, std::holds_alternative<std::monostate>(value) ? std::nullopt : std::optional{value});
+                ASSERT_EQ(data.getItemVT(0),
+                          std::holds_alternative<std::monostate>(value) ? std::nullopt : std::optional{value});
+                ASSERT_EQ(evaluator.eval(original, &data), evaluator.eval(simplified, &data))
+                    << dump(original) << " type=" << type << " E=" << token(PUSH_VAL, value).getStr_();
+              }
+            }
+  }
+  EXPECT_GT(rewritten, 0u);
 }
 
 //
