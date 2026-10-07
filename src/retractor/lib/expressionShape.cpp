@@ -358,9 +358,9 @@ exprShapeResult inferExpressionShape(const std::list<token> &program, const expr
         break;
 
       case BIT_NOT:
-        // Decyzja wlasciciela (#328): `~` tylko dla BYTE i UINT, gdzie rowna sie `-a`. Kazdy inny
-        // typ wartosci to odmowa planu - bitowa negacja liczby ze znakiem, wymiernej czy napisu
-        // nie jest w RQL zdefiniowana.
+        // Decyzja wlasciciela (#328): `~` tylko dla BYTE i UINT, gdzie jest dopelnieniem bitowym w
+        // szerokosci typu, `~a` = 2^N - 1 - a (np. `~0` = 255 dla BYTE). Kazdy inny typ wartosci to odmowa
+        // planu - bitowa negacja liczby ze znakiem, wymiernej czy napisu nie jest w RQL zdefiniowana.
         if (right.rtype == rdb::BYTE || right.rtype == rdb::UINT) {
           stack.push_back(right);
           break;
