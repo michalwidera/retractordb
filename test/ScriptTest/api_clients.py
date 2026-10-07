@@ -57,7 +57,13 @@ schema = with_delta(dict(stream=stream, delta='1/20', query='test', fields=[
     dict(name='a', type='INTEGER', count=2), dict(name='s', type='STRING', count=1),
     dict(name='r', type='RATIONAL', count=1)]), stream)
 if '--hello' in args:
-    emit('pong')
+    server = args[args.index('--server') + 1]
+    if server == 'badping':
+        emit('streams', streams=[])
+    elif server == 'pingerror':
+        emit('error', code='server_no_response', message='unavailable')
+    else:
+        emit('pong')
 elif '--dir' in args:
     emit('streams', streams=[with_delta(dict(name='valid', delta='1/20'), args[args.index('--server') + 1])])
 elif '--detail' in args:
@@ -135,7 +141,11 @@ def check_reaped_guard():
 
 def python_fake(binary):
     with Client("test", xqry=binary, timeout=2) as db:
-        assert db.ping()
+        assert db.ping() is None
+        for name, code in (("badping", "protocol_error"), ("pingerror", "server_no_response")):
+            with Client(name, xqry=binary, timeout=2) as broken:
+                with error(code):
+                    broken.ping()
         assert db.streams()[0].delta == Fraction(1, 20)
         assert db.describe("valid").fields[0].count == 2
         with db.subscribe("valid") as samples:
@@ -175,6 +185,8 @@ def python_fake(binary):
         samples = db.subscribe("wait")
         pid = samples.pid
     reaped(pid)
+    with error("closed"):
+        db.ping()
     print("PASS Python fake", flush=True)
 
 
@@ -231,7 +243,7 @@ SELECT 'hello world', 'null' STREAM words FROM numbers
                 with db.subscribe("numbers") as samples:
                     pid = samples.pid
                 reaped(pid)
-                assert db.ping()
+                assert db.ping() is None
                 subprocess.run([cpp, name, xqry, "real"], cwd=root, env=env, check=True, timeout=20)
                 with db.subscribe("numbers") as samples:
                     assert samples.next(timeout=2)

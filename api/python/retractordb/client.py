@@ -104,7 +104,6 @@ class Client:
 
     def ping(self):
         self._command("pong", "--hello")
-        return True
 
     def streams(self):
         result = self._command("streams", "--dir")

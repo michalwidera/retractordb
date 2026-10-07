@@ -73,11 +73,11 @@ class Subscription {
   Subscription(const Subscription &)            = delete;
   Subscription &operator=(const Subscription &) = delete;
 
-  const Schema &schema() const;
-  std::optional<Record> next(std::optional<std::chrono::milliseconds> timeout = std::nullopt);
+  [[nodiscard]] const Schema &schema() const;
+  [[nodiscard]] std::optional<Record> next(std::optional<std::chrono::milliseconds> timeout = std::nullopt);
   void close() noexcept;
-  int pid() const;
-  std::string endReason() const;
+  [[nodiscard]] int pid() const;
+  [[nodiscard]] std::string endReason() const;
 
  private:
   struct Impl;
@@ -89,14 +89,16 @@ class Subscription {
 class Client {
  public:
   explicit Client(std::string server, Options options = {});
+  Client(Client &&) noexcept;
+  Client &operator=(Client &&) noexcept;
   ~Client();
   Client(const Client &)            = delete;
   Client &operator=(const Client &) = delete;
 
-  bool ping();
-  std::vector<Stream> streams();
-  Schema describe(const std::string &stream);
-  Subscription subscribe(const std::string &stream, SubscribeOptions options = {});
+  void ping();
+  [[nodiscard]] std::vector<Stream> streams();
+  [[nodiscard]] Schema describe(const std::string &stream);
+  [[nodiscard]] Subscription subscribe(const std::string &stream, SubscribeOptions options = {});
   void close() noexcept;
 
  private:
