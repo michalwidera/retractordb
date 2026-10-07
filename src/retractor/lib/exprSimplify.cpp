@@ -147,10 +147,12 @@ std::optional<command_id> foldOperator(command_id tailOp, command_id op, bool co
   return op;
 }
 
-// Dziedzina a*E+b w reprezentacji wyniku. Wszystkie wspolczynniki pochodza
-// z INTEGER, a granice z int32/uint32; dzielenie i roznice mieszcza sie w int64.
+/// Przedział domknięty [first, second] wartości E; pusty, gdy first > second.
 using integerRange = std::pair<std::int64_t, std::int64_t>;
 
+/// Te E z `base`, dla których a*E+b mieści się w `output` - dziedzina określoności wyniku.
+/// Współczynniki pochodzą ze stałych INTEGER, granice z int32/uint32, więc dzielenie i różnice
+/// mieszczą się w int64.
 integerRange definedDomain(std::int64_t a, std::int64_t b, integerRange base, integerRange output) {
   if (a == 0) return b >= output.first && b <= output.second ? base : integerRange{1, 0};
   if (a < 0) {
@@ -160,26 +162,28 @@ integerRange definedDomain(std::int64_t a, std::int64_t b, integerRange base, in
   }
   const auto lower = output.first - b;
   const auto upper = output.second - b;
-  // C++ dzieli w strone zera; dolna granica wymaga ceil, gorna floor.
+  // C++ dzieli w stronę zera; dolna granica wymaga ceil, górna floor.
   const auto lo = lower / a + (lower % a > 0 ? 1 : 0);
   const auto hi = upper / a - (upper % a < 0 ? 1 : 0);
   return {std::max(base.first, lo), std::min(base.second, hi)};
 }
 
+/// Czy przepisanie `(E op c1) op c2` na `E op cf` zachowuje NULL przepełnienia pośredniego:
+/// dziedzina określoności formy przepisanej musi się zawierać w dziedzinie wyniku pośredniego.
 bool preservesIntermediateNull(const constantTail &tail, const rdb::descFldVT &constant, const rdb::descFldVT &folded) {
   const auto *c1 = std::get_if<int>(&tail.constant);
   const auto *c2 = std::get_if<int>(&constant);
   const auto *cf = std::get_if<int>(&folded);
-  // RATIONAL moze przepelnic licznik lub mianownik. Bez dowodu o promocjach
-  // i dziedzinie okreslonosci odmawiamy B, rowniez dla innych typow stalych.
+  // RATIONAL może przepełnić licznik albo mianownik. Bez dowodu o promocjach i dziedzinie
+  // określoności reguła B odmawia - również dla stałych innych typów.
   if (!c1 || !c2 || !cf || (*tail.baseType != rdb::BYTE && *tail.baseType != rdb::INTEGER && *tail.baseType != rdb::UINT))
     return false;
 
   const integerRange output = *tail.baseType == rdb::UINT
                                   ? integerRange{0, std::numeric_limits<unsigned>::max()}
                                   : integerRange{std::numeric_limits<int>::min(), std::numeric_limits<int>::max()};
-  // Typowanie B nie uwzglednia promocji BYTE do INTEGER w podwyrazeniu b+b.
-  // Caly zakres INTEGER jest bezpiecznym nadzbiorem takze dla takiej bazy.
+  // Typowanie reguły B nie widzi promocji BYTE do INTEGER w podwyrażeniu `b+b`. Cały zakres
+  // INTEGER jest bezpiecznym nadzbiorem także dla takiej bazy.
   const auto affine = [&](int c) -> integerRange {
     if (tail.op == MULTIPLY) return {c, 0};
     if (tail.op == ADD) return {1, c};
@@ -192,12 +196,14 @@ bool preservesIntermediateNull(const constantTail &tail, const rdb::descFldVT &c
   return after.first > after.second || (after.first >= before.first && after.second <= before.second);
 }
 
-/// Regula B - laczy stale tylko z zachowaniem dokladnego Val, wlacznie z NULL.
-/// Fold i kontrola reprezentacji chronia krok tworzacy nowa stala. Osobny
-/// straznik wymaga, by kazde E z okreslonym wynikiem po przepisaniu mialo tez
-/// okreslony wynik posredni przed przepisaniem. Wynik koncowy obu form jest
-/// wtedy ta sama liczba; NULL bazy propaguje sie w obu formach.
-/// Nie wystarcza c2 != 0 dla mnozenia: INT_MIN * -1 * -1 traci posredni NULL.
+/// Reguła B - łączy dwie stałe rozdzielone podwyrażeniem, z zachowaniem dokładnego Val,
+/// włącznie z NULL (#327).
+///
+/// Zwijanie stałych i kontrola reprezentacji chronią krok tworzący nową stałą. Osobny strażnik
+/// (preservesIntermediateNull) wymaga, by każde E z określonym wynikiem po przepisaniu miało też
+/// określony wynik pośredni przed przepisaniem. Wynik końcowy obu form jest wtedy tą samą liczbą,
+/// a NULL bazy propaguje się w obu formach. Dla mnożenia nie wystarcza `c2 != 0`:
+/// `INT_MIN * -1 * -1` traci pośredni NULL.
 std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant, command_id op) {
   if (!left.tail.has_value()) return std::nullopt;
   const auto &tail = *left.tail;

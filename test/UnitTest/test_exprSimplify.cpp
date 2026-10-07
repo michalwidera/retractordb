@@ -180,7 +180,7 @@ TEST(exprSimplify, reassociates_multiplication) {
 }
 
 TEST(exprSimplify, reassociates_with_constant_on_the_left) {
-  // 10 - x + 3 == 13 - x; okreslonosc wyniku gwarantuje okreslonosc 10-x.
+  // 10 - x + 3 == 13 - x; określoność wyniku gwarantuje określoność 10-x.
   const std::list<token> original{token(PUSH_VAL, 10), pushId(0), token(SUBTRACT), token(PUSH_VAL, 3), token(ADD)};
   std::list<token> program = original;
 
@@ -189,6 +189,18 @@ TEST(exprSimplify, reassociates_with_constant_on_the_left) {
   EXPECT_EQ(std::get<int>(program.front().getVT()), 13);
   EXPECT_EQ(program.back().getCommandID(), SUBTRACT);
   for (int x : {7, std::numeric_limits<int>::min(), std::numeric_limits<int>::max()})
+    expectSameResult(original, program, x);
+}
+
+TEST(exprSimplify, keeps_constant_on_the_left_with_intermediate_overflow) {
+  // 10 - x - 3 == 7 - x matematycznie, ale dla x = INT_MIN + 7 forma krokowa przepełnia się
+  // w 10 - x (NULL), a forma 7 - x daje INT_MAX. Strażnik reguły B odmawia (#327).
+  const std::list<token> original{token(PUSH_VAL, 10), pushId(0), token(SUBTRACT), token(PUSH_VAL, 3), token(SUBTRACT)};
+  std::list<token> program = original;
+
+  EXPECT_EQ(simplifyExpression(program, testFieldType), 0u);
+  EXPECT_EQ(dump(program), dump(original));
+  for (int x : {7, std::numeric_limits<int>::min() + 7, std::numeric_limits<int>::max()})
     expectSameResult(original, program, x);
 }
 

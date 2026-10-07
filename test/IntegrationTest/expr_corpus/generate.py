@@ -181,6 +181,7 @@ STORAGE 'temp'
 DECLARE i INTEGER, u UINT, b BYTE STREAM src, 1 TEXTFILE 'own_overflow.txt'
 DECLARE r INTEGER STREAM rat, 1 TEXTFILE 'own_overflow_rat.txt'
 SELECT src[0], src[1], src[2], src[1]*-2*-3, (src[0]+1)-1, src[0]*-1*-1, src[1]+5-3, (src[2]+src[2])*8388608*-1, src[1]+3-5 STREAM bounds FROM src
+# RATIONAL: DECLARE go nie zna, wiec powstaje z reduktora AVG(rat); iloraz daje skrajny mianownik.
 SELECT rat[0]/2147483647 STREAM ratio FROM AVG(rat)
 SELECT ratio[0], (ratio[0]+1)-1 STREAM rational_result FROM ratio
 """)
