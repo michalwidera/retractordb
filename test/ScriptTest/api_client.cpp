@@ -35,6 +35,13 @@ void expectError(const std::string &code, F action) {
   throw std::runtime_error("Expected error: " + code);
 }
 
+void expectClosed(retractordb::Client &client, const std::string &stream) {
+  expectError("closed", [&] { client.ping(); });
+  expectError("closed", [&] { return client.streams(); });
+  expectError("closed", [&] { return client.describe(stream); });
+  expectError("closed", [&] { return client.subscribe(stream); });
+}
+
 retractordb::Client makeClient(const std::string &server, const std::string &xqry) {
   retractordb::Client client(server, {.xqry = xqry, .timeout = 2s});
   return client;
@@ -48,11 +55,13 @@ void checkMoves(const std::string &server, const std::string &xqry, const std::s
     std::vector<retractordb::Client> clients;
     clients.reserve(1);
     clients.push_back(std::move(original));
+    expectClosed(original, stream);
     original.close();
     clients.push_back(makeClient(server, xqry));
     clients.front().ping();
     {
       auto ping = [client = std::move(clients.front())]() mutable { client.ping(); };
+      expectClosed(clients.front(), stream);
       clients.front().close();
       ping();
       require(kill(pid, 0) == 0, "move closed transferred subscription");
@@ -69,6 +78,7 @@ void checkMoves(const std::string &server, const std::string &xqry, const std::s
     auto replaced         = target.subscribe(stream);
     const int replacedPid = replaced.pid();
     target                = std::move(source);
+    expectClosed(source, stream);
     source.close();
     require(kill(replacedPid, 0) == -1, "move assignment left replaced child");
     require(!replaced.next(), "replaced client still reads");
@@ -78,7 +88,7 @@ void checkMoves(const std::string &server, const std::string &xqry, const std::s
     require(kill(incomingPid, 0) == -1, "moved client.close left child");
     require(!incoming.next(), "closed moved client still reads");
     target.close();
-    expectError("closed", [&] { target.ping(); });
+    expectClosed(target, stream);
   }
   source = makeClient(server, xqry);
   source.ping();
@@ -174,7 +184,7 @@ int main(int argc, char **argv) {
     db.close();
     require(kill(pid, 0) == -1, "client.close left child");
     require(!remaining.next(), "closed subscription still reads");
-    expectError("closed", [&] { db.ping(); });
+    expectClosed(db, fake ? "valid" : "numbers");
     std::cout << "PASS C++ " << argv[3] << '\n';
   } catch (const std::exception &error) {
     std::cerr << error.what() << '\n';

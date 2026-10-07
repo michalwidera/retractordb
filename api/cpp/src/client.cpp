@@ -411,8 +411,12 @@ Client::~Client()                             = default;
 void Client::close() noexcept {
   if (impl_) impl_->close();
 }
-void Client::ping() { impl_->command("pong", {"--hello"}); }
+void Client::ping() {
+  if (!impl_) throw Error("closed", "Client is closed");
+  impl_->command("pong", {"--hello"});
+}
 std::vector<Stream> Client::streams() {
+  if (!impl_) throw Error("closed", "Client is closed");
   const auto result = impl_->command("streams", {"--dir"});
   return parsed([&] {
     std::vector<Stream> streams;
@@ -424,10 +428,12 @@ std::vector<Stream> Client::streams() {
   });
 }
 Schema Client::describe(const std::string &stream) {
+  if (!impl_) throw Error("closed", "Client is closed");
   const auto result = impl_->command("schema", {"--detail", stream});
   return parsed([&] { return schema(result); });
 }
 Subscription Client::subscribe(const std::string &stream, SubscribeOptions options) {
+  if (!impl_) throw Error("closed", "Client is closed");
   if (options.limit < 0 || options.idleTimeout.count() < 0) throw std::invalid_argument("limits must be nonnegative");
   auto subscription =
       std::make_shared<Subscription::Impl>(impl_->args({"--select", stream, "--elimitqry", std::to_string(options.limit),
