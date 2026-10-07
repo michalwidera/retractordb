@@ -373,6 +373,13 @@ struct Client::Impl {
   Options options;
   std::vector<std::weak_ptr<Subscription::Impl>> subscriptions;
   bool closed{false};
+  ~Impl() { close(); }
+  void close() noexcept {
+    closed = true;
+    for (const auto &weak : subscriptions)
+      if (auto subscription = weak.lock()) subscription->close();
+    subscriptions.clear();
+  }
   std::vector<std::string> args(std::initializer_list<std::string> command) const {
     if (closed) throw Error("closed", "Client is closed");
     std::vector<std::string> result{options.xqry, "--server", server, "--jsonl"};
@@ -398,17 +405,13 @@ Client::Client(std::string server, Options options) : impl_(std::make_unique<Imp
   impl_->server  = std::move(server);
   impl_->options = std::move(options);
 }
-Client::~Client() { close(); }
+Client::Client(Client &&) noexcept            = default;
+Client &Client::operator=(Client &&) noexcept = default;
+Client::~Client()                             = default;
 void Client::close() noexcept {
-  impl_->closed = true;
-  for (const auto &weak : impl_->subscriptions)
-    if (auto subscription = weak.lock()) subscription->close();
-  impl_->subscriptions.clear();
+  if (impl_) impl_->close();
 }
-bool Client::ping() {
-  impl_->command("pong", {"--hello"});
-  return true;
-}
+void Client::ping() { impl_->command("pong", {"--hello"}); }
 std::vector<Stream> Client::streams() {
   const auto result = impl_->command("streams", {"--dir"});
   return parsed([&] {

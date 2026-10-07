@@ -44,6 +44,10 @@ Use `Options{.xqry="/path/to/xqry", .timeout=...}` for the binary and command/sc
 
 `next(timeout)` returns `std::optional<Record>`; empty means normal completion or explicit closure. Errors throw `retractordb::Error` with a string `code`. A `read_timeout` keeps the subscription open. `schema()` returns the schema; `endReason()` identifies normal completion and `pid()` identifies the child. Explicit `close()` and destructors reap that child. Subscriptions are move-only. Destroying the client closes all its subscriptions, including surviving handles.
 
+`Client` is also move-only, with a `noexcept` move constructor and move assignment. Moving transfers its subscriptions; move assignment first closes the destination's previous subscriptions. A moved-from client can be destroyed, closed, or assigned another client. Other operations require a client that owns its state. Methods returning data or subscriptions are `[[nodiscard]]`.
+
+`ping()` returns `void` on a valid response and throws `retractordb::Error` on failure. The Python equivalent returns `None` on success and raises `Error` on failure.
+
 `Record.values` maps names to vectors of `Value`: scalars have one element, arrays have their full length. Use `std::get_if` or `std::visit` for the alternatives in [the shared contract](../README.md). NULL is `std::monostate`.
 
 Two subscriptions own different processes. Serialize calls on each handle. The example handles SIGINT/SIGTERM with a stop flag and timed reads; the library does not change the application's signal handlers.
