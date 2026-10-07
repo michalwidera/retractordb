@@ -141,7 +141,7 @@ def check_reaped_guard():
 
 def python_fake(binary):
     with Client("test", xqry=binary, timeout=2) as db:
-        assert db.ping() is None
+        assert db.ping() is True
         for name, code in (("badping", "protocol_error"), ("pingerror", "server_no_response")):
             with Client(name, xqry=binary, timeout=2) as broken:
                 with error(code):
@@ -243,7 +243,7 @@ SELECT 'hello world', 'null' STREAM words FROM numbers
                 with db.subscribe("numbers") as samples:
                     pid = samples.pid
                 reaped(pid)
-                assert db.ping() is None
+                assert db.ping() is True
                 subprocess.run([cpp, name, xqry, "real"], cwd=root, env=env, check=True, timeout=20)
                 with db.subscribe("numbers") as samples:
                     assert samples.next(timeout=2)
