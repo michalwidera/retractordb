@@ -28,11 +28,10 @@ using fieldTypeLookup = std::function<std::optional<rdb::descFld>(const std::str
 ///        dowolnie długiego łańcucha oraz dla dowolnego powtórzonego podwyrażenia
 ///        (`(x+1)*(x+1)` → `(x+1)^2`). WYŁĄCZNIE przy `aggressive_expr_optimization=ON`.
 ///
-/// B wymaga zachowania NULL: dziedzina okreslonosci wyniku po przepisaniu musi
-/// zawierac sie w dziedzinie wyniku posredniego. Straznik obejmuje baze
-/// INTEGER/UINT/BYTE ze stalymi INTEGER; dla BYTE przyjmuje caly zakres INTEGER.
-/// RATIONAL i nieudowodnione promocje pozostaja bez reasocjacji. Konkatenacja
-/// STRING jest dopuszczona. Zwijanie stalych A i elementy neutralne C dzialaja nadal.
+/// B wymaga zachowania NULL: dziedzina określoności wyniku po przepisaniu musi zawierać się
+/// w dziedzinie wyniku pośredniego. Strażnik obejmuje bazę INTEGER/UINT/BYTE ze stałymi INTEGER;
+/// dla BYTE przyjmuje cały zakres INTEGER. RATIONAL i nieudowodnione promocje pozostają bez
+/// reasocjacji. Konkatenacja STRING jest dopuszczona. Reguły A i C działają bez zmian.
 ///
 /// Świadomie NIE ma tu `E*0` → `0`: `NULL*0` daje NULL, więc pochłanianie złamałoby 3VL.
 ///
