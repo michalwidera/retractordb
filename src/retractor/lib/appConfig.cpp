@@ -6,6 +6,7 @@
 #include <format>
 #include <limits>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -98,10 +99,6 @@ void sanitizeConfig(AppConfig &cfg) {
                 defaults.historyMemoryMib);
     cfg.historyMemoryMib = defaults.historyMemoryMib;
   }
-
-  if (!cfg.lockDir.empty() && !std::filesystem::path(cfg.lockDir).is_absolute()) {
-    SPDLOG_WARN("paths.lock_dir='{}' is not an absolute path.", cfg.lockDir);
-  }
 }
 
 // `[capacity, segments]` - kolejnosc jak w `RETENTION capacity segments`. Wartosc niepoprawna daje
@@ -161,7 +158,7 @@ void parseStorageRefDirs(const toml::node_view<const toml::node> node, AppConfig
 
 // Nakłada ustawienia z jednej tabeli TOML na akumulowaną konfigurację.
 // Klucze nieobecne w tabeli pozostawiają dotychczasową wartość (warstwowość).
-void applyTable(const toml::table &tbl, AppConfig &cfg) {
+void applyTable(const toml::table &tbl, AppConfig &cfg, const std::string &path) {
   if (auto v = tbl.at_path("storage.dir").value<std::string>(); v) cfg.storageDir = *v;
   if (auto v = tbl.at_path("storage.default_retention"); v) cfg.defaultRetention = parseDefaultRetention(v);
   if (auto v = tbl.at_path("storage.ref_dirs"); v) parseStorageRefDirs(v, cfg);
@@ -178,7 +175,13 @@ void applyTable(const toml::table &tbl, AppConfig &cfg) {
 
   if (auto v = tbl.at_path("scheduling.rt_priority").value<int>(); v) cfg.schedulingRtPriority = *v;
 
-  if (auto v = tbl.at_path("paths.lock_dir").value<std::string>(); v) cfg.lockDir = *v;
+  if (auto v = tbl.at_path("paths.lock_dir").value<std::string>(); v) {
+    // Kazda warstwa musi byc poprawna, nawet gdy nastepna nadpisuje ten klucz.
+    if (!v->empty() && !std::filesystem::path(*v).is_absolute())
+      throw std::invalid_argument(
+          std::format("Configuration error in '{}': paths.lock_dir='{}' must be an absolute path", path, *v));
+    cfg.lockDir = *v;
+  }
 
   if (auto v = tbl.at_path("server.autoname").value<bool>(); v) cfg.serverAutoName = *v;
 
@@ -201,13 +204,22 @@ std::optional<std::filesystem::path> userConfigPath() {
 
 AppConfig loadAppConfig(const std::optional<std::string> &cliPath) {
   AppConfig cfg;
+  const auto loadLayer = [&](const std::string &path) {
+    try {
+      const toml::table tbl = toml::parse_file(path);
+      applyTable(tbl, cfg, path);
+      cfg.loadedFrom.push_back(path);
+    } catch (const toml::parse_error &e) {
+      // what() biblioteki pomija sciezke; wywolujacy musi moc wskazac wadliwy plik.
+      throw toml::parse_error(std::format("Configuration error in '{}': {}", path, e.what()).c_str(), e.source());
+    }
+  };
 
   if (cliPath) {
-    // Jawnie podana ścieżka: plik musi istnieć i być poprawny - błąd jest twardy
-    // (toml::parse_file rzuca toml::parse_error). Wywołujący raportuje go użytkownikowi.
-    const toml::table tbl = toml::parse_file(*cliPath);
-    applyTable(tbl, cfg);
-    cfg.loadedFrom.push_back(*cliPath);
+    // Jawnie podana ścieżka: plik musi istnieć i być poprawny - błąd jest twardy, jak w warstwach
+    // wykrytych (loadLayer rzuca toml::parse_error z nazwą pliku, applyTable - std::invalid_argument
+    // dla względnego paths.lock_dir). Wywołujący raportuje go użytkownikowi.
+    loadLayer(*cliPath);
     sanitizeConfig(cfg);
     cfg.storageDir = normalizeStorageDir(cfg.storageDir);
     return cfg;
@@ -231,14 +243,10 @@ AppConfig loadAppConfig(const std::optional<std::string> &cliPath) {
 
   for (const auto &path : candidates) {
     std::error_code ec;
-    if (!std::filesystem::exists(path, ec)) continue;  // brak pliku = stan poprawny
-    try {
-      const toml::table tbl = toml::parse_file(path.string());
-      applyTable(tbl, cfg);
-      cfg.loadedFrom.push_back(path.string());
-    } catch (const toml::parse_error &e) {
-      SPDLOG_WARN("Config parse error in {}: {} - skipping this layer", path.string(), e.what());
-    }
+    const bool exists = std::filesystem::exists(path, ec);
+    if (ec) throw std::filesystem::filesystem_error("Cannot inspect configuration file", path, ec);
+    if (!exists) continue;  // brak pliku = stan poprawny
+    loadLayer(path.string());
   }
 
   sanitizeConfig(cfg);

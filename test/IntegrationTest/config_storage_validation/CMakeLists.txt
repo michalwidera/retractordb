@@ -14,3 +14,9 @@ add_test(
   NAME ${TestID}-unwritable
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash storage-validation.sh unwritable)
+
+add_test(
+  NAME ${TestID}-config-errors
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND python3 config-errors.py $<TARGET_FILE:xretractor>
+          $<TARGET_FILE:xqry> $<TARGET_FILE:xtrdb>)

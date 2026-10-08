@@ -448,7 +448,39 @@ int main(int argc, char *argv[]) try {
       return system::errc::success;
     }
 
-    appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
+    std::optional<std::string> configError;
+    try {
+      appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
+    } catch (const std::exception &e) {
+      configError = e.what();
+    }
+
+    // Pomoc dziala takze przy uszkodzonej konfiguracji (#426): blad jest wtedy tylko informacja
+    // w linii Config, a nie powodem odmowy.
+    if (vm.contains("help")) {
+      if constexpr (rdb::probe::enabled) std::println("[warning: probe benchmark build]\n");
+      std::println("{} - compiler & data processing tool.\n", argv[0]);
+      std::print("Usage: {}", argv[0]);
+      if (onlyCompile) std::print(" -c");
+      std::println(" queryfile [option]\n");
+      std::cout << desc;
+      std::println("{}", config_line);
+      std::println("Log: {}", tempLocation);
+      if (configError)
+        std::println("Config: error: {}", *configError);
+      else
+        std::println("Config: {}",
+                     appCfg.loadedFrom.empty() ? "Defaults" : fmt::format("{}", fmt::join(appCfg.loadedFrom, ", ")));
+      if (vm.contains("realtime")) rtCheckAndPrint();
+      std::println("{}", warranty);
+      return system::errc::success;
+    }
+
+    if (configError) {
+      SPDLOG_ERROR("{}", *configError);
+      if (!serviceLog) std::println(std::cerr, "ERROR: {}", *configError);
+      return system::errc::interrupted;
+    }
     if (appCfg.loadedFrom.empty())
       SPDLOG_INFO("No configuration file found; using built-in defaults.");
     else
@@ -477,21 +509,6 @@ int main(int argc, char *argv[]) try {
       const SweepReport swept = sweepAbandonedResources(guard.lockDirectory());
       std::println("Removed leftovers of dead instances: {} instance lock(s), {} IPC identity set(s), {} bus segment(s).",
                    swept.serviceLocks, swept.ipcIdentities, swept.busSegments);
-      return system::errc::success;
-    }
-
-    if (vm.contains("help")) {
-      if constexpr (rdb::probe::enabled) std::println("[warning: probe benchmark build]\n");
-      std::println("{} - compiler & data processing tool.\n", argv[0]);
-      std::print("Usage: {}", argv[0]);
-      if (onlyCompile) std::print(" -c");
-      std::println(" queryfile [option]\n");
-      std::cout << desc;
-      std::println("{}", config_line);
-      std::println("Log: {}", tempLocation);
-      std::println("Config: {}", appCfg.loadedFrom.empty() ? "Defaults" : fmt::format("{}", fmt::join(appCfg.loadedFrom, ", ")));
-      if (vm.contains("realtime")) rtCheckAndPrint();
-      std::println("{}", warranty);
       return system::errc::success;
     }
 

@@ -157,5 +157,6 @@ struct AppConfig {
 /// - cliPath != nullopt → czyta WYŁĄCZNIE ten plik; brak pliku lub błąd składni są twarde
 ///   (rzucają wyjątek) - to jawne żądanie użytkownika.
 /// - cliPath == nullopt → wyszukiwanie warstwowe; brak plików → wartości domyślne; błąd
-///   składni TOML w którejś warstwie → ostrzeżenie i pominięcie warstwy (usługa nie pada).
+///   składni TOML w dowolnej znalezionej warstwie rzuca wyjątek z nazwą pliku.
+/// Niepusty paths.lock_dir musi być bezwzględny w każdej wczytywanej warstwie.
 AppConfig loadAppConfig(const std::optional<std::string> &cliPath = std::nullopt);

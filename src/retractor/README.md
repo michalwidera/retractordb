@@ -124,7 +124,9 @@ xretractor and xqry support optional TOML configuration loaded in layers:
 
 The later layer overrides keys from previous layers. If `--config <file>` is used, only that file is loaded; a missing or invalid explicit file is an error.
 
-Missing implicit system and user configuration files are valid (defaults are used).
+Missing implicit system and user configuration files are valid (defaults are used). An existing file with invalid TOML stops startup with a nonzero exit code and an ERROR diagnostic naming the file and cause, including in Release builds. Each loaded layer must be valid even if a later layer would override its keys. The same rule applies to xqry and xtrdb. `--help` works regardless of the configuration; xretractor reports the error in the `Config:` line of its help.
+
+A nonempty `paths.lock_dir` must be absolute in every loaded file; a relative path stops startup with the same error reporting. An empty value keeps the default temporary directory.
 
 ### Validation and warnings
 
