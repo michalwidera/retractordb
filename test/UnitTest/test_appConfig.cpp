@@ -1,8 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <unistd.h>
+
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <optional>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -79,13 +83,17 @@ TEST_F(AppConfigTest, trailing_slash_preserved) {
   EXPECT_EQ(cfg.storageDir, "/data/");
 }
 
-TEST_F(AppConfigTest, malformed_toml_in_layer_falls_back_to_defaults) {
-  // Uszkodzony TOML w wyszukiwaniu warstwowym nie może wywrócić usługi.
+TEST_F(AppConfigTest, malformed_toml_in_layer_throws) {
+  // Uszkodzony plik to blad startu, a nie brak konfiguracji.
   writeFile(userConfigFile(), "[storage\ndir = oops");
 
-  const AppConfig cfg = loadAppConfig();
-
-  EXPECT_TRUE(cfg.storageDir.empty());
+  try {
+    (void)loadAppConfig();
+    FAIL() << "Malformed layer was accepted";
+  } catch (const toml::parse_error &e) {
+    EXPECT_NE(std::string(e.what()).find(userConfigFile().string()), std::string::npos);
+    EXPECT_NE(std::string(e.what()).find("Error while parsing"), std::string::npos);
+  }
 }
 
 TEST_F(AppConfigTest, service_query_file_defaults_to_canonical_path) {
@@ -289,4 +297,34 @@ TEST_F(AppConfigTest, invalid_storage_ref_dirs_is_an_error) {
     EXPECT_TRUE(cfg.storageRefDirsError.starts_with("storage.ref_dirs must be an array of absolute directory paths"))
         << value << ": " << cfg.storageRefDirsError;
   }
+}
+
+TEST_F(AppConfigTest, relative_lock_dir_is_an_error_in_discovered_and_explicit_files) {
+  writeFile(userConfigFile(), "[paths]\nlock_dir = \"relative/locks\"\n");
+  for (const auto &path : {std::optional<std::string>{}, std::optional<std::string>{userConfigFile().string()}}) {
+    try {
+      (void)loadAppConfig(path);
+      FAIL() << "Relative lock directory was accepted";
+    } catch (const std::invalid_argument &e) {
+      const std::string message = e.what();
+      EXPECT_NE(message.find(userConfigFile().string()), std::string::npos);
+      EXPECT_NE(message.find("paths.lock_dir='relative/locks' must be an absolute path"), std::string::npos);
+    }
+  }
+}
+
+TEST_F(AppConfigTest, absolute_and_empty_lock_dirs_are_valid) {
+  for (const std::string &dir : {tmpDir.string(), std::string{}}) {
+    writeFile(userConfigFile(), "[paths]\nlock_dir = \"" + dir + "\"\n");
+    EXPECT_EQ(loadAppConfig().lockDir, dir);
+  }
+}
+
+TEST_F(AppConfigTest, discovered_file_that_cannot_be_read_is_not_absent) {
+  // Root czyta plik mimo braku praw, wiec nie da sie tu odtworzyc pliku nieczytelnego.
+  if (::geteuid() == 0) GTEST_SKIP() << "root ignores file permissions";
+  writeFile(userConfigFile(), "[paths]\nlock_dir = \"\"\n");
+  fs::permissions(userConfigFile(), fs::perms::none);
+  EXPECT_THROW(loadAppConfig(), toml::parse_error);
+  fs::permissions(userConfigFile(), fs::perms::owner_read | fs::perms::owner_write);
 }

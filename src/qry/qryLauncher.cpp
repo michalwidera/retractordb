@@ -219,7 +219,24 @@ int main(int argc, char *argv[]) {
     po::notify(vm);
     (void)setvbuf(stdout, nullptr, _IONBF, 0);
 
-    const AppConfig appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
+    // Pomoc nie zalezy od konfiguracji, wiec dziala takze przy uszkodzonym pliku (#426).
+    if (vm.contains("help")) {
+      std::println("{} - data query tool.\n", argv[0]);
+      std::println("Usage: {} [option]\n", argv[0]);
+      std::cout << desc;
+      std::println("{}", config_line);
+      std::println("Log: {}", tempLocation);
+      std::println("{}", warranty);
+      return system::errc::success;
+    }
+
+    AppConfig appCfg;
+    try {
+      appCfg = loadAppConfig(vm.contains("config") ? std::optional<std::string>(sConfig) : std::nullopt);
+    } catch (const std::exception &e) {
+      SPDLOG_ERROR("{}", e.what());  // logger dwutorowy: komunikat trafia takze na stderr
+      return system::errc::interrupted;
+    }
 
     // Przestrzen nazw uruchomienia (RDB_NAMESPACE) wskazuje instancje docelowa wprost, wiec
     // musi byc znana PRZED --wait-server: czekanie odpytuje obiekty IPC konkretnej instancji,
@@ -322,12 +339,12 @@ int main(int argc, char *argv[]) {
       std::println(std::cerr, "xqry: --yaml/-y requires --dir/-d, --detail/-t or --bus/-b");
       return system::errc::invalid_argument;
     }
-    // `--bus` i `--help` nie sa komendami do serwera: pierwsza czyta wylacznie magistrale (bez
-    // kontaktu z jakakolwiek instancja), druga w ogole nie dotyka IPC. Czekanie na serwer nie
+    // `--bus` nie jest komenda do serwera: czyta wylacznie magistrale (bez kontaktu z jakakolwiek
+    // instancja). `--help` konczy program jeszcze przed konfiguracja. Czekanie na serwer nie
     // ma dla nich czego przyspieszyc ani czego doczekac, a przy dwoch zywych instancjach
     // odmawialoby wypisania tabeli -- czyli dokladnie tej odpowiedzi, ktora ma te dwie
     // instancje pokazac.
-    if (vm.contains("wait-server") && !vm.contains("help") && !vm.contains("bus")) {
+    if (vm.contains("wait-server") && !vm.contains("bus")) {
       // Jawny `--server` (i przestrzen nazw, ktora go zastepuje) wskazuje instancje wprost, wiec
       // czekamy na nia po nazwie. Bez nich adresata wskazuje magistrala -- i czekanie musi to
       // wykrywanie objac, inaczej mija sie z jedyna zywa instancja tylko dlatego, ze ma nazwe.
@@ -341,16 +358,6 @@ int main(int argc, char *argv[]) {
         return system::errc::no_child_process;
       }
     }
-    if (vm.contains("help")) {
-      std::println("{} - data query tool.\n", argv[0]);
-      std::println("Usage: {} [option]\n", argv[0]);
-      std::cout << desc;
-      std::println("{}", config_line);
-      std::println("Log: {}", tempLocation);
-      std::println("{}", warranty);
-      return system::errc::success;
-    }
-
     if (vm.contains("bus")) {
       std::vector<routing::NamespaceGroup> groups;
       for (const auto &segment : bus::segmentNames()) {

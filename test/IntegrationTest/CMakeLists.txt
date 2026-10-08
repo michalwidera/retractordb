@@ -85,6 +85,9 @@ macro(add_test)
   # makro.
   string(FIND "${CMAKE_CURRENT_SOURCE_DIR}" "${IT_TREE_ROOT}" _it_in_tree)
   if(_it_in_tree EQUAL 0)
+    # Konfiguracja operatora nie moze zmieniac wyniku testow. Scenariusze
+    # konfiguracji moga ustawic wlasny XDG_CONFIG_HOME wewnatrz skryptu.
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/.config")
     # Jawne proby pamieci maja osobny cel; nazwy -vg-* sa ich konwencja.
     if(_it_test_name MATCHES "-vg-")
       set_tests_properties(${_it_test_name} PROPERTIES LABELS valgrind)
@@ -103,8 +106,12 @@ macro(add_test)
       # zaszkodzic. Zostaje mocniejsza gwarancja.
       set_tests_properties(
         ${_it_test_name}
-        PROPERTIES RUN_SERIAL TRUE ENVIRONMENT_MODIFICATION
-                   "PATH=path_list_append:${CMAKE_INSTALL_PREFIX}/bin")
+        PROPERTIES
+          RUN_SERIAL
+          TRUE
+          ENVIRONMENT_MODIFICATION
+          "PATH=path_list_append:${CMAKE_INSTALL_PREFIX}/bin;XDG_CONFIG_HOME=set:${CMAKE_CURRENT_BINARY_DIR}/.config"
+      )
     else()
       # Przydzial jest per KATALOG, nie per test. Makro jest wolane wielokrotnie
       # w jednym CMakeLists, a testy jednego katalogu i tak nie moga biec obok
@@ -132,18 +139,39 @@ macro(add_test)
       # start pierwszego serwera.
       set_tests_properties(
         ${_it_test_name}
-        PROPERTIES RESOURCE_LOCK
-                   ${_it_namespace}
-                   FIXTURES_REQUIRED
-                   it_namespace_pool
-                   ENVIRONMENT
-                   "RDB_NAMESPACE=${_it_namespace};TMPDIR=${_it_tmpdir}"
-                   ENVIRONMENT_MODIFICATION
-                   "PATH=path_list_append:${CMAKE_INSTALL_PREFIX}/bin")
+        PROPERTIES
+          RESOURCE_LOCK
+          ${_it_namespace}
+          FIXTURES_REQUIRED
+          it_namespace_pool
+          ENVIRONMENT
+          "RDB_NAMESPACE=${_it_namespace};TMPDIR=${_it_tmpdir}"
+          ENVIRONMENT_MODIFICATION
+          "PATH=path_list_append:${CMAKE_INSTALL_PREFIX}/bin;XDG_CONFIG_HOME=set:${CMAKE_CURRENT_BINARY_DIR}/.config"
+      )
     endif()
   endif()
   unset(_it_test_name)
 endmacro()
+
+# Warstwy uzytkownika odcina XDG_CONFIG_HOME z makra, warstwy systemowej nie da
+# sie odciac - jej sciezki sa stale (appConfig.cpp). Istniejacy plik zmienia
+# wynik testow, a uszkodzony zatrzymuje kazdy test uruchamiajacy programy
+# (#426).
+set(_it_system_configs /etc/retractor/retractor.toml)
+if(RDB_OS_DARWIN)
+  list(APPEND _it_system_configs /usr/local/etc/retractor/retractor.toml
+       /opt/homebrew/etc/retractor/retractor.toml)
+endif()
+foreach(_it_system_config ${_it_system_configs})
+  if(EXISTS "${_it_system_config}")
+    message(
+      WARNING
+        "Integration tests will load the system configuration layer ${_it_system_config}"
+    )
+  endif()
+endforeach()
+unset(_it_system_configs)
 
 file(
   GLOB V_GLOB

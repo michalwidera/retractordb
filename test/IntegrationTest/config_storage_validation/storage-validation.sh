@@ -4,6 +4,9 @@ set -euo pipefail
 # stdout/stderr per tryb (nie wspólne stdout.txt/stderr.txt): oba warianty dzielą ten sam
 # WORKING_DIRECTORY i pod ctest -j mogą wykonywać się równolegle -- wspólna nazwa pliku
 # powodowała nadpisanie stderr.txt przez drugi wariant przed jego własnym grepem.
+#
+# --status, a nie --help: pomoc działa bez walidacji konfiguracji (#426), a --status
+# przechodzi przez nią i potem tylko sprawdza blokadę instancji.
 mode="${1:-}"
 stdout="stdout-${mode}.txt"
 stderr="stderr-${mode}.txt"
@@ -17,7 +20,7 @@ dir = "./_missing_storage_dir"
 EOF
 
     set +e
-    xretractor --config "$cfg" --help >"$stdout" 2>"$stderr"
+    xretractor --config "$cfg" --status >"$stdout" 2>"$stderr"
     rc=$?
     set -e
 
@@ -39,7 +42,7 @@ dir = "./_storage_unwritable"
 EOF
 
     set +e
-    xretractor --config "$cfg" --help >"$stdout" 2>"$stderr"
+    xretractor --config "$cfg" --status >"$stdout" 2>"$stderr"
     rc=$?
     set -e
 

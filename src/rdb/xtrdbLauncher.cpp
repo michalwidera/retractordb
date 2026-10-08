@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cerrno>
 #include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <iostream>
 #include <map>
@@ -102,7 +103,15 @@ int main(int argc, char *argv[]) {
 
   if (cliNoPrompt) colors = {};
 
-  const AppConfig appCfg = loadAppConfig();
+  AppConfig appCfg;
+  try {
+    appCfg = loadAppConfig();
+  } catch (const std::exception &e) {
+    SPDLOG_ERROR("{}", e.what());
+    std::println(std::cerr, "ERROR: {}", e.what());
+    spdlog::shutdown();
+    return 1;
+  }
   if (!appCfg.storageRefDirsError.empty()) {
     std::println(std::cerr, "Configuration error: {}", appCfg.storageRefDirsError);
     spdlog::shutdown();

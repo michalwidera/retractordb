@@ -99,6 +99,8 @@ Part A sends `SIGTERM`, `SIGINT` and `SIGHUP` from outside in each mode - idle, 
 
 Each test directory gets `RDB_NAMESPACE`, its own `TMPDIR` and a `RESOURCE_LOCK`, assigned from a pool of 16 by that same macro. A directory that must run on the machine-global identity (unnamed instance, or names it picks itself) opts out with `set(IT_NO_NAMESPACE TRUE)` before its `add_test` calls, and gets `RUN_SERIAL` instead.
 
+The same macro gives every integration test an empty `XDG_CONFIG_HOME`, so the user configuration layer never reaches a test. The system layer (`/etc/retractor/retractor.toml`, plus the Homebrew and `/usr/local` paths on Darwin) has a fixed path and cannot be cut off: configure prints a `WARNING` for each such file that exists, and a malformed one stops every test that starts a program (#426).
+
 **A program called by name runs the *installed* binary, and the script runs from its *build copy*, not from source.** Editing a `.sh` and the C++ it exercises requires syncing both. Install only after the final build: reconfiguration can relink the executable, leaving a previously installed copy stale. Full sequence after touching integration `.sh` + source:
 ```bash
 cmake . && ninja && ninja install && ctest
