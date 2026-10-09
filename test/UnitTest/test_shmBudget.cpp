@@ -5,6 +5,7 @@
 // rozjazd wychodzi tutaj, a nie dopiero jako odmowa subskrypcji przy wolnej pamieci.
 
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <string>
@@ -12,6 +13,7 @@
 
 #include <gtest/gtest.h>
 #include <boost/interprocess/ipc/message_queue.hpp>
+#include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/rational.hpp>
 
 #include "constants.hpp"
@@ -115,6 +117,34 @@ TEST(ShmBudget, SpaceIsMeasurableWhereSharedMemoryWorks) {
   EXPECT_GT(fs.total, 0U);
   EXPECT_LE(fs.available, fs.total);
 }
+
+// Kanarek (CLAUDE.md, Exception: canaries): na Linuksie Boost tworzy obiekty IPC przez shm_open.
+// Gdyby makro zniknelo albo zmienilo nazwe, testy sondy nie moga zniknac razem z nim po cichu.
+// Wyrazenie C++, nie #if: brak ktorejkolwiek stalej jest bledem kompilacji, a nie zerem.
+static_assert(!RDB_OS_LINUX || RDB_HAS_BOOST_POSIX_SHM,
+              "Linux: Boost.Interprocess musi uzywac shm_open; sprawdz makro po aktualizacji Boosta");
+
+#if RDB_HAS_BOOST_POSIX_SHM
+TEST(ShmBudget, SpaceRemovesItsProbe) {
+  const std::string name = "rdb_shm_probe_" + std::to_string(getpid());
+  EXPECT_TRUE(shmbudget::space().known);
+  EXPECT_THROW((IPC::shared_memory_object(IPC::open_only, name.c_str(), IPC::read_only)), IPC::interprocess_exception);
+}
+
+TEST(ShmBudget, SpacePreservesExistingObjectOnProbeNameCollision) {
+  const std::string name = "rdb_shm_probe_" + std::to_string(getpid());
+  IPC::shared_memory_object existing(IPC::create_only, name.c_str(), IPC::read_write);
+  existing.truncate(17);
+  EXPECT_TRUE(shmbudget::space().known) << "kolizja powinna uzyc pomiaru z katalogu";
+  EXPECT_NO_THROW({
+    IPC::shared_memory_object preserved(IPC::open_only, name.c_str(), IPC::read_only);
+    IPC::offset_t bytes = 0;
+    EXPECT_TRUE(preserved.get_size(bytes));
+    EXPECT_EQ(bytes, 17);
+  });
+  IPC::shared_memory_object::remove(name.c_str());
+}
+#endif
 
 TEST(ShmBudget, HumanBytesPicksUnit) {
   EXPECT_EQ(shmbudget::humanBytes(512), "512 B");

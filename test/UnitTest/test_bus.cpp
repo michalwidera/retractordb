@@ -1040,6 +1040,27 @@ TEST(BusPresence, LastMapperRemovesSegment) {
   EXPECT_FALSE(std::filesystem::exists(presenceFile(name)));
 }
 
+TEST(BusPresence, AttachHasDeadlineWithExclusivePresenceHolder) {
+  const std::string name = std::string(bus::kSegmentName) + "_utbusy" + std::to_string(getpid());
+  const std::string path = presenceFile(name);
+  int holder             = -1;
+  ASSERT_EQ(lockfile::acquire(path, true, false, holder), lockfile::Result::Acquired);
+  // Stary konstruktor tez musi zakonczyc test, zamiast zawiesic caly zestaw.
+  std::thread releaser([&] {
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    lockfile::removeAndRelease(path, holder);
+  });
+  const auto start = std::chrono::steady_clock::now();
+  {
+    bus::Bus client(name);
+    const auto elapsed = std::chrono::steady_clock::now() - start;
+    EXPECT_FALSE(client.attached());
+    EXPECT_LT(elapsed, std::chrono::milliseconds(1500));
+  }
+  releaser.join();
+  EXPECT_FALSE(segmentExists(name));
+}
+
 // Proces zabity nie posprzata jako ostatni wychodzacy: segment zostaje, ale jego LOCK_SH znika
 // razem z procesem. Sprzatacz usuwa taki segment i wylacznie taki. Pliki obecnosci leza we
 // wlasnym katalogu testu: w /tmp zabieral je sprzatacz konczacego sie sasiedniego serwera.

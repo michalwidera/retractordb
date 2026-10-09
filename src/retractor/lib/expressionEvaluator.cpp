@@ -1,8 +1,5 @@
 #include "expressionEvaluator.hpp"
 
-#include <spdlog/spdlog.h>
-#include <boost/container/small_vector.hpp>
-
 #include <algorithm>   // std::ranges::transform
 #include <cctype>      // std::tolower
 #include <cmath>       // sqrt, std::fabs
@@ -11,16 +8,19 @@
 #include <functional>  // std::function
 #include <limits>      // std::numeric_limits
 #include <optional>
-#include <regex>
 #include <stack>
 #include <stdexcept>
 #include <string>
 #include <type_traits>  // std::is_same_v
 #include <utility>      // std::cmp_greater_equal
 #include <variant>
-#include "fatalError.hpp"
+
+#include <spdlog/spdlog.h>
+#include <boost/container/small_vector.hpp>
+#include <boost/regex.hpp>
 
 #include "checkedArith.hpp"
+#include "fatalError.hpp"
 #include "rdb/convertTypes.hpp"
 #include "rdb/probe.hpp"
 
@@ -1028,12 +1028,12 @@ rdb::descFldVT expressionEvaluator::eval(const std::list<token> &program, rdb::p
         throw std::runtime_error("PUSH_IDX should be translated to other PUSH_ before eval");
         break;
       case PUSH_ID2: {
+        // Kompilator zamienia PUSH_ID2 na PUSH_ID; ta sciezka obsluguje surowe programy.
+        static const boost::regex identifier(R"((\w*)\[(\d*)\])");
         if (payload == nullptr) throw std::runtime_error("PUSH_ID2: payload is null");
         const auto tkStr = tk.getStr_();
-        std::regex r(R"((\w*)\[(\d*)\])");
-        std::smatch what;
-        std::regex_search(tkStr, what, r);  // something[1]
-        if (what.size() != 3)
+        boost::smatch what;
+        if (!boost::regex_search(tkStr, what, identifier) || what.size() != 3)  // something[1]
           throw std::runtime_error("PUSH_ID2: malformed identifier '" + tkStr + "', expected format: name[index]");
         // const std::string schema(what[1]);
         const std::string sOffset1(what[2]);

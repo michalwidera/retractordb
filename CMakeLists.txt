@@ -331,17 +331,21 @@ find_package(tomlplusplus CONFIG REQUIRED)
 # systemu: gdyby Boost kiedykolwiek zmienil te decyzje, sprawdzenie zauwazy to
 # przy pierwszej rekonfiguracji. Wynik trafia do shmEnv.sh, ktory czytaja
 # kontrole higieny IPC w testach integracyjnych
-# (test/IntegrationTest/portable.sh).
+# (test/IntegrationTest/portable.sh), oraz do platformConfig.h jako
+# RDB_HAS_BOOST_POSIX_SHM (sonda budzetu w shmBudget.cpp).
 get_target_property(_rdb_boost_includes boost::boost
                     INTERFACE_INCLUDE_DIRECTORIES)
 if(NOT _rdb_boost_includes)
   # Nazwa wlasciwosci zalezy od tego, jak generator Conana zlozyl cel. Gdy jej
   # nie ma, zostaje zmienna z find_package; a gdy i tej nie ma, proba pojdzie
-  # bez dodatkowych katalogow i po prostu sie nie powiedzie - czyli wynik bedzie
-  # "zaloz warianty plikowy", a to jest bezpieczniejsza z dwoch odpowiedzi.
+  # bez dodatkowych katalogow i sie nie powiedzie - a niezadeklarowane 0
+  # zatrzymuje konfiguracje ponizej.
   set(_rdb_boost_includes ${Boost_INCLUDE_DIRS})
 endif()
 set(CMAKE_REQUIRED_INCLUDES ${_rdb_boost_includes})
+# Bez pamieci podrecznej: wynik zalezy od wersji Boosta, a ta zmienia sie bez
+# zmiany wejsc z podpisu prob w PlatformChecks.cmake.
+unset(RDB_BOOST_POSIX_SHM CACHE)
 check_cxx_source_compiles(
   "#include <boost/interprocess/detail/workaround.hpp>
    #if !defined(BOOST_INTERPROCESS_POSIX_SHARED_MEMORY_OBJECTS)
@@ -356,6 +360,16 @@ if(RDB_BOOST_POSIX_SHM)
 else()
   set(RDB_BOOST_POSIX_SHM_01 0)
   set(RDB_SHM_DIR_HINT "/tmp")
+  # Ta sama dyscyplina co w PlatformChecks.cmake: znikniete albo przemianowane
+  # makro nie moze po cichu przelaczyc builda na wariant plikowy.
+  if(NOT "BOOST_POSIX_SHM" IN_LIST RDB_PLATFORM_FALLBACKS)
+    message(
+      FATAL_ERROR
+        "Boost.Interprocess nie definiuje BOOST_INTERPROCESS_POSIX_SHARED_MEMORY_OBJECTS, a sciezka zapasowa BOOST_POSIX_SHM nie jest zadeklarowana.\n"
+        "Najpierw sprawdz, czy makro nie zniknelo lub nie zmienilo nazwy po aktualizacji Boosta - wynik proby jest w CMakeFiles/CMakeConfigureLog.yaml. "
+        "Jesli wariant plikowy jest zamierzony, zadeklaruj go: -DRDB_PLATFORM_FALLBACKS=\"<nazwy oddzielone srednikiem>\" (obecnie: '${RDB_PLATFORM_FALLBACKS}')."
+    )
+  endif()
 endif()
 message(
   STATUS

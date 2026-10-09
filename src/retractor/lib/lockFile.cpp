@@ -68,7 +68,8 @@ Result acquire(const std::string &path, bool exclusive, bool writable, int &fd) 
     const int candidate = openOrCreate(path, writable ? O_RDWR : O_RDONLY);
     if (candidate == -1) return Result::Error;
 
-    if (::flock(candidate, exclusive ? (LOCK_EX | LOCK_NB) : LOCK_SH) == -1) {
+    // Takze czytelnik ma termin: zatrzymany posiadacz LOCK_EX nie moze zawiesic startu Bus.
+    if (::flock(candidate, (exclusive ? LOCK_EX : LOCK_SH) | LOCK_NB) == -1) {
       const int error   = errno;
       const bool linked = stillLinked(candidate, path);
       ::close(candidate);

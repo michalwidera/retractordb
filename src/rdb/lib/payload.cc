@@ -131,8 +131,8 @@ template <typename T>
 void copyToMemory(std::istream &is, payload &rhs, const std::string_view fieldName, const int arrayOffset) {
   T data;
   is >> data;
-  Descriptor desc(rhs.descriptor);
-  auto dest = rhs.span().subspan(desc.fieldByteOffset(fieldName) + arrayOffset, sizeof(T));
+  const Descriptor &desc = rhs.descriptor;
+  auto dest              = rhs.span().subspan(desc.fieldByteOffset(fieldName) + arrayOffset, sizeof(T));
   std::memcpy(dest.data(), &data, sizeof(T));
 }
 
@@ -643,7 +643,7 @@ std::istream &operator>>(std::istream &is, payload &rhs) {
     is >> std::hex;
   else
     is >> std::dec;
-  Descriptor desc(rhs.descriptor);
+  const Descriptor &desc = rhs.descriptor;
   if (!desc.hasField(fieldName)) {
     SPDLOG_ERROR("field {} not found", fieldName);
     return is;
@@ -705,7 +705,6 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
     os << std::dec;
   os << "{";
 
-  Descriptor desc(rhs.descriptor);
   int flatIndex = 0;
   for (size_t idx = 0; idx < rhs.descriptor.size(); ++idx) {
     const auto &r = rhs.descriptor[idx];

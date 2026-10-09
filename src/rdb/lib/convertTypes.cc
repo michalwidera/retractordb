@@ -1,9 +1,5 @@
 #include "rdb/convertTypes.hpp"
 
-#include <spdlog/spdlog.h>
-
-#include "fatalError.hpp"
-
 #include <charconv>
 #include <cmath>
 #include <cstdint>
@@ -13,6 +9,10 @@
 #include <type_traits>
 #include <typeinfo>
 #include <utility>
+
+#include <spdlog/spdlog.h>
+
+#include "fatalError.hpp"
 
 /// Zwezenie ZMIENNOPRZECINKOWE -> CALKOWITE bez zachowania nieokreslonego.
 ///

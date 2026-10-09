@@ -63,6 +63,17 @@ void expectLayout(const rdb::Descriptor &desc, std::initializer_list<int> offset
   EXPECT_FALSE(desc.flatIndexToDescriptorPosition(slot).has_value());
 }
 
+TEST(Descriptor, NamedLookupsAreConstAndPreserveArrayLayout) {
+  const rdb::Descriptor desc{rdb::rField("values", 4, 3, rdb::INTEGER), rdb::rField("label", 1, 5, rdb::STRING),
+                             rdb::rField("flag", 1, 1, rdb::BYTE)};
+  EXPECT_EQ(desc.fieldIndex("label"), 1U);
+  EXPECT_EQ(desc.fieldSize("values"), 12);
+  EXPECT_EQ(desc.fieldSize("label"), 5);
+  EXPECT_EQ(desc.fieldByteOffset("flag"), 17U);
+  EXPECT_EQ(desc.fieldTypeName("label"), "STRING");
+  EXPECT_EQ(desc.getSizeInBytes(), 18U);
+}
+
 bool test_descriptor() {
   rdb::Descriptor data1{rdb::rField("Name3", 1, 10, rdb::STRING), rdb::rField("Name4", 10, 1, rdb::STRING)};
 

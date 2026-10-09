@@ -160,7 +160,6 @@ void query::fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &
   };
 }
 
-// TODO: remove Descriptor(a,b) and use Descriptor(a,b,c) here - strings are broken if not fix
 rdb::Descriptor query::descriptorFrom(qTree &coreInstance) {
   rdb::Descriptor retVal{};
   if (isDeclaration()) {
