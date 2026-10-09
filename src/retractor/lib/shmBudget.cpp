@@ -2,7 +2,6 @@
 
 #include <fcntl.h>
 #include <sys/mman.h>
-#include <sys/statvfs.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -18,7 +17,14 @@
 #include "bus.hpp"
 #include "constants.hpp"
 #include "osPlatform.hpp"
+#include "platformConfig.h"
 #include "qTree.hpp"
+
+#if RDB_HAS_STATVFS
+#include <sys/statvfs.h>
+#else
+#error "Budzet pamieci dzielonej wymaga statvfs i fstatvfs; brak zaimplementowanego zamiennika."
+#endif
 
 namespace {
 
