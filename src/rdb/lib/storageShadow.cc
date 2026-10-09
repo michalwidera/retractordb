@@ -1,6 +1,10 @@
 #include "rdb/storageShadow.hpp"
 
+#include <filesystem>
 #include <stdexcept>
+#include <system_error>
+
+#include <spdlog/spdlog.h>
 
 namespace rdb {
 
@@ -27,7 +31,22 @@ void storageShadow::reset() {
 
 void storageShadow::rotate(int percounter, const bool reopen) {
   // Przed reset() glownego indeksu, ktory odrzucilby niezarchiwizowany cien.
-  shadow_.rotate(percounter);
+  if (!shadow_.rotate(percounter)) {
+    // reset() odrzucilby cien, ktorego nie udalo sie zarchiwizowac.
+    if (reopen) throw std::runtime_error("storageShadow::rotate: shadow rotation failed");
+    // Cien pod aktywna nazwa zostaje razem z .meta: nastepny start skasuje oba przez reset().
+    // Archiwum .meta obok niego dalo pusty indeks, do ktorego load() wczytalby cudze nadpisania.
+    // Cien juz przeniesiony (zawiodlo tylko utrwalenie katalogu) nie ma czego trzymac - .meta
+    // idzie do archiwum, inaczej reset() przy starcie skasowalby indeks zamknietej sesji.
+    std::error_code ec;
+    const bool shadowStayed = std::filesystem::exists(shadow_.filePath(), ec);
+    if (ec) SPDLOG_ERROR("storageShadow::rotate: checking '{}' failed: {}", shadow_.filePath(), ec.message());
+    if (ec || shadowStayed) {
+      flushCurrentEntry();
+      abandonFile();
+      return;
+    }
+  }
   metaData::rotate(percounter, reopen);
 }
 

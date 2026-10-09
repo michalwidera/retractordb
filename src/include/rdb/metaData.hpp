@@ -183,6 +183,7 @@ class metaData {
   /// Przy zamknieciu storage przekazuje reopen=false: indeks jest zapisany i archiwizowany
   /// bez odtwarzania aktywnego pliku. Wariant z cieniem archiwizuje tez .meta.shadow.
   /// Domyslne reopen=true przygotowuje nowy pusty indeks do dalszego zapisu.
+  /// Po bledzie rotacji nie resetuje indeksu; z reopen=true rzuca std::runtime_error.
   /// If percounter < 0, the rename is skipped and the index is simply reset.
   /// @param percounter rotation counter (same suffix used for data file rotation)
   virtual void rotate(int percounter, bool reopen = true);

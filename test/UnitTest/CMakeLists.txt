@@ -52,12 +52,16 @@ foreach(item ${V_GLOB})
   target_link_libraries(${OUTPUT_FILE_NOEXT} PRIVATE ${LIBRARY_TEST_SET})
   file(MAKE_DIRECTORY
        ${CMAKE_BINARY_DIR}/test/UnitTest/Data/${OUTPUT_FILE_NOEXT})
-  # Przejecie wywolan systemowych w pieciu testach. Opcja --wrap jest
-  # rozszerzeniem GNU ld/lld; konsolidatory bez niej dostaja to samo przez
-  # definicje symbolu o nazwie systemowej w pliku obiektowym testu (makro
-  # RDB_WRAP_SYSCALL, test/UnitTest/syscallWrap.hpp) i wtedy nie ma tu nic do
-  # dodania na linii konsolidacji.
+  # Przejecie wywolan systemowych w testach. Opcja --wrap jest rozszerzeniem GNU
+  # ld/lld; konsolidatory bez niej dostaja to samo przez definicje symbolu o
+  # nazwie systemowej w pliku obiektowym testu (makro RDB_WRAP_SYSCALL,
+  # test/UnitTest/syscallWrap.hpp) i wtedy nie ma tu nic do dodania na linii
+  # konsolidacji.
   if(RDB_HAS_LD_WRAP)
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_storageRotation")
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=rename
+                          -Wl,--wrap=open -Wl,--wrap=fsync -Wl,--wrap=close)
+    endif()
     if(OUTPUT_FILE_NOEXT STREQUAL "test_faccposix"
        OR OUTPUT_FILE_NOEXT STREQUAL "test_faccposixshd")
       target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=pread

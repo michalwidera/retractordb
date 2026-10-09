@@ -11,6 +11,7 @@
 
 #include "fatalError.hpp"
 #include "rdb/storageFile.hpp"
+#include "rdb/storageRotation.hpp"
 
 namespace rdb {
 
@@ -141,15 +142,7 @@ posixBinaryFileWithShadow::~posixBinaryFileWithShadow() {
   if (percounter_ >= 0) {
     for (const auto &file : {filename_, shadowName()}) {
       const std::string rotated_filename = file + ".old" + std::to_string(percounter_);
-      std::error_code ec;
-      // Nadpisanie istniejacego archiwum zostawia slad w logu - uzasadnienie w faccposix.cc.
-      const bool overwrites = std::filesystem::exists(rotated_filename, ec);
-      std::filesystem::rename(file, rotated_filename, ec);
-      if (ec) {
-        SPDLOG_ERROR("Failed to rotate file {} to {}: {}", file, rotated_filename, ec.message());
-      } else if (overwrites) {
-        SPDLOG_ERROR("Rotation of {} overwrote existing archive {}; its previous content is lost", file, rotated_filename);
-      }
+      (void)rotateStorageFile(file, rotated_filename);
     }
   }
 }

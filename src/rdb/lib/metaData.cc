@@ -1,17 +1,19 @@
 #include "rdb/metaData.hpp"
 
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
 #include <filesystem>
 #include <format>
 #include <memory>
 #include <ranges>
 #include <stdexcept>
+#include <system_error>
 #include <utility>
+
+#include <spdlog/spdlog.h>
 
 #include "rdb/bitsetCodec.hpp"
 #include "rdb/rleSegment.hpp"
+#include "rdb/storageRotation.hpp"
 
 namespace rdb {
 
@@ -198,16 +200,18 @@ bool metaData::isEmpty() const { return totalRecords() == 0; }
 
 void metaData::rotate(int percounter, const bool reopen) {
   flushCurrentEntry();
-  if (percounter >= 0 && !store_.empty() && store_.fileExists()) {
+  if (percounter >= 0 && !store_.empty()) {
     std::string rotatedPath = std::format("{}.old{}", store_.path(), percounter);
     std::error_code ec;
-    // Nadpisanie istniejacego archiwum zostawia slad w logu - uzasadnienie w faccposix.cc.
-    const bool overwrites = std::filesystem::exists(rotatedPath, ec);
-    std::filesystem::rename(store_.path(), rotatedPath, ec);
-    if (ec)
-      SPDLOG_WARN("metaData::rotate: failed to rename '{}' to '{}': {}", store_.path(), rotatedPath, ec.message());
-    else if (overwrites)
-      SPDLOG_ERROR("Rotation of {} overwrote existing archive {}; its previous content is lost", store_.path(), rotatedPath);
+    const bool exists = std::filesystem::exists(store_.path(), ec);
+    if (ec) SPDLOG_ERROR("metaData::rotate: checking '{}' failed: {}", store_.path(), ec.message());
+    if (ec || (exists && !rotateStorageFile(store_.path(), rotatedPath))) {
+      // Nie obcinamy niezarchiwizowanego indeksu przez reset(). Zamkniecie nie rzuca,
+      // a dalsza praca musi dostac blad zamiast pozornego sukcesu rotacji.
+      if (reopen) throw std::runtime_error(std::format("metaData::rotate: rotation to '{}' failed", rotatedPath));
+      abandonFile();
+      return;
+    }
   }
   if (reopen)
     reset();

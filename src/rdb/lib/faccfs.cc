@@ -9,10 +9,9 @@
 #include <span>
 #include <system_error>
 
-#include <spdlog/spdlog.h>
-
 #include "fatalError.hpp"
 #include "rdb/storageFile.hpp"
+#include "rdb/storageRotation.hpp"
 namespace rdb {
 
 genericBinaryFile::genericBinaryFile(  //
@@ -28,12 +27,7 @@ genericBinaryFile::genericBinaryFile(  //
 genericBinaryFile::~genericBinaryFile() {
   if (percounter_ >= 0) {
     std::string rotated_filename = filename_ + ".old" + std::to_string(percounter_);
-    std::error_code ec;
-    // Nadpisanie istniejacego archiwum zostawia slad w logu - uzasadnienie w faccposix.cc.
-    const bool overwrites = std::filesystem::exists(rotated_filename, ec);
-    std::filesystem::rename(filename_, rotated_filename, ec);
-    if (!ec && overwrites)
-      SPDLOG_ERROR("Rotation of {} overwrote existing archive {}; its previous content is lost", filename_, rotated_filename);
+    (void)rotateStorageFile(filename_, rotated_filename);
   }
 }
 
