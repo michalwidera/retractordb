@@ -293,6 +293,24 @@ if(RDB_USE_CCACHE)
   endif()
 endif()
 
+# IPO tylko w produkcyjnym Release (takze ablacyjnym), bez zmiany aparatury
+# Release-Probe. Wylaczenie do powtorzenia pomiaru A/B: -DRDB_USE_IPO=OFF.
+option(RDB_USE_IPO "Use supported IPO/LTO in production Release builds" ON)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF)
+if(RDB_USE_IPO AND NOT RDB_BENCH_PROBE)
+  include(CheckIPOSupported)
+  check_ipo_supported(
+    RESULT RDB_IPO_SUPPORTED
+    OUTPUT RDB_IPO_ERROR
+    LANGUAGES CXX)
+  if(RDB_IPO_SUPPORTED)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+  else()
+    message(STATUS "IPO for Release is not supported: ${RDB_IPO_ERROR}")
+  endif()
+endif()
+message(STATUS "IPO for Release: ${CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE}")
+
 find_package(Boost CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
