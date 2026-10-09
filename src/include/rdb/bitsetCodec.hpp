@@ -15,9 +15,11 @@ constexpr size_t packedByteCount(size_t bitCount) { return (bitCount + (kBitsPer
 /// @note dest must be exactly packedByteCount(bits.size()) bytes, zero-initialized by the caller -
 ///       this only sets the 1-bits, matching how both IndexRecord and ShadowOverride serialize
 ///       their bitset into a pre-zeroed tail of a larger, fixed-size record buffer.
+/// @throws std::invalid_argument when dest size differs from packedByteCount(bits.size()).
 void packBits(const std::vector<bool> &bits, std::span<std::byte> dest);
 
 /// @brief Unpack @p bitCount bits from @p src (src must be at least packedByteCount(bitCount) bytes).
+/// @throws std::invalid_argument when @p src is too short for @p bitCount.
 [[nodiscard]] std::vector<bool> unpackBits(std::span<const std::byte> src, size_t bitCount);
 
 }  // namespace rdb

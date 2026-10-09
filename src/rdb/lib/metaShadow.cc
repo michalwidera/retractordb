@@ -43,7 +43,8 @@ metaShadow::ShadowOverride metaShadow::ShadowOverride::deserialize(std::span<con
   const std::byte *end = ptr + data.size();
 
   auto read = [&]<typename T>(T &out) {
-    if (ptr + sizeof(T) > end) throw std::runtime_error("Buffer underrun while deserializing ShadowOverride");
+    if (static_cast<size_t>(end - ptr) < sizeof(T))
+      throw std::runtime_error("Buffer underrun while deserializing ShadowOverride");
     std::memcpy(&out, ptr, sizeof(T));
     ptr += sizeof(T);
   };
@@ -55,8 +56,12 @@ metaShadow::ShadowOverride metaShadow::ShadowOverride::deserialize(std::span<con
 
   size_t bitsetSize = 0;
   read(bitsetSize);
+  // Jak w IndexRecord::deserialize: dlugosc z pliku przed zaokragleniem (#421).
+  const auto available = static_cast<size_t>(end - ptr);
+  if (bitsetSize > available * kBitsPerByte)
+    throw std::runtime_error(
+        std::format("ShadowOverride bitset size {} exceeds remaining buffer ({} bytes)", bitsetSize, available));
   const size_t byteCount = packedByteCount(bitsetSize);
-  if (ptr + byteCount > end) throw std::runtime_error("Buffer underrun in ShadowOverride bitset data");
 
   ov.nullBitset = unpackBits(std::span<const std::byte>(ptr, byteCount), bitsetSize);
 

@@ -5,8 +5,13 @@
 #include "rdb/metaData.hpp"
 
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
+#include <fstream>
+#include <stdexcept>
+#include <string>
 
 struct MetaTestFixture : public ::testing::Test {
   const std::string metaFile = "test_metaData.meta";
@@ -37,6 +42,74 @@ TEST(MetaDataIndexRecordTest, test_IndexRecord_gap_serialization) {
   EXPECT_TRUE(deserialized.isGap);
   EXPECT_EQ(deserialized.recordCount, 5U);
   EXPECT_EQ(deserialized.nullBitset, gap.nullBitset);
+}
+
+// ── Uszkodzony bitsetSize w pliku (#421) ────────────────────────────
+//
+// bitsetSize czytany z .meta jest porownywany z ramka wpisu przed zaokragleniem
+// w packedByteCount; SIZE_MAX i SIZE_MAX-6 zawijaly tamto zaokraglenie do 0.
+
+namespace {
+
+// Offset pola bitsetSize we wpisie: flaga (1 B) + recordCount (8 B).
+constexpr size_t kBitsetSizeOffset = sizeof(uint8_t) + sizeof(size_t);
+
+std::vector<std::byte> withBitsetSize(std::vector<std::byte> buf, size_t bitsetSize) {
+  std::memcpy(buf.data() + kBitsetSizeOffset, &bitsetSize, sizeof(bitsetSize));
+  return buf;
+}
+
+}  // namespace
+
+TEST(MetaDataIndexRecordTest, deserialize_odrzuca_bitsetSize_spoza_ramki) {
+  rdb::metaData::IndexRecord original;
+  original.recordCount  = 7;
+  original.nullBitset   = {true, false, true, true, false};
+  const auto serialized = original.serialize();  // 1 bajt bitsetu = miejsce na 8 bitow
+
+  for (const size_t bitsetSize : {SIZE_MAX, SIZE_MAX - 6, size_t{1} << 40, size_t{9}}) {
+    SCOPED_TRACE(bitsetSize);
+    try {
+      (void)rdb::metaData::IndexRecord::deserialize(withBitsetSize(serialized, bitsetSize));
+      ADD_FAILURE() << "expected std::runtime_error";
+    } catch (const std::runtime_error &e) {
+      EXPECT_NE(std::string(e.what()).find("exceeds remaining buffer"), std::string::npos) << e.what();
+    }
+  }
+}
+
+TEST(MetaDataIndexRecordTest, deserialize_przyjmuje_bitsetSize_na_granicy_ramki) {
+  rdb::metaData::IndexRecord original;
+  original.recordCount  = 7;
+  original.nullBitset   = {true, false, true, true, false};
+  const auto serialized = original.serialize();
+
+  const auto same = rdb::metaData::IndexRecord::deserialize(serialized);
+  EXPECT_EQ(same.recordCount, 7U);
+  EXPECT_EQ(same.nullBitset, original.nullBitset);
+
+  const auto full = rdb::metaData::IndexRecord::deserialize(withBitsetSize(serialized, 8));
+  EXPECT_EQ(full.nullBitset, (std::vector<bool>{true, false, true, true, false, false, false, false}));
+}
+
+TEST_F(MetaTestFixture, otwarcie_uszkodzonego_meta_daje_runtime_error) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+  {
+    rdb::metaData meta(descriptor, metaFile);
+    meta.onRecordAppended({true});
+  }  // destruktor zapisuje biezacy wpis
+  EXPECT_NO_THROW(rdb::metaData(descriptor, metaFile));  // kontrola dodatnia
+
+  constexpr size_t kHeaderSize = sizeof(int64_t);
+  ASSERT_GT(std::filesystem::file_size(metaFile), kHeaderSize + kBitsetSizeOffset + sizeof(size_t));
+  {
+    std::fstream f(metaFile, std::ios::in | std::ios::out | std::ios::binary);
+    const size_t corrupt = SIZE_MAX - 6;
+    f.seekp(static_cast<std::streamoff>(kHeaderSize + kBitsetSizeOffset));
+    f.write(reinterpret_cast<const char *>(&corrupt), sizeof(corrupt));
+  }
+  EXPECT_THROW(rdb::metaData(descriptor, metaFile), std::runtime_error);
 }
 
 // ── onRecordModified: committed-on-disk path (rewriteFile) ──────────
