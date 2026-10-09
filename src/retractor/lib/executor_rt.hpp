@@ -43,6 +43,6 @@ bool rtAbsoluteSleep(const struct timespec &anchor, long interval_ms);
 /// i funkcja nie robi nic - bez przypięcia planista i tak rozłoży wątki.
 ///
 /// Na jądrach bez masek powinowactwa zwraca `false` zawsze: nie ma tam czego
-/// przestawić, a zagłodzenia też nie ma, bo `rtActivate` podnosi wtedy priorytet
-/// samego wątku wołającego, nie całego procesu.
+/// przestawić, a zagłodzenia też nie ma, bo wątku RT i wątku komunikacyjnego
+/// nie da się tam przypiąć do tych samych rdzeni.
 bool rtKeepThreadOffRtCpus(pthread_t handle);

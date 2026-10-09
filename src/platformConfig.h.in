@@ -26,11 +26,11 @@
 #define RDB_HAS_MACH_TIME_H @RDB_HAS_MACH_TIME_H@      ///< mach_absolute_time / mach_wait_until
 
 // --- szeregowanie czasu rzeczywistego -----------------------------------
-#define RDB_HAS_SCHED_SETSCHEDULER @RDB_HAS_SCHED_SETSCHEDULER@  ///< SCHED_FIFO dla CALEGO procesu
+#define RDB_HAS_SCHED_SETSCHEDULER @RDB_HAS_SCHED_SETSCHEDULER@  ///< sched_setscheduler(0, ...): SCHED_FIFO dla watku wolajacego
 #define RDB_HAS_SCHED_AFFINITY @RDB_HAS_SCHED_AFFINITY@      ///< cpu_set_t, sched_[gs]etaffinity
 #define RDB_HAS_MLOCKALL @RDB_HAS_MLOCKALL@            ///< mlockall(2)
 #define RDB_HAS_MCL_ONFAULT @RDB_HAS_MCL_ONFAULT@         ///< leniwe blokowanie nowych mapowan
-#define RDB_HAS_PTHREAD_SCHEDPARAM @RDB_HAS_PTHREAD_SCHEDPARAM@  ///< SCHED_FIFO dla POJEDYNCZEGO watku
+#define RDB_HAS_PTHREAD_SCHEDPARAM @RDB_HAS_PTHREAD_SCHEDPARAM@  ///< pthread_setschedparam + pthread_getschedparam
 
 // --- synchronizacja miedzyprocesowa -------------------------------------
 #define RDB_HAS_ROBUST_MUTEX @RDB_HAS_ROBUST_MUTEX@  ///< PTHREAD_MUTEX_ROBUST + pthread_mutex_consistent

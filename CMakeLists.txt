@@ -220,7 +220,7 @@ if(RDB_USE_MOLD)
 endif()
 
 # Watki sa potrzebne samym probom z PlatformChecks (pthread_mutexattr_setrobust,
-# pthread_attr_setschedparam): bez biblioteki watkow na linii linkowania probe
+# pthread_setschedparam, pthread_getschedparam): bez biblioteki watkow probe
 # wyszlaby falszywie ujemna na Linuksie. Na Darwinie Threads::Threads jest
 # pusty, bo pthreads siedza w libSystem.
 find_package(Threads REQUIRED)

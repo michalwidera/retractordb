@@ -56,7 +56,7 @@ if(NOT _rdb_probe_signature STREQUAL RDB_PLATFORM_PROBE_SIGNATURE)
     RDB_HAS_SCHED_AFFINITY
     RDB_HAS_MLOCKALL
     RDB_HAS_MCL_ONFAULT
-    RDB_HAS_PTHREAD_SCHEDPARAM
+    RDB_HAS_PTHREAD_SCHEDPARAM_CALLABLE
     RDB_HAS_ROBUST_MUTEX
     RDB_HAS_SYSCTL_KERN_PROC
     RDB_HAS_LD_WRAP
@@ -83,12 +83,18 @@ check_cxx_source_compiles("#include <sys/mman.h>
 check_cxx_source_compiles(
   "#include <pthread.h>
    int main() {
-     pthread_attr_t attr;
      struct sched_param sp{};
-     sp.sched_priority = 1;
-     return pthread_attr_init(&attr) + pthread_attr_setschedparam(&attr, &sp) + SCHED_FIFO;
+     int policy = 0;
+     return pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp) +
+            pthread_getschedparam(pthread_self(), &policy, &sp);
    }"
-  RDB_HAS_PTHREAD_SCHEDPARAM)
+  RDB_HAS_PTHREAD_SCHEDPARAM_CALLABLE)
+# Stara proba atrybutow watku nie moze przeslonic wyniku obu wywolan.
+# Na Darwinie oczekiwane 1 (oba wywolania sa w libSystem), dlatego
+# PTHREAD_SCHEDPARAM nie ma na liscie zer Darwina nizej: falszywe 0 zatrzyma
+# konfiguracje, zamiast dac po cichu binarke bez SCHED_FIFO. Wynik tej proby na
+# Darwinie nie byl jeszcze zmierzony (#423).
+set(RDB_HAS_PTHREAD_SCHEDPARAM "${RDB_HAS_PTHREAD_SCHEDPARAM_CALLABLE}")
 
 # --- muteks miedzyprocesowy ---------------------------------------------
 # Sprawdzane jako para: sam PTHREAD_MUTEX_ROBUST bez pthread_mutex_consistent
@@ -216,8 +222,10 @@ endforeach()
 #   CLOCK_NANOSLEEP     sen absolutny na mach_wait_until zamiast clock_nanosleep
 #   ABSOLUTE_SLEEP      sen WZGLEDNY - blad kazdego slotu sie kumuluje (dryf);
 #                       0 tylko wtedy, gdy nie ma ani clock_nanosleep, ani mach_time
-#   SCHED_SETSCHEDULER  SCHED_FIFO wylacznie dla watku wolajacego, nie procesu
-#   PTHREAD_SCHEDPARAM  na nim stoi zapasowa galaz SCHED_SETSCHEDULER
+#   SCHED_SETSCHEDULER  SCHED_FIFO przez pthread_setschedparam zamiast sched_setscheduler(0, ...);
+#                       zasieg ten sam - w obu galeziach tylko watek wolajacy
+#   PTHREAD_SCHEDPARAM  pthread_[gs]etschedparam w zapasowej galezi SCHED_SETSCHEDULER;
+#                       bez obu interfejsow aktywacja RT zglasza niepowodzenie
 #   SCHED_AFFINITY      bez rozdzielenia watku RT i watku komunikacji
 #   MLOCKALL            strony pamieci nieblokowane
 #   MCL_ONFAULT         samo MCL_CURRENT, bez blokowania nowych mapowan
