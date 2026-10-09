@@ -3,9 +3,12 @@
 // Mozliwosci platformy wykryte przy konfiguracji (cmake/PlatformChecks.cmake).
 //
 // Plik jest GENEROWANY - edytuj src/platformConfig.h.in, nigdy kopii w
-// build/*/generated. Kazda stala jest 0 albo 1, wiec uzywa sie ich przez
-// `#if RDB_HAS_X`, a nie `#ifdef`: literowka w nazwie daje wtedy blad
-// kompilacji zamiast cichego wyboru gorszej galezi.
+// build/*/generated. Kazda stala jest zawsze zdefiniowana jako 0 albo 1, wiec
+// uzywa sie ich przez `#if RDB_HAS_X`, a nie `#ifdef` (ten bylby zawsze prawdziwy).
+// Uwaga: build nie ma -Wundef, wiec literowka albo brakujaca stala w `#if` daje
+// po cichu 0, czyli galaz zapasowa. Bledem kompilacji jest dopiero w wyrazeniu
+// C++ (`if constexpr`, `static_assert`) - tam, gdzie to mozliwe, tak sprawdzac
+// (#431: `RDB_OS_LINUX` brakowalo, a `#if RDB_OS_LINUX` tego nie zauwazylo).
 //
 // Zasada doboru: mozliwosc BIBLIOTEKI sprawdza probe kompilacyjne (zalecenie
 // Apple z "Porting UNIX/Linux Applications to macOS"), a kontrakt JADRA - /proc
