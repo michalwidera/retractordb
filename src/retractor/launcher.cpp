@@ -907,7 +907,7 @@ int main(int argc, char *argv[]) try {
     case bus::ClaimStatus::Unavailable:
       // Utrzymujemy dotychczasowa decyzje fail-open. Blokada instancji nadal chroni jej IPC,
       // ale przy niedostepnej magistrali rozlacznosc zasobow miedzy nazwami nie jest wymuszana.
-      SPDLOG_WARN("xrdbbus unavailable ({}); stream name uniqueness is NOT enforced.", claimed.detail);
+      SPDLOG_WARN("xrdbbus: {}; stream name uniqueness is NOT enforced.", claimed.detail);
       break;
   }
 

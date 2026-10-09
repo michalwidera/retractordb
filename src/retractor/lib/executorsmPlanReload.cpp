@@ -192,7 +192,7 @@ std::string executorsm::validatePlanText(const std::string &planText) {
         return "Rejected: cannot register the replacement plan on the xrdbbus bus: " + claimed.detail;
       case bus::ClaimStatus::Unavailable:
         if (busPtr->attached()) return "Rejected: cannot reserve the replacement plan on the xrdbbus bus: " + claimed.detail;
-        SPDLOG_WARN("xrdbbus unavailable ({}); replacement plan stream name uniqueness is NOT enforced.", claimed.detail);
+        SPDLOG_WARN("xrdbbus: {}; replacement plan stream name uniqueness is NOT enforced.", claimed.detail);
         break;
     }
   }
