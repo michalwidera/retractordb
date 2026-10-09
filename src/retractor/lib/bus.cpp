@@ -423,12 +423,15 @@ struct Bus::Impl {
   std::string segmentName;
   std::string presenceFile;  ///< plik obecnosci, patrz kSegmentName w bus.hpp
   int presenceFd{-1};        ///< LOCK_SH na presenceFile przez caly czas odwzorowania
+  /// ENOTRECOVERABLE logowany raz na obiekt; atomowo, bo ad-hoc i wykonawca wolaja Bus z roznych watkow.
+  mutable std::atomic<bool> unrecoverableReported{false};
 
   /// Wynik proby zajecia zamka. `ownerDied` znaczy, ze poprzedni wlasciciel zginal
   /// trzymajac zamek -- wtedy, i tylko wtedy, trzeba naprawic niezmiennik slotow.
   struct LockOutcome {
     bool ok{false};
     bool ownerDied{false};
+    std::string detail;
   };
 
   /// Bierze zamek magistrali, obslugujac smierc poprzedniego wlasciciela.
@@ -440,9 +443,12 @@ struct Bus::Impl {
   // Nie const, choc clang-tidy to proponuje: acquire() jest const tylko w galezi
   // RDB_HAS_ROBUST_MUTEX, w zapasowej (Darwin) nie, i tam const by sie nie skompilowalo.
   // NOLINTNEXTLINE(readability-make-member-function-const)
-  [[nodiscard]] bool lock() {
+  [[nodiscard]] bool lock(std::string *failureDetail = nullptr) {
     const LockOutcome outcome = acquire();
-    if (!outcome.ok) return false;
+    if (!outcome.ok) {
+      if (failureDetail != nullptr) *failureDetail = outcome.detail.empty() ? "bus mutex unusable" : outcome.detail;
+      return false;
+    }
     if (outcome.ownerDied) {
       // Poprzedni wlasciciel zginal trzymajac zamek. Trzymanie zamka jest tu dowodem,
       // ze zadna ZYWA instancja nie jest w trakcie zapisu slotu, wiec slot o nieparzystym
@@ -471,6 +477,12 @@ struct Bus::Impl {
   [[nodiscard]] LockOutcome acquire() const {
     const int rc = pthread_mutex_lock(&segment->mutex);
     if (rc == EOWNERDEAD) return {.ok = true, .ownerDied = true};
+    if (rc == ENOTRECOVERABLE) {
+      const std::string detail =
+          "bus mutex is unrecoverable (ENOTRECOVERABLE); remove /dev/shm/" + segmentName + " once no instance maps it";
+      if (!unrecoverableReported.exchange(true)) SPDLOG_ERROR("xrdbbus: {}. Running WITHOUT name uniqueness.", detail);
+      return {.detail = detail};
+    }
     if (rc != 0) {
       SPDLOG_ERROR("xrdbbus: cannot lock bus mutex, rc={} ({})", rc, std::strerror(rc));
       return {};
@@ -766,10 +778,7 @@ ClaimResult Bus::claim(const ClaimRequest &request) {
 
   release();  // roszczenie jest jednorazowe; powtorne nie ma zostawiac starego slotu
 
-  if (!impl->lock()) {
-    retVal.detail = "bus mutex unusable";
-    return retVal;
-  }
+  if (!impl->lock(&retVal.detail)) return retVal;
 
   Segment &segment = *impl->segment;
   auto scratch     = std::make_unique<Slot>();  // ~57 KiB -- na stercie, nie na stosie
@@ -903,10 +912,7 @@ ClaimResult Bus::reservePlan(const std::vector<std::string> &streams, std::strin
   }
   if (const auto refused = storesExceedSlot(stores)) return *refused;
 
-  if (!impl->lock()) {
-    retVal.detail = "bus mutex unusable";
-    return retVal;
-  }
+  if (!impl->lock(&retVal.detail)) return retVal;
 
   Segment &segment = *impl->segment;
   auto scratch     = std::make_unique<Slot>();  // ~57 KiB -- na stercie, nie na stosie
@@ -973,10 +979,7 @@ ClaimResult Bus::activateReservedPlan() {
     retVal.detail = "instance holds no bus slot";
     return retVal;
   }
-  if (!impl->lock()) {
-    retVal.detail = "bus mutex unusable";
-    return retVal;
-  }
+  if (!impl->lock(&retVal.detail)) return retVal;
 
   Slot &mine = impl->segment->slots[impl->slotIndex];
   if (mine.reservationActive == 0) {
@@ -1024,10 +1027,7 @@ ClaimResult Bus::claimAdditional(const std::vector<std::string> &streams, const 
     }
   if (const auto refused = storesExceedSlot(stores)) return *refused;
 
-  if (!impl->lock()) {
-    retVal.detail = "bus mutex unusable";
-    return retVal;
-  }
+  if (!impl->lock(&retVal.detail)) return retVal;
 
   Segment &segment = *impl->segment;
   Slot &mine       = segment.slots[impl->slotIndex];

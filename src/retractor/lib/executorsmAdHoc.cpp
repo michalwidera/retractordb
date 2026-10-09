@@ -290,7 +290,7 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
       case bus::ClaimStatus::Unavailable:
         // Spojnie ze sciezka startowa: niedostepna magistrala nie zatrzymuje pracy, cena jest
         // wypisana wprost - rozlacznosc nazw nie jest wtedy egzekwowana.
-        SPDLOG_WARN("xrdbbus unavailable ({}); adhoc stream name uniqueness is NOT enforced.", claimed.detail);
+        SPDLOG_WARN("xrdbbus: {}; adhoc stream name uniqueness is NOT enforced.", claimed.detail);
         break;
     }
   }
