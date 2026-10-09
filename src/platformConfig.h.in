@@ -13,7 +13,6 @@
 // nim zadna funkcja, ktorej obecnosc dalo by sie sprawdzic.
 
 // --- rodzina systemu ----------------------------------------------------
-#define RDB_OS_LINUX @RDB_OS_LINUX@
 #define RDB_OS_DARWIN @RDB_OS_DARWIN@
 
 // --- kontrakty jadra ----------------------------------------------------
@@ -45,8 +44,7 @@
 #define RDB_HAS_ADDR2LINE @RDB_HAS_ADDR2LINE@  ///< program addr2line (binutils) dla boost::stacktrace
 
 // --- rozne --------------------------------------------------------------
-#define RDB_HAS_PIPE2 @RDB_HAS_PIPE2@    ///< pipe2(2) z O_CLOEXEC w jednym wywolaniu
-#define RDB_HAS_STATVFS @RDB_HAS_STATVFS@  ///< statvfs / fstatvfs
+#define RDB_HAS_STATVFS @RDB_HAS_STATVFS@  ///< statvfs + fstatvfs wymagane przez shmBudget
 
 // Zywotnosc procesu musi dac sie ustalic NA PEWNO: magistrala xrdbbus zwalnia na
 // tej podstawie sloty po martwych instancjach, a falszywe "zyje" zatrzymuje start

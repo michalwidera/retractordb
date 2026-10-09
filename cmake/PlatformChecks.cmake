@@ -60,8 +60,7 @@ if(NOT _rdb_probe_signature STREQUAL RDB_PLATFORM_PROBE_SIGNATURE)
     RDB_HAS_ROBUST_MUTEX
     RDB_HAS_SYSCTL_KERN_PROC
     RDB_HAS_LD_WRAP
-    RDB_HAS_PIPE2_CALLABLE
-    RDB_HAS_STATVFS)
+    RDB_HAS_STATVFS_CALLABLE)
     unset(${_rdb_probe_result} CACHE)
   endforeach()
   set(RDB_PLATFORM_PROBE_SIGNATURE
@@ -69,6 +68,17 @@ if(NOT _rdb_probe_signature STREQUAL RDB_PLATFORM_PROBE_SIGNATURE)
       CACHE INTERNAL "Wejscia prob PlatformChecks, z ktorymi policzono wyniki w pamieci podrecznej")
   message(STATUS "PlatformChecks: proby liczone od nowa (zmienione wejscia albo pierwsza konfiguracja)")
 endif()
+
+# Wyniki prob usunietych albo przemianowanych (#423, #428). Nic ich nie czyta,
+# ale pamiec podreczna istniejacego katalogu build trzymalaby je bez konca.
+foreach(
+  _rdb_obsolete
+  RDB_HAS_PTHREAD_SCHEDPARAM
+  RDB_HAS_PIPE2
+  RDB_HAS_PIPE2_CALLABLE
+  RDB_HAS_STATVFS)
+  unset(${_rdb_obsolete} CACHE)
+endforeach()
 
 # --- czas ---------------------------------------------------------------
 check_cxx_symbol_exists(clock_nanosleep "ctime" RDB_HAS_CLOCK_NANOSLEEP)
@@ -136,24 +146,17 @@ check_cxx_source_compiles(
 unset(CMAKE_REQUIRED_LINK_OPTIONS)
 
 # --- rozne --------------------------------------------------------------
-# Prawdziwe WYWOLANIE, a nie sam adres symbolu: diagnostyka dostepnosci Apple
-# odpala sie pewnie dopiero na uzyciu.
+# Budzet pamieci dzielonej wymaga obu funkcji: statvfs dla sciezki zapasowej
+# oraz fstatvfs dla deskryptora obiektu POSIX-owej pamieci dzielonej.
 check_cxx_source_compiles(
-  "#include <fcntl.h>
-   #include <unistd.h>
+  "#include <sys/statvfs.h>
    int main() {
-     int fd[2];
-     return pipe2(fd, O_CLOEXEC);
+     struct statvfs vfs{};
+     return statvfs(\"/\", &vfs) + fstatvfs(0, &vfs);
    }"
-  RDB_HAS_PIPE2_CALLABLE)
-# Osobna nazwa w pamieci podrecznej: wpis RDB_HAS_PIPE2=1 zapisany przez
-# konfiguracje sprzed tej poprawki nie ma jak przeslonic nowej proby.
-if(RDB_HAS_PIPE2_CALLABLE)
-  set(RDB_HAS_PIPE2 1)
-else()
-  set(RDB_HAS_PIPE2 0)
-endif()
-check_cxx_symbol_exists(statvfs "sys/statvfs.h" RDB_HAS_STATVFS)
+  RDB_HAS_STATVFS_CALLABLE)
+# Stary wynik dla samego statvfs nie moze przeslonic proby obu wywolan.
+set(RDB_HAS_STATVFS "${RDB_HAS_STATVFS_CALLABLE}")
 
 unset(CMAKE_REQUIRED_DEFINITIONS)
 unset(CMAKE_REQUIRED_LIBRARIES)
@@ -206,7 +209,6 @@ foreach(
   RDB_HAS_ROBUST_MUTEX
   RDB_HAS_SYSCTL_KERN_PROC
   RDB_HAS_LD_WRAP
-  RDB_HAS_PIPE2
   RDB_HAS_STATVFS)
   if(${_rdb_feature})
     set(${_rdb_feature} 1)
@@ -232,6 +234,8 @@ endforeach()
 #   ROBUST_MUTEX        zamek atomowy magistrali zamiast robust mutexa (bus.cpp)
 #   LD_WRAP             podmiana wywolan systemowych w testach przez dlsym
 #   ADDR2LINE           slad stosu bez numerow linii (payload.cc)
+#   STATVFS             brak pomiaru budzetu pamieci dzielonej; bez zamiennika,
+#                       shmBudget.cpp odmawia kompilacji nawet po deklaracji
 #
 # Falszywe 0 - brak _GNU_SOURCE, nietypowe naglowki, inny konsolidator - nie
 # daje zadnego bledu kompilacji, tylko po cichu inna binarke: na Linuksie zamek
@@ -282,7 +286,8 @@ foreach(
   MCL_ONFAULT
   ROBUST_MUTEX
   LD_WRAP
-  ADDR2LINE)
+  ADDR2LINE
+  STATVFS)
   if(NOT RDB_HAS_${_rdb_probe})
     if(_rdb_probe IN_LIST RDB_PLATFORM_FALLBACKS)
       list(APPEND _rdb_fallback_chosen ${_rdb_probe})
