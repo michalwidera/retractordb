@@ -5,6 +5,8 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
+#include <cerrno>
 #include <chrono>
 #include <csignal>
 #include <filesystem>
@@ -56,6 +58,76 @@ TEST_F(BusFixture, LivenessRequiresMatchingStartTime) {
   EXPECT_FALSE(bus::isProcessAlive(self, start + 1));
   EXPECT_FALSE(bus::isProcessAlive(0, start));
   EXPECT_FALSE(bus::isProcessAlive(-1, start));
+}
+
+// Klient i serwer adresuja odpowiedz czasem startu klienta, odczytanym przez siebie
+// i dla obcego PID-u. Oba odczyty musza wskazywac te sama inkarnacje procesu,
+// takze pod QEMU user-mode, ktore syntetyzuje /proc/<wlasny pid>/stat.
+TEST_F(BusFixture, ProcessIdentityAgreesAcrossProcesses) {
+  const auto parentStart = bus::processStartTime(static_cast<std::int32_t>(getpid()));
+  int replies[2];
+  int release[2];
+  ASSERT_EQ(pipe(replies), 0);
+  if (pipe(release) != 0) {
+    close(replies[0]);
+    close(replies[1]);
+    FAIL() << "pipe release";
+  }
+
+  const pid_t child = fork();
+  if (child < 0) {
+    close(replies[0]);
+    close(replies[1]);
+    close(release[0]);
+    close(release[1]);
+    FAIL() << "fork";
+  }
+  if (child == 0) {
+    close(replies[0]);
+    close(release[1]);
+    const std::array<std::uint64_t, 2> starts{bus::processStartTime(static_cast<std::int32_t>(getpid())),
+                                              bus::processStartTime(static_cast<std::int32_t>(getppid()))};
+    ssize_t written;
+    do {
+      written = write(replies[1], starts.data(), sizeof(starts));
+    } while (written < 0 && errno == EINTR);
+    close(replies[1]);
+    char unused;
+    ssize_t released;
+    do {
+      released = read(release[0], &unused, 1);
+    } while (released < 0 && errno == EINTR);
+    close(release[0]);
+    _exit(written == sizeof(starts) && released == 0 ? 0 : 1);
+  }
+
+  close(replies[1]);
+  close(release[0]);
+  std::array<std::uint64_t, 2> starts{};
+  ssize_t received;
+  do {
+    received = read(replies[0], starts.data(), sizeof(starts));
+  } while (received < 0 && errno == EINTR);
+  close(replies[0]);
+  const auto childStart = bus::processStartTime(child);
+  const bool childAlive = bus::isProcessAlive(child, starts[0]);
+  // EOF zwalnia potomka dopiero po odczycie jego wpisu; sprzatamy przed asercjami.
+  close(release[1]);
+  int status = 0;
+  pid_t waited;
+  do {
+    waited = waitpid(child, &status, 0);
+  } while (waited < 0 && errno == EINTR);
+
+  ASSERT_EQ(waited, child);
+  ASSERT_TRUE(WIFEXITED(status));
+  ASSERT_EQ(WEXITSTATUS(status), 0);
+  ASSERT_EQ(received, sizeof(starts));
+  EXPECT_NE(parentStart, 0U);
+  EXPECT_NE(childStart, 0U);
+  EXPECT_EQ(starts[0], childStart);
+  EXPECT_EQ(starts[1], parentStart);
+  EXPECT_TRUE(childAlive);
 }
 
 TEST_F(BusFixture, ClaimPublishesInstance) {

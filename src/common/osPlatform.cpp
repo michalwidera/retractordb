@@ -29,7 +29,7 @@ namespace {
 
 #if RDB_HAS_PROCFS
 
-/// Pole 22 (`starttime`) i pole 3 (`state`) z /proc/<pid>/stat w JEDNYM odczycie.
+/// Pole 22 (`starttime`) i pole 3 (`state`) wpisu lidera grupy watkow w JEDNYM odczycie.
 ///
 /// Pole 2 (`comm`) jest w nawiasach i moze zawierac spacje oraz nawiasy, wiec
 /// parsowanie zaczyna sie od OSTATNIEGO ')' w linii. Za nim stoi pole 3, a
@@ -53,7 +53,12 @@ ProcessSnapshot unreadEntry(std::int32_t pid) {
 ProcessSnapshot inspectViaProcFs(std::int32_t pid) {
   ProcessSnapshot retVal;
 
-  std::ifstream stat("/proc/" + std::to_string(pid) + "/stat");
+  // QEMU user-mode syntetyzuje /proc/<wlasny pid>/stat: jego starttime moze
+  // roznic sie od czasu, ktory jadro zwraca obserwatorowi tego samego procesu.
+  // Wpis lidera grupy watkow ma ten sam PID, czas startu i stan procesu, a ta
+  // sciezka daje obu stronom rzeczywisty wpis jadra, takze pod emulacja.
+  const auto processId = std::to_string(pid);
+  std::ifstream stat("/proc/" + processId + "/task/" + processId + "/stat");
   if (!stat.is_open()) return unreadEntry(pid);
 
   std::string line;
