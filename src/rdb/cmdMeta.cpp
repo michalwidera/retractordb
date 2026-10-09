@@ -5,6 +5,7 @@
 #include <fstream>
 #include <print>
 #include <span>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -105,7 +106,14 @@ bool MetaRawCmd::execute(CommandContext &ctx) {
       std::print("{}truncated entry at index: {}\n{}", ctx.colors.RED, entryIdx, ctx.colors.RESET);
       break;
     }
-    auto rec = rdb::metaData::IndexRecord::deserialize(std::span<const std::byte>(raw));
+    rdb::metaData::IndexRecord rec;
+    try {
+      rec = rdb::metaData::IndexRecord::deserialize(std::span<const std::byte>(raw));
+    } catch (const std::runtime_error &e) {
+      // Uszkodzony wpis (np. bitsetSize spoza ramki, #421) konczy zrzut jak wpis obciety.
+      std::print("{}corrupt entry at index: {} ({})\n{}", ctx.colors.RED, entryIdx, e.what(), ctx.colors.RESET);
+      break;
+    }
     std::print("entry[{}] ", entryIdx);
     std::print("count:{} ", rec.recordCount);
     std::print("gap:{} ", (rec.isGap ? 1 : 0));

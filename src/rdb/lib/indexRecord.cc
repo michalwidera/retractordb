@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <format>
 #include <span>
 #include <stdexcept>
 
@@ -33,7 +34,7 @@ IndexRecord IndexRecord::deserialize(std::span<const std::byte> data) {
   const std::byte *end = ptr + data.size();
 
   auto read = [&]<typename T>(T &out) {
-    if (ptr + sizeof(T) > end) throw std::runtime_error("Buffer underrun while deserializing");
+    if (static_cast<size_t>(end - ptr) < sizeof(T)) throw std::runtime_error("Buffer underrun while deserializing");
     std::memcpy(&out, ptr, sizeof(T));
     ptr += sizeof(T);
   };
@@ -46,8 +47,12 @@ IndexRecord IndexRecord::deserialize(std::span<const std::byte> data) {
 
   size_t bitsetSize = 0;
   read(bitsetSize);
+  // Dlugosc z pliku porownujemy z ramka PRZED zaokragleniem: packedByteCount zawija sie dla
+  // bitsetSize bliskiego SIZE_MAX, a ptr + byteCount wychodziloby poza obiekt (#421).
+  const auto available = static_cast<size_t>(end - ptr);
+  if (bitsetSize > available * kBitsPerByte)
+    throw std::runtime_error(std::format("Bitset size {} exceeds remaining buffer ({} bytes)", bitsetSize, available));
   const size_t byteCount = packedByteCount(bitsetSize);
-  if (ptr + byteCount > end) throw std::runtime_error("Buffer underrun in bitset data");
 
   rec.nullBitset = unpackBits(std::span<const std::byte>(ptr, byteCount), bitsetSize);
 

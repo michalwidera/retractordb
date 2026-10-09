@@ -3,6 +3,7 @@
 #include <iostream>
 #include <print>
 #include <sstream>
+#include <stdexcept>
 
 #include "rdb/descriptor.hpp"
 
@@ -21,9 +22,17 @@ bool OpenCmd::execute(CommandContext &ctx) {
   ctx.dacc          = std::make_unique<rdb::storage>(base, ctx.file, ctx.storageParam, ctx.storagePolicy);
   ctx.dacc->allowRefDirs(ctx.refDirs);
   std::string openError;
+  // Uszkodzony indeks `.meta` rzuca z konstruktora metaData (#421); odmowa jak kazdy inny blad open.
+  auto attach = [&ctx](const rdb::Descriptor *schema) -> std::string {
+    try {
+      return ctx.dacc->attachDescriptor(schema);
+    } catch (const std::runtime_error &e) {
+      return e.what();
+    }
+  };
 
   if (ctx.dacc->descriptorFileExist()) {
-    openError = ctx.dacc->attachDescriptor();
+    openError = attach(nullptr);
   } else {
     // Bez `.desc` schemat jest obowiazkowy i stoi w klamrach. Pierwszy znak sprawdzamy podgladem, bez
     // konsumowania, wiec nastepne polecenie skryptu zostaje poleceniem. Do 2026-09-27 petla brala
@@ -50,7 +59,7 @@ bool OpenCmd::execute(CommandContext &ctx) {
     std::stringstream schemaStream(schema);
     rdb::Descriptor desc;
     schemaStream >> desc;
-    openError = ctx.dacc->attachDescriptor(&desc);
+    openError = attach(&desc);
   }
   if (!openError.empty()) {
     std::print("{}open: {}\n{}", ctx.colors.RED, openError, ctx.colors.RESET);

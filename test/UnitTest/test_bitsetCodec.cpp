@@ -8,6 +8,9 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <stdexcept>
+
 #include "rdb/bitsetCodec.hpp"
 
 namespace {
@@ -55,4 +58,21 @@ TEST(BitsetCodecTest, packBits_ustawia_tylko_jedynki) {
   rdb::packBits(bits, buf);
   EXPECT_EQ(std::to_integer<uint8_t>(buf[0]), 0b00000010);
   EXPECT_EQ(std::to_integer<uint8_t>(buf[1]), 0b00000001);
+}
+
+TEST(BitsetCodecTest, unpackBits_odrzuca_bitCount_ponad_zrodlo) {
+  // Kontrakt z komentarza egzekwowany w kodeku (#421), bez zaokraglenia packedByteCount.
+  const std::vector<std::byte> buf(1, std::byte{0xFF});
+  EXPECT_EQ(rdb::unpackBits(buf, 8), std::vector<bool>(8, true));
+  EXPECT_THROW((void)rdb::unpackBits(buf, 9), std::invalid_argument);
+  EXPECT_THROW((void)rdb::unpackBits(buf, SIZE_MAX), std::invalid_argument);
+  EXPECT_THROW((void)rdb::unpackBits(buf, SIZE_MAX - 6), std::invalid_argument);
+}
+
+TEST(BitsetCodecTest, packBits_odrzuca_zly_rozmiar_celu) {
+  const std::vector<bool> bits(9, true);  // wymaga dokladnie 2 bajtow
+  std::vector<std::byte> tooShort(1, std::byte{0});
+  std::vector<std::byte> tooLong(3, std::byte{0});
+  EXPECT_THROW(rdb::packBits(bits, tooShort), std::invalid_argument);
+  EXPECT_THROW(rdb::packBits(bits, tooLong), std::invalid_argument);
 }
