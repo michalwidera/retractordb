@@ -61,7 +61,11 @@ class metaShadow {
   void discard();
 
   /// @brief Archiwizuje cien pod tym samym numerem co plik danych i glowny indeks.
-  void rotate(int percounter);
+  /// @return false po bledzie rotacji; szczegoly sa logowane na poziomie ERROR.
+  [[nodiscard]] bool rotate(int percounter);
+
+  /// @brief Sciezka aktywnego pliku cienia; pusta, gdy cien nie ma pliku.
+  [[nodiscard]] const std::string &filePath() const noexcept { return shadowFilePath_; }
 
   /// @brief Path of the shadow index file corresponding to @p metaFilePath, without instantiating a metaShadow.
   [[nodiscard]] static std::string shadowFilePathFor(std::string_view metaFilePath);

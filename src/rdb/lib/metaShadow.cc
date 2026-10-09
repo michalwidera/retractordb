@@ -14,6 +14,7 @@
 
 #include "rdb/bitsetCodec.hpp"
 #include "rdb/storageFile.hpp"
+#include "rdb/storageRotation.hpp"
 
 namespace rdb {
 
@@ -129,18 +130,19 @@ void metaShadow::discard() {
   std::filesystem::remove(shadowFilePath_, ec);
 }
 
-void metaShadow::rotate(int percounter) {
-  if (percounter < 0 || shadowFilePath_.empty()) return;
+bool metaShadow::rotate(int percounter) {
+  if (percounter < 0 || shadowFilePath_.empty()) return true;
   std::error_code ec;
-  if (!std::filesystem::exists(shadowFilePath_, ec)) return;
+  const bool exists = std::filesystem::exists(shadowFilePath_, ec);
+  if (ec) {
+    SPDLOG_ERROR("metaShadow::rotate: checking '{}' failed: {}", shadowFilePath_, ec.message());
+    return false;
+  }
+  if (!exists) return true;
   const std::string rotatedPath = std::format("{}.old{}", shadowFilePath_, percounter);
-  const bool overwrites         = std::filesystem::exists(rotatedPath, ec);
-  std::filesystem::rename(shadowFilePath_, rotatedPath, ec);
-  if (ec)
-    SPDLOG_WARN("metaShadow::rotate: failed to rename '{}' to '{}': {}", shadowFilePath_, rotatedPath, ec.message());
-  else if (overwrites)
-    SPDLOG_ERROR("Rotation of {} overwrote existing archive {}; its previous content is lost", shadowFilePath_, rotatedPath);
+  if (!rotateStorageFile(shadowFilePath_, rotatedPath)) return false;
   overrides_.clear();
+  return true;
 }
 
 }  // namespace rdb
