@@ -3,9 +3,12 @@
 // Mozliwosci platformy wykryte przy konfiguracji (cmake/PlatformChecks.cmake).
 //
 // Plik jest GENEROWANY - edytuj src/platformConfig.h.in, nigdy kopii w
-// build/*/generated. Kazda stala jest 0 albo 1, wiec uzywa sie ich przez
-// `#if RDB_HAS_X`, a nie `#ifdef`: literowka w nazwie daje wtedy blad
-// kompilacji zamiast cichego wyboru gorszej galezi.
+// build/*/generated. Kazda stala jest zawsze zdefiniowana jako 0 albo 1, wiec
+// uzywa sie ich przez `#if RDB_HAS_X`, a nie `#ifdef` (ten bylby zawsze prawdziwy).
+// Uwaga: build nie ma -Wundef, wiec literowka albo brakujaca stala w `#if` daje
+// po cichu 0, czyli galaz zapasowa. Bledem kompilacji jest dopiero w wyrazeniu
+// C++ (`if constexpr`, `static_assert`) - tam, gdzie to mozliwe, tak sprawdzac
+// (#431: `RDB_OS_LINUX` brakowalo, a `#if RDB_OS_LINUX` tego nie zauwazylo).
 //
 // Zasada doboru: mozliwosc BIBLIOTEKI sprawdza probe kompilacyjne (zalecenie
 // Apple z "Porting UNIX/Linux Applications to macOS"), a kontrakt JADRA - /proc
@@ -13,6 +16,7 @@
 // nim zadna funkcja, ktorej obecnosc dalo by sie sprawdzic.
 
 // --- rodzina systemu ----------------------------------------------------
+#define RDB_OS_LINUX @RDB_OS_LINUX@
 #define RDB_OS_DARWIN @RDB_OS_DARWIN@
 
 // --- kontrakty jadra ----------------------------------------------------
@@ -45,6 +49,7 @@
 
 // --- rozne --------------------------------------------------------------
 #define RDB_HAS_STATVFS @RDB_HAS_STATVFS@  ///< statvfs + fstatvfs wymagane przez shmBudget
+#define RDB_HAS_BOOST_POSIX_SHM @RDB_BOOST_POSIX_SHM_01@  ///< Boost.Interprocess tworzy obiekty IPC przez shm_open
 
 // Zywotnosc procesu musi dac sie ustalic NA PEWNO: magistrala xrdbbus zwalnia na
 // tej podstawie sloty po martwych instancjach, a falszywe "zyje" zatrzymuje start

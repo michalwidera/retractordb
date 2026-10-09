@@ -130,10 +130,10 @@ class Descriptor {
   void composeHashDescriptorFrom(const std::string &fieldNamePrefix, Descriptor lhs, Descriptor rhs);
   void removeConfigurationFields();
   [[nodiscard]] size_t getSizeInBytes() const;
-  size_t fieldIndex(std::string_view fieldName);
-  int fieldSize(std::string_view fieldName);
+  size_t fieldIndex(std::string_view fieldName) const;
+  int fieldSize(std::string_view fieldName) const;
   [[nodiscard]] int fieldSize(const rdb::rField &field) const;
-  size_t fieldByteOffset(std::string_view fieldName);
+  size_t fieldByteOffset(std::string_view fieldName) const;
   // Hot-path (P2, speed_improvement): dirty-check inline, zero wywolan cross-TU
   // gdy cache aktualny (getItem/setItem wolaja to per dostep, ~11% instrukcji
   // processRows przed inline). Ciezka przebudowa i zimny blad pozostaja poza TU.
@@ -142,7 +142,7 @@ class Descriptor {
     if (flatIndex < 0 || flatIndex >= flattenedFieldCount_) flatIndexOutOfRange(flatIndex);
     return fieldByteOffsets_[flatIndex];
   }
-  std::string_view fieldTypeName(std::string_view fieldName);
+  std::string_view fieldTypeName(std::string_view fieldName) const;
   [[nodiscard]] int flatElementCount() const {
     if (fieldMappingsDirty_) rebuildFieldMappings();
     return flattenedFieldCount_;

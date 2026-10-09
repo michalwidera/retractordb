@@ -1,15 +1,15 @@
 #include "rdb/storage.hpp"
 
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
 #include <cerrno>
 #include <chrono>
-
 #include <cstring>  //std::memset
 #include <filesystem>
 #include <format>
 #include <ranges>
+
+#include <spdlog/spdlog.h>
+
 #include "fatalError.hpp"
 #include "rdb/accessorFactory.hpp"
 #include "rdb/descriptorIO.hpp"

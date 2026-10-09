@@ -240,7 +240,7 @@ std::pair<std::string, size_t> Descriptor::storagePolicy() {
   return std::make_pair(retvalType, retval);
 }
 
-size_t Descriptor::fieldIndex(const std::string_view fieldName) {
+size_t Descriptor::fieldIndex(const std::string_view fieldName) const {
   auto it = std::ranges::find_if(*this,                                                               //
                                  [fieldName](const auto &item) { return item.rname == fieldName; });  //
 
@@ -250,9 +250,9 @@ size_t Descriptor::fieldIndex(const std::string_view fieldName) {
   return 0;  // ProForma Error
 }
 
-int Descriptor::fieldSize(const std::string_view fieldName) { return fieldSize((*this)[fieldIndex(fieldName)]); }
+int Descriptor::fieldSize(const std::string_view fieldName) const { return fieldSize((*this)[fieldIndex(fieldName)]); }
 
-size_t Descriptor::fieldByteOffset(const std::string_view fieldName) {
+size_t Descriptor::fieldByteOffset(const std::string_view fieldName) const {
   auto offset{0};
   for (auto const &field : *this) {
     if (fieldName == field.rname) return offset;
@@ -262,8 +262,8 @@ size_t Descriptor::fieldByteOffset(const std::string_view fieldName) {
   return 0;  // ProForma Error
 }
 
-std::string_view Descriptor::fieldTypeName(const std::string_view fieldName) {  //
-  return GetFieldType(((*this)[fieldIndex(fieldName)]).rtype);                  //
+std::string_view Descriptor::fieldTypeName(const std::string_view fieldName) const {  //
+  return GetFieldType(((*this)[fieldIndex(fieldName)]).rtype);                        //
 }
 
 std::pair<rdb::descFld, int> Descriptor::widestFieldType() {

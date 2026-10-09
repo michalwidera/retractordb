@@ -236,6 +236,10 @@ endforeach()
 #   ADDR2LINE           slad stosu bez numerow linii (payload.cc)
 #   STATVFS             brak pomiaru budzetu pamieci dzielonej; bez zamiennika,
 #                       shmBudget.cpp odmawia kompilacji nawet po deklaracji
+#   BOOST_POSIX_SHM     obiekty IPC Boosta jako zwykle pliki zamiast shm_open;
+#                       budzet mierzony z katalogu, bez sondy shm_open. Proba
+#                       siedzi w CMakeLists.txt (za find_package(Boost)) i tam
+#                       sprawdza deklaracje sama
 #
 # Falszywe 0 - brak _GNU_SOURCE, nietypowe naglowki, inny konsolidator - nie
 # daje zadnego bledu kompilacji, tylko po cichu inna binarke: na Linuksie zamek
@@ -264,7 +268,8 @@ if(RDB_OS_DARWIN)
       MCL_ONFAULT
       ROBUST_MUTEX
       LD_WRAP
-      ADDR2LINE)
+      ADDR2LINE
+      BOOST_POSIX_SHM)
 else()
   set(_rdb_default_fallbacks "")
 endif()

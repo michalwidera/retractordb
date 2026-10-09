@@ -379,6 +379,46 @@ TEST(LockFile, LiveHolderMeansBusyAndIsVisible) {
   EXPECT_FALSE(lockfile::isHeld(path));
 }
 
+TEST(LockFile, SharedAcquireWaitsOutTransientExclusiveHolder) {
+  const std::string path =
+      (std::filesystem::temp_directory_path() / ("ut_lockfile_shared_transient_" + std::to_string(getpid()) + ".lock")).string();
+  int holder = -1;
+  ASSERT_EQ(lockfile::acquire(path, true, false, holder), lockfile::Result::Acquired);
+  std::thread releaser([&] {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    lockfile::removeAndRelease(path, holder);
+  });
+  int fd            = -1;
+  const auto result = lockfile::acquire(path, false, false, fd);
+  releaser.join();
+  ASSERT_EQ(result, lockfile::Result::Acquired);
+  ASSERT_NE(fd, -1);
+  EXPECT_TRUE(lockfile::stillLinked(fd, path));
+  lockfile::removeAndRelease(path, fd);
+}
+
+TEST(LockFile, SharedAcquireHasDeadlineWithExclusiveHolder) {
+  const std::string path =
+      (std::filesystem::temp_directory_path() / ("ut_lockfile_shared_busy_" + std::to_string(getpid()) + ".lock")).string();
+  int holder = -1;
+  ASSERT_EQ(lockfile::acquire(path, true, false, holder), lockfile::Result::Acquired);
+  // Zabezpieczenie testu: dawny blokujacy LOCK_SH tez w koncu wroci, ale przekroczy termin.
+  std::thread releaser([&] {
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    lockfile::removeAndRelease(path, holder);
+  });
+  int fd             = -1;
+  const auto start   = std::chrono::steady_clock::now();
+  const auto result  = lockfile::acquire(path, false, false, fd);
+  const auto elapsed = std::chrono::steady_clock::now() - start;
+  releaser.join();
+  EXPECT_EQ(result, lockfile::Result::Busy);
+  EXPECT_EQ(fd, -1);
+  EXPECT_GE(elapsed, std::chrono::milliseconds(500));
+  EXPECT_LT(elapsed, std::chrono::milliseconds(1500));
+  if (fd != -1) lockfile::removeAndRelease(path, fd);
+}
+
 TEST(LockManagerFlock, IpcIdentityLockNeedsNoWriteAccess) {
   // Blokada tozsamosci lezy w katalogu wspolnym dla maszyny i moze nalezec do innego uzytkownika:
   // 0644, a przy fs.protected_regular jadro odrzuca nawet O_CREAT na takim pliku. Plik bez prawa

@@ -26,6 +26,12 @@
 #error "Budzet pamieci dzielonej wymaga statvfs i fstatvfs; brak zaimplementowanego zamiennika."
 #endif
 
+// Galaz sondy wybiera proba z CMakeLists.txt; ten plik sprawdza, ze widzi to samo makro Boosta.
+// Rozjazd znaczylby, ze proba kompilowala sie z innymi naglowkami niz silnik.
+#if RDB_HAS_BOOST_POSIX_SHM != defined(BOOST_INTERPROCESS_POSIX_SHARED_MEMORY_OBJECTS)
+#error "RDB_HAS_BOOST_POSIX_SHM nie zgadza sie z makrem Boost.Interprocess; rekonfiguruj build."
+#endif
+
 namespace {
 
 // Uklad segmentu boost::interprocess::message_queue.
@@ -56,19 +62,21 @@ std::string intervalText(const boost::rational<int> &interval) {
 namespace shmbudget {
 
 Space space() {
-#ifdef BOOST_INTERPROCESS_POSIX_SHARED_MEMORY_OBJECTS
+#if RDB_HAS_BOOST_POSIX_SHM
   // Sonda: obiekt pamieci dzielonej powstaje ta sama droga co obiekty silnika (shm_open),
   // wiec fstatvfs na jego deskryptorze opisuje system plikow, ktory NAPRAWDE ich dotyczy --
   // niezaleznie od tego, gdzie libc go zamontowala. Obiekt ma zerowa dlugosc, wiec sam pomiar
   // nie zajmuje miejsca, ktore mierzy.
   const std::string probeName = std::format("/rdb_shm_probe_{}", getpid());
-  const int fd                = shm_open(probeName.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+  // O_EXCL chroni cudzy obiekt pod ta nazwa. shm_open samo ustawia FD_CLOEXEC.
+  const int fd = shm_open(probeName.c_str(), O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR);
   if (fd < 0) return spaceFromPath(osplat::sharedMemoryBackingPath().c_str());
+  // Deskryptor pozostaje wazny po unlink; nazwa znika przed pomiarem, takze przy jego awarii.
+  shm_unlink(probeName.c_str());
 
   struct statvfs vfs{};
   const bool measured = fstatvfs(fd, &vfs) == 0;
   close(fd);
-  shm_unlink(probeName.c_str());
   if (!measured) return spaceFromPath(osplat::sharedMemoryBackingPath().c_str());
 
   return {.known     = true,

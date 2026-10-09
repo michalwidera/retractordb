@@ -22,17 +22,18 @@ constexpr int kExecFailedExitCode{127};
 // Domyślny wykonawca: fork + execvp(menedżer usług, argv). Bez shella (brak ryzyka
 // interpretacji argv). Zwraca kod wyjścia programu albo -1 przy błędzie fork/wait.
 int execServiceManager(const std::vector<std::string> &argv) {
+  // Po fork() potomek nie alokuje: alokator mogl zostac zablokowany przez inny watek.
+  std::vector<char *> cargv;
+  cargv.reserve(argv.size() + 1);
+  for (const auto &a : argv)
+    cargv.push_back(const_cast<char *>(a.c_str()));
+  cargv.push_back(nullptr);
   const pid_t pid = fork();
   if (pid < 0) {
     SPDLOG_ERROR("restartService: fork() failed before systemctl exec");
     return -1;
   }
   if (pid == 0) {
-    std::vector<char *> cargv;
-    cargv.reserve(argv.size() + 1);
-    for (const auto &a : argv)
-      cargv.push_back(const_cast<char *>(a.c_str()));
-    cargv.push_back(nullptr);
     execvp(cargv[0], cargv.data());
     _exit(kExecFailedExitCode);  // exec się nie powiódł (np. brak systemctl w PATH)
   }
