@@ -40,6 +40,36 @@ if(APPLE)
   set(CMAKE_REQUIRED_FLAGS "-Werror=unguarded-availability-new")
 endif()
 
+# check_* nie powtarza proby, ktorej wynik jest juz w pamieci podrecznej - nawet
+# gdy zmienil sie kompilator, standard albo linker, z ktorymi ja wykonano.
+# Istniejacy katalog build trzymalby wtedy odpowiedz udzielona INNEMU buildowi.
+# Podpis wejsc prob kasuje zapamietane wyniki przy kazdej ich zmianie.
+set(_rdb_probe_signature
+    "${CMAKE_CXX_COMPILER}|${CMAKE_CXX_COMPILER_VERSION}|${CMAKE_CXX_FLAGS}|${CMAKE_CXX_STANDARD}|${CMAKE_CXX_EXTENSIONS}|${CMAKE_EXE_LINKER_FLAGS}|${CMAKE_REQUIRED_DEFINITIONS}|${CMAKE_REQUIRED_FLAGS}|${CMAKE_REQUIRED_LIBRARIES}|${CMAKE_OSX_DEPLOYMENT_TARGET}|${CMAKE_OSX_SYSROOT}"
+)
+if(NOT _rdb_probe_signature STREQUAL RDB_PLATFORM_PROBE_SIGNATURE)
+  foreach(
+    _rdb_probe_result
+    RDB_HAS_CLOCK_NANOSLEEP
+    RDB_HAS_MACH_TIME_H
+    RDB_HAS_SCHED_SETSCHEDULER
+    RDB_HAS_SCHED_AFFINITY
+    RDB_HAS_MLOCKALL
+    RDB_HAS_MCL_ONFAULT
+    RDB_HAS_PTHREAD_SCHEDPARAM
+    RDB_HAS_ROBUST_MUTEX
+    RDB_HAS_SYSCTL_KERN_PROC
+    RDB_HAS_LD_WRAP
+    RDB_HAS_PIPE2_CALLABLE
+    RDB_HAS_STATVFS)
+    unset(${_rdb_probe_result} CACHE)
+  endforeach()
+  set(RDB_PLATFORM_PROBE_SIGNATURE
+      "${_rdb_probe_signature}"
+      CACHE INTERNAL "Wejscia prob PlatformChecks, z ktorymi policzono wyniki w pamieci podrecznej")
+  message(STATUS "PlatformChecks: proby liczone od nowa (zmienione wejscia albo pierwsza konfiguracja)")
+endif()
+
 # --- czas ---------------------------------------------------------------
 check_cxx_symbol_exists(clock_nanosleep "ctime" RDB_HAS_CLOCK_NANOSLEEP)
 check_include_file_cxx("mach/mach_time.h" RDB_HAS_MACH_TIME_H)

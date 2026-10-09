@@ -32,9 +32,10 @@ ninja descgrammar   # regenerate ANTLR4 grammar from DESC.g4
 ninja rqlgrammar    # regenerate ANTLR4 grammar from RQL.g4
 ```
 
-**macOS**: building there (`scripts/macos-build.sh`) and the differences to keep in mind when reading results (no Valgrind, weaker real time, launchd) are in the `macos-build` skill (`.claude/skills/macos-build/SKILL.md`). Two rules apply to all platform code:
+**macOS**: building there (`scripts/macos-build.sh`) and the differences to keep in mind when reading results (no Valgrind, weaker real time, launchd) are in the `macos-build` skill (`.claude/skills/macos-build/SKILL.md`). Two rules apply to all platform code, and one to its verification:
 - **The platform branch is chosen** not by OS name but through `RDB_HAS_*` from `generated/platformConfig.h` (compile probes in `cmake/PlatformChecks.cmake`). New platform code follows the same rule: `#if RDB_HAS_X`, never `#ifdef __APPLE__`.
 - **A fallback branch only by declaration**: a probe whose 0 selects the weaker branch must have that 0 declared in `RDB_PLATFORM_FALLBACKS` (empty on Linux; on Darwin it holds the zeros measured on Apple silicon); any undeclared 0 stops the configuration. A new fallback branch means a new entry in the list of controlled probes in `cmake/PlatformChecks.cmake`.
+- **Darwin is not a verification target for platform probes or the ablation floor.** A change to `cmake/PlatformChecks.cmake` or to the probe placement in `CMakeLists.txt`, and the ablation floor, need no run on macOS: the Linux results decide. The report names the Darwin branch as not verified and states its risk in one sentence; that is not a blocker.
 
 **CI locally, before pushing** (`scripts/test-ci.sh`, needs a running Docker):
 ```bash

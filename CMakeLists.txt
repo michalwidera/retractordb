@@ -24,17 +24,6 @@ project(
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-# Watki sa potrzebne samym probom z PlatformChecks (pthread_mutexattr_setrobust,
-# pthread_attr_setschedparam): bez biblioteki watkow na linii linkowania probe
-# wyszlaby falszywie ujemna na Linuksie. Na Darwinie Threads::Threads jest
-# pusty, bo pthreads siedza w libSystem.
-find_package(Threads REQUIRED)
-
-# Wykrywanie mozliwosci platformy PROBAMI KOMPILACYJNYMI, nie nazwa systemu.
-# Wynik: zmienne RDB_HAS_* / RDB_OS_*, podstawiane do generated/platformConfig.h
-# przez src/CMakeLists.txt. Uzasadnienie doboru metody stoi w samym module.
-include(PlatformChecks)
-
 # Cel wdrozeniowy macOS. NIE jest tu ustawiany - decyduje o nim profil Conana
 # (os.version) albo, przy jego braku, wersja hosta - ale jest SPRAWDZANY.
 # std::print i std::println sa w libc++ Apple'a oznaczone dostepnoscia: dla celu
@@ -212,8 +201,45 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # compiler option"; zmierzone 2026-09-19 w obrazie CI).
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 if(RDB_USE_MOLD)
+  # Bez tego sprawdzenia brak mold wychodzi dopiero w PlatformChecks: kazda
+  # proba sie nie linkuje, wiec konfiguracja staje na "niezadeklarowanych
+  # sciezkach zapasowych" z lista wszystkich prob, a przyczyna jest tylko w
+  # CMakeConfigureLog.yaml. Proba idzie przy KAZDEJ konfiguracji (wynik z
+  # pamieci podrecznej jest kasowany), zeby po doinstalowaniu mold wystarczyla
+  # ponowna konfiguracja.
+  include(CheckLinkerFlag)
+  unset(RDB_MOLD_LINKS CACHE)
+  check_linker_flag(CXX "-fuse-ld=mold" RDB_MOLD_LINKS)
+  if(NOT RDB_MOLD_LINKS)
+    message(
+      FATAL_ERROR
+        "RDB_USE_MOLD=ON, ale kompilator nie linkuje z -fuse-ld=mold (brak ld.mold?). Zainstaluj mold (scripts/buildrdb.sh toolchain) albo wylacz go: scripts/buildrdb.sh nomold, RDB_USE_MOLD=OFF w env lub -DRDB_USE_MOLD=OFF."
+    )
+  endif()
   string(APPEND CMAKE_CXX_FLAGS " -fuse-ld=mold")
 endif()
+
+# Watki sa potrzebne samym probom z PlatformChecks (pthread_mutexattr_setrobust,
+# pthread_attr_setschedparam): bez biblioteki watkow na linii linkowania probe
+# wyszlaby falszywie ujemna na Linuksie. Na Darwinie Threads::Threads jest
+# pusty, bo pthreads siedza w libSystem.
+find_package(Threads REQUIRED)
+
+# Wykrywanie mozliwosci platformy PROBAMI KOMPILACYJNYMI, nie nazwa systemu.
+# Wynik: zmienne RDB_HAS_* / RDB_OS_*, podstawiane do generated/platformConfig.h
+# przez src/CMakeLists.txt. Uzasadnienie doboru metody stoi w samym module.
+#
+# Miejsce jest celowe: ZA standardem jezyka i mold, PRZED sanitizerami i
+# coverage. try_compile dziedziczy CMAKE_CXX_STANDARD/EXTENSIONS (CMP0067, NEW
+# od 3.8) oraz CMAKE_CXX_FLAGS, wiec proba kompiluje sie jako -std=c++23 i
+# linkuje tym samym linkerem co build. Proba w innym trybie jezyka albo z innym
+# linkerem to droga dla falszywego 0 - i dla falszywego 1, ktorego kontrola
+# RDB_PLATFORM_FALLBACKS w ogole nie widzi. Flag sanitizera i --coverage proba
+# widziec NIE ma: ich biblioteki uruchomieniowe dokladaja wlasne symbole i
+# przechwytuja funkcje libc (m.in. pthread_*), wiec odpowiedz zalezalaby od
+# wariantu diagnostycznego, a build z sanitizerem ma sprawdzac TE SAME galezie
+# co build wysylkowy.
+include(PlatformChecks)
 
 # Sanitizery: odpowiednik valgrinda tam, gdzie valgrinda nie ma (Apple Silicon).
 # Pusta wartosc = wylaczone, czyli dotychczasowe zachowanie na kazdej
@@ -267,16 +293,6 @@ if(RDB_USE_CCACHE)
   endif()
 endif()
 
-if(ENABLE_COVERAGE)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
-endif()
-
-# cmake --preset conan-debug -DENABLE_COVERAGE=ON cd build/Debug ninja clean &&
-# ninja ctest cd ../.. gcovr --root . --filter 'src/' --gcov-executable gcov-14
-# --exclude '.*\.antlr.*' build/Debug --html-details coverage/coverage.html
-# --xml coverage/coverage.xml --print-summary
-
 find_package(Boost CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
@@ -327,6 +343,19 @@ message(
   STATUS
     "RDB_BOOST_POSIX_SHM=${RDB_BOOST_POSIX_SHM_01} (obiekty IPC pod ${RDB_SHM_DIR_HINT})"
 )
+
+# Za ostatnia proba kompilacyjna: --coverage w CMAKE_CXX_FLAGS przeszedlby do
+# try_compile, a proby maja odpowiadac za build wysylkowy (patrz
+# include(PlatformChecks)).
+if(ENABLE_COVERAGE)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+endif()
+
+# cmake --preset conan-debug -DENABLE_COVERAGE=ON cd build/Debug ninja clean &&
+# ninja ctest cd ../.. gcovr --root . --filter 'src/' --gcov-executable gcov-14
+# --exclude '.*\.antlr.*' build/Debug --html-details coverage/coverage.html
+# --xml coverage/coverage.xml --print-summary
 
 # Oznacz wszystkie importowane targety (Conan) jako systemowe - clang-tidy z
 # SystemHeaders:false pomija ich nagłówki (brak ostrzeżeń i notatek z .conan2/).
