@@ -211,11 +211,11 @@ TEST(ExecutorRtActivateTest, WithoutRootReturnsFalse) {
   EXPECT_FALSE(result);
 }
 
-#else
+#elif RDB_HAS_PTHREAD_SCHEDPARAM
 
-// Na jadrach, w ktorych polityka szeregowania jest wlasnoscia WATKU, a nie calego
-// procesu, podniesienie do SCHED_FIFO nie jest zastrzezone dla roota tak jak na
-// Linuksie - wiec "bez roota ma sie nie udac" nie jest tu zdaniem prawdziwym
+// Na jadrach bez sched_setscheduler (m.in. Darwin) SCHED_FIFO ustawia sie przez
+// pthread_setschedparam, a podniesienie do niego nie jest zastrzezone dla roota
+// tak jak na Linuksie - wiec "bez roota ma sie nie udac" nie jest tu zdaniem prawdziwym
 // i nie ma czego asercjonowac. Sprawdzalne jest natomiast, ze wynik NIE KLAMIE:
 // gdy rtActivate melduje sukces, wolajacy watek naprawde biegnie pod SCHED_FIFO.
 TEST(ExecutorRtActivateTest, SuccessImpliesRealTimePolicyOnCallingThread) {
@@ -324,8 +324,8 @@ TEST(ExecutorRtAffinityTest, LeavesUnpinnedThreadAlone) {
 #else
 
 // Bez masek powinowactwa nie ma czego przestawiac i nie ma tez zaglodzenia,
-// przed ktorym tamten mechanizm broni: rtActivate podnosi wtedy do SCHED_FIFO
-// sam watek wolajacy, wiec watek komunikacyjny zostaje przy polityce domyslnej.
+// przed ktorym tamten mechanizm broni: watku RT i watku komunikacyjnego nie da
+// sie przypiac do tych samych rdzeni.
 // Kontrakt, ktory MUSI obowiazywac takze tutaj: funkcja melduje false, czyli
 // "niczego nie zmieniono", zamiast udawac, ze watek zostal przeniesiony.
 TEST(ExecutorRtAffinityTest, ReportsNoMoveWhereAffinityIsUnavailable) {

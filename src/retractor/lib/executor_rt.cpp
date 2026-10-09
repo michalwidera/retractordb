@@ -44,6 +44,7 @@ const char *rec(bool v) { return v ? "[OK]  " : "[WARN]"; }
 /// mieści w drugim, gdzie dawalo EINVAL - czyli ciche zejscie do SCHED_OTHER na
 /// kazdym uruchomieniu. Ograniczenie zakresem jest bezczynne tam, gdzie wartosc i tak
 /// jest poprawna, wiec na Linuksie nie zmienia niczego.
+#if RDB_HAS_SCHED_SETSCHEDULER || RDB_HAS_PTHREAD_SCHEDPARAM
 int clampRtPriority(int priority) {
   const int lowest  = sched_get_priority_min(SCHED_FIFO);
   const int highest = sched_get_priority_max(SCHED_FIFO);
@@ -53,17 +54,22 @@ int clampRtPriority(int priority) {
     SPDLOG_WARN("SCHED_FIFO priority {} out of range [{}, {}] on this kernel, using {}", priority, lowest, highest, clamped);
   return clamped;
 }
+#endif
 
-/// Nazwa biezacej polityki szeregowania. Na Linuksie pytamy o CALY proces
-/// (sched_getscheduler), gdzie indziej o WOLAJACY WATEK (pthread_getschedparam) -
-/// bo tam polityka jest wlasnoscia watku i procesowego odpowiednika po prostu nie ma.
+/// Nazwa biezacej polityki szeregowania WOLAJACEGO WATKU. Na Linuksie przez
+/// sched_getscheduler(0) - pid 0 oznacza tam watek wolajacy, nie caly proces -
+/// gdzie indziej przez pthread_getschedparam, bo sched_getscheduler nie istnieje.
 const char *currentSchedulerName() {
-#if RDB_HAS_SCHED_SETSCHEDULER
-  const int policy = sched_getscheduler(0);
-#else
   int policy = SCHED_OTHER;
+#if RDB_HAS_SCHED_SETSCHEDULER
+  policy = sched_getscheduler(0);
+#else
+#if RDB_HAS_PTHREAD_SCHEDPARAM
   struct sched_param sp{};
   if (pthread_getschedparam(pthread_self(), &policy, &sp) != 0) return "unknown";
+#else
+  return "unknown";
+#endif
 #endif
   if (policy == SCHED_FIFO) return "SCHED_FIFO";
   if (policy == SCHED_RR) return "SCHED_RR";
@@ -155,8 +161,8 @@ bool checkLinux() {
 /// ktore maja sens wszedzie - limit blokowania pamieci i biezaca polityka.
 ///
 /// Co realnie daje sie tu sprawdzic:
-///   - polityke czasu rzeczywistego dla WATKU (pthread_setschedparam) - jest zawsze,
-///     ale wysokie priorytety wymagaja uprawnien, wiec sprawdzamy realny zakres;
+///   - polityke czasu rzeczywistego potwierdzona przez proby platformy;
+///     wysokie priorytety wymagaja uprawnien, wiec sprawdzamy realny zakres;
 ///   - RLIMIT_MEMLOCK - istnieje tak samo jak na Linuksie;
 ///   - blokowanie CALEJ przestrzeni adresowej - patrz rtActivate, bywa niezaimplementowane.
 /// Czego sprawdzic sie nie da, bo nie istnieje: jadra PREEMPT_RT i dlawienia RT.
@@ -167,7 +173,7 @@ bool checkGeneric() {
 
   const int lowest      = sched_get_priority_min(SCHED_FIFO);
   const int highest     = sched_get_priority_max(SCHED_FIFO);
-  const bool rtPolicyOk = (lowest >= 0 && highest >= lowest);
+  const bool rtPolicyOk = (RDB_HAS_SCHED_SETSCHEDULER || RDB_HAS_PTHREAD_SCHEDPARAM) && lowest >= 0 && highest >= lowest;
 
   std::cout << "\n=== RT requirements check ===\n";
   std::cout << ok(rtPolicyOk) << " SCHED_FIFO available       - thread RT policy, priority range " << lowest << ".." << highest
@@ -197,7 +203,7 @@ bool rtCheckAndPrint() {
 #endif
 }
 
-bool rtActivate(int priority) {
+bool rtActivate([[maybe_unused]] int priority) {
   bool ok = true;
   // Polityka mlockall (sledztwo ~40 ms, JOURNAL.md 2026-07-18, Fazy 2/3):
   // synchroniczna populacja stron NOWYCH mapowan pod MCL_FUTURE kosztowala ~25 ms
@@ -257,9 +263,11 @@ bool rtActivate(int priority) {
 
   if (mlockMode != "onfault") SPDLOG_WARN("RDB_MLOCKALL={} (diagnostic mode)", mlockMode);
 
+#if RDB_HAS_SCHED_SETSCHEDULER || RDB_HAS_PTHREAD_SCHEDPARAM
   const int effective = clampRtPriority(priority);
   struct sched_param sp{};
   sp.sched_priority = effective;
+#endif
 
 #if RDB_HAS_SCHED_SETSCHEDULER
   if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0) {
@@ -267,15 +275,19 @@ bool rtActivate(int priority) {
     ok = false;
   }
 #else
-  // Odpowiednik dla jader, w ktorych polityka szeregowania jest wlasnoscia WATKU,
-  // a nie procesu (m.in. Darwin: sched_setscheduler tam nie istnieje). Roznica jest
-  // realna i warto ja znac: obejmuje wylacznie watek wolajacy, wiec watek komunikacyjny
-  // zostaje przy polityce domyslnej -- co akurat jest tu pozadane, bo dokladnie temu
-  // sluzy rtKeepThreadOffRtCpus na Linuksie.
+#if RDB_HAS_PTHREAD_SCHEDPARAM
+  // Odpowiednik dla jader bez sched_setscheduler (m.in. Darwin). Zasieg jest ten sam
+  // co w galezi glownej: sched_setscheduler(0, ...) na Linuksie tez obejmuje tylko
+  // watek wolajacy. W obu galeziach watek komunikacyjny, uruchomiony przed
+  // rtActivate, zostaje wiec przy polityce domyslnej.
   if (const int rc = pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp); rc != 0) {
     SPDLOG_WARN("SCHED_FIFO failed: {}", strerror(rc));
     ok = false;
   }
+#else
+  SPDLOG_WARN("SCHED_FIFO unavailable: neither sched_setscheduler nor pthread scheduling is supported");
+  ok = false;
+#endif
 #endif
   return ok;
 }
@@ -343,9 +355,9 @@ bool rtKeepThreadOffRtCpus([[maybe_unused]] pthread_t handle) {
   // i nie bylo by nim, wiec funkcja mowi wprost, ze nic nie zrobila.
   //
   // Zagłodzenia, przed ktorym broni galaz linuksowa, na tym systemie zreszta nie ma:
-  // rtActivate podnosi do SCHED_FIFO sam WATEK wolajacy (nie ma tam odpowiednika
-  // sched_setscheduler dla calego procesu), wiec watek komunikacyjny i tak zostaje
-  // przy polityce domyslnej i jest szeregowany.
+  // powstaje ono tylko wtedy, gdy watek SCHED_FIFO i watek komunikacyjny sa
+  // przypiete do tych samych rdzeni, a bez masek powinowactwa nie da sie ich
+  // przypiac - planista moze zawsze przeniesc watek komunikacyjny na inny rdzen.
   //
   // Komunikat na stdout i tylko RAZ - z tego samego powodu co w galezi wyzej:
   // w Release SPDLOG_WARN jest wycinany w kompilacji, a log przebiegu pomiarowego
