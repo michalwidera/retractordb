@@ -15,6 +15,13 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash storage-validation.sh unwritable)
 
+# #430: dwa procesy na wspólnym katalogu wybierają różne nazwy pliku próby
+# zapisu
+add_test(
+  NAME ${TestID}-distinct-probe
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash storage-validation.sh distinct-probe)
+
 add_test(
   NAME ${TestID}-config-errors
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

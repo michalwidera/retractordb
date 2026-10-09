@@ -1,3 +1,6 @@
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <atomic>
 #include <cerrno>
@@ -12,6 +15,7 @@
 #include <mutex>
 #include <optional>
 #include <print>
+#include <random>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -197,14 +201,23 @@ static void validateConfiguredStorageDir(const AppConfig &cfg) {
                                 "': " + ec.message());
   }
 
-  const std::filesystem::path probeFile = storageDir / (".xretractor_write_probe_" + std::to_string(std::rand()) + ".tmp");
-  {
-    std::ofstream out(probeFile, std::ios::out | std::ios::trunc);
-    if (!out.is_open()) {
-      throw std::invalid_argument("Configuration error: storage.dir is not writable: " + storageDir.string());
-    }
-    out << "probe";
+  // Kilka instancji moze startowac rownoczesnie na wspolnym katalogu magazynu, wiec nazwa pliku
+  // proby musi byc unikalna dla procesu: nieziarnowany std::rand() dawal kazdemu procesowi te sama
+  // nazwe i instancje obcinaly oraz kasowaly sobie nawzajem plik proby (#430). PID rozroznia procesy
+  // zywe rownoczesnie na jednej maszynie, czlon z random_device - takze katalog wspoldzielony
+  // miedzy maszynami. O_EXCL nie obetnie cudzego pliku, a usuwamy tylko plik utworzony tutaj.
+  const std::filesystem::path probeFile = storageDir / (".xretractor_write_probe_" + std::to_string(::getpid()) + "_" +
+                                                        std::to_string(std::random_device{}()) + ".tmp");
+  const int fd                          = ::open(probeFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
+  if (fd < 0) {
+    throw std::invalid_argument("Configuration error: storage.dir is not writable: " + storageDir.string() + ": " +
+                                std::strerror(errno));
   }
+  [[maybe_unused]] const auto written = ::write(fd, "probe", 5);
+  ::close(fd);
+  // Hak testu it_config_storage_validation-distinct-probe: zostawia plik proby, by test mogl
+  // policzyc nazwy wybrane przez kolejne procesy.
+  if (std::getenv("RDB_FAULT_KEEP_WRITE_PROBE") != nullptr) return;
   std::filesystem::remove(probeFile, ec);
 }
 
