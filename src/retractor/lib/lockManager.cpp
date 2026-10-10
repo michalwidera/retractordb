@@ -14,16 +14,13 @@
 #include <sstream>
 
 #include <spdlog/spdlog.h>
-#include <boost/interprocess/ipc/message_queue.hpp>
-#include <boost/interprocess/shared_memory_object.hpp>
 
 #include "bus.hpp"
 #include "constants.hpp"
+#include "ipcSecurity.hpp"
 #include "lockFile.hpp"
 #include "osPlatform.hpp"
 #include "serverName.hpp"
-
-namespace IPC = boost::interprocess;
 
 namespace {
 
@@ -269,8 +266,8 @@ SweepReport sweepAbandonedResources(const std::string &serviceLockDir, std::stri
       std::string(machineLockDir), [](std::string_view file) { return ipcTokenOf(file).has_value(); },
       [](std::string_view file) {
         const ipc::ServerNames names = ipc::namesForToken(*ipcTokenOf(file));
-        IPC::shared_memory_object::remove(names.shmemSegment.c_str());
-        IPC::message_queue::remove(names.queryQueue.c_str());
+        ipc::security::removeOwned(names.shmemSegment);
+        ipc::security::removeOwned(names.queryQueue);
       });
   retVal.busSegments = bus::sweepAbandonedSegments(machineLockDir);
   return retVal;

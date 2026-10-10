@@ -13,8 +13,6 @@
 #include <vector>
 
 #include <spdlog/spdlog.h>
-#include <boost/interprocess/ipc/message_queue.hpp>
-#include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/system/error_code.hpp>
@@ -22,6 +20,7 @@
 #include "../retractor/lib/appConfig.hpp"
 #include "config.h"  // Add an automatically generated configuration file
 #include "constants.hpp"
+#include "ipcSecurity.hpp"
 #include "qry.hpp"
 #include "retractor/lib/bus.hpp"
 #include "retractor/lib/lockFile.hpp"
@@ -66,8 +65,8 @@ static int exitCodeFor(selectResult result) {
 static bool serverReachable(std::string_view serverName) {
   const ipc::ServerNames names = ipc::names(serverName);
   try {
-    IPC::shared_memory_object seg(IPC::open_only, names.shmemSegment.c_str(), IPC::read_only);
-    IPC::message_queue mq(IPC::open_only, names.queryQueue.c_str());
+    const auto seg = ipc::security::openMemory(names.shmemSegment, IPC::read_only);
+    const auto mq  = ipc::security::openQueue(names.queryQueue);
   } catch (...) {
     return false;
   }

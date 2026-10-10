@@ -21,6 +21,7 @@
 
 #include "constants.hpp"
 #include "ipcResponses.hpp"
+#include "ipcSecurity.hpp"
 #include "osPlatform.hpp"
 
 using boost::property_tree::ptree;
@@ -60,8 +61,12 @@ void IpcClient::producer() {
   int attempts = 0;
   for (; attempts < responseQueueOpenMaxFails_ && !done; ++attempts) {
     try {
-      mq = std::make_unique<IPC::message_queue>(IPC::open_only, queueName.c_str());
+      mq = ipc::security::openQueue(queueName);
       break;
+    } catch (const ipc::security::Rejected &) {
+      responseQueueMissing = true;
+      done                 = true;
+      return;
     } catch (const IPC::interprocess_exception &) {
       std::this_thread::sleep_for(ipc::kClientResponsePollInterval);
     }
@@ -139,11 +144,11 @@ ptree IpcClient::netClient(const std::string &netCommand, const std::string &net
     // czekania - na miejsce w kolejce komend i na odpowiedź - więc żadne nie trwa bez końca.
     const auto deadline = std::chrono::steady_clock::now() + clientResponseMaxFails_ * ipc::kClientResponsePollInterval;
 
-    IPC::message_queue mq(IPC::open_only, names_.queryQueue.c_str());
+    const auto mq = ipc::security::openQueue(names_.queryQueue);
     std::stringstream request_stream;
     write_info(request_stream, pt_request);
     const std::string request = request_stream.str();
-    if (!mq.timed_send(request.c_str(), request.length(), 0, deadline)) {
+    if (!mq->timed_send(request.c_str(), request.length(), 0, deadline)) {
       SPDLOG_ERROR("ipcClient: command queue '{}' stayed full until the deadline", names_.queryQueue);
       done = true;
       pt_response.put("error.response", "server not found");

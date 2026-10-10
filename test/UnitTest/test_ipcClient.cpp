@@ -87,7 +87,8 @@ TEST(IpcClient, producer_waits_for_late_response_queue) {
     // wywracał klienta przy starcie obciążonego serwera.
     std::this_thread::sleep_for(std::chrono::milliseconds(120));
     boost::interprocess::message_queue(boost::interprocess::create_only, responseQueueName().c_str(), 8,
-                                       ipc::kResponseQueueMaxMessageSize);
+                                       ipc::kResponseQueueMaxMessageSize,
+                                       boost::interprocess::permissions(ipc::kObjectPermissions));
   });
 
   std::thread producer([&transport] { transport.producer(); });
@@ -123,7 +124,7 @@ TEST(IpcClient, full_consumer_queue_does_not_prevent_shutdown) {
   using boost::interprocess::message_queue;
   message_queue::remove(responseQueueName().c_str());
   message_queue queue(boost::interprocess::create_only, responseQueueName().c_str(), kSpscQueueCapacity + 1,
-                      ipc::kResponseQueueMaxMessageSize);
+                      ipc::kResponseQueueMaxMessageSize, boost::interprocess::permissions(ipc::kObjectPermissions));
   // Pelny komunikat sprawdza tez miejsce na koncowe NUL w buforze odbiorcy.
   std::string row = "stream test\n";
   row.resize(ipc::kResponseQueueMaxMessageSize, ' ');
@@ -182,7 +183,7 @@ class SilentServer {
   SilentServer()
       : responses_(boost::interprocess::create_only, freshSegmentName()),
         queue_(boost::interprocess::open_or_create, ipc::names().queryQueue.c_str(), ipc::kQueryQueueMaxMessages,
-               ipc::kQueryQueueMaxMessageSize) {}
+               ipc::kQueryQueueMaxMessageSize, boost::interprocess::permissions(ipc::kObjectPermissions)) {}
 
   ~SilentServer() {
     boost::interprocess::shared_memory_object::remove(ipc::names().shmemSegment.c_str());
