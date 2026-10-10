@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "logCapture.hpp"
 #include "rdb/facctxtsrc.hpp"
 
 // Tests intentionally use raw byte buffers for parser and file-interface validation.
@@ -696,6 +697,137 @@ TEST_F(TextSourceROTest, missing_file_is_not_a_kind_refusal) {
   rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
   rdb::textSourceRO src(std::string("does_not_exist_kind.txt"), desc, true);
   EXPECT_EQ(src.initializationError(), "");
+}
+
+// ============================================================
+// textSourceRO - niepoprawny token liczbowy (#471)
+// ============================================================
+
+namespace {
+size_t countOccurrences(const std::string &text, const std::string &needle) {
+  size_t count = 0;
+  for (auto pos = text.find(needle); pos != std::string::npos; pos = text.find(needle, pos + needle.size()))
+    ++count;
+  return count;
+}
+
+// W Release SPDLOG_WARN jest wycinany w kompilacji (SPDLOG_ACTIVE_LEVEL=ERROR) - ostrzezenia nie ma wcale.
+constexpr size_t kExpectedWarnings = SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_WARN ? 1 : 0;
+}  // namespace
+
+// Token nieodczytany w calosci albo poza zakresem typu pola daje NULL, a nie 0, wartosc graniczna albo
+// obcieta liczbe. Sasiednie pole tego rekordu i nastepny rekord czytaja sie bez przesuniecia.
+TEST_F(TextSourceROTest, invalid_numeric_token_reads_as_null) {
+  struct Case {
+    std::string token;
+    rdb::descFld type;
+    int size;
+  };
+  const std::vector<Case> cases{
+      {"abc", rdb::INTEGER, sizeof(int)},         {"abc", rdb::UINT, sizeof(unsigned)}, {"abc", rdb::FLOAT, sizeof(float)},
+      {"abc", rdb::DOUBLE, sizeof(double)},       {"12x", rdb::INTEGER, sizeof(int)},   {"12x", rdb::UINT, sizeof(unsigned)},
+      {"99999999999", rdb::INTEGER, sizeof(int)}, {"-5", rdb::UINT, sizeof(unsigned)},  {"300", rdb::BYTE, 1},
+      {"1e999", rdb::DOUBLE, sizeof(double)},     {"1e39", rdb::FLOAT, sizeof(float)},  {"inf", rdb::DOUBLE, sizeof(double)},
+      {"nan", rdb::DOUBLE, sizeof(double)},       {"+-5", rdb::INTEGER, sizeof(int)},   {"-5", rdb::BYTE, 1},
+      {"1.5x", rdb::DOUBLE, sizeof(double)},
+  };
+
+  for (const auto &c : cases) {
+    SCOPED_TRACE(c.token + " as " + std::string(rdb::GetStringdescFld(c.type)));
+    auto filename = createTestFile("test_bad_token.txt", c.token + " 9\n7 8\n");
+
+    rdb::Descriptor desc{{"a", c.size, 1, c.type}, {"b", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+    rdb::textSourceRO src(filename, desc, false);
+
+    auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+    int b       = 0;
+
+    GTEST_ASSERT_EQ(src.read(buffer.get(), 0), EXIT_SUCCESS);
+    ASSERT_EQ(src.lastNullBitset().size(), 2U);
+    EXPECT_TRUE(src.lastNullBitset()[0]);
+    EXPECT_FALSE(src.lastNullBitset()[1]);
+    std::memcpy(&b, buffer.get() + c.size, sizeof(int));
+    EXPECT_EQ(b, 9);
+
+    GTEST_ASSERT_EQ(src.read(buffer.get(), 0), EXIT_SUCCESS);
+    EXPECT_FALSE(src.lastNullBitset()[0]);
+    EXPECT_FALSE(src.lastNullBitset()[1]);
+    std::memcpy(&b, buffer.get() + c.size, sizeof(int));
+    EXPECT_EQ(b, 8);
+  }
+}
+
+// Wiodacy '+' i liczba ujemna w typie ze znakiem pozostaja poprawne.
+TEST_F(TextSourceROTest, signed_numeric_tokens_still_parse) {
+  auto filename = createTestFile("test_signed_tokens.txt", "+7 -5 +7 +255 +2.5\n");
+
+  rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER},
+                       {"b", static_cast<int>(sizeof(int)), 1, rdb::INTEGER},
+                       {"c", static_cast<int>(sizeof(unsigned)), 1, rdb::UINT},
+                       {"d", 1, 1, rdb::BYTE},
+                       {"e", static_cast<int>(sizeof(double)), 1, rdb::DOUBLE}};
+  rdb::textSourceRO src(filename, desc, false);
+
+  auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  GTEST_ASSERT_EQ(src.read(buffer.get(), 0), EXIT_SUCCESS);
+  for (size_t k = 0; k < src.lastNullBitset().size(); ++k)
+    EXPECT_FALSE(src.lastNullBitset()[k]) << "field " << k;
+
+  int a          = 0;
+  int b          = 0;
+  unsigned c     = 0;
+  uint8_t d      = 0;
+  double e       = 0;
+  const auto *at = buffer.get();
+  std::memcpy(&a, at, sizeof(int));
+  std::memcpy(&b, at + 4, sizeof(int));
+  std::memcpy(&c, at + 8, sizeof(unsigned));
+  std::memcpy(&d, at + 12, 1);
+  std::memcpy(&e, at + 13, sizeof(double));
+  EXPECT_EQ(a, 7);
+  EXPECT_EQ(b, -5);
+  EXPECT_EQ(c, 7U);
+  EXPECT_EQ(d, 255);
+  EXPECT_DOUBLE_EQ(e, 2.5);
+}
+
+// Niepoprawny element tablicy unewaznia cale pole - ta sama regula co token NULL na elemencie.
+TEST_F(TextSourceROTest, invalid_array_element_nulls_whole_field) {
+  auto filename = createTestFile("test_bad_arr.txt", "1 x 3 4\n");
+
+  rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 3, rdb::INTEGER},
+                       {"b", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+  rdb::textSourceRO src(filename, desc, false);
+
+  auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+  GTEST_ASSERT_EQ(src.read(buffer.get(), 0), EXIT_SUCCESS);
+  ASSERT_EQ(src.lastNullBitset().size(), 2U);
+  EXPECT_TRUE(src.lastNullBitset()[0]);
+  EXPECT_FALSE(src.lastNullBitset()[1]);
+  int b = 0;
+  std::memcpy(&b, buffer.get() + (3 * sizeof(int)), sizeof(int));
+  EXPECT_EQ(b, 4);
+}
+
+// Jedno ostrzezenie na zrodlo: drugi zly token i kolejne przejscia zawijanego pliku nie dopisuja nic.
+TEST_F(TextSourceROTest, invalid_token_warned_once_across_wrap) {
+  auto filename = createTestFile("test_bad_wrap.txt", "abc\n12x\n");
+
+  rdb::Descriptor desc{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}};
+  LogCapture log;
+  {
+    rdb::textSourceRO src(filename, desc, true);
+    auto buffer = std::make_unique<uint8_t[]>(desc.getSizeInBytes());
+    for (int row = 0; row < 5; ++row) {
+      GTEST_ASSERT_EQ(src.read(buffer.get(), 0), EXIT_SUCCESS) << "row " << row;
+      EXPECT_TRUE(src.lastNullBitset()[0]) << "row " << row;
+    }
+  }
+  EXPECT_EQ(countOccurrences(log.text(), "invalid numeric token"), kExpectedWarnings) << log.text();
+  if (kExpectedWarnings == 1)
+    EXPECT_NE(log.text().find("Text source test_bad_wrap.txt: record 0, field a: invalid numeric token 'abc'"),
+              std::string::npos)
+        << log.text();
 }
 
 // NOLINTEND(modernize-avoid-c-arrays)

@@ -313,6 +313,10 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
                               int nom{0};
                               int den{1};
                               in >> nom >> expect<'/'> >> den;
+                              // Nieosiagalne z poprawnego planu (K1, #471): zaden wolajacy nie rzutuje napisu na RATIONAL.
+                              // normalize() promuje do wyzszego indeksu wariantu (STRING > RATIONAL), getRI() dostaje tokeny
+                              // z rational_se, okno rekordowe nad wyrazeniem tekstowym odrzuca kompilator, pole wyniku SELECT
+                              // ma typ swojego programu, a xtrdb zapisuje napis tylko do pola STRING.
                               if (den == 0) FatalError("convertTypes: rational denominator is zero (string parse)");
                               retVal = boost::rational<int>(nom, den);
                             }},
@@ -339,6 +343,7 @@ T cast<T>::operator()(const T &inVar, rdb::descFld reqType) {
           int nom{0};
           int den{1};
           in >> nom >> expect<'/'> >> den;
+          // Nieosiagalne (K1, #471) - dowod przy galezi descFldVT wyzej.
           if (den == 0) FatalError("convertTypes: rational denominator is zero (any string parse)");
           retVal = boost::rational<int>(nom, den);
         } else if (inVar.type() == typeid(std::pair<std::string, int>)) {
