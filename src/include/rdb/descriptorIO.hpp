@@ -3,6 +3,7 @@
 #include <string>
 
 #include "descriptor.hpp"
+#include "fatalError.hpp"
 
 namespace rdb {
 
@@ -16,8 +17,8 @@ namespace rdb {
 ///   niezgodność schematów wypisuje oba deskryptory i kończy się przez FatalError,
 /// - nie znać pozostałych plików magazynu - operują wyłącznie na wskazanej ścieżce .desc.
 
-/// @brief Read a descriptor without ending the process; return an empty string on success.
-[[nodiscard]] std::string tryLoadDescriptorFile(const std::string &descriptorFile, Descriptor &descriptor);
+/// Odczyt bez konczenia procesu: pusty message to sukces, K2 to skladnia/schemat, K4 to I/O z errno.
+[[nodiscard]] Refusal tryLoadDescriptorFile(const std::string &descriptorFile, Descriptor &descriptor);
 
 /// @brief Write the descriptor to a .desc file; FatalError on open or write failure.
 void saveDescriptorFile(const std::string &descriptorFile, const Descriptor &descriptor);

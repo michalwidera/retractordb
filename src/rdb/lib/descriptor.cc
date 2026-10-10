@@ -344,6 +344,8 @@ std::istream &operator>>(std::istream &is, Descriptor &rhs) {
 
   auto result = parserDESCString(rhs, strstream.str());
   if (result != "OK") {
+    // Nieosiagalne z xretractor (#473): silnik czyta .desc przez tryLoadDescriptorFile, ktore
+    // zwraca Refusal. Osiagalne z xtrdb: uszkodzony .desc w mapie magazynu i schemat w `open`.
     FatalError("descriptor parse failed: {}", result);
   }
 

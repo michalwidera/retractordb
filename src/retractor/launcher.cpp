@@ -759,13 +759,10 @@ int main(int argc, char *argv[]) try {
           // Te same sprawdzenia plikow magazynu co przy starcie ponizej - PRZED nadpisaniem pliku
           // uslugi. Bez nich plan odrzucany przy starcie wychodzil stad z kodem 0, a usluga tracila
           // dzialajacy plan na rzecz takiego, ktory nie wstaje (#265).
-          for (const std::string &refusal :
-               {checkKeptStores(coreInstance, appCfg.storageDir), checkDescriptorFiles(coreInstance, appCfg.storageDir),
-                checkDeclaredSources(coreInstance)}) {
-            if (refusal == "OK") continue;
-            std::cerr << "xretractor: " << refusal << "; nothing was changed\n";
-            SPDLOG_ERROR("Refused before delivery: {}", refusal);
-            return system::errc::protocol_error;
+          if (const rdb::Refusal refusal = checkPlanStorage(coreInstance, appCfg.storageDir); !refusal.message.empty()) {
+            std::cerr << "xretractor: " << refusal.message << "; nothing was changed\n";
+            SPDLOG_ERROR("Refused before delivery: {}", refusal.message);
+            return refusal.cls == rdb::ErrorClass::Environment ? system::errc::io_error : system::errc::protocol_error;
           }
           if (const CounterCheck counter = checkRotationCounter(coreInstance); !counter.refusal.empty()) {
             std::cerr << "xretractor: " << counter.refusal << "; nothing was changed\n";
@@ -812,23 +809,16 @@ int main(int argc, char *argv[]) try {
     return system::errc::interrupted;
   }
 
-  // Pliki, ktore :ROTATION zachowa, musza pasowac do planu - przed pierwsza czynnoscia startu.
-  // Nie w `-c`: kompilacja nie musi biec na maszynie z danymi.
-  if (const std::string kept = checkKeptStores(coreInstance, {}); kept != "OK") {
-    std::cerr << "xretractor: " << kept << '\n';
-    SPDLOG_ERROR("Plan refused: {}", kept);
-    return refusePlan();
-  }
-  if (const std::string descriptorError = checkDescriptorFiles(coreInstance, {}); descriptorError != "OK") {
-    std::cerr << "xretractor: " << descriptorError << '\n';
-    SPDLOG_ERROR("Plan refused: {}", descriptorError);
-    return refusePlan();
-  }
-  // Rodzaj pliku zrodel przed startem (#346). Akcesor odrzuca sciezke zlego rodzaju i sam, ale
-  // przy starcie konczy sie to FatalError-em budowy modelu - tu jest odmowa planu jak wyzej.
-  if (const std::string sourceError = checkDeclaredSources(coreInstance); sourceError != "OK") {
-    std::cerr << "xretractor: " << sourceError << '\n';
-    SPDLOG_ERROR("Plan refused: {}", sourceError);
+  // Te same kontrole czterech drog (#473), przed pierwsza czynnoscia startu. Nie w -c:
+  // kompilacja nie musi biec na maszynie z danymi. K2 to odmowa planu, K4 - jak przy liczniku
+  // ponizej - io_error z zachowanym planem, wiec jednostka wstanie z nim po naprawie srodowiska.
+  if (const rdb::Refusal refusal = checkPlanStorage(coreInstance, {}); !refusal.message.empty()) {
+    std::cerr << "xretractor: " << refusal.message << '\n';
+    if (refusal.cls == rdb::ErrorClass::Environment) {
+      SPDLOG_ERROR("Cannot start, plan kept: {}", refusal.message);
+      return system::errc::io_error;
+    }
+    SPDLOG_ERROR("Plan refused: {}", refusal.message);
     return refusePlan();
   }
   // Licznik rotacji (#472): wadliwa tresc to odmowa planu jak wyzej, ale nieczytelny plik nie obciaza

@@ -1,5 +1,6 @@
 #include <sys/stat.h>  // mkfifo
 
+#include <cerrno>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -14,6 +15,7 @@
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/planSource.hpp"
 #include "retractor/lib/qTree.hpp"
+#include "retractor/lib/serviceControl.hpp"
 
 /// @brief Wczytywanie zestawu RQL z tekstu - wspolne zrodlo startu z pliku i przeladowania
 /// w locie (`xqry --reset`).
@@ -318,11 +320,11 @@ TEST(PlanSource, rotation_refuses_kept_files_written_with_another_configuration)
     EXPECT_EQ(cm.compile(), "OK");
     std::ofstream(dir / "seg.desc") << keptDesc;
     std::ofstream(dir / "vol.desc") << "{ INTEGER vol_0 RETMEMORY 1 TYPE MEMORY }";
-    return checkKeptStores(plan, {});
+    return checkKeptStores(plan, {}).message;
   };
 
-  EXPECT_EQ(check("{ INTEGER seg_0 RETENTION 5 2 }", true), "OK");
-  EXPECT_EQ(check("{ INTEGER seg_0 RETENTION 5 2 TYPE DIRECT }", true), "OK");
+  EXPECT_EQ(check("{ INTEGER seg_0 RETENTION 5 2 }", true), "");
+  EXPECT_EQ(check("{ INTEGER seg_0 RETENTION 5 2 TYPE DIRECT }", true), "");
   EXPECT_EQ(check("{ INTEGER seg_0 RETENTION 5 3 }", true),
             "Stream 'seg' keeps its files under ROTATION, but kept_store/seg.desc was written with STORAGE DIRECT RETENTION 5 3 "
             "and the plan asks for STORAGE DIRECT RETENTION 5 2: put STORAGE DIRECT RETENTION 5 3 back in the plan, or remove "
@@ -333,7 +335,7 @@ TEST(PlanSource, rotation_refuses_kept_files_written_with_another_configuration)
       << ".desc sprzed D7";
   EXPECT_TRUE(check("{\n INTEGER }\n", true).contains("Fail: line 2:9"));
   // Bez rotacji pliki i tak znikaja przy starcie, wiec nie ma czego porownywac.
-  EXPECT_EQ(check("{ INTEGER seg_0 RETENTION 5 3 }", false), "OK");
+  EXPECT_EQ(check("{ INTEGER seg_0 RETENTION 5 3 }", false), "");
 
   fs::remove_all(dir);
 }
@@ -354,7 +356,7 @@ TEST(PlanSource, invalid_declared_descriptor_is_rejected_before_plan_activation)
   ASSERT_EQ(cm.compile(), "OK");
 
   std::ofstream(dir / "src.desc") << "{\n INTEGER }\n";
-  const std::string error = checkDescriptorFiles(plan, {});
+  const std::string error = checkDescriptorFiles(plan, {}).message;
   EXPECT_TRUE(error.contains("src.desc")) << error;
   EXPECT_TRUE(error.contains("Fail: line 2:9")) << error;
 
@@ -379,11 +381,11 @@ TEST(PlanSource, declared_descriptor_check_uses_the_runtime_direction) {
     compiler cm(plan);
     EXPECT_EQ(cm.compile(), "OK");
     std::ofstream(dir / "src.desc") << "{ " + keptType + " a REF \"data.txt\" TYPE TEXTSOURCE }\n";
-    return checkDescriptorFiles(plan, {});
+    return checkDescriptorFiles(plan, {}).message;
   };
 
   EXPECT_TRUE(check("INTEGER", "DOUBLE").contains("descriptor schema mismatch")) << "silnik konczy sie FatalError-em";
-  EXPECT_EQ(check("DOUBLE", "INTEGER"), "OK") << "silnik przyjmuje ten plan";
+  EXPECT_EQ(check("DOUBLE", "INTEGER"), "") << "silnik przyjmuje ten plan";
 
   fs::remove_all(dir);
 }
@@ -419,7 +421,7 @@ TEST(PlanSource, declared_source_kind_is_checked_without_opening_the_path) {
   const auto check = [](const std::string &declaration) {
     qTree plan;
     EXPECT_EQ(parsePlanText(plan, "DECLARE a INTEGER STREAM src, 1 " + declaration + "\n").status, "OK") << declaration;
-    return withinFiveSeconds([&plan] { return checkDeclaredSources(plan); });
+    return withinFiveSeconds([&plan] { return checkDeclaredSources(plan).message; });
   };
 
   EXPECT_EQ(check("BINFILE '" + fifo + "'"), "stream 'src': BINFILE '" + fifo + "' is a FIFO, not a regular file");
@@ -431,11 +433,11 @@ TEST(PlanSource, declared_source_kind_is_checked_without_opening_the_path) {
   EXPECT_EQ(check("DEVICE '" + regular + "'"),
             "stream 'src': DEVICE '" + regular + "' is a regular file, not a character device or FIFO");
 
-  EXPECT_EQ(check("DEVICE '" + fifo + "'"), "OK");
-  EXPECT_EQ(check("DEVICE '/dev/null'"), "OK");
-  EXPECT_EQ(check("BINFILE '" + regular + "'"), "OK");
-  EXPECT_EQ(check("TEXTFILE '" + regular + "'"), "OK");
-  EXPECT_EQ(check("BINFILE '" + (dir / "missing.bin").string() + "'"), "OK");
+  EXPECT_EQ(check("DEVICE '" + fifo + "'"), "");
+  EXPECT_EQ(check("DEVICE '/dev/null'"), "");
+  EXPECT_EQ(check("BINFILE '" + regular + "'"), "");
+  EXPECT_EQ(check("TEXTFILE '" + regular + "'"), "");
+  EXPECT_EQ(check("BINFILE '" + (dir / "missing.bin").string() + "'"), "");
 
   // Forma przestarzala: odmowa mowi, co wybrala regula i jakie slowo pasuje do pliku.
   EXPECT_EQ(check("FILE '" + fifo + "'"), "stream 'src': BINFILE '" + fifo +
@@ -448,8 +450,8 @@ TEST(PlanSource, declared_source_kind_is_checked_without_opening_the_path) {
                                     "'\nDECLARE a INTEGER STREAM good, 1 BINFILE '" + regular + "'\n")
                 .status,
             "OK");
-  EXPECT_EQ(checkDeclaredSources(plan, {"good"}), "OK");
-  EXPECT_NE(checkDeclaredSources(plan), "OK");
+  EXPECT_EQ(checkDeclaredSources(plan, {"good"}).message, "");
+  EXPECT_NE(checkDeclaredSources(plan).message, "");
 
   fs::remove_all(dir);
 }
@@ -479,35 +481,37 @@ TEST(PlanSource, declared_descriptor_must_match_the_source_kind_and_path) {
   // Dawny zapis: przepuszczony i zastapiony przy starcie.
   keep("rec.bin", "DEVICE");
   qTree legacy = plan("FILE 'rec.bin'");
-  EXPECT_EQ(checkDescriptorFiles(legacy, {}), "OK");
+  EXPECT_EQ(checkDescriptorFiles(legacy, {}).message, "");
   dropStalePlanArtifacts(legacy);
   EXPECT_FALSE(fs::exists(descFile));
 
   // Ten sam dawny zapis, ale plan czyta plik jako tekst - to juz inne zrodlo.
   keep("rec.bin", "DEVICE");
   qTree text = plan("TEXTFILE 'rec.bin'");
-  EXPECT_EQ(checkDescriptorFiles(text, {}), "stream 'src': " + descFile.string() +
-                                                " was written for TYPE DEVICE and the plan declares TYPE TEXTSOURCE; remove " +
-                                                descFile.string() + " to start the stream afresh");
+  EXPECT_EQ(checkDescriptorFiles(text, {}).message,
+            "stream 'src': " + descFile.string() +
+                " was written for TYPE DEVICE and the plan declares TYPE TEXTSOURCE; remove " + descFile.string() +
+                " to start the stream afresh");
   dropStalePlanArtifacts(text);
   EXPECT_TRUE(fs::exists(descFile)) << "start nie kasuje .desc, ktory nie jest dawnym zapisem BINFILE";
 
   // Dawny TYPE DEVICE dla innej sciezki nie jest dawnym zapisem tego strumienia.
   keep("old.bin", "DEVICE");
   qTree moved = plan("FILE 'rec.bin'");
-  EXPECT_TRUE(checkDescriptorFiles(moved, {}).contains("was written for TYPE DEVICE and the plan declares TYPE BINFILE"));
+  EXPECT_TRUE(
+      checkDescriptorFiles(moved, {}).message.contains("was written for TYPE DEVICE and the plan declares TYPE BINFILE"));
 
   // Zmiana sciezki przy tym samym rodzaju.
   keep("v.txt", "TEXTSOURCE");
   qTree path = plan("FILE 'w.txt'");
-  EXPECT_EQ(checkDescriptorFiles(path, {}), "stream 'src': " + descFile.string() +
-                                                " was written for source 'v.txt' and the plan reads 'w.txt'; remove " +
-                                                descFile.string() + " to start the stream afresh");
+  EXPECT_EQ(checkDescriptorFiles(path, {}).message, "stream 'src': " + descFile.string() +
+                                                        " was written for source 'v.txt' and the plan reads 'w.txt'; remove " +
+                                                        descFile.string() + " to start the stream afresh");
 
   // Urzadzenie bylo DEVICE przed zmiana i zostaje nim - `.desc` pasuje i zostaje.
   keep("/dev/urandom", "DEVICE");
   qTree device = plan("FILE '/dev/urandom'");
-  EXPECT_EQ(checkDescriptorFiles(device, {}), "OK");
+  EXPECT_EQ(checkDescriptorFiles(device, {}).message, "");
   dropStalePlanArtifacts(device);
   EXPECT_TRUE(fs::exists(descFile));
 
@@ -535,9 +539,9 @@ TEST(PlanSource, descriptor_check_can_be_limited_to_named_streams) {
       "stream 'moved': descriptor_check_names/moved.desc was written for source 'foreign.txt' and "
       "the plan reads 'planned.txt'; remove descriptor_check_names/moved.desc to start the stream "
       "afresh";
-  EXPECT_EQ(checkDescriptorFiles(plan, {}, {"fresh"}), "OK");
-  EXPECT_EQ(checkDescriptorFiles(plan, {}, {"fresh", "moved"}), refusal);
-  EXPECT_EQ(checkDescriptorFiles(plan, {}), refusal);
+  EXPECT_EQ(checkDescriptorFiles(plan, {}, {"fresh"}).message, "");
+  EXPECT_EQ(checkDescriptorFiles(plan, {}, {"fresh", "moved"}).message, refusal);
+  EXPECT_EQ(checkDescriptorFiles(plan, {}).message, refusal);
 
   fs::remove_all(dir);
 }
@@ -562,14 +566,14 @@ TEST(PlanSource, kept_select_descriptor_must_not_move_the_data_file) {
     compiler cm(plan);
     EXPECT_EQ(cm.compile(), "OK");
     std::ofstream(dir / "out.desc") << keptDesc;
-    return checkDescriptorFiles(plan, {});
+    return checkDescriptorFiles(plan, {}).message;
   };
 
-  EXPECT_EQ(check("{ INTEGER out_0 }", true), "OK");
+  EXPECT_EQ(check("{ INTEGER out_0 }", true), "");
   EXPECT_EQ(check("{ INTEGER out_0 REF \"../../etc/rdb\" }", true),
             "stream 'out': kept_select_ref/out.desc moves the stream's data file to '../../etc/rdb', which the plan does "
             "not do; remove kept_select_ref/out.desc to start the stream afresh");
-  EXPECT_EQ(check("{ INTEGER out_0 REF \"../../etc/rdb\" }", false), "OK");
+  EXPECT_EQ(check("{ INTEGER out_0 REF \"../../etc/rdb\" }", false), "");
 
   fs::remove_all(dir);
 }
@@ -622,4 +626,147 @@ TEST(PlanSource, device_timeout_warnings_use_the_effective_timeout) {
   EXPECT_EQ(deviceTimeoutWarnings(plan, 0.2), (std::vector<std::string>{late, inherit}));
   EXPECT_EQ(deviceTimeoutWarnings(plan, 0.2, {"inherit", "zeroed"}), (std::vector<std::string>{inherit}));
   EXPECT_EQ(deviceTimeoutWarnings(plan, 0.1, {"inherit"}), (std::vector<std::string>{}));
+}
+
+// K2 katalogu dotyczy takze MEMORY, ktore nadal zapisuje .desc. Pusty plan pozostaje idle.
+TEST(PlanSource, storage_directory_refusal_precedes_all_storage_operations) {
+  namespace fs       = std::filesystem;
+  const fs::path dir = "preflight_directory";
+  fs::remove_all(dir);
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan,
+                          "STORAGE 'preflight_directory/'\n"
+                          "DECLARE a DOUBLE STREAM src, 1 TEXTFILE 'data.txt'\n"
+                          "SELECT a STREAM out FROM src VOLATILE\n")
+                .status,
+            "OK");
+  compiler cm(plan);
+  ASSERT_EQ(cm.compile(), "OK");
+  const auto missing = checkPlanStorage(plan, {});
+  EXPECT_EQ(missing.cls, rdb::ErrorClass::Plan);
+  EXPECT_EQ(missing.err, ENOENT);
+  EXPECT_TRUE(missing.message.contains("does not exist"));
+  EXPECT_FALSE(fs::exists(dir));
+  std::ofstream(dir) << "not a directory";
+  const auto wrongKind = checkPlanStorage(plan, {});
+  EXPECT_EQ(wrongKind.cls, rdb::ErrorClass::Plan);
+  EXPECT_EQ(wrongKind.err, ENOTDIR);
+  EXPECT_TRUE(wrongKind.message.contains("not a directory"));
+  fs::remove(dir);
+  fs::create_directory(dir);
+  EXPECT_TRUE(checkPlanStorage(plan, {}).message.empty());
+  EXPECT_TRUE(fs::is_empty(dir)) << "preflight nie tworzy artefaktow";
+  fs::remove(dir);
+  qTree idle;
+  EXPECT_TRUE(checkStorageDirectory(idle, dir.string()).message.empty());
+}
+
+TEST(PlanSource, output_preflight_distinguishes_plan_and_environment_without_creating_files) {
+  namespace fs       = std::filesystem;
+  const fs::path dir = "preflight_output";
+  fs::remove_all(dir);
+  fs::create_directory(dir);
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan,
+                          "STORAGE 'preflight_output'\n"
+                          "DECLARE a DOUBLE STREAM src, 1 TEXTFILE 'data.txt'\n"
+                          "SELECT a STREAM out FROM src FILE 'nested/result' STORAGE DIRECT\n")
+                .status,
+            "OK");
+  compiler cm(plan);
+  ASSERT_EQ(cm.compile(), "OK");
+  const auto missingParent = checkOutputFilesOpenable(plan, {});
+  EXPECT_EQ(missingParent.cls, rdb::ErrorClass::Plan);
+  EXPECT_EQ(missingParent.err, ENOENT);
+  fs::create_directory(dir / "nested");
+  EXPECT_TRUE(checkOutputFilesOpenable(plan, {}).message.empty());
+  EXPECT_FALSE(fs::exists(dir / "nested/result"));
+  fs::create_directory(dir / "nested/result");
+  const auto directory = checkOutputFilesOpenable(plan, {});
+  EXPECT_EQ(directory.cls, rdb::ErrorClass::Plan);
+  EXPECT_EQ(directory.err, EISDIR);
+  fs::remove(dir / "nested/result");
+  std::ofstream(dir / "target") << "untouched";
+  fs::create_symlink("../target", dir / "nested/result");
+  const auto linked = checkOutputFilesOpenable(plan, {});
+  EXPECT_EQ(linked.cls, rdb::ErrorClass::Environment);
+  EXPECT_EQ(linked.err, ELOOP);
+  EXPECT_FALSE(linked.message.empty());
+  fs::remove_all(dir);
+}
+
+// Ad-hoc nie usuwa .desc wynikow: bez ROTATION oraz dla MEMORY musza przejsc kontrole.
+TEST(PlanSource, adhoc_checks_retained_select_descriptors_and_only_the_new_streams) {
+  namespace fs       = std::filesystem;
+  const fs::path dir = "preflight_adhoc_descriptor";
+  fs::remove_all(dir);
+  fs::create_directory(dir);
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan,
+                          "STORAGE 'preflight_adhoc_descriptor'\n"
+                          "DECLARE a DOUBLE STREAM src, 1 TEXTFILE 'data.txt'\n"
+                          "SELECT a STREAM disk FROM src\n"
+                          "SELECT a STREAM mem FROM src VOLATILE\n"
+                          "SELECT a STREAM fresh FROM src VOLATILE\n")
+                .status,
+            "OK");
+  compiler cm(plan);
+  ASSERT_EQ(cm.compile(), "OK");
+  for (const std::string name : {"disk", "mem"}) {
+    std::ofstream(dir / (name + ".desc")) << "{ STRING v[32] TYPE MEMORY RETMEMORY 1 }";
+    const auto mismatch = checkPlanStorage(plan, {}, {name});
+    EXPECT_EQ(mismatch.cls, rdb::ErrorClass::Plan);
+    EXPECT_TRUE(mismatch.message.contains("schema mismatch"));
+    std::ofstream(dir / (name + ".desc")) << "{ DOUBLE v TYPE UNKNOWN }";
+    const auto type = checkPlanStorage(plan, {}, {name});
+    EXPECT_EQ(type.cls, rdb::ErrorClass::Plan);
+    EXPECT_TRUE(type.message.contains("unsupported storage type"));
+  }
+  EXPECT_TRUE(checkPlanStorage(plan, {}, {"fresh"}).message.empty());
+  EXPECT_TRUE(checkPlanStorage(plan, {}).message.empty()) << "start usunie te deskryptory";
+  fs::remove_all(dir);
+}
+
+TEST(PlanSource, text_source_refuses_a_kept_rational_even_when_its_schema_fits_double) {
+  namespace fs       = std::filesystem;
+  const fs::path dir = "preflight_text_fields";
+  fs::remove_all(dir);
+  fs::create_directory(dir);
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan,
+                          "STORAGE 'preflight_text_fields'\n"
+                          "DECLARE a DOUBLE STREAM src, 1 TEXTFILE 'data.txt'\n")
+                .status,
+            "OK");
+  compiler cm(plan);
+  ASSERT_EQ(cm.compile(), "OK");
+  std::ofstream(dir / "src.desc") << "{ RATIONAL a REF \"data.txt\" TYPE TEXTSOURCE }";
+  const auto refusal = checkPlanStorage(plan, {});
+  EXPECT_EQ(refusal.cls, rdb::ErrorClass::Plan);
+  EXPECT_EQ(refusal.err, 0);
+  EXPECT_TRUE(refusal.message.contains("unsupported field type RATIONAL")) << refusal.message;
+  EXPECT_TRUE(checkPlanStorage(plan, {}, {"src"}).message.contains("unsupported field type"));
+  fs::remove_all(dir);
+}
+
+// Polityka startu jednostki: odmowa K2 czysci plik planu bez zatrzasku FatalError (#473).
+TEST(PlanSource, missing_storage_is_a_service_plan_refusal_without_the_fatal_latch) {
+  namespace fs        = std::filesystem;
+  const fs::path file = "preflight_service_plan.rql";
+  const fs::path dir  = "preflight_service_missing";
+  fs::remove_all(dir);
+  const std::string text =
+      "STORAGE 'preflight_service_missing'\n"
+      "DECLARE a INTEGER STREAM src, 1 TEXTFILE 'data.txt'\n";
+  std::ofstream(file) << text;
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan, text).status, "OK");
+  const auto refusal = checkPlanStorage(plan, {});
+  ASSERT_FALSE(refusal.message.empty());
+  EXPECT_EQ(refusal.cls, rdb::ErrorClass::Plan);
+  EXPECT_FALSE(fatalErrorRaised.load());
+  EXPECT_TRUE(servicecontrol::dropRefusedPlan("xretractor.service", file.string()));
+  EXPECT_EQ(fs::file_size(file), 0U);
+  EXPECT_FALSE(fatalErrorRaised.load());
+  fs::remove(file);
 }

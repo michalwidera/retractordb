@@ -22,14 +22,24 @@ set -e
 . "$(dirname "$0")/../serverlib.sh"
 
 # --- Sciezka 1: blad krytyczny przy starcie, jeszcze przed uruchomieniem serwera. ---
-# Katalog z dyrektywy STORAGE nie istnieje i RetractorDB go nie tworzy.
-rm -rf ./nosuchdir
+# Brak katalogu STORAGE jest K2 od #473. Hak wywoluje K1 na poprawnym planie,
+# po zarejestrowaniu cleanup, przed budowa modelu i uruchomieniem watku komunikacyjnego.
+rm -rf ./temp && mkdir -p ./temp
 status=0
-xretractor missing_storage.rql -m 4 -f >/dev/null 2>&1 || status=$?
+RDB_FAULT_FATAL_AT_START=1 run_timeout 30 xretractor query.rql -m 4 -f >/dev/null 2>start.err || status=$?
 if [ "$status" -ne 1 ]; then
-  echo "start z brakujacym katalogiem STORAGE: kod wyjscia $status, oczekiwano 1"
+  echo "blad krytyczny przy starcie: kod wyjscia $status, oczekiwano 1"
   echo "  (139 = SIGSEGV w atexit, 134 = SIGABRT - obie znacza regresje sciezki wyjscia)"
   exit 1
+fi
+grep -q 'FATAL: fault hook RDB_FAULT_FATAL_AT_START' start.err || {
+  echo "blad krytyczny przy starcie: brak komunikatu haka"
+  cat start.err
+  exit 1
+}
+if [ -e "$SERVER_LOCK" ]; then
+  lock_is_free "$SERVER_LOCK" || { echo "blad krytyczny przy starcie zostawil zajeta blokade"; exit 1; }
+  rm -f "$SERVER_LOCK"
 fi
 
 # --- Sciezka 2: blad krytyczny w WATKU KOMUNIKACYJNYM, przy zapytaniu ad hoc. ---

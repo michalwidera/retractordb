@@ -83,6 +83,9 @@ bool parseAndSetNumericItem(rdb::payload &payload, int index, rdb::descFld rtype
     case rdb::BYTE:
       return setParsed<uint8_t>(payload, index, token);
     default:
+      // K1 po preflight (#473): checkDeclaredSources i checkDescriptorFiles dopuszczaja dla
+      // TEXTFILE tylko typy obslugiwane tutaj oraz STRING (osobna galaz w read()). RATIONAL
+      // ze zgodnego rozmiarowo zachowanego .desc jest K2, odmawianym przed budowa akcesora.
       FatalError("facctxtsrc: unsupported field type: {}", static_cast<int>(rtype));
   }
 }
