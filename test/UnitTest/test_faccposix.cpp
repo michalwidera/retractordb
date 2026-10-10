@@ -449,7 +449,7 @@ TEST_F(PosixFileTest, zero_byte_write_returns_eio_without_writing_record) {
   EXPECT_EQ(file.count(), 0);
 }
 
-// storage nie liczy nieudanego dopisania: FatalError zapada przed recordsCount_++. Wlasnosc storage,
+// storage nie liczy nieudanego dopisania: EnvironmentError (K4, kod EIO) zapada przed recordsCount_++. Wlasnosc storage,
 // nie akcesora - test przechodzi takze na kodzie sprzed #270. Galezi `fd < 0` z E-03 nie da sie
 // osiagnac przez storage, bo attachStorage() odrzuca akcesor z niepustym initializationError();
 // dlatego deskryptor zamyka tu nakladka na write(), a jadro odpowiada EBADF. Sam blad E-03
@@ -467,7 +467,7 @@ TEST_F(PosixFileTest, storage_append_failure_is_fatal_without_count_increment) {
         static_cast<void>(s.write());
         std::_Exit(4);
       },
-      ::testing::ExitedWithCode(EXIT_FAILURE), "recordsCount=0");
+      ::testing::ExitedWithCode(EIO), "recordsCount=0");
 }
 
 // count(): awaria stat() inna niz ENOENT zatrzymuje proces, zamiast oddac blad jako liczbe.

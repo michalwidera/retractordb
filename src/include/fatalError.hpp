@@ -46,9 +46,14 @@ template <ErrorClass Cls, typename... Args>
   // std::exit. Stad catch-all: wazne jest wyjscie z procesu, nie komunikat.
   try {
     auto msg = fmt::format(fmt_str, std::forward<Args>(args)...);
+    // Klasa w komunikacie, takze w Release: skrypt i operator odrozniaja awarie srodowiska od
+    // bledu silnika bez zagladania w kod wyjscia. Przedrostek K4 zaczyna sie od "FATAL", wiec
+    // dotychczasowe wyszukiwanie po nim lapie obie klasy.
+    constexpr const char *stderrPrefix = Cls == ErrorClass::Internal ? "\nFATAL: " : "\nFATAL (environment): ";
+    constexpr const char *logPrefix    = Cls == ErrorClass::Internal ? "" : "environment: ";
     if (auto logger = spdlog::default_logger(); logger) {
       logger->log(spdlog::source_loc{loc.file_name(), static_cast<int>(loc.line()), loc.function_name()},
-                  spdlog::level::critical, msg);
+                  spdlog::level::critical, "{}{}", logPrefix, msg);
       // FLUSH, nie shutdown. std::exit ponizej uruchamia funkcje zarejestrowane przez
       // std::atexit, a te loguja - executorsm::cleanup() zaczyna od SPDLOG_WARN. Po
       // spdlog::shutdown() rejestr jest pusty i default_logger_raw() zwraca nullptr, wiec
@@ -66,7 +71,7 @@ template <ErrorClass Cls, typename... Args>
       // niz std::atexit(cleanup), a kolejnosc sprzatania jest odwrotna do rejestracji.
       logger->flush();
     }
-    std::cerr << "\nFATAL: " << msg << "\n";
+    std::cerr << stderrPrefix << msg << "\n";
   } catch (...) {  // NOLINT(bugprone-empty-catch) - pusty z rozmysla: rzut stad zabralby std::exit i handlerom atexit
   }
   std::exit(Cls == ErrorClass::Internal ? EXIT_FAILURE : EIO);
@@ -90,7 +95,7 @@ template <typename... Args>
 FatalError(fmt::format_string<Args...>, Args &&...) -> FatalError<Args...>;
 
 /// K4: srodowisko odmowilo (plik, dysk, pamiec dzielona). Konczy proces kodem EIO i nie
-/// podnosi zatrzasku fatalErrorRaised. Zamiana miejsc wywolan nalezy do #472.
+/// podnosi zatrzasku fatalErrorRaised, wiec usluga wstaje po nim z tym samym planem.
 template <typename... Args>
 struct EnvironmentError {
   [[noreturn]] EnvironmentError(fmt::format_string<Args...> fmt_str, Args &&...args,

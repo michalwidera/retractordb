@@ -2,6 +2,7 @@
 
 #include <unistd.h>
 
+#include <cerrno>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -95,7 +96,7 @@ TEST_F(PersistentCounterTest, getCount_is_idempotent_before_destruction) {
 }
 
 // ============================================================
-// Nieczytelny plik - odmowa startu, nie rotacja 0 (#281)
+// Nieczytelny plik - odmowa startu, nie rotacja 0 (#281); od #472 klasa K4, kod EIO
 // ============================================================
 
 // Plik 0-bajtowy to slad procesu zabitego w trakcie dawnego zapisu (ofstream obcinal plik
@@ -105,25 +106,25 @@ TEST_F(PersistentCounterTest, empty_file_is_not_rotation_zero) {
   ASSERT_TRUE(std::filesystem::exists(counterPath()));
   ASSERT_EQ(std::filesystem::file_size(counterPath()), 0U);
 
-  EXPECT_EXIT(PersistentCounter pc(counterPath()), ::testing::ExitedWithCode(EXIT_FAILURE),
+  EXPECT_EXIT(PersistentCounter pc(counterPath()), ::testing::ExitedWithCode(EIO),
               "Rotation counter file .* is unreadable \\(0 bytes");
 }
 
 TEST_F(PersistentCounterTest, non_numeric_file_is_fatal) {
   std::ofstream(counterPath()) << "not_a_number";
-  EXPECT_EXIT(PersistentCounter pc(counterPath()), ::testing::ExitedWithCode(EXIT_FAILURE), "is unreadable");
+  EXPECT_EXIT(PersistentCounter pc(counterPath()), ::testing::ExitedWithCode(EIO), "is unreadable");
 }
 
 // Dawny `>>` czytal z "12abc" liczbe 12 i ogon przemilczal.
 TEST_F(PersistentCounterTest, trailing_garbage_is_fatal) {
   std::ofstream(counterPath()) << "12abc";
-  EXPECT_EXIT(PersistentCounter pc(counterPath()), ::testing::ExitedWithCode(EXIT_FAILURE), "is unreadable");
+  EXPECT_EXIT(PersistentCounter pc(counterPath()), ::testing::ExitedWithCode(EIO), "is unreadable");
 }
 
 // percounter < 0 wylacza w storage rotacje - plik z "-1" nie moze tego zrobic po cichu.
 TEST_F(PersistentCounterTest, negative_value_is_fatal) {
   std::ofstream(counterPath()) << "-1";
-  EXPECT_EXIT(PersistentCounter pc(counterPath()), ::testing::ExitedWithCode(EXIT_FAILURE), "is unreadable");
+  EXPECT_EXIT(PersistentCounter pc(counterPath()), ::testing::ExitedWithCode(EIO), "is unreadable");
 }
 
 // Kontrola dodatnia: plik poprawiony recznie w edytorze konczy sie znakiem nowej linii.
@@ -131,6 +132,50 @@ TEST_F(PersistentCounterTest, trailing_newline_is_accepted) {
   std::ofstream(counterPath()) << "7\n";
   PersistentCounter pc(counterPath());
   EXPECT_EQ(pc.getCount(), 7);
+}
+
+// ============================================================
+// Odczyt bez rezerwacji: cztery wyniki rozdzielone przyczyna (#472)
+// ============================================================
+
+TEST_F(PersistentCounterTest, read_missing_file_is_missing) {
+  EXPECT_EQ(PersistentCounter::read(counterPath()).state, PersistentCounter::Reading::State::Missing);
+}
+
+TEST_F(PersistentCounterTest, read_valid_file_is_value_and_reserves_nothing) {
+  std::ofstream(counterPath()) << "7\n";
+  const auto reading = PersistentCounter::read(counterPath());
+  EXPECT_EQ(reading.state, PersistentCounter::Reading::State::Value);
+  EXPECT_EQ(reading.value, 7);
+  std::ifstream in(counterPath());
+  std::string saved;
+  in >> saved;
+  EXPECT_EQ(saved, "7");
+}
+
+// Odczytana w calosci tresc, ktora nie jest liczba, to wadliwy stan planu (K2), nie srodowisko.
+TEST_F(PersistentCounterTest, read_empty_file_is_invalid) {
+  std::ofstream(counterPath()).close();
+  const auto reading = PersistentCounter::read(counterPath());
+  EXPECT_EQ(reading.state, PersistentCounter::Reading::State::Invalid);
+  EXPECT_EQ(reading.detail, "0 bytes: ''");
+}
+
+// Katalog w miejscu pliku: open() sie udaje, read() zwraca EISDIR. Dawny ifstream czytal z niego
+// zero bajtow, wiec awaria odczytu udawala pusty plik - czyli blad planu zamiast srodowiska.
+// Katalog, a nie chmod 000, bo uprawnienia nie zatrzymuja roota w kontenerze CI.
+TEST_F(PersistentCounterTest, read_directory_is_unreadable_not_invalid) {
+  std::filesystem::create_directory(counterPath());
+  const auto reading = PersistentCounter::read(counterPath());
+  EXPECT_EQ(reading.state, PersistentCounter::Reading::State::Unreadable);
+  EXPECT_NE(reading.detail.find("read: "), std::string::npos) << reading.detail;
+}
+
+// Ta sama przyczyna w konstruktorze: EIO z opisem odczytu, nie "is unreadable" od tresci.
+TEST_F(PersistentCounterTest, unreadable_file_exits_with_eio) {
+  std::filesystem::create_directory(counterPath());
+  EXPECT_EXIT(PersistentCounter pc(counterPath()), ::testing::ExitedWithCode(EIO),
+              "FATAL \\(environment\\): Rotation counter file .* cannot be read \\(read: ");
 }
 
 // ============================================================
@@ -158,7 +203,7 @@ TEST_F(PersistentCounterTest, failed_reservation_is_fatal_and_keeps_previous_val
         std::filesystem::create_directory(counterPath() + ".tmp." + std::to_string(::getpid()));
         PersistentCounter pc(counterPath());
       },
-      ::testing::ExitedWithCode(EXIT_FAILURE), "Cannot reserve rotation number 6");
+      ::testing::ExitedWithCode(EIO), "Cannot reserve rotation number 6");
 
   std::ifstream in(counterPath());
   std::string saved;

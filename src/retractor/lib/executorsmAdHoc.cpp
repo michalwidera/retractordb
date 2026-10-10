@@ -280,6 +280,10 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
         // w claim(); claimAdditional dopisuje nazwy strumieni i maski trybow nie oglada.
         FatalError("executorsm::getAdHoc: bus reported a service mode conflict for an adhoc query");
         break;
+      case bus::ClaimStatus::NotReserved:
+        // Nieosiagalne: ten status zwraca wylacznie activateReservedPlan().
+        FatalError("executorsm::getAdHoc: bus reported a missing plan reservation for an adhoc query");
+        break;
       case bus::ClaimStatus::TooLarge:
       case bus::ClaimStatus::NoFreeSlot: {
         const std::string message = "Rejected: cannot register adhoc streams on the xrdbbus bus: " + claimed.detail;

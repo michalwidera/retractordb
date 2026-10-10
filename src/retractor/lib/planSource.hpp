@@ -66,6 +66,19 @@ void dropStalePlanArtifacts(const qTree &plan);
 /// takze z podpowiedzia jawnego slowa.
 [[nodiscard]] std::string checkDeclaredSources(const qTree &plan, const std::vector<std::string> &streamNames = {});
 
+/// Wynik checkRotationCounter(): pusty `refusal` = plan bez `:ROTATION` albo licznik uzyteczny.
+struct CounterCheck {
+  bool environment{false};  ///< true: pliku nie da sie sprawdzic ani odczytac (K4); false: wadliwa tresc (K2)
+  std::string refusal;
+};
+
+/// Licznik `:ROTATION` przed zmiana planu (#472): ta sama odmowa co checkKeptStores, zanim cokolwiek
+/// zostanie zmienione, bo konstruktor PersistentCounter biegnie juz po punkcie bez powrotu. Tylko
+/// odczyt - numer rezerwuje dopiero konstruktor. Rozdziela przyczyne, bo start reaguje na nie
+/// inaczej: wadliwa tresc to odmowa planu, a nieczytelny plik - awaria srodowiska z planem
+/// zachowanym. Nie w `-c` - kompilacja nie musi biec na maszynie z danymi.
+[[nodiscard]] CounterCheck checkRotationCounter(const qTree &plan);
+
 /// Ostrzezenia o deklaracjach w przestarzalej formie `DECLARE ... FILE` (#346), po jednym na
 /// deklaracje, w kolejnosci wierszy planu - kompilator sortuje wezly po interwale. Kazde nazywa
 /// wiersz, strumien i slowo wybrane przez zamrozona regule. Wypisuje je tylko wolajacy z --verbose:

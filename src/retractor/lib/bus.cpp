@@ -989,7 +989,12 @@ ClaimResult Bus::reservePlan(const std::vector<std::string> &streams, std::strin
 ClaimResult Bus::activateReservedPlan() {
   ClaimResult retVal;
 
-  if (!attached() || impl->slotIndex < 0) {
+  if (!attached()) {
+    retVal.detail = "instance is not attached to the bus";
+    return retVal;
+  }
+  if (impl->slotIndex < 0) {
+    retVal.status = ClaimStatus::NotReserved;
     retVal.detail = "instance holds no bus slot";
     return retVal;
   }
@@ -998,6 +1003,7 @@ ClaimResult Bus::activateReservedPlan() {
   Slot &mine = impl->segment->slots[impl->slotIndex];
   if (mine.reservationActive == 0) {
     impl->unlock();
+    retVal.status = ClaimStatus::NotReserved;
     retVal.detail = "instance holds no plan reservation";
     return retVal;
   }

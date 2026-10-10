@@ -47,10 +47,10 @@ void saveDescriptorFile(const std::string &descriptorFile, const Descriptor &des
   // Bez podazania za dowiazaniem: O_TRUNC przez dowiazanie obcialby jego cel (#374).
   const StorageFd descFile(descriptorFile, O_WRONLY | O_CREAT | O_TRUNC);
   if (!descFile.isOpen()) {
-    FatalError("storage: failed to open descriptor file for writing: {}: {}", descriptorFile, std::strerror(errno));
+    rdb::EnvironmentError("storage: failed to open descriptor file for writing: {}: {}", descriptorFile, std::strerror(errno));
   }
   if (!descFile.write(std::as_bytes(std::span{text}))) {
-    FatalError("storage: failed to write descriptor file: {}", descriptorFile);
+    rdb::EnvironmentError("storage: failed to write descriptor file: {}", descriptorFile);
   }
 }
 

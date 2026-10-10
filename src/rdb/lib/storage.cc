@@ -223,8 +223,8 @@ void storage::purge() {
 
   // Nieudany purge zostawia dane na nosniku; bez zatrzymania recordsCount_ = 0 rozjechalby sie z count().
   if (const auto result = accessor_->write(nullptr, 0); result != 0) {
-    FatalError("storage::purge: purge of '{}' failed (result={}: {})", paths_.storageFile(), result,
-               strerror(static_cast<int>(result)));
+    rdb::EnvironmentError("storage::purge: purge of '{}' failed (result={}: {})", paths_.storageFile(), result,
+                          strerror(static_cast<int>(result)));
   }
   recordsCount_ = 0;
 
@@ -280,8 +280,8 @@ rdb::ReadStatus storage::read(const size_t recordIndexFromFront, uint8_t *destin
   if (recordsCount_ > 0 && recordIndexFromFront < recordsCount_) {
     result = accessor_->read(destination, recordIndexFromFront * size);
     if (result != 0) {
-      FatalError("storage::read: read from '{}' at pos {} failed (result={}: {})", accessor_->name(), recordIndexFromFront,
-                 result, strerror(static_cast<int>(result)));
+      rdb::EnvironmentError("storage::read: read from '{}' at pos {} failed (result={}: {})", accessor_->name(),
+                            recordIndexFromFront, result, strerror(static_cast<int>(result)));
     }
     storagePayload_->setNullBitset(metaData_->nullBitsetFor(recordIndexFromFront));
   } else {
@@ -403,8 +403,8 @@ rdb::WriteStatus storage::write(const size_t recordIndex) {
       // Zrodlo deklarowane odmawia zapisu, zanim cokolwiek zapisze - stan magazynu jest nietkniety,
       // wiec to odmowa dla wolajacego, nie awaria. isDeclared() porownuje napisy: tylko w galezi bledu.
       if (result == ENOTSUP && isDeclared()) return WriteStatus::ReadOnly;
-      FatalError("storage::write: append to '{}' failed (result={}: {})", paths_.storageFile(), result,
-                 strerror(static_cast<int>(result)));
+      rdb::EnvironmentError("storage::write: append to '{}' failed (result={}: {})", paths_.storageFile(), result,
+                            strerror(static_cast<int>(result)));
     }
     recordsCount_++;
     // `if constexpr` obejmuje całe wywołanie, nie tylko treść sondy: przy wyłączonej
@@ -423,8 +423,8 @@ rdb::WriteStatus storage::write(const size_t recordIndex) {
   } else {
     result = accessor_->write(storagePayload_->span().data(), recordIndex * descriptor.getSizeInBytes());
     if (result != 0) {
-      FatalError("storage::write: overwrite to '{}' at index {} failed (result={}: {})", paths_.storageFile(), recordIndex,
-                 result, strerror(static_cast<int>(result)));
+      rdb::EnvironmentError("storage::write: overwrite to '{}' at index {} failed (result={}: {})", paths_.storageFile(),
+                            recordIndex, result, strerror(static_cast<int>(result)));
     }
     // Nadpisanie nie zwiększa objętości magazynu, więc nie wchodzi do `bytes`. Do metryki
     // K23 wchodzi, bo tam jednostką jest zapis rekordu, nie przyrost objętości - inaczej

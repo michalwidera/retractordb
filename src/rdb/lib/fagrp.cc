@@ -143,7 +143,7 @@ ssize_t groupFile<T>::purge() {
   vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_, followFinalLink_));
   // Status z konstruktora obsluguje tylko import planu. Tu, w pracy ciaglej, segment bez pliku
   // zapisywalby w ciemno, wiec zostaje dawne zatrzymanie z nazwa pliku.
-  if (const auto &err = vec_.back()->initializationError(); !err.empty()) FatalError("groupFile::purge: {}", err);
+  if (const auto &err = vec_.back()->initializationError(); !err.empty()) rdb::EnvironmentError("groupFile::purge: {}", err);
 
   SPDLOG_DEBUG("Purged all segments and reset group state.");
   if (vec_.size() != 1) FatalError("fagrp::purge: expected exactly one segment after purge");
@@ -171,7 +171,7 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
       SPDLOG_DEBUG("Rotating segments: currentSegment={}", currentSegment_);
       vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_, followFinalLink_));
       // Uzasadnienie przy purge().
-      if (const auto &err = vec_.back()->initializationError(); !err.empty()) FatalError("groupFile::write: {}", err);
+      if (const auto &err = vec_.back()->initializationError(); !err.empty()) rdb::EnvironmentError("groupFile::write: {}", err);
       writeCount_ = 0;
       if (retention_.segments != 0 && vec_.size() > retention_.segments) {
         SPDLOG_DEBUG("Removing oldest segment: {}", vec_.front()->name());
