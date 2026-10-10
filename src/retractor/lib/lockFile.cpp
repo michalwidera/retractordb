@@ -132,6 +132,12 @@ std::size_t sweep(const std::string &dir, const std::function<bool(std::string_v
     const std::string path = it->path().string();
     const int fd           = claimAbandoned(path);
     if (fd == -1) continue;
+    // Sprzatacz nie przejmuje pozostalosci innych kont, takze uruchomiony jako root.
+    struct stat owner{};
+    if (fstat(fd, &owner) != 0 || owner.st_uid != geteuid()) {
+      ::close(fd);
+      continue;
+    }
     removeGuarded(name);
     removeAndRelease(path, fd);
     ++removed;

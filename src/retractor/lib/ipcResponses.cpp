@@ -10,11 +10,11 @@
 #include <thread>
 
 #include <spdlog/spdlog.h>
-#include <boost/interprocess/permissions.hpp>
 #include <boost/property_tree/info_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 
 #include "bus.hpp"
+#include "ipcSecurity.hpp"
 
 namespace IPC = boost::interprocess;
 
@@ -171,8 +171,7 @@ std::optional<std::string> take(Segment &segment, const Owner &owner, std::chron
   }
 }
 
-Mapping::Mapping(IPC::create_only_t /*tag*/, const std::string &name)
-    : shm_(IPC::create_only, name.c_str(), IPC::read_write, IPC::permissions(kObjectPermissions)) {
+Mapping::Mapping(IPC::create_only_t /*tag*/, const std::string &name) : shm_(ipc::security::createMemory(name)) {
   // truncate wypelnia segment zerami, a zero to SlotState::Free w kazdym slocie.
   shm_.truncate(static_cast<IPC::offset_t>(sizeof(Segment)));
   region_ = IPC::mapped_region(shm_, IPC::read_write);
@@ -180,7 +179,7 @@ Mapping::Mapping(IPC::create_only_t /*tag*/, const std::string &name)
 }
 
 Mapping::Mapping(IPC::open_only_t /*tag*/, const std::string &name)
-    : shm_(IPC::open_only, name.c_str(), IPC::read_write),
+    : shm_(ipc::security::openMemory(name, IPC::read_write)),
       region_(shm_, IPC::read_write) {}
 
 bool Mapping::valid() const { return region_.get_size() >= sizeof(Segment) && compatible(segment()); }

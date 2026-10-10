@@ -23,6 +23,7 @@
 #include <boost/interprocess/shared_memory_object.hpp>
 
 #include "constants.hpp"
+#include "ipcSecurity.hpp"
 #include "lockFile.hpp"
 #include "osPlatform.hpp"
 #include "platformConfig.h"
@@ -171,7 +172,7 @@ std::string loadString(const char *src, std::size_t capacity) {
 /// z naglowka: segmentu nie kasuje nikt.
 void removeUnpublishedSegment(bool creator, const std::string &name) {
   if (!creator) return;
-  IPC::shared_memory_object::remove(name.c_str());
+  ipc::security::removeOwned(name);
 }
 
 void beginWrite(Slot &slot) {
@@ -343,7 +344,7 @@ std::size_t sweepAbandonedSegments(std::string_view machineLockDir) {
   const auto isSegmentPresence = [](std::string_view file) { return segmentFromPresence(file).has_value(); };
   return lockfile::sweep(std::string(machineLockDir), isSegmentPresence, [](std::string_view file) {
     const std::string segment(file.substr(0, file.size() - 5));
-    IPC::shared_memory_object::remove(segment.c_str());
+    ipc::security::removeOwned(segment);
   });
 }
 
@@ -421,8 +422,9 @@ struct Bus::Impl {
   Segment *segment{nullptr};
   int slotIndex{-1};
   std::string segmentName;
-  std::string presenceFile;  ///< plik obecnosci, patrz kSegmentName w bus.hpp
-  int presenceFd{-1};        ///< LOCK_SH na presenceFile przez caly czas odwzorowania
+  bool trustedObject{false};  ///< tylko zweryfikowany segment moze sprzatac ostatni czytelnik
+  std::string presenceFile;   ///< plik obecnosci, patrz kSegmentName w bus.hpp
+  int presenceFd{-1};         ///< LOCK_SH na presenceFile przez caly czas odwzorowania
   /// ENOTRECOVERABLE logowany raz na obiekt; atomowo, bo ad-hoc i wykonawca wolaja Bus z roznych watkow.
   mutable std::atomic<bool> unrecoverableReported{false};
 
@@ -598,6 +600,13 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
     return;
   }
 
+  try {
+    ipc::security::checkNamespace(name, createIfMissing);
+  } catch (const std::exception &ex) {
+    if (createIfMissing) SPDLOG_ERROR("xrdbbus: cannot access segment '{}': {}", name, ex.what());
+    return;
+  }
+
   bool creator = false;
   if (createIfMissing) {
     try {
@@ -607,15 +616,18 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
       impl->shm = std::make_unique<IPC::shared_memory_object>(IPC::create_only, name.c_str(), IPC::read_write,
                                                               IPC::permissions(ipc::kObjectPermissions));
       creator   = true;
-    } catch (const IPC::interprocess_exception &) {
-      impl->shm.reset();
+    } catch (const IPC::interprocess_exception &ex) {
+      if (ex.get_error_code() != IPC::already_exists_error) {
+        SPDLOG_ERROR("xrdbbus: cannot create segment '{}': {}", name, ex.what());
+        return;
+      }
     }
   }
 
   if (!impl->shm) {
     try {
-      impl->shm = std::make_unique<IPC::shared_memory_object>(IPC::open_only, name.c_str(), IPC::read_write);
-    } catch (const IPC::interprocess_exception &e) {
+      impl->shm = std::make_unique<IPC::shared_memory_object>(ipc::security::openMemory(name, IPC::read_write));
+    } catch (const std::exception &e) {
       // W trybie czytelnika brak segmentu jest odpowiedzia "nie ma zadnej instancji", a nie
       // usterka; ostrzezenie nalezy sie wylacznie temu, kto segment tworzyc UMIAL i nie zdolal.
       if (createIfMissing)
@@ -628,6 +640,8 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
   }
 
   try {
+    ipc::security::checkOpened(*impl->shm, name);
+    impl->trustedObject = true;
     if (creator) impl->shm->truncate(static_cast<IPC::offset_t>(sizeof(Segment)));
 
     // Instancja podlaczajaca sie moze trafic na segment miedzy create_only a truncate.
@@ -648,8 +662,8 @@ Bus::Bus(std::string_view segmentName, bool createIfMissing) : impl(std::make_un
 
     impl->region  = std::make_unique<IPC::mapped_region>(*impl->shm, IPC::read_write);
     impl->segment = static_cast<Segment *>(impl->region->get_address());
-  } catch (const IPC::interprocess_exception &e) {
-    SPDLOG_WARN("xrdbbus: cannot map bus segment '{}': {}", name, e.what());
+  } catch (const std::exception &e) {
+    SPDLOG_ERROR("xrdbbus: cannot map bus segment '{}': {}", name, e.what());
     impl->region.reset();
     impl->shm.reset();
     impl->segment = nullptr;
@@ -727,7 +741,7 @@ Bus::~Bus() {
   // i-wezel pliku. Nieudana zamiana LOCK_SH na LOCK_EX moze zdjac nasza LOCK_SH - bez znaczenia,
   // bo odwzorowanie jest juz zamkniete.
   if (::flock(impl->presenceFd, LOCK_EX | LOCK_NB) == 0 && lockfile::stillLinked(impl->presenceFd, impl->presenceFile)) {
-    IPC::shared_memory_object::remove(impl->segmentName.c_str());
+    if (impl->trustedObject) ipc::security::removeOwned(impl->segmentName);
     lockfile::removeAndRelease(impl->presenceFile, impl->presenceFd);
   } else {
     ::close(impl->presenceFd);

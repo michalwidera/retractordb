@@ -16,13 +16,12 @@
 #include <utility>
 
 #include <spdlog/spdlog.h>
-#include <boost/interprocess/permissions.hpp>
-#include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/property_tree/info_parser.hpp>
 
 #include "constants.hpp"
 #include "ipcResponses.hpp"
+#include "ipcSecurity.hpp"
 #include "osPlatform.hpp"
 #include "shmBudget.hpp"
 
@@ -95,21 +94,17 @@ void IpcServer::removeAllObjects() {
 }
 
 void IpcServer::removeGlobalObjects() const {
-  IPC::shared_memory_object::remove(names_.shmemSegment.c_str());
-  IPC::message_queue::remove(names_.queryQueue.c_str());
+  ipc::security::removeOwned(names_.shmemSegment);
+  ipc::security::removeOwned(names_.queryQueue);
 }
 
-/// Kolejka odpowiedzi, ktora przetrwa smierc serwera, nie jest tylko smieciem w
-/// /dev/shm: subscribe() otwiera ja przez open_or_create, a ten przy ISTNIEJACEJ
-/// kolejce IGNORUJE zadana pojemnosc. Klient, ktory po restarcie dostanie ten sam
-/// PID, dostaje kolejke o glebokosci z poprzedniego przebiegu i przepelnia ja
-/// w miejscu, ktorego nie da sie powiazac z przyczyna. Dlatego kasuje je KAZDA
-/// droga wyjscia, nie tylko normalna.
+/// Zamyka uchwyty i usuwa wlasne kolejki z zakonczonej epoki. Obcego UID nie
+/// sprzatamy nawet po odmowie startu lub subskrypcji.
 void IpcServer::removeClientQueues() {
   // Najpierw zamkniecie mapowan, potem unlink -- ta sama kolejnosc co w broadcast().
   id2QueueCache_.clear();
   for (const auto &element : id2StreamNameRelation_) {
-    IPC::message_queue::remove(names_.responseQueue(element.first).c_str());
+    ipc::security::removeOwned(names_.responseQueue(element.first));
   }
   id2StreamNameRelation_.clear();
   subscriptionEpoch_.fetch_add(1, std::memory_order_release);
@@ -132,21 +127,26 @@ bool IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
                     streamName, shmbudget::humanBytes(needed), maxElements, ipc::kResponseQueueMaxMessageSize,
                     shmbudget::humanBytes(fs.available)));
 
+  // Rejestracja jest serializowana przez watek komend. Najpierw wypisujemy
+  // stara subskrypcje, aby RT nie wysylal do odlinkowanej kolejki podczas mmap.
+  // Obca kolejka pod ta nazwa daje odmowe zamiast usuniecia lub przejecia.
+  {
+    std::scoped_lock lock(clientMapsMutex_);
+    if (subscriptionEpoch_.load(std::memory_order_relaxed) != expectedEpoch) return false;
+    if (!ipc::security::removeOwned(queueName))
+      throw ipc::security::Rejected(std::format("response queue '{}' could not be safely removed", queueName));
+    id2QueueCache_.erase(clientId);
+    id2StreamNameRelation_.erase(clientId);
+  }
   // Pre-otwarcie kolejki TUTAJ, w watku komunikacyjnym (sledztwo ~40 ms,
   // JOURNAL.md 2026-07-18, Faza 3): tworzenie + mmap segmentu (~MB) nie moze
   // zostac w torze emisji watku RT -- lazy open_only w broadcast() kosztowal
   // 42 ms przy pierwszej emisji do nowego klienta (populacja stron mapowania
   // pod mlockall). Rejestracja w id2StreamNameRelation_ dopiero PO zbudowaniu
   // kolejki i razem z uchwytem pod muteksem, wiec watek RT nigdy nie widzi
-  // klienta bez gotowego uchwytu (przy okazji znika dotychczasowy wyscig
-  // rejestracja-przed-utworzeniem-kolejki). Nadpisanie uchwytu przy
-  // re-rejestracji zamyka stare mapowanie w tym watku.
-  auto queueHandle = std::make_unique<IPC::message_queue>(IPC::open_or_create,                       // open or create
-                                                          queueName.c_str(),                         // name
-                                                          maxElements,                               // max message number
-                                                          ipc::kResponseQueueMaxMessageSize,         // max message size
-                                                          IPC::permissions(ipc::kObjectPermissions)  // tylko konto serwera
-  );
+  // klienta bez gotowego uchwytu. Tworzenie i mmap poza muteksem map oraz poza
+  // blokada epoki planu (#283).
+  auto queueHandle = ipc::security::createQueue(queueName, maxElements, ipc::kResponseQueueMaxMessageSize);
   // Sprawdzenie epoki i wpis do map pod JEDNYM zajeciem muteksu: broadcastOutOfBusiness bierze
   // ten sam muteks, wiec albo rejestracja wypada przed nim i OOB ja obejmie, albo po nim i widzi
   // nowa epoke. Rejestr zamkniety od odczytu expectedEpoch oznacza, ze strumien, ktorego
@@ -160,7 +160,7 @@ bool IpcServer::subscribe(int clientId, const std::string &streamName, int maxEl
     }
   }
   queueHandle.reset();  // zamknij mapowanie przed unlink -- ta sama kolejnosc co w broadcast()
-  IPC::message_queue::remove(queueName.c_str());
+  ipc::security::removeOwned(queueName);
   return false;
 }
 
@@ -230,14 +230,14 @@ void IpcServer::broadcast(std::span<const std::string_view> streams, const RowFo
         // emisji do danego klienta, nie w kazdym slocie (patrz komentarz przy
         // id2QueueCache_).
         auto &mqPtr = id2QueueCache_[element.first];
-        if (!mqPtr) mqPtr = std::make_unique<IPC::message_queue>(IPC::open_only, queueName.c_str());
+        if (!mqPtr) mqPtr = ipc::security::openQueue(queueName);
         //
         // If send queue is full - means no one is listening and queue is
         // going to remove
         //
         if (!trySendOrAbandoned(*mqPtr, row, element.first)) {
           mqPtr.reset();  // zamknij mapowanie przed unlink
-          IPC::message_queue::remove(queueName.c_str());
+          ipc::security::removeOwned(queueName);
           eraseList.push_back(element.first);
         }
       }
@@ -257,12 +257,12 @@ void IpcServer::broadcastOutOfBusiness() {
   std::scoped_lock lock(clientMapsMutex_);
   for (const auto &element : id2StreamNameRelation_) {
     //
-    // Queue may have been removed earlier (try_send overflow in broadcast).
-    // Wrap in try-catch to avoid crash on open_only failure.
+    // Uzywamy uchwytu wlasnej kolejki zamiast ponownie otwierac nazwe.
+    // Porzucony muteks nadal moze rzucic wyjatek.
     //
     const std::string queueName = names_.responseQueue(element.first);
     try {
-      IPC::message_queue mq(IPC::open_only, queueName.c_str());
+      auto &mq = *id2QueueCache_.at(element.first);
       //
       // Sending out-of-bussiness message
       //
@@ -273,9 +273,9 @@ void IpcServer::broadcastOutOfBusiness() {
       std::string row = strstream.str();
 
       mq.try_send(row.c_str(), row.length(), 0);
-      IPC::message_queue::remove(queueName.c_str());
+      ipc::security::removeOwned(queueName);
       SPDLOG_WARN("queue erased on out-of-business, procId={}", element.first);
-    } catch (IPC::interprocess_exception &e) {
+    } catch (const std::exception &e) {
       SPDLOG_WARN("broadcastOutOfBusiness: queue {} already removed, procId={}: {}", queueName, element.first, e.what());
     }
   }
@@ -294,16 +294,11 @@ void IpcServer::commandLoop() const {
     // executorsm::run() przejmuje blokade instancji PRZED start() -- flock dowodzi, ze zaden
     // inny ZYWY serwer tych obiektow nie uzywa. Nazwy pochodza z names_, wiec kasowanie nigdy
     // nie siega poza obszar tego serwera.
-    IPC::message_queue::remove(names_.queryQueue.c_str());
-    IPC::shared_memory_object::remove(names_.shmemSegment.c_str());
+    if (!ipc::security::removeOwned(names_.queryQueue) || !ipc::security::removeOwned(names_.shmemSegment))
+      throw ipc::security::Rejected("IPC startup refused: existing resources could not be safely removed");
     const ipc::responses::Mapping responses(IPC::create_only, names_.shmemSegment);
     const auto createCommandQueue = [this] {
-      return std::make_unique<IPC::message_queue>(IPC::open_or_create,                       // open or crate
-                                                  names_.queryQueue.c_str(),                 // name
-                                                  ipc::kQueryQueueMaxMessages,               // max message number
-                                                  ipc::kQueryQueueMaxMessageSize,            // max message size
-                                                  IPC::permissions(ipc::kObjectPermissions)  // tylko konto serwera
-      );
+      return ipc::security::createQueue(names_.queryQueue, ipc::kQueryQueueMaxMessages, ipc::kQueryQueueMaxMessageSize);
     };
     auto mq = createCommandQueue();
     callbacks_.onReady();
@@ -332,7 +327,8 @@ void IpcServer::commandLoop() const {
         if (ex.get_error_code() != IPC::not_recoverable) throw;
         SPDLOG_ERROR("command queue '{}' abandoned by a process that died holding its lock; recreating it", names_.queryQueue);
         mq.reset();
-        IPC::message_queue::remove(names_.queryQueue.c_str());
+        if (!ipc::security::removeOwned(names_.queryQueue))
+          throw ipc::security::Rejected("command queue recovery refused: unsafe existing object");
         mq = createCommandQueue();
         return false;
       }
