@@ -18,24 +18,32 @@ extern std::string parserDESCString(rdb::Descriptor &desc, std::string_view inle
 
 namespace rdb {
 
-std::string tryLoadDescriptorFile(const std::string &descriptorFile, Descriptor &descriptor) {
+Refusal tryLoadDescriptorFile(const std::string &descriptorFile, Descriptor &descriptor) {
   // `.desc` lezy w katalogu magazynu: dowiazanie pod jego nazwa jest odmowa (#374).
   const StorageFd file(descriptorFile, O_RDONLY);
   if (!file.isOpen()) {
     const int openErrno = errno;  // przed skladaniem napisu - alokacja moze ruszyc errno
-    return "cannot open descriptor file: " + descriptorFile + ": " + std::strerror(openErrno);
+    return {ErrorClass::Environment, "cannot open descriptor file: " + descriptorFile + ": " + std::strerror(openErrno),
+            openErrno};
   }
 
   const off_t fileSize = file.size();
+  if (fileSize < 0) {
+    const int err = errno;
+    return {ErrorClass::Environment, "cannot inspect descriptor file: " + descriptorFile + ": " + std::strerror(err), err};
+  }
   std::string content(fileSize > 0 ? static_cast<size_t>(fileSize) : 0, '\0');
-  const ssize_t got = fileSize < 0 ? -1 : file.readAt(std::as_writable_bytes(std::span{content}), 0);
-  if (got < 0) return "cannot read descriptor file: " + descriptorFile;
+  const ssize_t got = file.readAt(std::as_writable_bytes(std::span{content}), 0);
+  if (got < 0) {
+    const int err = errno;
+    return {ErrorClass::Environment, "cannot read descriptor file: " + descriptorFile + ": " + std::strerror(err), err};
+  }
   content.resize(static_cast<size_t>(got));
 
   Descriptor parsed;
   if (const std::string result = parserDESCString(parsed, content); result != "OK")
-    return "descriptor parse failed in '" + descriptorFile + "': " + result;
-  if (parsed.getSizeInBytes() == 0) return "storage: empty descriptor file: " + descriptorFile;
+    return {ErrorClass::Plan, "descriptor parse failed in '" + descriptorFile + "': " + result};
+  if (parsed.getSizeInBytes() == 0) return {ErrorClass::Plan, "storage: empty descriptor file: " + descriptorFile};
   descriptor = std::move(parsed);
   return {};
 }
@@ -60,6 +68,8 @@ void verifyDescriptorMatch(const Descriptor &provided, const Descriptor &existin
   SPDLOG_ERROR("Descriptors do not match.");
   std::cerr << "Error in data descriptor file: " << descriptorFile << '\n';
   std::cerr << "Provided Descriptor:\n" << provided << "\nExisting Descriptor:\n" << existing << '\n';
+  // K1 po preflight (#473): checkDescriptorFiles porownuje plan == plik przed publikacja,
+  // takze dla nowych SELECT-ow ad-hoc. Start/reset kasuja niezachowywane deskryptory.
   FatalError("storage: descriptor schema mismatch - remove data files and restart");
 }
 

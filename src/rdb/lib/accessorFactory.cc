@@ -88,6 +88,8 @@ std::unique_ptr<FileInterface> makeAccessor(const std::string_view storageType, 
   if (storageType == "TEXTSOURCE") {
     return std::make_unique<rdb::textSourceRO>(storageFile, descriptor, !oneShot);
   }
+  // K1 po preflight (#473): RQLParser kontroluje STORAGE/SUBSTRAT, a checkDescriptorFiles
+  // sprawdza TYPE zachowanego .desc, takze dla SELECT-ow ad-hoc, przed importem do modelu.
   FatalError("storage: unsupported storage type '{}'", storageType);
 }
 

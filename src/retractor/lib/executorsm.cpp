@@ -197,6 +197,11 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
   // miec handlera kasujacego IPC lub zwalniajacego cudze zasoby.
   std::atexit(cleanup);
 
+  // Hak K1 testu it_fatal_exit_path (#473). Brak katalogu STORAGE jest juz K2 preflight,
+  // a sciezka FatalError przed budowa modelu nadal musi sprawdzac sprzatanie atexit.
+  if (std::getenv("RDB_FAULT_FATAL_AT_START") != nullptr)
+    FatalError("fault hook RDB_FAULT_FATAL_AT_START: fatal error at startup");
+
   std::string percounterFilename{"{notinitialized}"};
   for (const auto &it : coreInstance)
     if (it.id == ":ROTATION") {

@@ -141,10 +141,8 @@ std::string executorsm::validatePlanText(const std::string &planText) {
     localCompiler.setHistoryMemoryBudget(cfgHistoryMemoryMib);
     localCompiler.setDefaultRetention(cfgDefaultRetention);
     if (const std::string response = localCompiler.compile(); response != "OK") return "Fail compile:" + response;
-    if (const std::string kept = checkKeptStores(candidate, cfgStorageDir); kept != "OK") return "Rejected: " + kept;
-    if (const std::string descriptorError = checkDescriptorFiles(candidate, cfgStorageDir); descriptorError != "OK")
-      return "Rejected: " + descriptorError;
-    if (const std::string sourceError = checkDeclaredSources(candidate); sourceError != "OK") return "Rejected: " + sourceError;
+    if (const rdb::Refusal refusal = checkPlanStorage(candidate, cfgStorageDir); !refusal.message.empty())
+      return "Rejected: " + refusal.message;
     // Obie przyczyny to tutaj odmowa zadania: dotychczasowy plan jest nietkniety i liczy dalej (#472).
     if (const CounterCheck counter = checkRotationCounter(candidate); !counter.refusal.empty())
       return "Rejected: " + counter.refusal;
@@ -153,8 +151,6 @@ std::string executorsm::validatePlanText(const std::string &planText) {
         std::println(std::cerr, "xretractor: warning: {}", warning);
     for (const std::string &warning : deviceTimeoutWarnings(candidate, cfgSourcesTimeout))
       SPDLOG_ERROR("Reset plan: {}", warning);
-    if (const std::string openError = checkOutputFilesOpenable(candidate, cfgStorageDir); openError != "OK")
-      return "Rejected: " + openError;
     // Ten sam wykaz co przy starcie (launcher), tylko do dziennika - kanal reset nie ma stderr operatora.
     // Poziom ERROR z tego samego powodu co raport ad-hoc (executorsmAdHoc.cpp): Release wycina nizsze.
     for (const auto &[stream, reason] : localCompiler.unboundedDiskStreams())

@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <source_location>
+#include <string>
 
 /// Podniesiona przez FatalError tuz przed std::exit. Handlery zarejestrowane przez
 /// std::atexit czytaja ja, zeby odroznic zakonczenie KRYTYCZNE od zwyklego wyjscia:
@@ -27,6 +28,13 @@ enum class ErrorClass {
   Request,      // K3: odrzucone zadanie ad hoc / IPC
   Environment,  // K4: srodowisko (plik, dysk, pamiec dzielona) - EnvironmentError
   Data          // K5: wadliwa wartosc w danych - NULL i ostrzezenie
+};
+
+/// Odmowa na granicy planu: pusty message oznacza sukces, err zachowuje kod systemowy K4.
+struct Refusal {
+  ErrorClass cls{ErrorClass::Plan};
+  std::string message;
+  int err{0};
 };
 
 namespace detail {

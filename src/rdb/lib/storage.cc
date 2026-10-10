@@ -42,7 +42,8 @@ storage::storage(const std::string_view qryID,         //
 std::string storage::attachDescriptor(const Descriptor *descriptorParam) {
   const bool descriptorExisted = descriptorFileExist();
   if (descriptorExisted) {
-    if (const std::string error = tryLoadDescriptorFile(paths_.descriptorFile(), descriptor); !error.empty()) return error;
+    if (const Refusal error = tryLoadDescriptorFile(paths_.descriptorFile(), descriptor); !error.message.empty())
+      return error.message;
     if (descriptorParam != nullptr) {
       verifyDescriptorMatch(*descriptorParam, descriptor, paths_.descriptorFile());
       // REF decyduje, ktory plik zostanie otwarty, zapisany i - przy DISPOSABLE - usuniety, a operator==
@@ -58,6 +59,8 @@ std::string storage::attachDescriptor(const Descriptor *descriptorParam) {
     }
   } else {
     if (descriptorParam == nullptr) {
+      // K1, #473: streamInstance zawsze przekazuje adres qry.descriptorStorage(). Brak pliku
+      // jest legalny, bo zapisujemy deskryptor z planu; oba braki naraz to blad wywolania API.
       FatalError("storage: no descriptor file and no descriptor provided");
     }
     descriptor = *descriptorParam;

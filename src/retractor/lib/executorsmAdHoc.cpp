@@ -195,23 +195,10 @@ ptree executorsm::getAdHoc(const std::string &adHocQuery) {
   const auto deviceReport = deviceTimeoutReport(coreInstanceCopy, cfgSourcesTimeout, noClockMode, adHocStreams);
 
   if (!adHocStreams.empty()) {
-    if (const std::string openError = checkOutputFilesOpenable(coreInstanceCopy, activeStorageDir, adHocStreams);
-        openError != "OK") {
-      ptRetval.put("db", "Rejected: " + openError);
-      SPDLOG_ERROR("AdHoc rejected: {}", openError);
-      return ptRetval;
-    }
-    if (const std::string sourceError = checkDeclaredSources(coreInstanceCopy, adHocStreams); sourceError != "OK") {
-      ptRetval.put("db", "Rejected: " + sourceError);
-      SPDLOG_ERROR("AdHoc rejected: {}", sourceError);
-      return ptRetval;
-    }
-    // Zachowany `.desc` musi zgadzac sie z planem w TYPE i REF, jak przy starcie i przeladowaniu (#278).
-    // rdb::storage odmowilby tego samego, ale dopiero po imporcie i kompilacji pod core_mutex.
-    if (const std::string descriptorError = checkDescriptorFiles(coreInstanceCopy, activeStorageDir, adHocStreams);
-        descriptorError != "OK") {
-      ptRetval.put("db", "Rejected: " + descriptorError);
-      SPDLOG_ERROR("AdHoc rejected: {}", descriptorError);
+    if (const rdb::Refusal refusal = checkPlanStorage(coreInstanceCopy, activeStorageDir, adHocStreams);
+        !refusal.message.empty()) {
+      ptRetval.put("db", "Rejected: " + refusal.message);
+      SPDLOG_ERROR("AdHoc rejected: {}", refusal.message);
       return ptRetval;
     }
     // Jak przy starcie: przestarzale `DECLARE ... FILE` tylko z --verbose serwera, na jego stderr.

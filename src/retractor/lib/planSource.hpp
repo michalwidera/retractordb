@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "fatalError.hpp"
 #include "qTree.hpp"
 
 /// @brief Wczytanie zestawu RQL z TEKSTU i sprzatanie artefaktow poprzedniego planu.
@@ -46,25 +47,33 @@ void dropStalePlanArtifacts(const qTree &plan);
 /// adresowanie rekordow (groupFile liczy segment jako indeks / capacity). Dlatego rozjazd jest
 /// odmowa planu, zanim cokolwiek zostanie zmienione (decyzja P5), a nie cicha wygrana jednej strony.
 ///
-/// @return "OK" albo powod odmowy z nazwa strumienia i obiema konfiguracjami. Bez `:ROTATION`
-///         zawsze "OK" - wtedy start i tak kasuje rodziny plikow (dropStalePlanArtifacts).
-[[nodiscard]] std::string checkKeptStores(qTree &plan, std::string_view defaultStorageDir);
+/// Pusty message oznacza sukces. Bez `:ROTATION` start kasuje rodziny plikow.
+[[nodiscard]] rdb::Refusal checkKeptStores(qTree &plan, std::string_view defaultStorageDir,
+                                           const std::vector<std::string> &streamNames = {});
 
 /// Sprawdza zachowane pliki .desc przed zmiana planu: deklaracje zawsze, wyniki tylko przy ROTATION.
 /// Deklaracja musi sie zgadzac takze w TYPE i REF, bo te magazyn bierze z pliku, nie z planu (#346).
 /// Jedyny przepuszczany rozjazd to dawny TYPE DEVICE zwyklego pliku binarnego, ktory zastepuje
 /// dropStalePlanArtifacts(). Pusta lista nazw oznacza caly plan; ad-hoc przekazuje tylko nowo
-/// dodawane strumienie.
-[[nodiscard]] std::string checkDescriptorFiles(qTree &plan, std::string_view defaultStorageDir,
-                                               const std::vector<std::string> &streamNames = {});
+/// dodawane strumienie, ktorych deskryptory zostaja takze bez ROTATION i dla MEMORY.
+[[nodiscard]] rdb::Refusal checkDescriptorFiles(qTree &plan, std::string_view defaultStorageDir,
+                                                const std::vector<std::string> &streamNames = {});
 
 /// Rodzaj pliku pod sciezka kazdej deklaracji (#346): BINFILE i TEXTFILE - plik zwykly, DEVICE -
 /// urzadzenie znakowe albo FIFO. Tylko stat(), bez otwarcia, wiec FIFO bez pisarza niczego nie
 /// wiesza. Pusta lista nazw oznacza caly plan; ad-hoc przekazuje tylko nowo dodawane strumienie.
 /// Nie w `-c` - kompilacja nie musi biec na maszynie z danymi.
-/// Zwraca "OK" albo powod odmowy z nazwa strumienia i sciezka; przy formie przestarzalej `FILE`
+/// Zwraca odmowe z nazwa strumienia i sciezka; przy formie przestarzalej `FILE`
 /// takze z podpowiedzia jawnego slowa.
-[[nodiscard]] std::string checkDeclaredSources(const qTree &plan, const std::vector<std::string> &streamNames = {});
+[[nodiscard]] rdb::Refusal checkDeclaredSources(const qTree &plan, const std::vector<std::string> &streamNames = {});
+
+/// STORAGE musi istniec i byc katalogiem, takze gdy wszystkie strumienie sa MEMORY.
+[[nodiscard]] rdb::Refusal checkStorageDirectory(const qTree &plan, std::string_view defaultStorageDir);
+
+/// Wspolny preflight czterech drog (#473), przed kasowaniem plikow/importem/rezerwacja.
+/// Pusta lista oznacza wymiane calego planu; lista nazw - nowe strumienie ad-hoc.
+[[nodiscard]] rdb::Refusal checkPlanStorage(qTree &plan, std::string_view defaultStorageDir,
+                                            const std::vector<std::string> &streamNames = {});
 
 /// Wynik checkRotationCounter(): pusty `refusal` = plan bez `:ROTATION` albo licznik uzyteczny.
 struct CounterCheck {
@@ -135,9 +144,9 @@ struct CounterCheck {
 
 /// Sprawdza otwarcie plikow wyjsciowych SELECT przed publikacja planu. Pusta lista nazw
 /// oznacza caly plan; ad-hoc przekazuje tylko nowo dodawane strumienie.
-/// Zwraca "OK" albo powod odmowy z nazwa strumienia i pliku.
-[[nodiscard]] std::string checkOutputFilesOpenable(const qTree &plan, std::string_view defaultStorageDir,
-                                                   const std::vector<std::string> &streamNames = {});
+/// K2: wadliwa sciezka/rodzaj pliku; K4: system odmowil operacji (z zachowanym errno).
+[[nodiscard]] rdb::Refusal checkOutputFilesOpenable(const qTree &plan, std::string_view defaultStorageDir,
+                                                    const std::vector<std::string> &streamNames = {});
 
 /// Normalizacja sciezki publikowanej w slocie magistrali. absolute() PRZED weakly_canonical():
 /// plik licznika przy pierwszym starcie jeszcze nie istnieje, a weakly_canonical nad

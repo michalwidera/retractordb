@@ -64,6 +64,7 @@ StoragePaths::StoragePaths(const std::string_view qryID, const std::string_view 
   if (!std::filesystem::exists(dirName)) {
     std::error_code absError;
     const auto full = std::filesystem::absolute(dirName, absError);
+    // K1 po preflight (#473): checkStorageDirectory odmawia przed budowa modelu na czterech drogach.
     FatalError(
         "storage: directory '{}' from the STORAGE directive does not exist ({}); "
         "RetractorDB does not create it - run 'mkdir -p {}' first",
@@ -71,6 +72,7 @@ StoragePaths::StoragePaths(const std::string_view qryID, const std::string_view 
   }
 
   if (!std::filesystem::is_directory(dirName)) {
+    // Ta sama kontrola K2 stoi w checkStorageDirectory (#473), przed zmiana planu.
     FatalError("storage: path '{}' from the STORAGE directive exists but is not a directory", dirName);
   }
 
@@ -115,6 +117,9 @@ void StoragePaths::relocateFromRef(const Descriptor &descriptor) {
   // and there is no specified storage as REF in descriptor - we should
   // stop immediately.
   if (storageFile_.empty()) {
+    // Nieosiagalne z planu (#473): konstruktor wymaga niepustego fileName, streamInstance bierze
+    // qry.filename albo niepuste qry.id, a DESC.g4 nie dopuszcza pustego REF. Sam brak REF
+    // zachowuje nazwe z konstruktora. Pusta sciezka wymaga wadliwego deskryptora zbudowanego w API.
     FatalError("storage: storage file not set in descriptor (missing REF field or :STORAGE directive)");
   }
 }
