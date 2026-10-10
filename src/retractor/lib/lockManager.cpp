@@ -1,7 +1,5 @@
 #include "lockManager.hpp"
 
-#include <fcntl.h>
-#include <sys/file.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -9,6 +7,7 @@
 #include <cerrno>
 #include <cstring>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <optional>
 #include <sstream>
@@ -25,6 +24,26 @@
 namespace {
 
 constexpr std::string_view kLockSuffix = ".lock";
+
+/// Opis odmowy dla operatora. Powod z kontroli pliku (Refused) nie dzieli kodow errno z bledami
+/// samego open(): EPERM z open() to np. plik niezmienny, nie obcy wlasciciel.
+std::string lockFailure(lockfile::Result result, int error) {
+  if (result != lockfile::Result::Refused) return strerror(error);
+  switch (error) {
+    case ELOOP:
+      return "symbolic link refused";
+    case EINVAL:
+      return "not a regular file";
+    case EPERM:
+      return std::format("untrusted owner, expected UID {}", geteuid());
+    case EMLINK:
+      return "not a file with a single link";
+    case EAGAIN:
+      return "open/create retry limit exceeded";
+    default:
+      return strerror(error);
+  }
+}
 
 /// Czy napis jest czlonem instancji z nazw IPC: sama nazwa serwera albo jej skrot ("0" i osiem
 /// malych cyfr szesnastkowych, patrz ipc::shortServerTag).
@@ -87,17 +106,20 @@ void FlockServiceGuard::setServiceQueryFile(const std::string &queryFile) { serv
 std::string FlockServiceGuard::lockDirectory() const { return std::filesystem::path(lockFilePath).parent_path().string(); }
 
 bool FlockServiceGuard::acquireLock() {
+  lockError.clear();
   // Komunikat dla operatora nalezy do wolajacego: tylko on wie, ktora tozsamosc probowal
   // przejac i co odczytal z pliku blokady (patrz launcher.cpp). Tutaj zostaje sam log,
   // zeby ta sama odmowa nie pojawiala sie na konsoli dwa razy.
-  switch (lockfile::acquire(lockFilePath, true, true, lockFileDescriptor)) {
+  switch (const auto result = lockfile::acquire(lockFilePath, true, true, lockFileDescriptor)) {
     case lockfile::Result::Acquired:
       break;
     case lockfile::Result::Busy:
       SPDLOG_WARN("Other instance is already running, cannot acquire lock on: {}", lockFilePath);
       return false;
     case lockfile::Result::Error:
-      SPDLOG_ERROR("Cannot acquire lock file: {} , errno: {}", lockFilePath, strerror(errno));
+    case lockfile::Result::Refused:
+      lockError = std::format("Cannot use lock file '{}': {}", lockFilePath, lockFailure(result, errno));
+      SPDLOG_ERROR("{}", lockError);
       return false;
   }
 
@@ -119,14 +141,15 @@ bool FlockServiceGuard::acquireIpcLock(std::string_view objectName, std::string_
   // z roznych katalogow blokad instancji.
   const std::string path = ipc::identityLockPath(objectName, machineLockDir);
   int fd                 = -1;
-  switch (lockfile::acquire(path, true, false, fd)) {
+  switch (const auto result = lockfile::acquire(path, true, false, fd)) {
     case lockfile::Result::Acquired:
       break;
     case lockfile::Result::Busy:
       SPDLOG_ERROR("IPC identity lock {} is held by another instance.", path);
       return false;
     case lockfile::Result::Error:
-      SPDLOG_ERROR("Cannot acquire IPC identity lock {}: {}", path, strerror(errno));
+    case lockfile::Result::Refused:
+      SPDLOG_ERROR("Cannot acquire IPC identity lock {}: {}", path, lockFailure(result, errno));
       return false;
   }
   ipcLockPath       = path;
@@ -160,18 +183,7 @@ void FlockServiceGuard::releaseLock() {
   }
 }
 
-bool FlockServiceGuard::isAnotherInstanceRunning() const {
-  int testFd = open(lockFilePath.c_str(), O_RDONLY);
-  if (testFd == -1) {
-    return false;
-  }
-
-  int result     = flock(testFd, LOCK_SH | LOCK_NB);
-  bool isRunning = (result == -1 && (errno == EWOULDBLOCK || errno == EAGAIN));
-
-  close(testFd);
-  return isRunning;
-}
+bool FlockServiceGuard::isAnotherInstanceRunning() const { return lockfile::isHeld(lockFilePath); }
 
 FlockServiceGuard::PeerInfo FlockServiceGuard::readPeerInfo() const {
   PeerInfo info;

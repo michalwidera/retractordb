@@ -31,17 +31,51 @@ constexpr std::chrono::milliseconds kRetryInterval{1};
 /// Ile razy zaczynac od nowa po trafieniu na skasowany i-wezel. Kazde trafienie znaczy, ze
 /// ktos zdazyl skasowac plik miedzy naszym open() a flock(); seria takich trafien nie jest
 /// wyscigiem, tylko systemem plikow, na ktorym ten protokol nie dziala.
-constexpr int kMaxRelinks = 100;
+constexpr int kMaxRelinks      = 100;
+constexpr int kMaxOpenAttempts = 100;
 
 constexpr mode_t kMode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 
-int openOrCreate(const std::string &path, int access) {
-  for (;;) {
-    const int fd = ::open(path.c_str(), access | O_CLOEXEC);
+/// 0, gdy plik nadaje sie na blokade; inaczej powod odmowy jako errno.
+int refusal(const struct stat &info, bool writable) {
+  if (!S_ISREG(info.st_mode)) return EINVAL;
+  // Czytelnik obecnosci/tozsamosci moze korzystac z pliku innego konta.
+  if (writable && info.st_uid != geteuid()) return EPERM;
+  if (writable && info.st_nlink != 1) return EMLINK;
+  return 0;
+}
+
+/// refused odroznia odmowe pliku od bledu systemu - oba koncza sie -1 z errno.
+int checkedOpen(const std::string &path, int access, bool &refused, bool create = false) {
+  refused = false;
+  // O_NONBLOCK pozwala odrzucic FIFO przez fstat zamiast czekac na drugiego uczestnika.
+  const int flags = access | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK | (create ? O_CREAT | O_EXCL : 0);
+  const int fd    = ::open(path.c_str(), flags, kMode);
+  if (fd == -1) {
+    // Przy O_NOFOLLOW ELOOP oznacza dowiazanie na koncu sciezki, a EISDIR - katalog.
+    refused = errno == ELOOP || errno == EISDIR;
+    if (errno == EISDIR) errno = EINVAL;
+    return -1;
+  }
+  // I-wezel jest ustalony przy open(): typu i wlasciciela nie da sie mu pozniej podmienic,
+  // a dowiazanie dodane pozniej nie przekierowuje zapisu - wystarcza ta jedna kontrola.
+  struct stat info{};
+  const bool described = ::fstat(fd, &info) == 0;
+  const int error      = described ? refusal(info, access == O_RDWR) : errno;
+  if (error == 0) return fd;
+  refused = described;
+  ::close(fd);
+  errno = error;
+  return -1;
+}
+
+int openOrCreate(const std::string &path, int access, bool &refused) {
+  for (int attempt = 0; attempt < kMaxOpenAttempts; ++attempt) {
+    const int fd = checkedOpen(path, access, refused);
     if (fd != -1 || errno != ENOENT) return fd;
     // O_EXCL: istniejacego pliku nie otwieramy z O_CREAT. Przy fs.protected_regular jadro
     // odrzuca O_CREAT na cudzym pliku w katalogu z bitem sticky, nawet gdy prawa by pozwalaly.
-    const int created = ::open(path.c_str(), access | O_CREAT | O_EXCL | O_CLOEXEC, kMode);
+    const int created = checkedOpen(path, access, refused, true);
     if (created != -1) {
       // umask moglby odebrac innym prawo odczytu, a O_RDONLY wystarcza im do flock.
       ::fchmod(created, kMode);
@@ -50,6 +84,9 @@ int openOrCreate(const std::string &path, int access) {
     if (errno != EEXIST) return -1;
     // Plik powstal miedzy naszymi dwoma open(); otwieramy ten.
   }
+  refused = true;
+  errno   = EAGAIN;
+  return -1;
 }
 
 }  // namespace
@@ -57,16 +94,17 @@ int openOrCreate(const std::string &path, int access) {
 bool stillLinked(int fd, const std::string &path) {
   struct stat held{};
   struct stat named{};
-  return ::fstat(fd, &held) == 0 && ::stat(path.c_str(), &named) == 0 && held.st_dev == named.st_dev &&
-         held.st_ino == named.st_ino;
+  return ::fstat(fd, &held) == 0 && ::lstat(path.c_str(), &named) == 0 && S_ISREG(named.st_mode) &&
+         held.st_dev == named.st_dev && held.st_ino == named.st_ino;
 }
 
 Result acquire(const std::string &path, bool exclusive, bool writable, int &fd) {
   const auto deadline = std::chrono::steady_clock::now() + kTransientHolderGrace;
   int relinks         = 0;
   for (;;) {
-    const int candidate = openOrCreate(path, writable ? O_RDWR : O_RDONLY);
-    if (candidate == -1) return Result::Error;
+    bool refused        = false;
+    const int candidate = openOrCreate(path, writable ? O_RDWR : O_RDONLY, refused);
+    if (candidate == -1) return refused ? Result::Refused : Result::Error;
 
     // Takze czytelnik ma termin: zatrzymany posiadacz LOCK_EX nie moze zawiesic startu Bus.
     if (::flock(candidate, (exclusive ? LOCK_EX : LOCK_SH) | LOCK_NB) == -1) {
@@ -105,7 +143,8 @@ void removeAndRelease(const std::string &path, int fd) {
 }
 
 bool isHeld(const std::string &path) {
-  const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
+  bool refused = false;
+  const int fd = checkedOpen(path, O_RDONLY, refused);
   if (fd == -1) return false;
   const bool held = ::flock(fd, LOCK_SH | LOCK_NB) == -1 && errno == EWOULDBLOCK;
   ::close(fd);
@@ -113,7 +152,8 @@ bool isHeld(const std::string &path) {
 }
 
 int claimAbandoned(const std::string &path) {
-  const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC);
+  bool refused = false;
+  const int fd = checkedOpen(path, O_RDONLY, refused);
   if (fd == -1) return -1;
   if (::flock(fd, LOCK_EX | LOCK_NB) == -1 || !stillLinked(fd, path)) {
     ::close(fd);

@@ -58,6 +58,9 @@ foreach(item ${V_GLOB})
   # test/UnitTest/syscallWrap.hpp) i wtedy nie ma tu nic do dodania na linii
   # konsolidacji.
   if(RDB_HAS_LD_WRAP)
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_lockManager")
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=open)
+    endif()
     if(OUTPUT_FILE_NOEXT STREQUAL "test_ipcSecurity")
       target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=fstat
                           -Wl,--wrap=lstat)

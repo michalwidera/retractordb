@@ -21,7 +21,7 @@
 /// a porzucony plik moze skasowac kazdy, komu uda sie zajac go wylacznie.
 namespace lockfile {
 
-enum class Result : std::uint8_t { Acquired, Busy, Error };
+enum class Result : std::uint8_t { Acquired, Busy, Error, Refused };
 
 /// Zajmuje blokade pliku `path`, tworzac go w razie potrzeby.
 ///
@@ -30,7 +30,11 @@ enum class Result : std::uint8_t { Acquired, Busy, Error };
 ///            z czekaniem: blokade wylaczna na pliku obecnosci trzymaja tylko tacy wlasciciele.
 /// writable:  deskryptor O_RDWR (plik niesie tresc). Inaczej O_RDONLY - do flock wystarcza,
 ///            a dziala takze na pliku, do ktorego ten uzytkownik nie ma prawa zapisu.
-/// Przy Result::Error errno opisuje przyczyne.
+/// Tylko zwykle pliki, bez podazania za dowiazaniem. Zapis wymaga UID procesu i jednej nazwy;
+/// odczyt nie wymaga tego samego UID. Ponowienia open/create sa ograniczone.
+/// Przy Result::Error errno opisuje blad systemu. Result::Refused to odmowa pliku pod sciezka,
+/// errno niesie powod: ELOOP - dowiazanie symboliczne, EINVAL - nie zwykly plik, EPERM - inny
+/// wlasciciel, EMLINK - wiecej niz jedna nazwa, EAGAIN - wyczerpany limit ponowien open/create.
 Result acquire(const std::string &path, bool exclusive, bool writable, int &fd);
 
 /// Czy deskryptor nadal odpowiada sciezce (ten sam i-wezel).

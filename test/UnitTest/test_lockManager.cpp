@@ -3,7 +3,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <chrono>
+#include <cstdarg>
+#include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -18,17 +22,46 @@
 #include <boost/interprocess/shared_memory_object.hpp>
 
 #include "constants.hpp"
+#include "logCapture.hpp"
 #include "platformConfig.h"
 #include "retractor/lib/bus.hpp"
 #include "retractor/lib/lockFile.hpp"
 #include "retractor/lib/lockManager.hpp"
 #include "retractor/lib/serviceControl.hpp"
+#include "syscallWrap.hpp"
 
 using servicecontrol::deliverQueryFile;
 using servicecontrol::restartCommand;
 using servicecontrol::restartService;
 
 namespace {
+
+std::string unstablePath;
+int openAttempts = 0;
+std::string failingPath;
+int failingErrno = 0;
+
+class LockFileSafety : public ::testing::Test {
+ protected:
+  std::filesystem::path dir;
+  const std::string service = "xretractor_service.safety";
+  std::filesystem::path path;
+  void SetUp() override {
+    std::string pattern = (std::filesystem::temp_directory_path() / "rdb466-XXXXXX").string();
+    ASSERT_NE(mkdtemp(pattern.data()), nullptr);
+    dir  = pattern;
+    path = dir / (service + ".lock");
+  }
+  void TearDown() override {
+    unstablePath.clear();
+    failingPath.clear();
+    std::filesystem::remove_all(dir);
+  }
+  static std::string contents(const std::filesystem::path &file) {
+    std::ifstream input(file);
+    return std::string(std::istreambuf_iterator<char>(input), {});
+  }
+};
 
 // Zapisuje syntetyczny plik blokady o znanej ścieżce i zwraca skonfigurowany guard,
 // który tę ścieżkę odczyta (setLockDir + nazwa serwisu wyznaczają lockFilePath).
@@ -41,6 +74,203 @@ std::filesystem::path writeLockFile(const std::string &dir, const std::string &s
 }
 
 }  // namespace
+
+extern "C" int __real_open(const char *path, int flags, ...);
+extern "C" int __wrap_open(const char *path, int flags, ...) {
+  mode_t mode = 0;
+  if (flags & O_CREAT) {
+    va_list arguments;
+    va_start(arguments, flags);
+    mode = static_cast<mode_t>(va_arg(arguments, int));
+    va_end(arguments);
+  }
+  if (!unstablePath.empty() && unstablePath == path) {
+    ++openAttempts;
+    errno = flags & O_CREAT ? EEXIST : ENOENT;
+    return -1;
+  }
+  if (!failingPath.empty() && failingPath == path) {
+    errno = failingErrno;
+    return -1;
+  }
+  return __real_open(path, flags, mode);
+}
+
+#if !RDB_HAS_LD_WRAP
+// Wariadyczne open przekazuje tryb tworzonego pliku takze w backendzie bez --wrap.
+extern "C" int __real_open(const char *path, int flags, ...) {
+  mode_t mode = 0;
+  if (flags & O_CREAT) {
+    va_list arguments;
+    va_start(arguments, flags);
+    mode = static_cast<mode_t>(va_arg(arguments, int));
+    va_end(arguments);
+  }
+  using Open       = int (*)(const char *, int, ...);
+  static Open next = nullptr;
+  if (next == nullptr) next = reinterpret_cast<Open>(::dlsym(RTLD_NEXT, "open"));
+  return next(path, flags, mode);
+}
+extern "C" int open(const char *path, int flags, ...) {
+  mode_t mode = 0;
+  if (flags & O_CREAT) {
+    va_list arguments;
+    va_start(arguments, flags);
+    mode = static_cast<mode_t>(va_arg(arguments, int));
+    va_end(arguments);
+  }
+  return __wrap_open(path, flags, mode);
+}
+#endif
+
+TEST_F(LockFileSafety, SymlinkPreservesTargetAndReportsReason) {
+  const auto target = writeLockFile(dir.string(), "sentinel", "sentinel contents\n");
+  const auto size   = std::filesystem::file_size(target);
+  std::filesystem::create_symlink(target, path);
+  const LogCapture capture;
+  spdlog::default_logger()->set_level(spdlog::level::err);
+  FlockServiceGuard guard(service);
+  guard.setLockDir(dir.string());
+  EXPECT_FALSE(guard.acquireLock());
+  EXPECT_FALSE(guard.isLockActive());
+  EXPECT_FALSE(guard.publishLockInfo());
+  guard.releaseLock();
+  EXPECT_EQ(contents(target), "sentinel contents\n");
+  EXPECT_EQ(std::filesystem::file_size(target), size);
+  EXPECT_TRUE(std::filesystem::is_symlink(path));
+  EXPECT_NE(guard.acquireLockError().find(path.string()), std::string::npos);
+  EXPECT_NE(guard.acquireLockError().find("symbolic link"), std::string::npos);
+  EXPECT_NE(capture.text().find("symbolic link"), std::string::npos);
+  EXPECT_FALSE(lockfile::isHeld(path.string()));
+  EXPECT_EQ(lockfile::claimAbandoned(path.string()), -1);
+}
+
+TEST_F(LockFileSafety, DanglingSymlinkIsRefusedWithoutCreatingTarget) {
+  const auto target = dir / "absent";
+  std::filesystem::create_symlink(target, path);
+  for (const bool writable : {false, true}) {
+    int fd           = -1;
+    const auto start = std::chrono::steady_clock::now();
+    EXPECT_EQ(lockfile::acquire(path.string(), true, writable, fd), lockfile::Result::Refused);
+    EXPECT_EQ(errno, ELOOP);
+    EXPECT_EQ(fd, -1);
+    EXPECT_LT(std::chrono::steady_clock::now() - start, std::chrono::seconds(2));
+  }
+  EXPECT_FALSE(std::filesystem::exists(target));
+  EXPECT_TRUE(std::filesystem::is_symlink(path));
+}
+
+TEST_F(LockFileSafety, WrongTypesDoNotBlockReadersWritersOrCleanup) {
+  ASSERT_EQ(mkfifo(path.c_str(), 0600), 0);
+  for (const bool directory : {false, true}) {
+    if (directory) {
+      std::filesystem::remove(path);
+      std::filesystem::create_directory(path);
+    }
+    const auto start = std::chrono::steady_clock::now();
+    for (const bool writable : {false, true}) {
+      int fd = -1;
+      EXPECT_EQ(lockfile::acquire(path.string(), true, writable, fd), lockfile::Result::Refused);
+      EXPECT_EQ(errno, EINVAL);
+      EXPECT_EQ(fd, -1);
+    }
+    EXPECT_FALSE(lockfile::isHeld(path.string()));
+    EXPECT_EQ(lockfile::claimAbandoned(path.string()), -1);
+    FlockServiceGuard guard(service);
+    guard.setLockDir(dir.string());
+    EXPECT_FALSE(guard.acquireLock());
+    EXPECT_FALSE(guard.isAnotherInstanceRunning());
+    EXPECT_NE(guard.acquireLockError().find("not a regular file"), std::string::npos);
+    EXPECT_LT(std::chrono::steady_clock::now() - start, std::chrono::seconds(2));
+  }
+}
+
+// Dowiazanie dodane po zajeciu nie przekierowuje zapisu: deskryptor wskazuje i-wezel instancji.
+// Odmowa publikacji niczego by nie chronila, a zostawilaby klientow bez linii PID.
+TEST_F(LockFileSafety, HardlinkRefusedBeforeAcquireLaterAliasDoesNotBlockPublish) {
+  const auto target = writeLockFile(dir.string(), "sentinel", "sentinel contents\n");
+  std::filesystem::create_hard_link(target, path);
+  FlockServiceGuard guard(service);
+  guard.setLockDir(dir.string());
+  EXPECT_FALSE(guard.acquireLock());
+  EXPECT_NE(guard.acquireLockError().find("single link"), std::string::npos);
+  EXPECT_EQ(contents(target), "sentinel contents\n");
+  std::filesystem::remove(path);
+  ASSERT_TRUE(guard.acquireLock());
+  ASSERT_TRUE(guard.publishLockInfo());
+  const auto alias = dir / "alias";
+  std::filesystem::create_hard_link(path, alias);
+  EXPECT_TRUE(guard.publishLockInfo());
+  EXPECT_NE(contents(path).find("PID: " + std::to_string(getpid())), std::string::npos);
+  EXPECT_EQ(contents(target), "sentinel contents\n");
+  guard.releaseLock();
+}
+
+TEST_F(LockFileSafety, AcquirePublishExcludeReleaseAndReacquire) {
+  writeLockFile(dir.string(), service, "stale process info\n");
+  FlockServiceGuard first(service);
+  first.setLockDir(dir.string());
+  ASSERT_TRUE(first.acquireLock());
+  EXPECT_TRUE(contents(path).empty());
+  first.setServiceQueryFile("private.rql");
+  ASSERT_TRUE(first.publishLockInfo());
+  EXPECT_EQ(first.readPeerInfo().pid, getpid());
+  EXPECT_EQ(first.readPeerInfo().queryFile, "private.rql");
+  FlockServiceGuard second(service);
+  second.setLockDir(dir.string());
+  EXPECT_FALSE(second.acquireLock());
+  EXPECT_TRUE(second.acquireLockError().empty());
+  EXPECT_TRUE(second.isAnotherInstanceRunning());
+  EXPECT_EQ(second.readPeerInfo().pid, getpid());
+  first.releaseLock();
+  EXPECT_FALSE(std::filesystem::exists(path));
+  EXPECT_TRUE(second.acquireLock());
+  EXPECT_TRUE(second.publishLockInfo());
+  second.releaseLock();
+  EXPECT_FALSE(std::filesystem::exists(path));
+}
+
+TEST_F(LockFileSafety, ReplacementSymlinkDoesNotIdentifyHeldInode) {
+  int fd = -1;
+  ASSERT_EQ(lockfile::acquire(path.string(), true, true, fd), lockfile::Result::Acquired);
+  const auto moved = dir / "moved";
+  std::filesystem::rename(path, moved);
+  std::filesystem::create_symlink(moved, path);
+  EXPECT_FALSE(lockfile::stillLinked(fd, path.string()));
+  lockfile::removeAndRelease(path.string(), fd);
+  EXPECT_TRUE(std::filesystem::is_symlink(path));
+  EXPECT_TRUE(std::filesystem::exists(moved));
+}
+
+// EPERM z samego open() (np. plik niezmienny) to blad systemu, nie obcy wlasciciel.
+TEST_F(LockFileSafety, SystemErrorFromOpenIsNotReportedAsRefusal) {
+  { std::ofstream(path) << "kept\n"; }
+  failingPath  = path.string();
+  failingErrno = EPERM;
+  int fd       = -1;
+  EXPECT_EQ(lockfile::acquire(path.string(), true, true, fd), lockfile::Result::Error);
+  EXPECT_EQ(errno, EPERM);
+  FlockServiceGuard guard(service);
+  guard.setLockDir(dir.string());
+  EXPECT_FALSE(guard.acquireLock());
+  EXPECT_NE(guard.acquireLockError().find(std::strerror(EPERM)), std::string::npos);
+  EXPECT_EQ(guard.acquireLockError().find("untrusted owner"), std::string::npos);
+  failingPath.clear();
+  EXPECT_EQ(contents(path), "kept\n");
+}
+
+TEST_F(LockFileSafety, OpenCreateRaceHasAnInternalRetryLimit) {
+  unstablePath = path.string();
+  openAttempts = 0;
+  int fd       = -1;
+  EXPECT_EQ(lockfile::acquire(path.string(), true, true, fd), lockfile::Result::Refused);
+  EXPECT_EQ(errno, EAGAIN);
+  EXPECT_EQ(fd, -1);
+  EXPECT_GT(openAttempts, 2);
+  EXPECT_LE(openAttempts, 200);
+  unstablePath.clear();
+  EXPECT_FALSE(std::filesystem::exists(path));
+}
 
 // Straznik nie zmienia ani wlasciciela deskryptorow, ani adresu (serviceGuardPtr) - R-01, #274.
 static_assert(!std::is_copy_constructible_v<FlockServiceGuard>);
