@@ -1,0 +1,4 @@
+ROTATION 'other_counter.txt'
+STORAGE 'temp'
+DECLARE a INTEGER[3] STREAM src2, 1/8 TEXTFILE 'data.txt'
+SELECT src2[0]+2 STREAM dst2 FROM src2

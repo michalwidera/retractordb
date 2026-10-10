@@ -9,8 +9,6 @@
 #include <cstddef>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
-#include <sstream>
 #include <string>
 #include <system_error>
 
@@ -31,7 +29,7 @@ PersistentCounter::PersistentCounter(std::string initFilename)
 {
   load();
   if (!save(count_ + 1))
-    FatalError(
+    rdb::EnvironmentError(
         "Cannot reserve rotation number {} in '{}'; refusing to start - otherwise the next session would reuse number {} "
         "and overwrite the archives of this one.",
         count_ + 1, persistentCounterFilename_, count_);
@@ -40,27 +38,38 @@ PersistentCounter::PersistentCounter(std::string initFilename)
 int PersistentCounter::getCount() const { return count_; }
 
 // Brak pliku to pierwsze uzycie planu z :ROTATION - rotacja 0. Kazdy INNY stan pliku, ktorego
-// nie da sie odczytac w calosci jako nieujemnej liczby, zatrzymuje silnik. Dawniej `infile >>
+// nie da sie odczytac w calosci jako nieujemnej liczby, nie daje numeru. Dawniej `infile >>
 // count_` na pustym pliku wpisywal 0 (od C++11 nieudany odczyt zeruje zmienna), wiec plik
 // uciety przez awarie udawal rotacje 0: plan zaczynal archiwizacje od nowa i nadpisywal
 // .old0, .old1, ... poprzednich sesji bez sladu w logu. Wartosc ujemna odpada z tego samego
 // powodu - percounter < 0 znaczy w storage "bez rotacji", wiec plik z "-1" wylaczylby
 // archiwizacje po cichu.
-// Odmowa zamiast wartosci zastepczej (decyzja operacyjna, #281): wlasciwego numeru nie da sie
-// tu odtworzyc, a kazdy zgadniety moze nadpisac archiwum. Operator naprawia plik albo
-// swiadomie go usuwa.
-void PersistentCounter::load() {
+//
+// Brak pliku musi byc POTWIERDZONY: blad samego sprawdzenia (np. EACCES na katalogu) nie jest
+// brakiem. Odczyt przez open/read, a nie ifstream, bo tylko tak zostaje errno: ifstream otwiera
+// katalog bez bledu i czyta z niego zero bajtow, czyli blad nosnika udawalby pusty plik (K2).
+PersistentCounter::Reading PersistentCounter::read(const std::string &filename) {
   constexpr std::size_t kErrorPreviewBytes = 32;
   std::error_code ec;
-  if (!std::filesystem::exists(persistentCounterFilename_, ec) && !ec) {
-    count_ = 0;
-    return;
-  }
+  const bool exists = std::filesystem::exists(filename, ec);
+  if (ec) return {.state = Reading::State::Unreadable, .detail = "cannot check whether it exists: " + ec.message()};
+  if (!exists) return {.state = Reading::State::Missing};
 
-  std::ifstream infile(persistentCounterFilename_, std::ios::binary);
-  std::ostringstream content;
-  if (infile.is_open()) content << infile.rdbuf();
-  const std::string text = content.str();
+  const int fd = ::open(filename.c_str(), O_RDONLY | O_CLOEXEC);
+  if (fd == -1) return {.state = Reading::State::Unreadable, .detail = std::string("open: ") + std::strerror(errno)};
+  std::string text;
+  char buffer[64];
+  ssize_t got = 0;
+  while ((got = ::read(fd, buffer, sizeof(buffer))) != 0) {
+    if (got > 0) {
+      text.append(buffer, static_cast<std::size_t>(got));
+    } else if (errno != EINTR) {
+      const int readErrno = errno;
+      ::close(fd);
+      return {.state = Reading::State::Unreadable, .detail = std::string("read: ") + std::strerror(readErrno)};
+    }
+  }
+  ::close(fd);
 
   const char *first = text.data();
   const char *last  = text.data() + text.size();
@@ -68,13 +77,36 @@ void PersistentCounter::load() {
     --last;
   int value{};
   const auto [ptr, err] = std::from_chars(first, last, value);
-  if (!infile.is_open() || err != std::errc() || ptr != last || value < 0)
-    FatalError(
-        "Rotation counter file '{}' is unreadable ({} bytes: '{}'); refusing to start. A guessed rotation number could "
-        "overwrite archives of previous sessions. Repair the file (a non-negative integer), or delete it to restart "
-        "rotation from 0 - existing .old<N> archives will then be overwritten.",
-        persistentCounterFilename_, text.size(), text.substr(0, kErrorPreviewBytes));
-  count_ = value;
+  if (err != std::errc() || ptr != last || value < 0)
+    return {.state  = Reading::State::Invalid,
+            .detail = std::to_string(text.size()) + " bytes: '" + text.substr(0, kErrorPreviewBytes) + "'"};
+  return {.state = Reading::State::Value, .value = value};
+}
+
+// Odmowa zamiast wartosci zastepczej (decyzja operacyjna, #281): wlasciwego numeru nie da sie
+// tu odtworzyc, a kazdy zgadniety moze nadpisac archiwum. Operator naprawia plik albo
+// swiadomie go usuwa. Klasa K4 dla obu przyczyn (#472): wadliwa tresc odrzucilo juz jako blad
+// planu checkRotationCounter() przed startem, wiec tutaj plik zmienil sie po tamtym sprawdzeniu.
+// Plan zostaje, a nastepny start rozpozna tresc ta sama droga co wtedy.
+void PersistentCounter::load() {
+  const Reading reading = read(persistentCounterFilename_);
+  switch (reading.state) {
+    case Reading::State::Missing:
+      count_ = 0;
+      return;
+    case Reading::State::Value:
+      count_ = reading.value;
+      return;
+    case Reading::State::Unreadable:
+      rdb::EnvironmentError("Rotation counter file '{}' cannot be read ({}); refusing to start.", persistentCounterFilename_,
+                            reading.detail);
+    case Reading::State::Invalid:
+      rdb::EnvironmentError(
+          "Rotation counter file '{}' is unreadable ({}); refusing to start. A guessed rotation number could overwrite "
+          "archives of previous sessions. Repair the file (a non-negative integer), or delete it to restart rotation from 0 "
+          "- existing .old<N> archives will then be overwritten.",
+          persistentCounterFilename_, reading.detail);
+  }
 }
 
 // Zapis przez plik tymczasowy, wzorem servicecontrol::writeQueryFile. Samo

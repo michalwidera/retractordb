@@ -56,7 +56,13 @@ ExecStart=@RETRACTOR_BIN@/xretractor --service --noanykey ${RETRACTOR_QUERY_FILE
 KillSignal=SIGTERM
 TimeoutStopSec=30
 Restart=on-failure
+# Blad srodowiska (dysk, nosnik, pamiec dzielona) konczy proces kodem EIO z zachowanym planem
+# (#472), wiec jednostka wraca sama po usunieciu przyczyny. Odstep rosnie od 5 s do 5 min
+# w 5 krokach: trwala awaria nie zalewa dziennika co 5 s, a jednostka nie poddaje sie po limicie
+# startow. systemd < 254 pomija oba klucze z ostrzezeniem i ponawia co RestartSec.
 RestartSec=5
+RestartSteps=5
+RestartMaxDelaySec=5min
 
 [Install]
 WantedBy=multi-user.target

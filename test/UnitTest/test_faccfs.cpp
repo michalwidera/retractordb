@@ -472,7 +472,7 @@ TEST_F(FaccfsTest, storage_purge_failure_is_fatal) {
         s.purge();
         std::_Exit(6);
       },
-      ::testing::ExitedWithCode(EXIT_FAILURE), "storage::purge: purge of .*purge_fail_data.* failed");
+      ::testing::ExitedWithCode(EIO), "storage::purge: purge of .*purge_fail_data.* failed");
 }
 
 // NOLINTEND(modernize-avoid-c-arrays)

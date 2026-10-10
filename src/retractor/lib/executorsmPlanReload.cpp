@@ -145,6 +145,9 @@ std::string executorsm::validatePlanText(const std::string &planText) {
     if (const std::string descriptorError = checkDescriptorFiles(candidate, cfgStorageDir); descriptorError != "OK")
       return "Rejected: " + descriptorError;
     if (const std::string sourceError = checkDeclaredSources(candidate); sourceError != "OK") return "Rejected: " + sourceError;
+    // Obie przyczyny to tutaj odmowa zadania: dotychczasowy plan jest nietkniety i liczy dalej (#472).
+    if (const CounterCheck counter = checkRotationCounter(candidate); !counter.refusal.empty())
+      return "Rejected: " + counter.refusal;
     if (verboseMode)
       for (const std::string &warning : deprecatedFileWarnings(candidate))
         std::println(std::cerr, "xretractor: warning: {}", warning);
@@ -186,6 +189,10 @@ std::string executorsm::validatePlanText(const std::string &planText) {
       case bus::ClaimStatus::ServiceConflict:
         // Nieosiagalne z tego samego powodu co w getAdHoc: reservePlan nie dotyka maski trybow.
         FatalError("executorsm::validatePlanText: bus reported a service mode conflict");
+        break;
+      case bus::ClaimStatus::NotReserved:
+        // Nieosiagalne: ten status zwraca wylacznie activateReservedPlan().
+        FatalError("executorsm::validatePlanText: bus reported a missing plan reservation");
         break;
       case bus::ClaimStatus::TooLarge:
       case bus::ClaimStatus::NoFreeSlot:
@@ -386,9 +393,18 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
   // wracala z "no active plan", choc plan zostal juz przyjety i ogloszony.
   dataModelExpected.store(!coreInstancePtr->empty(), std::memory_order_release);
 
+  // Dwie porazki, dwie klasy (#472). Brak slotu albo rezerwacji po przyjetym resecie to zlamana
+  // kolejnosc silnika (K1). Zamek magistrali, ktorego nie da sie wziac, to srodowisko - ale ani
+  // EIO, ani odmowa: stary plan jest juz rozebrany, a restart wstalby z tym samym zepsutym zamkiem
+  // (ENOTRECOVERABLE jest trwaly) w trybie fail-open, tylko ze STARYM planem z pliku i ze zgubionym
+  // resetem, ktory klient dostal jako OK. Liczymy wiec nowym planem w tym samym trybie fail-open co
+  // start (launcher) i ad-hoc; slot publikuje dalej nazwy starego planu, bo bez zamka nie da sie go
+  // zmienic.
   const bus::ClaimResult activated = xrdbbus.activateReservedPlan();
-  if (activated.status != bus::ClaimStatus::Claimed && xrdbbus.attached())
+  if (activated.status == bus::ClaimStatus::NotReserved)
     FatalError("Cannot activate the reserved bus resources: {}", activated.detail);
+  if (activated.status == bus::ClaimStatus::Unavailable && xrdbbus.attached())
+    SPDLOG_WARN("xrdbbus: {}; the reloaded plan is not published and stream name uniqueness is NOT enforced.", activated.detail);
 
   // Rezerwacja jest zuzyta, wiec od tej chwili wolno przyjac nastepny reset. Ani chwili
   // wczesniej: az dotad kolejne reservePlan() nadpisywaloby rezerwacje wlasnie aktywowana.

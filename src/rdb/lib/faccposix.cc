@@ -94,7 +94,7 @@ size_t posixBinaryFile::count() {
   struct stat stat_buf;
   if (stat(filename_.c_str(), &stat_buf) != 0) {
     if (errno == ENOENT) return 0;
-    FatalError("posixBinaryFile::count: ::stat '{}' failed: {}", filename_, strerror(errno));
+    rdb::EnvironmentError("posixBinaryFile::count: ::stat '{}' failed: {}", filename_, strerror(errno));
   }
   return stat_buf.st_size / recordSize_;
 }

@@ -93,9 +93,13 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
     for (auto i = 0; i < dumpHistoryCount; ++i) {
       auto *payLoadPtr = pProc->getPayload(streamName, dumpHistoryCount - i);
       auto resultSeek  = ::lseek(task.fd, 0, SEEK_END);
-      if (resultSeek == -1) FatalError("dumpManager::registerTask: lseek failed during history dump");
+      if (resultSeek == -1)
+        rdb::EnvironmentError("dumpManager::registerTask: lseek on '{}' failed during history dump: {}", task.dumpFilename,
+                              strerror(errno));
       ssize_t write_count_result = ::write(task.fd, payLoadPtr->span().data(), payLoadPtr->descriptor.getSizeInBytes());
-      if (write_count_result <= 0) FatalError("dumpManager::registerTask: write failed during history dump");
+      if (write_count_result <= 0)
+        rdb::EnvironmentError("dumpManager::registerTask: write to '{}' failed during history dump: {}", task.dumpFilename,
+                              strerror(errno));
     }
     if (task.dumpedRecordsToGo < dumpHistoryCount) {
       FatalError("dumpManager::registerTask: dumpedRecordsToGo {} < dumpHistoryCount {}", task.dumpedRecordsToGo,
@@ -160,10 +164,12 @@ bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::
   }
 
   auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
-  if (resultSeek == -1) FatalError("dumpManager::buildDumpChunk: lseek to end failed");
+  if (resultSeek == -1)
+    rdb::EnvironmentError("dumpManager::buildDumpChunk: lseek to end of '{}' failed: {}", task.dumpFilename, strerror(errno));
 
   ssize_t write_count_result = ::write(task.fd, payload->span().data(), payload->descriptor.getSizeInBytes());
-  if (write_count_result <= 0) FatalError("dumpManager::buildDumpChunk: write failed");
+  if (write_count_result <= 0)
+    rdb::EnvironmentError("dumpManager::buildDumpChunk: write to '{}' failed: {}", task.dumpFilename, strerror(errno));
 
   if (task.dumpedRecordsToGo > 0) {
     task.dumpedRecordsToGo--;
@@ -200,12 +206,12 @@ std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view s
   constexpr int kMaxRecreates = 100;
   for (int attempt = 0; attempt < kMaxRecreates; ++attempt) {
     if (::unlink(filename.c_str()) != 0 && errno != ENOENT) {
-      FatalError("dumpManager::createDumpFile: failed to remove '{}': {}", filename.string(), strerror(errno));
+      rdb::EnvironmentError("dumpManager::createDumpFile: failed to remove '{}': {}", filename.string(), strerror(errno));
     }
     int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, kDefaultDumpFileMode);
     if (fd >= 0) return std::make_pair(filename, fd);
     if (errno != EEXIST) break;
     // Ktos utworzyl plik miedzy naszym unlink() a open(); kasujemy go jeszcze raz.
   }
-  FatalError("dumpManager::createDumpFile: failed to create '{}': {}", filename.string(), strerror(errno));
+  rdb::EnvironmentError("dumpManager::createDumpFile: failed to create '{}': {}", filename.string(), strerror(errno));
 }

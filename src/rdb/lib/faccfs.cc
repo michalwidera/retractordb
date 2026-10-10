@@ -44,7 +44,7 @@ size_t genericBinaryFile::count() {
   const auto sizeInBytes = std::filesystem::file_size(filename_, ec);
   if (ec) {
     if (ec == std::errc::no_such_file_or_directory) return 0;
-    FatalError("genericBinaryFile::count: file_size('{}') failed: {}", filename_, ec.message());
+    rdb::EnvironmentError("genericBinaryFile::count: file_size('{}') failed: {}", filename_, ec.message());
   }
   return static_cast<size_t>(sizeInBytes / static_cast<uintmax_t>(recordSize_));
 }

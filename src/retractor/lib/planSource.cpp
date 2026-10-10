@@ -15,6 +15,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include "persistentCounter.hpp"
 #include "rdb/accessorFactory.hpp"
 #include "rdb/descriptorIO.hpp"
 #include "rdb/storageShadow.hpp"
@@ -234,6 +235,27 @@ std::string checkDeclaredSources(const qTree &plan, const std::vector<std::strin
     return std::format("stream '{}': {} ({})", q.id, mismatch, hint);
   }
   return "OK";
+}
+
+CounterCheck checkRotationCounter(const qTree &plan) {
+  const std::string path = planCounterPath(plan);
+  if (path.empty()) return {};
+  const PersistentCounter::Reading reading = PersistentCounter::read(path);
+  switch (reading.state) {
+    case PersistentCounter::Reading::State::Missing:
+    case PersistentCounter::Reading::State::Value:
+      return {};
+    case PersistentCounter::Reading::State::Unreadable:
+      return {.environment = true,
+              .refusal     = std::format("rotation counter file '{}' cannot be read ({})", path, reading.detail)};
+    case PersistentCounter::Reading::State::Invalid:
+      break;
+  }
+  return {.refusal = std::format(
+              "rotation counter file '{}' is unreadable ({}); a guessed rotation number could overwrite archives of previous "
+              "sessions - repair the file (a non-negative integer), or delete it to restart rotation from 0 (existing .old<N> "
+              "archives will then be overwritten)",
+              path, reading.detail)};
 }
 
 std::vector<std::string> deprecatedFileWarnings(const qTree &plan, const std::vector<std::string> &streamNames) {

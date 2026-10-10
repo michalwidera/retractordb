@@ -767,6 +767,11 @@ int main(int argc, char *argv[]) try {
             SPDLOG_ERROR("Refused before delivery: {}", refusal);
             return system::errc::protocol_error;
           }
+          if (const CounterCheck counter = checkRotationCounter(coreInstance); !counter.refusal.empty()) {
+            std::cerr << "xretractor: " << counter.refusal << "; nothing was changed\n";
+            SPDLOG_ERROR("Refused before delivery: {}", counter.refusal);
+            return counter.environment ? system::errc::io_error : system::errc::protocol_error;
+          }
           const std::string target = peer.queryFile.empty() ? appCfg.serviceQueryFile : peer.queryFile;
           SPDLOG_INFO("Detected running service unit '{}'; delivering compiled query set to {}.", peer.unit, target);
           if (!servicecontrol::deliverQueryFile(sInputFile, target)) {
@@ -824,6 +829,17 @@ int main(int argc, char *argv[]) try {
   if (const std::string sourceError = checkDeclaredSources(coreInstance); sourceError != "OK") {
     std::cerr << "xretractor: " << sourceError << '\n';
     SPDLOG_ERROR("Plan refused: {}", sourceError);
+    return refusePlan();
+  }
+  // Licznik rotacji (#472): wadliwa tresc to odmowa planu jak wyzej, ale nieczytelny plik nie obciaza
+  // planu - kod io_error bez odmowy, wiec jednostka wstanie z tym samym planem po naprawie nosnika.
+  if (const CounterCheck counter = checkRotationCounter(coreInstance); !counter.refusal.empty()) {
+    std::cerr << "xretractor: " << counter.refusal << '\n';
+    if (counter.environment) {
+      SPDLOG_ERROR("Cannot start, plan kept: {}", counter.refusal);
+      return system::errc::io_error;
+    }
+    SPDLOG_ERROR("Plan refused: {}", counter.refusal);
     return refusePlan();
   }
 
@@ -930,6 +946,10 @@ int main(int argc, char *argv[]) try {
       // ale przy niedostepnej magistrali rozlacznosc zasobow miedzy nazwami nie jest wymuszana.
       SPDLOG_WARN("xrdbbus: {}; stream name uniqueness is NOT enforced.", claimed.detail);
       break;
+    case bus::ClaimStatus::NotReserved:
+      // Nieosiagalne: ten status zwraca wylacznie activateReservedPlan().
+      SPDLOG_ERROR("Bus claim reported a missing plan reservation: {}", claimed.detail);
+      return system::errc::state_not_recoverable;
   }
 
   signal(SIGINT, handleSignal);   // Ctrl+C

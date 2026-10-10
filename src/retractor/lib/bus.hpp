@@ -230,6 +230,7 @@ enum class ClaimStatus : std::uint8_t {
   TooLarge,         ///< plan przekracza pojemnosc slotu
   NoFreeSlot,       ///< wszystkie sloty zajete przez zywe instancje
   Unavailable,      ///< magistrali nie da sie uzyc; start bez egzekwowania rozlacznosci
+  NotReserved,      ///< tylko activateReservedPlan(): przylaczona instancja bez slotu albo bez rezerwacji
 };
 
 struct ClaimResult {
@@ -324,6 +325,9 @@ class Bus {
 
   /// Zastepuje aktywne zasoby uprzednio zarezerwowanymi. Operacja nie moze juz wejsc
   /// w kolizje: od udanego reservePlan() rezerwacja uczestniczy we wszystkich roszczeniach.
+  /// Dwie porazki sa rozne z natury, wiec maja rozne statusy: Unavailable - magistrali nie da
+  /// sie uzyc (zamek, srodowisko), NotReserved - przylaczona instancja nie ma slotu albo
+  /// rezerwacji, czyli zlamana kolejnosc wywolan po stronie silnika.
   ClaimResult activateReservedPlan();
 
   /// Dopisuje nazwy strumieni i sciezki ich magazynow do JUZ posiadanego slotu, sprawdziwszy

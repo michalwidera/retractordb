@@ -277,6 +277,20 @@ TEST_F(BusFixture, ReservedPlanBlocksNamesUntilActivation) {
   EXPECT_EQ(other.claim({.name = "beta", .queryFile = "b.rql", .streams = {"old"}}).status, bus::ClaimStatus::Claimed);
 }
 
+// Aktywacja bez slotu albo bez rezerwacji to zlamana kolejnosc silnika, nie niedostepna magistrala:
+// wolajacy odroznia je po statusie (#472) - K1 dla NotReserved, fail-open dla Unavailable.
+TEST_F(BusFixture, ActivationWithoutReservationIsNotReserved) {
+  bus::Bus instance(kTestSegment);
+  EXPECT_EQ(instance.activateReservedPlan().status, bus::ClaimStatus::NotReserved);
+
+  ASSERT_EQ(instance.claim({.name = "alfa", .queryFile = "plan.rql", .streams = {"src"}}).status, bus::ClaimStatus::Claimed);
+  EXPECT_EQ(instance.activateReservedPlan().status, bus::ClaimStatus::NotReserved);
+
+  ASSERT_EQ(instance.reservePlan({"new"}, "", {}).status, bus::ClaimStatus::Claimed);
+  ASSERT_EQ(instance.activateReservedPlan().status, bus::ClaimStatus::Claimed);
+  EXPECT_EQ(instance.activateReservedPlan().status, bus::ClaimStatus::NotReserved);
+}
+
 TEST_F(BusFixture, RefusedPlanReplacementLeavesOwnResourcesIntact) {
   bus::Bus first(kTestSegment);
   bus::Bus second(kTestSegment);

@@ -38,5 +38,5 @@ TEST(FatalErrorTest, InternalExitsWithFailureAndRaisesLatch) {
 
 // K4: kod EIO, ten sam komunikat na stderr, zatrzask nie podniesiony.
 TEST(FatalErrorTest, EnvironmentExitsWithEioAndKeepsLatchDown) {
-  EXPECT_EXIT(raiseEnvironment(), ::testing::ExitedWithCode(EIO), "\nFATAL: environment fault 7\nlatch=0\n");
+  EXPECT_EXIT(raiseEnvironment(), ::testing::ExitedWithCode(EIO), "\nFATAL \\(environment\\): environment fault 7\nlatch=0\n");
 }

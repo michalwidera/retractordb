@@ -305,6 +305,11 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
     std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
     FatalError("fault hook RDB_FAULT_FATAL_IN_SLOT: fatal error inside a processing slot");
   }
+  // Hak testu it_env_error_exit (#472), ta sama droga: blad srodowiska (K4) w slocie konczy proces
+  // kodem EIO bez zatrzasku. Zadne RQL nie wywoluje awarii nosnika na zawolanie, a uprawnienia
+  // katalogu nie zatrzymuja roota w kontenerze CI.
+  if (std::getenv("RDB_FAULT_ENV_IN_SLOT") != nullptr)
+    rdb::EnvironmentError("fault hook RDB_FAULT_ENV_IN_SLOT: environment failure inside a processing slot");
 
   // Zrodlo dolaczone ad-hoc nie uczestniczylo w kroku zerowym. Uzbrajamy je
   // przed konsumentami pierwszego naleznego slotu. Koncowa faza deklaracji
