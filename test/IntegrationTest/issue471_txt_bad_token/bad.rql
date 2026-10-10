@@ -1,0 +1,7 @@
+# Niepoprawny token liczbowy w TEXTFILE daje NULL i jedno ostrzezenie (#471).
+# ctest -R it_issue471_txt_bad_token -V
+STORAGE 'temp'
+
+DECLARE a INTEGER, b INTEGER STREAM src, 1 TEXTFILE 'bad.txt'
+
+SELECT src[0], src[1] STREAM dst FROM src

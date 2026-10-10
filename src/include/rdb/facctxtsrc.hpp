@@ -27,9 +27,10 @@ namespace rdb {
 /// - zliczać wykonane odczyty i zwracać ich liczbę przez count(),
 /// - czytać wyłącznie plik zwykły (#346): ścieżkę innego rodzaju odrzucać przez initializationError(),
 ///   sprawdzając ją przez stat() przed otwarciem, żeby FIFO bez pisarza nie zablokowało open().
+/// - traktować token liczbowy niepoprawny (nieodczytany w całości albo poza zakresem typu pola) jako null pola
+///   i zgłaszać tylko pierwszy taki token źródła jednym ostrzeżeniem w logu (#471).
 ///
 /// @note Klasa nie obsługuje zapisu i nie zapewnia losowego dostępu do rekordów tekstowych.
-/// @note Interpretacja błędnych tokenów numerycznych zależy od bieżącej implementacji parsera i nie stanowi pełnej walidacji wejścia.
 class textSourceRO : public FileInterface {
   std::string filename_;
   std::string initializationError_;
@@ -48,6 +49,9 @@ class textSourceRO : public FileInterface {
   /// Wejście wyczerpane: ustawiane wyłącznie przy wyłączonym zawijaniu, bo przy włączonym
   /// koniec pliku jest tylko powrotem na jego początek, a nie końcem danych.
   bool exhausted_ = false;
+
+  /// Pierwszy niepoprawny token liczbowy został już zgłoszony - kolejne, także po zawinięciu pliku, nie są.
+  bool badTokenReported_ = false;
 
  public:
   textSourceRO(std::string_view fileName,          //

@@ -6,7 +6,8 @@
 #include <cerrno>
 #include <charconv>  // from_chars
 #include <cstring>   // memcpy
-#include <memory>    // make_unique
+#include <format>
+#include <memory>  // make_unique
 #include <optional>
 #include <ranges>
 #include <sstream>
@@ -34,42 +35,53 @@ std::optional<std::string> readTokenFromFstream(std::fstream &myFile, bool loopT
 
 bool isNullToken(const std::string &token) { return token == "NULL" || token == "Null" || token == "null"; }
 
+// Token liczbowy jest poprawny, gdy zostal odczytany W CALOSCI i miesci sie w zakresie typu pola (#471).
+// Token niepoprawny nie ma wartosci - wolajacy zapisuje NULL, tak jak przy przepelnieniu w obliczeniach.
+// Do 2026-10-10 `abc` dawalo 0, `12x` - 12, `99999999999` w INTEGER - 2147483647, `-5` w UINT -
+// 4294967291, a `300` w BYTE - 44.
 template <typename T>
-T parseAs(const std::string &token) {
+std::optional<T> parseAs(const std::string &token) {
   T var{0};
-  // std::from_chars nie alokuje i nie buduje obiektu strumienia, więc zdejmuje stały koszt konstrukcji
-  // std::istringstream ponoszony na każdy token. Składnie, których from_chars nie przyjmuje (wiodący '+',
-  // wartość ujemna dla typu bez znaku), obsługuje niezmieniona ścieżka strumieniowa poniżej - zbiór
-  // akceptowanych tokenów i wynik parsowania pozostają takie same jak dotąd.
-  //
-  // Tylko typy całkowite: dla zmiennoprzecinkowych from_chars przyjmuje "inf"/"nan", na których ścieżka
-  // strumieniowa daje 0 - to byłaby cicha zmiana zawartości strumienia, więc FLOAT/DOUBLE zostają na
-  // std::istringstream.
+  // Typy calkowite: from_chars nie alokuje i nie buduje strumienia, a zakres sprawdza sam
+  // (result_out_of_range, takze ujemna wartosc dla typu bez znaku). Nie przyjmuje wiodacego '+',
+  // ktory zrodlo akceptowalo dotad - zdejmujemy go, o ile stoi za nim cyfra (`+-5` jest bledny).
   if constexpr (std::is_integral_v<T>) {
-    if (std::from_chars(token.data(), token.data() + token.size(), var).ec == std::errc{}) return var;
+    const char *first = token.data();
+    const char *last  = token.data() + token.size();
+    if (token.size() > 1 && token[0] == '+' && token[1] >= '0' && token[1] <= '9') ++first;
+    const auto [ptr, ec] = std::from_chars(first, last, var);
+    if (ec != std::errc{} || ptr != last) return std::nullopt;
+  } else {
+    // FLOAT/DOUBLE zostaja na strumieniu: from_chars przyjmuje "inf"/"nan", a strumien je odrzuca.
+    // failbit niesie tez przekroczenie zakresu (`1e999`), a niedomiar (`1e-999` -> 0) go nie ustawia.
+    std::istringstream in(token);
+    in >> var;
+    if (in.fail() || in.peek() != std::char_traits<char>::eof()) return std::nullopt;
   }
-
-  std::istringstream(token) >> var;
   return var;
 }
 
-void parseAndSetNumericItem(rdb::payload &payload, int index, rdb::descFld rtype, const std::string &token) {
+template <typename T>
+bool setParsed(rdb::payload &payload, int index, const std::string &token) {
+  const auto value = parseAs<T>(token);
+  if (!value.has_value()) return false;
+  payload.setItem(index, *value);
+  return true;
+}
+
+// false = token niepoprawny; pola nie zapisuje, NULL ustawia wolajacy.
+bool parseAndSetNumericItem(rdb::payload &payload, int index, rdb::descFld rtype, const std::string &token) {
   switch (rtype) {
     case rdb::INTEGER:
-      payload.setItem(index, parseAs<int>(token));
-      break;
+      return setParsed<int>(payload, index, token);
     case rdb::UINT:
-      payload.setItem(index, parseAs<unsigned>(token));
-      break;
+      return setParsed<unsigned>(payload, index, token);
     case rdb::FLOAT:
-      payload.setItem(index, parseAs<float>(token));
-      break;
+      return setParsed<float>(payload, index, token);
     case rdb::DOUBLE:
-      payload.setItem(index, parseAs<double>(token));
-      break;
+      return setParsed<double>(payload, index, token);
     case rdb::BYTE:
-      payload.setItem(index, static_cast<uint8_t>(parseAs<unsigned>(token)));
-      break;
+      return setParsed<uint8_t>(payload, index, token);
     default:
       FatalError("facctxtsrc: unsupported field type: {}", static_cast<int>(rtype));
   }
@@ -137,6 +149,10 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
       // NULLTYPE[N] to N slotow, wiec - jak tablica liczbowa - N tokenow wiersza.
       for (auto j = 0; j < rdb::flatElementCount(item); j++) {
         auto token = readTokenFromFstream(myFile_, loopToBeginningIfEOF_);
+        // Nieosiagalne (K1, #471): pola NULLTYPE nie da sie zadeklarowac dla zrodla - typu NULL nie ma
+        // ani w DESC.g4, ani w DECLARE (fldType.hpp, flatElementCount), wiec deskryptor zrodla
+        // zbudowany z planu nigdy go nie niesie (buduja go recznie tylko testy jednostkowe). Zly token
+        // w takim polu nie jest wiec anomalia danych, tylko zlamanym niezmiennikiem.
         if (token.has_value() && !isNullToken(*token)) {
           FatalError("facctxtsrc: expected NULL token for NULL field, got: {}", *token);
         }
@@ -215,7 +231,17 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
             anyNull = true;
             continue;
           }
-          parseAndSetNumericItem(*payload_, i + j, item.rtype, *token);
+          if (!parseAndSetNumericItem(*payload_, i + j, item.rtype, *token)) {
+            // Zrodlo zawijane w petli czyta te same wiersze bez konca - jedno ostrzezenie na zrodlo.
+            if (!badTokenReported_) {
+              badTokenReported_ = true;
+              SPDLOG_WARN(
+                  "Text source {}: record {}, field {}{}: invalid numeric token '{}' read as NULL; further invalid tokens "
+                  "in this source are not reported",
+                  filename_, readCount_, item.rname, item.rarray > 1 ? std::format("[{}]", j) : std::string{}, *token);
+            }
+            anyNull = true;
+          }
         }
         // Bit NULL jest jeden na wpis deskryptora, a zapis wartosci elementu go kasuje. Dopoki element
         // NULL byl zapisywany w petli, `NULL 2 3` dawalo pole okreslone z zerem w a[0], a `2 3 NULL` -
