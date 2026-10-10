@@ -40,6 +40,7 @@ class FlockServiceGuard {
   std::string lockFilePath;
   std::string ipcLockPath;
   std::string serviceQueryFile;  // plik zapytań tej instancji; zapisywany do locka jako QUERYFILE
+  std::string lockError;
   int lockFileDescriptor{-1};
   int ipcLockDescriptor{-1};
   bool isLocked{false};
@@ -60,6 +61,8 @@ class FlockServiceGuard {
   // ustalona ZANIM instancja dotknie obiektow IPC, ale pusty plik nie moze udawac gotowego serwera
   // przed klientami, ktorzy czekaja na linie "PID: <pid>".
   bool acquireLock();
+  // Pusty przy zajetej blokadzie; blad otwarcia/walidacji nie oznacza zywego serwera.
+  [[nodiscard]] const std::string &acquireLockError() const { return lockError; }
 
   // Druga blokada chroni faktyczna nazwe IPC, takze przy kolizji skrotow nazw.
   // Wspolna dla wszystkich TMPDIR i przestrzeni magistrali. Przed dotknieciem IPC.

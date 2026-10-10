@@ -100,7 +100,9 @@
 ///
 /// Interfejs komunikacji i funkcjonalność:
 /// - Wymuszać pojedynczą instancję programu w systemie poprzez blokadę plikową (FlockServiceGuard); kolejna próba startu
-///   jest sygnalizowana błędem braku dostępnej blokady (no_lock_available).
+///   jest sygnalizowana błędem braku dostępnej blokady (no_lock_available). Plik blokady, którego nie
+///   wolno albo nie da się użyć (dowiązanie, nie zwykły plik, inny właściciel, błąd systemu), kończy
+///   start kodem io_error.
 /// - W przypadku rozpoznania funkcjonowania innej instancji programu, należy rozpoznać czy ta instancja działa jako serwis,
 ///   czy jako osobny proces, jeśli działa jako serwis zaraportować informację o tym fakcie i
 ///   przekompilować zapytania (sprawdzić poprawność) i przekazać zapytanie do tej instancji poprzez restart serwisu z zapytaniem (zachowując konfigurację serwisu).
@@ -829,6 +831,12 @@ int main(int argc, char *argv[]) try {
   // tozsamosci, potem atomowe roszczenie magistrali, dopiero potem kasowanie artefaktow.
   // Przegrany rownolegly start nie dochodzi dzieki temu do zadnej czynnosci destrukcyjnej.
   if (!guard.acquireLock()) {
+    // Pliku blokady nie da sie uzyc (dowiazanie, zly typ, obcy wlasciciel, blad systemu). To nie
+    // jest zajeta instancja, wiec inny kod wyjscia niz no_lock_available ponizej.
+    if (!guard.acquireLockError().empty()) {
+      std::cerr << "xretractor: " << guard.acquireLockError() << '\n';
+      return system::errc::io_error;
+    }
     // Odmowa startu musi byc widoczna tam, gdzie widac pozostale odmowy z tej transakcji
     // (konflikt strumienia, licznika, magistrali) - czyli na stderr, nie tylko w logu. Skrypt,
     // ktory startuje serwer w tle i po chwili odpytuje go klientem, nie ma innego sposobu, zeby

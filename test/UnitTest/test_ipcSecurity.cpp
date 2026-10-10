@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -18,6 +20,7 @@
 #include "retractor/lib/bus.hpp"
 #include "retractor/lib/ipcServer.hpp"
 #include "retractor/lib/lockFile.hpp"
+#include "retractor/lib/lockManager.hpp"
 #include "syscallWrap.hpp"
 
 namespace {
@@ -27,8 +30,9 @@ namespace sec = ipc::security;
 // Wstrzykniete metadane sprawdzaja odmowe takze bez uprawnien do zmiany UID.
 // Rzeczywisty drugi UID ma osobny test integracyjny, jawnie pomijany bez root.
 std::string foreignPath;
-int foreignFd     = -1;
-ino_t foreignLock = 0;
+int foreignFd      = -1;
+ino_t foreignLock  = 0;
+int rejectedLockFd = -1;
 uid_t otherUid() { return geteuid() == 65534 ? 65533 : 65534; }
 
 std::string pathFor(const std::string &name) {
@@ -63,7 +67,10 @@ RDB_WRAP_SYSCALL(int, lstat, (const char *path, struct stat *info), (path, info)
 
 extern "C" int __wrap_fstat(int fd, struct stat *info) {
   const int result = __real_fstat(fd, info);
-  if (result == 0 && (fd == foreignFd || (foreignLock != 0 && info->st_ino == foreignLock))) info->st_uid = otherUid();
+  if (result == 0 && (fd == foreignFd || (foreignLock != 0 && info->st_ino == foreignLock))) {
+    info->st_uid = otherUid();
+    if (foreignLock != 0 && info->st_ino == foreignLock) rejectedLockFd = fd;
+  }
   return result;
 }
 
@@ -230,5 +237,35 @@ TEST_F(IpcSecurity, SweepDoesNotRemoveForeignLockOrInvokeItsCleanup) {
   EXPECT_FALSE(callback);
   EXPECT_TRUE(std::filesystem::exists(path));
   foreignLock = 0;
+  std::filesystem::remove_all(dir);
+}
+
+TEST_F(IpcSecurity, WritableLockRejectsForeignDescriptorButReadersCanAcquireIt) {
+  const auto dir = std::filesystem::temp_directory_path() / serverName;
+  std::filesystem::create_directories(dir);
+  const auto path = dir / "foreign.lock";
+  { std::ofstream(path) << "foreign sentinel"; }
+  struct stat info{};
+  ASSERT_EQ(stat(path.c_str(), &info), 0);
+  foreignLock    = info.st_ino;
+  rejectedLockFd = -1;
+  FlockServiceGuard guard("foreign");
+  guard.setLockDir(dir.string());
+  EXPECT_FALSE(guard.acquireLock());
+  EXPECT_FALSE(guard.isLockActive());
+  EXPECT_NE(guard.acquireLockError().find("untrusted owner"), std::string::npos);
+  EXPECT_NE(guard.acquireLockError().find(path.string()), std::string::npos);
+  ASSERT_NE(rejectedLockFd, -1);
+  EXPECT_EQ(fcntl(rejectedLockFd, F_GETFD), -1);
+  EXPECT_EQ(errno, EBADF) << "odrzucony deskryptor pozostal otwarty";
+  for (const bool exclusive : {false, true}) {
+    int fd = -1;
+    ASSERT_EQ(lockfile::acquire(path.string(), exclusive, false, fd), lockfile::Result::Acquired);
+    EXPECT_EQ(close(fd), 0);
+  }
+  foreignLock = 0;
+  std::ifstream input(path);
+  EXPECT_EQ(std::string(std::istreambuf_iterator<char>(input), {}), "foreign sentinel");
+  EXPECT_EQ(std::filesystem::file_size(path), 16U);
   std::filesystem::remove_all(dir);
 }
