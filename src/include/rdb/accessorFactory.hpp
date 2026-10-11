@@ -8,6 +8,7 @@
 
 #include "descriptor.hpp"
 #include "fainterface.hpp"
+#include "memoryStore.hpp"
 #include "metaData.hpp"
 
 namespace rdb {
@@ -50,12 +51,15 @@ namespace rdb {
 /// @note Descriptor jest nie-const, bo retention()/storagePolicy() nie są metodami const.
 /// @param followFinalLink zapisywalny plik danych moze byc dowiazaniem - tylko dla REF podanego przez
 ///        wolajacego (#374, storageFile.hpp); zrodla deklarowane czytaja sciezke jak dotad.
+/// @param memory Memory Store dla typu "MEMORY"; nullptr wybiera MemoryStore::processDefault(),
+///        czyli zachowanie sprzed fazy 2 (#446, C2). Dla pozostalych typow bez znaczenia.
 [[nodiscard]] std::unique_ptr<FileInterface> makeAccessor(std::string_view storageType,    //
                                                           const std::string &storageFile,  //
                                                           Descriptor &descriptor,          //
                                                           bool oneShot,                    //
                                                           int percounter,                  //
-                                                          bool followFinalLink = false);
+                                                          bool followFinalLink = false,    //
+                                                          MemoryStore *memory  = nullptr);
 
 /// @brief Create the metaData variant matching the storage: inert for declared sources,
 ///        storageShadow when the accessor keeps a data shadow file, base metaData otherwise.
