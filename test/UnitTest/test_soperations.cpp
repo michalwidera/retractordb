@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <numeric>
 #include <vector>
@@ -9,6 +10,39 @@
 #include "SOperations.hpp"
 
 // ctest -R '^ut-soperations' -V
+
+namespace {
+[[noreturn]] void hashWithZeroDeltaA() {
+  int retPos = 0;
+  Hash(0, 1, 0, retPos);
+  std::exit(0);
+}
+
+[[noreturn]] void hashWithNegativeDeltaB() {
+  int retPos = 0;
+  Hash(1, -1, 0, retPos);
+  std::exit(0);
+}
+}  // namespace
+
+// Niedodatni przedział to naruszony niezmiennik (K1): ta sama droga co każdy FatalError.
+TEST(xSOperations, hash_rejects_non_positive_delta) {
+  EXPECT_EXIT(hashWithZeroDeltaA(), ::testing::ExitedWithCode(EXIT_FAILURE), "\nFATAL: Hash: deltaA must be > 0\n");
+  EXPECT_EXIT(hashWithNegativeDeltaB(), ::testing::ExitedWithCode(EXIT_FAILURE), "\nFATAL: Hash: deltaB must be > 0\n");
+}
+
+// W trybie rzucaj biblioteki (#476) ten sam błąd wraca jako EngineFatal.
+TEST(xSOperations, hash_non_positive_delta_throws_in_scope) {
+  rdb::ThrowOnFatalScope scope;
+  int retPos = 0;
+  try {
+    Hash(1, 0, 0, retPos);
+    ADD_FAILURE() << "Hash z deltaB == 0 nie zglosil bledu";
+  } catch (const rdb::EngineFatal &fault) {
+    EXPECT_EQ(fault.cls, rdb::ErrorClass::Internal);
+    EXPECT_EQ(fault.message, "Hash: deltaB must be > 0");
+  }
+}
 
 TEST(xSOperations, hash_operations) {
   std::vector<std::vector<int>> testdata{
