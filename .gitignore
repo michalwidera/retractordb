@@ -42,10 +42,18 @@ graph_info.json
 .project
 .cmake
 .settings/*
-docs/
+# docs/ bylo katalogiem wyjscia generatora i zostalo usuniete z master w
+# 53c304b9 ("Remove docs from main branch"). Od tej pory trzyma rowniez
+# trwala dokumentacje programu osadzania, wiec ignorujemy jego ZAWARTOSC
+# poza plikami .md - wyjscie generatora nadal nie wchodzi do repozytorium.
+docs/*
+!docs/*.md
 bin/*
 /lib/
 .venv/
+# Srodowiska wirtualne tworzone w drzewie: .venv-python (scripts/python-venv.sh)
+# i .venv-api z api/python/README.md. Wzorzec obejmuje oba i kazde nastepne.
+.venv-*/
 .codex/*
 !.codex/config.toml
 dokumentacja-rdb/
@@ -75,3 +83,20 @@ test/research_gate/**/raw/
 # Wzorzec BEZ koncowego ukosnika - `.lake/` pasuje tylko do katalogu, nie do dowiazania,
 # i test-ci.sh (git ls-files -co --exclude-standard) wrzucilby zerwany link do kontenera.
 .lake
+
+# Dokumenty projektowe (design/) sa notatkami roboczymi, nie zrodlem prawdy:
+# trwala dokumentacja programu osadzania zyje w docs/. Trzymane poza repozytorium,
+# zeby kolejne rewizje roadmapy nie generowaly diffow w historii kodu.
+design/
+
+# Artefakty Findera na macOS - platforma rozwojowa, wiec pojawiaja sie w kazdym katalogu.
+.DS_Store
+
+# Wyjscia budowy rozszerzenia Pythona (RDB_PYTHON=ON). Modul kompilowany trafia do
+# katalogu build, a instalacja editable zostawia te katalogi obok pakietu.
+api/python/**/*.so
+api/python/**/*.pyd
+api/python/build/
+api/python/dist/
+api/python/*.egg-info/
+.pytest_cache/
