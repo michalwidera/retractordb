@@ -44,6 +44,7 @@ class posixBinaryFileWithShadow : public FileInterface {
   int fd_shadow{-1};
   int percounter_;
   std::string initializationError_;
+  int initializationErrno_{0};
 
   [[nodiscard]] std::string shadowName() const;
   ssize_t shadowFind(uint8_t *ptrData, size_t position) const;
@@ -66,6 +67,7 @@ class posixBinaryFileWithShadow : public FileInterface {
   auto name() -> std::string & override;
   size_t count() override;
   [[nodiscard]] const std::string &initializationError() const override { return initializationError_; }
+  [[nodiscard]] int initializationErrno() const override { return initializationErrno_; }
   [[nodiscard]] bool hasShadow() const override { return true; }
 
   /// @brief Scala plik cienia z głównym plikiem i usuwa plik cienia

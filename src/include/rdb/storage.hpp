@@ -10,6 +10,7 @@
 
 #include "descriptor.hpp"
 #include "fainterface.hpp"
+#include "fatalError.hpp"
 #include "metaData.hpp"
 #include "payload.hpp"
 #include "sourceBuffer.hpp"
@@ -101,7 +102,7 @@ class storage {
   boost::rational<int> rInterval_{1};  ///< sampling interval for time calculations
 
   void detectStartupState();  ///< resetuje osierocony indeks lub wykrywa przerwe po przygotowaniu metadanych
-  [[nodiscard]] std::string attachStorage();
+  [[nodiscard]] Refusal attachStorage();
 
   void abortIfStorageNotPrepared();
   void initializeAccessor();
@@ -145,6 +146,9 @@ class storage {
 
   /// @return pusty napis albo powod odmowy odczytu deskryptora lub otwarcia magazynu
   [[nodiscard]] std::string attachDescriptor(const Descriptor *descriptor = nullptr);
+
+  /// Ta sama inicjalizacja z zachowana klasa odmowy dla granicy silnika (#474).
+  [[nodiscard]] Refusal attachDescriptorStatus(const Descriptor *descriptor = nullptr);
 
   /// @brief Oznacz magazyn jako materializowany podplan (substrat) dla sondy K23.
   ///

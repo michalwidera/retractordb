@@ -70,6 +70,7 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
   if (fd < 0) {
     const int openErrno  = errno;  // przed skladaniem napisu - uzasadnienie w faccposix.cc
     initializationError_ = "cannot open output file '" + filename_ + "': " + strerror(openErrno);
+    initializationErrno_ = openErrno;
     percounter_          = -1;
     return;
   }
@@ -78,6 +79,7 @@ posixBinaryFileWithShadow::posixBinaryFileWithShadow(const std::string_view file
   if (fd_shadow < 0) {
     const int openErrno  = errno;
     initializationError_ = "cannot open output file '" + shadowName() + "': " + strerror(openErrno);
+    initializationErrno_ = openErrno;
     percounter_          = -1;
     if (!mainFileExisted) std::filesystem::remove(filename_, fs_ec);
     return;

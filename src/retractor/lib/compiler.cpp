@@ -238,6 +238,7 @@ std::string compiler::resolveStreamIntervals() {
           boost::rational<int> delta2 = t2.getRI();  // There is no second stream
           // - just fraction argument
           if (delta2 == 0) {
+            // K1 (#474): RQLParser::acceptInterval odrzuca zero przed zapisem argumentu &.
             FatalError("compiler: DEHASH rational argument must not be zero for '{}'", q.id);
           }
           if (delta1 == 0) {
@@ -259,6 +260,7 @@ std::string compiler::resolveStreamIntervals() {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
           boost::rational<int> delta2 = t2.getRI();
           if (delta2 == 0) {
+            // K1 (#474): RQLParser::acceptInterval odrzuca zero przed zapisem argumentu %.
             FatalError("compiler: DEHASH rational argument must not be zero for '{}'", q.id);
           }
           if (delta1 == 0) {
@@ -285,6 +287,7 @@ std::string compiler::resolveStreamIntervals() {
             continue;
           }
           if (delta2 <= 0) {
+            // K1 (#474): rational_se nie ma znaku, a acceptInterval odrzuca zero celu -.
             FatalError("compiler: SUBTRACT target interval must be positive for '{}'", q.id);
           }
           delta = delta2;
@@ -1919,6 +1922,8 @@ std::map<std::string, int> compiler::computeRequiredCapacities() {
       if (rule.action != rule::DUMP) continue;
       auto [l, r] = rule.dumpRange;
       if (l >= r) {
+        // K1 (#474): RQLParser::buildRule sprawdza l < r przed dolaczeniem reguly DUMP,
+        // takze w attachAdHocRule. Kompilator nie przepisuje granic zrzutu.
         FatalError("compiler: dump range invalid [{}..{}] for query '{}'", l, r, q.id);
       }
       if (l < 0) capMap[q.id] = std::max(capMap[q.id], static_cast<int>(abs(l)) + 1);
@@ -2500,10 +2505,9 @@ std::string compiler::deduplicateSubstrats() {
 /// zderzeniem zajmuje sie factorMatchedHashTimeMoves(), ktora wtedy po prostu nie sklada
 /// faktoryzacji (przypadek `collide_user` w macierzy ablacyjnej).
 ///
-/// Praktycznie jedyna droga do naruszenia jest kolizja skrotu z composeStreamName(). Przy
-/// 64 bitach jest ona rzadsza od bledu sprzetu, ale poprawnosc nie ma sie opierac na
-/// prawdopodobienstwie: bez tej kontroli kolizja daje cicha zla odpowiedz, z nia - glosna
-/// awarie. Stad FatalError, tak samo jak w requireResolvedForEveryNode().
+/// Nazwy z podkresleniami tez koliduja: A_B + C oraz A + B_C tworza STREAM_ADD_A_B_C.
+/// To blad planu, osiagalny rowniez przez ad hoc. Kontrola musi stac przed pierwszym
+/// topologicalSort(), ktory identyfikuje wezly po id i zgubilby drugi program (#474).
 std::string compiler::validateSubstratNameUniqueness() {
   std::map<std::string, const query *> seen;
   for (const auto &candidate : coreInstance) {
@@ -2517,8 +2521,7 @@ std::string compiler::validateSubstratNameUniqueness() {
         std::equal(first.lProgram.begin(), first.lProgram.end(), candidate.lProgram.begin(), [](const token &a, const token &b) {
           return a.getCommandID() == b.getCommandID() && a.getVT() == b.getVT();
         });
-    if (!progMatch)
-      FatalError("compiler::validateSubstratNameUniqueness: substrate name '{}' denotes two different programs", candidate.id);
+    if (!progMatch) return std::format("Substrate name '{}' denotes two different programs", candidate.id);
   }
   return {"OK"};
 }
@@ -3312,6 +3315,7 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
   for (auto &t : instance.lProgram) {
     if (t.getCommandID() != PUSH_STREAM || !dependsOnOrdinal(t.getStr_())) continue;
     const auto parts = splitIndexedRef(t.getStr_());
+    // K1 (#474): dependsOnOrdinal zwraca true tylko po udanym splitIndexedRef tego samego tekstu.
     if (!parts.has_value()) FatalError("compiler::substituteOrdinal: malformed indexed stream reference '{}'", t.getStr_());
     const auto index = genIndexFolder(parts->second, ordinal).fold();
     if (!index) return "Stream '" + instance.id + "' references '" + t.getStr_() + "' - the index does not fit in int";
@@ -3331,6 +3335,7 @@ std::string compiler::substituteOrdinal(query &instance, int ordinal) {
       }
       if (t.getCommandID() != PUSH_ID2 || !dependsOnOrdinal(t.getStr_())) continue;
       const auto parts = splitIndexedRef(t.getStr_());
+      // K1 (#474): dependsOnOrdinal sprawdzil juz nawiasy przez splitIndexedRef tego samego tekstu.
       if (!parts.has_value()) FatalError("compiler::substituteOrdinal: malformed indexed field reference '{}'", t.getStr_());
       const auto index = genIndexFolder(parts->second, ordinal).fold();
       if (!index) return "Stream '" + instance.id + "' references '" + t.getStr_() + "' - the index does not fit in int";
@@ -3612,6 +3617,11 @@ std::string compiler::compile() {
   snapshotNamedSourceRefs();
 
   result = extractIntermediateStreams();
+  if (result != "OK") return result;
+
+  // Przed sortowaniem po nazwach: rowne nazwy roznych programow sa bledem planu,
+  // a identyczne duplikaty pozostaja legalne, takze przy wylaczonej deduplikacji (#474).
+  result = validateSubstratNameUniqueness();
   if (result != "OK") return result;
 
   result = expandSchemaWildcards();

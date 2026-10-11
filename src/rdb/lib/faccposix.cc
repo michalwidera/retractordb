@@ -38,6 +38,7 @@ posixBinaryFile::posixBinaryFile(const std::string_view fileName,  //
   if (fd < 0) {
     const int openErrno  = errno;  // przed skladaniem napisu - alokacja moze ruszyc errno
     initializationError_ = "cannot open output file '" + filename_ + "': " + strerror(openErrno);
+    initializationErrno_ = openErrno;
     percounter_          = -1;
     return;
   }

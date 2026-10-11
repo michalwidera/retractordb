@@ -148,10 +148,13 @@ void qTree::dumpCore() {
 std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
   std::set<boost::rational<int>> lstTimeIntervals;
   for (const auto &it : *this) {
-    if (it.rInterval == 0) {
-      FatalError("qTree: query '{}' rInterval is zero - check :STORAGE directive", it.id);
-    }
+    // Dyrektywy maja legalnie zerowy interwal i zostaja w planie `xretractor -c -w`,
+    // ktory nie buduje dataModel. Pomijamy je przed kontrola zera (#474).
     if (it.isCompilerDirective()) continue;
+    if (it.rInterval == 0) {
+      // K1 (#474): parser odrzuca zerowe DECLARE, a kompilator rozwiazuje interwaly SELECT.
+      FatalError("qTree: query '{}' rInterval is zero", it.id);
+    }
     lstTimeIntervals.insert(it.rInterval);
   }
   return lstTimeIntervals;

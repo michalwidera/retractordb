@@ -40,10 +40,13 @@ storage::storage(const std::string_view qryID,         //
       percounter_(percounter) {}
 
 std::string storage::attachDescriptor(const Descriptor *descriptorParam) {
+  return attachDescriptorStatus(descriptorParam).message;
+}
+
+Refusal storage::attachDescriptorStatus(const Descriptor *descriptorParam) {
   const bool descriptorExisted = descriptorFileExist();
   if (descriptorExisted) {
-    if (const Refusal error = tryLoadDescriptorFile(paths_.descriptorFile(), descriptor); !error.message.empty())
-      return error.message;
+    if (const Refusal error = tryLoadDescriptorFile(paths_.descriptorFile(), descriptor); !error.message.empty()) return error;
     if (descriptorParam != nullptr) {
       verifyDescriptorMatch(*descriptorParam, descriptor, paths_.descriptorFile());
       // REF decyduje, ktory plik zostanie otwarty, zapisany i - przy DISPOSABLE - usuniety, a operator==
@@ -53,9 +56,10 @@ std::string storage::attachDescriptor(const Descriptor *descriptorParam) {
       const std::string keptRef    = descriptorRef(descriptor);
       const std::string plannedRef = descriptorRef(*descriptorParam);
       if (keptRef != plannedRef)
-        return std::format("storage: {} names data file '{}', but the plan gives {}; remove {} to start the stream afresh",
-                           paths_.descriptorFile(), keptRef, plannedRef.empty() ? "none" : "'" + plannedRef + "'",
-                           paths_.descriptorFile());
+        return {ErrorClass::Plan,
+                std::format("storage: {} names data file '{}', but the plan gives {}; remove {} to start the stream afresh",
+                            paths_.descriptorFile(), keptRef, plannedRef.empty() ? "none" : "'" + plannedRef + "'",
+                            paths_.descriptorFile())};
     }
   } else {
     if (descriptorParam == nullptr) {
@@ -72,15 +76,15 @@ std::string storage::attachDescriptor(const Descriptor *descriptorParam) {
   storagePayload_ = std::make_unique<rdb::payload>(descriptor);
   buffer_.attach(descriptor);
 
-  const std::string error = attachStorage();
-  if (!error.empty() && !descriptorExisted) {
+  const Refusal error = attachStorage();
+  if (!error.message.empty() && !descriptorExisted) {
     std::error_code ec;
     std::filesystem::remove(paths_.descriptorFile(), ec);
   }
   return error;
 }
 
-std::string storage::attachStorage() {
+Refusal storage::attachStorage() {
   if (paths_.storageFile().empty()) FatalError("storage: storage file path is empty - storage not properly configured");
 
   auto it1 = std::ranges::find_if(descriptor,  //
@@ -95,13 +99,21 @@ std::string storage::attachStorage() {
   // z tego samego pliku moze tu jedynie zawezic dostep, nigdy go poszerzyc. Odmowa zapada przed
   // utworzeniem akcesora, czyli przed O_CREAT.
   if (!refFromCaller_ && !isDeclared() && paths_.refLeavesAllowedDirs())
-    return std::format(
-        "storage: {} moves the {} data file to '{}', outside the storage directory; add its directory to "
-        "storage.ref_dirs in retractor.toml to allow it",
-        paths_.descriptorFile(), storageType_, paths_.storageFile());
+    return {ErrorClass::Plan,
+            std::format("storage: {} moves the {} data file to '{}', outside the storage directory; add its directory to "
+                        "storage.ref_dirs in retractor.toml to allow it",
+                        paths_.descriptorFile(), storageType_, paths_.storageFile())};
 
   initializeAccessor();
-  if (!accessor_->initializationError().empty()) return accessor_->initializationError();
+  if (!accessor_->initializationError().empty()) {
+    // Niepusty status zrodla oznacza zly rodzaj pliku (BINFILE/TEXTFILE/DEVICE).
+    if (isDeclared()) return {ErrorClass::Plan, accessor_->initializationError()};
+    // Zapisywalne akcesory oddaja blad open(O_CREAT). Klasa jak w checkOutputFilesOpenable:
+    // sciezka sprzeczna z systemem plikow to plan, reszta to srodowisko (#474).
+    const int err = accessor_->initializationErrno();
+    return {err == ENOENT || err == ENOTDIR || err == EISDIR ? ErrorClass::Plan : ErrorClass::Environment,
+            accessor_->initializationError(), err};
+  }
 
   // Wstrzyknięcie wariantu metadanych - dobór wariantu (inertny/cień indeksu/bazowy) realizuje fabryka.
   metaData_ = makeMetaIndex(isDeclared(), accessor_->hasShadow(), descriptor, paths_.metaIndexFile());

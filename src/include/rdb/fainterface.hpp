@@ -112,6 +112,11 @@ struct FileInterface {
     return none;
   }
 
+  /// @brief errno nieudanego open() z konstruktora; 0, gdy blad nie pochodzi z open() albo go nie ma.
+  ///
+  /// Klasyfikacja odmowy (#474) zalezy od przyczyny, a tekst initializationError() jej nie niesie.
+  [[nodiscard]] virtual int initializationErrno() const { return 0; }
+
   /// @brief Whether this storage keeps a data shadow file (.shadow) for update operations.
   /// @return true when updates go to a shadow file (see posixBinaryFileWithShadow)
   [[nodiscard]] virtual bool hasShadow() const { return false; }
