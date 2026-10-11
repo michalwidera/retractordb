@@ -32,6 +32,7 @@ set(LIBRARY_TEST_SET
     magic_enum::magic_enum
     antlr4_static
     retractor
+    rdbembed
     rdb
     qry
     rqlparser

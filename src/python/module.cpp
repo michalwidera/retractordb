@@ -149,18 +149,14 @@ struct Record {
 
 /// Sformatuj obiekt przez jego operator<< - deskryptor i payload maja wlasne.
 ///
-/// Tryb jednoliniowy trzeba PRZYWROCIC. Manipulator singleLineFormat ustawia
-/// statyczna flage calego procesu i nigdy jej nie cofa, wiec pojedyncze repr()
-/// w notatniku zmienialoby format kazdego pozniejszego wypisu deskryptora.
-/// Flage per strumien wnosi faza 2 (#446, C2).
+/// Tryb jednoliniowy nalezy do strumienia (slot xalloc, faza 2 - #446, C2), a
+/// strumien jest tu lokalny: nie ma czego zapamietywac ani przywracac, a repr()
+/// nie zmienia formatu zadnego innego wypisu.
 template <typename T>
 std::string streamToString(const T &value) {
   return engineCall([&value] {
-    const bool previous = rdb::Descriptor::isSingleLineOutput();
-    rdb::Descriptor::setSingleLineOutput(true);
     std::ostringstream out;
-    out << value;
-    rdb::Descriptor::setSingleLineOutput(previous);
+    out << rdb::singleLineFormat << value;
     return out.str();
   });
 }

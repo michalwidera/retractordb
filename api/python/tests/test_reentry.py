@@ -4,13 +4,15 @@ A daemon constructs its state once. A notebook constructs it again on every cell
 run, which is what makes process-wide state visible:
 
 * ``fatalErrorRaised`` - src/include/fatalError.hpp (raised only outside the
-  throw-mode scope, so the binding never sets it)
-* the MEMORY map       - ``memoryStore`` in src/rdb/lib/faccmemory.cc
+  throw-mode scope, so the binding never sets it; it describes the xretractor
+  exit path and stays process-wide by decision (a) of #463)
+* the MEMORY map       - now ``rdb::MemoryStore``, owned by ``rdb::embed::Engine``
+  (phase 2, #446 C2); storages built without an engine keep the process default
 
-Stage 1a does not remove them; phase 2 (MemoryStore, #446 C2) does. These tests
-assert that the sequential case is clean today, so that the phase-2 work has a
-baseline it must not regress, and so the first overlapping-instance failure is
-caught here rather than in someone's notebook.
+These tests remain the baseline that work must not regress. They are NOT the proof
+of instance isolation, and it is worth being exact about why: isolation shows up on
+a write, and this binding is read-only by design. The proof lives in
+``ut_embedEngine`` until the binding grows writes.
 """
 
 from __future__ import annotations
@@ -39,7 +41,18 @@ def test_descriptor_parsing_is_repeatable(rdb, plain_storage: Path) -> None:
 
 
 def test_two_storages_open_at_once(rdb, plain_storage: Path) -> None:
-    """Overlapping instances - the case the globals will break first."""
+    """Overlapping instances, as far as a read-only binding can reach.
+
+    What this DOES check: two live ``Storage`` objects over the same stream do not
+    disturb each other's reads, in either order.
+
+    What it CANNOT check: MEMORY-store isolation. That state only diverges on a
+    *write*, and this binding is deliberately read-only. Phase 2 gave the MEMORY
+    store an owner and ``rdb::embed::Engine`` to hold it, and ``ut_embedEngine``
+    asserts two engines do not share a stream - in C++, because that is where
+    writes exist. This test becomes the Python half of that claim only once the
+    binding can write.
+    """
     with rdb.Storage("plain_file", "plain_file", storage_param=str(plain_storage)) as first:
         with rdb.Storage("plain_file", "plain_file", storage_param=str(plain_storage)) as second:
             assert tuple(first.read(0)) == (1, 10)
