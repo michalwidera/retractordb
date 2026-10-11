@@ -43,15 +43,20 @@ Group=retractor
 # uruchomioną z innym plikiem zapytań wykryje działający serwis, nadpisze ten plik zwalidowanym
 # zestawem i zleci restart jednostki (zachowując konfigurację jednostki).
 #
-# Błąd krytyczny (FatalError) i odmowa planu przed startem (parsowanie, kompilacja, niezgodne
-# zachowane pliki magazynu lub .desc) opróżniają ten plik przed wyjściem procesu: jednostka wstaje
-# wtedy w trybie bezczynnym, zamiast wracać w kółko na plan, który ją zabił albo nie może wystartować.
+# Błąd krytyczny (FatalError, także nieoczekiwany wyjątek) i odmowa planu przed startem
+# (parsowanie, kompilacja, niezgodne zachowane pliki magazynu lub .desc) opróżniają ten plik
+# przed wyjściem procesu: jednostka wstaje wtedy w trybie bezczynnym, zamiast wracać w kółko
+# na plan, który ją zabił albo nie może wystartować.
 #
 # Tryb usługowy logowania można też włączyć zmienną środowiskową zamiast flagi --service:
 #   Environment=XRETRACTOR_SERVICE=1
 Environment=RETRACTOR_QUERY_FILE=@RETRACTOR_QUERY_FILE@
 EnvironmentFile=-/etc/retractor/service.env
 ExecStart=@RETRACTOR_BIN@/xretractor --service --noanykey ${RETRACTOR_QUERY_FILE}
+# SIGABRT (std::terminate lub abort) pomija atexit, a OOM killer zabija bez ostrzezenia.
+# Po smierci procesu pomocnik oproznia plan przed restartem, bez blokad i alokatora
+# uszkodzonego procesu. Pozostale sygnaly i kody wyjscia zachowuja plik (#475).
+ExecStopPost=@RETRACTOR_LIBEXEC@/xretractor-stop-post ${RETRACTOR_QUERY_FILE}
 
 KillSignal=SIGTERM
 TimeoutStopSec=30

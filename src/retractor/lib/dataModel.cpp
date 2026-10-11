@@ -8,6 +8,7 @@
 #include <iterator>
 #include <memory>  // unique_ptr
 #include <mutex>
+#include <new>
 #include <stdexcept>
 #include <thread>
 #include <utility>
@@ -320,6 +321,15 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
   // katalogu nie zatrzymuja roota w kontenerze CI.
   if (std::getenv("RDB_FAULT_ENV_IN_SLOT") != nullptr)
     rdb::EnvironmentError("fault hook RDB_FAULT_ENV_IN_SLOT: environment failure inside a processing slot");
+
+  // Haki it_service_abort (#475). TERMINATE: wyjatek przekracza noexcept pod obiema blokadami
+  // slotu (std::terminate, SIGABRT). BADALLOC: zwykly bad_alloc, ktory lapie catch w executorsm::run.
+  if (std::getenv("RDB_FAULT_TERMINATE_IN_SLOT") != nullptr) {
+    std::cerr << "RDB_FAULT_TERMINATE_IN_SLOT: slot locked" << '\n';
+    const auto fail = [] { throw std::bad_alloc{}; };
+    [&fail]() noexcept { fail(); }();
+  }
+  if (std::getenv("RDB_FAULT_BADALLOC_IN_SLOT") != nullptr) throw std::bad_alloc{};
 
   // Zrodlo dolaczone ad-hoc nie uczestniczylo w kroku zerowym. Uzbrajamy je
   // przed konsumentami pierwszego naleznego slotu. Koncowa faza deklaracji

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Test poprawności pakietów CPack: pakiet binarny DEB zawiera DOKŁADNIE wymagany
-# zestaw plików (3 binaria + licencja + jednostka systemd + przykłady konfiguracji) -
+# zestaw plikow (3 binaria + licencja + jednostka i pomocnik systemd + konfiguracja) -
 # żadnych nadmiarowych.
 # Sprawdzamy tylko DEB (a nie TGZ) - whitelist jest identyczny dla obu (te same
 # reguły install + prefiks /usr), a budowanie obu podwajało czas (kompresja
@@ -26,6 +26,7 @@ EXPECTED=$(printf '%s\n' \
   usr/bin/xretractor \
   usr/bin/xtrdb \
   usr/lib/systemd/system/xretractor.service \
+  usr/libexec/retractordb/xretractor-stop-post \
   usr/share/doc/retractordb/LICENSE \
   usr/share/retractordb/retractor.toml \
   usr/share/retractordb/retractor.toml.example \
@@ -46,6 +47,12 @@ if command -v dpkg-deb >/dev/null 2>&1; then
   DEB=$(ls "$OUT"/*.deb | head -1)
   test -n "$DEB"
   assert_exact "DEB" "$(dpkg-deb -c "$DEB" | awk '$1 !~ /^d/ {print $NF}' | grep -oE 'usr/.*')"
+  dpkg-deb -x "$DEB" "$OUT/unpacked"
+  HELPER="$OUT/unpacked/usr/libexec/retractordb/xretractor-stop-post"
+  test -x "$HELPER"
+  cmp "$HELPER" "$2/xretractor-stop-post"
+  grep -Fxq 'ExecStopPost=/usr/libexec/retractordb/xretractor-stop-post ${RETRACTOR_QUERY_FILE}' \
+    "$OUT/unpacked/usr/lib/systemd/system/xretractor.service"
 else
   echo "POMINIĘTO weryfikację pakietu binarnego: brak dpkg-deb"
 fi
