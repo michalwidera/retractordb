@@ -2,8 +2,10 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <locale>
 #include <sstream>
 #include <stdexcept>
@@ -15,8 +17,10 @@
 #include "rdb/payload.hpp"
 #include "rdb/probe.hpp"  // sonda E4 (liczy tylko w buildzie RDB_BENCH_PROBE)
 #include "rdb/storage.hpp"
+#include "retractor/lib/compiler.hpp"
 #include "retractor/lib/dataModel.hpp"
 #include "retractor/lib/executorsmState.hpp"
+#include "retractor/lib/planSource.hpp"
 #include "retractor/lib/qTree.hpp"  // coreInstance
 #include "retractor/lib/RQLParser.hpp"
 
@@ -551,6 +555,80 @@ TEST_F(xschema, constructOutputPayload_expression) {
   std::stringstream ss;
   ss << rdb::singleLineFormat << *(dataArea->qSet["str2"]->outputPayload->getPayload());
   EXPECT_EQ(ss.str(), "{ str2_0:25 }");
+}
+
+// Przyczyny odmowy budowy modelu: wadliwy deskryptor i sciezka wyjscia sprzeczna z systemem
+// plikow (K2) oraz dowiazanie w miejscu pliku wyjscia (K4, ELOOP). Klasa i errno jak
+// w checkOutputFilesOpenable. Czesciowo zbudowany model nie moze byc publikowany (#474).
+TEST(dataModel, initialization_refusal_preserves_class_and_discards_partial_model) {
+  const std::filesystem::path directory("model_init_refusal");
+  std::filesystem::remove_all(directory);
+  std::filesystem::create_directory(directory);
+  std::ofstream(directory / "source.txt") << "7\n8\n";
+  const std::string prefix =
+      "STORAGE 'model_init_refusal'\n"
+      "DECLARE v INTEGER STREAM src, 1 TEXTFILE 'model_init_refusal/source.txt'\n";
+
+  {
+    std::ofstream(directory / "bad.desc") << "invalid descriptor\n";
+    qTree plan;
+    ASSERT_EQ(parsePlanText(plan, prefix + "SELECT * STREAM bad FROM src\n").status, "OK");
+    compiler cm(plan);
+    ASSERT_EQ(cm.compile(), "OK");
+    dataModel model(plan);
+    EXPECT_EQ(model.initializationError.cls, rdb::ErrorClass::Plan);
+    EXPECT_FALSE(model.initializationError.message.empty());
+    EXPECT_TRUE(model.initializationError.message.contains("bad.desc")) << model.initializationError.message;
+    EXPECT_TRUE(model.qSet.empty());
+  }
+  std::filesystem::remove(directory / "bad.desc");
+  {
+    qTree plan;
+    ASSERT_EQ(parsePlanText(plan, prefix + "SELECT * STREAM bad FROM src FILE 'missing/out'\n").status, "OK");
+    compiler cm(plan);
+    ASSERT_EQ(cm.compile(), "OK");
+    dataModel model(plan);
+    EXPECT_EQ(model.initializationError.cls, rdb::ErrorClass::Plan);
+    EXPECT_EQ(model.initializationError.err, ENOENT);
+    EXPECT_TRUE(model.initializationError.message.contains("cannot open output file")) << model.initializationError.message;
+    EXPECT_TRUE(model.qSet.empty());
+  }
+  std::filesystem::create_symlink("source.txt", directory / "link_out");
+  {
+    qTree plan;
+    ASSERT_EQ(parsePlanText(plan, prefix + "SELECT * STREAM bad FROM src FILE 'link_out' STORAGE POSIX\n").status, "OK");
+    compiler cm(plan);
+    ASSERT_EQ(cm.compile(), "OK");
+    dataModel model(plan);
+    EXPECT_EQ(model.initializationError.cls, rdb::ErrorClass::Environment);
+    EXPECT_EQ(model.initializationError.err, ELOOP);
+    EXPECT_TRUE(model.initializationError.message.contains("link_out")) << model.initializationError.message;
+    EXPECT_TRUE(model.qSet.empty());
+  }
+  {
+    qTree plan;
+    ASSERT_EQ(parsePlanText(plan, prefix + "SELECT * STREAM good FROM src STORAGE MEMORY\n").status, "OK");
+    compiler cm(plan);
+    ASSERT_EQ(cm.compile(), "OK");
+    dataModel model(plan);
+    EXPECT_TRUE(model.initializationError.message.empty());
+    EXPECT_TRUE(model.qSet.contains("src"));
+    EXPECT_TRUE(model.qSet.contains("good"));
+  }
+  std::filesystem::remove_all(directory);
+}
+
+TEST(dataModel, empty_plan_remains_an_internal_error) {
+  qTree plan;
+  EXPECT_DEATH({ dataModel model(plan); }, "coreInstance is empty");
+}
+
+TEST(dataModel, empty_directive_value_remains_an_internal_error) {
+  qTree plan;
+  query directive;
+  directive.id = ":STORAGE";
+  plan.push_back(directive);
+  EXPECT_DEATH({ dataModel model(plan); }, "has empty value");
 }
 
 TEST_F(xschema, constructRulesAndUpdate_empty_rules) {

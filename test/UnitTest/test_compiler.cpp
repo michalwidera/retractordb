@@ -1603,6 +1603,23 @@ TEST(xcompiler, reducer_over_another_from_operator_is_extracted_not_fatal) {
 
 // --- Nazwa substratu musi identyfikowac wezel ------------------------------------
 //
+// Kolizja skladania nazw jest bledem planu przed sortowaniem po id (#474). Wczesniej
+// drugi program znikal, wiec nawet pozniejsza kontrola kolizji nie widziala defektu.
+TEST(xcompiler, refuses_colliding_substrate_programs_before_topological_sort) {
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan,
+                          "DECLARE v INTEGER STREAM A_B, 1 BINFILE 'ab.bin'\n"
+                          "DECLARE v INTEGER STREAM C, 1 BINFILE 'c.bin'\n"
+                          "DECLARE v INTEGER STREAM A, 2 BINFILE 'a.bin'\n"
+                          "DECLARE v INTEGER STREAM B_C, 2 BINFILE 'bc.bin'\n"
+                          "SELECT * STREAM first FROM (A_B + C)>1\n"
+                          "SELECT * STREAM second FROM (A + B_C)>1\n")
+                .status,
+            "OK");
+  compiler cm(plan);
+  EXPECT_EQ(cm.compile(), "Substrate name 'STREAM_ADD_A_B_C' denotes two different programs");
+}
+
 // Do 2026-08-29 nazwa skladala sie z operatora i operandow, BEZ parametru operatora.
 // Dwa rozne okna nad tym samym zrodlem dawaly wiec jeden substrat STREAM_AGSE_a,
 // a drugie zapytanie po cichu liczylo okno pierwszego. Defekt byl osiagalny juz przez
@@ -2627,6 +2644,21 @@ TEST(xcompiler, rejects_zero_sized_generator) {
       )");
   EXPECT_NE(verdict, "OK");
   EXPECT_NE(verdict.find("stream generator size 0 must be greater than zero"), std::string::npos) << verdict;
+}
+
+// Skladnia gen_index gwarantuje ksztalt przed wejsciem do genIndexFolder. Brak
+// argumentu, obcy operator i niedomkniety nawias nie docieraja do jego K1 (#474).
+TEST(xparser, malformed_generator_indices_are_refused_before_compilation) {
+  for (const char *index : {"$+", "$/2", "($+1", "$+)", "*2"}) {
+    qTree plan;
+    testing::internal::CaptureStderr();
+    const auto result = parsePlanText(plan,
+                                      "DECLARE v INTEGER[4] STREAM src, 1 BINFILE 'src.bin'\n"
+                                      "SELECT src[" +
+                                          std::string(index) + "] STREAM cell[2] FROM src\n");
+    testing::internal::GetCapturedStderr();
+    EXPECT_NE(result.status, "OK") << index;
+  }
 }
 
 // --- wymiary zlozone, znane dopiero po przebiegach kompilatora (A2 M11) -----------------------

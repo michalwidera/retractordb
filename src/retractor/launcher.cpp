@@ -957,7 +957,16 @@ int main(int argc, char *argv[]) try {
   dropStalePlanArtifacts(coreInstance);
 
   executorsm exec;
-  return exec.run(coreInstance, guard, xrdbbus, cm, vm, appCfg, earlyServerName, systemd.unit.value_or(std::string{}));
+  const int result =
+      exec.run(coreInstance, guard, xrdbbus, cm, vm, appCfg, earlyServerName, systemd.unit.value_or(std::string{}));
+  if (!exec.initializationError.message.empty()) {
+    if (exec.initializationError.cls == rdb::ErrorClass::Plan) {
+      std::cerr << "Check result:" << exec.initializationError.message << '\n';
+      return refusePlan();
+    }
+    std::cerr << "xretractor: " << exec.initializationError.message << '\n';
+  }
+  return result;
 } catch (const std::exception &error) {
   const char *const executable = argc > 0 && argv[0] != nullptr ? argv[0] : "xretractor";
   std::fputs(executable, stderr);

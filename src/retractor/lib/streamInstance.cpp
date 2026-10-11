@@ -36,8 +36,8 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::strin
                                                  qry.isHold, percounter);
 
   auto desc           = qry.descriptorStorage();
-  initializationError = outputPayload->attachDescriptor(&desc);
-  if (!initializationError.empty()) return;
+  initializationError = outputPayload->attachDescriptorStatus(&desc);
+  if (!initializationError.message.empty()) return;
 
   // Jedyne miejsce, w którym rola z planu (`isSubstrat`) spotyka się z magazynem - sonda
   // logicznych zapisów (K23) rozdziela materializowany podplan od publicznego wyniku.

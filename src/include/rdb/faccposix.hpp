@@ -33,6 +33,7 @@ class posixBinaryFile : public FileInterface {
   int fd{-1};
   int percounter_;
   std::string initializationError_;
+  int initializationErrno_{0};
 
  public:
   /// @param followFinalLink plik danych spod REF wolajacego moze byc dowiazaniem (#374, storageFile.hpp)
@@ -51,6 +52,7 @@ class posixBinaryFile : public FileInterface {
   auto name() -> std::string & override;
   size_t count() override;
   [[nodiscard]] const std::string &initializationError() const override { return initializationError_; }
+  [[nodiscard]] int initializationErrno() const override { return initializationErrno_; }
 
   /// @brief Usuwa plik i wylacza rotacje w destruktorze (groupFile: retencja i purge).
   ///        Obiekt nie nadaje sie potem do zapisu.

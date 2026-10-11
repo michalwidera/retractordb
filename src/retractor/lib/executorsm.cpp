@@ -137,6 +137,7 @@ void executorsm::collectDueDevices(TimeLine &tl, dataModel &proc, const std::chr
 
 int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrdbbus, compiler &cm, vm_map &vm,
                     const AppConfig &cfg, std::string_view serverName, std::string_view systemdUnit) {
+  initializationError               = {};
   executorsm::coreInstancePtr       = &coreInstance;
   executorsm::cmPtr                 = &cm;
   executorsm::cfgQueueBufferSeconds = cfg.ipcQueueBufferSeconds;
@@ -343,7 +344,32 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
           for (auto &q : *coreInstancePtr)
             if (q.isDeclaration()) q.isOneShot = true;
 
+        // Hak testu it_plan_error_e4: zmiana pliku PO preflight, PRZED budowa modelu.
+        // Jak bramka RDB_FAULT_ADHOC_OPEN_GATE, raz na proces i z ograniczonym czekaniem.
+        static bool modelInitGateFired = false;
+        if (const char *gate = std::getenv("RDB_FAULT_MODEL_INIT_GATE"); gate != nullptr && !modelInitGateFired) {
+          modelInitGateFired = true;
+          std::ofstream(std::string(gate) + ".ready").put('\n');
+          const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+          while (!std::filesystem::exists(std::string(gate) + ".release") && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+
         dataModel proc(*coreInstancePtr);
+        if (!proc.initializationError.message.empty()) {
+          initializationError = proc.initializationError;
+          retVal =
+              initializationError.cls == rdb::ErrorClass::Environment ? system::errc::io_error : system::errc::protocol_error;
+          // Nie publikuj czesciowego modelu. Obudz handlery czekajace na jego gotowosc,
+          // a transport zamknij wspolna droga run(), bez zatrzasku FatalError (#474).
+          {
+            std::scoped_lock lock(core_mutex);
+            dataModelExpected = false;
+            iLoopLimitCnt     = executorsm::stop_now;
+          }
+          cv.notify_all();
+          break;
+        }
         {
           // Publikacja pod obiema blokadami: blokada epoki wpuszcza handlery dopiero do
           // modelu gotowego, core_mutex niesie powiadomienie do czekajacych na cv.

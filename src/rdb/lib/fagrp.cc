@@ -57,6 +57,7 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
   if (retention.noRetention()) {
     vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_, followFinalLink_));
     initializationError_ = vec_.back()->initializationError();
+    initializationErrno_ = vec_.back()->initializationErrno();
   } else {
     std::vector<size_t> existingSegments;
     existingSegments.reserve(retention_.segments == 0 ? kDefaultSegmentReserve : retention_.segments);
@@ -106,6 +107,7 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
       vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_, followFinalLink_));
       if (!vec_.back()->initializationError().empty()) {
         initializationError_ = vec_.back()->initializationError();
+        initializationErrno_ = vec_.back()->initializationErrno();
         for (auto &segment : vec_)
           segment->suppressRotation();
         break;

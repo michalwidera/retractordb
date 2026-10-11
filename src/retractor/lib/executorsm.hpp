@@ -15,6 +15,7 @@
 #include "bus.hpp"
 #include "compiler.hpp"
 #include "CRSMath.hpp"
+#include "fatalError.hpp"
 #include "lockManager.hpp"
 #include "rdb/faccbindev.hpp"
 
@@ -24,6 +25,9 @@ using ptree  = boost::property_tree::ptree;
 using vm_map = boost::program_options::variables_map;
 class dataModel;
 struct executorsm {
+  /// Odmowa budowy modelu wraca do launchera, ktory dla K2 woluje refusePlan (#474).
+  rdb::Refusal initializationError;
+
   /// serverName pusta => tozsamosc historyczna (jeden serwer na maszyne, dotychczasowe nazwy
   /// obiektow IPC). Niepusta => wlasny, rozlaczny obszar IPC tej instancji.
   /// @param systemdUnit nazwa jednostki systemd, gdy proces nia jest; pusta => zwykly proces.

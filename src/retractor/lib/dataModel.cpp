@@ -32,12 +32,16 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   // fetch all ':*' - and remove them from coreInstance
   //
 
+  // K1 (#474): executorsm::run nie buduje modelu dla pustej epoki, a ad hoc tylko dolacza
+  // instancje przez addQueriesToModel. Pusty reset przechodzi w tryb bezczynny.
   if (coreInstance_.empty()) FatalError("dataModel: coreInstance is empty - no queries to process");
 
   for (const auto &it : coreInstance_)
     if (it.isCompilerDirective()) {
       directive_[it.id] = it.filename;
       if (directive_[it.id].empty()) {
+        // K1 (#474): RQLParser::exitCoption odrzuca puste wartosci; dyrektywe STORAGE
+        // z konfiguracji launcher i applyPendingPlan dodaja tylko dla niepustego storageDir.
         FatalError("dataModel: compiler directive '{}' has empty value", it.id);
       }
     }
@@ -48,7 +52,12 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
 
   for (auto &qry : coreInstance_) {
     auto runtime = std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]);
-    if (!runtime->initializationError.empty()) FatalError("dataModel: {}", runtime->initializationError);
+    if (!runtime->initializationError.message.empty()) {
+      initializationError         = runtime->initializationError;
+      initializationError.message = "dataModel: stream '" + qry.id + "': " + initializationError.message;
+      qSet.clear();
+      return;
+    }
     runtime->logicalIndexBase = qry.logicalOrigin;
     qSet.emplace(qry.id, std::move(runtime));
   }
@@ -81,7 +90,8 @@ std::string dataModel::addQueriesToModel(const std::vector<std::string> &ids) {
   built.reserve(nodes.size());
   for (query *node : nodes) {
     auto runtime = std::make_unique<streamInstance>(coreInstance_, *node, directive_[":STORAGE"]);
-    if (!runtime->initializationError.empty()) return "stream '" + node->id + "': " + runtime->initializationError;
+    if (!runtime->initializationError.message.empty())
+      return "stream '" + node->id + "': " + runtime->initializationError.message;
     runtime->outputPayload->setDisposable(node->isDisposable);
     // SELECT dodany do działającego planu nie zaczyna w historycznym origin całego systemu.
     // Jego bazę wyznaczy dokładny pierwszy slot, w którym runtime zobaczy tę instancję.

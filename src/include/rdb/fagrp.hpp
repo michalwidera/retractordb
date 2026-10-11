@@ -49,6 +49,7 @@ class groupFile : public FileInterface {
   // Tylko bez retencji: segment `<nazwa>_segment_N` to nazwa zlozona przez silnik, nie REF wolajacego (#374).
   bool followFinalLink_;
   std::string initializationError_;
+  int initializationErrno_{0};
 
  public:
   groupFile(std::string_view fileName, const Descriptor &descriptor, const retention_t &retention, int percounter,
@@ -68,6 +69,7 @@ class groupFile : public FileInterface {
   auto name() -> std::string & override;
   size_t count() override;
   [[nodiscard]] const std::string &initializationError() const override { return initializationError_; }
+  [[nodiscard]] int initializationErrno() const override { return initializationErrno_; }
   [[nodiscard]] bool hasShadow() const override { return !vec_.empty() && vec_.front()->hasShadow(); }
   // NOLINTEND(portability-template-virtual-member-function)
 };

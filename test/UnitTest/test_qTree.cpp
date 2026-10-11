@@ -265,6 +265,17 @@ TEST(qTree, getAvailableTimeIntervals_skips_compiler_directives) {
   EXPECT_EQ(intervals.size(), 1u);
 }
 
+// Dyrektywa z parsera ma interwal zero. Plan `-c -w` niesie ja do TimeLine bez dataModel,
+// wiec dawniej `xretractor plan.rql -c -w 1` z STORAGE konczyl sie FATAL (#474).
+TEST(qTree, getAvailableTimeIntervals_skips_directive_with_zero_interval) {
+  qTree qt;
+  qt.push_back(makeQuery(":STORAGE", 0, 1));
+  qt.push_back(makeQuery("s1", 1, 2));
+
+  auto intervals = qt.getAvailableTimeIntervals();
+  EXPECT_EQ(intervals, std::set<rational>{rational(1, 2)});
+}
+
 TEST(qTree, getAvailableTimeIntervals_fatals_when_rInterval_is_zero) {
   qTree qt;
   qt.push_back(makeQuery("bad", 0, 1));

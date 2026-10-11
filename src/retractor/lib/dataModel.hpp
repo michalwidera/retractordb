@@ -73,6 +73,9 @@ class dataModel {
  public:
   std::map<std::string, std::unique_ptr<streamInstance>> qSet;
 
+  /// Niepusta odmowa oznacza model niegotowy do publikacji; qSet pozostaje puste (#474).
+  rdb::Refusal initializationError;
+
   explicit dataModel(qTree &coreInstance);
   ~dataModel();
 
