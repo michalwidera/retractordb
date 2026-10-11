@@ -2,11 +2,11 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <cstdlib>
-#include <iostream>
 #include <numeric>
 
 #include <boost/rational.hpp>
+
+#include "fatalError.hpp"
 
 using namespace boost;
 
@@ -36,14 +36,10 @@ constexpr int ceilR(boost::rational<int> const &num) {
 // gdzie z = deltaB/(deltaA+deltaB). retPos jest indeksem POSTĘPUJĄCYM (0-bazowym)
 // elementu strumienia składowego.
 inline bool Hash(const rational<int> &deltaA, const rational<int> &deltaB, const int i, int &retPos) {
-  if (deltaA <= 0) {
-    std::cerr << "\nFATAL: Hash: deltaA must be > 0\n";
-    std::exit(EXIT_FAILURE);
-  }
-  if (deltaB <= 0) {
-    std::cerr << "\nFATAL: Hash: deltaB must be > 0\n";
-    std::exit(EXIT_FAILURE);
-  }
+  // K1: przedziały planu są dodatnie. Przez FatalError, nie własne std::exit - zatrzask
+  // usługi, wpis w logu i tryb rzucaj biblioteki (#476) obejmują także to miejsce.
+  if (deltaA <= 0) FatalError("Hash: deltaA must be > 0");
+  if (deltaB <= 0) FatalError("Hash: deltaB must be > 0");
   const rational<int> zet = deltaB / (deltaA + deltaB);
   bool ret                = floorR(zet * i) == floorR(zet * (i + 1));
 
