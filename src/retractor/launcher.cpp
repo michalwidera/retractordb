@@ -33,6 +33,7 @@
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "constants.hpp"
+#include "fatalError.hpp"
 #include "lib/appConfig.hpp"
 #include "lib/bus.hpp"
 #include "lib/compiler.hpp"
@@ -968,6 +969,10 @@ int main(int argc, char *argv[]) try {
   }
   return result;
 } catch (const std::exception &error) {
+  // Nieoczekiwany wyjatek (np. bad_alloc w slocie) obciaza plan jak FatalError: zatrzask
+  // sprawia, ze cleanup() w atexit oproznia plik zapytan jednostki (#475). Poza jednostka
+  // systemd sciezka pliku jest pusta i zatrzask nie zmienia niczego.
+  fatalErrorRaised.store(true, std::memory_order_release);
   const char *const executable = argc > 0 && argv[0] != nullptr ? argv[0] : "xretractor";
   std::fputs(executable, stderr);
   std::fputs(": unexpected error: ", stderr);
@@ -975,6 +980,7 @@ int main(int argc, char *argv[]) try {
   std::fputc('\n', stderr);
   return EXIT_FAILURE;
 } catch (...) {
+  fatalErrorRaised.store(true, std::memory_order_release);
   const char *const executable = argc > 0 && argv[0] != nullptr ? argv[0] : "xretractor";
   std::fputs(executable, stderr);
   std::fputs(": unexpected non-standard error\n", stderr);

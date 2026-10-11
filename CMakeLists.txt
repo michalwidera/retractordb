@@ -596,12 +596,24 @@ endif()
 # wstawienie pliku do <prefiks>/lib/systemd/system byloby smieciem w pakiecie.
 set(RETRACTOR_BIN "${CPACK_PACKAGING_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}")
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  # Conan mapuje CMAKE_INSTALL_LIBEXECDIR na bin; pomocnik jednostki ma wlasne
+  # miejsce w pakiecie, obok pozostalych plikow uslugi, poza publicznym CLI.
+  set(RETRACTOR_SERVICE_HELPER_DIR "libexec/retractordb")
+  set(RETRACTOR_LIBEXEC
+      "${CPACK_PACKAGING_INSTALL_PREFIX}/${RETRACTOR_SERVICE_HELPER_DIR}")
   configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/packaging/systemd/xretractor.service.in
     ${CMAKE_BINARY_DIR}/xretractor.service @ONLY)
   install(
     FILES ${CMAKE_BINARY_DIR}/xretractor.service
     DESTINATION lib/systemd/system
+    COMPONENT service)
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/packaging/systemd/xretractor-stop-post.sh
+    ${CMAKE_BINARY_DIR}/xretractor-stop-post COPYONLY)
+  install(
+    PROGRAMS ${CMAKE_BINARY_DIR}/xretractor-stop-post
+    DESTINATION ${RETRACTOR_SERVICE_HELPER_DIR}
     COMPONENT service)
 endif()
 install(

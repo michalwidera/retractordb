@@ -667,6 +667,10 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
     std::cerr << ex.what() << '\n' << "IPC::interprocess exception" << '\n';
     retVal = system::errc::no_child_process;
   } catch (std::exception &e) {
+    // Nieoczekiwany wyjatek w petli (np. bad_alloc w slocie) obciaza plan jak FatalError:
+    // cleanup() oprozni plik zapytan jednostki (#475). Wyjatek IPC wyzej to srodowisko (K4),
+    // wiec plan zostaje.
+    fatalErrorRaised.store(true, std::memory_order_release);
     std::cerr << "IPC Fail." << '\n';
     std::cerr << e.what() << '\n';
     SPDLOG_ERROR("catch exception: {}", e.what());
