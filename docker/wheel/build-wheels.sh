@@ -4,7 +4,7 @@
 #
 # Uzycie, z dowolnego katalogu (na hoscie potrzebny Docker i cibuildwheel):
 #   docker/wheel/build-wheels.sh aarch64 | x86_64 | all
-# Wynik: wheelhouse/ w korzeniu repo. cibuildwheel instaluje sie np. przez
+# Wynik: build/wheelhouse/ w korzeniu repo. cibuildwheel instaluje sie np. przez
 # `pipx install cibuildwheel`; inna komende podaje sie w zmiennej CIBUILDWHEEL,
 # np. CIBUILDWHEEL="uvx cibuildwheel".
 #
@@ -52,7 +52,7 @@ trap 'rm -rf -- "$work_dir"' EXIT
     tar --null -T - -cf -
 ) | tar -C "$work_dir" -xf -
 
-mkdir -p "$repo_dir/wheelhouse"
-echo "build-wheels: $archs from $(git -C "$repo_dir" rev-parse --short HEAD) plus uncommitted changes -> $repo_dir/wheelhouse"
+mkdir -p "$repo_dir/build/wheelhouse"
+echo "build-wheels: $archs from $(git -C "$repo_dir" rev-parse --short HEAD) plus uncommitted changes -> $repo_dir/build/wheelhouse"
 cd "$work_dir"
-"${cibuildwheel[@]}" --platform linux --archs "$archs" --output-dir "$repo_dir/wheelhouse"
+"${cibuildwheel[@]}" --platform linux --archs "$archs" --output-dir "$repo_dir/build/wheelhouse"

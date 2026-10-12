@@ -287,7 +287,7 @@ docker/wheel/build-wheels.sh x86_64       # or aarch64, or all
 ```
 
 The script copies the checkout without ignored build artifacts to a temporary
-directory and writes wheels to `wheelhouse/`. It uses the locally built images
+directory and writes wheels to `build/wheelhouse/`. It uses the locally built images
 when tagged `micwide/buildenv-retractordb-wheel:manylinux_2_28_<arch>`; publishing
 them is a separate human action.
 
