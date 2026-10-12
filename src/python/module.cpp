@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <exception>
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -455,6 +456,11 @@ nb::object makeBlock(const std::vector<double> &values, const std::size_t rows, 
     if constexpr (std::is_integral_v<T>) {
       // Null nie ma reprezentacji w typie calkowitym; zero byloby cicha wartoscia.
       if (std::isnan(values[i])) throw nb::value_error("stream holds null values; use dtype float32 or float64");
+      // Gorna granica jest wylaczna: max int64 zaokragla sie w double do 2^63.
+      const double limit     = std::ldexp(1.0, std::numeric_limits<T>::digits);
+      const double truncated = std::trunc(values[i]);
+      if (!std::isfinite(truncated) || truncated < -limit || truncated >= limit)
+        throw nb::value_error("value is outside integer dtype range; use dtype float32 or float64");
     }
     data[i] = static_cast<T>(values[i]);
   }

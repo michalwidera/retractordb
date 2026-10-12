@@ -256,8 +256,8 @@ TEST(embedEnginePlan, refusals_carry_their_stage) {
   expectStage(doublingPlan("plan_data.txt") + "RULE r ON dst WHEN dst[0] > 100 DO SYSTEM 'echo no'\n", Stage::Check);
   expectStage(doublingPlan("plan_data.txt") + "ROTATION 'counter.txt'\n", Stage::Check);
   expectStage("DECLARE a INTEGER STREAM src, 1 DEVICE '/dev/null'\nSELECT a*2 STREAM dst FROM src\n", Stage::Check);
-  // Kontrola magazynu: zrodlo zlego rodzaju i brak katalogu :STORAGE. Brak pliku zrodla odmowa
-  // NIE jest - na master daje rekordy NULL (#346), tak samo w silniku osadzonym.
+  // Kontrola magazynu: zrodlo zlego rodzaju i brak katalogu :STORAGE. Brak pliku zrodla to odmowa
+  // klasy Environment (#451), sprawdzana osobno w missing_source_is_refused_unlike_the_service.
   expectStage(doublingPlan("/dev/null"), Stage::Check);
   expectStage("STORAGE 'engine_missing_dir'\n" + doublingPlan("plan_data.txt"), Stage::Check);
 
@@ -345,16 +345,25 @@ TEST(embedEnginePlan, foreign_artifacts_are_preserved) {
   EXPECT_EQ(firstValue(engine.record("dst", 1)), 8);
 }
 
-// Brak zrodla po poprawnym przebiegu daje rekordy NULL, jak w serwisie (#346), a nie odmowe.
-TEST(embedEnginePlan, missing_source_gives_null_records_like_the_service) {
+// Serwis daje przy braku zrodla rekordy NULL (#346); silnik osadzony odmawia klasa Environment z
+// errno (#451), a po poprawionym planie pracuje dalej.
+TEST(embedEnginePlan, missing_source_is_refused_unlike_the_service) {
   writeSource("ownership_source.txt", {3, 4});
   rdb::embed::Engine engine;
   engine.compile(doublingPlan("ownership_source.txt"));
   while (engine.step()) {}
-  engine.compile(doublingPlan("engine_missing_source.txt"), false);
+  for (const std::string source : {"engine_missing_source.txt", "engine_missing_dir/source.txt"}) {
+    const auto refused = refusalOf(engine, doublingPlan(source));
+    ASSERT_TRUE(refused.has_value()) << source;
+    EXPECT_EQ(refused->stage(), rdb::embed::Refused::Stage::Check);
+    EXPECT_EQ(refused->refusal().cls, rdb::ErrorClass::Environment);
+    EXPECT_EQ(refused->refusal().err, ENOENT) << refused->what();
+    EXPECT_NE(std::string(refused->what()).find("source file does not exist"), std::string::npos) << refused->what();
+    EXPECT_FALSE(engine.hasPlan());
+  }
+  engine.compile(doublingPlan("ownership_source.txt"));
   ASSERT_TRUE(engine.step().has_value());
-  ASSERT_TRUE(engine.step().has_value());
-  EXPECT_FALSE(engine.record("dst", 0).getItemVT(0).has_value());
+  EXPECT_EQ(firstValue(engine.record("dst", 0)), 6);
 }
 
 // Decyzja (a): K4 w slocie wychodzi z step() jako EngineFatal, proces hosta zyje, a plan zostaje

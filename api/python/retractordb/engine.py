@@ -201,11 +201,11 @@ class Engine(_core.Engine):
 
         block = self.to_numpy(stream, fields=fields, dtype=dtype)
         records, values = block.shape
-        n_windows = 0 if records < size else (records - size) // stride + 1
-        stacked = numpy.empty((n_windows, size, values), dtype=block.dtype)
-        for w in range(n_windows):
-            start = w * stride
-            stacked[w] = block[start : start + size]
+        if records < size:
+            stacked = numpy.empty((0, size, values), dtype=block.dtype)
+        else:
+            view = numpy.lib.stride_tricks.sliding_window_view(block, size, axis=0)
+            stacked = view[::stride].transpose(0, 2, 1).copy(order="C")
         return Window(stacked, stream, tuple(fields), size, stride)
 
     def __enter__(self) -> Engine:
