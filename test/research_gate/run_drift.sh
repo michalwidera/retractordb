@@ -346,12 +346,13 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
         S_MECH="NIESPRAWDZONY"
       fi
     fi
+    # Pusta tablica pod set -u w bash 3.2 wymaga rozwiniecia ${dirty_args[@]+...}.
     dirty_args=()
     [[ "$TREE" == "BRUDNE" ]] && dirty_args=(--allow-dirty)
     if [[ "$evidence_ready" -eq 0 ]]; then
       : # poziom juz odnotowany jako niesprawdzony
     elif K26V3_BUILD_ROOT="$PROFILES" python3 validate_corpus.py --out "$evidence" \
-         "${dirty_args[@]}" >"$(log_of "H9 84 kompilacje")" 2>&1; then
+         ${dirty_args[@]+"${dirty_args[@]}"} >"$(log_of "H9 84 kompilacje")" 2>&1; then
       confirm "H9 mechanizm - 84/84 kompilacji na czterech profilach, 4/4 odrzucone mutanty"
       S_MECH="ZGODNY"
     else
