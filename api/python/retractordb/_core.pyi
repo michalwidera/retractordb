@@ -128,7 +128,20 @@ class Storage:
         file_name: str,
         storage_param: str = "",
         storage_type: str = "DEFAULT",
-    ) -> None: ...
+        lock_dir: str = "",
+        config: str = "",
+    ) -> None:
+        """Open offline; lock_dir must match paths.lock_dir (empty uses TMPDIR).
+
+        config names a TOML file read only when given: paths.lock_dir and
+        embedded.lenient_lock_dirs; lock_dir wins over it. Listed directories, or the system
+        temporary directory without the key, are checked leniently, like xtrdb: only a held
+        lock refuses; other lock directories strictly. Without lock_dir and paths.lock_dir the
+        lock directory is a guess, reported as UserWarning and logged at INFO to the
+        "retractordb" logger. The startup
+        check does not exclude a later daemon start. An owned embedded directory stays locked
+        until close() or destruction; context exit closes the storage.
+        """
     @property
     def descriptor(self) -> Descriptor: ...
     @property
@@ -136,6 +149,10 @@ class Storage:
     @property
     def is_declared(self) -> bool:
         """True for BINFILE, TEXTFILE and DEVICE sources, which cannot be read directly."""
+    @property
+    def closed(self) -> bool: ...
+    def close(self) -> None:
+        """Close the storage and release its directory lock. Idempotent."""
     def read(self, index: int) -> Record: ...
     def __len__(self) -> int: ...
     def __getitem__(self, index: int) -> Record: ...
@@ -162,8 +179,16 @@ class Engine:
     the class to use: it adds ``rows()``, ``to_numpy()`` and ``window()``.
     """
 
-    def __init__(self, storage_dir: str = "") -> None:
-        """``storage_dir`` serves plans without a STORAGE directive; the directive wins."""
+    def __init__(self, storage_dir: str = "", lock_dir: str = "", config: str = "") -> None:
+        """Use a private temporary directory by default; explicit directories must be empty or owned.
+
+        STORAGE overrides the directory under the same ownership checks. The private directory
+        skips the service lock check. lock_dir must match the service's paths.lock_dir; config
+        is read as for Storage, and lock_dir wins over it.
+        """
+    @property
+    def storage_dir(self) -> str:
+        """Effective directory of the plan, or the default directory when there is no plan."""
     def compile(self, rql: str, until_eof: bool = True) -> None:
         """Parse, compile and build the plan; raises RQLSyntaxError or CompileError.
 

@@ -1,6 +1,9 @@
 #include "rdb/embed/engine.hpp"
 
+#include <fcntl.h>
+
 #include <algorithm>
+#include <cerrno>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -22,6 +25,8 @@
 
 #include "fatalError.hpp"
 #include "fldType.hpp"
+#include "rdb/embed/storageGuard.hpp"
+#include "rdb/storageFile.hpp"
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/CRSMath.hpp"
 #include "retractor/lib/dataModel.hpp"
@@ -46,6 +51,8 @@ namespace {
 /// ta sama zasada, ktorej pilnuje EpochPublication w executorsm.cpp, tutaj egzekwowana ukladem
 /// struktury.
 struct Engine::Plan {
+  // Zwalnia sie PO modelu i wszystkich jego magazynach.
+  std::unique_ptr<StorageGuard> guard;
   qTree tree;
   compiler cm{tree};
   std::unique_ptr<dataModel> model;
@@ -65,9 +72,17 @@ struct Engine::Plan {
   std::optional<EngineFatal> failure;
 };
 
-Engine::Engine(std::string storageDir) : storageDir_(std::move(storageDir)) {}
+Engine::Engine(std::string storageDir, std::string lockDir, std::string configPath)
+    : offline_(offlinePolicy(lockDir, configPath)),
+      storageDir_(storageDir.empty() ? temporaryStorageDirectory() : storageDir),
+      temporaryDir_(storageDir.empty()) {}
 
-Engine::~Engine() { close(); }
+Engine::~Engine() {
+  close();
+  if (temporaryDir_) removeTemporaryStorage(storageDir_);
+}
+
+const std::string &Engine::storageDir() const noexcept { return plan_ ? plan_->guard->directory() : storageDir_; }
 
 std::unique_ptr<storage> Engine::openStorage(const std::string_view qryID,         //
                                              const std::string_view fileName,      //
@@ -141,30 +156,62 @@ void Engine::compile(const std::string_view rql, const bool untilEof) {
 
   // Domyslny katalog magazynu, gdy plan nie niesie :STORAGE - jak launcher z `[storage] dir`: RQL
   // ma pierwszenstwo, katalog silnika jest tylko domyslny.
-  if (!storageDir_.empty() && std::ranges::none_of(plan->tree, [](const query &qry) { return qry.id == ":STORAGE"; })) {
+  const bool defaultDir = std::ranges::none_of(plan->tree, [](const query &qry) { return qry.id == ":STORAGE"; });
+  if (!storageDir_.empty() && defaultDir) {
     query directive;
     directive.id       = ":STORAGE";
     directive.filename = storageDir_;
     plan->tree.push_back(directive);
   }
 
-  // Zachowanie z galezi feature/jupyter-integration, do decyzji w #450: .desc i .meta deklaracji
-  // schodza PRZED kontrola magazynu. Usluga ich nie kasuje, a checkDescriptorFiles odrzuca zastany
-  // .desc deklaracji niezgodny z planem (#265); w notatniku, ktory uruchamia komorki wielokrotnie
-  // w jednym katalogu, zmiana pliku zrodlowego miedzy uruchomieniami jest przypadkiem normalnym,
-  // wiec plan jest tu jedynym zrodlem prawdy o deklaracji.
-  const std::filesystem::path storagePath(planStorageDir(plan->tree, storageDir_));
+  if (plan->tree.getAvailableTimeIntervals().empty()) refuse(Refused::Stage::Check, "plan holds no streams - only directives");
+  // Katalog z mkdtemp nie moze byc katalogiem serwisu, wiec blokady serwisu go nie dotycza.
+  if (!(temporaryDir_ && defaultDir)) checkOffline(offline_);
+  if (Refusal refusal = checkStorageDirectory(plan->tree, storageDir_); !refusal.message.empty())
+    throw Refused(Refused::Stage::Check, std::move(refusal));
+  if (Refusal refusal = checkDeclaredSources(plan->tree); !refusal.message.empty())
+    throw Refused(Refused::Stage::Check, std::move(refusal));
+  if (Refusal refusal = checkOutputFilesOpenable(plan->tree, storageDir_); !refusal.message.empty())
+    throw Refused(Refused::Stage::Check, std::move(refusal));
+
+  plan->guard = std::make_unique<StorageGuard>(planStorageDir(plan->tree, storageDir_), true);
+  const std::filesystem::path storagePath(plan->guard->directory());
+  // Zamrozona sciezka bezwzgledna obowiazuje tez model, nie tylko kontrole sciezek.
+  for (auto &qry : plan->tree)
+    if (qry.id == ":STORAGE") qry.filename = storagePath.string();
   for (const auto &qry : plan->tree) {
-    if (!qry.isDeclaration()) continue;
-    std::error_code ignored;
-    std::filesystem::remove(storagePath / (qry.id + ".desc"), ignored);
-    std::filesystem::remove(storagePath / (qry.id + ".meta"), ignored);
+    if (qry.isCompilerDirective()) continue;
+    plan->guard->checkPath((storagePath / (qry.id + ".desc")).string());
+    if (qry.isDeclaration()) {
+      // Zrodla poza katalogiem wynikow: zadne czyszczenie artefaktow nie moze ich usunac.
+      const std::string source = absolutePathOf(qry.filename);
+      const std::filesystem::path sourcePath(source);
+      if (std::ranges::mismatch(storagePath, sourcePath).in1 == storagePath.end())
+        refuse(Refused::Stage::Check, "source must be outside the Engine storage directory: " + source);
+      // Brak zrodla daje rekordy NULL jak w serwisie (#346); inna porazka otwarcia to K4.
+      const StorageFd input(source, O_RDONLY | O_NONBLOCK, kStreamFileMode, true);
+      if (const int err = errno; !input.isOpen() && err != ENOENT && err != ENOTDIR)
+        throw Refused(Refused::Stage::Check, {ErrorClass::Environment, "cannot open embedded source: " + source, err});
+      plan->guard->checkPath((storagePath / (qry.id + ".meta")).string());
+      continue;
+    }
+    const std::filesystem::path data = storagePath / (qry.filename.empty() ? qry.id : qry.filename);
+    for (const auto &suffix : {"", ".shadow", ".meta", ".meta.shadow"})
+      plan->guard->checkPath(data.string() + suffix);
   }
 
-  // Ten sam preflight co start uslugi (#473): katalog magazynu, zrodla deklarowane, zachowane .desc.
-  // Klasa odmowy zostaje: Environment (np. nieczytelny katalog) binding tlumaczy inaczej niz Plan.
-  if (Refusal refusal = checkPlanStorage(plan->tree, storageDir_); !refusal.message.empty()) {
-    throw Refused(Refused::Stage::Check, std::move(refusal));
+  // #450, wariant A: jedynie we WLASNYM zablokowanym katalogu plan zastepuje deklaracje.
+  // Kontrole niewymagajace zmiany plikow sa juz zakonczone, wiec odmowa nie kasuje starego .desc.
+  for (const auto &qry : plan->tree) {
+    if (!qry.isDeclaration()) continue;
+    for (const auto &suffix : {".desc", ".meta"}) {
+      const auto file = storagePath / (qry.id + suffix);
+      std::error_code ec;
+      std::filesystem::remove(file, ec);
+      if (ec)
+        throw Refused(Refused::Stage::Check,
+                      {ErrorClass::Environment, "cannot remove owned artifact: " + file.string(), ec.value()});
+    }
   }
 
   // Artefakty poprzedniego przebiegu, jak przed startem uslugi i przed `xqry --reset`: magazyn

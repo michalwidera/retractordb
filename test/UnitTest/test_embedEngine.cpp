@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cerrno>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -24,8 +25,8 @@
 // miejscem, w ktorym ta teza staje sie asercja.
 //
 // C3 (#491) dolozyl plan: compile() + step() nad tym samym cialem slotu, ktore wykonuje usluga.
-// Testy grupy embedEnginePlan biegna w katalogu roboczym testu i zostawiaja w nim artefakty
-// magazynu, tak jak zrobilby to xretractor.
+// Testy grupy embedEnginePlan czytaja zrodla z katalogu roboczego, a wyniki trzymaja
+// w osobnych katalogach silnikow (#450).
 //
 
 namespace {
@@ -51,12 +52,6 @@ void writeSource(const std::string &name, const std::vector<int> &values) {
 /// Plan z it_untileof_stop: jedno zrodlo co 1/2 s, jeden SELECT podwajajacy wartosc.
 std::string doublingPlan(const std::string &source) {
   return "DECLARE a INTEGER STREAM src, 1/2 TEXTFILE '" + source + "'\nSELECT a*2 STREAM dst FROM src\n";
-}
-
-/// Artefakty poprzedniego przebiegu w katalogu roboczym: magazyn liczylby dalej od nich.
-void dropArtifacts(const std::string &stream) {
-  for (const auto &suffix : {"", ".desc", ".meta", ".shadow"})
-    std::filesystem::remove(stream + suffix);
 }
 
 int firstValue(const rdb::payload &record) { return std::get<int>(record.getItemVT(0).value()); }
@@ -146,7 +141,6 @@ TEST(embedEngine, open_storage_failure_is_engine_fatal_not_process_exit) {
 TEST(embedEnginePlan, compile_step_and_read_the_result) {
   const std::vector<int> input{10, 20, 30, 40, 50, 60, 70, 80};
   writeSource("plan_data.txt", input);
-  dropArtifacts("dst");
 
   rdb::embed::Engine engine;
   ASSERT_FALSE(engine.hasPlan());
@@ -226,7 +220,6 @@ TEST(embedEnginePlan, two_engines_with_the_same_volatile_stream_stay_isolated) {
 TEST(embedEnginePlan, recompile_in_the_same_directory_reads_the_new_source) {
   writeSource("first_source.txt", {1, 2, 3});
   writeSource("second_source.txt", {10, 20, 30});
-  dropArtifacts("dst");
 
   rdb::embed::Engine engine;
   engine.compile(doublingPlan("first_source.txt"));
@@ -244,7 +237,6 @@ TEST(embedEnginePlan, recompile_in_the_same_directory_reads_the_new_source) {
 // kompilator, ograniczenia silnika osadzonego, kontrola magazynu; potem wywolania bez planu.
 TEST(embedEnginePlan, refusals_carry_their_stage) {
   writeSource("plan_data.txt", {1, 2});
-  dropArtifacts("dst");
   rdb::embed::Engine engine;
   using Stage = rdb::embed::Refused::Stage;
 
@@ -264,8 +256,8 @@ TEST(embedEnginePlan, refusals_carry_their_stage) {
   expectStage(doublingPlan("plan_data.txt") + "RULE r ON dst WHEN dst[0] > 100 DO SYSTEM 'echo no'\n", Stage::Check);
   expectStage(doublingPlan("plan_data.txt") + "ROTATION 'counter.txt'\n", Stage::Check);
   expectStage("DECLARE a INTEGER STREAM src, 1 DEVICE '/dev/null'\nSELECT a*2 STREAM dst FROM src\n", Stage::Check);
-  // Kontrola magazynu (checkPlanStorage): zrodlo zlego rodzaju i brak katalogu :STORAGE. Brak pliku
-  // zrodla odmowa NIE jest - na master daje rekordy NULL (#346), tak samo w silniku osadzonym.
+  // Kontrola magazynu: zrodlo zlego rodzaju i brak katalogu :STORAGE. Brak pliku zrodla odmowa
+  // NIE jest - na master daje rekordy NULL (#346), tak samo w silniku osadzonym.
   expectStage(doublingPlan("/dev/null"), Stage::Check);
   expectStage("STORAGE 'engine_missing_dir'\n" + doublingPlan("plan_data.txt"), Stage::Check);
 
@@ -286,26 +278,83 @@ TEST(embedEnginePlan, refusals_carry_their_stage) {
 // Katalog magazynu silnika obowiazuje tylko plan bez :STORAGE, jak `[storage] dir` uslugi.
 TEST(embedEnginePlan, storage_dir_is_a_default_and_the_directive_wins) {
   writeSource("plan_data.txt", {5, 6, 7});
-  std::filesystem::create_directories("engine_default_dir");
-  std::filesystem::create_directories("engine_directive_dir");
-  dropArtifacts("engine_default_dir/dst");
-  dropArtifacts("engine_directive_dir/dst");
-  const std::string source = std::filesystem::absolute("plan_data.txt").string();
+  rdb::embed::Engine defaultOwner;
+  rdb::embed::Engine directiveOwner;
+  const std::string defaultDir   = defaultOwner.storageDir();
+  const std::string directiveDir = directiveOwner.storageDir();
+  const std::string source       = std::filesystem::absolute("plan_data.txt").string();
 
   {
-    rdb::embed::Engine engine("engine_default_dir");
+    rdb::embed::Engine engine(defaultDir);
     engine.compile(doublingPlan(source));
     while (engine.step()) {}
     EXPECT_EQ(engine.recordCount("dst"), 3U);
   }
-  EXPECT_TRUE(std::filesystem::exists("engine_default_dir/dst.desc"));
+  EXPECT_TRUE(std::filesystem::exists(std::filesystem::path(defaultDir) / "dst.desc"));
 
   {
-    rdb::embed::Engine engine("engine_default_dir");
-    engine.compile("STORAGE 'engine_directive_dir'\n" + doublingPlan(source));
+    rdb::embed::Engine engine(defaultDir);
+    engine.compile("STORAGE '" + directiveDir + "'\n" + doublingPlan(source));
     while (engine.step()) {}
   }
-  EXPECT_TRUE(std::filesystem::exists("engine_directive_dir/dst.desc"));
+  EXPECT_TRUE(std::filesystem::exists(std::filesystem::path(directiveDir) / "dst.desc"));
+}
+
+// Blokada dotyczy obiektu katalogu, takze dla dyrektywy STORAGE i aliasu sciezki.
+// Odmowa drugiego silnika nie zmienia pierwszego planu; close() oddaje katalog.
+TEST(embedEnginePlan, directory_lock_covers_storage_directives_and_aliases) {
+  writeSource("ownership_source.txt", {3, 4});
+  rdb::embed::Engine first;
+  const std::string directory = first.storageDir();
+  const std::string alias     = directory + "/../" + std::filesystem::path(directory).filename().string();
+  rdb::embed::Engine second;
+  const auto plan      = doublingPlan("ownership_source.txt");
+  const auto alternate = "STORAGE '" + alias + "'\n" + plan;
+  first.compile(plan);
+  const auto failure = refusalOf(second, alternate);
+  ASSERT_TRUE(failure.has_value());
+  EXPECT_EQ(failure->refusal().cls, rdb::ErrorClass::Request);
+  EXPECT_EQ(failure->refusal().err, EBUSY);
+  EXPECT_FALSE(second.hasPlan());
+  while (first.step()) {}
+  EXPECT_EQ(firstValue(first.record("dst", 1)), 8);
+  first.close();
+  second.compile(alternate);
+  while (second.step()) {}
+  EXPECT_EQ(firstValue(second.record("dst", 1)), 8);
+}
+
+// Katalog zastany bez znacznika nie daje prawa do nadpisania .desc ani danych.
+TEST(embedEnginePlan, foreign_artifacts_are_preserved) {
+  writeSource("ownership_source.txt", {3, 4});
+  rdb::embed::Engine engine;
+  const auto descriptor = std::filesystem::path(engine.storageDir()) / "src.desc";
+  std::ofstream(descriptor) << "{ a DOUBLE[1] }\n";
+  const auto failure = refusalOf(engine, doublingPlan("ownership_source.txt"));
+  ASSERT_TRUE(failure.has_value());
+  EXPECT_EQ(failure->refusal().cls, rdb::ErrorClass::Plan);
+  EXPECT_FALSE(engine.hasPlan());
+  std::ifstream input(descriptor);
+  std::string content;
+  std::getline(input, content);
+  EXPECT_EQ(content, "{ a DOUBLE[1] }");
+  EXPECT_FALSE(std::filesystem::exists(std::filesystem::path(engine.storageDir()) / ".retractordb-embedded"));
+  std::filesystem::remove(descriptor);
+  engine.compile(doublingPlan("ownership_source.txt"));
+  while (engine.step()) {}
+  EXPECT_EQ(firstValue(engine.record("dst", 1)), 8);
+}
+
+// Brak zrodla po poprawnym przebiegu daje rekordy NULL, jak w serwisie (#346), a nie odmowe.
+TEST(embedEnginePlan, missing_source_gives_null_records_like_the_service) {
+  writeSource("ownership_source.txt", {3, 4});
+  rdb::embed::Engine engine;
+  engine.compile(doublingPlan("ownership_source.txt"));
+  while (engine.step()) {}
+  engine.compile(doublingPlan("engine_missing_source.txt"), false);
+  ASSERT_TRUE(engine.step().has_value());
+  ASSERT_TRUE(engine.step().has_value());
+  EXPECT_FALSE(engine.record("dst", 0).getItemVT(0).has_value());
 }
 
 // Decyzja (a): K4 w slocie wychodzi z step() jako EngineFatal, proces hosta zyje, a plan zostaje
@@ -314,7 +363,6 @@ TEST(embedEnginePlan, storage_dir_is_a_default_and_the_directive_wins) {
 // dalej; compile() zaczyna od nowa.
 TEST(embedEnginePlan, fault_in_a_slot_latches_the_plan) {
   writeSource("plan_data.txt", {1, 2, 3});
-  dropArtifacts("dst");
   rdb::embed::Engine engine;
   engine.compile(doublingPlan("plan_data.txt"));
 

@@ -299,6 +299,32 @@ TEST_F(AppConfigTest, invalid_storage_ref_dirs_is_an_error) {
   }
 }
 
+// #450: lista lagodnych katalogow blokad silnika osadzonego. Brak klucza (nullopt) znaczy z definicji
+// katalog tymczasowy systemu, a pusta lista - zaden. Katalog nie musi istniec; wpis wzgledny albo
+// nie-napis to powod odmowy, ktory zglasza silnik osadzony - loadAppConfig nie rzuca, bo ten sam plik
+// czyta xretractor, ktory klucza nie uzywa.
+TEST_F(AppConfigTest, embedded_lenient_lock_dirs) {
+  EXPECT_FALSE(loadAppConfig().embeddedLenientLockDirs.has_value());
+
+  const fs::path explicitFile = tmpDir / "custom.toml";
+  writeFile(explicitFile, "[embedded]\nlenient_lock_dirs = [\"/tmp\", \"" + (tmpDir / "none").string() + "\"]\n");
+  AppConfig cfg = loadAppConfig(explicitFile.string());
+  EXPECT_EQ(cfg.embeddedLenientLockDirs, (std::vector<std::string>{"/tmp", (tmpDir / "none").string()}));
+  EXPECT_TRUE(cfg.embeddedLenientLockDirsError.empty());
+
+  writeFile(explicitFile, "[embedded]\nlenient_lock_dirs = []\n");
+  cfg = loadAppConfig(explicitFile.string());
+  EXPECT_EQ(cfg.embeddedLenientLockDirs, std::vector<std::string>{});
+
+  for (const std::string &value : {std::string("\"/tmp\""), std::string("[\"relative/dir\"]"), std::string("[1]")}) {
+    writeFile(explicitFile, "[embedded]\nlenient_lock_dirs = " + value + "\n");
+    ASSERT_NO_THROW(cfg = loadAppConfig(explicitFile.string())) << value;
+    EXPECT_FALSE(cfg.embeddedLenientLockDirs.has_value()) << value;
+    EXPECT_TRUE(cfg.embeddedLenientLockDirsError.starts_with("embedded.lenient_lock_dirs must be an array of absolute paths"))
+        << value << ": " << cfg.embeddedLenientLockDirsError;
+  }
+}
+
 TEST_F(AppConfigTest, relative_lock_dir_is_an_error_in_discovered_and_explicit_files) {
   writeFile(userConfigFile(), "[paths]\nlock_dir = \"relative/locks\"\n");
   for (const auto &path : {std::optional<std::string>{}, std::optional<std::string>{userConfigFile().string()}}) {

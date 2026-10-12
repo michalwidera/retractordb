@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
+import sys
 import threading
 from fractions import Fraction
 from pathlib import Path
@@ -33,11 +35,12 @@ def doubling_plan(source: Path) -> str:
 @pytest.fixture
 def plan_dir(tmp_path: Path) -> Path:
     write_source(tmp_path)
+    (tmp_path / "storage").mkdir()
     return tmp_path
 
 
 def test_run_to_end_of_input_doubles_every_record(rdb, plan_dir: Path) -> None:
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         assert not engine.has_plan
         engine.compile(doubling_plan(plan_dir / "data.txt"))
         assert engine.has_plan
@@ -59,7 +62,7 @@ def test_run_to_end_of_input_doubles_every_record(rdb, plan_dir: Path) -> None:
 
 
 def test_step_returns_slot_indexes_then_none(rdb, plan_dir: Path) -> None:
-    engine = rdb.Engine(str(plan_dir))
+    engine = rdb.Engine(str(plan_dir / "storage"))
     engine.compile(doubling_plan(plan_dir / "data.txt"))
 
     assert engine.step() == 0
@@ -78,7 +81,7 @@ def test_step_returns_slot_indexes_then_none(rdb, plan_dir: Path) -> None:
 
 
 def test_run_with_a_slot_budget_stops_early(rdb, plan_dir: Path) -> None:
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         engine.compile(doubling_plan(plan_dir / "data.txt"))
         assert engine.run(slots=3) == 3
         assert engine.slots_done == 3
@@ -88,13 +91,13 @@ def test_run_with_a_slot_budget_stops_early(rdb, plan_dir: Path) -> None:
 
 
 def test_artefacts_land_in_the_engine_storage_dir(rdb, plan_dir: Path) -> None:
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         engine.compile(doubling_plan(plan_dir / "data.txt"))
         engine.run()
-    assert (plan_dir / "dst").exists()
-    assert (plan_dir / "dst.desc").exists()
+    assert (plan_dir / "storage" / "dst").exists()
+    assert (plan_dir / "storage" / "dst.desc").exists()
     # Magazyn jest zwykly: czyta go tez wiazanie etapu 1a.
-    with rdb.Storage("dst", "dst", storage_param=str(plan_dir)) as storage:
+    with rdb.Storage("dst", "dst", storage_param=str(plan_dir / "storage")) as storage:
         assert [record[0] for record in storage] == [value * 2 for value in INPUT]
 
 
@@ -102,11 +105,11 @@ def test_storage_directive_in_the_plan_wins(rdb, plan_dir: Path) -> None:
     inside = plan_dir / "inside"
     inside.mkdir()
     plan = f"STORAGE '{inside}'\n" + doubling_plan(plan_dir / "data.txt")
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         engine.compile(plan)
         engine.run()
     assert (inside / "dst").exists()
-    assert not (plan_dir / "dst").exists()
+    assert not (plan_dir / "storage" / "dst").exists()
 
 
 def test_missing_storage_dir_is_a_plan_error_not_a_dead_kernel(rdb, plan_dir: Path) -> None:
@@ -117,7 +120,7 @@ def test_missing_storage_dir_is_a_plan_error_not_a_dead_kernel(rdb, plan_dir: Pa
 
 
 def test_syntax_error_names_the_problem(rdb, plan_dir: Path) -> None:
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         with pytest.raises(rdb.RQLSyntaxError) as failure:
             engine.compile("SELEKT nonsense FROM nowhere\n")
         assert issubclass(rdb.RQLSyntaxError, rdb.PlanError)
@@ -126,14 +129,14 @@ def test_syntax_error_names_the_problem(rdb, plan_dir: Path) -> None:
 
 
 def test_compile_error_for_an_unknown_source(rdb, plan_dir: Path) -> None:
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         with pytest.raises(rdb.CompileError):
             engine.compile("SELECT a*2 STREAM dst FROM nosuch\n")
         assert issubclass(rdb.CompileError, rdb.PlanError)
 
 
 def test_empty_plan_is_a_compile_error(rdb, plan_dir: Path) -> None:
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         with pytest.raises(rdb.CompileError):
             engine.compile("# only a comment\n")
 
@@ -152,7 +155,7 @@ def test_service_only_features_are_refused_at_compile(rdb, plan_dir: Path, extra
     """DUMP needs the service's global model pointer, SYSTEM would run a shell in the host,
     ROTATION reads the service's counter, DEVICE needs the service loop's DEVICE phase.
     Refused up front, not half-way through a slot."""
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         with pytest.raises(rdb.CompileError):
             engine.compile(doubling_plan(plan_dir / "data.txt") + extra)
         assert not engine.has_plan
@@ -170,7 +173,7 @@ def test_operations_without_a_plan_raise_config_error(rdb) -> None:
 
 
 def test_record_access_follows_python_conventions(rdb, plan_dir: Path) -> None:
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         engine.compile(doubling_plan(plan_dir / "data.txt"))
         engine.run()
         assert engine.record("dst", -1)[0] == INPUT[-1] * 2
@@ -196,7 +199,7 @@ def test_record_access_follows_python_conventions(rdb, plan_dir: Path) -> None:
 
 def test_recompile_replaces_the_plan(rdb, plan_dir: Path) -> None:
     other = write_source(plan_dir, [1, 2, 3], name="other.txt")
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         engine.compile(doubling_plan(plan_dir / "data.txt"))
         engine.run()
         engine.compile(f"DECLARE a INTEGER STREAM src, 1 TEXTFILE '{other}'\nSELECT a*3 STREAM tripled FROM src\n")
@@ -210,11 +213,11 @@ def test_recompile_in_the_same_directory_reads_the_new_source(rdb, plan_dir: Pat
     """A stale src.desc carries REF to the previous file; the plan must win over it.
 
     The service refuses a kept declaration .desc that disagrees with the plan (#265);
-    the engine drops the declaration's descriptor first (#450 decides the final rule),
+    the engine replaces the declaration's descriptor in its owned directory (#450),
     because re-running a cell with a new file is normal.
     """
     other = write_source(plan_dir, [1, 2, 3], name="other.txt")
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         engine.compile(doubling_plan(plan_dir / "data.txt"))
         engine.run()
         engine.compile(doubling_plan(other))
@@ -225,7 +228,7 @@ def test_recompile_in_the_same_directory_reads_the_new_source(rdb, plan_dir: Pat
 
 def test_wrapping_source_when_until_eof_is_off(rdb, plan_dir: Path) -> None:
     """The daemon's default: a source without ONESHOT wraps to its start after EOF."""
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         engine.compile(doubling_plan(plan_dir / "data.txt"), until_eof=False)
         assert engine.run(slots=14) == 14
         assert not engine.end_of_input
@@ -245,7 +248,7 @@ def test_two_engines_do_not_share_a_volatile_stream(rdb, plan_dir: Path) -> None
     def plan(source: Path) -> str:
         return f"DECLARE a INTEGER STREAM src, 1 TEXTFILE '{source}'\nSELECT a*2 STREAM shared FROM src VOLATILE\n"
 
-    with rdb.Engine(str(plan_dir)) as first, rdb.Engine(str(plan_dir)) as second:
+    with rdb.Engine(str(plan_dir / "storage")) as first, rdb.Engine() as second:
         first.compile(plan(low))
         second.compile(plan(high))
         first.run()
@@ -267,7 +270,7 @@ def test_engine_logs_reach_the_logging_module(rdb, plan_dir: Path, caplog: pytes
     qTree::getQuery logs "Missing - <name>" at ERROR before it throws.
     """
     caplog.set_level(logging.DEBUG, logger="retractordb")
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         with pytest.raises(rdb.CompileError):
             engine.compile("SELECT a*2 STREAM dst FROM nosuch\n")
     engine_records = [record for record in caplog.records if record.name == "retractordb"]
@@ -284,7 +287,7 @@ def test_run_honours_keyboard_interrupt(rdb, plan_dir: Path) -> None:
     """
     import _thread
 
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         engine.compile(doubling_plan(plan_dir / "data.txt"), until_eof=False)
         timer = threading.Timer(0.2, _thread.interrupt_main)
         timer.start()
@@ -320,7 +323,7 @@ def test_fault_in_a_slot_is_an_io_error_and_latches_the_plan(rdb, plan_dir: Path
     cause. Raised as InternalError, it would taint the module like a real K1 (#476).
     The fault hook is the one it_env_error_exit uses on the service.
     """
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
         engine.compile(doubling_plan(plan_dir / "data.txt"))
         os.environ["RDB_FAULT_ENV_IN_SLOT"] = "1"
         try:
@@ -335,3 +338,183 @@ def test_fault_in_a_slot_is_an_io_error_and_latches_the_plan(rdb, plan_dir: Path
         assert not engine.failed
         engine.run()
         assert [row[0] for row in engine.rows("dst")] == [value * 2 for value in INPUT]
+
+
+def storage_bytes(directory: Path) -> dict[str, bytes]:
+    return {str(path.relative_to(directory)): path.read_bytes() for path in directory.rglob("*") if path.is_file()}
+
+
+def test_default_directories_are_private_and_removed_with_the_engine(rdb, plan_dir: Path) -> None:
+    first, second = rdb.Engine(), rdb.Engine()
+    first_dir, second_dir = Path(first.storage_dir), Path(second.storage_dir)
+    assert first_dir != second_dir
+    first.compile(doubling_plan(plan_dir / "data.txt"))
+    second.compile(doubling_plan(plan_dir / "data.txt").replace("a*2", "a*3"))
+    first.run()
+    second.run()
+    assert [row[0] for row in first.rows("dst")] == [value * 2 for value in INPUT]
+    assert [row[0] for row in second.rows("dst")] == [value * 3 for value in INPUT]
+    first.close()
+    assert first_dir.is_dir(), "close() must allow recompile in the same directory"
+    del first, second
+    assert not first_dir.exists()
+    assert not second_dir.exists()
+
+
+@pytest.mark.parametrize("descriptor", ["{ a INTEGER[1] }", "{ a DOUBLE[1] }", "broken descriptor"])
+@pytest.mark.parametrize("directive", [False, True], ids=["constructor", "STORAGE"])
+def test_foreign_storage_is_refused_without_changing_any_files(rdb, plan_dir: Path, descriptor: str, directive: bool) -> None:
+    directory = plan_dir / "storage"
+    for name, value in {"src.desc": descriptor, "src.meta": "old metadata", "dst": "old data", "dst.desc": descriptor}.items():
+        (directory / name).write_text(value)
+    before = storage_bytes(directory)
+    plan = doubling_plan(plan_dir / "data.txt")
+    with rdb.Engine("" if directive else str(directory)) as engine:
+        with pytest.raises(rdb.CompileError, match="empty directory"):
+            engine.compile((f"STORAGE '{directory}'\n" if directive else "") + plan)
+        assert not engine.has_plan
+    assert storage_bytes(directory) == before
+    with rdb.Engine() as usable:
+        usable.compile(doubling_plan(plan_dir / "data.txt"))
+        assert usable.run() == len(INPUT)
+
+
+@pytest.mark.parametrize("alias", [False, True], ids=["same-path", "symlink-alias"])
+def test_second_engine_is_refused_until_the_first_closes(rdb, plan_dir: Path, alias: bool) -> None:
+    directory = plan_dir / "storage"
+    second_dir = plan_dir / "alias" if alias else directory
+    if alias:
+        second_dir.symlink_to(directory, target_is_directory=True)
+    plan = doubling_plan(plan_dir / "data.txt")
+    with rdb.Engine(str(directory)) as first, rdb.Engine(str(second_dir)) as second:
+        first.compile(plan)
+        before = storage_bytes(directory)
+        with pytest.raises(rdb.ConfigError, match="busy"):
+            second.compile(plan)
+        assert storage_bytes(directory) == before
+        first.run()
+        assert [row[0] for row in first.rows("dst")] == [value * 2 for value in INPUT]
+        first.close()
+        second.compile(plan)
+        second.run()
+        assert [row[0] for row in second.rows("dst")] == [value * 2 for value in INPUT]
+
+
+def test_directory_lock_also_excludes_another_process(rdb, module_root: Path, plan_dir: Path) -> None:
+    directory = plan_dir / "storage"
+    plan = doubling_plan(plan_dir / "data.txt")
+    program = f"""
+import sys
+sys.path.insert(0, {str(module_root)!r})
+import retractordb as rdb
+with rdb.Engine({str(directory)!r}) as engine:
+    try:
+        engine.compile({plan!r})
+    except rdb.ConfigError as error:
+        assert 'busy' in str(error)
+        print('refused; kernel alive')
+    else:
+        raise AssertionError('another process acquired the directory')
+"""
+    with rdb.Engine(str(directory)) as first:
+        first.compile(plan)
+        result = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=15)
+        assert result.returncode == 0, result.stderr
+        assert "refused; kernel alive" in result.stdout
+        assert first.run() == len(INPUT)
+
+
+def test_process_death_releases_the_directory_lock(rdb, module_root: Path, plan_dir: Path) -> None:
+    directory = plan_dir / "storage"
+    plan = doubling_plan(plan_dir / "data.txt")
+    program = f"""
+import os, sys
+sys.path.insert(0, {str(module_root)!r})
+import retractordb as rdb
+engine = rdb.Engine({str(directory)!r})
+engine.compile({plan!r})
+engine.run(slots=2)
+os._exit(0)
+"""
+    result = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
+    with rdb.Engine(str(directory)) as engine:
+        engine.compile(plan)
+        engine.run()
+        assert [row[0] for row in engine.rows("dst")] == [value * 2 for value in INPUT]
+
+
+@pytest.mark.parametrize("output", ["missing/result", "../outside", ".retractordb-embedded", "link/outside"])
+def test_bad_output_paths_preserve_the_previous_artifacts(rdb, plan_dir: Path, output: str) -> None:
+    directory = plan_dir / "storage"
+    outside = plan_dir / "outside"
+    outside.write_bytes(b'outside data')
+    plan = doubling_plan(plan_dir / "data.txt")
+    with rdb.Engine(str(directory)) as engine:
+        engine.compile(plan)
+        engine.run()
+        engine.close()
+        (directory / "link").symlink_to(plan_dir, target_is_directory=True)
+        before = storage_bytes(directory)
+        with pytest.raises(rdb.CompileError):
+            engine.compile(plan.replace("FROM src", f"FROM src FILE '{output}'"))
+        assert not engine.has_plan
+        assert storage_bytes(directory) == before
+        assert outside.read_bytes() == b'outside data'
+        assert (directory / "link").is_symlink()
+        engine.compile(plan)
+        assert engine.run() == len(INPUT)
+
+
+def test_schema_can_change_in_an_owned_directory(rdb, plan_dir: Path) -> None:
+    with rdb.Engine(str(plan_dir / "storage")) as engine:
+        plan = doubling_plan(plan_dir / "data.txt")
+        engine.compile(plan)
+        engine.run()
+        engine.compile(plan.replace("a INTEGER", "a DOUBLE"))
+        engine.run()
+        assert engine.schema("src")[0].type == rdb.FieldType.DOUBLE
+        assert [row[0] for row in engine.rows("dst")] == [float(value * 2) for value in INPUT]
+
+
+def test_invalid_owner_marker_is_refused(rdb, plan_dir: Path) -> None:
+    directory = plan_dir / "storage"
+    (directory / ".retractordb-embedded").write_text("another format")
+    before = storage_bytes(directory)
+    with rdb.Engine(str(directory)) as engine:
+        with pytest.raises(rdb.CompileError, match="owner marker"):
+            engine.compile(doubling_plan(plan_dir / "data.txt"))
+    assert storage_bytes(directory) == before
+
+
+def test_source_in_storage_preserves_the_previous_artifacts(rdb, plan_dir: Path) -> None:
+    directory = plan_dir / "storage"
+    with rdb.Engine(str(directory)) as engine:
+        engine.compile(doubling_plan(plan_dir / "data.txt"))
+        engine.run()
+        engine.close()
+        source = directory / "input.txt"
+        source.write_text("1\n2\n")
+        before = storage_bytes(directory)
+        with pytest.raises(rdb.CompileError):
+            engine.compile(doubling_plan(source))
+        assert not engine.has_plan
+        assert storage_bytes(directory) == before
+
+
+def test_missing_source_gives_null_records_like_the_service(rdb, plan_dir: Path) -> None:
+    # #346: brak pliku zrodla to rekordy NULL, nie odmowa - tak samo jak w xretractor.
+    with rdb.Engine() as engine:
+        engine.compile(doubling_plan(plan_dir / "missing.txt"), until_eof=False)
+        assert engine.run(2) == 2
+        assert tuple(engine.record("dst", 0)) == (None,)
+
+
+def test_explicit_disposable_still_removes_the_external_source(rdb, plan_dir: Path) -> None:
+    source = plan_dir / "data.txt"
+    with rdb.Engine() as engine:
+        engine.compile(doubling_plan(source).replace("'\nSELECT", "' DISPOSABLE\nSELECT"))
+        engine.run()
+        assert source.exists()
+        engine.close()
+        assert not source.exists()

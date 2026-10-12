@@ -15,7 +15,8 @@ plan one logical time slot at a time. It links `rdbembed`, `retractorcore` and t
 storage library `rdb`; it needs no running daemon and includes no bus or IPC
 server. The `Engine` API and its limits are described in §7.
 
-The read-only storage API remains available independently of a compiled plan:
+The storage reading API remains available independently of a compiled plan.
+Opening a storage can rebuild its `.meta` index, so this is offline access: `Storage` checks held `xretractor_service*.lock` files before opening. Real protection needs the service's lock directory: pass `config=` with the service's TOML file (its `paths.lock_dir` is used) or `lock_dir=` directly; the argument wins over the file. Without either, the check looks into TMPDIR and `Storage` reports that guess as `UserWarning` (shown once per call site) and logs the same text at INFO to `logging.getLogger("retractordb")`. A lock directory listed in `[embedded] lenient_lock_dirs` is checked leniently, like `xtrdb`: only a held lock refuses, while an unreadable entry or a missing directory does not. Without that key the list is, by definition, the system temporary directory (TMPDIR, or `/tmp` without it) - the directory the service locks in when `paths.lock_dir` is empty; a shared temporary directory is where a stray entry is most likely, and TMPDIR is only a guess (a service started by systemd usually locks in `/tmp`). The key replaces that default, and any other lock directory is checked strictly. The library reads a configuration file only when `config=` names it. This startup check does not exclude a daemon that starts later or uses another lock directory. `close()` and context exit close the storage and flush its index.
 
 ```python
 import retractordb as rdb
@@ -191,7 +192,7 @@ build that may not be the one just built, hence the explicit variable above.
 ```python
 import retractordb as rdb
 
-with rdb.Engine("/tmp/plan") as eng:                     # storage dir for plans without STORAGE
+with rdb.Engine() as eng:                               # private storage directory; inputs live elsewhere
     eng.compile("""
         DECLARE a INTEGER STREAM src, 1/2 TEXTFILE '/tmp/plan/data.txt'
         SELECT a*2 STREAM dst FROM src
@@ -207,8 +208,9 @@ with rdb.Engine("/tmp/plan") as eng:                     # storage dir for plans
 
 | Binding | C++ |
 |---|---|
-| `Engine(storage_dir="")` | `rdb::embed::Engine` |
-| `compile(rql, until_eof=True)` | `Engine::compile` - `parsePlanText` + `compiler::compile` + `checkPlanStorage` + `dataModel` + `TimeLine` |
+| `Engine(storage_dir="", lock_dir="", config="")` | `rdb::embed::Engine` |
+| `storage_dir` | effective plan directory, or the default directory without a plan |
+| `compile(rql, until_eof=True)` | `Engine::compile` - parser, compiler, offline and ownership checks, `dataModel`, `TimeLine` |
 | `step()` -> `int | None` | `Engine::step`; `None` after the slot in which a declared source ran dry |
 | `run(slots=None)` -> `int` | a loop over `step()` in `module.cpp`, GIL released, `PyErr_CheckSignals` every 50 ms |
 | `failed` | `Engine::failed` - a slot raised, the plan stopped until the next `compile()` |
@@ -224,6 +226,8 @@ with rdb.Engine("/tmp/plan") as eng:                     # storage dir for plans
 | engine log records | `logging.getLogger("retractordb")`, through a spdlog sink installed by the module |
 
 `ConfigError` is also a `ValueError` and `IOError` an `OSError`, so `except ValueError` catches every refusal of the plan or the request and `except OSError` every failure of the environment; the whole hierarchy is in `core-phase-3.md` §3.
+
+**Storage ownership (#450, variant A).** `Engine()` creates a private temporary directory that survives `close()` until the engine is destroyed. An explicit directory, including a RQL `STORAGE` override, must be empty on first use or carry a valid `.retractordb-embedded` marker. The directory is locked until the plan's storages close; a second engine, including a path alias or another process, gets `ConfigError`. `Storage` takes the same lock in a marked directory until it closes. Source files must live outside the owned directory, and every output must stay inside it; a missing source gives NULL records, as in the service (#346). An explicit RQL `DISPOSABLE` still authorizes removal of its source. Recompilation may replace owned descriptors and results; a preflight refusal preserves old artifacts while closing the previous plan. Later I/O failures are not transactional. A plan in the private directory skips the service lock check, since no service can use a directory created by `mkdtemp`; an explicit directory is checked under the same `lock_dir` / `config` contract as `Storage`. The daemon's own behavior is unchanged.
 
 **Refused at `compile()`**, as `CompileError`, because the state they need is the service's and not the engine's: `DUMP` and `SYSTEM` rule actions, `:ROTATION` and `DEVICE` sources. `core-phase-3.md` §2.4 has the reasons and §5 what remains owed.
 

@@ -14,6 +14,7 @@
 
 #include "fatalError.hpp"
 #include "rdb/descriptor.hpp"
+#include "rdb/embed/storageGuard.hpp"
 #include "rdb/memoryStore.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/storage.hpp"
@@ -74,13 +75,19 @@ class Engine {
  public:
   /// @param storageDir katalog magazynu dla planu, ktory nie niesie wlasnej dyrektywy :STORAGE
   ///        (dyrektywa z RQL wygrywa - ta sama regula co `[storage] dir` w konfiguracji uslugi).
-  ///        Pusty => katalog roboczy procesu.
-  explicit Engine(std::string storageDir = {});
+  ///        Pusty => prywatny katalog tymczasowy, zyjacy do zniszczenia Engine.
+  /// @param lockDir katalog blokad serwisu (paths.lock_dir); pusty => TMPDIR albo paths.lock_dir z configPath.
+  /// @param configPath plik konfiguracji czytany tylko, gdy podany (paths.lock_dir, embedded.lenient_lock_dirs).
+  ///        Katalogu prywatnego kontrola blokad serwisu nie dotyczy.
+  explicit Engine(std::string storageDir = {}, std::string lockDir = {}, std::string configPath = {});
   Engine(const Engine &)            = delete;
   Engine &operator=(const Engine &) = delete;
   Engine(Engine &&)                 = delete;
   Engine &operator=(Engine &&)      = delete;
   ~Engine();
+
+  /// Efektywny katalog planu, a bez planu domyslny katalog tego Engine.
+  [[nodiscard]] const std::string &storageDir() const noexcept;
 
   /// Memory Store tej instancji. Publiczny, bo test izolacji musi umiec zapytac, do ktorego
   /// Memory Store trafil zapis.
@@ -191,7 +198,10 @@ class Engine {
   /// Cialo step() bez zatrzasku planu.
   std::optional<std::uint64_t> stepPlan(Plan &plan);
 
+  // Przed storageDir_: odmowa konfiguracji nie moze zostawic utworzonego katalogu prywatnego.
+  OfflinePolicy offline_;
   std::string storageDir_;
+  bool temporaryDir_{false};
   std::vector<std::string> warnings_;
   MemoryStore memory_;
   std::unique_ptr<Plan> plan_;
