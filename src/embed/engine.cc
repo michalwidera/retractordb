@@ -60,8 +60,9 @@ struct Engine::Plan {
   /// executorsm::collectAwaitedStreams. Pole planu, a nie zmienna slotu: pojemnosc zostaje miedzy
   /// taktami.
   std::vector<char> dueMask;
-  /// Tresc pierwszego bledu w slocie; obecna = plan zatrzasniety (patrz Engine).
-  std::optional<std::string> failure;
+  /// Pierwszy blad w slocie; obecny = plan zatrzasniety (patrz Engine). Klasa zostaje klasa tego
+  /// bledu: zatrzask po K4 zglaszany jako K1 kazalby hostowi uznac za zepsuty caly silnik.
+  std::optional<EngineFatal> failure;
 };
 
 Engine::Engine(std::string storageDir) : storageDir_(std::move(storageDir)) {}
@@ -82,6 +83,7 @@ std::unique_ptr<storage> Engine::openStorage(const std::string_view qryID,      
 void Engine::compile(const std::string_view rql, const bool untilEof) {
   // Poprzedni plan schodzi PRZED budowa nowego: oba pisalyby do tych samych plikow magazynu.
   close();
+  warnings_.clear();
 
   const ThrowOnFatalScope throwOnFatal;
   auto plan      = std::make_unique<Plan>();
@@ -92,6 +94,13 @@ void Engine::compile(const std::string_view rql, const bool untilEof) {
   const PlanSource loaded = parsePlanText(plan->tree, std::string(rql));
   if (loaded.status != "OK") refuse(Refused::Stage::Parse, loaded.status);
   if (plan->tree.empty()) refuse(Refused::Stage::Check, "plan holds no statements");
+
+  // Ostrzezenia K6 zbierane PRZED kompilacja: kompilator dopisuje do drzewa wezly posrednie, ktore
+  // moglyby powtorzyc ostrzezenie zapytania, z ktorego powstaly. Odkladane do konca compile(), zeby
+  // odmowa nie zostawila ostrzezen planu, ktorego nie ma.
+  std::vector<std::string> warnings = deprecatedFileWarnings(plan->tree);
+  for (const auto &qry : plan->tree)
+    warnings.insert(warnings.end(), qry.deprecatedNotations.begin(), qry.deprecatedNotations.end());
 
   std::string response;
   try {
@@ -182,25 +191,26 @@ void Engine::compile(const std::string_view rql, const bool untilEof) {
   if (intervals.empty()) refuse(Refused::Stage::Check, "plan holds no streams - only directives");
   plan->timeline = std::make_unique<CRationalStreamMath::TimeLine>(intervals);
 
-  plan_ = std::move(plan);
+  plan_     = std::move(plan);
+  warnings_ = std::move(warnings);
 }
 
 std::optional<std::uint64_t> Engine::step() {
   Plan &plan = requirePlan("step");
   if (plan.failure.has_value()) {
-    throw EngineFatal{.cls     = ErrorClass::Internal,
+    throw EngineFatal{.cls     = plan.failure->cls,
                       .message = std::format("Engine::step: the plan stopped at slot {} with: {} - compile it again",
-                                             plan.slotsDone, *plan.failure),
+                                             plan.slotsDone, plan.failure->message),
                       .where   = std::source_location::current()};
   }
   const ThrowOnFatalScope throwOnFatal;
   try {
     return stepPlan(plan);
   } catch (const EngineFatal &fault) {
-    plan.failure = fault.message;
+    plan.failure = fault;
     throw;
   } catch (const std::exception &error) {
-    plan.failure = error.what();
+    plan.failure = EngineFatal{.cls = ErrorClass::Internal, .message = error.what(), .where = std::source_location::current()};
     throw;
   }
 }
@@ -362,7 +372,8 @@ std::vector<double> Engine::project(const std::string &stream, const std::vector
 
 void Engine::close() noexcept {
   // Bez ThrowOnFatalScope: close() i ~Engine sa noexcept (host wola je z __del__ / __exit__), wiec
-  // K1/K4 z destruktora modelu albo magazynu konczy proces jak w usludze. Pelna polityka - #476.
+  // K1/K4 z destruktora modelu albo magazynu konczy proces jak w usludze - znane ograniczenie trybu
+  // osadzonego, opisane w docs/jupyter-integration.md sekcja 3 (#476).
   plan_.reset();
 }
 

@@ -79,11 +79,7 @@ Values come back as `int`, `float`, `str`, `Fraction` for RATIONAL, a tuple for
 the pair types, and `None` for NULL. A `Record` holds its own copy of the
 payload, so it stays valid after the next read.
 
-**Errors.** Engine failures arrive as exceptions under `RetractorDBError`: a malformed
-`.desc` file raises `CorruptDescriptor`, a broken engine invariant `InternalError`, and a
-failed file or disk operation `IOError`. Missing files, bad directories, unknown fields,
-out-of-range indices and reads from declared sources are checked by the binding and raise
-`NoSuchStream`, `KeyError`, `IndexError` or `StorageError`.
+**Errors.** Engine failures arrive as exceptions under `RetractorDBError`: a malformed `.desc` file raises `CorruptDescriptor` (a `PlanError`), an unsupported `storage_type` `ConfigError`, a failed file or disk operation `IOError` (an `OSError` with `errno`), and a broken engine invariant `InternalError`. After an `InternalError` the module refuses every further call into the engine until the interpreter restarts. Missing files, bad directories, unknown fields, out-of-range indices and reads from declared sources are checked by the binding and raise `NoSuchStream`, `KeyError`, `IndexError` or `StorageError`. The full class table is in [`docs/jupyter-integration.md`](../../docs/jupyter-integration.md) section 3.
 
 ### Running a plan
 
@@ -116,7 +112,8 @@ A refused plan raises `RQLSyntaxError` or `CompileError` (both `PlanError`, whic
 `ConfigError` and a `ValueError`) with the parser's or the compiler's message; a call
 without a plan raises `ConfigError`. A failure inside a slot raises `IOError` (an
 `OSError`) or `InternalError`, the kernel lives, and the plan stops (`eng.failed`) until
-the next `compile()`. `DUMP` and `SYSTEM` rule actions, `:ROTATION` and `DEVICE` sources
+the next `compile()`; an `InternalError` also stops the module until a restart.
+Deprecated RQL forms are reported by `compile()` as `DeprecationWarning`. `DUMP` and `SYSTEM` rule actions, `:ROTATION` and `DEVICE` sources
 are refused at `compile()`: they need service state the embedded engine does not have
 ([`docs/core-phase-3.md`](../../docs/core-phase-3.md)).
 

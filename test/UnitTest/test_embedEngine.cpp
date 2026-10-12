@@ -309,8 +309,9 @@ TEST(embedEnginePlan, storage_dir_is_a_default_and_the_directive_wins) {
 }
 
 // Decyzja (a): K4 w slocie wychodzi z step() jako EngineFatal, proces hosta zyje, a plan zostaje
-// zatrzasniety - model moze stac w polowie slotu, wiec kolejne step() odmawia liczenia z trescia
-// pierwszego bledu. Odczyty dzialaja dalej; compile() zaczyna od nowa.
+// zatrzasniety - model moze stac w polowie slotu, wiec kolejne step() odmawia liczenia z klasa i
+// trescia pierwszego bledu (#476: K4 zostaje K4, bo K1 skazilby modul hosta). Odczyty dzialaja
+// dalej; compile() zaczyna od nowa.
 TEST(embedEnginePlan, fault_in_a_slot_latches_the_plan) {
   writeSource("plan_data.txt", {1, 2, 3});
   dropArtifacts("dst");
@@ -339,7 +340,7 @@ TEST(embedEnginePlan, fault_in_a_slot_latches_the_plan) {
     latched = fault;
   }
   ASSERT_TRUE(latched.has_value()) << "zatrzasniety plan liczyl dalej";
-  EXPECT_EQ(latched->cls, rdb::ErrorClass::Internal);
+  EXPECT_EQ(latched->cls, rdb::ErrorClass::Environment);
   EXPECT_NE(latched->message.find("RDB_FAULT_ENV_IN_SLOT"), std::string::npos) << latched->message;
   EXPECT_NO_THROW(static_cast<void>(engine.recordCount("dst")));
 

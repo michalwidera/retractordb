@@ -316,7 +316,8 @@ def test_fault_in_a_slot_is_an_io_error_and_latches_the_plan(rdb, plan_dir: Path
     """K4 inside a slot reaches Python as IOError and the kernel lives (decision (a)).
 
     The model may stand half-way through the slot, so the plan refuses to go on until it
-    is compiled again; the first error's text names the cause of every later refusal.
+    is compiled again; every later refusal keeps the first error's class and names its
+    cause. Raised as InternalError, it would taint the module like a real K1 (#476).
     The fault hook is the one it_env_error_exit uses on the service.
     """
     with rdb.Engine(str(plan_dir)) as engine:
@@ -328,7 +329,7 @@ def test_fault_in_a_slot_is_an_io_error_and_latches_the_plan(rdb, plan_dir: Path
         finally:
             del os.environ["RDB_FAULT_ENV_IN_SLOT"]
         assert engine.failed
-        with pytest.raises(rdb.InternalError, match="RDB_FAULT_ENV_IN_SLOT"):
+        with pytest.raises(rdb.IOError, match="RDB_FAULT_ENV_IN_SLOT"):
             engine.step()
         engine.compile(doubling_plan(plan_dir / "data.txt"))
         assert not engine.failed
