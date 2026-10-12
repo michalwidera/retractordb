@@ -6,7 +6,8 @@ set(TestID "it_${TestID}")
 # Suma strumienia z samym soba (`a+a`, `m+m`). dataModel::fetchForward oddaje
 # referencje, a drugi odczyt zrodla niedeklarowanego nadpisuje jego biezacy
 # payload - wezel sumy musi wiec wziac lewy skladnik, zanim przeczyta prawy.
-# Test sprawdza wylacznie WARTOSCI, ktore nie zaleza od RDB_OPT_*, wiec nie
+# Test sprawdza WARTOSCI i to, ktory slot rekordu wejsciowego czyta kazde pole
+# `SELECT *` (wydruk planu) - jedno i drugie nie zalezy od RDB_OPT_*, wiec nie
 # dostaje DISABLED pod ablacja.
 
 add_test(

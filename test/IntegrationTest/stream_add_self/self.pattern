@@ -10,3 +10,28 @@
 { m_0:30 m_1:29 m_2:30 m_3:29 }
 { m_0:40 m_1:39 m_2:40 m_3:39 }
 { m_0:50 m_1:49 m_2:50 m_3:49 }
+== plan
+s1(1/1)
+	:- PUSH_STREAM(a)
+	:- PUSH_STREAM(a)
+	:- STREAM_ADD
+	a_0: INTEGER
+		PUSH_ID(s1[0])
+	a_1: INTEGER
+		PUSH_ID(s1[1])
+	a_2: INTEGER
+		PUSH_ID(s1[2])
+	a_3: INTEGER
+		PUSH_ID(s1[3])
+s2(1/1)
+	:- PUSH_STREAM(m)
+	:- PUSH_STREAM(m)
+	:- STREAM_ADD
+	m_0: INTEGER
+		PUSH_ID(s2[0])
+	m_1: INTEGER
+		PUSH_ID(s2[1])
+	m_2: INTEGER
+		PUSH_ID(s2[2])
+	m_3: INTEGER
+		PUSH_ID(s2[3])
