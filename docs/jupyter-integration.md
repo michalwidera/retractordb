@@ -1,6 +1,6 @@
 # Python, Jupyter and PyTorch integration
 
-**Stage 1a implemented; J1, J2 and J3 implemented on top of core phase 3** (see
+**Stage 1a and J1-J3 implemented; Linux wheel builds added in C4** (see
 [`core-phase-3.md`](core-phase-3.md) and §7 below). The rest of this document states what
 each stage delivers and what is still not implemented, so the boundary is unambiguous.
 
@@ -9,9 +9,13 @@ The full design, including the PyTorch and Colab reasoning this summarises, is i
 
 ## 1. What exists today
 
-A nanobind extension module, `retractordb._core`, bound directly against the storage
-library (`src/rdb/lib`, linked as the `rdb` static target). It is read-only and it
-covers the storage layer only - no query plan, no RQL, no execution.
+A nanobind extension module, `retractordb._core`, provides both read-only access
+to existing storages and an embedded `Engine` that compiles RQL and executes a
+plan one logical time slot at a time. It links `rdbembed`, `retractorcore` and the
+storage library `rdb`; it needs no running daemon and includes no bus or IPC
+server. The `Engine` API and its limits are described in §7.
+
+The read-only storage API remains available independently of a compiled plan:
 
 ```python
 import retractordb as rdb
@@ -32,23 +36,24 @@ with rdb.Storage("test_db", "test_db", storage_param="/path/to/dir") as st:
 | `load_descriptor(path)` | `rdb::tryLoadDescriptorFile` |
 | `Storage` | `rdb::storage` |
 | `Record` | `rdb::payload`, read through `getItemVT` |
+| `Engine` | `rdb::embed::Engine` - see §7 |
 | `RetractorDBError` and subclasses | engine failures and refusals - see §3 |
 
 Reads release the GIL. That is not premature: without it a single blocking read
 freezes the whole kernel including its UI, and retrofitting the guard after callers
 exist means auditing every one of them.
 
-## 2. Why the storage layer and nothing more
+## 2. Why the first stage covered storage only
 
-Everything above the storage layer needs the core work of #446 (phases 2 and 3).
-`qTree`, `dataModel` and `executorsm` keep process-wide state and drive themselves
-from a wall clock, and the plan layer is not yet separated from the daemon's IPC.
-Binding them today would produce an API that works once per interpreter.
+Stage 1a deliberately bound only the storage layer. At that point the plan and
+execution layers still needed the core work of #446: separating the engine from
+the daemon's IPC and giving each embedded engine its own Memory Store.
 
-The storage layer needs none of it. Its `.cc` files have no service dependencies,
-so this stage is a genuine capability that also answers the two questions the later
-stages would otherwise have to guess at: whether nanobind is the right tool, and how
-the C++ types actually cross into Python.
+That work is now implemented in C2-C3. `Engine` uses `TimeLine` and `dataModel`
+directly, without the service's wall clock, IPC thread or terminal, and instances
+do not share their Memory Stores. The storage binding established how the C++
+types cross into Python and confirmed the choice of nanobind (§3a); it no longer
+defines the full scope of `_core`.
 
 ## 3. Errors
 
@@ -120,7 +125,7 @@ Phase numbering follows the roadmap in `design/`.
 | **J1** | `Engine`: `compile()`, `step()`, `rows()`, plan errors (`RQLSyntaxError`, `CompileError`) | core phases 2-3 (#446) - **done**, see §7 |
 | **J2** | `Window`, DLPack export, `torch.utils.data.IterableDataset` | J1 - **done** (copy, not zero-copy: below) |
 | **J3** | `KeyboardInterrupt` during `run()`, logging bridge to the `logging` module | J1 - **done** |
-| **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | J2 - not started |
+| **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | build tooling in C4 (#492), acceptance on Colab in #447 |
 | **J5** | Colab notebook, CI smoke test against the built wheel | J4 - not started |
 | **J6** | Push ingest from Python, which turns a notebook into the engine's test harness | core phase 4 - not started |
 
@@ -164,15 +169,20 @@ See [`build-options.md`](build-options.md). In short:
 
 ```bash
 scripts/python-venv.sh                    # nanobind + numpy + pytest; prints the configure line
-cd build/Debug                            # cmake re-runs inside the build directory
-cmake -DRDB_PYTHON=ON -DPython_EXECUTABLE="$OLDPWD/.venv-python/bin/python3" .
-ninja
-cd "$OLDPWD" && .venv-python/bin/python3 -m pytest api/python/tests
+cmake -S . -B build/Debug-Python -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/build/Debug/generators/conan_toolchain.cmake" \
+  -DCMAKE_BUILD_TYPE=Debug -DRDB_PYTHON=ON \
+  -DPython_EXECUTABLE="$PWD/.venv-python/bin/python3"
+cmake --build build/Debug-Python --target _core
+RDB_PYTHON_MODULE_DIR="$PWD/build/Debug-Python/python" \
+  .venv-python/bin/python3 -m pytest api/python/tests
 ```
 
 The suite locates the built module in the build tree by itself and skips cleanly
 when there is none, so no installation step is needed and a build without
-`RDB_PYTHON` sees no failures.
+`RDB_PYTHON` sees no failures. Without `RDB_PYTHON_MODULE_DIR` it takes the first
+`build/*/python` in sorted order that holds `_core`; with more than one Python
+build that may not be the one just built, hence the explicit variable above.
 
 ## 7. What J1-J3 deliver
 
@@ -219,4 +229,80 @@ with rdb.Engine("/tmp/plan") as eng:                     # storage dir for plans
 
 **Not zero-copy.** `window()` materialises `(n_windows, size, n_values)` and `torch.from_dlpack` shares *that* array; the engine's own memory is never handed out. That is the v1 decision from §4, taken deliberately, and it is what makes a tensor safe to keep across `step()`.
 
-**J4-J6 are not started.** No `scikit-build-core` `pyproject.toml`, no wheels, no CI smoke test, no ingest. `api/python/pyproject.toml` still installs the client half only.
+The Linux wheel build is described below. J5 (notebook and CI smoke) and J6 (ingest) remain separate stages. `api/python/pyproject.toml` still installs the client half only.
+
+## 8. J4 build environment
+
+`docker/wheel/Dockerfile` extends PyPA's pinned `manylinux_2_28` image with valgrind
+(required by the Linux CMake configuration), a tools venv containing Conan, CMake
+>= 4.4.2 and Ninja, and a Release Conan cache under `CONAN_HOME=/opt/conan`.
+`RDB_USE_MOLD=OFF` selects the linker available in the image. The same Dockerfile
+serves x86_64 and aarch64; its header gives the base digests and build commands.
+
+Before building dependencies, `toolchain-probe.cpp` exercises the engine's C++23
+library features. `audit-so.py` asks `auditwheel show --json` for the resulting
+library's manylinux tag and rejects a glibc requirement above the image's policy
+or external libraries outside it. All Conan dependencies are built from source
+in that image, including build tools, to avoid importing binaries made for newer
+glibc versions.
+
+From the repository root:
+
+```bash
+docker build --platform linux/amd64 --build-arg RDB_VERSION="$(cat VERSION)" \
+  -f docker/wheel/Dockerfile \
+  -t micwide/buildenv-retractordb-wheel:manylinux_2_28_x86_64 .
+docker run --rm --platform linux/amd64 -v "$PWD:/src:ro" \
+  micwide/buildenv-retractordb-wheel:manylinux_2_28_x86_64 \
+  bash /src/docker/wheel/smoke.sh
+```
+
+`smoke.sh` copies tracked and new nonignored files into the container, checks the
+Conan cache with `--build never`, builds `_core`, audits it and runs
+`api/python/tests`. It prints the imported module's path and gives subprocess
+tests the same package root. The host checkout stays mounted read-only.
+`jobs.sh` caps parallel compilation at one job per 2 GiB, respecting cgroup limits.
+
+The audit also rejects symbols from `bus`, `ipcServer`, `serverName`,
+`lockManager` and `shmBudget`. A Release module is stripped, so smoke supplies its
+linker map to check linked service objects as well as exported symbols.
+
+## 9. Building the wheels
+
+The root `pyproject.toml` uses scikit-build-core and nanobind. It reads the version
+from `VERSION`, configures `RDB_PYTHON=ON`, builds only `_core` and installs only
+the `python` component alongside `api/python/retractordb`. NumPy is the runtime
+dependency; torch is optional. The separate `api/python/pyproject.toml` remains
+the client-only development installation.
+
+Both files declare the same distribution name, `retractordb` - the wheel with the
+version from `VERSION`, the client installation with its own fixed version. pip
+treats them as one package: `pip install ./api/python` in an environment holding
+the wheel uninstalls the wheel, `_core` included, and installing the wheel
+replaces the client installation. Keep them in separate venvs.
+
+```bash
+pipx install cibuildwheel
+docker/wheel/build-wheels.sh x86_64       # or aarch64, or all
+```
+
+The script copies the checkout without ignored build artifacts to a temporary
+directory and writes wheels to `wheelhouse/`. It uses the locally built images
+when tagged `micwide/buildenv-retractordb-wheel:manylinux_2_28_<arch>`; publishing
+them is a separate human action.
+
+Per architecture the configured builds produce CPython 3.10 and 3.11 wheels plus
+one `cp312-abi3` wheel for Python 3.12 and later. `STABLE_ABI` is active when
+scikit-build-core requests `Development.SABIModule`; ordinary development builds
+keep the interpreter-specific ABI. `EXCLUDE_FROM_ALL` keeps `_core` out of normal
+`ninja install`, and the explicit CPack component list excludes `python`.
+
+cibuildwheel repairs the manylinux wheels, runs `abi3audit --strict` on the abi3
+wheel and tests each installed wheel. The test command imports `_core` explicitly
+and sets `RDB_PYTHON_MODULE_DIR` to its installed package root, so subprocess tests
+also exercise the wheel instead of skipping for lack of a build tree.
+
+Colab acceptance remains in #447: install the x86_64 abi3 wheel in a fresh
+notebook and check that install plus import takes under about 20 seconds without
+a runtime restart. Notebook integration, wheel CI, PyPI publication and macOS
+wheels are outside C4.
