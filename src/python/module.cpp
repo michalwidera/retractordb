@@ -42,12 +42,12 @@
 #include "rdb/storage.hpp"
 
 /// @file
-/// @brief Etap 1a osadzania: modul rozszerzenia CPythona nad warstwa magazynu.
+/// @brief Modul rozszerzenia CPythona: odczyt magazynow i osadzony Engine.
 ///
-/// Wiazanie jest CELOWO tylko do odczytu i konczy sie na warstwie magazynu.
-/// Wszystko wyzej (qTree, dataModel, executorsm) jest uslugowe i trzyma stan
-/// globalny - wiec zwiazane dzis daloby API dzialajace raz na interpreter.
-/// Uzasadnienie i granice etapu: docs/jupyter-integration.md.
+/// Modul udostepnia odczyt istniejacych magazynow i rdb::embed::Engine z osobnym Memory Store.
+/// Engine uzywa TimeLine i dataModel, bez zegara, watku IPC i terminala. Etap 1a
+/// wiazal tylko magazyn, zanim oddzielono plan i wykonanie od IPC uslugi.
+/// Stan modulu i historia etapu 1a: docs/jupyter-integration.md, sekcje 1-2.
 ///
 /// BLEDY (decyzja (a) z #463). FatalError (K1) i EnvironmentError (K4) koncza
 /// proces std::exit - poza zakresem rdb::ThrowOnFatalScope. Kazde wejscie do
