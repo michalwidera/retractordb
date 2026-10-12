@@ -16,7 +16,10 @@ dependencies = []
 
 [project.optional-dependencies]
 # Wymagane do zbudowania i przetestowania modulu osadzonego, nie do uzywania klienta.
-embedded-build = ["nanobind>=2.0", "pytest>=7.0"]
+# numpy jest jedyna zaleznoscia uruchomieniowa tej polowy (Engine.to_numpy/window);
+# torch celowo nie - patrz retractordb/torch.py.
+embedded-build = ["nanobind>=2.0", "numpy>=1.23", "pytest>=7.0"]
+torch = ["torch>=2.0"]
 
 [tool.setuptools]
 packages = ["retractordb"]

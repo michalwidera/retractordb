@@ -11,8 +11,9 @@ run, which is what makes process-wide state visible:
 
 These tests remain the baseline that work must not regress. They are NOT the proof
 of instance isolation, and it is worth being exact about why: isolation shows up on
-a write, and this binding is read-only by design. The proof lives in
-``ut_embedEngine`` until the binding grows writes.
+a write, and the ``Storage`` binding is read-only by design. The proof lives in
+``ut_embedEngine`` and, since J1 gave the binding a plan that writes, in
+``test_engine.py::test_two_engines_do_not_share_a_volatile_stream``.
 """
 
 from __future__ import annotations
@@ -47,11 +48,11 @@ def test_two_storages_open_at_once(rdb, plain_storage: Path) -> None:
     disturb each other's reads, in either order.
 
     What it CANNOT check: MEMORY-store isolation. That state only diverges on a
-    *write*, and this binding is deliberately read-only. Phase 2 gave the MEMORY
+    *write*, and ``Storage`` is deliberately read-only. Phase 2 gave the MEMORY
     store an owner and ``rdb::embed::Engine`` to hold it, and ``ut_embedEngine``
-    asserts two engines do not share a stream - in C++, because that is where
-    writes exist. This test becomes the Python half of that claim only once the
-    binding can write.
+    asserts two engines do not share a stream. The Python half of that claim is
+    ``test_engine.py::test_two_engines_do_not_share_a_volatile_stream``, written once
+    J1 gave the binding a plan that writes.
     """
     with rdb.Storage("plain_file", "plain_file", storage_param=str(plain_storage)) as first:
         with rdb.Storage("plain_file", "plain_file", storage_param=str(plain_storage)) as second:

@@ -14,6 +14,10 @@ class dataModel {
  private:
   qTree &coreInstance_;
 
+  /// Memory Store magazynow MEMORY tego modelu; nullptr = instancja domyslna procesu. Przekazywany
+  /// kazdemu streamInstance, takze dodanemu ad hoc - patrz streamInstance.hpp.
+  rdb::MemoryStore *memory_;
+
   std::map<std::string, std::string> directive_{{":STORAGE", ""}, {":SUBSTRAT", ""}, {":ROTATION", ""}};
 
   /// Instancja wykonawcza strumienia po nazwie, ktora MOZE nie istniec w modelu.
@@ -76,7 +80,7 @@ class dataModel {
   /// Niepusta odmowa oznacza model niegotowy do publikacji; qSet pozostaje puste (#474).
   rdb::Refusal initializationError;
 
-  explicit dataModel(qTree &coreInstance);
+  explicit dataModel(qTree &coreInstance, rdb::MemoryStore *memory = nullptr);
   ~dataModel();
 
   dataModel() = delete;
