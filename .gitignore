@@ -100,3 +100,5 @@ api/python/build/
 api/python/dist/
 api/python/*.egg-info/
 .pytest_cache/
+# Kola z docker/wheel/build-wheels.sh (cibuildwheel --output-dir).
+wheelhouse/

@@ -28,7 +28,10 @@ endif()
 # pelne Development zatrzymaloby konfiguracje bez powodu.
 #
 # Prog 3.10 jest wspolny dla nas i dla nanobinda od wersji 3.0.
-find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
+# SKBUILD_SABI_COMPONENT jest pusty w zwyklym buildzie; scikit-build-core
+# ustawia Development.SABIModule przy budowie kola abi3 dla Pythona >= 3.12.
+find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module
+                                             ${SKBUILD_SABI_COMPONENT})
 
 # Katalog CMake nanobinda bierzemy z samego interpretera, nie z find_package po
 # nazwie: nanobind instaluje sie przez pip do site-packages TEGO interpretera, a
@@ -65,8 +68,10 @@ endforeach()
 
 # NB_STATIC: czesc wspolna nanobinda linkuje sie w modul zamiast do osobnej
 # biblioteki wspoldzielonej. Przy jednym module w drzewie to mniej plikow do
-# wydania i brak pytania o rpath.
-nanobind_add_module(_core NB_STATIC module.cpp)
+# wydania i brak pytania o rpath. STABLE_ABI dziala z Python::SABIModule i
+# Pythonem >= 3.12. Build deweloperski oraz kola dla 3.10/3.11 zachowuja ABI
+# konkretnego interpretera.
+nanobind_add_module(_core NB_STATIC STABLE_ABI module.cpp)
 
 # rdbembed wnosi za soba retractorcore, rqlparser i antlr4_static - plan,
 # kompilator i model danych, ktore od C3 stoja za Engine.
@@ -106,5 +111,15 @@ set(RDB_PYTHON_MODULE_DIR
     "${RDB_PYTHON_PACKAGE_ROOT}"
     CACHE PATH "Importable package root holding the built retractordb._core"
           FORCE)
+
+# scikit-build-core instaluje tylko komponent python. Cel jest wzgledny wobec
+# prefiksu, ktory scikit-build-core ustawia na katalog pakietow kola, wiec _core
+# laduje obok plikow .py z api/python/retractordb. Zwykly ninja install go
+# pomija; CPack ma osobna, jawna liste CPACK_COMPONENTS_ALL bez tego komponentu.
+install(
+  TARGETS _core
+  LIBRARY DESTINATION retractordb
+          COMPONENT python
+          EXCLUDE_FROM_ALL)
 
 message(STATUS "RDB_PYTHON: ${Python_EXECUTABLE} -> ${RDB_PYTHON_MODULE_DIR}")
