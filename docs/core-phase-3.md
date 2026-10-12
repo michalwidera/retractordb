@@ -50,7 +50,7 @@ Phase 2 made `rdb::storage` take a Memory Store and `Engine` own one, and proved
 
 One step differs from the service on purpose: before the preflight, `compile()` removes the `.desc` and `.meta` of every declaration in the storage directory. The service refuses a kept declaration descriptor that disagrees with the plan (#265); a notebook re-runs a cell with a new source file in the same directory as a matter of course, and the plan is the only source of truth about a declaration there. The final rule for kept descriptors in embedded mode is #450's decision.
 
-`compile()` also takes `untilEof` (default `true`): declared sources are marked `ONESHOT` before the model is built, exactly as `xretractor -u` does, and `step()` returns `nullopt` after the slot in which a source ran dry. The default differs from the service's on purpose: a notebook reads a file as a dataset, and a source that wraps to its start after EOF produces records from data that already passed. A missing source file is not a refusal - on `master` it yields NULL records (#346), and so it does here; with `untilEof` such a plan never reaches end of input.
+`compile()` also takes `untilEof` (default `true`): declared sources are marked `ONESHOT` before the model is built, exactly as `xretractor -u` does, and `step()` returns `nullopt` after the slot in which a source ran dry. The default differs from the service's on purpose: a notebook reads a file as a dataset, and a source that wraps to its start after EOF produces records from data that already passed. A missing source file is refused at `compile()` with an `Environment` refusal carrying `ENOENT` (#451); the service still yields NULL records for it (#346).
 
 ### 2.5 Errors
 

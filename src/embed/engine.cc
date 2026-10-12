@@ -188,10 +188,16 @@ void Engine::compile(const std::string_view rql, const bool untilEof) {
       const std::filesystem::path sourcePath(source);
       if (std::ranges::mismatch(storagePath, sourcePath).in1 == storagePath.end())
         refuse(Refused::Stage::Check, "source must be outside the Engine storage directory: " + source);
-      // Brak zrodla daje rekordy NULL jak w serwisie (#346); inna porazka otwarcia to K4.
+      // Serwis daje przy braku zrodla rekordy NULL (#346); granica osadzona odmawia (#451), bo w
+      // Release ostrzezenie facctxtsrc jest wyciete i kolumna NULL nie zostawilaby sladu.
       const StorageFd input(source, O_RDONLY | O_NONBLOCK, kStreamFileMode, true);
-      if (const int err = errno; !input.isOpen() && err != ENOENT && err != ENOTDIR)
+      if (const int err = errno; !input.isOpen()) {
+        if (err == ENOENT || err == ENOTDIR)
+          throw Refused(
+              Refused::Stage::Check,
+              {ErrorClass::Environment, std::format("stream '{}': source file does not exist: {}", qry.id, source), err});
         throw Refused(Refused::Stage::Check, {ErrorClass::Environment, "cannot open embedded source: " + source, err});
+      }
       plan->guard->checkPath((storagePath / (qry.id + ".meta")).string());
       continue;
     }
