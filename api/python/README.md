@@ -55,11 +55,14 @@ a plan compiled and stepped in-process, with NumPy and DLPack views of its strea
 (see below).
 
 ```sh
-scripts/python-venv.sh              # venv with nanobind + numpy + pytest; prints the next line
-cd build/Debug                      # cmake must re-run INSIDE the build directory
-cmake -DRDB_PYTHON=ON -DPython_EXECUTABLE="$OLDPWD/.venv-python/bin/python3" .
-ninja
-cd "$OLDPWD" && .venv-python/bin/python3 -m pytest api/python/tests
+scripts/python-venv.sh              # venv with nanobind + numpy + pytest
+cmake -S . -B build/Debug-Python -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/build/Debug/generators/conan_toolchain.cmake" \
+  -DCMAKE_BUILD_TYPE=Debug -DRDB_PYTHON=ON \
+  -DPython_EXECUTABLE="$PWD/.venv-python/bin/python3"
+cmake --build build/Debug-Python --target _core
+RDB_PYTHON_MODULE_DIR="$PWD/build/Debug-Python/python" \
+  .venv-python/bin/python3 -m pytest api/python/tests
 ```
 
 The script exists because Homebrew and distribution Pythons refuse `pip install`
@@ -120,3 +123,31 @@ are refused at `compile()`: they need service state the embedded engine does not
 `retractordb.torch` (`StreamDataset`, `as_tensor`) is the only module that imports
 torch, and only when you import it. `DataLoader(..., num_workers=0)`: the engine
 does not survive `fork`.
+
+### Notebooks
+
+[`j0_storage.ipynb`](notebooks/j0_storage.ipynb) reads a private copy of the test
+storage and demonstrates recoverable descriptor errors.
+[`j1_engine.ipynb`](notebooks/j1_engine.ipynb) compiles and steps a plan, reads
+records, exports NumPy/DLPack windows and recovers from refused plans.
+[`colab_quickstart.ipynb`](notebooks/colab_quickstart.ipynb) installs a Linux wheel
+and feeds a PyTorch training loop with a `TEXTFILE` source and `AVG(v:100)`.
+Until publication on PyPI, upload the wheel in Colab and set `WHEEL` in the first
+cell to its path. Acceptance on Colab remains in #448.
+
+For a local build, start the kernel with `RDB_PYTHON_MODULE_DIR` pointing to the
+build's `python/` directory and open the notebook from `api/python/notebooks`.
+The module and kernel must use compatible Python versions. Without the variable,
+`j0` and `j1` select the first built module in sorted order.
+
+The smoke script executes all three notebooks in separate kernels. The build
+mode uses the selected interpreter's existing dependencies:
+
+```sh
+.venv-python/bin/python3 -m pip install nbclient ipykernel torch
+PYTHON="$PWD/.venv-python/bin/python3" \
+  docker/wheel/notebook-smoke.sh --module-dir build/Debug-Python/python
+```
+
+The wheel mode creates a clean environment and additionally checks install time
+and package changes; see [section 10](../../docs/jupyter-integration.md#10-notebooks-and-their-smoke-test).

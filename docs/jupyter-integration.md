@@ -1,6 +1,6 @@
 # Python, Jupyter and PyTorch integration
 
-**Stage 1a and J1-J3 implemented; Linux wheel builds added in C4** (see
+**Stage 1a and J1-J3 implemented; Linux wheel builds added in C4, notebooks in C5** (see
 [`core-phase-3.md`](core-phase-3.md) and §7 below). The rest of this document states what
 each stage delivers and what is still not implemented, so the boundary is unambiguous.
 
@@ -126,7 +126,7 @@ Phase numbering follows the roadmap in `design/`.
 | **J2** | `Window`, DLPack export, `torch.utils.data.IterableDataset` | J1 - **done** (copy, not zero-copy: below) |
 | **J3** | `KeyboardInterrupt` during `run()`, logging bridge to the `logging` module | J1 - **done** |
 | **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | build tooling in C4 (#492), acceptance on Colab in #447 |
-| **J5** | Colab notebook, CI smoke test against the built wheel | J4 - not started |
+| **J5** | Colab notebook, CI smoke test against the built wheel | notebooks and local smoke in C5 (#493, §10); Colab acceptance remains in #448, CI job pending |
 | **J6** | Push ingest from Python, which turns a notebook into the engine's test harness | core phase 4 - not started |
 
 Three decisions from that document are worth restating because they constrain the
@@ -304,5 +304,67 @@ also exercise the wheel instead of skipping for lack of a build tree.
 
 Colab acceptance remains in #447: install the x86_64 abi3 wheel in a fresh
 notebook and check that install plus import takes under about 20 seconds without
-a runtime restart. Notebook integration, wheel CI, PyPI publication and macOS
-wheels are outside C4.
+a runtime restart. C5 adds the notebooks and local smoke test (§10); wheel CI,
+PyPI publication and macOS wheels remain outside C4.
+
+## 10. Notebooks and their smoke test
+
+C5 (#493) adapts three notebooks from `feature/jupyter-integration` to the current
+RQL syntax and exception hierarchy (§3). All committed cell outputs are empty.
+
+| Notebook in `api/python/notebooks/` | Flow |
+|---|---|
+| `j0_storage.ipynb` | descriptor, copied storage, NULL values, negative indexing and `CorruptDescriptor` with a usable kernel afterwards |
+| `j1_engine.ipynb` | `TEXTFILE`, compile/step/run, records, NumPy/DLPack windows, plan refusals and recompilation |
+| `colab_quickstart.ipynb` | wheel install, noisy signal from `TEXTFILE`, `AVG(v:100)`, windows and a PyTorch training loop |
+
+The Colab notebook checks the moving average against NumPy over the same input.
+Its first cell installs with `%pip` and prints the compiled module path and install
+time. Until publication on PyPI, upload a Linux wheel through Colab's Files panel
+and set `WHEEL` to its path, for example
+`'/content/retractordb-*-cp312-abi3-*_x86_64.whl'`. The smoke script supplies it via
+`RDB_WHEEL`.
+
+For local work, `RDB_PYTHON_MODULE_DIR` selects the built package root (§6) in all
+three notebooks; the interpreter must match the extension. Without it, `j0` and
+`j1` take the first `build/*/python` with an extension in sorted order. Open them
+from `api/python/notebooks`, or set `RDB_REPO_DIR` to the checkout root. The script
+sets this variable when running from a temporary directory, including in a
+container with a read-only checkout. `j0` copies only the data, descriptor and
+metadata fixtures, omitting the shadow update that would replace the first record.
+
+`docker/wheel/notebook-smoke.sh` runs all three notebooks through `nbclient`, each
+in a separate kernel registered for the selected interpreter. It validates their
+JSON, rejects deprecated RQL forms, fails on cell errors and checks that every
+notebook imported the selected `_core`. It never saves executed cell outputs in
+the source tree.
+
+The wheel profile uses Python 3.12, NumPy 2.0.2 and torch 2.11.0 in a fresh venv.
+These are fixed local test dependencies; they do not declare the current Colab
+runtime versions. Build the wheel with §9 first, then run on Linux:
+
+```bash
+docker/wheel/notebook-smoke.sh [wheel]
+# Or in a Linux container, with the checkout and build/wheelhouse read-only:
+docker run --rm -v "$PWD:/src:ro" python:3.12-slim \
+  bash /src/docker/wheel/notebook-smoke.sh
+```
+
+With no argument the script requires exactly one host-architecture cp312-abi3
+wheel in `build/wheelhouse/`. `PYTHON` selects another Python 3.12 executable. torch
+comes from the PyTorch CPU index by default; `RDB_TORCH_INDEX=` uses PyPI instead.
+The wheel profile also requires `pip freeze --all` to change only by adding
+`retractordb`, and install plus import to take at most 20 seconds (§4).
+
+The build profile uses an existing interpreter with NumPy, torch, `nbclient` and
+`ipykernel`; it installs nothing and does not measure wheel installation:
+
+```bash
+.venv-python/bin/python3 -m pip install nbclient ipykernel torch
+PYTHON="$PWD/.venv-python/bin/python3" \
+  docker/wheel/notebook-smoke.sh --module-dir build/Debug-Python/python
+```
+
+C5 brings the notebooks and this local check. Acceptance in a real Colab runtime
+remains in #448; running locally does not establish the Colab install/restart
+criterion. A CI job for the wheel notebook smoke remains pending.

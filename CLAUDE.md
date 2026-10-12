@@ -211,10 +211,12 @@ No marker appears in an intermediate update, nor while a check is still running:
 
 | Check | When |
 |-------|------|
-| `ninja test` | always |
-| `ninja test-valgrind` | always; on macOS a full `ctest` in a `-DRDB_SANITIZE=address,undefined` build instead |
+| `ninja test` | the diff touches something the suite builds or runs: C++ sources and headers, grammars, CMake files, the test tree, or a script or data file a test calls |
+| `ninja test-valgrind` | the same condition as `ninja test`; on macOS a full `ctest` in a `-DRDB_SANITIZE=address,undefined` build instead |
 | `ninja test_gate` | the session touched engine sources (`src/`); otherwise say explicitly that it was skipped and why |
 | ablation floor (below) | the session touched an optimizer pass |
+
+A check runs because it can see the change: a run that the diff cannot turn red is not evidence and only costs time. When a row's condition does not hold (documentation, notebooks, a script outside ctest), say that the check was skipped and why, and name the check that does exercise the change - for example `docker/wheel/notebook-smoke.sh` for the notebooks.
 
 A red result, a Valgrind error or leak, or an unreported check stops the commit, the handoff and the push, and goes to the human - never suppressed or worked around.
 
