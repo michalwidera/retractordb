@@ -289,6 +289,7 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
       # Na brudnym drzewie poziom nadal sie wykonuje - bramka chroni rozwoj,
       # a podczas rozwoju drzewo jest brudne. Dowod dostaje wtedy SHA z sufiksem
       # `-dirty` i nie jest dowodem proweniencji.
+      # Pusta tablica pod set -u w bash 3.2 wymaga rozwiniecia ${dirty_args[@]+...}.
       dirty_args=()
       [[ "$ENGINE_DIRTY" -gt 0 ]] && dirty_args=(--allow-dirty)
 
@@ -316,7 +317,7 @@ if [[ "$ONLY" == "both" || "$ONLY" == "h9" ]]; then
       if [[ "$evidence_ready" -eq 1 ]]; then
         step "H9 84/84 kompilacji + 4/4 odrzucone mutanty$([[ "$ENGINE_DIRTY" -gt 0 ]] && echo ' (drzewo brudne)')" \
           env K26V3_BUILD_ROOT="$PROFILES" python3 validate_corpus.py \
-              --out "$evidence" "${dirty_args[@]}"
+              --out "$evidence" ${dirty_args[@]+"${dirty_args[@]}"}
       fi
     fi
   else

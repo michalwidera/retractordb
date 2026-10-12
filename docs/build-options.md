@@ -145,6 +145,26 @@ libraries just for the module - doubles their build time and was not worth it wh
 stage 1a is the only consumer. Revisit when stage 1b makes the module a shipped
 artifact.
 
+### Not in a sanitizer build directory, unless you preload the runtime
+
+With `RDB_SANITIZE=address` (for example the directory `scripts/macos-build.sh --sanitize` configures), `retractordb._core` links the AddressSanitizer runtime. A Python interpreter loads the module with `dlopen`, which is too late for that runtime: on macOS the process aborts during import, on Linux it exits with "ASan runtime does not come first". Under pytest the reason is captured, so all you see is `Fatal Python error: Aborted` or exit code 1. CMake warns about this at configure time and prints the exact command for the host.
+
+Use a separate build directory without `RDB_SANITIZE` for the Python module. Or, to run the Python suite under the sanitizer (worth doing - on macOS it is the only memory check the binding gets), preload the runtime. The examples name the sanitizer build directory `<asan-build>`:
+
+```sh
+# macOS (Apple clang)
+DYLD_INSERT_LIBRARIES="$(clang -print-resource-dir)/lib/darwin/libclang_rt.asan_osx_dynamic.dylib" \
+ASAN_OPTIONS=detect_container_overflow=0 \
+RDB_PYTHON_MODULE_DIR=<asan-build>/python .venv-python/bin/python3 -m pytest api/python/tests
+
+# Linux (GCC): libstdc++ as well, because python itself is a C program
+LD_PRELOAD="$(g++ -print-file-name=libasan.so) $(g++ -print-file-name=libstdc++.so)" \
+ASAN_OPTIONS=detect_leaks=0 \
+RDB_PYTHON_MODULE_DIR=<asan-build>/python .venv-python/bin/python3 -m pytest api/python/tests
+```
+
+The unit tests need no such command, but they carry one ASan default of their own. libc++ (macOS) annotates the capacity of `std::vector`, and AddressSanitizer's container-overflow check built on those annotations is reliable only when all code touching the same vector is instrumented. Conan's GoogleTest is built without sanitizers, so a unit-test executable can mix instrumented and uninstrumented copies of the same inline vector code and get a false heap-buffer-overflow while GoogleTest registers tests, before `main`. The unit-test `main` (`test/UnitTest/launch/main.cpp`) therefore sets `detect_container_overflow=0` as its ASan default. The other ASan checks stay on, and `ASAN_OPTIONS=detect_container_overflow=1` turns this one back on. With GCC on Linux, libstdc++ adds those annotations only under `-D_GLIBCXX_SANITIZE_VECTOR`, which this build does not set, so there the default changes nothing.
+
 ### What it does not do
 
 It does not build a wheel. Wheel packaging is phase J4 and needs scikit-build-core
