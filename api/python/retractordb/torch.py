@@ -34,9 +34,16 @@ _ENGINE_DTYPE = {
 }
 
 
-def as_tensor(window: Window) -> torch.Tensor:
-    """The window as a tensor sharing the window's memory (DLPack, no copy)."""
-    return torch.from_dlpack(window)
+def as_tensor(window: Window, *, device: torch.device | str = "cpu") -> torch.Tensor:
+    """Share the window on CPU; copy to another device when explicitly requested.
+
+    MPS does not support float64; request float32 windows for that device.
+    """
+    target = torch.device(device)
+    if target.type == "mps" and str(window.dtype) == "float64":
+        raise ValueError("MPS does not support float64; create the window with dtype='float32'")
+    tensor = torch.from_dlpack(window)
+    return tensor if target.type == "cpu" else tensor.to(target)
 
 
 class StreamDataset(IterableDataset):  # type: ignore[misc]
@@ -47,9 +54,8 @@ class StreamDataset(IterableDataset):  # type: ignore[misc]
     the moment it is asked.
 
     ``num_workers=0`` is structural, not a temporary limit: DataLoader workers are
-    forked processes, and the engine holds open file descriptors and per-instance
-    state that does not survive ``fork``. Open a separate ``Engine`` per worker in a
-    ``worker_init_fn`` if you need parallel loading.
+    separate processes, and the engine holds open file descriptors and per-instance
+    state that must not be used from a worker. ``fork`` is outside the contract.
     """
 
     def __init__(
@@ -61,9 +67,13 @@ class StreamDataset(IterableDataset):  # type: ignore[misc]
         window: int,
         stride: int = 1,
         dtype: torch.dtype = torch.float32,
+        device: torch.device | str = "cpu",
     ) -> None:
         if dtype not in _ENGINE_DTYPE:
             raise ValueError(f"dtype must be one of {list(_ENGINE_DTYPE)}, not {dtype}")
+        self.device = torch.device(device)
+        if self.device.type == "mps" and dtype == torch.float64:
+            raise ValueError("MPS does not support float64; use dtype=torch.float32")
         self.engine = engine
         self.stream = stream
         self.fields = tuple(fields)
@@ -72,12 +82,14 @@ class StreamDataset(IterableDataset):  # type: ignore[misc]
         self.dtype = dtype
 
     def _windows(self) -> Window:
+        if torch.utils.data.get_worker_info() is not None:
+            raise ValueError("StreamDataset requires DataLoader(num_workers=0); Engine cannot be used in a worker")
         return self.engine.window(
             self.stream, fields=self.fields, size=self.window, stride=self.stride, dtype=_ENGINE_DTYPE[self.dtype]
         )
 
     def __iter__(self) -> Iterator[torch.Tensor]:
-        stacked = as_tensor(self._windows())
+        stacked = as_tensor(self._windows(), device=self.device)
         for index in range(stacked.shape[0]):
             yield stacked[index]
 

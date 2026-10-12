@@ -56,6 +56,26 @@ def pytest_configure(config: pytest.Config) -> None:
     root = _module_root()
     if root is not None:
         sys.path.insert(0, str(root))
+    if os.environ.get("RDB_PYTHON_MODULE_DIR"):
+        try:
+            import retractordb._core as core
+            import numpy  # noqa: F401
+            if os.environ.get("RDB_XRETRACTOR"):
+                import torch  # noqa: F401
+        except ImportError as exc:
+            raise pytest.UsageError(f"explicit embedded acceptance environment is incomplete: {exc}") from exc
+        if Path(core.__file__).resolve().parent != (root / "retractordb").resolve():
+            raise pytest.UsageError(f"wrong _core provenance: {core.__file__}; expected {root}")
+
+
+@pytest.fixture(scope="session")
+def xretractor(module_root: Path) -> Path:
+    executable = Path(os.environ.get("RDB_XRETRACTOR", module_root.parent / "src/retractor/xretractor")).resolve()
+    if not executable.is_file():
+        if os.environ.get("RDB_XRETRACTOR"):
+            pytest.fail(f"explicit acceptance requires a built xretractor: {executable}")
+        pytest.skip("reference tests require a built xretractor or RDB_XRETRACTOR")
+    return executable
 
 
 @pytest.fixture(scope="session")

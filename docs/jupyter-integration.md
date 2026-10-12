@@ -185,6 +185,12 @@ when there is none, so no installation step is needed and a build without
 `build/*/python` in sorted order that holds `_core`; with more than one Python
 build that may not be the one just built, hence the explicit variable above.
 
+For the full #451 acceptance, build `_core`, `xretractor` and `xqry`, install torch
+in the test environment and also set `RDB_XRETRACTOR` to that build's executable.
+With both variables set, missing `_core`, NumPy, torch or the reference executable
+fails the run. The wheel-only profile keeps torch optional and skips reference
+tests when no executable is available; those skips do not count toward #451.
+
 ## 7. What J1-J3 deliver
 
 `rdb::embed::Engine` compiles a plan and steps it, using the same slot body as the service's loop - `TimeLine` -> the mask of streams due in that slot -> `dataModel::processRows` - without the clock, the IPC thread and the terminal. The plan's storages are built with the engine's Memory Store, so two engines in one interpreter computing a `VOLATILE` stream of the same name do not share it; the C++ and Python tests both assert this. The engine links `retractorcore`, not the service library: no bus, no IPC server ([`core-phase-3.md`](core-phase-3.md) §2.1).
@@ -198,7 +204,7 @@ with rdb.Engine() as eng:                               # private storage direct
         SELECT a*2 STREAM dst FROM src
     """)
     eng.run()                                            # to end of input; Ctrl-C stops it
-    print(eng.streams(), eng.slots_done, eng.time)       # ['src', 'dst'] 9 9/2
+    print(eng.streams(), eng.slots_done, eng.time)       # ['src', 'dst'] 8 4
     print([row[0] for row in eng.rows("dst")])           # [20, 40, ..., 160]
 
     w = eng.window("dst", fields=["dst_0"], size=4, stride=2, dtype="float32")
@@ -227,11 +233,61 @@ with rdb.Engine() as eng:                               # private storage direct
 
 `ConfigError` is also a `ValueError` and `IOError` an `OSError`, so `except ValueError` catches every refusal of the plan or the request and `except OSError` every failure of the environment; the whole hierarchy is in `core-phase-3.md` §3.
 
-**Storage ownership (#450, variant A).** `Engine()` creates a private temporary directory that survives `close()` until the engine is destroyed. An explicit directory, including a RQL `STORAGE` override, must be empty on first use or carry a valid `.retractordb-embedded` marker. The directory is locked until the plan's storages close; a second engine, including a path alias or another process, gets `ConfigError`. `Storage` takes the same lock in a marked directory until it closes. Source files must live outside the owned directory, and every output must stay inside it; a missing source gives NULL records, as in the service (#346). An explicit RQL `DISPOSABLE` still authorizes removal of its source. Recompilation may replace owned descriptors and results; a preflight refusal preserves old artifacts while closing the previous plan. Later I/O failures are not transactional. A plan in the private directory skips the service lock check, since no service can use a directory created by `mkdtemp`; an explicit directory is checked under the same `lock_dir` / `config` contract as `Storage`. The daemon's own behavior is unchanged.
+**Storage ownership (#450, variant A).** `Engine()` creates a private temporary directory that survives `close()` until the engine is destroyed. An explicit directory, including a RQL `STORAGE` override, must be empty on first use or carry a valid `.retractordb-embedded` marker. The directory is locked until the plan's storages close; a second engine, including a path alias or another process, gets `ConfigError`. `Storage` takes the same lock in a marked directory until it closes. Source files must live outside the owned directory, and every output must stay inside it; a missing source file is refused at `compile()` with `IOError` (`errno` `ENOENT`), whereas the service gives NULL records (#346, #451). An explicit RQL `DISPOSABLE` still authorizes removal of its source. Recompilation may replace owned descriptors and results; a preflight refusal preserves old artifacts while closing the previous plan. Later I/O failures are not transactional. A plan in the private directory skips the service lock check, since no service can use a directory created by `mkdtemp`; an explicit directory is checked under the same `lock_dir` / `config` contract as `Storage`. The daemon's own behavior is unchanged.
 
 **Refused at `compile()`**, as `CompileError`, because the state they need is the service's and not the engine's: `DUMP` and `SYSTEM` rule actions, `:ROTATION` and `DEVICE` sources. `core-phase-3.md` §2.4 has the reasons and §5 what remains owed.
 
 **Not zero-copy.** `window()` materialises `(n_windows, size, n_values)` and `torch.from_dlpack` shares *that* array; the engine's own memory is never handed out. That is the v1 decision from §4, taken deliberately, and it is what makes a tensor safe to keep across `step()`.
+
+**Array conversion.** Floating dtypes represent NULL as NaN. Integer dtypes reject
+NULL, infinity and values whose truncated result is outside the target integer
+range with `ValueError`. Finite fractions inside that range truncate toward zero.
+`window()` selects overlapping windows with NumPy's `sliding_window_view` and
+copies the selected windows into one contiguous array. Arrays and DLPack tensors
+remain readable after subsequent steps, `close()` and destruction of the engine.
+
+**Torch devices and workers.** `as_tensor(window, device="cpu")` shares the window's
+CPU memory. An explicitly requested different device receives a copy.
+`StreamDataset(..., device="cpu")` uses the same rule. MPS rejects float64 before
+attempting a transfer; create float32 windows or use `dtype=torch.float32` for the
+dataset. Use `DataLoader(..., num_workers=0)`: a worker is refused before reading
+the engine. Neither `fork` nor creating a new engine in a worker initializer is
+part of this dataset's contract. Physical MPS/CUDA transfers need verification on
+the corresponding hardware; CPU tests only verify the MPS float64 guard.
+
+### J1-J3 contract and guarding tests (#451)
+
+Tests below live in `api/python/tests/`. A test name identifies coverage, not a
+claim that it was run on every platform; the acceptance report records the actual
+build, module path, results and unverified scope.
+
+| API / area | Contract | Guarding test / scope |
+|---|---|---|
+| RQL, descriptors, I/O | Engine failures use `RetractorDBError` subclasses; K2/K3 remain recoverable. Name/index/array conversion errors use the usual `KeyError`, `IndexError`, `ValueError`; an invalid Python signature can raise `TypeError`. | `test_engine.py`, `test_fatal_paths.py`, `test_error_classes.py`; standard Python exceptions are an explicit exception to the broad wording of #451. |
+| Internal failure | K1 becomes `InternalError` and taints the whole module until interpreter restart. `close()` remains available. Failure in a `noexcept` destructor can still terminate the process. | K1 and guarded API paths run in subprocesses in `test_error_classes.py` / `test_fatal_paths.py`; this is not proof of every fatal path. |
+| Missing source | `compile()` refuses a declared source file that does not exist with `IOError` (`errno` `ENOENT`, the path in the message); the previous plan is closed and a corrected cell works. The service keeps NULL records (#346), so this case is outside the reference intersection. | `test_engine.py::test_missing_source_is_a_typed_error_unlike_the_service`; C++ `ut_embedEngine` `missing_source_is_refused_unlike_the_service`. A file removed after `compile()` is not covered by this check. |
+| Lifecycle | A new compile closes the old plan, even if compilation fails. A slot failure latches `failed` and refuses further steps until a new compile. Ordinary close, context exit and destruction release resources. | Recompile/failure tests in `test_engine.py` and `test_error_classes.py`; `test_isolation.py::test_engine_context_and_destructor_release_owned_storage`. |
+| Slots / EOF | `step()` returns a slot index or `None`; `run(slots=...)` has a budget. Default EOF stops at the first exhausted source; `until_eof=False` wraps. | `test_engine.py`; multi-rate/EOF and delayed output in `test_reference.py`. |
+| Service features | DUMP, SYSTEM, ROTATION and DEVICE refuse compilation. | Four service-feature cases in `test_engine.py`; these plans are outside the reference intersection. |
+| Isolation / bus | MEMORY belongs to each engine. Engine does not join a bus, claim a namespace or create presence/IPC objects, including after SIGKILL; it can run beside service and standalone. | Instance tests in `test_engine.py` / C++ `ut_embedEngine`; six bus snapshots in `test_isolation.py`, on POSIX `/dev/shm`. |
+| Retention | An expired record index raises instead of reading another ring-buffer entry. | `test_reference.py` volatile cases and `test_window.py` retained-tail case. |
+| NumPy / windows / DLPack | Field order and arrays determine the value axis; `(windows,size,values)` respects size/stride and empty results. Copies survive the engine; DLPack shares the window allocation. | `test_window.py`, including NULL, numeric boundaries and owner destruction. |
+| PyTorch | Import remains lazy. Workers refuse before engine access. CPU shares memory; explicit device transfer copies. Float64/MPS refuses with a float32 hint. | `test_window.py`, including a real worker in a bounded subprocess; hardware transfer remains a separate check. |
+| Interrupt / logging | `run()` checks Python signals and stays usable after `KeyboardInterrupt`; engine diagnostics reach the retractordb logger. | `test_engine.py` interrupt and logging cases; interrupt is simulated with `_thread.interrupt_main`. |
+| Threading | Serialize every call on one Engine, including getters/reads/close/compile while run is active. Compilation, stepping, running and record reads release the GIL; the GIL does not protect engine state. Concurrent compilation or execution of separate engines has no general thread-safety guarantee. | Source contract; the interrupt test verifies another Python thread can interrupt run, not concurrent engine access. No mutex or thread-safety guarantee is added by #451. |
+
+`test_reference.py` compares the same logical plan and inputs in Engine and this
+checkout's `xretractor -u`, with separate output directories. It checks schema,
+record order/count, values/NULL, metadata and emission times reconstructed from
+the reference compiler's interval/origin/tail listing. This checks the Engine
+schedule against the reference plan; it is not a trace of standalone wall-clock
+execution. The supplemental wrapping case compares N slots with `until_eof=False`
+against `xretractor -m N+1`: the CLI counter stops at 1, whereas the Python budget
+counts executed slots. This case does not stop at EOF. A missing source is excluded
+with its reason: Engine refuses it, while the service gives NULL records.
+The intersection includes all five compatible `expr_corpus` plans.
+The eight plans with DUMP remain listed with their exclusion reason, and a scope
+test fails if an unclassified plan enters the corpus.
 
 The Linux wheel build is described below. J5 (notebook and CI smoke) and J6 (ingest) remain separate stages. `api/python/pyproject.toml` still installs the client half only.
 

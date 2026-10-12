@@ -7,6 +7,7 @@ is what ``Engine.run()`` must leave in the storage directory, record for record.
 
 from __future__ import annotations
 
+import errno
 import logging
 import os
 import subprocess
@@ -502,12 +503,21 @@ def test_source_in_storage_preserves_the_previous_artifacts(rdb, plan_dir: Path)
         assert storage_bytes(directory) == before
 
 
-def test_missing_source_gives_null_records_like_the_service(rdb, plan_dir: Path) -> None:
-    # #346: brak pliku zrodla to rekordy NULL, nie odmowa - tak samo jak w xretractor.
+def test_missing_source_is_a_typed_error_unlike_the_service(rdb, plan_dir: Path) -> None:
+    # Serwis daje przy braku pliku zrodla rekordy NULL (#346); granica osadzona odmawia (#451).
+    source = plan_dir / "input.txt"
+    source.write_text("1\n2\n")
     with rdb.Engine() as engine:
-        engine.compile(doubling_plan(plan_dir / "missing.txt"), until_eof=False)
-        assert engine.run(2) == 2
-        assert tuple(engine.record("dst", 0)) == (None,)
+        engine.compile(doubling_plan(source))
+        for missing in (plan_dir / "missing.txt", plan_dir / "no_dir" / "missing.txt"):
+            with pytest.raises(rdb.IOError, match="source file does not exist") as refused:
+                engine.compile(doubling_plan(missing), until_eof=False)
+            assert refused.value.errno == errno.ENOENT
+            assert str(missing) in str(refused.value)
+            assert not engine.has_plan
+        engine.compile(doubling_plan(source))
+        engine.run()
+        assert [row[0] for row in engine.rows("dst")] == [2, 4]
 
 
 def test_explicit_disposable_still_removes_the_external_source(rdb, plan_dir: Path) -> None:
