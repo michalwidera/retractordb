@@ -41,7 +41,7 @@ def run_survivor(module_root: Path, plan_dir: Path, body: str) -> subprocess.Com
             "import retractordb as rdb",
             f"plan_dir = {str(plan_dir)!r}",
             f"plan = {doubling_plan(plan_dir / 'data.txt')!r}",
-            "engine = rdb.Engine(plan_dir)",
+            "engine = rdb.Engine()",
             "engine.compile(plan)",
             body,
             "print('alive')",
@@ -117,7 +117,7 @@ def test_kernel_survives_k2_k3_k4_and_k1(module_root: Path, plan_dir: Path) -> N
 
 def test_k2_plan_error_leaves_the_engine_usable(rdb, plan_dir: Path) -> None:
     """K2 -> PlanError (a ValueError); no plan, and compile() works again."""
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine() as engine:
         with pytest.raises(rdb.PlanError) as failure:
             engine.compile("SELECT nonsense")
         assert isinstance(failure.value, ValueError)
@@ -130,7 +130,7 @@ def test_k2_plan_error_leaves_the_engine_usable(rdb, plan_dir: Path) -> None:
 
 def test_k3_config_error_leaves_the_plan_unchanged(rdb, plan_dir: Path) -> None:
     """K3 -> ConfigError (a ValueError, not a PlanError); the plan goes on where it was."""
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine() as engine:
         engine.compile(doubling_plan(plan_dir / "data.txt"))
         engine.run(slots=2)
         before = (engine.slots_done, engine.record_count("dst"))
@@ -148,7 +148,7 @@ def test_k3_config_error_leaves_the_plan_unchanged(rdb, plan_dir: Path) -> None:
 
 def test_k4_io_error_carries_errno_and_stops_the_plan(rdb, plan_dir: Path) -> None:
     """K4 -> IOError, an OSError with errno; the plan is dead, what it wrote is readable."""
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine() as engine:
         engine.compile(doubling_plan(plan_dir / "data.txt"))
         engine.run(slots=2)
         written = [row[0] for row in engine.rows("dst")]
@@ -188,7 +188,7 @@ def test_k4_refusal_keeps_the_system_errno_and_the_path(rdb, plain_storage: Path
 def test_k5_bad_token_is_null_and_the_plan_goes_on(rdb, plan_dir: Path) -> None:
     """K5 -> NULL in the result, no exception; the records around it are intact."""
     (plan_dir / "data.txt").write_text("10\nabc\n30\n40\n")
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine() as engine:
         engine.compile(doubling_plan(plan_dir / "data.txt"))
         engine.run()
         assert [row[0] for row in engine.rows("dst")] == [20, None, 60, 80]
@@ -203,7 +203,7 @@ def test_k6_deprecated_forms_are_deprecation_warnings(rdb, plan_dir: Path) -> No
     source = plan_dir / "data.txt"
     plan = f"DECLARE a INTEGER STREAM src, 1/2 FILE '{source}'\nSELECT * STREAM mean FROM src.avg\n"
 
-    with rdb.Engine(str(plan_dir)) as engine:
+    with rdb.Engine() as engine:
         with pytest.warns(DeprecationWarning) as caught:
             engine.compile(plan)
         messages = [str(item.message) for item in caught]

@@ -38,6 +38,7 @@
 #include "rdb/descriptor.hpp"
 #include "rdb/descriptorIO.hpp"
 #include "rdb/embed/engine.hpp"
+#include "rdb/embed/storageGuard.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/storage.hpp"
 
@@ -129,6 +130,22 @@ struct RdbIOError : RdbError {
         path(std::move(path)) {}
   int err;
   std::string path;
+};
+
+/// Odczyt i blokada maja wspolnego wlasciciela. Kopia shared_ptr na czas read() chroni przed
+/// close() z innego watku, gdy readRecord zwalnia GIL; blokada schodzi dopiero po magazynie.
+struct BoundStorage {
+  struct State {
+    std::unique_ptr<rdb::embed::StorageGuard> guard;
+    std::unique_ptr<rdb::storage> store;
+  };
+  std::shared_ptr<State> state;
+
+  [[nodiscard]] std::shared_ptr<State> require() const {
+    if (!state) throw RdbStorageError("storage is closed");
+    return state;
+  }
+  void close() noexcept { state.reset(); }
 };
 
 /// Skazenie modulu po K1 (wariant (a) z #463): stan silnika po zlamanym niezmienniku jest nieznany,
@@ -587,9 +604,10 @@ NB_MODULE(_core, m) {
       },
       nb::arg("path"), "Read a .desc file. A file that holds an invalid descriptor raises CorruptDescriptor.");
 
-  nb::class_<rdb::storage>(m, "Storage")
+  nb::class_<BoundStorage>(m, "Storage")
       .def(nb::new_([](const std::string &qry_id, const std::string &file_name, const std::string &storage_param,
-                       const std::string &storage_type) {
+                       const std::string &storage_type, const std::string &lock_dir, const std::string &config) {
+             requireUntainted();
              // Straze przed konstruktorem StoragePaths i attachDescriptor - kazdy z
              // tych warunkow ma w Pythonie wlasny typ wyjatku.
              if (qry_id.empty()) throw nb::value_error("qry_id must not be empty");
@@ -603,32 +621,90 @@ NB_MODULE(_core, m) {
                throw RdbConfigError("unsupported storage_type '" + storage_type + "'");
              }
 
-             auto created =
+             const rdb::embed::OfflinePolicy offline = rdb::embed::offlinePolicy(lock_dir, config);
+             rdb::embed::checkOffline(offline);
+             // Bez lock_dir i paths.lock_dir katalog blokad serwisu jest zgadywany (TMPDIR tego procesu,
+             // a serwis spod systemd blokuje zwykle w /tmp). Cisza dawalaby falszywe poczucie ochrony:
+             // UserWarning na ekran (raz na miejsce wywolania), a ten sam tekst do logu hosta na INFO.
+             if (offline.lockDir.empty()) {
+               constexpr const char *guessed =
+                   "Storage: no service lock directory given, so the running-service check looked into TMPDIR as a "
+                   "guess; pass config= with the service's TOML file or lock_dir= matching its paths.lock_dir";
+               nb::module_::import_("logging").attr("getLogger")("retractordb").attr("info")("%s", guessed);
+               if (PyErr_WarnEx(PyExc_UserWarning, guessed, 1) != 0) throw nb::python_error();
+             }
+             auto created   = std::make_unique<BoundStorage>();
+             created->state = std::make_shared<BoundStorage::State>();
+             auto &state    = *created->state;
+             state.guard    = std::make_unique<rdb::embed::StorageGuard>(storage_param, false);
+             if (state.guard->ownsDirectory()) {
+               const std::filesystem::path directory(state.guard->directory());
+               state.guard->checkPath((directory / (qry_id + ".desc")).string());
+               state.guard->checkPath((directory / (qry_id + ".meta")).string());
+               for (const auto &suffix : {"", ".shadow", ".meta", ".meta.shadow"})
+                 state.guard->checkPath((directory / file_name).string() + suffix);
+             }
+             state.store =
                  engineCall([&] { return std::make_unique<rdb::storage>(qry_id, file_name, storage_param, storage_type); });
-             if (!created->descriptorFileExist()) throw RdbNoSuchStream("no descriptor file for stream: " + qry_id);
-
-             raiseIfRefused(engineCall([&] { return created->attachDescriptorStatus(nullptr); }));
+             if (!state.store->descriptorFileExist()) throw RdbNoSuchStream("no descriptor file for stream: " + qry_id);
+             raiseIfRefused(engineCall([&] { return state.store->attachDescriptorStatus(nullptr); }));
              return created;
            }),
-           nb::arg("qry_id"), nb::arg("file_name"), nb::arg("storage_param") = "", nb::arg("storage_type") = "DEFAULT")
-      .def_prop_ro("descriptor", [](rdb::storage &self) { return self.descriptor; })
-      .def_prop_ro("record_count", &rdb::storage::getRecordsCount)
-      .def_prop_ro("is_declared", &rdb::storage::isDeclared)
-      .def("read", &readRecord, nb::arg("index"),
-           "Read one record. A negative index counts from the end, which is what revRead() does in C++.")
-      .def("__getitem__", &readRecord)
-      .def("__len__", [](const rdb::storage &self) { return self.getRecordsCount(); })
+           nb::arg("qry_id"), nb::arg("file_name"), nb::arg("storage_param") = "", nb::arg("storage_type") = "DEFAULT",
+           nb::arg("lock_dir") = "", nb::arg("config") = "",
+           "Open storage offline. lock_dir must match the service's paths.lock_dir; config names a TOML file read "
+           "only when given (paths.lock_dir, embedded.lenient_lock_dirs), and lock_dir wins over it. Without either "
+           "the check looks into TMPDIR. Listed lock directories, or the system temporary directory without the key, "
+           "are checked leniently, like xtrdb. The startup check does not exclude a later daemon start. Owned "
+           "embedded directories stay locked until close().")
+      .def_prop_ro("descriptor", [](const BoundStorage &self) { return self.require()->store->descriptor; })
+      .def_prop_ro("record_count",
+                   [](const BoundStorage &self) {
+                     const auto state = self.require();
+                     return engineCall([&] { return state->store->getRecordsCount(); });
+                   })
+      .def_prop_ro("is_declared", [](const BoundStorage &self) { return self.require()->store->isDeclared(); })
+      .def_prop_ro("closed", [](const BoundStorage &self) { return !self.state; })
+      .def("close", &BoundStorage::close, "Close the storage and release its directory lock. Idempotent.")
       .def(
-          "__enter__", [](rdb::storage &self) { return &self; }, nb::rv_policy::reference_internal)
+          "read",
+          [](const BoundStorage &self, Py_ssize_t index) {
+            const auto state = self.require();
+            return readRecord(*state->store, index);
+          },
+          nb::arg("index"), "Read one record. A negative index counts from the end, which is what revRead() does in C++.")
+      .def("__getitem__",
+           [](const BoundStorage &self, Py_ssize_t index) {
+             const auto state = self.require();
+             return readRecord(*state->store, index);
+           })
+      .def("__len__",
+           [](const BoundStorage &self) {
+             const auto state = self.require();
+             return engineCall([&] { return state->store->getRecordsCount(); });
+           })
+      .def(
+          "__enter__",
+          [](BoundStorage &self) {
+            static_cast<void>(self.require());
+            return &self;
+          },
+          nb::rv_policy::reference_internal)
       // .none() na kazdym argumencie NIE jest ozdoba: w nanobindzie argument
       // typu obiektowego domyslnie NIE przyjmuje None, a `with` przy wyjsciu bez
       // wyjatku podaje dokladnie (None, None, None). Bez tego kazdy blok `with`
       // konczy sie TypeError - przy czym cialo bloku juz sie wykonalo.
       .def(
-          "__exit__", [](rdb::storage &, nb::handle, nb::handle, nb::handle) { return false; }, nb::arg("exc_type").none(),
-          nb::arg("exc").none(), nb::arg("traceback").none())
-      .def("__repr__",
-           [](const rdb::storage &self) { return "<Storage records=" + std::to_string(self.getRecordsCount()) + ">"; });
+          "__exit__",
+          [](BoundStorage &self, nb::handle, nb::handle, nb::handle) {
+            self.close();
+            return false;
+          },
+          nb::arg("exc_type").none(), nb::arg("exc").none(), nb::arg("traceback").none())
+      .def("__repr__", [](const BoundStorage &self) {
+        return self.state ? "<Storage records=" + std::to_string(self.state->store->getRecordsCount()) + ">"
+                          : std::string("<Storage (closed)>");
+      });
 
   // Silnik osadzony. Metody z oknami i iteracja po rekordach sa dopisane po stronie Pythona
   // (retractordb/engine.py), ktory dziedziczy po tej klasie: numpy i logika okien nie maja powodu
@@ -636,8 +712,12 @@ NB_MODULE(_core, m) {
   nb::class_<rdb::embed::Engine>(m, "Engine",
                                  "One embedded engine: a compiled plan, driven one time slot at a time. See "
                                  "docs/jupyter-integration.md.")
-      .def(nb::init<std::string>(), nb::arg("storage_dir") = "", nb::call_guard<UntaintedGuard>(),
-           "storage_dir is used by plans that carry no STORAGE directive; the directive wins when present.")
+      .def(nb::init<std::string, std::string, std::string>(), nb::arg("storage_dir") = "", nb::arg("lock_dir") = "",
+           nb::arg("config") = "", nb::call_guard<UntaintedGuard>(),
+           "An empty storage_dir creates a private temporary directory, which skips the service lock check; an "
+           "explicit directory must be empty or owned. STORAGE in the plan overrides it under the same checks. "
+           "lock_dir must match the service's paths.lock_dir; config names a TOML file read only when given "
+           "(paths.lock_dir, embedded.lenient_lock_dirs), and lock_dir wins over it.")
       // string_view wskazuje bufor UTF-8 obiektu str, ktory zyje przez cale wywolanie, wiec
       // zwolnienie GIL-a na czas parsowania i kompilacji jest bezpieczne. Ostrzezenia K6 ida z
       // powrotem z GIL-em; stacklevel 1 przypisuje je ramce, ktora wolala compile().
@@ -661,6 +741,7 @@ NB_MODULE(_core, m) {
            "Advance up to `slots` slots (all, until end of input, when None). Returns the number of slots "
            "processed. Releases the GIL and honours KeyboardInterrupt.")
       .def_prop_ro("has_plan", &rdb::embed::Engine::hasPlan)
+      .def_prop_ro("storage_dir", &rdb::embed::Engine::storageDir)
       .def_prop_ro("slots_done", &rdb::embed::Engine::slotsDone)
       .def_prop_ro("end_of_input", &rdb::embed::Engine::endOfInput)
       .def_prop_ro("failed", &rdb::embed::Engine::failed,

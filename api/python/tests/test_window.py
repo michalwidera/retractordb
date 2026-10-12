@@ -19,7 +19,7 @@ from test_engine import INPUT, doubling_plan, write_source  # noqa: E402
 @pytest.fixture
 def ran(rdb, tmp_path: Path):
     write_source(tmp_path)
-    engine = rdb.Engine(str(tmp_path))
+    engine = rdb.Engine()
     engine.compile(doubling_plan(tmp_path / "data.txt"))
     engine.run()
     yield engine
@@ -81,7 +81,7 @@ def test_window_exports_dlpack_and_array_protocols(ran) -> None:
 
 def test_window_survives_the_engine_advancing(rdb, tmp_path: Path) -> None:
     write_source(tmp_path)
-    with rdb.Engine(str(tmp_path)) as engine:
+    with rdb.Engine() as engine:
         engine.compile(doubling_plan(tmp_path / "data.txt"), until_eof=False)
         engine.run(slots=5)
         before = engine.window("dst", fields=["dst_0"], size=2)

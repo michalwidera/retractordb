@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #include <spdlog/spdlog.h>
@@ -156,6 +157,29 @@ void parseStorageRefDirs(const toml::node_view<const toml::node> node, AppConfig
   }
 }
 
+// `[embedded] lenient_lock_dirs`: tablica bezwzglednych sciezek. Katalog nie musi istniec -
+// w trybie lagodnym brak katalogu blokad znaczy brak serwisu.
+void parseEmbeddedLenientLockDirs(const toml::node_view<const toml::node> node, AppConfig &cfg) {
+  cfg.embeddedLenientLockDirs.reset();
+  cfg.embeddedLenientLockDirsError.clear();
+  const auto *dirs = node.as_array();
+  if (dirs == nullptr) {
+    cfg.embeddedLenientLockDirsError = "embedded.lenient_lock_dirs must be an array of absolute paths";
+    return;
+  }
+  std::vector<std::string> parsed;
+  for (const auto &item : *dirs) {
+    const auto dir = item.value<std::string>();
+    if (!dir || !std::filesystem::path(*dir).is_absolute()) {
+      cfg.embeddedLenientLockDirsError = "embedded.lenient_lock_dirs must be an array of absolute paths";
+      if (dir) cfg.embeddedLenientLockDirsError += std::format(", got '{}'", *dir);
+      return;
+    }
+    parsed.push_back(*dir);
+  }
+  cfg.embeddedLenientLockDirs = std::move(parsed);
+}
+
 // Nakłada ustawienia z jednej tabeli TOML na akumulowaną konfigurację.
 // Klucze nieobecne w tabeli pozostawiają dotychczasową wartość (warstwowość).
 void applyTable(const toml::table &tbl, AppConfig &cfg, const std::string &path) {
@@ -182,6 +206,8 @@ void applyTable(const toml::table &tbl, AppConfig &cfg, const std::string &path)
           std::format("Configuration error in '{}': paths.lock_dir='{}' must be an absolute path", path, *v));
     cfg.lockDir = *v;
   }
+
+  if (auto v = tbl.at_path("embedded.lenient_lock_dirs"); v) parseEmbeddedLenientLockDirs(v, cfg);
 
   if (auto v = tbl.at_path("server.autoname").value<bool>(); v) cfg.serverAutoName = *v;
 

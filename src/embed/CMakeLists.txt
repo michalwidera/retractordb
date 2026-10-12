@@ -9,7 +9,12 @@ project(rdbembed LANGUAGES CXX)
 
 file(GLOB_RECURSE BUILDRDBEMBED_CC "*.cc")
 
-add_library(${PROJECT_NAME} STATIC ${BUILDRDBEMBED_CC})
+# appConfig.cpp dokladana zrodlowo, tak samo jak w xtrdb i xqry: jawnie podany
+# plik konfiguracji daje paths.lock_dir i embedded.lenient_lock_dirs (#450).
+# Zalezy wylacznie od toml++ i spdlog, wiec nie wnosi uslugi (magistrala, IPC) z
+# biblioteki `retractor`.
+add_library(${PROJECT_NAME} STATIC ${BUILDRDBEMBED_CC}
+                                   ../retractor/lib/appConfig.cpp)
 
 # Rdzen, nie `retractor`: silnik osadzony nie linkuje uslugi (magistrala, IPC) -
 # instancje osadzone nie pojawiaja sie na magistrali (#445). PUBLIC, bo
