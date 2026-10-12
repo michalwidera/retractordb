@@ -64,13 +64,26 @@ The engine has two ways to report failure (decision (a) of #463):
   opens that scope, so K1 reaches Python as `InternalError` and K4 as `IOError`
   rather than killing the interpreter.
 
-Two limits remain. A `FatalError` inside a `noexcept` function, or in a destructor
-running while another exception unwinds, still ends the process (#463). And the
-complete class table of the embedded API - what state the module is in after K1,
-`OSError` with `errno` - is #476; the plan refusals of `Engine` are in §7.
+The classes of #463 as a Python caller meets them (#476):
+
+| Class | Python | State afterwards |
+|---|---|---|
+| K1 `FatalError` | `retractordb.InternalError` | the module is tainted: every later call into the engine raises `InternalError` naming the first error, until the interpreter restarts; `close()` still works |
+| K2 plan refused | `PlanError` (a `ConfigError`, so a `ValueError`): `RQLSyntaxError`, `CompileError`, `CorruptDescriptor` | the instance lives without a plan; fix the input and call `compile()` again |
+| K3 request refused | `ConfigError` (a `ValueError`): no plan, a stream or index outside it, an unsupported `storage_type` | the instance lives, unchanged |
+| K4 `EnvironmentError` | `retractordb.IOError` (an `OSError`): `errno` is the system's code when the engine had one, `EIO` otherwise; `filename` is set when the call took the path as an argument, otherwise the path is in the message | the plan is dead: every later `step()` raises `IOError` again; what it wrote stays readable; `compile()` starts from scratch |
+| K5 bad value in the data | `None` / `NaN` in the result; the engine log record (Debug builds only) goes to `logging` | the instance lives |
+| K6 deprecated form | `DeprecationWarning` from `compile()`, one per `DECLARE ... FILE` and per postfix `s.avg` | the instance lives |
+| K7 abort | none - the interpreter ends | - |
+
+K1 taints the whole module rather than one instance (decision (a) of #463): the engine's process-wide state is shared by every instance, and after a broken invariant nothing says which of it is still sound. An unknown `storage_type` is checked by the binding against the accessor factory's own predicates, so a typo is a `ConfigError` instead of a K1 that would end the session. K5 has no `warnings.warn`: the engine reports it only through a `SPDLOG_WARN`, which a Release build compiles out.
+
+Known K7 paths: a `FatalError` or `EnvironmentError` inside a `noexcept` function (`payload::operator=(payload &&)`, `~binaryDeviceRO` in Debug) or in a destructor running while another exception unwinds, including `Engine.close()` and the engine's destructor, ends the process (#463). The plan refusals of `Engine` are in §7.
 
 `api/python/tests/test_fatal_paths.py` pins this in executable form: each failure
 mode raises in the test's own interpreter, and the suite has to survive them all.
+`test_error_classes.py` pins the table above row by row; K1, which taints the module,
+runs in a subprocess that also checks the interpreter survives K2, K3, K4 and K1.
 
 `test_reentry.py` does the same for phase 2: it constructs and destroys a `Storage`
 100 times in one process, which is the shape that process-wide state such as the
@@ -196,6 +209,7 @@ with rdb.Engine("/tmp/plan") as eng:                     # storage dir for plans
 | `retractordb.torch.StreamDataset`, `as_tensor` | `torch.from_dlpack` over `window()`; `num_workers=0` |
 | `RQLSyntaxError`, `CompileError` (both `PlanError`) | `rdb::embed::Refused`, stage `Parse` / `Check` |
 | `ConfigError` | `rdb::embed::Refused`, stage `Request` (no plan, a stream or index outside it) |
+| `DeprecationWarning` from `compile()` | `Engine::warnings` - `deprecatedFileWarnings` and `query::deprecatedNotations` |
 | `IOError`, `InternalError` | `rdb::EngineFatal` of class Environment / Internal, or a refusal of class Environment |
 | engine log records | `logging.getLogger("retractordb")`, through a spdlog sink installed by the module |
 

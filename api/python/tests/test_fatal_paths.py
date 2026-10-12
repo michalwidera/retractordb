@@ -7,7 +7,7 @@ throw ``rdb::EngineFatal`` instead (``src/include/fatalError.hpp``, decision (a)
 (``engineCall`` in ``src/python/module.cpp``), so K1 arrives here as
 ``InternalError`` and K4 as ``IOError``. Refusals the engine reports by value - a
 descriptor that does not parse, ``tryLoadDescriptorFile`` - arrive as
-``CorruptDescriptor``.
+``CorruptDescriptor``, which is a ``PlanError`` (class K2, #473).
 
 The cases below therefore run **in this interpreter** and assert an exception. That
 the rest of the suite still runs afterwards is the assertion that matters.
@@ -18,8 +18,8 @@ The guards in ``module.cpp`` stay as *translation*: an empty argument is a
 K1. ``test_guarded_paths_do_not_end_the_process`` still pins them in a subprocess:
 it is cheap, and it notices a dropped guard whose engine path would not be covered.
 
-The full class table (K1-K7) of the embedded API, including which of these
-refusals should become ``ConfigError``, belongs to #476.
+A K1 taints the whole module until the interpreter restarts (#476), so nothing here
+provokes one in this interpreter; ``test_error_classes.py`` does that in a subprocess.
 """
 
 from __future__ import annotations
@@ -115,15 +115,14 @@ def test_storage_open_survives_a_corrupt_descriptor(rdb, plain_storage: Path) ->
 
 
 def test_unsupported_storage_type_raises(rdb, plain_storage: Path) -> None:
-    """``storage_type`` reaches ``makeAccessor``, whose list of accepted types is the
-    only place that list exists - so no guard in the binding can stand in front of
-    it without duplicating that list and drifting from it.
+    """``storage_type`` is checked against the accessor factory's own predicates
+    (``isDeclaredType`` / ``isWritableType``), so the list of types stays in one place.
 
-    The engine reports an unknown type as K1 (``FatalError``), so in throw mode it
-    arrives as ``InternalError``. Without the scope this call took the kernel down.
-    Whether a bad argument should be ``ConfigError`` instead is #476.
+    The engine reports an unknown type as K1 (``FatalError``), and a K1 taints the
+    module until the interpreter restarts - too much for a typo in an argument. The
+    binding therefore refuses it first, as ``ConfigError`` (class K3, #476).
     """
-    with pytest.raises(rdb.InternalError) as caught:
+    with pytest.raises(rdb.ConfigError) as caught:
         rdb.Storage("plain_file", "plain_file", storage_param=str(plain_storage), storage_type="NONSENSE")
 
     assert "NONSENSE" in str(caught.value)
@@ -147,7 +146,7 @@ def test_storage_survives_a_rejected_type_and_opens_afterwards(rdb, plain_storag
     so a construction that throws part-way is exactly where a stray delete would show
     up. It also has to leave the process able to open the same storage properly.
     """
-    with pytest.raises(rdb.InternalError):
+    with pytest.raises(rdb.ConfigError):
         rdb.Storage("plain_file", "plain_file", storage_param=str(plain_storage), storage_type="NONSENSE")
 
     assert (plain_storage / "plain_file.desc").exists()

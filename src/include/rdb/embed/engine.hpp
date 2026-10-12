@@ -63,9 +63,9 @@ class Refused : public std::runtime_error {
 /// Bledy (decyzja (a) z #463): wywolania rdzenia ida w zakresie rdb::ThrowOnFatalScope, wiec K1
 /// (FatalError) i K4 (EnvironmentError) wychodza jako rdb::EngineFatal zamiast konczyc proces
 /// hosta; odmowy K2/K3 - jako Refused. Blad w slocie zatrzaskuje plan: model moze stac w polowie
-/// przeliczenia, wiec kazde nastepne step() zglasza EngineFatal{Internal} z trescia pierwszego
-/// bledu. Odczyty dzialaja dalej - host moze obejrzec, co powstalo przed bledem. Wyjscie z tego
-/// stanu to compile() albo close().
+/// przeliczenia, wiec kazde nastepne step() zglasza EngineFatal tej samej klasy co pierwszy blad (K4
+/// zostaje K4, inny wyjatek niz EngineFatal - K1) z jego trescia. Odczyty dzialaja dalej - host moze
+/// obejrzec, co powstalo przed bledem. Wyjscie z tego stanu to compile() albo close().
 ///
 /// @note Obiekt jest NIEPRZENOSNY i NIEKOPIOWALNY celowo. storage trzyma surowy wskaznik na
 ///       MemoryStore tego silnika; przeniesienie Engine przesunieloby Memory Store i zostawiloby kazdy
@@ -115,6 +115,11 @@ class Engine {
   ///        przy budowie modelu.
   /// @throws Refused (Parse, Check); rdb::EngineFatal (K1/K4). Po bledzie silnik jest bez planu.
   void compile(std::string_view rql, bool untilEof = true);
+
+  /// Ostrzezenia K6 ostatniego udanego compile(): przestarzale `DECLARE ... FILE` i notacja
+  /// przyrostkowa `s.avg` (w tej kolejnosci, kazde z numerem wiersza planu). Usluga wypisuje je na stderr albo do logu;
+  /// host osadzony pokazuje je po swojemu (Python: DeprecationWarning).
+  [[nodiscard]] const std::vector<std::string> &warnings() const noexcept { return warnings_; }
 
   /// Czy jest przyjety plan. false po zbudowaniu i po close().
   [[nodiscard]] bool hasPlan() const noexcept { return plan_ != nullptr; }
@@ -187,6 +192,7 @@ class Engine {
   std::optional<std::uint64_t> stepPlan(Plan &plan);
 
   std::string storageDir_;
+  std::vector<std::string> warnings_;
   MemoryStore memory_;
   std::unique_ptr<Plan> plan_;
 };

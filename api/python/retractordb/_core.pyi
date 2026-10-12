@@ -20,23 +20,32 @@ class NoSuchStream(RetractorDBError):
 class StorageError(RetractorDBError):
     """The storage exists but cannot serve the request."""
 
-class CorruptDescriptor(RetractorDBError):
-    """A .desc file exists but does not hold a valid descriptor."""
-
 class InternalError(RetractorDBError):
-    """A broken engine invariant (class K1) - a defect to report, not to handle."""
+    """A broken engine invariant (class K1) - a defect to report, not to handle.
+
+    It taints the module: every later call into the engine raises InternalError
+    again, naming the first error, until the interpreter restarts.
+    """
 
 class IOError(RetractorDBError, OSError):
-    """The environment refused: a file or disk operation failed (class K4)."""
+    """The environment refused: a file or disk operation failed (class K4).
+
+    ``errno`` is the system's code when the engine had one, EIO otherwise;
+    ``filename`` is set when the call took the path as an argument.
+    """
 
 class ConfigError(RetractorDBError, ValueError):
-    """A request the engine refuses (class K3): no plan, a stream or index outside it."""
+    """A request the engine refuses (class K3): no plan, a stream or index outside it,
+    an unsupported storage type."""
 
 class PlanError(ConfigError):
     """The plan is refused (class K2); the engine stays usable."""
 
 class RQLSyntaxError(PlanError):
     """The plan text does not parse. The message is the parser's, line and column included."""
+
+class CorruptDescriptor(PlanError):
+    """A .desc file exists but does not hold a valid descriptor (class K2)."""
 
 class CompileError(PlanError):
     """The plan parses but does not compile, or uses something the embedded engine lacks.
@@ -158,7 +167,8 @@ class Engine:
     def compile(self, rql: str, until_eof: bool = True) -> None:
         """Parse, compile and build the plan; raises RQLSyntaxError or CompileError.
 
-        With ``until_eof`` (the default) declared sources are read once, without
+        Deprecated RQL forms (``DECLARE ... FILE``, postfix ``s.avg``) are reported as
+        ``DeprecationWarning``, one per occurrence. With ``until_eof`` (the default) declared sources are read once, without
         wrapping past the end of their file, and ``step()`` reports end of input.
         ``until_eof=False`` is the service's behaviour: the source wraps forever.
         """
@@ -166,7 +176,8 @@ class Engine:
         """Advance one time slot; the slot index, or None at end of input. Releases the GIL.
 
         An error inside the slot leaves the plan stopped (``failed``); every later
-        ``step()`` raises InternalError until the plan is compiled again.
+        ``step()`` raises the same class again (IOError after IOError) until the plan
+        is compiled again.
         """
     def run(self, slots: int | None = None) -> int:
         """Advance up to ``slots`` slots (all, until end of input, when None).

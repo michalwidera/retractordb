@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <format>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -548,6 +549,10 @@ class ParserListener : public RQLBaseListener {
     std::ranges::transform(functionName, functionName.begin(), ::toupper);
     SPDLOG_WARN("RQL: notation '{}' is deprecated; use the functional form {}({})", ctx->getText(), functionName,
                 ctx->stream_expression()->getText());
+    // Ten sam komunikat w zapytaniu: log wyzej Release wycina, a fasada osadzona oddaje go hostowi (#476).
+    qry.deprecatedNotations.push_back(std::format("line {}: notation '{}' is deprecated; use the functional form {}({})",
+                                                  firstLine_ + ctx->getStart()->getLine() - 1, ctx->getText(), functionName,
+                                                  ctx->stream_expression()->getText()));
   }
 
   /// AVG/MIN/MAX/SUMC w postaci funkcyjnej nad WYRAZENIEM strumieniowym.
