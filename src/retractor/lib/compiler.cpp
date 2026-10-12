@@ -722,8 +722,13 @@ std::list<field> compiler::buildOutputSchema(const std::string &sName1, const st
     lRetVal = flattenArrayFields(coreInstance.getQuery(sName1).lSchema);  // NOLINT(bugprone-branch-clone)
   else if (cmd == STREAM_ADD) {
     int fieldCountSh = 0;
+    // Indeks w PUSH_ID jest liczony od PIERWSZEGO wystapienia nazwy w FROM - na nie
+    // localizeFieldOffsets() przepisuje odwolanie. Przy sumie strumienia z samym soba (`a+a`)
+    // prawa strona nie zaczyna wiec od zera, tylko liczy dalej za lewa: inaczej jej pola
+    // czytalyby sloty lewej polowy rekordu wejsciowego.
+    int i = 0;
     for (const auto &side : {sName1, sName2}) {
-      int i = 0;
+      if (side != sName1) i = 0;
       for (const auto &f : flattenArrayFields(coreInstance.getQuery(side).lSchema)) {
         field intf(rdb::rField(side + "_" + boost::lexical_cast<std::string>(fieldCountSh++), f.field_.rlen, f.field_.rarray,
                                f.field_.rtype),

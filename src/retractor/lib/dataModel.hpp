@@ -100,8 +100,12 @@ class dataModel {
    * używane przez przeplot (#) i rozplot (&, %), których formuły (SOperations.hpp)
    * zwracają indeksy postępujące. Indeks spoza dostępnego zakresu (przyszłość,
    * poza pojemnością historii) daje rekord all-null.
+   *
+   * Referencja wskazuje wpis historii źródła, jego bieżący payload albo rekord all-null
+   * (streamInstance::unavailableRecord) i jest ważna tylko do następnego odczytu tego
+   * strumienia - kolejny revRead nadpisuje bieżący payload. Nie przechowywać jej.
    */
-  rdb::payload fetchForward(const std::string &instance, int forwardIndex);
+  const rdb::payload &fetchForward(const std::string &instance, int forwardIndex);
 
   /*
    * This function creates Input payload for ConstructOutputPayload data source
