@@ -27,7 +27,7 @@
 
 std::mutex core_mutex;
 
-dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
+dataModel::dataModel(qTree &coreInstance, rdb::MemoryStore *memory) : coreInstance_(coreInstance), memory_(memory) {
   //
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
@@ -52,7 +52,7 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   coreInstance_.erase(removed.begin(), removed.end());
 
   for (auto &qry : coreInstance_) {
-    auto runtime = std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]);
+    auto runtime = std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"], memory_);
     if (!runtime->initializationError.message.empty()) {
       initializationError         = runtime->initializationError;
       initializationError.message = "dataModel: stream '" + qry.id + "': " + initializationError.message;
@@ -90,7 +90,7 @@ std::string dataModel::addQueriesToModel(const std::vector<std::string> &ids) {
   std::vector<std::unique_ptr<streamInstance>> built;
   built.reserve(nodes.size());
   for (query *node : nodes) {
-    auto runtime = std::make_unique<streamInstance>(coreInstance_, *node, directive_[":STORAGE"]);
+    auto runtime = std::make_unique<streamInstance>(coreInstance_, *node, directive_[":STORAGE"], memory_);
     if (!runtime->initializationError.message.empty())
       return "stream '" + node->id + "': " + runtime->initializationError.message;
     runtime->outputPayload->setDisposable(node->isDisposable);

@@ -2,7 +2,8 @@
 """Bramka fazy 2 (#446, C2): warstwa OSADZALNA nie trzyma stanu procesu.
 
 `src/rdb/lib` i `src/include/rdb` to czesc silnika, ktora laduje notatnik (binding
-Pythona, `src/python`). Demon buduje swoj stan raz, wiec stan procesu i stan silnika
+Pythona, `src/python`), a `src/embed` to fasada, przez ktora to robi (od C3 takze plan
+i jego wykonanie). Demon buduje swoj stan raz, wiec stan procesu i stan silnika
 sa w nim nieodroznialne. Host buduje go przy kazdym uruchomieniu komorki - i tam ta
 roznica jest bledem.
 
@@ -33,10 +34,10 @@ from pathlib import Path
 # Warstwa BIBLIOTECZNA, nie narzedzie: src/rdb/lib to add_library(rdb STATIC), a src/rdb/*.cpp
 # to zrodla wykonywalnego xtrdb (add_executable). Binarka moze konfigurowac loger i konczyc
 # proces - jest hostem, nie biblioteka.
-ROOTS = ("src/rdb/lib", "src/include/rdb")
+ROOTS = ("src/rdb/lib", "src/include/rdb", "src/embed")
 
-# Regula 4 obejmuje dodatkowo fasade osadzenia i naglowek z jedyna dozwolona droga wyjscia.
-EXIT_EXTRA = ("src/embed", "src/include/fatalError.hpp")
+# Regula 4 obejmuje dodatkowo naglowek z jedyna dozwolona droga wyjscia.
+EXIT_EXTRA = ("src/include/fatalError.hpp",)
 
 # plik -> (fragment linii, powod). Kazdy wpis to swiadoma decyzja, nie przeoczenie.
 ALLOWED = {

@@ -54,7 +54,13 @@ struct streamInstance {
   std::array<std::optional<bool>, 2> hashSideMatchesInput;
 
   // This constructor will create data based on query
-  explicit streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam = "");
+  //
+  // `memory` to Memory Store magazynu MEMORY, ktory dostaje outputPayload; nullptr wybiera instancje
+  // domyslna procesu (rdb::MemoryStore::processDefault), czyli dotychczasowe zachowanie uslugi.
+  // Silnik osadzony (rdb::embed::Engine) podaje tu Memory Store wlasny - w tym miejscu izolacja dwoch
+  // silnikow w jednym procesie dociera do planu, a nie tylko do magazynu.
+  explicit streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam = "",
+                          rdb::MemoryStore *memory = nullptr);
 
   [[nodiscard]] rdb::payload constructAgsePayload(int length,                   //  _@(_,length)
                                                   int step,                     //  _@(step,_)
