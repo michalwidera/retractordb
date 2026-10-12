@@ -61,7 +61,9 @@ and prints the configure line to paste.
 | `pytest>=7.0` | `api/python/tests` |
 | `clang-format==21.1.7`, `cmakelang` | `ninja cformat` |
 
-torch is deliberately absent: `retractordb.torch` imports it on demand and the one test that needs it skips without it (`jupyter-integration.md` §4).
+The lightweight `python-venv.sh` environment omits torch: `retractordb.torch`
+imports it on demand and the test needing it skips without it. For the complete
+test and notebook environments, use the profiles below.
 
 The formatters are here for the same reason as the rest: `src/CMakeLists.txt` tells
 you to `pip install clang-format cmakelang`, and PEP 668 no longer allows that into a
@@ -124,6 +126,93 @@ RDB_PYTHON_MODULE_DIR=build/Release/python \
 
 With no build found, every test skips with a message saying so. That is deliberate:
 a developer who never asked for the Python extension should not see failures from it.
+
+### Local Jupyter and PyTorch environments (#453)
+
+`scripts/jupyter-env.sh` creates persistent, isolated environments. It requires an
+installed Python 3.12 and either an already-built extension compatible with that
+interpreter or a compatible wheel. It does not compile the engine, install to the
+system Python, register a user-wide kernel, or change `~/.local/bin` or the caller's
+PATH. Linux x86_64 includes WSL2; run everything inside the Linux distribution.
+
+For a build-tree module, first configure a separate Conan build directory as
+described above, with `RDB_PYTHON=ON`, Python 3.12 and no sanitizers. For example,
+with an existing `build/Debug-Python/CMakeCache.txt`:
+
+```bash
+scripts/python-venv.sh --python python3.12 --venv .venv-python312
+cmake -S . -B build/Debug-Python -U '_Python_*' -U nanobind_DIR -DRDB_PYTHON=ON \
+  -DPython_EXECUTABLE="$PWD/.venv-python312/bin/python3"
+cmake --build build/Debug-Python --target _core --parallel 4
+```
+
+Keep the ordinary `build/Debug` configuration separate. Only the `_core` target
+needs building here; no `ninja install` is needed.
+
+Each environment then takes one command, from the repository root:
+
+```bash
+# System/test profile: build-tree module, pytest and nbclient, torch CPU on Linux.
+scripts/jupyter-env.sh system
+.venv-jupyter-system-cpu/bin/rdb-python -m pytest api/python/tests -ra
+PYTHON="$PWD/.venv-jupyter-system-cpu/bin/rdb-python" \
+  docker/wheel/notebook-smoke.sh --module-dir build/Debug-Python/python
+
+# Interactive user profile, against the same local build.
+scripts/jupyter-env.sh user
+.venv-jupyter-user-cpu/bin/rdb-jupyter api/python/notebooks
+
+# Alternatively, install an explicit local wheel into the user venv.
+scripts/jupyter-env.sh user --wheel \
+  build/wheelhouse/retractordb-0.1.11-cp312-abi3-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl \
+  --venv .venv-jupyter-wheel
+.venv-jupyter-wheel/bin/rdb-jupyter api/python/notebooks
+```
+
+Choose **RetractorDB (user, cpu)** in JupyterLab and open
+`colab_quickstart.ipynb`. Its PyTorch training cells run on CPU. The build profile
+imports `_core` directly from the selected build directory, without copying it
+into site-packages. `rdb-python` and the kernel carry the same explicit import
+root; both report/check the actual extension path. The wheel profile installs
+only into its own venv and passes the wheel path to the notebook's install cell.
+
+`--module-dir DIR`, `--python EXECUTABLE` and `--venv DIR` override the module
+root, interpreter and destination. Existing venvs must also use Python 3.12.
+Re-running the same command refreshes dependencies and the kernel specification;
+use separate venvs for different module sources or torch backends. The default
+`.venv-jupyter-*` directories are ignored by Git. No shell activation is required.
+
+The single version source is [`scripts/notebook-versions.sh`](../scripts/notebook-versions.sh),
+also read by `docker/wheel/notebook-smoke.sh`: Python 3.12, NumPy 2.0.2, nanobind,
+pytest, nbclient, nbformat and ipykernel are pinned there. Linux uses torch
+2.11.0+cpu from the CPU-only PyTorch index; the user profile also pins JupyterLab.
+These versions describe our repeatable local reference, not Colab's current
+runtime. Each setup checks `pip check`, `_core` provenance and DLPack sharing,
+prints elapsed seconds and venv size in KiB, and saves the resolved dependencies
+to `requirements-resolved.txt` inside the venv.
+
+| Platform/profile | Selection and scope |
+|---|---|
+| Linux x86_64 / WSL2 | Default CPU profile; primary verification target |
+| Linux aarch64 | CPU profile supported by the installer; execution must be verified on that host |
+| macOS arm64, macOS 14+ | Default `mps` profile; torch 2.14.1 from PyPI includes MPS; local build required until a macOS wheel is available |
+| Linux CUDA package | Explicit `--torch cuda`; torch 2.11.0+cu128; checks import, CUDA build version and CPU DLPack operations without a GPU |
+
+For macOS, the corresponding launchers are in `.venv-jupyter-user-mps` and
+`.venv-jupyter-system-mps`. The setup checks that torch includes MPS; an MPS
+device is not required for notebook execution on CPU. macOS and aarch64 runtime
+verification cannot be inferred from a Linux x86_64 run.
+
+The optional CUDA packaging check is separate from the default CPU environment
+and downloads several GB. It requires no NVIDIA driver or GPU and does not test
+GPU computation:
+
+```bash
+CUDA_VISIBLE_DEVICES='' scripts/jupyter-env.sh system --torch cuda
+CUDA_VISIBLE_DEVICES='' .venv-jupyter-system-cuda/bin/rdb-python -m pytest api/python/tests -ra
+CUDA_VISIBLE_DEVICES='' PYTHON="$PWD/.venv-jupyter-system-cuda/bin/rdb-python" \
+  docker/wheel/notebook-smoke.sh --module-dir build/Debug-Python/python
+```
 
 ### One side effect to know before measuring
 

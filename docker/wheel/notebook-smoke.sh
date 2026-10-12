@@ -12,6 +12,7 @@
 set -euo pipefail
 
 repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+source "$repo_dir/scripts/notebook-versions.sh"
 mode=wheel
 case $# in
   0)
@@ -40,6 +41,7 @@ esac
 
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/rdb-notebook-smoke.XXXXXX")
 trap 'rm -rf -- "$work_dir"' EXIT
+unset RDB_EXPECTED_CORE
 
 if [[ $mode == wheel ]]; then
   if [[ $(uname -s) != Linux ]]; then
@@ -48,23 +50,26 @@ if [[ $mode == wheel ]]; then
   fi
   [[ -f $wheel ]] || { echo "notebook-smoke: no such wheel: $wheel" >&2; exit 2; }
   wheel=$(cd "$(dirname "$wheel")" && pwd)/$(basename "$wheel")
-  python=${PYTHON:-python3.12}
-  "$python" -c 'import sys; sys.exit(sys.version_info[:2] != (3, 12))' || {
-    echo "notebook-smoke: wheel profile requires Python 3.12; set PYTHON" >&2
+  python=${PYTHON:-python$RDB_NOTEBOOK_PYTHON}
+  "$python" -c 'import sys; sys.exit(sys.version_info[:2] != tuple(map(int, sys.argv[1].split("."))))' "$RDB_NOTEBOOK_PYTHON" || {
+    echo "notebook-smoke: wheel profile requires Python $RDB_NOTEBOOK_PYTHON; set PYTHON" >&2
     exit 2
   }
   "$python" -m venv "$work_dir/venv"
   python=$work_dir/venv/bin/python3
   # Staly profil lokalnej proby, bez deklarowania wersji aktualnego runtime Colab.
-  "$python" -m pip install --quiet --disable-pip-version-check numpy==2.0.2 nbclient ipykernel
-  torch_index=${RDB_TORCH_INDEX-https://download.pytorch.org/whl/cpu}
+  "$python" -m pip install --quiet --disable-pip-version-check "${RDB_NOTEBOOK_PACKAGES[@]}"
+  torch_index=${RDB_TORCH_INDEX-$RDB_NOTEBOOK_CPU_INDEX}
   torch_args=()
   if [[ -n $torch_index ]]; then torch_args=(--index-url "$torch_index"); fi
-  "$python" -m pip install --quiet --disable-pip-version-check "${torch_args[@]}" torch==2.11.0
+  "$python" -m pip install --quiet --disable-pip-version-check "${torch_args[@]}" "torch==$RDB_NOTEBOOK_TORCH+cpu"
   export RDB_WHEEL=$wheel
   unset RDB_PYTHON_MODULE_DIR PYTHONPATH
 else
   python=${PYTHON:-python3}
+  # Launcher srodowiska ustawia wlasne sciezki Jupytera. Dalej potrzebujemy
+  # samego interpretera, zeby tymczasowe jadro smoke mialo pierwszenstwo.
+  python=$("$python" -c 'import sys; print(sys.executable)')
   export RDB_PYTHON_MODULE_DIR=$module_dir PYTHONPATH=$module_dir
   unset RDB_WHEEL
 fi
