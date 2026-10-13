@@ -193,6 +193,7 @@ python3 "$WM/inspect_text.py" --aggressive --strip-emoji-glue <source-file>
 - **No commit without human review, on any branch.** After verification the assistant shows the diff and stops; `git commit` runs only after an explicit go-ahead for that specific diff, and the go-ahead does not carry over to the next change. Green tests are not the go-ahead: they say the change works, not that it is the change the human wants in the history.
 - **`master`** - protected: nobody commits or pushes to it directly, the human included; changes reach it only through a merged pull request.
 - **`dev/muro`** - takes over the role of `master` locally: side branches start from it, and commits and pushes on it are performed by the human only.
+- **`[DEV:BRANCH]` freezes `master`.** While any issue labelled `[DEV:BRANCH]` is open, its developer branch (`dev/<name>`, named in the epic, e.g. `dev/445-jupyter-epic` for #445) is the main development branch: side branches start from it and their pull requests take it as base. Work and merges into `master` stop, so that `master` cannot drift away from the developer branch; `master` next receives the developer branch itself, through one pull request, when the epic's goal is reached. Work on `master` resumes only after every issue labelled `[DEV:BRANCH]` is closed - one open issue keeps the freeze. A change that must reach `master` during the freeze needs an explicit human decision, recorded in the epic, and is merged into the developer branch right after.
 - **Side branches** - the assistant may commit locally on that go-ahead. Pushing, opening a pull request or invoking CI needs a separate explicit request; anything that would trigger CI is handed over to the human.
 
 ### Session end
@@ -210,10 +211,12 @@ No marker appears in an intermediate update, nor while a check is still running:
 
 | Check | When |
 |-------|------|
-| `ninja test` | always |
-| `ninja test-valgrind` | always; on macOS a full `ctest` in a `-DRDB_SANITIZE=address,undefined` build instead |
+| `ninja test` | the diff touches something the suite builds or runs: C++ sources and headers, grammars, CMake files, the test tree, or a script or data file a test calls |
+| `ninja test-valgrind` | the same condition as `ninja test`; on macOS a full `ctest` in a `-DRDB_SANITIZE=address,undefined` build instead |
 | `ninja test_gate` | the session touched engine sources (`src/`); otherwise say explicitly that it was skipped and why |
 | ablation floor (below) | the session touched an optimizer pass |
+
+A check runs because it can see the change: a run that the diff cannot turn red is not evidence and only costs time. When a row's condition does not hold (documentation, notebooks, a script outside ctest), say that the check was skipped and why, and name the check that does exercise the change - for example `docker/wheel/notebook-smoke.sh` for the notebooks.
 
 A red result, a Valgrind error or leak, or an unreported check stops the commit, the handoff and the push, and goes to the human - never suppressed or worked around.
 

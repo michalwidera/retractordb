@@ -11,6 +11,7 @@
 #include "descriptor.hpp"
 #include "fainterface.hpp"
 #include "fatalError.hpp"
+#include "memoryStore.hpp"
 #include "metaData.hpp"
 #include "payload.hpp"
 #include "sourceBuffer.hpp"
@@ -128,6 +129,11 @@ class storage {
 
   std::unique_ptr<rdb::metaData> metaData_;
 
+  /// Memory Store magazynu MEMORY, jesli wolajacy podal wlasny; nullptr znaczy instancje domyslna
+  /// procesu. Przekazywany do makeAccessor przy budowie akcesora - patrz memoryStore.hpp.
+  /// Dla pozostalych typow magazynu bez znaczenia.
+  MemoryStore *memory_ = nullptr;
+
  public:
   storage() = delete;
   explicit storage(std::string_view qryID,                    //
@@ -136,7 +142,8 @@ class storage {
                    std::string_view storageType = "DEFAULT",  //
                    bool oneShot                 = false,      //
                    bool isHold                  = false,      //
-                   int percounter               = -1          //
+                   int percounter               = -1,         //
+                   MemoryStore *memory          = nullptr     //
   );
   virtual ~storage();
 

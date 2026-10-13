@@ -5,8 +5,17 @@ cmake_minimum_required(VERSION 3.20...4.4 FATAL_ERROR)
 
 add_subdirectory(common)
 add_subdirectory(rdb)
+add_subdirectory(embed)
 add_subdirectory(qry)
 add_subdirectory(retractor)
+
+# Rozszerzenie Pythona wchodzi tylko na zadanie (docs/build-options.md).
+# add_subdirectory jest warunkowe, a nie EXCLUDE_FROM_ALL, bo sam katalog wola
+# find_package(Python3) - to wyszukanie nie moze sie odbyc w buildzie, ktory o
+# Pythona nie prosil.
+if(RDB_PYTHON)
+  add_subdirectory(python)
+endif()
 
 add_custom_target(
   simple

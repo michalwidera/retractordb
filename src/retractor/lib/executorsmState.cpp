@@ -3,7 +3,6 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
-#include <memory>
 #include <mutex>
 #include <string>
 #include <utility>
@@ -12,14 +11,13 @@
 #include "appConfig.hpp"
 #include "executorsm.hpp"
 #include "ipcServer.hpp"
-#include "persistentCounter.hpp"
 
 // Definicje stanu opisanego w executorsmState.hpp. Komentarze - czym kazdy z tych obiektow
 // jest, kto go pisze i pod jakim muteksem - mieszkaja przy deklaracjach w naglowku.
 
-std::unique_ptr<PersistentCounter> pCounterPtr;
+// pCounterPtr i pProc definiuje coreState.cpp: czyta je rdzen (streamInstance, dumpManager), ktory
+// laduje takze silnik osadzony, a ten nie moze ciagnac za soba tej jednostki (IpcServer, magistrala).
 std::vector<std::pair<std::string, std::string>> processedLines;
-dataModel *pProc = nullptr;
 std::atomic<int> iLoopLimitCnt{executorsm::inifitie_loop};
 std::atomic<int> receivedSignal{0};
 

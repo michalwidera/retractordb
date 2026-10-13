@@ -136,6 +136,17 @@ void copyToMemory(std::istream &is, payload &rhs, const std::string_view fieldNa
   std::memcpy(dest.data(), &data, sizeof(T));
 }
 
+/// Znaczniki NULL pol danych `src` dopisane na koniec `target` - pola konfiguracyjne suma pomija
+/// (Descriptor::removeConfigurationFields), wiec ich bitow tez nie ma.
+void appendDataFieldNullFlags(std::vector<bool> &target, const payload &src) {
+  const auto &srcNullBitset = src.getNullBitset();
+  for (size_t i = 0; i < src.descriptor.size(); ++i) {
+    auto type = src.descriptor[i].rtype;
+    if (type == rdb::TYPE || type == rdb::REF || type == rdb::RETENTION || type == rdb::RETMEMORY) continue;
+    target.push_back(i < srcNullBitset.size() ? srcNullBitset[i] : false);
+  }
+}
+
 }  // namespace
 
 // default constructor
@@ -267,7 +278,7 @@ payload &payload::operator=(const Descriptor &other) {
 
 // Math operation operators
 
-payload payload::operator+(const payload &other) {
+payload payload::operator+(const payload &other) const {
   rdb::Descriptor descSum(descriptor);
   descSum += other.descriptor;          // ! moving this into constructor fails
   descSum.removeConfigurationFields();  //
@@ -278,18 +289,25 @@ payload payload::operator+(const payload &other) {
   result.nullBitset_.clear();
   result.nullBitset_.reserve(result.descriptor.size());
 
-  auto appendDataFieldNullFlags = [&result](const payload &src) {
-    for (size_t i = 0; i < src.descriptor.size(); ++i) {
-      auto type = src.descriptor[i].rtype;
-      if (type == rdb::TYPE || type == rdb::REF || type == rdb::RETENTION || type == rdb::RETMEMORY) continue;
-      result.nullBitset_.push_back(i < src.nullBitset_.size() ? src.nullBitset_[i] : false);
-    }
-  };
-
-  appendDataFieldNullFlags(*this);
-  appendDataFieldNullFlags(other);
+  appendDataFieldNullFlags(result.nullBitset_, *this);
+  appendDataFieldNullFlags(result.nullBitset_, other);
 
   return result;
+}
+
+// Te same bajty i te same znaczniki NULL co operator+ wyzej, wpisane od razu w ten payload.
+// Pola konfiguracyjne nie zajmuja bajtow (Descriptor::fieldSize), wiec prawy skladnik zaczyna
+// sie dokladnie za bajtami lewego - jak w sumie. clear() zostawia pojemnosc bitsetu, wiec
+// w kolejnych taktach nic sie tu nie alokuje.
+void payload::assignConcatenation(const payload &lhs, const payload &rhs) {
+  const auto lhsBytes = lhs.span();
+  const auto rhsBytes = rhs.span();
+  std::copy(lhsBytes.begin(), lhsBytes.end(), span().begin());
+  std::copy(rhsBytes.begin(), rhsBytes.end(), span().subspan(lhsBytes.size()).begin());
+
+  nullBitset_.clear();
+  appendDataFieldNullFlags(nullBitset_, lhs);
+  appendDataFieldNullFlags(nullBitset_, rhs);
 }
 
 // Member Functions
@@ -713,7 +731,7 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
         (r.rtype == rdb::RETENTION) ||  //
         (r.rtype == rdb::RETMEMORY))    // skip these types
       continue;
-    if (!Descriptor::isSingleLineOutput())
+    if (!isSingleLineOutput(os))
       os << "\t";
     else
       os << " ";
@@ -738,16 +756,16 @@ std::ostream &operator<<(std::ostream &os, const payload &rhs) {
       }
       flatIndex += flatCountForField;
     }
-    if (!Descriptor::isSingleLineOutput()) os << '\n';
+    if (!isSingleLineOutput(os)) os << '\n';
   }
   if (rhs.descriptor.empty()) {
     os << "Empty";
     SPDLOG_ERROR("Empty descriptor on payload.");
   }
-  if (Descriptor::isSingleLineOutput()) os << " ";
+  if (isSingleLineOutput(os)) os << " ";
   os << "}";
-  if (!Descriptor::isSingleLineOutput()) os << '\n';
-  Descriptor::setSingleLineOutput(false);
+  if (!isSingleLineOutput(os)) os << '\n';
+  setSingleLineOutput(os, false);
   return os;
 }
 

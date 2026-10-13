@@ -1,5 +1,13 @@
 # Python API
 
+This package carries two independent halves. The **client** below talks to a running
+`xretractor` daemon and is pure Python. The **embedded engine**
+(`retractordb._core`) runs the engine in-process, needs no daemon, and is built
+only on request - see [`docs/build-options.md`](../../docs/build-options.md) and
+[`docs/jupyter-integration.md`](../../docs/jupyter-integration.md).
+
+## Client (xqry)
+
 Requires Linux, Python 3.10+, and matching `xqry` / `xretractor` binaries. There are no runtime dependencies outside the Python standard library.
 
 ```sh
@@ -38,3 +46,108 @@ with Client("laboratory") as db:
 For a GUI, use timed reads from its worker or timer and handle `ReadTimeout`. Serialize calls on each handle. The package does not impose an event loop or invoke callbacks on the GUI thread. The example handles Ctrl+C; applications using other termination signals must arrange context cleanup themselves.
 
 See [the shared contract](../README.md) for delivery and lifecycle limits.
+
+## Embedded engine
+
+Built only with `-DRDB_PYTHON=ON`. Stage 1a covers the storage layer, read-only:
+reading `.desc` files and records without a running server. J1-J3 add `Engine`:
+a plan compiled and stepped in-process, with NumPy and DLPack views of its streams
+(see below).
+
+```sh
+scripts/python-venv.sh              # venv with nanobind + numpy + pytest
+cmake -S . -B build/Debug-Python -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$PWD/build/Debug/generators/conan_toolchain.cmake" \
+  -DCMAKE_BUILD_TYPE=Debug -DRDB_PYTHON=ON \
+  -DPython_EXECUTABLE="$PWD/.venv-python/bin/python3"
+cmake --build build/Debug-Python --target _core
+RDB_PYTHON_MODULE_DIR="$PWD/build/Debug-Python/python" \
+  .venv-python/bin/python3 -m pytest api/python/tests
+```
+
+The script exists because Homebrew and distribution Pythons refuse `pip install`
+under PEP 668. It is idempotent; `scripts/python-venv.sh --help` lists the options.
+
+```python
+import retractordb as rdb
+
+desc = rdb.load_descriptor("test_db.desc")
+print(desc.size_bytes, [f.name for f in desc])
+
+with rdb.Storage("test_db", "test_db", storage_param="/path/to/dir") as st:
+    print(len(st), st[0], st[-1])       # a negative index reads from the end
+```
+
+Values come back as `int`, `float`, `str`, `Fraction` for RATIONAL, a tuple for
+the pair types, and `None` for NULL. A `Record` holds its own copy of the
+payload, so it stays valid after the next read.
+
+**Errors.** Engine failures arrive as exceptions under `RetractorDBError`: a malformed `.desc` file raises `CorruptDescriptor` (a `PlanError`), an unsupported `storage_type` `ConfigError`, a failed file or disk operation `IOError` (an `OSError` with `errno`), and a broken engine invariant `InternalError`. After an `InternalError` the module refuses every further call into the engine until the interpreter restarts. Missing files, bad directories, unknown fields, out-of-range indices and reads from declared sources are checked by the binding and raise `NoSuchStream`, `KeyError`, `IndexError` or `StorageError`. The full class table is in [`docs/jupyter-integration.md`](../../docs/jupyter-integration.md) section 3.
+
+### Running a plan
+
+```python
+import retractordb as rdb
+
+with rdb.Engine("/tmp/plan") as eng:            # storage dir for plans without STORAGE
+    eng.compile("""
+        DECLARE a INTEGER STREAM src, 1/2 TEXTFILE '/tmp/plan/data.txt'
+        SELECT a*2 STREAM dst FROM src
+    """)
+    eng.run()                                   # every slot until the source runs dry
+    print(eng.streams(), eng.slots_done, eng.time)
+    print([row[0] for row in eng.rows("dst")])
+
+    w = eng.window("dst", fields=["dst_0"], size=4, stride=2, dtype="float32")
+    print(w.shape)                              # (n_windows, 4, 1)
+    import torch
+    t = torch.from_dlpack(w)                    # shares the window's memory, no torch dependency
+```
+
+`step()` advances one time slot and returns its index, or `None` once a declared
+source has run dry (`compile(..., until_eof=False)` gives the service's wrapping
+behaviour instead). `run(slots=None)` loops `step()` with the GIL released and
+honours Ctrl-C. `rows()`, `record()`, `to_numpy()` and `window()` all return copies;
+nothing aliases engine memory. Engine diagnostics go to
+`logging.getLogger("retractordb")`, not to the cell's output.
+
+A refused plan raises `RQLSyntaxError` or `CompileError` (both `PlanError`, which is a
+`ConfigError` and a `ValueError`) with the parser's or the compiler's message; a call
+without a plan raises `ConfigError`. A failure inside a slot raises `IOError` (an
+`OSError`) or `InternalError`, the kernel lives, and the plan stops (`eng.failed`) until
+the next `compile()`; an `InternalError` also stops the module until a restart.
+Deprecated RQL forms are reported by `compile()` as `DeprecationWarning`. `DUMP` and `SYSTEM` rule actions, `:ROTATION` and `DEVICE` sources
+are refused at `compile()`: they need service state the embedded engine does not have
+([`docs/core-phase-3.md`](../../docs/core-phase-3.md)).
+
+`retractordb.torch` (`StreamDataset`, `as_tensor`) is the only module that imports
+torch, and only when you import it. `DataLoader(..., num_workers=0)`: the engine
+does not survive `fork`.
+
+### Notebooks
+
+[`j0_storage.ipynb`](notebooks/j0_storage.ipynb) reads a private copy of the test
+storage and demonstrates recoverable descriptor errors.
+[`j1_engine.ipynb`](notebooks/j1_engine.ipynb) compiles and steps a plan, reads
+records, exports NumPy/DLPack windows and recovers from refused plans.
+[`colab_quickstart.ipynb`](notebooks/colab_quickstart.ipynb) installs a Linux wheel
+and feeds a PyTorch training loop with a `TEXTFILE` source and `AVG(v:100)`.
+Until publication on PyPI, upload the wheel in Colab and set `WHEEL` in the first
+cell to its path. Acceptance on Colab remains in #448.
+
+For a local build, start the kernel with `RDB_PYTHON_MODULE_DIR` pointing to the
+build's `python/` directory and open the notebook from `api/python/notebooks`.
+The module and kernel must use compatible Python versions. Without the variable,
+`j0` and `j1` select the first built module in sorted order.
+
+The smoke script executes all three notebooks in separate kernels. The build
+mode uses the selected interpreter's existing dependencies:
+
+```sh
+.venv-python/bin/python3 -m pip install nbclient ipykernel torch
+PYTHON="$PWD/.venv-python/bin/python3" \
+  docker/wheel/notebook-smoke.sh --module-dir build/Debug-Python/python
+```
+
+The wheel mode creates a clean environment and additionally checks install time
+and package changes; see [section 10](../../docs/jupyter-integration.md#10-notebooks-and-their-smoke-test).

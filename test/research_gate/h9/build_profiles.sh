@@ -60,6 +60,8 @@ raw_dir=${K6_RAW_DIR:-"$code_repo/build/gate-profiles-logs"}
 
 # Przypięcie builda. W czasie budowania nie trwa żaden pomiar, więc wolno użyć
 # także izolowanego rdzenia 3 - ale nigdy w trakcie kampanii.
+# Puste tablice rozwijamy przez ${tab[@]+"${tab[@]}"}: bash 3.2 pod set -u
+# traktuje zwykle "${tab[@]}" jako odczyt niezdefiniowanej zmiennej.
 build_wrapper=()
 if [ -n "${K6_CPUS:-}" ]; then
   # `taskset` jest z util-linux; na BSD/macOS nie ma ani jego, ani przypiecia do
@@ -166,7 +168,7 @@ while IFS=$'\t' read -r profile slug dedup share commutative factor; do
     cmake -S "$code_repo" -B "$build_dir" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE="$toolchain" \
-    "${ccache_args[@]}" \
+    ${ccache_args[@]+"${ccache_args[@]}"} \
     -DRDB_OPT_DEDUP_SUBSTRATES="$dedup" \
     -DRDB_OPT_SHARE_EQUIVALENT_SELECTS="$share" \
     -DRDB_OPT_COMMUTATIVE_ADD="$commutative" \
@@ -176,7 +178,7 @@ while IFS=$'\t' read -r profile slug dedup share commutative factor; do
     || die "cmake configure profilu $profile nie powiodl sie"
 
   run_logged "$raw_dir/build-$slug.log" "build profilu $profile" \
-    "${build_wrapper[@]}" cmake --build "$build_dir" --target xretractor \
+    ${build_wrapper[@]+"${build_wrapper[@]}"} cmake --build "$build_dir" --target xretractor \
     --parallel "$jobs" \
     || die "build profilu $profile nie powiodl sie"
 
@@ -208,7 +210,7 @@ while IFS=$'\t' read -r profile slug dedup share commutative factor; do
   fi
 
   if [ "${K6_RUN_CTEST:-0}" = "1" ]; then
-    "${build_wrapper[@]}" cmake --build "$build_dir" --parallel "$jobs" >>"$raw_dir/build-$slug.log" 2>&1
+    ${build_wrapper[@]+"${build_wrapper[@]}"} cmake --build "$build_dir" --parallel "$jobs" >>"$raw_dir/build-$slug.log" 2>&1
     ctest --test-dir "$build_dir" \
       -R '^it_optimizer_ablation-' \
       --output-on-failure >"$raw_dir/ctest-$slug.log" 2>&1 ||

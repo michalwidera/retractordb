@@ -322,11 +322,32 @@ TEST(descriptor, flat_output_resets_after_stream) {
   std::stringstream flatOut;
   flatOut << rdb::singleLineFormat << desc;
   EXPECT_EQ(flatOut.str(), "{ BYTE x }");
-  EXPECT_FALSE(rdb::Descriptor::isSingleLineOutput());
+  EXPECT_FALSE(rdb::isSingleLineOutput(flatOut)) << "tryb jednorazowy nie zostal zdjety z tego strumienia";
 
   std::stringstream multilineOut;
   multilineOut << desc;
   EXPECT_EQ(multilineOut.str(), "{\tBYTE x\n}");
+}
+
+// Faza 2 (#446, C2): tryb jednowierszowy nalezy do STRUMIENIA, nie do procesu. Przed zmiana obie
+// odpowiedzi ponizej pisala jedna statyczna flaga, wiec ustawienie jej dla pierwszego strumienia
+// zmienialo format drugiego - takze w cudzym kodzie, ktory o tej fladze nie wie.
+TEST(descriptor, single_line_mode_does_not_leak_between_streams) {
+  auto desc = rdb::Descriptor("x", 1, 1, rdb::BYTE);
+
+  std::stringstream flat;
+  std::stringstream multiline;
+
+  // Przeplot celowy: flaga jest podniesiona na 'flat' i NIEZUZYTA, gdy pisze 'multiline'.
+  flat << rdb::singleLineFormat;
+  EXPECT_TRUE(rdb::isSingleLineOutput(flat));
+  EXPECT_FALSE(rdb::isSingleLineOutput(multiline)) << "flaga przeciekla na drugi strumien";
+
+  multiline << desc;
+  EXPECT_EQ(multiline.str(), "{\tBYTE x\n}");
+
+  flat << desc;
+  EXPECT_EQ(flat.str(), "{ BYTE x }");
 }
 
 // Sprawdza mapowanie slotow na pola i elementy tablic oraz offsety bajtowe mieszanego rekordu.

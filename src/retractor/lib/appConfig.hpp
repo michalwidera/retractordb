@@ -111,6 +111,20 @@ struct AppConfig {
   /// Dla usług systemd zalecane /var/run/retractor lub $XDG_RUNTIME_DIR.
   std::string lockDir;
 
+  // === [embedded] ===
+
+  /// Katalogi blokad, w ktorych silnik osadzony (Engine/Storage w Pythonie, #450) sprawdza blokady
+  /// serwisu lagodnie, jak xtrdb: odmowe daje tylko trzymany flock, a wpis nieczytelny albo brak
+  /// katalogu nie. Katalog spoza listy jest sprawdzany scisle. Sciezki bezwzgledne. nullopt = brak
+  /// klucza, czyli z definicji katalog tymczasowy systemu (TMPDIR, bez niej /tmp) - ten sam, ktory
+  /// serwis bierze przy pustym paths.lock_dir. xretractor i xqry klucza nie czytaja.
+  std::optional<std::vector<std::string>> embeddedLenientLockDirs;
+
+  /// Powod odrzucenia `embedded.lenient_lock_dirs` (pusty = poprawny albo brak klucza). Jak przy
+  /// storageRefDirsError: loadAppConfig() go tylko zapisuje, a odmawia silnik osadzony - start
+  /// serwisu nie zalezy od klucza, ktorego serwis nie uzywa.
+  std::string embeddedLenientLockDirsError;
+
   // === [server] ===
 
   /// Losowanie nazwy instancji, gdy nie podano ani `--name`, ani `--autoname`. Wartosc `false`
