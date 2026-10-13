@@ -126,8 +126,8 @@ Phase numbering follows the roadmap in `design/`.
 | **J1** | `Engine`: `compile()`, `step()`, `rows()`, plan errors (`RQLSyntaxError`, `CompileError`) | core phases 2-3 (#446) - **done**, see §7 |
 | **J2** | `Window`, DLPack export, `torch.utils.data.IterableDataset` | J1 - **done** (copy, not zero-copy: below) |
 | **J3** | `KeyboardInterrupt` during `run()`, logging bridge to the `logging` module | J1 - **done** |
-| **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | build tooling in C4 (#492), acceptance on Colab in #447 |
-| **J5** | Colab notebook, CI smoke test against the built wheel | notebooks and local smoke in C5 (#493, §10); Colab acceptance remains in #448, CI job pending |
+| **J4** | `pyproject.toml` via scikit-build-core, `cibuildwheel`, manylinux wheels | build tooling in C4 (#492), distribution acceptance in #447 |
+| **J5** | Colab notebook, installed-wheel smoke | notebooks from C5 (#493), manual release check (§10); real Colab acceptance in #448 |
 | **J6** | Push ingest from Python, which turns a notebook into the engine's test harness | core phase 4 - not started |
 
 Three decisions from that document are worth restating because they constrain the
@@ -139,9 +139,10 @@ reinstalling a 2 GB package in Colab against the wrong CUDA, which is a multi-mi
 stall and sometimes a broken runtime. `numpy` is the one reasonable hard dependency.
 
 **Wheels, never a source distribution.** Colab would otherwise compile the engine
-plus the ANTLR runtime on every session. The acceptance criterion for J4 is that
-`!pip install retractordb` followed by an import takes under about 20 seconds and
-requires no runtime restart.
+plus the ANTLR runtime on every session. J5 installs a wheel from a file or direct
+HTTPS URL with `--no-deps`, preserving the runtime's NumPy and PyTorch. Installation
+and import are measured separately. Approximately 20 seconds is a roadmap reference,
+not an acceptance threshold; the real Colab run records whether a restart was needed.
 
 **Copy, do not pin, for the first DLPack implementation.** A `memcpy` of one window
 is nanoseconds against a backward pass, and a pinned engine buffer handed to a tensor
@@ -306,10 +307,10 @@ wheel and tests each installed wheel. The test command imports `_core` explicitl
 and sets `RDB_PYTHON_MODULE_DIR` to its installed package root, so subprocess tests
 also exercise the wheel instead of skipping for lack of a build tree.
 
-Colab acceptance remains in #447: install the x86_64 abi3 wheel in a fresh
-notebook and check that install plus import takes under about 20 seconds without
-a runtime restart. C5 adds the notebooks and local smoke test (§10); wheel CI,
-PyPI publication and macOS wheels remain outside C4.
+Colab notebook acceptance belongs to #448. It uses the x86_64 abi3 wheel built
+from the current branch, supplied as a file or direct HTTPS URL. C5 added the
+notebooks and local smoke test (§10); publishing to PyPI, wheel CI and macOS wheels
+remain outside C4 and do not block J5.
 
 ## 10. Notebooks and their smoke test
 
@@ -322,53 +323,89 @@ RQL syntax and exception hierarchy (§3). All committed cell outputs are empty.
 | `j1_engine.ipynb` | `TEXTFILE`, compile/step/run, records, NumPy/DLPack windows, plan refusals and recompilation |
 | `colab_quickstart.ipynb` | wheel install, noisy signal from `TEXTFILE`, `AVG(v:100)`, windows and a PyTorch training loop |
 
-The Colab notebook checks the moving average against NumPy over the same input.
-Its first cell installs with `%pip` and prints the compiled module path and install
-time. Until publication on PyPI, upload a Linux wheel through Colab's Files panel
-and set `WHEEL` to its path, for example
-`'/content/retractordb-*-cp312-abi3-*_x86_64.whl'`. The smoke script supplies it via
-`RDB_WHEEL`.
+The Colab notebook asserts the moving average against NumPy before importing
+PyTorch, and again after training. Without torch it still checks the signal and
+windows, then records that ML was skipped. With torch it trains on CUDA when
+available, otherwise CPU. T4 uses fp16 and GradScaler; GPUs with native bf16
+support, such as L4/A100, use bf16. CUDA epoch losses are checked against a CPU
+model with the same initialization and batches (`rtol=0.05`, `atol=0.002`).
+The notebook uses the existing `StreamDataset` API with `num_workers=0`.
+
+The first cell accepts `WHEEL` as a local path/glob or a direct HTTPS wheel URL,
+and `SOURCE_COMMIT` as the full source SHA from the wheel build log. Upload a wheel
+through Colab's Files panel, or edit those two values. The smoke script supplies
+`RDB_WHEEL` and `RDB_SOURCE_COMMIT`. Installation uses the kernel's interpreter
+and `--no-deps`; before/after NumPy and PyTorch versions must match. Installation,
+download (if any) and import have separate timers. No elapsed-time threshold is
+a pass/fail condition. The final cell writes `rdb-acceptance.json`.
 
 For local work, `RDB_PYTHON_MODULE_DIR` selects the built package root (§6) in all
 three notebooks; the interpreter must match the extension. Without it, `j0` and
 `j1` take the first `build/*/python` with an extension in sorted order. Open them
-from `api/python/notebooks`, or set `RDB_REPO_DIR` to the checkout root. The script
-sets this variable when running from a temporary directory, including in a
-container with a read-only checkout. `j0` copies only the data, descriptor and
-metadata fixtures, omitting the shadow update that would replace the first record.
+from `api/python/notebooks`, or set `RDB_REPO_DIR` to the checkout root. The smoke
+script sets this variable even in a container with a read-only checkout. `j0`
+copies only data, descriptor and metadata fixtures, omitting the shadow update
+that would replace the first record.
 
-`docker/wheel/notebook-smoke.sh` runs all three notebooks through `nbclient`, each
+`docker/wheel/notebook-smoke.sh` executes all three notebooks with `nbclient`, each
 in a separate kernel registered for the selected interpreter. It validates their
-JSON, rejects deprecated RQL forms, fails on cell errors and checks that every
-notebook imported the selected `_core`. It never saves executed cell outputs in
-the source tree.
+JSON, rejects deprecated RQL forms, fails on cell errors and checks the selected
+`_core` path in every notebook. `pip freeze --all` must change only by adding
+`retractordb`. Results include Python/NumPy/PyTorch versions, wheel filename,
+source SHA (supplied from the build log), wheel SHA-256, installation/import times,
+cell times, NumPy checks and epoch measurements. Windows/s and mean step time
+include the DataLoader, device transfer and optimizer; engine advancement and
+CPU-reference training are timed separately. The first epoch includes warm-up.
+These measurements describe this demonstration, not general engine performance.
 
-The wheel profile uses Python 3.12, NumPy 2.0.2 and torch 2.11.0 in a fresh venv.
-These are fixed local test dependencies; they do not declare the current Colab
-runtime versions. Build the wheel with §9 first, then run on Linux:
+The wheel profile creates a clean Python 3.12 venv using the versions in
+`scripts/notebook-versions.sh`. The default torch is the CPU build. These fixed
+local dependencies do not declare Colab's current runtime versions. An explicit
+`--without-torch` profile omits torch and checks that ML was skipped successfully.
+Use separate output directories; executed notebooks and `acceptance.json` remain
+there after the temporary venv is removed. Without `--output-dir`, the script
+prints a retained temporary results directory.
+
+### Manual release check for J5
+
+Run this step after building the current wheel (§9), before handing it to a Colab
+user or distributing it. Both installed-wheel profiles must pass; build-module
+smoke alone does not satisfy the release check. Keep the wheel build log with the
+report so its source SHA is traceable. The build must be from the named commit;
+any uncommitted changes affecting the wheel must be recorded and rebuilt after
+review/commit before release.
 
 ```bash
-docker/wheel/notebook-smoke.sh [wheel]
-# Or in a Linux container, with the checkout and build/wheelhouse read-only:
-docker run --rm -v "$PWD:/src:ro" python:3.12-slim \
-  bash /src/docker/wheel/notebook-smoke.sh
+# Use the full SHA recorded in the wheel build log, not a guess from an old wheel.
+SOURCE_COMMIT="paste-full-source-SHA-from-build-log"
+mkdir -p build/notebook-results/with-torch build/notebook-results/without-torch
+
+docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/notebook-results/with-torch:/results" \
+  python:3.12-slim bash /src/docker/wheel/notebook-smoke.sh \
+  --source-commit "$SOURCE_COMMIT" --output-dir /results
+
+docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/notebook-results/without-torch:/results" \
+  python:3.12-slim bash /src/docker/wheel/notebook-smoke.sh \
+  --source-commit "$SOURCE_COMMIT" --without-torch --output-dir /results
 ```
 
-With no argument the script requires exactly one host-architecture cp312-abi3
-wheel in `build/wheelhouse/`. `PYTHON` selects another Python 3.12 executable. torch
-comes from the PyTorch CPU index by default; `RDB_TORCH_INDEX=` uses PyPI instead.
-The wheel profile also requires `pip freeze --all` to change only by adding
-`retractordb`, and install plus import to take at most 20 seconds (§4).
+With no wheel argument, exactly one host-architecture cp312-abi3 wheel is required
+in `build/wheelhouse/`. Pass a file or HTTPS URL explicitly to select another.
+`PYTHON` selects another Python 3.12 executable. `RDB_TORCH_INDEX` overrides the
+CPU index; `RDB_TORCH_INDEX=` uses PyPI to resolve the CPU wheel version.
 
-The build profile uses an existing interpreter with NumPy, torch, `nbclient` and
-`ipykernel`; it installs nothing and does not measure wheel installation:
+For a build-module check, use an existing matching interpreter with NumPy,
+`nbclient`, `nbformat` and `ipykernel`, plus torch unless `--without-torch` is set:
 
 ```bash
-.venv-python/bin/python3 -m pip install nbclient ipykernel torch
-PYTHON="$PWD/.venv-python/bin/python3" \
-  docker/wheel/notebook-smoke.sh --module-dir build/Debug-Python/python
+PYTHON="$PWD/.venv-jupyter-system-cpu/bin/python3" \
+  docker/wheel/notebook-smoke.sh --module-dir build/Debug-Python/python \
+  --output-dir build/notebook-results/local-module
 ```
 
-C5 brings the notebooks and this local check. Acceptance in a real Colab runtime
-remains in #448; running locally does not establish the Colab install/restart
-criterion. A CI job for the wheel notebook smoke remains pending.
+This profile installs nothing and has no wheel installation timing. Real Colab
+CPU/GPU acceptance is a separate human run under
+[the protocol](colab-acceptance.md). Report its date, runtime and restart outcome
+separately from the container results. PyPI publication (#447), DeviceWindowLoader
+(#468) and MPS acceptance are not prerequisites of #448. Automated release CI
+remains a separate task.
