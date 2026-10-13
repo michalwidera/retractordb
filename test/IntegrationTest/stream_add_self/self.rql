@@ -1,9 +1,0 @@
-# Suma strumienia z samym soba: zrodlo deklarowane (`a+a`) i niedeklarowane (`m+m`).
-# ctest -R it_stream_add_self -V
-STORAGE 'temp'
-
-DECLARE ax INTEGER, ay INTEGER STREAM a, 1 TEXTFILE 'a.txt'
-
-SELECT a[0]*10, a[1]-1 STREAM m FROM a
-SELECT * STREAM s1 FROM a+a
-SELECT * STREAM s2 FROM m+m

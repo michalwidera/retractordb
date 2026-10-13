@@ -183,10 +183,6 @@ class query {
   bool isDeprecatedFile = false;
   /// Wiersz pliku planu, od ktorego zaczyna sie deklaracja - do ostrzezenia o formie przestarzalej.
   size_t declarationLine = 0;
-  /// Ostrzezenia K6 o przestarzalej notacji przyrostkowej (`s.avg`) w tym zapytaniu, w postaci
-  /// gotowej do pokazania. Log parsera wycina Release (SPDLOG_ACTIVE_LEVEL), a fasada osadzona
-  /// oddaje je hostowi jako DeprecationWarning (#476).
-  std::vector<std::string> deprecatedNotations;
   /// Jawna klauzula `TIMEOUT` deklaracji DEVICE w sekundach (#347), wymierna jak interwal. Brak
   /// klauzuli to cos innego niz jawne 0: brak bierze `[sources] timeout_s` z retractor.toml, a jawne 0
   /// wylacza dodatnia wartosc z konfiguracji dla tego jednego zrodla. Pierwszenstwo rozstrzyga

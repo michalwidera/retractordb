@@ -32,14 +32,12 @@ storage::storage(const std::string_view qryID,         //
                  const std::string_view storageType,   //
                  bool oneShot,                         //
                  bool isHold,                          //
-                 int percounter,                       //
-                 MemoryStore *memory)
+                 int percounter)
     : isOneShot_(oneShot),
       isHold_(isHold),
       paths_(qryID, fileName, storageParam),
       storageType_(storageType),
-      percounter_(percounter),
-      memory_(memory) {}
+      percounter_(percounter) {}
 
 std::string storage::attachDescriptor(const Descriptor *descriptorParam) {
   return attachDescriptorStatus(descriptorParam).message;
@@ -160,7 +158,7 @@ void storage::initializeAccessor() {
   // Samo refFromCaller_ to za malo: SELECT planu tez ma deskryptor od wolajacego, ale jego plik
   // danych sklada silnik z katalogu magazynu i nazwy strumienia.
   const bool followFinalLink = refFromCaller_ && !descriptorRef(descriptor).empty();
-  accessor_ = makeAccessor(storageType_, paths_.storageFile(), descriptor, isOneShot_, percounter_, followFinalLink, memory_);
+  accessor_ = makeAccessor(storageType_, paths_.storageFile(), descriptor, isOneShot_, percounter_, followFinalLink);
 }
 
 void storage::resetForUnitTest() {

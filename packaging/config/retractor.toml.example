@@ -79,16 +79,3 @@ dir = "/var/lib/retractor"
 # przy starcie, w `xretractor -c`, w kanale ad-hoc i przy `xqry --reset`. Wartość musi być > 0;
 # niepoprawna zostaje zastąpiona domyślną z ostrzeżeniem w dzienniku.
 # history_memory_mib = 1024
-
-# [embedded]
-# Silnik osadzony (Engine/Storage w Pythonie) czyta ten plik tylko wtedy, gdy wskazuje go
-# argument `config=` - sam konfiguracji nie szuka. Bierze z niego paths.lock_dir, czyli katalog
-# blokad serwisu, i sprawdza w nim, czy xretractor działa (bez niego - TMPDIR). Katalogi z tej
-# listy są sprawdzane łagodnie, jak w xtrdb: odmowę daje tylko faktycznie trzymana blokada.
-# Pozostałe ściśle: nieczytelny wpis z rodziny blokad albo brak katalogu to odmowa.
-# Bez klucza lista to z definicji katalog tymczasowy systemu (TMPDIR, a bez niej /tmp) - ten sam,
-# w którym serwis trzyma blokadę przy pustym paths.lock_dir. Podany klucz zastępuje tę wartość;
-# pusta lista oznacza kontrolę ścisłą wszędzie.
-# Wpisy: ścieżki bezwzględne; katalog nie musi istnieć. Inny wpis to odmowa silnika osadzonego -
-# xretractor tego klucza nie czyta.
-# lenient_lock_dirs = ["/tmp"]

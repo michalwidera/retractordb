@@ -21,7 +21,7 @@
 #include "rdb/convertTypes.hpp"
 #include "rdb/probe.hpp"
 
-streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam, rdb::MemoryStore *memory)
+streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam)
     : coreInstance(coreInstance) {
   // only objects with REF has storageNameParam filled.
   if (qry.id.empty()) FatalError("streamInstance: query id must not be empty");
@@ -33,7 +33,7 @@ streamInstance::streamInstance(qTree &coreInstance, query &qry, const std::strin
 
   inputPayload  = std::make_unique<rdb::payload>(qry.descriptorFrom(coreInstance));
   outputPayload = std::make_unique<rdb::storage>(qry.id, storageName, storagePathParam, qry.storage_policy, qry.isOneShot,
-                                                 qry.isHold, percounter, memory);
+                                                 qry.isHold, percounter);
 
   auto desc           = qry.descriptorStorage();
   initializationError = outputPayload->attachDescriptorStatus(&desc);
