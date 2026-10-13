@@ -1,7 +1,7 @@
 """Error classes K1-K7 of the embedded engine, as a Python caller meets them (#476).
 
-The table lives in docs/jupyter-integration.md section 3. Each test below pins one row:
-the exception (or warning) and the state the instance is left in.
+The table lives in https://documentation.retractordb.com/appendices/python-jupyter-api.html#errors.
+Each test below pins one row: the exception (or warning) and the state the instance is left in.
 
 K1 taints the whole module until the interpreter restarts, so the tests that provoke
 it run in a subprocess - a K1 here would fail every test after it. That subprocess is

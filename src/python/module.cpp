@@ -49,7 +49,7 @@
 /// Modul udostepnia odczyt istniejacych magazynow i rdb::embed::Engine z osobnym Memory Store.
 /// Engine uzywa TimeLine i dataModel, bez zegara, watku IPC i terminala. Etap 1a
 /// wiazal tylko magazyn, zanim oddzielono plan i wykonanie od IPC uslugi.
-/// Stan modulu i historia etapu 1a: docs/jupyter-integration.md, sekcje 1-2.
+/// Historia etapu 1a: https://documentation.retractordb.com/appendices/embedded-integration-history.html
 ///
 /// BLEDY (decyzja (a) z #463). FatalError (K1) i EnvironmentError (K4) koncza
 /// proces std::exit - poza zakresem rdb::ThrowOnFatalScope. Kazde wejscie do
@@ -59,7 +59,8 @@
 /// (rdb::Refusal z tryLoadDescriptorFile i attachDescriptorStatus), wychodza
 /// jako CorruptDescriptor albo IOError.
 ///
-/// TABELA KLAS K1-K7 (#476, docs/jupyter-integration.md sekcja 3). K1 skaza caly
+/// TABELA KLAS K1-K7 (#476): https://documentation.retractordb.com/appendices/python-jupyter-api.html#errors
+/// K1 skaza caly
 /// modul (wariant (a)): pierwszy InternalError zapamietuje komunikat, a kazde
 /// nastepne wejscie do silnika zglasza InternalError do restartu interpretera
 /// (UntaintedGuard). K4 to OSError z errno (Refusal::err, EIO bez kodu). K6
@@ -72,7 +73,8 @@
 /// ma wlasny typ wyjatku: brak pliku deskryptora, brak katalogu magazynu, puste
 /// argumenty, nieznane pole, indeks poza zakresem, odczyt ze zrodla deklarowanego.
 ///
-/// ETAP J1-J3 (#446, C3; docs/core-phase-3.md). Plan i jego wykonanie weszly do
+/// ETAP J1-J3 (#446, C3): https://documentation.retractordb.com/appendices/embedded-integration-history.html
+/// Plan i jego wykonanie weszly do
 /// wiazania przez fasade rdb::embed::Engine: compile, step/run, rekordy i gesta
 /// projekcja pol (_block), z ktorej Python sklada okna. Engine sam zaklada
 /// ThrowOnFatalScope, wiec K1/K4 przychodza z niego jako rdb::EngineFatal, a
@@ -448,7 +450,7 @@ std::uint64_t runEngine(rdb::embed::Engine &self, const std::optional<std::uint6
 
 /// Splaszczony blok double z silnika -> tablica numpy (rows x cols) w zadanym typie, z WLASNA
 /// pamiecia (kapsula zwalnia ja, gdy tablica ginie). Kopia jest zamierzona: "kopiuj, nie
-/// przypinaj" z docs/jupyter-integration.md sekcja 4.
+/// przypinaj": https://documentation.retractordb.com/appendices/python-jupyter-api.html#memory-ownership-numpy-and-dlpack
 template <typename T>
 nb::object makeBlock(const std::vector<double> &values, const std::size_t rows, const std::size_t cols) {
   auto data = std::make_unique<T[]>(values.size());
@@ -494,7 +496,9 @@ void requireStream(const rdb::embed::Engine &self, const std::string &stream) {
 }  // namespace
 
 NB_MODULE(_core, m) {
-  m.doc() = "RetractorDB embedded: storage layer and the embedded engine. See docs/jupyter-integration.md.";
+  m.doc() =
+      "RetractorDB embedded: storage layer and the embedded engine. See "
+      "https://documentation.retractordb.com/appendices/python-jupyter-api.html.";
 
   // Kolejnosc rejestracji ma znaczenie: nanobind probuje tlumaczy w kolejnosci
   // ODWROTNEJ do rejestracji, a typy pochodne lapia sie rowniez na catch po
@@ -717,7 +721,7 @@ NB_MODULE(_core, m) {
   // byc w C++.
   nb::class_<rdb::embed::Engine>(m, "Engine",
                                  "One embedded engine: a compiled plan, driven one time slot at a time. See "
-                                 "docs/jupyter-integration.md.")
+                                 "https://documentation.retractordb.com/appendices/python-jupyter-api.html.")
       .def(nb::init<std::string, std::string, std::string>(), nb::arg("storage_dir") = "", nb::arg("lock_dir") = "",
            nb::arg("config") = "", nb::call_guard<UntaintedGuard>(),
            "An empty storage_dir creates a private temporary directory, which skips the service lock check; an "

@@ -81,7 +81,8 @@ KNOWN_DEBT = {
 # Zywe staja sie wylacznie w buildzie pomiarowym, a ten z zalozenia prowadzi JEDEN silnik.
 # Przeniesienie ich do obiektu silnika kosztowaloby pogon za wskaznikiem dokladnie w petli,
 # ktora sonda mierzy. Wpis zostaje widoczny, bo zalozenie "kampania jest jednosilnikowa" jest
-# zalozeniem, a nie gwarancja. Patrz docs/core-phase-2.md sekcja 4.
+# zalozeniem, a nie gwarancja. Patrz:
+# https://documentation.retractordb.com/appendices/embedded-integration-history.html#c2-instance-owned-state
 
 LOGGER_CONFIG = re.compile(
     r"\bspdlog::(set_default_logger|register_logger|set_pattern|set_level|shutdown|drop\w*)\b"
@@ -157,7 +158,8 @@ def main() -> int:
     repo = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent
     problems, debt = scan(repo)
     if debt:
-        print("Znany dlug fazy 2 (przepuszczony, patrz docs/core-phase-2.md sekcja 4):")
+        print("Znany dlug fazy 2 (przepuszczony, patrz "
+              "https://documentation.retractordb.com/appendices/embedded-integration-history.html#c2-instance-owned-state):")
         for item in debt:
             print(f"  {item}")
         print()

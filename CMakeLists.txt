@@ -78,11 +78,12 @@ option(ENABLE_COVERAGE "Enable code coverage" OFF)
 # przed włączeniem. Użycie: scripts/buildrdb.sh debug -DENABLE_UNITY_BUILD=ON
 option(ENABLE_UNITY_BUILD "Enable unity build for faster compilation" OFF)
 
-# Konsumenci osadzeni (docs/build-options.md). Kazdy jest opt-in i domyslnie
-# OFF: przy wylaczonej fladze konfiguracja nie tworzy zadnego celu ani nie szuka
-# zaleznosci, wiec build kogos, kto nie osadza silnika, nie placi za to niczym.
-# Rodzina jest wspolna - RDB_IOS (host: macOS) i RDB_ANDROID (host: Linux) wejda
-# tak samo, gdy powstana.
+# Konsumenci osadzeni
+# (https://documentation.retractordb.com/system-installation/python-build.html).
+# Kazdy jest opt-in i domyslnie OFF: przy wylaczonej fladze konfiguracja nie
+# tworzy zadnego celu ani nie szuka zaleznosci, wiec build kogos, kto nie osadza
+# silnika, nie placi za to niczym. Rodzina jest wspolna - RDB_IOS (host: macOS)
+# i RDB_ANDROID (host: Linux) wejda tak samo, gdy powstana.
 #
 # Platforma hosta jest KONSEKWENCJA celu, nie jego wyborem, i flaga zadana na
 # niewlasciwym hoscie zatrzymuje konfiguracje zamiast zostac po cichu pominieta
@@ -308,7 +309,8 @@ if(RDB_SANITIZE)
         "you only see \"Fatal Python error: Aborted\"). Either build the module in a separate "
         "build directory without RDB_SANITIZE, or start Python with the runtime preloaded:\n"
         "  ${_rdb_asan_preload} <python> -m pytest api/python/tests\n"
-        "See docs/build-options.md.")
+        "See https://documentation.retractordb.com/system-installation/python-build.html."
+    )
   endif()
 endif()
 

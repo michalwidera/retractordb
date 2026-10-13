@@ -10,8 +10,9 @@ requires-python = ">=3.10"
 
 # Bez zaleznosci uruchomieniowych. Klient stoi na samej bibliotece standardowej,
 # a modul osadzony nie jest instalowany przez ten backend - buduje go CMake pod
-# flaga RDB_PYTHON (docs/build-options.md). Kola binarne to dopiero faza J4;
-# do tego czasu `pip install ./api/python` daje wylacznie polowe kliencka.
+# flaga RDB_PYTHON. `pip install ./api/python` daje wylacznie polowe kliencka;
+# wheel z _core buduje glowny pyproject.toml. Instrukcja:
+# https://documentation.retractordb.com/system-installation/python-build.html.
 dependencies = []
 
 [project.optional-dependencies]

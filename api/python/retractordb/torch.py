@@ -2,8 +2,8 @@
 
 This is the ONLY module in the package that imports torch, and nothing imports it
 implicitly - ``import retractordb`` never touches torch. The reason is packaging
-(docs/jupyter-integration.md section 4): a hard dependency on torch risks pip
-reinstalling a 2 GB package against the wrong CUDA in Colab. The DLPack protocol
+(https://documentation.retractordb.com/appendices/python-jupyter-api.html#devices-pytorch-and-threads):
+a hard dependency on torch risks pip reinstalling a 2 GB package against the wrong CUDA in Colab. The DLPack protocol
 on ``Window`` makes the dependency unnecessary; this module is a convenience over
 it, not a requirement.
 """

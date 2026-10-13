@@ -9,7 +9,8 @@ add_subdirectory(embed)
 add_subdirectory(qry)
 add_subdirectory(retractor)
 
-# Rozszerzenie Pythona wchodzi tylko na zadanie (docs/build-options.md).
+# Rozszerzenie Pythona wchodzi tylko na zadanie
+# (https://documentation.retractordb.com/system-installation/python-build.html).
 # add_subdirectory jest warunkowe, a nie EXCLUDE_FROM_ALL, bo sam katalog wola
 # find_package(Python3) - to wyszukanie nie moze sie odbyc w buildzie, ktory o
 # Pythona nie prosil.

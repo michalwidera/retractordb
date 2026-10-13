@@ -11,7 +11,7 @@
 # Lokalny build (bez instalacji), interpreter zgodny z modulem:
 #   PYTHON=.venv-jupyter-system-cpu/bin/python3 docker/wheel/notebook-smoke.sh \
 #     --module-dir build/Debug-Python/python
-# Prawdziwy Colab odbiera czlowiek wedlug docs/colab-acceptance.md.
+# Prawdziwy Colab odbiera czlowiek wedlug https://documentation.retractordb.com/appendices/notebook-acceptance.html.
 set -euo pipefail
 
 repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
