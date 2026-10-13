@@ -2,7 +2,7 @@
 
 Stage 1a gave the storage layer, read-only. J1 (core phase 3) added ``Engine``:
 a compiled plan driven one time slot at a time. ``retractordb.engine.Engine``
-subclasses it with the NumPy and window views; see docs/jupyter-integration.md.
+subclasses it with the NumPy and window views; see https://documentation.retractordb.com/appendices/python-jupyter-api.html.
 """
 
 from enum import Enum

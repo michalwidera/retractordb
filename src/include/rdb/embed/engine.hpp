@@ -180,8 +180,9 @@ class Engine {
 
   /// Gesta projekcja: rekordy [first, first+count) x elementy splaszczone `flatFields` (kolejnosc
   /// jak w argumencie), wierszami. Wartosc null daje NaN. To jest kopia, o ktorej mowi decyzja
-  /// "kopiuj, nie przypinaj" z docs/jupyter-integration.md sekcja 4; double miesci dokladnie kazdy
-  /// typ liczbowy deskryptora poza UINT powyzej 2^53.
+  /// "kopiuj, nie przypinaj" z zalacznika API Python:
+  /// https://documentation.retractordb.com/appendices/python-jupyter-api.html#memory-ownership-numpy-and-dlpack
+  /// Double miesci dokladnie kazdy typ liczbowy deskryptora poza UINT powyzej 2^53.
   /// @throws Refused (Request) dla pola nieliczbowego (STRING, pary) albo zakresu poza strumieniem.
   [[nodiscard]] std::vector<double> project(const std::string &stream, const std::vector<int> &flatFields, std::size_t first,
                                             std::size_t count);

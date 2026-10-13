@@ -42,12 +42,9 @@ graph_info.json
 .project
 .cmake
 .settings/*
-# docs/ bylo katalogiem wyjscia generatora i zostalo usuniete z master w
-# 53c304b9 ("Remove docs from main branch"). Od tej pory trzyma rowniez
-# trwala dokumentacje programu osadzania, wiec ignorujemy jego ZAWARTOSC
-# poza plikami .md - wyjscie generatora nadal nie wchodzi do repozytorium.
-docs/*
-!docs/*.md
+# Dokumentacja uzytkownika jest w sibling dokumentacja-rdb i documentation-rdb.
+# Katalog docs nie nalezy do drzewa zrodel; ewentualne wyjscie generatora ignorujemy.
+docs/
 bin/*
 /lib/
 .venv/
@@ -85,7 +82,7 @@ test/research_gate/**/raw/
 .lake
 
 # Dokumenty projektowe (design/) sa notatkami roboczymi, nie zrodlem prawdy:
-# trwala dokumentacja programu osadzania zyje w docs/. Trzymane poza repozytorium,
+# trwala dokumentacja jest w repozytoriach PL/EN. Notatki poza repozytorium,
 # zeby kolejne rewizje roadmapy nie generowaly diffow w historii kodu.
 design/
 

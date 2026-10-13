@@ -1,5 +1,5 @@
 # Srodowisko budowy kol (wheels) modulu retractordb._core - faza J4
-# (docs/jupyter-integration.md). Obraz bazowy to manylinux_2_28 z PyPA:
+# (https://documentation.retractordb.com/appendices/python-jupyter-api.html). Obraz bazowy to manylinux_2_28 z PyPA:
 # AlmaLinux 8, glibc 2.28, gcc-toolset-14 (GCC 14, C++23 razem z <print>),
 # CPython 3.10-3.15 w /opt/python i auditwheel. Kolo zbudowane tutaj laduje sie
 # na kazdym Linuksie z glibc >= 2.28 - w tym w Google Colab (runtime 2026.07:

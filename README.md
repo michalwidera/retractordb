@@ -21,7 +21,8 @@ RetractorDB provides a unique approach to time series data management through co
 
 ### Project Links
 - **Official website**: [retractordb.com](https://retractordb.com)
-- **Documentation**: [documentation.retractordb.com](https://documentation.retractordb.com/) (comprehensive documentation in Polish)
+- **Documentation**: [Polish](https://dokumentacja.retractordb.com/) and [English](https://documentation.retractordb.com/)
+- **Installation**: [system and Python/Jupyter](https://documentation.retractordb.com/system-installation/)
 - **Repository**: [github.com/michalwidera/retractordb](https://github.com/michalwidera/retractordb)
 
 ## Core Components
@@ -149,64 +150,6 @@ The ARM64 target uses Docker's `linux/arm64` platform to compile natively under 
 
 To build all release assets in Docker (`.deb`, x86-64 and AArch64 portable archives), check that a release is ready and verify it after publishing on GitHub, see [scripts/release_package/README.md](scripts/release_package/README.md).
 
-### Optimizer ablation build options
-
-The following CMake options control independent query-plan optimizations. All are `ON` by default, so a normal build preserves the production optimizer:
-
-| Option | Default | Controlled transformation |
-|--------|---------|---------------------------|
-| `RDB_OPT_DEDUP_SUBSTRATES` | `ON` | Merges structurally identical compiler substrates and rewrites their references. |
-| `RDB_OPT_SHARE_EQUIVALENT_SELECTS` | `ON` | Moves equivalent public `SELECT` computations into a shared `STREAM_SELECT_*` substrate. |
-| `RDB_OPT_COMMUTATIVE_ADD` | `ON` | Treats `A+B` and `B+A` as equivalent while fingerprinting plans for shared `SELECT` computations. |
-| `RDB_OPT_FACTOR_MATCHED_HASH_TIMEMOVES` | `ON` | Rewrites matched `(A>i)#(B>k)` plans to `(A#B)>(i+k)`. |
-
-`RDB_OPT_COMMUTATIVE_ADD=ON` requires `RDB_OPT_SHARE_EQUIVALENT_SELECTS=ON`; CMake rejects the otherwise ineffective combination. Disabling commutativity alone still allows syntactically identical `A+B` plans to share their computation.
-
-Configure every experimental variant in its own build directory:
-
-```bash
-cmake -S . -B build/abl-no-comm -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE=build/Debug/generators/conan_toolchain.cmake \
-  -DRDB_OPT_SHARE_EQUIVALENT_SELECTS=ON \
-  -DRDB_OPT_COMMUTATIVE_ADD=OFF
-cmake --build build/abl-no-comm
-build/abl-no-comm/src/retractor/xretractor --build-info
-```
-
-CMake option values persist in `CMakeCache.txt`. Use a fresh build directory or pass every `RDB_OPT_*` value explicitly when changing variants. `scripts/buildrdb.sh release` and `scripts/buildrdb.sh package` explicitly restore all production optimizer options to `ON`.
-
-`RDB_BENCH_PROBE` is independent measurement instrumentation, not an optimizer switch. Any valid optimizer combination can be configured with the probe either `ON` or `OFF`; production release and packaging force it to `OFF`.
-
-## Experiments
-
-[rdb-experiment](https://github.com/michalwidera/rdb-experiment) is an independent repository containing the scripts, journal, and results of RetractorDB research. It is not part of this repository, and the build, test suite, packaging, and CI do not require it.
-
-### What the experiments are
-
-They are the research record behind the project's publications - not demos and not example queries. Two families live there:
-
-- **Performance campaigns.** A supervisor machine drives a worker running RetractorDB on real hardware (a Raspberry Pi 400 under a `PREEMPT_RT` kernel). Each campaign raises the input rate or the number of attached `xqry` clients and records slot-level latency, CPU load, memory, and temperature, so the sustained-rate ceiling of a given platform can be located rather than guessed. These runs supply the *Performance Evaluation* section of the paper.
-- **Semantic experiments.** Machine validation of the algebra against independent oracles - for example the equivalence of the interleave operator with explicit CSDF and block SDF realizations, checked over several million output positions.
-
-Each campaign directory keeps its own `README.md` with the research goal, the machine state captured before and after every run, and the raw samples. `JOURNAL.md` records the chronological research log, including hypotheses that turned out wrong - they are part of the path, not something to be edited out. `REQUIREMENTS.md` defines how a campaign must be conducted to stay reproducible.
-
-### Why a separate repository
-
-Experimental data grows far faster than source code, and it grows monotonically: every campaign adds raw samples that must never be rewritten, because reproducibility is the point. Keeping that growing history in the main repository would make every `git clone`, CI job, and packaging build fetch measurement data it will never read.
-
-Keeping it separate leaves the engine repository small and makes the boundary explicit: the engine is the product, while experiments are evidence about it. The two repositories have separate histories and evolve on different schedules. Each experiment manifest records the full engine commit and the base commit of the experiment repository used for that campaign.
-
-### When you need it
-
-Clone it separately when you need to reproduce a published measurement, audit raw data, or run a campaign. The standard supervisor layout keeps both repositories as siblings:
-
-```bash
-cd /path/to/parent
-git clone https://github.com/michalwidera/retractordb.git
-git clone https://github.com/michalwidera/rdb-experiment.git
-```
-
-Run experiment commands from the `rdb-experiment` checkout. Its `README.md` describes the supervisor and worker layout, while `REQUIREMENTS.md` defines the reproducibility, clean-tree, build, and artifact rules. The supervisor accepts `--code-repo` and related path options when the checkouts do not use its documented default locations.
 
 ### What this does to CI
 

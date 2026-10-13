@@ -1,5 +1,6 @@
 # Kolo (wheel) pakietu retractordb z silnikiem osadzonym retractordb._core - faza J4
-# (docs/jupyter-integration.md). scikit-build-core konfiguruje CMake calego drzewa
+# https://documentation.retractordb.com/system-installation/python-build.html.
+# scikit-build-core konfiguruje CMake calego drzewa
 # z RDB_PYTHON=ON, ale kompiluje i instaluje wylacznie _core; pliki .py pakietu
 # pochodza z api/python/retractordb.
 #
@@ -27,7 +28,8 @@ license-files = ["LICENSE"]
 authors = [{ name = "Michal Widera" }]
 # numpy jest jedyna zaleznoscia uruchomieniowa (Engine.to_numpy/window). torch
 # celowo nie: w Colab wymuszona reinstalacja torcha to minuty i czasem zepsute
-# srodowisko (docs/jupyter-integration.md, sekcja 4).
+# srodowisko. Patrz polityka opcjonalnego torch:
+# https://documentation.retractordb.com/appendices/python-jupyter-api.html#devices-pytorch-and-threads.
 dependencies = ["numpy>=1.23"]
 
 [project.optional-dependencies]

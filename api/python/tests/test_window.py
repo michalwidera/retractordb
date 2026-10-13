@@ -1,8 +1,9 @@
 """J2: dense blocks, windows and the DLPack export.
 
-Everything here is a copy of engine memory by design (docs/jupyter-integration.md
-section 4), so the assertions that matter are the ones about shape, dtype and the
-fact that a window stays what it was after the engine moves on.
+Everything here is a copy of engine memory by design:
+https://documentation.retractordb.com/appendices/python-jupyter-api.html#memory-ownership-numpy-and-dlpack.
+The assertions that matter are the ones about shape, dtype and the fact that a
+window stays what it was after the engine moves on.
 """
 
 from __future__ import annotations

@@ -3,7 +3,7 @@
 ``_core.Engine`` (nanobind) owns the plan and steps it; this module adds the
 Python-side conveniences that have no business in C++: iteration over records,
 NumPy blocks, and the windowed, DLPack-exporting view that a training loop wants
-(docs/jupyter-integration.md section 4).
+(https://documentation.retractordb.com/appendices/python-jupyter-api.html#memory-ownership-numpy-and-dlpack).
 
 Everything here is a COPY of engine memory. That is the v1 decision from the
 roadmap - "copy, do not pin" - and it is what makes a tensor safe to keep across

@@ -19,7 +19,7 @@ Usage: scripts/jupyter-env.sh system|user [options]
                          cuda checks the Linux CUDA package without requiring a GPU
 All dependencies are pinned in scripts/notebook-versions.sh. No sudo or activation
 is needed. Re-running refreshes the same venv. The extension must already be built
-for Python 3.12; see docs/build-options.md for the build prerequisite.
+for Python 3.12; see https://documentation.retractordb.com/system-installation/python-build.html for the build prerequisite.
 EOF
 }
 

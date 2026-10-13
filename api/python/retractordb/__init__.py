@@ -9,8 +9,9 @@ Two independent halves live under this one name:
 ``retractordb._core``
     The embedded engine - a compiled extension module that needs no daemon.
     Built only when the tree is configured with ``-DRDB_PYTHON=ON``; see
-    ``docs/build-options.md``. ``Engine`` and ``Window`` (``retractordb.engine``)
-    sit on top of it and are resolved the same lazy way.
+    ``https://documentation.retractordb.com/system-installation/python-build.html``.
+    ``Engine`` and ``Window`` (``retractordb.engine``) sit on top of it and are
+    resolved the same lazy way.
 
 The embedded half is imported lazily, so a machine that never built the
 extension still gets a working client. Reaching for an embedded name without the
@@ -77,7 +78,7 @@ _ENGINE_NAMES = frozenset({"Engine", "Window"})
 _BUILD_HINT = (
     "retractordb._core is not built in this installation. Configure the tree with "
     "-DRDB_PYTHON=ON and build it, or put the build's python/ directory on sys.path. "
-    "See docs/build-options.md."
+    "See https://documentation.retractordb.com/system-installation/python-build.html."
 )
 
 

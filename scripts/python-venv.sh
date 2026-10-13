@@ -16,7 +16,7 @@
 #   scripts/python-venv.sh --venv /sciezka/do/venv
 #   scripts/python-venv.sh --print-python     # wypisz sama sciezke interpretera
 #
-# Dalej: docs/build-options.md
+# Dalej: https://documentation.retractordb.com/system-installation/python-build.html
 
 set -o errexit
 set -o nounset
@@ -36,7 +36,8 @@ readonly python_minimum="3.10"
 # kolejne wydania formatuja inaczej, wiec niepinowana wersja znaczy, ze `ninja
 # cformat` u dwoch osob daje dwa rozne drzewa i roznica ta wchodzi do commitow.
 # numpy: jedyna zaleznosc uruchomieniowa modulu osadzonego (Engine.to_numpy/window,
-# docs/jupyter-integration.md sekcja 4); torch CELOWO nie - retractordb.torch importuje
+# https://documentation.retractordb.com/appendices/python-jupyter-api.html#memory-ownership-numpy-and-dlpack).
+# torch CELOWO nie - retractordb.torch importuje
 # go dopiero na zyczenie, a test, ktory go potrzebuje, pomija sie bez niego.
 readonly package_list=(
   "nanobind>=2.0"

@@ -3,13 +3,17 @@ cmake_minimum_required(VERSION 3.20...4.4 FATAL_ERROR)
 project(rdbpython LANGUAGES CXX)
 
 # Modul rozszerzenia CPythona: warstwa magazynu (etap 1a) i silnik osadzony
-# rdb::embed::Engine (J1-J3, docs/jupyter-integration.md). Katalog wchodzi do
-# konfiguracji wylacznie przy RDB_PYTHON=ON - patrz src/CMakeLists.txt.
+# rdb::embed::Engine (J1-J3,
+# https://documentation.retractordb.com/appendices/python-jupyter-api.html).
+# Katalog wchodzi do konfiguracji wylacznie przy RDB_PYTHON=ON - patrz
+# src/CMakeLists.txt.
 
 # Platforma hosta jest konsekwencja celu, nie jego wyborem: rozszerzenia dla
 # Windows nikt jeszcze nie budowal. Flaga zadana na niewspieranym hoscie ma
 # zatrzymac konfiguracje, a nie zostac po cichu pominieta - zielony build bez
-# artefaktu jest gorszy niz blad (docs/build-options.md, regula 3).
+# artefaktu jest gorszy niz blad
+# (https://documentation.retractordb.com/system-installation/python-build.html,
+# regula 3).
 if(NOT (CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL
                                               "Darwin"))
   message(
@@ -52,7 +56,8 @@ if(NOT RDB_NANOBIND_PROBE EQUAL 0)
       "  scripts/python-venv.sh\n"
       "  cmake -DRDB_PYTHON=ON -DPython_EXECUTABLE=<repo>/.venv-python/bin/python3 .\n"
       "A Homebrew or distribution Python refuses a direct pip install (PEP 668), which is "
-      "why the script exists. See docs/build-options.md.")
+      "why the script exists. See https://documentation.retractordb.com/system-installation/python-build.html."
+  )
 endif()
 
 list(APPEND CMAKE_PREFIX_PATH "${RDB_NANOBIND_CMAKE_DIR}")

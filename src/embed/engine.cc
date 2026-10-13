@@ -426,7 +426,8 @@ std::vector<double> Engine::project(const std::string &stream, const std::vector
 void Engine::close() noexcept {
   // Bez ThrowOnFatalScope: close() i ~Engine sa noexcept (host wola je z __del__ / __exit__), wiec
   // K1/K4 z destruktora modelu albo magazynu konczy proces jak w usludze - znane ograniczenie trybu
-  // osadzonego, opisane w docs/jupyter-integration.md sekcja 3 (#476).
+  // osadzonego (#476). Opis bledow:
+  // https://documentation.retractordb.com/appendices/python-jupyter-api.html#errors
   plan_.reset();
 }
 
