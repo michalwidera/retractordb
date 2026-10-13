@@ -119,6 +119,13 @@ class payload {
   /// może niczego ukraść - przy definicji w payload.cc.
   payload &operator=(payload &&other) noexcept;
 
-  payload operator+(const payload &other);
+  payload operator+(const payload &other) const;
+
+  /// @brief Zapisuje do tego payloadu sume `lhs + rhs` bez budowy payloadu i deskryptora sumy.
+  ///
+  /// Wynik jest taki sam jak `*this = lhs + rhs`, ale tylko gdy uklad tego payloadu jest dokladnie
+  /// ukladem sumy: deskryptor zgodny z deskryptorem sumy w obie strony i o tej samej liczbie wpisow.
+  /// Sprawdza to wolajacy, raz na wezel (dataModel::constructInputPayload) - tu nie ma tego warunku.
+  void assignConcatenation(const payload &lhs, const payload &rhs);
 };
 }  // namespace rdb

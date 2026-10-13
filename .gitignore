@@ -42,10 +42,15 @@ graph_info.json
 .project
 .cmake
 .settings/*
+# Dokumentacja uzytkownika jest w sibling dokumentacja-rdb i documentation-rdb.
+# Katalog docs nie nalezy do drzewa zrodel; ewentualne wyjscie generatora ignorujemy.
 docs/
 bin/*
 /lib/
 .venv/
+# Srodowiska wirtualne tworzone w drzewie: .venv-python (scripts/python-venv.sh)
+# i .venv-api z api/python/README.md. Wzorzec obejmuje oba i kazde nastepne.
+.venv-*/
 .codex/*
 !.codex/config.toml
 dokumentacja-rdb/
@@ -75,3 +80,20 @@ test/research_gate/**/raw/
 # Wzorzec BEZ koncowego ukosnika - `.lake/` pasuje tylko do katalogu, nie do dowiazania,
 # i test-ci.sh (git ls-files -co --exclude-standard) wrzucilby zerwany link do kontenera.
 .lake
+
+# Dokumenty projektowe (design/) sa notatkami roboczymi, nie zrodlem prawdy:
+# trwala dokumentacja jest w repozytoriach PL/EN. Notatki poza repozytorium,
+# zeby kolejne rewizje roadmapy nie generowaly diffow w historii kodu.
+design/
+
+# Artefakty Findera na macOS - platforma rozwojowa, wiec pojawiaja sie w kazdym katalogu.
+.DS_Store
+
+# Wyjscia budowy rozszerzenia Pythona (RDB_PYTHON=ON). Modul kompilowany trafia do
+# katalogu build, a instalacja editable zostawia te katalogi obok pakietu.
+api/python/**/*.so
+api/python/**/*.pyd
+api/python/build/
+api/python/dist/
+api/python/*.egg-info/
+.pytest_cache/

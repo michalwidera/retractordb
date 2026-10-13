@@ -58,7 +58,8 @@ std::unique_ptr<FileInterface> makeAccessor(const std::string_view storageType, 
                                             Descriptor &descriptor,              //
                                             const bool oneShot,                  //
                                             const int percounter,                //
-                                            const bool followFinalLink) {
+                                            const bool followFinalLink,          //
+                                            MemoryStore *memory) {
   if (storageFile.empty()) FatalError("storage: storage file path is empty - storage not properly configured");
   if (storageType.empty()) FatalError("storage: storage type is empty - storage type not set");
 
@@ -71,7 +72,8 @@ std::unique_ptr<FileInterface> makeAccessor(const std::string_view storageType, 
                                                              followFinalLink);
   }
   if (storageType == "MEMORY") {
-    return std::make_unique<rdb::memoryFile>(storageFile, descriptor, descriptor.storagePolicy());
+    return std::make_unique<rdb::memoryFile>(storageFile, descriptor, descriptor.storagePolicy(),
+                                             memory != nullptr ? *memory : MemoryStore::processDefault());
   }
   if (storageType == "POSIX") {
     return std::make_unique<rdb::posixBinaryFile>(storageFile, descriptor, percounter, followFinalLink);

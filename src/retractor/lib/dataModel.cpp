@@ -9,6 +9,7 @@
 #include <memory>  // unique_ptr
 #include <mutex>
 #include <new>
+#include <optional>
 #include <stdexcept>
 #include <thread>
 #include <utility>
@@ -27,7 +28,7 @@
 
 std::mutex core_mutex;
 
-dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
+dataModel::dataModel(qTree &coreInstance, rdb::MemoryStore *memory) : coreInstance_(coreInstance), memory_(memory) {
   //
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
@@ -52,7 +53,7 @@ dataModel::dataModel(qTree &coreInstance) : coreInstance_(coreInstance) {
   coreInstance_.erase(removed.begin(), removed.end());
 
   for (auto &qry : coreInstance_) {
-    auto runtime = std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"]);
+    auto runtime = std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"], memory_);
     if (!runtime->initializationError.message.empty()) {
       initializationError         = runtime->initializationError;
       initializationError.message = "dataModel: stream '" + qry.id + "': " + initializationError.message;
@@ -90,7 +91,7 @@ std::string dataModel::addQueriesToModel(const std::vector<std::string> &ids) {
   std::vector<std::unique_ptr<streamInstance>> built;
   built.reserve(nodes.size());
   for (query *node : nodes) {
-    auto runtime = std::make_unique<streamInstance>(coreInstance_, *node, directive_[":STORAGE"]);
+    auto runtime = std::make_unique<streamInstance>(coreInstance_, *node, directive_[":STORAGE"], memory_);
     if (!runtime->initializationError.message.empty())
       return "stream '" + node->id + "': " + runtime->initializationError.message;
     runtime->outputPayload->setDisposable(node->isDisposable);
@@ -129,7 +130,7 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &
   return out.getPayload();
 }
 
-rdb::payload dataModel::fetchForward(const std::string &instance, const int forwardIndex) {
+const rdb::payload &dataModel::fetchForward(const std::string &instance, const int forwardIndex) {
   auto &runtime = streamRuntime(instance);
   auto &out     = *(runtime.outputPayload);
   out.releaseOnHold();
@@ -160,9 +161,12 @@ rdb::payload dataModel::fetchForward(const std::string &instance, const int forw
     // dlatego, że komunikat o rekordzie niedostępnym szedł na WARN, a Release kompiluje WARN
     // na wylot.
     SPDLOG_ERROR("fetchForward {}: record {} not available (count={}, base={})", instance, forwardIndex, count, *logicalBase);
-    rdb::payload nullRecord(out.descriptor);
-    nullRecord.setNullBitset(std::vector<bool>(out.descriptor.size(), true));
-    return nullRecord;
+    auto &nullRecord = runtime.unavailableRecord;
+    if (!nullRecord.has_value()) {
+      nullRecord.emplace(out.descriptor);
+      nullRecord->setNullBitset(std::vector<bool>(out.descriptor.size(), true));
+    }
+    return *nullRecord;
   }
 
   if (out.isDeclared()) return out.history(static_cast<size_t>(rev));
@@ -616,11 +620,38 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       const auto fwdPos1 = Add(qry.rInterval, coreInstance_.getQuery(nameSrc1).rInterval, n);
       const auto fwdPos2 = Add(qry.rInterval, coreInstance_.getQuery(nameSrc2).rInterval, n);
 
-      // operator + from payload payload::operator+(payload &other) step into action here
       // TODO support renaming of double-same fields after merge?
 
       rdb::probe::onAddMerge();
-      *runtime.inputPayload = fetchForward(nameSrc1, fwdPos1) + fetchForward(nameSrc2, fwdPos2);
+
+      // Referencja z fetchForward zyje do nastepnego odczytu tego strumienia. Przy tym samym zrodle
+      // po obu stronach (A+A) drugi odczyt nadpisuje biezacy payload zrodla, na ktory moze wskazywac
+      // lewa referencja, wiec lewy skladnik idzie wtedy przez kopie (it_stream_add_self).
+      std::optional<rdb::payload> lhsCopy;
+      const auto &lhsFetched = fetchForward(nameSrc1, fwdPos1);
+      if (nameSrc1 == nameSrc2) lhsCopy.emplace(lhsFetched);
+      const auto &lhs = lhsCopy.has_value() ? *lhsCopy : lhsFetched;
+      const auto &rhs = fetchForward(nameSrc2, fwdPos2);
+
+      // Suma wprost do slotu wejscia, bez payloadu i deskryptora sumy w kazdym takcie - tylko przy
+      // ukladzie wejscia dokladnie rownym ukladowi sumy. Wtedy przypisanie `*inputPayload = lhs + rhs`
+      // kopiuje bajty sumy na poczatek wejscia i bitset NULL wprost (rowna liczba wpisow), czyli robi
+      // dokladnie to, co payload::assignConcatenation. Descriptor::operator== to "lewy miesci prawy",
+      // stad sprawdzenie w obie strony. Wynik zalezy tylko od deskryptorow, wiec liczymy go raz,
+      // w pierwszym takcie (streamInstance::addMatchesInput); inny uklad idzie po staremu.
+      auto &sameLayout = runtime.addMatchesInput;
+      if (!sameLayout.has_value()) {
+        rdb::Descriptor sum(lhs.descriptor);
+        sum += rhs.descriptor;
+        sum.removeConfigurationFields();
+        const auto &input = runtime.inputPayload->descriptor;
+        sameLayout        = input.size() == sum.size() && input == sum && sum == input;
+      }
+      if (*sameLayout) {
+        runtime.inputPayload->assignConcatenation(lhs, rhs);
+      } else {
+        *runtime.inputPayload = lhs + rhs;
+      }
     } break;
     case STREAM_AGSE: {
       // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
@@ -660,7 +691,7 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       rdb::probe::onHashPick();
       int fwdPos            = 0;
       const bool takeSecond = Hash(intervalSrc1, intervalSrc2, n, fwdPos);
-      auto component        = fetchForward(takeSecond ? nameSrc2 : nameSrc1, fwdPos);
+      const auto &component = fetchForward(takeSecond ? nameSrc2 : nameSrc1, fwdPos);
 
       // Slot wejscia ma na kazdej pozycji dluzszy z dwoch elementow skladnikow
       // (Descriptor::composeHashDescriptorFrom). Skladnik o tym samym ukladzie przechodzi w calosci,
@@ -676,7 +707,7 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       auto &sameLayout = runtime.hashSideMatchesInput[takeSecond ? 1 : 0];
       if (!sameLayout.has_value()) sameLayout = component.descriptor == runtime.inputPayload->descriptor;
       if (*sameLayout) {
-        *runtime.inputPayload = std::move(component);
+        *runtime.inputPayload = component;
       } else {
         const int slots = runtime.inputPayload->descriptor.flatElementCount();
         for (int slot = 0; slot < slots; ++slot)

@@ -53,8 +53,27 @@ struct streamInstance {
   /// przeplotu zostaje puste.
   std::array<std::optional<bool>, 2> hashSideMatchesInput;
 
+  /// @brief Czy slot wejscia tej instancji ma dokladnie uklad sumy skladnikow `A+B`.
+  ///
+  /// Wypelniane w pierwszym takcie sumy (dataModel::constructInputPayload), z tego samego powodu co
+  /// hashSideMatchesInput: deskryptory skladnikow i wejscia sa stale przez zycie instancji. Prawda
+  /// pozwala pisac sume wprost do wejscia (payload::assignConcatenation). Poza wezlem sumy zostaje puste.
+  std::optional<bool> addMatchesInput;
+
+  /// @brief Rekord all-null tego strumienia, zwracany przez dataModel::fetchForward dla rekordu niedostepnego.
+  ///
+  /// Budowany przy pierwszym takim odczycie i potem tylko czytany. Trzymany tutaj, bo fetchForward
+  /// zwraca referencje, a rekord niedostepny jest rzadki - nie ma po co budowac go w kazdym takcie.
+  std::optional<rdb::payload> unavailableRecord;
+
   // This constructor will create data based on query
-  explicit streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam = "");
+  //
+  // `memory` to Memory Store magazynu MEMORY, ktory dostaje outputPayload; nullptr wybiera instancje
+  // domyslna procesu (rdb::MemoryStore::processDefault), czyli dotychczasowe zachowanie uslugi.
+  // Silnik osadzony (rdb::embed::Engine) podaje tu Memory Store wlasny - w tym miejscu izolacja dwoch
+  // silnikow w jednym procesie dociera do planu, a nie tylko do magazynu.
+  explicit streamInstance(qTree &coreInstance, query &qry, const std::string &storagePathParam = "",
+                          rdb::MemoryStore *memory = nullptr);
 
   [[nodiscard]] rdb::payload constructAgsePayload(int length,                   //  _@(_,length)
                                                   int step,                     //  _@(step,_)
