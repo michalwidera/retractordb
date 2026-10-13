@@ -3,12 +3,9 @@
 #include <array>
 #include <cerrno>
 #include <string>
-#include <vector>
 
 #include "rdb/descriptor.hpp"
 #include "rdb/faccmemory.hpp"
-#include "rdb/memoryStore.hpp"
-#include "rdb/storage.hpp"
 
 static rdb::Descriptor makeDesc(size_t size) { return {"f", static_cast<int>(size), 1, rdb::BYTE}; }
 
@@ -391,106 +388,4 @@ TEST(MemoryTest, test_faccmemory_bucket_count_constant_across_plan_swaps) {
     }
     GTEST_ASSERT_EQ(rdb::memoryFile::bucketCountForUnitTest(), baseline);
   }
-}
-
-// ============================================================
-// MemoryStore - wlascicielstwo pamieci MEMORY (faza 2, #446 C2)
-// ============================================================
-
-// Sedno fazy 2: dwa Memory Store to dwie pamieci. Ta sama nazwa strumienia, te same zapisy, zadnego
-// wspolnego stanu. Przed faza 2 pamiec byla mapa `static` w faccmemory.cc, wiec notatnik, ktory
-// zbudowal dwa silniki w jednym procesie, dostawal jeden strumien sklejony z dwoch.
-TEST(MemoryStoreTest, separate_stores_do_not_share_a_stream) {
-  BYTE record;
-  const std::string filename = "shared_name_two_stores";
-  auto recsize               = sizeof(BYTE);
-  auto retention             = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
-
-  rdb::MemoryStore storeA;
-  rdb::MemoryStore storeB;
-
-  rdb::memoryFile fileA(filename, makeDesc(recsize), retention, storeA);
-  rdb::memoryFile fileB(filename, makeDesc(recsize), retention, storeB);
-
-  record = 0x11;
-  fileA.write(&record);
-  GTEST_ASSERT_EQ(fileA.count(), 1);
-  GTEST_ASSERT_EQ(fileB.count(), 0) << "Memory Store B zobaczyl zapis do Memory Store A";
-
-  record = 0x22;
-  fileB.write(&record);
-  GTEST_ASSERT_EQ(fileA.count(), 1);
-  GTEST_ASSERT_EQ(fileB.count(), 1);
-
-  GTEST_ASSERT_EQ(fileA.read(&record, 0), EXIT_SUCCESS);
-  GTEST_ASSERT_EQ(record, 0x11);
-  GTEST_ASSERT_EQ(fileB.read(&record, 0), EXIT_SUCCESS);
-  GTEST_ASSERT_EQ(record, 0x22);
-}
-
-// Druga polowa kontraktu: W GRANICACH jednego Memory Store wspoldzielenie po nazwie zostaje - na tym
-// stoi plan, w ktorym piszacy i czytajacy ten sam strumien MEMORY to rozne obiekty. Kubelek
-// znika z ostatnia instancja, tak jak w domyslnym Memory Store.
-TEST(MemoryStoreTest, one_store_still_shares_by_stream_name) {
-  BYTE record;
-  const std::string filename = "shared_name_one_store";
-  auto recsize               = sizeof(BYTE);
-  auto retention             = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
-
-  rdb::MemoryStore store;
-  {
-    rdb::memoryFile writer(filename, makeDesc(recsize), retention, store);
-    rdb::memoryFile reader(filename, makeDesc(recsize), retention, store);
-
-    record = 0x37;
-    writer.write(&record);
-
-    GTEST_ASSERT_EQ(store.size(), 1);
-    GTEST_ASSERT_EQ(reader.count(), 1);
-    GTEST_ASSERT_EQ(reader.read(&record, 0), EXIT_SUCCESS);
-    GTEST_ASSERT_EQ(record, 0x37);
-  }
-  GTEST_ASSERT_TRUE(store.empty()) << "kubelek przezyl ostatnia instancje";
-}
-
-// Bez podanego Memory Store obowiazuje instancja domyslna procesu - zachowanie sprzed fazy 2, na ktorym
-// stoja xretractor, xtrdb i testy powyzej.
-TEST(MemoryStoreTest, default_is_the_process_store) {
-  BYTE record;
-  const std::string filename = "default_store_stream";
-  auto recsize               = sizeof(BYTE);
-  auto retention             = std::pair<std::string, size_t>("DEFAULT", rdb::memoryFile::no_retention);
-
-  rdb::memoryFile implicitStore(filename, makeDesc(recsize), retention);
-  rdb::memoryFile explicitStore(filename, makeDesc(recsize), retention, rdb::MemoryStore::processDefault());
-
-  record = 0x5A;
-  implicitStore.write(&record);
-
-  GTEST_ASSERT_EQ(explicitStore.count(), 1);
-  GTEST_ASSERT_EQ(explicitStore.read(&record, 0), EXIT_SUCCESS);
-  GTEST_ASSERT_EQ(record, 0x5A);
-}
-
-// Memory Store podany do rdb::storage ma dojechac az do akcesora. Bez tego memoryFile umie przyjac
-// Memory Store, ale nikt mu go nie podaje.
-TEST(MemoryStoreTest, storage_passes_its_store_down_to_the_accessor) {
-  // Pole TYPE nie jest danymi - attachStorage() czyta z niego nazwe typu magazynu,
-  // wiec "MEMORY" wybiera backend pamieciowy (accessorFactory.cc).
-  auto descriptor = rdb::Descriptor{{"a", 4, 1, rdb::INTEGER}, {"MEMORY", 0, 0, rdb::TYPE}};
-
-  rdb::MemoryStore given;
-  rdb::MemoryStore untouched;
-
-  rdb::storage stream("memstore_iso", "memstore_iso", "", "DEFAULT", false, false, -1, &given);
-  ASSERT_TRUE(stream.attachDescriptor(&descriptor).empty());
-  stream.setDisposable(true);
-
-  auto *payload = stream.getPayload();
-  payload->setNullBitset(std::vector<bool>(descriptor.size(), false));
-  payload->setItem(0, 7);
-  ASSERT_EQ(stream.write(), rdb::WriteStatus::Ok);
-
-  EXPECT_FALSE(given.empty()) << "zapis nie trafil do Memory Store podanego magazynowi";
-  EXPECT_TRUE(untouched.empty()) << "zapis trafil do cudzego Memory Store";
 }

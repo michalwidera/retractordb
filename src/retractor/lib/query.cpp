@@ -32,10 +32,9 @@ void query::reset() {
   kind             = sourceKind::none;
   isDeprecatedFile = false;
   declarationLine  = 0;
-  deprecatedNotations.clear();
-  generatorSize = notAGenerator;
-  policy        = std::make_pair("DEFAULT", 0);
-  retention     = rdb::retention_t{.segments = 0, .capacity = 0};
+  generatorSize    = notAGenerator;
+  policy           = std::make_pair("DEFAULT", 0);
+  retention        = rdb::retention_t{.segments = 0, .capacity = 0};
   timeoutSeconds.reset();
 }
 

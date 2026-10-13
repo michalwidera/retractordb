@@ -78,18 +78,6 @@ option(ENABLE_COVERAGE "Enable code coverage" OFF)
 # przed włączeniem. Użycie: scripts/buildrdb.sh debug -DENABLE_UNITY_BUILD=ON
 option(ENABLE_UNITY_BUILD "Enable unity build for faster compilation" OFF)
 
-# Konsumenci osadzeni (docs/build-options.md). Kazdy jest opt-in i domyslnie
-# OFF: przy wylaczonej fladze konfiguracja nie tworzy zadnego celu ani nie szuka
-# zaleznosci, wiec build kogos, kto nie osadza silnika, nie placi za to niczym.
-# Rodzina jest wspolna - RDB_IOS (host: macOS) i RDB_ANDROID (host: Linux) wejda
-# tak samo, gdy powstana.
-#
-# Platforma hosta jest KONSEKWENCJA celu, nie jego wyborem, i flaga zadana na
-# niewlasciwym hoscie zatrzymuje konfiguracje zamiast zostac po cichu pominieta
-# - inaczej dostaje sie zielony build bez artefaktu. Sprawdzenie siedzi w
-# src/python/CMakeLists.txt, przy celu, ktorego dotyczy.
-option(RDB_PYTHON "Build the retractordb._core Python extension (nanobind)" OFF)
-
 # Przełączniki optymalizatora planu używane w kontrolowanych badaniach
 # ablacyjnych. Domyślna konfiguracja zachowuje dotychczasowe działanie.
 option(RDB_OPT_DEDUP_SUBSTRATES
@@ -268,48 +256,6 @@ if(RDB_SANITIZE)
     -fsanitize=${RDB_SANITIZE} -fno-sanitize-recover=undefined
     -fno-omit-frame-pointer -g)
   add_link_options(-fsanitize=${RDB_SANITIZE})
-
-  # Python laduje modul przez dlopen, za pozno dla inicjalizacji runtime ASan.
-  # Runtime trzeba zaladowac przed startem interpretera. Z GCC potrzebny jest
-  # tez libstdc++, aby ASan znalazl __cxa_throw przed pierwszym wyjatkiem.
-  if(RDB_PYTHON AND RDB_SANITIZE MATCHES "address")
-    # mach/mach_time.h jest tylko na jadrze Mach, gdzie ladowaczem jest dyld, a
-    # biblioteke laduje sie z wyprzedzeniem przez DYLD_INSERT_LIBRARIES.
-    if(RDB_HAS_MACH_TIME_H)
-      execute_process(
-        COMMAND "${CMAKE_CXX_COMPILER}" -print-resource-dir
-        OUTPUT_VARIABLE _rdb_asan_resource_dir
-        OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-      set(_rdb_asan_preload
-          "DYLD_INSERT_LIBRARIES=\"${_rdb_asan_resource_dir}/lib/darwin/libclang_rt.asan_osx_dynamic.dylib\" ASAN_OPTIONS=detect_container_overflow=0"
-      )
-    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-      execute_process(
-        COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=libasan.so
-        OUTPUT_VARIABLE _rdb_asan_runtime
-        OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-      execute_process(
-        COMMAND "${CMAKE_CXX_COMPILER}" -print-file-name=libstdc++.so
-        OUTPUT_VARIABLE _rdb_asan_libstdcxx
-        OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-      set(_rdb_asan_preload
-          "LD_PRELOAD=\"${_rdb_asan_runtime} ${_rdb_asan_libstdcxx}\" ASAN_OPTIONS=detect_leaks=0"
-      )
-    else()
-      set(_rdb_asan_preload
-          "LD_PRELOAD=<the ASan runtime of ${CMAKE_CXX_COMPILER}> ASAN_OPTIONS=detect_leaks=0"
-      )
-    endif()
-    message(
-      WARNING
-        "RDB_PYTHON=ON with RDB_SANITIZE=${RDB_SANITIZE}: retractordb._core links the "
-        "AddressSanitizer runtime, and a Python interpreter that was not started with that "
-        "runtime aborts while importing the module (under pytest the reason is swallowed and "
-        "you only see \"Fatal Python error: Aborted\"). Either build the module in a separate "
-        "build directory without RDB_SANITIZE, or start Python with the runtime preloaded:\n"
-        "  ${_rdb_asan_preload} <python> -m pytest api/python/tests\n"
-        "See docs/build-options.md.")
-  endif()
 endif()
 
 # ccache buforuje wyniki kompilacji, przyspieszając powtórne budowanie (np.

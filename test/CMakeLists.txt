@@ -83,14 +83,6 @@ else()
   )
 endif()
 
-# Bramka fazy 2 (#446, C2): warstwa osadzalna (biblioteka rdb + jej naglowki
-# publiczne) nie trzyma stanu procesu, nie konfiguruje logera i konczy proces
-# tylko przez detail::terminateProcess. Uzasadnienie i lista swiadomych wyjatkow
-# stoja w samym skrypcie; znany dlug jest wypisywany, ale nie oblewa.
-add_test(NAME embedding_boundary
-         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/embedding_boundary.py
-                 ${CMAKE_SOURCE_DIR})
-
 # Dryft wobec dowodow Lean (math_proofs). Wartosci sprawdza ut_proofOracle na
 # tablicach z proofOracle.hpp; ten test pilnuje, ze kazde twierdzenie z Profs ma
 # wiersz w proof_manifest.tsv i ze tablice nie sa starsze od dowodow. Czyta

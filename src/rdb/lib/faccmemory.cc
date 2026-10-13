@@ -5,10 +5,35 @@
 #include <algorithm>  // for std::copy
 #include <cerrno>
 #include <limits>
+#include <map>
 #include <ranges>
 #include <utility>
 #include <vector>
 #include "fatalError.hpp"
+
+namespace rdb {
+
+/// Stan JEDNEGO strumienia trzymanego w pamięci procesu: rekordy, ich bitsety null i licznik
+/// zapisów - w jednym węźle mapy.
+///
+/// Do 2026-09-23 były to TRZY mapy kluczowane tą samą nazwą, a każdy dostęp do rekordu płacił
+/// za wyszukanie w każdej z nich osobno (read: trzy, write: do czterech). Callgrind przypisywał
+/// samym `map::operator[]` 3,75 % instrukcji slotu na planie ADD-owym i 4,86 % na potoku EKG,
+/// nie licząc udziału w `__memcmp_avx2` na porównaniach kluczy. Jeden węzeł na strumień znosi
+/// cały ten rachunek: wyszukanie jest JEDNO i zapada w konstruktorze memoryFile.
+struct memoryBucket {
+  std::vector<std::vector<uint8_t>> data;
+  std::vector<std::vector<bool>> nulls;
+  size_t writeCount{0};   // Licznik zapisów - logiczna pozycja niezależna od instancji.
+  ssize_t recordSize{0};  // Rozmiar rekordów w `data` - read() kopiuje rekord w całości.
+  size_t users{0};        // Żywe instancje memoryFile; ostatnia kasuje kubełek.
+};
+
+}  // namespace rdb
+
+/// Stan współdzielony po nazwie strumienia między instancjami memoryFile - ten sam kontrakt co
+/// przedtem, tylko w jednym drzewie zamiast w trzech.
+static std::map<std::string, rdb::memoryBucket> memoryStore;
 
 namespace {
 
@@ -19,10 +44,9 @@ namespace {
 /// ewentualna zmiana tego stanu rzeczy była czerwonym testem, a nie cichą pomyłką.
 ///
 /// Tylko Debug: w Release kosztowałaby dokładnie to wyszukanie, które ta zmiana usuwa.
-void assertBucketMatches([[maybe_unused]] const rdb::memoryBucket *cached, [[maybe_unused]] rdb::MemoryStore &store,
-                         [[maybe_unused]] const std::string &filename) {
+void assertBucketMatches([[maybe_unused]] const rdb::memoryBucket *cached, [[maybe_unused]] const std::string &filename) {
 #ifndef NDEBUG
-  if (cached != &store.bucket(filename))
+  if (cached != &memoryStore[filename])
     FatalError("memoryFile: zapamiętany kubełek nie odpowiada nazwie '{}' - nazwa zmieniona po konstrukcji?", filename);
 #endif
 }
@@ -32,7 +56,7 @@ void assertBucketMatches([[maybe_unused]] const rdb::memoryBucket *cached, [[may
 namespace rdb {
 
 memoryFile::memoryFile(const std::string_view fileName, const Descriptor &descriptor,
-                       const std::pair<std::string, size_t> &retentionSize, MemoryStore &store)
+                       const std::pair<std::string, size_t> &retentionSize)
     : filename_(std::string(fileName)),                                //
       recordSize_(static_cast<ssize_t>(descriptor.getSizeInBytes())),  //
       retentionSize_(retentionSize.second),                            //
@@ -41,8 +65,7 @@ memoryFile::memoryFile(const std::string_view fileName, const Descriptor &descri
       // destruktor OSTATNIEJ instancji, która go używa (write(nullptr, ...) czyści wektory POD
       // kluczem, nie klucz). Póki ta instancja żyje, węzeł jest więc ważny. Strumień dołączony
       // ad-hoc buduje własne memoryFile z własnym wyszukaniem i istniejących instancji nie dotyka.
-      bucket_(&store.bucket(filename_)),
-      store_(store) {
+      bucket_(&memoryStore[filename_]) {
   // Kubełek z rekordami innego rozmiaru nie ma czego przekazać tej instancji: read() kopiuje rekord
   // w całości, więc szerszy wyszedłby poza bufor wołającego. Nowy plan i tak dostaje świeży kubełek
   // (poprzedni ginie z ostatnią instancją) - to jest obrona, nie droga główna.
@@ -55,19 +78,19 @@ memoryFile::memoryFile(const std::string_view fileName, const Descriptor &descri
   ++bucket_->users;
 }
 
-/// Kubełek znika razem z ostatnią instancją, która go używa. Do 2026-09-27 kubełki żyły do
+/// Kubełek znika razem z ostatnią instancją, która go używa. Do 2026-09-27 wpisy memoryStore żyły do
 /// końca procesu: po `xqry --reset` strumień o tej samej nazwie dziedziczył rekordy i writeCount
 /// poprzedniego planu (przesunięty pierścień, zapis poza bufor przy węższym rekordzie, FatalError
 /// przy odczycie poza rozmiarem kubełka), a nazwy nieobecne w nowym planie zostawały w pamięci.
 memoryFile::~memoryFile() {
-  if (--bucket_->users == 0) store_.erase(filename_);
+  if (--bucket_->users == 0) memoryStore.erase(filename_);
 }
 
 auto memoryFile::name() -> std::string & { return filename_; }
 
 ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) {
   if (recordSize_ == 0) FatalError("memoryFile::write: recordSize_ is zero");
-  assertBucketMatches(bucket_, store_, filename_);
+  assertBucketMatches(bucket_, filename_);
   auto &bucket  = *bucket_;
   auto location = position / recordSize_;
   if (ptrData == nullptr) {
@@ -111,7 +134,7 @@ ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullB
 
 ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   if (recordSize_ == 0) FatalError("memoryFile::read: recordSize_ is zero");
-  assertBucketMatches(bucket_, store_, filename_);
+  assertBucketMatches(bucket_, filename_);
   auto &bucket        = *bucket_;
   const auto location = position / recordSize_;
   const size_t slot   = (retentionSize_ != no_retention) ? (location % retentionSize_) : location;
@@ -140,10 +163,10 @@ ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const 
 }
 
 size_t memoryFile::count() {
-  assertBucketMatches(bucket_, store_, filename_);
+  assertBucketMatches(bucket_, filename_);
   return bucket_->writeCount;
 }
 
-size_t memoryFile::bucketCountForUnitTest() { return MemoryStore::processDefault().size(); }
+size_t memoryFile::bucketCountForUnitTest() { return memoryStore.size(); }
 
 }  // namespace rdb
