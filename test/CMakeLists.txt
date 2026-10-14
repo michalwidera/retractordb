@@ -91,6 +91,14 @@ add_test(NAME embedding_boundary
          COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/embedding_boundary.py
                  ${CMAKE_SOURCE_DIR})
 
+# Tryb wyjatkow rdzenia (#511): cele wydawane bez -fno-exceptions (jednostki z
+# wyjatkami i bez nich w jednym programie lamaly ODR), a rdzen sprawdzony przez
+# biblioteki kontrolne RDB_NOEXCEPT_CHECK. Czyta compile_commands.json, wiec
+# widzi flagi, ktorymi build naprawde kompiluje. Samotest wewnatrz skryptu.
+add_test(NAME exception_mode_guard
+         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/exception_mode_guard.py
+                 ${CMAKE_BINARY_DIR})
+
 # Dryft wobec dowodow Lean (math_proofs). Wartosci sprawdza ut_proofOracle na
 # tablicach z proofOracle.hpp; ten test pilnuje, ze kazde twierdzenie z Profs ma
 # wiersz w proof_manifest.tsv i ze tablice nie sa starsze od dowodow. Czyta
