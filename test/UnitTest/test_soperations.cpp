@@ -2,7 +2,6 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <cstdlib>
 #include <iostream>
 #include <numeric>
 #include <vector>
@@ -11,36 +10,26 @@
 
 // ctest -R '^ut-soperations' -V
 
-namespace {
-[[noreturn]] void hashWithZeroDeltaA() {
-  int retPos = 0;
-  Hash(0, 1, 0, retPos);
-  std::exit(0);
-}
-
-[[noreturn]] void hashWithNegativeDeltaB() {
-  int retPos = 0;
-  Hash(1, -1, 0, retPos);
-  std::exit(0);
-}
-}  // namespace
-
-// Niedodatni przedział to naruszony niezmiennik (K1): ta sama droga co każdy FatalError.
-TEST(xSOperations, hash_rejects_non_positive_delta) {
-  EXPECT_EXIT(hashWithZeroDeltaA(), ::testing::ExitedWithCode(EXIT_FAILURE), "\nFATAL: Hash: deltaA must be > 0\n");
-  EXPECT_EXIT(hashWithNegativeDeltaB(), ::testing::ExitedWithCode(EXIT_FAILURE), "\nFATAL: Hash: deltaB must be > 0\n");
-}
-
-// Ten sam niezmiennik konczy proces rowniez przy wywolaniu bibliotecznym.
-TEST(xSOperations, hash_non_positive_delta_uses_fatal_handler) {
-  EXPECT_EXIT(
+#ifndef NDEBUG
+// Hash dostaje tylko dodatnie interwaly sprawdzone przez kompilator. Bezposrednie naruszenie
+// tego kontraktu strzeze asercja debug; nie jest to kanal odmowy blednego planu.
+TEST(xSOperations, hash_asserts_positive_delta_in_debug) {
+  EXPECT_DEATH(
       {
         int retPos = 0;
-        Hash(1, 0, 0, retPos);
-        std::_Exit(0);
+        Hash(0, 1, 0, retPos);
       },
-      ::testing::ExitedWithCode(EXIT_FAILURE), "FATAL: Hash: deltaB must be > 0");
+      "deltaA > 0");
+  for (const int deltaB : {0, -1}) {
+    EXPECT_DEATH(
+        {
+          int retPos = 0;
+          Hash(1, deltaB, 0, retPos);
+        },
+        "deltaB > 0");
+  }
 }
+#endif
 
 TEST(xSOperations, hash_operations) {
   std::vector<std::vector<int>> testdata{

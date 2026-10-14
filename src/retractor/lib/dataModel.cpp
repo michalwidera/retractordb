@@ -1,6 +1,7 @@
 #include "dataModel.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -554,11 +555,9 @@ rdb::Result<> dataModel::constructInputPayload(const query &qry, streamInstance 
       const auto &nameSrc         = nameArg(0);
       const auto rationalArgument = arg(1).getRI();
 
-      if (rationalArgument <= 0) {
-        // Argument pochodzi z planu, czyli od uzytkownika -- stad Errc::Config. Kompilator odrzuca
-        // zero (resolveStreamIntervals), ale nie argument ujemny, wiec to nie jest niezmiennik.
-        return rdb::fail(rdb::Errc::Config, "dataModel::constructInputPayload: DEHASH rational argument must be positive");
-      }
+      // Kompilator odrzuca niedodatni argument (resolveStreamIntervals). Parametr jest staly w planie,
+      // wiec w Release nie sprawdzamy go dla kazdego rekordu.
+      assert(rationalArgument > 0);
 
       // n - 0-bazowy indeks rekordu wyjściowego; Div/Mod (SOperations.hpp)
       // zwracają indeks POSTĘPUJĄCY elementu w strumieniu przeplecionym.
@@ -667,8 +666,6 @@ rdb::Result<> dataModel::constructInputPayload(const query &qry, streamInstance 
 
       const auto &nameSrc = nameArg(0);  // * INFO Sync with query.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
-      // Krok niedodatni odrzuca kompilator (compiler::checkStreamReferences) - tu to niezmiennik.
-      RDB_ASSERT(step > 0, "dataModel::constructInputPayload: AGSE step must be > 0, got {} for '{}'", step, qry.id);
       // Okno jest stemplowane końcem przedziału, więc rekord o indeksie logicznym n sięga
       // wstecz od pozycji n*step. Runtime'owa baza źródła przesuwa jego pozycje
       // spłaszczone o base*F. Dla planu startowego jest równa origin kompilatora,

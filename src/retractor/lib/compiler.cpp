@@ -263,8 +263,8 @@ std::string compiler::resolveStreamIntervals() {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
           boost::rational<int> delta2 = t2.getRI();  // There is no second stream
           // - just fraction argument
-          if (delta2 == 0) {
-            return fmt::format("Stream '{}' divides by a zero interval; the '&' argument must not be zero", q.id);
+          if (delta2 <= 0) {
+            return fmt::format("Stream '{}' has a non-positive interval argument; the '&' argument must be > 0", q.id);
           }
           if (delta1 == 0) {
             bOnceAgain = true;
@@ -289,8 +289,8 @@ std::string compiler::resolveStreamIntervals() {
         case STREAM_DEHASH_MOD: {
           boost::rational<int> delta1 = coreInstance.getDelta(t1.getStr_());
           boost::rational<int> delta2 = t2.getRI();
-          if (delta2 == 0) {
-            return fmt::format("Stream '{}' divides by a zero interval; the '%' argument must not be zero", q.id);
+          if (delta2 <= 0) {
+            return fmt::format("Stream '{}' has a non-positive interval argument; the '%' argument must be > 0", q.id);
           }
           if (delta1 == 0) {
             bOnceAgain = true;
@@ -385,6 +385,10 @@ std::string compiler::resolveStreamIntervals() {
         return internalCompilerError(
             fmt::format("compiler::prepareFields: stream interval (delta) not resolved for query '{}'", q.id));
       }
+      // Nie wypuszczamy niedodatniej delty do kolejnego wezla ani do rachunku origin/ogona.
+      // Wejscie jest juz sprawdzone, wiec taki wynik oznacza defekt wyliczania interwalu.
+      if (delta <= 0)
+        return internalCompilerError(fmt::format("compiler::resolveStreamIntervals: non-positive interval for '{}'", q.id));
       if (q.rInterval == 0) resolvedThisPass++;
       q.rInterval = delta;  // There is established delta value - return value
     }  // BOOST_FOREACH ( query & q , coreInstance )
@@ -3712,6 +3716,10 @@ std::string compiler::checkStreamReferences() {
   // PLANU i wracaja tu statusem, zanim ktorykolwiek przebieg zbuduje z nich wezel.
   for (const auto &q : coreInstance) {
     if (q.isCompilerDirective()) continue;
+    // SELECT z delta 0 czeka na resolveStreamIntervals(); deklaracja musi byc juz dodatnia.
+    // Sprawdzamy tez plany zbudowane bez parsera, zanim ktorykolwiek przebieg uzyje delty.
+    if (q.rInterval < 0 || (q.isDeclaration() && q.rInterval == 0))
+      return fmt::format("Stream '{}' has a non-positive interval; stream intervals must be > 0", q.id);
     for (const auto &t : q.lProgram) {
       if (t.getCommandID() == PUSH_STREAM && !coreInstance.exists(t.getStr_())) {
         // Wpis w logu, jak dawny "Missing - <nazwa>" z qTree::getQuery: host osadzajacy (most logow

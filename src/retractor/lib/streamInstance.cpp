@@ -3,6 +3,7 @@
 #include <sys/wait.h>  // WIFEXITED, WEXITSTATUS dla wyniku ::system()
 
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
 #include <cstdlib>  // std::div
 #include <memory>   // unique_ptr
@@ -86,8 +87,9 @@ rdb::Result<rdb::payload> streamInstance::constructAgsePayload(const int length,
                                                                const std::string &instance,  //
                                                                const int windowIndex,        //
                                                                const int sourceIndexBase) const {
-  // Krok niedodatni odrzuca kompilator (compiler::checkStreamReferences) - w wykonaniu to niezmiennik.
-  RDB_ASSERT(step > 0, "streamInstance::constructAgsePayload: step must be > 0, got {}", step);
+  // Krok niedodatni odrzuca kompilator (compiler::resolveStreamIntervals). Parametr jest staly w planie,
+  // wiec w Release nie sprawdzamy go dla kazdego okna.
+  assert(step > 0);
 
   // temporary alias for variable - for better understand what is happening here.
   const auto &source = outputPayload;

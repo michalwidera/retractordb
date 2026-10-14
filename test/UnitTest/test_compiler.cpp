@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <iterator>
 #include <map>
 #include <optional>
 #include <sstream>
@@ -75,6 +76,73 @@ TEST(xparser, check_parserRQLString) {
 }
 
 TEST(xparser, check_topological_sort) { qTree myInstance; }
+
+TEST(xcompiler, refuses_non_positive_intervals_before_hash_arithmetic) {
+  // Parser takich delt nie wpuszcza. Mutacja sprawdza sama granice kompilatora, takze przy
+  // przeciwnych deltach, ktore bez kontroli zeruja mianownik wzoru przeplotu.
+  for (const int interval : {0, -1}) {
+    for (const char *name : {"a", "b", "derived"}) {
+      if (interval == 0 && std::string(name) == "derived") continue;  // SELECT 0 jest jeszcze nierozwiazany.
+      SCOPED_TRACE(std::format("{}: {}", name, interval));
+      qTree plan;
+      ASSERT_EQ(parsePlanText(plan,
+                              "DECLARE av INTEGER STREAM a, 1 TEXTFILE 'a.txt'\n"
+                              "DECLARE bv INTEGER STREAM b, 1 TEXTFILE 'b.txt'\n"
+                              "SELECT * STREAM derived FROM a\n"
+                              "SELECT * STREAM dst FROM derived#b\n")
+                    .status,
+                "OK");
+      plan.getQuery(name).rInterval = interval;
+      const auto status             = compiler(plan).compile();
+      EXPECT_EQ(status, std::format("Stream '{}' has a non-positive interval; stream intervals must be > 0", name));
+      EXPECT_FALSE(isInternalCompilerError(status)) << status;
+    }
+  }
+}
+
+TEST(xcompiler, refuses_non_positive_operator_intervals_without_parser) {
+  for (const char op : {'&', '%', '-'}) {
+    for (const int interval : {0, -1}) {
+      SCOPED_TRACE(std::format("{}: {}", op, interval));
+      qTree plan;
+      ASSERT_EQ(parsePlanText(plan, std::format("DECLARE av INTEGER STREAM a, 1/2 TEXTFILE 'a.txt'\n"
+                                                "SELECT * STREAM dst FROM a{}1\n",
+                                                op))
+                    .status,
+                "OK");
+      auto &program = plan.getQuery("dst").lProgram;
+      if (op == '-')
+        program.back() = token(STREAM_SUBTRACT, boost::rational<int>(interval));
+      else
+        *std::next(program.begin()) = token(PUSH_VAL, boost::rational<int>(interval));
+      const auto status = compiler(plan).compile();
+      EXPECT_NE(status.find(std::format("'{}' argument must be > 0", op)), std::string::npos) << status;
+      EXPECT_FALSE(isInternalCompilerError(status)) << status;
+    }
+  }
+}
+
+TEST(xcompiler, positive_intervals_and_zero_interval_directives_survive_recompilation) {
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan,
+                          "STORAGE 'temp'\n"
+                          "SUBSTRAT 'memory'\n"
+                          "DECLARE av INTEGER STREAM a, 1/2 TEXTFILE 'a.txt'\n"
+                          "DECLARE bv INTEGER STREAM b, 1 TEXTFILE 'b.txt'\n"
+                          "SELECT * STREAM joined FROM a#b\n"
+                          "SELECT * STREAM slowed FROM joined-1\n")
+                .status,
+            "OK");
+  for (int iteration = 0; iteration < 2; ++iteration) {
+    ASSERT_EQ(compiler(plan).compile(), "OK");
+    for (const auto &q : plan) {
+      if (q.isCompilerDirective())
+        EXPECT_EQ(q.rInterval, 0) << q.id;
+      else
+        EXPECT_GT(q.rInterval, 0) << q.id;
+    }
+  }
+}
 
 TEST(xcompiler, refuses_deinterleave_with_equal_intervals) {
   // Mianownik rozplotu znika dla rownych interwalow. To blad planu, takze gdy interwal

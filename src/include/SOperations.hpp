@@ -1,14 +1,11 @@
 #pragma once
 
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
 #include <numeric>
 
 #include <boost/rational.hpp>
-
-#include <fmt/format.h>
-
-#include "rdb/error.hpp"
 
 using namespace boost;
 
@@ -38,10 +35,10 @@ constexpr int ceilR(boost::rational<int> const &num) {
 // gdzie z = deltaB/(deltaA+deltaB). retPos jest indeksem POSTĘPUJĄCYM (0-bazowym)
 // elementu strumienia składowego.
 inline bool Hash(const rational<int> &deltaA, const rational<int> &deltaB, const int i, int &retPos) {
-  // K1: przedzialy planu sa dodatnie. rdb::fatal kieruje blad do handlera hosta; zatrzask
-  // usługi i wpis w logu obejmują także to miejsce.
-  if (deltaA <= 0) rdb::fatal(fmt::format("Hash: deltaA must be > 0"));
-  if (deltaB <= 0) rdb::fatal(fmt::format("Hash: deltaB must be > 0"));
+  // Kompilator sprawdza dodatniosc interwalow przed rachunkiem origin i ogona.
+  // Parametry sa stale w planie, wiec w Release nie sprawdzamy ich dla kazdego rekordu.
+  assert(deltaA > 0);
+  assert(deltaB > 0);
   const rational<int> zet = deltaB / (deltaA + deltaB);
   bool ret                = floorR(zet * i) == floorR(zet * (i + 1));
 
