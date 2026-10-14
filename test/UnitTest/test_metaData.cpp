@@ -165,6 +165,54 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_on_disk) {
   EXPECT_EQ(meta.segments().size(), 4U);
 }
 
+// Nieudana podmiana .meta (#511). Do portu rename rzucal filesystem_error, potem przez chwile
+// konczyl sie cichym sukcesem - indeks NULL na dysku zostawal stary. Katalog w miejscu pliku
+// zatrzymuje rename takze roota w kontenerze CI, w przeciwienstwie do uprawnien.
+TEST_F(MetaTestFixture, nieudana_podmiana_meta_wraca_bledem_io) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+
+  rdb::metaData meta(descriptor, metaFile);
+  meta.onRecordAppended({true});
+  meta.onRecordAppended({true});
+  meta.onRecordAppended({false});                    // rec 0-1 na dysku
+  ASSERT_RDB_OK(meta.onRecordModified(0, {false}));  // kontrola dodatnia: ta sama droga przez rewrite
+
+  std::filesystem::remove(metaFile);
+  std::filesystem::create_directory(metaFile);
+  std::ofstream(metaFile + "/blocker").put('x');
+
+  EXPECT_RDB_ERROR(meta.onRecordModified(1, {false}), rdb::Errc::IO, metaFile);
+  EXPECT_EQ(meta.getNullBitset(1), std::vector<bool>{true}) << "stan w pamieci nie moze wyprzedzic dysku";
+  EXPECT_FALSE(std::filesystem::exists(metaFile + ".tmp"));
+
+  meta.abandonFile();
+  std::filesystem::remove_all(metaFile);
+}
+
+// Ta sama awaria przy wczytaniu: loadIndex() podmienia plik, gdy ostatni wpis nie jest luka.
+TEST_F(MetaTestFixture, nieudana_podmiana_przy_wczytaniu_jest_bledem_inicjalizacji) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+  {
+    rdb::metaData meta(descriptor, metaFile);
+    meta.onRecordAppended({true});
+  }  // destruktor zapisuje biezacy wpis
+  const auto before = std::filesystem::file_size(metaFile);
+
+  const std::string tmp = metaFile + ".tmp";
+  std::filesystem::create_directory(tmp);
+  std::ofstream(tmp + "/blocker").put('x');
+  {
+    rdb::metaData meta(descriptor, metaFile);
+    ASSERT_TRUE(meta.initializationError().has_value());
+    EXPECT_EQ(meta.initializationError()->code(), rdb::Errc::IO);
+    EXPECT_TRUE(meta.initializationError()->message().contains(tmp));
+  }  // odpiety plik: destruktor nie dopisuje wpisu drugi raz
+  EXPECT_EQ(std::filesystem::file_size(metaFile), before);
+  std::filesystem::remove_all(tmp);
+}
+
 // ── Stress ───────────────────────────────────────────────────────────
 
 TEST_F(MetaTestFixture, test_large_data_volume) {

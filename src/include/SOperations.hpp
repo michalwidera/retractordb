@@ -39,7 +39,7 @@ constexpr int ceilR(boost::rational<int> const &num) {
 // elementu strumienia składowego.
 inline bool Hash(const rational<int> &deltaA, const rational<int> &deltaB, const int i, int &retPos) {
   // K1: przedzialy planu sa dodatnie. rdb::fatal kieruje blad do handlera hosta; zatrzask
-  // usługi, wpis w logu i tryb rzucaj biblioteki (#476) obejmują także to miejsce.
+  // usługi i wpis w logu obejmują także to miejsce.
   if (deltaA <= 0) rdb::fatal(fmt::format("Hash: deltaA must be > 0"));
   if (deltaB <= 0) rdb::fatal(fmt::format("Hash: deltaB must be > 0"));
   const rational<int> zet = deltaB / (deltaA + deltaB);

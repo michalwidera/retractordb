@@ -6,6 +6,7 @@
 #include <cerrno>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <format>
@@ -237,6 +238,13 @@ Result<std::optional<std::uint64_t>> Engine::step() {
                 std::format("Engine::step: the plan stopped at slot {} with: {} - compile it again", plan->slotsDone,
                             plan->failure->message()),
                 plan->failure->err());
+  }
+  // Hak testu api/python/tests/test_error_classes.py (#511): wyjatek biblioteki standardowej w srodku
+  // wywolania rdzenia, jak bad_alloc przy braku pamieci. Rdzen nie ma `throw`, wiec wyjatek powstaje
+  // tam, gdzie powstaje naprawde - w libstdc++ (length_error z reserve).
+  if (std::getenv("RDB_FAULT_STD_EXCEPTION_IN_STEP") != nullptr) {
+    std::vector<char> fault;
+    fault.reserve(fault.max_size() + 1);
   }
   auto done = stepPlan(*plan);
   // Kopia bledu, nie przeniesienie: oryginal idzie do wolajacego, kopia zostaje w planie jako

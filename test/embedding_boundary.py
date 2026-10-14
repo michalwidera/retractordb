@@ -56,7 +56,7 @@ ALLOWED_EXIT = {
     "src/rdb/lib/error.cc": [("std::abort();", "domyslny handler fatal po naruszeniu niezmiennika")],
     "src/include/fatalError.hpp": [
         ("std::exit(Cls == ErrorClass::Internal ? EXIT_FAILURE : EIO);",
-         "detail::terminateProcess - wspolna akcja konczaca K1/K4 poza zakresem ThrowOnFatalScope"),
+         "detail::terminateProcess - wspolna akcja konczaca K1/K4 uslugi"),
     ],
 }
 

@@ -84,6 +84,32 @@ def test_k1_internal_error_taints_the_module(module_root: Path, plan_dir: Path) 
     assert "alive" in result.stdout
 
 
+def test_cpp_exception_from_the_core_is_k1(module_root: Path, plan_dir: Path) -> None:
+    """A C++ exception escaping the core (length_error, bad_alloc) -> InternalError and taint (#511)."""
+    body = "\n".join(
+        [
+            "os.environ['RDB_FAULT_STD_EXCEPTION_IN_STEP'] = '1'",
+            "try:",
+            "    engine.step()",
+            "    raise SystemExit('the C++ exception did not raise')",
+            "except rdb.InternalError as error:",
+            "    assert 'escaped the engine core' in str(error), error",
+            "del os.environ['RDB_FAULT_STD_EXCEPTION_IN_STEP']",
+            "try:",
+            "    engine.step()",
+            "    raise SystemExit('a tainted module accepted a call')",
+            "except rdb.InternalError as error:",
+            "    assert 'restart the interpreter' in str(error), error",
+            "engine.close()",
+        ]
+    )
+
+    result = run_survivor(module_root, plan_dir, body)
+
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    assert "alive" in result.stdout
+
+
 def test_kernel_survives_k2_k3_k4_and_k1(module_root: Path, plan_dir: Path) -> None:
     """One interpreter, every recoverable class in turn, K1 last: the process is still here."""
     body = "\n".join(

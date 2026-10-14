@@ -212,7 +212,9 @@ class metaData {
   /// implicit flushCurrentEntry() would recreate the just-deleted file (appendEntry() opens
   /// with ios::app, which creates a missing file).
   void abandonFile();
-  [[nodiscard]] virtual const std::optional<Error> &initializationError() const { return store_.initializationError(); }
+  [[nodiscard]] virtual const std::optional<Error> &initializationError() const {
+    return store_.initializationError() ? store_.initializationError() : loadError_;
+  }
 
  private:
   /// @brief State of the lazy-overwrite optimisation for the last on-disk RLE entry.
@@ -255,6 +257,7 @@ class metaData {
   DiskTailState tail_{};                       ///< lazy-overwrite state for the last on-disk entry
   IndexRecord currentEntry_;                   ///< accumulator for the pending (not yet committed) RLE run
   GapDetector gapDetector_;                    ///< nullfill/absorb state machine (przejęte od storage)
+  std::optional<Error> loadError_;             ///< loadIndex() nie podmienil pliku indeksu
 };  // class metaData
 
 }  // namespace rdb

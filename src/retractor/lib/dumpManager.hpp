@@ -50,8 +50,8 @@ class dumpManager {
   std::string storagePath;
   std::map<std::string, std::vector<dumpTask>> bookOfTasks;  // streamName -> list of tasks
 
-  rdb::Result<bool> buildDumpChunk(
+  [[nodiscard]] rdb::Result<bool> buildDumpChunk(
       dumpTask &task,
       std::unique_ptr<rdb::payload>::pointer payload);  // Execute dump task - return true if task is completed
-  rdb::Result<std::pair<std::string, int>> createDumpFile(std::string_view streamName, std::string_view taskName);
+  [[nodiscard]] rdb::Result<std::pair<std::string, int>> createDumpFile(std::string_view streamName, std::string_view taskName);
 };

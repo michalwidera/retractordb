@@ -48,7 +48,13 @@ void metaData::loadIndex() {
   if (!allEntries.empty() && !allEntries.back().isGap) {
     currentEntry_ = allEntries.back();
     allEntries.pop_back();
-    store_.rewrite(allEntries);
+    // Bez podmiany pliku ostatni wpis bylby na dysku i w currentEntry_ naraz - policzony dwa razy.
+    // Plik zostaje odpiety: destruktor (flushCurrentEntry) dopisalby inaczej ten wpis drugi raz.
+    if (auto rewritten = store_.rewrite(allEntries); !rewritten) {
+      loadError_ = std::move(rewritten).error();
+      store_.abandon();
+      return;
+    }
   }
 
   committedRecordCount_ = sumNonGapRecords(allEntries);
@@ -160,7 +166,7 @@ Result<> metaData::onRecordModified(size_t recordIndex, const std::vector<bool> 
   allEntries.erase(allEntries.begin() + static_cast<std::ptrdiff_t>(*segIdx));
   allEntries.insert(allEntries.begin() + static_cast<std::ptrdiff_t>(*segIdx), replacement.begin(), replacement.end());
 
-  store_.rewrite(allEntries);
+  RDB_TRY(store_.rewrite(allEntries));
   tail_.reset();
   committedRecordCount_ = sumNonGapRecords(allEntries);
   return {};

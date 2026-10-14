@@ -57,7 +57,9 @@ class MetaIndexStore {
   void overwriteLast(const IndexRecord &entry);
 
   /// @brief Rewrite the whole file: reserved header + given entries. No-op if empty().
-  void rewrite(const std::vector<IndexRecord> &entries);
+  /// Blad otwarcia, zapisu albo podmiany pliku wraca jako Errc::IO; plik i cache zostaja wtedy
+  /// w stanie sprzed wywolania.
+  [[nodiscard]] Result<> rewrite(const std::vector<IndexRecord> &entries);
 
   /// @brief Detach from the file path - all subsequent operations become no-ops.
   void abandon() { metaFilePath_.clear(); }

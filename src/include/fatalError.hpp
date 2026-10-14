@@ -5,7 +5,6 @@
 #include <atomic>
 #include <cerrno>
 #include <cstdlib>
-#include <exception>
 #include <iostream>
 #include <source_location>
 #include <string>
@@ -22,24 +21,7 @@ inline std::atomic<bool> fatalErrorRaised{false};
 
 namespace rdb {
 
-/// K1 albo K4 zgloszony w zakresie ThrowOnFatalScope zamiast zakonczenia procesu (#476).
-/// Celowo NIE dziedziczy po std::exception: rdzen ma handlery `catch (const std::exception &)`
-/// (foldConstants w exprSimplify.cpp otacza nim ewaluator), ktore polknelyby blad krytyczny
-/// i liczyly dalej tam, gdzie serwis konczy proces. Lapie go tylko granica, ktora zalozyla zakres.
-struct EngineFatal {
-  ErrorClass cls;
-  std::string message;
-  std::source_location where;
-};
-
 namespace detail {
-
-/// Glebokosc zakresow ThrowOnFatalScope w biezacym watku.
-inline thread_local int throwOnFatalDepth = 0;
-
-/// Czy FatalError / EnvironmentError rzuca teraz EngineFatal: tylko w zakresie ThrowOnFatalScope
-/// i nigdy w trakcie zwijania stosu - drugi wyjatek oznaczalby std::terminate.
-inline bool throwOnFatalActive() noexcept { return throwOnFatalDepth > 0 && std::uncaught_exceptions() == 0; }
 
 /// Wspolna akcja konczaca proces dla FatalError (K1) i EnvironmentError (K4). Klasa
 /// decyduje tylko o kodzie wyjscia i o zatrzasku fatalErrorRaised; reszta jest wspolna.
@@ -87,39 +69,7 @@ template <ErrorClass Cls, typename... Args>
   std::exit(Cls == ErrorClass::Internal ? EXIT_FAILURE : EIO);
 }
 
-/// Wybor akcji dla FatalError / EnvironmentError: rzut EngineFatal, gdy throwOnFatalActive(),
-/// w przeciwnym razie zakonczenie procesu. Rzut bez zatrzasku fatalErrorRaised - to stan procesu
-/// uslugi. Wywolanie z funkcji noexcept (payload::operator=(payload &&)) konczy sie w trybie rzucaj
-/// std::terminate - znane miejsca: #463, kontrola bugprone-exception-escape.
-template <ErrorClass Cls, typename... Args>
-[[noreturn]] void raise(std::source_location loc, fmt::format_string<Args...> fmt_str, Args &&...args) {
-  if (throwOnFatalActive()) {
-    std::string msg;
-    try {
-      msg = fmt::format(fmt_str, std::forward<Args>(args)...);
-    } catch (...) {  // NOLINT(bugprone-empty-catch) - jak w terminateProcess: wazna jest klasa, nie komunikat
-    }
-    if (auto logger = spdlog::default_logger(); logger)
-      logger->log(spdlog::source_loc{loc.file_name(), static_cast<int>(loc.line()), loc.function_name()},
-                  spdlog::level::critical, "{}{}", Cls == ErrorClass::Internal ? "" : "environment: ", msg);
-    throw EngineFatal{Cls, std::move(msg), loc};
-  }
-  terminateProcess<Cls, Args...>(loc, fmt_str, std::forward<Args>(args)...);
-}
-
 }  // namespace detail
-
-/// Zakres trybu rzucaj w biezacym watku: FatalError i EnvironmentError rzucaja EngineFatal
-/// zamiast konczyc proces. Zaklada go tylko granica biblioteki osadzonej (fasada Engine, #476)
-/// na czas jednego wywolania; xretractor (serwis i standalone) nigdy, wiec tam obie akcje
-/// koncza proces jak dotad. Watki IPC i wykonawcze zakresu nie dziedzicza.
-class ThrowOnFatalScope {
- public:
-  ThrowOnFatalScope() noexcept { ++detail::throwOnFatalDepth; }
-  ~ThrowOnFatalScope() { --detail::throwOnFatalDepth; }
-  ThrowOnFatalScope(const ThrowOnFatalScope &)            = delete;
-  ThrowOnFatalScope &operator=(const ThrowOnFatalScope &) = delete;
-};
 
 // [[noreturn]] replacement for the old FATAL_ERROR macro.
 // The struct+CTAD idiom allows std::source_location as a defaulted trailing
@@ -129,7 +79,7 @@ template <typename... Args>
 struct FatalError {
   [[noreturn]] FatalError(fmt::format_string<Args...> fmt_str, Args &&...args,
                           std::source_location loc = std::source_location::current()) {
-    detail::raise<ErrorClass::Internal, Args...>(loc, fmt_str, std::forward<Args>(args)...);
+    detail::terminateProcess<ErrorClass::Internal, Args...>(loc, fmt_str, std::forward<Args>(args)...);
   }
 };
 
@@ -142,7 +92,7 @@ template <typename... Args>
 struct EnvironmentError {
   [[noreturn]] EnvironmentError(fmt::format_string<Args...> fmt_str, Args &&...args,
                                 std::source_location loc = std::source_location::current()) {
-    detail::raise<ErrorClass::Environment, Args...>(loc, fmt_str, std::forward<Args>(args)...);
+    detail::terminateProcess<ErrorClass::Environment, Args...>(loc, fmt_str, std::forward<Args>(args)...);
   }
 };
 

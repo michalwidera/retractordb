@@ -182,13 +182,27 @@ T unwrap(T value) {
   return value;
 }
 
+/// Rdzen nie obsluguje wyjatkow (kontrola RDB_NOEXCEPT_CHECK), ale biblioteka standardowa i Boost
+/// rzucaja dalej (bad_alloc, length_error, bad_rational). Wyjatek, ktory wyszedl z wywolania rdzenia,
+/// przerwal kod bez obslugi wyjatkow, wiec stan silnika jest nieokreslony: K1 i skazenie modulu
+/// (tlumacz bledow, z GIL-em). Bez tego nanobind oddawal MemoryError, a nastepne wywolanie pracowalo
+/// na stanie po przerwanym slocie (#511).
 template <typename F>
 decltype(auto) engineCall(F &&call) {
   requireUntainted();
+  auto guarded = [&call]() -> decltype(auto) {
+    try {
+      return std::forward<F>(call)();
+    } catch (const std::exception &error) {
+      throw RdbInternalError(std::string("C++ exception escaped the engine core: ") + error.what());
+    } catch (...) {
+      throw RdbInternalError("C++ exception escaped the engine core");
+    }
+  };
   if constexpr (std::is_void_v<std::invoke_result_t<F>>)
-    return std::forward<F>(call)();
+    return guarded();
   else
-    return unwrap(std::forward<F>(call)());
+    return unwrap(guarded());
 }
 
 /// Typy Pythona o DWOCH bazach (ConfigError: ValueError, IOError: OSError) i ich

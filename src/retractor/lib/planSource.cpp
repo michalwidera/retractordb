@@ -161,9 +161,12 @@ void dropStalePlanArtifacts(const qTree &plan) {
       // pliku binarnego (sprzed #346) musi zniknac, zanim magazyn go przeczyta. Deklaracja nie
       // ma w katalogu magazynu zadnych danych - `.desc` zapisze sie od nowa z planu.
       // checkDescriptorFiles() przepuszcza wylacznie ten przypadek.
+      // Bez error_code `exists` rzuca filesystem_error (np. EACCES), a rdzen nie obsluguje wyjatkow. Blad
+      // sprawdzenia zostawia `.desc` - kontrola deskryptorow przy otwarciu magazynu zglosi go z przyczyna.
       const std::filesystem::path descFile = dir / (q.id + ".desc");
+      std::error_code ec;
       rdb::Descriptor kept;
-      if (std::filesystem::exists(descFile) && rdb::tryLoadDescriptorFile(descFile.string(), kept).message.empty() &&
+      if (std::filesystem::exists(descFile, ec) && rdb::tryLoadDescriptorFile(descFile.string(), kept).message.empty() &&
           isLegacyBinaryDescriptor(query(q).descriptorStorage(), kept)) {
         SPDLOG_INFO("Stream {}: replacing pre-#346 TYPE DEVICE in {} with TYPE BINFILE", q.id, descFile.string());
         dropArtifactFile(descFile);
