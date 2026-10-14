@@ -53,7 +53,7 @@
 ///
 /// BLEDY: rdzen zwraca Result. Wiazanie zamienia bledy-wartosci na wyjatki Pythona,
 /// zachowujac kategorie i errno. Naruszenie niezmiennika przez rdb::fatal() konczy
-/// proces hosta zgodnie z jego handlerem, takze w trybie RDB_NO_EXCEPTIONS=OFF.
+/// proces hosta zgodnie z jego handlerem.
 ///
 /// TABELA KLAS K1-K7 (#476): https://documentation.retractordb.com/appendices/python-jupyter-api.html#errors
 /// K1 skaza caly

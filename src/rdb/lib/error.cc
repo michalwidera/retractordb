@@ -6,12 +6,6 @@
 
 #include <spdlog/spdlog.h>
 
-// Boost w jednostkach kompilowanych z -fno-exceptions (BOOST_NO_EXCEPTIONS) nie rzuca, tylko
-// wola boost::throw_exception, ktorego definicje MUSI dostarczyc program. Dochodzi tu np.
-// boost::rational z mianownikiem zero albo bad_lexical_cast - w obu przypadkach wolajacy w
-// rdzeniu sprawdza warunek wczesniej, wiec dojscie tutaj jest zlamanym niezmiennikiem.
-#include <boost/throw_exception.hpp>
-
 namespace rdb {
 
 namespace {
@@ -51,15 +45,3 @@ FatalHandler setFatalHandler(FatalHandler handler) noexcept {
 }
 
 }  // namespace rdb
-
-#ifdef BOOST_NO_EXCEPTIONS
-namespace boost {
-
-void throw_exception(const std::exception &error) { rdb::fatal(error.what()); }
-
-void throw_exception(const std::exception &error, const boost::source_location &where) {
-  rdb::fatal(fmt::format("{} ({}:{})", error.what(), where.file_name(), where.line()));
-}
-
-}  // namespace boost
-#endif

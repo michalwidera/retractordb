@@ -1,6 +1,6 @@
 #include "rdb/stackTrace.hpp"
 
-// Wyspa z wyjatkami (rdb_exception_island w src/rdb/lib/CMakeLists.txt). Boost.Stacktrace
+// Wyspa z wyjatkami (ISLANDS w rdb_noexcept_check, src/rdb/lib/CMakeLists.txt). Boost.Stacktrace
 // zglasza bledy wylacznie rzutem i ma `throw`/`try` w funkcjach inline swoich naglowkow -
 // zaplecze domyslne (frame_unwind.ipp -> addr_base.hpp) od Boosta, ktory instaluje Conan na
 // macOS. W rdzeniu z -fno-exceptions to blad kompilacji, wiec cale uzycie Boost.Stacktrace

@@ -33,5 +33,5 @@ target_include_directories(
           ${spdlog_INCLUDE_DIR} #
           ${fmt_INCLUDE_DIR})
 
-rdb_no_exceptions(${PROJECT_NAME})
-rdb_exception_island(configBridge.cc ../retractor/lib/appConfig.cpp)
+rdb_noexcept_check(${PROJECT_NAME} ISLANDS configBridge.cc
+                   ../retractor/lib/appConfig.cpp)

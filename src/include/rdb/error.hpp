@@ -14,8 +14,8 @@
 /// @brief Bledy silnika jako WARTOSCI - bez wyjatkow C++.
 ///
 /// Rdzen silnika (biblioteki rdb, retractorcore i rdbembed) nie rzuca i nie lapie wyjatkow.
-/// Domyslny build kompiluje go z -fno-exceptions (opcja RDB_NO_EXCEPTIONS), wiec kazde `throw`,
-/// `try` albo `catch` w rdzeniu jest bledem kompilacji, a nie kwestia przegladu kodu. Uzasadnienie
+/// Domyslny build kompiluje go dodatkowo z -fno-exceptions (kontrola RDB_NOEXCEPT_CHECK), wiec kazde
+/// `throw`, `try` albo `catch` w rdzeniu jest bledem kompilacji, a nie kwestia przegladu kodu. Uzasadnienie
 /// jest w historii feature/jupyter-integration (1d014279).
 ///
 /// Trzy drogi zglaszania bledu:

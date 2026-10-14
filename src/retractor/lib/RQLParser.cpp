@@ -1181,10 +1181,10 @@ std::tuple<std::string, std::string, std::string> parseRqlText(qTree &coreInstan
 
 }  // namespace
 
-/// GRANICA WYSPY WYJATKOW (RDB_NO_EXCEPTIONS, korzen CMakeLists.txt). Ten plik jedyny w
+/// GRANICA WYSPY WYJATKOW (RDB_NOEXCEPT_CHECK, korzen CMakeLists.txt). Ten plik jedyny w
 /// retractorcore ma wyjatki, bo steruje wygenerowanym parserem ANTLR, ktory przerywa parsowanie
 /// rzutem - i zaden wyjatek nie moze go opuscic: wolajacy (launcher, planSource, executorsmAdHoc,
-/// Engine) sa skompilowani bez wyjatkow, a rzut przez ich ramki to std::terminate. Bledy
+/// Engine) nie obsluguja wyjatkow, a kontrola kompiluje ich bez nich. Bledy
 /// skladni i semantyki wracaja statusem jak dotad; zlamany niezmiennik listenera (abortInternal)
 /// i wszystko, co rzuci sam runtime ANTLR, wraca statusem z przedrostkiem kInternalCompilerError,
 /// ktory wolajacy odrozniaja od bledu planu.

@@ -297,9 +297,9 @@ std::string parseDescriptorText(rdb::Descriptor &desc, const std::string_view in
 
 }  // namespace
 
-/// GRANICA WYSPY WYJATKOW (RDB_NO_EXCEPTIONS, korzen CMakeLists.txt): ten plik jedyny w bibliotece
+/// GRANICA WYSPY WYJATKOW (RDB_NOEXCEPT_CHECK, korzen CMakeLists.txt): ten plik jedyny w bibliotece
 /// rdb ma wyjatki, bo steruje parserem ANTLR, ktory przerywa parsowanie rzutem. Zaden wyjatek nie
-/// moze go opuscic - wolajacy (descriptorIO, operator>>) sa skompilowani bez wyjatkow. Wszystko,
+/// moze go opuscic - wolajacy (descriptorIO, operator>>) nie obsluguja wyjatkow. Wszystko,
 /// czego nie zlapal parseDescriptorText (np. blad samego runtime ANTLR), wraca statusem "Fail: ...".
 std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet) {
   try {
