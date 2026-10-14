@@ -10,6 +10,8 @@
 #include <source_location>
 #include <string>
 
+#include "rdb/error.hpp"
+
 /// Podniesiona przez FatalError tuz przed std::exit. Handlery zarejestrowane przez
 /// std::atexit czytaja ja, zeby odroznic zakonczenie KRYTYCZNE od zwyklego wyjscia:
 /// std::exit uruchamia te same handlery w obu przypadkach, a rozstrzygniecie po kodzie
@@ -19,24 +21,6 @@
 inline std::atomic<bool> fatalErrorRaised{false};
 
 namespace rdb {
-
-/// Klasa bledu na granicy silnika - kategorie K1-K5 z analizy w #463. K6 (ostrzezenia)
-/// zostaje lista komunikatow, K7 nie jest kategoria do pisania. Statusy lokalne
-/// (ReadStatus, WriteStatus, ClaimStatus, lockFile::Result) zostaja w swoich miejscach.
-enum class ErrorClass {
-  Internal,     // K1: naruszony niezmiennik silnika - FatalError
-  Plan,         // K2: plan odrzucony przed startem
-  Request,      // K3: odrzucone zadanie ad hoc / IPC
-  Environment,  // K4: srodowisko (plik, dysk, pamiec dzielona) - EnvironmentError
-  Data          // K5: wadliwa wartosc w danych - NULL i ostrzezenie
-};
-
-/// Odmowa na granicy planu: pusty message oznacza sukces, err zachowuje kod systemowy K4.
-struct Refusal {
-  ErrorClass cls{ErrorClass::Plan};
-  std::string message;
-  int err{0};
-};
 
 /// K1 albo K4 zgloszony w zakresie ThrowOnFatalScope zamiast zakonczenia procesu (#476).
 /// Celowo NIE dziedziczy po std::exception: rdzen ma handlery `catch (const std::exception &)`
@@ -170,3 +154,8 @@ EnvironmentError(fmt::format_string<Args...>, Args &&...) -> EnvironmentError<Ar
 // 235 miejsc wywolan pisze FatalError bez przestrzeni nazw; CTAD dziala przez
 // using-declaration, bo przewodniki dedukcji naleza do szablonu, nie do nazwy.
 using rdb::FatalError;
+
+// Rdzen z Result wywoluje fatal bezposrednio; usluga zachowuje exit i handlery atexit.
+[[noreturn]] inline void daemonFatalExit(std::string_view message, const std::source_location &where) noexcept {
+  rdb::detail::terminateProcess<rdb::ErrorClass::Internal>(where, "{}", message);
+}

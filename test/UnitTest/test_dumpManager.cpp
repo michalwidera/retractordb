@@ -25,6 +25,7 @@
 
 #include "rdb/descriptor.hpp"
 #include "rdb/payload.hpp"
+#include "rdbResult.hpp"
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/dataModel.hpp"
 #include "retractor/lib/executorsmState.hpp"
@@ -80,7 +81,7 @@ TEST(dumpManager, buildDumpChunk_accepts_fd_zero_as_valid) {
   wrappedWriteCalls = 0;
   wrappedLastFd     = -1;
 
-  const bool completed = manager.buildDumpChunk(task, payload.get());
+  const bool completed = rdbtest::ok(manager.buildDumpChunk(task, payload.get()));
 
   wrapEnabled = false;
 
@@ -103,7 +104,9 @@ TEST(dumpManager, buildDumpChunk_rejects_negative_fd) {
   task.delayDumpRecordsToGo = 0;
   task.fd                   = -1;
 
-  EXPECT_DEATH({ (void)manager.buildDumpChunk(task, payload.get()); }, "file descriptor is not set");
+  // Niezmiennik silnika: RDB_ASSERT -> rdb::fatal (FATAL i koniec procesu). Plaster B3 fazy 1
+  // zamienil tu smierc procesu na rzut LogicError; rdzen bez wyjatkow wraca do zatrzymania.
+  EXPECT_DEATH(static_cast<void>(manager.buildDumpChunk(task, payload.get())), "FATAL: .*file descriptor is not set");
 }
 
 // ============================================================
@@ -121,7 +124,7 @@ TEST(dumpManager, buildDumpChunk_delay_decrements_returns_false) {
   task.delayDumpRecordsToGo = 2;
   task.fd                   = 0;  // wrapping nie jest potrzebne - zapis nie nastąpi
 
-  const bool result = manager.buildDumpChunk(task, payload.get());
+  const bool result = rdbtest::ok(manager.buildDumpChunk(task, payload.get()));
 
   EXPECT_FALSE(result);
   EXPECT_EQ(task.delayDumpRecordsToGo, 1);
@@ -141,7 +144,7 @@ TEST(dumpManager, buildDumpChunk_delay_exhausted_then_writes) {
   task.fd                   = 0;
 
   // Pierwsze wywołanie: opóźnienie, brak zapisu
-  bool r1 = manager.buildDumpChunk(task, payload.get());
+  bool r1 = rdbtest::ok(manager.buildDumpChunk(task, payload.get()));
   EXPECT_FALSE(r1);
   EXPECT_EQ(task.delayDumpRecordsToGo, 0);
 
@@ -150,7 +153,7 @@ TEST(dumpManager, buildDumpChunk_delay_exhausted_then_writes) {
   wrappedLseekCalls = 0;
   wrappedWriteCalls = 0;
 
-  bool r2 = manager.buildDumpChunk(task, payload.get());
+  bool r2 = rdbtest::ok(manager.buildDumpChunk(task, payload.get()));
 
   wrapEnabled = false;
 
@@ -178,15 +181,15 @@ TEST(dumpManager, buildDumpChunk_multiple_records_not_done_until_last) {
   wrapEnabled       = true;
   wrappedWriteCalls = 0;
 
-  bool r1 = manager.buildDumpChunk(task, payload.get());
+  bool r1 = rdbtest::ok(manager.buildDumpChunk(task, payload.get()));
   EXPECT_FALSE(r1);
   EXPECT_EQ(task.dumpedRecordsToGo, 2);
 
-  bool r2 = manager.buildDumpChunk(task, payload.get());
+  bool r2 = rdbtest::ok(manager.buildDumpChunk(task, payload.get()));
   EXPECT_FALSE(r2);
   EXPECT_EQ(task.dumpedRecordsToGo, 1);
 
-  bool r3 = manager.buildDumpChunk(task, payload.get());
+  bool r3 = rdbtest::ok(manager.buildDumpChunk(task, payload.get()));
   EXPECT_TRUE(r3);
   EXPECT_EQ(task.dumpedRecordsToGo, 0);
 
@@ -210,7 +213,9 @@ TEST(dumpManager, buildDumpChunk_negative_dumpedRecordsToGo_fatals) {
   task.delayDumpRecordsToGo = 0;
   task.fd                   = 0;
 
-  EXPECT_DEATH({ (void)manager.buildDumpChunk(task, payload.get()); }, "dumpedRecordsToGo is negative");
+  // Niezmiennik silnika: RDB_ASSERT -> rdb::fatal (FATAL i koniec procesu). Plaster B3 fazy 1
+  // zamienil tu smierc procesu na rzut LogicError; rdzen bez wyjatkow wraca do zatrzymania.
+  EXPECT_DEATH(static_cast<void>(manager.buildDumpChunk(task, payload.get())), "FATAL: .*dumpedRecordsToGo is negative");
 }
 
 TEST(dumpManager, buildDumpChunk_negative_delayDumpRecordsToGo_fatals) {
@@ -224,7 +229,9 @@ TEST(dumpManager, buildDumpChunk_negative_delayDumpRecordsToGo_fatals) {
   task.delayDumpRecordsToGo = -1;
   task.fd                   = 0;
 
-  EXPECT_DEATH({ (void)manager.buildDumpChunk(task, payload.get()); }, "delayDumpRecordsToGo is negative");
+  // Niezmiennik silnika: RDB_ASSERT -> rdb::fatal (FATAL i koniec procesu). Plaster B3 fazy 1
+  // zamienil tu smierc procesu na rzut LogicError; rdzen bez wyjatkow wraca do zatrzymania.
+  EXPECT_DEATH(static_cast<void>(manager.buildDumpChunk(task, payload.get())), "FATAL: .*delayDumpRecordsToGo is negative");
 }
 
 // ============================================================
@@ -312,7 +319,7 @@ TEST_F(DumpManagerFileTest, createDumpFile_without_retention_creates_tmp_suffix)
   manager.storagePath = sandBoxFolder.string();
   // retentionSize["stream_t"] = 0 (domyślna wartość mapy)
 
-  auto [filename, fd] = manager.createDumpFile("stream", "t");
+  auto [filename, fd] = rdbtest::ok(manager.createDumpFile("stream", "t"));
   ASSERT_GE(fd, 0);
   ::close(fd);
 
@@ -325,11 +332,11 @@ TEST_F(DumpManagerFileTest, createDumpFile_with_retention_creates_numbered_files
   manager.storagePath                  = sandBoxFolder.string();
   manager.retentionSize["stream_task"] = 3;
 
-  auto [f0, fd0] = manager.createDumpFile("stream", "task");
+  auto [f0, fd0] = rdbtest::ok(manager.createDumpFile("stream", "task"));
   ASSERT_GE(fd0, 0);
   ::close(fd0);
 
-  auto [f1, fd1] = manager.createDumpFile("stream", "task");
+  auto [f1, fd1] = rdbtest::ok(manager.createDumpFile("stream", "task"));
   ASSERT_GE(fd1, 0);
   ::close(fd1);
 
@@ -391,7 +398,7 @@ class DumpManagerTaskTest : public DumpManagerFileTest, public ::testing::WithPa
   void writeRecord(std::int32_t value) {
     auto &output = *model->qSet.at("result")->outputPayload;
     output.getPayload()->setItem(0, value);
-    static_cast<void>(output.write());
+    ASSERT_EQ(rdbtest::ok(output.write()), rdb::WriteStatus::Ok);
   }
 
   [[nodiscard]] std::string dumpPath(const char *filename) const { return (sandBoxFolder / filename).string(); }
@@ -417,7 +424,7 @@ class DumpManagerTaskTest : public DumpManagerFileTest, public ::testing::WithPa
     ASSERT_EQ(status, "OK");
     compiler compilePlan(plan);
     ASSERT_EQ(compilePlan.compile(), "OK");
-    model = std::make_unique<dataModel>(plan);
+    model = rdbtest::ok(dataModel::create(plan));
     pProc = model.get();
   }
 
@@ -440,13 +447,13 @@ TEST_P(DumpManagerTaskTest, registerTask_retains_completed_dump_files_and_conten
   for (int trigger = 0; trigger < 5; ++trigger) {
     const std::int32_t value = 10 + trigger;
     output.getPayload()->setItem(0, value);
-    static_cast<void>(output.write());
-    manager.registerTask("result", dumpTask("task", {0, 1}, retention));
+    ASSERT_EQ(rdbtest::ok(output.write()), rdb::WriteStatus::Ok);
+    ASSERT_RDB_OK(manager.registerTask("result", dumpTask("task", {0, 1}, retention)));
 
     const auto suffix   = retention == 0 ? "_dump.tmp" : "_dump_" + std::to_string(trigger % retention) + ".tmp";
     const auto filename = sandBoxFolder / ("result_task" + suffix);
     EXPECT_EQ(manager.bookOfTasks.at("result").back().dumpFilename, filename.string());
-    manager.processStreamChunk("result");
+    ASSERT_RDB_OK(manager.processStreamChunk("result"));
     EXPECT_TRUE(manager.bookOfTasks.at("result").empty());
     expectedDumps[filename] = value;
 
@@ -479,10 +486,10 @@ TEST_P(DumpManagerTaskTest, unretained_replacement_closes_only_same_rule_tasks) 
   writeRecord(1);
   writeRecord(2);
   writeRecord(3);
-  manager.registerTask("result", dumpTask("latest", {first, first + 3}, 0));
-  manager.registerTask("result", dumpTask("kept", {0, 7}, 100));
+  ASSERT_RDB_OK(manager.registerTask("result", dumpTask("latest", {first, first + 3}, 0)));
+  ASSERT_RDB_OK(manager.registerTask("result", dumpTask("kept", {0, 7}, 100)));
   const int keptFd = taskOf(manager, dumpPath("result_kept_dump_0.tmp")).fd;
-  manager.processStreamChunk("result");
+  ASSERT_RDB_OK(manager.processStreamChunk("result"));
 
   std::list<dumpObserver> observers;
   for (int trigger = 4; trigger <= 5; ++trigger) {
@@ -490,17 +497,19 @@ TEST_P(DumpManagerTaskTest, unretained_replacement_closes_only_same_rule_tasks) 
     ASSERT_GE(observers.emplace_back(dumpPath("result_latest_dump.tmp")).sizeAtOpen, 0);
 
     writeRecord(trigger);
-    if (trigger == 4) manager.registerTask("result", dumpTask("kept", {0, 7}, 100));
-    manager.registerTask("result", dumpTask("latest", {first, first + 3}, 0));
+    if (trigger == 4) {
+      ASSERT_RDB_OK(manager.registerTask("result", dumpTask("kept", {0, 7}, 100)));
+    }
+    ASSERT_RDB_OK(manager.registerTask("result", dumpTask("latest", {first, first + 3}, 0)));
     expectClosed(oldFd);
     EXPECT_NE(::fcntl(keptFd, F_GETFD), -1);
     EXPECT_EQ(manager.bookOfTasks.at("result").size(), 3U);
-    manager.processStreamChunk("result");
+    ASSERT_RDB_OK(manager.processStreamChunk("result"));
   }
 
   for (int value = 6; value <= 10; ++value) {
     writeRecord(value);
-    manager.processStreamChunk("result");
+    ASSERT_RDB_OK(manager.processStreamChunk("result"));
   }
   EXPECT_TRUE(manager.bookOfTasks.at("result").empty());
   for (const auto &observer : observers)
@@ -520,12 +529,12 @@ TEST_P(DumpManagerTaskTest, retention_wrap_closes_task_of_reused_slot) {
   writeRecord(1);
   writeRecord(2);
   writeRecord(3);
-  manager.registerTask("result", dumpTask("kept", {0, 9}, 100));
-  manager.registerTask("result", dumpTask("ring", {first, first + 5}, 2));
-  manager.processStreamChunk("result");
+  ASSERT_RDB_OK(manager.registerTask("result", dumpTask("kept", {0, 9}, 100)));
+  ASSERT_RDB_OK(manager.registerTask("result", dumpTask("ring", {first, first + 5}, 2)));
+  ASSERT_RDB_OK(manager.processStreamChunk("result"));
   writeRecord(4);
-  manager.registerTask("result", dumpTask("ring", {first, first + 5}, 2));
-  manager.processStreamChunk("result");
+  ASSERT_RDB_OK(manager.registerTask("result", dumpTask("ring", {first, first + 5}, 2)));
+  ASSERT_RDB_OK(manager.processStreamChunk("result"));
 
   const int wrappedFd = taskOf(manager, dumpPath("result_ring_dump_0.tmp")).fd;
   const int slot1Fd   = taskOf(manager, dumpPath("result_ring_dump_1.tmp")).fd;
@@ -533,16 +542,16 @@ TEST_P(DumpManagerTaskTest, retention_wrap_closes_task_of_reused_slot) {
   const dumpObserver observer(dumpPath("result_ring_dump_0.tmp"));
   ASSERT_GE(observer.sizeAtOpen, 0);
   writeRecord(5);
-  manager.registerTask("result", dumpTask("ring", {first, first + 5}, 2));
+  ASSERT_RDB_OK(manager.registerTask("result", dumpTask("ring", {first, first + 5}, 2)));
   expectClosed(wrappedFd);
   EXPECT_NE(::fcntl(slot1Fd, F_GETFD), -1);
   EXPECT_NE(::fcntl(keptFd, F_GETFD), -1);
   EXPECT_EQ(manager.bookOfTasks.at("result").size(), 3U);
-  manager.processStreamChunk("result");
+  ASSERT_RDB_OK(manager.processStreamChunk("result"));
 
   for (int value = 6; value <= 11; ++value) {
     writeRecord(value);
-    manager.processStreamChunk("result");
+    ASSERT_RDB_OK(manager.processStreamChunk("result"));
   }
   EXPECT_TRUE(manager.bookOfTasks.at("result").empty());
   expectDetachedAndFrozen(observer);
@@ -561,18 +570,18 @@ TEST_P(DumpManagerTaskTest, unretained_rules_do_not_evict_each_other) {
   writeRecord(1);
   writeRecord(2);
   writeRecord(3);
-  manager.registerTask("result", dumpTask("a", {first, first + 3}, 0));
+  ASSERT_RDB_OK(manager.registerTask("result", dumpTask("a", {first, first + 3}, 0)));
   const int aFd = taskOf(manager, dumpPath("result_a_dump.tmp")).fd;
-  manager.processStreamChunk("result");
+  ASSERT_RDB_OK(manager.processStreamChunk("result"));
   writeRecord(4);
-  manager.registerTask("result", dumpTask("b", {first, first + 3}, 0));
+  ASSERT_RDB_OK(manager.registerTask("result", dumpTask("b", {first, first + 3}, 0)));
   EXPECT_NE(::fcntl(aFd, F_GETFD), -1);
   EXPECT_EQ(manager.bookOfTasks.at("result").size(), 2U);
-  manager.processStreamChunk("result");
+  ASSERT_RDB_OK(manager.processStreamChunk("result"));
 
   for (int value = 5; value <= 8; ++value) {
     writeRecord(value);
-    manager.processStreamChunk("result");
+    ASSERT_RDB_OK(manager.processStreamChunk("result"));
   }
   EXPECT_TRUE(manager.bookOfTasks.at("result").empty());
 
@@ -592,14 +601,15 @@ TEST_F(DumpManagerFileTest, retention_counters_are_kept_per_stream_and_rule) {
   ASSERT_EQ(status, "OK");
   compiler compilePlan(plan);
   ASSERT_EQ(compilePlan.compile(), "OK");
-  dataModel model(plan);
-  pProc = &model;
+  auto modelOwner  = rdbtest::ok(dataModel::create(plan));
+  dataModel &model = *modelOwner;
+  pProc            = &model;
 
   dumpManager manager;
   manager.setDumpStorage(sandBoxFolder.string());
-  manager.registerTask("a", dumpTask("bc", {0, 1}, 3));
-  manager.registerTask("ab", dumpTask("c", {0, 1}, 2));
-  manager.registerTask("a", dumpTask("bc", {0, 1}, 3));
+  ASSERT_RDB_OK(manager.registerTask("a", dumpTask("bc", {0, 1}, 3)));
+  ASSERT_RDB_OK(manager.registerTask("ab", dumpTask("c", {0, 1}, 2)));
+  ASSERT_RDB_OK(manager.registerTask("a", dumpTask("bc", {0, 1}, 3)));
   EXPECT_EQ(manager.bookOfTasks.at("a").front().dumpFilename, (sandBoxFolder / "a_bc_dump_0.tmp").string());
   EXPECT_EQ(manager.bookOfTasks.at("a").back().dumpFilename, (sandBoxFolder / "a_bc_dump_1.tmp").string());
   EXPECT_EQ(manager.bookOfTasks.at("ab").back().dumpFilename, (sandBoxFolder / "ab_c_dump_0.tmp").string());
@@ -631,7 +641,7 @@ class DumpManagerHistoryTest : public DumpManagerFileTest, public ::testing::Wit
                                   std::to_string(GetParam().historyDepth) + " TO 1\n");
     ASSERT_EQ(status, "OK");
     ASSERT_EQ(compiler(plan).compile(), "OK");
-    model = std::make_unique<dataModel>(plan);
+    model = rdbtest::ok(dataModel::create(plan));
     pProc = model.get();
   }
 
@@ -651,9 +661,9 @@ TEST_P(DumpManagerHistoryTest, compiled_rule_dumps_history_and_current_record_by
 
   for (std::int32_t value = 1; value <= 12; ++value) {
     output.getPayload()->setItem(0, value);
-    static_cast<void>(output.write());
+    ASSERT_EQ(rdbtest::ok(output.write()), rdb::WriteStatus::Ok);
     ASSERT_EQ(output.getRecordsCount(), static_cast<size_t>(value));
-    runtime.constructRulesAndUpdate(plan.getQuery("result"));
+    ASSERT_RDB_OK(runtime.constructRulesAndUpdate(plan.getQuery("result")));
     if (value < 10) continue;
 
     std::vector<std::int32_t> expected;

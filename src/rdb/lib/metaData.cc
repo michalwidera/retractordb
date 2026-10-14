@@ -1,11 +1,14 @@
 #include "rdb/metaData.hpp"
 
+#include <fmt/format.h>
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <filesystem>
 #include <format>
 #include <memory>
 #include <ranges>
-#include <stdexcept>
+
 #include <system_error>
 #include <utility>
 
@@ -25,6 +28,7 @@ void metaData::createNullBitsetTemplate() {
 }
 
 void metaData::flushCurrentEntry() {
+  if (initializationError()) return;
   if (currentEntry_.recordCount > 0) {
     if (tail_.shouldOverwrite()) {
       store_.overwriteLast(currentEntry_);
@@ -39,6 +43,7 @@ void metaData::flushCurrentEntry() {
 
 void metaData::loadIndex() {
   auto allEntries = store_.readAll();
+  if (initializationError()) return;
 
   if (!allEntries.empty() && !allEntries.back().isGap) {
     currentEntry_ = allEntries.back();
@@ -63,13 +68,17 @@ std::pair<std::optional<size_t>, size_t> metaData::locateRecord(size_t recordInd
       cumulative += entry.recordCount;
       ++segmentIndex;
     }
-    throw std::logic_error("metaData: committedRecordCount_ inconsistent with on-disk entries");
+    // committedRecordCount_ liczony jest z tych samych wpisow (loadIndex, rewrite) i utrzymywany
+    // przyrostowo przez ten obiekt - rozjazd jest bledem w kodzie indeksu, nie stanem danych.
+    rdb::fatal("metaData: committedRecordCount_ inconsistent with on-disk entries");
   }
 
-  if (recordIndex < committedRecordCount_ + currentEntry_.recordCount)
-    return {std::nullopt, recordIndex - committedRecordCount_};
-
-  throw std::out_of_range("recordIndex out of range in metaData::locateRecord");
+  // Warunek wstepny wolajacych: onRecordModified() i nullBitsetFor() sprawdzaja zakres przed
+  // wywolaniem, a getNullBitset() wolany wprost z indeksem spoza zakresu to blad wolajacego.
+  RDB_ASSERT(recordIndex < committedRecordCount_ + currentEntry_.recordCount,
+             "recordIndex {} out of range in metaData::locateRecord (records: {})", recordIndex,
+             committedRecordCount_ + currentEntry_.recordCount);
+  return {std::nullopt, recordIndex - committedRecordCount_};
 }
 
 // ── Construction / destruction ───────────────────────────────────────
@@ -105,12 +114,18 @@ void metaData::onRecordAppended(const std::vector<bool> &nullBitsetParam) {
   }
 }
 
-void metaData::onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitsetParam) {
+Result<> metaData::onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitsetParam) {
+  // Rekord, ktorego indeks nie zna, ma w pliku danych - storage liczy rekordy z rozmiaru pliku
+  // danych, a indeks z pliku .meta. Rozjazd bywa skutkiem usuniecia albo obciecia .meta poza
+  // silnikiem, wiec wraca jako blad, nie konczy procesu.
+  if (recordIndex >= totalRecords())
+    return fail(Errc::Logic, fmt::format("recordIndex {} out of range in metaData::onRecordModified (records: {})", recordIndex,
+                                         totalRecords()));
   auto [segIdx, offset]     = locateRecord(recordIndex);
   const bool inCurrentEntry = !segIdx.has_value();
 
   if (inCurrentEntry) {
-    if (currentEntry_.nullBitset == nullBitsetParam) return;
+    if (currentEntry_.nullBitset == nullBitsetParam) return {};
 
     auto parts         = splitSegment(currentEntry_, offset, nullBitsetParam);
     IndexRecord newCur = parts.back();
@@ -129,7 +144,7 @@ void metaData::onRecordModified(size_t recordIndex, const std::vector<bool> &nul
 
     tail_.reset();
     currentEntry_ = newCur;
-    return;
+    return {};
   }
 
   auto allEntries = store_.readAll();
@@ -139,7 +154,7 @@ void metaData::onRecordModified(size_t recordIndex, const std::vector<bool> &nul
   if (tail_.shouldOverwrite() && !allEntries.empty()) allEntries.pop_back();
 
   auto &seg = allEntries[*segIdx];
-  if (seg.nullBitset == nullBitsetParam) return;
+  if (seg.nullBitset == nullBitsetParam) return {};
 
   auto replacement = splitSegment(seg, offset, nullBitsetParam);
   allEntries.erase(allEntries.begin() + static_cast<std::ptrdiff_t>(*segIdx));
@@ -148,6 +163,7 @@ void metaData::onRecordModified(size_t recordIndex, const std::vector<bool> &nul
   store_.rewrite(allEntries);
   tail_.reset();
   committedRecordCount_ = sumNonGapRecords(allEntries);
+  return {};
 }
 
 // ── Query interface ──────────────────────────────────────────────────
@@ -198,7 +214,7 @@ bool metaData::isGapBefore(size_t recordIndex) const {
 
 bool metaData::isEmpty() const { return totalRecords() == 0; }
 
-void metaData::rotate(int percounter, const bool reopen) {
+Result<> metaData::rotate(int percounter, const bool reopen) {
   flushCurrentEntry();
   if (percounter >= 0 && !store_.empty()) {
     std::string rotatedPath = std::format("{}.old{}", store_.path(), percounter);
@@ -208,15 +224,16 @@ void metaData::rotate(int percounter, const bool reopen) {
     if (ec || (exists && !rotateStorageFile(store_.path(), rotatedPath))) {
       // Nie obcinamy niezarchiwizowanego indeksu przez reset(). Zamkniecie nie rzuca,
       // a dalsza praca musi dostac blad zamiast pozornego sukcesu rotacji.
-      if (reopen) throw std::runtime_error(std::format("metaData::rotate: rotation to '{}' failed", rotatedPath));
+      if (reopen) return fail(Errc::IO, std::format("metaData::rotate: rotation to '{}' failed", rotatedPath), EIO);
       abandonFile();
-      return;
+      return {};
     }
   }
   if (reopen)
     reset();
   else
     abandonFile();
+  return {};
 }
 
 void metaData::reset() {

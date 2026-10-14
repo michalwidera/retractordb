@@ -1,5 +1,6 @@
 #include "rdb/facctxtsrc.hpp"
 
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -12,7 +13,7 @@
 #include <ranges>
 #include <sstream>
 #include <type_traits>  // is_integral_v
-#include "fatalError.hpp"
+
 #include "rdb/accessorFactory.hpp"
 
 namespace rdb {
@@ -86,8 +87,9 @@ bool parseAndSetNumericItem(rdb::payload &payload, int index, rdb::descFld rtype
       // K1 po preflight (#473): checkDeclaredSources i checkDescriptorFiles dopuszczaja dla
       // TEXTFILE tylko typy obslugiwane tutaj oraz STRING (osobna galaz w read()). RATIONAL
       // ze zgodnego rozmiarowo zachowanego .desc jest K2, odmawianym przed budowa akcesora.
-      FatalError("facctxtsrc: unsupported field type: {}", static_cast<int>(rtype));
+      rdb::fatal(fmt::format("facctxtsrc: unsupported field type: {}", static_cast<int>(rtype)));
   }
+  return true;
 }
 
 textSourceRO::textSourceRO(const std::string_view fileName,    //
@@ -157,7 +159,11 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
         // zbudowany z planu nigdy go nie niesie (buduja go recznie tylko testy jednostkowe). Zly token
         // w takim polu nie jest wiec anomalia danych, tylko zlamanym niezmiennikiem.
         if (token.has_value() && !isNullToken(*token)) {
-          FatalError("facctxtsrc: expected NULL token for NULL field, got: {}", *token);
+          // Blad tresci wejscia (EILSEQ -> Errc::Config w SourceBuffer), nie niezmiennika: silnik
+          // jest caly, to PLIK ZRODLOWY nie zgadza sie z deklaracja strumienia. Mowienie tu o
+          // bledzie wewnetrznym oskarzaloby RetractorDB o cudza literowke w danych.
+          inputError_ = fmt::format("facctxtsrc: expected a NULL token for a NULL field, got '{}' in {}", *token, filename_);
+          return EILSEQ;
         }
         payload_->setItem(i + j, std::nullopt);
       }
@@ -277,7 +283,7 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
   return EXIT_SUCCESS;
 }
 
-size_t textSourceRO::count() { return readCount_; }
+Result<size_t> textSourceRO::count() { return readCount_; }
 
 const std::vector<bool> &textSourceRO::lastNullBitset() const { return payload_->getNullBitset(); }
 

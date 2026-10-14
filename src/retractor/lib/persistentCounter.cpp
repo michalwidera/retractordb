@@ -14,7 +14,9 @@
 
 #include <spdlog/spdlog.h>
 
-#include "fatalError.hpp"
+#include <fmt/format.h>
+
+#include "rdb/error.hpp"
 
 // Numer N+1 jest rezerwowany przy starcie, a nie zapisywany w destruktorze (#281). Dawny
 // destruktor zapisywal go na koniec sesji i przy porazce mogl ja jedynie przemilczec: nastepna
@@ -26,13 +28,18 @@
 PersistentCounter::PersistentCounter(std::string initFilename)
     :                                                      //
       persistentCounterFilename_(std::move(initFilename))  //
-{
-  load();
-  if (!save(count_ + 1))
-    rdb::EnvironmentError(
-        "Cannot reserve rotation number {} in '{}'; refusing to start - otherwise the next session would reuse number {} "
-        "and overwrite the archives of this one.",
-        count_ + 1, persistentCounterFilename_, count_);
+{}
+
+rdb::Result<std::unique_ptr<PersistentCounter>> PersistentCounter::create(std::string initFilename) {
+  std::unique_ptr<PersistentCounter> self(new PersistentCounter(std::move(initFilename)));
+  RDB_TRY(self->load());
+  if (!self->save(self->count_ + 1))
+    return rdb::fail(rdb::Errc::IO,
+                     fmt::format("Cannot reserve rotation number {} in '{}'; refusing to start - otherwise the next session "
+                                 "would reuse number {} and overwrite the archives of this one.",
+                                 self->count_ + 1, self->persistentCounterFilename_, self->count_),
+                     errno != 0 ? errno : EIO);
+  return self;
 }
 
 int PersistentCounter::getCount() const { return count_; }
@@ -88,25 +95,31 @@ PersistentCounter::Reading PersistentCounter::read(const std::string &filename) 
 // swiadomie go usuwa. Klasa K4 dla obu przyczyn (#472): wadliwa tresc odrzucilo juz jako blad
 // planu checkRotationCounter() przed startem, wiec tutaj plik zmienil sie po tamtym sprawdzeniu.
 // Plan zostaje, a nastepny start rozpozna tresc ta sama droga co wtedy.
-void PersistentCounter::load() {
+rdb::Result<> PersistentCounter::load() {
   const Reading reading = read(persistentCounterFilename_);
   switch (reading.state) {
     case Reading::State::Missing:
       count_ = 0;
-      return;
+      return {};
     case Reading::State::Value:
       count_ = reading.value;
-      return;
+      return {};
     case Reading::State::Unreadable:
-      rdb::EnvironmentError("Rotation counter file '{}' cannot be read ({}); refusing to start.", persistentCounterFilename_,
-                            reading.detail);
+      return rdb::fail(rdb::Errc::IO,
+                       fmt::format("Rotation counter file '{}' cannot be read ({}); refusing to start.",
+                                   persistentCounterFilename_, reading.detail),
+                       EIO);
     case Reading::State::Invalid:
-      rdb::EnvironmentError(
-          "Rotation counter file '{}' is unreadable ({}); refusing to start. A guessed rotation number could overwrite "
-          "archives of previous sessions. Repair the file (a non-negative integer), or delete it to restart rotation from 0 "
-          "- existing .old<N> archives will then be overwritten.",
-          persistentCounterFilename_, reading.detail);
+      return rdb::fail(
+          rdb::Errc::IO,
+          fmt::format(
+              "Rotation counter file '{}' is unreadable ({}); refusing to start. A guessed rotation number could overwrite "
+              "archives of previous sessions. Repair the file (a non-negative integer), or delete it to restart rotation from 0 "
+              "- existing .old<N> archives will then be overwritten.",
+              persistentCounterFilename_, reading.detail),
+          EIO);
   }
+  rdb::fatal("unknown rotation counter state");
 }
 
 // Zapis przez plik tymczasowy, wzorem servicecontrol::writeQueryFile. Samo

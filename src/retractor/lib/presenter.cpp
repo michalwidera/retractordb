@@ -12,7 +12,7 @@
 
 #include "CRSMath.hpp"
 #include "executorsmState.hpp"
-#include "fatalError.hpp"
+#include "rdb/error.hpp"
 
 // https://ref.pencilcode.net/turtle/colors.html
 
@@ -446,7 +446,7 @@ void presenter::onlyCompileShowProgram() {
           break;
         default:
           std::cout << "\t\t" << "UNKNOWN_ACTION";
-          FatalError("presenter::onlyCompileShowProgram: unknown rule action");
+          rdb::fatal("presenter::onlyCompileShowProgram: unknown rule action");
       }
 
       std::cout << '\n';
@@ -454,7 +454,7 @@ void presenter::onlyCompileShowProgram() {
   }
 }
 
-void presenter::sequenceDiagram(int gridType, int cycleCount) {
+rdb::Result<> presenter::sequenceDiagram(int gridType, int cycleCount) {
   const int msInSec = 1000;
   bool isGridOn     = (gridType != 0);
 
@@ -482,9 +482,11 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
 
   if (cycleStepInt <= 0) {
     std::cerr << "Error: Cycle step is zero or negative." << '\n';
-    return;
+    return {};
   }
-  TimeLine tl(coreInstance.getAvailableTimeIntervals());
+  RDB_TRY_ASSIGN(const auto intervals, coreInstance.getAvailableTimeIntervals());
+  if (intervals.empty()) return rdb::fail(rdb::Errc::Config, "presenter: plan holds no streams - nothing to draw");
+  TimeLine tl(intervals);
 
   struct proc_t {
     std::set<std::string> procSet;
@@ -576,6 +578,7 @@ void presenter::sequenceDiagram(int gridType, int cycleCount) {
     objChar++;
     std::cout << '\n';
   }
+  return {};
 }
 
 int presenter::run(const boost::program_options::variables_map &vm) {
@@ -612,11 +615,19 @@ int presenter::run(const boost::program_options::variables_map &vm) {
         std::cerr << "Diagram grid type is invalid." << '\n';
         return system::errc::invalid_argument;
       }
-      sequenceDiagram(gridType, cycleCount);
+      if (auto drawn = sequenceDiagram(gridType, cycleCount); !drawn) {
+        std::cerr << "\nFATAL: " << drawn.error().message() << '\n';
+        return system::errc::operation_not_permitted;  // EPERM == 1 == EXIT_FAILURE
+      }
     } else {
       onlyCompileShowProgram();
     }
   } catch (std::exception &e) {
+    // Bledy SILNIKA tu nie przychodza - rdzen zwraca je wartoscia (rdb/error.hpp). Blad osi
+    // czasu wraca z sequenceDiagram i wychodzi wyzej jako "FATAL: ..." z kodem EPERM == 1, tak
+    // jak do 2026-10 robil to catch(const rdb::Error&). Bez SPDLOG: presenter nie wciaga spdloga;
+    // to sciezka narzedziowa (-c, --dot), uruchamiana z terminala, gdzie stderr JEST kanalem
+    // diagnostycznym. Ten catch zostaje dla bibliotek zewnetrznych (boost::regex, iostream).
     std::cerr << e.what() << '\n';
     return system::errc::interrupted;
   }

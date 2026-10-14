@@ -1,6 +1,7 @@
 #include "rdb/faccbindev.hpp"
 
 #include <fcntl.h>
+#include <fmt/format.h>
 #include <poll.h>
 #include <spdlog/spdlog.h>
 #include <sys/stat.h>
@@ -9,7 +10,7 @@
 #include <algorithm>
 #include <cerrno>
 #include <cstring>
-#include "fatalError.hpp"
+
 #include "rdb/accessorFactory.hpp"
 
 namespace rdb {
@@ -57,7 +58,7 @@ binaryDeviceRO::~binaryDeviceRO() {
   // import ad hoc tylko dopisuje wezly, a rozbiorka epoki idzie w watku wykonawczym, po fazie.
   // Gdyby import zaczal usuwac wezly, migawka musi przejsc na wspolwlasnosc.
   if (awaited_.load(std::memory_order_relaxed))
-    FatalError("binaryDeviceRO: DEVICE source '{}' destroyed during the DEVICE phase", filename_);
+    rdb::fatal(fmt::format("binaryDeviceRO: DEVICE source '{}' destroyed during the DEVICE phase", filename_));
 #endif
   if (fd_ >= 0) ::close(fd_);
 }
@@ -186,7 +187,7 @@ ssize_t binaryDeviceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, co
   return EXIT_SUCCESS;
 }
 
-size_t binaryDeviceRO::count() { return cnt_; }
+Result<size_t> binaryDeviceRO::count() { return cnt_; }
 
 const std::vector<bool> &binaryDeviceRO::lastNullBitset() const { return lastNullBitset_; }
 

@@ -15,6 +15,7 @@
 #include "expressionEvaluator.hpp"
 #include "expressionShape.hpp"   // functionResultType, isExactType, normalizedOperandType
 #include "rdb/convertTypes.hpp"  // cast - ta sama promocja co w normalize()
+#include "rdb/error.hpp"
 
 namespace {
 
@@ -84,19 +85,21 @@ std::optional<rdb::descFld> arithmeticResultType(std::optional<rdb::descFld> lef
 /// w którym powstaje wartość zwiniętej stałej - kompilator nie ma własnej kopii arytmetyki,
 /// więc zwijanie nie może się rozjechać z wykonaniem.
 ///
-/// nullopt oznacza „zostaw program w spokoju": albo ewaluator rzucił (np. `'a'-'b'`, nieznana
-/// funkcja) i błąd ma polecieć w wykonaniu jak dotąd, albo wynik jest wartością, której nie da
+/// nullopt oznacza „zostaw program w spokoju": albo ewaluator zwrócił błąd (np. `'a'-'b'`, nieznana
+/// funkcja) i błąd ma wyjść w wykonaniu jak dotąd, albo wynik jest wartością, której nie da
 /// się z powrotem wstawić do programu jako literał.
+///
+/// Złamany niezmiennik ewaluatora NIE jest jednym z tych przypadków: to RDB_ASSERT wewnątrz
+/// ewaluatora, a nie Errc::Eval, więc nie da się go tu pomylić z wyrażeniem, którego nie da się
+/// policzyć. Gdyby oba szły jednym kanałem, złamana normalizacja typów zamieniłaby się w ciche
+/// „nie zwijaj", czyli w INNY PROGRAM - taki, który nadal się liczy i nadal zwraca liczby.
 std::optional<rdb::descFldVT> foldConstants(const std::list<token> &program) {
   expressionEvaluator evaluator;
-  try {
-    auto value      = evaluator.eval(program, nullptr);
-    const auto type = typeOfConstant(value);
-    if (type == rdb::NULLTYPE || type == rdb::INTPAIR || type == rdb::IDXPAIR) return std::nullopt;
-    return value;
-  } catch (const std::exception &) {
-    return std::nullopt;
-  }
+  auto value = evaluator.eval(program, nullptr);
+  if (!value) return std::nullopt;
+  const auto type = typeOfConstant(*value);
+  if (type == rdb::NULLTYPE || type == rdb::INTPAIR || type == rdb::IDXPAIR) return std::nullopt;
+  return std::move(*value);
 }
 
 /// Ogon postaci `(E op c)` albo `(c op E)` - materiał dla reguł B i C.

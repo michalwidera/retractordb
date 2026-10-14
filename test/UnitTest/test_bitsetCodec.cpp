@@ -9,16 +9,16 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <stdexcept>
 
 #include "rdb/bitsetCodec.hpp"
+#include "rdbResult.hpp"
 
 namespace {
 
 std::vector<bool> roundTrip(const std::vector<bool> &bits) {
   std::vector<std::byte> buf(rdb::packedByteCount(bits.size()), std::byte{0});
-  rdb::packBits(bits, buf);
-  return rdb::unpackBits(buf, bits.size());
+  rdbtest::ok(rdb::packBits(bits, buf));
+  return rdbtest::ok(rdb::unpackBits(buf, bits.size()));
 }
 
 }  // namespace
@@ -55,7 +55,7 @@ TEST(BitsetCodecTest, packBits_ustawia_tylko_jedynki) {
   // (tak IndexRecord i ShadowOverride pakują bitset do wyzerowanego ogona bufora rekordu).
   const std::vector<bool> bits = {false, true, false, false, false, false, false, false, true};
   std::vector<std::byte> buf(rdb::packedByteCount(bits.size()), std::byte{0});
-  rdb::packBits(bits, buf);
+  rdbtest::ok(rdb::packBits(bits, buf));
   EXPECT_EQ(std::to_integer<uint8_t>(buf[0]), 0b00000010);
   EXPECT_EQ(std::to_integer<uint8_t>(buf[1]), 0b00000001);
 }
@@ -63,16 +63,16 @@ TEST(BitsetCodecTest, packBits_ustawia_tylko_jedynki) {
 TEST(BitsetCodecTest, unpackBits_odrzuca_bitCount_ponad_zrodlo) {
   // Kontrakt z komentarza egzekwowany w kodeku (#421), bez zaokraglenia packedByteCount.
   const std::vector<std::byte> buf(1, std::byte{0xFF});
-  EXPECT_EQ(rdb::unpackBits(buf, 8), std::vector<bool>(8, true));
-  EXPECT_THROW((void)rdb::unpackBits(buf, 9), std::invalid_argument);
-  EXPECT_THROW((void)rdb::unpackBits(buf, SIZE_MAX), std::invalid_argument);
-  EXPECT_THROW((void)rdb::unpackBits(buf, SIZE_MAX - 6), std::invalid_argument);
+  EXPECT_EQ(rdbtest::ok(rdb::unpackBits(buf, 8)), std::vector<bool>(8, true));
+  EXPECT_RDB_ERROR(rdb::unpackBits(buf, 9), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(rdb::unpackBits(buf, SIZE_MAX), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(rdb::unpackBits(buf, SIZE_MAX - 6), rdb::Errc::Config);
 }
 
 TEST(BitsetCodecTest, packBits_odrzuca_zly_rozmiar_celu) {
   const std::vector<bool> bits(9, true);  // wymaga dokladnie 2 bajtow
   std::vector<std::byte> tooShort(1, std::byte{0});
   std::vector<std::byte> tooLong(3, std::byte{0});
-  EXPECT_THROW(rdb::packBits(bits, tooShort), std::invalid_argument);
-  EXPECT_THROW(rdb::packBits(bits, tooLong), std::invalid_argument);
+  EXPECT_RDB_ERROR(rdb::packBits(bits, tooShort), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(rdb::packBits(bits, tooLong), rdb::Errc::Config);
 }

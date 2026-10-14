@@ -1,13 +1,15 @@
 #include "rdb/descriptor.hpp"
 
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <iostream>
 #include <ranges>
 #include <sstream>
+#include <utility>
 
-#include "fatalError.hpp"
+#include "rdb/error.hpp"
 
 #include <magic_enum/magic_enum.hpp>
 
@@ -80,7 +82,8 @@ void Descriptor::rebuildFieldMappings() const {
 // cross-TU. Tu zostaje tylko zimna sciezka bledu byteOffsetAtFlatIndex.
 void Descriptor::flatIndexOutOfRange(const int flatIndex) const {
   rebuildFieldMappings();
-  FatalError("descriptor: flatIndex {} out of range [0,{})", flatIndex, flattenedFieldCount_);
+  // Indeks plaski pochodzi z kompilatora albo ze strazy wiazania - spoza zakresu znaczy blad w kodzie.
+  rdb::fatal(fmt::format("descriptor: flatIndex {} out of range [0,{})", flatIndex, flattenedFieldCount_));
 }
 
 std::vector<rField> Descriptor::dataFields() {
@@ -106,14 +109,9 @@ Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs) {
 }
 
 Descriptor &Descriptor::operator+=(const Descriptor &rhs) {
-  if (this != &rhs) {
-    auto &target = mutableFields();
-    target.insert(target.end(), rhs.begin(), rhs.end());  // TODO: add rename of duplicates here.
-  } else {
-    FatalError("descriptor: cannot merge descriptor with itself");
-    // can't do safe: data | data
-    // due one name policy
-  }
+  RDB_ASSERT(this != &rhs, "descriptor: cannot merge descriptor with itself");
+  auto &target = mutableFields();
+  target.insert(target.end(), rhs.begin(), rhs.end());
 
   return *this;
 }
@@ -159,10 +157,11 @@ void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, D
   // strona tablicowa dawala deskryptor o szerokosci 1 zamiast 3 i przeplot zawieszal sie na
   // rekordzie wezszym niz plaski uklad zrodla. Ten sam warunek ta sama miara sprawdza
   // compiler::buildOutputSchema().
-  if (lhs.flatElementCount() != rhs.flatElementCount()) {
-    FatalError("descriptor: hash composition requires equal-width descriptors: lhs={} rhs={}", lhs.flatElementCount(),
-               rhs.flatElementCount());
-  }
+  // Wolajacy (compiler::buildOutputSchema, kontrola rozmiaru rekordu) sprawdzaja szerokosc i
+  // odrzucaja plan bledem kompilacji, zanim tu dojda.
+  RDB_ASSERT(lhs.flatElementCount() == rhs.flatElementCount(),
+             "descriptor: hash composition requires equal-width descriptors: lhs={} rhs={}", lhs.flatElementCount(),
+             rhs.flatElementCount());
 
   auto &target = mutableFields();
   target.clear();
@@ -170,7 +169,7 @@ void Descriptor::composeHashDescriptorFrom(const std::string &fieldNamePrefix, D
   for (int i = 0; i < width; ++i) {
     const auto lhsPosition = lhs.flatIndexToDescriptorPosition(i);
     const auto rhsPosition = rhs.flatIndexToDescriptorPosition(i);
-    if (!lhsPosition || !rhsPosition) FatalError("descriptor: invalid flat field position");
+    RDB_ASSERT(lhsPosition && rhsPosition, "descriptor: invalid flat field position");
     const auto &lhsField = lhs[lhsPosition->first];
     const auto &rhsField = rhs[rhsPosition->first];
     const auto maxRtype  = std::max(lhsField.rtype, rhsField.rtype);
@@ -242,10 +241,11 @@ size_t Descriptor::fieldIndex(const std::string_view fieldName) const {
   auto it = std::ranges::find_if(*this,                                                               //
                                  [fieldName](const auto &item) { return item.rname == fieldName; });  //
 
-  if (it != end()) return std::distance(begin(), it);
-  FatalError("descriptor: field ID not found");
-
-  return 0;  // ProForma Error
+  // Warunek wstepny: hasField(). Wiazanie Pythona (Descriptor.field_index) sprawdza go i zglasza
+  // KeyError z nazwa pola, zanim tu dojdzie - tekst od uzytkownika nie dociera wiec do asercji.
+  // Nazwa pola zostaje w komunikacie, bo bez niej blad w kodzie trudno znalezc.
+  RDB_ASSERT(it != end(), "descriptor: no field named '{}'", fieldName);
+  return std::distance(begin(), it);
 }
 
 int Descriptor::fieldSize(const std::string_view fieldName) const { return fieldSize((*this)[fieldIndex(fieldName)]); }
@@ -256,8 +256,8 @@ size_t Descriptor::fieldByteOffset(const std::string_view fieldName) const {
     if (fieldName == field.rname) return offset;
     offset += fieldSize(field);
   }
-  FatalError("descriptor: field not found by name");
-  return 0;  // ProForma Error
+  // Warunek wstepny jak w fieldIndex(): hasField() sprawdza wolajacy (straz wiazania, operator>>).
+  rdb::fatal(fmt::format("descriptor: no field named '{}' (byte offset lookup)", fieldName));
 }
 
 std::string_view Descriptor::fieldTypeName(const std::string_view fieldName) const {  //
@@ -349,17 +349,39 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
   return os;
 }
 
+/// Wczytaj deskryptor ze strumienia. Bledny tekst zapala failbit; NIE konczy procesu.
+///
+/// Do fazy 1 bledny deskryptor konczyl sie przez FatalError, czyli std::exit. Ekstraktor
+/// strumieniowy nie jest jednak miejscem, w ktorym zapada decyzja o przerwaniu programu -
+/// zglasza niepowodzenie stanem strumienia, a co z nim zrobic, wie wolajacy:
+/// loadDescriptorFile zwraca blad Errc::CorruptDescriptor, xtrdb wypisuje komunikat i czyta dalej.
 std::istream &operator>>(std::istream &is, Descriptor &rhs) {
+  // Strumien juz uszkodzony: nie ma czego czytac i nie wolno zmieniac jego stanu -
+  // w szczegolnosci nie wolno zgasic failbita ustawionego przez nieudane otwarcie pliku.
+  if (!is.good()) return is;
+
   std::stringstream strstream;
   strstream << is.rdbuf();
 
-  auto result = parserDESCString(rhs, strstream.str());
+  // Petla powyzej konczy sie WYLACZNIE niepowodzeniem ekstrakcji, wiec po odczytaniu
+  // calego (poprawnego) tekstu failbit jest zapalony tak samo jak po bledzie. Gasimy go,
+  // zeby po powrocie znaczyl dokladnie jedno: deskryptor sie nie sparsowal. eofbit i
+  // badbit zostaja nietkniete.
+  is.clear(is.rdstate() & ~std::ios::failbit);
+
+  // Parsujemy do obiektu tymczasowego, a nie wprost do rhs. Listener uzupelnia deskryptor
+  // polami w miare schodzenia po drzewie, wiec przerwany parse zostawilby rhs w stanie
+  // czesciowym - a wolajacy, ktory sprawdzi failbit dopiero po powrocie, mialby juz wtedy
+  // podmieniony wlasny deskryptor.
+  Descriptor parsed(rhs);
+  const auto result = parserDESCString(parsed, strstream.str());
   if (result != "OK") {
-    // Nieosiagalne z xretractor (#473): silnik czyta .desc przez tryLoadDescriptorFile, ktore
-    // zwraca Refusal. Osiagalne z xtrdb: uszkodzony .desc w mapie magazynu i schemat w `open`.
-    FatalError("descriptor parse failed: {}", result);
+    SPDLOG_ERROR("Descriptor parse failed: {}", result);
+    is.setstate(std::ios::failbit);
+    return is;
   }
 
+  rhs = std::move(parsed);
   return is;
 }
 

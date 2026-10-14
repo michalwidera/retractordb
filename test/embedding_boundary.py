@@ -15,11 +15,9 @@ strony:
      Descriptor::singleLineOutput_),
   3. brak KONFIGUROWANIA globalnego logera - biblioteka uzywa domyslnego loggera
      hosta, nigdy go nie ustawia ani nie zamyka,
-  4. jedyne wyjscie z procesu to std::exit w detail::terminateProcess
-     (src/include/fatalError.hpp). FatalError (K1) i EnvironmentError (K4) sa w
-     warstwie osadzalnej dozwolone: w zakresie ThrowOnFatalScope rzucaja
-     rdb::EngineFatal zamiast konczyc proces (decyzja (a) z #463), wiec granice
-     "biblioteka nie zabija hosta" trzyma ta jedna droga, a nie brak wywolan.
+  4. rdzen zwraca Result; jedyna droga zakonczenia hosta po naruszeniu niezmiennika
+     to rdb::fatal() (src/rdb/lib/error.cc). Host moze podmienic handler, ktory nie wraca.
+     Naglowek fatalError.hpp pozostaje mechanizmem zakonczenia procesu uslugi.
 
 Wyjatki sa WYMIENIONE Z NAZWY razem z powodem. Lista, ktora rosnie bez uzasadnienia,
 jest gorsza niz brak bramki.
@@ -41,6 +39,7 @@ EXIT_EXTRA = ("src/include/fatalError.hpp",)
 
 # plik -> (fragment linii, powod). Kazdy wpis to swiadoma decyzja, nie przeoczenie.
 ALLOWED = {
+    "src/rdb/lib/error.cc": [("static std::atomic<FatalHandler> slot{nullptr};", "polityka fatal calego procesu, ustawiana jawnie przez hosta")],
     "src/rdb/lib/memoryStore.cc": [
         ("static MemoryStore instance;",
          "instancja domyslna procesu - jawny, udokumentowany wlasciciel dla wolajacych, "
@@ -54,6 +53,7 @@ ALLOWED = {
 }
 
 ALLOWED_EXIT = {
+    "src/rdb/lib/error.cc": [("std::abort();", "domyslny handler fatal po naruszeniu niezmiennika")],
     "src/include/fatalError.hpp": [
         ("std::exit(Cls == ErrorClass::Internal ? EXIT_FAILURE : EIO);",
          "detail::terminateProcess - wspolna akcja konczaca K1/K4 poza zakresem ThrowOnFatalScope"),
@@ -133,7 +133,7 @@ def scan(repo: Path) -> tuple[list[str], list[str]]:
             for number, raw, code in code_lines(path):
                 where = f"{rel}:{number}"
                 if EXIT_CALL.search(code) and listed(ALLOWED_EXIT, rel, code) is None:
-                    problems.append(f"{where}: wyjscie z procesu poza detail::terminateProcess: {raw.strip()[:100]}")
+                    problems.append(f"{where}: wyjscie z procesu poza fatal / terminateProcess: {raw.strip()[:100]}")
                 if not state_rules:
                     continue
                 if LOGGER_CONFIG.search(code):
@@ -174,7 +174,7 @@ def main() -> int:
         )
         return 1
     print(f"Bramka osadzalnosci: {', '.join(ROOTS)} bez stanu procesu i bez konfiguracji logera;")
-    print(f"wyjscie z procesu ({', '.join(ROOTS + EXIT_EXTRA)}) tylko przez detail::terminateProcess.")
+    print(f"wyjscie z procesu ({', '.join(ROOTS + EXIT_EXTRA)}) tylko przez fatal / terminateProcess.")
     return 0
 
 

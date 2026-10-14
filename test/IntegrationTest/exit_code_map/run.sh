@@ -4,10 +4,8 @@
 # maja juz swoje testy (adhoc_parse_error, plan_error_e4, storage_refusal, env_error_exit,
 # fatal_exit_path, service_abort, signal_stop, xtrdb_open_missing); tu ich nie powtarzamy.
 #
-# Test przypina zachowanie master: zmiana ktoregokolwiek kodu ponizej jest zmiana klasy (z)
-# i wymaga decyzji czlowieka. Znane wyjatki:
-#   - nieznany strumien w FROM konczy start kodem EINTR, a nie odmowa EPROTO jak inne bledy
-#     planu; zmiana na `Check result:` i EPROTO to #485, ktore poprawi ten test,
+# Test przypina kody po porcie Result<T>: nieznany strumien w FROM jest odmowa planu
+# z kodem EPROTO i diagnostyka `Check result:`. Znane wyjatki:
 #   - `-u` z brakujacym plikiem zrodla nie konczy sie wcale (#488), wiec tego wiersza nie da sie
 #     przypiac kodem wyjscia,
 #   - wewnetrzny blad kompilatora jest z RQL nieosiagalny; pilnuje go ut_compiler.
@@ -17,7 +15,6 @@ set -euo pipefail
 . "$(dirname "$0")/../serverlib.sh"
 
 eproto=$(errno_value EPROTO)
-eintr=$(errno_value EINTR)
 enoent=$(errno_value ENOENT)
 echild=$(errno_value ECHILD)
 
@@ -83,13 +80,12 @@ if [ -e nosuchdir ]; then
   exit 1
 fi
 
-# (6) Nieznany strumien w FROM. Start z pliku (-c, -u, start serwera) konczy sie kodem EINTR:
-# qTree::getQuery rzuca std::logic_error, a launcher zamienia go na `interrupted` (#485).
-missing="Referenced Stream in QUERY _not found_ in CORE TREE."
+# (6) Nieznany strumien w FROM jest odrzucany przez kompilator jako blad planu.
+missing="Stream 'y' reads from 'nosuch', which is not defined in the plan"
 printf '%s\n' "STORAGE 'temp'" "$source_decl" "SELECT nosuch[0] STREAM y FROM nosuch STORAGE MEMORY" >unknown.rql
-expect_exit unknown_c "$eintr" "$missing" xretractor unknown.rql -c
-expect_exit unknown_u "$eintr" "$missing" xretractor unknown.rql -u
-expect_exit unknown_start "$eintr" "$missing" xretractor unknown.rql -k -r
+expect_exit unknown_c "$eproto" "$missing" xretractor unknown.rql -c
+expect_exit unknown_u "$eproto" "$missing" xretractor unknown.rql -u
+expect_exit unknown_start "$eproto" "$missing" xretractor unknown.rql -k -r
 for mode in unknown_c unknown_u unknown_start; do
   if grep -qF 'FATAL' "$mode.err"; then
     echo "$mode: nieznany strumien zgloszony jako FATAL"
@@ -104,8 +100,7 @@ printf '%s\n' "STORAGE 'temp'" "$source_decl" "DECLARE a INTEGER STREAM nosuch, 
 expect_exit declared_c 0 "" xretractor declared.rql -c
 
 # (7) Ten sam blad w dzialajacym serwerze: ad hoc i --reset sa odmowa, serwer zyje i liczy dalej.
-# Powod odmowy nie dociera dzis do klienta (pusta odpowiedz, przyczyna tylko w logu serwera:
-# `Command processor failure: ...`), wiec przypinamy kod i prefiks, nie tresc powodu.
+# Ad hoc zwraca blad kompilacji bez pozostawienia strumienia w planie.
 server_start base.rql -k -r
 expect_exit unknown_adhoc "$enoent" "bad rcv:" xqry -a "SELECT nosuch[0] STREAM y2 FROM nosuch STORAGE MEMORY"
 kill -0 "$_server_pid"

@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "rdbResult.hpp"
 #include "retractor/lib/qTree.hpp"
 #include "retractor/lib/token.hpp"
 
@@ -47,15 +48,19 @@ TEST(qTree, getQuery_returns_correct_query) {
   EXPECT_EQ(qt.getQuery("s2").id, "s2");
 }
 
+// Nazwa spoza planu to warunek wstepny getQuery(): odwolania z tresci planu odrzuca wczesniej
+// compiler::checkStreamReferences, nazwy od klienta sprawdzaja exists() ich wolajacy. Zlamany
+// warunek konczy proces przez rdb::fatal (RDB_ASSERT) - do 2026-10 byl to std::logic_error.
 TEST(qTree, getQuery_throws_logic_error_when_not_found) {
   qTree qt;
   qt.push_back(makeQuery("s1"));
-  EXPECT_THROW(qt.getQuery("missing"), std::logic_error);
+  EXPECT_DEATH(static_cast<void>(qt.getQuery("missing")), "FATAL: .*missing");
 }
 
+// Pusta nazwa nie jest bledem PLANU - zaden tekst RQL jej nie wytwarza - wiec to niezmiennik.
 TEST(qTree, getQuery_fatals_on_empty_name) {
   qTree qt;
-  EXPECT_DEATH({ qt.getQuery(""); }, "query name is empty");
+  EXPECT_DEATH(static_cast<void>(qt.getQuery("")), "FATAL: qTree::getQuery: query name is empty");
 }
 
 // ============================================================
@@ -247,7 +252,7 @@ TEST(qTree, getAvailableTimeIntervals_returns_unique_intervals) {
   qt.push_back(makeQuery("s2", 1, 1));
   qt.push_back(makeQuery("s3", 1, 2));  // duplikat - zbiór nie powtarza
 
-  auto intervals = qt.getAvailableTimeIntervals();
+  auto intervals = rdbtest::ok(qt.getAvailableTimeIntervals());
 
   EXPECT_EQ(intervals.size(), 2u);
   EXPECT_TRUE(intervals.count(rational(1, 2)));
@@ -261,7 +266,7 @@ TEST(qTree, getAvailableTimeIntervals_skips_compiler_directives) {
   query directive = makeQuery(":STORAGE", 1, 1);
   qt.push_back(directive);
 
-  auto intervals = qt.getAvailableTimeIntervals();
+  auto intervals = rdbtest::ok(qt.getAvailableTimeIntervals());
   EXPECT_EQ(intervals.size(), 1u);
 }
 
@@ -272,14 +277,14 @@ TEST(qTree, getAvailableTimeIntervals_skips_directive_with_zero_interval) {
   qt.push_back(makeQuery(":STORAGE", 0, 1));
   qt.push_back(makeQuery("s1", 1, 2));
 
-  auto intervals = qt.getAvailableTimeIntervals();
+  auto intervals = rdbtest::ok(qt.getAvailableTimeIntervals());
   EXPECT_EQ(intervals, std::set<rational>{rational(1, 2)});
 }
 
 TEST(qTree, getAvailableTimeIntervals_fatals_when_rInterval_is_zero) {
   qTree qt;
   qt.push_back(makeQuery("bad", 0, 1));
-  EXPECT_DEATH({ qt.getAvailableTimeIntervals(); }, "rInterval is zero");
+  EXPECT_DEATH(static_cast<void>(qt.getAvailableTimeIntervals()), "FATAL: .*rInterval is zero");
 }
 
 // ============================================================

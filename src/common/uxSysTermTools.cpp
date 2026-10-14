@@ -18,7 +18,6 @@
 #include <spdlog/sinks/stdout_sinks.h>
 #include <spdlog/spdlog.h>
 
-#include "fatalError.hpp"
 #include "platformConfig.h"
 
 namespace {

@@ -1,15 +1,18 @@
 #include <gtest/gtest.h>
 
 #include <cerrno>
+#include <csignal>
 #include <cstdlib>
 #include <exception>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <thread>
 #include <type_traits>
 
 #include "fatalError.hpp"
+#include "rdb/error.hpp"
 
 // ctest -R '^ut_fatalError' -V
 
@@ -128,4 +131,59 @@ TEST(FatalErrorTest, ScopeDoesNotReachOtherThreads) {
 // Po zamknieciu zakresu dotychczasowa droga.
 TEST(FatalErrorTest, AfterScopeExitsAgain) {
   EXPECT_EXIT(raiseAfterScope(), ::testing::ExitedWithCode(EXIT_FAILURE), "\nFATAL: fatal after scope\n");
+}
+
+// Nowa granica statusowa nie gubi kategorii ani errno przy zmianie typu wartosci.
+TEST(ResultTest, PropagationPreservesErrorAndErrno) {
+  const auto read      = []() -> rdb::Result<std::unique_ptr<int>> { return rdb::fail(rdb::Errc::IO, "read failed", ENOENT); };
+  const auto propagate = [&]() -> rdb::Result<int> {
+    RDB_TRY_ASSIGN(auto value, read());
+    return *value;
+  };
+  const auto result = propagate();
+  ASSERT_FALSE(result);
+  EXPECT_EQ(result.error().code(), rdb::Errc::IO);
+  EXPECT_EQ(result.error().err(), ENOENT);
+  EXPECT_EQ(result.error().message(), "read failed");
+}
+
+TEST(ResultTest, TrySupportsVoidAndMoveOnlyValues) {
+  const auto operation = []() -> rdb::Result<std::unique_ptr<int>> {
+    RDB_TRY(rdb::Result<>{});
+    RDB_TRY_ASSIGN(auto value, rdb::Result<std::unique_ptr<int>>{std::make_unique<int>(42)});
+    return value;
+  };
+  const auto result = operation();
+  ASSERT_TRUE(result);
+  EXPECT_EQ(**result, 42);
+}
+
+TEST(ResultTest, DefaultFatalHandlerAborts) {
+  EXPECT_EXIT(
+      {
+        rdb::setFatalHandler(nullptr);
+        rdb::fatal("default invariant");
+      },
+      ::testing::KilledBySignal(SIGABRT), "FATAL: default invariant");
+}
+
+TEST(ResultTest, ReturningFatalHandlerStillAborts) {
+  EXPECT_EXIT(
+      {
+        rdb::setFatalHandler([](std::string_view message, const std::source_location &where) noexcept {
+          std::cerr << "host handler: " << message << " " << where.file_name() << "\n";
+        });
+        rdb::fatal("returning invariant");
+      },
+      ::testing::KilledBySignal(SIGABRT), "host handler: returning invariant.*FATAL: returning invariant");
+}
+
+TEST(ResultTest, DaemonHandlerKeepsFatalLatchContract) {
+  EXPECT_EXIT(
+      {
+        std::atexit(reportLatch);
+        rdb::setFatalHandler(&daemonFatalExit);
+        rdb::fatal("daemon invariant");
+      },
+      ::testing::ExitedWithCode(EXIT_FAILURE), "FATAL: daemon invariant\nlatch=1");
 }

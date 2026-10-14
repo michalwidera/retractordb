@@ -7,7 +7,8 @@
 #include <string>
 #include <system_error>  // std::error_code
 
-#include "fatalError.hpp"
+#include <fmt/format.h>
+
 #include "rdb/storageShadow.hpp"
 
 namespace rdb {
@@ -38,15 +39,20 @@ std::string descriptorRef(const Descriptor &descriptor) {
   return (it == descriptor.end()) ? std::string{} : it->rname;
 }
 
-StoragePaths::StoragePaths(const std::string_view qryID, const std::string_view fileName, const std::string_view storageParam) {
-  if (qryID.empty()) FatalError("storage: qryID must not be empty");
-  if (fileName.empty()) FatalError("storage: fileName must not be empty");
+Result<StoragePaths> StoragePaths::make(const std::string_view qryID, const std::string_view fileName,
+                                        const std::string_view storageParam) {
+  // Odmowa PRZED zbudowaniem obiektu: storage, ktory tego nie przejdzie, nigdy nie powstaje, wiec
+  // jego destruktor sie nie wykona - a to on kasuje pliki magazynu disposable. Zla konfiguracja
+  // nie moze niczego usunac, i nie usuwa.
+  if (qryID.empty()) return fail(Errc::Config, "storage: qryID must not be empty");
+  if (fileName.empty()) return fail(Errc::Config, "storage: fileName must not be empty");
 
-  descriptorFile_ = std::string(qryID) + ".desc";
-  setStorageFile(std::string(fileName));
+  StoragePaths paths;
+  paths.descriptorFile_ = std::string(qryID) + ".desc";
+  paths.setStorageFile(std::string(fileName));
 
   if (storageParam.empty()) {
-    return;  // no change
+    return paths;  // no change
   }
 
   // Katalog wskazany przez :STORAGE musi ISTNIEC - dyrektywa go nie tworzy. Rozroznienie
@@ -61,25 +67,28 @@ StoragePaths::StoragePaths(const std::string_view qryID, const std::string_view 
   while (dirName.size() > 1 && dirName.back() == std::filesystem::path::preferred_separator)
     dirName.pop_back();
 
-  if (!std::filesystem::exists(dirName)) {
+  // Przeciazenia z error_code: wersje rzucajace zglaszaja filesystem_error np. przy braku prawa
+  // do odczytu katalogu nadrzednego. Blad stat() traktujemy jak brak katalogu - komunikat i tak
+  // kaze go sprawdzic.
+  std::error_code statError;
+  if (!std::filesystem::exists(dirName, statError)) {
     std::error_code absError;
     const auto full = std::filesystem::absolute(dirName, absError);
-    // K1 po preflight (#473): checkStorageDirectory odmawia przed budowa modelu na czterech drogach.
-    FatalError(
-        "storage: directory '{}' from the STORAGE directive does not exist ({}); "
-        "RetractorDB does not create it - run 'mkdir -p {}' first",
-        dirName, absError ? std::string("path could not be resolved") : full.string(), dirName);
+    return fail(Errc::Config,
+                fmt::format("storage: directory '{}' from the STORAGE directive does not exist ({}); "
+                            "RetractorDB does not create it - run 'mkdir -p {}' first",
+                            dirName, absError ? std::string("path could not be resolved") : full.string(), dirName));
   }
 
-  if (!std::filesystem::is_directory(dirName)) {
-    // Ta sama kontrola K2 stoi w checkStorageDirectory (#473), przed zmiana planu.
-    FatalError("storage: path '{}' from the STORAGE directive exists but is not a directory", dirName);
+  if (!std::filesystem::is_directory(dirName, statError)) {
+    return fail(Errc::Config,
+                fmt::format("storage: path '{}' from the STORAGE directive exists but is not a directory", dirName));
   }
 
-  storageDir_ = dirName;
-
-  descriptorFile_ = std::filesystem::path(storageParam) / std::filesystem::path(descriptorFile_);
-  setStorageFile(std::filesystem::path(storageParam) / std::filesystem::path(storageFile_));
+  paths.storageDir_     = dirName;
+  paths.descriptorFile_ = std::filesystem::path(storageParam) / std::filesystem::path(paths.descriptorFile_);
+  paths.setStorageFile(std::filesystem::path(storageParam) / std::filesystem::path(paths.storageFile_));
+  return paths;
 }
 
 void StoragePaths::setStorageFile(std::string file) {
@@ -102,7 +111,7 @@ void StoragePaths::setStorageFile(std::string file) {
 // podmiana pliku na dowiazanie po tym sprawdzeniu tez nic nie daje. Zostaje podmiana katalogu
 // posredniego sciezki REF miedzy sprawdzeniem a open(): wymaga zapisu do katalogu nadrzednego,
 // a jej zamkniecie (deskryptor katalogu, przejscie po komponentach) jest odlozone.
-void StoragePaths::relocateFromRef(const Descriptor &descriptor) {
+Result<> StoragePaths::relocateFromRef(const Descriptor &descriptor) {
   auto it = std::ranges::find_if(descriptor,  //
                                  [](const auto &item) { return item.rtype == rdb::REF; });
 
@@ -117,20 +126,19 @@ void StoragePaths::relocateFromRef(const Descriptor &descriptor) {
   // and there is no specified storage as REF in descriptor - we should
   // stop immediately.
   if (storageFile_.empty()) {
-    // Nieosiagalne z planu (#473): konstruktor wymaga niepustego fileName, streamInstance bierze
-    // qry.filename albo niepuste qry.id, a DESC.g4 nie dopuszcza pustego REF. Sam brak REF
-    // zachowuje nazwe z konstruktora. Pusta sciezka wymaga wadliwego deskryptora zbudowanego w API.
-    FatalError("storage: storage file not set in descriptor (missing REF field or :STORAGE directive)");
+    return fail(Errc::Config, "storage: storage file not set in descriptor (missing REF field or :STORAGE directive)");
   }
+  return {};
 }
 
 void StoragePaths::removeAllFiles(const bool keepDataFiles) const {
-  if (std::filesystem::exists(descriptorFile_)) ::remove(descriptorFile_.c_str());
+  std::error_code ignored;
+  if (std::filesystem::exists(descriptorFile_, ignored)) (void)::remove(descriptorFile_.c_str());
   if (keepDataFiles) return;
   if (!storageFile_.empty()) (void)::remove(storageFile_.c_str());
-  if (!metaIndexFile_.empty() && std::filesystem::exists(metaIndexFile_)) ::remove(metaIndexFile_.c_str());
+  if (!metaIndexFile_.empty() && std::filesystem::exists(metaIndexFile_, ignored)) (void)::remove(metaIndexFile_.c_str());
   const std::string metaShadowFile = storageShadow::metaShadowFilePath(metaIndexFile_);
-  if (!metaIndexFile_.empty() && std::filesystem::exists(metaShadowFile)) ::remove(metaShadowFile.c_str());
+  if (!metaIndexFile_.empty() && std::filesystem::exists(metaShadowFile, ignored)) (void)::remove(metaShadowFile.c_str());
 }
 
 }  // namespace rdb

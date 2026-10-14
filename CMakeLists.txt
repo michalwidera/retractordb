@@ -91,6 +91,51 @@ option(ENABLE_UNITY_BUILD "Enable unity build for faster compilation" OFF)
 # src/python/CMakeLists.txt, przy celu, ktorego dotyczy.
 option(RDB_PYTHON "Build the retractordb._core Python extension (nanobind)" OFF)
 
+# Rdzen silnika bez wyjatkow C++. Biblioteki rdb, retractorcore i rdbembed - to,
+# co laduje osadzony Engine - zglaszaja bledy wartoscia (rdb::Result,
+# src/include/rdb/error.hpp), a zlamany niezmiennik konczy sie rdb::fatal(). ON
+# kompiluje je z -fno-exceptions, wiec `throw`, `try` i `catch` w rdzeniu sa
+# bledem KOMPILACJI. Wyjatki zostaja tylko tam, gdzie wymaga ich kod cudzy:
+# wygenerowany parser ANTLR razem z dwoma opakowaniami (DESCParser.cc,
+# RQLParser.cpp), opakowanie Boost.Stacktrace (stackTrace.cc) oraz konfiguracja
+# TOML (appConfig.cpp za granica configBridge.cc) - "wyspy" z catch na granicy -
+# wiazanie nanobind oraz uslugi demona na Boost.Interprocess i program_options.
+# OFF tylko do diagnozy - kod rdzenia jest ten sam w obu trybach. Celowo POZA
+# `xretractor --build-info`: zbior kluczy tego wypisu sprawdza korpus bramki H9.
+option(
+  RDB_NO_EXCEPTIONS
+  "Compile the engine core (rdb, retractorcore, rdbembed) with -fno-exceptions"
+  ON)
+
+# rdb_no_exceptions(<target>): rdzen bez wyjatkow. SPDLOG_NO_EXCEPTIONS jest
+# wymagane, bo naglowki spdlog maja `try` w funkcjach inline i nie wykrywaja
+# trybu same. Makro idzie WYLACZNIE do rdzenia: w tym trybie spdlog konczy
+# proces (abort) na bledzie zapisu sinka, a plikowy sink demona na karcie SD ma
+# dalej zglaszac taki blad i pracowac dalej - patrz Konfiguracja logowania
+# uslugi zachowuje wyjatki.
+function(rdb_no_exceptions target)
+  if(RDB_NO_EXCEPTIONS)
+    target_compile_options(${target}
+                           PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>)
+    target_compile_definitions(${target} PRIVATE SPDLOG_NO_EXCEPTIONS)
+  endif()
+endfunction()
+
+# rdb_exception_island(<source>...): plik rdzenia, ktory MUSI miec wyjatki, bo
+# wola kod cudzy, ktory nimi steruje (parser ANTLR). Wyjatek nie moze opuscic
+# takiego pliku - kazda funkcja wystawiona reszcie rdzenia lapie wszystko na
+# granicy i zwraca status. Bez wspolnych PCH i bez unity build: oba laczylyby
+# jednostke z wyjatkami z jednostkami bez nich.
+function(rdb_exception_island)
+  if(RDB_NO_EXCEPTIONS)
+    set_source_files_properties(
+      ${ARGN}
+      PROPERTIES COMPILE_OPTIONS "-fexceptions;-USPDLOG_NO_EXCEPTIONS"
+                 SKIP_PRECOMPILE_HEADERS ON
+                 SKIP_UNITY_BUILD_INCLUSION ON)
+  endif()
+endfunction()
+
 # Przełączniki optymalizatora planu używane w kontrolowanych badaniach
 # ablacyjnych. Domyślna konfiguracja zachowuje dotychczasowe działanie.
 option(RDB_OPT_DEDUP_SUBSTRATES

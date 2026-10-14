@@ -36,7 +36,10 @@ MetaIndexStore::MetaIndexStore(std::string metaFilePath, size_t entrySize)
     : metaFilePath_(std::move(metaFilePath)),
       entrySize_(entrySize) {}
 
-bool MetaIndexStore::fileExists() const { return !metaFilePath_.empty() && std::filesystem::exists(metaFilePath_); }
+bool MetaIndexStore::fileExists() const {
+  std::error_code ec;
+  return !metaFilePath_.empty() && std::filesystem::exists(metaFilePath_, ec);
+}
 
 void MetaIndexStore::saveHeader() {
   if (metaFilePath_.empty()) return;
@@ -78,7 +81,14 @@ const std::vector<IndexRecord> &MetaIndexStore::readAll() const {
 
   std::span<const std::byte> remaining(fileData);
   while (remaining.size() >= entrySize_) {
-    entriesCache_.push_back(IndexRecord::deserialize(remaining.subspan(0, entrySize_)));
+    auto entry = IndexRecord::deserialize(remaining.subspan(0, entrySize_));
+    if (!entry) {
+      initializationError_ = Error(Errc::IO, entry.error().message() + " in " + metaFilePath_, EIO);
+      entriesCache_.clear();
+      cacheValid_ = true;
+      return entriesCache_;
+    }
+    entriesCache_.push_back(std::move(*entry));
     remaining = remaining.subspan(entrySize_);
   }
 
@@ -120,7 +130,9 @@ void MetaIndexStore::rewrite(const std::vector<IndexRecord> &entries) {
       std::ranges::copy(rec.serialize(), std::back_inserter(content));
     (void)out.write(content);
   }
-  std::filesystem::rename(tmpPath, metaFilePath_);
+  std::error_code ec;
+  std::filesystem::rename(tmpPath, metaFilePath_, ec);
+  if (ec) return;
   // write-through; guard na wypadek, gdyby caller podal sam cache (self-assign jest
   // bezpieczny dla std::vector, ale jawny warunek dokumentuje intencje)
   if (&entries != &entriesCache_) entriesCache_ = entries;

@@ -17,6 +17,7 @@
 #include "rdb/fainterface.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/storage.hpp"
+#include "rdbResult.hpp"
 
 // Tests intentionally use raw arrays and direct optional access to exercise binary storage semantics.
 // NOLINTBEGIN(modernize-avoid-c-arrays,bugprone-unchecked-optional-access)
@@ -131,9 +132,10 @@ TEST(xrdb, test_storage) {
   // This assert will fail is structure is not packed.
   EXPECT_TRUE(dataDescriptor.getSizeInBytes() == sizeof(dataPayload));
 
-  rdb::storage dAcc2("datafile-fstream2", "datafile-fstream2", "");
+  auto dAcc2Owner     = rdbtest::ok(rdb::storage::create("datafile-fstream2", "datafile-fstream2", ""));
+  rdb::storage &dAcc2 = *dAcc2Owner;
 
-  EXPECT_EQ(dAcc2.attachDescriptor(&dataDescriptor), "");
+  EXPECT_RDB_OK(dAcc2.attachDescriptor(&dataDescriptor));
   dAcc2.setDisposable(true);
 
   auto *pl = dAcc2.getPayload();
@@ -149,15 +151,15 @@ TEST(xrdb, test_storage) {
     EXPECT_EQ(std::any_cast<int>(pl->getItem(2).value()), tlenViaOffset);
   }
 
-  static_cast<void>(dAcc2.write());
-  static_cast<void>(dAcc2.write());
-  static_cast<void>(dAcc2.write());
+  ASSERT_EQ(rdbtest::ok(dAcc2.write()), rdb::WriteStatus::Ok);
+  ASSERT_EQ(rdbtest::ok(dAcc2.write()), rdb::WriteStatus::Ok);
+  ASSERT_EQ(rdbtest::ok(dAcc2.write()), rdb::WriteStatus::Ok);
 
   pl->setItem(0, std::string("xxxx xxxx"));
   pl->setItem(1, static_cast<uint8_t>(0x33));
   pl->setItem(2, 0x67);
 
-  static_cast<void>(dAcc2.write(1));
+  ASSERT_EQ(rdbtest::ok(dAcc2.write(1)), rdb::WriteStatus::Ok);
 
   static_cast<void>(dAcc2.revRead(dAcc2.getRecordsCount() - 1 - 1));
 
@@ -179,8 +181,9 @@ TEST(xrdb, test_storage_disposal_removes_all_files) {
   auto desc               = makeDesc(AREA_SIZE);
 
   {
-    rdb::storage s(qryId, qryId, "");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(qryId, qryId, ""));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     s.setDisposable(true);
 
     auto *pl = s.getPayload();
@@ -188,7 +191,7 @@ TEST(xrdb, test_storage_disposal_removes_all_files) {
     std::memcpy(xData, "test data", AREA_SIZE);
     std::memcpy(pl->span().data(), xData, AREA_SIZE);
 
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
   }  // ~storage(): isDisposable_ => usuwa plik danych, .desc i .meta
 
   EXPECT_FALSE(std::filesystem::exists(qryId));
@@ -222,22 +225,23 @@ TEST(xrdb, storage_persists_null_flags_via_metadata_stream) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     s.setDisposable(true);
 
     auto *pl = s.getPayload();
 
     pl->setItem(0, std::nullopt);
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
 
     pl->setItem(0, 77);
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
 
-    ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.read(0)), rdb::ReadStatus::Ok);
     EXPECT_FALSE(pl->getItem(0).has_value());
 
-    ASSERT_EQ(s.read(1), rdb::ReadStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.read(1)), rdb::ReadStatus::Ok);
     ASSERT_TRUE(pl->getItem(0).has_value());
     EXPECT_EQ(std::any_cast<int>(pl->getItem(0).value()), 77);
   }
@@ -259,29 +263,30 @@ TEST(xrdb, storage_read_beyond_last_record_reports_no_such_record) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER) + rdb::Descriptor("b", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     s.setDisposable(true);
 
     auto *pl = s.getPayload();
     pl->setItem(0, 11);
     pl->setItem(1, 22);
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
 
     // Rekord istniejacy: status Ok i wartosci nietkniete.
-    ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.read(0)), rdb::ReadStatus::Ok);
     ASSERT_TRUE(pl->getItem(0).has_value());
     EXPECT_EQ(std::any_cast<int>(pl->getItem(0).value()), 11);
 
     // Rekord tuz za koncem magazynu: status NoSuchRecord, a KAZDE pole jest NULL - nie zerem.
     // Gdyby bitset mowil "nie-null", reduktor zlozylby to zero do MIN/MAX/SUM/AVG zamiast pominac,
     // a porownanie z zerem nie odroznilo by braku danych od danych rownych zeru.
-    EXPECT_EQ(s.read(1), rdb::ReadStatus::NoSuchRecord);
+    EXPECT_EQ(rdbtest::ok(s.read(1)), rdb::ReadStatus::NoSuchRecord);
     EXPECT_FALSE(pl->getItem(0).has_value());
     EXPECT_FALSE(pl->getItem(1).has_value());
 
     // Pozycja daleko za koncem - ten sam kontrakt, bez wzgledu na to, jak daleko.
-    EXPECT_EQ(s.read(99), rdb::ReadStatus::NoSuchRecord);
+    EXPECT_EQ(rdbtest::ok(s.read(99)), rdb::ReadStatus::NoSuchRecord);
     EXPECT_FALSE(pl->getItem(0).has_value());
   }
 
@@ -305,11 +310,12 @@ TEST(xrdb, storage_append_to_declared_source_reports_read_only) {
   }
 
   {
-    rdb::storage s(streamName, streamName, ".");
-    ASSERT_EQ(s.attachDescriptor(), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, streamName, "."));
+    rdb::storage &s = *sOwner;
+    ASSERT_RDB_OK(s.attachDescriptor());
     ASSERT_TRUE(s.isDeclared());
 
-    EXPECT_EQ(s.write(), rdb::WriteStatus::ReadOnly);
+    EXPECT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::ReadOnly);
     EXPECT_EQ(s.getRecordsCount(), 0);
   }
 
@@ -332,15 +338,16 @@ TEST(xrdb, storage_read_from_empty_storage_reports_no_such_record) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     s.setDisposable(true);
 
     ASSERT_EQ(s.getRecordsCount(), 0U);
-    EXPECT_EQ(s.read(0), rdb::ReadStatus::NoSuchRecord);
+    EXPECT_EQ(rdbtest::ok(s.read(0)), rdb::ReadStatus::NoSuchRecord);
     EXPECT_FALSE(s.getPayload()->getItem(0).has_value());
 
-    EXPECT_EQ(s.revRead(0), rdb::ReadStatus::NoSuchRecord);
+    EXPECT_EQ(rdbtest::ok(s.revRead(0)), rdb::ReadStatus::NoSuchRecord);
     EXPECT_FALSE(s.getPayload()->getItem(0).has_value());
   }
 
@@ -355,19 +362,20 @@ TEST(xrdb, storage_updates_null_flags_on_record_modify) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     s.setDisposable(true);
 
     auto *pl = s.getPayload();
 
     pl->setItem(0, 123);
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
 
     pl->setItem(0, std::nullopt);
-    ASSERT_EQ(s.write(0), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write(0)), rdb::WriteStatus::Ok);
 
-    ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.read(0)), rdb::ReadStatus::Ok);
     EXPECT_FALSE(pl->getItem(0).has_value());
   }
 
@@ -389,23 +397,24 @@ TEST(xrdb, storage_purge_resets_metadata_stream_state) {
   std::filesystem::remove("./" + dataFile + ".shadow");
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
 
     auto *pl = s.getPayload();
 
     pl->setItem(0, std::nullopt);
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
     ASSERT_EQ(s.getRecordsCount(), 1U);
 
-    s.purge();
+    ASSERT_RDB_OK(s.purge());
     ASSERT_EQ(s.getRecordsCount(), 0U);
 
     pl->setItem(0, 1234);
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
     ASSERT_EQ(s.getRecordsCount(), 1U);
 
-    ASSERT_EQ(s.read(0), rdb::ReadStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.read(0)), rdb::ReadStatus::Ok);
     ASSERT_TRUE(pl->getItem(0).has_value());
     EXPECT_EQ(std::any_cast<int>(pl->getItem(0).value()), 1234);
   }
@@ -425,12 +434,13 @@ TEST(xrdb, storage_first_write_persists_first_meta_record) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
 
     auto *pl = s.getPayload();
     pl->setItem(0, std::nullopt);
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
     // Meta index is flushed to disk at destructor (lazy-write per spec):
     // "zapis pierwszego rekordu do pliku indeksu nie jest wymagany natychmiast"
   }
@@ -454,8 +464,9 @@ TEST(xrdb, storage_auto_gap_detection_marks_gap_after_null_records) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
 
     // nullFillCount=2: first 2 consecutive all-null appends go to storage (nullfill phase)
     // gap phase starts when consecutiveNullCount_ > nullFillCount_
@@ -467,17 +478,17 @@ TEST(xrdb, storage_auto_gap_detection_marks_gap_after_null_records) {
 
     // Nullfill phase: 2 all-null records written to storage as records 0 and 1
     pl->setNullBitset(allNull);
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
 
     // Gap phase: 2 more all-null records NOT written to storage (activeGapDuration_ = 2)
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
 
     // Non-null record: flushPendingGap(2) marks gap, then written as record 2
     pl->setNullBitset(nonNull);
     pl->setItem(0, 42);
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
 
     EXPECT_TRUE(s.hasGapBefore(2));
   }
@@ -496,8 +507,9 @@ TEST(xrdb, storage_gap_flushed_on_destructor) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     s.configureGapDetection(boost::rational<int>(1, 100), 1);
 
     auto *pl = s.getPayload();
@@ -505,18 +517,19 @@ TEST(xrdb, storage_gap_flushed_on_destructor) {
 
     // Nullfill phase: 1 all-null record written to storage as record 0
     pl->setNullBitset(allNull);
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
 
     // Gap phase: 1 more all-null record NOT written (activeGapDuration_ = 1)
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
 
     // Destructor fires here - flushPendingGap() must persist the gap to meta file
   }
 
   // Reopen and verify gap was saved
   {
-    rdb::storage s2(streamName, dataFile, ".");
-    EXPECT_EQ(s2.attachDescriptor(&desc), "");
+    auto s2Owner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s2 = *s2Owner;
+    EXPECT_RDB_OK(s2.attachDescriptor(&desc));
 
     // Record 0 was written; gap marker should be before record 1 (which doesn't exist yet,
     // but isGapBefore is based on meta entries, not record count)
@@ -537,8 +550,9 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_fast_writes) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
 
     // rInterval=1 (1 second), nullFillCount=2
     // All writes happen within milliseconds so no gap should be detected
@@ -548,7 +562,7 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_fast_writes) {
 
     for (int i = 0; i < 5; ++i) {
       pl->setItem(0, i);
-      ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+      ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
     }
 
     EXPECT_FALSE(s.hasGapBefore(0));
@@ -568,8 +582,9 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_modify) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
 
     // rInterval=1/100 (10ms), nullFillCount=2
     s.configureGapDetection(boost::rational<int>(1, 100), 2);
@@ -577,14 +592,14 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_modify) {
     auto *pl = s.getPayload();
 
     pl->setItem(0, 10);
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
 
     // Wait longer than threshold
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // Modify existing record - auto-gap should NOT be triggered for modifications
     pl->setItem(0, 99);
-    ASSERT_EQ(s.write(0), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write(0)), rdb::WriteStatus::Ok);
 
     EXPECT_FALSE(s.hasGapBefore(0));
   }
@@ -603,8 +618,9 @@ TEST(xrdb, storage_setSamplingInterval_propagates_to_meta) {
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
 
   {
-    rdb::storage s(streamName, dataFile, ".");
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(streamName, dataFile, "."));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
 
     s.configureGapDetection(boost::rational<int>(1, 10));
 
@@ -613,7 +629,7 @@ TEST(xrdb, storage_setSamplingInterval_propagates_to_meta) {
     // Write 3 records and verify meta tracks them
     for (int i = 0; i < 3; ++i) {
       pl->setItem(0, i * 10);
-      ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+      ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
     }
 
     EXPECT_FALSE(s.isMetaIndexEmpty());
@@ -639,18 +655,19 @@ TEST(xrdb, storage_rotates_data_and_null_indexes_on_shutdown) {
     const bool shadow   = type == "DEFAULT" || type == "POSIXSHD";
     for (int session = 0; session < 2; ++session) {
       {
-        rdb::storage s("result", "result", root.string(), type, false, false, session);
-        ASSERT_EQ(s.attachDescriptor(&desc), "");
+        auto sOwner     = rdbtest::ok(rdb::storage::create("result", "result", root.string(), type, false, false, session));
+        rdb::storage &s = *sOwner;
+        ASSERT_RDB_OK(s.attachDescriptor(&desc));
         EXPECT_EQ(s.getRecordsCount(), 0U);
         EXPECT_TRUE(s.isMetaIndexEmpty());
         auto *pl = s.getPayload();
         pl->setItem(0, session == 0 ? std::optional<std::any>{std::nullopt} : std::optional<std::any>{42});
-        EXPECT_EQ(s.write(), rdb::WriteStatus::Ok);
+        EXPECT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
         pl->setItem(0, 100 + session);
-        EXPECT_EQ(s.write(), rdb::WriteStatus::Ok);
+        EXPECT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
         pl->setItem(0, session == 0 ? std::optional<std::any>{77} : std::optional<std::any>{std::nullopt});
-        EXPECT_EQ(s.write(0), rdb::WriteStatus::Ok);
-        EXPECT_EQ(s.read(0), rdb::ReadStatus::Ok);
+        EXPECT_EQ(rdbtest::ok(s.write(0)), rdb::WriteStatus::Ok);
+        EXPECT_EQ(rdbtest::ok(s.read(0)), rdb::ReadStatus::Ok);
         EXPECT_EQ(pl->getNullBitset(), std::vector<bool>{session == 1});
         if (session == 0) EXPECT_EQ(std::any_cast<int>(pl->getItem(0).value()), 77);
       }
@@ -672,13 +689,14 @@ TEST(xrdb, storage_rotates_data_and_null_indexes_on_shutdown) {
                                    std::filesystem::copy_options::overwrite_existing);
       }
       {
-        rdb::storage view("result", "result", (root / "view").string(), type, false, false, -1);
-        ASSERT_EQ(view.attachDescriptor(&desc), "");
+        auto viewOwner = rdbtest::ok(rdb::storage::create("result", "result", (root / "view").string(), type, false, false, -1));
+        rdb::storage &view = *viewOwner;
+        ASSERT_RDB_OK(view.attachDescriptor(&desc));
         EXPECT_EQ(view.getRecordsCount(), 2U);
-        EXPECT_EQ(view.read(0), rdb::ReadStatus::Ok);
+        EXPECT_EQ(rdbtest::ok(view.read(0)), rdb::ReadStatus::Ok);
         EXPECT_EQ(view.getPayload()->getNullBitset(), std::vector<bool>{session == 1});
         if (session == 0) EXPECT_EQ(std::any_cast<int>(view.getPayload()->getItem(0).value()), 77);
-        EXPECT_EQ(view.read(1), rdb::ReadStatus::Ok);
+        EXPECT_EQ(rdbtest::ok(view.read(1)), rdb::ReadStatus::Ok);
         EXPECT_EQ(view.getPayload()->getNullBitset(), std::vector<bool>{false});
         EXPECT_EQ(std::any_cast<int>(view.getPayload()->getItem(0).value()), 100 + session);
       }
@@ -699,12 +717,13 @@ TEST(xrdb, storage_no_rotation_when_counts_match) {
 
   // First lifecycle: percounter=-1 so data file is NOT renamed.
   {
-    rdb::storage s(qryID2, dataFile2, ".", "POSIX", false, false, -1);
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(qryID2, dataFile2, ".", "POSIX", false, false, -1));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     auto *pl = s.getPayload();
     for (int i = 0; i < 3; ++i) {
       pl->setItem(0, i);
-      static_cast<void>(s.write());
+      ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
     }
   }
 
@@ -713,8 +732,9 @@ TEST(xrdb, storage_no_rotation_when_counts_match) {
 
   // Second lifecycle: counts match → no rotation.
   {
-    rdb::storage s(qryID2, dataFile2, ".", "POSIX", false, false, -1);
-    EXPECT_EQ(s.attachDescriptor(&desc), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(qryID2, dataFile2, ".", "POSIX", false, false, -1));
+    rdb::storage &s = *sOwner;
+    EXPECT_RDB_OK(s.attachDescriptor(&desc));
     s.configureGapDetection({1, 10});
 
     // Meta still has the original 3 records (not rotated).
@@ -764,8 +784,9 @@ TEST(xrdb, storage_ref_outside_store_reads_but_is_not_removed) {
   scene.keep(source, "TEXTSOURCE");
 
   {
-    rdb::storage s(scene.stream, scene.stream, scene.store);
-    ASSERT_EQ(s.attachDescriptor(), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(scene.stream, scene.stream, scene.store));
+    rdb::storage &s = *sOwner;
+    ASSERT_RDB_OK(s.attachDescriptor());
     EXPECT_TRUE(s.isDeclared());
     s.setDisposable(true);
   }
@@ -782,8 +803,11 @@ TEST(xrdb, storage_writable_ref_outside_store_is_refused) {
   scene.keep(target, "POSIX");
 
   {
-    rdb::storage s(scene.stream, scene.stream, scene.store);
-    const std::string error = s.attachDescriptor();
+    auto sOwner         = rdbtest::ok(rdb::storage::create(scene.stream, scene.stream, scene.store));
+    rdb::storage &s     = *sOwner;
+    const auto attached = s.attachDescriptor();
+    ASSERT_RDB_ERROR(attached, rdb::Errc::Compile);
+    const std::string &error = attached.error().message();
     EXPECT_EQ(error, "storage: " + scene.desc + " moves the POSIX data file to '" + target +
                          "', outside the storage directory; add its directory to storage.ref_dirs in retractor.toml to "
                          "allow it");
@@ -802,11 +826,12 @@ TEST(xrdb, storage_writable_ref_into_allowed_dir_works) {
   scene.keep(target, "POSIX");
 
   {
-    rdb::storage s(scene.stream, scene.stream, scene.store);
+    auto sOwner     = rdbtest::ok(rdb::storage::create(scene.stream, scene.stream, scene.store));
+    rdb::storage &s = *sOwner;
     s.allowRefDirs({std::filesystem::absolute(scene.outside).string()});
-    ASSERT_EQ(s.attachDescriptor(), "");
+    ASSERT_RDB_OK(s.attachDescriptor());
     *reinterpret_cast<int *>(s.getPayload()->span().data()) = 7;
-    ASSERT_EQ(s.write(), rdb::WriteStatus::Ok);
+    ASSERT_EQ(rdbtest::ok(s.write()), rdb::WriteStatus::Ok);
     EXPECT_EQ(std::filesystem::file_size(target), sizeof(int));
     s.setDisposable(true);
   }
@@ -825,27 +850,32 @@ TEST(xrdb, storage_kept_ref_must_match_the_plan) {
   std::ofstream(foreign) << "1\n";
 
   const auto attach = [&](const rdb::Descriptor &plan) {
-    rdb::storage s(scene.stream, scene.stream, scene.store);
-    const std::string error = s.attachDescriptor(&plan);
-    if (error.empty()) s.setDisposable(true);  // jak dataModel: DISPOSABLE dopiero po udanym otwarciu
-    return error;
+    auto sOwner     = rdbtest::ok(rdb::storage::create(scene.stream, scene.stream, scene.store));
+    rdb::storage &s = *sOwner;
+    auto result     = s.attachDescriptor(&plan);
+    if (result) s.setDisposable(true);  // jak dataModel: DISPOSABLE dopiero po udanym otwarciu
+    return result;
   };
   const rdb::Descriptor field("a", sizeof(int), 1, rdb::INTEGER);
 
   scene.keep(foreign, "TEXTSOURCE");
-  EXPECT_EQ(attach(field + rdb::Descriptor(planned, 0, 0, rdb::REF) + rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE)),
-            "storage: " + scene.desc + " names data file '" + foreign + "', but the plan gives '" + planned + "'; remove " +
-                scene.desc + " to start the stream afresh");
+  const auto attached0 =
+      attach(field + rdb::Descriptor(planned, 0, 0, rdb::REF) + rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE));
+  ASSERT_RDB_ERROR(attached0, rdb::Errc::Compile);
+  EXPECT_EQ(attached0.error().message(), "storage: " + scene.desc + " names data file '" + foreign + "', but the plan gives '" +
+                                             planned + "'; remove " + scene.desc + " to start the stream afresh");
 
   scene.keep(foreign, "POSIX");
-  EXPECT_EQ(attach(field), "storage: " + scene.desc + " names data file '" + foreign + "', but the plan gives none; remove " +
-                               scene.desc + " to start the stream afresh");
+  const auto attached1 = attach(field);
+  ASSERT_RDB_ERROR(attached1, rdb::Errc::Compile);
+  EXPECT_EQ(attached1.error().message(), "storage: " + scene.desc + " names data file '" + foreign +
+                                             "', but the plan gives none; remove " + scene.desc + " to start the stream afresh");
   EXPECT_TRUE(std::filesystem::exists(foreign));
   EXPECT_TRUE(std::filesystem::exists(scene.desc)) << "odmowa nie usuwa zachowanego .desc";
 
   // REF planu zgodny z plikiem: odczyt dziala, a DISPOSABLE z planu usuwa zrodlo jak dotad.
   scene.keep(planned, "TEXTSOURCE");
-  EXPECT_EQ(attach(field + rdb::Descriptor(planned, 0, 0, rdb::REF) + rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE)), "");
+  EXPECT_RDB_OK(attach(field + rdb::Descriptor(planned, 0, 0, rdb::REF) + rdb::Descriptor("TEXTSOURCE", 0, 0, rdb::TYPE)));
   EXPECT_FALSE(std::filesystem::exists(planned));
   EXPECT_TRUE(std::filesystem::exists(foreign));
 }
@@ -877,7 +907,7 @@ struct LinkScene : RefScene {
 
 void writeValue(rdb::storage &s, const int value, const size_t position = std::numeric_limits<size_t>::max()) {
   *reinterpret_cast<int *>(s.getPayload()->span().data()) = value;
-  ASSERT_EQ(s.write(position), rdb::WriteStatus::Ok);
+  ASSERT_EQ(rdbtest::ok(s.write(position)), rdb::WriteStatus::Ok);
 }
 }  // namespace
 
@@ -887,8 +917,11 @@ TEST(xrdb, storage_data_file_symlink_is_refused) {
     LinkScene scene;
     scene.link(scene.stream);
     {
-      rdb::storage s(scene.stream, scene.stream, scene.store, type, false, false, -1);
-      const std::string error = s.attachDescriptor(&scene.plan);
+      auto sOwner         = rdbtest::ok(rdb::storage::create(scene.stream, scene.stream, scene.store, type, false, false, -1));
+      rdb::storage &s     = *sOwner;
+      const auto attached = s.attachDescriptor(&scene.plan);
+      ASSERT_RDB_ERROR(attached, rdb::Errc::IO);
+      const std::string &error = attached.error().message();
       EXPECT_NE(error.find(scene.eloopMessage), std::string::npos) << type << ": " << error;
     }
     EXPECT_TRUE(scene.sentinelIntact()) << type;
@@ -897,8 +930,11 @@ TEST(xrdb, storage_data_file_symlink_is_refused) {
     LinkScene scene;
     scene.link(scene.stream + ".shadow");
     {
-      rdb::storage s(scene.stream, scene.stream, scene.store, type, false, false, -1);
-      const std::string error = s.attachDescriptor(&scene.plan);
+      auto sOwner         = rdbtest::ok(rdb::storage::create(scene.stream, scene.stream, scene.store, type, false, false, -1));
+      rdb::storage &s     = *sOwner;
+      const auto attached = s.attachDescriptor(&scene.plan);
+      ASSERT_RDB_ERROR(attached, rdb::Errc::IO);
+      const std::string &error = attached.error().message();
       EXPECT_NE(error.find(scene.eloopMessage), std::string::npos) << type << ": " << error;
     }
     EXPECT_TRUE(scene.sentinelIntact()) << type;
@@ -909,12 +945,11 @@ TEST(xrdb, storage_data_file_symlink_is_refused) {
 TEST(xrdb, storage_generic_symlink_is_not_written) {
   LinkScene scene;
   scene.link(scene.stream);
-  EXPECT_DEATH(
-      {
-        rdb::storage s(scene.stream, scene.stream, scene.store, "GENERIC", false, false, -1);
-        if (s.attachDescriptor(&scene.plan).empty()) writeValue(s, 7);
-      },
-      "failed");
+  auto sOwner     = rdbtest::ok(rdb::storage::create(scene.stream, scene.stream, scene.store, "GENERIC", false, false, -1));
+  rdb::storage &s = *sOwner;
+  ASSERT_RDB_OK(s.attachDescriptor(&scene.plan));
+  s.getPayload()->setItem(0, 7);
+  EXPECT_RDB_ERROR(s.write(), rdb::Errc::IO, "failed");
   EXPECT_TRUE(scene.sentinelIntact());
 }
 
@@ -925,8 +960,9 @@ TEST(xrdb, storage_meta_symlink_is_not_written) {
     LinkScene scene;
     scene.link(scene.stream + suffix);
     {
-      rdb::storage s(scene.stream, scene.stream, scene.store, "POSIXSHD", false, false, -1);
-      ASSERT_EQ(s.attachDescriptor(&scene.plan), "") << suffix;
+      auto sOwner     = rdbtest::ok(rdb::storage::create(scene.stream, scene.stream, scene.store, "POSIXSHD", false, false, -1));
+      rdb::storage &s = *sOwner;
+      ASSERT_RDB_OK(s.attachDescriptor(&scene.plan)) << suffix;
       writeValue(s, 7);
       writeValue(s, 8, 0);  // aktualizacja rekordu dopisuje wpis do `.meta.shadow`
       s.setDisposable(true);
@@ -942,20 +978,24 @@ TEST(xrdb, storage_descriptor_symlink_is_refused) {
   LinkScene scene;
   scene.link(scene.stream + ".desc");
   {
-    rdb::storage s(scene.stream, scene.stream, scene.store, "POSIX", false, false, -1);
-    const std::string error = s.attachDescriptor(&scene.plan);
+    auto sOwner         = rdbtest::ok(rdb::storage::create(scene.stream, scene.stream, scene.store, "POSIX", false, false, -1));
+    rdb::storage &s     = *sOwner;
+    const auto attached = s.attachDescriptor(&scene.plan);
+    ASSERT_RDB_ERROR(attached, rdb::Errc::IO);
+    const std::string &error = attached.error().message();
     EXPECT_NE(error.find(scene.eloopMessage), std::string::npos) << error;
   }
   EXPECT_TRUE(scene.sentinelIntact());
 
   std::filesystem::remove(scene.desc);
   scene.link(scene.stream + ".desc", "created");
-  EXPECT_DEATH(
-      {
-        rdb::storage s(scene.stream, scene.stream, scene.store, "POSIX", false, false, -1);
-        (void)s.attachDescriptor(&scene.plan);
-      },
-      "failed to open descriptor file for writing");
+  {
+    auto sOwner         = rdbtest::ok(rdb::storage::create(scene.stream, scene.stream, scene.store, "POSIX", false, false, -1));
+    rdb::storage &s     = *sOwner;
+    const auto attached = s.attachDescriptor(&scene.plan);
+    ASSERT_RDB_ERROR(attached, rdb::Errc::IO, "failed to open descriptor file for writing");
+    EXPECT_EQ(attached.error().err(), ELOOP);
+  }
   EXPECT_FALSE(std::filesystem::exists(scene.outside + "/created"));
 }
 
@@ -966,8 +1006,9 @@ TEST(xrdb, storage_directory_symlink_works) {
   std::filesystem::remove(storeLink);
   std::filesystem::create_directory_symlink(scene.store, storeLink);
   {
-    rdb::storage s(scene.stream, scene.stream, storeLink, "POSIX", false, false, -1);
-    ASSERT_EQ(s.attachDescriptor(&scene.plan), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(scene.stream, scene.stream, storeLink, "POSIX", false, false, -1));
+    rdb::storage &s = *sOwner;
+    ASSERT_RDB_OK(s.attachDescriptor(&scene.plan));
     writeValue(s, 7);
   }
   EXPECT_EQ(std::filesystem::file_size(scene.store + "/" + scene.stream), sizeof(int));
@@ -982,8 +1023,9 @@ TEST(xrdb, storage_caller_ref_symlink_works) {
   std::filesystem::create_symlink("target.bin", link);
   const rdb::Descriptor plan = scene.plan + rdb::Descriptor(link, 0, 0, rdb::REF) + rdb::Descriptor("POSIX", 0, 0, rdb::TYPE);
   {
-    rdb::storage s(scene.stream, scene.stream, scene.store);
-    ASSERT_EQ(s.attachDescriptor(&plan), "");
+    auto sOwner     = rdbtest::ok(rdb::storage::create(scene.stream, scene.stream, scene.store));
+    rdb::storage &s = *sOwner;
+    ASSERT_RDB_OK(s.attachDescriptor(&plan));
     writeValue(s, 7);
   }
   EXPECT_TRUE(std::filesystem::is_symlink(link));

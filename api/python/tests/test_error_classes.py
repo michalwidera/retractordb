@@ -5,13 +5,16 @@ Each test below pins one row: the exception (or warning) and the state the insta
 
 K1 taints the whole module until the interpreter restarts, so the tests that provoke
 it run in a subprocess - a K1 here would fail every test after it. That subprocess is
-also the "kernel survives" check: it has to print ``alive`` after the error.
+also the "kernel survives" check for errors returned as Result: it has to print
+``alive`` after the error. An invariant violation through rdb::fatal ends the host;
+its separate subprocess test checks SIGABRT.
 """
 
 from __future__ import annotations
 
 import errno
 import os
+import signal
 import subprocess
 import sys
 import warnings
@@ -54,14 +57,14 @@ def test_k1_internal_error_taints_the_module(module_root: Path, plan_dir: Path) 
     """K1 -> InternalError; every later call into the engine refuses until a restart."""
     body = "\n".join(
         [
-            "os.environ['RDB_FAULT_FATAL_IN_SLOT'] = '0'",
+            "os.environ['RDB_FAULT_ERROR_IN_SLOT'] = '0'",
             "try:",
             "    engine.step()",
             "    raise SystemExit('K1 did not raise')",
             "except rdb.InternalError as error:",
             "    assert not isinstance(error, (ValueError, OSError)), type(error).__mro__",
-            "    assert 'RDB_FAULT_FATAL_IN_SLOT' in str(error), error",
-            "del os.environ['RDB_FAULT_FATAL_IN_SLOT']",
+            "    assert 'RDB_FAULT_ERROR_IN_SLOT' in str(error), error",
+            "del os.environ['RDB_FAULT_ERROR_IN_SLOT']",
             "assert engine.failed",
             "for call in (lambda: engine.step(), lambda: engine.compile(plan), lambda: rdb.Engine(plan_dir),",
             "             lambda: engine.record_count('dst')):",
@@ -70,7 +73,7 @@ def test_k1_internal_error_taints_the_module(module_root: Path, plan_dir: Path) 
             "        raise SystemExit('a tainted module accepted a call')",
             "    except rdb.InternalError as error:",
             "        assert 'restart the interpreter' in str(error), error",
-            "        assert 'RDB_FAULT_FATAL_IN_SLOT' in str(error), error",
+            "        assert 'RDB_FAULT_ERROR_IN_SLOT' in str(error), error",
             "engine.close()",
         ]
     )
@@ -101,7 +104,7 @@ def test_kernel_survives_k2_k3_k4_and_k1(module_root: Path, plan_dir: Path) -> N
             "    pass",
             "del os.environ['RDB_FAULT_ENV_IN_SLOT']",
             "engine.compile(plan)",
-            "os.environ['RDB_FAULT_FATAL_IN_SLOT'] = '0'",
+            "os.environ['RDB_FAULT_ERROR_IN_SLOT'] = '0'",
             "try:",
             "    engine.step()",
             "except rdb.InternalError:",
@@ -126,6 +129,34 @@ def test_k2_plan_error_leaves_the_engine_usable(rdb, plan_dir: Path) -> None:
         engine.compile(doubling_plan(plan_dir / "data.txt"))
         engine.run()
         assert [row[0] for row in engine.rows("dst")] == [value * 2 for value in INPUT]
+
+
+@pytest.mark.parametrize("operator", ["&", "%"])
+def test_equal_deinterleave_interval_is_a_recoverable_plan_error(
+    module_root: Path, plan_dir: Path, operator: str,
+) -> None:
+    """Bledny rozplot daje CompileError, a interpreter i silnik pracuja dalej."""
+    source = plan_dir / "data.txt"
+    declaration = f"DECLARE a INTEGER STREAM src, 1/2 TEXTFILE '{source}'\n"
+    body = "\n".join(
+        [
+            "for expression in ('src', '(src-1/2)'):",
+            f"    invalid = {declaration!r} + "
+            f"'SELECT * STREAM bad FROM ' + expression + {operator + '1/2'!r}",
+            "    try:",
+            "        engine.compile(invalid)",
+            "        raise SystemExit('undefined interval was accepted')",
+            "    except rdb.CompileError as error:",
+            "        assert 'equal to the source interval' in str(error), error",
+            "    assert not engine.has_plan",
+            "    engine.compile(plan)",
+            "    engine.run()",
+            f"    assert [row[0] for row in engine.rows('dst')] == {[value * 2 for value in INPUT]!r}",
+        ]
+    )
+    result = run_survivor(module_root, plan_dir, body)
+    assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+    assert "alive" in result.stdout
 
 
 def test_k3_config_error_leaves_the_plan_unchanged(rdb, plan_dir: Path) -> None:
@@ -218,3 +249,14 @@ def test_k6_deprecated_forms_are_deprecation_warnings(rdb, plan_dir: Path) -> No
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             engine.compile(doubling_plan(source))
+
+
+def test_invariant_violation_ends_the_host(module_root: Path, plan_dir: Path) -> None:
+    """Naruszenie niezmiennika omija translacje Result i konczy proces hosta."""
+    result = run_survivor(
+        module_root, plan_dir,
+        "os.environ['RDB_FAULT_FATAL_IN_SLOT'] = '0'\nengine.step()",
+    )
+    assert result.returncode == -signal.SIGABRT, result.stderr
+    assert "FATAL: fault hook RDB_FAULT_FATAL_IN_SLOT" in result.stderr
+    assert "alive" not in result.stdout

@@ -31,17 +31,15 @@ TEST(xSOperations, hash_rejects_non_positive_delta) {
   EXPECT_EXIT(hashWithNegativeDeltaB(), ::testing::ExitedWithCode(EXIT_FAILURE), "\nFATAL: Hash: deltaB must be > 0\n");
 }
 
-// W trybie rzucaj biblioteki (#476) ten sam błąd wraca jako EngineFatal.
-TEST(xSOperations, hash_non_positive_delta_throws_in_scope) {
-  rdb::ThrowOnFatalScope scope;
-  int retPos = 0;
-  try {
-    Hash(1, 0, 0, retPos);
-    ADD_FAILURE() << "Hash z deltaB == 0 nie zglosil bledu";
-  } catch (const rdb::EngineFatal &fault) {
-    EXPECT_EQ(fault.cls, rdb::ErrorClass::Internal);
-    EXPECT_EQ(fault.message, "Hash: deltaB must be > 0");
-  }
+// Ten sam niezmiennik konczy proces rowniez przy wywolaniu bibliotecznym.
+TEST(xSOperations, hash_non_positive_delta_uses_fatal_handler) {
+  EXPECT_EXIT(
+      {
+        int retPos = 0;
+        Hash(1, 0, 0, retPos);
+        std::_Exit(0);
+      },
+      ::testing::ExitedWithCode(EXIT_FAILURE), "FATAL: Hash: deltaB must be > 0");
 }
 
 TEST(xSOperations, hash_operations) {

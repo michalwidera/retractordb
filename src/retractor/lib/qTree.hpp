@@ -10,6 +10,7 @@
 #include <boost/rational.hpp>
 
 #include "query.hpp"
+#include "rdb/error.hpp"
 
 /// Plan zapytan - wektor wezlow w kolejnosci przetwarzania, plus wyszukanie po nazwie.
 ///
@@ -92,7 +93,7 @@ class qTree : private std::vector<query> {
 
   boost::rational<int> getDelta(const std::string &query_name);
   void dumpCore();
-  std::set<boost::rational<int>> getAvailableTimeIntervals();
+  [[nodiscard]] rdb::Result<std::set<boost::rational<int>>> getAvailableTimeIntervals();
 
   std::map<std::string, int> maxCapacity;
 

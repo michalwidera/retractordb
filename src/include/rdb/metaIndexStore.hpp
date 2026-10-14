@@ -1,9 +1,11 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "error.hpp"
 #include "indexRecord.hpp"
 
 namespace rdb {
@@ -32,6 +34,8 @@ namespace rdb {
 class MetaIndexStore {
  public:
   MetaIndexStore(std::string metaFilePath, size_t entrySize);
+
+  [[nodiscard]] const std::optional<Error> &initializationError() const { return initializationError_; }
 
   [[nodiscard]] bool empty() const { return metaFilePath_.empty(); }
   [[nodiscard]] const std::string &path() const { return metaFilePath_; }
@@ -63,6 +67,7 @@ class MetaIndexStore {
   size_t entrySize_;
   mutable std::vector<IndexRecord> entriesCache_;
   mutable bool cacheValid_{false};
+  mutable std::optional<Error> initializationError_;
 };
 
 }  // namespace rdb

@@ -223,6 +223,12 @@ int main(int argc, char *argv[]) {
         std::print("{}unconnected\n{}", colors.RED, colors.RESET);
         continue;
       }
+      // Warstwa magazynu zglasza bledy wartoscia (rdb::Result) i kazda komenda wypisuje swoj
+      // blad sama, zostawiajac operatora przy prompcie. Do 2026-10 stal tu catch(rdb::Error),
+      // bo magazyn rzucal. Straz przy dacc powyzej zostaje: cmdOpen zeruje magazyn, ktorego nie
+      // udalo mu sie otworzyc, wiec kolejne komendy odbijaja sie o "unconnected" zamiast siegac
+      // po nullptr. Zlamany niezmiennik silnika (RDB_ASSERT) konczy proces - to blad w kodzie,
+      // nie w komendzie.
       if (!it->second->execute(ctx)) continue;
     } else if (cmd == "help" || cmd == "h") {
       std::print("{}", colors.GREEN);

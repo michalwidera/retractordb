@@ -8,13 +8,15 @@
 
 #include "rdb/descriptor.hpp"
 #include "rdb/metaShadow.hpp"
+#include "rdbResult.hpp"
 
+#include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <stdexcept>
+#include <iterator>
 #include <string>
 
 // ---------------------------------------------------------------------------
@@ -131,27 +133,24 @@ TEST(MetaShadowOverrideTest, deserialize_odrzuca_bitsetSize_spoza_ramki) {
   const auto serialized = original.serialize();  // 1 bajt bitsetu = miejsce na 8 bitow
 
   const auto same = rdb::metaShadow::ShadowOverride::deserialize(serialized);  // kontrola dodatnia
-  EXPECT_EQ(same.recordIndex, 4U);
-  EXPECT_EQ(same.nullBitset, original.nullBitset);
+  ASSERT_TRUE(same.has_value());
+  EXPECT_EQ(same->recordIndex, 4U);
+  EXPECT_EQ(same->nullBitset, original.nullBitset);
 
   for (const size_t bitsetSize : {SIZE_MAX, SIZE_MAX - 6, size_t{1} << 40, size_t{9}}) {
     SCOPED_TRACE(bitsetSize);
     auto raw = serialized;
     std::memcpy(raw.data() + kBitsetSizeOffset, &bitsetSize, sizeof(bitsetSize));
-    try {
-      (void)rdb::metaShadow::ShadowOverride::deserialize(raw);
-      ADD_FAILURE() << "expected std::runtime_error";
-    } catch (const std::runtime_error &e) {
-      EXPECT_NE(std::string(e.what()).find("exceeds remaining buffer"), std::string::npos) << e.what();
-    }
+    EXPECT_FALSE(rdb::metaShadow::ShadowOverride::deserialize(raw).has_value());
   }
 }
 
-TEST_F(ShadowUsageFixture, load_uszkodzonego_cienia_daje_runtime_error) {
+TEST_F(ShadowUsageFixture, load_uszkodzonego_cienia_zwraca_blad_io) {
   { rdb::metaShadow(descriptor, file).appendOverride(1, allNull); }
   {
     rdb::metaShadow shadow(descriptor, file);  // kontrola dodatnia
     shadow.load();
+    EXPECT_FALSE(shadow.initializationError().has_value());
     EXPECT_EQ(shadow.lookup(1), allNull);
   }
   {
@@ -160,8 +159,20 @@ TEST_F(ShadowUsageFixture, load_uszkodzonego_cienia_daje_runtime_error) {
     f.seekp(static_cast<std::streamoff>(kBitsetSizeOffset));
     f.write(reinterpret_cast<const char *>(&corrupt), sizeof(corrupt));
   }
-  rdb::metaShadow shadow(descriptor, file);
-  EXPECT_THROW(shadow.load(), std::runtime_error);
+  const auto readBytes = [&] {
+    std::ifstream input(shadowFile, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+  };
+  const std::string before = readBytes();
+  {
+    rdb::metaShadow shadow(descriptor, file);
+    shadow.load();
+    ASSERT_TRUE(shadow.initializationError().has_value());
+    EXPECT_EQ(shadow.initializationError()->code(), rdb::Errc::IO);
+    EXPECT_EQ(shadow.initializationError()->err(), EIO);
+    EXPECT_TRUE(shadow.initializationError()->message().contains(shadowFile));
+  }
+  EXPECT_EQ(readBytes(), before) << "odmowa nie moze przepisac uszkodzonego cienia";
 }
 
 /// @brief Ścieżka pliku cienia jest zgodna z konwencją używaną przez storageShadow::metaShadowFilePath().

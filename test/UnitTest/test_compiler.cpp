@@ -76,6 +76,33 @@ TEST(xparser, check_parserRQLString) {
 
 TEST(xparser, check_topological_sort) { qTree myInstance; }
 
+TEST(xcompiler, refuses_deinterleave_with_equal_intervals) {
+  // Mianownik rozplotu znika dla rownych interwalow. To blad planu, takze gdy interwal
+  // producenta dopiero wylicza kompilator; Boost nie moze tu wywolac fatal() hosta.
+  for (const char op : {'&', '%'}) {
+    for (const char *source : {"src", "(src-1/2)"}) {
+      SCOPED_TRACE(std::format("{}{}1/2", source, op));
+      qTree instance;
+      const auto loaded = parsePlanText(instance, std::format("DECLARE a INTEGER STREAM src, 1/2 TEXTFILE 'input.txt'\n"
+                                                              "SELECT * STREAM dst FROM {}{}1/2\n",
+                                                              source, op));
+      ASSERT_EQ(loaded.status, "OK");
+      const auto status = compiler(instance).compile();
+      EXPECT_NE(status.find("equal to the source interval"), std::string::npos) << status;
+      EXPECT_FALSE(isInternalCompilerError(status)) << status;
+    }
+
+    qTree valid;
+    ASSERT_EQ(parsePlanText(valid, std::format("DECLARE a INTEGER STREAM src, 1/2 TEXTFILE 'input.txt'\n"
+                                               "SELECT * STREAM dst FROM src{}1\n",
+                                               op))
+                  .status,
+              "OK");
+    ASSERT_EQ(compiler(valid).compile(), "OK");
+    EXPECT_EQ(valid.getQuery("dst").rInterval, boost::rational<int>(1));
+  }
+}
+
 TEST(xparser, check_multiline_backslash) {
   qTree instance;
   auto result = parserRQLFile_4Test(instance, "ut_multiline.rql");
@@ -993,17 +1020,12 @@ TEST(xcompiler, unrepresentable_interval_reports_range_error) {
       )");
   ASSERT_EQ(parseResult, "OK");
 
+  // Status planu, nie blad wewnetrzny: interwal wynika z tresci planu. Do 2026-10 zakres
+  // zglaszal rzut std::out_of_range, ktorego compile() nie lapal.
   compiler compilerInstance(instance);
-  EXPECT_THROW(
-      {
-        try {
-          compilerInstance.compile();
-        } catch (const std::out_of_range &error) {
-          EXPECT_NE(std::string(error.what()).find("out of representable range"), std::string::npos);
-          throw;
-        }
-      },
-      std::out_of_range);
+  const std::string status = compilerInstance.compile();
+  EXPECT_NE(status.find("out of representable range"), std::string::npos) << status;
+  EXPECT_FALSE(isInternalCompilerError(status)) << status;
 }
 
 // --- L5: nierozwiazany wezel planu nie moze degradowac po cichu ---------------------
@@ -1032,8 +1054,12 @@ TEST(xcompiler, unresolved_node_is_a_compilation_error) {
   // wersja przepisywala konsumentowi ciche zero.
   const std::map<std::string, int> partial{{"src", 0}};
 
-  EXPECT_DEATH(
-      { requireResolvedForEveryNode(plan, partial, "test", "startup latency"); }, "unresolved startup latency for 'consumer'");
+  // Status, nie smierc procesu (plaster A1 fazy 1) i nie wyjatek. Bramka pilnuje NIEZMIENNIKA
+  // kompilatora, wiec status niesie przedrostek kInternalCompilerError - wolajacy odroznia blad
+  // w tym kodzie od bledu planu uzytkownika. Do 2026-10 byl to rzut rdb::LogicError.
+  const std::string status = requireResolvedForEveryNode(plan, partial, "test", "startup latency");
+  EXPECT_TRUE(isInternalCompilerError(status)) << status;
+  EXPECT_NE(status.find("unresolved startup latency for 'consumer'"), std::string::npos) << status;
 }
 
 // Kontrola aparatury do testu wyzej: przy komplecie wynikow bramka musi milczec.
@@ -1045,16 +1071,15 @@ TEST(xcompiler, complete_resolution_passes_the_gate) {
 
   const std::map<std::string, int> complete{{"src", 0}, {"consumer", 3}};
 
-  requireResolvedForEveryNode(plan, complete, "test", "startup latency");
-  SUCCEED();
+  EXPECT_EQ(requireResolvedForEveryNode(plan, complete, "test", "startup latency"), "OK");
 }
 
 // Kontrola pozytywna na korpusie planow poprawnych: plan obejmujacy wszystkie dziewiec
 // klas operatorow musi wyjsc z kompilatora bez ani jednego wezla nierozwiazanego.
 //
-// Trybem porazki tego testu jest SMIERC PROCESU: requireResolvedForEveryNode() konczy
-// kompilacje przez FatalError, wiec nierozwiazany wezel przerywa binarke testu, zamiast
-// zapisac ostrzezenie w logu. Kontrola mutacyjna (zaszczepienie deklaracji usuniete
+// Trybem porazki tego testu jest status bledu wewnetrznego z compile(): requireResolvedForEveryNode()
+// konczy kompilacje statusem z przedrostkiem kInternalCompilerError, zamiast zapisac ostrzezenie
+// w logu i przejsc dalej. Kontrola mutacyjna (zaszczepienie deklaracji usuniete
 // z computeStartupLatency) pokazuje, ze ten tryb porazki dziala.
 TEST(xcompiler, every_node_of_a_nine_class_plan_is_resolved) {
   qTree instance;
@@ -1462,12 +1487,14 @@ TEST(xcompiler, malformed_intermediate_operator_is_rejected_before_iterator_unde
   malformed.lProgram.emplace_back(STREAM_TIMEMOVE);
   instance.push_back(malformed);
 
-  EXPECT_DEATH(
-      {
-        compiler compilerInstance(instance);
-        (void)compilerInstance.compile();
-      },
-      "operator 'STREAM_HASH' in query 'malformed' has 0 preceding tokens, needs 2");
+  // Niezmiennik kompilatora wychodzi Z compile() statusem z przedrostkiem kInternalCompilerError.
+  // Blad w samym kompilatorze ma dolecie tam, gdzie wolajacy rozpozna go jako InternalError,
+  // a nie wrocic do klienta jako "twoje zapytanie jest zle". Do 2026-10 byl to rzut LogicError.
+  compiler compilerInstance(instance);
+  const std::string status = compilerInstance.compile();
+  EXPECT_TRUE(isInternalCompilerError(status)) << status;
+  EXPECT_NE(status.find("operator 'STREAM_HASH' in query 'malformed' has 0 preceding tokens, needs 2"), std::string::npos)
+      << status;
 }
 
 // --- Issue 236: reduktor w postaci funkcyjnej SUMC()/MIN()/MAX()/AVG() ------------

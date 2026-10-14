@@ -12,6 +12,7 @@
 
 #include <gtest/gtest.h>
 
+#include "fatalError.hpp"
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/planSource.hpp"
 #include "retractor/lib/qTree.hpp"

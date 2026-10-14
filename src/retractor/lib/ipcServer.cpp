@@ -361,7 +361,19 @@ void IpcServer::commandLoop() const {
           // dostaje seq 0 i nadal odbiera swoja odpowiedz, bo sam tez czeka na 0.
           std::uint64_t clientSeq = 0;
           boost::conversion::try_lexical_convert(pt.get("db.seq", "0"), clientSeq);
-          ptree pt_retval = callbacks_.onCommand(pt);
+          ptree pt_retval;
+          try {
+            pt_retval = callbacks_.onCommand(pt);
+          } catch (const std::exception &ex) {
+            // Handler komendy ma wlasny catch(std::exception) i sam opisuje awarie klientowi;
+            // tutaj trafia tylko to, co wyleci POZA nim. Odpowiedz jest obowiazkowa: klient czeka
+            // na nia i bez niej melduje brak odpowiedzi, czyli wskazuje winnego po niewlasciwej
+            // stronie IPC. Usluga biegnie dalej -- jedno wadliwe zadanie nie jest powodem, zeby
+            // przestac obslugiwac pozostale.
+            SPDLOG_CRITICAL("Command handler escaped its own boundary: {}", ex.what());
+            pt_retval.clear();
+            pt_retval.put("error.response", std::string("command handler failure: ") + ex.what());
+          }
           // Sygnal idzie PO obsludze komendy, nie po jej odebraniu. Jedynym jego odbiorca jest
           // bramka --xqrywait, a bramka zdjeta w chwili ODEBRANIA komendy wpuszczala watek
           // przetwarzania jeszcze przed rejestracja subskrybenta: dla 'show' znaczylo to slot
@@ -373,7 +385,8 @@ void IpcServer::commandLoop() const {
           // subscribe() biegnie bez blokady epoki, a porzadek trzyma sie nadal, bo rejestracja
           // konczy sie przed powrotem z onCommand.
           // Kontrakt bramki jest nietkniety -- podnosi ja nadal KAZDA komenda, takze 'hello'
-          // (patrz it_xqrywait_gate). Wiadomosc odrzucona wyzej komenda nie jest i jej nie podnosi.
+          // (patrz it_xqrywait_gate), takze komenda, ktora sie wywrocila. Wiadomosc odrzucona wyzej
+          // komenda nie jest i jej nie podnosi.
           callbacks_.onCommandHandled();
           // Sending answer
           std::stringstream response_stream;
