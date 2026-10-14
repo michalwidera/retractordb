@@ -108,7 +108,14 @@ class storage {
   [[nodiscard]] Result<> attachStorage();
 
   /// Cztery niezmienniki, ktorych zlamanie znaczy uzycie magazynu przed attachDescriptor().
-  [[nodiscard]] Result<> requirePrepared() const;
+  /// Szybka sciezka inline: wolajacy (read, revRead, write - kazdy rekord) placa jedna galaz, a
+  /// Result<> sukcesu znika po wklejeniu. Tresc bledu buduje zimne notPrepared().
+  [[nodiscard]] Result<> requirePrepared() const {
+    if (!descriptor.empty() && accessor_ && storagePayload_ && metaData_) [[likely]]
+      return {};
+    return notPrepared();
+  }
+  [[nodiscard, gnu::cold]] Result<> notPrepared() const;
   [[nodiscard]] Result<> initializeAccessor();
 
   /// @brief Czy magazyn trzyma dane w pamięci, a nie na dysku (polityka TYPE deskryptora).

@@ -114,8 +114,16 @@ template <typename T = void>
 using Result = std::expected<T, Error>;
 
 /// Zbudowanie bledu do `return`: `return rdb::fail(Errc::Config, "...")`.
-[[nodiscard]] inline std::unexpected<Error> fail(Errc code, std::string message, int err = 0) {
+///
+/// Zimne i niewklejane: budowa bledu nie wnosi kodu do funkcji z goraca sciezka, ktora inaczej
+/// przestaje sie miescic w progu inline (#511). Przeciazenie dla literalu przenosi do srodka takze
+/// budowe std::string - najczestsza postac `return fail(Errc::X, "tekst")`.
+[[nodiscard, gnu::cold, gnu::noinline]] inline std::unexpected<Error> fail(Errc code, std::string message, int err = 0) {
   return std::unexpected<Error>(std::in_place, code, std::move(message), err);
+}
+
+[[nodiscard, gnu::cold, gnu::noinline]] inline std::unexpected<Error> fail(Errc code, const char *message, int err = 0) {
+  return std::unexpected<Error>(std::in_place, code, std::string(message), err);
 }
 
 /// Odmowa z aktualnego preflight zachowuje kategorie i errno.
@@ -169,9 +177,15 @@ FatalHandler setFatalHandler(FatalHandler handler) noexcept;
 /// jest WYLACZNIE po niespelnieniu warunku. Sprawdzenie zostaje w buildzie Release: kosztuje jedna
 /// galaz, a dalsza praca na zepsutym stanie (zapis poza payload, odczyt cudzego rekordu) jest
 /// gorsza niz zatrzymanie.
-#define RDB_ASSERT(cond, ...)                   \
-  do {                                          \
-    if (!(cond)) [[unlikely]] {                 \
-      ::rdb::fatal(::fmt::format(__VA_ARGS__)); \
-    }                                           \
+///
+/// Formatowanie i wywolanie fatal() siedza w zimnej lambdzie, ktorej kompilator nie wkleja: inaczej
+/// kazdy RDB_ASSERT wnosil kod fmt::format do funkcji z goraca sciezka, ta przestawala sie miescic
+/// w progu inline i wolanie jej kosztowalo wiecej niz samo sprawdzenie (#511). Miejsce zgloszenia
+/// to wiersz RDB_ASSERT, nie lambda.
+#define RDB_ASSERT(cond, ...)                                                                                         \
+  do {                                                                                                                \
+    if (!(cond)) [[unlikely]] {                                                                                       \
+      const auto rdbAssertWhere_ = ::std::source_location::current();                                                 \
+      [&] [[noreturn, gnu::cold, gnu::noinline]] () { ::rdb::fatal(::fmt::format(__VA_ARGS__), rdbAssertWhere_); }(); \
+    }                                                                                                                 \
   } while (false)

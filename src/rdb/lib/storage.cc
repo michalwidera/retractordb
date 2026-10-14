@@ -260,7 +260,7 @@ size_t storage::getRecordsCount() const { return recordsCount_; }
 /// wiec nie sa czescia umowy z wolajacym - sa czescia umowy magazynu z samym soba. Zwracane,
 /// a nie asercja, bo wszyscy wolajacy (read, write, purge) i tak zwracaja Result - host
 /// dostaje InternalError zamiast zakonczonego procesu.
-Result<> storage::requirePrepared() const {
+Result<> storage::notPrepared() const {
   if (descriptor.empty()) return fail(Errc::Logic, "storage: descriptor is empty - storage not initialized");
   if (!accessor_) return fail(Errc::Logic, "storage: data file not opened - accessor not initialized");
   if (!storagePayload_) return fail(Errc::Logic, "storage: payload not attached");
