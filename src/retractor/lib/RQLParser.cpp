@@ -432,7 +432,7 @@ class ParserListener : public RQLBaseListener {
   /// konieczne: rozwijanie stosu przechodzi przez `finally` generowanego kodu
   /// (antlrcpp::FinalAction), ktore wola exitRule(), a to wola kolejne exitXxx() na
   /// kontekscie zatrzymanym w polowie budowy. Pierwsza wersja tej naprawy po stronie RQL
-  /// padala tam segfaultem - patrz pulapka 2 w docs/core-phase-1.md §1.
+  /// rzucala bez zdjecia listenerow i padala tam segfaultem.
   ///
   /// NIE jest to kanal dla bledow uzytkownika; te ida przez reportSemanticError(), ktore
   /// wraca statusem i nie wymaga zadnego z tych zabiegow.
