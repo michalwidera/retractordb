@@ -95,14 +95,15 @@ rdb::Refusal checkDescriptorPath(const std::filesystem::path &path, bool &exists
   if (::lstat(path.c_str(), &info) == 0) {
     exists = true;
     if (!S_ISREG(info.st_mode) && !S_ISLNK(info.st_mode))
-      return {rdb::ErrorClass::Plan, std::format("descriptor file '{}' is not a regular file", path.string())};
+      return {.cls = rdb::ErrorClass::Plan, .message = std::format("descriptor file '{}' is not a regular file", path.string())};
     return {};
   }
   const int err = errno;
   exists        = false;
   if (err == ENOENT) return {};
-  return {rdb::ErrorClass::Environment,
-          std::format("cannot inspect descriptor file '{}': {}", path.string(), std::strerror(err)), err};
+  return {.cls     = rdb::ErrorClass::Environment,
+          .message = std::format("cannot inspect descriptor file '{}': {}", path.string(), std::strerror(err)),
+          .err     = err};
 }
 
 rdb::Refusal checkTextFields(const rdb::Descriptor &descriptor, const std::string &stream) {
@@ -117,8 +118,9 @@ rdb::Refusal checkTextFields(const rdb::Descriptor &descriptor, const std::strin
       case rdb::STRING:
         break;
       default:
-        return {rdb::ErrorClass::Plan, std::format("TEXTFILE stream '{}': unsupported field type {} for field '{}'", stream,
-                                                   descriptor.fieldTypeName(field.rname), field.rname)};
+        return {.cls     = rdb::ErrorClass::Plan,
+                .message = std::format("TEXTFILE stream '{}': unsupported field type {} for field '{}'", stream,
+                                       descriptor.fieldTypeName(field.rname), field.rname)};
     }
   }
   return {};
@@ -198,10 +200,11 @@ rdb::Refusal checkKeptStores(qTree &plan, const std::string_view defaultStorageD
     const auto keptStore    = describeStore(keptType, kept.retention());
     const auto plannedStore = describeStore(q.storageType(), q.descriptorStorage().retention());
     if (keptStore == plannedStore) continue;
-    return {rdb::ErrorClass::Plan,
-            std::format("Stream '{}' keeps its files under ROTATION, but {} was written with {} and the plan asks for {}: "
-                        "put {} back in the plan, or remove the stream's files to start it afresh",
-                        q.id, descFile.string(), keptStore, plannedStore, keptStore)};
+    return {.cls = rdb::ErrorClass::Plan,
+            .message =
+                std::format("Stream '{}' keeps its files under ROTATION, but {} was written with {} and the plan asks for {}: "
+                            "put {} back in the plan, or remove the stream's files to start it afresh",
+                            q.id, descFile.string(), keptStore, plannedStore, keptStore)};
   }
   return {};
 }
@@ -225,22 +228,24 @@ rdb::Refusal checkDescriptorFiles(qTree &plan, const std::string_view defaultSto
     if (const auto error = rdb::tryLoadDescriptorFile(descFile.string(), kept); !error.message.empty()) return error;
     const std::string keptType = configField(kept, rdb::TYPE);
     if (!keptType.empty() && !(q.isDeclaration() ? rdb::isDeclaredType(keptType) : rdb::isWritableType(keptType)))
-      return {rdb::ErrorClass::Plan,
-              std::format("storage: unsupported storage type '{}' in '{}' for stream '{}'", keptType, descFile.string(), q.id)};
+      return {.cls     = rdb::ErrorClass::Plan,
+              .message = std::format("storage: unsupported storage type '{}' in '{}' for stream '{}'", keptType,
+                                     descFile.string(), q.id)};
     if (keptType == "TEXTSOURCE")
       if (const auto error = checkTextFields(kept, q.id); !error.message.empty()) return error;
     // Kierunek jak w rdb::verifyDescriptorMatch (plan == plik): Descriptor::operator== jest asymetryczny.
     const rdb::Descriptor planned = q.descriptorStorage();
-    if (planned != kept) return {rdb::ErrorClass::Plan, "storage: descriptor schema mismatch in '" + descFile.string() + "'"};
+    if (planned != kept)
+      return {.cls = rdb::ErrorClass::Plan, .message = "storage: descriptor schema mismatch in '" + descFile.string() + "'"};
     if (!q.isDeclaration()) {
       // Plan nie daje SELECT-owi REF, wiec REF w jego `.desc` przenioslby zapis wyniku w miejsce,
       // ktorego plan nie zna (#278). rdb::storage odmowi tego samego, ale dopiero po starcie.
       if (const std::string keptRef = configField(kept, rdb::REF); !keptRef.empty())
-        return {
-            rdb::ErrorClass::Plan,
-            std::format("stream '{}': {} moves the stream's data file to '{}', which the plan does not do; remove {} to start "
-                        "the stream afresh",
-                        q.id, descFile.string(), keptRef, descFile.string())};
+        return {.cls     = rdb::ErrorClass::Plan,
+                .message = std::format(
+                    "stream '{}': {} moves the stream's data file to '{}', which the plan does not do; remove {} to start "
+                    "the stream afresh",
+                    q.id, descFile.string(), keptRef, descFile.string())};
       continue;
     }
     if (isLegacyBinaryDescriptor(planned, kept)) continue;
@@ -250,17 +255,19 @@ rdb::Refusal checkDescriptorFiles(qTree &plan, const std::string_view defaultSto
     // `w.txt`, a silnik czytal `v.txt` sprzed zmiany. Teraz to odmowa przed startem.
     const std::string plannedType = configField(planned, rdb::TYPE);
     if (keptType != plannedType)
-      return {rdb::ErrorClass::Plan,
-              std::format("stream '{}': {} was written for TYPE {} and the plan declares TYPE {}; remove {} to start the "
-                          "stream afresh",
-                          q.id, descFile.string(), keptType, plannedType, descFile.string())};
+      return {
+          .cls     = rdb::ErrorClass::Plan,
+          .message = std::format("stream '{}': {} was written for TYPE {} and the plan declares TYPE {}; remove {} to start the "
+                                 "stream afresh",
+                                 q.id, descFile.string(), keptType, plannedType, descFile.string())};
     const std::string keptRef    = configField(kept, rdb::REF);
     const std::string plannedRef = configField(planned, rdb::REF);
     if (keptRef != plannedRef)
-      return {rdb::ErrorClass::Plan,
-              std::format("stream '{}': {} was written for source '{}' and the plan reads '{}'; remove {} to start the "
-                          "stream afresh",
-                          q.id, descFile.string(), keptRef, plannedRef, descFile.string())};
+      return {
+          .cls     = rdb::ErrorClass::Plan,
+          .message = std::format("stream '{}': {} was written for source '{}' and the plan reads '{}'; remove {} to start the "
+                                 "stream afresh",
+                                 q.id, descFile.string(), keptRef, plannedRef, descFile.string())};
   }
   return {};
 }
@@ -279,12 +286,13 @@ rdb::Refusal checkDeclaredSources(const qTree &plan, const std::vector<std::stri
       const int err = errno;
       // Brak zrodla nadal daje NULL, jak dotad (#346); pozostale porazki maja klase K4.
       if (err == ENOENT || err == ENOTDIR) continue;
-      return {rdb::ErrorClass::Environment,
-              std::format("cannot inspect source '{}' for stream '{}': {}", q.filename, q.id, std::strerror(err)), err};
+      return {.cls     = rdb::ErrorClass::Environment,
+              .message = std::format("cannot inspect source '{}' for stream '{}': {}", q.filename, q.id, std::strerror(err)),
+              .err     = err};
     }
     const std::string mismatch = rdb::sourceKindMismatch(type, q.filename, info.st_mode);
     if (mismatch.empty()) continue;
-    if (!q.isDeprecatedFile) return {rdb::ErrorClass::Plan, std::format("stream '{}': {}", q.id, mismatch)};
+    if (!q.isDeprecatedFile) return {.cls = rdb::ErrorClass::Plan, .message = std::format("stream '{}': {}", q.id, mismatch)};
 
     // Forma przestarzala: autor napisal FILE, wiec komunikat mowi, jakie slowo wybrala regula
     // i jakie pasuje do tego, co lezy pod sciezka. Inaczej FIFO spoza /dev konczylo sie
@@ -298,7 +306,7 @@ rdb::Refusal checkDeclaredSources(const qTree &plan, const std::vector<std::stri
       fit = "BINFILE or TEXTFILE";
     std::string hint = std::format("deprecated FILE resolved this path as {}", sourceKindKeyword(q.kind));
     if (!fit.empty()) hint += std::format("; declare it with {}", fit);
-    return {rdb::ErrorClass::Plan, std::format("stream '{}': {} ({})", q.id, mismatch, hint)};
+    return {.cls = rdb::ErrorClass::Plan, .message = std::format("stream '{}': {} ({})", q.id, mismatch, hint)};
   }
   return {};
 }
@@ -426,17 +434,20 @@ rdb::Refusal checkStorageDirectory(const qTree &plan, const std::string_view def
   if (::stat(dir.c_str(), &info) != 0) {
     const int err = errno;
     if (err == ENOENT)
-      return {rdb::ErrorClass::Plan,
-              std::format("storage: directory '{}' from the STORAGE directive does not exist ({}); "
-                          "RetractorDB does not create it - run 'mkdir -p {}' first",
-                          dir, absolutePathOf(dir), dir),
-              err};
-    return {err == ENOTDIR ? rdb::ErrorClass::Plan : rdb::ErrorClass::Environment,
-            std::format("storage: cannot inspect directory '{}' from the STORAGE directive: {}", dir, std::strerror(err)), err};
+      return {.cls     = rdb::ErrorClass::Plan,
+              .message = std::format("storage: directory '{}' from the STORAGE directive does not exist ({}); "
+                                     "RetractorDB does not create it - run 'mkdir -p {}' first",
+                                     dir, absolutePathOf(dir), dir),
+              .err     = err};
+    return {
+        .cls     = err == ENOTDIR ? rdb::ErrorClass::Plan : rdb::ErrorClass::Environment,
+        .message = std::format("storage: cannot inspect directory '{}' from the STORAGE directive: {}", dir, std::strerror(err)),
+        .err     = err};
   }
   if (!S_ISDIR(info.st_mode))
-    return {rdb::ErrorClass::Plan,
-            std::format("storage: path '{}' from the STORAGE directive exists but is not a directory", dir), ENOTDIR};
+    return {.cls     = rdb::ErrorClass::Plan,
+            .message = std::format("storage: path '{}' from the STORAGE directive exists but is not a directory", dir),
+            .err     = ENOTDIR};
   return {};
 }
 
@@ -472,21 +483,25 @@ rdb::Refusal checkOutputFilesOpenable(const qTree &plan, const std::string_view 
         const int closeResult = ::close(fd);
         const int closeErr    = errno;
         if (statResult != 0)
-          return {rdb::ErrorClass::Environment,
-                  std::format("cannot inspect output file '{}' for stream '{}': {}", file, q.id, std::strerror(statErr)),
-                  statErr};
+          return {
+              .cls     = rdb::ErrorClass::Environment,
+              .message = std::format("cannot inspect output file '{}' for stream '{}': {}", file, q.id, std::strerror(statErr)),
+              .err     = statErr};
         if (!S_ISREG(info.st_mode))
-          return {rdb::ErrorClass::Plan, std::format("output file '{}' for stream '{}' is not a regular file", file, q.id)};
+          return {.cls     = rdb::ErrorClass::Plan,
+                  .message = std::format("output file '{}' for stream '{}' is not a regular file", file, q.id)};
         if (closeResult != 0)
-          return {rdb::ErrorClass::Environment,
-                  std::format("cannot close output file '{}' for stream '{}': {}", file, q.id, std::strerror(closeErr)),
-                  closeErr};
+          return {
+              .cls     = rdb::ErrorClass::Environment,
+              .message = std::format("cannot close output file '{}' for stream '{}': {}", file, q.id, std::strerror(closeErr)),
+              .err     = closeErr};
         return {};
       }
       const int openErr = errno;
       if (openErr != ENOENT)
-        return {openErr == EISDIR || openErr == ENOTDIR ? rdb::ErrorClass::Plan : rdb::ErrorClass::Environment,
-                std::format("cannot open output file '{}' for stream '{}': {}", file, q.id, std::strerror(openErr)), openErr};
+        return {.cls     = openErr == EISDIR || openErr == ENOTDIR ? rdb::ErrorClass::Plan : rdb::ErrorClass::Environment,
+                .message = std::format("cannot open output file '{}' for stream '{}': {}", file, q.id, std::strerror(openErr)),
+                .err     = openErr};
 
       const std::filesystem::path parent = std::filesystem::path(file).parent_path().empty()
                                                ? std::filesystem::path(".")
@@ -494,20 +509,21 @@ rdb::Refusal checkOutputFilesOpenable(const qTree &plan, const std::string_view 
       struct stat parentInfo{};
       if (::stat(parent.c_str(), &parentInfo) != 0) {
         const int err = errno;
-        return {err == ENOENT || err == ENOTDIR ? rdb::ErrorClass::Plan : rdb::ErrorClass::Environment,
-                std::format("cannot open output file '{}' for stream '{}': parent directory '{}' is unavailable: {}", file, q.id,
-                            parent.string(), std::strerror(err)),
-                err};
+        return {.cls     = err == ENOENT || err == ENOTDIR ? rdb::ErrorClass::Plan : rdb::ErrorClass::Environment,
+                .message = std::format("cannot open output file '{}' for stream '{}': parent directory '{}' is unavailable: {}",
+                                       file, q.id, parent.string(), std::strerror(err)),
+                .err     = err};
       }
       if (!S_ISDIR(parentInfo.st_mode))
-        return {rdb::ErrorClass::Plan,
-                std::format("cannot open output file '{}' for stream '{}': parent '{}' is not a directory", file, q.id,
-                            parent.string()),
-                ENOTDIR};
+        return {.cls     = rdb::ErrorClass::Plan,
+                .message = std::format("cannot open output file '{}' for stream '{}': parent '{}' is not a directory", file,
+                                       q.id, parent.string()),
+                .err     = ENOTDIR};
       if (::access(parent.c_str(), W_OK | X_OK) != 0) {
         const int err = errno;
-        return {rdb::ErrorClass::Environment,
-                std::format("cannot create output file '{}' for stream '{}': {}", file, q.id, std::strerror(err)), err};
+        return {.cls     = rdb::ErrorClass::Environment,
+                .message = std::format("cannot create output file '{}' for stream '{}': {}", file, q.id, std::strerror(err)),
+                .err     = err};
       }
       return {};
     };

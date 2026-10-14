@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <array>
 #include <cctype>
 #include <cerrno>
 #include <charconv>
@@ -57,6 +58,7 @@ int PersistentCounter::getCount() const { return count_; }
 // katalog bez bledu i czyta z niego zero bajtow, czyli blad nosnika udawalby pusty plik (K2).
 PersistentCounter::Reading PersistentCounter::read(const std::string &filename) {
   constexpr std::size_t kErrorPreviewBytes = 32;
+  constexpr std::size_t kReadBufferBytes   = 64;
   std::error_code ec;
   const bool exists = std::filesystem::exists(filename, ec);
   if (ec) return {.state = Reading::State::Unreadable, .detail = "cannot check whether it exists: " + ec.message()};
@@ -65,11 +67,11 @@ PersistentCounter::Reading PersistentCounter::read(const std::string &filename) 
   const int fd = ::open(filename.c_str(), O_RDONLY | O_CLOEXEC);
   if (fd == -1) return {.state = Reading::State::Unreadable, .detail = std::string("open: ") + std::strerror(errno)};
   std::string text;
-  char buffer[64];
+  std::array<char, kReadBufferBytes> buffer;
   ssize_t got = 0;
-  while ((got = ::read(fd, buffer, sizeof(buffer))) != 0) {
+  while ((got = ::read(fd, buffer.data(), buffer.size())) != 0) {
     if (got > 0) {
-      text.append(buffer, static_cast<std::size_t>(got));
+      text.append(buffer.data(), static_cast<std::size_t>(got));
     } else if (errno != EINTR) {
       const int readErrno = errno;
       ::close(fd);

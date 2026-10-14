@@ -23,27 +23,33 @@ Refusal tryLoadDescriptorFile(const std::string &descriptorFile, Descriptor &des
   const StorageFd file(descriptorFile, O_RDONLY);
   if (!file.isOpen()) {
     const int openErrno = errno;  // przed skladaniem napisu - alokacja moze ruszyc errno
-    return {ErrorClass::Environment, "cannot open descriptor file: " + descriptorFile + ": " + std::strerror(openErrno),
-            openErrno};
+    return {.cls     = ErrorClass::Environment,
+            .message = "cannot open descriptor file: " + descriptorFile + ": " + std::strerror(openErrno),
+            .err     = openErrno};
   }
 
   const off_t fileSize = file.size();
   if (fileSize < 0) {
     const int err = errno;
-    return {ErrorClass::Environment, "cannot inspect descriptor file: " + descriptorFile + ": " + std::strerror(err), err};
+    return {.cls     = ErrorClass::Environment,
+            .message = "cannot inspect descriptor file: " + descriptorFile + ": " + std::strerror(err),
+            .err     = err};
   }
   std::string content(fileSize > 0 ? static_cast<size_t>(fileSize) : 0, '\0');
   const ssize_t got = file.readAt(std::as_writable_bytes(std::span{content}), 0);
   if (got < 0) {
     const int err = errno;
-    return {ErrorClass::Environment, "cannot read descriptor file: " + descriptorFile + ": " + std::strerror(err), err};
+    return {.cls     = ErrorClass::Environment,
+            .message = "cannot read descriptor file: " + descriptorFile + ": " + std::strerror(err),
+            .err     = err};
   }
   content.resize(static_cast<size_t>(got));
 
   Descriptor parsed;
   if (const std::string result = parserDESCString(parsed, content); result != "OK")
-    return {ErrorClass::Plan, "descriptor parse failed in '" + descriptorFile + "': " + result};
-  if (parsed.getSizeInBytes() == 0) return {ErrorClass::Plan, "storage: empty descriptor file: " + descriptorFile};
+    return {.cls = ErrorClass::Plan, .message = "descriptor parse failed in '" + descriptorFile + "': " + result};
+  if (parsed.getSizeInBytes() == 0)
+    return {.cls = ErrorClass::Plan, .message = "storage: empty descriptor file: " + descriptorFile};
   descriptor = std::move(parsed);
   return {};
 }

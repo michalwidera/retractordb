@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -23,7 +24,7 @@ class PersistentCounter {
   /// poprawnym, nieudane sprawdzenie, otwarcie lub odczyt to srodowisko (K4), a odczytana w
   /// calosci tresc, ktora nie jest nieujemna liczba, to wadliwy stan wejsciowy planu (K2).
   struct Reading {
-    enum class State { Missing, Value, Unreadable, Invalid };
+    enum class State : std::uint8_t { Missing, Value, Unreadable, Invalid };
     State state{State::Missing};
     int value{0};
     std::string detail;  ///< Unreadable: operacja i przyczyna; Invalid: rozmiar i poczatek tresci

@@ -325,8 +325,8 @@ payload payload::operator+(const payload &other) const {
 void payload::assignConcatenation(const payload &lhs, const payload &rhs) {
   const auto lhsBytes = lhs.span();
   const auto rhsBytes = rhs.span();
-  std::copy(lhsBytes.begin(), lhsBytes.end(), span().begin());
-  std::copy(rhsBytes.begin(), rhsBytes.end(), span().subspan(lhsBytes.size()).begin());
+  std::ranges::copy(lhsBytes, span().begin());
+  std::ranges::copy(rhsBytes, span().subspan(lhsBytes.size()).begin());
 
   nullBitset_.clear();
   appendDataFieldNullFlags(nullBitset_, lhs);

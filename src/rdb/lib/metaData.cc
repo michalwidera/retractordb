@@ -1,8 +1,5 @@
 #include "rdb/metaData.hpp"
 
-#include <fmt/format.h>
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
 #include <filesystem>
 #include <format>
@@ -12,6 +9,7 @@
 #include <system_error>
 #include <utility>
 
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include "rdb/bitsetCodec.hpp"
@@ -29,6 +27,10 @@ void metaData::createNullBitsetTemplate() {
 
 void metaData::flushCurrentEntry() {
   if (initializationError()) return;
+  flushPendingEntry();
+}
+
+void metaData::flushPendingEntry() {
   if (currentEntry_.recordCount > 0) {
     if (tail_.shouldOverwrite()) {
       store_.overwriteLast(currentEntry_);
@@ -97,7 +99,10 @@ metaData::metaData(const Descriptor &descriptor, std::string metaFilePath)
   if (!store_.empty() && !store_.fileExists()) store_.saveHeader();
 }
 
-metaData::~metaData() { flushCurrentEntry(); }
+metaData::~metaData() {
+  // W destruktorze obowiazuje stan klasy bazowej; normalny flush zachowuje dispatch wirtualny.
+  if (!metaData::initializationError()) flushPendingEntry();
+}
 
 void metaData::abandonFile() { store_.abandon(); }
 

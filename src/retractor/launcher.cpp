@@ -33,7 +33,6 @@
 
 #include "config.h"  // Add an automatically generated configuration file
 #include "constants.hpp"
-#include "fatalError.hpp"
 #include "fatalError.hpp"  // fatalErrorRaised - zatrzask czytany przez executorsm::cleanup()
 #include "lib/appConfig.hpp"
 #include "lib/bus.hpp"

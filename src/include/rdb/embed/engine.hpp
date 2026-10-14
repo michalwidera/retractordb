@@ -53,8 +53,8 @@ class Engine {
   /// @param lockDir katalog blokad serwisu (paths.lock_dir); pusty => TMPDIR albo paths.lock_dir z configPath.
   /// @param configPath plik konfiguracji czytany tylko, gdy podany (paths.lock_dir, embedded.lenient_lock_dirs).
   ///        Katalogu prywatnego kontrola blokad serwisu nie dotyczy.
-  [[nodiscard]] static Result<std::unique_ptr<Engine>> create(std::string storageDir = {}, std::string lockDir = {},
-                                                              std::string configPath = {});
+  [[nodiscard]] static Result<std::unique_ptr<Engine>> create(std::string storageDir = {}, const std::string &lockDir = {},
+                                                              const std::string &configPath = {});
   Engine(const Engine &)            = delete;
   Engine &operator=(const Engine &) = delete;
   Engine(Engine &&)                 = delete;

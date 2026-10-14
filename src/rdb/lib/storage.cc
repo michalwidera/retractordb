@@ -68,9 +68,9 @@ Result<> storage::attachDescriptor(const Descriptor *descriptorParam) {
       const std::string keptRef    = descriptorRef(descriptor);
       const std::string plannedRef = descriptorRef(*descriptorParam);
       if (keptRef != plannedRef)
-        return fail(
-            Refusal{ErrorClass::Plan,
-                    std::format("storage: {} names data file '{}', but the plan gives {}; remove {} to start the stream afresh",
+        return fail(Refusal{.cls     = ErrorClass::Plan,
+                            .message = std::format(
+                                "storage: {} names data file '{}', but the plan gives {}; remove {} to start the stream afresh",
                                 paths_.descriptorFile(), keptRef, plannedRef.empty() ? "none" : "'" + plannedRef + "'",
                                 paths_.descriptorFile())});
     }
@@ -126,21 +126,22 @@ Result<> storage::attachStorage() {
   // z tego samego pliku moze tu jedynie zawezic dostep, nigdy go poszerzyc. Odmowa zapada przed
   // utworzeniem akcesora, czyli przed O_CREAT.
   if (!refFromCaller_ && !isDeclared() && paths_.refLeavesAllowedDirs())
-    return fail(
-        Refusal{ErrorClass::Plan,
-                std::format("storage: {} moves the {} data file to '{}', outside the storage directory; add its directory to "
-                            "storage.ref_dirs in retractor.toml to allow it",
-                            paths_.descriptorFile(), storageType_, paths_.storageFile())});
+    return fail(Refusal{
+        .cls     = ErrorClass::Plan,
+        .message = std::format("storage: {} moves the {} data file to '{}', outside the storage directory; add its directory to "
+                               "storage.ref_dirs in retractor.toml to allow it",
+                               paths_.descriptorFile(), storageType_, paths_.storageFile())});
 
   RDB_TRY(initializeAccessor());
   if (!accessor_->initializationError().empty()) {
     // Niepusty status zrodla oznacza zly rodzaj pliku (BINFILE/TEXTFILE/DEVICE).
-    if (isDeclared()) return fail(Refusal{ErrorClass::Plan, accessor_->initializationError()});
+    if (isDeclared()) return fail(Refusal{.cls = ErrorClass::Plan, .message = accessor_->initializationError()});
     // Zapisywalne akcesory oddaja blad open(O_CREAT). Klasa jak w checkOutputFilesOpenable:
     // sciezka sprzeczna z systemem plikow to plan, reszta to srodowisko (#474).
     const int err = accessor_->initializationErrno();
-    return fail(Refusal{err == ENOENT || err == ENOTDIR || err == EISDIR ? ErrorClass::Plan : ErrorClass::Environment,
-                        accessor_->initializationError(), err});
+    return fail(Refusal{.cls     = err == ENOENT || err == ENOTDIR || err == EISDIR ? ErrorClass::Plan : ErrorClass::Environment,
+                        .message = accessor_->initializationError(),
+                        .err     = err});
   }
 
   // Wstrzyknięcie wariantu metadanych - dobór wariantu (inertny/cień indeksu/bazowy) realizuje fabryka.
