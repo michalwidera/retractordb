@@ -1,9 +1,11 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "error.hpp"
 #include "indexRecord.hpp"
 
 namespace rdb {
@@ -33,6 +35,8 @@ class MetaIndexStore {
  public:
   MetaIndexStore(std::string metaFilePath, size_t entrySize);
 
+  [[nodiscard]] const std::optional<Error> &initializationError() const { return initializationError_; }
+
   [[nodiscard]] bool empty() const { return metaFilePath_.empty(); }
   [[nodiscard]] const std::string &path() const { return metaFilePath_; }
   [[nodiscard]] bool fileExists() const;
@@ -53,7 +57,9 @@ class MetaIndexStore {
   void overwriteLast(const IndexRecord &entry);
 
   /// @brief Rewrite the whole file: reserved header + given entries. No-op if empty().
-  void rewrite(const std::vector<IndexRecord> &entries);
+  /// Blad otwarcia, zapisu albo podmiany pliku wraca jako Errc::IO; plik i cache zostaja wtedy
+  /// w stanie sprzed wywolania.
+  [[nodiscard]] Result<> rewrite(const std::vector<IndexRecord> &entries);
 
   /// @brief Detach from the file path - all subsequent operations become no-ops.
   void abandon() { metaFilePath_.clear(); }
@@ -63,6 +69,7 @@ class MetaIndexStore {
   size_t entrySize_;
   mutable std::vector<IndexRecord> entriesCache_;
   mutable bool cacheValid_{false};
+  mutable std::optional<Error> initializationError_;
 };
 
 }  // namespace rdb

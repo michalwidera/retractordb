@@ -1,6 +1,7 @@
 #include "qTree.hpp"
 
 #include <fmt/core.h>
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -9,7 +10,7 @@
 #include <sstream>
 #include <stdexcept>
 
-#include "fatalError.hpp"
+#include "rdb/error.hpp"
 #include "rdb/rationalFormat.hpp"
 
 using namespace boost;
@@ -118,7 +119,7 @@ void qTree::dumpCore() {
       else if (nName == vcols[3])
         size = static_cast<int>(it.id.length());
       else {
-        FatalError("qTree::dumpCore: unknown column name");
+        rdb::fatal("qTree::dumpCore: unknown column name");
       }
       maxSize = std::max(maxSize, size);
     }
@@ -145,15 +146,14 @@ void qTree::dumpCore() {
   }
 }
 
-std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
+rdb::Result<std::set<boost::rational<int>>> qTree::getAvailableTimeIntervals() {
   std::set<boost::rational<int>> lstTimeIntervals;
   for (const auto &it : *this) {
     // Dyrektywy maja legalnie zerowy interwal i zostaja w planie `xretractor -c -w`,
     // ktory nie buduje dataModel. Pomijamy je przed kontrola zera (#474).
     if (it.isCompilerDirective()) continue;
     if (it.rInterval == 0) {
-      // K1 (#474): parser odrzuca zerowe DECLARE, a kompilator rozwiazuje interwaly SELECT.
-      FatalError("qTree: query '{}' rInterval is zero", it.id);
+      RDB_ASSERT(it.rInterval != 0, "qTree: query '{}' rInterval is zero", it.id);
     }
     lstTimeIntervals.insert(it.rInterval);
   }
@@ -161,13 +161,14 @@ std::set<boost::rational<int>> qTree::getAvailableTimeIntervals() {
 }
 
 query &qTree::getQuery(const std::string &query_name) {
-  if (query_name.empty()) FatalError("qTree::getQuery: query name is empty");
+  // Warunek wstepny: nazwa istnieje w planie. Odwolania z tresci planu sprawdza kompilator
+  // (compiler::checkStreamReferences) zanim ktorykolwiek przebieg tu siegnie, a nazwy od klienta
+  // (Engine, polecenia demona) sprawdzaja exists() ich wolajacy. Do 2026-10 `FROM nosuch` dochodzilo
+  // tu i konczylo kompilacje std::logic_error, ktorego nie lapal nikt po drodze.
+  RDB_ASSERT(!query_name.empty(), "qTree::getQuery: query name is empty");
 
   auto it = std::ranges::find_if(*this, [&query_name](const auto &node) { return node.id == query_name; });
-  if (it == std::end(*this)) {
-    SPDLOG_ERROR("Missing - {}", query_name);
-    throw std::logic_error("Referenced Stream in QUERY _not found_ in CORE TREE. (check log)");
-  }
+  RDB_ASSERT(it != std::end(*this), "qTree::getQuery: stream '{}' not found in the plan", query_name);
   return (*it);
 }
 
@@ -177,7 +178,6 @@ int qTree::getSeqNr(const std::string &query_name) {
     if (query_name == q.id) return cnt;
     ++cnt;
   }
-  SPDLOG_ERROR("No such stream in set - {}", query_name);
-  throw std::logic_error("No such stream in set.");
-  return -1;  // INVALID QUERY_NR
+  // Warunek wstepny jak w getQuery(): nazwa pochodzi z samego drzewa albo zostala sprawdzona.
+  rdb::fatal(fmt::format("qTree::getSeqNr: no such stream in set - {}", query_name));
 }

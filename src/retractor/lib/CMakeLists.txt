@@ -66,6 +66,8 @@ target_include_directories(
 # libretractorcore.a.
 target_link_libraries(retractorcore PUBLIC rdb rqlparser antlr4_static)
 
+rdb_noexcept_check(retractorcore ISLANDS RQLParser.cpp)
+
 # Usluga: reszta katalogu.
 file(GLOB BUILDSRCS_CPP "*.cpp")
 list(TRANSFORM RETRACTOR_CORE_SOURCES

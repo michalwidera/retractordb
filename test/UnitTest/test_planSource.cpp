@@ -8,10 +8,12 @@
 #include <future>
 #include <iostream>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include <gtest/gtest.h>
 
+#include "fatalError.hpp"
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/planSource.hpp"
 #include "retractor/lib/qTree.hpp"
@@ -198,6 +200,37 @@ TEST(PlanSource, rotation_drops_only_the_configuration_of_memory_streams) {
     EXPECT_FALSE(fs::exists(dir / file)) << file;
   for (const std::string file : {"disk", "disk.desc", "disk.meta"})
     EXPECT_TRUE(fs::exists(dir / file)) << file;
+
+  fs::remove_all(dir);
+}
+
+/// Sprawdzenie `.desc` deklaracji przy starcie nie rzuca (#511). stat() na dowiazaniu do samego
+/// siebie konczy sie ELOOP, a std::filesystem::exists bez error_code zamienia to w filesystem_error,
+/// ktorego rdzen nie obsluguje. Wpis zostaje na miejscu - odmowe z przyczyna da dalej kontrola
+/// deskryptorow przy otwarciu magazynu.
+TEST(PlanSource, unreadable_declaration_descriptor_does_not_throw) {
+  namespace fs       = std::filesystem;
+  const fs::path dir = "eloop_store";
+  fs::remove_all(dir);
+  fs::create_directory(dir);
+
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan,
+                          "STORAGE 'eloop_store'\n"
+                          "DECLARE a INTEGER STREAM src, 1 TEXTFILE 'data.txt'\n"
+                          "SELECT a+1 STREAM dst FROM src\n")
+                .status,
+            "OK");
+  compiler cm(plan);
+  ASSERT_EQ(cm.compile(), "OK");
+
+  fs::create_symlink("src.desc", dir / "src.desc");  // dowiazanie do samego siebie: stat() daje ELOOP
+  std::error_code ec;
+  ASSERT_FALSE(fs::exists(dir / "src.desc", ec));
+  ASSERT_EQ(ec, std::errc::too_many_symbolic_link_levels) << "kontrola dodatnia: wpis ma dawac ELOOP";
+
+  EXPECT_NO_THROW(dropStalePlanArtifacts(plan));
+  EXPECT_TRUE(fs::is_symlink(dir / "src.desc"));
 
   fs::remove_all(dir);
 }

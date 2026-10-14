@@ -1,7 +1,10 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <string_view>
+
+#include "rdb/error.hpp"
 
 namespace rdb::embed {
 
@@ -9,7 +12,7 @@ namespace rdb::embed {
 /// Nie tworzy blokad instancji xretractor ani obiektow magistrali.
 class StorageGuard {
  public:
-  StorageGuard(std::string_view directory, bool claim);
+  [[nodiscard]] static Result<std::unique_ptr<StorageGuard>> create(std::string_view directory, bool claim);
   ~StorageGuard();
   StorageGuard(const StorageGuard &)            = delete;
   StorageGuard &operator=(const StorageGuard &) = delete;
@@ -17,9 +20,11 @@ class StorageGuard {
   [[nodiscard]] const std::string &directory() const noexcept { return directory_; }
   [[nodiscard]] bool ownsDirectory() const noexcept { return fd_ >= 0; }
   /// Plik artefaktu musi zostac wewnatrz katalogu, takze po rozwiazaniu dowiazan.
-  void checkPath(const std::string &path) const;
+  [[nodiscard]] Result<> checkPath(const std::string &path) const;
 
  private:
+  StorageGuard() = default;
+  [[nodiscard]] Result<> initialize(std::string_view directory, bool claim);
   std::string directory_;
   int fd_{-1};
 };
@@ -34,12 +39,12 @@ struct OfflinePolicy {
 /// Plik konfiguracji czytany tylko, gdy podany. Argument lockDir wygrywa nad paths.lock_dir;
 /// lagodny jest katalog wymieniony w embedded.lenient_lock_dirs, a bez tego klucza katalog
 /// tymczasowy systemu (TMPDIR, bez niej /tmp).
-[[nodiscard]] OfflinePolicy offlinePolicy(std::string_view lockDir, std::string_view configPath);
+[[nodiscard]] Result<OfflinePolicy> offlinePolicy(std::string_view lockDir, std::string_view configPath);
 
 /// Tylko obserwacja trzymanych blokad. Katalog musi odpowiadac paths.lock_dir serwisu.
 /// Nie wyklucza pozniejszego startu xretractor.
-void checkOffline(const OfflinePolicy &policy);
-[[nodiscard]] std::string temporaryStorageDirectory();
+[[nodiscard]] Result<> checkOffline(const OfflinePolicy &policy);
+[[nodiscard]] Result<std::string> temporaryStorageDirectory();
 /// Sprzatanie tymczasowego katalogu nie usuwa magazynu zajetego przez Storage.
 void removeTemporaryStorage(const std::string &directory) noexcept;
 

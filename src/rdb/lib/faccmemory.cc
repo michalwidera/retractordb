@@ -8,28 +8,36 @@
 #include <ranges>
 #include <utility>
 #include <vector>
-#include "fatalError.hpp"
+
+#include <fmt/format.h>
+
+#include "rdb/error.hpp"
+
+namespace rdb {
+
+// Faza 2 refaktoru: stan magazynu MEMORY - dawniej mapy `static` tego pliku - przeniosl sie do
+// MemoryStore. Byl jedynym stanem magazynu MEMORY i byl stanem CALEGO PROCESU, wiec dwa silniki
+// zbudowane w jednym procesie dzielily dane strumienia o tej samej nazwie, nic o sobie nie wiedzac.
+// Kubelek jednego strumienia (memoryBucket) i jego zycie do ostatniej instancji - patrz memoryStore.hpp.
 
 namespace {
 
-/// Straż na jedyną drogę, którą uchwyt mógłby rozjechać się z nazwą: `name()` zwraca
-/// `std::string &` (tak stanowi FileInterface), więc ktoś MÓGŁBY zmienić nazwę instancji po
-/// konstrukcji, a zapamiętany węzeł zostałby przy poprzedniej. Dziś tego nie robi nikt -
-/// wszystkie wywołania `name()` w drzewie tylko czytają - i ta asercja jest po to, żeby
-/// ewentualna zmiana tego stanu rzeczy była czerwonym testem, a nie cichą pomyłką.
+/// Straz na jedyna droge, ktora uchwyt mogl by rozjechac sie z nazwa: `name()` zwraca
+/// `std::string &` (tak stanowi FileInterface), wiec ktos MOGLBY zmienic nazwe instancji po
+/// konstrukcji, a zapamietany wezel zostalby przy poprzedniej. Dzis tego nie robi nikt -
+/// wszystkie wywolania `name()` w drzewie tylko czytaja - i ta asercja jest po to, zeby
+/// ewentualna zmiana tego stanu rzeczy byla czerwonym testem, a nie cicha pomylka.
 ///
 /// Tylko Debug: w Release kosztowałaby dokładnie to wyszukanie, które ta zmiana usuwa.
 void assertBucketMatches([[maybe_unused]] const rdb::memoryBucket *cached, [[maybe_unused]] rdb::MemoryStore &store,
                          [[maybe_unused]] const std::string &filename) {
 #ifndef NDEBUG
-  if (cached != &store.bucket(filename))
-    FatalError("memoryFile: zapamiętany kubełek nie odpowiada nazwie '{}' - nazwa zmieniona po konstrukcji?", filename);
+  RDB_ASSERT(cached == &store.bucket(filename),
+             "memoryFile: zapamietany kubelek nie odpowiada nazwie '{}' - nazwa zmieniona po konstrukcji?", filename);
 #endif
 }
 
 }  // namespace
-
-namespace rdb {
 
 memoryFile::memoryFile(const std::string_view fileName, const Descriptor &descriptor,
                        const std::pair<std::string, size_t> &retentionSize, MemoryStore &store)
@@ -66,7 +74,8 @@ memoryFile::~memoryFile() {
 auto memoryFile::name() -> std::string & { return filename_; }
 
 ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) {
-  if (recordSize_ == 0) FatalError("memoryFile::write: recordSize_ is zero");
+  // Akcesor na deskryptorze zerowej szerokosci: rozmiar poza kontraktem (EINVAL), nie asercja.
+  if (recordSize_ == 0) return EINVAL;
   assertBucketMatches(bucket_, store_, filename_);
   auto &bucket  = *bucket_;
   auto location = position / recordSize_;
@@ -81,7 +90,7 @@ ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullB
 
   if (position == std::numeric_limits<size_t>::max()) {
     if (retentionSize_ != no_retention) {
-      // Kołowy bufor: zapisz do slotu writeCount % retentionSize_
+      // Kolowy bufor: zapisz do slotu writeCount % retentionSize_
       const size_t wc   = bucket.writeCount;
       const size_t slot = wc % retentionSize_;
       if (slot < bucket.data.size()) {
@@ -97,7 +106,7 @@ ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullB
     }
     bucket.writeCount++;
   } else {
-    // Nadpisanie rekordu pod wskazaną pozycją
+    // Nadpisanie rekordu pod wskazana pozycja
     const size_t slot = (retentionSize_ != no_retention) ? (location % retentionSize_) : location;
     if (slot >= bucket.data.size()) {
       SPDLOG_ERROR("Write failed: slot {} out of range, storage size {}", slot, bucket.data.size());
@@ -110,7 +119,7 @@ ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullB
 }
 
 ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
-  if (recordSize_ == 0) FatalError("memoryFile::read: recordSize_ is zero");
+  if (recordSize_ == 0) return EINVAL;  // uzasadnienie w write()
   assertBucketMatches(bucket_, store_, filename_);
   auto &bucket        = *bucket_;
   const auto location = position / recordSize_;
@@ -121,9 +130,9 @@ ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const 
     return ERANGE;
   }
 
-  // Rekord kopiujemy w całości, więc rekord innego rozmiaru niż ta instancja wyszedłby poza bufor
-  // wołającego (albo zostawił w nim śmieci). Konstruktor czyści kubełek o innym rozmiarze, ale nie
-  // pomoże, gdy obie instancje żyją naraz - dlatego straż stoi tutaj.
+  // Rekord kopiujemy w calosci, wiec rekord innego rozmiaru niz ta instancja wyszedlby poza bufor
+  // wolajacego (albo zostawil w nim smieci). Konstruktor czysci kubelek o innym rozmiarze, ale nie
+  // pomoze, gdy obie instancje zyja naraz - dlatego straz stoi tutaj.
   if (std::cmp_not_equal(bucket.data[slot].size(), recordSize_)) {
     SPDLOG_ERROR("Read failed: record in slot {} has {} bytes, '{}' reads {}", slot, bucket.data[slot].size(), filename_,
                  recordSize_);
@@ -139,7 +148,7 @@ ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const 
   return EXIT_SUCCESS;
 }
 
-size_t memoryFile::count() {
+Result<size_t> memoryFile::count() {
   assertBucketMatches(bucket_, store_, filename_);
   return bucket_->writeCount;
 }

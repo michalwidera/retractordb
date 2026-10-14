@@ -1,16 +1,13 @@
 """Kernel survival: what a failure in the storage layer does to a host process, pinned as tests.
 
-On the engine side ``FatalError`` (class K1) and ``EnvironmentError`` (K4) end the
-process with ``std::exit`` - except inside an ``rdb::ThrowOnFatalScope``, where they
-throw ``rdb::EngineFatal`` instead (``src/include/fatalError.hpp``, decision (a) of
-#463). Every call this binding makes into the engine opens that scope
-(``engineCall`` in ``src/python/module.cpp``), so K1 arrives here as
-``InternalError`` and K4 as ``IOError``. Refusals the engine reports by value - a
-descriptor that does not parse, ``tryLoadDescriptorFile`` - arrive as
-``CorruptDescriptor``, which is a ``PlanError`` (class K2, #473).
+Rdzen zwraca bledy jako ``rdb::Result``; wiazanie tlumaczy je na wyjatki
+Pythona z zachowaniem kategorii i errno. Bledny deskryptor daje
+``CorruptDescriptor``, a awaria systemu plikow ``IOError``. Naruszenie niezmiennika
+przez ``rdb::fatal()`` konczy hosta zgodnie z jego handlerem i ma osobny test
+w podprocesie w ``test_error_classes.py``.
 
-The cases below therefore run **in this interpreter** and assert an exception. That
-the rest of the suite still runs afterwards is the assertion that matters.
+Ponizsze przypadki zlego wejscia sa obslugiwane na granicy API, wiec interpreter
+przezywa je i moze wykonac nastepna operacje.
 
 The guards in ``module.cpp`` stay as *translation*: an empty argument is a
 ``ValueError``, an unknown field a ``KeyError``, an out-of-range index an
@@ -65,8 +62,7 @@ def test_corrupt_descriptor_is_a_retractordb_error(rdb, tmp_path: Path) -> None:
     """The new type belongs to the hierarchy, so `except RetractorDBError` still catches it.
 
     Worth pinning separately: nanobind tries exception translators in reverse
-    registration order, and the binding's C++ types derive from
-    ``std::runtime_error`` - which nanobind's own fallback translator would turn
+    registration order, and the binding uses a dedicated exception translator for Result errors - which nanobind's own fallback translator would turn
     into a plain ``RuntimeError`` if it were reached first.
     """
     path = tmp_path / "malformed.desc"
@@ -100,7 +96,7 @@ def test_storage_open_survives_a_corrupt_descriptor(rdb, plain_storage: Path) ->
     """The refusal has to leave a half-built storage that is destroyed cleanly.
 
     ``Storage(...)`` reaches ``tryLoadDescriptorFile`` inside
-    ``attachDescriptorStatus()``; the binding then drops a ``storage`` that owns
+    ``attachDescriptor()``; the binding then drops a ``storage`` that owns
     ``unique_ptr`` members and a destructor which flushes a pending gap. This is the
     test that would catch that path ending badly rather than merely reporting.
     """
@@ -131,8 +127,8 @@ def test_unsupported_storage_type_raises(rdb, plain_storage: Path) -> None:
 def test_engine_errors_share_the_base(rdb, tmp_path: Path) -> None:
     """InternalError and IOError hang off RetractorDBError, like CorruptDescriptor.
 
-    Same reasoning as the CorruptDescriptor case: the C++ types derive from
-    std::runtime_error, so a missing registration shows up as a bare RuntimeError
+    Same reasoning as the CorruptDescriptor case: a missing registration shows up
+    as a bare RuntimeError
     rather than as a member of the hierarchy.
     """
     assert issubclass(rdb.InternalError, rdb.RetractorDBError)
@@ -176,9 +172,8 @@ def test_unknown_field_raises_key_error(rdb, plain_storage: Path) -> None:
 def test_the_storage_layer_has_no_remaining_fatal_paths(rdb, plain_storage: Path) -> None:
     """Sweep the storage-layer failure modes, in one interpreter that has to survive them all.
 
-    Without the throw-mode scope each of these reached a different ``std::exit`` - the
-    accessor factory, the descriptor read, the descriptor lookup, the storage
-    constructor. The assertion is not any single exception type; it is that the loop
+    Kazdy z tych bledow musi zostac obsluzony na granicy: fabryka akcesora, odczyt
+    deskryptora, szukanie pola i tworzenie magazynu. The assertion is not any single exception type; it is that the loop
     finishes and the process is still here to report it.
     """
     desc_path = str(plain_storage / "plain_file.desc")

@@ -17,6 +17,7 @@
 #include <boost/property_tree/ptree.hpp>
 
 #include "rdb/faccbindev.hpp"
+#include "rdbResult.hpp"
 #include "retractor/lib/appConfig.hpp"
 #include "retractor/lib/bus.hpp"
 #include "retractor/lib/compiler.hpp"
@@ -52,7 +53,7 @@ class ExecutorsmAdHocRuleTest : public ::testing::TestWithParam<size_t> {
     ASSERT_EQ(status, "OK");
     compiler compilePlan(plan);
     ASSERT_EQ(compilePlan.compile(), "OK");
-    model                       = std::make_unique<dataModel>(plan);
+    model                       = rdbtest::ok(dataModel::create(plan));
     pProc                       = model.get();
     executorsm::coreInstancePtr = &plan;
   }
@@ -70,7 +71,7 @@ TEST_P(ExecutorsmAdHocRuleTest, attached_rule_first_dump_contains_only_records_a
   auto &output  = *runtime.outputPayload;
   for (int value = 10; value <= 12; ++value) {
     output.getPayload()->setItem(0, value);
-    static_cast<void>(output.write());
+    ASSERT_EQ(rdbtest::ok(output.write()), rdb::WriteStatus::Ok);
   }
 
   const auto historyDepth                  = static_cast<int>(GetParam());
@@ -83,14 +84,14 @@ TEST_P(ExecutorsmAdHocRuleTest, attached_rule_first_dump_contains_only_records_a
   const auto firstDump = sandBoxFolder / "result_guard_dump_0.tmp";
   for (int value = 13; value < 13 + historyDepth; ++value) {
     output.getPayload()->setItem(0, value);
-    static_cast<void>(output.write());
-    runtime.constructRulesAndUpdate(plan.getQuery("result"));
+    ASSERT_EQ(rdbtest::ok(output.write()), rdb::WriteStatus::Ok);
+    ASSERT_RDB_OK(runtime.constructRulesAndUpdate(plan.getQuery("result")));
     EXPECT_FALSE(std::filesystem::exists(firstDump)) << "Regula wyzwolona przed zgromadzeniem wlasnej historii";
   }
 
   output.getPayload()->setItem(0, 13 + historyDepth);
-  static_cast<void>(output.write());
-  runtime.constructRulesAndUpdate(plan.getQuery("result"));
+  ASSERT_EQ(rdbtest::ok(output.write()), rdb::WriteStatus::Ok);
+  ASSERT_RDB_OK(runtime.constructRulesAndUpdate(plan.getQuery("result")));
   std::ifstream dump(firstDump, std::ios::binary);
   ASSERT_TRUE(dump.is_open()) << "Regula nie wyzwolona przy pierwszym kompletnym oknie po dolaczeniu";
   for (int expectedValue = 13; expectedValue <= 13 + historyDepth; ++expectedValue) {

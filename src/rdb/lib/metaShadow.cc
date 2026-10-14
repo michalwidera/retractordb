@@ -8,7 +8,6 @@
 #include <format>
 #include <ranges>
 #include <span>
-#include <stdexcept>
 
 #include <spdlog/spdlog.h>
 
@@ -29,42 +28,45 @@ std::vector<std::byte> metaShadow::ShadowOverride::serialize() const {
   auto write = [&]<typename T>(const T &val) {
     std::memcpy(ptr, &val, sizeof(T));
     ptr += sizeof(T);
+    return true;
   };
 
   write(static_cast<uint8_t>(0));  // flag byte reserved, unused for overrides
   write(recordIndex);
   write(bitsetSize);
-  packBits(nullBitset, std::span<std::byte>(ptr, byteCount));
+  RDB_ASSERT(packBits(nullBitset, std::span<std::byte>(ptr, byteCount)).has_value(), "invalid serialization buffer");
 
   return buf;
 }
 
-metaShadow::ShadowOverride metaShadow::ShadowOverride::deserialize(std::span<const std::byte> data) {
+Result<metaShadow::ShadowOverride> metaShadow::ShadowOverride::deserialize(std::span<const std::byte> data) {
   const std::byte *ptr = data.data();
   const std::byte *end = ptr + data.size();
 
-  auto read = [&]<typename T>(T &out) {
-    if (static_cast<size_t>(end - ptr) < sizeof(T))
-      throw std::runtime_error("Buffer underrun while deserializing ShadowOverride");
+  auto read = [&]<typename T>(T &out) -> bool {
+    if (static_cast<size_t>(end - ptr) < sizeof(T)) return false;
     std::memcpy(&out, ptr, sizeof(T));
     ptr += sizeof(T);
+    return true;
   };
 
   ShadowOverride ov;
   uint8_t flag = 0;
-  read(flag);
-  read(ov.recordIndex);
+  if (!read(flag)) return fail(Errc::IO, "Buffer underrun while deserializing ShadowOverride", EIO);
+  if (!read(ov.recordIndex)) return fail(Errc::IO, "Buffer underrun while deserializing ShadowOverride", EIO);
 
   size_t bitsetSize = 0;
-  read(bitsetSize);
+  if (!read(bitsetSize)) return fail(Errc::IO, "Buffer underrun while deserializing ShadowOverride", EIO);
   // Jak w IndexRecord::deserialize: dlugosc z pliku przed zaokragleniem (#421).
   const auto available = static_cast<size_t>(end - ptr);
   if (bitsetSize > available * kBitsPerByte)
-    throw std::runtime_error(
-        std::format("ShadowOverride bitset size {} exceeds remaining buffer ({} bytes)", bitsetSize, available));
+    return fail(Errc::IO,
+                std::format("ShadowOverride bitset size {} exceeds remaining buffer ({} bytes)", bitsetSize, available), EIO);
   const size_t byteCount = packedByteCount(bitsetSize);
 
-  ov.nullBitset = unpackBits(std::span<const std::byte>(ptr, byteCount), bitsetSize);
+  auto bits = unpackBits(std::span<const std::byte>(ptr, byteCount), bitsetSize);
+  if (!bits) return std::unexpected(bits.error());
+  ov.nullBitset = std::move(*bits);
 
   return ov;
 }
@@ -101,7 +103,13 @@ void metaShadow::load() {
 
   std::span<const std::byte> remaining(fileData);
   while (remaining.size() >= entrySize_) {
-    overrides_.push_back(ShadowOverride::deserialize(remaining.subspan(0, entrySize_)));
+    auto entry = ShadowOverride::deserialize(remaining.subspan(0, entrySize_));
+    if (!entry) {
+      initializationError_ = Error(Errc::IO, entry.error().message() + " in " + shadowFilePath_, EIO);
+      overrides_.clear();
+      return;
+    }
+    overrides_.push_back(std::move(*entry));
     remaining = remaining.subspan(entrySize_);
   }
 }

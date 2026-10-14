@@ -11,6 +11,7 @@
 
 #include "rdb/descriptor.hpp"
 #include "rdb/metaData.hpp"
+#include "rdbResult.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -228,7 +229,7 @@ TEST_F(UsageFixture, scenariusz_modyfikacja_rekordu) {
     meta.onRecordAppended(allNull);
 
   // Okazuje się, że rekord 2 jednak miał dane - korekta po fakcie.
-  meta.onRecordModified(2, allPresent);
+  ASSERT_RDB_OK(meta.onRecordModified(2, allPresent));
 
   EXPECT_EQ(meta.totalRecords(), 5U);
 

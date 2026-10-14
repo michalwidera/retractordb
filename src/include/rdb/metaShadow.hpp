@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "descriptor.hpp"
+#include "error.hpp"
 
 namespace rdb {
 
@@ -37,7 +38,8 @@ class metaShadow {
     size_t recordIndex{0};         ///< absolute position of the overridden record in the main index
     std::vector<bool> nullBitset;  ///< new null bit-set pattern for that record
     [[nodiscard]] std::vector<std::byte> serialize() const;
-    static ShadowOverride deserialize(std::span<const std::byte> data);
+    /// Blad IO dla uszkodzonego wpisu cienia - jak IndexRecord::deserialize.
+    [[nodiscard]] static Result<ShadowOverride> deserialize(std::span<const std::byte> data);
   };
 
   /// @param descriptor   descriptor of the indexed data stream (determines entry size on disk)
@@ -46,6 +48,7 @@ class metaShadow {
 
   /// @brief (Re)load overrides from `<metaFilePath>.shadow`, replacing any in-memory state.
   void load();
+  [[nodiscard]] const std::optional<Error> &initializationError() const { return initializationError_; }
 
   /// @brief Record a new override for @p recordIndex, both in memory and on disk.
   void appendOverride(size_t recordIndex, const std::vector<bool> &nullBitset);
@@ -71,6 +74,7 @@ class metaShadow {
   [[nodiscard]] static std::string shadowFilePathFor(std::string_view metaFilePath);
 
  private:
+  std::optional<Error> initializationError_;
   std::string shadowFilePath_;             ///< path of the shadow index file (<metaFilePath>.shadow)
   const size_t entrySize_;                 ///< serialized size of one ShadowOverride on disk
   std::vector<ShadowOverride> overrides_;  ///< in-memory mirror of the shadow file, arrival order

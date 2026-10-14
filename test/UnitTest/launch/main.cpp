@@ -4,6 +4,7 @@
 #include <spdlog/spdlog.h>
 
 #include "config.h"
+#include "fatalError.hpp"
 
 // Adnotacje pojemnosci std::vector w libc++ (macOS) wymagaja instrumentacji calego
 // kodu dotykajacego wektora. GoogleTest z Conana nie ma sanitizerow, wiec polaczenie
@@ -30,6 +31,7 @@ __asan_default_options() {  // NOLINT(bugprone-reserved-identifier,readability-i
 #endif
 
 int main(int argc, char *argv[]) {  // NOLINT(bugprone-exception-escape)
+  rdb::setFatalHandler(&daemonFatalExit);
   auto filelog = spdlog::basic_logger_mt("log", std::string(argv[0]) + ".log");
   spdlog::set_default_logger(filelog);
   constexpr auto common_log_pattern = "%C%m%d %T.%e %^%s:%# [%L] %v%$";

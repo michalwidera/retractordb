@@ -23,6 +23,7 @@
 #include "rdb/metaShadow.hpp"
 #include "rdb/storageRotation.hpp"
 #include "rdb/storageShadow.hpp"
+#include "rdbResult.hpp"
 #include "syscallWrap.hpp"
 
 namespace {
@@ -253,7 +254,7 @@ TEST_F(StorageRotationTest, metadata_reopen_reports_failure_and_keeps_unarchived
   const auto bytes = readFile(source());
   failure          = Failure::Rename;
   recording        = true;
-  EXPECT_THROW(meta.rotate(7), std::runtime_error);
+  EXPECT_RDB_ERROR(meta.rotate(7), rdb::Errc::IO);
   EXPECT_EQ(readFile(source()), bytes);
   EXPECT_EQ(meta.totalRecords(), 1U);
   EXPECT_EQ(meta.getNullBitset(0), (std::vector<bool>{true}));
@@ -266,7 +267,7 @@ TEST_F(StorageRotationTest, metadata_sync_failure_never_recreates_active_file) {
   const auto bytes = readFile(source());
   failure          = Failure::Sync;
   recording        = true;
-  EXPECT_THROW(meta.rotate(7), std::runtime_error);
+  EXPECT_RDB_ERROR(meta.rotate(7), rdb::Errc::IO);
   EXPECT_FALSE(std::filesystem::exists(source()));
   EXPECT_EQ(readFile(source() + ".old7"), bytes);
 }
@@ -274,13 +275,13 @@ TEST_F(StorageRotationTest, metadata_sync_failure_never_recreates_active_file) {
 TEST_F(StorageRotationTest, shadow_failure_does_not_discard_unarchived_overrides) {
   rdb::storageShadow meta(descriptor, source());
   meta.onRecordAppended({false});
-  meta.onRecordModified(0, {true});
+  ASSERT_RDB_OK(meta.onRecordModified(0, {true}));
   const auto shadow = source() + ".shadow";
   const auto bytes  = readFile(shadow);
   failure           = Failure::Rename;
   failurePath       = shadow;
   recording         = true;
-  EXPECT_THROW(meta.rotate(7), std::runtime_error);
+  EXPECT_RDB_ERROR(meta.rotate(7), rdb::Errc::IO);
   EXPECT_EQ(readFile(shadow), bytes);
   EXPECT_EQ(meta.getNullBitset(0), (std::vector<bool>{true}));
   EXPECT_FALSE(std::filesystem::exists(shadow + ".old7"));
@@ -295,7 +296,7 @@ TEST_F(StorageRotationTest, inaccessible_metadata_path_is_logged_without_throwin
   std::filesystem::create_directory_symlink("source", root / "source");
   LogCapture log;
   spdlog::default_logger()->set_level(spdlog::level::err);
-  EXPECT_NO_THROW(meta.rotate(7, false));
+  EXPECT_RDB_OK(meta.rotate(7, false));
   EXPECT_EQ(readFile((root / "saved" / "stream").string()), bytes);
   EXPECT_NE(log.text().find("[error]"), std::string::npos);
   EXPECT_NE(log.text().find(source()), std::string::npos);
@@ -335,7 +336,7 @@ class RotationPathsTest : public StorageRotationTest, public ::testing::WithPara
     } else if (kind == 4) {
       rdb::metaData meta(descriptor, source());
       meta.onRecordAppended({true});
-      EXPECT_NO_THROW(meta.rotate(7, false));
+      EXPECT_RDB_OK(meta.rotate(7, false));
     } else if (kind == 5) {
       rdb::metaShadow meta(descriptor, source());
       meta.appendOverride(0, {true});
@@ -343,8 +344,8 @@ class RotationPathsTest : public StorageRotationTest, public ::testing::WithPara
     } else {
       rdb::storageShadow meta(descriptor, source());
       meta.onRecordAppended({false});
-      meta.onRecordModified(0, {true});
-      EXPECT_NO_THROW(meta.rotate(7, false));
+      ASSERT_RDB_OK(meta.onRecordModified(0, {true}));
+      EXPECT_RDB_OK(meta.rotate(7, false));
     }
   }
 };

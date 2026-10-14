@@ -22,16 +22,25 @@
 #include "fatalError.hpp"
 #include "ipcServer.hpp"
 #include "rdb/convertTypes.hpp"
+#include "rdb/error.hpp"
 #include "shmBudget.hpp"
 
 // Dyspozytor komend kanalu IPC i formatowanie odpowiedzi. Stan wspolny opisuje
 // executorsmState.hpp; kanaly `adhoc` i `reset-*` maja wlasne jednostki.
 using namespace esm;
 
-ptree executorsm::collectStreamsParameters() {
-  if (coreInstancePtr == nullptr) FatalError("executorsm::collectStreamsParameters: coreInstancePtr is null");
+ptree executorsm::engineErrorResponse(const std::string_view command, const std::string &message) {
+  SPDLOG_CRITICAL("Engine invariant violated while handling command '{}': {}", command, message);
   ptree ptRetval;
-  if (pProc == nullptr) FatalError("executorsm::collectStreamsParameters: pProc is null");
+  ptRetval.put("error.response", "engine error: " + message);
+  return ptRetval;
+}
+
+ptree executorsm::collectStreamsParameters() {
+  if (coreInstancePtr == nullptr)
+    return engineErrorResponse("get", "executorsm::collectStreamsParameters: coreInstancePtr is null");
+  ptree ptRetval;
+  if (pProc == nullptr) return engineErrorResponse("get", "executorsm::collectStreamsParameters: pProc is null");
   // Hak diagnostyczny testu regresyjnego it_service_reset_race, ta sama droga co RDB_FAULT_SHOW.
   //
   // Zwykle opoznienie tu nie wystarcza i zostalo odrzucone po probie: okno, w ktorym pProc jest
@@ -73,10 +82,23 @@ ptree executorsm::collectStreamsParameters() {
 }
 
 ptree executorsm::commandProcessor(const ptree &ptInval) {
-  if (coreInstancePtr == nullptr) FatalError("executorsm::commandProcessor: coreInstancePtr is null");
   ptree ptRetval;
   std::string command = ptInval.get("db.message", "");
+  // Nazwa strumienia przychodzi od KLIENTA, wiec literowka jest przypadkiem normalnym, a nie
+  // zlamanym niezmiennikiem. Sprawdzenie stoi tutaj, na granicy, bo qTree::getQuery() ma nazwe
+  // spoza planu za warunek wstepny (RDB_ASSERT): bez tej straznicy `xqry -s literowka` konczylby
+  // serwer. Do 2026-10 getQuery rzucal std::logic_error, a odpowiedz skladal catch(std::exception)
+  // jako "command processor failure"; wpis "Missing - <nazwa>" w logu zostaje ten sam.
+  const auto unknownStream = [&ptRetval, &command](const std::string &name) {
+    SPDLOG_ERROR("Missing - {}: command '{}' asks for a stream that is not in the plan", name, command);
+    ptRetval.put("error.response", "unknown stream: " + name);
+    return ptRetval;
+  };
   try {
+    // Kontrola stoi WEWNATRZ try, nie przed nim. Poza nim jej rzut omijalby wlasna granice bledu
+    // tej funkcji i ladowal w zaporze IpcServer::commandLoop() -- a zapora jest ostatnia deska
+    // ratunku transportu, nie kanalem raportowania silnika. Pod std::exit roznicy nie bylo.
+    if (coreInstancePtr == nullptr) return engineErrorResponse(command, "executorsm::commandProcessor: coreInstancePtr is null");
     // Hak it_zero_step_adhoc: znacznik powstaje przed proba zajecia blokady epoki.
     if (command == "adhoc")
       if (const char *gatePath = std::getenv("RDB_FAULT_ZERO_STEP_GATE"); gatePath != nullptr)
@@ -132,6 +154,7 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
         ptRetval.put("db", "error: missing stream name");
         return ptRetval;
       }
+      if (!coreInstancePtr->exists(streamName)) return unknownStream(streamName);
       for (const auto &s : (*coreInstancePtr)[streamName].lSchema) {
         ptRetval.put(std::string("db.field.") + s.field_.rname, s.field_.rname);
         ptRetval.put(std::string("db.field_count.") + s.field_.rname, rdb::flatElementCount(s.field_));
@@ -175,6 +198,7 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
         ptRetval.put("db", "error: missing stream name");
         return ptRetval;
       }
+      if (!coreInstancePtr->exists(streamName)) return unknownStream(streamName);
       if (ptInval.get("db.id", "").empty()) {
         SPDLOG_ERROR("commandProcessor: 'show' command missing db.id");
         ptRetval.put("db", "error: missing db.id");
@@ -262,6 +286,11 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
     SPDLOG_ERROR("ptree fail: {}", e.what());
     ptRetval.put("error.response", std::string("ptree fail: ") + e.what());
   } catch (std::exception &e) {
+    // Bledy SILNIKA tu nie przychodza: rdzen nie rzuca (Result, rdb/error.hpp), a zlamany
+    // niezmiennik wykryty w handlerze wraca jako engineErrorResponse - "engine error", proces
+    // zyje dalej. Do 2026-10 ta sama odpowiedz powstawala w catch(const rdb::Error&), ktory
+    // musial stac PRZED tym, bo rdb::Error dziedziczyl po std::exception. Zostaje catch dla
+    // bibliotek zewnetrznych (ptree, Boost.Interprocess) i dla bad_alloc.
     // Bez tego wpisu awaria handlera jest dla klienta NIEODROZNIALNA od powodzenia:
     // 'show' nie wypelnia ptRetval nawet po udanej subskrypcji, wiec pusta odpowiedz
     // znaczyla naraz "zrobione" i "wywrocilo sie". Klient dostawal komunikat o braku
@@ -272,13 +301,28 @@ ptree executorsm::commandProcessor(const ptree &ptInval) {
   return ptRetval;  // sub for a while
 }
 
+/// Formatowanie wiersza do emisji. Mimo sasiedztwa z dyspozytorem komend ta funkcja NIE biegnie
+/// w watku komunikacyjnym: transport dostaje ja jako RowFormatter i wola z IpcServer::broadcast(),
+/// czyli z petli przetwarzania, pod clientMapsMutex_ i w srodku obiegu po subskrybentach. Oba
+/// niezmienniki ponizej naleza wiec do sciezki taktu (etap B), nie do granicy komendy.
+///
+/// RowFormatter nie ma kanalu bledu. Awaria nosnika zachowuje klase K4: kod EIO i brak
+/// zatrzasku fatalErrorRaised; naruszenie niezmiennika zatrzymuje proces przez rdb::fatal.
+/// Sprzatanie IPC robi handler atexit (cleanup()); kolejki klientow bierze pod try_lock,
+/// wiec trzymany tu clientMapsMutex_ go nie zawiesi.
 std::string executorsm::printRowValue(const std::string &query_name) {
   using boost::property_tree::ptree;
   if (pProc == nullptr) return "";
-  if (coreInstancePtr == nullptr) FatalError("executorsm::printRowValue: coreInstancePtr is null");
-  // Null stad nie wraca: brak strumienia w modelu getPayload zglasza wyjatkiem (streamRuntime),
-  // a pusty payload magazynu konczy sie wczesniej FatalError w storage::getPayload().
-  auto *payload = pProc->getPayload(query_name, 0);
+  RDB_ASSERT(coreInstancePtr != nullptr, "executorsm::printRowValue: coreInstancePtr is null");
+  // Brak strumienia w modelu to RDB_ASSERT w streamRuntime (nazwy przychodza z planu). Blad stad
+  // to blad odczytu magazynu (revRead) - nosnik zawiodl w srodku taktu.
+  auto readPayload = pProc->getPayload(query_name, 0);
+  if (!readPayload) [[unlikely]] {
+    if (readPayload.error().code() == rdb::Errc::IO)
+      rdb::EnvironmentError("executorsm::printRowValue: stream '{}': {}", query_name, readPayload.error().message());
+    rdb::fatal(std::format("executorsm::printRowValue: stream '{}': {}", query_name, readPayload.error().message()));
+  }
+  auto *payload = *readPayload;
 
   ptree pt;
   pt.put("stream", query_name);

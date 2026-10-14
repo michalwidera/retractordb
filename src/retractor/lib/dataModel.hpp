@@ -6,9 +6,10 @@
 #include <span>
 #include <vector>
 
+#include <fmt/format.h>
 #include <boost/rational.hpp>
 
-#include "fatalError.hpp"      // FatalError w kontroli krzyzowej handleAt() (tylko Debug)
+#include "rdb/error.hpp"       // RDB_ASSERT w kontroli krzyzowej handleAt() (tylko Debug), rdb::Result
 #include "streamInstance.hpp"  // streamInstance (transitively includes qTree.hpp, rdb/payload.hpp)
 class dataModel {
  private:
@@ -27,15 +28,15 @@ class dataModel {
   /// importFrom(), a porazka rejestracji w modelu nie miala wycofania; dzis getAdHoc() przywraca
   /// plan przy kazdej porazce po imporcie. `qSet[id]` na nazwie spoza modelu nie zglaszalo
   /// bledu, tylko WSTAWIALO pusty unique_ptr i zaraz go luskalo -- czyli SIGSEGV. Brak nazwy
-  /// jest tu bledem zgloszonym tak samo jak w qTree::getQuery: wyjatkiem, ktory handler
-  /// zamienia w `error.response` dla klienta.
+  /// jest tu zlamanym niezmiennikiem (RDB_ASSERT), tak samo jak w qTree::getQuery: nazwy od
+  /// klienta sprawdza wczesniej handler komendy (exists()) i odpowiada `error.response`.
   [[nodiscard]] streamInstance &streamRuntime(const std::string &instance);
 
   [[nodiscard]] bool forwardRecordAvailable(const std::string &instance, int forwardIndex) const;
   [[nodiscard]] bool queryInputsAvailable(const query &qry, int logicalIndex);
-  void bootstrapDeclaration(const query &qry);
+  [[nodiscard]] rdb::Result<> bootstrapDeclaration(const query &qry);
   /// Kolejny rekord uzbrojonej deklaracji: odczyt z akcesora i fire() do historii.
-  void advanceDeclaration(const query &qry, rdb::storage &output);
+  [[nodiscard]] rdb::Result<> advanceDeclaration(const query &qry, rdb::storage &output);
 
   /// Instancje wykonawcze ULOZONE JAK PLAN: handles_[i] obsluguje coreInstance_.at(i). Tablica
   /// jest AKCELERATOREM, nie zmiana semantyki - powstaje z tych samych wywolan streamRuntime(),
@@ -66,10 +67,10 @@ class dataModel {
   /// wlasnie jego koszt mial zostac zdjety ze slotu.
   [[nodiscard]] streamInstance &handleAt(std::size_t position, [[maybe_unused]] const query &qry) {
 #ifndef NDEBUG
-    if (position >= handles_.size())
-      FatalError("dataModel::processRows: stream handle table has {} entries, plan position is {}", handles_.size(), position);
-    if (handles_[position] != &streamRuntime(qry.id))
-      FatalError("dataModel::processRows: stream handle at position {} does not match plan node '{}'", position, qry.id);
+    RDB_ASSERT(position < handles_.size(), "dataModel::processRows: stream handle table has {} entries, plan position is {}",
+               handles_.size(), position);
+    RDB_ASSERT(handles_[position] == &streamRuntime(qry.id),
+               "dataModel::processRows: stream handle at position {} does not match plan node '{}'", position, qry.id);
 #endif
     return *handles_[position];
   }
@@ -77,23 +78,26 @@ class dataModel {
  public:
   std::map<std::string, std::unique_ptr<streamInstance>> qSet;
 
-  /// Niepusta odmowa oznacza model niegotowy do publikacji; qSet pozostaje puste (#474).
-  rdb::Refusal initializationError;
+ private:
+  dataModel(qTree &coreInstance, rdb::MemoryStore *memory);
 
-  explicit dataModel(qTree &coreInstance, rdb::MemoryStore *memory = nullptr);
+ public:
+  /// Model planu: instancja kazdego strumienia z otwartym magazynem. Dyrektywa z pusta wartoscia
+  /// albo blad otwarcia magazynu wraca jako Result - zamiast rzutu z konstruktora.
+  [[nodiscard]] static rdb::Result<std::unique_ptr<dataModel>> create(qTree &coreInstance, rdb::MemoryStore *memory = nullptr);
   ~dataModel();
 
   dataModel() = delete;
 
   /// Dolacza instancje wezlow planu o podanych nazwach - wszystkie albo zadnej. Zwraca nazwe,
-  /// ktorej nie da sie dolaczyc (pusty napis = sukces); wyjatek z budowy instancji wychodzi
+  /// ktorej nie da sie dolaczyc (pusty napis = sukces); blad budowy instancji wraca
   /// przy nietknietym qSet. Wolajacy moze wiec wycofac plan, nie wyjmujac niczego z qSet - a
   /// z qSet nic sie nie usuwa (patrz handles_).
   [[nodiscard]] std::string addQueriesToModel(const std::vector<std::string> &ids);
   void syncDeclaredCapacities();
 
-  std::unique_ptr<rdb::payload>::pointer getPayload(const std::string &instance,  //
-                                                    int revOffset = 0);
+  [[nodiscard]] rdb::Result<std::unique_ptr<rdb::payload>::pointer> getPayload(const std::string &instance,  //
+                                                                               int revOffset = 0);
 
   /*
    * Rekord strumienia po indeksie POSTĘPUJĄCYM (0-bazowym) na osi czasu źródła -
@@ -105,7 +109,7 @@ class dataModel {
    * (streamInstance::unavailableRecord) i jest ważna tylko do następnego odczytu tego
    * strumienia - kolejny revRead nadpisuje bieżący payload. Nie przechowywać jej.
    */
-  const rdb::payload &fetchForward(const std::string &instance, int forwardIndex);
+  [[nodiscard]] rdb::Result<const rdb::payload *> fetchForward(const std::string &instance, int forwardIndex);
 
   /*
    * This function creates Input payload for ConstructOutputPayload data source
@@ -117,14 +121,14 @@ class dataModel {
    * ZRODLA nadal adresuje nazwa i tak ma zostac: wezly jezdza przez kopie planu i przezywaja
    * do innego drzewa, wiec zapamietany uchwyt zrodla wskazywalby strukture, ktorej juz nie ma.
    */
-  void constructInputPayload(const query &qry, streamInstance &runtime);
+  [[nodiscard]] rdb::Result<> constructInputPayload(const query &qry, streamInstance &runtime);
 
   /*
    * Wylicza okna rekordowe (MIN(pole:W:H) i rodzeństwo) dla jednego taktu strumienia.
    * Musi stać TU, a nie w streamInstance ani w ewaluatorze: okno czyta historię ŹRÓDŁA,
    * a dostęp do innych strumieni ma wyłącznie dataModel (qSet).
    */
-  void computeWindowAggregates(const query &qry, streamInstance &runtime);
+  [[nodiscard]] rdb::Result<> computeWindowAggregates(const query &qry, streamInstance &runtime);
 
   /// Liczy jeden takt planu. Nalezne strumienie opisuje MASKA POZYCYJNA rownolegla do planu:
   /// dueMask[i] != 0 znaczy "element i planu jest nalezny w tym takcie". Dlugosc maski musi byc
@@ -133,10 +137,14 @@ class dataModel {
   /// nalezny strumien w KAZDYM takcie, plus porownywanie napisow w trzech przebiegach ponizej.
   /// Maske trzyma i wypelnia executorsm::collectAwaitedStreams; uklad planu nie ma prawa zmienic
   /// sie miedzy jej wypelnieniem a tym wywolaniem.
-  void processRows(std::span<const char> dueMask, const boost::rational<int> &currentTimeSlot = boost::rational<int>(0));
-  void processZeroStep();
+  /// Jeden slot planu. Blad odczytu, zapisu albo ewaluacji konczy slot w miejscu, w ktorym
+  /// wystapil, i wraca do wolajacego - demon zatrzymuje sie na nim (executorsm::run), silnik
+  /// osadzony oddaje go z step().
+  [[nodiscard]] rdb::Result<> processRows(std::span<const char> dueMask,
+                                          const boost::rational<int> &currentTimeSlot = boost::rational<int>(0));
+  [[nodiscard]] rdb::Result<> processZeroStep();
 
-  std::vector<rdb::descFldVT> getRow(const std::string &instance, int timeOffset);
+  [[nodiscard]] rdb::Result<std::vector<rdb::descFldVT>> getRow(const std::string &instance, int timeOffset);
 
   size_t streamStoredSize(const std::string &instance);
 

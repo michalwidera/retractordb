@@ -24,8 +24,8 @@
 namespace {
 
 void dropArtifactFile(const std::filesystem::path &artifact_filename) {
-  if (std::filesystem::exists(artifact_filename)) {
-    std::error_code ec;
+  std::error_code ec;  // przeciazenia z error_code: blad stat() to "pliku nie widac", nie wyjatek
+  if (std::filesystem::exists(artifact_filename, ec)) {
     std::filesystem::remove(artifact_filename, ec);
     if (ec) {
       SPDLOG_WARN("Failed to remove file {}: {}", artifact_filename.string(), ec.message());
@@ -54,8 +54,11 @@ void dropArtifactFamily(const std::filesystem::path &dir, const query &q) {
 
   const std::string prefix           = data.filename().string() + "_segment_";
   const std::filesystem::path parent = data.parent_path().empty() ? std::filesystem::path(".") : data.parent_path();
+  // Petla z increment(ec), nie range-for: operator++ iteratora katalogu zglasza blad odczytu
+  // katalogu wyjatkiem, a tu ma on tylko zakonczyc sprzatanie.
   std::error_code ec;
-  for (const auto &entry : std::filesystem::directory_iterator(parent, ec)) {
+  for (std::filesystem::directory_iterator it(parent, ec), end; !ec && it != end; it.increment(ec)) {
+    const auto &entry      = *it;
     const std::string name = entry.path().filename().string();
     std::string_view rest  = name;
     if (!rest.starts_with(prefix)) continue;
@@ -158,9 +161,12 @@ void dropStalePlanArtifacts(const qTree &plan) {
       // pliku binarnego (sprzed #346) musi zniknac, zanim magazyn go przeczyta. Deklaracja nie
       // ma w katalogu magazynu zadnych danych - `.desc` zapisze sie od nowa z planu.
       // checkDescriptorFiles() przepuszcza wylacznie ten przypadek.
+      // Bez error_code `exists` rzuca filesystem_error (np. EACCES), a rdzen nie obsluguje wyjatkow. Blad
+      // sprawdzenia zostawia `.desc` - kontrola deskryptorow przy otwarciu magazynu zglosi go z przyczyna.
       const std::filesystem::path descFile = dir / (q.id + ".desc");
+      std::error_code ec;
       rdb::Descriptor kept;
-      if (std::filesystem::exists(descFile) && rdb::tryLoadDescriptorFile(descFile.string(), kept).message.empty() &&
+      if (std::filesystem::exists(descFile, ec) && rdb::tryLoadDescriptorFile(descFile.string(), kept).message.empty() &&
           isLegacyBinaryDescriptor(query(q).descriptorStorage(), kept)) {
         SPDLOG_INFO("Stream {}: replacing pre-#346 TYPE DEVICE in {} with TYPE BINFILE", q.id, descFile.string());
         dropArtifactFile(descFile);

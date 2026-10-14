@@ -9,7 +9,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
-#include <exception>
+
 #include <filesystem>
 #include <format>
 #include <span>
@@ -17,8 +17,8 @@
 #include <system_error>
 #include <vector>
 
+#include "configBridge.hpp"
 #include "constants.hpp"
-#include "rdb/embed/engine.hpp"
 #include "rdb/storageFile.hpp"
 #include "retractor/lib/appConfig.hpp"
 
@@ -28,23 +28,20 @@ namespace {
 constexpr std::string_view kOwnerFile = ".retractordb-embedded";
 constexpr std::string_view kOwnerText = "retractordb embedded storage v1\n";
 
-[[noreturn]] void ioError(const std::string &path, const int err) {
-  throw Refused(Refused::Stage::Check,
-                {ErrorClass::Environment, std::format("storage: '{}': {}", path, std::strerror(err)), err});
+std::unexpected<Error> ioError(const std::string &path, const int err) {
+  return fail(Errc::IO, std::format("storage: '{}': {}", path, std::strerror(err)), err);
 }
 
-[[noreturn]] void planError(const std::string &message) { throw Refused(Refused::Stage::Check, {ErrorClass::Plan, message}); }
+std::unexpected<Error> planError(const std::string &message) { return fail(Errc::Compile, message); }
 
-[[noreturn]] void busy(const std::string &path) {
-  throw Refused(Refused::Stage::Request, {ErrorClass::Request, "storage is busy: " + path, EBUSY});
-}
+std::unexpected<Error> busy(const std::string &path) { return fail(Errc::Config, "storage is busy: " + path, EBUSY); }
 
-std::filesystem::path resolve(const std::string &path) {
+Result<std::filesystem::path> resolve(const std::string &path) {
   std::error_code ec;
   const auto absolute = std::filesystem::absolute(path, ec);
-  if (ec) ioError(path, ec.value());
+  if (ec) return ioError(path, ec.value());
   const auto resolved = std::filesystem::weakly_canonical(absolute, ec);
-  if (ec) ioError(path, ec.value());
+  if (ec) return ioError(path, ec.value());
   return resolved;
 }
 
@@ -59,84 +56,81 @@ bool sameDirectory(const std::filesystem::path &left, const std::filesystem::pat
 
 }  // namespace
 
-StorageGuard::StorageGuard(const std::string_view directory, const bool claim)
-    : directory_(resolve(directory.empty() ? "." : std::string(directory)).string()) {
-  fd_ = ::open(directory_.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-  if (fd_ < 0) ioError(directory_, errno);
-  try {
-    // Kazde open ma osobny opis pliku, wiec flock wykrywa takze drugi obiekt w tym procesie.
-    if (::flock(fd_, LOCK_EX | LOCK_NB) != 0) {
-      const int err = errno;
-      if (err == EWOULDBLOCK || err == EAGAIN) busy(directory_);
-      ioError(directory_, err);
-    }
-    struct stat held{};
-    struct stat named{};
-    if (::fstat(fd_, &held) != 0 || ::stat(directory_.c_str(), &named) != 0) ioError(directory_, errno);
-    if (held.st_dev != named.st_dev || held.st_ino != named.st_ino) planError("storage directory changed: " + directory_);
+Result<std::unique_ptr<StorageGuard>> StorageGuard::create(const std::string_view directory, const bool claim) {
+  std::unique_ptr<StorageGuard> guard(new StorageGuard);
+  RDB_TRY(guard->initialize(directory, claim));
+  return guard;
+}
 
-    const std::string marker = (std::filesystem::path(directory_) / kOwnerFile).string();
-    struct stat info{};
-    if (::lstat(marker.c_str(), &info) != 0) {
-      const int err = errno;
-      if (err != ENOENT) ioError(marker, err);
-      if (!claim) {
-        ::close(fd_);
-        fd_ = -1;
-        return;
-      }
-      std::error_code ec;
-      const bool empty = std::filesystem::is_empty(directory_, ec);
-      if (ec) ioError(directory_, ec.value());
-      if (!empty) planError("Engine requires an empty directory or an owned embedded storage: " + directory_);
-      const StorageFd owner(marker, O_WRONLY | O_CREAT | O_EXCL, 0600);
-      if (!owner.isOpen()) ioError(marker, errno);
-      if (!owner.write(std::as_bytes(std::span(kOwnerText)))) ioError(marker, errno != 0 ? errno : EIO);
-    } else {
-      if (!S_ISREG(info.st_mode) || info.st_uid != ::geteuid() || info.st_nlink != 1)
-        planError("invalid embedded storage owner marker: " + marker);
-      const StorageFd owner(marker, O_RDONLY | O_NONBLOCK);
-      if (!owner.isOpen()) ioError(marker, errno);
-      std::string contents(kOwnerText.size() + 1, '\0');
-      const auto count = owner.readAt(std::as_writable_bytes(std::span(contents)), 0);
-      if (count < 0) ioError(marker, errno);
-      if (count != static_cast<ssize_t>(kOwnerText.size()) || contents.substr(0, kOwnerText.size()) != kOwnerText)
-        planError("invalid embedded storage owner marker: " + marker);
-    }
-  } catch (...) {
-    ::close(fd_);
-    fd_ = -1;
-    throw;
+Result<> StorageGuard::initialize(const std::string_view directory, const bool claim) {
+  RDB_TRY_ASSIGN(const auto path, resolve(directory.empty() ? "." : std::string(directory)));
+  directory_ = path.string();
+  fd_        = ::open(directory_.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+  if (fd_ < 0) return ioError(directory_, errno);
+  // Kazde open ma osobny opis pliku, wiec flock wykrywa takze drugi obiekt w tym procesie.
+  if (::flock(fd_, LOCK_EX | LOCK_NB) != 0) {
+    const int err = errno;
+    if (err == EWOULDBLOCK || err == EAGAIN) return busy(directory_);
+    return ioError(directory_, err);
   }
+  struct stat held{};
+  struct stat named{};
+  if (::fstat(fd_, &held) != 0 || ::stat(directory_.c_str(), &named) != 0) return ioError(directory_, errno);
+  if (held.st_dev != named.st_dev || held.st_ino != named.st_ino) return planError("storage directory changed: " + directory_);
+
+  const std::string marker = (std::filesystem::path(directory_) / kOwnerFile).string();
+  struct stat info{};
+  if (::lstat(marker.c_str(), &info) != 0) {
+    const int err = errno;
+    if (err != ENOENT) return ioError(marker, err);
+    if (!claim) {
+      ::close(fd_);
+      fd_ = -1;
+      return {};
+    }
+    std::error_code ec;
+    const bool empty = std::filesystem::is_empty(directory_, ec);
+    if (ec) return ioError(directory_, ec.value());
+    if (!empty) return planError("Engine requires an empty directory or an owned embedded storage: " + directory_);
+    const StorageFd owner(marker, O_WRONLY | O_CREAT | O_EXCL, 0600);
+    if (!owner.isOpen()) return ioError(marker, errno);
+    if (!owner.write(std::as_bytes(std::span(kOwnerText)))) return ioError(marker, errno != 0 ? errno : EIO);
+  } else {
+    if (!S_ISREG(info.st_mode) || info.st_uid != ::geteuid() || info.st_nlink != 1)
+      return planError("invalid embedded storage owner marker: " + marker);
+    const StorageFd owner(marker, O_RDONLY | O_NONBLOCK);
+    if (!owner.isOpen()) return ioError(marker, errno);
+    std::string contents(kOwnerText.size() + 1, '\0');
+    const auto count = owner.readAt(std::as_writable_bytes(std::span(contents)), 0);
+    if (count < 0) return ioError(marker, errno);
+    if (count != static_cast<ssize_t>(kOwnerText.size()) || contents.substr(0, kOwnerText.size()) != kOwnerText)
+      return planError("invalid embedded storage owner marker: " + marker);
+  }
+  return {};
 }
 
 StorageGuard::~StorageGuard() {
   if (fd_ >= 0) ::close(fd_);
 }
 
-void StorageGuard::checkPath(const std::string &path) const {
+Result<> StorageGuard::checkPath(const std::string &path) const {
   const std::filesystem::path base(directory_);
-  const auto resolved    = resolve(path);
+  RDB_TRY_ASSIGN(const auto resolved, resolve(path));
   const auto [end, rest] = std::ranges::mismatch(base, resolved);
   if (end != base.end() || rest == resolved.end() || resolved == base / kOwnerFile)
-    planError("embedded storage artifact leaves its owned directory or names its owner marker: " + path);
+    return planError("embedded storage artifact leaves its owned directory or names its owner marker: " + path);
+  return {};
 }
 
-OfflinePolicy offlinePolicy(const std::string_view lockDir, const std::string_view configPath) {
-  if (!lockDir.empty() && !std::filesystem::path(lockDir).is_absolute())
-    throw Refused(Refused::Stage::Request, {ErrorClass::Request, "lock_dir must be absolute"});
+Result<OfflinePolicy> offlinePolicy(const std::string_view lockDir, const std::string_view configPath) {
+  if (!lockDir.empty() && !std::filesystem::path(lockDir).is_absolute()) return fail(Errc::Config, "lock_dir must be absolute");
   OfflinePolicy policy{.lockDir = std::string(lockDir)};
   // Tylko wskazany plik, bez warstw /etc i XDG: biblioteka nie szuka konfiguracji sama.
   AppConfig cfg;
   if (!configPath.empty()) {
-    try {
-      cfg = loadAppConfig(std::string(configPath));
-    } catch (const std::exception &error) {
-      throw Refused(Refused::Stage::Request, {ErrorClass::Request, error.what()});
-    }
+    RDB_TRY_ASSIGN(cfg, embeddedConfig(std::string(configPath)));
     if (!cfg.embeddedLenientLockDirsError.empty())
-      throw Refused(Refused::Stage::Request, {ErrorClass::Request, std::format("Configuration error in '{}': {}", configPath,
-                                                                               cfg.embeddedLenientLockDirsError)});
+      return fail(Errc::Config, std::format("Configuration error in '{}': {}", configPath, cfg.embeddedLenientLockDirsError));
     if (policy.lockDir.empty()) policy.lockDir = cfg.lockDir;
   }
 
@@ -154,18 +148,19 @@ OfflinePolicy offlinePolicy(const std::string_view lockDir, const std::string_vi
   return policy;
 }
 
-void checkOffline(const OfflinePolicy &policy) {
+Result<> checkOffline(const OfflinePolicy &policy) {
   // Tryb lagodny: niepewnosc nie jest odmowa, bo domyslny katalog to tylko zgadywanie,
   // a we wspoldzielonym /tmp obcy wpis blokowalby wszystkich.
-  const auto fail = [&](const std::string &path, const int err) {
-    if (!policy.lenient) ioError(path, err);
+  const auto uncertainty = [&](const std::string &path, const int err) -> Result<> {
+    if (!policy.lenient) return ioError(path, err);
+    return {};
   };
   std::error_code ec;
   const auto directory =
       policy.lockDir.empty() ? std::filesystem::temp_directory_path(ec) : std::filesystem::path(policy.lockDir);
-  if (ec) return fail(policy.lockDir.empty() ? "TMPDIR" : policy.lockDir, ec.value());
+  if (ec) return uncertainty(policy.lockDir.empty() ? "TMPDIR" : policy.lockDir, ec.value());
   std::filesystem::directory_iterator entry(directory, ec);
-  if (ec) return fail(directory.string(), ec.value());
+  if (ec) return uncertainty(directory.string(), ec.value());
   // increment(ec) przy bledzie konczy iteracje; blad oceniamy po petli.
   for (; entry != std::filesystem::directory_iterator(); entry.increment(ec)) {
     const auto &path = entry->path();
@@ -173,7 +168,7 @@ void checkOffline(const OfflinePolicy &policy) {
     const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     if (fd < 0) {
       const int err = errno;
-      if (err != ENOENT) fail(path.string(), err);
+      if (err != ENOENT) RDB_TRY(uncertainty(path.string(), err));
       continue;
     }
     struct stat info{};
@@ -183,40 +178,38 @@ void checkOffline(const OfflinePolicy &policy) {
     const int lockErr    = errno;
     ::close(fd);
     if (inspected != 0) {
-      fail(path.string(), inspectErr);
+      RDB_TRY(uncertainty(path.string(), inspectErr));
       continue;
     }
     if (!S_ISREG(info.st_mode)) {
-      if (!policy.lenient) planError("invalid xretractor lock file: " + path.string());
+      if (!policy.lenient) return planError("invalid xretractor lock file: " + path.string());
       continue;
     }
     if (locked != 0) {
-      if (lockErr == EWOULDBLOCK || lockErr == EAGAIN) busy(path.string());
-      fail(path.string(), lockErr);
+      if (lockErr == EWOULDBLOCK || lockErr == EAGAIN) return busy(path.string());
+      RDB_TRY(uncertainty(path.string(), lockErr));
     }
   }
-  if (ec) fail(directory.string(), ec.value());
+  if (ec) return uncertainty(directory.string(), ec.value());
+  return {};
 }
 
-std::string temporaryStorageDirectory() {
+Result<std::string> temporaryStorageDirectory() {
   std::error_code ec;
   const auto parent = std::filesystem::temp_directory_path(ec);
-  if (ec) ioError("TMPDIR", ec.value());
+  if (ec) return ioError("TMPDIR", ec.value());
   const std::string pattern = (parent / "retractordb-engine-XXXXXX").string();
   std::vector<char> name(pattern.begin(), pattern.end());
   name.push_back('\0');
-  if (::mkdtemp(name.data()) == nullptr) ioError(pattern, errno);
-  return name.data();
+  if (::mkdtemp(name.data()) == nullptr) return ioError(pattern, errno);
+  return std::string(name.data());
 }
 
 void removeTemporaryStorage(const std::string &directory) noexcept {
-  try {
-    const StorageGuard guard(directory, true);
-    std::error_code ignored;
-    std::filesystem::remove_all(directory, ignored);
-  } catch (...) {
-    // Zajety lub niedostepny magazyn zostaje: sprzatanie nie moze zniszczyc zywego odczytu.
-  }
+  const auto guard = StorageGuard::create(directory, true);
+  if (!guard) return;
+  std::error_code ignored;
+  std::filesystem::remove_all(directory, ignored);
 }
 
 }  // namespace rdb::embed

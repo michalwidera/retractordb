@@ -647,6 +647,32 @@ TEST(descriptor, string_array_stays_one_flat_slot) {
   EXPECT_FALSE(text == eightBytes);
 }
 
+// ---------------------------------------------------------------------------
+// Wyszukiwanie po nazwie: nazwa spoza deskryptora jest zlamanym warunkiem wstepnym.
+//
+// Te trzy funkcje sa zwiazane wprost do Pythona (Descriptor.field_index i pokrewne), ale
+// wiazanie pyta najpierw hasField() i literowke uzytkownika zamienia na KeyError, zanim
+// dotrze tutaj (test_guarded_paths_do_not_end_the_process). Silnik pyta o pola, ktore
+// zadeklarowal. Stad rdb::fatal z nazwa pola - do 2026-10 byl to rzut LogicError.
+// ---------------------------------------------------------------------------
+TEST(descriptorDeathTest, lookup_by_unknown_name_is_fatal_and_names_the_field) {
+  const rdb::Descriptor desc{rdb::Descriptor("value", sizeof(int), 1, rdb::INTEGER)};
+
+  auto mutableDesc = desc;
+  EXPECT_DEATH(static_cast<void>(mutableDesc.fieldIndex("absent")), "FATAL: .*absent");
+  EXPECT_DEATH(static_cast<void>(mutableDesc.fieldByteOffset("absent")), "FATAL: .*absent");
+
+  // Pole, ktore istnieje, odpowiada - sprawdzenie nazwy obecnej nie konczy procesu.
+  EXPECT_TRUE(mutableDesc.hasField("value"));
+  EXPECT_FALSE(mutableDesc.hasField("absent"));
+  EXPECT_EQ(mutableDesc.fieldIndex("value"), 0U);
+}
+
+TEST(descriptorDeathTest, merging_a_descriptor_with_itself_is_fatal) {
+  rdb::Descriptor desc{rdb::Descriptor("value", sizeof(int), 1, rdb::INTEGER)};
+  EXPECT_DEATH(desc += desc, "FATAL: descriptor: cannot merge descriptor with itself");
+}
+
 // Przeniesiony deskryptor musi zostac SPOJNY: wektor pol jest pusty, wiec cache mapowan
 // nie moze udawac poprzedniego ukladu. Wersja `= default` tej wlasnosci nie ma - przenosi
 // wektory cache, ale kopiuje liczniki i flage brudnosci, wiec zrodlo raportowaloby sloty,

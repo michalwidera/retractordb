@@ -1,5 +1,6 @@
 #include ".antlr/DESCParser.h"
 
+#include <algorithm>
 #include <charconv>
 #include <cstdint>
 #include <iostream>
@@ -7,6 +8,7 @@
 #include <optional>
 #include <string>
 #include <system_error>
+#include <utility>
 
 #include ".antlr/DESCBaseListener.h"
 #include ".antlr/DESCLexer.h"
@@ -18,32 +20,6 @@ using namespace antlrcpp;
 using namespace antlr4;
 
 namespace {
-/// Blad skladni .desc: przerywa parsowanie, zamiast konczyc proces.
-///
-/// Wczesniej oba listenery bledow wolaly exit(EPERM). Plik .desc czyta takze serwer
-/// (storage::attachDescriptor), wiec uszkodzony deskryptor artefaktu konczyl xretractora (#265).
-///
-/// Rzut, a nie powrot z listenera - z tego samego powodu co RQLSyntaxError w RQLParser.cpp: po
-/// powrocie ANTLR wchodzi w odzyskiwanie i wola dalej metody exit* ParserDESCListener na kalekich
-/// kontekstach, gdzie etykieta tokenu (np. ctx->name) bywa nullem. Rzut wychodzi z desc() przez
-/// generowany kod, bo ten lapie wylacznie RecognitionException.
-struct DESCSyntaxError {
-  std::string message;
-};
-
-[[noreturn]] void abortParse(antlr4::Parser &parser, size_t line, size_t column, const std::string &msg,
-                             Token *offendingSymbol) {
-  const std::string message = "line " + std::to_string(line) + ":" + std::to_string(column) + " " + msg;
-  std::cerr << "Syntax error @Descriptor" << '\n';
-  std::cerr << "line:" << line << ":" << column << " at "
-            << (offendingSymbol != nullptr ? offendingSymbol->getText() : "<unknown>") << '\n';
-  std::cerr << "msg:" << msg << '\n';
-  // FinalAction wywoluje exitRule() podczas zwijania stosu. Bez odpiecia listenera
-  // exit* moze dereferencjonowac niekompletny kontekst po bledzie skladni.
-  parser.removeParseListeners();
-  throw DESCSyntaxError{message};
-}
-
 /// Wartosc tokenu DECIMAL albo nullopt, gdy nie miesci sie w int.
 ///
 /// std::from_chars, a nie std::stoi: metody exit* listenera biegna z noexcept-owego destruktora
@@ -61,10 +37,67 @@ std::optional<int> decimalLiteral(const std::string &text) {
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
 
+namespace {
+
+/// Blad skladni deskryptora: przerywa parsowanie, zamiast konczyc proces.
+///
+/// Do fazy 1 oba listenery bledow wolaly exit(EPERM). Wystarczyl jeden uszkodzony plik
+/// .desc, zeby zabic dowolny proces, ktory go otworzyl - lacznie z jadrem notatnika,
+/// gdzie znika cala sesja uzytkownika.
+///
+/// Sam powrot z listenera nie zalatwia sprawy: ANTLR wchodzi wtedy w odzyskiwanie i wola
+/// dalej callbacki ParserListenera na kalekich kontekstach, gdzie np. ctx->name jest
+/// nullem. Rzut wychodzi z desc() przez generowany kod, bo ten lapie wylacznie
+/// RecognitionException - dlatego ten typ NIE dziedziczy po niej.
+struct DESCSyntaxError {
+  std::string message;
+};
+
+/// Gorne ograniczenie dlugosci komunikatu. Ta sama wartosc i ten sam powod co w
+/// RQLParser.cpp: komunikat potrafi trafic do odpowiedzi serwera w segmencie 64 kB,
+/// a lista `expecting {...}` przy bledzie na poczatku deskryptora wylicza dziesiatki
+/// tokenow.
+constexpr size_t kMaxSyntaxErrorMessage = 300;
+
+/// Zdejmuje ParserListenera i rzuca DESCSyntaxError.
+///
+/// Zdjecie listenera jest warunkiem KONIECZNYM, nie porzadkami: rozwijanie stosu
+/// przechodzi przez `finally` generowanego kodu (antlrcpp::FinalAction), ktore wola
+/// exitRule(), a to wola exitIntegerID()/exitStringID()/... na kontekscie zatrzymanym w
+/// polowie budowy - czyli std::stoi() na ctx->arr rownym nullptr. Na sciezce RQL pierwsza
+/// wersja tej samej naprawy padala tam segfaultem; patrz abortParse() w RQLParser.cpp.
+/// Po removeParseListeners() petla triggerExitRuleEvent() chodzi po pustej liscie.
+///
+/// Listener bledow leksera dostaje ten sam parser, bo blad leksera rozwija stos przez
+/// dokladnie te same `finally` - token pobiera sie w srodku reguly parsera.
+[[noreturn]] void abortParse(antlr4::Parser &parser, size_t line, size_t charPositionInLine, const std::string &msg,
+                             Token *offendingSymbol) {
+  // Tekst obrazajacego tokenu, a nie jego adres. Listener leksera podaje tu nullptr, bo
+  // blad powstaje, zanim token zostanie zbudowany. Poprzednia wersja wypisywala tu goly
+  // wskaznik.
+  const std::string offendingText = (offendingSymbol != nullptr) ? offendingSymbol->getText() : std::string("<unknown>");
+
+  // Komunikat MUSI byc jednowierszowy - wraca wartoscia funkcji i bywa przekazywany dalej
+  // jako tekst wyjatku.
+  std::string message = "line " + std::to_string(line) + ":" + std::to_string(charPositionInLine) + " " + msg;
+  std::ranges::replace_if(message, [](char c) { return c == '\n' || c == '\r'; }, ' ');
+  if (message.size() > kMaxSyntaxErrorMessage) message.resize(kMaxSyntaxErrorMessage);
+
+  // Wydruk na stderr ZOSTAJE obok statusu: w trybie uslugowym stderr to journald, czyli
+  // jedyny slad po stronie serwera.
+  std::cerr << "Syntax error @Descriptor" << '\n';
+  std::cerr << "line:" << line << ":" << charPositionInLine << " at " << offendingText << '\n';
+  std::cerr << "msg:" << msg << '\n';
+
+  parser.removeParseListeners();
+  throw DESCSyntaxError{std::move(message)};
+}
+
+}  // namespace
+
 class LexerErrorListenerDesc : public BaseErrorListener {
  public:
   explicit LexerErrorListenerDesc(antlr4::Parser &parser) : parser_(parser) {}
-
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
     abortParse(parser_, line, charPositionInLine, msg, offendingSymbol);
@@ -77,7 +110,6 @@ class LexerErrorListenerDesc : public BaseErrorListener {
 class ParserErrorListenerDesc : public BaseErrorListener {
  public:
   explicit ParserErrorListenerDesc(antlr4::Parser &parser) : parser_(parser) {}
-
   void syntaxError(Recognizer *recognizer, Token *offendingSymbol, size_t line, size_t charPositionInLine,
                    const std::string &msg, std::exception_ptr e) override {
     abortParse(parser_, line, charPositionInLine, msg, offendingSymbol);
@@ -217,7 +249,21 @@ class ParserDESCListener : public DESCBaseListener {
   }
 };
 
-std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet) {
+/// Sparsuj tekstowy deskryptor. Zwraca "OK" albo jednowierszowy komunikat bledu.
+///
+/// Status jest WARTOSCIA ZWRACANA, nie zmienna globalna. Do fazy 1 stan parsera trzymal
+/// `statusDesc` o zasiegu zewnetrznym, ktory nikt nie zerowal przy wejsciu. Bylo to
+/// nieszkodliwe WYLACZNIE dlatego, ze listener konczyl proces przez exit(EPERM), wiec
+/// drugiego parsowania po bledzie nigdy nie bylo. W chwili, w ktorej exit znika, taki
+/// globalny status robi sie lepki i kazde kolejne parsowanie w tym procesie widzi "Fail"
+/// po cudzym bledzie. Dokladnie ta pulapka wywrocila wczesniej strone RQL; pinuje ja
+/// TEST(descriptor, parse_failure_does_not_poison_the_next_parse).
+///
+/// @param desc deskryptor zapisywany przez listenera. Przy bledzie moze zostac czesciowo
+///        uzupelniony - wolajacy ma go wtedy odrzucic, i tak robi operator>>.
+namespace {
+
+std::string parseDescriptorText(rdb::Descriptor &desc, const std::string_view inlet) {
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
   // to create a token stream.
@@ -226,6 +272,8 @@ std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet
   // Create a parser which parses the token stream
   // to create a parse tree.
   DESCParser parser(&tokens);
+  // Oba listenery bledow potrzebuja parsera (abortParse), wiec powstaja PO nim - i przed
+  // nim sa niszczone, czyli w chwili, gdy nikt juz do nich nie siega.
   LexerErrorListenerDesc lexerErrorListener(parser);
   lexer.removeErrorListeners();
   lexer.addErrorListener(&lexerErrorListener);
@@ -235,12 +283,30 @@ std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet
   parser.removeErrorListeners();
   parser.addErrorListener(&parserErrorListener);
   parser.addParseListener(&parserDescListener);
+
+  // Powod wczesnego powrotu, a nie ogladania drzewa po bledzie: patrz DESCSyntaxError.
   try {
     (void)parser.desc();
   } catch (const DESCSyntaxError &e) {
     return "Fail: " + e.message;
   }
-  // Blad wartosci idzie tym samym kanalem co wynik - operator>> konczy na nim FatalError-em.
+  // Blad wartosci idzie tym samym kanalem co wynik - operator>> zglasza go failbitem.
   if (!parserDescListener.error().empty()) return parserDescListener.error();
   return "OK";
+}
+
+}  // namespace
+
+/// GRANICA WYSPY WYJATKOW (RDB_NOEXCEPT_CHECK, korzen CMakeLists.txt): ten plik jedyny w bibliotece
+/// rdb ma wyjatki, bo steruje parserem ANTLR, ktory przerywa parsowanie rzutem. Zaden wyjatek nie
+/// moze go opuscic - wolajacy (descriptorIO, operator>>) nie obsluguja wyjatkow. Wszystko,
+/// czego nie zlapal parseDescriptorText (np. blad samego runtime ANTLR), wraca statusem "Fail: ...".
+std::string parserDESCString(rdb::Descriptor &desc, const std::string_view inlet) {
+  try {
+    return parseDescriptorText(desc, inlet);
+  } catch (const std::exception &error) {
+    return std::string("Fail: internal descriptor parser error: ") + error.what();
+  } catch (...) {
+    return "Fail: internal descriptor parser error";
+  }
 }

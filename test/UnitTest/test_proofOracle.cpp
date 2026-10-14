@@ -14,6 +14,7 @@
 #include <boost/rational.hpp>
 
 #include "proofOracle.hpp"
+#include "rdbResult.hpp"
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/CRSMath.hpp"
 #include "retractor/lib/dataModel.hpp"
@@ -111,10 +112,11 @@ using Trace = std::map<std::string, std::map<int, Emission>>;
 // Wykonanie planu slot po slocie, tak jak petla executorsm, do chwili horizon. Fizyczny rekord k
 // strumienia obliczanego nosi indeks logiczny logicalOrigin + k (dataModel::processRows).
 Trace runPlan(qTree &instance, const rational<int> &horizon) {
-  dataModel proc(instance);
-  pProc = &proc;  // dumpManager czyta model przez ten wskaznik
-  CRationalStreamMath::TimeLine timeline(instance.getAvailableTimeIntervals());
-  proc.processZeroStep();
+  auto procOwner  = rdbtest::ok(dataModel::create(instance));
+  dataModel &proc = *procOwner;
+  pProc           = &proc;  // dumpManager czyta model przez ten wskaznik
+  CRationalStreamMath::TimeLine timeline(rdbtest::ok(instance.getAvailableTimeIntervals()));
+  rdbtest::ok(proc.processZeroStep());
 
   Trace trace;
   for (auto now = timeline.getNextTimeSlot(); now <= horizon; now = timeline.getNextTimeSlot()) {
@@ -131,12 +133,12 @@ Trace runPlan(qTree &instance, const rational<int> &horizon) {
       }
       ++position;
     }
-    proc.processRows(dueMask, now);
+    rdbtest::ok(proc.processRows(dueMask, now));
     for (const auto &q : instance) {
       if (q.isDeclaration() || !due.contains(q.id)) continue;
       const auto count = proc.qSet.at(q.id)->outputPayload->getRecordsCount();
       if (count == before[q.id]) continue;
-      const auto row  = proc.getRow(q.id, 0);
+      const auto row  = rdbtest::ok(proc.getRow(q.id, 0));
       const int value = std::holds_alternative<int>(row.at(0)) ? std::get<int>(row.at(0)) : -1;
       trace[q.id][q.logicalOrigin + static_cast<int>(count) - 1] = {value, now};
     }

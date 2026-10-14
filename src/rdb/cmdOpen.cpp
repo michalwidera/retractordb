@@ -6,6 +6,7 @@
 #include <stdexcept>
 
 #include "rdb/descriptor.hpp"
+#include "rdb/error.hpp"
 
 std::pair<std::string, std::vector<std::string>> OpenCmd::usage() const {
   return {"open file [schema]",
@@ -19,20 +20,21 @@ bool OpenCmd::execute(CommandContext &ctx) {
   }
   const auto oldPos = ctx.file.find(".old");
   const auto base   = (oldPos != std::string::npos) ? ctx.file.substr(0, oldPos) : ctx.file;
-  ctx.dacc          = std::make_unique<rdb::storage>(base, ctx.file, ctx.storageParam, ctx.storagePolicy);
+  auto created      = rdb::storage::create(base, ctx.file, ctx.storageParam, ctx.storagePolicy);
+  if (!created) {
+    std::print("{}open: {}\n{}", ctx.colors.RED, created.error().message(), ctx.colors.RESET);
+    ctx.dacc.reset();
+    return false;
+  }
+  ctx.dacc = std::move(*created);
+  rdb::Result<> opened;
   ctx.dacc->allowRefDirs(ctx.refDirs);
-  std::string openError;
-  // Uszkodzony indeks `.meta` rzuca z konstruktora metaData (#421); odmowa jak kazdy inny blad open.
-  auto attach = [&ctx](const rdb::Descriptor *schema) -> std::string {
-    try {
-      return ctx.dacc->attachDescriptor(schema);
-    } catch (const std::runtime_error &e) {
-      return e.what();
-    }
-  };
 
   if (ctx.dacc->descriptorFileExist()) {
-    openError = attach(nullptr);
+    // attachDescriptor() nie konczy procesu i nie rzuca: odmowe (brak albo uszkodzenie .desc,
+    // nieudane otwarcie magazynu) zwraca bledem. xtrdb jest powloka interaktywna: odmowa ma
+    // zostac zgloszona i zostawic operatora przy prompcie, a nie wyrzucic go z narzedzia.
+    opened = ctx.dacc->attachDescriptor();
   } else {
     // Bez `.desc` schemat jest obowiazkowy i stoi w klamrach. Pierwszy znak sprawdzamy podgladem, bez
     // konsumowania, wiec nastepne polecenie skryptu zostaje poleceniem. Do 2026-09-27 petla brala
@@ -59,10 +61,20 @@ bool OpenCmd::execute(CommandContext &ctx) {
     std::stringstream schemaStream(schema);
     rdb::Descriptor desc;
     schemaStream >> desc;
-    openError = attach(&desc);
+    // Schemat przychodzi wprost od operatora, wiec literowka jest tu przypadkiem
+    // NORMALNYM, a nie awaryjnym. Do fazy 1 konczyla xtrdb przez exit(EPERM) w listenerze
+    // parsera; teraz ekstraktor zapala failbit i komenda odmawia, zostawiajac powloke.
+    if (schemaStream.fail()) {
+      std::print("{}invalid schema:{}\n{}", ctx.colors.RED, schema, ctx.colors.RESET);
+      // Magazyn powstal przed odczytem schematu i zostalby bez deskryptora - kazda
+      // nastepna komenda widzialaby otwarta baze, ktorej nie da sie uzyc.
+      ctx.dacc.reset();
+      return false;
+    }
+    opened = ctx.dacc->attachDescriptor(&desc);
   }
-  if (!openError.empty()) {
-    std::print("{}open: {}\n{}", ctx.colors.RED, openError, ctx.colors.RESET);
+  if (!opened) {
+    std::print("{}open: {}\n{}", ctx.colors.RED, opened.error().message(), ctx.colors.RESET);
     ctx.dacc.reset();
     return false;
   }

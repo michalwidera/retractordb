@@ -7,6 +7,7 @@
 #include <string_view>
 
 #include "descriptor.hpp"
+#include "error.hpp"
 #include "fainterface.hpp"
 #include "memoryStore.hpp"
 #include "metaData.hpp"
@@ -18,7 +19,7 @@ namespace rdb {
 /// Funkcje fabryki powinny:
 /// - odwzorowywać nazwę typu magazynu (DEFAULT/DIRECT/MEMORY/POSIX/POSIXSHD/GENERIC/BINFILE/DEVICE/TEXTSOURCE)
 ///   na konkretną implementację FileInterface (makeAccessor()); nieznany typ, pusta ścieżka danych lub
-///   pusty typ kończą się przez FatalError,
+///   pusty typ kończą się błędem Errc::Config (faza 1, plaster 2a; do 2026-10 rzutem ConfigError),
 /// - rozstrzygać, czy typ magazynu jest źródłem deklarowanym tylko do odczytu (isDeclaredType()),
 /// - dobierać wariant indeksu metadanych null (makeMetaIndex()): wariant inertny (pusta ścieżka pliku)
 ///   dla źródeł deklarowanych, storageShadow gdy accessor utrzymuje plik cienia danych, bazowy metaData
@@ -47,19 +48,19 @@ namespace rdb {
 /// ostrzega i daje rekordy NULL tak jak przed #346. Odmowa dotyczy istniejacej sciezki zlego rodzaju.
 [[nodiscard]] std::string sourceKindMismatch(std::string_view storageType, const std::string &path);
 
-/// @brief Create the FileInterface implementation for the given storage type; FatalError on unknown type.
+/// @brief Create the FileInterface implementation for the given storage type; Result error on unknown type.
 /// @note Descriptor jest nie-const, bo retention()/storagePolicy() nie są metodami const.
 /// @param followFinalLink zapisywalny plik danych moze byc dowiazaniem - tylko dla REF podanego przez
 ///        wolajacego (#374, storageFile.hpp); zrodla deklarowane czytaja sciezke jak dotad.
 /// @param memory Memory Store dla typu "MEMORY"; nullptr wybiera MemoryStore::processDefault(),
 ///        czyli zachowanie sprzed fazy 2 (#446, C2). Dla pozostalych typow bez znaczenia.
-[[nodiscard]] std::unique_ptr<FileInterface> makeAccessor(std::string_view storageType,    //
-                                                          const std::string &storageFile,  //
-                                                          Descriptor &descriptor,          //
-                                                          bool oneShot,                    //
-                                                          int percounter,                  //
-                                                          bool followFinalLink = false,    //
-                                                          MemoryStore *memory  = nullptr);
+[[nodiscard]] Result<std::unique_ptr<FileInterface>> makeAccessor(std::string_view storageType,    //
+                                                                  const std::string &storageFile,  //
+                                                                  Descriptor &descriptor,          //
+                                                                  bool oneShot,                    //
+                                                                  int percounter,                  //
+                                                                  bool followFinalLink = false,    //
+                                                                  MemoryStore *memory  = nullptr);
 
 /// @brief Create the metaData variant matching the storage: inert for declared sources,
 ///        storageShadow when the accessor keeps a data shadow file, base metaData otherwise.

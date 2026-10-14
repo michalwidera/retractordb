@@ -32,7 +32,7 @@ struct memoryFile : public FileInterface {
   const size_t retentionSize_;               // Retention size for the records, if set to no_retention, no limit is applied
   enum : std::uint8_t { no_retention = 0 };  // Default retention size if not specified
 
-  /// Węzeł TEGO strumienia w magazynie, wyszukany raz w konstruktorze i ważny do końca życia
+  /// Węzeł TEGO strumienia w sklepie, wyszukany raz w konstruktorze i ważny do końca życia
   /// instancji. Powód i warunki ważności - patrz konstruktor w faccmemory.cc.
   memoryBucket *bucket_;
 
@@ -50,7 +50,7 @@ struct memoryFile : public FileInterface {
   ssize_t read(uint8_t *ptrData, std::vector<bool> &nullBitset, size_t position) override;
 
   auto name() -> std::string & override;
-  size_t count() override;
+  [[nodiscard]] Result<size_t> count() override;
 
   /// Liczba kubełków w domyślnym Memory Store procesu. Tylko do testów jednostkowych - z zewnątrz nie ma innej drogi,
   /// żeby sprawdzić, że wymiana planu nie zostawia kubełków po strumieniach, których już nie ma.

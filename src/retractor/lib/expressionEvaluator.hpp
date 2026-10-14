@@ -4,6 +4,7 @@
 
 #include "fldType.hpp"
 #include "query.hpp"  // windowStats
+#include "rdb/error.hpp"
 #include "rdb/payload.hpp"
 #include "token.hpp"  // token, std::list
 
@@ -17,7 +18,7 @@
 /// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci.
 /// - zwracać wynik wyrażenia jako obiekt typu rdb::descFldVT, który może reprezentować różne typy danych.
 /// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu wyrażeń, zwłaszcza w przypadku złożonych wyrażeń lub dużych ilości danych w payload.
-/// - obsługiwać błędy, takie jak nieprawidłowe tokeny, niezgodne typy danych, dzielenie przez zero itp., i zwracać odpowiednie komunikaty błędów lub wyjątki w takich przypadkach.
+/// - obsługiwać błędy, takie jak nieprawidłowe tokeny, niezgodne typy danych, dzielenie przez zero itp., i zwracac odpowiedni blad Result w takich przypadkach.
 /// - być projektowany z myślą o łatwej integracji z innymi komponentami systemu, takimi jak streamInstance, aby umożliwić efektywne wyznaczanie wartości wyrażeń w różnych kontekstach, takich jak warunki reguł, obliczenia pól wyjściowych itp.
 ///
 /// @note Każde wyrażenie składa się z operatorów i operandów, reprezentowanych jako tokeny. Wykorzystuje stos do przechowywania pośrednich wyników obliczeń. Obsługuje operatory arytmetyczne, logiczne i porównania, a także negację. Umożliwia normalizację typów operandów przed wykonaniem operacji, zapewniając zgodność typów. Może być rozszerzona o dodatkowe operatory i funkcje w przyszłości.
@@ -34,6 +35,9 @@ class expressionEvaluator {
   ///        (qTree::windowGroups). Wypełnia je dataModel::computeWindowAggregates() PRZED
   ///        wyliczeniem pól, bo okno czyta historię ŹRÓDŁA, a payload wejściowy niesie tylko
   ///        rekord bieżący. nullptr znaczy: plan bez okien.
-  rdb::descFldVT eval(const std::list<token> &program, rdb::payload *payload = nullptr,
-                      const std::vector<windowStats> *windowValues = nullptr);
+  /// Wartosc wyrazenia RPN albo Errc::Eval, gdy programu nie da sie policzyc dla tych operandow
+  /// (operator nieokreslony dla typu, brak operandu, nieznana funkcja). NULL - brak wyniku w zbiorze
+  /// wartosci (dzielenie przez zero, przepelnienie) - jest wynikiem, nie bledem.
+  [[nodiscard]] rdb::Result<rdb::descFldVT> eval(const std::list<token> &program, rdb::payload *payload = nullptr,
+                                                 const std::vector<windowStats> *windowValues = nullptr);
 };

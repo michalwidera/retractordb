@@ -1,5 +1,6 @@
 #include "rdb/fagrp.hpp"
 
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -11,7 +12,7 @@
 #include <optional>
 #include <ranges>
 #include <string_view>
-#include "fatalError.hpp"
+#include <system_error>
 
 namespace rdb {
 
@@ -62,16 +63,23 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
     std::vector<size_t> existingSegments;
     existingSegments.reserve(retention_.segments == 0 ? kDefaultSegmentReserve : retention_.segments);
 
-    // Segmenty leza obok pliku grupy - pod :STORAGE w katalogu magazynu, nie w katalogu roboczym.
-    // Nazwe wpisu porownujemy z sama nazwa pliku grupy, bez katalogu.
     const std::filesystem::path groupPath(filename_);
-    const auto groupDir  = groupPath.has_parent_path() ? groupPath.parent_path() : std::filesystem::path(".");
+    const auto directory = groupPath.has_parent_path() ? groupPath.parent_path() : std::filesystem::path(".");
     const auto groupName = groupPath.filename().string();
-    for (const auto &entry : std::filesystem::directory_iterator(groupDir)) {
-      const auto filenameEx = entry.path().filename().string();
-      if (const auto segIdx = parseSegmentIndex(filenameEx, groupName); segIdx.has_value()) {
-        existingSegments.push_back(*segIdx);
+    std::error_code listError;
+    if (!listError) {
+      for (std::filesystem::directory_iterator it(directory, listError), end; !listError && it != end; it.increment(listError)) {
+        const auto filenameEx = it->path().filename().string();
+        if (const auto segIdx = parseSegmentIndex(filenameEx, groupName); segIdx.has_value()) {
+          existingSegments.push_back(*segIdx);
+        }
       }
+    }
+    if (listError) {
+      initializationErrno_ = listError.value();
+      initializationError_ =
+          fmt::format("groupFile: cannot list segments of '{}' in '{}': {}", filename_, directory.string(), listError.message());
+      return;
     }
 
     if (existingSegments.empty()) {
@@ -112,7 +120,17 @@ groupFile<T>::groupFile(const std::string_view fileName,  //
           segment->suppressRotation();
         break;
       }
-      writeCount_ = vec_.back()->count();
+      const auto segmentCount = vec_.back()->count();
+      if (!segmentCount) {
+        // Segment otwarty, ale jego rozmiaru nie da sie odczytac - ten sam status co nieudane
+        // otwarcie: import planu odmawia, zamiast dopisywac od zgadywanej pozycji.
+        initializationError_ = segmentCount.error().message();
+        initializationErrno_ = segmentCount.error().err();
+        for (auto &segment : vec_)
+          segment->suppressRotation();
+        break;
+      }
+      writeCount_ = *segmentCount;
     }
   }
 }
@@ -144,19 +162,28 @@ ssize_t groupFile<T>::purge() {
   currentFilename_ = filename_ + "_segment_" + std::to_string(currentSegment_);
   vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_, followFinalLink_));
   // Status z konstruktora obsluguje tylko import planu. Tu, w pracy ciaglej, segment bez pliku
-  // zapisywalby w ciemno, wiec zostaje dawne zatrzymanie z nazwa pliku.
-  if (const auto &err = vec_.back()->initializationError(); !err.empty()) rdb::EnvironmentError("groupFile::purge: {}", err);
+  // zapisywalby w ciemno, wiec purge konczy sie bledem nosnika (EIO, a powod z nazwa pliku idzie
+  // do logu) - storage::purge zamienia go na Errc::IO, a demon zatrzymuje sie na nim w executorsm::run.
+  if (const auto &err = vec_.back()->initializationError(); !err.empty()) {
+    SPDLOG_ERROR("groupFile::purge: {}", err);
+    return EIO;
+  }
 
   SPDLOG_DEBUG("Purged all segments and reset group state.");
-  if (vec_.size() != 1) FatalError("fagrp::purge: expected exactly one segment after purge");
-  if (vec_[0]->count() != 0) FatalError("fagrp::purge: segment is not empty after purge");
+  RDB_ASSERT(vec_.size() == 1, "fagrp::purge: expected exactly one segment after purge");
+  const auto remaining = vec_[0]->count();
+  if (!remaining) {
+    SPDLOG_ERROR("groupFile::purge: {}", remaining.error().message());
+    return EIO;
+  }
+  RDB_ASSERT(*remaining == 0, "fagrp::purge: segment is not empty after purge");
 
   return EXIT_SUCCESS;
 }
 
 template <typename T>
 ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) {
-  if (recordSize_ == 0) FatalError("groupFile::write: recordSize_ is zero");
+  if (recordSize_ == 0) return EINVAL;  // akcesor na deskryptorze zerowej szerokosci - poza kontraktem
 
   if (ptrData == nullptr && position == 0) {
     return purge();
@@ -164,7 +191,8 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
 
   if (retention_.noRetention()) return static_cast<FileInterface *>(vec_[0].get())->write(ptrData, nullBitset, position);
 
-  if (retention_.capacity == 0) FatalError("groupFile::write: retention capacity is zero");
+  // Pojemnosc zero odrzuca juz parser deskryptora (RETENTION n 0); tu - jak wyzej - poza kontraktem.
+  if (retention_.capacity == 0) return EINVAL;
 
   if (position == std::numeric_limits<size_t>::max()) {
     if (writeCount_ >= retention_.capacity) {
@@ -173,14 +201,17 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
       SPDLOG_DEBUG("Rotating segments: currentSegment={}", currentSegment_);
       vec_.push_back(std::make_unique<T>(name(), descriptor_, percounter_, followFinalLink_));
       // Uzasadnienie przy purge().
-      if (const auto &err = vec_.back()->initializationError(); !err.empty()) rdb::EnvironmentError("groupFile::write: {}", err);
+      if (const auto &err = vec_.back()->initializationError(); !err.empty()) {
+        SPDLOG_ERROR("groupFile::write: {}", err);
+        return EIO;
+      }
       writeCount_ = 0;
       if (retention_.segments != 0 && vec_.size() > retention_.segments) {
         SPDLOG_DEBUG("Removing oldest segment: {}", vec_.front()->name());
         vec_.front()->discard();  // usuwa takze cien; bez rotacji - uzasadnienie przy discard()
         vec_.erase(vec_.begin());
         removedSegments_++;
-        if (vec_.empty()) FatalError("groupFile::write: no segments remain after removing oldest");
+        RDB_ASSERT(!vec_.empty(), "groupFile::write: no segments remain after removing oldest");
       }
     }
     const auto rc =
@@ -206,10 +237,10 @@ ssize_t groupFile<T>::write(const uint8_t *ptrData, const std::vector<bool> &nul
 
 template <typename T>
 ssize_t groupFile<T>::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
-  if (recordSize_ == 0) FatalError("groupFile::read: recordSize_ is zero");
+  if (recordSize_ == 0) return EINVAL;  // uzasadnienie w write()
   if (retention_.noRetention()) return static_cast<FileInterface *>(vec_[0].get())->read(ptrData, nullBitset, position);
 
-  if (retention_.capacity == 0) FatalError("groupFile::read: retention capacity is zero");
+  if (retention_.capacity == 0) return EINVAL;  // uzasadnienie w write()
 
   // position to przesunięcie w bajtach, capacity liczy rekordy
   const auto recordIndex = position / recordSize_;
@@ -225,10 +256,12 @@ ssize_t groupFile<T>::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
 }
 
 template <typename T>
-size_t groupFile<T>::count() {
+Result<size_t> groupFile<T>::count() {
   size_t sumCount = 0;
-  for (auto &v : vec_)
-    sumCount += v->count();
+  for (auto &v : vec_) {
+    RDB_TRY_ASSIGN(const size_t segmentCount, v->count());
+    sumCount += segmentCount;
+  }
   return sumCount + (removedSegments_ * retention_.capacity);  // compensate for removed segments
 }
 

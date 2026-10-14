@@ -9,8 +9,8 @@
 #include <boost/rational.hpp>
 
 #include "descriptor.hpp"
+#include "error.hpp"
 #include "fainterface.hpp"
-#include "fatalError.hpp"
 #include "memoryStore.hpp"
 #include "metaData.hpp"
 #include "payload.hpp"
@@ -23,8 +23,10 @@ class binaryDeviceRO;
 
 /// @brief Wynik odczytu rekordu.
 ///
-/// Do 2026-09-23 read() i revRead() zwracaly `bool` o JEDNEJ mozliwej wartosci: kazda prawdziwa
-/// awaria konczy sie FatalError i nie wraca, a jedyna awaria odwracalna - brak rekordu - wracala
+/// Prawdziwa awaria odczytu (blad wejscia-wyjscia, zrodlo deklarowane czytane wprost) wraca jako
+/// blad Result; ReadStatus opisuje wylacznie odczyty UDANE. Historia: do 2026-09-23 read() i
+/// revRead() zwracaly `bool` o JEDNEJ mozliwej wartosci: kazda prawdziwa
+/// awaria konczyla sie FatalError i nie wracala, a jedyna awaria odwracalna - brak rekordu - wracala
 /// jako `true` z pamiecia wyzerowana i jawnie oznaczona jako NIE-null. Trzy miejsca obslugi bledu
 /// u wolajacych byly przez to martwe, a najgorzej konczylo sie to w reduktorze: zamiast pominac
 /// brakujacy rekord, skladal do MIN/MAX/SUM/AVG sfalszowane zero.
@@ -46,8 +48,8 @@ enum class ReadStatus : std::uint8_t {
 ///
 /// Jedyna awaria odwracalna to zapis do zrodla deklarowanego, ktore jest tylko do odczytu: akcesor
 /// odmawia ENOTSUP, zanim cokolwiek zapisze, wiec licznik rekordow i indeks metadanych zostaja
-/// nietkniete. Kazda inna awaria nadal konczy sie FatalError - czesciowy zapis rozjechalby
-/// recordsCount_ z count().
+/// nietkniete. Inna awaria wraca jako blad Result; silnik zatrzymuje przetwarzanie, aby czesciowy zapis
+/// nie rozjechal recordsCount_ z count().
 enum class WriteStatus : std::uint8_t {
   Ok,       ///< rekord dopisany, nadpisany albo pochloniety przez detekcje gap (rozliczony jako przerwa)
   ReadOnly  ///< magazyn jest zrodlem deklarowanym; nic nie zapisano
@@ -102,11 +104,19 @@ class storage {
 
   boost::rational<int> rInterval_{1};  ///< sampling interval for time calculations
 
-  void detectStartupState();  ///< resetuje osierocony indeks lub wykrywa przerwe po przygotowaniu metadanych
-  [[nodiscard]] Refusal attachStorage();
+  void detectStartupState();  ///< detect rotation or startup gap after meta index is ready
+  [[nodiscard]] Result<> attachStorage();
 
-  void abortIfStorageNotPrepared();
-  void initializeAccessor();
+  /// Cztery niezmienniki, ktorych zlamanie znaczy uzycie magazynu przed attachDescriptor().
+  /// Szybka sciezka inline: wolajacy (read, revRead, write - kazdy rekord) placa jedna galaz, a
+  /// Result<> sukcesu znika po wklejeniu. Tresc bledu buduje zimne notPrepared().
+  [[nodiscard]] Result<> requirePrepared() const {
+    if (!descriptor.empty() && accessor_ && storagePayload_ && metaData_) [[likely]]
+      return {};
+    return notPrepared();
+  }
+  [[nodiscard, gnu::cold]] Result<> notPrepared() const;
+  [[nodiscard]] Result<> initializeAccessor();
 
   /// @brief Czy magazyn trzyma dane w pamięci, a nie na dysku (polityka TYPE deskryptora).
   ///
@@ -134,28 +144,35 @@ class storage {
   /// Dla pozostalych typow magazynu bez znaczenia.
   MemoryStore *memory_ = nullptr;
 
+  storage(StoragePaths paths, std::string_view storageType, bool oneShot, bool isHold, int percounter, MemoryStore *memory);
+
  public:
   storage() = delete;
-  explicit storage(std::string_view qryID,                    //
-                   std::string_view fileName,                 //
-                   std::string_view storageParam,             //
-                   std::string_view storageType = "DEFAULT",  //
-                   bool oneShot                 = false,      //
-                   bool isHold                  = false,      //
-                   int percounter               = -1,         //
-                   MemoryStore *memory          = nullptr     //
+
+  /// Jedyna droga do magazynu. Zla konfiguracja (pusty identyfikator, katalog :STORAGE, ktorego
+  /// nie ma) wraca jako Errc::Config, zanim obiekt powstanie - wiec destruktor magazynu
+  /// disposable nie ma czego kasowac. Dawny konstruktor rzucal ConfigError z listy inicjalizacyjnej.
+  [[nodiscard]] static Result<std::unique_ptr<storage>> create(std::string_view qryID,                    //
+                                                               std::string_view fileName,                 //
+                                                               std::string_view storageParam,             //
+                                                               std::string_view storageType = "DEFAULT",  //
+                                                               bool oneShot                 = false,      //
+                                                               bool isHold                  = false,      //
+                                                               int percounter               = -1,         //
+                                                               MemoryStore *memory          = nullptr     //
   );
+  storage(const storage &)            = delete;
+  storage &operator=(const storage &) = delete;
   virtual ~storage();
 
   Descriptor descriptor;
 
   sourceState bufferState{sourceState::empty};  // ? test lock
 
-  /// @return pusty napis albo powod odmowy odczytu deskryptora lub otwarcia magazynu
-  [[nodiscard]] std::string attachDescriptor(const Descriptor *descriptor = nullptr);
-
-  /// Ta sama inicjalizacja z zachowana klasa odmowy dla granicy silnika (#474).
-  [[nodiscard]] Refusal attachDescriptorStatus(const Descriptor *descriptor = nullptr);
+  /// @return sukces albo powod odmowy: odczyt deskryptora (CorruptDescriptor tresc jak w
+  ///         tryLoadDescriptorFile), niezgodnosc schematu albo brak deskryptora (Config), zapis .desc
+  ///         lub otwarcie magazynu (IO).
+  [[nodiscard]] Result<> attachDescriptor(const Descriptor *descriptor = nullptr);
 
   /// @brief Oznacz magazyn jako materializowany podplan (substrat) dla sondy K23.
   ///
@@ -164,12 +181,13 @@ class storage {
   /// w nagłówku, żeby w buildzie bez sondy nie powstał osobny symbol w bibliotece.
   void markAsSubstrate(const bool value) { isSubstrate_ = value; }
 
-  [[nodiscard]] WriteStatus write(size_t recordIndex = std::numeric_limits<size_t>::max());
+  [[nodiscard]] Result<WriteStatus> write(size_t recordIndex = std::numeric_limits<size_t>::max());
 
-  [[nodiscard]] ReadStatus revRead(size_t recordIndexFromBack, uint8_t *destination = nullptr);
-  [[nodiscard]] ReadStatus read(size_t recordIndexFromFront, uint8_t *destination = nullptr);
+  [[nodiscard]] Result<ReadStatus> revRead(size_t recordIndexFromBack, uint8_t *destination = nullptr);
+  /// Errc::Config dla zrodla deklarowanego (czyta sie je przez revRead), Errc::IO dla nieudanego odczytu.
+  [[nodiscard]] Result<ReadStatus> read(size_t recordIndexFromFront, uint8_t *destination = nullptr);
   void fire();
-  void purge();
+  [[nodiscard]] Result<> purge();
 
   /// @brief Mark a transmission gap at the current position.
   ///
@@ -187,6 +205,8 @@ class storage {
   /// @return true if neither storage nor meta index contain any records
   [[nodiscard]] bool isMetaIndexEmpty() const;
 
+  /// Payload magazynu. Istnieje po kazdym udanym attachDescriptor(); wolanie wczesniej to blad w
+  /// kodzie wolajacego (RDB_ASSERT), nie stan, ktory trzeba obslugiwac.
   std::unique_ptr<rdb::payload>::pointer getPayload();
 
   void setDisposable(bool value);
@@ -197,7 +217,7 @@ class storage {
 
   void releaseOnHold();
   [[nodiscard]] size_t getRecordsCount() const;
-  bool descriptorFileExist();
+  [[nodiscard]] bool descriptorFileExist() const;
 
   /// @brief Rekord historii źródła deklarowanego (0 = najnowszy) bez mutacji bieżącego payloadu.
   [[nodiscard]] const payload &history(size_t recordIndexFromBack) const { return buffer_.history(recordIndexFromBack); }
@@ -234,6 +254,6 @@ class storage {
   [[nodiscard]] boost::rational<int> getSamplingInterval() const;
 
   // technical function - for unit tests
-  void resetForUnitTest();
+  [[nodiscard]] Result<> resetForUnitTest();
 };
 }  // namespace rdb

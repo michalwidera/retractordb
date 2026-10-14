@@ -29,10 +29,18 @@ target_include_directories(
           ${magic_enum_INCLUDE_DIR})
 
 # Parser deskryptora (.antlr) jest zaleznoscia tej biblioteki od zawsze
-# (DESCParser.cc); deklaracja jest potrzebna od kiedy retractorcore deklaruje
-# rdb, bo CMake powtarza wtedy librdb.a na linii konsolidacji i musi wiedziec,
+# (DESCParser.cc); zadeklarowana wraz z rdbembed (faza 3), bo od kiedy retractor
+# deklaruje rdb, CMake powtarza librdb.a na linii konsolidacji i musi wiedziec,
 # ze libdescparser.a stoi ZA nim.
 target_link_libraries(${PROJECT_NAME} PUBLIC descparser antlr4_static)
+
+# Rdzen bez wyjatkow (RDB_NOEXCEPT_CHECK, korzen CMakeLists.txt) z dwiema
+# wyspami. DESCParser.cc steruje parserem ANTLR, ktory przerywa parsowanie
+# wyjatkiem, i sam lapie go na granicy: parserDESCString() zwraca status.
+# stackTrace.cc opakowuje Boost.Stacktrace, ktorego naglowki maja `throw`/`try`
+# w funkcjach inline (zaplecze domyslne Boosta z Conana na macOS):
+# currentStackTrace() jest noexcept i zwraca napis.
+rdb_noexcept_check(${PROJECT_NAME} ISLANDS DESCParser.cc stackTrace.cc)
 
 if(ENABLE_UNITY_BUILD)
   set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD ON)

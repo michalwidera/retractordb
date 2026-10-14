@@ -115,7 +115,7 @@ class binaryDeviceRO : public FileInterface {
   ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override { return ENOTSUP; };
 
   auto name() -> std::string & override;
-  size_t count() override;
+  [[nodiscard]] Result<size_t> count() override;
   [[nodiscard]] bool exhausted() const override { return exhausted_; }
   [[nodiscard]] const std::string &initializationError() const override { return initializationError_; }
 

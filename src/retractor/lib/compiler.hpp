@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <map>
 #include <optional>
 #include <set>
@@ -22,8 +23,19 @@
 /// Zadeklarowana w nagłówku, bo poza dwoma miejscami użycia w kompilatorze woła ją
 /// bramka jednostkowa: reguły „plan bez nierozwiązanych węzłów" nie da się złamać
 /// zapytaniem RQL (gramatyka na to nie pozwala), więc test musi podać mapę wprost.
-void requireResolvedForEveryNode(const qTree &plan, const std::map<std::string, int> &resolved, std::string_view pass,
-                                 std::string_view quantity);
+/// @return "OK" albo status bledu wewnetrznego (przedrostek kInternalCompilerError).
+[[nodiscard]] std::string requireResolvedForEveryNode(const qTree &plan, const std::map<std::string, int> &resolved,
+                                                      std::string_view pass, std::string_view quantity);
+
+/// Przedrostek statusu compile() dla zlamanego niezmiennika kompilatora - bledu w kodzie, a nie
+/// w planie. Wolajacy (Engine::compile, demon) odrozniaja go od bledu planu uzytkownika.
+inline constexpr std::string_view kInternalCompilerError = "internal compiler error: ";
+
+/// Status z przedrostkiem kInternalCompilerError (i wpis w logu).
+[[nodiscard]] std::string internalCompilerError(const std::string &message);
+
+/// Czy status compile() opisuje blad wewnetrzny kompilatora, a nie blad planu.
+[[nodiscard]] bool isInternalCompilerError(std::string_view status);
 
 struct compiler {
   explicit compiler(qTree &coreInstance) : coreInstance(coreInstance) {};
@@ -79,7 +91,11 @@ struct compiler {
   std::map<std::pair<std::string, std::string>, std::optional<int>> fromSpanMemo_;
   [[nodiscard]] std::string checkRecordShape(const query &q, std::int64_t *planElements) const;
   std::string checkInputRecord(query &q);
-  std::list<field> buildOutputSchema(const std::string &sName1, const std::string &sName2, token &cmd_token);
+  /// "OK" i schemat w `schema` albo status odmowy (schemat nietkniety). Status, a nie
+  /// std::expected<std::list<field>, std::string>: GCC 14 z -O2 zglaszal na tej postaci falszywe
+  /// -Wfree-nonheap-object (napis w unii expected po inliningu).
+  [[nodiscard]] std::string buildOutputSchema(const std::string &sName1, const std::string &sName2, token &cmd_token,
+                                              std::list<field> &schema);
   [[nodiscard]] std::optional<rdb::rField> sourceFieldAt(const std::string &streamId, int flatIndex) const;
   std::string composeStreamName(const std::string &sName1, const std::string &sName2, const token &cmd);
   std::string resolveTokenReferences(std::list<token> &lProgram, query &q, const std::string &ruleName);
@@ -89,6 +105,11 @@ struct compiler {
   std::string checkFunctionCalls();
   std::string checkStreamReducerFieldRefs();
   std::string expandStreamGenerators();
+
+  /// Kazde odwolanie do strumienia w klauzuli FROM wskazuje strumien planu, a okno `@` ma krok
+  /// dodatni. Pierwszy przebieg po rozwinieciu generatorow: kazdy pozniejszy siega po wezly przez
+  /// qTree::getQuery() i query::descriptorFrom(), ktore traktuja oba warunki jako niezmienniki.
+  std::string checkStreamReferences();
   std::string substituteOrdinal(query &instance, int ordinal);
   std::string resolveStreamIntervals();
   std::string extractIntermediateStreams();
@@ -107,7 +128,7 @@ struct compiler {
                                 std::set<std::string> &viaInterleave);
   std::string validateSubstratNameUniqueness();
   std::string validateConstraints();
-  std::map<std::string, int> computeRequiredCapacities();
+  std::expected<std::map<std::string, int>, std::string> computeRequiredCapacities();
   std::string applyCapacitiesToStreams(const std::map<std::string, int> &capMap);
   std::string checkHistoryMemory();
   std::string applyDiskRetention();

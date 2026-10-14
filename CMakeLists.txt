@@ -91,6 +91,74 @@ option(ENABLE_UNITY_BUILD "Enable unity build for faster compilation" OFF)
 # src/python/CMakeLists.txt, przy celu, ktorego dotyczy.
 option(RDB_PYTHON "Build the retractordb._core Python extension (nanobind)" OFF)
 
+# Rdzen silnika bez wyjatkow C++. Biblioteki rdb, retractorcore i rdbembed - to,
+# co laduje osadzony Engine - zglaszaja bledy wartoscia (rdb::Result,
+# src/include/rdb/error.hpp), a zlamany niezmiennik konczy sie rdb::fatal().
+# Gwarancje daje KONTROLA: rdb_noexcept_check() kompiluje zrodla rdzenia drugi
+# raz z -fno-exceptions, wiec `throw`, `try` i `catch` w rdzeniu sa bledem
+# KOMPILACJI. Wydawane programy kompiluja rdzen Z wyjatkami, jak cala reszte, bo
+# programu wolnego od wyjatkow i tak nie ma: parser ANTLR, Boost.Interprocess,
+# program_options i nanobind steruja nimi. Rdzen bez wyjatkow w programie z
+# wyjatkami (#511) lamal ODR - funkcje inline Boosta i spdloga maja w obu
+# trybach inna tresc, a linker zostawial jedna kopie zaleznie od kolejnosci
+# obiektow - a wyjatek biblioteki standardowej (bad_alloc) przechodzil przez
+# ramki rdzenia bez destruktorow, zostawiajac zablokowany core_mutex. Celowo
+# POZA `xretractor --build-info`: zbior kluczy tego wypisu sprawdza korpus
+# bramki H9.
+option(
+  RDB_NOEXCEPT_CHECK
+  "Compile the engine core (rdb, retractorcore, rdbembed) once more with -fno-exceptions as a check"
+  ON)
+
+# rdb_noexcept_check(<target> [ISLANDS <source>...]): biblioteka OBJECT
+# <target>_noexcept_check z tymi samymi zrodlami, katalogami naglowkow i
+# definicjami co <target>, skompilowana z -fno-exceptions. Niczego nie linkuje -
+# istnieje tylko po to, zeby kompilacja padla. SPDLOG_NO_EXCEPTIONS jest
+# wymagane, bo naglowki spdlog maja `try` w funkcjach inline i nie wykrywaja
+# trybu same. ISLANDS to pliki rdzenia, ktore wolaja kod sterowany wyjatkami
+# (parser ANTLR, Boost.Stacktrace, TOML) i lapia wszystko na granicy - funkcja
+# wystawiona reszcie rdzenia zwraca status. Kontrola je pomija.
+function(rdb_noexcept_check target)
+  if(NOT RDB_NOEXCEPT_CHECK)
+    return()
+  endif()
+  cmake_parse_arguments(PARSE_ARGV 1 ARG "" "" "ISLANDS")
+  set(islands)
+  foreach(island IN LISTS ARG_ISLANDS)
+    cmake_path(ABSOLUTE_PATH island NORMALIZE OUTPUT_VARIABLE island)
+    list(APPEND islands ${island})
+  endforeach()
+  get_target_property(sources ${target} SOURCES)
+  set(checked)
+  foreach(source IN LISTS sources)
+    cmake_path(ABSOLUTE_PATH source NORMALIZE OUTPUT_VARIABLE source)
+    if(NOT source IN_LIST islands)
+      list(APPEND checked ${source})
+    endif()
+  endforeach()
+  # Wlasne katalogi i definicje celu w chwili wywolania (stad wywolanie PO
+  # target_include_directories i target_compile_definitions celu), a reszta
+  # przez te same biblioteki - tak zostaja ich naglowki -isystem.
+  get_target_property(includes ${target} INCLUDE_DIRECTORIES)
+  get_target_property(definitions ${target} COMPILE_DEFINITIONS)
+  get_target_property(libraries ${target} LINK_LIBRARIES)
+  foreach(property includes definitions libraries)
+    if(NOT ${property})
+      set(${property})
+    endif()
+  endforeach()
+  set(check ${target}_noexcept_check)
+  add_library(${check} OBJECT ${checked})
+  target_include_directories(${check} PRIVATE ${includes})
+  target_compile_definitions(${check} PRIVATE ${definitions}
+                                              SPDLOG_NO_EXCEPTIONS)
+  target_link_libraries(${check} PRIVATE ${libraries})
+  target_compile_options(${check}
+                         PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>)
+  # Kontrola dotyczy frontendu kompilatora; LTO tylko wydluzalby budowe.
+  set_target_properties(${check} PROPERTIES INTERPROCEDURAL_OPTIMIZATION OFF)
+endfunction()
+
 # Przełączniki optymalizatora planu używane w kontrolowanych badaniach
 # ablacyjnych. Domyślna konfiguracja zachowuje dotychczasowe działanie.
 option(RDB_OPT_DEDUP_SUBSTRATES

@@ -1,6 +1,7 @@
 #include "dataModel.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -8,18 +9,17 @@
 #include <iterator>
 #include <memory>  // unique_ptr
 #include <mutex>
-#include <new>
 #include <optional>
-#include <stdexcept>
 #include <thread>
 #include <utility>
 
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
 
 #include "executorsmState.hpp"
-#include "fatalError.hpp"
 #include "rdb/convertTypes.hpp"
+#include "rdb/error.hpp"
 #include "rdb/probe.hpp"
 #include "rdb/rationalFormat.hpp"
 #include "SOperations.hpp"
@@ -28,43 +28,41 @@
 
 std::mutex core_mutex;
 
-dataModel::dataModel(qTree &coreInstance, rdb::MemoryStore *memory) : coreInstance_(coreInstance), memory_(memory) {
+dataModel::dataModel(qTree &coreInstance, rdb::MemoryStore *memory) : coreInstance_(coreInstance), memory_(memory) {}
+
+rdb::Result<std::unique_ptr<dataModel>> dataModel::create(qTree &coreInstance, rdb::MemoryStore *memory) {
   //
   // Special parameters support in query set
   // fetch all ':*' - and remove them from coreInstance
   //
 
-  // K1 (#474): executorsm::run nie buduje modelu dla pustej epoki, a ad hoc tylko dolacza
-  // instancje przez addQueriesToModel. Pusty reset przechodzi w tryb bezczynny.
-  if (coreInstance_.empty()) FatalError("dataModel: coreInstance is empty - no queries to process");
+  // Wolajacy (executorsm, Engine::compile) odrzucaja pusty plan wczesniej - tu to niezmiennik.
+  RDB_ASSERT(!coreInstance.empty(), "dataModel: coreInstance is empty - no queries to process");
+  std::unique_ptr<dataModel> self(new dataModel(coreInstance, memory));
 
-  for (const auto &it : coreInstance_)
+  for (const auto &it : coreInstance)
     if (it.isCompilerDirective()) {
-      directive_[it.id] = it.filename;
-      if (directive_[it.id].empty()) {
-        // K1 (#474): RQLParser::exitCoption odrzuca puste wartosci; dyrektywe STORAGE
-        // z konfiguracji launcher i applyPendingPlan dodaja tylko dla niepustego storageDir.
-        FatalError("dataModel: compiler directive '{}' has empty value", it.id);
+      self->directive_[it.id] = it.filename;
+      if (self->directive_[it.id].empty()) {
+        RDB_ASSERT(!self->directive_[it.id].empty(), "dataModel: compiler directive '{}' has empty value", it.id);
       }
     }
 
-  auto removed = std::ranges::remove_if(coreInstance_,  //
+  auto removed = std::ranges::remove_if(coreInstance,  //
                                         [](const query &qry) { return qry.isCompilerDirective(); });
-  coreInstance_.erase(removed.begin(), removed.end());
+  coreInstance.erase(removed.begin(), removed.end());
 
-  for (auto &qry : coreInstance_) {
-    auto runtime = std::make_unique<streamInstance>(coreInstance_, qry, directive_[":STORAGE"], memory_);
-    if (!runtime->initializationError.message.empty()) {
-      initializationError         = runtime->initializationError;
-      initializationError.message = "dataModel: stream '" + qry.id + "': " + initializationError.message;
-      qSet.clear();
-      return;
-    }
-    runtime->logicalIndexBase = qry.logicalOrigin;
-    qSet.emplace(qry.id, std::move(runtime));
+  for (auto &qry : coreInstance) {
+    auto runtime = streamInstance::create(coreInstance, qry, self->directive_[":STORAGE"], memory);
+    if (!runtime)
+      return rdb::fail(rdb::Error(runtime.error().code(), "dataModel: stream '" + qry.id + "': " + runtime.error().message(),
+                                  runtime.error().err()));
+    (*runtime)->logicalIndexBase = qry.logicalOrigin;
+    self->qSet.emplace(qry.id, std::move(*runtime));
   }
-  for (auto const &[key, val] : qSet)
-    val->outputPayload->setDisposable(coreInstance_[key].isDisposable);
+  for (auto const &[key, val] : self->qSet)
+    val->outputPayload->setDisposable(coreInstance[key].isDisposable);
+  return self;
 }
 
 dataModel::~dataModel() = default;
@@ -91,9 +89,9 @@ std::string dataModel::addQueriesToModel(const std::vector<std::string> &ids) {
   std::vector<std::unique_ptr<streamInstance>> built;
   built.reserve(nodes.size());
   for (query *node : nodes) {
-    auto runtime = std::make_unique<streamInstance>(coreInstance_, *node, directive_[":STORAGE"], memory_);
-    if (!runtime->initializationError.message.empty())
-      return "stream '" + node->id + "': " + runtime->initializationError.message;
+    auto created = streamInstance::create(coreInstance_, *node, directive_[":STORAGE"], memory_);
+    if (!created) return "stream '" + node->id + "': " + created.error().message();
+    auto runtime = std::move(*created);
     runtime->outputPayload->setDisposable(node->isDisposable);
     // SELECT dodany do działającego planu nie zaczyna w historycznym origin całego systemu.
     // Jego bazę wyznaczy dokładny pierwszy slot, w którym runtime zobaczy tę instancję.
@@ -116,8 +114,8 @@ void dataModel::syncDeclaredCapacities() {
   }
 }
 
-std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &instance,  //
-                                                             const int revOffset) {
+rdb::Result<std::unique_ptr<rdb::payload>::pointer> dataModel::getPayload(const std::string &instance,  //
+                                                                          const int revOffset) {
   // This gePayload is called by constructInputPayload algebraic functions
   // that need to access different streams from qSet
   // this also need to release HOLD state if set for each stream before read
@@ -125,12 +123,12 @@ std::unique_ptr<rdb::payload>::pointer dataModel::getPayload(const std::string &
   out.releaseOnHold();
 
   if (!out.isDeclared()) {
-    static_cast<void>(out.revRead(revOffset));
+    RDB_TRY(out.revRead(revOffset));  // status bez znaczenia - brak rekordu to payload all-null; blad nie
   }
   return out.getPayload();
 }
 
-const rdb::payload &dataModel::fetchForward(const std::string &instance, const int forwardIndex) {
+rdb::Result<const rdb::payload *> dataModel::fetchForward(const std::string &instance, const int forwardIndex) {
   auto &runtime = streamRuntime(instance);
   auto &out     = *(runtime.outputPayload);
   out.releaseOnHold();
@@ -146,9 +144,7 @@ const rdb::payload &dataModel::fetchForward(const std::string &instance, const i
   // poprawkę raz, a nie każdy z osobna.
   const auto count        = static_cast<int>(out.getRecordsCount());
   const auto &logicalBase = runtime.logicalIndexBase;
-  if (!logicalBase.has_value()) {
-    FatalError("dataModel::fetchForward: logical index base not initialized for '{}'", instance);
-  }
+  RDB_ASSERT(logicalBase.has_value(), "dataModel::fetchForward: logical index base not initialized for '{}'", instance);
   const int physical = forwardIndex - *logicalBase;
   const int rev      = count - 1 - physical;
 
@@ -166,34 +162,33 @@ const rdb::payload &dataModel::fetchForward(const std::string &instance, const i
       nullRecord.emplace(out.descriptor);
       nullRecord->setNullBitset(std::vector<bool>(out.descriptor.size(), true));
     }
-    return *nullRecord;
+    return &*nullRecord;
   }
 
-  if (out.isDeclared()) return out.history(static_cast<size_t>(rev));
+  if (out.isDeclared()) return &out.history(static_cast<size_t>(rev));
 
-  // Zakres sprawdzony wyzej (outOfRange), wiec rekord istnieje.
-  static_cast<void>(out.revRead(static_cast<size_t>(rev)));
-  return *out.getPayload();
+  // Zakres sprawdzony wyzej (outOfRange), wiec rekord istnieje - status bez znaczenia, blad nie.
+  RDB_TRY(out.revRead(static_cast<size_t>(rev)));
+  return out.getPayload();
 }
 
-void dataModel::bootstrapDeclaration(const query &qry) {
+rdb::Result<> dataModel::bootstrapDeclaration(const query &qry) {
   auto &output = *streamRuntime(qry.id).outputPayload;
-  if (output.bufferState != rdb::sourceState::empty) {
-    FatalError("dataModel::bootstrapDeclaration: stream '{}' not in empty state", qry.id);
-  }
+  RDB_ASSERT(output.bufferState == rdb::sourceState::empty, "dataModel::bootstrapDeclaration: stream '{}' not in empty state",
+             qry.id);
   output.bufferState = rdb::sourceState::flux;
-  static_cast<void>(output.revRead(0));
+  RDB_TRY(output.revRead(0));
   output.fire();
-  if (output.bufferState != rdb::sourceState::armed) {
-    FatalError("dataModel::bootstrapDeclaration: stream '{}' not armed after fire()", qry.id);
-  }
+  RDB_ASSERT(output.bufferState == rdb::sourceState::armed,
+             "dataModel::bootstrapDeclaration: stream '{}' not armed after fire()", qry.id);
+  return {};
 }
 
 bool dataModel::forwardRecordAvailable(const std::string &instance, const int forwardIndex) const {
   // Jedyne wyszukanie w qSet omijajace streamRuntime(): predykat jest const, a streamRuntime()
   // nie. Galaz `false` dla nazwy spoza modelu jest przy tym nieosiagalna. Pytanie pada wylacznie
   // z processRows, ktory na wejsciu przepuszcza kazdy wezel planu przez refreshStreamHandles(),
-  // czyli przez streamRuntime(), a brak wpisu zglasza tam wyjatkiem.
+  // czyli przez streamRuntime(), a brak wpisu jest tam zlamanym niezmiennikiem.
   const auto found = qSet.find(instance);
   if (found == qSet.end()) return false;
 
@@ -271,7 +266,7 @@ bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
       available = forwardRecordAvailable(takeSecond ? second : first, forwardIndex);
     } break;
     default:
-      FatalError("dataModel::queryInputsAvailable: undefined command_id {}", static_cast<int>(cmd));
+      rdb::fatal(fmt::format("dataModel::queryInputsAvailable: undefined command_id {}", static_cast<int>(cmd)));
   }
 
   if (!available) return false;
@@ -281,59 +276,71 @@ bool dataModel::queryInputsAvailable(const query &qry, const int logicalIndex) {
   });
 }
 
-void dataModel::advanceDeclaration(const query &qry, rdb::storage &output) {
+rdb::Result<> dataModel::advanceDeclaration(const query &qry, rdb::storage &output) {
   output.bufferState = rdb::sourceState::flux;  // Unlock data sources - enable physical read from source
-  static_cast<void>(output.revRead(0));         // Declarations need to process in separate&first
+  RDB_TRY(output.revRead(0));                   // Declarations need to process in separate&first
   output.fire();                                // chamber_ -> outputPayload
   if (output.bufferState != rdb::sourceState::armed) {
-    FatalError("dataModel::processRows: stream '{}' not armed after processing", qry.id);
+    rdb::fatal(fmt::format("dataModel::processRows: stream '{}' not armed after processing", qry.id));
   }
+  return {};
 }
 
-void dataModel::processZeroStep() {
+rdb::Result<> dataModel::processZeroStep() {
   std::scoped_lock scoped_lock(core_mutex);
   // DEVICE nie ma kroku zerowego (#347): jego rekord jest czytany na poczatku slotu, ktory go
   // konsumuje, a nie slot wczesniej. Pierwszy rekord wnosi pierwszy nalezny slot w processRows.
   for (const auto &q : coreInstance_)
-    if (q.isDeclaration() && q.kind != sourceKind::device) bootstrapDeclaration(q);
+    if (q.isDeclaration() && q.kind != sourceKind::device) RDB_TRY(bootstrapDeclaration(q));
+  return {};
 }
 
-void dataModel::processRows(std::span<const char> dueMask, const boost::rational<int> &currentTimeSlot) {
+rdb::Result<> dataModel::processRows(std::span<const char> dueMask, const boost::rational<int> &currentTimeSlot) {
   std::scoped_lock scoped_lock(core_mutex);
 
   // Maska jest pozycyjna, wiec rozjazd dlugosci znaczy, ze opisuje INNY uklad planu niz ten,
   // ktory zaraz policzymy - i policzylaby sie wtedy cicho czesc planu przesunieta o rozne wezly.
-  if (dueMask.size() != coreInstance_.size())
-    FatalError("dataModel::processRows: due mask has {} entries, plan has {}", dueMask.size(), coreInstance_.size());
+  // Maske buduja wolajacy (executorsm, Engine::step) z tego samego drzewa - rozjazd to niezmiennik.
+  RDB_ASSERT(dueMask.size() == coreInstance_.size(), "dataModel::processRows: due mask has {} entries, plan has {}",
+             dueMask.size(), coreInstance_.size());
 
   // Tablica uchwytow rownolegla do planu. Odswiezenie to porownanie dwoch liczb, dopoki plan
   // stoi w miejscu; przebudowa kosztuje tyle, ile kosztowal JEDEN takt przed ta zmiana.
   refreshStreamHandles();
 
-  // Hak testu it_fatal_exit_path, ta sama droga co RDB_FAULT_PLAN_SWAP_DELAY. FatalError
+  // Hak testu it_fatal_exit_path, ta sama droga co RDB_FAULT_PLAN_SWAP_DELAY. rdb::fatal()
   // w srodku slotu pada pod core_mutex i pod plan_epoch_mutex (bierze go executorsm::run),
   // a po W3 z 2026-09-14 zadne znane RQL nie prowadzi juz do niego w wykonaniu. Uspienie
   // przed bledem otwiera okno na komende klienta, ktora stanie na blokadzie epoki. Znacznik na
   // stderr mowi testowi, ze blokady sa juz wziete, wiec okna nie trzeba trafiac zegarem.
+  //
+  // To jest droga ZLAMANEGO NIEZMIENNIKA: rdb::fatal() z handlerem demona (fatalError.hpp) -
+  // zatrzask fatalErrorRaised i std::exit, wiec sciezki 3 i 4 testu it_fatal_exit_path badaja
+  // zachowanie std::exit w slocie -- atexit, try_to_lock w cleanup(), niedolaczanie watku
+  // biezacego. Kazdy RDB_ASSERT w rdzeniu konczy sie dokladnie ta droga.
+  //
+  // Koszt: dwa getenv() na kazdy slot w kazdym buildzie.
   if (const char *delayMs = std::getenv("RDB_FAULT_FATAL_IN_SLOT"); delayMs != nullptr) {
     std::cerr << "RDB_FAULT_FATAL_IN_SLOT: slot locked" << '\n';
     std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
-    FatalError("fault hook RDB_FAULT_FATAL_IN_SLOT: fatal error inside a processing slot");
+    rdb::fatal("fault hook RDB_FAULT_FATAL_IN_SLOT: fatal error inside a processing slot");
+  }
+
+  // Blizniak powyzszego haka dla drogi BLEDU-WARTOSCI - tej, ktora wraca blad odczytu, zapisu albo
+  // ewaluacji: Result z tej funkcji, zwolnienie core_mutex przy powrocie, plan_epoch_mutex
+  // wziety przez executorsm::run na czas slotu, destruktor EpochPublication i zatrzymanie demona
+  // w executorsm::run. Hak istnieje, bo zadne znane RQL nie doprowadza dzis do bledu w slocie -
+  // bez niego ta droga bylaby testowana wylacznie na przypadku, ktory dziala zawsze.
+  if (const char *delayMs = std::getenv("RDB_FAULT_ERROR_IN_SLOT"); delayMs != nullptr) {
+    std::cerr << "RDB_FAULT_ERROR_IN_SLOT: slot locked" << '\n';
+    std::this_thread::sleep_for(std::chrono::milliseconds(std::atoi(delayMs)));
+    return rdb::fail(rdb::Errc::Logic, "fault hook RDB_FAULT_ERROR_IN_SLOT: engine error inside a processing slot");
   }
   // Hak testu it_env_error_exit (#472), ta sama droga: blad srodowiska (K4) w slocie konczy proces
   // kodem EIO bez zatrzasku. Zadne RQL nie wywoluje awarii nosnika na zawolanie, a uprawnienia
   // katalogu nie zatrzymuja roota w kontenerze CI.
   if (std::getenv("RDB_FAULT_ENV_IN_SLOT") != nullptr)
-    rdb::EnvironmentError("fault hook RDB_FAULT_ENV_IN_SLOT: environment failure inside a processing slot");
-
-  // Haki it_service_abort (#475). TERMINATE: wyjatek przekracza noexcept pod obiema blokadami
-  // slotu (std::terminate, SIGABRT). BADALLOC: zwykly bad_alloc, ktory lapie catch w executorsm::run.
-  if (std::getenv("RDB_FAULT_TERMINATE_IN_SLOT") != nullptr) {
-    std::cerr << "RDB_FAULT_TERMINATE_IN_SLOT: slot locked" << '\n';
-    const auto fail = [] { throw std::bad_alloc{}; };
-    [&fail]() noexcept { fail(); }();
-  }
-  if (std::getenv("RDB_FAULT_BADALLOC_IN_SLOT") != nullptr) throw std::bad_alloc{};
+    return rdb::fail(rdb::Errc::IO, "fault hook RDB_FAULT_ENV_IN_SLOT: environment failure inside a processing slot", EIO);
 
   // Zrodlo dolaczone ad-hoc nie uczestniczylo w kroku zerowym. Uzbrajamy je
   // przed konsumentami pierwszego naleznego slotu. Koncowa faza deklaracji
@@ -350,17 +357,16 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
     if (!q.isDeclaration()) continue;
     auto &runtime = handleAt(position, q);
     if (runtime.outputPayload->bufferState != rdb::sourceState::empty) {
-      if (q.kind == sourceKind::device) advanceDeclaration(q, *runtime.outputPayload);
+      if (q.kind == sourceKind::device) RDB_TRY(advanceDeclaration(q, *runtime.outputPayload));
       continue;
     }
 
     const auto slotNumber = currentTimeSlot / q.rInterval;
-    if (slotNumber.denominator() != 1) {
-      FatalError("dataModel::processRows: current slot {} is not aligned with interval {} for declaration '{}'", currentTimeSlot,
-                 q.rInterval, q.id);
-    }
+    RDB_ASSERT(slotNumber.denominator() == 1,
+               "dataModel::processRows: current slot {} is not aligned with interval {} for declaration '{}'", currentTimeSlot,
+               q.rInterval, q.id);
     runtime.logicalIndexBase = slotNumber.numerator() - 1;
-    bootstrapDeclaration(q);
+    RDB_TRY(bootstrapDeclaration(q));
   }
 
   // first - process all non-declaration queries
@@ -391,10 +397,9 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
       // Nie wolno zaczynać ponownie od query::logicalOrigin, bo fizyczny rekord 0 niósłby
       // wtedy bieżącą wartość oznaczoną historycznym indeksem.
       const auto slotNumber = currentTimeSlot / q.rInterval;
-      if (slotNumber.denominator() != 1) {
-        FatalError("dataModel::processRows: current slot {} is not aligned with interval {} for '{}'", currentTimeSlot,
-                   q.rInterval, q.id);
-      }
+      RDB_ASSERT(slotNumber.denominator() == 1,
+                 "dataModel::processRows: current slot {} is not aligned with interval {} for '{}'", currentTimeSlot,
+                 q.rInterval, q.id);
       const int firstLogicalIndex = slotNumber.numerator() - 1 - q.startupLatency;
       if (firstLogicalIndex < q.logicalOrigin || !queryInputsAvailable(q, firstLogicalIndex)) continue;
 
@@ -405,14 +410,13 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
     }
     if (runtime.elapsedSlots++ < silentSlots) continue;
 
-    constructInputPayload(q, runtime);          // That will create 'from' clause data set
-    computeWindowAggregates(q, runtime);        // That will reduce record windows read from the source history
-    runtime.constructOutputPayload(q.lSchema);  // That will create all fields from 'select' clause/list
-    // Odmowa zapisu (WriteStatus::ReadOnly) wraca od #269 do wolajacego, a dawniej konczyla proces w storage.
-    // Wyjscie zapytania nie jest zrodlem deklarowanym, wiec tu zostaje dawne zachowanie: koniec silnika.
-    if (runtime.outputPayload->write() != rdb::WriteStatus::Ok)  // That will store data from 'select' clause/list
-      FatalError("dataModel::processRows: stream '{}' refused the write of its output record", q.id);
-    runtime.constructRulesAndUpdate(q);  // That will process all rules for this query
+    RDB_TRY(constructInputPayload(q, runtime));          // That will create 'from' clause data set
+    RDB_TRY(computeWindowAggregates(q, runtime));        // That will reduce record windows read from the source history
+    RDB_TRY(runtime.constructOutputPayload(q.lSchema));  // That will create all fields from 'select' clause/list
+    RDB_TRY_ASSIGN(const auto written, runtime.outputPayload->write());
+    RDB_ASSERT(written == rdb::WriteStatus::Ok, "dataModel::processRows: stream '{}' refused the write of its output record",
+               q.id);                             // That will store data from 'select' clause/list
+    RDB_TRY(runtime.constructRulesAndUpdate(q));  // That will process all rules for this query
   }
 
   // Then - process all declarations to unlock them for next step
@@ -427,8 +431,9 @@ void dataModel::processRows(std::span<const char> dueMask, const boost::rational
     // do magazynu w miejscu (storage::fire -> sourceBuffer::fire), zmieniajac ten wlasnie stan.
     auto &runtime = handleAt(position, q);
     if (runtime.outputPayload->bufferState != rdb::sourceState::armed) continue;  // already processed
-    advanceDeclaration(q, *runtime.outputPayload);
+    RDB_TRY(advanceDeclaration(q, *runtime.outputPayload));
   }
+  return {};
 }
 
 std::string dataModel::exhaustedInputStream() const {
@@ -438,8 +443,8 @@ std::string dataModel::exhaustedInputStream() const {
   return {};
 }
 
-void dataModel::computeWindowAggregates(const query &qry, streamInstance &runtime) {
-  if (!qry.hasWindowAggregates()) return;
+rdb::Result<> dataModel::computeWindowAggregates(const query &qry, streamInstance &runtime) {
+  if (!qry.hasWindowAggregates()) return {};
 
   // Wektor odwzorowuje tabele grup TEGO zapytania jeden do jednego. Czyszczony w kazdym
   // takcie, zeby zadna pozycja nie niosla wyniku sprzed taktu.
@@ -449,9 +454,7 @@ void dataModel::computeWindowAggregates(const query &qry, streamInstance &runtim
   // nizej przez streamRuntime(), wiec drugie wyszukanie tej samej nazwy nie mialo co wniesc.
   const auto baseOf = [](const streamInstance &target, const std::string &id) {
     const auto &logicalBase = target.logicalIndexBase;
-    if (!logicalBase.has_value()) {
-      FatalError("dataModel::computeWindowAggregates: logical index base not initialized for '{}'", id);
-    }
+    RDB_ASSERT(logicalBase.has_value(), "dataModel::computeWindowAggregates: logical index base not initialized for '{}'", id);
     return *logicalBase;
   };
 
@@ -461,17 +464,17 @@ void dataModel::computeWindowAggregates(const query &qry, streamInstance &runtim
   const int n = static_cast<int>(runtime.outputPayload->getRecordsCount()) + baseOf(runtime, qry.id);
 
   for (size_t groupIndex = 0; groupIndex < qry.windowGroups.size(); ++groupIndex) {
-    const auto &group                = qry.windowGroups[groupIndex];
-    streamInstance &source           = streamRuntime(group.source);
-    runtime.windowValues[groupIndex] = source.reduceRecordWindow(group, n, baseOf(source, group.source));
+    const auto &group      = qry.windowGroups[groupIndex];
+    streamInstance &source = streamRuntime(group.source);
+    RDB_TRY_ASSIGN(runtime.windowValues[groupIndex], source.reduceRecordWindow(group, n, baseOf(source, group.source)));
   }
+  return {};
 }
 
-void dataModel::constructInputPayload(const query &qry, streamInstance &runtime) {
-  if (qry.lProgram.size() >= 4) {
-    FatalError("dataModel::constructInputPayload: program not optimized - {} tokens for query '{}', expected < 4",
-               qry.lProgram.size(), qry.id);
-  }
+rdb::Result<> dataModel::constructInputPayload(const query &qry, streamInstance &runtime) {
+  RDB_ASSERT(qry.lProgram.size() < 4,
+             "dataModel::constructInputPayload: program not optimized - {} tokens for query '{}', expected < 4",
+             qry.lProgram.size(), qry.id);
 
   // Tokeny programu czytane w miejscu - bez kopii listy do wektora w kazdym takcie.
   const auto arg = [&qry](const int i) -> const token & { return *std::next(qry.lProgram.begin(), i); };
@@ -486,9 +489,7 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
   // ktorej juz nie ma.
   const auto logicalIndexBase = [&](const std::string &id) {
     const auto &logicalBase = streamRuntime(id).logicalIndexBase;
-    if (!logicalBase.has_value()) {
-      FatalError("dataModel::constructInputPayload: logical index base not initialized for '{}'", id);
-    }
+    RDB_ASSERT(logicalBase.has_value(), "dataModel::constructInputPayload: logical index base not initialized for '{}'", id);
     return *logicalBase;
   };
 
@@ -500,9 +501,7 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
   // po nazwie.
   const auto logicalIndex = [&] {
     const auto &logicalBase = runtime.logicalIndexBase;
-    if (!logicalBase.has_value()) {
-      FatalError("dataModel::constructInputPayload: logical index base not initialized for '{}'", qry.id);
-    }
+    RDB_ASSERT(logicalBase.has_value(), "dataModel::constructInputPayload: logical index base not initialized for '{}'", qry.id);
     return static_cast<int>(runtime.outputPayload->getRecordsCount()) + *logicalBase;
   };
 
@@ -513,17 +512,18 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
     case PUSH_STREAM: {
       // 	:- PUSH_STREAM(core0)
       //
-      if (qry.lProgram.size() != 1) FatalError("dataModel::constructInputPayload: PUSH_STREAM expects 1 token");
+      RDB_ASSERT(qry.lProgram.size() == 1, "dataModel::constructInputPayload: PUSH_STREAM expects 1 token");
 
       const auto &nameSrc = nameArg(0);
 
-      *runtime.inputPayload = *getPayload(nameSrc);
+      RDB_TRY_ASSIGN(const auto *source, getPayload(nameSrc));
+      *runtime.inputPayload = *source;
     } break;
     case STREAM_TIMEMOVE: {
       // 	:- PUSH_STREAM(core0)
       //  :- STREAM_TIMEMOVE(1)
       //
-      if (qry.lProgram.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_TIMEMOVE expects 2 tokens");
+      RDB_ASSERT(qry.lProgram.size() == 2, "dataModel::constructInputPayload: STREAM_TIMEMOVE expects 2 tokens");
 
       const auto &nameSrc   = nameArg(0);
       const auto timeOffset = std::get<int>(operation.getVT());
@@ -541,7 +541,8 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       // indeks n-N nie schodzi poniżej początku logicznego producenta.
       const auto n = logicalIndex();
 
-      *runtime.inputPayload = fetchForward(nameSrc, n - timeOffset);
+      RDB_TRY_ASSIGN(const auto fetched, fetchForward(nameSrc, n - timeOffset));
+      *runtime.inputPayload = *fetched;
     } break;
     case STREAM_DEHASH_MOD:
     case STREAM_DEHASH_DIV: {
@@ -549,14 +550,14 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       //  :- PUSH_VAL(2/1)
       //  :- STREAM_DEHASH_MOD
       //
-      if (qry.lProgram.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_DEHASH expects 3 tokens");
+      RDB_ASSERT(qry.lProgram.size() == 3, "dataModel::constructInputPayload: STREAM_DEHASH expects 3 tokens");
 
       const auto &nameSrc         = nameArg(0);
       const auto rationalArgument = arg(1).getRI();
 
-      if (rationalArgument <= 0) {
-        FatalError("dataModel::constructInputPayload: DEHASH rational argument must be positive");
-      }
+      // Kompilator odrzuca niedodatni argument (resolveStreamIntervals). Parametr jest staly w planie,
+      // wiec w Release nie sprawdzamy go dla kazdego rekordu.
+      assert(rationalArgument > 0);
 
       // n - 0-bazowy indeks rekordu wyjściowego; Div/Mod (SOperations.hpp)
       // zwracają indeks POSTĘPUJĄCY elementu w strumieniu przeplecionym.
@@ -574,7 +575,8 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
         // ~Θ: b_n = c_{n+⌊n·Δb/Δa⌋} - dostępny w swoim slocie.
         fwdPos = Mod(rationalArgument, qry.rInterval, n);
       }
-      *runtime.inputPayload = fetchForward(nameSrc, fwdPos);
+      RDB_TRY_ASSIGN(const auto fetched, fetchForward(nameSrc, fwdPos));
+      *runtime.inputPayload = *fetched;
     } break;
     case STREAM_SUM:
     case STREAM_AVG:
@@ -584,27 +586,28 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
 
       // Wynik idzie wprost do payloadu wejsciowego - ma on juz pole wyniku (query::descriptorFrom, ta sama
       // regula reductionResultField), wiec nie budujemy co takt deskryptora i payloadu tylko po to, zeby je tu skopiowac.
-      streamRuntime(nameSrc).reduceFieldsInto(cmd, *runtime.inputPayload);
+      RDB_TRY(streamRuntime(nameSrc).reduceFieldsInto(cmd, *runtime.inputPayload));
     } break;
     case STREAM_SUBTRACT: {
       //  :- PUSH_STREAM(core0)
       //  :- STREAM_SUBTRACT(1/2)
       //
-      if (qry.lProgram.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_SUBTRACT expects 2 tokens");
+      RDB_ASSERT(qry.lProgram.size() == 2, "dataModel::constructInputPayload: STREAM_SUBTRACT expects 2 tokens");
 
       const auto &nameSrc         = nameArg(0);
       const auto rationalArgument = arg(1).getRI();
       const auto n                = logicalIndex();
       const auto forwardIndex     = Subtract(coreInstance_.getQuery(nameSrc).rInterval, rationalArgument, n);
 
-      *runtime.inputPayload = fetchForward(nameSrc, forwardIndex);
+      RDB_TRY_ASSIGN(const auto fetched, fetchForward(nameSrc, forwardIndex));
+      *runtime.inputPayload = *fetched;
     } break;
     case STREAM_ADD: {
       // 	:- PUSH_STREAM(core0)
       //  :- PUSH_STREAM(core1)
       //  :- STREAM_ADD
       //
-      if (qry.lProgram.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_ADD expects 3 tokens");
+      RDB_ASSERT(qry.lProgram.size() == 3, "dataModel::constructInputPayload: STREAM_ADD expects 3 tokens");
 
       const auto &nameSrc1 = nameArg(0);
       const auto &nameSrc2 = nameArg(1);
@@ -628,10 +631,12 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       // po obu stronach (A+A) drugi odczyt nadpisuje biezacy payload zrodla, na ktory moze wskazywac
       // lewa referencja, wiec lewy skladnik idzie wtedy przez kopie (it_stream_add_self).
       std::optional<rdb::payload> lhsCopy;
-      const auto &lhsFetched = fetchForward(nameSrc1, fwdPos1);
+      RDB_TRY_ASSIGN(const auto lhsPointer, fetchForward(nameSrc1, fwdPos1));
+      const auto &lhsFetched = *lhsPointer;
       if (nameSrc1 == nameSrc2) lhsCopy.emplace(lhsFetched);
       const auto &lhs = lhsCopy.has_value() ? *lhsCopy : lhsFetched;
-      const auto &rhs = fetchForward(nameSrc2, fwdPos2);
+      RDB_TRY_ASSIGN(const auto rhsPointer, fetchForward(nameSrc2, fwdPos2));
+      const auto &rhs = *rhsPointer;
 
       // Suma wprost do slotu wejscia, bez payloadu i deskryptora sumy w kazdym takcie - tylko przy
       // ukladzie wejscia dokladnie rownym ukladowi sumy. Wtedy przypisanie `*inputPayload = lhs + rhs`
@@ -657,27 +662,25 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       // 	:- PUSH_STREAM core -> delta_source (arg[0]) - operation
       //  :- STREAM_AGSE 2,3 -> window_step, window_length  (arg[1])
       //
-      if (qry.lProgram.size() != 2) FatalError("dataModel::constructInputPayload: STREAM_AGSE expects 2 tokens");
+      RDB_ASSERT(qry.lProgram.size() == 2, "dataModel::constructInputPayload: STREAM_AGSE expects 2 tokens");
 
       const auto &nameSrc = nameArg(0);  // * INFO Sync with query.cpp
       auto [step, length] = get<std::pair<int, int>>(operation.getVT());
-      if (step <= 0) {
-        FatalError("dataModel::constructInputPayload: AGSE step must be > 0, got {} for '{}'", step, qry.id);
-      }
       // Okno jest stemplowane końcem przedziału, więc rekord o indeksie logicznym n sięga
       // wstecz od pozycji n*step. Runtime'owa baza źródła przesuwa jego pozycje
       // spłaszczone o base*F. Dla planu startowego jest równa origin kompilatora,
       // ale zapytanie dodane ad hoc dostaje ją z bieżącej osi logicznej.
       const int windowIndex     = logicalIndex();
       const int sourceIndexBase = logicalIndexBase(nameSrc);
-      *runtime.inputPayload = streamRuntime(nameSrc).constructAgsePayload(length, step, nameSrc, windowIndex, sourceIndexBase);
+      RDB_TRY_ASSIGN(*runtime.inputPayload,
+                     streamRuntime(nameSrc).constructAgsePayload(length, step, nameSrc, windowIndex, sourceIndexBase));
     } break;
     case STREAM_HASH: {
       // 	:- PUSH_STREAM(core0)
       //  :- PUSH_STREAM(core1)
       //  :- STREAM_HASH
       //
-      if (qry.lProgram.size() != 3) FatalError("dataModel::constructInputPayload: STREAM_HASH expects 3 tokens");
+      RDB_ASSERT(qry.lProgram.size() == 3, "dataModel::constructInputPayload: STREAM_HASH expects 3 tokens");
 
       const auto &nameSrc1    = nameArg(0);
       const auto &nameSrc2    = nameArg(1);
@@ -691,7 +694,8 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
       rdb::probe::onHashPick();
       int fwdPos            = 0;
       const bool takeSecond = Hash(intervalSrc1, intervalSrc2, n, fwdPos);
-      const auto &component = fetchForward(takeSecond ? nameSrc2 : nameSrc1, fwdPos);
+      RDB_TRY_ASSIGN(const auto componentPointer, fetchForward(takeSecond ? nameSrc2 : nameSrc1, fwdPos));
+      const auto &component = *componentPointer;
 
       // Slot wejscia ma na kazdej pozycji dluzszy z dwoch elementow skladnikow
       // (Descriptor::composeHashDescriptorFrom). Skladnik o tym samym ukladzie przechodzi w calosci,
@@ -716,18 +720,20 @@ void dataModel::constructInputPayload(const query &qry, streamInstance &runtime)
 
     } break;
     default:
-      FatalError("dataModel::constructInputPayload: undefined command_id {}", static_cast<int>(cmd));
+      rdb::fatal(fmt::format("dataModel::constructInputPayload: undefined command_id {}", static_cast<int>(cmd)));
   }
+  return {};
 }
 
-std::vector<rdb::descFldVT> dataModel::getRow(const std::string &instance, const int timeOffset) {
+rdb::Result<std::vector<rdb::descFldVT>> dataModel::getRow(const std::string &instance, const int timeOffset) {
   std::vector<rdb::descFldVT> retVal;
 
   auto &out    = *(streamRuntime(instance).outputPayload);
   auto payload = std::make_unique<rdb::payload>(out.descriptor);
 
   if (!out.isDeclared()) {
-    if (out.revRead(timeOffset, payload->span().data()) == rdb::ReadStatus::NoSuchRecord) {
+    RDB_TRY_ASSIGN(const auto status, out.revRead(timeOffset, payload->span().data()));
+    if (status == rdb::ReadStatus::NoSuchRecord) {
       // Rekordu o tym offsecie nie ma - wiersz jest nieokreslony, czyli all-null; petla nizej zamieni
       // kazde pole na wartosc zastepcza jego typu. Bitset trzeba ustawic TUTAJ, bo revRead z wlasnym
       // buforem docelowym zapisuje znaczniki do payloadu magazynu, a nie do tego bufora.
@@ -761,9 +767,8 @@ void dataModel::refreshStreamHandles() {
 
   handles_.clear();
   handles_.reserve(coreInstance_.size());
-  // streamRuntime(), a nie qSet[]: wezel planu bez wpisu w modelu ma sie skonczyc zgloszonym
-  // bledem. Rewizje zapisujemy PO petli, wiec wyjatek zostawia tablice jawnie niegotowa i
-  // nastepne wejscie sprobuje jeszcze raz, zamiast wziac polowiczna za aktualna.
+  // streamRuntime(), a nie qSet[]: wezel planu bez wpisu w modelu to zlamany niezmiennik, a nie
+  // cicho dopisany pusty wpis mapy.
   for (const auto &q : coreInstance_)
     handles_.push_back(&streamRuntime(q.id));
 
@@ -774,10 +779,9 @@ void dataModel::markHandlesFreshForUnitTest() { handlesRevision_ = coreInstance_
 
 streamInstance &dataModel::streamRuntime(const std::string &instance) {
   const auto found = qSet.find(instance);
-  if (found == qSet.end()) {
-    SPDLOG_ERROR("dataModel: stream '{}' is in the plan but not in the model", instance);
-    throw std::logic_error("Stream present in the plan is missing from the data model. (check log)");
-  }
+  // Model buduje create() z KAZDEGO wezla planu, a addQueriesToModel() dokleja wezly ad-hoc w tej
+  // samej transakcji co plan - wezel bez wpisu to blad w kodzie.
+  RDB_ASSERT(found != qSet.end(), "dataModel: stream '{}' is in the plan but not in the model", instance);
   return *found->second;
 }
 

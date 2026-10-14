@@ -49,6 +49,7 @@ class textSourceRO : public FileInterface {
   /// Wejście wyczerpane: ustawiane wyłącznie przy wyłączonym zawijaniu, bo przy włączonym
   /// koniec pliku jest tylko powrotem na jego początek, a nie końcem danych.
   bool exhausted_ = false;
+  std::string inputError_;  ///< opis bledu tresci wejscia z ostatniego read() zwracajacego EILSEQ
 
   /// Pierwszy niepoprawny token liczbowy został już zgłoszony - kolejne, także po zawinięciu pliku, nie są.
   bool badTokenReported_ = false;
@@ -66,9 +67,10 @@ class textSourceRO : public FileInterface {
   ssize_t write(const uint8_t *ptrData, const std::vector<bool> &nullBitset, const size_t position) override { return ENOTSUP; }
 
   auto name() -> std::string & override;
-  size_t count() override;
+  [[nodiscard]] Result<size_t> count() override;
   [[nodiscard]] bool exhausted() const override { return exhausted_; }
   [[nodiscard]] const std::string &initializationError() const override { return initializationError_; }
+  [[nodiscard]] const std::string &inputError() const override { return inputError_; }
 
   const std::vector<bool> &lastNullBitset() const;
 };

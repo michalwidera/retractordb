@@ -9,7 +9,8 @@
 #include <span>
 #include <system_error>
 
-#include "fatalError.hpp"
+#include <fmt/format.h>
+
 #include "rdb/storageFile.hpp"
 #include "rdb/storageRotation.hpp"
 namespace rdb {
@@ -33,10 +34,10 @@ genericBinaryFile::~genericBinaryFile() {
 
 auto genericBinaryFile::name() -> std::string & { return filename_; }
 
-size_t genericBinaryFile::count() {
-  if (recordSize_ == 0) FatalError("genericBinaryFile::count: recordSize_ is zero");
+Result<size_t> genericBinaryFile::count() {
+  if (recordSize_ == 0) return fail(Errc::Logic, "genericBinaryFile::count: recordSize_ is zero");
   // Rozmiar pliku zamiast otwierania strumienia: ten sam kontrakt co w blizniakach
-  // posixowych (ENOENT = magazyn pusty, kazdy inny blad zatrzymuje) i bez open/seek/close
+  // posixowych (ENOENT = magazyn pusty, kazdy inny blad to Errc::IO) i bez open/seek/close
   // na kazde wywolanie. Poprzednia postac nie sprawdzala, czy strumien sie otworzyl -
   // tellg() zwracalo wtedy -1, co dla recordSize_ > 1 obcinalo sie do zera przypadkiem,
   // a dla recordSize_ == 1 dawalo SIZE_MAX.
@@ -44,14 +45,14 @@ size_t genericBinaryFile::count() {
   const auto sizeInBytes = std::filesystem::file_size(filename_, ec);
   if (ec) {
     if (ec == std::errc::no_such_file_or_directory) return 0;
-    rdb::EnvironmentError("genericBinaryFile::count: file_size('{}') failed: {}", filename_, ec.message());
+    return fail(Errc::IO, fmt::format("genericBinaryFile::count: file_size('{}') failed: {}", filename_, ec.message()));
   }
   return static_cast<size_t>(sizeInBytes / static_cast<uintmax_t>(recordSize_));
 }
 
 ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool> & /*nullBitset*/, const size_t position) {
-  if (recordSize_ == 0) FatalError("genericBinaryFile::write: recordSize_ is zero");
-  // Purge. Warunek wymagal dawniej takze recordSize_ == 0, czego nie da sie tu spelnic (FatalError
+  if (recordSize_ == 0) return EINVAL;
+  // Purge. Warunek wymagal dawniej takze recordSize_ == 0, czego nie da sie tu spelnic (EINVAL
   // wyzej), wiec purge wpadal w zwykly zapis spod nullptr i po cichu nie robil nic.
   if (ptrData == nullptr && position == 0) {
     const StorageFd purged(filename_, O_WRONLY | O_CREAT | O_TRUNC, kStreamFileMode, followFinalLink_);
@@ -72,7 +73,7 @@ ssize_t genericBinaryFile::write(const uint8_t *ptrData, const std::vector<bool>
 
 ssize_t genericBinaryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const size_t position) {
   nullBitset.clear();
-  if (recordSize_ == 0) FatalError("genericBinaryFile::read: recordSize_ is zero");
+  if (recordSize_ == 0) return EINVAL;
   const StorageFd file(filename_, O_RDONLY, kStreamFileMode, followFinalLink_);
   if (!file.isOpen()) return EIO;
   const ssize_t got =

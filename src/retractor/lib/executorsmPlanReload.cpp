@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
+#include <format>
 #include <iostream>
 #include <map>
 #include <mutex>
@@ -15,9 +16,9 @@
 
 #include "bus.hpp"
 #include "executorsmState.hpp"
-#include "fatalError.hpp"
 #include "persistentCounter.hpp"
 #include "planSource.hpp"
+#include "rdb/error.hpp"
 #include "serviceControl.hpp"
 
 // Przeladowanie calego planu (`xqry --reset`): trzyczesciowy transfer tekstu, jego walidacja
@@ -315,7 +316,7 @@ ptree executorsm::resetCommit(const ptree &ptInval) {
   return ptRetval;
 }
 
-void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, const AppConfig &cfg) {
+rdb::Result<> executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, const AppConfig &cfg) {
   std::string planText;
   {
     std::scoped_lock lock(core_mutex);
@@ -409,7 +410,9 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
   dropStalePlanArtifacts(*coreInstancePtr);
 
   for (const auto &it : *coreInstancePtr)
-    if (it.id == ":ROTATION") pCounterPtr = std::make_unique<PersistentCounter>(it.filename);
+    if (it.id == ":ROTATION") {
+      RDB_TRY_ASSIGN(pCounterPtr, PersistentCounter::create(it.filename));
+    }
 
   // Trwalosc planu: usluga, ktora zostanie zrestartowana, ma wstac z tym, co faktycznie
   // liczy, a nie z zestawem sprzed przeladowania. Niepowodzenie zapisu nie zatrzymuje
@@ -423,4 +426,5 @@ void executorsm::applyPendingPlan(FlockServiceGuard &guard, bus::Bus &xrdbbus, c
 
   guard.publishLockInfo();
   SPDLOG_INFO("Plan reloaded: {} node(s) in the new plan.", coreInstancePtr->size());
+  return {};
 }

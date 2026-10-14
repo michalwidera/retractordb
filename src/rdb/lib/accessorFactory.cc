@@ -4,7 +4,8 @@
 
 #include <format>
 
-#include "fatalError.hpp"
+#include <fmt/format.h>
+
 #include "rdb/faccbindev.hpp"
 #include "rdb/faccfs.hpp"
 #include "rdb/faccmemory.hpp"
@@ -53,15 +54,15 @@ std::string sourceKindMismatch(const std::string_view storageType, const std::st
   return sourceKindMismatch(storageType, path, sourceStat.st_mode);
 }
 
-std::unique_ptr<FileInterface> makeAccessor(const std::string_view storageType,  //
-                                            const std::string &storageFile,      //
-                                            Descriptor &descriptor,              //
-                                            const bool oneShot,                  //
-                                            const int percounter,                //
-                                            const bool followFinalLink,          //
-                                            MemoryStore *memory) {
-  if (storageFile.empty()) FatalError("storage: storage file path is empty - storage not properly configured");
-  if (storageType.empty()) FatalError("storage: storage type is empty - storage type not set");
+Result<std::unique_ptr<FileInterface>> makeAccessor(const std::string_view storageType,  //
+                                                    const std::string &storageFile,      //
+                                                    Descriptor &descriptor,              //
+                                                    const bool oneShot,                  //
+                                                    const int percounter,                //
+                                                    const bool followFinalLink,          //
+                                                    MemoryStore *memory) {
+  if (storageFile.empty()) return fail(Errc::Config, "storage: storage file path is empty - storage not properly configured");
+  if (storageType.empty()) return fail(Errc::Config, "storage: storage type is empty - storage type not set");
 
   if (storageType == "DEFAULT") {
     return std::make_unique<rdb::groupFile<posixBinaryFileWithShadow>>(storageFile, descriptor, descriptor.retention(),
@@ -90,9 +91,14 @@ std::unique_ptr<FileInterface> makeAccessor(const std::string_view storageType, 
   if (storageType == "TEXTSOURCE") {
     return std::make_unique<rdb::textSourceRO>(storageFile, descriptor, !oneShot);
   }
-  // K1 po preflight (#473): RQLParser kontroluje STORAGE/SUBSTRAT, a checkDescriptorFiles
-  // sprawdza TYPE zachowanego .desc, takze dla SELECT-ow ad-hoc, przed importem do modelu.
-  FatalError("storage: unsupported storage type '{}'", storageType);
+  // Jedyna sciezka w tej fabryce osiagalna DOWOLNYM poprawnym wywolaniem API: typ magazynu
+  // bierze sie z pola TYPE deskryptora albo wprost od wolajacego (argument storage_type
+  // wiazania Pythona), wiec literowka w nim trafiala tu prosto w std::exit. Zadna straz w
+  // wiazaniu tego nie zatrzymywala - nie zna listy typow, ktora jest wlasnie tutaj.
+  return fail(Errc::Config,
+              fmt::format("storage: unsupported storage type '{}' - expected one of DEFAULT, DIRECT, MEMORY, POSIX, "
+                          "POSIXSHD, GENERIC, DEVICE, TEXTSOURCE",
+                          storageType));
 }
 
 std::unique_ptr<metaData> makeMetaIndex(const bool declared,           //

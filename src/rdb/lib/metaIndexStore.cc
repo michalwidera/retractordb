@@ -3,6 +3,7 @@
 #include <fcntl.h>
 
 #include <algorithm>
+#include <cerrno>
 #include <cstdint>
 #include <filesystem>
 #include <format>
@@ -36,7 +37,10 @@ MetaIndexStore::MetaIndexStore(std::string metaFilePath, size_t entrySize)
     : metaFilePath_(std::move(metaFilePath)),
       entrySize_(entrySize) {}
 
-bool MetaIndexStore::fileExists() const { return !metaFilePath_.empty() && std::filesystem::exists(metaFilePath_); }
+bool MetaIndexStore::fileExists() const {
+  std::error_code ec;
+  return !metaFilePath_.empty() && std::filesystem::exists(metaFilePath_, ec);
+}
 
 void MetaIndexStore::saveHeader() {
   if (metaFilePath_.empty()) return;
@@ -78,7 +82,14 @@ const std::vector<IndexRecord> &MetaIndexStore::readAll() const {
 
   std::span<const std::byte> remaining(fileData);
   while (remaining.size() >= entrySize_) {
-    entriesCache_.push_back(IndexRecord::deserialize(remaining.subspan(0, entrySize_)));
+    auto entry = IndexRecord::deserialize(remaining.subspan(0, entrySize_));
+    if (!entry) {
+      initializationError_ = Error(Errc::IO, entry.error().message() + " in " + metaFilePath_, EIO);
+      entriesCache_.clear();
+      cacheValid_ = true;
+      return entriesCache_;
+    }
+    entriesCache_.push_back(std::move(*entry));
     remaining = remaining.subspan(entrySize_);
   }
 
@@ -107,24 +118,39 @@ void MetaIndexStore::overwriteLast(const IndexRecord &entry) {
     cacheValid_ = false;  // cache nie odzwierciedla ostatniego wpisu -- odbuduj przy odczycie
 }
 
-void MetaIndexStore::rewrite(const std::vector<IndexRecord> &entries) {
-  if (metaFilePath_.empty()) return;
+Result<> MetaIndexStore::rewrite(const std::vector<IndexRecord> &entries) {
+  if (metaFilePath_.empty()) return {};
   const std::string tmpPath = std::format("{}.tmp", metaFilePath_);
+  std::error_code ec;
   {
     const StorageFd out(tmpPath, O_WRONLY | O_CREAT | O_TRUNC);
-    if (!out.isOpen()) return;  // plik nietkniety -- cache pozostaje aktualny
+    if (const int err = errno; !out.isOpen())
+      return fail(Errc::IO, "MetaIndexStore::rewrite: cannot open " + tmpPath, err != 0 ? err : EIO);
     std::vector<std::byte> content;
     content.reserve(kHeaderSize + (entries.size() * entrySize_));
     std::ranges::copy(headerBytes(), std::back_inserter(content));
     for (const auto &rec : entries)
       std::ranges::copy(rec.serialize(), std::back_inserter(content));
-    (void)out.write(content);
+    if (!out.write(content)) {
+      const int err = errno != 0 ? errno : EIO;
+      std::filesystem::remove(tmpPath, ec);
+      return fail(Errc::IO, "MetaIndexStore::rewrite: cannot write " + tmpPath, err);
+    }
   }
-  std::filesystem::rename(tmpPath, metaFilePath_);
+  // Do #511 nieudana podmiana rzucala filesystem_error; plik na dysku i cache zostaja wtedy w
+  // stanie sprzed wywolania, a wolajacy dostaje blad zamiast cichego sukcesu.
+  std::filesystem::rename(tmpPath, metaFilePath_, ec);
+  if (ec) {
+    const int err           = ec.value();
+    const std::string cause = ec.message();
+    std::filesystem::remove(tmpPath, ec);
+    return fail(Errc::IO, std::format("MetaIndexStore::rewrite: cannot replace {}: {}", metaFilePath_, cause), err);
+  }
   // write-through; guard na wypadek, gdyby caller podal sam cache (self-assign jest
   // bezpieczny dla std::vector, ale jawny warunek dokumentuje intencje)
   if (&entries != &entriesCache_) entriesCache_ = entries;
   cacheValid_ = true;
+  return {};
 }
 
 }  // namespace rdb

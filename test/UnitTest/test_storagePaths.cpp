@@ -14,13 +14,14 @@
 
 #include "rdb/descriptor.hpp"
 #include "rdb/storagePaths.hpp"
+#include "rdbResult.hpp"
 
 // ---------------------------------------------------------------------------
 // Konstrukcja bez katalogu storageParam: deskryptor to qryID + ".desc",
 // indeks metadanych to plik danych + ".meta".
 // ---------------------------------------------------------------------------
 TEST(StoragePathsTest, basic_paths_without_storage_dir) {
-  rdb::StoragePaths paths("qry1", "data1", "");
+  auto paths = rdbtest::ok(rdb::StoragePaths::make("qry1", "data1", ""));
 
   EXPECT_EQ(paths.descriptorFile(), "qry1.desc");
   EXPECT_EQ(paths.storageFile(), "data1");
@@ -35,7 +36,7 @@ TEST(StoragePathsTest, storage_dir_prefixes_paths) {
   const std::filesystem::path dir{"storage_paths_dir"};
   std::filesystem::create_directory(dir);
 
-  rdb::StoragePaths paths("qry1", "data1", dir.string());
+  auto paths = rdbtest::ok(rdb::StoragePaths::make("qry1", "data1", dir.string()));
 
   EXPECT_EQ(paths.descriptorFile(), (dir / "qry1.desc").string());
   EXPECT_EQ(paths.storageFile(), (dir / "data1").string());
@@ -49,11 +50,11 @@ TEST(StoragePathsTest, storage_dir_prefixes_paths) {
 // indeks .meta przenosi się razem z nim.
 // ---------------------------------------------------------------------------
 TEST(StoragePathsTest, relocate_from_ref_moves_data_and_meta) {
-  rdb::StoragePaths paths("qry1", "data1", "");
+  auto paths = rdbtest::ok(rdb::StoragePaths::make("qry1", "data1", ""));
 
   auto desc = rdb::Descriptor("other.bin", 0, 0, rdb::REF) +  //
               rdb::Descriptor("a", sizeof(int), 1, rdb::INTEGER);
-  paths.relocateFromRef(desc);
+  ASSERT_RDB_OK(paths.relocateFromRef(desc));
 
   EXPECT_EQ(paths.storageFile(), "other.bin");
   EXPECT_EQ(paths.metaIndexFile(), "other.bin.meta");
@@ -64,10 +65,10 @@ TEST(StoragePathsTest, relocate_from_ref_moves_data_and_meta) {
 // Deskryptor bez pola REF: ścieżki pozostają bez zmian.
 // ---------------------------------------------------------------------------
 TEST(StoragePathsTest, relocate_without_ref_keeps_paths) {
-  rdb::StoragePaths paths("qry1", "data1", "");
+  auto paths = rdbtest::ok(rdb::StoragePaths::make("qry1", "data1", ""));
 
   auto desc = rdb::Descriptor("a", sizeof(int), 1, rdb::INTEGER);
-  paths.relocateFromRef(desc);
+  ASSERT_RDB_OK(paths.relocateFromRef(desc));
 
   EXPECT_EQ(paths.storageFile(), "data1");
   EXPECT_EQ(paths.metaIndexFile(), "data1.meta");
@@ -78,7 +79,7 @@ TEST(StoragePathsTest, relocate_without_ref_keeps_paths) {
 // indeksu .meta.shadow - porządkowanie magazynów dysponowalnych.
 // ---------------------------------------------------------------------------
 TEST(StoragePathsTest, remove_all_files_deletes_whole_set) {
-  rdb::StoragePaths paths("qry_rm", "data_rm", "");
+  auto paths = rdbtest::ok(rdb::StoragePaths::make("qry_rm", "data_rm", ""));
 
   for (const auto &file : {std::string("data_rm"), std::string("qry_rm.desc"),  //
                            std::string("data_rm.meta"), std::string("data_rm.meta.shadow")}) {
@@ -99,7 +100,7 @@ TEST(StoragePathsTest, remove_all_files_deletes_whole_set) {
 // instancji - znika sam deskryptor, plik danych i jego indeksy zostają (#278).
 // ---------------------------------------------------------------------------
 TEST(StoragePathsTest, remove_all_files_can_keep_data_files) {
-  rdb::StoragePaths paths("qry_keep", "data_keep", "");
+  auto paths = rdbtest::ok(rdb::StoragePaths::make("qry_keep", "data_keep", ""));
 
   for (const auto &file : {std::string("data_keep"), std::string("qry_keep.desc"),  //
                            std::string("data_keep.meta"), std::string("data_keep.meta.shadow")}) {
@@ -134,9 +135,10 @@ TEST(StoragePathsTest, ref_leaving_allowed_dirs_is_detected) {
   fs::create_directory_symlink(fs::absolute(dir / "archive"), dir / "store" / "link");
 
   const auto leaves = [&](const std::string &ref, const std::vector<std::string> &refDirs) {
-    rdb::StoragePaths paths("qry1", "data1", (dir / "store").string());
+    auto paths = rdbtest::ok(rdb::StoragePaths::make("qry1", "data1", (dir / "store").string()));
     paths.allowRefDirs(refDirs);
-    paths.relocateFromRef(rdb::Descriptor(ref, 0, 0, rdb::REF) + rdb::Descriptor("a", sizeof(int), 1, rdb::INTEGER));
+    rdbtest::ok(
+        paths.relocateFromRef(rdb::Descriptor(ref, 0, 0, rdb::REF) + rdb::Descriptor("a", sizeof(int), 1, rdb::INTEGER)));
     return paths.refLeavesAllowedDirs();
   };
   const std::string store = (dir / "store").string();
@@ -159,7 +161,66 @@ TEST(StoragePathsTest, ref_leaving_allowed_dirs_is_detected) {
 
 // Bez pola REF ścieżka pochodzi od wołającego - nie ma czego ograniczać.
 TEST(StoragePathsTest, no_ref_never_leaves_allowed_dirs) {
-  rdb::StoragePaths paths("qry1", "../data1", "");
-  paths.relocateFromRef(rdb::Descriptor("a", sizeof(int), 1, rdb::INTEGER));
+  auto paths = rdbtest::ok(rdb::StoragePaths::make("qry1", "../data1", ""));
+  ASSERT_RDB_OK(paths.relocateFromRef(rdb::Descriptor("a", sizeof(int), 1, rdb::INTEGER)));
   EXPECT_FALSE(paths.refLeavesAllowedDirs());
+}
+
+// ---------------------------------------------------------------------------
+// Faza 1, plaster 2a: zla konfiguracja jest wyjatkiem, nie koncem procesu.
+//
+// Zadnego z tych przypadkow nie dalo sie wczesniej przetestowac - kazdy konczyl
+// binarke testow przez std::exit, wiec caly zestaw szedl z nim. To jest dokladnie
+// ten powod, dla ktorego sciezki bledow w tej warstwie byly nieprzetestowane.
+// ---------------------------------------------------------------------------
+TEST(StoragePathsTest, empty_identifiers_are_rejected) {
+  EXPECT_RDB_ERROR(rdb::StoragePaths::make("", "data", ""), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(rdb::StoragePaths::make("qry", "", ""), rdb::Errc::Config);
+}
+
+TEST(StoragePathsTest, missing_storage_directory_is_rejected) {
+  const std::filesystem::path absent{"storage_paths_absent_dir"};
+  std::filesystem::remove_all(absent);
+
+  EXPECT_RDB_ERROR(rdb::StoragePaths::make("qry", "data", absent.string()), rdb::Errc::Config);
+}
+
+// Sciezka z koncowym ukosnikiem trafia w GALAZ KOLIZJI NAZW, nie w "nie istnieje":
+// konstruktor scina ukosnik przed sprawdzeniem, bo exists("plik/") jest falszem dla
+// zwyklego pliku i bez sciecia ta galaz bylaby nieosiagalna.
+TEST(StoragePathsTest, storage_param_pointing_at_a_file_is_rejected) {
+  const std::filesystem::path file{"storage_paths_not_a_dir"};
+  std::filesystem::remove_all(file);
+  { std::ofstream(file) << "x"; }
+
+  EXPECT_RDB_ERROR(rdb::StoragePaths::make("qry", "data", file.string()), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(rdb::StoragePaths::make("qry", "data", file.string() + "/"), rdb::Errc::Config);
+
+  std::filesystem::remove(file);
+}
+
+// Pusta sciezka po relokacji jest osiagalna DOKLADNIE jedna droga: pole REF o pustej
+// nazwie. Konstruktor odrzuca puste fileName, wiec storageFile_ nie moze byc puste
+// wczesniej - dopiero relocateFromRef() przepisuje je z deskryptora i dopiero wtedy
+// moze zniknac. Bez tej obserwacji sciezki nie da sie przetestowac inaczej niz przez
+// prywatny setStorageFile().
+TEST(StoragePathsTest, relocate_to_an_empty_ref_is_rejected) {
+  auto paths = rdbtest::ok(rdb::StoragePaths::make("qry", "data", ""));
+  ASSERT_EQ(paths.storageFile(), "data");
+
+  const rdb::Descriptor emptyRef{rdb::Descriptor("", 0, 0, rdb::REF)};
+  EXPECT_RDB_ERROR(paths.relocateFromRef(emptyRef), rdb::Errc::Config);
+}
+
+// Wyjatek z konstruktora znaczy, ze obiekt NIE POWSTAL - wiec nie ma destruktora,
+// ktory mialby cokolwiek posprzatac. Dla StoragePaths to istotne, bo removeAllFiles()
+// kasuje komplet plikow magazynu: zla konfiguracja nie moze skasowac cudzych danych.
+TEST(StoragePathsTest, a_rejected_construction_removes_nothing) {
+  const std::filesystem::path victim{"storage_paths_victim.desc"};
+  { std::ofstream(victim) << "keep me"; }
+
+  EXPECT_RDB_ERROR(rdb::StoragePaths::make("", "storage_paths_victim", ""), rdb::Errc::Config);
+  EXPECT_TRUE(std::filesystem::exists(victim));
+
+  std::filesystem::remove(victim);
 }

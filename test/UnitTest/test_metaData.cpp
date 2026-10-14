@@ -3,14 +3,16 @@
 #include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
 #include "rdb/metaData.hpp"
+#include "rdbResult.hpp"
 
+#include <cerrno>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <stdexcept>
+#include <iterator>
 #include <string>
 
 struct MetaTestFixture : public ::testing::Test {
@@ -25,10 +27,15 @@ TEST(MetaDataIndexRecordTest, test_IndexRecord_serialization) {
   original.recordCount = 42;
   original.nullBitset  = {true, false, true, true, false};
 
-  std::vector<std::byte> serialized       = original.serialize();
-  rdb::metaData::IndexRecord deserialized = rdb::metaData::IndexRecord::deserialize(serialized);
-  EXPECT_EQ(deserialized.recordCount, original.recordCount);
-  EXPECT_EQ(deserialized.nullBitset, original.nullBitset);
+  std::vector<std::byte> serialized = original.serialize();
+  const auto deserialized           = rdb::metaData::IndexRecord::deserialize(serialized);
+  ASSERT_TRUE(deserialized.has_value());
+  EXPECT_EQ(deserialized->recordCount, original.recordCount);
+  EXPECT_EQ(deserialized->nullBitset, original.nullBitset);
+
+  // Wpis krotszy niz deklaruje (uszkodzony plik .meta) zwraca blad, bez odczytu poza buforem.
+  serialized.pop_back();
+  EXPECT_FALSE(rdb::metaData::IndexRecord::deserialize(serialized).has_value());
 }
 
 TEST(MetaDataIndexRecordTest, test_IndexRecord_gap_serialization) {
@@ -39,9 +46,10 @@ TEST(MetaDataIndexRecordTest, test_IndexRecord_gap_serialization) {
 
   auto serialized   = gap.serialize();
   auto deserialized = rdb::metaData::IndexRecord::deserialize(serialized);
-  EXPECT_TRUE(deserialized.isGap);
-  EXPECT_EQ(deserialized.recordCount, 5U);
-  EXPECT_EQ(deserialized.nullBitset, gap.nullBitset);
+  ASSERT_TRUE(deserialized.has_value());
+  EXPECT_TRUE(deserialized->isGap);
+  EXPECT_EQ(deserialized->recordCount, 5U);
+  EXPECT_EQ(deserialized->nullBitset, gap.nullBitset);
 }
 
 // ── Uszkodzony bitsetSize w pliku (#421) ────────────────────────────
@@ -69,12 +77,7 @@ TEST(MetaDataIndexRecordTest, deserialize_odrzuca_bitsetSize_spoza_ramki) {
 
   for (const size_t bitsetSize : {SIZE_MAX, SIZE_MAX - 6, size_t{1} << 40, size_t{9}}) {
     SCOPED_TRACE(bitsetSize);
-    try {
-      (void)rdb::metaData::IndexRecord::deserialize(withBitsetSize(serialized, bitsetSize));
-      ADD_FAILURE() << "expected std::runtime_error";
-    } catch (const std::runtime_error &e) {
-      EXPECT_NE(std::string(e.what()).find("exceeds remaining buffer"), std::string::npos) << e.what();
-    }
+    EXPECT_FALSE(rdb::metaData::IndexRecord::deserialize(withBitsetSize(serialized, bitsetSize)).has_value());
   }
 }
 
@@ -85,21 +88,26 @@ TEST(MetaDataIndexRecordTest, deserialize_przyjmuje_bitsetSize_na_granicy_ramki)
   const auto serialized = original.serialize();
 
   const auto same = rdb::metaData::IndexRecord::deserialize(serialized);
-  EXPECT_EQ(same.recordCount, 7U);
-  EXPECT_EQ(same.nullBitset, original.nullBitset);
+  ASSERT_TRUE(same.has_value());
+  EXPECT_EQ(same->recordCount, 7U);
+  EXPECT_EQ(same->nullBitset, original.nullBitset);
 
   const auto full = rdb::metaData::IndexRecord::deserialize(withBitsetSize(serialized, 8));
-  EXPECT_EQ(full.nullBitset, (std::vector<bool>{true, false, true, true, false, false, false, false}));
+  ASSERT_TRUE(full.has_value());
+  EXPECT_EQ(full->nullBitset, (std::vector<bool>{true, false, true, true, false, false, false, false}));
 }
 
-TEST_F(MetaTestFixture, otwarcie_uszkodzonego_meta_daje_runtime_error) {
+TEST_F(MetaTestFixture, otwarcie_uszkodzonego_meta_zwraca_blad_io) {
   rdb::Descriptor descriptor;
   descriptor.append({{"x", 4, 0, rdb::INTEGER}});
   {
     rdb::metaData meta(descriptor, metaFile);
     meta.onRecordAppended({true});
   }  // destruktor zapisuje biezacy wpis
-  EXPECT_NO_THROW(rdb::metaData(descriptor, metaFile));  // kontrola dodatnia
+  {
+    rdb::metaData meta(descriptor, metaFile);  // kontrola dodatnia
+    EXPECT_FALSE(meta.initializationError().has_value());
+  }
 
   constexpr size_t kHeaderSize = sizeof(int64_t);
   ASSERT_GT(std::filesystem::file_size(metaFile), kHeaderSize + kBitsetSizeOffset + sizeof(size_t));
@@ -109,7 +117,19 @@ TEST_F(MetaTestFixture, otwarcie_uszkodzonego_meta_daje_runtime_error) {
     f.seekp(static_cast<std::streamoff>(kHeaderSize + kBitsetSizeOffset));
     f.write(reinterpret_cast<const char *>(&corrupt), sizeof(corrupt));
   }
-  EXPECT_THROW(rdb::metaData(descriptor, metaFile), std::runtime_error);
+  const auto readBytes = [&] {
+    std::ifstream input(metaFile, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+  };
+  const std::string before = readBytes();
+  {
+    rdb::metaData meta(descriptor, metaFile);
+    ASSERT_TRUE(meta.initializationError().has_value());
+    EXPECT_EQ(meta.initializationError()->code(), rdb::Errc::IO);
+    EXPECT_EQ(meta.initializationError()->err(), EIO);
+    EXPECT_TRUE(meta.initializationError()->message().contains(metaFile));
+  }
+  EXPECT_EQ(readBytes(), before) << "odmowa nie moze przepisac uszkodzonego indeksu";
 }
 
 // ── onRecordModified: committed-on-disk path (rewriteFile) ──────────
@@ -133,7 +153,7 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_on_disk) {
 
   EXPECT_EQ(meta.segments().size(), 2U);
 
-  meta.onRecordModified(1, noNull_);  // triggers rewriteFile
+  ASSERT_RDB_OK(meta.onRecordModified(1, noNull_));  // triggers rewriteFile
 
   EXPECT_EQ(meta.totalRecords(), 4U);
   EXPECT_EQ(meta.getNullBitset(0), null_);
@@ -143,6 +163,54 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_on_disk) {
 
   // [null_,2] split → [null_,1][noNull_,1][null_,1] + pending [noNull_,1] = 4 segments
   EXPECT_EQ(meta.segments().size(), 4U);
+}
+
+// Nieudana podmiana .meta (#511). Do portu rename rzucal filesystem_error, potem przez chwile
+// konczyl sie cichym sukcesem - indeks NULL na dysku zostawal stary. Katalog w miejscu pliku
+// zatrzymuje rename takze roota w kontenerze CI, w przeciwienstwie do uprawnien.
+TEST_F(MetaTestFixture, nieudana_podmiana_meta_wraca_bledem_io) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+
+  rdb::metaData meta(descriptor, metaFile);
+  meta.onRecordAppended({true});
+  meta.onRecordAppended({true});
+  meta.onRecordAppended({false});                    // rec 0-1 na dysku
+  ASSERT_RDB_OK(meta.onRecordModified(0, {false}));  // kontrola dodatnia: ta sama droga przez rewrite
+
+  std::filesystem::remove(metaFile);
+  std::filesystem::create_directory(metaFile);
+  std::ofstream(metaFile + "/blocker").put('x');
+
+  EXPECT_RDB_ERROR(meta.onRecordModified(1, {false}), rdb::Errc::IO, metaFile);
+  EXPECT_EQ(meta.getNullBitset(1), std::vector<bool>{true}) << "stan w pamieci nie moze wyprzedzic dysku";
+  EXPECT_FALSE(std::filesystem::exists(metaFile + ".tmp"));
+
+  meta.abandonFile();
+  std::filesystem::remove_all(metaFile);
+}
+
+// Ta sama awaria przy wczytaniu: loadIndex() podmienia plik, gdy ostatni wpis nie jest luka.
+TEST_F(MetaTestFixture, nieudana_podmiana_przy_wczytaniu_jest_bledem_inicjalizacji) {
+  rdb::Descriptor descriptor;
+  descriptor.append({{"x", 4, 0, rdb::INTEGER}});
+  {
+    rdb::metaData meta(descriptor, metaFile);
+    meta.onRecordAppended({true});
+  }  // destruktor zapisuje biezacy wpis
+  const auto before = std::filesystem::file_size(metaFile);
+
+  const std::string tmp = metaFile + ".tmp";
+  std::filesystem::create_directory(tmp);
+  std::ofstream(tmp + "/blocker").put('x');
+  {
+    rdb::metaData meta(descriptor, metaFile);
+    ASSERT_TRUE(meta.initializationError().has_value());
+    EXPECT_EQ(meta.initializationError()->code(), rdb::Errc::IO);
+    EXPECT_TRUE(meta.initializationError()->message().contains(tmp));
+  }  // odpiety plik: destruktor nie dopisuje wpisu drugi raz
+  EXPECT_EQ(std::filesystem::file_size(metaFile), before);
+  std::filesystem::remove_all(tmp);
 }
 
 // ── Stress ───────────────────────────────────────────────────────────
@@ -233,8 +301,8 @@ TEST_F(MetaTestFixture, integration_gap_markers_with_operations) {
     EXPECT_EQ(gapCnt, 2U);
   }
 
-  meta.onRecordModified(2, normal);
-  meta.onRecordModified(3, normal);
+  ASSERT_RDB_OK(meta.onRecordModified(2, normal));
+  ASSERT_RDB_OK(meta.onRecordModified(3, normal));
 
   EXPECT_EQ(meta.getNullBitset(2), normal);
   EXPECT_EQ(meta.getNullBitset(3), normal);
@@ -366,7 +434,7 @@ TEST_F(RotateFixture, rotate_renames_file_and_clears_state) {
   rdb::metaData m(descriptor, meta);
   ASSERT_EQ(m.totalRecords(), 3U);
 
-  m.rotate(0);
+  ASSERT_RDB_OK(m.rotate(0));
 
   EXPECT_TRUE(m.isEmpty());
   EXPECT_EQ(m.totalRecords(), 0U);
@@ -385,7 +453,7 @@ TEST_F(RotateFixture, rotate_negative_percounter_resets_without_rename) {
   rdb::metaData m(descriptor, meta);
   ASSERT_EQ(m.totalRecords(), 2U);
 
-  m.rotate(-1);
+  ASSERT_RDB_OK(m.rotate(-1));
 
   EXPECT_TRUE(m.isEmpty());
   EXPECT_FALSE(std::filesystem::exists(meta + ".old-1"));
@@ -401,7 +469,7 @@ TEST_F(RotateFixture, rotate_preserves_data_in_renamed_file) {
 
   {
     rdb::metaData m(descriptor, meta);
-    m.rotate(1);
+    ASSERT_RDB_OK(m.rotate(1));
   }
 
   rdb::metaData old(descriptor, metaOld1);
@@ -417,7 +485,7 @@ TEST_F(RotateFixture, rotate_overwrite_is_logged) {
   for (int session = 0; session < 2; ++session) {
     LogCapture log;
     m.onRecordAppended({false});
-    m.rotate(0);
+    ASSERT_RDB_OK(m.rotate(0));
     EXPECT_TRUE(std::filesystem::exists(metaOld0));
     const bool logged = log.text().find("overwrote existing archive " + metaOld0) != std::string::npos;
     EXPECT_EQ(logged, session == 1) << "session " << session << ", log: " << log.text();
@@ -433,7 +501,7 @@ TEST_F(RotateFixture, rotate_allows_records_after_rotation) {
   }
 
   rdb::metaData m(descriptor, meta);
-  m.rotate(0);
+  ASSERT_RDB_OK(m.rotate(0));
 
   m.onRecordAppended({false});
   m.onRecordAppended({true});
@@ -499,7 +567,7 @@ TEST_F(MetaTestFixture, test_modify_non_last_in_current_entry_while_tail_dirty) 
   // Modify non-last record in currentEntry_ (rec 1, offset 1, two records follow).
   // The stale on-disk entry [{A,3}] must be overwritten with the prefix [{A,1}],
   // not left as-is with new entries appended after it.
-  meta.onRecordModified(1, B);
+  ASSERT_RDB_OK(meta.onRecordModified(1, B));
 
   meta.flushCurrentEntry();  // flush suffix {A,2}
 
@@ -550,7 +618,7 @@ TEST_F(MetaTestFixture, test_modify_committed_entry_while_tail_dirty) {
   ASSERT_EQ(meta.totalRecords(), 5U);
 
   // Modify an earlier committed record (rec 1) while the on-disk tail is stale.
-  meta.onRecordModified(1, C);
+  ASSERT_RDB_OK(meta.onRecordModified(1, C));
 
   ASSERT_EQ(meta.totalRecords(), 5U);
   EXPECT_EQ(meta.getNullBitset(0), A);

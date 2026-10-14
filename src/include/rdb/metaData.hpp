@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "descriptor.hpp"
+#include "error.hpp"
 #include "gapDetector.hpp"
 #include "indexRecord.hpp"
 #include "metaIndexStore.hpp"
@@ -92,10 +93,11 @@ class metaData {
   /// containing the record is split accordingly.
   /// @param recordIndex position of the modified record in the stream
   /// @param nullBitset  new null bit-set pattern of the modified record
-  /// @throws std::out_of_range if recordIndex >= totalRecords()
+  /// @return Errc::Logic if recordIndex >= totalRecords() - the data file holds a record the index
+  ///         does not know (e.g. a .meta removed or truncated behind the engine's back)
   /// @note Virtual: the shadow-aware variant (storageShadow) records the change
   ///       as a shadow override instead of rewriting the main index.
-  virtual void onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitset);
+  [[nodiscard]] virtual Result<> onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitset);
 
   /// @brief Notify the meta index that a record has been appended.
   ///
@@ -110,7 +112,7 @@ class metaData {
   /// @brief Retrieve the null bit-set for the record at @p recordIndex.
   /// @param recordIndex global position of the record in the stream
   /// @return null bit-set (one bit per descriptor field, true = null)
-  /// @throws std::out_of_range if recordIndex >= totalRecords()
+  /// @pre recordIndex < totalRecords(); a violation is a broken invariant (RDB_ASSERT, rdb::fatal)
   /// @note Virtual: the shadow-aware variant (storageShadow) returns the shadow override when one exists.
   virtual std::vector<bool> getNullBitset(size_t recordIndex) const;
 
@@ -183,10 +185,10 @@ class metaData {
   /// Przy zamknieciu storage przekazuje reopen=false: indeks jest zapisany i archiwizowany
   /// bez odtwarzania aktywnego pliku. Wariant z cieniem archiwizuje tez .meta.shadow.
   /// Domyslne reopen=true przygotowuje nowy pusty indeks do dalszego zapisu.
-  /// Po bledzie rotacji nie resetuje indeksu; z reopen=true rzuca std::runtime_error.
+  /// Po bledzie rotacji nie resetuje indeksu; z reopen=true zwraca blad IO.
   /// If percounter < 0, the rename is skipped and the index is simply reset.
   /// @param percounter rotation counter (same suffix used for data file rotation)
-  virtual void rotate(int percounter, bool reopen = true);
+  [[nodiscard]] virtual Result<> rotate(int percounter, bool reopen = true);
 
   /// @brief Clear all index data and reset to initial state.
   ///
@@ -210,6 +212,9 @@ class metaData {
   /// implicit flushCurrentEntry() would recreate the just-deleted file (appendEntry() opens
   /// with ios::app, which creates a missing file).
   void abandonFile();
+  [[nodiscard]] virtual const std::optional<Error> &initializationError() const {
+    return store_.initializationError() ? store_.initializationError() : loadError_;
+  }
 
  private:
   /// @brief State of the lazy-overwrite optimisation for the last on-disk RLE entry.
@@ -252,6 +257,7 @@ class metaData {
   DiskTailState tail_{};                       ///< lazy-overwrite state for the last on-disk entry
   IndexRecord currentEntry_;                   ///< accumulator for the pending (not yet committed) RLE run
   GapDetector gapDetector_;                    ///< nullfill/absorb state machine (przejęte od storage)
+  std::optional<Error> loadError_;             ///< loadIndex() nie podmienil pliku indeksu
 };  // class metaData
 
 }  // namespace rdb

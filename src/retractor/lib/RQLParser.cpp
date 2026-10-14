@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include <fmt/format.h>
 #include <spdlog/sinks/basic_file_sink.h>  // support for basic file logging
 #include <spdlog/spdlog.h>
 #include <boost/lexical_cast.hpp>
@@ -22,9 +23,9 @@
 #include ".antlr/RQLLexer.h"
 #include ".antlr/RQLParser.h"
 #include "antlr4-runtime/antlr4-runtime.h"
+#include "compiler.hpp"  // kInternalCompilerError - status bledu wewnetrznego
 #include "constants.hpp"
 #include "exprSimplify.hpp"
-#include "fatalError.hpp"
 #include "qTree.hpp"
 #include "rdb/accessorFactory.hpp"
 #include "rdb/convertTypes.hpp"
@@ -46,6 +47,13 @@ constexpr size_t kAgseWindowSignChildIndex = 5;
 /// dalej callbacki ParserListenera na kalekich kontekstach, gdzie np. ctx->ID() jest nullem.
 /// Rzut wychodzi z prog() przez generowany kod, bo ten lapie wylacznie RecognitionException.
 struct RQLSyntaxError {
+  std::string message;
+};
+
+/// Zlamany niezmiennik listenera (abortInternal). Rzucany tylko WEWNATRZ tego pliku i lapany w
+/// parserRQLString() - tak jak RQLSyntaxError NIE dziedziczy po antlr4::RecognitionException,
+/// bo wygenerowany kod parsera lapie ten typ i polknalby rzut w odzyskiwaniu po bledzie.
+struct RQLInternalError {
   std::string message;
 };
 
@@ -194,6 +202,10 @@ class ParserListener : public RQLBaseListener {
 
   /* Wiersz pliku planu, na ktorym stoi parsowana porcja - jak w ParserErrorListener */
   size_t firstLine_;
+
+  /// Parser, wylacznie po to, zeby abortInternal() mogl zdjac listenery przed rzutem.
+  /// Listenery bledow trzymaja go z tego samego powodu - patrz abortParse().
+  antlr4::Parser &parser_;
 
   /* Helper variable required for rational numbers processing */
   boost::rational<int> rationalResult;
@@ -407,9 +419,28 @@ class ParserListener : public RQLBaseListener {
   }
 
  public:
-  ParserListener(qTree &coreInstance, size_t firstLine) : coreInstance(coreInstance), firstLine_(firstLine) {};
+  ParserListener(qTree &coreInstance, antlr4::Parser &parser, size_t firstLine)
+      : coreInstance(coreInstance),
+        firstLine_(firstLine),
+        parser_(parser) {};
 
   [[nodiscard]] const std::string &semanticError() const { return semanticError_; }
+
+  /// Zlamany niezmiennik listenera: rzuca, zamiast konczyc proces.
+  ///
+  /// Odpowiednik abortParse() dla drogi NIE-skladniowej. Zdjecie listenerow jest tak samo
+  /// konieczne: rozwijanie stosu przechodzi przez `finally` generowanego kodu
+  /// (antlrcpp::FinalAction), ktore wola exitRule(), a to wola kolejne exitXxx() na
+  /// kontekscie zatrzymanym w polowie budowy. Pierwsza wersja tej naprawy po stronie RQL
+  /// padala tam segfaultem - patrz pulapka 2 w docs/core-phase-1.md §1.
+  ///
+  /// NIE jest to kanal dla bledow uzytkownika; te ida przez reportSemanticError(), ktore
+  /// wraca statusem i nie wymaga zadnego z tych zabiegow.
+  [[noreturn]] void abortInternal(const std::string &message) {
+    SPDLOG_CRITICAL("Parser: {}", message);
+    parser_.removeParseListeners();
+    throw RQLInternalError{message};
+  }
 
   void enterProg(RQLParser::ProgContext *ctx) override {}
 
@@ -491,7 +522,8 @@ class ParserListener : public RQLBaseListener {
   /// historii zrodla, wiec literal w zakresie int, ale absurdalny, stawal sie pojemnoscia bufora.
   void exitWindow_agg(RQLParser::Window_aggContext *ctx) override {
     const int width = boundedLiteral("record window width", ctx->width->getText(), 1, rdb::limits::kMaxHistoryReach);
-    if (windowArgMarks.empty()) FatalError("RQLParser::exitWindow_agg: no argument mark for '{}'", ctx->getText());
+    if (windowArgMarks.empty())
+      abortInternal(fmt::format("RQLParser::exitWindow_agg: no argument mark for '{}'", ctx->getText()));
     const auto argStart = static_cast<int>(windowArgMarks.back());
     windowArgMarks.pop_back();
     const auto shape = std::make_pair(width, argStart);
@@ -506,7 +538,9 @@ class ParserListener : public RQLBaseListener {
     else if (name == "sumc")
       recpToken(WINDOW_SUM, shape);
     else
-      FatalError("RQLParser::exitWindow_agg: unknown aggregate '{}'", ctx->children[0]->getText());
+      // Gramatyka ogranicza nazwe do MIN|MAX|AVG|SUMC (RQL.g4 window_agg), wiec inna nazwa
+      // znaczy rozjazd listenera z gramatyka - blad w tym kodzie, nie w zapytaniu.
+      abortInternal(fmt::format("RQLParser::exitWindow_agg: unknown aggregate '{}'", ctx->children[0]->getText()));
   }
 
   void exitExpFloat(RQLParser::ExpFloatContext *ctx) override { recpToken(PUSH_VAL, literal<float>(ctx->getText())); }
@@ -581,7 +615,8 @@ class ParserListener : public RQLBaseListener {
     else if (ctx->SUMC() != nullptr)
       recpToken(STREAM_SUM);
     else
-      FatalError("RQLParser::exitStream_fn_call: unknown stream function '{}'", ctx->getText());
+      // Jak wyzej: RQL.g4 stream_fn_call wylicza dokladnie te cztery nazwy.
+      abortInternal(fmt::format("RQLParser::exitStream_fn_call: unknown stream function '{}'", ctx->getText()));
   }
   void exitSExpPlus(RQLParser::SExpPlusContext *ctx) override { recpToken(STREAM_ADD); }
   void exitSExpMinus(RQLParser::SExpMinusContext *ctx) override { recpToken(STREAM_SUBTRACT, rationalResult); }
@@ -1076,9 +1111,11 @@ class ParserListener : public RQLBaseListener {
   }
 };
 
-std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
-                                                                  std::vector<std::string> &statementKeywords, size_t firstLine,
-                                                                  std::string_view sourceFile) {
+namespace {
+
+std::tuple<std::string, std::string, std::string> parseRqlText(qTree &coreInstance, const std::string &inlet,
+                                                               std::vector<std::string> &statementKeywords, size_t firstLine,
+                                                               std::string_view sourceFile) {
   statementKeywords.clear();
   ANTLRInputStream input(inlet);
   // Create a lexer which scans the input stream
@@ -1094,7 +1131,7 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   lexer.removeErrorListeners();
   lexer.addErrorListener(&lexerErrorListener);
   ParserErrorListener parserErrorListener(parser, firstLine, sourceFile);
-  ParserListener parserListener(coreInstance, firstLine);
+  ParserListener parserListener(coreInstance, parser, firstLine);
   parser.removeParseListeners();
   parser.removeErrorListeners();
   parser.addErrorListener(&parserErrorListener);
@@ -1140,6 +1177,29 @@ std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreIns
   if (!parserListener.semanticError().empty()) return {parserListener.semanticError(), firsttoken, streamName};
 
   return {"OK", firsttoken, streamName};
+}
+
+}  // namespace
+
+/// GRANICA WYSPY WYJATKOW (RDB_NOEXCEPT_CHECK, korzen CMakeLists.txt). Ten plik jedyny w
+/// retractorcore ma wyjatki, bo steruje wygenerowanym parserem ANTLR, ktory przerywa parsowanie
+/// rzutem - i zaden wyjatek nie moze go opuscic: wolajacy (launcher, planSource, executorsmAdHoc,
+/// Engine) nie obsluguja wyjatkow, a kontrola kompiluje ich bez nich. Bledy
+/// skladni i semantyki wracaja statusem jak dotad; zlamany niezmiennik listenera (abortInternal)
+/// i wszystko, co rzuci sam runtime ANTLR, wraca statusem z przedrostkiem kInternalCompilerError,
+/// ktory wolajacy odrozniaja od bledu planu.
+std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
+                                                                  std::vector<std::string> &statementKeywords, size_t firstLine,
+                                                                  std::string_view sourceFile) {
+  try {
+    return parseRqlText(coreInstance, inlet, statementKeywords, firstLine, sourceFile);
+  } catch (const RQLInternalError &error) {
+    return {std::string(kInternalCompilerError) + error.message, "UNRECOGNIZED", ""};
+  } catch (const std::exception &error) {
+    return {std::string(kInternalCompilerError) + "RQL parser: " + error.what(), "UNRECOGNIZED", ""};
+  } catch (...) {
+    return {std::string(kInternalCompilerError) + "RQL parser: unknown failure", "UNRECOGNIZED", ""};
+  }
 }
 
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,

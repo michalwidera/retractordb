@@ -11,7 +11,7 @@
 
 #include <spdlog/spdlog.h>
 
-#include "fatalError.hpp"
+#include "rdb/error.hpp"
 #include "rdb/storageFile.hpp"
 
 extern std::string parserDESCString(rdb::Descriptor &desc, std::string_view inlet);
@@ -48,29 +48,42 @@ Refusal tryLoadDescriptorFile(const std::string &descriptorFile, Descriptor &des
   return {};
 }
 
-void saveDescriptorFile(const std::string &descriptorFile, const Descriptor &descriptor) {
+Result<Descriptor> loadDescriptorFile(const std::string &descriptorFile) {
+  Descriptor descriptor;
+  if (Refusal refusal = tryLoadDescriptorFile(descriptorFile, descriptor); !refusal.message.empty())
+    return fail(refusal.cls == ErrorClass::Environment ? Errc::IO : Errc::CorruptDescriptor, std::move(refusal.message),
+                refusal.err);
+  return descriptor;
+}
+
+Result<> saveDescriptorFile(const std::string &descriptorFile, const Descriptor &descriptor) {
   std::ostringstream content;
   content << descriptor;
   const std::string text = content.str();
   // Bez podazania za dowiazaniem: O_TRUNC przez dowiazanie obcialby jego cel (#374).
   const StorageFd descFile(descriptorFile, O_WRONLY | O_CREAT | O_TRUNC);
   if (!descFile.isOpen()) {
-    rdb::EnvironmentError("storage: failed to open descriptor file for writing: {}: {}", descriptorFile, std::strerror(errno));
+    const int err = errno;
+    return fail(Errc::IO,
+                fmt::format("storage: failed to open descriptor file for writing: {}: {}", descriptorFile, std::strerror(err)),
+                err);
   }
   if (!descFile.write(std::as_bytes(std::span{text}))) {
-    rdb::EnvironmentError("storage: failed to write descriptor file: {}", descriptorFile);
+    const int err = errno != 0 ? errno : EIO;
+    return fail(Errc::IO, fmt::format("storage: failed to write descriptor file: {}", descriptorFile), err);
   }
+  return {};
 }
 
-void verifyDescriptorMatch(const Descriptor &provided, const Descriptor &existing, const std::string &descriptorFile) {
-  if (provided == existing) return;
+Result<> verifyDescriptorMatch(const Descriptor &provided, const Descriptor &existing, const std::string &descriptorFile) {
+  if (provided == existing) return {};
 
   SPDLOG_ERROR("Descriptors do not match.");
   std::cerr << "Error in data descriptor file: " << descriptorFile << '\n';
   std::cerr << "Provided Descriptor:\n" << provided << "\nExisting Descriptor:\n" << existing << '\n';
   // K1 po preflight (#473): checkDescriptorFiles porownuje plan == plik przed publikacja,
   // takze dla nowych SELECT-ow ad-hoc. Start/reset kasuja niezachowywane deskryptory.
-  FatalError("storage: descriptor schema mismatch - remove data files and restart");
+  return fail(Errc::Logic, "storage: descriptor schema mismatch - remove data files and restart");
 }
 
 }  // namespace rdb

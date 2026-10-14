@@ -34,6 +34,7 @@
 #include "config.h"  // Add an automatically generated configuration file
 #include "constants.hpp"
 #include "fatalError.hpp"
+#include "fatalError.hpp"  // fatalErrorRaised - zatrzask czytany przez executorsm::cleanup()
 #include "lib/appConfig.hpp"
 #include "lib/bus.hpp"
 #include "lib/compiler.hpp"
@@ -48,6 +49,7 @@
 #include "lib/serverName.hpp"
 #include "lib/serviceControl.hpp"
 #include "lib/shmBudget.hpp"
+#include "rdb/error.hpp"
 #include "rdb/probe.hpp"  // baner buildu z sondami pomiarowymi
 #include "uxSysTermTools.hpp"
 
@@ -115,7 +117,7 @@
 /// - Nadawać instancji usługowej stałą nazwę ("service"), o ile operator nie wskazał innej, i
 ///   dopuszczać w systemie dokładnie jedną instancję w trybie usługowym; serwerów zwykłych może
 ///   pracować wiele.
-/// - Po błędzie krytycznym (FatalError) i po odmowie planu przed startem (parsowanie, kompilacja,
+/// - Po błędzie krytycznym (rdb::Error na szczycie executorsm::run albo FatalError) i po odmowie planu przed startem (parsowanie, kompilacja,
 ///   zachowane pliki magazynu i .desc) sprowadzać jednostkę systemd do stanu bez planu: plik
 ///   zapytań usługi jest opróżniany, więc restart podnosi ją w trybie bezczynnym zamiast wracać
 ///   w kółko na plan, który ją zabił albo nie może wystartować.
@@ -254,6 +256,10 @@ static void printOptimizerBuildInfo() {
 }
 
 int main(int argc, char *argv[]) try {
+  // Pierwsza instrukcja: zlamany niezmiennik rdzenia (RDB_ASSERT -> rdb::fatal) ma od poczatku
+  // konczyc serwer droga FatalError - zatrzask, "FATAL: ...", std::exit(EXIT_FAILURE) z
+  // handlerami atexit - a nie domyslnym std::abort biblioteki.
+  rdb::setFatalHandler(&daemonFatalExit);
   qTree coreInstance;
   compiler cm(coreInstance);
 
@@ -589,6 +595,14 @@ int main(int argc, char *argv[]) try {
       std::string response;
 
       response = cm.compile();
+
+      // Blad wewnetrzny kompilatora (przedrostek kInternalCompilerError) nie jest wina planu, wiec
+      // plan nie jest odrzucany - refusePlan() skasowalby go jednostce systemd. Do 2026-10
+      // przychodzil rzutem LogicError do catch(std::exception) nizej i konczyl proces kodem EINTR.
+      if (isInternalCompilerError(response)) {
+        std::cerr << "Input file:" << sInputFile << '\n' << "\nFATAL: " << response << '\n';
+        return EXIT_FAILURE;
+      }
 
       if (response != "OK") {
         std::cerr << "Input file:" << sInputFile << '\n'  //

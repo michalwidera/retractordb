@@ -6,8 +6,8 @@
 #include <utility>
 #include <vector>
 
-#include "fatalError.hpp"
 #include "qTree.hpp"
+#include "rdb/error.hpp"
 
 /// @brief Wczytanie zestawu RQL z TEKSTU i sprzatanie artefaktow poprzedniego planu.
 ///

@@ -4,15 +4,18 @@
 #include <sys/stat.h>
 
 #include <algorithm>  // std::min
+#include <cerrno>     // errno
 #include <cstdlib>    // std::abs
 #include <cstring>    // strerror
 #include <filesystem>
+#include <format>
 
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include "dataModel.hpp"
 #include "executorsmState.hpp"
-#include "fatalError.hpp"
+#include "rdb/error.hpp"
 
 namespace {
 constexpr mode_t kDefaultDumpFileMode = 0644;
@@ -56,20 +59,21 @@ dumpTask::~dumpTask() {
   }
 }
 
-void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
-  if (pProc == nullptr) FatalError("dumpManager::registerTask: dataModel pointer is null");
-  if (!pProc->qSet.contains(streamName)) {
-    FatalError("dumpManager::registerTask: stream '{}' not found in dataModel", streamName);
-  }
-  if (task.range.first > task.range.second) {
-    FatalError("dumpManager::registerTask: range.first {} > range.second {} for stream '{}'", task.range.first,
-               task.range.second, streamName);
-  }
+rdb::Result<> dumpManager::registerTask(const std::string &streamName, dumpTask task) {
+  // Model publikuje petla demona; silnik osadzony odrzuca reguly DUMP przy compile() - oba to niezmienniki.
+  RDB_ASSERT(pProc != nullptr, "dumpManager::registerTask: dataModel pointer is null");
+  RDB_ASSERT(pProc->qSet.contains(streamName), "dumpManager::registerTask: stream '{}' not found in dataModel", streamName);
+  // Niezmiennik, nie wejscie: zakres jest bramkowany DWUKROTNIE, w parserze (RQLParser.cpp,
+  // komunikat dla uzytkownika) i w compiler::computeRequiredCapacities. Zaden tekst RQL nie
+  // dociera tu z pustym zakresem.
+  RDB_ASSERT(task.range.first <= task.range.second,
+             "dumpManager::registerTask: range.first {} > range.second {} for stream '{}'", task.range.first, task.range.second,
+             streamName);
 
   // createDumpFile wybiera nazwe po retentionSize, wiec wpis musi byc przed nim. Do #379 stal po
   // nim i pierwsze wyzwolenie reguly z RETENTION trafialo do _dump.tmp zamiast _dump_0.tmp.
   retentionSize[streamName + "_" + task.taskName] = static_cast<int>(task.retentionSize);
-  std::tie(task.dumpFilename, task.fd)            = createDumpFile(streamName, task.taskName);
+  RDB_TRY_ASSIGN(std::tie(task.dumpFilename, task.fd), createDumpFile(streamName, task.taskName));
   // Nowy plik zastapil poprzedni pod ta sama nazwa: regula bez RETENTION odtwarza go przy kazdym
   // wyzwoleniu, regula z RETENTION N przy zawinieciu licznika slotow. Zadania tego pliku pisalyby
   // dalej do odlaczonego i-wezla, wiec je usuwamy; move/destruktor dumpTask zamyka ich deskryptory.
@@ -91,49 +95,55 @@ void dumpManager::registerTask(const std::string &streamName, dumpTask task) {
     // CHECK SEQUENCE IF THIS IS IN REVERSE ORDER
     int dumpHistoryCount = static_cast<int>(abs(task.range.first));
     for (auto i = 0; i < dumpHistoryCount; ++i) {
-      auto *payLoadPtr = pProc->getPayload(streamName, dumpHistoryCount - i);
-      auto resultSeek  = ::lseek(task.fd, 0, SEEK_END);
+      RDB_TRY_ASSIGN(auto *payLoadPtr, pProc->getPayload(streamName, dumpHistoryCount - i));
+      auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
       if (resultSeek == -1)
-        rdb::EnvironmentError("dumpManager::registerTask: lseek on '{}' failed during history dump: {}", task.dumpFilename,
-                              strerror(errno));
+        return rdb::fail(rdb::Errc::IO,
+                         fmt::format("dumpManager::registerTask: lseek on '{}' failed during history dump: {}",
+                                     task.dumpFilename, strerror(errno)),
+                         errno != 0 ? errno : EIO);
       ssize_t write_count_result = ::write(task.fd, payLoadPtr->span().data(), payLoadPtr->descriptor.getSizeInBytes());
       if (write_count_result <= 0)
-        rdb::EnvironmentError("dumpManager::registerTask: write to '{}' failed during history dump: {}", task.dumpFilename,
-                              strerror(errno));
+        return rdb::fail(rdb::Errc::IO,
+                         fmt::format("dumpManager::registerTask: write to '{}' failed during history dump: {}",
+                                     task.dumpFilename, strerror(errno)),
+                         errno != 0 ? errno : EIO);
     }
     if (task.dumpedRecordsToGo < dumpHistoryCount) {
-      FatalError("dumpManager::registerTask: dumpedRecordsToGo {} < dumpHistoryCount {}", task.dumpedRecordsToGo,
-                 dumpHistoryCount);
+      rdb::fatal(fmt::format("dumpManager::registerTask: dumpedRecordsToGo {} < dumpHistoryCount {}", task.dumpedRecordsToGo,
+                             dumpHistoryCount));
     }
+    RDB_ASSERT(task.dumpedRecordsToGo >= dumpHistoryCount,
+               "dumpManager::registerTask: dumpedRecordsToGo {} < dumpHistoryCount {}", task.dumpedRecordsToGo,
+               dumpHistoryCount);
     task.dumpedRecordsToGo -= dumpHistoryCount;
   } else {
     task.delayDumpRecordsToGo = static_cast<int>(task.range.first);
   }
 
   tasks.push_back(std::move(task));
+  return {};
 }
 
 void dumpManager::setDumpStorage(std::string storagePathParam) { storagePath = std::move(storagePathParam); }
 
-void dumpManager::processStreamChunk(const std::string &streamName) {
-  // Ksiega zadan PRZED siegnieciem po pProc: streamInstance wola te funkcje w kazdym slocie dla
-  // kazdego strumienia, a globalny pProc publikuje wylacznie petla uslugi. Silnik osadzony
-  // (rdb::embed::Engine) go nie publikuje i odrzuca reguly DUMP w compile(), wiec jego ksiega jest
-  // zawsze pusta - i wtedy wskaznik nie jest potrzebny.
-  if (!bookOfTasks.contains(streamName)) return;
-  if (pProc == nullptr) FatalError("dumpManager::processStreamChunk: dataModel pointer is null");
-  if (!pProc->qSet.contains(streamName)) {
-    FatalError("dumpManager::processStreamChunk: stream '{}' not found in dataModel", streamName);
-  }
+rdb::Result<> dumpManager::processStreamChunk(const std::string &streamName) {
+  // Brak zadan PRZED siegnieciem po pProc: streamInstance wola te funkcje w kazdym slocie dla
+  // kazdego strumienia, a globalny pProc publikuje wylacznie petla demona. Silnik osadzony
+  // (rdb::embed::Engine) go nie publikuje i odrzuca reguly DUMP przy compile(), wiec dla
+  // niego ta ksiega jest zawsze pusta - i wtedy wskaznik nie jest do niczego potrzebny.
+  if (!bookOfTasks.contains(streamName)) return {};
+  RDB_ASSERT(pProc != nullptr, "dumpManager::processStreamChunk: dataModel pointer is null");
+  RDB_ASSERT(pProc->qSet.contains(streamName), "dumpManager::processStreamChunk: stream '{}' not found in dataModel",
+             streamName);
 
   auto currentStreamCount = pProc->getStreamCount(streamName);
-  if (currentStreamCount == 0) return;  // nothing to dump
+  if (currentStreamCount == 0) return {};  // nothing to dump
 
-  auto *payLoadPtr = pProc->getPayload(streamName);
+  RDB_TRY_ASSIGN(auto *payLoadPtr, pProc->getPayload(streamName));
 
-  if (payLoadPtr->descriptor.getSizeInBytes() == 0)
-    FatalError("dumpManager::processStreamChunk: payload descriptor size is zero");
-  if (payLoadPtr->span().empty()) FatalError("dumpManager::processStreamChunk: payload data span is empty");
+  RDB_ASSERT(payLoadPtr->descriptor.getSizeInBytes() != 0, "dumpManager::processStreamChunk: payload descriptor size is zero");
+  RDB_ASSERT(!payLoadPtr->span().empty(), "dumpManager::processStreamChunk: payload data span is empty");
 
   // enumerate all tasks for this stream
   for (auto &task : bookOfTasks[streamName]) {
@@ -143,7 +153,7 @@ void dumpManager::processStreamChunk(const std::string &streamName) {
       SPDLOG_ERROR("dumpManager::processStreamChunk file descriptor is not set for stream: {}", streamName);
       continue;
     }
-    auto dumpTaskCompleted = buildDumpChunk(task, payLoadPtr);
+    RDB_TRY_ASSIGN(const bool dumpTaskCompleted, buildDumpChunk(task, payLoadPtr));
 
     if (dumpTaskCompleted) {
       ::close(task.fd);
@@ -154,12 +164,13 @@ void dumpManager::processStreamChunk(const std::string &streamName) {
   auto new_end = std::remove_if(bookOfTasks[streamName].begin(), bookOfTasks[streamName].end(),
                                 [](dumpTask &n) { return n.dumpedRecordsToGo == 0; });
   bookOfTasks[streamName].erase(new_end, bookOfTasks[streamName].end());
+  return {};
 }
 
-bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::pointer payload) {
-  if (task.dumpedRecordsToGo < 0) FatalError("dumpManager::buildDumpChunk: dumpedRecordsToGo is negative");
-  if (task.delayDumpRecordsToGo < 0) FatalError("dumpManager::buildDumpChunk: delayDumpRecordsToGo is negative");
-  if (task.fd < 0) FatalError("dumpManager::buildDumpChunk: file descriptor is not set");
+rdb::Result<bool> dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::pointer payload) {
+  RDB_ASSERT(task.dumpedRecordsToGo >= 0, "dumpManager::buildDumpChunk: dumpedRecordsToGo is negative");
+  RDB_ASSERT(task.delayDumpRecordsToGo >= 0, "dumpManager::buildDumpChunk: delayDumpRecordsToGo is negative");
+  RDB_ASSERT(task.fd >= 0, "dumpManager::buildDumpChunk: file descriptor is not set");
 
   // tutaj trzeba będzie opóźnić zrzut danych do pliku jeśli range określa tylko zrzut w przyszłości np. range 2 to 4
   if (task.delayDumpRecordsToGo != 0) {
@@ -169,11 +180,16 @@ bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::
 
   auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
   if (resultSeek == -1)
-    rdb::EnvironmentError("dumpManager::buildDumpChunk: lseek to end of '{}' failed: {}", task.dumpFilename, strerror(errno));
+    return rdb::fail(
+        rdb::Errc::IO,
+        fmt::format("dumpManager::buildDumpChunk: lseek to end of '{}' failed: {}", task.dumpFilename, strerror(errno)),
+        errno != 0 ? errno : EIO);
 
   ssize_t write_count_result = ::write(task.fd, payload->span().data(), payload->descriptor.getSizeInBytes());
   if (write_count_result <= 0)
-    rdb::EnvironmentError("dumpManager::buildDumpChunk: write to '{}' failed: {}", task.dumpFilename, strerror(errno));
+    return rdb::fail(rdb::Errc::IO,
+                     fmt::format("dumpManager::buildDumpChunk: write to '{}' failed: {}", task.dumpFilename, strerror(errno)),
+                     errno != 0 ? errno : EIO);
 
   if (task.dumpedRecordsToGo > 0) {
     task.dumpedRecordsToGo--;
@@ -182,7 +198,8 @@ bool dumpManager::buildDumpChunk(dumpTask &task, std::unique_ptr<rdb::payload>::
   return (task.dumpedRecordsToGo == 0);
 }
 
-std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view streamName, const std::string_view taskName) {
+rdb::Result<std::pair<std::string, int>> dumpManager::createDumpFile(const std::string_view streamName,
+                                                                     const std::string_view taskName) {
   // Klucz to rdzen nazwy pliku. Bez separatora pary a/bc i ab/c dzielily licznik slotow i RETENTION,
   // choc ich pliki sa rozne; rowny rdzen dwoch roznych par odrzuca juz parser.
   std::string key = std::string(streamName) + "_" + std::string(taskName);
@@ -193,10 +210,11 @@ std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view s
   } else {
     auto ret = (retentionCounter[key]++) % retentionSize[key];
     filename += "_dump_" + std::to_string(ret) + ".tmp";
-    if (ret >= retentionSize[key]) {
-      FatalError("dumpManager::createDumpFile: retention counter out of bounds: {} >= {} for key '{}'", ret, retentionSize[key],
-                 key);
-    }
+    // Warunek nie moze byc falszywy: 'ret' powstaje jako '% retentionSize[key]', wiec jest
+    // z definicji mniejsze od dzielnika. Zostaje jako asercja tego faktu - kosztuje jedno
+    // porownanie i nazywa zalozenie, na ktorym stoi nazwa pliku zrzutu.
+    RDB_ASSERT(ret < retentionSize[key], "dumpManager::createDumpFile: retention counter out of bounds: {} >= {} for key '{}'",
+               ret, retentionSize[key], key);
   }
   // Sciezka zrzutu jest w calosci przewidywalna z tekstu planu (STORAGE, strumien, regula), wiec
   // ktos z prawem zapisu do katalogu moze ja zajac przed nami. O_TRUNC obcina to, na co nazwa
@@ -210,12 +228,16 @@ std::pair<std::string, int> dumpManager::createDumpFile(const std::string_view s
   constexpr int kMaxRecreates = 100;
   for (int attempt = 0; attempt < kMaxRecreates; ++attempt) {
     if (::unlink(filename.c_str()) != 0 && errno != ENOENT) {
-      rdb::EnvironmentError("dumpManager::createDumpFile: failed to remove '{}': {}", filename.string(), strerror(errno));
+      return rdb::fail(rdb::Errc::IO,
+                       fmt::format("dumpManager::createDumpFile: failed to remove '{}': {}", filename.string(), strerror(errno)),
+                       errno != 0 ? errno : EIO);
     }
     int fd = ::open(filename.c_str(), O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, kDefaultDumpFileMode);
-    if (fd >= 0) return std::make_pair(filename, fd);
+    if (fd >= 0) return std::make_pair(filename.string(), fd);
     if (errno != EEXIST) break;
     // Ktos utworzyl plik miedzy naszym unlink() a open(); kasujemy go jeszcze raz.
   }
-  rdb::EnvironmentError("dumpManager::createDumpFile: failed to create '{}': {}", filename.string(), strerror(errno));
+  return rdb::fail(rdb::Errc::IO,
+                   fmt::format("dumpManager::createDumpFile: failed to create '{}': {}", filename.string(), strerror(errno)),
+                   errno != 0 ? errno : EIO);
 }
