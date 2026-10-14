@@ -43,7 +43,7 @@
 namespace rdb {
 
 /// Klasy odmowy zachowane z aktualnej granicy silnika (K1-K5).
-enum class ErrorClass { Internal, Plan, Request, Environment, Data };
+enum class ErrorClass : std::uint8_t { Internal, Plan, Request, Environment, Data };
 struct Refusal {
   ErrorClass cls{ErrorClass::Plan};
   std::string message;
@@ -128,9 +128,11 @@ using Result = std::expected<T, Error>;
 
 /// Odmowa z aktualnego preflight zachowuje kategorie i errno.
 [[nodiscard]] inline std::unexpected<Error> fail(Refusal refusal) {
-  const Errc code = refusal.cls == ErrorClass::Environment ? Errc::IO
-                    : refusal.cls == ErrorClass::Internal  ? Errc::Logic
-                                                           : Errc::Compile;
+  Errc code = Errc::Compile;
+  if (refusal.cls == ErrorClass::Environment)
+    code = Errc::IO;
+  else if (refusal.cls == ErrorClass::Internal)
+    code = Errc::Logic;
   return fail(code, std::move(refusal.message), refusal.err);
 }
 
@@ -184,7 +186,8 @@ FatalHandler setFatalHandler(FatalHandler handler) noexcept;
 /// to wiersz RDB_ASSERT, nie lambda.
 #define RDB_ASSERT(cond, ...)                                                                                         \
   do {                                                                                                                \
-    if (!(cond)) [[unlikely]] {                                                                                       \
+    const bool rdbAssertCondition_ = static_cast<bool>(cond);                                                         \
+    if (!rdbAssertCondition_) [[unlikely]] {                                                                          \
       const auto rdbAssertWhere_ = ::std::source_location::current();                                                 \
       [&] [[noreturn, gnu::cold, gnu::noinline]] () { ::rdb::fatal(::fmt::format(__VA_ARGS__), rdbAssertWhere_); }(); \
     }                                                                                                                 \

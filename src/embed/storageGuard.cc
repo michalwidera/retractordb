@@ -15,6 +15,7 @@
 #include <span>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #include "configBridge.hpp"
@@ -40,7 +41,7 @@ Result<std::filesystem::path> resolve(const std::string &path) {
   std::error_code ec;
   const auto absolute = std::filesystem::absolute(path, ec);
   if (ec) return ioError(path, ec.value());
-  const auto resolved = std::filesystem::weakly_canonical(absolute, ec);
+  auto resolved = std::filesystem::weakly_canonical(absolute, ec);
   if (ec) return ioError(path, ec.value());
   return resolved;
 }
@@ -103,7 +104,7 @@ Result<> StorageGuard::initialize(const std::string_view directory, const bool c
     std::string contents(kOwnerText.size() + 1, '\0');
     const auto count = owner.readAt(std::as_writable_bytes(std::span(contents)), 0);
     if (count < 0) return ioError(marker, errno);
-    if (count != static_cast<ssize_t>(kOwnerText.size()) || contents.substr(0, kOwnerText.size()) != kOwnerText)
+    if (std::cmp_not_equal(count, kOwnerText.size()) || !contents.starts_with(kOwnerText))
       return planError("invalid embedded storage owner marker: " + marker);
   }
   return {};

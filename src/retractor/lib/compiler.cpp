@@ -283,7 +283,7 @@ std::string compiler::resolveStreamIntervals() {
 
           if (delta1 > delta) {
             SPDLOG_ERROR("Faster div from slower src q.id={}", q.id);
-            return std::string("You cannot make faster div from slower source");
+            return {"You cannot make faster div from slower source"};
           }
         } break;
         case STREAM_DEHASH_MOD: {
@@ -309,7 +309,7 @@ std::string compiler::resolveStreamIntervals() {
 
           if (delta1 > delta) {
             SPDLOG_ERROR("Faster div from slower src q.id={}", q.id);
-            return std::string("You cannot make faster mod from slower source");
+            return {"You cannot make faster mod from slower source"};
           }
         } break;
         case STREAM_SUBTRACT: {
@@ -379,7 +379,7 @@ std::string compiler::resolveStreamIntervals() {
         } break;
         default:
           SPDLOG_ERROR("Undefined token: command={}", op.getStrCommandID());
-          return std::string("Undefined token/command on list");
+          return {"Undefined token/command on list"};
       }  // switch ( op.getCommandID() )
       if (delta == -1) {
         return internalCompilerError(
@@ -1142,7 +1142,7 @@ std::string compiler::expandIndexWildcards(query &q) {
       if (t.getCommandID() != PUSH_IDX) continue;
       boost::cmatch what;
       const std::string text(t.getStr_());
-      if (!regex_search(text.c_str(), what, xprFieldIdX)) return std::string("No mach on type conversion IDX");
+      if (!regex_search(text.c_str(), what, xprFieldIdX)) return {"No mach on type conversion IDX"};
       if (what.size() != 2) return internalCompilerError("compiler: PUSH_IDX regex match has unexpected capture count");
       const std::string schema(what[1]);
       t = token(PUSH_IDX, std::make_pair(schema, 0));  // .second arg is always 0

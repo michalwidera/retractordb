@@ -258,7 +258,7 @@ rdb::descFldVT evalAdd(const rdb::descFldVT &aParam, const rdb::descFldVT &bPara
                  [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
                    retVal = std::make_pair(a.first + b.first, a.second + b.second);
                  },
-                 []<typename T, typename U>(T, U) requires(!std::is_same_v<T, U>) {
+                 []<typename T, typename U>(const T &, const U &) requires(!std::is_same_v<T, U>) {
                    rdb::fatal("expressionEvaluator: mixed operand types reached '+' after normalization");
                  }  //
              },
@@ -291,7 +291,7 @@ rdb::descFldVT evalSubtract(const rdb::descFldVT &aParam, const rdb::descFldVT &
           [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
             retVal = std::make_pair(/* TODO? define str-str */ "?? -", a.second - b.second);
           },
-          []<typename T, typename U>(T, U) requires(!std::is_same_v<T, U>) {
+          []<typename T, typename U>(const T &, const U &) requires(!std::is_same_v<T, U>) {
             rdb::fatal("expressionEvaluator: mixed operand types reached '-' after normalization");
           }  //
       },
@@ -324,7 +324,7 @@ rdb::descFldVT evalMultiply(const rdb::descFldVT &aParam, const rdb::descFldVT &
           [&retVal](const std::pair<std::string, int> &a, const std::pair<std::string, int> &b) {
             retVal = std::make_pair(/* TODO? define str*str */ "?? *", a.second * b.second);
           },
-          []<typename T, typename U>(T, U) requires(!std::is_same_v<T, U>) {
+          []<typename T, typename U>(const T &, const U &) requires(!std::is_same_v<T, U>) {
             rdb::fatal("expressionEvaluator: mixed operand types reached '*' after normalization");
           }  //
       },
@@ -390,7 +390,7 @@ rdb::descFldVT evalDivide(const rdb::descFldVT &aParam, const rdb::descFldVT &bP
             else
               retVal = std::monostate{};
           },  //
-          []<typename T, typename U>(T, U) requires(!std::is_same_v<T, U>) {
+          []<typename T, typename U>(const T &, const U &) requires(!std::is_same_v<T, U>) {
             rdb::fatal("expressionEvaluator: mixed operand types reached '/' after normalization");
           }  //
       },

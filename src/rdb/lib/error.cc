@@ -26,6 +26,8 @@ std::atomic<FatalHandler> &fatalHandlerSlot() noexcept {
                 spdlog::level::critical, "{}", message);
     logger->flush();
   }
+  // Sciezka fatalna musi wypisac przyczyne bez wyjatkow i alokacji std::println.
+  // NOLINTNEXTLINE(modernize-use-std-print)
   std::fprintf(stderr, "\nFATAL: %.*s\n", static_cast<int>(message.size()), message.data());
   std::fflush(stderr);
   std::abort();

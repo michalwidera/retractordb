@@ -455,16 +455,18 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
         if (const char *gate = std::getenv("RDB_FAULT_MODEL_INIT_GATE"); gate != nullptr && !modelInitGateFired) {
           modelInitGateFired = true;
           std::ofstream(std::string(gate) + ".ready").put('\n');
-          const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+          constexpr auto kModelInitGatePollInterval = std::chrono::milliseconds(10);
+          const auto deadline                       = std::chrono::steady_clock::now() + std::chrono::seconds(10);
           while (!std::filesystem::exists(std::string(gate) + ".release") && std::chrono::steady_clock::now() < deadline)
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            std::this_thread::sleep_for(kModelInitGatePollInterval);
         }
 
         auto createdModel = dataModel::create(*coreInstancePtr);
         if (!createdModel) {
           const auto &error   = createdModel.error();
-          initializationError = {error.code() == rdb::Errc::IO ? rdb::ErrorClass::Environment : rdb::ErrorClass::Plan,
-                                 error.message(), error.err()};
+          initializationError = {.cls     = error.code() == rdb::Errc::IO ? rdb::ErrorClass::Environment : rdb::ErrorClass::Plan,
+                                 .message = error.message(),
+                                 .err     = error.err()};
           retVal =
               initializationError.cls == rdb::ErrorClass::Environment ? system::errc::io_error : system::errc::protocol_error;
           {

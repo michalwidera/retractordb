@@ -9,7 +9,6 @@
 #include <filesystem>
 #include <limits>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -28,7 +27,7 @@
 #include <nanobind/stl/string_view.h>
 #include <nanobind/stl/unique_ptr.h>
 #include <nanobind/stl/vector.h>
-#include <spdlog/sinks/base_sink.h>
+#include <spdlog/sinks/callback_sink.h>
 #include <spdlog/spdlog.h>
 #include <boost/rational.hpp>
 #include <magic_enum/magic_enum.hpp>
@@ -380,7 +379,7 @@ Record readRecord(rdb::storage &self, Py_ssize_t index) {
 
   // Kopia payloadu powstaje juz z GIL-em: to samo przepisanie pamieci, a Record
   // ma byc niezalezny od nastepnego read().
-  return Record{*target, static_cast<std::size_t>(index)};
+  return Record{.data = *target, .index = static_cast<std::size_t>(index)};
 }
 
 /// Most logow: spdlog -> logging.getLogger("retractordb").
@@ -396,9 +395,9 @@ Record readRecord(rdb::storage &self, Py_ssize_t index) {
 /// GIL: sink bywa wolany z wnetrza step()/run(), gdzie GIL jest zwolniony, wiec bierze go sam. Po
 /// Py_Finalize interpretera nie ma, a destruktory statykow C++ potrafia jeszcze logowac - stad
 /// straz na poczatku.
-class PythonLoggingSink final : public spdlog::sinks::base_sink<std::mutex> {
- protected:
-  void sink_it_(const spdlog::details::log_msg &msg) override {
+class PythonLoggingCallback {
+ public:
+  void operator()(const spdlog::details::log_msg &msg) const {
     if (Py_IsInitialized() == 0) return;
     const int level = pythonLevel(msg.level);
     const std::string text(msg.payload.data(), msg.payload.size());
@@ -411,23 +410,27 @@ class PythonLoggingSink final : public spdlog::sinks::base_sink<std::mutex> {
     }
   }
 
-  void flush_() override {}
-
  private:
+  static constexpr int kDebugLevel    = 10;
+  static constexpr int kInfoLevel     = 20;
+  static constexpr int kWarningLevel  = 30;
+  static constexpr int kErrorLevel    = 40;
+  static constexpr int kCriticalLevel = 50;
+
   /// Poziomy modulu logging: DEBUG=10, INFO=20, WARNING=30, ERROR=40, CRITICAL=50.
   static int pythonLevel(const spdlog::level::level_enum level) {
     switch (level) {
       case spdlog::level::trace:
       case spdlog::level::debug:
-        return 10;
+        return kDebugLevel;
       case spdlog::level::info:
-        return 20;
+        return kInfoLevel;
       case spdlog::level::warn:
-        return 30;
+        return kWarningLevel;
       case spdlog::level::err:
-        return 40;
+        return kErrorLevel;
       case spdlog::level::critical:
-        return 50;
+        return kCriticalLevel;
       default:
         return 0;
     }
@@ -464,6 +467,8 @@ std::uint64_t runEngine(rdb::embed::Engine &self, const std::optional<std::uint6
 /// przypinaj": https://documentation.retractordb.com/appendices/python-jupyter-api.html#memory-ownership-numpy-and-dlpack
 template <typename T>
 nb::object makeBlock(const std::vector<double> &values, const std::size_t rows, const std::size_t cols) {
+  // Rozmiar bufora NumPy jest znany dopiero w runtime; std::array wymaga stalego rozmiaru.
+  // NOLINTNEXTLINE(modernize-avoid-c-arrays)
   auto data = std::make_unique<T[]>(values.size());
   for (std::size_t i = 0; i < values.size(); ++i) {
     if constexpr (std::is_integral_v<T>) {
@@ -514,10 +519,10 @@ NB_MODULE(_core, m) {
   // Kolejnosc rejestracji ma znaczenie: nanobind probuje tlumaczy w kolejnosci
   // ODWROTNEJ do rejestracji, a typy pochodne lapia sie rowniez na catch po
   // klasie bazowej. Baza pierwsza => pochodne sprawdzane wczesniej.
-  const nb::object baseError = nb::exception<RdbError>(m, "RetractorDBError");
-  nb::exception<RdbNoSuchStream>(m, "NoSuchStream", baseError);
-  nb::exception<RdbStorageError>(m, "StorageError", baseError);
-  const nb::object internalError = nb::exception<RdbInternalError>(m, "InternalError", baseError);
+  const nb::object baseError                          = nb::exception<RdbError>(m, "RetractorDBError");
+  [[maybe_unused]] const nb::object noSuchStreamError = nb::exception<RdbNoSuchStream>(m, "NoSuchStream", baseError);
+  [[maybe_unused]] const nb::object storageError      = nb::exception<RdbStorageError>(m, "StorageError", baseError);
+  const nb::object internalError                      = nb::exception<RdbInternalError>(m, "InternalError", baseError);
 
   // Typy o dwoch bazach i hierarchia bledow planu (decyzja w #491): `except ValueError` lapie K2
   // i K3, `except OSError` - K4, `except RetractorDBError` - wszystko z modulu.
@@ -538,7 +543,7 @@ NB_MODULE(_core, m) {
   // Most logow instalowany raz, przy imporcie: od tej chwili kazdy zapis silnika przez spdlog trafia
   // do logging.getLogger("retractordb"). Poziom loggera spdloga zdejmujemy do trace, bo filtrowanie
   // ma nalezec do `logging`; to, co kompilacja wyciela przez SPDLOG_ACTIVE_LEVEL, i tak tu nie dociera.
-  spdlog::default_logger()->sinks() = {std::make_shared<PythonLoggingSink>()};
+  spdlog::default_logger()->sinks() = {std::make_shared<spdlog::sinks::callback_sink_mt>(PythonLoggingCallback{})};
   spdlog::default_logger()->set_level(spdlog::level::trace);
 
   // Nazwy pozycji wyliczenia biora sie z magic_enum, zeby nie rozjechac sie z
@@ -733,9 +738,8 @@ NB_MODULE(_core, m) {
   nb::class_<rdb::embed::Engine>(m, "Engine",
                                  "One embedded engine: a compiled plan, driven one time slot at a time. See "
                                  "https://documentation.retractordb.com/appendices/python-jupyter-api.html.")
-      .def(nb::new_([](std::string storage_dir, std::string lock_dir, std::string config) {
-             return engineCall(
-                 [&] { return rdb::embed::Engine::create(std::move(storage_dir), std::move(lock_dir), std::move(config)); });
+      .def(nb::new_([](std::string storage_dir, const std::string &lock_dir, const std::string &config) {
+             return engineCall([&] { return rdb::embed::Engine::create(std::move(storage_dir), lock_dir, config); });
            }),
            nb::arg("storage_dir") = "", nb::arg("lock_dir") = "", nb::arg("config") = "", nb::call_guard<UntaintedGuard>(),
            "An empty storage_dir creates a private temporary directory, which skips the service lock check; an "
@@ -827,7 +831,7 @@ NB_MODULE(_core, m) {
               const nb::gil_scoped_release release;
               data = engineCall([&] { return self.record(stream, static_cast<std::size_t>(index)); });
             }
-            return Record{std::move(data), static_cast<std::size_t>(index)};
+            return Record{.data = std::move(data), .index = static_cast<std::size_t>(index)};
           },
           nb::call_guard<UntaintedGuard>(), nb::arg("stream"), nb::arg("index"),
           "One record of a stream, oldest first; a negative index counts from the end. A copy.")

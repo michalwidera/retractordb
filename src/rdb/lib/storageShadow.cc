@@ -13,7 +13,7 @@ storageShadow::storageShadow(const Descriptor &descriptor, const std::string &me
     : metaData(descriptor, metaFilePath),
       shadow_(descriptor, metaFilePath) {
   shadow_.load();
-  if (initializationError()) abandonFile();
+  if (storageShadow::initializationError()) abandonFile();
 }
 
 Result<> storageShadow::onRecordModified(size_t recordIndex, const std::vector<bool> &nullBitset) {

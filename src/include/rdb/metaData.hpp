@@ -245,7 +245,8 @@ class metaData {
   };
 
   void createNullBitsetTemplate();
-  void loadIndex();  ///< restore currentEntry_ from store_'s committed entries
+  void flushPendingEntry();  ///< zapis po sprawdzeniu stanu inicjalizacji
+  void loadIndex();          ///< restore currentEntry_ from store_'s committed entries
 
   /// @brief Locate the RLE segment and offset within it for a given global record index.
   /// @return {segment index in committed entries (nullopt = currentEntry_), offset within segment}

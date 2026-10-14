@@ -1,9 +1,5 @@
 #include "rdb/convertTypes.hpp"
 
-#include <fmt/format.h>
-
-#include "rdb/error.hpp"
-
 #include <charconv>
 #include <cmath>
 #include <cstdint>
@@ -15,6 +11,7 @@
 #include <typeinfo>
 #include <utility>
 
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
 #include "rdb/error.hpp"

@@ -69,7 +69,8 @@ Engine::Engine(OfflinePolicy offline, std::string storageDir, const bool tempora
       storageDir_(std::move(storageDir)),
       temporaryDir_(temporaryDir) {}
 
-Result<std::unique_ptr<Engine>> Engine::create(std::string storageDir, std::string lockDir, std::string configPath) {
+Result<std::unique_ptr<Engine>> Engine::create(std::string storageDir, const std::string &lockDir,
+                                               const std::string &configPath) {
   RDB_TRY_ASSIGN(auto offline, offlinePolicy(lockDir, configPath));
   const bool temporary = storageDir.empty();
   if (temporary) {
