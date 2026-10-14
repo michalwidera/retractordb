@@ -15,6 +15,7 @@
 #include <optional>
 #include <stack>
 #include <string>
+#include <string_view>
 #include <type_traits>  // std::is_same_v
 #include <utility>      // std::cmp_greater_equal
 #include <variant>
@@ -35,13 +36,16 @@ expressionEvaluator::expressionEvaluator(/* args */) = default;
 // ewaluatora (typy rozne PO normalizacji) to RDB_ASSERT.
 //
 // Funkcje operacji zwracaja sama wartosc, a blad zglaszaja przez `error` - stala tresc, ktora
-// eval() zamienia na Errc::Eval. Result<descFldVT> na kazdym kroku programu kosztowal przeniesienie
-// i zniszczenie wariantu wiecej na operacje: +61 % instrukcji eval() na planach H9 (#511).
-// Po ustawieniu `error` wartosc zwrocona nie ma znaczenia.
+// eval() zamienia na Errc::Eval; pusty widok znaczy "bez bledu". Pomiar trend.py (#511):
+// Result<descFldVT> na kazdym kroku kosztowal +61 % instrukcji eval() na planach H9,
+// std::expected<descFldVT, std::string_view> wciaz jedno przeniesienie wariantu za duzo (+0,4 % Ir),
+// a std::optional<std::string_view> &error +0,5 % przez zmiane wklejania. Po ustawieniu `error`
+// wartosc zwrocona nie ma znaczenia. Tresci sa literalami o statycznym czasie zycia - widok na
+// napis tymczasowy bylby tu bledem.
 static std::unexpected<rdb::Error> evalError(std::string message) { return rdb::fail(rdb::Errc::Eval, std::move(message)); }
 
 /// Zgloszenie bledu z funkcji operacji: tresc do `error`, wartosc bez znaczenia.
-static rdb::descFldVT failWith(const char *&error, const char *message) {
+static rdb::descFldVT failWith(std::string_view &error, std::string_view message) {
   error = message;
   return {};
 }
@@ -57,7 +61,7 @@ static std::string lowercased(std::string text) {
 
 bool isNullValue(const rdb::descFldVT &value) { return std::holds_alternative<std::monostate>(value); }
 
-std::optional<bool> toLogicValue(const rdb::descFldVT &value, const char *&error) {
+std::optional<bool> toLogicValue(const rdb::descFldVT &value, std::string_view &error) {
   using LogicResult = std::optional<bool>;
   return std::visit(
       Overload{[](std::monostate) -> LogicResult { return std::nullopt; }, [](uint8_t a) -> LogicResult { return a != 0; },
@@ -76,7 +80,7 @@ std::optional<bool> toLogicValue(const rdb::descFldVT &value, const char *&error
       value);
 }
 
-rdb::descFldVT logicResultAsType(bool value, const rdb::descFldVT &typeRef, const char *&error) {
+rdb::descFldVT logicResultAsType(bool value, const rdb::descFldVT &typeRef, std::string_view &error) {
   using Value = rdb::descFldVT;
   return std::visit(
       Overload{[value](uint8_t) -> Value { return static_cast<uint8_t>(value ? 1 : 0); },
@@ -231,7 +235,7 @@ rdb::descFldVT signedUnsignedPower(const rdb::descFldVT &a, const rdb::descFldVT
 /// rdb::fatal - galaz jest nieosiagalna i tak ma byc zapisana.
 /// Zawezenie jest istotne: dla nowej alternatywy wariantu para (T,T) nie ma tu kandydata, wiec
 /// jest bledem kompilacji, a nie cichym wynikiem w czasie pracy (#267).
-rdb::descFldVT evalAdd(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, const char *&error) {
+rdb::descFldVT evalAdd(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, std::string_view &error) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
@@ -263,7 +267,7 @@ rdb::descFldVT evalAdd(const rdb::descFldVT &aParam, const rdb::descFldVT &bPara
   return retVal;
 }
 
-rdb::descFldVT evalSubtract(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, const char *&error) {
+rdb::descFldVT evalSubtract(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, std::string_view &error) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
@@ -296,7 +300,7 @@ rdb::descFldVT evalSubtract(const rdb::descFldVT &aParam, const rdb::descFldVT &
   return retVal;
 }
 
-rdb::descFldVT evalMultiply(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, const char *&error) {
+rdb::descFldVT evalMultiply(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, std::string_view &error) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
@@ -329,7 +333,7 @@ rdb::descFldVT evalMultiply(const rdb::descFldVT &aParam, const rdb::descFldVT &
   return retVal;
 }
 
-rdb::descFldVT evalDivide(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, const char *&error) {
+rdb::descFldVT evalDivide(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, std::string_view &error) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
@@ -450,17 +454,17 @@ std::optional<int> integralExponent(const rdb::descFldVT &value) {
 /// Wynik NIE jest rzutowany z powrotem na typ podstawy - typ ma byc dokladnie ten, ktory
 /// dalby zapisany wprost iloczyn (dla BYTE jest to INTEGER, bo `uint8_t * uint8_t`
 /// promuje sie do int).
-rdb::descFldVT exactPower(const rdb::descFldVT &base, int exponent, const char *&error) {
+rdb::descFldVT exactPower(const rdb::descFldVT &base, int exponent, std::string_view &error) {
   rdb::descFldVT result = castFldVT(rdb::descFldVT{1}, static_cast<rdb::descFld>(base.index()));
   rdb::descFldVT factor = base;
   for (int rest = exponent; rest > 0; rest >>= 1) {
     if ((rest & 1) != 0) {
       result = evalMultiply(result, factor, error);
-      if (error != nullptr) return {};
+      if (!error.empty()) return {};
     }
     if (rest > 1) {
       factor = evalMultiply(factor, factor, error);
-      if (error != nullptr) return {};
+      if (!error.empty()) return {};
     }
   }
   return result;
@@ -470,7 +474,7 @@ rdb::descFldVT exactPower(const rdb::descFldVT &base, int exponent, const char *
 
 /// strone do STRING, wiec wystarczy sprawdzic typ znormalizowany. To samo zdanie zalatwia
 /// INTPAIR i IDXPAIR, ktore nie sa wartosciami wyrazen.
-rdb::descFldVT power(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, const char *&error) {
+rdb::descFldVT power(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, std::string_view &error) {
   rdb::descFldVT promoted;
   auto [base, exponent] = normalize(aParam, bParam, promoted);
   if (isNullValue(base) || isNullValue(exponent)) return signedUnsignedPower(aParam, bParam);
@@ -490,7 +494,7 @@ rdb::descFldVT power(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam,
   return castFldVT(rdb::descFldVT{result}, resultType);
 }
 
-rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, const char *&error) {
+rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, std::string_view &error) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
@@ -521,7 +525,7 @@ rdb::descFldVT is_eq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam,
   return retVal;
 }
 
-rdb::descFldVT is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, const char *&error) {
+rdb::descFldVT is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, std::string_view &error) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
@@ -552,7 +556,7 @@ rdb::descFldVT is_neq(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam
   return retVal;
 }
 
-rdb::descFldVT is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, const char *&error) {
+rdb::descFldVT is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, std::string_view &error) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
@@ -583,7 +587,7 @@ rdb::descFldVT is_lt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam,
   return retVal;
 }
 
-rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, const char *&error) {
+rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, std::string_view &error) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
@@ -614,7 +618,7 @@ rdb::descFldVT is_gt(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam,
   return retVal;
 }
 
-rdb::descFldVT is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, const char *&error) {
+rdb::descFldVT is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, std::string_view &error) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
@@ -645,7 +649,7 @@ rdb::descFldVT is_le(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam,
   return retVal;
 }
 
-rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, const char *&error) {
+rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, std::string_view &error) {
   rdb::descFldVT retVal{0};
   rdb::descFldVT promoted;
   auto [a, b] = normalize(aParam, bParam, promoted);
@@ -676,11 +680,11 @@ rdb::descFldVT is_ge(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam,
   return retVal;
 }
 
-rdb::descFldVT is_logic_or(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, const char *&error) {
+rdb::descFldVT is_logic_or(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, std::string_view &error) {
   const auto a = toLogicValue(aParam, error);
-  if (error != nullptr) return {};
+  if (!error.empty()) return {};
   const auto b = toLogicValue(bParam, error);
-  if (error != nullptr) return {};
+  if (!error.empty()) return {};
 
   if ((a.has_value() && *a) || (b.has_value() && *b)) {
     return logicResultAsType(true, logicResultTypeRef(aParam, bParam), error);
@@ -693,11 +697,11 @@ rdb::descFldVT is_logic_or(const rdb::descFldVT &aParam, const rdb::descFldVT &b
   return std::monostate{};
 }
 
-rdb::descFldVT is_logic_and(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, const char *&error) {
+rdb::descFldVT is_logic_and(const rdb::descFldVT &aParam, const rdb::descFldVT &bParam, std::string_view &error) {
   const auto a = toLogicValue(aParam, error);
-  if (error != nullptr) return {};
+  if (!error.empty()) return {};
   const auto b = toLogicValue(bParam, error);
-  if (error != nullptr) return {};
+  if (!error.empty()) return {};
 
   if ((a.has_value() && !*a) || (b.has_value() && !*b)) {
     return logicResultAsType(false, logicResultTypeRef(aParam, bParam), error);
@@ -710,7 +714,7 @@ rdb::descFldVT is_logic_and(const rdb::descFldVT &aParam, const rdb::descFldVT &
   return std::monostate{};
 }
 
-rdb::descFldVT neg(const rdb::descFldVT &inVar, const char *&error) {
+rdb::descFldVT neg(const rdb::descFldVT &inVar, std::string_view &error) {
   rdb::descFldVT retVal;
   if (isNullValue(inVar)) return std::monostate{};
 
@@ -734,16 +738,16 @@ rdb::descFldVT neg(const rdb::descFldVT &inVar, const char *&error) {
 /// `~a` (#328) - bitowa negacja, zdefiniowana tylko dla BYTE i UINT; tam rowna neg().
 /// Inne typy odrzuca juz kompilator (inferExpressionShape), wiec wyjatek ponizej jest
 /// tylko straza programu, ktory bramke ominal.
-rdb::descFldVT bit_not(const rdb::descFldVT &inVar, const char *&error) {
+rdb::descFldVT bit_not(const rdb::descFldVT &inVar, std::string_view &error) {
   if (isNullValue(inVar)) return std::monostate{};
   if (const auto *a = std::get_if<uint8_t>(&inVar)) return static_cast<uint8_t>(~*a);
   if (const auto *a = std::get_if<unsigned>(&inVar)) return ~*a;
   return failWith(error, "Operator '~' defined only for BYTE and UINT operands");
 }
 
-rdb::descFldVT logic_not(const rdb::descFldVT &inVar, const char *&error) {
+rdb::descFldVT logic_not(const rdb::descFldVT &inVar, std::string_view &error) {
   const auto value = toLogicValue(inVar, error);
-  if (error != nullptr) return {};
+  if (!error.empty()) return {};
   if (!value.has_value()) return std::monostate{};
   return logicResultAsType(!(*value), inVar, error);
 }
@@ -756,7 +760,7 @@ rdb::descFldVT isnull(const rdb::descFldVT &inVar) { return isNullValue(inVar) ?
 /// RATIONAL idzie przez Rationalize z tolerancja 1e-6 - czyli gubi dokladna wartosc wymierna.
 /// Dla `Abs` ta strata bylaby czysto zbedna: wartosc bezwzgledna nie zmienia ani typu, ani
 /// mianownika. Wzorzec wziety z neg() powyzej, ktore jest tym samym rodzajem operacji.
-rdb::descFldVT absolute(const rdb::descFldVT &inVar, const char *&error) {
+rdb::descFldVT absolute(const rdb::descFldVT &inVar, std::string_view &error) {
   if (isNullValue(inVar)) return std::monostate{};
 
   rdb::descFldVT retVal;
@@ -785,13 +789,13 @@ rdb::descFldVT absolute(const rdb::descFldVT &inVar, const char *&error) {
 ///
 /// Dla stringa predykat nie ma sensu i jest bledem, a nie cicha konwersja: toLogicValue()
 /// uznaje kazdy niepusty napis za prawde, co dla nazwy `IsZero` byloby mylace.
-rdb::descFldVT isZeroValue(const rdb::descFldVT &inVar, bool wantZero, const char *&error) {
+rdb::descFldVT isZeroValue(const rdb::descFldVT &inVar, bool wantZero, std::string_view &error) {
   if (isNullValue(inVar)) return std::monostate{};
   if (std::holds_alternative<std::string>(inVar))
     return failWith(error, "Functions 'IsZero'/'IsNonZero' are not defined for string operands");
 
   const auto value = toLogicValue(inVar, error);
-  if (error != nullptr) return {};
+  if (!error.empty()) return {};
   if (!value.has_value()) return std::monostate{};
   const bool isZero = !(*value);
   return (isZero == wantZero) ? 1 : 0;
@@ -807,7 +811,7 @@ rdb::descFldVT isZeroValue(const rdb::descFldVT &inVar, bool wantZero, const cha
 /// Abs i IsZero, ktore odrzucaja napis. `Length(k)` nad polem INTEGER jest niemal na pewno
 /// literowka, a nie prosba o dlugosc zapisu dziesietnego; kto chce tej drugiej rzeczy, pisze
 /// `Length(to_string(k))` i mowi to wprost.
-rdb::descFldVT stringLength(const rdb::descFldVT &inVar, const char *&error) {
+rdb::descFldVT stringLength(const rdb::descFldVT &inVar, std::string_view &error) {
   if (isNullValue(inVar)) return std::monostate{};
 
   const auto *text = std::get_if<std::string>(&inVar);
@@ -825,7 +829,7 @@ rdb::descFldVT stringLength(const rdb::descFldVT &inVar, const char *&error) {
 /// potrzebne, ale to byla wlasciwosc TAMTEJ biblioteki, a nie gwarancja jezyka.
 using mathFn = double (*)(double);
 
-rdb::descFldVT callFun(rdb::descFldVT &inVar, const std::function<double(double)> &fnName, const char *&error) {
+rdb::descFldVT callFun(rdb::descFldVT &inVar, const std::function<double(double)> &fnName, std::string_view &error) {
   if (isNullValue(inVar)) return std::monostate{};
   auto backResultType = inVar.index();
   if (backResultType >= rdb::BYTE && backResultType <= rdb::DOUBLE) {
@@ -844,7 +848,7 @@ rdb::descFldVT callFun(rdb::descFldVT &inVar, const std::function<double(double)
 /// i wykonuje takze programy skladane z pominieciem kompilatora, wiec nie powtarza jego
 /// decyzji o kontrakcie jezyka; rachunek przez double jest tu poprawny i nie ma czego
 /// zabraniac.
-rdb::descFldVT callRealFun(const rdb::descFldVT &inVar, const std::function<double(double)> &fnName, const char *&error) {
+rdb::descFldVT callRealFun(const rdb::descFldVT &inVar, const std::function<double(double)> &fnName, std::string_view &error) {
   if (isNullValue(inVar)) return std::monostate{};
   if (inVar.index() < rdb::BYTE || inVar.index() > rdb::DOUBLE)
     return failWith(error, "callRealFun: math functions require numeric operand");
@@ -874,12 +878,12 @@ rdb::Result<rdb::descFldVT> expressionEvaluator::eval(const std::list<token> &pr
 
   // Wynik operacji na stos albo powrot z jej bledem. Operacja dostaje `opError` jako ostatni
   // argument (dopisuje go makro) i ustawia go tylko przy bledzie.
-  const char *opError = nullptr;
+  std::string_view opError;
 #define RDB_EVAL_PUSH(op, ...)                     \
   do {                                             \
     auto rdbEvalValue_ = op(__VA_ARGS__, opError); \
-    if (opError != nullptr) [[unlikely]]           \
-      return evalError(opError);                   \
+    if (!opError.empty()) [[unlikely]]             \
+      return evalError(std::string(opError));      \
     rStack.push(std::move(rdbEvalValue_));         \
   } while (false)
 
