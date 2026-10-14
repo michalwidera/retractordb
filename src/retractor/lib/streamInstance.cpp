@@ -47,6 +47,9 @@ rdb::Result<std::unique_ptr<streamInstance>> streamInstance::create(qTree &coreI
   RDB_TRY(self->outputPayload->attachDescriptor(&desc));
   auto &outputPayload = self->outputPayload;
 
+  self->widestOutputField_ = outputPayload->descriptor.widestFieldType();
+  self->reductionField_    = reductionResultField(self->widestOutputField_.first, self->widestOutputField_.second);
+
   // Jedyne miejsce, w którym rola z planu (`isSubstrat`) spotyka się z magazynem - sonda
   // logicznych zapisów (K23) rozdziela materializowany podplan od publicznego wyniku.
   // `if constexpr` obejmuje wywołanie, żeby build produkcyjny nie różnił się od wersji
@@ -393,9 +396,9 @@ rdb::Result<> streamInstance::reduceFieldsInto(command_id cmd, rdb::payload &tar
   // Inni konsumenci tego zrodla (getPayload z offsetem, fetchForward) zostawiaja w nim starszy rekord.
   RDB_TRY(outputPayload->revRead(0));
 
-  auto [sourceType, sourceLen] = outputPayload->descriptor.widestFieldType();
-  auto [maxType, maxLen]       = reductionResultField(sourceType, sourceLen);
-  auto maxType_                = maxType;
+  const auto [sourceType, sourceLen] = widestOutputField_;
+  const auto [maxType, maxLen]       = reductionField_;
+  auto maxType_                      = maxType;
 
   // Cel ma pole wyniku z tej samej reguly, ale policzonej nad deskryptorem PLANU, a magazyn zrodla moze
   // niesc deskryptor z dysku (verifyDescriptorMatch przepuszcza plan szerszy od pliku). Rozjazd wychodzil

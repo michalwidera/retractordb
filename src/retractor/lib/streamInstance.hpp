@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "dumpManager.hpp"
@@ -137,4 +138,10 @@ struct streamInstance {
   // watku przetwarzania (dataModel::processRows), nie z watku komunikacji IPC,
   // wiec bez potrzeby synchronizacji.
   mutable std::unordered_map<int, rdb::Descriptor> agseDescriptorCache_;
+
+  // Najszerszy typ danych wyjscia i pole wyniku reduktora nad nim (reductionResultField). Deskryptor
+  // wyjscia jest staly od create() - jak przy agseDescriptorCache_ - wiec reduceFieldsInto nie
+  // przeglada go w kazdym takcie.
+  std::pair<rdb::descFld, int> widestOutputField_{rdb::BYTE, 1};
+  std::pair<rdb::descFld, int> reductionField_{rdb::BYTE, 1};
 };
