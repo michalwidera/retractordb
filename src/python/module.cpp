@@ -74,7 +74,7 @@
 ///   +- InternalError                   K1: Errc::Logic / Errc::Eval
 /// Trzy decyzje uzytecznosci: GIL jest zwalniany na czas compile/step/run/_block,
 /// run() sprawdza sygnaly co kSignalCheckInterval, a logi silnika ida do modulu
-/// `logging` (PythonLoggingSink), nie na stdout.
+/// `logging` (PythonLoggingCallback), nie na stdout.
 
 namespace nb = nanobind;
 

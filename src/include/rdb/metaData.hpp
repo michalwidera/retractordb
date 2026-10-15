@@ -245,7 +245,7 @@ class metaData {
   };
 
   void createNullBitsetTemplate();
-  void flushPendingEntry();  ///< zapis po sprawdzeniu stanu inicjalizacji
+  void flushPendingEntry();  ///< zapis pending entry bez sprawdzania stanu inicjalizacji - sprawdza wywolujacy
   void loadIndex();          ///< restore currentEntry_ from store_'s committed entries
 
   /// @brief Locate the RLE segment and offset within it for a given global record index.
