@@ -63,6 +63,7 @@ namespace fs = std::filesystem;
 
 using Segment = rdb::metaData::IndexRecord;
 
+/// @requirements-exempt DataSegmentInfo: Dane segmentu magazynu uzywane do prezentacji mapy plikow.
 struct DataSegmentInfo {
   size_t index{};
   std::string path;
@@ -74,6 +75,7 @@ struct DataSegmentInfo {
   size_t shadowUpdates{};
 };
 
+/// @requirements-exempt RotatedFileInfo: Dane zarchiwizowanego pliku uzywane do prezentacji mapy plikow.
 struct RotatedFileInfo {
   int counter{};
   std::string ext;  // middle part between stem and .old<N>, e.g. "" / ".meta" / ".shadow"
@@ -81,6 +83,7 @@ struct RotatedFileInfo {
   uintmax_t bytes{};
 };
 
+/// @requirements-exempt DataStats: Zestaw statystyk plikow i rekordow magazynu.
 struct DataStats {
   bool segmentedData{};
   bool hasData{};

@@ -45,6 +45,7 @@ std::string queryPathLabel(std::string_view queryFile) {
 /// Wybor liter: R jak realtime, F jak flag `-f` (--no-clock), U jak until-eof, M jak `-m`
 /// (--llimitqry), X jak `-x` (--xqrywait), S jak service. Tryby sie nie wykluczaja, wiec
 /// pole jest napisem, nie jedna litera; brak ktoregokolwiek bitu to "N" -- zwykly przebieg.
+/// @requirements-exempt ModeLetter: Wpis tabeli laczacej bit trybu, litere i nazwe opcji.
 struct ModeLetter {
   std::uint32_t bit;
   char letter;
@@ -90,6 +91,7 @@ std::string yamlQuoted(std::string_view value) {
   return retVal + "\"";
 }
 
+/// @requirements-exempt ServerRow: Dane jednego wiersza tabeli instancji.
 struct ServerRow {
   std::string server;
   std::string pid;
@@ -98,6 +100,7 @@ struct ServerRow {
   std::vector<std::string> streams;
 };
 
+/// @requirements-exempt ColumnWidths: Zestaw szerokosci kolumn tabeli instancji.
 struct ColumnWidths {
   std::size_t server;
   std::size_t pid;

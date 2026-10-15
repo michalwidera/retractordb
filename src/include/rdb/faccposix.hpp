@@ -10,7 +10,7 @@ namespace rdb {
 
 /// @brief Implementacja binarnego magazynu rekordów opartego na deskryptorze pliku POSIX.
 ///
-/// Obiekt posixBinaryFile powinien:
+/// Obiekt klasy posixBinaryFile powinien:
 /// - implementować interfejs FileInterface dla binarnego pliku rekordowego,
 /// - umożliwiać dopisywanie rekordów oraz zapis i odczyt rekordu od wskazanej pozycji w pliku,
 /// - traktować Descriptor jako źródło rozmiaru pojedynczego rekordu,

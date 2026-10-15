@@ -10,16 +10,54 @@
 
 /// @brief Klasa opisująca proces wyznaczania wartości wyrażenia.
 ///
-/// obiekt klasy expressionEvaluator powinien:
+/// Obiekt klasy expressionEvaluator powinien:
 /// - przyjmować listę tokenów reprezentujących wyrażenie do wyznaczenia.
 /// - przyjmować opcjonalny wskaźnik do obiektu payload, który może być używany do pobierania wartości zmiennych w wyrażeniu.
-/// - obsługiwać różne operatory arytmetyczne, logiczne i porównania, takie jak dodawanie, odejmowanie, mnożenie, dzielenie, negację, porównania równości, nierówności, mniejszości, większości itp.
-/// - obsługiwać różne typy danych, takie jak liczby całkowite, zmiennoprzecinkowe, łańcuchy znaków itp., zgodnie z typami obsługiwanymi przez payload.
-/// - zarządzać pamięcią w sposób efektywny, aby uniknąć wycieków pamięci.
-/// - zwracać wynik wyrażenia jako obiekt typu rdb::descFldVT, który może reprezentować różne typy danych.
-/// - być zoptymalizowany pod kątem wydajności, aby nie wprowadzać nadmiernych opóźnień w przetwarzaniu wyrażeń, zwłaszcza w przypadku złożonych wyrażeń lub dużych ilości danych w payload.
-/// - obsługiwać błędy, takie jak nieprawidłowe tokeny, niezgodne typy danych, dzielenie przez zero itp., i zwracac odpowiedni blad Result w takich przypadkach.
-/// - być projektowany z myślą o łatwej integracji z innymi komponentami systemu, takimi jak streamInstance, aby umożliwić efektywne wyznaczanie wartości wyrażeń w różnych kontekstach, takich jak warunki reguł, obliczenia pól wyjściowych itp.
+/// - wykonywać operatory ADD (+), SUBTRACT (-), MULTIPLY (*), DIVIDE (/) i POWER (^) dla typów liczbowych
+///   BYTE, INTEGER, UINT, RATIONAL, FLOAT i DOUBLE; dla STRING dopuszczać ADD jako konkatenację,
+/// - obsługiwać warianty operandów BYTE (uint8_t), INTEGER (int), UINT (unsigned int), RATIONAL
+///   (boost::rational<int>), FLOAT (float), DOUBLE (double), INTPAIR (std::pair<int, int>), IDXPAIR
+///   (std::pair<std::string, int>), STRING (std::string) i NULLTYPE (std::monostate),
+/// - przed +, -, *, /, ^ i porównaniami sprowadzać operandy różnych typów do typu o wyższym indeksie
+///   descFldVT przez cast<descFldVT>; kolejność indeksów jest taka jak powyższa lista typów; arytmetyka
+///   +, -, *, / na dwóch BYTE daje INTEGER, na pozostałych zgodnych typach liczbowych zachowuje typ,
+/// - dla mieszanej pary INTEGER/UINT wykonywać +, -, *, / i porównania na dokładnych wartościach także
+///   przy ujemnym INTEGER; wynik arytmetyczny zwracać jako UINT albo NULL, jeśli nie mieści się w UINT,
+///   a porównanie jako UINT 0 lub 1; dla potęgowania takiej pary zawężać do UINT dopiero obliczony wynik,
+/// - dla BYTE, INTEGER, UINT i RATIONAL z nieujemnym całkowitym wykładnikiem liczyć potęgę jako iloczyn
+///   kolejnych czynników; dla wykładnika zero zwracać jedynkę typu znormalizowanej podstawy; pozostałe
+///   potęgi liczyć przez std::pow w double i konwertować do typu po normalizacji; NaN i nieskończoność dają NULL,
+/// - wykonywać CMP_EQUAL (=), CMP_NOT_EQUAL (!=), CMP_LT (<), CMP_GT (>), CMP_LE (<=) i CMP_GE (>=)
+///   dla liczb oraz STRING; porównania liczb zwracają 0 lub 1 w typie po normalizacji, porównania tekstu
+///   zwracają INTEGER 0 lub 1; INTPAIR i IDXPAIR w porównaniach odrzucać błędem Errc::Eval,
+/// - wykonywać NEGATE: dla INTEGER, RATIONAL, FLOAT i DOUBLE zmieniać znak, dla BYTE i UINT odwracać
+///   bity; BIT_NOT (~) dopuszczać wyłącznie dla BYTE i UINT; oba operatory przepuszczają NULL,
+/// - dla INTPAIR wykonywać +, -, *, / po obu składowych i NEGATE przez zmianę obu znaków; dla IDXPAIR
+///   ADD łączy napisy i dodaje drugie składowe, SUBTRACT/MULTIPLY/DIVIDE zwracają pierwszą składową
+///   odpowiednio "?? -"/"?? *"/"?? /" i wykonują działanie na drugich składowych, NEGATE dodaje prefiks
+///   "-" do napisu i zmienia znak drugiej składowej; POWER dla obu rodzajów par odrzucać błędem Errc::Eval,
+/// - wykonywać AND, OR i NOT w logice trójwartościowej: zero liczbowe i pusty STRING oznaczają fałsz,
+///   pozostałe wartości liczbowe i niepusty STRING prawdę; pary odrzucać błędem Errc::Eval; określony
+///   wynik ma typ pierwszego nie-null operandu (NOT: argumentu), a dla STRING jest INTEGER 0 lub 1,
+/// - obsługiwać CALL bez rozróżniania wielkości liter dla nazw Floor, Ceil, Sqrt, Round, Sin, Cos, Exp,
+///   Tan, Log, Log2, Trunc, IsNull, Null2Zero, Abs, IsZero, IsNonZero, Length, to_integer, to_float,
+///   to_double i to_string; CALL2 obsługuje wyłącznie nazwę to_string, również konwertując przez cast<descFldVT>,
+/// - dla liczbowych Floor, Ceil, Sqrt, Round, Tan, Log, Log2 i Trunc liczyć funkcję w double i konwertować
+///   wynik z powrotem do typu argumentu; Sin, Cos i Exp zwracają DOUBLE albo NULL dla wyniku niefinitywnego;
+///   Abs zachowuje typ liczbowy; IsZero i IsNonZero zwracają INTEGER 0 lub 1 dla liczb; Length zwraca
+///   długość STRING w bajtach jako INTEGER; wymienione funkcje propagują NULL i odrzucają inne typy błędem Errc::Eval,
+/// - zwracać z IsNull INTEGER 1 dla NULL i 0 dla pozostałych wartości, a z Null2Zero INTEGER 0 dla NULL
+///   i niezmieniony argument w pozostałych przypadkach; to_integer, to_float, to_double i to_string
+///   konwertują przez cast<descFldVT> do INTEGER, FLOAT, DOUBLE i STRING, propagując NULL,
+/// - odkładać na stos wartość PUSH_VAL oraz odczyt pola payload dla PUSH_ID i PUSH_ID2; tokeny WINDOW_MIN,
+///   WINDOW_MAX, WINDOW_AVG i WINDOW_SUM pobierają odpowiednio minValue, maxValue, avgValue i sumValue
+///   z przekazanej tablicy windowValues, według indeksu grupy zapisanego w tokenie.
+/// - zwalniać własną pamięć roboczą po zakończeniu eval(), również gdy wynikiem jest błąd.
+/// - zwracać wynik wyrażenia jako rdb::Result<rdb::descFldVT>, którego wartość może reprezentować różne typy danych.
+/// - zgłaszać błędem Result o kodzie Errc::Eval brak operandów, nieznane funkcje lub tokeny oraz operatory
+///   nieokreślone dla typu.
+/// - dla dzielenia przez zero oraz przepełnienia wykrytego przez checkedArith zwracać std::monostate (NULL)
+///   jako udany wynik Result.
 ///
 /// @note Każde wyrażenie składa się z operatorów i operandów, reprezentowanych jako tokeny. Wykorzystuje stos do przechowywania pośrednich wyników obliczeń. Obsługuje operatory arytmetyczne, logiczne i porównania, a także negację. Umożliwia normalizację typów operandów przed wykonaniem operacji, zapewniając zgodność typów. Może być rozszerzona o dodatkowe operatory i funkcje w przyszłości.
 /// @note W wyrażeniach mogą się pojawić wartości null, które powinny być obsługiwane zgodnie z zasadami logiki trójwartościowej (3VL). Porównanie wartości null z inną wartością zwraca null. Operacje logiczne z udziałem null są obsługiwane zgodnie z SQL 3VL: true OR null = true, false AND null = false, w pozostałych przypadkach wynik jest null (np. true AND null = null, false OR null = null).

@@ -46,6 +46,7 @@
 /// Dla typow liczbowych `rarray` wynosi zawsze 1 - wartoscia wyrazenia jest jedna liczba,
 /// nawet gdy operand byl elementem tablicy. Dla `STRING` obowiazuje zapis deskryptora
 /// `rlen = 1`, `rarray = szerokosc w bajtach`.
+/// @requirements-exempt exprShape: Opis ksztaltu wartosci; sameAs porownuje wylacznie pola rekordu.
 struct exprShape {
   rdb::descFld rtype = rdb::INTEGER;
   int rlen           = static_cast<int>(sizeof(int));
@@ -79,6 +80,7 @@ struct exprShape {
 /// inne od obu: to JEDYNY status, ktory konczy kompilacje bledem.
 enum class exprShapeStatus : std::uint8_t { resolved, unknown, illTyped, rejected };
 
+/// @requirements-exempt exprShapeResult: Wynik analizy ksztaltu; metody udostepniaja tylko zapisany status.
 struct exprShapeResult {
   exprShapeStatus status = exprShapeStatus::unknown;
   exprShape shape;

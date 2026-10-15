@@ -9,11 +9,13 @@ namespace rdb {
 
 /// @brief Implementacja binarnego magazynu POSIX z dodatkowym plikiem cienia dla operacji update.
 ///
-/// Obiekt posixBinaryFileWithShadow powinien:
+/// Obiekt klasy posixBinaryFileWithShadow powinien:
 /// - realizować append do głównego pliku danych oraz update do osobnego pliku cienia,
 /// - dzięki plikowi cienia zachowywać oryginalną, zarejestrowaną zawartość danych: aktualizacje nie nadpisują
 ///   rekordów w pliku głównym aż do jawnego wywołania merge(),
-/// - przechowywać w pliku cienia wyłącznie pary (pozycja, dane) opisujące zmiany istniejących rekordów,
+/// - przechowywać w pliku cienia pary (offset w bajtach, dane) dla operacji update,
+/// - interpretować position w read() i update jako offset w bajtach; dopisywanie wybiera pozycja
+///   std::numeric_limits<size_t>::max(),
 /// - podczas odczytu zwracać najnowszą wartość rekordu, preferując dane z pliku cienia przed danymi z pliku głównego,
 /// - przy wielokrotnych aktualizacjach tej samej pozycji traktować ostatni wpis w pliku cienia jako obowiązujący stan rekordu,
 /// - ignorować parametr nullBitset przy zapisie i czyścić go przy odczycie; obsługa wartości null jest realizowana poza tą klasą,
@@ -28,6 +30,7 @@ namespace rdb {
 ///
 /// @note Klasa nie utrzymuje osobnego indeksu zmian; wyszukiwanie aktualizacji w pliku cienia odbywa się przez przeszukiwanie wpisów od końca.
 /// @note Zwykłe operacje update nie modyfikują głównego pliku danych; fizyczne scalenie zmian następuje dopiero po wywołaniu merge().
+/// @note Update nie sprawdza, czy pozycja mieści się w pliku głównym; kontrola zakresu należy do wywołującego.
 
 class posixBinaryFileWithShadow : public FileInterface {
   std::string filename_;

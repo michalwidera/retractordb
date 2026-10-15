@@ -50,6 +50,7 @@ constexpr std::chrono::seconds kResetTransferTtl{60};
 
 /// Transfer planu w toku, per klient (db.id). Trzymany BEZ muteksu, bo dotyka go wylacznie
 /// watek komunikacyjny - IpcServer prowadzi dokladnie jedna petle odbioru komend.
+/// @requirements-exempt ResetTransfer: Stan transferu planu; obsluge porcji i terminow realizuja funkcje przeladowania.
 struct ResetTransfer {
   int expectedChunks{0};
   int receivedChunks{0};

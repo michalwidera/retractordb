@@ -9,6 +9,7 @@
 #include "constants.hpp"
 
 /// Tozsamosc systemd biezacego procesu, ustalona z /proc/self/cgroup.
+/// @requirements-exempt SystemdIdentity: Dane identyfikujace jednostke systemd i jej zakres.
 struct SystemdIdentity {
   std::optional<std::string> unit;  // nazwa jednostki, gdy proces jest jednostka systemd
   bool userScope{false};            // true => user.slice (systemctl --user), false => system
@@ -26,6 +27,7 @@ class FlockServiceGuard {
   // Service => proces jest jednostką systemd (znana nazwa unitu => możliwy systemctl restart).
   // Process => zwykły proces uruchomiony z linii poleceń.
   // Unknown => starszy/niepełny plik blokady albo brak danych.
+  /// @requirements-exempt PeerInfo: Dane wlasciciela blokady i jego uslugi, bez logiki sprawdzania blokad.
   struct PeerInfo {
     enum class Kind : std::uint8_t { Unknown, Process, Service };
     enum class Scope : std::uint8_t { Unknown, System, User };  // systemctl restart vs systemctl --user restart
@@ -97,6 +99,7 @@ class FlockServiceGuard {
 };
 
 /// Liczba usunietych pozostalosci, osobno dla kazdego rodzaju.
+/// @requirements-exempt SweepReport: Liczniki zasobow usunietych przez operacje sprzatania.
 struct SweepReport {
   std::size_t serviceLocks{0};   ///< pliki blokad instancji w katalogu blokad
   std::size_t ipcIdentities{0};  ///< blokady tozsamosci IPC razem z globalnymi obiektami IPC

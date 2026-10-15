@@ -22,7 +22,7 @@ enum FieldColumn : std::uint8_t { rname = 0, rlen = 1, rarray = 2, rtype = 3 };
 
 /// @brief Klasa opisująca układ pól rekordu oraz metadane konfiguracyjne związane z magazynem danych.
 ///
-/// Obiekt Descriptor powinien:
+/// Obiekt klasy Descriptor powinien:
 /// - przechowywać definicje pól rekordu w postaci listy opisowej (rField),
 /// - umożliwiać definiowanie pól o różnych typach, długościach i krotnościach tablicowych,
 /// - udostępniać informacje o logicznej i fizycznej strukturze danych, takie jak nazwy pól, typy, rozmiary i offsety,

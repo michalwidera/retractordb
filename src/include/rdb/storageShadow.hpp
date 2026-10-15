@@ -20,17 +20,18 @@ namespace rdb {
 ///   wartości null i przerwy w transmisji,
 /// - kierować aktualizacje rekordów (onRecordModified()) do cienia indeksu (.meta.shadow, obiekt metaShadow),
 ///   nie modyfikując głównego pliku indeksu - główny indeks pozostaje spójny z głównym plikiem danych,
-/// - podążać za plikiem cienia danych (.shadow): cień indeksu jest aktualizowany przy każdej aktualizacji
-///   rekordu oraz scalany/usuwany razem z cieniem danych, aby uniknąć rozbieżności między nimi,
 /// - przy odczycie (getNullBitset()) zwracać nadpisanie z cienia, jeśli istnieje; pozostałe rekordy prezentować
 ///   z głównego indeksu,
 /// - przy tworzeniu obiektu wczytywać istniejące nadpisania z pliku cienia indeksu (persystencja po restarcie),
 /// - udostępniać mergeShadow() scalające nadpisania (w kolejności zapisu - ostatnie nadpisanie pozycji wygrywa)
-///   do głównego indeksu i usuwające cień, lustrzanie do merge() pliku cienia danych,
-/// - udostępniać discardShadow() odrzucające cień bez scalania, lustrzanie do usunięcia pliku .shadow danych,
+///   do głównego indeksu metadanych i usuwające .meta.shadow; scalenie danych pozostawiać wywołującemu,
+/// - udostępniać discardShadow() odrzucające cień metadanych bez scalania; usunięcie cienia danych
+///   pozostawiać wywołującemu,
 /// - przy reset() (purge) czyscic glowny indeks i odrzucac cien,
 /// - przy rotacji archiwizowac glowny indeks i jego cien pod tym samym numerem co dane,
 /// - udostępniać ścieżkę pliku cienia indeksu (metaShadowFilePath()) na potrzeby porządkowania zasobów przez storage.
+/// @note mergeShadow() i discardShadow() działają wyłącznie na metadanych; wywołujący odpowiada za
+///       skoordynowanie ich z operacjami na cieniu danych; klasa nie wywołuje merge()/discard() akcesora.
 /// @note Walidacja zakresu recordIndex w onRecordModified() odbywa się względem totalRecords() głównego indeksu.
 /// @note Pozostałe wymagania (RLE, gap, persystencja głównego indeksu) dziedziczone z metaData.
 class storageShadow : public metaData {

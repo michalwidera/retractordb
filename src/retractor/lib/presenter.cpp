@@ -488,6 +488,7 @@ rdb::Result<> presenter::sequenceDiagram(int gridType, int cycleCount) {
   if (intervals.empty()) return rdb::fail(rdb::Errc::Config, "presenter: plan holds no streams - nothing to draw");
   TimeLine tl(intervals);
 
+  /// @requirements-exempt proc_t: Zbior procesow i interwal uzywane do prezentacji diagramu.
   struct proc_t {
     std::set<std::string> procSet;
     int interval;

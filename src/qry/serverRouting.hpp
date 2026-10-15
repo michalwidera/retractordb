@@ -26,12 +26,14 @@ enum class Status : std::uint8_t {
   CrossServer,     ///< zapytanie ad-hoc sięga strumieni należących do różnych instancji
 };
 
+/// @requirements-exempt Resolution: Wynik routingu; wybor instancji realizuja funkcje modulu.
 struct Resolution {
   Status status{Status::Resolved};
   std::string serverName;  ///< znaczące tylko dla Resolved
   std::string detail;      ///< gotowa treść komunikatu dla operatora
 };
 
+/// @requirements-exempt NamespaceGroup: Dane grupy instancji nalezacych do jednej przestrzeni nazw.
 struct NamespaceGroup {
   std::string name;  ///< pusta => magistrala domyslna
   std::vector<bus::InstanceInfo> instances;

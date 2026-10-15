@@ -49,6 +49,7 @@ namespace {
 /// dalej callbacki ParserListenera na kalekich kontekstach, gdzie np. ctx->name jest
 /// nullem. Rzut wychodzi z desc() przez generowany kod, bo ten lapie wylacznie
 /// RecognitionException - dlatego ten typ NIE dziedziczy po niej.
+/// @requirements-exempt DESCSyntaxError: Nosnik komunikatu bledu skladni deskryptora; bez logiki parsera.
 struct DESCSyntaxError {
   std::string message;
 };
@@ -95,6 +96,7 @@ constexpr size_t kMaxSyntaxErrorMessage = 300;
 
 }  // namespace
 
+/// @requirements-exempt LexerErrorListenerDesc: Adapter callbacku syntaxError z interfejsu listenera ANTLR4.
 class LexerErrorListenerDesc : public BaseErrorListener {
  public:
   explicit LexerErrorListenerDesc(antlr4::Parser &parser) : parser_(parser) {}
@@ -107,6 +109,7 @@ class LexerErrorListenerDesc : public BaseErrorListener {
   antlr4::Parser &parser_;
 };
 
+/// @requirements-exempt ParserErrorListenerDesc: Adapter callbacku syntaxError z interfejsu listenera ANTLR4.
 class ParserErrorListenerDesc : public BaseErrorListener {
  public:
   explicit ParserErrorListenerDesc(antlr4::Parser &parser) : parser_(parser) {}
@@ -119,6 +122,7 @@ class ParserErrorListenerDesc : public BaseErrorListener {
   antlr4::Parser &parser_;
 };
 
+/// @requirements-exempt ParserDESCListener: Implementacja callbackow DESCBaseListener generowanych przez ANTLR4.
 class ParserDESCListener : public DESCBaseListener {
   rdb::Descriptor &desc;
 

@@ -17,6 +17,7 @@
 /// nieskasowany plik `.desc` po starym strumieniu - wiec zrodlo jest jedno.
 
 /// Wynik wczytania zestawu.
+/// @requirements-exempt PlanSource: Wynik parsowania planu: status i lista instrukcji zrodlowych.
 struct PlanSource {
   /// "OK" albo komunikat parsera dla pierwszej instrukcji, ktora sie nie powiodla.
   std::string status{"OK"};
@@ -76,6 +77,7 @@ void dropStalePlanArtifacts(const qTree &plan);
                                             const std::vector<std::string> &streamNames = {});
 
 /// Wynik checkRotationCounter(): pusty `refusal` = plan bez `:ROTATION` albo licznik uzyteczny.
+/// @requirements-exempt CounterCheck: Wynik sprawdzenia licznika rotacji; sprawdzenie realizuje funkcja modulu.
 struct CounterCheck {
   bool environment{false};  ///< true: pliku nie da sie sprawdzic ani odczytac (K4); false: wadliwa tresc (K2)
   std::string refusal;

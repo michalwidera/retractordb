@@ -13,12 +13,14 @@
 
 namespace retractordb {
 
+/// @requirements-exempt Error: Nosnik kodu i komunikatu bledu klienta, bez wlasnej logiki obslugi bledu.
 class Error : public std::runtime_error {
  public:
   std::string code;
   Error(std::string code, const std::string &message);
 };
 
+/// @requirements-exempt Rational: Para licznika i mianownika; porownanie wartosci jest domyslne.
 struct Rational {
   std::int64_t numerator;
   std::int64_t denominator;
@@ -28,17 +30,20 @@ struct Rational {
 using Value = std::variant<std::monostate, std::int64_t, double, Rational, std::pair<std::int64_t, std::int64_t>,
                            std::pair<std::string, std::int64_t>, std::string>;
 
+/// @requirements-exempt Stream: Opis nazwy i interwalu strumienia zwracany przez klienta.
 struct Stream {
   std::string name;
   Rational delta;
 };
 
+/// @requirements-exempt Field: Opis nazwy, typu i krotnosci pola schematu.
 struct Field {
   std::string name;
   std::string type;
   std::size_t count;
 };
 
+/// @requirements-exempt Schema: Dane schematu strumienia zwracane przez klienta.
 struct Schema {
   std::string stream;
   Rational delta;
@@ -46,17 +51,20 @@ struct Schema {
   std::vector<Field> fields;
 };
 
+/// @requirements-exempt Record: Rekord danych odebrany przez klienta; bez logiki transmisji.
 struct Record {
   std::string stream;
   // Skalar ma jeden element, tablica zachowuje kolejnosc i NULL kazdego elementu.
   std::map<std::string, std::vector<Value>> values;
 };
 
+/// @requirements-exempt Options: Parametry uruchamiania i czasu oczekiwania klienta.
 struct Options {
   std::string xqry{"xqry"};
   std::chrono::milliseconds timeout{5000};
 };
 
+/// @requirements-exempt SubscribeOptions: Parametry limitu rekordow, czasu bezczynnosci i pojemnosci subskrypcji.
 struct SubscribeOptions {
   int limit{0};
   std::chrono::milliseconds idleTimeout{0};

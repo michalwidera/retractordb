@@ -152,6 +152,7 @@ inline constexpr std::uint32_t kService   = 1U << 5;  ///< --service albo praca 
 /// Cena skrotu: kolizja dwoch ROZNYCH sciezek bylaby falszywa odmowa startu. Przy 128 bitach
 /// i skali rzedu tysiecy sciezek na maszyne prawdopodobienstwo jest rzedu 1e-31, czyli nizsze
 /// niz przeklamanie samej pamieci.
+/// @requirements-exempt StoreDigest: Para slow skrotu sciezki; porownanie wartosci jest domyslne.
 struct StoreDigest {
   std::uint64_t high{0};
   std::uint64_t low{0};
@@ -165,6 +166,7 @@ struct StoreDigest {
 [[nodiscard]] StoreDigest storeDigest(std::string_view path);
 
 /// Opis jednej zywej instancji odczytany z magistrali.
+/// @requirements-exempt InstanceInfo: Migawka danych instancji odczytanych z magistrali.
 struct InstanceInfo {
   std::string name;  ///< pusta => instancja historyczna (bez --name)
   std::int32_t pid{0};
@@ -180,6 +182,7 @@ struct InstanceInfo {
 };
 
 /// Wlasciciel nazwy strumienia znaleziony w migawce magistrali.
+/// @requirements-exempt StreamOwner: Dane wlasciciela kolidujacej nazwy strumienia.
 struct StreamOwner {
   std::string stream;    ///< kolidujaca nazwa
   std::string instance;  ///< wlasciciel; pusta => instancja bezimienna
@@ -187,6 +190,7 @@ struct StreamOwner {
 };
 
 /// Wlasciciel pliku licznika rotacji znaleziony w migawce magistrali.
+/// @requirements-exempt CounterOwner: Dane wlasciciela kolidujacego pliku licznika rotacji.
 struct CounterOwner {
   std::string path;
   std::string instance;
@@ -195,6 +199,7 @@ struct CounterOwner {
 
 /// Wlasciciel pliku magazynu znaleziony w migawce magistrali. `path` jest sciezka Z ZAPYTANIA
 /// wolajacego -- slot niesie sam skrot, wiec to jedyna postac, ktora da sie pokazac czlowiekowi.
+/// @requirements-exempt StoreOwner: Dane wlasciciela kolidujacej sciezki magazynu.
 struct StoreOwner {
   std::string path;
   std::string instance;
@@ -233,6 +238,7 @@ enum class ClaimStatus : std::uint8_t {
   NotReserved,      ///< tylko activateReservedPlan(): przylaczona instancja bez slotu albo bez rezerwacji
 };
 
+/// @requirements-exempt ClaimResult: Wynik rezerwacji zasobow; decyzje podejmuje magistrala.
 struct ClaimResult {
   ClaimStatus status{ClaimStatus::Unavailable};
   std::string stream;     ///< kolidujaca nazwa strumienia (Conflict)
@@ -246,6 +252,7 @@ struct ClaimResult {
 };
 
 /// Komplet danych, ktore instancja publikuje w swoim slocie.
+/// @requirements-exempt ClaimRequest: Parametry rezerwacji zasobow publikowane przez instancje.
 struct ClaimRequest {
   std::string_view name;         ///< pusta => instancja historyczna (bez --name)
   std::string_view queryFile;    ///< plik zapytan, z ktorego instancja wystartowala

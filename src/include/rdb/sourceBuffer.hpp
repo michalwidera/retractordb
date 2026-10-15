@@ -18,13 +18,14 @@ enum class sourceState : std::uint8_t { empty, flux, armed };
 ///
 /// Obiekt klasy SourceBuffer powinien:
 /// - po attach(descriptor) utrzymywać komorę (chamber) - payload bieżącego rekordu odczytanego ze źródła,
-/// - realizować jedyne miejsce fizycznego odczytu ze źródła deklarowanego (readCurrent()): rekord i jego
-///   wzorzec null pochodzą z null-aware read() akcesora - źródła deklarowane przy błędzie same zwracają
-///   dane wyzerowane z wzorcem all-null, co jest logowane jako ostrzeżenie; wyjątkiem jest DEVICE (#347),
-///   którego bajty zbiera wcześniej faza DEVICE poza blokadami (rdb::awaitRecords), a read() akcesora
-///   tylko oddaje gotowy rekord albo all-null,
+/// - pobierać bieżący rekord i wzorzec null przez null-aware read() akcesora w readCurrent(); jest to
+///   jedyne miejsce fizycznego odczytu źródeł plikowych; dla DEVICE (#347) bajty zbiera wcześniej faza
+///   DEVICE poza blokadami (rdb::awaitRecords), a read() oddaje gotowy rekord albo all-null,
+/// - po EILSEQ z akcesora zwracać Errc::Config z opisem inputError(), pozostawiając payload wyjściowy
+///   bez zmian; dla pozostałych statusów przekazywać rekord i nullBitset otrzymane z akcesora,
+///   logując ostrzeżenie przy statusie różnym od EXIT_SUCCESS,
 /// - kopiować komorę do payloadu wyjściowego i do historii przez fire() - jedyne miejsce zasilania bufora
-///   historii; pojemność zero kończy się przez FatalError,
+///   historii; pojemność zero jest naruszeniem niezmiennika zgłaszanym przez RDB_ASSERT/rdb::fatal,
 /// - utrzymywać bufor historii o pojemności co najmniej 1 (setCapacity()) - spójność źródeł deklarowanych
 ///   wymaga zachowania przynajmniej bieżącego rekordu,
 /// - udostępniać rekordy historii przez history(index) dla index < size(); kontrola zakresu względem

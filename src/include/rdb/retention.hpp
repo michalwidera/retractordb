@@ -11,6 +11,7 @@ namespace rdb {
 
 using segments_t = size_t;  // silos_count
 using capacity_t = size_t;  // silos_size
+/// @requirements-exempt retention_t: Parametry retencji; przypisanie i predykat operuja tylko na ich polach.
 struct retention_t {
   segments_t segments;
   capacity_t capacity;

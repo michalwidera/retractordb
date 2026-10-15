@@ -82,28 +82,34 @@ namespace {
 
 /// Hierarchia bledow - typy C++ rzucane przez to wiazanie. Odmowy i bledy
 /// silnika (rdb::Error) maja wlasnego tlumacza.
+/// @requirements-exempt RdbError: Bazowy znacznik bledu powiazania Python; zachowanie dziedziczy ze std::runtime_error.
 struct RdbError : std::runtime_error {
   using std::runtime_error::runtime_error;
 };
 
+/// @requirements-exempt RdbNoSuchStream: Znacznik kategorii braku strumienia; bez wlasnej logiki wyjatku.
 struct RdbNoSuchStream : RdbError {
   using RdbError::RdbError;
 };
 
+/// @requirements-exempt RdbStorageError: Znacznik kategorii bledu magazynu; bez wlasnej logiki wyjatku.
 struct RdbStorageError : RdbError {
   using RdbError::RdbError;
 };
 
+/// @requirements-exempt RdbCorruptDescriptor: Znacznik kategorii uszkodzonego deskryptora; bez wlasnej logiki wyjatku.
 struct RdbCorruptDescriptor : RdbError {
   using RdbError::RdbError;
 };
 
 /// K1: zlamany niezmiennik silnika - blad w NASZYM kodzie, do zgloszenia, nie do obsluzenia.
+/// @requirements-exempt RdbInternalError: Znacznik kategorii bledu wewnetrznego; bez wlasnej logiki wyjatku.
 struct RdbInternalError : RdbError {
   using RdbError::RdbError;
 };
 
 /// K3: zly argument wywolania, ktory silnik zglosilby jako K1 (ConfigError).
+/// @requirements-exempt RdbConfigError: Znacznik kategorii bledu konfiguracji; bez wlasnej logiki wyjatku.
 struct RdbConfigError : RdbError {
   using RdbError::RdbError;
 };
@@ -122,6 +128,7 @@ struct RdbIOError : RdbError {
 /// Odczyt i blokada maja wspolnego wlasciciela. Kopia shared_ptr na czas read() chroni przed
 /// close() z innego watku, gdy readRecord zwalnia GIL; blokada schodzi dopiero po magazynie.
 struct BoundStorage {
+  /// @requirements-exempt State: Agregat wspoldzielonego stanu magazynu i jego blokady, bez wlasnych operacji.
   struct State {
     std::unique_ptr<rdb::embed::StorageGuard> guard;
     std::unique_ptr<rdb::storage> store;
@@ -139,6 +146,7 @@ struct BoundStorage {
 /// a statyki procesu (rejestry, Memory Store domyslny) dzielone przez wszystkie instancje. Pisane
 /// tylko z GIL-em (tlumacz bledow), czytane takze bez niego (engineCall pod gil_scoped_release),
 /// stad flaga atomowa wystawiana PO komunikacie.
+/// @requirements-exempt InternalFailure: Zapis pierwszego bledu wewnetrznego; obsluge realizuja funkcje powiazania Python.
 struct InternalFailure {
   std::atomic<bool> raised{false};
   std::string first;
@@ -208,6 +216,7 @@ decltype(auto) engineCall(F &&call) {
 /// pochodne. nb::exception przyjmuje jedna baze, wiec te powstaja przez
 /// PyErr_NewException; odwolania trzyma modul (atrybuty), a te wskazniki tylko
 /// je pozyczaja, wiec nie ma tu niczego do zwolnienia po Py_Finalize.
+/// @requirements-exempt PlanErrorTypes: Zestaw wskaznikow klas wyjatkow Python uzywanych przy tlumaczeniu bledow.
 struct PlanErrorTypes {
   PyObject *config    = nullptr;
   PyObject *rqlSyntax = nullptr;
@@ -331,6 +340,7 @@ nb::object toPython(const std::optional<rdb::descFldVT> &value) {
 /// nie wspoldzielenia pamieci. Widok na bufor magazynu uniewaznialby sie przy
 /// nastepnym read() i dawalby ciche czytanie cudzych danych; kopia rekordu to
 /// kilkadziesiat bajtow.
+/// @requirements-exempt Record: Para danych rekordu i jego indeksu udostepniana w Pythonie.
 struct Record {
   rdb::payload data;
   std::size_t index;

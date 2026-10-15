@@ -26,8 +26,8 @@ namespace rdb {
 /// - umożliwiać dopisywanie informacji o nowym rekordzie oraz aktualizację informacji dla rekordu już istniejącego,
 /// - kompresować kolejne rekordy o tym samym wzorcu null za pomocą prostego RLE,
 /// - utrzymywać ostatni segment RLE w pamięci i zapisywać go do pliku przy zmianie wzorca, oznaczeniu gap lub zamknięciu obiektu,
-/// - utrzymywać wszystkie segmenty RLE w pliku oprócz ostatniego, który jest w pamięci, aby umożliwić szybkie aktualizacje bez konieczności odczytu całego indeksu z pliku,
-/// - zapisywać i odtwarzać indeks z pliku tak, aby mógł być użyty po ponownym uruchomieniu programu; surowe
+/// - utrzymywać wszystkie segmenty RLE w pliku oprócz ostatniego, który jest w pamięci, aby umożliwić aktualizacje bez konieczności odczytu całego indeksu z pliku,
+/// - przy udanym I/O zapisywać i odtwarzać indeks z pliku do użycia po ponownym uruchomieniu programu; surowe
 ///   I/O pliku .meta (nagłówek, wpisy, cache) deleguje do obiektu MetaIndexStore (metaIndexStore.hpp),
 /// - umożliwiać odczyt wzorca null dla dowolnego logicznego rekordu zarejestrowanego w indeksie; dla rekordów spoza
 ///   indeksu (nullBitsetFor()) zwracać domyślny wzorzec all-false, aby wywołujący nie musiał sprawdzać zakresu,
@@ -42,12 +42,15 @@ namespace rdb {
 ///   zamykaniu magazynu),
 /// - nie przechowywać znacznika czasu dla każdego rekordu ani żadnego innego; nagłówek pliku jest 8-bajtowym polem
 ///   zarezerwowanym, zapisywanym jako zero (do 2026-09-02 niósł czas utworzenia indeksu - pole wycofane),
-/// - zarządzać własnymi zasobami w sposób bezpieczny i bez wycieków pamięci.
+/// - zwalniać własną pamięć przy niszczeniu obiektu.
 /// - przyjąć od obiektu storage informację o przerwie w transmisji danych (wraz z jej długością w jednostkach próbkowania) i zapisać ją jako wpis gap w indeksie,
 /// - przyjąć od obiektu storage informację o rotacji pliku danych i wykonać rotację indeksu: przemianować obecny plik indeksu z rozszerzeniem .old/percounter, następnie stworzyć nowy, czysty plik indeksu (bez wpisu gap), a przy zamknięciu magazynu tylko odłączyć się od pliku,
 /// - jeśli plik danych nie zrotował, przyjąć od obiektu storage informację o brakujących danych i dopisać odpowiedni wpis gap przed pierwszym nowym rekordem.
-/// - gwarantować, że plik indeksu nigdy nie zawiera przestarzałych (nadpisanych logicznie) wpisów: jeśli bieżący segment RLE został wciągnięty do pamięci w celu rozszerzenia (mechanizm lazy overwrite), każda operacja dopisująca nowe wpisy do pliku musi najpierw zastąpić ten przestarzały wpis zamiast dopisywać za nim.
-/// - udostępniać metodę wymuszającą natychmiastowy zapis pending entry na dysk (flushCurrentEntry()), aby null metadata przeżyła awarię lub otwarcie pliku przez drugi obiekt storage.
+/// - przy udanym I/O zastępować przestarzały ostatni wpis przed dopisaniem kolejnych wpisów, jeśli segment
+///   RLE został wciągnięty do pamięci w celu rozszerzenia (lazy overwrite),
+/// - udostępniać flushCurrentEntry(), które przy poprawnej inicjalizacji przekazuje oczekujący segment RLE
+///   do MetaIndexStore przez dopisanie albo nadpisanie ostatniego wpisu; metoda nie wykonuje fsync
+///   ani nie potwierdza trwałości zapisu na nośniku,
 /// - umożliwiać wyczyszczenie całej zawartości indeksu (reset()) odpowiadające wywołaniu purge() w storage - usunięcie wszystkich wpisów (wraz z licznikami maszyny gap, lecz bez wyłączania skonfigurowanej detekcji) przy zachowaniu 8-bajtowego zarezerwowanego nagłówka pliku.
 /// - udostępniać abandonFile() odłączające indeks od pliku (dalsze operacje I/O stają się no-opem) - wywoływane
 ///   przez storage dla magazynów dysponowalnych PRZED skasowaniem pliku .meta, aby destruktor (niejawny
@@ -55,6 +58,8 @@ namespace rdb {
 /// - stanowić polimorficzną bazę dla wariantów zachowania wstrzykiwanych do storage: metody onRecordModified(),
 ///   getNullBitset() i reset() są wirtualne, aby wariant magazynu z plikiem cienia danych (storageShadow,
 ///   storageShadow.hpp) mógł kierować aktualizacje do cienia indeksu bez rozgałęzień w kodzie storage.
+/// @note appendEntry(), overwriteLast() i saveHeader() nie propagują błędów I/O; flushCurrentEntry()
+///       aktualizuje stan w pamięci bez potwierdzenia zapisu, więc nie gwarantuje odtworzenia po awarii.
 /// @note Indeks przechowuje metadane o wartościach null niezależnie od binarnej zawartości rekordów w storage.
 /// @note Wpisy gap są markerami przerw transmisji danych między rekordami i nie są wliczane do numeracji logicznych rekordów zwracanej przez totalRecords().
 /// @note Interfejs klasy jest ograniczony do operacji potrzebnych do dopisywania, modyfikacji, odczytu i trwałego utrzymania indeksu null.

@@ -10,7 +10,7 @@ namespace rdb {
 
 /// @brief Implementacja magazynu rekordów przechowywanych wyłącznie w pamięci procesu.
 ///
-/// Obiekt memoryFile powinien:
+/// Obiekt klasy memoryFile powinien:
 /// - implementować interfejs FileInterface dla danych przechowywanych w pamięci,
 /// - umożliwiać zapis, odczyt i nadpisywanie rekordów binarnych o rozmiarze wyznaczonym przez Descriptor,
 /// - przechowywać rekordy, ich nullBitset i licznik zapisów w MemoryStore, indeksowane nazwą strumienia i współdzielone między ŻYWYMI instancjami o tej samej nazwie, KTÓRE DOSTAŁY TEN SAM Memory Store,

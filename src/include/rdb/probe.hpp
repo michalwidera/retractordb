@@ -61,6 +61,7 @@ constexpr bool enabled = rdb_probe_slot || rdb_probe_plan || rdb_probe_materiali
 // kosztu z błędem 258% na rodzinach niewidzianych przy dopasowaniu (K20 etap 1).
 //
 
+/// @requirements-exempt workCounters: Zestaw licznikow pracy; pomiary i aktualizacje wykonuja funkcje sondy.
 struct workCounters {
   unsigned long long agseWindows  = 0;  ///< konstrukcje okna agregatu (wywołania constructAgsePayload)
   unsigned long long agseElements = 0;  ///< odwiedziny elementów okna - praca rosnąca z długością okna
@@ -80,6 +81,7 @@ struct workCounters {
 /// Magazyn trwały i pamięciowy są liczone ROZDZIELNIE. Bez tego plan z `SUBSTRAT 'memory'`
 /// raportowałby objętość materializacji, której nigdy nie zapisał na dysk - a to jest
 /// dokładnie ta liczba, którą artykuł nazwałby „objętością materializacji".
+/// @requirements-exempt materializationCounters: Zestaw licznikow fizycznych zapisow i bajtow materializacji.
 struct materializationCounters {
   unsigned long long appends          = 0;
   unsigned long long overwrites       = 0;
@@ -109,6 +111,7 @@ struct materializationCounters {
 ///
 /// Zapis pochłonięty przez detekcję gap nie jest liczony - wynika to z położenia sondy
 /// za `metaData_->absorbAppend()`, nie z osobnej reguły tutaj.
+/// @requirements-exempt logicalWriteCounters: Zestaw licznikow logicznych zapisow strumieni i substratow.
 struct logicalWriteCounters {
   unsigned long long substrateAppends    = 0;
   unsigned long long substrateOverwrites = 0;
@@ -323,6 +326,7 @@ class slotProbe {
 ///   * tokeny programów pól (field::lProgram) - tam i TYLKO tam widać efekt R2.
 /// Ostatni składnik jest konieczny: współdzielenie równoważnych SELECT przenosi kosztowny
 /// program pól do jednego substratu, nie zmieniając ani jednego tokenu w lProgram.
+/// @requirements-exempt planShape: Dane pomiaru rozmiaru planu, bez logiki pomiarowej.
 struct planShape {
   std::size_t publicStreams = 0;
   std::size_t substrates    = 0;
@@ -333,6 +337,7 @@ struct planShape {
 /// Rozmiar buforów planu (K6, §9.2) - wynik computeRequiredCapacities(). Suma jest
 /// proporcjonalna do zajętości pamięci planu, maksimum wskazuje najgłębszy bufor,
 /// czyli ten decydujący o najgorszym przypadku.
+/// @requirements-exempt capacityShape: Dane pomiaru pojemnosci planu, bez logiki pomiarowej.
 struct capacityShape {
   std::size_t streams = 0;
   std::size_t total   = 0;

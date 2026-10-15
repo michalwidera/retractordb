@@ -38,6 +38,7 @@ inline constexpr const char *kDefaultServiceQueryFile{kBuildDefaultServiceQueryF
 ///   2. $XDG_CONFIG_HOME (lub ~/.config)/retractor/retractor.toml  (użytkownika)
 /// Każda kolejna warstwa nadpisuje klucze poprzedniej. Jawnie podana ścieżka (cliPath,
 /// flaga --config) wyłącza wyszukiwanie i wymaga istnienia oraz poprawności pliku.
+/// @requirements-exempt AppConfig: Nosnik parametrow konfiguracji; odczyt i walidacje wykonuja funkcje modulu.
 struct AppConfig {
   // === [storage] ===
 

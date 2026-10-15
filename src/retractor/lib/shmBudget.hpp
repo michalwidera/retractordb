@@ -21,6 +21,7 @@ namespace shmbudget {
 /// `known == false` znaczy "nie udalo sie ustalic", i jest to stan ROZNY od zera bajtow:
 /// wolajacy ma wtedy przepuscic operacje, a nie odmowic. Odmowa na podstawie nieudanego
 /// pomiaru zatrzymalaby prace tam, gdzie miejsca moze byc pod dostatkiem.
+/// @requirements-exempt Space: Wynik pomiaru dostepnej przestrzeni pamieci dzielonej.
 struct Space {
   bool known{false};
   std::uint64_t total{0};
@@ -53,6 +54,7 @@ struct Space {
 
 /// Koszt subskrypcji strumieni o jednym takcie. Strumienie o rownym takcie maja rowna kolejke,
 /// wiec raport grupuje je razem -- plan z pieciodziesieciu wezlow ma zwykle dwa lub trzy takty.
+/// @requirements-exempt IntervalCost: Dane kosztu kolejek dla interwalu, uzywane w raporcie budzetu.
 struct IntervalCost {
   boost::rational<int> interval;
   int elements{0};

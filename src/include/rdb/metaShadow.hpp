@@ -18,15 +18,17 @@ namespace rdb {
 /// Obiekt klasy metaShadow powinien:
 /// - przechowywać nadpisania wzorca null dla poszczególnych rekordów jako pary (indeks rekordu, wzorzec null),
 ///   nie modyfikując głównego indeksu, do którego cień się odnosi,
-/// - podążać za plikiem cienia danych (.shadow): plik cienia indeksu (<metaFilePath>.shadow) jest aktualizowany
-///   przy każdym nadpisaniu oraz scalany/usuwany razem z cieniem danych, aby uniknąć rozbieżności między nimi,
+/// - przez appendOverride() dopisywać nadpisanie do pamięci i podejmować próbę zapisu do pliku
+///   <metaFilePath>.shadow, o ile jego ścieżka nie jest pusta; koordynację z cieniem danych pozostawiać wywołującemu,
 /// - przy wielokrotnych nadpisaniach tej samej pozycji traktować ostatni zapisany wpis jako obowiązujący stan rekordu,
-/// - zapisywać i odtwarzać nadpisania z pliku tak, aby przetrwały ponowne uruchomienie programu,
+/// - przy udanym I/O zapisywać nadpisania do pliku i odtwarzać je przez load(), które zastępuje stan w pamięci,
 /// - umożliwiać scalenie nadpisań (w kolejności zapisu) do głównego indeksu przez wywołującego oraz odrzucenie
 ///   ich bez scalania, mirrorując odpowiednio merge() i usunięcie pliku .shadow danych,
 /// - udostępniać konwencję nazewnictwa pliku cienia (<metaFilePath>.shadow) jako metodę statyczną, aby inne
 ///   warstwy (np. storageShadow, storage) mogły się do niej odwołać bez duplikowania sufiksu,
-/// - zarządzać własnymi zasobami w sposób bezpieczny i bez wycieków pamięci.
+/// - zwalniać własną pamięć przy niszczeniu obiektu.
+/// @note appendOverride() zmienia pamięć przed próbą I/O i nie propaguje błędów otwarcia ani zapisu;
+///       obecność nadpisania w lookup() nie potwierdza, że można je odtworzyć po restarcie.
 /// @note Klasa nie zna pojęcia całkowitej liczby rekordów głównego indeksu ani nie waliduje zakresu
 ///       recordIndex - to odpowiedzialność wywołującego (storageShadow).
 /// @note Format wpisu na dysku jest zgodny z dawnym IndexRecord (flaga(1B) + size_t + size_t + bitset), aby

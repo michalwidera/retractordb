@@ -71,6 +71,7 @@ constexpr std::chrono::seconds kLongLockWait{10};
 #endif
 
 /// Slot jednej instancji. Wylacznie POD -- patrz komentarz naglowka.
+/// @requirements-exempt Slot: Rekord danych instancji w pamieci dzielonej; operacje realizuje magistrala.
 struct Slot {
   std::uint32_t seq;  ///< seqlock: nieparzysty => zapis w toku
   std::int32_t pid;
@@ -117,11 +118,13 @@ using BusMutex = pthread_mutex_t;
 /// a zapisaniem znacznika, w ktorym inny proces porownywalby zywy PID ze znacznikiem
 /// POPRZEDNIKA, uznal wlasciciela za martwego i przejal zamek trzymany naprawde.
 /// Zero znaczy "wolny".
+/// @requirements-exempt BusMutex: Slowo wlasciciela zapasowego zamka; operacje synchronizacji realizuje magistrala.
 struct BusMutex {
   std::uint64_t owner;
 };
 #endif
 
+/// @requirements-exempt Segment: Uklad pamieci grupujacy naglowek, stan zamka i sloty magistrali.
 struct Segment {
   std::uint64_t magic;
   std::uint32_t layoutVersion;
@@ -430,6 +433,7 @@ struct Bus::Impl {
 
   /// Wynik proby zajecia zamka. `ownerDied` znaczy, ze poprzedni wlasciciel zginal
   /// trzymajac zamek -- wtedy, i tylko wtedy, trzeba naprawic niezmiennik slotow.
+  /// @requirements-exempt LockOutcome: Wynik proby zajecia zamka: powodzenie, smierc wlasciciela i diagnostyka.
   struct LockOutcome {
     bool ok{false};
     bool ownerDied{false};

@@ -30,6 +30,7 @@ class StorageGuard {
 };
 
 /// Kontrola blokad serwisu po rozstrzygnieciu argumentu i pliku konfiguracji (#450).
+/// @requirements-exempt OfflinePolicy: Parametry kontroli dostepu offline; kontrole wykonuje checkOffline.
 struct OfflinePolicy {
   std::string lockDir;  ///< pusty => TMPDIR
   /// Jak xtrdb: odmowe daje tylko trzymany flock; wpis nieczytelny i brak katalogu nie.

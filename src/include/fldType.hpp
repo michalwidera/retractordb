@@ -57,6 +57,7 @@ constexpr auto GetStringdescFld(const enum descFld index) -> std::string_view {
   return index == NULLTYPE ? std::string_view("NULL") : magic_enum::enum_name(index);
 }
 
+/// @requirements-exempt rField: Opis pola deskryptora; konstruktor zapisuje tylko przekazane parametry.
 struct rField {
   std::string rname;
   int rlen;
@@ -91,6 +92,7 @@ inline rField flatSlotField(std::string name, descFld type, int bytes) {
 
 }  // namespace rdb
 // Support for std::visit over std::variant
+/// @requirements-exempt Overload: Agregat funktorow; udostepnia wylacznie ich odziedziczone operatory wywolania.
 template <typename... Ts>
 struct Overload : Ts... {
   using Ts::operator()...;

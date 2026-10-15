@@ -7,6 +7,7 @@
 #include "rdb/storage.hpp"
 #include "xtrdbTypes.hpp"
 
+/// @requirements-exempt CommandContext: Zestaw referencji do stanu przekazywanego obiektom komend.
 struct CommandContext {
   std::unique_ptr<rdb::storage> &dacc;
   payloadStatusType &payloadStatus;
