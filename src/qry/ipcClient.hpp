@@ -31,6 +31,17 @@ constexpr int kIpcClientDefaultResponseMaxFails = 300;
 // próbami to ipc::kClientResponsePollInterval.
 constexpr int kIpcClientDefaultResponseQueueOpenMaxFails = 100;
 
+/// Obiekt klasy IpcClient powinien:
+/// - używać nazw obiektów IPC serwera o podanej nazwie albo nazw historycznych dla nazwy pustej, a budżety prób przyjmować nie mniejsze niż 1.
+/// - w netClient wysyłać komendę z argumentem, pid procesu i numerem żądania unikalnym w obrębie procesu, także między kilkoma obiektami IpcClient, i odbierać odpowiedź wyłącznie ze slotu tego procesu (pid, czas startu procesu) i tego numeru żądania.
+/// - objąć jednym terminem, liczonym zegarem monotonicznym jako budżet prób razy interwał odpytywania, zarówno oczekiwanie na miejsce w kolejce komend, jak i oczekiwanie na odpowiedź.
+/// - zwracać odpowiedź z error.response równym server not found i ustawiać done, gdy segment odpowiedzi ma niezgodny układ, kolejka komend pozostaje pełna do terminu albo odpowiedź nie nadejdzie przed terminem.
+/// - przy błędzie systemowym IPC lub innym wyjątku ustawiać done i przekazywać wyjątek wołającemu.
+/// - w producer ponawiać otwarcie własnej kolejki odpowiedzi do wyczerpania budżetu prób albo ustawienia done, a odmowę zaufania obiektowi (ipc::security::Rejected) traktować jako brak kolejki bez ponawiania.
+/// - ustawiać responseQueueMissing wyłącznie po odmowie zaufania albo po wyczerpaniu budżetu prób otwarcia, a nie po przerwaniu oczekiwania przez wątek główny, i w każdym z tych przypadków kończyć producenta z ustawionym done.
+/// - odbierać komunikaty kolejki odpowiedzi, czekając interwał odpytywania wyłącznie przy pustej kolejce, parsować je jako dokument info i przekazywać do kolejki SPSC o pojemności kSpscQueueCapacity, czekając na miejsce bez gubienia elementów, dopóki done nie jest ustawione.
+/// - przez popQueue zwracać kolejny element odebrany przez producenta bez blokowania.
+/// - kończyć pętlę producenta po ustawieniu done przez dowolny wątek, a przy wyjątku w odbiorze zapisywać diagnostykę i ustawiać done.
 class IpcClient {
   boost::lockfree::spsc_queue<boost::property_tree::ptree, boost::lockfree::capacity<kSpscQueueCapacity>> spsc_queue_;
   int clientResponseMaxFails_{kIpcClientDefaultResponseMaxFails};

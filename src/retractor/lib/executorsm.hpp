@@ -25,6 +25,37 @@
 using ptree  = boost::property_tree::ptree;
 using vm_map = boost::program_options::variables_map;
 class dataModel;
+/// Obiekt klasy executorsm powinien:
+/// - przed wejściem w pętlę uruchamiać serwer IPC i czekać na gotowość jego zasobów, a dopiero po niej publikować opis procesu w pliku blokady, tak aby linia PID oznaczała serwer gotowy do obsługi klientów.
+/// - kończyć start kodem no_buffer_space, gdy zasobów IPC nie udało się zbudować, zamiast czekać bez końca.
+/// - w każdej niepustej epoce planu budować model danych, wykonywać krok zerowy deklaracji plikowych (bez DEVICE),
+///   a następnie w kolejnych taktach wyznaczać strumienie należne, liczyć je przez dataModel::processRows i rozsyłać ich
+///   wiersze subskrybentom; dla pustego planu działać w trybie bezczynnym bez modelu danych.
+/// - w trybie taktowanym spać do terminów slotów liczonych od wspólnej kotwicy, bez przesuwania jej po spóźnieniu;
+///   przy --realtime wywoływać rtActivate dopiero po pomyślnym rtCheckAndPrint i kontynuować także przy nieudanej aktywacji;
+///   w trybie --no-clock liczyć sloty bez czekania na zegar.
+/// - przy --xqrywait wstrzymywać obliczenia do pierwszej obsłużonej komendy klienta.
+/// - przy limicie pętli (--llimitqry) wykonywać dokładnie tyle slotów, a zatrzymanie klawiszem dopuszczać wyłącznie w przebiegu bez limitu i bez --noanykey.
+/// - przy --until-eof kończyć pracę po slocie wykrywającym koniec wejścia BINFILE lub TEXTFILE, a dla DEVICE po fazie
+///   oczekiwania, przed obliczeniem slotu; wpisywać do logu nazwę wyczerpanego źródła.
+/// - przed czytaniem modelu w taktach zbierać rekordy należnych źródeł DEVICE z terminem efektywnym (tryb bez zegara, klauzula TIMEOUT, konfiguracja, 0).
+/// - obsługiwać komendy hello (odpowiedź world), get (lista strumieni z parametrami), detail (schemat, okres, lokalizacja, pojemność, liczba rekordów i zapytanie strumienia), show (subskrypcja klienta), adhoc, kill (zatrzymanie pętli) oraz reset-begin, reset-chunk i reset-commit.
+/// - na get, detail, show i adhoc odpowiadać przy braku planu odpowiedzią braku planu, a w trakcie zamykania odpowiedzią zamykania serwera, a dla nazwy spoza planu error.response z nazwą strumienia.
+/// - w show odmawiać subskrypcji z error.response, gdy epoka planu skończyła się w trakcie subskrypcji, tak aby klient nie pozostał zarejestrowany na strumieniu planu, który już nie działa.
+/// - zamieniać wyjątek obsługi komendy na error.response bez kończenia procesu, a złamany niezmiennik silnika w komendzie zgłaszać odpowiedzią engine error z wpisem krytycznym w logu.
+/// - w adhoc kompilować zapytanie na kopii planu, roszczyć nowe nazwy na magistrali i importować je do działającego planu, a przy każdej porażce po imporcie przywracać plan i zwalniać roszczone zasoby; reguły DO SYSTEM odrzucać w tym kanale bezwarunkowo.
+/// - przyjmować plan kanałem --reset w porcjach z ograniczoną liczbą porcji, rozmiarem tekstu i liczbą równoczesnych transferów, a przy reset-commit sprawdzać go jak przy starcie (parsowanie, kompilacja, limity, licznik rotacji, rozłączność na magistrali) i rezerwować jego zasoby bez zmiany działającego planu.
+/// - odrzucać w kanale --reset plan z regułą DO SYSTEM, chyba że konfiguracja ustawia service.unrestricted.
+/// - po przyjęciu planu --reset kończyć bieżącą epokę rozesłaniem znacznika końca pracy subskrybentom i zastępować plan
+///   nowym; błąd ponownego parsowania lub kompilacji w applyPendingPlan zastępować pustym planem (tryb bezczynny).
+/// - w razie nieudanej budowy modelu danych, także po --reset, kończyć run kodem EIO dla Errc::IO albo EPROTO dla
+///   pozostałych błędów, zapisując przyczynę w initializationError.
+/// - przy aktywacji zasobów nowego planu kończyć proces przez FatalError z kodem EXIT_FAILURE dla statusu NotReserved;
+///   przy Unavailable kontynuować, a gdy magistrala jest dołączona, ostrzegać o braku publikacji nowego planu
+///   i kontroli unikalności nazw.
+/// - błąd odczytu lub rezerwacji numeru licznika rotacji zgłaszać jako Errc::IO i kończyć wykonanie kodem EIO;
+///   błąd wykonania slotu zgłaszać z zatrzymaniem pętli i kodem odpowiadającym jego kategorii.
+/// - przy SIGINT, SIGTERM, SIGHUP i zatrzymaniu pętli rozsyłać subskrybentom znacznik końca pracy i zatrzymywać wątek komunikacyjny przed zwróceniem kodu wyjścia.
 struct executorsm {
   /// Odmowa budowy modelu wraca do launchera, ktory dla K2 woluje refusePlan (#474).
   rdb::Refusal initializationError;

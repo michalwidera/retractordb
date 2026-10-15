@@ -281,7 +281,7 @@ struct ClaimRequest {
 /// Obiekt klasy Bus powinien:
 /// - przy konstrukcji zajmować współdzieloną blokadę pliku obecności przed otwarciem segmentu i podłączać się do segmentu o podanej nazwie, tworząc go wyłącznie w trybie createIfMissing, a przy niepowodzeniu przechodzić w stan niepodłączony bez przerywania startu serwera.
 /// - raportować przez attached, czy segment jest odwzorowany.
-/// - w claim, pod muteksem magistrali, zwalniać poprzedni slot tej instancji, a następnie zajmować wolny lub martwy slot wyłącznie wtedy, gdy nazwy strumieni, ścieżka licznika :ROTATION i skróty ścieżek magazynu są rozłączne ze wszystkimi żywymi instancjami i żadna żywa instancja nie pracuje w trybie usługowym, gdy żąda go ta instancja.
+/// - w claim po kontroli limitów zwalniać poprzedni slot tej instancji, a następnie pod muteksem magistrali zajmować wolny lub martwy slot wyłącznie wtedy, gdy nazwy strumieni, ścieżka licznika :ROTATION i skróty ścieżek magazynu są rozłączne ze wszystkimi żywymi instancjami i żadna żywa instancja nie pracuje w trybie usługowym, gdy żąda go ta instancja; przy TooLarge i przy niepodłączonej magistrali zachowywać poprzedni slot.
 /// - zwracać z claim odpowiednio Conflict, CounterConflict, StoreConflict albo ServiceConflict z kolidującym zasobem i jego właścicielem, TooLarge przy przekroczeniu pojemności slotu lub długości pól rozstrzygających, NoFreeSlot przy braku wolnego slotu i Unavailable, gdy magistrali nie da się użyć.
 /// - obcinać zbyt długie pola informacyjne (nazwa jednostki, plik zapytań) z ostrzeżeniem w logu zamiast odmawiać startu.
 /// - uznawać slot za żywy wyłącznie, gdy proces o jego pid istnieje, nie jest zombie i ma ten sam czas startu, a slot martwy traktować jako wolny bez demona i heartbeatów.

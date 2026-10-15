@@ -37,6 +37,24 @@ inline constexpr std::string_view kInternalCompilerError = "internal compiler er
 /// Czy status compile() opisuje blad wewnetrzny kompilatora, a nie blad planu.
 [[nodiscard]] bool isInternalCompilerError(std::string_view status);
 
+/// Obiekt klasy compiler powinien:
+/// - przez compile zwracać OK albo status błędu planu, a złamany niezmiennik kompilatora zgłaszać statusem z przedrostkiem kInternalCompilerError, nigdy wyjątkiem.
+/// - przed rozwinięciem generatorów odrzucać nieznane funkcje, niepoprawną arność i odwołania pól w reduktorach strumieni.
+/// - podczas rozwijania odrzucać niepoprawne generatory, a po ich rozwinięciu, przed wydzieleniem substratów, odrzucać
+///   odwołania FROM do strumieni spoza planu i okna AGSE o niedodatnim kroku.
+/// - rozwijać generatory strumieni do N instancji i odrzucać plan, który po rozwinięciu przekracza limit liczby strumieni.
+/// - sprowadzać każdą klauzulę FROM do jednego operatora strumieniowego przez wydzielenie strumieni pośrednich (substratów) o nazwach mieszczących się w budżecie długości, i odrzucać różne programy pod tą samą nazwą substratu.
+/// - rozwijać wieloznaczniki schematu, rozwiązywać interwały strumieni, odwołania pól i okna rekordowe, wyznaczać typy pól i odrzucać warunki reguł o niewłaściwym kształcie.
+/// - wyliczać dla każdego węzła origin i ogon dokładną arytmetyką wymierną, odrzucając plan z węzłem bez wyliczonej wartości.
+/// - wyznaczać pojemność historii każdego strumienia wymaganą przez konsumentów i odrzucać plan przekraczający budżet
+///   pamięci historii ustawiony przez setHistoryMemoryBudget; domyślną retencję dyskową z setDefaultRetention stosować
+///   do niedeklarowanych strumieni w magazynach DEFAULT i DIRECT bez własnego RETENTION.
+/// - zwracać plan w porządku topologicznym, w którym każdy producent poprzedza swoich konsumentów, niezależnie od tego, które optymalizacje zadziałały.
+/// - stosować optymalizacje faktoryzacji przesunięć przez przeplot, deduplikacji substratów, upraszczania wyrażeń i współdzielenia równoważnych SELECT wyłącznie za odpowiednim przełącznikiem RDB_OPT_*, tak aby wyłączenie każdego z nich nie zmieniało wartości wyników, a ogon co najwyżej wydłużało.
+/// - po każdej optymalizacji sprawdzać, że nazwy pól widoczne dla użytkownika nie zmieniły się, i odrzucać plan, gdy zmieniły się.
+/// - przez importFrom dopisywać do planu węzły źródła nieobecne w nim, z pominięciem dyrektyw, zwracać ich nazwy i ograniczać współdzielenie SELECT w następnej kompilacji do tych węzłów, tak aby nie przepisać istniejących instancji strumieni.
+/// - przez reset kasować stan zebrany podczas kompilacji, zachowując powiązanie z tym samym planem, tak aby kompilacja nowego planu nie widziała strumieni poprzedniego.
+/// - przez unboundedDiskStreams zwracać strumienie wynikowe zapisywane na dysku bez granicy retencji wraz z powodem.
 struct compiler {
   explicit compiler(qTree &coreInstance) : coreInstance(coreInstance) {};
   compiler() = delete;
