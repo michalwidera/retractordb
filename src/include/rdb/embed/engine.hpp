@@ -45,6 +45,37 @@ namespace rdb::embed {
 /// @note Obiekt jest NIEPRZENOSNY i NIEKOPIOWALNY celowo. storage trzyma surowy wskaznik na
 ///       MemoryStore tego silnika; przeniesienie Engine przesunieloby Memory Store i zostawiloby kazdy
 ///       zbudowany magazyn ze wskaznikiem na pustke.
+/// Obiekt klasy Engine powinien:
+/// - posiadać własny MemoryStore używany przez model planu i przez magazyny tworzone przez openStorage, tak aby strumienie MEMORY o tych samych nazwach w różnych instancjach nie współdzieliły danych.
+/// - zapewniać stabilny adres własnego MemoryStore przez wyłączenie kopiowania i przenoszenia Engine.
+/// - tworzyć instancję wyłącznie przez fabrykę create zwracającą Result, rozstrzygając OfflinePolicy z argumentów i jawnie wskazanej konfiguracji przed utworzeniem katalogu prywatnego, tak aby odmowa konfiguracji nie pozostawiała utworzonego katalogu.
+/// - przy tworzeniu bez storageDir zakładać prywatny katalog tymczasowy i przy niszczeniu instancji podejmować jego usunięcie po uzyskaniu blokady, pozostawiając katalog zajęty przez innego użytkownika magazynu.
+/// - zachowywać katalog prywatny po close dla ponownej kompilacji oraz pozostawiać katalog podany przez użytkownika po zniszczeniu Engine.
+/// - przed budową nowego planu zamykać poprzedni plan, a po odmowie compile pozostawać bez aktywnego planu.
+/// - przyjmować tekst RQL przez wspólną ścieżkę parsowania i kompilacji oraz publikować nowy plan dopiero po utworzeniu jego modelu danych i osi czasu.
+/// - zgłaszać odmowę parsera jako Errc::Syntax, wewnętrzny błąd kompilatora jako Errc::Logic, a odmowę kompilatora, plan bez instrukcji lub bez strumieni oraz odmowę kontroli planu przed budową modelu, w tym brak katalogu dyrektywy STORAGE i źródło niewłaściwego rodzaju, jako Errc::Compile, a odmowę środowiskową tych kontroli jako Errc::IO.
+/// - odrzucać dyrektywę ROTATION, źródła DEVICE oraz akcje reguł DUMP i SYSTEM jako Errc::Compile przed wykonaniem planu.
+/// - używać dyrektywy STORAGE z RQL przed domyślnym katalogiem instancji i udostępniać przez storageDir bezwzględną ścieżkę katalogu aktywnego planu, a bez planu domyślny katalog instancji.
+/// - przed wymianą artefaktów uzyskiwać wyłączną blokadę katalogu przez StorageGuard i utrzymywać ją do zamknięcia planu, sprawdzać ścieżki artefaktów oraz odrzucać źródła znajdujące się wewnątrz katalogu wyników.
+/// - odmawiać planu w katalogu zajętym przez inną instancję, także wskazanym dyrektywą STORAGE lub aliasem ścieżki, jako Errc::Config z EBUSY, bez wpływu na plan instancji trzymającej katalog.
+/// - odmawiać przejęcia katalogu zawierającego obce artefakty bez znacznika własności jako Errc::Compile, bez modyfikacji tych artefaktów.
+/// - przy planie korzystającym z katalogu innego niż własny domyślny katalog prywatny sprawdzać blokady usługi zgodnie z OfflinePolicy instancji.
+/// - odrzucać brak zadeklarowanego pliku źródłowego jako Errc::IO z kodem systemowym zamiast zastępować brak wejścia rekordami NULL.
+/// - przy każdym compile, dopiero po uzyskaniu blokady katalogu i zakończeniu kontroli niezmieniających plików, usuwać deskryptory i metadane deklaracji oraz artefakty poprzedniego przebiegu planu, tak aby odmowa we wcześniejszej kontroli zachowywała poprzednie artefakty, a przyjęty plan czytał nowe źródła i liczył wyniki od początku.
+/// - udostępniać ostrzeżenia o przestarzałych formach z ostatniej udanej kompilacji, każde z numerem wiersza planu, najpierw dla deklaracji FILE, potem dla notacji przyrostkowej, czyszcząc poprzednie ostrzeżenia przy rozpoczęciu kolejnego compile i nie publikując ostrzeżeń odrzuconego planu.
+/// - przy pierwszym step wykonać krok zerowy deklaracji, a następnie wykonywać po jednym slocie logicznej osi czasu przez model danych, bez oczekiwania na zegar ścienny i bez uruchamiania obsługi IPC lub terminala.
+/// - po udanym slocie zwracać jego kolejny indeks od zera, zwiększać slotsDone oraz udostępniać wymierny czas tego slotu przez time.
+/// - przy untilEof włączonym czytać źródła deklarowane bez zawijania, a po wykryciu w slocie końca któregokolwiek wejścia zwrócić indeks tego slotu z ważnymi wynikami, oznaczyć endOfInput i w kolejnych step zwracać nullopt bez dalszego przeliczania.
+/// - przy untilEof wyłączonym czytać źródła deklarowane z zawijaniem i nie kończyć planu z powodu końca wejścia, pozostawiając liczbę slotów pod kontrolą hosta.
+/// - zwracać obsługiwalne odmowy i błędy wykonania przez Result bez kończenia procesu hosta, zachowując kategorię i kod systemowy błędu przekazane przez warstwę, która go wykryła.
+/// - po błędzie Result z wykonania slotu oznaczać plan jako failed i odmawiać kolejnych kroków z kategorią, kodem systemowym i przyczyną pierwszego błędu oraz numerem slotu, w którym plan się zatrzymał, aż do compile lub close, pozostawiając możliwość odczytu dostępnych wyników.
+/// - udostępniać identyfikatory strumieni planu bez dyrektyw w kolejności wykonania, ich schematy, rozróżnienie deklaracji i wyników SELECT oraz liczniki zapisanych rekordów.
+/// - zwracać z schema wskaźnik do deskryptora magazynu strumienia, ważny do close lub kolejnego compile.
+/// - wyznaczać retainedFrom jako najstarszy nadal dostępny indeks postępujący, uwzględniając ograniczoną historię deklaracji i pojemność magazynów MEMORY.
+/// - zwracać z record niezależną kopię rekordu wraz z informacją NULL, odrzucając indeksy spoza zakresu od retainedFrom do liczby zapisanych rekordów jako Errc::Config i nie zużywając kolejnego rekordu źródła podczas odczytu historii deklaracji.
+/// - zwracać z project kopię wybranych elementów numerycznych jako wektor double w kolejności wierszy i wskazanych pól, odwzorowując NULL na NaN oraz odrzucając jako Errc::Config niepoprawne zakresy, indeksy pól i odczytane wartości nienumeryczne.
+/// - odmawiać operacji wymagających planu, gdy planu nie ma, oraz operacji wskazujących nieznany strumień przez Errc::Config.
+/// - wykonywać close idempotentnie, niszcząc model i magazyny przed zwolnieniem blokady katalogu oraz przywracając stan bez planu z zerowym licznikiem slotów i czasem oraz wyłączonymi endOfInput i failed.
 class Engine {
  public:
   /// @param storageDir katalog magazynu dla planu, ktory nie niesie wlasnej dyrektywy :STORAGE
