@@ -75,6 +75,7 @@ template <ErrorClass Cls, typename... Args>
 // The struct+CTAD idiom allows std::source_location as a defaulted trailing
 // parameter alongside a variadic template - impossible with a plain function.
 // Format string is checked at compile time via fmt::format_string<Args...>.
+/// @requirements-exempt FatalError: Adapter CTAD terminateProcess dla kategorii Internal, bez wlasnego stanu i logiki.
 template <typename... Args>
 struct FatalError {
   [[noreturn]] FatalError(fmt::format_string<Args...> fmt_str, Args &&...args,
@@ -88,6 +89,7 @@ FatalError(fmt::format_string<Args...>, Args &&...) -> FatalError<Args...>;
 
 /// K4: srodowisko odmowilo (plik, dysk, pamiec dzielona). Konczy proces kodem EIO i nie
 /// podnosi zatrzasku fatalErrorRaised, wiec usluga wstaje po nim z tym samym planem.
+/// @requirements-exempt EnvironmentError: Adapter CTAD terminateProcess dla kategorii Environment, bez wlasnego stanu i logiki.
 template <typename... Args>
 struct EnvironmentError {
   [[noreturn]] EnvironmentError(fmt::format_string<Args...> fmt_str, Args &&...args,

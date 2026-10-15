@@ -55,6 +55,7 @@ constexpr std::string_view kResponseQueuePrefix = "brcdbr";
 // Pusta nazwa serwera daje dokładnie nazwy historyczne (jednoserwerowe). To jest celowe:
 // sama parametryzacja niczego nie zmienia w zachowaniu, a rozdział obszarów włącza się
 // dopiero wtedy, gdy ktoś poda nazwę niepustą.
+/// @requirements-exempt ServerNames: Nosnik nazw obiektow IPC; responseQueue tylko dokleja id klienta do gotowego prefiksu.
 struct ServerNames {
   std::string shmemSegment;
   std::string queryQueue;
