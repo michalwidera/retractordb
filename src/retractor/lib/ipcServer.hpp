@@ -28,6 +28,21 @@
 /// sciezka FatalError konczy proces przez std::exit, ktory NIE uruchamia
 /// destruktorow, wiec sprzatanie musi byc osiagalne z handlera atexit --
 /// patrz shutdownFromExitHandler().
+/// Obiekt klasy IpcServer powinien:
+/// - wyznaczać nazwy wszystkich swoich obiektów IPC z nazwy serwera ustawionej przed start i używać wyłącznie ich przy tworzeniu, emisji i usuwaniu, tak aby nie usunąć obiektów innego serwera.
+/// - w start uruchamiać wątek komunikacyjny, który usuwa pozostałości własnych obiektów tylko po kontroli zaufania, tworzy segment odpowiedzi i kolejkę komend, a następnie wywołuje onReady albo, gdy zasobów nie da się zbudować, onFailure, dokładnie jedno z nich.
+/// - odbierać komendy z kolejki do chwili, gdy shouldStop zwróci prawdę, odrzucać z wpisem w logu komendę bez poprawnego db.id, przekazywać pozostałe do onCommand, po obsłudze wywoływać onCommandHandled i publikować odpowiedź w slocie adresata (pid, czas startu procesu, db.seq).
+/// - zamieniać wyjątek z onCommand na odpowiedź error.response bez przerywania wątku, a błąd pojedynczego komunikatu kończyć jego odrzuceniem z wpisem w logu.
+/// - odtwarzać kolejkę komend porzuconą przez proces zmarły z jej blokadą (not_recoverable) zamiast kończyć obsługę komend.
+/// - w subscribe sprawdzać przed utworzeniem kolejki klienta, czy pamięć dzielona ma na nią miejsce, zgłaszając brak wyjątkiem z wyceną, a następnie zastępować poprzednią kolejkę klienta nową i rejestrować go na strumieniu wyłącznie wtedy, gdy epoka rejestru nie zmieniła się od expectedEpoch, w przeciwnym razie usuwać utworzoną kolejkę i zwracać fałsz.
+/// - nie trzymać blokady map klienckich podczas tworzenia kolejki klienta.
+/// - w broadcast formatować wiersz strumienia najwyżej raz na wywołanie i tylko gdy strumień ma subskrybenta, wysyłać go bez blokowania do każdego subskrybenta, a klienta z pełną lub porzuconą kolejką wyrejestrowywać i usuwać jego kolejkę.
+/// - pomijać emisję wiersza dłuższego niż slot kolejki odpowiedzi, zgłaszając to w logu jeden raz na strumień, bez wyjątku.
+/// - w broadcastOutOfBusiness wysyłać każdemu subskrybentowi znacznik końca pracy, usuwać kolejki klientów, czyścić rejestr i zwiększać epokę rejestru; removeClientQueues zwiększa ją tak samo.
+/// - w stop dołączać wątek komunikacyjny, a w removeAllObjects usuwać segment odpowiedzi, kolejkę komend i kolejki wszystkich zarejestrowanych klientów.
+/// - w shutdownFromExitHandler odpinać wątek komunikacyjny, gdy wywołanie pochodzi z niego samego, w przeciwnym razie czekać na jego zakończenie najwyżej 2 s, a następnie usuwać obiekty globalne i kolejki klientów, te ostatnie tylko gdy blokadę map da się wziąć bez czekania.
+/// - po ogłoszeniu gotowości kończyć wątek komunikacyjny przy nieobsłużonym wyjątku z wpisem w logu, bez ponownego wywołania onReady ani onFailure.
+/// - uniemożliwiać kopiowanie obiektu.
 class IpcServer {
  public:
   using ptree = boost::property_tree::ptree;

@@ -228,6 +228,13 @@ class metaData {
   ///   dirty == false, committedCount == 0  →  no tracked last entry (initial / after reset)
   ///   dirty == false, committedCount  > 0  →  on-disk tail is valid; may be re-absorbed on same-pattern append
   ///   dirty == true                        →  on-disk tail is stale; must overwrite before next append
+  /// Obiekt klasy DiskTailState powinien:
+  /// - rozpoczynać i po reset pozostawać w stanie bez śledzonego wpisu: committedCount równe 0 i dirty wyłączone.
+  /// - przez markWritten(n) zapamiętywać liczbę rekordów ostatniego wpisu zapisanego na dysk i oznaczać ten wpis jako aktualny.
+  /// - przez markDirty oznaczać wpis na dysku jako nieaktualny i zerować committedCount, tak aby shouldOverwrite zwracało prawdę do kolejnego markWritten lub reset.
+  /// - przez clearPending zerować committedCount bez zmiany znacznika dirty.
+  /// - zwracać z shouldOverwrite wartość dirty, a z hasPending prawdę wyłącznie przy dodatnim committedCount.
+  /// - nie wykonywać żadnego I/O; decyzję o nadpisaniu lub dopisaniu wpisu podejmuje metaData.
   struct DiskTailState {
     size_t committedCount{0};  ///< recordCount of the last entry written to disk (0 = none)
     bool dirty{false};         ///< on-disk tail entry is stale; must overwrite, not append

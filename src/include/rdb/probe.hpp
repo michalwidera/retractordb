@@ -252,13 +252,22 @@ void logicalWriteReset();
 /// Sonda slotu: CSV z czasem obliczeń i latencją end-to-end, analizowany przez
 /// examples/ecg/e1_stats.py. Kolumny:
 ///   compute_ns  - czas processRows() (E1, czysty rdzeń obliczeń),
-///   wake_lag_ns - spóźnienie pobudki względem deadline'u interwału (kotwica + interwał;
+///   wake_lag_ns - spóźnienie pobudki względem deadline'u slotu (kotwica + termin slotu;
 ///                 ten sam cel, do którego dąży rtAbsoluteSleep) - jitter planisty,
 ///   e2e_ns      - od deadline'u (nominalny moment pojawienia się krotki wejściowej
 ///                 w modelu czasowym) do końca emisji wyniku do kolejek IPC.
 /// Aktywna dopiero, gdy `RDB_BENCH_CSV` wskazuje plik wyjściowy. Pętla śpi do tego samego
 /// deadline'u w każdym trybie taktowanym, więc wake_lag/e2e nie kumulują dryfu także bez `-t`;
 /// `-t` zmienia tylko szeregowanie (SCHED_FIFO, mlockall, powinowactwo CPU).
+/// Obiekt klasy slotProbe powinien:
+/// - w buildzie bez sondy slotu (rdb_probe_slot równe false) nie wykonywać żadnej operacji w open, anchor, beginSlot, beginCompute, endCompute, endSlot ani w destruktorze.
+/// - w open otwierać do zapisu plik wskazany przez zmienną RDB_BENCH_CSV i zapisywać nagłówek iter,compute_ns,wake_lag_ns,e2e_ns, a bez tej zmiennej lub przy nieudanym otwarciu pozostawać nieuzbrojoną bez wpływu na pracę usługi.
+/// - w anchor zapamiętywać kotwicę osi czasu, względem której wołający planuje sen slotu.
+/// - w beginSlot zapamiętywać chwilę pobudki i termin slotu równy kotwicy powiększonej o przekazane przesunięcie w milisekundach.
+/// - w beginCompute i endCompute zapamiętywać granice czasu obliczeń slotu.
+/// - w endSlot dopisywać wiersz z kolejnym numerem slotu od zera, czasem obliczeń, spóźnieniem pobudki względem terminu oraz czasem od terminu do końca emisji wyniku, wszystkie w nanosekundach.
+/// - w uzbrojonej sondzie nie zapisywać niczego, gdy plik nie został otwarty.
+/// - zamykać plik CSV przy zniszczeniu i uniemożliwiać kopiowanie sondy.
 class slotProbe {
  public:
   slotProbe() = default;
@@ -279,9 +288,10 @@ class slotProbe {
     if constexpr (rdb_probe_slot) setAnchor(origin);
   }
 
-  /// Początek slotu: moment pobudki i deadline wyliczony z kotwicy oraz interwału [ms].
-  [[gnu::always_inline]] void beginSlot(long intervalMs) {
-    if constexpr (rdb_probe_slot) markWake(intervalMs);
+  /// Początek slotu: moment pobudki i deadline = kotwica + @p deadlineMs (termin slotu w ms
+  /// od kotwicy - ten sam, który dostaje rtAbsoluteSleep).
+  [[gnu::always_inline]] void beginSlot(long deadlineMs) {
+    if constexpr (rdb_probe_slot) markWake(deadlineMs);
   }
 
   [[gnu::always_inline]] void beginCompute() {
@@ -301,7 +311,7 @@ class slotProbe {
   void openCsv();
   void closeCsv();
   void setAnchor(const std::timespec &origin);
-  void markWake(long intervalMs);
+  void markWake(long deadlineMs);
   void markComputeBegin();
   void markComputeEnd();
   void writeRow();
@@ -403,6 +413,12 @@ capacityShape shapeOfCapacities(const CapacityMap &capacities) {
 /// więc jej koszt zależy od rozmiaru planu, a ten różni się między profilami ablacyjnymi
 /// - bez odjęcia profil o większym planie wyglądałby na wolniejszy częściowo z powodu
 /// własnego pomiaru.
+/// Obiekt klasy planProbe powinien:
+/// - w buildzie bez sondy planu (rdb_probe_plan równe false) nie wykonywać żadnej operacji w konstruktorze, capture ani report.
+/// - przy konstrukcji uzbrajać się wyłącznie, gdy ustawiona jest zmienna RDB_BENCH_PLAN, zerować liczniki przepisań R1, R2 i R3 oraz zapamiętywać początek pomiaru kompilacji.
+/// - w nieuzbrojonej sondzie nie zdejmować migawek i nie wypisywać raportu.
+/// - przez capture zapamiętywać dla wskazanego etapu (entry, preDedup, postDedup, exit) liczbę strumieni publicznych, substratów, tokenów FROM i tokenów programów pól, z pominięciem dyrektyw kompilatora, i doliczać czas migawki do kosztu sondy.
+/// - przez report zdejmować migawkę etapu exit, a następnie wypisywać na stderr wiersze PLAN bench (cztery migawki i stan deduplikacji), REWRITE_APPLIED (r1, liczba węzłów z R2, r3), COMPILE_NS z czasem kompilacji pomniejszonym o koszt sondy oraz PLAN capacity (liczba strumieni, suma i maksimum pojemności).
 class planProbe {
  public:
   [[gnu::always_inline]] planProbe() {

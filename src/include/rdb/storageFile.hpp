@@ -41,6 +41,14 @@ inline constexpr mode_t kStreamFileMode = 0666;
 
 /// @brief Deskryptor pliku magazynu zamykany w destruktorze; zastepuje std::fstream, ktory nie
 ///        przyjmuje deskryptora (a __gnu_cxx::stdio_filebuf nie istnieje w libc++ na macOS).
+/// Obiekt klasy StorageFd powinien:
+/// - otwierać plik przez openStorageFile z podanymi flagami i trybem, zawsze z O_CLOEXEC i bez podążania za dowiązaniem symbolicznym w ostatnim komponencie ścieżki, chyba że wołający jawnie przekaże followFinalLink.
+/// - przy odmowie otwarcia dowiązania (ELOOP) zostawiać obiekt nieotwarty, a errno równe ELOOP po zapisie diagnostyki.
+/// - raportować przez isOpen, czy deskryptor został otwarty.
+/// - przez size zwracać rozmiar pliku z fstat albo -1 przy błędzie.
+/// - przez write i writeAt zapisywać całość bufora, ponawiając po EINTR i po zapisie częściowym, i zwracać fałsz przy błędzie lub zapisie zerowym; writeAt zapisuje od wskazanej pozycji bez zmiany pozycji pliku.
+/// - przez readAt czytać od wskazanej pozycji do zapełnienia bufora albo do końca pliku, ponawiając po EINTR, i zwracać liczbę przeczytanych bajtów albo -1 przy błędzie.
+/// - zamykać posiadany deskryptor przy zniszczeniu i uniemożliwiać kopiowanie, tak aby deskryptor miał jednego właściciela.
 class StorageFd {
   int fd_;
 

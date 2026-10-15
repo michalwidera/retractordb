@@ -13,6 +13,7 @@
 ///
 /// Uwaga przy podnoszeniu Boosta: gdyby biblioteka dodała własny std::formatter dla rational,
 /// poniższa specjalizacja przestanie się kompilować i trzeba ją wtedy usunąć.
+/// @requirements-exempt std::formatter<boost::rational<IntType>,char>: Formatter std::format; kontrakt w komentarzu wyzej.
 template <typename IntType>
 struct std::formatter<boost::rational<IntType>, char> {
   constexpr auto parse(std::format_parse_context &ctx) { return ctx.begin(); }
@@ -21,6 +22,7 @@ struct std::formatter<boost::rational<IntType>, char> {
   }
 };
 
+/// @requirements-exempt fmt::formatter<boost::rational<IntType>,char>: Blizniak formattera std::format dla fmt.
 template <typename IntType>
 struct fmt::formatter<boost::rational<IntType>, char> {
   constexpr auto parse(fmt::format_parse_context &ctx) { return ctx.begin(); }

@@ -71,6 +71,10 @@ inline std::pair<rdb::descFld, int> reductionResultField(rdb::descFld sourceType
 /// `valueType` ustala KOMPILACJA (typ pola albo najszerszy typ pol wyrazenia, przepuszczony
 /// przez reductionResultField), bo dla wyrazenia nie ma jednego wpisu deskryptora, z ktorego
 /// mozna go odczytac w wykonaniu.
+/// Obiekt klasy windowGroup powinien:
+/// - przechowywać strumień źródłowy, szerokość okna w rekordach, typ wartości redukcji oraz albo slot płaski pola źródła, albo program wyrażenia liczonego na każdym rekordzie okna.
+/// - traktować pusty program jako odczyt slotu wprost, a niepusty program jako wyrażenie, przy którym slot nie ma znaczenia.
+/// - przez sameAs uznawać dwie grupy za identyczne wyłącznie przy równym źródle, szerokości i typie wartości oraz równym slocie dla grup bez programu albo równych co do polecenia i wartości tokenach programu dla grup z programem.
 struct windowGroup {
   std::string source;                      ///< strumien zrodlowy (nazwa fizyczna po ekspansji generatorow)
   int slot  = 0;                           ///< slot plaski pola w rekordzie zrodla; nieuzywany, gdy `program` niepusty
@@ -125,6 +129,17 @@ inline std::string_view sourceKindKeyword(sourceKind kind) {
   return "";
 }
 
+/// Obiekt klasy query powinien:
+/// - przechowywać nazwę, interwał, plik źródła, schemat pól z programami, program FROM, grupy okien rekordowych, reguły, retencję, politykę magazynu oraz wyniki kompilacji: ogon, origin i liczność generatora.
+/// - traktować węzeł z pustym programem FROM jako deklarację źródła, węzeł o nazwie z przedrostkiem STREAM_ jako strumień generowany przez kompilator, a węzeł o nazwie zaczynającej się od dwukropka jako dyrektywę kompilatora.
+/// - przez isReductionRequired zwracać prawdę, gdy program FROM zawiera więcej niż jeden operator strumieniowy, wliczając reduktory AVG, MIN, MAX i SUMC.
+/// - przez getDepStream zwracać nazwy strumieni z tokenów PUSH_STREAM programu FROM w kolejności programu.
+/// - przez descriptorStorage budować deskryptor magazynu z pól schematu, a dla deklaracji dołączać REF z plikiem i TYPE z rodzaju źródła (BINFILE, TEXTSOURCE, DEVICE), dla SELECT zaś RETENTION przy zdefiniowanej retencji oraz RETMEMORY i TYPE przy polityce MEMORY.
+/// - przez storageType zwracać typ z polityki tylko wtedy, gdy polityka go wybiera (pojemność różna od zera i nazwa inna niż DEFAULT), a w przeciwnym razie STORAGE z planu.
+/// - przez descriptorFrom budować deskryptor wejścia operatora FROM: dla reduktorów jedno pole o typie wyniku redukcji, dla przeplotu złożenie deskryptorów składników, dla AGSE abs(długość) pól płaskich o najszerszym typie źródła, a dla pozostałych operatorów pola źródeł z niezerową długością.
+/// - przez reset czyścić identyfikator, nazwę pliku, schemat, program FROM i ostrzeżenia oraz przywracać wartości początkowe interwału, flag, rodzaju źródła, numeru wiersza deklaracji, generatora, policy, retention i timeoutSeconds.
+/// - traktować wywołanie getFieldIndex dla pola spoza schematu jako błąd w kodzie wołającego (rdb::fatal).
+/// - porządkować węzły według interwału operatorem <.
 class query {
   void fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &val, const std::string &id);
 

@@ -684,3 +684,74 @@ INSTANTIATE_TEST_SUITE_P(StorageBoundaries, DumpManagerHistoryTest,
                                            DumpHistoryCase{3, "RETENTION 4 STORAGE MEMORY"},
                                            DumpHistoryCase{3, "RETENTION 1 4 STORAGE DEFAULT"},
                                            DumpHistoryCase{3, "RETENTION 1 4 STORAGE DIRECT"}));
+
+struct DumpPastRangeCase {
+  int left;
+  int right;
+  const char *storageClause;
+};
+
+void PrintTo(const DumpPastRangeCase &testCase, std::ostream *out) {
+  *out << "DUMP " << testCase.left << " TO " << testCase.right << ", " << testCase.storageClause;
+}
+
+class DumpManagerPastRangeTest : public DumpManagerFileTest, public ::testing::WithParamInterface<DumpPastRangeCase> {
+ protected:
+  qTree plan;
+  std::unique_ptr<dataModel> model;
+
+  void SetUp() override {
+    DumpManagerFileTest::SetUp();
+    const auto inputFile = sandBoxFolder / "input.bin";
+    std::ofstream(inputFile, std::ios::binary).write("\0\0\0\0", 4);
+    const auto [status, keyword, streamName] =
+        parserRQLString(plan, "STORAGE '" + sandBoxFolder.string() + "'\nDECLARE value INTEGER STREAM src, 1 BINFILE '" +
+                                  inputFile.string() + "'\nSELECT src[0] STREAM result FROM src " + GetParam().storageClause +
+                                  "\nRULE capture ON result WHEN result[0] >= 10 DO DUMP " + std::to_string(GetParam().left) +
+                                  " TO " + std::to_string(GetParam().right) + "\n");
+    ASSERT_EQ(status, "OK");
+    ASSERT_EQ(compiler(plan).compile(), "OK");
+    model = rdbtest::ok(dataModel::create(plan));
+    pProc = model.get();
+  }
+
+  void TearDown() override {
+    pProc = nullptr;
+    model.reset();
+    DumpManagerFileTest::TearDown();
+  }
+};
+
+// Zakres DUMP jest polotwarty [left, right) wzgledem rekordu biezacego (0). Przy prawej granicy
+// <= 0 lezy w calosci w historii i jest gotowy w chwili wyzwolenia: `DUMP -5 TO -2` to rekordy
+// -5, -4, -3. Do 2026-10 registerTask zrzucal zawsze historie do -1, a dla prawej granicy ujemnej
+// konczyl proces przez rdb::fatal przy pierwszym wyzwoleniu reguly.
+TEST_P(DumpManagerPastRangeTest, past_only_range_dumps_exactly_its_history_records) {
+  auto &runtime       = *model->qSet.at("result");
+  auto &output        = *runtime.outputPayload;
+  const auto dumpPath = sandBoxFolder / "result_capture_dump.tmp";
+
+  for (std::int32_t value = 1; value <= 14; ++value) {
+    output.getPayload()->setItem(0, value);
+    ASSERT_EQ(rdbtest::ok(output.write()), rdb::WriteStatus::Ok);
+    ASSERT_RDB_OK(runtime.constructRulesAndUpdate(plan.getQuery("result")));
+    if (value < 10) continue;
+
+    // Regula bez RETENTION odtwarza plik przy kazdym wyzwoleniu, wiec plik niesie zakres
+    // ostatniego - i nic wiecej: zadanie zakonczone przy wyzwoleniu nie dopisuje kolejnych slotow.
+    std::vector<std::int32_t> expected;
+    for (auto offset = GetParam().left; offset < GetParam().right; ++offset)
+      expected.push_back(value + offset);
+    const std::string expectedBytes(reinterpret_cast<const char *>(expected.data()), expected.size() * sizeof(expected[0]));
+    std::ifstream dump(dumpPath, std::ios::binary);
+    ASSERT_TRUE(dump.is_open());
+    const std::string actualBytes(std::istreambuf_iterator<char>{dump}, std::istreambuf_iterator<char>{});
+    EXPECT_EQ(actualBytes, expectedBytes) << "trigger=" << value;
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(PastRanges, DumpManagerPastRangeTest,
+                         ::testing::Values(DumpPastRangeCase{-5, -2, "STORAGE MEMORY"},
+                                           DumpPastRangeCase{-5, 0, "STORAGE MEMORY"},
+                                           DumpPastRangeCase{-1, 0, "STORAGE MEMORY"},
+                                           DumpPastRangeCase{-3, -2, "RETENTION 1 4 STORAGE DIRECT"}));
