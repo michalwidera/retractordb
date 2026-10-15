@@ -95,7 +95,12 @@ Result<> StorageGuard::initialize(const std::string_view directory, const bool c
     if (!empty) return planError("Engine requires an empty directory or an owned embedded storage: " + directory_);
     const StorageFd owner(marker, O_WRONLY | O_CREAT | O_EXCL, 0600);
     if (!owner.isOpen()) return ioError(marker, errno);
-    if (!owner.write(std::as_bytes(std::span(kOwnerText)))) return ioError(marker, errno != 0 ? errno : EIO);
+    if (!owner.write(std::as_bytes(std::span(kOwnerText)))) {
+      const int err = errno != 0 ? errno : EIO;
+      // Niepelny znacznik utworzony wyzej pod blokada pustego katalogu zablokowalby katalog na stale.
+      ::unlink(marker.c_str());
+      return ioError(marker, err);
+    }
   } else {
     if (!S_ISREG(info.st_mode) || info.st_uid != ::geteuid() || info.st_nlink != 1)
       return planError("invalid embedded storage owner marker: " + marker);

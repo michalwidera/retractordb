@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <sys/resource.h>
+
 #include <cerrno>
+#include <csignal>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -13,6 +16,7 @@
 #include "fatalError.hpp"
 #include "rdb/descriptor.hpp"
 #include "rdb/embed/engine.hpp"
+#include "rdb/embed/storageGuard.hpp"
 #include "rdb/memoryStore.hpp"
 #include "rdbResult.hpp"
 
@@ -337,6 +341,30 @@ TEST(embedEnginePlan, foreign_artifacts_are_preserved) {
   ASSERT_RDB_OK(engine.compile(doublingPlan("ownership_source.txt")));
   while (rdbtest::ok(engine.step())) {}
   EXPECT_EQ(firstValue(rdbtest::ok(engine.record("dst", 1))), 8);
+}
+
+// RLIMIT_FSIZE ponizej dlugosci tresci znacznika: zapis czesciowy, potem EFBIG. Niepelny znacznik
+// zostawal w katalogu i kazde nastepne przejecie konczylo sie Errc::Compile ("invalid ... marker").
+TEST(embedStorageGuard, failed_marker_write_leaves_directory_claimable) {
+  const std::string directory = rdbtest::ok(rdb::embed::temporaryStorageDirectory());
+  rlimit saved{};
+  ASSERT_EQ(::getrlimit(RLIMIT_FSIZE, &saved), 0);
+  rlimit tight               = saved;
+  tight.rlim_cur             = 4;
+  const auto previousHandler = std::signal(SIGXFSZ, SIG_IGN);
+  ASSERT_EQ(::setrlimit(RLIMIT_FSIZE, &tight), 0);
+  const auto refused = rdb::embed::StorageGuard::create(directory, true);
+  ASSERT_EQ(::setrlimit(RLIMIT_FSIZE, &saved), 0);
+  std::signal(SIGXFSZ, previousHandler);
+
+  ASSERT_RDB_ERROR(refused, rdb::Errc::IO);
+  EXPECT_EQ(refused.error().err(), EFBIG);
+  EXPECT_TRUE(std::filesystem::is_empty(directory));
+  {
+    const auto guard = rdbtest::ok(rdb::embed::StorageGuard::create(directory, true));
+    EXPECT_TRUE(guard->ownsDirectory());
+  }
+  rdb::embed::removeTemporaryStorage(directory);
 }
 
 // Serwis daje przy braku zrodla rekordy NULL (#346); silnik osadzony zwraca Errc::IO
