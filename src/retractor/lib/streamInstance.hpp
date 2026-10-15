@@ -17,10 +17,33 @@
 /// Obiekt klasy streamInstance powinien:
 /// - być inicjalizowany z instancją qTree i query, na podstawie których będzie tworzył zawartość rekordów (payload).
 /// - w trakcie inicjalizacji powinna być możliwość dodania dodatkowego parametru, np. ścieżki do katalogu, w którym będą przechowywane dane (storagePathParam).
-/// - tworzyć payloady na podstawie zapytań, w tym agregacje i dozwolone operacje na polach.
-/// - zarządzać regułami aktualizacji danych zgodnie z definicjami w query.
-/// - współpracować z klasą dumpManager do rejestrowania i wykonywania zadań dumpowania danych (akcja DUMP); wywołania systemowe (akcja SYSTEM) są wykonywane bezpośrednio.
-/// - łączyć dane wejściowe (inputPayload) z logiką zapytania, aby generować dane wyjściowe (outputPayload) gotowe do zapisania w magazynie.
+/// - obsługiwać redukcje liczbowych pól bieżącego rekordu STREAM_MIN (MIN), STREAM_MAX (MAX), STREAM_SUM (SUMC)
+///   i STREAM_AVG (AVG), obejmujące wszystkie sloty płaskie, w tym elementy tablic, z pominięciem null;
+///   zwracać minimum, maksimum, sumę lub sumę podzieloną przez liczbę wartości nie-null, a przy braku takich
+///   wartości null; wynik dla BYTE, INTEGER, UINT i RATIONAL ma typ RATIONAL, dla FLOAT lub DOUBLE zachowuje typ,
+/// - przez reduceRecordWindow() wyznaczać MIN, MAX, SUMC i AVG z jednej wartości pola group.slot albo
+///   wyrażenia group.program na rekord, w zakresie lastLogicalIndex - (group.width - 1) do lastLogicalIndex;
+///   pomijać null i niedostępne rekordy, liczyć średnią z liczby pozostałych wartości, a przy zerowej liczbie
+///   zwracać null dla wszystkich agregatów; typ wyniku group.valueType należy do RATIONAL, FLOAT i DOUBLE,
+/// - przez constructAgsePayload() budować okno długości abs(length) ze spłaszczonych pozycji źródła
+///   windowIndex * step - (abs(length) - 1) do windowIndex * step; dla length > 0 umieszczać najnowszy
+///   element jako pierwszy, dla length < 0 zachowywać kolejność napływu; brakujące elementy oznaczać null,
+/// - wyrażenia pól i warunki reguł wykonywać przez expressionEvaluator: +, -, *, /, ^, NEGATE, BIT_NOT (~),
+///   porównania =, !=, <, >, <=, >=, AND, OR i NOT, wywołania CALL/CALL2 i odczyty pól; wyniki okien
+///   udostępniać wyrażeniom pól przez windowValues; zakres typów operandów, nazw funkcji i konwersji
+///   określa kontrakt expressionEvaluator,
+/// - przez constructRulesAndUpdate() oceniać reguły qry.lRules na kopii bieżącego payloadu wyjściowego,
+///   gdy getRecordsCount() >= armAtCount; warunek null, zero liczbowe lub pusty STRING nie uruchamia akcji,
+///   niezerowa liczba albo niepusty STRING uruchamia akcję, a wynik INTPAIR/IDXPAIR zwraca Errc::Eval,
+/// - dla prawdziwego warunku DUMP rejestrować w dumpManager zadanie z nazwą reguły, dumpRange i dump_retention;
+///   dla SYSTEM wywoływać systemCommand przez ::system(), logując nieudane wywołanie lub zakończenie z błędem;
+///   po ocenie reguł, także gdy lista jest pusta, wywoływać dumpManager::processStreamChunk(qry.id);
+///   błędy ewaluacji, rejestracji zadania lub przetwarzania zrzutu propagować w Result,
+/// - przez constructOutputPayload(fields) obliczać kolejne programy field.lProgram z inputPayload
+///   i windowValues, wynik pozycji i konwertować przez cast<descFldVT> do outputPayload->descriptor[i].rtype
+///   i zapisywać do slotu i przez setItemVT(); wynik null lub nieudana konwersja oznaczają null pola;
+///   po udanym obliczeniu wszystkich pól zwracać sukces bez dopisywania rekordu do magazynu, co należy
+///   do wywołującego; błąd przerywa obliczenia i wraca w Result, bez cofania wcześniej ustawionych pól.
 
 struct streamInstance {
   qTree &coreInstance;

@@ -44,6 +44,7 @@ namespace rdb {
 
 /// Klasy odmowy zachowane z aktualnej granicy silnika (K1-K5).
 enum class ErrorClass : std::uint8_t { Internal, Plan, Request, Environment, Data };
+/// @requirements-exempt Refusal: Nosnik kategorii, komunikatu i errno odmowy.
 struct Refusal {
   ErrorClass cls{ErrorClass::Plan};
   std::string message;
@@ -92,6 +93,7 @@ enum class Errc : std::uint8_t {
 ///
 /// Komunikat alokuje dopiero wtedy, gdy blad naprawde powstaje - sciezka bez bledu nie buduje
 /// zadnego napisu. Typ jest przenoszony, nie kopiowany, przez cala droge do granicy.
+/// @requirements-exempt Error: Nosnik kodu, komunikatu i errno bledu; metody udostepniaja zapisane dane.
 class Error {
  public:
   Error(Errc code, std::string message, int err = 0) noexcept : code_(code), message_(std::move(message)), err_(err) {}

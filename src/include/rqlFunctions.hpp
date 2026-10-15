@@ -33,6 +33,7 @@
 ///   zla szerokosc pola w deskryptorze.
 namespace rdb {
 
+/// @requirements-exempt RqlFunction: Rekord katalogu funkcji RQL: nazwy i dopuszczalna liczba argumentow.
 struct RqlFunction {
   std::string_view canonical;
   int minArgs;

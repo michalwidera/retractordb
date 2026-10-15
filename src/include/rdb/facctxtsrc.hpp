@@ -13,9 +13,15 @@ namespace rdb {
 
 /// @brief Implementacja tekstowego źródła danych działającego wyłącznie w trybie odczytu sekwencyjnego.
 ///
-/// Obiekt textSourceRO powinien:
+/// Obiekt klasy textSourceRO powinien:
 /// - odczytywać kolejne rekordy z pliku tekstowego i interpretować je zgodnie z dostarczonym Descriptor,
-/// - wspierać pola liczbowe, tekstowe oraz pola NULL zgodnie z zakresem obsługiwanym przez implementację,
+/// - obsługiwać pola danych BYTE, INTEGER, UINT, FLOAT, DOUBLE, STRING i NULLTYPE; dla BYTE, INTEGER i UINT
+///   czytać dziesiętny zapis całkowity mieszczący się odpowiednio w uint8_t, int i unsigned int, z opcjonalnym
+///   znakiem '+' przed cyfrą, a znakiem '-' tylko dla INTEGER; dla FLOAT i DOUBLE czytać przez operator>>
+///   std::istringstream zapis dziesiętny lub wykładniczy mieszczący się w float albo double, odrzucając inf i nan;
+///   token liczbowy musi być odczytany w całości, a niedomiar FLOAT/DOUBLE może dać zero,
+/// - dla STRING czytać token rozdzielany białymi znakami albo tekst między podwójnymi cudzysłowami bez
+///   interpretacji sekwencji escape; zapisywać najwyżej rlen * rarray bajtów i dopełniać krótszy tekst zerami,
 /// - implementować interfejs FileInterface, pozostając źródłem tylko do odczytu; metoda write(...) zawsze zwraca ENOTSUP,
 /// - obsługiwać informację o wartościach null przez nullBitset powiązany z wewnętrznym obiektem payload,
 /// - traktować brak tokenu lub token `null`/`NULL`/`Null` jako wartość null dla odpowiedniego pola,
@@ -23,8 +29,12 @@ namespace rdb {
 /// - po osiągnięciu końca pliku wracać do początku, jeśli włączono loopToBeginningIfEOF,
 /// - po osiągnięciu końca pliku przy wyłączonym loopToBeginningIfEOF zwracać kolejne rekordy jako wyzerowane dane z nullBitset ustawionym na same wartości true,
 /// - w tym samym przypadku zgłaszać wyczerpanie wejścia przez exhausted(), bo rekord all-null jest nieodróżnialny od danych,
-/// - w przypadku błędu otwarcia pliku lub błędu odczytu zwracać dane wyzerowane z nullBitset ustawionym na same wartości true,
-/// - zliczać wykonane odczyty i zwracać ich liczbę przez count(),
+/// - przy błędzie otwarcia pliku lub błędzie I/O rozpoznanym przed parsowaniem rekordu zwracać dane
+///   wyzerowane z nullBitset ustawionym na same wartości true,
+/// - dla tokenu innego niż null/NULL/Null w polu NULLTYPE zwracać EILSEQ i opis przez inputError(),
+///   bez publikowania częściowo zbudowanego rekordu do ptrData i nullBitset,
+/// - zliczać odczyty zakończone przekazaniem rekordu, także all-null, i zwracać ich liczbę przez count();
+///   odczyt przerwany przez EILSEQ nie zwiększa licznika,
 /// - czytać wyłącznie plik zwykły (#346): ścieżkę innego rodzaju odrzucać przez initializationError(),
 ///   sprawdzając ją przez stat() przed otwarciem, żeby FIFO bez pisarza nie zablokowało open().
 /// - traktować token liczbowy niepoprawny (nieodczytany w całości albo poza zakresem typu pola) jako null pola

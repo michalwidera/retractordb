@@ -23,6 +23,7 @@ class PersistentCounter {
   /// Odczyt pliku licznika bez rezerwacji numeru. Rozdziela przyczyne: brak pliku jest stanem
   /// poprawnym, nieudane sprawdzenie, otwarcie lub odczyt to srodowisko (K4), a odczytana w
   /// calosci tresc, ktora nie jest nieujemna liczba, to wadliwy stan wejsciowy planu (K2).
+  /// @requirements-exempt Reading: Wynik odczytu licznika: stan, wartosc i diagnostyka.
   struct Reading {
     enum class State : std::uint8_t { Missing, Value, Unreadable, Invalid };
     State state{State::Missing};

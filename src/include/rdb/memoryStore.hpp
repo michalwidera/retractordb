@@ -18,6 +18,7 @@ namespace rdb {
 /// samym `map::operator[]` 3,75 % instrukcji slotu na planie ADD-owym i 4,86 % na potoku EKG,
 /// nie licząc udziału w `__memcmp_avx2` na porównaniach kluczy. Jeden węzeł na strumień znosi
 /// cały ten rachunek: wyszukanie jest JEDNO i zapada w konstruktorze memoryFile.
+/// @requirements-exempt memoryBucket: Agregat rekordow i licznikow magazynu MEMORY; operacje realizuje memoryFile.
 struct memoryBucket {
   std::vector<std::vector<uint8_t>> data;
   std::vector<std::vector<bool>> nulls;

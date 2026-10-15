@@ -16,7 +16,7 @@ namespace rdb {
 
 /// @brief Implementacja binarnego źródła danych działającego wyłącznie w trybie odczytu sekwencyjnego.
 ///
-/// Obiekt binaryDeviceRO powinien:
+/// Obiekt klasy binaryDeviceRO powinien:
 /// - odczytywać kolejne porcje surowych danych binarnych o długości wyznaczonej przez Descriptor,
 /// - używać Descriptor wyłącznie do określenia długości rekordu i rozmiaru wektora nullBitset,
 /// - składać rekord z krótkich odczytów i ponawiać wywołanie systemowe przerwane przez EINTR,
@@ -135,6 +135,7 @@ class binaryDeviceRO : public FileInterface {
 };
 
 /// Jedno źródło fazy DEVICE i jego termin, liczony od początku należnego slotu.
+/// @requirements-exempt deviceWait: Parametry oczekiwania na zrodlo DEVICE: wskaznik zrodla i termin.
 struct deviceWait {
   binaryDeviceRO *source;
   std::chrono::steady_clock::time_point deadline;

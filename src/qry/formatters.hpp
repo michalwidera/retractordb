@@ -17,6 +17,7 @@ class Formatter {
   /// Jedna WARTOSC wiersza: pole, ktore ja niesie, jej pozycja w tym polu i krotnosc pola.
   /// Serwer splaszcza tablice (jedna wartosc na element, nie na pole), wiec sama lista pol
   /// ze schematu przestala opisywac wiersz -- kolumny sa jej rozwinieciem.
+  /// @requirements-exempt Column: Opis kolumny odpowiedzi: pole, indeks elementu i szerokosc.
   struct Column {
     std::string field;
     int index;

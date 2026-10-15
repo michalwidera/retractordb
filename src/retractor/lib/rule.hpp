@@ -7,6 +7,7 @@
 
 #include "token.hpp"
 
+/// @requirements-exempt rule: Opis warunku i akcji reguly; konstruktor jedynie zapisuje jej dane.
 struct rule {
   std::string name;
   std::list<token> condition;

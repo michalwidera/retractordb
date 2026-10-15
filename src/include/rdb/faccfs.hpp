@@ -9,15 +9,14 @@ namespace rdb {
 /**
  * @brief Implementacja prostego magazynu binarnego otwierającego plik osobno przy każdej operacji.
  *
- * Obiekt `genericBinaryFile` powinien:
+ * Obiekt klasy genericBinaryFile powinien:
  * - realizować odczyt i zapis rekordów binarnych o długości wyznaczonej przez `Descriptor`,
  * - implementować interfejs `FileInterface`,
  * - obsługiwać dopisywanie danych przy `position == std::numeric_limits<size_t>::max()`,
  * - obsługiwać zapis i odczyt od wskazanej pozycji w pliku dla operacji update/read,
  * - ignorować parametr `nullBitset` przy zapisie i czyścić go przy odczycie,
  * - zwracać przez `count()` liczbę rekordów wynikającą z rozmiaru pliku,
- * - udostępniać niepolimorficzne przeciążenia bez parametru `nullBitset` przez `using FileInterface::write; using FileInterface::read;`,
- * - pełnić rolę wewnętrznej implementacji dostępu do danych binarnych, a nie publicznego typu wysokiego poziomu.
+ * - udostępniać niepolimorficzne przeciążenia bez parametru `nullBitset` przez `using FileInterface::write; using FileInterface::read;`.
  *
  * @note Klasa nie utrzymuje osobnych metadanych null ani dodatkowego mechanizmu trwałości poza samym zapisem do pliku.
  * @note Purge przez `write(nullptr, ..., 0)` opróżnia plik (plik pozostaje, ma 0 bajtów).

@@ -12,14 +12,15 @@ namespace rdb {
 
 /// @brief Abstrakcyjny interfejs operacji wejścia/wyjścia dla magazynów używanych przez storage.
 ///
-/// Klasa dziedzicząca po FileInterface powinna:
+/// Obiekt klasy FileInterface powinien:
 /// - udostępniać wspólny kontrakt odczytu, zapisu i raportowania liczby rekordów niezależnie od rodzaju magazynu,
 /// - obsługiwać dane binarne o rozmiarze określanym poza tym interfejsem, zwykle przez Descriptor klasy pochodnej,
 /// - przyjmować nullBitset jako kanał przekazywania informacji o wartościach null dla pojedynczego rekordu, jeśli dana implementacja takie informacje wspiera,
 /// - umożliwiać dopisywanie danych przez przekazanie pozycji równej std::numeric_limits<size_t>::max(),
-/// - interpretować pozostałe wartości position zgodnie z kontraktem danej implementacji; dla większości magazynów losowego dostępu oznacza to pozycję w bajtach,
-/// - móc ograniczać dopuszczalne wartości position w przypadku źródeł sekwencyjnych, które nie wspierają losowego dostępu,
-/// - zwracać przez count() liczbę rekordów lub inną implementacyjnie zdefiniowaną miarę postępu zgodną z semantyką danej klasy pochodnej,
+/// - interpretować position w odczycie i aktualizacji magazynu losowego dostępu jako przesunięcie w bajtach;
+///   w read() źródła sekwencyjnego dopuszczać wyłącznie position == 0,
+/// - oddzielać w count() wynik typu size_t od błędu przez Result<size_t>; gdy ustalanie rozmiaru pliku
+///   kończy się ENOENT, zwracać 0, a pozostałe błędy odczytu rozmiaru zwracać jako Errc::IO,
 /// - raportować przez hasShadow(), czy magazyn utrzymuje plik cienia danych (.shadow) dla operacji update;
 ///   na tej podstawie storage dobiera wariant indeksu metadanych null (storageShadow zamiast metaData),
 ///   niezależnie od tego, czy magazyn w ogóle posiada indeks metadanych.
@@ -30,6 +31,7 @@ namespace rdb {
 /// 3. `write(data, nullBitset, position)` zapisuje rekord pod wskazaną pozycją zgodnie z semantyką implementacji.
 ///
 /// @note FileInterface nie narzuca sposobu przechowywania rekordu ani obowiązkowej obsługi nullBitset; definiuje jedynie wspólną postać wywołań.
+/// @note Źródła sekwencyjne mogą ograniczać dopuszczalne wartości position; ich zakres określa kontrakt klasy pochodnej.
 
 struct FileInterface {
   /// @brief Null-aware write: stores data and associated null bitset in the storage.
@@ -101,8 +103,7 @@ struct FileInterface {
   /// a `return 0` po błędzie innym niż ENOENT znaczyło "magazyn pusty", więc storage::write
   /// dopisywał od indeksu 0 po istniejących danych. Obie odpowiedzi są gorsze od zatrzymania.
   ///
-  /// @return liczba rekordów, albo inna miara postępu właściwa implementacji (patrz opis klasy);
-  ///         błąd odczytu rozmiaru jako Errc::IO
+  /// @return licznik rekordów zgodny z wymaganiami klasy pochodnej; błąd odczytu rozmiaru jako Errc::IO
   [[nodiscard]] virtual Result<size_t> count() = 0;
 
   /// @brief Powod, dla ktorego konstruktor nie otworzyl magazynu; pusty napis = akcesor gotowy.

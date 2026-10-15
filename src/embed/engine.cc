@@ -42,6 +42,7 @@ namespace rdb::embed {
 /// model i os czasu trzymaja referencje do drzewa, wiec drzewo stoi pierwsze i niszczy sie ostatnie -
 /// ta sama zasada, ktorej pilnuje EpochPublication w executorsm.cpp, tutaj egzekwowana ukladem
 /// struktury.
+/// @requirements-exempt Engine::Plan: Agregat stanu planu; operacje i cykl wykonania realizuje Engine.
 struct Engine::Plan {
   // Zwalnia sie PO modelu i wszystkich jego magazynach.
   std::unique_ptr<StorageGuard> guard;

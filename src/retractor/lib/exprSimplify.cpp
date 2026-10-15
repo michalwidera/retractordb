@@ -103,6 +103,7 @@ std::optional<rdb::descFldVT> foldConstants(const std::list<token> &program) {
 }
 
 /// Ogon postaci `(E op c)` albo `(c op E)` - materiał dla reguł B i C.
+/// @requirements-exempt constantTail: Opis stalego ogona wyrazenia przekazywany regulom upraszczania.
 struct constantTail {
   command_id op;                         ///< operacja węzła: ADD, SUBTRACT albo MULTIPLY
   rdb::descFldVT constant;               ///< stały operand
@@ -113,6 +114,7 @@ struct constantTail {
 
 #if aggressive_expr_optimization
 /// Podwyrażenie zwinięte już do postaci `E ^ k` - materiał dla reguły D.
+/// @requirements-exempt powerForm: Opis podstawy i wykladnika potegi, bez logiki przepisywania wyrazenia.
 struct powerForm {
   std::list<token> base;  ///< program podwyrażenia E
   int exponent;           ///< wykładnik, zawsze >= 2
@@ -120,6 +122,7 @@ struct powerForm {
 #endif
 
 /// Węzeł drzewa wyrażenia odtworzonego ze strumienia ONP.
+/// @requirements-exempt node: Dane wezla analizy wyrazenia; przeksztalcenia wykonuja funkcje upraszczania.
 struct node {
   std::list<token> program;
   std::optional<rdb::descFldVT> constant;  ///< wartość, gdy CAŁE podwyrażenie jest stałe
@@ -517,6 +520,7 @@ namespace {
 /// Wartość na stosie wnioskowania typu wyniku: napis o znanej szerokości albo liczba.
 /// Liczba wchodząca w konkatenację ma szerokość 0 - tak samo, jak liczyła ją reguła
 /// sprzed 2026-08-30, więc szerokości pól w istniejących planach się nie zmieniają.
+/// @requirements-exempt inferredValue: Wynik analizy rodzaju wartosci i szerokosci napisu.
 struct inferredValue {
   bool isString;
   int width;

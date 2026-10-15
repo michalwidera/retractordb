@@ -97,6 +97,7 @@ struct windowGroup {
 /// `count` liczy wartości NIE-NULL. NULL-e są pomijane (nie zerowane), a okno bez ani
 /// jednej wartości daje NULL we wszystkich czterech polach - zasada brzegu: brak wyniku
 /// nie jest zerem.
+/// @requirements-exempt windowStats: Agregat wynikow redukcji okna; obliczenia wykonuje dataModel.
 struct windowStats {
   rdb::descFldVT minValue{std::monostate{}};
   rdb::descFldVT maxValue{std::monostate{}};
@@ -243,6 +244,7 @@ class query {
 bool operator<(const query &lhs, const query &rhs);
 
 /// Efektywny termin odczytu zrodla DEVICE i to, skad pochodzi (#347).
+/// @requirements-exempt deviceTimeout: Wartosc terminu DEVICE i informacja o pochodzeniu ustawienia.
 struct deviceTimeout {
   double seconds = 0.0;
   /// "RQL", "config", "default" albo "no-clock" - do wpisu w logu przy starcie epoki.

@@ -46,6 +46,7 @@ constexpr size_t kAgseWindowSignChildIndex = 5;
 /// Sam powrot z listenera nie zalatwia sprawy: ANTLR wchodzi wtedy w odzyskiwanie i wola
 /// dalej callbacki ParserListenera na kalekich kontekstach, gdzie np. ctx->ID() jest nullem.
 /// Rzut wychodzi z prog() przez generowany kod, bo ten lapie wylacznie RecognitionException.
+/// @requirements-exempt RQLSyntaxError: Nosnik komunikatu bledu skladni RQL; bez logiki parsera.
 struct RQLSyntaxError {
   std::string message;
 };
@@ -53,6 +54,7 @@ struct RQLSyntaxError {
 /// Zlamany niezmiennik listenera (abortInternal). Rzucany tylko WEWNATRZ tego pliku i lapany w
 /// parserRQLString() - tak jak RQLSyntaxError NIE dziedziczy po antlr4::RecognitionException,
 /// bo wygenerowany kod parsera lapie ten typ i polknalby rzut w odzyskiwaniu po bledzie.
+/// @requirements-exempt RQLInternalError: Nosnik komunikatu bledu wewnetrznego parsera; bez wlasnej obslugi bledu.
 struct RQLInternalError {
   std::string message;
 };
@@ -160,6 +162,7 @@ std::optional<T> parseLiteral(const std::string &text) {
 
 // https://stackoverflow.com/questions/44515370/how-to-override-error-reporting-in-c-target-of-antlr4
 
+/// @requirements-exempt LexerErrorListener: Adapter callbacku syntaxError z interfejsu listenera ANTLR4.
 class LexerErrorListener : public BaseErrorListener {
  public:
   LexerErrorListener(antlr4::Parser &parser, size_t firstLine, std::string_view sourceFile)
@@ -177,6 +180,7 @@ class LexerErrorListener : public BaseErrorListener {
   std::string_view sourceFile_;
 };
 
+/// @requirements-exempt ParserErrorListener: Adapter callbacku syntaxError z interfejsu listenera ANTLR4.
 class ParserErrorListener : public BaseErrorListener {
  public:
   ParserErrorListener(antlr4::Parser &parser, size_t firstLine, std::string_view sourceFile)
@@ -197,6 +201,7 @@ class ParserErrorListener : public BaseErrorListener {
 /* Iterator - each new field gets new fieldCount number */
 int fieldCount = 0;
 
+/// @requirements-exempt ParserListener: Implementacja callbackow RQLBaseListener generowanych przez ANTLR4.
 class ParserListener : public RQLBaseListener {
   qTree &coreInstance;
 

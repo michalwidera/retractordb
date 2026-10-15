@@ -77,6 +77,7 @@ constexpr int kToStringDefaultWidth = 32;
 
 /// Kształt pola źródłowego: typ i szerokość napisu w bajtach (`rlen * rarray`).
 /// Dla pól nietekstowych szerokość jest bez znaczenia i nie jest czytana.
+/// @requirements-exempt fieldShape: Opis typu i szerokosci pola przekazywany do analizy wyrazenia.
 struct fieldShape {
   rdb::descFld type;
   int width;

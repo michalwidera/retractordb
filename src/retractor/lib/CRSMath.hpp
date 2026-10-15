@@ -19,7 +19,6 @@ using std::set;
 /// - być inicjalizowany zbiorem czasów między kolejnymi zdarzeniami.
 /// - dostarczać funkcji zwracającej najbliższy kolejny termin w systemie odstępów czasów.
 /// - być zabezpieczony przed kopiowaniem.
-/// - być używany do zarządzania i synchronizacji zdarzeń w systemie.
 /// - dostarczać funkcji sprawdzającej, czy dany odstęp czasowy jest oczekiwany w bieżącym przedziale czasowym.
 
 class TimeLine : private boost::noncopyable {

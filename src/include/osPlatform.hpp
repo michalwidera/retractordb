@@ -30,6 +30,7 @@ namespace osplat {
 ///     potwierdzilo braku procesu - typowo hidepid / ProtectProc na /proc albo EPERM
 ///     z sysctl dla procesu innego uzytkownika. Znaczy "nie wiem", NIE "martwy";
 ///     `found`, `zombie` i `startTime` sa wtedy puste.
+/// @requirements-exempt ProcessSnapshot: Dane migawki procesu; odczyt i interpretacje realizuja funkcje warstwy systemowej.
 struct ProcessSnapshot {
   bool found{false};
   bool zombie{false};
@@ -50,6 +51,7 @@ struct ProcessSnapshot {
 /// systemd, na Darwinie proces poza zadaniem launchd. Nazwa jednostki jest
 /// przekazywana menedzerowi doslownie (systemctl restart <unit> / launchctl
 /// kickstart), wiec nie jest normalizowana.
+/// @requirements-exempt ServiceIdentity: Dane identyfikujace jednostke uslugi i jej zakres.
 struct ServiceIdentity {
   std::optional<std::string> unit;
   /// Zakres uzytkownika: systemd --user (user.slice) albo launchd LaunchAgent.

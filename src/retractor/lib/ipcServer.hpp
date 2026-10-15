@@ -41,6 +41,7 @@ class IpcServer {
   /// Formatowanie wiersza strumienia do postaci wysylanej klientom.
   using RowFormatter = std::function<std::string(const std::string &)>;
 
+  /// @requirements-exempt Callbacks: Zestaw funkcji zwrotnych przekazywanych serwerowi IPC.
   struct Callbacks {
     CommandHandler onCommand;
     Notifier onReady;           // zasoby IPC gotowe -- raz, przed petla odbioru

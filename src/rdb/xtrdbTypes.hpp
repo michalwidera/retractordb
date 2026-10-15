@@ -4,6 +4,7 @@
 
 enum payloadStatusType : std::uint8_t { fetched, clean, stored, changed, error };
 
+/// @requirements-exempt Colors: Zestaw sekwencji kolorow terminala przekazywanych do formatowania.
 struct Colors {
   std::string_view GREEN;
   std::string_view RED;

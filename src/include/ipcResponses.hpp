@@ -39,6 +39,7 @@ inline constexpr std::uint32_t kLayoutVersion = 1;
 // NOLINTNEXTLINE(performance-enum-size): zgodny z 32-bitowym slowem atomowym stanu slotu IPC
 enum class SlotState : std::uint32_t { Free = 0, Writing = 1, Ready = 2, Reading = 3 };
 
+/// @requirements-exempt Header: Naglowek danych segmentu IPC; inicjalizacje i kontrole wykonuja funkcje protokolu.
 struct Header {
   std::uint64_t magic;
   std::uint32_t layoutVersion;
@@ -48,6 +49,7 @@ struct Header {
   std::uint64_t reserved1;
 };
 
+/// @requirements-exempt Slot: Rekord odpowiedzi IPC; przejscia stanu realizuja funkcje protokolu.
 struct Slot {
   std::uint32_t state;  ///< SlotState, dostep wylacznie przez std::atomic_ref
   std::int32_t pid;
@@ -58,6 +60,7 @@ struct Slot {
   char data[kResponseSlotDataSize];  // NOLINT(modernize-avoid-c-arrays): uklad pamieci dzielonej
 };
 
+/// @requirements-exempt Segment: Uklad pamieci grupujacy naglowek i sloty odpowiedzi IPC.
 struct Segment {
   Header header;
   Slot slots[kResponseSlotCount];  // NOLINT(modernize-avoid-c-arrays): uklad pamieci dzielonej
@@ -69,6 +72,7 @@ static_assert(sizeof(Slot) == kResponseSlotHeaderBytes + kResponseSlotDataSize);
 static_assert(sizeof(Segment) == kShmemSegmentSize);
 
 /// Adresat odpowiedzi: proces klienta i numer jego zadania.
+/// @requirements-exempt Owner: Agregat danych adresata odpowiedzi IPC, bez wlasnej logiki.
 struct Owner {
   std::int32_t pid{0};
   std::uint64_t startTime{0};

@@ -11,6 +11,7 @@
 namespace ipc::security {
 
 /// Odmowa zaufania obiektowi, odrozniona od chwilowego braku kolejki klienta.
+/// @requirements-exempt Rejected: Znacznik kategorii odmowy; zachowanie wyjatku dziedziczy ze std::runtime_error.
 class Rejected : public std::runtime_error {
  public:
   using std::runtime_error::runtime_error;

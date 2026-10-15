@@ -12,17 +12,21 @@
 ///
 /// Obiekt klasy groupFile powinien:
 /// - tworzyć i utrzymywać segmenty o pojemności określonej przez retention_.capacity,
-/// - ograniczać liczbę utrzymywanych segmentów do retention_.segments i usuwać najstarszy segment po przekroczeniu limitu,
+/// - przy dodatnim retention_.segments ograniczać liczbę segmentów otwartych w grupie do tego limitu;
+///   podczas dopisywania nowego segmentu usuwać najstarszy po przekroczeniu limitu; zero oznacza brak limitu,
 /// - umożliwiać tryb bez retencji, w którym wszystkie rekordy są przechowywane w pojedynczym pliku,
 /// - realizować operacje read i write zgodnie z interfejsem FileInterface, kierując je do właściwego segmentu,
-/// - traktować parametr position jako logiczną pozycję rekordu w groupFile; pozycja jest mapowana na segment i offset w segmencie,
+/// - przy odczycie i update traktować position jako offset w bajtach; dla magazynu segmentowanego
+///   wyznaczać indeks rekordu przez position / recordSize_, a następnie segment i lokalny offset w bajtach,
 /// - propagować parametr nullBitset do segmentu T bez własnego przechowywania informacji o wartościach null,
 /// - obsługiwać dopisywanie rekordów oraz aktualizację istniejącego rekordu w odpowiednim segmencie,
 /// - zwracać przez count() logiczną liczbę rekordów uwzględniającą także rekordy znajdujące się wcześniej w usuniętych segmentach,
 /// - zwracać przez name() nazwę bieżącego segmentu, gdy retencja jest aktywna, albo nazwę bazową pliku w trybie bez retencji,
 /// - raportować przez hasShadow() mechanizm cienia swoich segmentów T (grupa nie dodaje własnego pliku cienia),
 /// - obsługiwać purge wywołane przez write(nullptr, ..., 0), resetując stan obiektu i odtwarzając pusty segment gotowy do dalszego zapisu,
-/// - przy tworzeniu obiektu odtwarzać stan grupy na podstawie istniejących plików segmentów, wybierając spójny końcowy fragment sekwencji i rekonstruując removedSegments_.
+/// - przy tworzeniu obiektu odtwarzać stan grupy na podstawie istniejących plików segmentów, wybierając
+///   spójny końcowy fragment sekwencji ograniczony dodatnim limitem retention_.segments i rekonstruując removedSegments_,
+/// - przy odtwarzaniu stanu pozostawiać bez zmian pliki segmentów pominięte przy wyborze tego fragmentu.
 ///
 /// @note Klasa zarządza segmentacją i retencją, ale nie interpretuje zawartości rekordów ani semantyki null.
 /// @note Pozycje wskazujące rekordy należące do już usuniętych segmentów są traktowane jako niedostępne do odczytu i aktualizacji.
