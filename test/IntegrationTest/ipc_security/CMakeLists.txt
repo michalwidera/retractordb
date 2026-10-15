@@ -11,6 +11,12 @@ foreach(_case lifecycle foreign-uid)
                                                      SKIP_RETURN_CODE 77)
 endforeach()
 
+# RUN_SERIAL: lifecycle sprawdza pozostalosci po SIGKILL, a kazda rownolegla
+# instancja sprzata je przy wyjsciu (sweepAbandonedResources, blokady we
+# wspolnym /tmp) - zabralaby je, zanim test zdazy sprawdzic, ze w ogole
+# powstaly. Tak samo jak w leftover_sweep.
+set_tests_properties(${TestID}-lifecycle PROPERTIES RUN_SERIAL TRUE)
+
 # Drugi UID wymaga root/CAP_SETUID i mozliwosci chown. Skrypt zrzuca uprawnienia
 # procesow serwera/klienta i zaklada obce obiekty jako root. Brak tych warunkow
 # jest niewykonana weryfikacja, a nie zielona kontrola wlasnosci.
