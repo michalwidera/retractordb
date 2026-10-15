@@ -25,6 +25,17 @@
 /// MUTUJACYCH jest teraz wyliczalny (push_back, pop_back, erase, clear, replaceAll,
 /// sort, topologicalSort), wiec da sie go domknac - a nie tylko miec nadzieje, ze nikt nie
 /// siegnal do bazy bokiem.
+/// Obiekt klasy qTree powinien:
+/// - przechowywać plan jako uporządkowany ciąg węzłów query i udostępniać z interfejsu wektora wyłącznie odczyt, iterację, dostęp pozycyjny oraz mutacje push_back, pop_back, erase, clear, replaceAll, sort i topologicalSort.
+/// - przy każdej mutacji kształtu planu nadawać nowy numer rewizji z jednego, atomowego dozownika procesu, zaczynającego od 1, tak aby równy numer oznaczał równy kształt także między różnymi obiektami qTree.
+/// - przy kopiowaniu i przypisaniu całego drzewa przenosić numer rewizji źródła.
+/// - przez replaceAll podmieniać wszystkie węzły bez zmiany pozostałych składowych obiektu, w tym maxCapacity.
+/// - przez topologicalSort ustawiać każdy strumień po strumieniach, od których zależy przez PUSH_STREAM.
+/// - przez sort porządkować węzły według rosnącego interwału.
+/// - przez getQuery i operator[] z nazwą zwracać węzeł o tej nazwie, traktując pustą lub nieznaną nazwę jako naruszenie warunku wstępnego (RDB_ASSERT), a przez exists sprawdzać obecność nazwy bez naruszenia.
+/// - przez getDelta zwracać interwał wskazanego strumienia.
+/// - przez getAvailableTimeIntervals zwracać zbiór interwałów wszystkich węzłów poza dyrektywami, traktując zerowy interwał węzła niebędącego dyrektywą jako naruszenie niezmiennika.
+/// - przez dumpCore wypisywać tabelę z pozycją, interwałem, pojemnością i nazwą każdego węzła.
 class qTree : private std::vector<query> {
   /* Topological sort vars */
   std::map<std::string, bool> visited_;

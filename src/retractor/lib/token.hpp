@@ -8,6 +8,13 @@
 
 #include "rdb/descriptor.hpp"
 
+/// Obiekt klasy token powinien:
+/// - przechowywać identyfikator polecenia command_id i wartość typu rdb::descFldVT, domyślnie VOID_COMMAND i 0.
+/// - udostępniać wartość przez getVT jako referencję bez kopiowania wariantu.
+/// - przez getRI zwracać wartość przekonwertowaną na RATIONAL regułami cast.
+/// - przez getStr_ zwracać tekst wartości: null dla wartości pustej, napis bez zmian, liczbę dziesiętną dla BYTE i typów liczbowych, licznik/mianownik dla RATIONAL, parę rozdzieloną przecinkiem dla pary liczb oraz samą nazwę dla pary nazwa i indeks.
+/// - przez getCommandID i getStrCommandID udostępniać identyfikator polecenia i jego nazwę.
+/// - wypisywać token w postaci diagnostycznej <nazwa polecenia>(<wartość>), w której para nazwa i indeks ma postać nazwa[indeks].
 class token {
   command_id command_;
   rdb::descFldVT valueVT_;

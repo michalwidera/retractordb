@@ -11,6 +11,22 @@
 
 #include "rdb/error.hpp"       // RDB_ASSERT w kontroli krzyzowej handleAt() (tylko Debug), rdb::Result
 #include "streamInstance.hpp"  // streamInstance (transitively includes qTree.hpp, rdb/payload.hpp)
+/// Obiekt klasy dataModel powinien:
+/// - w create zapamiętywać wartości dyrektyw :STORAGE, :SUBSTRAT i :ROTATION, usuwać dyrektywy z planu i tworzyć instancję każdego pozostałego strumienia z otwartym magazynem w katalogu :STORAGE i we wskazanym MemoryStore, a błąd otwarcia magazynu zwracać jako Result z nazwą strumienia.
+/// - traktować pusty plan i dyrektywę z pustą wartością jako naruszenie niezmiennika.
+/// - w addQueriesToModel dołączać instancje wszystkich wskazanych węzłów planu albo żadnej, zwracając nazwę, której nie da się dołączyć, i nie usuwając z modelu żadnej istniejącej instancji.
+/// - w processRows liczyć wyłącznie węzły oznaczone w masce pozycyjnej o długości planu, w kolejności: uzbrojenie nowych źródeł i odczyt rekordów DEVICE, obliczenie strumieni niebędących deklaracjami w porządku planu, a na końcu przesunięcie pozostałych źródeł deklarowanych do następnego rekordu.
+/// - nie emitować rekordu strumienia w pierwszych origin + ogon należnych slotach, ani jako zera, ani jako NULL.
+/// - dla strumienia dołączonego ad hoc wyznaczać indeks pierwszego rekordu z bieżącego slotu i emitować go dopiero, gdy wszystkie jego wejścia są dostępne.
+/// - dla każdego emitowanego strumienia budować rekord wejściowy z klauzuli FROM, liczyć okna rekordowe, budować rekord wyjściowy z listy SELECT, zapisywać go do magazynu i wykonywać reguły strumienia.
+/// - przerywać slot na pierwszym błędzie odczytu, zapisu albo ewaluacji i zwracać go jako Result bez kończenia procesu.
+/// - przez fetchForward zwracać rekord strumienia po indeksie logicznym, a dla indeksu spoza dostępnej historii rekord all-null, ważny do następnego odczytu tego strumienia.
+/// - przez getPayload udostępniać payload wraz z informacją NULL: dla strumienia SELECT rekord cofnięty o podaną liczbę rekordów albo all-null przy braku rekordu, a dla deklaracji payload bieżący niezależnie od przesunięcia.
+/// - przez getRow zwracać wartości pól rekordu cofniętego o podaną liczbę rekordów dla strumienia SELECT albo rekordu bieżącego deklaracji niezależnie od przesunięcia, zastępując wartości NULL przez nullFallbackValue typu pola, także przy braku rekordu SELECT.
+/// - przez getStreamCount i streamStoredSize zwracać liczbę zapisanych rekordów strumienia i jej rozmiar w bajtach.
+/// - przez syncDeclaredCapacities zwiększać pojemność historii źródeł deklarowanych do wymaganej przez plan, nigdy jej nie zmniejszając.
+/// - przez exhaustedInputStream zwracać nazwę pierwszego źródła deklarowanego, które wyczerpało wejście, albo pusty napis.
+/// - traktować odwołanie do strumienia z planu bez instancji w modelu oraz maskę o długości innej niż plan jako naruszenie niezmiennika.
 class dataModel {
  private:
   qTree &coreInstance_;

@@ -36,6 +36,11 @@ namespace rdb {
 class metaShadow {
  public:
   /// @brief Single override: the new null bit-set pattern for one absolute record index.
+  /// Obiekt klasy ShadowOverride powinien:
+  /// - przechowywać bezwzględny indeks nadpisanego rekordu głównego indeksu i nowy wzorzec null tego rekordu, jeden bit na pole deskryptora.
+  /// - przez serialize zapisywać bajt zarezerwowany równy 0, recordIndex i długość bitsetu jako size_t w porządku bajtów maszyny, a następnie bitset upakowany od najmłodszego bitu w ceil(n/8) bajtach z zerowymi bitami dopełnienia, w układzie zgodnym z wpisem IndexRecord.
+  /// - przez deserialize odtwarzać wpis zapisany przez serialize, pomijając wartość bajtu zarezerwowanego.
+  /// - zwracać z deserialize Errc::IO z kodem EIO, gdy ramka jest za krótka na nagłówek albo deklarowana długość bitsetu przekracza pozostałe bajty, porównując długość przed zaokrągleniem do bajtów.
   struct ShadowOverride {
     size_t recordIndex{0};         ///< absolute position of the overridden record in the main index
     std::vector<bool> nullBitset;  ///< new null bit-set pattern for that record

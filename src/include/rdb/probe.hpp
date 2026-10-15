@@ -259,6 +259,15 @@ void logicalWriteReset();
 /// Aktywna dopiero, gdy `RDB_BENCH_CSV` wskazuje plik wyjściowy. Pętla śpi do tego samego
 /// deadline'u w każdym trybie taktowanym, więc wake_lag/e2e nie kumulują dryfu także bez `-t`;
 /// `-t` zmienia tylko szeregowanie (SCHED_FIFO, mlockall, powinowactwo CPU).
+/// Obiekt klasy slotProbe powinien:
+/// - w buildzie bez sondy slotu (rdb_probe_slot równe false) nie wykonywać żadnej operacji w open, anchor, beginSlot, beginCompute, endCompute, endSlot ani w destruktorze.
+/// - w open otwierać do zapisu plik wskazany przez zmienną RDB_BENCH_CSV i zapisywać nagłówek iter,compute_ns,wake_lag_ns,e2e_ns, a bez tej zmiennej lub przy nieudanym otwarciu pozostawać nieuzbrojoną bez wpływu na pracę usługi.
+/// - w anchor zapamiętywać kotwicę osi czasu, względem której wołający planuje sen slotu.
+/// - w beginSlot zapamiętywać chwilę pobudki i termin slotu równy kotwicy powiększonej o przekazane przesunięcie w milisekundach.
+/// - w beginCompute i endCompute zapamiętywać granice czasu obliczeń slotu.
+/// - w endSlot dopisywać wiersz z kolejnym numerem slotu od zera, czasem obliczeń, spóźnieniem pobudki względem terminu oraz czasem od terminu do końca emisji wyniku, wszystkie w nanosekundach.
+/// - w uzbrojonej sondzie nie zapisywać niczego, gdy plik nie został otwarty.
+/// - zamykać plik CSV przy zniszczeniu i uniemożliwiać kopiowanie sondy.
 class slotProbe {
  public:
   slotProbe() = default;
@@ -404,6 +413,12 @@ capacityShape shapeOfCapacities(const CapacityMap &capacities) {
 /// więc jej koszt zależy od rozmiaru planu, a ten różni się między profilami ablacyjnymi
 /// - bez odjęcia profil o większym planie wyglądałby na wolniejszy częściowo z powodu
 /// własnego pomiaru.
+/// Obiekt klasy planProbe powinien:
+/// - w buildzie bez sondy planu (rdb_probe_plan równe false) nie wykonywać żadnej operacji w konstruktorze, capture ani report.
+/// - przy konstrukcji uzbrajać się wyłącznie, gdy ustawiona jest zmienna RDB_BENCH_PLAN, zerować liczniki przepisań R1, R2 i R3 oraz zapamiętywać początek pomiaru kompilacji.
+/// - w nieuzbrojonej sondzie nie zdejmować migawek i nie wypisywać raportu.
+/// - przez capture zapamiętywać dla wskazanego etapu (entry, preDedup, postDedup, exit) liczbę strumieni publicznych, substratów, tokenów FROM i tokenów programów pól, z pominięciem dyrektyw kompilatora, i doliczać czas migawki do kosztu sondy.
+/// - przez report zdejmować migawkę etapu exit, a następnie wypisywać na stderr wiersze PLAN bench (cztery migawki i stan deduplikacji), REWRITE_APPLIED (r1, liczba węzłów z R2, r3), COMPILE_NS z czasem kompilacji pomniejszonym o koszt sondy oraz PLAN capacity (liczba strumieni, suma i maksimum pojemności).
 class planProbe {
  public:
   [[gnu::always_inline]] planProbe() {

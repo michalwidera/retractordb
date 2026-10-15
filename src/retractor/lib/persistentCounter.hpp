@@ -18,6 +18,14 @@
    Uzasadnienie przy load() i save() w persistentCounter.cpp.
 */
 
+/// Obiekt klasy PersistentCounter powinien:
+/// - przez read rozróżniać brak pliku (Missing), wartość (Value), plik, którego nie da się sprawdzić, otworzyć lub odczytać (Unreadable) oraz treść, która po obcięciu końcowych białych znaków nie jest w całości nieujemną liczbą całkowitą (Invalid), podając w detail przyczynę albo rozmiar i początek treści.
+/// - traktować brak pliku jako numer rotacji 0 wyłącznie wtedy, gdy brak został potwierdzony, a nie gdy samo sprawdzenie istnienia się nie powiodło.
+/// - w create wczytywać numer N bieżącej sesji i przed zwróceniem obiektu zapisywać N+1, tak aby numer był zarezerwowany przed powstaniem pierwszego archiwum.
+/// - zwracać z create Errc::IO dla pliku Unreadable lub Invalid oraz dla nieudanej rezerwacji N+1, nie zastępując numeru wartością zgadniętą.
+/// - zapisywać nową wartość przez plik tymczasowy w tym samym katalogu, z fsync pliku przed atomowym rename i fsync katalogu po nim, tak aby każdy odczyt widział starą albo nową wartość, a nigdy plik pusty.
+/// - po nieudanym zapisie lub rename usuwać plik tymczasowy, a porażkę fsync katalogu po udanym rename zgłaszać w logu bez odmowy.
+/// - przez getCount zwracać numer bieżącej sesji N.
 class PersistentCounter {
  public:
   /// Odczyt pliku licznika bez rezerwacji numeru. Rozdziela przyczyne: brak pliku jest stanem

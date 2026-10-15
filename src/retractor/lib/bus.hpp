@@ -278,6 +278,22 @@ struct ClaimRequest {
 /// Odrzucany jest wylacznie 'Z' -- uzasadnienie w bus.cpp przy definicji.
 [[nodiscard]] bool isProcessAlive(std::int32_t pid, std::uint64_t startTime);
 
+/// Obiekt klasy Bus powinien:
+/// - przy konstrukcji zajmować współdzieloną blokadę pliku obecności przed otwarciem segmentu i podłączać się do segmentu o podanej nazwie, tworząc go wyłącznie w trybie createIfMissing, a przy niepowodzeniu przechodzić w stan niepodłączony bez przerywania startu serwera.
+/// - raportować przez attached, czy segment jest odwzorowany.
+/// - w claim, pod muteksem magistrali, zwalniać poprzedni slot tej instancji, a następnie zajmować wolny lub martwy slot wyłącznie wtedy, gdy nazwy strumieni, ścieżka licznika :ROTATION i skróty ścieżek magazynu są rozłączne ze wszystkimi żywymi instancjami i żadna żywa instancja nie pracuje w trybie usługowym, gdy żąda go ta instancja.
+/// - zwracać z claim odpowiednio Conflict, CounterConflict, StoreConflict albo ServiceConflict z kolidującym zasobem i jego właścicielem, TooLarge przy przekroczeniu pojemności slotu lub długości pól rozstrzygających, NoFreeSlot przy braku wolnego slotu i Unavailable, gdy magistrali nie da się użyć.
+/// - obcinać zbyt długie pola informacyjne (nazwa jednostki, plik zapytań) z ostrzeżeniem w logu zamiast odmawiać startu.
+/// - uznawać slot za żywy wyłącznie, gdy proces o jego pid istnieje, nie jest zombie i ma ten sam czas startu, a slot martwy traktować jako wolny bez demona i heartbeatów.
+/// - w reservePlan rezerwować w posiadanym slocie zasoby następnego planu po kontroli rozłączności pod muteksem, pozostawiając aktywne zasoby publikowane, a przy odmowie nie zmieniać slotu; bez posiadanego slotu zwracać Unavailable.
+/// - w activateReservedPlan zastępować aktywne zasoby zarezerwowanymi bez ponownej kontroli kolizji, zwracając NotReserved dla instancji bez slotu lub rezerwacji i Unavailable, gdy magistrali nie da się użyć.
+/// - w claimAdditional dopisywać do posiadanego slotu tylko nazwy i ścieżki nieobecne w nim, po kontroli rozłączności, zwracać faktycznie dopisane w addedStreams i addedStores, a przy odmowie nie zmieniać slotu.
+/// - w releaseAdditional zdejmować z własnego slotu wyłącznie podane nazwy i ścieżki, bez zmiany reszty slotu, a bez slotu nie robić nic.
+/// - w release zwalniać własny slot pod muteksem, idempotentnie, także z obsługi atexit.
+/// - przez instances zwracać migawkę żywych instancji czytaną seqlockiem, bez muteksu i bez kontaktu z serwerami, pomijając sloty w trakcie zapisu i sloty martwe.
+/// - po przejęciu muteksu porzuconego przez zmarłego właściciela unieważniać sloty przerwane w trakcie zapisu przed oznaczeniem stanu jako spójnego.
+/// - przy zniszczeniu zwalniać slot i odwzorowanie, a segment i plik obecności usuwać wyłącznie wtedy, gdy uda się zająć wyłączną blokadę obecności, czyli segmentu nie mapuje nikt inny.
+/// - uniemożliwiać kopiowanie obiektu.
 class Bus {
  public:
   /// Podlacza sie do segmentu, tworzac go, gdy jeszcze nie istnieje. Niepowodzenie nie jest

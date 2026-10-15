@@ -19,6 +19,12 @@ struct CommandContext {
   const std::vector<std::string> &refDirs;  ///< storage.ref_dirs z retractor.toml (#278)
 };
 
+/// Obiekt klasy ICommand powinien:
+/// - definiować dla każdej komendy xtrdb opis składni i pomocy przez usage, zwracający nazwę z argumentami oraz linie opisu; pusta nazwa pomija komendę w pomocy.
+/// - przez requiresConnection deklarować, czy komenda wymaga otwartego magazynu; domyślnie prawda, a launcher nie wywołuje takiej komendy bez magazynu.
+/// - wymagać od implementacji execute wykonania komendy na stanie przekazanym w CommandContext i zwrócenia prawdy, gdy launcher ma potwierdzić wykonanie, albo fałszu, gdy potwierdzenie ma zostać pominięte.
+/// - wymagać od implementacji zgłaszania błędów magazynu komunikatem dla operatora bez kończenia procesu i bez pozostawiania w kontekście magazynu, którego nie udało się otworzyć.
+/// - umożliwiać niszczenie implementacji przez wskaźnik na ICommand.
 class ICommand {
  public:
   virtual ~ICommand()                                                                  = default;
