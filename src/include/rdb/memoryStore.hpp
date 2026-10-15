@@ -42,6 +42,14 @@ struct memoryBucket {
 /// @note Bez synchronizacji, tak samo jak mapa, którą zastępuje: magazyn MEMORY jednego planu jest
 ///       obsługiwany w wątku przetwarzania. Współdzielenie jednego Memory Store przez wątki wymagałoby
 ///       zamka i nie jest przez tę klasę obiecane.
+/// Obiekt klasy MemoryStore powinien:
+/// - przechowywać stan magazynów MEMORY jako jeden kubełek na nazwę strumienia, tworzony pusty przy pierwszym sięgnięciu przez bucket.
+/// - zwracać przy kolejnych wywołaniach bucket dla tej samej nazwy ten sam kubełek, tak aby piszący i czytający ten sam strumień w jednym planie widzieli te same rekordy.
+/// - zapewniać ważność referencji zwróconej przez bucket do wywołania erase dla tej nazwy, niezależnie od dodawania i usuwania innych kubełków.
+/// - przez erase usuwać kubełek wraz z nazwą, a przez size i empty raportować liczbę istniejących kubełków.
+/// - nie współdzielić kubełków między różnymi instancjami MemoryStore, także dla strumieni o tych samych nazwach.
+/// - przez processDefault udostępniać jedną instancję na proces, inicjowaną przy pierwszym użyciu, dla wołających, którzy nie podają własnego MemoryStore.
+/// - nie zapewniać synchronizacji dostępu z wielu wątków.
 class MemoryStore {
  public:
   /// Kubełek strumienia; tworzy pusty przy pierwszym sięgnięciu. Węzły std::map są stabilne -

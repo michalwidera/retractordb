@@ -21,6 +21,21 @@ struct SystemdIdentity {
 /// slot nie umie odpowiedziec, ktora jednostke trzeba zatrzymac, zeby zwolnic kolidujaca nazwe.
 [[nodiscard]] SystemdIdentity detectSystemdIdentity();
 
+/// Obiekt klasy FlockServiceGuard powinien:
+/// - wyznaczać ścieżkę pliku blokady instancji z nazwy serwera w domyślnym katalogu blokad albo w katalogu ustawionym przez setLockDir.
+/// - w acquireLock przejmować nieblokująco wyłączną blokadę pliku instancji według protokołu lockFile, a po przejęciu
+///   podejmować próbę obcięcia pliku do zera bez zapisu opisu procesu; przy błędzie ftruncate zachowywać blokadę,
+///   wpisywać ostrzeżenie do logu i zwracać sukces.
+/// - zwracać z acquireLock fałsz z pustym acquireLockError, gdy blokadę trzyma inna instancja, a fałsz z opisem przyczyny, gdy plik nie mógł zostać otwarty lub nie przeszedł kontroli (dowiązanie, nie zwykły plik, obcy właściciel, wiele dowiązań).
+/// - w acquireIpcLock przejmować drugą wyłączną blokadę dla nazwy obiektu IPC w katalogu blokad maszyny, wspólnym dla wszystkich katalogów blokad instancji, wyłącznie gdy blokada instancji jest aktywna i blokada IPC nie jest jeszcze trzymana.
+/// - w publishLockInfo zapisywać do trzymanego pliku blokady, od początku, linie PID, PPID, MODE (service lub process),
+///   przy usłudze UNIT i SCOPE (system lub user) oraz QUERYFILE, gdy ustawiono plik zapytań, jednym write, a potem fsync;
+///   zwracać fałsz przy nieaktywnej blokadzie, błędzie ftruncate, lseek lub fsync albo wyniku write == -1.
+///   Krótkiego zapisu, w tym 0 bajtów, nie rozpoznawać jako błędu.
+/// - przez readPeerInfo odczytywać z pliku blokady innej instancji PID, tryb, jednostkę, zakres i plik zapytań, zwracając wartości Unknown i pid 0 dla brakującego pliku lub brakujących linii.
+/// - przez isAnotherInstanceRunning sprawdzać, czy blokadę pliku instancji trzyma jakikolwiek proces, a przez isLockActive, czy trzyma ją ten obiekt.
+/// - w releaseLock i przy zniszczeniu usuwać pliki obu trzymanych blokad jeszcze pod blokadą i zwalniać ich deskryptory, idempotentnie.
+/// - uniemożliwiać kopiowanie i przenoszenie, tak aby adres strażnika używany przez obsługę wyjścia pozostawał ważny.
 class FlockServiceGuard {
  public:
   // Tryb działania instancji trzymającej blokadę, odczytany z pliku blokady.

@@ -8,6 +8,25 @@
 
 enum class formatMode : std::uint8_t { RAW, GRAPHITE, INFLUXDB, GNUPLOT };
 
+/// Obiekt klasy Formatter powinien:
+/// - przez columns rozwijać pola z db.field w kolumny, po jednej na element pola, z krotnością z db.field_count.<pole>, a przy jej braku traktować pole jako jednoelementowe.
+/// - przez isNullAt uznawać wartość za null wyłącznie, gdy znak mapy null na tej pozycji jest równy '1', a przez isAllNull
+///   zwracać prawdę tylko dla dodatniej liczby wartości, z których wszystkie są null.
+/// - przez displayedValue zwracać wartość z wiersza albo dla null tekst NaN w trybie gnuplot i null w pozostałych trybach.
+/// - przez renderRaw wypisywać wartości wiersza rozdzielone spacją i zakończone CRLF, pomijając wiersz złożony wyłącznie z null, gdy wołający o to prosi.
+/// - przez initGnuplot wypisywać ustawienia terminala i zakresów osi, z osią x malejącą w trybie od prawej do lewej.
+/// - przez renderGnuplot przechowywać dla każdej kolumny okno ostatnich wartości o szerokości z wymiaru x, najnowszą
+///   na pozycji 0, i wypisywać polecenie plot z jedną krzywą na każdą wartość wiersza i jednym blokiem danych na krzywą.
+///   Tytuły budować z nazw rozwiniętych kolumn (pole[i] dla tablic), a przy krótszym schemacie używać col<i>;
+///   w nazwach tytułów zamieniać podkreślenia na myślniki.
+/// - przez renderGnuplotOhlc traktować cztery pierwsze wartości jako open, high, low i close, a dalsze jako próbki świecy, rysować świece z pominięciem niepełnych i próbki na wspólnej osi, a dla wiersza bez próbek jednorazowo zgłaszać na stderr niewłaściwy kształt strumienia i nic nie rysować.
+/// - przez renderGraphite wypisywać dla każdej kolumny schematu (columns), której wartość nie jest oznaczona jako null,
+///   także pustego tekstu, wiersz <strumień>.<metryka> <wartość> <czas uniksowy>, z metryką pole.<i> dla elementów
+///   tablic i nazwą pola dla skalarów; wartości wiersza poza kolumnami schematu pomijać.
+/// - przez renderInfluxDB wypisywać jeden wiersz line protocol z kolumnami schematu (columns), których wartości nie są
+///   oznaczone jako null, także pustymi tekstami, jako pole=wartość, z kluczem pole_<i> dla elementów tablic
+///   i znacznikiem czasu w nanosekundach; wartości poza kolumnami schematu pomijać, a gdy żadna kolumna nie ma
+///   wartości nieoznaczonej jako null, nie wypisywać niczego.
 class Formatter {
   std::vector<std::deque<std::string>> gnuplot_lines_;
   bool ohlcShapeReported_{false};

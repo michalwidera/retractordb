@@ -106,6 +106,13 @@ PublishStatus publish(Segment &segment, const Owner &owner, std::string_view tex
 
 /// Odwzorowanie segmentu odpowiedzi. Konstrukcja z create_only tworzy go i inicjuje (serwer),
 /// z open_only otwiera istniejacy (klient). Bledy systemowe jako interprocess_exception.
+/// Obiekt klasy Mapping powinien:
+/// - w konstruktorze z create_only tworzyć nowy obiekt pamięci dzielonej przez ipc::security::createMemory, odmawiając istniejącej nazwy, ustawiać jego rozmiar na sizeof(Segment), odwzorowywać go do odczytu i zapisu i inicjować nagłówek segmentu przez initialize, pozostawiając wszystkie sloty w stanie Free.
+/// - w konstruktorze z open_only otwierać istniejący obiekt przez ipc::security::openMemory z kontrolą właściciela, trybu i dowiązań oraz odwzorowywać go do odczytu i zapisu bez zmiany jego zawartości.
+/// - zgłaszać błędy tworzenia, otwarcia i odwzorowania segmentu wyjątkiem interprocess_exception albo ipc::security::Rejected, bez zwracania częściowo odwzorowanego obiektu.
+/// - przez valid zwracać prawdę wyłącznie wtedy, gdy odwzorowanie ma co najmniej sizeof(Segment) bajtów, a nagłówek ma magię kMagic i wersję układu, liczbę i rozmiar slotów tej binarki.
+/// - przez segment udostępniać odwzorowany Segment bez kopiowania, pozostawiając protokół slotów funkcjom publish, tryTake i take.
+/// - utrzymywać odwzorowanie i uchwyt obiektu przez czas życia Mapping i zwalniać je przy zniszczeniu bez usuwania nazwy obiektu pamięci dzielonej.
 class Mapping {
  public:
   Mapping(boost::interprocess::create_only_t /*tag*/, const std::string &name);
