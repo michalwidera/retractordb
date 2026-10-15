@@ -93,8 +93,14 @@ rdb::Result<> dumpManager::registerTask(const std::string &streamName, dumpTask 
     // if range.first is 0 or positive - no history dump needed
     // CHECK IF WE HAVE ENOUGH HISTORY
     // CHECK SEQUENCE IF THIS IS IN REVERSE ORDER
-    int dumpHistoryCount = static_cast<int>(abs(task.range.first));
-    for (auto i = 0; i < dumpHistoryCount; ++i) {
+    //
+    // Zakres jest polotwarty [first, second) wzgledem rekordu biezacego (0). Prawa granica ujemna
+    // (`DUMP -5 TO -2` = rekordy -5, -4, -3) lezy w calosci w historii: zrzut konczy sie tutaj, a
+    // zadanie z dumpedRecordsToGo == 0 usuwa najblizszy processStreamChunk. Do 2026-10 petla
+    // zrzucala zawsze abs(first) rekordow, czyli do -1, i tak zakres konczyl sie rdb::fatal.
+    const int dumpHistoryCount = static_cast<int>(abs(task.range.first));
+    const int historyEnd       = task.range.second < 0 ? static_cast<int>(abs(task.range.second)) : 0;
+    for (auto i = 0; i < dumpHistoryCount - historyEnd; ++i) {
       RDB_TRY_ASSIGN(auto *payLoadPtr, pProc->getPayload(streamName, dumpHistoryCount - i));
       auto resultSeek = ::lseek(task.fd, 0, SEEK_END);
       if (resultSeek == -1)
@@ -109,14 +115,12 @@ rdb::Result<> dumpManager::registerTask(const std::string &streamName, dumpTask 
                                      task.dumpFilename, strerror(errno)),
                          errno != 0 ? errno : EIO);
     }
-    if (task.dumpedRecordsToGo < dumpHistoryCount) {
-      rdb::fatal(fmt::format("dumpManager::registerTask: dumpedRecordsToGo {} < dumpHistoryCount {}", task.dumpedRecordsToGo,
-                             dumpHistoryCount));
-    }
-    RDB_ASSERT(task.dumpedRecordsToGo >= dumpHistoryCount,
-               "dumpManager::registerTask: dumpedRecordsToGo {} < dumpHistoryCount {}", task.dumpedRecordsToGo,
-               dumpHistoryCount);
-    task.dumpedRecordsToGo -= dumpHistoryCount;
+    // Niezmiennik, nie wejscie: zakres niepusty (first < second) gwarantuje parser, wiec zrzucona
+    // historia nigdy nie przekracza dlugosci zakresu.
+    RDB_ASSERT(task.dumpedRecordsToGo >= dumpHistoryCount - historyEnd,
+               "dumpManager::registerTask: dumpedRecordsToGo {} < history records dumped {}", task.dumpedRecordsToGo,
+               dumpHistoryCount - historyEnd);
+    task.dumpedRecordsToGo -= dumpHistoryCount - historyEnd;
   } else {
     task.delayDumpRecordsToGo = static_cast<int>(task.range.first);
   }

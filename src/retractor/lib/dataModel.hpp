@@ -82,8 +82,9 @@ class dataModel {
   dataModel(qTree &coreInstance, rdb::MemoryStore *memory);
 
  public:
-  /// Model planu: instancja kazdego strumienia z otwartym magazynem. Dyrektywa z pusta wartoscia
-  /// albo blad otwarcia magazynu wraca jako Result - zamiast rzutu z konstruktora.
+  /// Model planu: instancja kazdego strumienia z otwartym magazynem. Blad otwarcia magazynu wraca
+  /// jako Result - zamiast rzutu z konstruktora. Dyrektywa z pusta wartoscia to zlamany niezmiennik
+  /// (RDB_ASSERT): odrzuca ja juz parser ("requires a non-empty value").
   [[nodiscard]] static rdb::Result<std::unique_ptr<dataModel>> create(qTree &coreInstance, rdb::MemoryStore *memory = nullptr);
   ~dataModel();
 

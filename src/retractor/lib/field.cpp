@@ -22,7 +22,7 @@ token field::getFirstFieldToken() {
   return *lProgram.begin();
 }
 
-std::ostream &operator<<(std::ostream &os, rdb::descFld &s) { return os << rdb::GetStringdescFld(s); }
+std::ostream &operator<<(std::ostream &os, const rdb::descFld &s) { return os << rdb::GetStringdescFld(s); }
 
 std::ostream &operator<<(std::ostream &os, const field &s) {
   os << "FLD/";

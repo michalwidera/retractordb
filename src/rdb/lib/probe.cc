@@ -158,10 +158,10 @@ void slotProbe::closeCsv() {
 
 void slotProbe::setAnchor(const std::timespec &origin) { anchorNs_ = toNs(origin); }
 
-void slotProbe::markWake(long intervalMs) {
+void slotProbe::markWake(long deadlineMs) {
   if (csv_ == nullptr) return;
   wakeNs_     = nowNs();
-  deadlineNs_ = anchorNs_ + (intervalMs * kNanosecondsPerMillisecond);  // ms -> ns
+  deadlineNs_ = anchorNs_ + (deadlineMs * kNanosecondsPerMillisecond);  // ms -> ns
 }
 
 void slotProbe::markComputeBegin() {

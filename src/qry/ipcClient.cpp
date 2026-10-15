@@ -171,7 +171,6 @@ ptree IpcClient::netClient(const std::string &netCommand, const std::string &net
     done = true;
     throw;
   } catch (std::exception &e) {
-    pt_response.put("error.response", e.what());
     done = true;
     throw;
   }

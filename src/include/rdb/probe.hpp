@@ -252,7 +252,7 @@ void logicalWriteReset();
 /// Sonda slotu: CSV z czasem obliczeń i latencją end-to-end, analizowany przez
 /// examples/ecg/e1_stats.py. Kolumny:
 ///   compute_ns  - czas processRows() (E1, czysty rdzeń obliczeń),
-///   wake_lag_ns - spóźnienie pobudki względem deadline'u interwału (kotwica + interwał;
+///   wake_lag_ns - spóźnienie pobudki względem deadline'u slotu (kotwica + termin slotu;
 ///                 ten sam cel, do którego dąży rtAbsoluteSleep) - jitter planisty,
 ///   e2e_ns      - od deadline'u (nominalny moment pojawienia się krotki wejściowej
 ///                 w modelu czasowym) do końca emisji wyniku do kolejek IPC.
@@ -279,9 +279,10 @@ class slotProbe {
     if constexpr (rdb_probe_slot) setAnchor(origin);
   }
 
-  /// Początek slotu: moment pobudki i deadline wyliczony z kotwicy oraz interwału [ms].
-  [[gnu::always_inline]] void beginSlot(long intervalMs) {
-    if constexpr (rdb_probe_slot) markWake(intervalMs);
+  /// Początek slotu: moment pobudki i deadline = kotwica + @p deadlineMs (termin slotu w ms
+  /// od kotwicy - ten sam, który dostaje rtAbsoluteSleep).
+  [[gnu::always_inline]] void beginSlot(long deadlineMs) {
+    if constexpr (rdb_probe_slot) markWake(deadlineMs);
   }
 
   [[gnu::always_inline]] void beginCompute() {
@@ -301,7 +302,7 @@ class slotProbe {
   void openCsv();
   void closeCsv();
   void setAnchor(const std::timespec &origin);
-  void markWake(long intervalMs);
+  void markWake(long deadlineMs);
   void markComputeBegin();
   void markComputeEnd();
   void writeRow();
