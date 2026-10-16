@@ -245,7 +245,6 @@ TEST(embedEnginePlan, refusals_carry_their_stage) {
     const auto refused = refusalOf(engine, rql);
     ASSERT_TRUE(refused.has_value()) << "plan przeszedl: " << rql;
     EXPECT_EQ(refused->code(), code) << refused->message();
-    EXPECT_TRUE(rdb::isConfigFamily(refused->code())) << refused->message();
     EXPECT_FALSE(engine.hasPlan()) << "odrzucony plan nie ma prawa zostac planem silnika";
   };
 

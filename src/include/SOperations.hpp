@@ -105,10 +105,6 @@ constexpr int Add(const rational<int> &deltaOut, const rational<int> &deltaSrc, 
   return floorR(n * deltaOut / deltaSrc);
 }
 
-/// Funkcja agse powinna:
-/// - zwracać floorR(offset/step) liczone na liczbach wymiernych.
-constexpr int agse(int offset, int step) { return floorR(boost::rational<int>(offset) / boost::rational<int>(step)); }
-
 /// Funkcja roundedAwayFromZero powinna:
 /// - zwracać iloraz numerator / denominator w int64: dokładny, gdy dzielenie jest bez reszty, a w przeciwnym razie zaokrąglony od zera (jak ceilR).
 ///

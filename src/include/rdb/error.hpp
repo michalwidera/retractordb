@@ -63,14 +63,6 @@ enum class Errc : std::uint8_t {
   Logic               ///< zlamany niezmiennik wykryty w miejscu, ktore umie go zwrocic (dawny LogicError)
 };
 
-/// Funkcja isConfigFamily powinna:
-/// - zwracać true wyłącznie dla kategorii rodziny "złe wejście": Config, Syntax i Compile.
-///
-/// @note Odpowiednik dawnego `catch (const ConfigError &)`.
-[[nodiscard]] constexpr bool isConfigFamily(Errc code) noexcept {
-  return code == Errc::Config || code == Errc::Syntax || code == Errc::Compile;
-}
-
 /// Funkcja errcName powinna:
 /// - zwracać nazwę kategorii do komunikatów i logów: ConfigError, CorruptDescriptor, SyntaxError, CompileError, EvalError, IOError albo LogicError, a dla wartości spoza wyliczenia "Error".
 [[nodiscard]] constexpr std::string_view errcName(Errc code) noexcept {

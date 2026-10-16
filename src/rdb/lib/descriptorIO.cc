@@ -54,14 +54,6 @@ Refusal tryLoadDescriptorFile(const std::string &descriptorFile, Descriptor &des
   return {};
 }
 
-Result<Descriptor> loadDescriptorFile(const std::string &descriptorFile) {
-  Descriptor descriptor;
-  if (Refusal refusal = tryLoadDescriptorFile(descriptorFile, descriptor); !refusal.message.empty())
-    return fail(refusal.cls == ErrorClass::Environment ? Errc::IO : Errc::CorruptDescriptor, std::move(refusal.message),
-                refusal.err);
-  return descriptor;
-}
-
 Result<> saveDescriptorFile(const std::string &descriptorFile, const Descriptor &descriptor) {
   std::ostringstream content;
   content << descriptor;

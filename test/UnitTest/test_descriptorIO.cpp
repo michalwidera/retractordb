@@ -37,10 +37,6 @@ TEST(DescriptorIOTest, save_and_load_round_trip) {
   EXPECT_TRUE(loaded == saved);
   EXPECT_EQ(loaded.getSizeInBytes(), saved.getSizeInBytes());
 
-  const auto loadedResult = rdb::loadDescriptorFile(file);
-  ASSERT_RDB_OK(loadedResult);
-  EXPECT_TRUE(*loadedResult == saved);
-
   std::filesystem::remove(file);
 }
 
@@ -53,10 +49,6 @@ TEST(DescriptorIOTest, bad_syntax_returns_an_error_without_ending_the_process) {
   EXPECT_EQ(error.cls, rdb::ErrorClass::Plan);
   EXPECT_EQ(error.err, 0);
   EXPECT_TRUE(error.message.contains("Fail: line 2:9")) << error.message;
-  const auto loadedResult = rdb::loadDescriptorFile(file);
-  ASSERT_RDB_ERROR(loadedResult, rdb::Errc::CorruptDescriptor, "Fail: line 2:9");
-  EXPECT_EQ(loadedResult.error().message(), error.message);
-  EXPECT_EQ(loadedResult.error().err(), error.err);
   EXPECT_TRUE(descriptor.empty());
 
   std::filesystem::remove(file);
@@ -84,20 +76,12 @@ TEST(DescriptorIOTest, io_refusal_preserves_the_error_class_and_errno) {
   EXPECT_EQ(missing.cls, rdb::ErrorClass::Environment);
   EXPECT_EQ(missing.err, ENOENT);
   EXPECT_FALSE(missing.message.empty());
-  const auto missingResult = rdb::loadDescriptorFile(file.string());
-  ASSERT_RDB_ERROR(missingResult, rdb::Errc::IO, "cannot open descriptor file");
-  EXPECT_EQ(missingResult.error().err(), ENOENT);
-  EXPECT_EQ(missingResult.error().message(), missing.message);
   ASSERT_RDB_OK(rdb::saveDescriptorFile(file.string(), sampleDescriptor()));
   std::filesystem::create_symlink(file, link);
   const auto linked = rdb::tryLoadDescriptorFile(link.string(), descriptor);
   EXPECT_EQ(linked.cls, rdb::ErrorClass::Environment);
   EXPECT_EQ(linked.err, ELOOP);
   EXPECT_TRUE(descriptor.empty());
-  const auto linkedResult = rdb::loadDescriptorFile(link.string());
-  ASSERT_RDB_ERROR(linkedResult, rdb::Errc::IO, "cannot open descriptor file");
-  EXPECT_EQ(linkedResult.error().err(), ELOOP);
-  EXPECT_EQ(linkedResult.error().message(), linked.message);
   std::filesystem::remove(link);
   std::filesystem::remove(file);
 }

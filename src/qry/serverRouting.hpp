@@ -98,22 +98,16 @@ struct NamespaceGroup {
 ///       nie pasuje do wzorca `^<nazwa> |`, wiec skrypty dopasowujace wiersze instancji jej nie widza.
 [[nodiscard]] std::vector<std::string> describe(const std::vector<bus::InstanceInfo> &instances);
 
-/// Funkcja describeYaml powinna:
-/// - zwracać dokument YAML zaczynający się od "---" i "apiVersion: xqry/v1", a dla pustej migawki kończący się "servers: []".
-/// - dla każdej instancji, posortowanej po instanceLabel, wypisywać name, pid, modes (litery jak w describe), pełną ścieżkę query w cudzysłowie (z ucieczką `\` i `"`), gdy jest niepusta, oraz listę streams albo "streams: []".
-/// - nie wypisywać legendy liter trybów.
-///
-/// @note Konsument formatu ma dostac dokument, nie nic. Sciezka jest pelna, bo odbiorca ma ja moc otworzyc,
-///       i cytowana, bo moze zawierac dwukropek albo spacje.
-[[nodiscard]] std::vector<std::string> describeYaml(const std::vector<bus::InstanceInfo> &instances);
-
 /// Funkcja describeNamespacesYaml powinna:
 /// - zwracać dokument YAML zaczynający się od "---" i "apiVersion: xqry/v1", a dla pustej listy grup kończący się "servers: []".
-/// - dla grup w podanej kolejności wypisywać ich instancje posortowane po instanceLabel, w tej samej postaci co describeYaml, z dodatkowym polem namespace: null dla magistrali domyślnej, a w pozostałych przypadkach nazwa w cudzysłowie.
+/// - dla grup w podanej kolejności wypisywać ich instancje posortowane po instanceLabel: name, namespace (null dla magistrali domyślnej, a w pozostałych przypadkach nazwa w cudzysłowie), pid, modes (litery jak w describe), pełną ścieżkę query w cudzysłowie (z ucieczką `\` i `"`), gdy jest niepusta, oraz listę streams albo "streams: []".
+/// - nie wypisywać legendy liter trybów.
 /// - dla niepustej listy grup, z których żadna nie ma instancji, wypisywać samo "servers:".
 ///
 /// @note Lista wszystkich magistral dla `xqry --bus -y`. Jedyny wolajacy (qryLauncher) pomija grupy bez
-///       instancji, wiec przypadek "servers:" bez listy nie wystepuje.
+///       instancji, wiec przypadek "servers:" bez listy nie wystepuje. Konsument formatu ma dostac dokument,
+///       nie nic. Sciezka jest pelna, bo odbiorca ma ja moc otworzyc, i cytowana, bo moze zawierac dwukropek
+///       albo spacje.
 [[nodiscard]] std::vector<std::string> describeNamespacesYaml(const std::vector<NamespaceGroup> &groups);
 
 }  // namespace routing

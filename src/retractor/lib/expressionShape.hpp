@@ -145,6 +145,10 @@ std::optional<rdb::descFld> functionResultType(std::string_view name, std::optio
 
 /// Funkcja isExactType powinna:
 /// - zwracać true wyłącznie dla typów o arytmetyce dokładnej i łącznej: BYTE, INTEGER, UINT i RATIONAL.
+///
+/// @note Calkowite pozostaja laczne takze w arytmetyce modulo 2^n. FLOAT i DOUBLE sa poza zbiorem swiadomie:
+///       reasocjacja zmienia tam liczbe zaokraglen - dla float x = 2^24 mamy (x+1)+1 == x, ale x+2 == x+2,
+///       wiec przepisanie w exprSimplify zmieniloby wynik.
 bool isExactType(rdb::descFld type);
 
 /// Funkcja inferExpressionShape powinna:

@@ -11,8 +11,7 @@ namespace rdb {
 ///
 /// Funkcje descriptorIO powinny:
 /// - wczytywać Descriptor z istniejącego pliku .desc bez kończenia procesu: tryLoadDescriptorFile()
-///   zwraca błąd otwarcia, składni, wartości i pusty deskryptor jako komunikat, a loadDescriptorFile()
-///   zwraca z tym samym komunikatem błąd Errc::CorruptDescriptor,
+///   zwraca błąd otwarcia, składni, wartości i pusty deskryptor jako komunikat,
 /// - zapisywać Descriptor do pliku .desc (saveDescriptorFile()) z kontrolą błędów otwarcia i zapisu,
 /// - weryfikować zgodność deskryptora dostarczonego z już zapisanym (verifyDescriptorMatch());
 ///   niezgodnosc po preflight wypisuje oba deskryptory i wraca jako Errc::Logic,
@@ -26,12 +25,6 @@ namespace rdb {
 ///
 /// @note Dowiazanie pod nazwa .desc w katalogu magazynu jest odmowa (#374).
 [[nodiscard]] Refusal tryLoadDescriptorFile(const std::string &descriptorFile, Descriptor &descriptor);
-
-/// Funkcja loadDescriptorFile powinna:
-/// - zwracać deskryptor odczytany przez tryLoadDescriptorFile.
-/// - odmowę środowiskową (brak pliku, brak uprawnień, błąd odczytu) zwracać jako Errc::IO z errno, a pozostałe (składnia, pusty deskryptor) jako Errc::CorruptDescriptor, z komunikatem odmowy.
-/// - nie kończyć procesu i nie zgłaszać wyjątku, tak aby host osadzający przetrwał zły plik.
-[[nodiscard]] Result<Descriptor> loadDescriptorFile(const std::string &descriptorFile);
 
 /// Funkcja saveDescriptorFile powinna:
 /// - zapisywać tekstową postać deskryptora do pliku .desc, tworząc go albo obcinając, bez podążania za dowiązaniem.
