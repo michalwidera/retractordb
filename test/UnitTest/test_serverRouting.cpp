@@ -284,4 +284,154 @@ TEST(serverRouting, describeNamespacesYamlDistinguishesDefaultFromNamedNull) {
   EXPECT_EQ(routing::describeNamespacesYaml({})[2], "servers: []");
 }
 
+// Wymagania z serverRouting.hpp, ktorych dotad nic nie sprawdzalo wprost. Teksty zapytan sa
+// wejsciem leksera routingu: tam, gdzie przypadek wymaga tekstu spoza RQL.g4, mowi to komentarz.
+
+TEST(serverRouting, sourceStreamsSkipBackslashEscapeInsideLiteral) {
+  // Bez ucieczki literal konczylby sie na `\'`, `FROM fake` dalby nazwe `fake`, a reszta tekstu
+  // zostalaby literalem do konca. RQL.g4 (STRING) ucieczki odwrotnym ukosnikiem nie zna.
+  EXPECT_EQ(routing::extractSourceStreams("SELECT 'x\\' FROM fake' STREAM y FROM a"), (std::vector<std::string>{"a"}));
+}
+
+TEST(serverRouting, sourceStreamsEndLineCommentAtNewlineAndKeepUnderscore) {
+  EXPECT_EQ(routing::extractSourceStreams("SELECT 1 STREAM y FROM a // b\n + c_d"), (std::vector<std::string>{"a", "c_d"}));
+}
+
+TEST(serverRouting, sourceStreamsTakeIdentifierRightAfterOn) {
+  EXPECT_EQ(routing::extractSourceStreams("RULE dsta ON dstb WHEN dstb[0] > 3 DO DUMP -2 TO 2"),
+            (std::vector<std::string>{"dstb"}));
+  EXPECT_EQ(routing::extractSourceStreams("RULE r on a WHEN a[0] > 1 DO DUMP -1 TO 1"), (std::vector<std::string>{"a"}));
+}
+
+TEST(serverRouting, sourceStreamsSkipEveryReducerAndNameAfterDot) {
+  EXPECT_EQ(routing::extractSourceStreams("SELECT 1 STREAM y FROM MAX(a)+AVG(b)+SUMC(c)+max(d)+avg(e)+sumc(f)"),
+            (std::vector<std::string>{"a", "b", "c", "d", "e", "f"}));
+  // Po kropce RQL.g4 dopuszcza tylko reduktor, ktory i tak odpada jako slowo kluczowe; regula
+  // kropki widac dopiero na zwyklej nazwie, takze oddzielonej spacjami.
+  EXPECT_EQ(routing::extractSourceStreams("SELECT 1 STREAM y FROM a.b+c . d"), (std::vector<std::string>{"a", "c"}));
+}
+
+TEST(serverRouting, sourceStreamsStopAtFirstTerminatorAfterFrom) {
+  // Drugie zdanie planu pokazuje, ze analiza sie KONCZY: bez przerwania `FROM b` dodaloby nazwy.
+  for (const std::string terminator : {"FILE 'y.dat'", "RETENTION 4", "VOLATILE", "STORAGE MEMORY", "file 'y.dat'",
+                                       "retention 4", "volatile", "storage memory"}) {
+    SCOPED_TRACE(terminator);
+    EXPECT_EQ(routing::extractSourceStreams("SELECT a[0] STREAM y FROM a " + terminator + " SELECT b[0] STREAM z FROM b"),
+              (std::vector<std::string>{"a"}));
+  }
+  // Przed FROM te same slowa niczego nie koncza.
+  EXPECT_EQ(routing::extractSourceStreams("DEFAULT VOLATILE STORAGE 'memory' SELECT a[0] STREAM y FROM a"),
+            (std::vector<std::string>{"a"}));
+  EXPECT_EQ(routing::extractSourceStreams("RULE r ON a WHEN a[0] > 1 DO DUMP -1 TO 1 RETENTION 3 SELECT b[0] STREAM z FROM b"),
+            (std::vector<std::string>{"a", "b"}));
+}
+
+TEST(serverRouting, sourceStreamsRecognizeOnlyUniformCaseKeywords) {
+  EXPECT_EQ(routing::extractSourceStreams("SELECT 1 STREAM y FROM Max+Avg+Sumc+File+Retention+Volatile"),
+            (std::vector<std::string>{"Max", "Avg", "Sumc", "File", "Retention", "Volatile"}));
+  // `From` i `On` to dla RQL.g4 zwykle nazwy, wiec tekst nie ma ani FROM, ani ON.
+  EXPECT_TRUE(routing::extractSourceStreams("SELECT 1 STREAM y From a").empty());
+  EXPECT_TRUE(routing::extractSourceStreams("RULE r On a WHEN a[0] > 1 DO DUMP -1 TO 1").empty());
+}
+
+TEST(serverRouting, sourceStreamsKeepOrderAndRepetitions) {
+  EXPECT_EQ(routing::extractSourceStreams("SELECT 1 STREAM y FROM b+a#b+a"), (std::vector<std::string>{"b", "a", "b", "a"}));
+}
+
+TEST(serverRouting, streamResolvesToFirstServingInstanceInSnapshotOrder) {
+  // Magistrala nie dopuszcza dwoch wlascicieli jednej nazwy; migawke z takim stanem siejemy wprost.
+  const bus::InstanceInfo alfa    = makeInstance("alfa", 101, "alfa.rql", {"dup"});
+  const bus::InstanceInfo beta    = makeInstance("beta", 202, "beta.rql", {"dup"});
+  const routing::Resolution first = routing::forStream({alfa, beta}, "dup");
+  EXPECT_EQ(first.status, routing::Status::Resolved);
+  EXPECT_EQ(first.serverName, "alfa");
+  const routing::Resolution swapped = routing::forStream({beta, alfa}, "dup");
+  EXPECT_EQ(swapped.status, routing::Status::Resolved);
+  EXPECT_EQ(swapped.serverName, "beta");
+}
+
+TEST(serverRouting, unknownStreamCarriesExactMessage) {
+  EXPECT_EQ(routing::forStream(twoInstances(), "nosuch").detail, "nosuch: stream not found on any live instance");
+}
+
+TEST(serverRouting, adHocSkipsUnknownNamesWhenOwnerIsUnique) {
+  const routing::Resolution resolved = routing::forAdHoc(twoInstances(), "SELECT 1 STREAM tmp FROM srca+nowhere+dsta");
+  EXPECT_EQ(resolved.status, routing::Status::Resolved);
+  EXPECT_EQ(resolved.serverName, "alfa");
+}
+
+TEST(serverRouting, adHocCrossServerListsEachPairOnce) {
+  const routing::Resolution resolved = routing::forAdHoc(twoInstances(), "SELECT 1 STREAM tmp FROM dstb+dsta+dstb+srca");
+  EXPECT_EQ(resolved.status, routing::Status::CrossServer);
+  EXPECT_EQ(resolved.detail, "ad-hoc query crosses a server boundary (dstb@beta, dsta@alfa, srca@alfa)");
+}
+
+TEST(serverRouting, adHocUndecidableNamesLiveInstancesAndHint) {
+  const routing::Resolution resolved = routing::forAdHoc(twoInstances(), "SELECT 1 STREAM tmp FROM nowhere");
+  EXPECT_EQ(resolved.detail, "ad-hoc query names no stream of any live instance (alfa, beta); use --server <name>");
+}
+
+TEST(serverRouting, wholeInstanceAmbiguityCountsInstances) {
+  std::vector<bus::InstanceInfo> instances = twoInstances();
+  instances.push_back(makeInstance("gamma", 303, "gamma.rql", {"dstc"}));
+  const routing::Resolution resolved = routing::forSingleTarget(instances);
+  EXPECT_EQ(resolved.status, routing::Status::Ambiguous);
+  EXPECT_EQ(resolved.detail, "3 live instances (alfa, beta, gamma); use --server <name>");
+}
+
+TEST(serverRouting, describeOfEmptySnapshotIsEmpty) { EXPECT_TRUE(routing::describe({}).empty()); }
+
+TEST(serverRouting, describeAndYamlSortByLabelNotRawName) {
+  // "#x" < "(unnamed)", ale "" < "#x": kolejnosc rozstrzyga, czy sortowano po etykiecie.
+  const std::vector<bus::InstanceInfo> instances{makeInstance("", 1, "a.rql", {"s1"}), makeInstance("#x", 2, "b.rql", {"s2"})};
+  const std::vector<std::string> lines = routing::describe(instances);
+  ASSERT_EQ(lines.size(), 5U);
+  EXPECT_EQ(lines[2], "#x        | 2   | N    | b.rql | s2");
+  EXPECT_EQ(lines[3], "(unnamed) | 1   | N    | a.rql | s1");
+
+  const std::vector<std::string> yaml = routing::describeNamespacesYaml({{.name = "", .instances = instances}});
+  ASSERT_EQ(yaml.size(), 17U);
+  EXPECT_EQ(yaml[3], "  - name: #x");
+  EXPECT_EQ(yaml[10], "  - name: (unnamed)");
+}
+
+TEST(serverRouting, describePadsColumnsToWidestValue) {
+  // Dlugosc sklejonej listy strumieni (19 + 2 + 1) dalaby kreske dluzsza o trzy znaki.
+  const std::vector<std::string> lines =
+      routing::describe({makeInstance("alfa", 1234567, "plan.rql", {"averyverylongstream", "s"})});
+  ASSERT_EQ(lines.size(), 5U);
+  EXPECT_EQ(lines[0], "SERVER | PID     | MODE | QUERY    | STREAMS");
+  EXPECT_EQ(lines[1], "-------+---------+------+----------+--------------------");
+  EXPECT_EQ(lines[2], "alfa   | 1234567 | N    | plan.rql | averyverylongstream");
+  EXPECT_EQ(lines[3], "       |         |      |          | s");
+}
+
+TEST(serverRouting, describeShortensQueryPathOnlyWhenShorter) {
+  const std::vector<std::string> lines = routing::describe(
+      {makeInstance("a", 1, "/p/q.rql", {"s1"}), makeInstance("b", 2, "/plan.rql", {"s2"}),
+       makeInstance("c", 3, "deep/dir/tree/plan.rql", {"s3"}), makeInstance("d", 4, "/very/long/plans/dir/x.rql", {"s4"})});
+  ASSERT_EQ(lines.size(), 7U);
+  EXPECT_EQ(lines[2], "a      | 1   | N    | /p/q.rql               | s1");
+  EXPECT_EQ(lines[3], "b      | 2   | N    | /plan.rql              | s2");
+  EXPECT_EQ(lines[4], "c      | 3   | N    | deep/dir/tree/plan.rql | s3");
+  EXPECT_EQ(lines[5], "d      | 4   | N    | .../dir/x.rql          | s4");
+}
+
+TEST(serverRouting, describeNamespacesYamlKeepsGroupOrderAndEscapesQuery) {
+  const std::vector<routing::NamespaceGroup> groups{
+      {.name = "zeta", .instances = {makeInstance("b", 2, R"(/p/a "q"\c.rql)", {"s"})}},
+      {.name = "", .instances = {makeInstance("a", 1, "", {})}}};
+  EXPECT_EQ(
+      routing::describeNamespacesYaml(groups),
+      (std::vector<std::string>{"---", "apiVersion: xqry/v1", "servers:", "  - name: b", R"(    namespace: "zeta")",
+                                "    pid: 2", "    modes: N", R"(    query: "/p/a \"q\"\\c.rql")", "    streams:", "      - s",
+                                "  - name: a", "    namespace: null", "    pid: 1", "    modes: N", "    streams: []"}));
+}
+
+TEST(serverRouting, describeNamespacesYamlFramesDocumentWithoutInstances) {
+  EXPECT_EQ(routing::describeNamespacesYaml({}), (std::vector<std::string>{"---", "apiVersion: xqry/v1", "servers: []"}));
+  EXPECT_EQ(routing::describeNamespacesYaml({{.name = "", .instances = {}}, {.name = "x", .instances = {}}}),
+            (std::vector<std::string>{"---", "apiVersion: xqry/v1", "servers:"}));
+}
+
 }  // namespace
