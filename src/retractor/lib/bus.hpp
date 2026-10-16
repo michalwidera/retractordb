@@ -57,6 +57,7 @@ inline constexpr std::string_view kSegmentName = "xrdbbus_v7";
 
 /// Funkcja segmentName powinna:
 /// - zwracać nazwę segmentu dla bieżącego uruchomienia: kSegmentName + "_" + przestrzeń nazw z servername::environmentNamespace(), gdy przestrzeń jest niepusta i poprawna według servername::isValid, a w przeciwnym razie samo kSegmentName.
+///   Test: `BusSegmentNamespace.AppendsNamespaceToSegmentName`, `BusSegmentNamespace.UnsetOrEmptyKeepsProductionSegment`, `BusSegmentNamespace.InvalidValueNeverReachesTheObjectName`.
 ///
 /// @note Rozlacznosc nazw strumieni jest wlasnoscia CALEJ maszyny, wiec dwa zestawy testow integracyjnych z
 ///       tymi samymi nazwami (`core0`, `dst`, `str1`) nie moga biec na jednym segmencie - drugi start odpada na
@@ -66,16 +67,22 @@ inline constexpr std::string_view kSegmentName = "xrdbbus_v7";
 
 /// Funkcja segmentNames powinna:
 /// - zwracać posortowane nazwy segmentów bieżącej wersji układu odczytane z plików `<segment>.lock` w ipc::kMachineLockDir: dokładnie kSegmentName albo kSegmentName + "_" + nazwa poprawna według servername::isValid.
+///   Test: `BusSegmentNames.ListsOnlyCurrentLayoutPresenceFiles`; samo kSegmentName (plik /tmp/xrdbbus_v7.lock) bez przypadku - nalezy do dzialajacych serwerow produkcyjnych, test go nie zaklada.
 /// - kończyć przegląd bez błędu, gdy katalogu nie da się otworzyć albo czytać.
+///   Nietestowalne: katalog jest staly (ipc::kMachineLockDir), bez parametru, wiec testu nie da sie skierowac na katalog nieczytelny; ta sama petla directory_iterator z error_code w lockfile::sweep konczy sie zerem w `BusPresence.SweepLeavesOtherLayoutVersions`.
 /// - nie sprawdzać, czy segment albo żywa instancja nadal istnieje.
+///   Test: `BusSegmentNames.ListsOnlyCurrentLayoutPresenceFiles`.
 ///
 /// @note Samo znalezienie pliku obecnosci niczego nie dowodzi; czytelnik sprawdza to przez Bus.
 [[nodiscard]] std::vector<std::string> segmentNames();
 
 /// Funkcja sweepAbandonedSegments powinna:
 /// - przez lockfile::sweep w machineLockDir zajmować porzucone pliki obecności segmentów bieżącej wersji układu (nazwy jak w segmentNames), pod tą blokadą usuwać segment o nazwie pliku bez ".lock" przez ipc::security::removeOwned, a potem plik obecności.
+///   Test: `BusPresence.SweepRemovesOnlyUnmappedSegments`, `LockManagerSweep.RemovesOnlyAbandonedLocksAndTheirIpcObjects`.
 /// - nie ruszać plików obecności innych wersji, plików trzymanych przez kogokolwiek ani plików innych kont.
+///   Test: `BusPresence.SweepLeavesOtherLayoutVersions`, `BusPresence.SweepRemovesOnlyUnmappedSegments`; pliki innych kont bez przypadku - wymagaja drugiego konta (root i chown), pomijanie innego UID nalezy do lockfile::sweep.
 /// - zwracać liczbę usuniętych plików obecności, także tych, przy których removeOwned odmówił usunięcia segmentu.
+///   Test: `BusPresence.SweepRemovesOnlyUnmappedSegments`, `BusPresence.SweepCountsPresenceWhoseSegmentRemovalWasRefused` (tylko RDB_HAS_BOOST_POSIX_SHM: obiekt podmieniony na dowiazanie).
 ///
 /// @note Sprzata pozostalosci po procesach zabitych, ktore nie zdazyly posprzatac jako ostatni wychodzacy.
 ///       Inne wersje maja binarki sprzed protokolu obecnosci, ktore blokady nie biora, wiec jej brak nic o nich
@@ -84,6 +91,7 @@ std::size_t sweepAbandonedSegments(std::string_view machineLockDir = ipc::kMachi
 
 /// Funkcja segmentBytes powinna:
 /// - zwracać rozmiar całego segmentu magistrali w bajtach, bez ujawniania jego układu.
+///   Test: `BusFixture.SegmentBytesIsTheWholeMappedObject`.
 ///
 /// @note Segment jest tworzony w calosci i od razu zerowany, wiec to miejsce ZAJETE w /dev/shm, a nie
 ///       rezerwacja rosnaca z uzyciem. Sluzy wycenie budzetu pamieci dzielonej (shmBudget).
@@ -169,8 +177,11 @@ struct StoreDigest {
 
 /// Funkcja storeDigest powinna:
 /// - zwracać skrót 128-bitowy: `low` jako 64-bitowy FNV-1a ścieżki, a `high` jako FNV-1a ścieżki kontynuowany od stanu po soli "rdb-store".
+///   Test: `BusStoreDigest.MatchesFnv1aReferenceValues`, `BusStoreDigest.IsAStableFunctionOfThePath`.
 /// - dawać dla tej samej ścieżki ten sam skrót w każdym procesie, niezależnie od biblioteki standardowej.
+///   Test: `BusStoreDigest.MatchesFnv1aReferenceValues`; wartosci wzorcowe wpisane w test, policzone niezaleznie.
 /// - traktować ścieżkę jako napis, bez normalizacji i bez zaglądania do systemu plików.
+///   Test: `BusStoreDigest.MatchesFnv1aReferenceValues`, `BusStoreDigest.IsAStableFunctionOfThePath`.
 ///
 /// @note Skrot jedzie do pamieci dzielonej i porownuja go ROZNE procesy, wiec std::hash odpada. Dwie polowy
 ///       licza sie z dwoch roznych wiadomosci (druga z sola), zeby nie byly ze soba powiazane.
@@ -219,9 +230,13 @@ struct StoreOwner {
 
 /// Funkcja findForeignOwner powinna:
 /// - pomijać instancje o nazwie równej selfName, przy pustej selfName - wszystkie instancje bezimienne.
+///   Test: `BusForeignOwner.OwnStreamsAreNotAConflict`, `BusForeignOwner.UnnamedInstanceTakesPart`.
 /// - zwracać pierwszą w kolejności migawki pozostałą instancję, która ma którąkolwiek nazwę z streams, z tą nazwą (pierwszą w kolejności strumieni instancji), nazwą instancji i pid.
+///   Test: `BusForeignOwner.ReportsOwnerOutsideSelf`, `BusForeignOwner.FirstMatchFollowsSnapshotAndInstanceStreamOrder`.
 /// - zwracać nullopt, gdy żadna inna instancja nie ma nazwy z streams.
+///   Test: `BusForeignOwner.DisjointSetAndEmptyInputsPass`.
 /// - działać wyłącznie na podanej migawce, bez IPC i bez kontaktu z serwerami.
+///   Test: `BusForeignOwner.ReportsOwnerOutsideSelf`, `BusForeignOwner.DisjointSetAndEmptyInputsPass`; migawka z wymyslonymi pid bez segmentu i serwerow, brak IPC wynika z sygnatury, nie z asercji.
 ///
 /// @note Sprawdza zestaw zapytan PRZED dostarczeniem go dzialajacemu serwisowi: instancje docelowa trzeba
 ///       pominac, bo restart i tak zwalnia jej slot.
@@ -230,7 +245,9 @@ struct StoreOwner {
 
 /// Funkcja findForeignCounterOwner powinna:
 /// - dla pustej counterPath zwracać nullopt.
+///   Test: `BusForeignCounterOwner.OwnDistinctAndEmptyCountersPass`.
 /// - zwracać pierwszą w kolejności migawki instancję o nazwie innej niż selfName, której ścieżka licznika `:ROTATION` jest napisowo równa counterPath, z tą ścieżką, nazwą instancji i pid, a nullopt, gdy takiej nie ma.
+///   Test: `BusForeignCounterOwner.ReportsForeignCounterBeforeDelivery`, `BusForeignCounterOwner.FirstMatchFollowsSnapshotOrder`, `BusForeignCounterOwner.OwnDistinctAndEmptyCountersPass`.
 ///
 /// @note Pusta sciezka nie rosci zasobu. Instancja docelowa jest pomijana, bo dostarczenie planu zastepuje
 ///       jej dotychczasowy slot po restarcie.
@@ -239,7 +256,9 @@ struct StoreOwner {
 
 /// Funkcja findForeignStoreOwner powinna:
 /// - dla kolejnych ścieżek z stores liczyć storeDigest i zwracać pierwszą ścieżkę, której skrót występuje w storeDigests instancji o nazwie innej niż selfName, z tą ścieżką wołającego, nazwą instancji i pid.
+///   Test: `BusForeignStoreOwner.ReportsForeignStoreBeforeDelivery`, `BusForeignStoreOwner.FirstMatchFollowsCallerStoreOrder`.
 /// - zwracać nullopt, gdy żadna inna instancja nie ma skrótu żadnej ze ścieżek.
+///   Test: `BusForeignStoreOwner.OwnDistinctAndEmptyStoresPass`.
 ///
 /// @note Chroni to, czego nazwa strumienia nie chroni: `FILE` odrywa nazwe pliku od nazwy zapytania, wiec dwa
 ///       plany o ROZLACZNYCH nazwach moga wskazywac jeden magazyn. Slot niesie sam skrot, wiec zwracana jest
@@ -288,13 +307,18 @@ struct ClaimRequest {
 
 /// Funkcja processStartTime powinna:
 /// - zwracać znacznik startu procesu z osplat::inspectProcess (Linux: pole 22 starttime ze stat lidera grupy wątków, Darwin: czas z sysctl), a 0, gdy procesu nie ma albo jego wpisu nie da się odczytać.
+///   Test: `BusFixture.ProcessIdentityAgreesAcrossProcesses`, `BusFixture.ProcessStateDecidesLiveness`; na Linuksie biegnie galaz procfs, galaz sysctl (Darwin) tylko w buildzie macOS.
 [[nodiscard]] std::uint64_t processStartTime(std::int32_t pid);
 
 /// Funkcja isProcessAlive powinna:
 /// - dla pid <= 0 zwracać false.
+///   Test: `BusFixture.LivenessRequiresMatchingStartTime`.
 /// - dla wpisu procesu, którego nie da się odczytać (hidepid, ProtectProc), logować ostrzeżenie i zwracać true.
+///   Test: `BusFixture.UnreadableOwnerKeepsSlot`; ostrzezenie (SPDLOG_WARN) bez asercji - Release kompiluje je bez wyjscia.
 /// - dla procesu nieistniejącego i dla procesu zombie zwracać false.
+///   Test: `BusFixture.ZombieSlotIsFreeAgain`, `BusFixture.ProcessStateDecidesLiveness`.
 /// - w pozostałych przypadkach zwracać true wyłącznie przy niezerowym znaczniku startu równym startTime, także dla procesu zatrzymanego sygnałem albo w nieprzerywalnym śnie.
+///   Test: `BusFixture.LivenessRequiresMatchingStartTime`, `BusFixture.ProcessStateDecidesLiveness`; nieprzerywalny sen i czytelny wpis z zerowym znacznikiem bez przypadku - nie da sie ich wywolac deterministycznie.
 ///
 /// @note Zgodnosc startTime odroznia ten sam proces od innego, ktoremu jadro nadalo zwolniony PID. Zombie
 ///       trzymalby nazwy strumieni az do wait() rodzica. Wpis nieczytelny to "nie wiem": falszywe "zyje"
@@ -303,20 +327,35 @@ struct ClaimRequest {
 
 /// Obiekt klasy Bus powinien:
 /// - przy konstrukcji zajmować współdzieloną blokadę pliku obecności przed otwarciem segmentu i podłączać się do segmentu o podanej nazwie, tworząc go wyłącznie w trybie createIfMissing, a przy niepowodzeniu przechodzić w stan niepodłączony bez przerywania startu serwera.
+///   Test: `BusPresence.LastMapperRemovesSegment`, `BusPresence.AttachHasDeadlineWithExclusivePresenceHolder`, `BusFixture.ReaderModeNeverCreatesSegmentAndIsUnavailable`.
 /// - raportować przez attached, czy segment jest odwzorowany.
+///   Test: `BusFixture.ClaimPublishesInstance`, `BusFixture.ReaderModeNeverCreatesSegmentAndIsUnavailable`.
 /// - w claim po kontroli limitów zwalniać poprzedni slot tej instancji, a następnie pod muteksem magistrali zajmować wolny lub martwy slot wyłącznie wtedy, gdy nazwy strumieni, ścieżka licznika :ROTATION i skróty ścieżek magazynu są rozłączne ze wszystkimi żywymi instancjami i żadna żywa instancja nie pracuje w trybie usługowym, gdy żąda go ta instancja; przy TooLarge i przy niepodłączonej magistrali zachowywać poprzedni slot.
+///   Test: `BusFixture.ReclaimReplacesOwnSlot`, `BusFixture.ReclaimRefusedByLimitsKeepsPreviousSlotButConflictDropsIt`, `BusFixture.ZombieSlotIsFreeAgain`, `BusFixture.SecondServiceInstanceIsRefused`, `FallbackLock.LiveStoppedOwnerKeepsLockBeyondDiagnosticDeadline`; magistrala niepodlaczona nigdy nie ma slotu, wiec ta polowa jest pusta.
 /// - zwracać z claim odpowiednio Conflict, CounterConflict, StoreConflict albo ServiceConflict z kolidującym zasobem i jego właścicielem, TooLarge przy przekroczeniu pojemności slotu lub długości pól rozstrzygających, NoFreeSlot przy braku wolnego slotu i Unavailable, gdy magistrali nie da się użyć.
+///   Test: `BusFixture.CollidingStreamIsRefusedWithOwner`, `BusFixture.SharedRotationCounterIsRefused`, `BusFixture.SharedStorageFileIsRefused`, `BusFixture.SecondServiceInstanceIsRefused`, `BusFixture.OversizedPlanIsRefused`, `BusFixture.OversizedCounterPathIsRefused`, `BusFixture.FullBusIsNoFreeSlot`, `BusFixture.ReaderModeNeverCreatesSegmentAndIsUnavailable`, `BusRepairSeqlock.UnrecoverableMutexReportsRecoveryInstructions` (ut_busSlotCount, galaz robust).
 /// - obcinać zbyt długie pola informacyjne (nazwa jednostki, plik zapytań) z ostrzeżeniem w logu zamiast odmawiać startu.
+///   Test: `BusFixture.InformationalFieldsAreTruncatedNotRefused`; ostrzezenie (SPDLOG_WARN) bez asercji - Release kompiluje je bez wyjscia.
 /// - uznawać slot za żywy wyłącznie, gdy proces o jego pid istnieje, nie jest zombie i ma ten sam czas startu, a slot martwy traktować jako wolny bez demona i heartbeatów.
+///   Test: `BusFixture.ZombieSlotIsFreeAgain`, `BusFixture.UnreadableOwnerKeepsSlot`, `FallbackLock.SlotWithForeignStartTimeIsFree` (ut_busFallback; kod zywotnosci slotu wspolny dla obu galezi zamka).
 /// - w reservePlan rezerwować w posiadanym slocie zasoby następnego planu po kontroli rozłączności pod muteksem, pozostawiając aktywne zasoby publikowane, a przy odmowie nie zmieniać slotu; bez posiadanego slotu zwracać Unavailable.
+///   Test: `BusFixture.ReservedPlanBlocksNamesUntilActivation`, `BusFixture.RefusedPlanReplacementLeavesOwnResourcesIntact`, `BusFixture.RefusedStoreReservationLeavesOwnStoresIntact`, `BusFixture.ReservePlanWithoutSlotIsUnavailable`.
 /// - w activateReservedPlan zastępować aktywne zasoby zarezerwowanymi bez ponownej kontroli kolizji, zwracając NotReserved dla instancji bez slotu lub rezerwacji i Unavailable, gdy magistrali nie da się użyć.
+///   Test: `BusFixture.ReservedPlanBlocksNamesUntilActivation`, `BusFixture.ReservedPlanBlocksStoresUntilActivation`, `BusFixture.ActivationWithoutReservationIsNotReserved`, `BusFixture.ReaderModeNeverCreatesSegmentAndIsUnavailable`.
 /// - w claimAdditional dopisywać do posiadanego slotu tylko nazwy i ścieżki nieobecne w nim, po kontroli rozłączności, zwracać faktycznie dopisane w addedStreams i addedStores, a przy odmowie nie zmieniać slotu.
+///   Test: `BusFixture.ClaimAdditionalExtendsOwnSlot`, `BusFixture.ClaimAdditionalIsIdempotent`, `BusFixture.ClaimAdditionalConflictLeavesOwnSlotIntact`, `BusFixture.ClaimAdditionalStoreConflictLeavesOwnSlotIntact`, `BusFixture.ReleaseAdditionalFreesOnlyWhatWasAdded`.
 /// - w releaseAdditional zdejmować z własnego slotu wyłącznie podane nazwy i ścieżki, bez zmiany reszty slotu, a bez slotu nie robić nic.
+///   Test: `BusFixture.ReleaseAdditionalFreesOnlyWhatWasAdded`, `BusFixture.ReleaseAdditionalKeepsOrderOfRemainingEntries`, `BusFixture.ReleaseAdditionalKeepsRestOfSlot`.
 /// - w release zwalniać własny slot pod muteksem, idempotentnie, także z obsługi atexit.
+///   Test: `BusFixture.ReleaseIsIdempotent`, `BusFixture.ReleaseFreesTheName`; wywolanie z obslugi atexit (executorsm.cpp) bez przypadku jednostkowego, sprzatanie po wyjsciu sprawdza `it_leftover_sweep`.
 /// - przez instances zwracać migawkę żywych instancji czytaną seqlockiem, bez muteksu i bez kontaktu z serwerami, pomijając sloty w trakcie zapisu i sloty martwe.
+///   Test: `BusFixture.ClaimPublishesInstance`, `BusFixture.ZombieSlotIsFreeAgain`, `FallbackLock.InstancesSkipSlotMidWriteWithoutTakingLock` (ut_busFallback; odczyt wspolny dla obu galezi zamka).
 /// - po przejęciu muteksu porzuconego przez zmarłego właściciela unieważniać sloty przerwane w trakcie zapisu przed oznaczeniem stanu jako spójnego.
+///   Test: `BusRepairSeqlock.RepairPublishesFreshEvenSequence` (ut_busSlotCount i ut_busFallback), `BusRepairSeqlock.InterruptedRepairRemainsRecoverable` (ut_busSlotCount), `FallbackLock.DeadOwnerIsRecoveredAndInterruptedSlotInvalidated`; kolejnosc naprawy przed pthread_mutex_consistent bez asercji - okno miedzy nimi bez haka RDB_FAULT_*.
 /// - przy zniszczeniu zwalniać slot i odwzorowanie, a segment i plik obecności usuwać wyłącznie wtedy, gdy uda się zająć wyłączną blokadę obecności, czyli segmentu nie mapuje nikt inny.
+///   Test: `BusPresence.LastMapperRemovesSegment`, `BusFixture.ReleaseFreesTheName`.
 /// - uniemożliwiać kopiowanie obiektu.
+///   Sprawdzenie kompilacji: test/UnitTest/test_bus.cpp - static_assert(!std::is_copy_constructible_v<bus::Bus> && !std::is_copy_assignable_v<bus::Bus>).
 class Bus {
  public:
   /// Podlacza sie do segmentu, tworzac go, gdy jeszcze nie istnieje. Niepowodzenie nie jest

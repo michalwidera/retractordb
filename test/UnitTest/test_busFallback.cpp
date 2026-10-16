@@ -118,4 +118,55 @@ TEST_F(FallbackLock, DeadOwnerIsRecoveredAndInterruptedSlotInvalidated) {
   EXPECT_EQ(instances[0].name, "candidate");
   EXPECT_EQ(segment->slots[0].seq % 2, 0U);
 }
+
+// instances() nie bierze zamka i pomija slot w trakcie zapisu: wlasciciel zatrzymany w srodku
+// zapisu trzyma zamek, a jego slot ma zywy pid i zgodny czas startu. Kontrola dodatnia: ten sam
+// slot z parzystym seq jest widoczny. Kod odczytu jest wspolny dla obu galezi zamka.
+TEST_F(FallbackLock, InstancesSkipSlotMidWriteWithoutTakingLock) {
+  bus::Bus candidate(name);
+  ASSERT_TRUE(candidate.attached());
+  ASSERT_EQ(candidate.claim({.name = "candidate", .streams = {"dst"}}).status, bus::ClaimStatus::Claimed);
+  IPC::shared_memory_object object(IPC::open_only, name.c_str(), IPC::read_write);
+  IPC::mapped_region mapping(object, IPC::read_write);
+  auto *segment = static_cast<bus::Segment *>(mapping.get_address());
+  stopOwner(segment);
+
+  auto reader = std::async(std::launch::async, [&] { return candidate.instances(); });
+  ASSERT_EQ(reader.wait_for(5s), std::future_status::ready) << "instances() czeka na zamek magistrali";
+  EXPECT_TRUE(reader.get().empty());
+
+  std::atomic_ref<std::uint32_t>(segment->slots[0].seq).store(2, std::memory_order_release);
+  const auto visible = candidate.instances();
+  ASSERT_EQ(visible.size(), 1U);
+  EXPECT_EQ(visible[0].pid, child);
+  EXPECT_EQ(visible[0].name, "candidate");
+
+  // Destruktor candidate bierze zamek, wiec wlasciciel musi go najpierw oddac.
+  kill(child, SIGCONT);
+  waitpid(child, nullptr, 0);
+  child = -1;
+}
+
+// Slot zywego pid-u z innym czasem startu nalezy do procesu, ktorego juz nie ma (pid uzyty
+// ponownie), wiec jest wolny. Kontrola dodatnia: z wlasciwym czasem startu ta sama nazwa koliduje.
+TEST_F(FallbackLock, SlotWithForeignStartTimeIsFree) {
+  bus::Bus candidate(name);
+  bus::Bus peer(name);
+  ASSERT_TRUE(candidate.attached());
+  ASSERT_EQ(peer.claim({.name = "peer", .streams = {"dst"}}).status, bus::ClaimStatus::Claimed);
+  ASSERT_EQ(candidate.claim({.name = "candidate", .streams = {"dst"}}).status, bus::ClaimStatus::Conflict);
+
+  IPC::shared_memory_object object(IPC::open_only, name.c_str(), IPC::read_write);
+  IPC::mapped_region mapping(object, IPC::read_write);
+  auto *segment = static_cast<bus::Segment *>(mapping.get_address());
+  bus::beginWrite(segment->slots[0]);
+  segment->slots[0].startTime += 1;
+  bus::endWrite(segment->slots[0]);
+
+  EXPECT_TRUE(candidate.instances().empty());
+  EXPECT_EQ(candidate.claim({.name = "candidate", .streams = {"dst"}}).status, bus::ClaimStatus::Claimed);
+  const auto instances = candidate.instances();
+  ASSERT_EQ(instances.size(), 1U);
+  EXPECT_EQ(instances[0].name, "candidate");
+}
 }  // namespace

@@ -11,14 +11,17 @@
 #include <csignal>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 #include <boost/interprocess/shared_memory_object.hpp>
 
 #include "osPlatform.hpp"
+#include "platformConfig.h"
 #include "retractor/lib/bus.hpp"
 #include "retractor/lib/lockFile.hpp"
 #include "retractor/lib/serverName.hpp"
@@ -1104,4 +1107,318 @@ TEST(BusPresence, SweepRemovesOnlyUnmappedSegments) {
   ::close(holder);
   IPC::shared_memory_object::remove(live.c_str());
   std::filesystem::remove_all(dir);
+}
+
+// --- Wymagania bus.hpp: przypadki dopisane przy oznaczaniu pokrycia ---
+
+static_assert(!std::is_copy_constructible_v<bus::Bus> && !std::is_copy_assignable_v<bus::Bus>,
+              "Bus trzyma odwzorowanie i blokade obecnosci; kopia zwalnialaby je dwa razy");
+
+// Lista segmentow czyta wylacznie nazwy plikow obecnosci: plik bez segmentu tez trafia na liste,
+// a nazwy innej wersji, niepoprawne i bez ".lock" nie. Pliki poprawne trzymamy pod LOCK_SH, bo
+// w /tmp nieblokowane pliki obecnosci zabiera sprzatacz sasiedniego serwera.
+TEST(BusSegmentNames, ListsOnlyCurrentLayoutPresenceFiles) {
+  const std::string pid    = std::to_string(getpid());
+  const std::string first  = std::string(bus::kSegmentName) + "_utnamesa" + pid;
+  const std::string second = std::string(bus::kSegmentName) + "_utnamesb" + pid;
+  const std::vector<std::string> ignored{
+      "xrdbbus_v6_utnamesc" + pid + ".lock", std::string(bus::kSegmentName) + "_Utnamesd" + pid + ".lock",
+      std::string(bus::kSegmentName) + "_utnamese" + pid + ".lck", std::string(bus::kSegmentName) + "utnamesf" + pid + ".lock"};
+  int held[2] = {-1, -1};
+  ASSERT_EQ(lockfile::acquire(presenceFile(second), false, false, held[0]), lockfile::Result::Acquired);
+  ASSERT_EQ(lockfile::acquire(presenceFile(first), false, false, held[1]), lockfile::Result::Acquired);
+  for (const auto &file : ignored) {
+    std::ofstream touch("/tmp/" + file);
+  }
+
+  const auto names = bus::segmentNames();
+  for (const auto &file : ignored)
+    std::filesystem::remove("/tmp/" + file);
+  lockfile::removeAndRelease(presenceFile(second), held[0]);
+  lockfile::removeAndRelease(presenceFile(first), held[1]);
+
+  EXPECT_TRUE(std::ranges::is_sorted(names));
+  const auto at = [&](const std::string &name) { return std::ranges::find(names, name); };
+  ASSERT_NE(at(first), names.end()) << "plik obecnosci bez segmentu nie trafil na liste";
+  ASSERT_NE(at(second), names.end());
+  EXPECT_LT(at(first), at(second));
+  EXPECT_FALSE(segmentExists(first)) << "lista nie moze zalezec od istnienia segmentu";
+  for (const auto &name : names)
+    if (name.find("names") != std::string::npos && name.find(pid) != std::string::npos)
+      EXPECT_TRUE(name == first || name == second) << "na liste trafila nazwa spoza wersji ukladu: " << name;
+}
+
+// Sprzatacz nie rusza plikow obecnosci innej wersji ukladu, a katalog, ktorego nie ma, konczy
+// przeglad z zerem zamiast bledem.
+TEST(BusPresence, SweepLeavesOtherLayoutVersions) {
+  const std::string pid = std::to_string(getpid());
+  const auto dir        = std::filesystem::temp_directory_path() / ("ut_bus_sweep_old_" + pid);
+  const auto old        = dir / ("xrdbbus_v6_utold" + pid + ".lock");
+  std::filesystem::create_directories(dir);
+  { std::ofstream touch(old); }
+
+  EXPECT_EQ(bus::sweepAbandonedSegments(dir.string()), 0U);
+  EXPECT_TRUE(std::filesystem::exists(old));
+  EXPECT_EQ(bus::sweepAbandonedSegments((dir / "brak").string()), 0U);
+
+  std::filesystem::remove_all(dir);
+}
+
+// Odmowa removeOwned (obiekt nie jest zwyklym plikiem) zostawia segment, ale plik obecnosci
+// i tak znika i jest liczony. Podmiana obiektu wymaga jego sciezki w systemie plikow.
+TEST(BusPresence, SweepCountsPresenceWhoseSegmentRemovalWasRefused) {
+  if (!RDB_HAS_BOOST_POSIX_SHM) GTEST_SKIP() << "obiekt IPC bez sciezki shm_open";
+  const std::string pid     = std::to_string(getpid());
+  const auto dir            = std::filesystem::temp_directory_path() / ("ut_bus_sweep_refused_" + pid);
+  const std::string segment = std::string(bus::kSegmentName) + "_utrefused" + pid;
+  const auto object         = std::filesystem::path(osplat::sharedMemoryBackingPath()) / segment;
+  const auto presence       = dir / (segment + ".lock");
+  std::filesystem::create_directories(dir);
+  { std::ofstream touch(presence); }
+  std::filesystem::create_symlink("/nonexistent-rdb-target", object);
+
+  EXPECT_EQ(bus::sweepAbandonedSegments(dir.string()), 1U);
+  EXPECT_FALSE(std::filesystem::exists(presence));
+  EXPECT_TRUE(std::filesystem::is_symlink(object)) << "removeOwned nie odmowil usuniecia obiektu";
+
+  std::filesystem::remove(object);
+  std::filesystem::remove_all(dir);
+}
+
+// Segment jest zakladany w calosci, wiec jego rozmiar to dokladnie segmentBytes() i miesci
+// co najmniej obie tablice nazw strumieni wszystkich slotow.
+TEST_F(BusFixture, SegmentBytesIsTheWholeMappedObject) {
+  bus::Bus instance(kTestSegment);
+  ASSERT_TRUE(instance.attached());
+
+  IPC::shared_memory_object object(IPC::open_only, kTestSegment, IPC::read_only);
+  IPC::offset_t size = 0;
+  ASSERT_TRUE(object.get_size(size));
+  EXPECT_EQ(static_cast<std::size_t>(size), bus::segmentBytes());
+  EXPECT_GT(bus::segmentBytes(), 2 * bus::kMaxSlots * bus::kMaxStreams * bus::kStreamNameSize);
+}
+
+// Wartosci wzorcowe policzone niezaleznie (Python, FNV-1a 64: baza 0xcbf29ce484222325, mnoznik
+// 0x100000001b3); low("a") to wektor testowy z opisu FNV. Stala w tescie dowodzi, ze skrot nie
+// zalezy od procesu ani od biblioteki standardowej.
+TEST(BusStoreDigest, MatchesFnv1aReferenceValues) {
+  EXPECT_EQ(bus::storeDigest(""), (bus::StoreDigest{.high = 0x9f579bf8337a2afbULL, .low = 0xcbf29ce484222325ULL}));
+  EXPECT_EQ(bus::storeDigest("a"), (bus::StoreDigest{.high = 0x3c08a0bf789663aeULL, .low = 0xaf63dc4c8601ec8cULL}));
+  EXPECT_EQ(bus::storeDigest("/var/lib/rdb/dst"),
+            (bus::StoreDigest{.high = 0xfecd4c077203770aULL, .low = 0xf96f445d8dcf6e9cULL}));
+
+  // Napis, nie plik: sciezki tozsame w systemie plikow maja rozne skroty.
+  EXPECT_FALSE(bus::storeDigest("/tmp/./x") == bus::storeDigest("/tmp/x"));
+  EXPECT_FALSE(bus::storeDigest("/tmp//x") == bus::storeDigest("/tmp/x"));
+}
+
+// "Pierwszy" w kazdej z trzech funkcji znaczy co innego: dla nazw - pierwsza instancja migawki
+// i pierwsza jej nazwa, dla licznika - pierwsza instancja, dla magazynu - pierwsza sciezka wolajacego.
+TEST(BusForeignOwner, FirstMatchFollowsSnapshotAndInstanceStreamOrder) {
+  const auto owner = bus::findForeignOwner(snapshotOf(), "gamma", {"dstb", "dst", "srca"});
+  ASSERT_TRUE(owner.has_value());
+  EXPECT_EQ(owner->stream, "srca");
+  EXPECT_EQ(owner->instance, "alfa");
+  EXPECT_EQ(owner->pid, 101);
+}
+
+TEST(BusForeignCounterOwner, FirstMatchFollowsSnapshotOrder) {
+  const std::vector<bus::InstanceInfo> shared{bus::InstanceInfo{.name = "x", .pid = 201, .counterPath = "/tmp/shared.cnt"},
+                                              bus::InstanceInfo{.name = "y", .pid = 202, .counterPath = "/tmp/shared.cnt"}};
+  const auto first = bus::findForeignCounterOwner(shared, "gamma", "/tmp/shared.cnt");
+  ASSERT_TRUE(first.has_value());
+  EXPECT_EQ(first->instance, "x");
+  EXPECT_EQ(first->pid, 201);
+  const auto next = bus::findForeignCounterOwner(shared, "x", "/tmp/shared.cnt");
+  ASSERT_TRUE(next.has_value());
+  EXPECT_EQ(next->instance, "y");
+  EXPECT_EQ(next->pid, 202);
+}
+
+TEST(BusForeignStoreOwner, FirstMatchFollowsCallerStoreOrder) {
+  const auto owner = bus::findForeignStoreOwner(snapshotOf(), "gamma", {"/var/rdb/dste", "/var/rdb/dst"});
+  ASSERT_TRUE(owner.has_value());
+  EXPECT_EQ(owner->path, "/var/rdb/dste");
+  EXPECT_EQ(owner->instance, "");
+  EXPECT_EQ(owner->pid, 103);
+}
+
+// Stan procesu wprost: zatrzymany sygnalem zyje, zebrany i nieczytelny maja znacznik zero,
+// a zerowy znacznik oczekiwany nie pasuje do zywego procesu.
+TEST_F(BusFixture, ProcessStateDecidesLiveness) {
+  const auto self = static_cast<std::int32_t>(getpid());
+  EXPECT_FALSE(bus::isProcessAlive(self, 0));
+
+  const pid_t child = fork();
+  ASSERT_NE(child, -1);
+  if (child == 0) {
+    for (;;)
+      pause();
+    _exit(0);
+  }
+
+  int status = 0;
+  ASSERT_EQ(kill(child, SIGSTOP), 0);
+  ASSERT_EQ(waitpid(child, &status, WUNTRACED), child);
+  ASSERT_TRUE(WIFSTOPPED(status));
+  const std::uint64_t start = bus::processStartTime(child);
+  EXPECT_NE(start, 0U);
+  EXPECT_TRUE(bus::isProcessAlive(child, start)) << "proces zatrzymany SIGSTOP uznany za martwy";
+
+  ASSERT_EQ(kill(child, SIGKILL), 0);
+  ASSERT_EQ(waitpid(child, &status, 0), child);
+  EXPECT_EQ(bus::processStartTime(child), 0U);
+  EXPECT_FALSE(bus::isProcessAlive(child, start));
+
+  unreadablePid.store(child);
+  EXPECT_EQ(bus::processStartTime(child), 0U);
+  unreadablePid.store(0);
+}
+
+// Czytelnik (createIfMissing = false) nie zaklada segmentu, a bez segmentu kazda operacja
+// konczy sie Unavailable albo niczym. Dopiero tworca zaklada segment.
+TEST_F(BusFixture, ReaderModeNeverCreatesSegmentAndIsUnavailable) {
+  {
+    bus::Bus reader(kTestSegment, false);
+    EXPECT_FALSE(reader.attached());
+    EXPECT_FALSE(segmentExists(kTestSegment));
+
+    EXPECT_EQ(reader.claim({.name = "alfa", .queryFile = "a.rql", .streams = {"dsta"}}).status, bus::ClaimStatus::Unavailable);
+    EXPECT_EQ(reader.reservePlan({"dsta"}, "", {}).status, bus::ClaimStatus::Unavailable);
+    EXPECT_EQ(reader.activateReservedPlan().status, bus::ClaimStatus::Unavailable);
+    EXPECT_EQ(reader.claimAdditional({"dsta"}, {}).status, bus::ClaimStatus::Unavailable);
+    reader.releaseAdditional({"dsta"}, {});
+    reader.release();
+    EXPECT_TRUE(reader.instances().empty());
+  }
+  EXPECT_FALSE(segmentExists(kTestSegment));
+
+  bus::Bus creator(kTestSegment);
+  EXPECT_TRUE(creator.attached());
+  EXPECT_TRUE(segmentExists(kTestSegment));
+}
+
+TEST_F(BusFixture, ReservePlanWithoutSlotIsUnavailable) {
+  bus::Bus instance(kTestSegment);
+  ASSERT_TRUE(instance.attached());
+  EXPECT_EQ(instance.reservePlan({"dsta"}, "", {}).status, bus::ClaimStatus::Unavailable);
+  EXPECT_TRUE(instance.instances().empty());
+}
+
+// Odmowa z limitow przychodzi PRZED zwolnieniem poprzedniego slotu, wiec go nie rusza; odmowa
+// z kolizji przychodzi PO nim, wiec ponowne roszczenie z kolizja zostawia instancje bez slotu.
+TEST_F(BusFixture, ReclaimRefusedByLimitsKeepsPreviousSlotButConflictDropsIt) {
+  bus::Bus first(kTestSegment);
+  bus::Bus second(kTestSegment);
+  ASSERT_EQ(first.claim({.name = "alfa", .queryFile = "a.rql", .counterPath = "/tmp/a.cnt", .streams = {"dsta"}}).status,
+            bus::ClaimStatus::Claimed);
+
+  std::vector<std::string> tooManyStreams;
+  for (std::size_t i = 0; i <= bus::kMaxStreams; ++i)
+    tooManyStreams.push_back("s" + std::to_string(i));
+  std::vector<std::string> tooManyStores;
+  for (std::size_t i = 0; i <= bus::kMaxStores; ++i)
+    tooManyStores.push_back("/tmp/s" + std::to_string(i));
+  const std::vector<bus::ClaimRequest> oversized{
+      {.name = "alfa", .queryFile = "b.rql", .streams = tooManyStreams},
+      {.name = "alfa", .queryFile = "b.rql", .streams = {std::string(bus::kStreamNameSize, 'x')}},
+      {.name = "alfa", .queryFile = "b.rql", .counterPath = std::string(bus::kCounterPathSize, 'p'), .streams = {"dsta"}},
+      {.name = "alfa", .queryFile = "b.rql", .streams = {"dsta"}, .stores = tooManyStores}};
+  for (const auto &request : oversized) {
+    EXPECT_EQ(first.claim(request).status, bus::ClaimStatus::TooLarge);
+    const auto instances = first.instances();
+    ASSERT_EQ(instances.size(), 1U);
+    EXPECT_EQ(instances[0].queryFile, "a.rql");
+    EXPECT_EQ(instances[0].streams, (std::vector<std::string>{"dsta"}));
+    EXPECT_EQ(instances[0].counterPath, "/tmp/a.cnt");
+  }
+
+  ASSERT_EQ(second.claim({.name = "beta", .queryFile = "b.rql", .streams = {"dstb"}}).status, bus::ClaimStatus::Claimed);
+  EXPECT_EQ(first.claim({.name = "alfa", .queryFile = "c.rql", .streams = {"dsta", "dstb"}}).status, bus::ClaimStatus::Conflict);
+  const auto instances = second.instances();
+  ASSERT_EQ(instances.size(), 1U);
+  EXPECT_EQ(instances[0].name, "beta");
+}
+
+// Wszystkie sloty zajete przez zywe instancje: kolejne roszczenie to NoFreeSlot, nie Conflict.
+TEST_F(BusFixture, FullBusIsNoFreeSlot) {
+  std::vector<std::unique_ptr<bus::Bus>> holders;
+  for (std::size_t i = 0; i < bus::kMaxSlots; ++i) {
+    holders.push_back(std::make_unique<bus::Bus>(kTestSegment));
+    const std::string name = "s" + std::to_string(i);
+    ASSERT_EQ(holders.back()->claim({.name = name, .queryFile = "q.rql", .streams = {name}}).status, bus::ClaimStatus::Claimed);
+  }
+
+  bus::Bus late(kTestSegment);
+  const auto refused = late.claim({.name = "late", .queryFile = "q.rql", .streams = {"late"}});
+  EXPECT_EQ(refused.status, bus::ClaimStatus::NoFreeSlot);
+  EXPECT_EQ(late.instances().size(), bus::kMaxSlots);
+
+  holders.back().reset();
+  EXPECT_EQ(late.claim({.name = "late", .queryFile = "q.rql", .streams = {"late"}}).status, bus::ClaimStatus::Claimed);
+}
+
+// Pola informacyjne za dlugie nie blokuja startu: slot niesie ich poczatek do granicy pola.
+TEST_F(BusFixture, InformationalFieldsAreTruncatedNotRefused) {
+  bus::Bus instance(kTestSegment);
+  const std::string unit(300, 'u');
+  const std::string queryFile(400, 'q');
+
+  ASSERT_EQ(instance.claim({.name = "alfa", .queryFile = queryFile, .unit = unit, .streams = {"dsta"}}).status,
+            bus::ClaimStatus::Claimed);
+  const auto instances = instance.instances();
+  ASSERT_EQ(instances.size(), 1U);
+  EXPECT_EQ(instances[0].unit, unit.substr(0, bus::kUnitNameSize - 1));
+  EXPECT_EQ(instances[0].queryFile, queryFile.substr(0, bus::kQueryFileSize - 1));
+}
+
+// releaseAdditional zdejmuje tylko podane wpisy: licznik, tryby, pola informacyjne i rezerwacja
+// planu zostaja. Instancja bez slotu nie zdejmuje niczego, takze z cudzego slotu.
+TEST_F(BusFixture, ReleaseAdditionalKeepsRestOfSlot) {
+  bus::Bus first(kTestSegment);
+  bus::Bus other(kTestSegment);
+  ASSERT_EQ(first
+                .claim({.name        = "alfa",
+                        .queryFile   = "a.rql",
+                        .unit        = "xretractor-alfa.service",
+                        .counterPath = "/tmp/a.cnt",
+                        .modes       = bus::mode::kRealTime,
+                        .streams     = {"srca"}})
+                .status,
+            bus::ClaimStatus::Claimed);
+  ASSERT_EQ(first.reservePlan({"nowy"}, "/tmp/n.cnt", {}).status, bus::ClaimStatus::Claimed);
+  const auto added = first.claimAdditional({"adhoc"}, {"/tmp/adhoc"});
+  ASSERT_EQ(added.status, bus::ClaimStatus::Claimed);
+
+  first.releaseAdditional(added.addedStreams, added.addedStores);
+  const auto instances = first.instances();
+  ASSERT_EQ(instances.size(), 1U);
+  EXPECT_EQ(instances[0].streams, (std::vector<std::string>{"srca"}));
+  EXPECT_TRUE(instances[0].storeDigests.empty());
+  EXPECT_EQ(instances[0].queryFile, "a.rql");
+  EXPECT_EQ(instances[0].unit, "xretractor-alfa.service");
+  EXPECT_EQ(instances[0].counterPath, "/tmp/a.cnt");
+  EXPECT_EQ(instances[0].modes, bus::mode::kRealTime);
+  EXPECT_EQ(other.claim({.name = "beta", .queryFile = "b.rql", .streams = {"nowy"}}).status, bus::ClaimStatus::Conflict);
+
+  ASSERT_EQ(first.activateReservedPlan().status, bus::ClaimStatus::Claimed);
+  other.releaseAdditional({"nowy"}, {});
+  const auto after = first.instances();
+  ASSERT_EQ(after.size(), 1U);
+  EXPECT_EQ(after[0].streams, (std::vector<std::string>{"nowy"}));
+  EXPECT_EQ(after[0].counterPath, "/tmp/n.cnt");
+}
+
+TEST_F(BusFixture, ReleaseIsIdempotent) {
+  bus::Bus first(kTestSegment);
+  bus::Bus second(kTestSegment);
+  ASSERT_EQ(first.claim({.name = "alfa", .queryFile = "a.rql", .streams = {"dst"}}).status, bus::ClaimStatus::Claimed);
+  ASSERT_EQ(second.claim({.name = "beta", .queryFile = "b.rql", .streams = {"dstb"}}).status, bus::ClaimStatus::Claimed);
+
+  first.release();
+  first.release();
+  const auto instances = second.instances();
+  ASSERT_EQ(instances.size(), 1U);
+  EXPECT_EQ(instances[0].name, "beta");
+  EXPECT_EQ(first.claim({.name = "alfa", .queryFile = "a.rql", .streams = {"dst"}}).status, bus::ClaimStatus::Claimed);
 }
