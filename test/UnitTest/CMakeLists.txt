@@ -104,7 +104,7 @@ foreach(item ${V_GLOB})
     endif()
     if(OUTPUT_FILE_NOEXT STREQUAL "test_dumpManager")
       target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=lseek
-                          -Wl,--wrap=write)
+                          -Wl,--wrap=write -Wl,--wrap=unlink)
     endif()
     # test_bus i test_busFallback udaja wpis procesu nieczytelny (hidepid /
     # ProtectProc) - test/UnitTest/unreadableProcess.hpp.

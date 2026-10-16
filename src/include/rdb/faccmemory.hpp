@@ -25,9 +25,13 @@ namespace rdb {
 ///   Test: `MemoryTest.test_faccmemory_infinite`.
 /// - zwracać przez count() logiczną liczbę rekordów (łączną liczbę zapisów append),
 ///   Test: `MemoryTest.test_faccmemory_retention`.
-/// - przy ustawionej retencji przechowywać najwyżej wskazaną liczbę rekordów, zastępując najstarsze nowymi,
-///   a dla nadpisanej pozycji zwracać rekord, który zajął jej miejsce; bez retencji nie ograniczać liczby rekordów.
-///   Test: `MemoryTest.test_faccmemory_retention`, `MemoryTest.test_faccmemory_infinite`.
+/// - przy ustawionej retencji przechowywać najwyżej wskazaną liczbę rekordów, zastępując najstarsze nowymi;
+///   bez retencji nie ograniczać liczby rekordów,
+///   Test: `MemoryTest.test_faccmemory_retention`, `MemoryTest.test_faccmemory_retention_boundary`, `MemoryTest.test_faccmemory_infinite`.
+/// - przy ustawionej retencji R odczyt i nadpisanie w miejscu rekordu spoza ostatnich R zapisów (starszego albo
+///   jeszcze niezapisanego) odrzucać kodem ERANGE, nie sięgając do slotu zajętego przez inny rekord - tak jak magazyn
+///   dyskowy odrzuca rekord z usuniętego segmentu.
+///   Test: `MemoryTest.test_faccmemory_retention`, `MemoryTest.test_faccmemory_retention_boundary`, `MemoryTest.update_outside_retention_window_keeps_newer_records`, `MemoryTest.storage_read_outside_memory_retention_is_an_io_error`.
 ///
 /// @note Trwałość danych dotyczy wyłącznie czasu życia Memory Store (MemoryStore); klasa nie zapisuje stanu na dysk.
 /// @note Stan rekordów, nullBitset i licznik zapisów są współdzielone po nazwie strumienia między żywymi instancjami -
@@ -39,7 +43,8 @@ struct memoryFile : public FileInterface {
   std::string filename_;
   const ssize_t recordSize_;
   /// Rozmiar bufora kołowego; no_retention wyłącza ograniczenie liczby rekordów.
-  /// Append wybiera slot writeCount % retentionSize_, a read i update slot location % retentionSize_.
+  /// Append wybiera slot writeCount % retentionSize_, a read i update slot location % retentionSize_ - tylko dla
+  /// rekordu z okna ostatnich retentionSize_ zapisow.
   const size_t retentionSize_;
 
  public:

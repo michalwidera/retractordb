@@ -13,20 +13,35 @@
 #include "streamInstance.hpp"  // streamInstance (transitively includes qTree.hpp, rdb/payload.hpp)
 /// Obiekt klasy dataModel powinien:
 /// - w create zapamiętywać wartości dyrektyw :STORAGE, :SUBSTRAT i :ROTATION, usuwać dyrektywy z planu i tworzyć instancję każdego pozostałego strumienia z otwartym magazynem w katalogu :STORAGE i we wskazanym MemoryStore, a błąd otwarcia magazynu zwracać jako Result z nazwą strumienia.
+///   Test: `DataModelSlotContract.create_strips_directives_and_builds_every_stream_in_the_given_memory_store`, `dataModel.initialization_refusal_preserves_class_and_discards_partial_model`. Kontrola strukturalna: wartości :SUBSTRAT i :ROTATION są tylko zapamiętywane w directive_ i nie mają obserwowalnego skutku w dataModel.
 /// - traktować pusty plan i dyrektywę z pustą wartością jako naruszenie niezmiennika.
+///   Test: `dataModel.empty_plan_remains_an_internal_error`, `dataModel.empty_directive_value_remains_an_internal_error`.
 /// - w addQueriesToModel dołączać instancje wszystkich wskazanych węzłów planu albo żadnej, zwracając nazwę, której nie da się dołączyć, i nie usuwając z modelu żadnej istniejącej instancji.
+///   Test: `xschema.addQueriesToModel_is_all_or_nothing`, `DataModelSlotContract.adhoc_stream_starts_at_the_index_of_its_first_due_slot`, `it_adhoc_register_rollback-run`.
 /// - w processRows liczyć wyłącznie węzły oznaczone w masce pozycyjnej o długości planu, w kolejności: uzbrojenie nowych źródeł i odczyt rekordów DEVICE, obliczenie strumieni niebędących deklaracjami w porządku planu, a na końcu przesunięcie pozostałych źródeł deklarowanych do następnego rekordu.
+///   Test: `DataModelSlotContract.processRows_computes_due_nodes_in_plan_order_before_advancing_sources`, `xschema.getRow_1`, `it_device_timeout-run` (rekord DEVICE na początku slotu).
 /// - nie emitować rekordu strumienia w pierwszych origin + ogon należnych slotach, ani jako zera, ani jako NULL.
+///   Test: `DataModelSlotContract.processRows_emits_nothing_during_origin_plus_tail_slots`, `it_k24h10_exact_tails`, `it_k19_boundaries`.
 /// - dla strumienia dołączonego ad hoc wyznaczać indeks pierwszego rekordu z bieżącego slotu i emitować go dopiero, gdy wszystkie jego wejścia są dostępne.
+///   Test: `DataModelSlotContract.adhoc_stream_starts_at_the_index_of_its_first_due_slot`, `it_issue227_join_alignment-adhoc-origin` (także oczekiwanie na wejścia źródła dołączonego ad hoc).
 /// - dla każdego emitowanego strumienia budować rekord wejściowy z klauzuli FROM, liczyć okna rekordowe, budować rekord wyjściowy z listy SELECT, zapisywać go do magazynu i wykonywać reguły strumienia.
+///   Test: `DataModelSlotContract.processRows_computes_due_nodes_in_plan_order_before_advancing_sources`, `DataModelSlotContract.processRows_emits_nothing_during_origin_plus_tail_slots`, `xschema_rules.constructRulesAndUpdate_system_rule_fires`, `it_window_aggregate`.
 /// - przerywać slot na pierwszym błędzie odczytu, zapisu albo ewaluacji i zwracać go jako Result bez kończenia procesu.
+///   Test: `DataModelSlotContract.processRows_stops_the_slot_at_the_first_error`, `it_env_error_exit-run` (błąd środowiska w slocie przez hak RDB_FAULT_ENV_IN_SLOT).
 /// - przez fetchForward zwracać rekord strumienia po indeksie logicznym, a dla indeksu spoza dostępnej historii rekord all-null, ważny do następnego odczytu tego strumienia.
+///   Test: `DataModelSlotContract.reads_by_offset_and_forward_index_fall_back_to_null`. Kontrola strukturalna: ważność wskaźnika do następnego odczytu wynika z odczytu przez payload magazynu albo unavailableRecord (fetchForward w dataModel.cpp).
 /// - przez getPayload udostępniać payload wraz z informacją NULL: dla strumienia SELECT rekord cofnięty o podaną liczbę rekordów albo all-null przy braku rekordu, a dla deklaracji payload bieżący niezależnie od przesunięcia.
+///   Test: `DataModelSlotContract.reads_by_offset_and_forward_index_fall_back_to_null`, `xschema.missingStream_is_reported_not_inserted`.
 /// - przez getRow zwracać wartości pól rekordu cofniętego o podaną liczbę rekordów dla strumienia SELECT albo rekordu bieżącego deklaracji niezależnie od przesunięcia, zastępując wartości NULL przez nullFallbackValue typu pola, także przy braku rekordu SELECT.
+///   Test: `DataModelSlotContract.reads_by_offset_and_forward_index_fall_back_to_null`, `xschema.getRow_1`.
 /// - przez getStreamCount i streamStoredSize zwracać liczbę zapisanych rekordów strumienia i jej rozmiar w bajtach.
+///   Test: `DataModelSlotContract.reads_by_offset_and_forward_index_fall_back_to_null`, `DataModelSlotContract.processRows_emits_nothing_during_origin_plus_tail_slots`.
 /// - przez syncDeclaredCapacities zwiększać pojemność historii źródeł deklarowanych do wymaganej przez plan, nigdy jej nie zmniejszając.
+///   Test: `DataModelSlotContract.syncDeclaredCapacities_only_grows_history`.
 /// - przez exhaustedInputStream zwracać nazwę pierwszego źródła deklarowanego, które wyczerpało wejście, albo pusty napis.
+///   Test: `DataModelSlotContract.exhaustedInputStream_names_the_source_after_its_last_record`, `it_untileof_stop-run`.
 /// - traktować odwołanie do strumienia z planu bez instancji w modelu oraz maskę o długości innej niż plan jako naruszenie niezmiennika.
+///   Test: `xschema.missingStream_is_reported_not_inserted`, `xschema.handleTable_stale_entry_is_caught`, `DataModelSlotContract.processRows_mask_of_another_length_is_an_invariant_failure`.
 class dataModel {
  private:
   qTree &coreInstance_;
