@@ -1,10 +1,12 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <cstddef>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <limits>
 #include <sstream>
 #include <tuple>
@@ -16,6 +18,7 @@
 #include "cmdID.hpp"
 #include "constants.hpp"
 #include "fldType.hpp"
+#include "logCapture.hpp"
 #include "osPlatform.hpp"
 #include "rdb/accessorFactory.hpp"
 #include "rdb/convertTypes.hpp"
@@ -41,6 +44,8 @@ static_assert(!std::is_copy_assignable_v<CRationalStreamMath::TimeLine>);
 static_assert(std::has_virtual_destructor_v<ICommand>);
 static_assert(!std::is_copy_constructible_v<rdb::StorageFd>);
 static_assert(!std::is_copy_assignable_v<rdb::StorageFd>);
+static_assert(std::is_abstract_v<rdb::FileInterface>);
+static_assert(std::has_virtual_destructor_v<rdb::FileInterface>);
 
 TEST(RequirementContracts, memory_bucket_identity_survives_other_insertions_and_erasures) {
   rdb::MemoryStore store;
@@ -280,6 +285,45 @@ TEST(RequirementContracts, storage_fd_flags_offsets_eof_and_lifetime) {
     EXPECT_EQ(fd.size(), 3);
   }
   std::filesystem::remove(file);
+}
+
+TEST(RequirementContracts, storage_file_symlink_refusal_preserves_errno_bytes_and_descriptor_lifetime) {
+  const std::string target = "contracts_link_target";
+  const std::string link   = "contracts_link";
+  std::ofstream(target, std::ios::binary) << "original";
+  std::filesystem::create_symlink(target, link);
+  LogCapture log;
+  errno = 0;
+  EXPECT_EQ(rdb::openStorageFile(link, O_WRONLY | O_TRUNC), -1);
+  EXPECT_EQ(errno, ELOOP);
+  {
+    rdb::StorageFd refused(link, O_WRONLY | O_TRUNC);
+    EXPECT_EQ(errno, ELOOP);
+    EXPECT_FALSE(refused.isOpen());
+  }
+  EXPECT_NE(log.text().find("symbolic link"), std::string::npos);
+  std::ifstream input(target, std::ios::binary);
+  EXPECT_EQ(std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()), "original");
+  {
+    const rdb::StorageFd allowed(link, O_RDONLY, 0600, true);
+    EXPECT_TRUE(allowed.isOpen());
+    EXPECT_EQ(allowed.size(), 8);
+  }
+  int owned = -1;
+  {
+    const int before = ::open(target.c_str(), O_RDONLY);
+    ASSERT_GE(before, 0);
+    ::close(before);
+    rdb::StorageFd file(target, O_RDONLY);
+    // W jednowatkowym tescie open przydziela najnizszy wolny numer.
+    owned = before;
+    EXPECT_NE(::fcntl(owned, F_GETFD) & FD_CLOEXEC, 0);
+  }
+  errno = 0;
+  EXPECT_EQ(::fcntl(owned, F_GETFD), -1);
+  EXPECT_EQ(errno, EBADF);
+  std::filesystem::remove(link);
+  std::filesystem::remove(target);
 }
 
 TEST(RequirementContracts, payload_decimal_hex_and_string_padding) {

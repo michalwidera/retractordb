@@ -746,6 +746,94 @@ TEST(xrdb, storage_no_rotation_when_counts_match) {
     std::filesystem::remove(f);
 }
 
+TEST(xrdb, startup_gap_uses_the_data_file_age_and_survives_reopen) {
+  const std::filesystem::path root = "ut-startup-gap";
+  std::filesystem::remove_all(root);
+  std::filesystem::create_directory(root);
+  const rdb::Descriptor descriptor("v", 4, 1, rdb::INTEGER);
+  {
+    auto storage = rdbtest::ok(rdb::storage::create("result", "result", root.string(), "POSIX"));
+    ASSERT_RDB_OK(storage->attachDescriptor(&descriptor));
+    storage->getPayload()->setItem(0, 7);
+    ASSERT_EQ(rdbtest::ok(storage->write()), rdb::WriteStatus::Ok);
+  }
+  std::filesystem::last_write_time(root / "result", std::filesystem::file_time_type::clock::now() - std::chrono::minutes(125));
+  {
+    auto storage = rdbtest::ok(rdb::storage::create("result", "result", root.string(), "POSIX"));
+    ASSERT_RDB_OK(storage->attachDescriptor(&descriptor));
+    storage->configureGapDetection({3600, 1});
+    EXPECT_TRUE(storage->hasGapBefore(1));
+    storage->getPayload()->setItem(0, 99);
+    ASSERT_EQ(rdbtest::ok(storage->write()), rdb::WriteStatus::Ok);
+    EXPECT_EQ(storage->getRecordsCount(), 2U);
+  }
+  {
+    rdb::metaData reopened(descriptor, (root / "result.meta").string());
+    EXPECT_EQ(reopened.totalRecords(), 2U);
+    EXPECT_TRUE(reopened.isGapBefore(1));
+    const auto segments = reopened.segments();
+    ASSERT_EQ(segments.size(), 3U);
+    EXPECT_TRUE(segments[1].isGap);
+    EXPECT_EQ(segments[1].recordCount, 2U);
+  }
+  std::filesystem::remove_all(root);
+}
+
+TEST(xrdb, empty_data_file_discards_orphaned_metadata_before_the_first_write) {
+  const std::filesystem::path root = "ut-orphaned-meta";
+  std::filesystem::remove_all(root);
+  std::filesystem::create_directory(root);
+  const rdb::Descriptor descriptor("v", 4, 1, rdb::INTEGER);
+  {
+    rdb::metaData orphan(descriptor, (root / "result.meta").string());
+    orphan.onRecordAppended({true});
+  }
+  {
+    auto storage = rdbtest::ok(rdb::storage::create("result", "result", root.string(), "POSIX"));
+    ASSERT_RDB_OK(storage->attachDescriptor(&descriptor));
+    EXPECT_EQ(storage->getRecordsCount(), 0U);
+    EXPECT_TRUE(storage->isMetaIndexEmpty());
+    EXPECT_EQ(std::filesystem::file_size(root / "result.meta"), 8U);
+    storage->getPayload()->setItem(0, 55);
+    EXPECT_EQ(rdbtest::ok(storage->write()), rdb::WriteStatus::Ok);
+    EXPECT_EQ(rdbtest::ok(storage->read(0)), rdb::ReadStatus::Ok);
+    EXPECT_EQ(storage->getPayload()->getNullBitset(), std::vector<bool>{false});
+    EXPECT_EQ(std::any_cast<int>(*storage->getPayload()->getItem(0)), 55);
+  }
+  std::filesystem::remove_all(root);
+}
+
+TEST(xrdb, declared_history_replays_values_and_nulls_without_another_source_read) {
+  const std::filesystem::path root = "ut-declared-history";
+  std::filesystem::remove_all(root);
+  std::filesystem::create_directory(root);
+  std::ofstream(root / "input.txt") << "1 NULL 3";
+  const auto descriptor =
+      rdb::Descriptor("v", 4, 1, rdb::INTEGER) + rdb::Descriptor((root / "input.txt").string(), 0, 0, rdb::REF);
+  {
+    auto storage = rdbtest::ok(rdb::storage::create("source", "unused", root.string(), "TEXTSOURCE", true));
+    ASSERT_RDB_OK(storage->attachDescriptor(&descriptor));
+    storage->setCapacity(2);
+    EXPECT_EQ(storage->historyCapacity(), 2U);
+    for (int slot = 0; slot < 3; ++slot) {
+      storage->bufferState = rdb::sourceState::flux;
+      EXPECT_EQ(rdbtest::ok(storage->revRead(0)), rdb::ReadStatus::Ok);
+      storage->fire();
+      for (int repeat = 0; repeat < 2; ++repeat) {
+        EXPECT_EQ(rdbtest::ok(storage->revRead(0)), rdb::ReadStatus::Ok);
+        const auto value = storage->getPayload()->getItem(0);
+        EXPECT_EQ(value.has_value(), slot != 1);
+        if (value) EXPECT_EQ(std::any_cast<int>(*value), slot == 0 ? 1 : 3);
+      }
+    }
+    EXPECT_EQ(rdbtest::ok(storage->revRead(1)), rdb::ReadStatus::Ok);
+    EXPECT_FALSE(storage->getPayload()->getItem(0));
+    EXPECT_EQ(storage->getRecordsCount(), 3U);
+    EXPECT_FALSE(std::filesystem::exists(root / "input.txt.meta"));
+  }
+  std::filesystem::remove_all(root);
+}
+
 // REF z wczytanego `.desc` a uprawnienia magazynu (#278). REF moze prowadzic poza katalog magazynu
 // - tak opisuje sie zewnetrzne zrodla DECLARE - ale wziety wylacznie z pliku nie kieruje zapisu
 // poza katalog magazynu i `storage.ref_dirs`, a porzadkowanie magazynu nie usuwa pliku spoza nich.

@@ -11,31 +11,42 @@
 ///
 /// Obiekt klasy payload powinien:
 /// - zarządzać binarnym obszarem pamięci odpowiadającym układowi pól opisanemu przez Descriptor,
+///   Test: `payload.position_conversion_case_3_with_payload`, `payload.rational_field_layout_is_two_int32_numerator_first`.
 /// - umożliwiać ustawianie i pobieranie wartości pól na podstawie pozycji w spłaszczonym widoku Descriptor,
+///   Test: `payload.position_conversion_case_3_with_payload`, `payload.assign_between_array_and_scalar_record_forms`.
 /// - obsługiwać pola danych BYTE, INTEGER, UINT, RATIONAL, FLOAT, DOUBLE, STRING i NULLTYPE; dla pola bez
 ///   znacznika null zwracać z getItem() std::any zawierające odpowiednio uint8_t, int, unsigned int,
 ///   boost::rational<int>, float, double, std::string albo std::monostate; dla RATIONAL z mianownikiem
 ///   niedodatnim w buforze zwracać std::nullopt,
+///   Test: `payload.vt_interface_roundtrip_matches_any_interface`, `payload.null_type_round_trips_as_monostate`, `payload.rational_field_with_non_positive_denominator_reads_as_null`.
 /// - w setItem() konwertować niepustą wartość przez cast<std::any>(wartość, typ_pola) z convertTypes.hpp;
 ///   wynik std::monostate dla pola innego niż NULLTYPE zamieniać na znacznik null i nullFallbackValue(typ_pola),
 ///   a po udanej konwersji kasować znacznik null; setItem(..., std::nullopt) ustawia znacznik null i zapisuje
 ///   nullFallbackValue(typ_pola): zero liczbowe, 0/1 dla RATIONAL, pusty STRING albo std::monostate dla NULLTYPE,
+///   Test: `payload.conversion_failure_and_nullopt_write_typed_fallback_bytes`, `payload.null_can_be_cleared_by_writing_value`, `payload.nullopt_writes_string_fallback_to_memory`.
 /// - przy konwersji liczby do BYTE, INTEGER lub UINT sprawdzać zakres typu docelowego po obcięciu części
 ///   ułamkowej ku zeru; wartość poza zakresem oraz NaN i nieskończoność zamieniać na null; przy konwersji
 ///   STRING do tych typów odczytywać przez std::from_chars prefiks typu int, a do FLOAT/DOUBLE prefiks
 ///   typu double, bez wymogu odczytania całego napisu, następnie konwertować do typu pola,
+///   Test: `payload.out_of_range_float_writes_null_through_both_interfaces`, `payload.in_range_float_writes_value_truncated_toward_zero`, `payload.conversion_failure_and_nullopt_write_typed_fallback_bytes`. Test: `cast_contract.string_prefixes_and_pair_parsing_match_both_interfaces`.
 /// - zapisywać STRING w najwyżej rlen * rarray bajtach, przycinając dłuższą wartość i dopełniając krótszą
 ///   zerami; getItem() zwraca tekst do pierwszego bajtu zerowego albo do końca pola, jeśli nie ma zera,
 ///   Test: `RequirementContracts.payload_decimal_hex_and_string_padding`.
 /// - zwalniać własną pamięć przy niszczeniu obiektu,
+///   Nietestowalne: brak publicznego pomiaru zwalnianej pamięci; cykle kopiowania i przenoszenia payload sprawdza ut_payload-valgrind.
 /// - udostępniać tekstową reprezentację danych przez operator<< oraz wczytywanie wartości przez operator>>,
+///   Test: `payload.operator_istream_clears_null_flag_for_integer_field`, `payload.operator_istream_clears_null_flag_for_string_field`, `payload.stream_operators_support_rational_fields`, `payload.operator_ostream_mixed_null_and_value`.
 /// - umożliwiać formatowanie tekstowej reprezentacji wartości numerycznych w trybie dziesiętnym lub szesnastkowym,
 ///   Test: `RequirementContracts.payload_decimal_hex_and_string_padding`.
 /// - wspierać kopiowanie stanu obiektu przez konstruktor kopiujący i operator=,
+///   Test: `payload.copy_constructor_preserves_null_bitset`, `payload.copy_assignment_preserves_null_bitset`, `payload.null_flags_survive_the_change_of_record_form`.
 /// - wspierać przenoszenie stanu obiektu przez konstruktor przenoszący i operator=(payload&&), zachowując regułę zgodności deskryptorów obowiązującą przy przypisaniu,
+///   Test: `payload.move_assignment_into_empty_target_takes_over_the_record`, `payload.move_assignment_between_compatible_record_forms_keeps_target_shape`, `payload.move_construction_leaves_a_reusable_source`.
 /// - wspierać łączenie danych dwóch obiektów payload przez operator+,
+///   Test: `payload.add_operator`, `payload.add_preserves_null_flags`, `payload.assign_concatenation_matches_sum_assignment`.
 /// - dla pola oznaczonego jako null w nullBitset zwracać z getItem() std::nullopt; dla pola NULLTYPE
 ///   bez tego oznaczenia zwracać std::any zawierające std::monostate; w obu przypadkach operator<< wypisuje "null".
+///   Test: `payload.null_type_round_trips_as_monostate`, `payload.operator_ostream_emits_null_for_null_field`.
 
 namespace rdb {
 /// @brief This class define accessing method to payload (memory area)

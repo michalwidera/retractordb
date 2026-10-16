@@ -75,6 +75,34 @@ TEST(payload, nullopt_writes_integer_fallback_to_memory) {
   EXPECT_FALSE(payload.getItem(0).has_value());
 }
 
+TEST(payload, conversion_failure_and_nullopt_write_typed_fallback_bytes) {
+  const rdb::Descriptor descriptor{{"r", 8, 1, rdb::RATIONAL}, {"i", 4, 1, rdb::INTEGER}, {"b", 1, 1, rdb::BYTE}};
+  std::vector<uint8_t> expected(13, 0);
+  const int32_t denominator = 1;
+  std::memcpy(expected.data() + 4, &denominator, sizeof(denominator));
+  for (const bool explicitNull : {false, true}) {
+    rdb::payload value(descriptor);
+    value.setItem(0, boost::rational<int>(7, 3));
+    value.setItem(1, 99);
+    value.setItem(2, 255);
+    for (int i = 0; i < 3; ++i) {
+      if (explicitNull)
+        value.setItem(i, std::nullopt);
+      else
+        value.setItem(i, std::vector<int>{1, 2});
+      EXPECT_FALSE(value.getItem(i).has_value());
+    }
+    EXPECT_EQ(std::vector<uint8_t>(value.span().begin(), value.span().end()), expected);
+    EXPECT_EQ(value.getNullBitset(), (std::vector<bool>{true, true, true}));
+    value.setItem(1, std::string("12tail"));
+    EXPECT_EQ(std::any_cast<int>(value.getItem(1).value()), 12);
+    EXPECT_EQ(value.getNullBitset(), (std::vector<bool>{true, false, true}));
+    value.setItem(2, std::string("256"));
+    EXPECT_FALSE(value.getItem(2).has_value());
+    EXPECT_EQ(value.span()[12], 0);
+  }
+}
+
 TEST(payload, nullopt_writes_string_fallback_to_memory) {
   auto desc = rdb::Descriptor("name", 1, 6, rdb::STRING);
   rdb::payload payload(desc);

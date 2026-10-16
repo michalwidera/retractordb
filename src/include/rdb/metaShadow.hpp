@@ -18,15 +18,22 @@ namespace rdb {
 /// Obiekt klasy metaShadow powinien:
 /// - przechowywać nadpisania wzorca null dla poszczególnych rekordów jako pary (indeks rekordu, wzorzec null),
 ///   nie modyfikując głównego indeksu, do którego cień się odnosi,
+///   Test: `ShadowUsageFixture.reload_replaces_memory_and_last_override_survives_restart`.
 /// - przez appendOverride() dopisywać nadpisanie do pamięci i podejmować próbę zapisu do pliku
 ///   <metaFilePath>.shadow, o ile jego ścieżka nie jest pusta; koordynację z cieniem danych pozostawiać wywołującemu,
+///   Test: `ShadowUsageFixture.reload_replaces_memory_and_last_override_survives_restart`, `ShadowUsageFixture.failed_shadow_open_keeps_main_bytes_but_only_updates_memory`.
 /// - przy wielokrotnych nadpisaniach tej samej pozycji traktować ostatni zapisany wpis jako obowiązujący stan rekordu,
+///   Test: `ShadowUsageFixture.scenariusz_ostatnie_nadpisanie_wygrywa`, `ShadowUsageFixture.reload_replaces_memory_and_last_override_survives_restart`.
 /// - przy udanym I/O zapisywać nadpisania do pliku i odtwarzać je przez load(), które zastępuje stan w pamięci,
+///   Test: `ShadowUsageFixture.scenariusz_persystencja_po_restarcie`, `ShadowUsageFixture.reload_replaces_memory_and_last_override_survives_restart`.
 /// - umożliwiać scalenie nadpisań (w kolejności zapisu) do głównego indeksu przez wywołującego oraz odrzucenie
 ///   ich bez scalania, mirrorując odpowiednio merge() i usunięcie pliku .shadow danych,
+///   Test: `StorageShadowFixture.polymorphic_updates_preserve_main_bytes_and_merge_in_arrival_order`, `StorageShadowFixture.scenariusz_discard_i_reset`.
 /// - udostępniać konwencję nazewnictwa pliku cienia (<metaFilePath>.shadow) jako metodę statyczną, aby inne
 ///   warstwy (np. storageShadow, storage) mogły się do niej odwołać bez duplikowania sufiksu,
+///   Test: `StorageShadowTest.metaShadowFilePath_dopisuje_sufiks_shadow`.
 /// - zwalniać własną pamięć przy niszczeniu obiektu.
+///   Nietestowalne: brak publicznego pomiaru zwalnianej pamięci; cykle życia metaShadow sprawdza ut_metaShadow_usage-valgrind.
 /// @note appendOverride() zmienia pamięć przed próbą I/O i nie propaguje błędów otwarcia ani zapisu;
 ///       obecność nadpisania w lookup() nie potwierdza, że można je odtworzyć po restarcie.
 /// @note Klasa nie zna pojęcia całkowitej liczby rekordów głównego indeksu ani nie waliduje zakresu
@@ -38,6 +45,7 @@ class metaShadow {
   /// @brief Single override: the new null bit-set pattern for one absolute record index.
   /// Obiekt klasy ShadowOverride powinien:
   /// - przechowywać bezwzględny indeks nadpisanego rekordu głównego indeksu i nowy wzorzec null tego rekordu, jeden bit na pole deskryptora.
+  ///   Test: `ShadowUsageFixture.reload_replaces_memory_and_last_override_survives_restart`.
   /// - przez serialize zapisywać bajt zarezerwowany równy 0, recordIndex i długość bitsetu jako size_t w porządku bajtów maszyny, a następnie bitset upakowany od najmłodszego bitu w ceil(n/8) bajtach z zerowymi bitami dopełnienia, w układzie zgodnym z wpisem IndexRecord.
   ///   Test: `RequirementContracts.index_and_shadow_frames_match_the_legacy_binary_layout`.
   /// - przez deserialize odtwarzać wpis zapisany przez serialize, pomijając wartość bajtu zarezerwowanego.

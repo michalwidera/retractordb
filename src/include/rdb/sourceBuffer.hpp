@@ -18,9 +18,11 @@ enum class sourceState : std::uint8_t { empty, flux, armed };
 ///
 /// Obiekt klasy SourceBuffer powinien:
 /// - po attach(descriptor) utrzymywać komorę (chamber) - payload bieżącego rekordu odczytanego ze źródła,
+///   Test: `SourceBufferTest.read_current_fills_out_from_source`.
 /// - pobierać bieżący rekord i wzorzec null przez null-aware read() akcesora w readCurrent(); jest to
 ///   jedyne miejsce fizycznego odczytu źródeł plikowych; dla DEVICE (#347) bajty zbiera wcześniej faza
 ///   DEVICE poza blokadami (rdb::awaitRecords), a read() oddaje gotowy rekord albo all-null,
+///   Test: `SourceBufferTest.read_current_fills_out_from_source`, `SourceBufferTest.read_current_after_eof_returns_null_row`. Test: `BinaryDeviceROTest.device_read_does_not_retry_after_the_device_phase`.
 /// - po EILSEQ z akcesora zwracać Errc::Config z opisem inputError(), pozostawiając payload wyjściowy
 ///   bez zmian; dla pozostałych statusów przekazywać rekord i nullBitset otrzymane z akcesora,
 ///   logując ostrzeżenie przy statusie różnym od EXIT_SUCCESS,
@@ -30,8 +32,10 @@ enum class sourceState : std::uint8_t { empty, flux, armed };
 ///   Test: `SourceBufferDeathTest.fire_without_capacity_is_an_invariant_failure`.
 /// - utrzymywać bufor historii o pojemności co najmniej 1 (setCapacity()) - spójność źródeł deklarowanych
 ///   wymaga zachowania przynajmniej bieżącego rekordu,
+///   Test: `SourceBufferTest.capacity_is_at_least_one`.
 /// - udostępniać rekordy historii przez history(index) dla index < size(); kontrola zakresu względem
 ///   pojemności i rozmiaru należy do wywołującego (storage), bo to on decyduje o wartościach zastępczych.
+///   Test: `SourceBufferTest.fire_pushes_chamber_into_history`, `SourceBufferTest.history_preserves_nulls_independently_of_the_output`.
 class SourceBuffer {
  public:
   /// @brief Create the chamber payload for the given record layout.

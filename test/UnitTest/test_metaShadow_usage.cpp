@@ -42,6 +42,52 @@ struct ShadowUsageFixture : public ::testing::Test {
   }
 };
 
+TEST_F(ShadowUsageFixture, reload_replaces_memory_and_last_override_survives_restart) {
+  const auto readBytes = [&](const std::string &path) {
+    std::ifstream input(path, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+  };
+  std::ofstream(file, std::ios::binary) << "main index sentinel";
+  rdb::metaShadow shadow(descriptor, file);
+  shadow.appendOverride(2, allNull);
+  shadow.appendOverride(2, allPresent);
+  EXPECT_EQ(readBytes(file), "main index sentinel");
+  std::string expected;
+  for (char bits : {char{7}, char{0}}) {
+    expected.push_back(0);
+    const size_t index  = 2;
+    const size_t fields = 3;
+    expected.append(reinterpret_cast<const char *>(&index), sizeof(index));
+    expected.append(reinterpret_cast<const char *>(&fields), sizeof(fields));
+    expected.push_back(bits);
+  }
+  EXPECT_EQ(readBytes(shadowFile), expected);
+  rdb::metaShadow reopened(descriptor, file);
+  reopened.load();
+  EXPECT_EQ(reopened.lookup(2), allPresent);
+  ASSERT_EQ(reopened.overrides().size(), 2U);
+  EXPECT_EQ(reopened.overrides()[0].nullBitset, allNull);
+  EXPECT_EQ(reopened.overrides()[1].nullBitset, allPresent);
+  std::filesystem::remove(shadowFile);
+  reopened.load();
+  EXPECT_TRUE(reopened.overrides().empty());
+  EXPECT_FALSE(reopened.lookup(2));
+}
+
+TEST_F(ShadowUsageFixture, failed_shadow_open_keeps_main_bytes_but_only_updates_memory) {
+  const std::string original = "original shadow target";
+  std::ofstream(file) << original;
+  std::filesystem::create_symlink(file, shadowFile);
+  rdb::metaShadow shadow(descriptor, file);
+  shadow.appendOverride(1, allNull);
+  EXPECT_EQ(shadow.lookup(1), allNull);
+  std::ifstream input(file);
+  EXPECT_EQ(std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()), original);
+  rdb::metaShadow reopened(descriptor, file);
+  reopened.load();
+  EXPECT_FALSE(reopened.lookup(1));
+}
+
 // ---------------------------------------------------------------------------
 // Scenariusz 1: Brak nadpisania → lookup() zwraca std::nullopt.
 // ---------------------------------------------------------------------------

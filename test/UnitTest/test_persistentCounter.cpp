@@ -1,16 +1,148 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <dlfcn.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
+#include <vector>
 
+#include "logCapture.hpp"
 #include "rdbResult.hpp"
 #include "retractor/lib/persistentCounter.hpp"
+#include "syscallWrap.hpp"
+
+namespace {
+enum class CounterFailure { None, Write, ShortWrite, FileSync, Close, Rename, DirectorySync };
+CounterFailure counterFailure = CounterFailure::None;
+bool counterRecording         = false;
+bool interruptCounterRead     = false;
+int counterReads              = 0;
+int temporaryFd               = -1;
+std::string observedCounter;
+std::string observedTemporary;
+std::vector<std::string> counterCalls;
+
+std::string counterBytes(const std::string &path) {
+  std::ifstream input(path, std::ios::binary);
+  return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+}
+}  // namespace
+
+extern "C" ssize_t __real_read(int, void *, size_t);
+extern "C" ssize_t __real_write(int, const void *, size_t);
+extern "C" int __real_fsync(int);
+extern "C" int __real_close(int);
+
+extern "C" ssize_t __wrap_read(int fd, void *buffer, size_t size) {
+  if (interruptCounterRead) {
+    ++counterReads;
+    if (counterReads == 1) {
+      errno = EINTR;
+      return -1;
+    }
+    return __real_read(fd, buffer, std::min(size, size_t{1}));
+  }
+  return __real_read(fd, buffer, size);
+}
+
+extern "C" ssize_t __wrap_write(int fd, const void *buffer, size_t size) {
+  if (counterRecording && std::string_view(static_cast<const char *>(buffer), size) == "99") {
+    temporaryFd = fd;
+    counterCalls.emplace_back("write");
+    if (counterFailure == CounterFailure::Write) {
+      errno = ENOSPC;
+      return -1;
+    }
+    if (counterFailure == CounterFailure::ShortWrite) {
+      errno = EIO;
+      return __real_write(fd, buffer, 1);
+    }
+  }
+  return __real_write(fd, buffer, size);
+}
+
+extern "C" int __wrap_fsync(int fd) {
+  if (counterRecording) {
+    const bool isFile = fd == temporaryFd;
+    counterCalls.emplace_back(isFile ? "fsync-file" : "fsync-directory");
+    EXPECT_EQ(counterBytes(observedCounter), isFile ? "98" : "99");
+    if (isFile) EXPECT_EQ(counterBytes(observedTemporary), "99");
+    if ((isFile && counterFailure == CounterFailure::FileSync) || (!isFile && counterFailure == CounterFailure::DirectorySync)) {
+      errno = EIO;
+      return -1;
+    }
+  }
+  return __real_fsync(fd);
+}
+
+extern "C" int __wrap_close(int fd) {
+  const bool closeTemporary = counterRecording && fd == temporaryFd;
+  if (closeTemporary) {
+    counterCalls.emplace_back("close-file");
+    temporaryFd = -1;
+  }
+  const int result = __real_close(fd);
+  if (closeTemporary && counterFailure == CounterFailure::Close) {
+    errno = EIO;
+    return -1;
+  }
+  return result;
+}
+
+namespace {
+bool renameProbe    = false;
+bool renameProbeHit = false;
+}  // namespace
+
+// filesystem::rename wywoluje libc z biblioteki dzielonej, poza zasiegiem --wrap.
+// Na ELF eksport symbolu z testu przechwytuje te droge. Na Darwinie biblioteka dzielona
+// rozwiazuje rename dwupoziomowo, prosto w libSystem, wiec podmiana tam nie dziala -
+// rozstrzyga o tym sonda renameInterposed(), nie nazwa systemu.
+extern "C" int rename(const char *source, const char *target) noexcept {
+  using Rename         = int (*)(const char *, const char *);
+  static auto original = reinterpret_cast<Rename>(::dlsym(RTLD_NEXT, "rename"));
+  if (renameProbe) {
+    renameProbeHit = true;
+    errno          = ENOENT;
+    return -1;
+  }
+  if (counterRecording && observedTemporary == source) {
+    counterCalls.emplace_back("rename");
+    EXPECT_EQ(counterBytes(observedCounter), "98");
+    EXPECT_EQ(counterBytes(observedTemporary), "99");
+    if (counterFailure == CounterFailure::Rename) {
+      errno = EACCES;
+      return -1;
+    }
+  }
+  return original(source, target);
+}
+
+RDB_WRAP_SYSCALL(ssize_t, read, (int fd, void *buffer, size_t size), (fd, buffer, size));
+RDB_WRAP_SYSCALL(ssize_t, write, (int fd, const void *buffer, size_t size), (fd, buffer, size));
+RDB_WRAP_SYSCALL(int, fsync, (int fd), (fd));
+RDB_WRAP_SYSCALL(int, close, (int fd), (fd));
+
+namespace {
+// Czy wywolanie std::filesystem::rename trafia na podmiane z tego pliku.
+bool renameInterposed() {
+  renameProbe    = true;
+  renameProbeHit = false;
+  std::error_code ec;
+  std::filesystem::rename("rdb-rename-probe-source", "rdb-rename-probe-target", ec);
+  renameProbe = false;
+  return renameProbeHit;
+}
+}  // namespace
 
 // ctest -R '^ut_persistentCounter' -V
 
@@ -28,6 +160,12 @@ class PersistentCounterTest : public ::testing::Test {
   }
 
   void TearDown() override {
+    counterRecording     = false;
+    interruptCounterRead = false;
+    counterFailure       = CounterFailure::None;
+    temporaryFd          = -1;
+    counterCalls.clear();
+    counterReads = 0;
     if (std::filesystem::is_directory(sandBoxFolder)) {
       std::filesystem::remove_all(sandBoxFolder);
     }
@@ -247,4 +385,86 @@ TEST_F(PersistentCounterTest, custom_filename_creates_correct_file) {
   { auto pc = rdbtest::ok(PersistentCounter::create(custom)); }
   EXPECT_TRUE(std::filesystem::exists(custom));
   EXPECT_FALSE(std::filesystem::exists(counterPath()));
+}
+
+TEST_F(PersistentCounterTest, reservation_orders_sync_rename_and_directory_sync) {
+  if (!renameInterposed()) {
+    ASSERT_FALSE(RDB_OS_LINUX) << "podmiana rename musi dzialac na Linuksie";
+    GTEST_SKIP() << "std::filesystem::rename omija podmiane rename z testu";
+  }
+  std::ofstream(counterPath()) << "98";
+  observedCounter   = counterPath();
+  observedTemporary = counterPath() + ".tmp." + std::to_string(::getpid());
+  counterRecording  = true;
+  auto counter      = PersistentCounter::create(counterPath());
+  counterRecording  = false;
+  ASSERT_RDB_OK(counter);
+  EXPECT_EQ((*counter)->getCount(), 98);
+  EXPECT_EQ(counterCalls, (std::vector<std::string>{"write", "fsync-file", "close-file", "rename", "fsync-directory"}));
+  EXPECT_EQ(counterBytes(counterPath()), "99");
+  EXPECT_FALSE(std::filesystem::exists(observedTemporary));
+}
+
+TEST_F(PersistentCounterTest, failed_write_sync_close_or_rename_keeps_old_bytes_and_removes_temporary) {
+  for (const auto fault : {CounterFailure::Write, CounterFailure::ShortWrite, CounterFailure::FileSync, CounterFailure::Close,
+                           CounterFailure::Rename}) {
+    SCOPED_TRACE(static_cast<int>(fault));
+    if (fault == CounterFailure::Rename && !renameInterposed()) {
+      ASSERT_FALSE(RDB_OS_LINUX) << "podmiana rename musi dzialac na Linuksie";
+      continue;  // awarii rename nie da sie tu wstrzyknac; pozostale przypadki ida przez --wrap
+    }
+    std::ofstream(counterPath()) << "98";
+    observedCounter   = counterPath();
+    observedTemporary = counterPath() + ".tmp." + std::to_string(::getpid());
+    counterCalls.clear();
+    counterFailure   = fault;
+    counterRecording = true;
+    auto counter     = PersistentCounter::create(counterPath());
+    counterRecording = false;
+    ASSERT_RDB_ERROR(counter, rdb::Errc::IO);
+    EXPECT_EQ(counter.error().err(), fault == CounterFailure::Write ? ENOSPC : fault == CounterFailure::Rename ? EACCES : EIO);
+    EXPECT_EQ(counterBytes(counterPath()), "98");
+    EXPECT_FALSE(std::filesystem::exists(observedTemporary));
+    EXPECT_EQ(std::count(counterCalls.begin(), counterCalls.end(), "fsync-directory"), 0);
+    EXPECT_EQ(std::count(counterCalls.begin(), counterCalls.end(), "rename"), fault == CounterFailure::Rename ? 1 : 0);
+  }
+}
+
+TEST_F(PersistentCounterTest, directory_sync_failure_logs_but_keeps_the_completed_reservation) {
+  std::ofstream(counterPath()) << "98";
+  observedCounter   = counterPath();
+  observedTemporary = counterPath() + ".tmp." + std::to_string(::getpid());
+  counterFailure    = CounterFailure::DirectorySync;
+  LogCapture log;
+  counterRecording = true;
+  auto counter     = PersistentCounter::create(counterPath());
+  counterRecording = false;
+  ASSERT_RDB_OK(counter);
+  EXPECT_EQ((*counter)->getCount(), 98);
+  EXPECT_EQ(counterBytes(counterPath()), "99");
+  EXPECT_FALSE(std::filesystem::exists(observedTemporary));
+  EXPECT_NE(log.text().find("[error]"), std::string::npos);
+  EXPECT_NE(log.text().find("directory fsync failed"), std::string::npos);
+}
+
+TEST_F(PersistentCounterTest, read_retries_interrupted_and_short_reads_without_reserving) {
+  std::ofstream(counterPath()) << "98\n";
+  interruptCounterRead = true;
+  const auto value     = PersistentCounter::read(counterPath());
+  interruptCounterRead = false;
+  EXPECT_EQ(value.state, PersistentCounter::Reading::State::Value);
+  EXPECT_EQ(value.value, 98);
+  EXPECT_EQ(counterReads, 5);
+  EXPECT_EQ(counterBytes(counterPath()), "98\n");
+}
+
+TEST_F(PersistentCounterTest, existence_failure_is_unreadable_instead_of_missing) {
+  std::filesystem::create_symlink(counterFile, counterPath());
+  const auto reading = PersistentCounter::read(counterPath());
+  EXPECT_EQ(reading.state, PersistentCounter::Reading::State::Unreadable);
+  EXPECT_NE(reading.detail.find("cannot check whether it exists"), std::string::npos);
+  const auto result = PersistentCounter::create(counterPath());
+  ASSERT_RDB_ERROR(result, rdb::Errc::IO);
+  EXPECT_EQ(result.error().err(), EIO);
+  EXPECT_TRUE(std::filesystem::is_symlink(counterPath()));
 }

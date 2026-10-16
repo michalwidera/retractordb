@@ -32,6 +32,7 @@ inline constexpr mode_t kStreamFileMode = 0666;
 /// - otwierać plik magazynu z podanymi flagami i trybem, zawsze z O_CLOEXEC, a bez followFinalLink także z O_NOFOLLOW, i zwracać deskryptor albo -1 z errno.
 ///   Test: `RequirementContracts.storage_fd_flags_offsets_eof_and_lifetime`.
 /// - przy odmowie otwarcia dowiązania (ELOOP) logować błąd, zachowując errno dla wołającego.
+///   Test: `RequirementContracts.storage_file_symlink_refusal_preserves_errno_bytes_and_descriptor_lifetime`.
 [[nodiscard]] inline int openStorageFile(const std::string &path, const int flags, const mode_t mode = kStreamFileMode,
                                          const bool followFinalLink = false) {
   const int fd = ::open(path.c_str(), flags | O_CLOEXEC | (followFinalLink ? 0 : O_NOFOLLOW), mode);
@@ -47,7 +48,9 @@ inline constexpr mode_t kStreamFileMode = 0666;
 ///        przyjmuje deskryptora (a __gnu_cxx::stdio_filebuf nie istnieje w libc++ na macOS).
 /// Obiekt klasy StorageFd powinien:
 /// - otwierać plik przez openStorageFile z podanymi flagami i trybem, zawsze z O_CLOEXEC i bez podążania za dowiązaniem symbolicznym w ostatnim komponencie ścieżki, chyba że wołający jawnie przekaże followFinalLink.
+///   Test: `RequirementContracts.storage_fd_flags_offsets_eof_and_lifetime`, `RequirementContracts.storage_file_symlink_refusal_preserves_errno_bytes_and_descriptor_lifetime`.
 /// - przy odmowie otwarcia dowiązania (ELOOP) zostawiać obiekt nieotwarty, a errno równe ELOOP po zapisie diagnostyki.
+///   Test: `RequirementContracts.storage_file_symlink_refusal_preserves_errno_bytes_and_descriptor_lifetime`.
 /// - raportować przez isOpen, czy deskryptor został otwarty.
 ///   Test: `RequirementContracts.storage_fd_flags_offsets_eof_and_lifetime`, `DescriptorIOTest.storage_fd_retries_partial_and_interrupted_io`.
 /// - przez size zwracać rozmiar pliku z fstat albo -1 przy błędzie.
@@ -58,6 +61,7 @@ inline constexpr mode_t kStreamFileMode = 0666;
 ///   Test: `RequirementContracts.storage_fd_flags_offsets_eof_and_lifetime`, `DescriptorIOTest.storage_fd_retries_partial_and_interrupted_io`.
 /// - zamykać posiadany deskryptor przy zniszczeniu i uniemożliwiać kopiowanie, tak aby deskryptor miał jednego właściciela.
 ///   Sprawdzenie kompilacji: test/UnitTest/test_contracts.cpp - static_assert braku kopiowania i przypisania StorageFd.
+///   Test: `RequirementContracts.storage_file_symlink_refusal_preserves_errno_bytes_and_descriptor_lifetime`.
 class StorageFd {
   int fd_;
 

@@ -2,6 +2,7 @@
 
 #include <sys/stat.h>  // mkfifo
 
+#include <array>
 #include <cerrno>
 #include <chrono>
 #include <cstdlib>
@@ -829,6 +830,118 @@ TEST_F(TextSourceROTest, invalid_token_warned_once_across_wrap) {
     EXPECT_NE(log.text().find("Text source test_bad_wrap.txt: record 0, field a: invalid numeric token 'abc'"),
               std::string::npos)
         << log.text();
+}
+
+TEST_F(TextSourceROTest, invalid_position_does_not_consume_input_and_counts_the_null_row) {
+  const auto file = createTestFile("test_position.txt", "42");
+  const rdb::Descriptor descriptor{{"a", 4, 1, rdb::INTEGER}};
+  rdb::textSourceRO source(file, descriptor, false);
+  int value = -1;
+  std::vector<bool> nulls{false};
+  EXPECT_EQ(source.read(reinterpret_cast<uint8_t *>(&value), nulls, 1), EINVAL);
+  EXPECT_EQ(value, 0);
+  EXPECT_EQ(nulls, std::vector<bool>{true});
+  EXPECT_FALSE(source.exhausted());
+  EXPECT_EQ(source.read(reinterpret_cast<uint8_t *>(&value), nulls, 0), EXIT_SUCCESS);
+  EXPECT_EQ(value, 42);
+  EXPECT_EQ(nulls, std::vector<bool>{false});
+  EXPECT_EQ(rdbtest::ok(source.count()), 2U);
+}
+
+TEST_F(TextSourceROTest, null_spellings_and_missing_tokens_preserve_the_final_record) {
+  const auto file = createTestFile("test_null_spellings.txt", "null NULL Null 42");
+  const rdb::Descriptor descriptor{{"a", 4, 1, rdb::INTEGER}, {"b", 4, 1, rdb::INTEGER}};
+  rdb::textSourceRO source(file, descriptor, false);
+  std::array<int, 2> values{-1, -1};
+  std::vector<bool> nulls;
+  EXPECT_EQ(source.read(reinterpret_cast<uint8_t *>(values.data()), nulls, 0), EXIT_SUCCESS);
+  EXPECT_EQ(values, (std::array<int, 2>{0, 0}));
+  EXPECT_EQ(nulls, (std::vector<bool>{true, true}));
+  EXPECT_FALSE(source.exhausted());
+  EXPECT_EQ(source.read(reinterpret_cast<uint8_t *>(values.data()), nulls, 0), EXIT_SUCCESS);
+  EXPECT_EQ(values, (std::array<int, 2>{0, 42}));
+  EXPECT_EQ(nulls, (std::vector<bool>{true, false}));
+  EXPECT_FALSE(source.exhausted());
+  for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(source.read(reinterpret_cast<uint8_t *>(values.data()), nulls, 0), EXIT_SUCCESS);
+    EXPECT_EQ(values, (std::array<int, 2>{0, 0}));
+    EXPECT_EQ(nulls, (std::vector<bool>{true, true}));
+    EXPECT_TRUE(source.exhausted());
+  }
+  EXPECT_EQ(rdbtest::ok(source.count()), 4U);
+
+  const auto partial = createTestFile("test_missing_token.txt", "7");
+  rdb::textSourceRO shortSource(partial, descriptor, false);
+  EXPECT_EQ(shortSource.read(reinterpret_cast<uint8_t *>(values.data()), nulls, 0), EXIT_SUCCESS);
+  EXPECT_EQ(values, (std::array<int, 2>{7, 0}));
+  EXPECT_EQ(nulls, (std::vector<bool>{false, true}));
+}
+
+TEST_F(TextSourceROTest, nulltype_content_error_preserves_output_and_does_not_count) {
+  const auto file = createTestFile("test_nulltype_error.txt", "12 bad 9 Null");
+  const rdb::Descriptor descriptor{{"a", 4, 1, rdb::INTEGER}, {"missing", 0, 1, rdb::NULLTYPE}};
+  rdb::textSourceRO source(file, descriptor, false);
+  int value = 81;
+  std::vector<bool> nulls{false, true};
+  EXPECT_EQ(source.read(reinterpret_cast<uint8_t *>(&value), nulls, 0), EILSEQ);
+  EXPECT_EQ(value, 81);
+  EXPECT_EQ(nulls, (std::vector<bool>{false, true}));
+  EXPECT_EQ(rdbtest::ok(source.count()), 0U);
+  EXPECT_NE(source.inputError().find("expected a NULL token"), std::string::npos);
+  EXPECT_NE(source.inputError().find("bad"), std::string::npos);
+  EXPECT_NE(source.inputError().find(file), std::string::npos);
+  EXPECT_EQ(source.read(reinterpret_cast<uint8_t *>(&value), nulls, 0), EXIT_SUCCESS);
+  EXPECT_EQ(value, 9);
+  EXPECT_EQ(nulls, (std::vector<bool>{false, true}));
+  EXPECT_EQ(rdbtest::ok(source.count()), 1U);
+}
+
+TEST_F(TextSourceROTest, quoted_strings_keep_backslashes_and_zero_pad_the_field) {
+  const auto file = createTestFile("test_literal_string.txt", "\"a\\nb\"\n");
+  const rdb::Descriptor descriptor{{"s", 1, 6, rdb::STRING}};
+  rdb::textSourceRO source(file, descriptor, false);
+  std::array<uint8_t, 6> bytes;
+  bytes.fill(0xFF);
+  std::vector<bool> nulls;
+  EXPECT_EQ(source.read(bytes.data(), nulls, 0), EXIT_SUCCESS);
+  EXPECT_EQ(bytes, (std::array<uint8_t, 6>{'a', '\\', 'n', 'b', 0, 0}));
+  EXPECT_EQ(nulls, std::vector<bool>{false});
+}
+
+// Pusty plik w petli nie ma rekordu takze po zawinieciu - jak BINFILE (read_fails_on_empty_file_when_loop_enabled)
+// zwraca EIO juz w pierwszym odczycie. Do 2026-10-16 pierwszy odczyt zwracal EXIT_SUCCESS z rekordem all-null,
+// a EIO dopiero kolejne.
+TEST_F(TextSourceROTest, empty_looped_file_reports_eio_on_every_read) {
+  const auto file = createTestFile("test_empty_loop.txt", "");
+  const rdb::Descriptor descriptor{{"a", 4, 1, rdb::INTEGER}};
+  rdb::textSourceRO source(file, descriptor, true);
+  for (size_t attempt = 1; attempt <= 2; ++attempt) {
+    SCOPED_TRACE(attempt);
+    int value = -1;
+    std::vector<bool> nulls{false};
+    EXPECT_EQ(source.read(reinterpret_cast<uint8_t *>(&value), nulls, 0), EIO);
+    EXPECT_EQ(value, 0);
+    EXPECT_EQ(nulls, std::vector<bool>{true});
+    EXPECT_EQ(rdbtest::ok(source.count()), attempt);
+    EXPECT_FALSE(source.exhausted());
+  }
+}
+
+TEST_F(TextSourceROTest, floating_point_underflow_is_zero_with_clear_null_bits) {
+  const auto file = createTestFile("test_underflow.txt", "1e-999 1e-999");
+  const rdb::Descriptor descriptor{{"f", 4, 1, rdb::FLOAT}, {"d", 8, 1, rdb::DOUBLE}};
+  rdb::textSourceRO source(file, descriptor, false);
+  std::array<uint8_t, 12> bytes;
+  bytes.fill(0xFF);
+  std::vector<bool> nulls;
+  EXPECT_EQ(source.read(bytes.data(), nulls, 0), EXIT_SUCCESS);
+  float f  = 1;
+  double d = 1;
+  std::memcpy(&f, bytes.data(), sizeof(f));
+  std::memcpy(&d, bytes.data() + sizeof(f), sizeof(d));
+  EXPECT_EQ(f, 0.0F);
+  EXPECT_EQ(d, 0.0);
+  EXPECT_EQ(nulls, (std::vector<bool>{false, false}));
 }
 
 // NOLINTEND(modernize-avoid-c-arrays)

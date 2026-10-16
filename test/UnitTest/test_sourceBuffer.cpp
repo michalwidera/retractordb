@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -110,8 +111,11 @@ TEST(SourceBufferTest, fire_pushes_chamber_into_history) {
 
   for (int expected : {1, 2, 3}) {
     rdbtest::ok(buffer.readCurrent(source, out));
+    EXPECT_EQ(buffer.size(), static_cast<size_t>(std::min(expected - 1, 2)));
+    out.setItem(0, -99);
     buffer.fire(out);
     EXPECT_EQ(valueOf(out), expected);
+    EXPECT_EQ(rdbtest::ok(source.count()), static_cast<size_t>(expected));
   }
 
   EXPECT_EQ(buffer.size(), 2U);              // pojemność 2 - najstarszy rekord wypchnięty
@@ -119,6 +123,27 @@ TEST(SourceBufferTest, fire_pushes_chamber_into_history) {
   EXPECT_EQ(valueOf(buffer.history(1)), 2);
 
   std::filesystem::remove("sb_fire.txt");
+}
+
+TEST(SourceBufferTest, history_preserves_nulls_independently_of_the_output) {
+  createTextFile("sb_history_null.txt", "null\n7\n");
+  auto descriptor = intDescriptor();
+  rdb::textSourceRO source("sb_history_null.txt", descriptor, false);
+  rdb::SourceBuffer buffer;
+  buffer.attach(descriptor);
+  buffer.setCapacity(2);
+  rdb::payload out(descriptor);
+  ASSERT_RDB_OK(buffer.readCurrent(source, out));
+  EXPECT_EQ(buffer.size(), 0U);
+  buffer.fire(out);
+  ASSERT_RDB_OK(buffer.readCurrent(source, out));
+  buffer.fire(out);
+  out.setItem(0, 99);
+  EXPECT_EQ(valueOf(buffer.history(0)), 7);
+  EXPECT_EQ(buffer.history(0).getNullBitset(), std::vector<bool>{false});
+  EXPECT_EQ(valueOf(buffer.history(1)), 0);
+  EXPECT_EQ(buffer.history(1).getNullBitset(), std::vector<bool>{true});
+  std::filesystem::remove("sb_history_null.txt");
 }
 
 TEST(SourceBufferTest, input_content_failure_preserves_the_output_and_reports_the_cause) {

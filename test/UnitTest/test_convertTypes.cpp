@@ -10,7 +10,10 @@
 #include <random>
 #include <stack>
 #include <string>
+#include <type_traits>
 #include <utility>
+
+#include <gmock/gmock.h>
 
 #include "fldType.hpp"
 #include "rdb/convertTypes.hpp"
@@ -778,7 +781,96 @@ TEST(cast_any, idxpair_matches_variant_branch) {
   cast<std::any> ca;
   cast<rdb::descFldVT> cv;
   const P in{"12", 5};
+  EXPECT_EQ(std::any_cast<boost::rational<int>>(ca(std::any(in), rdb::RATIONAL)), boost::rational<int>(5));
+  EXPECT_EQ(std::any_cast<IP>(ca(std::any(in), rdb::INTPAIR)), (IP{12, 5}));
   EXPECT_EQ(std::any_cast<boost::rational<int>>(ca(std::any(in), rdb::RATIONAL)),
             std::get<boost::rational<int>>(cv(rdb::descFldVT(in), rdb::RATIONAL)));
   EXPECT_EQ(std::any_cast<IP>(ca(std::any(in), rdb::INTPAIR)), std::get<IP>(cv(rdb::descFldVT(in), rdb::INTPAIR)));
+}
+
+TEST(cast_contract, monostate_uses_the_typed_fallback_for_every_target) {
+  const std::vector<std::pair<rdb::descFld, rdb::descFldVT>> cases{{rdb::BYTE, uint8_t{0}},
+                                                                   {rdb::INTEGER, 0},
+                                                                   {rdb::UINT, 0U},
+                                                                   {rdb::FLOAT, 0.0F},
+                                                                   {rdb::DOUBLE, 0.0},
+                                                                   {rdb::RATIONAL, boost::rational<int>(0)},
+                                                                   {rdb::INTPAIR, std::pair{0, 0}},
+                                                                   {rdb::IDXPAIR, std::pair{std::string{}, 0}},
+                                                                   {rdb::STRING, std::string{}},
+                                                                   {rdb::NULLTYPE, std::monostate{}}};
+  for (const auto &[type, expected] : cases) {
+    SCOPED_TRACE(type);
+    EXPECT_EQ(cast<rdb::descFldVT>{}(std::monostate{}, type), expected);
+    const auto actual = cast<std::any>{}(std::any(std::monostate{}), type);
+    std::visit(
+        [&](const auto &value) {
+          using Value = std::decay_t<decltype(value)>;
+          ASSERT_EQ(actual.type(), typeid(Value));
+          EXPECT_EQ(std::any_cast<Value>(actual), value);
+        },
+        expected);
+  }
+}
+
+TEST(Rationalize, explicit_threshold_and_term_limit_select_known_convergents) {
+  // 3/4 = [0; 1, 3]. Limit liczy wyrazy ponad pierwszy.
+  EXPECT_EQ(Rationalize(0.75, 1E-6, 0), boost::rational<int>(0));
+  EXPECT_EQ(Rationalize(0.75, 1E-6, 1), boost::rational<int>(1));
+  EXPECT_EQ(Rationalize(0.75, 1E-6, 2), boost::rational<int>(3, 4));
+  EXPECT_EQ(Rationalize(-0.75, 1E-6, 2), boost::rational<int>(-3, 4));
+  EXPECT_EQ(Rationalize(1.25, 0.5), boost::rational<int>(1));
+  EXPECT_EQ(Rationalize(1.25, 0.25), boost::rational<int>(5, 4));
+}
+
+TEST(Rationalize, retains_the_last_representable_numerator_and_denominator) {
+  const int limit = std::numeric_limits<int>::max();
+  EXPECT_EQ(Rationalize(2147483647.5), boost::rational<int>(limit));
+  EXPECT_EQ(Rationalize(-2147483647.5), boost::rational<int>(-limit));
+  EXPECT_EQ(Rationalize(1.0 / 2147483647.5, 1E-12), boost::rational<int>(1, limit));
+}
+
+TEST(any_to_variant_cast, unsupported_pairs_report_their_type_before_termination) {
+  using Pair      = std::pair<int, int>;
+  using IndexPair = std::pair<std::string, int>;
+  EXPECT_DEATH(static_cast<void>(any_to_variant_cast(std::any(Pair{3, 4}))),
+               ::testing::HasSubstr(std::string("unsupported type ") + typeid(Pair).name()));
+  EXPECT_DEATH(static_cast<void>(any_to_variant_cast(std::any(IndexPair{"key", 7}))),
+               ::testing::HasSubstr(std::string("unsupported type ") + typeid(IndexPair).name()));
+}
+
+TEST(cast_contract, string_prefixes_and_pair_parsing_match_both_interfaces) {
+  const auto check = [](const std::string &input, rdb::descFld type, const rdb::descFldVT &expected) {
+    SCOPED_TRACE(input);
+    EXPECT_EQ(cast<rdb::descFldVT>{}(input, type), expected);
+    const auto actual = cast<std::any>{}(std::any(input), type);
+    std::visit(
+        [&](const auto &value) {
+          using Value = std::decay_t<decltype(value)>;
+          ASSERT_EQ(actual.type(), typeid(Value));
+          EXPECT_EQ(std::any_cast<Value>(actual), value);
+        },
+        expected);
+  };
+  check("12tail", rdb::INTEGER, 12);
+  check("1.5tail", rdb::DOUBLE, 1.5);
+  check("2147483648", rdb::UINT, std::monostate{});
+  check("bad", rdb::INTEGER, std::monostate{});
+  check("3/4tail", rdb::RATIONAL, boost::rational<int>(3, 4));
+  check("bad", rdb::RATIONAL, boost::rational<int>(0));
+  check("3,4tail", rdb::INTPAIR, std::pair{3, 4});
+  check("bad", rdb::INTPAIR, std::pair{0, 1});
+}
+
+TEST(cast_contract, invalid_rational_pairs_and_idxpair_targets_are_null) {
+  const int low = std::numeric_limits<int>::min();
+  for (const auto &input : {std::pair{3, 0}, std::pair{3, low}, std::pair{low, -1}}) {
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(cast<rdb::descFldVT>{}(input, rdb::RATIONAL)));
+    EXPECT_EQ(cast<std::any>{}(std::any(input), rdb::RATIONAL).type(), typeid(std::monostate));
+  }
+  EXPECT_EQ(std::get<boost::rational<int>>(cast<rdb::descFldVT>{}(std::pair{3, -4}, rdb::RATIONAL)),
+            boost::rational<int>(-3, 4));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(cast<rdb::descFldVT>{}(5, rdb::IDXPAIR)));
+  EXPECT_EQ(cast<std::any>{}(std::any(5), rdb::IDXPAIR).type(), typeid(std::monostate));
+  EXPECT_EQ(cast<std::any>{}(std::any{}, rdb::INTEGER).type(), typeid(std::monostate));
 }

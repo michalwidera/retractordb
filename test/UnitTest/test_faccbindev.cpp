@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <fcntl.h>
+#include <poll.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -25,9 +26,44 @@
 #include <utility>
 #include <vector>
 
+#include "logCapture.hpp"
 #include "rdb/descriptor.hpp"
 #include "rdb/faccbindev.hpp"
 #include "rdbResult.hpp"
+#include "syscallWrap.hpp"
+
+namespace {
+enum class ReadFault { None, InterruptedThenShort, Error };
+ReadFault readFault = ReadFault::None;
+int readFaultFd     = -1;
+int injectedReads   = 0;
+bool failPoll       = false;
+int injectedPolls   = 0;
+}  // namespace
+
+extern "C" ssize_t __real_read(int, void *, size_t);
+extern "C" int __real_poll(struct pollfd *, nfds_t, int);
+extern "C" ssize_t __wrap_read(int fd, void *buffer, size_t size) {
+  if (fd == readFaultFd && readFault != ReadFault::None) {
+    ++injectedReads;
+    if (readFault == ReadFault::Error || injectedReads == 1) {
+      errno = readFault == ReadFault::Error ? EIO : EINTR;
+      return -1;
+    }
+    return __real_read(fd, buffer, std::min(size, size_t{2}));
+  }
+  return __real_read(fd, buffer, size);
+}
+extern "C" int __wrap_poll(struct pollfd *fds, nfds_t count, int timeout) {
+  if (failPoll) {
+    ++injectedPolls;
+    errno = EINVAL;
+    return -1;
+  }
+  return __real_poll(fds, count, timeout);
+}
+RDB_WRAP_SYSCALL(ssize_t, read, (int fd, void *buffer, size_t size), (fd, buffer, size));
+RDB_WRAP_SYSCALL(int, poll, (struct pollfd * fds, nfds_t count, int timeout), (fds, count, timeout));
 
 // Tests intentionally use raw byte buffers for binary device I/O coverage.
 // NOLINTBEGIN(modernize-avoid-c-arrays)
@@ -81,7 +117,14 @@ class BinaryDeviceROTest : public ::testing::Test {
     std::filesystem::create_directories(sandBoxFolder);
   }
 
-  void TearDown() override { std::filesystem::remove_all(sandBoxFolder); }
+  void TearDown() override {
+    readFault     = ReadFault::None;
+    readFaultFd   = -1;
+    injectedReads = 0;
+    failPoll      = false;
+    injectedPolls = 0;
+    std::filesystem::remove_all(sandBoxFolder);
+  }
 
   [[nodiscard]] std::string sandboxPath(const std::string &name) const { return (sandBoxFolder / name).string(); }
 
@@ -173,6 +216,7 @@ TEST_F(BinaryDeviceROTest, read_zero_fills_on_eof_when_loop_disabled) {
   auto nulls = dev.lastNullBitset();
   ASSERT_EQ(nulls.size(), 1U);
   EXPECT_TRUE(nulls[0]);
+  EXPECT_TRUE(dev.exhausted());
 }
 
 TEST_F(BinaryDeviceROTest, read_fails_on_empty_file_when_loop_enabled) {
@@ -556,5 +600,106 @@ TEST_F(BinaryDeviceROTest, device_destroyed_during_the_device_phase_is_fatal) {
   // Faza zdjela znacznik - zniszczenie po niej jest legalne.
 }
 #endif
+
+TEST_F(BinaryDeviceROTest, binfile_retries_eintr_and_short_reads_without_interpreting_bytes) {
+  const auto path = sandboxPath("short.bin");
+  writeBinaryFile(path, {0xFF, 0, 0x7F, 0x80});
+  const rdb::Descriptor descriptor{{"opaque", 3, 1, rdb::STRING}, {"flag", 1, 1, rdb::BYTE}};
+  rdb::binaryDeviceRO source(path, descriptor, false, "BINFILE");
+  readFaultFd = source.pollDescriptor();
+  readFault   = ReadFault::InterruptedThenShort;
+  std::vector<uint8_t> bytes(4, 0xAA);
+  std::vector<bool> nulls{true};
+  EXPECT_EQ(source.read(bytes.data(), nulls, 0), EXIT_SUCCESS);
+  EXPECT_EQ(injectedReads, 3);
+  EXPECT_EQ(bytes, (std::vector<uint8_t>{0xFF, 0, 0x7F, 0x80}));
+  EXPECT_EQ(nulls, (std::vector<bool>{false, false}));
+  EXPECT_EQ(rdbtest::ok(source.count()), 1U);
+}
+
+TEST_F(BinaryDeviceROTest, binfile_invalid_position_and_read_error_return_counted_zero_null_rows) {
+  const auto path = sandboxPath("error.bin");
+  writeBinaryFile(path, {1, 2, 3, 4});
+  auto descriptor = fixedIntDescriptor();
+  rdb::binaryDeviceRO source(path, descriptor, false, "BINFILE");
+  std::vector<uint8_t> bytes(4, 0xFF);
+  std::vector<bool> nulls{false};
+  EXPECT_EQ(source.read(bytes.data(), nulls, 1), EINVAL);
+  EXPECT_EQ(bytes, (std::vector<uint8_t>{0, 0, 0, 0}));
+  EXPECT_EQ(nulls, std::vector<bool>{true});
+  readFaultFd = source.pollDescriptor();
+  readFault   = ReadFault::Error;
+  EXPECT_EQ(source.read(bytes.data(), nulls, 0), EIO);
+  EXPECT_EQ(bytes, (std::vector<uint8_t>{0, 0, 0, 0}));
+  EXPECT_EQ(nulls, std::vector<bool>{true});
+  EXPECT_FALSE(source.exhausted());
+  readFault = ReadFault::None;
+  EXPECT_EQ(source.read(bytes.data(), nulls, 0), EXIT_SUCCESS);
+  EXPECT_EQ(bytes, (std::vector<uint8_t>{1, 2, 3, 4}));
+  EXPECT_EQ(nulls, std::vector<bool>{false});
+  EXPECT_EQ(rdbtest::ok(source.count()), 3U);
+}
+
+TEST_F(BinaryDeviceROTest, poll_failure_ends_all_waits_and_clears_every_awaited_mark) {
+  const auto first  = sandboxPath("poll-first.fifo");
+  const auto second = sandboxPath("poll-second.fifo");
+  ASSERT_EQ(::mkfifo(first.c_str(), 0600), 0);
+  ASSERT_EQ(::mkfifo(second.c_str(), 0600), 0);
+  const int firstWriter  = ::open(first.c_str(), O_RDWR | O_CLOEXEC);
+  const int secondWriter = ::open(second.c_str(), O_RDWR | O_CLOEXEC);
+  ASSERT_GE(firstWriter, 0);
+  ASSERT_GE(secondWriter, 0);
+  auto descriptor = fixedIntDescriptor();
+  rdb::binaryDeviceRO a(first, descriptor, true, "DEVICE");
+  rdb::binaryDeviceRO b(second, descriptor, true, "DEVICE");
+  a.markAwaited(true);
+  b.markAwaited(true);
+  LogCapture log;
+  failPoll = true;
+  EXPECT_LT(timedAwait({{&a, std::chrono::seconds(30)}, {&b, std::chrono::seconds(30)}}), std::chrono::seconds(1));
+  EXPECT_EQ(injectedPolls, 1);
+#if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_WARN
+  EXPECT_NE(log.text().find("awaitRecords: poll failed"), std::string::npos);
+#endif
+  EXPECT_EQ(readRecord(a), std::nullopt);
+  EXPECT_EQ(readRecord(b), std::nullopt);
+  // Destruktory w Debug sprawdzaja zdjecie obu znacznikow takze po bledzie poll().
+  ::close(firstWriter);
+  ::close(secondWriter);
+}
+
+TEST_F(BinaryDeviceROTest, device_read_error_does_not_exhaust_and_next_slot_recovers) {
+  const auto path = sandboxPath("read-error.fifo");
+  ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
+  auto descriptor = fixedIntDescriptor();
+  rdb::binaryDeviceRO source(path, descriptor, false, "DEVICE");
+  const int writer = openWriter(path);
+  readFaultFd      = source.pollDescriptor();
+  readFault        = ReadFault::Error;
+  source.markAwaited(true);
+  EXPECT_LT(timedAwait({{&source, std::chrono::seconds(30)}}), std::chrono::seconds(1));
+  EXPECT_EQ(readRecord(source), std::nullopt);
+  EXPECT_FALSE(source.exhausted());
+  EXPECT_EQ(injectedReads, 1);
+  readFault = ReadFault::None;
+  writeAll(writer, {1, 2, 3, 4});
+  EXPECT_EQ(readRecord(source), (std::vector<uint8_t>{1, 2, 3, 4}));
+  EXPECT_EQ(rdbtest::ok(source.count()), 2U);
+  ::close(writer);
+}
+
+TEST_F(BinaryDeviceROTest, device_fill_retries_eintr_and_short_reads) {
+  const auto path = sandboxPath("interrupted.fifo");
+  ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
+  auto descriptor = fixedIntDescriptor();
+  rdb::binaryDeviceRO source(path, descriptor, true, "DEVICE");
+  const int writer = openWriter(path);
+  writeAll(writer, {0x11, 0x22, 0x33, 0x44});
+  readFaultFd = source.pollDescriptor();
+  readFault   = ReadFault::InterruptedThenShort;
+  EXPECT_EQ(readRecord(source), (std::vector<uint8_t>{0x11, 0x22, 0x33, 0x44}));
+  EXPECT_EQ(injectedReads, 3);
+  ::close(writer);
+}
 
 // NOLINTEND(modernize-avoid-c-arrays)

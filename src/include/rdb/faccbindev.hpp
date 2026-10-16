@@ -18,22 +18,35 @@ namespace rdb {
 ///
 /// Obiekt klasy binaryDeviceRO powinien:
 /// - odczytywać kolejne porcje surowych danych binarnych o długości wyznaczonej przez Descriptor,
+///   Test: `BinaryDeviceROTest.read_exact_record_and_count`.
 /// - używać Descriptor wyłącznie do określenia długości rekordu i rozmiaru wektora nullBitset,
+///   Test: `BinaryDeviceROTest.binfile_retries_eintr_and_short_reads_without_interpreting_bytes`.
 /// - składać rekord z krótkich odczytów i ponawiać wywołanie systemowe przerwane przez EINTR,
+///   Test: `BinaryDeviceROTest.binfile_retries_eintr_and_short_reads_without_interpreting_bytes`, `BinaryDeviceROTest.device_fill_retries_eintr_and_short_reads`.
 /// - implementować interfejs FileInterface, pozostając źródłem tylko do odczytu; metoda write(...) zawsze zwraca ENOTSUP,
+///   Test: `BinaryDeviceROTest.name_and_write_contract`.
 /// - obsługiwać wyłącznie sekwencyjny odczyt, w którym jedyną poprawną pozycją jest 0,
+///   Test: `BinaryDeviceROTest.binfile_invalid_position_and_read_error_return_counted_zero_null_rows`.
 /// - przy poprawnym odczycie ustawiać nullBitset na same wartości false,
+///   Test: `BinaryDeviceROTest.read_exact_record_and_count`, `BinaryDeviceROTest.binfile_retries_eintr_and_short_reads_without_interpreting_bytes`.
 /// - w przypadku błędu, niepoprawnej pozycji lub braku danych zwracać dane wyzerowane i nullBitset ustawiony na same wartości true,
+///   Test: `BinaryDeviceROTest.read_fails_on_missing_file_with_null_metadata`, `BinaryDeviceROTest.binfile_invalid_position_and_read_error_return_counted_zero_null_rows`, `BinaryDeviceROTest.read_zero_fills_on_eof_when_loop_disabled`.
 /// - po osiągnięciu końca strumienia próbować wrócić do początku, jeśli włączono loopToBeginningIfEOF,
+///   Test: `BinaryDeviceROTest.read_loops_to_beginning_on_eof_when_enabled`.
 /// - po osiągnięciu końca strumienia przy wyłączonym loopToBeginningIfEOF zwracać rekord oznaczony jako null,
+///   Test: `BinaryDeviceROTest.read_zero_fills_on_eof_when_loop_disabled`.
 /// - w tym samym przypadku zgłaszać wyczerpanie wejścia przez exhausted(), bo rekord all-null jest nieodróżnialny od danych,
+///   Test: `BinaryDeviceROTest.read_zero_fills_on_eof_when_loop_disabled`, `BinaryDeviceROTest.device_eof_means_no_writer_and_with_oneshot_exhaustion_after_data`.
 /// - zliczać wykonane odczyty i zwracać ich liczbę przez count(),
+///   Test: `BinaryDeviceROTest.count_starts_at_zero_before_any_read`, `BinaryDeviceROTest.read_exact_record_and_count`, `BinaryDeviceROTest.binfile_invalid_position_and_read_error_return_counted_zero_null_rows`.
 /// - obsługiwać dwa typy źródła deklarowanego (#346): BINFILE (plik zwykły) i DEVICE (urządzenie znakowe
 ///   albo FIFO); ścieżkę złego rodzaju odrzucać przez initializationError() - BINFILE sprawdza stat()
 ///   przed otwarciem, więc FIFO bez pisarza nie blokuje open(), a oba typy dodatkowo fstat() po otwarciu,
+///   Test: `BinaryDeviceROTest.binfile_refuses_a_fifo_without_blocking`, `BinaryDeviceROTest.binfile_refuses_a_character_device_and_device_a_regular_file`. Kontrola strukturalna: sourceKindMismatch przed open i po fstat w faccbindev.cc.
 /// - dla DEVICE (#347) nigdy nie czekać: otwierać z O_NONBLOCK, dopełniać rekord próbami nieblokującymi
 ///   (fill()) w prywatnym buforze, który przeżywa krótki odczyt i timeout, a w read() oddawać rekord
 ///   skompletowany albo all-null; czekanie z terminem należy do awaitRecords(), poza blokadami modelu.
+///   Test: `BinaryDeviceROTest.device_opens_a_fifo_without_a_writer_without_blocking`, `BinaryDeviceROTest.device_keeps_a_short_read_until_the_record_completes`, `BinaryDeviceROTest.device_read_does_not_retry_after_the_device_phase`, `BinaryDeviceROTest.await_partial_record_hits_the_deadline_and_completes_later`.
 ///
 /// EOF dla DEVICE to `read() == 0` i nic innego - POLLHUP służy wyłącznie budzeniu, co znosi różnicę
 /// Linux/Darwin w poll() na FIFO bez pisarza. Bez ONESHOT EOF znaczy "w tej chwili nie ma pisarza":
@@ -143,10 +156,15 @@ struct deviceWait {
 
 /// Funkcja awaitRecords powinna:
 /// - w fazie DEVICE jednego slotu wykonywać najpierw jedną próbę nieblokującą dla każdego źródła, a czekać tylko na źródła, którym brakuje danych i których termin jeszcze nie minął.
+///   Test: `BinaryDeviceROTest.await_with_zero_timeout_does_not_wait`, `BinaryDeviceROTest.await_returns_when_a_late_writer_completes_the_record`.
 /// - czekać na wszystkie oczekujące źródła jednym poll() naraz, tak aby łączne czekanie było maksimum terminów, a nie ich sumą.
+///   Test: `BinaryDeviceROTest.await_of_two_sources_takes_the_longer_deadline_not_the_sum`.
 /// - nie odnawiać terminu źródła: po EINTR i po fałszywym przebudzeniu wracać do czekania na ten sam termin.
+///   Test: `BinaryDeviceROTest.await_deadline_survives_eintr`, `BinaryDeviceROTest.await_deadline_survives_eagain`.
 /// - kończyć czekanie źródła od razu po danych, EOF albo błędzie, a po błędzie poll() innym niż EINTR kończyć czekanie wszystkich źródeł w tym slocie z ostrzeżeniem.
+///   Test: `BinaryDeviceROTest.await_returns_when_a_late_writer_completes_the_record`, `BinaryDeviceROTest.await_ends_on_eof_without_waiting_for_the_deadline`, `BinaryDeviceROTest.device_read_error_does_not_exhaust_and_next_slot_recovers`, `BinaryDeviceROTest.poll_failure_ends_all_waits_and_clears_every_awaited_mark`.
 /// - na końcu zdejmować markAwaited() ze wszystkich podanych źródeł.
+///   Test: `BinaryDeviceROTest.device_destroyed_during_the_device_phase_is_fatal`, `BinaryDeviceROTest.poll_failure_ends_all_waits_and_clears_every_awaited_mark`. Kontrola znacznika przez destruktor działa tylko w Debug.
 ///
 /// @note Faza DEVICE (#347). Wola ja watek wykonawczy BEZ blokad modelu; zrodla musza przezyc cale wywolanie
 ///       (niezmiennik pilnowany w Debug przez destruktor binaryDeviceRO).

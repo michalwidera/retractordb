@@ -20,6 +20,116 @@ struct MetaTestFixture : public ::testing::Test {
   void TearDown() override { std::remove(metaFile.c_str()); }
 };
 
+TEST_F(MetaTestFixture, header_lazy_tail_and_gap_have_exact_bytes_after_reopen) {
+  const rdb::Descriptor descriptor{{"a", 4, 1, rdb::INTEGER}, {"b", 4, 1, rdb::INTEGER}};
+  const std::vector<bool> a{true, false};
+  const std::vector<bool> b{false, true};
+  const auto bytes = [&] {
+    std::ifstream input(metaFile, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+  };
+  std::string expected(8, '\0');
+  const auto appendFrame = [&](bool gap, size_t count, char bits) {
+    expected.push_back(gap ? 1 : 0);
+    expected.append(reinterpret_cast<const char *>(&count), sizeof(count));
+    const size_t bitCount = 2;
+    expected.append(reinterpret_cast<const char *>(&bitCount), sizeof(bitCount));
+    expected.push_back(bits);
+  };
+  {
+    rdb::metaData meta(descriptor, metaFile);
+    EXPECT_EQ(bytes(), expected);
+    meta.onRecordAppended(a);
+    EXPECT_EQ(bytes(), expected);
+    meta.flushCurrentEntry();
+    appendFrame(false, 1, 1);
+    EXPECT_EQ(bytes(), expected);
+    meta.onRecordAppended(a);
+    EXPECT_EQ(bytes(), expected) << "rozszerzenie pozostaje lazy do flushu";
+    meta.onRecordAppended(b);
+    expected.resize(8);
+    appendFrame(false, 2, 1);
+    EXPECT_EQ(bytes(), expected);
+    meta.onTransmissionGap(7);
+    appendFrame(false, 1, 2);
+    appendFrame(true, 7, 3);
+    EXPECT_EQ(bytes(), expected);
+    meta.onRecordAppended(a);
+  }
+  appendFrame(false, 1, 1);
+  EXPECT_EQ(bytes(), expected);
+  const std::string committed = expected.substr(0, expected.size() - (1 + 2 * sizeof(size_t) + 1));
+  {
+    rdb::metaData reopened(descriptor, metaFile);
+    ASSERT_FALSE(reopened.initializationError());
+    EXPECT_EQ(bytes(), committed) << "ostatni segment nie-gap wraca do pamieci i znika z pliku";
+    EXPECT_EQ(reopened.totalRecords(), 4U);
+    EXPECT_EQ(reopened.getNullBitset(0), a);
+    EXPECT_EQ(reopened.getNullBitset(1), a);
+    EXPECT_EQ(reopened.getNullBitset(2), b);
+    EXPECT_EQ(reopened.getNullBitset(3), a);
+    EXPECT_TRUE(reopened.isGapBefore(3));
+    EXPECT_FALSE(reopened.isGapBefore(0));
+    EXPECT_EQ(reopened.nullBitsetFor(4), (std::vector<bool>{false, false}));
+  }
+  EXPECT_EQ(bytes(), expected) << "zamkniecie utrwala segment z pamieci";
+}
+
+TEST_F(MetaTestFixture, reset_keeps_gap_detection_but_discards_tail_and_pending_gap) {
+  const rdb::Descriptor descriptor{{"a", 4, 1, rdb::INTEGER}};
+  rdb::metaData meta(descriptor, metaFile);
+  meta.configureGapDetection(1);
+  EXPECT_FALSE(meta.absorbAppend({true}));
+  meta.onRecordAppended({true});
+  meta.flushCurrentEntry();
+  EXPECT_TRUE(meta.absorbAppend({true}));
+  meta.reset();
+  meta.flushPendingGap();
+  EXPECT_TRUE(meta.gapDetectionEnabled());
+  EXPECT_TRUE(meta.isEmpty());
+  EXPECT_TRUE(meta.segments().empty());
+  EXPECT_EQ(std::filesystem::file_size(metaFile), 8U);
+  EXPECT_FALSE(meta.absorbAppend({true}));
+  meta.onRecordAppended({true});
+  EXPECT_TRUE(meta.absorbAppend({true}));
+  EXPECT_FALSE(meta.absorbAppend({false}));
+  meta.onRecordAppended({false});
+  EXPECT_EQ(meta.totalRecords(), 2U);
+  const auto entries = meta.segments();
+  ASSERT_EQ(entries.size(), 3U);
+  EXPECT_TRUE(entries[1].isGap);
+  EXPECT_EQ(entries[1].recordCount, 1U);
+}
+
+TEST_F(MetaTestFixture, failed_rewrite_preserves_file_bytes_errno_and_the_live_index) {
+  const rdb::Descriptor descriptor{{"a", 4, 1, rdb::INTEGER}};
+  const auto bytes = [&] {
+    std::ifstream input(metaFile, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+  };
+  {
+    rdb::metaData meta(descriptor, metaFile);
+    meta.onRecordAppended({true});
+    meta.onRecordAppended({true});
+    meta.onRecordAppended({false});
+    meta.flushCurrentEntry();
+    const auto original = bytes();
+    std::filesystem::create_directory(metaFile + ".tmp");
+    const auto result = meta.onRecordModified(0, {false});
+    ASSERT_RDB_ERROR(result, rdb::Errc::IO);
+    EXPECT_EQ(result.error().err(), EISDIR);
+    EXPECT_EQ(bytes(), original);
+    EXPECT_EQ(meta.totalRecords(), 3U);
+    EXPECT_EQ(meta.getNullBitset(0), std::vector<bool>{true});
+    EXPECT_EQ(meta.getNullBitset(2), std::vector<bool>{false});
+    std::filesystem::remove(metaFile + ".tmp");
+  }
+  rdb::metaData reopened(descriptor, metaFile);
+  EXPECT_EQ(reopened.totalRecords(), 3U);
+  EXPECT_EQ(reopened.getNullBitset(0), std::vector<bool>{true});
+  EXPECT_EQ(reopened.getNullBitset(2), std::vector<bool>{false});
+}
+
 // ── Low-level serialization ──────────────────────────────────────────
 
 TEST(MetaDataIndexRecordTest, test_IndexRecord_serialization) {

@@ -16,6 +16,8 @@
 
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 
 // ── Warunek wstrzyknięcia: cień danych raportowany przez accessor ────
 
@@ -150,4 +152,31 @@ TEST_F(StorageShadowFixture, scenariusz_discard_i_reset) {
   meta.reset();
   EXPECT_TRUE(meta.isEmpty());
   EXPECT_FALSE(std::filesystem::exists(shadowFile));
+}
+
+TEST_F(StorageShadowFixture, polymorphic_updates_preserve_main_bytes_and_merge_in_arrival_order) {
+  const auto bytes = [&] {
+    std::ifstream input(file, std::ios::binary);
+    return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+  };
+  {
+    rdb::storageShadow shadow(descriptor, file);
+    rdb::metaData &base = shadow;
+    base.onRecordAppended(allPresent);
+    base.onRecordAppended(allNull);
+    base.flushCurrentEntry();
+    const auto mainBytes = bytes();
+    ASSERT_RDB_OK(base.onRecordModified(0, allNull));
+    ASSERT_RDB_OK(base.onRecordModified(0, allPresent));
+    ASSERT_RDB_OK(base.onRecordModified(1, allPresent));
+    EXPECT_EQ(bytes(), mainBytes);
+    EXPECT_EQ(base.getNullBitset(0), allPresent);
+    EXPECT_EQ(base.getNullBitset(1), allPresent);
+    ASSERT_RDB_OK(shadow.mergeShadow());
+    EXPECT_FALSE(std::filesystem::exists(shadowFile));
+  }
+  rdb::metaData reopened(descriptor, file);
+  EXPECT_EQ(reopened.totalRecords(), 2U);
+  EXPECT_EQ(reopened.getNullBitset(0), allPresent);
+  EXPECT_EQ(reopened.getNullBitset(1), allPresent);
 }
