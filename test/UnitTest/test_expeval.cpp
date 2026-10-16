@@ -7,7 +7,9 @@
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -2302,4 +2304,172 @@ TEST(xExpressionEval, unary_minus_stays_arithmetic_for_signed_types) {
   EXPECT_EQ(evalUnary(2.5F, token(NEGATE)), rdb::descFldVT{-2.5F});
   EXPECT_TRUE(isNull(evalUnary(intMin, token(NEGATE))));
   EXPECT_RDB_ERROR(evalUnaryResult(std::string("ab"), token(NEGATE)), rdb::Errc::Eval);
+}
+
+TEST(xExpressionEval, call2_accepts_only_the_canonical_to_string_name) {
+  expressionEvaluator evaluator;
+  EXPECT_EQ(rdbtest::ok(evaluator.eval({token(PUSH_VAL, 42), token(CALL2, std::pair<std::string, int>{"to_string", 8})})),
+            rdb::descFldVT(std::string("42")));
+  EXPECT_EQ(rdbtest::ok(
+                evaluator.eval({token(PUSH_VAL, std::monostate{}), token(CALL2, std::pair<std::string, int>{"to_string", 8})})),
+            rdb::descFldVT(std::monostate{}));
+  for (const char *name : {"TO_STRING", "To_StRiNg", "Sqrt"})
+    EXPECT_RDB_ERROR(evaluator.eval({token(PUSH_VAL, 1), token(CALL2, std::pair<std::string, int>{name, 8})}), rdb::Errc::Eval);
+}
+
+TEST(xExpressionEval, window_tokens_read_the_selected_group_and_reject_invalid_indices) {
+  expressionEvaluator evaluator;
+  std::vector<windowStats> groups(2);
+  groups[0] = {.minValue = -999, .maxValue = 999, .sumValue = 777, .avgValue = 555};
+  groups[1] = {.minValue = -3, .maxValue = 7, .sumValue = 9, .avgValue = boost::rational<int>(9, 4)};
+  const std::vector<std::pair<command_id, rdb::descFldVT>> cases{
+      {WINDOW_MIN, -3}, {WINDOW_MAX, 7}, {WINDOW_SUM, 9}, {WINDOW_AVG, boost::rational<int>(9, 4)}};
+  for (const auto &[op, expected] : cases) {
+    EXPECT_EQ(rdbtest::ok(evaluator.eval({token(op, 1)}, nullptr, &groups)), expected);
+    EXPECT_RDB_ERROR(evaluator.eval({token(op, 1)}), rdb::Errc::Eval);
+    for (const int index : {-1, 2})
+      EXPECT_RDB_ERROR(evaluator.eval({token(op, index)}, nullptr, &groups), rdb::Errc::Eval);
+  }
+}
+
+TEST(xExpressionEval, three_valued_truth_tables_cover_both_operand_orders) {
+  const std::vector<rdb::descFldVT> values{0, 1, std::monostate{}};
+  // Wiersze i kolumny: FALSE, TRUE, UNKNOWN; -1 oznacza UNKNOWN.
+  constexpr int andTable[3][3]{{0, 0, 0}, {0, 1, -1}, {0, -1, -1}};
+  constexpr int orTable[3][3]{{0, 1, -1}, {1, 1, 1}, {-1, 1, -1}};
+  expressionEvaluator evaluator;
+  for (size_t left = 0; left < 3; ++left)
+    for (size_t right = 0; right < 3; ++right)
+      for (const auto op : {AND, OR}) {
+        const int expected = op == AND ? andTable[left][right] : orTable[left][right];
+        const auto result =
+            rdbtest::ok(evaluator.eval({token(PUSH_VAL, values[left]), token(PUSH_VAL, values[right]), token(op)}));
+        EXPECT_EQ(result, expected < 0 ? rdb::descFldVT(std::monostate{}) : rdb::descFldVT(expected));
+      }
+}
+
+TEST(xExpressionEval, pair_arithmetic_and_refusals_preserve_the_contract) {
+  using integers = std::pair<int, int>;
+  using indexed  = std::pair<std::string, int>;
+  expressionEvaluator evaluator;
+  for (const auto &[op, expected] :
+       std::vector<std::pair<command_id, integers>>{{ADD, {8, 12}}, {SUBTRACT, {4, 4}}, {MULTIPLY, {12, 32}}, {DIVIDE, {3, 2}}})
+    EXPECT_EQ(rdbtest::ok(evaluator.eval({token(PUSH_VAL, integers{6, 8}), token(PUSH_VAL, integers{2, 4}), token(op)})),
+              rdb::descFldVT(expected));
+  for (const auto &[op, expected] : std::vector<std::pair<command_id, indexed>>{
+           {ADD, {"leftright", 10}}, {SUBTRACT, {"?? -", 6}}, {MULTIPLY, {"?? *", 16}}, {DIVIDE, {"?? /", 4}}})
+    EXPECT_EQ(
+        rdbtest::ok(evaluator.eval({token(PUSH_VAL, indexed{"left", 8}), token(PUSH_VAL, indexed{"right", 2}), token(op)})),
+        rdb::descFldVT(expected));
+  EXPECT_EQ(rdbtest::ok(evaluator.eval({token(PUSH_VAL, integers{6, 8}), token(NEGATE)})), rdb::descFldVT(integers{-6, -8}));
+  EXPECT_EQ(rdbtest::ok(evaluator.eval({token(PUSH_VAL, indexed{"left", 8}), token(NEGATE)})),
+            rdb::descFldVT(indexed{"-left", -8}));
+  for (const auto &value : std::vector<rdb::descFldVT>{integers{1, 2}, indexed{"x", 2}}) {
+    for (const auto op : {POWER, CMP_EQUAL, CMP_NOT_EQUAL, CMP_LT, CMP_GT, CMP_LE, CMP_GE, AND, OR})
+      EXPECT_RDB_ERROR(evaluator.eval({token(PUSH_VAL, value), token(PUSH_VAL, value), token(op)}), rdb::Errc::Eval);
+    EXPECT_RDB_ERROR(evaluator.eval({token(PUSH_VAL, value), token(NOT)}), rdb::Errc::Eval);
+  }
+}
+
+TEST(xExpressionEval, deep_stack_is_released_after_success_and_error) {
+  expressionEvaluator evaluator;
+  std::list<token> program;
+  for (int i = 0; i < 32; ++i)
+    program.emplace_back(PUSH_VAL, std::string(64, 'x'));
+  auto invalid = program;
+  invalid.emplace_back(PUSH_STREAM, std::string("unsupported"));
+  for (int i = 1; i < 32; ++i)
+    program.emplace_back(ADD);
+  EXPECT_EQ(rdbtest::ok(evaluator.eval(program)), rdb::descFldVT(std::string(2048, 'x')));
+  EXPECT_RDB_ERROR(evaluator.eval(invalid), rdb::Errc::Eval);
+  EXPECT_EQ(rdbtest::ok(evaluator.eval({token(PUSH_VAL, 7)})), rdb::descFldVT(7));
+}
+
+TEST(xExpressionEval, numeric_arithmetic_and_comparisons_cover_all_promotions) {
+  using value = rdb::descFldVT;
+  using ratio = boost::rational<int>;
+  const std::vector<value> left{uint8_t{6}, 6, 6U, ratio(6), 6.0F, 6.0};
+  const std::vector<value> right{uint8_t{2}, 2, 2U, ratio(2), 2.0F, 2.0};
+  // Tabela promocji z kontraktu typow, niezalezna od cast i normalize.
+  constexpr int types[6][6]{{0, 1, 2, 3, 4, 5}, {1, 1, 2, 3, 4, 5}, {2, 2, 2, 3, 4, 5},
+                            {3, 3, 3, 3, 4, 5}, {4, 4, 4, 4, 4, 5}, {5, 5, 5, 5, 5, 5}};
+  const std::vector<std::pair<command_id, std::vector<value>>> cases{{ADD, {uint8_t{8}, 8, 8U, ratio(8), 8.0F, 8.0}},
+                                                                     {SUBTRACT, {uint8_t{4}, 4, 4U, ratio(4), 4.0F, 4.0}},
+                                                                     {MULTIPLY, {uint8_t{12}, 12, 12U, ratio(12), 12.0F, 12.0}},
+                                                                     {DIVIDE, {uint8_t{3}, 3, 3U, ratio(3), 3.0F, 3.0}},
+                                                                     {POWER, {uint8_t{36}, 36, 36U, ratio(36), 36.0F, 36.0}},
+                                                                     {CMP_EQUAL, {uint8_t{0}, 0, 0U, ratio(0), 0.0F, 0.0}},
+                                                                     {CMP_NOT_EQUAL, {uint8_t{1}, 1, 1U, ratio(1), 1.0F, 1.0}},
+                                                                     {CMP_LT, {uint8_t{0}, 0, 0U, ratio(0), 0.0F, 0.0}},
+                                                                     {CMP_GT, {uint8_t{1}, 1, 1U, ratio(1), 1.0F, 1.0}},
+                                                                     {CMP_LE, {uint8_t{0}, 0, 0U, ratio(0), 0.0F, 0.0}},
+                                                                     {CMP_GE, {uint8_t{1}, 1, 1U, ratio(1), 1.0F, 1.0}}};
+  for (size_t a = 0; a < 6; ++a)
+    for (size_t b = 0; b < 6; ++b)
+      for (const auto &[op, expected] : cases) {
+        SCOPED_TRACE(std::to_string(a) + "," + std::to_string(b) + "," + std::to_string(op));
+        const int type =
+            types[a][b] == 0 && (op == ADD || op == SUBTRACT || op == MULTIPLY || op == DIVIDE || op == POWER) ? 1 : types[a][b];
+        EXPECT_EQ(evalBinary(left[a], right[b], op), expected[type]);
+      }
+}
+
+TEST(xExpressionEval, exact_power_zero_exponent_is_one_of_the_product_type) {
+  using ratio = boost::rational<int>;
+  // BYTE^0 to INTEGER 1, jak BYTE^k dla k >= 1 i jak deklaruje kompilator (arithmeticValueType).
+  for (const auto &[base, one] : std::vector<std::pair<rdb::descFldVT, rdb::descFldVT>>{
+           {uint8_t{7}, 1}, {uint8_t{0}, 1}, {7, 1}, {7U, 1U}, {ratio(2, 3), ratio(1)}}) {
+    const auto zero = std::visit(
+        [](const auto &v) -> rdb::descFldVT {
+          using T = std::decay_t<decltype(v)>;
+          if constexpr (std::is_arithmetic_v<T> || std::is_same_v<T, ratio>)
+            return T(0);
+          else
+            return std::monostate{};
+        },
+        base);
+    EXPECT_EQ(evalBinary(base, zero, POWER), one);
+  }
+}
+
+// Regresja #521: `-(b^e)` nad polami BYTE przy e = 0 dawalo 254 - NEGATE na BYTE odwraca bity,
+// a `b^0` zostawal BYTE, choc pole ma typ INTEGER. Wartosc oczekiwana: -(b^e) = -(liczba b do potegi e).
+TEST(xExpressionEval, negated_byte_power_with_zero_exponent_is_minus_one) {
+  expressionEvaluator evaluator;
+  for (const auto &[b, e, expected] : {std::tuple{3, 0, -1}, std::tuple{0, 0, -1}, std::tuple{3, 1, -3}, std::tuple{3, 2, -9}}) {
+    SCOPED_TRACE(std::to_string(b) + "^" + std::to_string(e));
+    EXPECT_EQ(rdbtest::ok(evaluator.eval({token(PUSH_VAL, static_cast<uint8_t>(b)), token(PUSH_VAL, static_cast<uint8_t>(e)),
+                                          token(POWER), token(NEGATE)})),
+              rdb::descFldVT(expected));
+  }
+}
+
+TEST(xExpressionEval, logic_result_uses_the_first_non_null_operand_type) {
+  using value = rdb::descFldVT;
+  using ratio = boost::rational<int>;
+  const std::vector<value> truthy{uint8_t{2}, 2, 2U, ratio(2), 2.0F, 2.0, std::string("x")};
+  const std::vector<value> ones{uint8_t{1}, 1, 1U, ratio(1), 1.0F, 1.0, 1};
+  const std::vector<value> zeros{uint8_t{0}, 0, 0U, ratio(0), 0.0F, 0.0, 0};
+  for (size_t i = 0; i < truthy.size(); ++i) {
+    EXPECT_EQ(evalBinary(truthy[i], 1.0, OR), ones[i]);
+    EXPECT_EQ(evalBinary(std::monostate{}, truthy[i], OR), ones[i]);
+    EXPECT_EQ(evalBinary(truthy[i], 0.0, AND), zeros[i]);
+    EXPECT_EQ(evalUnary(truthy[i], token(NOT)), zeros[i]);
+  }
+}
+
+TEST(xExpressionEval, scalar_math_functions_preserve_numeric_types_and_reject_pairs) {
+  using value = rdb::descFldVT;
+  using ratio = boost::rational<int>;
+  const std::vector<value> zeros{uint8_t{0}, 0, 0U, ratio(0), 0.0F, 0.0};
+  const std::vector<value> ones{uint8_t{1}, 1, 1U, ratio(1), 1.0F, 1.0};
+  for (const char *name : {"Floor", "Ceil", "Sqrt", "Round", "Tan", "Log", "Log2", "Trunc", "Abs"}) {
+    for (size_t i = 0; i < zeros.size(); ++i) {
+      const auto &input = std::string_view(name).starts_with("Log") ? ones[i] : zeros[i];
+      EXPECT_EQ(evalUnary(input, token(CALL, std::string(name))), zeros[i]) << name;
+    }
+    EXPECT_TRUE(isNull(evalUnary(std::monostate{}, token(CALL, std::string(name))))) << name;
+    for (const auto &input : std::vector<value>{std::pair{1, 2}, std::pair<std::string, int>{"x", 2}})
+      EXPECT_RDB_ERROR(evalUnaryResult(input, token(CALL, std::string(name))), rdb::Errc::Eval) << name;
+  }
 }

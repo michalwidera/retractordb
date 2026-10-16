@@ -427,3 +427,9 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
 }
 
 }  // Namespace
+
+TEST(TimeLineDeathTest, empty_interval_set_is_an_invariant_failure) {
+  EXPECT_DEATH(TimeLine(std::set<boost::rational<int>>{}), "input interval set must not be empty");
+  TimeLine timeline({boost::rational<int>(1)});
+  EXPECT_DEATH(timeline.updateTimeIntervals({}), "input interval set must not be empty");
+}

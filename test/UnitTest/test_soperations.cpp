@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <iostream>
 #include <numeric>
+#include <tuple>
 #include <vector>
 
 #include "SOperations.hpp"
@@ -455,4 +456,14 @@ TEST(xSOperations, hash_scan_limit_keeps_the_exact_branch_in_use) {
   };
   const int replaced = std::max(toSlots(0, deltaA, deltaOut), toSlots(latencyB, deltaB, deltaOut) + ownPhaseTerm);
   EXPECT_GT(replaced, static_cast<int>(exact)) << "przypadek przestal odrozniac obie postacie";
+}
+
+TEST(xSOperations, hash_scan_limit_boundary_has_an_exact_witness) {
+  // Niezalezna tablica zdarzen: W_A=0, W_B=1. Dla kazdej pary minimalny ogon
+  // wynosi 3, a oszacowanie zachowawcze 4. Tylko ostatni okres przekracza prog.
+  for (const auto &[a, b, expected] : {std::tuple{99997, 2, 3}, std::tuple{99997, 3, 3}, std::tuple{99999, 2, 4}}) {
+    SCOPED_TRACE(a + b);
+    EXPECT_EQ(HashStartupLatency(boost::rational<int>(a), boost::rational<int>(b), boost::rational<int>(a * b, a + b), 0, 1),
+              expected);
+  }
 }

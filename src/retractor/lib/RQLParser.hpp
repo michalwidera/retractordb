@@ -31,7 +31,12 @@ class qTree;
 /// - czyścić statementKeywords i zapisywać do niego słowa kluczowe wszystkich instrukcji porcji, wielkimi literami.
 ///   Test: `PlanSource.parser_status_keywords_and_partial_plan_are_explicit`.
 /// - liczyć wiersze w komunikatach od firstLine i podawać sourceFile w logu błędów składni; przeciążenia bez firstLine przyjmują 1, a przeciążenie bez statementKeywords odrzuca zebrane słowa.
+///   Test: `PlanSource.syntax_error_names_the_file_line_and_keeps_earlier_statements`, `PlanSource.parser_overloads_use_line_one_or_the_explicit_source_offset`.
 /// - nie przepuszczać żadnego wyjątku: złamany niezmiennik listenera i każdy wyjątek runtime ANTLR zwracać statusem z przedrostkiem kInternalCompilerError i słowem "UNRECOGNIZED".
+///   Test: `PlanSource.parser_contains_internal_standard_and_unknown_exceptions`.
+///   Test sprawdza kopie tej jednostki wkompilowana w ut_planSource, z ANTLRInputStream podmienionym makrem na strumien
+///   rzucajacy wyjatek; biblioteka zostaje bez haka. Zmiana tworzenia strumienia nie wycisza testu: przy innym typie
+///   strumienia nic nie rzuca i status wraca "OK" (czerwony), przy nazwie kwalifikowanej podmiana sie nie kompiluje.
 /// - po błędzie nie cofać zmian już naniesionych w coreInstance.
 ///   Test: `PlanSource.parser_status_keywords_and_partial_plan_are_explicit`.
 ///

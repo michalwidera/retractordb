@@ -258,18 +258,19 @@ TEST(xExpressionShape, binary_arithmetic_matrix_matches_the_evaluator) {
   }
 }
 
-// `bajt ^ 0` jest jedynym miejscem, w ktorym typ wyniku zalezy od WARTOSCI wykladnika:
-// exactPower() startuje od jedynki w typie podstawy i przy zerowym wykladniku nie wykonuje
-// ani jednego mnozenia, wiec nie ma promocji. Kontrakt statyczny podaje INTEGER - czyli
-// odpowiedz dla kazdego wykladnika >= 1 - a wartosc 1 zapisuje sie do pola INTEGER bez straty.
-TEST(xExpressionShape, byte_power_zero_is_the_documented_value_dependent_case) {
+// `bajt ^ 0` byl do 2026-10-16 jedynym miejscem, w ktorym typ wyniku zalezal od WARTOSCI
+// wykladnika: exactPower() startowal od jedynki w typie podstawy i przy zerowym wykladniku nie
+// wykonywal mnozenia. Zapis 1 do pola INTEGER byl bezstratny, ale wewnatrz wyrazenia nie:
+// `-(b^0)` liczylo NEGATE na BYTE, czyli `~1` = 254 zamiast -1 (#521). Teraz exactPower startuje
+// dla BYTE od jedynki INTEGER, wiec typ wykonania zgadza sie z kontraktem statycznym dla kazdego k.
+TEST(xExpressionShape, byte_power_is_integer_for_every_exponent) {
   auto record = testPayload(0);
 
   std::list<token> program{readField(sByte), readField(sByte), token(POWER)};
   EXPECT_EQ(analyse(program).shape.rtype, rdb::INTEGER);
 
-  // 0 ^ 0 w typie dokladnym: wynik jest jedynka w typie PODSTAWY, czyli BYTE.
-  EXPECT_EQ(evaluatedType(program, record), rdb::BYTE);
+  // 0 ^ 0 w typie dokladnym: jedynka w typie iloczynu, czyli INTEGER.
+  EXPECT_EQ(evaluatedType(program, record), rdb::INTEGER);
 
   // Kazdy wykladnik dodatni daje juz INTEGER, zgodnie z kontraktem statycznym.
   auto positive = testPayload(2);

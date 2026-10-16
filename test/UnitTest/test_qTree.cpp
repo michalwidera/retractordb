@@ -4,12 +4,15 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 
 #include "rdbResult.hpp"
 #include "retractor/lib/qTree.hpp"
 #include "retractor/lib/token.hpp"
 
 // ctest -R '^ut_qTree' -V
+
+static_assert(!std::is_convertible_v<qTree *, std::vector<query> *>);
 
 using rational = boost::rational<int>;
 
@@ -444,4 +447,21 @@ TEST(qTree, planRevision_never_matches_the_value_reserved_for_no_observation) {
   EXPECT_NE(qt.planRevision(), 0u);
   qt.push_back(makeQuery("alpha"));
   EXPECT_NE(qt.planRevision(), 0u);
+}
+
+TEST(qTree, replaceAll_preserves_capacity_and_copy_assignment_carries_revision) {
+  qTree plan;
+  plan.push_back(makeQuery("old"));
+  plan.maxCapacity["old"] = 17;
+  plan.replaceAll({makeQuery("new", 2)});
+  ASSERT_EQ(plan.size(), 1U);
+  EXPECT_EQ(plan[0].id, "new");
+  EXPECT_EQ(plan.maxCapacity, (std::map<std::string, int>{{"old", 17}}));
+  qTree copy;
+  copy = plan;
+  EXPECT_EQ(copy.planRevision(), plan.planRevision());
+  EXPECT_EQ(copy[0].id, "new");
+  copy.clear();
+  EXPECT_NE(copy.planRevision(), plan.planRevision());
+  EXPECT_EQ(plan.size(), 1U);
 }

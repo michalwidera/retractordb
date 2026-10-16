@@ -7,6 +7,7 @@
 #include <fstream>
 #include <limits>
 #include <sstream>
+#include <tuple>
 #include <type_traits>
 #include <vector>
 
@@ -29,6 +30,7 @@
 #include "rdbResult.hpp"
 #include "retractor/lib/checkedArith.hpp"
 #include "retractor/lib/CRSMath.hpp"
+#include "retractor/lib/qTree.hpp"
 #include "retractor/lib/query.hpp"
 #include "retractor/lib/token.hpp"
 #include "rqlFunctions.hpp"
@@ -453,4 +455,99 @@ TEST(RequirementContracts, catalogue_fallback_values_and_process_snapshot) {
   EXPECT_FALSE(self.zombie);
   EXPECT_NE(self.startTime, 0U);
   EXPECT_EQ(osplat::sharedMemoryBackingPath(), RDB_OS_LINUX ? "/dev/shm" : "/tmp");
+}
+
+TEST(RequirementContracts, storage_descriptor_keeps_schema_and_source_or_output_configuration) {
+  using item         = std::tuple<std::string, int, int, rdb::descFld>;
+  const auto entries = [](const rdb::Descriptor &descriptor) {
+    std::vector<item> result;
+    for (const auto &f : descriptor)
+      result.emplace_back(f.rname, f.rlen, f.rarray, f.rtype);
+    return result;
+  };
+  query node(1, "src");
+  node.filename = "input.txt";
+  node.lSchema.emplace_back(rdb::rField("a", 4, 2, rdb::INTEGER), std::list<token>{});
+  node.lSchema.emplace_back(rdb::rField("s", 1, 7, rdb::STRING), std::list<token>{});
+  const std::vector<item> schema{{"a", 4, 2, rdb::INTEGER}, {"s", 1, 7, rdb::STRING}};
+  for (const auto &[kind, type] : std::vector<std::pair<sourceKind, std::string>>{
+           {sourceKind::binFile, "BINFILE"}, {sourceKind::textFile, "TEXTSOURCE"}, {sourceKind::device, "DEVICE"}}) {
+    node.kind     = kind;
+    auto expected = schema;
+    expected.emplace_back("input.txt", 0, 0, rdb::REF);
+    expected.emplace_back(type, 0, 0, rdb::TYPE);
+    EXPECT_EQ(entries(node.descriptorStorage()), expected);
+  }
+  node.lProgram = {token(PUSH_STREAM, std::string("parent"))};
+  EXPECT_EQ(entries(node.descriptorStorage()), schema);
+  node.retention = {.segments = 3, .capacity = 11};
+  for (const auto *profile : {"MEMORY", "POSIX"}) {
+    node.policy   = {profile, 13};
+    auto expected = schema;
+    expected.emplace_back("", 3, 11, rdb::RETENTION);
+    expected.emplace_back("", 13, 0, rdb::RETMEMORY);
+    expected.emplace_back(profile, 0, 0, rdb::TYPE);
+    EXPECT_EQ(entries(node.descriptorStorage()), expected);
+  }
+}
+
+TEST(RequirementContracts, from_descriptor_covers_reducers_hash_windows_and_zero_length_fields) {
+  qTree plan;
+  query source(1, "src");
+  source.kind     = sourceKind::binFile;
+  source.filename = "src.bin";
+  source.lSchema.emplace_back(rdb::rField("a", 4, 2, rdb::INTEGER), std::list<token>{});
+  plan.push_back(source);
+  query other = source;
+  other.id    = "other";
+  other.lSchema.clear();
+  other.lSchema.emplace_back(rdb::rField("b", 8, 2, rdb::DOUBLE), std::list<token>{});
+  plan.push_back(other);
+  query output(1, "out");
+  for (const auto op : {STREAM_AVG, STREAM_MIN, STREAM_MAX, STREAM_SUM}) {
+    output.lProgram       = {token(PUSH_STREAM, std::string("src")), token(op)};
+    const auto descriptor = output.descriptorFrom(plan);
+    ASSERT_EQ(descriptor.size(), 1U);
+    EXPECT_EQ(descriptor[0].rname, "out_0");
+    EXPECT_EQ(descriptor[0].rtype, rdb::RATIONAL);
+    EXPECT_EQ(descriptor[0].rlen, static_cast<int>(sizeof(boost::rational<int>)));
+    EXPECT_EQ(descriptor[0].rarray, 1);
+  }
+  output.lProgram = {token(PUSH_STREAM, std::string("src")), token(PUSH_STREAM, std::string("other")), token(STREAM_HASH)};
+  const auto hash = output.descriptorFrom(plan);
+  ASSERT_EQ(hash.size(), 2U);
+  for (size_t i = 0; i < 2; ++i) {
+    EXPECT_EQ(hash[i].rname, "out_" + std::to_string(i));
+    EXPECT_EQ(hash[i].rtype, rdb::DOUBLE);
+    EXPECT_EQ(hash[i].rlen, 8);
+    EXPECT_EQ(hash[i].rarray, 1);
+  }
+  query mixed(1, "mixed");
+  mixed.kind    = sourceKind::binFile;
+  mixed.lSchema = source.lSchema;
+  mixed.lSchema.emplace_back(rdb::rField("wider", 8, 1, rdb::DOUBLE), std::list<token>{});
+  plan.push_back(mixed);
+  for (const int length : {-3, 3}) {
+    output.lProgram   = {token(PUSH_STREAM, std::string("mixed")), token(STREAM_AGSE, std::pair{1, length})};
+    const auto window = output.descriptorFrom(plan);
+    ASSERT_EQ(window.size(), 3U);
+    for (size_t i = 0; i < 3; ++i) {
+      EXPECT_EQ(window[i].rname, "out_" + std::to_string(i));
+      EXPECT_EQ(window[i].rtype, rdb::DOUBLE);
+      EXPECT_EQ(window[i].rlen, 8);
+      EXPECT_EQ(window[i].rarray, 1);
+    }
+  }
+  plan["src"].lSchema.emplace_back(rdb::rField("empty", 0, 1, rdb::INTEGER), std::list<token>{});
+  for (const auto op : {PUSH_STREAM, STREAM_TIMEMOVE, STREAM_SUBTRACT, STREAM_DEHASH_DIV, STREAM_DEHASH_MOD, STREAM_ADD}) {
+    output.lProgram = {token(PUSH_STREAM, std::string("src"))};
+    if (op == STREAM_ADD) output.lProgram.emplace_back(PUSH_STREAM, std::string("other"));
+    if (op != PUSH_STREAM) output.lProgram.emplace_back(op, 1);
+    const auto descriptor = output.descriptorFrom(plan);
+    ASSERT_EQ(descriptor.size(), op == STREAM_ADD ? 2U : 1U);
+    EXPECT_EQ(descriptor[0].rtype, rdb::INTEGER);
+    EXPECT_EQ(descriptor[0].rlen, 4);
+    EXPECT_EQ(descriptor[0].rarray, 2);
+    if (op == STREAM_ADD) EXPECT_EQ(descriptor[1].rtype, rdb::DOUBLE);
+  }
 }

@@ -12,6 +12,7 @@
 #include <sstream>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -24,6 +25,39 @@
 #include "retractor/lib/qTree.hpp"
 #include "retractor/lib/RQLParser.hpp"
 #include "retractor/lib/serviceControl.hpp"
+
+// ANTLR usuwa makro EOF; fmt musi byc wczytany wczesniej przez naglowki projektu.
+#include <antlr4-runtime/antlr4-runtime.h>
+
+// Kopia jednostki parsera z podmienionym wylacznie w tescie strumieniem ANTLR.
+// Nie dodaje zadnego haka ani konwersji do biblioteki produkcyjnej.
+namespace {
+enum class ParserFault { none, internal, standard, unknown };
+ParserFault parserFault = ParserFault::none;
+class BoundaryInputStream : public antlr4::ANTLRInputStream {
+ public:
+  explicit BoundaryInputStream(const std::string &text);
+};
+}  // namespace
+
+#define ANTLRInputStream BoundaryInputStream
+#include "retractor/lib/RQLParser.cpp"
+#undef ANTLRInputStream
+
+namespace {
+BoundaryInputStream::BoundaryInputStream(const std::string &text) : antlr4::ANTLRInputStream(text) {
+  switch (std::exchange(parserFault, ParserFault::none)) {
+    case ParserFault::internal:
+      throw RQLInternalError{"injected listener invariant"};
+    case ParserFault::standard:
+      throw std::runtime_error("injected ANTLR failure");
+    case ParserFault::unknown:
+      throw 521;
+    case ParserFault::none:
+      break;
+  }
+}
+}  // namespace
 
 /// @brief Wczytywanie zestawu RQL z tekstu - wspolne zrodlo startu z pliku i przeladowania
 /// w locie (`xqry --reset`).
@@ -89,6 +123,37 @@ TEST(PlanSource, timeout_report_covers_sources_filters_and_no_clock) {
 TEST(PlanSource, logical_lines_keep_start_numbers_and_drop_unfinished_statements) {
   std::istringstream input(" \t\r\n  # ignored\nSELECT \\\n  a\n\nRULE b\nunfinished\\\n");
   EXPECT_EQ(readLogicalLines(input), (std::vector<std::pair<std::string, size_t>>{{"SELECT    a", 3}, {"RULE b", 6}}));
+}
+
+TEST(PlanSource, parser_contains_internal_standard_and_unknown_exceptions) {
+  for (const auto &[kind, expected] :
+       std::vector<std::pair<ParserFault, std::string>>{{ParserFault::internal, "injected listener invariant"},
+                                                        {ParserFault::standard, "RQL parser: injected ANTLR failure"},
+                                                        {ParserFault::unknown, "RQL parser: unknown failure"}}) {
+    parserFault = kind;
+    qTree plan;
+    std::vector<std::string> keywords{"stale"};
+    const auto [status, keyword, name] =
+        parserRQLString(plan, "DECLARE a INTEGER STREAM src, 1 BINFILE 'src.bin'", keywords, 7, "fault.rql");
+    EXPECT_EQ(status, std::string(kInternalCompilerError) + expected);
+    EXPECT_EQ(keyword, "UNRECOGNIZED");
+    EXPECT_TRUE(name.empty());
+    EXPECT_TRUE(keywords.empty());
+    EXPECT_TRUE(plan.empty());
+    EXPECT_EQ(std::get<0>(parserRQLString(plan, "DECLARE a INTEGER STREAM src, 1 BINFILE 'src.bin'")), "OK");
+    EXPECT_TRUE(plan.exists("src"));
+  }
+}
+
+TEST(PlanSource, parser_overloads_use_line_one_or_the_explicit_source_offset) {
+  qTree plan;
+  std::vector<std::string> keywords;
+  LogCapture log;
+  const std::string invalid = "\n?";
+  EXPECT_TRUE(std::get<0>(parserRQLString(plan, invalid, keywords, 41, "fragment.rql")).starts_with("line 42:"));
+  EXPECT_TRUE(log.text().contains("fragment.rql: line 42:"));
+  EXPECT_TRUE(std::get<0>(parserRQLString(plan, invalid, keywords)).starts_with("line 2:"));
+  EXPECT_TRUE(std::get<0>(parserRQLString(plan, invalid)).starts_with("line 2:"));
 }
 
 TEST(PlanSource, parser_status_keywords_and_partial_plan_are_explicit) {

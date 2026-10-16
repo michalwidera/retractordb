@@ -8,6 +8,7 @@
 #include <iterator>
 #include <map>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <string>
 #include <tuple>
@@ -5079,4 +5080,84 @@ TEST(xparser, query_reset_clears_the_source_kind) {
   EXPECT_EQ(q.kind, sourceKind::none);
   EXPECT_FALSE(q.isDeprecatedFile);
   EXPECT_EQ(q.declarationLine, 0U);
+}
+
+TEST(xcompiler, resolution_gate_includes_directives_and_names_the_first_missing_node_and_pass) {
+  qTree plan;
+  plan.push_back(query(0, ":STORAGE"));
+  plan.push_back(query(1, "src"));
+  plan.push_back(query(1, "consumer"));
+  EXPECT_EQ(requireResolvedForEveryNode(plan, {{"src", 0}}, "origin-pass", "origin"),
+            "internal compiler error: origin-pass: unresolved origin for ':STORAGE'");
+  EXPECT_EQ(requireResolvedForEveryNode(plan, {{":STORAGE", 0}}, "tail-pass", "tail"),
+            "internal compiler error: tail-pass: unresolved tail for 'src'");
+  EXPECT_EQ(requireResolvedForEveryNode(plan, {{":STORAGE", 0}, {"src", 0}, {"consumer", 3}}, "pass", "tail"), "OK");
+}
+
+TEST(xcompiler, import_returns_only_new_non_directive_nodes_and_reset_forgets_previous_plan) {
+  qTree live;
+  ASSERT_EQ(std::get<0>(parserRQLString(live, "DECLARE a INTEGER STREAM src, 1 BINFILE 'src.bin'")), "OK");
+  compiler compiling(live);
+  ASSERT_EQ(compiling.compile(), "OK");
+  qTree addition;
+  ASSERT_EQ(
+      std::get<0>(parserRQLString(
+          addition, "STORAGE 'other'\nDECLARE a INTEGER STREAM src, 1 BINFILE 'src.bin'\nSELECT a+2 STREAM extra FROM src")),
+      "OK");
+  EXPECT_EQ(compiling.importFrom(addition), (std::vector<std::string>{"extra"}));
+  EXPECT_FALSE(live.exists(":STORAGE"));
+  ASSERT_EQ(compiling.compile(), "OK");
+  EXPECT_TRUE(compiling.importFrom(addition).empty());
+  live.clear();
+  compiling.reset();
+  ASSERT_EQ(std::get<0>(parserRQLString(
+                live, "DECLARE b DOUBLE STREAM fresh, 1/2 BINFILE 'fresh.bin'\nSELECT b STREAM result FROM fresh")),
+            "OK");
+  ASSERT_EQ(compiling.compile(), "OK");
+  EXPECT_FALSE(live.exists("src"));
+  EXPECT_FALSE(live.exists("extra"));
+  EXPECT_EQ(live["result"].rInterval, boost::rational<int>(1, 2));
+  EXPECT_EQ(live["result"].lSchema.front().field_.rtype, rdb::DOUBLE);
+  EXPECT_FALSE(live.maxCapacity.contains("src"));
+  EXPECT_EQ(live["result"].getDepStream(), (std::vector<std::string>{"fresh"}));
+}
+
+TEST(xcompiler, compiled_plan_places_every_producer_before_its_consumers) {
+  qTree plan;
+  ASSERT_EQ(std::get<0>(parserRQLString(plan,
+                                        "DECLARE x INTEGER STREAM a, 1 BINFILE 'a.bin'\n"
+                                        "DECLARE x INTEGER STREAM b, 2 BINFILE 'b.bin'\n"
+                                        "SELECT a[0]+b[0] STREAM sum FROM a+b\n"
+                                        "SELECT b[0]+a[0] STREAM twin FROM b+a\n"
+                                        "SELECT * STREAM matched FROM (a>2)#(b>1)\n"
+                                        "SELECT a[0]*1+0 STREAM simple FROM a\n")),
+            "OK");
+  ASSERT_EQ(compiler(plan).compile(), "OK");
+  std::set<std::string> available;
+  for (auto &node : plan) {
+    for (const auto &dependency : node.getDepStream())
+      EXPECT_TRUE(available.contains(dependency)) << node.id << " <- " << dependency;
+    available.insert(node.id);
+  }
+}
+
+TEST(xcompiler, missing_from_source_and_non_positive_agse_step_are_refused_after_generator_expansion) {
+  qTree missing;
+  ASSERT_EQ(std::get<0>(parserRQLString(missing, "SELECT * STREAM dst FROM missing")), "OK");
+  EXPECT_EQ(compiler(missing).compile(), "Stream 'dst' reads from 'missing', which is not defined in the plan");
+  // Kontrola stoi przed wydzieleniem substratow: po nim brak nazwalby substrat, nie strumien autora.
+  qTree wide;
+  ASSERT_EQ(std::get<0>(parserRQLString(
+                wide, "DECLARE a INTEGER STREAM src, 1 BINFILE 'src.bin'\nSELECT * STREAM dst FROM (src+missing)>1")),
+            "OK");
+  EXPECT_EQ(compiler(wide).compile(), "Stream 'dst' reads from 'missing', which is not defined in the plan");
+  for (const int step : {-1, 0}) {
+    qTree plan;
+    ASSERT_EQ(std::get<0>(parserRQLString(
+                  plan, "DECLARE a INTEGER STREAM src, 1 BINFILE 'src.bin'\nSELECT * STREAM dst FROM src@(1,3)")),
+              "OK");
+    plan["dst"].lProgram.back() = token(STREAM_AGSE, std::pair{step, 3});
+    EXPECT_EQ(compiler(plan).compile(),
+              "Stream 'dst' has an AGSE step of " + std::to_string(step) + "; the step in @(step,window) must be > 0");
+  }
 }

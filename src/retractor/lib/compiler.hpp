@@ -15,7 +15,9 @@
 
 /// Funkcja requireResolvedForEveryNode powinna:
 /// - zwracać "OK", gdy mapa resolved zawiera identyfikator każdego węzła planu, także deklaracji i dyrektyw.
+///   Test: `xcompiler.complete_resolution_passes_the_gate`, `xcompiler.resolution_gate_includes_directives_and_names_the_first_missing_node_and_pass`.
 /// - dla pierwszego węzła spoza mapy zwracać przez internalCompilerError status z nazwą przebiegu pass, wielkości quantity i identyfikatorem węzła.
+///   Test: `xcompiler.unresolved_node_is_a_compilation_error`, `xcompiler.resolution_gate_includes_directives_and_names_the_first_missing_node_and_pass`.
 ///
 /// @note Wspolna bramka przebiegow compiler::computeLogicalOrigin i compiler::computeStartupLatency. Do
 ///       2026-08-07 wezel pominiety dostawal po cichu domyslne 0, czyli rezim ZANIZAJACY ogon. Legalny plan
@@ -45,22 +47,43 @@ inline constexpr std::string_view kInternalCompilerError = "internal compiler er
 
 /// Obiekt klasy compiler powinien:
 /// - przez compile zwracać OK albo status błędu planu, a złamany niezmiennik kompilatora zgłaszać statusem z przedrostkiem kInternalCompilerError, nigdy wyjątkiem.
+///   Test: `xparser.check_compile`, `xcompiler.still_reports_true_circular_dependency`, `xcompiler.malformed_intermediate_operator_is_rejected_before_iterator_underflow`.
 /// - przed rozwinięciem generatorów odrzucać nieznane funkcje, niepoprawną arność i odwołania pól w reduktorach strumieni.
+///   Test: `xparser.unknown_function_is_rejected_at_compile_time`, `xparser.declared_width_is_rejected_for_functions_without_width`, `xcompiler.rejects_a_stream_reducer_used_as_a_field_reference`.
 /// - podczas rozwijania odrzucać niepoprawne generatory, a po ich rozwinięciu, przed wydzieleniem substratów, odrzucać
 ///   odwołania FROM do strumieni spoza planu i okna AGSE o niedodatnim kroku.
+///   Test: `xcompiler.rejects_zero_sized_generator`, `xcompiler.rejects_generator_without_ordinal`, `xcompiler.refuses_non_positive_operator_intervals_without_parser`.
+///   Test: `xcompiler.missing_from_source_and_non_positive_agse_step_are_refused_after_generator_expansion`.
 /// - rozwijać generatory strumieni do N instancji i odrzucać plan, który po rozwinięciu przekracza limit liczby strumieni.
+///   Test: `xcompiler.generator_plan_is_identical_to_hand_written_plan`, `xcompiler.generator_substitutes_ordinal_as_a_value`, `xcompiler.stream_count_after_generator_expansion_is_limited`.
 /// - sprowadzać każdą klauzulę FROM do jednego operatora strumieniowego przez wydzielenie strumieni pośrednich (substratów) o nazwach mieszczących się w budżecie długości, i odrzucać różne programy pod tą samą nazwą substratu.
+///   Test: `xcompiler.stream_function_matches_the_two_step_form`, `xcompiler.wide_from_clause_falls_back_to_digest`, `xcompiler.substrate_names_stay_identifiers`.
+///   Test: `xcompiler.refuses_colliding_substrate_programs_before_topological_sort`.
 /// - rozwijać wieloznaczniki schematu, rozwiązywać interwały strumieni, odwołania pól i okna rekordowe, wyznaczać typy pól i odrzucać warunki reguł o niewłaściwym kształcie.
+///   Test: `xcompiler.index_wildcard_expands_in_place_beside_other_select_items`, `xcompiler.resolves_intervals_independently_of_plan_order`, `xcompiler.window_group_addresses_a_single_flat_slot`.
+///   Test: `xcompiler.requested16_three_documented_boundaries`, `xcompiler.rule_condition_reaching_another_stream_is_refused`.
 /// - wyliczać dla każdego węzła origin i ogon dokładną arytmetyką wymierną, odrzucając plan z węzłem bez wyliczonej wartości.
+///   Test: `xcompiler.computes_startup_latency`, `xcompiler.exact_tail_for_subtract_and_dehash`, `xcompiler.every_node_of_a_nine_class_plan_is_resolved`.
+///   Test: `xcompiler.unresolved_node_is_a_compilation_error`, `xcompiler.agse_logical_origin_beyond_int_is_a_plan_error`.
 /// - wyznaczać pojemność historii każdego strumienia wymaganą przez konsumentów i odrzucać plan przekraczający budżet
 ///   pamięci historii ustawiony przez setHistoryMemoryBudget; domyślną retencję dyskową z setDefaultRetention stosować
 ///   do niedeklarowanych strumieni w magazynach DEFAULT i DIRECT bez własnego RETENTION.
+///   Test: `capacities.add_declared_matches_event_table`, `capacities.subtract_declared_matches_event_table`, `xcompiler.agse_capacity_period_is_computed_without_int_overflow`.
+///   Test: `xcompiler.stream_history_in_memory_is_limited_by_the_config_budget`, `xcompiler.default_retention_bounds_disk_streams_without_retention`, `xcompiler.default_retention_too_small_for_the_plan_is_a_compilation_error`.
 /// - zwracać plan w porządku topologicznym, w którym każdy producent poprzedza swoich konsumentów, niezależnie od tego, które optymalizacje zadziałały.
+///   Test: `xcompiler.compiled_plan_places_every_producer_before_its_consumers`.
 /// - stosować optymalizacje faktoryzacji przesunięć przez przeplot, deduplikacji substratów, upraszczania wyrażeń i współdzielenia równoważnych SELECT wyłącznie za odpowiednim przełącznikiem RDB_OPT_*, tak aby wyłączenie każdego z nich nie zmieniało wartości wyników, a ogon co najwyżej wydłużało.
+///   Test: `xcompiler.toggles_substrate_deduplication`, `xcompiler.toggles_matched_hash_time_move_factorization`, `xcompiler.shares_commutative_add_select_computation`.
+///   Test: `xcompiler.window_subexpression_goes_through_expression_simplification`, `ProofOracle.causal_shift_matching_read`, `ProofOracle.exact_tail_rewrite`.
 /// - po każdej optymalizacji sprawdzać, że nazwy pól widoczne dla użytkownika nie zmieniły się, i odrzucać plan, gdy zmieniły się.
+///   Test: `xcompiler.rewrites_preserve_observable_field_names`.
+///   Kontrola strukturalna: compiler.cpp - snapshot i verifyUserFieldNamesPreserved po kazdym z czterech przebiegow; odmowa zmiany nazw ma jawny status. Test sprawdza zachowanie nazw, nie wymusza odmowy.
 /// - przez importFrom dopisywać do planu węzły źródła nieobecne w nim, z pominięciem dyrektyw, zwracać ich nazwy i ograniczać współdzielenie SELECT w następnej kompilacji do tych węzłów, tak aby nie przepisać istniejących instancji strumieni.
+///   Test: `xcompiler.does_not_rewrite_existing_queries_during_import`, `xcompiler.import_returns_only_new_non_directive_nodes_and_reset_forgets_previous_plan`.
 /// - przez reset kasować stan zebrany podczas kompilacji, zachowując powiązanie z tym samym planem, tak aby kompilacja nowego planu nie widziała strumieni poprzedniego.
+///   Test: `xcompiler.import_returns_only_new_non_directive_nodes_and_reset_forgets_previous_plan`.
 /// - przez unboundedDiskStreams zwracać strumienie wynikowe zapisywane na dysku bez granicy retencji wraz z powodem.
+///   Test: `xcompiler.default_retention_bounds_disk_streams_without_retention`.
 struct compiler {
   explicit compiler(qTree &coreInstance) : coreInstance(coreInstance) {};
   compiler() = delete;

@@ -16,11 +16,14 @@ using std::set;
 /// @brief Klasa TimeLine wyznacza kolejne przedziały czasowe.
 ///
 /// Obiekt klasy TimeLine powinien:
-/// - być inicjalizowany zbiorem czasów między kolejnymi zdarzeniami.
+/// - być inicjalizowany niepustym zbiorem czasów między kolejnymi zdarzeniami.
+///   Test: `TimeLineUnitTest.FiltersOutNaturalMultiplesFromInputSet`, `TimeLineDeathTest.empty_interval_set_is_an_invariant_failure`.
 /// - dostarczać funkcji zwracającej najbliższy kolejny termin w systemie odstępów czasów.
+///   Test: `TimeLineUnitTest.GeneratesNearestNextTermsForSimpleDeltas`, `TimeLineUnitTest.UpdatingIntervalsPreservesPositionAndSchedulesNewFasterRate`.
 /// - być zabezpieczony przed kopiowaniem.
 ///   Sprawdzenie kompilacji: test/UnitTest/test_contracts.cpp - static_assert braku kopiowania i przypisania TimeLine.
 /// - dostarczać funkcji sprawdzającej, czy dany odstęp czasowy jest oczekiwany w bieżącym przedziale czasowym.
+///   Test: `TimeLineUnitTest.AwaitCheckMatchesCurrentTimeSlotAndRejectsZeroDelta`.
 
 class TimeLine : private boost::noncopyable {
   /** Set of _SORTED_ deltas */

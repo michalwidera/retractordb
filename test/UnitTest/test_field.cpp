@@ -30,6 +30,17 @@ TEST(field, list_constructor_preserves_program_order) {
   EXPECT_EQ(first.getCommandID(), PUSH_ID);
   EXPECT_EQ(firstValue.first, "src");
   EXPECT_EQ(firstValue.second, 0);
+  EXPECT_EQ(tested.field_.rname, "sum");
+  EXPECT_EQ(tested.field_.rlen, static_cast<int>(sizeof(int)));
+  EXPECT_EQ(tested.field_.rarray, 1);
+  EXPECT_EQ(tested.field_.rtype, rdb::INTEGER);
+  auto actual = tested.lProgram.begin();
+  for (const auto &expected : program) {
+    ASSERT_NE(actual, tested.lProgram.end());
+    EXPECT_EQ(actual->getCommandID(), expected.getCommandID());
+    EXPECT_EQ(actual->getVT(), expected.getVT());
+    ++actual;
+  }
 }
 
 TEST(field, stream_output_serializes_metadata_and_program) {
