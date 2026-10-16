@@ -134,23 +134,28 @@ inline logicalWriteCounters logicalWrite{};
 
 /// Funkcja printRuntimeCounters powinna:
 /// - wypisywać na stderr wiersz MATERIALIZED przy ustawionym RDB_BENCH_MATERIALIZE i wiersz LOGICAL przy ustawionym RDB_BENCH_LOGICAL (oba tylko w buildzie z sondą materializacji) oraz wiersz WORK przy ustawionym RDB_BENCH_WORK (tylko w buildzie z sondą pracy).
+///   Test: `probeReport.materialization_line_printed_when_armed`, `probeReport.logical_line_is_armed_by_its_own_variable`, `probeReport.work_line_printed_when_armed`, `probeReport.runtime_counters_are_silent_without_environment`; wiersze sprawdza tylko build RDB_BENCH_PROBE=ON (job CI ablation-probe-on).
 void printRuntimeCounters();
 
 /// Funkcja countRewriteR1 powinna:
 /// - zwiększać o jeden licznik zastosowań reguły przepisującej R1.
+///   Test: `probePlanReport.stages_and_rewrites_reported_when_armed`; tylko build RDB_BENCH_PROBE=ON - licznik czyta wylacznie raport planProbe.
 void countRewriteR1();
 
 /// Funkcja countRewriteR2 powinna:
 /// - dodawać węzeł do zbioru węzłów, w których zadziałała reguła R2, licząc każdy węzeł raz.
+///   Test: `probePlanReport.stages_and_rewrites_reported_when_armed`; tylko build RDB_BENCH_PROBE=ON - zbior czyta wylacznie raport planProbe.
 void countRewriteR2(const std::string &node);
 
 /// Funkcja countRewriteR3 powinna:
 /// - zwiększać licznik przepisań reguły R3 o liczbę zastosowań.
+///   Test: `probePlanReport.stages_and_rewrites_reported_when_armed`; tylko build RDB_BENCH_PROBE=ON - licznik czyta wylacznie raport planProbe.
 void countRewriteR3(std::size_t applied);
 }  // namespace detail
 
 /// Funkcja onAgseWindow powinna:
 /// - w buildzie z sondą pracy zwiększać o jeden licznik okien agregatu i o elements licznik odwiedzonych elementów, a w pozostałych nie robić nic.
+///   Test: `probeWork.counters_accumulate_per_event`, `probeWork.counters_accumulate_across_slots`; galaz z sonda sprawdza tylko build RDB_BENCH_PROBE=ON (job CI ablation-probe-on).
 ///
 /// @note Okno odwiedza `elements` elementow w KAZDYM slocie, niezaleznie od tego, ile trafi w dostepny zakres.
 [[gnu::always_inline]] inline void onAgseWindow(std::size_t elements) noexcept {
@@ -162,6 +167,7 @@ void countRewriteR3(std::size_t applied);
 
 /// Funkcja onAgseRead powinna:
 /// - w buildzie z sondą pracy zwiększać o jeden licznik odczytów rekordów źródła w oknie, osobny od licznika odwiedzin, a w pozostałych nie robić nic.
+///   Test: `probeWork.counters_accumulate_per_event`; galaz z sonda sprawdza tylko build RDB_BENCH_PROBE=ON (job CI ablation-probe-on).
 ///
 /// @note Cache `lastReadPosition` czesc odwiedzin omija, dlatego odczyty i odwiedziny sa rozdzielne.
 [[gnu::always_inline]] inline void onAgseRead() noexcept {
@@ -170,6 +176,7 @@ void countRewriteR3(std::size_t applied);
 
 /// Funkcja onEval powinna:
 /// - w buildzie z sondą pracy zwiększać o jeden licznik wykonań programu wyrażenia i o tokens licznik wykonanych tokenów, a w pozostałych nie robić nic.
+///   Test: `probeWork.counters_accumulate_per_event`, `probeWork.counters_accumulate_across_slots`; galaz z sonda sprawdza tylko build RDB_BENCH_PROBE=ON (job CI ablation-probe-on).
 ///
 /// @note Praca arytmetyczna slotu to liczba WYKONANYCH tokenow, nie rozmiar programu w planie.
 [[gnu::always_inline]] inline void onEval(std::size_t tokens) noexcept {
@@ -181,22 +188,26 @@ void countRewriteR3(std::size_t applied);
 
 /// Funkcja onHashPick powinna:
 /// - w buildzie z sondą pracy zwiększać o jeden licznik wyborów składowej przeplotu (STREAM_HASH), a w pozostałych nie robić nic.
+///   Test: `probeWork.counters_accumulate_per_event`; galaz z sonda sprawdza tylko build RDB_BENCH_PROBE=ON (job CI ablation-probe-on).
 [[gnu::always_inline]] inline void onHashPick() noexcept {
   if constexpr (rdb_probe_work) ++detail::work.hashPicks;
 }
 
 /// Funkcja onAddMerge powinna:
 /// - w buildzie z sondą pracy zwiększać o jeden licznik scaleń payloadów sumy strumieni (STREAM_ADD), a w pozostałych nie robić nic.
+///   Test: `probeWork.counters_accumulate_per_event`; galaz z sonda sprawdza tylko build RDB_BENCH_PROBE=ON (job CI ablation-probe-on).
 [[gnu::always_inline]] inline void onAddMerge() noexcept {
   if constexpr (rdb_probe_work) ++detail::work.addMerges;
 }
 
 /// Funkcja workReport powinna:
 /// - zwracać kopię bieżących liczników pracy.
+///   Test: `probeCounters.work_report_is_a_snapshot_and_reset_clears_seeded_state`, `probeWork.report_is_a_snapshot_not_a_view`.
 workCounters workReport();
 
 /// Funkcja workReset powinna:
 /// - zerować wszystkie liczniki pracy.
+///   Test: `probeCounters.work_report_is_a_snapshot_and_reset_clears_seeded_state`, `probeWork.reset_zeroes_every_counter`.
 void workReset();
 
 //
@@ -205,6 +216,7 @@ void workReset();
 
 /// Funkcja onMaterializedAppend powinna:
 /// - w buildzie z sondą materializacji zwiększać o jeden liczbę dopisań i o bytes liczbę bajtów magazynów pamięciowych albo trwałych, zależnie od memoryBacked, a w pozostałych nie robić nic.
+///   Test: `probeMaterialization.persistent_and_memory_storage_counted_separately`; galaz z sonda sprawdza tylko build RDB_BENCH_PROBE=ON (job CI ablation-probe-on).
 [[gnu::always_inline]] inline void onMaterializedAppend(bool memoryBacked, std::size_t bytes) noexcept {
   if constexpr (rdb_probe_materialize) {
     if (memoryBacked) {
@@ -219,6 +231,7 @@ void workReset();
 
 /// Funkcja onMaterializedOverwrite powinna:
 /// - w buildzie z sondą materializacji zwiększać o jeden liczbę nadpisań magazynów pamięciowych albo trwałych, zależnie od memoryBacked, a w pozostałych nie robić nic.
+///   Test: `probeMaterialization.overwrite_costs_a_write_but_no_volume`; galaz z sonda sprawdza tylko build RDB_BENCH_PROBE=ON (job CI ablation-probe-on).
 [[gnu::always_inline]] inline void onMaterializedOverwrite(bool memoryBacked) noexcept {
   if constexpr (rdb_probe_materialize) {
     if (memoryBacked)
@@ -230,16 +243,21 @@ void workReset();
 
 /// Funkcja materializationReport powinna:
 /// - zwracać kopię bieżących liczników materializacji.
+///   Test: `probeCounters.materialization_report_is_a_snapshot_and_reset_clears_seeded_state`.
 materializationCounters materializationReport();
 
 /// Funkcja materializationReset powinna:
 /// - zerować wszystkie liczniki materializacji.
+///   Test: `probeCounters.materialization_report_is_a_snapshot_and_reset_clears_seeded_state`, `probeMaterialization.reset_zeroes_every_counter`.
 void materializationReset();
 
 /// Funkcja canonicalRecordBytes powinna:
 /// - zwracać kanoniczną szerokość rekordu opisanego deskryptorem: sumę kanonicznych szerokości pól i kanoniczną mapę NULL/luk o jednym bicie na slot płaski, zaokrągloną w górę do bajtu.
+///   Test: `probeCanonicalRecord.integer_field_is_eight_bytes_plus_one_map_byte`, `probeCanonicalRecord.array_multiplies_the_canonical_width`, `probeCanonicalRecord.null_map_rounds_up_to_whole_bytes`, `probeCanonicalRecord.empty_descriptor_has_only_an_empty_null_map`.
 /// - liczyć szerokość pola jako rarray razy: 1 dla BYTE, kCanonicalWideNumericBytes dla INTEGER, UINT i DOUBLE, kCanonicalFloatBytes dla FLOAT, kCanonicalPairBytes dla RATIONAL i INTPAIR oraz rlen dla STRING; dla IDXPAIR rlen razy rarray plus kCanonicalWideNumericBytes, a dla NULLTYPE i pól konfiguracyjnych 0.
+///   Test: `probeCanonicalRecord.width_per_type_follows_the_frozen_mapping`, `probeCanonicalRecord.uint_and_pair_types_follow_the_frozen_mapping`, `probeCanonicalRecord.string_keeps_its_declared_width`, `probeCanonicalRecord.configuration_fields_and_nulltype_carry_no_width`; mnozenie przez rarray sprawdzone dla INTEGER i IDXPAIR, pola RETENTION i RETMEMORY bez przypadku.
 /// - zależeć wyłącznie od deskryptora, nie od zawartości rekordu.
+///   Test: `probeCanonicalRecord.result_is_independent_of_record_contents`, `probeLogicalGate.null_values_do_not_change_the_canonical_width`; ten drugi rozni zawartosc rekordu tylko w buildzie RDB_BENCH_PROBE=ON.
 ///
 /// @note To jest serializer metryki pierwotnej K23 i jedyne miejsce, w ktorym wolno go zmienic; ta sama
 ///       definicja obowiazuje job Flinka, a predeklaracja kampanii ja zamraza.
@@ -247,6 +265,7 @@ std::size_t canonicalRecordBytes(const Descriptor &descriptor);
 
 /// Funkcja onLogicalWrite powinna:
 /// - w buildzie z sondą materializacji zwiększać o jeden licznik dopisań albo nadpisań (append) substratu albo wyniku publicznego (substrate) i o canonicalBytes licznik bajtów tej roli, a w pozostałych nie robić nic.
+///   Test: `probeLogicalWrite.substrate_and_public_roles_counted_apart`, `probeLogicalWrite.overwrite_carries_bytes_unlike_the_native_counter`, `probeLogicalGate.overwrite_keeps_the_role_of_its_stream`; galaz z sonda sprawdza tylko build RDB_BENCH_PROBE=ON (job CI ablation-probe-on).
 [[gnu::always_inline]] inline void onLogicalWrite(bool substrate, bool append, std::size_t canonicalBytes) noexcept {
   if constexpr (rdb_probe_materialize) {
     auto &counters = detail::logicalWrite;
@@ -268,14 +287,17 @@ std::size_t canonicalRecordBytes(const Descriptor &descriptor);
 
 /// Funkcja logicalWriteReport powinna:
 /// - zwracać kopię bieżących liczników zapisów logicznych.
+///   Test: `probeCounters.logical_write_report_is_a_snapshot_and_reset_clears_seeded_state`.
 logicalWriteCounters logicalWriteReport();
 
 /// Funkcja logicalWriteReset powinna:
 /// - zerować wszystkie liczniki zapisów logicznych.
+///   Test: `probeCounters.logical_write_report_is_a_snapshot_and_reset_clears_seeded_state`, `probeLogicalWrite.reset_zeroes_every_counter`.
 void logicalWriteReset();
 
 /// Funkcja reportRuntimeCounters powinna:
 /// - w buildzie z sondą materializacji albo pracy wypisywać raport liczników przez printRuntimeCounters, a w pozostałych nie robić nic.
+///   Test: `probeReport.work_line_printed_when_armed`, `probeReport.materialization_line_printed_when_armed`, `probeReport.logical_line_is_armed_by_its_own_variable`; galaz z sonda sprawdza tylko build RDB_BENCH_PROBE=ON (job CI ablation-probe-on).
 ///
 /// @note Raport (K6 + K23 + E4) wolany po zakonczeniu mierzonej petli, zeby nie obciazal budzetu slotu.
 ///       Osobne zmienne srodowiskowe, bo wiersze opisuja rozne wielkosci.
@@ -299,13 +321,21 @@ void logicalWriteReset();
 /// `-t` zmienia tylko szeregowanie (SCHED_FIFO, mlockall, powinowactwo CPU).
 /// Obiekt klasy slotProbe powinien:
 /// - w buildzie bez sondy slotu (rdb_probe_slot równe false) nie wykonywać żadnej operacji w open, anchor, beginSlot, beginCompute, endCompute, endSlot ani w destruktorze.
+///   Test: `probeSlot.csv_has_header_and_one_row_per_slot`, `probeSlot.measured_intervals_keep_their_order`; jedynym obserwowalnym efektem jest plik CSV, ktorego build bez sondy nie tworzy mimo ustawionej zmiennej.
 /// - w open otwierać do zapisu plik wskazany przez zmienną RDB_BENCH_CSV i zapisywać nagłówek iter,compute_ns,wake_lag_ns,e2e_ns, a bez tej zmiennej lub przy nieudanym otwarciu pozostawać nieuzbrojoną bez wpływu na pracę usługi.
+///   Test: `probeSlot.csv_has_header_and_one_row_per_slot`, `probeSlot.disarmed_probe_writes_nothing_and_survives_use`, `probeSlot.unopenable_or_unopened_csv_leaves_the_probe_disarmed`; naglowek sprawdza tylko build RDB_BENCH_PROBE=ON.
 /// - w anchor zapamiętywać kotwicę osi czasu, względem której wołający planuje sen slotu.
+///   Test: `probeSlot.deadline_is_anchor_plus_offset_and_compute_spans_its_markers`; tylko build RDB_BENCH_PROBE=ON.
 /// - w beginSlot zapamiętywać chwilę pobudki i termin slotu równy kotwicy powiększonej o przekazane przesunięcie w milisekundach.
+///   Test: `probeSlot.deadline_is_anchor_plus_offset_and_compute_spans_its_markers`; tylko build RDB_BENCH_PROBE=ON.
 /// - w beginCompute i endCompute zapamiętywać granice czasu obliczeń slotu.
+///   Test: `probeSlot.deadline_is_anchor_plus_offset_and_compute_spans_its_markers`; tylko build RDB_BENCH_PROBE=ON.
 /// - w endSlot dopisywać wiersz z kolejnym numerem slotu od zera, czasem obliczeń, spóźnieniem pobudki względem terminu oraz czasem od terminu do końca emisji wyniku, wszystkie w nanosekundach.
+///   Test: `probeSlot.csv_has_header_and_one_row_per_slot`, `probeSlot.measured_intervals_keep_their_order`, `probeSlot.deadline_is_anchor_plus_offset_and_compute_spans_its_markers`; tylko build RDB_BENCH_PROBE=ON.
 /// - w uzbrojonej sondzie nie zapisywać niczego, gdy plik nie został otwarty.
+///   Test: `probeSlot.unopenable_or_unopened_csv_leaves_the_probe_disarmed`; uzbrojenie bez pliku ma skutek tylko w buildzie RDB_BENCH_PROBE=ON.
 /// - zamykać plik CSV przy zniszczeniu i uniemożliwiać kopiowanie sondy.
+///   Test: `probeSlot.csv_has_header_and_one_row_per_slot` (domkniecie pliku w destruktorze, tylko build RDB_BENCH_PROBE=ON); zakaz kopiowania: static_assert w test/UnitTest/test_probe.cpp.
 class slotProbe {
  public:
   slotProbe() = default;
@@ -403,6 +433,7 @@ enum class planStage : std::uint8_t {
 
 /// Funkcja shapeOf powinna:
 /// - zwracać kształt planu z pominięciem dyrektyw kompilatora: liczbę strumieni publicznych, liczbę substratów, łączną liczbę tokenów programów FROM i łączną liczbę tokenów programów pól.
+///   Test: `probePlanShape.directives_are_not_part_of_the_plan`, `probePlanShape.substrates_counted_apart_from_public_streams`, `probePlanShape.field_tokens_counted_separately_from_from_tokens`, `probePlanShape.empty_plan_has_zero_shape`.
 ///
 /// @note Szablon, bo typy planu naleza do biblioteki retractor, a sonda lezy poziom nizej, w rdb.
 template <class Plan>
@@ -420,6 +451,7 @@ planShape shapeOf(const Plan &plan) {
 
 /// Funkcja shapeOfCapacities powinna:
 /// - zwracać dla mapy pojemności historii liczbę strumieni, sumę pojemności i największą pojemność.
+///   Test: `probePlanShape.capacities_summed_and_maximum_reported`, `probePlanShape.empty_capacity_map_has_zero_shape`.
 template <class CapacityMap>
 capacityShape shapeOfCapacities(const CapacityMap &capacities) {
   capacityShape acc;
@@ -433,18 +465,21 @@ capacityShape shapeOfCapacities(const CapacityMap &capacities) {
 
 /// Funkcja onRewriteR1 powinna:
 /// - w buildzie z sondą planu liczyć zastosowanie reguły R1 (faktoryzacja przesunięć przez przeplot), a w pozostałych nie robić nic.
+///   Test: `probePlanReport.stages_and_rewrites_reported_when_armed`; tylko build RDB_BENCH_PROBE=ON - bez sondy licznika nie czyta nic, wiec polowa "nie robic nic" nie ma odczytu.
 [[gnu::always_inline]] inline void onRewriteR1() {
   if constexpr (rdb_probe_plan) detail::countRewriteR1();
 }
 
 /// Funkcja onRewriteR2 powinna:
 /// - w buildzie z sondą planu liczyć węzeł, w którym zadziałała reguła R2 (przemienność ADD przy odciskach), raz na węzeł, a w pozostałych nie robić nic.
+///   Test: `probePlanReport.stages_and_rewrites_reported_when_armed`; tylko build RDB_BENCH_PROBE=ON - bez sondy zbioru nie czyta nic, wiec polowa "nie robic nic" nie ma odczytu.
 [[gnu::always_inline]] inline void onRewriteR2(const std::string &node) {
   if constexpr (rdb_probe_plan) detail::countRewriteR2(node);
 }
 
 /// Funkcja onRewriteR3 powinna:
 /// - w buildzie z sondą planu doliczać liczbę przepisań reguły R3 (uproszczenia algebraiczne), a w pozostałych nie robić nic.
+///   Test: `probePlanReport.stages_and_rewrites_reported_when_armed`; tylko build RDB_BENCH_PROBE=ON - bez sondy licznika nie czyta nic, wiec polowa "nie robic nic" nie ma odczytu.
 ///
 /// @note Liczona suma przepisan, bo jedno wyrazenie moze zwinac wiele stalych naraz.
 [[gnu::always_inline]] inline void onRewriteR3(std::size_t applied) {
@@ -460,10 +495,15 @@ capacityShape shapeOfCapacities(const CapacityMap &capacities) {
 /// własnego pomiaru.
 /// Obiekt klasy planProbe powinien:
 /// - w buildzie bez sondy planu (rdb_probe_plan równe false) nie wykonywać żadnej operacji w konstruktorze, capture ani report.
+///   Test: `probePlanReport.stages_and_rewrites_reported_when_armed`, `probePlanReport.dedup_switch_is_visible_in_the_report`; jedynym obserwowalnym efektem jest raport, ktorego build bez sondy nie wypisuje mimo RDB_BENCH_PLAN.
 /// - przy konstrukcji uzbrajać się wyłącznie, gdy ustawiona jest zmienna RDB_BENCH_PLAN, zerować liczniki przepisań R1, R2 i R3 oraz zapamiętywać początek pomiaru kompilacji.
+///   Test: `probePlanReport.silent_without_environment`, `probePlanReport.construction_resets_rewrite_counters`, `probePlanReport.compile_time_runs_from_construction_less_the_probe_cost`; tylko build RDB_BENCH_PROBE=ON.
 /// - w nieuzbrojonej sondzie nie zdejmować migawek i nie wypisywać raportu.
+///   Test: `probePlanReport.silent_without_environment`; pominiecie samej migawki nie ma odczytu poza raportem.
 /// - przez capture zapamiętywać dla wskazanego etapu (entry, preDedup, postDedup, exit) liczbę strumieni publicznych, substratów, tokenów FROM i tokenów programów pól, z pominięciem dyrektyw kompilatora, i doliczać czas migawki do kosztu sondy.
+///   Test: `probePlanReport.stages_and_rewrites_reported_when_armed`, `probePlanReport.compile_time_runs_from_construction_less_the_probe_cost`; tylko build RDB_BENCH_PROBE=ON, pomijanie dyrektyw sprawdza `probePlanShape.directives_are_not_part_of_the_plan` na shapeOf.
 /// - przez report zdejmować migawkę etapu exit, a następnie wypisywać na stderr wiersze PLAN bench (cztery migawki i stan deduplikacji), REWRITE_APPLIED (r1, liczba węzłów z R2, r3), COMPILE_NS z czasem kompilacji pomniejszonym o koszt sondy oraz PLAN capacity (liczba strumieni, suma i maksimum pojemności).
+///   Test: `probePlanReport.stages_and_rewrites_reported_when_armed`, `probePlanReport.dedup_switch_is_visible_in_the_report`, `probePlanReport.compile_time_runs_from_construction_less_the_probe_cost`; tylko build RDB_BENCH_PROBE=ON.
 class planProbe {
  public:
   [[gnu::always_inline]] planProbe() {

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
@@ -8,6 +9,8 @@
 #include <list>
 #include <map>
 #include <string>
+#include <thread>
+#include <type_traits>
 #include <vector>
 
 #include <boost/rational.hpp>
@@ -733,4 +736,225 @@ TEST(probeSlot, disarmed_probe_writes_nothing_and_survives_use) {
   }
 
   EXPECT_FALSE(std::filesystem::exists(csv));
+}
+
+//
+// ─── Uzupelnienia pokrycia wymagan probe.hpp ────────────────────────────────────
+//
+// Raporty i zerowanie licznikow sa wkompilowane w kazdym buildzie, ale bez sondy nic ich
+// nie podnosi - testy wyzej widza wtedy same zera i nie odroznia kopii od widoku ani
+// zerowania od braku zdarzen. Stan zasiewany wprost w `detail`, zeby obie wlasnosci byly
+// sprawdzone takze w `ninja test` (build bez sondy).
+//
+
+TEST(probeCounters, work_report_is_a_snapshot_and_reset_clears_seeded_state) {
+  rdb::probe::detail::work = rdb::probe::workCounters{
+      .agseWindows = 1, .agseElements = 2, .agseReads = 3, .evalCalls = 4, .evalTokens = 5, .hashPicks = 6, .addMerges = 7};
+  const auto before = rdb::probe::workReport();
+  ++rdb::probe::detail::work.agseWindows;
+
+  EXPECT_EQ(before.agseWindows, 1u) << "raport nie moze sledzic pozniejszych zmian";
+  EXPECT_EQ(before.addMerges, 7u);
+  EXPECT_EQ(rdb::probe::workReport().agseWindows, 2u);
+
+  rdb::probe::workReset();
+  const auto w = rdb::probe::workReport();
+  EXPECT_EQ(w.agseWindows, 0u);
+  EXPECT_EQ(w.agseElements, 0u);
+  EXPECT_EQ(w.agseReads, 0u);
+  EXPECT_EQ(w.evalCalls, 0u);
+  EXPECT_EQ(w.evalTokens, 0u);
+  EXPECT_EQ(w.hashPicks, 0u);
+  EXPECT_EQ(w.addMerges, 0u);
+}
+
+TEST(probeCounters, materialization_report_is_a_snapshot_and_reset_clears_seeded_state) {
+  rdb::probe::detail::materialization = rdb::probe::materializationCounters{
+      .appends = 1, .overwrites = 2, .bytes = 3, .memoryAppends = 4, .memoryOverwrites = 5, .memoryBytes = 6};
+  const auto before = rdb::probe::materializationReport();
+  ++rdb::probe::detail::materialization.bytes;
+
+  EXPECT_EQ(before.bytes, 3u) << "raport nie moze sledzic pozniejszych zmian";
+  EXPECT_EQ(before.memoryBytes, 6u);
+  EXPECT_EQ(rdb::probe::materializationReport().bytes, 4u);
+
+  rdb::probe::materializationReset();
+  const auto m = rdb::probe::materializationReport();
+  EXPECT_EQ(m.appends, 0u);
+  EXPECT_EQ(m.overwrites, 0u);
+  EXPECT_EQ(m.bytes, 0u);
+  EXPECT_EQ(m.memoryAppends, 0u);
+  EXPECT_EQ(m.memoryOverwrites, 0u);
+  EXPECT_EQ(m.memoryBytes, 0u);
+}
+
+TEST(probeCounters, logical_write_report_is_a_snapshot_and_reset_clears_seeded_state) {
+  rdb::probe::detail::logicalWrite = rdb::probe::logicalWriteCounters{.substrateAppends    = 1,
+                                                                      .substrateOverwrites = 2,
+                                                                      .substrateBytes      = 3,
+                                                                      .publicAppends       = 4,
+                                                                      .publicOverwrites    = 5,
+                                                                      .publicBytes         = 6};
+  const auto before                = rdb::probe::logicalWriteReport();
+  ++rdb::probe::detail::logicalWrite.substrateBytes;
+
+  EXPECT_EQ(before.substrateBytes, 3u) << "raport nie moze sledzic pozniejszych zmian";
+  EXPECT_EQ(before.publicBytes, 6u);
+  EXPECT_EQ(rdb::probe::logicalWriteReport().substrateBytes, 4u);
+
+  rdb::probe::logicalWriteReset();
+  const auto l = rdb::probe::logicalWriteReport();
+  EXPECT_EQ(l.substrateAppends, 0u);
+  EXPECT_EQ(l.substrateOverwrites, 0u);
+  EXPECT_EQ(l.substrateBytes, 0u);
+  EXPECT_EQ(l.publicAppends, 0u);
+  EXPECT_EQ(l.publicOverwrites, 0u);
+  EXPECT_EQ(l.publicBytes, 0u);
+}
+
+TEST(probeCanonicalRecord, uint_and_pair_types_follow_the_frozen_mapping) {
+  const rdb::Descriptor uintField{{"u", sizeof(unsigned), 1, rdb::UINT}};
+  const rdb::Descriptor intPairField{{"p", 8, 1, rdb::INTPAIR}};
+  const rdb::Descriptor idxPairField{{"x", 12, 1, rdb::IDXPAIR}};
+  const rdb::Descriptor idxPairArray{{"x", 12, 2, rdb::IDXPAIR}};
+
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(uintField), 8u + 1u);
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(intPairField), 16u + 1u);
+  // IDXPAIR: rlen razy rarray plus jedno 8-bajtowe pole indeksu - indeks NIE mnozy sie przez rarray.
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(idxPairField), 12u + 8u + 1u);
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(idxPairArray), 24u + 8u + 1u);
+}
+
+static_assert(!std::is_copy_constructible_v<rdb::probe::slotProbe> && !std::is_copy_assignable_v<rdb::probe::slotProbe>,
+              "sonda slotu trzyma uchwyt pliku CSV - kopia zamknelaby go dwukrotnie");
+
+TEST(probeSlot, unopenable_or_unopened_csv_leaves_the_probe_disarmed) {
+  // Nieudane fopen i brak wywolania open() koncza sie tak samo: sonda dziala dalej
+  // bez pliku i bez wplywu na petle slotu.
+  const std::filesystem::path missingDir = "probe_slot_missing_dir";
+  std::filesystem::remove_all(missingDir);
+  {
+    const envGuard armed("RDB_BENCH_CSV", (missingDir / "slot.csv").c_str());
+    rdb::probe::slotProbe bench;
+    bench.open();
+    std::timespec anchor{};
+    ::clock_gettime(CLOCK_MONOTONIC, &anchor);
+    bench.anchor(anchor);
+    bench.beginSlot(0);
+    bench.beginCompute();
+    bench.endCompute();
+    bench.endSlot();
+  }
+  EXPECT_FALSE(std::filesystem::exists(missingDir));
+
+  const std::filesystem::path unopened = "probe_slot_unopened.csv";
+  std::filesystem::remove(unopened);
+  {
+    const envGuard armed("RDB_BENCH_CSV", unopened.c_str());
+    rdb::probe::slotProbe bench;  // bez open(): zmienna ustawiona, ale pliku nikt nie otworzyl
+    std::timespec anchor{};
+    ::clock_gettime(CLOCK_MONOTONIC, &anchor);
+    bench.anchor(anchor);
+    bench.beginSlot(0);
+    bench.beginCompute();
+    bench.endCompute();
+    bench.endSlot();
+  }
+  EXPECT_FALSE(std::filesystem::exists(unopened));
+}
+
+TEST(probeSlot, deadline_is_anchor_plus_offset_and_compute_spans_its_markers) {
+  // Kotwica 30 s w przeszlosci, a drugi termin 60 s po niej: spoznienie pobudki wypada raz
+  // ok. +30 s, raz ok. -30 s. Kotwica niezapamietana albo przesuniecie liczone w innej
+  // jednostce niz ms przesuneloby obie liczby o rzedy wielkosci.
+  constexpr long kSecondNs = 1'000'000'000L;
+  constexpr auto kCompute  = std::chrono::milliseconds(5);
+
+  const std::filesystem::path csv = "probe_slot_deadline.csv";
+  std::filesystem::remove(csv);
+  const envGuard armed("RDB_BENCH_CSV", csv.c_str());
+
+  {
+    rdb::probe::slotProbe bench;
+    bench.open();
+    std::timespec anchor{};
+    ::clock_gettime(CLOCK_MONOTONIC, &anchor);
+    anchor.tv_sec -= 30;
+    bench.anchor(anchor);
+
+    bench.beginSlot(0);
+    bench.beginCompute();
+    std::this_thread::sleep_for(kCompute);
+    bench.endCompute();
+    bench.endSlot();
+
+    bench.beginSlot(60'000);
+    bench.beginCompute();
+    bench.endCompute();
+    bench.endSlot();
+  }
+
+  if constexpr (!rdb_probe_slot) {
+    EXPECT_FALSE(std::filesystem::exists(csv));
+    return;
+  }
+
+  const auto lines = readLines(csv);
+  ASSERT_EQ(lines.size(), 3u);
+
+  long iter = -1, computeNs = 0, wakeLagNs = 0, e2eNs = 0;
+  ASSERT_EQ(std::sscanf(lines[1].c_str(), "%ld,%ld,%ld,%ld", &iter, &computeNs, &wakeLagNs, &e2eNs), 4);
+  EXPECT_EQ(iter, 0);
+  EXPECT_GE(computeNs, std::chrono::nanoseconds(kCompute).count()) << "sen lezy miedzy beginCompute a endCompute";
+  EXPECT_GE(wakeLagNs, 30 * kSecondNs);
+  EXPECT_LT(wakeLagNs, 35 * kSecondNs);
+  EXPECT_GE(e2eNs - wakeLagNs, computeNs) << "emisja wyniku nastepuje po obliczeniach tego slotu";
+
+  ASSERT_EQ(std::sscanf(lines[2].c_str(), "%ld,%ld,%ld,%ld", &iter, &computeNs, &wakeLagNs, &e2eNs), 4);
+  EXPECT_EQ(iter, 1);
+  EXPECT_GE(wakeLagNs, -30 * kSecondNs);
+  EXPECT_LT(wakeLagNs, -25 * kSecondNs);
+  EXPECT_GE(e2eNs, wakeLagNs);
+
+  std::filesystem::remove(csv);
+}
+
+TEST(probePlanReport, compile_time_runs_from_construction_less_the_probe_cost) {
+  // COMPILE_NS liczy sie od konstrukcji sondy, a koszt migawek jest od niego odejmowany.
+  // Oba skladniki razem nie moga przekroczyc czasu zmierzonego z zewnatrz; bez odejmowania
+  // suma przekroczylaby go o caly koszt sondy, ktory sto migawek planu 1000 zapytan czyni
+  // wiekszym niz narzut samego wywolania.
+  const envGuard planEnv("RDB_BENCH_PLAN", "1");
+  constexpr auto kCompile = std::chrono::milliseconds(5);
+
+  qTree plan;
+  for (int i = 0; i < 1000; ++i)
+    plan.push_back(makeQuery("q" + std::to_string(i), false, 1, {1}));
+
+  std::timespec outerBegin{}, outerEnd{};
+  ::clock_gettime(CLOCK_MONOTONIC, &outerBegin);
+  rdb::probe::planProbe bench;
+  for (int i = 0; i < 100; ++i)
+    bench.capture(rdb::probe::planStage::entry, plan);
+  std::this_thread::sleep_for(kCompile);
+
+  testing::internal::CaptureStderr();
+  bench.report(plan, plan.maxCapacity, true);
+  const std::string output = testing::internal::GetCapturedStderr();
+  ::clock_gettime(CLOCK_MONOTONIC, &outerEnd);
+
+  if constexpr (!rdb_probe_plan) {
+    EXPECT_EQ(output, "");
+    return;
+  }
+
+  const auto at = output.find("COMPILE_NS ");
+  ASSERT_NE(at, std::string::npos) << output;
+  long compileNs = -1, probeNs = -1;
+  ASSERT_EQ(std::sscanf(output.c_str() + at, "COMPILE_NS %ld sonda=%ld", &compileNs, &probeNs), 2) << output;
+
+  const long outerNs = ((outerEnd.tv_sec - outerBegin.tv_sec) * 1'000'000'000L) + (outerEnd.tv_nsec - outerBegin.tv_nsec);
+  EXPECT_GT(probeNs, 0) << output;
+  EXPECT_GE(compileNs, std::chrono::nanoseconds(kCompile).count()) << output;
+  EXPECT_LE(compileNs + probeNs, outerNs) << output;
 }
