@@ -11,3 +11,13 @@ add_test(
   COMMAND bash run.sh)
 
 set_tests_properties(${TestID} PROPERTIES TIMEOUT 120)
+
+# Wymiana planu przy magistrali niedostepnej (Unavailable); bez /dev/shm
+# niewykonalna (77).
+add_test(
+  NAME ${TestID}-bus-unavailable
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash bus_unavailable.sh)
+
+set_tests_properties(${TestID}-bus-unavailable PROPERTIES TIMEOUT 120
+                                                          SKIP_RETURN_CODE 77)

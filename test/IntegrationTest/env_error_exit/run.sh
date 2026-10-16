@@ -107,4 +107,25 @@ if [ -e "$SERVER_LOCK" ] && ! lock_is_free "$SERVER_LOCK"; then
 fi
 rm -f "$SERVER_LOCK"
 
+# --- 5. Blad silnika (nie srodowiska) w slocie: kod EXIT_FAILURE (#521, etap 9b). ---
+# Kontrakt executorsm: blad wykonania slotu zatrzymuje petle i konczy proces kodem jego kategorii.
+# Para z krokiem 4: Errc::IO daje EIO bez zatrzasku, kazda inna kategoria - 1 i "FATAL:".
+reset_tree
+status=0
+RDB_FAULT_ERROR_IN_SLOT=0 run_timeout 30 xretractor plan.rql -k >/dev/null 2>slot_logic.err || status=$?
+if [ "$status" -ne 1 ]; then
+  echo "blad silnika w slocie: kod $status, oczekiwano 1 (EXIT_FAILURE; 124 = zawieszenie)"
+  cat slot_logic.err
+  exit 1
+fi
+grep -q "^FATAL: fault hook RDB_FAULT_ERROR_IN_SLOT" slot_logic.err || {
+  echo "blad silnika w slocie: brak komunikatu FATAL bez przedrostka srodowiska"
+  cat slot_logic.err
+  exit 1
+}
+if [ -e "$SERVER_LOCK" ] && ! lock_is_free "$SERVER_LOCK"; then
+  echo "blad silnika w slocie: blokada instancji zostala zajeta po wyjsciu"
+  exit 1
+fi
+rm -f "$SERVER_LOCK"
 echo "OK"

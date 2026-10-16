@@ -11,3 +11,13 @@ add_test(
   COMMAND bash run.sh)
 
 set_tests_properties(${TestID}-run PROPERTIES TIMEOUT 90)
+
+# Rezerwacja numeru licznika rotacji w katalogu tylko do odczytu; pod rootem
+# niewykonalna (77).
+add_test(
+  NAME ${TestID}-rotation-reserve
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND bash rotation_reserve.sh)
+
+set_tests_properties(${TestID}-rotation-reserve PROPERTIES TIMEOUT 90
+                                                           SKIP_RETURN_CODE 77)

@@ -287,6 +287,12 @@ int executorsm::run(qTree &coreInstance, FlockServiceGuard &guard, bus::Bus &xrd
     auto counter = PersistentCounter::create(percounterFilename);
     if (!counter) {
       reportEngineFailure(counter.error());
+      // Galaz EXIT_FAILURE jest dzis martwa (analiza #521, etap 9b): create() zwraca wylacznie
+      // Errc::IO - plik nieczytelny, tresc nie bedaca liczba nieujemna, nieudana rezerwacja
+      // numeru (od #480 wszystkie to K4), a nieznany stan konczy proces przez rdb::fatal. Nie jest
+      // to defekt: przypisanie kodu jest to samo co dla bledu silnika w petli epok ponizej, wiec gdy
+      // create() zacznie zwracac inna kategorie, wyjdzie ona jak kazdy blad silnika (kod 1 i
+      // zatrzask fatalErrorRaised). Rekomendacja: zostawic, nie zastepowac stalym EIO.
       return counter.error().code() == rdb::Errc::IO ? EIO : EXIT_FAILURE;
     }
     pCounterPtr = std::move(*counter);

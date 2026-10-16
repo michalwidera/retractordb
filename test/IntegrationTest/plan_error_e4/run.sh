@@ -120,3 +120,23 @@ server_wait_status > late_link.status
 test "$(cat late_link.status)" -eq "$(errno_value EIO)"
 grep -qF "xretractor: dataModel: stream 'linked': cannot open output file" late_link.err
 if grep -qF 'Check result:' late_link.err || grep -qF 'FATAL:' late_link.err; then cat late_link.err; exit 1; fi
+
+# Ta sama odmowa po --reset (#521, etap 9b). Instancja startuje bez planu, wiec bramka budowy
+# modelu (raz na proces) zatrzymuje dopiero pierwsza epoke planu przyjetego kanalem reset.
+# reset-commit sprawdzil deskryptory, a test psuje je przed budowa modelu: run() konczy sie
+# kodem EPROTO z przyczyna z initializationError, jak przy starcie.
+rm -rf temp
+mkdir temp
+rm -f model_gate.ready model_gate.release
+export RDB_FAULT_MODEL_INIT_GATE="$PWD/model_gate"
+server_start -k -r > late_reset.out 2> late_reset.err
+unset RDB_FAULT_MODEL_INIT_GATE
+xqry --reset plan.rql
+wait_for_model_gate
+printf 'invalid descriptor\n' > temp/first.desc
+touch model_gate.release
+server_wait_status > late_reset.status
+test "$(cat late_reset.status)" -eq "$expected_rc"
+grep -qF "Check result:dataModel: stream 'first':" late_reset.err
+grep -qF 'descriptor parse failed' late_reset.err
+if grep -qF 'FATAL:' late_reset.err; then cat late_reset.err; exit 1; fi

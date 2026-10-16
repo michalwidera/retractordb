@@ -13,3 +13,15 @@ add_test(
   COMMAND bash run.sh)
 
 set_tests_properties(${TestID}-run PROPERTIES TIMEOUT 60)
+
+# Wpis logu o wyczerpanym zrodle ma poziom INFO, ktory Release wycina (jak w
+# service_idle).
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+  set(_rdbInfoActive 0)
+else()
+  set(_rdbInfoActive 1)
+endif()
+set_property(
+  TEST ${TestID}-run
+  APPEND
+  PROPERTY ENVIRONMENT "RDB_INFO_ACTIVE=${_rdbInfoActive}")

@@ -11,6 +11,18 @@ foreach(_case lifecycle foreign-uid)
                                                      SKIP_RETURN_CODE 77)
 endforeach()
 
+# Kontrakt startu executorsm (#521): linia PID dopiero po zasobach IPC (strace)
+# i kod ENOBUFS, gdy zasobow IPC nie da sie zbudowac (unshare). Bez narzedzia -
+# weryfikacja niewykonana (77).
+foreach(_case order ipc-failure)
+  add_test(
+    NAME ${TestID}-start-${_case}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    COMMAND bash start_order.sh $<TARGET_FILE:xretractor> ${_case})
+  set_tests_properties(${TestID}-start-${_case} PROPERTIES TIMEOUT 60
+                                                           SKIP_RETURN_CODE 77)
+endforeach()
+
 # RUN_SERIAL: lifecycle sprawdza pozostalosci po SIGKILL, a kazda rownolegla
 # instancja sprzata je przy wyjsciu (sweepAbandonedResources, blokady we
 # wspolnym /tmp) - zabralaby je, zanim test zdazy sprawdzic, ze w ogole
