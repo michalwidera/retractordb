@@ -42,7 +42,14 @@ struct ProcessSnapshot {
   std::uint64_t startTime{0};
 };
 
-/// Odczyt wpisu procesu. Jedno wywolanie jadra na obu platformach.
+/// Funkcja inspectProcess powinna:
+/// - dla pid <= 0 zwracać pustą migawkę (found == false, unreadable == false).
+/// - odczytywać wpis procesu jednym odczytem jądra (Linux: /proc/<pid>/task/<pid>/stat, Darwin: sysctl KERN_PROC_PID) i dla odczytanego wpisu ustawiać found, zombie i niezerowy startTime.
+/// - zgłaszać brak procesu (found == false, unreadable == false) wyłącznie wtedy, gdy jądro go potwierdziło: kill(pid, 0) z ESRCH na Linuksie, ESRCH albo pusty wynik sysctl na Darwinie.
+/// - w każdym innym przypadku nieudanego odczytu, także przy ukrytym /proc (hidepid) i EPERM, ustawiać wyłącznie unreadable == true.
+///
+/// @note Na Linuksie czytany jest wpis lidera grupy watkow, bo QEMU user-mode syntetyzuje /proc/<wlasny pid>/stat
+///       z innym starttime niz widzi obserwator.
 [[nodiscard]] ProcessSnapshot inspectProcess(std::int32_t pid);
 
 /// Tozsamosc procesu w menedzerze uslug systemu.
@@ -59,20 +66,23 @@ struct ServiceIdentity {
   bool userScope{false};
 };
 
-/// Ustala tozsamosc WLASNEGO procesu w menedzerze uslug.
+/// Funkcja detectServiceIdentity powinna:
+/// - na systemie z systemd zwracać jako unit najgłębszy segment ścieżki cgroup z /proc/self/cgroup kończący się na ".service", z pominięciem user@<uid>.service, a userScope ustawiać, gdy ścieżka biegnie przez /user.slice albo /user@.
+/// - na systemie z launchd zwracać jako unit wartość XPC_SERVICE_NAME tylko wtedy, gdy jest niepusta, różna od "0", nie zaczyna się od "application." i rodzicem procesu jest launchd (PID 1), a userScope ustawiać dla efektywnego UID różnego od 0.
+/// - w każdym innym przypadku, także na systemie bez znanego menedżera usług, zwracać unit == nullopt (zwykły proces).
+///
+/// @note Na Darwinie samo XPC_SERVICE_NAME nie wystarcza: srodowisko jest dziedziczone, wiec program z terminala
+///       uruchomionego z Findera widzi etykiete aplikacji GUI. Zakres z UID-a to heurystyka - wybiera tylko
+///       domene dla `launchctl`.
 [[nodiscard]] ServiceIdentity detectServiceIdentity();
 
-/// Sciezka systemu plikow, ktory NAPRAWDE niesie obiekty pamieci dzielonej tego
-/// procesu - to, co trzeba zmierzyc, pytajac "ile zostalo miejsca na kolejki IPC".
+/// Funkcja sharedMemoryBackingPath powinna:
+/// - zwracać ścieżkę systemu plików, który niesie obiekty pamięci dzielonej procesu: "/dev/shm" na Linuksie i "/tmp" na Darwinie.
 ///
-/// Na Linuksie jest to tmpfs spod shm_open (zwykle /dev/shm). Na Darwinie
-/// Boost.Interprocess nie uzywa shm_open w ogole: `_POSIX_SHARED_MEMORY_OBJECTS`
-/// jest tam ujemne, wiec segmenty sa ZWYKLYMI PLIKAMI w katalogu roboczym
-/// biblioteki pod $TMPDIR. Pomiar /dev/shm nie mialby tam sensu - tej sciezki po
-/// prostu nie ma - a pomiar $TMPDIR opisuje wlasciwy wolumin.
-///
-/// Napis pusty znaczy "nie ustalono"; wolajacy ma wtedy przepuscic operacje, a nie
-/// odmowic (patrz kontrakt shmbudget::Space).
+/// @note To, co trzeba zmierzyc, pytajac "ile zostalo miejsca na kolejki IPC". Na Darwinie Boost.Interprocess nie
+///       uzywa shm_open (`_POSIX_SHARED_MEMORY_OBJECTS` jest ujemne), wiec segmenty sa zwyklymi plikami pod /tmp,
+///       a /dev/shm nie istnieje. Na Linuksie sciezka jest tylko droga zapasowa - pomiar glowny idzie przez
+///       fstatvfs na deskryptorze utworzonego obiektu (shmbudget::space).
 [[nodiscard]] std::string sharedMemoryBackingPath();
 
 }  // namespace osplat

@@ -168,10 +168,17 @@ struct AppConfig {
   std::vector<std::string> loadedFrom;
 };
 
-/// Wczytuje konfigurację.
-/// - cliPath != nullopt → czyta WYŁĄCZNIE ten plik; brak pliku lub błąd składni są twarde
-///   (rzucają wyjątek) - to jawne żądanie użytkownika.
-/// - cliPath == nullopt → wyszukiwanie warstwowe; brak plików → wartości domyślne; błąd
-///   składni TOML w dowolnej znalezionej warstwie rzuca wyjątek z nazwą pliku.
-/// Niepusty paths.lock_dir musi być bezwzględny w każdej wczytywanej warstwie.
+/// Funkcja loadAppConfig powinna:
+/// - przy podanym cliPath wczytywać wyłącznie ten plik, a brak pliku albo błąd składni TOML zgłaszać wyjątkiem toml::parse_error z nazwą pliku.
+/// - bez cliPath nakładać kolejno istniejące warstwy: /etc/retractor/retractor.toml, na Darwinie także /usr/local/etc/retractor/retractor.toml i /opt/homebrew/etc/retractor/retractor.toml, a na końcu plik użytkownika ($XDG_CONFIG_HOME/retractor/retractor.toml, bez niej ~/.config/retractor/retractor.toml), tak że klucz z późniejszej warstwy nadpisuje wcześniejszy.
+/// - pomijać brakujące warstwy, a bez żadnej zwracać wartości domyślne; błąd sprawdzenia istnienia warstwy zgłaszać wyjątkiem std::filesystem::filesystem_error.
+/// - błąd składni TOML w dowolnej warstwie zgłaszać wyjątkiem toml::parse_error z nazwą pliku.
+/// - odrzucać wyjątkiem std::invalid_argument z nazwą pliku niepusty, względny paths.lock_dir w każdej wczytywanej warstwie, także nadpisanej później.
+/// - zapisywać ścieżki wczytanych plików w loadedFrom, w kolejności nakładania.
+/// - po wczytaniu zastępować wartościami domyślnymi, z ostrzeżeniem w logu, niedodatnie wartości kluczy `[ipc]`, `[timing]` i `limits.history_memory_mib` oraz `scheduling.rt_priority` spoza 1..99, a do niepustego storage.dir dopisywać końcowy '/'.
+///
+/// @note Jawna sciezka to zadanie uzytkownika, wiec jej blad jest twardy. Warstwa systemowa ma kilka sciezek,
+///       bo na macOS /etc nalezy do systemu (SIP), a oprogramowanie spoza systemu trzyma konfiguracje w
+///       prefiksie instalacji. Bledne `storage.ref_dirs`, `embedded.lenient_lock_dirs` i `sources.timeout_s`
+///       nie rzucaja: zostaje powod odrzucenia, ktory zamienia na blad dopiero wolajacy.
 AppConfig loadAppConfig(const std::optional<std::string> &cliPath = std::nullopt);

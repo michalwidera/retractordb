@@ -52,16 +52,35 @@ struct OfflinePolicy {
   bool lenient{true};
 };
 
-/// Plik konfiguracji czytany tylko, gdy podany. Argument lockDir wygrywa nad paths.lock_dir;
-/// lagodny jest katalog wymieniony w embedded.lenient_lock_dirs, a bez tego klucza katalog
-/// tymczasowy systemu (TMPDIR, bez niej /tmp).
+/// Funkcja offlinePolicy powinna:
+/// - odrzucać niepusty względny lockDir jako Errc::Config.
+/// - czytać wyłącznie wskazany plik konfiguracji, a bez configPath żadnego, i zwracać jego błąd oraz błędny klucz embedded.lenient_lock_dirs jako Errc::Config.
+/// - przyjmować katalog blokad z argumentu lockDir, a gdy jest pusty - z paths.lock_dir pliku konfiguracji; pusty wynik oznacza katalog tymczasowy systemu.
+/// - bez klucza embedded.lenient_lock_dirs uznawać za łagodny wyłącznie katalog tymczasowy systemu, a z kluczem wyłącznie katalog wymieniony na jego liście, porównując katalogi jako te same obiekty systemu plików.
+///
+/// @note Biblioteka nie szuka konfiguracji sama (bez warstw /etc i XDG). Katalog tymczasowy jest brany tak
+///       jak przez serwis przy pustym paths.lock_dir (#450).
 [[nodiscard]] Result<OfflinePolicy> offlinePolicy(std::string_view lockDir, std::string_view configPath);
 
-/// Tylko obserwacja trzymanych blokad. Katalog musi odpowiadac paths.lock_dir serwisu.
-/// Nie wyklucza pozniejszego startu xretractor.
+/// Funkcja checkOffline powinna:
+/// - sprawdzać pliki blokad instancji xretractor (rodzina serviceLockInstance) w katalogu polityki albo, gdy jest pusty, w katalogu tymczasowym systemu, bez podążania za dowiązaniem i bez blokowania.
+/// - zwracać Errc::Config z EBUSY, gdy którakolwiek blokada jest trzymana.
+/// - w trybie łagodnym przepuszczać niepewność (brak lub nieczytelny katalog, nieczytelny wpis, wpis niebędący plikiem zwykłym), a w trybie ścisłym zwracać ją jako Errc::IO z errno, a wpis niebędący plikiem zwykłym jako Errc::Compile.
+/// - tylko obserwować blokady, nie zakładając własnej.
+///
+/// @note Katalog musi odpowiadac paths.lock_dir serwisu. Kontrola nie wyklucza pozniejszego startu xretractor.
+///       Lagodnosc wynika z tego, ze domyslny katalog to zgadywanie, a we wspoldzielonym /tmp obcy wpis
+///       blokowalby wszystkich.
 [[nodiscard]] Result<> checkOffline(const OfflinePolicy &policy);
+
+/// Funkcja temporaryStorageDirectory powinna:
+/// - tworzyć nowy, unikalny katalog retractordb-engine-XXXXXX w katalogu tymczasowym systemu przez mkdtemp i zwracać jego ścieżkę.
+/// - błąd ustalenia katalogu tymczasowego albo utworzenia katalogu zwracać jako Errc::IO z errno.
 [[nodiscard]] Result<std::string> temporaryStorageDirectory();
-/// Sprzatanie tymczasowego katalogu nie usuwa magazynu zajetego przez Storage.
+
+/// Funkcja removeTemporaryStorage powinna:
+/// - usuwać katalog wraz z zawartością wyłącznie po uzyskaniu jego blokady StorageGuard z przejęciem, a katalog zajęty przez inny magazyn albo nieprzejmowalny pozostawiać.
+/// - nie zgłaszać błędów ani wyjątków.
 void removeTemporaryStorage(const std::string &directory) noexcept;
 
 }  // namespace rdb::embed

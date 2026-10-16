@@ -23,30 +23,31 @@ inline constexpr std::size_t kMaxLength = 32;
 /// oraz kontrola trybu kService przy roszczeniu slotu.
 inline constexpr const char *kServiceInstanceName = "service";
 
-/// Losuje nazwe w stylu "przymiotnik_nazwisko" (jeden token, bez spacji), np. "nervous_hopper".
-/// Kolejne wywolania moga dac te sama nazwe -- o rozstrzyganiu kolizji decyduje wolajacy.
+/// Funkcja generate powinna:
+/// - zwracać nazwę "przymiotnik_nazwisko" (np. "nervous_hopper") wylosowaną z dwóch stałych list po 64 pozycje, poprawną według isValid.
+/// - brać ziarno losowania z std::random_device, nie z zegara.
+/// - nie gwarantować różnych nazw w kolejnych wywołaniach.
+///
+/// @note Ziarno z zegara dawaloby te sama nazwe serwerom startowanym przez skrypt w tej samej sekundzie.
+///       O rozstrzyganiu kolizji decyduje wolajacy.
 std::string generate();
 
-/// Czy nazwa nadaje sie na czlon nazwy obiektu IPC i pliku blokady:
-/// pierwszy znak mala litera, dalej male litery, cyfry, '_' lub '-', dlugosc 1..kMaxLength.
+/// Funkcja isValid powinna:
+/// - zwracać true wyłącznie dla nazwy o długości 1..kMaxLength, której pierwszy znak to mała litera ASCII, a pozostałe to małe litery ASCII, cyfry, '_' albo '-'.
+///
+/// @note Taka nazwa nadaje sie na czlon nazwy obiektu IPC i pliku blokady.
 bool isValid(std::string_view name);
 
 /// Nazwa zmiennej srodowiskowej niosacej przestrzen nazw calego uruchomienia.
 inline constexpr const char *kNamespaceEnv = "RDB_NAMESPACE";
 
-/// Przestrzen nazw uruchomienia odczytana z kNamespaceEnv; pusta, gdy zmienna nie jest
-/// ustawiona albo ma wartosc pusta.
+/// Funkcja environmentNamespace powinna:
+/// - zwracać surową wartość zmiennej środowiskowej kNamespaceEnv, bez sprawdzania, a pusty napis, gdy zmienna nie jest ustawiona.
 ///
-/// Jedno pokretlo rozdziela KOMPLET zasobow globalnych dla maszyny: nazwe segmentu magistrali
-/// (bus::segmentName), domyslna nazwe instancji xretractora i domyslny cel xqry. Powstalo dla
-/// rownoczesnych testow integracyjnych, ktore dziela nazwy strumieni: bez wlasnej magistrali
-/// druga taka instancja odpada na ClaimStatus::Conflict, bo rozlacznosc nazw jest wlasnoscia
-/// maszyny, a nie katalogu roboczego.
-///
-/// Wartosc jest zwracana SUROWA, bez sprawdzania. Ocenia ja wolajacy przez isValid i ma
-/// zatrzymac program z komunikatem: po cichu zignorowana przestrzen nazw cofnelaby rownolegle
-/// uruchomienia na wspolne zasoby, czyli awaria bylaby widoczna dopiero jako kolizja gdzie
-/// indziej.
+/// @note Jedno pokretlo rozdziela KOMPLET zasobow globalnych maszyny: segment magistrali (bus::segmentName),
+///       domyslna nazwe instancji xretractora i domyslny cel xqry - dla rownoczesnych testow integracyjnych
+///       dzielacych nazwy strumieni. Wolajacy ocenia wartosc przez isValid i zatrzymuje program z
+///       komunikatem: po cichu zignorowana przestrzen nazw cofnelaby uruchomienia na wspolne zasoby.
 std::string environmentNamespace();
 
 }  // namespace servername

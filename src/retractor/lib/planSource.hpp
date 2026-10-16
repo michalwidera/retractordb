@@ -26,53 +26,88 @@ struct PlanSource {
   std::vector<std::pair<std::string, std::string>> lines;
 };
 
-/// Parsuje caly zestaw RQL podany jako tekst i dopisuje jego wezly do @p plan.
+/// Funkcja parsePlanText powinna:
+/// - dzielić tekst na instrukcje przez readLogicalLines i parsować je kolejno przez parserRQLString, z numerem pierwszego wiersza instrukcji i nazwą pliku sourceFile do logu błędów składni, dopisując węzły do plan.
+/// - dla każdej udanej instrukcji dopisywać do lines parę (nazwa strumienia z zapisu, treść instrukcji) w kolejności wystąpienia.
+/// - przy pierwszej nieudanej instrukcji przerywać i zwracać jej komunikat jako status, z lines obejmującym tylko instrukcje sprzed niej.
+/// - dla tekstu pustego albo złożonego wyłącznie z komentarzy i pustych wierszy zwracać status "OK" i pustą listę instrukcji.
 ///
-/// Tekst PUSTY (albo zlozony wylacznie z komentarzy i pustych wierszy) nie jest bledem:
-/// status zostaje "OK", a lista instrukcji pusta. Rozstrzygniecie, czy pusty plan znaczy
-/// "tryb bezczynny", czy "nie ma czego kompilowac", nalezy do wolajacego - dla uslugi to
-/// stan poprawny, dla `--onlycompile` blad.
-/// `sourceFile` jest opcjonalna nazwa pliku dla logu bledow skladni.
+/// @note Pusty plan nie jest tu bledem: dla uslugi to tryb bezczynny, dla `--onlycompile` blad - rozstrzyga
+///       wolajacy. Funkcja jest wspolna dla startu z pliku (launcher) i przeladowania `reset` (executorsm),
+///       bo rozjazd miedzy nimi bylby rozjazdem semantyki planu.
 [[nodiscard]] PlanSource parsePlanText(qTree &plan, const std::string &text, std::string_view sourceFile = {});
 
-/// Kasuje pelne rodziny plikow (dane z cieniem, `.desc`, `.meta` z cieniem, segmenty retencji)
-/// wszystkich wezlow skompilowanego planu, takze posrednich.
+/// Funkcja dropStalePlanArtifacts powinna:
+/// - pomijać dyrektywy kompilatora i brać katalog z dyrektywy `:STORAGE` planu, bez katalogu domyślnego (pusty = katalog roboczy).
+/// - dla deklaracji kasować wyłącznie `<id>.desc` zapisany przed #346 z TYPE DEVICE, gdy plan deklaruje TYPE BINFILE, a REF i sloty się zgadzają; każdy inny `.desc` deklaracji, także przy błędzie jego sprawdzenia lub odczytu, zostawiać.
+/// - dla pozostałych węzłów, także pośrednich i instancji generatora, kasować pełną rodzinę plików: `<id>.desc`, plik danych (nazwa z `FILE` albo id) z cieniem `.shadow`, `.meta` z cieniem oraz segmenty retencji `<nazwa>_segment_N` z cieniami.
+/// - przy dyrektywie `:ROTATION` zostawiać pliki węzłów plikowych i kasować tylko rodziny strumieni MEMORY (`VOLATILE` albo `STORAGE memory`).
+/// - błąd usunięcia pliku logować ostrzeżeniem i iść dalej, a błąd odczytu katalogu kończyć tylko szukanie segmentów.
 ///
-/// Przy `:ROTATION` wezly plikowe zostaja - tam poprzednie przebiegi sa danymi, nie smieciem -
-/// a znika tylko konfiguracja strumieni MEMORY. Katalog to `:STORAGE` planu (z domyslnym
-/// katalogiem konfiguracji juz dopisanym przez wolajacego).
+/// @note Katalog domyslny konfiguracji dopisuje do planu wolajacy. Przy `:ROTATION` poprzednie przebiegi
+///       sa danymi, a `.desc` i `.meta` strumienia MEMORY to konfiguracja POPRZEDNIEGO przebiegu (magazyn
+///       bierze TYPE i RETMEMORY z pliku). Do 2026-09-27 znikaly tylko `<id>`, `<id>.desc` i `<id>.meta`:
+///       stare segmenty wracaly pod swieze metadane ("record count mismatch"), a pliki wezlow posrednich rosly.
 void dropStalePlanArtifacts(const qTree &plan);
 
-/// Zgodnosc plikow, ktore `:ROTATION` zachowa, z planem: TYPE i RETENTION z zachowanego `.desc`
-/// wygrywaja w magazynie z planem, a zmiana pojemnosci przy zachowanych segmentach przestawilaby
-/// adresowanie rekordow (groupFile liczy segment jako indeks / capacity). Dlatego rozjazd jest
-/// odmowa planu, zanim cokolwiek zostanie zmienione (decyzja P5), a nie cicha wygrana jednej strony.
+/// Funkcja checkKeptStores powinna:
+/// - dla planu bez dyrektywy `:ROTATION` zwracać pustą odmowę.
+/// - badać tylko węzły wynikowe, z pominięciem deklaracji, dyrektyw i strumieni MEMORY, a przy niepustej liście nazw tylko węzły z listy.
+/// - pomijać węzeł bez pliku `<id>.desc` w katalogu planStorageDir(plan, defaultStorageDir).
+/// - odrzucać z klasą Plan `.desc`, który nie jest zwykłym plikiem ani dowiązaniem, a błąd lstat inny niż ENOENT zwracać z klasą Environment i errno.
+/// - zwracać odmowę wczytania `.desc`, gdy pliku nie da się wczytać.
+/// - porównywać konfigurację magazynu z pliku (TYPE z `.desc`, a bez niego STORAGE planu, oraz RETENTION) z planowaną i przy różnicy zwracać odmowę klasy Plan nazywającą strumień, plik i obie konfiguracje.
+/// - zwracać pierwszą znalezioną odmowę, a pustą, gdy wszystkie zachowane magazyny zgadzają się z planem.
 ///
-/// Pusty message oznacza sukces. Bez `:ROTATION` start kasuje rodziny plikow.
+/// @note TYPE i RETENTION z zachowanego `.desc` wygrywaja w magazynie z planem, a zmiana pojemnosci przy
+///       zachowanych segmentach przestawilaby adresowanie (groupFile liczy segment jako indeks / capacity).
+///       Dlatego rozjazd jest odmowa, zanim cokolwiek zostanie zmienione (decyzja P5). Bez `:ROTATION`
+///       start kasuje rodziny plikow.
 [[nodiscard]] rdb::Refusal checkKeptStores(qTree &plan, std::string_view defaultStorageDir,
                                            const std::vector<std::string> &streamNames = {});
 
-/// Sprawdza zachowane pliki .desc przed zmiana planu: deklaracje zawsze, wyniki tylko przy ROTATION.
-/// Deklaracja musi sie zgadzac takze w TYPE i REF, bo te magazyn bierze z pliku, nie z planu (#346).
-/// Jedyny przepuszczany rozjazd to dawny TYPE DEVICE zwyklego pliku binarnego, ktory zastepuje
-/// dropStalePlanArtifacts(). Pusta lista nazw oznacza caly plan; ad-hoc przekazuje tylko nowo
-/// dodawane strumienie, ktorych deskryptory zostaja takze bez ROTATION i dla MEMORY.
+/// Funkcja checkDescriptorFiles powinna:
+/// - pomijać dyrektywy; przy pustej liście nazw badać deklaracje zawsze, a węzły wynikowe tylko przy `:ROTATION` i poza strumieniami MEMORY; przy niepustej liście badać każdy węzeł z listy.
+/// - pomijać węzeł bez pliku `<id>.desc` w katalogu planStorageDir(plan, defaultStorageDir), a `.desc` niebędący zwykłym plikiem ani dowiązaniem, błąd lstat i błąd wczytania zgłaszać jak checkKeptStores.
+/// - odrzucać z klasą Plan TYPE z pliku spoza typów deklaracji (dla deklaracji) albo spoza typów zapisywalnych (dla węzła wynikowego).
+/// - dla TYPE TEXTSOURCE odrzucać z klasą Plan pole o niezerowej długości typu innego niż BYTE, INTEGER, UINT, FLOAT, DOUBLE i STRING.
+/// - odrzucać z klasą Plan rozjazd schematu, porównując deskryptor planu z deskryptorem pliku w kierunku plan == plik.
+/// - dla węzła wynikowego odrzucać z klasą Plan każde niepuste REF w pliku.
+/// - dla deklaracji przepuszczać tylko dawny TYPE DEVICE (sprzed #346) zwykłego pliku binarnego, gdy plan deklaruje TYPE BINFILE, a REF i sloty się zgadzają, a poza nim odrzucać z klasą Plan różnicę TYPE albo REF między plikiem a planem.
+/// - zwracać pierwszą znalezioną odmowę, a pustą, gdy wszystkie pliki zgadzają się z planem.
+///
+/// @note Magazyn bierze TYPE i REF z pliku, nie z planu (#346): do tej zmiany plan wskazywal `w.txt`, a silnik
+///       czytal `v.txt` sprzed zmiany. Przepuszczony dawny TYPE DEVICE zastepuje dropStalePlanArtifacts().
+///       Ad-hoc przekazuje tylko nowo dodawane strumienie, ktorych deskryptory zostaja takze bez ROTATION i dla
+///       MEMORY (#473). REF w `.desc` wyniku przenioslby zapis tam, gdzie plan nie pisze (#278).
+///       Descriptor::operator== jest asymetryczny, stad kierunek jak w rdb::verifyDescriptorMatch.
 [[nodiscard]] rdb::Refusal checkDescriptorFiles(qTree &plan, std::string_view defaultStorageDir,
                                                 const std::vector<std::string> &streamNames = {});
 
-/// Rodzaj pliku pod sciezka kazdej deklaracji (#346): BINFILE i TEXTFILE - plik zwykly, DEVICE -
-/// urzadzenie znakowe albo FIFO. Tylko stat(), bez otwarcia, wiec FIFO bez pisarza niczego nie
-/// wiesza. Pusta lista nazw oznacza caly plan; ad-hoc przekazuje tylko nowo dodawane strumienie.
-/// Nie w `-c` - kompilacja nie musi biec na maszynie z danymi.
-/// Zwraca odmowe z nazwa strumienia i sciezka; przy formie przestarzalej `FILE`
-/// takze z podpowiedzia jawnego slowa.
+/// Funkcja checkDeclaredSources powinna:
+/// - badać tylko deklaracje, a przy niepustej liście nazw tylko deklaracje z listy.
+/// - dla TYPE TEXTSOURCE odrzucać z klasą Plan pole o niezerowej długości typu innego niż BYTE, INTEGER, UINT, FLOAT, DOUBLE i STRING.
+/// - sprawdzać rodzaj pliku pod ścieżką przez stat(), bez otwierania; brak pliku (ENOENT, ENOTDIR) przepuszczać, a inny błąd stat zwracać z klasą Environment i errno.
+/// - odrzucać z klasą Plan, z nazwą strumienia i ścieżką, BINFILE albo TEXTFILE, które nie wskazują zwykłego pliku, oraz DEVICE, które nie wskazuje urządzenia znakowego ani FIFO.
+/// - dla deklaracji w przestarzałej formie `FILE` dopisywać do odmowy słowo wybrane przez regułę, a gdy pod ścieżką leży urządzenie znakowe, FIFO albo zwykły plik - także pasujące słowo (DEVICE albo "BINFILE or TEXTFILE").
+///
+/// @note stat() zamiast otwarcia, wiec FIFO bez pisarza niczego nie wiesza. Brak zrodla nadal daje NULL (#346).
+///       Nie w `-c` - kompilacja nie musi biec na maszynie z danymi.
 [[nodiscard]] rdb::Refusal checkDeclaredSources(const qTree &plan, const std::vector<std::string> &streamNames = {});
 
-/// STORAGE musi istniec i byc katalogiem, takze gdy wszystkie strumienie sa MEMORY.
+/// Funkcja checkStorageDirectory powinna:
+/// - dla planu złożonego wyłącznie z dyrektyw oraz dla pustego katalogu (katalog roboczy) zwracać pustą odmowę.
+/// - sprawdzać katalog planStorageDir(plan, defaultStorageDir) bez końcowych separatorów (poza samym "/"), także gdy wszystkie strumienie są MEMORY, i nigdy go nie tworzyć.
+/// - dla nieistniejącego katalogu zwracać odmowę klasy Plan z ENOENT, ścieżką bezwzględną i podpowiedzią `mkdir -p`.
+/// - dla ścieżki, która nie jest katalogiem (także ENOTDIR ze stat), zwracać odmowę klasy Plan, a dla innego błędu stat odmowę klasy Environment, w obu przypadkach z errno.
 [[nodiscard]] rdb::Refusal checkStorageDirectory(const qTree &plan, std::string_view defaultStorageDir);
 
-/// Wspolny preflight czterech drog (#473), przed kasowaniem plikow/importem/rezerwacja.
-/// Pusta lista oznacza wymiane calego planu; lista nazw - nowe strumienie ad-hoc.
+/// Funkcja checkPlanStorage powinna:
+/// - wykonywać kolejno checkStorageDirectory, checkKeptStores, checkDescriptorFiles, checkDeclaredSources i checkOutputFilesOpenable z tymi samymi argumentami i zwracać pierwszą niepustą odmowę.
+/// - nie sprawdzać licznika rotacji, który wołający sprawdza osobno przez checkRotationCounter.
+///
+/// @note Wspolny preflight czterech drog (#473), przed kasowaniem plikow, importem i rezerwacja. Pusta lista
+///       oznacza wymiane calego planu; lista nazw - nowe strumienie ad-hoc.
 [[nodiscard]] rdb::Refusal checkPlanStorage(qTree &plan, std::string_view defaultStorageDir,
                                             const std::vector<std::string> &streamNames = {});
 
@@ -83,75 +118,100 @@ struct CounterCheck {
   std::string refusal;
 };
 
-/// Licznik `:ROTATION` przed zmiana planu (#472): ta sama odmowa co checkKeptStores, zanim cokolwiek
-/// zostanie zmienione, bo konstruktor PersistentCounter biegnie juz po punkcie bez powrotu. Tylko
-/// odczyt - numer rezerwuje dopiero konstruktor. Rozdziela przyczyne, bo start reaguje na nie
-/// inaczej: wadliwa tresc to odmowa planu, a nieczytelny plik - awaria srodowiska z planem
-/// zachowanym. Nie w `-c` - kompilacja nie musi biec na maszynie z danymi.
+/// Funkcja checkRotationCounter powinna:
+/// - dla planu bez dyrektywy `:ROTATION` ze ścieżką zwracać pusty wynik.
+/// - tylko odczytywać licznik przez PersistentCounter::read, bez rezerwowania numeru.
+/// - dla brakującego pliku i dla poprawnej wartości zwracać pusty wynik.
+/// - dla pliku, którego nie da się odczytać, zwracać environment = true i odmowę ze ścieżką i przyczyną (K4).
+/// - dla wadliwej treści zwracać environment = false i odmowę ze ścieżką, przyczyną i instrukcją naprawy albo usunięcia pliku (K2).
+///
+/// @note #472: ta sama odmowa co checkKeptStores, zanim cokolwiek zostanie zmienione, bo konstruktor
+///       PersistentCounter biegnie juz po punkcie bez powrotu. Start reaguje na obie przyczyny inaczej:
+///       wadliwa tresc to odmowa planu, nieczytelny plik - awaria srodowiska z planem zachowanym.
+///       Nie w `-c` - kompilacja nie musi biec na maszynie z danymi.
 [[nodiscard]] CounterCheck checkRotationCounter(const qTree &plan);
 
-/// Ostrzezenia o deklaracjach w przestarzalej formie `DECLARE ... FILE` (#346), po jednym na
-/// deklaracje, w kolejnosci wierszy planu - kompilator sortuje wezly po interwale. Kazde nazywa
-/// wiersz, strumien i slowo wybrane przez zamrozona regule. Wypisuje je tylko wolajacy z --verbose:
-/// bez niego stare plany, testy i narzedzia pomiarowe nie zmieniaja wyjscia. Pusta lista nazw
-/// oznacza caly plan; ad-hoc przekazuje tylko nowo dodawane strumienie.
+/// Funkcja deprecatedFileWarnings powinna:
+/// - zwracać po jednym ostrzeżeniu na deklarację w przestarzałej formie `DECLARE ... FILE` (#346), z numerem wiersza, nazwą strumienia, ścieżką i słowem wybranym przez zamrożoną regułę.
+/// - porządkować ostrzeżenia według wiersza deklaracji w planie, nie według kolejności węzłów.
+/// - przy niepustej liście nazw ograniczać się do strumieni z listy.
+///
+/// @note Kompilator sortuje wezly po interwale, stad sortowanie po wierszu. Wypisuje je tylko wolajacy z
+///       --verbose: bez niego stare plany, testy i narzedzia pomiarowe nie zmieniaja wyjscia. Ad-hoc
+///       przekazuje tylko nowo dodawane strumienie.
 [[nodiscard]] std::vector<std::string> deprecatedFileWarnings(const qTree &plan,
                                                               const std::vector<std::string> &streamNames = {});
 
-/// Ostrzezenia o zrodlach DEVICE, ktorych efektywny TIMEOUT (jawna klauzula albo @p configured
-/// z `[sources] timeout_s`) jest dluzszy od interwalu strumienia (#347): czekanie przekroczy wtedy
-/// slot. Po jednym na deklaracje, w kolejnosci wierszy planu. Pusta lista nazw oznacza caly plan.
+/// Funkcja deviceTimeoutWarnings powinna:
+/// - zwracać po jednym ostrzeżeniu na źródło DEVICE, którego efektywny TIMEOUT (effectiveDeviceTimeout z configured, w trybie z zegarem) jest ściśle dłuższy od interwału strumienia, z wierszem, nazwą, terminem, jego pochodzeniem i interwałem.
+/// - porządkować ostrzeżenia według wiersza deklaracji.
+/// - przy niepustej liście nazw ograniczać się do strumieni z listy.
+///
+/// @note #347: czekanie dluzsze od interwalu przekracza slot. @p configured pochodzi z `[sources] timeout_s`.
 [[nodiscard]] std::vector<std::string> deviceTimeoutWarnings(const qTree &plan, std::optional<double> configured,
                                                              const std::vector<std::string> &streamNames = {});
 
-/// Efektywny termin kazdego zrodla DEVICE wraz z jego pochodzeniem (#347): "RQL", "config",
-/// "default" albo "no-clock" (`-f`). Wpis do dziennika przy starcie epoki i przy imporcie ad-hoc -
-/// operator widzi, z jakim terminem naprawde czyta kazde zrodlo. Pusta lista nazw oznacza caly plan.
+/// Funkcja deviceTimeoutReport powinna:
+/// - zwracać po jednym wpisie na każde źródło DEVICE z efektywnym terminem i jego pochodzeniem z effectiveDeviceTimeout ("RQL", "config", "default" albo "no-clock" przy noClock), w kolejności węzłów planu.
+/// - przy niepustej liście nazw ograniczać się do strumieni z listy.
+///
+/// @note #347: wpis do dziennika przy starcie epoki i przy imporcie ad-hoc - operator widzi, z jakim terminem
+///       naprawde czyta kazde zrodlo.
 [[nodiscard]] std::vector<std::string> deviceTimeoutReport(const qTree &plan, std::optional<double> configured, bool noClock,
                                                            const std::vector<std::string> &streamNames = {});
 
-/// Nazwy strumieni, ktore plan ROSCI na magistrali: wszystkie wezly poza dyrektywami.
+/// Funkcja planStreamNames powinna:
+/// - zwracać identyfikatory wszystkich węzłów planu poza dyrektywami kompilatora, w kolejności planu.
+///
+/// @note To nazwy, ktore plan ROSCI na magistrali.
 [[nodiscard]] std::vector<std::string> planStreamNames(const qTree &plan);
 
-/// Znormalizowana sciezka licznika `:ROTATION`; pusta, gdy plan nie ma rotacji.
+/// Funkcja planCounterPath powinna:
+/// - zwracać absolutePathOf ścieżki z pierwszej dyrektywy `:ROTATION` o niepustej ścieżce, a pusty napis, gdy takiej nie ma.
 [[nodiscard]] std::string planCounterPath(const qTree &plan);
 
-/// Katalog magazynu, ktorego plan naprawde uzyje: dyrektywa `:STORAGE`, a gdy jej nie ma --
-/// @p defaultStorageDir (domyslny katalog z konfiguracji). Pusty wynik znaczy "katalog roboczy".
+/// Funkcja planStorageDir powinna:
+/// - zwracać ścieżkę z dyrektywy `:STORAGE` planu (przy kilku - z ostatniej), a bez niej defaultStorageDir.
+///
+/// @note defaultStorageDir to domyslny katalog z konfiguracji. Pusty wynik znaczy "katalog roboczy".
 [[nodiscard]] std::string planStorageDir(const qTree &plan, std::string_view defaultStorageDir);
 
-/// Znormalizowane sciezki PLIKOW MAGAZYNU, ktore plan ROSCI na magistrali.
-///
-/// Nazwa strumienia nie chroni pliku danych, a wylacznie deskryptor `<id>.desc` -- tylko on jest
-/// budowany z identyfikatora zapytania. Sam plik danych bierze `qry.filename`, gdy zapytanie ma
-/// klauzule `FILE` (patrz streamInstance), wiec dwa plany o ROZLACZNYCH nazwach moga wskazywac
-/// jeden magazyn.
-///
-/// Ze zbioru wypadaja dwa rodzaje wezlow, i oba wypadaja z powodu, nie dla wygody:
-///   - DEKLARACJE: `query::descriptorStorage()` nadaje kazdej `TYPE BINFILE`, `TEXTSOURCE` albo `DEVICE`,
-///     czyli zrodlo TYLKO DO ODCZYTU. Wiele serwerow czytajacych jeden plik jest poprawne
-///     (na tym stoi caly it_multiserver_uniqueness, gdzie kilka planow czyta `data.txt`).
-///   - MEMORY (`VOLATILE` albo `STORAGE memory`): `rdb::memoryFile` zyje w pamieci procesu
-///     i nie dotyka systemu plikow, wiec roszczenie sciezki byloby konfliktem o nic.
+/// Funkcja planStorePaths powinna:
+/// - zwracać ścieżki plików danych węzłów wynikowych, znormalizowane przez absolutePathOf, w katalogu planStorageDir(plan, defaultStorageDir) i pod nazwą z `FILE` albo identyfikatorem węzła.
+/// - pomijać dyrektywy, deklaracje i strumienie MEMORY (`VOLATILE` albo `STORAGE memory`).
+/// - pomijać powtórzenia ścieżki, zachowując kolejność pierwszego wystąpienia.
+/// - nie uwzględniać przestawienia pliku magazynu przez pole REF istniejącego `.desc`.
 ///
 /// @param defaultStorageDir katalog uzywany, gdy plan nie niesie dyrektywy `:STORAGE` -- ta sama
-///        wartosc, ktora launcher dokleda z konfiguracji (`[storage] dir`). Bez niej rezerwacja
+///        wartosc, ktora launcher dokleja z konfiguracji (`[storage] dir`). Bez niej rezerwacja
 ///        wskazywalaby katalog roboczy, a plan pisalby gdzie indziej.
 ///
-/// ZNANY LIMIT: pole `REF` w istniejacym `.desc` przestawia plik magazynu poza katalog `:STORAGE`
-/// (rdb::StoragePaths::relocateFromRef). Z samego planu tego nie widac, a czytanie deskryptora
-/// kazdego strumienia przy kazdym roszczeniu byloby operacja dyskowa w sciezce, ktora ma byc
-/// atomowa i krotka. Sciezki po `REF` pozostaja wiec niechronione.
+/// @note Nazwa strumienia chroni tylko deskryptor `<id>.desc`; plik danych bierze `qry.filename` przy klauzuli
+///       `FILE`, wiec dwa plany o rozlacznych nazwach moga wskazywac jeden magazyn. Deklaracje sa zrodlami
+///       TYLKO DO ODCZYTU (wiele serwerow czytajacych jeden plik jest poprawne - it_multiserver_uniqueness),
+///       a `rdb::memoryFile` nie dotyka systemu plikow. Powtorzenie nie wnosi nic, bo roszczenie porownuje
+///       wylacznie instancje. ZNANY LIMIT: REF (rdb::StoragePaths::relocateFromRef) z planu nie widac, a
+///       czytanie deskryptorow przy roszczeniu byloby operacja dyskowa w sciezce atomowej i krotkiej.
 [[nodiscard]] std::vector<std::string> planStorePaths(const qTree &plan, std::string_view defaultStorageDir);
 
-/// Sprawdza otwarcie plikow wyjsciowych SELECT przed publikacja planu. Pusta lista nazw
-/// oznacza caly plan; ad-hoc przekazuje tylko nowo dodawane strumienie.
-/// K2: wadliwa sciezka/rodzaj pliku; K4: system odmowil operacji (z zachowanym errno).
+/// Funkcja checkOutputFilesOpenable powinna:
+/// - badać węzły wynikowe, z pominięciem dyrektyw, deklaracji i strumieni MEMORY, a przy niepustej liście nazw tylko węzły z listy.
+/// - sprawdzać plik `<katalog>/<FILE albo id>`, przy TYPE DEFAULT i DIRECT z RETENTION jego segment `_segment_0`, a przy DEFAULT i POSIXSHD także cień `.shadow`.
+/// - istniejący plik otwierać jak akcesor (O_RDWR, O_NOFOLLOW, O_NONBLOCK) i zamykać, odrzucając z klasą Plan plik, który nie jest zwykłym plikiem, a błąd fstat lub close zwracając z klasą Environment i errno.
+/// - błąd otwarcia inny niż ENOENT zwracać z errno, z klasą Plan dla EISDIR i ENOTDIR, a Environment dla pozostałych.
+/// - nie tworzyć pliku: dla nieistniejącego odrzucać z klasą Plan brak katalogu nadrzędnego albo rodzica niebędącego katalogiem, a z klasą Environment inny błąd stat rodzica i brak prawa zapisu i przeszukania w nim.
+/// - zwracać pierwszą znalezioną odmowę, a pustą, gdy każdy plik da się otworzyć albo utworzyć.
+///
+/// @note Brak tworzenia pliku chroni nosnik embedded przed zapisem przy kazdym resecie. K2: wadliwa sciezka
+///       lub rodzaj pliku; K4: system odmowil operacji (z zachowanym errno).
 [[nodiscard]] rdb::Refusal checkOutputFilesOpenable(const qTree &plan, std::string_view defaultStorageDir,
                                                     const std::vector<std::string> &streamNames = {});
 
-/// Normalizacja sciezki publikowanej w slocie magistrali. absolute() PRZED weakly_canonical():
-/// plik licznika przy pierwszym starcie jeszcze nie istnieje, a weakly_canonical nad
-/// nieistniejaca sciezka wzgledna zwraca ja bez zmiany - czyli bez katalogu roboczego,
-/// o ktory w tej normalizacji chodzi.
+/// Funkcja absolutePathOf powinna:
+/// - dla pustej ścieżki zwracać pusty napis.
+/// - zwracać weakly_canonical(absolute(path)), a przy błędzie absolute samo path, przy błędzie weakly_canonical - ścieżkę bezwzględną.
+///
+/// @note Normalizuje sciezke publikowana w slocie magistrali. absolute() PRZED weakly_canonical(): plik
+///       licznika przy pierwszym starcie jeszcze nie istnieje, a weakly_canonical nad nieistniejaca sciezka
+///       wzgledna zwraca ja bez katalogu roboczego, o ktory w tej normalizacji chodzi.
 [[nodiscard]] std::string absolutePathOf(const std::string &path);

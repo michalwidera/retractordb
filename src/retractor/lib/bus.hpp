@@ -55,31 +55,38 @@ namespace bus {
 /// postaci /dev/shm/*.<nazwa>.
 inline constexpr std::string_view kSegmentName = "xrdbbus_v7";
 
-/// Nazwa segmentu dla BIEZACEGO uruchomienia: kSegmentName, a przy ustawionej przestrzeni
-/// nazw (servername::environmentNamespace) kSegmentName + "_" + przestrzen.
+/// Funkcja segmentName powinna:
+/// - zwracać nazwę segmentu dla bieżącego uruchomienia: kSegmentName + "_" + przestrzeń nazw z servername::environmentNamespace(), gdy przestrzeń jest niepusta i poprawna według servername::isValid, a w przeciwnym razie samo kSegmentName.
 ///
-/// Rozlacznosc nazw strumieni jest wlasnoscia CALEJ maszyny, wiec dwa niezalezne zestawy
-/// testow integracyjnych uzywajace tych samych nazw (`core0`, `dst`, `str1` powtarzaja sie
-/// w kilkunastu katalogach) nie moga biec obok siebie na jednym segmencie -- drugi start
-/// odpada na ClaimStatus::Conflict. Wlasny segment daje kazdemu z nich wlasna przestrzen
-/// nazw strumieni, bez ruszania samych zapytan i plikow wzorcowych.
-///
-/// Podkreslenie, tak samo jak przy czlonie wersji: kropka jest zarezerwowana dla obiektow
-/// instancji ("<obiekt>.<nazwa instancji>") i wpadalaby pod wzorce sprzatajace.
+/// @note Rozlacznosc nazw strumieni jest wlasnoscia CALEJ maszyny, wiec dwa zestawy testow integracyjnych z
+///       tymi samymi nazwami (`core0`, `dst`, `str1`) nie moga biec na jednym segmencie - drugi start odpada na
+///       ClaimStatus::Conflict. Niepoprawna przestrzen odrzucaja launchery; tutaj chroni pozostalych wolajacych.
+///       Podkreslenie, nie kropka: kropka nalezy do obiektow instancji i wpadalaby pod wzorce sprzatajace.
 [[nodiscard]] std::string segmentName();
 
-/// Nazwy segmentow biezacej wersji znalezione przez pliki obecnosci. Samo znalezienie pliku
-/// nie dowodzi, ze segment lub zywa instancja nadal istnieje; czytelnik sprawdza to przez Bus.
+/// Funkcja segmentNames powinna:
+/// - zwracać posortowane nazwy segmentów bieżącej wersji układu odczytane z plików `<segment>.lock` w ipc::kMachineLockDir: dokładnie kSegmentName albo kSegmentName + "_" + nazwa poprawna według servername::isValid.
+/// - kończyć przegląd bez błędu, gdy katalogu nie da się otworzyć albo czytać.
+/// - nie sprawdzać, czy segment albo żywa instancja nadal istnieje.
+///
+/// @note Samo znalezienie pliku obecnosci niczego nie dowodzi; czytelnik sprawdza to przez Bus.
 [[nodiscard]] std::vector<std::string> segmentNames();
 
-/// Kasuje segmenty tej wersji ukladu, ktorych nikt nie mapuje - pozostalosci po procesach zabitych,
-/// ktore nie zdazyly posprzatac jako ostatni wychodzacy. Zwraca liczbe usunietych.
-/// Pliki obecnosci przeglada w machineLockDir; inny katalog niz domyslny podaja tylko testy.
+/// Funkcja sweepAbandonedSegments powinna:
+/// - przez lockfile::sweep w machineLockDir zajmować porzucone pliki obecności segmentów bieżącej wersji układu (nazwy jak w segmentNames), pod tą blokadą usuwać segment o nazwie pliku bez ".lock" przez ipc::security::removeOwned, a potem plik obecności.
+/// - nie ruszać plików obecności innych wersji, plików trzymanych przez kogokolwiek ani plików innych kont.
+/// - zwracać liczbę usuniętych plików obecności, także tych, przy których removeOwned odmówił usunięcia segmentu.
+///
+/// @note Sprzata pozostalosci po procesach zabitych, ktore nie zdazyly posprzatac jako ostatni wychodzacy.
+///       Inne wersje maja binarki sprzed protokolu obecnosci, ktore blokady nie biora, wiec jej brak nic o nich
+///       nie mowi. Katalog inny niz domyslny podaja tylko testy.
 std::size_t sweepAbandonedSegments(std::string_view machineLockDir = ipc::kMachineLockDir);
 
-/// Rozmiar segmentu magistrali w bajtach. Segment jest tworzony w calosci i od razu
-/// zerowany, wiec jest to miejsce ZAJETE w /dev/shm, a nie rezerwacja rosnaca z uzyciem.
-/// Udostepnione dla wyceny budzetu pamieci dzielonej (shmBudget); uklad zostaje prywatny.
+/// Funkcja segmentBytes powinna:
+/// - zwracać rozmiar całego segmentu magistrali w bajtach, bez ujawniania jego układu.
+///
+/// @note Segment jest tworzony w calosci i od razu zerowany, wiec to miejsce ZAJETE w /dev/shm, a nie
+///       rezerwacja rosnaca z uzyciem. Sluzy wycenie budzetu pamieci dzielonej (shmBudget).
 [[nodiscard]] std::size_t segmentBytes();
 
 /// Pojemnosci ukladu. Przekroczenie ktoregokolwiek limitu jest bledem startu, a nie cichym
@@ -160,9 +167,13 @@ struct StoreDigest {
   [[nodiscard]] friend bool operator==(const StoreDigest &, const StoreDigest &) = default;
 };
 
-/// Skrot znormalizowanej sciezki magazynu. Wyliczany JAWNIE tutaj, a nie przez std::hash:
-/// wartosc jedzie do pamieci dzielonej i porownuja ja ROZNE procesy, wiec musi byc czescia
-/// formatu slotu, a nie szczegolem implementacji biblioteki standardowej.
+/// Funkcja storeDigest powinna:
+/// - zwracać skrót 128-bitowy: `low` jako 64-bitowy FNV-1a ścieżki, a `high` jako FNV-1a ścieżki kontynuowany od stanu po soli "rdb-store".
+/// - dawać dla tej samej ścieżki ten sam skrót w każdym procesie, niezależnie od biblioteki standardowej.
+/// - traktować ścieżkę jako napis, bez normalizacji i bez zaglądania do systemu plików.
+///
+/// @note Skrot jedzie do pamieci dzielonej i porownuja go ROZNE procesy, wiec std::hash odpada. Dwie polowy
+///       licza sie z dwoch roznych wiadomosci (druga z sola), zeby nie byly ze soba powiazane.
 [[nodiscard]] StoreDigest storeDigest(std::string_view path);
 
 /// Opis jednej zywej instancji odczytany z magistrali.
@@ -206,23 +217,33 @@ struct StoreOwner {
   std::int32_t pid{0};
 };
 
-/// Szuka w migawce nazwy z `streams`, ktora nalezy do instancji INNEJ niz `selfName`.
+/// Funkcja findForeignOwner powinna:
+/// - pomijać instancje o nazwie równej selfName, przy pustej selfName - wszystkie instancje bezimienne.
+/// - zwracać pierwszą w kolejności migawki pozostałą instancję, która ma którąkolwiek nazwę z streams, z tą nazwą (pierwszą w kolejności strumieni instancji), nazwą instancji i pid.
+/// - zwracać nullopt, gdy żadna inna instancja nie ma nazwy z streams.
+/// - działać wyłącznie na podanej migawce, bez IPC i bez kontaktu z serwerami.
 ///
-/// Sluzy sprawdzeniu zestawu zapytan PRZED dostarczeniem go dzialajacemu serwisowi: instancje
-/// docelowa trzeba pominac, bo restart i tak zwalnia jej slot, a kolizja z nia sama nie jest
-/// kolizja. Czysta funkcja nad gotowa migawka -- bez IPC i bez kontaktu z serwerami.
+/// @note Sprawdza zestaw zapytan PRZED dostarczeniem go dzialajacemu serwisowi: instancje docelowa trzeba
+///       pominac, bo restart i tak zwalnia jej slot.
 [[nodiscard]] std::optional<StreamOwner> findForeignOwner(const std::vector<InstanceInfo> &instances, std::string_view selfName,
                                                           const std::vector<std::string> &streams);
 
-/// Odpowiednik findForeignOwner dla znormalizowanej sciezki licznika :ROTATION. Pusta
-/// sciezka nie rości zasobu. Instancja docelowa jest pomijana, bo dostarczenie planu
-/// zastępuje jej dotychczasowy slot po restarcie.
+/// Funkcja findForeignCounterOwner powinna:
+/// - dla pustej counterPath zwracać nullopt.
+/// - zwracać pierwszą w kolejności migawki instancję o nazwie innej niż selfName, której ścieżka licznika `:ROTATION` jest napisowo równa counterPath, z tą ścieżką, nazwą instancji i pid, a nullopt, gdy takiej nie ma.
+///
+/// @note Pusta sciezka nie rosci zasobu. Instancja docelowa jest pomijana, bo dostarczenie planu zastepuje
+///       jej dotychczasowy slot po restarcie.
 [[nodiscard]] std::optional<CounterOwner> findForeignCounterOwner(const std::vector<InstanceInfo> &instances,
                                                                   std::string_view selfName, std::string_view counterPath);
 
-/// Odpowiednik findForeignOwner dla znormalizowanych sciezek plikow magazynu. Chroni to, czego
-/// nazwa strumienia nie chroni: `FILE` odrywa nazwe pliku od nazwy zapytania, wiec dwa plany
-/// o ROZLACZNYCH nazwach moga wskazywac jeden magazyn.
+/// Funkcja findForeignStoreOwner powinna:
+/// - dla kolejnych ścieżek z stores liczyć storeDigest i zwracać pierwszą ścieżkę, której skrót występuje w storeDigests instancji o nazwie innej niż selfName, z tą ścieżką wołającego, nazwą instancji i pid.
+/// - zwracać nullopt, gdy żadna inna instancja nie ma skrótu żadnej ze ścieżek.
+///
+/// @note Chroni to, czego nazwa strumienia nie chroni: `FILE` odrywa nazwe pliku od nazwy zapytania, wiec dwa
+///       plany o ROZLACZNYCH nazwach moga wskazywac jeden magazyn. Slot niesie sam skrot, wiec zwracana jest
+///       sciezka wolajacego.
 [[nodiscard]] std::optional<StoreOwner> findForeignStoreOwner(const std::vector<InstanceInfo> &instances,
                                                               std::string_view selfName, const std::vector<std::string> &stores);
 
@@ -265,17 +286,19 @@ struct ClaimRequest {
   std::vector<std::string> stores;
 };
 
-/// Czas startu procesu: pole 22 z /proc/<pid>/stat. Zwraca 0, gdy procesu nie ma
-/// albo pliku nie da sie odczytac.
+/// Funkcja processStartTime powinna:
+/// - zwracać znacznik startu procesu z osplat::inspectProcess (Linux: pole 22 starttime ze stat lidera grupy wątków, Darwin: czas z sysctl), a 0, gdy procesu nie ma albo jego wpisu nie da się odczytać.
 [[nodiscard]] std::uint64_t processStartTime(std::int32_t pid);
 
-/// Czy proces o podanym PID nadal zyje. Zgodnosc startTime odrozania ten sam proces
-/// od innego procesu, ktoremu jadro nadalo ten sam, zwolniony wczesniej PID.
+/// Funkcja isProcessAlive powinna:
+/// - dla pid <= 0 zwracać false.
+/// - dla wpisu procesu, którego nie da się odczytać (hidepid, ProtectProc), logować ostrzeżenie i zwracać true.
+/// - dla procesu nieistniejącego i dla procesu zombie zwracać false.
+/// - w pozostałych przypadkach zwracać true wyłącznie przy niezerowym znaczniku startu równym startTime, także dla procesu zatrzymanego sygnałem albo w nieprzerywalnym śnie.
 ///
-/// Proces ZOMBIE (stan 'Z') jest martwy: niezebrany potomek zachowuje /proc/<pid>/stat
-/// razem ze starttime, wiec bez sprawdzenia stanu trzymalby swoje nazwy strumieni az do
-/// wait() rodzica. Stan czytany jest z tej samej linii co starttime, czyli za darmo.
-/// Odrzucany jest wylacznie 'Z' -- uzasadnienie w bus.cpp przy definicji.
+/// @note Zgodnosc startTime odroznia ten sam proces od innego, ktoremu jadro nadalo zwolniony PID. Zombie
+///       trzymalby nazwy strumieni az do wait() rodzica. Wpis nieczytelny to "nie wiem": falszywe "zyje"
+///       kosztuje zajety slot, a falszywe "martwy" - dwie instancje na jednym <qryID>.desc.
 [[nodiscard]] bool isProcessAlive(std::int32_t pid, std::uint64_t startTime);
 
 /// Obiekt klasy Bus powinien:

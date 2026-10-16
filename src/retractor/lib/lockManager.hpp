@@ -15,10 +15,11 @@ struct SystemdIdentity {
   bool userScope{false};            // true => user.slice (systemctl --user), false => system
 };
 
-/// Ustala wlasna tozsamosc systemd. unit == nullopt => zwykly proces.
+/// Funkcja detectSystemdIdentity powinna:
+/// - zwracać nazwę jednostki i zakres użytkownika przeniesione wprost z osplat::detectServiceIdentity (Linux: jednostka systemd z /proc/self/cgroup, Darwin: zadanie launchd), z unit == nullopt dla zwykłego procesu.
 ///
-/// Wyniesione z lockManager.cpp, bo tozsamosci jednostki potrzebuje takze magistrala: bez niej
-/// slot nie umie odpowiedziec, ktora jednostke trzeba zatrzymac, zeby zwolnic kolidujaca nazwe.
+/// @note Deklaracja w naglowku, bo tozsamosci jednostki potrzebuje takze magistrala: bez niej slot nie umie
+///       odpowiedziec, ktora jednostke trzeba zatrzymac, zeby zwolnic kolidujaca nazwe.
 [[nodiscard]] SystemdIdentity detectSystemdIdentity();
 
 /// Obiekt klasy FlockServiceGuard powinien:
@@ -121,11 +122,14 @@ struct SweepReport {
   std::size_t busSegments{0};    ///< segmenty magistrali, ktorych nikt nie mapuje
 };
 
-/// Usuwa pozostalosci instancji, ktore nie zyja: pliki blokad, globalne obiekty IPC i segmenty
-/// magistrali. Normalny koniec procesu sprzata po sobie sam; tu trafia to, co zostawil proces
-/// zabity (SIGKILL, OOM, awaria zasilania). Bezpieczne w kazdej chwili i przy dzialajacych
-/// instancjach: usuwa wylacznie to, czego blokade udalo sie zajac wylacznie (lockFile.hpp),
-/// a zywa instancja trzyma swoje blokady do konca.
-/// machineLockDir: katalog blokad tozsamosci IPC i obecnosci na magistrali; inny niz domyslny
-/// podaja tylko testy.
+/// Funkcja sweepAbandonedResources powinna:
+/// - przez lockfile::sweep usuwać w serviceLockDir porzucone pliki blokad instancji (`xretractor_service.lock` albo `xretractor_service.<poprawna nazwa>.lock`) i liczyć je w serviceLocks.
+/// - przez lockfile::sweep usuwać w machineLockDir porzucone blokady tożsamości IPC instancji bezimiennej albo o członie będącym poprawną nazwą serwera lub jej skrótem, a pod tą blokadą usuwać przez ipc::security::removeOwned segment pamięci dzielonej i kolejkę komend tego członu, licząc je w ipcIdentities.
+/// - usuwać porzucone segmenty magistrali przez bus::sweepAbandonedSegments(machineLockDir) i liczyć je w busSegments.
+/// - nie ruszać niczego, czego blokady nie da się zająć wyłącznie, plików innych kont ani kolejek odpowiedzi klientów.
+///
+/// @note Normalny koniec procesu sprzata po sobie sam; tu trafia to, co zostawil proces zabity (SIGKILL, OOM,
+///       awaria zasilania). Bezpieczne przy dzialajacych instancjach, bo zywa instancja trzyma swoje blokady
+///       do konca. Kolejek odpowiedzi nie da sie wyliczyc bez listowania /dev/shm. machineLockDir inny niz
+///       domyslny podaja tylko testy.
 SweepReport sweepAbandonedResources(const std::string &serviceLockDir, std::string_view machineLockDir = ipc::kMachineLockDir);

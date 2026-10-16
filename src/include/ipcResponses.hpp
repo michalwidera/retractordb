@@ -85,21 +85,33 @@ enum class PublishStatus : std::uint8_t {
   Full        ///< wszystkie sloty zajete przez zywych - odpowiedz przepada
 };
 
-/// Wypelnia naglowek swiezo utworzonego (wyzerowanego) segmentu.
+/// Funkcja initialize powinna:
+/// - zapisywać w nagłówku wyzerowanego segmentu wersję układu kLayoutVersion, liczbę slotów kResponseSlotCount i rozmiar slotu, a magię kMagic na końcu z semantyką release, tak aby klient widzący magię widział cały nagłówek.
+/// - pozostawiać sloty w stanie Free.
 void initialize(Segment &segment);
 
-/// Czy segment ma uklad tej binarki.
+/// Funkcja compatible powinna:
+/// - zwracać true wyłącznie wtedy, gdy nagłówek segmentu ma magię kMagic (odczytaną z semantyką acquire), wersję układu kLayoutVersion, liczbę slotów kResponseSlotCount i rozmiar slotu tej binarki.
 [[nodiscard]] bool compatible(const Segment &segment);
 
-/// Odpowiedz na komende serwera - odpowiedz dluzsza niz slot jest zastepowana
-/// error.response "response too large (N B > K B)". Wolac wylacznie z jednego watku.
+/// Funkcja publish powinna:
+/// - zastępować odpowiedź dłuższą niż kResponseSlotDataSize komunikatem info z error.response "response too large (N B > K B)" i logować to jako błąd.
+/// - zapisywać odpowiedź w pierwszym wolnym slocie razem z pid, startTime i seq adresata, a stan Ready ustawiać dopiero po zapisaniu treści, i zwracać Published.
+/// - przy braku wolnego slotu odzyskiwać slot w stanie Ready albo Reading, którego właściciel nie żyje, i zwracać Reclaimed, nigdy nie odbierając slotu żywemu klientowi.
+/// - gdy wszystkie sloty trzymają żywi klienci, porzucać odpowiedź z logiem błędu i zwracać Full.
+///
+/// @note Wolac wylacznie z jednego watku.
 PublishStatus publish(Segment &segment, const Owner &owner, std::string_view text);
 
-/// Jeden przeglad slotow: odpowiedz dla `owner` albo nullopt. Sloty z pid-em `owner`, ale
-/// innym seq albo startTime (zalegle odpowiedzi) zwalnia po drodze.
+/// Funkcja tryTake powinna:
+/// - w jednym przeglądzie slotów zwracać treść odpowiedzi w stanie Ready z pid, startTime i seq równymi `owner` i zwalniać jej slot, a bez takiej odpowiedzi zwracać nullopt.
+/// - zwalniać po drodze sloty z pid-em `owner`, ale innym startTime albo seq (zaległe odpowiedzi poprzedniego procesu albo porzuconych żądań).
+/// - oddawać w stanie Ready slot, który po przejęciu okazał się należeć do innego pid-u.
+/// - odrzucać skopiowaną treść, gdy zwolnienie slotu po kopiowaniu się nie powiedzie, bo serwer mógł go w tym czasie nadpisać.
 [[nodiscard]] std::optional<std::string> tryTake(Segment &segment, const Owner &owner);
 
-/// tryTake powtarzane co `pollInterval` az do `deadline`.
+/// Funkcja take powinna:
+/// - powtarzać tryTake co pollInterval i zwracać pierwszą odebraną odpowiedź, a po osiągnięciu deadline bez odpowiedzi zwracać nullopt.
 [[nodiscard]] std::optional<std::string> take(Segment &segment, const Owner &owner,
                                               std::chrono::steady_clock::time_point deadline,
                                               std::chrono::milliseconds pollInterval);

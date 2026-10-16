@@ -17,30 +17,48 @@
 
 class qTree;
 
-/// Parsuje JEDNA porcje tekstu RQL. `firstLine` to numer wiersza, na ktorym ta porcja stoi
-/// w pliku zrodlowym - wolajacy, ktory tnie plik na instrukcje (parsePlanText,
-/// parserRQLFile_4Test), podaje tu pozycje instrukcji, reszta zostawia 1.
-/// `sourceFile` podaje nazwe pliku do logu bledow skladni; pusty dla zapytan bez pliku.
+/// Funkcja parserRQLString powinna:
+/// - parsować porcję tekstu RQL `inlet` i dopisywać węzły jej instrukcji do coreInstance.
+/// - zwracać krotkę {status, pierwsze słowo kluczowe porcji wielkimi literami, nazwa strumienia pierwszej instrukcji SELECT, DECLARE albo RULE}.
+/// - przy powodzeniu zwracać status "OK", a dla porcji bez instrukcji słowo kluczowe "UNRECOGNIZED".
+/// - przy błędzie leksera lub składni zwracać treść błędu jako status, słowo "UNRECOGNIZED" i pustą nazwę strumienia.
+/// - przy błędzie semantycznym zwracać jego treść jako status razem ze słowem kluczowym i nazwą strumienia instrukcji.
+/// - czyścić statementKeywords i zapisywać do niego słowa kluczowe wszystkich instrukcji porcji, wielkimi literami.
+/// - liczyć wiersze w komunikatach od firstLine i podawać sourceFile w logu błędów składni; przeciążenia bez firstLine przyjmują 1, a przeciążenie bez statementKeywords odrzuca zebrane słowa.
+/// - nie przepuszczać żadnego wyjątku: złamany niezmiennik listenera i każdy wyjątek runtime ANTLR zwracać statusem z przedrostkiem kInternalCompilerError i słowem "UNRECOGNIZED".
+/// - po błędzie nie cofać zmian już naniesionych w coreInstance.
 ///
-/// Zwraca {status, pierwsze slowo kluczowe, nazwa strumienia}. Status "OK" albo tresc bledu;
-/// `statementKeywords` dostaje slowa kluczowe wszystkich instrukcji porcji.
+/// @note firstLine to numer wiersza porcji w pliku zrodlowym: podaja go wolajacy, ktory tnie plik na
+///       instrukcje (parsePlanText, parserRQLFile_4Test). Zmieniony po bledzie coreInstance odrzuca
+///       wolajacy (caly plan w launcherze, kopie planu w executorsm::getAdHoc). Plik ma jedyna w
+///       retractorcore wyspe wyjatkow (RDB_NOEXCEPT_CHECK), bo ANTLR przerywa parsowanie rzutem.
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
                                                                   std::vector<std::string> &statementKeywords, size_t firstLine,
                                                                   std::string_view sourceFile = {});
 
-/// Jak wyzej, z `firstLine` rownym 1.
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet,
                                                                   std::vector<std::string> &statementKeywords);
 
-/// Jak wyzej, bez zbierania slow kluczowych.
 std::tuple<std::string, std::string, std::string> parserRQLString(qTree &coreInstance, const std::string &inlet);
 
-/// Wiersze logiczne pliku RQL: komentarze `#` usuniete, kontynuacje `\` sklejone. Z kazda
-/// instrukcja wraca numer wiersza PLIKU, na ktorym sie ona zaczyna - powody obu regul stoja
-/// przy definicji.
+/// Funkcja readLogicalLines powinna:
+/// - pomijać wiersze puste lub złożone ze spacji, tabulacji i CR oraz wiersze, których pierwszy niebiały znak to `#`.
+/// - zamykać instrukcję na każdym pozostałym wierszu, który nie kończy się znakiem `\`.
+/// - wiersz kończący się `\` doklejać do instrukcji bez tego znaku, ze spacją w jego miejscu, i czytać dalej.
+/// - zwracać pary (treść instrukcji, numer wiersza pliku od 1, na którym instrukcja się zaczyna) w kolejności pliku.
+/// - pomijać bez komunikatu instrukcję, której ostatni wiersz przed końcem strumienia kończy się `\`.
+///
+/// @note Komentarz `#` obsluguje ta funkcja, nie lekser: lekser zna `#` tylko jako operator przeplotu, a do
+///       2026-08-29 jego regula `'# '` zjadala `FROM a # b` do `FROM a`. Komentarz konczacy wiersz to `//`.
+///       Numer wiersza pliku jest kotwica komunikatow skladni - bez niego blad wskazywal wiersz 1 instrukcji.
 std::vector<std::pair<std::string, size_t>> readLogicalLines(std::istream &file);
 
-/// Wczytuje i parsuje CALY plik RQL. Istnieje wylacznie dla testow jednostkowych: droga
-/// produkcyjna prowadzi przez parsePlanText (planSource.hpp), ktora dodatkowo zapamietuje
-/// wiersze zrodlowe planu.
+/// Funkcja parserRQLFile_4Test powinna:
+/// - dla pliku, którego nie da się otworzyć, logować błąd i zwracać "Unable to open file.".
+/// - parsować kolejno instrukcje z readLogicalLines przez parserRQLString z numerem pierwszego wiersza i nazwą pliku.
+/// - przy pierwszej nieudanej instrukcji logować ją i zwracać jej status.
+/// - zwracać "OK" po udanym sparsowaniu wszystkich instrukcji, a "Empty file." dla pliku bez instrukcji.
+///
+/// @note Tylko dla testow jednostkowych: droga produkcyjna to parsePlanText (planSource.hpp), ktora
+///       dodatkowo zapamietuje wiersze zrodlowe planu.
 std::string parserRQLFile_4Test(qTree &coreInstance, const std::string &sInputFile);

@@ -81,11 +81,13 @@ inline constexpr std::size_t kObjectNameTailBudget = 12;
 /// Dlugosc skrotu z shortServerTag: "0" i osiem cyfr szesnastkowych.
 inline constexpr std::size_t kShortServerTagLength = 9;
 
-/// Skrot nazwy serwera: osiem cyfr szesnastkowych FNV-1a.
+/// Funkcja shortServerTag powinna:
+/// - zwracać napis długości kShortServerTagLength: "0" i osiem małych cyfr szesnastkowych 32-bitowego skrótu nazwy serwera, czyli XOR obu połówek 64-bitowego FNV-1a.
+/// - dawać dla tej samej nazwy ten sam wynik w każdym procesie, niezależnie od biblioteki standardowej.
 ///
-/// Liczony JAWNIE, a nie przez std::hash, z tego samego powodu co skrot sciezki
-/// magazynu w bus.hpp: wartosc musi byc identyczna po obu stronach IPC, a wynik
-/// std::hash jest szczegolem implementacji biblioteki standardowej.
+/// @note Skrot liczony JAWNIE, a nie przez std::hash, z tego samego powodu co skrot sciezki magazynu w bus.hpp:
+///       wartosc musi byc identyczna po obu stronach IPC. Wiodace "0" oddziela skroty od nazw doslownych,
+///       bo nazwa uzytkownika zaczyna sie litera.
 inline std::string shortServerTag(std::string_view serverName) {
   constexpr std::uint64_t basis = 0xcbf2'9ce4'8422'2325ULL;
   constexpr std::uint64_t prime = 0x0000'0100'0000'01B3ULL;
@@ -102,12 +104,13 @@ inline std::string shortServerTag(std::string_view serverName) {
   return {buffer};
 }
 
-/// Czlon nazwy obiektu odpowiadajacy tej instancji: sama nazwa serwera, a gdy
-/// komplet nazw nie miescilby sie w limicie platformy - jej skrot.
+/// Funkcja serverNameToken powinna:
+/// - dla pustej nazwy serwera zwracać pusty napis.
+/// - zwracać samą nazwę serwera, gdy najdłuższa nazwa obiektu instancji (kResponseQueuePrefix, kropka, nazwa serwera, kropka i zapas kObjectNameTailBudget) mieści się w kMaxObjectNameLength, a w przeciwnym razie skrót shortServerTag.
 ///
-/// Decyzje podejmuje NAJDLUZSZA z nazw (kolejka odpowiedzi z identyfikatorem
-/// klienta), zeby wszystkie obiekty jednej instancji byly nazwane jednakowo:
-/// serwer i klient licza to niezaleznie i musza dojsc do tej samej nazwy.
+/// @note Decyzje podejmuje NAJDLUZSZA z nazw (kolejka odpowiedzi z identyfikatorem klienta), zeby wszystkie
+///       obiekty jednej instancji byly nazwane jednakowo: serwer i klient licza to niezaleznie i musza dojsc
+///       do tej samej nazwy.
 inline std::string serverNameToken(std::string_view serverName) {
   if (serverName.empty()) return {};
   const std::size_t longest = kResponseQueuePrefix.size() + 1 + serverName.size() + 1 + kObjectNameTailBudget;
@@ -115,7 +118,8 @@ inline std::string serverNameToken(std::string_view serverName) {
   return shortServerTag(serverName);
 }
 
-/// Nazwa bazowa z sufiksem serwera; bez sufiksu, gdy nazwa serwera pusta.
+/// Funkcja withServerSuffix powinna:
+/// - zwracać base z dopisanym ".<serverName>", a dla pustej nazwy serwera samo base.
 inline std::string withServerSuffix(std::string_view base, std::string_view serverName) {
   std::string retVal(base);
   if (!serverName.empty()) {
@@ -125,8 +129,12 @@ inline std::string withServerSuffix(std::string_view base, std::string_view serv
   return retVal;
 }
 
-/// Komplet nazw dla gotowego czlonu instancji (patrz serverNameToken). Sprzatacz pozostalosci
-/// zna wylacznie czlon - odczytany z nazwy pliku blokady tozsamosci - a nie nazwe serwera.
+/// Funkcja namesForToken powinna:
+/// - budować nazwę segmentu pamięci dzielonej i kolejki komend przez withServerSuffix z podanym członem instancji.
+/// - budować prefiks kolejki odpowiedzi jako kResponseQueuePrefix dla pustego członu, a dla niepustego jako withServerSuffix(kResponseQueuePrefix, człon) zakończony kropką.
+///
+/// @note Przyjmuje gotowy czlon (patrz serverNameToken): sprzatacz pozostalosci zna wylacznie czlon - odczytany
+///       z nazwy pliku blokady tozsamosci - a nie nazwe serwera.
 inline ServerNames namesForToken(std::string_view token) {
   ServerNames retVal;
   retVal.shmemSegment = withServerSuffix(kShmemSegment, token);
@@ -151,16 +159,20 @@ inline constexpr std::string_view kMachineLockDir = "/tmp";
 /// Przedrostek pliku blokady tozsamosci IPC. Pelna nazwa: przedrostek + nazwa kolejki komend + ".lock".
 inline constexpr std::string_view kIdentityLockPrefix = "xretractor_ipc.";
 
-/// Plik blokady tozsamosci IPC. Serwer trzyma ja wylacznie od chwili PRZED utworzeniem swoich
-/// obiektow IPC do chwili PO ich skasowaniu, a po jego smierci zwalnia ja jadro - dlatego jest
-/// zarazem najpewniejszym dowodem, ze serwer o tym czlonie zyje. Katalog inny niz domyslny podaja
-/// tylko testy - patrz kMachineLockDir.
+/// Funkcja identityLockPath powinna:
+/// - zwracać ścieżkę pliku blokady tożsamości IPC: dir, "/", kIdentityLockPrefix, nazwa kolejki komend i ".lock", domyślnie w kMachineLockDir.
+///
+/// @note Serwer trzyma te blokade wylacznie od chwili PRZED utworzeniem swoich obiektow IPC do chwili PO ich
+///       skasowaniu, a po jego smierci zwalnia ja jadro - dlatego jest najpewniejszym dowodem, ze serwer o tym
+///       czlonie zyje. Katalog inny niz domyslny podaja tylko testy - patrz kMachineLockDir.
 inline std::string identityLockPath(std::string_view queryQueue, std::string_view dir = kMachineLockDir) {
   return std::string(dir) + "/" + std::string(kIdentityLockPrefix) + std::string(queryQueue) + ".lock";
 }
 
-/// Czlon instancji liczony RAZ i uzyty we wszystkich czterech nazwach - patrz serverNameToken.
-/// Na Linuksie jest to zawsze sama nazwa serwera.
+/// Funkcja names powinna:
+/// - zwracać komplet nazw instancji namesForToken(serverNameToken(serverName)), z członem liczonym raz dla wszystkich nazw.
+///
+/// @note Na Linuksie czlonem jest zawsze sama nazwa serwera.
 inline ServerNames names(std::string_view serverName = {}) { return namesForToken(serverNameToken(serverName)); }
 
 /// Rodzina plikow blokady instancji: xretractor_service.lock dla instancji bezimiennej,
@@ -170,24 +182,32 @@ inline ServerNames names(std::string_view serverName = {}) { return namesForToke
 inline constexpr std::string_view kServiceLockFamily = "xretractor_service";
 inline constexpr std::string_view kServiceLockSuffix = ".lock";
 
-/// Nazwa uslugi instancji: rdzen nazwy pliku jej blokady i etykieta w `xretractor --status`.
-/// Czlonem jest sama nazwa serwera, nie skrot z serverNameToken.
+/// Funkcja serviceName powinna:
+/// - zwracać withServerSuffix(kServiceLockFamily, serverName), z samą nazwą serwera jako członem, nie skrótem z serverNameToken.
+///
+/// @note Nazwa uslugi to rdzen nazwy pliku jej blokady i etykieta w `xretractor --status`.
 inline std::string serviceName(std::string_view serverName) { return withServerSuffix(kServiceLockFamily, serverName); }
 
-/// Plik blokady instancji (bez katalogu).
+/// Funkcja serviceLockFile powinna:
+/// - zwracać nazwę pliku blokady instancji: serviceName z dopisanym kServiceLockSuffix, bez katalogu.
 inline std::string serviceLockFile(std::string_view serviceName) {
   return std::string(serviceName) + std::string(kServiceLockSuffix);
 }
 
-/// Katalog blokad instancji: paths.lock_dir, a gdy nie ustawiony - katalog tymczasowy procesu
-/// (TMPDIR). Inaczej niz kMachineLockDir: ta blokada rozdziela instancje w obrebie jednego katalogu.
+/// Funkcja serviceLockDir powinna:
+/// - zwracać skonfigurowany katalog blokad instancji (paths.lock_dir), a gdy jest pusty - katalog tymczasowy procesu z std::filesystem::temp_directory_path.
+///
+/// @note Inaczej niz kMachineLockDir: ta blokada rozdziela instancje w obrebie jednego katalogu.
 inline std::filesystem::path serviceLockDir(std::string_view configuredDir) {
   if (configuredDir.empty()) return std::filesystem::temp_directory_path();
   return {configuredDir};
 }
 
-/// Czlon serwera odczytany z nazwy pliku blokady instancji: pusty dla instancji bezimiennej,
-/// nullopt dla pliku spoza rodziny. Poprawnosci samej nazwy nie ocenia - to nalezy do wolajacego.
+/// Funkcja serviceLockInstance powinna:
+/// - dla nazwy pliku, która nie zaczyna się od kServiceLockFamily albo nie kończy się kServiceLockSuffix, zwracać nullopt.
+/// - dla nazwy bez członu pomiędzy nimi zwracać pusty napis (instancja bezimienna).
+/// - dla członu postaci ".<nazwa>" z niepustą nazwą zwracać nazwę bez kropki, a dla każdego innego członu nullopt.
+/// - nie oceniać poprawności odczytanej nazwy serwera, pozostawiając to wołającemu.
 inline std::optional<std::string_view> serviceLockInstance(std::string_view file) {
   if (file.size() < kServiceLockFamily.size() + kServiceLockSuffix.size() || !file.starts_with(kServiceLockFamily) ||
       !file.ends_with(kServiceLockSuffix))

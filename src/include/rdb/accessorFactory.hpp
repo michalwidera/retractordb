@@ -29,31 +29,33 @@ namespace rdb {
 /// - skupiać całą wiedzę o konkretnych typach akcesorów w jednym miejscu - storage zna wyłącznie
 ///   abstrakcyjny FileInterface.
 
-/// @brief Whether the storage type is a read-only declared source (BINFILE/DEVICE/TEXTSOURCE).
+/// Funkcja isDeclaredType powinna:
+/// - zwracać true wyłącznie dla typów źródeł deklarowanych tylko do odczytu: BINFILE, DEVICE i TEXTSOURCE.
 [[nodiscard]] bool isDeclaredType(std::string_view storageType);
 
-/// @brief Whether the storage type is a writable SELECT output profile (DEFAULT/DIRECT/MEMORY/POSIX/POSIXSHD/GENERIC).
+/// Funkcja isWritableType powinna:
+/// - zwracać true wyłącznie dla zapisywalnych profili wyjścia SELECT: DEFAULT, DIRECT, MEMORY, POSIX, POSIXSHD i GENERIC.
 [[nodiscard]] bool isWritableType(std::string_view storageType);
 
-/// @brief Odmowa rodzaju pliku zrodla deklarowanego (#346); pusta, gdy rodzaj pliku pasuje do typu.
+/// Funkcja sourceKindMismatch powinna:
+/// - zwracać pusty napis, gdy rodzaj pliku pasuje do typu źródła deklarowanego: urządzenie znakowe albo FIFO dla DEVICE, plik zwykły dla BINFILE i TEXTSOURCE.
+/// - dla rodzaju niepasującego (także katalogu, urządzenia blokowego i gniazda) zwracać odmowę nazywającą słowo RQL (TEXTFILE dla TEXTSOURCE), ścieżkę i rodzaj znalezionego pliku, bez nazwy strumienia, którą dokleja wołający.
+/// - w wariancie bez trybu ustalać rodzaj przez stat(), bez otwierania pliku, a dla ścieżki, której stat() nie widzi, zwracać pusty napis.
 ///
-/// BINFILE i TEXTSOURCE (slowo RQL TEXTFILE) przyjmuja wylacznie plik zwykly, DEVICE wylacznie
-/// urzadzenie znakowe albo FIFO. Katalog, urzadzenie blokowe i gniazdo odpadaja dla wszystkich.
-/// Komunikat nazywa slowo RQL i sciezke; nazwe strumienia dokleja wolajacy.
+/// @note Odmowa rodzaju pliku wprowadzona w #346. Wariant przez stat() nie blokuje sie na FIFO bez pisarza;
+///       brak pliku nie jest tu odmowa - obsluguje go akcesor.
 [[nodiscard]] std::string sourceKindMismatch(std::string_view storageType, const std::string &path, mode_t mode);
-
-/// @brief To samo przez stat(), czyli BEZ otwarcia: FIFO bez pisarza niczego tu nie blokuje.
-///
-/// Sciezka, ktorej stat() nie widzi (brak pliku, brak uprawnien), nie jest odmowa - akcesor
-/// ostrzega i daje rekordy NULL tak jak przed #346. Odmowa dotyczy istniejacej sciezki zlego rodzaju.
 [[nodiscard]] std::string sourceKindMismatch(std::string_view storageType, const std::string &path);
 
-/// @brief Create the FileInterface implementation for the given storage type; Result error on unknown type.
-/// @note Descriptor jest nie-const, bo retention()/storagePolicy() nie są metodami const.
-/// @param followFinalLink zapisywalny plik danych moze byc dowiazaniem - tylko dla REF podanego przez
-///        wolajacego (#374, storageFile.hpp); zrodla deklarowane czytaja sciezke jak dotad.
-/// @param memory Memory Store dla typu "MEMORY"; nullptr wybiera MemoryStore::processDefault(),
-///        czyli zachowanie sprzed fazy 2 (#446, C2). Dla pozostalych typow bez znaczenia.
+/// Funkcja makeAccessor powinna:
+/// - tworzyć implementację FileInterface właściwą dla typu magazynu: groupFile z cieniem dla DEFAULT, groupFile bez cienia dla DIRECT, memoryFile dla MEMORY, posixBinaryFile dla POSIX, posixBinaryFileWithShadow dla POSIXSHD, genericBinaryFile dla GENERIC, binaryDeviceRO dla BINFILE i DEVICE oraz textSourceRO dla TEXTSOURCE.
+/// - dla MEMORY używać wskazanego Memory Store, a przy memory == nullptr MemoryStore::processDefault().
+/// - przekazywać followFinalLink wyłącznie akcesorom zapisywalnym, a źródłom deklarowanym czytanie z zawijaniem, gdy oneShot jest wyłączone.
+/// - zwracać Errc::Config dla pustej ścieżki, pustego typu i typu spoza listy, bez kończenia procesu.
+///
+/// @note Descriptor jest nie-const, bo retention()/storagePolicy() nie są metodami const. followFinalLink
+///       dotyczy tylko REF podanego przez wolajacego (#374, storageFile.hpp). Typ bierze sie takze wprost od
+///       wolajacego (wiazanie Pythona), wiec nieznany typ musi byc zwyklym bledem.
 [[nodiscard]] Result<std::unique_ptr<FileInterface>> makeAccessor(std::string_view storageType,    //
                                                                   const std::string &storageFile,  //
                                                                   Descriptor &descriptor,          //
@@ -62,8 +64,9 @@ namespace rdb {
                                                                   bool followFinalLink = false,    //
                                                                   MemoryStore *memory  = nullptr);
 
-/// @brief Create the metaData variant matching the storage: inert for declared sources,
-///        storageShadow when the accessor keeps a data shadow file, base metaData otherwise.
+/// Funkcja makeMetaIndex powinna:
+/// - dla źródła deklarowanego zwracać inertny metaData bez pliku (pusta ścieżka, bez persystencji).
+/// - dla magazynu z plikiem cienia danych zwracać storageShadow na metaIndexFile, a dla pozostałych bazowy metaData na metaIndexFile.
 [[nodiscard]] std::unique_ptr<metaData> makeMetaIndex(bool declared,                 //
                                                       bool hasShadow,                //
                                                       const Descriptor &descriptor,  //

@@ -63,12 +63,16 @@ enum class Errc : std::uint8_t {
   Logic               ///< zlamany niezmiennik wykryty w miejscu, ktore umie go zwrocic (dawny LogicError)
 };
 
-/// Rodzina "zle wejscie": Config i jej dwie pochodne. Odpowiednik `catch (const ConfigError &)`.
+/// Funkcja isConfigFamily powinna:
+/// - zwracać true wyłącznie dla kategorii rodziny "złe wejście": Config, Syntax i Compile.
+///
+/// @note Odpowiednik dawnego `catch (const ConfigError &)`.
 [[nodiscard]] constexpr bool isConfigFamily(Errc code) noexcept {
   return code == Errc::Config || code == Errc::Syntax || code == Errc::Compile;
 }
 
-/// Nazwa kategorii do komunikatow i logow.
+/// Funkcja errcName powinna:
+/// - zwracać nazwę kategorii do komunikatów i logów: ConfigError, CorruptDescriptor, SyntaxError, CompileError, EvalError, IOError albo LogicError, a dla wartości spoza wyliczenia "Error".
 [[nodiscard]] constexpr std::string_view errcName(Errc code) noexcept {
   switch (code) {
     case Errc::Config:
@@ -115,11 +119,13 @@ class Error {
 template <typename T = void>
 using Result = std::expected<T, Error>;
 
-/// Zbudowanie bledu do `return`: `return rdb::fail(Errc::Config, "...")`.
+/// Funkcja fail powinna:
+/// - budować błąd do `return` jako std::unexpected<Error> z podaną kategorią, komunikatem i errno (domyślnie 0), także z komunikatu w postaci literału.
+/// - dla Refusal zachowywać komunikat i errno, a kategorię wyznaczać z klasy odmowy: Environment jako IO, Internal jako Logic, pozostałe jako Compile.
+/// - dla istniejącego Error przekazywać go wyżej bez zmian, z innym typem wartości.
 ///
-/// Zimne i niewklejane: budowa bledu nie wnosi kodu do funkcji z goraca sciezka, ktora inaczej
-/// przestaje sie miescic w progu inline (#511). Przeciazenie dla literalu przenosi do srodka takze
-/// budowe std::string - najczestsza postac `return fail(Errc::X, "tekst")`.
+/// @note Warianty z kategoria sa zimne i niewklejane (#511): budowa bledu, takze std::string z literalu, nie
+///       wnosi kodu do funkcji z goraca sciezka, ktora inaczej przestaje sie miescic w progu inline.
 [[nodiscard, gnu::cold, gnu::noinline]] inline std::unexpected<Error> fail(Errc code, std::string message, int err = 0) {
   return std::unexpected<Error>(std::in_place, code, std::move(message), err);
 }
@@ -128,7 +134,6 @@ using Result = std::expected<T, Error>;
   return std::unexpected<Error>(std::in_place, code, std::string(message), err);
 }
 
-/// Odmowa z aktualnego preflight zachowuje kategorie i errno.
 [[nodiscard]] inline std::unexpected<Error> fail(Refusal refusal) {
   Errc code = Errc::Compile;
   if (refusal.cls == ErrorClass::Environment)
@@ -138,19 +143,22 @@ using Result = std::expected<T, Error>;
   return fail(code, std::move(refusal.message), refusal.err);
 }
 
-/// Przekazanie istniejacego bledu wyzej, z innym typem wartosci.
 [[nodiscard]] inline std::unexpected<Error> fail(Error error) noexcept { return std::unexpected<Error>(std::move(error)); }
 
 /// Handler zlamanego niezmiennika. MUSI nie wracac; gdyby wrocil, fatal() i tak wola std::abort().
 using FatalHandler = void (*)(std::string_view message, const std::source_location &where) noexcept;
 
-/// Zlamany niezmiennik silnika: zapis przyczyny i zatrzymanie procesu w znanym stanie.
-/// Nie odwija stosu i nie wraca. Domyslny handler loguje (spdlog, stderr) i wola std::abort().
+/// Funkcja fatal powinna:
+/// - przy złamanym niezmienniku silnika wywoływać zainstalowany handler z komunikatem i miejscem wywołania, a bez handlera - domyślny.
+/// - w domyślnym handlerze logować przyczynę na poziomie critical (gdy jest logger spdlog), wypisywać "FATAL: <komunikat>" na stderr bez wyjątków i kończyć proces przez std::abort().
+/// - nigdy nie wracać i nie odwijać stosu: gdy handler wróci, kończyć proces jak domyślny handler.
 [[noreturn]] void fatal(std::string_view message, std::source_location where = std::source_location::current()) noexcept;
 
-/// Instaluje handler fatal() i zwraca poprzedni. nullptr przywraca domyslny. Demon instaluje go
-/// raz, przed startem watkow (launcher.cpp); host osadzajacy moze zainstalowac wlasny, np. zeby
-/// zrzucic stan przed zakonczeniem.
+/// Funkcja setFatalHandler powinna:
+/// - atomowo instalować handler fatal() i zwracać poprzedni, a dla nullptr przywracać handler domyślny.
+///
+/// @note Demon instaluje go raz, przed startem watkow (launcher.cpp); host osadzajacy moze zainstalowac
+///       wlasny, np. zeby zrzucic stan przed zakonczeniem.
 FatalHandler setFatalHandler(FatalHandler handler) noexcept;
 
 }  // namespace rdb

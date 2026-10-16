@@ -28,6 +28,9 @@ namespace rdb {
 /// Domyslne uprawnienia to 0666 & ~umask - tak tworzyly pliki zastapione tu std::fstream.
 inline constexpr mode_t kStreamFileMode = 0666;
 
+/// Funkcja openStorageFile powinna:
+/// - otwierać plik magazynu z podanymi flagami i trybem, zawsze z O_CLOEXEC, a bez followFinalLink także z O_NOFOLLOW, i zwracać deskryptor albo -1 z errno.
+/// - przy odmowie otwarcia dowiązania (ELOOP) logować błąd, zachowując errno dla wołającego.
 [[nodiscard]] inline int openStorageFile(const std::string &path, const int flags, const mode_t mode = kStreamFileMode,
                                          const bool followFinalLink = false) {
   const int fd = ::open(path.c_str(), flags | O_CLOEXEC | (followFinalLink ? 0 : O_NOFOLLOW), mode);

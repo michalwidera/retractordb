@@ -23,38 +23,49 @@ namespace lockfile {
 
 enum class Result : std::uint8_t { Acquired, Busy, Error, Refused };
 
-/// Zajmuje blokade pliku `path`, tworzac go w razie potrzeby.
+/// Funkcja acquire powinna:
+/// - otwierać plik `path` bez podążania za dowiązaniem (O_RDWR przy writable, inaczej O_RDONLY), a brakujący tworzyć przez O_CREAT | O_EXCL z prawami 0644 niezależnymi od umask.
+/// - zajmować na nim flock LOCK_EX przy exclusive, inaczej LOCK_SH, bez blokowania, ponawiając próbę co 1 ms przez okno kTransientHolderGrace (500 ms), a po nim zwracać Result::Busy.
+/// - po zajęciu blokady sprawdzać, że ścieżka nadal wskazuje ten sam i-węzeł, a jeśli nie - zaczynać od nowa, po 100 takich trafieniach zwracając Result::Error z ESTALE.
+/// - przy Result::Acquired zwracać deskryptor z zajętą blokadą w fd.
+/// - zwracać Result::Refused z powodem w errno: ELOOP dla dowiązania symbolicznego, EINVAL dla obiektu niebędącego zwykłym plikiem, EPERM (tylko writable) dla pliku innego właściciela niż UID procesu, EMLINK (tylko writable) dla pliku o więcej niż jednej nazwie, EAGAIN po wyczerpaniu 100 prób open/create.
+/// - zwracać Result::Error z errno błędu systemu dla każdej innej porażki open, fstat albo flock.
 ///
-/// exclusive: LOCK_EX bez czekania na zywego wlasciciela, ale z krotkim oknem na wlasciciela
-///            przejsciowego - sprzatacza albo proces, ktory wlasnie kasuje plik. Inaczej LOCK_SH
-///            z czekaniem: blokade wylaczna na pliku obecnosci trzymaja tylko tacy wlasciciele.
-/// writable:  deskryptor O_RDWR (plik niesie tresc). Inaczej O_RDONLY - do flock wystarcza,
-///            a dziala takze na pliku, do ktorego ten uzytkownik nie ma prawa zapisu.
-/// Tylko zwykle pliki, bez podazania za dowiazaniem. Zapis wymaga UID procesu i jednej nazwy;
-/// odczyt nie wymaga tego samego UID. Ponowienia open/create sa ograniczone.
-/// Przy Result::Error errno opisuje blad systemu. Result::Refused to odmowa pliku pod sciezka,
-/// errno niesie powod: ELOOP - dowiazanie symboliczne, EINVAL - nie zwykly plik, EPERM - inny
-/// wlasciciel, EMLINK - wiecej niz jedna nazwa, EAGAIN - wyczerpany limit ponowien open/create.
+/// @note Okno 500 ms czeka na wlasciciela przejsciowego (sprzatacz, proces kasujacy plik); zywa instancja trzyma
+///       blokade do konca, wiec po nim "zajete" jest prawdziwe. Termin ma takze czytelnik LOCK_SH: zatrzymany
+///       posiadacz LOCK_EX nie moze zawiesic startu Bus. O_RDONLY wystarcza do flock i dziala takze na pliku,
+///       do ktorego ten uzytkownik nie ma prawa zapisu.
 Result acquire(const std::string &path, bool exclusive, bool writable, int &fd);
 
-/// Czy deskryptor nadal odpowiada sciezce (ten sam i-wezel).
+/// Funkcja stillLinked powinna:
+/// - zwracać true wyłącznie wtedy, gdy `path` (bez podążania za dowiązaniem) jest zwykłym plikiem o tym samym urządzeniu i i-węźle co deskryptor fd.
 [[nodiscard]] bool stillLinked(int fd, const std::string &path);
 
-/// Kasuje plik trzymany blokada wylaczna i zamyka deskryptor, co zwalnia blokade. Pliku, ktory
-/// przestal byc tym i-wezlem, nie rusza: pod ta sciezka lezy wtedy cudza blokada.
+/// Funkcja removeAndRelease powinna:
+/// - kasować `path` tylko wtedy, gdy stillLinked(fd, path), a następnie zawsze zamykać fd, co zwalnia blokadę.
+///
+/// @note Wolajacy trzyma blokade wylaczna. Pliku, ktory przestal byc tym i-wezlem, nie rusza: pod ta sciezka
+///       lezy wtedy cudza blokada.
 void removeAndRelease(const std::string &path, int fd);
 
-/// Czy ktos trzyma blokade wylaczna na pliku `path`. Sprawdza przez LOCK_SH bez czekania, wiec
-/// wlasciciel startujacy w tej samej chwili trafia co najwyzej na okno wlasciciela przejsciowego.
+/// Funkcja isHeld powinna:
+/// - zwracać true wyłącznie wtedy, gdy plik da się otworzyć do odczytu, a próba LOCK_SH bez czekania kończy się EWOULDBLOCK, czyli ktoś trzyma blokadę wyłączną.
+/// - zwracać false dla pliku brakującego, odrzuconego (dowiązanie, nie zwykły plik) albo nieotwieralnego.
+///
+/// @note Wlasciciel startujacy w tej samej chwili trafia co najwyzej na okno wlasciciela przejsciowego.
 [[nodiscard]] bool isHeld(const std::string &path);
 
-/// Zajmuje porzucony plik blokady: bez tworzenia i bez czekania. -1, gdy plik jest trzymany,
-/// zniknal albo nie da sie go otworzyc.
+/// Funkcja claimAbandoned powinna:
+/// - otwierać istniejący zwykły plik do odczytu bez tworzenia i bez podążania za dowiązaniem, zajmować LOCK_EX bez czekania i zwracać deskryptor, gdy ścieżka nadal wskazuje ten i-węzeł.
+/// - zwracać -1, gdy plik jest trzymany, zniknął, został podmieniony albo nie da się go otworzyć.
 [[nodiscard]] int claimAbandoned(const std::string &path);
 
-/// Przeglada katalog `dir`. Dla kazdego pliku, ktorego nazwe przyjmie `accept`, zajmuje porzucona
-/// blokade, wola `removeGuarded(nazwa)` - wciaz pod ta blokada - i kasuje plik. Zwraca liczbe
-/// skasowanych plikow. Pliki trzymane przez zywych wlascicieli zostaja nietkniete.
+/// Funkcja sweep powinna:
+/// - dla każdego pliku katalogu `dir`, którego nazwę przyjmie `accept`, zajmować porzuconą blokadę przez claimAbandoned i pomijać pliki trzymane przez żywych właścicieli.
+/// - pomijać pliki innego właściciela niż efektywny UID procesu, także gdy proces działa jako root.
+/// - dla zajętego pliku wołać `removeGuarded(nazwa)` wciąż pod blokadą, a następnie removeAndRelease.
+/// - zwracać liczbę plików, dla których wywołano removeGuarded i removeAndRelease.
+/// - kończyć przegląd bez błędu, gdy katalogu nie da się otworzyć albo czytać.
 std::size_t sweep(const std::string &dir, const std::function<bool(std::string_view)> &accept,
                   const std::function<void(std::string_view)> &removeGuarded);
 

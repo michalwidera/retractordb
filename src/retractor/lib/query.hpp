@@ -22,15 +22,14 @@ class qTree;
 
 inline constexpr size_t kGeneratedPrefixLength = sizeof("STREAM_") - 1;
 
-/// Typ i długość pola, w którym mieści się wynik redukcji (AVG/MIN/MAX/SUMC).
+/// Funkcja reductionResultField powinna:
+/// - dla typu źródła BYTE, INTEGER, UINT albo RATIONAL zwracać pole RATIONAL o długości sizeof(boost::rational<int>).
+/// - dla każdego innego typu źródła zwracać typ i długość źródła bez zmian.
 ///
-/// K24/D4: schemat wyjścia redukcji budowany przez kompilator jest zawsze
-/// RATIONAL, a rachunek redukcji idzie po boost::rational<int>. Deskryptor
-/// wejściowy (query::descriptorFrom) i payload wyniku
-/// (streamInstance::reduceFieldsToPayload) używały typu ŹRÓDŁA, więc wartość
-/// przechodziła przez rational_cast<int> - średnia z dwóch pól o sumie
-/// nieparzystej dawała 2000003/2 jako 1000001/1. Reguła jest tu jedna dla obu
-/// miejsc właśnie po to, żeby nie mogły się ponownie rozjechać.
+/// @note K24/D4: rachunek redukcji (AVG/MIN/MAX/SUMC) idzie po boost::rational<int>. Deskryptor wejsciowy
+///       (query::descriptorFrom) i payload wyniku (streamInstance::reduceFieldsToPayload) uzywaly typu
+///       ZRODLA, wiec wartosc przechodzila przez rational_cast<int> - srednia 2000003/2 dawala 1000001/1.
+///       Regula jest tu jedna dla obu miejsc, zeby nie mogly sie ponownie rozjechac.
 inline std::pair<rdb::descFld, int> reductionResultField(rdb::descFld sourceType, int sourceLength) {
   const bool arithmetic =
       sourceType == rdb::BYTE || sourceType == rdb::INTEGER || sourceType == rdb::UINT || sourceType == rdb::RATIONAL;
@@ -114,7 +113,10 @@ struct windowStats {
 /// przestarzale `FILE` parser tlumaczy na jeden z trzech rodzajow, wiec dalej silnik widzi tylko je.
 enum class sourceKind : std::uint8_t { none, binFile, textFile, device };
 
-/// Slowo kluczowe RQL rodzaju - do komunikatow i ostrzezen.
+/// Funkcja sourceKindKeyword powinna:
+/// - zwracać słowo kluczowe RQL rodzaju źródła: "BINFILE", "TEXTFILE" albo "DEVICE", a dla sourceKind::none pusty napis.
+///
+/// @note Do komunikatow i ostrzezen.
 inline std::string_view sourceKindKeyword(sourceKind kind) {
   switch (kind) {
     case sourceKind::binFile:
@@ -256,6 +258,8 @@ class query {
   friend std::ostream &operator<<(std::ostream &os, const query &s);
 };
 
+/// Funkcja operator< powinna:
+/// - porządkować węzły wyłącznie według interwału rInterval, rosnąco.
 bool operator<(const query &lhs, const query &rhs);
 
 /// Efektywny termin odczytu zrodla DEVICE i to, skad pochodzi (#347).
@@ -266,9 +270,20 @@ struct deviceTimeout {
   std::string_view origin;
 };
 
-/// Pierwszenstwo: tryb bez zegara (`-f`) > jawna klauzula TIMEOUT > `[sources] timeout_s` > 0.
-/// W trybie bez zegara termin wynosi zawsze 0: sekundy rzeczywiste nie maja przelicznika na czas
-/// wirtualny, a proba nieblokujaca zostawia DEVICE uzytecznym w szybkich testach.
+/// Funkcja effectiveDeviceTimeout powinna:
+/// - w trybie bez zegara (noClock, `-f`) zwracać 0 s z pochodzeniem "no-clock".
+/// - w przeciwnym razie zwracać jawną klauzulę TIMEOUT węzła z pochodzeniem "RQL", a bez niej configured z pochodzeniem "config", a bez obu 0 s z pochodzeniem "default".
+///
+/// @note #347. Bez zegara termin wynosi zawsze 0: sekundy rzeczywiste nie maja przelicznika na czas wirtualny,
+///       a proba nieblokujaca zostawia DEVICE uzytecznym w szybkich testach. configured to `[sources] timeout_s`.
 deviceTimeout effectiveDeviceTimeout(const query &qry, std::optional<double> configured, bool noClock);
 
+/// Funkcja GetArgs powinna:
+/// - dla programu FROM z jednym tokenem zwracać jego napis jako pierwszy argument, pusty drugi i ten sam token jako operator.
+/// - dla dwóch tokenów zwracać napis pierwszego jako pierwszy argument, pusty drugi i drugi token jako operator.
+/// - dla trzech tokenów zwracać napisy dwóch pierwszych jako argumenty i trzeci token jako operator.
+/// - kończyć proces przez RDB_ASSERT dla programu dłuższego niż trzy tokeny.
+///
+/// @note Wolaja ja wylacznie przebiegi kompilatora po extractIntermediateStreams() i wykonanie planu
+///       skompilowanego, gdzie program FROM ma 1..3 tokeny.
 std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog);

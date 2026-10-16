@@ -161,21 +161,25 @@ class Descriptor {
   friend std::istream &operator>>(std::istream &is, Descriptor &rhs);
 };
 
-// http://www.gotw.ca/gotw/004.htm
+/// Funkcja operator+ powinna:
+/// - zwracać nowy deskryptor z polami lhs, a po nich polami rhs, bez zmiany argumentów.
+///
+/// @note Wzorzec: http://www.gotw.ca/gotw/004.htm
 Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs);
 
-/// Format jednowierszowy deskryptora i payloadu. Stan NALEZY DO STRUMIENIA, nie do procesu:
-/// siedzi w slocie std::ios_base::xalloc() tego konkretnego ostream-a.
+/// Funkcja singleLineFormat powinna:
+/// - jako manipulator włączać format jednowierszowy deskryptora i payloadu wyłącznie dla podanego strumienia i zwracać ten strumień.
 ///
-/// Do fazy 2 (#446, C2) byla to statyczna skladowa Descriptor::singleLineOutput_ - flaga calego
-/// procesu w warstwie, ktora laduje notatnik: ustawiana manipulatorem, a KASOWANA przez sam
-/// operator<< po pierwszym uzyciu. Dwa watki wypisujace rownolegle scigaly sie o format wyjscia
-/// trzeciego, a wiazanie Pythona musialo zapamietywac i przywracac jej wartosc wokol repr().
-///
-/// Semantyka JEDNORAZOWOSCI zostaje bez zmian: operator<< zdejmuje flage po wypisaniu, wiec
-/// `os << rdb::singleLineFormat << x` dotyczy dokladnie tego jednego wypisu. Nowe jest tylko
-/// to, ze "gdzie" oznacza teraz ten strumien, a nie caly proces.
+/// @note Stan nalezy do strumienia (slot std::ios_base::xalloc()), nie do procesu: do fazy 2 (#446, C2) byla to
+///       flaga calego procesu, o ktora scigaly sie watki. Jednorazowosc zostaje: operator<< zdejmuje flage po
+///       wypisaniu, wiec `os << rdb::singleLineFormat << x` dotyczy tego jednego wypisu.
 std::ostream &singleLineFormat(std::ostream &os);
+
+/// Funkcja isSingleLineOutput powinna:
+/// - zwracać, czy dla podanego strumienia jest włączony format jednowierszowy.
 [[nodiscard]] bool isSingleLineOutput(std::ostream &os);
+
+/// Funkcja setSingleLineOutput powinna:
+/// - włączać albo wyłączać format jednowierszowy wyłącznie dla podanego strumienia.
 void setSingleLineOutput(std::ostream &os, bool enabled);
 }  // namespace rdb

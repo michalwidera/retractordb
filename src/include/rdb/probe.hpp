@@ -132,14 +132,27 @@ inline workCounters work{};
 inline materializationCounters materialization{};
 inline logicalWriteCounters logicalWrite{};
 
+/// Funkcja printRuntimeCounters powinna:
+/// - wypisywać na stderr wiersz MATERIALIZED przy ustawionym RDB_BENCH_MATERIALIZE i wiersz LOGICAL przy ustawionym RDB_BENCH_LOGICAL (oba tylko w buildzie z sondą materializacji) oraz wiersz WORK przy ustawionym RDB_BENCH_WORK (tylko w buildzie z sondą pracy).
 void printRuntimeCounters();
+
+/// Funkcja countRewriteR1 powinna:
+/// - zwiększać o jeden licznik zastosowań reguły przepisującej R1.
 void countRewriteR1();
+
+/// Funkcja countRewriteR2 powinna:
+/// - dodawać węzeł do zbioru węzłów, w których zadziałała reguła R2, licząc każdy węzeł raz.
 void countRewriteR2(const std::string &node);
+
+/// Funkcja countRewriteR3 powinna:
+/// - zwiększać licznik przepisań reguły R3 o liczbę zastosowań.
 void countRewriteR3(std::size_t applied);
 }  // namespace detail
 
-/// Konstrukcja okna agregatu: okno odwiedza `elements` elementów w KAŻDYM slocie,
-/// niezależnie od tego, ile z nich trafi w dostępny zakres.
+/// Funkcja onAgseWindow powinna:
+/// - w buildzie z sondą pracy zwiększać o jeden licznik okien agregatu i o elements licznik odwiedzonych elementów, a w pozostałych nie robić nic.
+///
+/// @note Okno odwiedza `elements` elementow w KAZDYM slocie, niezaleznie od tego, ile trafi w dostepny zakres.
 [[gnu::always_inline]] inline void onAgseWindow(std::size_t elements) noexcept {
   if constexpr (rdb_probe_work) {
     ++detail::work.agseWindows;
@@ -147,15 +160,18 @@ void countRewriteR3(std::size_t applied);
   }
 }
 
-/// Odczyt rekordu źródła w oknie; cache `lastReadPosition` część odwiedzin omija,
-/// dlatego odczyty i odwiedziny liczone są rozdzielnie.
+/// Funkcja onAgseRead powinna:
+/// - w buildzie z sondą pracy zwiększać o jeden licznik odczytów rekordów źródła w oknie, osobny od licznika odwiedzin, a w pozostałych nie robić nic.
+///
+/// @note Cache `lastReadPosition` czesc odwiedzin omija, dlatego odczyty i odwiedziny sa rozdzielne.
 [[gnu::always_inline]] inline void onAgseRead() noexcept {
   if constexpr (rdb_probe_work) ++detail::work.agseReads;
 }
 
-/// Wykonanie programu wyrażenia: praca arytmetyczna slotu to LICZBA WYKONANYCH tokenów,
-/// nie rozmiar programu w planie - ten sam program wykonuje się raz na slot na każdy
-/// strumień, który go używa.
+/// Funkcja onEval powinna:
+/// - w buildzie z sondą pracy zwiększać o jeden licznik wykonań programu wyrażenia i o tokens licznik wykonanych tokenów, a w pozostałych nie robić nic.
+///
+/// @note Praca arytmetyczna slotu to liczba WYKONANYCH tokenow, nie rozmiar programu w planie.
 [[gnu::always_inline]] inline void onEval(std::size_t tokens) noexcept {
   if constexpr (rdb_probe_work) {
     ++detail::work.evalCalls;
@@ -163,23 +179,32 @@ void countRewriteR3(std::size_t applied);
   }
 }
 
-/// Wybór składowej przeplotu w tym slocie (STREAM_HASH).
+/// Funkcja onHashPick powinna:
+/// - w buildzie z sondą pracy zwiększać o jeden licznik wyborów składowej przeplotu (STREAM_HASH), a w pozostałych nie robić nic.
 [[gnu::always_inline]] inline void onHashPick() noexcept {
   if constexpr (rdb_probe_work) ++detail::work.hashPicks;
 }
 
-/// Scalenie payloadów sumy strumieni (STREAM_ADD).
+/// Funkcja onAddMerge powinna:
+/// - w buildzie z sondą pracy zwiększać o jeden licznik scaleń payloadów sumy strumieni (STREAM_ADD), a w pozostałych nie robić nic.
 [[gnu::always_inline]] inline void onAddMerge() noexcept {
   if constexpr (rdb_probe_work) ++detail::work.addMerges;
 }
 
+/// Funkcja workReport powinna:
+/// - zwracać kopię bieżących liczników pracy.
 workCounters workReport();
+
+/// Funkcja workReset powinna:
+/// - zerować wszystkie liczniki pracy.
 void workReset();
 
 //
 // ─── K6: objętość materializacji (rdb_probe_materialize) ────────────────────────
 //
 
+/// Funkcja onMaterializedAppend powinna:
+/// - w buildzie z sondą materializacji zwiększać o jeden liczbę dopisań i o bytes liczbę bajtów magazynów pamięciowych albo trwałych, zależnie od memoryBacked, a w pozostałych nie robić nic.
 [[gnu::always_inline]] inline void onMaterializedAppend(bool memoryBacked, std::size_t bytes) noexcept {
   if constexpr (rdb_probe_materialize) {
     if (memoryBacked) {
@@ -192,6 +217,8 @@ void workReset();
   }
 }
 
+/// Funkcja onMaterializedOverwrite powinna:
+/// - w buildzie z sondą materializacji zwiększać o jeden liczbę nadpisań magazynów pamięciowych albo trwałych, zależnie od memoryBacked, a w pozostałych nie robić nic.
 [[gnu::always_inline]] inline void onMaterializedOverwrite(bool memoryBacked) noexcept {
   if constexpr (rdb_probe_materialize) {
     if (memoryBacked)
@@ -201,19 +228,25 @@ void workReset();
   }
 }
 
+/// Funkcja materializationReport powinna:
+/// - zwracać kopię bieżących liczników materializacji.
 materializationCounters materializationReport();
+
+/// Funkcja materializationReset powinna:
+/// - zerować wszystkie liczniki materializacji.
 void materializationReset();
 
-/// Kanoniczna szerokość rekordu opisanego deskryptorem, wraz z kanoniczną mapą NULL/luk.
+/// Funkcja canonicalRecordBytes powinna:
+/// - zwracać kanoniczną szerokość rekordu opisanego deskryptorem: sumę kanonicznych szerokości pól i kanoniczną mapę NULL/luk o jednym bicie na slot płaski, zaokrągloną w górę do bajtu.
+/// - liczyć szerokość pola jako rarray razy: 1 dla BYTE, kCanonicalWideNumericBytes dla INTEGER, UINT i DOUBLE, kCanonicalFloatBytes dla FLOAT, kCanonicalPairBytes dla RATIONAL i INTPAIR oraz rlen dla STRING; dla IDXPAIR rlen razy rarray plus kCanonicalWideNumericBytes, a dla NULLTYPE i pól konfiguracyjnych 0.
+/// - zależeć wyłącznie od deskryptora, nie od zawartości rekordu.
 ///
-/// **To jest serializer metryki pierwotnej K23 i jedyne miejsce, w którym wolno go zmienić.**
-/// Ta sama definicja obowiązuje job Flinka; predeklaracja kampanii ją zamraża. Wynik zależy
-/// wyłącznie od deskryptora, nie od zawartości rekordu - metryka bajtowa jest
-/// deterministycznym wynikiem mechanizmu, więc nie może się zmieniać z danymi.
+/// @note To jest serializer metryki pierwotnej K23 i jedyne miejsce, w ktorym wolno go zmienic; ta sama
+///       definicja obowiazuje job Flinka, a predeklaracja kampanii ja zamraza.
 std::size_t canonicalRecordBytes(const Descriptor &descriptor);
 
-/// Zapis rekordu do magazynu strumienia: `substrate` rozdziela materializowany podplan od
-/// wyniku publicznego, `append` - dopisanie od nadpisania.
+/// Funkcja onLogicalWrite powinna:
+/// - w buildzie z sondą materializacji zwiększać o jeden licznik dopisań albo nadpisań (append) substratu albo wyniku publicznego (substrate) i o canonicalBytes licznik bajtów tej roli, a w pozostałych nie robić nic.
 [[gnu::always_inline]] inline void onLogicalWrite(bool substrate, bool append, std::size_t canonicalBytes) noexcept {
   if constexpr (rdb_probe_materialize) {
     auto &counters = detail::logicalWrite;
@@ -233,14 +266,19 @@ std::size_t canonicalRecordBytes(const Descriptor &descriptor);
   }
 }
 
+/// Funkcja logicalWriteReport powinna:
+/// - zwracać kopię bieżących liczników zapisów logicznych.
 logicalWriteCounters logicalWriteReport();
+
+/// Funkcja logicalWriteReset powinna:
+/// - zerować wszystkie liczniki zapisów logicznych.
 void logicalWriteReset();
 
-/// Raport liczników runtime (K6 + K23 + E4) na stderr, po zakończeniu mierzonej pętli - żeby
-/// zliczanie nie obciążało budżetu slotu. Każdy wiersz sterowany osobną zmienną
-/// środowiskową (`RDB_BENCH_MATERIALIZE`, `RDB_BENCH_LOGICAL`, `RDB_BENCH_WORK`), bo to różne
-/// wielkości: tam objętość zapisów w reprezentacji natywnej, obok kanoniczne bajty zapisów
-/// z rozdziałem na role, tu liczba odwiedzin elementów.
+/// Funkcja reportRuntimeCounters powinna:
+/// - w buildzie z sondą materializacji albo pracy wypisywać raport liczników przez printRuntimeCounters, a w pozostałych nie robić nic.
+///
+/// @note Raport (K6 + K23 + E4) wolany po zakonczeniu mierzonej petli, zeby nie obciazal budzetu slotu.
+///       Osobne zmienne srodowiskowe, bo wiersze opisuja rozne wielkosci.
 [[gnu::always_inline]] inline void reportRuntimeCounters() {
   if constexpr (rdb_probe_materialize || rdb_probe_work) detail::printRuntimeCounters();
 }
@@ -363,8 +401,10 @@ enum class planStage : std::uint8_t {
   exit        ///< końcowy, zoptymalizowany plan
 };
 
-/// Kształt planu. Szablon, bo typy planu (qTree/query/field) należą do biblioteki
-/// retractor, a sonda leży poziom niżej - w rdb, gdzie sięga po nią także storage.
+/// Funkcja shapeOf powinna:
+/// - zwracać kształt planu z pominięciem dyrektyw kompilatora: liczbę strumieni publicznych, liczbę substratów, łączną liczbę tokenów programów FROM i łączną liczbę tokenów programów pól.
+///
+/// @note Szablon, bo typy planu naleza do biblioteki retractor, a sonda lezy poziom nizej, w rdb.
 template <class Plan>
 planShape shapeOf(const Plan &plan) {
   planShape acc;
@@ -378,6 +418,8 @@ planShape shapeOf(const Plan &plan) {
   return acc;
 }
 
+/// Funkcja shapeOfCapacities powinna:
+/// - zwracać dla mapy pojemności historii liczbę strumieni, sumę pojemności i największą pojemność.
 template <class CapacityMap>
 capacityShape shapeOfCapacities(const CapacityMap &capacities) {
   capacityShape acc;
@@ -389,19 +431,22 @@ capacityShape shapeOfCapacities(const CapacityMap &capacities) {
   return acc;
 }
 
-/// Zastosowanie reguły przepisującej R1 (faktoryzacja przesunięć przez przeplot).
+/// Funkcja onRewriteR1 powinna:
+/// - w buildzie z sondą planu liczyć zastosowanie reguły R1 (faktoryzacja przesunięć przez przeplot), a w pozostałych nie robić nic.
 [[gnu::always_inline]] inline void onRewriteR1() {
   if constexpr (rdb_probe_plan) detail::countRewriteR1();
 }
 
-/// Zastosowanie reguły R2 (przemienność ADD przy odciskach) w danym węźle - liczone
-/// po węzłach, bo ta sama reguła może odpalić w jednym węźle wielokrotnie.
+/// Funkcja onRewriteR2 powinna:
+/// - w buildzie z sondą planu liczyć węzeł, w którym zadziałała reguła R2 (przemienność ADD przy odciskach), raz na węzeł, a w pozostałych nie robić nic.
 [[gnu::always_inline]] inline void onRewriteR2(const std::string &node) {
   if constexpr (rdb_probe_plan) detail::countRewriteR2(node);
 }
 
-/// Zastosowania reguły R3 (uproszczenia algebraiczne wyrażeń) - liczone sumą przepisań,
-/// bo jedno wyrażenie może zwinąć wiele stałych naraz, a metryka pyta o rozmiar planu.
+/// Funkcja onRewriteR3 powinna:
+/// - w buildzie z sondą planu doliczać liczbę przepisań reguły R3 (uproszczenia algebraiczne), a w pozostałych nie robić nic.
+///
+/// @note Liczona suma przepisan, bo jedno wyrazenie moze zwinac wiele stalych naraz.
 [[gnu::always_inline]] inline void onRewriteR3(std::size_t applied) {
   if constexpr (rdb_probe_plan) detail::countRewriteR3(applied);
 }

@@ -43,7 +43,9 @@ enum class selectResult : std::uint8_t {
   renderFailed         ///< pętla odbioru i renderowania przerwana wyjątkiem po stronie klienta
 };
 
-/// Nazwa trybu do komunikatu dla operatora.
+/// Funkcja toString powinna:
+/// - zwracać stały opis wyniku selectResult w języku angielskim do komunikatu dla operatora: "ok", "stream unknown to the server", "server did not answer within the timeout", "server did not create the client response queue", "no data in stream", "server has no plan loaded (idle); load one with --reset", "server is shutting down" i "select loop failed in the client; reason in the client log".
+/// - dla wartości spoza wyliczenia zwracać "unknown".
 const char *toString(selectResult result);
 
 /// Obiekt klasy qry powinien:

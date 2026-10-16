@@ -24,24 +24,25 @@ struct cast {
   T operator()(const T &inVar, rdb::descFld reqType);
 };
 
-/// @brief Convert std::any holding supported scalar value to descriptor variant.
-/// @param a input value; must contain one of supported payload scalar types
-/// @return value converted to rdb::descFldVT
-/// @pre the value holds a supported type; anything else is a broken invariant (rdb::fatal)
+/// Funkcja any_to_variant_cast powinna:
+/// - dla pustego std::any oraz std::any z std::monostate zwracać std::monostate (NULL).
+/// - dla std::any z wartością typu uint8_t, int, unsigned, boost::rational<int>, float, double albo std::string zwracać tę samą wartość jako alternatywę rdb::descFldVT tego typu.
+/// - traktować std::any z typem spoza tej listy, także z parą INTPAIR lub IDXPAIR, jako naruszenie niezmiennika i kończyć proces przez rdb::fatal z nazwą typu w komunikacie.
 rdb::descFldVT any_to_variant_cast(std::any a);
 
-/// @brief Build default fallback value for a given descriptor field type.
-/// @param type descriptor field type used to choose default value
-/// @return zero/empty value encoded as rdb::descFldVT for the given type
+/// Funkcja nullFallbackValue powinna:
+/// - zwracać dla typu pola wartość zastępującą NULL: zero w alternatywie tego typu dla BYTE, INTEGER, UINT, FLOAT i DOUBLE, 0/1 dla RATIONAL, parę (0, 0) dla INTPAIR, parę ("", 0) dla IDXPAIR, pusty napis dla STRING i std::monostate dla NULLTYPE.
+/// - dla pól metadeskryptora TYPE, REF, RETENTION i RETMEMORY zwracać uint8_t(0).
 rdb::descFldVT nullFallbackValue(rdb::descFld type);
 
-/// @brief Approximate floating-point value as rational number by its continued-fraction expansion.
-/// @param inValue source floating-point value
-/// @param DIFF precision threshold used to stop approximation
-/// @param ttl_const maximum number of continued-fraction iterations
-/// @return the last convergent whose numerator and denominator both fit in `int` - the expansion stops
-///         early when the next one would not - negated for a negative input; {0,1} for NaN, infinity
-///         and any value whose magnitude truncates to 2^31 or more (the function is total; NULL for
-///         such input is decided on the conversion path, not here)
+/// Funkcja Rationalize powinna:
+/// - zwracać konwergent rozwinięcia modułu inValue w ułamek łańcuchowy, ze znakiem inValue.
+/// - kończyć rozwinięcie, gdy reszta ułamkowa spadnie poniżej DIFF, albo po uwzględnieniu ttl_const + 1 wyrazów.
+/// - zwracać ostatni konwergent, którego licznik i mianownik mieszczą się w int, gdy następny by się w nim nie zmieścił.
+/// - zwracać 0/1 dla NaN, nieskończoności i wartości, których moduł obcięty do części całkowitej wynosi co najmniej 2^31.
+/// - nie zwracać NULL: o NULL dla wartości bez reprezentacji w RATIONAL decyduje ścieżka konwersji cast.
+///
+/// @param DIFF prog reszty ulamkowej konczacy rozwiniecie
+/// @param ttl_const limit wyrazow rozwiniecia ponad pierwszy
 boost::rational<int> Rationalize(double inValue, double DIFF = kDefaultRationalizeDiff,
                                  int ttl_const = kDefaultRationalizeIterations);

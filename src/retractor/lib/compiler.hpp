@@ -13,17 +13,14 @@
 #include "appConfig.hpp"  // appcfg::kDefaultHistoryMemoryMib
 #include "qTree.hpp"      // for qTree, query, token
 
-/// Zatrzymuje kompilację, jeżeli którykolwiek węzeł planu nie ma wyliczonej wielkości.
+/// Funkcja requireResolvedForEveryNode powinna:
+/// - zwracać "OK", gdy mapa resolved zawiera identyfikator każdego węzła planu, także deklaracji i dyrektyw.
+/// - dla pierwszego węzła spoza mapy zwracać przez internalCompilerError status z nazwą przebiegu pass, wielkości quantity i identyfikatorem węzła.
 ///
-/// Wspólna bramka obu przebiegów rachunku indeksu logicznego
-/// (compiler::computeLogicalOrigin i compiler::computeStartupLatency). Uzasadnienie -
-/// dlaczego nierozwiązany węzeł jest błędem, a nie stanem dopuszczalnym - jest przy
-/// definicji w compiler.cpp.
-///
-/// Zadeklarowana w nagłówku, bo poza dwoma miejscami użycia w kompilatorze woła ją
-/// bramka jednostkowa: reguły „plan bez nierozwiązanych węzłów" nie da się złamać
-/// zapytaniem RQL (gramatyka na to nie pozwala), więc test musi podać mapę wprost.
-/// @return "OK" albo status bledu wewnetrznego (przedrostek kInternalCompilerError).
+/// @note Wspolna bramka przebiegow compiler::computeLogicalOrigin i compiler::computeStartupLatency. Do
+///       2026-08-07 wezel pominiety dostawal po cichu domyslne 0, czyli rezim ZANIZAJACY ogon. Legalny plan
+///       nie zostawia wezla nierozwiazanego, wiec to defekt kompilatora; regule da sie zlamac tylko z testu
+///       jednostkowego, ktory podaje mape wprost - stad deklaracja w naglowku.
 [[nodiscard]] std::string requireResolvedForEveryNode(const qTree &plan, const std::map<std::string, int> &resolved,
                                                       std::string_view pass, std::string_view quantity);
 
@@ -31,10 +28,16 @@
 /// w planie. Wolajacy (Engine::compile, demon) odrozniaja go od bledu planu uzytkownika.
 inline constexpr std::string_view kInternalCompilerError = "internal compiler error: ";
 
-/// Status z przedrostkiem kInternalCompilerError (i wpis w logu).
+/// Funkcja internalCompilerError powinna:
+/// - zwracać message poprzedzony przedrostkiem kInternalCompilerError.
+/// - zapisywać ten sam tekst w logu na poziomie ERROR.
+///
+/// @note Zlamany niezmiennik kompilatora nie moze wrocic do klienta jako blad jego planu: Engine::compile
+///       zglasza go jako Errc::Logic, a demon traktuje jak blad krytyczny.
 [[nodiscard]] std::string internalCompilerError(const std::string &message);
 
-/// Czy status compile() opisuje blad wewnetrzny kompilatora, a nie blad planu.
+/// Funkcja isInternalCompilerError powinna:
+/// - zwracać true wyłącznie dla statusu zaczynającego się od kInternalCompilerError, czyli błędu wewnętrznego kompilatora, a nie błędu planu.
 [[nodiscard]] bool isInternalCompilerError(std::string_view status);
 
 /// Obiekt klasy compiler powinien:

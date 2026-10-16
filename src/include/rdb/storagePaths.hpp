@@ -66,7 +66,8 @@ class StoragePaths {
   std::string metaIndexFile_;
 };
 
-/// @brief Wartość pola REF deskryptora; pusta, gdy go nie ma.
+/// Funkcja descriptorRef powinna:
+/// - zwracać nazwę pierwszego pola REF deskryptora, a gdy go nie ma - pusty napis.
 [[nodiscard]] std::string descriptorRef(const Descriptor &descriptor);
 
 }  // namespace rdb

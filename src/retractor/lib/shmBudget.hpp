@@ -28,28 +28,41 @@ struct Space {
   std::uint64_t available{0};
 };
 
-/// Pojemnosc i wolne miejsce systemu plikow obslugujacego shm_open().
+/// Funkcja space powinna:
+/// - przy obiektach POSIX-owej pamięci dzielonej Boosta mierzyć pojemność i wolne miejsce (f_blocks i f_bavail razy f_frsize) przez fstatvfs na deskryptorze sondy shm_open o zerowej długości, utworzonej z O_EXCL i usuniętej przed pomiarem.
+/// - gdy sondy nie da się utworzyć albo zmierzyć, a także bez obiektów POSIX-owych w Boost.Interprocess, mierzyć statvfs na osplat::sharedMemoryBackingPath().
+/// - zwracać known == false wyłącznie wtedy, gdy zawiódł także pomiar zapasowy.
 ///
-/// Pomiar idzie przez fstatvfs() na deskryptorze obiektu, ktory naprawde powstal, a nie przez
-/// statvfs("/dev/shm"): sciezka jest szczegolem implementacji libc, a w kontenerze rozmiar tego
-/// tmpfs ustawia --shm-size i bywa maly (domyslnie 64 MiB). Gdy sonda nie przejdzie, zostaje
-/// statvfs("/dev/shm") jako droga zapasowa.
+/// @note Sciezka /dev/shm jest szczegolem libc, a w kontenerze rozmiar tmpfs ustawia --shm-size (domyslnie
+///       64 MiB). known == false to "nie wiem", nie zero bajtow: wolajacy ma wtedy przepuscic operacje.
 [[nodiscard]] Space space();
 
-/// Liczba elementow kolejki odpowiedzi dla strumienia o takcie `interval` [s].
-/// Wspolne zrodlo dla executorsm (tworzy kolejke) i raportu (wycenia ja przed startem).
+/// Funkcja responseQueueElements powinna:
+/// - dla interval == 0 zwracać minElements.
+/// - w pozostałych przypadkach zwracać bufferSeconds / interval liczone wymiernie i zaokrąglone w górę, nie mniej niż minElements.
+///
+/// @param interval takt strumienia w sekundach.
+///
+/// @note Wspolne zrodlo dla executorsm (tworzy kolejke) i raportu (wycenia ja przed startem). Obciecie
+///       czestotliwosci przed mnozeniem dawalo dla taktu 2/45 s 220 elementow zamiast 225.
 [[nodiscard]] int responseQueueElements(const boost::rational<int> &interval, int bufferSeconds, int minElements);
 
-/// Rozmiar segmentu boost::interprocess::message_queue o zadanej pojemnosci.
-/// Wzor jest przypiety testem jednostkowym do rozmiaru realnie utworzonej kolejki.
+/// Funkcja messageQueueBytes powinna:
+/// - zwracać rozmiar segmentu boost::interprocess::message_queue o maxMessages wiadomościach po maxMessageSize bajtów, liczony wzorem samego Boosta (mq_hdr_t::get_mem_size) na bieżącej platformie.
+///
+/// @note Przypieta stala 208 zanizala kazda kolejke o 8 B na aarch64 (pthread_mutex_t 48 B zamiast 40 B).
+///       Wzor jest przypiety testem jednostkowym do rozmiaru realnie utworzonej kolejki.
 [[nodiscard]] std::uint64_t messageQueueBytes(std::uint64_t maxMessages, std::uint64_t maxMessageSize);
 
-/// Kolejka odpowiedzi jednego subskrybenta: messageQueueBytes z rozmiarem wiadomosci odpowiedzi.
+/// Funkcja responseQueueBytes powinna:
+/// - zwracać messageQueueBytes(maxElements, ipc::kResponseQueueMaxMessageSize) - rozmiar kolejki odpowiedzi jednego subskrybenta.
 [[nodiscard]] std::uint64_t responseQueueBytes(int maxElements);
 
-/// Rezerwacja niezalezna od liczby klientow: segment magistrali, kolejka komend, segment mapy.
-/// Segment magistrali jest wspolny dla maszyny (a scislej: dla przestrzeni nazw), wiec dla
-/// instancji dolaczajacej sie do istniejacej magistrali jest to szacunek z gory.
+/// Funkcja fixedReservationBytes powinna:
+/// - zwracać sumę rozmiaru segmentu magistrali (bus::segmentBytes), kolejki komend (messageQueueBytes z ipc::kQueryQueueMaxMessages i ipc::kQueryQueueMaxMessageSize) i segmentu ipc::kShmemSegmentSize.
+///
+/// @note Rezerwacja niezalezna od liczby klientow. Segment magistrali jest wspolny dla przestrzeni nazw, wiec
+///       dla instancji dolaczajacej sie do istniejacej magistrali to szacunek z gory.
 [[nodiscard]] std::uint64_t fixedReservationBytes();
 
 /// Koszt subskrypcji strumieni o jednym takcie. Strumienie o rownym takcie maja rowna kolejke,
@@ -62,13 +75,24 @@ struct IntervalCost {
   std::vector<std::string> streams;
 };
 
-/// Koszty subskrypcji planu, malejaco po rozmiarze kolejki.
+/// Funkcja intervalCosts powinna:
+/// - grupować węzły planu poza dyrektywami kompilatora według taktu i dla każdego taktu zwracać liczbę elementów z responseQueueElements, rozmiar z responseQueueBytes i nazwy strumieni w kolejności planu.
+/// - porządkować grupy malejąco po rozmiarze kolejki.
+///
+/// @note Dyrektyw nie da sie subskrybowac komenda `show`, wiec nie maja kolejki.
 [[nodiscard]] std::vector<IntervalCost> intervalCosts(const qTree &plan, int bufferSeconds, int minElements);
 
-/// Rozmiar w postaci czytelnej dla czlowieka (B / KiB / MiB / GiB).
+/// Funkcja humanBytes powinna:
+/// - zwracać "<n> B" poniżej 1 KiB, a od 1 KiB, 1 MiB i 1 GiB wartość z jednym miejscem po przecinku w KiB, MiB albo GiB (potęgi 1024).
 [[nodiscard]] std::string humanBytes(std::uint64_t bytes);
 
-/// Raport budzetu planu: rezerwacja stala, stan systemu plikow i koszt subskrypcji per takt.
+/// Funkcja report powinna:
+/// - zwracać tekst z systemem plików pod osplat::sharedMemoryBackingPath(), jego pojemnością i wolnym miejscem albo "unknown (statvfs failed)", gdy space() nie zna stanu.
+/// - podawać rezerwację stałą z rozbiciem na segment magistrali, kolejkę komend i segment odpowiedzi, a przy znanym stanie także wolne miejsce po rezerwacji (0, gdy rezerwacja go nie mieści).
+/// - dla każdego taktu z intervalCosts podawać takt, liczbę elementów, rozmiar kolejki na klienta, liczbę mieszczących się klientów (wolne po rezerwacji / rozmiar kolejki, "?" przy nieznanym stanie) i strumienie.
+/// - dla planu bez strumieni do subskrypcji kończyć raport zdaniem "plan has no subscribable streams".
+///
+/// @note Zapas liczony po rezerwacji stalej i z gory, bo raport ma nie obiecywac miejsca.
 [[nodiscard]] std::string report(const qTree &plan, int bufferSeconds, int minElements);
 
 }  // namespace shmbudget

@@ -141,12 +141,14 @@ struct deviceWait {
   std::chrono::steady_clock::time_point deadline;
 };
 
-/// @brief Faza DEVICE jednego slotu (#347): najpierw jedna próba nieblokująca dla każdego źródła,
-/// potem jedno poll() na wszystkie, które czekają, aż do ich terminów.
+/// Funkcja awaitRecords powinna:
+/// - w fazie DEVICE jednego slotu wykonywać najpierw jedną próbę nieblokującą dla każdego źródła, a czekać tylko na źródła, którym brakuje danych i których termin jeszcze nie minął.
+/// - czekać na wszystkie oczekujące źródła jednym poll() naraz, tak aby łączne czekanie było maksimum terminów, a nie ich sumą.
+/// - nie odnawiać terminu źródła: po EINTR i po fałszywym przebudzeniu wracać do czekania na ten sam termin.
+/// - kończyć czekanie źródła od razu po danych, EOF albo błędzie, a po błędzie poll() innym niż EINTR kończyć czekanie wszystkich źródeł w tym slocie z ostrzeżeniem.
+/// - na końcu zdejmować markAwaited() ze wszystkich podanych źródeł.
 ///
-/// Łączne czekanie to maksimum terminów, nie ich suma. Termin się nie odnawia: EINTR z poll() i EAGAIN
-/// po fałszywym przebudzeniu wracają do czekania na ten sam deadline. EOF i błąd kończą czekanie danego
-/// źródła od razu. Woła ją wątek wykonawczy BEZ blokad modelu; źródła muszą przeżyć całe wywołanie
-/// (niezmiennik pilnowany w Debug przez destruktor binaryDeviceRO). Na końcu zdejmuje markAwaited().
+/// @note Faza DEVICE (#347). Wola ja watek wykonawczy BEZ blokad modelu; zrodla musza przezyc cale wywolanie
+///       (niezmiennik pilnowany w Debug przez destruktor binaryDeviceRO).
 void awaitRecords(std::span<const deviceWait> waits);
 }  // namespace rdb
