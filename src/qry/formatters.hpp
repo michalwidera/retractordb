@@ -11,9 +11,11 @@ enum class formatMode : std::uint8_t { RAW, GRAPHITE, INFLUXDB, GNUPLOT };
 /// Obiekt klasy Formatter powinien:
 /// - przez isNullAt uznawać wartość za null wyłącznie, gdy znak mapy null na tej pozycji jest równy '1', a przez isAllNull
 ///   zwracać prawdę tylko dla dodatniej liczby wartości, z których wszystkie są null.
+///   Test: `Formatter.null_marker_and_gnuplot_axis_contracts`.
 /// - przez displayedValue zwracać wartość z wiersza albo dla null tekst NaN w trybie gnuplot i null w pozostałych trybach.
 /// - przez renderRaw wypisywać wartości wiersza rozdzielone spacją i zakończone CRLF, pomijając wiersz złożony wyłącznie z null, gdy wołający o to prosi.
 /// - przez initGnuplot wypisywać ustawienia terminala i zakresów osi, z osią x malejącą w trybie od prawej do lewej.
+///   Test: `Formatter.null_marker_and_gnuplot_axis_contracts`.
 /// - przez renderGnuplot przechowywać dla każdej kolumny okno ostatnich wartości o szerokości z wymiaru x, najnowszą
 ///   na pozycji 0, i wypisywać polecenie plot z jedną krzywą na każdą wartość wiersza i jednym blokiem danych na krzywą.
 ///   Tytuły budować z pól db.field rozwiniętych po jednym elemencie na kolumnę według krotności

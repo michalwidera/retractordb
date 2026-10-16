@@ -15,18 +15,25 @@ namespace rdb {
 ///
 /// Obiekt klasy StoragePaths powinien:
 /// - przy konstrukcji walidować niepuste qryID i fileName; ścieżka deskryptora to qryID + ".desc",
+///   Test: `StoragePathsTest.basic_paths_without_storage_dir`, `StoragePathsTest.empty_identifiers_are_rejected`.
 /// - jeśli podano katalog storageParam - sprawdzić, że istnieje, i osadzić w nim ścieżki deskryptora oraz danych;
 ///   każda z tych kontroli kończy się błędem Errc::Config zwróconym z make(), a nie końcem procesu,
+///   Test: `StoragePathsTest.storage_dir_prefixes_paths`, `StoragePathsTest.missing_storage_directory_is_rejected`, `StoragePathsTest.storage_param_pointing_at_a_file_is_rejected`.
 /// - utrzymywać w jednym miejscu niezmiennik metaIndexFile() == storageFile() + ".meta" przy każdej zmianie ścieżki danych,
+///   Test: `StoragePathsTest.basic_paths_without_storage_dir`, `StoragePathsTest.relocate_from_ref_moves_data_and_meta`.
 /// - realizować relokację pliku danych wg pola REF deskryptora (relocateFromRef()) - deskryptor może wskazać
 ///   inne położenie pliku danych; brak ścieżki danych po relokacji wraca jako Errc::Config,
+///   Test: `StoragePathsTest.relocate_from_ref_moves_data_and_meta`, `StoragePathsTest.relocate_to_an_empty_ref_is_rejected`.
 /// - przy relokacji ustalać, czy REF wyprowadza plik danych poza katalogi dozwolone przez operatora
 ///   (katalog magazynu i allowRefDirs()) - decyzję, co z tym zrobić, podejmuje storage, bo tylko on wie,
 ///   czy REF pochodzi od wołającego, czy wyłącznie z wczytanego pliku .desc,
+///   Test: `StoragePathsTest.ref_leaving_allowed_dirs_is_detected`.
 /// - usuwać komplet plików magazynu (removeAllFiles()) dla magazynów dysponowalnych: plik danych, deskryptor,
 ///   indeks .meta oraz cień indeksu .meta.shadow; na żądanie z zachowaniem pliku danych i jego indeksów,
+///   Test: `StoragePathsTest.remove_all_files_deletes_whole_set`, `StoragePathsTest.remove_all_files_can_keep_data_files`.
 /// - nie wykonywać żadnego innego I/O poza sprawdzeniem katalogu storageParam, rozwiązaniem ścieżki REF
 ///   i kasowaniem plików.
+///   Nietestowalne: ograniczenie odpowiedzialnosci modulu; kompletnego braku innych operacji I/O nie dowodzi test funkcjonalny, sprawdzane przegladem storagePaths.cc.
 class StoragePaths {
  public:
   /// Errc::Config dla pustego identyfikatora albo storageParam, ktory nie istnieje lub nie jest katalogiem.
@@ -68,6 +75,7 @@ class StoragePaths {
 
 /// Funkcja descriptorRef powinna:
 /// - zwracać nazwę pierwszego pola REF deskryptora, a gdy go nie ma - pusty napis.
+///   Test: `StoragePathsTest.relocate_from_ref_moves_data_and_meta`, `StoragePathsTest.relocate_without_ref_keeps_paths`.
 [[nodiscard]] std::string descriptorRef(const Descriptor &descriptor);
 
 }  // namespace rdb

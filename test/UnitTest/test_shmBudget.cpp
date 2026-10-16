@@ -5,6 +5,7 @@
 // rozjazd wychodzi tutaj, a nie dopiero jako odmowa subskrypcji przy wolnej pamieci.
 
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <unistd.h>
 
 #include <filesystem>
@@ -20,7 +21,31 @@
 #include "osPlatform.hpp"
 #include "platformConfig.h"
 #include "retractor/lib/bus.hpp"
+#include "retractor/lib/qTree.hpp"
 #include "retractor/lib/shmBudget.hpp"
+#include "syscallWrap.hpp"
+
+namespace {
+bool failDescriptorMeasure = false, failPathMeasure = false;
+}
+extern "C" int __real_fstatvfs(int, struct statvfs *);
+extern "C" int __real_statvfs(const char *, struct statvfs *);
+extern "C" int __wrap_fstatvfs(int fd, struct statvfs *result) {
+  if (failDescriptorMeasure) {
+    errno = EIO;
+    return -1;
+  }
+  return __real_fstatvfs(fd, result);
+}
+extern "C" int __wrap_statvfs(const char *path, struct statvfs *result) {
+  if (failPathMeasure) {
+    errno = EIO;
+    return -1;
+  }
+  return __real_statvfs(path, result);
+}
+RDB_WRAP_SYSCALL(int, fstatvfs, (int fd, struct statvfs *result), (fd, result));
+RDB_WRAP_SYSCALL(int, statvfs, (const char *path, struct statvfs *result), (path, result));
 
 namespace {
 
@@ -150,6 +175,42 @@ TEST(ShmBudget, HumanBytesPicksUnit) {
   EXPECT_EQ(shmbudget::humanBytes(512), "512 B");
   EXPECT_EQ(shmbudget::humanBytes(2048), "2.0 KiB");
   EXPECT_EQ(shmbudget::humanBytes(3U * 1024 * 1024), "3.0 MiB");
+  EXPECT_EQ(shmbudget::humanBytes(1024), "1.0 KiB");
+  EXPECT_EQ(shmbudget::humanBytes(UINT64_C(1073741824)), "1.0 GiB");
+}
+
+TEST(ShmBudget, MeasurementFallbackAndUnknownReportAreExplicit) {
+  struct Restore {
+    ~Restore() { failDescriptorMeasure = failPathMeasure = false; }
+  } restore;
+  failDescriptorMeasure = true;
+  EXPECT_TRUE(shmbudget::space().known);
+  failPathMeasure = true;
+  EXPECT_FALSE(shmbudget::space().known);
+  qTree plan;
+  const auto empty = shmbudget::report(plan, 10, 100);
+  EXPECT_TRUE(empty.contains("unknown (statvfs failed)"));
+  EXPECT_TRUE(empty.contains("plan has no subscribable streams"));
+  plan.push_back(query(1, "src"));
+  const auto unknown = shmbudget::report(plan, 10, 100);
+  EXPECT_TRUE(unknown.contains("src"));
+  EXPECT_TRUE(unknown.contains("?"));
+}
+
+TEST(ShmBudget, IntervalCostsGroupInPlanOrderAndSortByQueueBytes) {
+  qTree plan;
+  plan.push_back(query(0, ":STORAGE"));
+  plan.push_back(query(1, "slow"));
+  plan.push_back(query(boost::rational<int>(1, 20), "fast"));
+  plan.push_back(query(1, "also_slow"));
+  const auto costs = shmbudget::intervalCosts(plan, 10, 1);
+  ASSERT_EQ(costs.size(), 2U);
+  EXPECT_EQ(costs[0].streams, (std::vector<std::string>{"fast"}));
+  EXPECT_EQ(costs[1].streams, (std::vector<std::string>{"slow", "also_slow"}));
+  EXPECT_GT(costs[0].bytes, costs[1].bytes);
+  EXPECT_EQ(costs[0].elements, 200);
+  EXPECT_EQ(costs[1].elements, 10);
+  EXPECT_EQ(costs[0].bytes, shmbudget::responseQueueBytes(200));
 }
 
 }  // namespace

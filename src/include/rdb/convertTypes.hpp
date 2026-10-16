@@ -33,6 +33,7 @@ rdb::descFldVT any_to_variant_cast(std::any a);
 /// Funkcja nullFallbackValue powinna:
 /// - zwracać dla typu pola wartość zastępującą NULL: zero w alternatywie tego typu dla BYTE, INTEGER, UINT, FLOAT i DOUBLE, 0/1 dla RATIONAL, parę (0, 0) dla INTPAIR, parę ("", 0) dla IDXPAIR, pusty napis dla STRING i std::monostate dla NULLTYPE.
 /// - dla pól metadeskryptora TYPE, REF, RETENTION i RETMEMORY zwracać uint8_t(0).
+///   Test: `RequirementContracts.catalogue_fallback_values_and_process_snapshot`.
 rdb::descFldVT nullFallbackValue(rdb::descFld type);
 
 /// Funkcja Rationalize powinna:

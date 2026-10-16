@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <sys/resource.h>
+#include <sys/stat.h>
 
 #include <cerrno>
+#include <cmath>
 #include <csignal>
 #include <cstdint>
 #include <cstdlib>
@@ -10,6 +12,7 @@
 #include <fstream>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -21,6 +24,15 @@
 #include "rdbResult.hpp"
 
 // ctest -R '^ut_embedEngine' -V
+
+// Magazyny zachowuja wskaznik na MemoryStore, wiec adres Engine musi pozostac staly.
+static_assert(!std::is_copy_constructible_v<rdb::embed::Engine>);
+static_assert(!std::is_copy_assignable_v<rdb::embed::Engine>);
+static_assert(!std::is_move_constructible_v<rdb::embed::Engine>);
+static_assert(!std::is_move_assignable_v<rdb::embed::Engine>);
+static_assert(!std::is_default_constructible_v<rdb::embed::Engine>);
+static_assert(!std::is_copy_constructible_v<rdb::embed::StorageGuard>);
+static_assert(!std::is_copy_assignable_v<rdb::embed::StorageGuard>);
 
 //
 // Fasada osadzenia (#446, C2): jeden obiekt = jedna instancja silnika w procesie.
@@ -423,4 +435,184 @@ TEST(embedEnginePlan, fault_in_a_slot_latches_the_plan) {
     while (rdbtest::ok(engine.step())) {}
     EXPECT_EQ(rdbtest::ok(engine.recordCount("dst")), 3U);
   }
+}
+
+TEST(embedEnginePlan, projection_and_record_copies_preserve_values_nulls_and_field_order) {
+  writeSource("projection_source.txt", {1, 2, 3});
+  auto engine = rdbtest::ok(rdb::embed::Engine::create());
+  ASSERT_RDB_OK(
+      engine->compile("DECLARE a INTEGER STREAM src, 1 TEXTFILE 'projection_source.txt'\n"
+                      "SELECT a, 1/(a-2) STREAM dst FROM src\n"));
+  const auto *schema = rdbtest::ok(engine->schema("dst"));
+  ASSERT_TRUE(rdbtest::ok(engine->step()));
+  auto first = rdbtest::ok(engine->record("dst", 0));
+  while (rdbtest::ok(engine->step())) {}
+  EXPECT_EQ(rdbtest::ok(engine->schema("dst")), schema);
+  EXPECT_EQ(firstValue(first), 1);
+  first.setItem(0, 999);
+  EXPECT_EQ(firstValue(rdbtest::ok(engine->record("dst", 0))), 1);
+  const auto values = rdbtest::ok(engine->project("dst", {1, 0}, 0, 3));
+  ASSERT_EQ(values.size(), 6U);
+  EXPECT_DOUBLE_EQ(values[0], -1);
+  EXPECT_DOUBLE_EQ(values[1], 1);
+  EXPECT_TRUE(std::isnan(values[2]));
+  EXPECT_DOUBLE_EQ(values[3], 2);
+  EXPECT_DOUBLE_EQ(values[4], 1);
+  EXPECT_DOUBLE_EQ(values[5], 3);
+  EXPECT_RDB_ERROR(engine->project("dst", {0}, 3, 1), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->project("dst", {-1}, 0, 1), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->project("dst", {2}, 0, 1), rdb::Errc::Config);
+  EXPECT_FALSE(rdbtest::ok(engine->record("dst", 1)).getItemVT(1).has_value());
+  const auto oldest = rdbtest::ok(engine->retainedFrom("src"));
+  const auto count  = rdbtest::ok(engine->recordCount("src"));
+  if (oldest > 0) EXPECT_RDB_ERROR(engine->record("src", oldest - 1), rdb::Errc::Config);
+  for (size_t i = oldest; i < count; ++i) {
+    EXPECT_RDB_OK(engine->record("src", i));
+    EXPECT_RDB_OK(engine->record("src", i));
+  }
+  EXPECT_EQ(rdbtest::ok(engine->recordCount("src")), count);
+  ASSERT_RDB_OK(
+      engine->compile("DECLARE a INTEGER STREAM src, 1 TEXTFILE 'projection_source.txt'\n"
+                      "SELECT to_string(a:4) STREAM dst FROM src\n"));
+  ASSERT_TRUE(rdbtest::ok(engine->step()));
+  EXPECT_RDB_ERROR(engine->project("dst", {0}, 0, 1), rdb::Errc::Config);
+}
+
+TEST(embedEnginePlan, wrapping_and_close_reset_all_observable_state) {
+  writeSource("wrapping_source.txt", {1, 2});
+  auto engine = rdbtest::ok(rdb::embed::Engine::create());
+  ASSERT_RDB_OK(engine->compile(doublingPlan("wrapping_source.txt"), false));
+  for (int i = 0; i < 8; ++i)
+    ASSERT_TRUE(rdbtest::ok(engine->step()));
+  EXPECT_FALSE(engine->endOfInput());
+  EXPECT_EQ(rdbtest::ok(engine->recordCount("dst")), 8U);
+  for (int i = 0; i < 8; ++i)
+    EXPECT_EQ(firstValue(rdbtest::ok(engine->record("dst", i))), i % 2 == 0 ? 2 : 4);
+  engine->close();
+  engine->close();
+  EXPECT_FALSE(engine->hasPlan());
+  EXPECT_FALSE(engine->failed());
+  EXPECT_FALSE(engine->endOfInput());
+  EXPECT_EQ(engine->slotsDone(), 0U);
+  EXPECT_EQ(engine->time(), 0);
+  EXPECT_RDB_ERROR(engine->step(), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->streams(), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->schema("src"), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->isDeclared("src"), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->recordCount("src"), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->retainedFrom("src"), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->record("src", 0), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->project("src", {0}, 0, 1), rdb::Errc::Config);
+}
+
+TEST(embedEngine, temporary_directory_is_kept_while_another_guard_owns_it) {
+  auto engine          = rdbtest::ok(rdb::embed::Engine::create());
+  const auto directory = engine->storageDir();
+  engine->close();
+  EXPECT_TRUE(std::filesystem::is_directory(directory));
+  auto guard = rdbtest::ok(rdb::embed::StorageGuard::create(directory, true));
+  engine.reset();
+  EXPECT_TRUE(std::filesystem::is_directory(directory));
+  guard.reset();
+  rdb::embed::removeTemporaryStorage(directory);
+  EXPECT_FALSE(std::filesystem::exists(directory));
+}
+
+TEST(embedEngine, invalid_configuration_creates_no_directory_and_user_directory_survives_destruction) {
+  namespace fs       = std::filesystem;
+  const auto sandbox = fs::absolute("engine_create_tmp");
+  fs::create_directory(sandbox);
+  const std::string config = "engine_invalid_config.toml";
+  std::ofstream(config) << "[broken";
+  const std::optional<std::string> oldTmp =
+      std::getenv("TMPDIR") ? std::optional<std::string>{std::getenv("TMPDIR")} : std::nullopt;
+  ASSERT_EQ(setenv("TMPDIR", sandbox.c_str(), 1), 0);
+  const auto refused = rdb::embed::Engine::create("", "", config);
+  if (oldTmp)
+    setenv("TMPDIR", oldTmp->c_str(), 1);
+  else
+    unsetenv("TMPDIR");
+  EXPECT_RDB_ERROR(refused, rdb::Errc::Config);
+  EXPECT_TRUE(fs::is_empty(sandbox));
+  fs::remove(config);
+  {
+    auto engine = rdbtest::ok(rdb::embed::Engine::create(sandbox.string()));
+    EXPECT_EQ(engine->storageDir(), sandbox.string());
+  }
+  EXPECT_TRUE(fs::is_directory(sandbox));
+  fs::remove_all(sandbox);
+}
+
+// Przestarzala skladnia jest tu przedmiotem testu, dlatego wystepuje celowo.
+TEST(embedEnginePlan, warnings_are_ordered_and_only_published_for_an_accepted_plan) {
+  writeSource("warning_source.txt", {1, 2});
+  auto engine = rdbtest::ok(rdb::embed::Engine::create());
+  const std::string deprecated =
+      "DECLARE a INTEGER STREAM src, 1 FILE 'warning_source.txt'\n"
+      "SELECT * STREAM mean FROM src.avg\n";
+  ASSERT_RDB_OK(engine->compile(deprecated));
+  ASSERT_EQ(engine->warnings().size(), 2U);
+  EXPECT_TRUE(engine->warnings()[0].contains("line 1"));
+  EXPECT_TRUE(engine->warnings()[0].contains("FILE"));
+  EXPECT_TRUE(engine->warnings()[1].contains("src.avg"));
+  ASSERT_RDB_OK(engine->compile(doublingPlan("warning_source.txt")));
+  EXPECT_TRUE(engine->warnings().empty());
+  EXPECT_RDB_ERROR(engine->compile(deprecated + "SELECT * STREAM dst FROM unknown_source\n"), rdb::Errc::Compile);
+  EXPECT_TRUE(engine->warnings().empty());
+  EXPECT_FALSE(engine->hasPlan());
+}
+
+TEST(embedStorageGuard, claim_marker_canonical_paths_and_artifact_boundaries) {
+  namespace fs         = std::filesystem;
+  const auto directory = fs::absolute("guard_contract");
+  fs::remove_all(directory);
+  fs::create_directory(directory);
+  {
+    auto reader = rdbtest::ok(rdb::embed::StorageGuard::create(directory.string(), false));
+    EXPECT_FALSE(reader->ownsDirectory());
+    EXPECT_EQ(reader->directory(), directory.string());
+    EXPECT_TRUE(fs::is_empty(directory));
+  }
+  std::ofstream(directory / "foreign") << "keep";
+  EXPECT_RDB_ERROR(rdb::embed::StorageGuard::create(directory.string(), true), rdb::Errc::Compile);
+  EXPECT_TRUE(fs::exists(directory / "foreign"));
+  fs::remove(directory / "foreign");
+  {
+    auto owner = rdbtest::ok(rdb::embed::StorageGuard::create(directory.string(), true));
+    EXPECT_TRUE(owner->ownsDirectory());
+    const auto marker = directory / ".retractordb-embedded";
+    struct stat info{};
+    ASSERT_EQ(stat(marker.c_str(), &info), 0);
+    EXPECT_EQ(info.st_mode & 0777, 0600);
+    std::ifstream input(marker);
+    EXPECT_EQ(std::string(std::istreambuf_iterator<char>(input), {}), "retractordb embedded storage v1\n");
+    EXPECT_RDB_OK(owner->checkPath((directory / "data").string()));
+    EXPECT_RDB_ERROR(owner->checkPath(directory.string()), rdb::Errc::Compile);
+    EXPECT_RDB_ERROR(owner->checkPath(marker.string()), rdb::Errc::Compile);
+    EXPECT_RDB_ERROR(owner->checkPath(directory.string() + "2/data"), rdb::Errc::Compile);
+    fs::create_directory_symlink(directory.parent_path(), directory / "escape");
+    EXPECT_RDB_ERROR(owner->checkPath((directory / "escape/data").string()), rdb::Errc::Compile);
+  }
+  EXPECT_TRUE(fs::exists(directory / ".retractordb-embedded"));
+  fs::remove_all(directory);
+}
+
+TEST(embedStorageGuard, invalid_marker_links_and_contents_are_refused_without_mutation) {
+  namespace fs         = std::filesystem;
+  const auto directory = fs::absolute("guard_invalid_marker");
+  fs::remove_all(directory);
+  fs::create_directory(directory);
+  const auto marker = directory / ".retractordb-embedded";
+  std::ofstream(marker) << "wrong";
+  EXPECT_RDB_ERROR(rdb::embed::StorageGuard::create(directory.string(), true), rdb::Errc::Compile);
+  EXPECT_EQ(fs::file_size(marker), 5U);
+  std::ofstream(marker) << "retractordb embedded storage v1\n";
+  fs::create_hard_link(marker, directory / "alias");
+  EXPECT_RDB_ERROR(rdb::embed::StorageGuard::create(directory.string(), true), rdb::Errc::Compile);
+  fs::remove(directory / "alias");
+  fs::rename(marker, directory / "target");
+  fs::create_symlink("target", marker);
+  EXPECT_RDB_ERROR(rdb::embed::StorageGuard::create(directory.string(), true), rdb::Errc::Compile);
+  EXPECT_TRUE(fs::is_symlink(marker));
+  fs::remove_all(directory);
 }

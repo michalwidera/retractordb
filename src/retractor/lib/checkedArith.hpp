@@ -21,8 +21,11 @@ namespace checkedArith {
 
 /// Funkcja add powinna:
 /// - dla int zwracać sumę albo nullopt, gdy nie mieści się w int32.
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 /// - dla unsigned zwracać sumę albo nullopt, gdy przekracza zakres [0, 2^32).
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 /// - dla boost::rational<int> zwracać sumę w postaci skróconej albo nullopt, gdy skrócony licznik lub mianownik nie mieści się w int, a dla dwóch ułamków całkowitych (mianownik 1) liczyć ją przez sumę int32.
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 ///
 /// @note UINT do 2026-09-26 zawijal sie po cichu. Skladniki RATIONAL sa znormalizowane (mianownik dodatni,
 ///       |licznik| <= 2^31), wiec iloczyny krzyzowe mieszcza sie w 2^62, a ich suma w int64. Skrot przez int32
@@ -35,8 +38,11 @@ inline std::optional<int> add(int a, int b) {
 
 /// Funkcja sub powinna:
 /// - dla int zwracać różnicę albo nullopt, gdy nie mieści się w int32.
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 /// - dla unsigned zwracać różnicę albo nullopt, gdy jest ujemna.
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 /// - dla boost::rational<int> zwracać różnicę w postaci skróconej albo nullopt, gdy skrócony licznik lub mianownik nie mieści się w int, a dla dwóch ułamków całkowitych liczyć ją przez różnicę int32.
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 ///
 /// @note UINT do 2026-09-26 zawijal sie po cichu (`3 - 5` dawalo 4294967294).
 inline std::optional<int> sub(int a, int b) {
@@ -47,8 +53,11 @@ inline std::optional<int> sub(int a, int b) {
 
 /// Funkcja mul powinna:
 /// - dla int zwracać iloczyn albo nullopt, gdy nie mieści się w int32.
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 /// - dla unsigned zwracać iloczyn albo nullopt, gdy przekracza zakres [0, 2^32).
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 /// - dla boost::rational<int> zwracać iloczyn w postaci skróconej albo nullopt, gdy skrócony licznik lub mianownik nie mieści się w int, a dla dwóch ułamków całkowitych liczyć go przez iloczyn int32.
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 inline std::optional<int> mul(int a, int b) {
   int result = 0;
   if (__builtin_mul_overflow(a, b, &result)) return std::nullopt;
@@ -57,7 +66,9 @@ inline std::optional<int> mul(int a, int b) {
 
 /// Funkcja div powinna:
 /// - dla int zwracać iloraz obcięty w stronę zera, a nullopt wyłącznie dla INT_MIN / -1, przy niezerowym dzielniku zapewnionym przez wołającego.
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 /// - dla boost::rational<int> zwracać iloraz w postaci skróconej albo nullopt, gdy dzielnik jest zerem albo skrócony licznik lub mianownik nie mieści się w int.
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 ///
 /// @note Jedyny iloraz int32 spoza zakresu to INT_MIN / -1. Iloraz UINT miesci sie zawsze, wiec wariantu
 ///       unsigned nie ma.
@@ -68,7 +79,9 @@ inline std::optional<int> div(int a, int b) {
 
 /// Funkcja neg powinna:
 /// - dla int zwracać -a albo nullopt dla INT_MIN.
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 /// - dla boost::rational<int> zwracać -a albo nullopt, gdy licznik jest równy INT_MIN.
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 inline std::optional<int> neg(int a) {
   if (a == std::numeric_limits<int>::min()) return std::nullopt;
   return -a;
@@ -96,8 +109,11 @@ namespace detail {
 
 /// Funkcja narrowed powinna:
 /// - dla zerowego mianownika zwracać nullopt.
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 /// - skracać ułamek int64 przez gcd i przenosić znak do licznika, tak by mianownik był dodatni.
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 /// - zwracać skrócony ułamek jako boost::rational<int>, a nullopt, gdy skrócony licznik lub mianownik nie mieści się w int.
+///   Test: `RequirementContracts.checked_arithmetic_bounds_and_reduced_rationals`.
 ///
 /// @note Dopiero postac skrocona rozstrzyga, czy wartosc NAPRAWDE nie miesci sie w rational<int>, wiec nie
 ///       ma falszywych alarmow (`1/65536 + 1/65536` przechodzi przez mianownik 2^32 i daje 1/32768).

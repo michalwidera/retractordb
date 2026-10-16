@@ -44,7 +44,9 @@ struct ProcessSnapshot {
 
 /// Funkcja inspectProcess powinna:
 /// - dla pid <= 0 zwracać pustą migawkę (found == false, unreadable == false).
+///   Test: `RequirementContracts.catalogue_fallback_values_and_process_snapshot`.
 /// - odczytywać wpis procesu jednym odczytem jądra (Linux: /proc/<pid>/task/<pid>/stat, Darwin: sysctl KERN_PROC_PID) i dla odczytanego wpisu ustawiać found, zombie i niezerowy startTime.
+///   Test: `RequirementContracts.catalogue_fallback_values_and_process_snapshot`.
 /// - zgłaszać brak procesu (found == false, unreadable == false) wyłącznie wtedy, gdy jądro go potwierdziło: kill(pid, 0) z ESRCH na Linuksie, ESRCH albo pusty wynik sysctl na Darwinie.
 /// - w każdym innym przypadku nieudanego odczytu, także przy ukrytym /proc (hidepid) i EPERM, ustawiać wyłącznie unreadable == true.
 ///
@@ -78,6 +80,7 @@ struct ServiceIdentity {
 
 /// Funkcja sharedMemoryBackingPath powinna:
 /// - zwracać ścieżkę systemu plików, który niesie obiekty pamięci dzielonej procesu: "/dev/shm" na Linuksie i "/tmp" na Darwinie.
+///   Test: `RequirementContracts.catalogue_fallback_values_and_process_snapshot`.
 ///
 /// @note To, co trzeba zmierzyc, pytajac "ile zostalo miejsca na kolejki IPC". Na Darwinie Boost.Interprocess nie
 ///       uzywa shm_open (`_POSIX_SHARED_MEMORY_OBJECTS` jest ujemne), wiec segmenty sa zwyklymi plikami pod /tmp,

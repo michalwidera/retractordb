@@ -10,16 +10,102 @@
 #include <csignal>
 #include <ctime>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
 
+#include "logCapture.hpp"
 #include "platformConfig.h"
 #include "retractor/lib/executor_rt.hpp"
+#include "syscallWrap.hpp"
+
+#if RDB_HAS_SCHED_SETSCHEDULER && RDB_HAS_MLOCKALL
+namespace {
+bool mockActivation = false;
+std::vector<int> lockCalls;
+int lockError = 0, scheduleError = 0, scheduledPid = -1, scheduledPolicy = -1, scheduledPriority = -1;
+}  // namespace
+extern "C" int __real_mlockall(int);
+extern "C" int __real_sched_setscheduler(pid_t, int, const struct sched_param *);
+extern "C" int __wrap_mlockall(int flags) {
+  if (!mockActivation) return __real_mlockall(flags);
+  lockCalls.push_back(flags);
+  errno = lockError;
+  return lockError ? -1 : 0;
+}
+extern "C" int __wrap_sched_setscheduler(pid_t pid, int policy, const struct sched_param *parameter) {
+  if (!mockActivation) return __real_sched_setscheduler(pid, policy, parameter);
+  scheduledPid      = pid;
+  scheduledPolicy   = policy;
+  scheduledPriority = parameter->sched_priority;
+  errno             = scheduleError;
+  return scheduleError ? -1 : 0;
+}
+RDB_WRAP_SYSCALL(int, mlockall, (int flags), (flags));
+RDB_WRAP_SYSCALL(int, sched_setscheduler, (pid_t pid, int policy, const struct sched_param *parameter),
+                 (pid, policy, parameter));
+#endif
 
 // ctest -R '^ut-test_executor_rt' -V
 
 namespace {
+
+#if RDB_HAS_SCHED_SETSCHEDULER && RDB_HAS_MLOCKALL
+TEST(ExecutorRtActivateTest, MockedCallsCheckMemoryPolicyErrnosAndThreadPriority) {
+  struct Restore {
+    std::optional<std::string> previous =
+        std::getenv("RDB_MLOCKALL") ? std::optional<std::string>{std::getenv("RDB_MLOCKALL")} : std::nullopt;
+    ~Restore() {
+      mockActivation = false;
+      if (previous)
+        setenv("RDB_MLOCKALL", previous->c_str(), 1);
+      else
+        unsetenv("RDB_MLOCKALL");
+    }
+  } restore;
+  mockActivation = true;
+  for (const std::string mode : {"onfault", "populate", "off"}) {
+    SCOPED_TRACE(mode);
+    ASSERT_EQ(setenv("RDB_MLOCKALL", mode.c_str(), 1), 0);
+    lockCalls.clear();
+    lockError = scheduleError = 0;
+    LogCapture log;
+    EXPECT_TRUE(rtActivate(0));
+    EXPECT_EQ(scheduledPid, 0);
+    EXPECT_EQ(scheduledPolicy, SCHED_FIFO);
+    EXPECT_EQ(scheduledPriority, sched_get_priority_min(SCHED_FIFO));
+    if (mode == "off")
+      EXPECT_TRUE(lockCalls.empty());
+    else if (mode == "populate")
+      EXPECT_EQ(lockCalls, (std::vector<int>{MCL_CURRENT | MCL_FUTURE}));
+    else {
+#if RDB_HAS_MCL_ONFAULT
+      EXPECT_EQ(lockCalls, (std::vector<int>{MCL_CURRENT, MCL_FUTURE | MCL_ONFAULT}));
+#else
+      EXPECT_EQ(lockCalls, (std::vector<int>{MCL_CURRENT}));
+#endif
+    }
+#if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_WARN
+    if (mode != "onfault") EXPECT_TRUE(log.text().contains("diagnostic mode"));
+#endif
+    EXPECT_TRUE(rtActivate(1000));
+    EXPECT_EQ(scheduledPriority, sched_get_priority_max(SCHED_FIFO));
+  }
+  ASSERT_EQ(setenv("RDB_MLOCKALL", "onfault", 1), 0);
+  lockCalls.clear();
+  lockError = EPERM;
+  EXPECT_FALSE(rtActivate());
+  EXPECT_EQ(lockCalls, (std::vector<int>{MCL_CURRENT}));
+  lockError = ENOSYS;
+  EXPECT_TRUE(rtActivate());
+  lockError     = 0;
+  scheduleError = EPERM;
+  EXPECT_FALSE(rtActivate());
+  scheduleError = 0;
+}
+#endif
 
 // --- rtAbsoluteSleep ---
 

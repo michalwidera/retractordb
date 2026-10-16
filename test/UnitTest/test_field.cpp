@@ -51,3 +51,8 @@ TEST(field, stream_output_handles_empty_program) {
   EXPECT_EQ(out.str(), "FLD/name:decl,type:0,prog:");
   EXPECT_TRUE(tested.lProgram.empty());
 }
+
+TEST(fieldDeathTest, first_token_of_an_empty_program_is_an_invariant_failure) {
+  field tested(rdb::rField("empty", 4, 1, rdb::INTEGER), std::list<token>{});
+  ASSERT_DEATH(tested.getFirstFieldToken(), "no program tokens");
+}

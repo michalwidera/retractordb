@@ -30,7 +30,9 @@ inline constexpr std::string_view kInternalCompilerError = "internal compiler er
 
 /// Funkcja internalCompilerError powinna:
 /// - zwracać message poprzedzony przedrostkiem kInternalCompilerError.
+///   Test: `PlanSource.internal_compiler_status_is_prefixed_logged_and_recognized`.
 /// - zapisywać ten sam tekst w logu na poziomie ERROR.
+///   Test: `PlanSource.internal_compiler_status_is_prefixed_logged_and_recognized`.
 ///
 /// @note Zlamany niezmiennik kompilatora nie moze wrocic do klienta jako blad jego planu: Engine::compile
 ///       zglasza go jako Errc::Logic, a demon traktuje jak blad krytyczny.
@@ -38,6 +40,7 @@ inline constexpr std::string_view kInternalCompilerError = "internal compiler er
 
 /// Funkcja isInternalCompilerError powinna:
 /// - zwracać true wyłącznie dla statusu zaczynającego się od kInternalCompilerError, czyli błędu wewnętrznego kompilatora, a nie błędu planu.
+///   Test: `PlanSource.internal_compiler_status_is_prefixed_logged_and_recognized`.
 [[nodiscard]] bool isInternalCompilerError(std::string_view status);
 
 /// Obiekt klasy compiler powinien:

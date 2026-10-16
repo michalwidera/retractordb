@@ -12,21 +12,34 @@
 ///
 /// Obiekt klasy groupFile powinien:
 /// - tworzyć i utrzymywać segmenty o pojemności określonej przez retention_.capacity,
+///   Test: `GroupFileTest.test_fagrp_segmented_write_and_read`.
 /// - przy dodatnim retention_.segments ograniczać liczbę segmentów otwartych w grupie do tego limitu;
 ///   podczas dopisywania nowego segmentu usuwać najstarszy po przekroczeniu limitu; zero oznacza brak limitu,
+///   Test: `GroupFileTest.test_fagrp_segment_rotation`.
 /// - umożliwiać tryb bez retencji, w którym wszystkie rekordy są przechowywane w pojedynczym pliku,
+///   Test: `GroupFileTest.test_fagrp_no_retention`.
 /// - realizować operacje read i write zgodnie z interfejsem FileInterface, kierując je do właściwego segmentu,
+///   Test: `GroupFileTest.test_fagrp_segmented_write_and_read`.
 /// - przy odczycie i update traktować position jako offset w bajtach; dla magazynu segmentowanego
 ///   wyznaczać indeks rekordu przez position / recordSize_, a następnie segment i lokalny offset w bajtach,
+///   Test: `GroupFileTest.test_fagrp_multibyte_record_segment_mapping`.
 /// - propagować parametr nullBitset do segmentu T bez własnego przechowywania informacji o wartościach null,
+///   Test: `StorageShadowFixture.scenariusz_nadpisanie_w_cieniu`.
 /// - obsługiwać dopisywanie rekordów oraz aktualizację istniejącego rekordu w odpowiednim segmencie,
+///   Test: `GroupFileTest.test_fagrp_update_in_place`.
 /// - zwracać przez count() logiczną liczbę rekordów uwzględniającą także rekordy znajdujące się wcześniej w usuniętych segmentach,
+///   Test: `GroupFileTest.test_fagrp_count_after_rotation`.
 /// - zwracać przez name() nazwę bieżącego segmentu, gdy retencja jest aktywna, albo nazwę bazową pliku w trybie bez retencji,
+///   Test: `GroupFileTest.test_fagrp_name_retention`, `GroupFileTest.test_fagrp_name_no_retention`.
 /// - raportować przez hasShadow() mechanizm cienia swoich segmentów T (grupa nie dodaje własnego pliku cienia),
+///   Test: `StorageShadowTest.hasShadow_raportowany_przez_accessor`.
 /// - obsługiwać purge wywołane przez write(nullptr, ..., 0), resetując stan obiektu i odtwarzając pusty segment gotowy do dalszego zapisu,
+///   Test: `GroupFileTest.test_fagrp_purge`, `GroupFileTest.test_fagrp_purge_no_retention`.
 /// - przy tworzeniu obiektu odtwarzać stan grupy na podstawie istniejących plików segmentów, wybierając
 ///   spójny końcowy fragment sekwencji ograniczony dodatnim limitem retention_.segments i rekonstruując removedSegments_,
+///   Test: `GroupFileTest.test_fagrp_restore_state_after_restart`, `GroupFileTest.test_fagrp_restore_state_after_restart_in_subdirectory`.
 /// - przy odtwarzaniu stanu pozostawiać bez zmian pliki segmentów pominięte przy wyborze tego fragmentu.
+///   Test: `GroupFileTest.test_fagrp_restore_state_after_restart`.
 ///
 /// @note Klasa zarządza segmentacją i retencją, ale nie interpretuje zawartości rekordów ani semantyki null.
 /// @note Pozycje wskazujące rekordy należące do już usuniętych segmentów są traktowane jako niedostępne do odczytu i aktualizacji.

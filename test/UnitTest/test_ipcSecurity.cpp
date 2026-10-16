@@ -89,6 +89,17 @@ TEST_F(IpcSecurity, ExclusiveCollisionPreservesQueueAndItsContents) {
   EXPECT_EQ(reopened->get_num_msg(), 1U);
 }
 
+TEST_F(IpcSecurity, InvalidNamesMissingObjectsAndExclusiveMemoryCreation) {
+  EXPECT_THROW(sec::checkNamespace("", false), sec::Rejected);
+  EXPECT_THROW(sec::checkNamespace("unsafe/name", true), sec::Rejected);
+  EXPECT_THROW(sec::openMemory(names.shmemSegment, IPC::read_only), IPC::interprocess_exception);
+  auto memory = sec::createMemory(names.shmemSegment);
+  memory.truncate(16);
+  EXPECT_THROW(sec::createMemory(names.shmemSegment), sec::Rejected);
+  EXPECT_TRUE(sec::removeOwned(names.shmemSegment));
+  EXPECT_TRUE(sec::removeOwned(names.shmemSegment));
+}
+
 TEST_F(IpcSecurity, NewObjectsHaveMode0600AndExpectedOwner) {
   const auto memory  = sec::createMemory(names.shmemSegment);
   const auto queue   = sec::createQueue(names.queryQueue, 1, 16);

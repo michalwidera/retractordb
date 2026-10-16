@@ -65,6 +65,7 @@ enum class Errc : std::uint8_t {
 
 /// Funkcja errcName powinna:
 /// - zwracać nazwę kategorii do komunikatów i logów: ConfigError, CorruptDescriptor, SyntaxError, CompileError, EvalError, IOError albo LogicError, a dla wartości spoza wyliczenia "Error".
+///   Test: `ResultTest.ErrorNamesRefusalClassesAndHandlerExchange`.
 [[nodiscard]] constexpr std::string_view errcName(Errc code) noexcept {
   switch (code) {
     case Errc::Config:
@@ -113,7 +114,9 @@ using Result = std::expected<T, Error>;
 
 /// Funkcja fail powinna:
 /// - budować błąd do `return` jako std::unexpected<Error> z podaną kategorią, komunikatem i errno (domyślnie 0), także z komunikatu w postaci literału.
+///   Test: `ResultTest.ErrorNamesRefusalClassesAndHandlerExchange`.
 /// - dla Refusal zachowywać komunikat i errno, a kategorię wyznaczać z klasy odmowy: Environment jako IO, Internal jako Logic, pozostałe jako Compile.
+///   Test: `ResultTest.ErrorNamesRefusalClassesAndHandlerExchange`.
 /// - dla istniejącego Error przekazywać go wyżej bez zmian, z innym typem wartości.
 ///
 /// @note Warianty z kategoria sa zimne i niewklejane (#511): budowa bledu, takze std::string z literalu, nie
@@ -148,6 +151,7 @@ using FatalHandler = void (*)(std::string_view message, const std::source_locati
 
 /// Funkcja setFatalHandler powinna:
 /// - atomowo instalować handler fatal() i zwracać poprzedni, a dla nullptr przywracać handler domyślny.
+///   Test: `ResultTest.ErrorNamesRefusalClassesAndHandlerExchange`.
 ///
 /// @note Demon instaluje go raz, przed startem watkow (launcher.cpp); host osadzajacy moze zainstalowac
 ///       wlasny, np. zeby zrzucic stan przed zakonczeniem.

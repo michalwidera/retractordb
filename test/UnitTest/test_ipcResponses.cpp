@@ -16,6 +16,7 @@
 
 #include "constants.hpp"
 #include "ipcResponses.hpp"
+#include "ipcSecurity.hpp"
 #include "osPlatform.hpp"
 
 namespace {
@@ -196,8 +197,37 @@ TEST(IpcResponses, header_identifies_layout) {
   EXPECT_FALSE(resp::compatible(*zeroed)) << "segment bez naglowka uznany za zgodny";
   resp::initialize(*zeroed);
   EXPECT_TRUE(resp::compatible(*zeroed));
+  for (const auto &slot : zeroed->slots)
+    EXPECT_EQ(stateOf(slot), resp::SlotState::Free);
   zeroed->header.layoutVersion += 1;
   EXPECT_FALSE(resp::compatible(*zeroed));
+  resp::initialize(*zeroed);
+  zeroed->header.slotCount += 1;
+  EXPECT_FALSE(resp::compatible(*zeroed));
+  resp::initialize(*zeroed);
+  zeroed->header.slotSize += 1;
+  EXPECT_FALSE(resp::compatible(*zeroed));
+  resp::initialize(*zeroed);
+  zeroed->header.magic = 0;
+  EXPECT_FALSE(resp::compatible(*zeroed));
+}
+
+TEST(IpcResponses, mapping_refuses_missing_and_existing_names_without_replacing_the_owner) {
+  const std::string name = "ut_ipcResponses_contract_" + std::to_string(getpid());
+  IPC::shared_memory_object::remove(name.c_str());
+  EXPECT_THROW(resp::Mapping(IPC::open_only, name), IPC::interprocess_exception);
+  {
+    const resp::Mapping server(IPC::create_only, name);
+    ASSERT_TRUE(server.valid());
+    EXPECT_THROW(resp::Mapping(IPC::create_only, name), ipc::security::Rejected);
+    ASSERT_EQ(resp::publish(server.segment(), self(1), "unchanged"), resp::PublishStatus::Published);
+    const resp::Mapping client(IPC::open_only, name);
+    EXPECT_EQ(resp::tryTake(client.segment(), self(1)), "unchanged");
+    server.segment().header.slotSize += 1;
+    EXPECT_FALSE(server.valid());
+    EXPECT_FALSE(client.valid());
+  }
+  EXPECT_TRUE(IPC::shared_memory_object::remove(name.c_str()));
 }
 
 // Odwzorowanie w pamieci dzielonej: serwer tworzy, klient otwiera i widzi to samo.

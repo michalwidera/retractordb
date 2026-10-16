@@ -24,8 +24,10 @@ enum class sourceState : std::uint8_t { empty, flux, armed };
 /// - po EILSEQ z akcesora zwracać Errc::Config z opisem inputError(), pozostawiając payload wyjściowy
 ///   bez zmian; dla pozostałych statusów przekazywać rekord i nullBitset otrzymane z akcesora,
 ///   logując ostrzeżenie przy statusie różnym od EXIT_SUCCESS,
+///   Test: `SourceBufferTest.input_content_failure_preserves_the_output_and_reports_the_cause`, `SourceBufferTest.read_failure_warning_preserves_the_null_row`.
 /// - kopiować komorę do payloadu wyjściowego i do historii przez fire() - jedyne miejsce zasilania bufora
 ///   historii; pojemność zero jest naruszeniem niezmiennika zgłaszanym przez RDB_ASSERT/rdb::fatal,
+///   Test: `SourceBufferDeathTest.fire_without_capacity_is_an_invariant_failure`.
 /// - utrzymywać bufor historii o pojemności co najmniej 1 (setCapacity()) - spójność źródeł deklarowanych
 ///   wymaga zachowania przynajmniej bieżącego rekordu,
 /// - udostępniać rekordy historii przez history(index) dla index < size(); kontrola zakresu względem

@@ -513,6 +513,8 @@ TEST(xqry, select_result_descriptions_are_distinct) {
     seen.insert(text);
   }
   EXPECT_EQ(seen.size(), all.size()) << "tryby awarii musza byc rozroznialne w komunikacie";
+  EXPECT_STREQ(toString(static_cast<selectResult>(255)), "unknown");
+  EXPECT_STREQ(toString(selectResult::renderFailed), "select loop failed in the client; reason in the client log");
 }
 
 // === Weryfikacja zgloszenia [P2]: `xqry -d` maskuje brak odpowiedzi jako stan bezczynny ===

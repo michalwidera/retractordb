@@ -239,7 +239,13 @@ TEST(qTree, dumpCore_does_not_crash) {
   // dumpCore() pisze tabele na stdout - to jego zadanie, nie hałas do logu testu.
   testing::internal::CaptureStdout();
   qt.dumpCore();
-  testing::internal::GetCapturedStdout();
+  const auto output = testing::internal::GetCapturedStdout();
+  for (const char *column : {"Idx", "Delta", "Cap", "Name"})
+    EXPECT_TRUE(output.contains(column));
+  EXPECT_TRUE(output.contains("s1"));
+  EXPECT_TRUE(output.contains("s2"));
+  EXPECT_TRUE(output.contains("10"));
+  EXPECT_TRUE(output.contains("5"));
 }
 
 // ============================================================

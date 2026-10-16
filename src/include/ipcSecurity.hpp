@@ -19,6 +19,7 @@ class Rejected : public std::runtime_error {
 
 /// Funkcja checkNamespace powinna:
 /// - odrzucać pustą nazwę i nazwę zawierającą '/' wyjątkiem Rejected.
+///   Test: `IpcSecurity.InvalidNamesMissingObjectsAndExclusiveMemoryCreation`.
 /// - sprawdzać każdy katalog ścieżki obiektu: wpis i jego cel należą do roota albo do bieżącego efektywnego UID, cel jest katalogiem, a prawo zapisu dla grupy lub innych idzie w parze z bitem sticky; niezgodność zgłaszać jako Rejected.
 /// - przy createDirectories tworzyć brakujący katalog z trybem kDirectoryPermissions i sprawdzać go jak istniejący.
 /// - bez createDirectories zgłaszać brak katalogu jako interprocess_exception z ENOENT (chwilowy brak), a inny błąd odczytu katalogu jako Rejected.
@@ -35,11 +36,13 @@ void checkOpened(const boost::interprocess::shared_memory_object &object, const 
 /// Funkcja createMemory powinna:
 /// - przygotowywać katalogi przez checkNamespace(name, true), tworzyć obiekt pamięci dzielonej wyłącznie jako nowy, z trybem kObjectPermissions, i sprawdzać go przez checkOpened.
 /// - każde niepowodzenie tworzenia, także istniejącą nazwę, zgłaszać jako Rejected z UID właściciela znalezionego wpisu.
+///   Test: `IpcSecurity.InvalidNamesMissingObjectsAndExclusiveMemoryCreation`.
 boost::interprocess::shared_memory_object createMemory(const std::string &name);
 
 /// Funkcja openMemory powinna:
 /// - przed otwarciem sprawdzać przestrzeń nazw i metadane istniejącego wpisu bez podążania za dowiązaniem, a po otwarciu w trybie mode sprawdzać deskryptor przez checkOpened.
 /// - brak obiektu zgłaszać wyjątkiem interprocess_exception Boosta, a obiekt niezaufany jako Rejected.
+///   Test: `IpcSecurity.InvalidNamesMissingObjectsAndExclusiveMemoryCreation`.
 ///
 /// @note Wpis sprawdzany osobno, bo Boost w backendzie plikowym otwiera dowiazania.
 boost::interprocess::shared_memory_object openMemory(const std::string &name, boost::interprocess::mode_t mode);
@@ -58,6 +61,7 @@ std::unique_ptr<boost::interprocess::message_queue> openQueue(const std::string 
 
 /// Funkcja removeOwned powinna:
 /// - zwracać true, gdy obiekt nie istnieje albo został usunięty.
+///   Test: `IpcSecurity.InvalidNamesMissingObjectsAndExclusiveMemoryCreation`.
 /// - usuwać wyłącznie zwykły obiekt z jednym dowiązaniem, należący do bieżącego efektywnego UID, w zaufanej przestrzeni nazw, niezależnie od jego trybu i bez mapowania ani czytania treści.
 /// - przy odmowie albo błędzie logować diagnostykę ERROR i zwracać false, nie zgłaszając wyjątku.
 ///

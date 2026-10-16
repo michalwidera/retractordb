@@ -12,12 +12,14 @@ using namespace boost;
 /// Funkcja floorR powinna:
 /// - zwracać część całkowitą num, licząc numerator / denominator w int.
 /// (!sr_problem:nazwa obiecuje podłogę, a dla ujemnego num wynik jest obcięciem w stronę zera, np. floorR(-1/2) == 0; wołający dziś podają wartości nieujemne.)
+///   Test: `xSOperations.rounding_helpers_obey_signed_and_64_bit_contracts`.
 ///
 /// Wzorzec: https://stackoverflow.com/questions/35971827/c-boost-rational-class-floor-function
 constexpr int floorR(boost::rational<int> const &num) { return static_cast<int>(num.numerator() / num.denominator()); }
 
 /// Funkcja floorDiv powinna:
 /// - zwracać iloraz numerator / denominator zaokrąglony w dół (w stronę minus nieskończoności), także dla ujemnego licznika lub mianownika, w arytmetyce int64.
+///   Test: `xSOperations.rounding_helpers_obey_signed_and_64_bit_contracts`.
 ///
 /// Dzielenie całkowite z zaokrągleniem W DÓŁ. Wbudowane `/` zaokrągla w stronę zera, co dla
 /// ujemnych liczników daje inny rekord niż model zdarzeniowy - a ujemne pozycje spłaszczone
@@ -31,6 +33,7 @@ constexpr std::int64_t floorDiv(const std::int64_t numerator, const std::int64_t
 
 /// Funkcja ceilR powinna:
 /// - zwracać num, gdy jest całkowite, a w przeciwnym razie zaokrąglać je od zera: część całkowitą obciętą w stronę zera powiększać o 1 dla dodatniego num i pomniejszać o 1 dla ujemnego.
+///   Test: `xSOperations.rounding_helpers_obey_signed_and_64_bit_contracts`.
 constexpr int ceilR(boost::rational<int> const &num) {
   auto inum = static_cast<int>(num.numerator() / num.denominator());
   if (num == inum) return inum;
@@ -107,6 +110,7 @@ constexpr int Add(const rational<int> &deltaOut, const rational<int> &deltaSrc, 
 
 /// Funkcja roundedAwayFromZero powinna:
 /// - zwracać iloraz numerator / denominator w int64: dokładny, gdy dzielenie jest bez reszty, a w przeciwnym razie zaokrąglony od zera (jak ceilR).
+///   Test: `xSOperations.rounding_helpers_obey_signed_and_64_bit_contracts`.
 ///
 /// Rachunek w int64, bo (1+W_src)*F przekracza int juz dla trzech okien `@(1,65536)` w lancuchu
 /// (A2 M11). Zaokraglenie jest to samo co w ceilR() - od zera - wiec w zakresie int wynik sie nie

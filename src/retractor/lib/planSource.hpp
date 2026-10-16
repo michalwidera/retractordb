@@ -120,10 +120,15 @@ struct CounterCheck {
 
 /// Funkcja checkRotationCounter powinna:
 /// - dla planu bez dyrektywy `:ROTATION` ze ścieżką zwracać pusty wynik.
+///   Test: `PlanSource.rotation_counter_preflight_is_read_only_and_preserves_error_class`.
 /// - tylko odczytywać licznik przez PersistentCounter::read, bez rezerwowania numeru.
+///   Test: `PlanSource.rotation_counter_preflight_is_read_only_and_preserves_error_class`.
 /// - dla brakującego pliku i dla poprawnej wartości zwracać pusty wynik.
+///   Test: `PlanSource.rotation_counter_preflight_is_read_only_and_preserves_error_class`.
 /// - dla pliku, którego nie da się odczytać, zwracać environment = true i odmowę ze ścieżką i przyczyną (K4).
+///   Test: `PlanSource.rotation_counter_preflight_is_read_only_and_preserves_error_class`.
 /// - dla wadliwej treści zwracać environment = false i odmowę ze ścieżką, przyczyną i instrukcją naprawy albo usunięcia pliku (K2).
+///   Test: `PlanSource.rotation_counter_preflight_is_read_only_and_preserves_error_class`.
 ///
 /// @note #472: ta sama odmowa co checkKeptStores, zanim cokolwiek zostanie zmienione, bo konstruktor
 ///       PersistentCounter biegnie juz po punkcie bez powrotu. Start reaguje na obie przyczyny inaczej:
@@ -153,7 +158,9 @@ struct CounterCheck {
 
 /// Funkcja deviceTimeoutReport powinna:
 /// - zwracać po jednym wpisie na każde źródło DEVICE z efektywnym terminem i jego pochodzeniem z effectiveDeviceTimeout ("RQL", "config", "default" albo "no-clock" przy noClock), w kolejności węzłów planu.
+///   Test: `PlanSource.timeout_report_covers_sources_filters_and_no_clock`.
 /// - przy niepustej liście nazw ograniczać się do strumieni z listy.
+///   Test: `PlanSource.timeout_report_covers_sources_filters_and_no_clock`.
 ///
 /// @note #347: wpis do dziennika przy starcie epoki i przy imporcie ad-hoc - operator widzi, z jakim terminem
 ///       naprawde czyta kazde zrodlo.

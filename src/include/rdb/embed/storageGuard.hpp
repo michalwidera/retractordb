@@ -12,16 +12,23 @@ namespace rdb::embed {
 /// Nie tworzy blokad instancji xretractor ani obiektow magistrali.
 /// Obiekt klasy StorageGuard powinien:
 /// - tworzyć strażnika przez fabrykę zwracającą Result i udostępniać bezwzględną ścieżkę katalogu po rozwiązaniu istniejących dowiązań, przyjmując katalog bieżący dla pustego argumentu directory.
+///   Test: `embedStorageGuard.claim_marker_canonical_paths_and_artifact_boundaries`.
 /// - otwierać istniejący katalog z deskryptorem zamykanym przy exec (O_CLOEXEC) i przed sprawdzaniem lub tworzeniem znacznika uzyskiwać na tym deskryptorze nieblokującą wyłączną blokadę flock, obejmującą także inne otwarcia tego samego katalogu w tym samym procesie i przez aliasy ścieżki.
 /// - zwracać Errc::Config z EBUSY, gdy wyłączna blokada katalogu jest już zajęta.
 /// - po uzyskaniu blokady porównywać urządzenie i i-węzeł otwartego katalogu z obiektem wskazanym przez jego ścieżkę, odmawiając inicjalizacji jako Errc::Compile w razie rozbieżności.
 /// - przy claim włączonym i braku znacznika dopuszczać przejęcie wyłącznie pustego katalogu, odmawiając katalogu niepustego jako Errc::Compile, i tworzyć plik .retractordb-embedded w trybie wyłącznego utworzenia, bez podążania za dowiązaniem, z żądanymi uprawnieniami 0600 i treścią retractordb embedded storage v1 zakończoną znakiem nowej linii.
+///   Test: `embedStorageGuard.claim_marker_canonical_paths_and_artifact_boundaries`.
 /// - przy claim wyłączonym i braku znacznika kończyć inicjalizację bez tworzenia znacznika i bez utrzymywania blokady katalogu.
+///   Test: `embedStorageGuard.claim_marker_canonical_paths_and_artifact_boundaries`.
 /// - przy istniejącym znaczniku wymagać, sprawdzając go bez podążania za dowiązaniem, zwykłego pliku należącego do efektywnego użytkownika procesu, z dokładnie jednym dowiązaniem i dokładnie oczekiwaną treścią, czytaną przez otwarcie nieblokujące i bez podążania za dowiązaniem, zwracając Errc::Compile dla niezgodnego znacznika.
+///   Test: `embedStorageGuard.invalid_marker_links_and_contents_are_refused_without_mutation`.
 /// - utrzymywać uzyskaną blokadę poprawnie oznaczonego katalogu przez czas życia strażnika oraz raportować przez ownsDirectory, czy strażnik posiada otwarty deskryptor chroniący katalog.
+///   Test: `embedStorageGuard.claim_marker_canonical_paths_and_artifact_boundaries`.
 /// - w checkPath rozwiązywać ścieżkę artefaktu, względną względem bieżącego katalogu procesu, i akceptować wyłącznie ścieżki ściśle wewnątrz chronionego katalogu, porównując elementy ścieżki i odrzucając sam katalog oraz ścieżkę znacznika własności jako Errc::Compile.
+///   Test: `embedStorageGuard.claim_marker_canonical_paths_and_artifact_boundaries`.
 /// - przekazywać pozostałe błędy operacji systemu plików jako Errc::IO z komunikatem wskazującym ścieżkę i kodem systemowym błędu.
 /// - zamykać posiadany deskryptor katalogu przy zniszczeniu oraz po nieudanej inicjalizacji, zwalniając blokadę bez usuwania katalogu i trwałego znacznika.
+///   Test: `embedStorageGuard.claim_marker_canonical_paths_and_artifact_boundaries`.
 /// - uniemożliwiać kopiowanie strażnika, aby pojedynczy obiekt odpowiadał za zamknięcie posiadanego deskryptora.
 /// - nie tworzyć blokad instancji xretractor ani obiektów magistrali.
 /// - po nieudanym zapisie treści znacznika utworzonego w tym samym wywołaniu usuwać ten znacznik przed zwróceniem Errc::IO, aby katalog pozostał możliwy do przejęcia.
@@ -80,6 +87,7 @@ struct OfflinePolicy {
 
 /// Funkcja removeTemporaryStorage powinna:
 /// - usuwać katalog wraz z zawartością wyłącznie po uzyskaniu jego blokady StorageGuard z przejęciem, a katalog zajęty przez inny magazyn albo nieprzejmowalny pozostawiać.
+///   Test: `embedEngine.temporary_directory_is_kept_while_another_guard_owns_it`.
 /// - nie zgłaszać błędów ani wyjątków.
 void removeTemporaryStorage(const std::string &directory) noexcept;
 

@@ -31,7 +31,9 @@ struct Space {
 /// Funkcja space powinna:
 /// - przy obiektach POSIX-owej pamięci dzielonej Boosta mierzyć pojemność i wolne miejsce (f_blocks i f_bavail razy f_frsize) przez fstatvfs na deskryptorze sondy shm_open o zerowej długości, utworzonej z O_EXCL i usuniętej przed pomiarem.
 /// - gdy sondy nie da się utworzyć albo zmierzyć, a także bez obiektów POSIX-owych w Boost.Interprocess, mierzyć statvfs na osplat::sharedMemoryBackingPath().
+///   Test: `ShmBudget.MeasurementFallbackAndUnknownReportAreExplicit`.
 /// - zwracać known == false wyłącznie wtedy, gdy zawiódł także pomiar zapasowy.
+///   Test: `ShmBudget.MeasurementFallbackAndUnknownReportAreExplicit`.
 ///
 /// @note Sciezka /dev/shm jest szczegolem libc, a w kontenerze rozmiar tmpfs ustawia --shm-size (domyslnie
 ///       64 MiB). known == false to "nie wiem", nie zero bajtow: wolajacy ma wtedy przepuscic operacje.
@@ -40,6 +42,7 @@ struct Space {
 /// Funkcja responseQueueElements powinna:
 /// - dla interval == 0 zwracać minElements.
 /// - w pozostałych przypadkach zwracać bufferSeconds / interval liczone wymiernie i zaokrąglone w górę, nie mniej niż minElements.
+///   Test: `ShmBudget.IntervalCostsGroupInPlanOrderAndSortByQueueBytes`.
 ///
 /// @param interval takt strumienia w sekundach.
 ///
@@ -77,7 +80,9 @@ struct IntervalCost {
 
 /// Funkcja intervalCosts powinna:
 /// - grupować węzły planu poza dyrektywami kompilatora według taktu i dla każdego taktu zwracać liczbę elementów z responseQueueElements, rozmiar z responseQueueBytes i nazwy strumieni w kolejności planu.
+///   Test: `ShmBudget.IntervalCostsGroupInPlanOrderAndSortByQueueBytes`.
 /// - porządkować grupy malejąco po rozmiarze kolejki.
+///   Test: `ShmBudget.IntervalCostsGroupInPlanOrderAndSortByQueueBytes`.
 ///
 /// @note Dyrektyw nie da sie subskrybowac komenda `show`, wiec nie maja kolejki.
 [[nodiscard]] std::vector<IntervalCost> intervalCosts(const qTree &plan, int bufferSeconds, int minElements);
@@ -88,9 +93,12 @@ struct IntervalCost {
 
 /// Funkcja report powinna:
 /// - zwracać tekst z systemem plików pod osplat::sharedMemoryBackingPath(), jego pojemnością i wolnym miejscem albo "unknown (statvfs failed)", gdy space() nie zna stanu.
+///   Test: `ShmBudget.MeasurementFallbackAndUnknownReportAreExplicit`.
 /// - podawać rezerwację stałą z rozbiciem na segment magistrali, kolejkę komend i segment odpowiedzi, a przy znanym stanie także wolne miejsce po rezerwacji (0, gdy rezerwacja go nie mieści).
 /// - dla każdego taktu z intervalCosts podawać takt, liczbę elementów, rozmiar kolejki na klienta, liczbę mieszczących się klientów (wolne po rezerwacji / rozmiar kolejki, "?" przy nieznanym stanie) i strumienie.
+///   Test: `ShmBudget.MeasurementFallbackAndUnknownReportAreExplicit`.
 /// - dla planu bez strumieni do subskrypcji kończyć raport zdaniem "plan has no subscribable streams".
+///   Test: `ShmBudget.MeasurementFallbackAndUnknownReportAreExplicit`.
 ///
 /// @note Zapas liczony po rezerwacji stalej i z gory, bo raport ma nie obiecywac miejsca.
 [[nodiscard]] std::string report(const qTree &plan, int bufferSeconds, int minElements);

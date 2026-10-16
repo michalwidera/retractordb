@@ -73,4 +73,5 @@ enum command_id : std::uint8_t {
 
 /// Funkcja GetStringcommand_id powinna:
 /// - zwracać nazwę wartości wyliczenia command_id.
+///   Test: `RequirementContracts.token_default_reference_conversions_and_diagnostics`.
 constexpr auto GetStringcommand_id(enum command_id index) -> std::string_view { return magic_enum::enum_name(index); }

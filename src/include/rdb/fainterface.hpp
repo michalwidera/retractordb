@@ -16,7 +16,9 @@ namespace rdb {
 /// - udostępniać wspólny kontrakt odczytu, zapisu i raportowania liczby rekordów niezależnie od rodzaju magazynu,
 /// - obsługiwać dane binarne o rozmiarze określanym poza tym interfejsem, zwykle przez Descriptor klasy pochodnej,
 /// - przyjmować nullBitset jako kanał przekazywania informacji o wartościach null dla pojedynczego rekordu, jeśli dana implementacja takie informacje wspiera,
+///   Test: `RequirementContracts.writable_backends_clear_null_metadata_except_memory`.
 /// - umożliwiać dopisywanie danych przez przekazanie pozycji równej std::numeric_limits<size_t>::max(),
+///   Test: `RequirementContracts.writable_backends_clear_null_metadata_except_memory`.
 /// - interpretować position w odczycie i aktualizacji magazynu losowego dostępu jako przesunięcie w bajtach;
 ///   w read() źródła sekwencyjnego dopuszczać wyłącznie position == 0,
 /// - oddzielać w count() wynik typu size_t od błędu przez Result<size_t>; gdy ustalanie rozmiaru pliku

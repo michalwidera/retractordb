@@ -57,6 +57,19 @@ TEST(Formatter, renderRaw_outputs_values) {
   auto out = testing::internal::GetCapturedStdout();
   EXPECT_NE(out.find("hello"), std::string::npos);
   EXPECT_NE(out.find("world"), std::string::npos);
+  EXPECT_EQ(out, "hello world \r\n");
+}
+
+TEST(Formatter, null_marker_and_gnuplot_axis_contracts) {
+  EXPECT_FALSE(Formatter::isNullAt("x", 0));
+  for (const bool reversed : {false, true}) {
+    testing::internal::CaptureStdout();
+    Formatter::initGnuplot({12, -3, 7}, reversed);
+    const auto text = testing::internal::GetCapturedStdout();
+    EXPECT_TRUE(text.contains("set term qt noraise"));
+    EXPECT_TRUE(text.contains(reversed ? "set xrange [12:0]" : "set xrange [0:12]"));
+    EXPECT_TRUE(text.contains("set yrange [-3:7]"));
+  }
 }
 
 TEST(Formatter, renderRaw_skip_all_null_produces_no_output) {

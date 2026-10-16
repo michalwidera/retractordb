@@ -10,6 +10,24 @@
 
 // ctest -R '^ut-soperations' -V
 
+TEST(xSOperations, rounding_helpers_obey_signed_and_64_bit_contracts) {
+  EXPECT_EQ(floorR(boost::rational<int>(-3, 2)), -1);
+  EXPECT_EQ(floorR(boost::rational<int>(3, 2)), 1);
+  EXPECT_EQ(ceilR(boost::rational<int>(-3, 2)), -2);
+  EXPECT_EQ(ceilR(boost::rational<int>(3, 2)), 2);
+  EXPECT_EQ(ceilR(boost::rational<int>(-2)), -2);
+  EXPECT_EQ(ceilR(boost::rational<int>(0)), 0);
+  EXPECT_EQ(floorDiv(-3, 2), -2);
+  EXPECT_EQ(floorDiv(3, -2), -2);
+  EXPECT_EQ(floorDiv(-3, -2), 1);
+  EXPECT_EQ(floorDiv(4, 2), 2);
+  EXPECT_EQ(floorDiv(INT64_C(6000000001), 2), INT64_C(3000000000));
+  EXPECT_EQ(roundedAwayFromZero(-3, 2), -2);
+  EXPECT_EQ(roundedAwayFromZero(3, 2), 2);
+  EXPECT_EQ(roundedAwayFromZero(-4, 2), -2);
+  EXPECT_EQ(roundedAwayFromZero(INT64_C(6000000001), 2), INT64_C(3000000001));
+}
+
 #ifndef NDEBUG
 // Hash dostaje tylko dodatnie interwaly sprawdzone przez kompilator. Bezposrednie naruszenie
 // tego kontraktu strzeze asercja debug; nie jest to kanal odmowy blednego planu.

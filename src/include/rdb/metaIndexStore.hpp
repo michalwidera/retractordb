@@ -23,15 +23,20 @@ namespace rdb {
 ///
 /// Obiekt klasy MetaIndexStore powinien:
 /// - utrzymywać ścieżkę pliku indeksu oraz rozmiar pojedynczego zserializowanego wpisu,
+///   Test: `RequirementContracts.meta_store_cache_mutations_refusal_and_abandon`.
 /// - cache'ować odczytane wpisy (readAll()) i przy udanym I/O utrzymywać cache przyrostowo przy mutacjach;
 ///   plik odczytywać i deserializować tylko wtedy, gdy cache nie jest ważny,
+///   Test: `RequirementContracts.meta_store_cache_mutations_refusal_and_abandon`.
 /// - zwracać z rewrite() błąd Errc::IO przy nieudanym otwarciu, zapisie lub podmianie pliku;
 ///   cache aktualizować dopiero po udanej podmianie,
+///   Test: `RequirementContracts.meta_store_cache_mutations_refusal_and_abandon`.
 /// - działać jako wariant inertny (bez żadnego I/O), gdy ścieżka pliku jest pusta - tak samo
 ///   jak dotychczasowy wariant metaData dla źródeł deklarowanych,
+///   Test: `RequirementContracts.meta_store_cache_mutations_refusal_and_abandon`.
 /// - udostępniać abandon() odłączające magazyn od pliku - dalsze operacje stają się no-opem;
 ///   używane przez metaData przed usunięciem pliku dysponowalnego magazynu, żeby destruktor
 ///   nie odtworzył go ponownie.
+///   Test: `RequirementContracts.meta_store_cache_mutations_refusal_and_abandon`.
 /// @note saveHeader(), appendEntry() i overwriteLast() nie zwracają potwierdzenia I/O; błędy zapisu
 ///       nie są propagowane, więc po awarii I/O cache może odbiegać od pliku.
 class MetaIndexStore {

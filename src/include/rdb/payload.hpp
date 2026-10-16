@@ -26,9 +26,11 @@
 ///   typu double, bez wymogu odczytania całego napisu, następnie konwertować do typu pola,
 /// - zapisywać STRING w najwyżej rlen * rarray bajtach, przycinając dłuższą wartość i dopełniając krótszą
 ///   zerami; getItem() zwraca tekst do pierwszego bajtu zerowego albo do końca pola, jeśli nie ma zera,
+///   Test: `RequirementContracts.payload_decimal_hex_and_string_padding`.
 /// - zwalniać własną pamięć przy niszczeniu obiektu,
 /// - udostępniać tekstową reprezentację danych przez operator<< oraz wczytywanie wartości przez operator>>,
 /// - umożliwiać formatowanie tekstowej reprezentacji wartości numerycznych w trybie dziesiętnym lub szesnastkowym,
+///   Test: `RequirementContracts.payload_decimal_hex_and_string_padding`.
 /// - wspierać kopiowanie stanu obiektu przez konstruktor kopiujący i operator=,
 /// - wspierać przenoszenie stanu obiektu przez konstruktor przenoszący i operator=(payload&&), zachowując regułę zgodności deskryptorów obowiązującą przy przypisaniu,
 /// - wspierać łączenie danych dwóch obiektów payload przez operator+,

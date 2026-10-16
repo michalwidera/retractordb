@@ -24,14 +24,23 @@ enum FieldColumn : std::uint8_t { rname = 0, rlen = 1, rarray = 2, rtype = 3 };
 ///
 /// Obiekt klasy Descriptor powinien:
 /// - przechowywać definicje pól rekordu w postaci listy opisowej (rField),
+///   Test: `descriptor.print_and_basic_accessors`.
 /// - umożliwiać definiowanie pól o różnych typach, długościach i krotnościach tablicowych,
+///   Test: `Descriptor.NamedLookupsAreConstAndPreserveArrayLayout`.
 /// - udostępniać informacje o logicznej i fizycznej strukturze danych, takie jak nazwy pól, typy, rozmiary i offsety,
+///   Test: `Descriptor.NamedLookupsAreConstAndPreserveArrayLayout`.
 /// - wyznaczać rozmiar binarnej reprezentacji rekordu z pominięciem pól konfiguracyjnych,
+///   Test: `descriptor.print_and_basic_accessors`, `descriptor.clean_ref_and_flat_fields`.
 /// - udostępniać odwzorowanie między pozycją w spłaszczonym widoku pól a indeksem pola oraz offsetem w rekordzie,
+///   Test: `descriptor.offset_and_convert_for_string_and_arrays`, `descriptor.position_conversion_case_1`, `descriptor.position_conversion_case_2`.
 /// - umożliwiać dodawanie i łączenie opisów pól,
+///   Test: `descriptor.append_refreshes_cached_layout`, `descriptor.concatenation_refreshes_cached_layout`.
 /// - umożliwiać odczyt i zapis tekstowej reprezentacji deskryptora przez operatory strumieniowe,
+///   Test: `descriptor.read_from_stream`, `descriptor.print_and_basic_accessors`.
 /// - udostępniać metadane konfiguracyjne zapisane w polach specjalnych, takie jak REF, TYPE, RETENTION i RETMEMORY,
+///   Test: `descriptor.retention_and_policy_defaults`, `descriptor.retention_and_policy_values`.
 /// - umożliwiać porównanie kompatybilności dwóch deskryptorów w zakresie pól danych przez operator==.
+///   Test: `descriptor.compare`, `descriptor.compare_ignores_configuration_fields_without_out_of_bounds_access`.
 ///
 /// @note Pola są dostępne tylko do odczytu; zmiany układu przechodzą przez metody unieważniające cache.
 /// @note Operator== nie oznacza ścisłej równości wszystkich właściwości deskryptora; sprawdza zgodność pól danych z pominięciem pól konfiguracyjnych.
@@ -163,12 +172,14 @@ class Descriptor {
 
 /// Funkcja operator+ powinna:
 /// - zwracać nowy deskryptor z polami lhs, a po nich polami rhs, bez zmiany argumentów.
+///   Test: `descriptor.concatenation_refreshes_cached_layout`.
 ///
 /// @note Wzorzec: http://www.gotw.ca/gotw/004.htm
 Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs);
 
 /// Funkcja singleLineFormat powinna:
 /// - jako manipulator włączać format jednowierszowy deskryptora i payloadu wyłącznie dla podanego strumienia i zwracać ten strumień.
+///   Test: `descriptor.flat_output_resets_after_stream`.
 ///
 /// @note Stan nalezy do strumienia (slot std::ios_base::xalloc()), nie do procesu: do fazy 2 (#446, C2) byla to
 ///       flaga calego procesu, o ktora scigaly sie watki. Jednorazowosc zostaje: operator<< zdejmuje flage po
@@ -177,9 +188,11 @@ std::ostream &singleLineFormat(std::ostream &os);
 
 /// Funkcja isSingleLineOutput powinna:
 /// - zwracać, czy dla podanego strumienia jest włączony format jednowierszowy.
+///   Test: `descriptor.single_line_mode_does_not_leak_between_streams`.
 [[nodiscard]] bool isSingleLineOutput(std::ostream &os);
 
 /// Funkcja setSingleLineOutput powinna:
 /// - włączać albo wyłączać format jednowierszowy wyłącznie dla podanego strumienia.
+///   Test: `descriptor.single_line_mode_does_not_leak_between_streams`.
 void setSingleLineOutput(std::ostream &os, bool enabled);
 }  // namespace rdb

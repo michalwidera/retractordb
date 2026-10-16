@@ -28,11 +28,17 @@ bool rtCheckAndPrint();
 
 /// Funkcja rtActivate powinna:
 /// - blokować pamięć według RDB_MLOCKALL: "onfault" (domyślnie) - mlockall(MCL_CURRENT), a dopiero po jego powodzeniu MCL_FUTURE | MCL_ONFAULT (bez MCL_ONFAULT samo MCL_CURRENT); "off" - bez blokowania; każda inna wartość - MCL_CURRENT | MCL_FUTURE.
+///   Test: `ExecutorRtActivateTest.MockedCallsCheckMemoryPolicyErrnosAndThreadPriority`.
 /// - dla wartości RDB_MLOCKALL innej niż "onfault" logować ostrzeżenie o trybie diagnostycznym.
+///   Test: `ExecutorRtActivateTest.MockedCallsCheckMemoryPolicyErrnosAndThreadPriority`.
 /// - traktować ENOSYS z mlockall i brak mlockall na platformie jako powodzenie, a inny błąd mlockall logować ostrzeżeniem i zwracać false.
+///   Test: `ExecutorRtActivateTest.MockedCallsCheckMemoryPolicyErrnosAndThreadPriority`.
 /// - ustawiać wątkowi wołającemu (nie całemu procesowi) politykę SCHED_FIFO z priorytetem sprowadzonym do zakresu przyjmowanego przez jądro, z ostrzeżeniem przy zmianie wartości.
+///   Test: `ExecutorRtActivateTest.MockedCallsCheckMemoryPolicyErrnosAndThreadPriority`.
 /// - porażkę ustawienia SCHED_FIFO albo brak takiej możliwości logować ostrzeżeniem i zwracać false.
+///   Test: `ExecutorRtActivateTest.MockedCallsCheckMemoryPolicyErrnosAndThreadPriority`.
 /// - zwracać true, gdy blokowanie pamięci i SCHED_FIFO się powiodły.
+///   Test: `ExecutorRtActivateTest.MockedCallsCheckMemoryPolicyErrnosAndThreadPriority`.
 ///
 /// @note Sledztwo ~40 ms (JOURNAL.md 2026-07-18): MCL_FUTURE z populacja kosztowalo ~25 ms na mmapie kolejki
 ///       IPC w watku FIFO, a pelne MCL_ONFAULT przenosilo koszt zimnego page cache binarki w srodek biegu.

@@ -2,9 +2,11 @@
 #include <spdlog/spdlog.h>
 
 #include <fcntl.h>
+#include <termios.h>
 #include <unistd.h>
 
 #include <array>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -134,6 +136,44 @@ TEST_F(KbHitRedirectedStdin, non_tty_at_eof_is_not_a_keypress) {
   EXPECT_FALSE(_kbhit(false));
 }
 
+TEST_F(KbHitRedirectedStdin, getch_reads_the_next_character) {
+  redirectStdinFrom("qr");
+  std::clearerr(stdin);
+  EXPECT_EQ(_getch(), 'q');
+  EXPECT_EQ(_getch(), 'r');
+}
+
+TEST_F(KbHitRedirectedStdin, tty_key_remains_available_and_terminal_mode_is_restored) {
+  struct Pty {
+    int master = posix_openpt(O_RDWR | O_NOCTTY);
+    int slave  = -1;
+    ~Pty() {
+      if (slave >= 0) close(slave);
+      if (master >= 0) close(master);
+    }
+  } pty;
+  ASSERT_GE(pty.master, 0);
+  ASSERT_EQ(grantpt(pty.master), 0);
+  ASSERT_EQ(unlockpt(pty.master), 0);
+  pty.slave = open(ptsname(pty.master), O_RDWR | O_NOCTTY);
+  ASSERT_GE(pty.slave, 0);
+  savedStdin = dup(STDIN_FILENO);
+  ASSERT_GE(savedStdin, 0);
+  ASSERT_GE(dup2(pty.slave, STDIN_FILENO), 0);
+  std::clearerr(stdin);
+  struct termios before{}, after{};
+  ASSERT_EQ(tcgetattr(STDIN_FILENO, &before), 0);
+  EXPECT_FALSE(_kbhit(false));
+  std::clearerr(stdin);
+  ASSERT_EQ(write(pty.master, "k", 1), 1);
+  EXPECT_TRUE(_kbhit(false));
+  ASSERT_EQ(tcgetattr(STDIN_FILENO, &after), 0);
+  EXPECT_EQ(after.c_lflag, before.c_lflag);
+  EXPECT_EQ(after.c_iflag, before.c_iflag);
+  EXPECT_EQ(fcntl(STDIN_FILENO, F_GETFL) & O_NONBLOCK, 0);
+  EXPECT_EQ(_getch(), 'k');
+}
+
 // --- setupLoggerMain tests ---
 
 class SetupLoggerMainTest : public ::testing::Test {
@@ -161,6 +201,30 @@ TEST_F(SetupLoggerMainTest, dual_mode_returns_valid_path) {
   EXPECT_NE(result.find("test_unit_dual"), std::string::npos);
   spdlog::default_logger()->flush();
   std::filesystem::remove(result);
+}
+
+TEST_F(SetupLoggerMainTest, file_logging_appends_and_dual_logging_keeps_stdout_clean) {
+  const std::string name = "contract_logger";
+  const auto path        = setupLoggerMain(name, false);
+  spdlog::error("first marker");
+  spdlog::default_logger()->flush();
+  spdlog::drop_all();
+  testing::internal::CaptureStdout();
+  testing::internal::CaptureStderr();
+  const auto samePath = setupLoggerMain("ignored/directory/" + name, true);
+  spdlog::error("second marker");
+  spdlog::default_logger()->flush();
+  const auto stderrText = testing::internal::GetCapturedStderr();
+  const auto stdoutText = testing::internal::GetCapturedStdout();
+  EXPECT_EQ(samePath, path);
+  EXPECT_TRUE(stdoutText.empty());
+  EXPECT_TRUE(stderrText.contains("second marker"));
+  EXPECT_EQ(spdlog::default_logger()->level(), static_cast<spdlog::level::level_enum>(SPDLOG_ACTIVE_LEVEL));
+  std::ifstream input(path);
+  const std::string text{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+  EXPECT_TRUE(text.contains("first marker"));
+  EXPECT_TRUE(text.contains("second marker"));
+  std::filesystem::remove(path);
 }
 
 // Tryb usługowy: log na stderr z prefiksem priorytetu sd-daemon "<N>". Przechwytujemy stderr
@@ -196,6 +260,11 @@ TEST_F(SetupLoggerMainTest, service_mode_emits_sd_daemon_priority_prefix) {
   std::stringstream ss;
   ss << in.rdbuf();
   const std::string out = ss.str();
+
+  // Wyjscie trafia do pliku, nie na terminal: log dla journala ma byc czystym tekstem,
+  // a kazda linia ma byc zrzucona od razu, bez czekania na jawny flush.
+  EXPECT_EQ(out.find('\033'), std::string::npos) << "kod ANSI w logu uslugowym bez TTY";
+  EXPECT_EQ(spdlog::default_logger()->flush_level(), spdlog::level::trace);
 
   // Test podaza za decyzja projektowa: ciche raportowanie w Release
   // (SPDLOG_ACTIVE_LEVEL=ERROR - zwiazane z efektywnoscia) odfiltrowuje INFO na

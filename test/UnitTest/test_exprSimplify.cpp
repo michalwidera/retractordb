@@ -1,3 +1,4 @@
+#include <climits>
 #include <cmath>
 #include <limits>
 #include <list>
@@ -72,6 +73,55 @@ void expectSameUintResult(const std::list<token> &original, const std::list<toke
 }
 
 }  // namespace
+
+TEST(exprSimplify, string_width_stack_contract_and_saturation) {
+  const auto lookup = [](const std::string &stream, int slot) -> std::optional<fieldShape> {
+    EXPECT_EQ(stream, "A");
+    if (slot == 2) return fieldShape{rdb::STRING, 7};
+    if (slot == 0) return fieldShape{rdb::INTEGER, 4};
+    return std::nullopt;
+  };
+  EXPECT_EQ(inferStringWidth({}, lookup), std::nullopt);
+  EXPECT_EQ(inferStringWidth({pushString("")}, lookup), kToStringDefaultWidth);
+  EXPECT_EQ(inferStringWidth({pushString("abc")}, lookup), 3);
+  EXPECT_EQ(inferStringWidth({token(PUSH_VAL, 2)}, lookup), std::nullopt);
+  EXPECT_EQ(inferStringWidth({pushId(2)}, lookup), 7);
+  EXPECT_EQ(inferStringWidth({pushId(0)}, lookup), std::nullopt);
+  EXPECT_EQ(inferStringWidth({pushId(99)}, lookup), std::nullopt);
+  for (const auto command : {PUSH_ID1, PUSH_ID2, PUSH_ID3, PUSH_ID4, PUSH_ID5, PUSH_IDX})
+    EXPECT_EQ(inferStringWidth({token(command, std::make_pair(std::string("A"), 2))}, lookup), std::nullopt);
+  EXPECT_EQ(inferStringWidth({pushId(2), pushString("abc"), token(ADD)}, lookup), 10);
+  EXPECT_EQ(inferStringWidth({pushString("abc"), pushId(0), token(ADD)}, lookup), 3);
+  EXPECT_EQ(inferStringWidth({pushId(0), pushString("abc"), token(ADD)}, lookup), 3);
+  EXPECT_EQ(inferStringWidth({pushId(0), token(CALL, std::string("to_string"))}, lookup), kToStringDefaultWidth);
+  EXPECT_EQ(inferStringWidth({pushId(0), token(CALL2, std::make_pair(std::string("to_string"), 19))}, lookup), 19);
+  EXPECT_EQ(
+      inferStringWidth({pushId(0), token(CALL2, std::make_pair(std::string("to_string"), INT_MAX)), pushString("a"), token(ADD)},
+                       lookup),
+      INT_MAX);
+  EXPECT_EQ(inferStringWidth({pushString("abc"), pushString("def")}, lookup), std::nullopt);
+  for (const auto command : {PUSH_STREAM, COUNT, PUSH_TSCAN})
+    EXPECT_EQ(inferStringWidth({token(command)}, lookup), std::nullopt);
+  for (const auto command : {CALL, CALL2, NEGATE, BIT_NOT, NOT}) {
+    EXPECT_EQ(inferStringWidth({token(command)}, lookup), std::nullopt);
+    EXPECT_EQ(inferStringWidth({pushString("abc"), token(command, std::string("Length"))}, lookup), std::nullopt);
+  }
+  for (const auto command :
+       {ADD, SUBTRACT, MULTIPLY, DIVIDE, POWER, CMP_EQUAL, CMP_NOT_EQUAL, CMP_LT, CMP_GT, CMP_LE, CMP_GE, AND, OR}) {
+    EXPECT_EQ(inferStringWidth({pushString("abc"), token(command)}, lookup), std::nullopt);
+    if (command != ADD)
+      EXPECT_EQ(inferStringWidth({pushString("abc"), pushString("def"), token(command)}, lookup), std::nullopt);
+  }
+}
+
+TEST(exprSimplify, empty_and_unresolved_leaf_programs_are_unchanged) {
+  for (auto program :
+       {std::list<token>{}, std::list<token>{token(PUSH_ID2, std::string("A[0]")), token(PUSH_VAL, 0), token(ADD)}}) {
+    const auto before = dump(program);
+    EXPECT_EQ(simplifyExpression(program, testFieldType), 0U);
+    EXPECT_EQ(dump(program), before);
+  }
+}
 
 //
 // ─── A: zwijanie stałych ────────────────────────────────────────────────────────

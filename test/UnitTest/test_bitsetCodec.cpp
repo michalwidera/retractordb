@@ -58,6 +58,10 @@ TEST(BitsetCodecTest, packBits_ustawia_tylko_jedynki) {
   rdbtest::ok(rdb::packBits(bits, buf));
   EXPECT_EQ(std::to_integer<uint8_t>(buf[0]), 0b00000010);
   EXPECT_EQ(std::to_integer<uint8_t>(buf[1]), 0b00000001);
+  buf = {std::byte{0x55}, std::byte{0xAA}};
+  ASSERT_RDB_OK(rdb::packBits(bits, buf));
+  EXPECT_EQ(buf[0], std::byte{0x57});
+  EXPECT_EQ(buf[1], std::byte{0xAB});
 }
 
 TEST(BitsetCodecTest, unpackBits_odrzuca_bitCount_ponad_zrodlo) {
@@ -75,4 +79,6 @@ TEST(BitsetCodecTest, packBits_odrzuca_zly_rozmiar_celu) {
   std::vector<std::byte> tooLong(3, std::byte{0});
   EXPECT_RDB_ERROR(rdb::packBits(bits, tooShort), rdb::Errc::Config);
   EXPECT_RDB_ERROR(rdb::packBits(bits, tooLong), rdb::Errc::Config);
+  EXPECT_EQ(tooShort, (std::vector<std::byte>{std::byte{0}}));
+  EXPECT_EQ(tooLong, (std::vector<std::byte>(3, std::byte{0})));
 }

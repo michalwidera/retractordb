@@ -10,6 +10,7 @@
 
 #include "fatalError.hpp"
 #include "rdb/error.hpp"
+#include "rdbResult.hpp"
 
 // ctest -R '^ut_fatalError' -V
 
@@ -98,4 +99,42 @@ TEST(ResultTest, DaemonHandlerKeepsFatalLatchContract) {
         rdb::fatal("daemon invariant");
       },
       ::testing::ExitedWithCode(EXIT_FAILURE), "FATAL: daemon invariant\nlatch=1");
+}
+
+TEST(ResultTest, ErrorNamesRefusalClassesAndHandlerExchange) {
+  for (const auto &[code, name] :
+       std::vector<std::pair<rdb::Errc, std::string>>{{rdb::Errc::Config, "ConfigError"},
+                                                      {rdb::Errc::CorruptDescriptor, "CorruptDescriptor"},
+                                                      {rdb::Errc::Syntax, "SyntaxError"},
+                                                      {rdb::Errc::Compile, "CompileError"},
+                                                      {rdb::Errc::Eval, "EvalError"},
+                                                      {rdb::Errc::IO, "IOError"},
+                                                      {rdb::Errc::Logic, "LogicError"}})
+    EXPECT_EQ(rdb::errcName(code), name);
+  EXPECT_EQ(rdb::errcName(static_cast<rdb::Errc>(255)), "Error");
+  for (const auto cls : {rdb::ErrorClass::Environment, rdb::ErrorClass::Internal, rdb::ErrorClass::Plan,
+                         rdb::ErrorClass::Request, rdb::ErrorClass::Data}) {
+    const rdb::Result<> result = rdb::fail(rdb::Refusal{.cls = cls, .message = "cause", .err = EACCES});
+    const auto expected        = cls == rdb::ErrorClass::Environment ? rdb::Errc::IO
+                                 : cls == rdb::ErrorClass::Internal  ? rdb::Errc::Logic
+                                                                     : rdb::Errc::Compile;
+    ASSERT_RDB_ERROR(result, expected, "cause");
+    EXPECT_EQ(result.error().err(), EACCES);
+  }
+  const rdb::Result<> literal = rdb::fail(rdb::Errc::Config, "literal");
+  ASSERT_RDB_ERROR(literal, rdb::Errc::Config, "literal");
+  EXPECT_EQ(literal.error().err(), 0);
+  const auto handler  = +[](std::string_view, const std::source_location &) noexcept {};
+  const auto previous = rdb::setFatalHandler(handler);
+  EXPECT_EQ(rdb::setFatalHandler(nullptr), handler);
+  rdb::setFatalHandler(previous);
+}
+
+TEST(FatalErrorTest, FormattingFailureStillRunsAtexit) {
+  EXPECT_EXIT(
+      {
+        std::atexit(reportLatch);
+        rdb::detail::terminateProcess<rdb::ErrorClass::Internal>(std::source_location::current(), fmt::runtime("{"), 1);
+      },
+      ::testing::ExitedWithCode(EXIT_FAILURE), "latch=1");
 }

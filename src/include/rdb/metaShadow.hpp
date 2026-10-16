@@ -39,8 +39,11 @@ class metaShadow {
   /// Obiekt klasy ShadowOverride powinien:
   /// - przechowywać bezwzględny indeks nadpisanego rekordu głównego indeksu i nowy wzorzec null tego rekordu, jeden bit na pole deskryptora.
   /// - przez serialize zapisywać bajt zarezerwowany równy 0, recordIndex i długość bitsetu jako size_t w porządku bajtów maszyny, a następnie bitset upakowany od najmłodszego bitu w ceil(n/8) bajtach z zerowymi bitami dopełnienia, w układzie zgodnym z wpisem IndexRecord.
+  ///   Test: `RequirementContracts.index_and_shadow_frames_match_the_legacy_binary_layout`.
   /// - przez deserialize odtwarzać wpis zapisany przez serialize, pomijając wartość bajtu zarezerwowanego.
+  ///   Test: `RequirementContracts.index_and_shadow_frames_match_the_legacy_binary_layout`.
   /// - zwracać z deserialize Errc::IO z kodem EIO, gdy ramka jest za krótka na nagłówek albo deklarowana długość bitsetu przekracza pozostałe bajty, porównując długość przed zaokrągleniem do bajtów.
+  ///   Test: `RequirementContracts.index_and_shadow_frames_match_the_legacy_binary_layout`.
   struct ShadowOverride {
     size_t recordIndex{0};         ///< absolute position of the overridden record in the main index
     std::vector<bool> nullBitset;  ///< new null bit-set pattern for that record

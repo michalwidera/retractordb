@@ -7,6 +7,7 @@
 #include <fstream>
 #include <future>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <system_error>
 #include <vector>
@@ -14,9 +15,12 @@
 #include <gtest/gtest.h>
 
 #include "fatalError.hpp"
+#include "logCapture.hpp"
+#include "rdbResult.hpp"
 #include "retractor/lib/compiler.hpp"
 #include "retractor/lib/planSource.hpp"
 #include "retractor/lib/qTree.hpp"
+#include "retractor/lib/RQLParser.hpp"
 #include "retractor/lib/serviceControl.hpp"
 
 /// @brief Wczytywanie zestawu RQL z tekstu - wspolne zrodlo startu z pliku i przeladowania
@@ -34,6 +38,112 @@ TEST(PlanSource, empty_text_is_an_empty_plan_not_an_error) {
   EXPECT_EQ(loaded.status, "OK");
   EXPECT_TRUE(loaded.lines.empty());
   EXPECT_TRUE(plan.empty());
+}
+
+TEST(PlanSource, rotation_counter_preflight_is_read_only_and_preserves_error_class) {
+  namespace fs           = std::filesystem;
+  const std::string file = "preflight_counter";
+  fs::remove_all(file);
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan, "ROTATION 'preflight_counter'\n").status, "OK");
+  EXPECT_TRUE(checkRotationCounter(plan).refusal.empty());
+  EXPECT_FALSE(fs::exists(file));
+  std::ofstream(file) << "7\n";
+  EXPECT_TRUE(checkRotationCounter(plan).refusal.empty());
+  std::string saved;
+  std::ifstream(file) >> saved;
+  EXPECT_EQ(saved, "7");
+  std::ofstream(file) << "invalid";
+  const auto invalid = checkRotationCounter(plan);
+  EXPECT_FALSE(invalid.environment);
+  EXPECT_TRUE(invalid.refusal.contains(file));
+  fs::remove(file);
+  fs::create_directory(file);
+  const auto inaccessible = checkRotationCounter(plan);
+  EXPECT_TRUE(inaccessible.environment);
+  EXPECT_TRUE(inaccessible.refusal.contains(file));
+  fs::remove(file);
+  qTree empty;
+  EXPECT_TRUE(checkRotationCounter(empty).refusal.empty());
+}
+
+TEST(PlanSource, timeout_report_covers_sources_filters_and_no_clock) {
+  qTree plan;
+  ASSERT_EQ(parsePlanText(plan,
+                          "DECLARE a BYTE STREAM explicit_timeout, 1 DEVICE '/dev/zero' TIMEOUT 0.5\n"
+                          "DECLARE a BYTE STREAM inherited, 1 DEVICE '/dev/zero'\n"
+                          "DECLARE a BYTE STREAM file_source, 1 BINFILE 'file.bin'\n")
+                .status,
+            "OK");
+  EXPECT_EQ(deviceTimeoutReport(plan, 0.25, false),
+            (std::vector<std::string>{"DEVICE stream 'explicit_timeout': effective TIMEOUT 0.5 s (RQL)",
+                                      "DEVICE stream 'inherited': effective TIMEOUT 0.25 s (config)"}));
+  EXPECT_EQ(deviceTimeoutReport(plan, std::nullopt, false, {"inherited"}),
+            (std::vector<std::string>{"DEVICE stream 'inherited': effective TIMEOUT 0 s (default)"}));
+  EXPECT_EQ(deviceTimeoutReport(plan, 0.25, true, {"explicit_timeout"}),
+            (std::vector<std::string>{"DEVICE stream 'explicit_timeout': effective TIMEOUT 0 s (no-clock)"}));
+}
+
+TEST(PlanSource, logical_lines_keep_start_numbers_and_drop_unfinished_statements) {
+  std::istringstream input(" \t\r\n  # ignored\nSELECT \\\n  a\n\nRULE b\nunfinished\\\n");
+  EXPECT_EQ(readLogicalLines(input), (std::vector<std::pair<std::string, size_t>>{{"SELECT    a", 3}, {"RULE b", 6}}));
+}
+
+TEST(PlanSource, parser_status_keywords_and_partial_plan_are_explicit) {
+  qTree plan;
+  std::vector<std::string> keywords{"stale"};
+  const auto [ok, first, name] =
+      parserRQLString(plan, "DECLARE a INTEGER STREAM src, 1 TEXTFILE 'data.txt'\nSELECT a STREAM dst FROM src\n", keywords);
+  EXPECT_EQ(ok, "OK");
+  EXPECT_EQ(first, "DECLARE");
+  EXPECT_EQ(name, "src");
+  EXPECT_EQ(keywords, (std::vector<std::string>{"DECLARE", "SELECT"}));
+  EXPECT_TRUE(plan.exists("src"));
+  EXPECT_TRUE(plan.exists("dst"));
+  const auto [empty, unrecognized, emptyName] = parserRQLString(plan, "", keywords);
+  EXPECT_NE(empty, "OK");
+  EXPECT_EQ(unrecognized, "UNRECOGNIZED");
+  EXPECT_TRUE(emptyName.empty());
+  EXPECT_TRUE(keywords.empty());
+  const auto [bad, unknown, noName] = parserRQLString(plan, "SELEKT", keywords);
+  EXPECT_NE(bad, "OK");
+  EXPECT_EQ(unknown, "UNRECOGNIZED");
+  EXPECT_TRUE(noName.empty());
+  EXPECT_TRUE(plan.exists("src"));
+  const auto [semantic, declared, invalid] =
+      parserRQLString(plan, "DECLARE a INTEGER STREAM invalid, 0 TEXTFILE 'data.txt'\n", keywords);
+  EXPECT_NE(semantic, "OK");
+  EXPECT_EQ(declared, "DECLARE");
+  EXPECT_EQ(invalid, "invalid");
+}
+
+TEST(PlanSource, file_parser_reports_missing_empty_and_first_invalid_statement) {
+  const std::string file = "parser_contract.rql";
+  std::filesystem::remove(file);
+  qTree plan;
+  LogCapture log;
+  EXPECT_EQ(parserRQLFile_4Test(plan, file), "Unable to open file.");
+  EXPECT_TRUE(log.text().contains("Unable to open file"));
+  std::ofstream(file) << "# comment only\n";
+  EXPECT_EQ(parserRQLFile_4Test(plan, file), "Empty file.");
+  std::ofstream(file) << "DECLARE a INTEGER STREAM before, 1 TEXTFILE 'data.txt'\n"
+                         "SELEKT broken\n"
+                         "DECLARE a INTEGER STREAM after, 1 TEXTFILE 'data.txt'\n";
+  EXPECT_NE(parserRQLFile_4Test(plan, file), "OK");
+  EXPECT_TRUE(plan.exists("before"));
+  EXPECT_FALSE(plan.exists("after"));
+  EXPECT_TRUE(log.text().contains("Parsing failed"));
+  std::filesystem::remove(file);
+}
+
+TEST(PlanSource, internal_compiler_status_is_prefixed_logged_and_recognized) {
+  LogCapture log;
+  const auto status = internalCompilerError("audit boundary");
+  EXPECT_EQ(status, std::string(kInternalCompilerError) + "audit boundary");
+  EXPECT_TRUE(log.text().contains(status));
+  EXPECT_TRUE(isInternalCompilerError(status));
+  EXPECT_FALSE(isInternalCompilerError("OK"));
+  EXPECT_FALSE(isInternalCompilerError("prefix " + status));
 }
 
 TEST(PlanSource, comments_and_blank_lines_alone_are_an_empty_plan) {

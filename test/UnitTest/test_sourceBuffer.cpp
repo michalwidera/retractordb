@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 
+#include "logCapture.hpp"
 #include "rdb/facctxtsrc.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/sourceBuffer.hpp"
@@ -118,4 +119,47 @@ TEST(SourceBufferTest, fire_pushes_chamber_into_history) {
   EXPECT_EQ(valueOf(buffer.history(1)), 2);
 
   std::filesystem::remove("sb_fire.txt");
+}
+
+TEST(SourceBufferTest, input_content_failure_preserves_the_output_and_reports_the_cause) {
+  const std::string file = "sb_invalid_content.txt";
+  createTextFile(file, "12 invalid\n");
+  const rdb::Descriptor descriptor{{"a", 4, 1, rdb::INTEGER}, {"missing", 0, 1, rdb::NULLTYPE}};
+  rdb::textSourceRO source(file, descriptor, false);
+  rdb::SourceBuffer buffer;
+  buffer.attach(descriptor);
+  rdb::payload out(descriptor);
+  out.setItem(0, 81);
+  const auto result = buffer.readCurrent(source, out);
+  ASSERT_RDB_ERROR(result, rdb::Errc::Config, "expected a NULL token");
+  EXPECT_EQ(result.error().message(), source.inputError());
+  EXPECT_EQ(valueOf(out), 81);
+  EXPECT_EQ(out.getNullBitset(), (std::vector<bool>{false, false}));
+  std::filesystem::remove(file);
+}
+
+TEST(SourceBufferTest, read_failure_warning_preserves_the_null_row) {
+  const std::string file = "sb_missing_warning.txt";
+  std::filesystem::remove(file);
+  auto descriptor = intDescriptor();
+  rdb::textSourceRO source(file, descriptor, false);
+  rdb::SourceBuffer buffer;
+  buffer.attach(descriptor);
+  rdb::payload out(descriptor);
+  LogCapture log;
+  ASSERT_RDB_OK(buffer.readCurrent(source, out));
+  EXPECT_EQ(valueOf(out), 0);
+  EXPECT_EQ(out.getNullBitset(), std::vector<bool>{true});
+#if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_WARN
+  EXPECT_TRUE(log.text().contains("Read failure from declared source"));
+#endif
+  std::filesystem::remove(file);
+}
+
+TEST(SourceBufferDeathTest, fire_without_capacity_is_an_invariant_failure) {
+  auto descriptor = intDescriptor();
+  rdb::SourceBuffer buffer;
+  buffer.attach(descriptor);
+  rdb::payload out(descriptor);
+  ASSERT_DEATH(buffer.fire(out), "circular buffer capacity is zero");
 }

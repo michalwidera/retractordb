@@ -24,7 +24,9 @@ inline constexpr size_t kGeneratedPrefixLength = sizeof("STREAM_") - 1;
 
 /// Funkcja reductionResultField powinna:
 /// - dla typu źródła BYTE, INTEGER, UINT albo RATIONAL zwracać pole RATIONAL o długości sizeof(boost::rational<int>).
+///   Test: `RequirementContracts.query_helpers_identify_nodes_dependencies_and_reset_state`.
 /// - dla każdego innego typu źródła zwracać typ i długość źródła bez zmian.
+///   Test: `RequirementContracts.query_helpers_identify_nodes_dependencies_and_reset_state`.
 ///
 /// @note K24/D4: rachunek redukcji (AVG/MIN/MAX/SUMC) idzie po boost::rational<int>. Deskryptor wejsciowy
 ///       (query::descriptorFrom) i payload wyniku (streamInstance::reduceFieldsToPayload) uzywaly typu
@@ -73,7 +75,9 @@ inline std::pair<rdb::descFld, int> reductionResultField(rdb::descFld sourceType
 /// Obiekt klasy windowGroup powinien:
 /// - przechowywać strumień źródłowy, szerokość okna w rekordach, typ wartości redukcji oraz albo slot płaski pola źródła, albo program wyrażenia liczonego na każdym rekordzie okna.
 /// - traktować pusty program jako odczyt slotu wprost, a niepusty program jako wyrażenie, przy którym slot nie ma znaczenia.
+///   Test: `RequirementContracts.window_identity_compares_programs_or_slots`.
 /// - przez sameAs uznawać dwie grupy za identyczne wyłącznie przy równym źródle, szerokości i typie wartości oraz równym slocie dla grup bez programu albo równych co do polecenia i wartości tokenach programu dla grup z programem.
+///   Test: `RequirementContracts.window_identity_compares_programs_or_slots`.
 struct windowGroup {
   std::string source;                      ///< strumien zrodlowy (nazwa fizyczna po ekspansji generatorow)
   int slot  = 0;                           ///< slot plaski pola w rekordzie zrodla; nieuzywany, gdy `program` niepusty
@@ -115,6 +119,7 @@ enum class sourceKind : std::uint8_t { none, binFile, textFile, device };
 
 /// Funkcja sourceKindKeyword powinna:
 /// - zwracać słowo kluczowe RQL rodzaju źródła: "BINFILE", "TEXTFILE" albo "DEVICE", a dla sourceKind::none pusty napis.
+///   Test: `RequirementContracts.query_helpers_identify_nodes_dependencies_and_reset_state`.
 ///
 /// @note Do komunikatow i ostrzezen.
 inline std::string_view sourceKindKeyword(sourceKind kind) {
@@ -134,14 +139,21 @@ inline std::string_view sourceKindKeyword(sourceKind kind) {
 /// Obiekt klasy query powinien:
 /// - przechowywać nazwę, interwał, plik źródła, schemat pól z programami, program FROM, grupy okien rekordowych, reguły, retencję, politykę magazynu oraz wyniki kompilacji: ogon, origin i liczność generatora.
 /// - traktować węzeł z pustym programem FROM jako deklarację źródła, węzeł o nazwie z przedrostkiem STREAM_ jako strumień generowany przez kompilator, a węzeł o nazwie zaczynającej się od dwukropka jako dyrektywę kompilatora.
+///   Test: `RequirementContracts.query_helpers_identify_nodes_dependencies_and_reset_state`.
 /// - przez isReductionRequired zwracać prawdę, gdy program FROM zawiera więcej niż jeden operator strumieniowy, wliczając reduktory AVG, MIN, MAX i SUMC.
+///   Test: `RequirementContracts.query_helpers_identify_nodes_dependencies_and_reset_state`.
 /// - przez getDepStream zwracać nazwy strumieni z tokenów PUSH_STREAM programu FROM w kolejności programu.
+///   Test: `RequirementContracts.query_helpers_identify_nodes_dependencies_and_reset_state`.
 /// - przez descriptorStorage budować deskryptor magazynu z pól schematu, a dla deklaracji dołączać REF z plikiem i TYPE z rodzaju źródła (BINFILE, TEXTSOURCE, DEVICE), dla SELECT zaś RETENTION przy zdefiniowanej retencji oraz RETMEMORY i TYPE przy polityce z pojemnością (MEMORY albo profil dyrektywy :SUBSTRAT).
 /// - przez storageType zwracać typ z polityki tylko wtedy, gdy polityka go wybiera (pojemność różna od zera i nazwa inna niż DEFAULT), a w przeciwnym razie STORAGE z planu.
+///   Test: `RequirementContracts.query_helpers_identify_nodes_dependencies_and_reset_state`.
 /// - przez descriptorFrom budować deskryptor wejścia operatora FROM: dla reduktorów jedno pole o typie wyniku redukcji, dla przeplotu złożenie deskryptorów składników, dla AGSE abs(długość) pól płaskich o najszerszym typie źródła, a dla pozostałych operatorów pola źródeł z niezerową długością.
 /// - przez reset czyścić identyfikator, nazwę pliku, schemat, program FROM i ostrzeżenia oraz przywracać wartości początkowe interwału, flag, rodzaju źródła, numeru wiersza deklaracji, generatora, policy, retention i timeoutSeconds.
+///   Test: `RequirementContracts.query_helpers_identify_nodes_dependencies_and_reset_state`.
 /// - traktować wywołanie getFieldIndex dla pola spoza schematu jako błąd w kodzie wołającego (rdb::fatal).
+///   Test: `RequirementContractsDeathTest.oversized_from_and_unknown_fields_are_invariant_failures`.
 /// - porządkować węzły według interwału operatorem <.
+///   Test: `RequirementContracts.query_helpers_identify_nodes_dependencies_and_reset_state`.
 class query {
   void fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &val, const std::string &id);
 
@@ -260,6 +272,7 @@ class query {
 
 /// Funkcja operator< powinna:
 /// - porządkować węzły wyłącznie według interwału rInterval, rosnąco.
+///   Test: `RequirementContracts.query_helpers_identify_nodes_dependencies_and_reset_state`.
 bool operator<(const query &lhs, const query &rhs);
 
 /// Efektywny termin odczytu zrodla DEVICE i to, skad pochodzi (#347).
@@ -272,7 +285,9 @@ struct deviceTimeout {
 
 /// Funkcja effectiveDeviceTimeout powinna:
 /// - w trybie bez zegara (noClock, `-f`) zwracać 0 s z pochodzeniem "no-clock".
+///   Test: `PlanSource.timeout_report_covers_sources_filters_and_no_clock`.
 /// - w przeciwnym razie zwracać jawną klauzulę TIMEOUT węzła z pochodzeniem "RQL", a bez niej configured z pochodzeniem "config", a bez obu 0 s z pochodzeniem "default".
+///   Test: `PlanSource.timeout_report_covers_sources_filters_and_no_clock`.
 ///
 /// @note #347. Bez zegara termin wynosi zawsze 0: sekundy rzeczywiste nie maja przelicznika na czas wirtualny,
 ///       a proba nieblokujaca zostawia DEVICE uzytecznym w szybkich testach. configured to `[sources] timeout_s`.
@@ -280,9 +295,13 @@ deviceTimeout effectiveDeviceTimeout(const query &qry, std::optional<double> con
 
 /// Funkcja GetArgs powinna:
 /// - dla programu FROM z jednym tokenem zwracać jego napis jako pierwszy argument, pusty drugi i ten sam token jako operator.
+///   Test: `RequirementContracts.from_arguments_follow_the_compiled_program_shape`.
 /// - dla dwóch tokenów zwracać napis pierwszego jako pierwszy argument, pusty drugi i drugi token jako operator.
+///   Test: `RequirementContracts.from_arguments_follow_the_compiled_program_shape`.
 /// - dla trzech tokenów zwracać napisy dwóch pierwszych jako argumenty i trzeci token jako operator.
+///   Test: `RequirementContracts.from_arguments_follow_the_compiled_program_shape`.
 /// - kończyć proces przez RDB_ASSERT dla programu dłuższego niż trzy tokeny.
+///   Test: `RequirementContractsDeathTest.oversized_from_and_unknown_fields_are_invariant_failures`.
 ///
 /// @note Wolaja ja wylacznie przebiegi kompilatora po extractIntermediateStreams() i wykonanie planu
 ///       skompilowanego, gdzie program FROM ma 1..3 tokeny.

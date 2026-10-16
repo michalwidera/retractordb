@@ -11,22 +11,37 @@ namespace rdb {
 ///
 /// Obiekt klasy posixBinaryFileWithShadow powinien:
 /// - realizować append do głównego pliku danych oraz update do osobnego pliku cienia,
+///   Test: `ShadowFileTest.test_faccposixshd_append_to_main`, `ShadowFileTest.test_faccposixshd_update_to_shadow`.
 /// - dzięki plikowi cienia zachowywać oryginalną, zarejestrowaną zawartość danych: aktualizacje nie nadpisują
 ///   rekordów w pliku głównym aż do jawnego wywołania merge(),
+///   Test: `ShadowFileTest.test_faccposixshd_update_to_shadow`, `ShadowFileTest.test_faccposixshd_merge`.
 /// - przechowywać w pliku cienia pary (offset w bajtach, dane) dla operacji update,
+///   Test: `ShadowFileTest.test_faccposixshd_shadow_entry_format`.
 /// - interpretować position w read() i update jako offset w bajtach; dopisywanie wybiera pozycja
 ///   std::numeric_limits<size_t>::max(),
+///   Test: `ShadowFileTest.test_faccposixshd_multibyte_record`, `ShadowFileTest.test_faccposixshd_append_to_main`.
 /// - podczas odczytu zwracać najnowszą wartość rekordu, preferując dane z pliku cienia przed danymi z pliku głównego,
+///   Test: `ShadowFileTest.test_faccposixshd_update_to_shadow`.
 /// - przy wielokrotnych aktualizacjach tej samej pozycji traktować ostatni wpis w pliku cienia jako obowiązujący stan rekordu,
+///   Test: `ShadowFileTest.test_faccposixshd_multiple_updates_same_pos`.
 /// - ignorować parametr nullBitset przy zapisie i czyścić go przy odczycie; obsługa wartości null jest realizowana poza tą klasą,
+///   Test: `ShadowFileTest.test_faccposixshd_append_to_main`.
 /// - implementować interfejs FileInterface,
+///   Test: `AccessorFactoryTest.maps_type_to_accessor_class`.
 /// - udostępniać operację merge(), która scala zmiany z pliku cienia do pliku głównego i zeruje plik cienia,
+///   Test: `ShadowFileTest.test_faccposixshd_merge`.
 /// - w operacji purge wywołanej przez write(nullptr, ..., 0) opróżniać w miejscu zarówno plik główny, jak i plik cienia,
+///   Test: `ShadowFileTest.test_faccposixshd_purge_keeps_files_usable`.
 /// - przez discard() usuwać oba pliki i rezygnować z rotacji - dla właściciela, który porzuca plik celowo,
+///   Test: `GroupFileTest.test_fagrp_segment_rotation_removes_shadow`.
 /// - zwracać przez count() liczbę rekordów wynikającą wyłącznie z rozmiaru pliku głównego,
+///   Test: `ShadowFileTest.test_faccposixshd_count_ignores_shadow`.
 /// - raportować przez hasShadow() posiadanie pliku cienia danych, aby storage dobrał wariant indeksu metadanych,
+///   Test: `AccessorFactoryTest.maps_type_to_accessor_class`.
 /// - przy tworzeniu obiektu odtwarzać stan z istniejącego pliku głównego i istniejącego pliku cienia, przycinając niepełne końcówki wpisów,
+///   Test: `ShadowFileTest.test_faccposixshd_restore_truncates_unaligned_main_file`, `ShadowFileTest.test_faccposixshd_restore_truncates_unaligned_shadow_file`.
 /// - zwalniać deskryptory plików przy niszczeniu obiektu i podejmować próbę utrwalenia zapisanych danych przez fsync.
+///   Test: `ShadowFileTest.test_faccposixshd_persistence`.
 ///
 /// @note Klasa nie utrzymuje osobnego indeksu zmian; wyszukiwanie aktualizacji w pliku cienia odbywa się przez przeszukiwanie wpisów od końca.
 /// @note Zwykłe operacje update nie modyfikują głównego pliku danych; fizyczne scalenie zmian następuje dopiero po wywołaniu merge().

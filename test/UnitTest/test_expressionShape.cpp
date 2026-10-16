@@ -115,6 +115,82 @@ const std::vector<rdb::descFld> &numericTypes() {
 
 }  // namespace
 
+// Niezalezne oczekiwania rozmiaru i dokladnosci, takze dla typow spoza wartosci liczbowych.
+TEST(xExpressionShape, type_helpers_cover_descriptor_types_and_the_fallback) {
+  const std::vector<int> lengths{
+      1,           sizeof(int), sizeof(unsigned), sizeof(ratio), sizeof(float), sizeof(double), sizeof(int),
+      sizeof(int), 1,           sizeof(int),      sizeof(int),   sizeof(int),   sizeof(int),    sizeof(int)};
+  for (unsigned i = 0; i < lengths.size(); ++i) {
+    SCOPED_TRACE(i);
+    const auto type = static_cast<rdb::descFld>(i);
+    EXPECT_EQ(fieldLengthOfType(type), lengths[i]);
+    const auto shape = numericShape(type);
+    EXPECT_EQ(shape.rtype, type);
+    EXPECT_EQ(shape.rlen, lengths[i]);
+    EXPECT_EQ(shape.rarray, 1);
+    EXPECT_EQ(isExactType(type), i <= rdb::RATIONAL);
+  }
+  EXPECT_EQ(fieldLengthOfType(static_cast<rdb::descFld>(255)), sizeof(int));
+  EXPECT_FALSE(isExactType(static_cast<rdb::descFld>(255)));
+}
+
+TEST(xExpressionShape, function_type_policy_handles_unknown_arguments_and_mixed_case) {
+  for (const auto type : {std::optional<rdb::descFld>{}, std::optional{rdb::RATIONAL}, std::optional{rdb::STRING}}) {
+    EXPECT_EQ(functionResultType("TO_INTEGER", type), rdb::INTEGER);
+    EXPECT_EQ(functionResultType("To_FlOaT", type), rdb::FLOAT);
+    EXPECT_EQ(functionResultType("TO_DOUBLE", type), rdb::DOUBLE);
+    EXPECT_EQ(functionResultType("TO_STRING", type), rdb::STRING);
+    for (const char *name : {"ISNULL", "IsZeRo", "ISNONZERO", "LENGTH"})
+      EXPECT_EQ(functionResultType(name, type), rdb::INTEGER);
+    for (const char *name : {"SIN", "CoS", "EXP"})
+      EXPECT_EQ(functionResultType(name, type), rdb::DOUBLE);
+    for (const char *name : {"ABS", "NULL2ZERO", "FLOOR", "CEIL", "SQRT", "ROUND", "TRUNC", "TAN", "LOG", "LOG2"})
+      EXPECT_EQ(functionResultType(name, type), type);
+    EXPECT_EQ(functionResultType("unknown_function", type), std::nullopt);
+  }
+}
+
+TEST(xExpressionShape, malformed_references_and_window_tokens_report_unknown) {
+  EXPECT_EQ(inferExpressionShape({readField(0)}, {}, {}).status, exprShapeStatus::unknown);
+  EXPECT_EQ(analyse({token(PUSH_ID, 0)}).status, exprShapeStatus::unknown);
+  for (const auto command : {PUSH_ID1, PUSH_ID2, PUSH_ID3, PUSH_ID4, PUSH_ID5, PUSH_IDX})
+    EXPECT_EQ(analyse({token(command)}).status, exprShapeStatus::unknown);
+  for (const auto command : {WINDOW_MIN, WINDOW_MAX, WINDOW_AVG, WINDOW_SUM}) {
+    const auto window = [](int index) -> std::optional<exprShape> {
+      EXPECT_EQ(index, 3);
+      return numericShape(rdb::DOUBLE);
+    };
+    const auto resolved = inferExpressionShape({token(command, 3)}, {}, window);
+    ASSERT_TRUE(resolved.resolved());
+    EXPECT_EQ(resolved.shape.rtype, rdb::DOUBLE);
+    EXPECT_EQ(inferExpressionShape({token(command, std::string("bad"))}, {}, window).status, exprShapeStatus::unknown);
+    EXPECT_EQ(inferExpressionShape({token(command, 3)}, {}, {}).status, exprShapeStatus::unknown);
+    EXPECT_EQ(inferExpressionShape({token(command, 3)}, {}, [](int) { return std::optional<exprShape>{}; }).status,
+              exprShapeStatus::unknown);
+  }
+}
+
+TEST(xExpressionShape, literal_shapes_include_empty_strings_and_reject_pairs) {
+  const auto empty = analyse({token(PUSH_VAL, std::string())});
+  ASSERT_TRUE(empty.resolved());
+  EXPECT_EQ(empty.shape.rtype, rdb::STRING);
+  EXPECT_EQ(empty.shape.rlen, 1);
+  EXPECT_EQ(empty.shape.rarray, kToStringDefaultWidth);
+  EXPECT_EQ(analyse({token(PUSH_VAL, std::make_pair(1, 2))}).status, exprShapeStatus::unknown);
+  EXPECT_EQ(analyse({readField(0), token(CALL, std::string("unknown_function"))}).status, exprShapeStatus::unknown);
+  EXPECT_EQ(analyse({readField(sText), token(CALL, std::string("Abs"))}).status, exprShapeStatus::illTyped);
+  for (const char *name : {"sin", "cos", "exp"})
+    EXPECT_EQ(analyse({readField(sText), token(CALL, std::string(name))}).status, exprShapeStatus::illTyped);
+}
+
+TEST(xExpressionShape, stack_underflow_is_checked_for_every_operator_family) {
+  for (const auto command : {ADD, SUBTRACT, MULTIPLY, DIVIDE, POWER, CMP_EQUAL, CMP_NOT_EQUAL, CMP_LT, CMP_GT, CMP_LE, CMP_GE,
+                             AND, OR, NEGATE, BIT_NOT, NOT, CALL, CALL2}) {
+    SCOPED_TRACE(command);
+    EXPECT_EQ(analyse({token(command)}).status, exprShapeStatus::illTyped);
+  }
+}
+
 // --- czyste odczyty -------------------------------------------------------------------
 
 TEST(xExpressionShape, pure_field_read_keeps_type_and_length) {

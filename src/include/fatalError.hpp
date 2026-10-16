@@ -28,7 +28,9 @@ namespace detail {
 /// - dla klasy Internal ustawiać zatrzask fatalErrorRaised przed logowaniem, a dla Environment pozostawiać go bez zmian.
 /// - logować sformatowany komunikat na poziomie critical z miejscem wywołania (dla Environment z przedrostkiem "environment: "), opróżniać logger bez jego zamykania i wypisywać komunikat na stderr z przedrostkiem "FATAL: " albo "FATAL (environment): ".
 /// - nigdy nie zgłaszać wyjątku: błąd formatowania lub logowania pomijać i mimo to zakończyć proces.
+///   Test: `FatalErrorTest.FormattingFailureStillRunsAtexit`.
 /// - kończyć proces przez std::exit z kodem EXIT_FAILURE dla Internal i EIO dla Environment, tak aby wykonały się handlery atexit.
+///   Test: `FatalErrorTest.FormattingFailureStillRunsAtexit`.
 ///
 /// @note Wolana takze z noexcept-owych operatorow przenoszacych. Flush zamiast spdlog::shutdown: handlery atexit
 ///       loguja (executorsm::cleanup), a po shutdown makra SPDLOG_* konczyly sie SIGSEGV. Blad srodowiska nie
