@@ -46,7 +46,10 @@
 ///   do wywołującego; błąd przerywa obliczenia i wraca w Result, bez cofania wcześniej ustawionych pól.
 
 struct streamInstance {
+ private:
   qTree &coreInstance;
+
+ public:
   streamInstance() = delete;
 
   std::unique_ptr<rdb::storage> outputPayload;  // here is payload that will be stored - select clause

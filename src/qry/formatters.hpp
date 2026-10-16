@@ -9,7 +9,6 @@
 enum class formatMode : std::uint8_t { RAW, GRAPHITE, INFLUXDB, GNUPLOT };
 
 /// Obiekt klasy Formatter powinien:
-/// - przez columns rozwijać pola z db.field w kolumny, po jednej na element pola, z krotnością z db.field_count.<pole>, a przy jej braku traktować pole jako jednoelementowe.
 /// - przez isNullAt uznawać wartość za null wyłącznie, gdy znak mapy null na tej pozycji jest równy '1', a przez isAllNull
 ///   zwracać prawdę tylko dla dodatniej liczby wartości, z których wszystkie są null.
 /// - przez displayedValue zwracać wartość z wiersza albo dla null tekst NaN w trybie gnuplot i null w pozostałych trybach.
@@ -17,22 +16,24 @@ enum class formatMode : std::uint8_t { RAW, GRAPHITE, INFLUXDB, GNUPLOT };
 /// - przez initGnuplot wypisywać ustawienia terminala i zakresów osi, z osią x malejącą w trybie od prawej do lewej.
 /// - przez renderGnuplot przechowywać dla każdej kolumny okno ostatnich wartości o szerokości z wymiaru x, najnowszą
 ///   na pozycji 0, i wypisywać polecenie plot z jedną krzywą na każdą wartość wiersza i jednym blokiem danych na krzywą.
-///   Tytuły budować z nazw rozwiniętych kolumn (pole[i] dla tablic), a przy krótszym schemacie używać col<i>;
+///   Tytuły budować z pól db.field rozwiniętych po jednym elemencie na kolumnę według krotności
+///   db.field_count.<pole> (domyślnie 1), jako pole[i] dla tablic, a przy krótszym schemacie używać col<i>;
 ///   w nazwach tytułów zamieniać podkreślenia na myślniki.
 /// - przez renderGnuplotOhlc traktować cztery pierwsze wartości jako open, high, low i close, a dalsze jako próbki świecy, rysować świece z pominięciem niepełnych i próbki na wspólnej osi, a dla wiersza bez próbek jednorazowo zgłaszać na stderr niewłaściwy kształt strumienia i nic nie rysować.
-/// - przez renderGraphite wypisywać dla każdej kolumny schematu (columns), której wartość nie jest oznaczona jako null,
-///   także pustego tekstu, wiersz <strumień>.<metryka> <wartość> <czas uniksowy>, z metryką pole.<i> dla elementów
-///   tablic i nazwą pola dla skalarów; wartości wiersza poza kolumnami schematu pomijać.
-/// - przez renderInfluxDB wypisywać jeden wiersz line protocol z kolumnami schematu (columns), których wartości nie są
-///   oznaczone jako null, także pustymi tekstami, jako pole=wartość, z kluczem pole_<i> dla elementów tablic
-///   i znacznikiem czasu w nanosekundach; wartości poza kolumnami schematu pomijać, a gdy żadna kolumna nie ma
-///   wartości nieoznaczonej jako null, nie wypisywać niczego.
+/// - przez renderGraphite rozwijać pola db.field w kolumny według krotności db.field_count.<pole> (domyślnie 1)
+///   i dla każdej wartości nieoznaczonej jako null, także pustego tekstu, wypisywać wiersz
+///   <strumień>.<metryka> <wartość> <czas uniksowy>, z metryką pole.<i> dla elementów tablic i nazwą pola
+///   dla skalarów; wartości wiersza poza kolumnami schematu pomijać.
+/// - przez renderInfluxDB rozwijać pola db.field w kolumny według krotności db.field_count.<pole> (domyślnie 1)
+///   i wypisywać jeden wiersz line protocol z wartościami tych kolumn nieoznaczonymi jako null, także pustymi
+///   tekstami, jako pole=wartość, z kluczem pole_<i> dla elementów tablic i znacznikiem czasu w nanosekundach;
+///   wartości wiersza poza kolumnami schematu pomijać, a gdy żadna kolumna nie ma wartości nieoznaczonej jako null,
+///   nie wypisywać niczego.
 class Formatter {
   std::vector<std::deque<std::string>> gnuplot_lines_;
   bool ohlcShapeReported_{false};
   static const std::vector<std::string> colors_;
 
- public:
   /// Jedna WARTOSC wiersza: pole, ktore ja niesie, jej pozycja w tym polu i krotnosc pola.
   /// Serwer splaszcza tablice (jedna wartosc na element, nie na pole), wiec sama lista pol
   /// ze schematu przestala opisywac wiersz -- kolumny sa jej rozwinieciem.
@@ -48,6 +49,7 @@ class Formatter {
   /// jednoelementowe -- klient nadal dziala, tylko nie rozwija tablic.
   static std::vector<Column> columns(const boost::property_tree::ptree &schema);
 
+ public:
   static bool isNullAt(const std::string &nullmap, int index);
   static bool isAllNull(const std::string &nullmap, int count);
   static std::string displayedValue(const boost::property_tree::ptree &row, int index, const std::string &nullmap,

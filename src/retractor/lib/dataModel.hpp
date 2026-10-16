@@ -140,6 +140,7 @@ class dataModel {
    */
   [[nodiscard]] rdb::Result<> constructInputPayload(const query &qry, streamInstance &runtime);
 
+ private:
   /*
    * Wylicza okna rekordowe (MIN(pole:W:H) i rodzeństwo) dla jednego taktu strumienia.
    * Musi stać TU, a nie w streamInstance ani w ewaluatorze: okno czyta historię ŹRÓDŁA,
@@ -147,6 +148,7 @@ class dataModel {
    */
   [[nodiscard]] rdb::Result<> computeWindowAggregates(const query &qry, streamInstance &runtime);
 
+ public:
   /// Liczy jeden takt planu. Nalezne strumienie opisuje MASKA POZYCYJNA rownolegla do planu:
   /// dueMask[i] != 0 znaczy "element i planu jest nalezny w tym takcie". Dlugosc maski musi byc
   /// rowna dlugosci planu - pytanie brzmi zawsze "czy element i jest nalezny?", a nie "czy jest

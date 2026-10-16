@@ -18,8 +18,8 @@ namespace rdb {
 /// - obsługiwać append przez position == std::numeric_limits<size_t>::max() oraz update przez wskazaną pozycję,
 /// - traktować write(nullptr, ...) jako polecenie wyczyszczenia pamięci dla danego strumienia,
 /// - zwracać przez count() logiczną liczbę rekordów (łączną liczbę zapisów append),
-/// - opcjonalnie ograniczać liczbę przechowywanych rekordów przy dopisywaniu za pomocą kołowego bufora (ring buffer):
-///   zapis nadpisuje najstarszy slot, odczyt używa location % retentionSize jako indeksu w buforze.
+/// - przy ustawionej retencji przechowywać najwyżej wskazaną liczbę rekordów, zastępując najstarsze nowymi,
+///   a dla nadpisanej pozycji zwracać rekord, który zajął jej miejsce; bez retencji nie ograniczać liczby rekordów.
 ///
 /// @note Trwałość danych dotyczy wyłącznie czasu życia Memory Store (MemoryStore); klasa nie zapisuje stanu na dysk.
 /// @note Stan rekordów, nullBitset i licznik zapisów są współdzielone po nazwie strumienia między żywymi instancjami -
@@ -27,11 +27,17 @@ namespace rdb {
 ///       MemoryStore::processDefault(), czyli zachowanie sprzed fazy 2 (#446, C2).
 
 struct memoryFile : public FileInterface {
+ private:
   std::string filename_;
   const ssize_t recordSize_;
-  const size_t retentionSize_;               // Retention size for the records, if set to no_retention, no limit is applied
+  /// Rozmiar bufora kołowego; no_retention wyłącza ograniczenie liczby rekordów.
+  /// Append wybiera slot writeCount % retentionSize_, a read i update slot location % retentionSize_.
+  const size_t retentionSize_;
+
+ public:
   enum : std::uint8_t { no_retention = 0 };  // Default retention size if not specified
 
+ private:
   /// Węzeł TEGO strumienia w sklepie, wyszukany raz w konstruktorze i ważny do końca życia
   /// instancji. Powód i warunki ważności - patrz konstruktor w faccmemory.cc.
   memoryBucket *bucket_;

@@ -24,6 +24,7 @@ namespace rdb {
  *       openStorageFile() (storageFile.hpp), a dowiązanie pod nazwą pliku daje EIO.
  */
 struct genericBinaryFile : public FileInterface {
+ private:
   std::string filename_;
   const ssize_t recordSize_;
   int percounter_;

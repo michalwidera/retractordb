@@ -6,6 +6,8 @@ class ReadCmd : public ICommand {
 
  public:
   explicit ReadCmd(bool reverse) : reverse_(reverse) {}
+
+ private:
   // rread is an alias - suppress duplicate help entry
   [[nodiscard]] std::pair<std::string, std::vector<std::string>> usage() const override {
     if (reverse_) return {};
@@ -19,6 +21,8 @@ class ListCmd : public ICommand {
 
  public:
   explicit ListCmd(bool reverse) : reverse_(reverse) {}
+
+ private:
   // rlist is an alias - suppress duplicate help entry
   [[nodiscard]] std::pair<std::string, std::vector<std::string>> usage() const override {
     if (reverse_) return {};
@@ -28,31 +32,31 @@ class ListCmd : public ICommand {
 };
 
 class WriteCmd : public ICommand {
- public:
+ private:
   [[nodiscard]] std::pair<std::string, std::vector<std::string>> usage() const override;
   bool execute(CommandContext &ctx) override;
 };
 
 class DumpCmd : public ICommand {
- public:
+ private:
   [[nodiscard]] std::pair<std::string, std::vector<std::string>> usage() const override;
   bool execute(CommandContext &ctx) override;
 };
 
 class AppendCmd : public ICommand {
- public:
+ private:
   [[nodiscard]] std::pair<std::string, std::vector<std::string>> usage() const override;
   bool execute(CommandContext &ctx) override;
 };
 
 class PurgeCmd : public ICommand {
- public:
+ private:
   [[nodiscard]] std::pair<std::string, std::vector<std::string>> usage() const override;
   bool execute(CommandContext &ctx) override;
 };
 
 class SizeCmd : public ICommand {
- public:
+ private:
   [[nodiscard]] std::pair<std::string, std::vector<std::string>> usage() const override;
   bool execute(CommandContext &ctx) override;
 };
@@ -62,6 +66,8 @@ class DescCmd : public ICommand {
 
  public:
   explicit DescCmd(bool compact) : compact_(compact) {}
+
+ private:
   // descc is an alias - suppress duplicate help entry
   [[nodiscard]] std::pair<std::string, std::vector<std::string>> usage() const override {
     if (compact_) return {};
@@ -71,13 +77,13 @@ class DescCmd : public ICommand {
 };
 
 class CapCmd : public ICommand {
- public:
+ private:
   [[nodiscard]] std::pair<std::string, std::vector<std::string>> usage() const override;
   bool execute(CommandContext &ctx) override;
 };
 
 class RoxCmd : public ICommand {
- public:
+ private:
   [[nodiscard]] std::pair<std::string, std::vector<std::string>> usage() const override;
   bool execute(CommandContext &ctx) override;
 };
