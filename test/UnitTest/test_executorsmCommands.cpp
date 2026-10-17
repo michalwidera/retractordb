@@ -90,11 +90,13 @@ class ExecutorsmCommandsTest : public ::testing::Test {
 };
 
 TEST_F(ExecutorsmCommandsTest, hello_answers_world) {
+  // covers: executorsm.executorsm.9~1
   EXPECT_EQ(reply(executorsm::commandProcessor(command("hello"))), "world");
 }
 
 // get: kazdy wezel planu z okresem, rozmiarem w bajtach, liczba rekordow, lokalizacja i pojemnoscia.
 TEST_F(ExecutorsmCommandsTest, get_lists_every_stream_with_its_parameters) {
+  // covers: executorsm.executorsm.9~1
   const auto response = executorsm::commandProcessor(command("get"));
   EXPECT_EQ(response.get("db.stream.result", ""), "result");
   EXPECT_EQ(response.get("db.stream.result.duration", ""), "1");
@@ -107,6 +109,7 @@ TEST_F(ExecutorsmCommandsTest, get_lists_every_stream_with_its_parameters) {
 
 // detail: schemat, okres, lokalizacja, pojemnosc, liczba rekordow i zapytanie jednego strumienia.
 TEST_F(ExecutorsmCommandsTest, detail_describes_schema_period_location_capacity_records_and_query) {
+  // covers: executorsm.executorsm.9~1
   const auto response  = executorsm::commandProcessor(command("detail", "result"));
   const auto fieldName = plan.getQuery("result").lSchema.front().field_.rname;
   EXPECT_EQ(response.get("db.stream", ""), "result");
@@ -124,6 +127,7 @@ TEST_F(ExecutorsmCommandsTest, detail_describes_schema_period_location_capacity_
 
 // Nazwa spoza planu to odpowiedz z bledem i nazwa, a nie koniec procesu.
 TEST_F(ExecutorsmCommandsTest, unknown_stream_is_an_error_response_naming_it) {
+  // covers: executorsm.executorsm.10~1
   EXPECT_EQ(error(executorsm::commandProcessor(command("detail", "ghost"))), "unknown stream: ghost");
   EXPECT_EQ(error(executorsm::commandProcessor(command("show", "ghost", "7"))), "unknown stream: ghost");
   EXPECT_EQ(reply(executorsm::commandProcessor(command("hello"))), "world");
@@ -132,6 +136,7 @@ TEST_F(ExecutorsmCommandsTest, unknown_stream_is_an_error_response_naming_it) {
 // Bez modelu komendy, ktore go wymagaja, dostaja odpowiedz braku planu; w trakcie zamykania -
 // odpowiedz zamykania serwera.
 TEST_F(ExecutorsmCommandsTest, commands_needing_a_model_answer_no_plan_or_stopping) {
+  // covers: executorsm.executorsm.10~1
   pProc = nullptr;
   for (const char *name : {"get", "detail", "show", "adhoc"})
     EXPECT_EQ(reply(executorsm::commandProcessor(command(name, "result", "7"))), "no active plan") << name;
@@ -144,6 +149,7 @@ TEST_F(ExecutorsmCommandsTest, commands_needing_a_model_answer_no_plan_or_stoppi
 // error.response, a nastepna komenda jest obslugiwana. Zlamany niezmiennik (brak planu w
 // dyspozytorze) daje "engine error" i wpis krytyczny w logu.
 TEST_F(ExecutorsmCommandsTest, handler_failures_become_error_responses) {
+  // covers: executorsm.executorsm.12~1
   EXPECT_THAT(error(executorsm::commandProcessor(command("show", "result", "not-a-number"))),
               ::testing::StartsWith("command processor failure: "));
   EXPECT_EQ(reply(executorsm::commandProcessor(command("hello"))), "world");
@@ -156,6 +162,7 @@ TEST_F(ExecutorsmCommandsTest, handler_failures_become_error_responses) {
 }
 
 TEST_F(ExecutorsmCommandsTest, kill_stops_the_loop) {
+  // covers: executorsm.executorsm.9~1
   static_cast<void>(executorsm::commandProcessor(command("kill")));
   EXPECT_EQ(iLoopLimitCnt.load(), executorsm::stop_now);
 }
@@ -163,6 +170,7 @@ TEST_F(ExecutorsmCommandsTest, kill_stops_the_loop) {
 // Limity kanalu reset: liczba porcji 0..512, najwyzej 8 transferow naraz (wznowienie wlasnego
 // sie nie liczy), porcja ponad zapowiedz i tekst ponad 204800 B koncza transfer odmowa.
 TEST_F(ExecutorsmCommandsTest, reset_transfer_limits) {
+  // covers: executorsm.executorsm.9~1, executorsm.executorsm.14~1
   const auto resetBegin  = [](const boost::property_tree::ptree &request) { return executorsm::resetBegin(request); };
   const auto resetChunk  = [](const boost::property_tree::ptree &request) { return executorsm::resetChunk(request); };
   const auto resetCommit = [](const boost::property_tree::ptree &request) { return executorsm::resetCommit(request); };
@@ -193,6 +201,7 @@ TEST_F(ExecutorsmCommandsTest, reset_transfer_limits) {
 // kompilacji i DO SYSTEM (bez service.unrestricted) zostawia plan i nie zglasza wymiany; plan
 // przyjety czeka w esm::pendingPlanText, a kolejny commit w trakcie wymiany jest odrzucany.
 TEST_F(ExecutorsmCommandsTest, reset_commit_validates_without_touching_the_running_plan) {
+  // covers: executorsm.executorsm.14~1, executorsm.executorsm.15~1
   const auto commit = [&](const std::string &text, const std::string &id) {
     EXPECT_EQ(reply(executorsm::resetBegin(command("reset-begin", "1", id))), "OK");
     EXPECT_EQ(reply(executorsm::resetChunk(command("reset-chunk", text, id))), "OK");

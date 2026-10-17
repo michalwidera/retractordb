@@ -85,10 +85,8 @@ inline constexpr std::array<RqlFunction, 21> kRqlFunctions{{
 }};
 
 /// Funkcja findRqlFunction powinna:
-/// - zwracać wpis tabeli kRqlFunctions, którego nazwa kanoniczna albo niepusty skrót jest równy podanej nazwie bez względu na wielkość liter.
-///   Test: `RequirementContracts.catalogue_fallback_values_and_process_snapshot`.
-/// - dla nazwy nieznanej zwracać nullopt.
-///   Test: `RequirementContracts.catalogue_fallback_values_and_process_snapshot`.
+/// - [rqlfunctions.find-rql-function.1~1] zwracać wpis tabeli kRqlFunctions, którego nazwa kanoniczna albo niepusty skrót jest równy podanej nazwie bez względu na wielkość liter.
+/// - [rqlfunctions.find-rql-function.2~1] dla nazwy nieznanej zwracać nullopt.
 inline std::optional<RqlFunction> findRqlFunction(std::string_view name) {
   const auto sameIgnoringCase = [](std::string_view a, std::string_view b) {
     return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](unsigned char x, unsigned char y) {

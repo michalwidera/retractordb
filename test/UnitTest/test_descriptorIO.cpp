@@ -116,6 +116,7 @@ rdb::Descriptor sampleDescriptor() {
 // Zapis i odczyt: deskryptor odczytany z pliku jest identyczny z zapisanym.
 // ---------------------------------------------------------------------------
 TEST(DescriptorIOTest, save_and_load_round_trip) {
+  // covers: storage.storage.4~1
   const std::string file{"dio_roundtrip.desc"};
   const auto saved = sampleDescriptor();
 
@@ -145,6 +146,7 @@ TEST(DescriptorIOTest, bad_syntax_returns_an_error_without_ending_the_process) {
 }
 
 TEST(DescriptorIOTest, storage_returns_a_bad_descriptor_error) {
+  // covers: storage.storage.4~1
   const std::string file{"dio_storage.desc"};
   std::ofstream(file) << "{\n INTEGER }\n";
 
@@ -157,6 +159,7 @@ TEST(DescriptorIOTest, storage_returns_a_bad_descriptor_error) {
 }
 
 TEST(DescriptorIOTest, io_refusal_preserves_the_error_class_and_errno) {
+  // covers: descriptorio.try-load-descriptor-file.1~1, descriptorio.try-load-descriptor-file.2~1
   const std::filesystem::path file = "dio_missing.desc";
   const std::filesystem::path link = "dio_link.desc";
   std::filesystem::remove(file);
@@ -181,18 +184,21 @@ TEST(DescriptorIOTest, io_refusal_preserves_the_error_class_and_errno) {
 // błąd Errc::Logic po kontroli wstępnej - bez końca procesu i bez wyjątku.
 // ---------------------------------------------------------------------------
 TEST(DescriptorIOTest, verify_match_accepts_equal_descriptors) {
+  // covers: descriptorio.verify-descriptor-match.1~1, storage.storage.4~1
   const auto lhs = sampleDescriptor();
   const auto rhs = sampleDescriptor();
   EXPECT_RDB_OK(rdb::verifyDescriptorMatch(lhs, rhs, "dio_verify.desc"));
 }
 
 TEST(DescriptorIOTest, verify_match_rejects_different_descriptors) {
+  // covers: storage.storage.4~1
   const auto lhs = sampleDescriptor();
   const auto rhs = rdb::Descriptor("a", sizeof(int), 1, rdb::INTEGER);
   EXPECT_RDB_ERROR(rdb::verifyDescriptorMatch(lhs, rhs, "dio_verify.desc"), rdb::Errc::Logic, "descriptor schema mismatch");
 }
 
 TEST(DescriptorIOTest, load_replaces_an_existing_descriptor_and_only_reads_the_named_file) {
+  // covers: descriptorio.descriptor-io.4~1, descriptorio.try-load-descriptor-file.1~1
   const std::string file = "dio_replace.desc";
   const auto expected    = sampleDescriptor();
   ASSERT_RDB_OK(rdb::saveDescriptorFile(file, expected));
@@ -207,6 +213,7 @@ TEST(DescriptorIOTest, load_replaces_an_existing_descriptor_and_only_reads_the_n
 }
 
 TEST(DescriptorIOTest, all_load_refusals_preserve_a_nonempty_descriptor) {
+  // covers: descriptorio.descriptor-io.1~1, descriptorio.try-load-descriptor-file.3~1, descriptorio.try-load-descriptor-file.4~1
   const std::string file = "dio_preserved.desc";
   const auto original    = sampleDescriptor();
   for (const std::string content : {"{\n INTEGER }\n", "{}", "{ INTEGER a[0] }"}) {
@@ -229,6 +236,7 @@ TEST(DescriptorIOTest, all_load_refusals_preserve_a_nonempty_descriptor) {
 }
 
 TEST(DescriptorIOTest, size_and_read_failures_preserve_descriptor_errno_and_path) {
+  // covers: descriptorio.try-load-descriptor-file.2~1, descriptorio.try-load-descriptor-file.4~1
   const std::string file = "dio_injected.desc";
   const auto original    = sampleDescriptor();
   ASSERT_RDB_OK(rdb::saveDescriptorFile(file, original));
@@ -246,6 +254,7 @@ TEST(DescriptorIOTest, size_and_read_failures_preserve_descriptor_errno_and_path
 }
 
 TEST(DescriptorIOTest, save_truncates_the_file_and_does_not_follow_a_symlink) {
+  // covers: descriptorio.save-descriptor-file.1~1
   const std::string file = "dio_truncated.desc";
   const std::string link = "dio_write_link.desc";
   const auto descriptor  = sampleDescriptor();
@@ -266,6 +275,7 @@ TEST(DescriptorIOTest, save_truncates_the_file_and_does_not_follow_a_symlink) {
 }
 
 TEST(DescriptorIOTest, save_reports_open_write_and_zero_write_failures) {
+  // covers: descriptorio.descriptor-io.2~1, descriptorio.save-descriptor-file.2~1
   const std::string file = "dio_save_failure.desc";
   const auto descriptor  = sampleDescriptor();
   const auto opened      = rdb::saveDescriptorFile("dio_absent_directory/entry.desc", descriptor);
@@ -283,6 +293,7 @@ TEST(DescriptorIOTest, save_reports_open_write_and_zero_write_failures) {
 }
 
 TEST(DescriptorIOTest, mismatch_diagnostics_include_path_and_both_descriptors) {
+  // covers: descriptorio.descriptor-io.3~1, descriptorio.verify-descriptor-match.2~1
   const auto provided = sampleDescriptor();
   const auto existing = rdb::Descriptor("other", 4, 1, rdb::INTEGER);
   std::ostringstream providedText, existingText;
@@ -300,6 +311,7 @@ TEST(DescriptorIOTest, mismatch_diagnostics_include_path_and_both_descriptors) {
 }
 
 TEST(DescriptorIOTest, storage_fd_retries_partial_and_interrupted_io) {
+  // covers: storagefile.storage-fd.3~1, storagefile.storage-fd.4~1, storagefile.storage-fd.5~1, storagefile.storage-fd.6~1
   const std::string file = "dio_fd_retry.desc";
   const std::vector<std::byte> bytes{std::byte{1}, std::byte{2}, std::byte{3}};
   for (const auto fault : {IoFault::interruptedWrite, IoFault::partialWrite}) {

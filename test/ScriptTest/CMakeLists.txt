@@ -32,6 +32,12 @@ set_tests_properties(st_xplot_lifecycle PROPERTIES TIMEOUT 180)
 add_executable(test_api_client EXCLUDE_FROM_ALL api_client.cpp)
 target_link_libraries(test_api_client PRIVATE RetractorDB::client)
 foreach(mode fake real)
+  # covers: qry.qry.14~1, retractordbclient.subscription.1~1, retractordbclient.subscription.3~1
+  # covers: retractordbclient.subscription.4~1, retractordbclient.client.1~1, retractordbclient.client.2~1
+  # covers: retractordbclient.client.3~1, retractordbclient.client.4~1, retractordbclient.client.5~1, srcclient.process.1~1
+  # covers: srcclient.subscription-impl.1~1, srcclient.subscription-impl.2~1, srcclient.client-impl.1~1
+  # covers: srcclient.client-impl.2~1, retractordbclient.subscription.2~1, srcclient.process.2~1, srcclient.process.3~1
+  # covers: srcclient.process.4~1
   add_test(
     NAME st_api_${mode}
     COMMAND

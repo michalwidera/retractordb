@@ -241,6 +241,7 @@ extern "C" int __wrap_statvfs(const char *path, struct statvfs *info) {
   return result;
 }
 
+// covers: ipcserver.ipc-server.16~1
 static_assert(!std::is_copy_constructible_v<IpcServer> && !std::is_copy_assignable_v<IpcServer>);
 
 TEST_F(IpcServerQueues, abandonQueueLock_reports_eof_from_child) {
@@ -266,6 +267,7 @@ TEST_F(IpcServerQueues, subscribe_creates_response_queue) {
 }
 
 TEST_F(IpcServerQueues, removeAllObjects_removes_every_client_queue) {
+  // covers: ipcserver.ipc-server.13~1
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
   ASSERT_TRUE(server.subscribe(kClientB, "strumien", 16, server.subscriptionEpoch()));
@@ -284,6 +286,7 @@ TEST_F(IpcServerQueues, removeAllObjects_removes_every_client_queue) {
 // IGNORUJE zadana pojemnosc - klient z powtorzonym PID-em dostawal glebokosc
 // z poprzedniego przebiegu.
 TEST_F(IpcServerQueues, exit_handler_removes_client_queues_too) {
+  // covers: ipcserver.ipc-server.14~1
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
   ASSERT_TRUE(server.subscribe(kClientB, "strumien", 16, server.subscriptionEpoch()));
@@ -298,6 +301,7 @@ TEST_F(IpcServerQueues, exit_handler_removes_client_queues_too) {
 
 // Obie drogi wyjscia kasuja ten sam zestaw obiektow globalnych, takze segment odpowiedzi.
 TEST_F(IpcServerQueues, exit_handler_removes_response_segment) {
+  // covers: ipcserver.ipc-server.14~1
   const std::string segmentName = ipc::names().shmemSegment;
   { const ipc::responses::Mapping created(IPC::create_only, segmentName); }
   ASSERT_TRUE(segmentExists(segmentName));
@@ -321,6 +325,7 @@ TEST_F(IpcServerQueues, empty_server_name_yields_historical_names) {
 // nawzajem kasowac. To jest cel calego etapu -- bez tego wiele serwerow na jednej
 // maszynie nie ma prawa dzialac.
 TEST_F(IpcServerQueues, servers_with_distinct_names_have_disjoint_queues) {
+  // covers: ipcserver.ipc-server.1~1
   IpcServer serverA;
   serverA.setServerName(kServerA);
   IpcServer serverB;
@@ -347,6 +352,7 @@ TEST_F(IpcServerQueues, servers_with_distinct_names_have_disjoint_queues) {
 // Ta sama rozlacznosc dla segmentu odpowiedzi: sciezka atexit serwera A nie moze
 // zdjac segmentu serwera B.
 TEST_F(IpcServerQueues, exit_handler_does_not_touch_other_servers_segment) {
+  // covers: ipcserver.ipc-server.1~1
   const std::string segmentB = ipc::names(kServerB).shmemSegment;
   { const ipc::responses::Mapping createdB(IPC::create_only, segmentB); }
   ASSERT_TRUE(segmentExists(segmentB));
@@ -365,6 +371,7 @@ TEST_F(IpcServerQueues, exit_handler_does_not_touch_other_servers_segment) {
 // lock_exception(not_recoverable) poza broadcast() - az za petle przetwarzania, czyli jeden
 // klient konczyl serwer wszystkim. Kolejka martwego ma zniknac jak przepelniona, emisja trwac.
 TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
+  // covers: ipcserver.ipc-server.8~1
   if (!kDeadQueueOwnerDetectable) GTEST_SKIP() << "#410: zamek kolejki to spin_mutex - martwy wlasciciel = wieczny spin";
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
@@ -386,6 +393,7 @@ TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
 // zamkniety (OOB na koncu epoki) miedzy odczytem parametrow strumienia a rejestracja. Spozniona
 // rejestracja przezylaby OOB i przy --reset trafila na strumien nowego planu o tej samej nazwie.
 TEST_F(IpcServerQueues, subscribe_after_out_of_business_is_refused_without_queue) {
+  // covers: executorsm.executorsm.11~1, ipcserver.ipc-server.6~1
   IpcServer server;
   const std::uint64_t epoch = server.subscriptionEpoch();
   server.broadcastOutOfBusiness();
@@ -410,6 +418,7 @@ TEST_F(IpcServerQueues, subscribe_after_out_of_business_is_refused_without_queue
 
 // Ta sama straz na drugiej drodze zamkniecia rejestru: kasowanie kolejek przy wyjsciu.
 TEST_F(IpcServerQueues, subscribe_after_queue_removal_is_refused_without_queue) {
+  // covers: ipcserver.ipc-server.6~1, ipcserver.ipc-server.12~1
   IpcServer server;
   const std::uint64_t epoch = server.subscriptionEpoch();
   server.removeAllObjects();
@@ -419,6 +428,7 @@ TEST_F(IpcServerQueues, subscribe_after_queue_removal_is_refused_without_queue) 
 }
 
 TEST_F(IpcServerQueues, removal_is_idempotent) {
+  // covers: ipcserver.ipc-server.13~1
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
 
@@ -429,6 +439,7 @@ TEST_F(IpcServerQueues, removal_is_idempotent) {
 }
 
 TEST_F(IpcServerQueues, broadcast_formats_once_for_subscribers_and_drops_only_the_full_queue) {
+  // covers: ipcserver.ipc-server.8~1
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "stream", 1, server.subscriptionEpoch()));
   ASSERT_TRUE(server.subscribe(kClientB, "stream", 3, server.subscriptionEpoch()));
@@ -457,6 +468,7 @@ TEST_F(IpcServerQueues, broadcast_formats_once_for_subscribers_and_drops_only_th
 }
 
 TEST_F(IpcServerQueues, oversized_rows_are_skipped_and_reported_once_per_stream) {
+  // covers: ipcserver.ipc-server.9~1
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "wide", 2, server.subscriptionEpoch()));
   ASSERT_TRUE(server.subscribe(kClientB, "other-wide", 2, server.subscriptionEpoch()));
@@ -484,6 +496,7 @@ TEST_F(IpcServerQueues, oversized_rows_are_skipped_and_reported_once_per_stream)
 }
 
 TEST_F(IpcServerQueues, out_of_business_sends_marker_and_closes_the_subscription_epoch) {
+  // covers: ipcserver.ipc-server.10~1, ipcserver.ipc-server.12~1
   IpcServer server;
   const auto epoch = server.subscriptionEpoch();
   ASSERT_TRUE(server.subscribe(kClientA, "stream", 2, epoch));
@@ -510,6 +523,7 @@ TEST_F(IpcServerQueues, out_of_business_sends_marker_and_closes_the_subscription
 
 // OOB to jedna proba bez czekania: pelna kolejka nie dostaje znacznika, ale jej nazwa znika.
 TEST_F(IpcServerQueues, out_of_business_to_full_queue_drops_the_marker_and_removes_the_queue) {
+  // covers: ipcserver.ipc-server.10~1, ipcserver.ipc-server.11~1
   IpcServer server;
   const auto epoch = server.subscriptionEpoch();
   ASSERT_TRUE(server.subscribe(kClientA, "stream", 1, epoch));
@@ -529,6 +543,7 @@ TEST_F(IpcServerQueues, out_of_business_to_full_queue_drops_the_marker_and_remov
 // #523: try_send porzuconej kolejki rzuca not_recoverable, a wyjatek omijal removeOwned. Rejestr byl
 // mimo to czyszczony, wiec kolejki nie usuwalo potem nawet removeAllObjects - zostawala w /dev/shm.
 TEST_F(IpcServerQueues, out_of_business_removes_queue_abandoned_by_dead_client) {
+  // covers: ipcserver.ipc-server.11~1, ipcserver.ipc-server.12~1
   if (!kDeadQueueOwnerDetectable) GTEST_SKIP() << "#410: zamek kolejki to spin_mutex - martwy wlasciciel = wieczny spin";
   IpcServer server;
   const auto epoch = server.subscriptionEpoch();
@@ -553,6 +568,7 @@ TEST_F(IpcServerQueues, out_of_business_removes_queue_abandoned_by_dead_client) 
 }
 
 TEST_F(IpcServerQueues, insufficient_space_refuses_subscription_before_queue_creation) {
+  // covers: ipcserver.ipc-server.6~1
   IpcServer server;
   noQueueSpace = true;
   try {
@@ -570,6 +586,7 @@ TEST_F(IpcServerQueues, insufficient_space_refuses_subscription_before_queue_cre
 }
 
 TEST_F(IpcServerQueues, epoch_can_close_while_queue_creation_is_paused) {
+  // covers: ipcserver.ipc-server.6~1, ipcserver.ipc-server.7~1
   if (!RDB_HAS_BOOST_POSIX_SHM) GTEST_SKIP() << "synchronizacja na shm_open wymaga backendu POSIX";
   IpcServer server;
   const auto epoch = server.subscriptionEpoch();
@@ -596,6 +613,7 @@ TEST_F(IpcServerQueues, epoch_can_close_while_queue_creation_is_paused) {
 }
 
 TEST_F(IpcServerQueues, exit_handler_does_not_wait_for_the_broadcast_map_lock) {
+  // covers: ipcserver.ipc-server.14~1
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "stream", 2, server.subscriptionEpoch()));
   std::promise<void> entered, resume;
@@ -733,6 +751,7 @@ std::string command(std::optional<int> clientId, const std::string &argument) {
 // Test pilnuje zachowania na granicy: komenda o pelnej dlugosci dochodzi w calosci,
 // a watek komunikacyjny obsluguje nastepna.
 TEST(IpcServerLoop, full_size_command_is_received_whole_and_server_keeps_serving) {
+  // covers: ipcserver.ipc-server.2~1, ipcserver.ipc-server.3~1
   RunningServer server;
   ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
 
@@ -757,6 +776,7 @@ TEST(IpcServerLoop, full_size_command_is_received_whole_and_server_keeps_serving
 // jakimkolwiek catch watku komunikacyjnego - std::terminate calego serwera jedna wiadomoscia
 // od dowolnego lokalnego procesu. Ma byc odmowa: nic nie wykonane, nastepna komenda obsluzona.
 TEST(IpcServerLoop, garbage_command_is_rejected_and_server_keeps_serving) {
+  // covers: ipcserver.ipc-server.4~1
   RunningServer server;
   ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
 
@@ -772,6 +792,7 @@ TEST(IpcServerLoop, garbage_command_is_rejected_and_server_keeps_serving) {
 // PO wykonaniu komendy. Komenda bez adresu zwrotnego ma byc odrzucona PRZED handlerem, zeby
 // odmowa nie miala skutkow ubocznych (kill, reset-commit bez nadawcy).
 TEST(IpcServerLoop, command_without_client_id_is_rejected_and_server_keeps_serving) {
+  // covers: ipcserver.ipc-server.3~1
   RunningServer server;
   ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
 
@@ -787,6 +808,7 @@ TEST(IpcServerLoop, command_without_client_id_is_rejected_and_server_keeps_servi
 // not_recoverable przy kazdym obrocie, a wyjatek konczyl watek komunikacyjny: serwer liczyl
 // dalej, ale nie przyjmowal juz zadnej komendy. Ma odtworzyc kolejke i obsluzyc nastepna.
 TEST(IpcServerLoop, command_queue_abandoned_by_dead_client_is_recreated) {
+  // covers: ipcserver.ipc-server.5~1
   if (!kDeadQueueOwnerDetectable) GTEST_SKIP() << "#410: zamek kolejki to spin_mutex - martwy wlasciciel = wieczny spin";
   RunningServer server;
   ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
@@ -802,6 +824,7 @@ TEST(IpcServerLoop, command_queue_abandoned_by_dead_client_is_recreated) {
 }
 
 TEST(IpcServerLoop, handler_exception_is_answered_and_the_next_command_is_served) {
+  // covers: ipcserver.ipc-server.4~1
   RunningServer server([](const ptree &request) {
     if (request.get<std::string>("db.argument") == "throw") throw std::runtime_error("contract failure");
     ptree response;
@@ -820,6 +843,7 @@ TEST(IpcServerLoop, handler_exception_is_answered_and_the_next_command_is_served
 }
 
 TEST(IpcServerLoop, exception_after_ready_stops_thread_without_announcing_startup_failure) {
+  // covers: ipcserver.ipc-server.13~1, ipcserver.ipc-server.15~1
   IpcServer server;
   server.setServerName("postready" + std::to_string(getpid()));
   int ready = 0, failure = 0;

@@ -7,6 +7,7 @@ set(TestID "it_${TestID}")
 # zegarem sciennym. Test porownuje artefakt przebiegu taktowanego i przebiegu
 # --no-clock bajtowo oraz sprawdza, ze drugi jest realnie krotszy.
 
+# covers: launcher.xretractor.4~1, launcher.xretractor.37~1, executorsm.executorsm.4~1, executorsm.executorsm.6~1
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

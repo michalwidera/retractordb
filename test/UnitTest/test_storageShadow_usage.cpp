@@ -22,6 +22,7 @@
 // ── Warunek wstrzyknięcia: cień danych raportowany przez accessor ────
 
 TEST(StorageShadowTest, hasShadow_raportowany_przez_accessor) {
+  // covers: fagrp.group-file.10~1, fainterface.file-interface.7~1, storage.storage.7~1
   rdb::Descriptor desc("a", 4, 1, rdb::INTEGER);
 
   rdb::posixBinaryFileWithShadow shd("ut_ss_shd.bin", desc);
@@ -42,6 +43,7 @@ TEST(StorageShadowTest, hasShadow_raportowany_przez_accessor) {
 }
 
 TEST(StorageShadowTest, metaShadowFilePath_dopisuje_sufiks_shadow) {
+  // covers: metashadow.meta-shadow.6~1, storageshadow.storage-shadow.9~1
   EXPECT_EQ(rdb::storageShadow::metaShadowFilePath("data.meta"), "data.meta.shadow");
   EXPECT_EQ(rdb::storageShadow::metaShadowFilePath(""), "");
 }
@@ -74,6 +76,7 @@ struct StorageShadowFixture : public ::testing::Test {
 // z głównym plikiem danych; cień indeksu jest spójny z cieniem danych.
 // ---------------------------------------------------------------------------
 TEST_F(StorageShadowFixture, scenariusz_nadpisanie_w_cieniu) {
+  // covers: fagrp.group-file.6~1, storageshadow.storage-shadow.3~1
   rdb::storageShadow meta(descriptor, file);
 
   // 5 rekordów allNull trafia do głównego indeksu (append nie używa cienia).
@@ -108,6 +111,7 @@ TEST_F(StorageShadowFixture, scenariusz_nadpisanie_w_cieniu) {
 // (jak merge() pliku cienia danych).
 // ---------------------------------------------------------------------------
 TEST_F(StorageShadowFixture, scenariusz_persystencja_i_merge) {
+  // covers: storageshadow.storage-shadow.4~1, storageshadow.storage-shadow.5~1
   {
     rdb::storageShadow meta(descriptor, file);
     for (int i = 0; i < 5; ++i)
@@ -138,6 +142,8 @@ TEST_F(StorageShadowFixture, scenariusz_persystencja_i_merge) {
 // główny indeks i odrzuca cień.
 // ---------------------------------------------------------------------------
 TEST_F(StorageShadowFixture, scenariusz_discard_i_reset) {
+  // covers: metadata.meta-data.20~1, metashadow.meta-shadow.5~1, storageshadow.storage-shadow.6~1
+  // covers: storageshadow.storage-shadow.7~1
   rdb::storageShadow meta(descriptor, file);
   for (int i = 0; i < 3; ++i)
     meta.onRecordAppended(allNull);
@@ -155,6 +161,8 @@ TEST_F(StorageShadowFixture, scenariusz_discard_i_reset) {
 }
 
 TEST_F(StorageShadowFixture, polymorphic_updates_preserve_main_bytes_and_merge_in_arrival_order) {
+  // covers: metadata.meta-data.20~1, metashadow.meta-shadow.5~1, storage.storage.6~1, storageshadow.storage-shadow.2~1
+  // covers: storageshadow.storage-shadow.5~1
   const auto bytes = [&] {
     std::ifstream input(file, std::ios::binary);
     return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());

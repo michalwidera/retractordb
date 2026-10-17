@@ -29,10 +29,8 @@ namespace rdb {
 inline constexpr mode_t kStreamFileMode = 0666;
 
 /// Funkcja openStorageFile powinna:
-/// - otwierać plik magazynu z podanymi flagami i trybem, zawsze z O_CLOEXEC, a bez followFinalLink także z O_NOFOLLOW, i zwracać deskryptor albo -1 z errno.
-///   Test: `RequirementContracts.storage_fd_flags_offsets_eof_and_lifetime`.
-/// - przy odmowie otwarcia dowiązania (ELOOP) logować błąd, zachowując errno dla wołającego.
-///   Test: `RequirementContracts.storage_file_symlink_refusal_preserves_errno_bytes_and_descriptor_lifetime`.
+/// - [storagefile.open-storage-file.1~1] otwierać plik magazynu z podanymi flagami i trybem, zawsze z O_CLOEXEC, a bez followFinalLink także z O_NOFOLLOW, i zwracać deskryptor albo -1 z errno.
+/// - [storagefile.open-storage-file.2~1] przy odmowie otwarcia dowiązania (ELOOP) logować błąd, zachowując errno dla wołającego.
 [[nodiscard]] inline int openStorageFile(const std::string &path, const int flags, const mode_t mode = kStreamFileMode,
                                          const bool followFinalLink = false) {
   const int fd = ::open(path.c_str(), flags | O_CLOEXEC | (followFinalLink ? 0 : O_NOFOLLOW), mode);
@@ -47,21 +45,14 @@ inline constexpr mode_t kStreamFileMode = 0666;
 /// @brief Deskryptor pliku magazynu zamykany w destruktorze; zastepuje std::fstream, ktory nie
 ///        przyjmuje deskryptora (a __gnu_cxx::stdio_filebuf nie istnieje w libc++ na macOS).
 /// Obiekt klasy StorageFd powinien:
-/// - otwierać plik przez openStorageFile z podanymi flagami i trybem, zawsze z O_CLOEXEC i bez podążania za dowiązaniem symbolicznym w ostatnim komponencie ścieżki, chyba że wołający jawnie przekaże followFinalLink.
-///   Test: `RequirementContracts.storage_fd_flags_offsets_eof_and_lifetime`, `RequirementContracts.storage_file_symlink_refusal_preserves_errno_bytes_and_descriptor_lifetime`.
-/// - przy odmowie otwarcia dowiązania (ELOOP) zostawiać obiekt nieotwarty, a errno równe ELOOP po zapisie diagnostyki.
-///   Test: `RequirementContracts.storage_file_symlink_refusal_preserves_errno_bytes_and_descriptor_lifetime`.
-/// - raportować przez isOpen, czy deskryptor został otwarty.
-///   Test: `RequirementContracts.storage_fd_flags_offsets_eof_and_lifetime`, `DescriptorIOTest.storage_fd_retries_partial_and_interrupted_io`.
-/// - przez size zwracać rozmiar pliku z fstat albo -1 przy błędzie.
-///   Test: `RequirementContracts.storage_fd_flags_offsets_eof_and_lifetime`, `DescriptorIOTest.storage_fd_retries_partial_and_interrupted_io`.
-/// - przez write i writeAt zapisywać całość bufora, ponawiając po EINTR i po zapisie częściowym, i zwracać fałsz przy błędzie lub zapisie zerowym; writeAt zapisuje od wskazanej pozycji bez zmiany pozycji pliku.
-///   Test: `RequirementContracts.storage_fd_flags_offsets_eof_and_lifetime`, `DescriptorIOTest.storage_fd_retries_partial_and_interrupted_io`.
-/// - przez readAt czytać od wskazanej pozycji do zapełnienia bufora albo do końca pliku, ponawiając po EINTR, i zwracać liczbę przeczytanych bajtów albo -1 przy błędzie.
-///   Test: `RequirementContracts.storage_fd_flags_offsets_eof_and_lifetime`, `DescriptorIOTest.storage_fd_retries_partial_and_interrupted_io`.
-/// - zamykać posiadany deskryptor przy zniszczeniu i uniemożliwiać kopiowanie, tak aby deskryptor miał jednego właściciela.
+/// - [storagefile.storage-fd.1~1] otwierać plik przez openStorageFile z podanymi flagami i trybem, zawsze z O_CLOEXEC i bez podążania za dowiązaniem symbolicznym w ostatnim komponencie ścieżki, chyba że wołający jawnie przekaże followFinalLink.
+/// - [storagefile.storage-fd.2~1] przy odmowie otwarcia dowiązania (ELOOP) zostawiać obiekt nieotwarty, a errno równe ELOOP po zapisie diagnostyki.
+/// - [storagefile.storage-fd.3~1] raportować przez isOpen, czy deskryptor został otwarty.
+/// - [storagefile.storage-fd.4~1] przez size zwracać rozmiar pliku z fstat albo -1 przy błędzie.
+/// - [storagefile.storage-fd.5~1] przez write i writeAt zapisywać całość bufora, ponawiając po EINTR i po zapisie częściowym, i zwracać fałsz przy błędzie lub zapisie zerowym; writeAt zapisuje od wskazanej pozycji bez zmiany pozycji pliku.
+/// - [storagefile.storage-fd.6~1] przez readAt czytać od wskazanej pozycji do zapełnienia bufora albo do końca pliku, ponawiając po EINTR, i zwracać liczbę przeczytanych bajtów albo -1 przy błędzie.
+/// - [storagefile.storage-fd.7~1] zamykać posiadany deskryptor przy zniszczeniu i uniemożliwiać kopiowanie, tak aby deskryptor miał jednego właściciela.
 ///   Sprawdzenie kompilacji: test/UnitTest/test_contracts.cpp - static_assert braku kopiowania i przypisania StorageFd.
-///   Test: `RequirementContracts.storage_file_symlink_refusal_preserves_errno_bytes_and_descriptor_lifetime`.
 class StorageFd {
   int fd_;
 

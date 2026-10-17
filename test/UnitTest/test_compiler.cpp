@@ -53,7 +53,11 @@ bool check_compile_function() {
 // SELECT * STREAM test1 FROM core@(1,-10)
 // SELECT * STREAM test2 FROM core@(1,10)
 
-TEST(xparser, check_compile) { EXPECT_TRUE(check_compile_function()); }
+TEST(xparser, check_compile) {
+  // covers: query.query.1~1
+  // covers: compiler.compiler.1~1
+  EXPECT_TRUE(check_compile_function());
+}
 
 TEST(xparser, check_compile_result) {
   EXPECT_TRUE(check_compile_function());
@@ -102,6 +106,7 @@ TEST(xcompiler, refuses_non_positive_intervals_before_hash_arithmetic) {
 }
 
 TEST(xcompiler, refuses_non_positive_operator_intervals_without_parser) {
+  // covers: compiler.compiler.3~1
   for (const char op : {'&', '%', '-'}) {
     for (const int interval : {0, -1}) {
       SCOPED_TRACE(std::format("{}: {}", op, interval));
@@ -456,6 +461,7 @@ INSTANTIATE_TEST_SUITE_P(
     [](const testing::TestParamInfo<DimensionLimit> &info) { return info.param.name; });
 
 TEST(xcompiler, rule_condition_reaching_another_stream_is_refused) {
+  // covers: compiler.compiler.6~1
   // Warunek reguly ewaluator liczy na payloadzie WYJSCIOWYM celu i bierze z tokenu wylacznie
   // indeks - nazwa schematu jest ignorowana. Odwolanie do cudzego strumienia czytaloby wiec
   // pod tym indeksem wlasny rekord: cicho i zawsze zle.
@@ -474,6 +480,7 @@ TEST(xcompiler, rule_condition_reaching_another_stream_is_refused) {
 }
 
 TEST(xcompiler, shares_commutative_add_select_computation) {
+  // covers: compiler.compiler.10~1
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
         SUBSTRAT 'memory'
@@ -617,6 +624,7 @@ TEST(xcompiler, preserves_add_grouping_in_computation_fingerprint) {
 }
 
 TEST(xcompiler, toggles_substrate_deduplication) {
+  // covers: compiler.compiler.10~1
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
         SUBSTRAT 'memory'
@@ -638,6 +646,7 @@ TEST(xcompiler, toggles_substrate_deduplication) {
 }
 
 TEST(xcompiler, toggles_matched_hash_time_move_factorization) {
+  // covers: compiler.compiler.10~1
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
         SUBSTRAT 'memory'
@@ -664,6 +673,7 @@ TEST(xcompiler, toggles_matched_hash_time_move_factorization) {
 }
 
 TEST(xcompiler, does_not_rewrite_existing_queries_during_import) {
+  // covers: compiler.compiler.12~1
   qTree live;
   auto [baseParseResult, baseKeyword, baseStream] = parserRQLString(live, R"(
         SUBSTRAT 'memory'
@@ -695,6 +705,7 @@ TEST(xcompiler, does_not_rewrite_existing_queries_during_import) {
 // Ogon strumienia (query::startupLatency): liczba poczatkowych slotow wlasnego interwalu bez
 // zdefiniowanego wyniku. Jest obserwowalna semantyka runtime, a nie prefiks rekordow-zastepnikow.
 TEST(xcompiler, computes_startup_latency) {
+  // covers: compiler.compiler.7~1
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
         DECLARE value INTEGER STREAM a, 1/10 FILE 'a.txt'
@@ -813,6 +824,7 @@ TEST(xcompiler, computes_startup_latency) {
 // bramką regresyjną: tam slot jest prawdziwy i ma zostać. Trybem porażki tego testu jest
 // powrót zawyżenia - zaniżenie łapie osobna bramka `EXPECT_GE` w ut_h10aGate.
 TEST(xcompiler, exact_tail_for_subtract_and_dehash) {
+  // covers: compiler.compiler.7~1
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
         DECLARE value INTEGER STREAM s58,  5/8  FILE 'a.txt'
@@ -931,6 +943,7 @@ TEST(xcompiler, shift_matching_identity_does_not_lengthen_startup_latency) {
 // Kontrola niepustosci sprawdzana mutacyjnie: wstrzykniecie zmiany nazwy pola w
 // deduplicateSubstrats() konczy kompilacje bledem "changed observable field names".
 TEST(xcompiler, rewrites_preserve_observable_field_names) {
+  // covers: compiler.compiler.11~1
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
         DECLARE a INTEGER STREAM s1, 1 FILE 'd1.dat'
@@ -973,6 +986,7 @@ TEST(xcompiler, rewrites_preserve_observable_field_names) {
 // 16, 20 i 32 znowu tak. Niemonotonicznosc w liczbie zapytan jest wlasnie objawem zaleznosci
 // od kolejnosci, a nie od poprawnosci planu.
 TEST(xcompiler, resolves_intervals_independently_of_plan_order) {
+  // covers: compiler.compiler.6~1
   // Liczby lancuchow dobrane tak, by trafic w defekt: przy dyrektywach planu zawodzily
   // 4, 5, 6, 8 i 12, a 1, 2, 3, 7, 9, 10 i 11 przechodzily. Ta niemonotonicznosc jest
   // objawem zaleznosci od kolejnosci; pojedyncza liczba lancuchow bylaby krucha.
@@ -1005,6 +1019,7 @@ TEST(xcompiler, resolves_intervals_independently_of_plan_order) {
 // Zluzowanie warunku konca nie moze uczynic detektora cykli slepym.
 // str2 czyta samo siebie, wiec zaden przebieg nie rozwiaze go nigdy.
 TEST(xcompiler, still_reports_true_circular_dependency) {
+  // covers: compiler.compiler.1~1
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
         DECLARE value INTEGER STREAM src, 1 FILE 'a.txt'
@@ -1115,6 +1130,7 @@ TEST(xcompiler, unrepresentable_interval_reports_range_error) {
 // inaczej test broniacy tej reguly nie mialby jak jej naruszyc.
 
 TEST(xcompiler, unresolved_node_is_a_compilation_error) {
+  // covers: compiler.require-resolved-for-every-node.2~1, compiler.compiler.7~1
   qTree plan;
   plan.push_back(query(boost::rational<int>(1), "src"));
   plan.push_back(query(boost::rational<int>(1), "consumer"));
@@ -1134,6 +1150,7 @@ TEST(xcompiler, unresolved_node_is_a_compilation_error) {
 // Kontrola aparatury do testu wyzej: przy komplecie wynikow bramka musi milczec.
 // Bez niej test smierci przechodzilby takze dla bramki, ktora zabija zawsze.
 TEST(xcompiler, complete_resolution_passes_the_gate) {
+  // covers: compiler.require-resolved-for-every-node.1~1
   qTree plan;
   plan.push_back(query(boost::rational<int>(1), "src"));
   plan.push_back(query(boost::rational<int>(1), "consumer"));
@@ -1151,6 +1168,7 @@ TEST(xcompiler, complete_resolution_passes_the_gate) {
 // w logu i przejsc dalej. Kontrola mutacyjna (zaszczepienie deklaracji usuniete
 // z computeStartupLatency) pokazuje, ze ten tryb porazki dziala.
 TEST(xcompiler, every_node_of_a_nine_class_plan_is_resolved) {
+  // covers: compiler.compiler.7~1
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
         SUBSTRAT 'memory'
@@ -1380,6 +1398,7 @@ TEST(xcompiler, sum_allows_constituent_index_wildcards) {
 // zalozenia asercja `lSchema.size() != 1`, wiec `SELECT x[_], y.k` przerywalo proces
 // (`FATAL: ... requires exactly one schema field, got 2`) zamiast sie skompilowac.
 TEST(xcompiler, index_wildcard_expands_in_place_beside_other_select_items) {
+  // covers: compiler.compiler.6~1
   auto slotsOf = [](const query &q) {
     std::vector<int> slots;
     for (const auto &f : q.lSchema)
@@ -1550,6 +1569,7 @@ TEST(xcompiler, shift_over_agse_matches_the_two_step_form) {
 // Uszkodzony program pośredni nie może cofnąć iteratora przed begin(). Operator binarny
 // bez operandów ma zostać odrzucony przed próbą wycięcia zakresu z listy tokenów.
 TEST(xcompiler, malformed_intermediate_operator_is_rejected_before_iterator_underflow) {
+  // covers: compiler.compiler.1~1
   qTree instance;
   query malformed(boost::rational<int>(1), "malformed");
   malformed.lProgram.emplace_back(STREAM_HASH);
@@ -1600,6 +1620,7 @@ qTree compilePlan(const std::string &rql) {
 // co para zapytan z nazwanym oknem - az do brzegu (origin, ogon) i deskryptora wyjscia.
 // Rozna jest tylko nazwa wezla okna: uzytkownik nadal moze ja nadac sam, ale nie musi.
 TEST(xcompiler, stream_function_matches_the_two_step_form) {
+  // covers: compiler.compiler.5~1
   auto oneClause = compilePlan(R"(
         SUBSTRAT 'memory'
         DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
@@ -1702,6 +1723,7 @@ TEST(xcompiler, reducer_over_another_from_operator_is_extracted_not_fatal) {
 // Kolizja skladania nazw jest bledem planu przed sortowaniem po id (#474). Wczesniej
 // drugi program znikal, wiec nawet pozniejsza kontrola kolizji nie widziala defektu.
 TEST(xcompiler, refuses_colliding_substrate_programs_before_topological_sort) {
+  // covers: compiler.compiler.5~1
   qTree plan;
   ASSERT_EQ(parsePlanText(plan,
                           "DECLARE v INTEGER STREAM A_B, 1 BINFILE 'ab.bin'\n"
@@ -1805,6 +1827,7 @@ TEST(xcompiler, range_check_and_offset_agree_on_a_name_reached_twice) {
 // `-` liczby ujemnej idzie na "N", a `/` liczby wymiernej na "_" - do 2026-08-29 nazwa
 // substratu `&` niosla kreske ulamkowa, czyli separator sciezki, wprost z token::getStr_().
 TEST(xcompiler, substrate_names_stay_identifiers) {
+  // covers: compiler.compiler.5~1
   auto plan = compilePlan(R"(
         SUBSTRAT 'memory'
         DECLARE v INTEGER STREAM a, 1/500 FILE 'a.txt'
@@ -2081,6 +2104,7 @@ TEST(xparser, newly_implemented_functions_compile) {
 // bez implementacji, wiec plan kompilowal sie czysto i ginal dopiero w wykonaniu na
 // `Unsupported function call`. Teraz odpadaja na kompilacji, kanalem `Check result:`.
 TEST(xparser, unknown_function_is_rejected_at_compile_time) {
+  // covers: compiler.compiler.2~1
   for (const char *call : {"Crc(a)", "Sum(a)", "Sign(a)", "Chr(a)", "Count(a)", "IntCast(a)", "FloatCast(a)", "ToNumber(a)",
                            "ToTimeStamp(a)", "Sqrtt(a)"}) {
     const std::string result = compileRql(selectRql(call));
@@ -2105,6 +2129,7 @@ TEST(xparser, unknown_function_in_rule_condition_is_rejected) {
 // pola wyjsciowego, a nie wartoscia na stosie. Arnosc sprawdza tabela w rqlFunctions.hpp,
 // a nie ksztalt gramatyki, wiec dodanie funkcji o innej arnosci nie wymaga regeneracji ANTLR.
 TEST(xparser, declared_width_is_rejected_for_functions_without_width) {
+  // covers: compiler.compiler.2~1
   const std::string result = compileRql(selectRql("Sqrt(a:8)"));
   EXPECT_NE(result, "OK");
   EXPECT_NE(result.find("takes no width argument"), std::string::npos) << result;
@@ -2161,6 +2186,7 @@ TEST(xcompiler, substrate_name_stays_readable_below_threshold) {
 // Powyzej progu nazwa czytelna ustepuje skrotowi. Bez tego plan jest NIEZAPISYWALNY:
 // nazwa substratu jest nazwa pliku, a NAME_MAX to 255 bajtow.
 TEST(xcompiler, wide_from_clause_falls_back_to_digest) {
+  // covers: compiler.compiler.5~1
   auto plan = compilePlan(wideAdditionPlan(14));
 
   bool sawDigest = false;
@@ -2642,6 +2668,7 @@ std::string renderPlan(qTree &plan) {
 /// jest NIE DO ODROZNIENIA od recznie rozpisanych SELECT-ow. Gdyby ten test zaczal padac,
 /// generator przestalby byc skrotem zapisu, a stalby sie osobnym bytem w silniku.
 TEST(xcompiler, generator_plan_is_identical_to_hand_written_plan) {
+  // covers: compiler.compiler.4~1
   qTree generated;
   auto [genParse, genKeyword, genName] = parserRQLString(generated, R"(
         DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
@@ -2670,6 +2697,7 @@ TEST(xcompiler, generator_plan_is_identical_to_hand_written_plan) {
 
 /// `$` poza nawiasami kwadratowymi jest WARTOSCIA, wiec kazda instancja liczy co innego.
 TEST(xcompiler, generator_substitutes_ordinal_as_a_value) {
+  // covers: compiler.compiler.4~1
   qTree instance;
   auto [parseResult, firstKeyword, streamName] = parserRQLString(instance, R"(
         DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
@@ -2724,6 +2752,7 @@ TEST(xcompiler, generator_expands_ordinal_in_from_clause) {
 /// Generator bez `$` wyprodukowalby N identycznych strumieni pod roznymi nazwami - to zawsze
 /// pomylka zapisu, nigdy zamiar, wiec kompilator ma ja zatrzymac.
 TEST(xcompiler, rejects_generator_without_ordinal) {
+  // covers: compiler.compiler.3~1
   const std::string verdict = compileRql(R"(
         DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
         SELECT cells[0] STREAM cell[4] FROM cells
@@ -2734,6 +2763,7 @@ TEST(xcompiler, rejects_generator_without_ordinal) {
 
 /// `[0]` musi byc odrozniane od braku generatora - inaczej stalby sie po cichu strumieniem `cell`.
 TEST(xcompiler, rejects_zero_sized_generator) {
+  // covers: compiler.compiler.3~1
   const std::string verdict = compileRql(R"(
         DECLARE cell INTEGER[4] STREAM cells, 1/10 FILE 'cells.txt'
         SELECT cells[$] STREAM cell[0] FROM cells
@@ -2763,6 +2793,7 @@ TEST(xparser, malformed_generator_indices_are_refused_before_compilation) {
 // kazda instancje. Planu wiekszego niz slot magistrali serwer i tak nie uruchomi, wiec odmowa zapada
 // PRZED kopiowaniem. Plan bez generatora zostaje magistrali (it_service_reset_race).
 TEST(xcompiler, stream_count_after_generator_expansion_is_limited) {
+  // covers: compiler.compiler.4~1
   const std::string source = "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n";
   EXPECT_EQ(compileRql(source + "SELECT src[0]+$ STREAM cell[147] FROM src\n"), "OK");
 
@@ -2938,6 +2969,7 @@ TEST(xcompiler, plan_wide_element_count_is_limited) {
 // po 2^32 slotach. Do 2026-09-27 int sie przepelnial i plan przechodzil; teraz to blad planu. Ten sam
 // iloczyn z duzym krokiem daje origin w zakresie - odmowa dotyczy wyniku, nie rachunku posredniego.
 TEST(xcompiler, agse_logical_origin_beyond_int_is_a_plan_error) {
+  // covers: compiler.compiler.7~1
   const std::string source  = "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\nSELECT * STREAM w1 FROM src@(1,65536)\n";
   const std::string verdict = compileRql(source + "SELECT * STREAM w2 FROM w1@(1,65536)\n");
   EXPECT_TRUE(verdict.contains("Stream 'w2' has a logical origin of 4294967295 slots; the limit is 2147483647")) << verdict;
@@ -2947,6 +2979,7 @@ TEST(xcompiler, agse_logical_origin_beyond_int_is_a_plan_error) {
 // Petla okresu AGSE w computeRequiredCapacities liczyla (n+1+Wout)*step w int: przy F = 65536 i kroku
 // 65535 to ok. 2^32 (A2 M11). Wartosc oczekiwana policzona niezaleznie, liczbami calkowitymi Pythona.
 TEST(xcompiler, agse_capacity_period_is_computed_without_int_overflow) {
+  // covers: compiler.compiler.8~1
   qTree plan;
   ASSERT_EQ(std::get<0>(parserRQLString(plan,
                                         "DECLARE x BYTE[65536] STREAM src, 1 FILE 'a.txt'\n"
@@ -2959,6 +2992,7 @@ TEST(xcompiler, agse_capacity_period_is_computed_without_int_overflow) {
 // Pamiec historii planu: pierscienie zrodel deklarowanych (SourceBuffer) i magazynow MEMORY, wycenione
 // capacity x (sizeof(rdb::payload) + bajty rekordu). Budzet przychodzi z `[limits] history_memory_mib`.
 TEST(xcompiler, stream_history_in_memory_is_limited_by_the_config_budget) {
+  // covers: compiler.compiler.8~1
   const std::filesystem::path config =
       std::filesystem::temp_directory_path() / ("ut_compiler_budget_" + std::to_string(::getpid()) + ".toml");
   std::ofstream(config) << "[limits]\nhistory_memory_mib = 1\n";
@@ -3429,6 +3463,7 @@ TEST(xcompiler, index_wildcard_through_a_width_changing_join_is_refused) {
 // dawalo tu FLOAT-owi typ nastepnego pola - a to nie jest „typ nieznany", tylko typ ZLY:
 // regula D przepisywalaby na `^` mnozenie zmiennoprzecinkowe, ktorego przepisac nie wolno.
 TEST(xcompiler, field_type_lookup_uses_flat_element_index) {
+  // covers: exprsimplify.simplify-expression.3~1
   auto floatArray = compilePlan(
       "SUBSTRAT 'memory'\n"
       "DECLARE f FLOAT[4], n INTEGER STREAM src, 1 FILE 'a.txt'\n"
@@ -3716,6 +3751,7 @@ TEST(xcompiler, window_aggregate_origin_covers_the_whole_window) {
 // Wynik idzie ta sama regula promocji co reduktory strumieniowe (reductionResultField):
 // zrodlo arytmetyczne daje RATIONAL, zeby srednia nie tracila dokladnosci na rzutowaniu.
 TEST(xcompiler, window_aggregate_result_type_follows_the_reduction_rule) {
+  // covers: query.query.7~1
   auto plan = compilePlan(
       "SUBSTRAT 'memory'\n"
       "DECLARE a INTEGER, d DOUBLE STREAM src, 1 FILE 'src.txt'\n"
@@ -3765,6 +3801,7 @@ TEST(xcompiler, window_aggregates_of_one_shape_share_a_group) {
 // Okno adresuje JEDEN slot plaski rekordu zrodla - redukuje po czasie, nie po elementach
 // jednego rekordu. Nazwa tablicy nie jest nazwa pola, wiec argumentem jest element `a[k]`.
 TEST(xcompiler, window_group_addresses_a_single_flat_slot) {
+  // covers: compiler.compiler.6~1
   auto plan = compilePlan(
       "SUBSTRAT 'memory'\n"
       "DECLARE a INTEGER[3], c INTEGER STREAM src, 1 FILE 'src.txt'\n"
@@ -3859,6 +3896,7 @@ TEST(xcompiler, window_aggregate_accepts_an_expression_argument) {
 // stoi w tabeli grup, a nie w programie. Rachunek zwiniety do samego odczytu pola wraca przy
 // okazji na szybka sciezke, wiec `MIN(x*1 : W)` daje DOKLADNIE ten sam plan co `MIN(x : W)`.
 TEST(xcompiler, window_subexpression_goes_through_expression_simplification) {
+  // covers: compiler.compiler.10~1
   auto plan = compilePlan(
       "SUBSTRAT 'memory'\n"
       "DECLARE a INTEGER, b INTEGER STREAM src, 1 FILE 'src.txt'\n"
@@ -4038,6 +4076,7 @@ TEST(xcompiler, window_result_type_reaches_copies_of_the_window_stream) {
 // Trzy granice wymienione wprost w pozycji 16. Kazda kompilowala sie czysto i kazda dawala
 // deskryptor niezgodny z wartoscia, ktora silnik do niego zapisywal.
 TEST(xcompiler, requested16_three_documented_boundaries) {
+  // covers: compiler.compiler.6~1
   auto plan = compilePlan(
       "SUBSTRAT 'memory'\n"
       "DECLARE d DOUBLE, k INTEGER STREAM source, 1 FILE 'source.txt'\n"
@@ -4268,6 +4307,7 @@ TEST(xcompiler, declared_to_string_width_survives_a_second_compilation) {
 // konczylo sie komunikatem `Unsupported token in expressionEvaluator` przy zerze rekordow.
 // Kanal `Check result:` zamyka ten wzorzec w kompilacji i nazywa obejscie.
 TEST(xcompiler, rejects_a_stream_reducer_used_as_a_field_reference) {
+  // covers: compiler.compiler.2~1
   for (const auto &[reducer, spelling] :
        std::vector<std::pair<std::string, std::string>>{{"AVG", "avg"}, {"MIN", "min"}, {"MAX", "max"}, {"SUMC", "sumc"}}) {
     qTree plan;
@@ -4748,6 +4788,7 @@ TEST(xcompiler, disk_retention_must_cover_the_history_the_plan_reads) {
 // Jawne RETENTION, MEMORY i magazyny bez retencji (POSIX...) zostaja jak byly; te ostatnie, razem ze
 // wszystkim, co nadal nie ma granicy, wymienia unboundedDiskStreams().
 TEST(xcompiler, default_retention_bounds_disk_streams_without_retention) {
+  // covers: compiler.compiler.8~1, compiler.compiler.14~1
   const std::string rql  = R"(
     DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'
     SELECT src[0] STREAM plain FROM src
@@ -4802,6 +4843,7 @@ TEST(xcompiler, default_retention_bounds_disk_streams_without_retention) {
 // Retencja z konfiguracji przechodzi te sama kontrole glebokosci co jawna - klucz TOML nie moze
 // zamienic poprawnego planu w FatalError dzialajacego serwera.
 TEST(xcompiler, default_retention_too_small_for_the_plan_is_a_compilation_error) {
+  // covers: compiler.compiler.8~1
   qTree plan;
   ASSERT_EQ(std::get<0>(parserRQLString(plan,
                                         "DECLARE a INTEGER STREAM src, 1 FILE 'a.txt'\n"
@@ -5083,6 +5125,7 @@ TEST(xparser, query_reset_clears_the_source_kind) {
 }
 
 TEST(xcompiler, resolution_gate_includes_directives_and_names_the_first_missing_node_and_pass) {
+  // covers: compiler.require-resolved-for-every-node.1~1, compiler.require-resolved-for-every-node.2~1
   qTree plan;
   plan.push_back(query(0, ":STORAGE"));
   plan.push_back(query(1, "src"));
@@ -5095,6 +5138,7 @@ TEST(xcompiler, resolution_gate_includes_directives_and_names_the_first_missing_
 }
 
 TEST(xcompiler, import_returns_only_new_non_directive_nodes_and_reset_forgets_previous_plan) {
+  // covers: compiler.compiler.12~1, compiler.compiler.13~1
   qTree live;
   ASSERT_EQ(std::get<0>(parserRQLString(live, "DECLARE a INTEGER STREAM src, 1 BINFILE 'src.bin'")), "OK");
   compiler compiling(live);
@@ -5123,6 +5167,7 @@ TEST(xcompiler, import_returns_only_new_non_directive_nodes_and_reset_forgets_pr
 }
 
 TEST(xcompiler, compiled_plan_places_every_producer_before_its_consumers) {
+  // covers: compiler.compiler.9~1
   qTree plan;
   ASSERT_EQ(std::get<0>(parserRQLString(plan,
                                         "DECLARE x INTEGER STREAM a, 1 BINFILE 'a.bin'\n"
@@ -5142,6 +5187,7 @@ TEST(xcompiler, compiled_plan_places_every_producer_before_its_consumers) {
 }
 
 TEST(xcompiler, missing_from_source_and_non_positive_agse_step_are_refused_after_generator_expansion) {
+  // covers: compiler.compiler.3~1
   qTree missing;
   ASSERT_EQ(std::get<0>(parserRQLString(missing, "SELECT * STREAM dst FROM missing")), "OK");
   EXPECT_EQ(compiler(missing).compile(), "Stream 'dst' reads from 'missing', which is not defined in the plan");

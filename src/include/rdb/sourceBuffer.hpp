@@ -17,25 +17,19 @@ enum class sourceState : std::uint8_t { empty, flux, armed };
 /// @brief Bufor bieżącego rekordu i historii dla źródeł deklarowanych (BINFILE/DEVICE/TEXTSOURCE) - wydzielony z klasy storage.
 ///
 /// Obiekt klasy SourceBuffer powinien:
-/// - po attach(descriptor) utrzymywać komorę (chamber) - payload bieżącego rekordu odczytanego ze źródła,
-///   Test: `SourceBufferTest.read_current_fills_out_from_source`.
-/// - pobierać bieżący rekord i wzorzec null przez null-aware read() akcesora w readCurrent(); jest to
+/// - [sourcebuffer.source-buffer.1~1] po attach(descriptor) utrzymywać komorę (chamber) - payload bieżącego rekordu odczytanego ze źródła,
+/// - [sourcebuffer.source-buffer.2~1] pobierać bieżący rekord i wzorzec null przez null-aware read() akcesora w readCurrent(); jest to
 ///   jedyne miejsce fizycznego odczytu źródeł plikowych; dla DEVICE (#347) bajty zbiera wcześniej faza
 ///   DEVICE poza blokadami (rdb::awaitRecords), a read() oddaje gotowy rekord albo all-null,
-///   Test: `SourceBufferTest.read_current_fills_out_from_source`, `SourceBufferTest.read_current_after_eof_returns_null_row`. Test: `BinaryDeviceROTest.device_read_does_not_retry_after_the_device_phase`.
-/// - po EILSEQ z akcesora zwracać Errc::Config z opisem inputError(), pozostawiając payload wyjściowy
+/// - [sourcebuffer.source-buffer.3~1] po EILSEQ z akcesora zwracać Errc::Config z opisem inputError(), pozostawiając payload wyjściowy
 ///   bez zmian; dla pozostałych statusów przekazywać rekord i nullBitset otrzymane z akcesora,
 ///   logując ostrzeżenie przy statusie różnym od EXIT_SUCCESS,
-///   Test: `SourceBufferTest.input_content_failure_preserves_the_output_and_reports_the_cause`, `SourceBufferTest.read_failure_warning_preserves_the_null_row`.
-/// - kopiować komorę do payloadu wyjściowego i do historii przez fire() - jedyne miejsce zasilania bufora
+/// - [sourcebuffer.source-buffer.4~1] kopiować komorę do payloadu wyjściowego i do historii przez fire() - jedyne miejsce zasilania bufora
 ///   historii; pojemność zero jest naruszeniem niezmiennika zgłaszanym przez RDB_ASSERT/rdb::fatal,
-///   Test: `SourceBufferDeathTest.fire_without_capacity_is_an_invariant_failure`.
-/// - utrzymywać bufor historii o pojemności co najmniej 1 (setCapacity()) - spójność źródeł deklarowanych
+/// - [sourcebuffer.source-buffer.5~1] utrzymywać bufor historii o pojemności co najmniej 1 (setCapacity()) - spójność źródeł deklarowanych
 ///   wymaga zachowania przynajmniej bieżącego rekordu,
-///   Test: `SourceBufferTest.capacity_is_at_least_one`.
-/// - udostępniać rekordy historii przez history(index) dla index < size(); kontrola zakresu względem
+/// - [sourcebuffer.source-buffer.6~1] udostępniać rekordy historii przez history(index) dla index < size(); kontrola zakresu względem
 ///   pojemności i rozmiaru należy do wywołującego (storage), bo to on decyduje o wartościach zastępczych.
-///   Test: `SourceBufferTest.fire_pushes_chamber_into_history`, `SourceBufferTest.history_preserves_nulls_independently_of_the_output`.
 class SourceBuffer {
  public:
   /// @brief Create the chamber payload for the given record layout.

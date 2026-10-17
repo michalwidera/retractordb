@@ -130,6 +130,7 @@ def test_context_exit_really_closes_the_storage(rdb, plain_storage: Path) -> Non
 
 
 def test_context_exit_closes_on_exception(rdb, plain_storage: Path) -> None:
+    # covers: module.bound-storage.1~1
     with pytest.raises(RuntimeError, match="body failed"):
         with open_plain(rdb, plain_storage) as storage:
             storage.read(0)
@@ -143,6 +144,7 @@ def test_unmarked_offline_storage_still_allows_independent_readers(rdb, plain_st
 
 
 def test_close_is_idempotent_and_record_copy_survives(rdb, plain_storage: Path) -> None:
+    # covers: module.bound-storage.2~1
     storage = open_plain(rdb, plain_storage)
     record = storage[0]
     storage.close()
@@ -154,6 +156,7 @@ def test_close_is_idempotent_and_record_copy_survives(rdb, plain_storage: Path) 
 
 
 def test_engine_and_storage_share_the_owned_directory_lock(rdb, tmp_path: Path) -> None:
+    # covers: module.bound-storage.1~1
     from test_engine import doubling_plan
 
     source = tmp_path / "source.txt"
@@ -180,6 +183,7 @@ def test_engine_and_storage_share_the_owned_directory_lock(rdb, tmp_path: Path) 
 @pytest.mark.parametrize("default_directory", [False, True], ids=["explicit-lock-dir", "TMPDIR"])
 def test_held_service_lock_refuses_storage_and_engine(rdb, plain_storage: Path, tmp_path: Path,
                                                      monkeypatch, default_directory: bool) -> None:
+    # covers: engine.engine.14~1, storageguard.check-offline.1~1
     from test_engine import doubling_plan, storage_bytes
 
     locks = tmp_path / "locks"
@@ -242,6 +246,7 @@ def test_default_lock_check_is_lenient_like_xtrdb(rdb, plain_storage: Path, tmp_
 
 
 def test_explicit_lock_dir_is_strict_unless_listed_as_lenient(rdb, plain_storage: Path, tmp_path: Path) -> None:
+    # covers: storageguard.offline-policy.4~1
     locks = tmp_path / "locks"
     locks.mkdir()
     plant_unreadable_lock(locks)
@@ -260,6 +265,7 @@ def test_explicit_lock_dir_is_strict_unless_listed_as_lenient(rdb, plain_storage
 
 def test_system_temp_is_lenient_until_the_key_says_otherwise(rdb, plain_storage: Path, tmp_path: Path,
                                                              monkeypatch) -> None:
+    # covers: storageguard.offline-policy.4~1
     locks = tmp_path / "locks"
     locks.mkdir()
     plant_unreadable_lock(locks)
@@ -277,6 +283,7 @@ def test_system_temp_is_lenient_until_the_key_says_otherwise(rdb, plain_storage:
 
 
 def test_guessed_lock_directory_is_reported(rdb, plain_storage: Path, tmp_path: Path, caplog) -> None:
+    # covers: module.python-logging-callback.1~1
     import logging
     import warnings
 
@@ -308,6 +315,7 @@ def test_guessed_lock_directory_is_reported(rdb, plain_storage: Path, tmp_path: 
 
 
 def test_config_supplies_the_lock_dir_and_the_argument_wins(rdb, plain_storage: Path, tmp_path: Path) -> None:
+    # covers: storageguard.offline-policy.3~1
     locks, other = tmp_path / "locks", tmp_path / "other"
     locks.mkdir()
     other.mkdir()
@@ -324,6 +332,7 @@ def test_config_supplies_the_lock_dir_and_the_argument_wins(rdb, plain_storage: 
 @pytest.mark.parametrize("problem", ["missing", "relative-lenient", "relative-lock-dir", "syntax"])
 def test_bad_config_is_a_config_error_and_keeps_the_kernel(rdb, plain_storage: Path, tmp_path: Path,
                                                          problem: str) -> None:
+    # covers: storageguard.offline-policy.2~1
     config = tmp_path / "bad.toml"
     if problem == "relative-lenient":
         write_config(config, lenient=["relative/locks"])
@@ -340,6 +349,7 @@ def test_bad_config_is_a_config_error_and_keeps_the_kernel(rdb, plain_storage: P
 
 
 def test_missing_lock_directory_preserves_errno_and_kernel(rdb, plain_storage: Path, tmp_path: Path) -> None:
+    # covers: storageguard.check-offline.3~1
     with pytest.raises(rdb.IOError) as failure:
         rdb.Storage("plain_file", "plain_file", storage_param=str(plain_storage), lock_dir=str(tmp_path / "absent"))
     assert failure.value.errno == errno.ENOENT
@@ -348,6 +358,7 @@ def test_missing_lock_directory_preserves_errno_and_kernel(rdb, plain_storage: P
 
 
 def test_real_daemon_refuses_offline_access_without_changing_its_artifacts(rdb, module_root: Path, tmp_path: Path) -> None:
+    # covers: engine.engine.14~1
     from test_engine import doubling_plan, storage_bytes
 
     executable = Path(os.environ.get("RDB_XRETRACTOR", module_root.parent / "src/retractor/xretractor"))

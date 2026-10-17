@@ -21,6 +21,10 @@ struct MetaTestFixture : public ::testing::Test {
 };
 
 TEST_F(MetaTestFixture, header_lazy_tail_and_gap_have_exact_bytes_after_reopen) {
+  // covers: metadata.meta-data.4~1, metadata.meta-data.5~1, metadata.meta-data.6~1, metadata.meta-data.7~1
+  // covers: metadata.meta-data.8~1, metadata.meta-data.11~1, metadata.meta-data.13~1, metadata.meta-data.16~1
+  // covers: metadata.meta-data.17~1, metadata.disk-tail-state.2~1, metadata.disk-tail-state.3~1, metadata.disk-tail-state.4~1
+  // covers: metadata.disk-tail-state.5~1
   const rdb::Descriptor descriptor{{"a", 4, 1, rdb::INTEGER}, {"b", 4, 1, rdb::INTEGER}};
   const std::vector<bool> a{true, false};
   const std::vector<bool> b{false, true};
@@ -76,6 +80,7 @@ TEST_F(MetaTestFixture, header_lazy_tail_and_gap_have_exact_bytes_after_reopen) 
 }
 
 TEST_F(MetaTestFixture, reset_keeps_gap_detection_but_discards_tail_and_pending_gap) {
+  // covers: metadata.meta-data.9~1, metadata.meta-data.10~1, metadata.meta-data.18~1, metadata.disk-tail-state.1~1
   const rdb::Descriptor descriptor{{"a", 4, 1, rdb::INTEGER}};
   rdb::metaData meta(descriptor, metaFile);
   meta.configureGapDetection(1);
@@ -102,6 +107,7 @@ TEST_F(MetaTestFixture, reset_keeps_gap_detection_but_discards_tail_and_pending_
 }
 
 TEST_F(MetaTestFixture, failed_rewrite_preserves_file_bytes_errno_and_the_live_index) {
+  // covers: metadata.meta-data.2~1
   const rdb::Descriptor descriptor{{"a", 4, 1, rdb::INTEGER}};
   const auto bytes = [&] {
     std::ifstream input(metaFile, std::ios::binary);
@@ -180,6 +186,7 @@ std::vector<std::byte> withBitsetSize(std::vector<std::byte> buf, size_t bitsetS
 }  // namespace
 
 TEST(MetaDataIndexRecordTest, deserialize_odrzuca_bitsetSize_spoza_ramki) {
+  // covers: indexrecord.index-record.4~1
   rdb::metaData::IndexRecord original;
   original.recordCount  = 7;
   original.nullBitset   = {true, false, true, true, false};
@@ -249,6 +256,7 @@ TEST_F(MetaTestFixture, otwarcie_uszkodzonego_meta_zwraca_blad_io) {
 // record has already been committed to disk by a pattern change.
 
 TEST_F(MetaTestFixture, test_modify_committed_entry_on_disk) {
+  // covers: metadata.meta-data.2~1, metadata.meta-data.5~1
   rdb::Descriptor descriptor;
   descriptor.append({{"x", 4, 0, rdb::INTEGER}});
 
@@ -359,6 +367,7 @@ TEST_F(MetaTestFixture, test_large_data_volume) {
 // a freshly loaded instance must see an empty stream.
 
 TEST_F(MetaTestFixture, test_reset_clears_all_data) {
+  // covers: metadata.meta-data.18~1
   rdb::Descriptor descriptor;
   descriptor.append({{"x", 4, 0, rdb::INTEGER}});
 
@@ -421,6 +430,7 @@ TEST_F(MetaTestFixture, integration_gap_markers_with_operations) {
 // ── Gap persistence ──────────────────────────────────────────────────
 
 TEST_F(MetaTestFixture, test_transmission_gaps_persistence) {
+  // covers: metadata.meta-data.8~1
   rdb::Descriptor descriptor;
   descriptor.append({{"v", 4, 0, rdb::INTEGER}});
 
@@ -495,6 +505,7 @@ TEST_F(MetaTestFixture, test_lazy_overwrite_persistence) {
 // A transmission gap must trigger the overwrite of the dirty tail entry
 // before the gap marker is appended.
 TEST_F(MetaTestFixture, test_lazy_overwrite_gap_flushes_dirty_tail) {
+  // covers: metadata.disk-tail-state.4~1
   rdb::Descriptor descriptor;
   descriptor.append({{"v", 4, 0, rdb::INTEGER}});
 
@@ -534,6 +545,7 @@ struct RotateFixture : public ::testing::Test {
 
 // rotate() renames current file to .old<N> and clears all in-memory state.
 TEST_F(RotateFixture, rotate_renames_file_and_clears_state) {
+  // covers: metadata.meta-data.14~1
   {
     rdb::metaData m(descriptor, meta);
     m.onRecordAppended({false});
@@ -571,6 +583,7 @@ TEST_F(RotateFixture, rotate_negative_percounter_resets_without_rename) {
 
 // Renamed .old file contains the original records.
 TEST_F(RotateFixture, rotate_preserves_data_in_renamed_file) {
+  // covers: metadata.meta-data.14~1
   {
     rdb::metaData m(descriptor, meta);
     m.onRecordAppended({false});
@@ -604,6 +617,7 @@ TEST_F(RotateFixture, rotate_overwrite_is_logged) {
 
 // After rotation, new records can be appended and queried correctly.
 TEST_F(RotateFixture, rotate_allows_records_after_rotation) {
+  // covers: metadata.meta-data.14~1
   {
     rdb::metaData m(descriptor, meta);
     for (int i = 0; i < 5; ++i)
@@ -622,6 +636,8 @@ TEST_F(RotateFixture, rotate_allows_records_after_rotation) {
 // ── Multiple consecutive flush → re-merge cycles must each produce
 // the correct merged count without accumulating stale entries.
 TEST_F(MetaTestFixture, test_lazy_overwrite_multiple_cycles) {
+  // covers: metadata.meta-data.16~1, metadata.disk-tail-state.1~1, metadata.disk-tail-state.2~1, metadata.disk-tail-state.3~1
+  // covers: metadata.disk-tail-state.5~1
   rdb::Descriptor descriptor;
   descriptor.append({{"z", 4, 0, rdb::INTEGER}});
 
@@ -709,6 +725,7 @@ TEST_F(MetaTestFixture, test_modify_non_last_in_current_entry_while_tail_dirty) 
 // by the stale count) and wrong patterns at the logical tail.
 
 TEST_F(MetaTestFixture, test_modify_committed_entry_while_tail_dirty) {
+  // covers: metadata.meta-data.16~1
   rdb::Descriptor descriptor;
   descriptor.append({{"f1", 4, 0, rdb::INTEGER}, {"f2", 4, 0, rdb::INTEGER}});
 

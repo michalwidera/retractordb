@@ -7,19 +7,14 @@ namespace rdb {
 /// @brief Maszyna stanów decydująca, kiedy ciąg rekordów all-null stanowi przerwę w transmisji.
 ///
 /// Obiekt klasy GapDetector powinien:
-/// - być nieaktywny (enabled() == false), dopóki configure() nie zostanie wywołane,
-///   Test: `GapDetectorTest.disabled_by_default`, `GapDetectorTest.configure_enables_it`.
-/// - po skonfigurowaniu (configure(nullFillCount)) przepuszczać pierwsze nullFillCount kolejnych
+/// - [gapdetector.gap-detector.1~1] być nieaktywny (enabled() == false), dopóki configure() nie zostanie wywołane,
+/// - [gapdetector.gap-detector.2~1] po skonfigurowaniu (configure(nullFillCount)) przepuszczać pierwsze nullFillCount kolejnych
 ///   obserwacji all-null (absorb(true) zwraca false - wywołujący ma je zapisać fizycznie, faza nullfill),
-///   Test: `GapDetectorTest.nullfill_phase_passes_through`.
-/// - dalsze obserwacje all-null pochłaniać (absorb(true) zwraca true), akumulując długość oczekującej przerwy,
-///   Test: `GapDetectorTest.absorbs_beyond_nullfill_phase`.
-/// - przy pierwszej obserwacji nie-null (absorb(false)) zerować licznik fazy nullfill, zwracając false;
+/// - [gapdetector.gap-detector.3~1] dalsze obserwacje all-null pochłaniać (absorb(true) zwraca true), akumulując długość oczekującej przerwy,
+/// - [gapdetector.gap-detector.4~1] przy pierwszej obserwacji nie-null (absorb(false)) zerować licznik fazy nullfill, zwracając false;
 ///   ewentualna oczekująca przerwa NIE jest tu odrzucana - pozostaje do odebrania przez takePendingGap(),
-///   Test: `GapDetectorTest.non_null_after_gap_leaves_pending_gap_for_caller`.
-/// - udostępniać takePendingGap() zwracające zaakumulowaną długość przerwy i zerujące ją do 0,
-///   Test: `GapDetectorTest.absorbs_beyond_nullfill_phase`.
-/// - nie wykonywać żadnego I/O - decyzję, co zrobić z przerwą (np. zapisać wpis gap), podejmuje wywołujący.
+/// - [gapdetector.gap-detector.5~1] udostępniać takePendingGap() zwracające zaakumulowaną długość przerwy i zerujące ją do 0,
+/// - [gapdetector.gap-detector.6~1] nie wykonywać żadnego I/O - decyzję, co zrobić z przerwą (np. zapisać wpis gap), podejmuje wywołujący.
 ///   Nietestowalne: ograniczenie architektury (brak I/O); test zachowania nie dowodzi braku wszystkich efektow ubocznych, sprawdzane przegladem gapDetector.cc.
 class GapDetector {
  public:

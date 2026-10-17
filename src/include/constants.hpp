@@ -82,10 +82,8 @@ inline constexpr std::size_t kObjectNameTailBudget = 12;
 inline constexpr std::size_t kShortServerTagLength = 9;
 
 /// Funkcja shortServerTag powinna:
-/// - zwracać napis długości kShortServerTagLength: "0" i osiem małych cyfr szesnastkowych 32-bitowego skrótu nazwy serwera, czyli XOR obu połówek 64-bitowego FNV-1a.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
-/// - dawać dla tej samej nazwy ten sam wynik w każdym procesie, niezależnie od biblioteki standardowej.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
+/// - [constants.short-server-tag.1~1] zwracać napis długości kShortServerTagLength: "0" i osiem małych cyfr szesnastkowych 32-bitowego skrótu nazwy serwera, czyli XOR obu połówek 64-bitowego FNV-1a.
+/// - [constants.short-server-tag.2~1] dawać dla tej samej nazwy ten sam wynik w każdym procesie, niezależnie od biblioteki standardowej.
 ///
 /// @note Skrot liczony JAWNIE, a nie przez std::hash, z tego samego powodu co skrot sciezki magazynu w bus.hpp:
 ///       wartosc musi byc identyczna po obu stronach IPC. Wiodace "0" oddziela skroty od nazw doslownych,
@@ -107,10 +105,8 @@ inline std::string shortServerTag(std::string_view serverName) {
 }
 
 /// Funkcja serverNameToken powinna:
-/// - dla pustej nazwy serwera zwracać pusty napis.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
-/// - zwracać samą nazwę serwera, gdy najdłuższa nazwa obiektu instancji (kResponseQueuePrefix, kropka, nazwa serwera, kropka i zapas kObjectNameTailBudget) mieści się w kMaxObjectNameLength, a w przeciwnym razie skrót shortServerTag.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
+/// - [constants.server-name-token.1~1] dla pustej nazwy serwera zwracać pusty napis.
+/// - [constants.server-name-token.2~1] zwracać samą nazwę serwera, gdy najdłuższa nazwa obiektu instancji (kResponseQueuePrefix, kropka, nazwa serwera, kropka i zapas kObjectNameTailBudget) mieści się w kMaxObjectNameLength, a w przeciwnym razie skrót shortServerTag.
 ///
 /// @note Decyzje podejmuje NAJDLUZSZA z nazw (kolejka odpowiedzi z identyfikatorem klienta), zeby wszystkie
 ///       obiekty jednej instancji byly nazwane jednakowo: serwer i klient licza to niezaleznie i musza dojsc
@@ -123,8 +119,7 @@ inline std::string serverNameToken(std::string_view serverName) {
 }
 
 /// Funkcja withServerSuffix powinna:
-/// - zwracać base z dopisanym ".<serverName>", a dla pustej nazwy serwera samo base.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
+/// - [constants.with-server-suffix.1~1] zwracać base z dopisanym ".<serverName>", a dla pustej nazwy serwera samo base.
 inline std::string withServerSuffix(std::string_view base, std::string_view serverName) {
   std::string retVal(base);
   if (!serverName.empty()) {
@@ -135,10 +130,8 @@ inline std::string withServerSuffix(std::string_view base, std::string_view serv
 }
 
 /// Funkcja namesForToken powinna:
-/// - budować nazwę segmentu pamięci dzielonej i kolejki komend przez withServerSuffix z podanym członem instancji.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
-/// - budować prefiks kolejki odpowiedzi jako kResponseQueuePrefix dla pustego członu, a dla niepustego jako withServerSuffix(kResponseQueuePrefix, człon) zakończony kropką.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
+/// - [constants.names-for-token.1~1] budować nazwę segmentu pamięci dzielonej i kolejki komend przez withServerSuffix z podanym członem instancji.
+/// - [constants.names-for-token.2~1] budować prefiks kolejki odpowiedzi jako kResponseQueuePrefix dla pustego członu, a dla niepustego jako withServerSuffix(kResponseQueuePrefix, człon) zakończony kropką.
 ///
 /// @note Przyjmuje gotowy czlon (patrz serverNameToken): sprzatacz pozostalosci zna wylacznie czlon - odczytany
 ///       z nazwy pliku blokady tozsamosci - a nie nazwe serwera.
@@ -167,8 +160,7 @@ inline constexpr std::string_view kMachineLockDir = "/tmp";
 inline constexpr std::string_view kIdentityLockPrefix = "xretractor_ipc.";
 
 /// Funkcja identityLockPath powinna:
-/// - zwracać ścieżkę pliku blokady tożsamości IPC: dir, "/", kIdentityLockPrefix, nazwa kolejki komend i ".lock", domyślnie w kMachineLockDir.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
+/// - [constants.identity-lock-path.1~1] zwracać ścieżkę pliku blokady tożsamości IPC: dir, "/", kIdentityLockPrefix, nazwa kolejki komend i ".lock", domyślnie w kMachineLockDir.
 ///
 /// @note Serwer trzyma te blokade wylacznie od chwili PRZED utworzeniem swoich obiektow IPC do chwili PO ich
 ///       skasowaniu, a po jego smierci zwalnia ja jadro - dlatego jest najpewniejszym dowodem, ze serwer o tym
@@ -178,8 +170,7 @@ inline std::string identityLockPath(std::string_view queryQueue, std::string_vie
 }
 
 /// Funkcja names powinna:
-/// - zwracać komplet nazw instancji namesForToken(serverNameToken(serverName)), z członem liczonym raz dla wszystkich nazw.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
+/// - [constants.names.1~1] zwracać komplet nazw instancji namesForToken(serverNameToken(serverName)), z członem liczonym raz dla wszystkich nazw.
 ///
 /// @note Na Linuksie czlonem jest zawsze sama nazwa serwera.
 inline ServerNames names(std::string_view serverName = {}) { return namesForToken(serverNameToken(serverName)); }
@@ -192,22 +183,19 @@ inline constexpr std::string_view kServiceLockFamily = "xretractor_service";
 inline constexpr std::string_view kServiceLockSuffix = ".lock";
 
 /// Funkcja serviceName powinna:
-/// - zwracać withServerSuffix(kServiceLockFamily, serverName), z samą nazwą serwera jako członem, nie skrótem z serverNameToken.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
+/// - [constants.service-name.1~1] zwracać withServerSuffix(kServiceLockFamily, serverName), z samą nazwą serwera jako członem, nie skrótem z serverNameToken.
 ///
 /// @note Nazwa uslugi to rdzen nazwy pliku jej blokady i etykieta w `xretractor --status`.
 inline std::string serviceName(std::string_view serverName) { return withServerSuffix(kServiceLockFamily, serverName); }
 
 /// Funkcja serviceLockFile powinna:
-/// - zwracać nazwę pliku blokady instancji: serviceName z dopisanym kServiceLockSuffix, bez katalogu.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
+/// - [constants.service-lock-file.1~1] zwracać nazwę pliku blokady instancji: serviceName z dopisanym kServiceLockSuffix, bez katalogu.
 inline std::string serviceLockFile(std::string_view serviceName) {
   return std::string(serviceName) + std::string(kServiceLockSuffix);
 }
 
 /// Funkcja serviceLockDir powinna:
-/// - zwracać skonfigurowany katalog blokad instancji (paths.lock_dir), a gdy jest pusty - katalog tymczasowy procesu z std::filesystem::temp_directory_path.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
+/// - [constants.service-lock-dir.1~1] zwracać skonfigurowany katalog blokad instancji (paths.lock_dir), a gdy jest pusty - katalog tymczasowy procesu z std::filesystem::temp_directory_path.
 ///
 /// @note Inaczej niz kMachineLockDir: ta blokada rozdziela instancje w obrebie jednego katalogu.
 inline std::filesystem::path serviceLockDir(std::string_view configuredDir) {
@@ -216,14 +204,10 @@ inline std::filesystem::path serviceLockDir(std::string_view configuredDir) {
 }
 
 /// Funkcja serviceLockInstance powinna:
-/// - dla nazwy pliku, która nie zaczyna się od kServiceLockFamily albo nie kończy się kServiceLockSuffix, zwracać nullopt.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
-/// - dla nazwy bez członu pomiędzy nimi zwracać pusty napis (instancja bezimienna).
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
-/// - dla członu postaci ".<nazwa>" z niepustą nazwą zwracać nazwę bez kropki, a dla każdego innego członu nullopt.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
-/// - nie oceniać poprawności odczytanej nazwy serwera, pozostawiając to wołającemu.
-///   Test: `RequirementContracts.ipc_names_preserve_legacy_names_and_bound_the_instance_token`.
+/// - [constants.service-lock-instance.1~1] dla nazwy pliku, która nie zaczyna się od kServiceLockFamily albo nie kończy się kServiceLockSuffix, zwracać nullopt.
+/// - [constants.service-lock-instance.2~1] dla nazwy bez członu pomiędzy nimi zwracać pusty napis (instancja bezimienna).
+/// - [constants.service-lock-instance.3~1] dla członu postaci ".<nazwa>" z niepustą nazwą zwracać nazwę bez kropki, a dla każdego innego członu nullopt.
+/// - [constants.service-lock-instance.4~1] nie oceniać poprawności odczytanej nazwy serwera, pozostawiając to wołającemu.
 inline std::optional<std::string_view> serviceLockInstance(std::string_view file) {
   if (file.size() < kServiceLockFamily.size() + kServiceLockSuffix.size() || !file.starts_with(kServiceLockFamily) ||
       !file.ends_with(kServiceLockSuffix))

@@ -112,6 +112,7 @@ struct wrapReset {
 };
 
 TEST(dumpManager, buildDumpChunk_accepts_fd_zero_as_valid) {
+  // covers: dumpmanager.dump-manager.7~1
   dumpManager manager;
 
   auto descriptor = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
@@ -161,6 +162,7 @@ TEST(dumpManager, buildDumpChunk_rejects_negative_fd) {
 // ============================================================
 
 TEST(dumpManager, buildDumpChunk_delay_decrements_returns_false) {
+  // covers: dumpmanager.dump-manager.5~1
   dumpManager manager;
 
   auto descriptor = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
@@ -179,6 +181,7 @@ TEST(dumpManager, buildDumpChunk_delay_decrements_returns_false) {
 }
 
 TEST(dumpManager, buildDumpChunk_delay_exhausted_then_writes) {
+  // covers: dumpmanager.dump-manager.5~1
   dumpManager manager;
 
   auto descriptor = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
@@ -215,6 +218,7 @@ TEST(dumpManager, buildDumpChunk_delay_exhausted_then_writes) {
 // ============================================================
 
 TEST(dumpManager, buildDumpChunk_multiple_records_not_done_until_last) {
+  // covers: dumpmanager.dump-manager.7~1
   dumpManager manager;
 
   auto descriptor = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
@@ -286,6 +290,7 @@ TEST(dumpManager, buildDumpChunk_negative_delayDumpRecordsToGo_fatals) {
 // ============================================================
 
 TEST(dumpTask, move_constructor_transfers_fd) {
+  // covers: dumpmanager.dump-task.3~1
   int fd = ::open("/dev/null", O_RDWR);
   ASSERT_GE(fd, 0);
 
@@ -299,6 +304,7 @@ TEST(dumpTask, move_constructor_transfers_fd) {
 }
 
 TEST(dumpTask, move_assignment_closes_old_fd_and_transfers) {
+  // covers: dumpmanager.dump-task.3~1
   int fd1 = ::open("/dev/null", O_RDWR);
   int fd2 = ::open("/dev/null", O_RDWR);
   ASSERT_GE(fd1, 0);
@@ -320,6 +326,7 @@ TEST(dumpTask, move_assignment_closes_old_fd_and_transfers) {
 }
 
 TEST(dumpTask, destructor_closes_fd) {
+  // covers: dumpmanager.dump-task.4~1
   int fd = ::open("/dev/null", O_RDWR);
   ASSERT_GE(fd, 0);
 
@@ -333,6 +340,7 @@ TEST(dumpTask, destructor_closes_fd) {
 }
 
 TEST(dumpTask, destructor_with_negative_fd_does_not_crash) {
+  // covers: dumpmanager.dump-task.4~1
   dumpTask task("t", {0, 1}, 0);
   // task.fd = -1 domyślnie - destruktor nie wywołuje close
 }
@@ -356,12 +364,14 @@ class DumpManagerFileTest : public ::testing::Test {
 };
 
 TEST_F(DumpManagerFileTest, setDumpStorage_sets_path) {
+  // covers: dumpmanager.dump-manager.1~1
   dumpManager manager;
   manager.setDumpStorage(sandBoxFolder.string());
   EXPECT_EQ(manager.storagePath, sandBoxFolder.string());
 }
 
 TEST_F(DumpManagerFileTest, createDumpFile_without_retention_creates_tmp_suffix) {
+  // covers: dumpmanager.dump-manager.1~1
   dumpManager manager;
   manager.storagePath = sandBoxFolder.string();
   // retentionSize["stream_t"] = 0 (domyślna wartość mapy)
@@ -375,6 +385,7 @@ TEST_F(DumpManagerFileTest, createDumpFile_without_retention_creates_tmp_suffix)
 }
 
 TEST_F(DumpManagerFileTest, createDumpFile_with_retention_creates_numbered_files) {
+  // covers: dumpmanager.dump-manager.1~1
   dumpManager manager;
   manager.storagePath                  = sandBoxFolder.string();
   manager.retentionSize["stream_task"] = 3;
@@ -485,6 +496,7 @@ class DumpManagerTaskTest : public DumpManagerFileTest, public ::testing::WithPa
 // Pierwsza nazwa, zawiniecie retencji i bajty kazdego pozostalego zrzutu.
 // Zadania koncza sie przed kolejnym wyzwoleniem - nakladanie zrzutow to osobny kontrakt (#380).
 TEST_P(DumpManagerTaskTest, registerTask_retains_completed_dump_files_and_contents) {
+  // covers: dumpmanager.dump-manager.1~1, dumpmanager.dump-manager.6~1
   dumpManager manager;
   manager.setDumpStorage(sandBoxFolder.string());
   const auto retention = GetParam();
@@ -527,6 +539,7 @@ INSTANTIATE_TEST_SUITE_P(BoundarySizes, DumpManagerTaskTest, ::testing::Values(s
 // #380: regula bez RETENTION odtwarza swoj plik przy kazdym wyzwoleniu. Zastapione zadanie
 // konczy sie od razu, choc obca regula z RETENTION 100 trzyma w ksiedze dluzsze okna.
 TEST_P(DumpManagerTaskTest, unretained_replacement_closes_only_same_rule_tasks) {
+  // covers: dumpmanager.dump-manager.3~1, dumpmanager.dump-manager.4~1
   dumpManager manager;
   manager.setDumpStorage(sandBoxFolder.string());
   const long first = rangeStart();
@@ -570,6 +583,7 @@ TEST_P(DumpManagerTaskTest, unretained_replacement_closes_only_same_rule_tasks) 
 // #380: regula z RETENTION 2 odtwarza plik slotu 0 przy trzecim wyzwoleniu. Zadanie pierwszego
 // wyzwolenia konczy sie wtedy, choc obca regula z RETENTION 100 zostawilaby mu miejsce w ksiedze.
 TEST_P(DumpManagerTaskTest, retention_wrap_closes_task_of_reused_slot) {
+  // covers: dumpmanager.dump-manager.3~1
   dumpManager manager;
   manager.setDumpStorage(sandBoxFolder.string());
   const long first = rangeStart();
@@ -611,6 +625,7 @@ TEST_P(DumpManagerTaskTest, retention_wrap_closes_task_of_reused_slot) {
 // #380: dwie reguly bez RETENTION na jednym strumieniu maja nakladajace sie okna. Do #380 ksiega
 // miala wtedy pojemnosc 1 i wyzwolenie drugiej ucinalo widoczny zrzut pierwszej.
 TEST_P(DumpManagerTaskTest, unretained_rules_do_not_evict_each_other) {
+  // covers: dumpmanager.dump-manager.3~1, dumpmanager.dump-manager.5~1
   dumpManager manager;
   manager.setDumpStorage(sandBoxFolder.string());
   const long first = rangeStart();
@@ -639,6 +654,7 @@ TEST_P(DumpManagerTaskTest, unretained_rules_do_not_evict_each_other) {
 // Licznik slotow i RETENTION naleza do pary strumien/regula. Klucz bez separatora sklejal a/bc
 // z ab/c (oba "abc"), choc ich pliki sa rozne: druga regula zaczynala od cudzego slotu 1.
 TEST_F(DumpManagerFileTest, retention_counters_are_kept_per_stream_and_rule) {
+  // covers: dumpmanager.dump-manager.1~1
   const auto inputFile = sandBoxFolder / "input.bin";
   std::ofstream(inputFile, std::ios::binary).write("\0\0\0\0", 4);
   qTree plan;
@@ -702,6 +718,7 @@ class DumpManagerHistoryTest : public DumpManagerFileTest, public ::testing::Wit
 // #419: prawdziwy magazyn i regula skompilowanego planu, bez recznego powiekszania
 // pierscienia. Zrzut porownujemy bajtowo po kilku obrotach pierscienia/segmentow.
 TEST_P(DumpManagerHistoryTest, compiled_rule_dumps_history_and_current_record_bytes) {
+  // covers: dumpmanager.dump-manager.4~1
   auto &runtime       = *model->qSet.at("result");
   auto &output        = *runtime.outputPayload;
   const auto dumpPath = sandBoxFolder / "result_capture_dump.tmp";
@@ -774,6 +791,7 @@ class DumpManagerPastRangeTest : public DumpManagerFileTest, public ::testing::W
 // -5, -4, -3. Do 2026-10 registerTask zrzucal zawsze historie do -1, a dla prawej granicy ujemnej
 // konczyl proces przez rdb::fatal przy pierwszym wyzwoleniu reguly.
 TEST_P(DumpManagerPastRangeTest, past_only_range_dumps_exactly_its_history_records) {
+  // covers: dumpmanager.dump-manager.4~1
   auto &runtime       = *model->qSet.at("result");
   auto &output        = *runtime.outputPayload;
   const auto dumpPath = sandBoxFolder / "result_capture_dump.tmp";
@@ -807,10 +825,12 @@ INSTANTIATE_TEST_SUITE_P(PastRanges, DumpManagerPastRangeTest,
 // Kontrakt etapu 9 (#521): konstrukcja, tworzenie pliku, porazki I/O
 // ============================================================
 
+// covers: dumpmanager.dump-task.3~1
 static_assert(!std::is_copy_constructible_v<dumpTask> && !std::is_copy_assignable_v<dumpTask>);
 static_assert(std::is_nothrow_move_constructible_v<dumpTask> && std::is_nothrow_move_assignable_v<dumpTask>);
 
 TEST(dumpTask, constructor_keeps_rule_and_starts_closed_with_zero_counters) {
+  // covers: dumpmanager.dump-task.2~1
   const dumpTask task("capture", {-3, 4}, 7);
   EXPECT_EQ(task.taskName, "capture");
   EXPECT_EQ(task.range, (std::pair<long, long>{-3, 4}));
@@ -824,6 +844,7 @@ TEST(dumpTask, constructor_keeps_rule_and_starts_closed_with_zero_counters) {
 // Poprzedni plik pod ta nazwa zostaje odlaczony, a nie obciety: deskryptor otwarty na nim przed
 // wywolaniem widzi stara tresc i nlink 0. Tryb liczony z umask procesu, nie odczytany z silnika.
 TEST_F(DumpManagerFileTest, createDumpFile_replaces_previous_file_with_a_fresh_inode) {
+  // covers: dumpmanager.dump-manager.2~1
   dumpManager manager;
   manager.setDumpStorage(sandBoxFolder.string());
   const auto path = sandBoxFolder / "stream_t_dump.tmp";
@@ -853,6 +874,7 @@ TEST_F(DumpManagerFileTest, createDumpFile_replaces_previous_file_with_a_fresh_i
 // Konkurent odtwarza plik miedzy unlink() a open(): O_EXCL odmawia, a createDumpFile kasuje
 // i probuje ponownie - do skutku, gdy konkurent ustapi, i najwyzej kMaxRecreates (100) razy.
 TEST_F(DumpManagerFileTest, createDumpFile_retries_a_competing_creator_at_most_100_times) {
+  // covers: dumpmanager.dump-manager.2~1, dumpmanager.dump-manager.8~1
   const wrapReset reset;
   dumpManager manager;
   manager.setDumpStorage(sandBoxFolder.string());
@@ -886,6 +908,7 @@ TEST_F(DumpManagerFileTest, createDumpFile_retries_a_competing_creator_at_most_1
 // Porazki usuniecia i utworzenia wracaja jako Errc::IO z errno, ktore system zwraca dla tej
 // samej operacji wykonanej niezaleznie przez test.
 TEST_F(DumpManagerFileTest, createDumpFile_reports_remove_and_create_failures_with_errno) {
+  // covers: dumpmanager.dump-manager.8~1
   dumpManager manager;
   manager.setDumpStorage(sandBoxFolder.string());
   std::filesystem::create_directory(sandBoxFolder / "stream_dir_dump.tmp");
@@ -908,6 +931,7 @@ TEST_F(DumpManagerFileTest, createDumpFile_reports_remove_and_create_failures_wi
 // Jeden write o rozmiarze deskryptora. Niepelny, ale dodatni wynik liczy sie jako rekord i nie
 // jest ponawiany; zero i -1 to Errc::IO z errno (EIO, gdy write nie ustawil errno).
 TEST(dumpManager, buildDumpChunk_counts_any_positive_write_and_reports_failures) {
+  // covers: dumpmanager.dump-manager.7~1, dumpmanager.dump-manager.8~1
   const wrapReset reset;
   dumpManager manager;
   auto descriptor = rdb::Descriptor("v", 4, 1, rdb::INTEGER) + rdb::Descriptor("w", 8, 1, rdb::DOUBLE);
@@ -983,6 +1007,7 @@ class DumpManagerModelTest : public DumpManagerFileTest {
 // rekordow nie pisze i nie przesuwa licznikow zadania. Po wyczerpaniu zakresu plik zadania jest
 // zamkniety, a zadanie znika z ksiegi.
 TEST_F(DumpManagerModelTest, processStreamChunk_does_no_work_without_tasks_or_records) {
+  // covers: dumpmanager.dump-manager.5~1, dumpmanager.dump-manager.6~1
   const wrapReset reset;
   dumpManager manager;
   manager.setDumpStorage(sandBoxFolder.string());
@@ -1020,6 +1045,7 @@ TEST_F(DumpManagerModelTest, processStreamChunk_does_no_work_without_tasks_or_re
 // Zrzut historii przy rejestracji ma te same porazki co zapis w slocie: Errc::IO z errno,
 // a zadanie nie trafia do ksiegi.
 TEST_F(DumpManagerModelTest, registerTask_history_dump_reports_seek_and_write_failures) {
+  // covers: dumpmanager.dump-manager.8~1
   const wrapReset reset;
   dumpManager manager;
   manager.setDumpStorage(sandBoxFolder.string());

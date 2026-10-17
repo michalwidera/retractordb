@@ -7,6 +7,7 @@ set(TestID "it_${TestID}")
 # wejscia". Test porownuje artefakt przebiegu z --until-eof z przebiegiem o
 # recznie dobranym -m i sprawdza, ze bez tego trybu zrodlo nadal sie zawija.
 
+# covers: launcher.xretractor.38~1, datamodel.data-model.14~1, executorsm.executorsm.7~1
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

@@ -10,16 +10,14 @@
 using namespace boost;
 
 /// Funkcja floorR powinna:
-/// - zwracać część całkowitą num, licząc numerator / denominator w int.
+/// - [soperations.floor-r.1~1] zwracać część całkowitą num, licząc numerator / denominator w int.
 /// (!sr_problem:nazwa obiecuje podłogę, a dla ujemnego num wynik jest obcięciem w stronę zera, np. floorR(-1/2) == 0; wołający dziś podają wartości nieujemne.)
-///   Test: `xSOperations.rounding_helpers_obey_signed_and_64_bit_contracts`.
 ///
 /// Wzorzec: https://stackoverflow.com/questions/35971827/c-boost-rational-class-floor-function
 constexpr int floorR(boost::rational<int> const &num) { return static_cast<int>(num.numerator() / num.denominator()); }
 
 /// Funkcja floorDiv powinna:
-/// - zwracać iloraz numerator / denominator zaokrąglony w dół (w stronę minus nieskończoności), także dla ujemnego licznika lub mianownika, w arytmetyce int64.
-///   Test: `xSOperations.rounding_helpers_obey_signed_and_64_bit_contracts`.
+/// - [soperations.floor-div.1~1] zwracać iloraz numerator / denominator zaokrąglony w dół (w stronę minus nieskończoności), także dla ujemnego licznika lub mianownika, w arytmetyce int64.
 ///
 /// Dzielenie całkowite z zaokrągleniem W DÓŁ. Wbudowane `/` zaokrągla w stronę zera, co dla
 /// ujemnych liczników daje inny rekord niż model zdarzeniowy - a ujemne pozycje spłaszczone
@@ -32,8 +30,7 @@ constexpr std::int64_t floorDiv(const std::int64_t numerator, const std::int64_t
 }
 
 /// Funkcja ceilR powinna:
-/// - zwracać num, gdy jest całkowite, a w przeciwnym razie zaokrąglać je od zera: część całkowitą obciętą w stronę zera powiększać o 1 dla dodatniego num i pomniejszać o 1 dla ujemnego.
-///   Test: `xSOperations.rounding_helpers_obey_signed_and_64_bit_contracts`.
+/// - [soperations.ceil-r.1~1] zwracać num, gdy jest całkowite, a w przeciwnym razie zaokrąglać je od zera: część całkowitą obciętą w stronę zera powiększać o 1 dla dodatniego num i pomniejszać o 1 dla ujemnego.
 constexpr int ceilR(boost::rational<int> const &num) {
   auto inum = static_cast<int>(num.numerator() / num.denominator());
   if (num == inum) return inum;
@@ -41,11 +38,8 @@ constexpr int ceilR(boost::rational<int> const &num) {
 }
 
 /// Funkcja Hash powinna:
-/// - dla rekordu i (od 0) przeplotu C = A#B przy z = deltaB/(deltaA+deltaB) zwracać true i ustawiać retPos = i - ⌊iz⌋ (indeks w B), gdy ⌊iz⌋ == ⌊(i+1)z⌋, a w przeciwnym razie zwracać false i ustawiać retPos = ⌊iz⌋ (indeks w A).
-///   Test: `xSOperations.hash_operations`, `xSOperations.hash_operations_nonunit_delta`, `xSOperations.hash_operations_equal_delta`.
-///   Test: `ProofOracle.interleaveAt_table`.
-/// - zakładać dodatnie deltaA i deltaB, sprawdzane asercją wyłącznie w buildzie Debug.
-///   Test: `xSOperations.hash_asserts_positive_delta_in_debug`.
+/// - [soperations.hash.1~1] dla rekordu i (od 0) przeplotu C = A#B przy z = deltaB/(deltaA+deltaB) zwracać true i ustawiać retPos = i - ⌊iz⌋ (indeks w B), gdy ⌊iz⌋ == ⌊(i+1)z⌋, a w przeciwnym razie zwracać false i ustawiać retPos = ⌊iz⌋ (indeks w A).
+/// - [soperations.hash.2~1] zakładać dodatnie deltaA i deltaB, sprawdzane asercją wyłącznie w buildzie Debug.
 ///
 /// Przeplot (definicja formalna): dla i-tego rekordu strumienia C = A#B (i od 0)
 ///   c_i = b_{i-⌊iz⌋}  gdy ⌊iz⌋ == ⌊(i+1)z⌋   (zwraca true,  retPos = indeks w B)
@@ -74,22 +68,19 @@ inline bool Hash(const rational<int> &deltaA, const rational<int> &deltaB, const
 // Wynik jest indeksem POSTĘPUJĄCYM (0-bazowym) w strumieniu C.
 
 /// Funkcja Div powinna:
-/// - zwracać indeks postępujący w przeplocie C elementu a_i lewej składowej (Θ): i + ceilR((i+1)*deltaA/deltaB).
-///   Test: `xSOperations.divmod_operations`, `ProofOracle.deinterleave_table`.
+/// - [soperations.div.1~1] zwracać indeks postępujący w przeplocie C elementu a_i lewej składowej (Θ): i + ceilR((i+1)*deltaA/deltaB).
 constexpr int Div(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, const int i) {
   return i + ceilR((i + 1) * deltaA / deltaB);
 }
 
 /// Funkcja Mod powinna:
-/// - zwracać indeks postępujący w przeplocie C elementu b_i prawej składowej (~Θ): i + floorR(i*deltaB/deltaA).
-///   Test: `xSOperations.divmod_operations`, `ProofOracle.deinterleave_table`.
+/// - [soperations.mod.1~1] zwracać indeks postępujący w przeplocie C elementu b_i prawej składowej (~Θ): i + floorR(i*deltaB/deltaA).
 constexpr int Mod(const boost::rational<int> &deltaA, const boost::rational<int> &deltaB, const int i) {
   return i + floorR(i * deltaB / deltaA);
 }
 
 /// Funkcja Subtract powinna:
-/// - zwracać indeks rekordu C wybranego dla rekordu i różnicy C-Delta: i dla równych interwałów, a w przeciwnym razie ceilR(i*deltaTarget/deltaSource).
-///   Test: `xSOperations.subtract_uses_forward_target_index`, `ProofOracle.rateDiff_table`.
+/// - [soperations.subtract.1~1] zwracać indeks rekordu C wybranego dla rekordu i różnicy C-Delta: i dla równych interwałów, a w przeciwnym razie ceilR(i*deltaTarget/deltaSource).
 ///
 /// Różnica C-Delta wybiera z C składową o docelowym interwale Delta.
 /// Delta nie może być mniejsza od interwału C (wynik nie może wymagać
@@ -101,8 +92,7 @@ constexpr int Subtract(const rational<int> &deltaSource, const rational<int> &de
 }
 
 /// Funkcja Add powinna:
-/// - zwracać indeks postępujący rekordu składowej o interwale deltaSrc czytanego przez rekord n sumy: n, gdy deltaOut == deltaSrc, a w przeciwnym razie floorR(n*deltaOut/deltaSrc).
-///   Test: `xSOperations.add_pairs_slower_component_by_floor_index`, `ProofOracle.sample_self`.
+/// - [soperations.add.1~1] zwracać indeks postępujący rekordu składowej o interwale deltaSrc czytanego przez rekord n sumy: n, gdy deltaOut == deltaSrc, a w przeciwnym razie floorR(n*deltaOut/deltaSrc).
 ///
 /// Suma strumieni (definicja formalna): dla C = A+B, gdzie Delta_c = min(Delta_a, Delta_b):
 ///   c_n = (a_n, b_{⌊n·Delta_a/Delta_b⌋})   gdy Delta_a <= Delta_b
@@ -116,8 +106,7 @@ constexpr int Add(const rational<int> &deltaOut, const rational<int> &deltaSrc, 
 }
 
 /// Funkcja roundedAwayFromZero powinna:
-/// - zwracać iloraz numerator / denominator w int64: dokładny, gdy dzielenie jest bez reszty, a w przeciwnym razie zaokrąglony od zera (jak ceilR).
-///   Test: `xSOperations.rounding_helpers_obey_signed_and_64_bit_contracts`.
+/// - [soperations.rounded-away-from-zero.1~1] zwracać iloraz numerator / denominator w int64: dokładny, gdy dzielenie jest bez reszty, a w przeciwnym razie zaokrąglony od zera (jak ceilR).
 ///
 /// Rachunek w int64, bo (1+W_src)*F przekracza int juz dla trzech okien `@(1,65536)` w lancuchu
 /// (A2 M11). Zaokraglenie jest to samo co w ceilR() - od zera - wiec w zakresie int wynik sie nie
@@ -129,8 +118,7 @@ constexpr std::int64_t roundedAwayFromZero(const std::int64_t numerator, const s
 }
 
 /// Funkcja AgseStartupLatency powinna:
-/// - zwracać ogon okna AGSE W = roundedAwayFromZero((1 + sourceLatency) * sourceWidth, step) - 1, liczony w int64.
-///   Test: `xSOperations.agse_startup_latency_covers_newest_field`, `xSOperations.agse_origin_and_latency_do_not_overflow_int`.
+/// - [soperations.agse-startup-latency.1~1] zwracać ogon okna AGSE W = roundedAwayFromZero((1 + sourceLatency) * sourceWidth, step) - 1, liczony w int64.
 ///
 /// Okno AGSE jest stemplowane KOŃCEM przedziału: rekord n obejmuje spłaszczone
 /// pozycje źródła n*step-(abs(length)-1) ... n*step, więc najnowsze pole okna
@@ -162,8 +150,7 @@ constexpr std::int64_t AgseStartupLatency(const int sourceWidth, const int step,
 }
 
 /// Funkcja AgseLogicalOrigin powinna:
-/// - zwracać początek logiczny strumienia okna O = roundedAwayFromZero(sourceOrigin * sourceWidth + |length| - 1, step), czyli najmniejsze n, dla którego całe okno leży w istniejącej części źródła, liczony w int64.
-///   Test: `xSOperations.agse_logical_origin_skips_incomplete_windows`, `xSOperations.agse_origin_and_latency_do_not_overflow_int`.
+/// - [soperations.agse-logical-origin.1~1] zwracać początek logiczny strumienia okna O = roundedAwayFromZero(sourceOrigin * sourceWidth + |length| - 1, step), czyli najmniejsze n, dla którego całe okno leży w istniejącej części źródła, liczony w int64.
 ///
 /// Początek logiczny strumienia okna: najmniejsze n, dla którego całe okno
 /// n*step-(abs(length)-1) ... n*step mieści się w istniejącej części źródła.
@@ -179,8 +166,7 @@ constexpr std::int64_t AgseLogicalOrigin(const int sourceWidth, const int step, 
 }
 
 /// Funkcja AddStartupLatency powinna:
-/// - zwracać ogon sumy strumieni względem jednej składowej: ceilR((1 + sourceLatency) * deltaSource / deltaTarget) - 1; maksimum po składowych wyznacza wołający.
-///   Test: `xSOperations.add_startup_latency_covers_slower_component`, `capacities.add_declared_matches_event_table`.
+/// - [soperations.add-startup-latency.1~1] zwracać ogon sumy strumieni względem jednej składowej: ceilR((1 + sourceLatency) * deltaSource / deltaTarget) - 1; maksimum po składowych wyznacza wołający.
 ///
 /// Suma strumieni czyta składową o interwale deltaSource po indeksie
 /// floor(n*Delta_out/Delta_src) (patrz Add()). Rekord o tym indeksie jest
@@ -198,8 +184,7 @@ constexpr int AddStartupLatency(const rational<int> &deltaSource, const rational
 }
 
 /// Funkcja PhaseStartupLatency powinna:
-/// - zwracać ogon operatora o afinicznym odwzorowaniu indeksu: max(0, ceilR((phaseBound + sourceLatency + 1) / ratio) - 1), gdzie ratio = Delta_out/Delta_src, a phaseBound to kres części fazowej indeksu.
-///   Test: `xSOperations.subtract_startup_latency_covers_fractional_phase`, `xSOperations.dehash_startup_latency_follows_the_phase_bound`.
+/// - [soperations.phase-startup-latency.1~1] zwracać ogon operatora o afinicznym odwzorowaniu indeksu: max(0, ceilR((phaseBound + sourceLatency + 1) / ratio) - 1), gdzie ratio = Delta_out/Delta_src, a phaseBound to kres części fazowej indeksu.
 ///
 /// Ogon operatorów jednoargumentowych o afinicznym odwzorowaniu indeksu: `-`, `Θ` i `~Θ`.
 /// Jedna postać, trzy stałe fazowe.
@@ -227,8 +212,7 @@ constexpr int PhaseStartupLatency(const rational<int> &phaseBound, const rationa
 }
 
 /// Funkcja SubtractStartupLatency powinna:
-/// - zwracać ogon różnicy C-Delta: PhaseStartupLatency((q-1)/q, deltaTarget/deltaSource, sourceLatency), gdzie q to mianownik skróconego deltaTarget/deltaSource.
-///   Test: `xSOperations.subtract_startup_latency_covers_fractional_phase`, `capacities.subtract_declared_matches_event_table`.
+/// - [soperations.subtract-startup-latency.1~1] zwracać ogon różnicy C-Delta: PhaseStartupLatency((q-1)/q, deltaTarget/deltaSource, sourceLatency), gdzie q to mianownik skróconego deltaTarget/deltaSource.
 ///
 /// C-Delta wybiera c_{ceil(n*Delta/Dc)}, czyli e(n) = (q - n*p mod q)/q przy p/q = Delta/Dc
 /// po skróceniu. Kres (q-1)/q jest osiągany dla n spełniającego n*p = 1 (mod q).
@@ -240,8 +224,7 @@ constexpr int SubtractStartupLatency(const rational<int> &deltaSource, const rat
 }
 
 /// Funkcja ThetaStartupLatency powinna:
-/// - zwracać ogon rozplotu Θ: PhaseStartupLatency((a+b-1)/b, deltaTarget/deltaSource, sourceLatency), gdzie a/b to skrócone deltaTarget/other.
-///   Test: `xSOperations.dehash_startup_latency_follows_the_phase_bound`.
+/// - [soperations.theta-startup-latency.1~1] zwracać ogon rozplotu Θ: PhaseStartupLatency((a+b-1)/b, deltaTarget/deltaSource, sourceLatency), gdzie a/b to skrócone deltaTarget/other.
 ///
 /// Θ czyta pozycję i + ceil((i+1)*Da/Db) przeplotu (patrz Div()). Przy a/b = Delta_out/param
 /// po skróceniu faza wynosi (a-t)/b dla t = 0 i (a+b-t)/b dla t > 0, gdzie t = (n+1)*a mod b,
@@ -255,8 +238,7 @@ constexpr int ThetaStartupLatency(const rational<int> &deltaSource, const ration
 }
 
 /// Funkcja NThetaStartupLatency powinna:
-/// - zwracać ogon rozplotu ~Θ: PhaseStartupLatency(0, deltaTarget/deltaSource, sourceLatency).
-///   Test: `xSOperations.dehash_startup_latency_follows_the_phase_bound`.
+/// - [soperations.n-theta-startup-latency.1~1] zwracać ogon rozplotu ~Θ: PhaseStartupLatency(0, deltaTarget/deltaSource, sourceLatency).
 ///
 /// ~Θ czyta pozycję i + floor(i*Db/Da) (patrz Mod()), więc e(n) = -(n*a mod b)/b <= 0
 /// i kres wynosi 0, osiągany dla n = 0. Ogon jest zatem samym przeliczeniem dostępności
@@ -273,13 +255,9 @@ constexpr int NThetaStartupLatency(const rational<int> &deltaSource, const ratio
 constexpr std::int64_t kHashPhaseScanLimit = 100'000;
 
 /// Funkcja HashStartupLatency powinna:
-/// - dla okresu fazowego p+q nie większego niż kHashPhaseScanLimit (p/q to skrócone deltaA/deltaB) zwracać dokładny ogon przeplotu: maksimum po i z [0, p+q) wartości ceil((j(i) + 1 + W_src(i)) * Delta_src(i) / deltaOut) - 1 - i, gdzie składową i jej indeks j(i) wybiera Hash, liczone w int64.
-///   Test: `ProofOracle.exactInterleaveTail_table`, `ProofOracle.exactInterleaveTail_exact`, `xSOperations.hash_startup_latency_uses_64bit_intermediate_arithmetic`.
-///   Test: `xSOperations.hash_scan_limit_boundary_has_an_exact_witness`.
-/// - powyżej kHashPhaseScanLimit zwracać oszacowanie O(1) max(conv(latencyA), conv(latencyB) + ceil((p+q-1)/p)), gdzie conv(W) = ceilR(W * Delta_src / deltaOut) dla W > 0 i 0 w przeciwnym razie.
-///   Test: `xSOperations.hash_startup_latency_above_scan_limit_stays_safe`, `xSOperations.hash_scan_limit_boundary_has_an_exact_witness`.
-/// - nigdy nie zaniżać ogona: zaniżenie oznacza rekord wyemitowany przed określeniem zależności.
-///   Test: `ProofOracle.exactInterleaveTail_exact`, `xSOperations.hash_startup_latency_above_scan_limit_stays_safe`.
+/// - [soperations.hash-startup-latency.1~1] dla okresu fazowego p+q nie większego niż kHashPhaseScanLimit (p/q to skrócone deltaA/deltaB) zwracać dokładny ogon przeplotu: maksimum po i z [0, p+q) wartości ceil((j(i) + 1 + W_src(i)) * Delta_src(i) / deltaOut) - 1 - i, gdzie składową i jej indeks j(i) wybiera Hash, liczone w int64.
+/// - [soperations.hash-startup-latency.2~1] powyżej kHashPhaseScanLimit zwracać oszacowanie O(1) max(conv(latencyA), conv(latencyB) + ceil((p+q-1)/p)), gdzie conv(W) = ceilR(W * Delta_src / deltaOut) dla W > 0 i 0 w przeciwnym razie.
+/// - [soperations.hash-startup-latency.3~1] nigdy nie zaniżać ogona: zaniżenie oznacza rekord wyemitowany przed określeniem zależności.
 ///
 /// Ogon przeplotu (`#`). Rekord i strumienia C = A#B niesie treść rekordu j(i)
 /// jednej ze składowych, wybranej przez Hash(); jest określony w chwili

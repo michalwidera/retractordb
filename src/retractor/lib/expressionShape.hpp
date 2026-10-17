@@ -104,30 +104,25 @@ using exprFieldShapeFn = std::function<std::optional<exprShape>(const std::strin
 using exprWindowShapeFn = std::function<std::optional<exprShape>(int groupIndex)>;
 
 /// Funkcja fieldLengthOfType powinna:
-/// - zwracać długość jednego elementu pola w bajtach: 1 dla BYTE i STRING, sizeof(int) dla INTEGER, sizeof(unsigned) dla UINT, sizeof(boost::rational<int>) dla RATIONAL, sizeof(float) dla FLOAT i sizeof(double) dla DOUBLE.
-///   Test: `xExpressionShape.type_helpers_cover_descriptor_types_and_the_fallback`.
-/// - dla każdego innego typu zwracać sizeof(int).
-///   Test: `xExpressionShape.type_helpers_cover_descriptor_types_and_the_fallback`.
+/// - [expressionshape.field-length-of-type.1~1] zwracać długość jednego elementu pola w bajtach: 1 dla BYTE i STRING, sizeof(int) dla INTEGER, sizeof(unsigned) dla UINT, sizeof(boost::rational<int>) dla RATIONAL, sizeof(float) dla FLOAT i sizeof(double) dla DOUBLE.
+/// - [expressionshape.field-length-of-type.2~1] dla każdego innego typu zwracać sizeof(int).
 ///
 /// @note Jedna definicja dla calego drzewa.
 int fieldLengthOfType(rdb::descFld type);
 
 /// Funkcja numericShape powinna:
-/// - zwracać kształt o podanym typie, długości fieldLengthOfType(type) i krotności rarray = 1.
-///   Test: `xExpressionShape.type_helpers_cover_descriptor_types_and_the_fallback`.
+/// - [expressionshape.numeric-shape.1~1] zwracać kształt o podanym typie, długości fieldLengthOfType(type) i krotności rarray = 1.
 exprShape numericShape(rdb::descFld type);
 
 /// Funkcja normalizedOperandType powinna:
-/// - zwracać typ o wyższym indeksie wariantu z dwóch podanych, tak jak `normalize()` z `expressionEvaluator`.
-///   Test: `xExpressionShape.binary_arithmetic_matrix_matches_the_evaluator`.
+/// - [expressionshape.normalized-operand-type.1~1] zwracać typ o wyższym indeksie wariantu z dwóch podanych, tak jak `normalize()` z `expressionEvaluator`.
 ///
 /// @note To NIE jest typ wyniku operacji arytmetycznej - dla `BYTE` operator C++ promuje jeszcze do `int`.
 ///       Patrz `arithmeticValueType()`.
 rdb::descFld normalizedOperandType(rdb::descFld left, rdb::descFld right);
 
 /// Funkcja arithmeticValueType powinna:
-/// - zwracać typ wartości operatora arytmetycznego (`+`, `-`, `*`, `/`, `^`): normalizedOperandType(left, right), z wyjątkiem pary BYTE i BYTE, która daje INTEGER.
-///   Test: `xExpressionShape.binary_arithmetic_matrix_matches_the_evaluator`.
+/// - [expressionshape.arithmetic-value-type.1~1] zwracać typ wartości operatora arytmetycznego (`+`, `-`, `*`, `/`, `^`): normalizedOperandType(left, right), z wyjątkiem pary BYTE i BYTE, która daje INTEGER.
 ///
 /// Wyjatek dla `BYTE op BYTE`: `uint8_t + uint8_t` w C++ promuje sie do `int` i wlasnie `int`
 /// laduje w wariancie (`expressionEvaluator::operator+` i pozostale). Ta sama promocja stoi za
@@ -135,18 +130,12 @@ rdb::descFld normalizedOperandType(rdb::descFld left, rdb::descFld right);
 rdb::descFld arithmeticValueType(rdb::descFld left, rdb::descFld right);
 
 /// Funkcja functionResultType powinna:
-/// - rozpoznawać nazwę funkcji bez względu na wielkość liter.
-///   Test: `xExpressionShape.function_type_policy_handles_unknown_arguments_and_mixed_case`.
-/// - dla `to_integer`, `to_float`, `to_double` i `to_string` zwracać odpowiednio INTEGER, FLOAT, DOUBLE i STRING, niezależnie od argumentu.
-///   Test: `xExpressionShape.function_type_policy_handles_unknown_arguments_and_mixed_case`.
-/// - dla `isnull`, `IsZero`, `IsNonZero` i `Length` zwracać INTEGER, niezależnie od argumentu.
-///   Test: `xExpressionShape.function_type_policy_handles_unknown_arguments_and_mixed_case`.
-/// - dla `sin`, `cos` i `exp` zwracać DOUBLE, także nad argumentem całkowitym i RATIONAL.
-///   Test: `xExpressionShape.function_type_policy_handles_unknown_arguments_and_mixed_case`.
-/// - dla `Abs`, `null2zero`, `Floor`, `Ceil`, `Sqrt`, `round`, `trunc`, `tan`, `log` i `log2` zwracać typ argumentu, a nullopt, gdy typ argumentu jest nieznany.
-///   Test: `xExpressionShape.function_type_policy_handles_unknown_arguments_and_mixed_case`.
-/// - dla nazwy spoza tej tabeli zwracać nullopt.
-///   Test: `xExpressionShape.function_type_policy_handles_unknown_arguments_and_mixed_case`.
+/// - [expressionshape.function-result-type.1~1] rozpoznawać nazwę funkcji bez względu na wielkość liter.
+/// - [expressionshape.function-result-type.2~1] dla `to_integer`, `to_float`, `to_double` i `to_string` zwracać odpowiednio INTEGER, FLOAT, DOUBLE i STRING, niezależnie od argumentu.
+/// - [expressionshape.function-result-type.3~1] dla `isnull`, `IsZero`, `IsNonZero` i `Length` zwracać INTEGER, niezależnie od argumentu.
+/// - [expressionshape.function-result-type.4~1] dla `sin`, `cos` i `exp` zwracać DOUBLE, także nad argumentem całkowitym i RATIONAL.
+/// - [expressionshape.function-result-type.5~1] dla `Abs`, `null2zero`, `Floor`, `Ceil`, `Sqrt`, `round`, `trunc`, `tan`, `log` i `log2` zwracać typ argumentu, a nullopt, gdy typ argumentu jest nieznany.
+/// - [expressionshape.function-result-type.6~1] dla nazwy spoza tej tabeli zwracać nullopt.
 ///
 /// @note Jedna polityka dla calego drzewa. `callFun` liczy funkcje matematyczne w `double` i rzutuje z powrotem
 ///       na typ wejscia, wiec `Ceil` nad `DOUBLE` daje `DOUBLE`, a nie `INTEGER`. `sin`, `cos`, `exp` licza kat
@@ -155,8 +144,7 @@ rdb::descFld arithmeticValueType(rdb::descFld left, rdb::descFld right);
 std::optional<rdb::descFld> functionResultType(std::string_view name, std::optional<rdb::descFld> argumentType);
 
 /// Funkcja isExactType powinna:
-/// - zwracać true wyłącznie dla typów o arytmetyce dokładnej i łącznej: BYTE, INTEGER, UINT i RATIONAL.
-///   Test: `xExpressionShape.type_helpers_cover_descriptor_types_and_the_fallback`.
+/// - [expressionshape.is-exact-type.1~1] zwracać true wyłącznie dla typów o arytmetyce dokładnej i łącznej: BYTE, INTEGER, UINT i RATIONAL.
 ///
 /// @note Calkowite pozostaja laczne takze w arytmetyce modulo 2^n. FLOAT i DOUBLE sa poza zbiorem swiadomie:
 ///       reasocjacja zmienia tam liczbe zaokraglen - dla float x = 2^24 mamy (x+1)+1 == x, ale x+2 == x+2,
@@ -164,40 +152,23 @@ std::optional<rdb::descFld> functionResultType(std::string_view name, std::optio
 bool isExactType(rdb::descFld type);
 
 /// Funkcja inferExpressionShape powinna:
-/// - dla pustego programu zwracać unknown.
-///   Test: `xExpressionShape.unresolved_program_reports_unknown`.
-/// - wykonywać program ONP na stosie kształtów jak `expressionEvaluator::eval()` na stosie wartości, zdejmując operandy przed rozpoznaniem operacji i zwracając illTyped, gdy na stosie brakuje operandów.
-///   Test: `xExpressionShape.stack_underflow_is_checked_for_every_operator_family`.
-/// - dla literału napisowego `PUSH_VAL` kłaść STRING o szerokości równej długości napisu, dla literału liczbowego numericShape jego typu, a dla wartości o typie powyżej DOUBLE zwracać unknown.
-///   Test: `xExpressionShape.literal_shapes_include_empty_strings_and_reject_pairs`, `xExpressionShape.binary_arithmetic_matrix_matches_the_evaluator`.
-/// - dla `PUSH_ID` kłaść kształt z shapeOfField(strumień, płaski indeks slotu), a zwracać unknown, gdy token nie niesie pary albo shapeOfField jest pusty lub zwraca nullopt.
-///   Test: `xExpressionShape.pure_field_read_keeps_type_and_length`, `xExpressionShape.malformed_references_and_window_tokens_report_unknown`.
-/// - dla nierozwiązanych odwołań `PUSH_ID1`..`PUSH_ID5` i `PUSH_IDX` oraz dla każdego tokenu spoza zestawu ewaluatora zwracać unknown.
-///   Test: `xExpressionShape.malformed_references_and_window_tokens_report_unknown`, `xExpressionShape.unresolved_program_reports_unknown`.
-/// - dla `WINDOW_MIN`, `WINDOW_MAX`, `WINDOW_AVG` i `WINDOW_SUM` kłaść kształt z shapeOfWindow(indeks grupy), a zwracać unknown, gdy token nie niesie liczby int albo shapeOfWindow jest pusty lub zwraca nullopt.
-///   Test: `xExpressionShape.malformed_references_and_window_tokens_report_unknown`.
-/// - dla `+` z operandem STRING kłaść STRING o sumie szerokości operandów tekstowych, przy czym operand liczbowy wnosi zero.
-///   Test: `xExpressionShape.string_concatenation_sums_widths_and_numbers_add_nothing`.
-/// - dla `+`, `-`, `*`, `/` i `^` nad typami liczbowymi kłaść numericShape(arithmeticValueType), a dla operandu o typie powyżej DOUBLE (także napisu pod `-`, `*`, `/`, `^`) zwracać illTyped.
-///   Test: `xExpressionShape.binary_arithmetic_matrix_matches_the_evaluator`, `xExpressionShape.ill_typed_program_reports_ill_typed`.
-/// - dla porównań kłaść INTEGER, gdy typ znormalizowany operandów to STRING, w przeciwnym razie numericShape typu znormalizowanego bez promocji BYTE, a dla typu znormalizowanego INTPAIR albo IDXPAIR zwracać illTyped.
-///   Test: `xExpressionShape.comparison_result_is_the_normalized_operand_type`, `xExpressionShape.string_comparison_and_logic_are_integer`.
-/// - dla `AND` i `OR` kłaść INTEGER przy lewym operandzie STRING, a w przeciwnym razie kształt lewego operandu, zwracając illTyped dla operandu o typie powyżej STRING.
-///   Test: `xExpressionShape.string_comparison_and_logic_are_integer`.
-/// - dla jednoargumentowego `-` zachowywać kształt operandu liczbowego, odrzucać (rejected) operand STRING, a dla każdego innego typu powyżej DOUBLE zwracać illTyped.
-///   Test: `xExpressionShape.unary_operators_keep_the_argument_type`, `xExpressionShape.unary_minus_over_string_is_rejected`.
-/// - dla `~` zachowywać kształt operandu BYTE i UINT, odrzucać (rejected) z nazwą typu operand INTEGER, RATIONAL, FLOAT, DOUBLE i STRING, a dla pozostałych typów zwracać illTyped.
-///   Test: `xExpressionShape.bitwise_not_resolves_only_for_byte_and_uint`.
-/// - dla `NOT` kłaść INTEGER nad STRING, a w przeciwnym razie kształt operandu, zwracając illTyped dla typu powyżej STRING.
-///   Test: `xExpressionShape.unary_operators_keep_the_argument_type`, `xExpressionShape.string_comparison_and_logic_are_integer`.
-/// - dla `to_string` kłaść STRING o szerokości zadeklarowanej w `CALL2`, a bez niej kToStringDefaultWidth; dla `null2zero` zachowywać kształt operandu, także napisu i jego szerokość.
-///   Test: `xExpressionShape.to_string_width_comes_from_the_declaration`, `xExpressionShape.null2zero_static_type_is_the_argument_type`.
-/// - odrzucać (rejected) z komunikatem dla kanału `Check result:` funkcje `Sqrt`, `sin`, `cos`, `exp`, `tan`, `log` i `log2` nad RATIONAL, nazywając funkcję jej kanoniczną pisownią i wskazując `to_double`.
-///   Test: `xExpressionShape.rejects_irrational_functions_over_a_rational_argument`.
-/// - dla pozostałych funkcji kłaść numericShape(functionResultType), zwracając unknown dla nazwy spoza tabeli, a illTyped dla `sin`, `cos`, `exp` nad typem powyżej DOUBLE oraz dla funkcji, której wynik byłby STRING.
-///   Test: `xExpressionShape.every_rql_function_has_a_declared_result_type`, `xExpressionShape.literal_shapes_include_empty_strings_and_reject_pairs`.
-/// - po wykonaniu programu zwracać illTyped, gdy na stosie nie została dokładnie jedna wartość, a w przeciwnym razie resolved z jej kształtem, przy czym napis o zerowej szerokości dostaje szerokość kToStringDefaultWidth.
-///   Test: `xExpressionShape.ill_typed_program_reports_ill_typed`, `xExpressionShape.literal_shapes_include_empty_strings_and_reject_pairs`.
+/// - [expressionshape.infer-expression-shape.1~1] dla pustego programu zwracać unknown.
+/// - [expressionshape.infer-expression-shape.2~1] wykonywać program ONP na stosie kształtów jak `expressionEvaluator::eval()` na stosie wartości, zdejmując operandy przed rozpoznaniem operacji i zwracając illTyped, gdy na stosie brakuje operandów.
+/// - [expressionshape.infer-expression-shape.3~1] dla literału napisowego `PUSH_VAL` kłaść STRING o szerokości równej długości napisu, dla literału liczbowego numericShape jego typu, a dla wartości o typie powyżej DOUBLE zwracać unknown.
+/// - [expressionshape.infer-expression-shape.4~1] dla `PUSH_ID` kłaść kształt z shapeOfField(strumień, płaski indeks slotu), a zwracać unknown, gdy token nie niesie pary albo shapeOfField jest pusty lub zwraca nullopt.
+/// - [expressionshape.infer-expression-shape.5~1] dla nierozwiązanych odwołań `PUSH_ID1`..`PUSH_ID5` i `PUSH_IDX` oraz dla każdego tokenu spoza zestawu ewaluatora zwracać unknown.
+/// - [expressionshape.infer-expression-shape.6~1] dla `WINDOW_MIN`, `WINDOW_MAX`, `WINDOW_AVG` i `WINDOW_SUM` kłaść kształt z shapeOfWindow(indeks grupy), a zwracać unknown, gdy token nie niesie liczby int albo shapeOfWindow jest pusty lub zwraca nullopt.
+/// - [expressionshape.infer-expression-shape.7~1] dla `+` z operandem STRING kłaść STRING o sumie szerokości operandów tekstowych, przy czym operand liczbowy wnosi zero.
+/// - [expressionshape.infer-expression-shape.8~1] dla `+`, `-`, `*`, `/` i `^` nad typami liczbowymi kłaść numericShape(arithmeticValueType), a dla operandu o typie powyżej DOUBLE (także napisu pod `-`, `*`, `/`, `^`) zwracać illTyped.
+/// - [expressionshape.infer-expression-shape.9~1] dla porównań kłaść INTEGER, gdy typ znormalizowany operandów to STRING, w przeciwnym razie numericShape typu znormalizowanego bez promocji BYTE, a dla typu znormalizowanego INTPAIR albo IDXPAIR zwracać illTyped.
+/// - [expressionshape.infer-expression-shape.10~1] dla `AND` i `OR` kłaść INTEGER przy lewym operandzie STRING, a w przeciwnym razie kształt lewego operandu, zwracając illTyped dla operandu o typie powyżej STRING.
+/// - [expressionshape.infer-expression-shape.11~1] dla jednoargumentowego `-` zachowywać kształt operandu liczbowego, odrzucać (rejected) operand STRING, a dla każdego innego typu powyżej DOUBLE zwracać illTyped.
+/// - [expressionshape.infer-expression-shape.12~1] dla `~` zachowywać kształt operandu BYTE i UINT, odrzucać (rejected) z nazwą typu operand INTEGER, RATIONAL, FLOAT, DOUBLE i STRING, a dla pozostałych typów zwracać illTyped.
+/// - [expressionshape.infer-expression-shape.13~1] dla `NOT` kłaść INTEGER nad STRING, a w przeciwnym razie kształt operandu, zwracając illTyped dla typu powyżej STRING.
+/// - [expressionshape.infer-expression-shape.14~1] dla `to_string` kłaść STRING o szerokości zadeklarowanej w `CALL2`, a bez niej kToStringDefaultWidth; dla `null2zero` zachowywać kształt operandu, także napisu i jego szerokość.
+/// - [expressionshape.infer-expression-shape.15~1] odrzucać (rejected) z komunikatem dla kanału `Check result:` funkcje `Sqrt`, `sin`, `cos`, `exp`, `tan`, `log` i `log2` nad RATIONAL, nazywając funkcję jej kanoniczną pisownią i wskazując `to_double`.
+/// - [expressionshape.infer-expression-shape.16~1] dla pozostałych funkcji kłaść numericShape(functionResultType), zwracając unknown dla nazwy spoza tabeli, a illTyped dla `sin`, `cos`, `exp` nad typem powyżej DOUBLE oraz dla funkcji, której wynik byłby STRING.
+/// - [expressionshape.infer-expression-shape.17~1] po wykonaniu programu zwracać illTyped, gdy na stosie nie została dokładnie jedna wartość, a w przeciwnym razie resolved z jej kształtem, przy czym napis o zerowej szerokości dostaje szerokość kToStringDefaultWidth.
 ///
 /// @param program program pola albo warunku, w ONP
 /// @param shapeOfField ksztalt pola zrodlowego dla `PUSH_ID`

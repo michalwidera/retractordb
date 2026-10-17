@@ -265,6 +265,7 @@ def test_two_engines_do_not_share_a_volatile_stream(rdb, plan_dir: Path) -> None
 
 
 def test_engine_logs_reach_the_logging_module(rdb, plan_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
+    # covers: module.python-logging-callback.1~1
     """Engine diagnostics go to logging.getLogger('retractordb'), never to stdout.
 
     A clean run logs nothing, so the record comes from a deterministic error path:
@@ -281,6 +282,7 @@ def test_engine_logs_reach_the_logging_module(rdb, plan_dir: Path, caplog: pytes
 
 
 def test_logging_handler_failure_preserves_the_plan_error_and_next_compile(rdb, plan_dir: Path, monkeypatch) -> None:
+    # covers: module.python-logging-callback.2~1
     failures = []
 
     def record_failure(item):

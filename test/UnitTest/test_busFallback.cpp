@@ -60,6 +60,7 @@ class FallbackLock : public ::testing::Test {
 };
 
 TEST_F(FallbackLock, LiveStoppedOwnerKeepsLockBeyondDiagnosticDeadline) {
+  // covers: bus.bus.3~1
   bus::Bus candidate(name);
   ASSERT_TRUE(candidate.attached());
   IPC::shared_memory_object object(IPC::open_only, name.c_str(), IPC::read_write);
@@ -103,6 +104,7 @@ TEST_F(FallbackLock, UnreadableOwnerKeepsLock) {
 }
 
 TEST_F(FallbackLock, DeadOwnerIsRecoveredAndInterruptedSlotInvalidated) {
+  // covers: bus.bus.13~1
   bus::Bus candidate(name);
   ASSERT_TRUE(candidate.attached());
   IPC::shared_memory_object object(IPC::open_only, name.c_str(), IPC::read_write);
@@ -123,6 +125,7 @@ TEST_F(FallbackLock, DeadOwnerIsRecoveredAndInterruptedSlotInvalidated) {
 // zapisu trzyma zamek, a jego slot ma zywy pid i zgodny czas startu. Kontrola dodatnia: ten sam
 // slot z parzystym seq jest widoczny. Kod odczytu jest wspolny dla obu galezi zamka.
 TEST_F(FallbackLock, InstancesSkipSlotMidWriteWithoutTakingLock) {
+  // covers: bus.bus.12~1
   bus::Bus candidate(name);
   ASSERT_TRUE(candidate.attached());
   ASSERT_EQ(candidate.claim({.name = "candidate", .streams = {"dst"}}).status, bus::ClaimStatus::Claimed);
@@ -150,6 +153,7 @@ TEST_F(FallbackLock, InstancesSkipSlotMidWriteWithoutTakingLock) {
 // Slot zywego pid-u z innym czasem startu nalezy do procesu, ktorego juz nie ma (pid uzyty
 // ponownie), wiec jest wolny. Kontrola dodatnia: z wlasciwym czasem startu ta sama nazwa koliduje.
 TEST_F(FallbackLock, SlotWithForeignStartTimeIsFree) {
+  // covers: bus.bus.6~1
   bus::Bus candidate(name);
   bus::Bus peer(name);
   ASSERT_TRUE(candidate.attached());

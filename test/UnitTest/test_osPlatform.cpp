@@ -11,6 +11,7 @@
 #include "unreadableProcess.hpp"
 
 TEST(OsPlatform, InvalidPidAndConfirmedAbsenceHaveEmptySnapshots) {
+  // covers: osplatform.inspect-process.1~1, osplatform.inspect-process.3~1
   for (const auto pid : {0, -1, std::numeric_limits<pid_t>::max()}) {
     const auto snapshot = osplat::inspectProcess(pid);
     EXPECT_FALSE(snapshot.found);
@@ -21,6 +22,7 @@ TEST(OsPlatform, InvalidPidAndConfirmedAbsenceHaveEmptySnapshots) {
 }
 
 TEST(OsPlatform, PermissionDenialIsUnknownRatherThanDead) {
+  // covers: osplatform.inspect-process.4~1
   struct Restore {
     ~Restore() { unreadablePid = 0; }
   } restore;
@@ -33,6 +35,7 @@ TEST(OsPlatform, PermissionDenialIsUnknownRatherThanDead) {
 }
 
 TEST(OsPlatform, ExitedChildRemainsAZombieUntilReaped) {
+  // covers: osplatform.inspect-process.2~1
   // Podejrzane poza procfs (Darwin): waitid(WNOWAIT) i czas startu zombie z sysctl nie byly tam wykonane.
   if (!RDB_HAS_PROCFS) GTEST_SKIP() << "zombie przez waitid(WNOWAIT) sprawdzony tylko na galezi procfs";
   const pid_t child = fork();

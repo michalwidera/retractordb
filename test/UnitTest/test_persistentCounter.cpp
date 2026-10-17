@@ -179,6 +179,7 @@ class PersistentCounterTest : public ::testing::Test {
 // ============================================================
 
 TEST_F(PersistentCounterTest, starts_at_zero_when_no_file) {
+  // covers: persistentcounter.persistent-counter.2~1
   auto pc = rdbtest::ok(PersistentCounter::create(counterPath()));
   EXPECT_EQ(pc->getCount(), 0);
 }
@@ -190,6 +191,7 @@ TEST_F(PersistentCounterTest, starts_at_zero_when_no_file) {
 // Numer nastepnej sesji jest w pliku, zanim ta sesja cokolwiek zarchiwizuje - nie dopiero
 // po destrukcji obiektu.
 TEST_F(PersistentCounterTest, construction_reserves_next_value) {
+  // covers: persistentcounter.persistent-counter.3~1
   auto pc = rdbtest::ok(PersistentCounter::create(counterPath()));
   EXPECT_EQ(pc->getCount(), 0);
 
@@ -204,6 +206,7 @@ TEST_F(PersistentCounterTest, construction_reserves_next_value) {
 // ============================================================
 
 TEST_F(PersistentCounterTest, second_instance_loads_saved_value) {
+  // covers: persistentcounter.persistent-counter.7~1
   { auto pc = rdbtest::ok(PersistentCounter::create(counterPath())); }  // zapisuje 1
 
   auto pc2 = rdbtest::ok(PersistentCounter::create(counterPath()));
@@ -228,6 +231,7 @@ TEST_F(PersistentCounterTest, count_accumulates_across_instances) {
 // ============================================================
 
 TEST_F(PersistentCounterTest, getCount_is_idempotent_before_destruction) {
+  // covers: persistentcounter.persistent-counter.7~1
   { auto pc = rdbtest::ok(PersistentCounter::create(counterPath())); }  // zapisuje 1
 
   auto pc2 = rdbtest::ok(PersistentCounter::create(counterPath()));
@@ -246,6 +250,7 @@ TEST_F(PersistentCounterTest, getCount_is_idempotent_before_destruction) {
 // Plik 0-bajtowy to slad procesu zabitego w trakcie dawnego zapisu (ofstream obcinal plik
 // przy otwarciu). Czytany jako 0 kazal planowi nadpisywac archiwa .old0, .old1, ...
 TEST_F(PersistentCounterTest, empty_file_is_not_rotation_zero) {
+  // covers: persistentcounter.persistent-counter.4~1
   std::ofstream(counterPath()).close();
   ASSERT_TRUE(std::filesystem::exists(counterPath()));
   ASSERT_EQ(std::filesystem::file_size(counterPath()), 0U);
@@ -302,10 +307,12 @@ TEST_F(PersistentCounterTest, trailing_newline_is_accepted) {
 // ============================================================
 
 TEST_F(PersistentCounterTest, read_missing_file_is_missing) {
+  // covers: persistentcounter.persistent-counter.1~1
   EXPECT_EQ(PersistentCounter::read(counterPath()).state, PersistentCounter::Reading::State::Missing);
 }
 
 TEST_F(PersistentCounterTest, read_valid_file_is_value_and_reserves_nothing) {
+  // covers: persistentcounter.persistent-counter.1~1
   std::ofstream(counterPath()) << "7\n";
   const auto reading = PersistentCounter::read(counterPath());
   EXPECT_EQ(reading.state, PersistentCounter::Reading::State::Value);
@@ -318,6 +325,7 @@ TEST_F(PersistentCounterTest, read_valid_file_is_value_and_reserves_nothing) {
 
 // Odczytana w calosci tresc, ktora nie jest liczba, to wadliwy stan planu (K2), nie srodowisko.
 TEST_F(PersistentCounterTest, read_empty_file_is_invalid) {
+  // covers: persistentcounter.persistent-counter.1~1
   std::ofstream(counterPath()).close();
   const auto reading = PersistentCounter::read(counterPath());
   EXPECT_EQ(reading.state, PersistentCounter::Reading::State::Invalid);
@@ -328,6 +336,7 @@ TEST_F(PersistentCounterTest, read_empty_file_is_invalid) {
 // zero bajtow, wiec awaria odczytu udawala pusty plik - czyli blad planu zamiast srodowiska.
 // Katalog, a nie chmod 000, bo uprawnienia nie zatrzymuja roota w kontenerze CI.
 TEST_F(PersistentCounterTest, read_directory_is_unreadable_not_invalid) {
+  // covers: persistentcounter.persistent-counter.1~1
   std::filesystem::create_directory(counterPath());
   const auto reading = PersistentCounter::read(counterPath());
   EXPECT_EQ(reading.state, PersistentCounter::Reading::State::Unreadable);
@@ -336,6 +345,7 @@ TEST_F(PersistentCounterTest, read_directory_is_unreadable_not_invalid) {
 
 // Ta sama przyczyna w konstruktorze: EIO z opisem odczytu, nie "is unreadable" od tresci.
 TEST_F(PersistentCounterTest, unreadable_file_exits_with_eio) {
+  // covers: persistentcounter.persistent-counter.4~1
   std::filesystem::create_directory(counterPath());
   const auto created = PersistentCounter::create(counterPath());
   ASSERT_RDB_ERROR(created, rdb::Errc::IO, "cannot be read (read: ");
@@ -360,6 +370,7 @@ TEST_F(PersistentCounterTest, save_leaves_no_temp_file) {
 // przeszedl. Nazwa pliku tymczasowego niesie pid - tego procesu, bo odmowa jest wyjatkiem, a
 // nie smiercia procesu potomnego.
 TEST_F(PersistentCounterTest, failed_reservation_returns_io_and_keeps_previous_value) {
+  // covers: persistentcounter.persistent-counter.4~1
   std::ofstream(counterPath()) << "5";
 
   std::filesystem::create_directory(counterPath() + ".tmp." + std::to_string(::getpid()));
@@ -388,6 +399,7 @@ TEST_F(PersistentCounterTest, custom_filename_creates_correct_file) {
 }
 
 TEST_F(PersistentCounterTest, reservation_orders_sync_rename_and_directory_sync) {
+  // covers: persistentcounter.persistent-counter.3~1, persistentcounter.persistent-counter.5~1
   if (!renameInterposed()) {
     ASSERT_FALSE(RDB_OS_LINUX) << "podmiana rename musi dzialac na Linuksie";
     GTEST_SKIP() << "std::filesystem::rename omija podmiane rename z testu";
@@ -406,6 +418,8 @@ TEST_F(PersistentCounterTest, reservation_orders_sync_rename_and_directory_sync)
 }
 
 TEST_F(PersistentCounterTest, failed_write_sync_close_or_rename_keeps_old_bytes_and_removes_temporary) {
+  // covers: persistentcounter.persistent-counter.4~1, persistentcounter.persistent-counter.5~1
+  // covers: persistentcounter.persistent-counter.6~1
   for (const auto fault : {CounterFailure::Write, CounterFailure::ShortWrite, CounterFailure::FileSync, CounterFailure::Close,
                            CounterFailure::Rename}) {
     SCOPED_TRACE(static_cast<int>(fault));
@@ -431,6 +445,7 @@ TEST_F(PersistentCounterTest, failed_write_sync_close_or_rename_keeps_old_bytes_
 }
 
 TEST_F(PersistentCounterTest, directory_sync_failure_logs_but_keeps_the_completed_reservation) {
+  // covers: persistentcounter.persistent-counter.6~1
   std::ofstream(counterPath()) << "98";
   observedCounter   = counterPath();
   observedTemporary = counterPath() + ".tmp." + std::to_string(::getpid());
@@ -448,6 +463,7 @@ TEST_F(PersistentCounterTest, directory_sync_failure_logs_but_keeps_the_complete
 }
 
 TEST_F(PersistentCounterTest, read_retries_interrupted_and_short_reads_without_reserving) {
+  // covers: persistentcounter.persistent-counter.1~1
   std::ofstream(counterPath()) << "98\n";
   interruptCounterRead = true;
   const auto value     = PersistentCounter::read(counterPath());
@@ -459,6 +475,7 @@ TEST_F(PersistentCounterTest, read_retries_interrupted_and_short_reads_without_r
 }
 
 TEST_F(PersistentCounterTest, existence_failure_is_unreadable_instead_of_missing) {
+  // covers: persistentcounter.persistent-counter.1~1, persistentcounter.persistent-counter.2~1
   std::filesystem::create_symlink(counterFile, counterPath());
   const auto reading = PersistentCounter::read(counterPath());
   EXPECT_EQ(reading.state, PersistentCounter::Reading::State::Unreadable);

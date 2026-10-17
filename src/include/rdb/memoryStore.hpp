@@ -43,19 +43,13 @@ struct memoryBucket {
 ///       obsługiwany w wątku przetwarzania. Współdzielenie jednego Memory Store przez wątki wymagałoby
 ///       zamka i nie jest przez tę klasę obiecane.
 /// Obiekt klasy MemoryStore powinien:
-/// - przechowywać stan magazynów MEMORY jako jeden kubełek na nazwę strumienia, tworzony pusty przy pierwszym sięgnięciu przez bucket.
-///   Test: `RequirementContracts.memory_bucket_identity_survives_other_insertions_and_erasures`.
-/// - zwracać przy kolejnych wywołaniach bucket dla tej samej nazwy ten sam kubełek, tak aby piszący i czytający ten sam strumień w jednym planie widzieli te same rekordy.
-///   Test: `MemoryStoreTest.one_store_still_shares_by_stream_name`.
-/// - zapewniać ważność referencji zwróconej przez bucket do wywołania erase dla tej nazwy, niezależnie od dodawania i usuwania innych kubełków.
-///   Test: `RequirementContracts.memory_bucket_identity_survives_other_insertions_and_erasures`.
-/// - przez erase usuwać kubełek wraz z nazwą, a przez size i empty raportować liczbę istniejących kubełków.
-///   Test: `RequirementContracts.memory_bucket_identity_survives_other_insertions_and_erasures`.
-/// - nie współdzielić kubełków między różnymi instancjami MemoryStore, także dla strumieni o tych samych nazwach.
-///   Test: `MemoryStoreTest.separate_stores_do_not_share_a_stream`.
-/// - przez processDefault udostępniać jedną instancję na proces, inicjowaną przy pierwszym użyciu, dla wołających, którzy nie podają własnego MemoryStore.
-///   Test: `MemoryStoreTest.default_is_the_process_store`.
-/// - nie zapewniać synchronizacji dostępu z wielu wątków.
+/// - [memorystore.memory-store.1~1] przechowywać stan magazynów MEMORY jako jeden kubełek na nazwę strumienia, tworzony pusty przy pierwszym sięgnięciu przez bucket.
+/// - [memorystore.memory-store.2~1] zwracać przy kolejnych wywołaniach bucket dla tej samej nazwy ten sam kubełek, tak aby piszący i czytający ten sam strumień w jednym planie widzieli te same rekordy.
+/// - [memorystore.memory-store.3~1] zapewniać ważność referencji zwróconej przez bucket do wywołania erase dla tej nazwy, niezależnie od dodawania i usuwania innych kubełków.
+/// - [memorystore.memory-store.4~1] przez erase usuwać kubełek wraz z nazwą, a przez size i empty raportować liczbę istniejących kubełków.
+/// - [memorystore.memory-store.5~1] nie współdzielić kubełków między różnymi instancjami MemoryStore, także dla strumieni o tych samych nazwach.
+/// - [memorystore.memory-store.6~1] przez processDefault udostępniać jedną instancję na proces, inicjowaną przy pierwszym użyciu, dla wołających, którzy nie podają własnego MemoryStore.
+/// - [memorystore.memory-store.7~1] nie zapewniać synchronizacji dostępu z wielu wątków.
 ///   Nietestowalne: brak obietnicy bezpieczenstwa wielowatkowego, a nie zachowanie do wywolania; uzycie rownolegle ma niezdefiniowane zachowanie.
 class MemoryStore {
  public:

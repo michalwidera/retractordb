@@ -31,6 +31,7 @@ qTree coreInstance;
 namespace {
 
 TEST(TimeLineUnitTest, GeneratesNearestNextTermsForSimpleDeltas) {
+  // covers: crsmath.time-line.2~1
   set<boost::rational<int>> deltas = {
       boost::rational<int>(1, 2),
       boost::rational<int>(3, 4),
@@ -46,6 +47,7 @@ TEST(TimeLineUnitTest, GeneratesNearestNextTermsForSimpleDeltas) {
 }
 
 TEST(TimeLineUnitTest, FiltersOutNaturalMultiplesFromInputSet) {
+  // covers: crsmath.time-line.1~1
   set<boost::rational<int>> deltas = {
       boost::rational<int>(1, 1),
       boost::rational<int>(4, 1),
@@ -62,6 +64,7 @@ TEST(TimeLineUnitTest, FiltersOutNaturalMultiplesFromInputSet) {
 }
 
 TEST(TimeLineUnitTest, AwaitCheckMatchesCurrentTimeSlotAndRejectsZeroDelta) {
+  // covers: crsmath.time-line.4~1
   set<boost::rational<int>> deltas = {
       boost::rational<int>(1, 2),
       boost::rational<int>(3, 4),
@@ -89,6 +92,7 @@ TEST(TimeLineUnitTest, AwaitCheckMatchesCurrentTimeSlotAndRejectsZeroDelta) {
 }
 
 TEST(TimeLineUnitTest, UpdatingIntervalsPreservesPositionAndSchedulesNewFasterRate) {
+  // covers: crsmath.time-line.2~1
   TimeLine tl({boost::rational<int>(1, 10), boost::rational<int>(1, 5)});
 
   EXPECT_EQ(tl.getNextTimeSlot(), boost::rational<int>(1, 10));
@@ -429,6 +433,7 @@ TEST_F(crsMathTest, check_if_streams_values_are_correct) {
 }  // Namespace
 
 TEST(TimeLineDeathTest, empty_interval_set_is_an_invariant_failure) {
+  // covers: crsmath.time-line.1~1
   EXPECT_DEATH(TimeLine(std::set<boost::rational<int>>{}), "input interval set must not be empty");
   TimeLine timeline({boost::rational<int>(1)});
   EXPECT_DEATH(timeline.updateTimeIntervals({}), "input interval set must not be empty");

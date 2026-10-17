@@ -9,11 +9,13 @@
 #include "rdb/gapDetector.hpp"
 
 TEST(GapDetectorTest, disabled_by_default) {
+  // covers: gapdetector.gap-detector.1~1
   rdb::GapDetector d;
   EXPECT_FALSE(d.enabled());
 }
 
 TEST(GapDetectorTest, configure_enables_it) {
+  // covers: gapdetector.gap-detector.1~1
   rdb::GapDetector d;
   d.configure(2);
   EXPECT_TRUE(d.enabled());
@@ -24,6 +26,7 @@ TEST(GapDetectorTest, configure_enables_it) {
 // (absorb() zwraca false - wywołujący ma je zapisać fizycznie, R17).
 // ---------------------------------------------------------------------------
 TEST(GapDetectorTest, nullfill_phase_passes_through) {
+  // covers: gapdetector.gap-detector.2~1
   rdb::GapDetector d;
   d.configure(2);
 
@@ -38,6 +41,7 @@ TEST(GapDetectorTest, nullfill_phase_passes_through) {
 // długość oczekującej przerwy.
 // ---------------------------------------------------------------------------
 TEST(GapDetectorTest, absorbs_beyond_nullfill_phase) {
+  // covers: gapdetector.gap-detector.3~1, gapdetector.gap-detector.5~1
   rdb::GapDetector d;
   d.configure(2);
 
@@ -57,6 +61,7 @@ TEST(GapDetectorTest, absorbs_beyond_nullfill_phase) {
 // sam nie decyduje, co z nią zrobić (brak I/O w tej klasie).
 // ---------------------------------------------------------------------------
 TEST(GapDetectorTest, non_null_after_gap_leaves_pending_gap_for_caller) {
+  // covers: gapdetector.gap-detector.4~1
   rdb::GapDetector d;
   d.configure(2);
 

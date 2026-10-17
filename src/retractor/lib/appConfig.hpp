@@ -169,20 +169,16 @@ struct AppConfig {
 };
 
 /// Funkcja loadAppConfig powinna:
-/// - przy podanym cliPath wczytywać wyłącznie ten plik, a brak pliku albo błąd składni TOML zgłaszać wyjątkiem toml::parse_error z nazwą pliku.
-///   Test: `AppConfigTest.explicit_path_ignores_a_malformed_user_layer`, `AppConfigTest.explicit_missing_config_path_throws`, `AppConfigTest.malformed_explicit_path_names_the_file`.
-/// - bez cliPath nakładać kolejno istniejące warstwy: /etc/retractor/retractor.toml, na Darwinie także /usr/local/etc/retractor/retractor.toml i /opt/homebrew/etc/retractor/retractor.toml, a na końcu plik użytkownika ($XDG_CONFIG_HOME/retractor/retractor.toml, bez niej ~/.config/retractor/retractor.toml), tak że klucz z późniejszej warstwy nadpisuje wcześniejszy.
-///   Test: `AppConfigTest.layered_tables_override_only_present_keys_and_validate_each_layer`, `AppConfigTest.user_layer_provides_storage_dir`. Nietestowalne: stale sciezki systemowe, ich kolejnosc i fallback HOME sprawdza strukturalnie st_stage12_contracts; test tabel nie jest pelnym przebiegiem loadAppConfig przez /etc ani Darwin.
-/// - pomijać brakujące warstwy, a bez żadnej zwracać wartości domyślne; błąd sprawdzenia istnienia warstwy zgłaszać wyjątkiem std::filesystem::filesystem_error.
-///   Test: `AppConfigTest.missing_files_yield_defaults`, `AppConfigTest.existence_error_is_not_treated_as_a_missing_layer`.
-/// - błąd składni TOML w dowolnej warstwie zgłaszać wyjątkiem toml::parse_error z nazwą pliku.
-///   Test: `AppConfigTest.malformed_toml_in_layer_throws`, `AppConfigTest.malformed_explicit_path_names_the_file`.
-/// - odrzucać wyjątkiem std::invalid_argument z nazwą pliku niepusty, względny paths.lock_dir w każdej wczytywanej warstwie, także nadpisanej później.
-///   Test: `AppConfigTest.relative_lock_dir_is_an_error_in_discovered_and_explicit_files`, `AppConfigTest.layered_tables_override_only_present_keys_and_validate_each_layer`.
-/// - zapisywać ścieżki wczytanych plików w loadedFrom, w kolejności nakładania.
-///   Test: `AppConfigTest.loaded_from_empty_when_no_file_found`, `AppConfigTest.loaded_from_records_user_layer_path`, `AppConfigTest.loaded_from_records_explicit_path`. Nietestowalne: loadedFrom po kilku warstwach systemowych to kontrola strukturalna st_stage12_contracts, nie asercja na plikach /etc.
-/// - po wczytaniu zastępować wartościami domyślnymi, z ostrzeżeniem w logu, niedodatnie wartości kluczy `[ipc]`, `[timing]` i `limits.history_memory_mib` oraz `scheduling.rt_priority` spoza 1..99, a do niepustego storage.dir dopisywać końcowy '/'.
-///   Test: `AppConfigTest.invalid_numeric_settings_fall_back_with_keyed_warnings`, `AppConfigTest.rt_priority_accepts_both_bounds_and_refuses_one_above`, `AppConfigTest.trailing_slash_preserved`, `AppConfigTest.user_layer_provides_storage_dir`. Ograniczenie: ostrzezenia WARN sa sprawdzane tylko przy poziomie kompilacji, ktory je zachowuje.
+/// - [appconfig.load-app-config.1~1] przy podanym cliPath wczytywać wyłącznie ten plik, a brak pliku albo błąd składni TOML zgłaszać wyjątkiem toml::parse_error z nazwą pliku.
+/// - [appconfig.load-app-config.2~1] bez cliPath nakładać kolejno istniejące warstwy: /etc/retractor/retractor.toml, na Darwinie także /usr/local/etc/retractor/retractor.toml i /opt/homebrew/etc/retractor/retractor.toml, a na końcu plik użytkownika ($XDG_CONFIG_HOME/retractor/retractor.toml, bez niej ~/.config/retractor/retractor.toml), tak że klucz z późniejszej warstwy nadpisuje wcześniejszy.
+///   Nietestowalne: stale sciezki systemowe, ich kolejnosc i fallback HOME sprawdza strukturalnie st_stage12_contracts; test tabel nie jest pelnym przebiegiem loadAppConfig przez /etc ani Darwin.
+/// - [appconfig.load-app-config.3~1] pomijać brakujące warstwy, a bez żadnej zwracać wartości domyślne; błąd sprawdzenia istnienia warstwy zgłaszać wyjątkiem std::filesystem::filesystem_error.
+/// - [appconfig.load-app-config.4~1] błąd składni TOML w dowolnej warstwie zgłaszać wyjątkiem toml::parse_error z nazwą pliku.
+/// - [appconfig.load-app-config.5~1] odrzucać wyjątkiem std::invalid_argument z nazwą pliku niepusty, względny paths.lock_dir w każdej wczytywanej warstwie, także nadpisanej później.
+/// - [appconfig.load-app-config.6~1] zapisywać ścieżki wczytanych plików w loadedFrom, w kolejności nakładania.
+///   Nietestowalne: loadedFrom po kilku warstwach systemowych to kontrola strukturalna st_stage12_contracts, nie asercja na plikach /etc.
+/// - [appconfig.load-app-config.7~1] po wczytaniu zastępować wartościami domyślnymi, z ostrzeżeniem w logu, niedodatnie wartości kluczy `[ipc]`, `[timing]` i `limits.history_memory_mib` oraz `scheduling.rt_priority` spoza 1..99, a do niepustego storage.dir dopisywać końcowy '/'.
+///   Ograniczenie: ostrzezenia WARN sa sprawdzane tylko przy poziomie kompilacji, ktory je zachowuje.
 ///
 /// @note Jawna sciezka to zadanie uzytkownika, wiec jej blad jest twardy. Warstwa systemowa ma kilka sciezek,
 ///       bo na macOS /etc nalezy do systemu (SIP), a oprogramowanie spoza systemu trzyma konfiguracje w

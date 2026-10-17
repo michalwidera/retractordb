@@ -8,14 +8,20 @@ Wymaganie to punkt bloku "... powinna:" w src/ lub api/, zaczynajacy sie od ID z
 ID: czlony malymi literami, cyframi i '-' rozdzielone kropka, pierwszy zaczyna sie od litery,
 co najmniej dwa czlony; wersja ~N rosnie, gdy zmienia sie sens wymagania (nie przy poprawce
 redakcyjnej). Test pokrywajacy wymaganie deklaruje to komentarzem na poczatku linii, w C++
-na poczatku ciala TEST, w Pythonie, bashu i CMake na poczatku funkcji testu albo pliku:
+na poczatku ciala TEST, w Pythonie i bashu na poczatku funkcji testu albo pliku, w CMake
+bezposrednio nad add_test testu integracyjnego:
 
     // covers: svc.write.empty-content~1, svc.write.tmp-rename~1
     # covers: xtrdb.command.usage~1
 
-Bledy (kod wyjscia 1): ID o zlej skladni, zduplikowane ID, `covers` z nieznanym ID, `covers`
-ze stara wersja, wymaganie bez zadnego `covers`. Punkty bez ID (format sprzed migracji) sa
-pomijane. --report wypisuje macierz wymaganie -> testy w Markdownie.
+Blok trwa od linii konczacej sie "powinna:" (powinien, powinno, powinny, powinni) do pierwszej
+linii, ktora nie jest komentarzem ///; strefa punktu siega do nastepnego punktu. Linia strefy
+"///   Nietestowalne: ..." albo "///   Kontrola strukturalna: ..." zwalnia wymaganie z `covers`.
+
+Bledy (kod wyjscia 1): punkt bloku bez ID, ID o zlej skladni, zduplikowane ID, linia `Test:`
+w strefie punktu z ID (format sprzed migracji), `covers` z nieznanym ID, `covers` ze stara
+wersja, wymaganie bez zadnego `covers` i bez zwolnienia. --report wypisuje macierz
+wymaganie -> testy w Markdownie.
 
 Uzycie: req-trace.py [<katalog repozytorium>] [--report]
 """
@@ -30,6 +36,11 @@ ID = r"[a-z][a-z0-9]*(?:\.[a-z0-9][a-z0-9-]*)+~[1-9][0-9]*"
 REQUIREMENT = re.compile(r"^\s*/// - \[(" + ID + r")\] ")
 # Nawias bez spacji z tylda w miejscu ID: zamierzone ID z bledem skladni, nie proza.
 ID_LIKE = re.compile(r"^\s*/// - \[([^\]\s]*~[^\]\s]*)\]")
+BLOCK_HEAD = re.compile(r"^\s*///.*\bpowin(?:na|no|ny|ni|ien):\s*$")
+BULLET = re.compile(r"^\s*/// - ")
+DOC = re.compile(r"^\s*///")
+EXEMPT = re.compile(r"^\s*///\s+(?:Nietestowalne|Kontrola strukturalna):")
+OLD_TEST = re.compile(r"^\s*///\s+Test:")
 COVERS = re.compile(r"^\s*(?://|#)\s*covers:\s*(.*?)\s*$")
 TEST_CPP = re.compile(r"^\s*TEST(?:_F|_P)?\s*\(\s*(\w+)\s*,\s*(\w+)\s*\)")
 TEST_PY = re.compile(r"^\s*def\s+(test_\w+)\s*\(")
@@ -53,23 +64,41 @@ def split_id(versioned):
     return name, int(version)
 
 
+def requirement_bullets(lines):
+    """Punkty blokow "... powinna:" jako (indeks linii punktu, linie jego strefy)."""
+    bullets, in_block, zone = [], False, None
+    for index, line in enumerate(lines):
+        if BLOCK_HEAD.match(line) or not DOC.match(line):
+            in_block, zone = bool(BLOCK_HEAD.match(line)), None
+        elif in_block and BULLET.match(line):
+            zone = []
+            bullets.append((index, zone))
+        elif zone is not None:
+            zone.append(line)
+    return bullets
+
+
 def collect(root):
     errors = []
-    requirements = {}  # nazwa -> (wersja, miejsce)
+    requirements = {}  # nazwa -> (wersja, miejsce, zwolnione z covers)
     for top in ("src", "api"):
         for path in walk(root, top, lambda p: p.suffix in CODE_SUFFIXES):
-            for number, line in enumerate(path.read_text(errors="replace").splitlines(), 1):
-                where = f"{path.relative_to(root)}:{number}"
-                match = REQUIREMENT.match(line)
+            lines = path.read_text(errors="replace").splitlines()
+            for index, zone in requirement_bullets(lines):
+                where = f"{path.relative_to(root)}:{index + 1}"
+                match = REQUIREMENT.match(lines[index])
                 if not match:
-                    if malformed := ID_LIKE.match(line):
-                        errors.append(f"{where}: ID o zlej skladni: {malformed[1]}")
+                    malformed = ID_LIKE.match(lines[index])
+                    errors.append(f"{where}: ID o zlej skladni: {malformed[1]}" if malformed
+                                  else f"{where}: punkt wymagania bez ID")
                     continue
+                if any(OLD_TEST.match(line) for line in zone):
+                    errors.append(f"{where}: linia Test: przy punkcie z ID - pokrycie deklaruje test przez covers")
                 name, version = split_id(match[1])
                 if name in requirements:
                     errors.append(f"{where}: zduplikowane ID {name} (pierwsze w {requirements[name][1]})")
                     continue
-                requirements[name] = (version, where)
+                requirements[name] = (version, where, any(EXEMPT.match(line) for line in zone))
 
     coverage = {name: [] for name in requirements}
     is_test_file = lambda p: p.suffix in TEST_SUFFIXES or p.name == "CMakeLists.txt"
@@ -80,6 +109,8 @@ def collect(root):
             if test:
                 owner = ".".join(test.groups())
                 continue
+            if line.startswith("}"):  # koniec ciala TEST: dalsze znaczniki sa na poziomie pliku
+                owner = None
             match = COVERS.match(line)
             if not match:
                 continue
@@ -98,8 +129,8 @@ def collect(root):
                 elif evidence not in coverage[name]:
                     coverage[name].append(evidence)
 
-    for name, (version, where) in sorted(requirements.items()):
-        if not coverage[name]:
+    for name, (version, where, exempt) in sorted(requirements.items()):
+        if not coverage[name] and not exempt:
             errors.append(f"{where}: wymaganie {name}~{version} nie ma zadnego covers")
     return requirements, coverage, errors
 
@@ -113,12 +144,15 @@ def main():
     requirements, coverage, errors = collect(args.root.resolve())
     if args.report:
         print("| Wymaganie | Miejsce | Testy |\n|---|---|---|")
-        for name, (version, where) in sorted(requirements.items()):
-            print(f"| `{name}~{version}` | {where} | {'<br>'.join(coverage[name]) or '**brak**'} |")
+        for name, (version, where, exempt) in sorted(requirements.items()):
+            tests = "<br>".join(coverage[name]) or ("nietestowalne" if exempt else "**brak**")
+            print(f"| `{name}~{version}` | {where} | {tests} |")
     for error in errors:
         print(f"req-trace: {error}", file=sys.stderr)
     covered = sum(1 for tests in coverage.values() if tests)
-    print(f"req-trace: {len(requirements)} wymagan z ID, {covered} pokrytych, {len(errors)} bledow", file=sys.stderr)
+    exempt = sum(1 for name, (_, _, free) in requirements.items() if free and not coverage[name])
+    print(f"req-trace: {len(requirements)} wymagan z ID, {covered} pokrytych, {exempt} nietestowalnych, "
+          f"{len(errors)} bledow", file=sys.stderr)
     return 1 if errors else 0
 
 

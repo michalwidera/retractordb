@@ -1,0 +1,2 @@
+markup:
+  literal_comment_pattern: '^\s*covers:'

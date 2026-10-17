@@ -65,12 +65,14 @@ class AppConfigTest : public ::testing::Test {
 }  // namespace
 
 TEST_F(AppConfigTest, missing_files_yield_defaults) {
+  // covers: appconfig.load-app-config.3~1
   // Brak jakiegokolwiek pliku w warstwie użytkownika → wartości domyślne, nie błąd.
   const AppConfig cfg = loadAppConfig();
   EXPECT_TRUE(cfg.storageDir.empty());
 }
 
 TEST_F(AppConfigTest, user_layer_provides_storage_dir) {
+  // covers: appconfig.load-app-config.2~1, appconfig.load-app-config.7~1
   writeFile(userConfigFile(), "[storage]\ndir = \"/var/lib/retractor\"\n");
 
   const AppConfig cfg = loadAppConfig();
@@ -80,6 +82,7 @@ TEST_F(AppConfigTest, user_layer_provides_storage_dir) {
 }
 
 TEST_F(AppConfigTest, trailing_slash_preserved) {
+  // covers: appconfig.load-app-config.7~1
   writeFile(userConfigFile(), "[storage]\ndir = \"/data/\"\n");
 
   const AppConfig cfg = loadAppConfig();
@@ -88,6 +91,7 @@ TEST_F(AppConfigTest, trailing_slash_preserved) {
 }
 
 TEST_F(AppConfigTest, malformed_toml_in_layer_throws) {
+  // covers: appconfig.load-app-config.4~1
   // Uszkodzony plik to blad startu, a nie brak konfiguracji.
   writeFile(userConfigFile(), "[storage\ndir = oops");
 
@@ -137,6 +141,7 @@ TEST_F(AppConfigTest, explicit_config_path_is_read) {
 }
 
 TEST_F(AppConfigTest, explicit_missing_config_path_throws) {
+  // covers: appconfig.load-app-config.1~1
   // Jawnie podana, nieistniejąca ścieżka to twardy błąd (żądanie użytkownika).
   const fs::path missing = tmpDir / "nope.toml";
 
@@ -144,6 +149,7 @@ TEST_F(AppConfigTest, explicit_missing_config_path_throws) {
 }
 
 TEST_F(AppConfigTest, explicit_path_ignores_a_malformed_user_layer) {
+  // covers: appconfig.load-app-config.1~1
   writeFile(userConfigFile(), "[broken");
   const auto file = tmpDir / "explicit.toml";
   writeFile(file, "[ipc]\nmin_queue_elements = 17\n");
@@ -153,6 +159,7 @@ TEST_F(AppConfigTest, explicit_path_ignores_a_malformed_user_layer) {
 }
 
 TEST_F(AppConfigTest, malformed_explicit_path_names_the_file) {
+  // covers: appconfig.load-app-config.1~1, appconfig.load-app-config.4~1
   const auto file = tmpDir / "broken.toml";
   writeFile(file, "[broken");
   try {
@@ -164,6 +171,7 @@ TEST_F(AppConfigTest, malformed_explicit_path_names_the_file) {
 }
 
 TEST_F(AppConfigTest, layered_tables_override_only_present_keys_and_validate_each_layer) {
+  // covers: appconfig.load-app-config.2~1, appconfig.load-app-config.5~1
   AppConfig cfg;
   applyTable(toml::parse("[ipc]\nmin_queue_elements = 17\nqueue_buffer_seconds = 23\n"), cfg, "system.toml");
   applyTable(toml::parse("[ipc]\nmin_queue_elements = 31\n"), cfg, "user.toml");
@@ -178,6 +186,7 @@ TEST_F(AppConfigTest, layered_tables_override_only_present_keys_and_validate_eac
 }
 
 TEST_F(AppConfigTest, existence_error_is_not_treated_as_a_missing_layer) {
+  // covers: appconfig.load-app-config.3~1
   fs::create_directories(userConfigFile().parent_path());
   fs::create_symlink(userConfigFile().filename(), userConfigFile());
   try {
@@ -190,6 +199,7 @@ TEST_F(AppConfigTest, existence_error_is_not_treated_as_a_missing_layer) {
 }
 
 TEST_F(AppConfigTest, invalid_numeric_settings_fall_back_with_keyed_warnings) {
+  // covers: appconfig.load-app-config.7~1
   for (const int value : {0, -1}) {
     SCOPED_TRACE(value);
     const auto text = std::to_string(value);
@@ -219,6 +229,7 @@ TEST_F(AppConfigTest, invalid_numeric_settings_fall_back_with_keyed_warnings) {
 }
 
 TEST_F(AppConfigTest, rt_priority_accepts_both_bounds_and_refuses_one_above) {
+  // covers: appconfig.load-app-config.7~1
   const auto file = tmpDir / "priority.toml";
   for (const int priority : {1, 99, 100}) {
     writeFile(file, "[scheduling]\nrt_priority = " + std::to_string(priority) + "\n");
@@ -227,12 +238,14 @@ TEST_F(AppConfigTest, rt_priority_accepts_both_bounds_and_refuses_one_above) {
 }
 
 TEST_F(AppConfigTest, loaded_from_empty_when_no_file_found) {
+  // covers: appconfig.load-app-config.6~1
   // Brak pliku → loadedFrom puste (sygnał, że użyto wartości domyślnych).
   const AppConfig cfg = loadAppConfig();
   EXPECT_TRUE(cfg.loadedFrom.empty());
 }
 
 TEST_F(AppConfigTest, loaded_from_records_user_layer_path) {
+  // covers: appconfig.load-app-config.6~1
   writeFile(userConfigFile(), "[storage]\ndir = \"/var/lib/retractor\"\n");
 
   const AppConfig cfg = loadAppConfig();
@@ -242,6 +255,7 @@ TEST_F(AppConfigTest, loaded_from_records_user_layer_path) {
 }
 
 TEST_F(AppConfigTest, loaded_from_records_explicit_path) {
+  // covers: appconfig.load-app-config.6~1
   const fs::path explicitFile = tmpDir / "custom.toml";
   writeFile(explicitFile, "[storage]\ndir = \"/srv/rdb\"\n");
 
@@ -413,6 +427,7 @@ TEST_F(AppConfigTest, embedded_lenient_lock_dirs) {
 }
 
 TEST_F(AppConfigTest, relative_lock_dir_is_an_error_in_discovered_and_explicit_files) {
+  // covers: appconfig.load-app-config.5~1
   writeFile(userConfigFile(), "[paths]\nlock_dir = \"relative/locks\"\n");
   for (const auto &path : {std::optional<std::string>{}, std::optional<std::string>{userConfigFile().string()}}) {
     try {

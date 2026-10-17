@@ -44,12 +44,14 @@ TEST(IpcClient, done_is_independently_per_instance) {
 // ---- popQueue ----
 
 TEST(IpcClient, popQueue_returns_false_on_empty) {
+  // covers: ipcclient.ipc-client.10~1
   IpcClient t;
   boost::property_tree::ptree pt;
   EXPECT_FALSE(t.popQueue(pt));
 }
 
 TEST(IpcClient, popQueue_does_not_modify_pt_on_empty) {
+  // covers: ipcclient.ipc-client.10~1
   IpcClient t;
   boost::property_tree::ptree pt;
   pt.put("key", "original");
@@ -83,6 +85,7 @@ struct QueueEraser {
 
 // Producent musi PRZECZEKAĆ opóźnione utworzenie kolejki, a nie poddać się od razu.
 TEST(IpcClient, producer_waits_for_late_response_queue) {
+  // covers: ipcclient.ipc-client.7~1
   QueueEraser eraser;
   boost::interprocess::message_queue::remove(responseQueueName().c_str());
 
@@ -112,6 +115,7 @@ TEST(IpcClient, producer_waits_for_late_response_queue) {
 // Samo `done` jest nieodróżnialne od normalnego końca strumienia - i to była
 // przyczyna, dla której klient kończył się zerem bez danych.
 TEST(IpcClient, producer_reports_missing_queue_distinctly_from_normal_end) {
+  // covers: ipcclient.ipc-client.7~1, ipcclient.ipc-client.8~1
   QueueEraser eraser;
   boost::interprocess::message_queue::remove(responseQueueName().c_str());
 
@@ -126,6 +130,7 @@ TEST(IpcClient, producer_reports_missing_queue_distinctly_from_normal_end) {
 }
 
 TEST(IpcClient, full_consumer_queue_does_not_prevent_shutdown) {
+  // covers: ipcclient.ipc-client.9~1, ipcclient.ipc-client.11~1
   QueueEraser eraser;
   using boost::interprocess::message_queue;
   message_queue::remove(responseQueueName().c_str());
@@ -203,6 +208,7 @@ class SilentServer {
 // CPU. 100 ms nie wystarczało: okno throttlingu RT ma okres rzędu sekundy, więc
 // klient poddawał się, zanim wątek komunikacyjny w ogóle został zaszeregowany.
 TEST(IpcClient, netClient_default_budget_survives_briefly_starved_server) {
+  // covers: ipcclient.ipc-client.3~1
   const SilentServer server;
 
   IpcClient transport;  // domyślny budżet - to on był defektem
@@ -218,6 +224,7 @@ TEST(IpcClient, netClient_default_budget_survives_briefly_starved_server) {
 // obrotów przeciążony klient (albo dłuższy `lock`) skracał faktyczne czekanie
 // poniżej zadeklarowanego, czyli dokładnie wtedy, gdy potrzebne było najdłuższe.
 TEST(IpcClient, netClient_honours_configured_budget_by_wall_clock) {
+  // covers: ipcclient.ipc-client.1~1, ipcclient.ipc-client.3~1, ipcclient.ipc-client.5~1
   const SilentServer server;
 
   IpcClient transport(120, kIpcClientDefaultResponseQueueOpenMaxFails);  // 120 × 10 ms = 1200 ms
@@ -268,6 +275,7 @@ class ClientContract : public ::testing::Test {
 }  // namespace
 
 TEST_F(ClientContract, requests_from_distinct_objects_have_distinct_sequences_and_ignore_stale_replies) {
+  // covers: ipcclient.ipc-client.1~1, ipcclient.ipc-client.2~1, ipcserver.ipc-server.3~1
   namespace IPC = boost::interprocess;
   const ipc::responses::Mapping responses(IPC::create_only, names.shmemSegment);
   const auto queue       = ipc::security::createQueue(names.queryQueue, 2, ipc::kQueryQueueMaxMessageSize);
@@ -297,6 +305,7 @@ TEST_F(ClientContract, requests_from_distinct_objects_have_distinct_sequences_an
 }
 
 TEST_F(ClientContract, incompatible_layout_is_refused_before_sending) {
+  // covers: ipcclient.ipc-client.5~1
   const ipc::responses::Mapping responses(boost::interprocess::create_only, names.shmemSegment);
   const auto queue                     = ipc::security::createQueue(names.queryQueue, 1, ipc::kQueryQueueMaxMessageSize);
   responses.segment().header.slotCount = 0;
@@ -309,6 +318,7 @@ TEST_F(ClientContract, incompatible_layout_is_refused_before_sending) {
 // #522: termin steady_clock trafial do timed_send Boosta jako CLOCK_REALTIME, wiec pelna kolejka
 // odmawiala po ulamku milisekundy zamiast po budzecie.
 TEST_F(ClientContract, full_command_queue_waits_until_the_deadline_without_overwriting_the_old_command) {
+  // covers: ipcclient.ipc-client.3~1, ipcclient.ipc-client.4~1, ipcclient.ipc-client.5~1
   const ipc::responses::Mapping responses(boost::interprocess::create_only, names.shmemSegment);
   const auto queue = ipc::security::createQueue(names.queryQueue, 1, ipc::kQueryQueueMaxMessageSize);
   queue->send("sentinel", 8, 0);
@@ -329,6 +339,7 @@ TEST_F(ClientContract, full_command_queue_waits_until_the_deadline_without_overw
 
 // Kontrola dodatnia do poprzedniego: miejsce zwolnione przed terminem pozwala wyslac komende.
 TEST_F(ClientContract, command_is_sent_when_queue_space_frees_before_the_deadline) {
+  // covers: ipcclient.ipc-client.3~1, ipcclient.ipc-client.4~1
   const ipc::responses::Mapping responses(boost::interprocess::create_only, names.shmemSegment);
   const auto queue = ipc::security::createQueue(names.queryQueue, 1, ipc::kQueryQueueMaxMessageSize);
   queue->send("sentinel", 8, 0);
@@ -351,6 +362,7 @@ TEST_F(ClientContract, command_is_sent_when_queue_space_frees_before_the_deadlin
 }
 
 TEST_F(ClientContract, nonpositive_budgets_are_clamped_to_one_attempt) {
+  // covers: ipcclient.ipc-client.1~1, ipcclient.ipc-client.5~1, qry.qry.1~1
   const ipc::responses::Mapping responses(boost::interprocess::create_only, names.shmemSegment);
   const auto queue = ipc::security::createQueue(names.queryQueue, 1, ipc::kQueryQueueMaxMessageSize);
   IpcClient request(-3, -5, serverName);
@@ -366,6 +378,7 @@ TEST_F(ClientContract, nonpositive_budgets_are_clamped_to_one_attempt) {
 }
 
 TEST_F(ClientContract, missing_command_queue_propagates_ipc_exception_and_sets_done) {
+  // covers: ipcclient.ipc-client.6~1
   const ipc::responses::Mapping responses(boost::interprocess::create_only, names.shmemSegment);
   IpcClient client(1, 1, serverName);
   EXPECT_THROW(client.netClient("hello", ""), boost::interprocess::interprocess_exception);
@@ -373,6 +386,7 @@ TEST_F(ClientContract, missing_command_queue_propagates_ipc_exception_and_sets_d
 }
 
 TEST_F(ClientContract, malformed_response_propagates_parser_exception_and_sets_done) {
+  // covers: ipcclient.ipc-client.6~1
   const ipc::responses::Mapping responses(boost::interprocess::create_only, names.shmemSegment);
   const auto queue = ipc::security::createQueue(names.queryQueue, 1, ipc::kQueryQueueMaxMessageSize);
   IpcClient client(100, 1, serverName);
@@ -388,6 +402,7 @@ TEST_F(ClientContract, malformed_response_propagates_parser_exception_and_sets_d
 }
 
 TEST_F(ClientContract, stopping_before_queue_open_does_not_blame_the_server) {
+  // covers: ipcclient.ipc-client.8~1
   const LogCapture log;
   IpcClient client(1, 100, serverName);
   client.done = true;
@@ -397,6 +412,7 @@ TEST_F(ClientContract, stopping_before_queue_open_does_not_blame_the_server) {
 }
 
 TEST_F(ClientContract, producer_preserves_fifo_across_spsc_backpressure) {
+  // covers: ipcclient.ipc-client.9~1, ipcclient.ipc-client.10~1
   const int count  = kSpscQueueCapacity + 1;
   const auto queue = ipc::security::createQueue(names.responseQueue(getpid()), count, ipc::kResponseQueueMaxMessageSize);
   for (int i = 0; i < count; ++i) {
@@ -421,6 +437,7 @@ TEST_F(ClientContract, producer_preserves_fifo_across_spsc_backpressure) {
 }
 
 TEST_F(ClientContract, malformed_stream_row_stops_producer_and_logs_the_cause) {
+  // covers: ipcclient.ipc-client.11~1
   const auto queue = ipc::security::createQueue(names.responseQueue(getpid()), 1, ipc::kResponseQueueMaxMessageSize);
   queue->send("}", 1, 0);
   const LogCapture log;

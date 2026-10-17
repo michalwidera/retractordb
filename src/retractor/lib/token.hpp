@@ -9,18 +9,13 @@
 #include "rdb/descriptor.hpp"
 
 /// Obiekt klasy token powinien:
-/// - przechowywać identyfikator polecenia command_id i wartość typu rdb::descFldVT, domyślnie VOID_COMMAND i 0.
-///   Test: `RequirementContracts.token_default_reference_conversions_and_diagnostics`.
-/// - udostępniać wartość przez getVT jako referencję bez kopiowania wariantu.
+/// - [token.token.1~1] przechowywać identyfikator polecenia command_id i wartość typu rdb::descFldVT, domyślnie VOID_COMMAND i 0.
+/// - [token.token.2~1] udostępniać wartość przez getVT jako referencję bez kopiowania wariantu.
 ///   Sprawdzenie kompilacji: test/UnitTest/test_contracts.cpp - static_assert typu referencji zwracanej przez getVT().
-/// - przez getRI zwracać wartość przekonwertowaną na RATIONAL regułami cast.
-///   Test: `RequirementContracts.token_default_reference_conversions_and_diagnostics`.
-/// - przez getStr_ zwracać tekst wartości: null dla wartości pustej, napis bez zmian, liczbę dziesiętną dla BYTE i typów liczbowych, licznik/mianownik dla RATIONAL, parę rozdzieloną przecinkiem dla pary liczb oraz samą nazwę dla pary nazwa i indeks.
-///   Test: `RequirementContracts.token_default_reference_conversions_and_diagnostics`.
-/// - przez getCommandID i getStrCommandID udostępniać identyfikator polecenia i jego nazwę.
-///   Test: `RequirementContracts.token_default_reference_conversions_and_diagnostics`.
-/// - wypisywać token w postaci diagnostycznej <nazwa polecenia>(<wartość>), w której para nazwa i indeks ma postać nazwa[indeks].
-///   Test: `RequirementContracts.token_default_reference_conversions_and_diagnostics`.
+/// - [token.token.3~1] przez getRI zwracać wartość przekonwertowaną na RATIONAL regułami cast.
+/// - [token.token.4~1] przez getStr_ zwracać tekst wartości: null dla wartości pustej, napis bez zmian, liczbę dziesiętną dla BYTE i typów liczbowych, licznik/mianownik dla RATIONAL, parę rozdzieloną przecinkiem dla pary liczb oraz samą nazwę dla pary nazwa i indeks.
+/// - [token.token.5~1] przez getCommandID i getStrCommandID udostępniać identyfikator polecenia i jego nazwę.
+/// - [token.token.6~1] wypisywać token w postaci diagnostycznej <nazwa polecenia>(<wartość>), w której para nazwa i indeks ma postać nazwa[indeks].
 class token {
   command_id command_;
   rdb::descFldVT valueVT_;

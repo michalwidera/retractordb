@@ -54,8 +54,7 @@ static_assert(std::is_same_v<std::variant_alternative_t<STRING, descFldVT>, std:
 static_assert(std::is_same_v<std::variant_alternative_t<NULLTYPE, descFldVT>, std::monostate>);
 
 /// Funkcja GetStringdescFld powinna:
-/// - zwracać nazwę typu pola: "NULL" dla NULLTYPE, a dla pozostałych typów nazwę wyliczenia descFld.
-///   Test: `RequirementContracts.field_helpers_preserve_flat_slot_layout`.
+/// - [fldtype.get-stringdesc-fld.1~1] zwracać nazwę typu pola: "NULL" dla NULLTYPE, a dla pozostałych typów nazwę wyliczenia descFld.
 constexpr auto GetStringdescFld(const enum descFld index) -> std::string_view {
   return index == NULLTYPE ? std::string_view("NULL") : magic_enum::enum_name(index);
 }
@@ -74,8 +73,7 @@ struct rField {
 };
 
 /// Funkcja flatElementCount powinna:
-/// - zwracać liczbę slotów płaskich zajmowanych przez pole w rekordzie: 1 dla STRING (N w STRING[N] to długość tekstu, nie krotność), a dla pozostałych typów, także NULLTYPE, rarray.
-///   Test: `RequirementContracts.field_helpers_preserve_flat_slot_layout`.
+/// - [fldtype.flat-element-count.1~1] zwracać liczbę slotów płaskich zajmowanych przez pole w rekordzie: 1 dla STRING (N w STRING[N] to długość tekstu, nie krotność), a dla pozostałych typów, także NULLTYPE, rarray.
 ///
 /// @note Jedna definicja dla calego drzewa (deskryptor, kompilator, parser zrodla tekstowego, payload,
 ///       executorsm): rozjazd miedzy recznymi kopiami przesuwal indeksy plaskie i po cichu podmienial wartosci
@@ -83,8 +81,7 @@ struct rField {
 constexpr int flatElementCount(const rField &field) { return field.rtype == STRING ? 1 : field.rarray; }
 
 /// Funkcja flatSlotField powinna:
-/// - zwracać pole jednego slotu płaskiego o szerokości bytes: dla STRING z rlen = 1 i rarray = bytes, a dla pozostałych typów z rlen = bytes i rarray = 1.
-///   Test: `RequirementContracts.field_helpers_preserve_flat_slot_layout`.
+/// - [fldtype.flat-slot-field.1~1] zwracać pole jednego slotu płaskiego o szerokości bytes: dla STRING z rlen = 1 i rarray = bytes, a dla pozostałych typów z rlen = bytes i rarray = 1.
 ///
 /// @note Napis ma ten sam zapis, ktory daja DECLARE i parser `.desc`: porownania ksztaltu biora rlen i rarray
 ///       osobno, wiec drugi zapis (`rlen = N`, okno AGSE do 2026-09-27) bylby dla nich innym polem.

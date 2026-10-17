@@ -24,17 +24,13 @@ namespace rdb {
 namespace detail {
 
 /// Funkcja terminateProcess powinna:
-/// - kończyć proces wyłącznie dla klas Internal (K1) i Environment (K4), co sprawdza się w czasie kompilacji.
+/// - [fatalerror.terminate-process.1~1] kończyć proces wyłącznie dla klas Internal (K1) i Environment (K4), co sprawdza się w czasie kompilacji.
 ///   Sprawdzenie kompilacji: static_assert ograniczajacy Cls w detail::terminateProcess; poprawne instancje Internal i Environment buduja sie w ut_fatalError.
 ///   Ograniczenie weryfikacji: nie budowano oddzielnej negatywnej probki dla pozostalych klas.
-/// - dla klasy Internal ustawiać zatrzask fatalErrorRaised przed logowaniem, a dla Environment pozostawiać go bez zmian.
-///   Test: `FatalErrorTest.TerminationLogsLocationFlushesAndKeepsLoggerAlive`, `FatalErrorTest.EnvironmentPreservesAnAlreadyRaisedLatch`.
-/// - logować sformatowany komunikat na poziomie critical z miejscem wywołania (dla Environment z przedrostkiem "environment: "), opróżniać logger bez jego zamykania i wypisywać komunikat na stderr z przedrostkiem "FATAL: " albo "FATAL (environment): ".
-///   Test: `FatalErrorTest.TerminationLogsLocationFlushesAndKeepsLoggerAlive`.
-/// - nigdy nie zgłaszać wyjątku: błąd formatowania lub logowania pomijać i mimo to zakończyć proces.
-///   Test: `FatalErrorTest.FormattingFailureStillRunsAtexit`, `FatalErrorTest.LoggingFailureStillRunsAtexit`.
-/// - kończyć proces przez std::exit z kodem EXIT_FAILURE dla Internal i EIO dla Environment, tak aby wykonały się handlery atexit.
-///   Test: `FatalErrorTest.InternalExitsWithFailureAndRaisesLatch`, `FatalErrorTest.EnvironmentExitsWithEioAndKeepsLatchDown`, `FatalErrorTest.FormattingFailureStillRunsAtexit`, `FatalErrorTest.LoggingFailureStillRunsAtexit`.
+/// - [fatalerror.terminate-process.2~1] dla klasy Internal ustawiać zatrzask fatalErrorRaised przed logowaniem, a dla Environment pozostawiać go bez zmian.
+/// - [fatalerror.terminate-process.3~1] logować sformatowany komunikat na poziomie critical z miejscem wywołania (dla Environment z przedrostkiem "environment: "), opróżniać logger bez jego zamykania i wypisywać komunikat na stderr z przedrostkiem "FATAL: " albo "FATAL (environment): ".
+/// - [fatalerror.terminate-process.4~1] nigdy nie zgłaszać wyjątku: błąd formatowania lub logowania pomijać i mimo to zakończyć proces.
+/// - [fatalerror.terminate-process.5~1] kończyć proces przez std::exit z kodem EXIT_FAILURE dla Internal i EIO dla Environment, tak aby wykonały się handlery atexit.
 ///
 /// @note Wolana takze z noexcept-owych operatorow przenoszacych. Flush zamiast spdlog::shutdown: handlery atexit
 ///       loguja (executorsm::cleanup), a po shutdown makra SPDLOG_* konczyly sie SIGSEGV. Blad srodowiska nie
@@ -122,8 +118,7 @@ EnvironmentError(fmt::format_string<Args...>, Args &&...) -> EnvironmentError<Ar
 using rdb::FatalError;
 
 /// Funkcja daemonFatalExit powinna:
-/// - kończyć proces usługi jak FatalError klasy Internal (terminateProcess), z komunikatem i miejscem przekazanym przez fatal(), zachowując std::exit i handlery atexit.
-///   Test: `ResultTest.DaemonHandlerKeepsFatalLatchContract`, `FatalErrorTest.DaemonHandlerLogsTheCallerLocation`.
+/// - [fatalerror.daemon-fatal-exit.1~1] kończyć proces usługi jak FatalError klasy Internal (terminateProcess), z komunikatem i miejscem przekazanym przez fatal(), zachowując std::exit i handlery atexit.
 ///
 /// @note Handler fatal() demona; rdzen z Result wola fatal bezposrednio.
 [[noreturn]] inline void daemonFatalExit(std::string_view message, const std::source_location &where) noexcept {

@@ -15,44 +15,39 @@
 /// @brief Klasa streamInstance umożliwia tworzenie zawartości poszczególnych rekordów
 ///
 /// Obiekt klasy streamInstance powinien:
-/// - być inicjalizowany z instancją qTree i query, na podstawie których będzie tworzył zawartość rekordów (payload).
-///   Test: `xschema.check_construct_payload`, `xschema.reduceFieldsToPayload_single_field`.
-/// - w trakcie inicjalizacji powinna być możliwość dodania dodatkowego parametru, np. ścieżki do katalogu, w którym będą przechowywane dane (storagePathParam).
-///   Test: `StreamRuntimeContract.rule_condition_truthiness_selects_dump_and_system_actions` (zrzuty w katalogu STORAGE), `dataModel.initialization_refusal_preserves_class_and_discards_partial_model` (.desc czytany z katalogu STORAGE).
-/// - obsługiwać redukcje liczbowych pól bieżącego rekordu STREAM_MIN (MIN), STREAM_MAX (MAX), STREAM_SUM (SUMC)
+/// - [streaminstance.stream-instance.1~1] być inicjalizowany z instancją qTree i query, na podstawie których będzie tworzył zawartość rekordów (payload).
+/// - [streaminstance.stream-instance.2~1] w trakcie inicjalizacji powinna być możliwość dodania dodatkowego parametru, np. ścieżki do katalogu, w którym będą przechowywane dane (storagePathParam).
+///   Zakres testow: `StreamRuntimeContract.rule_condition_truthiness_selects_dump_and_system_actions` (zrzuty w katalogu STORAGE), `dataModel.initialization_refusal_preserves_class_and_discards_partial_model` (.desc czytany z katalogu STORAGE).
+/// - [streaminstance.stream-instance.3~1] obsługiwać redukcje liczbowych pól bieżącego rekordu STREAM_MIN (MIN), STREAM_MAX (MAX), STREAM_SUM (SUMC)
 ///   i STREAM_AVG (AVG), obejmujące wszystkie sloty płaskie, w tym elementy tablic, z pominięciem null;
 ///   zwracać minimum, maksimum, sumę lub sumę podzieloną przez liczbę wartości nie-null, a przy braku takich
 ///   wartości null; wynik dla BYTE, INTEGER, UINT i RATIONAL ma typ RATIONAL, dla FLOAT lub DOUBLE zachowuje typ,
-///   Test: `xschema.reduceFieldsToPayload_max`, `xschema.reduceFieldsToPayload_min`, `xschema.reduceFieldsToPayload_sum`, `xschema.reduceFieldsToPayload_avg`, `xschema_all_null.reduceFieldsToPayload_all_null_avg`, `xschema_partial_null.reduceFieldsToPayload_partial_null_avg`, `it_array_derived` (elementy tablic), `it_reducer_float_max_avg_count-value` (FLOAT i DOUBLE).
-/// - przez reduceRecordWindow() wyznaczać MIN, MAX, SUMC i AVG z jednej wartości pola group.slot albo
+///   Zakres testow: `xschema.reduceFieldsToPayload_max`, `xschema.reduceFieldsToPayload_min`, `xschema.reduceFieldsToPayload_sum`, `xschema.reduceFieldsToPayload_avg`, `xschema_all_null.reduceFieldsToPayload_all_null_avg`, `xschema_partial_null.reduceFieldsToPayload_partial_null_avg`, `it_array_derived` (elementy tablic), `it_reducer_float_max_avg_count-value` (FLOAT i DOUBLE).
+/// - [streaminstance.stream-instance.4~1] przez reduceRecordWindow() wyznaczać MIN, MAX, SUMC i AVG z jednej wartości pola group.slot albo
 ///   wyrażenia group.program na rekord, w zakresie lastLogicalIndex - (group.width - 1) do lastLogicalIndex;
 ///   pomijać null i niedostępne rekordy, liczyć średnią z liczby pozostałych wartości, a przy zerowej liczbie
 ///   zwracać null dla wszystkich agregatów; typ wyniku group.valueType należy do RATIONAL, FLOAT i DOUBLE,
-///   Test: `StreamRuntimeContract.record_window_skips_nulls_and_missing_records`, `it_window_aggregate`.
-/// - przez constructAgsePayload() budować okno długości abs(length) ze spłaszczonych pozycji źródła
+/// - [streaminstance.stream-instance.5~1] przez constructAgsePayload() budować okno długości abs(length) ze spłaszczonych pozycji źródła
 ///   windowIndex * step - (abs(length) - 1) do windowIndex * step; dla length > 0 umieszczać najnowszy
 ///   element jako pierwszy, dla length < 0 zachowywać kolejność napływu; brakujące elementy oznaczać null,
-///   Test: `xschema.check_construct_payload`, `xschema.check_construct_payload_mirror`, `xschema.constructAgsePayload_marks_missing_elements_null_and_scales_by_step`, `it_agse_array`.
-/// - wyrażenia pól i warunki reguł wykonywać przez expressionEvaluator: +, -, *, /, ^, NEGATE, BIT_NOT (~),
+/// - [streaminstance.stream-instance.6~1] wyrażenia pól i warunki reguł wykonywać przez expressionEvaluator: +, -, *, /, ^, NEGATE, BIT_NOT (~),
 ///   porównania =, !=, <, >, <=, >=, AND, OR i NOT, wywołania CALL/CALL2 i odczyty pól; wyniki okien
 ///   udostępniać wyrażeniom pól przez windowValues; zakres typów operandów, nazw funkcji i konwersji
 ///   określa kontrakt expressionEvaluator,
-///   Test: `xExpressionEval.numeric_arithmetic_and_comparisons_cover_all_promotions`, `xExpressionEval.pow_operand_order`, `xExpressionEval.minus_and_bitwise_not_agree_on_byte_and_uint`, `xExpressionEval.three_valued_truth_tables_cover_both_operand_orders`, `xExpressionEval.call2_accepts_only_the_canonical_to_string_name`, `xExpressionEval.push_id_reads_value_from_payload`, `xExpressionEval.window_tokens_read_the_selected_group_and_reject_invalid_indices`, `xschema.constructOutputPayload_expression`, `it_window_aggregate`.
-/// - przez constructRulesAndUpdate() oceniać reguły qry.lRules na kopii bieżącego payloadu wyjściowego,
+/// - [streaminstance.stream-instance.7~1] przez constructRulesAndUpdate() oceniać reguły qry.lRules na kopii bieżącego payloadu wyjściowego,
 ///   gdy getRecordsCount() >= armAtCount; warunek null, zero liczbowe lub pusty STRING nie uruchamia akcji,
 ///   niezerowa liczba albo niepusty STRING uruchamia akcję, a wynik INTPAIR/IDXPAIR zwraca Errc::Eval,
-///   Test: `StreamRuntimeContract.rule_condition_truthiness_selects_dump_and_system_actions`, `StreamRuntimeContract.rule_waits_until_records_reach_armAtCount`, `StreamRuntimeContract.rule_errors_return_in_result`, `it_rule_string_compare-run`. Kontrola strukturalna: warunek liczony na kopii payloadu wyjściowego (constructRulesAndUpdate w streamInstance.cpp).
-/// - dla prawdziwego warunku DUMP rejestrować w dumpManager zadanie z nazwą reguły, dumpRange i dump_retention;
+///   Kontrola strukturalna: warunek liczony na kopii payloadu wyjściowego (constructRulesAndUpdate w streamInstance.cpp).
+/// - [streaminstance.stream-instance.8~1] dla prawdziwego warunku DUMP rejestrować w dumpManager zadanie z nazwą reguły, dumpRange i dump_retention;
 ///   dla SYSTEM wywoływać systemCommand przez ::system(), logując nieudane wywołanie lub zakończenie z błędem;
 ///   po ocenie reguł, także gdy lista jest pusta, wywoływać dumpManager::processStreamChunk(qry.id);
 ///   błędy ewaluacji, rejestracji zadania lub przetwarzania zrzutu propagować w Result,
-///   Test: `StreamRuntimeContract.rule_condition_truthiness_selects_dump_and_system_actions`, `StreamRuntimeContract.failing_system_command_is_logged_without_failing_the_slot`, `StreamRuntimeContract.pending_dump_advances_with_an_empty_rule_list`, `StreamRuntimeContract.rule_errors_return_in_result`, `xschema_rules.constructRulesAndUpdate_system_rule_fires`, `it_issue42_rule-dump`. Nietestowalne: wynik -1 samego ::system() (brak powłoki albo zasobów procesu) nie daje się wymusić bez haka w kodzie produkcyjnym; ta gałąź tylko loguje.
-/// - przez constructOutputPayload(fields) obliczać kolejne programy field.lProgram z inputPayload
+///   Nietestowalne: wynik -1 samego ::system() (brak powłoki albo zasobów procesu) nie daje się wymusić bez haka w kodzie produkcyjnym; ta gałąź tylko loguje.
+/// - [streaminstance.stream-instance.9~1] przez constructOutputPayload(fields) obliczać kolejne programy field.lProgram z inputPayload
 ///   i windowValues, wynik pozycji i konwertować przez cast<descFldVT> do outputPayload->descriptor[i].rtype
 ///   i zapisywać do slotu i przez setItemVT(); wynik null lub nieudana konwersja oznaczają null pola;
 ///   po udanym obliczeniu wszystkich pól zwracać sukces bez dopisywania rekordu do magazynu, co należy
 ///   do wywołującego; błąd przerywa obliczenia i wraca w Result, bez cofania wcześniej ustawionych pól.
-///   Test: `StreamRuntimeContract.output_fields_null_on_failed_conversion_and_stop_on_error`, `xschema.constructOutputPayload_expression`.
 
 struct streamInstance {
  private:

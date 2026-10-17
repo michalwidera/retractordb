@@ -58,44 +58,33 @@ enum class WriteStatus : std::uint8_t {
 /// @brief Warstwa koordynująca Descriptor, payload i FileInterface dla odczytu oraz zapisu rekordów.
 ///
 /// Obiekt klasy storage powinien:
-/// - utrzymywać Descriptor oraz powiązane obiekty payload używane do odczytu, zapisu i buforowania danych,
-///   Test: `xrdb.test_storage`.
-/// - delegować wyliczanie i spójność ścieżek plików magazynu (deskryptor .desc, plik danych, indeks .meta)
+/// - [storage.storage.1~1] utrzymywać Descriptor oraz powiązane obiekty payload używane do odczytu, zapisu i buforowania danych,
+/// - [storage.storage.2~1] delegować wyliczanie i spójność ścieżek plików magazynu (deskryptor .desc, plik danych, indeks .meta)
 ///   do obiektu StoragePaths (storagePaths.hpp), łącznie z relokacją wg pola REF deskryptora
 ///   oraz kasowaniem kompletu plików magazynów dysponowalnych,
-///   Test: `StoragePathsTest.storage_dir_prefixes_paths`, `StoragePathsTest.relocate_from_ref_moves_data_and_meta`, `StoragePathsTest.remove_all_files_deletes_whole_set`. Test: `xrdb.test_storage_disposal_removes_all_files`, `xrdb.storage_ref_outside_store_reads_but_is_not_removed`.
-/// - tworzyć odpowiednią implementację FileInterface na podstawie konfiguracji i typu magazynu zakodowanego w Descriptor,
+/// - [storage.storage.3~1] tworzyć odpowiednią implementację FileInterface na podstawie konfiguracji i typu magazynu zakodowanego w Descriptor,
 ///   delegując samo odwzorowanie typu magazynu na konkretną klasę akcesora oraz dobór wariantu indeksu metadanych
 ///   do fabryki (accessorFactory.hpp) - storage zna wyłącznie abstrakcyjny FileInterface,
-///   Test: `AccessorFactoryTest.maps_type_to_accessor_class`, `AccessorFactoryTest.maps_declared_sources`, `AccessorFactoryTest.meta_index_variant_selection`. Kontrola strukturalna: initializeAccessor i makeMetaIndex w storage.cc delegują wybór do fabryki.
-/// - zarządzać plikiem deskryptora oraz inicjalizacją właściwego magazynu danych; odczyt, zapis
+///   Kontrola strukturalna: initializeAccessor i makeMetaIndex w storage.cc delegują wybór do fabryki.
+/// - [storage.storage.4~1] zarządzać plikiem deskryptora oraz inicjalizacją właściwego magazynu danych; odczyt, zapis
 ///   i weryfikację zgodności pliku .desc delegować do funkcji descriptorIO (descriptorIO.hpp),
-///   Test: `DescriptorIOTest.save_and_load_round_trip`, `DescriptorIOTest.storage_returns_a_bad_descriptor_error`, `DescriptorIOTest.verify_match_accepts_equal_descriptors`, `DescriptorIOTest.verify_match_rejects_different_descriptors`.
-/// - udostępniać odczyt i zapis rekordów przez logiczne indeksy rekordów, mapowane wewnętrznie na pozycje właściwe dla accessor_,
-///   Test: `xrdb.test_storage`, `xrdb.storage_read_beyond_last_record_reports_no_such_record`.
-/// - delegować całość metadanych null i gap do wstrzykniętego obiektu metaData, którego wariant jest wybierany
+/// - [storage.storage.5~1] udostępniać odczyt i zapis rekordów przez logiczne indeksy rekordów, mapowane wewnętrznie na pozycje właściwe dla accessor_,
+/// - [storage.storage.6~1] delegować całość metadanych null i gap do wstrzykniętego obiektu metaData, którego wariant jest wybierany
 ///   przy attachStorage(): storageShadow gdy accessor utrzymuje plik cienia danych (FileInterface::hasShadow()),
 ///   bazowy metaData dla pozostałych zapisywalnych, wariant inertny (pusta ścieżka pliku) dla źródeł
 ///   deklarowanych - dzięki temu write()/read() nie zawierają rozgałęzień zależnych od wariantu magazynu,
-///   Test: `AccessorFactoryTest.meta_index_variant_selection`. Test: `StorageShadowFixture.polymorphic_updates_preserve_main_bytes_and_merge_in_arrival_order`. Test: `xrdb.declared_history_replays_values_and_nulls_without_another_source_read`.
-/// - traktować posiadanie pliku cienia danych i posiadanie metaindeksu jako niezależne własności magazynu:
+/// - [storage.storage.7~1] traktować posiadanie pliku cienia danych i posiadanie metaindeksu jako niezależne własności magazynu:
 ///   plik cienia zachowuje oryginalną, zarejestrowaną zawartość danych (aktualizacje trafiają do cienia aż do
 ///   merge), a metaindeks pozwala uwzględnić wartości null oraz przerwy w transmisji,
-///   Test: `xrdb.storage_rotates_data_and_null_indexes_on_shutdown`. Test: `StorageShadowTest.hasShadow_raportowany_przez_accessor`.
-/// - dla źródeł deklarowanych tylko do odczytu obsługiwać odczyt bieżącego rekordu oraz opcjonalny bufor historii,
+/// - [storage.storage.8~1] dla źródeł deklarowanych tylko do odczytu obsługiwać odczyt bieżącego rekordu oraz opcjonalny bufor historii,
 ///   delegując komorę bieżącego rekordu, fizyczny odczyt ze źródła i bufor historii do obiektu SourceBuffer
 ///   (sourceBuffer.hpp); storage zachowuje decyzje o wartościach zastępczych i stan bufferState,
-///   Test: `xrdb.declared_history_replays_values_and_nulls_without_another_source_read`. Test: `SourceBufferTest.fire_pushes_chamber_into_history`.
-/// - wspierać czyszczenie magazynu i odpowiadającego mu indeksu metadanych przez purge() lub reset(),
-///   Test: `xrdb.storage_purge_resets_metadata_stream_state`.
-/// - umożliwiać konfigurację interwału próbkowania oraz liczby rekordów nullfill poprzedzających oznaczenie gap;
+/// - [storage.storage.9~1] wspierać czyszczenie magazynu i odpowiadającego mu indeksu metadanych przez purge() lub reset(),
+/// - [storage.storage.10~1] umożliwiać konfigurację interwału próbkowania oraz liczby rekordów nullfill poprzedzających oznaczenie gap;
 ///   samą maszynę detekcji gap (nullfill/absorpcja/flush) realizuje metaData,
-///   Test: `xrdb.storage_setSamplingInterval_propagates_to_meta`, `xrdb.storage_auto_gap_detection_marks_gap_after_null_records`.
-/// - przy starcie wyznaczać przerwę w transmisji danych (wynikającą z niedziałania systemu) jako liczbę interwałów próbkowania, które upłynęły od ostatniego zapisu pliku danych do momentu startu, i przekazywać ją do obiektu indeksu metadanych w celu zarejestrowania jako wpis gap,
-///   Test: `xrdb.startup_gap_uses_the_data_file_age_and_survives_reopen`.
-/// - przy zamknieciu rotowac indeks metadanych pod tym samym numerem .old<percounter> co dane,
+/// - [storage.storage.11~1] przy starcie wyznaczać przerwę w transmisji danych (wynikającą z niedziałania systemu) jako liczbę interwałów próbkowania, które upłynęły od ostatniego zapisu pliku danych do momentu startu, i przekazywać ją do obiektu indeksu metadanych w celu zarejestrowania jako wpis gap,
+/// - [storage.storage.12~1] przy zamknieciu rotowac indeks metadanych pod tym samym numerem .old<percounter> co dane,
 ///   a przy starcie pustego magazynu usuwac osierocony indeks pozostawiony przez starsza wersje.
-///   Test: `xrdb.storage_rotates_data_and_null_indexes_on_shutdown`, `xrdb.empty_data_file_discards_orphaned_metadata_before_the_first_write`.
 ///
 /// @note Klasa sama nie implementuje fizycznego formatu magazynu; deleguje operacje I/O do accessor_.
 /// @note Semantyka nullfill i gap dotyczy tylko ścieżki zapisu z włączonym mechanizmem gap detection (configureGapDetection()).

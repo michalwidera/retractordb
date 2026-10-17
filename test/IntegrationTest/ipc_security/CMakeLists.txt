@@ -2,6 +2,8 @@ get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
 foreach(_case lifecycle foreign-uid)
+  # covers: ipcsecurity.remove-owned.2~1, lockfile.sweep.2~1, lockmanager.sweep-abandoned-resources.4~1, ipcserver.ipc-server.2~1
+  # covers: ipcserver.ipc-server.13~1
   add_test(
     NAME ${TestID}-${_case}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -15,6 +17,7 @@ endforeach()
 # i kod ENOBUFS, gdy zasobow IPC nie da sie zbudowac (unshare). Bez narzedzia -
 # weryfikacja niewykonana (77).
 foreach(_case order ipc-failure)
+  # covers: executorsm.executorsm.1~1, executorsm.executorsm.2~1
   add_test(
     NAME ${TestID}-start-${_case}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

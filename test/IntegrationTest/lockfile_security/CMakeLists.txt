@@ -2,6 +2,7 @@ get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
 foreach(_case lifecycle foreign-uid)
+  # covers: launcher.xretractor.27~1
   add_test(
     NAME ${TestID}-${_case}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

@@ -22,6 +22,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND ${IT_VALGRIND} xretractor query.rql -m 5 -f)
 
+# covers: launcher.xretractor.2~1, launcher.xretractor.4~1, launcher.xretractor.35~1
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -37,6 +38,7 @@ add_test(
 # rownoczesnie; te testy i tak pracowaly na danych stad, tylko z drugiego
 # CMakeLists.
 
+# covers: launcher.xretractor.3~1, launcher.xretractor.6~1, launcher.xretractor.34~1
 add_test(
   NAME ${TestID}-compile
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -44,6 +46,7 @@ add_test(
     xretractor query.rql -c > out-compile.txt && \
     bash ../compare.sh pattern.txt out-compile.txt")
 
+# covers: launcher.xretractor.6~1, launcher.xretractor.34~1
 add_test(
   NAME ${TestID}-dot
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

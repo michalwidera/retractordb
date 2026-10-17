@@ -49,6 +49,7 @@ extern "C" int __wrap_pthread_mutex_consistent(pthread_mutex_t *mutex) {
 }
 
 TEST_F(BusRepairSeqlock, InterruptedSlotIsRepairedBeforeMutexIsMarkedConsistent) {
+  // covers: bus.bus.13~1
   bus::Bus candidate(name);
   ASSERT_TRUE(candidate.attached());
   IPC::shared_memory_object object(IPC::open_only, name.c_str(), IPC::read_write);
@@ -70,6 +71,7 @@ TEST_F(BusRepairSeqlock, InterruptedSlotIsRepairedBeforeMutexIsMarkedConsistent)
 
 // ENOTRECOVERABLE powstaje po unlock bez consistent, nie po samej smierci naprawiajacego.
 TEST_F(BusRepairSeqlock, UnrecoverableMutexReportsRecoveryInstructions) {
+  // covers: bus.bus.4~1
   bus::Bus candidate(name);
   ASSERT_EQ(candidate.claim({.name = "candidate", .streams = {"old"}}).status, bus::ClaimStatus::Claimed);
   ASSERT_EQ(candidate.reservePlan({"replacement"}, {}, {}).status, bus::ClaimStatus::Claimed);
@@ -106,6 +108,7 @@ TEST_F(BusRepairSeqlock, UnrecoverableMutexReportsRecoveryInstructions) {
 
 // Drugi wlasciciel tez ginie przed consistent: trzeci nadal moze naprawic muteks i slot.
 TEST_F(BusRepairSeqlock, InterruptedRepairRemainsRecoverable) {
+  // covers: bus.bus.13~1
   bus::Bus candidate(name);
   ASSERT_TRUE(candidate.attached());
   IPC::shared_memory_object object(IPC::open_only, name.c_str(), IPC::read_write);

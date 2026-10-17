@@ -48,6 +48,7 @@ static bool initCore() {
 TEST(presenter, parse_ok) { EXPECT_TRUE(initCore()); }
 
 TEST(presenter, tags_without_fields_returns_error) {
+  // covers: presenter.presenter.2~1
   EXPECT_TRUE(initCore());
   presenter p(coreInstance);
   auto vm = makeVM({"--tags"});
@@ -61,6 +62,7 @@ TEST(presenter, tags_without_fields_returns_error) {
 }
 
 TEST(presenter, default_mode_returns_success) {
+  // covers: presenter.presenter.9~1
   EXPECT_TRUE(initCore());
   presenter p(coreInstance);
   auto vm = makeVM({});
@@ -119,6 +121,7 @@ TEST(presenter, csv_mode_returns_success) {
 }
 
 TEST(presenter, diagram_empty_grid_type_returns_error) {
+  // covers: presenter.presenter.5~1
   EXPECT_TRUE(initCore());
   presenter p(coreInstance);
   auto vm = makeVM({"--diagram", ":2"});
@@ -129,6 +132,7 @@ TEST(presenter, diagram_empty_grid_type_returns_error) {
 }
 
 TEST(presenter, diagram_invalid_grid_type_returns_error) {
+  // covers: presenter.presenter.5~1
   EXPECT_TRUE(initCore());
   presenter p(coreInstance);
   auto vm = makeVM({"--diagram", "5:1"});
@@ -170,6 +174,7 @@ std::string render(qTree &plan, const std::vector<std::string> &options) {
 }  // namespace
 
 TEST(presenter, mode_precedence_and_read_only_plan_are_observable) {
+  // covers: presenter.presenter.1~1, presenter.presenter.2~1
   qTree plan;
   ASSERT_EQ(std::get<0>(parserRQLString(plan, "DECLARE a INTEGER STREAM src, 1 BINFILE 'source.bin'")), "OK");
   const auto revision = plan.planRevision();
@@ -183,6 +188,7 @@ TEST(presenter, mode_precedence_and_read_only_plan_are_observable) {
 }
 
 TEST(presenter, dot_colors_dependencies_and_optional_details_are_printed) {
+  // covers: presenter.presenter.3~1
   qTree plan;
   ASSERT_EQ(std::get<0>(parserRQLString(plan,
                                         "STORAGE 'output'\nDECLARE a INTEGER STREAM binary, 1 BINFILE 'in.bin'\n"
@@ -212,6 +218,7 @@ TEST(presenter, dot_colors_dependencies_and_optional_details_are_printed) {
 }
 
 TEST(presenter, csv_tables_have_ordered_headers_and_tab_separated_rows) {
+  // covers: presenter.presenter.4~1
   qTree plan;
   ASSERT_EQ(std::get<0>(parserRQLString(plan, "DECLARE a INTEGER STREAM src, 1 BINFILE 'source.bin'")), "OK");
   const auto text      = render(plan, {"--csv"});
@@ -228,6 +235,7 @@ TEST(presenter, csv_tables_have_ordered_headers_and_tab_separated_rows) {
 }
 
 TEST(presenter, listing_contains_boundaries_timeouts_windows_and_both_rule_actions) {
+  // covers: presenter.presenter.3~1, presenter.presenter.7~1
   qTree plan;
   query node(boost::rational<int>(1, 2), "result");
   node.filename       = "source.bin";
@@ -256,6 +264,7 @@ TEST(presenter, listing_contains_boundaries_timeouts_windows_and_both_rule_actio
 }
 
 TEST(presenter, plain_listing_omits_optional_annotations_byte_for_byte) {
+  // covers: presenter.presenter.8~1
   qTree plan;
   plan.push_back(query(0, ":STORAGE"));
   plan.push_back(query(1, "src"));
@@ -264,6 +273,7 @@ TEST(presenter, plain_listing_omits_optional_annotations_byte_for_byte) {
 }
 
 TEST(presenter, diagram_rejects_non_numeric_grid_type_and_cycle_count) {
+  // covers: presenter.presenter.5~1
   qTree plan;
   ASSERT_EQ(std::get<0>(parserRQLString(plan, "DECLARE a INTEGER STREAM src, 1 BINFILE 'source.bin'")), "OK");
   for (const auto *argument : {"nonnumeric:1", "0x:1", "1 :1", "0:", "0:abc", "0:2x", "0:0", "0:-1", "0:99999999999"}) {
@@ -281,6 +291,7 @@ TEST(presenter, diagram_rejects_non_numeric_grid_type_and_cycle_count) {
 }
 
 TEST(presenter, empty_diagram_is_fatal_eperm) {
+  // covers: presenter.presenter.6~1
   qTree empty;
   presenter display(empty);
   testing::internal::CaptureStdout();
@@ -294,6 +305,7 @@ TEST(presenter, empty_diagram_is_fatal_eperm) {
 }
 
 TEST(presenter, external_option_type_error_returns_interrupted_and_diagnostic) {
+  // covers: presenter.presenter.9~1
   qTree plan;
   presenter display(plan);
   po::variables_map options;

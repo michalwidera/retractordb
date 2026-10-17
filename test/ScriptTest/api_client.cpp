@@ -14,11 +14,14 @@
 using namespace std::chrono_literals;
 using retractordb::Error;
 
+// covers: retractordbclient.client.4~1
 static_assert(std::is_nothrow_move_constructible_v<retractordb::Client>);
 static_assert(std::is_nothrow_move_assignable_v<retractordb::Client>);
 static_assert(!std::is_copy_constructible_v<retractordb::Client>);
 static_assert(!std::is_copy_assignable_v<retractordb::Client>);
+// covers: retractordbclient.client.3~1
 static_assert(std::is_same_v<decltype(std::declval<retractordb::Client &>().ping()), void>);
+// covers: retractordbclient.subscription.3~1
 static_assert(std::is_nothrow_move_constructible_v<retractordb::Subscription>);
 static_assert(std::is_nothrow_move_assignable_v<retractordb::Subscription>);
 static_assert(!std::is_copy_constructible_v<retractordb::Subscription>);

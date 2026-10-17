@@ -74,15 +74,15 @@ struct SubscribeOptions {
 class Client;
 
 /// Obiekt klasy Subscription powinien:
-/// - posiadac niezalezny proces xqry, schemat otrzymany przed rekordami oraz powod konca transmisji.
-///   Test: `st_api_fake`, `st_api_real` (api_client.cpp: main, rozne PID, typy, NULL i endReason).
-/// - zwracac nastepny rekord albo nullopt po end/close; timeout odczytu zglaszac jako Error("read_timeout") bez zamykania subskrypcji, inne bledy protokolu lub procesu zamykac i przekazywac dalej.
-///   Test: `st_api_fake` (api_client.cpp: main, wait, bad, exit, error, partial, oversized, endexit, endhang).
-/// - przenosic wlasnosc bez wyjatkow, a przy przypisaniu zamykac poprzedni proces celu; obiekt po oddaniu wlasnosci obsluguje next (nullopt), close i destrukcje, pozostale akcesory wymagaja obiektu, ktory nie oddal wlasnosci.
+/// - [retractordbclient.subscription.1~1] posiadac niezalezny proces xqry, schemat otrzymany przed rekordami oraz powod konca transmisji.
+///   Zakres testow: `st_api_fake`, `st_api_real` (api_client.cpp: main, rozne PID, typy, NULL i endReason).
+/// - [retractordbclient.subscription.2~1] zwracac nastepny rekord albo nullopt po end/close; timeout odczytu zglaszac jako Error("read_timeout") bez zamykania subskrypcji, inne bledy protokolu lub procesu zamykac i przekazywac dalej.
+///   Zakres testow: `st_api_fake` (api_client.cpp: main, wait, bad, exit, error, partial, oversized, endexit, endhang).
+/// - [retractordbclient.subscription.3~1] przenosic wlasnosc bez wyjatkow, a przy przypisaniu zamykac poprzedni proces celu; obiekt po oddaniu wlasnosci obsluguje next (nullopt), close i destrukcje, pozostale akcesory wymagaja obiektu, ktory nie oddal wlasnosci.
 ///   Sprawdzenie kompilacji: static_assert cech Subscription w api_client.cpp.
-///   Test: `st_api_fake`, `st_api_real` (api_client.cpp: checkSubscriptionMoves).
-/// - wykonywac close idempotentnie i przy destrukcji, zbierajac dziecko; zwykle close zachowuje schemat, pierwotny PID i zapisany powod konca.
-///   Test: `st_api_fake`, `st_api_real` (api_client.cpp: checkSubscriptionMoves i main).
+///   Zakres testow: `st_api_fake`, `st_api_real` (api_client.cpp: checkSubscriptionMoves).
+/// - [retractordbclient.subscription.4~1] wykonywac close idempotentnie i przy destrukcji, zbierajac dziecko; zwykle close zachowuje schemat, pierwotny PID i zapisany powod konca.
+///   Zakres testow: `st_api_fake`, `st_api_real` (api_client.cpp: checkSubscriptionMoves i main).
 class Subscription {
  public:
   Subscription(Subscription &&) noexcept;
@@ -105,18 +105,18 @@ class Subscription {
 };
 
 /// Obiekt klasy Client powinien:
-/// - wymagac jawnej nazwy serwera (1-32 znaki, pierwsza mala litera ASCII, dalej male litery, cyfry, '_' lub '-') i dodatniego timeout; dla niepoprawnych argumentow zglaszac std::invalid_argument.
-///   Test: `st_api_fake`, `st_api_real` (api_client.cpp: checkArgumentRefusals).
-/// - odrzucac ujemny limit rekordow, ujemny idleTimeout i zerowa capacity subskrypcji przez std::invalid_argument.
-///   Test: `st_api_fake`, `st_api_real` (api_client.cpp: checkArgumentRefusals).
-/// - wykonywac ping/streams/describe przez osobny proces xqry --jsonl, a subscribe zwracac osobny uchwyt do procesu; ping zwraca void, bledy zachowuja kod Error, niepoprawny dekodowany schemat daje protocol_error.
+/// - [retractordbclient.client.1~1] wymagac jawnej nazwy serwera (1-32 znaki, pierwsza mala litera ASCII, dalej male litery, cyfry, '_' lub '-') i dodatniego timeout; dla niepoprawnych argumentow zglaszac std::invalid_argument.
+///   Zakres testow: `st_api_fake`, `st_api_real` (api_client.cpp: checkArgumentRefusals).
+/// - [retractordbclient.client.2~1] odrzucac ujemny limit rekordow, ujemny idleTimeout i zerowa capacity subskrypcji przez std::invalid_argument.
+///   Zakres testow: `st_api_fake`, `st_api_real` (api_client.cpp: checkArgumentRefusals).
+/// - [retractordbclient.client.3~1] wykonywac ping/streams/describe przez osobny proces xqry --jsonl, a subscribe zwracac osobny uchwyt do procesu; ping zwraca void, bledy zachowuja kod Error, niepoprawny dekodowany schemat daje protocol_error.
 ///   Sprawdzenie kompilacji: static_assert typu wyniku ping w api_client.cpp.
-///   Test: `st_api_fake`, `st_api_real` (api_client.cpp: main).
-/// - przenosic subskrypcje razem z wlascicielem; przypisanie i destrukcja zamykaja subskrypcje poprzedniego wlasciciela, nawet gdy ich uchwyty nadal istnieja.
+///   Zakres testow: `st_api_fake`, `st_api_real` (api_client.cpp: main).
+/// - [retractordbclient.client.4~1] przenosic subskrypcje razem z wlascicielem; przypisanie i destrukcja zamykaja subskrypcje poprzedniego wlasciciela, nawet gdy ich uchwyty nadal istnieja.
 ///   Sprawdzenie kompilacji: static_assert przenoszenia i zakazu kopiowania w api_client.cpp.
-///   Test: `st_api_fake`, `st_api_real` (api_client.cpp: checkMoves).
-/// - wykonywac close idempotentnie; cztery operacje zadaniowe po close lub oddaniu wlasnosci zglaszaja Error("closed") przy poprawnych opcjach subskrypcji, a obiekt po oddaniu wlasnosci mozna ponownie przypisac.
-///   Test: `st_api_fake`, `st_api_real` (api_client.cpp: expectClosed, checkMoves i main).
+///   Zakres testow: `st_api_fake`, `st_api_real` (api_client.cpp: checkMoves).
+/// - [retractordbclient.client.5~1] wykonywac close idempotentnie; cztery operacje zadaniowe po close lub oddaniu wlasnosci zglaszaja Error("closed") przy poprawnych opcjach subskrypcji, a obiekt po oddaniu wlasnosci mozna ponownie przypisac.
+///   Zakres testow: `st_api_fake`, `st_api_real` (api_client.cpp: expectClosed, checkMoves i main).
 class Client {
  public:
   explicit Client(std::string server, Options options = {});

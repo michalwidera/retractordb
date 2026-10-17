@@ -43,6 +43,8 @@ struct ShadowUsageFixture : public ::testing::Test {
 };
 
 TEST_F(ShadowUsageFixture, reload_replaces_memory_and_last_override_survives_restart) {
+  // covers: metashadow.meta-shadow.1~1, metashadow.meta-shadow.2~1, metashadow.meta-shadow.3~1, metashadow.meta-shadow.4~1
+  // covers: metashadow.shadow-override.1~1
   const auto readBytes = [&](const std::string &path) {
     std::ifstream input(path, std::ios::binary);
     return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
@@ -75,6 +77,7 @@ TEST_F(ShadowUsageFixture, reload_replaces_memory_and_last_override_survives_res
 }
 
 TEST_F(ShadowUsageFixture, failed_shadow_open_keeps_main_bytes_but_only_updates_memory) {
+  // covers: metashadow.meta-shadow.2~1
   const std::string original = "original shadow target";
   std::ofstream(file) << original;
   std::filesystem::create_symlink(file, shadowFile);
@@ -116,6 +119,7 @@ TEST_F(ShadowUsageFixture, scenariusz_nadpisanie_widoczne) {
 // Scenariusz 3: Wielokrotne nadpisania tej samej pozycji - ostatnie wygrywa.
 // ---------------------------------------------------------------------------
 TEST_F(ShadowUsageFixture, scenariusz_ostatnie_nadpisanie_wygrywa) {
+  // covers: metashadow.meta-shadow.3~1
   rdb::metaShadow shadow(descriptor, file);
 
   shadow.appendOverride(2, allNull);
@@ -131,6 +135,7 @@ TEST_F(ShadowUsageFixture, scenariusz_ostatnie_nadpisanie_wygrywa) {
 // Scenariusz 4: Persystencja - nowa instancja odczytuje nadpisania z pliku cienia po load().
 // ---------------------------------------------------------------------------
 TEST_F(ShadowUsageFixture, scenariusz_persystencja_po_restarcie) {
+  // covers: metashadow.meta-shadow.4~1
   {
     rdb::metaShadow shadow(descriptor, file);
     shadow.appendOverride(0, allNull);

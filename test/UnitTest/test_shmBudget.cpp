@@ -107,6 +107,7 @@ std::uint64_t realQueueBytes(std::uint64_t maxMessages, std::uint64_t maxMessage
 }
 
 TEST(ShmBudget, QueueFormulaMatchesRealSegment) {
+  // covers: shmbudget.message-queue-bytes.1~1
   for (const auto [messages, size] :
        {std::pair<std::uint64_t, std::uint64_t>{100, 1024}, std::pair<std::uint64_t, std::uint64_t>{1000, 1000},
         std::pair<std::uint64_t, std::uint64_t>{250, 1024}}) {
@@ -120,10 +121,12 @@ TEST(ShmBudget, QueueFormulaMatchesRealSegment) {
 }
 
 TEST(ShmBudget, ResponseQueueUsesResponseMessageSize) {
+  // covers: shmbudget.response-queue-bytes.1~1
   EXPECT_EQ(shmbudget::responseQueueBytes(100), shmbudget::messageQueueBytes(100, ipc::kResponseQueueMaxMessageSize));
 }
 
 TEST(ShmBudget, ElementsFollowTickAndFloor) {
+  // covers: shmbudget.response-queue-elements.1~1
   // 10 s zapasu przy takcie 1 ms to dziesiec tysiecy elementow -- to jest ta liczba, ktora
   // zamienia sie na 10 MiB kolejki i wyczerpuje /dev/shm kontenera przy siodmym kliencie.
   EXPECT_EQ(shmbudget::responseQueueElements(ratio(1, 1000), kBufferSeconds, kMinElements), 10000);
@@ -136,6 +139,7 @@ TEST(ShmBudget, ElementsFollowTickAndFloor) {
 }
 
 TEST(ShmBudget, ElementsRoundUpOnFractionalFrequency) {
+  // covers: shmbudget.response-queue-elements.2~1
   // Takt o niecalkowitej odwrotnosci. Obciecie czestotliwosci PRZED pomnozeniem przez czas
   // bufora dawalo 22 * 10 = 220 zamiast 225: kolejka o piec elementow za krotka na kazdym
   // takcie 22,5 Hz. Caly iloraz musi byc liczony wymiernie i zaokraglony w gore.
@@ -147,6 +151,7 @@ TEST(ShmBudget, ElementsRoundUpOnFractionalFrequency) {
 }
 
 TEST(ShmBudget, FixedReservationIsSumOfItsParts) {
+  // covers: shmbudget.fixed-reservation-bytes.1~1
   EXPECT_EQ(shmbudget::fixedReservationBytes(),
             bus::segmentBytes() + shmbudget::messageQueueBytes(ipc::kQueryQueueMaxMessages, ipc::kQueryQueueMaxMessageSize) +
                 ipc::kShmemSegmentSize);
@@ -167,12 +172,14 @@ static_assert(!RDB_OS_LINUX || RDB_HAS_BOOST_POSIX_SHM,
 
 #if RDB_HAS_BOOST_POSIX_SHM
 TEST(ShmBudget, SpaceRemovesItsProbe) {
+  // covers: shmbudget.space.1~1
   const std::string name = "rdb_shm_probe_" + std::to_string(getpid());
   EXPECT_TRUE(shmbudget::space().known);
   EXPECT_THROW((IPC::shared_memory_object(IPC::open_only, name.c_str(), IPC::read_only)), IPC::interprocess_exception);
 }
 
 TEST(ShmBudget, SpacePreservesExistingObjectOnProbeNameCollision) {
+  // covers: shmbudget.space.1~1
   const std::string name = "rdb_shm_probe_" + std::to_string(getpid());
   IPC::shared_memory_object existing(IPC::create_only, name.c_str(), IPC::read_write);
   existing.truncate(17);
@@ -188,6 +195,7 @@ TEST(ShmBudget, SpacePreservesExistingObjectOnProbeNameCollision) {
 #endif
 
 TEST(ShmBudget, HumanBytesPicksUnit) {
+  // covers: shmbudget.human-bytes.1~1
   EXPECT_EQ(shmbudget::humanBytes(0), "0 B");
   EXPECT_EQ(shmbudget::humanBytes(1023), "1023 B");
   EXPECT_EQ(shmbudget::humanBytes(512), "512 B");
@@ -200,6 +208,7 @@ TEST(ShmBudget, HumanBytesPicksUnit) {
 }
 
 TEST(ShmBudget, MeasurementUsesAvailableBlocksAndFragmentSize) {
+  // covers: shmbudget.space.1~1
   struct Restore {
     ~Restore() { measuredSpace.reset(); }
   } restore;
@@ -220,6 +229,7 @@ TEST(ShmBudget, MeasurementUsesAvailableBlocksAndFragmentSize) {
 }
 
 TEST(ShmBudget, ReportSubtractsReservationAndRoundsClientCountDown) {
+  // covers: shmbudget.report.1~1, shmbudget.report.2~1, shmbudget.report.3~1
   struct Restore {
     ~Restore() { measuredSpace.reset(); }
   } restore;
@@ -257,6 +267,7 @@ TEST(ShmBudget, ReportSubtractsReservationAndRoundsClientCountDown) {
 }
 
 TEST(ShmBudget, MeasurementFallbackAndUnknownReportAreExplicit) {
+  // covers: shmbudget.space.2~1, shmbudget.space.3~1, shmbudget.report.1~1, shmbudget.report.3~1, shmbudget.report.4~1
   struct Restore {
     ~Restore() { failDescriptorMeasure = failPathMeasure = false; }
   } restore;
@@ -275,6 +286,7 @@ TEST(ShmBudget, MeasurementFallbackAndUnknownReportAreExplicit) {
 }
 
 TEST(ShmBudget, IntervalCostsGroupInPlanOrderAndSortByQueueBytes) {
+  // covers: shmbudget.response-queue-elements.2~1, shmbudget.interval-costs.1~1, shmbudget.interval-costs.2~1
   qTree plan;
   plan.push_back(query(0, ":STORAGE"));
   plan.push_back(query(1, "slow"));

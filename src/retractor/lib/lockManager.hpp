@@ -16,36 +16,30 @@ struct SystemdIdentity {
 };
 
 /// Funkcja detectSystemdIdentity powinna:
-/// - zwracać nazwę jednostki i zakres użytkownika przeniesione wprost z osplat::detectServiceIdentity (Linux: jednostka systemd z /proc/self/cgroup, Darwin: zadanie launchd), z unit == nullopt dla zwykłego procesu.
-///   Test: `LockManagerIdentity.CopiesThePlatformServiceIdentity`. Nietestowalne: test nie uruchamia procesu w kazdym managerze uslug; porownuje caly wynik z warstwa platformowa. Darwin niezweryfikowany.
+/// - [lockmanager.detect-systemd-identity.1~1] zwracać nazwę jednostki i zakres użytkownika przeniesione wprost z osplat::detectServiceIdentity (Linux: jednostka systemd z /proc/self/cgroup, Darwin: zadanie launchd), z unit == nullopt dla zwykłego procesu.
+///   Nietestowalne: test nie uruchamia procesu w kazdym managerze uslug; porownuje caly wynik z warstwa platformowa. Darwin niezweryfikowany.
 ///
 /// @note Deklaracja w naglowku, bo tozsamosci jednostki potrzebuje takze magistrala: bez niej slot nie umie
 ///       odpowiedziec, ktora jednostke trzeba zatrzymac, zeby zwolnic kolidujaca nazwe.
 [[nodiscard]] SystemdIdentity detectSystemdIdentity();
 
 /// Obiekt klasy FlockServiceGuard powinien:
-/// - wyznaczać ścieżkę pliku blokady instancji z nazwy serwera w domyślnym katalogu blokad albo w katalogu ustawionym przez setLockDir.
-///   Test: `LockFileSafety.IpcLockRequiresInstanceLockAndCannotBeAcquiredTwice`, `LockFileSafety.AcquirePublishExcludeReleaseAndReacquire`.
-/// - w acquireLock przejmować nieblokująco wyłączną blokadę pliku instancji według protokołu lockFile, a po przejęciu
+/// - [lockmanager.flock-service-guard.1~1] wyznaczać ścieżkę pliku blokady instancji z nazwy serwera w domyślnym katalogu blokad albo w katalogu ustawionym przez setLockDir.
+/// - [lockmanager.flock-service-guard.2~1] w acquireLock przejmować nieblokująco wyłączną blokadę pliku instancji według protokołu lockFile, a po przejęciu
 ///   podejmować próbę obcięcia pliku do zera bez zapisu opisu procesu; przy błędzie ftruncate zachowywać blokadę,
 ///   wpisywać ostrzeżenie do logu i zwracać sukces.
-///   Test: `LockFileSafety.AcquirePublishExcludeReleaseAndReacquire`, `LockFileSafety.TruncateFailureDuringAcquireKeepsTheLockAndReportsWarning`.
-/// - zwracać z acquireLock fałsz z pustym acquireLockError, gdy blokadę trzyma inna instancja, a fałsz z opisem przyczyny, gdy plik nie mógł zostać otwarty lub nie przeszedł kontroli (dowiązanie, nie zwykły plik, obcy właściciel, wiele dowiązań).
-///   Test: `LockFileSafety.AcquirePublishExcludeReleaseAndReacquire`, `LockFileSafety.SymlinkPreservesTargetAndReportsReason`, `LockFileSafety.WrongTypesDoNotBlockReadersWritersOrCleanup`, `LockFileSafety.HardlinkRefusedBeforeAcquireLaterAliasDoesNotBlockPublish`, `IpcSecurity.WritableLockRejectsForeignDescriptorButReadersCanAcquireIt`.
-/// - w acquireIpcLock przejmować drugą wyłączną blokadę dla nazwy obiektu IPC w katalogu blokad maszyny, wspólnym dla wszystkich katalogów blokad instancji, wyłącznie gdy blokada instancji jest aktywna i blokada IPC nie jest jeszcze trzymana.
-///   Test: `LockFileSafety.IpcLockRequiresInstanceLockAndCannotBeAcquiredTwice`, `LockManagerFlock.HashCollisionCannotAcquireTheSameIpcIdentity`, `LockManagerFlock.IpcIdentityLockNeedsNoWriteAccess`; integracja `it_ipc_identity_lock`.
-/// - w publishLockInfo zapisywać do trzymanego pliku blokady, od początku, linie PID, PPID, MODE (service lub process),
+/// - [lockmanager.flock-service-guard.3~1] zwracać z acquireLock fałsz z pustym acquireLockError, gdy blokadę trzyma inna instancja, a fałsz z opisem przyczyny, gdy plik nie mógł zostać otwarty lub nie przeszedł kontroli (dowiązanie, nie zwykły plik, obcy właściciel, wiele dowiązań).
+/// - [lockmanager.flock-service-guard.4~1] w acquireIpcLock przejmować drugą wyłączną blokadę dla nazwy obiektu IPC w katalogu blokad maszyny, wspólnym dla wszystkich katalogów blokad instancji, wyłącznie gdy blokada instancji jest aktywna i blokada IPC nie jest jeszcze trzymana.
+///   Zakres testow: `LockFileSafety.IpcLockRequiresInstanceLockAndCannotBeAcquiredTwice`, `LockManagerFlock.HashCollisionCannotAcquireTheSameIpcIdentity`, `LockManagerFlock.IpcIdentityLockNeedsNoWriteAccess`; integracja `it_ipc_identity_lock`.
+/// - [lockmanager.flock-service-guard.5~1] w publishLockInfo zapisywać do trzymanego pliku blokady, od początku, linie PID, PPID, MODE (service lub process),
 ///   przy usłudze UNIT i SCOPE (system lub user) oraz QUERYFILE, gdy ustawiono plik zapytań, jednym write, a potem fsync;
 ///   zwracać fałsz przy nieaktywnej blokadzie, błędzie ftruncate, lseek lub fsync albo wyniku write == -1.
 ///   Krótkiego zapisu, w tym 0 bajtów, nie rozpoznawać jako błędu.
-///   Test: `LockFileSafety.PublishingChecksEveryIoBoundaryAndUsesOneWrite`, `LockFileSafety.DocumentedShortWritesAreAcceptedWithoutRetry`, `LockFileSafety.AcquirePublishExcludeReleaseAndReacquire`. Nietestowalne: galezie UNIT/SCOPE wykonywane tylko jesli test dziala w jednostce; kontrola strukturalna writeLockInfo i testy odczytu obu zakresow nie zastepuja takiego wykonania.
-/// - przez readPeerInfo odczytywać z pliku blokady innej instancji PID, tryb, jednostkę, zakres i plik zapytań, zwracając wartości Unknown i pid 0 dla brakującego pliku lub brakujących linii.
-///   Test: `LockManagerPeerInfo.parses_service_with_unit_scope_and_queryfile`, `LockManagerPeerInfo.parses_user_scope`, `LockManagerPeerInfo.plain_process_lock_yields_process_kind`, `LockManagerPeerInfo.missing_lock_file_yields_unknown`.
-/// - przez isAnotherInstanceRunning sprawdzać, czy blokadę pliku instancji trzyma jakikolwiek proces, a przez isLockActive, czy trzyma ją ten obiekt.
-///   Test: `LockFileSafety.AcquirePublishExcludeReleaseAndReacquire`, `LockFileSafety.IpcLockRequiresInstanceLockAndCannotBeAcquiredTwice`.
-/// - w releaseLock i przy zniszczeniu usuwać pliki obu trzymanych blokad jeszcze pod blokadą i zwalniać ich deskryptory, idempotentnie.
-///   Test: `LockFileSafety.AcquirePublishExcludeReleaseAndReacquire`, `LockFileSafety.IpcLockRequiresInstanceLockAndCannotBeAcquiredTwice`, `LockManagerFlock.IpcIdentityLockNeedsNoWriteAccess`.
-/// - uniemożliwiać kopiowanie i przenoszenie, tak aby adres strażnika używany przez obsługę wyjścia pozostawał ważny.
+///   Nietestowalne: galezie UNIT/SCOPE wykonywane tylko jesli test dziala w jednostce; kontrola strukturalna writeLockInfo i testy odczytu obu zakresow nie zastepuja takiego wykonania.
+/// - [lockmanager.flock-service-guard.6~1] przez readPeerInfo odczytywać z pliku blokady innej instancji PID, tryb, jednostkę, zakres i plik zapytań, zwracając wartości Unknown i pid 0 dla brakującego pliku lub brakujących linii.
+/// - [lockmanager.flock-service-guard.7~1] przez isAnotherInstanceRunning sprawdzać, czy blokadę pliku instancji trzyma jakikolwiek proces, a przez isLockActive, czy trzyma ją ten obiekt.
+/// - [lockmanager.flock-service-guard.8~1] w releaseLock i przy zniszczeniu usuwać pliki obu trzymanych blokad jeszcze pod blokadą i zwalniać ich deskryptory, idempotentnie.
+/// - [lockmanager.flock-service-guard.9~1] uniemożliwiać kopiowanie i przenoszenie, tak aby adres strażnika używany przez obsługę wyjścia pozostawał ważny.
 ///   Sprawdzenie kompilacji: test/UnitTest/test_lockManager.cpp, cztery static_assert cech kopiowania i przenoszenia FlockServiceGuard.
 class FlockServiceGuard {
  public:
@@ -133,14 +127,13 @@ struct SweepReport {
 };
 
 /// Funkcja sweepAbandonedResources powinna:
-/// - przez lockfile::sweep usuwać w serviceLockDir porzucone pliki blokad instancji (`xretractor_service.lock` albo `xretractor_service.<poprawna nazwa>.lock`) i liczyć je w serviceLocks.
-///   Test: `LockManagerSweep.RemovesOnlyAbandonedLocksAndTheirIpcObjects`, `ServiceLockFamily.NamesRoundTripAndForeignFilesAreRejected`; integracja `it_leftover_sweep`.
-/// - przez lockfile::sweep usuwać w machineLockDir porzucone blokady tożsamości IPC instancji bezimiennej albo o członie będącym poprawną nazwą serwera lub jej skrótem, a pod tą blokadą usuwać przez ipc::security::removeOwned segment pamięci dzielonej i kolejkę komend tego członu, licząc je w ipcIdentities.
-///   Test: `LockManagerSweep.RemovesOnlyAbandonedLocksAndTheirIpcObjects`; integracje `it_ipc_identity_lock`, `it_leftover_sweep`. Nietestowalne: odmiany czlonu pustego i skroconego sa sprawdzone strukturalnie w ipcTokenOf/isInstanceToken; nie usuwamy globalnych obiektow bezimiennego serwera na maszynie testujacej.
-/// - usuwać porzucone segmenty magistrali przez bus::sweepAbandonedSegments(machineLockDir) i liczyć je w busSegments.
-///   Test: `LockManagerSweep.RemovesOnlyAbandonedLocksAndTheirIpcObjects`, `BusPresence.SweepRemovesOnlyUnmappedSegments`.
-/// - nie ruszać niczego, czego blokady nie da się zająć wyłącznie, plików innych kont ani kolejek odpowiedzi klientów.
-///   Test: `LockManagerSweep.RemovesOnlyAbandonedLocksAndTheirIpcObjects`, `IpcSecurity.SweepDoesNotRemoveForeignLockOrInvokeItsCleanup`; integracje `it_leftover_sweep`, `it_ipc_security-foreign-uid` (root lub jawny skip). Nietestowalne: brak wyliczania kolejek klientow - kontrola strukturalna sweepAbandonedResources, ktora przeglada tylko rodziny blokad.
+/// - [lockmanager.sweep-abandoned-resources.1~1] przez lockfile::sweep usuwać w serviceLockDir porzucone pliki blokad instancji (`xretractor_service.lock` albo `xretractor_service.<poprawna nazwa>.lock`) i liczyć je w serviceLocks.
+///   Zakres testow: `LockManagerSweep.RemovesOnlyAbandonedLocksAndTheirIpcObjects`, `ServiceLockFamily.NamesRoundTripAndForeignFilesAreRejected`; integracja `it_leftover_sweep`.
+/// - [lockmanager.sweep-abandoned-resources.2~1] przez lockfile::sweep usuwać w machineLockDir porzucone blokady tożsamości IPC instancji bezimiennej albo o członie będącym poprawną nazwą serwera lub jej skrótem, a pod tą blokadą usuwać przez ipc::security::removeOwned segment pamięci dzielonej i kolejkę komend tego członu, licząc je w ipcIdentities.
+///   Zakres testow: `LockManagerSweep.RemovesOnlyAbandonedLocksAndTheirIpcObjects`; integracje `it_ipc_identity_lock`, `it_leftover_sweep`. Nietestowalne: odmiany czlonu pustego i skroconego sa sprawdzone strukturalnie w ipcTokenOf/isInstanceToken; nie usuwamy globalnych obiektow bezimiennego serwera na maszynie testujacej.
+/// - [lockmanager.sweep-abandoned-resources.3~1] usuwać porzucone segmenty magistrali przez bus::sweepAbandonedSegments(machineLockDir) i liczyć je w busSegments.
+/// - [lockmanager.sweep-abandoned-resources.4~1] nie ruszać niczego, czego blokady nie da się zająć wyłącznie, plików innych kont ani kolejek odpowiedzi klientów.
+///   Zakres testow: `LockManagerSweep.RemovesOnlyAbandonedLocksAndTheirIpcObjects`, `IpcSecurity.SweepDoesNotRemoveForeignLockOrInvokeItsCleanup`; integracje `it_leftover_sweep`, `it_ipc_security-foreign-uid` (root lub jawny skip). Nietestowalne: brak wyliczania kolejek klientow - kontrola strukturalna sweepAbandonedResources, ktora przeglada tylko rodziny blokad.
 ///
 /// @note Normalny koniec procesu sprzata po sobie sam; tu trafia to, co zostawil proces zabity (SIGKILL, OOM,
 ///       awaria zasilania). Bezpieczne przy dzialajacych instancjach, bo zywa instancja trzyma swoje blokady

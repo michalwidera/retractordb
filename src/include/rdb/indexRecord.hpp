@@ -11,16 +11,11 @@ namespace rdb {
 /// @brief Single entry in a meta index – a null bit-set pattern and count
 ///        of consecutive records sharing that pattern.
 /// Obiekt klasy IndexRecord powinien:
-/// - przechowywać wzorzec null jako jeden bit na pole deskryptora, liczbę kolejnych rekordów o tym wzorcu oraz znacznik przerwy transmisji.
-///   Test: `RequirementContracts.index_and_shadow_frames_match_the_legacy_binary_layout`.
-/// - przez serialize zapisywać wpis jako bajt znacznika przerwy (1 dla przerwy, 0 w przeciwnym razie), recordCount i długość bitsetu jako size_t w porządku bajtów maszyny, a następnie bitset upakowany od najmłodszego bitu w ceil(n/8) bajtach z zerowymi bitami dopełnienia.
-///   Test: `RequirementContracts.index_and_shadow_frames_match_the_legacy_binary_layout`.
-/// - przez deserialize odtwarzać wpis zapisany przez serialize, traktując każdy niezerowy bajt znacznika jako przerwę.
-///   Test: `RequirementContracts.index_and_shadow_frames_match_the_legacy_binary_layout`.
-/// - zwracać z deserialize Errc::IO z kodem EIO, gdy ramka jest za krótka na nagłówek albo deklarowana długość bitsetu przekracza pozostałe bajty, porównując długość przed zaokrągleniem do bajtów, tak aby skrajna długość nie powodowała odczytu poza buforem.
-///   Test: `MetaDataIndexRecordTest.deserialize_odrzuca_bitsetSize_spoza_ramki`, `RequirementContracts.index_and_shadow_frames_match_the_legacy_binary_layout`.
-/// - zachowywać format wpisu zgodny z istniejącymi plikami .meta i z formatem wpisów metaShadow::ShadowOverride.
-///   Test: `RequirementContracts.index_and_shadow_frames_match_the_legacy_binary_layout`.
+/// - [indexrecord.index-record.1~1] przechowywać wzorzec null jako jeden bit na pole deskryptora, liczbę kolejnych rekordów o tym wzorcu oraz znacznik przerwy transmisji.
+/// - [indexrecord.index-record.2~1] przez serialize zapisywać wpis jako bajt znacznika przerwy (1 dla przerwy, 0 w przeciwnym razie), recordCount i długość bitsetu jako size_t w porządku bajtów maszyny, a następnie bitset upakowany od najmłodszego bitu w ceil(n/8) bajtach z zerowymi bitami dopełnienia.
+/// - [indexrecord.index-record.3~1] przez deserialize odtwarzać wpis zapisany przez serialize, traktując każdy niezerowy bajt znacznika jako przerwę.
+/// - [indexrecord.index-record.4~1] zwracać z deserialize Errc::IO z kodem EIO, gdy ramka jest za krótka na nagłówek albo deklarowana długość bitsetu przekracza pozostałe bajty, porównując długość przed zaokrągleniem do bajtów, tak aby skrajna długość nie powodowała odczytu poza buforem.
+/// - [indexrecord.index-record.5~1] zachowywać format wpisu zgodny z istniejącymi plikami .meta i z formatem wpisów metaShadow::ShadowOverride.
 struct IndexRecord {
   std::vector<bool> nullBitset;                            ///< one bit per descriptor field (true = null)
   size_t recordCount{0};                                   ///< number of consecutive records with this pattern

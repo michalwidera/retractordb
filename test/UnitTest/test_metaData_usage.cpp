@@ -52,6 +52,7 @@ struct UsageFixture : public ::testing::Test {
 // ten wzorzec dla dowolnego rekordu po fakcie.
 // ---------------------------------------------------------------------------
 TEST_F(UsageFixture, scenariusz_nagrywanie_rekordow) {
+  // covers: metadata.meta-data.1~1
   rdb::metaData meta(descriptor, file);
 
   // Symulacja 4 rekordów przychodzących z czujnika:
@@ -82,6 +83,7 @@ TEST_F(UsageFixture, scenariusz_nagrywanie_rekordow) {
 // plik meta pozostaje mały nawet przy długich seriach danych.
 // ---------------------------------------------------------------------------
 TEST_F(UsageFixture, scenariusz_kompresja_rle) {
+  // covers: metadata.meta-data.3~1
   rdb::metaData meta(descriptor, file);
 
   // 500 rekordów z czujnika online (allPresent), po nich 200 rekordów offline.
@@ -110,6 +112,7 @@ TEST_F(UsageFixture, scenariusz_kompresja_rle) {
 // Nowy obiekt otwierający ten sam plik odtwarza pełny indeks null.
 // ---------------------------------------------------------------------------
 TEST_F(UsageFixture, scenariusz_persystencja_po_restarcie) {
+  // covers: metadata.meta-data.6~1
   // Pierwsza sesja - program zapisuje dane i kończy pracę.
   {
     rdb::metaData meta(descriptor, file);
@@ -222,6 +225,7 @@ TEST_F(UsageFixture, scenariusz_flush_dla_bezpieczenstwa) {
 // przed modyfikowanym rekordem, sam rekord, po nim.
 // ---------------------------------------------------------------------------
 TEST_F(UsageFixture, scenariusz_modyfikacja_rekordu) {
+  // covers: metadata.meta-data.2~1
   rdb::metaData meta(descriptor, file);
 
   // 5 rekordów: wszystkie allNull (np. czujnik był offline).
@@ -290,6 +294,7 @@ TEST_F(UsageFixture, scenariusz_reset_strumienia) {
 // Uwaga: wynik false oznacza "zapisz rekord" - wtedy storage woła onRecordAppended().
 // ---------------------------------------------------------------------------
 TEST_F(UsageFixture, scenariusz_maszyna_gap) {
+  // covers: metadata.meta-data.9~1
   rdb::metaData meta(descriptor, file);
   EXPECT_FALSE(meta.gapDetectionEnabled());
 
@@ -354,6 +359,7 @@ TEST_F(UsageFixture, scenariusz_bez_abandonFile_odtwarza_usuniety_plik) {
 // no-opem (ten sam wariant inertny, co dla źródeł deklarowanych).
 // ---------------------------------------------------------------------------
 TEST_F(UsageFixture, scenariusz_abandonFile_zapobiega_odtworzeniu) {
+  // covers: metadata.meta-data.19~1
   {
     rdb::metaData meta(descriptor, file);
     meta.onRecordAppended(allPresent);  // ten sam pending wpis co w scenariuszu 9

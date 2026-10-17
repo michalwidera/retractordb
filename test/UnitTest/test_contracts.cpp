@@ -38,17 +38,22 @@
 #include "retractor/lib/token.hpp"
 #include "rqlFunctions.hpp"
 
+// covers: token.token.2~1, query.query.1~1
 static_assert(std::is_same_v<decltype(std::declval<const token &>().getVT()), const rdb::descFldVT &>);
+// covers: crsmath.time-line.3~1
 static_assert(!std::is_copy_constructible_v<CRationalStreamMath::TimeLine>);
 static_assert(!std::is_copy_assignable_v<CRationalStreamMath::TimeLine>);
 // covers: xtrdb.command.virtual-dtor~1
 static_assert(std::has_virtual_destructor_v<ICommand>);
+// covers: storagefile.storage-fd.7~1
 static_assert(!std::is_copy_constructible_v<rdb::StorageFd>);
 static_assert(!std::is_copy_assignable_v<rdb::StorageFd>);
+// covers: fainterface.file-interface.1~1
 static_assert(std::is_abstract_v<rdb::FileInterface>);
 static_assert(std::has_virtual_destructor_v<rdb::FileInterface>);
 
 TEST(RequirementContracts, memory_bucket_identity_survives_other_insertions_and_erasures) {
+  // covers: memorystore.memory-store.1~1, memorystore.memory-store.3~1, memorystore.memory-store.4~1
   rdb::MemoryStore store;
   EXPECT_TRUE(store.empty());
   auto &original = store.bucket("kept");
@@ -69,6 +74,7 @@ TEST(RequirementContracts, memory_bucket_identity_survives_other_insertions_and_
 }
 
 TEST(RequirementContracts, rle_split_preserves_prefix_suffix_and_clears_gap_flags) {
+  // covers: rlesegment.split-segment.1~1, rlesegment.split-segment.2~1, rlesegment.sum-non-gap-records.1~1
   const rdb::IndexRecord segment{.nullBitset = {true, false}, .recordCount = 3, .isGap = true};
   const std::vector<bool> changed{false, true};
   for (size_t offset = 0; offset < 3; ++offset) {
@@ -101,6 +107,9 @@ TEST(RequirementContracts, rle_split_preserves_prefix_suffix_and_clears_gap_flag
 }
 
 TEST(RequirementContracts, index_and_shadow_frames_match_the_legacy_binary_layout) {
+  // covers: indexrecord.index-record.1~1, indexrecord.index-record.2~1, indexrecord.index-record.3~1
+  // covers: indexrecord.index-record.4~1, indexrecord.index-record.5~1, metashadow.shadow-override.2~1
+  // covers: metashadow.shadow-override.3~1, metashadow.shadow-override.4~1
   const std::vector<bool> bits{true, false, true, false, false, false, false, true, true};
   const size_t count = 42, bitCount = bits.size();
   std::vector<std::byte> expected(1 + 2 * sizeof(size_t) + 2, std::byte{0});
@@ -125,6 +134,7 @@ TEST(RequirementContracts, index_and_shadow_frames_match_the_legacy_binary_layou
 }
 
 TEST(RequirementContracts, field_helpers_preserve_flat_slot_layout) {
+  // covers: fldtype.get-stringdesc-fld.1~1, fldtype.flat-element-count.1~1, fldtype.flat-slot-field.1~1
   EXPECT_EQ(rdb::GetStringdescFld(rdb::NULLTYPE), "NULL");
   EXPECT_EQ(rdb::GetStringdescFld(rdb::RATIONAL), "RATIONAL");
   EXPECT_EQ(rdb::flatElementCount({"text", 1, 10, rdb::STRING}), 1);
@@ -143,6 +153,7 @@ TEST(RequirementContracts, field_helpers_preserve_flat_slot_layout) {
 }
 
 TEST(RequirementContracts, token_default_reference_conversions_and_diagnostics) {
+  // covers: cmdid.get-stringcommand-id.1~1, token.token.1~1, token.token.3~1, token.token.4~1, token.token.5~1, token.token.6~1
   const token empty;
   EXPECT_EQ(empty.getCommandID(), VOID_COMMAND);
   EXPECT_EQ(std::get<int>(empty.getVT()), 0);
@@ -168,6 +179,11 @@ TEST(RequirementContracts, token_default_reference_conversions_and_diagnostics) 
 }
 
 TEST(RequirementContracts, ipc_names_preserve_legacy_names_and_bound_the_instance_token) {
+  // covers: constants.short-server-tag.1~1, constants.short-server-tag.2~1, constants.server-name-token.1~1
+  // covers: constants.server-name-token.2~1, constants.with-server-suffix.1~1, constants.names-for-token.1~1
+  // covers: constants.names-for-token.2~1, constants.identity-lock-path.1~1, constants.names.1~1, constants.service-name.1~1
+  // covers: constants.service-lock-file.1~1, constants.service-lock-dir.1~1, constants.service-lock-instance.1~1
+  // covers: constants.service-lock-instance.2~1, constants.service-lock-instance.3~1, constants.service-lock-instance.4~1
   using namespace ipc;
   EXPECT_EQ(shortServerTag(""), "04fd0bfc1");
   EXPECT_EQ(shortServerTag("server"), "0c31509af");
@@ -203,6 +219,8 @@ TEST(RequirementContracts, ipc_names_preserve_legacy_names_and_bound_the_instanc
 }
 
 TEST(RequirementContracts, meta_store_cache_mutations_refusal_and_abandon) {
+  // covers: metaindexstore.meta-index-store.1~1, metaindexstore.meta-index-store.2~1, metaindexstore.meta-index-store.3~1
+  // covers: metaindexstore.meta-index-store.4~1, metaindexstore.meta-index-store.5~1
   namespace fs           = std::filesystem;
   const std::string file = "contracts_index.meta";
   fs::remove_all(file);
@@ -246,6 +264,7 @@ TEST(RequirementContracts, meta_store_cache_mutations_refusal_and_abandon) {
 }
 
 TEST(RequirementContracts, writable_backends_clear_null_metadata_except_memory) {
+  // covers: fainterface.file-interface.1~1, fainterface.file-interface.3~1, fainterface.file-interface.4~1
   rdb::Descriptor descriptor("a", 1, 1, rdb::BYTE);
   for (const char *type : {"GENERIC", "POSIX", "POSIXSHD", "DIRECT", "DEFAULT", "MEMORY"}) {
     SCOPED_TRACE(type);
@@ -265,6 +284,8 @@ TEST(RequirementContracts, writable_backends_clear_null_metadata_except_memory) 
 }
 
 TEST(RequirementContracts, storage_fd_flags_offsets_eof_and_lifetime) {
+  // covers: storagefile.open-storage-file.1~1, storagefile.storage-fd.1~1, storagefile.storage-fd.3~1
+  // covers: storagefile.storage-fd.4~1, storagefile.storage-fd.5~1, storagefile.storage-fd.6~1
   const std::string file = "contracts_fd";
   const int raw          = rdb::openStorageFile(file, O_RDWR | O_CREAT | O_TRUNC, 0600);
   ASSERT_GE(raw, 0);
@@ -289,6 +310,8 @@ TEST(RequirementContracts, storage_fd_flags_offsets_eof_and_lifetime) {
 }
 
 TEST(RequirementContracts, storage_file_symlink_refusal_preserves_errno_bytes_and_descriptor_lifetime) {
+  // covers: storagefile.open-storage-file.2~1, storagefile.storage-fd.1~1, storagefile.storage-fd.2~1
+  // covers: storagefile.storage-fd.7~1
   const std::string target = "contracts_link_target";
   const std::string link   = "contracts_link";
   std::ofstream(target, std::ios::binary) << "original";
@@ -328,6 +351,7 @@ TEST(RequirementContracts, storage_file_symlink_refusal_preserves_errno_bytes_an
 }
 
 TEST(RequirementContracts, payload_decimal_hex_and_string_padding) {
+  // covers: payload.payload.6~1, payload.payload.9~1
   rdb::payload value(rdb::Descriptor("n", 4, 1, rdb::INTEGER));
   value.setItem(0, 42);
   std::ostringstream decimal, hex;
@@ -346,6 +370,10 @@ TEST(RequirementContracts, payload_decimal_hex_and_string_padding) {
 }
 
 TEST(RequirementContracts, checked_arithmetic_bounds_and_reduced_rationals) {
+  // covers: checkedarith.add.1~1, checkedarith.add.2~1, checkedarith.add.3~1, checkedarith.sub.1~1, checkedarith.sub.2~1
+  // covers: checkedarith.sub.3~1, checkedarith.mul.1~1, checkedarith.mul.2~1, checkedarith.mul.3~1, checkedarith.div.1~1
+  // covers: checkedarith.div.2~1, checkedarith.neg.1~1, checkedarith.neg.2~1, checkedarith.narrowed.1~1
+  // covers: checkedarith.narrowed.2~1, checkedarith.narrowed.3~1
   using namespace checkedArith;
   using ratio      = boost::rational<int>;
   constexpr int hi = std::numeric_limits<int>::max(), lo = std::numeric_limits<int>::min();
@@ -384,6 +412,8 @@ TEST(RequirementContracts, checked_arithmetic_bounds_and_reduced_rationals) {
 }
 
 TEST(RequirementContracts, query_helpers_identify_nodes_dependencies_and_reset_state) {
+  // covers: query.reduction-result-field.1~1, query.reduction-result-field.2~1, query.source-kind-keyword.1~1, query.query.2~1
+  // covers: query.query.3~1, query.query.4~1, query.query.6~1, query.query.8~1, query.query.10~1, query.operator-less.1~1
   EXPECT_EQ(sourceKindKeyword(sourceKind::none), "");
   EXPECT_EQ(sourceKindKeyword(sourceKind::binFile), "BINFILE");
   EXPECT_EQ(sourceKindKeyword(sourceKind::textFile), "TEXTFILE");
@@ -433,6 +463,7 @@ TEST(RequirementContracts, query_helpers_identify_nodes_dependencies_and_reset_s
 }
 
 TEST(RequirementContracts, window_identity_compares_programs_or_slots) {
+  // covers: query.window-group.1~1, query.window-group.2~1, query.window-group.3~1
   const windowGroup base{.source = "src", .slot = 1, .width = 3};
   auto changed = base;
   EXPECT_TRUE(base.sameAs(changed));
@@ -460,6 +491,7 @@ TEST(RequirementContracts, window_identity_compares_programs_or_slots) {
 }
 
 TEST(RequirementContracts, from_arguments_follow_the_compiled_program_shape) {
+  // covers: query.get-args.1~1, query.get-args.2~1, query.get-args.3~1
   for (int size = 1; size <= 3; ++size) {
     std::list<token> program{token(PUSH_STREAM, std::string("left"))};
     if (size == 2) program.emplace_back(STREAM_SUM);
@@ -475,6 +507,7 @@ TEST(RequirementContracts, from_arguments_follow_the_compiled_program_shape) {
 }
 
 TEST(RequirementContractsDeathTest, oversized_from_and_unknown_fields_are_invariant_failures) {
+  // covers: query.query.9~1, query.get-args.4~1
   std::list<token> oversized(4, token(PUSH_STREAM, std::string("src")));
   ASSERT_DEATH(GetArgs(oversized), "program too large");
   query node(1, "node");
@@ -483,6 +516,8 @@ TEST(RequirementContractsDeathTest, oversized_from_and_unknown_fields_are_invari
 }
 
 TEST(RequirementContracts, catalogue_fallback_values_and_process_snapshot) {
+  // covers: osplatform.inspect-process.1~1, osplatform.inspect-process.2~1, osplatform.shared-memory-backing-path.1~1
+  // covers: rqlfunctions.find-rql-function.1~1, rqlfunctions.find-rql-function.2~1, converttypes.null-fallback-value.2~1
   const auto canonical = rdb::findRqlFunction("To_InTeGeR");
   ASSERT_TRUE(canonical.has_value());
   EXPECT_EQ(canonical->canonical, "to_integer");
@@ -503,6 +538,7 @@ TEST(RequirementContracts, catalogue_fallback_values_and_process_snapshot) {
 }
 
 TEST(RequirementContracts, storage_descriptor_keeps_schema_and_source_or_output_configuration) {
+  // covers: query.query.5~1
   using item         = std::tuple<std::string, int, int, rdb::descFld>;
   const auto entries = [](const rdb::Descriptor &descriptor) {
     std::vector<item> result;
@@ -537,6 +573,7 @@ TEST(RequirementContracts, storage_descriptor_keeps_schema_and_source_or_output_
 }
 
 TEST(RequirementContracts, from_descriptor_covers_reducers_hash_windows_and_zero_length_fields) {
+  // covers: query.query.7~1
   qTree plan;
   query source(1, "src");
   source.kind     = sourceKind::binFile;

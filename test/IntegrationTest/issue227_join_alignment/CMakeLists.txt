@@ -16,6 +16,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash verify.sh)
 
+# covers: datamodel.data-model.6~1
 add_test(
   NAME ${TestID}-adhoc-origin
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

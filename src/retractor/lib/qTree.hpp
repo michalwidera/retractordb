@@ -26,32 +26,18 @@
 /// sort, topologicalSort), wiec da sie go domknac - a nie tylko miec nadzieje, ze nikt nie
 /// siegnal do bazy bokiem.
 /// Obiekt klasy qTree powinien:
-/// - przechowywać plan jako uporządkowany ciąg węzłów query i udostępniać z interfejsu wektora wyłącznie odczyt, iterację, dostęp pozycyjny oraz mutacje push_back, pop_back, erase, clear, replaceAll, sort i topologicalSort.
-///   Test: `qTree.bracket_operator_takes_position_and_name`.
+/// - [qtree.q-tree.1~1] przechowywać plan jako uporządkowany ciąg węzłów query i udostępniać z interfejsu wektora wyłącznie odczyt, iterację, dostęp pozycyjny oraz mutacje push_back, pop_back, erase, clear, replaceAll, sort i topologicalSort.
 ///   Sprawdzenie kompilacji: test/UnitTest/test_qTree.cpp - static_assert braku konwersji do publicznej bazy vector.
-/// - przy każdej mutacji kształtu planu nadawać nowy numer rewizji z jednego, atomowego dozownika procesu, zaczynającego od 1, tak aby równy numer oznaczał równy kształt także między różnymi obiektami qTree.
-///   Test: `qTree.planRevision_changes_on_push_back_copy`, `qTree.planRevision_changes_on_push_back_move`, `qTree.planRevision_changes_on_pop_back`.
-///   Test: `qTree.planRevision_changes_on_erase_single`, `qTree.planRevision_changes_on_erase_range`, `qTree.planRevision_changes_on_clear`.
-///   Test: `qTree.planRevision_changes_on_replaceAll`, `qTree.planRevision_changes_on_sort_even_when_order_already_correct`, `qTree.planRevision_changes_on_topologicalSort`.
-///   Test: `qTree.planRevision_differs_between_freshly_built_trees`, `qTree.planRevision_never_matches_the_value_reserved_for_no_observation`.
+/// - [qtree.q-tree.2~1] przy każdej mutacji kształtu planu nadawać nowy numer rewizji z jednego, atomowego dozownika procesu, zaczynającego od 1, tak aby równy numer oznaczał równy kształt także między różnymi obiektami qTree.
 ///   Kontrola strukturalna: qTree.cpp, nextPlanRevision - jeden static atomic<uint64_t>{1} i fetch_add; testy obserwuja rewizje, nie dowodza atomowosci.
-/// - przy kopiowaniu i przypisaniu całego drzewa przenosić numer rewizji źródła.
-///   Test: `qTree.planRevision_copy_carries_source_number_until_first_mutation`, `qTree.replaceAll_preserves_capacity_and_copy_assignment_carries_revision`.
-/// - przez replaceAll podmieniać wszystkie węzły bez zmiany pozostałych składowych obiektu, w tym maxCapacity.
-///   Test: `qTree.replaceAll_preserves_capacity_and_copy_assignment_carries_revision`.
-/// - przez topologicalSort ustawiać każdy strumień po strumieniach, od których zależy przez PUSH_STREAM.
-///   Test: `qTree.topologicalSort_chain_three_nodes`.
-/// - przez sort porządkować węzły według rosnącego interwału.
-///   Test: `qTree.sort_orders_by_rInterval_ascending`.
-/// - przez getQuery i operator[] z nazwą zwracać węzeł o tej nazwie, traktując pustą lub nieznaną nazwę jako naruszenie warunku wstępnego (RDB_ASSERT), a przez exists sprawdzać obecność nazwy bez naruszenia.
-///   Test: `qTree.getQuery_returns_correct_query`, `qTree.bracket_operator_returns_correct_query`, `qTree.getQuery_throws_logic_error_when_not_found`.
-///   Test: `qTree.getQuery_fatals_on_empty_name`, `qTree.exists_returns_true_when_query_present`, `qTree.exists_returns_false_when_query_absent`.
-/// - przez getDelta zwracać interwał wskazanego strumienia.
-///   Test: `qTree.getDelta_returns_rInterval`.
-/// - przez getAvailableTimeIntervals zwracać zbiór interwałów wszystkich węzłów poza dyrektywami, traktując zerowy interwał węzła niebędącego dyrektywą jako naruszenie niezmiennika.
-///   Test: `qTree.getAvailableTimeIntervals_returns_unique_intervals`, `qTree.getAvailableTimeIntervals_skips_directive_with_zero_interval`, `qTree.getAvailableTimeIntervals_fatals_when_rInterval_is_zero`.
-/// - przez dumpCore wypisywać tabelę z pozycją, interwałem, pojemnością i nazwą każdego węzła.
-///   Test: `qTree.dumpCore_does_not_crash`.
+/// - [qtree.q-tree.3~1] przy kopiowaniu i przypisaniu całego drzewa przenosić numer rewizji źródła.
+/// - [qtree.q-tree.4~1] przez replaceAll podmieniać wszystkie węzły bez zmiany pozostałych składowych obiektu, w tym maxCapacity.
+/// - [qtree.q-tree.5~1] przez topologicalSort ustawiać każdy strumień po strumieniach, od których zależy przez PUSH_STREAM.
+/// - [qtree.q-tree.6~1] przez sort porządkować węzły według rosnącego interwału.
+/// - [qtree.q-tree.7~1] przez getQuery i operator[] z nazwą zwracać węzeł o tej nazwie, traktując pustą lub nieznaną nazwę jako naruszenie warunku wstępnego (RDB_ASSERT), a przez exists sprawdzać obecność nazwy bez naruszenia.
+/// - [qtree.q-tree.8~1] przez getDelta zwracać interwał wskazanego strumienia.
+/// - [qtree.q-tree.9~1] przez getAvailableTimeIntervals zwracać zbiór interwałów wszystkich węzłów poza dyrektywami, traktując zerowy interwał węzła niebędącego dyrektywą jako naruszenie niezmiennika.
+/// - [qtree.q-tree.10~1] przez dumpCore wypisywać tabelę z pozycją, interwałem, pojemnością i nazwą każdego węzła.
 class qTree : private std::vector<query> {
   /* Topological sort vars */
   std::map<std::string, bool> visited_;

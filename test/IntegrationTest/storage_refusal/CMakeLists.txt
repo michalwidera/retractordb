@@ -2,6 +2,7 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 foreach(mode start delivery reset adhoc)
+  # covers: launcher.xretractor.29~1, executorsm.executorsm.14~1, executorsm.executorsm.13~1
   add_test(
     NAME ${TestID}-${mode}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

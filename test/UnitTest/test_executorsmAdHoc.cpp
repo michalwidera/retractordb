@@ -107,6 +107,7 @@ TEST_P(ExecutorsmAdHocRuleTest, attached_rule_first_dump_contains_only_records_a
 // tu Guard i guard na result, jeden plik na systemie nieczulym na wielkosc liter - dostaje odmowe
 // parsera, a zywy plan zostaje bez niej.
 TEST_P(ExecutorsmAdHocRuleTest, attached_rule_sharing_a_dump_file_is_refused) {
+  // covers: executorsm.executorsm.13~1
   testing::internal::CaptureStderr();
   ASSERT_EQ(executorsm::getAdHoc("RULE Guard ON result WHEN result[0] > 0 DO DUMP 0 TO 1").get<std::string>("db"), "OK");
   const auto reply = executorsm::getAdHoc("RULE guard ON result WHEN result[0] > 1 DO DUMP 0 TO 1").get<std::string>("db");

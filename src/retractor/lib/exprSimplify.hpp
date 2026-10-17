@@ -14,30 +14,18 @@
 using fieldTypeLookup = std::function<std::optional<rdb::descFld>(const std::string &, int)>;
 
 /// Funkcja simplifyExpression powinna:
-/// - dla pustego programu, programu z tokenem spoza zestawu ewaluatora (np. PUSH_STREAM, COUNT, PUSH_IDX) i programu, który nie zostawia na stosie dokładnie jednej wartości, zwracać 0 i nie zmieniać programu.
-///   Test: `exprSimplify.empty_and_unresolved_leaf_programs_are_unchanged`, `exprSimplify.refuses_program_with_token_outside_the_evaluator`, `exprSimplify.refuses_malformed_program`.
-/// - podmieniać program wyłącznie wtedy, gdy zadziałało co najmniej jedno przepisanie, i zwracać liczbę przepisań.
-///   Test: `exprSimplify.folds_constant_arithmetic`, `exprSimplify.reassociates_whole_chain_in_one_pass`, `exprSimplify.keeps_expression_without_constants_untouched`.
-/// - brać typ PUSH_ID z typeOfField po nazwie strumienia i płaskim indeksie pola, a PUSH_ID2 traktować jako liść bez typu.
-///   Test: `exprSimplify.empty_and_unresolved_leaf_programs_are_unchanged`, `xcompiler.field_type_lookup_uses_flat_element_index`.
-/// - (A) zwijać podwyrażenie złożone wyłącznie ze stałych do jednej stałej policzonej produkcyjnym ewaluatorem (expressionEvaluator::eval bez payloadu), a zostawiać je, gdy ewaluator nie da wartości albo da NULL lub parę.
-///   Test: `exprSimplify.folds_constant_arithmetic`, `exprSimplify.folds_function_call_on_constant`, `exprSimplify.leaves_expression_the_evaluator_cannot_compute`, `exprSimplify.leaves_division_by_constant_zero`.
-/// - nigdy nie zwijać wywołania `to_string` (CALL i CALL2), także nad stałym argumentem; zwijać wolno tylko sam argument.
-///   Test: `xExpressionShape.constant_to_string_keeps_its_declared_width_when_simplified`, `xExpressionShape.constant_to_string_without_width_keeps_the_default_width`.
-/// - (B) łączyć dwie stałe ogona `(E op c1) op c2` w jedną dla `+` i `-` (`E-c1-c2` → `E-(c1+c2)`, `c1-E-c2` → `(c1-c2)-E`) oraz `*` z `*`, wyłącznie gdy obie stałe są INTEGER, E ma znany typ BYTE, INTEGER albo UINT, zwinięta stała ma reprezentację w typie operacji, a dziedzina określoności formy przepisanej zawiera się w dziedzinie wyniku pośredniego.
-///   Test: `exprSimplify.constant_tail_matrix_preserves_values_and_null_at_boundaries`.
-/// - (B) łączyć ogon konkatenacji `E+'a'+'b'` → `E+'ab'` dla E typu STRING, wyłącznie ze stałymi po prawej.
-///   Test: `exprSimplify.concatenates_string_tail`, `exprSimplify.keeps_string_constants_apart_when_they_surround_the_field`.
-/// - (C) usuwać element neutralny (`E+0`, `E-0`, `E*1`, `E/1`) wyłącznie wtedy, gdy E ma znany typ o arytmetyce dokładnej, a stała ma ten sam typ co E.
-///   Test: `exprSimplify.drops_neutral_operands`, `exprSimplify.keeps_neutral_operand_of_a_wider_type`.
-/// - stosować reguły B i C do stałej po lewej (`c+E`, `c*E`) tylko dla `+` i `*`, gdy E ma znany typ liczbowy, a stała jest liczbą.
-///   Test: `exprSimplify.reassociates_with_constant_on_the_left`, `exprSimplify.drops_neutral_operand_written_on_the_left`.
-/// - (D) wyłącznie przy `aggressive_expr_optimization=ON` zwijać iloczyn powtórzonego niestałego podwyrażenia o typie dokładnym do potęgi: `a*a` → `a^2`, `a^k*a` → `a^(k+1)`.
-///   Test: `exprSimplify.folds_squared_factor_into_power`, `exprSimplify.folds_multiplication_chain_into_power`, `exprSimplify.folds_repeated_subexpression`, `exprSimplify.keeps_repeated_factor_when_aggressive_rewrites_are_off`.
-/// - nie stosować reguł B, C i D do `^`, porównań ani operatorów logicznych, a dla FLOAT i DOUBLE nie stosować żadnej z nich.
-///   Test: `exprSimplify.keeps_float_expression_untouched`, `exprSimplify.does_not_fold_repeated_factor_for_inexact_types`.
-/// - nie przepisywać `E*0` na `0`.
-///   Test: `exprSimplify.keeps_multiplication_by_zero`.
+/// - [exprsimplify.simplify-expression.1~1] dla pustego programu, programu z tokenem spoza zestawu ewaluatora (np. PUSH_STREAM, COUNT, PUSH_IDX) i programu, który nie zostawia na stosie dokładnie jednej wartości, zwracać 0 i nie zmieniać programu.
+/// - [exprsimplify.simplify-expression.2~1] podmieniać program wyłącznie wtedy, gdy zadziałało co najmniej jedno przepisanie, i zwracać liczbę przepisań.
+/// - [exprsimplify.simplify-expression.3~1] brać typ PUSH_ID z typeOfField po nazwie strumienia i płaskim indeksie pola, a PUSH_ID2 traktować jako liść bez typu.
+/// - [exprsimplify.simplify-expression.4~1] (A) zwijać podwyrażenie złożone wyłącznie ze stałych do jednej stałej policzonej produkcyjnym ewaluatorem (expressionEvaluator::eval bez payloadu), a zostawiać je, gdy ewaluator nie da wartości albo da NULL lub parę.
+/// - [exprsimplify.simplify-expression.5~1] nigdy nie zwijać wywołania `to_string` (CALL i CALL2), także nad stałym argumentem; zwijać wolno tylko sam argument.
+/// - [exprsimplify.simplify-expression.6~1] (B) łączyć dwie stałe ogona `(E op c1) op c2` w jedną dla `+` i `-` (`E-c1-c2` → `E-(c1+c2)`, `c1-E-c2` → `(c1-c2)-E`) oraz `*` z `*`, wyłącznie gdy obie stałe są INTEGER, E ma znany typ BYTE, INTEGER albo UINT, zwinięta stała ma reprezentację w typie operacji, a dziedzina określoności formy przepisanej zawiera się w dziedzinie wyniku pośredniego.
+/// - [exprsimplify.simplify-expression.7~1] (B) łączyć ogon konkatenacji `E+'a'+'b'` → `E+'ab'` dla E typu STRING, wyłącznie ze stałymi po prawej.
+/// - [exprsimplify.simplify-expression.8~1] (C) usuwać element neutralny (`E+0`, `E-0`, `E*1`, `E/1`) wyłącznie wtedy, gdy E ma znany typ o arytmetyce dokładnej, a stała ma ten sam typ co E.
+/// - [exprsimplify.simplify-expression.9~1] stosować reguły B i C do stałej po lewej (`c+E`, `c*E`) tylko dla `+` i `*`, gdy E ma znany typ liczbowy, a stała jest liczbą.
+/// - [exprsimplify.simplify-expression.10~1] (D) wyłącznie przy `aggressive_expr_optimization=ON` zwijać iloczyn powtórzonego niestałego podwyrażenia o typie dokładnym do potęgi: `a*a` → `a^2`, `a^k*a` → `a^(k+1)`.
+/// - [exprsimplify.simplify-expression.11~1] nie stosować reguł B, C i D do `^`, porównań ani operatorów logicznych, a dla FLOAT i DOUBLE nie stosować żadnej z nich.
+/// - [exprsimplify.simplify-expression.12~1] nie przepisywać `E*0` na `0`.
 ///
 /// Zwija stałe i kanonizuje wyrażenia, żeby plan wykonania był krótszy już po kompilacji -
 /// program pola liczony jest raz na interwał, więc każdy usunięty token jest oszczędnością
@@ -111,18 +99,12 @@ struct fieldShape {
 using fieldShapeLookup = std::function<std::optional<fieldShape>(const std::string &, int)>;
 
 /// Funkcja inferStringWidth powinna:
-/// - dla pustego programu, tokenu spoza zestawu ewaluatora (np. PUSH_STREAM, COUNT, PUSH_TSCAN) i operatora bez operandów na stosie zwracać nullopt.
-///   Test: `exprSimplify.string_width_stack_contract_and_saturation`.
-/// - traktować literał tekstowy jako napis swojej długości, a każdy inny literał jako liczbę.
-///   Test: `exprSimplify.string_width_stack_contract_and_saturation`.
-/// - traktować PUSH_ID jako napis o szerokości z shapeOfField, gdy pole źródłowe jest STRING, a każde inne odwołanie, także nierozwiązane PUSH_ID1..PUSH_ID5 i PUSH_IDX oraz pole o nieznanym kształcie, jako liczbę.
-///   Test: `exprSimplify.string_width_stack_contract_and_saturation`.
-/// - traktować `to_string` jako napis o szerokości zadeklarowanej w CALL2, a bez niej kToStringDefaultWidth; każdą inną funkcję i każdy operator jednoargumentowy jako liczbę.
-///   Test: `exprSimplify.string_width_stack_contract_and_saturation`.
-/// - traktować `+` z co najmniej jednym operandem tekstowym jako napis o sumie szerokości operandów, w której liczba wnosi 0, nasyconej na INT_MAX; pozostałe operatory dwuargumentowe jako liczbę.
-///   Test: `exprSimplify.string_width_stack_contract_and_saturation`.
-/// - zwracać szerokość, gdy na stosie zostaje dokładnie jedna wartość i jest napisem, przy szerokości 0 - kToStringDefaultWidth; w przeciwnym razie nullopt.
-///   Test: `exprSimplify.string_width_stack_contract_and_saturation`.
+/// - [exprsimplify.infer-string-width.1~1] dla pustego programu, tokenu spoza zestawu ewaluatora (np. PUSH_STREAM, COUNT, PUSH_TSCAN) i operatora bez operandów na stosie zwracać nullopt.
+/// - [exprsimplify.infer-string-width.2~1] traktować literał tekstowy jako napis swojej długości, a każdy inny literał jako liczbę.
+/// - [exprsimplify.infer-string-width.3~1] traktować PUSH_ID jako napis o szerokości z shapeOfField, gdy pole źródłowe jest STRING, a każde inne odwołanie, także nierozwiązane PUSH_ID1..PUSH_ID5 i PUSH_IDX oraz pole o nieznanym kształcie, jako liczbę.
+/// - [exprsimplify.infer-string-width.4~1] traktować `to_string` jako napis o szerokości zadeklarowanej w CALL2, a bez niej kToStringDefaultWidth; każdą inną funkcję i każdy operator jednoargumentowy jako liczbę.
+/// - [exprsimplify.infer-string-width.5~1] traktować `+` z co najmniej jednym operandem tekstowym jako napis o sumie szerokości operandów, w której liczba wnosi 0, nasyconej na INT_MAX; pozostałe operatory dwuargumentowe jako liczbę.
+/// - [exprsimplify.infer-string-width.6~1] zwracać szerokość, gdy na stosie zostaje dokładnie jedna wartość i jest napisem, przy szerokości 0 - kToStringDefaultWidth; w przeciwnym razie nullopt.
 ///
 /// Odpowiada na jedno pytanie: czy wartość, która ZOSTAJE NA STOSIE po wykonaniu programu,
 /// jest napisem, i jak szeroka. Do 2026-08-30 pytanie to było zadawane inaczej - przez skan

@@ -13,24 +13,18 @@ namespace rdb {
 /// @brief Abstrakcyjny interfejs operacji wejścia/wyjścia dla magazynów używanych przez storage.
 ///
 /// Obiekt klasy FileInterface powinien:
-/// - udostępniać wspólny kontrakt odczytu, zapisu i raportowania liczby rekordów niezależnie od rodzaju magazynu,
-///   Sprawdzenie kompilacji: test/UnitTest/test_contracts.cpp - static_assert abstrakcyjności i wirtualnego destruktora FileInterface. Test: `RequirementContracts.writable_backends_clear_null_metadata_except_memory`.
-/// - obsługiwać dane binarne o rozmiarze określanym poza tym interfejsem, zwykle przez Descriptor klasy pochodnej,
-///   Test: `GroupFileTest.test_fagrp_multibyte_record_segment_mapping`.
-/// - przyjmować nullBitset jako kanał przekazywania informacji o wartościach null dla pojedynczego rekordu, jeśli dana implementacja takie informacje wspiera,
-///   Test: `RequirementContracts.writable_backends_clear_null_metadata_except_memory`.
-/// - umożliwiać dopisywanie danych przez przekazanie pozycji równej std::numeric_limits<size_t>::max(),
-///   Test: `RequirementContracts.writable_backends_clear_null_metadata_except_memory`.
-/// - interpretować position w odczycie i aktualizacji magazynu losowego dostępu jako przesunięcie w bajtach;
+/// - [fainterface.file-interface.1~1] udostępniać wspólny kontrakt odczytu, zapisu i raportowania liczby rekordów niezależnie od rodzaju magazynu,
+///   Sprawdzenie kompilacji: test/UnitTest/test_contracts.cpp - static_assert abstrakcyjności i wirtualnego destruktora FileInterface.
+/// - [fainterface.file-interface.2~1] obsługiwać dane binarne o rozmiarze określanym poza tym interfejsem, zwykle przez Descriptor klasy pochodnej,
+/// - [fainterface.file-interface.3~1] przyjmować nullBitset jako kanał przekazywania informacji o wartościach null dla pojedynczego rekordu, jeśli dana implementacja takie informacje wspiera,
+/// - [fainterface.file-interface.4~1] umożliwiać dopisywanie danych przez przekazanie pozycji równej std::numeric_limits<size_t>::max(),
+/// - [fainterface.file-interface.5~1] interpretować position w odczycie i aktualizacji magazynu losowego dostępu jako przesunięcie w bajtach;
 ///   w read() źródła sekwencyjnego dopuszczać wyłącznie position == 0,
-///   Test: `GroupFileTest.test_fagrp_multibyte_record_segment_mapping`. Test: `BinaryDeviceROTest.binfile_invalid_position_and_read_error_return_counted_zero_null_rows`. Test: `TextSourceROTest.invalid_position_does_not_consume_input_and_counts_the_null_row`.
-/// - oddzielać w count() wynik typu size_t od błędu przez Result<size_t>; gdy ustalanie rozmiaru pliku
+/// - [fainterface.file-interface.6~1] oddzielać w count() wynik typu size_t od błędu przez Result<size_t>; gdy ustalanie rozmiaru pliku
 ///   kończy się ENOENT, zwracać 0, a pozostałe błędy odczytu rozmiaru zwracać jako Errc::IO,
-///   Test: `PosixFileTest.test_faccposix_count_stat_failure_is_fatal`. Test: `BinaryDeviceROTest.count_starts_at_zero_before_any_read`, `BinaryDeviceROTest.read_exact_record_and_count`.
-/// - raportować przez hasShadow(), czy magazyn utrzymuje plik cienia danych (.shadow) dla operacji update;
+/// - [fainterface.file-interface.7~1] raportować przez hasShadow(), czy magazyn utrzymuje plik cienia danych (.shadow) dla operacji update;
 ///   na tej podstawie storage dobiera wariant indeksu metadanych null (storageShadow zamiast metaData),
 ///   niezależnie od tego, czy magazyn w ogóle posiada indeks metadanych.
-///   Test: `StorageShadowTest.hasShadow_raportowany_przez_accessor`. Test: `AccessorFactoryTest.meta_index_variant_selection`.
 ///
 /// Podstawowe operacje objęte kontraktem polimorficznym:
 /// 1. `read(data, nullBitset, position)` odczytuje rekord z magazynu i wypełnia `nullBitset`, jeśli implementacja wspiera metadane null.

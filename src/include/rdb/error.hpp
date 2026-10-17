@@ -64,8 +64,7 @@ enum class Errc : std::uint8_t {
 };
 
 /// Funkcja errcName powinna:
-/// - zwracać nazwę kategorii do komunikatów i logów: ConfigError, CorruptDescriptor, SyntaxError, CompileError, EvalError, IOError albo LogicError, a dla wartości spoza wyliczenia "Error".
-///   Test: `ResultTest.ErrorNamesRefusalClassesAndHandlerExchange`.
+/// - [error.errc-name.1~1] zwracać nazwę kategorii do komunikatów i logów: ConfigError, CorruptDescriptor, SyntaxError, CompileError, EvalError, IOError albo LogicError, a dla wartości spoza wyliczenia "Error".
 [[nodiscard]] constexpr std::string_view errcName(Errc code) noexcept {
   switch (code) {
     case Errc::Config:
@@ -113,12 +112,9 @@ template <typename T = void>
 using Result = std::expected<T, Error>;
 
 /// Funkcja fail powinna:
-/// - budować błąd do `return` jako std::unexpected<Error> z podaną kategorią, komunikatem i errno (domyślnie 0), także z komunikatu w postaci literału.
-///   Test: `ResultTest.ErrorNamesRefusalClassesAndHandlerExchange`.
-/// - dla Refusal zachowywać komunikat i errno, a kategorię wyznaczać z klasy odmowy: Environment jako IO, Internal jako Logic, pozostałe jako Compile.
-///   Test: `ResultTest.ErrorNamesRefusalClassesAndHandlerExchange`.
-/// - dla istniejącego Error przekazywać go wyżej bez zmian, z innym typem wartości.
-///   Test: `ResultTest.PropagationPreservesErrorAndErrno`.
+/// - [error.fail.1~1] budować błąd do `return` jako std::unexpected<Error> z podaną kategorią, komunikatem i errno (domyślnie 0), także z komunikatu w postaci literału.
+/// - [error.fail.2~1] dla Refusal zachowywać komunikat i errno, a kategorię wyznaczać z klasy odmowy: Environment jako IO, Internal jako Logic, pozostałe jako Compile.
+/// - [error.fail.3~1] dla istniejącego Error przekazywać go wyżej bez zmian, z innym typem wartości.
 ///
 /// @note Warianty z kategoria sa zimne i niewklejane (#511): budowa bledu, takze std::string z literalu, nie
 ///       wnosi kodu do funkcji z goraca sciezka, ktora inaczej przestaje sie miescic w progu inline.
@@ -145,18 +141,14 @@ using Result = std::expected<T, Error>;
 using FatalHandler = void (*)(std::string_view message, const std::source_location &where) noexcept;
 
 /// Funkcja fatal powinna:
-/// - przy złamanym niezmienniku silnika wywoływać zainstalowany handler z komunikatem i miejscem wywołania, a bez handlera - domyślny.
-///   Test: `ResultTest.FatalHandlerReceivesTheExactLocation`, `ResultTest.DefaultFatalHandlerAborts`.
-/// - w domyślnym handlerze, przy nierzucającym loggerze, logować przyczynę na poziomie critical z miejscem wywołania, opróżniać logger, wypisywać "FATAL: <komunikat>" na stderr i kończyć proces przez std::abort().
-///   Test: `ResultTest.DefaultFatalLogsLocationAndWorksWithoutALogger`.
+/// - [error.fatal.1~1] przy złamanym niezmienniku silnika wywoływać zainstalowany handler z komunikatem i miejscem wywołania, a bez handlera - domyślny.
+/// - [error.fatal.2~1] w domyślnym handlerze, przy nierzucającym loggerze, logować przyczynę na poziomie critical z miejscem wywołania, opróżniać logger, wypisywać "FATAL: <komunikat>" na stderr i kończyć proces przez std::abort().
 ///   Ograniczenie weryfikacji: domyslny handler jest noexcept, ale nie przechwytuje wyjatku z logowania; test nie zapewnia diagnostyki przy rzucajacym loggerze.
-/// - nigdy nie wracać i nie odwijać stosu: gdy handler wróci, kończyć proces jak domyślny handler.
-///   Test: `ResultTest.ReturningFatalHandlerStillAborts`, `ResultTest.DefaultFatalHandlerAborts`.
+/// - [error.fatal.3~1] nigdy nie wracać i nie odwijać stosu: gdy handler wróci, kończyć proces jak domyślny handler.
 [[noreturn]] void fatal(std::string_view message, std::source_location where = std::source_location::current()) noexcept;
 
 /// Funkcja setFatalHandler powinna:
-/// - atomowo instalować handler fatal() i zwracać poprzedni, a dla nullptr przywracać handler domyślny.
-///   Test: `ResultTest.ErrorNamesRefusalClassesAndHandlerExchange`.
+/// - [error.set-fatal-handler.1~1] atomowo instalować handler fatal() i zwracać poprzedni, a dla nullptr przywracać handler domyślny.
 ///   Nietestowalne: atomowosc i kolejnosc acq_rel potwierdza przeglad fatalHandlerSlot().exchange w error.cc; test sprawdza wymiane, nie wszystkie przeploty.
 ///
 /// @note Demon instaluje go raz, przed startem watkow (launcher.cpp); host osadzajacy moze zainstalowac

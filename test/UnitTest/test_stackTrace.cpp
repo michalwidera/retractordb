@@ -8,6 +8,10 @@
 
 #include "rdb/stackTrace.hpp"
 
+// covers: stacktrace.current-stack-trace.2~1
 static_assert(noexcept(rdb::currentStackTrace()));
 
-TEST(StackTrace, returns_a_nonempty_trace_of_the_current_thread) { EXPECT_FALSE(rdb::currentStackTrace().empty()); }
+TEST(StackTrace, returns_a_nonempty_trace_of_the_current_thread) {
+  // covers: stacktrace.current-stack-trace.1~1
+  EXPECT_FALSE(rdb::currentStackTrace().empty());
+}

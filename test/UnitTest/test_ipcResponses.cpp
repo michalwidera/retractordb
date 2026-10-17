@@ -82,6 +82,7 @@ extern "C" char *__wrap_getenv(const char *name) {
 }
 
 TEST(IpcResponses, publish_then_take_frees_the_slot) {
+  // covers: ipcresponses.publish.2~1, ipcresponses.try-take.1~1
   auto segment = freshSegment();
   ASSERT_EQ(resp::publish(*segment, self(1), "odpowiedz"), resp::PublishStatus::Published);
   EXPECT_EQ(stateOf(segment->slots[0]), resp::SlotState::Ready);
@@ -96,6 +97,7 @@ TEST(IpcResponses, publish_then_take_frees_the_slot) {
 }
 
 TEST(IpcResponses, foreign_pid_slot_is_left_alone) {
+  // covers: ipcresponses.try-take.1~1
   auto segment = freshSegment();
   const resp::Owner other{.pid = 990001, .startTime = 7, .seq = 1};
   ASSERT_EQ(resp::publish(*segment, other, "cudza"), resp::PublishStatus::Published);
@@ -106,6 +108,7 @@ TEST(IpcResponses, foreign_pid_slot_is_left_alone) {
 
 // Wlasne zadanie, na ktore klient przestal czekac: jego seq jest starsze niz biezace.
 TEST(IpcResponses, own_pid_with_foreign_seq_is_released) {
+  // covers: ipcresponses.try-take.2~1
   auto segment = freshSegment();
   ASSERT_EQ(resp::publish(*segment, self(1), "zalegla"), resp::PublishStatus::Published);
   ASSERT_EQ(resp::publish(*segment, self(2), "biezaca"), resp::PublishStatus::Published);
@@ -117,6 +120,7 @@ TEST(IpcResponses, own_pid_with_foreign_seq_is_released) {
 
 // Poprzedni proces o tym samym PID-ie liczyl seq od tego samego 1. Rozroznia go tylko startTime.
 TEST(IpcResponses, own_pid_with_other_start_time_is_released_not_taken) {
+  // covers: ipcresponses.try-take.2~1
   auto segment            = freshSegment();
   resp::Owner predecessor = self(1);
   predecessor.startTime += 1;
@@ -128,6 +132,7 @@ TEST(IpcResponses, own_pid_with_other_start_time_is_released_not_taken) {
 
 // Slot w trakcie zapisu jest niewidoczny dla klienta, nawet z jego pid i seq.
 TEST(IpcResponses, writing_slot_is_not_taken) {
+  // covers: ipcresponses.try-take.1~1
   auto segment = freshSegment();
   ASSERT_EQ(resp::publish(*segment, self(1), "x"), resp::PublishStatus::Published);
   segment->slots[0].state = static_cast<std::uint32_t>(resp::SlotState::Writing);
@@ -137,6 +142,7 @@ TEST(IpcResponses, writing_slot_is_not_taken) {
 }
 
 TEST(IpcResponses, taken_slot_is_reused) {
+  // covers: ipcresponses.publish.2~1
   auto segment = freshSegment();
   fillWith(*segment, self(1));
   ASSERT_EQ(resp::tryTake(*segment, self(5)), "x");
@@ -146,6 +152,7 @@ TEST(IpcResponses, taken_slot_is_reused) {
 
 // Odpowiedz, po ktora martwy klient juz nie przyjdzie.
 TEST(IpcResponses, ready_slot_of_dead_client_is_reclaimed_when_full) {
+  // covers: ipcresponses.publish.3~1
   auto segment = freshSegment();
   fillWith(*segment, deadOwner());
 
@@ -155,6 +162,7 @@ TEST(IpcResponses, ready_slot_of_dead_client_is_reclaimed_when_full) {
 
 // Odbior przerwany smiercia klienta - stan, ktory zostawia kill -9 w trakcie kopiowania.
 TEST(IpcResponses, reading_slot_of_dead_client_is_reclaimed_when_full) {
+  // covers: ipcresponses.publish.3~1
   auto segment = freshSegment();
   fillWith(*segment, deadOwner());
   for (auto &slot : segment->slots)
@@ -166,6 +174,7 @@ TEST(IpcResponses, reading_slot_of_dead_client_is_reclaimed_when_full) {
 
 // Odzysk dopiero przy braku wolnego: zalegla odpowiedz martwego zostaje, dopoki jest miejsce.
 TEST(IpcResponses, free_slot_is_preferred_over_reclaim) {
+  // covers: ipcresponses.publish.2~1
   auto segment = freshSegment();
   ASSERT_EQ(resp::publish(*segment, deadOwner(), "martwego"), resp::PublishStatus::Published);
   EXPECT_EQ(resp::publish(*segment, self(1), "nowa"), resp::PublishStatus::Published);
@@ -174,6 +183,7 @@ TEST(IpcResponses, free_slot_is_preferred_over_reclaim) {
 
 // Zywego wlasciciela nie wolno wywlaszczyc - jego odbior moze wlasnie trwac.
 TEST(IpcResponses, live_owners_are_never_reclaimed) {
+  // covers: ipcresponses.publish.3~1, ipcresponses.publish.4~1
   const LogCapture log;
   auto segment = freshSegment();
   fillWith(*segment, self(1));
@@ -187,6 +197,7 @@ TEST(IpcResponses, live_owners_are_never_reclaimed) {
 }
 
 TEST(IpcResponses, response_larger_than_slot_is_replaced_with_error) {
+  // covers: ipcresponses.publish.1~1
   const LogCapture log;
   auto segment = freshSegment();
   const std::string huge(ipc::kResponseSlotDataSize + 1, 'a');
@@ -202,6 +213,7 @@ TEST(IpcResponses, response_larger_than_slot_is_replaced_with_error) {
 }
 
 TEST(IpcResponses, live_readers_are_not_reclaimed_or_modified) {
+  // covers: ipcresponses.publish.3~1
   auto segment = freshSegment();
   fillWith(*segment, self(1));
   for (auto &slot : segment->slots)
@@ -215,6 +227,7 @@ TEST(IpcResponses, live_readers_are_not_reclaimed_or_modified) {
 }
 
 TEST(IpcResponses, failed_release_discards_the_copy_and_keeps_scanning) {
+  // covers: ipcresponses.try-take.4~1
   auto segment = freshSegment();
   ASSERT_EQ(resp::publish(*segment, self(1), "untrusted"), resp::PublishStatus::Published);
   ASSERT_EQ(resp::publish(*segment, self(1), "trusted"), resp::PublishStatus::Published);
@@ -227,6 +240,7 @@ TEST(IpcResponses, failed_release_discards_the_copy_and_keeps_scanning) {
 }
 
 TEST(IpcResponses, take_returns_a_ready_answer_without_waiting_for_the_deadline) {
+  // covers: ipcresponses.take.1~1
   auto segment = freshSegment();
   ASSERT_EQ(resp::publish(*segment, self(9), "ready"), resp::PublishStatus::Published);
   EXPECT_EQ(
@@ -236,6 +250,7 @@ TEST(IpcResponses, take_returns_a_ready_answer_without_waiting_for_the_deadline)
 }
 
 TEST(IpcResponses, mapping_checks_size_and_every_header_field_without_reinitializing_slots) {
+  // covers: ipcresponses.initialize.2~1, ipcresponses.mapping.1~1, ipcresponses.mapping.3~1, ipcresponses.mapping.4~1
   const std::string name = "ut_ipcResponses_layout_" + std::to_string(getpid());
   IPC::shared_memory_object::remove(name.c_str());
   {
@@ -273,6 +288,7 @@ TEST(IpcResponses, mapping_checks_size_and_every_header_field_without_reinitiali
 }
 
 TEST(IpcResponses, response_of_exactly_slot_size_fits) {
+  // covers: ipcresponses.publish.1~1
   auto segment = freshSegment();
   const std::string exact(ipc::kResponseSlotDataSize, 'b');
   ASSERT_EQ(resp::publish(*segment, self(1), exact), resp::PublishStatus::Published);
@@ -280,6 +296,7 @@ TEST(IpcResponses, response_of_exactly_slot_size_fits) {
 }
 
 TEST(IpcResponses, take_gives_up_at_deadline) {
+  // covers: ipcresponses.take.1~1
   auto segment       = freshSegment();
   const auto start   = std::chrono::steady_clock::now();
   const auto result  = resp::take(*segment, self(1), start + std::chrono::milliseconds(50), std::chrono::milliseconds(5));
@@ -290,6 +307,7 @@ TEST(IpcResponses, take_gives_up_at_deadline) {
 }
 
 TEST(IpcResponses, header_identifies_layout) {
+  // covers: ipcresponses.initialize.1~1, ipcresponses.initialize.2~1, ipcresponses.compatible.1~1
   const auto zeroed = std::make_unique<resp::Segment>();  // pol megabajta - nie na stosie
   EXPECT_FALSE(resp::compatible(*zeroed)) << "segment bez naglowka uznany za zgodny";
   resp::initialize(*zeroed);
@@ -310,6 +328,7 @@ TEST(IpcResponses, header_identifies_layout) {
 }
 
 TEST(IpcResponses, mapping_refuses_missing_and_existing_names_without_replacing_the_owner) {
+  // covers: ipcresponses.mapping.1~1, ipcresponses.mapping.3~1, ipcresponses.mapping.6~1
   const std::string name = "ut_ipcResponses_contract_" + std::to_string(getpid());
   IPC::shared_memory_object::remove(name.c_str());
   EXPECT_THROW(resp::Mapping(IPC::open_only, name), IPC::interprocess_exception);
@@ -329,6 +348,7 @@ TEST(IpcResponses, mapping_refuses_missing_and_existing_names_without_replacing_
 
 // Odwzorowanie w pamieci dzielonej: serwer tworzy, klient otwiera i widzi to samo.
 TEST(IpcResponses, mapping_create_and_open_share_the_segment) {
+  // covers: ipcresponses.mapping.2~1, ipcresponses.mapping.5~1
   const std::string name = "ut_ipcResponses_" + std::to_string(getpid());
   IPC::shared_memory_object::remove(name.c_str());
   {

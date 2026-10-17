@@ -7,6 +7,7 @@ set(TestID "it_${TestID}")
 # komend. Klient jest zatrzymywany w stanie READING hakiem
 # RDB_FAULT_CLIENT_READ_DELAY, wiec test jest deterministyczny.
 
+# covers: ipcresponses.publish.3~1
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

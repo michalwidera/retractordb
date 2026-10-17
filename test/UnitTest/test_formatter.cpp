@@ -30,23 +30,27 @@ TEST(Formatter, isAllNull_empty_nullmap) { EXPECT_FALSE(Formatter::isAllNull("",
 // ---- displayedValue ----
 
 TEST(Formatter, displayedValue_non_null) {
+  // covers: formatters.formatter.2~1
   ptree row;
   row.put("0", "42");
   EXPECT_EQ(Formatter::displayedValue(row, 0, "0", formatMode::RAW), "42");
 }
 
 TEST(Formatter, displayedValue_null_raw) {
+  // covers: formatters.formatter.2~1
   ptree row;
   for (const auto mode : {formatMode::RAW, formatMode::GRAPHITE, formatMode::INFLUXDB})
     EXPECT_EQ(Formatter::displayedValue(row, 0, "1", mode), "null");
 }
 
 TEST(Formatter, displayedValue_null_gnuplot) {
+  // covers: formatters.formatter.2~1
   ptree row;
   EXPECT_EQ(Formatter::displayedValue(row, 0, "1", formatMode::GNUPLOT), "NaN");
 }
 
 TEST(Formatter, displayedValue_missing_key_returns_empty) {
+  // covers: formatters.formatter.2~1
   ptree row;
   EXPECT_EQ(Formatter::displayedValue(row, 0, "0", formatMode::RAW), "");
 }
@@ -54,6 +58,7 @@ TEST(Formatter, displayedValue_missing_key_returns_empty) {
 // ---- renderRaw ----
 
 TEST(Formatter, renderRaw_outputs_values) {
+  // covers: formatters.formatter.3~1
   ptree row;
   row.put("0", "hello");
   row.put("1", "world");
@@ -66,6 +71,7 @@ TEST(Formatter, renderRaw_outputs_values) {
 }
 
 TEST(Formatter, null_marker_and_gnuplot_axis_contracts) {
+  // covers: formatters.formatter.1~1, formatters.formatter.4~1
   EXPECT_FALSE(Formatter::isNullAt("x", 0));
   EXPECT_FALSE(Formatter::isAllNull("1", -1));
   for (const bool reversed : {false, true}) {
@@ -79,6 +85,7 @@ TEST(Formatter, null_marker_and_gnuplot_axis_contracts) {
 }
 
 TEST(Formatter, renderRaw_skip_all_null_produces_no_output) {
+  // covers: formatters.formatter.3~1
   ptree row;
   testing::internal::CaptureStdout();
   Formatter::renderRaw(row, 2, "11", true);
@@ -94,6 +101,7 @@ TEST(Formatter, renderRaw_no_skip_when_partial_null) {
 }
 
 TEST(Formatter, renderRaw_skipNull_false_outputs_all_null_row) {
+  // covers: formatters.formatter.3~1
   ptree row;
   testing::internal::CaptureStdout();
   Formatter::renderRaw(row, 2, "11", false);
@@ -135,6 +143,7 @@ TEST(Formatter, renderGnuplot_respects_window_size) {
 }
 
 TEST(Formatter, renderGnuplot_null_value_becomes_NaN) {
+  // covers: formatters.formatter.5~1
   ptree schema;
   schema.put("db.field.x", "x");
   ptree row;
@@ -148,6 +157,7 @@ TEST(Formatter, renderGnuplot_null_value_becomes_NaN) {
 }
 
 TEST(Formatter, renderGnuplot_expands_arrays_and_fallbacks_with_newest_first) {
+  // covers: formatters.formatter.5~1
   Formatter formatter;
   ptree schema;
   schema.put("db.field.vec_values", "vec_values");
@@ -188,6 +198,7 @@ std::string feedOhlc(Formatter &fmt, const std::vector<std::vector<std::string>>
 // Wiersz: open, high, low, close, probki w kolejnosci naplywu. Najnowsza probka stoi w x = 0,
 // a swieca nad srodkiem swoich probek - dane swiecy ida w porzadku gnuplota: x open low high close.
 TEST(Formatter, renderGnuplotOhlc_places_candle_over_its_samples) {
+  // covers: formatters.formatter.6~1
   Formatter fmt;
   auto out = feedOhlc(fmt, {{"10", "40", "5", "30", "10", "40", "5", "30"}}, "", 20);
 
@@ -197,6 +208,7 @@ TEST(Formatter, renderGnuplotOhlc_places_candle_over_its_samples) {
 
 // Okno -p liczy probki: 8 probek to dwie swiece po 4, wiec pierwszy wiersz wypada.
 TEST(Formatter, renderGnuplotOhlc_window_counts_samples) {
+  // covers: formatters.formatter.6~1
   Formatter fmt;
   auto out             = feedOhlc(fmt,
                                   {{"1", "1", "1", "1", "1", "1", "1", "1"},
@@ -213,6 +225,7 @@ TEST(Formatter, renderGnuplotOhlc_window_counts_samples) {
 
 // Swieca z NULL-em znika w calosci, jej probki zostaja.
 TEST(Formatter, renderGnuplotOhlc_null_candle_is_skipped) {
+  // covers: formatters.formatter.6~1
   Formatter fmt;
   auto out = feedOhlc(fmt, {{"", "40", "5", "30", "7"}}, "10000", 5);
 
@@ -231,6 +244,7 @@ TEST(Formatter, renderGnuplotOhlc_all_null_waits_for_valid_points) {
 }
 
 TEST(Formatter, renderGnuplotOhlc_null_samples_draws_only_candle) {
+  // covers: formatters.formatter.6~1
   Formatter fmt;
   auto out = feedOhlc(fmt, {{"10", "40", "5", "30", ""}}, "00001", 5);
 
@@ -239,6 +253,7 @@ TEST(Formatter, renderGnuplotOhlc_null_samples_draws_only_candle) {
 }
 
 TEST(Formatter, renderGnuplotOhlc_row_without_samples_plots_nothing) {
+  // covers: formatters.formatter.6~1
   Formatter fmt;
   testing::internal::CaptureStderr();
   auto out = feedOhlc(fmt, {{"10", "40", "5", "30"}}, "", 5);
@@ -253,6 +268,7 @@ TEST(Formatter, renderGnuplotOhlc_row_without_samples_plots_nothing) {
 // ---- renderGraphite ----
 
 TEST(Formatter, renderGraphite_format) {
+  // covers: formatters.formatter.7~1
   ptree row;
   row.put("0", "99");
   ptree schema;
@@ -267,6 +283,7 @@ TEST(Formatter, renderGraphite_format) {
 }
 
 TEST(Formatter, renderGraphite_skips_null_fields) {
+  // covers: formatters.formatter.7~1
   ptree row;
   ptree schema;
   schema.put("db.field.x", "x");
@@ -294,6 +311,7 @@ TEST(Formatter, renderGraphite_multiple_fields_partial_null) {
 // ---- renderInfluxDB ----
 
 TEST(Formatter, renderInfluxDB_format) {
+  // covers: formatters.formatter.8~1
   ptree row;
   row.put("0", "3.14");
   ptree schema;
@@ -308,6 +326,7 @@ TEST(Formatter, renderInfluxDB_format) {
 }
 
 TEST(Formatter, renderInfluxDB_all_null_produces_no_output) {
+  // covers: formatters.formatter.8~1
   ptree row;
   ptree schema;
   schema.put("db.field.x", "x");
@@ -333,6 +352,7 @@ TEST(Formatter, renderInfluxDB_multiple_fields_comma_separated) {
 }
 
 TEST(Formatter, monitoring_formats_expand_arrays_keep_empty_values_and_ignore_surplus) {
+  // covers: formatters.formatter.7~1, formatters.formatter.8~1
   ptree schema, row;
   schema.put("db.field.vec", "vec");
   schema.put("db.field_count.vec", 2);

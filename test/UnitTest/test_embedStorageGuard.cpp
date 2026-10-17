@@ -17,6 +17,7 @@
 #include "rdbResult.hpp"
 #include "syscallWrap.hpp"
 
+// covers: storageguard.remove-temporary-storage.2~1
 static_assert(noexcept(rdb::embed::removeTemporaryStorage(std::declval<const std::string &>())));
 
 namespace {
@@ -110,6 +111,8 @@ extern "C" int __wrap_lstat(const char *path, struct stat *info) {
 }
 
 TEST_F(embedStorageGuardBoundary, cloexec_alias_busy_and_destruction_release) {
+  // covers: storageguard.storage-guard.2~1, storageguard.storage-guard.3~1, storageguard.storage-guard.8~1
+  // covers: storageguard.storage-guard.11~1
   observeDirectory = true;
   auto owner       = rdbtest::ok(rdb::embed::StorageGuard::create(directory.string(), true));
   EXPECT_NE(observedFlags & FD_CLOEXEC, 0);
@@ -134,6 +137,7 @@ TEST_F(embedStorageGuardBoundary, cloexec_alias_busy_and_destruction_release) {
 }
 
 TEST_F(embedStorageGuardBoundary, metadata_and_lock_failures_close_the_candidate_fd) {
+  // covers: storageguard.storage-guard.4~1, storageguard.storage-guard.10~1, storageguard.storage-guard.11~1
   observeDirectory = true;
   for (const auto fault : {GuardFault::device, GuardFault::inode, GuardFault::stat, GuardFault::flock}) {
     guardFault         = fault;
@@ -155,6 +159,7 @@ TEST_F(embedStorageGuardBoundary, metadata_and_lock_failures_close_the_candidate
 }
 
 TEST_F(embedStorageGuardBoundary, foreign_owner_nonregular_and_trailing_marker_are_refused) {
+  // covers: storageguard.storage-guard.7~1
   const auto marker          = directory / ".retractordb-embedded";
   const std::string contents = "retractordb embedded storage v1\n";
   std::ofstream(marker) << contents;
@@ -177,6 +182,7 @@ TEST_F(embedStorageGuardBoundary, foreign_owner_nonregular_and_trailing_marker_a
 }
 
 TEST_F(embedStorageGuardBoundary, filesystem_failures_keep_path_and_errno) {
+  // covers: storageguard.storage-guard.9~1, storageguard.storage-guard.10~1
   const auto missing = directory / "missing";
   const auto refused = rdb::embed::StorageGuard::create(missing.string(), true);
   ASSERT_RDB_ERROR(refused, rdb::Errc::IO, missing.string());
@@ -196,6 +202,8 @@ TEST_F(embedStorageGuardBoundary, filesystem_failures_keep_path_and_errno) {
 }
 
 TEST_F(embedStorageGuardBoundary, offline_busy_and_uncertainty_checks_do_not_modify_locks) {
+  // covers: storageguard.check-offline.1~1, storageguard.check-offline.2~1, storageguard.check-offline.3~1
+  // covers: storageguard.check-offline.4~1
   const auto lock = directory / "xretractor_service.boundary.lock";
   std::ofstream(lock) << "PID: sentinel\n";
   const int fd = open(lock.c_str(), O_RDONLY | O_CLOEXEC);
@@ -232,6 +240,9 @@ TEST_F(embedStorageGuardBoundary, offline_busy_and_uncertainty_checks_do_not_mod
 }
 
 TEST_F(embedStorageGuardBoundary, current_directory_and_temporary_cleanup) {
+  // covers: engine.engine.4~1, storageguard.storage-guard.1~1, storageguard.storage-guard.6~1
+  // covers: storageguard.temporary-storage-directory.1~1, storageguard.remove-temporary-storage.1~1
+  // covers: storageguard.remove-temporary-storage.2~1
   const auto previous = fs::current_path();
   fs::current_path(directory);
   const auto unclaimed = rdb::embed::StorageGuard::create("", false);
@@ -259,6 +270,7 @@ TEST_F(embedStorageGuardBoundary, current_directory_and_temporary_cleanup) {
 }
 
 TEST_F(embedStorageGuardBoundary, invalid_tmpdir_preserves_errno) {
+  // covers: storageguard.temporary-storage-directory.2~1
   const std::optional<std::string> previous = getenv("TMPDIR") ? std::optional<std::string>{getenv("TMPDIR")} : std::nullopt;
   const auto missing                        = (directory / "missing").string();
   ASSERT_EQ(setenv("TMPDIR", missing.c_str(), 1), 0);
@@ -272,6 +284,7 @@ TEST_F(embedStorageGuardBoundary, invalid_tmpdir_preserves_errno) {
 }
 
 TEST_F(embedStorageGuardBoundary, mkdtemp_failure_preserves_errno_without_creating_a_directory) {
+  // covers: storageguard.temporary-storage-directory.2~1
   failTemporaryCreate = true;
   const auto refused  = rdb::embed::temporaryStorageDirectory();
   ASSERT_RDB_ERROR(refused, rdb::Errc::IO, "retractordb-engine-XXXXXX");
@@ -280,6 +293,8 @@ TEST_F(embedStorageGuardBoundary, mkdtemp_failure_preserves_errno_without_creati
 }
 
 TEST_F(embedStorageGuardBoundary, offline_policy_resolves_configuration_and_rejects_relative_arguments) {
+  // covers: storageguard.offline-policy.1~1, storageguard.offline-policy.2~1, storageguard.offline-policy.3~1
+  // covers: storageguard.offline-policy.4~1
   EXPECT_RDB_ERROR(rdb::embed::offlinePolicy("relative", ""), rdb::Errc::Config, "absolute");
   const auto defaults = rdbtest::ok(rdb::embed::offlinePolicy("", ""));
   EXPECT_TRUE(defaults.lockDir.empty());

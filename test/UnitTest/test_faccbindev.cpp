@@ -143,6 +143,8 @@ class BinaryDeviceROTest : public ::testing::Test {
 static rdb::Descriptor fixedIntDescriptor() { return rdb::Descriptor{{"a", static_cast<int>(sizeof(int)), 1, rdb::INTEGER}}; }
 
 TEST_F(BinaryDeviceROTest, read_exact_record_and_count) {
+  // covers: faccbindev.binary-device-ro.1~1, faccbindev.binary-device-ro.6~1, faccbindev.binary-device-ro.11~1
+  // covers: fainterface.file-interface.6~1
   auto path = sandboxPath("device.bin");
   writeBinaryFile(path, {0x11, 0x22, 0x33, 0x44});
 
@@ -163,6 +165,7 @@ TEST_F(BinaryDeviceROTest, read_exact_record_and_count) {
 }
 
 TEST_F(BinaryDeviceROTest, count_starts_at_zero_before_any_read) {
+  // covers: faccbindev.binary-device-ro.11~1, fainterface.file-interface.6~1
   auto path = sandboxPath("position.bin");
   writeBinaryFile(path, {0xAA, 0xBB, 0xCC, 0xDD});
 
@@ -176,6 +179,7 @@ TEST_F(BinaryDeviceROTest, count_starts_at_zero_before_any_read) {
 }
 
 TEST_F(BinaryDeviceROTest, read_loops_to_beginning_on_eof_when_enabled) {
+  // covers: accessorfactory.make-accessor.3~1, faccbindev.binary-device-ro.8~1
   auto path = sandboxPath("loop.bin");
   writeBinaryFile(path, {0x01, 0x02, 0x03, 0x04});
 
@@ -193,6 +197,7 @@ TEST_F(BinaryDeviceROTest, read_loops_to_beginning_on_eof_when_enabled) {
 }
 
 TEST_F(BinaryDeviceROTest, read_zero_fills_on_eof_when_loop_disabled) {
+  // covers: faccbindev.binary-device-ro.7~1, faccbindev.binary-device-ro.9~1, faccbindev.binary-device-ro.10~1
   auto path = sandboxPath("noloop.bin");
   writeBinaryFile(path, {0x10, 0x20, 0x30, 0x40});
 
@@ -240,6 +245,7 @@ TEST_F(BinaryDeviceROTest, read_fails_on_empty_file_when_loop_enabled) {
 }
 
 TEST_F(BinaryDeviceROTest, read_fails_on_missing_file_with_null_metadata) {
+  // covers: faccbindev.binary-device-ro.7~1
   auto desc = fixedIntDescriptor();
   rdb::binaryDeviceRO dev(sandboxPath("missing.bin"), desc, true, "BINFILE");
   uint8_t out[4] = {0xFF, 0xFF, 0xFF, 0xFF};
@@ -257,6 +263,7 @@ TEST_F(BinaryDeviceROTest, read_fails_on_missing_file_with_null_metadata) {
 }
 
 TEST_F(BinaryDeviceROTest, name_and_write_contract) {
+  // covers: faccbindev.binary-device-ro.4~1
   auto path = sandboxPath("name.bin");
   writeBinaryFile(path, {0xAA, 0xBB, 0xCC, 0xDD});
 
@@ -272,6 +279,7 @@ TEST_F(BinaryDeviceROTest, name_and_write_contract) {
 // Od #347 DEVICE nie czeka w read(): bajty zebrane w jednym slocie czekaja w prywatnym buforze,
 // a rekord dokonczony pozniej trafia do pierwszego kolejnego slotu.
 TEST_F(BinaryDeviceROTest, device_keeps_a_short_read_until_the_record_completes) {
+  // covers: faccbindev.binary-device-ro.13~1
   auto path = sandboxPath("short-read.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
   const int writer = ::open(path.c_str(), O_RDWR | O_CLOEXEC);
@@ -291,6 +299,7 @@ TEST_F(BinaryDeviceROTest, device_keeps_a_short_read_until_the_record_completes)
 // FIFO bez pisarza nie wiesza otwarcia (O_NONBLOCK) ani odczytu. EOF przed pierwszymi danymi to
 // pisarz, ktory sie jeszcze nie podlaczyl - takze z ONESHOT nie jest wyczerpaniem.
 TEST_F(BinaryDeviceROTest, device_opens_a_fifo_without_a_writer_without_blocking) {
+  // covers: faccbindev.binary-device-ro.13~1
   auto path = sandboxPath("nowriter.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
   auto desc = fixedIntDescriptor();
@@ -317,6 +326,7 @@ TEST_F(BinaryDeviceROTest, device_opens_a_fifo_without_a_writer_without_blocking
 // Bez ONESHOT EOF znaczy "teraz nie ma pisarza": all-null, zrodlo zostaje otwarte, a nowy pisarz
 // wznawia dane. Z ONESHOT pierwszy EOF po danych to wyczerpanie i dalsze dane juz nie wracaja.
 TEST_F(BinaryDeviceROTest, device_eof_means_no_writer_and_with_oneshot_exhaustion_after_data) {
+  // covers: faccbindev.binary-device-ro.10~1
   auto path = sandboxPath("eof.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
   auto desc = fixedIntDescriptor();
@@ -365,6 +375,7 @@ TEST_F(BinaryDeviceROTest, device_drops_an_incomplete_record_at_eof) {
 // read() pod blokada modelu nie ponawia proby, ktora faza DEVICE juz wykonala w tym slocie: dane,
 // ktore przyszly po terminie, naleza do nastepnego slotu.
 TEST_F(BinaryDeviceROTest, device_read_does_not_retry_after_the_device_phase) {
+  // covers: faccbindev.binary-device-ro.13~1, sourcebuffer.source-buffer.2~1
   auto path = sandboxPath("late.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
   const int writer = ::open(path.c_str(), O_RDWR | O_CLOEXEC);
@@ -383,6 +394,7 @@ TEST_F(BinaryDeviceROTest, device_read_does_not_retry_after_the_device_phase) {
 // bez pisarza wisi w samym wywolaniu. Konstrukcja idzie w osobnym watku z limitem czasu - gdyby
 // akcesor otworzyl FIFO, test zakonczylby proces zamiast wisiec do limitu ctest.
 TEST_F(BinaryDeviceROTest, binfile_refuses_a_fifo_without_blocking) {
+  // covers: faccbindev.binary-device-ro.12~1
   auto path = sandboxPath("feed.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
   auto desc = fixedIntDescriptor();
@@ -402,6 +414,7 @@ TEST_F(BinaryDeviceROTest, binfile_refuses_a_fifo_without_blocking) {
 }
 
 TEST_F(BinaryDeviceROTest, binfile_refuses_a_character_device_and_device_a_regular_file) {
+  // covers: faccbindev.binary-device-ro.12~1
   auto desc = fixedIntDescriptor();
   rdb::binaryDeviceRO null(std::string("/dev/null"), desc, true, "BINFILE");
   EXPECT_EQ(null.initializationError(), "BINFILE '/dev/null' is a character device, not a regular file");
@@ -422,6 +435,7 @@ TEST_F(BinaryDeviceROTest, binfile_refuses_a_character_device_and_device_a_regul
 
 // TIMEOUT 0: jedna proba nieblokujaca, bez czekania.
 TEST_F(BinaryDeviceROTest, await_with_zero_timeout_does_not_wait) {
+  // covers: faccbindev.await-records.1~1
   auto path = sandboxPath("empty.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
   const int writer = ::open(path.c_str(), O_RDWR | O_CLOEXEC);
@@ -436,6 +450,7 @@ TEST_F(BinaryDeviceROTest, await_with_zero_timeout_does_not_wait) {
 // Pisarz spozniony w granicach terminu: rekord trafia do tego slotu, a faza konczy sie razem z nim,
 // nie z terminem.
 TEST_F(BinaryDeviceROTest, await_returns_when_a_late_writer_completes_the_record) {
+  // covers: faccbindev.await-records.1~1, faccbindev.await-records.4~1
   auto path = sandboxPath("late-writer.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
   const int writer = ::open(path.c_str(), O_RDWR | O_CLOEXEC);
@@ -456,6 +471,7 @@ TEST_F(BinaryDeviceROTest, await_returns_when_a_late_writer_completes_the_record
 
 // Niepelny rekord po terminie: all-null w tym slocie, rekord dokonczony trafia do nastepnego.
 TEST_F(BinaryDeviceROTest, await_partial_record_hits_the_deadline_and_completes_later) {
+  // covers: faccbindev.binary-device-ro.13~1
   auto path = sandboxPath("partial.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
   const int writer = ::open(path.c_str(), O_RDWR | O_CLOEXEC);
@@ -476,6 +492,7 @@ TEST_F(BinaryDeviceROTest, await_partial_record_hits_the_deadline_and_completes_
 
 // Dwa DEVICE w jednym slocie czekaja rownolegle: laczny czas to maksimum terminow, nie suma.
 TEST_F(BinaryDeviceROTest, await_of_two_sources_takes_the_longer_deadline_not_the_sum) {
+  // covers: faccbindev.await-records.2~1
   auto first  = sandboxPath("first.fifo");
   auto second = sandboxPath("second.fifo");
   ASSERT_EQ(::mkfifo(first.c_str(), 0600), 0);
@@ -495,6 +512,7 @@ TEST_F(BinaryDeviceROTest, await_of_two_sources_takes_the_longer_deadline_not_th
 
 // EOF konczy czekanie zrodla od razu: FIFO bez pisarza nie trzyma slotu do terminu.
 TEST_F(BinaryDeviceROTest, await_ends_on_eof_without_waiting_for_the_deadline) {
+  // covers: faccbindev.await-records.4~1
   auto path = sandboxPath("eof-wait.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
   auto desc = fixedIntDescriptor();
@@ -518,6 +536,7 @@ void countSignal(int /*signal*/) { signalsDelivered.fetch_add(1, std::memory_ord
 // Odnowienie lapie gorna granica 700 ms; kontrola liczby sygnalow sprawdza tylko, ze przerwanie zaszlo
 // wiecej niz raz. Nie zalezy od ziarna budzika: na macOS 5 ms wychodzi pod obciazeniem ok. 37 ms (#408).
 TEST_F(BinaryDeviceROTest, await_deadline_survives_eintr) {
+  // covers: faccbindev.await-records.3~1
   auto path = sandboxPath("eintr.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
   const int writer = ::open(path.c_str(), O_RDWR | O_CLOEXEC);
@@ -556,6 +575,7 @@ TEST_F(BinaryDeviceROTest, await_deadline_survives_eintr) {
 // Jak wyzej: odnowienie lapie granica 700 ms, kontrola kropel nie zalezy od ziarna budzika (na macOS
 // 20 ms wychodzi ok. 100 ms, #408).
 TEST_F(BinaryDeviceROTest, await_deadline_survives_eagain) {
+  // covers: faccbindev.await-records.3~1
   auto path = sandboxPath("drip.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
   const int writer = ::open(path.c_str(), O_RDWR | O_CLOEXEC);
@@ -585,6 +605,7 @@ TEST_F(BinaryDeviceROTest, await_deadline_survives_eagain) {
 // w destruktorze i tylko w Debug.
 #ifndef NDEBUG
 TEST_F(BinaryDeviceROTest, device_destroyed_during_the_device_phase_is_fatal) {
+  // covers: faccbindev.await-records.5~1
   auto desc = fixedIntDescriptor();
   EXPECT_DEATH(
       {
@@ -602,6 +623,7 @@ TEST_F(BinaryDeviceROTest, device_destroyed_during_the_device_phase_is_fatal) {
 #endif
 
 TEST_F(BinaryDeviceROTest, binfile_retries_eintr_and_short_reads_without_interpreting_bytes) {
+  // covers: faccbindev.binary-device-ro.2~1, faccbindev.binary-device-ro.3~1, faccbindev.binary-device-ro.6~1
   const auto path = sandboxPath("short.bin");
   writeBinaryFile(path, {0xFF, 0, 0x7F, 0x80});
   const rdb::Descriptor descriptor{{"opaque", 3, 1, rdb::STRING}, {"flag", 1, 1, rdb::BYTE}};
@@ -618,6 +640,8 @@ TEST_F(BinaryDeviceROTest, binfile_retries_eintr_and_short_reads_without_interpr
 }
 
 TEST_F(BinaryDeviceROTest, binfile_invalid_position_and_read_error_return_counted_zero_null_rows) {
+  // covers: faccbindev.binary-device-ro.5~1, faccbindev.binary-device-ro.7~1, faccbindev.binary-device-ro.11~1
+  // covers: fainterface.file-interface.5~1
   const auto path = sandboxPath("error.bin");
   writeBinaryFile(path, {1, 2, 3, 4});
   auto descriptor = fixedIntDescriptor();
@@ -641,6 +665,7 @@ TEST_F(BinaryDeviceROTest, binfile_invalid_position_and_read_error_return_counte
 }
 
 TEST_F(BinaryDeviceROTest, poll_failure_ends_all_waits_and_clears_every_awaited_mark) {
+  // covers: faccbindev.await-records.4~1, faccbindev.await-records.5~1
   const auto first  = sandboxPath("poll-first.fifo");
   const auto second = sandboxPath("poll-second.fifo");
   ASSERT_EQ(::mkfifo(first.c_str(), 0600), 0);
@@ -669,6 +694,7 @@ TEST_F(BinaryDeviceROTest, poll_failure_ends_all_waits_and_clears_every_awaited_
 }
 
 TEST_F(BinaryDeviceROTest, device_read_error_does_not_exhaust_and_next_slot_recovers) {
+  // covers: faccbindev.await-records.4~1
   const auto path = sandboxPath("read-error.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
   auto descriptor = fixedIntDescriptor();
@@ -689,6 +715,7 @@ TEST_F(BinaryDeviceROTest, device_read_error_does_not_exhaust_and_next_slot_reco
 }
 
 TEST_F(BinaryDeviceROTest, device_fill_retries_eintr_and_short_reads) {
+  // covers: faccbindev.binary-device-ro.3~1
   const auto path = sandboxPath("interrupted.fifo");
   ASSERT_EQ(::mkfifo(path.c_str(), 0600), 0);
   auto descriptor = fixedIntDescriptor();

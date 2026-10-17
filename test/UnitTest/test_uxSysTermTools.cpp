@@ -19,6 +19,7 @@
 // --- fixArgcv tests ---
 
 TEST(FixArgcv, strips_trailing_cr_from_arguments) {
+  // covers: uxsystermtools.fix-argcv.1~1
   std::string arg0           = "program\r";
   std::string arg1           = "hello\r";
   std::array<char *, 2> argv = {arg0.data(), arg1.data()};
@@ -30,6 +31,7 @@ TEST(FixArgcv, strips_trailing_cr_from_arguments) {
 }
 
 TEST(FixArgcv, does_not_modify_arguments_without_trailing_cr) {
+  // covers: uxsystermtools.fix-argcv.1~1
   std::string arg0           = "program";
   std::string arg1           = "--flag";
   std::array<char *, 2> argv = {arg0.data(), arg1.data()};
@@ -41,6 +43,7 @@ TEST(FixArgcv, does_not_modify_arguments_without_trailing_cr) {
 }
 
 TEST(FixArgcv, handles_empty_string_argument) {
+  // covers: uxsystermtools.fix-argcv.1~1
   std::string arg0;
   std::array<char *, 1> argv = {arg0.data()};
 
@@ -61,6 +64,7 @@ TEST(FixArgcv, handles_null_argv) {
 }
 
 TEST(FixArgcv, only_strips_last_character_if_cr) {
+  // covers: uxsystermtools.fix-argcv.1~1
   std::string arg0           = "a\rb\r";
   std::array<char *, 1> argv = {arg0.data()};
 
@@ -71,7 +75,10 @@ TEST(FixArgcv, only_strips_last_character_if_cr) {
 
 // --- _kbhit tests ---
 
-TEST(KbHit, returns_zero_when_ignore_any_key) { EXPECT_EQ(_kbhit(true), 0); }
+TEST(KbHit, returns_zero_when_ignore_any_key) {
+  // covers: uxsystermtools.kbhit.2~1
+  EXPECT_EQ(_kbhit(true), 0);
+}
 
 // Regresja defektu wykrytego w kampanii K6b (issue_215).
 //
@@ -116,6 +123,7 @@ TEST_F(KbHitRedirectedStdin, non_tty_with_pending_bytes_is_not_a_keypress) {
 }
 
 TEST_F(KbHitRedirectedStdin, non_tty_does_not_consume_stdin) {
+  // covers: uxsystermtools.kbhit.2~1
   redirectStdinFrom("pierwsza linia\ndruga linia\n");
   ASSERT_EQ(::isatty(STDIN_FILENO), 0);
 
@@ -131,12 +139,14 @@ TEST_F(KbHitRedirectedStdin, non_tty_does_not_consume_stdin) {
 }
 
 TEST_F(KbHitRedirectedStdin, non_tty_at_eof_is_not_a_keypress) {
+  // covers: uxsystermtools.kbhit.2~1
   redirectStdinFrom("");
   ASSERT_EQ(::isatty(STDIN_FILENO), 0);
   EXPECT_FALSE(_kbhit(false));
 }
 
 TEST_F(KbHitRedirectedStdin, getch_reads_the_next_character) {
+  // covers: uxsystermtools.getch.1~1
   redirectStdinFrom("qr");
   std::clearerr(stdin);
   EXPECT_EQ(_getch(), 'q');
@@ -144,6 +154,7 @@ TEST_F(KbHitRedirectedStdin, getch_reads_the_next_character) {
 }
 
 TEST_F(KbHitRedirectedStdin, tty_key_remains_available_and_terminal_mode_is_restored) {
+  // covers: uxsystermtools.kbhit.1~1, uxsystermtools.getch.1~1
   struct Pty {
     int master = posix_openpt(O_RDWR | O_NOCTTY);
     int slave  = -1;
@@ -204,6 +215,8 @@ TEST_F(SetupLoggerMainTest, dual_mode_returns_valid_path) {
 }
 
 TEST_F(SetupLoggerMainTest, file_logging_appends_and_dual_logging_keeps_stdout_clean) {
+  // covers: uxsystermtools.setup-logger-main.2~1, uxsystermtools.setup-logger-main.3~1, uxsystermtools.setup-logger-main.4~1
+  // covers: launcher.xretractor.7~1
   const std::string name = "contract_logger";
   const auto path        = setupLoggerMain(name, false);
   spdlog::error("first marker");
@@ -228,6 +241,7 @@ TEST_F(SetupLoggerMainTest, file_logging_appends_and_dual_logging_keeps_stdout_c
 }
 
 TEST_F(SetupLoggerMainTest, service_logging_has_no_file_timestamp_or_stdout_and_flushes_each_line) {
+  // covers: uxsystermtools.setup-logger-main.1~1
   const auto name = "rdb521-service-log-" + std::to_string(getpid());
   const auto file = std::filesystem::temp_directory_path() / (name + ".log");
   ASSERT_FALSE(std::filesystem::exists(file));
@@ -254,6 +268,8 @@ TEST_F(SetupLoggerMainTest, service_logging_has_no_file_timestamp_or_stdout_and_
 // Tryb usługowy: log na stderr z prefiksem priorytetu sd-daemon "<N>". Przechwytujemy stderr
 // (dup2 na plik), logujemy INFO i ERROR, po czym sprawdzamy prefiksy: INFO=>6, ERROR=>3.
 TEST_F(SetupLoggerMainTest, service_mode_emits_sd_daemon_priority_prefix) {
+  // covers: uxsystermtools.setup-logger-main.1~1, launcher.xretractor.20~1, launcher.xretractor.21~1, launcher.xretractor.22~1
+  // covers: launcher.xretractor.24~1, launcher.xretractor.25~1
   namespace fs               = std::filesystem;
   const fs::path captureFile = fs::temp_directory_path() / "xretractor_service_log_capture.txt";
 

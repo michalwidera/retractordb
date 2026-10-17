@@ -22,6 +22,7 @@
 // ctest -R '^ut-expeval' -V
 
 TEST(xExpressionEval, add_int_int) {
+  // covers: expressionevaluator.expression-evaluator.15~1
   /*
   PUSH_VAL(1)
   PUSH_VAL(2)
@@ -79,6 +80,7 @@ TEST(xExpressionEval, add_double_int) {
 }
 
 TEST(xExpressionEval, add_string_int) {
+  // covers: expressionevaluator.expression-evaluator.3~1, expressionevaluator.expression-evaluator.4~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 1);
   program.emplace_back(PUSH_VAL, rdb::descFldVT("data1"));
@@ -107,6 +109,7 @@ TEST(xExpressionEval, add_rational_int) {
 }
 
 TEST(xExpressionEval, add_rational_string) {
+  // covers: expressionevaluator.expression-evaluator.5~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT("test"));
   program.emplace_back(PUSH_VAL, boost::rational<int>(1, 2));
@@ -225,6 +228,7 @@ TEST(xExpressionEval, call_floor_function_double) {
 }
 
 TEST(xExpressionEval, call_floor_function_rational) {
+  // covers: expressionevaluator.expression-evaluator.13~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, boost::rational<int>(3 / 2));
   program.emplace_back(CALL, std::string("floor"));
@@ -249,6 +253,7 @@ TEST(xExpressionEval, call_ceil_function_double) {
 }
 
 TEST(xExpressionEval, long_program) {
+  // covers: expressionevaluator.expression-evaluator.1~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 1.25);
   program.emplace_back(PUSH_VAL, 1);
@@ -265,6 +270,7 @@ TEST(xExpressionEval, long_program) {
 }
 
 TEST(xExpressionEval, add_null_int_propagates_null) {
+  // covers: expressionevaluator.expression-evaluator.4~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
   program.emplace_back(PUSH_VAL, 2);
@@ -327,6 +333,7 @@ TEST(xExpressionEval, not_true_is_false) {
 }
 
 TEST(xExpressionEval, not_null_is_null) {
+  // covers: expressionevaluator.expression-evaluator.11~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
   program.emplace_back(NOT);
@@ -379,6 +386,7 @@ TEST(xExpressionEval, zero_divided_by_value_stays_a_value) {
 // rozgalezieniem po typach, wiec float i double nie daja inf, a rational nie rzuca wyjatkiem.
 // To jest ten przypadek, ktory bez testu cicho wrocilby do semantyki IEEE.
 TEST(xExpressionEval, divide_by_zero_yields_null_for_every_numeric_type) {
+  // covers: expressionevaluator.expression-evaluator.19~1
   const std::vector<rdb::descFldVT> zeros{
       rdb::descFldVT{static_cast<uint8_t>(0)}, rdb::descFldVT{0}, rdb::descFldVT{0U}, rdb::descFldVT{0.0F}, rdb::descFldVT{0.0},
       rdb::descFldVT{boost::rational<int>(0)}};
@@ -398,6 +406,7 @@ TEST(xExpressionEval, divide_by_zero_yields_null_for_every_numeric_type) {
 // pary - tak jak dla int i rational. Do #267 straznik polykal pary catch-allem, a zero w skladowej
 // konczylo proces sygnalem SIGFPE na x86-64. Asercja wykonuje sie tylko wtedy, gdy proces zyje.
 TEST(xExpressionEval, divide_intpair_by_zero_component_yields_null) {
+  // covers: expressionevaluator.expression-evaluator.10~1
   for (const auto &divisor : {std::pair<int, int>(3, 0), std::pair<int, int>(0, 2)}) {
     std::list<token> program;
     program.emplace_back(PUSH_VAL, rdb::descFldVT(std::pair<int, int>(6, 4)));
@@ -412,6 +421,7 @@ TEST(xExpressionEval, divide_intpair_by_zero_component_yields_null) {
 
 // IDXPAIR dzieli tylko skladowa liczbowa - napisu nikt nie dzieli, wiec o NULL decyduje zero w `second`.
 TEST(xExpressionEval, divide_idxpair_by_zero_index_yields_null) {
+  // covers: expressionevaluator.expression-evaluator.10~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::pair<std::string, int>("a", 6)));
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::pair<std::string, int>("b", 0)));
@@ -422,6 +432,7 @@ TEST(xExpressionEval, divide_idxpair_by_zero_index_yields_null) {
 }
 
 TEST(xExpressionEval, malformed_stack_throws) {
+  // covers: expressionevaluator.expression-evaluator.17~1, expressionevaluator.expression-evaluator.18~1
   std::list<token> program;
   program.emplace_back(ADD);
 
@@ -645,6 +656,7 @@ TEST(xExpressionEval, neg_int) {
 }
 
 TEST(xExpressionEval, neg_null_propagates_null) {
+  // covers: expressionevaluator.expression-evaluator.9~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
   program.emplace_back(NEGATE);
@@ -656,6 +668,7 @@ TEST(xExpressionEval, neg_null_propagates_null) {
 // --- null propagation in comparisons ---
 
 TEST(xExpressionEval, cmp_equal_null_propagates_null) {
+  // covers: expressionevaluator.expression-evaluator.8~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
   program.emplace_back(PUSH_VAL, 3);
@@ -728,6 +741,7 @@ TEST(xExpressionEval, call_unsupported_function_throws) {
 }
 
 TEST(xExpressionEval, empty_program_throws) {
+  // covers: expressionevaluator.expression-evaluator.18~1
   std::list<token> program;
 
   expressionEvaluator test;
@@ -791,6 +805,7 @@ TEST(xExpressionEval, not_empty_string_is_true) {
 }
 
 TEST(xExpressionEval, and_string_int_uses_string_truthiness) {
+  // covers: expressionevaluator.expression-evaluator.11~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("text")));
   program.emplace_back(PUSH_VAL, 1);
@@ -816,6 +831,8 @@ TEST(xExpressionEval, not_intpair_throws) {
 // --- PUSH_ID from payload ---
 
 TEST(xExpressionEval, push_id_reads_value_from_payload) {
+  // covers: expressionevaluator.expression-evaluator.2~1, expressionevaluator.expression-evaluator.15~1
+  // covers: streaminstance.stream-instance.6~1
   auto desc = rdb::Descriptor("x", 4, 1, rdb::INTEGER);
   rdb::payload p(desc);
   p.setItem(0, 42);
@@ -831,6 +848,7 @@ TEST(xExpressionEval, push_id_reads_value_from_payload) {
 }
 
 TEST(xExpressionEval, push_id_null_payload_throws) {
+  // covers: expressionevaluator.expression-evaluator.2~1
   std::list<token> program;
   program.emplace_back(PUSH_ID, rdb::descFldVT(std::pair<std::string, int>("x", 0)));
 
@@ -841,6 +859,7 @@ TEST(xExpressionEval, push_id_null_payload_throws) {
 // --- PUSH_ID2 ---
 
 TEST(xExpressionEval, push_id2_reads_value_from_payload) {
+  // covers: expressionevaluator.expression-evaluator.15~1
   auto desc = rdb::Descriptor("x", 4, 1, rdb::INTEGER);
   rdb::payload p(desc);
   p.setItem(0, 99);
@@ -903,6 +922,7 @@ TEST(xExpressionEval, too_many_values_on_stack_throws) {
 // właśnie tak. Pozostałe testy w tym pliku fabrykują nazwy małymi literami, czyli sprawdzają
 // samo złożenie wielkości liter w ewaluatorze, a nie postać, którą dostaje z parsera.
 TEST(xExpressionEval, call_function_name_as_grammar_writes_it) {
+  // covers: expressionevaluator.expression-evaluator.12~1
   const std::vector<std::pair<std::string, double>> cases{{"Sqrt", 2.0}, {"Ceil", 4.0}, {"Floor", 4.0}};
 
   for (const auto &[name, expected] : cases) {
@@ -927,6 +947,7 @@ TEST(xExpressionEval, call_function_name_as_grammar_writes_it) {
 // tej daty i został usunięty razem z ośmioma innymi nazwami bez implementacji. Błąd wraca
 // wartością Errc::Eval (do 2026-10 rzutem std::runtime_error).
 TEST(xExpressionEval, call_unknown_function_keeps_author_spelling) {
+  // covers: expressionevaluator.expression-evaluator.18~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 4.0);
   program.emplace_back(CALL, std::string("Crc"));
@@ -966,6 +987,7 @@ TEST(xExpressionEval, call_abs_preserves_type) {
 }
 
 TEST(xExpressionEval, call_iszero_and_isnonzero_return_integer) {
+  // covers: expressionevaluator.expression-evaluator.12~1, expressionevaluator.expression-evaluator.13~1
   const std::vector<std::tuple<int, int, int>> cases{{0, 1, 0}, {5, 0, 1}, {-5, 0, 1}};
 
   for (const auto &[input, zeroExpected, nonZeroExpected] : cases) {
@@ -987,6 +1009,7 @@ TEST(xExpressionEval, call_iszero_and_isnonzero_return_integer) {
 // STRING na pierwszym bajcie zerowym, więc `STRING[8]` z wartością `42` dochodzi do ewaluatora
 // jako napis dwuznakowy. Wynik jest INTEGER niezależnie od szerokości pola źródłowego.
 TEST(xExpressionEval, call_length_counts_value_not_field_width) {
+  // covers: expressionevaluator.expression-evaluator.12~1, expressionevaluator.expression-evaluator.13~1
   const std::vector<std::pair<std::string, int>> cases{{"", 0}, {"42", 2}, {"hello", 5}};
 
   for (const auto &[input, expected] : cases) {
@@ -1005,6 +1028,7 @@ TEST(xExpressionEval, call_length_counts_value_not_field_width) {
 // `Abs` i `IsZero`, które odrzucają napis. `Length(k)` nad polem INTEGER jest niemal na pewno
 // literówką; kto chce długości zapisu dziesiętnego, pisze `Length(to_string(k))`.
 TEST(xExpressionEval, call_length_rejects_numeric_operand) {
+  // covers: expressionevaluator.expression-evaluator.13~1
   for (const auto &value : std::vector<rdb::descFldVT>{7, 2.5, boost::rational<int>(22, 7)}) {
     std::list<token> program;
     program.emplace_back(PUSH_VAL, value);
@@ -1017,6 +1041,7 @@ TEST(xExpressionEval, call_length_rejects_numeric_operand) {
 
 // NULL pochłania: predykat na braku danych jest brakiem danych, a nie fałszem.
 TEST(xExpressionEval, new_functions_propagate_null) {
+  // covers: expressionevaluator.expression-evaluator.13~1
   for (const char *name : {"Abs", "IsZero", "IsNonZero", "Length"}) {
     std::list<token> program;
     program.emplace_back(PUSH_VAL, rdb::descFldVT{std::monostate{}});
@@ -1041,6 +1066,7 @@ TEST(xExpressionEval, call_sqrt_function_double) {
 }
 
 TEST(xExpressionEval, call_round_function_double) {
+  // covers: expressionevaluator.expression-evaluator.13~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 1.5);
   program.emplace_back(CALL, std::string("round"));
@@ -1095,6 +1121,7 @@ TEST(xExpressionEval, call_cos_zero) {
 // ktos przeniosl bramke pietro nizej, ten test zapali sie pierwszy i pokaze, ze zmienil sie
 // kontrakt, a nie tylko miejsce sprawdzenia.
 TEST(xExpressionEval, real_functions_return_double_for_exact_arguments) {
+  // covers: expressionevaluator.expression-evaluator.12~1, expressionevaluator.expression-evaluator.13~1
   for (const auto &[name, expected] :
        std::vector<std::pair<std::string, double>>{{"sin", std::sin(1.0)}, {"cos", std::cos(1.0)}, {"exp", std::exp(1.0)}}) {
     for (const auto &argument : {rdb::descFldVT{1}, rdb::descFldVT{boost::rational<int>(1)}}) {
@@ -1110,6 +1137,7 @@ TEST(xExpressionEval, real_functions_return_double_for_exact_arguments) {
 }
 
 TEST(xExpressionEval, real_functions_propagate_null_and_reject_text) {
+  // covers: expressionevaluator.expression-evaluator.13~1
   for (const char *name : {"sin", "cos", "exp"}) {
     std::list<token> missing;
     missing.emplace_back(PUSH_VAL, rdb::descFldVT{std::monostate{}});
@@ -1124,6 +1152,7 @@ TEST(xExpressionEval, real_functions_propagate_null_and_reject_text) {
 }
 
 TEST(xExpressionEval, exp_overflow_returns_null) {
+  // covers: expressionevaluator.expression-evaluator.13~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 1000.0);
   program.emplace_back(CALL, std::string("exp"));
@@ -1341,6 +1370,7 @@ TEST(xExpressionEval, uint_sub_below_zero_is_null) {
 }
 
 TEST(xExpressionEval, uint_add_and_mul_overflow_is_null) {
+  // covers: expressionevaluator.expression-evaluator.19~1
   for (const auto op : {ADD, MULTIPLY}) {
     std::list<token> program;
     program.emplace_back(PUSH_VAL, 4000000000U);
@@ -1353,6 +1383,7 @@ TEST(xExpressionEval, uint_add_and_mul_overflow_is_null) {
 }
 
 TEST(xExpressionEval, uint_arithmetic_at_the_bound_is_exact) {
+  // covers: expressionevaluator.expression-evaluator.19~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 65535U);
   program.emplace_back(PUSH_VAL, 65537U);
@@ -1366,6 +1397,7 @@ TEST(xExpressionEval, uint_arithmetic_at_the_bound_is_exact) {
 }
 
 TEST(xExpressionEval, isnull_returns_1_for_null) {
+  // covers: expressionevaluator.expression-evaluator.12~1, expressionevaluator.expression-evaluator.14~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
   program.emplace_back(CALL, std::string("isnull"));
@@ -1378,6 +1410,7 @@ TEST(xExpressionEval, isnull_returns_1_for_null) {
 }
 
 TEST(xExpressionEval, isnull_returns_0_for_non_null) {
+  // covers: expressionevaluator.expression-evaluator.14~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 42);
   program.emplace_back(CALL, std::string("isnull"));
@@ -1393,6 +1426,7 @@ TEST(xExpressionEval, isnull_returns_0_for_non_null) {
 // albo okno bez ani jednej wartosci. Ogona strumienia nie dotyczy - tam nie ma rekordu,
 // wiec nie ma czego zamieniac (patrz query::startupLatency).
 TEST(xExpressionEval, null2zero_replaces_null_with_zero) {
+  // covers: expressionevaluator.expression-evaluator.12~1, expressionevaluator.expression-evaluator.14~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
   program.emplace_back(CALL, std::string("null2zero"));
@@ -1407,6 +1441,7 @@ TEST(xExpressionEval, null2zero_replaces_null_with_zero) {
 // Wartosc nie-NULL przechodzi BEZ ZMIANY - takze co do typu, zeby zawiniecie pola nie
 // przycinalo wyniku okna z RATIONAL do liczby calkowitej.
 TEST(xExpressionEval, null2zero_passes_a_value_through_unchanged) {
+  // covers: expressionevaluator.expression-evaluator.14~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, boost::rational<int>(7, 2));
   program.emplace_back(CALL, std::string("null2zero"));
@@ -1436,6 +1471,7 @@ TEST(xExpressionEval, cmp_not_equal_string_not_equal) {
 }
 
 TEST(xExpressionEval, cmp_not_equal_string_equal) {
+  // covers: expressionevaluator.expression-evaluator.8~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
@@ -1449,6 +1485,7 @@ TEST(xExpressionEval, cmp_not_equal_string_equal) {
 }
 
 TEST(xExpressionEval, cmp_lt_string_true) {
+  // covers: expressionevaluator.expression-evaluator.8~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("xyz")));
@@ -1475,6 +1512,7 @@ TEST(xExpressionEval, cmp_lt_string_false) {
 }
 
 TEST(xExpressionEval, cmp_gt_string_true) {
+  // covers: expressionevaluator.expression-evaluator.8~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("xyz")));
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
@@ -1514,6 +1552,7 @@ TEST(xExpressionEval, cmp_le_string_true_less) {
 }
 
 TEST(xExpressionEval, cmp_le_string_true_equal) {
+  // covers: expressionevaluator.expression-evaluator.8~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
@@ -1553,6 +1592,7 @@ TEST(xExpressionEval, cmp_ge_string_true_greater) {
 }
 
 TEST(xExpressionEval, cmp_ge_string_true_equal) {
+  // covers: expressionevaluator.expression-evaluator.8~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("abc")));
@@ -1644,6 +1684,7 @@ TEST(xExpressionEval, or_of_false_string_comparison_is_false) {
 // więc po pop: a=string, b=float → normalize(string, float) → konkatenacja.
 
 TEST(xExpressionEval, add_string_float_converts_via_to_string) {
+  // covers: expressionevaluator.expression-evaluator.3~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 1.0F);
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("unit")));
@@ -1672,6 +1713,7 @@ TEST(xExpressionEval, add_string_double_converts_via_to_string) {
 // --- to_integer ---
 
 TEST(xExpressionEval, call_to_integer_from_string) {
+  // covers: expressionevaluator.expression-evaluator.12~1, expressionevaluator.expression-evaluator.14~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("42")));
   program.emplace_back(CALL, std::string("to_integer"));
@@ -1696,6 +1738,7 @@ TEST(xExpressionEval, call_to_integer_from_double_truncates) {
 }
 
 TEST(xExpressionEval, call_to_integer_null_propagates_null) {
+  // covers: expressionevaluator.expression-evaluator.14~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
   program.emplace_back(CALL, std::string("to_integer"));
@@ -1737,6 +1780,7 @@ TEST(xExpressionEval, call_math_over_integer_without_integer_result_is_null) {
 // --- to_float ---
 
 TEST(xExpressionEval, call_to_float_from_string) {
+  // covers: expressionevaluator.expression-evaluator.14~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("2.5")));
   program.emplace_back(CALL, std::string("to_float"));
@@ -1749,6 +1793,7 @@ TEST(xExpressionEval, call_to_float_from_string) {
 }
 
 TEST(xExpressionEval, call_to_float_from_int) {
+  // covers: expressionevaluator.expression-evaluator.12~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 5);
   program.emplace_back(CALL, std::string("to_float"));
@@ -1761,6 +1806,7 @@ TEST(xExpressionEval, call_to_float_from_int) {
 }
 
 TEST(xExpressionEval, call_to_float_null_propagates_null) {
+  // covers: expressionevaluator.expression-evaluator.14~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
   program.emplace_back(CALL, std::string("to_float"));
@@ -1772,6 +1818,7 @@ TEST(xExpressionEval, call_to_float_null_propagates_null) {
 // --- to_double ---
 
 TEST(xExpressionEval, call_to_double_from_string) {
+  // covers: expressionevaluator.expression-evaluator.14~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::string("1.5")));
   program.emplace_back(CALL, std::string("to_double"));
@@ -1784,6 +1831,7 @@ TEST(xExpressionEval, call_to_double_from_string) {
 }
 
 TEST(xExpressionEval, call_to_double_from_int) {
+  // covers: expressionevaluator.expression-evaluator.12~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 7);
   program.emplace_back(CALL, std::string("to_double"));
@@ -1796,6 +1844,7 @@ TEST(xExpressionEval, call_to_double_from_int) {
 }
 
 TEST(xExpressionEval, call_to_double_null_propagates_null) {
+  // covers: expressionevaluator.expression-evaluator.14~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
   program.emplace_back(CALL, std::string("to_double"));
@@ -1807,6 +1856,7 @@ TEST(xExpressionEval, call_to_double_null_propagates_null) {
 // --- to_string ---
 
 TEST(xExpressionEval, call_to_string_from_int) {
+  // covers: expressionevaluator.expression-evaluator.12~1, expressionevaluator.expression-evaluator.14~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 42);
   program.emplace_back(CALL, std::string("to_string"));
@@ -1843,6 +1893,7 @@ TEST(xExpressionEval, call_to_string_identity) {
 }
 
 TEST(xExpressionEval, call_to_string_null_propagates_null) {
+  // covers: expressionevaluator.expression-evaluator.14~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, rdb::descFldVT(std::monostate{}));
   program.emplace_back(CALL, std::string("to_string"));
@@ -1857,6 +1908,7 @@ TEST(xExpressionEval, call_to_string_null_propagates_null) {
 // Potegowanie jest pierwszym NIEPRZEMIENNYM operatorem w tym pliku, ktory nie ma
 // osobnego znaku po obu stronach, wiec pomylka stron przeszlaby przez kazdy inny test.
 TEST(xExpressionEval, pow_operand_order) {
+  // covers: streaminstance.stream-instance.6~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 2);
   program.emplace_back(PUSH_VAL, 3);
@@ -1900,6 +1952,7 @@ TEST(xExpressionEval, pow_int_double_promotes_to_double) {
 
 // Podstawa calkowita obcina wynik, dokladnie jak dzielenie calkowite: 2^-1 = 0.5 -> 0.
 TEST(xExpressionEval, pow_negative_exponent_truncates_on_integer_base) {
+  // covers: expressionevaluator.expression-evaluator.7~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 2);
   program.emplace_back(PUSH_VAL, -1);
@@ -1915,6 +1968,7 @@ TEST(xExpressionEval, pow_negative_exponent_truncates_on_integer_base) {
 // Wynik poza zbiorem wartosci jest wartoscia POCHLANIAJACA, jak dzielenie przez zero.
 // Rzut nieskonczonosci na int bylby zreszta zachowaniem niezdefiniowanym.
 TEST(xExpressionEval, pow_non_finite_result_gives_null) {
+  // covers: expressionevaluator.expression-evaluator.7~1
   for (const auto &operands : {std::pair<rdb::descFldVT, rdb::descFldVT>{0, -1},         // 0^-1 = inf
                                std::pair<rdb::descFldVT, rdb::descFldVT>{-8.0, 0.5}}) {  // (-8)^0.5 = NaN
     std::list<token> program;
@@ -1957,6 +2011,7 @@ TEST(xExpressionEval, pow_string_operand_throws) {
 // razem z przekreceniem i promocja typu. Na tej rownosci stoi regula D w exprSimplify,
 // ktora przepisuje `a*a` na `a^2`.
 TEST(xExpressionEval, pow_on_exact_types_matches_multiplication) {
+  // covers: expressionevaluator.expression-evaluator.7~1
   struct testCase {
     rdb::descFldVT value;
     int exponent;
@@ -2016,6 +2071,7 @@ constexpr int intMin = std::numeric_limits<int>::min();
 }  // namespace
 
 TEST(xExpressionEval, int_overflow_returns_null) {
+  // covers: expressionevaluator.expression-evaluator.19~1
   EXPECT_EQ(evalBinary(7, 300000000, MULTIPLY), rdb::descFldVT{2100000000});
   EXPECT_TRUE(isNull(evalBinary(7, 1000000000, MULTIPLY)));
   EXPECT_EQ(evalBinary(-2, 1073741824, MULTIPLY), rdb::descFldVT{intMin});
@@ -2055,6 +2111,7 @@ TEST(xExpressionEval, narrowed_rejects_zero_denominator) {
 }
 
 TEST(xExpressionEval, rational_overflow_returns_null) {
+  // covers: expressionevaluator.expression-evaluator.19~1
   using R = boost::rational<int>;
 
   EXPECT_EQ(evalBinary(R(9), R(200000000), MULTIPLY), rdb::descFldVT{R(1800000000)});
@@ -2126,6 +2183,7 @@ TEST(xExpressionEval, float_hardware_rounding_is_ties_to_even_at_2p24) {
 
 // (2) JEDEN KROK PRZEZ WARIANT: FLOAT + INTEGER ma zostac FLOAT i zaokraglic sie TERAZ.
 TEST(xExpressionEval, float_add_int_stays_float_at_2p24) {
+  // covers: expressionevaluator.expression-evaluator.5~1
   std::list<token> program;
   program.emplace_back(PUSH_VAL, 16777216.0F);
   program.emplace_back(PUSH_VAL, 1);
@@ -2200,6 +2258,7 @@ TEST(xExpressionEval, double_chain_at_2p24_is_exact_and_narrows_to_16777220) {
 // tylko dla wyniku spoza zakresu. Od da67e5a3 do tej zmiany kazda operacja z ujemnym INTEGER
 // dawala NULL, takze `10 + (-2)` i porownanie `-998 < 165`.
 TEST(xExpressionEval, uint_with_negative_int_is_exact_when_result_fits) {
+  // covers: expressionevaluator.expression-evaluator.6~1
   struct testCase {
     rdb::descFldVT a;
     rdb::descFldVT b;
@@ -2218,6 +2277,7 @@ TEST(xExpressionEval, uint_with_negative_int_is_exact_when_result_fits) {
 // Wynik ujemny nie ma reprezentacji w UINT - NULL, a nie iloczyn liczby 4294966298, jak przed
 // da67e5a3. NULL na wejsciu i dzielenie przez zero zostaja NULL.
 TEST(xExpressionEval, uint_with_negative_int_is_null_when_result_does_not_fit) {
+  // covers: expressionevaluator.expression-evaluator.6~1
   struct testCase {
     rdb::descFldVT a;
     rdb::descFldVT b;
@@ -2232,6 +2292,7 @@ TEST(xExpressionEval, uint_with_negative_int_is_null_when_result_does_not_fit) {
 // Porownanie jest dokladne i daje UINT 1/0, jak porownanie dwoch UINT. Porownania zyja tylko
 // w RULE WHEN, wiec zaden zapisany artefakt nie zmienia typu.
 TEST(xExpressionEval, comparison_of_uint_with_negative_int_is_exact) {
+  // covers: expressionevaluator.expression-evaluator.6~1
   struct testCase {
     command_id op;
     unsigned expected;
@@ -2249,6 +2310,7 @@ TEST(xExpressionEval, comparison_of_uint_with_negative_int_is_exact) {
 
 // `^` wedlug regul typow dokladnych: wykladnik nieujemny - iloczyn, ujemny - std::pow z obcieciem.
 TEST(xExpressionEval, power_of_uint_with_negative_int_is_exact_when_result_fits) {
+  // covers: expressionevaluator.expression-evaluator.6~1
   struct testCase {
     rdb::descFldVT base;
     rdb::descFldVT exponent;
@@ -2274,6 +2336,7 @@ TEST(xExpressionEval, power_of_uint_with_negative_int_is_exact_when_result_fits)
 // Decyzja wlasciciela: w typach bez liczb ujemnych `-a` jest negacja bitowa (neg()), a `~a`
 // daje ten sam wynik. Granice: 0, 1 i wartosc najwieksza typu. NULL przechodzi bez zmian.
 TEST(xExpressionEval, minus_and_bitwise_not_agree_on_byte_and_uint) {
+  // covers: expressionevaluator.expression-evaluator.9~1, streaminstance.stream-instance.6~1
   for (const uint8_t a : {uint8_t{0}, uint8_t{1}, uint8_t{0x0f}, uint8_t{0xff}}) {
     const rdb::descFldVT expected{static_cast<uint8_t>(~a)};
     EXPECT_EQ(evalUnary(a, token(NEGATE)), expected) << int{a};
@@ -2291,6 +2354,7 @@ TEST(xExpressionEval, minus_and_bitwise_not_agree_on_byte_and_uint) {
 // `~` nad innym typem odrzuca kompilator; ewaluator, do ktorego taki program mimo to dotarl,
 // nie zgaduje wartosci, tylko zglasza blad - tak jak `negate` nad napisem.
 TEST(xExpressionEval, bitwise_not_outside_byte_and_uint_throws) {
+  // covers: expressionevaluator.expression-evaluator.9~1
   for (const rdb::descFldVT &a : {rdb::descFldVT{5}, rdb::descFldVT{boost::rational<int>(3, 2)}, rdb::descFldVT{2.5F},
                                   rdb::descFldVT{2.5}, rdb::descFldVT{std::string("ab")}})
     EXPECT_RDB_ERROR(evalUnaryResult(a, token(BIT_NOT)), rdb::Errc::Eval) << a.index();
@@ -2299,6 +2363,7 @@ TEST(xExpressionEval, bitwise_not_outside_byte_and_uint_throws) {
 // Kontrola z drugiej strony: `-a` nad typami ze znakiem zostaje arytmetyczne, a przepelnienie
 // (`-INT_MIN`) daje NULL - neg() jest tym samym kodem, co przed #328.
 TEST(xExpressionEval, unary_minus_stays_arithmetic_for_signed_types) {
+  // covers: expressionevaluator.expression-evaluator.9~1
   EXPECT_EQ(evalUnary(5, token(NEGATE)), rdb::descFldVT{-5});
   EXPECT_EQ(evalUnary(2.5, token(NEGATE)), rdb::descFldVT{-2.5});
   EXPECT_EQ(evalUnary(2.5F, token(NEGATE)), rdb::descFldVT{-2.5F});
@@ -2307,6 +2372,7 @@ TEST(xExpressionEval, unary_minus_stays_arithmetic_for_signed_types) {
 }
 
 TEST(xExpressionEval, call2_accepts_only_the_canonical_to_string_name) {
+  // covers: expressionevaluator.expression-evaluator.12~1, streaminstance.stream-instance.6~1
   expressionEvaluator evaluator;
   EXPECT_EQ(rdbtest::ok(evaluator.eval({token(PUSH_VAL, 42), token(CALL2, std::pair<std::string, int>{"to_string", 8})})),
             rdb::descFldVT(std::string("42")));
@@ -2318,6 +2384,7 @@ TEST(xExpressionEval, call2_accepts_only_the_canonical_to_string_name) {
 }
 
 TEST(xExpressionEval, window_tokens_read_the_selected_group_and_reject_invalid_indices) {
+  // covers: expressionevaluator.expression-evaluator.15~1, streaminstance.stream-instance.6~1
   expressionEvaluator evaluator;
   std::vector<windowStats> groups(2);
   groups[0] = {.minValue = -999, .maxValue = 999, .sumValue = 777, .avgValue = 555};
@@ -2333,6 +2400,7 @@ TEST(xExpressionEval, window_tokens_read_the_selected_group_and_reject_invalid_i
 }
 
 TEST(xExpressionEval, three_valued_truth_tables_cover_both_operand_orders) {
+  // covers: expressionevaluator.expression-evaluator.11~1, streaminstance.stream-instance.6~1
   const std::vector<rdb::descFldVT> values{0, 1, std::monostate{}};
   // Wiersze i kolumny: FALSE, TRUE, UNKNOWN; -1 oznacza UNKNOWN.
   constexpr int andTable[3][3]{{0, 0, 0}, {0, 1, -1}, {0, -1, -1}};
@@ -2349,6 +2417,9 @@ TEST(xExpressionEval, three_valued_truth_tables_cover_both_operand_orders) {
 }
 
 TEST(xExpressionEval, pair_arithmetic_and_refusals_preserve_the_contract) {
+  // covers: expressionevaluator.expression-evaluator.4~1, expressionevaluator.expression-evaluator.8~1
+  // covers: expressionevaluator.expression-evaluator.10~1, expressionevaluator.expression-evaluator.11~1
+  // covers: expressionevaluator.expression-evaluator.18~1
   using integers = std::pair<int, int>;
   using indexed  = std::pair<std::string, int>;
   expressionEvaluator evaluator;
@@ -2372,6 +2443,7 @@ TEST(xExpressionEval, pair_arithmetic_and_refusals_preserve_the_contract) {
 }
 
 TEST(xExpressionEval, deep_stack_is_released_after_success_and_error) {
+  // covers: expressionevaluator.expression-evaluator.16~1, expressionevaluator.expression-evaluator.18~1
   expressionEvaluator evaluator;
   std::list<token> program;
   for (int i = 0; i < 32; ++i)
@@ -2386,6 +2458,9 @@ TEST(xExpressionEval, deep_stack_is_released_after_success_and_error) {
 }
 
 TEST(xExpressionEval, numeric_arithmetic_and_comparisons_cover_all_promotions) {
+  // covers: expressionevaluator.expression-evaluator.3~1, expressionevaluator.expression-evaluator.4~1
+  // covers: expressionevaluator.expression-evaluator.5~1, expressionevaluator.expression-evaluator.8~1
+  // covers: expressionevaluator.expression-evaluator.17~1, streaminstance.stream-instance.6~1
   using value = rdb::descFldVT;
   using ratio = boost::rational<int>;
   const std::vector<value> left{uint8_t{6}, 6, 6U, ratio(6), 6.0F, 6.0};
@@ -2415,6 +2490,7 @@ TEST(xExpressionEval, numeric_arithmetic_and_comparisons_cover_all_promotions) {
 }
 
 TEST(xExpressionEval, exact_power_zero_exponent_is_one_of_the_product_type) {
+  // covers: expressionevaluator.expression-evaluator.7~1
   using ratio = boost::rational<int>;
   // BYTE^0 to INTEGER 1, jak BYTE^k dla k >= 1 i jak deklaruje kompilator (arithmeticValueType).
   for (const auto &[base, one] : std::vector<std::pair<rdb::descFldVT, rdb::descFldVT>>{
@@ -2435,6 +2511,7 @@ TEST(xExpressionEval, exact_power_zero_exponent_is_one_of_the_product_type) {
 // Regresja #521: `-(b^e)` nad polami BYTE przy e = 0 dawalo 254 - NEGATE na BYTE odwraca bity,
 // a `b^0` zostawal BYTE, choc pole ma typ INTEGER. Wartosc oczekiwana: -(b^e) = -(liczba b do potegi e).
 TEST(xExpressionEval, negated_byte_power_with_zero_exponent_is_minus_one) {
+  // covers: expressionevaluator.expression-evaluator.7~1
   expressionEvaluator evaluator;
   for (const auto &[b, e, expected] : {std::tuple{3, 0, -1}, std::tuple{0, 0, -1}, std::tuple{3, 1, -3}, std::tuple{3, 2, -9}}) {
     SCOPED_TRACE(std::to_string(b) + "^" + std::to_string(e));
@@ -2445,6 +2522,7 @@ TEST(xExpressionEval, negated_byte_power_with_zero_exponent_is_minus_one) {
 }
 
 TEST(xExpressionEval, logic_result_uses_the_first_non_null_operand_type) {
+  // covers: expressionevaluator.expression-evaluator.11~1
   using value = rdb::descFldVT;
   using ratio = boost::rational<int>;
   const std::vector<value> truthy{uint8_t{2}, 2, 2U, ratio(2), 2.0F, 2.0, std::string("x")};
@@ -2459,6 +2537,7 @@ TEST(xExpressionEval, logic_result_uses_the_first_non_null_operand_type) {
 }
 
 TEST(xExpressionEval, scalar_math_functions_preserve_numeric_types_and_reject_pairs) {
+  // covers: expressionevaluator.expression-evaluator.12~1, expressionevaluator.expression-evaluator.13~1
   using value = rdb::descFldVT;
   using ratio = boost::rational<int>;
   const std::vector<value> zeros{uint8_t{0}, 0, 0U, ratio(0), 0.0F, 0.0};

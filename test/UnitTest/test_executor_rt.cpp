@@ -86,6 +86,8 @@ namespace {
 
 #if RDB_HAS_SCHED_SETSCHEDULER && RDB_HAS_MLOCKALL
 TEST(ExecutorRtActivateTest, MockedCallsCheckMemoryPolicyErrnosAndThreadPriority) {
+  // covers: executorrt.rt-activate.1~1, executorrt.rt-activate.2~1, executorrt.rt-activate.3~1, executorrt.rt-activate.4~1
+  // covers: executorrt.rt-activate.5~1, executorrt.rt-activate.6~1
   struct Restore {
     std::optional<std::string> previous =
         std::getenv("RDB_MLOCKALL") ? std::optional<std::string>{std::getenv("RDB_MLOCKALL")} : std::nullopt;
@@ -142,6 +144,7 @@ TEST(ExecutorRtActivateTest, MockedCallsCheckMemoryPolicyErrnosAndThreadPriority
 // --- rtAbsoluteSleep ---
 
 TEST(ExecutorRtSleepTest, PastAnchorReturnsImmediately) {
+  // covers: executorrt.rt-absolute-sleep.1~1
   struct timespec anchor{};
   clock_gettime(CLOCK_MONOTONIC, &anchor);
   anchor.tv_sec -= 100;
@@ -157,6 +160,7 @@ TEST(ExecutorRtSleepTest, PastAnchorReturnsImmediately) {
 }
 
 TEST(ExecutorRtSleepTest, SmallIntervalCompletesInTime) {
+  // covers: executorrt.rt-absolute-sleep.1~1
   struct timespec anchor{};
   clock_gettime(CLOCK_MONOTONIC, &anchor);
 
@@ -171,6 +175,7 @@ TEST(ExecutorRtSleepTest, SmallIntervalCompletesInTime) {
 }
 
 TEST(ExecutorRtSleepTest, NanosecondCarryOverDoesNotHang) {
+  // covers: executorrt.rt-absolute-sleep.1~1
   // anchor.tv_nsec near 1s boundary + 200ms interval → carry triggered
   struct timespec anchor{};
   clock_gettime(CLOCK_MONOTONIC, &anchor);
@@ -212,6 +217,7 @@ void ignoreWakeSignal(int /*signum*/) {}
 // Sygnaly przychodza przez pierwsze 300 ms, wiec watek zdazy zasnac nawet pod valgrindem.
 // Ponowienie liczace nowy okres skonczyloby sie najwczesniej po 300 + 600 ms.
 TEST(ExecutorRtSleepTest, InterruptReportsEarlyWakeAndRetryKeepsDeadline) {
+  // covers: executorrt.rt-absolute-sleep.2~1, executorrt.rt-absolute-sleep.3~1
   constexpr long kDeadlineMs = 600;
   const auto previous        = std::signal(SIGUSR1, ignoreWakeSignal);
   ASSERT_NE(previous, SIG_ERR);
@@ -244,6 +250,7 @@ TEST(ExecutorRtSleepTest, InterruptReportsEarlyWakeAndRetryKeepsDeadline) {
 // przy 100 Hz w slocie 214748365 (~24,9 dnia) termin wychodzil ujemny, przy 360 Hz juz po ~2,8 dnia,
 // a sen absolutny do terminu z przeszlosci nie spi wcale.
 TEST(ExecutorRtSleepTest, SlotDeadlineMsSurvivesLongAxis) {
+  // covers: executorrt.rt-slot-deadline-ms.1~1
   EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(1, 3)), 333);
   EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(2, 3)), 666);
   EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(214748365, 100)), 2147483650L);
@@ -263,6 +270,7 @@ TEST(ExecutorRtCheckTest, DoesNotCrashAndReturnsBool) {
 }
 
 TEST(ExecutorRtCheckTest, OutputContainsAllRequiredSections) {
+  // covers: executorrt.rt-check-and-print.1~1, executorrt.rt-check-and-print.3~1
   std::ostringstream captured;
   auto *old = std::cout.rdbuf(captured.rdbuf());
   rtCheckAndPrint();
@@ -313,6 +321,8 @@ TEST(ExecutorRtCheckTest, FalseReturnImpliesErrorInOutput) {
 }
 
 TEST(ExecutorRtCheckTest, ReturnValueAgreesWithCriticalRowsAndWarningsStayAdvisory) {
+  // covers: executorrt.rt-check-and-print.1~1, executorrt.rt-check-and-print.2~1, executorrt.rt-check-and-print.3~1
+  // covers: executorrt.rt-check-and-print.4~1
   testing::internal::CaptureStdout();
   const bool result = rtCheckAndPrint();
   const auto output = testing::internal::GetCapturedStdout();
@@ -395,6 +405,8 @@ TEST(ExecutorRtActivateTest, SuccessImpliesRealTimePolicyOnCallingThread) {
 #if RDB_HAS_SCHED_AFFINITY
 
 TEST(ExecutorRtAffinityTest, MockedComplementAndEveryRefusalAreReported) {
+  // covers: executorrt.rt-keep-thread-off-rt-cpus.1~1, executorrt.rt-keep-thread-off-rt-cpus.2~1
+  // covers: executorrt.rt-keep-thread-off-rt-cpus.3~1
   struct Restore {
     ~Restore() { mockAffinity = false; }
   } restore;
@@ -436,6 +448,7 @@ TEST(ExecutorRtAffinityTest, MockedComplementAndEveryRefusalAreReported) {
 }
 
 TEST(ExecutorRtAffinityTest, MovesThreadOffPinnedRtCore) {
+  // covers: executorrt.rt-keep-thread-off-rt-cpus.1~1
   if (sysconf(_SC_NPROCESSORS_ONLN) < 2) GTEST_SKIP() << "test wymaga co najmniej dwoch rdzeni online";
 
   cpu_set_t original;
@@ -476,6 +489,7 @@ TEST(ExecutorRtAffinityTest, MovesThreadOffPinnedRtCore) {
 // Bez przypięcia nie ma zagłodzenia i nie ma czego naprawiać - funkcja musi
 // wtedy zostawić powinowactwo w spokoju, zamiast zawężać je na własną rękę.
 TEST(ExecutorRtAffinityTest, LeavesUnpinnedThreadAlone) {
+  // covers: executorrt.rt-keep-thread-off-rt-cpus.2~1
   const long online = sysconf(_SC_NPROCESSORS_ONLN);
   if (online < 2) GTEST_SKIP() << "test wymaga co najmniej dwoch rdzeni online";
 
@@ -512,6 +526,7 @@ TEST(ExecutorRtAffinityTest, LeavesUnpinnedThreadAlone) {
 // Kontrakt, ktory MUSI obowiazywac takze tutaj: funkcja melduje false, czyli
 // "niczego nie zmieniono", zamiast udawac, ze watek zostal przeniesiony.
 TEST(ExecutorRtAffinityTest, ReportsNoMoveWhereAffinityIsUnavailable) {
+  // covers: executorrt.rt-keep-thread-off-rt-cpus.4~1
   std::atomic<bool> stop{false};
   std::thread aux([&stop] {
     while (!stop)

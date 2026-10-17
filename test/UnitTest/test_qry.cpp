@@ -47,11 +47,15 @@ boost::property_tree::ptree qry_fake::netClient(const std::string &cmd, const st
 }
 
 // Verify hello handshake succeeds when server responds with "world"
-TEST(xqry, test_hello) { EXPECT_TRUE(obj.hello() == boost::system::errc::success); }
+TEST(xqry, test_hello) {
+  // covers: qry.qry.11~1
+  EXPECT_TRUE(obj.hello() == boost::system::errc::success);
+}
 
 // Verify dir() formats single-stream table in the shared xqry form: header row, separator,
 // columns left-aligned and joined by " | ", no edge pipes
 TEST(xqry, test_dir) {
+  // covers: qry.qry.12~1
   EXPECT_EQ(obj.dir().value(),
             "name  | duration | size | count | location      | cap\n"
             "------+----------+------+-------+---------------+----\n"
@@ -114,6 +118,7 @@ TEST(xqry, test_detailShowYaml_found) {
 // Verify detailShow() prints the stream header and the field list as two column tables,
 // in the same form as dir() and `xqry --bus`
 TEST(xqry, test_detailShow_found) {
+  // covers: qry.qry.13~1
   qry_fake_detail obj_detail;
   EXPECT_EQ(obj_detail.detailShow("core0").value(),
             "name  | delta | query\n"
@@ -129,6 +134,7 @@ TEST(xqry, test_detailShow_found) {
 // Verify both detail forms return an empty string when the queried stream does not exist -
 // the empty result is what makes the launcher report "no such stream"
 TEST(xqry, test_detailShow_not_found) {
+  // covers: qry.qry.13~1
   qry_fake_detail obj_detail;
 
   const auto detail = obj_detail.detailShow("nonexistent");
@@ -139,6 +145,7 @@ TEST(xqry, test_detailShow_not_found) {
 
 // Verify adhoc() returns false (success) when server acknowledges with "OK"
 TEST(xqry, test_adhoc_success) {
+  // covers: qry.qry.9~1
   qry_fake_detail obj_detail;
   auto result = obj_detail.adhoc("SELECT * STREAM test FROM core0");
 
@@ -162,6 +169,7 @@ boost::property_tree::ptree qry_fake_adhoc_fail::netClient(const std::string &cm
 
 // Verify adhoc() returns true (error) when server responds with non-"OK" value
 TEST(xqry, test_adhoc_failure) {
+  // covers: qry.qry.9~1
   qry_fake_adhoc_fail obj_fail;
   auto result = obj_fail.adhoc("INVALID QUERY");
 
@@ -183,6 +191,7 @@ boost::property_tree::ptree qry_fake_hello_fail::netClient(const std::string &cm
 
 // Verify hello() returns protocol_error when server responds with unexpected value
 TEST(xqry, test_hello_failure) {
+  // covers: qry.qry.11~1
   qry_fake_hello_fail obj_fail;
   EXPECT_TRUE(obj_fail.hello() == boost::system::errc::protocol_error);
 }
@@ -196,6 +205,7 @@ boost::property_tree::ptree qry_fake_hello_empty::netClient(const std::string &c
 
 // Verify hello() returns protocol_error when server responds with an empty payload
 TEST(xqry, test_hello_empty_response) {
+  // covers: qry.qry.11~1
   qry_fake_hello_empty obj_empty;
   EXPECT_TRUE(obj_empty.hello() == boost::system::errc::protocol_error);
 }
@@ -217,6 +227,7 @@ TEST(xqry, test_dirYaml) {
 
 // Verify dirYaml() exact output for a deterministic single-stream response
 TEST(xqry, test_dirYaml_exact_output) {
+  // covers: qry.qry.12~1
   qry_fake_detail obj_detail;
   EXPECT_EQ(obj_detail.dirYaml().value(),
             "---\n"
@@ -318,6 +329,7 @@ TEST(xqry, test_detailShowYaml_multi_stream_core1) {
 
 // Verify detailShowYaml() exact YAML for deterministic single-stream metadata
 TEST(xqry, test_detailShowYaml_exact_output) {
+  // covers: qry.qry.13~1
   qry_fake_detail obj_detail;
   EXPECT_EQ(obj_detail.detailShowYaml("core0").value(),
             "---\n"
@@ -358,6 +370,7 @@ boost::property_tree::ptree qry_fake_nosize::netClient(const std::string &cmd, c
 
 // Verify dirYaml() omits "size:" line when stream size is "-1" (unbounded)
 TEST(xqry, test_dirYaml_size_minus_one_omitted) {
+  // covers: qry.qry.12~1
   qry_fake_nosize obj_nosize;
   auto result = obj_nosize.dirYaml().value();
 
@@ -367,6 +380,7 @@ TEST(xqry, test_dirYaml_size_minus_one_omitted) {
 
 // Verify dirYaml() omits "location:" line when stream location is empty
 TEST(xqry, test_dirYaml_empty_location_omitted) {
+  // covers: qry.qry.12~1
   qry_fake_nosize obj_nosize;
   auto result = obj_nosize.dirYaml().value();
 
@@ -461,6 +475,7 @@ class qry_fake_known_stream : public qry {
 // łapał to jako std::exception i zwracał `interrupted` - operator dostawał
 // informację o przerwaniu zamiast o przeciążonym serwerze.
 TEST(xqry, select_reports_server_no_response_instead_of_throwing) {
+  // covers: qry.qry.4~1
   qry_fake_no_response obj_no_response;
   boost::program_options::variables_map vm;
   EXPECT_NO_THROW({
@@ -472,6 +487,7 @@ TEST(xqry, select_reports_server_no_response_instead_of_throwing) {
 // B: odpowiedź bez listy strumieni jest tym samym trybem - serwer nie dostarczył
 // tego, o co pytano.
 TEST(xqry, select_reports_server_no_response_on_malformed_answer) {
+  // covers: qry.qry.2~1
   qry_fake_malformed obj_malformed;
   boost::program_options::variables_map vm;
   EXPECT_NO_THROW({
@@ -493,6 +509,7 @@ TEST(xqry, select_reports_stream_not_found_separately) {
 // ani jeden element. Wcześniej `select()` zwracał `true` i klient kończył się
 // ZEREM; teraz musi zameldować, że kolejki nie było.
 TEST(xqry, select_does_not_report_success_when_no_element_was_read) {
+  // covers: qry.qry.8~1
   qry_fake_known_stream obj_known(2);  // dwie proby otwarcia, zeby test byl szybki
   boost::program_options::variables_map vm;
   // Przebieg z zadeklarowanym budzetem elementow (-m N), a nie nieograniczony: tylko taki
@@ -508,6 +525,7 @@ TEST(xqry, select_does_not_report_success_when_no_element_was_read) {
 }
 
 TEST(xqry, end_of_stream_before_the_first_row_reports_no_data) {
+  // covers: qry.qry.8~1
   namespace IPC   = boost::interprocess;
   const auto name = ipc::names().responseQueue(getpid());
   struct RemoveQueue {
@@ -535,6 +553,7 @@ TEST(xqry, end_of_stream_before_the_first_row_reports_no_data) {
 // Każdy tryb ma własny, niepusty opis - komunikat operatora nie może być pusty
 // ani wspólny dla różnych awarii.
 TEST(xqry, select_result_descriptions_are_distinct) {
+  // covers: qry.to-string.2~1
   const std::array<selectResult, 7> all{
       selectResult::ok,     selectResult::streamNotFound, selectResult::serverNoResponse, selectResult::clientQueueMissing,
       selectResult::noData, selectResult::noActivePlan,   selectResult::serverStopping};
@@ -573,6 +592,7 @@ class qry_fake_stopping : public qry {
 };
 
 TEST(xqry, dir_reports_no_response_instead_of_idle) {
+  // covers: qry.qry.12~1
   qry_fake_no_response obj_no_response;
   const auto listing = obj_no_response.dir();
   ASSERT_FALSE(listing.has_value()) << "brak odpowiedzi serwera nie moze wygladac jak stan bezczynny";
@@ -587,17 +607,20 @@ TEST(xqry, dirYaml_reports_no_response_instead_of_empty_list) {
 }
 
 TEST(xqry, dir_still_names_idle_instance) {
+  // covers: qry.qry.2~1
   qry_fake_idle obj_idle;
   EXPECT_EQ(obj_idle.dir().value(), "no active plan\n");
 }
 
 TEST(xqry, dirYaml_still_gives_empty_list_for_idle_instance) {
+  // covers: qry.qry.12~1
   qry_fake_idle obj_idle;
   EXPECT_EQ(obj_idle.dirYaml().value(), "---\napiVersion: xqry/v1\nstreams: []\n");
 }
 
 // Zamykajacy sie serwer ma wlasny werdykt: inny komunikat i inny kod wyjscia niz milczenie.
 TEST(xqry, dir_names_stopping_server_separately) {
+  // covers: qry.qry.2~1, qry.qry.12~1
   qry_fake_stopping obj_stopping;
   const auto listing = obj_stopping.dir();
   ASSERT_FALSE(listing.has_value());
@@ -605,18 +628,21 @@ TEST(xqry, dir_names_stopping_server_separately) {
 }
 
 TEST(xqry, select_names_stopping_server_separately) {
+  // covers: qry.qry.4~1
   qry_fake_stopping obj_stopping;
   boost::program_options::variables_map vm;
   EXPECT_EQ(obj_stopping.select(vm, 0, "core0", {0, 0, 0}), selectResult::serverStopping);
 }
 
 TEST(xqry, detailShow_does_not_throw_for_idle_instance) {
+  // covers: qry.qry.13~1
   qry_fake_idle obj_idle;
   EXPECT_NO_THROW({ EXPECT_EQ(obj_idle.detailShow("core0").error(), selectResult::noActivePlan); });
   EXPECT_NO_THROW({ EXPECT_EQ(obj_idle.detailShowYaml("core0").error(), selectResult::noActivePlan); });
 }
 
 TEST(xqry, detailShow_does_not_throw_when_server_is_silent) {
+  // covers: qry.qry.13~1
   qry_fake_no_response obj_no_response;
   EXPECT_NO_THROW({ EXPECT_EQ(obj_no_response.detailShow("core0").error(), selectResult::serverNoResponse); });
 }
@@ -641,6 +667,7 @@ class qry_fake_plan_swapped_midway : public qry {
 };
 
 TEST(xqry, detailShow_survives_plan_swap_between_get_and_detail) {
+  // covers: qry.qry.13~1
   qry_fake_plan_swapped_midway obj_swapped;
   EXPECT_NO_THROW({ EXPECT_EQ(obj_swapped.detailShow("core0").error(), selectResult::noActivePlan); });
 }
@@ -661,6 +688,7 @@ class RecordingQry : public qry {
 }  // namespace
 
 TEST(xqry, reset_preserves_binary_text_across_chunks_and_commits_last) {
+  // covers: qry.qry.10~1
   RecordingQry client;
   std::string plan(805, 'x');
   plan.replace(398, 7, std::string("\n'\\\"\0\r\n", 7));
@@ -678,6 +706,7 @@ TEST(xqry, reset_preserves_binary_text_across_chunks_and_commits_last) {
 }
 
 TEST(xqry, empty_reset_has_zero_chunks_and_empty_adhoc_sends_nothing) {
+  // covers: qry.qry.9~1, qry.qry.10~1
   RecordingQry client;
   EXPECT_TRUE(client.adhoc(""));
   EXPECT_TRUE(client.calls.empty());
@@ -686,6 +715,7 @@ TEST(xqry, empty_reset_has_zero_chunks_and_empty_adhoc_sends_nothing) {
 }
 
 TEST(xqry, reset_stops_at_each_refusal_and_prints_the_stage_once) {
+  // covers: qry.qry.10~1
   for (std::size_t failed = 0; failed < 5; ++failed) {
     SCOPED_TRACE(failed);
     RecordingQry client;
@@ -703,6 +733,7 @@ TEST(xqry, reset_stops_at_each_refusal_and_prints_the_stage_once) {
 }
 
 TEST(xqry, response_error_precedes_streams_and_streams_precede_idle_marker) {
+  // covers: qry.qry.2~1
   for (const bool hasError : {false, true}) {
     RecordingQry client;
     boost::property_tree::ptree answer;
@@ -725,6 +756,7 @@ TEST(xqry, response_error_precedes_streams_and_streams_precede_idle_marker) {
 }
 
 TEST(xqry, select_subscribes_first_and_preserves_the_get_verdict_after_show_refusal) {
+  // covers: qry.qry.3~1, qry.qry.4~1
   for (const bool known : {false, true}) {
     RecordingQry client;
     boost::property_tree::ptree show, get;
@@ -739,6 +771,7 @@ TEST(xqry, select_subscribes_first_and_preserves_the_get_verdict_after_show_refu
 }
 
 TEST(xqry, result_descriptions_match_the_public_diagnostics) {
+  // covers: qry.to-string.1~1
   const std::array<const char *, 8> expected{"ok",
                                              "stream unknown to the server",
                                              "server did not answer within the timeout",
@@ -752,6 +785,7 @@ TEST(xqry, result_descriptions_match_the_public_diagnostics) {
 }
 
 TEST(xqry, json_commands_emit_versioned_lines_and_errors) {
+  // covers: qry.qry.14~1
   qry_fake_detail client;
   testing::internal::CaptureStdout();
   EXPECT_EQ(client.jsonCommand("hello", "", 0, 0), 0);
@@ -775,6 +809,7 @@ TEST(xqry, json_commands_emit_versioned_lines_and_errors) {
 }
 
 TEST(xqry, detail_forms_preserve_stopping_and_plan_swap_verdicts) {
+  // covers: qry.qry.13~1
   for (const bool yaml : {false, true}) {
     qry_fake_stopping stopping;
     const auto stopped = yaml ? stopping.detailShowYaml("core0") : stopping.detailShow("core0");

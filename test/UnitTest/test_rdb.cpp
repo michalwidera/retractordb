@@ -109,6 +109,7 @@ bool test_3() {
 }
 
 TEST(xrdb, test_storage) {
+  // covers: storage.storage.1~1, storage.storage.5~1
   // This structure is tricky
   // If not aligned - size is 15
   // If aligned - size is 16
@@ -177,6 +178,7 @@ TEST(xrdb, test_storage) {
 // plik .meta, bo appendEntry() otwiera plik trybem ios::app.
 // ---------------------------------------------------------------------------
 TEST(xrdb, test_storage_disposal_removes_all_files) {
+  // covers: storage.storage.2~1
   const std::string qryId = "disposal-fstream";
   auto desc               = makeDesc(AREA_SIZE);
 
@@ -256,6 +258,7 @@ TEST(xrdb, storage_persists_null_flags_via_metadata_stream) {
 // oznaczona jako nie-null. Przez to semantyka pochlaniania NULL-i sie nie wlaczala, a obsluga bledu
 // u trzech wolajacych byla martwa. Ten test pilnuje obu polowek kontraktu naraz: statusu i bitsetu.
 TEST(xrdb, storage_read_beyond_last_record_reports_no_such_record) {
+  // covers: storage.storage.5~1
   const std::string streamName = "ut-no-such-record";
   const std::string dataFile   = "ut-no-such-record.bin";
   const std::string metaFile   = "./" + dataFile + ".meta";
@@ -383,6 +386,7 @@ TEST(xrdb, storage_updates_null_flags_on_record_modify) {
 }
 
 TEST(xrdb, storage_purge_resets_metadata_stream_state) {
+  // covers: storage.storage.9~1
   const std::string streamName = "ut-purge-meta-reset";
   const std::string dataFile   = "ut-purge-meta-reset.bin";
   const std::string descFile   = "./" + streamName + ".desc";
@@ -456,6 +460,7 @@ TEST(xrdb, storage_first_write_persists_first_meta_record) {
 }
 
 TEST(xrdb, storage_auto_gap_detection_marks_gap_after_null_records) {
+  // covers: storage.storage.10~1
   const std::string streamName = "ut-auto-gap";
   const std::string dataFile   = "ut-auto-gap.bin";
   const std::string descFile   = "./" + streamName + ".desc";
@@ -499,6 +504,7 @@ TEST(xrdb, storage_auto_gap_detection_marks_gap_after_null_records) {
 }
 
 TEST(xrdb, storage_gap_flushed_on_destructor) {
+  // covers: metadata.meta-data.10~1
   const std::string streamName = "ut-auto-gap-dtor";
   const std::string dataFile   = "ut-auto-gap-dtor.bin";
   const std::string descFile   = "./" + streamName + ".desc";
@@ -610,6 +616,7 @@ TEST(xrdb, storage_auto_gap_not_triggered_on_modify) {
 }
 
 TEST(xrdb, storage_setSamplingInterval_propagates_to_meta) {
+  // covers: storage.storage.10~1
   const std::string streamName = "ut-interval-prop";
   const std::string dataFile   = "ut-interval-prop.bin";
   const std::string descFile   = "./" + streamName + ".desc";
@@ -644,6 +651,8 @@ TEST(xrdb, storage_setSamplingInterval_propagates_to_meta) {
 // Rotacja zamyka dane, indeks i oba cienie w tej samej sesji, bez detekcji gap.
 // Korekta rekordu 0 sprawdza niepusty cien, a ponowny odczyt archiwum - jego NULL-e.
 TEST(xrdb, storage_rotates_data_and_null_indexes_on_shutdown) {
+  // covers: metadata.meta-data.14~1, storage.storage.7~1, storage.storage.12~1, storageshadow.storage-shadow.1~1
+  // covers: storageshadow.storage-shadow.8~1
   const auto desc = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
   for (const std::string type : {"DIRECT", "DEFAULT", "POSIX", "POSIXSHD", "GENERIC"}) {
     SCOPED_TRACE(type);
@@ -747,6 +756,7 @@ TEST(xrdb, storage_no_rotation_when_counts_match) {
 }
 
 TEST(xrdb, startup_gap_uses_the_data_file_age_and_survives_reopen) {
+  // covers: metadata.meta-data.15~1, storage.storage.11~1
   const std::filesystem::path root = "ut-startup-gap";
   std::filesystem::remove_all(root);
   std::filesystem::create_directory(root);
@@ -780,6 +790,7 @@ TEST(xrdb, startup_gap_uses_the_data_file_age_and_survives_reopen) {
 }
 
 TEST(xrdb, empty_data_file_discards_orphaned_metadata_before_the_first_write) {
+  // covers: storage.storage.12~1
   const std::filesystem::path root = "ut-orphaned-meta";
   std::filesystem::remove_all(root);
   std::filesystem::create_directory(root);
@@ -804,6 +815,7 @@ TEST(xrdb, empty_data_file_discards_orphaned_metadata_before_the_first_write) {
 }
 
 TEST(xrdb, declared_history_replays_values_and_nulls_without_another_source_read) {
+  // covers: storage.storage.6~1, storage.storage.8~1
   const std::filesystem::path root = "ut-declared-history";
   std::filesystem::remove_all(root);
   std::filesystem::create_directory(root);
@@ -866,6 +878,7 @@ struct RefScene {
 
 // Odczyt zewnetrznego zrodla dziala jak dotad, ale `rox` nie usuwa pliku, ktorego instancja nie posiada.
 TEST(xrdb, storage_ref_outside_store_reads_but_is_not_removed) {
+  // covers: storage.storage.2~1
   RefScene scene;
   const std::string source = scene.outside + "/source.txt";
   std::ofstream(source) << "1\n2\n";
@@ -1105,6 +1118,7 @@ TEST(xrdb, storage_directory_symlink_works) {
 
 // REF podany przez wolajacego jest decyzja operatora (#278): dowiazanie pod nim prowadzi zapis do celu.
 TEST(xrdb, storage_caller_ref_symlink_works) {
+  // covers: accessorfactory.make-accessor.3~1
   LinkScene scene;
   const std::string link   = scene.outside + "/link";
   const std::string target = scene.outside + "/target.bin";

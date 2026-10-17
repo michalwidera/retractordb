@@ -184,6 +184,7 @@ class PosixFileTest : public ::testing::Test {
 
 // Verify basic write (append) and read of records
 TEST_F(PosixFileTest, test_faccposix_write_and_read) {
+  // covers: faccposix.posix-binary-file.2~1, faccposix.posix-binary-file.4~1, faccposix.posix-binary-file.5~1
   BYTE record;
 
   auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_test"), desc);
@@ -233,6 +234,7 @@ TEST_F(PosixFileTest, test_faccposix_read_empty_file) {
 
 // Verify truncate (write nullptr at position 0) clears the file
 TEST_F(PosixFileTest, test_faccposix_truncate) {
+  // covers: faccposix.posix-binary-file.8~1
   BYTE record;
 
   auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_trunc"), desc);
@@ -256,6 +258,7 @@ TEST_F(PosixFileTest, test_faccposix_truncate) {
 // szly do skasowanego i-wezla, count() (stat po nazwie) zwracal 0, odczyt oddawal dane sprzed
 // purge, a wszystko ginelo przy zamknieciu.
 TEST_F(PosixFileTest, test_faccposix_purge_keeps_file_usable) {
+  // covers: faccposix.posix-binary-file.6~1
   const std::string path = sandboxPath("posix_purge");
   {
     rdb::posixBinaryFile pfa(path, desc);
@@ -277,6 +280,7 @@ TEST_F(PosixFileTest, test_faccposix_purge_keeps_file_usable) {
 
 // Verify update-in-place overwrites record at given byte position
 TEST_F(PosixFileTest, test_faccposix_update_in_place) {
+  // covers: faccposix.posix-binary-file.2~1
   BYTE record;
 
   auto pfa = std::make_unique<rdb::posixBinaryFile>(sandboxPath("posix_update"), desc);
@@ -319,6 +323,7 @@ TEST_F(PosixFileTest, test_faccposix_name) {
 
 // Verify multi-byte record write and read
 TEST_F(PosixFileTest, test_faccposix_multibyte_record) {
+  // covers: faccposix.posix-binary-file.3~1
   int record;
   auto recsize_int = sizeof(int);
 
@@ -344,6 +349,7 @@ TEST_F(PosixFileTest, test_faccposix_multibyte_record) {
 
 // Verify data persists on disk after destructor (durability via reopen)
 TEST_F(PosixFileTest, test_faccposix_persistence) {
+  // covers: faccposix.posix-binary-file.9~1
   BYTE record;
   auto path = sandboxPath("posix_persist");
 
@@ -467,6 +473,7 @@ TEST_F(PosixFileTest, storage_append_failure_is_fatal_without_count_increment) {
 // (uzasadnienie kontraktu przy FileInterface::count). Dlatego sprawdzamy nie tylko to, ZE
 // count() odmawia, ale i to, ze odmawia samo - komunikatem tej wlasnie funkcji.
 TEST_F(PosixFileTest, test_faccposix_count_stat_failure_is_fatal) {
+  // covers: faccposix.posix-binary-file.5~1, fainterface.file-interface.6~1
   const std::string path = sandboxPath("posix_count_stat_fail");
   {
     auto pfa    = std::make_unique<rdb::posixBinaryFile>(path, desc);
@@ -489,6 +496,7 @@ TEST_F(PosixFileTest, test_faccposix_count_stat_failure_is_fatal) {
 // sladem jest log (#281). Pierwsza rotacja pod tym numerem jest kontrola - nie nadpisuje
 // niczego i komunikatu nie ma.
 TEST_F(PosixFileTest, test_faccposix_rotation_overwrite_is_logged) {
+  // covers: faccposix.posix-binary-file.10~1
   const std::string path    = sandboxPath("posix_rotate");
   const std::string archive = path + ".old7";
   BYTE record               = 0xAA;

@@ -9,6 +9,7 @@
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
+# covers: datamodel.data-model.7~1, streaminstance.stream-instance.4~1, streaminstance.stream-instance.6~1
 add_test(
   NAME ${TestID}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

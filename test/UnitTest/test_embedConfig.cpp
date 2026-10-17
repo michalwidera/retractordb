@@ -37,6 +37,7 @@ AppConfig boundaryLoadAppConfig(const std::string &path) {
 #undef embeddedConfig
 
 TEST(embedConfig, explicit_file_preserves_values_and_rejected_key_reasons) {
+  // covers: configbridge.embedded-config.1~1
   const auto locks       = std::filesystem::absolute("chosen_locks").string();
   const std::string path = "explicit.toml";
   std::ofstream(path) << "[paths]\nlock_dir = '" << locks
@@ -51,6 +52,7 @@ TEST(embedConfig, explicit_file_preserves_values_and_rejected_key_reasons) {
 }
 
 TEST(embedConfig, missing_malformed_and_relative_lock_paths_are_config_errors) {
+  // covers: configbridge.embedded-config.2~1
   const std::string path = "invalid.toml";
   std::filesystem::remove(path);
   for (const std::string contents : {"", "[broken", "[paths]\nlock_dir = 'relative'\n"}) {
@@ -63,6 +65,7 @@ TEST(embedConfig, missing_malformed_and_relative_lock_paths_are_config_errors) {
 }
 
 TEST(embedConfig, standard_and_unknown_loader_exceptions_return_config_results) {
+  // covers: configbridge.embedded-config.2~1, configbridge.embedded-config.3~1, configbridge.embedded-config.4~1
   using namespace rdb::embed;
   configFault         = ConfigFault::standard;
   const auto standard = embeddedConfigUnderTest("chosen.toml");

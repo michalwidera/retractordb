@@ -117,6 +117,8 @@ const std::vector<rdb::descFld> &numericTypes() {
 
 // Niezalezne oczekiwania rozmiaru i dokladnosci, takze dla typow spoza wartosci liczbowych.
 TEST(xExpressionShape, type_helpers_cover_descriptor_types_and_the_fallback) {
+  // covers: expressionshape.field-length-of-type.1~1, expressionshape.field-length-of-type.2~1
+  // covers: expressionshape.numeric-shape.1~1, expressionshape.is-exact-type.1~1
   const std::vector<int> lengths{
       1,           sizeof(int), sizeof(unsigned), sizeof(ratio), sizeof(float), sizeof(double), sizeof(int),
       sizeof(int), 1,           sizeof(int),      sizeof(int),   sizeof(int),   sizeof(int),    sizeof(int)};
@@ -135,6 +137,9 @@ TEST(xExpressionShape, type_helpers_cover_descriptor_types_and_the_fallback) {
 }
 
 TEST(xExpressionShape, function_type_policy_handles_unknown_arguments_and_mixed_case) {
+  // covers: expressionshape.function-result-type.1~1, expressionshape.function-result-type.2~1
+  // covers: expressionshape.function-result-type.3~1, expressionshape.function-result-type.4~1
+  // covers: expressionshape.function-result-type.5~1, expressionshape.function-result-type.6~1
   for (const auto type : {std::optional<rdb::descFld>{}, std::optional{rdb::RATIONAL}, std::optional{rdb::STRING}}) {
     EXPECT_EQ(functionResultType("TO_INTEGER", type), rdb::INTEGER);
     EXPECT_EQ(functionResultType("To_FlOaT", type), rdb::FLOAT);
@@ -151,6 +156,8 @@ TEST(xExpressionShape, function_type_policy_handles_unknown_arguments_and_mixed_
 }
 
 TEST(xExpressionShape, malformed_references_and_window_tokens_report_unknown) {
+  // covers: expressionshape.infer-expression-shape.4~1, expressionshape.infer-expression-shape.5~1
+  // covers: expressionshape.infer-expression-shape.6~1
   EXPECT_EQ(inferExpressionShape({readField(0)}, {}, {}).status, exprShapeStatus::unknown);
   EXPECT_EQ(analyse({token(PUSH_ID, 0)}).status, exprShapeStatus::unknown);
   for (const auto command : {PUSH_ID1, PUSH_ID2, PUSH_ID3, PUSH_ID4, PUSH_ID5, PUSH_IDX})
@@ -171,6 +178,8 @@ TEST(xExpressionShape, malformed_references_and_window_tokens_report_unknown) {
 }
 
 TEST(xExpressionShape, literal_shapes_include_empty_strings_and_reject_pairs) {
+  // covers: expressionshape.infer-expression-shape.3~1, expressionshape.infer-expression-shape.16~1
+  // covers: expressionshape.infer-expression-shape.17~1
   const auto empty = analyse({token(PUSH_VAL, std::string())});
   ASSERT_TRUE(empty.resolved());
   EXPECT_EQ(empty.shape.rtype, rdb::STRING);
@@ -184,6 +193,7 @@ TEST(xExpressionShape, literal_shapes_include_empty_strings_and_reject_pairs) {
 }
 
 TEST(xExpressionShape, stack_underflow_is_checked_for_every_operator_family) {
+  // covers: expressionshape.infer-expression-shape.2~1
   for (const auto command : {ADD, SUBTRACT, MULTIPLY, DIVIDE, POWER, CMP_EQUAL, CMP_NOT_EQUAL, CMP_LT, CMP_GT, CMP_LE, CMP_GE,
                              AND, OR, NEGATE, BIT_NOT, NOT, CALL, CALL2}) {
     SCOPED_TRACE(command);
@@ -194,6 +204,7 @@ TEST(xExpressionShape, stack_underflow_is_checked_for_every_operator_family) {
 // --- czyste odczyty -------------------------------------------------------------------
 
 TEST(xExpressionShape, pure_field_read_keeps_type_and_length) {
+  // covers: expressionshape.infer-expression-shape.4~1
   const rdb::Descriptor desc = testDescriptor();
   for (const auto type : numericTypes()) {
     const auto result = analyse({readField(slotOf(type))});
@@ -227,6 +238,8 @@ TEST(xExpressionShape, numeric_array_element_has_arity_one) {
 // Jest to jedyny test, ktory ustala regule promocji BYTE: `bajt + bajt` daje INTEGER, bo
 // `uint8_t + uint8_t` promuje sie w C++ do `int`.
 TEST(xExpressionShape, binary_arithmetic_matrix_matches_the_evaluator) {
+  // covers: expressionshape.normalized-operand-type.1~1, expressionshape.arithmetic-value-type.1~1
+  // covers: expressionshape.infer-expression-shape.3~1, expressionshape.infer-expression-shape.8~1
   auto record = testPayload(6);
   auto right  = testPayload(3);
 
@@ -282,6 +295,7 @@ TEST(xExpressionShape, byte_power_is_integer_for_every_exponent) {
 // `neg()` i `logic_not()` ZACHOWUJA typ argumentu - promocji tu nie ma, inaczej niz przy
 // operatorach dwuargumentowych. Dla BYTE `neg` liczy `~a` i oddaje `uint8_t`.
 TEST(xExpressionShape, unary_operators_keep_the_argument_type) {
+  // covers: expressionshape.infer-expression-shape.11~1, expressionshape.infer-expression-shape.13~1
   auto record = testPayload(6);
   for (const auto type : numericTypes()) {
     for (const auto op : {NEGATE, NOT}) {
@@ -298,6 +312,7 @@ TEST(xExpressionShape, unary_operators_keep_the_argument_type) {
 // `~` (#328) przechodzi wylacznie nad BYTE i UINT i wtedy zachowuje typ, jak NEGATE. Kazdy
 // inny typ wartosci, takze napis, to `rejected` - kompilacja staje, zamiast liczyc.
 TEST(xExpressionShape, bitwise_not_resolves_only_for_byte_and_uint) {
+  // covers: expressionshape.infer-expression-shape.12~1
   auto record = testPayload(6);
   for (const auto type : numericTypes()) {
     std::list<token> program{readField(slotOf(type)), token(BIT_NOT)};
@@ -319,6 +334,7 @@ TEST(xExpressionShape, bitwise_not_resolves_only_for_byte_and_uint) {
 // `-` nad napisem przed #328 bylo `illTyped`, czyli przepuszczeniem do bledu wykonania -
 // a wyjatek w slocie konczy serwer. Teraz odmowa.
 TEST(xExpressionShape, unary_minus_over_string_is_rejected) {
+  // covers: expressionshape.infer-expression-shape.11~1
   const auto inferred = analyse({readField(sText), token(NEGATE)});
   EXPECT_EQ(inferred.status, exprShapeStatus::rejected);
   EXPECT_NE(inferred.reason.find("unary '-'"), std::string::npos) << inferred.reason;
@@ -330,6 +346,7 @@ TEST(xExpressionShape, unary_minus_over_string_is_rejected) {
 // w regule `term_logic`, czyli w warunku RULE - deskryptora nie opisuja, ale analizator
 // musi je znac, bo przez ten sam program chodzi upraszczanie wyrazen.
 TEST(xExpressionShape, comparison_result_is_the_normalized_operand_type) {
+  // covers: expressionshape.infer-expression-shape.9~1
   auto record = testPayload(6);
   for (const auto type : numericTypes()) {
     std::list<token> program{readField(slotOf(type)), readField(slotOf(type)), token(CMP_LT)};
@@ -343,6 +360,8 @@ TEST(xExpressionShape, comparison_result_is_the_normalized_operand_type) {
 // Porownanie napisow i logika nad napisem daja INTEGER 1/0. Do 2026-09-26 dawaly napis
 // `"1"`/`"0"`, ktory toLogicValue() czytal jako prawde, bo jest niepusty.
 TEST(xExpressionShape, string_comparison_and_logic_are_integer) {
+  // covers: expressionshape.infer-expression-shape.9~1, expressionshape.infer-expression-shape.10~1
+  // covers: expressionshape.infer-expression-shape.13~1
   auto record = testPayload(6);
   for (const auto op : {CMP_EQUAL, CMP_NOT_EQUAL, CMP_LT, CMP_GT, CMP_LE, CMP_GE, AND, OR}) {
     std::list<token> program{readField(sText), readField(sText), token(op)};
@@ -365,6 +384,7 @@ TEST(xExpressionShape, string_comparison_and_logic_are_integer) {
 // zadna nazwa z rqlFunctions.hpp nie zostala pominieta, wiec dopisanie funkcji bez decyzji
 // o jej typie wyniku zapala ten test.
 TEST(xExpressionShape, every_rql_function_has_a_declared_result_type) {
+  // covers: expressionshape.infer-expression-shape.16~1
   auto record = testPayload(4);
 
   struct functionCase {
@@ -434,6 +454,7 @@ TEST(xExpressionShape, every_rql_function_has_a_declared_result_type) {
 // (koncza na DOUBLE), ale kontrakt jezyka jest jeden dla wszystkich funkcji o niewymiernej
 // przeciwdziedzinie - patrz opis przy rejectedIrrationalOverExact() w expressionShape.cpp.
 TEST(xExpressionShape, rejects_irrational_functions_over_a_rational_argument) {
+  // covers: expressionshape.infer-expression-shape.15~1
   for (const char *name : {"Sqrt", "sin", "cos", "exp", "tan", "log", "log2"}) {
     std::list<token> program{readField(sRational), token(CALL, std::string(name))};
     const auto inferred = analyse(program);
@@ -464,6 +485,7 @@ TEST(xExpressionShape, keeps_functions_that_the_gate_must_not_reach) {
 }
 
 TEST(xExpressionShape, to_string_width_comes_from_the_declaration) {
+  // covers: expressionshape.infer-expression-shape.14~1
   const auto declared = analyse({readField(sInt), token(CALL2, std::make_pair(std::string("to_string"), 16))});
   ASSERT_TRUE(declared.resolved());
   EXPECT_EQ(declared.shape.rtype, rdb::STRING);
@@ -475,6 +497,7 @@ TEST(xExpressionShape, to_string_width_comes_from_the_declaration) {
 }
 
 TEST(xExpressionShape, string_concatenation_sums_widths_and_numbers_add_nothing) {
+  // covers: expressionshape.infer-expression-shape.7~1
   // `to_string(i:16) + '_test'` - 16 + 5.
   std::list<token> program{readField(sInt), token(CALL2, std::make_pair(std::string("to_string"), 16)),
                            token(PUSH_VAL, std::string("_test")), token(ADD)};
@@ -540,6 +563,7 @@ TEST(xExpressionShape, null_value_does_not_change_the_static_type) {
 // payload::setItemVT() rzutuje zapisywana wartosc na typ pola - zero jest dokladnie
 // reprezentowalne w kazdym typie liczbowym, wiec `null2zero(d)` daje w polu DOUBLE 0.0.
 TEST(xExpressionShape, null2zero_static_type_is_the_argument_type) {
+  // covers: expressionshape.infer-expression-shape.14~1
   std::list<token> program{readField(sDouble), token(CALL, std::string("null2zero"))};
   EXPECT_EQ(analyse(program).shape.rtype, rdb::DOUBLE);
 
@@ -588,6 +612,7 @@ TEST(xExpressionShape, window_aggregate_shape_comes_from_its_group) {
 // --- stany kontrolowane -------------------------------------------------------------------
 
 TEST(xExpressionShape, unresolved_program_reports_unknown) {
+  // covers: expressionshape.infer-expression-shape.1~1, expressionshape.infer-expression-shape.5~1
   // Postac przedrozwiazaniowa odwolania do pola.
   EXPECT_EQ(analyse({token(PUSH_ID3, std::string("x"))}).status, exprShapeStatus::unknown);
   // Token spoza zestawu ewaluatora.
@@ -602,6 +627,7 @@ TEST(xExpressionShape, unresolved_program_reports_unknown) {
 // jak `unknown` - pole zostaje przy sentinelu - zeby blad polecial w WYKONANIU, dokladnie
 // tam, gdzie lecial dotad.
 TEST(xExpressionShape, ill_typed_program_reports_ill_typed) {
+  // covers: expressionshape.infer-expression-shape.8~1, expressionshape.infer-expression-shape.17~1
   // `'abc' * 2` - ewaluator rzuca `Operator '*' not defined for string operands`.
   std::list<token> product{readField(sText), token(PUSH_VAL, 2), token(MULTIPLY)};
   EXPECT_EQ(analyse(product).status, exprShapeStatus::illTyped);
@@ -685,6 +711,7 @@ TEST(xExpressionShape, simplification_does_not_change_the_inferred_shape) {
 // Test pilnuje obu polowek naraz: szerokosc przezywa uproszczenie, a uproszczenie nadal dziala
 // POD `to_string` (argument `1+1` zwija sie do jednej stalej).
 TEST(xExpressionShape, constant_to_string_keeps_its_declared_width_when_simplified) {
+  // covers: exprsimplify.simplify-expression.5~1
   const auto typeOfField = [](const std::string &, int) -> std::optional<rdb::descFld> { return rdb::INTEGER; };
 
   std::list<token> program{token(PUSH_VAL, 1), token(PUSH_VAL, 1), token(ADD),
@@ -710,6 +737,7 @@ TEST(xExpressionShape, constant_to_string_keeps_its_declared_width_when_simplifi
 // szerokosc domyslna, wiec zwiniecie go do literalu gubi ja dokladnie tak samo - tyle ze cicho,
 // bo w RQL nie widac zadnej liczby, ktora mialaby przepasc.
 TEST(xExpressionShape, constant_to_string_without_width_keeps_the_default_width) {
+  // covers: exprsimplify.simplify-expression.5~1
   const auto typeOfField = [](const std::string &, int) -> std::optional<rdb::descFld> { return rdb::INTEGER; };
 
   std::list<token> program{token(PUSH_VAL, 1), token(PUSH_VAL, 1), token(ADD), token(CALL, std::string("to_string"))};

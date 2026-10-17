@@ -26,58 +26,55 @@ using ptree  = boost::property_tree::ptree;
 using vm_map = boost::program_options::variables_map;
 class dataModel;
 /// Obiekt klasy executorsm powinien:
-/// - przed wejściem w pętlę uruchamiać serwer IPC i czekać na gotowość jego zasobów, a dopiero po niej publikować opis procesu w pliku blokady, tak aby linia PID oznaczała serwer gotowy do obsługi klientów.
-///   Test: `it_ipc_security-start-order` (w śladzie strace utworzenie segmentu odpowiedzi i kolejki komend poprzedza zapis linii PID), `it_xqrywait_gate-run` (komenda wysłana zaraz po linii PID zostaje obsłużona).
-/// - kończyć start kodem no_buffer_space, gdy zasobów IPC nie udało się zbudować, zamiast czekać bez końca.
-///   Test: `it_ipc_security-start-ipc-failure` (przestrzeń nazw użytkownika z tmpfs 512 KiB: kod ENOBUFS i komunikat, bez zawieszenia).
-/// - w każdej niepustej epoce planu budować model danych, wykonywać krok zerowy deklaracji plikowych (bez DEVICE),
+/// - [executorsm.executorsm.1~1] przed wejściem w pętlę uruchamiać serwer IPC i czekać na gotowość jego zasobów, a dopiero po niej publikować opis procesu w pliku blokady, tak aby linia PID oznaczała serwer gotowy do obsługi klientów.
+///   Zakres testow: `it_ipc_security-start-order` (w śladzie strace utworzenie segmentu odpowiedzi i kolejki komend poprzedza zapis linii PID), `it_xqrywait_gate-run` (komenda wysłana zaraz po linii PID zostaje obsłużona).
+/// - [executorsm.executorsm.2~1] kończyć start kodem no_buffer_space, gdy zasobów IPC nie udało się zbudować, zamiast czekać bez końca.
+///   Zakres testow: `it_ipc_security-start-ipc-failure` (przestrzeń nazw użytkownika z tmpfs 512 KiB: kod ENOBUFS i komunikat, bez zawieszenia).
+/// - [executorsm.executorsm.3~1] w każdej niepustej epoce planu budować model danych, wykonywać krok zerowy deklaracji plikowych (bez DEVICE),
 ///   a następnie w kolejnych taktach wyznaczać strumienie należne, liczyć je przez dataModel::processRows i rozsyłać ich
 ///   wiersze subskrybentom; dla pustego planu działać w trybie bezczynnym bez modelu danych.
-///   Test: `it_service_idle-run`, `it_service_idle-env`, `it_service_idle-empty`, `it_service_reset` (instancja bezczynna przyjmuje plan), `it_device_timeout-run` (DEVICE bez kroku zerowego: te same rekordy co BINFILE), `it_xqrywait_first_row-run` (wiersze u subskrybenta), `DataModelSlotContract.processRows_computes_due_nodes_in_plan_order_before_advancing_sources`.
-/// - w trybie taktowanym spać do terminów slotów liczonych od wspólnej kotwicy, bez przesuwania jej po spóźnieniu;
+///   Zakres testow: `it_service_idle-run`, `it_service_idle-env`, `it_service_idle-empty`, `it_service_reset` (instancja bezczynna przyjmuje plan), `it_device_timeout-run` (DEVICE bez kroku zerowego: te same rekordy co BINFILE), `it_xqrywait_first_row-run` (wiersze u subskrybenta), `DataModelSlotContract.processRows_computes_due_nodes_in_plan_order_before_advancing_sources`.
+/// - [executorsm.executorsm.4~1] w trybie taktowanym spać do terminów slotów liczonych od wspólnej kotwicy, bez przesuwania jej po spóźnieniu;
 ///   przy --realtime wywoływać rtActivate dopiero po pomyślnym rtCheckAndPrint i kontynuować także przy nieudanej aktywacji;
 ///   w trybie --no-clock liczyć sloty bez czekania na zegar.
-///   Test: `it_slot_schedule-run` (kotwica, nadrabianie bez przesuwania, własna kotwica epoki po resecie, --realtime bez uprawnień RT z tym samym harmonogramem), `it_slot_schedule-vg-run`, `it_noclock_offline-run`. Kontrola strukturalna: rtActivate stoi w gałęzi `if (rtCheckAndPrint())`, a pętla slotów rusza niezależnie od wyniku obu wywołań.
-/// - przy --xqrywait wstrzymywać obliczenia do pierwszej obsłużonej komendy klienta.
-///   Test: `it_xqrywait_gate-run`, `it_xqrywait_first_row-run`.
-/// - przy limicie pętli --llimitqry N wykonywać N obrotów licząc krok zerowy, czyli dokładnie N-1 slotów (-m 1 liczy wyłącznie
+///   Zakres testow: `it_slot_schedule-run` (kotwica, nadrabianie bez przesuwania, własna kotwica epoki po resecie, --realtime bez uprawnień RT z tym samym harmonogramem), `it_slot_schedule-vg-run`, `it_noclock_offline-run`. Kontrola strukturalna: rtActivate stoi w gałęzi `if (rtCheckAndPrint())`, a pętla slotów rusza niezależnie od wyniku obu wywołań.
+/// - [executorsm.executorsm.5~1] przy --xqrywait wstrzymywać obliczenia do pierwszej obsłużonej komendy klienta.
+/// - [executorsm.executorsm.6~1] przy limicie pętli --llimitqry N wykonywać N obrotów licząc krok zerowy, czyli dokładnie N-1 slotów (-m 1 liczy wyłącznie
 ///   krok zerowy), a zatrzymanie klawiszem dopuszczać wyłącznie w przebiegu bez limitu i bez --noanykey.
-///   Test: `it_noclock_offline-run` (-m 1 i -m 4 dają 0 i 3 rekordy), `it_xqrywait_gate-run` (-x -m 5 kończy się sam), `it_tty_keystroke_immunity` (przebieg z limitem ignoruje bajt na terminalu; bez limitu bajt kończy przebieg, a z --noanykey nie).
-/// - przy --until-eof kończyć pracę po slocie wykrywającym koniec wejścia BINFILE lub TEXTFILE, a dla DEVICE po fazie
+///   Zakres testow: `it_noclock_offline-run` (-m 1 i -m 4 dają 0 i 3 rekordy), `it_xqrywait_gate-run` (-x -m 5 kończy się sam), `it_tty_keystroke_immunity` (przebieg z limitem ignoruje bajt na terminalu; bez limitu bajt kończy przebieg, a z --noanykey nie).
+/// - [executorsm.executorsm.7~1] przy --until-eof kończyć pracę po slocie wykrywającym koniec wejścia BINFILE lub TEXTFILE, a dla DEVICE po fazie
 ///   oczekiwania, przed obliczeniem slotu; wpisywać do logu nazwę wyczerpanego źródła.
-///   Test: `it_untileof_stop-run` (stop na pierwszym wyczerpanym źródle, nazwa źródła w logu poza Release), `it_device_timeout-run` (BINFILE i DEVICE z --until-eof dają ten sam artefakt bez rekordu all-null), `DataModelSlotContract.exhaustedInputStream_names_the_source_after_its_last_record`.
-/// - przed czytaniem modelu w taktach zbierać rekordy należnych źródeł DEVICE z terminem efektywnym (tryb bez zegara, klauzula TIMEOUT, konfiguracja, 0).
-///   Test: `it_device_timeout-run` (pierwszeństwo: klauzula, także 0, przed `[sources] timeout_s`, potem 0; w -f zawsze 0; czekanie nie trzyma blokad modelu), `it_device_timeout-vg-run`.
-/// - obsługiwać komendy hello (odpowiedź world), get (lista strumieni z parametrami), detail (schemat, okres, lokalizacja, pojemność, liczba rekordów i zapytanie strumienia), show (subskrypcja klienta), adhoc, kill (zatrzymanie pętli) oraz reset-begin, reset-chunk i reset-commit.
-///   Test: `ExecutorsmCommandsTest.hello_answers_world`, `ExecutorsmCommandsTest.get_lists_every_stream_with_its_parameters`, `ExecutorsmCommandsTest.detail_describes_schema_period_location_capacity_records_and_query`, `ExecutorsmCommandsTest.kill_stops_the_loop`, `ExecutorsmCommandsTest.reset_transfer_limits`, `it_xqrywait_first_row-run` (show), `it_issue6_adhoc-run` (adhoc), `it_service_reset` (reset-* i kill).
-/// - na get, detail, show i adhoc odpowiadać przy braku planu odpowiedzią braku planu, a w trakcie zamykania odpowiedzią
+///   Zakres testow: `it_untileof_stop-run` (stop na pierwszym wyczerpanym źródle, nazwa źródła w logu poza Release), `it_device_timeout-run` (BINFILE i DEVICE z --until-eof dają ten sam artefakt bez rekordu all-null), `DataModelSlotContract.exhaustedInputStream_names_the_source_after_its_last_record`.
+/// - [executorsm.executorsm.8~1] przed czytaniem modelu w taktach zbierać rekordy należnych źródeł DEVICE z terminem efektywnym (tryb bez zegara, klauzula TIMEOUT, konfiguracja, 0).
+///   Zakres testow: `it_device_timeout-run` (pierwszeństwo: klauzula, także 0, przed `[sources] timeout_s`, potem 0; w -f zawsze 0; czekanie nie trzyma blokad modelu), `it_device_timeout-vg-run`.
+/// - [executorsm.executorsm.9~1] obsługiwać komendy hello (odpowiedź world), get (lista strumieni z parametrami), detail (schemat, okres, lokalizacja, pojemność, liczba rekordów i zapytanie strumienia), show (subskrypcja klienta), adhoc, kill (zatrzymanie pętli) oraz reset-begin, reset-chunk i reset-commit.
+///   Zakres testow: `ExecutorsmCommandsTest.hello_answers_world`, `ExecutorsmCommandsTest.get_lists_every_stream_with_its_parameters`, `ExecutorsmCommandsTest.detail_describes_schema_period_location_capacity_records_and_query`, `ExecutorsmCommandsTest.kill_stops_the_loop`, `ExecutorsmCommandsTest.reset_transfer_limits`, `it_xqrywait_first_row-run` (show), `it_issue6_adhoc-run` (adhoc), `it_service_reset` (reset-* i kill).
+/// - [executorsm.executorsm.10~1] na get, detail, show i adhoc odpowiadać przy braku planu odpowiedzią braku planu, a w trakcie zamykania odpowiedzią
 ///   zamykania serwera; na detail i show z nazwą spoza planu odpowiadać error.response z nazwą strumienia.
-///   Test: `ExecutorsmCommandsTest.commands_needing_a_model_answer_no_plan_or_stopping`, `ExecutorsmCommandsTest.unknown_stream_is_an_error_response_naming_it`, `it_issue252_missing_stream-run`, `it_service_reset` (odpowiedź braku planu u klienta).
-/// - w show odmawiać subskrypcji z error.response, gdy epoka planu skończyła się w trakcie subskrypcji, tak aby klient nie pozostał zarejestrowany na strumieniu planu, który już nie działa.
-///   Test: `it_subscribe_epoch_race-run`, `IpcServerQueues.subscribe_after_out_of_business_is_refused_without_queue`.
-/// - zamieniać wyjątek obsługi komendy na error.response bez kończenia procesu, a złamany niezmiennik silnika w komendzie zgłaszać odpowiedzią engine error z wpisem krytycznym w logu.
-///   Test: `ExecutorsmCommandsTest.handler_failures_become_error_responses`, `it_show_handler_failure-run`.
-/// - w adhoc kompilować zapytanie na kopii planu, roszczyć nowe nazwy na magistrali i importować je do działającego planu, a przy każdej porażce po imporcie przywracać plan i zwalniać roszczone zasoby; reguły DO SYSTEM odrzucać w tym kanale bezwarunkowo.
-///   Test: `it_plan_error_e4-run` (odmowa kompilacji kopii zostawia plan), `it_multiserver_uniqueness` (punkty 6 i 7: odmowa cudzej nazwy, roszczenie nazwy ad-hoc), `it_issue6_adhoc-run`, `it_adhoc_register_rollback-run`, `it_adhoc_rule-run` (odmowa DO SYSTEM bez wykonania polecenia), `it_storage_refusal-adhoc`, `ExecutorsmAdHocRuleTest.attached_rule_sharing_a_dump_file_is_refused`.
-/// - przyjmować plan kanałem --reset w porcjach z ograniczoną liczbą porcji, rozmiarem tekstu i liczbą równoczesnych transferów, a przy reset-commit sprawdzać go jak przy starcie (parsowanie, kompilacja, limity, licznik rotacji, rozłączność na magistrali) i rezerwować jego zasoby bez zmiany działającego planu.
-///   Test: `ExecutorsmCommandsTest.reset_transfer_limits`, `ExecutorsmCommandsTest.reset_commit_validates_without_touching_the_running_plan` (parsowanie, kompilacja, równoległa wymiana), `it_service_reset` (odmowy z działającym planem, nazwa zajęta przez inną instancję), `it_service_reset_race` (limit 148 strumieni), `it_env_error_exit-run` (licznik rotacji), `it_storage_refusal-reset`, `it_service_reset_double` (rezerwacja na magistrali).
-/// - odrzucać w kanale --reset plan z regułą DO SYSTEM, chyba że konfiguracja ustawia service.unrestricted.
-///   Test: `ExecutorsmCommandsTest.reset_commit_validates_without_touching_the_running_plan`, `it_service_reset` (kroki 3b i 8).
-/// - po przyjęciu planu --reset kończyć bieżącą epokę rozesłaniem znacznika końca pracy subskrybentom i zastępować plan
+///   Zakres testow: `ExecutorsmCommandsTest.commands_needing_a_model_answer_no_plan_or_stopping`, `ExecutorsmCommandsTest.unknown_stream_is_an_error_response_naming_it`, `it_issue252_missing_stream-run`, `it_service_reset` (odpowiedź braku planu u klienta).
+/// - [executorsm.executorsm.11~1] w show odmawiać subskrypcji z error.response, gdy epoka planu skończyła się w trakcie subskrypcji, tak aby klient nie pozostał zarejestrowany na strumieniu planu, który już nie działa.
+/// - [executorsm.executorsm.12~1] zamieniać wyjątek obsługi komendy na error.response bez kończenia procesu, a złamany niezmiennik silnika w komendzie zgłaszać odpowiedzią engine error z wpisem krytycznym w logu.
+/// - [executorsm.executorsm.13~1] w adhoc kompilować zapytanie na kopii planu, roszczyć nowe nazwy na magistrali i importować je do działającego planu, a przy każdej porażce po imporcie przywracać plan i zwalniać roszczone zasoby; reguły DO SYSTEM odrzucać w tym kanale bezwarunkowo.
+///   Zakres testow: `it_plan_error_e4-run` (odmowa kompilacji kopii zostawia plan), `it_multiserver_uniqueness` (punkty 6 i 7: odmowa cudzej nazwy, roszczenie nazwy ad-hoc), `it_issue6_adhoc-run`, `it_adhoc_register_rollback-run`, `it_adhoc_rule-run` (odmowa DO SYSTEM bez wykonania polecenia), `it_storage_refusal-adhoc`, `ExecutorsmAdHocRuleTest.attached_rule_sharing_a_dump_file_is_refused`.
+/// - [executorsm.executorsm.14~1] przyjmować plan kanałem --reset w porcjach z ograniczoną liczbą porcji, rozmiarem tekstu i liczbą równoczesnych transferów, a przy reset-commit sprawdzać go jak przy starcie (parsowanie, kompilacja, limity, licznik rotacji, rozłączność na magistrali) i rezerwować jego zasoby bez zmiany działającego planu.
+///   Zakres testow: `ExecutorsmCommandsTest.reset_transfer_limits`, `ExecutorsmCommandsTest.reset_commit_validates_without_touching_the_running_plan` (parsowanie, kompilacja, równoległa wymiana), `it_service_reset` (odmowy z działającym planem, nazwa zajęta przez inną instancję), `it_service_reset_race` (limit 148 strumieni), `it_env_error_exit-run` (licznik rotacji), `it_storage_refusal-reset`, `it_service_reset_double` (rezerwacja na magistrali).
+/// - [executorsm.executorsm.15~1] odrzucać w kanale --reset plan z regułą DO SYSTEM, chyba że konfiguracja ustawia service.unrestricted.
+///   Zakres testow: `ExecutorsmCommandsTest.reset_commit_validates_without_touching_the_running_plan`, `it_service_reset` (kroki 3b i 8).
+/// - [executorsm.executorsm.16~1] po przyjęciu planu --reset kończyć bieżącą epokę rozesłaniem znacznika końca pracy subskrybentom i zastępować plan
 ///   nowym; błąd ponownego parsowania lub kompilacji w applyPendingPlan zastępować pustym planem (tryb bezczynny).
-///   Test: `it_signal_stop-run` (część C: subskrybent kończy się kodem 0 na znaczniku po --reset), `it_service_reset` (podmiana planu i nazw na magistrali). Nietestowalne: pusty plan po porażce w applyPendingPlan - resetCommit przepuszcza tylko tekst, który przeszedł to samo parsowanie i kompilację na kopii, a rozjazd wymagałby haka w kodzie produkcyjnym.
-/// - w razie nieudanej budowy modelu danych, także po --reset, kończyć run kodem EIO dla Errc::IO albo EPROTO dla
+///   Zakres testow: `it_signal_stop-run` (część C: subskrybent kończy się kodem 0 na znaczniku po --reset), `it_service_reset` (podmiana planu i nazw na magistrali). Nietestowalne: pusty plan po porażce w applyPendingPlan - resetCommit przepuszcza tylko tekst, który przeszedł to samo parsowanie i kompilację na kopii, a rozjazd wymagałby haka w kodzie produkcyjnym.
+/// - [executorsm.executorsm.17~1] w razie nieudanej budowy modelu danych, także po --reset, kończyć run kodem EIO dla Errc::IO albo EPROTO dla
 ///   pozostałych błędów, zapisując przyczynę w initializationError.
-///   Test: `it_plan_error_e4-run` (przy starcie EPROTO dla deskryptora i pliku wyjścia, EIO dla dowiązania; po --reset EPROTO z przyczyną), `dataModel.initialization_refusal_preserves_class_and_discards_partial_model`.
-/// - przy aktywacji zasobów nowego planu kończyć proces przez FatalError z kodem EXIT_FAILURE dla statusu NotReserved;
+///   Zakres testow: `it_plan_error_e4-run` (przy starcie EPROTO dla deskryptora i pliku wyjścia, EIO dla dowiązania; po --reset EPROTO z przyczyną), `dataModel.initialization_refusal_preserves_class_and_discards_partial_model`.
+/// - [executorsm.executorsm.18~1] przy aktywacji zasobów nowego planu kończyć proces przez FatalError z kodem EXIT_FAILURE dla statusu NotReserved;
 ///   przy Unavailable kontynuować, a gdy magistrala jest dołączona, ostrzegać o braku publikacji nowego planu
 ///   i kontroli unikalności nazw.
-///   Test: `it_service_reset_double-bus-unavailable` (magistrala niedostępna: plan po --reset wchodzi i liczy). Nietestowalne: NotReserved oznacza złamaną kolejność silnika (rezerwację pilnuje planSwapInFlight, regresję `it_service_reset_double`), a Unavailable przy dołączonej magistrali wymaga zamka magistrali, którego nie da się wziąć - żadne z nich nie daje się wymusić bez haka w kodzie produkcyjnym. Kontrola strukturalna: gałąź NotReserved w applyPendingPlan woła FatalError.
-/// - błąd odczytu lub rezerwacji numeru licznika rotacji zgłaszać jako Errc::IO i kończyć wykonanie kodem EIO;
+///   Zakres testow: `it_service_reset_double-bus-unavailable` (magistrala niedostępna: plan po --reset wchodzi i liczy). Nietestowalne: NotReserved oznacza złamaną kolejność silnika (rezerwację pilnuje planSwapInFlight, regresję `it_service_reset_double`), a Unavailable przy dołączonej magistrali wymaga zamka magistrali, którego nie da się wziąć - żadne z nich nie daje się wymusić bez haka w kodzie produkcyjnym. Kontrola strukturalna: gałąź NotReserved w applyPendingPlan woła FatalError.
+/// - [executorsm.executorsm.19~1] błąd odczytu lub rezerwacji numeru licznika rotacji zgłaszać jako Errc::IO i kończyć wykonanie kodem EIO;
 ///   błąd wykonania slotu zgłaszać z zatrzymaniem pętli i kodem odpowiadającym jego kategorii.
-///   Test: `it_env_error_exit-rotation-reserve` (rezerwacja numeru przy starcie i po --reset: EIO), `it_env_error_exit-run` (błąd środowiska w slocie: EIO; błąd silnika w slocie: EXIT_FAILURE), `it_fatal_exit_path-run`.
-/// - przy SIGINT, SIGTERM, SIGHUP i zatrzymaniu pętli rozsyłać subskrybentom znacznik końca pracy i zatrzymywać wątek komunikacyjny przed zwróceniem kodu wyjścia.
-///   Test: `it_signal_stop-run` (wyjście kodem 0 we wszystkich trybach; część C: subskrybent kończy się kodem 0 na znaczniku po każdym sygnale i po kill). Kontrola strukturalna: ipcServer.stop() i removeAllObjects() przed `return` w executorsm::run.
+///   Zakres testow: `it_env_error_exit-rotation-reserve` (rezerwacja numeru przy starcie i po --reset: EIO), `it_env_error_exit-run` (błąd środowiska w slocie: EIO; błąd silnika w slocie: EXIT_FAILURE), `it_fatal_exit_path-run`.
+/// - [executorsm.executorsm.20~1] przy SIGINT, SIGTERM, SIGHUP i zatrzymaniu pętli rozsyłać subskrybentom znacznik końca pracy i zatrzymywać wątek komunikacyjny przed zwróceniem kodu wyjścia.
+///   Zakres testow: `it_signal_stop-run` (wyjście kodem 0 we wszystkich trybach; część C: subskrybent kończy się kodem 0 na znaczniku po każdym sygnale i po kill). Kontrola strukturalna: ipcServer.stop() i removeAllObjects() przed `return` w executorsm::run.
 struct executorsm {
   /// Odmowa budowy modelu wraca do launchera, ktory dla K2 woluje refusePlan (#474).
   rdb::Refusal initializationError;

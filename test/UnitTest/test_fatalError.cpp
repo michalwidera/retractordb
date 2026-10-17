@@ -19,6 +19,7 @@
 
 // ctest -R '^ut_fatalError' -V
 
+// covers: fatalerror.terminate-process.1~1
 // Wywolania w silniku pisza FatalError bez przestrzeni nazw; nazwa globalna ma prowadzic
 // do rdb::FatalError, a CTAD ma przejsc przez using-declaration.
 static_assert(std::is_same_v<decltype(FatalError("x {}", 1)), rdb::FatalError<int>>);
@@ -87,16 +88,19 @@ void reportLoggerState() {
 
 // K1: kod EXIT_FAILURE, komunikat FATAL na stderr, zatrzask podniesiony przed atexit.
 TEST(FatalErrorTest, InternalExitsWithFailureAndRaisesLatch) {
+  // covers: fatalerror.terminate-process.5~1
   EXPECT_EXIT(raiseInternal(), ::testing::ExitedWithCode(EXIT_FAILURE), "\nFATAL: internal fault 42\nlatch=1\n");
 }
 
 // K4: kod EIO, ten sam komunikat na stderr, zatrzask nie podniesiony.
 TEST(FatalErrorTest, EnvironmentExitsWithEioAndKeepsLatchDown) {
+  // covers: fatalerror.terminate-process.5~1
   EXPECT_EXIT(raiseEnvironment(), ::testing::ExitedWithCode(EIO), "\nFATAL \\(environment\\): environment fault 7\nlatch=0\n");
 }
 
 // Nowa granica statusowa nie gubi kategorii ani errno przy zmianie typu wartosci.
 TEST(ResultTest, PropagationPreservesErrorAndErrno) {
+  // covers: error.fail.3~1
   const auto read      = []() -> rdb::Result<std::unique_ptr<int>> { return rdb::fail(rdb::Errc::IO, "read failed", ENOENT); };
   const auto propagate = [&]() -> rdb::Result<int> {
     RDB_TRY_ASSIGN(auto value, read());
@@ -121,6 +125,7 @@ TEST(ResultTest, TrySupportsVoidAndMoveOnlyValues) {
 }
 
 TEST(ResultTest, DefaultFatalHandlerAborts) {
+  // covers: error.fatal.1~1, error.fatal.3~1
   EXPECT_EXIT(
       {
         rdb::setFatalHandler(nullptr);
@@ -130,6 +135,7 @@ TEST(ResultTest, DefaultFatalHandlerAborts) {
 }
 
 TEST(ResultTest, ReturningFatalHandlerStillAborts) {
+  // covers: error.fatal.3~1
   EXPECT_EXIT(
       {
         rdb::setFatalHandler([](std::string_view message, const std::source_location &where) noexcept {
@@ -141,6 +147,7 @@ TEST(ResultTest, ReturningFatalHandlerStillAborts) {
 }
 
 TEST(ResultTest, DaemonHandlerKeepsFatalLatchContract) {
+  // covers: fatalerror.daemon-fatal-exit.1~1
   EXPECT_EXIT(
       {
         std::atexit(reportLatch);
@@ -151,6 +158,7 @@ TEST(ResultTest, DaemonHandlerKeepsFatalLatchContract) {
 }
 
 TEST(ResultTest, ErrorNamesRefusalClassesAndHandlerExchange) {
+  // covers: error.errc-name.1~1, error.fail.1~1, error.fail.2~1, error.set-fatal-handler.1~1
   for (const auto &[code, name] :
        std::vector<std::pair<rdb::Errc, std::string>>{{rdb::Errc::Config, "ConfigError"},
                                                       {rdb::Errc::CorruptDescriptor, "CorruptDescriptor"},
@@ -180,6 +188,7 @@ TEST(ResultTest, ErrorNamesRefusalClassesAndHandlerExchange) {
 }
 
 TEST(FatalErrorTest, FormattingFailureStillRunsAtexit) {
+  // covers: fatalerror.terminate-process.4~1, fatalerror.terminate-process.5~1
   EXPECT_EXIT(
       {
         std::atexit(reportLatch);
@@ -195,6 +204,7 @@ TEST(FatalErrorTest, FormattingFailureStillRunsAtexit) {
 }
 
 TEST(FatalErrorTest, TerminationLogsLocationFlushesAndKeepsLoggerAlive) {
+  // covers: fatalerror.terminate-process.2~1, fatalerror.terminate-process.3~1
   EXPECT_EXIT(auditedTermination(false), ::testing::ExitedWithCode(EXIT_FAILURE),
               "audit: level=5 source=1 latch=1 message=audit 42\naudit: flushed\n"
               "\nFATAL: audit 42\nlogger-alive=1\naudit: level=2 source=0 latch=1 message=atexit logging\nlatch=1");
@@ -205,10 +215,12 @@ TEST(FatalErrorTest, TerminationLogsLocationFlushesAndKeepsLoggerAlive) {
 }
 
 TEST(FatalErrorTest, EnvironmentPreservesAnAlreadyRaisedLatch) {
+  // covers: fatalerror.terminate-process.2~1
   EXPECT_EXIT(auditedTermination(true, true), ::testing::ExitedWithCode(EIO), "source=1 latch=1 message=environment: audit 42");
 }
 
 TEST(FatalErrorTest, LoggingFailureStillRunsAtexit) {
+  // covers: fatalerror.terminate-process.4~1, fatalerror.terminate-process.5~1
   EXPECT_EXIT(auditedTermination(false, false, true), ::testing::ExitedWithCode(EXIT_FAILURE),
               "audit: level=5 source=1 latch=1 message=audit 42\nlatch=1");
   EXPECT_EXIT(auditedTermination(true, false, true), ::testing::ExitedWithCode(EIO),
@@ -216,11 +228,13 @@ TEST(FatalErrorTest, LoggingFailureStillRunsAtexit) {
 }
 
 TEST(FatalErrorTest, DaemonHandlerLogsTheCallerLocation) {
+  // covers: fatalerror.daemon-fatal-exit.1~1
   EXPECT_EXIT(auditedTermination(false, false, false, true), ::testing::ExitedWithCode(EXIT_FAILURE),
               "audit: level=5 source=1 latch=1 message=audit 42.*latch=1");
 }
 
 TEST(ResultTest, DefaultFatalLogsLocationAndWorksWithoutALogger) {
+  // covers: error.fatal.2~1
   EXPECT_EXIT(
       {
         const auto location = std::source_location::current();
@@ -242,6 +256,7 @@ TEST(ResultTest, DefaultFatalLogsLocationAndWorksWithoutALogger) {
 }
 
 TEST(ResultTest, FatalHandlerReceivesTheExactLocation) {
+  // covers: error.fatal.1~1
   EXPECT_EXIT(
       {
         expectedOrigin = std::source_location::current();

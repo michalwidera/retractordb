@@ -230,6 +230,7 @@ extern "C" int open(const char *path, int flags, ...) {
 #endif
 
 TEST_F(LockFileSafety, SymlinkPreservesTargetAndReportsReason) {
+  // covers: lockfile.is-held.2~1, lockfile.claim-abandoned.2~1, lockmanager.flock-service-guard.3~1
   const auto target = writeLockFile(dir.string(), "sentinel", "sentinel contents\n");
   const auto size   = std::filesystem::file_size(target);
   std::filesystem::create_symlink(target, path);
@@ -252,6 +253,7 @@ TEST_F(LockFileSafety, SymlinkPreservesTargetAndReportsReason) {
 }
 
 TEST_F(LockFileSafety, DanglingSymlinkIsRefusedWithoutCreatingTarget) {
+  // covers: lockfile.acquire.1~1, lockfile.acquire.5~1
   const auto target = dir / "absent";
   std::filesystem::create_symlink(target, path);
   for (const bool writable : {false, true}) {
@@ -267,6 +269,7 @@ TEST_F(LockFileSafety, DanglingSymlinkIsRefusedWithoutCreatingTarget) {
 }
 
 TEST_F(LockFileSafety, WrongTypesDoNotBlockReadersWritersOrCleanup) {
+  // covers: lockfile.acquire.5~1, lockfile.is-held.2~1, lockfile.claim-abandoned.2~1, lockmanager.flock-service-guard.3~1
   ASSERT_EQ(mkfifo(path.c_str(), 0600), 0);
   for (const bool directory : {false, true}) {
     if (directory) {
@@ -294,6 +297,7 @@ TEST_F(LockFileSafety, WrongTypesDoNotBlockReadersWritersOrCleanup) {
 // Dowiazanie dodane po zajeciu nie przekierowuje zapisu: deskryptor wskazuje i-wezel instancji.
 // Odmowa publikacji niczego by nie chronila, a zostawilaby klientow bez linii PID.
 TEST_F(LockFileSafety, HardlinkRefusedBeforeAcquireLaterAliasDoesNotBlockPublish) {
+  // covers: lockfile.acquire.5~1, lockmanager.flock-service-guard.3~1
   const auto target = writeLockFile(dir.string(), "sentinel", "sentinel contents\n");
   std::filesystem::create_hard_link(target, path);
   FlockServiceGuard guard(service);
@@ -313,6 +317,8 @@ TEST_F(LockFileSafety, HardlinkRefusedBeforeAcquireLaterAliasDoesNotBlockPublish
 }
 
 TEST_F(LockFileSafety, AcquirePublishExcludeReleaseAndReacquire) {
+  // covers: lockmanager.flock-service-guard.1~1, lockmanager.flock-service-guard.2~1, lockmanager.flock-service-guard.3~1
+  // covers: lockmanager.flock-service-guard.5~1, lockmanager.flock-service-guard.7~1, lockmanager.flock-service-guard.8~1
   writeLockFile(dir.string(), service, "stale process info\n");
   FlockServiceGuard first(service);
   first.setLockDir(dir.string());
@@ -337,6 +343,7 @@ TEST_F(LockFileSafety, AcquirePublishExcludeReleaseAndReacquire) {
 }
 
 TEST_F(LockFileSafety, ReplacementSymlinkDoesNotIdentifyHeldInode) {
+  // covers: lockfile.still-linked.1~1, lockfile.remove-and-release.1~1
   int fd = -1;
   ASSERT_EQ(lockfile::acquire(path.string(), true, true, fd), lockfile::Result::Acquired);
   const auto moved = dir / "moved";
@@ -360,6 +367,7 @@ TEST_F(LockFileSafety, ReplacementSymlinkDoesNotIdentifyHeldInode) {
 
 // EPERM z samego open() (np. plik niezmienny) to blad systemu, nie obcy wlasciciel.
 TEST_F(LockFileSafety, SystemErrorFromOpenIsNotReportedAsRefusal) {
+  // covers: lockfile.acquire.6~1
   { std::ofstream(path) << "kept\n"; }
   failingPath  = path.string();
   failingErrno = EPERM;
@@ -376,6 +384,7 @@ TEST_F(LockFileSafety, SystemErrorFromOpenIsNotReportedAsRefusal) {
 }
 
 TEST_F(LockFileSafety, OpenCreateRaceHasAnInternalRetryLimit) {
+  // covers: lockfile.acquire.5~1
   unstablePath = path.string();
   openAttempts = 0;
   int fd       = -1;
@@ -389,6 +398,7 @@ TEST_F(LockFileSafety, OpenCreateRaceHasAnInternalRetryLimit) {
 }
 
 TEST_F(LockFileSafety, NewLockIgnoresUmaskAndUsesTheRequestedAccessMode) {
+  // covers: lockfile.acquire.1~1, lockfile.acquire.4~1, lockfile.still-linked.1~1, lockfile.remove-and-release.1~1
   const mode_t previous = umask(0077);
   for (const bool writable : {false, true}) {
     int fd            = -1;
@@ -408,6 +418,7 @@ TEST_F(LockFileSafety, NewLockIgnoresUmaskAndUsesTheRequestedAccessMode) {
 }
 
 TEST_F(LockFileSafety, StatAndFlockSystemErrorsCloseTheCandidateDescriptor) {
+  // covers: lockfile.acquire.6~1
   trackedPath = path.string();
   for (const auto fault : {LockFault::Stat, LockFault::Flock}) {
     lockFault = fault;
@@ -422,6 +433,7 @@ TEST_F(LockFileSafety, StatAndFlockSystemErrorsCloseTheCandidateDescriptor) {
 }
 
 TEST_F(LockFileSafety, RelinkingAfterSuccessfulFlockStopsAtOneHundredAttempts) {
+  // covers: lockfile.acquire.3~1
   trackedPath  = path.string();
   lockFault    = LockFault::Relink;
   relinkChecks = 0;
@@ -436,6 +448,8 @@ TEST_F(LockFileSafety, RelinkingAfterSuccessfulFlockStopsAtOneHundredAttempts) {
 }
 
 TEST_F(LockFileSafety, SweepCallbackRunsUnderExclusiveLockAndCountsOnlyAcceptedFiles) {
+  // covers: lockfile.claim-abandoned.1~1, lockfile.claim-abandoned.2~1, lockfile.sweep.1~1, lockfile.sweep.3~1
+  // covers: lockfile.sweep.4~1, lockfile.sweep.5~1
   std::ofstream(path) << "abandoned";
   std::ofstream(dir / "unrelated") << "kept";
   int callbacks = 0;
@@ -466,6 +480,7 @@ TEST_F(LockFileSafety, SweepCallbackRunsUnderExclusiveLockAndCountsOnlyAcceptedF
 }
 
 TEST_F(LockFileSafety, TruncateFailureDuringAcquireKeepsTheLockAndReportsWarning) {
+  // covers: lockmanager.flock-service-guard.2~1
   std::ofstream(path) << "previous";
   trackedPath = path.string();
   lockFault   = LockFault::Truncate;
@@ -486,6 +501,7 @@ TEST_F(LockFileSafety, TruncateFailureDuringAcquireKeepsTheLockAndReportsWarning
 }
 
 TEST_F(LockFileSafety, PublishingChecksEveryIoBoundaryAndUsesOneWrite) {
+  // covers: lockmanager.flock-service-guard.5~1
   trackedPath = path.string();
   FlockServiceGuard guard(service);
   guard.setLockDir(dir.string());
@@ -513,6 +529,7 @@ TEST_F(LockFileSafety, PublishingChecksEveryIoBoundaryAndUsesOneWrite) {
 }
 
 TEST_F(LockFileSafety, DocumentedShortWritesAreAcceptedWithoutRetry) {
+  // covers: lockmanager.flock-service-guard.5~1
   trackedPath = path.string();
   FlockServiceGuard guard(service);
   guard.setLockDir(dir.string());
@@ -528,6 +545,8 @@ TEST_F(LockFileSafety, DocumentedShortWritesAreAcceptedWithoutRetry) {
 }
 
 TEST_F(LockFileSafety, IpcLockRequiresInstanceLockAndCannotBeAcquiredTwice) {
+  // covers: lockmanager.flock-service-guard.1~1, lockmanager.flock-service-guard.4~1, lockmanager.flock-service-guard.7~1
+  // covers: lockmanager.flock-service-guard.8~1
   FlockServiceGuard guard(service);
   EXPECT_EQ(guard.lockDirectory(), std::filesystem::temp_directory_path().string());
   guard.setLockDir(dir.string());
@@ -544,6 +563,7 @@ TEST_F(LockFileSafety, IpcLockRequiresInstanceLockAndCannotBeAcquiredTwice) {
 }
 
 TEST(LockManagerIdentity, CopiesThePlatformServiceIdentity) {
+  // covers: lockmanager.detect-systemd-identity.1~1
   const auto platform = osplat::detectServiceIdentity();
   const auto guard    = detectSystemdIdentity();
   EXPECT_EQ(guard.unit, platform.unit);
@@ -551,6 +571,7 @@ TEST(LockManagerIdentity, CopiesThePlatformServiceIdentity) {
 }
 
 // Straznik nie zmienia ani wlasciciela deskryptorow, ani adresu (serviceGuardPtr) - R-01, #274.
+// covers: lockmanager.flock-service-guard.9~1
 static_assert(!std::is_copy_constructible_v<FlockServiceGuard>);
 static_assert(!std::is_copy_assignable_v<FlockServiceGuard>);
 static_assert(!std::is_move_constructible_v<FlockServiceGuard>);
@@ -559,6 +580,7 @@ static_assert(!std::is_move_assignable_v<FlockServiceGuard>);
 // --- readPeerInfo: parsowanie MODE/UNIT/SCOPE/QUERYFILE ---
 
 TEST(LockManagerPeerInfo, parses_service_with_unit_scope_and_queryfile) {
+  // covers: lockmanager.flock-service-guard.6~1
   const std::string dir = (std::filesystem::temp_directory_path() / "ut_lockmgr_svc").string();
   const std::string svc = "ut_svc";
   writeLockFile(dir, svc,
@@ -579,6 +601,7 @@ TEST(LockManagerPeerInfo, parses_service_with_unit_scope_and_queryfile) {
 }
 
 TEST(LockManagerPeerInfo, parses_user_scope) {
+  // covers: lockmanager.flock-service-guard.6~1
   const std::string dir = (std::filesystem::temp_directory_path() / "ut_lockmgr_user").string();
   const std::string svc = "ut_user";
   writeLockFile(dir, svc, "PID: 5\nMODE: service\nUNIT: xretractor.service\nSCOPE: user\n");
@@ -594,6 +617,7 @@ TEST(LockManagerPeerInfo, parses_user_scope) {
 }
 
 TEST(LockManagerPeerInfo, plain_process_lock_yields_process_kind) {
+  // covers: lockmanager.flock-service-guard.6~1
   const std::string dir = (std::filesystem::temp_directory_path() / "ut_lockmgr_proc").string();
   const std::string svc = "ut_proc";
   writeLockFile(dir, svc, "PID: 9\nPPID: 1\nMODE: process\n");
@@ -610,6 +634,7 @@ TEST(LockManagerPeerInfo, plain_process_lock_yields_process_kind) {
 }
 
 TEST(LockManagerPeerInfo, missing_lock_file_yields_unknown) {
+  // covers: lockmanager.flock-service-guard.6~1
   const std::string dir = (std::filesystem::temp_directory_path() / ("ut_lockmgr_absent_" + std::to_string(getpid()))).string();
   FlockServiceGuard guard("ut_absent");
   guard.setLockDir(dir);
@@ -631,6 +656,7 @@ TEST(LockManagerPeerInfo, missing_lock_file_yields_unknown) {
 }
 
 TEST(LockManagerFlock, releaseRemovesFileAndOrphanedOpenerCannotWin) {
+  // covers: lockfile.acquire.3~1, lockfile.remove-and-release.1~1
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / ("ut_lockmgr_inode_" + std::to_string(getpid()));
   const std::string serviceName   = "xretractor_service.alfa";
   const std::filesystem::path lockPath = dir / (serviceName + ".lock");
@@ -950,6 +976,7 @@ TEST_F(ServiceControlContract, refused_plan_handles_empty_paths_and_logs_both_ou
 }
 
 TEST(LockManagerFlock, HashCollisionCannotAcquireTheSameIpcIdentity) {
+  // covers: lockmanager.flock-service-guard.4~1
   // Dwie rozne poprawne nazwy, ten sam skrot FNV. Kolizja wymuszona danymi,
   // nie podmiana funkcji haszujacej; test dziala tez na Linuksie.
   const std::string firstName  = "review_collision_65273";
@@ -1003,6 +1030,7 @@ bool shmExists(const std::string &name) {
 }  // namespace
 
 TEST(LockFile, ExclusiveAcquireWaitsOutTransientHolder) {
+  // covers: lockfile.acquire.2~1
   // Sprzatacz i proces kasujacy plik trzymaja blokade przez chwile. Startujaca instancja nie moze
   // wtedy odpasc z "juz dziala" - czeka krotko i dostaje nowy plik.
   const std::string path =
@@ -1023,6 +1051,8 @@ TEST(LockFile, ExclusiveAcquireWaitsOutTransientHolder) {
 }
 
 TEST(LockFile, LiveHolderMeansBusyAndIsVisible) {
+  // covers: lockfile.acquire.2~1, lockfile.acquire.4~1, lockfile.is-held.1~1, lockfile.is-held.2~1, lockfile.claim-abandoned.1~1
+  // covers: lockfile.claim-abandoned.2~1
   const std::string path =
       (std::filesystem::temp_directory_path() / ("ut_lockfile_live_" + std::to_string(getpid()) + ".lock")).string();
   int holder = -1;
@@ -1036,6 +1066,7 @@ TEST(LockFile, LiveHolderMeansBusyAndIsVisible) {
 }
 
 TEST(LockFile, SharedAcquireWaitsOutTransientExclusiveHolder) {
+  // covers: lockfile.acquire.2~1
   const std::string path =
       (std::filesystem::temp_directory_path() / ("ut_lockfile_shared_transient_" + std::to_string(getpid()) + ".lock")).string();
   int holder = -1;
@@ -1054,6 +1085,7 @@ TEST(LockFile, SharedAcquireWaitsOutTransientExclusiveHolder) {
 }
 
 TEST(LockFile, SharedAcquireHasDeadlineWithExclusiveHolder) {
+  // covers: lockfile.acquire.2~1
   const std::string path =
       (std::filesystem::temp_directory_path() / ("ut_lockfile_shared_busy_" + std::to_string(getpid()) + ".lock")).string();
   int holder = -1;
@@ -1076,6 +1108,7 @@ TEST(LockFile, SharedAcquireHasDeadlineWithExclusiveHolder) {
 }
 
 TEST(LockManagerFlock, IpcIdentityLockNeedsNoWriteAccess) {
+  // covers: lockmanager.flock-service-guard.4~1, lockmanager.flock-service-guard.8~1
   // Blokada tozsamosci lezy w katalogu wspolnym dla maszyny i moze nalezec do innego uzytkownika:
   // 0644, a przy fs.protected_regular jadro odrzuca nawet O_CREAT na takim pliku. Plik bez prawa
   // zapisu odtwarza to bez drugiego konta (pod rootem test przechodzi trywialnie). Katalog wlasny,
@@ -1098,6 +1131,9 @@ TEST(LockManagerFlock, IpcIdentityLockNeedsNoWriteAccess) {
 }
 
 TEST(LockManagerSweep, RemovesOnlyAbandonedLocksAndTheirIpcObjects) {
+  // covers: bus.sweep-abandoned-segments.1~1, lockfile.sweep.1~1, lockfile.sweep.4~1, lockmanager.sweep-abandoned-resources.1~1
+  // covers: lockmanager.sweep-abandoned-resources.2~1, lockmanager.sweep-abandoned-resources.3~1
+  // covers: lockmanager.sweep-abandoned-resources.4~1
   // Wlasne katalogi zamiast /tmp: tam porzucone blokady zabieral sprzatacz konczacego sie
   // sasiedniego serwera i licznik wychodzil 0. Osobny katalog na kazdy rodzaj, zeby zamiana
   // argumentow nie przeszla niezauwazona.
@@ -1156,6 +1192,7 @@ TEST(LockManagerSweep, RemovesOnlyAbandonedLocksAndTheirIpcObjects) {
 // silnik, druga sprzatacz i straznik xtrdb. Oczekiwane nazwy plikow sa wpisane recznie, zeby test
 // nie porownywal funkcji z nia sama.
 TEST(ServiceLockFamily, NamesRoundTripAndForeignFilesAreRejected) {
+  // covers: lockmanager.sweep-abandoned-resources.1~1
   EXPECT_EQ(ipc::serviceLockFile(ipc::serviceName("")), "xretractor_service.lock");
   EXPECT_EQ(ipc::serviceLockFile(ipc::serviceName("alfa")), "xretractor_service.alfa.lock");
 

@@ -5,6 +5,7 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
+# covers: launcher.xretractor.29~1, executorsm.executorsm.14~1
 add_test(
   NAME ${TestID}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -12,6 +13,7 @@ add_test(
 
 set_tests_properties(${TestID} PROPERTIES TIMEOUT 120)
 
+# covers: executorsm.executorsm.18~1
 # Wymiana planu przy magistrali niedostepnej (Unavailable); bez /dev/shm
 # niewykonalna (77).
 add_test(

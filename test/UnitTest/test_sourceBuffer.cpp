@@ -42,6 +42,7 @@ int valueOf(const rdb::payload &p) {
 // jeden rekord - setCapacity(0) podnosi pojemność do 1.
 // ---------------------------------------------------------------------------
 TEST(SourceBufferTest, capacity_is_at_least_one) {
+  // covers: sourcebuffer.source-buffer.5~1
   rdb::SourceBuffer buffer;
   EXPECT_EQ(buffer.capacity(), 0U);
 
@@ -57,6 +58,7 @@ TEST(SourceBufferTest, capacity_is_at_least_one) {
 // poprawny odczyt daje wzorzec all-false i wartość z pliku.
 // ---------------------------------------------------------------------------
 TEST(SourceBufferTest, read_current_fills_out_from_source) {
+  // covers: sourcebuffer.source-buffer.1~1, sourcebuffer.source-buffer.2~1
   createTextFile("sb_read.txt", "42\n");
   auto desc = intDescriptor();
   rdb::textSourceRO source("sb_read.txt", desc, false);
@@ -78,6 +80,7 @@ TEST(SourceBufferTest, read_current_fills_out_from_source) {
 // zwraca dane wyzerowane z wzorcem all-null - SourceBuffer przekazuje je dalej.
 // ---------------------------------------------------------------------------
 TEST(SourceBufferTest, read_current_after_eof_returns_null_row) {
+  // covers: sourcebuffer.source-buffer.2~1
   createTextFile("sb_eof.txt", "7\n");
   auto desc = intDescriptor();
   rdb::textSourceRO source("sb_eof.txt", desc, false);
@@ -100,6 +103,7 @@ TEST(SourceBufferTest, read_current_after_eof_returns_null_row) {
 // to najnowszy rekord, starsze rekordy przesuwają się w głąb bufora.
 // ---------------------------------------------------------------------------
 TEST(SourceBufferTest, fire_pushes_chamber_into_history) {
+  // covers: sourcebuffer.source-buffer.6~1, storage.storage.8~1
   createTextFile("sb_fire.txt", "1\n2\n3\n");
   auto desc = intDescriptor();
   rdb::textSourceRO source("sb_fire.txt", desc, false);
@@ -126,6 +130,7 @@ TEST(SourceBufferTest, fire_pushes_chamber_into_history) {
 }
 
 TEST(SourceBufferTest, history_preserves_nulls_independently_of_the_output) {
+  // covers: sourcebuffer.source-buffer.6~1
   createTextFile("sb_history_null.txt", "null\n7\n");
   auto descriptor = intDescriptor();
   rdb::textSourceRO source("sb_history_null.txt", descriptor, false);
@@ -147,6 +152,7 @@ TEST(SourceBufferTest, history_preserves_nulls_independently_of_the_output) {
 }
 
 TEST(SourceBufferTest, input_content_failure_preserves_the_output_and_reports_the_cause) {
+  // covers: sourcebuffer.source-buffer.3~1
   const std::string file = "sb_invalid_content.txt";
   createTextFile(file, "12 invalid\n");
   const rdb::Descriptor descriptor{{"a", 4, 1, rdb::INTEGER}, {"missing", 0, 1, rdb::NULLTYPE}};
@@ -164,6 +170,7 @@ TEST(SourceBufferTest, input_content_failure_preserves_the_output_and_reports_th
 }
 
 TEST(SourceBufferTest, read_failure_warning_preserves_the_null_row) {
+  // covers: sourcebuffer.source-buffer.3~1
   const std::string file = "sb_missing_warning.txt";
   std::filesystem::remove(file);
   auto descriptor = intDescriptor();
@@ -182,6 +189,7 @@ TEST(SourceBufferTest, read_failure_warning_preserves_the_null_row) {
 }
 
 TEST(SourceBufferDeathTest, fire_without_capacity_is_an_invariant_failure) {
+  // covers: sourcebuffer.source-buffer.4~1
   auto descriptor = intDescriptor();
   rdb::SourceBuffer buffer;
   buffer.attach(descriptor);

@@ -12,6 +12,7 @@
 
 // ctest -R '^ut_qTree' -V
 
+// covers: qtree.q-tree.1~1
 static_assert(!std::is_convertible_v<qTree *, std::vector<query> *>);
 
 using rational = boost::rational<int>;
@@ -23,12 +24,14 @@ static query makeQuery(const std::string &id, int num = 1, int den = 1) { return
 // ============================================================
 
 TEST(qTree, exists_returns_true_when_query_present) {
+  // covers: qtree.q-tree.7~1
   qTree qt;
   qt.push_back(makeQuery("alpha"));
   EXPECT_TRUE(qt.exists("alpha"));
 }
 
 TEST(qTree, exists_returns_false_when_query_absent) {
+  // covers: qtree.q-tree.7~1
   qTree qt;
   qt.push_back(makeQuery("alpha"));
   EXPECT_FALSE(qt.exists("beta"));
@@ -44,6 +47,7 @@ TEST(qTree, exists_returns_false_on_empty_tree) {
 // ============================================================
 
 TEST(qTree, getQuery_returns_correct_query) {
+  // covers: qtree.q-tree.7~1
   qTree qt;
   qt.push_back(makeQuery("s1"));
   qt.push_back(makeQuery("s2"));
@@ -55,6 +59,7 @@ TEST(qTree, getQuery_returns_correct_query) {
 // compiler::checkStreamReferences, nazwy od klienta sprawdzaja exists() ich wolajacy. Zlamany
 // warunek konczy proces przez rdb::fatal (RDB_ASSERT) - do 2026-10 byl to std::logic_error.
 TEST(qTree, getQuery_throws_logic_error_when_not_found) {
+  // covers: qtree.q-tree.7~1
   qTree qt;
   qt.push_back(makeQuery("s1"));
   EXPECT_DEATH(static_cast<void>(qt.getQuery("missing")), "FATAL: .*missing");
@@ -62,6 +67,7 @@ TEST(qTree, getQuery_throws_logic_error_when_not_found) {
 
 // Pusta nazwa nie jest bledem PLANU - zaden tekst RQL jej nie wytwarza - wiec to niezmiennik.
 TEST(qTree, getQuery_fatals_on_empty_name) {
+  // covers: qtree.q-tree.7~1
   qTree qt;
   EXPECT_DEATH(static_cast<void>(qt.getQuery("")), "FATAL: qTree::getQuery: query name is empty");
 }
@@ -130,6 +136,7 @@ TEST(qTree, exists_true_for_twin_names) {
 // ============================================================
 
 TEST(qTree, bracket_operator_returns_correct_query) {
+  // covers: qtree.q-tree.7~1
   qTree qt;
   qt.push_back(makeQuery("x"));
   EXPECT_EQ(qt["x"].id, "x");
@@ -139,6 +146,7 @@ TEST(qTree, bracket_operator_returns_correct_query) {
 // w qTree.hpp wersja pozycyjna jest ukryta przez wersje po nazwie i ten test nie kompiluje sie -
 // to jest cala jego tresc, wiec nie wolno go usunac jako "oczywistego".
 TEST(qTree, bracket_operator_takes_position_and_name) {
+  // covers: qtree.q-tree.1~1
   qTree qt;
   qt.push_back(makeQuery("pierwszy"));
   qt.push_back(makeQuery("drugi"));
@@ -155,6 +163,7 @@ TEST(qTree, bracket_operator_takes_position_and_name) {
 // ============================================================
 
 TEST(qTree, getDelta_returns_rInterval) {
+  // covers: qtree.q-tree.8~1
   qTree qt;
   qt.push_back(makeQuery("q", 3, 4));
   EXPECT_EQ(qt.getDelta("q"), rational(3, 4));
@@ -165,6 +174,7 @@ TEST(qTree, getDelta_returns_rInterval) {
 // ============================================================
 
 TEST(qTree, sort_orders_by_rInterval_ascending) {
+  // covers: qtree.q-tree.6~1
   qTree qt;
   qt.push_back(makeQuery("slow", 3, 1));
   qt.push_back(makeQuery("fast", 1, 2));
@@ -207,6 +217,7 @@ TEST(qTree, topologicalSort_places_dependency_before_dependent) {
 }
 
 TEST(qTree, topologicalSort_chain_three_nodes) {
+  // covers: qtree.q-tree.5~1
   // C zależy od B, B zależy od A. Oryginalna kolejność: C B A. Oczekiwana: A B C.
   qTree qt;
 
@@ -233,6 +244,7 @@ TEST(qTree, topologicalSort_chain_three_nodes) {
 // ============================================================
 
 TEST(qTree, dumpCore_does_not_crash) {
+  // covers: qtree.q-tree.10~1
   qTree qt;
   qt.push_back(makeQuery("s1", 1, 2));
   qt.push_back(makeQuery("s2", 1, 1));
@@ -256,6 +268,7 @@ TEST(qTree, dumpCore_does_not_crash) {
 // ============================================================
 
 TEST(qTree, getAvailableTimeIntervals_returns_unique_intervals) {
+  // covers: qtree.q-tree.9~1
   qTree qt;
   qt.push_back(makeQuery("s1", 1, 2));
   qt.push_back(makeQuery("s2", 1, 1));
@@ -282,6 +295,7 @@ TEST(qTree, getAvailableTimeIntervals_skips_compiler_directives) {
 // Dyrektywa z parsera ma interwal zero. Plan `-c -w` niesie ja do TimeLine bez dataModel,
 // wiec dawniej `xretractor plan.rql -c -w 1` z STORAGE konczyl sie FATAL (#474).
 TEST(qTree, getAvailableTimeIntervals_skips_directive_with_zero_interval) {
+  // covers: qtree.q-tree.9~1
   qTree qt;
   qt.push_back(makeQuery(":STORAGE", 0, 1));
   qt.push_back(makeQuery("s1", 1, 2));
@@ -291,6 +305,7 @@ TEST(qTree, getAvailableTimeIntervals_skips_directive_with_zero_interval) {
 }
 
 TEST(qTree, getAvailableTimeIntervals_fatals_when_rInterval_is_zero) {
+  // covers: qtree.q-tree.9~1
   qTree qt;
   qt.push_back(makeQuery("bad", 0, 1));
   EXPECT_DEATH(static_cast<void>(qt.getAvailableTimeIntervals()), "FATAL: .*rInterval is zero");
@@ -307,6 +322,7 @@ TEST(qTree, getAvailableTimeIntervals_fatals_when_rInterval_is_zero) {
 // całego drzewa nie potrafią podstawić numeru, który obserwator uzna za swój.
 
 TEST(qTree, planRevision_changes_on_push_back_copy) {
+  // covers: qtree.q-tree.2~1
   qTree qt;
   const auto before = qt.planRevision();
   const query node  = makeQuery("alpha");
@@ -315,6 +331,7 @@ TEST(qTree, planRevision_changes_on_push_back_copy) {
 }
 
 TEST(qTree, planRevision_changes_on_push_back_move) {
+  // covers: qtree.q-tree.2~1
   qTree qt;
   const auto before = qt.planRevision();
   qt.push_back(makeQuery("alpha"));
@@ -322,6 +339,7 @@ TEST(qTree, planRevision_changes_on_push_back_move) {
 }
 
 TEST(qTree, planRevision_changes_on_pop_back) {
+  // covers: qtree.q-tree.2~1
   qTree qt;
   qt.push_back(makeQuery("alpha"));
   const auto before = qt.planRevision();
@@ -330,6 +348,7 @@ TEST(qTree, planRevision_changes_on_pop_back) {
 }
 
 TEST(qTree, planRevision_changes_on_erase_single) {
+  // covers: qtree.q-tree.2~1
   qTree qt;
   qt.push_back(makeQuery("alpha"));
   qt.push_back(makeQuery("beta"));
@@ -340,6 +359,7 @@ TEST(qTree, planRevision_changes_on_erase_single) {
 }
 
 TEST(qTree, planRevision_changes_on_erase_range) {
+  // covers: qtree.q-tree.2~1
   qTree qt;
   qt.push_back(makeQuery("alpha"));
   qt.push_back(makeQuery("beta"));
@@ -350,6 +370,7 @@ TEST(qTree, planRevision_changes_on_erase_range) {
 }
 
 TEST(qTree, planRevision_changes_on_clear) {
+  // covers: qtree.q-tree.2~1
   qTree qt;
   qt.push_back(makeQuery("alpha"));
   const auto before = qt.planRevision();
@@ -358,6 +379,7 @@ TEST(qTree, planRevision_changes_on_clear) {
 }
 
 TEST(qTree, planRevision_changes_on_replaceAll) {
+  // covers: qtree.q-tree.2~1
   qTree qt;
   qt.push_back(makeQuery("alpha"));
   const auto before = qt.planRevision();
@@ -367,6 +389,7 @@ TEST(qTree, planRevision_changes_on_replaceAll) {
 }
 
 TEST(qTree, planRevision_changes_on_sort_even_when_order_already_correct) {
+  // covers: qtree.q-tree.2~1
   // sort() jest operacją na kształcie z definicji, a nie z wyniku: kolejność po niej jest
   // nowym stanem także wtedy, gdy wyszła taka sama. Numer bierze zawsze - inaczej trzeba by
   // porównywać plan przed i po, czyli robić dokładnie tę pracę, której numer ma oszczędzić.
@@ -379,6 +402,7 @@ TEST(qTree, planRevision_changes_on_sort_even_when_order_already_correct) {
 }
 
 TEST(qTree, planRevision_changes_on_topologicalSort) {
+  // covers: qtree.q-tree.2~1
   qTree qt;
   query a = makeQuery("A");
   a.lProgram.push_back(token(PUSH_STREAM, std::string("B")));
@@ -405,6 +429,7 @@ TEST(qTree, planRevision_unchanged_by_node_content) {
 }
 
 TEST(qTree, planRevision_differs_between_freshly_built_trees) {
+  // covers: qtree.q-tree.2~1
   // Numery wydaje jeden dozownik na proces, więc puste drzewo powstałe przy przeładowaniu
   // planu nie może trafić w numer, który ktoś zapamiętał dla innego drzewa.
   qTree first;
@@ -413,6 +438,7 @@ TEST(qTree, planRevision_differs_between_freshly_built_trees) {
 }
 
 TEST(qTree, planRevision_copy_carries_source_number_until_first_mutation) {
+  // covers: qtree.q-tree.3~1
   // Kopia planu w kanale ad-hoc (executorsm::getAdHoc) niesie numer źródła, bo w tej chwili
   // ma dokładnie jego kształt. Pierwsza mutacja kopii bierze własny numer.
   qTree live;
@@ -441,6 +467,7 @@ TEST(qTree, planRevision_assignment_cannot_restore_an_observed_number) {
 }
 
 TEST(qTree, planRevision_never_matches_the_value_reserved_for_no_observation) {
+  // covers: qtree.q-tree.2~1
   // Zero znaczy "jeszcze nic nie obserwowane" u tego, kto numer zapamiętuje, więc żadne
   // żywe drzewo nie ma prawa go nosić.
   qTree qt;
@@ -450,6 +477,7 @@ TEST(qTree, planRevision_never_matches_the_value_reserved_for_no_observation) {
 }
 
 TEST(qTree, replaceAll_preserves_capacity_and_copy_assignment_carries_revision) {
+  // covers: qtree.q-tree.3~1, qtree.q-tree.4~1
   qTree plan;
   plan.push_back(makeQuery("old"));
   plan.maxCapacity["old"] = 17;

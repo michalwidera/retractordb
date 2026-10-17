@@ -68,6 +68,7 @@ BoundaryInputStream::BoundaryInputStream(const std::string &text) : antlr4::ANTL
 /// bezczynny" nie dzialala wcale, a Restart=on-failure zapetlal start uslugi.
 
 TEST(PlanSource, empty_text_is_an_empty_plan_not_an_error) {
+  // covers: plansource.parse-plan-text.4~1
   qTree plan;
   const PlanSource loaded = parsePlanText(plan, "");
 
@@ -77,6 +78,8 @@ TEST(PlanSource, empty_text_is_an_empty_plan_not_an_error) {
 }
 
 TEST(PlanSource, rotation_counter_preflight_is_read_only_and_preserves_error_class) {
+  // covers: plansource.check-rotation-counter.1~1, plansource.check-rotation-counter.2~1, plansource.check-rotation-counter.3~1
+  // covers: plansource.check-rotation-counter.4~1, plansource.check-rotation-counter.5~1
   namespace fs           = std::filesystem;
   const std::string file = "preflight_counter";
   fs::remove_all(file);
@@ -104,6 +107,8 @@ TEST(PlanSource, rotation_counter_preflight_is_read_only_and_preserves_error_cla
 }
 
 TEST(PlanSource, timeout_report_covers_sources_filters_and_no_clock) {
+  // covers: plansource.device-timeout-report.1~1, plansource.device-timeout-report.2~1, query.effective-device-timeout.1~1
+  // covers: query.effective-device-timeout.2~1
   qTree plan;
   ASSERT_EQ(parsePlanText(plan,
                           "DECLARE a BYTE STREAM explicit_timeout, 1 DEVICE '/dev/zero' TIMEOUT 0.5\n"
@@ -121,11 +126,14 @@ TEST(PlanSource, timeout_report_covers_sources_filters_and_no_clock) {
 }
 
 TEST(PlanSource, logical_lines_keep_start_numbers_and_drop_unfinished_statements) {
+  // covers: rqlparser.read-logical-lines.1~1, rqlparser.read-logical-lines.2~1, rqlparser.read-logical-lines.3~1
+  // covers: rqlparser.read-logical-lines.4~1, rqlparser.read-logical-lines.5~1
   std::istringstream input(" \t\r\n  # ignored\nSELECT \\\n  a\n\nRULE b\nunfinished\\\n");
   EXPECT_EQ(readLogicalLines(input), (std::vector<std::pair<std::string, size_t>>{{"SELECT    a", 3}, {"RULE b", 6}}));
 }
 
 TEST(PlanSource, parser_contains_internal_standard_and_unknown_exceptions) {
+  // covers: rqlparser.parser-rql-string.8~1
   for (const auto &[kind, expected] :
        std::vector<std::pair<ParserFault, std::string>>{{ParserFault::internal, "injected listener invariant"},
                                                         {ParserFault::standard, "RQL parser: injected ANTLR failure"},
@@ -146,6 +154,7 @@ TEST(PlanSource, parser_contains_internal_standard_and_unknown_exceptions) {
 }
 
 TEST(PlanSource, parser_overloads_use_line_one_or_the_explicit_source_offset) {
+  // covers: rqlparser.parser-rql-string.7~1
   qTree plan;
   std::vector<std::string> keywords;
   LogCapture log;
@@ -157,6 +166,9 @@ TEST(PlanSource, parser_overloads_use_line_one_or_the_explicit_source_offset) {
 }
 
 TEST(PlanSource, parser_status_keywords_and_partial_plan_are_explicit) {
+  // covers: rqlparser.parser-rql-string.1~1, rqlparser.parser-rql-string.2~1, rqlparser.parser-rql-string.3~1
+  // covers: rqlparser.parser-rql-string.4~1, rqlparser.parser-rql-string.5~1, rqlparser.parser-rql-string.6~1
+  // covers: rqlparser.parser-rql-string.9~1
   qTree plan;
   std::vector<std::string> keywords{"stale"};
   const auto [ok, first, name] =
@@ -185,6 +197,8 @@ TEST(PlanSource, parser_status_keywords_and_partial_plan_are_explicit) {
 }
 
 TEST(PlanSource, file_parser_reports_missing_empty_and_first_invalid_statement) {
+  // covers: rqlparser.parser-rql-file-4-test.1~1, rqlparser.parser-rql-file-4-test.2~1, rqlparser.parser-rql-file-4-test.3~1
+  // covers: rqlparser.parser-rql-file-4-test.4~1
   const std::string file = "parser_contract.rql";
   std::filesystem::remove(file);
   qTree plan;
@@ -204,6 +218,7 @@ TEST(PlanSource, file_parser_reports_missing_empty_and_first_invalid_statement) 
 }
 
 TEST(PlanSource, internal_compiler_status_is_prefixed_logged_and_recognized) {
+  // covers: compiler.internal-compiler-error.1~1, compiler.internal-compiler-error.2~1, compiler.is-internal-compiler-error.1~1
   LogCapture log;
   const auto status = internalCompilerError("audit boundary");
   EXPECT_EQ(status, std::string(kInternalCompilerError) + "audit boundary");
@@ -214,6 +229,7 @@ TEST(PlanSource, internal_compiler_status_is_prefixed_logged_and_recognized) {
 }
 
 TEST(PlanSource, comments_and_blank_lines_alone_are_an_empty_plan) {
+  // covers: plansource.parse-plan-text.4~1
   qTree plan;
   const PlanSource loaded = parsePlanText(plan, "# tylko komentarz\n\n   \n# i jeszcze jeden\n");
 
@@ -223,6 +239,7 @@ TEST(PlanSource, comments_and_blank_lines_alone_are_an_empty_plan) {
 }
 
 TEST(PlanSource, statements_land_in_the_plan_and_in_the_line_list) {
+  // covers: plansource.parse-plan-text.1~1, plansource.parse-plan-text.2~1
   qTree plan;
   const PlanSource loaded = parsePlanText(plan,
                                           "DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'\n"
@@ -249,6 +266,7 @@ TEST(PlanSource, a_broken_statement_stops_the_load_and_reports_the_reason) {
 /// Instrukcje po pierwszej bledna nie sa juz czytane. Zestaw czesciowo wczytany bylby gorszy
 /// od zadnego: skompilowalby sie i policzyl COS INNEGO, niz operator zapisal w pliku.
 TEST(PlanSource, load_stops_at_the_first_bad_statement) {
+  // covers: plansource.parse-plan-text.3~1
   qTree plan;
   testing::internal::CaptureStderr();
   const PlanSource loaded = parsePlanText(plan,
@@ -267,6 +285,7 @@ TEST(PlanSource, load_stops_at_the_first_bad_statement) {
 /// strumieniem i nie ma czego roscic, a nazwanie jej tak konczyloby sie kolizja kazdych
 /// dwoch planow uzywajacych STORAGE.
 TEST(PlanSource, directives_do_not_claim_stream_names) {
+  // covers: plansource.plan-stream-names.1~1, plansource.plan-counter-path.1~1
   qTree plan;
   const PlanSource loaded = parsePlanText(plan,
                                           "STORAGE 'temp'\n"
@@ -282,6 +301,7 @@ TEST(PlanSource, directives_do_not_claim_stream_names) {
 /// Nazwa strumienia nie chroni pliku danych: klauzula `FILE` odrywa nazwe pliku od nazwy
 /// zapytania, wiec magistrala musi dostac osobno ZNORMALIZOWANE sciezki magazynow.
 TEST(PlanSource, stores_follow_the_file_clause_and_the_storage_directive) {
+  // covers: plansource.plan-store-paths.1~1, plansource.plan-store-paths.2~1
   qTree plan;
   const PlanSource loaded = parsePlanText(plan,
                                           "STORAGE 'temp'\n"
@@ -299,6 +319,7 @@ TEST(PlanSource, stores_follow_the_file_clause_and_the_storage_directive) {
 /// sciezki byloby konfliktem o nic. Obie drogi do tego typu (VOLATILE i STORAGE memory)
 /// musza dawac ten sam wynik, bo w wykonaniu obie koncza sie tym samym akcesorem.
 TEST(PlanSource, memory_streams_do_not_claim_a_store) {
+  // covers: plansource.plan-store-paths.2~1
   qTree plan;
   const PlanSource loaded = parsePlanText(plan,
                                           "DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'\n"
@@ -314,6 +335,7 @@ TEST(PlanSource, memory_streams_do_not_claim_a_store) {
 /// ta sama regula pierwszenstwa, co przy budowie planu w launcherze. Bez tego parametru
 /// rezerwacja wskazywalaby katalog roboczy, a plan pisalby gdzie indziej.
 TEST(PlanSource, default_storage_dir_yields_to_the_storage_directive) {
+  // covers: plansource.plan-storage-dir.1~1, plansource.plan-store-paths.1~1
   qTree bare;
   ASSERT_EQ(parsePlanText(bare,
                           "DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'\n"
@@ -336,6 +358,7 @@ TEST(PlanSource, default_storage_dir_yields_to_the_storage_directive) {
 /// Dwa strumienie jednego planu wskazujace jeden plik daja JEDEN wpis. Roszczenie porownuje
 /// plany miedzy soba, wiec duplikat zajalby wpis w slocie i niczego nie wniosl.
 TEST(PlanSource, aliased_streams_claim_one_store_once) {
+  // covers: plansource.plan-store-paths.3~1
   qTree plan;
   const PlanSource loaded = parsePlanText(plan,
                                           "DECLARE a INTEGER STREAM src, 1 FILE 'data.txt'\n"
@@ -351,6 +374,7 @@ TEST(PlanSource, aliased_streams_claim_one_store_once) {
 /// TYPE i RETMEMORY z wczytanego .desc, nie z planu, wiec .desc sprzed 108a5e94 przywracal przy
 /// rotacji pierscien bez granicy. Obie drogi do MEMORY (VOLATILE i STORAGE memory) musza dac to samo.
 TEST(PlanSource, rotation_drops_only_the_configuration_of_memory_streams) {
+  // covers: plansource.drop-stale-plan-artifacts.4~1
   namespace fs       = std::filesystem;
   const fs::path dir = "rotation_store";
   fs::remove_all(dir);
@@ -386,6 +410,7 @@ TEST(PlanSource, rotation_drops_only_the_configuration_of_memory_streams) {
 /// ktorego rdzen nie obsluguje. Wpis zostaje na miejscu - odmowe z przyczyna da dalej kontrola
 /// deskryptorow przy otwarciu magazynu.
 TEST(PlanSource, unreadable_declaration_descriptor_does_not_throw) {
+  // covers: plansource.drop-stale-plan-artifacts.2~1
   namespace fs       = std::filesystem;
   const fs::path dir = "eloop_store";
   fs::remove_all(dir);
@@ -455,6 +480,7 @@ std::vector<std::string> familyFiles(const std::string &intermediate) {
 /// swieze metadane (FatalError przy drugim starcie), a pliki wezlow posrednich rosly miedzy restartami.
 /// Pliki podobne z nazwy, ale spoza rodziny, zostaja.
 TEST(PlanSource, start_drops_whole_file_families_of_every_plan_node) {
+  // covers: plansource.drop-stale-plan-artifacts.1~1, plansource.drop-stale-plan-artifacts.3~1
   namespace fs       = std::filesystem;
   const fs::path dir = "family_store";
   fs::remove_all(dir);
@@ -485,6 +511,7 @@ TEST(PlanSource, start_drops_whole_file_families_of_every_plan_node) {
 
 /// Mirror: przy :ROTATION cala rodzina wezla plikowego zostaje, takze posredniego.
 TEST(PlanSource, rotation_keeps_whole_file_families) {
+  // covers: plansource.drop-stale-plan-artifacts.4~1
   namespace fs       = std::filesystem;
   const fs::path dir = "family_store";
   fs::remove_all(dir);
@@ -512,6 +539,8 @@ TEST(PlanSource, rotation_keeps_whole_file_families) {
 /// .desc wygrywaja w magazynie, a zmiana pojemnosci przy starych segmentach przestawilaby adresowanie
 /// rekordow - wiec rozjazd jest odmowa z obiema konfiguracjami, zanim cokolwiek zostanie zmienione.
 TEST(PlanSource, rotation_refuses_kept_files_written_with_another_configuration) {
+  // covers: plansource.check-kept-stores.1~1, plansource.check-kept-stores.5~1, plansource.check-kept-stores.6~1
+  // covers: plansource.check-kept-stores.7~1
   namespace fs       = std::filesystem;
   const fs::path dir = "kept_store";
   fs::remove_all(dir);
@@ -551,6 +580,7 @@ TEST(PlanSource, rotation_refuses_kept_files_written_with_another_configuration)
 }
 
 TEST(PlanSource, invalid_declared_descriptor_is_rejected_before_plan_activation) {
+  // covers: plansource.check-descriptor-files.2~1
   namespace fs       = std::filesystem;
   const fs::path dir = "bad_declared_descriptor";
   fs::remove_all(dir);
@@ -577,6 +607,7 @@ TEST(PlanSource, invalid_declared_descriptor_is_rejected_before_plan_activation)
 // (plan == plik). Descriptor::operator== jest asymetryczny: odwrocony kierunek odrzucal plan, ktory
 // silnik przyjmuje, i przepuszczal taki, na ktorym silnik konczyl sie FatalError-em.
 TEST(PlanSource, declared_descriptor_check_uses_the_runtime_direction) {
+  // covers: plansource.check-descriptor-files.5~1
   namespace fs       = std::filesystem;
   const fs::path dir = "declared_descriptor_direction";
   fs::remove_all(dir);
@@ -619,6 +650,8 @@ auto withinFiveSeconds(F call) {
 // Rodzaj pliku pod sciezka deklaracji (#346): BINFILE i TEXTFILE - plik zwykly, DEVICE - urzadzenie
 // znakowe albo FIFO. Brak pliku nie jest odmowa - akcesor ostrzega i daje NULL jak dotad.
 TEST(PlanSource, declared_source_kind_is_checked_without_opening_the_path) {
+  // covers: plansource.check-declared-sources.1~1, plansource.check-declared-sources.3~1, plansource.check-declared-sources.4~1
+  // covers: plansource.check-declared-sources.5~1
   namespace fs       = std::filesystem;
   const fs::path dir = "declared_source_kind";
   fs::remove_all(dir);
@@ -671,6 +704,7 @@ TEST(PlanSource, declared_source_kind_is_checked_without_opening_the_path) {
 // Jedyny przepuszczany rozjazd to dawny TYPE DEVICE zwyklego pliku binarnego - ten `.desc`
 // zastepuje start.
 TEST(PlanSource, declared_descriptor_must_match_the_source_kind_and_path) {
+  // covers: plansource.drop-stale-plan-artifacts.2~1, plansource.check-descriptor-files.7~1
   namespace fs       = std::filesystem;
   const fs::path dir = "declared_descriptor_kind";
   fs::remove_all(dir);
@@ -731,6 +765,7 @@ TEST(PlanSource, declared_descriptor_must_match_the_source_kind_and_path) {
 // Ad-hoc sprawdza tylko nowo dodawane strumienie (#278): niezgodny `.desc` strumienia spoza listy
 // nie blokuje importu, a dodawanego - tak, tym samym komunikatem co przy starcie.
 TEST(PlanSource, descriptor_check_can_be_limited_to_named_streams) {
+  // covers: plansource.check-descriptor-files.1~1, plansource.check-descriptor-files.8~1
   namespace fs       = std::filesystem;
   const fs::path dir = "descriptor_check_names";
   fs::remove_all(dir);
@@ -760,6 +795,7 @@ TEST(PlanSource, descriptor_check_can_be_limited_to_named_streams) {
 // w dowolne miejsce (#278). Pod :ROTATION, gdy pliki zostaja, jest to odmowa przed startem. Bez
 // rotacji start i tak kasuje `.desc` wezla.
 TEST(PlanSource, kept_select_descriptor_must_not_move_the_data_file) {
+  // covers: plansource.check-descriptor-files.1~1, plansource.check-descriptor-files.6~1
   namespace fs       = std::filesystem;
   const fs::path dir = "kept_select_ref";
   fs::remove_all(dir);
@@ -791,6 +827,8 @@ TEST(PlanSource, kept_select_descriptor_must_not_move_the_data_file) {
 // Ostrzezenia o formie przestarzalej ida w kolejnosci wierszy planu, choc kompilator sortuje
 // wezly po interwale. Wiersz to pierwszy wiersz instrukcji takze przy kontynuacji `\`.
 TEST(PlanSource, deprecated_file_warnings_follow_the_plan_lines) {
+  // covers: plansource.deprecated-file-warnings.1~1, plansource.deprecated-file-warnings.2~1
+  // covers: plansource.deprecated-file-warnings.3~1
   qTree plan;
   ASSERT_EQ(parsePlanText(plan,
                           "DECLARE a INTEGER STREAM slow, 2 FILE 'a.txt'\n"
@@ -815,6 +853,7 @@ TEST(PlanSource, deprecated_file_warnings_follow_the_plan_lines) {
 // a bez niej `[sources] timeout_s`; jawne `TIMEOUT 0` wylacza wartosc z konfiguracji. Termin rowny
 // interwalowi jeszcze miesci sie w slocie.
 TEST(PlanSource, device_timeout_warnings_use_the_effective_timeout) {
+  // covers: plansource.device-timeout-warnings.1~1, plansource.device-timeout-warnings.3~1
   qTree plan;
   ASSERT_EQ(parsePlanText(plan,
                           "DECLARE a BYTE STREAM late, 1/10 DEVICE '/dev/zero' TIMEOUT 0.5\n"
@@ -840,6 +879,8 @@ TEST(PlanSource, device_timeout_warnings_use_the_effective_timeout) {
 
 // K2 katalogu dotyczy takze MEMORY, ktore nadal zapisuje .desc. Pusty plan pozostaje idle.
 TEST(PlanSource, storage_directory_refusal_precedes_all_storage_operations) {
+  // covers: plansource.check-storage-directory.1~1, plansource.check-storage-directory.2~1
+  // covers: plansource.check-storage-directory.3~1, plansource.check-storage-directory.4~1, plansource.check-plan-storage.1~1
   namespace fs       = std::filesystem;
   const fs::path dir = "preflight_directory";
   fs::remove_all(dir);
@@ -872,6 +913,8 @@ TEST(PlanSource, storage_directory_refusal_precedes_all_storage_operations) {
 }
 
 TEST(PlanSource, output_preflight_distinguishes_plan_and_environment_without_creating_files) {
+  // covers: plansource.check-output-files-openable.4~1, plansource.check-output-files-openable.5~1
+  // covers: plansource.check-output-files-openable.6~1
   namespace fs       = std::filesystem;
   const fs::path dir = "preflight_output";
   fs::remove_all(dir);
@@ -907,6 +950,8 @@ TEST(PlanSource, output_preflight_distinguishes_plan_and_environment_without_cre
 
 // Ad-hoc nie usuwa .desc wynikow: bez ROTATION oraz dla MEMORY musza przejsc kontrole.
 TEST(PlanSource, adhoc_checks_retained_select_descriptors_and_only_the_new_streams) {
+  // covers: plansource.check-descriptor-files.1~1, plansource.check-descriptor-files.3~1, plansource.check-descriptor-files.5~1
+  // covers: plansource.check-plan-storage.1~1
   namespace fs       = std::filesystem;
   const fs::path dir = "preflight_adhoc_descriptor";
   fs::remove_all(dir);
@@ -938,6 +983,7 @@ TEST(PlanSource, adhoc_checks_retained_select_descriptors_and_only_the_new_strea
 }
 
 TEST(PlanSource, text_source_refuses_a_kept_rational_even_when_its_schema_fits_double) {
+  // covers: plansource.check-descriptor-files.4~1
   namespace fs       = std::filesystem;
   const fs::path dir = "preflight_text_fields";
   fs::remove_all(dir);
@@ -984,6 +1030,8 @@ TEST(PlanSource, missing_storage_is_a_service_plan_refusal_without_the_fatal_lat
 // Blad skladni wskazuje wiersz PLIKU i sam plik: parsePlanText podaje parserowi numer pierwszego
 // wiersza instrukcji i nazwe zrodla. Udane instrukcje sprzed bledu trafiaja na liste z trescia.
 TEST(PlanSource, syntax_error_names_the_file_line_and_keeps_earlier_statements) {
+  // covers: rqlparser.parser-rql-string.7~1, plansource.parse-plan-text.1~1, plansource.parse-plan-text.2~1
+  // covers: plansource.parse-plan-text.3~1
   qTree plan;
   LogCapture log;
   testing::internal::CaptureStderr();
@@ -1009,6 +1057,8 @@ TEST(PlanSource, syntax_error_names_the_file_line_and_keeps_earlier_statements) 
 // wolajacy. Instancje generatora sa wezlami planu jak kazde inne. `.desc` deklaracji, ktorego nie
 // da sie wczytac, zostaje - odmowe z przyczyna da kontrola przy otwarciu magazynu.
 TEST(PlanSource, start_drops_generator_instances_in_the_working_directory) {
+  // covers: plansource.drop-stale-plan-artifacts.1~1, plansource.drop-stale-plan-artifacts.2~1
+  // covers: plansource.drop-stale-plan-artifacts.3~1
   namespace fs = std::filesystem;
   qTree plan;
   ASSERT_EQ(parsePlanText(plan,
@@ -1039,6 +1089,7 @@ TEST(PlanSource, start_drops_generator_instances_in_the_working_directory) {
 // Sprzatanie nie zatrzymuje sie na bledzie: plik, ktorego nie da sie usunac, zostaje, a katalog,
 // ktorego nie da sie czytac, konczy tylko szukanie segmentow. Rodzina dalszego wezla znika.
 TEST(PlanSource, cleanup_errors_leave_files_but_do_not_stop_the_start) {
+  // covers: plansource.drop-stale-plan-artifacts.5~1
   if (::geteuid() == 0) GTEST_SKIP() << "root ignores directory permissions";
   namespace fs       = std::filesystem;
   const fs::path dir = "drop_errors";
@@ -1078,6 +1129,8 @@ TEST(PlanSource, cleanup_errors_leave_files_but_do_not_stop_the_start) {
 // badane, wezel bez `.desc` jest pomijany, `.desc` niebedacy plikiem to K2, a blad lstat inny niz
 // ENOENT - K4 z errno. Z kilku rozjazdow wraca pierwszy w kolejnosci planu.
 TEST(PlanSource, kept_store_check_scope_and_error_classes) {
+  // covers: plansource.check-kept-stores.2~1, plansource.check-kept-stores.3~1, plansource.check-kept-stores.4~1
+  // covers: plansource.check-kept-stores.6~1, plansource.check-kept-stores.7~1
   namespace fs       = std::filesystem;
   const fs::path dir = "kept_scope";
   fs::remove_all(dir);
@@ -1128,6 +1181,8 @@ TEST(PlanSource, kept_store_check_scope_and_error_classes) {
 // przy pustej liscie, TYPE spoza typow deklaracji, klasa K2 rozjazdu TYPE, REF i REF wyniku oraz
 // `.desc` niebedacy plikiem i blad lstat.
 TEST(PlanSource, descriptor_file_check_scope_and_error_classes) {
+  // covers: plansource.check-descriptor-files.1~1, plansource.check-descriptor-files.2~1, plansource.check-descriptor-files.3~1
+  // covers: plansource.check-descriptor-files.6~1, plansource.check-descriptor-files.7~1, plansource.check-descriptor-files.8~1
   namespace fs       = std::filesystem;
   const fs::path dir = "desc_scope";
   fs::remove_all(dir);
@@ -1191,6 +1246,8 @@ TEST(PlanSource, descriptor_file_check_scope_and_error_classes) {
 // Kontrola zrodel deklarowanych: wyniki nie sa zrodlami, ENOTDIR jak brak pliku,
 // inny blad stat to K4 z errno, rozjazd rodzaju to K2, a forma przestarzala podpowiada slowo.
 TEST(PlanSource, declared_source_check_scope_classes_and_deprecated_hints) {
+  // covers: plansource.check-declared-sources.1~1, plansource.check-declared-sources.3~1, plansource.check-declared-sources.4~1
+  // covers: plansource.check-declared-sources.5~1
   namespace fs       = std::filesystem;
   const fs::path dir = "declared_scope";
   fs::remove_all(dir);
@@ -1239,6 +1296,8 @@ TEST(PlanSource, declared_source_check_scope_classes_and_deprecated_hints) {
 // "/" zostaje "/", odmowa braku podaje sciezke bezwzgledna i polecenie, ENOTDIR ze stat to K2, a
 // inny blad stat - K4.
 TEST(PlanSource, storage_directory_check_edges) {
+  // covers: plansource.check-storage-directory.1~1, plansource.check-storage-directory.2~1
+  // covers: plansource.check-storage-directory.3~1, plansource.check-storage-directory.4~1
   namespace fs              = std::filesystem;
   const std::string missing = "storage_edges_missing";
   const std::string file    = "storage_edges_file";
@@ -1278,6 +1337,7 @@ TEST(PlanSource, storage_directory_check_edges) {
 // checkPlanStorage zwraca odmowe pierwszej kontroli w porzadku: zachowane magazyny, deskryptory,
 // zrodla, pliki wyjscia. Kazdy krok usuwa jedna przyczyne. Licznika rotacji nie czyta.
 TEST(PlanSource, plan_storage_check_order_and_counter_left_to_the_caller) {
+  // covers: plansource.check-plan-storage.1~1, plansource.check-plan-storage.2~1
   namespace fs       = std::filesystem;
   const fs::path dir = "storage_order";
   fs::remove_all(dir);
@@ -1317,6 +1377,7 @@ TEST(PlanSource, plan_storage_check_order_and_counter_left_to_the_caller) {
 // Ostrzezenia o TIMEOUT ida w kolejnosci wierszy planu, choc kompilator stawia szybszy strumien
 // wczesniej.
 TEST(PlanSource, device_timeout_warnings_follow_the_plan_lines) {
+  // covers: plansource.device-timeout-warnings.2~1
   qTree plan;
   ASSERT_EQ(parsePlanText(plan,
                           "DECLARE a BYTE STREAM slow, 1 DEVICE '/dev/zero' TIMEOUT 2\n"
@@ -1339,6 +1400,8 @@ TEST(PlanSource, device_timeout_warnings_follow_the_plan_lines) {
 // przestawienia przez REF zachowanego `.desc`. absolutePathOf: pusty napis, normalizacja, a przy
 // bledzie weakly_canonical sciezka bezwzgledna, przy bledzie absolute - wejscie bez zmian.
 TEST(PlanSource, path_helpers_follow_directives_and_normalize) {
+  // covers: plansource.plan-stream-names.1~1, plansource.plan-counter-path.1~1, plansource.plan-storage-dir.1~1
+  // covers: plansource.plan-store-paths.4~1, plansource.absolute-path-of.1~1, plansource.absolute-path-of.2~1
   namespace fs       = std::filesystem;
   const fs::path cwd = fs::current_path();
   const fs::path dir = "helpers_store";
@@ -1379,6 +1442,9 @@ TEST(PlanSource, path_helpers_follow_directives_and_normalize) {
 // DEFAULT z RETENTION sprawdza `_segment_0` i jego cien, DIRECT bez cienia. Istniejace FIFO jest
 // otwierane i odrzucane jako K2, ENOTDIR z open to K2, katalog bez prawa zapisu - K4.
 TEST(PlanSource, output_preflight_scope_segments_shadows_and_permissions) {
+  // covers: plansource.check-output-files-openable.1~1, plansource.check-output-files-openable.2~1
+  // covers: plansource.check-output-files-openable.3~1, plansource.check-output-files-openable.4~1
+  // covers: plansource.check-output-files-openable.5~1, plansource.check-output-files-openable.6~1
   namespace fs       = std::filesystem;
   const fs::path dir = "output_scope";
   fs::remove_all(dir);

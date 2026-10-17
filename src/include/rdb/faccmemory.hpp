@@ -11,27 +11,18 @@ namespace rdb {
 /// @brief Implementacja magazynu rekordów przechowywanych wyłącznie w pamięci procesu.
 ///
 /// Obiekt klasy memoryFile powinien:
-/// - implementować interfejs FileInterface dla danych przechowywanych w pamięci,
-///   Test: `MemoryStoreTest.storage_passes_its_store_down_to_the_accessor`.
-/// - umożliwiać zapis, odczyt i nadpisywanie rekordów binarnych o rozmiarze wyznaczonym przez Descriptor,
-///   Test: `MemoryTest.test_faccmemory_multibyte_record`, `MemoryTest.test_faccmemory_update_in_place`.
-/// - przechowywać rekordy, ich nullBitset i licznik zapisów w MemoryStore, indeksowane nazwą strumienia i współdzielone między ŻYWYMI instancjami o tej samej nazwie, KTÓRE DOSTAŁY TEN SAM Memory Store,
-///   Test: `MemoryStoreTest.one_store_still_shares_by_stream_name`.
-/// - kasować ten stan razem z ostatnią instancją, która go używa - strumień o tej samej nazwie w następnym planie zaczyna od zera,
-///   Test: `MemoryTest.test_faccmemory_bucket_dies_with_last_instance`.
-/// - obsługiwać append przez position == std::numeric_limits<size_t>::max() oraz update przez wskazaną pozycję,
-///   Test: `MemoryTest.test_faccmemory_infinite`, `MemoryTest.test_faccmemory_update_in_place`.
-/// - traktować write(nullptr, ...) jako polecenie wyczyszczenia pamięci dla danego strumienia,
-///   Test: `MemoryTest.test_faccmemory_infinite`.
-/// - zwracać przez count() logiczną liczbę rekordów (łączną liczbę zapisów append),
-///   Test: `MemoryTest.test_faccmemory_retention`.
-/// - przy ustawionej retencji przechowywać najwyżej wskazaną liczbę rekordów, zastępując najstarsze nowymi;
+/// - [faccmemory.memory-file.1~1] implementować interfejs FileInterface dla danych przechowywanych w pamięci,
+/// - [faccmemory.memory-file.2~1] umożliwiać zapis, odczyt i nadpisywanie rekordów binarnych o rozmiarze wyznaczonym przez Descriptor,
+/// - [faccmemory.memory-file.3~1] przechowywać rekordy, ich nullBitset i licznik zapisów w MemoryStore, indeksowane nazwą strumienia i współdzielone między ŻYWYMI instancjami o tej samej nazwie, KTÓRE DOSTAŁY TEN SAM Memory Store,
+/// - [faccmemory.memory-file.4~1] kasować ten stan razem z ostatnią instancją, która go używa - strumień o tej samej nazwie w następnym planie zaczyna od zera,
+/// - [faccmemory.memory-file.5~1] obsługiwać append przez position == std::numeric_limits<size_t>::max() oraz update przez wskazaną pozycję,
+/// - [faccmemory.memory-file.6~1] traktować write(nullptr, ...) jako polecenie wyczyszczenia pamięci dla danego strumienia,
+/// - [faccmemory.memory-file.7~1] zwracać przez count() logiczną liczbę rekordów (łączną liczbę zapisów append),
+/// - [faccmemory.memory-file.8~1] przy ustawionej retencji przechowywać najwyżej wskazaną liczbę rekordów, zastępując najstarsze nowymi;
 ///   bez retencji nie ograniczać liczby rekordów,
-///   Test: `MemoryTest.test_faccmemory_retention`, `MemoryTest.test_faccmemory_retention_boundary`, `MemoryTest.test_faccmemory_infinite`.
-/// - przy ustawionej retencji R odczyt i nadpisanie w miejscu rekordu spoza ostatnich R zapisów (starszego albo
+/// - [faccmemory.memory-file.9~1] przy ustawionej retencji R odczyt i nadpisanie w miejscu rekordu spoza ostatnich R zapisów (starszego albo
 ///   jeszcze niezapisanego) odrzucać kodem ERANGE, nie sięgając do slotu zajętego przez inny rekord - tak jak magazyn
 ///   dyskowy odrzuca rekord z usuniętego segmentu.
-///   Test: `MemoryTest.test_faccmemory_retention`, `MemoryTest.test_faccmemory_retention_boundary`, `MemoryTest.update_outside_retention_window_keeps_newer_records`, `MemoryTest.storage_read_outside_memory_retention_is_an_io_error`.
 ///
 /// @note Trwałość danych dotyczy wyłącznie czasu życia Memory Store (MemoryStore); klasa nie zapisuje stanu na dysk.
 /// @note Stan rekordów, nullBitset i licznik zapisów są współdzielone po nazwie strumienia między żywymi instancjami -

@@ -3,6 +3,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
   return()
 endif()
 
+# covers: launcher.xretractor.31~1
 add_test(
   NAME it_service_abort-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
