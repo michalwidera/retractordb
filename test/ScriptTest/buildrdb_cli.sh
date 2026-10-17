@@ -139,7 +139,7 @@ done < "$state_log"
 coverage_parent="$test_root/coverage"
 coverage_source="$coverage_parent/retractordb"
 copy_launcher "$coverage_source"
-mkdir -p "$coverage_source/build/Debug"
+mkdir -p "$coverage_source/build/Debug" "$coverage_source/build/Coverage"
 coverage_home="$test_root/coverage-home"
 make_home "$coverage_home"
 coverage_stubs="$test_root/coverage-stubs"
@@ -184,7 +184,11 @@ HOME="$coverage_home" PATH="$coverage_stubs:$PATH" RDB_TEST_COVERAGE_LOG="$cover
   "$coverage_source/scripts/buildrdb.sh" coverage >"$test_root/coverage-output.log" 2>&1
 coverage_calls=$(<"$coverage_log")
 assert_contains "$coverage_calls" "conan install $coverage_source -s build_type=Debug --build missing"
-assert_contains "$coverage_calls" "cmake -S $coverage_source -B $coverage_source/build/Debug -G Ninja"
+assert_contains "$coverage_calls" "cmake -S $coverage_source -B $coverage_source/build/Coverage -G Ninja"
+# Pokrycie nie konfiguruje build/Debug: konfiguracja tego katalogu z innego zrodla
+# (VS Code) kasowala build/Debug/test w trakcie pracy gcovr.
+[[ "$coverage_calls" != *"-B $coverage_source/build/Debug"* ]] || fail "coverage configures build/Debug"
+assert_contains "$coverage_calls" " build/Coverage --html-details"
 assert_contains "$coverage_calls" "-DCMAKE_BUILD_TYPE=Debug"
 assert_contains "$coverage_calls" "-DCMAKE_TOOLCHAIN_FILE=$coverage_source/build/Debug/generators/conan_toolchain.cmake"
 assert_contains "$coverage_calls" "-DENABLE_COVERAGE=ON"

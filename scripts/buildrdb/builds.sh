@@ -233,16 +233,22 @@ run_build_option() {
                 rdb_pip_install gcovr || { echo "Error: Failed to install gcovr"; exit 1; }
             fi
 
+            # Osobny katalog build/Coverage: konfiguracja build/Debug (np. CMake Tools
+            # VS Code przy otwarciu okna) kasuje build/Debug/test razem z .gcda w
+            # trakcie pracy gcovr, a ENABLE_COVERAGE=ON zostawalby w cache Debug.
+            # Toolchain z build/Debug/generators - osobny `conan install -of` dopisalby
+            # do CMakeUserPresets.json drugi preset conan-debug, ktory VS Code moglby
+            # wybrac i konfigurowac wlasnie ten katalog.
             cd "$rdb_source_dir"
             conan install "$rdb_source_dir" -s build_type=Debug --build missing
             cmake \
                 -S "$rdb_source_dir" \
-                -B "$rdb_source_dir/build/Debug" \
+                -B "$rdb_source_dir/build/Coverage" \
                 -G Ninja \
                 -DCMAKE_BUILD_TYPE=Debug \
                 -DCMAKE_TOOLCHAIN_FILE="$rdb_source_dir/build/Debug/generators/conan_toolchain.cmake" \
                 -DENABLE_COVERAGE=ON
-            cd build/Debug
+            cd build/Coverage
             find . -name '*.gcda' -delete -o -name '*.gcno' -delete
             build_jobs=$(compute_build_jobs)
             echo "-- Building with -j$build_jobs (RAM-aware cap applied automatically by default; override with RDB_BUILD_JOBS=N, or force a fixed cap via 'lowmem')"
@@ -256,7 +262,7 @@ run_build_option() {
             # dolaczaja bus.cpp z inna galezia #if, wiec ta sama funkcja wystepuje
             # pod roznymi liniami (np. markConsistent), a domyslny tryb strict
             # gcovr 8 przerywa wtedy raport.
-            gcovr --root . --filter 'src/' --gcov-executable "$gcov_exec" --gcov-ignore-errors all --merge-mode-functions=separate --exclude '.*\.antlr.*' build/Debug --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
+            gcovr --root . --filter 'src/' --gcov-executable "$gcov_exec" --gcov-ignore-errors all --merge-mode-functions=separate --exclude '.*\.antlr.*' build/Coverage --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
             ;;
     esac
 }

@@ -90,7 +90,7 @@ show_help() {
             echo "  conan      - Detect conan profile and set C++23 standard"
             echo "  ninja      - Add Ninja generator to conan profile"
             echo "  bashrc     - Add ~/.local/bin to PATH in $(rdb_display_path "$(rdb_shell_rc_path)") (and create it)"
-            echo "  coverage   - Build tests with code coverage enabled"
+            echo "  coverage   - Build tests with code coverage enabled (in build/Coverage)"
             echo "  gate_requirements - Install deps of the research gate (JDK 17 + Flink 2.3.0) and verify them"
             echo "  attach_knowledge - Clone and attach the sibling RetractorDB knowledge index"
             echo "  mold       - Enable mold linker for subsequent options (default; e.g. buildrdb.sh mold debug)"

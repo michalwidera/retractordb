@@ -14,7 +14,7 @@ scripts/buildrdb.sh bashrc      # add ~/.local/bin to PATH (matches install pref
 scripts/buildrdb.sh debug       # conan install + build (Debug)
 scripts/buildrdb.sh release     # conan install + build (Release)
 scripts/buildrdb.sh package     # cpack DEB/TGZ + auto-clean staging (_CPack_Packages, install_manifest.txt)
-scripts/buildrdb.sh coverage    # build with coverage + gcovr report → coverage/coverage.html
+scripts/buildrdb.sh coverage    # build with coverage in build/Coverage + gcovr report → coverage/coverage.html
 ```
 
 Options chain: `scripts/buildrdb.sh conan ninja debug`
