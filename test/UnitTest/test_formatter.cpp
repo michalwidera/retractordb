@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <chrono>
+#include <ctime>
+#include <regex>
+
 #include <boost/property_tree/ptree.hpp>
 
 #include "qry/formatters.hpp"
@@ -33,7 +37,8 @@ TEST(Formatter, displayedValue_non_null) {
 
 TEST(Formatter, displayedValue_null_raw) {
   ptree row;
-  EXPECT_EQ(Formatter::displayedValue(row, 0, "1", formatMode::RAW), "null");
+  for (const auto mode : {formatMode::RAW, formatMode::GRAPHITE, formatMode::INFLUXDB})
+    EXPECT_EQ(Formatter::displayedValue(row, 0, "1", mode), "null");
 }
 
 TEST(Formatter, displayedValue_null_gnuplot) {
@@ -62,6 +67,7 @@ TEST(Formatter, renderRaw_outputs_values) {
 
 TEST(Formatter, null_marker_and_gnuplot_axis_contracts) {
   EXPECT_FALSE(Formatter::isNullAt("x", 0));
+  EXPECT_FALSE(Formatter::isAllNull("1", -1));
   for (const bool reversed : {false, true}) {
     testing::internal::CaptureStdout();
     Formatter::initGnuplot({12, -3, 7}, reversed);
@@ -141,6 +147,29 @@ TEST(Formatter, renderGnuplot_null_value_becomes_NaN) {
   EXPECT_NE(out.find("NaN"), std::string::npos);
 }
 
+TEST(Formatter, renderGnuplot_expands_arrays_and_fallbacks_with_newest_first) {
+  Formatter formatter;
+  ptree schema;
+  schema.put("db.field.vec_values", "vec_values");
+  schema.put("db.field_count.vec_values", 2);
+  testing::internal::CaptureStdout();
+  for (const int value : {10, 20, 30}) {
+    ptree row;
+    row.put("0", value);
+    row.put("1", value + 1);
+    row.put("2", value + 2);
+    formatter.renderGnuplot(row, 3, "000", "s", schema, {2, 0, 100});
+  }
+  const auto output = testing::internal::GetCapturedStdout();
+  const auto last   = output.rfind("plot");
+  ASSERT_NE(last, std::string::npos);
+  EXPECT_EQ(output.substr(last),
+            "plot '-' u 1:2 t '[vec-values[0]]' w lines lc rgb 'red',"
+            " '-' u 1:2 t '[vec-values[1]]' w lines lc rgb 'blue',"
+            " '-' u 1:2 t '[col2]' w lines lc rgb 'green'\r\n"
+            "0 30\r\n1 20\r\ne\r\n0 31\r\n1 21\r\ne\r\n0 32\r\n1 22\r\ne\r\n");
+}
+
 // ---- renderGnuplotOhlc ----
 
 namespace {
@@ -212,11 +241,13 @@ TEST(Formatter, renderGnuplotOhlc_null_samples_draws_only_candle) {
 TEST(Formatter, renderGnuplotOhlc_row_without_samples_plots_nothing) {
   Formatter fmt;
   testing::internal::CaptureStderr();
-  auto out         = feedOhlc(fmt, {{"10", "40", "5", "30"}}, "", 5);
+  auto out = feedOhlc(fmt, {{"10", "40", "5", "30"}}, "", 5);
+  out += feedOhlc(fmt, {{"10", "40", "5", "30"}}, "", 5);
   const auto error = testing::internal::GetCapturedStderr();
 
   EXPECT_TRUE(out.empty()) << out;
   EXPECT_NE(error.find("--gnuplot-ohlc"), std::string::npos) << error;
+  EXPECT_EQ(error.find("--gnuplot-ohlc"), error.rfind("--gnuplot-ohlc"));
 }
 
 // ---- renderGraphite ----
@@ -299,4 +330,38 @@ TEST(Formatter, renderInfluxDB_multiple_fields_comma_separated) {
   auto out = testing::internal::GetCapturedStdout();
 
   EXPECT_NE(out.find("a=1,b=2"), std::string::npos);
+}
+
+TEST(Formatter, monitoring_formats_expand_arrays_keep_empty_values_and_ignore_surplus) {
+  ptree schema, row;
+  schema.put("db.field.vec", "vec");
+  schema.put("db.field_count.vec", 2);
+  schema.put("db.field.scalar", "scalar");
+  row.put("0", "10");
+  row.put("1", "");
+  row.put("2", "99");
+  row.put("3", "777");
+  const auto secondsBefore = std::time(nullptr);
+  testing::internal::CaptureStdout();
+  Formatter::renderGraphite(row, "0010", "s", schema);
+  const auto graphite     = testing::internal::GetCapturedStdout();
+  const auto secondsAfter = std::time(nullptr);
+  std::smatch match;
+  ASSERT_TRUE(std::regex_match(graphite, match, std::regex("s\\.vec\\.0 10 ([0-9]+)\ns\\.vec\\.1  ([0-9]+)\n"))) << graphite;
+  for (int index : {1, 2}) {
+    EXPECT_GE(std::stoll(match[index].str()), secondsBefore);
+    EXPECT_LE(std::stoll(match[index].str()), secondsAfter);
+  }
+
+  const auto nanoseconds = [] {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+  };
+  const auto before = nanoseconds();
+  testing::internal::CaptureStdout();
+  Formatter::renderInfluxDB(row, "0010", "s", schema);
+  const auto influx = testing::internal::GetCapturedStdout();
+  const auto after  = nanoseconds();
+  ASSERT_TRUE(std::regex_match(influx, match, std::regex("s vec_0=10,vec_1= ([0-9]+)\n"))) << influx;
+  EXPECT_GE(std::stoll(match[1].str()), before);
+  EXPECT_LE(std::stoll(match[1].str()), after);
 }

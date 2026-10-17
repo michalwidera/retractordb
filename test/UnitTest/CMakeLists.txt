@@ -86,6 +86,11 @@ foreach(item ${V_GLOB})
       target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=mlockall
                           -Wl,--wrap=sched_setscheduler)
     endif()
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_executor_rt" AND RDB_HAS_SCHED_AFFINITY)
+      target_link_options(
+        ${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=sched_getaffinity
+        -Wl,--wrap=sysconf -Wl,--wrap=pthread_setaffinity_np)
+    endif()
     if(OUTPUT_FILE_NOEXT STREQUAL "test_descriptorIO")
       target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=fstat
                           -Wl,--wrap=pread -Wl,--wrap=write -Wl,--wrap=pwrite)
@@ -101,7 +106,9 @@ foreach(item ${V_GLOB})
         -Wl,--wrap=ftruncate
         -Wl,--wrap=lseek
         -Wl,--wrap=write
-        -Wl,--wrap=fsync)
+        -Wl,--wrap=fsync
+        -Wl,--wrap=fork
+        -Wl,--wrap=waitpid)
     endif()
     if(OUTPUT_FILE_NOEXT STREQUAL "test_ipcResponses")
       target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=getenv)
@@ -133,8 +140,9 @@ foreach(item ${V_GLOB})
     endif()
     # test_bus i test_busFallback udaja wpis procesu nieczytelny (hidepid /
     # ProtectProc) - test/UnitTest/unreadableProcess.hpp.
-    if(OUTPUT_FILE_NOEXT STREQUAL "test_bus" OR OUTPUT_FILE_NOEXT STREQUAL
-                                                "test_busFallback")
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_bus"
+       OR OUTPUT_FILE_NOEXT STREQUAL "test_busFallback"
+       OR OUTPUT_FILE_NOEXT STREQUAL "test_osPlatform")
       if(RDB_HAS_PROCFS)
         target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=kill)
       else()

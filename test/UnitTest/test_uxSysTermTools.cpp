@@ -227,6 +227,30 @@ TEST_F(SetupLoggerMainTest, file_logging_appends_and_dual_logging_keeps_stdout_c
   std::filesystem::remove(path);
 }
 
+TEST_F(SetupLoggerMainTest, service_logging_has_no_file_timestamp_or_stdout_and_flushes_each_line) {
+  const auto name = "rdb521-service-log-" + std::to_string(getpid());
+  const auto file = std::filesystem::temp_directory_path() / (name + ".log");
+  ASSERT_FALSE(std::filesystem::exists(file));
+  testing::internal::CaptureStdout();
+  testing::internal::CaptureStderr();
+  const auto destination = setupLoggerMain(name, true, true);
+  spdlog::error("service marker");
+  const auto error  = testing::internal::GetCapturedStderr();
+  const auto output = testing::internal::GetCapturedStdout();
+  EXPECT_TRUE(output.empty());
+  EXPECT_FALSE(std::filesystem::exists(file));
+  EXPECT_EQ(spdlog::default_logger()->sinks().size(), 1U);
+  EXPECT_EQ(spdlog::default_logger()->flush_level(), spdlog::level::trace);
+  EXPECT_EQ(spdlog::default_logger()->level(), static_cast<spdlog::level::level_enum>(SPDLOG_ACTIVE_LEVEL));
+#if RDB_HAS_SYSTEMD
+  EXPECT_EQ(destination, "journald (stderr)");
+  EXPECT_EQ(error, "<3>[E] service marker\n");
+#else
+  EXPECT_EQ(destination, "system log (stderr)");
+  EXPECT_EQ(error, "[E] service marker\n");
+#endif
+}
+
 // Tryb usługowy: log na stderr z prefiksem priorytetu sd-daemon "<N>". Przechwytujemy stderr
 // (dup2 na plik), logujemy INFO i ERROR, po czym sprawdzamy prefiksy: INFO=>6, ERROR=>3.
 TEST_F(SetupLoggerMainTest, service_mode_emits_sd_daemon_priority_prefix) {

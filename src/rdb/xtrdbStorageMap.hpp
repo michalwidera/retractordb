@@ -12,10 +12,13 @@
 /// - w sekcji DESCRIPTOR podawać pola danych z typem, nazwą, krotnością i rozmiarem oraz rozmiar rekordu.
 ///   Test: `it_issue153_storagemap_meta_cases-contracts`.
 /// - w sekcji DATA podawać plik `<baseName>` z liczbą rekordów, a przy segmentach RETENTION (`<baseName>_segment_N`) sumy rekordów i bajtów pliku bieżącego i segmentów, politykę retencji z limitem rekordów i bajtów albo "unbounded" oraz zakres rekordów każdego segmentu.
+///   Test: `it_issue153_storagemap_meta_cases-contracts`.
 /// - w sekcji META podawać `<baseName>.meta` z liczbą segmentów i rekordów (bez luk), paskiem segmentów i legendą, a w sekcji SHADOW `<baseName>.shadow` z liczbą aktualizacji.
+///   Test: `it_issue153_storagemap_meta_cases-contracts`.
 /// - oznaczać brakujący plik danych, `.meta` albo `.shadow` dopiskiem "(missing)".
 ///   Test: `it_issue153_storagemap_meta_cases-contracts`.
 /// - w sekcji ROTATED FILES wypisywać pliki `<nazwa bazowa>*.old<N>` z katalogu bazy, malejąco po N, z rozmiarem w bajtach.
+///   Test: `it_issue153_storagemap_meta_cases-contracts`.
 /// - nie zmieniać żadnego pliku magazynu.
 ///   Test: `it_issue153_storagemap_meta_cases-contracts`.
 ///

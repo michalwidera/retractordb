@@ -45,10 +45,14 @@ struct ProcessSnapshot {
 /// Funkcja inspectProcess powinna:
 /// - dla pid <= 0 zwracać pustą migawkę (found == false, unreadable == false).
 ///   Test: `RequirementContracts.catalogue_fallback_values_and_process_snapshot`.
-/// - odczytywać wpis procesu jednym odczytem jądra (Linux: /proc/<pid>/task/<pid>/stat, Darwin: sysctl KERN_PROC_PID) i dla odczytanego wpisu ustawiać found, zombie i niezerowy startTime.
+///   Test: `OsPlatform.InvalidPidAndConfirmedAbsenceHaveEmptySnapshots`.
+/// - odczytywać stan i czas startu z tego samego wpisu procesu (Linux: /proc/<pid>/task/<pid>/stat, Darwin: sysctl KERN_PROC_PID) i dla odczytanego wpisu ustawiać found, zombie i niezerowy startTime.
 ///   Test: `RequirementContracts.catalogue_fallback_values_and_process_snapshot`.
+///   Test: `OsPlatform.ExitedChildRemainsAZombieUntilReaped`. Ograniczenie: stan i startTime pochodza z jednego wpisu, bez gwarancji pojedynczego wywolania read przez iostream; bez procfs (Darwin) test jest pomijany jako niezweryfikowany.
 /// - zgłaszać brak procesu (found == false, unreadable == false) wyłącznie wtedy, gdy jądro go potwierdziło: kill(pid, 0) z ESRCH na Linuksie, ESRCH albo pusty wynik sysctl na Darwinie.
+///   Test: `OsPlatform.InvalidPidAndConfirmedAbsenceHaveEmptySnapshots`.
 /// - w każdym innym przypadku nieudanego odczytu, także przy ukrytym /proc (hidepid) i EPERM, ustawiać wyłącznie unreadable == true.
+///   Test: `OsPlatform.PermissionDenialIsUnknownRatherThanDead`. Ograniczenie: wymuszono EPERM po nieudanym odczycie; uszkodzonej tresci /proc nie wstrzykuje sie do implementacji.
 ///
 /// @note Na Linuksie czytany jest wpis lidera grupy watkow, bo QEMU user-mode syntetyzuje /proc/<wlasny pid>/stat
 ///       z innym starttime niz widzi obserwator.
@@ -70,8 +74,11 @@ struct ServiceIdentity {
 
 /// Funkcja detectServiceIdentity powinna:
 /// - na systemie z systemd zwracać jako unit najgłębszy segment ścieżki cgroup z /proc/self/cgroup kończący się na ".service", z pominięciem user@<uid>.service, a userScope ustawiać, gdy ścieżka biegnie przez /user.slice albo /user@.
+///   Nietestowalne: kontrola strukturalna detectSystemd w src/common/osPlatform.cpp i st_stage12_contracts (filtry .service, user@ i userScope); bez wymuszenia wariantow cgroup w dzialajacej jednostce.
 /// - na systemie z launchd zwracać jako unit wartość XPC_SERVICE_NAME tylko wtedy, gdy jest niepusta, różna od "0", nie zaczyna się od "application." i rodzicem procesu jest launchd (PID 1), a userScope ustawiać dla efektywnego UID różnego od 0.
+///   Nietestowalne: kontrola strukturalna detectLaunchd w src/common/osPlatform.cpp i st_stage12_contracts (etykieta, PPID i UID); wymaga osobnego wykonania na Darwinie.
 /// - w każdym innym przypadku, także na systemie bez znanego menedżera usług, zwracać unit == nullopt (zwykły proces).
+///   Nietestowalne: kontrola strukturalna detectServiceIdentity w st_stage12_contracts i pustych wynikow detectSystemd/detectLaunchd; system bez znanego menedzera nie jest tu wykonywany.
 ///
 /// @note Na Darwinie samo XPC_SERVICE_NAME nie wystarcza: srodowisko jest dziedziczone, wiec program z terminala
 ///       uruchomionego z Findera widzi etykiete aplikacji GUI. Zakres z UID-a to heurystyka - wybiera tylko

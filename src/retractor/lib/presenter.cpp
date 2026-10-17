@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <iostream>  // for operator<<
 #include <sstream>
 #include <string_view>
@@ -461,6 +462,11 @@ rdb::Result<> presenter::sequenceDiagram(int gridType, int cycleCount) {
   std::cout << "% Creating diagram output grid is " << (isGridOn ? "on" : "off") << ", cycle count:" << cycleCount << '\n';
   // https://swirly.dev
 
+  // Pusty plan sprawdzany przed rachunkiem siatki: wartownicy INT_MAX/INT_MIN w rational<int>
+  // przepelnialy `minInterval * msInSec` (UB), a wynik konczyl sie sukcesem bez diagramu.
+  RDB_TRY_ASSIGN(const auto intervals, coreInstance.getAvailableTimeIntervals());
+  if (intervals.empty()) return rdb::fail(rdb::Errc::Config, "presenter: plan holds no streams - nothing to draw");
+
   auto minInterval = boost::rational<int>(std::numeric_limits<int>::max());
   auto maxInterval = boost::rational<int>(std::numeric_limits<int>::min());
   for (const auto &q : coreInstance) {
@@ -480,12 +486,9 @@ rdb::Result<> presenter::sequenceDiagram(int gridType, int cycleCount) {
   auto cycleStepInt = boost::rational_cast<int>((maxInterval * msInSec) / grid);
   std::cout << "% Full cycle step count in grid is " << cycleStepInt << '\n';
 
-  if (cycleStepInt <= 0) {
-    std::cerr << "Error: Cycle step is zero or negative." << '\n';
-    return {};
-  }
-  RDB_TRY_ASSIGN(const auto intervals, coreInstance.getAvailableTimeIntervals());
-  if (intervals.empty()) return rdb::fail(rdb::Errc::Config, "presenter: plan holds no streams - nothing to draw");
+  if (cycleStepInt <= 0) return rdb::fail(rdb::Errc::Config, "presenter: cycle step is zero or negative");
+  if (cycleCount > std::numeric_limits<int>::max() / cycleStepInt)
+    return rdb::fail(rdb::Errc::Config, "presenter: cycle count is too large");
   TimeLine tl(intervals);
 
   /// @requirements-exempt proc_t: Zbior procesow i interwal uzywane do prezentacji diagramu.
@@ -602,17 +605,24 @@ int presenter::run(const boost::program_options::variables_map &vm) {
 
       std::string::size_type const secondArgLocation(sDiagramArgument.find_last_of(':'));
       std::string gridArg = sDiagramArgument.substr(0, secondArgLocation);
+      // Caly tekst musi byc liczba: atoi przyjmowal literowke jako 0 (`--diagram x` rysowal bez siatki).
+      auto parseInt = [](std::string_view text, int &value) {
+        const auto [end, ec] = std::from_chars(text.data(), text.data() + text.size(), value);
+        return ec == std::errc{} && end == text.data() + text.size();
+      };
       int cycleCount{1};
-      if (secondArgLocation != std::string::npos) {
-        cycleCount = atoi(sDiagramArgument.substr(secondArgLocation + 1).c_str());
+      if (secondArgLocation != std::string::npos &&
+          (!parseInt(std::string_view(sDiagramArgument).substr(secondArgLocation + 1), cycleCount) || cycleCount < 1)) {
+        std::cerr << "Diagram cycle count is invalid." << '\n';
+        return system::errc::invalid_argument;
       }
 
       if (gridArg.empty()) {
         std::cerr << "Diagram grid type not specified." << '\n';
         return system::errc::invalid_argument;
       }
-      int gridType = atoi(gridArg.c_str());
-      if (gridType < 0 || gridType > 1) {
+      int gridType{0};
+      if (!parseInt(gridArg, gridType) || gridType < 0 || gridType > 1) {
         std::cerr << "Diagram grid type is invalid." << '\n';
         return system::errc::invalid_argument;
       }

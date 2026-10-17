@@ -6,6 +6,7 @@
 /// - zwracać true, gdy na terminalu czeka naciśnięty klawisz, pozostawiając go do odczytu, a bez klawisza false, bez blokowania i z przywróceniem trybu terminala.
 ///   Test: `KbHitRedirectedStdin.tty_key_remains_available_and_terminal_mode_is_restored`.
 /// - zwracać false bez czytania wejścia, gdy ignoreAnyKey jest ustawione albo stdin nie jest terminalem.
+///   Test: `KbHit.returns_zero_when_ignore_any_key`, `KbHitRedirectedStdin.non_tty_does_not_consume_stdin`, `KbHitRedirectedStdin.non_tty_at_eof_is_not_a_keypress`.
 ///
 /// @note Gdy stdin jest plikiem albo potokiem, getchar() zwracal pierwszy bajt WEJSCIA zamiast klawisza:
 ///       xqry z przekierowanym stdin konczyl sie kodem 0 bez odczytu strumienia (K6b, issue_215).
@@ -18,12 +19,14 @@ int _getch();
 
 /// Funkcja fixArgcv powinna:
 /// - usuwać końcowy znak powrotu karetki z każdego argumentu argv, pozostawiając pozostałe argumenty bez zmian.
+///   Test: `FixArgcv.strips_trailing_cr_from_arguments`, `FixArgcv.does_not_modify_arguments_without_trailing_cr`, `FixArgcv.handles_empty_string_argument`, `FixArgcv.only_strips_last_character_if_cr`.
 ///
 /// @note Skrypty .sh przekazywaly argumenty z dodatkowym \r (od gcc 9.x czesc testow padala).
 void fixArgcv(int argc, char **argv);
 
 /// Funkcja setupLoggerMain powinna:
 /// - w trybie usługi ustawiać domyślny logger na stderr, bez pliku i bez znacznika czasu, z flush po każdej linii, z przedrostkiem priorytetu sd-daemon "<N>" tylko przy systemd, i zwracać opis celu logu.
+///   Test: `SetupLoggerMainTest.service_logging_has_no_file_timestamp_or_stdout_and_flushes_each_line`, `SetupLoggerMainTest.service_mode_emits_sd_daemon_priority_prefix`. Ograniczenie: prefiks systemd i jego brak to rozne galezie platformowe.
 /// - poza trybem usługi dopisywać log do pliku <katalog tymczasowy>/<nazwa pliku z loggerFile>.log, bez obcinania, i zwracać jego ścieżkę.
 ///   Test: `SetupLoggerMainTest.file_logging_appends_and_dual_logging_keeps_stdout_clean`.
 /// - w trybie dual logować jednocześnie do pliku i na stderr, nigdy na stdout, który jest strumieniem danych klienta.

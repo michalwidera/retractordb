@@ -9,6 +9,8 @@
 #include <unistd.h>
 
 #include <filesystem>
+#include <optional>
+#include <sstream>
 #include <string>
 #include <system_error>
 
@@ -27,7 +29,9 @@
 
 namespace {
 bool failDescriptorMeasure = false, failPathMeasure = false;
-}
+std::optional<struct statvfs> measuredSpace;
+bool probeWasUnlinked = false, probeWasEmpty = false;
+}  // namespace
 extern "C" int __real_fstatvfs(int, struct statvfs *);
 extern "C" int __real_statvfs(const char *, struct statvfs *);
 extern "C" int __wrap_fstatvfs(int fd, struct statvfs *result) {
@@ -35,12 +39,24 @@ extern "C" int __wrap_fstatvfs(int fd, struct statvfs *result) {
     errno = EIO;
     return -1;
   }
+  if (measuredSpace) {
+    struct stat entry{};
+    probeWasEmpty    = fstat(fd, &entry) == 0 && entry.st_size == 0;
+    const auto name  = "/dev/shm/rdb_shm_probe_" + std::to_string(getpid());
+    probeWasUnlinked = !std::filesystem::exists(name);
+    *result          = *measuredSpace;
+    return 0;
+  }
   return __real_fstatvfs(fd, result);
 }
 extern "C" int __wrap_statvfs(const char *path, struct statvfs *result) {
   if (failPathMeasure) {
     errno = EIO;
     return -1;
+  }
+  if (measuredSpace) {
+    *result = *measuredSpace;
+    return 0;
   }
   return __real_statvfs(path, result);
 }
@@ -172,11 +188,72 @@ TEST(ShmBudget, SpacePreservesExistingObjectOnProbeNameCollision) {
 #endif
 
 TEST(ShmBudget, HumanBytesPicksUnit) {
+  EXPECT_EQ(shmbudget::humanBytes(0), "0 B");
+  EXPECT_EQ(shmbudget::humanBytes(1023), "1023 B");
   EXPECT_EQ(shmbudget::humanBytes(512), "512 B");
   EXPECT_EQ(shmbudget::humanBytes(2048), "2.0 KiB");
   EXPECT_EQ(shmbudget::humanBytes(3U * 1024 * 1024), "3.0 MiB");
   EXPECT_EQ(shmbudget::humanBytes(1024), "1.0 KiB");
   EXPECT_EQ(shmbudget::humanBytes(UINT64_C(1073741824)), "1.0 GiB");
+  EXPECT_EQ(shmbudget::humanBytes(UINT64_C(1073741823)), "1024.0 MiB");
+  EXPECT_EQ(shmbudget::humanBytes(1536), "1.5 KiB");
+}
+
+TEST(ShmBudget, MeasurementUsesAvailableBlocksAndFragmentSize) {
+  struct Restore {
+    ~Restore() { measuredSpace.reset(); }
+  } restore;
+  measuredSpace.emplace();
+  measuredSpace->f_blocks = 500;
+  measuredSpace->f_bavail = 123;
+  measuredSpace->f_bfree  = 321;
+  measuredSpace->f_frsize = 32;
+  measuredSpace->f_bsize  = 4096;
+  const auto result       = shmbudget::space();
+  EXPECT_TRUE(result.known);
+  EXPECT_EQ(result.total, 16000U);
+  EXPECT_EQ(result.available, 3936U);
+#if RDB_HAS_BOOST_POSIX_SHM
+  EXPECT_TRUE(probeWasUnlinked);
+  EXPECT_TRUE(probeWasEmpty);
+#endif
+}
+
+TEST(ShmBudget, ReportSubtractsReservationAndRoundsClientCountDown) {
+  struct Restore {
+    ~Restore() { measuredSpace.reset(); }
+  } restore;
+  const auto fixed = shmbudget::fixedReservationBytes();
+  const auto queue = shmbudget::responseQueueBytes(10);
+  measuredSpace.emplace();
+  measuredSpace->f_frsize = 1;
+  measuredSpace->f_blocks = fixed + 10 * queue;
+  qTree plan;
+  plan.push_back(query(1, "first"));
+  plan.push_back(query(1, "second"));
+  for (const auto available : {fixed + 3 * queue + queue / 2, fixed - 1}) {
+    measuredSpace->f_bavail = available;
+    const auto report       = shmbudget::report(plan, 10, 1);
+    EXPECT_TRUE(report.contains("filesystem behind " + osplat::sharedMemoryBackingPath()));
+    EXPECT_TRUE(report.contains("bus segment " + shmbudget::humanBytes(bus::segmentBytes())));
+    EXPECT_TRUE(report.contains("command queue " + shmbudget::humanBytes(shmbudget::messageQueueBytes(
+                                                       ipc::kQueryQueueMaxMessages, ipc::kQueryQueueMaxMessageSize))));
+    EXPECT_TRUE(report.contains("response segment " + shmbudget::humanBytes(ipc::kShmemSegmentSize)));
+    EXPECT_TRUE(report.contains(shmbudget::humanBytes(available)));
+    EXPECT_TRUE(report.contains(shmbudget::humanBytes(available < fixed ? 0 : available - fixed)));
+    const auto position = report.find("  1 s");
+    ASSERT_NE(position, std::string::npos) << report;
+    std::istringstream row(report.substr(position));
+    std::string tick, seconds, amount, unit, first, second;
+    int elements = -1, clients = -1;
+    row >> tick >> seconds >> elements >> amount >> unit >> clients >> first >> second;
+    EXPECT_EQ(tick, "1");
+    EXPECT_EQ(seconds, "s");
+    EXPECT_EQ(elements, 10);
+    EXPECT_EQ(amount + " " + unit, shmbudget::humanBytes(queue));
+    EXPECT_EQ(clients, available < fixed ? 0 : 3);
+    EXPECT_EQ(first + " " + second, "first, second");
+  }
 }
 
 TEST(ShmBudget, MeasurementFallbackAndUnknownReportAreExplicit) {

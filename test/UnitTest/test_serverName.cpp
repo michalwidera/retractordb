@@ -29,6 +29,13 @@ TEST(ServerName, accepts_expected_shapes) {
   EXPECT_TRUE(servername::isValid(std::string(servername::kMaxLength, 'a')));
 }
 
+TEST(ServerName, rejects_embedded_nul_non_ascii_and_invalid_leading_characters) {
+  EXPECT_FALSE(servername::isValid(std::string("valid\0tail", 10)));
+  EXPECT_FALSE(servername::isValid("a\xc3\xa9"));
+  for (const auto name : {"_valid", "-valid", "a\n", "a\t", "a\\b", "aZ"})
+    EXPECT_FALSE(servername::isValid(name)) << name;
+}
+
 // Generator ma produkowac nazwy, ktore przechodza wlasna walidacje - inaczej wylosowana
 // nazwa bylaby odrzucana przez sciezke, ktora ma ja przyjac.
 TEST(ServerName, generated_names_are_always_valid) {

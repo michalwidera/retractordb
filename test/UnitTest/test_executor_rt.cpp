@@ -48,6 +48,38 @@ RDB_WRAP_SYSCALL(int, sched_setscheduler, (pid_t pid, int policy, const struct s
                  (pid, policy, parameter));
 #endif
 
+#if RDB_HAS_SCHED_AFFINITY
+namespace {
+bool mockAffinity     = false;
+int affinityReadError = 0, affinityWriteError = 0, affinityWrites = 0;
+long affinityOnline = 3;
+cpu_set_t callingMask{}, writtenMask{};
+pthread_t writtenThread{};
+}  // namespace
+extern "C" int __real_sched_getaffinity(pid_t, size_t, cpu_set_t *);
+extern "C" long __real_sysconf(int);
+extern "C" int __real_pthread_setaffinity_np(pthread_t, size_t, const cpu_set_t *);
+extern "C" int __wrap_sched_getaffinity(pid_t pid, size_t size, cpu_set_t *mask) {
+  if (!mockAffinity) return __real_sched_getaffinity(pid, size, mask);
+  *mask = callingMask;
+  errno = affinityReadError;
+  return affinityReadError ? -1 : 0;
+}
+extern "C" long __wrap_sysconf(int key) {
+  return mockAffinity && key == _SC_NPROCESSORS_ONLN ? affinityOnline : __real_sysconf(key);
+}
+extern "C" int __wrap_pthread_setaffinity_np(pthread_t thread, size_t size, const cpu_set_t *mask) {
+  if (!mockAffinity) return __real_pthread_setaffinity_np(thread, size, mask);
+  ++affinityWrites;
+  writtenThread = thread;
+  writtenMask   = *mask;
+  return affinityWriteError;
+}
+RDB_WRAP_SYSCALL(int, sched_getaffinity, (pid_t pid, size_t size, cpu_set_t *mask), (pid, size, mask));
+RDB_WRAP_SYSCALL(long, sysconf, (int key), (key));
+RDB_WRAP_SYSCALL(int, pthread_setaffinity_np, (pthread_t thread, size_t size, const cpu_set_t *mask), (thread, size, mask));
+#endif
+
 // ctest -R '^ut-test_executor_rt' -V
 
 namespace {
@@ -117,7 +149,7 @@ TEST(ExecutorRtSleepTest, PastAnchorReturnsImmediately) {
   struct timespec before{};
   struct timespec after{};
   clock_gettime(CLOCK_MONOTONIC, &before);
-  rtAbsoluteSleep(anchor, 0);
+  EXPECT_TRUE(rtAbsoluteSleep(anchor, 0));
   clock_gettime(CLOCK_MONOTONIC, &after);
 
   long elapsed_ms = (after.tv_sec - before.tv_sec) * 1000 + (after.tv_nsec - before.tv_nsec) / 1'000'000;
@@ -129,7 +161,7 @@ TEST(ExecutorRtSleepTest, SmallIntervalCompletesInTime) {
   clock_gettime(CLOCK_MONOTONIC, &anchor);
 
   struct timespec before = anchor;
-  rtAbsoluteSleep(anchor, 10);
+  EXPECT_TRUE(rtAbsoluteSleep(anchor, 10));
   struct timespec after{};
   clock_gettime(CLOCK_MONOTONIC, &after);
 
@@ -280,6 +312,30 @@ TEST(ExecutorRtCheckTest, FalseReturnImpliesErrorInOutput) {
   }
 }
 
+TEST(ExecutorRtCheckTest, ReturnValueAgreesWithCriticalRowsAndWarningsStayAdvisory) {
+  testing::internal::CaptureStdout();
+  const bool result = rtCheckAndPrint();
+  const auto output = testing::internal::GetCapturedStdout();
+#if RDB_HAS_PROCFS
+  const auto nice = output.find(" CAP_SYS_NICE / root");
+  const auto lock = output.find(" CAP_IPC_LOCK / root");
+  ASSERT_NE(nice, std::string::npos);
+  ASSERT_NE(lock, std::string::npos);
+  const bool both = output.substr(nice - 6, 6) == "[OK]  " && output.substr(lock - 6, 6) == "[OK]  ";
+  EXPECT_EQ(result, both);
+  EXPECT_EQ(output.contains("ERROR: Missing critical capabilities"), !both);
+  EXPECT_EQ(output.contains("setcap cap_sys_nice,cap_ipc_lock+ep"), !both);
+  const auto preempt = output.find(" PREEMPT_RT kernel");
+  ASSERT_NE(preempt, std::string::npos);
+  EXPECT_EQ(output.contains("Install PREEMPT_RT"), output.substr(preempt - 6, 6) == "[WARN]");
+#else
+  EXPECT_TRUE(output.contains("Best-effort real time only"));
+  EXPECT_FALSE(output.contains("CAP_SYS_NICE"));
+  EXPECT_EQ(result, (RDB_HAS_SCHED_SETSCHEDULER || RDB_HAS_PTHREAD_SCHEDPARAM) && sched_get_priority_min(SCHED_FIFO) >= 0 &&
+                        sched_get_priority_max(SCHED_FIFO) >= sched_get_priority_min(SCHED_FIFO));
+#endif
+}
+
 // --- rtActivate ---
 
 #if RDB_HAS_SCHED_SETSCHEDULER
@@ -337,6 +393,47 @@ TEST(ExecutorRtActivateTest, SuccessImpliesRealTimePolicyOnCallingThread) {
 // mechanizm, który mu zapobiega: rozdział rdzeni.
 
 #if RDB_HAS_SCHED_AFFINITY
+
+TEST(ExecutorRtAffinityTest, MockedComplementAndEveryRefusalAreReported) {
+  struct Restore {
+    ~Restore() { mockAffinity = false; }
+  } restore;
+  mockAffinity = true;
+  for (int scenario = 0; scenario < 5; ++scenario) {
+    SCOPED_TRACE(scenario);
+    affinityReadError  = scenario == 1 ? EPERM : 0;
+    affinityWriteError = scenario == 3 ? EINVAL : 0;
+    affinityOnline     = scenario == 2 ? 0 : 3;
+    affinityWrites     = 0;
+    CPU_ZERO(&callingMask);
+    CPU_SET(0, &callingMask);
+    if (scenario == 4) {
+      CPU_SET(1, &callingMask);
+      CPU_SET(2, &callingMask);
+    }
+    const auto thread = pthread_self();
+    testing::internal::CaptureStdout();
+    const bool moved  = rtKeepThreadOffRtCpus(thread);
+    const auto output = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(moved, scenario == 0);
+    EXPECT_EQ(affinityWrites, scenario == 0 || scenario == 3 ? 1 : 0);
+    if (scenario == 0) {
+      EXPECT_TRUE(pthread_equal(writtenThread, thread));
+      EXPECT_EQ(CPU_COUNT(&writtenMask), 2);
+      EXPECT_FALSE(CPU_ISSET(0, &writtenMask));
+      EXPECT_TRUE(CPU_ISSET(1, &writtenMask));
+      EXPECT_TRUE(CPU_ISSET(2, &writtenMask));
+      EXPECT_TRUE(output.contains("[INFO]"));
+      EXPECT_TRUE(output.contains("auxiliary cores: 2"));
+    } else if (scenario == 4) {
+      EXPECT_TRUE(output.empty());
+    } else {
+      EXPECT_TRUE(output.contains("[WARN]"));
+      const char *reason = scenario == 1 ? "read RT thread affinity" : scenario == 2 ? "online cores" : "move the comms thread";
+      EXPECT_TRUE(output.contains(reason)) << output;
+    }
+  }
+}
 
 TEST(ExecutorRtAffinityTest, MovesThreadOffPinnedRtCore) {
   if (sysconf(_SC_NPROCESSORS_ONLN) < 2) GTEST_SKIP() << "test wymaga co najmniej dwoch rdzeni online";
@@ -432,6 +529,9 @@ TEST(ExecutorRtAffinityTest, ReportsNoMoveWhereAffinityIsUnavailable) {
   // Komunikat wypisywany jest RAZ na proces, wiec przy drugim wywolaniu w tym
   // samym binarium bedzie pusty - stad asercja tylko o tresci, gdy cos padlo.
   if (!out.empty()) EXPECT_NE(out.find("CPU affinity is not available"), std::string::npos);
+  testing::internal::CaptureStdout();
+  EXPECT_FALSE(rtKeepThreadOffRtCpus(pthread_self()));
+  EXPECT_TRUE(testing::internal::GetCapturedStdout().empty());
 }
 
 #endif

@@ -1,6 +1,7 @@
 #include <fcntl.h>
 #include <sys/file.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <cerrno>
@@ -30,6 +31,29 @@
 #include "retractor/lib/lockManager.hpp"
 #include "retractor/lib/serviceControl.hpp"
 #include "syscallWrap.hpp"
+
+namespace {
+int serviceProcessFault = 0;
+}
+extern "C" pid_t __real_fork();
+extern "C" pid_t __real_waitpid(pid_t, int *, int);
+extern "C" pid_t __wrap_fork() {
+  if (serviceProcessFault == 1) {
+    errno = EAGAIN;
+    return -1;
+  }
+  if (serviceProcessFault == 2) return 424242;
+  return __real_fork();
+}
+extern "C" pid_t __wrap_waitpid(pid_t pid, int *status, int options) {
+  if (serviceProcessFault == 2 && pid == 424242) {
+    errno = EINTR;
+    return -1;
+  }
+  return __real_waitpid(pid, status, options);
+}
+RDB_WRAP_SYSCALL(pid_t, fork, (), ());
+RDB_WRAP_SYSCALL(pid_t, waitpid, (pid_t pid, int *status, int options), (pid, status, options));
 
 using servicecontrol::deliverQueryFile;
 using servicecontrol::restartCommand;
@@ -686,6 +710,7 @@ TEST(ServiceControlRestart, builds_user_scope_argv) {
   EXPECT_EQ(captured[0], "launchctl");
   EXPECT_TRUE(captured[3].starts_with("gui/")) << "polecenie nie trafia w domene uzytkownika: " << captured[3];
   EXPECT_TRUE(captured[3].ends_with("/xretractor.service"));
+  EXPECT_EQ(captured[3], "gui/" + std::to_string(getuid()) + "/xretractor.service");
 #endif
 }
 
@@ -764,7 +789,9 @@ TEST(ServiceControlWrite, empty_content_truncates_the_target) {
 TEST(ServiceControlWrite, fails_when_the_target_directory_does_not_exist) {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_writequery_nodir";
   std::filesystem::remove_all(dir);
+  LogCapture log;
   EXPECT_FALSE(servicecontrol::writeQueryFile("x\n", (dir / "startup.rql").string()));
+  EXPECT_TRUE(log.text().contains("cannot open temp"));
 }
 
 // Odmowa planu przed startem czysci plik zapytan WYLACZNIE w jednostce uslugowej: zwykly proces
@@ -787,8 +814,126 @@ TEST(ServiceControlDropRefused, clears_the_query_file_only_inside_a_service_unit
 TEST(ServiceControlDeliver, fails_on_missing_source) {
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_deliver_missing";
   std::filesystem::create_directories(dir);
+  LogCapture log;
   EXPECT_FALSE(deliverQueryFile((dir / "nope.rql").string(), (dir / "out.rql").string()));
+  EXPECT_TRUE(log.text().contains("cannot open source"));
+  EXPECT_TRUE(log.text().contains((dir / "nope.rql").string()));
   std::filesystem::remove_all(dir);
+}
+
+namespace {
+class ServiceControlContract : public ::testing::Test {
+ protected:
+  std::filesystem::path dir;
+  std::optional<std::string> previousPath;
+  void SetUp() override {
+    std::string pattern = (std::filesystem::temp_directory_path() / "rdb521-service-XXXXXX").string();
+    ASSERT_NE(mkdtemp(pattern.data()), nullptr);
+    dir = pattern;
+    if (const auto *path = std::getenv("PATH")) previousPath = path;
+  }
+  void TearDown() override {
+    serviceProcessFault = 0;
+    if (previousPath)
+      setenv("PATH", previousPath->c_str(), 1);
+    else
+      unsetenv("PATH");
+    std::filesystem::remove_all(dir);
+  }
+  static std::string read(const std::filesystem::path &file) {
+    std::ifstream input(file, std::ios::binary);
+    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+  }
+};
+}  // namespace
+
+TEST_F(ServiceControlContract, real_exec_passes_literal_arguments_and_propagates_exit_and_signal) {
+#if RDB_HAS_LAUNCHD
+  const auto manager = dir / "launchctl";
+#else
+  const auto manager = dir / "systemctl";
+#endif
+  ASSERT_EQ(setenv("PATH", dir.c_str(), 1), 0);
+  for (const bool signaled : {false, true}) {
+    {
+      std::ofstream executable(manager);
+      executable << "#!/bin/sh\nprintf '%s\\n' \"$@\"\n";
+      executable << (signaled ? "kill -TERM \"$$\"\n" : "exit 7\n");
+    }
+    ASSERT_EQ(chmod(manager.c_str(), 0700), 0);
+    testing::internal::CaptureStdout();
+    const int status     = restartService(false, "literal; exit 99");
+    const auto arguments = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(status, signaled ? -1 : 7);
+#if RDB_HAS_LAUNCHD
+    EXPECT_EQ(arguments, "kickstart\n-k\nsystem/literal; exit 99\n");
+#else
+    EXPECT_EQ(arguments, "restart\nliteral; exit 99\n");
+#endif
+  }
+  std::filesystem::remove(manager);
+  EXPECT_EQ(restartService(false, "unused"), 127);
+}
+
+TEST_F(ServiceControlContract, fork_and_wait_failures_return_minus_one) {
+  // Podejrzane bez --wrap (Darwin): falszywy fork przez RDB_WRAP_SYSCALL nie byl tam wykonany.
+  if (!RDB_HAS_LD_WRAP) GTEST_SKIP() << "podmiana fork/waitpid sprawdzona tylko z -Wl,--wrap";
+  for (int fault : {1, 2}) {
+    serviceProcessFault = fault;
+    EXPECT_EQ(restartService(false, "unused"), -1);
+  }
+}
+
+TEST_F(ServiceControlContract, delivery_preserves_binary_bytes_and_rename_keeps_the_old_reader) {
+  const auto source = dir / "source.rql";
+  const auto target = dir / "target.rql";
+  const std::string content("a\0b\r\n", 5);
+  std::ofstream(source, std::ios::binary).write(content.data(), static_cast<std::streamsize>(content.size()));
+  std::ofstream(target) << "old contents";
+  std::ifstream oldReader(target);
+  ASSERT_TRUE(deliverQueryFile(source.string(), target.string()));
+  EXPECT_EQ(read(target), content);
+  EXPECT_EQ(std::string(std::istreambuf_iterator<char>(oldReader), std::istreambuf_iterator<char>()), "old contents");
+  EXPECT_FALSE(std::filesystem::exists(target.string() + ".tmp." + std::to_string(getpid())));
+}
+
+TEST_F(ServiceControlContract, rename_failure_preserves_the_target_and_removes_the_temporary_file) {
+  const auto target = dir / "directory";
+  std::filesystem::create_directory(target);
+  std::ofstream(target / "kept") << "sentinel";
+  LogCapture log;
+  EXPECT_FALSE(servicecontrol::writeQueryFile("replacement", target.string()));
+  EXPECT_EQ(read(target / "kept"), "sentinel");
+  EXPECT_FALSE(std::filesystem::exists(target.string() + ".tmp." + std::to_string(getpid())));
+  EXPECT_TRUE(log.text().contains("rename"));
+  EXPECT_TRUE(log.text().contains(target.string()));
+}
+
+TEST_F(ServiceControlContract, write_failure_preserves_the_target_and_reports_the_temporary_file) {
+  if (!std::filesystem::exists("/dev/full")) GTEST_SKIP() << "test wymaga urzadzenia /dev/full";
+  const auto target    = dir / "plan.rql";
+  const auto temporary = target.string() + ".tmp." + std::to_string(getpid());
+  std::ofstream(target) << "old contents";
+  std::filesystem::create_symlink("/dev/full", temporary);
+  LogCapture log;
+  EXPECT_FALSE(servicecontrol::writeQueryFile("replacement", target.string()));
+  EXPECT_EQ(read(target), "old contents");
+  EXPECT_TRUE(log.text().contains("write failed to temp"));
+  EXPECT_TRUE(log.text().contains(temporary));
+  EXPECT_TRUE(std::filesystem::is_symlink(temporary));
+}
+
+TEST_F(ServiceControlContract, refused_plan_handles_empty_paths_and_logs_both_outcomes) {
+  EXPECT_FALSE(servicecontrol::dropRefusedPlan("unit.service", ""));
+  const auto target = dir / "plan.rql";
+  std::ofstream(target) << "kept";
+  LogCapture log;
+  EXPECT_TRUE(servicecontrol::dropRefusedPlan("unit.service", target.string()));
+  EXPECT_EQ(read(target), "");
+  EXPECT_TRUE(log.text().contains("cleared"));
+  EXPECT_FALSE(servicecontrol::dropRefusedPlan("unit.service", (dir / "missing" / "plan.rql").string()));
+  EXPECT_TRUE(log.text().contains("could NOT clear"));
+  EXPECT_TRUE(log.text().contains("critical"));
 }
 
 TEST(LockManagerFlock, HashCollisionCannotAcquireTheSameIpcIdentity) {

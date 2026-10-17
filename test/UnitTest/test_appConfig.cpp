@@ -13,7 +13,11 @@
 
 #include <toml++/toml.hpp>
 
+#include "logCapture.hpp"
 #include "retractor/lib/appConfig.hpp"
+
+// Ta sama implementacja; dolaczenie udostepnia testowi skladanie warstw bez zapisu do /etc.
+#include "retractor/lib/appConfig.cpp"
 
 namespace fs = std::filesystem;
 
@@ -26,7 +30,7 @@ void writeFile(const fs::path &path, const std::string &content) {
 }
 
 // Test fixture: izoluje warstwę użytkownika przez XDG_CONFIG_HOME wskazujący na
-// unikalny katalog tymczasowy. Dzięki temu testy nie zależą od /etc/retractor.
+// unikalny katalog tymczasowy. Warstwa systemowa nadal jest aktywna.
 class AppConfigTest : public ::testing::Test {
  protected:
   fs::path tmpDir;
@@ -137,6 +141,89 @@ TEST_F(AppConfigTest, explicit_missing_config_path_throws) {
   const fs::path missing = tmpDir / "nope.toml";
 
   EXPECT_THROW(loadAppConfig(missing.string()), toml::parse_error);
+}
+
+TEST_F(AppConfigTest, explicit_path_ignores_a_malformed_user_layer) {
+  writeFile(userConfigFile(), "[broken");
+  const auto file = tmpDir / "explicit.toml";
+  writeFile(file, "[ipc]\nmin_queue_elements = 17\n");
+  const auto cfg = loadAppConfig(file.string());
+  EXPECT_EQ(cfg.ipcMinQueueElements, 17);
+  EXPECT_EQ(cfg.loadedFrom, (std::vector<std::string>{file.string()}));
+}
+
+TEST_F(AppConfigTest, malformed_explicit_path_names_the_file) {
+  const auto file = tmpDir / "broken.toml";
+  writeFile(file, "[broken");
+  try {
+    (void)loadAppConfig(file.string());
+    FAIL() << "Malformed explicit configuration was accepted";
+  } catch (const toml::parse_error &error) {
+    EXPECT_TRUE(std::string(error.what()).contains(file.string()));
+  }
+}
+
+TEST_F(AppConfigTest, layered_tables_override_only_present_keys_and_validate_each_layer) {
+  AppConfig cfg;
+  applyTable(toml::parse("[ipc]\nmin_queue_elements = 17\nqueue_buffer_seconds = 23\n"), cfg, "system.toml");
+  applyTable(toml::parse("[ipc]\nmin_queue_elements = 31\n"), cfg, "user.toml");
+  EXPECT_EQ(cfg.ipcMinQueueElements, 31);
+  EXPECT_EQ(cfg.ipcQueueBufferSeconds, 23);
+  try {
+    applyTable(toml::parse("[paths]\nlock_dir = 'relative'\n"), cfg, "system.toml");
+    FAIL() << "Invalid earlier layer was accepted";
+  } catch (const std::invalid_argument &error) {
+    EXPECT_TRUE(std::string(error.what()).contains("system.toml"));
+  }
+}
+
+TEST_F(AppConfigTest, existence_error_is_not_treated_as_a_missing_layer) {
+  fs::create_directories(userConfigFile().parent_path());
+  fs::create_symlink(userConfigFile().filename(), userConfigFile());
+  try {
+    (void)loadAppConfig();
+    FAIL() << "Symlink loop was treated as an absent configuration";
+  } catch (const fs::filesystem_error &error) {
+    EXPECT_EQ(error.path1(), userConfigFile());
+    EXPECT_EQ(error.code(), std::errc::too_many_symbolic_link_levels);
+  }
+}
+
+TEST_F(AppConfigTest, invalid_numeric_settings_fall_back_with_keyed_warnings) {
+  for (const int value : {0, -1}) {
+    SCOPED_TRACE(value);
+    const auto text = std::to_string(value);
+    const auto file = tmpDir / "numeric.toml";
+    writeFile(file, "[ipc]\nqueue_buffer_seconds = " + text + "\nmin_queue_elements = " + text +
+                        "\nclient_response_max_fails = " + text + "\n[timing]\nserver_startup_wait_s = " + text +
+                        "\nserver_startup_poll_ms = " + text + "\nquery_no_data_timeout_ms = " + text +
+                        "\n[scheduling]\nrt_priority = " + text + "\n[limits]\nhistory_memory_mib = " + text + "\n");
+    LogCapture log;
+    const auto cfg = loadAppConfig(file.string());
+    const AppConfig defaults;
+    EXPECT_EQ(cfg.ipcQueueBufferSeconds, defaults.ipcQueueBufferSeconds);
+    EXPECT_EQ(cfg.ipcMinQueueElements, defaults.ipcMinQueueElements);
+    EXPECT_EQ(cfg.ipcClientResponseMaxFails, defaults.ipcClientResponseMaxFails);
+    EXPECT_EQ(cfg.timingServerStartupWaitSeconds, defaults.timingServerStartupWaitSeconds);
+    EXPECT_EQ(cfg.timingServerStartupPollIntervalMs, defaults.timingServerStartupPollIntervalMs);
+    EXPECT_EQ(cfg.timingQueryNoDataTimeoutMs, defaults.timingQueryNoDataTimeoutMs);
+    EXPECT_EQ(cfg.schedulingRtPriority, defaults.schedulingRtPriority);
+    EXPECT_EQ(cfg.historyMemoryMib, defaults.historyMemoryMib);
+#if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_WARN
+    for (const auto key : {"ipc.queue_buffer_seconds", "ipc.min_queue_elements", "ipc.client_response_max_fails",
+                           "timing.server_startup_wait_s", "timing.server_startup_poll_ms", "timing.query_no_data_timeout_ms",
+                           "scheduling.rt_priority", "limits.history_memory_mib"})
+      EXPECT_TRUE(log.text().contains(key)) << key;
+#endif
+  }
+}
+
+TEST_F(AppConfigTest, rt_priority_accepts_both_bounds_and_refuses_one_above) {
+  const auto file = tmpDir / "priority.toml";
+  for (const int priority : {1, 99, 100}) {
+    writeFile(file, "[scheduling]\nrt_priority = " + std::to_string(priority) + "\n");
+    EXPECT_EQ(loadAppConfig(file.string()).schedulingRtPriority, priority == 100 ? 50 : priority);
+  }
 }
 
 TEST_F(AppConfigTest, loaded_from_empty_when_no_file_found) {

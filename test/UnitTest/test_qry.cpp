@@ -1,9 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <unistd.h>
+
 #include <array>
 #include <set>
+#include <sstream>
 #include <string>
+#include <vector>
 
+#include <boost/interprocess/ipc/message_queue.hpp>
+#include <boost/json.hpp>
+#include <boost/property_tree/info_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/system/error_code.hpp>
 
@@ -500,6 +507,31 @@ TEST(xqry, select_does_not_report_success_when_no_element_was_read) {
   EXPECT_EQ(result, selectResult::clientQueueMissing);
 }
 
+TEST(xqry, end_of_stream_before_the_first_row_reports_no_data) {
+  namespace IPC   = boost::interprocess;
+  const auto name = ipc::names().responseQueue(getpid());
+  struct RemoveQueue {
+    std::string name;
+    ~RemoveQueue() { IPC::message_queue::remove(name.c_str()); }
+  } cleanup{name};
+  IPC::message_queue::remove(name.c_str());
+  IPC::message_queue queue(IPC::create_only, name.c_str(), 1, ipc::kResponseQueueMaxMessageSize,
+                           IPC::permissions(ipc::kObjectPermissions));
+  boost::property_tree::ptree end;
+  end.put("stream", constants::Reserved_id_oob);
+  std::ostringstream serialized;
+  boost::property_tree::write_info(serialized, end);
+  const auto message = serialized.str();
+  queue.send(message.data(), message.size(), 0);
+  qry_fake_known_stream client(2);
+  boost::program_options::variables_map options;
+  testing::internal::CaptureStdout();
+  const auto result = client.select(options, 1, "core0", {0, 0, 0});
+  const auto output = testing::internal::GetCapturedStdout();
+  EXPECT_EQ(result, selectResult::noData);
+  EXPECT_TRUE(output.empty());
+}
+
 // Każdy tryb ma własny, niepusty opis - komunikat operatora nie może być pusty
 // ani wspólny dla różnych awarii.
 TEST(xqry, select_result_descriptions_are_distinct) {
@@ -611,4 +643,146 @@ class qry_fake_plan_swapped_midway : public qry {
 TEST(xqry, detailShow_survives_plan_swap_between_get_and_detail) {
   qry_fake_plan_swapped_midway obj_swapped;
   EXPECT_NO_THROW({ EXPECT_EQ(obj_swapped.detailShow("core0").error(), selectResult::noActivePlan); });
+}
+
+namespace {
+class RecordingQry : public qry {
+ public:
+  std::vector<std::pair<std::string, std::string>> calls;
+  std::vector<boost::property_tree::ptree> replies;
+  boost::property_tree::ptree netClient(const std::string &command, const std::string &argument) override {
+    calls.emplace_back(command, argument);
+    if (calls.size() <= replies.size()) return replies[calls.size() - 1];
+    boost::property_tree::ptree reply;
+    reply.put("db", "OK");
+    return reply;
+  }
+};
+}  // namespace
+
+TEST(xqry, reset_preserves_binary_text_across_chunks_and_commits_last) {
+  RecordingQry client;
+  std::string plan(805, 'x');
+  plan.replace(398, 7, std::string("\n'\\\"\0\r\n", 7));
+  EXPECT_FALSE(client.reset(plan));
+  ASSERT_EQ(client.calls.size(), 5U);
+  EXPECT_EQ(client.calls.front(), (std::pair<std::string, std::string>{"reset-begin", "3"}));
+  std::string restored;
+  for (std::size_t index = 1; index <= 3; ++index) {
+    EXPECT_EQ(client.calls[index].first, "reset-chunk");
+    EXPECT_EQ(client.calls[index].second.size(), index == 3 ? 5U : 400U);
+    restored += client.calls[index].second;
+  }
+  EXPECT_EQ(restored, plan);
+  EXPECT_EQ(client.calls.back(), (std::pair<std::string, std::string>{"reset-commit", ""}));
+}
+
+TEST(xqry, empty_reset_has_zero_chunks_and_empty_adhoc_sends_nothing) {
+  RecordingQry client;
+  EXPECT_TRUE(client.adhoc(""));
+  EXPECT_TRUE(client.calls.empty());
+  EXPECT_FALSE(client.reset(""));
+  EXPECT_EQ(client.calls, (std::vector<std::pair<std::string, std::string>>{{"reset-begin", "0"}, {"reset-commit", ""}}));
+}
+
+TEST(xqry, reset_stops_at_each_refusal_and_prints_the_stage_once) {
+  for (std::size_t failed = 0; failed < 5; ++failed) {
+    SCOPED_TRACE(failed);
+    RecordingQry client;
+    client.replies.resize(failed + 1);
+    for (auto &reply : client.replies)
+      reply.put("db", "OK");
+    client.replies.back().put("db", "denied");
+    testing::internal::CaptureStderr();
+    const bool refused = client.reset(std::string(805, 'x'));
+    const auto error   = testing::internal::GetCapturedStderr();
+    EXPECT_TRUE(refused);
+    ASSERT_EQ(client.calls.size(), failed + 1);
+    EXPECT_EQ(error, "xqry: plan reload refused at " + client.calls.back().first + ": denied\n");
+  }
+}
+
+TEST(xqry, response_error_precedes_streams_and_streams_precede_idle_marker) {
+  for (const bool hasError : {false, true}) {
+    RecordingQry client;
+    boost::property_tree::ptree answer;
+    answer.put("db", "no active plan");
+    answer.put("db.stream.core0", "core0");
+    answer.put("db.stream.core0.duration", "1");
+    answer.put("db.stream.core0.size", "-1");
+    answer.put("db.stream.core0.count", "0");
+    answer.put("db.stream.core0.cap", "0");
+    answer.put("db.stream.core0.location", "");
+    if (hasError) answer.put("error.response", "timeout");
+    client.replies.push_back(answer);
+    const auto result = client.dirYaml();
+    ASSERT_EQ(result.has_value(), !hasError);
+    if (hasError)
+      EXPECT_EQ(result.error(), selectResult::serverNoResponse);
+    else
+      EXPECT_TRUE(result->contains("- name: core0"));
+  }
+}
+
+TEST(xqry, select_subscribes_first_and_preserves_the_get_verdict_after_show_refusal) {
+  for (const bool known : {false, true}) {
+    RecordingQry client;
+    boost::property_tree::ptree show, get;
+    show.put("error.response", "subscription refused");
+    get.put("db.stream.other", "other");
+    if (known) get.put("db.stream.core0", "core0");
+    client.replies = {show, get};
+    boost::program_options::variables_map vm;
+    EXPECT_EQ(client.select(vm, 1, "core0", {0, 0, 0}), known ? selectResult::clientQueueMissing : selectResult::streamNotFound);
+    EXPECT_EQ(client.calls, (std::vector<std::pair<std::string, std::string>>{{"show", "core0"}, {"get", ""}}));
+  }
+}
+
+TEST(xqry, result_descriptions_match_the_public_diagnostics) {
+  const std::array<const char *, 8> expected{"ok",
+                                             "stream unknown to the server",
+                                             "server did not answer within the timeout",
+                                             "server did not create the client response queue",
+                                             "no data in stream",
+                                             "server has no plan loaded (idle); load one with --reset",
+                                             "server is shutting down",
+                                             "select loop failed in the client; reason in the client log"};
+  for (std::size_t index = 0; index < expected.size(); ++index)
+    EXPECT_STREQ(toString(static_cast<selectResult>(index)), expected[index]);
+}
+
+TEST(xqry, json_commands_emit_versioned_lines_and_errors) {
+  qry_fake_detail client;
+  testing::internal::CaptureStdout();
+  EXPECT_EQ(client.jsonCommand("hello", "", 0, 0), 0);
+  const auto pong = boost::json::parse(testing::internal::GetCapturedStdout()).as_object();
+  EXPECT_EQ(pong.at("version").as_int64(), 1);
+  EXPECT_EQ(pong.at("event").as_string(), "pong");
+  testing::internal::CaptureStdout();
+  EXPECT_EQ(client.jsonCommand("dir", "", 0, 0), 0);
+  const auto streams = boost::json::parse(testing::internal::GetCapturedStdout()).as_object();
+  EXPECT_EQ(streams.at("event").as_string(), "streams");
+  ASSERT_EQ(streams.at("streams").as_array().size(), 1U);
+  EXPECT_EQ(streams.at("streams").as_array()[0].as_object().at("name").as_string(), "core0");
+
+  qry_fake_idle idle;
+  testing::internal::CaptureStdout();
+  EXPECT_EQ(idle.jsonCommand("detail", "core0", 0, 0), 1);
+  const auto error = boost::json::parse(testing::internal::GetCapturedStdout()).as_object();
+  EXPECT_EQ(error.at("version").as_int64(), 1);
+  EXPECT_EQ(error.at("event").as_string(), "error");
+  EXPECT_EQ(error.at("code").as_string(), "no_active_plan");
+}
+
+TEST(xqry, detail_forms_preserve_stopping_and_plan_swap_verdicts) {
+  for (const bool yaml : {false, true}) {
+    qry_fake_stopping stopping;
+    const auto stopped = yaml ? stopping.detailShowYaml("core0") : stopping.detailShow("core0");
+    ASSERT_FALSE(stopped.has_value());
+    EXPECT_EQ(stopped.error(), selectResult::serverStopping);
+    qry_fake_plan_swapped_midway swapped;
+    const auto reloaded = yaml ? swapped.detailShowYaml("core0") : swapped.detailShow("core0");
+    ASSERT_FALSE(reloaded.has_value());
+    EXPECT_EQ(reloaded.error(), selectResult::noActivePlan);
+  }
 }

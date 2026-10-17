@@ -45,24 +45,40 @@ enum class selectResult : std::uint8_t {
 
 /// Funkcja toString powinna:
 /// - zwracać stały opis wyniku selectResult w języku angielskim do komunikatu dla operatora: "ok", "stream unknown to the server", "server did not answer within the timeout", "server did not create the client response queue", "no data in stream", "server has no plan loaded (idle); load one with --reset", "server is shutting down" i "select loop failed in the client; reason in the client log".
+///   Test: `xqry.result_descriptions_match_the_public_diagnostics`.
 /// - dla wartości spoza wyliczenia zwracać "unknown".
+///   Test: `xqry.select_result_descriptions_are_distinct`.
 const char *toString(selectResult result);
 
 /// Obiekt klasy qry powinien:
 /// - rozmawiać z serwerem o podanej nazwie przez IpcClient, przyjmując limit ciszy serwera i budżety prób nie mniejsze niż 1.
+///   Test: `ClientContract.nonpositive_budgets_are_clamped_to_one_attempt`, `it_multiserver_named`. Ograniczenie: konstruktor qry i przekazanie nazwy/budzetow do IpcClient sa kontrola strukturalna st_stage12_contracts.
 /// - rozpoznawać odpowiedź serwera w kolejności: error.response jako brak odpowiedzi, db.stream jako listę strumieni, db równe odpowiedzi braku planu jako stan bezczynny, db równe odpowiedzi zamykania jako zamykanie serwera, a każdą inną jako odpowiedź nieprawidłową raportowaną jak brak odpowiedzi.
+///   Test: `xqry.response_error_precedes_streams_and_streams_precede_idle_marker`, `xqry.dir_still_names_idle_instance`, `xqry.dir_names_stopping_server_separately`, `xqry.select_reports_server_no_response_on_malformed_answer`.
 /// - w select subskrybować strumień komendą show przed jakąkolwiek inną komendą, a dopiero potem sprawdzać przez get istnienie strumienia, tak aby serwer wstrzymany bramką nie emitował wierszy przed utworzeniem kolejki klienta.
+///   Test: `xqry.select_subscribes_first_and_preserves_the_get_verdict_after_show_refusal`, `it_xqrywait_first_row-run`.
 /// - w select zwracać streamNotFound dla strumienia nieznanego serwerowi, noActivePlan, serverStopping albo serverNoResponse według odpowiedzi na get, a clientQueueMissing, gdy serwer odrzucił subskrypcję istniejącego strumienia.
+///   Test: `xqry.select_subscribes_first_and_preserves_the_get_verdict_after_show_refusal`, `xqry.select_reports_server_no_response_instead_of_throwing`, `xqry.select_names_stopping_server_separately`.
 /// - w select renderować elementy wybranego strumienia formatem outputFormatMode do wyczerpania limitu elementów, końca strumienia oznaczonego zarezerwowanym identyfikatorem, ciszy serwera dłuższej niż limit albo przerwania przez operatora.
+///   Test: `it_xqry_array_row-run`, `it_xqry_server_silent-run`, `it_select_loop_failure-run`. Ograniczenie: zatrzymanie klawiszem ma test _kbhit i kontrole warunku ignoreAnyKey, bez interaktywnej petli select bez limitu.
 /// - zatrzymywać select klawiszem wyłącznie w przebiegu bez limitu elementów i bez wymogu Ctrl+C, a przy limicie N renderować dokładnie N elementów także wtedy, gdy producent dostarczył ich więcej naraz.
+///   Test: `it_xqry_elem_limit-run`, `it_client_tty_keystroke_immunity-run`. Nietestowalne: warunek needctrlc/przebiegu bez limitu jest kontrola strukturalna select w qry.cpp; test TTY sprawdza odpornosc przebiegu z limitem.
 /// - po zakończeniu pętli select zatrzymywać i dołączać wątek producenta przed ustaleniem werdyktu.
+///   Nietestowalne: kolejnosc done, producer_thread.join i werdyktu jest kontrola strukturalna st_stage12_contracts; test brakujacej kolejki sprawdza tylko widoczny wynik.
 /// - zwracać z select renderFailed przy wyjątku w pętli odbioru, clientQueueMissing albo noData, gdy nie wyrenderowano żadnego elementu, serverNoResponse, gdy serwer zamilkł po części elementów, a ok wyłącznie po co najmniej jednym elemencie bez tych zdarzeń.
+///   Test: `it_select_loop_failure-run`, `xqry.select_does_not_report_success_when_no_element_was_read`, `xqry.end_of_stream_before_the_first_row_reports_no_data`, `it_xqry_server_silent-run`, `it_xqry_elem_limit-run`.
 /// - przez adhoc wysyłać zapytanie ad hoc i zwracać prawdę przy pustym zapytaniu albo odpowiedzi innej niż OK.
+///   Test: `xqry.test_adhoc_success`, `xqry.test_adhoc_failure`, `xqry.empty_reset_has_zero_chunks_and_empty_adhoc_sends_nothing`.
 /// - przez reset dzielić tekst planu na porcje po kResetChunkBytes bajtów, wysyłać reset-begin z liczbą porcji, kolejne reset-chunk i reset-commit, przerywać przy pierwszej odpowiedzi innej niż OK z jednym komunikatem na stderr wskazującym etap i powód, i zwracać prawdę przy odmowie; pusty plan wysyłać jako zero porcji, co przy przyjęciu przeprowadza instancję w stan bezczynny.
+///   Test: `xqry.reset_preserves_binary_text_across_chunks_and_commits_last`, `xqry.reset_stops_at_each_refusal_and_prints_the_stage_once`, `xqry.empty_reset_has_zero_chunks_and_empty_adhoc_sends_nothing`, `it_service_reset`.
 /// - przez hello zwracać sukces wyłącznie przy odpowiedzi world, a w przeciwnym razie protocol_error.
+///   Test: `xqry.test_hello`, `xqry.test_hello_failure`, `xqry.test_hello_empty_response`.
 /// - przez dir zwracać tabelę strumieni z nazwą, czasem, rozmiarem, liczbą rekordów, lokalizacją i pojemnością, a przez dirYaml dokument YAML z nazwą, czasem, liczbą rekordów, rozmiarem pomijanym przy wartości -1 i lokalizacją pomijaną, gdy jest pusta; dla instancji bezczynnej zwracać wydruk braku planu albo dokument YAML z pustą listą, a dla braku odpowiedzi lub zamykania werdykt zamiast wydruku.
+///   Test: `xqry.test_dir`, `xqry.test_dirYaml_exact_output`, `xqry.test_dirYaml_size_minus_one_omitted`, `xqry.test_dirYaml_empty_location_omitted`, `xqry.dirYaml_still_gives_empty_list_for_idle_instance`, `xqry.dir_reports_no_response_instead_of_idle`, `xqry.dir_names_stopping_server_separately`.
 /// - przez detailShow i detailShowYaml zwracać nazwę, okres, zapytanie oraz pola strumienia z typami, a dla nieznanego strumienia, instancji bezczynnej, zamykania lub braku odpowiedzi, także przy przeładowaniu planu między get i detail, odpowiedni werdykt zamiast wyjątku.
+///   Test: `xqry.test_detailShow_found`, `xqry.test_detailShowYaml_exact_output`, `xqry.test_detailShow_not_found`, `xqry.detailShow_does_not_throw_for_idle_instance`, `xqry.detailShow_does_not_throw_when_server_is_silent`, `xqry.detailShow_survives_plan_swap_between_get_and_detail`, `xqry.detail_forms_preserve_stopping_and_plan_swap_verdicts`.
 /// - przez jsonCommand wypisywać na stdout zdarzenia JSON w wersji 1, jedno na wiersz: pong dla hello, streams dla dir, schema dla detail, a dla select schema, kolejne record z wartościami i null oraz end z przyczyną limit albo server_stopped_or_reloaded, a każdą porażkę zgłaszać zdarzeniem error z kodem i kodem wyjścia 1.
+///   Test: `xqry.json_commands_emit_versioned_lines_and_errors`, `st_api_real`. Ograniczenie: st_api_real wymaga osobnego zbudowania i wykonania przez test-api; sam ninja test nie wykonuje protokolu strumieniowego API.
 class qry {
   int elemLimitCnt{0};
   int serverNoDataTimeoutMs_{kDefaultServerNoDataTimeoutMs};

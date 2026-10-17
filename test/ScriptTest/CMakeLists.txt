@@ -2,6 +2,10 @@ add_test(NAME st_buildrdb_cli
          COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/buildrdb_cli.sh
                  ${CMAKE_SOURCE_DIR})
 
+add_test(NAME st_stage12_contracts
+         COMMAND python3 -B ${CMAKE_CURRENT_SOURCE_DIR}/stage12_contracts.py
+                 ${CMAKE_SOURCE_DIR})
+
 add_test(
   NAME st_collect_test_failures
   COMMAND python3 -B ${CMAKE_CURRENT_SOURCE_DIR}/collect_test_failures.py

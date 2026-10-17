@@ -25,8 +25,11 @@ inline constexpr const char *kServiceInstanceName = "service";
 
 /// Funkcja generate powinna:
 /// - zwracać nazwę "przymiotnik_nazwisko" (np. "nervous_hopper") wylosowaną z dwóch stałych list po 64 pozycje, poprawną według isValid.
+///   Test: `ServerName.generated_names_are_always_valid`. Nietestowalne: stale listy po 64 i zlozenie nazwy sprawdza strukturalnie st_stage12_contracts; losowanie nie odwiedza deterministycznie calego katalogu.
 /// - brać ziarno losowania z std::random_device, nie z zegara.
+///   Nietestowalne: zrodlo ziarna to wlasnosc konstrukcji, kontrola strukturalna st_stage12_contracts (random_device -> mt19937), nie pomiar roznic miedzy nazwami.
 /// - nie gwarantować różnych nazw w kolejnych wywołaniach.
+///   Nietestowalne: brak gwarancji unikalnosci wynika ze skonczonego katalogu 64 x 64, kontrolowanego przez st_stage12_contracts; nie zada sie kolizji ani jej braku w probie losowej.
 ///
 /// @note Ziarno z zegara dawaloby te sama nazwe serwerom startowanym przez skrypt w tej samej sekundzie.
 ///       O rozstrzyganiu kolizji decyduje wolajacy.
@@ -34,6 +37,7 @@ std::string generate();
 
 /// Funkcja isValid powinna:
 /// - zwracać true wyłącznie dla nazwy o długości 1..kMaxLength, której pierwszy znak to mała litera ASCII, a pozostałe to małe litery ASCII, cyfry, '_' albo '-'.
+///   Test: `ServerName.rejects_names_unsafe_in_ipc_and_paths`, `ServerName.accepts_expected_shapes`, `ServerName.rejects_embedded_nul_non_ascii_and_invalid_leading_characters`.
 ///
 /// @note Taka nazwa nadaje sie na czlon nazwy obiektu IPC i pliku blokady.
 bool isValid(std::string_view name);
@@ -43,6 +47,7 @@ inline constexpr const char *kNamespaceEnv = "RDB_NAMESPACE";
 
 /// Funkcja environmentNamespace powinna:
 /// - zwracać surową wartość zmiennej środowiskowej kNamespaceEnv, bez sprawdzania, a pusty napis, gdy zmienna nie jest ustawiona.
+///   Test: `ServerName.environment_namespace_is_returned_verbatim`.
 ///
 /// @note Jedno pokretlo rozdziela KOMPLET zasobow globalnych maszyny: segment magistrali (bus::segmentName),
 ///       domyslna nazwe instancji xretractora i domyslny cel xqry - dla rownoczesnych testow integracyjnych
