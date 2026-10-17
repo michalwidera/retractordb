@@ -54,6 +54,7 @@ class FaccfsTest : public ::testing::Test {
 // ============================================================
 
 TEST_F(FaccfsTest, write_and_read_single_record) {
+  // covers: faccfs.generic-binary-file.1~1, faccfs.generic-binary-file.7~1
   auto desc = makeDesc(AREA_SIZE);
   rdb::genericBinaryFile gf(sandboxPath(filename), desc);
 
@@ -80,6 +81,7 @@ TEST_F(FaccfsTest, count_returns_zero_for_new_file) {
 }
 
 TEST_F(FaccfsTest, count_returns_correct_number_of_records) {
+  // covers: faccfs.generic-binary-file.6~1
   auto desc = makeDesc(AREA_SIZE);
   rdb::genericBinaryFile gf(sandboxPath(filename), desc);
 
@@ -97,6 +99,7 @@ TEST_F(FaccfsTest, count_returns_correct_number_of_records) {
 }
 
 TEST_F(FaccfsTest, count_after_update_does_not_change) {
+  // covers: faccfs.generic-binary-file.6~1
   auto desc = makeDesc(AREA_SIZE);
   rdb::genericBinaryFile gf(sandboxPath(filename), desc);
 
@@ -132,6 +135,7 @@ TEST_F(FaccfsTest, name_returns_filename) {
 // ============================================================
 
 TEST_F(FaccfsTest, append_multiple_and_read_back) {
+  // covers: faccfs.generic-binary-file.3~1
   auto desc = makeDesc(AREA_SIZE);
   rdb::genericBinaryFile gf(sandboxPath(filename), desc);
 
@@ -171,6 +175,7 @@ TEST_F(FaccfsTest, read_beyond_end_returns_erange_and_torn_record_eio) {
 // ============================================================
 
 TEST_F(FaccfsTest, update_in_place_modifies_correct_record) {
+  // covers: faccfs.generic-binary-file.4~1
   auto desc = makeDesc(AREA_SIZE);
   rdb::genericBinaryFile gf(sandboxPath(filename), desc);
 
@@ -303,6 +308,7 @@ TEST_F(FaccfsTest, destructor_no_rotation_when_percounter_negative) {
 // ============================================================
 
 TEST_F(FaccfsTest, read_clears_null_bitset) {
+  // covers: faccfs.generic-binary-file.5~1
   auto desc = makeDesc(AREA_SIZE);
   rdb::genericBinaryFile gf(sandboxPath(filename), desc);
 
@@ -326,6 +332,7 @@ TEST_F(FaccfsTest, read_clears_null_bitset) {
 // ============================================================
 
 TEST_F(FaccfsTest, write_with_null_bitset_append) {
+  // covers: faccfs.generic-binary-file.5~1
   auto desc = makeDesc(AREA_SIZE);
   rdb::genericBinaryFile gf(sandboxPath(filename), desc);
 
@@ -341,6 +348,7 @@ TEST_F(FaccfsTest, write_with_null_bitset_append) {
 }
 
 TEST_F(FaccfsTest, write_with_null_bitset_update) {
+  // covers: faccfs.generic-binary-file.5~1
   auto desc = makeDesc(AREA_SIZE);
   rdb::genericBinaryFile gf(sandboxPath(filename), desc);
 
@@ -362,6 +370,7 @@ TEST_F(FaccfsTest, write_with_null_bitset_update) {
 // ============================================================
 
 TEST_F(FaccfsTest, single_byte_record_size) {
+  // covers: faccfs.generic-binary-file.1~1
   auto desc = makeDesc(1);
   rdb::genericBinaryFile gf(sandboxPath("single_byte"), desc);
 
@@ -384,6 +393,7 @@ TEST_F(FaccfsTest, single_byte_record_size) {
 // ============================================================
 
 TEST_F(FaccfsTest, large_record_size) {
+  // covers: faccfs.generic-binary-file.1~1
   const size_t LARGE = 4096;
   auto desc          = makeDesc(LARGE);
   rdb::genericBinaryFile gf(sandboxPath("large_record"), desc);
