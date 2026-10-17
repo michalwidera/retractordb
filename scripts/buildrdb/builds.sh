@@ -252,7 +252,11 @@ run_build_option() {
             cd ../..
             rm -f *.gcov
             mkdir -p coverage
-            gcovr --root . --filter 'src/' --gcov-executable "$gcov_exec" --gcov-ignore-errors all --exclude '.*\.antlr.*' build/Debug --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
+            # --merge-mode-functions=separate: test_busFallback i test_busSlotCount
+            # dolaczaja bus.cpp z inna galezia #if, wiec ta sama funkcja wystepuje
+            # pod roznymi liniami (np. markConsistent), a domyslny tryb strict
+            # gcovr 8 przerywa wtedy raport.
+            gcovr --root . --filter 'src/' --gcov-executable "$gcov_exec" --gcov-ignore-errors all --merge-mode-functions=separate --exclude '.*\.antlr.*' build/Debug --html-details coverage/coverage.html --xml coverage/coverage.xml --print-summary
             ;;
     esac
 }
