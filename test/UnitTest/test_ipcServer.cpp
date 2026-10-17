@@ -526,9 +526,9 @@ TEST_F(IpcServerQueues, out_of_business_to_full_queue_drops_the_marker_and_remov
   EXPECT_FALSE(queue.try_receive(bytes, sizeof(bytes), size, priority)) << "znacznik konca trafil do pelnej kolejki";
 }
 
-// Przypina obecne zachowanie (#523): wyjatek z try_send omija removeOwned, a rejestr jest czyszczony,
-// wiec kolejki nie usunie juz nawet removeAllObjects. Naprawa #523 odwraca asercje istnienia kolejki.
-TEST_F(IpcServerQueues, out_of_business_leaves_queue_abandoned_by_dead_client) {
+// #523: try_send porzuconej kolejki rzuca not_recoverable, a wyjatek omijal removeOwned. Rejestr byl
+// mimo to czyszczony, wiec kolejki nie usuwalo potem nawet removeAllObjects - zostawala w /dev/shm.
+TEST_F(IpcServerQueues, out_of_business_removes_queue_abandoned_by_dead_client) {
   if (!kDeadQueueOwnerDetectable) GTEST_SKIP() << "#410: zamek kolejki to spin_mutex - martwy wlasciciel = wieczny spin";
   IpcServer server;
   const auto epoch = server.subscriptionEpoch();
@@ -541,7 +541,7 @@ TEST_F(IpcServerQueues, out_of_business_leaves_queue_abandoned_by_dead_client) {
   EXPECT_NO_THROW(server.broadcastOutOfBusiness());
   EXPECT_EQ(server.subscriptionEpoch(), epoch + 1);
   EXPECT_FALSE(queueExists(kClientB)) << "zdrowa kolejka nie zostala usunieta";
-  EXPECT_TRUE(queueExists(kClientA));
+  EXPECT_FALSE(queueExists(kClientA)) << "kolejka martwego klienta zostala po koncu epoki";
   bool formatted = false;
   const std::array<std::string_view, 1> streams{"strumien"};
   server.broadcast(streams, [&](const std::string &) {
@@ -550,7 +550,6 @@ TEST_F(IpcServerQueues, out_of_business_leaves_queue_abandoned_by_dead_client) {
   });
   EXPECT_FALSE(formatted) << "rejestr nie zostal wyczyszczony";
   server.removeAllObjects();
-  EXPECT_TRUE(queueExists(kClientA));
 }
 
 TEST_F(IpcServerQueues, insufficient_space_refuses_subscription_before_queue_creation) {

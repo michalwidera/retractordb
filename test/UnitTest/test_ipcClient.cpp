@@ -306,16 +306,18 @@ TEST_F(ClientContract, incompatible_layout_is_refused_before_sending) {
   EXPECT_EQ(queue->get_num_msg(), 0U);
 }
 
-// Przypina obecne zachowanie: termin steady_clock trafia do timed_send jako CLOCK_REALTIME, wiec
-// pelna kolejka odmawia od razu (#522). Naprawa #522 odwraca asercje czasu (elapsed >= budzet).
-TEST_F(ClientContract, full_command_queue_is_refused_before_the_deadline_without_overwriting_the_old_command) {
+// #522: termin steady_clock trafial do timed_send Boosta jako CLOCK_REALTIME, wiec pelna kolejka
+// odmawiala po ulamku milisekundy zamiast po budzecie.
+TEST_F(ClientContract, full_command_queue_waits_until_the_deadline_without_overwriting_the_old_command) {
   const ipc::responses::Mapping responses(boost::interprocess::create_only, names.shmemSegment);
   const auto queue = ipc::security::createQueue(names.queryQueue, 1, ipc::kQueryQueueMaxMessageSize);
   queue->send("sentinel", 8, 0);
   IpcClient client(100, 1, serverName);
   const auto start = std::chrono::steady_clock::now();
   EXPECT_EQ(client.netClient("kill", "").get<std::string>("error.response", ""), "server not found");
-  EXPECT_LT(std::chrono::steady_clock::now() - start, 100 * ipc::kClientResponsePollInterval);
+  const auto elapsed = std::chrono::steady_clock::now() - start;
+  EXPECT_GE(elapsed, 100 * ipc::kClientResponsePollInterval);
+  EXPECT_LT(elapsed, std::chrono::seconds(5));
   EXPECT_TRUE(client.done);
   char bytes[ipc::kQueryQueueMaxMessageSize]{};
   std::size_t size  = 0;
@@ -323,6 +325,29 @@ TEST_F(ClientContract, full_command_queue_is_refused_before_the_deadline_without
   ASSERT_TRUE(queue->try_receive(bytes, sizeof(bytes), size, priority));
   EXPECT_EQ(std::string(bytes, size), "sentinel");
   EXPECT_EQ(queue->get_num_msg(), 0U);
+}
+
+// Kontrola dodatnia do poprzedniego: miejsce zwolnione przed terminem pozwala wyslac komende.
+TEST_F(ClientContract, command_is_sent_when_queue_space_frees_before_the_deadline) {
+  const ipc::responses::Mapping responses(boost::interprocess::create_only, names.shmemSegment);
+  const auto queue = ipc::security::createQueue(names.queryQueue, 1, ipc::kQueryQueueMaxMessageSize);
+  queue->send("sentinel", 8, 0);
+  IpcClient client(100, 1, serverName);
+  auto result = std::async(std::launch::async, [&] { return client.netClient("inspect", ""); });
+  std::this_thread::sleep_for(10 * ipc::kClientResponsePollInterval);
+  char bytes[ipc::kQueryQueueMaxMessageSize]{};
+  std::size_t size  = 0;
+  unsigned priority = 0;
+  ASSERT_TRUE(queue->try_receive(bytes, sizeof(bytes), size, priority));
+  EXPECT_EQ(std::string(bytes, size), "sentinel");
+  const auto request = receive(*queue);
+  ASSERT_EQ(request.get<std::string>("db.message", ""), "inspect");
+  ipc::responses::publish(
+      responses.segment(),
+      {.pid = getpid(), .startTime = osplat::inspectProcess(getpid()).startTime, .seq = request.get<std::uint64_t>("db.seq")},
+      "result sent\n");
+  EXPECT_EQ(result.get().get<std::string>("result", ""), "sent");
+  EXPECT_FALSE(client.done);
 }
 
 TEST_F(ClientContract, nonpositive_budgets_are_clamped_to_one_attempt) {

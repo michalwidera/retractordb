@@ -47,12 +47,12 @@
 ///   Test: `IpcServerQueues.broadcast_formats_once_for_subscribers_and_drops_only_the_full_queue`, `IpcServerQueues.broadcast_drops_queue_abandoned_by_dead_client`. Ograniczenie weryfikacji: kolejnosc i powtorzenia nazw potwierdza kontrola strukturalna petli broadcast w ipcServer.cpp; brak osobnej asercji duplikatow.
 /// - pomijać emisję wiersza dłuższego niż slot kolejki odpowiedzi, zgłaszając to w logu jeden raz na strumień, bez wyjątku.
 ///   Test: `IpcServerQueues.oversized_rows_are_skipped_and_reported_once_per_stream`.
-/// - w broadcastOutOfBusiness podejmować dla każdego subskrybenta jedną próbę wysłania znacznika końca pracy, bez czekania na miejsce w kolejce i bez ponawiania, a po próbie zakończonej bez wyjątku usuwać jego kolejkę przez removeOwned, także gdy pełna kolejka znacznika nie przyjęła.
+/// - w broadcastOutOfBusiness podejmować dla każdego subskrybenta jedną próbę wysłania znacznika końca pracy, bez czekania na miejsce w kolejce i bez ponawiania; pełna kolejka znacznika nie dostaje.
 ///   Test: `IpcServerQueues.out_of_business_sends_marker_and_closes_the_subscription_epoch`, `IpcServerQueues.out_of_business_to_full_queue_drops_the_marker_and_removes_the_queue`.
-/// - przy std::exception z wysyłki (np. kolejka porzucona przez zmarły proces z jej blokadą) zapisywać ostrzeżenie w logu i pomijać usunięcie tej kolejki, która zostaje bez wpisu w rejestrze (znany defekt, #523).
-///   Test: `IpcServerQueues.out_of_business_leaves_queue_abandoned_by_dead_client` (wykonanie wymaga wykrywalnej smierci wlasciciela muteksu Boosta).
+/// - po próbie wysłania usuwać kolejkę każdego subskrybenta przez removeOwned niezależnie od jej wyniku, także gdy wysyłka zgłosiła std::exception (np. kolejka porzucona przez zmarły proces z jej blokadą); błąd wysyłki zapisywać ostrzeżeniem w logu.
+///   Test: `IpcServerQueues.out_of_business_to_full_queue_drops_the_marker_and_removes_the_queue`, `IpcServerQueues.out_of_business_removes_queue_abandoned_by_dead_client` (wykonanie wymaga wykrywalnej smierci wlasciciela muteksu Boosta).
 /// - po przejściu wszystkich subskrybentów czyścić rejestr i zwiększać epokę rejestru dokładnie raz; removeClientQueues zwiększa ją tak samo.
-///   Test: `IpcServerQueues.out_of_business_sends_marker_and_closes_the_subscription_epoch`, `IpcServerQueues.out_of_business_leaves_queue_abandoned_by_dead_client`, `IpcServerQueues.subscribe_after_queue_removal_is_refused_without_queue`.
+///   Test: `IpcServerQueues.out_of_business_sends_marker_and_closes_the_subscription_epoch`, `IpcServerQueues.out_of_business_removes_queue_abandoned_by_dead_client`, `IpcServerQueues.subscribe_after_queue_removal_is_refused_without_queue`.
 /// - w stop dołączać wątek komunikacyjny, a w removeAllObjects usuwać segment odpowiedzi, kolejkę komend i kolejki wszystkich zarejestrowanych klientów.
 ///   Test: `IpcServerQueues.removeAllObjects_removes_every_client_queue`, `IpcServerQueues.removal_is_idempotent`, `IpcServerLoop.exception_after_ready_stops_thread_without_announcing_startup_failure`; integracja `it_ipc_security-lifecycle`.
 /// - w shutdownFromExitHandler odpinać wątek komunikacyjny, gdy wywołanie pochodzi z niego samego, w przeciwnym razie czekać na jego zakończenie najwyżej 2 s, a następnie usuwać obiekty globalne i kolejki klientów, te ostatnie tylko gdy blokadę map da się wziąć bez czekania.
@@ -132,7 +132,7 @@ class IpcServer {
   void broadcast(std::span<const std::string_view> streams, const RowFormatter &formatRow);
 
   /// Probuje zawiadomic klientow o koncu pracy bez czekania na miejsce w kolejce i czysci rejestr.
-  /// Sprzatanie kolejek, takze znany defekt po wyjatku wysylki (#523): wymagania powyzej.
+  /// Kolejke kazdego subskrybenta usuwa takze po nieudanej wysylce: wymagania powyzej.
   void broadcastOutOfBusiness();
 
   /// Kasuje wszystkie obiekty IPC serwera: segment odpowiedzi, kolejke komend
