@@ -14,6 +14,7 @@
 
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
+# covers: datamodel.data-model.5~1
 # Flaga -f (--no-clock) zdejmuje czekanie na zegar scienny; os czasu planu,
 # wyrownanie slotow i ogon zostaja bez zmian, wiec artefakt jest bajtowo ten
 # sam. Rownosc obu sciezek pilnuje it_noclock_offline. UWAGA: w trybie -c litera

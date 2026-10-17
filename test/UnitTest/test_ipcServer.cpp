@@ -1,7 +1,10 @@
 #include <gtest/gtest-spi.h>
 #include <gtest/gtest.h>
 
+#include <fcntl.h>
 #include <poll.h>
+#include <sys/mman.h>
+#include <sys/statvfs.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -18,6 +21,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 
 #include <boost/interprocess/ipc/message_queue.hpp>
 #include <boost/interprocess/mapped_region.hpp>
@@ -26,11 +30,18 @@
 
 #include "constants.hpp"
 #include "ipcResponses.hpp"
+#include "logCapture.hpp"
 #include "retractor/lib/ipcServer.hpp"
+#include "syscallWrap.hpp"
 
 namespace {
 
 namespace IPC = boost::interprocess;
+
+std::string pausedQueue;
+std::promise<void> *queueCreationEntered = nullptr;
+std::shared_future<void> queueCreationResume;
+bool noQueueSpace = false;
 
 // Identyfikatory klientow poza zakresem realnych PID-ow, zeby test nie mogl
 // trafic w kolejke zywego procesu na tej maszynie.
@@ -185,7 +196,13 @@ bool segmentExists(const std::string &name) {
 class IpcServerQueues : public ::testing::Test {
  protected:
   void SetUp() override { wipe(); }
-  void TearDown() override { wipe(); }
+  void TearDown() override {
+    queueCreationEntered = nullptr;
+    pausedQueue.clear();
+    queueCreationResume = {};
+    noQueueSpace        = false;
+    wipe();
+  }
 
   static void wipe() {
     for (const std::string_view server : {std::string_view{}, kServerA, kServerB}) {
@@ -197,6 +214,35 @@ class IpcServerQueues : public ::testing::Test {
 };
 
 }  // namespace
+
+extern "C" int __real_shm_open(const char *name, int flags, mode_t mode);
+extern "C" int __real_fstatvfs(int fd, struct statvfs *info);
+extern "C" int __real_statvfs(const char *path, struct statvfs *info);
+RDB_WRAP_SYSCALL(int, shm_open, (const char *name, int flags, mode_t mode), (name, flags, mode));
+RDB_WRAP_SYSCALL(int, fstatvfs, (int fd, struct statvfs *info), (fd, info));
+RDB_WRAP_SYSCALL(int, statvfs, (const char *path, struct statvfs *info), (path, info));
+extern "C" int __wrap_shm_open(const char *name, int flags, mode_t mode) {
+  std::string_view token(name);
+  if (token.starts_with('/')) token.remove_prefix(1);
+  if ((flags & O_CREAT) && queueCreationEntered != nullptr && token == pausedQueue) {
+    queueCreationEntered->set_value();
+    queueCreationResume.wait();
+  }
+  return __real_shm_open(name, flags, mode);
+}
+extern "C" int __wrap_fstatvfs(int fd, struct statvfs *info) {
+  const int result = __real_fstatvfs(fd, info);
+  if (result == 0 && noQueueSpace) info->f_bavail = 0;
+  return result;
+}
+extern "C" int __wrap_statvfs(const char *path, struct statvfs *info) {
+  const int result = __real_statvfs(path, info);
+  if (result == 0 && noQueueSpace) info->f_bavail = 0;
+  return result;
+}
+
+// covers: ipcserver.ipc-server.16~1
+static_assert(!std::is_copy_constructible_v<IpcServer> && !std::is_copy_assignable_v<IpcServer>);
 
 TEST_F(IpcServerQueues, abandonQueueLock_reports_eof_from_child) {
   EXPECT_FATAL_FAILURE(abandonQueueLock(queueNameFor(kClientA)), "potomek nie wzial muteksu kolejki");
@@ -221,6 +267,7 @@ TEST_F(IpcServerQueues, subscribe_creates_response_queue) {
 }
 
 TEST_F(IpcServerQueues, removeAllObjects_removes_every_client_queue) {
+  // covers: ipcserver.ipc-server.13~1
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
   ASSERT_TRUE(server.subscribe(kClientB, "strumien", 16, server.subscriptionEpoch()));
@@ -239,6 +286,7 @@ TEST_F(IpcServerQueues, removeAllObjects_removes_every_client_queue) {
 // IGNORUJE zadana pojemnosc - klient z powtorzonym PID-em dostawal glebokosc
 // z poprzedniego przebiegu.
 TEST_F(IpcServerQueues, exit_handler_removes_client_queues_too) {
+  // covers: ipcserver.ipc-server.14~1
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
   ASSERT_TRUE(server.subscribe(kClientB, "strumien", 16, server.subscriptionEpoch()));
@@ -253,6 +301,7 @@ TEST_F(IpcServerQueues, exit_handler_removes_client_queues_too) {
 
 // Obie drogi wyjscia kasuja ten sam zestaw obiektow globalnych, takze segment odpowiedzi.
 TEST_F(IpcServerQueues, exit_handler_removes_response_segment) {
+  // covers: ipcserver.ipc-server.14~1
   const std::string segmentName = ipc::names().shmemSegment;
   { const ipc::responses::Mapping created(IPC::create_only, segmentName); }
   ASSERT_TRUE(segmentExists(segmentName));
@@ -276,6 +325,7 @@ TEST_F(IpcServerQueues, empty_server_name_yields_historical_names) {
 // nawzajem kasowac. To jest cel calego etapu -- bez tego wiele serwerow na jednej
 // maszynie nie ma prawa dzialac.
 TEST_F(IpcServerQueues, servers_with_distinct_names_have_disjoint_queues) {
+  // covers: ipcserver.ipc-server.1~1
   IpcServer serverA;
   serverA.setServerName(kServerA);
   IpcServer serverB;
@@ -302,6 +352,7 @@ TEST_F(IpcServerQueues, servers_with_distinct_names_have_disjoint_queues) {
 // Ta sama rozlacznosc dla segmentu odpowiedzi: sciezka atexit serwera A nie moze
 // zdjac segmentu serwera B.
 TEST_F(IpcServerQueues, exit_handler_does_not_touch_other_servers_segment) {
+  // covers: ipcserver.ipc-server.1~1
   const std::string segmentB = ipc::names(kServerB).shmemSegment;
   { const ipc::responses::Mapping createdB(IPC::create_only, segmentB); }
   ASSERT_TRUE(segmentExists(segmentB));
@@ -320,6 +371,7 @@ TEST_F(IpcServerQueues, exit_handler_does_not_touch_other_servers_segment) {
 // lock_exception(not_recoverable) poza broadcast() - az za petle przetwarzania, czyli jeden
 // klient konczyl serwer wszystkim. Kolejka martwego ma zniknac jak przepelniona, emisja trwac.
 TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
+  // covers: ipcserver.ipc-server.8~1
   if (!kDeadQueueOwnerDetectable) GTEST_SKIP() << "#410: zamek kolejki to spin_mutex - martwy wlasciciel = wieczny spin";
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
@@ -341,6 +393,7 @@ TEST_F(IpcServerQueues, broadcast_drops_queue_abandoned_by_dead_client) {
 // zamkniety (OOB na koncu epoki) miedzy odczytem parametrow strumienia a rejestracja. Spozniona
 // rejestracja przezylaby OOB i przy --reset trafila na strumien nowego planu o tej samej nazwie.
 TEST_F(IpcServerQueues, subscribe_after_out_of_business_is_refused_without_queue) {
+  // covers: executorsm.executorsm.11~1, ipcserver.ipc-server.6~1
   IpcServer server;
   const std::uint64_t epoch = server.subscriptionEpoch();
   server.broadcastOutOfBusiness();
@@ -365,6 +418,7 @@ TEST_F(IpcServerQueues, subscribe_after_out_of_business_is_refused_without_queue
 
 // Ta sama straz na drugiej drodze zamkniecia rejestru: kasowanie kolejek przy wyjsciu.
 TEST_F(IpcServerQueues, subscribe_after_queue_removal_is_refused_without_queue) {
+  // covers: ipcserver.ipc-server.6~1, ipcserver.ipc-server.12~1
   IpcServer server;
   const std::uint64_t epoch = server.subscriptionEpoch();
   server.removeAllObjects();
@@ -374,12 +428,213 @@ TEST_F(IpcServerQueues, subscribe_after_queue_removal_is_refused_without_queue) 
 }
 
 TEST_F(IpcServerQueues, removal_is_idempotent) {
+  // covers: ipcserver.ipc-server.13~1
   IpcServer server;
   ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, server.subscriptionEpoch()));
 
   server.removeAllObjects();
   EXPECT_NO_THROW(server.removeAllObjects());
   EXPECT_NO_THROW(server.shutdownFromExitHandler());
+  EXPECT_FALSE(queueExists(kClientA));
+}
+
+TEST_F(IpcServerQueues, broadcast_formats_once_for_subscribers_and_drops_only_the_full_queue) {
+  // covers: ipcserver.ipc-server.8~1
+  IpcServer server;
+  ASSERT_TRUE(server.subscribe(kClientA, "stream", 1, server.subscriptionEpoch()));
+  ASSERT_TRUE(server.subscribe(kClientB, "stream", 3, server.subscriptionEpoch()));
+  IPC::message_queue full(IPC::open_only, queueNameFor(kClientA).c_str());
+  IPC::message_queue healthy(IPC::open_only, queueNameFor(kClientB).c_str());
+  full.send("sentinel", 8, 0);
+  int formatted = 0;
+  const std::array<std::string_view, 2> streams{"unsubscribed", "stream"};
+  server.broadcast(streams, [&](const std::string &name) {
+    EXPECT_EQ(name, "stream");
+    ++formatted;
+    return std::string("row");
+  });
+  EXPECT_EQ(formatted, 1);
+  EXPECT_FALSE(queueExists(kClientA));
+  EXPECT_TRUE(queueExists(kClientB));
+  EXPECT_EQ(full.get_num_msg(), 1U);
+  EXPECT_EQ(healthy.get_num_msg(), 1U);
+  server.broadcast(streams, [&](const std::string &) {
+    ++formatted;
+    return std::string("next");
+  });
+  EXPECT_EQ(formatted, 2);
+  EXPECT_EQ(healthy.get_num_msg(), 2U);
+  server.removeAllObjects();
+}
+
+TEST_F(IpcServerQueues, oversized_rows_are_skipped_and_reported_once_per_stream) {
+  // covers: ipcserver.ipc-server.9~1
+  IpcServer server;
+  ASSERT_TRUE(server.subscribe(kClientA, "wide", 2, server.subscriptionEpoch()));
+  ASSERT_TRUE(server.subscribe(kClientB, "other-wide", 2, server.subscriptionEpoch()));
+  const LogCapture log;
+  const std::array<std::string_view, 2> streams{"wide", "other-wide"};
+  for (int i = 0; i < 2; ++i)
+    EXPECT_NO_THROW(
+        server.broadcast(streams, [](const std::string &) { return std::string(ipc::kResponseQueueMaxMessageSize + 1, 'x'); }));
+  IPC::message_queue queue(IPC::open_only, queueNameFor(kClientA).c_str());
+  IPC::message_queue other(IPC::open_only, queueNameFor(kClientB).c_str());
+  EXPECT_EQ(queue.get_num_msg(), 0U);
+  EXPECT_EQ(other.get_num_msg(), 0U);
+  const std::string text = log.text();
+  const auto first       = text.find("does not fit");
+  ASSERT_NE(first, std::string::npos);
+  const auto second = text.find("does not fit", first + 1);
+  ASSERT_NE(second, std::string::npos);
+  EXPECT_EQ(text.find("does not fit", second + 1), std::string::npos);
+  EXPECT_NE(text.find("stream 'wide'"), std::string::npos);
+  EXPECT_NE(text.find("stream 'other-wide'"), std::string::npos);
+  server.broadcast(streams, [](const std::string &) { return std::string(ipc::kResponseQueueMaxMessageSize, 'x'); });
+  EXPECT_EQ(queue.get_num_msg(), 1U);
+  EXPECT_EQ(other.get_num_msg(), 1U);
+  server.removeAllObjects();
+}
+
+TEST_F(IpcServerQueues, out_of_business_sends_marker_and_closes_the_subscription_epoch) {
+  // covers: ipcserver.ipc-server.10~1, ipcserver.ipc-server.12~1
+  IpcServer server;
+  const auto epoch = server.subscriptionEpoch();
+  ASSERT_TRUE(server.subscribe(kClientA, "stream", 2, epoch));
+  IPC::message_queue queue(IPC::open_only, queueNameFor(kClientA).c_str());
+  server.broadcastOutOfBusiness();
+  EXPECT_EQ(server.subscriptionEpoch(), epoch + 1);
+  EXPECT_FALSE(queueExists(kClientA));
+  char bytes[ipc::kResponseQueueMaxMessageSize]{};
+  std::size_t size  = 0;
+  unsigned priority = 0;
+  ASSERT_TRUE(queue.try_receive(bytes, sizeof(bytes), size, priority));
+  std::stringstream text(std::string(bytes, size));
+  boost::property_tree::ptree row;
+  read_info(text, row);
+  EXPECT_EQ(row.get<std::string>("stream"), constants::Reserved_id_oob);
+  bool formatted = false;
+  const std::array<std::string_view, 1> streams{"stream"};
+  server.broadcast(streams, [&](const std::string &) {
+    formatted = true;
+    return std::string("unexpected");
+  });
+  EXPECT_FALSE(formatted);
+}
+
+// OOB to jedna proba bez czekania: pelna kolejka nie dostaje znacznika, ale jej nazwa znika.
+TEST_F(IpcServerQueues, out_of_business_to_full_queue_drops_the_marker_and_removes_the_queue) {
+  // covers: ipcserver.ipc-server.10~1, ipcserver.ipc-server.11~1
+  IpcServer server;
+  const auto epoch = server.subscriptionEpoch();
+  ASSERT_TRUE(server.subscribe(kClientA, "stream", 1, epoch));
+  IPC::message_queue queue(IPC::open_only, queueNameFor(kClientA).c_str());
+  queue.send("sentinel", 8, 0);
+  server.broadcastOutOfBusiness();
+  EXPECT_EQ(server.subscriptionEpoch(), epoch + 1);
+  EXPECT_FALSE(queueExists(kClientA));
+  char bytes[ipc::kResponseQueueMaxMessageSize]{};
+  std::size_t size  = 0;
+  unsigned priority = 0;
+  ASSERT_TRUE(queue.try_receive(bytes, sizeof(bytes), size, priority));
+  EXPECT_EQ(std::string(bytes, size), "sentinel");
+  EXPECT_FALSE(queue.try_receive(bytes, sizeof(bytes), size, priority)) << "znacznik konca trafil do pelnej kolejki";
+}
+
+// #523: try_send porzuconej kolejki rzuca not_recoverable, a wyjatek omijal removeOwned. Rejestr byl
+// mimo to czyszczony, wiec kolejki nie usuwalo potem nawet removeAllObjects - zostawala w /dev/shm.
+TEST_F(IpcServerQueues, out_of_business_removes_queue_abandoned_by_dead_client) {
+  // covers: ipcserver.ipc-server.11~1, ipcserver.ipc-server.12~1
+  if (!kDeadQueueOwnerDetectable) GTEST_SKIP() << "#410: zamek kolejki to spin_mutex - martwy wlasciciel = wieczny spin";
+  IpcServer server;
+  const auto epoch = server.subscriptionEpoch();
+  ASSERT_TRUE(server.subscribe(kClientA, "strumien", 16, epoch));
+  ASSERT_TRUE(server.subscribe(kClientB, "strumien", 16, epoch));
+  IPC::message_queue probe(IPC::open_only, queueNameFor(kClientA).c_str());
+  ASSERT_NO_FATAL_FAILURE(abandonQueueLock(queueNameFor(kClientA)));
+  ASSERT_TRUE(queueLockIsAbandoned(probe)) << "symulacja martwego wlasciciela nie zadzialala";
+
+  EXPECT_NO_THROW(server.broadcastOutOfBusiness());
+  EXPECT_EQ(server.subscriptionEpoch(), epoch + 1);
+  EXPECT_FALSE(queueExists(kClientB)) << "zdrowa kolejka nie zostala usunieta";
+  EXPECT_FALSE(queueExists(kClientA)) << "kolejka martwego klienta zostala po koncu epoki";
+  bool formatted = false;
+  const std::array<std::string_view, 1> streams{"strumien"};
+  server.broadcast(streams, [&](const std::string &) {
+    formatted = true;
+    return std::string("unexpected");
+  });
+  EXPECT_FALSE(formatted) << "rejestr nie zostal wyczyszczony";
+  server.removeAllObjects();
+}
+
+TEST_F(IpcServerQueues, insufficient_space_refuses_subscription_before_queue_creation) {
+  // covers: ipcserver.ipc-server.6~1
+  IpcServer server;
+  noQueueSpace = true;
+  try {
+    server.subscribe(kClientA, "expensive", 16, server.subscriptionEpoch());
+    ADD_FAILURE() << "subskrypcja bez wolnej pamieci przeszla";
+  } catch (const std::runtime_error &error) {
+    const std::string reason(error.what());
+    EXPECT_NE(reason.find("expensive"), std::string::npos);
+    EXPECT_NE(reason.find("needs"), std::string::npos);
+    EXPECT_NE(reason.find("16 elements"), std::string::npos);
+    EXPECT_NE(reason.find("0 B free"), std::string::npos);
+  }
+  noQueueSpace = false;
+  EXPECT_FALSE(queueExists(kClientA));
+}
+
+TEST_F(IpcServerQueues, epoch_can_close_while_queue_creation_is_paused) {
+  // covers: ipcserver.ipc-server.6~1, ipcserver.ipc-server.7~1
+  if (!RDB_HAS_BOOST_POSIX_SHM) GTEST_SKIP() << "synchronizacja na shm_open wymaga backendu POSIX";
+  IpcServer server;
+  const auto epoch = server.subscriptionEpoch();
+  std::promise<void> entered, resume;
+  auto entrance        = entered.get_future();
+  pausedQueue          = queueNameFor(kClientA);
+  queueCreationResume  = resume.get_future().share();
+  queueCreationEntered = &entered;
+  auto subscription    = std::async(std::launch::async, [&] { return server.subscribe(kClientA, "stream", 2, epoch); });
+  const bool reached   = entrance.wait_for(std::chrono::seconds(5)) == std::future_status::ready;
+  EXPECT_TRUE(reached);
+  // Takze regresja trzymajaca muteks podczas mmap musi dac sie odblokowac po czerwonej asercji.
+  auto closing = std::async(std::launch::async, [&] { server.broadcastOutOfBusiness(); });
+  EXPECT_EQ(closing.wait_for(std::chrono::seconds(2)), std::future_status::ready)
+      << "tworzenie kolejki zatrzymalo zamkniecie rejestru";
+  resume.set_value();
+  closing.get();
+  EXPECT_FALSE(subscription.get());
+  queueCreationEntered = nullptr;
+  pausedQueue.clear();
+  queueCreationResume = {};
+  EXPECT_FALSE(queueExists(kClientA));
+  EXPECT_EQ(server.subscriptionEpoch(), epoch + 1);
+}
+
+TEST_F(IpcServerQueues, exit_handler_does_not_wait_for_the_broadcast_map_lock) {
+  // covers: ipcserver.ipc-server.14~1
+  IpcServer server;
+  ASSERT_TRUE(server.subscribe(kClientA, "stream", 2, server.subscriptionEpoch()));
+  std::promise<void> entered, resume;
+  auto entrance  = entered.get_future();
+  auto release   = resume.get_future().share();
+  auto broadcast = std::async(std::launch::async, [&] {
+    const std::array<std::string_view, 1> streams{"stream"};
+    server.broadcast(streams, [&](const std::string &) {
+      entered.set_value();
+      release.wait();
+      return std::string("row");
+    });
+  });
+  EXPECT_EQ(entrance.wait_for(std::chrono::seconds(5)), std::future_status::ready);
+  auto shutdown = std::async(std::launch::async, [&] { server.shutdownFromExitHandler(); });
+  EXPECT_EQ(shutdown.wait_for(std::chrono::seconds(2)), std::future_status::ready);
+  resume.set_value();
+  broadcast.get();
+  shutdown.get();
+  EXPECT_TRUE(queueExists(kClientA));
+  server.removeAllObjects();
   EXPECT_FALSE(queueExists(kClientA));
 }
 
@@ -399,12 +654,13 @@ using ptree = IpcServer::ptree;
 /// handlera odroznia komende odrzucona od wykonanej, ktorej odpowiedz tylko przepadla.
 class RunningServer {
  public:
-  RunningServer() : names_(ipc::names(kServerLoop)) {
+  explicit RunningServer(IpcServer::CommandHandler handler = {}) : names_(ipc::names(kServerLoop)) {
     server_.setServerName(kServerLoop);
     auto readyFuture = ready_.get_future();
     server_.start({.onCommand =
-                       [this](const ptree &request) {
+                       [this, handler](const ptree &request) {
                          ++handled_;
+                         if (handler) return handler(request);
                          ptree response;
                          response.put("argumentLength", request.get("db.argument", std::string{}).size());
                          return response;
@@ -495,6 +751,7 @@ std::string command(std::optional<int> clientId, const std::string &argument) {
 // Test pilnuje zachowania na granicy: komenda o pelnej dlugosci dochodzi w calosci,
 // a watek komunikacyjny obsluguje nastepna.
 TEST(IpcServerLoop, full_size_command_is_received_whole_and_server_keeps_serving) {
+  // covers: ipcserver.ipc-server.2~1, ipcserver.ipc-server.3~1
   RunningServer server;
   ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
 
@@ -519,6 +776,7 @@ TEST(IpcServerLoop, full_size_command_is_received_whole_and_server_keeps_serving
 // jakimkolwiek catch watku komunikacyjnego - std::terminate calego serwera jedna wiadomoscia
 // od dowolnego lokalnego procesu. Ma byc odmowa: nic nie wykonane, nastepna komenda obsluzona.
 TEST(IpcServerLoop, garbage_command_is_rejected_and_server_keeps_serving) {
+  // covers: ipcserver.ipc-server.4~1
   RunningServer server;
   ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
 
@@ -534,6 +792,7 @@ TEST(IpcServerLoop, garbage_command_is_rejected_and_server_keeps_serving) {
 // PO wykonaniu komendy. Komenda bez adresu zwrotnego ma byc odrzucona PRZED handlerem, zeby
 // odmowa nie miala skutkow ubocznych (kill, reset-commit bez nadawcy).
 TEST(IpcServerLoop, command_without_client_id_is_rejected_and_server_keeps_serving) {
+  // covers: ipcserver.ipc-server.3~1
   RunningServer server;
   ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
 
@@ -549,6 +808,7 @@ TEST(IpcServerLoop, command_without_client_id_is_rejected_and_server_keeps_servi
 // not_recoverable przy kazdym obrocie, a wyjatek konczyl watek komunikacyjny: serwer liczyl
 // dalej, ale nie przyjmowal juz zadnej komendy. Ma odtworzyc kolejke i obsluzyc nastepna.
 TEST(IpcServerLoop, command_queue_abandoned_by_dead_client_is_recreated) {
+  // covers: ipcserver.ipc-server.5~1
   if (!kDeadQueueOwnerDetectable) GTEST_SKIP() << "#410: zamek kolejki to spin_mutex - martwy wlasciciel = wieczny spin";
   RunningServer server;
   ASSERT_TRUE(server.ready()) << "watek komunikacyjny nie zbudowal zasobow IPC";
@@ -561,4 +821,41 @@ TEST(IpcServerLoop, command_queue_abandoned_by_dead_client_is_recreated) {
   const auto next = server.response(kClientNext);
   ASSERT_TRUE(next.has_value()) << "watek komunikacyjny przestal obslugiwac komendy";
   EXPECT_EQ(server.handled(), 1);
+}
+
+TEST(IpcServerLoop, handler_exception_is_answered_and_the_next_command_is_served) {
+  // covers: ipcserver.ipc-server.4~1
+  RunningServer server([](const ptree &request) {
+    if (request.get<std::string>("db.argument") == "throw") throw std::runtime_error("contract failure");
+    ptree response;
+    response.put("result", "next");
+    return response;
+  });
+  ASSERT_TRUE(server.ready());
+  server.send(command(kClientFull, "throw"));
+  const auto failed = server.response(kClientFull);
+  ASSERT_TRUE(failed.has_value());
+  EXPECT_EQ(failed->get<std::string>("error.response", ""), "command handler failure: contract failure");
+  server.send(command(kClientNext, "ok"));
+  const auto next = server.response(kClientNext);
+  ASSERT_TRUE(next.has_value());
+  EXPECT_EQ(next->get<std::string>("result", ""), "next");
+}
+
+TEST(IpcServerLoop, exception_after_ready_stops_thread_without_announcing_startup_failure) {
+  // covers: ipcserver.ipc-server.13~1, ipcserver.ipc-server.15~1
+  IpcServer server;
+  server.setServerName("postready" + std::to_string(getpid()));
+  int ready = 0, failure = 0;
+  const LogCapture log;
+  server.start({.onCommand        = [](const ptree &) { return ptree{}; },
+                .onReady          = [&] { ++ready; },
+                .onFailure        = [&] { ++failure; },
+                .onCommandHandled = [] {},
+                .shouldStop       = []() -> bool { throw std::runtime_error("stop predicate failure"); }});
+  server.stop();
+  server.removeAllObjects();
+  EXPECT_EQ(ready, 1);
+  EXPECT_EQ(failure, 0);
+  EXPECT_NE(log.text().find("server no longer accepts commands: stop predicate failure"), std::string::npos);
 }

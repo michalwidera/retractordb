@@ -24,16 +24,6 @@ namespace {
 /// nazwana wprost.
 rdb::descFld typeOfConstant(const rdb::descFldVT &value) { return static_cast<rdb::descFld>(value.index()); }
 
-/// Typy o arytmetyce DOKŁADNEJ i łącznej: całkowite (dodawanie i mnożenie pozostają łączne
-/// także w arytmetyce modulo 2^n) oraz wymierne.
-///
-/// FLOAT i DOUBLE są poza zbiorem świadomie: reasocjacja zmienia tam liczbę zaokrągleń.
-/// Dla float x = 2^24 mamy (x+1)+1 == x, ale x+2 == x+2 - przepisanie zmieniłoby wynik.
-///
-/// Definicja jest JEDNA dla całego drzewa (expressionShape.hpp) - ta sama, której używa
-/// `power()` w ewaluatorze, decydując o dokładnym iloczynie zamiast `std::pow`.
-bool isExact(rdb::descFld type) { return isExactType(type); }
-
 bool isNumeric(rdb::descFld type) { return type <= rdb::DOUBLE; }
 
 bool isConstantEqualTo(const rdb::descFldVT &value, int reference) {
@@ -219,7 +209,7 @@ std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant
   const auto tailConstantType = typeOfConstant(tail.constant);
   const auto constantType     = typeOfConstant(constant);
 
-  const bool exactArithmetic = isExact(*tail.baseType) && isExact(tailConstantType) && isExact(constantType);
+  const bool exactArithmetic = isExactType(*tail.baseType) && isExactType(tailConstantType) && isExactType(constantType);
   // Konkatenacja jest łączna, ale NIE przemienna, więc przepisujemy wyłącznie ogon po prawej:
   // `E+'a'+'b'` to `E+'ab'`, ale `'a'+E+'b'` już nie zwija się do `'ab'+E`.
   const bool stringConcat = *tail.baseType == rdb::STRING && tailConstantType == rdb::STRING && constantType == rdb::STRING &&
@@ -267,7 +257,7 @@ std::optional<node> reassociate(const node &left, const rdb::descFldVT &constant
 
 /// Reguła C - usuwa element neutralny.
 std::optional<node> dropNeutralOperand(const node &left, const rdb::descFldVT &constant, command_id op) {
-  if (!left.type.has_value() || !isExact(*left.type)) return std::nullopt;
+  if (!left.type.has_value() || !isExactType(*left.type)) return std::nullopt;
   // Stała musi mieć TĘ SAMĄ reprezentację co podwyrażenie. Inaczej usunięcie operatora
   // skasowałoby promocję typu: `bajt + 0` daje int, a samo `bajt` zostaje bajtem i dalsza
   // arytmetyka zaczyna zawijać modulo 256.
@@ -317,7 +307,7 @@ node powerNode(std::list<token> base, int exponent, rdb::descFld baseType) {
 std::optional<node> foldRepeatedFactor(const node &left, const node &right) {
   // Stałe należą do reguły A; `2*2` ma się zwinąć do 4, a nie do `2^2`.
   if (left.constant.has_value() || right.constant.has_value()) return std::nullopt;
-  if (!right.type.has_value() || !isExact(*right.type)) return std::nullopt;
+  if (!right.type.has_value() || !isExactType(*right.type)) return std::nullopt;
 
   // `a * a` - pierwszy krok łańcucha.
   if (sameProgram(left.program, right.program)) return powerNode(right.program, 2, *right.type);

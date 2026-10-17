@@ -11,22 +11,22 @@
 /// @brief Klasa groupFile udostępnia magazyn rekordów podzielony na segmenty zgodnie z polityką retencji.
 ///
 /// Obiekt klasy groupFile powinien:
-/// - tworzyć i utrzymywać segmenty o pojemności określonej przez retention_.capacity,
-/// - przy dodatnim retention_.segments ograniczać liczbę segmentów otwartych w grupie do tego limitu;
+/// - [fagrp.group-file.1~1] tworzyć i utrzymywać segmenty o pojemności określonej przez retention_.capacity,
+/// - [fagrp.group-file.2~1] przy dodatnim retention_.segments ograniczać liczbę segmentów otwartych w grupie do tego limitu;
 ///   podczas dopisywania nowego segmentu usuwać najstarszy po przekroczeniu limitu; zero oznacza brak limitu,
-/// - umożliwiać tryb bez retencji, w którym wszystkie rekordy są przechowywane w pojedynczym pliku,
-/// - realizować operacje read i write zgodnie z interfejsem FileInterface, kierując je do właściwego segmentu,
-/// - przy odczycie i update traktować position jako offset w bajtach; dla magazynu segmentowanego
+/// - [fagrp.group-file.3~1] umożliwiać tryb bez retencji, w którym wszystkie rekordy są przechowywane w pojedynczym pliku,
+/// - [fagrp.group-file.4~1] realizować operacje read i write zgodnie z interfejsem FileInterface, kierując je do właściwego segmentu,
+/// - [fagrp.group-file.5~1] przy odczycie i update traktować position jako offset w bajtach; dla magazynu segmentowanego
 ///   wyznaczać indeks rekordu przez position / recordSize_, a następnie segment i lokalny offset w bajtach,
-/// - propagować parametr nullBitset do segmentu T bez własnego przechowywania informacji o wartościach null,
-/// - obsługiwać dopisywanie rekordów oraz aktualizację istniejącego rekordu w odpowiednim segmencie,
-/// - zwracać przez count() logiczną liczbę rekordów uwzględniającą także rekordy znajdujące się wcześniej w usuniętych segmentach,
-/// - zwracać przez name() nazwę bieżącego segmentu, gdy retencja jest aktywna, albo nazwę bazową pliku w trybie bez retencji,
-/// - raportować przez hasShadow() mechanizm cienia swoich segmentów T (grupa nie dodaje własnego pliku cienia),
-/// - obsługiwać purge wywołane przez write(nullptr, ..., 0), resetując stan obiektu i odtwarzając pusty segment gotowy do dalszego zapisu,
-/// - przy tworzeniu obiektu odtwarzać stan grupy na podstawie istniejących plików segmentów, wybierając
+/// - [fagrp.group-file.6~1] propagować parametr nullBitset do segmentu T bez własnego przechowywania informacji o wartościach null,
+/// - [fagrp.group-file.7~1] obsługiwać dopisywanie rekordów oraz aktualizację istniejącego rekordu w odpowiednim segmencie,
+/// - [fagrp.group-file.8~1] zwracać przez count() logiczną liczbę rekordów uwzględniającą także rekordy znajdujące się wcześniej w usuniętych segmentach,
+/// - [fagrp.group-file.9~1] zwracać przez name() nazwę bieżącego segmentu, gdy retencja jest aktywna, albo nazwę bazową pliku w trybie bez retencji,
+/// - [fagrp.group-file.10~1] raportować przez hasShadow() mechanizm cienia swoich segmentów T (grupa nie dodaje własnego pliku cienia),
+/// - [fagrp.group-file.11~1] obsługiwać purge wywołane przez write(nullptr, ..., 0), resetując stan obiektu i odtwarzając pusty segment gotowy do dalszego zapisu,
+/// - [fagrp.group-file.12~1] przy tworzeniu obiektu odtwarzać stan grupy na podstawie istniejących plików segmentów, wybierając
 ///   spójny końcowy fragment sekwencji ograniczony dodatnim limitem retention_.segments i rekonstruując removedSegments_,
-/// - przy odtwarzaniu stanu pozostawiać bez zmian pliki segmentów pominięte przy wyborze tego fragmentu.
+/// - [fagrp.group-file.13~1] przy odtwarzaniu stanu pozostawiać bez zmian pliki segmentów pominięte przy wyborze tego fragmentu.
 ///
 /// @note Klasa zarządza segmentacją i retencją, ale nie interpretuje zawartości rekordów ani semantyki null.
 /// @note Pozycje wskazujące rekordy należące do już usuniętych segmentów są traktowane jako niedostępne do odczytu i aktualizacji.

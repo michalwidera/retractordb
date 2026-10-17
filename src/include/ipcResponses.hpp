@@ -85,21 +85,38 @@ enum class PublishStatus : std::uint8_t {
   Full        ///< wszystkie sloty zajete przez zywych - odpowiedz przepada
 };
 
-/// Wypelnia naglowek swiezo utworzonego (wyzerowanego) segmentu.
+/// Funkcja initialize powinna:
+/// - [ipcresponses.initialize.1~1] zapisywać w nagłówku wyzerowanego segmentu wersję układu kLayoutVersion, liczbę slotów kResponseSlotCount i rozmiar slotu, a magię kMagic na końcu z semantyką release, tak aby klient widzący magię widział cały nagłówek.
+///   Nietestowalne: porzadek release/acquire nie wynika z testu wartosci; kontrola strukturalna initialize/compatible w ipcResponses.cpp (magia zapisywana na koncu).
+/// - [ipcresponses.initialize.2~1] pozostawiać sloty w stanie Free.
 void initialize(Segment &segment);
 
-/// Czy segment ma uklad tej binarki.
+/// Funkcja compatible powinna:
+/// - [ipcresponses.compatible.1~1] zwracać true wyłącznie wtedy, gdy nagłówek segmentu ma magię kMagic (odczytaną z semantyką acquire), wersję układu kLayoutVersion, liczbę slotów kResponseSlotCount i rozmiar slotu tej binarki.
 [[nodiscard]] bool compatible(const Segment &segment);
 
-/// Odpowiedz na komende serwera - odpowiedz dluzsza niz slot jest zastepowana
-/// error.response "response too large (N B > K B)". Wolac wylacznie z jednego watku.
+/// Funkcja publish powinna:
+/// - [ipcresponses.publish.1~1] zastępować odpowiedź dłuższą niż kResponseSlotDataSize komunikatem info z error.response "response too large (N B > K B)" i logować to jako błąd.
+/// - [ipcresponses.publish.2~1] zapisywać odpowiedź w pierwszym wolnym slocie razem z pid, startTime i seq adresata, a stan Ready ustawiać dopiero po zapisaniu treści, i zwracać Published.
+///   Nietestowalne: kolejnosc zapisu payloadu przed release Ready - kontrola strukturalna publish w ipcResponses.cpp.
+/// - [ipcresponses.publish.3~1] przy braku wolnego slotu odzyskiwać slot w stanie Ready albo Reading, którego właściciel nie żyje, i zwracać Reclaimed, nigdy nie odbierając slotu żywemu klientowi.
+///   Zakres testow: `IpcResponses.ready_slot_of_dead_client_is_reclaimed_when_full`, `IpcResponses.reading_slot_of_dead_client_is_reclaimed_when_full`, `IpcResponses.live_owners_are_never_reclaimed`, `IpcResponses.live_readers_are_not_reclaimed_or_modified`; integracja `it_ipc_client_killed_reading-run`.
+/// - [ipcresponses.publish.4~1] gdy wszystkie sloty trzymają żywi klienci, porzucać odpowiedź z logiem błędu i zwracać Full.
+///
+/// @note Wolac wylacznie z jednego watku.
 PublishStatus publish(Segment &segment, const Owner &owner, std::string_view text);
 
-/// Jeden przeglad slotow: odpowiedz dla `owner` albo nullopt. Sloty z pid-em `owner`, ale
-/// innym seq albo startTime (zalegle odpowiedzi) zwalnia po drodze.
+/// Funkcja tryTake powinna:
+/// - [ipcresponses.try-take.1~1] w jednym przeglądzie slotów zwracać treść odpowiedzi w stanie Ready z pid, startTime i seq równymi `owner` i zwalniać jej slot, a bez takiej odpowiedzi zwracać nullopt.
+/// - [ipcresponses.try-take.2~1] zwalniać po drodze sloty z pid-em `owner`, ale innym startTime albo seq (zaległe odpowiedzi poprzedniego procesu albo porzuconych żądań).
+/// - [ipcresponses.try-take.3~1] oddawać w stanie Ready slot, który po przejęciu okazał się należeć do innego pid-u.
+///   Nietestowalne: deterministyczna podmiana pid miedzy wstepnym odczytem a CAS nie ma punktu synchronizacji. Kontrola strukturalna tryTake w ipcResponses.cpp: drugi odczyt pid po CAS i oddanie Reading -> Ready przez CAS. Test `IpcResponses.foreign_pid_slot_is_left_alone` sprawdza tylko sciezke bez podmiany; nie zalicza sie jako test tego wyscigu.
+/// - [ipcresponses.try-take.4~1] odrzucać skopiowaną treść, gdy zwolnienie slotu po kopiowaniu się nie powiedzie, bo serwer mógł go w tym czasie nadpisać.
+///   Zakres testow: `IpcResponses.failed_release_discards_the_copy_and_keeps_scanning` (przechwycenie istniejacego getenv punktu diagnostycznego po przejeciu slotu, bez haka w produkcji).
 [[nodiscard]] std::optional<std::string> tryTake(Segment &segment, const Owner &owner);
 
-/// tryTake powtarzane co `pollInterval` az do `deadline`.
+/// Funkcja take powinna:
+/// - [ipcresponses.take.1~1] powtarzać tryTake co pollInterval i zwracać pierwszą odebraną odpowiedź, a po osiągnięciu deadline bez odpowiedzi zwracać nullopt.
 [[nodiscard]] std::optional<std::string> take(Segment &segment, const Owner &owner,
                                               std::chrono::steady_clock::time_point deadline,
                                               std::chrono::milliseconds pollInterval);
@@ -107,12 +124,14 @@ PublishStatus publish(Segment &segment, const Owner &owner, std::string_view tex
 /// Odwzorowanie segmentu odpowiedzi. Konstrukcja z create_only tworzy go i inicjuje (serwer),
 /// z open_only otwiera istniejacy (klient). Bledy systemowe jako interprocess_exception.
 /// Obiekt klasy Mapping powinien:
-/// - w konstruktorze z create_only tworzyć nowy obiekt pamięci dzielonej przez ipc::security::createMemory, odmawiając istniejącej nazwy, ustawiać jego rozmiar na sizeof(Segment), odwzorowywać go do odczytu i zapisu i inicjować nagłówek segmentu przez initialize, pozostawiając wszystkie sloty w stanie Free.
-/// - w konstruktorze z open_only otwierać istniejący obiekt przez ipc::security::openMemory z kontrolą właściciela, trybu i dowiązań oraz odwzorowywać go do odczytu i zapisu bez zmiany jego zawartości.
-/// - zgłaszać błędy tworzenia, otwarcia i odwzorowania segmentu wyjątkiem interprocess_exception albo ipc::security::Rejected, bez zwracania częściowo odwzorowanego obiektu.
-/// - przez valid zwracać prawdę wyłącznie wtedy, gdy odwzorowanie ma co najmniej sizeof(Segment) bajtów, a nagłówek ma magię kMagic i wersję układu, liczbę i rozmiar slotów tej binarki.
-/// - przez segment udostępniać odwzorowany Segment bez kopiowania, pozostawiając protokół slotów funkcjom publish, tryTake i take.
-/// - utrzymywać odwzorowanie i uchwyt obiektu przez czas życia Mapping i zwalniać je przy zniszczeniu bez usuwania nazwy obiektu pamięci dzielonej.
+/// - [ipcresponses.mapping.1~1] w konstruktorze z create_only tworzyć nowy obiekt pamięci dzielonej przez ipc::security::createMemory, odmawiając istniejącej nazwy, ustawiać jego rozmiar na sizeof(Segment), odwzorowywać go do odczytu i zapisu i inicjować nagłówek segmentu przez initialize, pozostawiając wszystkie sloty w stanie Free.
+/// - [ipcresponses.mapping.2~1] w konstruktorze z open_only otwierać istniejący obiekt przez ipc::security::openMemory z kontrolą właściciela, trybu i dowiązań oraz odwzorowywać go do odczytu i zapisu bez zmiany jego zawartości.
+/// - [ipcresponses.mapping.3~1] zgłaszać błędy tworzenia, otwarcia i odwzorowania segmentu wyjątkiem interprocess_exception albo ipc::security::Rejected, bez zwracania częściowo odwzorowanego obiektu.
+///   Zakres testow: `IpcResponses.mapping_refuses_missing_and_existing_names_without_replacing_the_owner`, `IpcResponses.mapping_checks_size_and_every_header_field_without_reinitializing_slots` (w tym porazka mapowania pustego obiektu).
+/// - [ipcresponses.mapping.4~1] przez valid zwracać prawdę wyłącznie wtedy, gdy odwzorowanie ma co najmniej sizeof(Segment) bajtów, a nagłówek ma magię kMagic i wersję układu, liczbę i rozmiar slotów tej binarki.
+/// - [ipcresponses.mapping.5~1] przez segment udostępniać odwzorowany Segment bez kopiowania, pozostawiając protokół slotów funkcjom publish, tryTake i take.
+/// - [ipcresponses.mapping.6~1] utrzymywać odwzorowanie i uchwyt obiektu przez czas życia Mapping i zwalniać je przy zniszczeniu bez usuwania nazwy obiektu pamięci dzielonej.
+///   Nietestowalne: zamkniecie uchwytu i unmap sa delegowane destruktorom pol Boosta; kontrola strukturalna skladu Mapping, bez recznego zarzadzania uchwytami.
 class Mapping {
  public:
   Mapping(boost::interprocess::create_only_t /*tag*/, const std::string &name);

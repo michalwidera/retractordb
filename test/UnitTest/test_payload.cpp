@@ -23,6 +23,7 @@ static_assert(std::is_same_v<decltype(std::declval<rdb::payload &>().span()), st
 static_assert(std::is_same_v<decltype(std::declval<const rdb::payload &>().span()), std::span<const uint8_t>>);
 
 TEST(payload, position_conversion_case_3_with_payload) {
+  // covers: payload.payload.1~1, payload.payload.2~1
   auto desc1{rdb::Descriptor("ByteW", 1, 1, rdb::BYTE) +    //
              rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER) +  //
@@ -51,6 +52,7 @@ TEST(payload, position_conversion_case_3_with_payload) {
 }
 
 TEST(payload, null_can_be_cleared_by_writing_value) {
+  // covers: payload.payload.4~1
   auto desc = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
   rdb::payload payload(desc);
 
@@ -75,7 +77,37 @@ TEST(payload, nullopt_writes_integer_fallback_to_memory) {
   EXPECT_FALSE(payload.getItem(0).has_value());
 }
 
+TEST(payload, conversion_failure_and_nullopt_write_typed_fallback_bytes) {
+  // covers: payload.payload.4~1, payload.payload.5~1
+  const rdb::Descriptor descriptor{{"r", 8, 1, rdb::RATIONAL}, {"i", 4, 1, rdb::INTEGER}, {"b", 1, 1, rdb::BYTE}};
+  std::vector<uint8_t> expected(13, 0);
+  const int32_t denominator = 1;
+  std::memcpy(expected.data() + 4, &denominator, sizeof(denominator));
+  for (const bool explicitNull : {false, true}) {
+    rdb::payload value(descriptor);
+    value.setItem(0, boost::rational<int>(7, 3));
+    value.setItem(1, 99);
+    value.setItem(2, 255);
+    for (int i = 0; i < 3; ++i) {
+      if (explicitNull)
+        value.setItem(i, std::nullopt);
+      else
+        value.setItem(i, std::vector<int>{1, 2});
+      EXPECT_FALSE(value.getItem(i).has_value());
+    }
+    EXPECT_EQ(std::vector<uint8_t>(value.span().begin(), value.span().end()), expected);
+    EXPECT_EQ(value.getNullBitset(), (std::vector<bool>{true, true, true}));
+    value.setItem(1, std::string("12tail"));
+    EXPECT_EQ(std::any_cast<int>(value.getItem(1).value()), 12);
+    EXPECT_EQ(value.getNullBitset(), (std::vector<bool>{true, false, true}));
+    value.setItem(2, std::string("256"));
+    EXPECT_FALSE(value.getItem(2).has_value());
+    EXPECT_EQ(value.span()[12], 0);
+  }
+}
+
 TEST(payload, nullopt_writes_string_fallback_to_memory) {
+  // covers: payload.payload.4~1
   auto desc = rdb::Descriptor("name", 1, 6, rdb::STRING);
   rdb::payload payload(desc);
 
@@ -88,6 +120,7 @@ TEST(payload, nullopt_writes_string_fallback_to_memory) {
 }
 
 TEST(payload, null_type_round_trips_as_monostate) {
+  // covers: payload.payload.3~1, payload.payload.13~1
   auto desc = rdb::Descriptor("nothing", 0, 1, rdb::NULLTYPE);
   rdb::payload payload(desc);
 
@@ -106,6 +139,7 @@ TEST(payload, null_type_round_trips_as_monostate) {
 }
 
 TEST(payload, add_preserves_null_flags) {
+  // covers: payload.payload.12~1
   auto leftDesc  = rdb::Descriptor("a", 4, 1, rdb::INTEGER);
   auto rightDesc = rdb::Descriptor("b", 4, 1, rdb::INTEGER);
 
@@ -123,6 +157,7 @@ TEST(payload, add_preserves_null_flags) {
 }
 
 TEST(payload, add_operator) {
+  // covers: payload.payload.12~1
   auto data1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
              rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
              rdb::Descriptor("ll", 4, 1, rdb::INTEGER) +    //
@@ -176,6 +211,7 @@ TEST(payload, add_operator) {
 }
 
 TEST(payload, operator_ostream_emits_null_for_null_field) {
+  // covers: payload.payload.13~1
   auto desc = rdb::Descriptor("x", 4, 1, rdb::INTEGER);
   rdb::payload p(desc);
 
@@ -187,6 +223,7 @@ TEST(payload, operator_ostream_emits_null_for_null_field) {
 }
 
 TEST(payload, operator_ostream_mixed_null_and_value) {
+  // covers: payload.payload.8~1
   auto desc = rdb::Descriptor("a", 4, 1, rdb::INTEGER) +  //
               rdb::Descriptor("b", 4, 1, rdb::INTEGER);
   rdb::payload p(desc);
@@ -217,6 +254,7 @@ TEST(payload, get_and_set_null_bitset_round_trips) {
 }
 
 TEST(payload, copy_constructor_preserves_null_bitset) {
+  // covers: payload.payload.10~1
   auto desc = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
   rdb::payload original(desc);
   original.setItem(0, std::nullopt);
@@ -228,6 +266,7 @@ TEST(payload, copy_constructor_preserves_null_bitset) {
 }
 
 TEST(payload, copy_assignment_preserves_null_bitset) {
+  // covers: payload.payload.10~1
   auto desc = rdb::Descriptor("v", 4, 1, rdb::INTEGER);
   rdb::payload original(desc);
   original.setItem(0, std::nullopt);
@@ -251,6 +290,7 @@ TEST(payload, operator_ostream_null_string_field) {
 }
 
 TEST(payload, operator_istream_clears_null_flag_for_integer_field) {
+  // covers: payload.payload.8~1
   auto desc = rdb::Descriptor("value", 4, 1, rdb::INTEGER);
   rdb::payload p(desc);
 
@@ -267,6 +307,7 @@ TEST(payload, operator_istream_clears_null_flag_for_integer_field) {
 }
 
 TEST(payload, operator_istream_clears_null_flag_for_string_field) {
+  // covers: payload.payload.8~1
   auto desc = rdb::Descriptor("name", 1, 8, rdb::STRING);
   rdb::payload p(desc);
 
@@ -283,6 +324,7 @@ TEST(payload, operator_istream_clears_null_flag_for_string_field) {
 }
 
 TEST(payload, stream_operators_support_rational_fields) {
+  // covers: payload.payload.8~1
   auto desc = rdb::Descriptor("ratio", static_cast<int>(sizeof(boost::rational<int>)), 1, rdb::RATIONAL);
   rdb::payload p(desc);
 
@@ -303,6 +345,7 @@ TEST(payload, stream_operators_support_rational_fields) {
 // getItem), a setItemVT musi zapisac te same bajty co setItem. To bramka
 // bezpieczenstwa przed przelaczeniem goracych sciezek na interfejs wariantowy.
 TEST(payload, vt_interface_roundtrip_matches_any_interface) {
+  // covers: payload.payload.3~1
   auto desc = rdb::Descriptor("b", 1, 1, rdb::BYTE) +      //
               rdb::Descriptor("i", 4, 1, rdb::INTEGER) +   //
               rdb::Descriptor("u", 4, 1, rdb::UINT) +      //
@@ -392,6 +435,7 @@ TEST(payload, integral_item_matches_vt_interface) {
 // NULL - bit w nullBitset i bajty zastepcze, dokladnie jak nullopt - a nie jako liczba
 // nasycona albo przycieta (narrowFloatTo w convertTypes.cc). Obie drogi zapisu naraz.
 TEST(payload, out_of_range_float_writes_null_through_both_interfaces) {
+  // covers: payload.payload.5~1
   auto desc = rdb::Descriptor("i", 4, 1, rdb::INTEGER) + rdb::Descriptor("b", 1, 1, rdb::BYTE);
 
   rdb::payload v(desc);
@@ -418,6 +462,7 @@ TEST(payload, out_of_range_float_writes_null_through_both_interfaces) {
 }
 
 TEST(payload, in_range_float_writes_value_truncated_toward_zero) {
+  // covers: payload.payload.5~1
   auto desc = rdb::Descriptor("i", 4, 1, rdb::INTEGER);
   rdb::payload p(desc);
   p.setItemVT(0, rdb::descFldVT{-2.7});
@@ -431,6 +476,7 @@ TEST(payload, in_range_float_writes_value_truncated_toward_zero) {
 // twierdzi dokladnie to. Do 2026-08-30 dokumentacja podawala 16 B i pare int64 - bledny opis
 // przeszedl niezauwazony, bo nic go nie sprawdzalo. Ten test jest ta kontrola.
 TEST(payload, rational_field_layout_is_two_int32_numerator_first) {
+  // covers: payload.payload.1~1
   static_assert(sizeof(boost::rational<int>) == 2 * sizeof(int32_t));
 
   auto desc = rdb::Descriptor("ratio", static_cast<int>(sizeof(boost::rational<int>)), 1, rdb::RATIONAL);
@@ -496,6 +542,7 @@ TEST(payload, rational_field_from_zeroed_record_reads_as_null) {
 // oznacza rekord uszkodzony. Dwie z tych par zalamuja sam konstruktor boost::rational, a nie tylko
 // niezmiennik klasy - dlatego strazy nie da sie zawezic do samego zera.
 TEST(payload, rational_field_with_non_positive_denominator_reads_as_null) {
+  // covers: payload.payload.3~1
   auto desc = rdb::Descriptor("ratio", static_cast<int>(sizeof(boost::rational<int>)), 1, rdb::RATIONAL);
   rdb::payload p(desc);
 
@@ -523,6 +570,7 @@ TEST(payload, rational_field_with_non_positive_denominator_reads_as_null) {
 // `INTEGER`. Bajty ida wprost, bo uklad jest ten sam; znaczniki NULL wymagaja odwzorowania,
 // bo sa per WPIS deskryptora - jeden bit po stronie tablicy, trzy po stronie skalarow.
 TEST(payload, assign_between_array_and_scalar_record_forms) {
+  // covers: payload.payload.2~1
   const rdb::Descriptor arrayForm("cells", 4, 3, rdb::INTEGER);
   const auto scalarForm{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
                         rdb::Descriptor("c1", 4, 1, rdb::INTEGER) +  //
@@ -551,6 +599,7 @@ TEST(payload, assign_between_array_and_scalar_record_forms) {
 // skalarnych musi je scalic: NULL na dowolnym elemencie oznacza NULL calego pola. Rozwiniecie
 // idzie w druga strone - jeden bit rozklada sie na wszystkie sloty.
 TEST(payload, null_flags_survive_the_change_of_record_form) {
+  // covers: payload.payload.10~1
   const rdb::Descriptor arrayForm("cells", 4, 3, rdb::INTEGER);
   const auto scalarForm{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
                         rdb::Descriptor("c1", 4, 1, rdb::INTEGER) +  //
@@ -578,6 +627,7 @@ TEST(payload, null_flags_survive_the_change_of_record_form) {
 // przypisanie kopiujace realizuje przez operator=(const Descriptor&), tylko bez kopii. Zrodlo
 // zostaje odpowiednikiem obiektu z konstruktora domyslnego, wiec nadaje sie do ponownego uzycia.
 TEST(payload, move_assignment_into_empty_target_takes_over_the_record) {
+  // covers: payload.payload.11~1
   const auto form{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
                   rdb::Descriptor("c1", 4, 1, rdb::INTEGER)};
 
@@ -603,6 +653,7 @@ TEST(payload, move_assignment_into_empty_target_takes_over_the_record) {
 // zachowuje deskryptor CELU razem z nazwami pol - inaczej niz domyslna semantyka przenoszenia.
 // Znaczniki NULL ida przez przecelowanie, bo sa per WPIS deskryptora.
 TEST(payload, move_assignment_between_compatible_record_forms_keeps_target_shape) {
+  // covers: payload.payload.11~1
   const rdb::Descriptor arrayForm("cells", 4, 3, rdb::INTEGER);
   const auto scalarForm{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
                         rdb::Descriptor("c1", 4, 1, rdb::INTEGER) +  //
@@ -642,6 +693,7 @@ TEST(payload, move_assignment_between_compatible_record_forms_keeps_target_shape
 
 // Konstruktor przenoszacy: stan idzie do nowego obiektu, zrodlo zostaje puste i uzywalne.
 TEST(payload, move_construction_leaves_a_reusable_source) {
+  // covers: payload.payload.11~1
   const auto form{rdb::Descriptor("c0", 4, 1, rdb::INTEGER) +  //
                   rdb::Descriptor("c1", 4, 1, rdb::INTEGER)};
 
@@ -667,6 +719,7 @@ TEST(payload, move_construction_leaves_a_reusable_source) {
 // w srodku rekordu), pole tablicowe, napis i rozne typy liczbowe. Dwa takty na tych samych
 // obiektach - w drugim zmieniaja sie wartosci i znaczniki NULL, wiec po pierwszym nic nie moze zostac.
 TEST(payload, assign_concatenation_matches_sum_assignment) {
+  // covers: payload.payload.12~1
   const auto lhsForm{rdb::Descriptor("ref", 0, 0, rdb::REF) +         //
                      rdb::Descriptor("name", 1, 8, rdb::STRING) +     //
                      rdb::Descriptor("cells", 4, 3, rdb::INTEGER) +   //

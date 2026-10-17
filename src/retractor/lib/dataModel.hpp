@@ -12,21 +12,26 @@
 #include "rdb/error.hpp"       // RDB_ASSERT w kontroli krzyzowej handleAt() (tylko Debug), rdb::Result
 #include "streamInstance.hpp"  // streamInstance (transitively includes qTree.hpp, rdb/payload.hpp)
 /// Obiekt klasy dataModel powinien:
-/// - w create zapamiętywać wartości dyrektyw :STORAGE, :SUBSTRAT i :ROTATION, usuwać dyrektywy z planu i tworzyć instancję każdego pozostałego strumienia z otwartym magazynem w katalogu :STORAGE i we wskazanym MemoryStore, a błąd otwarcia magazynu zwracać jako Result z nazwą strumienia.
-/// - traktować pusty plan i dyrektywę z pustą wartością jako naruszenie niezmiennika.
-/// - w addQueriesToModel dołączać instancje wszystkich wskazanych węzłów planu albo żadnej, zwracając nazwę, której nie da się dołączyć, i nie usuwając z modelu żadnej istniejącej instancji.
-/// - w processRows liczyć wyłącznie węzły oznaczone w masce pozycyjnej o długości planu, w kolejności: uzbrojenie nowych źródeł i odczyt rekordów DEVICE, obliczenie strumieni niebędących deklaracjami w porządku planu, a na końcu przesunięcie pozostałych źródeł deklarowanych do następnego rekordu.
-/// - nie emitować rekordu strumienia w pierwszych origin + ogon należnych slotach, ani jako zera, ani jako NULL.
-/// - dla strumienia dołączonego ad hoc wyznaczać indeks pierwszego rekordu z bieżącego slotu i emitować go dopiero, gdy wszystkie jego wejścia są dostępne.
-/// - dla każdego emitowanego strumienia budować rekord wejściowy z klauzuli FROM, liczyć okna rekordowe, budować rekord wyjściowy z listy SELECT, zapisywać go do magazynu i wykonywać reguły strumienia.
-/// - przerywać slot na pierwszym błędzie odczytu, zapisu albo ewaluacji i zwracać go jako Result bez kończenia procesu.
-/// - przez fetchForward zwracać rekord strumienia po indeksie logicznym, a dla indeksu spoza dostępnej historii rekord all-null, ważny do następnego odczytu tego strumienia.
-/// - przez getPayload udostępniać payload wraz z informacją NULL: dla strumienia SELECT rekord cofnięty o podaną liczbę rekordów albo all-null przy braku rekordu, a dla deklaracji payload bieżący niezależnie od przesunięcia.
-/// - przez getRow zwracać wartości pól rekordu cofniętego o podaną liczbę rekordów dla strumienia SELECT albo rekordu bieżącego deklaracji niezależnie od przesunięcia, zastępując wartości NULL przez nullFallbackValue typu pola, także przy braku rekordu SELECT.
-/// - przez getStreamCount i streamStoredSize zwracać liczbę zapisanych rekordów strumienia i jej rozmiar w bajtach.
-/// - przez syncDeclaredCapacities zwiększać pojemność historii źródeł deklarowanych do wymaganej przez plan, nigdy jej nie zmniejszając.
-/// - przez exhaustedInputStream zwracać nazwę pierwszego źródła deklarowanego, które wyczerpało wejście, albo pusty napis.
-/// - traktować odwołanie do strumienia z planu bez instancji w modelu oraz maskę o długości innej niż plan jako naruszenie niezmiennika.
+/// - [datamodel.data-model.1~1] w create zapamiętywać wartości dyrektyw :STORAGE, :SUBSTRAT i :ROTATION, usuwać dyrektywy z planu i tworzyć instancję każdego pozostałego strumienia z otwartym magazynem w katalogu :STORAGE i we wskazanym MemoryStore, a błąd otwarcia magazynu zwracać jako Result z nazwą strumienia.
+///   Kontrola strukturalna: wartości :SUBSTRAT i :ROTATION są tylko zapamiętywane w directive_ i nie mają obserwowalnego skutku w dataModel.
+/// - [datamodel.data-model.2~1] traktować pusty plan i dyrektywę z pustą wartością jako naruszenie niezmiennika.
+/// - [datamodel.data-model.3~1] w addQueriesToModel dołączać instancje wszystkich wskazanych węzłów planu albo żadnej, zwracając nazwę, której nie da się dołączyć, i nie usuwając z modelu żadnej istniejącej instancji.
+/// - [datamodel.data-model.4~1] w processRows liczyć wyłącznie węzły oznaczone w masce pozycyjnej o długości planu, w kolejności: uzbrojenie nowych źródeł i odczyt rekordów DEVICE, obliczenie strumieni niebędących deklaracjami w porządku planu, a na końcu przesunięcie pozostałych źródeł deklarowanych do następnego rekordu.
+///   Zakres testow: `DataModelSlotContract.processRows_computes_due_nodes_in_plan_order_before_advancing_sources`, `xschema.getRow_1`, `it_device_timeout-run` (rekord DEVICE na początku slotu).
+/// - [datamodel.data-model.5~1] nie emitować rekordu strumienia w pierwszych origin + ogon należnych slotach, ani jako zera, ani jako NULL.
+/// - [datamodel.data-model.6~1] dla strumienia dołączonego ad hoc wyznaczać indeks pierwszego rekordu z bieżącego slotu i emitować go dopiero, gdy wszystkie jego wejścia są dostępne.
+///   Zakres testow: `DataModelSlotContract.adhoc_stream_starts_at_the_index_of_its_first_due_slot`, `it_issue227_join_alignment-adhoc-origin` (także oczekiwanie na wejścia źródła dołączonego ad hoc).
+/// - [datamodel.data-model.7~1] dla każdego emitowanego strumienia budować rekord wejściowy z klauzuli FROM, liczyć okna rekordowe, budować rekord wyjściowy z listy SELECT, zapisywać go do magazynu i wykonywać reguły strumienia.
+/// - [datamodel.data-model.8~1] przerywać slot na pierwszym błędzie odczytu, zapisu albo ewaluacji i zwracać go jako Result bez kończenia procesu.
+///   Zakres testow: `DataModelSlotContract.processRows_stops_the_slot_at_the_first_error`, `it_env_error_exit-run` (błąd środowiska w slocie przez hak RDB_FAULT_ENV_IN_SLOT).
+/// - [datamodel.data-model.9~1] przez fetchForward zwracać rekord strumienia po indeksie logicznym, a dla indeksu spoza dostępnej historii rekord all-null, ważny do następnego odczytu tego strumienia.
+///   Kontrola strukturalna: ważność wskaźnika do następnego odczytu wynika z odczytu przez payload magazynu albo unavailableRecord (fetchForward w dataModel.cpp).
+/// - [datamodel.data-model.10~1] przez getPayload udostępniać payload wraz z informacją NULL: dla strumienia SELECT rekord cofnięty o podaną liczbę rekordów albo all-null przy braku rekordu, a dla deklaracji payload bieżący niezależnie od przesunięcia.
+/// - [datamodel.data-model.11~1] przez getRow zwracać wartości pól rekordu cofniętego o podaną liczbę rekordów dla strumienia SELECT albo rekordu bieżącego deklaracji niezależnie od przesunięcia, zastępując wartości NULL przez nullFallbackValue typu pola, także przy braku rekordu SELECT.
+/// - [datamodel.data-model.12~1] przez getStreamCount i streamStoredSize zwracać liczbę zapisanych rekordów strumienia i jej rozmiar w bajtach.
+/// - [datamodel.data-model.13~1] przez syncDeclaredCapacities zwiększać pojemność historii źródeł deklarowanych do wymaganej przez plan, nigdy jej nie zmniejszając.
+/// - [datamodel.data-model.14~1] przez exhaustedInputStream zwracać nazwę pierwszego źródła deklarowanego, które wyczerpało wejście, albo pusty napis.
+/// - [datamodel.data-model.15~1] traktować odwołanie do strumienia z planu bez instancji w modelu oraz maskę o długości innej niż plan jako naruszenie niezmiennika.
 class dataModel {
  private:
   qTree &coreInstance_;
@@ -140,6 +145,7 @@ class dataModel {
    */
   [[nodiscard]] rdb::Result<> constructInputPayload(const query &qry, streamInstance &runtime);
 
+ private:
   /*
    * Wylicza okna rekordowe (MIN(pole:W:H) i rodzeństwo) dla jednego taktu strumienia.
    * Musi stać TU, a nie w streamInstance ani w ewaluatorze: okno czyta historię ŹRÓDŁA,
@@ -147,6 +153,7 @@ class dataModel {
    */
   [[nodiscard]] rdb::Result<> computeWindowAggregates(const query &qry, streamInstance &runtime);
 
+ public:
   /// Liczy jeden takt planu. Nalezne strumienie opisuje MASKA POZYCYJNA rownolegla do planu:
   /// dueMask[i] != 0 znaczy "element i planu jest nalezny w tym takcie". Dlugosc maski musi byc
   /// rowna dlugosci planu - pytanie brzmi zawsze "czy element i jest nalezny?", a nie "czy jest

@@ -29,20 +29,33 @@
 /// destruktorow, wiec sprzatanie musi byc osiagalne z handlera atexit --
 /// patrz shutdownFromExitHandler().
 /// Obiekt klasy IpcServer powinien:
-/// - wyznaczać nazwy wszystkich swoich obiektów IPC z nazwy serwera ustawionej przed start i używać wyłącznie ich przy tworzeniu, emisji i usuwaniu, tak aby nie usunąć obiektów innego serwera.
-/// - w start uruchamiać wątek komunikacyjny, który usuwa pozostałości własnych obiektów tylko po kontroli zaufania, tworzy segment odpowiedzi i kolejkę komend, a następnie wywołuje onReady albo, gdy zasobów nie da się zbudować, onFailure, dokładnie jedno z nich.
-/// - odbierać komendy z kolejki do chwili, gdy shouldStop zwróci prawdę, odrzucać z wpisem w logu komendę bez poprawnego db.id, przekazywać pozostałe do onCommand, po obsłudze wywoływać onCommandHandled i publikować odpowiedź w slocie adresata (pid, czas startu procesu, db.seq).
-/// - zamieniać wyjątek z onCommand na odpowiedź error.response bez przerywania wątku, a błąd pojedynczego komunikatu kończyć jego odrzuceniem z wpisem w logu.
-/// - odtwarzać kolejkę komend porzuconą przez proces zmarły z jej blokadą (not_recoverable) zamiast kończyć obsługę komend.
-/// - w subscribe sprawdzać przed utworzeniem kolejki klienta, czy pamięć dzielona ma na nią miejsce, zgłaszając brak wyjątkiem z wyceną, a następnie zastępować poprzednią kolejkę klienta nową i rejestrować go na strumieniu wyłącznie wtedy, gdy epoka rejestru nie zmieniła się od expectedEpoch, w przeciwnym razie usuwać utworzoną kolejkę i zwracać fałsz.
-/// - nie trzymać blokady map klienckich podczas tworzenia kolejki klienta.
-/// - w broadcast formatować wiersz strumienia najwyżej raz na wywołanie i tylko gdy strumień ma subskrybenta, wysyłać go bez blokowania do każdego subskrybenta, a klienta z pełną lub porzuconą kolejką wyrejestrowywać i usuwać jego kolejkę.
-/// - pomijać emisję wiersza dłuższego niż slot kolejki odpowiedzi, zgłaszając to w logu jeden raz na strumień, bez wyjątku.
-/// - w broadcastOutOfBusiness wysyłać każdemu subskrybentowi znacznik końca pracy, usuwać kolejki klientów, czyścić rejestr i zwiększać epokę rejestru; removeClientQueues zwiększa ją tak samo.
-/// - w stop dołączać wątek komunikacyjny, a w removeAllObjects usuwać segment odpowiedzi, kolejkę komend i kolejki wszystkich zarejestrowanych klientów.
-/// - w shutdownFromExitHandler odpinać wątek komunikacyjny, gdy wywołanie pochodzi z niego samego, w przeciwnym razie czekać na jego zakończenie najwyżej 2 s, a następnie usuwać obiekty globalne i kolejki klientów, te ostatnie tylko gdy blokadę map da się wziąć bez czekania.
-/// - po ogłoszeniu gotowości kończyć wątek komunikacyjny przy nieobsłużonym wyjątku z wpisem w logu, bez ponownego wywołania onReady ani onFailure.
-/// - uniemożliwiać kopiowanie obiektu.
+/// - [ipcserver.ipc-server.1~1] wyznaczać nazwy wszystkich swoich obiektów IPC z nazwy serwera ustawionej przed start i używać wyłącznie ich przy tworzeniu, emisji i usuwaniu, tak aby nie usunąć obiektów innego serwera.
+///   Zakres testow: `IpcServerQueues.servers_with_distinct_names_have_disjoint_queues`, `IpcServerQueues.exit_handler_does_not_touch_other_servers_segment`; integracja `it_ipc_identity_lock`.
+/// - [ipcserver.ipc-server.2~1] w start uruchamiać wątek komunikacyjny, który usuwa pozostałości własnych obiektów tylko po kontroli zaufania, tworzy segment odpowiedzi i kolejkę komend, a następnie wywołuje onReady albo, gdy budowa zasobów kończy się std::exception, onFailure, dokładnie jedno z nich. Warunek kontraktu: wołający przekazuje oba callbacki i żaden z nich nie rzuca; wyjście przez sygnał, std::exit albo wyjątek spoza std::exception nie jest objęte tą gwarancją.
+///   Zakres testow: `IpcServerLoop.full_size_command_is_received_whole_and_server_keeps_serving`; integracja `it_ipc_security-lifecycle`. Rzucajace onReady jest poza kontraktem (proba diagnostyczna w #521: wywoluje wtedy takze onFailure).
+/// - [ipcserver.ipc-server.3~1] odbierać komendy z kolejki do chwili, gdy shouldStop zwróci prawdę, odrzucać z wpisem w logu komendę bez poprawnego db.id, przekazywać pozostałe do onCommand, po obsłudze wywoływać onCommandHandled i publikować odpowiedź w slocie adresata (pid, czas startu procesu, db.seq).
+///   Zakres testow: `IpcServerLoop.full_size_command_is_received_whole_and_server_keeps_serving`, `IpcServerLoop.command_without_client_id_is_rejected_and_server_keeps_serving`, `ClientContract.requests_from_distinct_objects_have_distinct_sequences_and_ignore_stale_replies`; kolejnosc onCommandHandled sprawdza integracja `it_xqrywait_first_row-run`.
+/// - [ipcserver.ipc-server.4~1] zamieniać wyjątek z onCommand dziedziczący po std::exception na odpowiedź error.response bez przerywania wątku; std::exception z pozostałej obsługi pojedynczego komunikatu (np. parsowania lub serializacji) kończyć jego odrzuceniem z wpisem w logu. Funkcje zwrotne mogą zgłaszać błędy tylko przez std::exception, z wyjątkiem onReady i onFailure, które nie mogą rzucać; przechwytywanie wyjątków innych typów nie jest gwarantowane.
+/// - [ipcserver.ipc-server.5~1] odtwarzać kolejkę komend porzuconą przez proces zmarły z jej blokadą (not_recoverable) zamiast kończyć obsługę komend.
+///   Zakres testow: `IpcServerLoop.command_queue_abandoned_by_dead_client_is_recreated` (wykonanie wymaga wykrywalnej smierci wlasciciela muteksu Boosta).
+/// - [ipcserver.ipc-server.6~1] w subscribe sprawdzać przed utworzeniem kolejki klienta, czy pamięć dzielona ma na nią miejsce, zgłaszając brak wyjątkiem z wyceną, a następnie zastępować poprzednią kolejkę klienta nową i rejestrować go na strumieniu wyłącznie wtedy, gdy epoka rejestru nie zmieniła się od expectedEpoch, w przeciwnym razie usuwać utworzoną kolejkę i zwracać fałsz.
+///   Zakres testow: `IpcServerQueues.insufficient_space_refuses_subscription_before_queue_creation`, `IpcSecurity.ResubscriptionRecreatesOwnQueueWithRequestedCapacity`, `IpcServerQueues.epoch_can_close_while_queue_creation_is_paused`, `IpcServerQueues.subscribe_after_out_of_business_is_refused_without_queue`, `IpcServerQueues.subscribe_after_queue_removal_is_refused_without_queue`; integracja `it_subscribe_epoch_race-run`.
+/// - [ipcserver.ipc-server.7~1] nie trzymać blokady map klienckich podczas tworzenia kolejki klienta.
+///   Zakres testow: `IpcServerQueues.epoch_can_close_while_queue_creation_is_paused` (backend POSIX); kontrola strukturalna subscribe w ipcServer.cpp dla backendu plikowego, niewykonana na Darwinie.
+/// - [ipcserver.ipc-server.8~1] w broadcast przetwarzać span streams w jego kolejności, bez deduplikacji nazw; dla każdego wystąpienia nazwy formatować wiersz najwyżej raz i tylko gdy strumień nadal ma subskrybenta, współdzielić ten wiersz między jego subskrybentami i wysyłać go bez czekania na miejsce w kolejce. Powtórzona nazwa oznacza kolejną emisję, o ile pozostali subskrybenci; klienta z pełną lub porzuconą kolejką wyrejestrowywać i usuwać jego kolejkę.
+///   Ograniczenie weryfikacji: kolejnosc i powtorzenia nazw potwierdza kontrola strukturalna petli broadcast w ipcServer.cpp; brak osobnej asercji duplikatow.
+/// - [ipcserver.ipc-server.9~1] pomijać emisję wiersza dłuższego niż slot kolejki odpowiedzi, zgłaszając to w logu jeden raz na strumień, bez wyjątku.
+/// - [ipcserver.ipc-server.10~1] w broadcastOutOfBusiness podejmować dla każdego subskrybenta jedną próbę wysłania znacznika końca pracy, bez czekania na miejsce w kolejce i bez ponawiania; pełna kolejka znacznika nie dostaje.
+/// - [ipcserver.ipc-server.11~1] po próbie wysłania usuwać kolejkę każdego subskrybenta przez removeOwned niezależnie od jej wyniku, także gdy wysyłka zgłosiła std::exception (np. kolejka porzucona przez zmarły proces z jej blokadą); błąd wysyłki zapisywać ostrzeżeniem w logu.
+///   Zakres testow: `IpcServerQueues.out_of_business_to_full_queue_drops_the_marker_and_removes_the_queue`, `IpcServerQueues.out_of_business_removes_queue_abandoned_by_dead_client` (wykonanie wymaga wykrywalnej smierci wlasciciela muteksu Boosta).
+/// - [ipcserver.ipc-server.12~1] po przejściu wszystkich subskrybentów czyścić rejestr i zwiększać epokę rejestru dokładnie raz; removeClientQueues zwiększa ją tak samo.
+/// - [ipcserver.ipc-server.13~1] w stop dołączać wątek komunikacyjny, a w removeAllObjects usuwać segment odpowiedzi, kolejkę komend i kolejki wszystkich zarejestrowanych klientów.
+///   Zakres testow: `IpcServerQueues.removeAllObjects_removes_every_client_queue`, `IpcServerQueues.removal_is_idempotent`, `IpcServerLoop.exception_after_ready_stops_thread_without_announcing_startup_failure`; integracja `it_ipc_security-lifecycle`.
+/// - [ipcserver.ipc-server.14~1] w shutdownFromExitHandler odpinać wątek komunikacyjny, gdy wywołanie pochodzi z niego samego, w przeciwnym razie czekać na jego zakończenie najwyżej 2 s, a następnie usuwać obiekty globalne i kolejki klientów, te ostatnie tylko gdy blokadę map da się wziąć bez czekania.
+///   Zakres testow: `IpcServerQueues.exit_handler_removes_client_queues_too`, `IpcServerQueues.exit_handler_removes_response_segment`, `IpcServerQueues.exit_handler_does_not_wait_for_the_broadcast_map_lock`; integracja `it_fatal_exit_path-run` (proces potomny i limit czasu). Nietestowalne: dokladne 2 s i detach biezacego watku - kontrola strukturalna shutdownFromExitHandler w ipcServer.cpp, bez asercji dokladnego czasu planisty.
+/// - [ipcserver.ipc-server.15~1] po poprawnym powrocie z onReady kończyć wątek komunikacyjny z wpisem w logu przy std::exception nieobsłużonym wewnątrz pętli, bez ponownego wywołania onReady ani onFailure. Wyjątki spoza std::exception są poza kontraktem i nie mają gwarancji zatrzymania ograniczonego do tego wątku.
+/// - [ipcserver.ipc-server.16~1] uniemożliwiać kopiowanie obiektu.
+///   Sprawdzenie kompilacji: test/UnitTest/test_ipcServer.cpp, static_assert cech kopiowania IpcServer.
 class IpcServer {
  public:
   using ptree = boost::property_tree::ptree;
@@ -65,9 +78,10 @@ class IpcServer {
     StopPredicate shouldStop;
   };
 
-  /// onReady i onFailure wykluczaja sie i razem sa WYCZERPUJACE: watek komunikacyjny zawsze
-  /// wola dokladnie jedno z nich, zanim skonczy prace. Bez onFailure zawiedziona budowa zasobow
-  /// (najczesciej brak miejsca w /dev/shm na kolejke komend) konczyla watek po cichu, a strona
+  /// Wolajacy przekazuje onReady i onFailure, oba nierzucajace. W tym kontrakcie zwykly start
+  /// albo blad budowy zasobow typu std::exception wywoluje dokladnie jedno z nich.
+  /// Wyjatek z callbacku narusza kontrakt; gwarancja nie obejmuje przerwania procesu. Bez onFailure
+  /// zawiedziona budowa zasobow (najczesciej brak miejsca w /dev/shm na kolejke komend) konczyla watek po cichu, a strona
   /// czekajaca na gotowosc czekala bez konca.
 
   IpcServer()                             = default;
@@ -104,6 +118,7 @@ class IpcServer {
   bool subscribe(int clientId, const std::string &streamName, int maxElements, std::uint64_t expectedEpoch);
 
   /// Rozsyla biezacy wiersz kazdego z podanych strumieni do jego subskrybentow.
+  /// Kazde wystapienie nazwy jest osobna emisja; span nie jest deduplikowany.
   ///
   /// Nazwy przychodza jako WIDOKI na napisy wolajacego (u serwera: identyfikatory zywego planu)
   /// i musza zyc przez cale wywolanie. Serwer nie zapamietuje zadnego z nich; jedyny, ktory tu
@@ -111,7 +126,8 @@ class IpcServer {
   /// kopia. Emisja bierze zbior taki, jaki wyznaczyl takt: bez odtwarzania go z napisow.
   void broadcast(std::span<const std::string_view> streams, const RowFormatter &formatRow);
 
-  /// Zawiadamia klientow o koncu pracy serwera i czysci rejestr subskrypcji.
+  /// Probuje zawiadomic klientow o koncu pracy bez czekania na miejsce w kolejce i czysci rejestr.
+  /// Kolejke kazdego subskrybenta usuwa takze po nieudanej wysylce: wymagania powyzej.
   void broadcastOutOfBusiness();
 
   /// Kasuje wszystkie obiekty IPC serwera: segment odpowiedzi, kolejke komend

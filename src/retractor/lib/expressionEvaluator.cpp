@@ -454,8 +454,13 @@ std::optional<int> integralExponent(const rdb::descFldVT &value) {
 /// Wynik NIE jest rzutowany z powrotem na typ podstawy - typ ma byc dokladnie ten, ktory
 /// dalby zapisany wprost iloczyn (dla BYTE jest to INTEGER, bo `uint8_t * uint8_t`
 /// promuje sie do int).
+///
+/// Jedynka startowa dla BYTE jest wiec od razu INTEGER. Do 2026-10-16 byla BYTE, a przy
+/// wykladniku 0 nie zachodzilo zadne mnozenie: `b^0` zostawal BYTE, choc kompilator
+/// (arithmeticValueType) deklaruje INTEGER, i `-(b^0)` dawal 254 zamiast -1 (#521).
 rdb::descFldVT exactPower(const rdb::descFldVT &base, int exponent, std::string_view &error) {
-  rdb::descFldVT result = castFldVT(rdb::descFldVT{1}, static_cast<rdb::descFld>(base.index()));
+  const auto baseType   = static_cast<rdb::descFld>(base.index());
+  rdb::descFldVT result = castFldVT(rdb::descFldVT{1}, baseType == rdb::BYTE ? rdb::INTEGER : baseType);
   rdb::descFldVT factor = base;
   for (int rest = exponent; rest > 0; rest >>= 1) {
     if ((rest & 1) != 0) {

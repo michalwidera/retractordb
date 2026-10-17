@@ -99,3 +99,63 @@ for sig in TERM INT HUP; do
   expect_clean_exit "SIG$sig pod muteksem dziennika"
   expect_log_line "SIG$sig pod muteksem dziennika" "$sig"
 done
+
+# --- Czesc C: subskrybent dostaje znacznik konca pracy (#521, etap 9b) ---
+# Kontrakt executorsm: zatrzymanie (SIGTERM, SIGINT, SIGHUP, komenda kill) i przyjety --reset konczy
+# epoke rozeslaniem OUT_OF_BUSSINESS do subskrybentow. Klient z niewyczerpanym budzetem -m konczy sie
+# na znaczniku kodem 0. Bez znacznika czekalby do limitu ciszy i konczyl sie bledem "went silent"
+# (it_xqry_server_silent) - to odroznia oba zachowania kodem wyjscia, bez pomiaru czasu.
+printf '[timing]\nquery_no_data_timeout_ms = 5000\n' > client.toml
+{
+  echo "STORAGE 'temp'"
+  echo
+  echo "DECLARE a INTEGER STREAM src2, 1/8 TEXTFILE 'data.txt'"
+  echo
+  echo "SELECT src2[0] STREAM dst2 FROM src2"
+} > query2.rql
+
+subscribe() {
+  xqry -s dst -m 1000 --config client.toml > sub.out 2> sub.err &
+  _sub_pid=$!
+  local i=0
+  until [ "$(wc -l < sub.out)" -ge 2 ]; do
+    if [ "$i" -ge 100 ] || ! kill -0 "$_sub_pid" 2>/dev/null; then
+      echo "$1: subskrybent nie dostal 2 wierszy w ciagu 10 s"
+      cat sub.err
+      exit 1
+    fi
+    sleep 0.1
+    i=$((i + 1))
+  done
+}
+
+expect_subscriber_released() {
+  if ! wait_for_exit "$_sub_pid"; then
+    echo "$1: subskrybent zyje 15 s po koncu epoki"
+    kill "$_sub_pid" 2>/dev/null || true
+    exit 1
+  fi
+  local status=0
+  wait "$_sub_pid" || status=$?
+  if [ "$status" -ne 0 ]; then
+    echo "$1: subskrybent zakonczyl sie kodem $status zamiast 0 na znaczniku konca pracy"
+    cat sub.err
+    exit 1
+  fi
+}
+
+for stop in TERM INT HUP kill; do
+  server_start query.rql -k
+  subscribe "$stop"
+  if [ "$stop" = kill ]; then xqry -k > /dev/null; else kill -"$stop" "$_server_pid"; fi
+  expect_subscriber_released "zatrzymanie $stop"
+  expect_clean_exit "zatrzymanie $stop z subskrybentem"
+done
+
+server_start query.rql -k
+subscribe reset
+xqry --reset query2.rql > /dev/null
+expect_subscriber_released "--reset"
+kill -0 "$_server_pid"
+xqry -k > /dev/null
+expect_clean_exit "zatrzymanie po --reset"

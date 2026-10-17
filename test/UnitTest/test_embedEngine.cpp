@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <sys/resource.h>
+#include <sys/stat.h>
 
 #include <cerrno>
+#include <cmath>
 #include <csignal>
 #include <cstdint>
 #include <cstdlib>
@@ -10,6 +12,7 @@
 #include <fstream>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -21,6 +24,18 @@
 #include "rdbResult.hpp"
 
 // ctest -R '^ut_embedEngine' -V
+
+// Magazyny zachowuja wskaznik na MemoryStore, wiec adres Engine musi pozostac staly.
+// covers: engine.engine.2~1
+static_assert(!std::is_copy_constructible_v<rdb::embed::Engine>);
+static_assert(!std::is_copy_assignable_v<rdb::embed::Engine>);
+static_assert(!std::is_move_constructible_v<rdb::embed::Engine>);
+static_assert(!std::is_move_assignable_v<rdb::embed::Engine>);
+// covers: engine.engine.3~1
+static_assert(!std::is_default_constructible_v<rdb::embed::Engine>);
+// covers: storageguard.storage-guard.12~1
+static_assert(!std::is_copy_constructible_v<rdb::embed::StorageGuard>);
+static_assert(!std::is_copy_assignable_v<rdb::embed::StorageGuard>);
 
 //
 // Fasada osadzenia (#446, C2): jeden obiekt = jedna instancja silnika w procesie.
@@ -73,6 +88,7 @@ std::optional<rdb::Error> refusalOf(rdb::embed::Engine &engine, const std::strin
 // Sedno: DWA silniki, TA SAMA nazwa strumienia MEMORY, zero wspolnego stanu. Przed faza 2 pamiec
 // magazynu MEMORY byla mapa `static` w faccmemory.cc, wiec ten przypadek nie mial jak przejsc.
 TEST(embedEngine, two_engines_do_not_share_a_memory_stream) {
+  // covers: engine.engine.1~1
   auto descriptor = memoryBackedInteger();
 
   auto firstOwner            = rdbtest::ok(rdb::embed::Engine::create());
@@ -125,6 +141,7 @@ TEST(embedEngine, storage_built_without_an_engine_uses_the_process_default) {
 // Pusty qryID jest odrzucany na granicy API: Errc::Config z przyczyna, zanim powstanie magazyn.
 // Odmowa nie podnosi zatrzasku uslugi ani nie konczy procesu hosta.
 TEST(embedEngine, open_storage_failure_is_engine_fatal_not_process_exit) {
+  // covers: engine.engine.22~1
   auto engineOwner           = rdbtest::ok(rdb::embed::Engine::create());
   rdb::embed::Engine &engine = *engineOwner;
   const auto opened          = engine.openStorage("", "engine_fatal", "", "DEFAULT", false, false, -1);
@@ -136,6 +153,8 @@ TEST(embedEngine, open_storage_failure_is_engine_fatal_not_process_exit) {
 // Osiem rekordow wejscia daje osiem rekordow wyjscia, zadnego policzonego z all-null wstawionego za
 // koniec pliku - dokladnie artefakt `xretractor -u`.
 TEST(embedEnginePlan, compile_step_and_read_the_result) {
+  // covers: engine.engine.7~1, engine.engine.18~1, engine.engine.19~1, engine.engine.20~1, engine.engine.24~1
+  // covers: engine.engine.29~1
   const std::vector<int> input{10, 20, 30, 40, 50, 60, 70, 80};
   writeSource("plan_data.txt", input);
 
@@ -186,6 +205,7 @@ TEST(embedEnginePlan, compile_step_and_read_the_result) {
 // z roznych wejsc. Zanim dataModel dostal Memory Store, oba pisalyby do jednej mapy procesu i drugi
 // silnik czytalby wartosci pierwszego.
 TEST(embedEnginePlan, two_engines_with_the_same_volatile_stream_stay_isolated) {
+  // covers: engine.engine.1~1, engine.engine.26~1
   writeSource("low.txt", {1, 2, 3, 4});
   writeSource("high.txt", {100, 200, 300, 400});
   const auto plan = [](const std::string &source) {
@@ -218,6 +238,7 @@ TEST(embedEnginePlan, two_engines_with_the_same_volatile_stream_stay_isolated) {
 // deklaracji (#450). Bez tego zastany `src.desc` z REF na poprzedni plik odrzucilaby kontrola
 // magazynu (#265) - a notatnik uruchamia komorki w jednym katalogu wielokrotnie.
 TEST(embedEnginePlan, recompile_in_the_same_directory_reads_the_new_source) {
+  // covers: engine.engine.5~1, engine.engine.16~1
   writeSource("first_source.txt", {1, 2, 3});
   writeSource("second_source.txt", {10, 20, 30});
 
@@ -237,6 +258,7 @@ TEST(embedEnginePlan, recompile_in_the_same_directory_reads_the_new_source) {
 // Odmowy planu i API maja kategorie wedlug miejsca wykrycia: parser, kompilator,
 // ograniczenia osadzenia i magazyn. Brak planu jest odmowa wywolania API.
 TEST(embedEnginePlan, refusals_carry_their_stage) {
+  // covers: engine.engine.7~1, engine.engine.8~1, engine.engine.9~1
   writeSource("plan_data.txt", {1, 2});
   auto engineOwner           = rdbtest::ok(rdb::embed::Engine::create());
   rdb::embed::Engine &engine = *engineOwner;
@@ -245,7 +267,6 @@ TEST(embedEnginePlan, refusals_carry_their_stage) {
     const auto refused = refusalOf(engine, rql);
     ASSERT_TRUE(refused.has_value()) << "plan przeszedl: " << rql;
     EXPECT_EQ(refused->code(), code) << refused->message();
-    EXPECT_TRUE(rdb::isConfigFamily(refused->code())) << refused->message();
     EXPECT_FALSE(engine.hasPlan()) << "odrzucony plan nie ma prawa zostac planem silnika";
   };
 
@@ -253,6 +274,7 @@ TEST(embedEnginePlan, refusals_carry_their_stage) {
   expectCategory("DECLARE a INTEGER STREAM src, 1 TEXTFILE 'plan_data.txt'\nSELECT a*2 STREAM dst FROM nosuch\n",
                  rdb::Errc::Compile);
   expectCategory("# nothing but a comment\n", rdb::Errc::Compile);
+  expectCategory("STORAGE '.'\n", rdb::Errc::Compile);
   expectCategory(doublingPlan("plan_data.txt") + "RULE r ON dst WHEN dst[0] > 100 DO DUMP -1 TO 1\n", rdb::Errc::Compile);
   expectCategory(doublingPlan("plan_data.txt") + "RULE r ON dst WHEN dst[0] > 100 DO SYSTEM 'echo no'\n", rdb::Errc::Compile);
   expectCategory(doublingPlan("plan_data.txt") + "ROTATION 'counter.txt'\n", rdb::Errc::Compile);
@@ -268,6 +290,7 @@ TEST(embedEnginePlan, refusals_carry_their_stage) {
 
 // Katalog magazynu silnika obowiazuje tylko plan bez :STORAGE, jak `[storage] dir` uslugi.
 TEST(embedEnginePlan, storage_dir_is_a_default_and_the_directive_wins) {
+  // covers: engine.engine.10~1
   writeSource("plan_data.txt", {5, 6, 7});
   auto defaultEngineOwner            = rdbtest::ok(rdb::embed::Engine::create());
   rdb::embed::Engine &defaultOwner   = *defaultEngineOwner;
@@ -281,6 +304,7 @@ TEST(embedEnginePlan, storage_dir_is_a_default_and_the_directive_wins) {
     auto engineOwner           = rdbtest::ok(rdb::embed::Engine::create(defaultDir));
     rdb::embed::Engine &engine = *engineOwner;
     ASSERT_RDB_OK(engine.compile(doublingPlan(source)));
+    EXPECT_EQ(engine.storageDir(), std::filesystem::canonical(defaultDir).string());
     while (rdbtest::ok(engine.step())) {}
     EXPECT_EQ(rdbtest::ok(engine.recordCount("dst")), 3U);
   }
@@ -290,7 +314,10 @@ TEST(embedEnginePlan, storage_dir_is_a_default_and_the_directive_wins) {
     auto engineOwner           = rdbtest::ok(rdb::embed::Engine::create(defaultDir));
     rdb::embed::Engine &engine = *engineOwner;
     ASSERT_RDB_OK(engine.compile("STORAGE '" + directiveDir + "'\n" + doublingPlan(source)));
+    EXPECT_EQ(engine.storageDir(), std::filesystem::canonical(directiveDir).string());
     while (rdbtest::ok(engine.step())) {}
+    engine.close();
+    EXPECT_EQ(engine.storageDir(), defaultDir);
   }
   EXPECT_TRUE(std::filesystem::exists(std::filesystem::path(directiveDir) / "dst.desc"));
 }
@@ -298,6 +325,7 @@ TEST(embedEnginePlan, storage_dir_is_a_default_and_the_directive_wins) {
 // Blokada dotyczy obiektu katalogu, takze dla dyrektywy STORAGE i aliasu sciezki.
 // Odmowa drugiego silnika nie zmienia pierwszego planu; close() oddaje katalog.
 TEST(embedEnginePlan, directory_lock_covers_storage_directives_and_aliases) {
+  // covers: engine.engine.11~1, engine.engine.12~1, engine.engine.30~1, storageguard.storage-guard.3~1
   writeSource("ownership_source.txt", {3, 4});
   auto firstOwner             = rdbtest::ok(rdb::embed::Engine::create());
   rdb::embed::Engine &first   = *firstOwner;
@@ -323,6 +351,7 @@ TEST(embedEnginePlan, directory_lock_covers_storage_directives_and_aliases) {
 
 // Katalog zastany bez znacznika nie daje prawa do nadpisania .desc ani danych.
 TEST(embedEnginePlan, foreign_artifacts_are_preserved) {
+  // covers: engine.engine.13~1
   writeSource("ownership_source.txt", {3, 4});
   auto engineOwner           = rdbtest::ok(rdb::embed::Engine::create());
   rdb::embed::Engine &engine = *engineOwner;
@@ -346,6 +375,7 @@ TEST(embedEnginePlan, foreign_artifacts_are_preserved) {
 // RLIMIT_FSIZE ponizej dlugosci tresci znacznika: zapis czesciowy, potem EFBIG. Niepelny znacznik
 // zostawal w katalogu i kazde nastepne przejecie konczylo sie Errc::Compile ("invalid ... marker").
 TEST(embedStorageGuard, failed_marker_write_leaves_directory_claimable) {
+  // covers: storageguard.storage-guard.14~1
   const std::string directory = rdbtest::ok(rdb::embed::temporaryStorageDirectory());
   rlimit saved{};
   ASSERT_EQ(::getrlimit(RLIMIT_FSIZE, &saved), 0);
@@ -370,6 +400,7 @@ TEST(embedStorageGuard, failed_marker_write_leaves_directory_claimable) {
 // Serwis daje przy braku zrodla rekordy NULL (#346); silnik osadzony zwraca Errc::IO
 // z errno (#451), a po poprawionym planie pracuje dalej.
 TEST(embedEnginePlan, missing_source_is_refused_unlike_the_service) {
+  // covers: engine.engine.8~1, engine.engine.15~1, engine.engine.22~1
   writeSource("ownership_source.txt", {3, 4});
   auto engineOwner           = rdbtest::ok(rdb::embed::Engine::create());
   rdb::embed::Engine &engine = *engineOwner;
@@ -391,6 +422,7 @@ TEST(embedEnginePlan, missing_source_is_refused_unlike_the_service) {
 // Blad w slocie wraca wartoscia i zatrzaskuje plan. Kolejne step() zachowuje
 // kategorie, errno i przyczyne pierwszego bledu; odczyty dzialaja, compile() zaczyna od nowa.
 TEST(embedEnginePlan, fault_in_a_slot_latches_the_plan) {
+  // covers: engine.engine.22~1, engine.engine.23~1
   writeSource("plan_data.txt", {1, 2, 3});
   auto engineOwner           = rdbtest::ok(rdb::embed::Engine::create());
   rdb::embed::Engine &engine = *engineOwner;
@@ -424,4 +456,309 @@ TEST(embedEnginePlan, fault_in_a_slot_latches_the_plan) {
     while (rdbtest::ok(engine.step())) {}
     EXPECT_EQ(rdbtest::ok(engine.recordCount("dst")), 3U);
   }
+}
+
+TEST(embedEnginePlan, shortest_input_eof_keeps_the_last_slot_and_stops_every_stream) {
+  // covers: engine.engine.18~1, engine.engine.19~1, engine.engine.20~1
+  writeSource("short_input.txt", {7});
+  writeSource("long_input.txt", {10, 20, 30});
+  auto engine = rdbtest::ok(rdb::embed::Engine::create());
+  ASSERT_RDB_OK(
+      engine->compile("DECLARE a INTEGER STREAM short_src, 1/2 TEXTFILE 'short_input.txt'\n"
+                      "DECLARE b INTEGER STREAM long_src, 1/2 TEXTFILE 'long_input.txt'\n"
+                      "SELECT a*2 STREAM short_dst FROM short_src\n"
+                      "SELECT b*2 STREAM long_dst FROM long_src\n"));
+  EXPECT_EQ(rdbtest::ok(engine->step()), std::optional<std::uint64_t>{0});
+  EXPECT_TRUE(engine->endOfInput());
+  EXPECT_EQ(engine->slotsDone(), 1U);
+  EXPECT_EQ(engine->time(), boost::rational<int>(1, 2));
+  EXPECT_EQ(firstValue(rdbtest::ok(engine->record("short_dst", 0))), 14);
+  EXPECT_EQ(firstValue(rdbtest::ok(engine->record("long_dst", 0))), 20);
+  for (int i = 0; i < 3; ++i) {
+    EXPECT_FALSE(rdbtest::ok(engine->step()));
+    EXPECT_EQ(engine->slotsDone(), 1U);
+    EXPECT_EQ(engine->time(), boost::rational<int>(1, 2));
+    EXPECT_EQ(rdbtest::ok(engine->recordCount("long_dst")), 1U);
+  }
+}
+
+TEST(embedEnginePlan, retained_boundaries_and_history_reads_do_not_consume_input) {
+  // covers: engine.engine.26~1, engine.engine.27~1
+  writeSource("history_input.txt", {3, 5, 7, 11});
+  auto engine = rdbtest::ok(rdb::embed::Engine::create());
+  ASSERT_RDB_OK(
+      engine->compile("DECLARE a INTEGER STREAM src, 1 TEXTFILE 'history_input.txt'\n"
+                      "SELECT a*2 STREAM ring FROM src VOLATILE\n"
+                      "SELECT a*2 STREAM disk FROM src\n"));
+  const std::vector<int> expected{6, 10, 14, 22};
+  for (std::size_t i = 0; i < expected.size(); ++i) {
+    ASSERT_TRUE(rdbtest::ok(engine->step()));
+    EXPECT_EQ(rdbtest::ok(engine->retainedFrom("ring")), i);
+    EXPECT_EQ(rdbtest::ok(engine->retainedFrom("disk")), 0U);
+    EXPECT_EQ(firstValue(rdbtest::ok(engine->record("ring", i))), expected[i]);
+    EXPECT_EQ(firstValue(rdbtest::ok(engine->record("disk", i))), expected[i]);
+    if (i > 0) EXPECT_RDB_ERROR(engine->record("ring", i - 1), rdb::Errc::Config);
+    EXPECT_RDB_ERROR(engine->record("ring", i + 1), rdb::Errc::Config);
+    const auto oldest = rdbtest::ok(engine->retainedFrom("src"));
+    const auto count  = rdbtest::ok(engine->recordCount("src"));
+    ASSERT_GT(count, 0U);
+    ASSERT_EQ(oldest, count - 1);
+    const auto current  = rdbtest::ok(engine->record("src", oldest));
+    const auto repeated = rdbtest::ok(engine->record("src", oldest));
+    EXPECT_EQ(current.getItemVT(0), repeated.getItemVT(0));
+    EXPECT_EQ(rdbtest::ok(engine->recordCount("src")), count);
+    if (oldest > 0) EXPECT_RDB_ERROR(engine->record("src", oldest - 1), rdb::Errc::Config);
+  }
+}
+
+TEST(embedEnginePlan, failure_after_progress_preserves_results_and_close_clears_the_latch) {
+  // covers: engine.engine.23~1, engine.engine.30~1
+  writeSource("failed_input.txt", {2, 3, 5, 7});
+  auto engine = rdbtest::ok(rdb::embed::Engine::create());
+  ASSERT_RDB_OK(engine->compile(doublingPlan("failed_input.txt")));
+  ASSERT_TRUE(rdbtest::ok(engine->step()));
+  ASSERT_TRUE(rdbtest::ok(engine->step()));
+  const auto time = engine->time();
+  ASSERT_EQ(setenv("RDB_FAULT_ENV_IN_SLOT", "1", 1), 0);
+  const auto refused = engine->step();
+  ASSERT_EQ(unsetenv("RDB_FAULT_ENV_IN_SLOT"), 0);
+  ASSERT_RDB_ERROR(refused, rdb::Errc::IO);
+  ASSERT_TRUE(engine->failed());
+  for (int i = 0; i < 2; ++i) {
+    const auto latched = engine->step();
+    ASSERT_RDB_ERROR(latched, refused.error().code(), refused.error().message());
+    EXPECT_EQ(latched.error().err(), refused.error().err());
+    EXPECT_TRUE(latched.error().message().contains("stopped at slot 2"));
+    EXPECT_EQ(engine->slotsDone(), 2U);
+    EXPECT_EQ(engine->time(), time);
+    EXPECT_EQ(rdbtest::ok(engine->recordCount("dst")), 2U);
+    EXPECT_EQ(firstValue(rdbtest::ok(engine->record("dst", 0))), 4);
+    EXPECT_EQ(firstValue(rdbtest::ok(engine->record("dst", 1))), 6);
+  }
+  engine->close();
+  EXPECT_FALSE(engine->failed());
+  EXPECT_FALSE(engine->hasPlan());
+  EXPECT_FALSE(engine->endOfInput());
+  EXPECT_EQ(engine->slotsDone(), 0U);
+  EXPECT_EQ(engine->time(), 0);
+  ASSERT_RDB_OK(engine->compile(doublingPlan("failed_input.txt")));
+  ASSERT_TRUE(rdbtest::ok(engine->step()));
+  EXPECT_EQ(firstValue(rdbtest::ok(engine->record("dst", 0))), 4);
+}
+
+TEST(embedEnginePlan, preflight_refusal_preserves_previous_artifact_bytes) {
+  // covers: engine.engine.6~1, engine.engine.11~1, engine.engine.16~1
+  writeSource("preserved_input.txt", {2, 5});
+  auto engine = rdbtest::ok(rdb::embed::Engine::create());
+  ASSERT_RDB_OK(engine->compile(doublingPlan("preserved_input.txt")));
+  while (rdbtest::ok(engine->step())) {}
+  engine->close();
+  std::vector<std::pair<std::filesystem::path, std::string>> saved;
+  for (const auto &entry : std::filesystem::directory_iterator(engine->storageDir())) {
+    if (!entry.is_regular_file()) continue;
+    std::ifstream input(entry.path(), std::ios::binary);
+    saved.emplace_back(entry.path(), std::string(std::istreambuf_iterator<char>(input), {}));
+  }
+  ASSERT_FALSE(saved.empty());
+  EXPECT_RDB_ERROR(engine->compile(doublingPlan("missing_preserved_input.txt")), rdb::Errc::IO);
+  EXPECT_FALSE(engine->hasPlan());
+  for (const auto &[path, contents] : saved) {
+    std::ifstream input(path, std::ios::binary);
+    EXPECT_EQ(std::string(std::istreambuf_iterator<char>(input), {}), contents) << path;
+  }
+  const auto inside = std::filesystem::path(engine->storageDir()) / "inside.txt";
+  writeSource(inside.string(), {13});
+  EXPECT_RDB_ERROR(engine->compile(doublingPlan(inside.string())), rdb::Errc::Compile, "source must be outside");
+  EXPECT_TRUE(std::filesystem::exists(inside));
+  ASSERT_RDB_OK(engine->compile(doublingPlan("preserved_input.txt")));
+  ASSERT_TRUE(rdbtest::ok(engine->step()));
+  EXPECT_EQ(firstValue(rdbtest::ok(engine->record("dst", 0))), 4);
+}
+
+TEST(embedEnginePlan, projection_and_record_copies_preserve_values_nulls_and_field_order) {
+  // covers: engine.engine.25~1, engine.engine.27~1, engine.engine.28~1
+  writeSource("projection_source.txt", {1, 2, 3});
+  auto engine = rdbtest::ok(rdb::embed::Engine::create());
+  ASSERT_RDB_OK(
+      engine->compile("DECLARE a INTEGER STREAM src, 1 TEXTFILE 'projection_source.txt'\n"
+                      "SELECT a, 1/(a-2) STREAM dst FROM src\n"));
+  const auto *schema = rdbtest::ok(engine->schema("dst"));
+  ASSERT_TRUE(rdbtest::ok(engine->step()));
+  auto first = rdbtest::ok(engine->record("dst", 0));
+  while (rdbtest::ok(engine->step())) {}
+  EXPECT_EQ(rdbtest::ok(engine->schema("dst")), schema);
+  EXPECT_EQ(firstValue(first), 1);
+  first.setItem(0, 999);
+  EXPECT_EQ(firstValue(rdbtest::ok(engine->record("dst", 0))), 1);
+  const auto values = rdbtest::ok(engine->project("dst", {1, 0}, 0, 3));
+  ASSERT_EQ(values.size(), 6U);
+  EXPECT_DOUBLE_EQ(values[0], -1);
+  EXPECT_DOUBLE_EQ(values[1], 1);
+  EXPECT_TRUE(std::isnan(values[2]));
+  EXPECT_DOUBLE_EQ(values[3], 2);
+  EXPECT_DOUBLE_EQ(values[4], 1);
+  EXPECT_DOUBLE_EQ(values[5], 3);
+  EXPECT_RDB_ERROR(engine->project("dst", {0}, 3, 1), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->project("dst", {-1}, 0, 1), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->project("dst", {2}, 0, 1), rdb::Errc::Config);
+  EXPECT_FALSE(rdbtest::ok(engine->record("dst", 1)).getItemVT(1).has_value());
+  const auto oldest = rdbtest::ok(engine->retainedFrom("src"));
+  const auto count  = rdbtest::ok(engine->recordCount("src"));
+  if (oldest > 0) EXPECT_RDB_ERROR(engine->record("src", oldest - 1), rdb::Errc::Config);
+  for (size_t i = oldest; i < count; ++i) {
+    EXPECT_RDB_OK(engine->record("src", i));
+    EXPECT_RDB_OK(engine->record("src", i));
+  }
+  EXPECT_EQ(rdbtest::ok(engine->recordCount("src")), count);
+  ASSERT_RDB_OK(
+      engine->compile("DECLARE a INTEGER STREAM src, 1 TEXTFILE 'projection_source.txt'\n"
+                      "SELECT to_string(a:4) STREAM dst FROM src\n"));
+  ASSERT_TRUE(rdbtest::ok(engine->step()));
+  EXPECT_RDB_ERROR(engine->project("dst", {0}, 0, 1), rdb::Errc::Config);
+}
+
+TEST(embedEnginePlan, wrapping_and_close_reset_all_observable_state) {
+  // covers: engine.engine.21~1, engine.engine.29~1, engine.engine.30~1
+  writeSource("wrapping_source.txt", {1, 2});
+  auto engine = rdbtest::ok(rdb::embed::Engine::create());
+  ASSERT_RDB_OK(engine->compile(doublingPlan("wrapping_source.txt"), false));
+  for (int i = 0; i < 8; ++i)
+    ASSERT_TRUE(rdbtest::ok(engine->step()));
+  EXPECT_FALSE(engine->endOfInput());
+  EXPECT_EQ(rdbtest::ok(engine->recordCount("dst")), 8U);
+  for (int i = 0; i < 8; ++i)
+    EXPECT_EQ(firstValue(rdbtest::ok(engine->record("dst", i))), i % 2 == 0 ? 2 : 4);
+  engine->close();
+  engine->close();
+  EXPECT_FALSE(engine->hasPlan());
+  EXPECT_FALSE(engine->failed());
+  EXPECT_FALSE(engine->endOfInput());
+  EXPECT_EQ(engine->slotsDone(), 0U);
+  EXPECT_EQ(engine->time(), 0);
+  EXPECT_RDB_ERROR(engine->step(), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->streams(), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->schema("src"), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->isDeclared("src"), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->recordCount("src"), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->retainedFrom("src"), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->record("src", 0), rdb::Errc::Config);
+  EXPECT_RDB_ERROR(engine->project("src", {0}, 0, 1), rdb::Errc::Config);
+}
+
+TEST(embedEngine, temporary_directory_is_kept_while_another_guard_owns_it) {
+  // covers: engine.engine.4~1, engine.engine.5~1, storageguard.remove-temporary-storage.1~1
+  auto engine          = rdbtest::ok(rdb::embed::Engine::create());
+  const auto directory = engine->storageDir();
+  engine->close();
+  EXPECT_TRUE(std::filesystem::is_directory(directory));
+  auto guard = rdbtest::ok(rdb::embed::StorageGuard::create(directory, true));
+  engine.reset();
+  EXPECT_TRUE(std::filesystem::is_directory(directory));
+  guard.reset();
+  rdb::embed::removeTemporaryStorage(directory);
+  EXPECT_FALSE(std::filesystem::exists(directory));
+}
+
+TEST(embedEngine, invalid_configuration_creates_no_directory_and_user_directory_survives_destruction) {
+  // covers: engine.engine.3~1, engine.engine.5~1
+  namespace fs       = std::filesystem;
+  const auto sandbox = fs::absolute("engine_create_tmp");
+  fs::create_directory(sandbox);
+  const std::string config = "engine_invalid_config.toml";
+  std::ofstream(config) << "[broken";
+  const std::optional<std::string> oldTmp =
+      std::getenv("TMPDIR") ? std::optional<std::string>{std::getenv("TMPDIR")} : std::nullopt;
+  ASSERT_EQ(setenv("TMPDIR", sandbox.c_str(), 1), 0);
+  const auto refused = rdb::embed::Engine::create("", "", config);
+  if (oldTmp)
+    setenv("TMPDIR", oldTmp->c_str(), 1);
+  else
+    unsetenv("TMPDIR");
+  EXPECT_RDB_ERROR(refused, rdb::Errc::Config);
+  EXPECT_TRUE(fs::is_empty(sandbox));
+  fs::remove(config);
+  {
+    auto engine = rdbtest::ok(rdb::embed::Engine::create(sandbox.string()));
+    EXPECT_EQ(engine->storageDir(), sandbox.string());
+  }
+  EXPECT_TRUE(fs::is_directory(sandbox));
+  fs::remove_all(sandbox);
+}
+
+// Przestarzala skladnia jest tu przedmiotem testu, dlatego wystepuje celowo.
+TEST(embedEnginePlan, warnings_are_ordered_and_only_published_for_an_accepted_plan) {
+  // covers: engine.engine.6~1, engine.engine.17~1
+  writeSource("warning_source.txt", {1, 2});
+  auto engine = rdbtest::ok(rdb::embed::Engine::create());
+  const std::string deprecated =
+      "DECLARE a INTEGER STREAM src, 1 FILE 'warning_source.txt'\n"
+      "SELECT * STREAM mean FROM src.avg\n";
+  ASSERT_RDB_OK(engine->compile(deprecated));
+  ASSERT_EQ(engine->warnings().size(), 2U);
+  EXPECT_TRUE(engine->warnings()[0].contains("line 1"));
+  EXPECT_TRUE(engine->warnings()[0].contains("FILE"));
+  EXPECT_TRUE(engine->warnings()[1].contains("src.avg"));
+  ASSERT_RDB_OK(engine->compile(doublingPlan("warning_source.txt")));
+  EXPECT_TRUE(engine->warnings().empty());
+  EXPECT_RDB_ERROR(engine->compile(deprecated + "SELECT * STREAM dst FROM unknown_source\n"), rdb::Errc::Compile);
+  EXPECT_TRUE(engine->warnings().empty());
+  EXPECT_FALSE(engine->hasPlan());
+}
+
+TEST(embedStorageGuard, claim_marker_canonical_paths_and_artifact_boundaries) {
+  // covers: engine.engine.11~1, storageguard.storage-guard.1~1, storageguard.storage-guard.5~1, storageguard.storage-guard.6~1
+  // covers: storageguard.storage-guard.8~1, storageguard.storage-guard.9~1
+  namespace fs         = std::filesystem;
+  const auto directory = fs::absolute("guard_contract");
+  fs::remove_all(directory);
+  fs::create_directory(directory);
+  {
+    auto reader = rdbtest::ok(rdb::embed::StorageGuard::create(directory.string(), false));
+    EXPECT_FALSE(reader->ownsDirectory());
+    EXPECT_EQ(reader->directory(), directory.string());
+    EXPECT_TRUE(fs::is_empty(directory));
+  }
+  std::ofstream(directory / "foreign") << "keep";
+  EXPECT_RDB_ERROR(rdb::embed::StorageGuard::create(directory.string(), true), rdb::Errc::Compile);
+  EXPECT_TRUE(fs::exists(directory / "foreign"));
+  fs::remove(directory / "foreign");
+  {
+    auto owner = rdbtest::ok(rdb::embed::StorageGuard::create(directory.string(), true));
+    EXPECT_TRUE(owner->ownsDirectory());
+    const auto marker = directory / ".retractordb-embedded";
+    struct stat info{};
+    ASSERT_EQ(stat(marker.c_str(), &info), 0);
+    EXPECT_EQ(info.st_mode & 0777, 0600);
+    std::ifstream input(marker);
+    EXPECT_EQ(std::string(std::istreambuf_iterator<char>(input), {}), "retractordb embedded storage v1\n");
+    EXPECT_RDB_OK(owner->checkPath((directory / "data").string()));
+    EXPECT_RDB_ERROR(owner->checkPath(directory.string()), rdb::Errc::Compile);
+    EXPECT_RDB_ERROR(owner->checkPath(marker.string()), rdb::Errc::Compile);
+    EXPECT_RDB_ERROR(owner->checkPath(directory.string() + "2/data"), rdb::Errc::Compile);
+    fs::create_directory_symlink(directory.parent_path(), directory / "escape");
+    EXPECT_RDB_ERROR(owner->checkPath((directory / "escape/data").string()), rdb::Errc::Compile);
+  }
+  EXPECT_TRUE(fs::exists(directory / ".retractordb-embedded"));
+  fs::remove_all(directory);
+}
+
+TEST(embedStorageGuard, invalid_marker_links_and_contents_are_refused_without_mutation) {
+  // covers: storageguard.storage-guard.7~1
+  namespace fs         = std::filesystem;
+  const auto directory = fs::absolute("guard_invalid_marker");
+  fs::remove_all(directory);
+  fs::create_directory(directory);
+  const auto marker = directory / ".retractordb-embedded";
+  std::ofstream(marker) << "wrong";
+  EXPECT_RDB_ERROR(rdb::embed::StorageGuard::create(directory.string(), true), rdb::Errc::Compile);
+  EXPECT_EQ(fs::file_size(marker), 5U);
+  std::ofstream(marker) << "retractordb embedded storage v1\n";
+  fs::create_hard_link(marker, directory / "alias");
+  EXPECT_RDB_ERROR(rdb::embed::StorageGuard::create(directory.string(), true), rdb::Errc::Compile);
+  fs::remove(directory / "alias");
+  fs::rename(marker, directory / "target");
+  fs::create_symlink("target", marker);
+  EXPECT_RDB_ERROR(rdb::embed::StorageGuard::create(directory.string(), true), rdb::Errc::Compile);
+  EXPECT_TRUE(fs::is_symlink(marker));
+  fs::remove_all(directory);
 }

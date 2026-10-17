@@ -7,14 +7,15 @@ namespace rdb {
 /// @brief Maszyna stanów decydująca, kiedy ciąg rekordów all-null stanowi przerwę w transmisji.
 ///
 /// Obiekt klasy GapDetector powinien:
-/// - być nieaktywny (enabled() == false), dopóki configure() nie zostanie wywołane,
-/// - po skonfigurowaniu (configure(nullFillCount)) przepuszczać pierwsze nullFillCount kolejnych
+/// - [gapdetector.gap-detector.1~1] być nieaktywny (enabled() == false), dopóki configure() nie zostanie wywołane,
+/// - [gapdetector.gap-detector.2~1] po skonfigurowaniu (configure(nullFillCount)) przepuszczać pierwsze nullFillCount kolejnych
 ///   obserwacji all-null (absorb(true) zwraca false - wywołujący ma je zapisać fizycznie, faza nullfill),
-/// - dalsze obserwacje all-null pochłaniać (absorb(true) zwraca true), akumulując długość oczekującej przerwy,
-/// - przy pierwszej obserwacji nie-null (absorb(false)) zerować licznik fazy nullfill, zwracając false;
+/// - [gapdetector.gap-detector.3~1] dalsze obserwacje all-null pochłaniać (absorb(true) zwraca true), akumulując długość oczekującej przerwy,
+/// - [gapdetector.gap-detector.4~1] przy pierwszej obserwacji nie-null (absorb(false)) zerować licznik fazy nullfill, zwracając false;
 ///   ewentualna oczekująca przerwa NIE jest tu odrzucana - pozostaje do odebrania przez takePendingGap(),
-/// - udostępniać takePendingGap() zwracające zaakumulowaną długość przerwy i zerujące ją do 0,
-/// - nie wykonywać żadnego I/O - decyzję, co zrobić z przerwą (np. zapisać wpis gap), podejmuje wywołujący.
+/// - [gapdetector.gap-detector.5~1] udostępniać takePendingGap() zwracające zaakumulowaną długość przerwy i zerujące ją do 0,
+/// - [gapdetector.gap-detector.6~1] nie wykonywać żadnego I/O - decyzję, co zrobić z przerwą (np. zapisać wpis gap), podejmuje wywołujący.
+///   Nietestowalne: ograniczenie architektury (brak I/O); test zachowania nie dowodzi braku wszystkich efektow ubocznych, sprawdzane przegladem gapDetector.cc.
 class GapDetector {
  public:
   /// @brief Enable the state machine; @p nullFillCount all-null observations pass through before absorbing.

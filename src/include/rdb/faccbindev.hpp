@@ -17,21 +17,22 @@ namespace rdb {
 /// @brief Implementacja binarnego źródła danych działającego wyłącznie w trybie odczytu sekwencyjnego.
 ///
 /// Obiekt klasy binaryDeviceRO powinien:
-/// - odczytywać kolejne porcje surowych danych binarnych o długości wyznaczonej przez Descriptor,
-/// - używać Descriptor wyłącznie do określenia długości rekordu i rozmiaru wektora nullBitset,
-/// - składać rekord z krótkich odczytów i ponawiać wywołanie systemowe przerwane przez EINTR,
-/// - implementować interfejs FileInterface, pozostając źródłem tylko do odczytu; metoda write(...) zawsze zwraca ENOTSUP,
-/// - obsługiwać wyłącznie sekwencyjny odczyt, w którym jedyną poprawną pozycją jest 0,
-/// - przy poprawnym odczycie ustawiać nullBitset na same wartości false,
-/// - w przypadku błędu, niepoprawnej pozycji lub braku danych zwracać dane wyzerowane i nullBitset ustawiony na same wartości true,
-/// - po osiągnięciu końca strumienia próbować wrócić do początku, jeśli włączono loopToBeginningIfEOF,
-/// - po osiągnięciu końca strumienia przy wyłączonym loopToBeginningIfEOF zwracać rekord oznaczony jako null,
-/// - w tym samym przypadku zgłaszać wyczerpanie wejścia przez exhausted(), bo rekord all-null jest nieodróżnialny od danych,
-/// - zliczać wykonane odczyty i zwracać ich liczbę przez count(),
-/// - obsługiwać dwa typy źródła deklarowanego (#346): BINFILE (plik zwykły) i DEVICE (urządzenie znakowe
+/// - [faccbindev.binary-device-ro.1~1] odczytywać kolejne porcje surowych danych binarnych o długości wyznaczonej przez Descriptor,
+/// - [faccbindev.binary-device-ro.2~1] używać Descriptor wyłącznie do określenia długości rekordu i rozmiaru wektora nullBitset,
+/// - [faccbindev.binary-device-ro.3~1] składać rekord z krótkich odczytów i ponawiać wywołanie systemowe przerwane przez EINTR,
+/// - [faccbindev.binary-device-ro.4~1] implementować interfejs FileInterface, pozostając źródłem tylko do odczytu; metoda write(...) zawsze zwraca ENOTSUP,
+/// - [faccbindev.binary-device-ro.5~1] obsługiwać wyłącznie sekwencyjny odczyt, w którym jedyną poprawną pozycją jest 0,
+/// - [faccbindev.binary-device-ro.6~1] przy poprawnym odczycie ustawiać nullBitset na same wartości false,
+/// - [faccbindev.binary-device-ro.7~1] w przypadku błędu, niepoprawnej pozycji lub braku danych zwracać dane wyzerowane i nullBitset ustawiony na same wartości true,
+/// - [faccbindev.binary-device-ro.8~1] po osiągnięciu końca strumienia próbować wrócić do początku, jeśli włączono loopToBeginningIfEOF,
+/// - [faccbindev.binary-device-ro.9~1] po osiągnięciu końca strumienia przy wyłączonym loopToBeginningIfEOF zwracać rekord oznaczony jako null,
+/// - [faccbindev.binary-device-ro.10~1] w tym samym przypadku zgłaszać wyczerpanie wejścia przez exhausted(), bo rekord all-null jest nieodróżnialny od danych,
+/// - [faccbindev.binary-device-ro.11~1] zliczać wykonane odczyty i zwracać ich liczbę przez count(),
+/// - [faccbindev.binary-device-ro.12~1] obsługiwać dwa typy źródła deklarowanego (#346): BINFILE (plik zwykły) i DEVICE (urządzenie znakowe
 ///   albo FIFO); ścieżkę złego rodzaju odrzucać przez initializationError() - BINFILE sprawdza stat()
 ///   przed otwarciem, więc FIFO bez pisarza nie blokuje open(), a oba typy dodatkowo fstat() po otwarciu,
-/// - dla DEVICE (#347) nigdy nie czekać: otwierać z O_NONBLOCK, dopełniać rekord próbami nieblokującymi
+///   Kontrola strukturalna: sourceKindMismatch przed open i po fstat w faccbindev.cc.
+/// - [faccbindev.binary-device-ro.13~1] dla DEVICE (#347) nigdy nie czekać: otwierać z O_NONBLOCK, dopełniać rekord próbami nieblokującymi
 ///   (fill()) w prywatnym buforze, który przeżywa krótki odczyt i timeout, a w read() oddawać rekord
 ///   skompletowany albo all-null; czekanie z terminem należy do awaitRecords(), poza blokadami modelu.
 ///
@@ -141,12 +142,15 @@ struct deviceWait {
   std::chrono::steady_clock::time_point deadline;
 };
 
-/// @brief Faza DEVICE jednego slotu (#347): najpierw jedna próba nieblokująca dla każdego źródła,
-/// potem jedno poll() na wszystkie, które czekają, aż do ich terminów.
+/// Funkcja awaitRecords powinna:
+/// - [faccbindev.await-records.1~1] w fazie DEVICE jednego slotu wykonywać najpierw jedną próbę nieblokującą dla każdego źródła, a czekać tylko na źródła, którym brakuje danych i których termin jeszcze nie minął.
+/// - [faccbindev.await-records.2~1] czekać na wszystkie oczekujące źródła jednym poll() naraz, tak aby łączne czekanie było maksimum terminów, a nie ich sumą.
+/// - [faccbindev.await-records.3~1] nie odnawiać terminu źródła: po EINTR i po fałszywym przebudzeniu wracać do czekania na ten sam termin.
+/// - [faccbindev.await-records.4~1] kończyć czekanie źródła od razu po danych, EOF albo błędzie, a po błędzie poll() innym niż EINTR kończyć czekanie wszystkich źródeł w tym slocie z ostrzeżeniem.
+/// - [faccbindev.await-records.5~1] na końcu zdejmować markAwaited() ze wszystkich podanych źródeł.
+///   Zakres testow: `BinaryDeviceROTest.device_destroyed_during_the_device_phase_is_fatal`, `BinaryDeviceROTest.poll_failure_ends_all_waits_and_clears_every_awaited_mark`. Kontrola znacznika przez destruktor działa tylko w Debug.
 ///
-/// Łączne czekanie to maksimum terminów, nie ich suma. Termin się nie odnawia: EINTR z poll() i EAGAIN
-/// po fałszywym przebudzeniu wracają do czekania na ten sam deadline. EOF i błąd kończą czekanie danego
-/// źródła od razu. Woła ją wątek wykonawczy BEZ blokad modelu; źródła muszą przeżyć całe wywołanie
-/// (niezmiennik pilnowany w Debug przez destruktor binaryDeviceRO). Na końcu zdejmuje markAwaited().
+/// @note Faza DEVICE (#347). Wola ja watek wykonawczy BEZ blokad modelu; zrodla musza przezyc cale wywolanie
+///       (niezmiennik pilnowany w Debug przez destruktor binaryDeviceRO).
 void awaitRecords(std::span<const deviceWait> waits);
 }  // namespace rdb

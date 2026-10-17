@@ -81,6 +81,18 @@ else:
         sys.exit(7)
     elif stream == 'wait':
         while True: signal.pause()
+    elif stream == 'partial':
+        sys.stdout.write('{')
+        sys.stdout.flush()
+    elif stream == 'oversized':
+        sys.stdout.write('x' * 1048577)
+        sys.stdout.flush()
+    elif stream == 'endexit':
+        emit('end', reason='limit')
+        sys.exit(7)
+    elif stream == 'endhang':
+        emit('end', reason='limit')
+        while True: signal.pause()
     else:
         for i in range(100000 if stream == 'flood' else 3):
             os.write(2, b'diagnostic\n' * 1000)

@@ -58,31 +58,32 @@ enum class WriteStatus : std::uint8_t {
 /// @brief Warstwa koordynująca Descriptor, payload i FileInterface dla odczytu oraz zapisu rekordów.
 ///
 /// Obiekt klasy storage powinien:
-/// - utrzymywać Descriptor oraz powiązane obiekty payload używane do odczytu, zapisu i buforowania danych,
-/// - delegować wyliczanie i spójność ścieżek plików magazynu (deskryptor .desc, plik danych, indeks .meta)
+/// - [storage.storage.1~1] utrzymywać Descriptor oraz powiązane obiekty payload używane do odczytu, zapisu i buforowania danych,
+/// - [storage.storage.2~1] delegować wyliczanie i spójność ścieżek plików magazynu (deskryptor .desc, plik danych, indeks .meta)
 ///   do obiektu StoragePaths (storagePaths.hpp), łącznie z relokacją wg pola REF deskryptora
 ///   oraz kasowaniem kompletu plików magazynów dysponowalnych,
-/// - tworzyć odpowiednią implementację FileInterface na podstawie konfiguracji i typu magazynu zakodowanego w Descriptor,
+/// - [storage.storage.3~1] tworzyć odpowiednią implementację FileInterface na podstawie konfiguracji i typu magazynu zakodowanego w Descriptor,
 ///   delegując samo odwzorowanie typu magazynu na konkretną klasę akcesora oraz dobór wariantu indeksu metadanych
 ///   do fabryki (accessorFactory.hpp) - storage zna wyłącznie abstrakcyjny FileInterface,
-/// - zarządzać plikiem deskryptora oraz inicjalizacją właściwego magazynu danych; odczyt, zapis
+///   Kontrola strukturalna: initializeAccessor i makeMetaIndex w storage.cc delegują wybór do fabryki.
+/// - [storage.storage.4~1] zarządzać plikiem deskryptora oraz inicjalizacją właściwego magazynu danych; odczyt, zapis
 ///   i weryfikację zgodności pliku .desc delegować do funkcji descriptorIO (descriptorIO.hpp),
-/// - udostępniać odczyt i zapis rekordów przez logiczne indeksy rekordów, mapowane wewnętrznie na pozycje właściwe dla accessor_,
-/// - delegować całość metadanych null i gap do wstrzykniętego obiektu metaData, którego wariant jest wybierany
+/// - [storage.storage.5~1] udostępniać odczyt i zapis rekordów przez logiczne indeksy rekordów, mapowane wewnętrznie na pozycje właściwe dla accessor_,
+/// - [storage.storage.6~1] delegować całość metadanych null i gap do wstrzykniętego obiektu metaData, którego wariant jest wybierany
 ///   przy attachStorage(): storageShadow gdy accessor utrzymuje plik cienia danych (FileInterface::hasShadow()),
 ///   bazowy metaData dla pozostałych zapisywalnych, wariant inertny (pusta ścieżka pliku) dla źródeł
 ///   deklarowanych - dzięki temu write()/read() nie zawierają rozgałęzień zależnych od wariantu magazynu,
-/// - traktować posiadanie pliku cienia danych i posiadanie metaindeksu jako niezależne własności magazynu:
+/// - [storage.storage.7~1] traktować posiadanie pliku cienia danych i posiadanie metaindeksu jako niezależne własności magazynu:
 ///   plik cienia zachowuje oryginalną, zarejestrowaną zawartość danych (aktualizacje trafiają do cienia aż do
 ///   merge), a metaindeks pozwala uwzględnić wartości null oraz przerwy w transmisji,
-/// - dla źródeł deklarowanych tylko do odczytu obsługiwać odczyt bieżącego rekordu oraz opcjonalny bufor historii,
+/// - [storage.storage.8~1] dla źródeł deklarowanych tylko do odczytu obsługiwać odczyt bieżącego rekordu oraz opcjonalny bufor historii,
 ///   delegując komorę bieżącego rekordu, fizyczny odczyt ze źródła i bufor historii do obiektu SourceBuffer
 ///   (sourceBuffer.hpp); storage zachowuje decyzje o wartościach zastępczych i stan bufferState,
-/// - wspierać czyszczenie magazynu i odpowiadającego mu indeksu metadanych przez purge() lub reset(),
-/// - umożliwiać konfigurację interwału próbkowania oraz liczby rekordów nullfill poprzedzających oznaczenie gap;
+/// - [storage.storage.9~1] wspierać czyszczenie magazynu i odpowiadającego mu indeksu metadanych przez purge() lub reset(),
+/// - [storage.storage.10~1] umożliwiać konfigurację interwału próbkowania oraz liczby rekordów nullfill poprzedzających oznaczenie gap;
 ///   samą maszynę detekcji gap (nullfill/absorpcja/flush) realizuje metaData,
-/// - przy starcie wyznaczać przerwę w transmisji danych (wynikającą z niedziałania systemu) jako liczbę interwałów próbkowania, które upłynęły od ostatniego zapisu pliku danych do momentu startu, i przekazywać ją do obiektu indeksu metadanych w celu zarejestrowania jako wpis gap,
-/// - przy zamknieciu rotowac indeks metadanych pod tym samym numerem .old<percounter> co dane,
+/// - [storage.storage.11~1] przy starcie wyznaczać przerwę w transmisji danych (wynikającą z niedziałania systemu) jako liczbę interwałów próbkowania, które upłynęły od ostatniego zapisu pliku danych do momentu startu, i przekazywać ją do obiektu indeksu metadanych w celu zarejestrowania jako wpis gap,
+/// - [storage.storage.12~1] przy zamknieciu rotowac indeks metadanych pod tym samym numerem .old<percounter> co dane,
 ///   a przy starcie pustego magazynu usuwac osierocony indeks pozostawiony przez starsza wersje.
 ///
 /// @note Klasa sama nie implementuje fizycznego formatu magazynu; deleguje operacje I/O do accessor_.

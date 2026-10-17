@@ -46,3 +46,18 @@ if xretractor query.rql -k -r -m 1 -f -t 2>/dev/null; then
   echo "FAIL: -f razem z -t powinno byc odrzucone"
   exit 1
 fi
+
+# 4. Budzet -m (#521, etap 9b): -m N to N obrotow petli liczac krok zerowy, czyli N-1 slotow.
+#    Plan ma jeden interwal, wiec kazdy slot liczy dst raz (rekord INTEGER = 4 B), a krok zerowy
+#    czyta tylko deklaracje. -m 1 nie liczy zadnego slotu, -m 4 liczy trzy.
+for budget in 1 4; do
+  rm -rf temp
+  mkdir -p temp
+  xretractor query.rql -k -r -f -m "$budget"
+  want=$(((budget - 1) * 4))
+  got=$(file_size temp/dst)
+  if [ "$got" -ne "$want" ]; then
+    echo "FAIL: -m $budget dal $got B w dst, oczekiwano $want B ($((budget - 1)) slotow)"
+    exit 1
+  fi
+done

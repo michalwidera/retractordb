@@ -210,6 +210,8 @@ TEST_F(ShadowFileTest, write_without_shadow_descriptor_returns_ebadf) {
 
 // Verify append writes go to main file, not shadow
 TEST_F(ShadowFileTest, test_faccposixshd_append_to_main) {
+  // covers: faccposixshd.posix-binary-file-with-shadow.1~1, faccposixshd.posix-binary-file-with-shadow.4~1
+  // covers: faccposixshd.posix-binary-file-with-shadow.7~1
   BYTE record;
   auto path = sandboxPath("shd_main");
 
@@ -234,6 +236,8 @@ TEST_F(ShadowFileTest, test_faccposixshd_append_to_main) {
 
 // Verify update writes go to shadow file, main file unchanged
 TEST_F(ShadowFileTest, test_faccposixshd_update_to_shadow) {
+  // covers: faccposixshd.posix-binary-file-with-shadow.1~1, faccposixshd.posix-binary-file-with-shadow.2~1
+  // covers: faccposixshd.posix-binary-file-with-shadow.5~1
   BYTE record;
   auto path = sandboxPath("shd_update");
 
@@ -272,6 +276,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_update_to_shadow) {
 
 // Verify multiple updates to same position - last write wins
 TEST_F(ShadowFileTest, test_faccposixshd_multiple_updates_same_pos) {
+  // covers: faccposixshd.posix-binary-file-with-shadow.6~1
   BYTE record;
   auto path = sandboxPath("shd_multi");
 
@@ -301,6 +306,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_multiple_updates_same_pos) {
 
 // Verify merge applies shadow changes to main file and clears shadow
 TEST_F(ShadowFileTest, test_faccposixshd_merge) {
+  // covers: faccposixshd.posix-binary-file-with-shadow.2~1, faccposixshd.posix-binary-file-with-shadow.9~1
   BYTE record;
   auto path = sandboxPath("shd_merge");
 
@@ -361,6 +367,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_truncate) {
 // Purge oproznia oba pliki W MIEJSCU - uzasadnienie przy tescie purge w test_faccposix.cpp.
 // Tu dochodzi cien: wpis sprzed purge nie moze przeslonic nowego rekordu na tej samej pozycji.
 TEST_F(ShadowFileTest, test_faccposixshd_purge_keeps_files_usable) {
+  // covers: faccposixshd.posix-binary-file-with-shadow.10~1
   rdb::posixBinaryFileWithShadow shd(sandboxPath("shd_purge"), desc);
   BYTE record = 10;
   GTEST_ASSERT_EQ(shd.write(&record), EXIT_SUCCESS);
@@ -377,6 +384,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_purge_keeps_files_usable) {
 
 // Verify count returns only main file record count (shadow doesn't affect count)
 TEST_F(ShadowFileTest, test_faccposixshd_count_ignores_shadow) {
+  // covers: faccposixshd.posix-binary-file-with-shadow.12~1
   BYTE record;
   auto path = sandboxPath("shd_count");
 
@@ -423,6 +431,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_read_beyond_eof) {
 
 // Verify shadow entry binary format: (size_t position, data[recordSize])
 TEST_F(ShadowFileTest, test_faccposixshd_shadow_entry_format) {
+  // covers: faccposixshd.posix-binary-file-with-shadow.3~1
   BYTE record;
   auto path = sandboxPath("shd_fmt");
 
@@ -451,6 +460,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_shadow_entry_format) {
 
 // Verify multi-byte record shadow operations
 TEST_F(ShadowFileTest, test_faccposixshd_multibyte_record) {
+  // covers: faccposixshd.posix-binary-file-with-shadow.4~1
   const size_t multiRecSize = 4;
   auto path                 = sandboxPath("shd_multi_rec");
 
@@ -486,6 +496,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_multibyte_record) {
 
 // Verify data persists after close and reopen
 TEST_F(ShadowFileTest, test_faccposixshd_persistence) {
+  // covers: faccposixshd.posix-binary-file-with-shadow.15~1
   BYTE record;
   auto path = sandboxPath("shd_persist");
 
@@ -625,6 +636,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_merge_empty_shadow) {
 
 // Verify reopen restores main file alignment to whole records
 TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_main_file) {
+  // covers: faccposixshd.posix-binary-file-with-shadow.14~1
   const size_t multiRecSize = 2;
   auto path                 = sandboxPath("shd_restore_main_align");
 
@@ -655,6 +667,7 @@ TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_main_file) 
 
 // Verify reopen restores shadow file alignment to whole (position, data) entries
 TEST_F(ShadowFileTest, test_faccposixshd_restore_truncates_unaligned_shadow_file) {
+  // covers: faccposixshd.posix-binary-file-with-shadow.14~1
   auto path = sandboxPath("shd_restore_shadow_align");
 
   // Prepare main file with 2 records

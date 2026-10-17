@@ -153,6 +153,7 @@ const std::vector<addCapacityCase> addCases{
 }  // namespace
 
 TEST(capacities, subtract_declared_matches_event_table) {
+  // covers: soperations.subtract-startup-latency.1~1, compiler.compiler.8~1
   const ratio sourceDelta(1, 100);
 
   for (const auto &testCase : subtractCases) {
@@ -176,6 +177,7 @@ TEST(capacities, subtract_declared_matches_event_table) {
 }
 
 TEST(capacities, add_declared_matches_event_table) {
+  // covers: soperations.add-startup-latency.1~1, compiler.compiler.8~1
   for (const auto &testCase : addCases) {
     const ratio outputDelta = std::min(testCase.leftDelta, testCase.rightDelta);
     const ratio leftRatio   = outputDelta / testCase.leftDelta;

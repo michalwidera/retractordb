@@ -4,6 +4,8 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
+# covers: launcher.xretractor.5~1, launcher.xretractor.7~1, launcher.xretractor.15~1, launcher.xretractor.33~1
+# covers: executorsm.executorsm.16~1, executorsm.executorsm.20~1
 # Typ buildu decyduje, czy komunikat SPDLOG_WARN o sygnale jest w ogole
 # wkompilowany (Release wycina go progiem SPDLOG_ACTIVE_LEVEL, glowny
 # CMakeLists.txt). Dlatego binarka z tego drzewa, a nie kopia z ~/.local/bin -

@@ -117,6 +117,7 @@ TEST_F(GroupFileTest, failed_rotation_segment_is_fatal) {
 
 // Verify no-retention mode writes all records into a single file
 TEST_F(GroupFileTest, test_fagrp_no_retention) {
+  // covers: fagrp.group-file.3~1
   BYTE record;
 
   auto retention = rdb::retention_t{0, 0};
@@ -137,6 +138,7 @@ TEST_F(GroupFileTest, test_fagrp_no_retention) {
 
 // Verify retention mode splits records across segment files with correct contents
 TEST_F(GroupFileTest, test_fagrp_segmented_write_and_read) {
+  // covers: fagrp.group-file.1~1, fagrp.group-file.4~1
   BYTE record;
 
   rdb::segments_t silos_count = 2;
@@ -171,6 +173,7 @@ TEST_F(GroupFileTest, test_fagrp_segmented_write_and_read) {
 // Rotation triggers when the current segment reaches capacity. The next record
 // is written to the new segment.
 TEST_F(GroupFileTest, test_fagrp_segment_rotation) {
+  // covers: fagrp.group-file.2~1
   BYTE record;
 
   rdb::segments_t silos_count = 2;
@@ -198,6 +201,7 @@ TEST_F(GroupFileTest, test_fagrp_segment_rotation) {
 
 // Verify rotation removes shadow file for evicted segment as well.
 TEST_F(GroupFileTest, test_fagrp_segment_rotation_removes_shadow) {
+  // covers: faccposixshd.posix-binary-file-with-shadow.11~1
   BYTE record;
 
   rdb::segments_t silos_count = 2;
@@ -224,6 +228,7 @@ TEST_F(GroupFileTest, test_fagrp_segment_rotation_removes_shadow) {
 
 // Verify purge clears all segments and resets state
 TEST_F(GroupFileTest, test_fagrp_purge) {
+  // covers: fagrp.group-file.11~1
   BYTE record;
 
   rdb::segments_t silos_count = 2;
@@ -253,6 +258,7 @@ TEST_F(GroupFileTest, test_fagrp_purge) {
 
 // Verify purge API works in no-retention mode as well.
 TEST_F(GroupFileTest, test_fagrp_purge_no_retention) {
+  // covers: fagrp.group-file.11~1
   BYTE record;
 
   auto retention = rdb::retention_t{0, 0};
@@ -276,6 +282,7 @@ TEST_F(GroupFileTest, test_fagrp_purge_no_retention) {
 // probowac rotacji skasowanego pliku (falszywy "Failed to rotate" w logu). Segmenty, ktore
 // retencje przetrwaly, dostaja przy koncu sesji zwykla rotacje do .old<N>.
 TEST_F(GroupFileTest, test_fagrp_retention_drop_is_not_a_rotation_failure) {
+  // covers: faccposix.posix-binary-file.7~1
   LogCapture log;
   {
     auto gfa = std::make_unique<rdb::groupFile<>>(filename, makeDesc(recsize), rdb::retention_t{2, 2}, 3);
@@ -307,6 +314,7 @@ TEST_F(GroupFileTest, test_fagrp_purge_is_not_a_rotation_failure) {
 
 // Verify name() returns base filename in no-retention mode
 TEST_F(GroupFileTest, test_fagrp_name_no_retention) {
+  // covers: fagrp.group-file.9~1
   auto retention = rdb::retention_t{0, 0};
   auto gfa       = std::make_unique<rdb::groupFile<>>(filename, makeDesc(recsize), retention, -1);
 
@@ -315,6 +323,7 @@ TEST_F(GroupFileTest, test_fagrp_name_no_retention) {
 
 // Verify name() returns segment filename in retention mode
 TEST_F(GroupFileTest, test_fagrp_name_retention) {
+  // covers: fagrp.group-file.9~1
   auto retention = rdb::retention_t{2, 3};
   auto gfa       = std::make_unique<rdb::groupFile<>>(filename, makeDesc(recsize), retention, -1);
 
@@ -331,6 +340,7 @@ TEST_F(GroupFileTest, test_fagrp_empty_count) {
 
 // Verify update-in-place within a segment overwrites the correct record
 TEST_F(GroupFileTest, test_fagrp_update_in_place) {
+  // covers: fagrp.group-file.7~1
   BYTE record;
 
   auto retention = rdb::retention_t{0, 0};
@@ -366,6 +376,7 @@ TEST_F(GroupFileTest, test_fagrp_update_in_place) {
 
 // Verify count compensates for removed segments after rotation.
 TEST_F(GroupFileTest, test_fagrp_count_after_rotation) {
+  // covers: fagrp.group-file.8~1
   BYTE record;
 
   rdb::segments_t silos_count = 2;
@@ -408,6 +419,7 @@ TEST_F(GroupFileTest, test_fagrp_access_removed_segment_fails) {
 
 // Verify segment mapping for multi-byte records: position is a byte offset, capacity is in records.
 TEST_F(GroupFileTest, test_fagrp_multibyte_record_segment_mapping) {
+  // covers: fagrp.group-file.5~1, fainterface.file-interface.2~1, fainterface.file-interface.5~1
   const size_t size = sizeof(uint32_t);
   uint32_t record;
 
@@ -441,6 +453,7 @@ TEST_F(GroupFileTest, test_fagrp_multibyte_record_segment_mapping) {
 
 // Verify object state is restored after restart and append continues from restored state.
 TEST_F(GroupFileTest, test_fagrp_restore_state_after_restart) {
+  // covers: fagrp.group-file.12~1, fagrp.group-file.13~1
   BYTE record;
 
   rdb::segments_t silos_count = 2;
@@ -484,6 +497,7 @@ TEST_F(GroupFileTest, test_fagrp_restore_state_after_restart) {
 // szukano dawniej w katalogu roboczym i porownywano z pelna sciezka, wiec po restarcie grupa
 // zaczynala od pustego `_segment_0`, a pozniejsze segmenty zostawaly na dysku do nadpisania.
 TEST_F(GroupFileTest, test_fagrp_restore_state_after_restart_in_subdirectory) {
+  // covers: fagrp.group-file.12~1
   BYTE record;
   const std::string stored = "store/" + filename;
   std::filesystem::create_directory("store");

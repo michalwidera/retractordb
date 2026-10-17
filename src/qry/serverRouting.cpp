@@ -5,7 +5,6 @@
 #include <cctype>
 #include <cstddef>
 #include <filesystem>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -133,13 +132,14 @@ std::vector<std::string> tableLines(const ServerRow &row, const ColumnWidths &wi
   return retVal;
 }
 
-void appendYamlServer(std::vector<std::string> &lines, const bus::InstanceInfo &instance,
-                      std::optional<std::string_view> namespaceName) {
+void appendYamlServer(std::vector<std::string> &lines, const bus::InstanceInfo &instance, std::string_view namespaceName) {
   lines.push_back("  - name: " + instanceLabel(instance.name));
-  if (namespaceName)
-    lines.push_back("    namespace: " + (namespaceName->empty() ? std::string("null") : yamlQuoted(*namespaceName)));
+  lines.push_back("    namespace: " + (namespaceName.empty() ? std::string("null") : yamlQuoted(namespaceName)));
   lines.push_back("    pid: " + std::to_string(instance.pid));
   lines.push_back("    modes: " + modeLabel(instance.modes));
+  // Sciezka zapytania trafia tu W CALOSCI, a nie skrocona jak w tabeli: skrot `.../` sluzy
+  // czytelnosci dla czlowieka, a odbiorca YAML-a ma dostac sciezke, ktora da sie otworzyc.
+  // Wartosc jest cytowana, bo sciezka moze zawierac dwukropek albo spacje.
   if (!instance.queryFile.empty()) lines.push_back("    query: " + yamlQuoted(instance.queryFile));
   if (instance.streams.empty()) {
     lines.emplace_back("    streams: []");
@@ -372,25 +372,6 @@ std::vector<std::string> describe(const std::vector<bus::InstanceInfo> &instance
   // czyli nie pasuje do zadnego wzorca kolumnowego -- skrypty dopasowujace wiersze instancji
   // po "^<nazwa> |" jej nie widza.
   retVal.push_back(modeLegend());
-  return retVal;
-}
-
-std::vector<std::string> describeYaml(const std::vector<bus::InstanceInfo> &instances) {
-  std::vector<std::string> retVal{"---", "apiVersion: xqry/v1"};
-  if (instances.empty()) {
-    retVal.emplace_back("servers: []");
-    return retVal;
-  }
-
-  // Sciezka zapytania trafia tu W CALOSCI, a nie skrocona jak w tabeli: skrot `.../` sluzy
-  // czytelnosci dla czlowieka, a odbiorca YAML-a ma dostac sciezke, ktora da sie otworzyc.
-  // Wartosc jest cytowana, bo sciezka moze zawierac dwukropek albo spacje.
-  std::vector<bus::InstanceInfo> ordered = instances;
-  std::ranges::sort(ordered, {}, [](const bus::InstanceInfo &instance) { return instanceLabel(instance.name); });
-
-  retVal.emplace_back("servers:");
-  for (const auto &instance : ordered)
-    appendYamlServer(retVal, instance, std::nullopt);
   return retVal;
 }
 

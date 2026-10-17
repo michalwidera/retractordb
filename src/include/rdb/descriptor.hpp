@@ -23,15 +23,15 @@ enum FieldColumn : std::uint8_t { rname = 0, rlen = 1, rarray = 2, rtype = 3 };
 /// @brief Klasa opisująca układ pól rekordu oraz metadane konfiguracyjne związane z magazynem danych.
 ///
 /// Obiekt klasy Descriptor powinien:
-/// - przechowywać definicje pól rekordu w postaci listy opisowej (rField),
-/// - umożliwiać definiowanie pól o różnych typach, długościach i krotnościach tablicowych,
-/// - udostępniać informacje o logicznej i fizycznej strukturze danych, takie jak nazwy pól, typy, rozmiary i offsety,
-/// - wyznaczać rozmiar binarnej reprezentacji rekordu z pominięciem pól konfiguracyjnych,
-/// - udostępniać odwzorowanie między pozycją w spłaszczonym widoku pól a indeksem pola oraz offsetem w rekordzie,
-/// - umożliwiać dodawanie i łączenie opisów pól,
-/// - umożliwiać odczyt i zapis tekstowej reprezentacji deskryptora przez operatory strumieniowe,
-/// - udostępniać metadane konfiguracyjne zapisane w polach specjalnych, takie jak REF, TYPE, RETENTION i RETMEMORY,
-/// - umożliwiać porównanie kompatybilności dwóch deskryptorów w zakresie pól danych przez operator==.
+/// - [descriptor.descriptor.1~1] przechowywać definicje pól rekordu w postaci listy opisowej (rField),
+/// - [descriptor.descriptor.2~1] umożliwiać definiowanie pól o różnych typach, długościach i krotnościach tablicowych,
+/// - [descriptor.descriptor.3~1] udostępniać informacje o logicznej i fizycznej strukturze danych, takie jak nazwy pól, typy, rozmiary i offsety,
+/// - [descriptor.descriptor.4~1] wyznaczać rozmiar binarnej reprezentacji rekordu z pominięciem pól konfiguracyjnych,
+/// - [descriptor.descriptor.5~1] udostępniać odwzorowanie między pozycją w spłaszczonym widoku pól a indeksem pola oraz offsetem w rekordzie,
+/// - [descriptor.descriptor.6~1] umożliwiać dodawanie i łączenie opisów pól,
+/// - [descriptor.descriptor.7~1] umożliwiać odczyt i zapis tekstowej reprezentacji deskryptora przez operatory strumieniowe,
+/// - [descriptor.descriptor.8~1] udostępniać metadane konfiguracyjne zapisane w polach specjalnych, takie jak REF, TYPE, RETENTION i RETMEMORY,
+/// - [descriptor.descriptor.9~1] umożliwiać porównanie kompatybilności dwóch deskryptorów w zakresie pól danych przez operator==.
 ///
 /// @note Pola są dostępne tylko do odczytu; zmiany układu przechodzą przez metody unieważniające cache.
 /// @note Operator== nie oznacza ścisłej równości wszystkich właściwości deskryptora; sprawdza zgodność pól danych z pominięciem pól konfiguracyjnych.
@@ -161,21 +161,25 @@ class Descriptor {
   friend std::istream &operator>>(std::istream &is, Descriptor &rhs);
 };
 
-// http://www.gotw.ca/gotw/004.htm
+/// Funkcja operator+ powinna:
+/// - [descriptor.operator-plus.1~1] zwracać nowy deskryptor z polami lhs, a po nich polami rhs, bez zmiany argumentów.
+///
+/// @note Wzorzec: http://www.gotw.ca/gotw/004.htm
 Descriptor operator+(const Descriptor &lhs, const Descriptor &rhs);
 
-/// Format jednowierszowy deskryptora i payloadu. Stan NALEZY DO STRUMIENIA, nie do procesu:
-/// siedzi w slocie std::ios_base::xalloc() tego konkretnego ostream-a.
+/// Funkcja singleLineFormat powinna:
+/// - [descriptor.single-line-format.1~1] jako manipulator włączać format jednowierszowy deskryptora i payloadu wyłącznie dla podanego strumienia i zwracać ten strumień.
 ///
-/// Do fazy 2 (#446, C2) byla to statyczna skladowa Descriptor::singleLineOutput_ - flaga calego
-/// procesu w warstwie, ktora laduje notatnik: ustawiana manipulatorem, a KASOWANA przez sam
-/// operator<< po pierwszym uzyciu. Dwa watki wypisujace rownolegle scigaly sie o format wyjscia
-/// trzeciego, a wiazanie Pythona musialo zapamietywac i przywracac jej wartosc wokol repr().
-///
-/// Semantyka JEDNORAZOWOSCI zostaje bez zmian: operator<< zdejmuje flage po wypisaniu, wiec
-/// `os << rdb::singleLineFormat << x` dotyczy dokladnie tego jednego wypisu. Nowe jest tylko
-/// to, ze "gdzie" oznacza teraz ten strumien, a nie caly proces.
+/// @note Stan nalezy do strumienia (slot std::ios_base::xalloc()), nie do procesu: do fazy 2 (#446, C2) byla to
+///       flaga calego procesu, o ktora scigaly sie watki. Jednorazowosc zostaje: operator<< zdejmuje flage po
+///       wypisaniu, wiec `os << rdb::singleLineFormat << x` dotyczy tego jednego wypisu.
 std::ostream &singleLineFormat(std::ostream &os);
+
+/// Funkcja isSingleLineOutput powinna:
+/// - [descriptor.is-single-line-output.1~1] zwracać, czy dla podanego strumienia jest włączony format jednowierszowy.
 [[nodiscard]] bool isSingleLineOutput(std::ostream &os);
+
+/// Funkcja setSingleLineOutput powinna:
+/// - [descriptor.set-single-line-output.1~1] włączać albo wyłączać format jednowierszowy wyłącznie dla podanego strumienia.
 void setSingleLineOutput(std::ostream &os, bool enabled);
 }  // namespace rdb

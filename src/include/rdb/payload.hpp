@@ -10,29 +10,30 @@
 /// @brief Definicja klasy zarządzającej obszarem pamięci interpretowanym zgodnie z opisem w Descriptor.
 ///
 /// Obiekt klasy payload powinien:
-/// - zarządzać binarnym obszarem pamięci odpowiadającym układowi pól opisanemu przez Descriptor,
-/// - umożliwiać ustawianie i pobieranie wartości pól na podstawie pozycji w spłaszczonym widoku Descriptor,
-/// - obsługiwać pola danych BYTE, INTEGER, UINT, RATIONAL, FLOAT, DOUBLE, STRING i NULLTYPE; dla pola bez
+/// - [payload.payload.1~1] zarządzać binarnym obszarem pamięci odpowiadającym układowi pól opisanemu przez Descriptor,
+/// - [payload.payload.2~1] umożliwiać ustawianie i pobieranie wartości pól na podstawie pozycji w spłaszczonym widoku Descriptor,
+/// - [payload.payload.3~1] obsługiwać pola danych BYTE, INTEGER, UINT, RATIONAL, FLOAT, DOUBLE, STRING i NULLTYPE; dla pola bez
 ///   znacznika null zwracać z getItem() std::any zawierające odpowiednio uint8_t, int, unsigned int,
 ///   boost::rational<int>, float, double, std::string albo std::monostate; dla RATIONAL z mianownikiem
 ///   niedodatnim w buforze zwracać std::nullopt,
-/// - w setItem() konwertować niepustą wartość przez cast<std::any>(wartość, typ_pola) z convertTypes.hpp;
+/// - [payload.payload.4~1] w setItem() konwertować niepustą wartość przez cast<std::any>(wartość, typ_pola) z convertTypes.hpp;
 ///   wynik std::monostate dla pola innego niż NULLTYPE zamieniać na znacznik null i nullFallbackValue(typ_pola),
 ///   a po udanej konwersji kasować znacznik null; setItem(..., std::nullopt) ustawia znacznik null i zapisuje
 ///   nullFallbackValue(typ_pola): zero liczbowe, 0/1 dla RATIONAL, pusty STRING albo std::monostate dla NULLTYPE,
-/// - przy konwersji liczby do BYTE, INTEGER lub UINT sprawdzać zakres typu docelowego po obcięciu części
+/// - [payload.payload.5~1] przy konwersji liczby do BYTE, INTEGER lub UINT sprawdzać zakres typu docelowego po obcięciu części
 ///   ułamkowej ku zeru; wartość poza zakresem oraz NaN i nieskończoność zamieniać na null; przy konwersji
 ///   STRING do tych typów odczytywać przez std::from_chars prefiks typu int, a do FLOAT/DOUBLE prefiks
 ///   typu double, bez wymogu odczytania całego napisu, następnie konwertować do typu pola,
-/// - zapisywać STRING w najwyżej rlen * rarray bajtach, przycinając dłuższą wartość i dopełniając krótszą
+/// - [payload.payload.6~1] zapisywać STRING w najwyżej rlen * rarray bajtach, przycinając dłuższą wartość i dopełniając krótszą
 ///   zerami; getItem() zwraca tekst do pierwszego bajtu zerowego albo do końca pola, jeśli nie ma zera,
-/// - zwalniać własną pamięć przy niszczeniu obiektu,
-/// - udostępniać tekstową reprezentację danych przez operator<< oraz wczytywanie wartości przez operator>>,
-/// - umożliwiać formatowanie tekstowej reprezentacji wartości numerycznych w trybie dziesiętnym lub szesnastkowym,
-/// - wspierać kopiowanie stanu obiektu przez konstruktor kopiujący i operator=,
-/// - wspierać przenoszenie stanu obiektu przez konstruktor przenoszący i operator=(payload&&), zachowując regułę zgodności deskryptorów obowiązującą przy przypisaniu,
-/// - wspierać łączenie danych dwóch obiektów payload przez operator+,
-/// - dla pola oznaczonego jako null w nullBitset zwracać z getItem() std::nullopt; dla pola NULLTYPE
+/// - [payload.payload.7~1] zwalniać własną pamięć przy niszczeniu obiektu,
+///   Nietestowalne: brak publicznego pomiaru zwalnianej pamięci; cykle kopiowania i przenoszenia payload sprawdza ut_payload-valgrind.
+/// - [payload.payload.8~1] udostępniać tekstową reprezentację danych przez operator<< oraz wczytywanie wartości przez operator>>,
+/// - [payload.payload.9~1] umożliwiać formatowanie tekstowej reprezentacji wartości numerycznych w trybie dziesiętnym lub szesnastkowym,
+/// - [payload.payload.10~1] wspierać kopiowanie stanu obiektu przez konstruktor kopiujący i operator=,
+/// - [payload.payload.11~1] wspierać przenoszenie stanu obiektu przez konstruktor przenoszący i operator=(payload&&), zachowując regułę zgodności deskryptorów obowiązującą przy przypisaniu,
+/// - [payload.payload.12~1] wspierać łączenie danych dwóch obiektów payload przez operator+,
+/// - [payload.payload.13~1] dla pola oznaczonego jako null w nullBitset zwracać z getItem() std::nullopt; dla pola NULLTYPE
 ///   bez tego oznaczenia zwracać std::any zawierające std::monostate; w obu przypadkach operator<< wypisuje "null".
 
 namespace rdb {

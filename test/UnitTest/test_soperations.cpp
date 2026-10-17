@@ -4,16 +4,37 @@
 #include <cstdint>
 #include <iostream>
 #include <numeric>
+#include <tuple>
 #include <vector>
 
 #include "SOperations.hpp"
 
 // ctest -R '^ut-soperations' -V
 
+TEST(xSOperations, rounding_helpers_obey_signed_and_64_bit_contracts) {
+  // covers: soperations.floor-r.1~1, soperations.floor-div.1~1, soperations.ceil-r.1~1, soperations.rounded-away-from-zero.1~1
+  EXPECT_EQ(floorR(boost::rational<int>(-3, 2)), -1);
+  EXPECT_EQ(floorR(boost::rational<int>(3, 2)), 1);
+  EXPECT_EQ(ceilR(boost::rational<int>(-3, 2)), -2);
+  EXPECT_EQ(ceilR(boost::rational<int>(3, 2)), 2);
+  EXPECT_EQ(ceilR(boost::rational<int>(-2)), -2);
+  EXPECT_EQ(ceilR(boost::rational<int>(0)), 0);
+  EXPECT_EQ(floorDiv(-3, 2), -2);
+  EXPECT_EQ(floorDiv(3, -2), -2);
+  EXPECT_EQ(floorDiv(-3, -2), 1);
+  EXPECT_EQ(floorDiv(4, 2), 2);
+  EXPECT_EQ(floorDiv(INT64_C(6000000001), 2), INT64_C(3000000000));
+  EXPECT_EQ(roundedAwayFromZero(-3, 2), -2);
+  EXPECT_EQ(roundedAwayFromZero(3, 2), 2);
+  EXPECT_EQ(roundedAwayFromZero(-4, 2), -2);
+  EXPECT_EQ(roundedAwayFromZero(INT64_C(6000000001), 2), INT64_C(3000000001));
+}
+
 #ifndef NDEBUG
 // Hash dostaje tylko dodatnie interwaly sprawdzone przez kompilator. Bezposrednie naruszenie
 // tego kontraktu strzeze asercja debug; nie jest to kanal odmowy blednego planu.
 TEST(xSOperations, hash_asserts_positive_delta_in_debug) {
+  // covers: soperations.hash.2~1
   EXPECT_DEATH(
       {
         int retPos = 0;
@@ -32,6 +53,7 @@ TEST(xSOperations, hash_asserts_positive_delta_in_debug) {
 #endif
 
 TEST(xSOperations, hash_operations) {
+  // covers: soperations.hash.1~1
   std::vector<std::vector<int>> testdata{
       {0, 1, 0},  // B[0]
       {1, 1, 1},  // B[1]
@@ -61,6 +83,7 @@ TEST(xSOperations, hash_operations) {
 // Stary kod używał delta_c zamiast z w retPos, co było maskowane w teście
 // wyżej przez deltaA == 1 (wtedy delta_c == z liczbowo).
 TEST(xSOperations, hash_operations_nonunit_delta) {
+  // covers: soperations.hash.1~1
   std::vector<std::vector<int>> testdata{
       {0, 1, 0},  // B[0]
       {1, 0, 0},  //      A[0]
@@ -87,6 +110,7 @@ TEST(xSOperations, hash_operations_nonunit_delta) {
 
 // Równe delty (perfect shuffle): z = 1/2 - wzorzec B,A,B,A,...
 TEST(xSOperations, hash_operations_equal_delta) {
+  // covers: soperations.hash.1~1
   auto delta = boost::rational<int>(1, 360);
 
   int retPos{0};
@@ -137,6 +161,7 @@ TEST(xSOperations, hash_matched_time_moves) {
 }
 
 TEST(xSOperations, divmod_operations) {
+  // covers: soperations.div.1~1, soperations.mod.1~1
   std::vector<std::vector<int>> testdata{
       {0, 2, 0},    //
       {1, 5, 1},    //
@@ -184,6 +209,7 @@ TEST(xSOperations, divmod_inverts_hash) {
 }
 
 TEST(xSOperations, subtract_uses_forward_target_index) {
+  // covers: soperations.subtract.1~1
   const boost::rational<int> source{1, 2};
 
   for (int i = 0; i < 20; ++i) {
@@ -200,6 +226,7 @@ TEST(xSOperations, subtract_uses_forward_target_index) {
 // Silnik odwzorowywał wcześniej b_{⌊(n+1)·Δa/Δb⌋} (bieżący payload składowej) -
 // stąd wartości oczekiwane wypisane wprost, a nie wyprowadzone drugą kopią wzoru.
 TEST(xSOperations, add_pairs_slower_component_by_floor_index) {
+  // covers: soperations.add.1~1
   const boost::rational<int> fast{1, 2};
 
   // Składowa o interwale wyjścia jest indeksowana wprost n.
@@ -223,6 +250,7 @@ TEST(xSOperations, add_pairs_slower_component_by_floor_index) {
 // wyprowadzone z warunku dostępności: rekord floor(n*step/F) jest określony w chwili
 // (floor(n*step/F)+1+W_src)*Delta_src, a slot n kończy się w (n+1+W)*Delta_out.
 TEST(xSOperations, agse_startup_latency_covers_newest_field) {
+  // covers: soperations.agse-startup-latency.1~1
   // F=1, step=1: rekord n potrzebuje wyłącznie źródła n, dostępnego w jego własnym slocie.
   // Czekanie na komplet okna przeszło do origin, więc ogon jest zerowy niezależnie od długości.
   EXPECT_EQ(0, AgseStartupLatency(1, 1, 0));
@@ -239,6 +267,7 @@ TEST(xSOperations, agse_startup_latency_covers_newest_field) {
 // Origin jest jedynym miejscem, w którym rozpiętość okna wpływa na start strumienia.
 // O = ceil((O_src*F + |len| - 1) / step).
 TEST(xSOperations, agse_logical_origin_skips_incomplete_windows) {
+  // covers: soperations.agse-logical-origin.1~1
   // F=1, step=1, len=4: pierwsze pełne okno kończy się na pozycji 3.
   EXPECT_EQ(3, AgseLogicalOrigin(1, 1, 4, 0));
   // Znak długości jest wyłącznie konwencją kolejności pól - origin jest ten sam.
@@ -256,6 +285,7 @@ TEST(xSOperations, agse_logical_origin_skips_incomplete_windows) {
 // 2026-09-27 obie postaci liczyly w int i przepelnienie bylo UB; teraz wynik jest dokladny w int64,
 // a wartosc spoza int odrzuca kompilator jako blad planu (A2 M11).
 TEST(xSOperations, agse_origin_and_latency_do_not_overflow_int) {
+  // covers: soperations.agse-startup-latency.1~1, soperations.agse-logical-origin.1~1
   EXPECT_EQ(std::int64_t{4294967295}, AgseLogicalOrigin(65536, 1, 65536, 65535));
   EXPECT_EQ(std::int64_t{4294967295}, AgseStartupLatency(65536, 1, 65535));
   // Duzy krok sprowadza ten sam iloczyn posredni z powrotem do int.
@@ -265,6 +295,7 @@ TEST(xSOperations, agse_origin_and_latency_do_not_overflow_int) {
 // Ogon sumy strumieni musi objąć dostępność rekordu KAŻDEJ składowej pod
 // indeksem floor(n*D_out/D_src), a nie tylko przeliczyć ogon składowej.
 TEST(xSOperations, add_startup_latency_covers_slower_component) {
+  // covers: soperations.add-startup-latency.1~1
   const boost::rational<int> fast{1, 2};
 
   // Składowa o interwale wyjścia i zerowym ogonie nie wnosi opóźnienia.
@@ -283,6 +314,7 @@ TEST(xSOperations, add_startup_latency_covers_slower_component) {
 // z modelu zdarzeniowego (investigation_K24H10, weryfikacja per węzeł), nie z tej samej
 // postaci zamkniętej - inaczej test potwierdzałby wyłącznie sam siebie.
 TEST(xSOperations, subtract_startup_latency_covers_fractional_phase) {
+  // covers: soperations.phase-startup-latency.1~1, soperations.subtract-startup-latency.1~1
   const boost::rational<int> source{1, 2};
 
   // Składowa dwa razy szybsza od wyniku: pierwszy potrzebny rekord istnieje w slocie 0.
@@ -298,6 +330,8 @@ TEST(xSOperations, subtract_startup_latency_covers_fractional_phase) {
 }
 
 TEST(xSOperations, dehash_startup_latency_follows_the_phase_bound) {
+  // covers: soperations.phase-startup-latency.1~1, soperations.theta-startup-latency.1~1
+  // covers: soperations.n-theta-startup-latency.1~1
   const boost::rational<int> source{1, 2};
 
   // Iloraz całkowity: kres fazy Θ wynosi a, po podzieleniu przez r daje ogon ZERO.
@@ -367,6 +401,7 @@ boost::rational<int> interleavedInterval(const boost::rational<int> &deltaA, con
 // Zaniżenie jest tą klasą defektu, której cały reżim bezpieczny ma nie dopuszczać:
 // oznacza rekord wydany, zanim jego zależności są określone.
 TEST(xSOperations, hash_startup_latency_uses_64bit_intermediate_arithmetic) {
+  // covers: soperations.hash-startup-latency.1~1
   const boost::rational<int> deltaA{99991, 100000};
   const boost::rational<int> deltaB{99991, 100000};
   const auto deltaOut = interleavedInterval(deltaA, deltaB);
@@ -388,6 +423,7 @@ TEST(xSOperations, hash_startup_latency_uses_64bit_intermediate_arithmetic) {
 // - wartość zwrócona nie może spaść poniżej granicy zdarzeniowej wyliczonej przeglądem
 // całego okresu. Bez tego testu gałąź nie wykonuje się w ctest ani razu.
 TEST(xSOperations, hash_startup_latency_above_scan_limit_stays_safe) {
+  // covers: soperations.hash-startup-latency.2~1, soperations.hash-startup-latency.3~1
   const boost::rational<int> deltaA{1, 1};
   const boost::rational<int> deltaB{1, 100001};
   const auto deltaOut = interleavedInterval(deltaA, deltaB);
@@ -437,4 +473,15 @@ TEST(xSOperations, hash_scan_limit_keeps_the_exact_branch_in_use) {
   };
   const int replaced = std::max(toSlots(0, deltaA, deltaOut), toSlots(latencyB, deltaB, deltaOut) + ownPhaseTerm);
   EXPECT_GT(replaced, static_cast<int>(exact)) << "przypadek przestal odrozniac obie postacie";
+}
+
+TEST(xSOperations, hash_scan_limit_boundary_has_an_exact_witness) {
+  // covers: soperations.hash-startup-latency.1~1, soperations.hash-startup-latency.2~1
+  // Niezalezna tablica zdarzen: W_A=0, W_B=1. Dla kazdej pary minimalny ogon
+  // wynosi 3, a oszacowanie zachowawcze 4. Tylko ostatni okres przekracza prog.
+  for (const auto &[a, b, expected] : {std::tuple{99997, 2, 3}, std::tuple{99997, 3, 3}, std::tuple{99999, 2, 4}}) {
+    SCOPED_TRACE(a + b);
+    EXPECT_EQ(HashStartupLatency(boost::rational<int>(a), boost::rational<int>(b), boost::rational<int>(a * b, a + b), 0, 1),
+              expected);
+  }
 }

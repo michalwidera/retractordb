@@ -17,18 +17,18 @@ enum class sourceState : std::uint8_t { empty, flux, armed };
 /// @brief Bufor bieżącego rekordu i historii dla źródeł deklarowanych (BINFILE/DEVICE/TEXTSOURCE) - wydzielony z klasy storage.
 ///
 /// Obiekt klasy SourceBuffer powinien:
-/// - po attach(descriptor) utrzymywać komorę (chamber) - payload bieżącego rekordu odczytanego ze źródła,
-/// - pobierać bieżący rekord i wzorzec null przez null-aware read() akcesora w readCurrent(); jest to
+/// - [sourcebuffer.source-buffer.1~1] po attach(descriptor) utrzymywać komorę (chamber) - payload bieżącego rekordu odczytanego ze źródła,
+/// - [sourcebuffer.source-buffer.2~1] pobierać bieżący rekord i wzorzec null przez null-aware read() akcesora w readCurrent(); jest to
 ///   jedyne miejsce fizycznego odczytu źródeł plikowych; dla DEVICE (#347) bajty zbiera wcześniej faza
 ///   DEVICE poza blokadami (rdb::awaitRecords), a read() oddaje gotowy rekord albo all-null,
-/// - po EILSEQ z akcesora zwracać Errc::Config z opisem inputError(), pozostawiając payload wyjściowy
+/// - [sourcebuffer.source-buffer.3~1] po EILSEQ z akcesora zwracać Errc::Config z opisem inputError(), pozostawiając payload wyjściowy
 ///   bez zmian; dla pozostałych statusów przekazywać rekord i nullBitset otrzymane z akcesora,
 ///   logując ostrzeżenie przy statusie różnym od EXIT_SUCCESS,
-/// - kopiować komorę do payloadu wyjściowego i do historii przez fire() - jedyne miejsce zasilania bufora
+/// - [sourcebuffer.source-buffer.4~1] kopiować komorę do payloadu wyjściowego i do historii przez fire() - jedyne miejsce zasilania bufora
 ///   historii; pojemność zero jest naruszeniem niezmiennika zgłaszanym przez RDB_ASSERT/rdb::fatal,
-/// - utrzymywać bufor historii o pojemności co najmniej 1 (setCapacity()) - spójność źródeł deklarowanych
+/// - [sourcebuffer.source-buffer.5~1] utrzymywać bufor historii o pojemności co najmniej 1 (setCapacity()) - spójność źródeł deklarowanych
 ///   wymaga zachowania przynajmniej bieżącego rekordu,
-/// - udostępniać rekordy historii przez history(index) dla index < size(); kontrola zakresu względem
+/// - [sourcebuffer.source-buffer.6~1] udostępniać rekordy historii przez history(index) dla index < size(); kontrola zakresu względem
 ///   pojemności i rozmiaru należy do wywołującego (storage), bo to on decyduje o wartościach zastępczych.
 class SourceBuffer {
  public:

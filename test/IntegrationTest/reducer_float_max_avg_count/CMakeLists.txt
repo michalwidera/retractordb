@@ -13,6 +13,7 @@ set(TestID "it_${TestID}")
 # Test sprawdza wylacznie WARTOSCI, ktore nie zaleza od RDB_OPT_*, wiec nie
 # dostaje DISABLED pod ablacja.
 
+# covers: streaminstance.stream-instance.3~1
 add_test(
   NAME ${TestID}-value
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

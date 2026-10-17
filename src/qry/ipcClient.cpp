@@ -148,7 +148,14 @@ ptree IpcClient::netClient(const std::string &netCommand, const std::string &net
     std::stringstream request_stream;
     write_info(request_stream, pt_request);
     const std::string request = request_stream.str();
-    if (!mq->timed_send(request.c_str(), request.length(), 0, deadline)) {
+    // Nie timed_send: natywny backend POSIX Boosta czyta termin steady_clock jako CLOCK_REALTIME, czyli
+    // chwilę dawno minioną, i pełna kolejka odmawiała od razu (#522). Odpytujemy własnym zegarem, jak take.
+    bool sent = mq->try_send(request.c_str(), request.length(), 0);
+    while (!sent && std::chrono::steady_clock::now() < deadline) {
+      std::this_thread::sleep_for(ipc::kClientResponsePollInterval);
+      sent = mq->try_send(request.c_str(), request.length(), 0);
+    }
+    if (!sent) {
       SPDLOG_ERROR("ipcClient: command queue '{}' stayed full until the deadline", names_.queryQueue);
       done = true;
       pt_response.put("error.response", "server not found");

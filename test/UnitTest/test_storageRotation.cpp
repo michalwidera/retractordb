@@ -178,6 +178,7 @@ class StorageRotationTest : public ::testing::Test {
 };
 
 TEST_F(StorageRotationTest, same_directory_is_synced_once_after_rename) {
+  // covers: storagerotation.rotate-storage-file.1~1
   const auto path = source();
   writeFile(path);
   recording = true;
@@ -200,6 +201,7 @@ TEST_F(StorageRotationTest, relative_filename_syncs_current_directory) {
 }
 
 TEST_F(StorageRotationTest, different_directories_are_both_synced_even_if_first_fails) {
+  // covers: storagerotation.rotate-storage-file.1~1
   for (const auto injected : {Failure::None, Failure::Open, Failure::Sync, Failure::Close}) {
     SCOPED_TRACE(static_cast<int>(injected));
     const auto path    = source();
@@ -234,6 +236,7 @@ TEST_F(StorageRotationTest, second_directory_failure_is_not_success) {
 }
 
 TEST_F(StorageRotationTest, failed_rename_keeps_source_and_never_syncs_directory) {
+  // covers: storagerotation.rotate-storage-file.3~1
   const auto path = source();
   writeFile(path);
   failure = Failure::Rename;
@@ -273,6 +276,7 @@ TEST_F(StorageRotationTest, metadata_sync_failure_never_recreates_active_file) {
 }
 
 TEST_F(StorageRotationTest, shadow_failure_does_not_discard_unarchived_overrides) {
+  // covers: storageshadow.storage-shadow.8~1
   rdb::storageShadow meta(descriptor, source());
   meta.onRecordAppended({false});
   ASSERT_RDB_OK(meta.onRecordModified(0, {true}));
@@ -351,6 +355,7 @@ class RotationPathsTest : public StorageRotationTest, public ::testing::WithPara
 };
 
 TEST_P(RotationPathsTest, reports_failure_at_error_level_and_syncs_successful_rename) {
+  // covers: storagerotation.rotate-storage-file.2~1, storagerotation.rotate-storage-file.3~1
   const auto [kind, injected] = GetParam();
   failure                     = injected;
   failurePath                 = injected == Failure::Rename ? rotatedSource(kind) : (root / "source").string();

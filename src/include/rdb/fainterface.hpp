@@ -13,15 +13,16 @@ namespace rdb {
 /// @brief Abstrakcyjny interfejs operacji wejścia/wyjścia dla magazynów używanych przez storage.
 ///
 /// Obiekt klasy FileInterface powinien:
-/// - udostępniać wspólny kontrakt odczytu, zapisu i raportowania liczby rekordów niezależnie od rodzaju magazynu,
-/// - obsługiwać dane binarne o rozmiarze określanym poza tym interfejsem, zwykle przez Descriptor klasy pochodnej,
-/// - przyjmować nullBitset jako kanał przekazywania informacji o wartościach null dla pojedynczego rekordu, jeśli dana implementacja takie informacje wspiera,
-/// - umożliwiać dopisywanie danych przez przekazanie pozycji równej std::numeric_limits<size_t>::max(),
-/// - interpretować position w odczycie i aktualizacji magazynu losowego dostępu jako przesunięcie w bajtach;
+/// - [fainterface.file-interface.1~1] udostępniać wspólny kontrakt odczytu, zapisu i raportowania liczby rekordów niezależnie od rodzaju magazynu,
+///   Sprawdzenie kompilacji: test/UnitTest/test_contracts.cpp - static_assert abstrakcyjności i wirtualnego destruktora FileInterface.
+/// - [fainterface.file-interface.2~1] obsługiwać dane binarne o rozmiarze określanym poza tym interfejsem, zwykle przez Descriptor klasy pochodnej,
+/// - [fainterface.file-interface.3~1] przyjmować nullBitset jako kanał przekazywania informacji o wartościach null dla pojedynczego rekordu, jeśli dana implementacja takie informacje wspiera,
+/// - [fainterface.file-interface.4~1] umożliwiać dopisywanie danych przez przekazanie pozycji równej std::numeric_limits<size_t>::max(),
+/// - [fainterface.file-interface.5~1] interpretować position w odczycie i aktualizacji magazynu losowego dostępu jako przesunięcie w bajtach;
 ///   w read() źródła sekwencyjnego dopuszczać wyłącznie position == 0,
-/// - oddzielać w count() wynik typu size_t od błędu przez Result<size_t>; gdy ustalanie rozmiaru pliku
+/// - [fainterface.file-interface.6~1] oddzielać w count() wynik typu size_t od błędu przez Result<size_t>; gdy ustalanie rozmiaru pliku
 ///   kończy się ENOENT, zwracać 0, a pozostałe błędy odczytu rozmiaru zwracać jako Errc::IO,
-/// - raportować przez hasShadow(), czy magazyn utrzymuje plik cienia danych (.shadow) dla operacji update;
+/// - [fainterface.file-interface.7~1] raportować przez hasShadow(), czy magazyn utrzymuje plik cienia danych (.shadow) dla operacji update;
 ///   na tej podstawie storage dobiera wariant indeksu metadanych null (storageShadow zamiast metaData),
 ///   niezależnie od tego, czy magazyn w ogóle posiada indeks metadanych.
 ///

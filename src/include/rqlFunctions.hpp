@@ -84,9 +84,9 @@ inline constexpr std::array<RqlFunction, 21> kRqlFunctions{{
      .alias     = "str"},  // drugi argument to ZADEKLAROWANA SZEROKOSC pola, nie wartosc na stosie
 }};
 
-/// @brief Znajdz funkcje po nazwie albo skrocie, ignorujac wielkosc liter.
-/// @param name nazwa tak, jak napisal ja autor zapytania
-/// @return wpis tabeli albo nullopt, gdy nazwa jest nieznana
+/// Funkcja findRqlFunction powinna:
+/// - [rqlfunctions.find-rql-function.1~1] zwracać wpis tabeli kRqlFunctions, którego nazwa kanoniczna albo niepusty skrót jest równy podanej nazwie bez względu na wielkość liter.
+/// - [rqlfunctions.find-rql-function.2~1] dla nazwy nieznanej zwracać nullopt.
 inline std::optional<RqlFunction> findRqlFunction(std::string_view name) {
   const auto sameIgnoringCase = [](std::string_view a, std::string_view b) {
     return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](unsigned char x, unsigned char y) {

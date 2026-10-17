@@ -11,15 +11,18 @@ namespace rdb {
 /// @brief Implementacja magazynu rekordów przechowywanych wyłącznie w pamięci procesu.
 ///
 /// Obiekt klasy memoryFile powinien:
-/// - implementować interfejs FileInterface dla danych przechowywanych w pamięci,
-/// - umożliwiać zapis, odczyt i nadpisywanie rekordów binarnych o rozmiarze wyznaczonym przez Descriptor,
-/// - przechowywać rekordy, ich nullBitset i licznik zapisów w MemoryStore, indeksowane nazwą strumienia i współdzielone między ŻYWYMI instancjami o tej samej nazwie, KTÓRE DOSTAŁY TEN SAM Memory Store,
-/// - kasować ten stan razem z ostatnią instancją, która go używa - strumień o tej samej nazwie w następnym planie zaczyna od zera,
-/// - obsługiwać append przez position == std::numeric_limits<size_t>::max() oraz update przez wskazaną pozycję,
-/// - traktować write(nullptr, ...) jako polecenie wyczyszczenia pamięci dla danego strumienia,
-/// - zwracać przez count() logiczną liczbę rekordów (łączną liczbę zapisów append),
-/// - opcjonalnie ograniczać liczbę przechowywanych rekordów przy dopisywaniu za pomocą kołowego bufora (ring buffer):
-///   zapis nadpisuje najstarszy slot, odczyt używa location % retentionSize jako indeksu w buforze.
+/// - [faccmemory.memory-file.1~1] implementować interfejs FileInterface dla danych przechowywanych w pamięci,
+/// - [faccmemory.memory-file.2~1] umożliwiać zapis, odczyt i nadpisywanie rekordów binarnych o rozmiarze wyznaczonym przez Descriptor,
+/// - [faccmemory.memory-file.3~1] przechowywać rekordy, ich nullBitset i licznik zapisów w MemoryStore, indeksowane nazwą strumienia i współdzielone między ŻYWYMI instancjami o tej samej nazwie, KTÓRE DOSTAŁY TEN SAM Memory Store,
+/// - [faccmemory.memory-file.4~1] kasować ten stan razem z ostatnią instancją, która go używa - strumień o tej samej nazwie w następnym planie zaczyna od zera,
+/// - [faccmemory.memory-file.5~1] obsługiwać append przez position == std::numeric_limits<size_t>::max() oraz update przez wskazaną pozycję,
+/// - [faccmemory.memory-file.6~1] traktować write(nullptr, ...) jako polecenie wyczyszczenia pamięci dla danego strumienia,
+/// - [faccmemory.memory-file.7~1] zwracać przez count() logiczną liczbę rekordów (łączną liczbę zapisów append),
+/// - [faccmemory.memory-file.8~1] przy ustawionej retencji przechowywać najwyżej wskazaną liczbę rekordów, zastępując najstarsze nowymi;
+///   bez retencji nie ograniczać liczby rekordów,
+/// - [faccmemory.memory-file.9~1] przy ustawionej retencji R odczyt i nadpisanie w miejscu rekordu spoza ostatnich R zapisów (starszego albo
+///   jeszcze niezapisanego) odrzucać kodem ERANGE, nie sięgając do slotu zajętego przez inny rekord - tak jak magazyn
+///   dyskowy odrzuca rekord z usuniętego segmentu.
 ///
 /// @note Trwałość danych dotyczy wyłącznie czasu życia Memory Store (MemoryStore); klasa nie zapisuje stanu na dysk.
 /// @note Stan rekordów, nullBitset i licznik zapisów są współdzielone po nazwie strumienia między żywymi instancjami -
@@ -27,11 +30,18 @@ namespace rdb {
 ///       MemoryStore::processDefault(), czyli zachowanie sprzed fazy 2 (#446, C2).
 
 struct memoryFile : public FileInterface {
+ private:
   std::string filename_;
   const ssize_t recordSize_;
-  const size_t retentionSize_;               // Retention size for the records, if set to no_retention, no limit is applied
+  /// Rozmiar bufora kołowego; no_retention wyłącza ograniczenie liczby rekordów.
+  /// Append wybiera slot writeCount % retentionSize_, a read i update slot location % retentionSize_ - tylko dla
+  /// rekordu z okna ostatnich retentionSize_ zapisow.
+  const size_t retentionSize_;
+
+ public:
   enum : std::uint8_t { no_retention = 0 };  // Default retention size if not specified
 
+ private:
   /// Węzeł TEGO strumienia w sklepie, wyszukany raz w konstruktorze i ważny do końca życia
   /// instancji. Powód i warunki ważności - patrz konstruktor w faccmemory.cc.
   memoryBucket *bucket_;

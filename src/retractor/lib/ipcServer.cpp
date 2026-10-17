@@ -272,12 +272,14 @@ void IpcServer::broadcastOutOfBusiness() {
       write_info(strstream, pt);
       std::string row = strstream.str();
 
-      mq.try_send(row.c_str(), row.length(), 0);
-      ipc::security::removeOwned(queueName);
-      SPDLOG_WARN("queue erased on out-of-business, procId={}", element.first);
+      (void)trySendOrAbandoned(mq, row, element.first);
     } catch (const std::exception &e) {
-      SPDLOG_WARN("broadcastOutOfBusiness: queue {} already removed, procId={}: {}", queueName, element.first, e.what());
+      SPDLOG_WARN("broadcastOutOfBusiness: end marker not sent to queue {}, procId={}: {}", queueName, element.first, e.what());
     }
+    // Poza try: wyjatek wysylki nie moze ominac usuniecia - po wyczyszczeniu rejestru nikt
+    // juz tej kolejki nie zna, a sweepAbandonedResources kolejek klientow nie rusza (#523).
+    ipc::security::removeOwned(queueName);
+    SPDLOG_WARN("queue erased on out-of-business, procId={}", element.first);
   }
   id2StreamNameRelation_.clear();
   id2QueueCache_.clear();

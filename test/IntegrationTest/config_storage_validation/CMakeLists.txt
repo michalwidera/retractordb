@@ -5,11 +5,13 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
+# covers: launcher.xretractor.18~1, launcher.xretractor.40~1, launcher.xretractor.42~1
 add_test(
   NAME ${TestID}-nonexistent
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash storage-validation.sh nonexistent)
 
+# covers: launcher.xretractor.40~1, launcher.xretractor.42~1
 add_test(
   NAME ${TestID}-unwritable
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -22,6 +24,7 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash storage-validation.sh distinct-probe)
 
+# covers: launcher.xretractor.39~1
 add_test(
   NAME ${TestID}-config-errors
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

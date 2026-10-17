@@ -168,10 +168,20 @@ struct AppConfig {
   std::vector<std::string> loadedFrom;
 };
 
-/// Wczytuje konfigurację.
-/// - cliPath != nullopt → czyta WYŁĄCZNIE ten plik; brak pliku lub błąd składni są twarde
-///   (rzucają wyjątek) - to jawne żądanie użytkownika.
-/// - cliPath == nullopt → wyszukiwanie warstwowe; brak plików → wartości domyślne; błąd
-///   składni TOML w dowolnej znalezionej warstwie rzuca wyjątek z nazwą pliku.
-/// Niepusty paths.lock_dir musi być bezwzględny w każdej wczytywanej warstwie.
+/// Funkcja loadAppConfig powinna:
+/// - [appconfig.load-app-config.1~1] przy podanym cliPath wczytywać wyłącznie ten plik, a brak pliku albo błąd składni TOML zgłaszać wyjątkiem toml::parse_error z nazwą pliku.
+/// - [appconfig.load-app-config.2~1] bez cliPath nakładać kolejno istniejące warstwy: /etc/retractor/retractor.toml, na Darwinie także /usr/local/etc/retractor/retractor.toml i /opt/homebrew/etc/retractor/retractor.toml, a na końcu plik użytkownika ($XDG_CONFIG_HOME/retractor/retractor.toml, bez niej ~/.config/retractor/retractor.toml), tak że klucz z późniejszej warstwy nadpisuje wcześniejszy.
+///   Nietestowalne: stale sciezki systemowe, ich kolejnosc i fallback HOME sprawdza strukturalnie st_stage12_contracts; test tabel nie jest pelnym przebiegiem loadAppConfig przez /etc ani Darwin.
+/// - [appconfig.load-app-config.3~1] pomijać brakujące warstwy, a bez żadnej zwracać wartości domyślne; błąd sprawdzenia istnienia warstwy zgłaszać wyjątkiem std::filesystem::filesystem_error.
+/// - [appconfig.load-app-config.4~1] błąd składni TOML w dowolnej warstwie zgłaszać wyjątkiem toml::parse_error z nazwą pliku.
+/// - [appconfig.load-app-config.5~1] odrzucać wyjątkiem std::invalid_argument z nazwą pliku niepusty, względny paths.lock_dir w każdej wczytywanej warstwie, także nadpisanej później.
+/// - [appconfig.load-app-config.6~1] zapisywać ścieżki wczytanych plików w loadedFrom, w kolejności nakładania.
+///   Nietestowalne: loadedFrom po kilku warstwach systemowych to kontrola strukturalna st_stage12_contracts, nie asercja na plikach /etc.
+/// - [appconfig.load-app-config.7~1] po wczytaniu zastępować wartościami domyślnymi, z ostrzeżeniem w logu, niedodatnie wartości kluczy `[ipc]`, `[timing]` i `limits.history_memory_mib` oraz `scheduling.rt_priority` spoza 1..99, a do niepustego storage.dir dopisywać końcowy '/'.
+///   Ograniczenie: ostrzezenia WARN sa sprawdzane tylko przy poziomie kompilacji, ktory je zachowuje.
+///
+/// @note Jawna sciezka to zadanie uzytkownika, wiec jej blad jest twardy. Warstwa systemowa ma kilka sciezek,
+///       bo na macOS /etc nalezy do systemu (SIP), a oprogramowanie spoza systemu trzyma konfiguracje w
+///       prefiksie instalacji. Bledne `storage.ref_dirs`, `embedded.lenient_lock_dirs` i `sources.timeout_s`
+///       nie rzucaja: zostaje powod odrzucenia, ktory zamienia na blad dopiero wolajacy.
 AppConfig loadAppConfig(const std::optional<std::string> &cliPath = std::nullopt);

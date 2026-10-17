@@ -15,6 +15,7 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
+# covers: launcher.xretractor.3~1, presenter.presenter.7~1
 add_test(
   NAME ${TestID}-compile
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -42,6 +43,7 @@ if(NOT RDB_DOT_EXECUTABLE)
       "graphviz (dot) not found - ${TestID}-dot will check the DOT text only")
 endif()
 
+# covers: launcher.xretractor.6~1, launcher.xretractor.34~1, presenter.presenter.3~1
 add_test(
   NAME ${TestID}-dot
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

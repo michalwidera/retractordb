@@ -33,6 +33,7 @@ bash ../compare.sh --ignore-eol pattern-run.txt out-run.txt
 # rownoczesnie; te testy i tak pracowaly na danych stad, tylko z drugiego
 # CMakeLists.
 
+# covers: streaminstance.stream-instance.8~1
 # Zawartosc zrzutow DO DUMP. Osobny wpis ctest, bo -run pilnuje strumienia str1,
 # a to jest asercja o INNYM artefakcie: plikach temp/str1_*_dump*.tmp, ktorych
 # do 2026-09-23 nie ogladal zaden wzorzec. Wzorzec przypina stan FAKTYCZNY -

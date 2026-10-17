@@ -116,6 +116,10 @@ struct RdbConfigError : RdbError {
 
 /// K4: srodowisko odmowilo (plik, dysk). Python dostaje OSError(errno, komunikat[, sciezka]);
 /// Brak kodu systemowego daje EIO - ten sam kod, ktorym konczy sie usluga.
+/// Obiekt RdbIOError powinien:
+/// - [module.rdb-io-error.1~1] zachowywac przyczyne, errno i znana sciezke jako pythonowy IOError dziedziczacy po OSError oraz Error.
+/// - [module.rdb-io-error.2~1] zastepowac brak errno przez EIO.
+///   Nietestowalne: kontrola strukturalna konstruktora RdbIOError i translateEngineError; publiczne testy K4 przekazuja niezerowe errno i nie wymuszaja tej galezi osobno.
 struct RdbIOError : RdbError {
   explicit RdbIOError(const std::string &message, const int err = 0, std::string path = {})
       : RdbError(message),
@@ -127,6 +131,11 @@ struct RdbIOError : RdbError {
 
 /// Odczyt i blokada maja wspolnego wlasciciela. Kopia shared_ptr na czas read() chroni przed
 /// close() z innego watku, gdy readRecord zwalnia GIL; blokada schodzi dopiero po magazynie.
+/// Obiekt BoundStorage powinien:
+/// - [module.bound-storage.1~1] utrzymywac blokade katalogu oznaczonego jako wlasny przez czas zycia otwartego magazynu i zwalniac ja przy close lub wyjsciu z kontekstu, takze przy wyjatku.
+/// - [module.bound-storage.2~1] wykonywac close idempotentnie, odmawiac odczytu zamknietego magazynu i pozostawiac zwrocone kopie rekordow wazne po close.
+/// - [module.bound-storage.3~1] utrzymywac lokalna kopie shared_ptr<State> na czas read z oddanym GIL i niszczyc store przed guard.
+///   Nietestowalne: kontrola strukturalna lambd read/__getitem__ i odwrotnej kolejnosci pol State; brak deterministycznego punktu synchronizacji pomiedzy read a close.
 struct BoundStorage {
   /// @requirements-exempt State: Agregat wspoldzielonego stanu magazynu i jego blokady, bez wlasnych operacji.
   struct State {
@@ -173,6 +182,10 @@ void requireUntainted() {
 
 /// nb::call_guard dla metod Engine: konstruktor rzuca, zanim wywolanie wejdzie do silnika. Stoi
 /// PRZED gil_scoped_release, wiec sprawdza z GIL-em.
+/// Obiekt UntaintedGuard powinien:
+/// - [module.untainted-guard.1~1] odmawiac wejscia do strzezonych metod po pierwszym K1, z pierwotna przyczyna i zaleceniem restartu interpretera; close pozostaje dostepne.
+/// - [module.untainted-guard.2~1] sprawdzac zatrzask przed zwolnieniem GIL, nie zamieniajac K2/K3/K4 w skazenie modulu.
+///   Nietestowalne: kolejnosc konstruktorow call_guard<UntaintedGuard, gil_scoped_release> sprawdzona strukturalnie przy rejestracji step.
 struct UntaintedGuard {
   UntaintedGuard() { requireUntainted(); }
 };
@@ -405,6 +418,12 @@ Record readRecord(rdb::storage &self, Py_ssize_t index) {
 /// GIL: sink bywa wolany z wnetrza step()/run(), gdzie GIL jest zwolniony, wiec bierze go sam. Po
 /// Py_Finalize interpretera nie ma, a destruktory statykow C++ potrafia jeszcze logowac - stad
 /// straz na poczatku.
+/// Obiekt PythonLoggingCallback powinien:
+/// - [module.python-logging-callback.1~1] przekazywac diagnostyke silnika do logging.getLogger("retractordb") z poziomem Python odpowiadajacym spdlog.
+///   Ograniczenie weryfikacji: wykonywane sa poziomy ERROR i INFO; pelne mapowanie poziomow sprawdzone strukturalnie w pythonLevel.
+/// - [module.python-logging-callback.2~1] przechwytywac python_error z dostarczenia logu i zglaszac go jako unraisable, zachowujac pierwotny wynik operacji silnika.
+/// - [module.python-logging-callback.3~1] brac GIL przed uzyciem Python API i pomijac logowanie, gdy Py_IsInitialized()==0.
+///   Nietestowalne: kontrola strukturalna operator(); nie wymuszono logowania z destruktora po Py_Finalize ani wszystkich przeplotow watkow.
 class PythonLoggingCallback {
  public:
   void operator()(const spdlog::details::log_msg &msg) const {

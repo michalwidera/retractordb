@@ -22,40 +22,44 @@ namespace rdb {
 /// niezależny od pliku cienia danych (.shadow), który służy zachowaniu oryginalnej zarejestrowanej zawartości.
 ///
 /// Obiekt klasy metaData powinien:
-/// - przechowywać dla każdego rekordu wzorzec wartości null w postaci bitsetu zgodnego z Descriptor,
-/// - umożliwiać dopisywanie informacji o nowym rekordzie oraz aktualizację informacji dla rekordu już istniejącego,
-/// - kompresować kolejne rekordy o tym samym wzorcu null za pomocą prostego RLE,
-/// - utrzymywać ostatni segment RLE w pamięci i zapisywać go do pliku przy zmianie wzorca, oznaczeniu gap lub zamknięciu obiektu,
-/// - utrzymywać wszystkie segmenty RLE w pliku oprócz ostatniego, który jest w pamięci, aby umożliwić aktualizacje bez konieczności odczytu całego indeksu z pliku,
-/// - przy udanym I/O zapisywać i odtwarzać indeks z pliku do użycia po ponownym uruchomieniu programu; surowe
+/// - [metadata.meta-data.1~1] przechowywać dla każdego rekordu wzorzec wartości null w postaci bitsetu zgodnego z Descriptor,
+/// - [metadata.meta-data.2~1] umożliwiać dopisywanie informacji o nowym rekordzie oraz aktualizację informacji dla rekordu już istniejącego,
+/// - [metadata.meta-data.3~1] kompresować kolejne rekordy o tym samym wzorcu null za pomocą prostego RLE,
+/// - [metadata.meta-data.4~1] utrzymywać ostatni segment RLE w pamięci i zapisywać go do pliku przy zmianie wzorca, oznaczeniu gap lub zamknięciu obiektu,
+/// - [metadata.meta-data.5~1] utrzymywać zatwierdzone segmenty RLE przez MetaIndexStore, a przy wczytaniu przenosić ostatni segment
+///   niebędący gap do pamięci i usuwać jego kopię z pliku; aktualizacja zatwierdzonego segmentu korzysta
+///   z readAll/rewrite, a jawny flush może utrwalić także ostatni segment,
+/// - [metadata.meta-data.6~1] przy udanym I/O zapisywać i odtwarzać indeks z pliku do użycia po ponownym uruchomieniu programu; surowe
 ///   I/O pliku .meta (nagłówek, wpisy, cache) deleguje do obiektu MetaIndexStore (metaIndexStore.hpp),
-/// - umożliwiać odczyt wzorca null dla dowolnego logicznego rekordu zarejestrowanego w indeksie; dla rekordów spoza
+/// - [metadata.meta-data.7~1] umożliwiać odczyt wzorca null dla dowolnego logicznego rekordu zarejestrowanego w indeksie; dla rekordów spoza
 ///   indeksu (nullBitsetFor()) zwracać domyślny wzorzec all-false, aby wywołujący nie musiał sprawdzać zakresu,
-/// - przechowywać informację o przerwach w transmisji danych jako osobne wpisy gap z licznikiem długości przerwy i wzorcem wszystkich pól ustawionych na null,
-/// - realizować maszynę detekcji przerw transmisji przejętą od storage: po skonfigurowaniu (configureGapDetection())
+/// - [metadata.meta-data.8~1] przechowywać informację o przerwach w transmisji danych jako osobne wpisy gap z licznikiem długości przerwy i wzorcem wszystkich pól ustawionych na null,
+/// - [metadata.meta-data.9~1] realizować maszynę detekcji przerw transmisji przejętą od storage: po skonfigurowaniu (configureGapDetection())
 ///   pierwsze nullFillCount kolejnych rekordów all-null przepuszczać do fizycznego zapisu (faza nullfill), a dalsze
 ///   rekordy all-null pochłaniać (absorbAppend() zwraca true) akumulując długość oczekującej przerwy; pierwszy rekord
 ///   nie-null opróżnia oczekującą przerwę jako wpis gap i zeruje licznik fazy nullfill; sam stan maszyny
 ///   (liczniki nullfill/absorpcji, oczekująca przerwa) deleguje do obiektu GapDetector (gapDetector.hpp),
 ///   pozostawiając sobie zapis wpisu gap do indeksu,
-/// - udostępniać flushPendingGap() zapisujące zaakumulowaną przerwę jako wpis gap (wywoływane przez storage także przy
+/// - [metadata.meta-data.10~1] udostępniać flushPendingGap() zapisujące zaakumulowaną przerwę jako wpis gap (wywoływane przez storage także przy
 ///   zamykaniu magazynu),
-/// - nie przechowywać znacznika czasu dla każdego rekordu ani żadnego innego; nagłówek pliku jest 8-bajtowym polem
+/// - [metadata.meta-data.11~1] nie przechowywać znacznika czasu dla każdego rekordu ani żadnego innego; nagłówek pliku jest 8-bajtowym polem
 ///   zarezerwowanym, zapisywanym jako zero (do 2026-09-02 niósł czas utworzenia indeksu - pole wycofane),
-/// - zwalniać własną pamięć przy niszczeniu obiektu.
-/// - przyjąć od obiektu storage informację o przerwie w transmisji danych (wraz z jej długością w jednostkach próbkowania) i zapisać ją jako wpis gap w indeksie,
-/// - przyjąć od obiektu storage informację o rotacji pliku danych i wykonać rotację indeksu: przemianować obecny plik indeksu z rozszerzeniem .old/percounter, następnie stworzyć nowy, czysty plik indeksu (bez wpisu gap), a przy zamknięciu magazynu tylko odłączyć się od pliku,
-/// - jeśli plik danych nie zrotował, przyjąć od obiektu storage informację o brakujących danych i dopisać odpowiedni wpis gap przed pierwszym nowym rekordem.
-/// - przy udanym I/O zastępować przestarzały ostatni wpis przed dopisaniem kolejnych wpisów, jeśli segment
+/// - [metadata.meta-data.12~1] zwalniać własną pamięć przy niszczeniu obiektu.
+///   Nietestowalne: brak publicznego pomiaru zwalnianej pamięci; cykle życia metaData sprawdza ut_metaData-valgrind i ut_metaData_usage-valgrind.
+/// - [metadata.meta-data.13~1] przyjąć od obiektu storage informację o przerwie w transmisji danych (wraz z jej długością w jednostkach próbkowania) i zapisać ją jako wpis gap w indeksie,
+/// - [metadata.meta-data.14~1] przyjąć od obiektu storage informację o rotacji pliku danych i wykonać rotację indeksu: przemianować obecny plik indeksu z rozszerzeniem .old/percounter, następnie stworzyć nowy, czysty plik indeksu (bez wpisu gap), a przy zamknięciu magazynu tylko odłączyć się od pliku,
+/// - [metadata.meta-data.15~1] jeśli plik danych nie zrotował, przyjąć od obiektu storage informację o brakujących danych i dopisać odpowiedni wpis gap przed pierwszym nowym rekordem.
+/// - [metadata.meta-data.16~1] przy udanym I/O zastępować przestarzały ostatni wpis przed dopisaniem kolejnych wpisów, jeśli segment
 ///   RLE został wciągnięty do pamięci w celu rozszerzenia (lazy overwrite),
-/// - udostępniać flushCurrentEntry(), które przy poprawnej inicjalizacji przekazuje oczekujący segment RLE
+/// - [metadata.meta-data.17~1] udostępniać flushCurrentEntry(), które przy poprawnej inicjalizacji przekazuje oczekujący segment RLE
 ///   do MetaIndexStore przez dopisanie albo nadpisanie ostatniego wpisu; metoda nie wykonuje fsync
 ///   ani nie potwierdza trwałości zapisu na nośniku,
-/// - umożliwiać wyczyszczenie całej zawartości indeksu (reset()) odpowiadające wywołaniu purge() w storage - usunięcie wszystkich wpisów (wraz z licznikami maszyny gap, lecz bez wyłączania skonfigurowanej detekcji) przy zachowaniu 8-bajtowego zarezerwowanego nagłówka pliku.
-/// - udostępniać abandonFile() odłączające indeks od pliku (dalsze operacje I/O stają się no-opem) - wywoływane
+///   Kontrola strukturalna: flushPendingEntry w metaData.cc i appendEntry/overwriteLast w metaIndexStore.cc nie wywołują fsync.
+/// - [metadata.meta-data.18~1] umożliwiać wyczyszczenie całej zawartości indeksu (reset()) odpowiadające wywołaniu purge() w storage - usunięcie wszystkich wpisów (wraz z licznikami maszyny gap, lecz bez wyłączania skonfigurowanej detekcji) przy zachowaniu 8-bajtowego zarezerwowanego nagłówka pliku.
+/// - [metadata.meta-data.19~1] udostępniać abandonFile() odłączające indeks od pliku (dalsze operacje I/O stają się no-opem) - wywoływane
 ///   przez storage dla magazynów dysponowalnych PRZED skasowaniem pliku .meta, aby destruktor (niejawny
 ///   flushCurrentEntry()) nie odtworzył właśnie usuniętego pliku.
-/// - stanowić polimorficzną bazę dla wariantów zachowania wstrzykiwanych do storage: metody onRecordModified(),
+/// - [metadata.meta-data.20~1] stanowić polimorficzną bazę dla wariantów zachowania wstrzykiwanych do storage: metody onRecordModified(),
 ///   getNullBitset() i reset() są wirtualne, aby wariant magazynu z plikiem cienia danych (storageShadow,
 ///   storageShadow.hpp) mógł kierować aktualizacje do cienia indeksu bez rozgałęzień w kodzie storage.
 /// @note appendEntry(), overwriteLast() i saveHeader() nie propagują błędów I/O; flushCurrentEntry()
@@ -229,12 +233,13 @@ class metaData {
   ///   dirty == false, committedCount  > 0  →  on-disk tail is valid; may be re-absorbed on same-pattern append
   ///   dirty == true                        →  on-disk tail is stale; must overwrite before next append
   /// Obiekt klasy DiskTailState powinien:
-  /// - rozpoczynać i po reset pozostawać w stanie bez śledzonego wpisu: committedCount równe 0 i dirty wyłączone.
-  /// - przez markWritten(n) zapamiętywać liczbę rekordów ostatniego wpisu zapisanego na dysk i oznaczać ten wpis jako aktualny.
-  /// - przez markDirty oznaczać wpis na dysku jako nieaktualny i zerować committedCount, tak aby shouldOverwrite zwracało prawdę do kolejnego markWritten lub reset.
-  /// - przez clearPending zerować committedCount bez zmiany znacznika dirty.
-  /// - zwracać z shouldOverwrite wartość dirty, a z hasPending prawdę wyłącznie przy dodatnim committedCount.
-  /// - nie wykonywać żadnego I/O; decyzję o nadpisaniu lub dopisaniu wpisu podejmuje metaData.
+  /// - [metadata.disk-tail-state.1~1] rozpoczynać i po reset pozostawać w stanie bez śledzonego wpisu: committedCount równe 0 i dirty wyłączone.
+  /// - [metadata.disk-tail-state.2~1] przez markWritten(n) zapamiętywać liczbę rekordów ostatniego wpisu zapisanego na dysk i oznaczać ten wpis jako aktualny.
+  /// - [metadata.disk-tail-state.3~1] przez markDirty oznaczać wpis na dysku jako nieaktualny i zerować committedCount, tak aby shouldOverwrite zwracało prawdę do kolejnego markWritten lub reset.
+  /// - [metadata.disk-tail-state.4~1] przez clearPending zerować committedCount bez zmiany znacznika dirty.
+  /// - [metadata.disk-tail-state.5~1] zwracać z shouldOverwrite wartość dirty, a z hasPending prawdę wyłącznie przy dodatnim committedCount.
+  /// - [metadata.disk-tail-state.6~1] nie wykonywać żadnego I/O; decyzję o nadpisaniu lub dopisaniu wpisu podejmuje metaData.
+  ///   Nietestowalne: własność strukturalna prywatnego DiskTailState; kontrola jego definicji w tym nagłówku: tylko pola, przypisania i zapytania noexcept, bez I/O.
   struct DiskTailState {
     size_t committedCount{0};  ///< recordCount of the last entry written to disk (0 = none)
     bool dirty{false};         ///< on-disk tail entry is stale; must overwrite, not append

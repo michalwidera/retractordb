@@ -22,14 +22,14 @@ namespace rdb {
 /// reinterpretować tych bajtów pod nowe znaczenie.
 ///
 /// Obiekt klasy MetaIndexStore powinien:
-/// - utrzymywać ścieżkę pliku indeksu oraz rozmiar pojedynczego zserializowanego wpisu,
-/// - cache'ować odczytane wpisy (readAll()) i przy udanym I/O utrzymywać cache przyrostowo przy mutacjach;
+/// - [metaindexstore.meta-index-store.1~1] utrzymywać ścieżkę pliku indeksu oraz rozmiar pojedynczego zserializowanego wpisu,
+/// - [metaindexstore.meta-index-store.2~1] cache'ować odczytane wpisy (readAll()) i przy udanym I/O utrzymywać cache przyrostowo przy mutacjach;
 ///   plik odczytywać i deserializować tylko wtedy, gdy cache nie jest ważny,
-/// - zwracać z rewrite() błąd Errc::IO przy nieudanym otwarciu, zapisie lub podmianie pliku;
+/// - [metaindexstore.meta-index-store.3~1] zwracać z rewrite() błąd Errc::IO przy nieudanym otwarciu, zapisie lub podmianie pliku;
 ///   cache aktualizować dopiero po udanej podmianie,
-/// - działać jako wariant inertny (bez żadnego I/O), gdy ścieżka pliku jest pusta - tak samo
+/// - [metaindexstore.meta-index-store.4~1] działać jako wariant inertny (bez żadnego I/O), gdy ścieżka pliku jest pusta - tak samo
 ///   jak dotychczasowy wariant metaData dla źródeł deklarowanych,
-/// - udostępniać abandon() odłączające magazyn od pliku - dalsze operacje stają się no-opem;
+/// - [metaindexstore.meta-index-store.5~1] udostępniać abandon() odłączające magazyn od pliku - dalsze operacje stają się no-opem;
 ///   używane przez metaData przed usunięciem pliku dysponowalnego magazynu, żeby destruktor
 ///   nie odtworzył go ponownie.
 /// @note saveHeader(), appendEntry() i overwriteLast() nie zwracają potwierdzenia I/O; błędy zapisu

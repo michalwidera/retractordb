@@ -354,7 +354,7 @@ std::ostream &operator<<(std::ostream &os, const Descriptor &rhs) {
 /// Do fazy 1 bledny deskryptor konczyl sie przez FatalError, czyli std::exit. Ekstraktor
 /// strumieniowy nie jest jednak miejscem, w ktorym zapada decyzja o przerwaniu programu -
 /// zglasza niepowodzenie stanem strumienia, a co z nim zrobic, wie wolajacy:
-/// loadDescriptorFile zwraca blad Errc::CorruptDescriptor, xtrdb wypisuje komunikat i czyta dalej.
+/// tryLoadDescriptorFile zwraca odmowe klasy Plan, xtrdb wypisuje komunikat i czyta dalej.
 std::istream &operator>>(std::istream &is, Descriptor &rhs) {
   // Strumien juz uszkodzony: nie ma czego czytac i nie wolno zmieniac jego stanu -
   // w szczegolnosci nie wolno zgasic failbita ustawionego przez nieudane otwarcie pliku.

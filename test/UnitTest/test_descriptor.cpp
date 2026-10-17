@@ -64,6 +64,7 @@ void expectLayout(const rdb::Descriptor &desc, std::initializer_list<int> offset
 }
 
 TEST(Descriptor, NamedLookupsAreConstAndPreserveArrayLayout) {
+  // covers: descriptor.descriptor.2~1, descriptor.descriptor.3~1
   const rdb::Descriptor desc{rdb::rField("values", 4, 3, rdb::INTEGER), rdb::rField("label", 1, 5, rdb::STRING),
                              rdb::rField("flag", 1, 1, rdb::BYTE)};
   EXPECT_EQ(desc.fieldIndex("label"), 1U);
@@ -147,11 +148,17 @@ bool test_descriptor_read() {
 
 // Sprawdza odczyt deskryptora przez operator>> i jego ponowny zapis tekstowy.
 // Pokrywa mieszany uklad napisow, pola BYTE i pol UINT w wejsciach z podzialem na wiersze.
-TEST(descriptor, read_from_stream) { EXPECT_TRUE(test_descriptor_read()); }
+TEST(descriptor, read_from_stream) {
+  // covers: descriptor.descriptor.7~1
+  EXPECT_TRUE(test_descriptor_read());
+}
 
 // Sprawdza budowanie deskryptora przez append, += i + oraz formatowanie i dostep po nazwie.
 // Pokrywa napisy o dlugosci zapisanej w rlen lub rarray i pola liczbowe za nimi.
-TEST(descriptor, print_and_basic_accessors) { EXPECT_TRUE(test_descriptor()); }
+TEST(descriptor, print_and_basic_accessors) {
+  // covers: descriptor.descriptor.1~1, descriptor.descriptor.4~1, descriptor.descriptor.7~1
+  EXPECT_TRUE(test_descriptor());
+}
 
 // Sprawdza typ i szerokosc pojedynczego slotu zwracane przez widestFieldType().
 // Pokrywa tablice INTEGER, jej polaczenie ze skalarem DOUBLE oraz jeden napis STRING[12].
@@ -170,6 +177,7 @@ TEST(descriptor, widest_field_type_reports_flat_element_width) {
 // Sprawdza zgodnosc identycznych ukladow i odmowe dla zmienionej kolejnosci typow pol.
 // Pokrywa tez napis w prawym deskryptorze dluzszy niz pole dostepne w lewym.
 TEST(descriptor, compare) {
+  // covers: descriptor.descriptor.9~1
   rdb::Descriptor dataDescriptor1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
                                   rdb::Descriptor("Control", 1, 1, rdb::BYTE) +  //
                                   rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
@@ -190,6 +198,7 @@ TEST(descriptor, compare) {
 // Sprawdza pomijanie REF i TYPE podczas porownania deskryptorow z rozna liczba wpisow.
 // Pokrywa zgodne pole INTEGER po konfiguracji oraz odmowe dla szerszego pola DOUBLE.
 TEST(descriptor, compare_ignores_configuration_fields_without_out_of_bounds_access) {
+  // covers: descriptor.descriptor.9~1
   auto withConfig = rdb::Descriptor("source.dat", 0, 0, rdb::REF) +   //
                     rdb::Descriptor("TEXTSOURCE", 0, 1, rdb::TYPE) +  //
                     rdb::Descriptor("value", 4, 1, rdb::INTEGER);
@@ -203,6 +212,7 @@ TEST(descriptor, compare_ignores_configuration_fields_without_out_of_bounds_acce
 // Sprawdza domyslne wyniki retention() i storagePolicy() bez pol konfiguracyjnych.
 // Pokrywa deskryptor z jednym polem danych: brak retencji, pusty typ magazynu i pojemnosc zero.
 TEST(descriptor, retention_and_policy_defaults) {
+  // covers: descriptor.descriptor.8~1
   auto desc = rdb::Descriptor("value", 4, 1, rdb::INTEGER);
 
   auto retention = desc.retention();
@@ -216,6 +226,7 @@ TEST(descriptor, retention_and_policy_defaults) {
 // Sprawdza odczyt konfiguracji RETENTION, RETMEMORY i TYPE obok pola danych.
 // Pokrywa retencje 5 segmentow po 2 rekordy oraz magazyn MEMORY o pojemnosci 7.
 TEST(descriptor, retention_and_policy_values) {
+  // covers: descriptor.descriptor.8~1
   auto desc = rdb::Descriptor("value", 4, 1, rdb::INTEGER) +  //
               rdb::Descriptor("MEMORY", 0, 1, rdb::TYPE) +    //
               rdb::Descriptor("retention-mem", 7, 1, rdb::RETMEMORY) + rdb::Descriptor("retention", 5, 2, rdb::RETENTION);
@@ -232,6 +243,7 @@ TEST(descriptor, retention_and_policy_values) {
 // Sprawdza wybor pol danych, liczbe slotow plaskich i usuniecie konfiguracji REF oraz TYPE.
 // Pokrywa tablice BYTE[3] i jeden napis, ktore musza pozostac po usunieciu konfiguracji.
 TEST(descriptor, clean_ref_and_flat_fields) {
+  // covers: descriptor.descriptor.4~1
   auto desc = rdb::Descriptor("src.bin", 0, 0, rdb::REF) +      //
               rdb::Descriptor("TEXTSOURCE", 0, 1, rdb::TYPE) +  //
               rdb::Descriptor("a", 1, 3, rdb::BYTE) +           //
@@ -317,6 +329,7 @@ TEST(descriptor, create_hash_numeric_slot_takes_the_length_of_the_winning_type) 
 // Sprawdza jednorazowe dzialanie singleLineFormat i reset flagi po zapisie deskryptora.
 // Pokrywa dwa kolejne zapisy: pierwszy w jednym wierszu, drugi w domyslnym formacie wielowierszowym.
 TEST(descriptor, flat_output_resets_after_stream) {
+  // covers: descriptor.single-line-format.1~1
   auto desc = rdb::Descriptor("x", 1, 1, rdb::BYTE);
 
   std::stringstream flatOut;
@@ -333,6 +346,7 @@ TEST(descriptor, flat_output_resets_after_stream) {
 // odpowiedzi ponizej pisala jedna statyczna flaga, wiec ustawienie jej dla pierwszego strumienia
 // zmienialo format drugiego - takze w cudzym kodzie, ktory o tej fladze nie wie.
 TEST(descriptor, single_line_mode_does_not_leak_between_streams) {
+  // covers: descriptor.is-single-line-output.1~1, descriptor.set-single-line-output.1~1
   auto desc = rdb::Descriptor("x", 1, 1, rdb::BYTE);
 
   std::stringstream flat;
@@ -353,6 +367,7 @@ TEST(descriptor, single_line_mode_does_not_leak_between_streams) {
 // Sprawdza mapowanie slotow na pola i elementy tablic oraz offsety bajtowe mieszanego rekordu.
 // Pokrywa dwa sloty BYTE, jeden napis o rozmiarze 5 * 9 bajtow i INTEGER pod offsetem 47.
 TEST(descriptor, offset_and_convert_for_string_and_arrays) {
+  // covers: descriptor.descriptor.5~1
   auto desc = rdb::Descriptor("a", 1, 2, rdb::BYTE) +    //
               rdb::Descriptor("s", 5, 9, rdb::STRING) +  //
               rdb::Descriptor("v", 4, 1, rdb::INTEGER);
@@ -383,6 +398,7 @@ TEST(descriptor, empty_descriptor_has_empty_flat_mapping) {
 // #424: sprawdza odswiezenie rozmiaru, offsetow i mapowan po append na juz zbudowanym cache.
 // Pokrywa dodanie napisu i INTEGER za tablica BYTE; stare dwa sloty musza rozszerzyc sie do czterech.
 TEST(descriptor, append_refreshes_cached_layout) {
+  // covers: descriptor.descriptor.6~1
   rdb::Descriptor desc{{"a", 1, 2, rdb::BYTE}};
   expectLayout(desc, {0, 1}, {{0, 0}, {0, 1}}, 2);
 
@@ -393,6 +409,7 @@ TEST(descriptor, append_refreshes_cached_layout) {
 // #424: sprawdza aktualny uklad po laczeniu deskryptorow przez + i +=, gdy oba maja zbudowany cache.
 // Pokrywa zachowanie lewego argumentu przy + oraz dopisanie napisu i INTEGER za tablica BYTE.
 TEST(descriptor, concatenation_refreshes_cached_layout) {
+  // covers: descriptor.descriptor.6~1, descriptor.operator-plus.1~1
   rdb::Descriptor desc{{"a", 1, 2, rdb::BYTE}};
   const rdb::Descriptor rhs{{"s", 1, 5, rdb::STRING}, {"b", 4, 1, rdb::INTEGER}};
   expectLayout(desc, {0, 1}, {{0, 0}, {0, 1}}, 2);
@@ -471,6 +488,7 @@ TEST(descriptor, assignment_transfers_clean_and_dirty_layouts) {
 // Sprawdza przypisanie indeksu plaskiego do pola i elementu tablicy w rekordzie zaczynajacym sie od napisu.
 // Pokrywa STRING[10] jako jeden slot, BYTE[3] jako trzy sloty i koncowy skalar INTEGER.
 TEST(descriptor, position_conversion_case_1) {
+  // covers: descriptor.descriptor.5~1
   auto desc1{rdb::Descriptor("Name", 1, 10, rdb::STRING) +  //
              rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};
@@ -485,6 +503,7 @@ TEST(descriptor, position_conversion_case_1) {
 // Sprawdza mapowanie indeksow plaskich, gdy pole przed tablica jest skalarem liczbowym.
 // Pokrywa BYTE, trzy elementy BYTE[3] i koncowy INTEGER, z zachowaniem indeksow elementow tablicy.
 TEST(descriptor, position_conversion_case_2) {
+  // covers: descriptor.descriptor.5~1
   auto desc1{rdb::Descriptor("Name", 1, 1, rdb::BYTE) +     //
              rdb::Descriptor("Control", 1, 3, rdb::BYTE) +  //
              rdb::Descriptor("TLen", 4, 1, rdb::INTEGER)};

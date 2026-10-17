@@ -43,24 +43,31 @@ enum class selectResult : std::uint8_t {
   renderFailed         ///< pętla odbioru i renderowania przerwana wyjątkiem po stronie klienta
 };
 
-/// Nazwa trybu do komunikatu dla operatora.
+/// Funkcja toString powinna:
+/// - [qry.to-string.1~1] zwracać stały opis wyniku selectResult w języku angielskim do komunikatu dla operatora: "ok", "stream unknown to the server", "server did not answer within the timeout", "server did not create the client response queue", "no data in stream", "server has no plan loaded (idle); load one with --reset", "server is shutting down" i "select loop failed in the client; reason in the client log".
+/// - [qry.to-string.2~1] dla wartości spoza wyliczenia zwracać "unknown".
 const char *toString(selectResult result);
 
 /// Obiekt klasy qry powinien:
-/// - rozmawiać z serwerem o podanej nazwie przez IpcClient, przyjmując limit ciszy serwera i budżety prób nie mniejsze niż 1.
-/// - rozpoznawać odpowiedź serwera w kolejności: error.response jako brak odpowiedzi, db.stream jako listę strumieni, db równe odpowiedzi braku planu jako stan bezczynny, db równe odpowiedzi zamykania jako zamykanie serwera, a każdą inną jako odpowiedź nieprawidłową raportowaną jak brak odpowiedzi.
-/// - w select subskrybować strumień komendą show przed jakąkolwiek inną komendą, a dopiero potem sprawdzać przez get istnienie strumienia, tak aby serwer wstrzymany bramką nie emitował wierszy przed utworzeniem kolejki klienta.
-/// - w select zwracać streamNotFound dla strumienia nieznanego serwerowi, noActivePlan, serverStopping albo serverNoResponse według odpowiedzi na get, a clientQueueMissing, gdy serwer odrzucił subskrypcję istniejącego strumienia.
-/// - w select renderować elementy wybranego strumienia formatem outputFormatMode do wyczerpania limitu elementów, końca strumienia oznaczonego zarezerwowanym identyfikatorem, ciszy serwera dłuższej niż limit albo przerwania przez operatora.
-/// - zatrzymywać select klawiszem wyłącznie w przebiegu bez limitu elementów i bez wymogu Ctrl+C, a przy limicie N renderować dokładnie N elementów także wtedy, gdy producent dostarczył ich więcej naraz.
-/// - po zakończeniu pętli select zatrzymywać i dołączać wątek producenta przed ustaleniem werdyktu.
-/// - zwracać z select renderFailed przy wyjątku w pętli odbioru, clientQueueMissing albo noData, gdy nie wyrenderowano żadnego elementu, serverNoResponse, gdy serwer zamilkł po części elementów, a ok wyłącznie po co najmniej jednym elemencie bez tych zdarzeń.
-/// - przez adhoc wysyłać zapytanie ad hoc i zwracać prawdę przy pustym zapytaniu albo odpowiedzi innej niż OK.
-/// - przez reset dzielić tekst planu na porcje po kResetChunkBytes bajtów, wysyłać reset-begin z liczbą porcji, kolejne reset-chunk i reset-commit, przerywać przy pierwszej odpowiedzi innej niż OK z jednym komunikatem na stderr wskazującym etap i powód, i zwracać prawdę przy odmowie; pusty plan wysyłać jako zero porcji, co przy przyjęciu przeprowadza instancję w stan bezczynny.
-/// - przez hello zwracać sukces wyłącznie przy odpowiedzi world, a w przeciwnym razie protocol_error.
-/// - przez dir zwracać tabelę strumieni z nazwą, czasem, rozmiarem, liczbą rekordów, lokalizacją i pojemnością, a przez dirYaml dokument YAML z nazwą, czasem, liczbą rekordów, rozmiarem pomijanym przy wartości -1 i lokalizacją pomijaną, gdy jest pusta; dla instancji bezczynnej zwracać wydruk braku planu albo dokument YAML z pustą listą, a dla braku odpowiedzi lub zamykania werdykt zamiast wydruku.
-/// - przez detailShow i detailShowYaml zwracać nazwę, okres, zapytanie oraz pola strumienia z typami, a dla nieznanego strumienia, instancji bezczynnej, zamykania lub braku odpowiedzi, także przy przeładowaniu planu między get i detail, odpowiedni werdykt zamiast wyjątku.
-/// - przez jsonCommand wypisywać na stdout zdarzenia JSON w wersji 1, jedno na wiersz: pong dla hello, streams dla dir, schema dla detail, a dla select schema, kolejne record z wartościami i null oraz end z przyczyną limit albo server_stopped_or_reloaded, a każdą porażkę zgłaszać zdarzeniem error z kodem i kodem wyjścia 1.
+/// - [qry.qry.1~1] rozmawiać z serwerem o podanej nazwie przez IpcClient, przyjmując limit ciszy serwera i budżety prób nie mniejsze niż 1.
+///   Ograniczenie: konstruktor qry i przekazanie nazwy/budzetow do IpcClient sa kontrola strukturalna st_stage12_contracts.
+/// - [qry.qry.2~1] rozpoznawać odpowiedź serwera w kolejności: error.response jako brak odpowiedzi, db.stream jako listę strumieni, db równe odpowiedzi braku planu jako stan bezczynny, db równe odpowiedzi zamykania jako zamykanie serwera, a każdą inną jako odpowiedź nieprawidłową raportowaną jak brak odpowiedzi.
+/// - [qry.qry.3~1] w select subskrybować strumień komendą show przed jakąkolwiek inną komendą, a dopiero potem sprawdzać przez get istnienie strumienia, tak aby serwer wstrzymany bramką nie emitował wierszy przed utworzeniem kolejki klienta.
+/// - [qry.qry.4~1] w select zwracać streamNotFound dla strumienia nieznanego serwerowi, noActivePlan, serverStopping albo serverNoResponse według odpowiedzi na get, a clientQueueMissing, gdy serwer odrzucił subskrypcję istniejącego strumienia.
+/// - [qry.qry.5~1] w select renderować elementy wybranego strumienia formatem outputFormatMode do wyczerpania limitu elementów, końca strumienia oznaczonego zarezerwowanym identyfikatorem, ciszy serwera dłuższej niż limit albo przerwania przez operatora.
+///   Ograniczenie: zatrzymanie klawiszem ma test _kbhit i kontrole warunku ignoreAnyKey, bez interaktywnej petli select bez limitu.
+/// - [qry.qry.6~1] zatrzymywać select klawiszem wyłącznie w przebiegu bez limitu elementów i bez wymogu Ctrl+C, a przy limicie N renderować dokładnie N elementów także wtedy, gdy producent dostarczył ich więcej naraz.
+///   Nietestowalne: warunek needctrlc/przebiegu bez limitu jest kontrola strukturalna select w qry.cpp; test TTY sprawdza odpornosc przebiegu z limitem.
+/// - [qry.qry.7~1] po zakończeniu pętli select zatrzymywać i dołączać wątek producenta przed ustaleniem werdyktu.
+///   Nietestowalne: kolejnosc done, producer_thread.join i werdyktu jest kontrola strukturalna st_stage12_contracts; test brakujacej kolejki sprawdza tylko widoczny wynik.
+/// - [qry.qry.8~1] zwracać z select renderFailed przy wyjątku w pętli odbioru, clientQueueMissing albo noData, gdy nie wyrenderowano żadnego elementu, serverNoResponse, gdy serwer zamilkł po części elementów, a ok wyłącznie po co najmniej jednym elemencie bez tych zdarzeń.
+/// - [qry.qry.9~1] przez adhoc wysyłać zapytanie ad hoc i zwracać prawdę przy pustym zapytaniu albo odpowiedzi innej niż OK.
+/// - [qry.qry.10~1] przez reset dzielić tekst planu na porcje po kResetChunkBytes bajtów, wysyłać reset-begin z liczbą porcji, kolejne reset-chunk i reset-commit, przerywać przy pierwszej odpowiedzi innej niż OK z jednym komunikatem na stderr wskazującym etap i powód, i zwracać prawdę przy odmowie; pusty plan wysyłać jako zero porcji, co przy przyjęciu przeprowadza instancję w stan bezczynny.
+/// - [qry.qry.11~1] przez hello zwracać sukces wyłącznie przy odpowiedzi world, a w przeciwnym razie protocol_error.
+/// - [qry.qry.12~1] przez dir zwracać tabelę strumieni z nazwą, czasem, rozmiarem, liczbą rekordów, lokalizacją i pojemnością, a przez dirYaml dokument YAML z nazwą, czasem, liczbą rekordów, rozmiarem pomijanym przy wartości -1 i lokalizacją pomijaną, gdy jest pusta; dla instancji bezczynnej zwracać wydruk braku planu albo dokument YAML z pustą listą, a dla braku odpowiedzi lub zamykania werdykt zamiast wydruku.
+/// - [qry.qry.13~1] przez detailShow i detailShowYaml zwracać nazwę, okres, zapytanie oraz pola strumienia z typami, a dla nieznanego strumienia, instancji bezczynnej, zamykania lub braku odpowiedzi, także przy przeładowaniu planu między get i detail, odpowiedni werdykt zamiast wyjątku.
+/// - [qry.qry.14~1] przez jsonCommand wypisywać na stdout zdarzenia JSON w wersji 1, jedno na wiersz: pong dla hello, streams dla dir, schema dla detail, a dla select schema, kolejne record z wartościami i null oraz end z przyczyną limit albo server_stopped_or_reloaded, a każdą porażkę zgłaszać zdarzeniem error z kodem i kodem wyjścia 1.
+///   Ograniczenie: st_api_real wymaga osobnego zbudowania i wykonania przez test-api; sam ninja test nie wykonuje protokolu strumieniowego API.
 class qry {
   int elemLimitCnt{0};
   int serverNoDataTimeoutMs_{kDefaultServerNoDataTimeoutMs};

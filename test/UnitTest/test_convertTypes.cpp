@@ -10,7 +10,10 @@
 #include <random>
 #include <stack>
 #include <string>
+#include <type_traits>
 #include <utility>
+
+#include <gmock/gmock.h>
 
 #include "fldType.hpp"
 #include "rdb/convertTypes.hpp"
@@ -18,8 +21,14 @@
 // ── Rationalize ──────────────────────────────────────────────────────────────
 
 TEST(Rationalize, zero) { EXPECT_EQ(Rationalize(0.0), boost::rational<int>(0, 1)); }
-TEST(Rationalize, half) { EXPECT_EQ(Rationalize(0.5), boost::rational<int>(1, 2)); }
-TEST(Rationalize, third) { EXPECT_EQ(Rationalize(1.0 / 3.0), boost::rational<int>(1, 3)); }
+TEST(Rationalize, half) {
+  // covers: converttypes.rationalize.1~1
+  EXPECT_EQ(Rationalize(0.5), boost::rational<int>(1, 2));
+}
+TEST(Rationalize, third) {
+  // covers: converttypes.rationalize.1~1
+  EXPECT_EQ(Rationalize(1.0 / 3.0), boost::rational<int>(1, 3));
+}
 TEST(Rationalize, threequarters) { EXPECT_EQ(Rationalize(0.75), boost::rational<int>(3, 4)); }
 TEST(Rationalize, whole_number) { EXPECT_EQ(Rationalize(3.0), boost::rational<int>(3, 1)); }
 
@@ -35,11 +44,18 @@ TEST(Rationalize, whole_number) { EXPECT_EQ(Rationalize(3.0), boost::rational<in
 // Testy sa architektonicznie neutralne - ta sama oczekiwana wartosc na kazdej maszynie -
 // wiec ich zadaniem jest padac na tej, ktora by sie wylamala.
 
-TEST(Rationalize, negative_half) { EXPECT_EQ(Rationalize(-2.5), boost::rational<int>(-5, 2)); }
-TEST(Rationalize, negative_whole_number) { EXPECT_EQ(Rationalize(-2.0), boost::rational<int>(-2, 1)); }
+TEST(Rationalize, negative_half) {
+  // covers: converttypes.rationalize.1~1
+  EXPECT_EQ(Rationalize(-2.5), boost::rational<int>(-5, 2));
+}
+TEST(Rationalize, negative_whole_number) {
+  // covers: converttypes.rationalize.1~1
+  EXPECT_EQ(Rationalize(-2.0), boost::rational<int>(-2, 1));
+}
 TEST(Rationalize, negative_third) { EXPECT_NEAR(boost::rational_cast<double>(Rationalize(-10.0 / 3.0)), -10.0 / 3.0, 1E-6); }
 // Symetria znaku: rozwiniecie |x| daje p/q, a -|x| ma dac dokladnie -p/q.
 TEST(Rationalize, sign_is_symmetric) {
+  // covers: converttypes.rationalize.1~1
   EXPECT_EQ(Rationalize(-1.0 / 3.0), -Rationalize(1.0 / 3.0));
   EXPECT_EQ(Rationalize(-0.75), -Rationalize(0.75));
   EXPECT_EQ(Rationalize(-1.5), -Rationalize(1.5));
@@ -52,12 +68,17 @@ TEST(Rationalize, negative_zero_is_zero) { EXPECT_EQ(Rationalize(-0.0), boost::r
 // NaN, nieskonczonosc i wartosc poza zakresem `int` oddaja {0,1}. NULL stoi o poziom wyzej,
 // na sciezce konwersji (ponizej: cast_variant / cast_any do RATIONAL i INTPAIR).
 
-TEST(Rationalize, nan_is_zero) { EXPECT_EQ(Rationalize(std::numeric_limits<double>::quiet_NaN()), boost::rational<int>(0, 1)); }
+TEST(Rationalize, nan_is_zero) {
+  // covers: converttypes.rationalize.4~1, converttypes.rationalize.5~1
+  EXPECT_EQ(Rationalize(std::numeric_limits<double>::quiet_NaN()), boost::rational<int>(0, 1));
+}
 TEST(Rationalize, infinity_is_zero) {
+  // covers: converttypes.rationalize.4~1
   EXPECT_EQ(Rationalize(std::numeric_limits<double>::infinity()), boost::rational<int>(0, 1));
   EXPECT_EQ(Rationalize(-std::numeric_limits<double>::infinity()), boost::rational<int>(0, 1));
 }
 TEST(Rationalize, above_integer_range_is_zero) {
+  // covers: converttypes.rationalize.4~1
   EXPECT_EQ(Rationalize(1e30), boost::rational<int>(0, 1));
   EXPECT_EQ(Rationalize(-1e30), boost::rational<int>(0, 1));
 }
@@ -71,7 +92,10 @@ TEST(Rationalize, at_integer_bound_is_exact) {
 // droga przez wartosc bezwzgledna wymagalaby tu negacji INT_MIN, czyli nowego przepelnienia w
 // miejsce usunietego zachowania nieokreslonego. `boost::rational<int>` z licznikiem INT_MIN
 // jest zreszta nie do uzycia dalej - kazda negacja takiego ulamka przepelnia sie tak samo.
-TEST(Rationalize, at_negative_integer_bound_is_zero) { EXPECT_EQ(Rationalize(-2147483648.0), boost::rational<int>(0, 1)); }
+TEST(Rationalize, at_negative_integer_bound_is_zero) {
+  // covers: converttypes.rationalize.4~1
+  EXPECT_EQ(Rationalize(-2147483648.0), boost::rational<int>(0, 1));
+}
 
 // --- konwergent ponad `int` (#309) ---
 //
@@ -183,74 +207,109 @@ TEST(Rationalize, matches_legacy_where_legacy_did_not_overflow) {
 
 // ── nullFallbackValue ─────────────────────────────────────────────────────────
 
-TEST(nullFallbackValue, byte) { EXPECT_EQ(std::get<uint8_t>(nullFallbackValue(rdb::BYTE)), 0); }
-TEST(nullFallbackValue, integer) { EXPECT_EQ(std::get<int>(nullFallbackValue(rdb::INTEGER)), 0); }
-TEST(nullFallbackValue, uint) { EXPECT_EQ(std::get<unsigned>(nullFallbackValue(rdb::UINT)), 0U); }
+TEST(nullFallbackValue, byte) {
+  // covers: converttypes.null-fallback-value.1~1
+  EXPECT_EQ(std::get<uint8_t>(nullFallbackValue(rdb::BYTE)), 0);
+}
+TEST(nullFallbackValue, integer) {
+  // covers: converttypes.null-fallback-value.1~1
+  EXPECT_EQ(std::get<int>(nullFallbackValue(rdb::INTEGER)), 0);
+}
+TEST(nullFallbackValue, uint) {
+  // covers: converttypes.null-fallback-value.1~1
+  EXPECT_EQ(std::get<unsigned>(nullFallbackValue(rdb::UINT)), 0U);
+}
 TEST(nullFallbackValue, rational) {
+  // covers: converttypes.null-fallback-value.1~1
   EXPECT_EQ(std::get<boost::rational<int>>(nullFallbackValue(rdb::RATIONAL)), boost::rational<int>(0, 1));
 }
-TEST(nullFallbackValue, float_type) { EXPECT_EQ(std::get<float>(nullFallbackValue(rdb::FLOAT)), 0.0F); }
-TEST(nullFallbackValue, double_type) { EXPECT_EQ(std::get<double>(nullFallbackValue(rdb::DOUBLE)), 0.0); }
+TEST(nullFallbackValue, float_type) {
+  // covers: converttypes.null-fallback-value.1~1
+  EXPECT_EQ(std::get<float>(nullFallbackValue(rdb::FLOAT)), 0.0F);
+}
+TEST(nullFallbackValue, double_type) {
+  // covers: converttypes.null-fallback-value.1~1
+  EXPECT_EQ(std::get<double>(nullFallbackValue(rdb::DOUBLE)), 0.0);
+}
 TEST(nullFallbackValue, intpair) {
+  // covers: converttypes.null-fallback-value.1~1
   using P  = std::pair<int, int>;
   P result = std::get<P>(nullFallbackValue(rdb::INTPAIR));
   P expected{0, 0};
   EXPECT_EQ(result, expected);
 }
 TEST(nullFallbackValue, idxpair) {
+  // covers: converttypes.null-fallback-value.1~1
   using P  = std::pair<std::string, int>;
   P result = std::get<P>(nullFallbackValue(rdb::IDXPAIR));
   P expected{"", 0};
   EXPECT_EQ(result, expected);
 }
-TEST(nullFallbackValue, string) { EXPECT_EQ(std::get<std::string>(nullFallbackValue(rdb::STRING)), ""); }
-TEST(nullFallbackValue, nulltype) { EXPECT_TRUE(std::holds_alternative<std::monostate>(nullFallbackValue(rdb::NULLTYPE))); }
+TEST(nullFallbackValue, string) {
+  // covers: converttypes.null-fallback-value.1~1
+  EXPECT_EQ(std::get<std::string>(nullFallbackValue(rdb::STRING)), "");
+}
+TEST(nullFallbackValue, nulltype) {
+  // covers: converttypes.null-fallback-value.1~1
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(nullFallbackValue(rdb::NULLTYPE)));
+}
 
 // ── any_to_variant_cast ───────────────────────────────────────────────────────
 
 TEST(any_to_variant_cast, empty_any_returns_monostate) {
+  // covers: converttypes.any-to-variant-cast.1~1
   EXPECT_TRUE(std::holds_alternative<std::monostate>(any_to_variant_cast(std::any{})));
 }
 TEST(any_to_variant_cast, monostate_input) {
+  // covers: converttypes.any-to-variant-cast.1~1
   EXPECT_TRUE(std::holds_alternative<std::monostate>(any_to_variant_cast(std::any(std::monostate{}))));
 }
 TEST(any_to_variant_cast, int_input) {
+  // covers: converttypes.any-to-variant-cast.2~1
   auto result = any_to_variant_cast(std::any(42));
   EXPECT_EQ(std::get<int>(result), 42);
 }
 TEST(any_to_variant_cast, uint8_input) {
+  // covers: converttypes.any-to-variant-cast.2~1
   auto result = any_to_variant_cast(std::any(uint8_t(7)));
   EXPECT_EQ(std::get<uint8_t>(result), 7);
 }
 TEST(any_to_variant_cast, unsigned_input) {
+  // covers: converttypes.any-to-variant-cast.2~1
   auto result = any_to_variant_cast(std::any(unsigned(99)));
   EXPECT_EQ(std::get<unsigned>(result), 99U);
 }
 TEST(any_to_variant_cast, double_input) {
+  // covers: converttypes.any-to-variant-cast.2~1
   auto result = any_to_variant_cast(std::any(3.14));
   EXPECT_DOUBLE_EQ(std::get<double>(result), 3.14);
 }
 TEST(any_to_variant_cast, float_input) {
+  // covers: converttypes.any-to-variant-cast.2~1
   auto result = any_to_variant_cast(std::any(1.5F));
   EXPECT_FLOAT_EQ(std::get<float>(result), 1.5F);
 }
 TEST(any_to_variant_cast, string_input) {
+  // covers: converttypes.any-to-variant-cast.2~1
   auto result = any_to_variant_cast(std::any(std::string("hello")));
   EXPECT_EQ(std::get<std::string>(result), "hello");
 }
 TEST(any_to_variant_cast, rational_input) {
+  // covers: converttypes.any-to-variant-cast.2~1
   auto result = any_to_variant_cast(std::any(boost::rational<int>(1, 3)));
   EXPECT_EQ(std::get<boost::rational<int>>(result), boost::rational<int>(1, 3));
 }
 // Typ spoza wariantu to niezmiennik: wartosci std::any powstaja w silniku z typow deskryptora.
 // rdb::fatal z nazwa przyczyny - do 2026-10 byl to rzut std::bad_any_cast.
 TEST(any_to_variant_cast, unsupported_type_throws) {
+  // covers: converttypes.any-to-variant-cast.3~1
   EXPECT_DEATH(static_cast<void>(any_to_variant_cast(std::any(std::vector<int>{1, 2}))), "FATAL: ");
 }
 
 // ── cast<descFldVT> - NULLTYPE ────────────────────────────────────────────────
 
 TEST(cast_variant, nulltype_returns_monostate) {
+  // covers: converttypes.cast.1~1
   cast<rdb::descFldVT> c;
   rdb::descFldVT in = 5;
   auto result       = c(in, rdb::NULLTYPE);
@@ -330,11 +389,13 @@ TEST(cast_variant, double_to_integer_truncates_toward_zero) {
 // ── cast<descFldVT> - STRING ──────────────────────────────────────────────────
 
 TEST(cast_variant, int_to_string) {
+  // covers: converttypes.cast.10~1
   cast<rdb::descFldVT> c;
   rdb::descFldVT in = 42;
   EXPECT_EQ(std::get<std::string>(c(in, rdb::STRING)), "42");
 }
 TEST(cast_variant, double_to_string) {
+  // covers: converttypes.cast.10~1
   cast<rdb::descFldVT> c;
   rdb::descFldVT in = 1.0;
   EXPECT_EQ(std::get<std::string>(c(in, rdb::STRING)), std::to_string(1.0));
@@ -355,6 +416,7 @@ TEST(cast_variant, idxpair_to_string) {
   EXPECT_EQ(std::get<std::string>(c(in, rdb::STRING)), "key,7");
 }
 TEST(cast_variant, rational_to_string) {
+  // covers: converttypes.cast.10~1
   cast<rdb::descFldVT> c;
   rdb::descFldVT in = boost::rational<int>(2, 3);
   EXPECT_EQ(std::get<std::string>(c(in, rdb::STRING)), "2/3");
@@ -388,6 +450,7 @@ TEST(cast_variant, string_to_rational) {
 // Para to dwie niezalezne liczby, nie ulamek: skalar nie ma w niej reprezentacji i daje NULL.
 // Do 2026-09-26 calkowite dawaly (0, n), a RATIONAL/FLOAT/DOUBLE (licznik, mianownik).
 TEST(cast_variant, scalar_to_intpair_is_null) {
+  // covers: converttypes.cast.5~1
   cast<rdb::descFldVT> c;
   const rdb::descFldVT scalars[] = {rdb::descFldVT{static_cast<uint8_t>(7)},    rdb::descFldVT{7},    rdb::descFldVT{7U},
                                     rdb::descFldVT{boost::rational<int>(3, 5)}, rdb::descFldVT{0.5F}, rdb::descFldVT{0.5}};
@@ -395,6 +458,7 @@ TEST(cast_variant, scalar_to_intpair_is_null) {
     EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::INTPAIR))) << "variant index " << in.index();
 }
 TEST(cast_variant, intpair_to_intpair) {
+  // covers: converttypes.cast.9~1
   using P = std::pair<int, int>;
   cast<rdb::descFldVT> c;
   rdb::descFldVT in = P{2, 5};
@@ -414,6 +478,7 @@ TEST(cast_variant, string_to_intpair) {
 // ── cast<std::any> - numeric conversions ─────────────────────────────────────
 
 TEST(cast_any, nulltype_returns_monostate) {
+  // covers: converttypes.cast.1~1
   cast<std::any> c;
   std::any in = 5;
   auto result = c(in, rdb::NULLTYPE);
@@ -463,6 +528,7 @@ TEST(cast_any, string_to_rational) {
 // Ta sama regula w sciezce std::any. BYTE i UINT wkladaly tu wczesniej do std::any
 // pair<int, uint8_t> / pair<int, unsigned> zamiast pair<int, int>.
 TEST(cast_any, scalar_to_intpair_is_null) {
+  // covers: converttypes.cast.5~1
   cast<std::any> c;
   const std::any scalars[] = {std::any(static_cast<uint8_t>(7)),    std::any(7),    std::any(7U),
                               std::any(boost::rational<int>(3, 5)), std::any(0.5F), std::any(0.5)};
@@ -478,6 +544,7 @@ TEST(cast_any, string_to_intpair) {
   EXPECT_EQ(result, expected);
 }
 TEST(cast_any, intpair_to_intpair) {
+  // covers: converttypes.cast.9~1
   using P = std::pair<int, int>;
   cast<std::any> c;
   std::any in = P{3, 9};
@@ -534,6 +601,7 @@ TEST(cast_variant, double_nan_to_integer_is_null) {
 // Granica DOKLADNA: INT_MAX i INT_MIN da sie zapisac w double, wiec maja przejsc bez zmiany,
 // a nie wpasc w NULL o jeden krok za wczesnie.
 TEST(cast_variant, double_at_integer_bounds_is_exact) {
+  // covers: converttypes.cast.3~1
   cast<rdb::descFldVT> c;
   rdb::descFldVT hi = static_cast<double>(std::numeric_limits<int>::max());
   rdb::descFldVT lo = static_cast<double>(std::numeric_limits<int>::lowest());
@@ -551,6 +619,7 @@ TEST(cast_variant, double_one_past_integer_bounds_is_null) {
 // Zakres sprawdza sie na wartosci OBCIETEJ w strone zera, tak jak konwertuje jezyk: czesc
 // ulamkowa za granica nie wyprowadza wartosci poza zakres.
 TEST(cast_variant, fraction_past_integer_bounds_truncates_into_range) {
+  // covers: converttypes.cast.3~1
   cast<rdb::descFldVT> c;
   rdb::descFldVT hi = 2147483647.5;
   rdb::descFldVT lo = -2147483648.5;
@@ -648,6 +717,7 @@ TEST(cast_variant, uint_above_int_max_to_rational_is_null) {
   EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::RATIONAL)));
 }
 TEST(cast_variant, negative_string_to_uint_is_null) {
+  // covers: converttypes.cast.7~1
   cast<rdb::descFldVT> c;
   rdb::descFldVT in = std::string("-5");
   EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::UINT)));
@@ -675,11 +745,13 @@ TEST(cast_any, double_above_integer_range_is_null) {
 // zamiast jako {0,1} - zero w polu bylo liczba, ktorej nikt nie policzyl.
 
 TEST(cast_variant, double_nan_to_rational_is_null) {
+  // covers: converttypes.cast.4~1, converttypes.rationalize.5~1
   cast<rdb::descFldVT> c;
   rdb::descFldVT in = std::numeric_limits<double>::quiet_NaN();
   EXPECT_TRUE(std::holds_alternative<std::monostate>(c(in, rdb::RATIONAL)));
 }
 TEST(cast_variant, double_infinity_to_rational_is_null) {
+  // covers: converttypes.cast.4~1
   cast<rdb::descFldVT> c;
   rdb::descFldVT plus  = std::numeric_limits<double>::infinity();
   rdb::descFldVT minus = -std::numeric_limits<double>::infinity();
@@ -714,6 +786,7 @@ TEST(cast_variant, negative_double_to_rational) {
 }
 
 TEST(cast_variant, finite_double_outside_rational_range_is_null) {
+  // covers: converttypes.rationalize.5~1
   cast<rdb::descFldVT> c;
   for (const double value : {2147483648.0, -2147483648.0, 1e30, -1e30}) {
     rdb::descFldVT in = value;
@@ -768,17 +841,114 @@ TEST(cast_any, unknown_type_to_scalar_is_null) {
 // wariantowa go ma. Teraz pierwszy daje NULL, a drugi to samo co galaz wariantowa.
 
 TEST(cast_any, unknown_type_is_null_for_every_target) {
+  // covers: converttypes.cast.6~1
   cast<std::any> c;
   for (const auto type : {rdb::BYTE, rdb::INTEGER, rdb::UINT, rdb::FLOAT, rdb::DOUBLE, rdb::RATIONAL, rdb::INTPAIR, rdb::STRING})
     EXPECT_EQ(c(std::any(7L), type).type(), typeid(std::monostate)) << "type " << type;
 }
 TEST(cast_any, idxpair_matches_variant_branch) {
+  // covers: converttypes.cast.9~1
   using P  = std::pair<std::string, int>;
   using IP = std::pair<int, int>;
   cast<std::any> ca;
   cast<rdb::descFldVT> cv;
   const P in{"12", 5};
+  EXPECT_EQ(std::any_cast<boost::rational<int>>(ca(std::any(in), rdb::RATIONAL)), boost::rational<int>(5));
+  EXPECT_EQ(std::any_cast<IP>(ca(std::any(in), rdb::INTPAIR)), (IP{12, 5}));
   EXPECT_EQ(std::any_cast<boost::rational<int>>(ca(std::any(in), rdb::RATIONAL)),
             std::get<boost::rational<int>>(cv(rdb::descFldVT(in), rdb::RATIONAL)));
   EXPECT_EQ(std::any_cast<IP>(ca(std::any(in), rdb::INTPAIR)), std::get<IP>(cv(rdb::descFldVT(in), rdb::INTPAIR)));
+}
+
+TEST(cast_contract, monostate_uses_the_typed_fallback_for_every_target) {
+  // covers: converttypes.cast.2~1
+  const std::vector<std::pair<rdb::descFld, rdb::descFldVT>> cases{{rdb::BYTE, uint8_t{0}},
+                                                                   {rdb::INTEGER, 0},
+                                                                   {rdb::UINT, 0U},
+                                                                   {rdb::FLOAT, 0.0F},
+                                                                   {rdb::DOUBLE, 0.0},
+                                                                   {rdb::RATIONAL, boost::rational<int>(0)},
+                                                                   {rdb::INTPAIR, std::pair{0, 0}},
+                                                                   {rdb::IDXPAIR, std::pair{std::string{}, 0}},
+                                                                   {rdb::STRING, std::string{}},
+                                                                   {rdb::NULLTYPE, std::monostate{}}};
+  for (const auto &[type, expected] : cases) {
+    SCOPED_TRACE(type);
+    EXPECT_EQ(cast<rdb::descFldVT>{}(std::monostate{}, type), expected);
+    const auto actual = cast<std::any>{}(std::any(std::monostate{}), type);
+    std::visit(
+        [&](const auto &value) {
+          using Value = std::decay_t<decltype(value)>;
+          ASSERT_EQ(actual.type(), typeid(Value));
+          EXPECT_EQ(std::any_cast<Value>(actual), value);
+        },
+        expected);
+  }
+}
+
+TEST(Rationalize, explicit_threshold_and_term_limit_select_known_convergents) {
+  // covers: converttypes.rationalize.2~1
+  // 3/4 = [0; 1, 3]. Limit liczy wyrazy ponad pierwszy.
+  EXPECT_EQ(Rationalize(0.75, 1E-6, 0), boost::rational<int>(0));
+  EXPECT_EQ(Rationalize(0.75, 1E-6, 1), boost::rational<int>(1));
+  EXPECT_EQ(Rationalize(0.75, 1E-6, 2), boost::rational<int>(3, 4));
+  EXPECT_EQ(Rationalize(-0.75, 1E-6, 2), boost::rational<int>(-3, 4));
+  EXPECT_EQ(Rationalize(1.25, 0.5), boost::rational<int>(1));
+  EXPECT_EQ(Rationalize(1.25, 0.25), boost::rational<int>(5, 4));
+}
+
+TEST(Rationalize, retains_the_last_representable_numerator_and_denominator) {
+  // covers: converttypes.rationalize.3~1
+  const int limit = std::numeric_limits<int>::max();
+  EXPECT_EQ(Rationalize(2147483647.5), boost::rational<int>(limit));
+  EXPECT_EQ(Rationalize(-2147483647.5), boost::rational<int>(-limit));
+  EXPECT_EQ(Rationalize(1.0 / 2147483647.5, 1E-12), boost::rational<int>(1, limit));
+}
+
+TEST(any_to_variant_cast, unsupported_pairs_report_their_type_before_termination) {
+  // covers: converttypes.any-to-variant-cast.3~1
+  using Pair      = std::pair<int, int>;
+  using IndexPair = std::pair<std::string, int>;
+  EXPECT_DEATH(static_cast<void>(any_to_variant_cast(std::any(Pair{3, 4}))),
+               ::testing::HasSubstr(std::string("unsupported type ") + typeid(Pair).name()));
+  EXPECT_DEATH(static_cast<void>(any_to_variant_cast(std::any(IndexPair{"key", 7}))),
+               ::testing::HasSubstr(std::string("unsupported type ") + typeid(IndexPair).name()));
+}
+
+TEST(cast_contract, string_prefixes_and_pair_parsing_match_both_interfaces) {
+  // covers: converttypes.cast.7~1, converttypes.cast.8~1, payload.payload.5~1
+  const auto check = [](const std::string &input, rdb::descFld type, const rdb::descFldVT &expected) {
+    SCOPED_TRACE(input);
+    EXPECT_EQ(cast<rdb::descFldVT>{}(input, type), expected);
+    const auto actual = cast<std::any>{}(std::any(input), type);
+    std::visit(
+        [&](const auto &value) {
+          using Value = std::decay_t<decltype(value)>;
+          ASSERT_EQ(actual.type(), typeid(Value));
+          EXPECT_EQ(std::any_cast<Value>(actual), value);
+        },
+        expected);
+  };
+  check("12tail", rdb::INTEGER, 12);
+  check("1.5tail", rdb::DOUBLE, 1.5);
+  check("2147483648", rdb::UINT, std::monostate{});
+  check("bad", rdb::INTEGER, std::monostate{});
+  check("3/4tail", rdb::RATIONAL, boost::rational<int>(3, 4));
+  check("bad", rdb::RATIONAL, boost::rational<int>(0));
+  check("3,4tail", rdb::INTPAIR, std::pair{3, 4});
+  check("bad", rdb::INTPAIR, std::pair{0, 1});
+}
+
+TEST(cast_contract, invalid_rational_pairs_and_idxpair_targets_are_null) {
+  // covers: converttypes.cast.6~1
+  const int low = std::numeric_limits<int>::min();
+  for (const auto &input : {std::pair{3, 0}, std::pair{3, low}, std::pair{low, -1}}) {
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(cast<rdb::descFldVT>{}(input, rdb::RATIONAL)));
+    EXPECT_EQ(cast<std::any>{}(std::any(input), rdb::RATIONAL).type(), typeid(std::monostate));
+  }
+  EXPECT_EQ(std::get<boost::rational<int>>(cast<rdb::descFldVT>{}(std::pair{3, -4}, rdb::RATIONAL)),
+            boost::rational<int>(-3, 4));
+  EXPECT_TRUE(std::holds_alternative<std::monostate>(cast<rdb::descFldVT>{}(5, rdb::IDXPAIR)));
+  EXPECT_EQ(cast<std::any>{}(std::any(5), rdb::IDXPAIR).type(), typeid(std::monostate));
+  EXPECT_EQ(cast<std::any>{}(std::any{}, rdb::INTEGER).type(), typeid(std::monostate));
 }

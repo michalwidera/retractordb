@@ -24,6 +24,7 @@ std::vector<bool> roundTrip(const std::vector<bool> &bits) {
 }  // namespace
 
 TEST(BitsetCodecTest, packedByteCount_zaokragla_w_gore) {
+  // covers: bitsetcodec.packed-byte-count.1~1
   EXPECT_EQ(rdb::packedByteCount(0), 0U);
   EXPECT_EQ(rdb::packedByteCount(1), 1U);
   EXPECT_EQ(rdb::packedByteCount(8), 1U);
@@ -38,6 +39,7 @@ TEST(BitsetCodecTest, roundtrip_w_obrebie_jednego_bajtu) {
 }
 
 TEST(BitsetCodecTest, roundtrip_przekracza_granice_bajtu) {
+  // covers: bitsetcodec.unpack-bits.1~1
   // 13 bitów = 2 bajty; wzorzec asymetryczny wykrywa pomylenie kolejności bitów/bajtów.
   const std::vector<bool> bits = {true,  false, false, true,  true, false, true, false,  // bajt 0
                                   false, true,  true,  false, true};                     // bajt 1
@@ -45,12 +47,14 @@ TEST(BitsetCodecTest, roundtrip_przekracza_granice_bajtu) {
 }
 
 TEST(BitsetCodecTest, roundtrip_skrajne_wzorce) {
+  // covers: bitsetcodec.unpack-bits.1~1
   EXPECT_EQ(roundTrip(std::vector<bool>(17, true)), std::vector<bool>(17, true));
   EXPECT_EQ(roundTrip(std::vector<bool>(17, false)), std::vector<bool>(17, false));
   EXPECT_EQ(roundTrip(std::vector<bool>{}), std::vector<bool>{});
 }
 
 TEST(BitsetCodecTest, packBits_ustawia_tylko_jedynki) {
+  // covers: bitsetcodec.pack-bits.1~1
   // Kontrakt: bufor zerowany przez wywołującego; packBits nie dotyka bitów 0
   // (tak IndexRecord i ShadowOverride pakują bitset do wyzerowanego ogona bufora rekordu).
   const std::vector<bool> bits = {false, true, false, false, false, false, false, false, true};
@@ -58,9 +62,14 @@ TEST(BitsetCodecTest, packBits_ustawia_tylko_jedynki) {
   rdbtest::ok(rdb::packBits(bits, buf));
   EXPECT_EQ(std::to_integer<uint8_t>(buf[0]), 0b00000010);
   EXPECT_EQ(std::to_integer<uint8_t>(buf[1]), 0b00000001);
+  buf = {std::byte{0x55}, std::byte{0xAA}};
+  ASSERT_RDB_OK(rdb::packBits(bits, buf));
+  EXPECT_EQ(buf[0], std::byte{0x57});
+  EXPECT_EQ(buf[1], std::byte{0xAB});
 }
 
 TEST(BitsetCodecTest, unpackBits_odrzuca_bitCount_ponad_zrodlo) {
+  // covers: bitsetcodec.unpack-bits.2~1
   // Kontrakt z komentarza egzekwowany w kodeku (#421), bez zaokraglenia packedByteCount.
   const std::vector<std::byte> buf(1, std::byte{0xFF});
   EXPECT_EQ(rdbtest::ok(rdb::unpackBits(buf, 8)), std::vector<bool>(8, true));
@@ -70,9 +79,12 @@ TEST(BitsetCodecTest, unpackBits_odrzuca_bitCount_ponad_zrodlo) {
 }
 
 TEST(BitsetCodecTest, packBits_odrzuca_zly_rozmiar_celu) {
+  // covers: bitsetcodec.pack-bits.2~1
   const std::vector<bool> bits(9, true);  // wymaga dokladnie 2 bajtow
   std::vector<std::byte> tooShort(1, std::byte{0});
   std::vector<std::byte> tooLong(3, std::byte{0});
   EXPECT_RDB_ERROR(rdb::packBits(bits, tooShort), rdb::Errc::Config);
   EXPECT_RDB_ERROR(rdb::packBits(bits, tooLong), rdb::Errc::Config);
+  EXPECT_EQ(tooShort, (std::vector<std::byte>{std::byte{0}}));
+  EXPECT_EQ(tooLong, (std::vector<std::byte>(3, std::byte{0})));
 }

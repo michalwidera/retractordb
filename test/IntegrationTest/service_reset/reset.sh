@@ -263,6 +263,48 @@ if [ "$(wc -l < out_alpha_after_sys.txt)" -lt 2 ]; then
   exit 1
 fi
 
+# --- 3d. Nazwa zajeta przez inna instancje: odmowa resetu, plan dzialajacy zostaje (#521). ---
+#
+# reset-commit sprawdza rozlacznosc nazw na magistrali tak jak start. Druga, zwykla instancja
+# `other` trzyma strumien gamma; plan uslugi z ta sama nazwa ma dostac odmowe wskazujaca
+# wlasciciela, a alpha liczyc dalej.
+printf '%s\n' "STORAGE 'temp'" "DECLARE a INTEGER STREAM src_other, 0.2 TEXTFILE 'data.txt'" \
+  "SELECT a+3 STREAM gamma FROM src_other STORAGE MEMORY" > other.rql
+printf '%s\n' "STORAGE 'temp'" "DECLARE a INTEGER STREAM src_gamma, 0.2 TEXTFILE 'data.txt'" \
+  "SELECT a+4 STREAM gamma FROM src_gamma STORAGE MEMORY" > gamma.rql
+xretractor other.rql --name other --noanykey </dev/null > other.txt 2>&1 &
+other_pid=$!
+i=0
+until bus_own | grep -qE '^other +\|'; do
+  if [ "$i" -ge 100 ] || ! kill -0 "$other_pid" 2>/dev/null; then
+    echo "instancja 'other' nie pojawila sie na magistrali w ciagu 10 s"
+    cat other.txt
+    exit 1
+  fi
+  sleep 0.1
+  i=$((i + 1))
+done
+status=0
+xqry --reset gamma.rql --server service > conflict_out.txt 2> conflict_err.txt || status=$?
+xqry -k --server other > /dev/null
+wait "$other_pid"
+if [ "$status" -eq 0 ]; then
+  echo "plan z nazwa nalezaca do instancji 'other' zostal przyjety"
+  cat conflict_out.txt conflict_err.txt
+  exit 1
+fi
+grep -q "stream 'gamma' is already served by instance 'other'" conflict_err.txt || {
+  echo "odmowa resetu nie wskazala wlasciciela nazwy"
+  cat conflict_err.txt
+  exit 1
+}
+xqry -s alpha -m 2 --server service > out_alpha_after_conflict.txt
+if [ "$(wc -l < out_alpha_after_conflict.txt)" -lt 2 ]; then
+  echo "po odmowie resetu z zajeta nazwa strumien alpha przestal liczyc"
+  cat out_alpha_after_conflict.txt
+  exit 1
+fi
+
 # --- 4. Podmiana planu: nowe nazwy wchodza, stare znikaja z magistrali. ---
 xqry --reset plan2.rql --server service
 wait_for_stream beta

@@ -73,6 +73,7 @@ class BusRepairSeqlock : public ::testing::Test {
 // jego zapisu. snapshot() przyjmie te kopie, jesli po naprawie zobaczy znowu `before`, wiec
 // naprawa nie moze cofnac licznika - musi opublikowac nowa parzysta wartosc.
 TEST_F(BusRepairSeqlock, RepairPublishesFreshEvenSequence) {
+  // covers: bus.bus.13~1
   bus::Bus candidate(name);
   ASSERT_TRUE(candidate.attached());
   IPC::shared_memory_object object(IPC::open_only, name.c_str(), IPC::read_write);

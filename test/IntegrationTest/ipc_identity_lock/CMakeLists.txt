@@ -1,5 +1,7 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
+# covers: launcher.xretractor.19~1, launcher.xretractor.27~1, launcher.xretractor.30~1, ipcserver.ipc-server.1~1
+# covers: lockmanager.flock-service-guard.4~1, lockmanager.sweep-abandoned-resources.2~1
 add_test(
   NAME ${TestID}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

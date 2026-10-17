@@ -54,6 +54,7 @@ def run_survivor(module_root: Path, plan_dir: Path, body: str) -> subprocess.Com
 
 
 def test_k1_internal_error_taints_the_module(module_root: Path, plan_dir: Path) -> None:
+    # covers: module.untainted-guard.1~1
     """K1 -> InternalError; every later call into the engine refuses until a restart."""
     body = "\n".join(
         [
@@ -85,6 +86,7 @@ def test_k1_internal_error_taints_the_module(module_root: Path, plan_dir: Path) 
 
 
 def test_cpp_exception_from_the_core_is_k1(module_root: Path, plan_dir: Path) -> None:
+    # covers: module.untainted-guard.1~1
     """A C++ exception escaping the core (length_error, bad_alloc) -> InternalError and taint (#511)."""
     body = "\n".join(
         [
@@ -111,6 +113,7 @@ def test_cpp_exception_from_the_core_is_k1(module_root: Path, plan_dir: Path) ->
 
 
 def test_kernel_survives_k2_k3_k4_and_k1(module_root: Path, plan_dir: Path) -> None:
+    # covers: module.untainted-guard.2~1
     """One interpreter, every recoverable class in turn, K1 last: the process is still here."""
     body = "\n".join(
         [
@@ -186,6 +189,7 @@ def test_equal_deinterleave_interval_is_a_recoverable_plan_error(
 
 
 def test_k3_config_error_leaves_the_plan_unchanged(rdb, plan_dir: Path) -> None:
+    # covers: module.untainted-guard.2~1
     """K3 -> ConfigError (a ValueError, not a PlanError); the plan goes on where it was."""
     with rdb.Engine() as engine:
         engine.compile(doubling_plan(plan_dir / "data.txt"))
@@ -204,6 +208,7 @@ def test_k3_config_error_leaves_the_plan_unchanged(rdb, plan_dir: Path) -> None:
 
 
 def test_k4_io_error_carries_errno_and_stops_the_plan(rdb, plan_dir: Path) -> None:
+    # covers: module.rdb-io-error.1~1
     """K4 -> IOError, an OSError with errno; the plan is dead, what it wrote is readable."""
     with rdb.Engine() as engine:
         engine.compile(doubling_plan(plan_dir / "data.txt"))
@@ -226,6 +231,7 @@ def test_k4_io_error_carries_errno_and_stops_the_plan(rdb, plan_dir: Path) -> No
 
 
 def test_k4_refusal_keeps_the_system_errno_and_the_path(rdb, plain_storage: Path) -> None:
+    # covers: module.rdb-io-error.1~1
     """A refusal by value keeps its errno, and the binding adds the path it was given.
 
     A symlink in place of a .desc is refused by the storage layer (O_NOFOLLOW, #374) with

@@ -1,3 +1,4 @@
+#include <climits>
 #include <cmath>
 #include <limits>
 #include <list>
@@ -73,11 +74,64 @@ void expectSameUintResult(const std::list<token> &original, const std::list<toke
 
 }  // namespace
 
+TEST(exprSimplify, string_width_stack_contract_and_saturation) {
+  // covers: exprsimplify.infer-string-width.1~1, exprsimplify.infer-string-width.2~1, exprsimplify.infer-string-width.3~1
+  // covers: exprsimplify.infer-string-width.4~1, exprsimplify.infer-string-width.5~1, exprsimplify.infer-string-width.6~1
+  const auto lookup = [](const std::string &stream, int slot) -> std::optional<fieldShape> {
+    EXPECT_EQ(stream, "A");
+    if (slot == 2) return fieldShape{rdb::STRING, 7};
+    if (slot == 0) return fieldShape{rdb::INTEGER, 4};
+    return std::nullopt;
+  };
+  EXPECT_EQ(inferStringWidth({}, lookup), std::nullopt);
+  EXPECT_EQ(inferStringWidth({pushString("")}, lookup), kToStringDefaultWidth);
+  EXPECT_EQ(inferStringWidth({pushString("abc")}, lookup), 3);
+  EXPECT_EQ(inferStringWidth({token(PUSH_VAL, 2)}, lookup), std::nullopt);
+  EXPECT_EQ(inferStringWidth({pushId(2)}, lookup), 7);
+  EXPECT_EQ(inferStringWidth({pushId(0)}, lookup), std::nullopt);
+  EXPECT_EQ(inferStringWidth({pushId(99)}, lookup), std::nullopt);
+  for (const auto command : {PUSH_ID1, PUSH_ID2, PUSH_ID3, PUSH_ID4, PUSH_ID5, PUSH_IDX})
+    EXPECT_EQ(inferStringWidth({token(command, std::make_pair(std::string("A"), 2))}, lookup), std::nullopt);
+  EXPECT_EQ(inferStringWidth({pushId(2), pushString("abc"), token(ADD)}, lookup), 10);
+  EXPECT_EQ(inferStringWidth({pushString("abc"), pushId(0), token(ADD)}, lookup), 3);
+  EXPECT_EQ(inferStringWidth({pushId(0), pushString("abc"), token(ADD)}, lookup), 3);
+  EXPECT_EQ(inferStringWidth({pushId(0), token(CALL, std::string("to_string"))}, lookup), kToStringDefaultWidth);
+  EXPECT_EQ(inferStringWidth({pushId(0), token(CALL2, std::make_pair(std::string("to_string"), 19))}, lookup), 19);
+  EXPECT_EQ(
+      inferStringWidth({pushId(0), token(CALL2, std::make_pair(std::string("to_string"), INT_MAX)), pushString("a"), token(ADD)},
+                       lookup),
+      INT_MAX);
+  EXPECT_EQ(inferStringWidth({pushString("abc"), pushString("def")}, lookup), std::nullopt);
+  for (const auto command : {PUSH_STREAM, COUNT, PUSH_TSCAN})
+    EXPECT_EQ(inferStringWidth({token(command)}, lookup), std::nullopt);
+  for (const auto command : {CALL, CALL2, NEGATE, BIT_NOT, NOT}) {
+    EXPECT_EQ(inferStringWidth({token(command)}, lookup), std::nullopt);
+    EXPECT_EQ(inferStringWidth({pushString("abc"), token(command, std::string("Length"))}, lookup), std::nullopt);
+  }
+  for (const auto command :
+       {ADD, SUBTRACT, MULTIPLY, DIVIDE, POWER, CMP_EQUAL, CMP_NOT_EQUAL, CMP_LT, CMP_GT, CMP_LE, CMP_GE, AND, OR}) {
+    EXPECT_EQ(inferStringWidth({pushString("abc"), token(command)}, lookup), std::nullopt);
+    if (command != ADD)
+      EXPECT_EQ(inferStringWidth({pushString("abc"), pushString("def"), token(command)}, lookup), std::nullopt);
+  }
+}
+
+TEST(exprSimplify, empty_and_unresolved_leaf_programs_are_unchanged) {
+  // covers: exprsimplify.simplify-expression.1~1, exprsimplify.simplify-expression.3~1
+  for (auto program :
+       {std::list<token>{}, std::list<token>{token(PUSH_ID2, std::string("A[0]")), token(PUSH_VAL, 0), token(ADD)}}) {
+    const auto before = dump(program);
+    EXPECT_EQ(simplifyExpression(program, testFieldType), 0U);
+    EXPECT_EQ(dump(program), before);
+  }
+}
+
 //
 // ─── A: zwijanie stałych ────────────────────────────────────────────────────────
 //
 
 TEST(exprSimplify, folds_constant_arithmetic) {
+  // covers: exprsimplify.simplify-expression.2~1, exprsimplify.simplify-expression.4~1
   std::list<token> program{token(PUSH_VAL, 1), token(PUSH_VAL, 1), token(ADD)};
 
   EXPECT_EQ(simplifyExpression(program, testFieldType), 1u);
@@ -95,6 +149,7 @@ TEST(exprSimplify, concatenates_string_literals) {
 }
 
 TEST(exprSimplify, folds_function_call_on_constant) {
+  // covers: exprsimplify.simplify-expression.4~1
   std::list<token> program{token(PUSH_VAL, 4), token(CALL, rdb::descFldVT(std::string("sqrt")))};
 
   EXPECT_EQ(simplifyExpression(program, testFieldType), 1u);
@@ -103,6 +158,7 @@ TEST(exprSimplify, folds_function_call_on_constant) {
 }
 
 TEST(exprSimplify, leaves_expression_the_evaluator_cannot_compute) {
+  // covers: exprsimplify.simplify-expression.4~1
   // '-' nie jest zdefiniowane dla łańcuchów: błąd ma zostać zgłoszony w wykonaniu,
   // a nie zamieniony przez kompilator na cokolwiek innego.
   const std::list<token> original{pushString("a"), pushString("b"), token(SUBTRACT)};
@@ -113,6 +169,7 @@ TEST(exprSimplify, leaves_expression_the_evaluator_cannot_compute) {
 }
 
 TEST(exprSimplify, leaves_division_by_constant_zero) {
+  // covers: exprsimplify.simplify-expression.4~1
   // Dzielenie przez zero daje w wykonaniu NULL - nie ma literału, którym dałoby się
   // ten wynik wstawić z powrotem do programu.
   const std::list<token> original{token(PUSH_VAL, 1), token(PUSH_VAL, 0), token(DIVIDE)};
@@ -138,6 +195,7 @@ TEST(exprSimplify, reassociates_addition_tail) {
 }
 
 TEST(exprSimplify, reassociates_whole_chain_in_one_pass) {
+  // covers: exprsimplify.simplify-expression.2~1
   const std::list<token> original{pushId(0),  token(PUSH_VAL, 1), token(ADD), token(PUSH_VAL, 1),
                                   token(ADD), token(PUSH_VAL, 1), token(ADD)};
   std::list<token> program = original;
@@ -181,6 +239,7 @@ TEST(exprSimplify, reassociates_multiplication) {
 }
 
 TEST(exprSimplify, reassociates_with_constant_on_the_left) {
+  // covers: exprsimplify.simplify-expression.9~1
   // 10 - x + 3 == 13 - x; określoność wyniku gwarantuje określoność 10-x.
   const std::list<token> original{token(PUSH_VAL, 10), pushId(0), token(SUBTRACT), token(PUSH_VAL, 3), token(ADD)};
   std::list<token> program = original;
@@ -206,6 +265,7 @@ TEST(exprSimplify, keeps_constant_on_the_left_with_intermediate_overflow) {
 }
 
 TEST(exprSimplify, concatenates_string_tail) {
+  // covers: exprsimplify.simplify-expression.7~1
   // pole STRING + 'a' + 'b' == pole + 'ab'
   const std::list<token> original{pushId(2), pushString("a"), token(ADD), pushString("b"), token(ADD)};
   std::list<token> program = original;
@@ -216,6 +276,7 @@ TEST(exprSimplify, concatenates_string_tail) {
 }
 
 TEST(exprSimplify, keeps_string_constants_apart_when_they_surround_the_field) {
+  // covers: exprsimplify.simplify-expression.7~1
   // 'a' + pole + 'b' NIE zwija się do 'ab' + pole - konkatenacja nie jest przemienna.
   const std::list<token> original{pushString("a"), pushId(2), token(ADD), pushString("b"), token(ADD)};
   std::list<token> program = original;
@@ -225,6 +286,7 @@ TEST(exprSimplify, keeps_string_constants_apart_when_they_surround_the_field) {
 }
 
 TEST(exprSimplify, keeps_float_expression_untouched) {
+  // covers: exprsimplify.simplify-expression.11~1
   // Dla float reasocjacja zmienia liczbę zaokrągleń - reguła musi odmówić.
   const std::list<token> original{pushId(1), token(PUSH_VAL, 1), token(ADD), token(PUSH_VAL, 1), token(ADD)};
   std::list<token> program = original;
@@ -322,6 +384,7 @@ TEST(exprSimplify, preserves_null_in_issue327_counterexamples) {
 }
 
 TEST(exprSimplify, constant_tail_matrix_preserves_values_and_null_at_boundaries) {
+  // covers: exprsimplify.simplify-expression.6~1
   const std::vector<int> constants{std::numeric_limits<int>::min(), -65536, -3, -2, -1, 0, 1, 2, 3, 65536,
                                    std::numeric_limits<int>::max()};
   const std::vector<command_id> operators{ADD, SUBTRACT, MULTIPLY};
@@ -370,6 +433,7 @@ TEST(exprSimplify, constant_tail_matrix_preserves_values_and_null_at_boundaries)
 //
 
 TEST(exprSimplify, drops_neutral_operands) {
+  // covers: exprsimplify.simplify-expression.8~1
   struct testCase {
     command_id op;
     int constant;
@@ -386,6 +450,7 @@ TEST(exprSimplify, drops_neutral_operands) {
 }
 
 TEST(exprSimplify, drops_neutral_operand_written_on_the_left) {
+  // covers: exprsimplify.simplify-expression.9~1
   const std::list<token> original{token(PUSH_VAL, 0), pushId(0), token(ADD)};
   std::list<token> program = original;
 
@@ -396,6 +461,7 @@ TEST(exprSimplify, drops_neutral_operand_written_on_the_left) {
 }
 
 TEST(exprSimplify, keeps_multiplication_by_zero) {
+  // covers: exprsimplify.simplify-expression.12~1
   // NULL * 0 daje NULL, a nie 0 - pochłanianie złamałoby logikę trójwartościową.
   const std::list<token> original{pushId(0), token(PUSH_VAL, 0), token(MULTIPLY)};
   std::list<token> program = original;
@@ -405,6 +471,7 @@ TEST(exprSimplify, keeps_multiplication_by_zero) {
 }
 
 TEST(exprSimplify, keeps_neutral_operand_of_a_wider_type) {
+  // covers: exprsimplify.simplify-expression.8~1
   // Pole BYTE + literał INTEGER: usunięcie ADD skasowałoby promocję do int i dalsza
   // arytmetyka zaczęłaby zawijać modulo 256.
   const std::list<token> original{pushId(3), token(PUSH_VAL, 0), token(ADD)};
@@ -419,6 +486,7 @@ TEST(exprSimplify, keeps_neutral_operand_of_a_wider_type) {
 //
 
 TEST(exprSimplify, refuses_program_with_token_outside_the_evaluator) {
+  // covers: exprsimplify.simplify-expression.1~1
   // PUSH_STREAM należy do algebry strumieni - nie znamy jego arytmetyki stosu,
   // więc program zostaje nietknięty w całości, razem ze zwijalnymi stałymi.
   const std::list<token> original{token(PUSH_STREAM, rdb::descFldVT(std::string("A"))), token(PUSH_VAL, 1), token(PUSH_VAL, 1),
@@ -430,6 +498,7 @@ TEST(exprSimplify, refuses_program_with_token_outside_the_evaluator) {
 }
 
 TEST(exprSimplify, refuses_malformed_program) {
+  // covers: exprsimplify.simplify-expression.1~1
   const std::list<token> original{token(PUSH_VAL, 1), token(ADD)};
   std::list<token> program = original;
 
@@ -438,6 +507,7 @@ TEST(exprSimplify, refuses_malformed_program) {
 }
 
 TEST(exprSimplify, keeps_expression_without_constants_untouched) {
+  // covers: exprsimplify.simplify-expression.2~1
   const std::list<token> original{pushId(0), pushId(0), token(ADD)};
   std::list<token> program = original;
 
@@ -481,6 +551,7 @@ TEST(exprSimplify, folds_rational_power_without_overflow) {
 #if aggressive_expr_optimization
 
 TEST(exprSimplify, folds_squared_factor_into_power) {
+  // covers: exprsimplify.simplify-expression.10~1
   // x * x == x ^ 2
   const std::list<token> original{pushId(0), pushId(0), token(MULTIPLY)};
   std::list<token> program = original;
@@ -497,6 +568,7 @@ TEST(exprSimplify, folds_squared_factor_into_power) {
 }
 
 TEST(exprSimplify, folds_multiplication_chain_into_power) {
+  // covers: exprsimplify.simplify-expression.10~1
   // x * x * x * x == x ^ 4, w jednym przebiegu
   const std::list<token> original{pushId(0), pushId(0), token(MULTIPLY), pushId(0), token(MULTIPLY), pushId(0), token(MULTIPLY)};
   std::list<token> program = original;
@@ -511,6 +583,7 @@ TEST(exprSimplify, folds_multiplication_chain_into_power) {
 
 // Powtórzonym czynnikiem może być całe podwyrażenie, nie tylko pole.
 TEST(exprSimplify, folds_repeated_subexpression) {
+  // covers: exprsimplify.simplify-expression.10~1
   // (x+1) * (x+1) == (x+1) ^ 2
   const std::list<token> original{pushId(0),          token(PUSH_VAL, 1), token(ADD),     pushId(0),
                                   token(PUSH_VAL, 1), token(ADD),         token(MULTIPLY)};
@@ -524,6 +597,7 @@ TEST(exprSimplify, folds_repeated_subexpression) {
 // FLOAT i DOUBLE zostają nietknięte: `x*x` to jedno mnożenie IEEE, a `x^2` idzie przez
 // std::pow, który nie ma gwarancji poprawnego zaokrąglenia.
 TEST(exprSimplify, does_not_fold_repeated_factor_for_inexact_types) {
+  // covers: exprsimplify.simplify-expression.11~1
   std::list<token> program{pushId(1), pushId(1), token(MULTIPLY)};
   EXPECT_EQ(simplifyExpression(program, testFieldType), 0u);
   EXPECT_EQ(dump(program), dump(std::list<token>{pushId(1), pushId(1), token(MULTIPLY)}));
@@ -544,6 +618,7 @@ TEST(exprSimplify, does_not_fold_distinct_factors) {
 #else
 
 TEST(exprSimplify, keeps_repeated_factor_when_aggressive_rewrites_are_off) {
+  // covers: exprsimplify.simplify-expression.10~1
   const std::list<token> original{pushId(0), pushId(0), token(MULTIPLY)};
   std::list<token> program = original;
 

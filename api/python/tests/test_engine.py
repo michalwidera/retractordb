@@ -265,6 +265,7 @@ def test_two_engines_do_not_share_a_volatile_stream(rdb, plan_dir: Path) -> None
 
 
 def test_engine_logs_reach_the_logging_module(rdb, plan_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
+    # covers: module.python-logging-callback.1~1
     """Engine diagnostics go to logging.getLogger('retractordb'), never to stdout.
 
     A clean run logs nothing, so the record comes from a deterministic error path:
@@ -278,6 +279,36 @@ def test_engine_logs_reach_the_logging_module(rdb, plan_dir: Path, caplog: pytes
     assert engine_records, "no engine log record arrived"
     assert any("nosuch" in record.getMessage() for record in engine_records)
     assert all(record.levelno >= logging.DEBUG for record in engine_records)
+
+
+def test_logging_handler_failure_preserves_the_plan_error_and_next_compile(rdb, plan_dir: Path, monkeypatch) -> None:
+    # covers: module.python-logging-callback.2~1
+    failures = []
+
+    def record_failure(item):
+        failures.append((type(item.exc_value), str(item.exc_value)))
+
+    monkeypatch.setattr(sys, "unraisablehook", record_failure)
+
+    class RejectLog(logging.Handler):
+        def emit(self, record):
+            raise RuntimeError("injected Python logging failure")
+
+    logger = logging.getLogger("retractordb")
+    handler = RejectLog()
+    logger.addHandler(handler)
+    try:
+        with rdb.Engine() as engine:
+            with pytest.raises(rdb.CompileError):
+                engine.compile("SELECT a*2 STREAM dst FROM nosuch\n")
+            assert not engine.failed
+            engine.compile(doubling_plan(plan_dir / "data.txt"))
+            assert engine.run() == len(INPUT)
+    finally:
+        logger.removeHandler(handler)
+    assert failures
+    assert all(kind is RuntimeError for kind, _ in failures)
+    assert all("injected Python logging failure" in message for _, message in failures)
 
 
 def test_run_honours_keyboard_interrupt(rdb, plan_dir: Path) -> None:

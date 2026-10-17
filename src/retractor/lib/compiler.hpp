@@ -13,17 +13,14 @@
 #include "appConfig.hpp"  // appcfg::kDefaultHistoryMemoryMib
 #include "qTree.hpp"      // for qTree, query, token
 
-/// Zatrzymuje kompilację, jeżeli którykolwiek węzeł planu nie ma wyliczonej wielkości.
+/// Funkcja requireResolvedForEveryNode powinna:
+/// - [compiler.require-resolved-for-every-node.1~1] zwracać "OK", gdy mapa resolved zawiera identyfikator każdego węzła planu, także deklaracji i dyrektyw.
+/// - [compiler.require-resolved-for-every-node.2~1] dla pierwszego węzła spoza mapy zwracać przez internalCompilerError status z nazwą przebiegu pass, wielkości quantity i identyfikatorem węzła.
 ///
-/// Wspólna bramka obu przebiegów rachunku indeksu logicznego
-/// (compiler::computeLogicalOrigin i compiler::computeStartupLatency). Uzasadnienie -
-/// dlaczego nierozwiązany węzeł jest błędem, a nie stanem dopuszczalnym - jest przy
-/// definicji w compiler.cpp.
-///
-/// Zadeklarowana w nagłówku, bo poza dwoma miejscami użycia w kompilatorze woła ją
-/// bramka jednostkowa: reguły „plan bez nierozwiązanych węzłów" nie da się złamać
-/// zapytaniem RQL (gramatyka na to nie pozwala), więc test musi podać mapę wprost.
-/// @return "OK" albo status bledu wewnetrznego (przedrostek kInternalCompilerError).
+/// @note Wspolna bramka przebiegow compiler::computeLogicalOrigin i compiler::computeStartupLatency. Do
+///       2026-08-07 wezel pominiety dostawal po cichu domyslne 0, czyli rezim ZANIZAJACY ogon. Legalny plan
+///       nie zostawia wezla nierozwiazanego, wiec to defekt kompilatora; regule da sie zlamac tylko z testu
+///       jednostkowego, ktory podaje mape wprost - stad deklaracja w naglowku.
 [[nodiscard]] std::string requireResolvedForEveryNode(const qTree &plan, const std::map<std::string, int> &resolved,
                                                       std::string_view pass, std::string_view quantity);
 
@@ -31,30 +28,37 @@
 /// w planie. Wolajacy (Engine::compile, demon) odrozniaja go od bledu planu uzytkownika.
 inline constexpr std::string_view kInternalCompilerError = "internal compiler error: ";
 
-/// Status z przedrostkiem kInternalCompilerError (i wpis w logu).
+/// Funkcja internalCompilerError powinna:
+/// - [compiler.internal-compiler-error.1~1] zwracać message poprzedzony przedrostkiem kInternalCompilerError.
+/// - [compiler.internal-compiler-error.2~1] zapisywać ten sam tekst w logu na poziomie ERROR.
+///
+/// @note Zlamany niezmiennik kompilatora nie moze wrocic do klienta jako blad jego planu: Engine::compile
+///       zglasza go jako Errc::Logic, a demon traktuje jak blad krytyczny.
 [[nodiscard]] std::string internalCompilerError(const std::string &message);
 
-/// Czy status compile() opisuje blad wewnetrzny kompilatora, a nie blad planu.
+/// Funkcja isInternalCompilerError powinna:
+/// - [compiler.is-internal-compiler-error.1~1] zwracać true wyłącznie dla statusu zaczynającego się od kInternalCompilerError, czyli błędu wewnętrznego kompilatora, a nie błędu planu.
 [[nodiscard]] bool isInternalCompilerError(std::string_view status);
 
 /// Obiekt klasy compiler powinien:
-/// - przez compile zwracać OK albo status błędu planu, a złamany niezmiennik kompilatora zgłaszać statusem z przedrostkiem kInternalCompilerError, nigdy wyjątkiem.
-/// - przed rozwinięciem generatorów odrzucać nieznane funkcje, niepoprawną arność i odwołania pól w reduktorach strumieni.
-/// - podczas rozwijania odrzucać niepoprawne generatory, a po ich rozwinięciu, przed wydzieleniem substratów, odrzucać
+/// - [compiler.compiler.1~1] przez compile zwracać OK albo status błędu planu, a złamany niezmiennik kompilatora zgłaszać statusem z przedrostkiem kInternalCompilerError, nigdy wyjątkiem.
+/// - [compiler.compiler.2~1] przed rozwinięciem generatorów odrzucać nieznane funkcje, niepoprawną arność i odwołania pól w reduktorach strumieni.
+/// - [compiler.compiler.3~1] podczas rozwijania odrzucać niepoprawne generatory, a po ich rozwinięciu, przed wydzieleniem substratów, odrzucać
 ///   odwołania FROM do strumieni spoza planu i okna AGSE o niedodatnim kroku.
-/// - rozwijać generatory strumieni do N instancji i odrzucać plan, który po rozwinięciu przekracza limit liczby strumieni.
-/// - sprowadzać każdą klauzulę FROM do jednego operatora strumieniowego przez wydzielenie strumieni pośrednich (substratów) o nazwach mieszczących się w budżecie długości, i odrzucać różne programy pod tą samą nazwą substratu.
-/// - rozwijać wieloznaczniki schematu, rozwiązywać interwały strumieni, odwołania pól i okna rekordowe, wyznaczać typy pól i odrzucać warunki reguł o niewłaściwym kształcie.
-/// - wyliczać dla każdego węzła origin i ogon dokładną arytmetyką wymierną, odrzucając plan z węzłem bez wyliczonej wartości.
-/// - wyznaczać pojemność historii każdego strumienia wymaganą przez konsumentów i odrzucać plan przekraczający budżet
+/// - [compiler.compiler.4~1] rozwijać generatory strumieni do N instancji i odrzucać plan, który po rozwinięciu przekracza limit liczby strumieni.
+/// - [compiler.compiler.5~1] sprowadzać każdą klauzulę FROM do jednego operatora strumieniowego przez wydzielenie strumieni pośrednich (substratów) o nazwach mieszczących się w budżecie długości, i odrzucać różne programy pod tą samą nazwą substratu.
+/// - [compiler.compiler.6~1] rozwijać wieloznaczniki schematu, rozwiązywać interwały strumieni, odwołania pól i okna rekordowe, wyznaczać typy pól i odrzucać warunki reguł o niewłaściwym kształcie.
+/// - [compiler.compiler.7~1] wyliczać dla każdego węzła origin i ogon dokładną arytmetyką wymierną, odrzucając plan z węzłem bez wyliczonej wartości.
+/// - [compiler.compiler.8~1] wyznaczać pojemność historii każdego strumienia wymaganą przez konsumentów i odrzucać plan przekraczający budżet
 ///   pamięci historii ustawiony przez setHistoryMemoryBudget; domyślną retencję dyskową z setDefaultRetention stosować
 ///   do niedeklarowanych strumieni w magazynach DEFAULT i DIRECT bez własnego RETENTION.
-/// - zwracać plan w porządku topologicznym, w którym każdy producent poprzedza swoich konsumentów, niezależnie od tego, które optymalizacje zadziałały.
-/// - stosować optymalizacje faktoryzacji przesunięć przez przeplot, deduplikacji substratów, upraszczania wyrażeń i współdzielenia równoważnych SELECT wyłącznie za odpowiednim przełącznikiem RDB_OPT_*, tak aby wyłączenie każdego z nich nie zmieniało wartości wyników, a ogon co najwyżej wydłużało.
-/// - po każdej optymalizacji sprawdzać, że nazwy pól widoczne dla użytkownika nie zmieniły się, i odrzucać plan, gdy zmieniły się.
-/// - przez importFrom dopisywać do planu węzły źródła nieobecne w nim, z pominięciem dyrektyw, zwracać ich nazwy i ograniczać współdzielenie SELECT w następnej kompilacji do tych węzłów, tak aby nie przepisać istniejących instancji strumieni.
-/// - przez reset kasować stan zebrany podczas kompilacji, zachowując powiązanie z tym samym planem, tak aby kompilacja nowego planu nie widziała strumieni poprzedniego.
-/// - przez unboundedDiskStreams zwracać strumienie wynikowe zapisywane na dysku bez granicy retencji wraz z powodem.
+/// - [compiler.compiler.9~1] zwracać plan w porządku topologicznym, w którym każdy producent poprzedza swoich konsumentów, niezależnie od tego, które optymalizacje zadziałały.
+/// - [compiler.compiler.10~1] stosować optymalizacje faktoryzacji przesunięć przez przeplot, deduplikacji substratów, upraszczania wyrażeń i współdzielenia równoważnych SELECT wyłącznie za odpowiednim przełącznikiem RDB_OPT_*, tak aby wyłączenie każdego z nich nie zmieniało wartości wyników, a ogon co najwyżej wydłużało.
+/// - [compiler.compiler.11~1] po każdej optymalizacji sprawdzać, że nazwy pól widoczne dla użytkownika nie zmieniły się, i odrzucać plan, gdy zmieniły się.
+///   Kontrola strukturalna: compiler.cpp - snapshot i verifyUserFieldNamesPreserved po kazdym z czterech przebiegow; odmowa zmiany nazw ma jawny status. Test sprawdza zachowanie nazw, nie wymusza odmowy.
+/// - [compiler.compiler.12~1] przez importFrom dopisywać do planu węzły źródła nieobecne w nim, z pominięciem dyrektyw, zwracać ich nazwy i ograniczać współdzielenie SELECT w następnej kompilacji do tych węzłów, tak aby nie przepisać istniejących instancji strumieni.
+/// - [compiler.compiler.13~1] przez reset kasować stan zebrany podczas kompilacji, zachowując powiązanie z tym samym planem, tak aby kompilacja nowego planu nie widziała strumieni poprzedniego.
+/// - [compiler.compiler.14~1] przez unboundedDiskStreams zwracać strumienie wynikowe zapisywane na dysku bez granicy retencji wraz z powodem.
 struct compiler {
   explicit compiler(qTree &coreInstance) : coreInstance(coreInstance) {};
   compiler() = delete;

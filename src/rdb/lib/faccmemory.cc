@@ -37,6 +37,17 @@ void assertBucketMatches([[maybe_unused]] const rdb::memoryBucket *cached, [[may
 #endif
 }
 
+/// Czy rekord `location` nadal lezy w pierscieniu. Przy retencji R pierscien trzyma wylacznie
+/// ostatnie R zapisow, czyli rekordy [writeCount - R, writeCount); slot `location % R` rekordu
+/// starszego albo jeszcze niezapisanego nalezy do INNEGO rekordu. Do 2026-10-16 read() oddawal
+/// wtedy ten cudzy rekord z sukcesem, a update w miejscu go nadpisywal - po cichu, inaczej niz
+/// magazyn dyskowy (groupFile::read zwraca ERANGE dla usunietego segmentu). Bez retencji granice
+/// sprawdza dalej warunek `slot >= bucket.data.size()`.
+bool retained(const rdb::memoryBucket &bucket, const size_t location, const size_t retentionSize) {
+  if (retentionSize == rdb::memoryFile::no_retention) return true;
+  return location < bucket.writeCount && bucket.writeCount - location <= retentionSize;
+}
+
 }  // namespace
 
 memoryFile::memoryFile(const std::string_view fileName, const Descriptor &descriptor,
@@ -107,6 +118,11 @@ ssize_t memoryFile::write(const uint8_t *ptrData, const std::vector<bool> &nullB
     bucket.writeCount++;
   } else {
     // Nadpisanie rekordu pod wskazana pozycja
+    if (!retained(bucket, location, retentionSize_)) {
+      SPDLOG_ERROR("Write failed: record {} outside retention window of {} records, written {}", location, retentionSize_,
+                   bucket.writeCount);
+      return ERANGE;
+    }
     const size_t slot = (retentionSize_ != no_retention) ? (location % retentionSize_) : location;
     if (slot >= bucket.data.size()) {
       SPDLOG_ERROR("Write failed: slot {} out of range, storage size {}", slot, bucket.data.size());
@@ -123,7 +139,12 @@ ssize_t memoryFile::read(uint8_t *ptrData, std::vector<bool> &nullBitset, const 
   assertBucketMatches(bucket_, store_, filename_);
   auto &bucket        = *bucket_;
   const auto location = position / recordSize_;
-  const size_t slot   = (retentionSize_ != no_retention) ? (location % retentionSize_) : location;
+  if (!retained(bucket, location, retentionSize_)) {
+    SPDLOG_ERROR("Read failed: record {} outside retention window of {} records, written {}", location, retentionSize_,
+                 bucket.writeCount);
+    return ERANGE;
+  }
+  const size_t slot = (retentionSize_ != no_retention) ? (location % retentionSize_) : location;
 
   if (slot >= bucket.data.size()) {
     SPDLOG_ERROR("Read failed: slot {} out of range, storage size {}", slot, bucket.data.size());

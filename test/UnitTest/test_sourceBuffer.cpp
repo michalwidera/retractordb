@@ -7,12 +7,14 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
 
+#include "logCapture.hpp"
 #include "rdb/facctxtsrc.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/sourceBuffer.hpp"
@@ -40,6 +42,7 @@ int valueOf(const rdb::payload &p) {
 // jeden rekord - setCapacity(0) podnosi pojemność do 1.
 // ---------------------------------------------------------------------------
 TEST(SourceBufferTest, capacity_is_at_least_one) {
+  // covers: sourcebuffer.source-buffer.5~1
   rdb::SourceBuffer buffer;
   EXPECT_EQ(buffer.capacity(), 0U);
 
@@ -55,6 +58,7 @@ TEST(SourceBufferTest, capacity_is_at_least_one) {
 // poprawny odczyt daje wzorzec all-false i wartość z pliku.
 // ---------------------------------------------------------------------------
 TEST(SourceBufferTest, read_current_fills_out_from_source) {
+  // covers: sourcebuffer.source-buffer.1~1, sourcebuffer.source-buffer.2~1
   createTextFile("sb_read.txt", "42\n");
   auto desc = intDescriptor();
   rdb::textSourceRO source("sb_read.txt", desc, false);
@@ -76,6 +80,7 @@ TEST(SourceBufferTest, read_current_fills_out_from_source) {
 // zwraca dane wyzerowane z wzorcem all-null - SourceBuffer przekazuje je dalej.
 // ---------------------------------------------------------------------------
 TEST(SourceBufferTest, read_current_after_eof_returns_null_row) {
+  // covers: sourcebuffer.source-buffer.2~1
   createTextFile("sb_eof.txt", "7\n");
   auto desc = intDescriptor();
   rdb::textSourceRO source("sb_eof.txt", desc, false);
@@ -98,6 +103,7 @@ TEST(SourceBufferTest, read_current_after_eof_returns_null_row) {
 // to najnowszy rekord, starsze rekordy przesuwają się w głąb bufora.
 // ---------------------------------------------------------------------------
 TEST(SourceBufferTest, fire_pushes_chamber_into_history) {
+  // covers: sourcebuffer.source-buffer.6~1, storage.storage.8~1
   createTextFile("sb_fire.txt", "1\n2\n3\n");
   auto desc = intDescriptor();
   rdb::textSourceRO source("sb_fire.txt", desc, false);
@@ -109,8 +115,11 @@ TEST(SourceBufferTest, fire_pushes_chamber_into_history) {
 
   for (int expected : {1, 2, 3}) {
     rdbtest::ok(buffer.readCurrent(source, out));
+    EXPECT_EQ(buffer.size(), static_cast<size_t>(std::min(expected - 1, 2)));
+    out.setItem(0, -99);
     buffer.fire(out);
     EXPECT_EQ(valueOf(out), expected);
+    EXPECT_EQ(rdbtest::ok(source.count()), static_cast<size_t>(expected));
   }
 
   EXPECT_EQ(buffer.size(), 2U);              // pojemność 2 - najstarszy rekord wypchnięty
@@ -118,4 +127,72 @@ TEST(SourceBufferTest, fire_pushes_chamber_into_history) {
   EXPECT_EQ(valueOf(buffer.history(1)), 2);
 
   std::filesystem::remove("sb_fire.txt");
+}
+
+TEST(SourceBufferTest, history_preserves_nulls_independently_of_the_output) {
+  // covers: sourcebuffer.source-buffer.6~1
+  createTextFile("sb_history_null.txt", "null\n7\n");
+  auto descriptor = intDescriptor();
+  rdb::textSourceRO source("sb_history_null.txt", descriptor, false);
+  rdb::SourceBuffer buffer;
+  buffer.attach(descriptor);
+  buffer.setCapacity(2);
+  rdb::payload out(descriptor);
+  ASSERT_RDB_OK(buffer.readCurrent(source, out));
+  EXPECT_EQ(buffer.size(), 0U);
+  buffer.fire(out);
+  ASSERT_RDB_OK(buffer.readCurrent(source, out));
+  buffer.fire(out);
+  out.setItem(0, 99);
+  EXPECT_EQ(valueOf(buffer.history(0)), 7);
+  EXPECT_EQ(buffer.history(0).getNullBitset(), std::vector<bool>{false});
+  EXPECT_EQ(valueOf(buffer.history(1)), 0);
+  EXPECT_EQ(buffer.history(1).getNullBitset(), std::vector<bool>{true});
+  std::filesystem::remove("sb_history_null.txt");
+}
+
+TEST(SourceBufferTest, input_content_failure_preserves_the_output_and_reports_the_cause) {
+  // covers: sourcebuffer.source-buffer.3~1
+  const std::string file = "sb_invalid_content.txt";
+  createTextFile(file, "12 invalid\n");
+  const rdb::Descriptor descriptor{{"a", 4, 1, rdb::INTEGER}, {"missing", 0, 1, rdb::NULLTYPE}};
+  rdb::textSourceRO source(file, descriptor, false);
+  rdb::SourceBuffer buffer;
+  buffer.attach(descriptor);
+  rdb::payload out(descriptor);
+  out.setItem(0, 81);
+  const auto result = buffer.readCurrent(source, out);
+  ASSERT_RDB_ERROR(result, rdb::Errc::Config, "expected a NULL token");
+  EXPECT_EQ(result.error().message(), source.inputError());
+  EXPECT_EQ(valueOf(out), 81);
+  EXPECT_EQ(out.getNullBitset(), (std::vector<bool>{false, false}));
+  std::filesystem::remove(file);
+}
+
+TEST(SourceBufferTest, read_failure_warning_preserves_the_null_row) {
+  // covers: sourcebuffer.source-buffer.3~1
+  const std::string file = "sb_missing_warning.txt";
+  std::filesystem::remove(file);
+  auto descriptor = intDescriptor();
+  rdb::textSourceRO source(file, descriptor, false);
+  rdb::SourceBuffer buffer;
+  buffer.attach(descriptor);
+  rdb::payload out(descriptor);
+  LogCapture log;
+  ASSERT_RDB_OK(buffer.readCurrent(source, out));
+  EXPECT_EQ(valueOf(out), 0);
+  EXPECT_EQ(out.getNullBitset(), std::vector<bool>{true});
+#if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_WARN
+  EXPECT_TRUE(log.text().contains("Read failure from declared source"));
+#endif
+  std::filesystem::remove(file);
+}
+
+TEST(SourceBufferDeathTest, fire_without_capacity_is_an_invariant_failure) {
+  // covers: sourcebuffer.source-buffer.4~1
+  auto descriptor = intDescriptor();
+  rdb::SourceBuffer buffer;
+  buffer.attach(descriptor);
+  rdb::payload out(descriptor);
+  ASSERT_DEATH(buffer.fire(out), "circular buffer capacity is zero");
 }

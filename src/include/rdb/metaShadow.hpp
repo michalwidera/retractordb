@@ -16,17 +16,18 @@ namespace rdb {
 ///        posiadających plik cienia danych (.shadow, zob. posixBinaryFileWithShadow).
 ///
 /// Obiekt klasy metaShadow powinien:
-/// - przechowywać nadpisania wzorca null dla poszczególnych rekordów jako pary (indeks rekordu, wzorzec null),
+/// - [metashadow.meta-shadow.1~1] przechowywać nadpisania wzorca null dla poszczególnych rekordów jako pary (indeks rekordu, wzorzec null),
 ///   nie modyfikując głównego indeksu, do którego cień się odnosi,
-/// - przez appendOverride() dopisywać nadpisanie do pamięci i podejmować próbę zapisu do pliku
+/// - [metashadow.meta-shadow.2~1] przez appendOverride() dopisywać nadpisanie do pamięci i podejmować próbę zapisu do pliku
 ///   <metaFilePath>.shadow, o ile jego ścieżka nie jest pusta; koordynację z cieniem danych pozostawiać wywołującemu,
-/// - przy wielokrotnych nadpisaniach tej samej pozycji traktować ostatni zapisany wpis jako obowiązujący stan rekordu,
-/// - przy udanym I/O zapisywać nadpisania do pliku i odtwarzać je przez load(), które zastępuje stan w pamięci,
-/// - umożliwiać scalenie nadpisań (w kolejności zapisu) do głównego indeksu przez wywołującego oraz odrzucenie
+/// - [metashadow.meta-shadow.3~1] przy wielokrotnych nadpisaniach tej samej pozycji traktować ostatni zapisany wpis jako obowiązujący stan rekordu,
+/// - [metashadow.meta-shadow.4~1] przy udanym I/O zapisywać nadpisania do pliku i odtwarzać je przez load(), które zastępuje stan w pamięci,
+/// - [metashadow.meta-shadow.5~1] umożliwiać scalenie nadpisań (w kolejności zapisu) do głównego indeksu przez wywołującego oraz odrzucenie
 ///   ich bez scalania, mirrorując odpowiednio merge() i usunięcie pliku .shadow danych,
-/// - udostępniać konwencję nazewnictwa pliku cienia (<metaFilePath>.shadow) jako metodę statyczną, aby inne
+/// - [metashadow.meta-shadow.6~1] udostępniać konwencję nazewnictwa pliku cienia (<metaFilePath>.shadow) jako metodę statyczną, aby inne
 ///   warstwy (np. storageShadow, storage) mogły się do niej odwołać bez duplikowania sufiksu,
-/// - zwalniać własną pamięć przy niszczeniu obiektu.
+/// - [metashadow.meta-shadow.7~1] zwalniać własną pamięć przy niszczeniu obiektu.
+///   Nietestowalne: brak publicznego pomiaru zwalnianej pamięci; cykle życia metaShadow sprawdza ut_metaShadow_usage-valgrind.
 /// @note appendOverride() zmienia pamięć przed próbą I/O i nie propaguje błędów otwarcia ani zapisu;
 ///       obecność nadpisania w lookup() nie potwierdza, że można je odtworzyć po restarcie.
 /// @note Klasa nie zna pojęcia całkowitej liczby rekordów głównego indeksu ani nie waliduje zakresu
@@ -37,10 +38,10 @@ class metaShadow {
  public:
   /// @brief Single override: the new null bit-set pattern for one absolute record index.
   /// Obiekt klasy ShadowOverride powinien:
-  /// - przechowywać bezwzględny indeks nadpisanego rekordu głównego indeksu i nowy wzorzec null tego rekordu, jeden bit na pole deskryptora.
-  /// - przez serialize zapisywać bajt zarezerwowany równy 0, recordIndex i długość bitsetu jako size_t w porządku bajtów maszyny, a następnie bitset upakowany od najmłodszego bitu w ceil(n/8) bajtach z zerowymi bitami dopełnienia, w układzie zgodnym z wpisem IndexRecord.
-  /// - przez deserialize odtwarzać wpis zapisany przez serialize, pomijając wartość bajtu zarezerwowanego.
-  /// - zwracać z deserialize Errc::IO z kodem EIO, gdy ramka jest za krótka na nagłówek albo deklarowana długość bitsetu przekracza pozostałe bajty, porównując długość przed zaokrągleniem do bajtów.
+  /// - [metashadow.shadow-override.1~1] przechowywać bezwzględny indeks nadpisanego rekordu głównego indeksu i nowy wzorzec null tego rekordu, jeden bit na pole deskryptora.
+  /// - [metashadow.shadow-override.2~1] przez serialize zapisywać bajt zarezerwowany równy 0, recordIndex i długość bitsetu jako size_t w porządku bajtów maszyny, a następnie bitset upakowany od najmłodszego bitu w ceil(n/8) bajtach z zerowymi bitami dopełnienia, w układzie zgodnym z wpisem IndexRecord.
+  /// - [metashadow.shadow-override.3~1] przez deserialize odtwarzać wpis zapisany przez serialize, pomijając wartość bajtu zarezerwowanego.
+  /// - [metashadow.shadow-override.4~1] zwracać z deserialize Errc::IO z kodem EIO, gdy ramka jest za krótka na nagłówek albo deklarowana długość bitsetu przekracza pozostałe bajty, porównując długość przed zaokrągleniem do bajtów.
   struct ShadowOverride {
     size_t recordIndex{0};         ///< absolute position of the overridden record in the main index
     std::vector<bool> nullBitset;  ///< new null bit-set pattern for that record

@@ -13,23 +13,23 @@ namespace rdb {
 /// @brief Wariant indeksu metadanych null dla magazynów posiadających plik cienia danych (.shadow).
 ///
 /// Obiekt klasy storageShadow powinien:
-/// - być wstrzykiwany do storage zamiast bazowego metaData, gdy accessor magazynu utrzymuje plik cienia
+/// - [storageshadow.storage-shadow.1~1] być wstrzykiwany do storage zamiast bazowego metaData, gdy accessor magazynu utrzymuje plik cienia
 ///   danych (FileInterface::hasShadow(), np. posixBinaryFileWithShadow), tak aby write/read w storage nie
 ///   zawierały żadnych rozgałęzień zależnych od obecności cienia; posiadanie pliku cienia jest niezależne od
 ///   posiadania metaindeksu - cień danych zachowuje oryginalną zarejestrowaną zawartość, metaindeks rejestruje
 ///   wartości null i przerwy w transmisji,
-/// - kierować aktualizacje rekordów (onRecordModified()) do cienia indeksu (.meta.shadow, obiekt metaShadow),
+/// - [storageshadow.storage-shadow.2~1] kierować aktualizacje rekordów (onRecordModified()) do cienia indeksu (.meta.shadow, obiekt metaShadow),
 ///   nie modyfikując głównego pliku indeksu - główny indeks pozostaje spójny z głównym plikiem danych,
-/// - przy odczycie (getNullBitset()) zwracać nadpisanie z cienia, jeśli istnieje; pozostałe rekordy prezentować
+/// - [storageshadow.storage-shadow.3~1] przy odczycie (getNullBitset()) zwracać nadpisanie z cienia, jeśli istnieje; pozostałe rekordy prezentować
 ///   z głównego indeksu,
-/// - przy tworzeniu obiektu wczytywać istniejące nadpisania z pliku cienia indeksu (persystencja po restarcie),
-/// - udostępniać mergeShadow() scalające nadpisania (w kolejności zapisu - ostatnie nadpisanie pozycji wygrywa)
+/// - [storageshadow.storage-shadow.4~1] przy tworzeniu obiektu wczytywać istniejące nadpisania z pliku cienia indeksu (persystencja po restarcie),
+/// - [storageshadow.storage-shadow.5~1] udostępniać mergeShadow() scalające nadpisania (w kolejności zapisu - ostatnie nadpisanie pozycji wygrywa)
 ///   do głównego indeksu metadanych i usuwające .meta.shadow; scalenie danych pozostawiać wywołującemu,
-/// - udostępniać discardShadow() odrzucające cień metadanych bez scalania; usunięcie cienia danych
+/// - [storageshadow.storage-shadow.6~1] udostępniać discardShadow() odrzucające cień metadanych bez scalania; usunięcie cienia danych
 ///   pozostawiać wywołującemu,
-/// - przy reset() (purge) czyscic glowny indeks i odrzucac cien,
-/// - przy rotacji archiwizowac glowny indeks i jego cien pod tym samym numerem co dane,
-/// - udostępniać ścieżkę pliku cienia indeksu (metaShadowFilePath()) na potrzeby porządkowania zasobów przez storage.
+/// - [storageshadow.storage-shadow.7~1] przy reset() (purge) czyscic glowny indeks i odrzucac cien,
+/// - [storageshadow.storage-shadow.8~1] przy rotacji archiwizowac glowny indeks i jego cien pod tym samym numerem co dane,
+/// - [storageshadow.storage-shadow.9~1] udostępniać ścieżkę pliku cienia indeksu (metaShadowFilePath()) na potrzeby porządkowania zasobów przez storage.
 /// @note mergeShadow() i discardShadow() działają wyłącznie na metadanych; wywołujący odpowiada za
 ///       skoordynowanie ich z operacjami na cieniu danych; klasa nie wywołuje merge()/discard() akcesora.
 /// @note Walidacja zakresu recordIndex w onRecordModified() odbywa się względem totalRecords() głównego indeksu.

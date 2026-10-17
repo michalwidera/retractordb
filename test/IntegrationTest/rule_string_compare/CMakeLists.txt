@@ -8,6 +8,7 @@ set(TestID "it_${TestID}")
 # Test liczy odpalenia kazdej reguly. Sprawdza wylacznie wartosci warunkow,
 # ktore nie zaleza od RDB_OPT_*.
 
+# covers: streaminstance.stream-instance.7~1
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

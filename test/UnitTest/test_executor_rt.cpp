@@ -10,20 +10,141 @@
 #include <csignal>
 #include <ctime>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
 
+#include "logCapture.hpp"
 #include "platformConfig.h"
 #include "retractor/lib/executor_rt.hpp"
+#include "syscallWrap.hpp"
+
+#if RDB_HAS_SCHED_SETSCHEDULER && RDB_HAS_MLOCKALL
+namespace {
+bool mockActivation = false;
+std::vector<int> lockCalls;
+int lockError = 0, scheduleError = 0, scheduledPid = -1, scheduledPolicy = -1, scheduledPriority = -1;
+}  // namespace
+extern "C" int __real_mlockall(int);
+extern "C" int __real_sched_setscheduler(pid_t, int, const struct sched_param *);
+extern "C" int __wrap_mlockall(int flags) {
+  if (!mockActivation) return __real_mlockall(flags);
+  lockCalls.push_back(flags);
+  errno = lockError;
+  return lockError ? -1 : 0;
+}
+extern "C" int __wrap_sched_setscheduler(pid_t pid, int policy, const struct sched_param *parameter) {
+  if (!mockActivation) return __real_sched_setscheduler(pid, policy, parameter);
+  scheduledPid      = pid;
+  scheduledPolicy   = policy;
+  scheduledPriority = parameter->sched_priority;
+  errno             = scheduleError;
+  return scheduleError ? -1 : 0;
+}
+RDB_WRAP_SYSCALL(int, mlockall, (int flags), (flags));
+RDB_WRAP_SYSCALL(int, sched_setscheduler, (pid_t pid, int policy, const struct sched_param *parameter),
+                 (pid, policy, parameter));
+#endif
+
+#if RDB_HAS_SCHED_AFFINITY
+namespace {
+bool mockAffinity     = false;
+int affinityReadError = 0, affinityWriteError = 0, affinityWrites = 0;
+long affinityOnline = 3;
+cpu_set_t callingMask{}, writtenMask{};
+pthread_t writtenThread{};
+}  // namespace
+extern "C" int __real_sched_getaffinity(pid_t, size_t, cpu_set_t *);
+extern "C" long __real_sysconf(int);
+extern "C" int __real_pthread_setaffinity_np(pthread_t, size_t, const cpu_set_t *);
+extern "C" int __wrap_sched_getaffinity(pid_t pid, size_t size, cpu_set_t *mask) {
+  if (!mockAffinity) return __real_sched_getaffinity(pid, size, mask);
+  *mask = callingMask;
+  errno = affinityReadError;
+  return affinityReadError ? -1 : 0;
+}
+extern "C" long __wrap_sysconf(int key) {
+  return mockAffinity && key == _SC_NPROCESSORS_ONLN ? affinityOnline : __real_sysconf(key);
+}
+extern "C" int __wrap_pthread_setaffinity_np(pthread_t thread, size_t size, const cpu_set_t *mask) {
+  if (!mockAffinity) return __real_pthread_setaffinity_np(thread, size, mask);
+  ++affinityWrites;
+  writtenThread = thread;
+  writtenMask   = *mask;
+  return affinityWriteError;
+}
+RDB_WRAP_SYSCALL(int, sched_getaffinity, (pid_t pid, size_t size, cpu_set_t *mask), (pid, size, mask));
+RDB_WRAP_SYSCALL(long, sysconf, (int key), (key));
+RDB_WRAP_SYSCALL(int, pthread_setaffinity_np, (pthread_t thread, size_t size, const cpu_set_t *mask), (thread, size, mask));
+#endif
 
 // ctest -R '^ut-test_executor_rt' -V
 
 namespace {
 
+#if RDB_HAS_SCHED_SETSCHEDULER && RDB_HAS_MLOCKALL
+TEST(ExecutorRtActivateTest, MockedCallsCheckMemoryPolicyErrnosAndThreadPriority) {
+  // covers: executorrt.rt-activate.1~1, executorrt.rt-activate.2~1, executorrt.rt-activate.3~1, executorrt.rt-activate.4~1
+  // covers: executorrt.rt-activate.5~1, executorrt.rt-activate.6~1
+  struct Restore {
+    std::optional<std::string> previous =
+        std::getenv("RDB_MLOCKALL") ? std::optional<std::string>{std::getenv("RDB_MLOCKALL")} : std::nullopt;
+    ~Restore() {
+      mockActivation = false;
+      if (previous)
+        setenv("RDB_MLOCKALL", previous->c_str(), 1);
+      else
+        unsetenv("RDB_MLOCKALL");
+    }
+  } restore;
+  mockActivation = true;
+  for (const std::string mode : {"onfault", "populate", "off"}) {
+    SCOPED_TRACE(mode);
+    ASSERT_EQ(setenv("RDB_MLOCKALL", mode.c_str(), 1), 0);
+    lockCalls.clear();
+    lockError = scheduleError = 0;
+    LogCapture log;
+    EXPECT_TRUE(rtActivate(0));
+    EXPECT_EQ(scheduledPid, 0);
+    EXPECT_EQ(scheduledPolicy, SCHED_FIFO);
+    EXPECT_EQ(scheduledPriority, sched_get_priority_min(SCHED_FIFO));
+    if (mode == "off")
+      EXPECT_TRUE(lockCalls.empty());
+    else if (mode == "populate")
+      EXPECT_EQ(lockCalls, (std::vector<int>{MCL_CURRENT | MCL_FUTURE}));
+    else {
+#if RDB_HAS_MCL_ONFAULT
+      EXPECT_EQ(lockCalls, (std::vector<int>{MCL_CURRENT, MCL_FUTURE | MCL_ONFAULT}));
+#else
+      EXPECT_EQ(lockCalls, (std::vector<int>{MCL_CURRENT}));
+#endif
+    }
+#if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_WARN
+    if (mode != "onfault") EXPECT_TRUE(log.text().contains("diagnostic mode"));
+#endif
+    EXPECT_TRUE(rtActivate(1000));
+    EXPECT_EQ(scheduledPriority, sched_get_priority_max(SCHED_FIFO));
+  }
+  ASSERT_EQ(setenv("RDB_MLOCKALL", "onfault", 1), 0);
+  lockCalls.clear();
+  lockError = EPERM;
+  EXPECT_FALSE(rtActivate());
+  EXPECT_EQ(lockCalls, (std::vector<int>{MCL_CURRENT}));
+  lockError = ENOSYS;
+  EXPECT_TRUE(rtActivate());
+  lockError     = 0;
+  scheduleError = EPERM;
+  EXPECT_FALSE(rtActivate());
+  scheduleError = 0;
+}
+#endif
+
 // --- rtAbsoluteSleep ---
 
 TEST(ExecutorRtSleepTest, PastAnchorReturnsImmediately) {
+  // covers: executorrt.rt-absolute-sleep.1~1
   struct timespec anchor{};
   clock_gettime(CLOCK_MONOTONIC, &anchor);
   anchor.tv_sec -= 100;
@@ -31,7 +152,7 @@ TEST(ExecutorRtSleepTest, PastAnchorReturnsImmediately) {
   struct timespec before{};
   struct timespec after{};
   clock_gettime(CLOCK_MONOTONIC, &before);
-  rtAbsoluteSleep(anchor, 0);
+  EXPECT_TRUE(rtAbsoluteSleep(anchor, 0));
   clock_gettime(CLOCK_MONOTONIC, &after);
 
   long elapsed_ms = (after.tv_sec - before.tv_sec) * 1000 + (after.tv_nsec - before.tv_nsec) / 1'000'000;
@@ -39,11 +160,12 @@ TEST(ExecutorRtSleepTest, PastAnchorReturnsImmediately) {
 }
 
 TEST(ExecutorRtSleepTest, SmallIntervalCompletesInTime) {
+  // covers: executorrt.rt-absolute-sleep.1~1
   struct timespec anchor{};
   clock_gettime(CLOCK_MONOTONIC, &anchor);
 
   struct timespec before = anchor;
-  rtAbsoluteSleep(anchor, 10);
+  EXPECT_TRUE(rtAbsoluteSleep(anchor, 10));
   struct timespec after{};
   clock_gettime(CLOCK_MONOTONIC, &after);
 
@@ -53,6 +175,7 @@ TEST(ExecutorRtSleepTest, SmallIntervalCompletesInTime) {
 }
 
 TEST(ExecutorRtSleepTest, NanosecondCarryOverDoesNotHang) {
+  // covers: executorrt.rt-absolute-sleep.1~1
   // anchor.tv_nsec near 1s boundary + 200ms interval → carry triggered
   struct timespec anchor{};
   clock_gettime(CLOCK_MONOTONIC, &anchor);
@@ -94,6 +217,7 @@ void ignoreWakeSignal(int /*signum*/) {}
 // Sygnaly przychodza przez pierwsze 300 ms, wiec watek zdazy zasnac nawet pod valgrindem.
 // Ponowienie liczace nowy okres skonczyloby sie najwczesniej po 300 + 600 ms.
 TEST(ExecutorRtSleepTest, InterruptReportsEarlyWakeAndRetryKeepsDeadline) {
+  // covers: executorrt.rt-absolute-sleep.2~1, executorrt.rt-absolute-sleep.3~1
   constexpr long kDeadlineMs = 600;
   const auto previous        = std::signal(SIGUSR1, ignoreWakeSignal);
   ASSERT_NE(previous, SIG_ERR);
@@ -126,6 +250,7 @@ TEST(ExecutorRtSleepTest, InterruptReportsEarlyWakeAndRetryKeepsDeadline) {
 // przy 100 Hz w slocie 214748365 (~24,9 dnia) termin wychodzil ujemny, przy 360 Hz juz po ~2,8 dnia,
 // a sen absolutny do terminu z przeszlosci nie spi wcale.
 TEST(ExecutorRtSleepTest, SlotDeadlineMsSurvivesLongAxis) {
+  // covers: executorrt.rt-slot-deadline-ms.1~1
   EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(1, 3)), 333);
   EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(2, 3)), 666);
   EXPECT_EQ(rtSlotDeadlineMs(boost::rational<int>(214748365, 100)), 2147483650L);
@@ -145,6 +270,7 @@ TEST(ExecutorRtCheckTest, DoesNotCrashAndReturnsBool) {
 }
 
 TEST(ExecutorRtCheckTest, OutputContainsAllRequiredSections) {
+  // covers: executorrt.rt-check-and-print.1~1, executorrt.rt-check-and-print.3~1
   std::ostringstream captured;
   auto *old = std::cout.rdbuf(captured.rdbuf());
   rtCheckAndPrint();
@@ -192,6 +318,32 @@ TEST(ExecutorRtCheckTest, FalseReturnImpliesErrorInOutput) {
   if (!result) {
     EXPECT_NE(captured.str().find("ERROR"), std::string::npos);
   }
+}
+
+TEST(ExecutorRtCheckTest, ReturnValueAgreesWithCriticalRowsAndWarningsStayAdvisory) {
+  // covers: executorrt.rt-check-and-print.1~1, executorrt.rt-check-and-print.2~1, executorrt.rt-check-and-print.3~1
+  // covers: executorrt.rt-check-and-print.4~1
+  testing::internal::CaptureStdout();
+  const bool result = rtCheckAndPrint();
+  const auto output = testing::internal::GetCapturedStdout();
+#if RDB_HAS_PROCFS
+  const auto nice = output.find(" CAP_SYS_NICE / root");
+  const auto lock = output.find(" CAP_IPC_LOCK / root");
+  ASSERT_NE(nice, std::string::npos);
+  ASSERT_NE(lock, std::string::npos);
+  const bool both = output.substr(nice - 6, 6) == "[OK]  " && output.substr(lock - 6, 6) == "[OK]  ";
+  EXPECT_EQ(result, both);
+  EXPECT_EQ(output.contains("ERROR: Missing critical capabilities"), !both);
+  EXPECT_EQ(output.contains("setcap cap_sys_nice,cap_ipc_lock+ep"), !both);
+  const auto preempt = output.find(" PREEMPT_RT kernel");
+  ASSERT_NE(preempt, std::string::npos);
+  EXPECT_EQ(output.contains("Install PREEMPT_RT"), output.substr(preempt - 6, 6) == "[WARN]");
+#else
+  EXPECT_TRUE(output.contains("Best-effort real time only"));
+  EXPECT_FALSE(output.contains("CAP_SYS_NICE"));
+  EXPECT_EQ(result, (RDB_HAS_SCHED_SETSCHEDULER || RDB_HAS_PTHREAD_SCHEDPARAM) && sched_get_priority_min(SCHED_FIFO) >= 0 &&
+                        sched_get_priority_max(SCHED_FIFO) >= sched_get_priority_min(SCHED_FIFO));
+#endif
 }
 
 // --- rtActivate ---
@@ -252,7 +404,51 @@ TEST(ExecutorRtActivateTest, SuccessImpliesRealTimePolicyOnCallingThread) {
 
 #if RDB_HAS_SCHED_AFFINITY
 
+TEST(ExecutorRtAffinityTest, MockedComplementAndEveryRefusalAreReported) {
+  // covers: executorrt.rt-keep-thread-off-rt-cpus.1~1, executorrt.rt-keep-thread-off-rt-cpus.2~1
+  // covers: executorrt.rt-keep-thread-off-rt-cpus.3~1
+  struct Restore {
+    ~Restore() { mockAffinity = false; }
+  } restore;
+  mockAffinity = true;
+  for (int scenario = 0; scenario < 5; ++scenario) {
+    SCOPED_TRACE(scenario);
+    affinityReadError  = scenario == 1 ? EPERM : 0;
+    affinityWriteError = scenario == 3 ? EINVAL : 0;
+    affinityOnline     = scenario == 2 ? 0 : 3;
+    affinityWrites     = 0;
+    CPU_ZERO(&callingMask);
+    CPU_SET(0, &callingMask);
+    if (scenario == 4) {
+      CPU_SET(1, &callingMask);
+      CPU_SET(2, &callingMask);
+    }
+    const auto thread = pthread_self();
+    testing::internal::CaptureStdout();
+    const bool moved  = rtKeepThreadOffRtCpus(thread);
+    const auto output = testing::internal::GetCapturedStdout();
+    EXPECT_EQ(moved, scenario == 0);
+    EXPECT_EQ(affinityWrites, scenario == 0 || scenario == 3 ? 1 : 0);
+    if (scenario == 0) {
+      EXPECT_TRUE(pthread_equal(writtenThread, thread));
+      EXPECT_EQ(CPU_COUNT(&writtenMask), 2);
+      EXPECT_FALSE(CPU_ISSET(0, &writtenMask));
+      EXPECT_TRUE(CPU_ISSET(1, &writtenMask));
+      EXPECT_TRUE(CPU_ISSET(2, &writtenMask));
+      EXPECT_TRUE(output.contains("[INFO]"));
+      EXPECT_TRUE(output.contains("auxiliary cores: 2"));
+    } else if (scenario == 4) {
+      EXPECT_TRUE(output.empty());
+    } else {
+      EXPECT_TRUE(output.contains("[WARN]"));
+      const char *reason = scenario == 1 ? "read RT thread affinity" : scenario == 2 ? "online cores" : "move the comms thread";
+      EXPECT_TRUE(output.contains(reason)) << output;
+    }
+  }
+}
+
 TEST(ExecutorRtAffinityTest, MovesThreadOffPinnedRtCore) {
+  // covers: executorrt.rt-keep-thread-off-rt-cpus.1~1
   if (sysconf(_SC_NPROCESSORS_ONLN) < 2) GTEST_SKIP() << "test wymaga co najmniej dwoch rdzeni online";
 
   cpu_set_t original;
@@ -293,6 +489,7 @@ TEST(ExecutorRtAffinityTest, MovesThreadOffPinnedRtCore) {
 // Bez przypięcia nie ma zagłodzenia i nie ma czego naprawiać - funkcja musi
 // wtedy zostawić powinowactwo w spokoju, zamiast zawężać je na własną rękę.
 TEST(ExecutorRtAffinityTest, LeavesUnpinnedThreadAlone) {
+  // covers: executorrt.rt-keep-thread-off-rt-cpus.2~1
   const long online = sysconf(_SC_NPROCESSORS_ONLN);
   if (online < 2) GTEST_SKIP() << "test wymaga co najmniej dwoch rdzeni online";
 
@@ -329,6 +526,7 @@ TEST(ExecutorRtAffinityTest, LeavesUnpinnedThreadAlone) {
 // Kontrakt, ktory MUSI obowiazywac takze tutaj: funkcja melduje false, czyli
 // "niczego nie zmieniono", zamiast udawac, ze watek zostal przeniesiony.
 TEST(ExecutorRtAffinityTest, ReportsNoMoveWhereAffinityIsUnavailable) {
+  // covers: executorrt.rt-keep-thread-off-rt-cpus.4~1
   std::atomic<bool> stop{false};
   std::thread aux([&stop] {
     while (!stop)
@@ -346,6 +544,9 @@ TEST(ExecutorRtAffinityTest, ReportsNoMoveWhereAffinityIsUnavailable) {
   // Komunikat wypisywany jest RAZ na proces, wiec przy drugim wywolaniu w tym
   // samym binarium bedzie pusty - stad asercja tylko o tresci, gdy cos padlo.
   if (!out.empty()) EXPECT_NE(out.find("CPU affinity is not available"), std::string::npos);
+  testing::internal::CaptureStdout();
+  EXPECT_FALSE(rtKeepThreadOffRtCpus(pthread_self()));
+  EXPECT_TRUE(testing::internal::GetCapturedStdout().empty());
 }
 
 #endif

@@ -177,7 +177,8 @@ rdb::descFld arithmeticValueType(const rdb::descFld left, const rdb::descFld rig
   const auto normalized = normalizedOperandType(left, right);
   // `uint8_t op uint8_t` promuje sie w C++ do `int`, a wariant zapamietuje wlasnie `int`.
   // Ta sama promocja obowiazuje potege typu dokladnego (`exactPower` mnozy tym samym
-  // `operator*`), wiec `bajt ^ k` dla k >= 1 takze jest INTEGER.
+  // `operator*`), wiec `bajt ^ k` takze jest INTEGER - dla k = 0 rowniez, bo exactPower
+  // zaczyna dla BYTE od jedynki INTEGER.
   return normalized == rdb::BYTE ? rdb::INTEGER : normalized;
 }
 

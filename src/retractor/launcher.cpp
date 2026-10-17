@@ -55,95 +55,104 @@
 /// @brief Główny plik uruchamiający program, odpowiedzialny za parsowanie argumentów, obsługę sygnałów i koordynację działania programu.
 ///
 /// program xretractor powinien:
-/// - być budowany jako pojedynczy plik wykonywalny, który można uruchomić z linii poleceń.
-/// - Przyjmować jako opcjonalny argument plik z zapytaniami RQL; brak pliku uruchamia tryb bezczynny (idle).
-/// - Parsować ten plik i kompilować zapytania do postaci wewnętrznej reprezentacji (qTree).
-/// - Uruchamiać wykonanie zapytań, zarządzać ich cyklem życia i obsługiwać wyniki.
-/// - Obsługiwać sygnały systemowe (np. SIGINT, SIGTERM), aby umożliwić bezpieczne zatrzymanie programu.
-/// - Zapewniać opcje konfiguracyjne, takie jak tryb tylko kompilacji, ciche działanie, generowanie diagramów itp.
-/// - Logować istotne informacje o działaniu programu, błędach i wynikach do pliku logów (poza trybem usługowym)
-/// - Być odpornym na błędy, zapewniając odpowiednie komunikaty o błędach i obsługę wyjątków.
+/// - [launcher.xretractor.1~1] być budowany jako pojedynczy plik wykonywalny, który można uruchomić z linii poleceń.
+///   Nietestowalne: wlasnosc budowy (jeden cel xretractor w src/retractor/CMakeLists.txt), nie zachowanie programu; kazdy test integracyjny uruchamia ten jeden plik.
+/// - [launcher.xretractor.2~1] Przyjmować jako opcjonalny argument plik z zapytaniami RQL; brak pliku uruchamia tryb bezczynny (idle).
+/// - [launcher.xretractor.3~1] Parsować ten plik i kompilować zapytania do postaci wewnętrznej reprezentacji (qTree).
+/// - [launcher.xretractor.4~1] Uruchamiać wykonanie zapytań, zarządzać ich cyklem życia i obsługiwać wyniki.
+/// - [launcher.xretractor.5~1] Obsługiwać sygnały systemowe (np. SIGINT, SIGTERM), aby umożliwić bezpieczne zatrzymanie programu.
+/// - [launcher.xretractor.6~1] Zapewniać opcje konfiguracyjne, takie jak tryb tylko kompilacji, ciche działanie, generowanie diagramów itp.
+/// - [launcher.xretractor.7~1] Logować istotne informacje o działaniu programu, błędach i wynikach do pliku logów (poza trybem usługowym)
+/// - [launcher.xretractor.8~1] Być odpornym na błędy, zapewniając odpowiednie komunikaty o błędach i obsługę wyjątków.
+///   Nietestowalne: wymaganie ogolne bez kryterium rozstrzygniecia; konkretne sciezki bledow przypinaja `it_exit_code_map-run`, `it_fatal_exit_path-run` i `it_env_error_exit-run`.
 ///
 /// Niezależność od programu nadzorującego (supervisor):
-/// - xretractor jest samodzielnym procesem i NIE wymaga do działania żadnego programu nadrzędnego
+/// - [launcher.xretractor.9~1] xretractor jest samodzielnym procesem i NIE wymaga do działania żadnego programu nadrzędnego
 ///   typu supervisor/orchestrator; musi w pełni funkcjonować uruchomiony bezpośrednio z linii poleceń.
-/// - Nie zakłada obecności kanału sterującego nadzorcy ani jego API (REST/gRPC); własny cykl życia
+///   Nietestowalne: brak zaleznosci od nadzorcy to wlasnosc architektury; posrednio wszystkie testy integracyjne uruchamiaja xretractor bez nadzorcy.
+/// - [launcher.xretractor.10~1] Nie zakłada obecności kanału sterującego nadzorcy ani jego API (REST/gRPC); własny cykl życia
 ///   (start, praca, zatrzymanie) realizuje samodzielnie poprzez argumenty CLI i sygnały systemowe.
-/// - Cała koordynacja stanu odbywa się przez własne mechanizmy procesu: blokadę pojedynczej instancji
+///   Nietestowalne: brak zaleznosci od API nadzorcy to wlasnosc architektury; cykl zycia przez CLI i sygnaly sprawdzaja `it_service_idle-run` i `it_signal_stop-run`.
+/// - [launcher.xretractor.11~1] Cała koordynacja stanu odbywa się przez własne mechanizmy procesu: blokadę pojedynczej instancji
 ///   (FlockServiceGuard), kanał IPC do klientów (xqry) oraz sygnały - bez zależności od procesu nadzorcy.
-/// - Ewentualny supervisor pełni wyłącznie rolę zewnętrznego zarządcy plików/uruchomień i może zostać
+///   Nietestowalne: wylacznosc mechanizmow koordynacji to wlasnosc architektury; same mechanizmy sprawdzaja `it_ipc_identity_lock`, `it_multiserver_named` i `it_signal_stop-run`.
+/// - [launcher.xretractor.12~1] Ewentualny supervisor pełni wyłącznie rolę zewnętrznego zarządcy plików/uruchomień i może zostać
 ///   przebudowany lub usunięty bez wpływu na zdolność xretractor do samodzielnej pracy.
+///   Nietestowalne: wymaganie wobec programu zewnetrznego (supervisor), nie wobec xretractor.
 ///
 /// Praca jako usługa systemd:
-/// - Działać w trybie pierwszoplanowym (foreground), bez samodzielnej demonizacji - zgodnie z `Type=simple`.
-/// - Umożliwiać start bez pliku .rql (tryb idle), tak aby jednostka systemd mogła wstać przy starcie systemu
+/// - [launcher.xretractor.13~1] Działać w trybie pierwszoplanowym (foreground), bez samodzielnej demonizacji - zgodnie z `Type=simple`.
+/// - [launcher.xretractor.14~1] Umożliwiać start bez pliku .rql (tryb idle), tak aby jednostka systemd mogła wstać przy starcie systemu
 ///   i pozostać aktywna, zanim zostaną zdefiniowane jakiekolwiek zapytania (bez pętli restartów/crash-loop).
-/// - Reagować na SIGTERM bezpiecznym, kontrolowanym zatrzymaniem (graceful shutdown) w skończonym czasie,
+/// - [launcher.xretractor.15~1] Reagować na SIGTERM bezpiecznym, kontrolowanym zatrzymaniem (graceful shutdown) w skończonym czasie,
 ///   współpracując z `KillSignal=SIGTERM` i `TimeoutStopSec` menedżera systemd.
-/// - W trybie usługi nie oczekiwać na klawisz/terminal (opcja --noanykey), działając bez TTY.
-/// - Zwracać kody wyjścia zgodne z konwencją POSIX, aby systemd mógł poprawnie ocenić stan i politykę Restart.
-/// - Udostępniać kontrolę stanu działania (opcja --status) na potrzeby zewnętrznego monitoringu/healthcheck.
-/// - Sprzątać pozostałości instancji zabitych (pliki blokad, obiekty IPC, segmenty magistrali) przy każdym
+/// - [launcher.xretractor.16~1] W trybie usługi nie oczekiwać na klawisz/terminal (opcja --noanykey), działając bez TTY.
+/// - [launcher.xretractor.17~1] Zwracać kody wyjścia zgodne z konwencją POSIX, aby systemd mógł poprawnie ocenić stan i politykę Restart.
+/// - [launcher.xretractor.18~1] Udostępniać kontrolę stanu działania (opcja --status) na potrzeby zewnętrznego monitoringu/healthcheck.
+/// - [launcher.xretractor.19~1] Sprzątać pozostałości instancji zabitych (pliki blokad, obiekty IPC, segmenty magistrali) przy każdym
 ///   wyjściu i na żądanie (opcja --cleanup, np. z timera systemd), nie ruszając niczego, co należy do żywej instancji.
 ///
 /// Logowanie w trybie usługi systemowej:
-/// - W trybie usługi kierować logi na standardowe wyjście procesu (stdout/stderr), tak aby były przechwytywane
+/// - [launcher.xretractor.20~1] W trybie usługi kierować logi na standardowe wyjście procesu (stdout/stderr), tak aby były przechwytywane
 ///   przez journald i dostępne przez `journalctl -u`; nie pisać logów do pliku w katalogu tymczasowym (/tmp).
-/// - Nie duplikować znacznika czasu w komunikacie - czas nadaje journald; format usługowy ma być zwięzły
+/// - [launcher.xretractor.21~1] Nie duplikować znacznika czasu w komunikacie - czas nadaje journald; format usługowy ma być zwięzły
 ///   (poziom + treść), bez własnego timestampu.
-/// - Nie emitować kodów ANSI/kolorów w trybie usługowym, gdy wyjście nie jest terminalem (brak TTY) - log do journala musi być
+/// - [launcher.xretractor.22~1] Nie emitować kodów ANSI/kolorów w trybie usługowym, gdy wyjście nie jest terminalem (brak TTY) - log do journala musi być
 ///   czystym tekstem.
-/// - Nie wykonywać własnej rotacji ani retencji plików logów - pozostawić to menedżerowi journald.
-/// - Zapewniać natychmiastowy zrzut (flush) po każdej linii, aby wpisy pojawiały się w dzienniku na bieżąco.
-/// - Mapować poziom logowania na priorytety syslog (prefiks `<0>`..`<7>` wg sd-daemon),
+/// - [launcher.xretractor.23~1] Nie wykonywać własnej rotacji ani retencji plików logów - pozostawić to menedżerowi journald.
+///   Nietestowalne: brak wlasnej rotacji to ograniczenie odpowiedzialnosci; tryb uslugowy nie otwiera pliku logu, co sprawdza `SetupLoggerMainTest.service_mode_emits_sd_daemon_priority_prefix`.
+/// - [launcher.xretractor.24~1] Zapewniać natychmiastowy zrzut (flush) po każdej linii, aby wpisy pojawiały się w dzienniku na bieżąco.
+/// - [launcher.xretractor.25~1] Mapować poziom logowania na priorytety syslog (prefiks `<0>`..`<7>` wg sd-daemon),
 ///   aby journald poprawnie klasyfikował wagę komunikatów w trybie usługowym.
-/// - Umożliwiać włączenie trybu usługowego logowania zarówno flagą CLI (--service), jak i zmienną
+/// - [launcher.xretractor.26~1] Umożliwiać włączenie trybu usługowego logowania zarówno flagą CLI (--service), jak i zmienną
 ///   środowiskową XRETRACTOR_SERVICE - dla wygody konfiguracji jednostki systemd przez Environment=.
 ///
 /// Interfejs komunikacji i funkcjonalność:
-/// - Wymuszać pojedynczą instancję programu w systemie poprzez blokadę plikową (FlockServiceGuard); kolejna próba startu
+/// - [launcher.xretractor.27~1] Wymuszać pojedynczy proces dla danej tożsamości instancji poprzez blokadę plikową (FlockServiceGuard); kolejna próba startu
 ///   jest sygnalizowana błędem braku dostępnej blokady (no_lock_available). Plik blokady, którego nie
 ///   wolno albo nie da się użyć (dowiązanie, nie zwykły plik, inny właściciel, błąd systemu), kończy
 ///   start kodem io_error.
-/// - W przypadku rozpoznania funkcjonowania innej instancji programu, należy rozpoznać czy ta instancja działa jako serwis,
+/// - [launcher.xretractor.28~1] W przypadku rozpoznania funkcjonowania innej instancji programu, należy rozpoznać czy ta instancja działa jako serwis,
 ///   czy jako osobny proces, jeśli działa jako serwis zaraportować informację o tym fakcie i
 ///   przekompilować zapytania (sprawdzić poprawność) i przekazać zapytanie do tej instancji poprzez restart serwisu z zapytaniem (zachowując konfigurację serwisu).
-/// - Umożliwiać przeładowanie CAŁEGO planu działającej instancji jedną komendą klienta
+/// - [launcher.xretractor.29~1] Umożliwiać przeładowanie CAŁEGO planu działającej instancji jedną komendą klienta
 ///   (`xqry --reset plan.rql`), bez restartu procesu i bez uprawnień do systemctl. Zestaw ma być
 ///   sprawdzony (parsowanie, kompilacja, rozłączność nazw) PRZED dotknięciem planu działającego -
 ///   odmowa nie może kosztować usługi. Zestaw pusty jest żądaniem poprawnym: sprowadza instancję
 ///   do trybu bezczynnego.
-/// - Nadawać instancji usługowej stałą nazwę ("service"), o ile operator nie wskazał innej, i
-///   dopuszczać w systemie dokładnie jedną instancję w trybie usługowym; serwerów zwykłych może
+/// - [launcher.xretractor.30~1] Nadawać instancji usługowej stałą nazwę ("service"), o ile operator nie wskazał innej, i
+///   dopuszczać w jednej przestrzeni nazw magistrali dokładnie jedną instancję w trybie usługowym; serwerów zwykłych może
 ///   pracować wiele.
-/// - Po błędzie krytycznym (rdb::Error na szczycie executorsm::run albo FatalError) i po odmowie planu przed startem (parsowanie, kompilacja,
+/// - [launcher.xretractor.31~1] Po błędzie krytycznym (rdb::Error na szczycie executorsm::run albo FatalError) i po odmowie planu przed startem (parsowanie, kompilacja,
 ///   zachowane pliki magazynu i .desc) sprowadzać jednostkę systemd do stanu bez planu: plik
 ///   zapytań usługi jest opróżniany, więc restart podnosi ją w trybie bezczynnym zamiast wracać
 ///   w kółko na plan, który ją zabił albo nie może wystartować.
-/// - Udostępniać dane wynikowe strumieni klientom (xqry) przez współdzieloną pamięć / IPC (Boost.Interprocess)
+/// - [launcher.xretractor.32~1] Udostępniać dane wynikowe strumieni klientom (xqry) przez współdzieloną pamięć / IPC (Boost.Interprocess)
 ///   obsługiwane w osobnym wątku komunikacyjnym, niezależnym od wątku przetwarzania danych.
-/// - Umożliwiać sterowanie startem przetwarzania z poziomu klienta (opcja --xqrywait: wstrzymanie pętli do
+/// - [launcher.xretractor.33~1] Umożliwiać sterowanie startem przetwarzania z poziomu klienta (opcja --xqrywait: wstrzymanie pętli do
 ///   nadejścia pierwszego zapytania kanałem IPC) oraz zewnętrzne zatrzymanie instancji.
-/// - Wspierać tryb wsadowej kompilacji bez uruchamiania przetwarzania (--onlycompile) z generowaniem artefaktów
+/// - [launcher.xretractor.34~1] Wspierać tryb wsadowej kompilacji bez uruchamiania przetwarzania (--onlycompile) z generowaniem artefaktów
 ///   diagnostycznych (dot/csv/diagram) jako odrębną, nieusługową ścieżką użycia.
-/// - Oferować ograniczenie liczby iteracji pętli (--llimitqry) na potrzeby testów i pracy deterministycznej.
-/// - Planować sloty względem stałej kotwicy czasu monotonicznego (sen do bezwzględnego punktu czasu w każdym
+/// - [launcher.xretractor.35~1] Oferować ograniczenie liczby iteracji pętli (--llimitqry) na potrzeby testów i pracy deterministycznej.
+/// - [launcher.xretractor.36~1] Planować sloty względem stałej kotwicy czasu monotonicznego (sen do bezwzględnego punktu czasu w każdym
 ///   trybie taktowanym) i opcjonalnie wspierać szeregowanie czasu rzeczywistego (--realtime: SCHED_FIFO, mlockall,
 ///   powinowactwo CPU) dla deterministycznych interwałów przetwarzania.
-/// - Oferować tryb bez taktowania zegarem ściennym (--no-clock) dla przebiegów offline: pełna semantyka
+/// - [launcher.xretractor.37~1] Oferować tryb bez taktowania zegarem ściennym (--no-clock) dla przebiegów offline: pełna semantyka
 ///   interwałów planu, ale bez czekania na zegar. Wyklucza się z --realtime.
-/// - Oferować tryb liczenia do końca wejścia (--until-eof): źródła deklarowane czytane bez zawijania,
+/// - [launcher.xretractor.38~1] Oferować tryb liczenia do końca wejścia (--until-eof): źródła deklarowane czytane bez zawijania,
 ///   a przebieg kończony w slocie, w którym pierwsze z nich wyczerpie dane. Zdejmuje dobieranie --llimitqry
 ///   do długości serii danych.
 ///
 /// Konfiguracja:
-/// - System w trybie usługowym wspiera pliki konfiguracjne podobnie jak inne usługi systemu linux (np. sshd).
-/// - W plikach konfiguracyjnych można zdefiniować katalogi w których będą przechowywane artefakty (storage) a także inne ustawienia.
-/// - Pliki konfiguracyjne są opcjonalne, a ich brak nie powinien uniemożliwiać startu programu; w przypadku braku konfiguracji
+/// - [launcher.xretractor.39~1] System w trybie usługowym wspiera pliki konfiguracjne podobnie jak inne usługi systemu linux (np. sshd).
+/// - [launcher.xretractor.40~1] W plikach konfiguracyjnych można zdefiniować katalogi w których będą przechowywane artefakty (storage) a także inne ustawienia.
+/// - [launcher.xretractor.41~1] Pliki konfiguracyjne są opcjonalne, a ich brak nie powinien uniemożliwiać startu programu; w przypadku braku konfiguracji
 ///   program powinien działać z domyślnymi ustawieniami, a brak konfiguracji traktować jako stan poprawny (nie błąd).
-/// - Jeśli ustawiono storage.dir, katalog musi istnieć i mieć uprawnienia zapisu; w przeciwnym razie start programu
+///   Zakres testow: `it_service_idle-run` (makro add_test daje kazdemu testowi integracyjnemu pusty XDG_CONFIG_HOME, wiec start bez konfiguracji jest warunkiem calego zestawu).
+/// - [launcher.xretractor.42~1] Jeśli ustawiono storage.dir, katalog musi istnieć i mieć uprawnienia zapisu; w przeciwnym razie start programu
 ///   jest przerywany z błędem konfiguracji.
-/// - Konfigurację wspiera bibliteka toml++.
+/// - [launcher.xretractor.43~1] Konfigurację wspiera bibliteka toml++.
+///   Nietestowalne: wybor biblioteki implementacji; format pliku sprawdza `it_config_storage_validation-config-errors`.
 
 using namespace boost;
 

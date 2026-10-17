@@ -7,6 +7,15 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
+# covers: xtrdbstoragemap.show-storage-map.1~1, xtrdbstoragemap.show-storage-map.2~1, xtrdbstoragemap.show-storage-map.3~1
+# covers: xtrdbstoragemap.show-storage-map.4~1, xtrdbstoragemap.show-storage-map.5~1, xtrdbstoragemap.show-storage-map.6~1
+# covers: xtrdbstoragemap.show-storage-map.7~1, xtrdbstoragemap.show-storage-map.8~1, xtrdbstoragemap.show-storage-map.9~1
+add_test(
+  NAME ${TestID}-contracts
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  COMMAND python3 verify_contracts.py $<TARGET_FILE:xtrdb>)
+set_tests_properties(${TestID}-contracts PROPERTIES TIMEOUT 60)
+
 add_test(
   NAME ${TestID}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

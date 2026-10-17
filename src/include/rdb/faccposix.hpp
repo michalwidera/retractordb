@@ -11,16 +11,16 @@ namespace rdb {
 /// @brief Implementacja binarnego magazynu rekordów opartego na deskryptorze pliku POSIX.
 ///
 /// Obiekt klasy posixBinaryFile powinien:
-/// - implementować interfejs FileInterface dla binarnego pliku rekordowego,
-/// - umożliwiać dopisywanie rekordów oraz zapis i odczyt rekordu od wskazanej pozycji w pliku,
-/// - traktować Descriptor jako źródło rozmiaru pojedynczego rekordu,
-/// - ignorować parametr nullBitset przy zapisie i czyścić go przy odczycie; klasa nie przechowuje metadanych null,
-/// - zwracać przez count() liczbę rekordów wynikającą z rozmiaru pliku danych,
-/// - obsługiwać purge przez write(nullptr, ..., 0), opróżniając plik danych w miejscu (deskryptor pozostaje ważny),
-/// - przez discard() usuwać plik i rezygnować z rotacji - dla właściciela, który porzuca plik celowo,
-/// - przy tworzeniu obiektu odtwarzać spójny stan istniejącego pliku przez przycięcie niepełnego końca do wielokrotności rozmiaru rekordu,
-/// - przy niszczeniu obiektu zamykać deskryptor pliku i podejmować próbę utrwalenia danych przez fsync,
-/// - jeśli parametr percounter jest nieujemny, próbować po zamknięciu przemianować plik do postaci `<nazwa>.old<percounter>`.
+/// - [faccposix.posix-binary-file.1~1] implementować interfejs FileInterface dla binarnego pliku rekordowego,
+/// - [faccposix.posix-binary-file.2~1] umożliwiać dopisywanie rekordów oraz zapis i odczyt rekordu od wskazanej pozycji w pliku,
+/// - [faccposix.posix-binary-file.3~1] traktować Descriptor jako źródło rozmiaru pojedynczego rekordu,
+/// - [faccposix.posix-binary-file.4~1] ignorować parametr nullBitset przy zapisie i czyścić go przy odczycie; klasa nie przechowuje metadanych null,
+/// - [faccposix.posix-binary-file.5~1] zwracać przez count() liczbę rekordów wynikającą z rozmiaru pliku danych,
+/// - [faccposix.posix-binary-file.6~1] obsługiwać purge przez write(nullptr, ..., 0), opróżniając plik danych w miejscu (deskryptor pozostaje ważny),
+/// - [faccposix.posix-binary-file.7~1] przez discard() usuwać plik i rezygnować z rotacji - dla właściciela, który porzuca plik celowo,
+/// - [faccposix.posix-binary-file.8~1] przy tworzeniu obiektu odtwarzać spójny stan istniejącego pliku przez przycięcie niepełnego końca do wielokrotności rozmiaru rekordu,
+/// - [faccposix.posix-binary-file.9~1] przy niszczeniu obiektu zamykać deskryptor pliku i podejmować próbę utrwalenia danych przez fsync,
+/// - [faccposix.posix-binary-file.10~1] jeśli parametr percounter jest nieujemny, próbować po zamknięciu przemianować plik do postaci `<nazwa>.old<percounter>`.
 ///
 /// @note Klasa nie zapewnia dodatkowej warstwy trwałości ani wersjonowania poza bezpośrednim zapisem do jednego pliku binarnego.
 

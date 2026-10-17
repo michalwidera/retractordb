@@ -431,6 +431,7 @@ class ParserListener : public RQLBaseListener {
 
   [[nodiscard]] const std::string &semanticError() const { return semanticError_; }
 
+ private:
   /// Zlamany niezmiennik listenera: rzuca, zamiast konczyc proces.
   ///
   /// Odpowiednik abortParse() dla drogi NIE-skladniowej. Zdjecie listenerow jest tak samo
@@ -447,6 +448,7 @@ class ParserListener : public RQLBaseListener {
     throw RQLInternalError{message};
   }
 
+ public:
   void enterProg(RQLParser::ProgContext *ctx) override {}
 
   void exitFieldID(RQLParser::FieldIDContext *ctx) override { recpToken(PUSH_ID3, ctx->getText()); }
@@ -502,6 +504,7 @@ class ParserListener : public RQLBaseListener {
   /// `$` uzyte poza generatorem.
   void exitExpGenIndex(RQLParser::ExpGenIndexContext *ctx) override { recpToken(PUSH_GENIDX); }
 
+ private:
   /// Poczatki podprogramow argumentow okna - pozycja w `program` w chwili wejscia w regule.
   ///
   /// Stos, a nie pojedyncza zmienna, bo gramatyka dopuszcza `MIN(MAX(a[0]:2):3)`: znacznik
@@ -511,6 +514,7 @@ class ParserListener : public RQLBaseListener {
   /// Znaczniki sa wazne w obrebie JEDNEGO wyrazenia - `program` czysci exitExpression().
   std::vector<size_t> windowArgMarks;
 
+ public:
   void enterWindow_agg(RQLParser::Window_aggContext *ctx) override { windowArgMarks.push_back(program.size()); }
 
   /// `MIN(cells[0] : 10)` - agregat okna REKORDOWEGO w liscie SELECT.
@@ -923,6 +927,7 @@ class ParserListener : public RQLBaseListener {
     fieldCount = 0;
   }
 
+ private:
   /// Czy tuz PRZED podana liczba stoi w zapisie znak minus.
   ///
   /// Znak jest w gramatyce osobnym, OPCJONALNYM dzieckiem (`'-'? DECIMAL`), wiec numery pozycji
@@ -940,6 +945,7 @@ class ParserListener : public RQLBaseListener {
     return false;
   }
 
+ public:
   /// Granice zakresu siegaja historii strumienia, a RETENTION to liczba jednoczesnych zadan zrzutu,
   /// z ktorych kazde trzyma otwarty deskryptor pliku - stad granice z rdb/sizeLimits.hpp (A2 M11).
   void exitDumppart(RQLParser::DumppartContext *ctx) override {

@@ -7,14 +7,22 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
+#include <list>
 #include <locale>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
+#include <variant>
 #include <vector>
 
 #include "config.h"
+#include "logCapture.hpp"
+#include "rdb/convertTypes.hpp"
 #include "rdb/fainterface.hpp"
+#include "rdb/memoryStore.hpp"
 #include "rdb/payload.hpp"
 #include "rdb/probe.hpp"  // sonda E4 (liczy tylko w buildzie RDB_BENCH_PROBE)
 #include "rdb/storage.hpp"
@@ -117,6 +125,7 @@ class xschema : public ::testing::Test {
 };
 
 TEST_F(xschema, check_construct_payload) {
+  // covers: streaminstance.stream-instance.1~1, streaminstance.stream-instance.5~1
   auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
   streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
@@ -145,6 +154,7 @@ TEST_F(xschema, check_construct_payload) {
 }
 
 TEST_F(xschema, check_construct_payload_mirror) {
+  // covers: streaminstance.stream-instance.5~1
   auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
   streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
@@ -317,6 +327,7 @@ auto print(const std::vector<rdb::descFldVT> &row) {
 }
 
 TEST_F(xschema, getRow_1) {
+  // covers: datamodel.data-model.4~1, datamodel.data-model.11~1
   /* datafile1.txt contents:
   20 31
   21 32
@@ -395,6 +406,7 @@ TEST_F(xschema, handleTable_survives_plan_reorder) {
 }
 
 TEST_F(xschema, handleTable_stale_entry_is_caught) {
+  // covers: datamodel.data-model.15~1
   // Kontrola DODATNIA. Ten sam uklad co wyzej, jedna roznica: tablica zostaje oznaczona jako
   // zbudowana dla biezacej rewizji, choc jej zawartosc opisuje plan sprzed przestawienia.
   // Niezmiennik zabrania takiego stanu, wiec wytworzyc go moze tylko hak testowy - i wlasnie
@@ -429,6 +441,7 @@ TEST_F(xschema, handleTable_stale_entry_is_caught) {
 // odpowiada dla strumienia, ktory w nim jest.
 
 TEST_F(xschema, missingStream_is_reported_not_inserted) {
+  // covers: datamodel.data-model.10~1, datamodel.data-model.15~1
   const std::string ghost = "no_such_stream";
   const auto sizeBefore   = dataArea->qSet.size();
 
@@ -450,6 +463,7 @@ TEST_F(xschema, missingStream_is_reported_not_inserted) {
 // tablica uchwytow trzyma surowe wskazniki. Poprawna nazwa przed bledna nie moze wiec zostac
 // w modelu sama.
 TEST_F(xschema, addQueriesToModel_is_all_or_nothing) {
+  // covers: datamodel.data-model.3~1
   query extra = coreInstance["str2"];
   extra.id    = "str2_extra";
   coreInstance.push_back(extra);
@@ -520,6 +534,7 @@ TEST_F(xschema, agse_adhoc_join_flat_position_beyond_int) {
 }
 
 TEST_F(xschema, reduceFieldsToPayload_max) {
+  // covers: streaminstance.stream-instance.3~1
   auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
   streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
@@ -531,6 +546,7 @@ TEST_F(xschema, reduceFieldsToPayload_max) {
 }
 
 TEST_F(xschema, reduceFieldsToPayload_min) {
+  // covers: streaminstance.stream-instance.3~1
   auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
   streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
@@ -542,6 +558,7 @@ TEST_F(xschema, reduceFieldsToPayload_min) {
 }
 
 TEST_F(xschema, reduceFieldsToPayload_sum) {
+  // covers: streaminstance.stream-instance.3~1
   auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
   streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
@@ -553,6 +570,7 @@ TEST_F(xschema, reduceFieldsToPayload_sum) {
 }
 
 TEST_F(xschema, reduceFieldsToPayload_avg) {
+  // covers: streaminstance.stream-instance.3~1
   auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
   streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
@@ -567,6 +585,7 @@ TEST_F(xschema, reduceFieldsToPayload_avg) {
 }
 
 TEST_F(xschema, constructOutputPayload_expression) {
+  // covers: streaminstance.stream-instance.6~1, streaminstance.stream-instance.9~1
   // str2: SELECT str2[0]+5 FROM core0 → core0.a=20, result=25
   rdbtest::ok(dataArea->processZeroStep());
   rdbtest::ok(dataArea->constructInputPayload(coreInstance["str2"], *dataArea->qSet["str2"]));
@@ -580,6 +599,7 @@ TEST_F(xschema, constructOutputPayload_expression) {
 // plikow (K2) oraz dowiazanie w miejscu pliku wyjscia (K4, ELOOP). Klasa i errno jak
 // w checkOutputFilesOpenable. Czesciowo zbudowany model nie moze byc publikowany (#474).
 TEST(dataModel, initialization_refusal_preserves_class_and_discards_partial_model) {
+  // covers: datamodel.data-model.1~1, executorsm.executorsm.17~1, streaminstance.stream-instance.2~1
   const std::filesystem::path directory("model_init_refusal");
   std::filesystem::remove_all(directory);
   std::filesystem::create_directory(directory);
@@ -631,11 +651,13 @@ TEST(dataModel, initialization_refusal_preserves_class_and_discards_partial_mode
 }
 
 TEST(dataModel, empty_plan_remains_an_internal_error) {
+  // covers: datamodel.data-model.2~1
   qTree plan;
   EXPECT_DEATH({ (void)dataModel::create(plan); }, "coreInstance is empty");
 }
 
 TEST(dataModel, empty_directive_value_remains_an_internal_error) {
+  // covers: datamodel.data-model.2~1
   qTree plan;
   query directive;
   directive.id = ":STORAGE";
@@ -650,6 +672,7 @@ TEST_F(xschema, constructRulesAndUpdate_empty_rules) {
 }
 
 TEST_F(xschema, reduceFieldsToPayload_single_field) {
+  // covers: streaminstance.stream-instance.1~1
   auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str2"]));
   streamInstance &data = *dataOwner;
   data.outputPayload->setDisposable(false);
@@ -680,6 +703,7 @@ class xschema_rules : public ::testing::Test {
 };
 
 TEST_F(xschema_rules, constructRulesAndUpdate_system_rule_fires) {
+  // covers: datamodel.data-model.7~1, streaminstance.stream-instance.8~1
   // core0 first row: a=20 → str_rule[0]=20 > 0 → rule1 fires, rule2 does not
   std::vector<char> ruleMask(coreInstance.size(), 0);
   for (std::size_t position = 0; position < coreInstance.size(); ++position)
@@ -738,6 +762,7 @@ TEST_F(xschema_all_null, reduceFieldsToPayload_all_null_max) {
 }
 
 TEST_F(xschema_all_null, reduceFieldsToPayload_all_null_avg) {
+  // covers: streaminstance.stream-instance.3~1
   auto result = rdbtest::ok(dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_AVG, "str1"));
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
@@ -773,6 +798,7 @@ TEST_F(xschema_partial_null, reduceFieldsToPayload_partial_null_sum) {
 }
 
 TEST_F(xschema_partial_null, reduceFieldsToPayload_partial_null_avg) {
+  // covers: streaminstance.stream-instance.3~1
   // AVG: tylko 1 pole niezerowe (10), mianownik = 1, wynik = 10
   auto result = rdbtest::ok(dataArea_null->qSet["str1"]->reduceFieldsToPayload(STREAM_AVG, "str1"));
   std::stringstream ss;
@@ -815,6 +841,493 @@ TEST_F(xschema_partial_null, null_bits_flushed_to_disk_second_reader_ignores_nul
   std::stringstream ss;
   ss << rdb::singleLineFormat << result;
   EXPECT_EQ(ss.str(), "{ str1:10/1 }");
+}
+
+// ============================================================
+// Kontrakt etapu 9 (#521): streamInstance - okna, reguly, pola wyjscia
+// ============================================================
+
+// Okno siegajace przed poczatek strumienia: brakujace pozycje sa NULL. Krok mnozy indeks okna
+// (pozycje windowIndex*step-(N-1) .. windowIndex*step). str1 = 11,12 / 13,14 / 15,16.
+TEST_F(xschema, constructAgsePayload_marks_missing_elements_null_and_scales_by_step) {
+  // covers: streaminstance.stream-instance.5~1
+  auto dataOwner       = rdbtest::ok(streamInstance::create(coreInstance, coreInstance["str1"]));
+  streamInstance &data = *dataOwner;
+  data.outputPayload->setDisposable(false);
+
+  const auto early = rdbtest::ok(data.constructAgsePayload(4, 1, "str1", 1));  // pozycje -2..1
+  EXPECT_EQ(early.getItemVT(0), std::optional<rdb::descFldVT>(12));
+  EXPECT_EQ(early.getItemVT(1), std::optional<rdb::descFldVT>(11));
+  EXPECT_FALSE(early.getItemVT(2).has_value());
+  EXPECT_FALSE(early.getItemVT(3).has_value());
+
+  const auto mirrored = rdbtest::ok(data.constructAgsePayload(-4, 1, "str1", 1));
+  EXPECT_FALSE(mirrored.getItemVT(0).has_value());
+  EXPECT_FALSE(mirrored.getItemVT(1).has_value());
+  EXPECT_EQ(mirrored.getItemVT(2), std::optional<rdb::descFldVT>(11));
+  EXPECT_EQ(mirrored.getItemVT(3), std::optional<rdb::descFldVT>(12));
+
+  const auto stepped = rdbtest::ok(data.constructAgsePayload(2, 2, "str1", 2));  // pozycje 3..4
+  EXPECT_EQ(stepped.getItemVT(0), std::optional<rdb::descFldVT>(15));
+  EXPECT_EQ(stepped.getItemVT(1), std::optional<rdb::descFldVT>(14));
+}
+
+class StreamRuntimeContract : public ::testing::Test {
+ protected:
+  std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_stream_runtime_contract";
+  qTree plan;
+  std::unique_ptr<dataModel> model;
+
+  void SetUp() override {
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir / "input.bin", std::ios::binary) << std::string(12, '\0');
+    const auto source = parsePlanText(plan, "STORAGE '" + dir.string() +
+                                                "'\n"
+                                                "DECLARE v INTEGER, s STRING[8] STREAM src, 1 BINFILE '" +
+                                                (dir / "input.bin").string() +
+                                                "'\n"
+                                                "SELECT src[0], src[1] STREAM out FROM src RETENTION 8 STORAGE MEMORY\n"
+                                                "RULE onNumber ON out WHEN out[0] DO DUMP 0 TO 3 RETENTION 2\n"
+                                                "RULE onText ON out WHEN out[1] DO SYSTEM 'touch " +
+                                                (dir / "text_fired").string() + "'\n");
+    ASSERT_EQ(source.status, "OK");
+    ASSERT_EQ(compiler(plan).compile(), "OK");
+    model = rdbtest::ok(dataModel::create(plan));
+    pProc = model.get();
+  }
+
+  void TearDown() override {
+    pProc = nullptr;
+    model.reset();
+    std::filesystem::remove_all(dir);
+  }
+
+  [[nodiscard]] streamInstance &out() { return *model->qSet.at("out"); }
+
+  // Zapisuje rekord strumienia `out` i zwraca jego bajty, tak jak trafiaja do zrzutu.
+  std::string writeRecord(std::optional<int> number, std::optional<std::string> text) {
+    auto *record = out().outputPayload->getPayload();
+    record->setItemVT(0, number ? std::optional<rdb::descFldVT>(*number) : std::nullopt);
+    record->setItemVT(1, text ? std::optional<rdb::descFldVT>(*text) : std::nullopt);
+    EXPECT_EQ(rdbtest::ok(out().outputPayload->write()), rdb::WriteStatus::Ok);
+    return {reinterpret_cast<const char *>(record->span().data()), record->descriptor.getSizeInBytes()};
+  }
+
+  [[nodiscard]] std::string fileBytes(const char *name) const {
+    std::ifstream file(dir / name, std::ios::binary);
+    return {std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
+  }
+
+  // Kopia wezla `out` z jedna regula o podanej nazwie (pusta nazwa = bez regul).
+  [[nodiscard]] query withRule(const std::string &name) {
+    query copy = plan.getQuery("out");
+    copy.lRules.remove_if([&](const rule &r) { return r.name != name; });
+    return copy;
+  }
+};
+
+// Warunek: NULL, zero i pusty STRING nie uruchamiaja akcji; liczba niezerowa (takze ujemna)
+// i niepusty STRING uruchamiaja. DUMP rejestruje zadanie z nazwa reguly, zakresem [0, 3)
+// i RETENTION 2 w katalogu STORAGE; kazde zadanie dopisuje biezacy rekord w swoim slocie.
+TEST_F(StreamRuntimeContract, rule_condition_truthiness_selects_dump_and_system_actions) {
+  // covers: streaminstance.stream-instance.2~1, streaminstance.stream-instance.7~1, streaminstance.stream-instance.8~1
+  const query &node = plan.getQuery("out");
+  const auto marker = dir / "text_fired";
+
+  writeRecord(0, "");
+  ASSERT_RDB_OK(out().constructRulesAndUpdate(node));
+  writeRecord(std::nullopt, std::nullopt);
+  ASSERT_RDB_OK(out().constructRulesAndUpdate(node));
+  EXPECT_FALSE(std::filesystem::exists(marker));
+  EXPECT_FALSE(std::filesystem::exists(dir / "out_onNumber_dump_0.tmp"));
+
+  writeRecord(0, "x");
+  ASSERT_RDB_OK(out().constructRulesAndUpdate(node));
+  EXPECT_TRUE(std::filesystem::exists(marker));
+  EXPECT_FALSE(std::filesystem::exists(dir / "out_onNumber_dump_0.tmp"));
+  std::filesystem::remove(marker);
+
+  const auto negative = writeRecord(-3, "");
+  ASSERT_RDB_OK(out().constructRulesAndUpdate(node));
+  EXPECT_FALSE(std::filesystem::exists(marker));
+  EXPECT_EQ(fileBytes("out_onNumber_dump_0.tmp"), negative);
+
+  const auto seven = writeRecord(7, "");
+  ASSERT_RDB_OK(out().constructRulesAndUpdate(node));
+  EXPECT_EQ(fileBytes("out_onNumber_dump_0.tmp"), negative + seven);
+  EXPECT_EQ(fileBytes("out_onNumber_dump_1.tmp"), seven);
+  EXPECT_FALSE(std::filesystem::exists(dir / "out_onNumber_dump.tmp"));
+}
+
+// Regula z armAtCount N jest pomijana, dopoki strumien nie ma N rekordow.
+TEST_F(StreamRuntimeContract, rule_waits_until_records_reach_armAtCount) {
+  // covers: streaminstance.stream-instance.7~1
+  query armed                     = withRule("onNumber");
+  armed.lRules.front().armAtCount = 3;
+  writeRecord(1, "");
+  ASSERT_RDB_OK(out().constructRulesAndUpdate(armed));
+  writeRecord(2, "");
+  ASSERT_RDB_OK(out().constructRulesAndUpdate(armed));
+  EXPECT_FALSE(std::filesystem::exists(dir / "out_onNumber_dump_0.tmp"));
+  const auto third = writeRecord(3, "");
+  ASSERT_RDB_OK(out().constructRulesAndUpdate(armed));
+  EXPECT_EQ(fileBytes("out_onNumber_dump_0.tmp"), third);
+}
+
+// Zadanie zrzutu biegnie dalej w slotach, w ktorych wezel nie ma juz zadnej reguly.
+TEST_F(StreamRuntimeContract, pending_dump_advances_with_an_empty_rule_list) {
+  // covers: streaminstance.stream-instance.8~1
+  const query fireOnce = withRule("onNumber");
+  const query noRules  = withRule("");
+  ASSERT_TRUE(noRules.lRules.empty());
+
+  std::string expected = writeRecord(1, "");
+  ASSERT_RDB_OK(out().constructRulesAndUpdate(fireOnce));
+  expected += writeRecord(2, "");
+  ASSERT_RDB_OK(out().constructRulesAndUpdate(noRules));
+  expected += writeRecord(3, "");
+  ASSERT_RDB_OK(out().constructRulesAndUpdate(noRules));
+  writeRecord(4, "");
+  ASSERT_RDB_OK(out().constructRulesAndUpdate(noRules));
+  EXPECT_EQ(fileBytes("out_onNumber_dump_0.tmp"), expected);
+}
+
+// Warunek bez wartosci logicznej (para) to Errc::Eval, a porazka utworzenia zrzutu to Errc::IO -
+// oba wracaja w Result zamiast konczyc proces.
+TEST_F(StreamRuntimeContract, rule_errors_return_in_result) {
+  // covers: streaminstance.stream-instance.7~1, streaminstance.stream-instance.8~1
+  query pairCondition                    = withRule("onNumber");
+  pairCondition.lRules.front().condition = {token(PUSH_VAL, rdb::descFldVT(std::pair<int, int>{1, 2}))};
+  writeRecord(1, "");
+  EXPECT_RDB_ERROR(out().constructRulesAndUpdate(pairCondition), rdb::Errc::Eval, "pair");
+
+  std::filesystem::remove_all(dir);
+  writeRecord(1, "");
+  const auto missingStorage = out().constructRulesAndUpdate(withRule("onNumber"));
+  ASSERT_RDB_ERROR(missingStorage, rdb::Errc::IO, "failed to create");
+  EXPECT_EQ(missingStorage.error().err(), ENOENT);
+}
+
+// SYSTEM konczacy sie bledem nie przerywa slotu, ale zostawia wpis w logu z kodem wyjscia.
+TEST_F(StreamRuntimeContract, failing_system_command_is_logged_without_failing_the_slot) {
+  // covers: streaminstance.stream-instance.8~1
+  query failing                        = withRule("onText");
+  failing.lRules.front().systemCommand = "exit 3";
+  const LogCapture log;
+  writeRecord(0, "x");
+  ASSERT_RDB_OK(out().constructRulesAndUpdate(failing));
+  EXPECT_THAT(log.text(), ::testing::HasSubstr("system() command exited with status: 3"));
+}
+
+// Okno rekordowe: jedna wartosc slotu na rekord z zakresu last-(width-1)..last, z przesunieciem
+// o baze logiczna; NULL i rekordy spoza historii sa pomijane, a puste okno daje same NULL.
+TEST_F(StreamRuntimeContract, record_window_skips_nulls_and_missing_records) {
+  // covers: streaminstance.stream-instance.4~1
+  writeRecord(1, "");
+  writeRecord(std::nullopt, "");
+  writeRecord(4, "");
+  writeRecord(7, "");
+
+  windowGroup group;
+  group.source    = "out";
+  group.slot      = 0;
+  group.width     = 3;
+  group.valueType = rdb::RATIONAL;
+  using rational  = boost::rational<int>;
+
+  const auto full = rdbtest::ok(out().reduceRecordWindow(group, 3, 0));  // null, 4, 7
+  EXPECT_EQ(full.count, 2);
+  EXPECT_EQ(full.minValue, rdb::descFldVT(rational(4)));
+  EXPECT_EQ(full.maxValue, rdb::descFldVT(rational(7)));
+  EXPECT_EQ(full.sumValue, rdb::descFldVT(rational(11)));
+  EXPECT_EQ(full.avgValue, rdb::descFldVT(rational(11, 2)));
+
+  const auto ahead = rdbtest::ok(out().reduceRecordWindow(group, 5, 0));  // 7 i dwa rekordy przyszle
+  EXPECT_EQ(ahead.count, 1);
+  EXPECT_EQ(ahead.avgValue, rdb::descFldVT(rational(7)));
+
+  const auto shifted = rdbtest::ok(out().reduceRecordWindow(group, 4, 2));  // fizyczne 0..2: 1, null, 4
+  EXPECT_EQ(shifted.count, 2);
+  EXPECT_EQ(shifted.sumValue, rdb::descFldVT(rational(5)));
+  EXPECT_EQ(shifted.avgValue, rdb::descFldVT(rational(5, 2)));
+
+  const auto empty = rdbtest::ok(out().reduceRecordWindow(group, 0, 2));
+  EXPECT_EQ(empty.count, 0);
+  for (const auto &value : {empty.minValue, empty.maxValue, empty.sumValue, empty.avgValue})
+    EXPECT_TRUE(std::holds_alternative<std::monostate>(value));
+
+  // Wyrazenie liczone na kazdym rekordzie okna, typ wyniku z grupy (DOUBLE, FLOAT).
+  group.program   = {token(PUSH_ID, rdb::descFldVT(std::pair<std::string, int>(out().outputPayload->descriptor[0].rname, 0))),
+                     token(PUSH_VAL, rdb::descFldVT(10)), token(MULTIPLY)};
+  group.valueType = rdb::DOUBLE;
+  const auto computed = rdbtest::ok(out().reduceRecordWindow(group, 3, 0));
+  EXPECT_EQ(computed.count, 2);
+  EXPECT_EQ(computed.maxValue, rdb::descFldVT(70.0));
+  EXPECT_EQ(computed.avgValue, rdb::descFldVT(55.0));
+  group.valueType = rdb::FLOAT;
+  EXPECT_EQ(rdbtest::ok(out().reduceRecordWindow(group, 3, 0)).minValue, rdb::descFldVT(40.0F));
+}
+
+// Pola wyjscia: NULL z wyrazenia i nieudana konwersja na typ pola daja NULL pola; blad
+// przerywa obliczenia bez cofania pol juz ustawionych, a magazyn nie dostaje rekordu.
+TEST_F(StreamRuntimeContract, output_fields_null_on_failed_conversion_and_stop_on_error) {
+  // covers: streaminstance.stream-instance.9~1
+  auto &runtime = out();
+  runtime.inputPayload->setItemVT(0, rdb::descFldVT(5));
+  runtime.inputPayload->setItemVT(1, rdb::descFldVT(std::string("in")));
+  auto *record = runtime.outputPayload->getPayload();
+
+  std::list<field> fields = plan.getQuery("out").lSchema;
+  ASSERT_EQ(fields.size(), 2U);
+  ASSERT_RDB_OK(runtime.constructOutputPayload(fields));
+  EXPECT_EQ(record->getItemVT(0), std::optional<rdb::descFldVT>(5));
+  EXPECT_EQ(record->getItemVT(1), std::optional<rdb::descFldVT>(std::string("in")));
+
+  fields.front().lProgram = {token(PUSH_VAL, rdb::descFldVT(1)), token(PUSH_VAL, rdb::descFldVT(0)), token(DIVIDE)};
+  ASSERT_RDB_OK(runtime.constructOutputPayload(fields));
+  EXPECT_FALSE(record->getItemVT(0).has_value());
+
+  record->setItemVT(0, rdb::descFldVT(99));
+  fields.front().lProgram = {token(PUSH_VAL, rdb::descFldVT(1e20))};
+  ASSERT_RDB_OK(runtime.constructOutputPayload(fields));
+  EXPECT_FALSE(record->getItemVT(0).has_value());
+
+  fields                              = plan.getQuery("out").lSchema;
+  std::next(fields.begin())->lProgram = {token(PUSH_VAL, rdb::descFldVT(std::string("a"))),
+                                         token(PUSH_VAL, rdb::descFldVT(std::string("b"))), token(SUBTRACT)};
+  record->setItemVT(0, rdb::descFldVT(99));
+  record->setItemVT(1, rdb::descFldVT(std::string("old")));
+  EXPECT_RDB_ERROR(runtime.constructOutputPayload(fields), rdb::Errc::Eval);
+  EXPECT_EQ(record->getItemVT(0), std::optional<rdb::descFldVT>(5));
+  EXPECT_EQ(record->getItemVT(1), std::optional<rdb::descFldVT>(std::string("old")));
+  EXPECT_EQ(runtime.outputPayload->getRecordsCount(), 0U);
+}
+
+// ============================================================
+// Kontrakt etapu 9 (#521): dataModel - maska, kolejnosc slotu, origin + ogon, odczyty
+// ============================================================
+
+class DataModelSlotContract : public ::testing::Test {
+ protected:
+  std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_datamodel_slot_contract";
+  qTree plan;
+  std::unique_ptr<dataModel> model;
+
+  [[nodiscard]] std::string planText() const {
+    return "STORAGE '" + dir.string() +
+           "'\n"
+           "SUBSTRAT 'memory'\n"
+           "DECLARE v INTEGER STREAM src, 1 TEXTFILE '" +
+           (dir / "input.txt").string() +
+           "' ONESHOT\n"
+           "SELECT src[0] STREAM a FROM src RETENTION 8 STORAGE MEMORY\n"
+           "SELECT a[0]*2 STREAM b FROM a STORAGE MEMORY\n"
+           "SELECT * STREAM w FROM src@(1,3) STORAGE MEMORY\n";
+  }
+
+  void SetUp() override {
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    std::ofstream(dir / "input.txt") << "10\n20\n30\n40\n50\n";
+    ASSERT_EQ(parsePlanText(plan, planText()).status, "OK");
+    ASSERT_EQ(compiler(plan).compile(), "OK");
+    model = rdbtest::ok(dataModel::create(plan));
+    pProc = model.get();
+  }
+
+  void TearDown() override {
+    pProc = nullptr;
+    model.reset();
+    std::filesystem::remove_all(dir);
+  }
+
+  [[nodiscard]] std::vector<char> due(std::initializer_list<const char *> ids) const {
+    std::vector<char> mask(plan.size(), 0);
+    for (std::size_t position = 0; position < plan.size(); ++position)
+      for (const char *id : ids)
+        if (plan.at(position).id == id) mask[position] = 1;
+    return mask;
+  }
+
+  [[nodiscard]] std::vector<char> allDue() const { return std::vector<char>(plan.size(), 1); }
+
+  [[nodiscard]] std::optional<rdb::descFldVT> latest(const char *id, std::size_t back = 0) {
+    auto &out = *model->qSet.at(id)->outputPayload;
+    EXPECT_EQ(rdbtest::ok(out.revRead(back)), rdb::ReadStatus::Ok);
+    return out.getPayload()->getItemVT(0);
+  }
+
+  [[nodiscard]] std::optional<rdb::descFldVT> sourceValue() {
+    return model->qSet.at("src")->outputPayload->getPayload()->getItemVT(0);
+  }
+};
+
+// Dyrektywy znikaja z planu, kazdy pozostaly wezel ma instancje, a magazyny MEMORY trafiaja do
+// podanego Memory Store, nie do domyslnego procesu. Blad otwarcia magazynu niesie nazwe strumienia.
+TEST_F(DataModelSlotContract, create_strips_directives_and_builds_every_stream_in_the_given_memory_store) {
+  // covers: datamodel.data-model.1~1
+  EXPECT_TRUE(std::ranges::none_of(plan, [](const query &q) { return q.isCompilerDirective(); }));
+  EXPECT_EQ(model->qSet.size(), plan.size());
+  for (const auto &q : plan)
+    EXPECT_TRUE(model->qSet.contains(q.id)) << q.id;
+
+  rdb::MemoryStore store;
+  const auto defaultBuckets = rdb::MemoryStore::processDefault().size();
+  qTree isolated;
+  ASSERT_EQ(parsePlanText(isolated, planText()).status, "OK");
+  ASSERT_EQ(compiler(isolated).compile(), "OK");
+  const auto isolatedModel = rdbtest::ok(dataModel::create(isolated, &store));
+  EXPECT_EQ(store.size(), 3U);  // a, b, w
+  EXPECT_EQ(rdb::MemoryStore::processDefault().size(), defaultBuckets);
+
+  std::ofstream(dir / "a.desc") << "invalid descriptor\n";
+  qTree broken;
+  ASSERT_EQ(parsePlanText(broken, "STORAGE '" + dir.string() + "'\nDECLARE v INTEGER STREAM src, 1 TEXTFILE '" +
+                                      (dir / "input.txt").string() + "'\nSELECT src[0] STREAM a FROM src\n")
+                .status,
+            "OK");
+  ASSERT_EQ(compiler(broken).compile(), "OK");
+  EXPECT_RDB_ERROR(dataModel::create(broken), rdb::Errc::CorruptDescriptor, "stream 'a'");
+}
+
+// Slot liczy wylacznie wezly z maski. Wezly obliczane ida w porzadku planu (b czyta rekord a
+// z tego samego slotu), czytajac biezacy rekord zrodla; zrodlo przesuwa sie dopiero na koncu.
+TEST_F(DataModelSlotContract, processRows_computes_due_nodes_in_plan_order_before_advancing_sources) {
+  // covers: datamodel.data-model.4~1, datamodel.data-model.7~1, executorsm.executorsm.3~1
+  ASSERT_RDB_OK(model->processZeroStep());
+  EXPECT_EQ(sourceValue(), std::optional<rdb::descFldVT>(10));
+
+  ASSERT_RDB_OK(model->processRows(allDue(), 1));
+  EXPECT_EQ(latest("a"), std::optional<rdb::descFldVT>(10));
+  EXPECT_EQ(latest("b"), std::optional<rdb::descFldVT>(20));
+  EXPECT_EQ(sourceValue(), std::optional<rdb::descFldVT>(20));
+
+  ASSERT_RDB_OK(model->processRows(due({"src", "a"}), 2));
+  EXPECT_EQ(model->getStreamCount("a"), 2U);
+  EXPECT_EQ(latest("a"), std::optional<rdb::descFldVT>(20));
+  EXPECT_EQ(model->getStreamCount("b"), 1U);
+  EXPECT_EQ(model->getStreamCount("w"), 0U);
+  EXPECT_EQ(sourceValue(), std::optional<rdb::descFldVT>(30));
+
+  ASSERT_RDB_OK(model->processRows(due({"a"}), 3));  // zrodlo poza maska: nie przesuwa sie
+  EXPECT_EQ(latest("a"), std::optional<rdb::descFldVT>(30));
+  EXPECT_EQ(sourceValue(), std::optional<rdb::descFldVT>(30));
+}
+
+// Okno @(1,3) nad zrodlem o jednym polu: pierwszy kompletny rekord okna ma indeks logiczny 2,
+// wiec dwa pierwsze nalezne sloty nie emituja niczego - ani zera, ani NULL.
+TEST_F(DataModelSlotContract, processRows_emits_nothing_during_origin_plus_tail_slots) {
+  // covers: datamodel.data-model.5~1, datamodel.data-model.7~1, datamodel.data-model.12~1
+  ASSERT_RDB_OK(model->processZeroStep());
+  ASSERT_RDB_OK(model->processRows(allDue(), 1));
+  ASSERT_RDB_OK(model->processRows(allDue(), 2));
+  EXPECT_EQ(model->getStreamCount("w"), 0U);
+  EXPECT_EQ(model->streamStoredSize("w"), 0U);
+
+  ASSERT_RDB_OK(model->processRows(allDue(), 3));
+  ASSERT_EQ(model->getStreamCount("w"), 1U);
+  const auto *window = rdbtest::ok(model->getPayload("w"));
+  EXPECT_EQ(window->getItemVT(0), std::optional<rdb::descFldVT>(30));
+  EXPECT_EQ(window->getItemVT(1), std::optional<rdb::descFldVT>(20));
+  EXPECT_EQ(window->getItemVT(2), std::optional<rdb::descFldVT>(10));
+}
+
+// Pierwszy blad ewaluacji konczy slot: nastepne wezly nie licza sie, zrodlo sie nie przesuwa,
+// a blad wraca w Result.
+TEST_F(DataModelSlotContract, processRows_stops_the_slot_at_the_first_error) {
+  // covers: datamodel.data-model.8~1
+  ASSERT_RDB_OK(model->processZeroStep());
+  plan["a"].lSchema.front().lProgram = {token(PUSH_VAL, rdb::descFldVT(std::string("x"))),
+                                        token(PUSH_VAL, rdb::descFldVT(std::string("y"))), token(SUBTRACT)};
+  EXPECT_RDB_ERROR(model->processRows(allDue(), 1), rdb::Errc::Eval);
+  EXPECT_EQ(model->getStreamCount("a"), 0U);
+  EXPECT_EQ(model->getStreamCount("b"), 0U);
+  EXPECT_EQ(sourceValue(), std::optional<rdb::descFldVT>(10));
+}
+
+TEST_F(DataModelSlotContract, processRows_mask_of_another_length_is_an_invariant_failure) {
+  // covers: datamodel.data-model.15~1
+  EXPECT_DEATH(static_cast<void>(model->processRows(std::vector<char>(plan.size() + 1, 1))), "due mask has");
+}
+
+// Odczyty po trzech slotach: a = 10, 20, 30, zrodlo stoi na 40.
+TEST_F(DataModelSlotContract, reads_by_offset_and_forward_index_fall_back_to_null) {
+  // covers: datamodel.data-model.9~1, datamodel.data-model.10~1, datamodel.data-model.11~1, datamodel.data-model.12~1
+  ASSERT_RDB_OK(model->processZeroStep());
+  for (int slot = 1; slot <= 3; ++slot)
+    ASSERT_RDB_OK(model->processRows(due({"src", "a"}), slot));
+
+  EXPECT_EQ(rdbtest::ok(model->fetchForward("a", 1))->getItemVT(0), std::optional<rdb::descFldVT>(20));
+  EXPECT_FALSE(rdbtest::ok(model->fetchForward("a", 3))->getItemVT(0).has_value());
+  EXPECT_FALSE(rdbtest::ok(model->fetchForward("a", -1))->getItemVT(0).has_value());
+  EXPECT_EQ(rdbtest::ok(model->fetchForward("src", 3))->getItemVT(0), std::optional<rdb::descFldVT>(40));
+  EXPECT_FALSE(rdbtest::ok(model->fetchForward("src", 4))->getItemVT(0).has_value());
+
+  EXPECT_EQ(rdbtest::ok(model->getPayload("a", 1))->getItemVT(0), std::optional<rdb::descFldVT>(20));
+  EXPECT_FALSE(rdbtest::ok(model->getPayload("a", 3))->getItemVT(0).has_value());
+  EXPECT_EQ(rdbtest::ok(model->getPayload("src", 2))->getItemVT(0), std::optional<rdb::descFldVT>(40));
+
+  const rdb::descFldVT fallback = nullFallbackValue(rdb::INTEGER);
+  EXPECT_EQ(rdbtest::ok(model->getRow("a", 2)), std::vector<rdb::descFldVT>{10});
+  EXPECT_EQ(rdbtest::ok(model->getRow("a", 3)), std::vector<rdb::descFldVT>{fallback});
+  EXPECT_EQ(rdbtest::ok(model->getRow("src", 2)), std::vector<rdb::descFldVT>{40});
+
+  auto &a = *model->qSet.at("a")->outputPayload;
+  a.getPayload()->setItemVT(0, std::nullopt);
+  ASSERT_EQ(rdbtest::ok(a.write()), rdb::WriteStatus::Ok);
+  EXPECT_EQ(rdbtest::ok(model->getRow("a", 0)), std::vector<rdb::descFldVT>{fallback});
+  EXPECT_FALSE(rdbtest::ok(model->getPayload("a", 0))->getItemVT(0).has_value());
+
+  EXPECT_EQ(model->getStreamCount("a"), 4U);
+  EXPECT_EQ(model->streamStoredSize("a"), 4U * a.descriptor.getSizeInBytes());
+}
+
+// Strumien dolaczony w slocie T = 4 przy ogonie 0 dostaje indeks pierwszego rekordu
+// n = T/Delta - 1 = 3 i emituje w tym samym slocie rekord zrodla o indeksie 3.
+TEST_F(DataModelSlotContract, adhoc_stream_starts_at_the_index_of_its_first_due_slot) {
+  // covers: datamodel.data-model.3~1, datamodel.data-model.6~1
+  ASSERT_RDB_OK(model->processZeroStep());
+  for (int slot = 1; slot <= 3; ++slot)
+    ASSERT_RDB_OK(model->processRows(due({"src", "a"}), slot));
+
+  query late = plan.getQuery("a");
+  late.id    = "late";
+  plan.push_back(late);
+  ASSERT_EQ(model->addQueriesToModel({"late"}), "");
+  EXPECT_FALSE(model->qSet.at("late")->logicalIndexBase.has_value());
+
+  ASSERT_RDB_OK(model->processRows(due({"src", "a", "late"}), 4));
+  ASSERT_EQ(model->getStreamCount("late"), 1U);
+  EXPECT_EQ(model->qSet.at("late")->logicalIndexBase, std::optional<int>(3));
+  EXPECT_EQ(latest("late"), std::optional<rdb::descFldVT>(40));
+  EXPECT_EQ(latest("a"), std::optional<rdb::descFldVT>(40));
+}
+
+TEST_F(DataModelSlotContract, syncDeclaredCapacities_only_grows_history) {
+  // covers: datamodel.data-model.13~1
+  auto &source            = *model->qSet.at("src")->outputPayload;
+  const auto starting     = source.historyCapacity();
+  plan.maxCapacity["src"] = static_cast<int>(starting) + 4;
+  model->syncDeclaredCapacities();
+  EXPECT_EQ(source.historyCapacity(), starting + 4);
+  plan.maxCapacity["src"] = 1;
+  model->syncDeclaredCapacities();
+  EXPECT_EQ(source.historyCapacity(), starting + 4);
+}
+
+// Zrodlo ONESHOT z piecioma rekordami: krok zerowy czyta 10, slot k przesuwa na rekord k+1.
+// Slot 5 siega za koniec pliku.
+TEST_F(DataModelSlotContract, exhaustedInputStream_names_the_source_after_its_last_record) {
+  // covers: datamodel.data-model.14~1, executorsm.executorsm.7~1
+  ASSERT_RDB_OK(model->processZeroStep());
+  for (int slot = 1; slot <= 4; ++slot) {
+    ASSERT_RDB_OK(model->processRows(due({"src"}), slot));
+    EXPECT_EQ(model->exhaustedInputStream(), "") << "slot " << slot;
+  }
+  EXPECT_EQ(sourceValue(), std::optional<rdb::descFldVT>(50));
+  ASSERT_RDB_OK(model->processRows(due({"src"}), 5));
+  EXPECT_EQ(model->exhaustedInputStream(), "src");
 }
 
 // Restore fixture: the null-test fixtures above delete and recreate str1/str2,

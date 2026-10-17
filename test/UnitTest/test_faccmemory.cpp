@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cerrno>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -26,6 +27,7 @@ using BYTE = unsigned char;
 
 // Verify write and sequential read of 4 records without retention limit
 TEST(MemoryTest, test_faccmemory_infinite) {
+  // covers: faccmemory.memory-file.5~1, faccmemory.memory-file.6~1, faccmemory.memory-file.8~1
   struct {
     BYTE data;
   } record;
@@ -64,8 +66,10 @@ TEST(MemoryTest, test_faccmemory_infinite) {
 }
 
 // Verify retention ring buffer: after 4 writes with size 2, ring holds last 2 records.
-// Reads at any position succeed via modular mapping; no EXIT_FAILURE for old positions.
+// Positions outside the last 2 writes are refused with ERANGE instead of returning the record
+// that took over their ring slot.
 TEST(MemoryTest, test_faccmemory_retention) {
+  // covers: faccmemory.memory-file.7~1, faccmemory.memory-file.8~1, faccmemory.memory-file.9~1
   struct {
     BYTE data;
   } record;
@@ -94,9 +98,13 @@ TEST(MemoryTest, test_faccmemory_retention) {
   GTEST_ASSERT_EQ(mfa->read(&record.data, 3), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record.data, 4);
 
-  // Position 0 maps to ring slot 0 - returns the record currently at that slot (value 3)
-  GTEST_ASSERT_EQ(mfa->read(&record.data, 0), EXIT_SUCCESS);
-  GTEST_ASSERT_EQ(record.data, 3);
+  // Positions 0 and 1 left the ring; slot 0 now holds record 2, not record 0
+  record.data = 0;
+  GTEST_ASSERT_EQ(mfa->read(&record.data, 0), ERANGE);
+  GTEST_ASSERT_EQ(mfa->read(&record.data, 1), ERANGE);
+  GTEST_ASSERT_EQ(record.data, 0);
+  // Position 4 has not been written yet
+  GTEST_ASSERT_EQ(mfa->read(&record.data, 4), ERANGE);
 
   mfa->write(nullptr);                            // Clear the storage
   GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 0);  // After clearing, count should be 0
@@ -104,6 +112,7 @@ TEST(MemoryTest, test_faccmemory_retention) {
 
 // Verify write and read of multi-byte records (4-byte integers) without retention
 TEST(MemoryTest, test_faccmemory_multibyte_record) {
+  // covers: faccmemory.memory-file.2~1
   int record;
 
   std::string filename = "test_file_memory_multi";
@@ -137,6 +146,7 @@ TEST(MemoryTest, test_faccmemory_multibyte_record) {
 
 // Verify update-in-place overwrites existing record at given position
 TEST(MemoryTest, test_faccmemory_update_in_place) {
+  // covers: faccmemory.memory-file.2~1, faccmemory.memory-file.5~1
   BYTE record;
 
   std::string filename = "test_file_memory_update";
@@ -202,8 +212,9 @@ TEST(MemoryTest, test_faccmemory_empty_count) {
 }
 
 // Verify retention ring boundary: ring of size 3 overwrites slot 0 on the 4th write.
-// All reads succeed via modular mapping - no EXIT_FAILURE for wrapped positions.
+// The overwritten position is refused; the positions still in the ring read their own records.
 TEST(MemoryTest, test_faccmemory_retention_boundary) {
+  // covers: faccmemory.memory-file.8~1, faccmemory.memory-file.9~1
   BYTE record;
 
   std::string filename = "test_file_memory_boundary";
@@ -232,11 +243,12 @@ TEST(MemoryTest, test_faccmemory_retention_boundary) {
 
   GTEST_ASSERT_EQ(rdbtest::ok(mfa->count()), 4);
 
-  // Position 0 maps to slot 0 - now holds value 4 (overwritten)
-  GTEST_ASSERT_EQ(mfa->read(&record, 0), EXIT_SUCCESS);
-  GTEST_ASSERT_EQ(record, 4);
+  // Position 0 shares slot 0 with position 3 and left the ring with the 4th write
+  GTEST_ASSERT_EQ(mfa->read(&record, 0), ERANGE);
+  GTEST_ASSERT_EQ(mfa->read(&record, 1), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(record, 2);
 
-  // Position 3 also maps to slot 0 - same value
+  // Position 3 is the record now held in slot 0
   GTEST_ASSERT_EQ(mfa->read(&record, 3), EXIT_SUCCESS);
   GTEST_ASSERT_EQ(record, 4);
 
@@ -317,6 +329,7 @@ TEST(MemoryTest, test_faccmemory_shared_between_live_instances) {
 // plan starts empty. Until 2026-09-27 it inherited the records and writeCount of the previous plan,
 // which after `xqry --reset` shifted its ring and ended the server with FatalError.
 TEST(MemoryTest, test_faccmemory_bucket_dies_with_last_instance) {
+  // covers: faccmemory.memory-file.4~1
   BYTE record = 0x42;
 
   std::string filename = "test_file_memory_last_instance";
@@ -402,6 +415,7 @@ TEST(MemoryTest, test_faccmemory_bucket_count_constant_across_plan_swaps) {
 // wspolnego stanu. Przed faza 2 pamiec byla mapa `static` w faccmemory.cc, wiec notatnik, ktory
 // zbudowal dwa silniki w jednym procesie, dostawal jeden strumien sklejony z dwoch.
 TEST(MemoryStoreTest, separate_stores_do_not_share_a_stream) {
+  // covers: memorystore.memory-store.5~1
   BYTE record;
   const std::string filename = "shared_name_two_stores";
   auto recsize               = sizeof(BYTE);
@@ -433,6 +447,7 @@ TEST(MemoryStoreTest, separate_stores_do_not_share_a_stream) {
 // stoi plan, w ktorym piszacy i czytajacy ten sam strumien MEMORY to rozne obiekty. Kubelek
 // znika z ostatnia instancja, tak jak w domyslnym Memory Store.
 TEST(MemoryStoreTest, one_store_still_shares_by_stream_name) {
+  // covers: faccmemory.memory-file.3~1, memorystore.memory-store.2~1
   BYTE record;
   const std::string filename = "shared_name_one_store";
   auto recsize               = sizeof(BYTE);
@@ -457,6 +472,7 @@ TEST(MemoryStoreTest, one_store_still_shares_by_stream_name) {
 // Bez podanego Memory Store obowiazuje instancja domyslna procesu - zachowanie sprzed fazy 2, na ktorym
 // stoja xretractor, xtrdb i testy powyzej.
 TEST(MemoryStoreTest, default_is_the_process_store) {
+  // covers: accessorfactory.make-accessor.2~1, memorystore.memory-store.6~1
   BYTE record;
   const std::string filename = "default_store_stream";
   auto recsize               = sizeof(BYTE);
@@ -476,6 +492,7 @@ TEST(MemoryStoreTest, default_is_the_process_store) {
 // Memory Store podany do rdb::storage ma dojechac az do akcesora. Bez tego memoryFile umie przyjac
 // Memory Store, ale nikt mu go nie podaje.
 TEST(MemoryStoreTest, storage_passes_its_store_down_to_the_accessor) {
+  // covers: accessorfactory.make-accessor.1~1, accessorfactory.make-accessor.2~1, faccmemory.memory-file.1~1
   // Pole TYPE nie jest danymi - attachStorage() czyta z niego nazwe typu magazynu,
   // wiec "MEMORY" wybiera backend pamieciowy (accessorFactory.cc).
   auto descriptor = rdb::Descriptor{{"a", 4, 1, rdb::INTEGER}, {"MEMORY", 0, 0, rdb::TYPE}};
@@ -496,4 +513,54 @@ TEST(MemoryStoreTest, storage_passes_its_store_down_to_the_accessor) {
 
   EXPECT_FALSE(given.empty()) << "zapis nie trafil do Memory Store podanego magazynowi";
   EXPECT_TRUE(untouched.empty()) << "zapis trafil do cudzego Memory Store";
+}
+
+// Nadpisanie w miejscu rekordu, ktory opuscil pierscien, trafialo do slotu nowszego rekordu
+// i zglaszalo sukces. Teraz jest odmowa, a rekordy w oknie zostaja nietkniete.
+TEST(MemoryTest, update_outside_retention_window_keeps_newer_records) {
+  // covers: faccmemory.memory-file.9~1
+  BYTE record = 0;
+  rdb::MemoryStore store;
+  rdb::memoryFile mfa("update_outside_window", makeDesc(sizeof(BYTE)), {"MEMORY", 2}, store);
+  for (BYTE value = 1; value <= 3; ++value)
+    GTEST_ASSERT_EQ(mfa.write(&value), EXIT_SUCCESS);
+
+  BYTE stale = 0x7F;
+  EXPECT_EQ(mfa.write(&stale, 0), ERANGE);
+  EXPECT_EQ(mfa.write(&stale, 3), ERANGE);  // jeszcze niezapisany
+  GTEST_ASSERT_EQ(mfa.read(&record, 1), EXIT_SUCCESS);
+  EXPECT_EQ(record, 2);
+  GTEST_ASSERT_EQ(mfa.read(&record, 2), EXIT_SUCCESS);
+  EXPECT_EQ(record, 3);
+
+  BYTE fresh = 0x55;
+  EXPECT_EQ(mfa.write(&fresh, 1), EXIT_SUCCESS);
+  GTEST_ASSERT_EQ(mfa.read(&record, 1), EXIT_SUCCESS);
+  EXPECT_EQ(record, 0x55);
+  EXPECT_EQ(rdbtest::ok(mfa.count()), 3U);
+}
+
+// Ta sama granica widziana przez rdb::storage: rekord spoza retencji MEMORY to Errc::IO z ERANGE,
+// jak rekord z usunietego segmentu magazynu dyskowego - a nie cudze dane ze statusem Ok.
+TEST(MemoryTest, storage_read_outside_memory_retention_is_an_io_error) {
+  // covers: faccmemory.memory-file.9~1
+  auto descriptor = rdb::Descriptor("a", 4, 1, rdb::INTEGER) + rdb::Descriptor("MEMORY", 0, 1, rdb::TYPE) +
+                    rdb::Descriptor("retention-mem", 2, 1, rdb::RETMEMORY);
+  rdb::MemoryStore store;
+  auto streamOwner = rdbtest::ok(rdb::storage::create("memretention", "memretention", "", "DEFAULT", false, false, -1, &store));
+  rdb::storage &stream = *streamOwner;
+  ASSERT_RDB_OK(stream.attachDescriptor(&descriptor));
+  stream.setDisposable(true);
+
+  for (int value = 10; value <= 30; value += 10) {
+    stream.getPayload()->setNullBitset(std::vector<bool>(descriptor.size(), false));
+    stream.getPayload()->setItem(0, value);
+    ASSERT_EQ(rdbtest::ok(stream.write()), rdb::WriteStatus::Ok);
+  }
+
+  ASSERT_EQ(rdbtest::ok(stream.revRead(1)), rdb::ReadStatus::Ok);
+  EXPECT_EQ(stream.getPayload()->getItemVT(0), std::optional<rdb::descFldVT>(20));
+  const auto outside = stream.revRead(2);
+  ASSERT_RDB_ERROR(outside, rdb::Errc::IO);
+  EXPECT_EQ(outside.error().err(), ERANGE);
 }

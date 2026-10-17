@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
@@ -8,6 +9,8 @@
 #include <list>
 #include <map>
 #include <string>
+#include <thread>
+#include <type_traits>
 #include <vector>
 
 #include <boost/rational.hpp>
@@ -95,6 +98,7 @@ std::vector<std::string> readLines(const std::filesystem::path &file) {
 //
 
 TEST(probeWork, counters_accumulate_per_event) {
+  // covers: probe.on-agse-window.1~1, probe.on-agse-read.1~1, probe.on-eval.1~1, probe.on-hash-pick.1~1, probe.on-add-merge.1~1
   rdb::probe::workReset();
 
   // Okna o RÓŻNEJ długości: praca okna rośnie z liczbą odwiedzonych elementów, a nie
@@ -118,6 +122,7 @@ TEST(probeWork, counters_accumulate_per_event) {
 }
 
 TEST(probeWork, counters_accumulate_across_slots) {
+  // covers: probe.on-agse-window.1~1, probe.on-eval.1~1
   // Liczniki są procesowe i sumują się przez cały przebieg - analiza dzieli je dopiero
   // przez liczbę slotów. Gubienie zdarzeń zaniżałoby pracę, a to jest dokładnie ta klasa
   // błędu, przez którą upadł model kosztu K20 etap 1.
@@ -135,6 +140,7 @@ TEST(probeWork, counters_accumulate_across_slots) {
 }
 
 TEST(probeWork, reset_zeroes_every_counter) {
+  // covers: probe.work-reset.1~1
   rdb::probe::onAgseWindow(3);
   rdb::probe::onAgseRead();
   rdb::probe::onEval(1);
@@ -154,6 +160,7 @@ TEST(probeWork, reset_zeroes_every_counter) {
 }
 
 TEST(probeWork, report_is_a_snapshot_not_a_view) {
+  // covers: probe.work-report.1~1
   // Raport musi być kopią: kampania zdejmuje odczyt na końcu przebiegu i porównuje go
   // z odczytem wcześniejszym. Referencja dawałaby dwie identyczne liczby.
   rdb::probe::workReset();
@@ -172,6 +179,7 @@ TEST(probeWork, report_is_a_snapshot_not_a_view) {
 //
 
 TEST(probeMaterialization, persistent_and_memory_storage_counted_separately) {
+  // covers: probe.on-materialized-append.1~1
   // Bez tego podziału plan z SUBSTRAT 'memory' raportowałby objętość, której nigdy nie
   // zapisał na dysk - a to jest liczba, którą artykuł nazywa „objętością materializacji".
   rdb::probe::materializationReset();
@@ -187,6 +195,7 @@ TEST(probeMaterialization, persistent_and_memory_storage_counted_separately) {
 }
 
 TEST(probeMaterialization, overwrite_costs_a_write_but_no_volume) {
+  // covers: probe.on-materialized-overwrite.1~1
   // Nadpisanie nie zwiększa objętości magazynu, tylko koszt zapisu - dlatego nie ma
   // parametru z liczbą bajtów i nie wolno mu ruszyć licznika `bytes`.
   rdb::probe::materializationReset();
@@ -203,6 +212,7 @@ TEST(probeMaterialization, overwrite_costs_a_write_but_no_volume) {
 }
 
 TEST(probeMaterialization, reset_zeroes_every_counter) {
+  // covers: probe.materialization-reset.1~1
   rdb::probe::onMaterializedAppend(false, 10);
   rdb::probe::onMaterializedAppend(true, 10);
   rdb::probe::onMaterializedOverwrite(false);
@@ -227,12 +237,14 @@ TEST(probeMaterialization, reset_zeroes_every_counter) {
 //
 
 TEST(probeCanonicalRecord, empty_descriptor_has_only_an_empty_null_map) {
+  // covers: probe.canonical-record-bytes.1~1
   const rdb::Descriptor descriptor;
 
   EXPECT_EQ(rdb::probe::canonicalRecordBytes(descriptor), 0u);
 }
 
 TEST(probeCanonicalRecord, integer_field_is_eight_bytes_plus_one_map_byte) {
+  // covers: probe.canonical-record-bytes.1~1
   // Kanoniczna szerokość NIE jest natywnym rlen: pole zadeklarowane jako 4-bajtowe
   // liczy się jako 8 B, bo metryka ma być neutralna wobec obu porównywanych systemów.
   const rdb::Descriptor descriptor{{"a", sizeof(int), 1, rdb::INTEGER}};
@@ -241,6 +253,7 @@ TEST(probeCanonicalRecord, integer_field_is_eight_bytes_plus_one_map_byte) {
 }
 
 TEST(probeCanonicalRecord, width_per_type_follows_the_frozen_mapping) {
+  // covers: probe.canonical-record-bytes.2~1
   const rdb::Descriptor byteField{{"a", 1, 1, rdb::BYTE}};
   const rdb::Descriptor floatField{{"a", 4, 1, rdb::FLOAT}};
   const rdb::Descriptor doubleField{{"a", 8, 1, rdb::DOUBLE}};
@@ -253,6 +266,7 @@ TEST(probeCanonicalRecord, width_per_type_follows_the_frozen_mapping) {
 }
 
 TEST(probeCanonicalRecord, string_keeps_its_declared_width) {
+  // covers: probe.canonical-record-bytes.2~1
   // Napis jest jedynym typem, dla którego szerokość zadeklarowana JEST szerokością
   // kanoniczną - nie ma neutralnego rozmiaru napisu do podstawienia.
   const rdb::Descriptor descriptor{{"s", 16, 1, rdb::STRING}};
@@ -261,6 +275,7 @@ TEST(probeCanonicalRecord, string_keeps_its_declared_width) {
 }
 
 TEST(probeCanonicalRecord, array_multiplies_the_canonical_width) {
+  // covers: probe.canonical-record-bytes.1~1
   const rdb::Descriptor descriptor{{"a", sizeof(int), 3, rdb::INTEGER}};
 
   // 3 wartości × 8 B + mapa NULL na 3 bity = 1 bajt
@@ -268,6 +283,7 @@ TEST(probeCanonicalRecord, array_multiplies_the_canonical_width) {
 }
 
 TEST(probeCanonicalRecord, null_map_rounds_up_to_whole_bytes) {
+  // covers: probe.canonical-record-bytes.1~1
   // Mapa ma jeden bit na wartość, zaokrąglony w górę: 8 wartości = 1 bajt, 9 = 2 bajty.
   const rdb::Descriptor eightValues{{"a", sizeof(int), 8, rdb::INTEGER}};
   const rdb::Descriptor nineValues{{"a", sizeof(int), 9, rdb::INTEGER}};
@@ -277,6 +293,7 @@ TEST(probeCanonicalRecord, null_map_rounds_up_to_whole_bytes) {
 }
 
 TEST(probeCanonicalRecord, configuration_fields_and_nulltype_carry_no_width) {
+  // covers: probe.canonical-record-bytes.2~1
   // Pola konfiguracyjne nie są danymi rekordu; ta sama reguła co w Descriptor::fieldSize().
   const rdb::Descriptor descriptor{{"a", sizeof(int), 1, rdb::INTEGER},  //
                                    {"TYPE", 0, 1, rdb::TYPE},
@@ -288,6 +305,7 @@ TEST(probeCanonicalRecord, configuration_fields_and_nulltype_carry_no_width) {
 }
 
 TEST(probeCanonicalRecord, result_is_independent_of_record_contents) {
+  // covers: probe.canonical-record-bytes.3~1
   // Metryka bajtowa jest deterministycznym wynikiem mechanizmu - dwa odczyty tego samego
   // deskryptora muszą dać tę samą liczbę, niezależnie od tego, co stoi w rekordzie.
   const rdb::Descriptor descriptor{{"a", sizeof(int), 2, rdb::INTEGER}, {"s", 8, 1, rdb::STRING}};
@@ -307,6 +325,7 @@ TEST(probeLogicalWrite, zero_writes_report_zero) {
 }
 
 TEST(probeLogicalWrite, substrate_and_public_roles_counted_apart) {
+  // covers: probe.on-logical-write.1~1
   // Metryka pierwotna to bajty substratu, a mianownikiem jest liczba rekordów publicznych.
   // Licznik globalny nie dawał ani jednej, ani drugiej wielkości.
   rdb::probe::logicalWriteReset();
@@ -322,6 +341,7 @@ TEST(probeLogicalWrite, substrate_and_public_roles_counted_apart) {
 }
 
 TEST(probeLogicalWrite, overwrite_carries_bytes_unlike_the_native_counter) {
+  // covers: probe.on-logical-write.1~1
   // To jest ta różnica, która ratuje pomiar substratu na buforze kołowym: po zawinięciu
   // zapisy idą ścieżką nadpisania i licznik natywny pokazałby tam zero bajtów.
   rdb::probe::logicalWriteReset();
@@ -364,6 +384,7 @@ TEST(probeLogicalWrite, records_of_different_width_sum_exactly) {
 }
 
 TEST(probeLogicalWrite, reset_zeroes_every_counter) {
+  // covers: probe.logical-write-reset.1~1
   rdb::probe::onLogicalWrite(true, true, 10);
   rdb::probe::onLogicalWrite(false, false, 10);
 
@@ -387,6 +408,7 @@ TEST(probeLogicalWrite, reset_zeroes_every_counter) {
 //
 
 TEST(probePlanShape, directives_are_not_part_of_the_plan) {
+  // covers: probe.shape-of.1~1, probe.plan-probe.4~1
   qTree plan;
   plan.push_back(makeQuery("public", false, 2, {3}));
   plan.push_back(makeQuery(":STORAGE", false, 5, {5, 5}));  // dyrektywa kompilatora
@@ -399,6 +421,7 @@ TEST(probePlanShape, directives_are_not_part_of_the_plan) {
 }
 
 TEST(probePlanShape, substrates_counted_apart_from_public_streams) {
+  // covers: probe.shape-of.1~1
   // Substrat nie ma tożsamości obserwowalnej, więc to on jest właściwą jednostką
   // redukcji strukturalnej - liczony osobno od strumieni publicznych.
   qTree plan;
@@ -413,6 +436,7 @@ TEST(probePlanShape, substrates_counted_apart_from_public_streams) {
 }
 
 TEST(probePlanShape, field_tokens_counted_separately_from_from_tokens) {
+  // covers: probe.shape-of.1~1
   // Rozdział jest konieczny: współdzielenie równoważnych SELECT przenosi kosztowny
   // program pól do jednego substratu i NIE zmienia ani jednego tokenu w lProgram.
   // Metryka licząca same lProgram dawała identyczny odczyt dla programu pól
@@ -426,6 +450,7 @@ TEST(probePlanShape, field_tokens_counted_separately_from_from_tokens) {
 }
 
 TEST(probePlanShape, empty_plan_has_zero_shape) {
+  // covers: probe.shape-of.1~1
   const qTree plan;
 
   const auto shape = rdb::probe::shapeOf(plan);
@@ -436,6 +461,7 @@ TEST(probePlanShape, empty_plan_has_zero_shape) {
 }
 
 TEST(probePlanShape, capacities_summed_and_maximum_reported) {
+  // covers: probe.shape-of-capacities.1~1
   // Suma jest proporcjonalna do zajętości pamięci planu, maksimum wskazuje najgłębszy
   // bufor - ten decydujący o najgorszym przypadku.
   const std::map<std::string, int> capacities{{"a", 3}, {"b", 7}, {"c", 1}};
@@ -447,6 +473,7 @@ TEST(probePlanShape, capacities_summed_and_maximum_reported) {
 }
 
 TEST(probePlanShape, empty_capacity_map_has_zero_shape) {
+  // covers: probe.shape-of-capacities.1~1
   const std::map<std::string, int> capacities;
 
   const auto shape = rdb::probe::shapeOfCapacities(capacities);
@@ -463,6 +490,7 @@ TEST(probePlanShape, empty_capacity_map_has_zero_shape) {
 //
 
 TEST(probeReport, runtime_counters_are_silent_without_environment) {
+  // covers: probe.print-runtime-counters.1~1
   const envGuard noMaterialize("RDB_BENCH_MATERIALIZE", nullptr);
   const envGuard noLogical("RDB_BENCH_LOGICAL", nullptr);
   const envGuard noWork("RDB_BENCH_WORK", nullptr);
@@ -473,6 +501,7 @@ TEST(probeReport, runtime_counters_are_silent_without_environment) {
 }
 
 TEST(probeReport, work_line_printed_when_armed) {
+  // covers: probe.print-runtime-counters.1~1, probe.report-runtime-counters.1~1
   const envGuard noMaterialize("RDB_BENCH_MATERIALIZE", nullptr);
   const envGuard noLogical("RDB_BENCH_LOGICAL", nullptr);
   const envGuard work("RDB_BENCH_WORK", "1");
@@ -497,6 +526,7 @@ TEST(probeReport, work_line_printed_when_armed) {
 }
 
 TEST(probeReport, materialization_line_printed_when_armed) {
+  // covers: probe.print-runtime-counters.1~1, probe.report-runtime-counters.1~1
   const envGuard materialize("RDB_BENCH_MATERIALIZE", "1");
   const envGuard noLogical("RDB_BENCH_LOGICAL", nullptr);
   const envGuard noWork("RDB_BENCH_WORK", nullptr);
@@ -519,6 +549,7 @@ TEST(probeReport, materialization_line_printed_when_armed) {
 }
 
 TEST(probeReport, logical_line_is_armed_by_its_own_variable) {
+  // covers: probe.print-runtime-counters.1~1, probe.report-runtime-counters.1~1
   // Dwie osobne zmienne, bo to dwie różne wielkości: MATERIALIZED opisuje objętość
   // magazynu w reprezentacji natywnej, LOGICAL - kanoniczne bajty zapisów wg roli.
   const envGuard noMaterialize("RDB_BENCH_MATERIALIZE", nullptr);
@@ -543,6 +574,7 @@ TEST(probeReport, logical_line_is_armed_by_its_own_variable) {
 }
 
 TEST(probePlanReport, silent_without_environment) {
+  // covers: probe.plan-probe.2~1, probe.plan-probe.3~1
   const envGuard noPlan("RDB_BENCH_PLAN", nullptr);
 
   qTree plan;
@@ -557,6 +589,8 @@ TEST(probePlanReport, silent_without_environment) {
 }
 
 TEST(probePlanReport, stages_and_rewrites_reported_when_armed) {
+  // covers: probe.count-rewrite-r1.1~1, probe.count-rewrite-r2.1~1, probe.count-rewrite-r3.1~1, probe.on-rewrite-r1.1~1
+  // covers: probe.on-rewrite-r2.1~1, probe.on-rewrite-r3.1~1, probe.plan-probe.1~1, probe.plan-probe.4~1, probe.plan-probe.5~1
   const envGuard planEnv("RDB_BENCH_PLAN", "1");
 
   qTree plan;
@@ -597,6 +631,7 @@ TEST(probePlanReport, stages_and_rewrites_reported_when_armed) {
 }
 
 TEST(probePlanReport, dedup_switch_is_visible_in_the_report) {
+  // covers: probe.plan-probe.1~1, probe.plan-probe.5~1
   // Profil ablacyjny musi dać się rozpoznać po samym wierszu raportu - bez tego wyniki
   // dwóch profili są nierozróżnialne w zbiorczym logu kampanii.
   const envGuard planEnv("RDB_BENCH_PLAN", "1");
@@ -615,6 +650,7 @@ TEST(probePlanReport, dedup_switch_is_visible_in_the_report) {
 }
 
 TEST(probePlanReport, construction_resets_rewrite_counters) {
+  // covers: probe.plan-probe.2~1
   const envGuard planEnv("RDB_BENCH_PLAN", "1");
 
   rdb::probe::onRewriteR1();
@@ -639,6 +675,7 @@ TEST(probePlanReport, construction_resets_rewrite_counters) {
 //
 
 TEST(probeSlot, csv_has_header_and_one_row_per_slot) {
+  // covers: probe.slot-probe.1~1, probe.slot-probe.2~1, probe.slot-probe.6~1, probe.slot-probe.8~1
   const std::filesystem::path csv = "probe_slot.csv";
   std::filesystem::remove(csv);
   const envGuard armed("RDB_BENCH_CSV", csv.c_str());
@@ -677,6 +714,7 @@ TEST(probeSlot, csv_has_header_and_one_row_per_slot) {
 }
 
 TEST(probeSlot, measured_intervals_keep_their_order) {
+  // covers: probe.slot-probe.1~1, probe.slot-probe.6~1
   const std::filesystem::path csv = "probe_slot_order.csv";
   std::filesystem::remove(csv);
   const envGuard armed("RDB_BENCH_CSV", csv.c_str());
@@ -714,6 +752,7 @@ TEST(probeSlot, measured_intervals_keep_their_order) {
 }
 
 TEST(probeSlot, disarmed_probe_writes_nothing_and_survives_use) {
+  // covers: probe.slot-probe.2~1
   // Normalny tryb pracy usługi: sonda wkompilowana, ale zmiennej nie ma. Wywołania
   // muszą być bezpieczne i nie mogą zostawić po sobie pliku.
   const envGuard disarmed("RDB_BENCH_CSV", nullptr);
@@ -733,4 +772,232 @@ TEST(probeSlot, disarmed_probe_writes_nothing_and_survives_use) {
   }
 
   EXPECT_FALSE(std::filesystem::exists(csv));
+}
+
+//
+// ─── Uzupelnienia pokrycia wymagan probe.hpp ────────────────────────────────────
+//
+// Raporty i zerowanie licznikow sa wkompilowane w kazdym buildzie, ale bez sondy nic ich
+// nie podnosi - testy wyzej widza wtedy same zera i nie odroznia kopii od widoku ani
+// zerowania od braku zdarzen. Stan zasiewany wprost w `detail`, zeby obie wlasnosci byly
+// sprawdzone takze w `ninja test` (build bez sondy).
+//
+
+TEST(probeCounters, work_report_is_a_snapshot_and_reset_clears_seeded_state) {
+  // covers: probe.work-report.1~1, probe.work-reset.1~1
+  rdb::probe::detail::work = rdb::probe::workCounters{
+      .agseWindows = 1, .agseElements = 2, .agseReads = 3, .evalCalls = 4, .evalTokens = 5, .hashPicks = 6, .addMerges = 7};
+  const auto before = rdb::probe::workReport();
+  ++rdb::probe::detail::work.agseWindows;
+
+  EXPECT_EQ(before.agseWindows, 1u) << "raport nie moze sledzic pozniejszych zmian";
+  EXPECT_EQ(before.addMerges, 7u);
+  EXPECT_EQ(rdb::probe::workReport().agseWindows, 2u);
+
+  rdb::probe::workReset();
+  const auto w = rdb::probe::workReport();
+  EXPECT_EQ(w.agseWindows, 0u);
+  EXPECT_EQ(w.agseElements, 0u);
+  EXPECT_EQ(w.agseReads, 0u);
+  EXPECT_EQ(w.evalCalls, 0u);
+  EXPECT_EQ(w.evalTokens, 0u);
+  EXPECT_EQ(w.hashPicks, 0u);
+  EXPECT_EQ(w.addMerges, 0u);
+}
+
+TEST(probeCounters, materialization_report_is_a_snapshot_and_reset_clears_seeded_state) {
+  // covers: probe.materialization-report.1~1, probe.materialization-reset.1~1
+  rdb::probe::detail::materialization = rdb::probe::materializationCounters{
+      .appends = 1, .overwrites = 2, .bytes = 3, .memoryAppends = 4, .memoryOverwrites = 5, .memoryBytes = 6};
+  const auto before = rdb::probe::materializationReport();
+  ++rdb::probe::detail::materialization.bytes;
+
+  EXPECT_EQ(before.bytes, 3u) << "raport nie moze sledzic pozniejszych zmian";
+  EXPECT_EQ(before.memoryBytes, 6u);
+  EXPECT_EQ(rdb::probe::materializationReport().bytes, 4u);
+
+  rdb::probe::materializationReset();
+  const auto m = rdb::probe::materializationReport();
+  EXPECT_EQ(m.appends, 0u);
+  EXPECT_EQ(m.overwrites, 0u);
+  EXPECT_EQ(m.bytes, 0u);
+  EXPECT_EQ(m.memoryAppends, 0u);
+  EXPECT_EQ(m.memoryOverwrites, 0u);
+  EXPECT_EQ(m.memoryBytes, 0u);
+}
+
+TEST(probeCounters, logical_write_report_is_a_snapshot_and_reset_clears_seeded_state) {
+  // covers: probe.logical-write-report.1~1, probe.logical-write-reset.1~1
+  rdb::probe::detail::logicalWrite = rdb::probe::logicalWriteCounters{.substrateAppends    = 1,
+                                                                      .substrateOverwrites = 2,
+                                                                      .substrateBytes      = 3,
+                                                                      .publicAppends       = 4,
+                                                                      .publicOverwrites    = 5,
+                                                                      .publicBytes         = 6};
+  const auto before                = rdb::probe::logicalWriteReport();
+  ++rdb::probe::detail::logicalWrite.substrateBytes;
+
+  EXPECT_EQ(before.substrateBytes, 3u) << "raport nie moze sledzic pozniejszych zmian";
+  EXPECT_EQ(before.publicBytes, 6u);
+  EXPECT_EQ(rdb::probe::logicalWriteReport().substrateBytes, 4u);
+
+  rdb::probe::logicalWriteReset();
+  const auto l = rdb::probe::logicalWriteReport();
+  EXPECT_EQ(l.substrateAppends, 0u);
+  EXPECT_EQ(l.substrateOverwrites, 0u);
+  EXPECT_EQ(l.substrateBytes, 0u);
+  EXPECT_EQ(l.publicAppends, 0u);
+  EXPECT_EQ(l.publicOverwrites, 0u);
+  EXPECT_EQ(l.publicBytes, 0u);
+}
+
+TEST(probeCanonicalRecord, uint_and_pair_types_follow_the_frozen_mapping) {
+  // covers: probe.canonical-record-bytes.2~1
+  const rdb::Descriptor uintField{{"u", sizeof(unsigned), 1, rdb::UINT}};
+  const rdb::Descriptor intPairField{{"p", 8, 1, rdb::INTPAIR}};
+  const rdb::Descriptor idxPairField{{"x", 12, 1, rdb::IDXPAIR}};
+  const rdb::Descriptor idxPairArray{{"x", 12, 2, rdb::IDXPAIR}};
+
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(uintField), 8u + 1u);
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(intPairField), 16u + 1u);
+  // IDXPAIR: rlen razy rarray plus jedno 8-bajtowe pole indeksu - indeks NIE mnozy sie przez rarray.
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(idxPairField), 12u + 8u + 1u);
+  EXPECT_EQ(rdb::probe::canonicalRecordBytes(idxPairArray), 24u + 8u + 1u);
+}
+
+static_assert(!std::is_copy_constructible_v<rdb::probe::slotProbe> && !std::is_copy_assignable_v<rdb::probe::slotProbe>,
+              "sonda slotu trzyma uchwyt pliku CSV - kopia zamknelaby go dwukrotnie");
+
+TEST(probeSlot, unopenable_or_unopened_csv_leaves_the_probe_disarmed) {
+  // covers: probe.slot-probe.2~1, probe.slot-probe.7~1
+  // Nieudane fopen i brak wywolania open() koncza sie tak samo: sonda dziala dalej
+  // bez pliku i bez wplywu na petle slotu.
+  const std::filesystem::path missingDir = "probe_slot_missing_dir";
+  std::filesystem::remove_all(missingDir);
+  {
+    const envGuard armed("RDB_BENCH_CSV", (missingDir / "slot.csv").c_str());
+    rdb::probe::slotProbe bench;
+    bench.open();
+    std::timespec anchor{};
+    ::clock_gettime(CLOCK_MONOTONIC, &anchor);
+    bench.anchor(anchor);
+    bench.beginSlot(0);
+    bench.beginCompute();
+    bench.endCompute();
+    bench.endSlot();
+  }
+  EXPECT_FALSE(std::filesystem::exists(missingDir));
+
+  const std::filesystem::path unopened = "probe_slot_unopened.csv";
+  std::filesystem::remove(unopened);
+  {
+    const envGuard armed("RDB_BENCH_CSV", unopened.c_str());
+    rdb::probe::slotProbe bench;  // bez open(): zmienna ustawiona, ale pliku nikt nie otworzyl
+    std::timespec anchor{};
+    ::clock_gettime(CLOCK_MONOTONIC, &anchor);
+    bench.anchor(anchor);
+    bench.beginSlot(0);
+    bench.beginCompute();
+    bench.endCompute();
+    bench.endSlot();
+  }
+  EXPECT_FALSE(std::filesystem::exists(unopened));
+}
+
+TEST(probeSlot, deadline_is_anchor_plus_offset_and_compute_spans_its_markers) {
+  // covers: probe.slot-probe.3~1, probe.slot-probe.4~1, probe.slot-probe.5~1, probe.slot-probe.6~1
+  // Kotwica 30 s w przeszlosci, a drugi termin 60 s po niej: spoznienie pobudki wypada raz
+  // ok. +30 s, raz ok. -30 s. Kotwica niezapamietana albo przesuniecie liczone w innej
+  // jednostce niz ms przesuneloby obie liczby o rzedy wielkosci.
+  constexpr long kSecondNs = 1'000'000'000L;
+  constexpr auto kCompute  = std::chrono::milliseconds(5);
+
+  const std::filesystem::path csv = "probe_slot_deadline.csv";
+  std::filesystem::remove(csv);
+  const envGuard armed("RDB_BENCH_CSV", csv.c_str());
+
+  {
+    rdb::probe::slotProbe bench;
+    bench.open();
+    std::timespec anchor{};
+    ::clock_gettime(CLOCK_MONOTONIC, &anchor);
+    anchor.tv_sec -= 30;
+    bench.anchor(anchor);
+
+    bench.beginSlot(0);
+    bench.beginCompute();
+    std::this_thread::sleep_for(kCompute);
+    bench.endCompute();
+    bench.endSlot();
+
+    bench.beginSlot(60'000);
+    bench.beginCompute();
+    bench.endCompute();
+    bench.endSlot();
+  }
+
+  if constexpr (!rdb_probe_slot) {
+    EXPECT_FALSE(std::filesystem::exists(csv));
+    return;
+  }
+
+  const auto lines = readLines(csv);
+  ASSERT_EQ(lines.size(), 3u);
+
+  long iter = -1, computeNs = 0, wakeLagNs = 0, e2eNs = 0;
+  ASSERT_EQ(std::sscanf(lines[1].c_str(), "%ld,%ld,%ld,%ld", &iter, &computeNs, &wakeLagNs, &e2eNs), 4);
+  EXPECT_EQ(iter, 0);
+  EXPECT_GE(computeNs, std::chrono::nanoseconds(kCompute).count()) << "sen lezy miedzy beginCompute a endCompute";
+  EXPECT_GE(wakeLagNs, 30 * kSecondNs);
+  EXPECT_LT(wakeLagNs, 35 * kSecondNs);
+  EXPECT_GE(e2eNs - wakeLagNs, computeNs) << "emisja wyniku nastepuje po obliczeniach tego slotu";
+
+  ASSERT_EQ(std::sscanf(lines[2].c_str(), "%ld,%ld,%ld,%ld", &iter, &computeNs, &wakeLagNs, &e2eNs), 4);
+  EXPECT_EQ(iter, 1);
+  EXPECT_GE(wakeLagNs, -30 * kSecondNs);
+  EXPECT_LT(wakeLagNs, -25 * kSecondNs);
+  EXPECT_GE(e2eNs, wakeLagNs);
+
+  std::filesystem::remove(csv);
+}
+
+TEST(probePlanReport, compile_time_runs_from_construction_less_the_probe_cost) {
+  // covers: probe.plan-probe.2~1, probe.plan-probe.4~1, probe.plan-probe.5~1
+  // COMPILE_NS liczy sie od konstrukcji sondy, a koszt migawek jest od niego odejmowany.
+  // Oba skladniki razem nie moga przekroczyc czasu zmierzonego z zewnatrz; bez odejmowania
+  // suma przekroczylaby go o caly koszt sondy, ktory sto migawek planu 1000 zapytan czyni
+  // wiekszym niz narzut samego wywolania.
+  const envGuard planEnv("RDB_BENCH_PLAN", "1");
+  constexpr auto kCompile = std::chrono::milliseconds(5);
+
+  qTree plan;
+  for (int i = 0; i < 1000; ++i)
+    plan.push_back(makeQuery("q" + std::to_string(i), false, 1, {1}));
+
+  std::timespec outerBegin{}, outerEnd{};
+  ::clock_gettime(CLOCK_MONOTONIC, &outerBegin);
+  rdb::probe::planProbe bench;
+  for (int i = 0; i < 100; ++i)
+    bench.capture(rdb::probe::planStage::entry, plan);
+  std::this_thread::sleep_for(kCompile);
+
+  testing::internal::CaptureStderr();
+  bench.report(plan, plan.maxCapacity, true);
+  const std::string output = testing::internal::GetCapturedStderr();
+  ::clock_gettime(CLOCK_MONOTONIC, &outerEnd);
+
+  if constexpr (!rdb_probe_plan) {
+    EXPECT_EQ(output, "");
+    return;
+  }
+
+  const auto at = output.find("COMPILE_NS ");
+  ASSERT_NE(at, std::string::npos) << output;
+  long compileNs = -1, probeNs = -1;
+  ASSERT_EQ(std::sscanf(output.c_str() + at, "COMPILE_NS %ld sonda=%ld", &compileNs, &probeNs), 2) << output;
+
+  const long outerNs = ((outerEnd.tv_sec - outerBegin.tv_sec) * 1'000'000'000L) + (outerEnd.tv_nsec - outerBegin.tv_nsec);
+  EXPECT_GT(probeNs, 0) << output;
+  EXPECT_GE(compileNs, std::chrono::nanoseconds(kCompile).count()) << output;
+  EXPECT_LE(compileNs + probeNs, outerNs) << output;
 }

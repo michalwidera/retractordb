@@ -17,6 +17,7 @@ set(IT_NO_NAMESPACE TRUE)
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
+# covers: qry.qry.1~1, launcher.xretractor.18~1, launcher.xretractor.30~1
 add_test(
   NAME ${TestID}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

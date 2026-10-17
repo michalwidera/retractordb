@@ -71,4 +71,6 @@ enum command_id : std::uint8_t {
   BIT_NOT  // 48
 };
 
+/// Funkcja GetStringcommand_id powinna:
+/// - [cmdid.get-stringcommand-id.1~1] zwracać nazwę wartości wyliczenia command_id.
 constexpr auto GetStringcommand_id(enum command_id index) -> std::string_view { return magic_enum::enum_name(index); }

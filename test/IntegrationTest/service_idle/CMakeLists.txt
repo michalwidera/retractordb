@@ -20,16 +20,21 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
+# covers: launcher.xretractor.2~1, launcher.xretractor.13~1, launcher.xretractor.14~1, launcher.xretractor.16~1
+# covers: launcher.xretractor.20~1, launcher.xretractor.21~1, launcher.xretractor.25~1, launcher.xretractor.26~1
+# covers: launcher.xretractor.41~1, executorsm.executorsm.3~1
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash service-idle.sh $<TARGET_FILE:xretractor>)
 
+# covers: launcher.xretractor.26~1, executorsm.executorsm.3~1
 add_test(
   NAME ${TestID}-env
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash service-idle.sh $<TARGET_FILE:xretractor> env)
 
+# covers: launcher.xretractor.14~1, executorsm.executorsm.3~1
 add_test(
   NAME ${TestID}-empty
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

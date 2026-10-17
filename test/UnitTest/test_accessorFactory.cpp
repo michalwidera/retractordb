@@ -27,6 +27,7 @@ rdb::Descriptor testDescriptor() { return {rdb::Descriptor("a", sizeof(int), 1, 
 }  // namespace
 
 TEST(AccessorFactoryTest, declared_types) {
+  // covers: accessorfactory.fabryki.2~1, accessorfactory.is-declared-type.1~1
   EXPECT_TRUE(rdb::isDeclaredType("BINFILE"));
   EXPECT_TRUE(rdb::isDeclaredType("DEVICE"));
   EXPECT_TRUE(rdb::isDeclaredType("TEXTSOURCE"));
@@ -36,6 +37,7 @@ TEST(AccessorFactoryTest, declared_types) {
 
 // Profile zapisywalne to dokladnie te, ktore przyjmuje `STORAGE` w SELECT i `:SUBSTRAT` (#346).
 TEST(AccessorFactoryTest, writable_types) {
+  // covers: accessorfactory.is-writable-type.1~1
   for (const auto *type : {"DEFAULT", "DIRECT", "MEMORY", "POSIX", "POSIXSHD", "GENERIC"})
     EXPECT_TRUE(rdb::isWritableType(type)) << type;
   for (const auto *type : {"BINFILE", "DEVICE", "TEXTSOURCE", "memory", "FOO", ""})
@@ -45,6 +47,8 @@ TEST(AccessorFactoryTest, writable_types) {
 // Rodzaj pliku zrodla deklarowanego (#346): plik zwykly dla BINFILE i TEXTSOURCE, urzadzenie
 // znakowe albo FIFO dla DEVICE. Komunikat mowi slowem RQL - TEXTFILE, nie nazwa typu magazynu.
 TEST(AccessorFactoryTest, source_kind_mismatch_by_file_type) {
+  // covers: accessorfactory.source-kind-mismatch.1~1, accessorfactory.source-kind-mismatch.2~1
+  // covers: accessorfactory.source-kind-mismatch.3~1
   EXPECT_EQ(rdb::sourceKindMismatch("BINFILE", "p", S_IFREG), "");
   EXPECT_EQ(rdb::sourceKindMismatch("TEXTSOURCE", "p", S_IFREG), "");
   EXPECT_EQ(rdb::sourceKindMismatch("DEVICE", "p", S_IFCHR), "");
@@ -68,6 +72,8 @@ TEST(AccessorFactoryTest, source_kind_mismatch_by_file_type) {
 // utrzymują plik cienia danych (hasShadow()), pozostałe nie.
 // ---------------------------------------------------------------------------
 TEST(AccessorFactoryTest, maps_type_to_accessor_class) {
+  // covers: accessorfactory.fabryki.1~1, accessorfactory.make-accessor.1~1, faccposix.posix-binary-file.1~1
+  // covers: faccposixshd.posix-binary-file-with-shadow.8~1, faccposixshd.posix-binary-file-with-shadow.13~1, storage.storage.3~1
   auto desc = testDescriptor();
 
   auto posix = rdbtest::ok(rdb::makeAccessor("POSIX", "af_posix.bin", desc, false, -1));
@@ -93,6 +99,7 @@ TEST(AccessorFactoryTest, maps_type_to_accessor_class) {
 // Źródła deklarowane: BINFILE/DEVICE/TEXTSOURCE są tylko do odczytu, bez cienia danych.
 // ---------------------------------------------------------------------------
 TEST(AccessorFactoryTest, maps_declared_sources) {
+  // covers: accessorfactory.fabryki.1~1, accessorfactory.make-accessor.1~1, storage.storage.3~1
   auto desc = testDescriptor();
 
   auto binary = rdbtest::ok(rdb::makeAccessor("BINFILE", "af_missing.bin", desc, true, -1));
@@ -113,6 +120,8 @@ TEST(AccessorFactoryTest, maps_declared_sources) {
 // storageShadow przy cieniu danych, bazowy metaData w pozostałych przypadkach.
 // ---------------------------------------------------------------------------
 TEST(AccessorFactoryTest, meta_index_variant_selection) {
+  // covers: accessorfactory.fabryki.3~1, accessorfactory.make-meta-index.1~1, accessorfactory.make-meta-index.2~1
+  // covers: fainterface.file-interface.7~1, storage.storage.3~1, storage.storage.6~1, storageshadow.storage-shadow.1~1
   const auto desc = testDescriptor();
 
   auto inert = rdb::makeMetaIndex(true, false, desc, "af_decl.meta");
@@ -135,6 +144,7 @@ TEST(AccessorFactoryTest, meta_index_variant_selection) {
 // jest wlasnie tutaj. rdb.Storage(storage_type="NONSENSE") zabijal jadro notatnika.
 // ---------------------------------------------------------------------------
 TEST(AccessorFactoryTest, unsupported_storage_type_is_rejected) {
+  // covers: accessorfactory.fabryki.1~1, accessorfactory.make-accessor.4~1
   auto desc = testDescriptor();
 
   EXPECT_RDB_ERROR(rdb::makeAccessor("NONSENSE", "af_unsupported.bin", desc, false, -1), rdb::Errc::Config);
@@ -143,6 +153,7 @@ TEST(AccessorFactoryTest, unsupported_storage_type_is_rejected) {
 }
 
 TEST(AccessorFactoryTest, empty_arguments_are_rejected) {
+  // covers: accessorfactory.fabryki.1~1, accessorfactory.make-accessor.4~1
   auto desc = testDescriptor();
 
   EXPECT_RDB_ERROR(rdb::makeAccessor("DEFAULT", "", desc, false, -1), rdb::Errc::Config);

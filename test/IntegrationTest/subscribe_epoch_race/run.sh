@@ -6,8 +6,12 @@
 # subskrypcji odmowic i podac powod.
 #
 # Kolejnosc jest wymuszona, nie zgadywana:
-#  - plan odchodzacy czeka w kazdym slocie 3 s na DEVICE (FIFO z pisarzem, bez danych), poza
-#    blokada epoki, wiec --reset przyjety teraz rozbiera epoke dopiero po tym czekaniu;
+#  - plan odchodzacy czeka w kazdym slocie 3 s na DEVICE (FIFO z pisarzem), poza blokada epoki,
+#    wiec --reset przyjety W TRAKCIE tego czekania rozbiera epoke dopiero po nim. --reset idzie
+#    dopiero, gdy FIFO opustoszeje z polowy rekordu INTEGER: zabiera ja wylacznie faza DEVICE
+#    slotu i czeka na reszte do terminu, wiec petla minela juz sprawdzenie planResetRequested.
+#    Sam powrot server_start (wiersz PID) tego nie gwarantowal: przy wolnym starcie epoki --reset
+#    przychodzil przed pierwszym slotem, plan wymienial sie od razu i `show` trafial w nowy;
 #  - `show` wysylany zaraz po --reset zastaje stary model i odczytuje z niego parametry;
 #  - hak RDB_FAULT_SUBSCRIBE_AWAIT_PLAN_SWAP trzyma handler miedzy zwolnieniem blokady a
 #    subscribe(), az rejestr subskrypcji zostanie zamkniety (OOB starej epoki) i nowy plan
@@ -38,6 +42,24 @@ unset RDB_FAULT_SUBSCRIBE_AWAIT_PLAN_SWAP
 # Log klienta jest wspolny dla przestrzeni nazw i dopisywany (patrz it_show_handler_failure).
 QRY_LOG="${TMPDIR:-/tmp}/xqry.log"
 : > "$QRY_LOG"
+
+# Polowa rekordu (2 z 4 bajtow): niepelny rekord DEVICE przezywa timeout, wiec slot czeka pelny termin.
+printf '\000\000' >&3
+if ! python3 -I - wait.fifo <<'EOF'; then
+import array, fcntl, os, sys, termios, time
+fd = os.open(sys.argv[1], os.O_RDONLY | os.O_NONBLOCK)
+pending = array.array("i", [0])
+deadline = time.monotonic() + 30
+while time.monotonic() < deadline:
+    fcntl.ioctl(fd, termios.FIONREAD, pending, True)
+    if pending[0] == 0:
+        sys.exit(0)
+    time.sleep(0.005)
+sys.exit(1)
+EOF
+  echo "slot planu odchodzacego nie wszedl w czekanie na DEVICE"
+  exit 1
+fi
 
 xqry --reset new.rql
 rc=0

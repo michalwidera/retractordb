@@ -19,38 +19,60 @@
 /// Dzielnik rozny od zera jest warunkiem wstepnym `div`; zero obsluguje wolajacy.
 namespace checkedArith {
 
+/// Funkcja add powinna:
+/// - [checkedarith.add.1~1] dla int zwracać sumę albo nullopt, gdy nie mieści się w int32.
+/// - [checkedarith.add.2~1] dla unsigned zwracać sumę albo nullopt, gdy przekracza zakres [0, 2^32).
+/// - [checkedarith.add.3~1] dla boost::rational<int> zwracać sumę w postaci skróconej albo nullopt, gdy skrócony licznik lub mianownik nie mieści się w int, a dla dwóch ułamków całkowitych (mianownik 1) liczyć ją przez sumę int32.
+///
+/// @note UINT do 2026-09-26 zawijal sie po cichu. Skladniki RATIONAL sa znormalizowane (mianownik dodatni,
+///       |licznik| <= 2^31), wiec iloczyny krzyzowe mieszcza sie w 2^62, a ich suma w int64. Skrot przez int32
+///       to typowa suma reduktora nad polami INTEGER promowanymi do RATIONAL.
 inline std::optional<int> add(int a, int b) {
   int result = 0;
   if (__builtin_add_overflow(a, b, &result)) return std::nullopt;
   return result;
 }
 
+/// Funkcja sub powinna:
+/// - [checkedarith.sub.1~1] dla int zwracać różnicę albo nullopt, gdy nie mieści się w int32.
+/// - [checkedarith.sub.2~1] dla unsigned zwracać różnicę albo nullopt, gdy jest ujemna.
+/// - [checkedarith.sub.3~1] dla boost::rational<int> zwracać różnicę w postaci skróconej albo nullopt, gdy skrócony licznik lub mianownik nie mieści się w int, a dla dwóch ułamków całkowitych liczyć ją przez różnicę int32.
+///
+/// @note UINT do 2026-09-26 zawijal sie po cichu (`3 - 5` dawalo 4294967294).
 inline std::optional<int> sub(int a, int b) {
   int result = 0;
   if (__builtin_sub_overflow(a, b, &result)) return std::nullopt;
   return result;
 }
 
+/// Funkcja mul powinna:
+/// - [checkedarith.mul.1~1] dla int zwracać iloczyn albo nullopt, gdy nie mieści się w int32.
+/// - [checkedarith.mul.2~1] dla unsigned zwracać iloczyn albo nullopt, gdy przekracza zakres [0, 2^32).
+/// - [checkedarith.mul.3~1] dla boost::rational<int> zwracać iloczyn w postaci skróconej albo nullopt, gdy skrócony licznik lub mianownik nie mieści się w int, a dla dwóch ułamków całkowitych liczyć go przez iloczyn int32.
 inline std::optional<int> mul(int a, int b) {
   int result = 0;
   if (__builtin_mul_overflow(a, b, &result)) return std::nullopt;
   return result;
 }
 
-/// Jedyny iloraz int32 spoza zakresu to INT_MIN / -1.
+/// Funkcja div powinna:
+/// - [checkedarith.div.1~1] dla int zwracać iloraz obcięty w stronę zera, a nullopt wyłącznie dla INT_MIN / -1, przy niezerowym dzielniku zapewnionym przez wołającego.
+/// - [checkedarith.div.2~1] dla boost::rational<int> zwracać iloraz w postaci skróconej albo nullopt, gdy dzielnik jest zerem albo skrócony licznik lub mianownik nie mieści się w int.
+///
+/// @note Jedyny iloraz int32 spoza zakresu to INT_MIN / -1. Iloraz UINT miesci sie zawsze, wiec wariantu
+///       unsigned nie ma.
 inline std::optional<int> div(int a, int b) {
   if (a == std::numeric_limits<int>::min() && b == -1) return std::nullopt;
   return a / b;
 }
 
+/// Funkcja neg powinna:
+/// - [checkedarith.neg.1~1] dla int zwracać -a albo nullopt dla INT_MIN.
+/// - [checkedarith.neg.2~1] dla boost::rational<int> zwracać -a albo nullopt, gdy licznik jest równy INT_MIN.
 inline std::optional<int> neg(int a) {
   if (a == std::numeric_limits<int>::min()) return std::nullopt;
   return -a;
 }
-
-// UINT: wynik spoza [0, 2^32) - za duza suma albo iloczyn, ujemna roznica - nie ma reprezentacji
-// w typie. Do 2026-09-26 zawijal sie po cichu (`3 - 5` dawalo 4294967294). Iloraz UINT miesci sie
-// zawsze, wiec `div` dla niego nie ma.
 
 inline std::optional<unsigned> add(unsigned a, unsigned b) {
   unsigned result = 0;
@@ -72,9 +94,13 @@ inline std::optional<unsigned> mul(unsigned a, unsigned b) {
 
 namespace detail {
 
-/// Ulamek policzony na int64 sprowadzony do najnizszych terminow. Dopiero wtedy wiadomo, czy
-/// wartosc NAPRAWDE nie miesci sie w rational<int> - skrocona postac jest jedyna, wiec nie ma
-/// falszywych alarmow (`1/65536 + 1/65536` przechodzi przez mianownik 2^32 i daje 1/32768).
+/// Funkcja narrowed powinna:
+/// - [checkedarith.narrowed.1~1] dla zerowego mianownika zwracać nullopt.
+/// - [checkedarith.narrowed.2~1] skracać ułamek int64 przez gcd i przenosić znak do licznika, tak by mianownik był dodatni.
+/// - [checkedarith.narrowed.3~1] zwracać skrócony ułamek jako boost::rational<int>, a nullopt, gdy skrócony licznik lub mianownik nie mieści się w int.
+///
+/// @note Dopiero postac skrocona rozstrzyga, czy wartosc NAPRAWDE nie miesci sie w rational<int>, wiec nie
+///       ma falszywych alarmow (`1/65536 + 1/65536` przechodzi przez mianownik 2^32 i daje 1/32768).
 inline std::optional<boost::rational<int>> narrowed(std::int64_t numerator, std::int64_t denominator) {
   // Zerowy mianownik nie ma postaci skroconej i nie moze dojsc do gcd: gcd(0, 0) to zero, a dzielenie
   // ponizej dzieli wtedy przez zero - SIGFPE na x86-64, cichy 0 na arm64, czyli to samo wejscie i dwa
@@ -95,12 +121,6 @@ inline std::optional<boost::rational<int>> narrowed(std::int64_t numerator, std:
 }
 
 }  // namespace detail
-
-// Skladniki sa znormalizowane (mianownik dodatni, |licznik| <= 2^31), wiec kazdy iloczyn ponizej
-// miesci sie w 2^62, a suma dwoch takich w int64.
-
-// Ulamki calkowite (mianownik 1) ida skrotem przez int32 bez gcd - to typowa suma reduktora
-// nad polami INTEGER promowanymi do RATIONAL.
 
 inline std::optional<boost::rational<int>> add(boost::rational<int> a, boost::rational<int> b) {
   if (a.denominator() == 1 && b.denominator() == 1) {

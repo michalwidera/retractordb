@@ -9,11 +9,13 @@
 get_filename_component(TestID ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 set(TestID "it_${TestID}")
 
+# covers: datamodel.data-model.4~1, executorsm.executorsm.3~1, executorsm.executorsm.7~1, executorsm.executorsm.8~1
 add_test(
   NAME ${TestID}-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   COMMAND bash run.sh)
 
+# covers: executorsm.executorsm.8~1
 add_test(
   NAME ${TestID}-vg-run
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

@@ -190,6 +190,7 @@ constexpr int kShiftMatchingCases[][3] = {{1, 2, 1}, {3, 2, 1}, {1, 1, 2}};
 
 // Definicje przeplotu i rozplotu (interleaveAt, deinterleaveLeft/Right) wobec Hash, Div i Mod.
 TEST(ProofOracle, interleaveAt_table) {
+  // covers: soperations.hash.1~1
   for (int d : kScales)
     for (const auto &row : kInterleaveRows) {
       int pos         = -1;
@@ -200,6 +201,7 @@ TEST(ProofOracle, interleaveAt_table) {
 }
 
 TEST(ProofOracle, deinterleave_table) {
+  // covers: soperations.div.1~1, soperations.mod.1~1
   for (int d : kScales)
     for (const auto &row : kInterleaveRows) {
       const rational<int> deltaA(row.a, d);
@@ -211,6 +213,7 @@ TEST(ProofOracle, deinterleave_table) {
 
 // Definicja roznicy (rateDiff) wobec Subtract; interwaly w tablicy sa w cwiartkach.
 TEST(ProofOracle, rateDiff_table) {
+  // covers: soperations.subtract.1~1
   for (int d : kScales)
     for (const auto &row : kSubtractRows)
       ASSERT_EQ(Subtract(rational<int>(row.period, 4 * d), rational<int>(row.target, 4 * d), row.n), row.index)
@@ -219,6 +222,7 @@ TEST(ProofOracle, rateDiff_table) {
 
 // Definicja dokladnego ogona przeplotu (exactInterleaveTail) wobec HashStartupLatency.
 TEST(ProofOracle, exactInterleaveTail_table) {
+  // covers: soperations.hash-startup-latency.1~1
   for (int d : kScales)
     for (const auto &row : kTailRows)
       ASSERT_EQ(hashTail(row.a, row.b, row.wa, row.wb, d), row.tail)
@@ -302,6 +306,7 @@ TEST(ProofOracle, event_order_counterexample) {
 // od dowolnego progu N0, a przy W = ogon-1 pada na ktoryms z nich. Z okresowosci wymagan
 // (tailRequirement_period) wystarczy jeden okres a+b od progu.
 TEST(ProofOracle, exactInterleaveTail_exact) {
+  // covers: soperations.hash-startup-latency.1~1, soperations.hash-startup-latency.3~1
   for (int a = 1; a <= 40; ++a)
     for (int b = 1; b <= 40; ++b)
       for (int wa = 0; wa <= 3; ++wa)
@@ -353,6 +358,7 @@ TEST(ProofOracle, shift_matching_values) {
 // Przesuniecie dopasowane do tempa (i*a = k*b) wyciagniete przed przeplot nie zmniejsza ogona
 // ponizej przesuniecia zastosowanego do skladowych.
 TEST(ProofOracle, exact_tail_rewrite) {
+  // covers: compiler.compiler.10~1
   for (int a = 1; a <= 20; ++a)
     for (int b = 1; b <= 20; ++b)
       for (int m = 1; m <= 3; ++m) {
@@ -387,6 +393,7 @@ TEST(ProofOracle, resample_roundtrip) {
 
 // Skladowa o interwale sumy jest czytana pod wlasnym indeksem: sampleIndex d d n = n.
 TEST(ProofOracle, sample_self) {
+  // covers: soperations.add.1~1
   for (int d : kScales)
     for (int p = 1; p <= 24; ++p)
       for (int n = 0; n < 50; ++n)
@@ -616,6 +623,7 @@ TEST(ProofOracle, causalShift_read) {
 
 // Wykonany plan: (A>i)#(B>k) i (A#B)>(i+k) zaczynaja od tego samego indeksu i niosa te same rekordy.
 TEST(ProofOracle, causal_shift_matching_read) {
+  // covers: compiler.compiler.10~1
   for (const auto [a, b, m] : kShiftMatchingCases) {
     const ShiftMatchingRun run(a, b, m);
     ASSERT_FALSE(HasFatalFailure());

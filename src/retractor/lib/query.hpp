@@ -22,15 +22,14 @@ class qTree;
 
 inline constexpr size_t kGeneratedPrefixLength = sizeof("STREAM_") - 1;
 
-/// Typ i długość pola, w którym mieści się wynik redukcji (AVG/MIN/MAX/SUMC).
+/// Funkcja reductionResultField powinna:
+/// - [query.reduction-result-field.1~1] dla typu źródła BYTE, INTEGER, UINT albo RATIONAL zwracać pole RATIONAL o długości sizeof(boost::rational<int>).
+/// - [query.reduction-result-field.2~1] dla każdego innego typu źródła zwracać typ i długość źródła bez zmian.
 ///
-/// K24/D4: schemat wyjścia redukcji budowany przez kompilator jest zawsze
-/// RATIONAL, a rachunek redukcji idzie po boost::rational<int>. Deskryptor
-/// wejściowy (query::descriptorFrom) i payload wyniku
-/// (streamInstance::reduceFieldsToPayload) używały typu ŹRÓDŁA, więc wartość
-/// przechodziła przez rational_cast<int> - średnia z dwóch pól o sumie
-/// nieparzystej dawała 2000003/2 jako 1000001/1. Reguła jest tu jedna dla obu
-/// miejsc właśnie po to, żeby nie mogły się ponownie rozjechać.
+/// @note K24/D4: rachunek redukcji (AVG/MIN/MAX/SUMC) idzie po boost::rational<int>. Deskryptor wejsciowy
+///       (query::descriptorFrom) i payload wyniku (streamInstance::reduceFieldsToPayload) uzywaly typu
+///       ZRODLA, wiec wartosc przechodzila przez rational_cast<int> - srednia 2000003/2 dawala 1000001/1.
+///       Regula jest tu jedna dla obu miejsc, zeby nie mogly sie ponownie rozjechac.
 inline std::pair<rdb::descFld, int> reductionResultField(rdb::descFld sourceType, int sourceLength) {
   const bool arithmetic =
       sourceType == rdb::BYTE || sourceType == rdb::INTEGER || sourceType == rdb::UINT || sourceType == rdb::RATIONAL;
@@ -72,9 +71,9 @@ inline std::pair<rdb::descFld, int> reductionResultField(rdb::descFld sourceType
 /// przez reductionResultField), bo dla wyrazenia nie ma jednego wpisu deskryptora, z ktorego
 /// mozna go odczytac w wykonaniu.
 /// Obiekt klasy windowGroup powinien:
-/// - przechowywać strumień źródłowy, szerokość okna w rekordach, typ wartości redukcji oraz albo slot płaski pola źródła, albo program wyrażenia liczonego na każdym rekordzie okna.
-/// - traktować pusty program jako odczyt slotu wprost, a niepusty program jako wyrażenie, przy którym slot nie ma znaczenia.
-/// - przez sameAs uznawać dwie grupy za identyczne wyłącznie przy równym źródle, szerokości i typie wartości oraz równym slocie dla grup bez programu albo równych co do polecenia i wartości tokenach programu dla grup z programem.
+/// - [query.window-group.1~1] przechowywać strumień źródłowy, szerokość okna w rekordach, typ wartości redukcji oraz albo slot płaski pola źródła, albo program wyrażenia liczonego na każdym rekordzie okna.
+/// - [query.window-group.2~1] traktować pusty program jako odczyt slotu wprost, a niepusty program jako wyrażenie, przy którym slot nie ma znaczenia.
+/// - [query.window-group.3~1] przez sameAs uznawać dwie grupy za identyczne wyłącznie przy równym źródle, szerokości i typie wartości oraz równym slocie dla grup bez programu albo równych co do polecenia i wartości tokenach programu dla grup z programem.
 struct windowGroup {
   std::string source;                      ///< strumien zrodlowy (nazwa fizyczna po ekspansji generatorow)
   int slot  = 0;                           ///< slot plaski pola w rekordzie zrodla; nieuzywany, gdy `program` niepusty
@@ -114,7 +113,10 @@ struct windowStats {
 /// przestarzale `FILE` parser tlumaczy na jeden z trzech rodzajow, wiec dalej silnik widzi tylko je.
 enum class sourceKind : std::uint8_t { none, binFile, textFile, device };
 
-/// Slowo kluczowe RQL rodzaju - do komunikatow i ostrzezen.
+/// Funkcja sourceKindKeyword powinna:
+/// - [query.source-kind-keyword.1~1] zwracać słowo kluczowe RQL rodzaju źródła: "BINFILE", "TEXTFILE" albo "DEVICE", a dla sourceKind::none pusty napis.
+///
+/// @note Do komunikatow i ostrzezen.
 inline std::string_view sourceKindKeyword(sourceKind kind) {
   switch (kind) {
     case sourceKind::binFile:
@@ -130,16 +132,17 @@ inline std::string_view sourceKindKeyword(sourceKind kind) {
 }
 
 /// Obiekt klasy query powinien:
-/// - przechowywać nazwę, interwał, plik źródła, schemat pól z programami, program FROM, grupy okien rekordowych, reguły, retencję, politykę magazynu oraz wyniki kompilacji: ogon, origin i liczność generatora.
-/// - traktować węzeł z pustym programem FROM jako deklarację źródła, węzeł o nazwie z przedrostkiem STREAM_ jako strumień generowany przez kompilator, a węzeł o nazwie zaczynającej się od dwukropka jako dyrektywę kompilatora.
-/// - przez isReductionRequired zwracać prawdę, gdy program FROM zawiera więcej niż jeden operator strumieniowy, wliczając reduktory AVG, MIN, MAX i SUMC.
-/// - przez getDepStream zwracać nazwy strumieni z tokenów PUSH_STREAM programu FROM w kolejności programu.
-/// - przez descriptorStorage budować deskryptor magazynu z pól schematu, a dla deklaracji dołączać REF z plikiem i TYPE z rodzaju źródła (BINFILE, TEXTSOURCE, DEVICE), dla SELECT zaś RETENTION przy zdefiniowanej retencji oraz RETMEMORY i TYPE przy polityce z pojemnością (MEMORY albo profil dyrektywy :SUBSTRAT).
-/// - przez storageType zwracać typ z polityki tylko wtedy, gdy polityka go wybiera (pojemność różna od zera i nazwa inna niż DEFAULT), a w przeciwnym razie STORAGE z planu.
-/// - przez descriptorFrom budować deskryptor wejścia operatora FROM: dla reduktorów jedno pole o typie wyniku redukcji, dla przeplotu złożenie deskryptorów składników, dla AGSE abs(długość) pól płaskich o najszerszym typie źródła, a dla pozostałych operatorów pola źródeł z niezerową długością.
-/// - przez reset czyścić identyfikator, nazwę pliku, schemat, program FROM i ostrzeżenia oraz przywracać wartości początkowe interwału, flag, rodzaju źródła, numeru wiersza deklaracji, generatora, policy, retention i timeoutSeconds.
-/// - traktować wywołanie getFieldIndex dla pola spoza schematu jako błąd w kodzie wołającego (rdb::fatal).
-/// - porządkować węzły według interwału operatorem <.
+/// - [query.query.1~1] przechowywać nazwę, interwał, plik źródła, schemat pól z programami, program FROM, grupy okien rekordowych, reguły, retencję, politykę magazynu oraz wyniki kompilacji: ogon, origin i liczność generatora.
+///   Sprawdzenie kompilacji: test/UnitTest/test_contracts.cpp i test/UnitTest/test_compiler.cpp - dostep do skladowych query w testach kontraktow i kompilacji.
+/// - [query.query.2~1] traktować węzeł z pustym programem FROM jako deklarację źródła, węzeł o nazwie z przedrostkiem STREAM_ jako strumień generowany przez kompilator, a węzeł o nazwie zaczynającej się od dwukropka jako dyrektywę kompilatora.
+/// - [query.query.3~1] przez isReductionRequired zwracać prawdę, gdy program FROM zawiera więcej niż jeden operator strumieniowy, wliczając reduktory AVG, MIN, MAX i SUMC.
+/// - [query.query.4~1] przez getDepStream zwracać nazwy strumieni z tokenów PUSH_STREAM programu FROM w kolejności programu.
+/// - [query.query.5~1] przez descriptorStorage budować deskryptor magazynu z pól schematu, a dla deklaracji dołączać REF z plikiem i TYPE z rodzaju źródła (BINFILE, TEXTSOURCE, DEVICE), dla SELECT zaś RETENTION przy zdefiniowanej retencji oraz RETMEMORY i TYPE przy polityce z pojemnością (MEMORY albo profil dyrektywy :SUBSTRAT).
+/// - [query.query.6~1] przez storageType zwracać typ z polityki tylko wtedy, gdy polityka go wybiera (pojemność różna od zera i nazwa inna niż DEFAULT), a w przeciwnym razie STORAGE z planu.
+/// - [query.query.7~1] przez descriptorFrom budować deskryptor wejścia operatora FROM: dla reduktorów jedno pole o typie wyniku redukcji, dla przeplotu po jednym polu na wspolny slot plaski skladowych z szerszym typem, dla AGSE abs(długość) pól płaskich o najszerszym typie źródła, a dla pozostałych operatorów pola źródeł z niezerową długością.
+/// - [query.query.8~1] przez reset czyścić identyfikator, nazwę pliku, schemat, program FROM i ostrzeżenia oraz przywracać wartości początkowe interwału, flag, rodzaju źródła, numeru wiersza deklaracji, generatora, policy, retention i timeoutSeconds.
+/// - [query.query.9~1] traktować wywołanie getFieldIndex dla pola spoza schematu jako błąd w kodzie wołającego (rdb::fatal).
+/// - [query.query.10~1] porządkować węzły według interwału operatorem <.
 class query {
   void fillDescriptor(const std::list<field> &lSchemaVar, rdb::Descriptor &val, const std::string &id);
 
@@ -153,7 +156,7 @@ class query {
   std::string filename;
   boost::rational<int> rInterval = 0;
 
-  /// @brief Licznosc rodziny generatora strumieni; 0 = zwyczajny strumien, nie generator.
+  /// @brief Licznosc rodziny generatora strumieni; -1 = zwyczajny strumien, nie generator.
   ///
   /// Ustawia parser z zapisu `STREAM cell[24]`, kasuje compiler::expandStreamGenerators()
   /// przy tworzeniu kazdej z N instancji. Zadne zapytanie z nieujemna wartoscia tego pola nie
@@ -256,6 +259,8 @@ class query {
   friend std::ostream &operator<<(std::ostream &os, const query &s);
 };
 
+/// Funkcja operator< powinna:
+/// - [query.operator-less.1~1] porządkować węzły wyłącznie według interwału rInterval, rosnąco.
 bool operator<(const query &lhs, const query &rhs);
 
 /// Efektywny termin odczytu zrodla DEVICE i to, skad pochodzi (#347).
@@ -266,9 +271,20 @@ struct deviceTimeout {
   std::string_view origin;
 };
 
-/// Pierwszenstwo: tryb bez zegara (`-f`) > jawna klauzula TIMEOUT > `[sources] timeout_s` > 0.
-/// W trybie bez zegara termin wynosi zawsze 0: sekundy rzeczywiste nie maja przelicznika na czas
-/// wirtualny, a proba nieblokujaca zostawia DEVICE uzytecznym w szybkich testach.
+/// Funkcja effectiveDeviceTimeout powinna:
+/// - [query.effective-device-timeout.1~1] w trybie bez zegara (noClock, `-f`) zwracać 0 s z pochodzeniem "no-clock".
+/// - [query.effective-device-timeout.2~1] w przeciwnym razie zwracać jawną klauzulę TIMEOUT węzła z pochodzeniem "RQL", a bez niej configured z pochodzeniem "config", a bez obu 0 s z pochodzeniem "default".
+///
+/// @note #347. Bez zegara termin wynosi zawsze 0: sekundy rzeczywiste nie maja przelicznika na czas wirtualny,
+///       a proba nieblokujaca zostawia DEVICE uzytecznym w szybkich testach. configured to `[sources] timeout_s`.
 deviceTimeout effectiveDeviceTimeout(const query &qry, std::optional<double> configured, bool noClock);
 
+/// Funkcja GetArgs powinna:
+/// - [query.get-args.1~1] dla programu FROM z jednym tokenem zwracać jego napis jako pierwszy argument, pusty drugi i ten sam token jako operator.
+/// - [query.get-args.2~1] dla dwóch tokenów zwracać napis pierwszego jako pierwszy argument, pusty drugi i drugi token jako operator.
+/// - [query.get-args.3~1] dla trzech tokenów zwracać napisy dwóch pierwszych jako argumenty i trzeci token jako operator.
+/// - [query.get-args.4~1] kończyć proces przez RDB_ASSERT dla programu dłuższego niż trzy tokeny.
+///
+/// @note Wolaja ja wylacznie przebiegi kompilatora po extractIntermediateStreams() i wykonanie planu
+///       skompilowanego, gdzie program FROM ma 1..3 tokeny.
 std::tuple<std::string, std::string, token> GetArgs(std::list<token> &prog);

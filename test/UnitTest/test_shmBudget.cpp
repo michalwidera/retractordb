@@ -5,9 +5,12 @@
 // rozjazd wychodzi tutaj, a nie dopiero jako odmowa subskrypcji przy wolnej pamieci.
 
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <unistd.h>
 
 #include <filesystem>
+#include <optional>
+#include <sstream>
 #include <string>
 #include <system_error>
 
@@ -20,7 +23,45 @@
 #include "osPlatform.hpp"
 #include "platformConfig.h"
 #include "retractor/lib/bus.hpp"
+#include "retractor/lib/qTree.hpp"
 #include "retractor/lib/shmBudget.hpp"
+#include "syscallWrap.hpp"
+
+namespace {
+bool failDescriptorMeasure = false, failPathMeasure = false;
+std::optional<struct statvfs> measuredSpace;
+bool probeWasUnlinked = false, probeWasEmpty = false;
+}  // namespace
+extern "C" int __real_fstatvfs(int, struct statvfs *);
+extern "C" int __real_statvfs(const char *, struct statvfs *);
+extern "C" int __wrap_fstatvfs(int fd, struct statvfs *result) {
+  if (failDescriptorMeasure) {
+    errno = EIO;
+    return -1;
+  }
+  if (measuredSpace) {
+    struct stat entry{};
+    probeWasEmpty    = fstat(fd, &entry) == 0 && entry.st_size == 0;
+    const auto name  = "/dev/shm/rdb_shm_probe_" + std::to_string(getpid());
+    probeWasUnlinked = !std::filesystem::exists(name);
+    *result          = *measuredSpace;
+    return 0;
+  }
+  return __real_fstatvfs(fd, result);
+}
+extern "C" int __wrap_statvfs(const char *path, struct statvfs *result) {
+  if (failPathMeasure) {
+    errno = EIO;
+    return -1;
+  }
+  if (measuredSpace) {
+    *result = *measuredSpace;
+    return 0;
+  }
+  return __real_statvfs(path, result);
+}
+RDB_WRAP_SYSCALL(int, fstatvfs, (int fd, struct statvfs *result), (fd, result));
+RDB_WRAP_SYSCALL(int, statvfs, (const char *path, struct statvfs *result), (path, result));
 
 namespace {
 
@@ -66,6 +107,7 @@ std::uint64_t realQueueBytes(std::uint64_t maxMessages, std::uint64_t maxMessage
 }
 
 TEST(ShmBudget, QueueFormulaMatchesRealSegment) {
+  // covers: shmbudget.message-queue-bytes.1~1
   for (const auto [messages, size] :
        {std::pair<std::uint64_t, std::uint64_t>{100, 1024}, std::pair<std::uint64_t, std::uint64_t>{1000, 1000},
         std::pair<std::uint64_t, std::uint64_t>{250, 1024}}) {
@@ -79,10 +121,12 @@ TEST(ShmBudget, QueueFormulaMatchesRealSegment) {
 }
 
 TEST(ShmBudget, ResponseQueueUsesResponseMessageSize) {
+  // covers: shmbudget.response-queue-bytes.1~1
   EXPECT_EQ(shmbudget::responseQueueBytes(100), shmbudget::messageQueueBytes(100, ipc::kResponseQueueMaxMessageSize));
 }
 
 TEST(ShmBudget, ElementsFollowTickAndFloor) {
+  // covers: shmbudget.response-queue-elements.1~1
   // 10 s zapasu przy takcie 1 ms to dziesiec tysiecy elementow -- to jest ta liczba, ktora
   // zamienia sie na 10 MiB kolejki i wyczerpuje /dev/shm kontenera przy siodmym kliencie.
   EXPECT_EQ(shmbudget::responseQueueElements(ratio(1, 1000), kBufferSeconds, kMinElements), 10000);
@@ -95,6 +139,7 @@ TEST(ShmBudget, ElementsFollowTickAndFloor) {
 }
 
 TEST(ShmBudget, ElementsRoundUpOnFractionalFrequency) {
+  // covers: shmbudget.response-queue-elements.2~1
   // Takt o niecalkowitej odwrotnosci. Obciecie czestotliwosci PRZED pomnozeniem przez czas
   // bufora dawalo 22 * 10 = 220 zamiast 225: kolejka o piec elementow za krotka na kazdym
   // takcie 22,5 Hz. Caly iloraz musi byc liczony wymiernie i zaokraglony w gore.
@@ -106,6 +151,7 @@ TEST(ShmBudget, ElementsRoundUpOnFractionalFrequency) {
 }
 
 TEST(ShmBudget, FixedReservationIsSumOfItsParts) {
+  // covers: shmbudget.fixed-reservation-bytes.1~1
   EXPECT_EQ(shmbudget::fixedReservationBytes(),
             bus::segmentBytes() + shmbudget::messageQueueBytes(ipc::kQueryQueueMaxMessages, ipc::kQueryQueueMaxMessageSize) +
                 ipc::kShmemSegmentSize);
@@ -126,12 +172,14 @@ static_assert(!RDB_OS_LINUX || RDB_HAS_BOOST_POSIX_SHM,
 
 #if RDB_HAS_BOOST_POSIX_SHM
 TEST(ShmBudget, SpaceRemovesItsProbe) {
+  // covers: shmbudget.space.1~1
   const std::string name = "rdb_shm_probe_" + std::to_string(getpid());
   EXPECT_TRUE(shmbudget::space().known);
   EXPECT_THROW((IPC::shared_memory_object(IPC::open_only, name.c_str(), IPC::read_only)), IPC::interprocess_exception);
 }
 
 TEST(ShmBudget, SpacePreservesExistingObjectOnProbeNameCollision) {
+  // covers: shmbudget.space.1~1
   const std::string name = "rdb_shm_probe_" + std::to_string(getpid());
   IPC::shared_memory_object existing(IPC::create_only, name.c_str(), IPC::read_write);
   existing.truncate(17);
@@ -147,9 +195,111 @@ TEST(ShmBudget, SpacePreservesExistingObjectOnProbeNameCollision) {
 #endif
 
 TEST(ShmBudget, HumanBytesPicksUnit) {
+  // covers: shmbudget.human-bytes.1~1
+  EXPECT_EQ(shmbudget::humanBytes(0), "0 B");
+  EXPECT_EQ(shmbudget::humanBytes(1023), "1023 B");
   EXPECT_EQ(shmbudget::humanBytes(512), "512 B");
   EXPECT_EQ(shmbudget::humanBytes(2048), "2.0 KiB");
   EXPECT_EQ(shmbudget::humanBytes(3U * 1024 * 1024), "3.0 MiB");
+  EXPECT_EQ(shmbudget::humanBytes(1024), "1.0 KiB");
+  EXPECT_EQ(shmbudget::humanBytes(UINT64_C(1073741824)), "1.0 GiB");
+  EXPECT_EQ(shmbudget::humanBytes(UINT64_C(1073741823)), "1024.0 MiB");
+  EXPECT_EQ(shmbudget::humanBytes(1536), "1.5 KiB");
+}
+
+TEST(ShmBudget, MeasurementUsesAvailableBlocksAndFragmentSize) {
+  // covers: shmbudget.space.1~1
+  struct Restore {
+    ~Restore() { measuredSpace.reset(); }
+  } restore;
+  measuredSpace.emplace();
+  measuredSpace->f_blocks = 500;
+  measuredSpace->f_bavail = 123;
+  measuredSpace->f_bfree  = 321;
+  measuredSpace->f_frsize = 32;
+  measuredSpace->f_bsize  = 4096;
+  const auto result       = shmbudget::space();
+  EXPECT_TRUE(result.known);
+  EXPECT_EQ(result.total, 16000U);
+  EXPECT_EQ(result.available, 3936U);
+#if RDB_HAS_BOOST_POSIX_SHM
+  EXPECT_TRUE(probeWasUnlinked);
+  EXPECT_TRUE(probeWasEmpty);
+#endif
+}
+
+TEST(ShmBudget, ReportSubtractsReservationAndRoundsClientCountDown) {
+  // covers: shmbudget.report.1~1, shmbudget.report.2~1, shmbudget.report.3~1
+  struct Restore {
+    ~Restore() { measuredSpace.reset(); }
+  } restore;
+  const auto fixed = shmbudget::fixedReservationBytes();
+  const auto queue = shmbudget::responseQueueBytes(10);
+  measuredSpace.emplace();
+  measuredSpace->f_frsize = 1;
+  measuredSpace->f_blocks = fixed + 10 * queue;
+  qTree plan;
+  plan.push_back(query(1, "first"));
+  plan.push_back(query(1, "second"));
+  for (const auto available : {fixed + 3 * queue + queue / 2, fixed - 1}) {
+    measuredSpace->f_bavail = available;
+    const auto report       = shmbudget::report(plan, 10, 1);
+    EXPECT_TRUE(report.contains("filesystem behind " + osplat::sharedMemoryBackingPath()));
+    EXPECT_TRUE(report.contains("bus segment " + shmbudget::humanBytes(bus::segmentBytes())));
+    EXPECT_TRUE(report.contains("command queue " + shmbudget::humanBytes(shmbudget::messageQueueBytes(
+                                                       ipc::kQueryQueueMaxMessages, ipc::kQueryQueueMaxMessageSize))));
+    EXPECT_TRUE(report.contains("response segment " + shmbudget::humanBytes(ipc::kShmemSegmentSize)));
+    EXPECT_TRUE(report.contains(shmbudget::humanBytes(available)));
+    EXPECT_TRUE(report.contains(shmbudget::humanBytes(available < fixed ? 0 : available - fixed)));
+    const auto position = report.find("  1 s");
+    ASSERT_NE(position, std::string::npos) << report;
+    std::istringstream row(report.substr(position));
+    std::string tick, seconds, amount, unit, first, second;
+    int elements = -1, clients = -1;
+    row >> tick >> seconds >> elements >> amount >> unit >> clients >> first >> second;
+    EXPECT_EQ(tick, "1");
+    EXPECT_EQ(seconds, "s");
+    EXPECT_EQ(elements, 10);
+    EXPECT_EQ(amount + " " + unit, shmbudget::humanBytes(queue));
+    EXPECT_EQ(clients, available < fixed ? 0 : 3);
+    EXPECT_EQ(first + " " + second, "first, second");
+  }
+}
+
+TEST(ShmBudget, MeasurementFallbackAndUnknownReportAreExplicit) {
+  // covers: shmbudget.space.2~1, shmbudget.space.3~1, shmbudget.report.1~1, shmbudget.report.3~1, shmbudget.report.4~1
+  struct Restore {
+    ~Restore() { failDescriptorMeasure = failPathMeasure = false; }
+  } restore;
+  failDescriptorMeasure = true;
+  EXPECT_TRUE(shmbudget::space().known);
+  failPathMeasure = true;
+  EXPECT_FALSE(shmbudget::space().known);
+  qTree plan;
+  const auto empty = shmbudget::report(plan, 10, 100);
+  EXPECT_TRUE(empty.contains("unknown (statvfs failed)"));
+  EXPECT_TRUE(empty.contains("plan has no subscribable streams"));
+  plan.push_back(query(1, "src"));
+  const auto unknown = shmbudget::report(plan, 10, 100);
+  EXPECT_TRUE(unknown.contains("src"));
+  EXPECT_TRUE(unknown.contains("?"));
+}
+
+TEST(ShmBudget, IntervalCostsGroupInPlanOrderAndSortByQueueBytes) {
+  // covers: shmbudget.response-queue-elements.2~1, shmbudget.interval-costs.1~1, shmbudget.interval-costs.2~1
+  qTree plan;
+  plan.push_back(query(0, ":STORAGE"));
+  plan.push_back(query(1, "slow"));
+  plan.push_back(query(boost::rational<int>(1, 20), "fast"));
+  plan.push_back(query(1, "also_slow"));
+  const auto costs = shmbudget::intervalCosts(plan, 10, 1);
+  ASSERT_EQ(costs.size(), 2U);
+  EXPECT_EQ(costs[0].streams, (std::vector<std::string>{"fast"}));
+  EXPECT_EQ(costs[1].streams, (std::vector<std::string>{"slow", "also_slow"}));
+  EXPECT_GT(costs[0].bytes, costs[1].bytes);
+  EXPECT_EQ(costs[0].elements, 200);
+  EXPECT_EQ(costs[1].elements, 10);
+  EXPECT_EQ(costs[0].bytes, shmbudget::responseQueueBytes(200));
 }
 
 }  // namespace

@@ -276,6 +276,7 @@ TEST(probeLogicalGate, two_records_of_the_same_stream_sum_up) {
 // ── NULL i luka ─────────────────────────────────────────────────────────────────
 
 TEST(probeLogicalGate, null_values_do_not_change_the_canonical_width) {
+  // covers: probe.canonical-record-bytes.3~1
   // Mapa NULL ma stałą szerokość, więc rekord z wartościami puste kosztuje tyle samo.
   // Metryka pierwotna ma być deterministyczna - inaczej iloraz zależałby od danych.
   const auto descriptor  = oneInteger();
@@ -356,6 +357,7 @@ TEST(probeLogicalGate, overwrite_is_counted_with_its_bytes) {
 }
 
 TEST(probeLogicalGate, overwrite_keeps_the_role_of_its_stream) {
+  // covers: probe.on-logical-write.1~1
   const auto descriptor  = oneInteger();
   const auto recordBytes = rdb::probe::canonicalRecordBytes(descriptor);
 

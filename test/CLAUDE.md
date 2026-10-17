@@ -8,6 +8,10 @@
 
 **Reconfigure (`cmake .`) wipes built unit-test binaries.** The `test/` copy step regenerates the `build/Debug/test/` subtree, deleting `test_*` binaries → ctest fails with `No such file or directory` for ~all unit tests. After any `cmake .`, rebuild with `ninja` before `ctest`.
 
+### Requirement IDs and `covers`
+
+Every bullet in a `... powinna:` block (`powinien`, `powinno`, `powinny` alike; the block runs to the first line that is not a `///` comment) carries a versioned ID: `/// - [svc.write.empty-content~1] ...`. Since 2026-10-17 the whole tree uses this form; the migrated IDs read `<file>.<symbol>.<n>~1` (`dumpmanager.dump-task.3~1`), a new bullet takes the next free `<n>` of its block, and an existing ID is never renumbered. A bullet has no `Test:` line; the test that checks it says so itself, with a comment at the start of a line - `// covers: id~N, id~N` as the first line of a `TEST` body, `# covers: ...` at the start of a Python test function, at the top of the comment block above the `add_test` of an integration test in its `CMakeLists.txt` (`.cmake-format.yaml` keeps a comment block that starts with `covers:` verbatim; placed under prose, the line would be rewrapped into it and lose its marker), or near the top of a `run.sh` / `verify*.py`, `// covers: ...` right above a `static_assert`. A line `///   Nietestowalne: ...` or `///   Kontrola strukturalna: ...` under the bullet frees it from `covers`; `///   Zakres testow: ...` keeps prose about what the tests do and do not reach, and is not checked. `st_req_trace` (`scripts/req-trace.py`) fails on a block bullet without an ID, a malformed or duplicate ID, a `Test:` line under a bullet, a `covers` naming an unknown ID or an old version, and an ID with no `covers` and no exemption; `scripts/req-trace.py --report` prints the requirement-to-test matrix. Bump the version when the meaning of a requirement changes, not for an editorial fix: every `covers` of the old version then fails until someone has re-read that test against the new text.
+
 ### Verify test provenance before running
 
 Before every focused or full `ctest`, `ninja test`, or `ninja test-valgrind` run:

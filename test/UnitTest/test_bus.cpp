@@ -11,14 +11,17 @@
 #include <csignal>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 #include <boost/interprocess/shared_memory_object.hpp>
 
 #include "osPlatform.hpp"
+#include "platformConfig.h"
 #include "retractor/lib/bus.hpp"
 #include "retractor/lib/lockFile.hpp"
 #include "retractor/lib/serverName.hpp"
@@ -50,6 +53,7 @@ std::vector<std::string> streamsOf(const std::vector<bus::InstanceInfo> &instanc
 // wpis martwym. To wlasnie ta niezgodnosc odroznia zywy slot od slotu po procesie, ktoremu
 // jadro nadalo wczesniej ten sam, zwolniony PID -- sam kill(pid, 0) tego nie rozstrzyga.
 TEST_F(BusFixture, LivenessRequiresMatchingStartTime) {
+  // covers: bus.is-process-alive.1~1, bus.is-process-alive.4~1
   const auto self           = static_cast<std::int32_t>(getpid());
   const std::uint64_t start = bus::processStartTime(self);
 
@@ -64,6 +68,7 @@ TEST_F(BusFixture, LivenessRequiresMatchingStartTime) {
 // i dla obcego PID-u. Oba odczyty musza wskazywac te sama inkarnacje procesu,
 // takze pod QEMU user-mode, ktore syntetyzuje /proc/<wlasny pid>/stat.
 TEST_F(BusFixture, ProcessIdentityAgreesAcrossProcesses) {
+  // covers: bus.process-start-time.1~1
   const auto parentStart = bus::processStartTime(static_cast<std::int32_t>(getpid()));
   int replies[2];
   int release[2];
@@ -131,6 +136,7 @@ TEST_F(BusFixture, ProcessIdentityAgreesAcrossProcesses) {
 }
 
 TEST_F(BusFixture, ClaimPublishesInstance) {
+  // covers: bus.bus.2~1, bus.bus.12~1
   bus::Bus first(kTestSegment);
   ASSERT_TRUE(first.attached());
 
@@ -147,6 +153,7 @@ TEST_F(BusFixture, ClaimPublishesInstance) {
 
 // Sedno etapu 2b: kolizja nazwy strumienia jest odmowa, a odmowa wskazuje wlasciciela.
 TEST_F(BusFixture, CollidingStreamIsRefusedWithOwner) {
+  // covers: bus.bus.4~1
   bus::Bus first(kTestSegment);
   bus::Bus second(kTestSegment);
   ASSERT_TRUE(first.attached());
@@ -194,6 +201,7 @@ TEST_F(BusFixture, DisjointStreamsCoexist) {
 }
 
 TEST_F(BusFixture, ReleaseFreesTheName) {
+  // covers: bus.bus.11~1, bus.bus.14~1
   bus::Bus second(kTestSegment);
   {
     bus::Bus first(kTestSegment);
@@ -208,6 +216,7 @@ TEST_F(BusFixture, ReleaseFreesTheName) {
 // Powtorne roszczenie tej samej instancji zastepuje jej wlasny slot, a nie doklada drugiego
 // -- inaczej instancja kolidowalaby sama ze soba.
 TEST_F(BusFixture, ReclaimReplacesOwnSlot) {
+  // covers: bus.bus.3~1
   bus::Bus instance(kTestSegment);
 
   ASSERT_EQ(instance.claim({.name = "alfa", .queryFile = "one.rql", .streams = {"dst"}}).status, bus::ClaimStatus::Claimed);
@@ -223,6 +232,7 @@ TEST_F(BusFixture, ReclaimReplacesOwnSlot) {
 // Przekroczenie pojemnosci slotu jest bledem, a nie cichym zawieszeniem gwarancji:
 // slot z obcieta lista strumieni nie moglby juz odpowiadac na pytanie o rozlacznosc.
 TEST_F(BusFixture, OversizedPlanIsRefused) {
+  // covers: bus.bus.4~1
   bus::Bus instance(kTestSegment);
 
   std::vector<std::string> tooMany;
@@ -253,6 +263,7 @@ TEST_F(BusFixture, LongestAllowedStreamNameSurvivesRoundTrip) {
 }
 
 TEST_F(BusFixture, ReservedPlanBlocksNamesUntilActivation) {
+  // covers: bus.bus.7~1, bus.bus.8~1
   bus::Bus instance(kTestSegment);
   bus::Bus other(kTestSegment);
 
@@ -280,6 +291,7 @@ TEST_F(BusFixture, ReservedPlanBlocksNamesUntilActivation) {
 // Aktywacja bez slotu albo bez rezerwacji to zlamana kolejnosc silnika, nie niedostepna magistrala:
 // wolajacy odroznia je po statusie (#472) - K1 dla NotReserved, fail-open dla Unavailable.
 TEST_F(BusFixture, ActivationWithoutReservationIsNotReserved) {
+  // covers: bus.bus.8~1
   bus::Bus instance(kTestSegment);
   EXPECT_EQ(instance.activateReservedPlan().status, bus::ClaimStatus::NotReserved);
 
@@ -292,6 +304,7 @@ TEST_F(BusFixture, ActivationWithoutReservationIsNotReserved) {
 }
 
 TEST_F(BusFixture, RefusedPlanReplacementLeavesOwnResourcesIntact) {
+  // covers: bus.bus.7~1
   bus::Bus first(kTestSegment);
   bus::Bus second(kTestSegment);
 
@@ -316,6 +329,7 @@ TEST_F(BusFixture, RefusedPlanReplacementLeavesOwnResourcesIntact) {
 // Sedno rozszerzenia na ad-hoc: nazwa powolana w locie dochodzi do wlasnego slotu i od tej
 // chwili jest widoczna dla pozostalych instancji.
 TEST_F(BusFixture, ClaimAdditionalExtendsOwnSlot) {
+  // covers: bus.bus.9~1
   bus::Bus first(kTestSegment);
   bus::Bus second(kTestSegment);
 
@@ -331,6 +345,7 @@ TEST_F(BusFixture, ClaimAdditionalExtendsOwnSlot) {
 // zaczynajacym od release(), serwer straciłby po odmowie roszczenie takze na nazwy,
 // ktore juz obsluguje.
 TEST_F(BusFixture, ClaimAdditionalConflictLeavesOwnSlotIntact) {
+  // covers: bus.bus.9~1
   bus::Bus first(kTestSegment);
   bus::Bus second(kTestSegment);
 
@@ -353,6 +368,7 @@ TEST_F(BusFixture, ClaimAdditionalConflictLeavesOwnSlotIntact) {
 // Wlasna nazwa nie koliduje sama ze soba: powtorzone zapytanie ad-hoc ma przechodzic,
 // a slot nie ma rosnac o duplikaty.
 TEST_F(BusFixture, ClaimAdditionalIsIdempotent) {
+  // covers: bus.bus.9~1
   bus::Bus instance(kTestSegment);
 
   ASSERT_EQ(instance.claim({.name = "alfa", .queryFile = "alfa.rql", .streams = {"srca"}}).status, bus::ClaimStatus::Claimed);
@@ -400,6 +416,7 @@ TEST_F(BusFixture, ClaimAdditionalRespectsSlotCapacity) {
 // sprawdzenia stanu taki slot trzymalby swoje nazwy strumieni az do wait() rodzica --
 // czyli dowolnie dlugo, bo to rodzic decyduje, kiedy zbierze potomka.
 TEST_F(BusFixture, ZombieSlotIsFreeAgain) {
+  // covers: bus.is-process-alive.3~1, bus.bus.3~1, bus.bus.6~1, bus.bus.12~1
   bus::Bus parent(kTestSegment);
   ASSERT_TRUE(parent.attached());
 
@@ -454,6 +471,7 @@ TEST_F(BusFixture, ZombieSlotIsFreeAgain) {
 // na koncu: bez podmiany ten sam slot jest wolny, inaczej test przechodzilby takze przy poprawce,
 // ktora blokuje kazdy martwy slot.
 TEST_F(BusFixture, UnreadableOwnerKeepsSlot) {
+  // covers: bus.is-process-alive.2~1, bus.bus.6~1
   bus::Bus parent(kTestSegment);
   ASSERT_TRUE(parent.attached());
 
@@ -536,6 +554,7 @@ std::vector<bus::InstanceInfo> snapshotOf() {
 }  // namespace
 
 TEST(BusForeignOwner, ReportsOwnerOutsideSelf) {
+  // covers: bus.find-foreign-owner.2~1, bus.find-foreign-owner.4~1
   const auto owner = bus::findForeignOwner(snapshotOf(), "beta", {"srcb", "dst"});
   ASSERT_TRUE(owner.has_value());
   EXPECT_EQ(owner->stream, "dst");
@@ -546,6 +565,7 @@ TEST(BusForeignOwner, ReportsOwnerOutsideSelf) {
 // Sedno reguly: nazwy WLASNEJ instancji nie sa kolizja. Restart serwisu zwalnia jego slot,
 // wiec zestaw dostarczany temu samemu serwisowi musi przejsc, choc jego nazwy sa w magistrali.
 TEST(BusForeignOwner, OwnStreamsAreNotAConflict) {
+  // covers: bus.find-foreign-owner.1~1
   EXPECT_FALSE(bus::findForeignOwner(snapshotOf(), "beta", {"srcb", "dstb"}).has_value());
   EXPECT_FALSE(bus::findForeignOwner(snapshotOf(), "alfa", {"srca", "dst"}).has_value());
 }
@@ -553,6 +573,7 @@ TEST(BusForeignOwner, OwnStreamsAreNotAConflict) {
 // Instancja bezimienna bierze udzial w regule na tych samych prawach: dostarczenie do niej
 // pomija jej wlasne nazwy, a dostarczenie do nazwanej instancji widzi jej nazwy jako cudze.
 TEST(BusForeignOwner, UnnamedInstanceTakesPart) {
+  // covers: bus.find-foreign-owner.1~1
   const auto owner = bus::findForeignOwner(snapshotOf(), "alfa", {"dste"});
   ASSERT_TRUE(owner.has_value());
   EXPECT_EQ(owner->instance, "");
@@ -562,12 +583,14 @@ TEST(BusForeignOwner, UnnamedInstanceTakesPart) {
 }
 
 TEST(BusForeignOwner, DisjointSetAndEmptyInputsPass) {
+  // covers: bus.find-foreign-owner.3~1, bus.find-foreign-owner.4~1
   EXPECT_FALSE(bus::findForeignOwner(snapshotOf(), "gamma", {"nowy1", "nowy2"}).has_value());
   EXPECT_FALSE(bus::findForeignOwner(snapshotOf(), "gamma", {}).has_value());
   EXPECT_FALSE(bus::findForeignOwner({}, "gamma", {"dst"}).has_value());
 }
 
 TEST(BusForeignCounterOwner, ReportsForeignCounterBeforeDelivery) {
+  // covers: bus.find-foreign-counter-owner.2~1
   const auto owner = bus::findForeignCounterOwner(snapshotOf(), "beta", "/tmp/alfa.cnt");
   ASSERT_TRUE(owner.has_value());
   EXPECT_EQ(owner->path, "/tmp/alfa.cnt");
@@ -576,6 +599,7 @@ TEST(BusForeignCounterOwner, ReportsForeignCounterBeforeDelivery) {
 }
 
 TEST(BusForeignCounterOwner, OwnDistinctAndEmptyCountersPass) {
+  // covers: bus.find-foreign-counter-owner.1~1, bus.find-foreign-counter-owner.2~1
   EXPECT_FALSE(bus::findForeignCounterOwner(snapshotOf(), "alfa", "/tmp/alfa.cnt").has_value());
   EXPECT_FALSE(bus::findForeignCounterOwner(snapshotOf(), "gamma", "/tmp/gamma.cnt").has_value());
   EXPECT_FALSE(bus::findForeignCounterOwner(snapshotOf(), "gamma", "").has_value());
@@ -586,6 +610,7 @@ TEST(BusForeignCounterOwner, OwnDistinctAndEmptyCountersPass) {
 // i zapis licznika nie sa objete blokada pliku), czyli dostac ten sam numer i nadpisac sobie
 // archiwa. Nazwy strumieni sa tu ROZLACZNE -- kolizja dotyczy wylacznie licznika.
 TEST_F(BusFixture, SharedRotationCounterIsRefused) {
+  // covers: bus.bus.4~1
   bus::Bus first(kTestSegment);
   bus::Bus second(kTestSegment);
 
@@ -680,6 +705,7 @@ TEST_F(BusFixture, SlotCarriesRunModes) {
 // nazwa) przechodzily oba. Test odtwarza to bez wyscigu: dwa roszczenia w jednym procesie sa
 // serializowane tym samym muteksem co dwa procesy, a slot pierwszej instancji juz istnieje.
 TEST_F(BusFixture, SecondServiceInstanceIsRefused) {
+  // covers: bus.bus.3~1, bus.bus.4~1
   bus::Bus first(kTestSegment);
   bus::Bus second(kTestSegment);
 
@@ -711,6 +737,7 @@ TEST_F(BusFixture, SecondServiceInstanceIsRefused) {
 // Sciezka dluzsza niz pole slotu jest odmowa, nie cichym obcieciem: obciety napis zrownalby
 // dwa rozne pliki licznika albo rozdzielil jeden.
 TEST_F(BusFixture, OversizedCounterPathIsRefused) {
+  // covers: bus.bus.4~1
   bus::Bus instance(kTestSegment);
 
   const std::string tooLong(bus::kCounterPathSize, 'p');
@@ -726,6 +753,7 @@ TEST_F(BusFixture, OversizedCounterPathIsRefused) {
 // strumienia broni wylacznie deskryptora <id>.desc, wiec bez tego roszczenia dwa procesy
 // dopisywalyby rownolegle do tego samego magazynu.
 TEST_F(BusFixture, SharedStorageFileIsRefused) {
+  // covers: bus.bus.4~1
   bus::Bus first(kTestSegment);
   bus::Bus second(kTestSegment);
 
@@ -783,6 +811,7 @@ TEST_F(BusFixture, SlotCarriesStores) {
 // przyjeciem `--reset` a granica epoki inna instancja nie moze zajac pliku, do ktorego ten
 // plan zaraz zacznie pisac.
 TEST_F(BusFixture, ReservedPlanBlocksStoresUntilActivation) {
+  // covers: bus.bus.8~1
   bus::Bus instance(kTestSegment);
   bus::Bus other(kTestSegment);
 
@@ -807,6 +836,7 @@ TEST_F(BusFixture, ReservedPlanBlocksStoresUntilActivation) {
 
 // Odmowa rezerwacji nie rusza wlasnych zasobow -- stary plan dalej dziala i dalej je rosci.
 TEST_F(BusFixture, RefusedStoreReservationLeavesOwnStoresIntact) {
+  // covers: bus.bus.7~1
   bus::Bus first(kTestSegment);
   bus::Bus second(kTestSegment);
 
@@ -852,6 +882,7 @@ TEST_F(BusFixture, ClaimAdditionalClaimsStores) {
 // Odmowa przy dokladaniu ad-hoc nie ma prawa zostawic sladu we wlasnym slocie: plan
 // dzialajacego serwera nie moze urosnac o zasob, ktorego nie dostal.
 TEST_F(BusFixture, ClaimAdditionalStoreConflictLeavesOwnSlotIntact) {
+  // covers: bus.bus.9~1
   bus::Bus first(kTestSegment);
   bus::Bus second(kTestSegment);
 
@@ -876,6 +907,7 @@ TEST_F(BusFixture, ClaimAdditionalStoreConflictLeavesOwnSlotIntact) {
 // Nazwa i plik wracaja do puli dla innych instancji, a nazwy i magazyny planu -- takze te
 // powtorzone w zapytaniu ad-hoc -- zostaja przy wlascicielu.
 TEST_F(BusFixture, ReleaseAdditionalFreesOnlyWhatWasAdded) {
+  // covers: bus.bus.9~1, bus.bus.10~1
   bus::Bus first(kTestSegment);
   bus::Bus second(kTestSegment);
   bus::Bus third(kTestSegment);
@@ -906,6 +938,7 @@ TEST_F(BusFixture, ReleaseAdditionalFreesOnlyWhatWasAdded) {
 // Zwolnienie wpisu ze srodka tablicy zageszcza ja z zachowaniem kolejnosci pozostalych:
 // slot nie moze zostac z dziura ani z przestawionymi nazwami.
 TEST_F(BusFixture, ReleaseAdditionalKeepsOrderOfRemainingEntries) {
+  // covers: bus.bus.10~1
   bus::Bus instance(kTestSegment);
 
   ASSERT_EQ(instance.claim({.name = "alfa", .queryFile = "a.rql", .streams = {"srca"}}).status, bus::ClaimStatus::Claimed);
@@ -948,6 +981,7 @@ TEST_F(BusFixture, StoreLimitCountsFilesNotPathLength) {
 // Skrot jedzie do pamieci dzielonej i porownuja go rozne procesy, wiec musi byc funkcja
 // napisu, a nie stanu procesu: ta sama sciezka zawsze ten sam skrot, rozne sciezki rozny.
 TEST(BusStoreDigest, IsAStableFunctionOfThePath) {
+  // covers: bus.store-digest.1~1, bus.store-digest.3~1
   EXPECT_EQ(bus::storeDigest("/var/lib/rdb/dst"), bus::storeDigest("/var/lib/rdb/dst"));
   EXPECT_FALSE(bus::storeDigest("/var/lib/rdb/dst") == bus::storeDigest("/var/lib/rdb/dsu"));
   EXPECT_FALSE(bus::storeDigest("/var/lib/rdb/dst") == bus::storeDigest("/var/lib/rdb/dst/"));
@@ -961,6 +995,7 @@ TEST(BusStoreDigest, IsAStableFunctionOfThePath) {
 }
 
 TEST(BusForeignStoreOwner, ReportsForeignStoreBeforeDelivery) {
+  // covers: bus.find-foreign-store-owner.1~1
   const auto owner = bus::findForeignStoreOwner(snapshotOf(), "beta", {"/var/rdb/dstb", "/var/rdb/dst"});
   ASSERT_TRUE(owner.has_value());
   EXPECT_EQ(owner->path, "/var/rdb/dst");
@@ -971,6 +1006,7 @@ TEST(BusForeignStoreOwner, ReportsForeignStoreBeforeDelivery) {
 // Wlasne magazyny nie sa kolizja: restart serwisu zwalnia jego slot, wiec zestaw dostarczany
 // temu samemu serwisowi musi przejsc, choc jego pliki sa w magistrali.
 TEST(BusForeignStoreOwner, OwnDistinctAndEmptyStoresPass) {
+  // covers: bus.find-foreign-store-owner.2~1
   EXPECT_FALSE(bus::findForeignStoreOwner(snapshotOf(), "alfa", {"/var/rdb/dst"}).has_value());
   EXPECT_FALSE(bus::findForeignStoreOwner(snapshotOf(), "gamma", {"/var/rdb/nowy"}).has_value());
   EXPECT_FALSE(bus::findForeignStoreOwner(snapshotOf(), "gamma", {}).has_value());
@@ -1002,11 +1038,13 @@ class BusSegmentNamespace : public ::testing::Test {
 };
 
 TEST_F(BusSegmentNamespace, AppendsNamespaceToSegmentName) {
+  // covers: bus.segment-name.1~1
   ASSERT_EQ(setenv(servername::kNamespaceEnv, "it07", 1), 0);
   EXPECT_EQ(bus::segmentName(), std::string(bus::kSegmentName) + "_it07");
 }
 
 TEST_F(BusSegmentNamespace, UnsetOrEmptyKeepsProductionSegment) {
+  // covers: bus.segment-name.1~1
   ASSERT_EQ(unsetenv(servername::kNamespaceEnv), 0);
   EXPECT_EQ(bus::segmentName(), bus::kSegmentName);
   ASSERT_EQ(setenv(servername::kNamespaceEnv, "", 1), 0);
@@ -1014,6 +1052,7 @@ TEST_F(BusSegmentNamespace, UnsetOrEmptyKeepsProductionSegment) {
 }
 
 TEST_F(BusSegmentNamespace, InvalidValueNeverReachesTheObjectName) {
+  // covers: bus.segment-name.1~1
   for (const char *bad : {"z/skosem", "z.kropka", "Wielka", "9cyfra", "z spacja"}) {
     ASSERT_EQ(setenv(servername::kNamespaceEnv, bad, 1), 0);
     EXPECT_EQ(bus::segmentName(), bus::kSegmentName) << "niepoprawna wartosc trafila do nazwy segmentu: " << bad;
@@ -1039,6 +1078,7 @@ std::string presenceFile(const std::string &segment) { return "/tmp/" + segment 
 // kto ja jeszcze mapuje, a zostawianie segmentu na zawsze zapelnialo /dev/shm po 1,8 MB na
 // kazda przestrzen nazw.
 TEST(BusPresence, LastMapperRemovesSegment) {
+  // covers: bus.bus.1~1, bus.bus.14~1
   const std::string name = std::string(bus::kSegmentName) + "_utlast" + std::to_string(getpid());
   {
     bus::Bus first(name);
@@ -1055,6 +1095,7 @@ TEST(BusPresence, LastMapperRemovesSegment) {
 }
 
 TEST(BusPresence, AttachHasDeadlineWithExclusivePresenceHolder) {
+  // covers: bus.bus.1~1
   const std::string name = std::string(bus::kSegmentName) + "_utbusy" + std::to_string(getpid());
   const std::string path = presenceFile(name);
   int holder             = -1;
@@ -1079,6 +1120,8 @@ TEST(BusPresence, AttachHasDeadlineWithExclusivePresenceHolder) {
 // razem z procesem. Sprzatacz usuwa taki segment i wylacznie taki. Pliki obecnosci leza we
 // wlasnym katalogu testu: w /tmp zabieral je sprzatacz konczacego sie sasiedniego serwera.
 TEST(BusPresence, SweepRemovesOnlyUnmappedSegments) {
+  // covers: bus.sweep-abandoned-segments.1~1, bus.sweep-abandoned-segments.2~1, bus.sweep-abandoned-segments.3~1
+  // covers: lockmanager.sweep-abandoned-resources.3~1
   const std::string pid  = std::to_string(getpid());
   const auto dir         = std::filesystem::temp_directory_path() / ("ut_bus_sweep_" + pid);
   const std::string dead = std::string(bus::kSegmentName) + "_utdead" + pid;
@@ -1104,4 +1147,335 @@ TEST(BusPresence, SweepRemovesOnlyUnmappedSegments) {
   ::close(holder);
   IPC::shared_memory_object::remove(live.c_str());
   std::filesystem::remove_all(dir);
+}
+
+// --- Wymagania bus.hpp: przypadki dopisane przy oznaczaniu pokrycia ---
+
+// covers: bus.bus.15~1
+static_assert(!std::is_copy_constructible_v<bus::Bus> && !std::is_copy_assignable_v<bus::Bus>,
+              "Bus trzyma odwzorowanie i blokade obecnosci; kopia zwalnialaby je dwa razy");
+
+// Lista segmentow czyta wylacznie nazwy plikow obecnosci: plik bez segmentu tez trafia na liste,
+// a nazwy innej wersji, niepoprawne i bez ".lock" nie. Pliki poprawne trzymamy pod LOCK_SH, bo
+// w /tmp nieblokowane pliki obecnosci zabiera sprzatacz sasiedniego serwera.
+TEST(BusSegmentNames, ListsOnlyCurrentLayoutPresenceFiles) {
+  // covers: bus.segment-names.1~1, bus.segment-names.3~1
+  const std::string pid    = std::to_string(getpid());
+  const std::string first  = std::string(bus::kSegmentName) + "_utnamesa" + pid;
+  const std::string second = std::string(bus::kSegmentName) + "_utnamesb" + pid;
+  const std::vector<std::string> ignored{
+      "xrdbbus_v6_utnamesc" + pid + ".lock", std::string(bus::kSegmentName) + "_Utnamesd" + pid + ".lock",
+      std::string(bus::kSegmentName) + "_utnamese" + pid + ".lck", std::string(bus::kSegmentName) + "utnamesf" + pid + ".lock"};
+  int held[2] = {-1, -1};
+  ASSERT_EQ(lockfile::acquire(presenceFile(second), false, false, held[0]), lockfile::Result::Acquired);
+  ASSERT_EQ(lockfile::acquire(presenceFile(first), false, false, held[1]), lockfile::Result::Acquired);
+  for (const auto &file : ignored) {
+    std::ofstream touch("/tmp/" + file);
+  }
+
+  const auto names = bus::segmentNames();
+  for (const auto &file : ignored)
+    std::filesystem::remove("/tmp/" + file);
+  lockfile::removeAndRelease(presenceFile(second), held[0]);
+  lockfile::removeAndRelease(presenceFile(first), held[1]);
+
+  EXPECT_TRUE(std::ranges::is_sorted(names));
+  const auto at = [&](const std::string &name) { return std::ranges::find(names, name); };
+  ASSERT_NE(at(first), names.end()) << "plik obecnosci bez segmentu nie trafil na liste";
+  ASSERT_NE(at(second), names.end());
+  EXPECT_LT(at(first), at(second));
+  EXPECT_FALSE(segmentExists(first)) << "lista nie moze zalezec od istnienia segmentu";
+  for (const auto &name : names)
+    if (name.find("names") != std::string::npos && name.find(pid) != std::string::npos)
+      EXPECT_TRUE(name == first || name == second) << "na liste trafila nazwa spoza wersji ukladu: " << name;
+}
+
+// Sprzatacz nie rusza plikow obecnosci innej wersji ukladu, a katalog, ktorego nie ma, konczy
+// przeglad z zerem zamiast bledem.
+TEST(BusPresence, SweepLeavesOtherLayoutVersions) {
+  // covers: bus.sweep-abandoned-segments.2~1
+  const std::string pid = std::to_string(getpid());
+  const auto dir        = std::filesystem::temp_directory_path() / ("ut_bus_sweep_old_" + pid);
+  const auto old        = dir / ("xrdbbus_v6_utold" + pid + ".lock");
+  std::filesystem::create_directories(dir);
+  { std::ofstream touch(old); }
+
+  EXPECT_EQ(bus::sweepAbandonedSegments(dir.string()), 0U);
+  EXPECT_TRUE(std::filesystem::exists(old));
+  EXPECT_EQ(bus::sweepAbandonedSegments((dir / "brak").string()), 0U);
+
+  std::filesystem::remove_all(dir);
+}
+
+// Odmowa removeOwned (obiekt nie jest zwyklym plikiem) zostawia segment, ale plik obecnosci
+// i tak znika i jest liczony. Podmiana obiektu wymaga jego sciezki w systemie plikow.
+TEST(BusPresence, SweepCountsPresenceWhoseSegmentRemovalWasRefused) {
+  // covers: bus.sweep-abandoned-segments.3~1
+  if (!RDB_HAS_BOOST_POSIX_SHM) GTEST_SKIP() << "obiekt IPC bez sciezki shm_open";
+  const std::string pid     = std::to_string(getpid());
+  const auto dir            = std::filesystem::temp_directory_path() / ("ut_bus_sweep_refused_" + pid);
+  const std::string segment = std::string(bus::kSegmentName) + "_utrefused" + pid;
+  const auto object         = std::filesystem::path(osplat::sharedMemoryBackingPath()) / segment;
+  const auto presence       = dir / (segment + ".lock");
+  std::filesystem::create_directories(dir);
+  { std::ofstream touch(presence); }
+  std::filesystem::create_symlink("/nonexistent-rdb-target", object);
+
+  EXPECT_EQ(bus::sweepAbandonedSegments(dir.string()), 1U);
+  EXPECT_FALSE(std::filesystem::exists(presence));
+  EXPECT_TRUE(std::filesystem::is_symlink(object)) << "removeOwned nie odmowil usuniecia obiektu";
+
+  std::filesystem::remove(object);
+  std::filesystem::remove_all(dir);
+}
+
+// Segment jest zakladany w calosci, wiec jego rozmiar to dokladnie segmentBytes() i miesci
+// co najmniej obie tablice nazw strumieni wszystkich slotow.
+TEST_F(BusFixture, SegmentBytesIsTheWholeMappedObject) {
+  // covers: bus.segment-bytes.1~1
+  bus::Bus instance(kTestSegment);
+  ASSERT_TRUE(instance.attached());
+
+  IPC::shared_memory_object object(IPC::open_only, kTestSegment, IPC::read_only);
+  IPC::offset_t size = 0;
+  ASSERT_TRUE(object.get_size(size));
+  EXPECT_EQ(static_cast<std::size_t>(size), bus::segmentBytes());
+  EXPECT_GT(bus::segmentBytes(), 2 * bus::kMaxSlots * bus::kMaxStreams * bus::kStreamNameSize);
+}
+
+// Wartosci wzorcowe policzone niezaleznie (Python, FNV-1a 64: baza 0xcbf29ce484222325, mnoznik
+// 0x100000001b3); low("a") to wektor testowy z opisu FNV. Stala w tescie dowodzi, ze skrot nie
+// zalezy od procesu ani od biblioteki standardowej.
+TEST(BusStoreDigest, MatchesFnv1aReferenceValues) {
+  // covers: bus.store-digest.1~1, bus.store-digest.2~1, bus.store-digest.3~1
+  EXPECT_EQ(bus::storeDigest(""), (bus::StoreDigest{.high = 0x9f579bf8337a2afbULL, .low = 0xcbf29ce484222325ULL}));
+  EXPECT_EQ(bus::storeDigest("a"), (bus::StoreDigest{.high = 0x3c08a0bf789663aeULL, .low = 0xaf63dc4c8601ec8cULL}));
+  EXPECT_EQ(bus::storeDigest("/var/lib/rdb/dst"),
+            (bus::StoreDigest{.high = 0xfecd4c077203770aULL, .low = 0xf96f445d8dcf6e9cULL}));
+
+  // Napis, nie plik: sciezki tozsame w systemie plikow maja rozne skroty.
+  EXPECT_FALSE(bus::storeDigest("/tmp/./x") == bus::storeDigest("/tmp/x"));
+  EXPECT_FALSE(bus::storeDigest("/tmp//x") == bus::storeDigest("/tmp/x"));
+}
+
+// "Pierwszy" w kazdej z trzech funkcji znaczy co innego: dla nazw - pierwsza instancja migawki
+// i pierwsza jej nazwa, dla licznika - pierwsza instancja, dla magazynu - pierwsza sciezka wolajacego.
+TEST(BusForeignOwner, FirstMatchFollowsSnapshotAndInstanceStreamOrder) {
+  // covers: bus.find-foreign-owner.2~1
+  const auto owner = bus::findForeignOwner(snapshotOf(), "gamma", {"dstb", "dst", "srca"});
+  ASSERT_TRUE(owner.has_value());
+  EXPECT_EQ(owner->stream, "srca");
+  EXPECT_EQ(owner->instance, "alfa");
+  EXPECT_EQ(owner->pid, 101);
+}
+
+TEST(BusForeignCounterOwner, FirstMatchFollowsSnapshotOrder) {
+  // covers: bus.find-foreign-counter-owner.2~1
+  const std::vector<bus::InstanceInfo> shared{bus::InstanceInfo{.name = "x", .pid = 201, .counterPath = "/tmp/shared.cnt"},
+                                              bus::InstanceInfo{.name = "y", .pid = 202, .counterPath = "/tmp/shared.cnt"}};
+  const auto first = bus::findForeignCounterOwner(shared, "gamma", "/tmp/shared.cnt");
+  ASSERT_TRUE(first.has_value());
+  EXPECT_EQ(first->instance, "x");
+  EXPECT_EQ(first->pid, 201);
+  const auto next = bus::findForeignCounterOwner(shared, "x", "/tmp/shared.cnt");
+  ASSERT_TRUE(next.has_value());
+  EXPECT_EQ(next->instance, "y");
+  EXPECT_EQ(next->pid, 202);
+}
+
+TEST(BusForeignStoreOwner, FirstMatchFollowsCallerStoreOrder) {
+  // covers: bus.find-foreign-store-owner.1~1
+  const auto owner = bus::findForeignStoreOwner(snapshotOf(), "gamma", {"/var/rdb/dste", "/var/rdb/dst"});
+  ASSERT_TRUE(owner.has_value());
+  EXPECT_EQ(owner->path, "/var/rdb/dste");
+  EXPECT_EQ(owner->instance, "");
+  EXPECT_EQ(owner->pid, 103);
+}
+
+// Stan procesu wprost: zatrzymany sygnalem zyje, zebrany i nieczytelny maja znacznik zero,
+// a zerowy znacznik oczekiwany nie pasuje do zywego procesu.
+TEST_F(BusFixture, ProcessStateDecidesLiveness) {
+  // covers: bus.process-start-time.1~1, bus.is-process-alive.3~1, bus.is-process-alive.4~1
+  const auto self = static_cast<std::int32_t>(getpid());
+  EXPECT_FALSE(bus::isProcessAlive(self, 0));
+
+  const pid_t child = fork();
+  ASSERT_NE(child, -1);
+  if (child == 0) {
+    for (;;)
+      pause();
+    _exit(0);
+  }
+
+  int status = 0;
+  ASSERT_EQ(kill(child, SIGSTOP), 0);
+  ASSERT_EQ(waitpid(child, &status, WUNTRACED), child);
+  ASSERT_TRUE(WIFSTOPPED(status));
+  const std::uint64_t start = bus::processStartTime(child);
+  EXPECT_NE(start, 0U);
+  EXPECT_TRUE(bus::isProcessAlive(child, start)) << "proces zatrzymany SIGSTOP uznany za martwy";
+
+  ASSERT_EQ(kill(child, SIGKILL), 0);
+  ASSERT_EQ(waitpid(child, &status, 0), child);
+  EXPECT_EQ(bus::processStartTime(child), 0U);
+  EXPECT_FALSE(bus::isProcessAlive(child, start));
+
+  unreadablePid.store(child);
+  EXPECT_EQ(bus::processStartTime(child), 0U);
+  unreadablePid.store(0);
+}
+
+// Czytelnik (createIfMissing = false) nie zaklada segmentu, a bez segmentu kazda operacja
+// konczy sie Unavailable albo niczym. Dopiero tworca zaklada segment.
+TEST_F(BusFixture, ReaderModeNeverCreatesSegmentAndIsUnavailable) {
+  // covers: bus.bus.1~1, bus.bus.2~1, bus.bus.4~1, bus.bus.8~1
+  {
+    bus::Bus reader(kTestSegment, false);
+    EXPECT_FALSE(reader.attached());
+    EXPECT_FALSE(segmentExists(kTestSegment));
+
+    EXPECT_EQ(reader.claim({.name = "alfa", .queryFile = "a.rql", .streams = {"dsta"}}).status, bus::ClaimStatus::Unavailable);
+    EXPECT_EQ(reader.reservePlan({"dsta"}, "", {}).status, bus::ClaimStatus::Unavailable);
+    EXPECT_EQ(reader.activateReservedPlan().status, bus::ClaimStatus::Unavailable);
+    EXPECT_EQ(reader.claimAdditional({"dsta"}, {}).status, bus::ClaimStatus::Unavailable);
+    reader.releaseAdditional({"dsta"}, {});
+    reader.release();
+    EXPECT_TRUE(reader.instances().empty());
+  }
+  EXPECT_FALSE(segmentExists(kTestSegment));
+
+  bus::Bus creator(kTestSegment);
+  EXPECT_TRUE(creator.attached());
+  EXPECT_TRUE(segmentExists(kTestSegment));
+}
+
+TEST_F(BusFixture, ReservePlanWithoutSlotIsUnavailable) {
+  // covers: bus.bus.7~1
+  bus::Bus instance(kTestSegment);
+  ASSERT_TRUE(instance.attached());
+  EXPECT_EQ(instance.reservePlan({"dsta"}, "", {}).status, bus::ClaimStatus::Unavailable);
+  EXPECT_TRUE(instance.instances().empty());
+}
+
+// Odmowa z limitow przychodzi PRZED zwolnieniem poprzedniego slotu, wiec go nie rusza; odmowa
+// z kolizji przychodzi PO nim, wiec ponowne roszczenie z kolizja zostawia instancje bez slotu.
+TEST_F(BusFixture, ReclaimRefusedByLimitsKeepsPreviousSlotButConflictDropsIt) {
+  // covers: bus.bus.3~1
+  bus::Bus first(kTestSegment);
+  bus::Bus second(kTestSegment);
+  ASSERT_EQ(first.claim({.name = "alfa", .queryFile = "a.rql", .counterPath = "/tmp/a.cnt", .streams = {"dsta"}}).status,
+            bus::ClaimStatus::Claimed);
+
+  std::vector<std::string> tooManyStreams;
+  for (std::size_t i = 0; i <= bus::kMaxStreams; ++i)
+    tooManyStreams.push_back("s" + std::to_string(i));
+  std::vector<std::string> tooManyStores;
+  for (std::size_t i = 0; i <= bus::kMaxStores; ++i)
+    tooManyStores.push_back("/tmp/s" + std::to_string(i));
+  const std::vector<bus::ClaimRequest> oversized{
+      {.name = "alfa", .queryFile = "b.rql", .streams = tooManyStreams},
+      {.name = "alfa", .queryFile = "b.rql", .streams = {std::string(bus::kStreamNameSize, 'x')}},
+      {.name = "alfa", .queryFile = "b.rql", .counterPath = std::string(bus::kCounterPathSize, 'p'), .streams = {"dsta"}},
+      {.name = "alfa", .queryFile = "b.rql", .streams = {"dsta"}, .stores = tooManyStores}};
+  for (const auto &request : oversized) {
+    EXPECT_EQ(first.claim(request).status, bus::ClaimStatus::TooLarge);
+    const auto instances = first.instances();
+    ASSERT_EQ(instances.size(), 1U);
+    EXPECT_EQ(instances[0].queryFile, "a.rql");
+    EXPECT_EQ(instances[0].streams, (std::vector<std::string>{"dsta"}));
+    EXPECT_EQ(instances[0].counterPath, "/tmp/a.cnt");
+  }
+
+  ASSERT_EQ(second.claim({.name = "beta", .queryFile = "b.rql", .streams = {"dstb"}}).status, bus::ClaimStatus::Claimed);
+  EXPECT_EQ(first.claim({.name = "alfa", .queryFile = "c.rql", .streams = {"dsta", "dstb"}}).status, bus::ClaimStatus::Conflict);
+  const auto instances = second.instances();
+  ASSERT_EQ(instances.size(), 1U);
+  EXPECT_EQ(instances[0].name, "beta");
+}
+
+// Wszystkie sloty zajete przez zywe instancje: kolejne roszczenie to NoFreeSlot, nie Conflict.
+TEST_F(BusFixture, FullBusIsNoFreeSlot) {
+  // covers: bus.bus.4~1
+  std::vector<std::unique_ptr<bus::Bus>> holders;
+  for (std::size_t i = 0; i < bus::kMaxSlots; ++i) {
+    holders.push_back(std::make_unique<bus::Bus>(kTestSegment));
+    const std::string name = "s" + std::to_string(i);
+    ASSERT_EQ(holders.back()->claim({.name = name, .queryFile = "q.rql", .streams = {name}}).status, bus::ClaimStatus::Claimed);
+  }
+
+  bus::Bus late(kTestSegment);
+  const auto refused = late.claim({.name = "late", .queryFile = "q.rql", .streams = {"late"}});
+  EXPECT_EQ(refused.status, bus::ClaimStatus::NoFreeSlot);
+  EXPECT_EQ(late.instances().size(), bus::kMaxSlots);
+
+  holders.back().reset();
+  EXPECT_EQ(late.claim({.name = "late", .queryFile = "q.rql", .streams = {"late"}}).status, bus::ClaimStatus::Claimed);
+}
+
+// Pola informacyjne za dlugie nie blokuja startu: slot niesie ich poczatek do granicy pola.
+TEST_F(BusFixture, InformationalFieldsAreTruncatedNotRefused) {
+  // covers: bus.bus.5~1
+  bus::Bus instance(kTestSegment);
+  const std::string unit(300, 'u');
+  const std::string queryFile(400, 'q');
+
+  ASSERT_EQ(instance.claim({.name = "alfa", .queryFile = queryFile, .unit = unit, .streams = {"dsta"}}).status,
+            bus::ClaimStatus::Claimed);
+  const auto instances = instance.instances();
+  ASSERT_EQ(instances.size(), 1U);
+  EXPECT_EQ(instances[0].unit, unit.substr(0, bus::kUnitNameSize - 1));
+  EXPECT_EQ(instances[0].queryFile, queryFile.substr(0, bus::kQueryFileSize - 1));
+}
+
+// releaseAdditional zdejmuje tylko podane wpisy: licznik, tryby, pola informacyjne i rezerwacja
+// planu zostaja. Instancja bez slotu nie zdejmuje niczego, takze z cudzego slotu.
+TEST_F(BusFixture, ReleaseAdditionalKeepsRestOfSlot) {
+  // covers: bus.bus.10~1
+  bus::Bus first(kTestSegment);
+  bus::Bus other(kTestSegment);
+  ASSERT_EQ(first
+                .claim({.name        = "alfa",
+                        .queryFile   = "a.rql",
+                        .unit        = "xretractor-alfa.service",
+                        .counterPath = "/tmp/a.cnt",
+                        .modes       = bus::mode::kRealTime,
+                        .streams     = {"srca"}})
+                .status,
+            bus::ClaimStatus::Claimed);
+  ASSERT_EQ(first.reservePlan({"nowy"}, "/tmp/n.cnt", {}).status, bus::ClaimStatus::Claimed);
+  const auto added = first.claimAdditional({"adhoc"}, {"/tmp/adhoc"});
+  ASSERT_EQ(added.status, bus::ClaimStatus::Claimed);
+
+  first.releaseAdditional(added.addedStreams, added.addedStores);
+  const auto instances = first.instances();
+  ASSERT_EQ(instances.size(), 1U);
+  EXPECT_EQ(instances[0].streams, (std::vector<std::string>{"srca"}));
+  EXPECT_TRUE(instances[0].storeDigests.empty());
+  EXPECT_EQ(instances[0].queryFile, "a.rql");
+  EXPECT_EQ(instances[0].unit, "xretractor-alfa.service");
+  EXPECT_EQ(instances[0].counterPath, "/tmp/a.cnt");
+  EXPECT_EQ(instances[0].modes, bus::mode::kRealTime);
+  EXPECT_EQ(other.claim({.name = "beta", .queryFile = "b.rql", .streams = {"nowy"}}).status, bus::ClaimStatus::Conflict);
+
+  ASSERT_EQ(first.activateReservedPlan().status, bus::ClaimStatus::Claimed);
+  other.releaseAdditional({"nowy"}, {});
+  const auto after = first.instances();
+  ASSERT_EQ(after.size(), 1U);
+  EXPECT_EQ(after[0].streams, (std::vector<std::string>{"nowy"}));
+  EXPECT_EQ(after[0].counterPath, "/tmp/n.cnt");
+}
+
+TEST_F(BusFixture, ReleaseIsIdempotent) {
+  // covers: bus.bus.11~1
+  bus::Bus first(kTestSegment);
+  bus::Bus second(kTestSegment);
+  ASSERT_EQ(first.claim({.name = "alfa", .queryFile = "a.rql", .streams = {"dst"}}).status, bus::ClaimStatus::Claimed);
+  ASSERT_EQ(second.claim({.name = "beta", .queryFile = "b.rql", .streams = {"dstb"}}).status, bus::ClaimStatus::Claimed);
+
+  first.release();
+  first.release();
+  const auto instances = second.instances();
+  ASSERT_EQ(instances.size(), 1U);
+  EXPECT_EQ(instances[0].name, "beta");
+  EXPECT_EQ(first.claim({.name = "alfa", .queryFile = "a.rql", .streams = {"dst"}}).status, bus::ClaimStatus::Claimed);
 }

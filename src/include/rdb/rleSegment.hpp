@@ -7,13 +7,15 @@
 
 namespace rdb {
 
-/// @brief Split an RLE segment at @p offset, replacing that one record with @p newBitset.
+/// Funkcja splitSegment powinna:
+/// - [rlesegment.split-segment.1~1] dzielić segment RLE w pozycji offset na 1 do 3 części w kolejności: prefiks offset rekordów z bitsetem segmentu (tylko dla offset > 0), jeden rekord z newBitset i sufiks pozostałych rekordów z bitsetem segmentu (tylko gdy jakieś zostały).
+/// - [rlesegment.split-segment.2~1] oznaczać wszystkie części jako niebędące przerwą.
 ///
-/// Used when a single record inside a multi-record RLE segment gets a corrected null pattern.
-/// @return 1 to 3 parts, in order: prefix (if offset > 0), the replaced record, suffix (if any).
+/// @note Uzywana, gdy jeden rekord segmentu wielorekordowego dostaje poprawiony wzorzec NULL.
 std::vector<IndexRecord> splitSegment(const IndexRecord &seg, size_t offset, const std::vector<bool> &newBitset);
 
-/// @brief Sum recordCount across all non-gap entries (gap markers don't consume record indices).
+/// Funkcja sumNonGapRecords powinna:
+/// - [rlesegment.sum-non-gap-records.1~1] zwracać sumę recordCount wpisów niebędących przerwą; znaczniki przerwy nie zużywają indeksów rekordów.
 size_t sumNonGapRecords(const std::vector<IndexRecord> &entries);
 
 }  // namespace rdb

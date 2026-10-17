@@ -273,7 +273,13 @@ ssize_t textSourceRO::read(uint8_t *ptrData, std::vector<bool> &nullBitset, cons
   // na wejsciu do read() go nie zlapie - konczy sie dopiero ekstrakcja tokenu w TYM rekordzie.
   // failbit po petli oznacza rekord skladany z brakujacych tokenow, czyli pierwszy rekord za
   // koncem wejscia. Rekord kompletny zostawia czysty failbit, nawet jesli eofbit juz stoi.
-  if (!loopToBeginningIfEOF_ && myFile_.fail()) exhausted_ = true;
+  // W petli failbit po zawinieciu znaczy, ze plik nie dal rekordu nawet od poczatku (np. jest pusty).
+  // To blad wejscia jak w BINFILE, nie rekord: do 2026-10-16 ten odczyt zwracal EXIT_SUCCESS z rekordem
+  // all-null, a EIO dopiero kolejny - z bramki failbit na wejsciu.
+  if (myFile_.fail()) {
+    if (loopToBeginningIfEOF_) return markAllNullAndZero(EIO);
+    exhausted_ = true;
+  }
 
   std::memcpy(ptrData, payload_->span().data(), descriptor_.getSizeInBytes());
 

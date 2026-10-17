@@ -14,19 +14,20 @@ namespace rdb {
 ///        pliku danych oraz indeksu metadanych (.meta).
 ///
 /// Obiekt klasy StoragePaths powinien:
-/// - przy konstrukcji walidować niepuste qryID i fileName; ścieżka deskryptora to qryID + ".desc",
-/// - jeśli podano katalog storageParam - sprawdzić, że istnieje, i osadzić w nim ścieżki deskryptora oraz danych;
+/// - [storagepaths.storage-paths.1~1] przy konstrukcji walidować niepuste qryID i fileName; ścieżka deskryptora to qryID + ".desc",
+/// - [storagepaths.storage-paths.2~1] jeśli podano katalog storageParam - sprawdzić, że istnieje, i osadzić w nim ścieżki deskryptora oraz danych;
 ///   każda z tych kontroli kończy się błędem Errc::Config zwróconym z make(), a nie końcem procesu,
-/// - utrzymywać w jednym miejscu niezmiennik metaIndexFile() == storageFile() + ".meta" przy każdej zmianie ścieżki danych,
-/// - realizować relokację pliku danych wg pola REF deskryptora (relocateFromRef()) - deskryptor może wskazać
+/// - [storagepaths.storage-paths.3~1] utrzymywać w jednym miejscu niezmiennik metaIndexFile() == storageFile() + ".meta" przy każdej zmianie ścieżki danych,
+/// - [storagepaths.storage-paths.4~1] realizować relokację pliku danych wg pola REF deskryptora (relocateFromRef()) - deskryptor może wskazać
 ///   inne położenie pliku danych; brak ścieżki danych po relokacji wraca jako Errc::Config,
-/// - przy relokacji ustalać, czy REF wyprowadza plik danych poza katalogi dozwolone przez operatora
+/// - [storagepaths.storage-paths.5~1] przy relokacji ustalać, czy REF wyprowadza plik danych poza katalogi dozwolone przez operatora
 ///   (katalog magazynu i allowRefDirs()) - decyzję, co z tym zrobić, podejmuje storage, bo tylko on wie,
 ///   czy REF pochodzi od wołającego, czy wyłącznie z wczytanego pliku .desc,
-/// - usuwać komplet plików magazynu (removeAllFiles()) dla magazynów dysponowalnych: plik danych, deskryptor,
+/// - [storagepaths.storage-paths.6~1] usuwać komplet plików magazynu (removeAllFiles()) dla magazynów dysponowalnych: plik danych, deskryptor,
 ///   indeks .meta oraz cień indeksu .meta.shadow; na żądanie z zachowaniem pliku danych i jego indeksów,
-/// - nie wykonywać żadnego innego I/O poza sprawdzeniem katalogu storageParam, rozwiązaniem ścieżki REF
+/// - [storagepaths.storage-paths.7~1] nie wykonywać żadnego innego I/O poza sprawdzeniem katalogu storageParam, rozwiązaniem ścieżki REF
 ///   i kasowaniem plików.
+///   Nietestowalne: ograniczenie odpowiedzialnosci modulu; kompletnego braku innych operacji I/O nie dowodzi test funkcjonalny, sprawdzane przegladem storagePaths.cc.
 class StoragePaths {
  public:
   /// Errc::Config dla pustego identyfikatora albo storageParam, ktory nie istnieje lub nie jest katalogiem.
@@ -66,7 +67,8 @@ class StoragePaths {
   std::string metaIndexFile_;
 };
 
-/// @brief Wartość pola REF deskryptora; pusta, gdy go nie ma.
+/// Funkcja descriptorRef powinna:
+/// - [storagepaths.descriptor-ref.1~1] zwracać nazwę pierwszego pola REF deskryptora, a gdy go nie ma - pusty napis.
 [[nodiscard]] std::string descriptorRef(const Descriptor &descriptor);
 
 }  // namespace rdb

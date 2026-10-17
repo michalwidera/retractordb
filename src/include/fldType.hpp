@@ -53,6 +53,8 @@ static_assert(std::is_same_v<std::variant_alternative_t<IDXPAIR, descFldVT>, std
 static_assert(std::is_same_v<std::variant_alternative_t<STRING, descFldVT>, std::string>);
 static_assert(std::is_same_v<std::variant_alternative_t<NULLTYPE, descFldVT>, std::monostate>);
 
+/// Funkcja GetStringdescFld powinna:
+/// - [fldtype.get-stringdesc-fld.1~1] zwracać nazwę typu pola: "NULL" dla NULLTYPE, a dla pozostałych typów nazwę wyliczenia descFld.
 constexpr auto GetStringdescFld(const enum descFld index) -> std::string_view {
   return index == NULLTYPE ? std::string_view("NULL") : magic_enum::enum_name(index);
 }
@@ -70,22 +72,19 @@ struct rField {
         rtype(type) {}
 };
 
-// Liczba SLOTOW PLASKICH zajmowanych przez pole w rekordzie. Jedna definicja dla calego
-// drzewa: wolaja ja deskryptor, kompilator, parser zrodla tekstowego, wypisywanie payloadu
-// i odpowiedzi executorsm. Regula byla przepisana recznie w kazdym z tych miejsc, a rozjazd
-// miedzy nimi przesuwa indeksy plaskie wzgledem wartosci - czyli po cichu podmienia wartosci
-// pod nazwami pol.
-//
-// STRING[N] to JEDNA wartosc: N jest dlugoscia tekstu, nie krotnoscia pola.
-// NULLTYPE[N] zajmuje N slotow jak pole liczbowe, choc nie zajmuje bajtow rekordu. Dzis nic
-// w drzewie nie buduje NULLTYPE o rarray != 1 (typu NULL nie ma ani w DESC.g4, ani w DECLARE);
-// regula mowi, jak liczyc, gdyby takie pole powstalo.
+/// Funkcja flatElementCount powinna:
+/// - [fldtype.flat-element-count.1~1] zwracać liczbę slotów płaskich zajmowanych przez pole w rekordzie: 1 dla STRING (N w STRING[N] to długość tekstu, nie krotność), a dla pozostałych typów, także NULLTYPE, rarray.
+///
+/// @note Jedna definicja dla calego drzewa (deskryptor, kompilator, parser zrodla tekstowego, payload,
+///       executorsm): rozjazd miedzy recznymi kopiami przesuwal indeksy plaskie i po cichu podmienial wartosci
+///       pod nazwami pol. Dzis nic nie buduje NULLTYPE o rarray != 1.
 constexpr int flatElementCount(const rField &field) { return field.rtype == STRING ? 1 : field.rarray; }
 
-// Pole JEDNEGO slotu plaskiego o szerokosci `bytes`. Napis ma zapis `rlen = 1`, `rarray = N` - ten
-// sam, ktory daja DECLARE i parser `.desc`; liczba - `rlen = bytes`, `rarray = 1`. Porownania
-// ksztaltu biora rlen i rarray osobno, wiec drugi zapis tego samego napisu (`rlen = N`), ktory
-// do 2026-09-27 dawalo okno AGSE, bylby dla nich innym polem.
+/// Funkcja flatSlotField powinna:
+/// - [fldtype.flat-slot-field.1~1] zwracać pole jednego slotu płaskiego o szerokości bytes: dla STRING z rlen = 1 i rarray = bytes, a dla pozostałych typów z rlen = bytes i rarray = 1.
+///
+/// @note Napis ma ten sam zapis, ktory daja DECLARE i parser `.desc`: porownania ksztaltu biora rlen i rarray
+///       osobno, wiec drugi zapis (`rlen = N`, okno AGSE do 2026-09-27) bylby dla nich innym polem.
 inline rField flatSlotField(std::string name, descFld type, int bytes) {
   return type == STRING ? rField(std::move(name), 1, bytes, type) : rField(std::move(name), bytes, 1, type);
 }

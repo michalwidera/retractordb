@@ -64,12 +64,66 @@ foreach(item ${V_GLOB})
   # test/UnitTest/syscallWrap.hpp) i wtedy nie ma tu nic do dodania na linii
   # konsolidacji.
   if(RDB_HAS_LD_WRAP)
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_embedStorageGuard")
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=fstat
+                          -Wl,--wrap=flock -Wl,--wrap=lstat -Wl,--wrap=mkdtemp)
+    endif()
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_faccbindev")
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=read
+                          -Wl,--wrap=poll)
+    endif()
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_persistentCounter")
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=read
+                          -Wl,--wrap=write -Wl,--wrap=fsync -Wl,--wrap=close)
+    endif()
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_shmBudget")
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=fstatvfs
+                          -Wl,--wrap=statvfs)
+    endif()
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_executor_rt"
+       AND RDB_HAS_SCHED_SETSCHEDULER
+       AND RDB_HAS_MLOCKALL)
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=mlockall
+                          -Wl,--wrap=sched_setscheduler)
+    endif()
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_executor_rt" AND RDB_HAS_SCHED_AFFINITY)
+      target_link_options(
+        ${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=sched_getaffinity
+        -Wl,--wrap=sysconf -Wl,--wrap=pthread_setaffinity_np)
+    endif()
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_descriptorIO")
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=fstat
+                          -Wl,--wrap=pread -Wl,--wrap=write -Wl,--wrap=pwrite)
+    endif()
     if(OUTPUT_FILE_NOEXT STREQUAL "test_lockManager")
-      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=open)
+      target_link_options(
+        ${OUTPUT_FILE_NOEXT}
+        PRIVATE
+        -Wl,--wrap=open
+        -Wl,--wrap=fstat
+        -Wl,--wrap=lstat
+        -Wl,--wrap=flock
+        -Wl,--wrap=ftruncate
+        -Wl,--wrap=lseek
+        -Wl,--wrap=write
+        -Wl,--wrap=fsync
+        -Wl,--wrap=fork
+        -Wl,--wrap=waitpid)
+    endif()
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_ipcResponses")
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=getenv)
+    endif()
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_busSlotCount" AND RDB_HAS_ROBUST_MUTEX)
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE
+                          -Wl,--wrap=pthread_mutex_consistent)
+    endif()
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_ipcServer")
+      target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=shm_open
+                          -Wl,--wrap=fstatvfs -Wl,--wrap=statvfs)
     endif()
     if(OUTPUT_FILE_NOEXT STREQUAL "test_ipcSecurity")
       target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=fstat
-                          -Wl,--wrap=lstat)
+                          -Wl,--wrap=lstat -Wl,--wrap=stat)
     endif()
     if(OUTPUT_FILE_NOEXT STREQUAL "test_storageRotation")
       target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=rename
@@ -82,12 +136,13 @@ foreach(item ${V_GLOB})
     endif()
     if(OUTPUT_FILE_NOEXT STREQUAL "test_dumpManager")
       target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=lseek
-                          -Wl,--wrap=write)
+                          -Wl,--wrap=write -Wl,--wrap=unlink)
     endif()
     # test_bus i test_busFallback udaja wpis procesu nieczytelny (hidepid /
     # ProtectProc) - test/UnitTest/unreadableProcess.hpp.
-    if(OUTPUT_FILE_NOEXT STREQUAL "test_bus" OR OUTPUT_FILE_NOEXT STREQUAL
-                                                "test_busFallback")
+    if(OUTPUT_FILE_NOEXT STREQUAL "test_bus"
+       OR OUTPUT_FILE_NOEXT STREQUAL "test_busFallback"
+       OR OUTPUT_FILE_NOEXT STREQUAL "test_osPlatform")
       if(RDB_HAS_PROCFS)
         target_link_options(${OUTPUT_FILE_NOEXT} PRIVATE -Wl,--wrap=kill)
       else()
