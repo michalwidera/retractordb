@@ -2,11 +2,16 @@
 
 #include <cerrno>
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <mutex>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
+
+#include <spdlog/sinks/base_sink.h>
 
 #include "fatalError.hpp"
 #include "rdb/error.hpp"
@@ -20,9 +25,53 @@ static_assert(std::is_same_v<decltype(FatalError("x {}", 1)), rdb::FatalError<in
 
 namespace {
 
+std::source_location expectedOrigin;
+
 // Handler atexit widzi zatrzask tak, jak widzi go executorsm::cleanup(): po std::exit
 // z akcji konczacej proces.
 void reportLatch() { std::cerr << "latch=" << (fatalErrorRaised.load(std::memory_order_acquire) ? 1 : 0) << "\n"; }
+
+class FatalAuditSink : public spdlog::sinks::base_sink<std::mutex> {
+ public:
+  std::source_location expected;
+  bool rejectLog{false};
+
+ protected:
+  void sink_it_(const spdlog::details::log_msg &message) override {
+    const bool location = message.source.filename != nullptr && expected.file_name() == std::string(message.source.filename) &&
+                          message.source.line == static_cast<int>(expected.line()) && message.source.funcname != nullptr &&
+                          expected.function_name() == std::string_view(message.source.funcname);
+    std::fprintf(stderr, "audit: level=%d source=%d latch=%d message=%.*s\n", static_cast<int>(message.level), location,
+                 fatalErrorRaised.load() ? 1 : 0, static_cast<int>(message.payload.size()), message.payload.data());
+    if (rejectLog) throw std::runtime_error("injected sink failure");
+  }
+  void flush_() override { std::fprintf(stderr, "audit: flushed\n"); }
+};
+
+void reportLoggerState() {
+  const auto logger = spdlog::default_logger();
+  std::fprintf(stderr, "logger-alive=%d\n", logger != nullptr);
+  if (logger) logger->info("atexit logging");
+}
+
+[[noreturn]] void auditedTermination(bool environment, bool preset = false, bool rejectLog = false, bool daemon = false) {
+  fatalErrorRaised.store(preset);
+  const auto location = std::source_location::current();
+  auto sink           = std::make_shared<FatalAuditSink>();
+  sink->expected      = location;
+  sink->rejectLog     = rejectLog;
+  auto logger         = std::make_shared<spdlog::logger>("fatal-audit", sink);
+  if (rejectLog) logger->set_error_handler([](const std::string &) { throw std::runtime_error("injected logger failure"); });
+  spdlog::set_default_logger(logger);
+  std::atexit(reportLatch);
+  if (!rejectLog) std::atexit(reportLoggerState);
+  if (environment) rdb::detail::terminateProcess<rdb::ErrorClass::Environment>(location, "audit {}", 42);
+  if (daemon) {
+    rdb::setFatalHandler(&daemonFatalExit);
+    rdb::fatal("audit 42", location);
+  }
+  rdb::detail::terminateProcess<rdb::ErrorClass::Internal>(location, "audit {}", 42);
+}
 
 [[noreturn]] void raiseInternal() {
   std::atexit(reportLatch);
@@ -137,4 +186,73 @@ TEST(FatalErrorTest, FormattingFailureStillRunsAtexit) {
         rdb::detail::terminateProcess<rdb::ErrorClass::Internal>(std::source_location::current(), fmt::runtime("{"), 1);
       },
       ::testing::ExitedWithCode(EXIT_FAILURE), "latch=1");
+  EXPECT_EXIT(
+      {
+        std::atexit(reportLatch);
+        rdb::detail::terminateProcess<rdb::ErrorClass::Environment>(std::source_location::current(), fmt::runtime("{"), 1);
+      },
+      ::testing::ExitedWithCode(EIO), "latch=0");
+}
+
+TEST(FatalErrorTest, TerminationLogsLocationFlushesAndKeepsLoggerAlive) {
+  EXPECT_EXIT(auditedTermination(false), ::testing::ExitedWithCode(EXIT_FAILURE),
+              "audit: level=5 source=1 latch=1 message=audit 42\naudit: flushed\n"
+              "\nFATAL: audit 42\nlogger-alive=1\naudit: level=2 source=0 latch=1 message=atexit logging\nlatch=1");
+  EXPECT_EXIT(
+      auditedTermination(true), ::testing::ExitedWithCode(EIO),
+      "audit: level=5 source=1 latch=0 message=environment: audit 42\naudit: flushed\n"
+      "\nFATAL \\(environment\\): audit 42\nlogger-alive=1\naudit: level=2 source=0 latch=0 message=atexit logging\nlatch=0");
+}
+
+TEST(FatalErrorTest, EnvironmentPreservesAnAlreadyRaisedLatch) {
+  EXPECT_EXIT(auditedTermination(true, true), ::testing::ExitedWithCode(EIO), "source=1 latch=1 message=environment: audit 42");
+}
+
+TEST(FatalErrorTest, LoggingFailureStillRunsAtexit) {
+  EXPECT_EXIT(auditedTermination(false, false, true), ::testing::ExitedWithCode(EXIT_FAILURE),
+              "audit: level=5 source=1 latch=1 message=audit 42\nlatch=1");
+  EXPECT_EXIT(auditedTermination(true, false, true), ::testing::ExitedWithCode(EIO),
+              "audit: level=5 source=1 latch=0 message=environment: audit 42\nlatch=0");
+}
+
+TEST(FatalErrorTest, DaemonHandlerLogsTheCallerLocation) {
+  EXPECT_EXIT(auditedTermination(false, false, false, true), ::testing::ExitedWithCode(EXIT_FAILURE),
+              "audit: level=5 source=1 latch=1 message=audit 42.*latch=1");
+}
+
+TEST(ResultTest, DefaultFatalLogsLocationAndWorksWithoutALogger) {
+  EXPECT_EXIT(
+      {
+        const auto location = std::source_location::current();
+        auto sink           = std::make_shared<FatalAuditSink>();
+        sink->expected      = location;
+        spdlog::set_default_logger(std::make_shared<spdlog::logger>("default-fatal-audit", sink));
+        rdb::setFatalHandler(nullptr);
+        rdb::fatal("located default", location);
+      },
+      ::testing::KilledBySignal(SIGABRT),
+      "audit: level=5 source=1 latch=0 message=located default\naudit: flushed\n\nFATAL: located default");
+  EXPECT_EXIT(
+      {
+        spdlog::set_default_logger(nullptr);
+        rdb::setFatalHandler(nullptr);
+        rdb::fatal("without logger");
+      },
+      ::testing::KilledBySignal(SIGABRT), "FATAL: without logger");
+}
+
+TEST(ResultTest, FatalHandlerReceivesTheExactLocation) {
+  EXPECT_EXIT(
+      {
+        expectedOrigin = std::source_location::current();
+        rdb::setFatalHandler([](std::string_view message, const std::source_location &where) noexcept {
+          std::fprintf(stderr, "handler: %.*s at %s:%u\n", static_cast<int>(message.size()), message.data(), where.file_name(),
+                       where.line());
+          std::_Exit(where.line() == expectedOrigin.line() && std::string_view(where.file_name()) == expectedOrigin.file_name()
+                         ? 42
+                         : 43);
+        });
+        rdb::fatal("located invariant", expectedOrigin);
+      },
+      ::testing::ExitedWithCode(42), "handler: located invariant at .*test_fatalError.cpp:");
 }

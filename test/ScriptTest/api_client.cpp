@@ -19,6 +19,10 @@ static_assert(std::is_nothrow_move_assignable_v<retractordb::Client>);
 static_assert(!std::is_copy_constructible_v<retractordb::Client>);
 static_assert(!std::is_copy_assignable_v<retractordb::Client>);
 static_assert(std::is_same_v<decltype(std::declval<retractordb::Client &>().ping()), void>);
+static_assert(std::is_nothrow_move_constructible_v<retractordb::Subscription>);
+static_assert(std::is_nothrow_move_assignable_v<retractordb::Subscription>);
+static_assert(!std::is_copy_constructible_v<retractordb::Subscription>);
+static_assert(!std::is_copy_assignable_v<retractordb::Subscription>);
 
 void require(bool value, const char *message) {
   if (!value) throw std::runtime_error(message);
@@ -33,6 +37,31 @@ void expectError(const std::string &code, F action) {
     return;
   }
   throw std::runtime_error("Expected error: " + code);
+}
+
+template <typename F>
+void expectInvalidArgument(F action) {
+  try {
+    action();
+  } catch (const std::invalid_argument &) {
+    return;
+  }
+  throw std::runtime_error("Expected invalid_argument");
+}
+
+void checkArgumentRefusals(const std::string &xqry) {
+  for (const std::string name : std::vector<std::string>{"", "Upper", "_hidden", "a b", std::string(33, 'a')})
+    expectInvalidArgument([&] { retractordb::Client invalid(name); });
+  for (const std::string name : std::vector<std::string>{"a", "a_b-9", std::string(32, 'a')}) {
+    retractordb::Client valid(name, {.xqry = xqry, .timeout = 1ms});
+    valid.close();
+  }
+  for (const auto timeout : {0ms, -1ms})
+    expectInvalidArgument([&] { retractordb::Client invalid("valid", {.xqry = xqry, .timeout = timeout}); });
+  retractordb::Client client("valid", {.xqry = xqry});
+  expectInvalidArgument([&] { return client.subscribe("valid", {.limit = -1}); });
+  expectInvalidArgument([&] { return client.subscribe("valid", {.idleTimeout = -1ms}); });
+  expectInvalidArgument([&] { return client.subscribe("valid", {.capacity = 0}); });
 }
 
 void expectClosed(retractordb::Client &client, const std::string &stream) {
@@ -94,16 +123,41 @@ void checkMoves(const std::string &server, const std::string &xqry, const std::s
   source.ping();
 }
 
+void checkSubscriptionMoves(retractordb::Client &db, const std::string &stream) {
+  auto original         = db.subscribe(stream);
+  const int incomingPid = original.pid();
+  auto moved            = std::move(original);
+  require(!original.next(), "moved-from subscription still reads");
+  original.close();
+  require(moved.pid() == incomingPid, "move lost subscription PID");
+  auto target           = db.subscribe(stream);
+  const int replacedPid = target.pid();
+  target                = std::move(moved);
+  require(kill(replacedPid, 0) == -1, "subscription move assignment left replaced child");
+  require(!moved.next(), "move-assigned source still reads");
+  moved.close();
+  require(kill(incomingPid, 0) == 0, "subscription move killed transferred child");
+  require(!target.schema().fields.empty(), "subscription move lost schema");
+  target.close();
+  target.close();
+  require(kill(incomingPid, 0) == -1, "subscription close left child");
+  require(target.pid() == incomingPid, "close lost original PID");
+  require(!target.schema().fields.empty(), "close lost schema");
+  require(!target.next(), "closed subscription still reads");
+}
+
 int main(int argc, char **argv) {
   if (argc != 4) return 2;
   try {
     const bool fake = std::string(argv[3]) == "fake";
+    checkArgumentRefusals(argv[2]);
     checkMoves(argv[1], argv[2], fake ? "wait" : "numbers");
     retractordb::Client db(argv[1], {.xqry = argv[2], .timeout = 2s});
     db.ping();
     require(!db.streams().empty(), "streams");
     const auto schema = db.describe(fake ? "valid" : "numbers");
     require(!schema.fields.empty(), "schema");
+    checkSubscriptionMoves(db, fake ? "wait" : "numbers");
     if (fake) {
       for (const auto &[name, code] : {std::pair{"badping", "protocol_error"}, {"pingerror", "server_no_response"}}) {
         auto broken = makeClient(name, argv[2]);
@@ -125,8 +179,13 @@ int main(int argc, char **argv) {
         require(kill(pid, 0) == -1, "child not reaped");
       }
       expectError("protocol_error", [&] { return db.subscribe("badversion"); });
-      for (const auto &[mode, code] :
-           {std::pair{"bad", "protocol_error"}, {"exit", "process_exit"}, {"error", "stream_not_found"}}) {
+      for (const auto &[mode, code] : {std::pair{"bad", "protocol_error"},
+                                       {"exit", "process_exit"},
+                                       {"error", "stream_not_found"},
+                                       {"partial", "protocol_error"},
+                                       {"oversized", "protocol_error"},
+                                       {"endexit", "process_exit"},
+                                       {"endhang", "process_timeout"}}) {
         expectError(code, [&] {
           auto samples = db.subscribe(mode);
           return samples.next(2s);
@@ -140,6 +199,8 @@ int main(int argc, char **argv) {
       }
       {
         auto samples = db.subscribe("wait");
+        expectError("read_timeout", [&] { return samples.next(20ms); });
+        require(kill(samples.pid(), 0) == 0, "read timeout closed subscription");
         expectError("read_timeout", [&] { return samples.next(20ms); });
         const auto begin = std::chrono::steady_clock::now();
         const int pid    = samples.pid();

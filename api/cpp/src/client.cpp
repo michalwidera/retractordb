@@ -122,7 +122,19 @@ Record record(const json::object &event, const Schema &description) {
   return result;
 }
 
-// Jeden watek czyta oba potoki. Nigdy nie czeka na miejsce w kolejce aplikacji.
+/// Jeden watek czyta oba potoki. Nigdy nie czeka na miejsce w kolejce aplikacji.
+/// Obiekt klasy Process powinien:
+/// - uruchamiac xqry przez posix_spawnp z osobnymi potokami stdout/stderr i grupa procesu; deskryptory potokow nie przechodza do rownolegle uruchamianego dziecka.
+///   Test: `st_api_fake` (api_spawn.cpp: kontrolowany przeplot pipe/fcntl oraz sprawdzenie odziedziczonych deskryptorow); `st_api_real` (dwa procesy subskrypcji).
+///   Nietestowalne: ustawienie grupy procesu potwierdza przeglad posix_spawnattr_setpgroup w konstruktorze; brak osobnej asercji getpgid.
+/// - oprozniac oba potoki jednym watkiem, ograniczac zdarzenie JSONL do 1 MiB, kolejke do capacity i zachowywac tylko ostatnie 64 KiB stderr; przeladowanie kolejki zglaszac jako buffer_overflow, niepelny lub zbyt dlugi wiersz jako protocol_error.
+///   Test: `st_api_fake` (api_client.cpp: flood, partial, oversized; stub jednoczesnie wypelnia stderr).
+///   Nietestowalne: dokladne obciecie ogona stderr do 65536 bajtow sprawdzone strukturalnie w pump; nie jest asercja skutecznego oprozniania obu potokow.
+/// - odrozniac timeout odczytu, blad protokolu i blad procesu, a po zdarzeniu koncowym czekac na poprawne wyjscie dziecka w budzecie klienta.
+///   Test: `st_api_fake` (api_client.cpp: wait, bad, exit, error, endexit, endhang).
+/// - przy close/destrukcji obudzic oczekujacych, wyslac SIGTERM, po oknie 1000 ms uzyc SIGKILL, zebrac dziecko, dolaczyc czytnik i zamknac potoki.
+///   Test: `st_api_fake` (api_client.cpp: wait ignoruje SIGTERM, sprawdzony czas close i brak PID; api_clients.py: reaped odrzuca takze zombie).
+///   Ograniczenie weryfikacji: nie wymuszono osobno EINTR kazdego poll/read/waitpid ani wszystkich odmow posix_spawn.
 class Process {
   int child_{-1};
   int originalPid_{-1};
@@ -315,6 +327,11 @@ class Process {
 
 Error::Error(std::string value, const std::string &message) : std::runtime_error(message), code(std::move(value)) {}
 
+/// Obiekt klasy Subscription::Impl powinien:
+/// - wymagac pierwszego zdarzenia schema, zachowac schemat i timeout oraz utrzymywac proces do konca lub close.
+///   Test: `st_api_fake` (api_client.cpp: badversion, wadliwe delta, wait i checkSubscriptionMoves), `st_api_real`.
+/// - po close ustawic closed i zamknac proces, pozostawiajac schemat i powod konca dostepne przez istniejacy uchwyt.
+///   Test: `st_api_fake`, `st_api_real` (api_client.cpp: checkSubscriptionMoves i main).
 struct Subscription::Impl {
   Process process;
   Schema description;
@@ -368,6 +385,11 @@ std::optional<Record> Subscription::next(std::optional<Milliseconds> timeout) {
   }
 }
 
+/// Obiekt klasy Client::Impl powinien:
+/// - rejestrowac subskrypcje slabo, tak aby close/destrukcja wlasciciela zamykaly zywe procesy bez przedluzania zycia porzuconych uchwytow.
+///   Test: `st_api_fake`, `st_api_real` (api_client.cpp: checkMoves i checkSubscriptionMoves).
+/// - odmawiac argumentow komendy po close, a dla komendy jednorazowej sprawdzac oczekiwane zdarzenie i poprawne zakonczenie procesu.
+///   Test: `st_api_fake` (api_client.cpp: expectClosed, badping i pingerror), `st_api_real`.
 struct Client::Impl {
   std::string server;
   Options options;

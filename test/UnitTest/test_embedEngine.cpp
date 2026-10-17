@@ -264,6 +264,7 @@ TEST(embedEnginePlan, refusals_carry_their_stage) {
   expectCategory("DECLARE a INTEGER STREAM src, 1 TEXTFILE 'plan_data.txt'\nSELECT a*2 STREAM dst FROM nosuch\n",
                  rdb::Errc::Compile);
   expectCategory("# nothing but a comment\n", rdb::Errc::Compile);
+  expectCategory("STORAGE '.'\n", rdb::Errc::Compile);
   expectCategory(doublingPlan("plan_data.txt") + "RULE r ON dst WHEN dst[0] > 100 DO DUMP -1 TO 1\n", rdb::Errc::Compile);
   expectCategory(doublingPlan("plan_data.txt") + "RULE r ON dst WHEN dst[0] > 100 DO SYSTEM 'echo no'\n", rdb::Errc::Compile);
   expectCategory(doublingPlan("plan_data.txt") + "ROTATION 'counter.txt'\n", rdb::Errc::Compile);
@@ -292,6 +293,7 @@ TEST(embedEnginePlan, storage_dir_is_a_default_and_the_directive_wins) {
     auto engineOwner           = rdbtest::ok(rdb::embed::Engine::create(defaultDir));
     rdb::embed::Engine &engine = *engineOwner;
     ASSERT_RDB_OK(engine.compile(doublingPlan(source)));
+    EXPECT_EQ(engine.storageDir(), std::filesystem::canonical(defaultDir).string());
     while (rdbtest::ok(engine.step())) {}
     EXPECT_EQ(rdbtest::ok(engine.recordCount("dst")), 3U);
   }
@@ -301,7 +303,10 @@ TEST(embedEnginePlan, storage_dir_is_a_default_and_the_directive_wins) {
     auto engineOwner           = rdbtest::ok(rdb::embed::Engine::create(defaultDir));
     rdb::embed::Engine &engine = *engineOwner;
     ASSERT_RDB_OK(engine.compile("STORAGE '" + directiveDir + "'\n" + doublingPlan(source)));
+    EXPECT_EQ(engine.storageDir(), std::filesystem::canonical(directiveDir).string());
     while (rdbtest::ok(engine.step())) {}
+    engine.close();
+    EXPECT_EQ(engine.storageDir(), defaultDir);
   }
   EXPECT_TRUE(std::filesystem::exists(std::filesystem::path(directiveDir) / "dst.desc"));
 }
@@ -435,6 +440,119 @@ TEST(embedEnginePlan, fault_in_a_slot_latches_the_plan) {
     while (rdbtest::ok(engine.step())) {}
     EXPECT_EQ(rdbtest::ok(engine.recordCount("dst")), 3U);
   }
+}
+
+TEST(embedEnginePlan, shortest_input_eof_keeps_the_last_slot_and_stops_every_stream) {
+  writeSource("short_input.txt", {7});
+  writeSource("long_input.txt", {10, 20, 30});
+  auto engine = rdbtest::ok(rdb::embed::Engine::create());
+  ASSERT_RDB_OK(
+      engine->compile("DECLARE a INTEGER STREAM short_src, 1/2 TEXTFILE 'short_input.txt'\n"
+                      "DECLARE b INTEGER STREAM long_src, 1/2 TEXTFILE 'long_input.txt'\n"
+                      "SELECT a*2 STREAM short_dst FROM short_src\n"
+                      "SELECT b*2 STREAM long_dst FROM long_src\n"));
+  EXPECT_EQ(rdbtest::ok(engine->step()), std::optional<std::uint64_t>{0});
+  EXPECT_TRUE(engine->endOfInput());
+  EXPECT_EQ(engine->slotsDone(), 1U);
+  EXPECT_EQ(engine->time(), boost::rational<int>(1, 2));
+  EXPECT_EQ(firstValue(rdbtest::ok(engine->record("short_dst", 0))), 14);
+  EXPECT_EQ(firstValue(rdbtest::ok(engine->record("long_dst", 0))), 20);
+  for (int i = 0; i < 3; ++i) {
+    EXPECT_FALSE(rdbtest::ok(engine->step()));
+    EXPECT_EQ(engine->slotsDone(), 1U);
+    EXPECT_EQ(engine->time(), boost::rational<int>(1, 2));
+    EXPECT_EQ(rdbtest::ok(engine->recordCount("long_dst")), 1U);
+  }
+}
+
+TEST(embedEnginePlan, retained_boundaries_and_history_reads_do_not_consume_input) {
+  writeSource("history_input.txt", {3, 5, 7, 11});
+  auto engine = rdbtest::ok(rdb::embed::Engine::create());
+  ASSERT_RDB_OK(
+      engine->compile("DECLARE a INTEGER STREAM src, 1 TEXTFILE 'history_input.txt'\n"
+                      "SELECT a*2 STREAM ring FROM src VOLATILE\n"
+                      "SELECT a*2 STREAM disk FROM src\n"));
+  const std::vector<int> expected{6, 10, 14, 22};
+  for (std::size_t i = 0; i < expected.size(); ++i) {
+    ASSERT_TRUE(rdbtest::ok(engine->step()));
+    EXPECT_EQ(rdbtest::ok(engine->retainedFrom("ring")), i);
+    EXPECT_EQ(rdbtest::ok(engine->retainedFrom("disk")), 0U);
+    EXPECT_EQ(firstValue(rdbtest::ok(engine->record("ring", i))), expected[i]);
+    EXPECT_EQ(firstValue(rdbtest::ok(engine->record("disk", i))), expected[i]);
+    if (i > 0) EXPECT_RDB_ERROR(engine->record("ring", i - 1), rdb::Errc::Config);
+    EXPECT_RDB_ERROR(engine->record("ring", i + 1), rdb::Errc::Config);
+    const auto oldest = rdbtest::ok(engine->retainedFrom("src"));
+    const auto count  = rdbtest::ok(engine->recordCount("src"));
+    ASSERT_GT(count, 0U);
+    ASSERT_EQ(oldest, count - 1);
+    const auto current  = rdbtest::ok(engine->record("src", oldest));
+    const auto repeated = rdbtest::ok(engine->record("src", oldest));
+    EXPECT_EQ(current.getItemVT(0), repeated.getItemVT(0));
+    EXPECT_EQ(rdbtest::ok(engine->recordCount("src")), count);
+    if (oldest > 0) EXPECT_RDB_ERROR(engine->record("src", oldest - 1), rdb::Errc::Config);
+  }
+}
+
+TEST(embedEnginePlan, failure_after_progress_preserves_results_and_close_clears_the_latch) {
+  writeSource("failed_input.txt", {2, 3, 5, 7});
+  auto engine = rdbtest::ok(rdb::embed::Engine::create());
+  ASSERT_RDB_OK(engine->compile(doublingPlan("failed_input.txt")));
+  ASSERT_TRUE(rdbtest::ok(engine->step()));
+  ASSERT_TRUE(rdbtest::ok(engine->step()));
+  const auto time = engine->time();
+  ASSERT_EQ(setenv("RDB_FAULT_ENV_IN_SLOT", "1", 1), 0);
+  const auto refused = engine->step();
+  ASSERT_EQ(unsetenv("RDB_FAULT_ENV_IN_SLOT"), 0);
+  ASSERT_RDB_ERROR(refused, rdb::Errc::IO);
+  ASSERT_TRUE(engine->failed());
+  for (int i = 0; i < 2; ++i) {
+    const auto latched = engine->step();
+    ASSERT_RDB_ERROR(latched, refused.error().code(), refused.error().message());
+    EXPECT_EQ(latched.error().err(), refused.error().err());
+    EXPECT_TRUE(latched.error().message().contains("stopped at slot 2"));
+    EXPECT_EQ(engine->slotsDone(), 2U);
+    EXPECT_EQ(engine->time(), time);
+    EXPECT_EQ(rdbtest::ok(engine->recordCount("dst")), 2U);
+    EXPECT_EQ(firstValue(rdbtest::ok(engine->record("dst", 0))), 4);
+    EXPECT_EQ(firstValue(rdbtest::ok(engine->record("dst", 1))), 6);
+  }
+  engine->close();
+  EXPECT_FALSE(engine->failed());
+  EXPECT_FALSE(engine->hasPlan());
+  EXPECT_FALSE(engine->endOfInput());
+  EXPECT_EQ(engine->slotsDone(), 0U);
+  EXPECT_EQ(engine->time(), 0);
+  ASSERT_RDB_OK(engine->compile(doublingPlan("failed_input.txt")));
+  ASSERT_TRUE(rdbtest::ok(engine->step()));
+  EXPECT_EQ(firstValue(rdbtest::ok(engine->record("dst", 0))), 4);
+}
+
+TEST(embedEnginePlan, preflight_refusal_preserves_previous_artifact_bytes) {
+  writeSource("preserved_input.txt", {2, 5});
+  auto engine = rdbtest::ok(rdb::embed::Engine::create());
+  ASSERT_RDB_OK(engine->compile(doublingPlan("preserved_input.txt")));
+  while (rdbtest::ok(engine->step())) {}
+  engine->close();
+  std::vector<std::pair<std::filesystem::path, std::string>> saved;
+  for (const auto &entry : std::filesystem::directory_iterator(engine->storageDir())) {
+    if (!entry.is_regular_file()) continue;
+    std::ifstream input(entry.path(), std::ios::binary);
+    saved.emplace_back(entry.path(), std::string(std::istreambuf_iterator<char>(input), {}));
+  }
+  ASSERT_FALSE(saved.empty());
+  EXPECT_RDB_ERROR(engine->compile(doublingPlan("missing_preserved_input.txt")), rdb::Errc::IO);
+  EXPECT_FALSE(engine->hasPlan());
+  for (const auto &[path, contents] : saved) {
+    std::ifstream input(path, std::ios::binary);
+    EXPECT_EQ(std::string(std::istreambuf_iterator<char>(input), {}), contents) << path;
+  }
+  const auto inside = std::filesystem::path(engine->storageDir()) / "inside.txt";
+  writeSource(inside.string(), {13});
+  EXPECT_RDB_ERROR(engine->compile(doublingPlan(inside.string())), rdb::Errc::Compile, "source must be outside");
+  EXPECT_TRUE(std::filesystem::exists(inside));
+  ASSERT_RDB_OK(engine->compile(doublingPlan("preserved_input.txt")));
+  ASSERT_TRUE(rdbtest::ok(engine->step()));
+  EXPECT_EQ(firstValue(rdbtest::ok(engine->record("dst", 0))), 4);
 }
 
 TEST(embedEnginePlan, projection_and_record_copies_preserve_values_nulls_and_field_order) {

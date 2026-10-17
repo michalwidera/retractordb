@@ -142,6 +142,17 @@ def test_unmarked_offline_storage_still_allows_independent_readers(rdb, plain_st
         assert tuple(first[0]) == tuple(second[0]) == (1, 10)
 
 
+def test_close_is_idempotent_and_record_copy_survives(rdb, plain_storage: Path) -> None:
+    storage = open_plain(rdb, plain_storage)
+    record = storage[0]
+    storage.close()
+    storage.close()
+    assert storage.closed
+    assert tuple(record) == (1, 10)
+    with pytest.raises(rdb.StorageError, match="closed"):
+        storage[0]
+
+
 def test_engine_and_storage_share_the_owned_directory_lock(rdb, tmp_path: Path) -> None:
     from test_engine import doubling_plan
 

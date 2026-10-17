@@ -118,6 +118,7 @@ using Result = std::expected<T, Error>;
 /// - dla Refusal zachowywać komunikat i errno, a kategorię wyznaczać z klasy odmowy: Environment jako IO, Internal jako Logic, pozostałe jako Compile.
 ///   Test: `ResultTest.ErrorNamesRefusalClassesAndHandlerExchange`.
 /// - dla istniejącego Error przekazywać go wyżej bez zmian, z innym typem wartości.
+///   Test: `ResultTest.PropagationPreservesErrorAndErrno`.
 ///
 /// @note Warianty z kategoria sa zimne i niewklejane (#511): budowa bledu, takze std::string z literalu, nie
 ///       wnosi kodu do funkcji z goraca sciezka, ktora inaczej przestaje sie miescic w progu inline.
@@ -145,13 +146,18 @@ using FatalHandler = void (*)(std::string_view message, const std::source_locati
 
 /// Funkcja fatal powinna:
 /// - przy złamanym niezmienniku silnika wywoływać zainstalowany handler z komunikatem i miejscem wywołania, a bez handlera - domyślny.
-/// - w domyślnym handlerze logować przyczynę na poziomie critical (gdy jest logger spdlog), wypisywać "FATAL: <komunikat>" na stderr bez wyjątków i kończyć proces przez std::abort().
+///   Test: `ResultTest.FatalHandlerReceivesTheExactLocation`, `ResultTest.DefaultFatalHandlerAborts`.
+/// - w domyślnym handlerze, przy nierzucającym loggerze, logować przyczynę na poziomie critical z miejscem wywołania, opróżniać logger, wypisywać "FATAL: <komunikat>" na stderr i kończyć proces przez std::abort().
+///   Test: `ResultTest.DefaultFatalLogsLocationAndWorksWithoutALogger`.
+///   Ograniczenie weryfikacji: domyslny handler jest noexcept, ale nie przechwytuje wyjatku z logowania; test nie zapewnia diagnostyki przy rzucajacym loggerze.
 /// - nigdy nie wracać i nie odwijać stosu: gdy handler wróci, kończyć proces jak domyślny handler.
+///   Test: `ResultTest.ReturningFatalHandlerStillAborts`, `ResultTest.DefaultFatalHandlerAborts`.
 [[noreturn]] void fatal(std::string_view message, std::source_location where = std::source_location::current()) noexcept;
 
 /// Funkcja setFatalHandler powinna:
 /// - atomowo instalować handler fatal() i zwracać poprzedni, a dla nullptr przywracać handler domyślny.
 ///   Test: `ResultTest.ErrorNamesRefusalClassesAndHandlerExchange`.
+///   Nietestowalne: atomowosc i kolejnosc acq_rel potwierdza przeglad fatalHandlerSlot().exchange w error.cc; test sprawdza wymiane, nie wszystkie przeploty.
 ///
 /// @note Demon instaluje go raz, przed startem watkow (launcher.cpp); host osadzajacy moze zainstalowac
 ///       wlasny, np. zeby zrzucic stan przed zakonczeniem.

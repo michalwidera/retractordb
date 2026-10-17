@@ -116,6 +116,11 @@ struct RdbConfigError : RdbError {
 
 /// K4: srodowisko odmowilo (plik, dysk). Python dostaje OSError(errno, komunikat[, sciezka]);
 /// Brak kodu systemowego daje EIO - ten sam kod, ktorym konczy sie usluga.
+/// Obiekt RdbIOError powinien:
+/// - zachowywac przyczyne, errno i znana sciezke jako pythonowy IOError dziedziczacy po OSError oraz Error.
+///   Test: pytest `test_error_classes.test_k4_refusal_keeps_the_system_errno_and_the_path`, `test_error_classes.test_k4_io_error_carries_errno_and_stops_the_plan`.
+/// - zastepowac brak errno przez EIO.
+///   Nietestowalne: kontrola strukturalna konstruktora RdbIOError i translateEngineError; publiczne testy K4 przekazuja niezerowe errno i nie wymuszaja tej galezi osobno.
 struct RdbIOError : RdbError {
   explicit RdbIOError(const std::string &message, const int err = 0, std::string path = {})
       : RdbError(message),
@@ -127,6 +132,13 @@ struct RdbIOError : RdbError {
 
 /// Odczyt i blokada maja wspolnego wlasciciela. Kopia shared_ptr na czas read() chroni przed
 /// close() z innego watku, gdy readRecord zwalnia GIL; blokada schodzi dopiero po magazynie.
+/// Obiekt BoundStorage powinien:
+/// - utrzymywac blokade katalogu oznaczonego jako wlasny przez czas zycia otwartego magazynu i zwalniac ja przy close lub wyjsciu z kontekstu, takze przy wyjatku.
+///   Test: pytest `test_storage.test_engine_and_storage_share_the_owned_directory_lock`, `test_storage.test_context_exit_closes_on_exception`.
+/// - wykonywac close idempotentnie, odmawiac odczytu zamknietego magazynu i pozostawiac zwrocone kopie rekordow wazne po close.
+///   Test: pytest `test_storage.test_close_is_idempotent_and_record_copy_survives`.
+/// - utrzymywac lokalna kopie shared_ptr<State> na czas read z oddanym GIL i niszczyc store przed guard.
+///   Nietestowalne: kontrola strukturalna lambd read/__getitem__ i odwrotnej kolejnosci pol State; brak deterministycznego punktu synchronizacji pomiedzy read a close.
 struct BoundStorage {
   /// @requirements-exempt State: Agregat wspoldzielonego stanu magazynu i jego blokady, bez wlasnych operacji.
   struct State {
@@ -173,6 +185,12 @@ void requireUntainted() {
 
 /// nb::call_guard dla metod Engine: konstruktor rzuca, zanim wywolanie wejdzie do silnika. Stoi
 /// PRZED gil_scoped_release, wiec sprawdza z GIL-em.
+/// Obiekt UntaintedGuard powinien:
+/// - odmawiac wejscia do strzezonych metod po pierwszym K1, z pierwotna przyczyna i zaleceniem restartu interpretera; close pozostaje dostepne.
+///   Test: pytest `test_error_classes.test_k1_internal_error_taints_the_module`, `test_error_classes.test_cpp_exception_from_the_core_is_k1`.
+/// - sprawdzac zatrzask przed zwolnieniem GIL, nie zamieniajac K2/K3/K4 w skazenie modulu.
+///   Test: pytest `test_error_classes.test_kernel_survives_k2_k3_k4_and_k1`, `test_error_classes.test_k3_config_error_leaves_the_plan_unchanged`.
+///   Nietestowalne: kolejnosc konstruktorow call_guard<UntaintedGuard, gil_scoped_release> sprawdzona strukturalnie przy rejestracji step.
 struct UntaintedGuard {
   UntaintedGuard() { requireUntainted(); }
 };
@@ -405,6 +423,14 @@ Record readRecord(rdb::storage &self, Py_ssize_t index) {
 /// GIL: sink bywa wolany z wnetrza step()/run(), gdzie GIL jest zwolniony, wiec bierze go sam. Po
 /// Py_Finalize interpretera nie ma, a destruktory statykow C++ potrafia jeszcze logowac - stad
 /// straz na poczatku.
+/// Obiekt PythonLoggingCallback powinien:
+/// - przekazywac diagnostyke silnika do logging.getLogger("retractordb") z poziomem Python odpowiadajacym spdlog.
+///   Test: pytest `test_engine.test_engine_logs_reach_the_logging_module`, `test_storage.test_guessed_lock_directory_is_reported`.
+///   Ograniczenie weryfikacji: wykonywane sa poziomy ERROR i INFO; pelne mapowanie poziomow sprawdzone strukturalnie w pythonLevel.
+/// - przechwytywac python_error z dostarczenia logu i zglaszac go jako unraisable, zachowujac pierwotny wynik operacji silnika.
+///   Test: pytest `test_engine.test_logging_handler_failure_preserves_the_plan_error_and_next_compile`.
+/// - brac GIL przed uzyciem Python API i pomijac logowanie, gdy Py_IsInitialized()==0.
+///   Nietestowalne: kontrola strukturalna operator(); nie wymuszono logowania z destruktora po Py_Finalize ani wszystkich przeplotow watkow.
 class PythonLoggingCallback {
  public:
   void operator()(const spdlog::details::log_msg &msg) const {
