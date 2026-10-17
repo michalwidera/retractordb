@@ -669,6 +669,7 @@ TEST(LockManagerFlock, releaseRemovesFileAndOrphanedOpenerCannotWin) {
 // --- restartService: składanie argv przez wstrzykiwalny runner ---
 
 TEST(ServiceControlRestart, builds_system_scope_argv) {
+  // covers: svc.restart-command.systemd-argv~1, svc.restart-command.launchd-argv~1, svc.restart-service.runner~1
   std::vector<std::string> captured;
   const int rc = restartService(/*userScope=*/false, "xretractor.service", [&](const std::vector<std::string> &argv) {
     captured = argv;
@@ -694,6 +695,7 @@ TEST(ServiceControlRestart, builds_system_scope_argv) {
 }
 
 TEST(ServiceControlRestart, builds_user_scope_argv) {
+  // covers: svc.restart-command.systemd-argv~1, svc.restart-command.launchd-argv~1, svc.restart-service.runner~1
   std::vector<std::string> captured;
   restartService(/*userScope=*/true, "xretractor.service", [&](const std::vector<std::string> &argv) {
     captured = argv;
@@ -715,6 +717,7 @@ TEST(ServiceControlRestart, builds_user_scope_argv) {
 }
 
 TEST(ServiceControlRestart, propagates_runner_exit_code) {
+  // covers: svc.restart-service.runner~1
   const int rc = restartService(false, "x.service", [](const std::vector<std::string> &) { return 5; });
   EXPECT_EQ(rc, 5);
 }
@@ -770,6 +773,7 @@ TEST(ServiceControlWrite, writes_content_over_existing_target) {
 }
 
 TEST(ServiceControlWrite, empty_content_truncates_the_target) {
+  // covers: svc.write.empty-content~1
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_writequery_empty";
   std::filesystem::create_directories(dir);
   const std::filesystem::path dst = dir / "startup.rql";
@@ -787,6 +791,7 @@ TEST(ServiceControlWrite, empty_content_truncates_the_target) {
 }
 
 TEST(ServiceControlWrite, fails_when_the_target_directory_does_not_exist) {
+  // covers: svc.write.result-and-cleanup~1
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_writequery_nodir";
   std::filesystem::remove_all(dir);
   LogCapture log;
@@ -797,6 +802,7 @@ TEST(ServiceControlWrite, fails_when_the_target_directory_does_not_exist) {
 // Odmowa planu przed startem czysci plik zapytan WYLACZNIE w jednostce uslugowej: zwykly proces
 // z terminala dostaje plik .rql operatora, a tego ruszac nie wolno.
 TEST(ServiceControlDropRefused, clears_the_query_file_only_inside_a_service_unit) {
+  // covers: svc.drop-refused.empty-args~1
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_drop_refused";
   std::filesystem::create_directories(dir);
   const std::filesystem::path plan = dir / "startup.rql";
@@ -812,6 +818,7 @@ TEST(ServiceControlDropRefused, clears_the_query_file_only_inside_a_service_unit
 }
 
 TEST(ServiceControlDeliver, fails_on_missing_source) {
+  // covers: svc.deliver.missing-source~1
   const std::filesystem::path dir = std::filesystem::temp_directory_path() / "ut_deliver_missing";
   std::filesystem::create_directories(dir);
   LogCapture log;
@@ -848,6 +855,7 @@ class ServiceControlContract : public ::testing::Test {
 }  // namespace
 
 TEST_F(ServiceControlContract, real_exec_passes_literal_arguments_and_propagates_exit_and_signal) {
+  // covers: svc.restart-command.literal-unit~1, svc.restart-service.fork-exec~1, svc.restart-service.exit-codes~1
 #if RDB_HAS_LAUNCHD
   const auto manager = dir / "launchctl";
 #else
@@ -876,6 +884,7 @@ TEST_F(ServiceControlContract, real_exec_passes_literal_arguments_and_propagates
 }
 
 TEST_F(ServiceControlContract, fork_and_wait_failures_return_minus_one) {
+  // covers: svc.restart-service.exit-codes~1
   // Podejrzane bez --wrap (Darwin): falszywy fork przez RDB_WRAP_SYSCALL nie byl tam wykonany.
   if (!RDB_HAS_LD_WRAP) GTEST_SKIP() << "podmiana fork/waitpid sprawdzona tylko z -Wl,--wrap";
   for (int fault : {1, 2}) {
@@ -885,6 +894,7 @@ TEST_F(ServiceControlContract, fork_and_wait_failures_return_minus_one) {
 }
 
 TEST_F(ServiceControlContract, delivery_preserves_binary_bytes_and_rename_keeps_the_old_reader) {
+  // covers: svc.deliver.binary-copy~1, svc.write.tmp-rename~1
   const auto source = dir / "source.rql";
   const auto target = dir / "target.rql";
   const std::string content("a\0b\r\n", 5);
@@ -898,6 +908,7 @@ TEST_F(ServiceControlContract, delivery_preserves_binary_bytes_and_rename_keeps_
 }
 
 TEST_F(ServiceControlContract, rename_failure_preserves_the_target_and_removes_the_temporary_file) {
+  // covers: svc.write.result-and-cleanup~1
   const auto target = dir / "directory";
   std::filesystem::create_directory(target);
   std::ofstream(target / "kept") << "sentinel";
@@ -910,6 +921,7 @@ TEST_F(ServiceControlContract, rename_failure_preserves_the_target_and_removes_t
 }
 
 TEST_F(ServiceControlContract, write_failure_preserves_the_target_and_reports_the_temporary_file) {
+  // covers: svc.write.result-and-cleanup~1
   if (!std::filesystem::exists("/dev/full")) GTEST_SKIP() << "test wymaga urzadzenia /dev/full";
   const auto target    = dir / "plan.rql";
   const auto temporary = target.string() + ".tmp." + std::to_string(getpid());
@@ -924,6 +936,7 @@ TEST_F(ServiceControlContract, write_failure_preserves_the_target_and_reports_th
 }
 
 TEST_F(ServiceControlContract, refused_plan_handles_empty_paths_and_logs_both_outcomes) {
+  // covers: svc.drop-refused.empty-args~1, svc.drop-refused.clear-file~1, svc.drop-refused.log-critical~1
   EXPECT_FALSE(servicecontrol::dropRefusedPlan("unit.service", ""));
   const auto target = dir / "plan.rql";
   std::ofstream(target) << "kept";

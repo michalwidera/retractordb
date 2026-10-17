@@ -41,6 +41,7 @@
 static_assert(std::is_same_v<decltype(std::declval<const token &>().getVT()), const rdb::descFldVT &>);
 static_assert(!std::is_copy_constructible_v<CRationalStreamMath::TimeLine>);
 static_assert(!std::is_copy_assignable_v<CRationalStreamMath::TimeLine>);
+// covers: xtrdb.command.virtual-dtor~1
 static_assert(std::has_virtual_destructor_v<ICommand>);
 static_assert(!std::is_copy_constructible_v<rdb::StorageFd>);
 static_assert(!std::is_copy_assignable_v<rdb::StorageFd>);

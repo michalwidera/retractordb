@@ -25,6 +25,7 @@ def code(path):
 
 class Stage12Structure(unittest.TestCase):
     def test_names_have_finite_catalogues_and_device_seed(self):
+        # covers: srvname.generate.shape~1, srvname.generate.device-seed~1, srvname.generate.no-uniqueness~1
         source = code("src/retractor/lib/serverName.cpp")
         for name in ("kAdjectives", "kSurnames"):
             match = re.search(r"std::array<std::string_view,\s*64>\s+" + name + r"\{([^}]+)\}", source)
@@ -85,7 +86,8 @@ class Stage12Structure(unittest.TestCase):
             text = (ROOT / header).read_text()
             for match in re.finditer(r"^/// - .*\n(?:^///(?! - ).*\n)*", text, re.M):
                 with self.subTest(header=header, requirement=match[0].splitlines()[0]):
-                    self.assertRegex(match[0], r"Test:|Sprawdzenie kompilacji:|Nietestowalne:")
+                    # Punkt z ID kwalifikuje st_req_trace (scripts/req-trace.py), nie ta kontrola.
+                    self.assertRegex(match[0], r"Test:|Sprawdzenie kompilacji:|Nietestowalne:|^/// - \[[^\]\s]+~\d+\] ")
                     for line in match[0].splitlines():
                         if "Test:" not in line:
                             continue

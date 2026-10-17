@@ -6,6 +6,14 @@ add_test(NAME st_stage12_contracts
          COMMAND python3 -B ${CMAKE_CURRENT_SOURCE_DIR}/stage12_contracts.py
                  ${CMAKE_SOURCE_DIR})
 
+add_test(NAME st_req_trace
+         COMMAND python3 -B ${CMAKE_SOURCE_DIR}/scripts/req-trace.py
+                 ${CMAKE_SOURCE_DIR})
+
+add_test(NAME st_req_trace_selftest
+         COMMAND python3 -B ${CMAKE_CURRENT_SOURCE_DIR}/req_trace_test.py
+                 ${CMAKE_SOURCE_DIR})
+
 add_test(
   NAME st_collect_test_failures
   COMMAND python3 -B ${CMAKE_CURRENT_SOURCE_DIR}/collect_test_failures.py

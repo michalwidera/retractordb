@@ -1,4 +1,6 @@
 """Diagnostyka i brak modyfikacji plikow przez xtrdb -s."""
+# covers: xtrdb.command.usage~1, xtrdb.command.requires-connection~1, xtrdb.command.execute-result~1
+# covers: xtrdb.command.error-reporting~1
 
 import pathlib
 import re

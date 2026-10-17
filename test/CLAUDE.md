@@ -8,6 +8,10 @@
 
 **Reconfigure (`cmake .`) wipes built unit-test binaries.** The `test/` copy step regenerates the `build/Debug/test/` subtree, deleting `test_*` binaries → ctest fails with `No such file or directory` for ~all unit tests. After any `cmake .`, rebuild with `ninja` before `ctest`.
 
+### Requirement IDs and `covers`
+
+A requirement bullet in a `... powinna:` block may carry a versioned ID: `/// - [svc.write.empty-content~1] ...`. Such a bullet has no `Test:` line; the test that checks it says so itself, with a comment at the start of a line - `// covers: id~N, id~N` as the first line of a `TEST` body, `# covers: ...` at the start of a Python test function or near the top of a `run.sh` / `verify*.py`, `// covers: ...` right above a `static_assert`. `st_req_trace` (`scripts/req-trace.py`) fails on a malformed or duplicate ID, a `covers` naming an unknown ID or an old version, and an ID with no `covers` at all; `scripts/req-trace.py --report` prints the requirement-to-test matrix. Bump the version when the meaning of a requirement changes, not for an editorial fix: every `covers` of the old version then fails until someone has re-read that test against the new text. Bullets without an ID (the format before the migration) are not checked by it. Pilot migrated on 2026-10-17: `serviceControl.hpp`, `serverName.hpp`, `ICommand.hpp`.
+
 ### Verify test provenance before running
 
 Before every focused or full `ctest`, `ninja test`, or `ninja test-valgrind` run:

@@ -13,6 +13,7 @@ namespace {
 // walidacja nie jest kosmetyczna: znak sciezki albo spacja w nazwie to albo obiekt
 // nie do utworzenia, albo blokada w innym miejscu niz sadzi reszta systemu.
 TEST(ServerName, rejects_names_unsafe_in_ipc_and_paths) {
+  // covers: srvname.is-valid.charset~1
   EXPECT_FALSE(servername::isValid(""));
   EXPECT_FALSE(servername::isValid("z spacja"));
   EXPECT_FALSE(servername::isValid("ze/skosem"));
@@ -23,6 +24,7 @@ TEST(ServerName, rejects_names_unsafe_in_ipc_and_paths) {
 }
 
 TEST(ServerName, accepts_expected_shapes) {
+  // covers: srvname.is-valid.charset~1
   EXPECT_TRUE(servername::isValid("a"));
   EXPECT_TRUE(servername::isValid("nervous_hopper"));
   EXPECT_TRUE(servername::isValid("alfa-2"));
@@ -30,6 +32,7 @@ TEST(ServerName, accepts_expected_shapes) {
 }
 
 TEST(ServerName, rejects_embedded_nul_non_ascii_and_invalid_leading_characters) {
+  // covers: srvname.is-valid.charset~1
   EXPECT_FALSE(servername::isValid(std::string("valid\0tail", 10)));
   EXPECT_FALSE(servername::isValid("a\xc3\xa9"));
   for (const auto name : {"_valid", "-valid", "a\n", "a\t", "a\\b", "aZ"})
@@ -39,6 +42,7 @@ TEST(ServerName, rejects_embedded_nul_non_ascii_and_invalid_leading_characters) 
 // Generator ma produkowac nazwy, ktore przechodza wlasna walidacje - inaczej wylosowana
 // nazwa bylaby odrzucana przez sciezke, ktora ma ja przyjac.
 TEST(ServerName, generated_names_are_always_valid) {
+  // covers: srvname.generate.shape~1
   for (int i = 0; i < 200; ++i) {
     const std::string name = servername::generate();
     EXPECT_TRUE(servername::isValid(name)) << "wylosowana nazwa nie przechodzi walidacji: " << name;
@@ -58,6 +62,7 @@ TEST(ServerName, generated_names_vary) {
 // zeby zla wartosc zatrzymala program z komunikatem zamiast zostac po cichu zignorowana -
 // zignorowana cofnelaby rownolegle uruchomienie na zasoby wspolne.
 TEST(ServerName, environment_namespace_is_returned_verbatim) {
+  // covers: srvname.env-namespace.verbatim~1
   ASSERT_EQ(setenv(servername::kNamespaceEnv, "it03", 1), 0);
   EXPECT_EQ(servername::environmentNamespace(), "it03");
 

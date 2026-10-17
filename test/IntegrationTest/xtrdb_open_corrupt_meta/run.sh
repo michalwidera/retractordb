@@ -6,6 +6,7 @@
 # zaokraglenie packedByteCount do 0 i omijal straznika ramki.
 #
 # Uzycie: run.sh <xtrdb>
+# covers: xtrdb.command.error-reporting~1
 set -e
 . "$(dirname "$0")/../portable.sh"
 xtrdb="$1"
